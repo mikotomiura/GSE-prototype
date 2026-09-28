@@ -14,8 +14,10 @@
 
 ## ライセンス
 
-- コード（`kit/`）: Apache-2.0
-- データ・文書（`experiment/` の記録・`manuscript/`）: CC BY 4.0
+種類で分ける（ディレクトリでは分けない）。
+
+- コード（`.py` / `.sh` / `.swift` / `.rs` などのソース）: Apache-2.0
+- データ（`kit/corpus/data/` の句と読みを含む）・文書（`*.md`・`experiment/` の記録・`manuscript/`）: CC BY 4.0
 
 ## 部品の置き場
 
@@ -47,5 +49,8 @@ bash papers/ime-observation/kit/check.sh --self-test  # この入口自身の陰
   （目印の無い補助モジュールは compile だけ）。
 - 入口は verify で毎回・各 acceptance でも回るので、**selftest は速い既定で書く**（1 本 30 秒以内。超えると
   警告が出る）。重い検査は `--selftest --full` などに分け、既定では回さない。
-- ログ形式の契約は [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md)。`gt` と `obs` の行に本文が入らないことは
-  `kit/formats/validate_logs.py` が機械で保証する。
+- ログ形式の契約は [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md)。`gt` と `obs` の行の**形**（文字列の値が
+  列挙か正規表現に収まり、未知のキー・エスケープが無いこと）は `kit/formats/validate_logs.py` が機械で確かめる。
+  ⚠️ 整数・版の文字列・`manifest_sha256` の値の意味は範囲外で、content-free は生産側の設計（種別・長さ・時刻
+  しか書かない）が担う（FORMATS.md の「保証の範囲」）。
+- 目印は**行全体が `# kit: selftest`** のコメントとして書く（文字列の中の目印は拾わない）。

@@ -6,11 +6,15 @@
   validate_logs.py --selftest              陽性対照と陰性対照（速い既定・1 秒未満）
 
 exit 2 は「検査できなかった」（使い方の誤り・ファイルが開けない）。違反 0 件とは区別する。
+★ 0 以外はすべて不合格として扱うこと。違反が 1 件でもあれば、開けないファイルが混ざっていても exit 1 を返す。
 
-ここが保証するのは「gt と obs の行に本文が入らないこと」である。文字列を値に持てるキーは
-FORMATS.md の列挙か正規表現で縛り、未知のキーは拒否し、整数の位置に整数以外を置かせない。
+ここが保証するのは gt と obs の行の**形**である: 文字列を値に持てるキーは FORMATS.md の列挙か
+正規表現で縛り、未知のキーとエスケープ（バックスラッシュ）を拒否し、整数の位置に整数以外を置かせない。
+⚠️ 保証の範囲外: 整数の欄・版の文字列・manifest_sha256 の**値の意味**（そこへ符号化された本文）は
+   検査しない。content-free は生産側の設計（種別・長さ・時刻しか書かない）が担い、本検査器はその形を
+   機械で確かめる。
 ⚠️ 違反の説明には**値を出さない**（本文が混じっていた場合に、検査器の出力から漏れないように）。
-   出すのは違反の種類と、安全な綴りのキー名だけ。
+   出すのは違反の種類と、FORMATS.md に載っている既知のキー名だけ（未知のキー名は出さない）。
 """
 import argparse
 import json
@@ -26,8 +30,8 @@ I64_MIN = -(2 ** 63)
 
 VERSION_RE = re.compile(r"[0-9A-Za-z.+-]{1,32}")
 SHA256_RE = re.compile(r"[0-9A-Fa-f]{64}")
-CAP_NAME_RE = re.compile(r"[a-z][a-z0-9_]{0,39}")
-SAFE_KEY_RE = re.compile(r"[A-Za-z0-9_]{1,40}")
+# ★ 単体ロガーの行の種類は 2 つだけ。3 つの配列を通して各名前は高々 1 回（＝合計 2 個まで）。
+CAP_NAMES = ("key", "ime_shadow")
 
 OS_NAMES = ("macos", "windows")
 GT_SRCS = ("mac_nstic", "win_imm", "win_tsf")
@@ -82,6 +86,14 @@ OBS_CATEGORIES = (
 )
 OBS_HEADER_KEYS = ("type", "format", "os", "logger_version", "manifest_sha256", "capabilities")
 CAP_KEYS = ("unconditional", "threshold_gated", "config_gated")
+OBS_KEY_KEYS = ("type", "t", "category", "press")
+OBS_SHADOW_KEYS = ("type", "t", "dwell_ms", "nav", "abandon")
+
+# 違反の説明に出してよいキー名（FORMATS.md に載っている名前だけ）
+KNOWN_KEYS = frozenset(
+    GT_HEADER_KEYS + GT_EVENT_BASE + OBS_HEADER_KEYS + CAP_KEYS + OBS_KEY_KEYS + OBS_SHADOW_KEYS
+    + tuple(k for table in GT_EVENTS.values() for req, opt in table.values() for k in req + opt)
+)
 
 MAX_SHOWN = 50
 
@@ -110,10 +122,10 @@ def _no_dup(pairs):
 
 
 def _safe(name):
-    """キー名を出してよいのは安全な綴りのときだけ（本文がキー名に入っていても漏らさない）。"""
-    if isinstance(name, str) and SAFE_KEY_RE.fullmatch(name):
+    """キー名を出してよいのは既知の名前のときだけ（本文がキー名に入っていても漏らさない）。"""
+    if isinstance(name, str) and name in KNOWN_KEYS:
         return name
-    return "（安全に表示できない綴りのキー）"
+    return "（FORMATS.md に無い名前・表示しない）"
 
 
 def _has_space_outside_strings(text):
@@ -191,6 +203,10 @@ def _parse_line(raw, ln, errs):
     """1 行を検査して dict を返す。返せないときは None（理由は errs に入れる）。"""
     if raw.endswith(b"\r"):
         raw = raw[:-1]
+    if b"\\" in raw:
+        # 許される文字列値はどれも \ を含まない。エスケープで綴ると生の文字列で行を探す検査が素通りする
+        errs.add(ln, "escape", "エスケープ（\\）がある（gt / obs の行はエスケープを使わない）")
+        # 中身の検査は続ける（他の違反も一度に出す）
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
@@ -259,6 +275,7 @@ def _check_capabilities(errs, ln, cap):
         errs.add(ln, "type", "オブジェクトの位置にオブジェクト以外がある: capabilities")
         return
     _check_keys(errs, ln, cap, CAP_KEYS, ())
+    seen = set()
     for k in CAP_KEYS:
         if k not in cap:
             continue
@@ -267,7 +284,11 @@ def _check_capabilities(errs, ln, cap):
             errs.add(ln, "type", "配列の位置に配列以外がある: " + k)
             continue
         for n in names:
-            _check_regex(errs, ln, k, n, CAP_NAME_RE)
+            _check_enum(errs, ln, k, n, CAP_NAMES)
+            if isinstance(n, str) and n in CAP_NAMES:
+                if n in seen:
+                    errs.add(ln, "dup", "capabilities の同じ名前が 2 回以上ある: " + k)
+                seen.add(n)
 
 
 def _check_obs_header(obj, ln, errs):
@@ -288,7 +309,7 @@ def _check_obs_header(obj, ln, errs):
 def _check_obs_line(obj, ln, errs):
     t = obj.get("type")
     if t == "key":
-        _check_keys(errs, ln, obj, ("type", "t", "category", "press"), ())
+        _check_keys(errs, ln, obj, OBS_KEY_KEYS, ())
         if "t" in obj:
             _check_int(errs, ln, "t", obj["t"], 0, U64_MAX)
         if "category" in obj:
@@ -296,7 +317,7 @@ def _check_obs_line(obj, ln, errs):
         if "press" in obj:
             _check_bool(errs, ln, "press", obj["press"])
     elif t == "ime_shadow":
-        _check_keys(errs, ln, obj, ("type", "t", "dwell_ms", "nav", "abandon"), ())
+        _check_keys(errs, ln, obj, OBS_SHADOW_KEYS, ())
         if "t" in obj:
             _check_int(errs, ln, "t", obj["t"], 0, U64_MAX)
         if "dwell_ms" in obj:
@@ -431,6 +452,15 @@ def _gt_cases():
         ("列挙外の ui_kind", _text(_gt_header("win_tsf"), _ev("ui_begin", ui_kind="日本語")), "enum"),
         ("未知のキー（ヘッダ）", _text(_gt_header(note="x")), "unknown_key"),
         ("未知のキー（日本語のキー名）", _text(mac_h, _ev("unmark", **{"日本語": 1})), "unknown_key"),
+        ("未知のキー（ローマ字のキー名・名前を出さない）", _text(mac_h, _ev("unmark", nihongowokaku=1)),
+         "unknown_key"),
+        ("エスケープ（format の \\/）",
+         _text('{"kind":"header","format":"gt\\/1","src":"mac_nstic","app_version":"0.1.0","os":"macos"}'),
+         "escape"),
+        ("エスケープ（ev の \\u）", _text(mac_h, '{"kind":"ev","t_wall_ms":1,"t_mono_ns":2,"ev":"\\u0075nmark"}'),
+         "escape"),
+        ("エスケープ（キー名の \\u）",
+         _text(mac_h, '{"kind":"ev","t_wall_ms":1,"t_mono_ns":2,"ev":"unmark","t\\u0065xt":1}'), "escape"),
         ("ヘッダが無い", _text(*ok), "header"),
         ("空のファイル", "", "header"),
         ("format が違う", _text(_gt_header(format="gt/2")), "format"),
@@ -475,8 +505,8 @@ def _obs_cases():
         ("obs 正: os=windows ＋ 全部空の capabilities",
          _text(_obs_header(os="windows", capabilities={"unconditional": [], "threshold_gated": [],
                                                        "config_gated": []}), _key()), None),
-        ("obs 正: 名前の長さの上限（40 字）",
-         _text(_obs_header(capabilities={"unconditional": ["a" + "b" * 39], "threshold_gated": [],
+        ("obs 正: 2 つの名前を同じ配列に",
+         _text(_obs_header(capabilities={"unconditional": ["key", "ime_shadow"], "threshold_gated": [],
                                          "config_gated": []})), None),
         ("obs 正: CRLF の行末", _text(h, _key()).replace("\n", "\r\n"), None),
     ]
@@ -500,13 +530,16 @@ def _obs_cases():
         ("manifest_sha256 が 63 桁", _text(_obs_header(manifest_sha256="0" * 63)), "regex"),
         ("manifest_sha256 が hex でない", _text(_obs_header(manifest_sha256="g" * 64)), "regex"),
         ("capabilities の名前が日本語", _text(_obs_header(capabilities=cap(config_gated=["日本語"]))),
-         "regex"),
+         "enum"),
         ("capabilities の名前が大文字", _text(_obs_header(capabilities=cap(unconditional=["Key"]))),
-         "regex"),
-        ("capabilities の名前が数字始まり", _text(_obs_header(capabilities=cap(unconditional=["1key"]))),
-         "regex"),
-        ("capabilities の名前が 41 字",
-         _text(_obs_header(capabilities=cap(unconditional=["a" + "b" * 40]))), "regex"),
+         "enum"),
+        ("capabilities の名前がローマ字の単語列",
+         _text(_obs_header(capabilities=cap(unconditional=["watashi", "ha", "nihongo", "wo", "kaku"]))),
+         "enum"),
+        ("capabilities の名前が同じ配列で重複",
+         _text(_obs_header(capabilities=cap(unconditional=["key", "key"]))), "dup"),
+        ("capabilities の名前が別の配列で重複",
+         _text(_obs_header(capabilities=cap(unconditional=["key"], config_gated=["key"]))), "dup"),
         ("capabilities の名前が文字列でない", _text(_obs_header(capabilities=cap(unconditional=[1]))),
          "type"),
         ("capabilities のキー欠落",
@@ -526,6 +559,8 @@ def _obs_cases():
         ("nav が u32 の外", _text(h, _shadow(nav=U32_MAX + 1)), "range"),
         ("abandon が整数", _text(h, _shadow(abandon=0)), "type"),
         ("区切りに空白", _text(h, '{"type": "key","t":10,"category":"space","press":true}'), "sep"),
+        ("エスケープ（type の \\u）", _text(h, '{"type":"k\\u0065y","t":10,"category":"space","press":true}'),
+         "escape"),
         ("gt のヘッダを obs として検査", _text(_gt_header(), _ev("unmark")), "header"),
     ]
     for name, body, code in neg:
@@ -535,6 +570,10 @@ def _obs_cases():
 
 def _as_bytes(body):
     return body if isinstance(body, bytes) else body.encode("utf-8")
+
+
+# 陰性対照に埋めた本文の目印。違反の説明にこれが出たら漏れている
+_LEAK_SENTINELS = ("日本", "insertText", "nihongo", "watashi")
 
 
 def _run_cases(fails):
@@ -552,9 +591,9 @@ def _run_cases(fails):
             elif want not in codes:
                 fails.append("%s: 別の理由で拒否された（期待 %s・実際 %s）" % (name, want, sorted(codes)))
             else:
-                # ⚠️ 説明に値（本文）を出していないこと
+                # ⚠️ 説明に値（本文）も未知のキー名も出していないこと
                 for _, _, msg in found:
-                    if "日本" in msg or "insertText" in msg:
+                    if any(s in msg for s in _LEAK_SENTINELS):
                         fails.append("%s: 違反の説明に値が出ている: %s" % (name, msg))
     return n
 
@@ -600,7 +639,10 @@ def _run_cli(fails):
         f.write(_text(_gt_header(), _ev("insert_text", len=2),
                       _ev("insert_text", len=3, text="日本語")).encode("utf-8"))
 
+    calls = [0]
+
     def run(*args):
+        calls[0] += 1
         p = subprocess.run([sys.executable, me] + list(args), stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT, env=env)
         return p.returncode, p.stdout.decode("utf-8", "replace")
@@ -625,13 +667,16 @@ def _run_cli(fails):
         rc, out = run("--kind", "gt", good, leak)
         if rc != 1:
             fails.append("CLI: 複数ファイルの一方が違反なら exit 1（実際 %d）" % rc)
+        rc, out = run("--kind", "gt", os.path.join(tmp, "missing.jsonl"), leak)
+        if rc != 1:
+            fails.append("CLI: 開けないファイルと違反が重なったら exit 1 を優先（実際 %d）" % rc)
         rc, out = run("--kind", "bogus", good)
         if rc != 2:
             fails.append("CLI: 未知の --kind が exit 2 でない（%d）" % rc)
         rc, out = run("--kind", "gt")
         if rc != 2:
             fails.append("CLI: FILE が無いのが exit 2 でない（%d）" % rc)
-        return 6
+        return calls[0]
     finally:
         for name in os.listdir(tmp):
             os.remove(os.path.join(tmp, name))
@@ -667,23 +712,27 @@ def main(argv):
         return selftest()
     if not args.kind or not args.files:
         ap.error("--kind gt|obs と FILE が要る")
-    rc = 0
+    violated = False
+    unreadable = False
     for path in args.files:
         try:
             with open(path, "rb") as f:
                 data = f.read()
         except OSError as e:
             print("%s: 開けない（%s）" % (path, type(e).__name__), file=sys.stderr)
-            rc = 2
+            unreadable = True
             continue
         found = validate(args.kind, data)
         for ln, code, msg in found[:MAX_SHOWN]:
             print("%s:%d: [%s] %s" % (path, ln, code, msg), file=sys.stderr)
         if len(found) > MAX_SHOWN:
             print("%s: …ほか %d 件" % (path, len(found) - MAX_SHOWN), file=sys.stderr)
-        if found and rc == 0:
-            rc = 1
-    return rc
+        if found:
+            violated = True
+    # ★ 違反を優先する（exit 2 を「読み飛ばし」と扱う呼び出し側でも違反が赤になるように）
+    if violated:
+        return 1
+    return 2 if unreadable else 0
 
 
 if __name__ == "__main__":

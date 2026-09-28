@@ -6,4 +6,14 @@
 runs/
 sealed/
 experiment/raw/
+# 圧縮・アーカイブした生ログ（Zenodo への寄託物は作業ツリーに置かれやすい）
+*.jsonl.*
+*.ndjson.*
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.zst
+.venv/
+venv/
 !kit/corpus/data/*.jsonl

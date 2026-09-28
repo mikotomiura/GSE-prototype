@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kit/check.sh — 論文キットの検証の入口（ループの verify の test / typecheck）。
 #
-#   bash kit/check.sh              既定: kit/ 配下で「# kit: selftest」を含む .py を全部探し、
+#   bash kit/check.sh              既定: kit/ 配下で「# kit: selftest」の行（行全体が目印のコメント）を持つ .py を全部探し、
 #                                  python3 <file> --selftest を順に回す。1 本でも赤なら exit 1。
 #                                  ⚠️ 1 本も見つからなければ exit 1（空振りの緑を出さない）。
 #   bash kit/check.sh --compile    kit/ 配下の全 .py を python3 -m py_compile（0 本なら exit 1）。
@@ -38,6 +38,10 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+if [ ! -d "${ROOT}" ]; then
+  echo "check.sh: --root がディレクトリではない: ${ROOT}" >&2
+  exit 2
+fi
 
 export PYTHONUTF8=1
 PY="python3"
@@ -54,7 +58,14 @@ trap 'rm -rf "${WORK}"' EXIT
 list_py () { # list_py <root>
   find "$1" -type f -name '*.py' \
     -not -path '*/__pycache__/*' -not -path '*/target/*' -not -path '*/.build/*' \
+    -not -path '*/.venv/*' -not -path '*/venv/*' \
     2>/dev/null | LC_ALL=C sort
+}
+
+# 目印を持つか。★ 行全体が目印のコメントであること（文字列の中の目印は拾わない）。
+#   行末の空白と CR は許す（CRLF のファイルで目印が黙って外れ、selftest が回らなくなるのを防ぐ）。
+has_mark () { # has_mark <file>
+  grep -qE -- '^# kit: selftest[[:space:]]*$' "$1"
 }
 
 run_selftests () { # run_selftests <root>  ★ 緑 0 / 赤 1
@@ -62,7 +73,7 @@ run_selftests () { # run_selftests <root>  ★ 緑 0 / 赤 1
   list_py "${root}" > "${WORK}/py.list"
   while IFS= read -r f; do
     [ -n "${f}" ] || continue
-    grep -qF -- "${MARK}" "${f}" || continue
+    has_mark "${f}" || continue
     total=$((total + 1))
     out="${WORK}/out.${total}"
     t0="${SECONDS}"
@@ -133,7 +144,8 @@ st_expect_out () { # st_expect_out <固定文字列> <説明>  ★ 直前の st_
 
 entry_selftest () {
   local T="${WORK}/st"
-  mkdir -p "${T}/green/sub" "${T}/red" "${T}/nomark" "${T}/empty" "${T}/broken" "${T}/slow" "${T}/ignored/target"
+  mkdir -p "${T}/green/sub" "${T}/red" "${T}/nomark" "${T}/empty" "${T}/broken" "${T}/slow" "${T}/ignored/target" \
+           "${T}/ignored/.venv/lib" "${T}/strmark" "${T}/crlf"
   printf '# kit: selftest\nimport sys\nsys.exit(0)\n' > "${T}/green/a.py"
   printf '# kit: selftest\nimport sys\nsys.exit(0)\n' > "${T}/green/sub/b.py"
   cp "${T}/green/a.py" "${T}/red/a.py"
@@ -144,6 +156,13 @@ entry_selftest () {
   # target/ 配下は見ない（赤くなる selftest があっても無視される）
   printf '# kit: selftest\nimport sys\nsys.exit(1)\n' > "${T}/ignored/target/x.py"
   printf '# kit: selftest\nimport sys\nsys.exit(0)\n' > "${T}/ignored/ok.py"
+  # .venv/ 配下も見ない
+  printf '# kit: selftest\nimport sys\nsys.exit(1)\n' > "${T}/ignored/.venv/lib/y.py"
+  # 文字列の中の目印は拾わない（拾うと --selftest を知らない補助モジュールが回されて赤・副作用）
+  printf 'MARK = "# kit: selftest"\nimport sys\nsys.exit(1)\n' > "${T}/strmark/helper.py"
+  cp "${T}/green/a.py" "${T}/strmark/a.py"
+  # CRLF のファイルの目印も拾う（拾わないと selftest が黙って回らない）
+  printf '# kit: selftest\r\nimport sys\r\nsys.exit(1)\r\n' > "${T}/crlf/c.py"
 
   echo "=== 入口の陰性対照 ==="
   st_expect 0 "緑の selftest だけなら緑" --root "${T}/green"
@@ -152,7 +171,9 @@ entry_selftest () {
   st_expect_out "boom" "赤になった selftest の出力が出る"
   st_expect 1 "目印の無い .py だけなら空振りで赤" --root "${T}/nomark"
   st_expect 1 ".py が 1 本も無ければ空振りで赤" --root "${T}/empty"
-  st_expect 0 "target/ 配下の赤い selftest は見ない" --root "${T}/ignored"
+  st_expect 0 "target/ と .venv/ 配下の赤い selftest は見ない" --root "${T}/ignored"
+  st_expect 0 "文字列の中の目印は拾わない" --root "${T}/strmark"
+  st_expect 1 "CRLF のファイルの目印も拾う（赤の selftest が回って赤）" --root "${T}/crlf"
   st_expect 0 "遅い selftest は警告だけで止めない" --root "${T}/slow"
   KIT_SLOW_SECONDS=1 bash "${SELF}" --root "${T}/slow" > "${WORK}/st.out" 2>&1
   st_expect_out "秒超" "閾値を超えたら警告が出る（KIT_SLOW_SECONDS=1）"
@@ -161,13 +182,14 @@ entry_selftest () {
   st_expect 1 "--compile: .py が 0 本なら空振りで赤" --compile --root "${T}/empty"
   st_expect 2 "未知の引数は exit 2" --bogus
   st_expect 2 "--root の値が無ければ exit 2" --root
+  st_expect 2 "--root がディレクトリでなければ exit 2" --root "${T}/no-such-dir"
 
   # ★ 実物の kit/ に対して: 目印つきの .py が 1 本以上ある（この入口が空振りしていない）
   if [ "${ROOT}" = "$(cd "$(dirname "${SELF}")" && pwd)" ]; then
     list_py "${ROOT}" > "${WORK}/py.list"
     n=0
     while IFS= read -r f; do
-      [ -n "${f}" ] && grep -qF -- "${MARK}" "${f}" && n=$((n + 1))
+      [ -n "${f}" ] && has_mark "${f}" && n=$((n + 1))
     done < "${WORK}/py.list"
     if [ "${n}" -ge 1 ]; then st_ok "実物の kit/ に selftest が ${n} 本ある"
     else st_ng "実物の kit/ に selftest が 1 本も無い"; fi
