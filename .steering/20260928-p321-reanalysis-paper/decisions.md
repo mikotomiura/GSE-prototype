@@ -238,3 +238,18 @@
 - **背景**: 転記 A・B はどちらも LLM（同じモデルの独立な 2 インスタンス）で、一致しても共通の読み違いは防げない（判断 12-4）。
 - **採用**: 研究者が照合する。照合表 = `p434-human-check.md`（17 行・Table 5 の 3 行・本文の 3 文）。
 - **終わったら**: 照合の日付と結果を `p434-human-check.md` の末尾に書き、論文用リポジトリの `data/li-coblenz-2026/README.md`（How the transcriptions were made）に「著者が PDF と照合した」と追記する。⚠️ 一致しない行があれば転記 A・B を直し、`run.sh` を回し直す（`ALLOW_RESULT_CHANGE=1` は結果が変わる場合だけ）。
+
+## 判断 17: EMSE の原稿の書式・査読方式を一次で確認した（2026-09-28・研究者の問い「テンプレートやフォーマットの確認は済んでいるか」を受けて）
+
+- ⚠️ それまで確認していたのは費用・Aims and scope・審査期間だけで、**書式は未確認だった**（引き継ぎにも書式の確認が明記されていなかった）。
+- ★ 一次（`https://link.springer.com/journal/10664/submission-guidelines` ・実ブラウザで取得）の逐語:
+  - 査読: "This journal follows a single-blind reviewing procedure." → ★ **匿名化は不要**（著者名を書く・論文用リポジトリを直接リンクしてよい）。→ 判断 6 の「匿名の保存先」は不要になり、判断 10（プレプリントを投稿と同時）とも衝突しない。
+  - テンプレート: "LaTeX macro package (Download zip, 190 kB)"（`https://media.springer.com/full/springer-instructions-for-authors-assets/zip/468198_LaTeX_DL_468198_01072021.zip` ・⚠️ ファイル名の日付は 2021）と、"Springer Nature's LaTeX template"（`https://www.springernature.com/gp/authors/campaigns/latex-author-support` ）の 2 系統。⚠️ 同じページの Text Formatting には "Manuscripts should be submitted in Word." ともある（Word / LaTeX のどちらも受け付ける）。逐語 "Please do not use subfolders for your LaTeX submission, e.g. for figures or bibliographic files."
+  - 要旨: "Please provide an abstract of 150 to 250 words." ／ キーワード: "Please provide 4 to 6 keywords"
+  - 引用: "Cite references in the text by name and year in parentheses."（著者名・年）・文献リストは第一著者の姓のアルファベット順
+  - 必須の節: "The following statements should be included under the heading \"Statements and Declarations\" … submissions that do not include relevant declarations will be returned as incomplete."（Competing Interests など）／ "All original research must include a data availability statement."
+  - LLM: "Large Language Models (LLMs), such as ChatGPT, do not currently satisfy our authorship criteria. … Use of an LLM should be properly documented in the Methods section" ／ "AI assisted copy editing" は申告不要。→ ★ **[P434] の転記と解析・執筆の支援に LLM を使ったことを Methods に書く**（判断 12-4・16）。
+  - 所属: "For authors that are (temporarily) unaffiliated we will only capture their city and country of residence" → 個人研究者でも投稿できる。
+  - 分量: ⚠️ **このページに頁数・語数の上限は見当たらなかった**（要旨の 150–250 語だけ）。
+- ⚠️ テンプレートの zip は**まだダウンロードしていない**（ダウンロードは研究者の承認を取ってから・どちらのテンプレートを使うかも執筆タスクで決める）。
+- **影響範囲**: `outline.md` の未決（査読方式は解決）・引き継ぎ §2。
