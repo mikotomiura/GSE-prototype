@@ -68,6 +68,7 @@ A JSON object. Unknown keys and missing keys are refused.
 | `ready_wait_ms` | how long to wait after starting the children before the first block |
 | `backend` | `dryrun`, `macos`, or `windows` |
 | `clock_sync_disabled`, `auto_update_disabled` | statements by the person who prepared the machine |
+| `label` | optional; the name of the cell in the analysis (1 to 64 characters from letters, digits and `_ . + -`, for example `macos-live-on`). The analysis requires it and requires it to be unique among the runs that were not aborted, so every cell of a measurement matrix needs one |
 | `backend_opts` | optional for `dryrun`; for a real backend it must give the option of its `focus_back` key (the application or window to bring to the front) |
 | `stop_wait_ms` | optional, default 5000; how long a child has to end after the termination request |
 | `settle_ms` | optional, default 1000; a wait after the last block, before the children are stopped |

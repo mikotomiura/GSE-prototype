@@ -140,7 +140,8 @@ def _is_int(v):
 
 REQUIRED_KEYS = ("os", "ime", "ime_settings", "refinput_cmd", "logger_cmd", "reset_cmd", "focus_cmd",
                  "ready_wait_ms", "backend", "clock_sync_disabled", "auto_update_disabled")
-OPTIONAL_KEYS = ("backend_opts", "stop_wait_ms", "settle_ms", "command_timeout_ms")
+OPTIONAL_KEYS = ("label", "backend_opts", "stop_wait_ms", "settle_ms", "command_timeout_ms")
+LABEL_RE = re.compile(r"^[A-Za-z0-9_.+-]{1,64}$")   # the form of a cell label that the analysis accepts
 
 
 def _cmd(cell, key, allow_empty, needs_out):
@@ -169,6 +170,8 @@ def check_cell(cell):
         raise CellError("ime must be a non-empty string (name and version)")
     if not isinstance(cell["ime_settings"], dict):
         raise CellError("ime_settings must be an object")
+    if "label" in cell and (not isinstance(cell["label"], str) or not LABEL_RE.fullmatch(cell["label"])):
+        raise CellError("label must be 1 to 64 characters from letters, digits and _ . + -")
     _cmd(cell, "refinput_cmd", False, True)
     _cmd(cell, "logger_cmd", False, True)
     _cmd(cell, "reset_cmd", True, False)
@@ -1198,6 +1201,11 @@ def _selftest_body(tmp, check, exit_with):
     check("a cell with a missing key exits 2 and starts nothing", rc == 2 and not os.path.exists(d))
     rc, d = go("unknown_key", _cell(stub, {"rest_cmd": []}))
     check("a cell with an unknown key exits 2 and starts nothing", rc == 2 and not os.path.exists(d))
+    rc, d = go("bad_label", _cell(stub, {"label": "two words"}))
+    check("a cell label outside the allowed characters exits 2 and starts nothing",
+          rc == 2 and not os.path.exists(d))
+    check("a cell label of the allowed form is kept", check_cell(_cell(stub, {"label": "macos-live_on.1"}))["label"]
+          == "macos-live_on.1")
     rc, d = go("no_out", _cell(stub, {"logger_cmd": [sys.executable, stub]}))
     check("a child command that never receives its log path exits 2", rc == 2 and not os.path.exists(d))
     rc, d = go("os_mismatch", _cell(stub, {"os": "windows"}))

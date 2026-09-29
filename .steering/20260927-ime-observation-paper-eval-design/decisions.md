@@ -429,3 +429,37 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
   - 005: 差し替えた api を捨てない（`close` の後の `open` で本物を作らない・二重の `open` は拒む）・selftest の冒頭で本物の `_Api` を番兵に替える（code-reviewer M1・security 補足）／keymap の網羅を核の `KEYNAMES` と比べる（常に真だった・M2）／窓は可視・完全一致のタイトルでちょうど 1 つ（`EnumWindows`）・最小化なら元に戻す（M3・L4）／管理者として動いていたら `open()` で止める（security L-e）／戻り値 0 の説明から UIPI の推測を外し `get_last_error()` を載せる・UIPI の取りこぼしは戻り値で見分けられないこと・前景ロック・Windows 11 のタイマー分解能・仮想キーの `wScan` が 0 であること（観測器は仮想キーで判定する）を docstring に（L1〜L3・L7）／selftest の穴（押下だけで前面化・`KEYUP`・keymap の値の型）。
   - 006: 想定外の例外を握りつぶさない（トレースバックを run ディレクトリと stderr に）／OS の版と Python の版を manifest に／`allow_send` がフラグから渡ることを selftest で確かめる／押下の直前に子の生死を同期で確かめる／`{out}` を絶対パスに／時計の分解能の検査を子を起こす前に／計画を 1 回だけ読む／commit を開始時に取り作業ツリーの変更の有無も残す／reset / focus の stderr と失敗の種類を残す／停止の間の SIGTERM・2 回目の Ctrl-C でも全員を止めて manifest を書く／stderr のファイルも排他で作る／Windows で `.bat` / `.cmd` を拒む／例のセルのリセットを失敗する仮コマンドに／README（スリープ・画面ロックを止める・F13〜F19 が他のアプリのホットキーを発火しうる・セルのファイルは実行されるコード・ラッパー経由で起動しない）。
   - 直さない: 006 L19（`emit.py` の私的な関数への依存と事前検査の重複）は核の issue を開き直すことになるので、次に核を触るときに回す。
+
+## 判断 59: `emit.py` の送出の基準を `trial_begin` の刻印そのものにする（2026-09-29・研究者の回答・004 の追補）
+
+- 事象と原因は `blockers.md` B12（既定の selftest が約 1% で「計画より早く送った」になる。基準の `perf_counter()` を刻印より先に取っていた）。
+- 選択肢: A = 基準を刻印に揃える／ B = selftest の許容を広げる（oracle のずれは残る）／ C = 記録だけして後で
+- **採用: A**。メインが base に入れた: `Emitter._emit` が書いた行を返し、`run_trial` は `start = <trial_begin の t_mono_ns> / 1e9` とする（刻印の単調時計 `perf_counter_ns` と待ちの `perf_counter` は同じ時計）。selftest に「keys are scheduled from the recorded trial_begin timestamp」（`trial_begin` の刻印だけを 5 ms 遅らせる `Emitter` の派生で 2 試行を送り、最小の遅れが -1 ms 以上）を足した。
+- 確認（G-GEAR・Python 3.11.9）: 既定の selftest 48 件が緑・style 違反 0 件。写しで基準を元の形に戻す変異で新しいケースが 3 回とも赤。
+- ⚠️ Mac: 次の Mac のセッションで `004-acceptance.sh` を回し直す（macOS では `perf_counter_ns` / `perf_counter` はどちらも `mach_absolute_time()`）。
+
+## 判断 60〜61: 023 の worker の Stop（写しと公開物の書き方が両立しない）を仕様の側で解く（2026-09-30・研究者の回答）
+
+- 事象: W5 の 023 の worker が attempt 1 で Status を `blocked` にして止まった（`blocked（受け入れ条件どうしの矛盾）`）。AC2「写しと元の差はプロセス名の行だけ」と判断 36 の書き方（`style_ok`）が両立しない（違反 166 件・すべて 3 本の写しの中）。一次で確かめた: 計測器 2 本（`sample-macos.sh` / `sample-windows.sh`）は注釈の行だけが違反（行末の注釈は無い）、`calibrate-cpu.sh` は画面に出す文言（`echo` / heredoc の本文）も日本語と ★。元の `summarize.py` は校正の値を掛け合わせておらず、`calibrate-cpu.sh` は測定器の陽性対照（手作業の確認）。
+- もう 1 点: issue 023 は「写しの表（元のパス・SHA-256・変えた行）を README に書く」としていて、worker の公開 README に GSE のパス（`experiments/20260903-o1-runtime-cost/...`）と「以前の計測から写した」が載った。判断 36 / 43 より前に書いた仕様（機械の門の禁止語には当たらないので `style_ok` は緑だった）。
+
+| # | 論点 | 採用 | 理由 |
+|---|---|---|---|
+| 60 | 写しと書き方 | ★ **計測器 2 本は実行される行を元と同じに保ち、注釈だけを学術的な英語に訳す**。AC2 を「注釈（`#` の行・`#!` を除く）と空行を除くと、元との差はプロセス名の行だけ」に改め、陽性対照（実行される行を 1 行足すと検出する）を acceptance に足した。★ **`calibrate-cpu.sh` は写さず、同じ測り方を英語で書き直す**（集計には使わない手作業の確認） | 計器の同一性（測るコード）を保ったまま公開物の書き方を守る。校正の文言は出力そのものなので、訳すと「写し」の検査が機械で書けない |
+| 61 | 出典の表の置き場 | ★ **`kit/e3/PROVENANCE.internal.md` に移す**（Allowed Files に足した・024 は書き出さない・`_style_check.py` の対象外）。公開の README は計器の中身だけを書き、元のパスと写した関係を書かない。acceptance: README と 4 本に `experiments/20260903` が 0 件・README に `copied` が 0 件・`PROVENANCE.internal.md` に 2 本の元のパスと元の SHA-256 | ロガーと同じ形（判断 43） |
+
+- 段取り: 023 の worktree（worker の `d70e30f4` / `30e321ec`）は片付け、直した issue と acceptance で `--issues 023` を回し直す。
+
+## 判断 62〜63: W5 の 020 の merge ゲートのレビューを受けた裁定（2026-09-30・研究者の回答）
+
+★ 020 はループで attempt 1 の `issue_done`。clean な checkout で `020-acceptance.sh` 失敗 0 件（✅ 28）。寄託前の検査 `--check-deposit`（判断 57）も入っていた。
+レビュー: code-reviewer 1 本（HIGH 4・MEDIUM 5・LOW 9）・security-checker 1 本（CRITICAL / HIGH なし・MEDIUM 5・LOW 8）。一次で確かめた: `run.sh:77` は行頭の `frozen_at:` / `sha256:` だけを見る／`pipeline.py:124-126` の `repo_root()` は 2 段しか上がらず `<repo>/papers` を返す／`run_cell.py:141-165` はセルの `label` を未知のキーとして拒み、pipeline はラベルを `cell.label`（無ければ `os`）から取るので同じ OS の 2 セルが必ず重なる／ロガーは `ime_shadow` を `config_gated` に置く（`kit/logger/src/main.rs:71-73`・0 行は判定不能）が Step 0 はそれも「宣言あり」と数える／design.md §1.2 は両 OS 共通の定義 `all` の値も求める／`match.py` の `theta` / `drop_start_while_open` を設定で渡せない。
+
+| # | 論点（出どころ） | 採用 | 理由 |
+|---|---|---|---|
+| 62 | code-reviewer H3・M3: セルのラベルの出どころ | ★ **セルのファイルに任意のキー `label` を足す**（006 の追補としてメインが base に入れた: `OPTIONAL_KEYS` に `label`・書式は `^[A-Za-z0-9_.+-]{1,64}$`〔照合器の `CELL_RE` と同じ〕・selftest に陽性と陰性・README と例のセル）。★ pipeline は `cell.label` を**必須**にし、`os` への黙った代替をやめる。同じ label の run は**中止していないものが 1 つだけ**（撮り直しの中止分は件数に数える） | ラベルはセルの性質で、出どころの記録（`run.json`）に残るべき。run_cell では任意のまま（dryrun の検査のセルに要らない）にし、解析で必須にする |
+| 63 | code-reviewer H1・M1・M2: 凍結の門 | ★ **書式 ＋ 迂回の封じ ＋ 設定の照合**: 印は `frozen_at: YYYY-MM-DD…` と `sha256: <64 桁の 16 進>` をちょうど 1 行ずつ（プレースホルダ・空・コメントやフェンスの中は数えない）。`sha256` は「`config.json`・`SEED`・正解の規則ファイルの順に、各ファイルの SHA-256（16 進）に改行を付けて連ねたもの」の SHA-256 と定義し、`pipeline.py --freeze-hash` で出す。`run.sh` と `pipeline.py`（実データの解析では `--prereg PATH` を必須にする・合成の run だけ免除）の両方で再計算して一致を求める。解析コードの固定は凍結のコミットのタグで行う（M3）。★ `.gitattributes` に `experiment/*.json`・`SEED`・`*.sh`・`gt_rules*.json` の `eol=lf` を足した（機械ごとにハッシュが食い違わないように） | 凍結の後に解析の設定を変えられない・直接呼び出しでも迂回できないことを機械で保証する |
+
+- ★ 仕様の範囲の直し（研究者に問わずメインが段取り）:
+  - code-reviewer: H2 `repo_root()` を run_cell と同じ定義（`git rev-parse --show-toplevel`・無ければ 3 段上）に／H4 Step 0 は `ime_shadow` が gated で、正解のセッションが 1 件以上あるのに `ime_shadow` の行が 0 件なら「判定不能」の違反にする（合成のヘッダも実物と同じ `config_gated` に）／M4 各セルで OS の定義と共通の定義 `all` の両方を出す（design §1.2）／M5 `theta` と `drop_start_while_open` を設定で渡す（`clock_offsets_ms` の出どころは M1 / M3 で決める・⚠️ 未決・今は 0）／L4 seed の導き方を書き、合成の生成と注入の乱数を分ける／L6 `--synthetic` の出力先が本番の `results/` なら止め、結果に合成の印／L7 `SEED` の厳密な検査／L8 `CDPATH`／L9 想定外の例外は型名だけで exit 2・失敗したら古い結果を残さない。
+  - security: M-A `--pack OUT.zip`（寄託する 5 ファイルだけを決定的に束ね、その束を検査し SHA-256 を出す・`data.md` の手順を「束ねる → 検査 → 寄託 → SHA-256 を記録」に）／M-B 機械に依存しない規則（5 ファイルの中の絶対パスの形〔ドライブ文字・UNC・`/Users/`・`/home/`・`/Volumes/`・MSYS の `/c/`〕をすべて拒み、`~` と `<repo>` で始まるものと相対パスだけを許す）と `--also-user` / `--also-home`（検査した機械を `data.md` に記録）／M-C 中断 run の null のログは無くてよい・`run.json` は必ず見る／M-D 寄託の門でも content-free の検査とハッシュの照合を通す／M-E `data.md` の行に `run.json` の SHA-256 を持たせて照合し、結果の `runs.list` に `manifest_sha256`／L-a `outputs.*.sha256` の書式／L-b `RecursionError`・想定外の例外／L-c 照合済みのバイト列を検査する／L-d 通常ファイルだけ・リンクを拒む・大きさの上限／L-e `--runs-from` はコメントとフェンスの中を読まない・使ったラベルを出す／L-f `--synthetic` は既存を上書きしない／L-h `mktemp` の失敗。

@@ -1,4 +1,5 @@
 {
+  "label": "macos-standard-live-on",
   "os": "macos",
   "ime": "macOS Japanese (Hiragana) - version to be filled in from the machine",
   "ime_settings": {
