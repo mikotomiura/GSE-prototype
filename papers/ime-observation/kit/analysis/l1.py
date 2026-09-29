@@ -311,11 +311,22 @@ def oracle_report(oracle_agreement, plan_trials=None, cell=None):
     if not isinstance(oracle_agreement, dict):
         raise ValueError("oracle_agreement must be an object")
     if not oracle_agreement.get("plan_available"):
-        return {"plan_available": False, "n_trials": oracle_agreement.get("n_trials")}
+        nt = oracle_agreement.get("n_trials")
+        if nt is not None and not match._is_int(nt):
+            raise ValueError("oracle_agreement: n_trials must be an integer")
+        return {"plan_available": False, "n_trials": nt}
     try:
         n, agree, by_type = oracle_agreement["n_trials"], oracle_agreement["n_agree"], oracle_agreement["by_type"]
     except KeyError as e:
         raise ValueError("oracle_agreement is missing %s" % e)
+    if not (match._is_int(n) and match._is_int(agree) and 0 <= agree <= n):
+        raise ValueError("oracle_agreement: n_trials / n_agree must be integers with 0 <= n_agree <= n_trials")
+    ua = oracle_agreement.get("unassigned_sessions")
+    if ua is not None and not (match._is_int(ua) and ua >= 0):
+        raise ValueError("oracle_agreement: unassigned_sessions must be a non-negative integer")
+    if not isinstance(by_type, dict) or any(k not in gt_sessions.MISMATCH_TYPES or not match._is_int(v) or v < 0
+                                            for k, v in by_type.items()):
+        raise ValueError("oracle_agreement: by_type must map known mismatch types to counts")
     dis = n - agree
     out = {"plan_available": True, "n_agree": agree, "unassigned_sessions": oracle_agreement.get("unassigned_sessions"),
            "removed_from_evaluation": False}
@@ -430,8 +441,8 @@ def evaluate(match_bytes, sessions_bytes, plan_bytes, oracle_bytes, config_bytes
     _src, sess, _exc = match.parse_sessions(sessions_bytes, definition)
     sobj = match._json_loads(match._decode(sessions_bytes, "sessions"), "sessions", True)
     cell = m["config"].get("cell")
-    if not isinstance(cell, str):
-        raise InputError("match: config.cell is missing")
+    if not isinstance(cell, str) or not match.CELL_RE.fullmatch(cell):
+        raise InputError("match: config.cell is missing or has the wrong shape")
     rep = l1_report(m["matching"], sess, sobj.get("oracle_agreement"), plan["trials"], cell,
                     cfg["B"], cfg["seed"], cfg["limit_ms"])
     rep.update({
@@ -740,6 +751,14 @@ def _case_oracle():
         f.append("the per-stratum disagreement counts are wrong: %r" % (got,))
     if oracle_report({"plan_available": False, "n_trials": 7}) != {"plan_available": False, "n_trials": 7}:
         f.append("without a plan only the trial count is reported")
+    good = {"plan_available": True, "n_trials": 3, "n_agree": 3, "by_type": {}, "unassigned_sessions": 0}
+    for name, bad in (("unassigned_sessions", dict(good, unassigned_sessions="x")), ("n_trials", dict(good, n_trials="3", n_agree=3)),
+                      ("by_type key", dict(good, by_type={"free text": 1})), ("by_type value", dict(good, by_type={"no_session": "1"}))):
+        try:
+            oracle_report(bad)
+            f.append("an oracle_agreement with a bad %s was accepted" % name)
+        except ValueError:
+            pass
     try:
         oracle_report({"plan_available": True, "n_trials": 3})
         f.append("an incomplete oracle_agreement was accepted")
@@ -891,6 +910,12 @@ def _case_cli():
             f.append("a B above the upper bound was accepted")
         if parse_config(b'{"B": %d}' % MAX_B)["B"] != MAX_B:
             f.append("the largest allowed B was refused")
+        mjc = json.loads(open(p["match.json"], "rb").read().decode("utf-8"))
+        mjc["config"]["cell"] = "not a cell label"
+        with open(os.path.join(d, "badcell.json"), "wb") as fh:
+            fh.write(match.render(mjc))
+        if run("o11.json", match=os.path.join(d, "badcell.json"))[0] != 2:
+            f.append("a cell label of the wrong shape was copied into the output")
         # a malformed match output exits 2 with a message, not with a traceback
         for name, edit in (("no obs", lambda m: m["matching"]["pairs"][0].pop("obs")),
                            ("no dwell_ms", lambda m: m["matching"]["pairs"][0]["obs"].pop("dwell_ms")),
