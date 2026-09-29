@@ -59,3 +59,6 @@ line contains `E3_PROC` and every removed line is the process-name line.
   match other processes (an editor that has the name in its arguments, the sampler itself).
 - `calibrate-cpu.sh` and the macOS sampler were not run on a Mac in this issue (the loop ran on Windows).
   The Windows sampler and `run_e3.sh` were run against an absent process only (all rows zero, `not measured`).
+  Later, on 2026-09-30, `run_e3.sh idle` (and so the macOS sampler) was run on a Mac for 8 seconds against a
+  running observer to check the process name; the rows carried real values. `calibrate-cpu.sh` and a full
+  eight-hour run on a Mac are still not done.

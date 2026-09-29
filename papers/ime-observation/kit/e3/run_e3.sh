@@ -13,8 +13,9 @@
 #             long plan, not a repetition that starts the observer again).
 #
 # This script samples the process named by E3_PROC (default: ime-observation-logger; on Windows without the
-# .exe suffix). The name may contain letters, digits, dot, underscore and hyphen. A running process of that name is counted before the run; the count must be exactly
-# one for idle and zero for working. A duplicate that appears during the run is not detected.
+# .exe suffix). The name may contain letters, digits, dot, underscore and hyphen. A running process of that
+# name is counted before the run; the count must be exactly one for idle and zero for working. A duplicate
+# that appears during the run is not detected.
 # Rows taken while the process is absent carry zero in every column and are left out by the summary.
 #
 # E3_EXE (optional) is the path of the observer executable; its SHA-256 is recorded in conditions.txt (the

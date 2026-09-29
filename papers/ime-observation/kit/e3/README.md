@@ -70,7 +70,7 @@ SHA-256 of the measured executable (`unknown` if it cannot be read; the path is 
 ## The process name on macOS
 
 On macOS `pgrep -x` compares the full executable name, so the 22-character name `ime-observation-logger`
-matches; only the COMMAND column of `top` shows the first 16 characters. `run_e3.sh` uses the full name when
+matches (checked on macOS 27.0); only the COMMAND column of `top` shows the first 16 characters. `run_e3.sh` uses the full name when
 `E3_PROC` is not set. Before the first run, start the observer and look at the name the system reports:
 
 ```
