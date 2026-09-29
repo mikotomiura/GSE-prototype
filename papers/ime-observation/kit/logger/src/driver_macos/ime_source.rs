@@ -5,19 +5,21 @@
 //! keyboard, where the mode is switched from the menu bar or with a shortcut) the identifier of the
 //! current keyboard input source is polled.
 //!
-//! The input-source API must be called on the main dispatch queue. A blocking call to that queue from
-//! a helper thread hangs when the process's main thread does not service it, and the main thread of
-//! this program runs the monitoring loop instead. The query is therefore submitted asynchronously and
-//! its latest completed result is read on the next poll; when the main queue is never serviced, no
-//! result arrives and the flag written by the mode keys stays in force. As a consequence a switch of
-//! the input source by other means than a JIS mode key is observed only if the process's main thread
-//! services the main dispatch queue.
+//! The input-source API must be called on the main dispatch queue, which the main thread of the
+//! process services by running its main run loop. A blocking call to that queue from a helper thread
+//! would hang whenever the main thread does not service it, so the query is submitted asynchronously
+//! and its latest completed result is read on the next poll. When the main queue is never serviced,
+//! no result arrives and the flag written by the mode keys stays in force; a warning is logged once
+//! if no query has completed within [`NO_RESULT_WARNING_AFTER`] of the first submission. The number
+//! of completed queries is reported when the driver stops. As a consequence a switch of the input
+//! source by other means than a JIS mode key is observed only if the process's main thread services
+//! the main dispatch queue.
 
 use std::ffi::c_void;
-use std::sync::atomic::{AtomicBool, AtomicI8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI8, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use core_foundation::base::{CFRelease, TCFType};
 use core_foundation::string::CFString;
@@ -26,6 +28,8 @@ use super::{IME_OPEN, IME_STATE_DIRTY, JIS_KEYBOARD_SEEN};
 
 /// Longest wait on the wake channel before the sources are read again.
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
+/// How long after the first submitted query the absence of any completed query is reported.
+const NO_RESULT_WARNING_AFTER: Duration = Duration::from_secs(2);
 /// Pause after a wake-up, so that the tap callback has finished updating the flags it shares.
 const SETTLE: Duration = Duration::from_millis(5);
 
@@ -69,6 +73,12 @@ pub(super) fn resolve_open(dirty: bool, jis_keyboard_seen: bool, hook_flag: bool
     }
 }
 
+/// Writes `open` to the shared flag only if it still holds `read`, the value the poll saw before it
+/// asked the input source. Returns whether the write happened.
+pub(super) fn publish_open(cell: &AtomicBool, read: bool, open: bool) -> bool {
+    cell.compare_exchange(read, open, Ordering::AcqRel, Ordering::Acquire).is_ok()
+}
+
 // Text Input Sources (Carbon) and Grand Central Dispatch.
 #[allow(non_camel_case_types)]
 type TISInputSourceRef = *const c_void;
@@ -99,6 +109,13 @@ static QUERY_RESULT: AtomicI8 = AtomicI8::new(-1);
 /// Whether a query is submitted and has not completed. At most one is outstanding, so a main queue
 /// that is never serviced holds a single pending item rather than a growing backlog.
 static QUERY_PENDING: AtomicBool = AtomicBool::new(false);
+/// Number of queries that have completed on the main queue.
+static COMPLETED_QUERIES: AtomicU64 = AtomicU64::new(0);
+
+/// Number of input-source queries completed so far.
+pub(super) fn completed_queries() -> u64 {
+    COMPLETED_QUERIES.load(Ordering::Relaxed)
+}
 
 /// Runs on the main dispatch queue: reads the identifier of the current keyboard input source.
 unsafe extern "C" fn query_on_main_queue(_context: *mut c_void) {
@@ -120,6 +137,7 @@ unsafe extern "C" fn query_on_main_queue(_context: *mut c_void) {
         }
     };
     QUERY_RESULT.store(i8::from(japanese), Ordering::Release);
+    COMPLETED_QUERIES.fetch_add(1, Ordering::Relaxed);
     QUERY_PENDING.store(false, Ordering::Release);
 }
 
@@ -150,9 +168,11 @@ fn latest_query() -> Option<bool> {
 
 /// Body of the polling thread. Reads the sources at least every [`POLL_INTERVAL`], and sooner when the
 /// tap callback signals a key press, until the stop flag or the local stop flag is raised. It writes
-/// the open/closed flag only from a completed query of the input source, so a mode key applied in
-/// the meantime is never overwritten by the flag read here.
+/// the open/closed flag only from a completed query of the input source, and only if the flag still
+/// holds the value read before the query, so a mode key applied in the meantime is never overwritten.
 pub(super) fn poll_loop(wake_rx: Receiver<()>, stop: &AtomicBool, local_stop: &AtomicBool) {
+    let mut first_submission: Option<Instant> = None;
+    let mut warned = false;
     while !stop.load(Ordering::Acquire) && !local_stop.load(Ordering::Acquire) {
         match wake_rx.recv_timeout(POLL_INTERVAL) {
             Ok(()) => thread::sleep(SETTLE),
@@ -166,9 +186,18 @@ pub(super) fn poll_loop(wake_rx: Receiver<()>, stop: &AtomicBool, local_stop: &A
             continue;
         }
         submit_query();
+        let submitted_at = *first_submission.get_or_insert_with(Instant::now);
+        if !warned && submitted_at.elapsed() >= NO_RESULT_WARNING_AFTER && completed_queries() == 0 {
+            warned = true;
+            tracing::warn!(
+                "no input-source query has completed; the main thread may not be servicing the main \
+                 dispatch queue, so the open/closed state follows the mode keys only"
+            );
+        }
         let open = resolve_open(dirty, jis_keyboard_seen, hook_flag, latest_query());
         if open != hook_flag {
-            IME_OPEN.store(open, Ordering::Release);
+            // Give up when a mode key changed the flag since it was read above.
+            publish_open(&IME_OPEN, hook_flag, open);
         }
     }
 }

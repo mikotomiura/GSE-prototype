@@ -1,5 +1,5 @@
 {
-  "upstream_repo_commit": "657335fb7d5f2ea8cb7d27ea3496affa6a3acccc",
+  "upstream_repo_commit": "3fec903c82553f92b2fd8be94db1679edc26ed1d",
   "entries": [
     {
       "kind": "excerpt",
@@ -52,7 +52,7 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "a87c29e4ab99991d554829ec4e9c49dfeaf48c608be2c977d93a3ca410af3c97",
+      "sha256": "28773ca204e85fe3befc5f7c345a8af1633313d229bdbae6e7b09a2ff39c5253",
       "upstream_range_sha256": null,
       "check_decls": null,
       "reason": "Entry point of the macOS driver: the listen-only event tap, its run-loop thread and start-up handshake, the forwarding thread, the tap callback, and the modifier and input-mode handling that feeds the conversion-session state machine. Newly written; the key-code tables and the input-source selection live in the submodules."
@@ -66,7 +66,7 @@
       "start_anchor": "pub fn spawn_ime_open_polling_thread(",
       "end_anchor": "// IME state source selection (pure — テストできる形に切り出す)",
       "symbol": "spawn_ime_open_polling_thread",
-      "sha256": "07312868f2336d228231bebb696185a50826b3b4e48ac39f098d0c86dd008b4a",
+      "sha256": "fd711cc1024b450b3c8358589dd9d4e45a6ac5e8ea194a320f140bc0b9f42e9f",
       "upstream_range_sha256": "abd9d1fdd8aee8cf4657dc9d7a80eb7b00066448329a3f3af11512c21b64378f",
       "check_decls": null,
       "reason": "Polling of the input source. The selection between the mode-key flag and the input-source query is excerpted; the polling loop and the query are newly written, because the query is submitted to the main dispatch queue without blocking, and the loop writes the flag only from a completed query."
@@ -80,7 +80,7 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "265a2354b449703a44795a4f157c559ef59287ad4a5b290201bcfb925190c731",
+      "sha256": "49eef1059da8139e66f04188eed23acbaee788b48a20fb760d98686b9201e690",
       "upstream_range_sha256": null,
       "check_decls": null,
       "reason": "Unit tests of the pure parts of the macOS driver, on cells and channels local to each test."

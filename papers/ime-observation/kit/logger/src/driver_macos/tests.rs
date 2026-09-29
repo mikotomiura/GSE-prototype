@@ -181,3 +181,37 @@ fn only_identifiers_of_a_japanese_input_method_are_recognised() {
     assert!(!ime_source::is_japanese_source_id("com.apple.keylayout.US"));
     assert!(!ime_source::is_japanese_source_id(""));
 }
+
+#[test]
+fn auto_repeat_events_are_not_queued_and_only_observed_keys_are() {
+    assert!(queue_row(false, 0x00));
+    assert!(!queue_row(true, 0x00));
+    assert!(!queue_row(false, 0x66));
+    assert!(!queue_row(false, 0x37));
+}
+
+#[test]
+fn every_press_and_any_mode_key_transition_wakes_the_poll() {
+    assert!(wakes_poll(true, 0x41));
+    assert!(!wakes_poll(false, 0x41));
+    assert!(wakes_poll(false, 0xF2));
+    assert!(wakes_poll(false, 0xF0));
+}
+
+#[test]
+fn only_presses_drive_the_conversion_state_machine() {
+    assert!(drives_compose(true));
+    assert!(!drives_compose(false));
+}
+
+#[test]
+fn the_poll_result_does_not_overwrite_a_mode_key_applied_in_the_meantime() {
+    let open = AtomicBool::new(false);
+    // The poll read `false`, then a mode key set the flag.
+    open.store(true, Ordering::Release);
+    assert!(!ime_source::publish_open(&open, false, false));
+    assert!(open.load(Ordering::Acquire));
+    open.store(false, Ordering::Release);
+    assert!(ime_source::publish_open(&open, false, true));
+    assert!(open.load(Ordering::Acquire));
+}

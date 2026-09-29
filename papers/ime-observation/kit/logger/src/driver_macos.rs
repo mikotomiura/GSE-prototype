@@ -13,13 +13,19 @@
 //! and counted, and the count is reported once when the driver stops.
 //!
 //! Start-up is synchronous: `start` returns only after the tap is installed, and reports a failed
-//! installation (usually a missing Input Monitoring permission) as an error.
+//! installation (usually a missing Input Monitoring permission) as an error. When the installation
+//! fails, the driver asks the system once to show its Input Monitoring prompt, so that a user who has
+//! not yet been asked can grant the permission and start the program again.
 //!
 //! Known limits. A tap that the system disables is re-enabled, both when the callback is told of the
-//! disabling and by a periodic check on the driver thread; keys typed while it was disabled are not
-//! observed, which is indistinguishable from an idle period. Auto-repeat events are not reported as
-//! key rows. Modifier keys are not observed, because the tap listens to key presses and releases
-//! only.
+//! disabling and by a periodic check on the driver thread; both kinds of re-enabling are counted and
+//! reported when the driver stops. Keys typed while the tap was disabled are not observed, which is
+//! indistinguishable from an idle period. The tap is not re-created if re-enabling does not restore
+//! delivery; the callback gives up re-enabling after a long run of consecutive disabling notices,
+//! and the periodic check continues. While Secure Event Input is active (for example in a password
+//! field), the system delivers no key events to the tap, which is likewise indistinguishable from
+//! an idle period. Auto-repeat events are not reported as key rows. Modifier keys are not observed,
+//! because the tap listens to key presses and releases only.
 
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, AtomicU64, Ordering};
@@ -54,7 +60,7 @@ const SLICE: Duration = Duration::from_millis(100);
 const KEY_QUEUE_CAPACITY: usize = 1024;
 /// Number of consecutive disabling notices after which the callback stops re-enabling the tap. Any
 /// delivered key event resets the count.
-const MAX_CONSECUTIVE_REENABLES: u32 = 20;
+const MAX_CONSECUTIVE_REENABLES: u32 = 100;
 
 /// Whether a Japanese input method is currently open, as far as the mode keys and the input-source
 /// poll can tell.
@@ -78,6 +84,10 @@ static DROPPED_KEY_EVENTS: AtomicU64 = AtomicU64::new(0);
 static TAP_PORT: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
 /// Disabling notices received since the last delivered key event.
 static CONSECUTIVE_REENABLES: AtomicU32 = AtomicU32::new(0);
+/// Number of times the callback re-enabled the tap after a disabling notice.
+static CALLBACK_REENABLES: AtomicU32 = AtomicU32::new(0);
+/// Number of times the periodic check found the tap disabled and re-enabled it.
+static PERIODIC_REENABLES: AtomicU32 = AtomicU32::new(0);
 
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
@@ -164,20 +174,37 @@ fn send_or_count_drop(tx: &SyncSender<KeyEvent>, event: KeyEvent, dropped: &Atom
     }
 }
 
+/// Whether a key row is queued for the core: auto-repeat events are dropped, and only keys of the
+/// observed set are reported.
+fn queue_row(repeat: bool, mac_vk: u64) -> bool {
+    !repeat && keymap::observed(mac_vk)
+}
+
+/// Whether a key transition wakes the input-source poll: every press, and any transition of a mode
+/// key.
+fn wakes_poll(press: bool, vk: u32) -> bool {
+    press || ime_mode::is_ime_mode_key(vk)
+}
+
+/// Whether a key transition is fed to the conversion-session state machine: presses only.
+fn drives_compose(press: bool) -> bool {
+    press
+}
+
 /// Handles one key transition: updates the input-mode flag, feeds the conversion-session state
 /// machine, queues the key row for the core, and wakes the input-source poll.
 fn handle_key(mac_vk: u64, press: bool, repeat: bool, command: bool, control: bool, t: u64) {
     let vk = keymap::to_vk(mac_vk);
     apply_mode_key(vk, press, &SHARED_MODE_CELLS);
-    if press {
+    if drives_compose(press) {
         ime_compose::drive(vk, IME_OPEN.load(Ordering::Acquire), chord_of(command, control), t);
     }
-    if !repeat && keymap::observed(mac_vk) {
+    if queue_row(repeat, mac_vk) {
         if let Some(tx) = KEY_TX.get() {
             send_or_count_drop(tx, KeyEvent { t, vk, press }, &DROPPED_KEY_EVENTS);
         }
     }
-    if press || ime_mode::is_ime_mode_key(vk) {
+    if wakes_poll(press, vk) {
         if let Some(tx) = WAKE_TX.get() {
             let _ = tx.try_send(());
         }
@@ -197,6 +224,7 @@ fn tap_callback(
         if CONSECUTIVE_REENABLES.fetch_add(1, Ordering::Relaxed) < MAX_CONSECUTIVE_REENABLES {
             let port = TAP_PORT.load(Ordering::Acquire);
             if !port.is_null() {
+                CALLBACK_REENABLES.fetch_add(1, Ordering::Relaxed);
                 // SAFETY: the port is stored by the thread that runs this callback, after the tap
                 // exists and before its run loop is entered, and cleared before the tap is
                 // released; re-enabling a tap is a light call meant for this context.
@@ -300,6 +328,12 @@ fn tap_thread(
             return;
         }
     };
+    if stop.load(Ordering::Acquire) {
+        // The caller gave up waiting for the start; nobody uses the tap any more.
+        // SAFETY: the tap is alive and owned by this thread; the port is invalidated once.
+        unsafe { CFMachPortInvalidate(port) };
+        return;
+    }
     let run_loop = CFRunLoop::get_current();
     // SAFETY: `kCFRunLoopDefaultMode` is a constant of the CoreFoundation framework.
     run_loop.add_source(&source, unsafe { kCFRunLoopDefaultMode });
@@ -329,6 +363,9 @@ fn tap_thread(
     drop(tap);
     tracing::info!(
         dropped_key_events = DROPPED_KEY_EVENTS.load(Ordering::Relaxed),
+        callback_reenables = CALLBACK_REENABLES.load(Ordering::Relaxed),
+        periodic_reenables = PERIODIC_REENABLES.load(Ordering::Relaxed),
+        input_source_queries_completed = ime_source::completed_queries(),
         "event tap thread stopped"
     );
 }
@@ -346,6 +383,7 @@ fn run_until_stopped(stop: &AtomicBool, port: CFMachPortRef) {
         // SAFETY: the port belongs to the tap that this thread owns and has not yet invalidated.
         unsafe {
             if !CGEventTapIsEnabled(port) {
+                PERIODIC_REENABLES.fetch_add(1, Ordering::Relaxed);
                 CGEventTapEnable(port, true);
             }
         }
