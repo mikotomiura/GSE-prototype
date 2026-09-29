@@ -1,0 +1,14 @@
+{
+  "_note": "Analysis settings. The values are provisional and are frozen when the pre-registration is frozen; after that they are not edited. gt_rules is resolved relative to this file; the rule file is a working hypothesis to be revised against the calibration pilot before the freeze.",
+  "iou_min": 0.5,
+  "obs_end_offset_ms": 0,
+  "text_size_trials": 8,
+  "bootstrap_B": 2000,
+  "limit_ms": 20000,
+  "mixtures": {
+    "slow_heavy": {"slow": 0.6, "mid": 0.3, "fast": 0.1},
+    "uniform": {"slow": 1, "mid": 1, "fast": 1},
+    "fast_heavy": {"slow": 0.1, "mid": 0.3, "fast": 0.6}
+  },
+  "gt_rules": "../kit/analysis/gt_rules.example.json"
+}
