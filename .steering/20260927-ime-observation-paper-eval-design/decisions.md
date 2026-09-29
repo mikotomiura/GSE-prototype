@@ -367,3 +367,34 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 | Mac の base で verify（`kit/check.sh`）が赤: `analysis/gt_sessions.py` の selftest「input hardening」の深い入れ子（3000 段）が Python 3.14.4 では `RecursionError` にならず受理される | ★ **selftest の深さを 1,000,000 段に上げる**（`gt_sessions.py` の 1 行）。拒否の実装（`RecursionError` を捕まえる）は変えない | 実測: Python 3.14.4 は 3000 / 10000 / 100000 段を解析し、1,000,000 段で `RecursionError`。3.9.6 も 1,000,000 段で `RecursionError`。G-GEAR の版でも同じ向き（深いほど必ず落ちる）。ベースラインの verify が赤だと Mac の全 attempt が verify で落ちる。★ 他の部品（`open_set` / `closed_set` / `build_corpus` / `seal_obs`）の同種の検査は、別の理由（型の検査など）でも拒否されるので 3.14 でも緑だった |
 
 - 確認: 直した後の base で `kit/check.sh` が 20 本すべて緑、`010-acceptance.sh` 失敗 0 件（Mac・Python 3.14.4）。
+
+## 判断 48〜49: Mac の W2 の 004 の merge ゲートのレビューを受けた裁定（2026-09-29・研究者の回答）
+
+★ 004 はループで attempt 1 の `issue_done`。clean な checkout（`loop/004-issue` を detached）で `004-acceptance.sh` 失敗 0 件（✅ 28）。
+レビュー: code-reviewer 1 本・security-checker 1 本（並列）。CRITICAL なし。HIGH は 2 件（どちらも一次で確認）。
+
+| # | 論点（出どころ） | 採用 | 理由 |
+|---|---|---|---|
+| 48 | security HIGH: 送出の確認（`--i-understand-this-sends-keys`）と `SUPPORTED_KEYS` の事前検査が CLI の `run()` にしか無い。006 が `Emitter` / `Backend` を直接使うと素通りし、フラグなしで実キーが出る | ★ **門を `Emitter` に置く**（`allow_send=False` が既定・dryrun 以外は明示が要る・送る前に `SUPPORTED_KEYS` を検査）。**Backend の境界は変えない**（005 / 026 の差し込みの形を保つ） | 006 が使う層で止める。境界を変えると 005 にも波及する |
+| 49 | security MEDIUM: `focus_away` の既定の退避先が Finder で、前面化の成功を確かめていない。前面化に失敗すると次の `enter` が Finder に入り、選択中のファイルの改名が始まりうる | ★ **既定をなくし（`away_app` を必須）、activate の後に前面アプリのバンドル ID を読み戻して一致しなければ送出を止める**。退避先は M1 で「キー入力で状態が変わらないアプリ」を選ぶ | 実機でファイルを壊しうる経路を送る前に閉じる |
+
+- ★ 仕様の範囲の直し（メインが段取り）: selftest の否定対照が本物の `main()` で `--backend macos` を起動していた（code-reviewer HIGH・フラグ検査が壊れた瞬間に実際に送る）→ 検査の間だけ `load_backend` を番兵に差し替える／close のキーごとの try・down は送る前に `_held` へ／SIGTERM で close を通す／送る前の計画の検査（down/up の対・必須の欄・重複 ID・`at_ms` の上限・入れ子・サイズ）／`SubprocessError` の終了コード／CLI で `reset_ime` を黙って無視しない／`--validate` の型（bool の `step` / `seq`・keyname の列挙・`reset` の位置）／`marker_gap_ms` の検査／`fullmatch`・`/usr/bin/osascript`／README（擬似キーの時間・ヘッダだけの oracle の後始末・`CGEventSetFlags` の既定フラグの上書きを M1 で確かめる）。
+
+## 判断 50: Mac の W2 の 007 の merge ゲートのレビューを受けた裁定（2026-09-29・研究者の回答）
+
+★ 007 はループで attempt 1 の `issue_done`。clean な checkout（`loop/007-issue` を detached）で `007-acceptance.sh` 失敗 0 件（✅ 14）。
+レビュー: code-reviewer 1 本・security-checker 1 本（並列）。CRITICAL なし。security は内容の漏れの経路なし（MEDIUM 2・LOW）。code-reviewer の HIGH 2 件のうち「マウスが IME に届かない」は、S9 のクリック先が IME の候補窓（別プロセス）なので実質は下がる（issue 026 で確認）→ 仕様の範囲で入れる。
+
+| # | 論点（出どころ） | 採用 | 理由 |
+|---|---|---|---|
+| 50 | code-reviewer MEDIUM: 参照入力欄は確定した文字をメモリ上の本文にため続け（`doCommand` は記録だけ）、IME は `attributedSubstring` 経由で前の試行の文字を左の文脈として読める。変換の結果が試行の順に依存しうる（design.md の「IME は学習する」と同じ型の独立性の崩れ） | ★ **確定のたびに本文を空にする**（未確定が無くなった時点で本文と選択を空に戻す）。README に「通常のテキスト欄と違い左の文脈を与えない」と書く。削除・移動のコマンドは最小限実装する | 試行の独立を保つ。本文がメモリに残る時間も最小になる |
+
+- ★ 仕様の範囲の直し（メインが段取り）: マウスイベントを入力コンテキストへ／`characterIndex(for:)` は `NSNotFound`・`firstRect` の `actualRange` をクランプ／`setMarkedText` の範囲の加算のオーバーフロー／selftest の `--out` が既存のパス（ディレクトリごと）を消す → 既存は拒否し `O_EXCL|O_NOFOLLOW`・0600 で作る（security MEDIUM）／書き込み失敗で exit 1／ログへ書く経路を `record` とヘッダに絞る／focus_in の二重記録／`validAttributesForMarkedText`／selftest で IME への答え（範囲・長さ）を検査／README の主張を「文字列を書かない」に絞り、`vk` の列から打鍵が復元できる旨を書く（security MEDIUM）。
+
+## 判断 51: 012 の merge ゲートの HIGH（main queue が回らない）を 011 の追補で解く（2026-09-29・研究者の回答）
+
+- 事象: 012 の code-reviewer HIGH。macOS のドライバは入力ソースの問い合わせを main queue に積むが、単体ロガーの `main()` はメインスレッドで監視ループを回し main queue を処理しない → 問い合わせが一度も完了せず、JIS のモードキー以外の切替・起動時点の日本語入力が黙って欠測になる（写した元は main queue が回る前提で同期に聞く）。一次で確認し、小さな再現プログラムで陰性対照（回さない → 0 / 10 件）も実測した。
+- 選択肢: A = 011 の追補で `main.rs` を直す（写した元と同じ判断に戻す）／ B = 仕様の範囲（警告・Known limits・M1 の手順で各ブロックの先頭に かな）
+- **採用: A**。メインが base に入れた: `main.rs` に `run_with_main_queue`（macOS だけ: 記録を別スレッドへ、メインスレッドは main run loop を最大 100 ms ずつ回す。他の OS は従来どおり）・`manifest.json` の `main.rs` を指す 3 エントリの `sha256` の更新（`--update`・`--self` / `--against-upstream` は一致）・`PROVENANCE.internal.md` に記録。
+- 確認（Mac）: release ビルド・clippy・`cargo test` 75 件が緑。再現プログラムで回す形が 10 / 10 件を実行（CPU 時間ほぼ 0）。
+- ⚠️ 残り: Windows 側は `cfg` で従来の経路のままだが、コンパイルは G-GEAR でしか確かめられない → 次の G-GEAR のセッションで 011 / 013 / 014 の acceptance を回す。012 はこの base を取り込んでから、残りの指摘（警告と件数・タップの復帰の件数と上限・競合・テスト・ドキュメント）を直す。

@@ -398,6 +398,41 @@ fn run(out_path: &Path, duration: Option<Duration>) -> Result<(), String> {
     result
 }
 
+/// Runs a recording while the main thread services the main dispatch queue.
+///
+/// The macOS driver submits its query of the current keyboard input source to the main dispatch
+/// queue, which is serviced only while the process's main thread runs its run loop. The recording
+/// therefore runs on a helper thread, and the main thread runs the main run loop in slices of at most
+/// 100 ms until the recording ends. Without this, an input source selected before the start, or
+/// switched by any means other than a mode key, would never be observed.
+#[cfg(target_os = "macos")]
+fn run_with_main_queue(path: PathBuf, duration: Option<Duration>) -> Result<(), String> {
+    use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop, CFRunLoopRunResult};
+
+    let recording = std::thread::Builder::new()
+        .name("recording".to_string())
+        .spawn(move || run(&path, duration))
+        .map_err(|e| format!("cannot start the recording thread: {e}"))?;
+    while !recording.is_finished() {
+        // SAFETY: `kCFRunLoopDefaultMode` is an immutable constant exported by CoreFoundation.
+        let mode = unsafe { kCFRunLoopDefaultMode };
+        let r = CFRunLoop::run_in_mode(mode, Duration::from_millis(POLL_MS), true);
+        if matches!(r, CFRunLoopRunResult::Finished) {
+            // The run loop had nothing to wait on and returned at once; avoid spinning.
+            std::thread::sleep(Duration::from_millis(POLL_MS));
+        }
+    }
+    recording
+        .join()
+        .unwrap_or_else(|_| Err("the recording thread panicked".to_string()))
+}
+
+/// On other platforms the recording runs on the main thread.
+#[cfg(not(target_os = "macos"))]
+fn run_with_main_queue(path: PathBuf, duration: Option<Duration>) -> Result<(), String> {
+    run(&path, duration)
+}
+
 // ---------------------------------------------------------------------------
 // --selftest (platform-independent): drives the state machine directly with a fixed key sequence,
 // without a driver, runs the monitoring loop, and checks the log it wrote back.
@@ -575,7 +610,7 @@ fn main() {
         r
     } else {
         let path = parsed.out.unwrap_or_default();
-        run(&path, parsed.duration_s.map(Duration::from_secs))
+        run_with_main_queue(path, parsed.duration_s.map(Duration::from_secs))
     };
     if let Err(e) = result {
         tracing::error!("{e}");
