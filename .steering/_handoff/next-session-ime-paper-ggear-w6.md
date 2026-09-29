@@ -17,7 +17,7 @@
 ## §1 状態（2026-09-30 の終わり）
 
 - base `feature/ime-eval-kit`: 005（`9098e1ee`）・006（`5668dccd`）・023（`038645a8`）・020（`82a74e22`）を merge 済み。追補: FORMATS の reset 行の条件（001・`08541088`）・`emit.py` の送出の基準（004・判断 59・`96a19df6`）・セルの `label`（006・判断 62・`1c4b025e`）・`.gitattributes` の `experiment/` の `eol=lf`（判断 63）。
-  - ⚠️ **このセッションの最後に、merge 後の base（`82a74e22`）の clean な checkout（`C:/wt/clean-base`）で全 acceptance 24 本を回していた**。結果は `C:/wt/all-summary2.txt`（無ければ回し直す: `bash C:/Users/johnd/.claude/jobs/669e93c9/tmp/all-acc.sh` は消えている可能性があるので、`for id in 001 … 028` を自分で回す）。★ **緑を確かめてから push する**（§1 の push 状態は §4 を見る）。macOS 専用の 004 / 007 / 012 は exit 2 ＝対象外。
+  - ✅ **merge 後の base（`82a74e22`）の clean な checkout で全 acceptance 24 本を回した**（2026-09-30）: G-GEAR で回る 21 本がすべて失敗 0 件（macOS 専用の 004 / 007 / 012 は exit 2 ＝対象外）・`_style_check.py papers/ime-observation` 違反 0 件 → push 済み。
 - 残りの issue: **024**（W6・依存 020 は merge 済み・`issue_done` は G-GEAR の events にある）。任意の 025 / 026 / 027 は `## Status: blocked`。
 - ★ ループ外の段取り（研究者と人の仕事・`_issue-plan.md` §5）: M0（コーパス）→ M1（macOS の較正パイロット）→ M2 → M3（事前登録の凍結）… 。W6 の後に main への merge を研究者が判断する。
 - 公開物の書き方（判断 36 / 42 / 43）: `papers/ime-observation/` は学術的な英語・GSE への言及なし・内部の番号（decision / issue / judgment・M0〜M13）なし・写した元との関係の語なし・★ ⚠ なし。各 acceptance の最後の `style_ok` が見る。出どころは `*.internal.md` と manifest の `upstream_*` の欄だけ（024 が落とす）。
@@ -56,7 +56,7 @@
 
 ## §4 このセッションの後始末の状態
 
-- ★ このセッションの最後に行ったこと（着手時に `git worktree list` / `git branch --list 'loop/*'` / `git status` で確かめ直す）: tasklist・decisions（判断 65）のコミット、全 acceptance が緑なら push、`loop/020-issue` / `loop/023-issue` の worktree と `C:/wt/clean-020` / `clean-023` の片付け。`C:/wt/clean-base` は全 acceptance の結果の確認用に残している場合がある（不要なら `git worktree remove --force`・失敗したら `rm -rf` → `git worktree prune`・B7）。
+- ★ このセッションの最後に行ったこと（着手時に `git worktree list` / `git branch --list 'loop/*'` / `git status` で確かめ直す）: tasklist・decisions（判断 65）と handoff のコミット、全 acceptance が緑を確かめて push、`loop/005`・`006`・`020`・`023` の worktree と枝、検証用の `C:/wt/clean-*` の片付け。
 - 止まった 023 の記録はローカルの枝 `archive/ime-023-attempt1-stop`（push していない）。
 - 片付けの手順: `bash scripts/loop-spawn.sh --cleanup <id>`（未 merge のコミットを持つ枝は消さない → 内容を確かめてから `git branch -D`）。
 

@@ -53,7 +53,7 @@
     - [x] 1 run で 020 は attempt 1 の `issue_done`・023 は worker が Stop（AC2 と公開物の書き方の矛盾）→ 判断 60 / 61 で 023 の issue と acceptance を直し（`96a19df6`）、回し直して attempt 1 の `issue_done`（止まった記録は `archive/ime-023-attempt1-stop`）
     - [x] clean な checkout で acceptance 失敗 0 件（020 ✅ 28 / 023 ✅ 27）。レビュー 4 本（code-reviewer 2・security-checker 2）→ 判断 62〜64 を研究者に問い確定（セルの `label`〔006 の追補 `1c4b025e`〕・凍結の門・E3 は 8 時間）
     - [x] 直しを作業用エージェント（Sonnet）に渡し、メインが clean な checkout で acceptance を回し直し、写しへの変異で確かめてから merge（023: 4 本 / 020: 4 本がすべて赤 → 023 `038645a8` / 020 `82a74e22`）。020 の selftest は 56 秒 → 既定 17 秒と `--full` 29 秒に分けた
-    - [ ] merge 後の base の全 acceptance → push → 片付け
+    - [x] merge 後の base（`82a74e22`）の clean な checkout で全 acceptance 21 本（G-GEAR で回るもの）が失敗 0 件・`_style_check.py` 違反 0 件 → push → 片付け（2026-09-30）
     - [ ] ⚠️ Mac: `emit.py`（判断 59）を変えたので `004-acceptance.sh` を回し直す・E3 のプロセス名が 16 文字で切れるか（`ps -c -o comm= -p <pid>`）を確かめる（判断 64）
   - [ ] W6（024: 公開 repo への書き出し）。★ 着手の前に研究者に確認する
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
