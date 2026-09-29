@@ -9,20 +9,20 @@
 - [x] サーヴェイの手順を検索の前に `design.md` に固定
 
 ## B. 深掘りとサーヴェイ（判断 7 の順）
-- [ ] N-12: AF016 の補足資料 S1・S3（ブラウザ）で、全体の指標の 22 研究を研究単位で照合
-- [ ] 検索スクリプト `evidence/search_round.py`（common.py を使う）と検査 `scripts/check_surveys_here.py`
-- [ ] S-15 過信と疲労: 検索 → 0 段目（種文献で確認）→ 抽出（Sonnet）→ メインの確認 → 3 ファイル
-- [ ] S-14 燃え尽き: 同上
-- [ ] S-13 組織の水準: 同上
-- [ ] 無料の本文 4 件（B5・B9・B10・B12）を読み、事実のファイルに要点を足す
-- [ ] `check_survey_files.py`（本タスクと前タスクのディレクトリ）が違反 0
+- [x] N-12: AF016 の補足資料（ブラウザでリンクを見つけて取得）で、全体の指標の 22 研究の内訳を研究単位で再現（memo-issues.md §2.6）
+- [x] 検索スクリプト `evidence/search_round.py`（common.py を使う）と検査 `scripts/check_surveys_here.py`
+- [x] S-15 過信と疲労: 検索 641 → 0 段目 192 → 抽出 187 → 表 11・質的 8（種文献 2/2）
+- [x] S-14 燃え尽き: 検索 157（補いを含む・判断 8）→ 抽出 106 → 表 30・質的 4・介入 4
+- [x] S-13 組織の水準: 検索 270 → 抽出 110 → 表 7・質的 9（組織を単位にした AI の研究 0）
+- [ ] 無料の本文 4 件（B5・B9・B10・B12）を読み、事実のファイルに要点を足す → ★ 次のセッションへ（引き継ぎに書く）
+- [x] `check_survey_files.py`（本タスクと前タスクのディレクトリ）が違反 0
 
 ## C. 判定者用ファイル
-- [ ] `scripts/candidates.py`（追加候補のデータ）
-- [ ] `scripts/fetch_oa.py` → `evidence/oa_2026-09-30.json`
-- [ ] `scripts/judge_xlsx.py`（出力の保護・DOI の quote・行の高さ）
-- [ ] `scripts/check_judge_xlsx.py`（格納先ごとの検査・要点の出どころ・`--selftest` の変異と陰性対照）
-- [ ] 判定者 1 用のファイルを作り、Downloads に写す（上書きしない）
+- [x] `scripts/candidates.py`（追加候補のデータ・132 件）
+- [x] `scripts/fetch_oa.py` → `evidence/oa_2026-09-30.json`（164 件すべて取得）
+- [x] `scripts/judge_xlsx.py`（出力の保護・DOI の quote・行の高さ）
+- [x] `scripts/check_judge_xlsx.py`（selftest: 陰性対照 0 件・変異 29 種が赤・出力の保護 4 種）
+- [x] 判定者 1 用のファイルを作り、Downloads に写した（`archive/judge/` と同一・違反 0・集計の数式を LibreOffice で再計算して確認）
 
 ## D. 完了
 - [ ] code-reviewer ＋ security-checker（並列）・指摘対応

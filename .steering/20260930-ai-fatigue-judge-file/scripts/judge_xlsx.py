@@ -103,7 +103,7 @@ def sha256(path):
 
 
 # ---------------------------------------------------------------- 事実のファイルからの抜き出し
-DOI_RE = re.compile(r"10\.\d{4,9}/[^\s|）)（(。,、;・\]]+", re.I)
+DOI_RE = re.compile(r"10\.\d{4,9}/[^\s|）)（(。,、;・〈〉\]]+", re.I)
 
 
 def strip_md(s):
@@ -157,7 +157,9 @@ def find_bullets(path, heading):
 
 def tag(path, sec):
     sid = re.search(r"survey-(S-\d\d)", path).group(1)
-    return f"{sid} {sec.lstrip('#').strip().split(' ')[0]}"
+    if sec.startswith("§"):
+        return f"{sid} {sec}"
+    return f"{sid} §{sec.lstrip('#').strip().split(' ')[0].rstrip('.')}"
 
 
 def extract(c):
