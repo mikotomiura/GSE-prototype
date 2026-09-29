@@ -62,21 +62,24 @@
 | 論文の利用許諾 | CC BY-NC-ND 4.0（出版社版の公開 2026-06-26） | Crossref |
 | 補足資料そのもの（Table S1〜S13） | 取得していない（ScienceDirect はスクリプトを弾く） | — |
 
-## 5. AI の文脈の研究で使われた一般的な疲労・燃え尽きの測定（項目は AI に触れない）
+## 5. AI の文脈の研究で使われた一般的な疲労・燃え尽きの測定（尺度の名前と出典からは AI に向けたものではないもの）
 
-| 測定 | 使った研究 | 出どころ |
-|---|---|---|
-| Fatigue Assessment Scale（10 項目） | AF001（収束）・DB の AF028 は尺度の原著 | AF001 本文 |
-| Chalder Fatigue Scale（11 項目）・Multidimensional Fatigue Inventory | AF001（収束）。AF004 は MFI-20 の認知疲労の下位尺度（09-28 の評価版の記述・本文は未読） | AF001 本文／評価版 |
-| Screen Fatigue Scale・Social Media Fatigue Scale | AF001（収束） | AF001 本文 |
-| Maslach Burnout Inventory（6 項目） | Kim & Lee 2024（S-02 #9） | 本文 |
-| MBI-Student Survey（15 項目） | Wu 2026（S-12） | 本文 |
-| Burnout Assessment Tool（BAT-22） | The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education（Mind & Society 2025, doi:10.56011/mind-mri-143-20259・大学生 401・AI 利用者 332 と非利用者 69 を比べる） | 抄録 |
-| デジタル燃え尽き尺度（24 項目）・デジタル疲労（6 項目） | Honggang ほか 2026（S-02 #2） | 本文 |
-| 公衆衛生協会ストレスチェックリスト短縮版の疲労・身体反応 | Cureus 2025 チャットボット（S-12） | 本文 |
-| 精神的・身体的疲労の単一項目（5 件法） | AI-Echo RCT（S-12） | 補足資料 |
-| NASA-TLX（作業負荷） | Omon ほか 2025（S-12） | 抄録 |
-| Zoom Exhaustion & Fatigue Scale | DB の AF026（尺度の原著・AI ではない） | DB |
+★「項目が AI に触れないか」を一次で確かめた範囲を右の列に書いた。
+
+| 測定 | 使った研究 | 出どころ | 項目が AI に触れないかの確認 |
+|---|---|---|---|
+| Fatigue Assessment Scale（10 項目） | AF001（収束）・DB の AF028 は尺度の原著 | AF001 本文 | 確認（AF001 の本文が「普段の感じ方」を問う一般の尺度と書く） |
+| Chalder Fatigue Scale（11 項目）・Multidimensional Fatigue Inventory | AF001（収束）。AF004 は MFI-20 の認知疲労の下位尺度（09-28 の評価版の記述・本文は未読） | AF001 本文／評価版 | AF001 では確認（一般・臨床の疲労の尺度として使う）。AF004 は未確認 |
+| Screen Fatigue Scale・Social Media Fatigue Scale | AF001（収束） | AF001 本文 | 未確認（デジタルの疲労の尺度で、AI 以外の技術に向く） |
+| Maslach Burnout Inventory（6 項目） | Kim & Lee 2024（S-02 #9） | 本文 | 確認（項目は仕事による消耗を問い、AI に触れない） |
+| MBI-Student Survey（15 項目） | Wu 2026（S-12） | 本文 | 未確認（中国語版の検証研究に従ったと本文が書く。項目文は見ていない） |
+| Burnout Assessment Tool（BAT-22） | The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education（Mind & Society 2025, doi:10.56011/mind-mri-143-20259・大学生 401・AI 利用者 332 と非利用者 69 を比べる） | 抄録 | 未確認 |
+| デジタル燃え尽き尺度（24 項目）・デジタル疲労（6 項目） | Honggang ほか 2026（S-02 #2） | 本文 | 未確認（項目文は本文に無い。デジタル疲労の定義はデジタルの学習基盤に向く） |
+| 公衆衛生協会ストレスチェックリスト短縮版の疲労・身体反応 | Cureus 2025 チャットボット（S-12） | 本文 | 未確認（一般のストレスの尺度） |
+| 精神的・身体的疲労の単一項目（5 件法） | AI-Echo RCT（S-12） | 補足資料 | 確認（その日の心エコー業務を問う） |
+| Zoom Exhaustion & Fatigue Scale | DB の AF026（尺度の原著・AI ではない） | DB | 未確認（ビデオ会議に向く） |
+
+- 作業負荷の測定（疲労・燃え尽きの尺度ではない）として、NASA-TLX が Omon ほか 2025（S-12）と S-04 の多くの研究で使われている。
 
 ## 6. 尺度ではないが、AI 疲労の測定・定義に触れる記録（§1 の検索で当たったもの）
 
@@ -95,4 +98,4 @@
 - AI に向けた疲労の測定: 10 種類（§2）。うち、開発・検証の論文があるもの 1（AF001）、探索的因子分析だけのもの 1（AF009）、既存の尺度を AI に向けて翻案したもの 2（AF005・Chung & Kwon）、項目数だけ・項目ごとのもの 2（AF008・AF011）、測定を確かめられていないもの 3（AF002/AF003・Kang & Li・Asmi）、由来の記載のないデータセット 1。
 - 項目文・前文に AI が入ることを一次で確かめたもの: AF001（15/15）・AF005（16/16）。本文の記述で確かめたもの: Chung & Kwon。
 - 翻訳版: 0。
-- AI の文脈の研究で使われた一般的な測定: 11 種類（§5）。
+- AI の文脈の研究で使われた一般的な疲労・燃え尽きの測定: 13 種類（§5 の表の 10 行。MFI・Chalder・スクリーン疲労・SNS 疲労・デジタル燃え尽き・デジタル疲労を別に数える）。作業負荷の NASA-TLX は別。

@@ -2,7 +2,7 @@
 
 > ⚠️★★★ **判定者は、自分の判定が終わるまで読まないでください。** 提案は AI（Claude）の判定案に基づく（どの候補を足すかは判定そのものなので）。
 > DB（xlsx）は変えていない。反映するかは研究者が決め、反映するなら N-04（v1.1 への更新）で行う。
-> 各行の根拠は、括弧内のサーヴェイの判定案のファイルにある。
+> 各行の根拠は「出どころ」の列のファイル・節にある（`survey-S-xx.md` は事実のファイル、`survey-S-xx-ai-judgments.md` は判定案のファイル）。
 
 ## A. 新しい候補（TA 段で「含める」とした一次研究）
 
@@ -47,24 +47,24 @@
 
 | 対象 | 提案 | 出どころ |
 |---|---|---|
-| AF001 の「次の確認・作業」 | 「補足 Table S6 の全項目を確認」→「15 項目は本文 Table 1 で確認済み（Table S6 は 30 項目版）。事前登録は研究 2〜4（AsPredicted #249,222・#249,751・#253,505）、研究 1 は無し」に直す（N-07 を閉じる） | S-08 §4 |
-| The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education（Mind & Society 2025, doi:10.56011/mind-mri-143-20259） | 一次研究の候補として追加（BAT-22・AI 利用者と非利用者の比較） | S-08 §5 |
-| Digital-Age Psychosocial Strain（IJRISS 2026, doi:10.47772/ijriss.2026.102400020）・Too Much, Too Fast（IJAHSS 2025, doi:10.56734/ijahss.v6n8a7） | 既存レビューとして保持（証拠集合の外） | S-08 §6 |
-| Synthetonia（Zenodo 2026, doi:10.5281/zenodo.22566309）・GenAI Fatigue の制御理論（Zenodo 2025, doi:10.5281/zenodo.17772700） | 保持しない。語の用法（S-11）の記録にだけ使う | S-08 §6 |
+| AF001 の「次の確認・作業」 | 「補足 Table S6 の全項目を確認」→「15 項目は本文 Table 1 で確認済み（Table S6 は 30 項目版）。事前登録は研究 2〜4（AsPredicted #249,222・#249,751・#253,505）、研究 1 は無し」に直す（N-07 を閉じる） | `survey-S-08.md` §4 |
+| The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education（Mind & Society 2025, doi:10.56011/mind-mri-143-20259） | 一次研究の候補として追加（BAT-22・AI 利用者と非利用者の比較） | `survey-S-08.md` §5 |
+| Digital-Age Psychosocial Strain（IJRISS 2026, doi:10.47772/ijriss.2026.102400020）・Too Much, Too Fast（IJAHSS 2025, doi:10.56734/ijahss.v6n8a7） | 既存レビューとして保持（証拠集合の外） | `survey-S-08.md` §6 |
+| Synthetonia（Zenodo 2026, doi:10.5281/zenodo.22566309）・GenAI Fatigue の制御理論（Zenodo 2025, doi:10.5281/zenodo.17772700） | 保持しない。語の用法（S-11）の記録にだけ使う | `survey-S-08.md` §6・`survey-S-08-ai-judgments.md` §4 |
 
 ## F. S-04（AI の導入と疲労・燃え尽き）から —— ★ N-05 の範囲の決定を待つ
 
 | 対象 | 提案 | 出どころ |
 |---|---|---|
-| 無作為化 8 件（Lukac 2025・Afshar 2025・小児の専門医 2025・カルテ要約 2026（前刷り）・AI-Echo 2026・放射線科のボット 2026・歯学生 2026・デンマークの相談員 2024） | 範囲に入れるなら中心-B の最初の候補 | S-04 §2.1 |
-| 繰り返しの調査（*Appl Clin Inform* 2026, doi:10.1055/a-2892-7988）・Liu 2024 | 範囲の決定に関わらず、「AI で疲れる」側の中心-B の候補として記録 | S-04 §2.3・§5 |
-| メタ分析（*J Med Internet Res* 2026, doi:10.2196/93618）・スコーピングレビュー（*Front Psychol* 2026, doi:10.3389/fpsyg.2026.1840884） | 既存レビューとして保持（E4）。本検索（S-01）で後方の引用追跡の出発点 | S-04 §6 |
-| 検索ログ | S-04 の検索 5 本（Europe PMC 3・Semantic Scholar 1・OpenAlex 1）と、機械のふるいの規則（判断 9・10）を追記 | S-04 §1 |
+| 無作為化 8 件（Lukac 2025・Afshar 2025・小児の専門医 2025・カルテ要約 2026（前刷り）・AI-Echo 2026・放射線科のボット 2026・歯学生 2026・デンマークの相談員 2024） | 範囲に入れるなら中心-B の最初の候補 | `survey-S-04.md` §2.1・`survey-S-04-ai-judgments.md` §2 |
+| 繰り返しの調査（*Appl Clin Inform* 2026, doi:10.1055/a-2892-7988）・Liu 2024 | 範囲の決定に関わらず、「AI で疲れる」側の中心-B の候補として記録 | `survey-S-04.md` §2.3・§5 |
+| メタ分析（*J Med Internet Res* 2026, doi:10.2196/93618）・スコーピングレビュー（*Front Psychol* 2026, doi:10.3389/fpsyg.2026.1840884） | 既存レビューとして保持（E4）。本検索（S-01）で後方の引用追跡の出発点 | `survey-S-04.md` §6 |
+| 検索ログ | S-04 の検索 5 本（Europe PMC 3・Semantic Scholar 1・OpenAlex 1）と、機械のふるいの規則（判断 9・10）を追記 | `survey-S-04.md` §1 |
 
 ## G. S-05（自動化を見張る疲労）から —— ★ N-05 の範囲の決定を待つ
 
 | 対象 | 提案 | 出どころ |
 |---|---|---|
-| 種文献 6 件（Desmond & Hancock 2000・Saxby 2013・Neubauer 2011・Körber 2015・Matthews 2019・Parasuraman & Manzey 2010） | 範囲に入れない場合も「尺度・理論」の枠（理論の文献）として保持の候補（S-09 で使う） | S-05 §2・§3 |
-| 会計の AI の作業圧力と情動の鈍麻（*Front Psychol* 2026, doi:10.3389/fpsyg.2026.1900940） | 検索漏れの候補として記録（縦断・働く人） | S-05 §6 |
+| 種文献 6 件（Desmond & Hancock 2000・Saxby 2013・Neubauer 2011・Körber 2015・Matthews 2019・Parasuraman & Manzey 2010） | 範囲に入れない場合も「尺度・理論」の枠（理論の文献）として保持の候補（S-09 で使う） | `survey-S-05.md` §2・§3 |
+| 会計の AI の作業圧力と情動の鈍麻（*Front Psychol* 2026, doi:10.3389/fpsyg.2026.1900940） | 検索漏れの候補として記録（縦断・働く人） | `survey-S-05.md` §6・`survey-S-05-ai-judgments.md` §2 |
 

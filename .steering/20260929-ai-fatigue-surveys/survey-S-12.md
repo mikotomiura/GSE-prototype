@@ -24,7 +24,7 @@
 | CiNii Research（all） | 題名 | `(AI OR 人工知能 OR ChatGPT OR 大規模言語モデル OR LLM OR チャットボット) (疲労 OR 疲れ OR 疲弊 OR 燃え尽き OR バーンアウト OR 消耗 OR テクノストレス)` | 1 | 1 | 54 | 31 |
 | CiNii Research（all） | 題名 | `(生成AI OR ChatGPT OR 大規模言語モデル OR LLM) (負担 OR 負荷)` | 1 | 1 | 24 | 0 |
 | CiNii Research（all） | 題名 | `("generative AI" OR ChatGPT OR "large language model" OR "artificial intelligence" OR chatbot) (fatigue OR burnout OR exhaustion OR technostress)` | 1 | 1 | 19 | 18 |
-| CiNii Research（KAKEN の研究課題） | 題名 | 上の 3 本 | 3 | 3 | 9・2・2 | 11 |
+| CiNii Research（KAKEN の研究課題） | 題名 | 上の 3 本 | 3 | 3 | 9・2・2 | 11（重複を除く前。英語の組の 2 件は日本語の組の 9 件と重なる。負担の語の組の 2 件は通過していない） |
 | 国立国会図書館サーチ | 題名 | AI の語 6 × 疲労の語 7 | 42 | 9 | 132 | 30 |
 
 - AI の語: `AI`・`人工知能`・`ChatGPT`・`大規模言語モデル`・`LLM`・`チャットボット`。疲労の語: `疲労`・`疲れ`・`疲弊`・`燃え尽き`・`バーンアウト`・`消耗`・`テクノストレス`。狭い AI の語: `生成AI`・`ChatGPT`・`大規模言語モデル`・`LLM`。負担の語: `負担`・`負荷`。英語: `generative AI`・`ChatGPT`・`large language model`・`artificial intelligence`・`chatbot` × `fatigue`・`burnout`・`exhaustion`・`technostress`。
@@ -124,7 +124,7 @@
 
 ### 3.5 CiNii Research の英語の組で当たった、日本の対象者か未確認の英語論文（本節は 3.1〜3.4 と別に数える）
 
-CiNii Research の英語の組（19 件）には、日本の研究機関に限らない英語論文が入っていた。題名に AI の語と疲労の語を含み、上の区分に入らない次の 6 件は、抄録で対象者の国を確かめた（4.2）。
+CiNii Research の英語の組（19 件）には、日本の研究機関に限らない英語論文が入っていた。題名に AI の語と疲労の語を含み、上の区分に入らない次の 6 件は、抄録で対象者の国を確かめた（Dizon ほか 2025 は 4.1、ほかの 5 件は 4.2）。
 
 | 年 | 題名 | 収録先 | DOI |
 |---|---|---|---|
@@ -165,7 +165,7 @@ CiNii Research の英語の組（19 件）には、日本の研究機関に限�
 | RAMS 2026. Human Reliability Analysis for Repetitive Tasks … Human-AI Teaming. doi:10.1109/RAMS50514.2026.11424510 | 日本の原子力施設の点検の事例で、反復作業の認知的疲労を人間信頼性解析でモデル化 |
 | BMJ Open 2023. Effect of multimodal comprehensive communication skills training with video analysis by artificial intelligence for physicians on acute geriatric care … doi:10.1136/bmjopen-2022-065477 | 日本（所属は東京医療センター）の医師へのコミュニケーション技能の研修。AI は研修の前後の面接の動画を分析する道具で、副次評価項目に医師の燃え尽きの得点がある |
 | Liu H ほか 2024. Artificial Intelligence and Radiologist Burnout. *JAMA Netw Open*. doi:10.1001/jamanetworkopen.2024.48714 | 中国の放射線科医の調査（日本の対象者ではない） |
-| Duong CD ほか 2024. Compulsive ChatGPT usage, anxiety, burnout, and sleep disturbance … *Acta Psychologica*. doi:10.1016/j.actpsy.2024.104622 | ベトナムの大学生の調査（日本の対象者ではない） |
+| Duong CD ほか 2024. Compulsive ChatGPT usage, anxiety, burnout, and sleep disturbance … *Acta Psychologica*. doi:10.1016/j.actpsy.2024.104622 | ベトナムの ChatGPT の利用者 2,602 名の横断調査（構造方程式モデリング・日本の対象者ではない）。強迫的な ChatGPT の利用 → 不安・燃え尽き → 睡眠障害の経路 |
 | Chung J, Kwon H 2025. Privacy fatigue and its effects on ChatGPT acceptance … *Educ Inf Technol*. doi:10.1007/s10639-024-13198-6 | 韓国の大学生の調査（日本の対象者ではない） |
 | Hashem R ほか 2023. AI to the rescue … *RPTEL*. doi:10.58459/rptel.2024.19023 | 中等学校の教員の負担軽減と燃え尽きの予防に ChatGPT が役立つかを調べた。抄録は UAE の AI 統合の目標に触れる（日本の対象者ではない） |
 | Shah SJ ほか 2024. Ambient AI scribes … *JAMIA*. doi:10.1093/jamia/ocae295 | 米国（Stanford Health Care）の医師 48 名（日本の対象者ではない） |

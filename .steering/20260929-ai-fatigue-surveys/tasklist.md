@@ -18,7 +18,7 @@
 - [x] `researcher-requests.md`（[研究者] 有料データベース 3・本文の入手 9）
 
 ## 検査
-- [x] `python scripts/check_survey_files.py` が緑（事実 5 本・判定案 6 本・違反 0）・`--selftest` で変異 63 種がすべて赤
+- [x] `python scripts/check_survey_files.py` が緑（事実 7 本・判定案 6 本・違反 0）・`--selftest` で変異 141 種がすべて赤（レビュー後に検査を強めた・判断 13）
 - [ ] 本文・PDF・抄録の全文・尺度の項目文がコミットに無いこと（`git diff --stat` と evidence の鍵の検査）
 - [ ] DB の xlsx が変わっていないこと（`git diff --stat` に xlsx が無い）
 
