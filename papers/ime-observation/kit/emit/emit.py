@@ -11,21 +11,27 @@ per-step ``at_ms``); it never chooses an interval itself. Every key it sends is 
 and monotonic time taken immediately before dispatch, so the oracle states what was intended and when it was
 actually sent. The oracle is used only to verify the observed ground truth, never as an input to an observer.
 
-Sending is opt-in. A backend that posts real key events is refused with exit status 2 unless the flag named
-by ``SEND_FLAG`` is given, and no output file is created in that case. Synthetic keys go to the application
-that is in front, so run a real backend only against a prepared target window.
+Sending is opt-in, and the gate sits in ``Emitter`` itself: a backend other than ``dryrun`` is not opened
+unless the emitter was constructed with ``allow_send=True``, and no output file is created otherwise. The
+command line passes ``allow_send`` only when the flag named by ``SEND_FLAG`` is given (exit status 2 without
+it). Synthetic keys go to the application that is in front, so run a real backend only against a prepared
+target window.
 
 Library use (an orchestrator that also resets the input method between blocks)::
 
-    with Emitter(backend, out_path, plan_sha256, os_name, backend_name) as em:
+    with Emitter(backend, out_path, plan_sha256, os_name, backend_name,
+                 allow_send=True, supported_keys=module.SUPPORTED_KEYS) as em:
         em.write_reset(block_id, exit_code)
         em.run_block(block, trials)
 
 The context manager opens the backend on entry and always closes it on exit, including after an exception.
+``run_block`` checks, before it sends anything, that every key of the block is in ``supported_keys``.
 
 Backend contract (``backend_<name>.py``): ``SUPPORTED_KEYS`` (a frozenset of key names, pseudo-keys
 included) and a ``Backend`` class with ``__init__(opts)`` (unknown options raise), ``open()``, ``send(key, down)``,
 and ``close()``. A plan that uses a key outside ``SUPPORTED_KEYS`` is refused before anything is sent.
+A backend module may also define ``KEY_OPTIONS``, a mapping from a key name to the backend option that the key
+needs; a plan that uses such a key without the option is refused before anything is sent.
 
 Exit status: 0 success / 1 validation failed or a run failed / 2 the run was refused or could not start.
 """
@@ -37,9 +43,12 @@ import io
 import json
 import os
 import re
+import signal
+import subprocess
 import sys
 import tempfile
 import time
+import types
 
 EMITTER_VERSION = "1"
 SEND_FLAG = "--i-understand-this-sends-keys"
@@ -59,10 +68,23 @@ KEYS_OF_KIND = {
     "reset": ("block_id", "exit_code"),
 }
 TIME_KEYS = ("t_wall_ms", "t_mono_ns")
+KEYNAMES = frozenset(
+    [chr(c) for c in range(ord("a"), ord("z") + 1)] + [str(d) for d in range(10)]
+    + ["f%d" % n for n in range(13, 20)]
+    + ["space", "enter", "esc", "backspace", "tab", "left", "right", "up", "down", "minus", "comma",
+       "period", "ime_on", "ime_off", "shift", "mouse_click", "focus_away", "focus_back"])
+MAX_PLAN_BYTES = 16 * 1024 * 1024   # size limit of a plan file
+MAX_AT_MS = 3600000                 # upper bound of a step time (one hour into a trial)
+MAX_GAP_MS = 3600000                # upper bound of gap_before_ms and marker_gap_ms
+SIGTERM_STATUS = 143
 
 
 class PlanError(Exception):
     pass
+
+
+class SendRefused(Exception):
+    """Raised when an emitter is asked to open a real backend without permission to send."""
 
 
 def _is_int(v):
@@ -75,19 +97,73 @@ def _dumps(obj):
 
 # ------------------------------------------------------------------ plan
 
+def _no_duplicate_keys(pairs):
+    obj = {}
+    for k, v in pairs:
+        if k in obj:
+            raise ValueError("repeated key")
+        obj[k] = v
+    return obj
+
+
+def _check_steps(n, steps):
+    if not isinstance(steps, list):
+        raise PlanError("line %d: steps must be an array" % n)
+    prev, held = 0, set()
+    for s in steps:
+        if (not isinstance(s, dict) or not isinstance(s.get("key"), str)
+                or not _is_int(s.get("at_ms")) or s["at_ms"] < prev or s["at_ms"] > MAX_AT_MS
+                or not isinstance(s.get("down"), bool)):
+            raise PlanError("line %d: malformed, out-of-order, or too late step (at_ms is at most %d)"
+                            % (n, MAX_AT_MS))
+        prev = s["at_ms"]
+        if s["down"]:
+            if s["key"] in held:
+                raise PlanError("line %d: a key is pressed twice without a release" % n)
+            held.add(s["key"])
+        elif s["key"] in held:
+            held.discard(s["key"])
+        else:
+            raise PlanError("line %d: a key is released without a press" % n)
+    if held:
+        raise PlanError("line %d: a trial ends with a key still pressed" % n)
+
+
+def _check_gap(n, row, name, required):
+    if name not in row:
+        if required:
+            raise PlanError("line %d: %s is required" % (n, name))
+        return
+    if not _is_int(row[name]) or not 0 <= row[name] <= MAX_GAP_MS:
+        raise PlanError("line %d: %s must be an integer from 0 to %d" % (n, name, MAX_GAP_MS))
+
+
 def read_plan(path):
-    """Return (sha256 of the file bytes, header, [(block, [trial, ...]), ...]); raise PlanError."""
+    """Return (sha256 of the file bytes, header, [(block, [trial, ...]), ...]); raise PlanError.
+
+    Everything is checked before the caller sends a key: row shapes, integer ranges, unique block and trial
+    identifiers, repeated JSON keys, nesting depth, file size, and the pairing of presses and releases in
+    every trial. ``gap_before_ms`` is optional (absent means no wait); ``marker_gap_ms`` is required when the
+    marker is not empty.
+    """
+    if os.path.getsize(path) > MAX_PLAN_BYTES:
+        raise PlanError("the plan file is larger than %d bytes" % MAX_PLAN_BYTES)
     with open(path, "rb") as f:
-        raw = f.read()
+        raw = f.read(MAX_PLAN_BYTES + 1)
+    if len(raw) > MAX_PLAN_BYTES:
+        raise PlanError("the plan file is larger than %d bytes" % MAX_PLAN_BYTES)
     sha = hashlib.sha256(raw).hexdigest()
     header, blocks = None, []
+    block_ids, trial_ids = set(), set()
     for n, line in enumerate(raw.decode("utf-8").splitlines(), 1):
         if not line.strip():
             continue
         try:
-            row = json.loads(line)
+            row = json.loads(line, object_pairs_hook=_no_duplicate_keys)
+        except RecursionError:
+            raise PlanError("line %d: nested too deeply" % n)
         except ValueError:
-            raise PlanError("line %d: not JSON" % n)
+            raise PlanError("line %d: not JSON, or a key is repeated" % n)
         if not isinstance(row, dict):
             raise PlanError("line %d: not an object" % n)
         kind = row.get("kind")
@@ -96,12 +172,17 @@ def read_plan(path):
                 raise PlanError("line %d: the first row must be a plan/1 header with a known os" % n)
             header = row
         elif kind == "block":
-            if not _is_int(row.get("block_id")) or not isinstance(row.get("marker", []), list):
-                raise PlanError("line %d: malformed block row" % n)
-            if not all(isinstance(k, str) for k in row.get("marker", [])):
+            marker = row.get("marker")
+            if not _is_int(row.get("block_id")) or not isinstance(marker, list):
+                raise PlanError("line %d: malformed block row (block_id and marker are required)" % n)
+            if row["block_id"] in block_ids:
+                raise PlanError("line %d: block_id repeats" % n)
+            block_ids.add(row["block_id"])
+            if not all(isinstance(k, str) for k in marker):
                 raise PlanError("line %d: marker must list key names" % n)
-            if not all(_is_int(row.get(k, 0)) and row.get(k, 0) >= 0 for k in ("marker_gap_ms",)):
-                raise PlanError("line %d: marker_gap_ms must be a non-negative integer" % n)
+            _check_gap(n, row, "marker_gap_ms", bool(marker))
+            if "reset_ime" in row and not isinstance(row["reset_ime"], bool):
+                raise PlanError("line %d: reset_ime must be a boolean" % n)
             blocks.append((row, []))
         elif kind == "trial":
             if not blocks:
@@ -110,18 +191,11 @@ def read_plan(path):
                 raise PlanError("line %d: block_id differs from the preceding block row" % n)
             if not isinstance(row.get("trial_id"), str):
                 raise PlanError("line %d: trial_id must be a string" % n)
-            if not (_is_int(row.get("gap_before_ms", 0)) and row.get("gap_before_ms", 0) >= 0):
-                raise PlanError("line %d: gap_before_ms must be a non-negative integer" % n)
-            prev = 0
-            steps = row.get("steps")
-            if not isinstance(steps, list):
-                raise PlanError("line %d: steps must be an array" % n)
-            for s in steps:
-                if (not isinstance(s, dict) or not isinstance(s.get("key"), str)
-                        or not _is_int(s.get("at_ms")) or s["at_ms"] < prev
-                        or not isinstance(s.get("down"), bool)):
-                    raise PlanError("line %d: malformed or out-of-order step" % n)
-                prev = s["at_ms"]
+            if row["trial_id"] in trial_ids:
+                raise PlanError("line %d: trial_id repeats" % n)
+            trial_ids.add(row["trial_id"])
+            _check_gap(n, row, "gap_before_ms", False)
+            _check_steps(n, row.get("steps"))
             blocks[-1][1].append(row)
         else:
             raise PlanError("line %d: unknown row kind" % n)
@@ -130,12 +204,23 @@ def read_plan(path):
     return sha, header, blocks
 
 
+def block_keys(block, trials):
+    keys = set(block.get("marker", []))
+    for t in trials:
+        keys.update(s["key"] for s in t["steps"])
+    return keys
+
+
+def check_key_options(module, keys, opts):
+    """Return the key names that need a backend option the caller did not give (sorted)."""
+    needs = getattr(module, "KEY_OPTIONS", {})
+    return sorted(k for k in keys if k in needs and needs[k] not in opts)
+
+
 def plan_keys(blocks):
     keys = set()
     for block, trials in blocks:
-        keys.update(block.get("marker", []))
-        for t in trials:
-            keys.update(s["key"] for s in t["steps"])
+        keys.update(block_keys(block, trials))
     return keys
 
 
@@ -160,14 +245,24 @@ def _stamp():
 
 
 class Emitter(object):
-    def __init__(self, backend, out, plan_sha256, os_name, backend_name):
+    def __init__(self, backend, out, plan_sha256, os_name, backend_name, allow_send=False, supported_keys=None):
         self.backend = backend
         self.out = out
+        self._name = backend_name
+        self._allow_send = bool(allow_send)
+        self._supported = None if supported_keys is None else frozenset(supported_keys)
         self._header = {"kind": "header", "format": "oracle/1", "plan_sha256": plan_sha256,
                         "os": os_name, "emitter_version": EMITTER_VERSION, "backend": backend_name}
         self._f = None
 
     def __enter__(self):
+        if self._name != "dryrun":
+            if not self._allow_send:
+                raise SendRefused("backend %s sends real key events; the emitter was not given permission to send"
+                                  % self._name)
+            if self._supported is None:
+                raise SendRefused("backend %s needs supported_keys so that a block is checked before it is sent"
+                                  % self._name)
         self._f = open(self.out, "x", encoding="utf-8", newline="\n")
         try:
             self._row(self._header)
@@ -203,6 +298,10 @@ class Emitter(object):
         self._emit("reset", block_id=block_id, exit_code=exit_code)
 
     def run_block(self, block, trials):
+        if self._supported is not None:
+            unsupported = sorted(block_keys(block, trials) - self._supported)
+            if unsupported:
+                raise PlanError("keys not supported by backend %s: %s" % (self._name, ", ".join(unsupported)))
         block_id = block["block_id"]
         self._emit("block_begin", block_id=block_id)
         gap = block.get("marker_gap_ms", 0)
@@ -259,6 +358,7 @@ def validate_oracle(path):
     block_id, marker_seq, trial_started = None, 0, False
     trial_id, step, down = None, 0, set()
     seen_trials, last_mono = set(), None
+    pending_reset = None     # block_id of a reset row that still needs its block_begin
     for idx, (n, line) in enumerate(lines):
         if re.search(r"\s", line) or "\\" in line:
             bad(n, "whitespace or a backslash outside the compact form")
@@ -296,15 +396,23 @@ def validate_oracle(path):
         if kind in ("block_begin", "block_end", "marker", "reset") and not _is_int(row["block_id"]):
             bad(n, "block_id must be an integer")
             continue
+        if pending_reset is not None and kind != "block_begin":
+            bad(n, "a reset row must be followed directly by block_begin")
+            pending_reset = None
         if kind == "reset":
             if state != "top" or not _is_int(row["exit_code"]):
                 bad(n, "reset must sit between blocks and carry an integer exit_code")
+            pending_reset = row["block_id"]
         elif kind == "block_begin":
             if state != "top":
                 bad(n, "block_begin inside a block")
+            if pending_reset is not None and pending_reset != row["block_id"]:
+                bad(n, "block_id differs from the preceding reset row")
+            pending_reset = None
             state, block_id, marker_seq, trial_started = "block", row["block_id"], 0, False
         elif kind == "marker":
-            if state != "block" or trial_started or row["block_id"] != block_id or row["seq"] != marker_seq:
+            if (state != "block" or trial_started or row["block_id"] != block_id or not _is_int(row["seq"])
+                    or row["seq"] != marker_seq):
                 bad(n, "marker out of place or out of sequence")
             marker_seq += 1
         elif kind == "trial_begin":
@@ -313,10 +421,12 @@ def validate_oracle(path):
             state, trial_id, step, down, trial_started = "trial", row["trial_id"], 0, set(), True
             seen_trials.add(row["trial_id"])
         elif kind == "sent":
-            if state != "trial" or row["trial_id"] != trial_id or row["step"] != step:
+            if state != "trial" or row["trial_id"] != trial_id or not _is_int(row["step"]) or row["step"] != step:
                 bad(n, "sent outside its trial or out of step order")
             elif not isinstance(row["key"], str) or not isinstance(row["down"], bool):
                 bad(n, "sent needs a string key and a boolean down")
+            elif row["key"] not in KEYNAMES:
+                bad(n, "sent carries a key outside the enumeration of key names")
             elif row["down"]:
                 if row["key"] in down:
                     bad(n, "key pressed twice without a release")
@@ -338,6 +448,8 @@ def validate_oracle(path):
             state = "top"
     if state != "top":
         errors.append("the file ends inside an open %s" % state)
+    if pending_reset is not None:
+        errors.append("the file ends with a reset row that has no block_begin")
     return errors
 
 
@@ -367,6 +479,14 @@ def parse_opts(items):
     return opts
 
 
+def wants_reset(blocks):
+    return any(block.get("reset_ime") is True for block, _ in blocks)
+
+
+def _terminate(signum, frame):
+    sys.exit(SIGTERM_STATUS)
+
+
 def run(args):
     try:
         opts = parse_opts(args.backend_opt)
@@ -380,17 +500,30 @@ def run(args):
         return 2
     try:
         module = load_backend(args.backend)
-    except PlanError as e:
-        print("emit: %s" % e, file=sys.stderr)
+    except (PlanError, ValueError, OSError, SyntaxError, ImportError) as e:
+        print("emit: backend %s could not be loaded: %s" % (args.backend, e), file=sys.stderr)
         return 2
     if args.backend != "dryrun" and header["os"] != args.backend:
         print("emit: the plan is for %s but the backend is %s" % (header["os"], args.backend), file=sys.stderr)
         return 2
-    unsupported = sorted(plan_keys(blocks) - set(module.SUPPORTED_KEYS))
+    keys = plan_keys(blocks)
+    unsupported = sorted(keys - set(module.SUPPORTED_KEYS))
     if unsupported:
         print("emit: keys not supported by backend %s: %s" % (args.backend, ", ".join(unsupported)),
               file=sys.stderr)
         return 2
+    missing = check_key_options(module, keys, opts)
+    if missing:
+        print("emit: keys that need a backend option that was not given: %s" % ", ".join(missing),
+              file=sys.stderr)
+        return 2
+    if wants_reset(blocks):
+        if args.backend != "dryrun":
+            print("emit: a block asks for an input-method reset, which the command line does not perform; "
+                  "the procedure that prepares each cell resets the input method, so drive the Emitter "
+                  "class from it instead", file=sys.stderr)
+            return 2
+        print("emit: note: reset_ime is ignored by the command line (dryrun continues)", file=sys.stderr)
     if os.path.exists(args.out):
         print("emit: refusing to overwrite an existing output file", file=sys.stderr)
         return 2
@@ -399,13 +532,20 @@ def run(args):
     except (ValueError, TypeError) as e:
         print("emit: %s" % e, file=sys.stderr)
         return 2
+    previous = signal.signal(signal.SIGTERM, _terminate)
     try:
-        with Emitter(backend, args.out, sha, header["os"], args.backend) as em:
+        with Emitter(backend, args.out, sha, header["os"], args.backend,
+                     allow_send=args.send_flag, supported_keys=module.SUPPORTED_KEYS) as em:
             for block, trials in blocks:
                 em.run_block(block, trials)
-    except (RuntimeError, OSError) as e:
+    except (SendRefused, PlanError) as e:
+        print("emit: %s" % e, file=sys.stderr)
+        return 2
+    except (RuntimeError, OSError, subprocess.SubprocessError) as e:
         print("emit: run failed: %s" % e, file=sys.stderr)
         return 1
+    finally:
+        signal.signal(signal.SIGTERM, previous)
     return 0
 
 
@@ -534,11 +674,146 @@ def selftest():
                 f.write(body)
             check("validation rejects %s" % name, _quiet_main(["--validate", p]) == 1)
 
-        # sending is opt-in
-        for real in ("macos", "windows"):
-            o = os.path.join(tmp, "real_%s.jsonl" % real)
-            check("backend %s without the send flag exits 2 and writes nothing" % real,
-                  _quiet_main(["--plan", plan, "--out", o, "--backend", real]) == 2 and not os.path.exists(o))
+        marks = [r for r in rows if r["kind"] == "marker"]
+        check("the marker gap of the plan is honoured",
+              len(marks) >= 2 and (marks[1]["t_mono_ns"] - marks[0]["t_mono_ns"]) >= (5 - 1) * 1000000)
+
+        # sending is opt-in: the real-backend path runs the real main() with load_backend replaced by a sentinel
+        # that raises when called, so the check cannot reach a backend module at all
+        loaded = []
+
+        def sentinel_loader(name):
+            loaded.append(name)
+            raise AssertionError("load_backend must not be reached without the send flag")
+
+        original_loader = globals()["load_backend"]
+        globals()["load_backend"] = sentinel_loader
+        try:
+            for real in ("macos", "windows"):
+                o = os.path.join(tmp, "real_%s.jsonl" % real)
+                check("backend %s without the send flag exits 2 and writes nothing" % real,
+                      _quiet_main(["--plan", plan, "--out", o, "--backend", real]) == 2 and not os.path.exists(o))
+        finally:
+            globals()["load_backend"] = original_loader
+        check("no backend module was loaded on the refused paths", loaded == [])
+
+        # the gate is in Emitter: used directly, it does not open a real backend without allow_send
+        class Sentinel(object):
+            opened = 0
+            closed = 0
+
+            def open(self):
+                Sentinel.opened += 1
+                raise AssertionError("a real backend was opened without permission")
+
+            def send(self, key, down):
+                raise AssertionError("a key was sent without permission")
+
+            def close(self):
+                Sentinel.closed += 1
+
+        o = os.path.join(tmp, "direct.jsonl")
+        try:
+            with Emitter(Sentinel(), o, "0" * 64, "macos", "macos", supported_keys=["a"]):
+                pass
+            refused = False
+        except SendRefused:
+            refused = True
+        check("an Emitter used directly does not open a real backend without allow_send",
+              refused and Sentinel.opened == 0 and not os.path.exists(o))
+        try:
+            with Emitter(Sentinel(), o, "0" * 64, "macos", "macos", allow_send=True):
+                pass
+            refused = False
+        except SendRefused:
+            refused = True
+        check("a real backend needs supported_keys as well", refused and Sentinel.opened == 0
+              and not os.path.exists(o))
+
+        # read_plan refuses a malformed plan before anything is sent
+        base_rows = _load_rows(plan)
+
+        def plan_with(edit):
+            rows2 = json.loads(json.dumps(base_rows))
+            edit(rows2)
+            p2 = os.path.join(tmp, "variant.jsonl")
+            with open(p2, "w", encoding="utf-8", newline="\n") as f:
+                for r in rows2:
+                    f.write(_dumps(r) + "\n")
+            return p2
+
+        def rejected(path2):
+            try:
+                read_plan(path2)
+                return False
+            except PlanError:
+                return True
+
+        def double_press(rows2):
+            rows2[2]["steps"].insert(1, {"key": "a", "at_ms": 1, "down": True})
+
+        def stray_release(rows2):
+            rows2[2]["steps"].insert(0, {"key": "b", "at_ms": 0, "down": False})
+
+        def held_at_end(rows2):
+            rows2[2]["steps"].append({"key": "c", "at_ms": 300, "down": True})
+
+        def no_marker(rows2):
+            del rows2[1]["marker"]
+
+        def no_marker_gap(rows2):
+            del rows2[1]["marker_gap_ms"]
+
+        def repeated_trial(rows2):
+            rows2[3]["trial_id"] = rows2[2]["trial_id"]
+
+        def repeated_block(rows2):
+            rows2[-4]["block_id"] = 0
+
+        def too_late(rows2):
+            rows2[2]["steps"].append({"key": "d", "at_ms": MAX_AT_MS + 1, "down": True})
+
+        cases = {"a key pressed twice": double_press, "a release without a press": stray_release,
+                 "a key still pressed at the end of a trial": held_at_end, "a block without marker": no_marker,
+                 "a marker without marker_gap_ms": no_marker_gap, "a repeated trial_id": repeated_trial,
+                 "a step later than the limit": too_late}
+        for name, edit in cases.items():
+            check("read_plan rejects %s" % name, rejected(plan_with(edit)))
+        check("read_plan rejects a repeated block_id", rejected(plan_with(repeated_block)))
+        p2 = os.path.join(tmp, "dup.jsonl")
+        with open(plan, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        lines[1] = lines[1].replace('"kind":"block",', '"kind":"block","kind":"block",', 1)
+        with open(p2, "w", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join(lines) + "\n")
+        check("read_plan rejects a repeated JSON key", rejected(p2))
+        with open(p2, "w", encoding="utf-8", newline="\n") as f:
+            f.write(lines[0] + "\n" + "[" * 100000 + "\n")
+        check("read_plan rejects deep nesting without crashing", rejected(p2))
+        saved = globals()["MAX_PLAN_BYTES"]
+        globals()["MAX_PLAN_BYTES"] = 100
+        try:
+            check("read_plan rejects an oversized file", rejected(plan))
+        finally:
+            globals()["MAX_PLAN_BYTES"] = saved
+
+        # validation of the oracle beyond the basic shape
+        good = open(out, encoding="utf-8").read()
+        olines = good.splitlines()
+        reset_row = _dumps({"kind": "reset", "block_id": 5, "exit_code": 0, "t_wall_ms": 1, "t_mono_ns": 1})
+        extra = {
+            "a boolean step": good.replace('"step":0,', '"step":false,', 1),
+            "a key outside the enumeration": good.replace('"key":"a"', '"key":"zz"', 1),
+            "a reset row with no block_begin after it": good + _dumps(
+                {"kind": "reset", "block_id": 9, "exit_code": 0, "t_wall_ms": 1,
+                 "t_mono_ns": 10 ** 18}) + "\n",
+            "a reset row for another block": "\n".join(olines[:1] + [reset_row] + olines[1:]) + "\n",
+        }
+        for name, body in extra.items():
+            p3 = os.path.join(tmp, "extra.jsonl")
+            with open(p3, "w", encoding="utf-8", newline="\n") as f:
+                f.write(body)
+            check("validation rejects %s" % name, _quiet_main(["--validate", p3]) == 1)
 
         # a key outside SUPPORTED_KEYS stops the run before anything is sent
         plan_bad = os.path.join(tmp, "plan_bad.jsonl")
@@ -550,6 +825,21 @@ def selftest():
         # the backend is always closed, including after a failure mid-run
         module = load_backend("dryrun")
         _, _, blocks = read_plan(plan)
+        quiet = module.Backend({})
+        try:
+            with Emitter(quiet, os.path.join(tmp, "prechecked.jsonl"), "0" * 64, "macos", "dryrun",
+                         supported_keys=["a"]) as em:
+                em.run_block(blocks[0][0], blocks[0][1])
+            stopped = False
+        except PlanError:
+            stopped = True
+        check("Emitter checks every key of a block against supported_keys before sending",
+              stopped and quiet.sends == 0)
+        fake = types.SimpleNamespace(KEY_OPTIONS={"focus_away": "away_app"})
+        check("a key that needs a backend option is refused when the option is missing",
+              check_key_options(fake, {"a", "focus_away"}, {}) == ["focus_away"]
+              and check_key_options(fake, {"a", "focus_away"}, {"away_app": "x"}) == [])
+        check("the plan asks for an input-method reset in its second block", wants_reset(blocks))
         backend = module.Backend({"fail_after": "10"})
         try:
             with Emitter(backend, os.path.join(tmp, "failed.jsonl"), "0" * 64, "macos", "dryrun") as em:
