@@ -50,6 +50,29 @@
 - **制約**: 無料の学術 API だけ（判断 3）。検索式はサーヴェイごとに `design.md` に固定してから回す（前タスクの作法）。コンテキストが半分を超えたら、残りを引き継ぎに書いて区切る（記憶 `feedback_session_split_at_half_context`）。
 - 要件（`requirement.md`）のスコープを改めた。
 
+## 判断 8: S-14 の検索が種文献を 1 件も拾わなかったので、補いの検索を足した（design.md S2 からの逸脱・2026-09-30 04:05）
+
+- **見つけ方**: S-14 の検索（04:01・`evidence/S-14/s14_results_2026-09-30.json`）の `seeds` で、種文献 3 件（AF019・S-02 #9 Kim & Lee 2024・S-02 #2 Honggang ほか 2026）がどれも `found_in_runs: false`。★ S-15 は種文献 2 件とも当たっていた。
+- **原因**（検索式と題名・抄録を突き合わせた）: (1) Europe PMC E1 と Semantic Scholar S1 の AI の語群に単独の `AI` が無い（Honggang の題名は「AI dependency」で、`"artificial intelligence"` を含まない）。(2)「AI の導入 → 仕事のストレス → 燃え尽き」の型（Kim & Lee 2024）は `technostress` 等の語を使わず `job stress` と書くが、その語が無い。(3) AF019 と Kim & Lee 2024 は Europe PMC に記録が無く、Semantic Scholar には抄録が無い（出版社が配っていない）ので、題名だけで当たる必要がある。
+- **採用**（補いの結果を見る前に固定）: 同じ 0 段目の 3 群のまま、補いの検索 2 本を `S-14s` として回し、S-14 の本検索と重複を除いて抽出に回す。
+  - Europe PMC E3: `TITLE_ABS:(technostress OR "job stress" OR "work stress" OR "occupational stress" OR "AI anxiety" OR "AI awareness" OR STARA) AND TITLE_ABS:(burnout OR "burn-out" OR exhaustion OR "emotional exhaustion") AND TITLE_ABS:(AI OR "artificial intelligence" OR "AI adoption" OR "AI dependency" OR "generative AI" OR ChatGPT)`
+  - Semantic Scholar S3: `("AI adoption" | "AI dependency" | "AI use" | "AI usage" | "AI implementation") + ("job stress" | technostress | "work stress") + (burnout | exhaustion)`
+  - 0 段目のストレッサーの群はもとから `stress` を含むので変えない。
+- **失うもの**: 種文献が補いでも当たらなければ、題名に燃え尽きもストレスの語も無い研究（AF019 のように「幸福」「JD-R」と書くもの）は拾えないと事実のファイルに書く。
+
+## 判断 9: 種文献の確かめの結果（S-14 の補い・S-13）（2026-09-30 04:03〜04:06）
+
+- **S-14 の補い**（`S-14s`・04:02）: 種文献 3 件のうち 2 件（Kim & Lee 2024・Honggang ほか 2026）が当たった。★ AF019 は Europe PMC に記録が無く、Semantic Scholar にも抄録が無い（出版社が配っていない）ため、題名（「JD-R」「幸福」）だけでは当たらない。正規表現の漏れではなく情報源の欠けとして、事実のファイルに書く。0 段目は補いの 44 件がすべて通過（検索式が 0 段目の 3 群とほぼ同じ語のため）。
+- **S-13**（04:03）: 種文献 2 件とも当たらなかった。(1) Jeong ほか 2024（S-02 #11）は 0 段目の疲労の語群を通らない。★ 前タスクの事実のファイル（`issue-status.md` §3）で「疲労・燃え尽きを測っていない」と確かめた研究で、**種文献の選び方の誤り**（S-13 の問いは疲労系の測定を条件にする）。正規表現は変えない。(2) AF019 は S-14 と同じ理由。
+  - ★ 代わりの確かめ（結果を見た後なので、記録にとどめる）: 組織の方針と燃え尽きを扱う既知の研究 Gallup のパネル（S-04 の抽出の表 R262・`10.65864/zpxksxfkfk`）は S-13 で当たり、0 段目も通った。S-02 #1（Asmi ほか 2026・組織のストレス要因と意思決定疲労）は当たらなかった（Emerald の抄録が情報源に無い）。
+- 採用: 検索式・0 段目は変えずに抽出へ進む。種文献の限界は事実のファイルの検索記録に書く。
+
+## 判断 10: 検索の記録の JSON の 500 字を超える検索式を、AND の節のリストに書き換えた（2026-09-30 04:25 ごろ）
+
+- **見つけ方**: `scripts/check_surveys_here.py`（前タスクの検査器の `run()`）が `evidence/S-15/s15_results_2026-09-30.json` の `runs[0].query`（555 字）を「500 字を超える文字列」で赤にした。この規則は抄録の混入を見張るためのもので、中身は design.md S1 の Europe PMC E1 の検索式そのもの。
+- **採用**: その 1 か所だけを `" AND "` で分けた 3 節のリストに置き換え、`query_note` に理由を書いた（`" AND ".join` で元の式に戻ることと、`run_id` が変わらないことを確かめてから書き戻した）。ほかの JSON に 500 字を超える文字列は無い。
+- ★ 実行した版の記録の書き換えにあたるので、ここに残す。検査の規則（500 字）は変えていない。
+
 ## 判断 6: 前タスクの事実のファイル `survey-S-08.md` の節の番号の誤りを直した（2026-09-30）
 
 - 「Table S6 は 30 項目版（本文 §4 の記述）」の §4 は、AF001 の出版社版 PDF では §3.2.2（研究 1 の結果）。§4 は研究 2 の EFA。補足資料（出版社の公開ファイル）の表題「30-Item Scale Used for EFA」でも確かめた。日付つきの注で直した。
