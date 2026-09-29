@@ -288,6 +288,29 @@ mutate "台帳の走査: 期限切れを打ち切りとして扱わない" \
 mutate "点検の走査: 期限切れを打ち切りとして扱わない" \
   's/  if \(it\.timedOut\(\)\) truncated = true;[^\n]*\n(  var elapsed)/$1/'
 
+# ★ 2026-09-28 見た目（状況ボード・受領台帳の書式）
+mutate "見た目: 要対応順に並べない" \
+  's/return rows\.slice\(\)\.sort\(function \(a, b\) \{/return rows.slice().sort(function (a, b) { return 0;/'
+mutate "見た目: 途絶の色を欠番の色にする" \
+  's/\{ flag: O1_LEDGER_FLAG_STALE, bg: O1_UI\.dangerBg, fg: O1_UI\.dangerFg \}/{ flag: O1_LEDGER_FLAG_STALE, bg: O1_UI.gapBg, fg: O1_UI.dangerFg }/'
+mutate "見た目: 途絶タブを clear でなく clearContents（前回の色が残る）" \
+  's/  dash\.clear\(\); \/\/ ★ 値と書式の両方/  dash.clearContents(); \/\/ ★ 値と書式の両方/'
+mutate "見た目: 途絶タブの見出しを固定しない" \
+  's/  dash\.setFrozenRows\(H\);/  dash.setFrozenRows(2);/'
+mutate "見た目: 受領台帳の書式を毎回付け直す（研究者の列幅を戻す）" \
+  's/  if \(sheet\.getFrozenRows\(\) === 2\) return false;\n  var width = O1_LEDGER_HEAD\.length;/  var width = O1_LEDGER_HEAD.length;/'
+mutate "見た目: 条件付き書式の範囲を 1 列狭くする" \
+  's/sheet\.getRange\("A3:" \+ colLetter\(width - 1\)\)/sheet.getRange("A3:" + colLetter(width - 2))/'
+mutate "見た目: 結合を表題の 4 行だけ解く（空の案内行の結合が残る）" \
+  's/dash\.getRange\(1, 1, dash\.getMaxRows\(\), width\)\.breakApart\(\);/dash.getRange(1, 1, H - 1, width).breakApart();/'
+mutate "見た目: 経過日数の赤字を外す" \
+  's/dash\.getRange\(row, 4\)\.setFontColor\(O1_UI\.dangerFg\)/dash.getRange(row, 4).setFontColor(O1_UI.ink)/'
+
+mutate "見た目: 途絶タブの書式の例外を捕まえない（通知が止まる）" \
+  's/\} catch \(e\) \{\n    console\.log\("⚠️ 途絶タブの見た目/} catch (e) { throw e;\n    console.log("⚠️ 途絶タブの見た目/'
+mutate "見た目: 受領台帳の書式の例外を捕まえない（走査が止まる）" \
+  's/  try \{\n    o1LedgerStyleLedgerTab_\(sheet\);/  o1LedgerStyleLedgerTab_(sheet); if (false) try {/'
+
 echo
 echo "壊すと赤: $PASS / 穴: $FAIL"
 if [ "$FAIL" -ne 0 ]; then

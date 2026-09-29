@@ -1683,7 +1683,8 @@ function o1EnsureMgmtTab_(ss, tab, banner) {
     // ★ ロスターと同じ形にする（行 1 バナー / 行 2 見出し / 行 3+ データ）。
     sheet.appendRow([banner]);
     sheet.appendRow(O1_MGMT_HEAD.slice());
-    Logger.log("✅ 「" + tab + "」を作りました（★ バナー + 見出し）。");
+    o1StyleMgmtTab_(sheet, tab === O1_MGMT_REJECT_TAB);
+    Logger.log("✅ 「" + tab + "」を作りました（★ バナー + 見出し + 見た目）。");
     return;
   }
   // ⚠️★ **見出し行が無い形**（バナーだけ / 列が足りない）を先に見る（code-reviewer LOW）。
@@ -1713,7 +1714,66 @@ function o1EnsureMgmtTab_(ss, tab, banner) {
       );
     }
   }
-  Logger.log("ℹ️ 「" + tab + "」は既にあります（★ 何も変えていません）。");
+  // ★ 見た目だけ整える（★ 値には触れない・初回だけ = 固定行が 2 でないとき）。
+  var styled = false;
+  try {
+    styled = o1StyleMgmtTab_(sheet, tab === O1_MGMT_REJECT_TAB);
+  } catch (e) {
+    Logger.log("⚠️ 「" + tab + "」の見た目を整えられませんでした（★ 値には触れていません）: " + e);
+  }
+  Logger.log(
+    "ℹ️ 「" + tab + "」は既にあります（★ 値は何も変えていません" + (styled ? "・見た目を整えました" : "") + "）。"
+  );
+}
+
+// ★ 見た目（2026-09-28 研究者依頼「視覚的にも理解しやすい形に」・`.steering/20260928-o1-mgmt-sheet-design/`）。
+//   ★ 配色は Phase1 管理シート（`Form_Phase1/GSE_Phase1_Form_Builder.gs` の `UI_*`）と
+//     台帳の `O1_UI`（`GSE_O1_Ledger.gs`）に揃える（⚠️ 別プロジェクトなので定数は共有できない）。
+var O1_MGMT_UI = {
+  navy: "#1a3a5c", white: "#ffffff", accent: "#eaf2fb", ink: "#333333", muted: "#8a97a5",
+  okBg: "#e8f5e9", okFg: "#1e7e34", warnBg: "#fff8e1", warnFg: "#8a6d00",
+  dangerBg: "#fdecea", dangerFg: "#b71c1c", grayBg: "#f1f3f4"
+};
+/** 列幅（px・`O1_MGMT_HEAD` と同じ順: 記録日時 / 種別 / P-ID / 結果 / 理由 / 備考）。 */
+var O1_MGMT_WIDTHS = [150, 80, 70, 70, 200, 260];
+
+/**
+ * 登録ログ・却下ログの見た目を整える。★ **値には触れない**（追記のみの約束）。
+ * ★ 固定行が 2 でないとき（＝初回）だけ付ける —— 研究者が列幅を変えても毎回戻さない。
+ * ★ 色は**条件付き書式**（これから追記される行にも効く）:
+ *   結果 ok = 緑 / partial = 黄 / error・blocked = 赤、種別 system の行 = 灰。
+ * @return {boolean} 付けたら true
+ */
+function o1StyleMgmtTab_(sheet, rejected) {
+  if (sheet.getFrozenRows() === 2) return false;
+  var U = O1_MGMT_UI;
+  var width = O1_MGMT_HEAD.length;
+  sheet.getRange(1, 1, 1, width)
+    .setBackground(rejected ? U.dangerBg : U.accent).setFontColor(rejected ? U.dangerFg : U.ink).setFontWeight("bold");
+  sheet.getRange(2, 1, 1, width)
+    .setBackground(U.navy).setFontColor(U.white).setFontWeight("bold").setHorizontalAlignment("center");
+  for (var c = 0; c < width; c++) sheet.setColumnWidth(c + 1, O1_MGMT_WIDTHS[c]);
+  sheet.setFrozenRows(2);
+  sheet.setTabColor(rejected ? U.dangerFg : U.navy);
+  // ⚠️ 行数で範囲を切らない（追記で伸びた先に色が付かない）→ 列だけで開いた範囲。
+  var last = String.fromCharCode(64 + width); // ★ 見出しの列数から（列を足してもずれない）
+  var rows = sheet.getRange("A3:" + last);
+  var result = sheet.getRange("D3:D");
+  var rule = function (formula, range, bg, fg) {
+    return SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(formula).setBackground(bg).setFontColor(fg).setRanges([range]).build();
+  };
+  // ⚠️★ **先に書いたルールが勝つ**（code-reviewer MEDIUM・2026-09-28）。結果の色を先に置く ——
+  //   さもないと `system / partial / reject-log-full`（却下ログが満杯＝以後の却下が残らない）の行が
+  //   いちばん目立たない灰色になる。
+  // ⚠️ このタブの**既存の条件付き書式は置き換わる**（初回だけ・研究者手順に明記）。
+  sheet.setConditionalFormatRules([
+    rule('=$D3="ok"', result, U.okBg, U.okFg),
+    rule('=$D3="partial"', result, U.warnBg, U.warnFg),
+    rule('=OR($D3="error",$D3="blocked")', result, U.dangerBg, U.dangerFg),
+    rule('=$B3="system"', rows, U.grayBg, U.muted)
+  ]);
+  return true;
 }
 
 /** ★ 登録ログの状態を**読み取りだけ**で確かめる（⚠️ 中身は出さない）。 */
