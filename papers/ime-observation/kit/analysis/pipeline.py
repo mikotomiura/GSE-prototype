@@ -13,7 +13,9 @@ agreement) and l2 (aggregate agreement).
   pipeline.py --synthetic DIR --seed N            write two synthetic run directories under DIR
   pipeline.py --check-deposit DIR [DIR ...]       refuse a run directory that is not safe to deposit
   pipeline.py --pack DIR --out ARCHIVE.zip        bundle the five deposit files into a checked archive
-  pipeline.py --selftest                          fast default (a few tens of seconds)
+  pipeline.py --selftest [--full]                 default: a representative variant of every case
+                                                  (one positive and the most important negatives of
+                                                  each gate); --full: every variant, about a minute
 
 A run directory (written by the run-cell tool) holds plan.jsonl, oracle.jsonl, gt.jsonl, obs.jsonl and
 run.json (the manifest, format run/1). The manifest records the SHA-256 of every log; a log that no
@@ -97,6 +99,13 @@ fixed times (1980-01-01), fixed attributes and no compression (so the bytes do n
 compression library), checks the contents of the archive again with the same check and prints its
 SHA-256. An existing output file is never overwritten.
 
+Self-test. The default --selftest runs, for every case, a positive variant and the most important negative
+variants of each gate, calls functions directly where it can and starts a child process only for the shell
+entry point; it is meant to finish in under 20 seconds. --selftest --full runs every variant (all freeze-mark
+spellings, every shell-entry variant, every usage and configuration error, every spelling of a path, and the
+rarer input errors) and takes about a minute. Files that have not changed are read from disk once during a
+self-test.
+
 Exit status: 0 on success; 1 when a check finds a violation; 2 when an input cannot be read, is
 malformed or does not match its recorded hash, when usage is incorrect, or on an unexpected error (the
 message then names the type of the error only); 3 when the analysis is not frozen.
@@ -116,6 +125,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -193,6 +203,13 @@ def _is_int(v):
     return type(v) is int
 
 
+# The selftest sets a dict here: a file that has not changed is read from disk once. Only a file whose
+# modification time is at least CACHE_SETTLE_NS old is cached, so a file that is rewritten within the
+# resolution of the clock is never mistaken for the earlier one.
+_READ_CACHE = None
+CACHE_SETTLE_NS = 300000000
+
+
 def _read_regular(path, what):
     """Read a regular file of at most MAX_FILE_BYTES; a link or a special file is refused."""
     try:
@@ -203,11 +220,16 @@ def _read_regular(path, what):
         raise InputError("%s: not a regular file (a link or a special file is refused)" % what)
     if st.st_size > MAX_FILE_BYTES:
         raise InputError("%s: larger than %d MiB" % (what, MAX_FILE_BYTES // (1024 * 1024)))
+    key = (os.path.abspath(path), st.st_mtime_ns, st.st_size, st.st_ino)
+    if _READ_CACHE is not None and key in _READ_CACHE:
+        return _READ_CACHE[key]
     try:
         with open(path, "rb") as fh:
             data = fh.read(MAX_FILE_BYTES + 1)
     except OSError as e:
         raise InputError("%s: cannot be read (%s)" % (what, type(e).__name__))
+    if _READ_CACHE is not None and time.time_ns() - st.st_mtime_ns > CACHE_SETTLE_NS:
+        _READ_CACHE[key] = data
     if len(data) > MAX_FILE_BYTES:
         raise InputError("%s: larger than %d MiB" % (what, MAX_FILE_BYTES // (1024 * 1024)))
     return data
@@ -933,9 +955,16 @@ def main(argv):
     ap.add_argument("--pack", metavar="RUN_DIR")
     ap.add_argument("--also-user", action="append", default=[], dest="also_users", metavar="NAME")
     ap.add_argument("--also-home", action="append", default=[], dest="also_homes", metavar="PATH")
-    ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--selftest", action="store_true",
+                    help="fast default: a representative variant of every case (about 20 seconds)")
+    ap.add_argument("--full", action="store_true",
+                    help="with --selftest: run every variant of every case (about a minute)")
     args = ap.parse_args(argv)
+    if args.full and not args.selftest:
+        ap.error("--full is used together with --selftest")
     if args.selftest:
+        global FULL
+        FULL = args.full
         return selftest()
     res = None
     try:
@@ -1004,6 +1033,8 @@ def main(argv):
 
 
 # ---------------------------------------------------------------- selftest
+
+FULL = False   # --selftest --full runs every variant of every case; the default runs a representative subset
 
 def _quiet(argv):
     out, err = io.StringIO(), io.StringIO()
@@ -1133,11 +1164,13 @@ def _case_reproduces(d):
     if det is None or not det["recall"]["value"] > 0.7 or not det["precision"]["value"] > 0.7:
         f.append("detection on a synthetic cell is implausibly low: %r" % (det and det["recall"]["value"],))
     # the seed matters, and the injected errors are visible (a run with no misses would not show them)
+    if det is not None and det["n_miss"] + det["n_false_pos"] + det["n_split_gt"] + det["n_merge_obs"] == 0:
+        f.append("no injected error reached the detection counts")
+    if not FULL:
+        return f
     o3 = os.path.join(d, "out3")
     if _quiet(["--runs"] + runs + ["--config", cfg, "--seed", "8", "--out", o3])[0] != 0 or _read_results(o3) == outs[0]:
         f.append("a different seed gives the same results")
-    if det is not None and det["n_miss"] + det["n_false_pos"] + det["n_split_gt"] + det["n_merge_obs"] == 0:
-        f.append("no injected error reached the detection counts")
     # the two matcher settings that used to be fixed reach the matcher
     o4 = os.path.join(d, "out4")
     cfg4 = _config_file(d, {"theta": 0.9, "drop_start_while_open": True})
@@ -1160,13 +1193,14 @@ def _case_labels_and_hashes(d):
         f.append("an aborted run is not left out and counted (rc %d): %s" % (rc, err[-200:]))
     if res and [x["aborted"] for x in res["runs"]["list"]] != [False, True]:
         f.append("the run list does not say which run was aborted")
-    # an aborted run may share the label of the run that replaced it, and is counted
-    runs1 = make_synthetic(os.path.join(d, "abt1"), 4)
-    m0 = json.loads(open(os.path.join(runs1[0], MANIFEST), "rb").read().decode("utf-8"))
-    _set_manifest(runs1[1], cell=dict(m0["cell"]), aborted=True, abort_reason="synthetic")
-    rc, _o, err = _quiet(["--runs"] + runs1 + ["--config", cfg, "--seed", "1", "--out", os.path.join(d, "outa1")])
-    if rc != 0:
-        f.append("an aborted run with the label of a finished run was refused (rc %d): %s" % (rc, err[-200:]))
+    if FULL:
+        # an aborted run may share the label of the run that replaced it, and is counted
+        runs1 = make_synthetic(os.path.join(d, "abt1"), 4)
+        m0 = json.loads(open(os.path.join(runs1[0], MANIFEST), "rb").read().decode("utf-8"))
+        _set_manifest(runs1[1], cell=dict(m0["cell"]), aborted=True, abort_reason="synthetic")
+        rc, _o, err = _quiet(["--runs"] + runs1 + ["--config", cfg, "--seed", "1", "--out", os.path.join(d, "outa1")])
+        if rc != 0:
+            f.append("an aborted run with the label of a finished run was refused (rc %d): %s" % (rc, err[-200:]))
     # a log that no longer matches its recorded hash stops the run (exit 2)
     runs2 = make_synthetic(os.path.join(d, "abt2"), 4)
     with open(os.path.join(runs2[0], "obs.jsonl"), "ab") as fh:
@@ -1190,13 +1224,14 @@ def _case_labels_and_hashes(d):
     rc, _o, err = _quiet(["--runs"] + runs4 + ["--config", cfg, "--seed", "1", "--out", os.path.join(d, "outd")])
     if rc != 2 or "label" not in err:
         f.append("a cell without a label was accepted or not explained (rc %d)" % rc)
-    # a recorded hash that is not 64 lowercase hex digits is refused, also for an aborted run
-    runs5 = make_synthetic(os.path.join(d, "abt5"), 4)
-    m = json.loads(open(os.path.join(runs5[1], MANIFEST), "rb").read().decode("utf-8"))
-    m["outputs"]["obs"]["sha256"] = "ABC"
-    _set_manifest(runs5[1], outputs=m["outputs"], aborted=True)
-    if _quiet(["--runs"] + runs5 + ["--config", cfg, "--seed", "1", "--out", os.path.join(d, "oute")])[0] != 2:
-        f.append("a malformed recorded hash of an aborted run was accepted")
+    if FULL:
+        # a recorded hash that is not 64 lowercase hex digits is refused, also for an aborted run
+        runs5 = make_synthetic(os.path.join(d, "abt5"), 4)
+        m = json.loads(open(os.path.join(runs5[1], MANIFEST), "rb").read().decode("utf-8"))
+        m["outputs"]["obs"]["sha256"] = "ABC"
+        _set_manifest(runs5[1], outputs=m["outputs"], aborted=True)
+        if _quiet(["--runs"] + runs5 + ["--config", cfg, "--seed", "1", "--out", os.path.join(d, "oute")])[0] != 2:
+            f.append("a malformed recorded hash of an aborted run was accepted")
     return f
 
 
@@ -1218,22 +1253,23 @@ def _case_step_zero(d):
         f.append("an observation row with content was accepted (rc %d)" % rc)
     if os.path.exists(os.path.join(d, "o1", "e1_l1.json")):
         f.append("a result was written although step 0 found a violation")
-    # a header that does not declare ime_shadow is refused
-    base2 = make_synthetic(os.path.join(d, "s0b"), 2)
-    lines = open(os.path.join(base2[0], "obs.jsonl"), "rb").read().split(b"\n", 1)
-    hdr = json.loads(lines[0].decode("utf-8"))
-    hdr["capabilities"]["config_gated"] = []
-    _rewrite_log(base2[0], "obs", json.dumps(hdr, separators=(",", ":")).encode("utf-8") + b"\n" + lines[1])
-    rc, _o, err = rc_of(base2, "o2")
-    if rc != 1 or "ime_shadow" not in err:
-        f.append("a header without the ime_shadow channel was accepted (rc %d)" % rc)
-    # a plan that breaks the plan format is refused
-    base3 = make_synthetic(os.path.join(d, "s0c"), 2)
-    plan = open(os.path.join(base3[0], "plan.jsonl"), "rb").read().replace(b'"speed":"slow"', b'"speed":"sluggish"', 1)
-    _rewrite_log(base3[0], "plan", plan)
-    rc = rc_of(base3, "o3")[0]
-    if rc != 1:
-        f.append("an invalid plan was accepted (rc %d)" % rc)
+    if FULL:
+        # a header that does not declare ime_shadow is refused
+        base2 = make_synthetic(os.path.join(d, "s0b"), 2)
+        lines = open(os.path.join(base2[0], "obs.jsonl"), "rb").read().split(b"\n", 1)
+        hdr = json.loads(lines[0].decode("utf-8"))
+        hdr["capabilities"]["config_gated"] = []
+        _rewrite_log(base2[0], "obs", json.dumps(hdr, separators=(",", ":")).encode("utf-8") + b"\n" + lines[1])
+        rc, _o, err = rc_of(base2, "o2")
+        if rc != 1 or "ime_shadow" not in err:
+            f.append("a header without the ime_shadow channel was accepted (rc %d)" % rc)
+        # a plan that breaks the plan format is refused
+        base3 = make_synthetic(os.path.join(d, "s0c"), 2)
+        plan = open(os.path.join(base3[0], "plan.jsonl"), "rb").read().replace(b'"speed":"slow"', b'"speed":"sluggish"', 1)
+        _rewrite_log(base3[0], "plan", plan)
+        rc = rc_of(base3, "o3")[0]
+        if rc != 1:
+            f.append("an invalid plan was accepted (rc %d)" % rc)
     # a gated channel that produced no row, although the ground truth holds sessions, cannot be judged
     base4 = make_synthetic(os.path.join(d, "s0d"), 2)
     rows = [ln for ln in open(os.path.join(base4[0], "obs.jsonl"), "rb").read().split(b"\n") if ln and b'"type":"ime_shadow"' not in ln]
@@ -1241,20 +1277,21 @@ def _case_step_zero(d):
     rc, _o, err = rc_of(base4, "o4")
     if rc != 1 or "gated and produced no row" not in err:
         f.append("a gated channel with no row was accepted or not explained (rc %d)" % rc)
-    # a header that names the channel as unconditional is not held to that rule
-    hdr2 = json.loads(rows[0].decode("utf-8"))
-    hdr2["capabilities"] = {"unconditional": ["key", "ime_shadow"], "threshold_gated": [], "config_gated": []}
-    rows[0] = json.dumps(hdr2, separators=(",", ":")).encode("utf-8")
-    _rewrite_log(base4[0], "obs", b"\n".join(rows) + b"\n")
-    if rc_of(base4, "o5")[0] != 0:
-        f.append("an unconditional channel with no row was refused")
-    # a first line nested too deeply is reported, not a crash
-    base5 = make_synthetic(os.path.join(d, "s0e"), 2)
-    lines = open(os.path.join(base5[0], "obs.jsonl"), "rb").read().split(b"\n", 1)
-    _rewrite_log(base5[0], "obs", b"[" * 100000 + b"]" * 100000 + b"\n" + lines[1])
-    rc, _o, err = rc_of(base5, "o6")
-    if rc not in (1, 2) or "Traceback" in err:
-        f.append("a deeply nested first line was not reported cleanly (rc %s)" % (rc,))
+    if FULL:
+        # a header that names the channel as unconditional is not held to that rule
+        hdr2 = json.loads(rows[0].decode("utf-8"))
+        hdr2["capabilities"] = {"unconditional": ["key", "ime_shadow"], "threshold_gated": [], "config_gated": []}
+        rows[0] = json.dumps(hdr2, separators=(",", ":")).encode("utf-8")
+        _rewrite_log(base4[0], "obs", b"\n".join(rows) + b"\n")
+        if rc_of(base4, "o5")[0] != 0:
+            f.append("an unconditional channel with no row was refused")
+        # a first line nested too deeply is reported, not a crash
+        base5 = make_synthetic(os.path.join(d, "s0e"), 2)
+        lines = open(os.path.join(base5[0], "obs.jsonl"), "rb").read().split(b"\n", 1)
+        _rewrite_log(base5[0], "obs", b"[" * 100000 + b"]" * 100000 + b"\n" + lines[1])
+        rc, _o, err = rc_of(base5, "o6")
+        if rc not in (1, 2) or "Traceback" in err:
+            f.append("a deeply nested first line was not reported cleanly (rc %s)" % (rc,))
     return f
 
 
@@ -1285,12 +1322,18 @@ def _case_freeze_gate(d):
             argv += ["--prereg", pr]
         return _quiet(argv)[0]
 
-    def check_rc():
-        return _quiet(["--check-prereg", pr, "--config", cfg, "--seed-file", seedf])[0]
+    def check_rc(cli=FULL):
+        if cli:
+            return _quiet(["--check-prereg", pr, "--config", cfg, "--seed-file", seedf])[0]
+        try:   # the default runs the check in-process; the command line is exercised by the other calls
+            check_prereg_text(open(pr, "rb").read().decode("utf-8"), good)
+            return 0
+        except NotFrozen:
+            return 3
 
     if analyse_rc("g0", False) != 3:
         f.append("real data was analysed without --prereg")
-    if analyse_rc("g1") != 3 or check_rc() != 3:
+    if FULL and (analyse_rc("g1") != 3 or check_rc() != 3):
         f.append("real data was analysed although the pre-registration file does not exist")
     zero = "0" * 64
     negatives = (
@@ -1307,9 +1350,13 @@ def _case_freeze_gate(d):
         ("a frozen_at without a date", "frozen_at: soon\nsha256: %s\n" % good),
         ("an unclosed comment", "<!-- start\nfrozen_at: 2026-01-01\nsha256: %s\n" % good),
     )
+    representative = ("placeholders", "marks inside a multi-line comment", "marks inside a code fence",
+                      "a second frozen_at line", "a sha256 that does not match")
     for i, (name, text) in enumerate(negatives):
+        if not FULL and name not in representative:
+            continue
         _write(pr, text.encode("utf-8"))
-        if check_rc() != 3 or (i % 3 == 0 and analyse_rc("g2") != 3):
+        if check_rc() != 3 or ((i % 3 == 0 if FULL else name == "a sha256 that does not match") and analyse_rc("g2") != 3):
             f.append("the freeze gate accepted: %s" % name)
         if os.path.exists(os.path.join(d, "g2", "e1_l1.json")):
             f.append("a result was written when the gate refused: %s" % name)
@@ -1318,19 +1365,22 @@ def _case_freeze_gate(d):
                  ("marks with CRLF line ends", _prereg_text(good).replace("\n", "\r\n")))
     for i, (name, text) in enumerate(positives):
         _write(pr, text.encode("utf-8"))
+        if i > 0 and not FULL:
+            break
         rc = analyse_rc("g3") if i == 0 else 0
-        if rc != 0 or check_rc() != 0:
+        if rc != 0 or (FULL and check_rc() != 0):
             f.append("the freeze gate refused: %s (rc %s)" % (name, rc))
     # the analysis settings changed by one byte after the freeze
     _write(pr, _prereg_text(good).encode("utf-8"))
     with open(cfg, "ab") as fh:
         fh.write(b" ")
-    if analyse_rc("g4") != 3 or check_rc() != 3:
+    if check_rc(True) != 3 or (FULL and analyse_rc("g4") != 3):
         f.append("a configuration that changed by one byte after the freeze was accepted")
-    _write(cfg, open(cfg, "rb").read()[:-1])
-    _write(seedf, b"8\n")
-    if analyse_rc("g5") not in (2, 3):
-        f.append("a seed that changed after the freeze was accepted")
+    if FULL:
+        _write(cfg, open(cfg, "rb").read()[:-1])
+        _write(seedf, b"8\n")
+        if analyse_rc("g5") not in (2, 3):
+            f.append("a seed that changed after the freeze was accepted")
     return f
 
 
@@ -1340,7 +1390,7 @@ def _case_run_sh(d):
     if bash is None or not os.path.isfile(os.path.join(os.path.dirname(KIT), "experiment", "run.sh")):
         return f
     root = os.path.join(d, "tree")
-    shutil.copytree(KIT, os.path.join(root, "kit"), ignore=shutil.ignore_patterns("target", ".build", "__pycache__"))
+    shutil.copytree(KIT, os.path.join(root, "kit"), ignore=shutil.ignore_patterns("target", ".build", "__pycache__", "logger", "e2", "refinput-macos", "refinput-windows", "pilot", "corpus"))
     exp = os.path.join(root, "experiment")
     os.makedirs(exp)
     shutil.copyfile(os.path.join(os.path.dirname(KIT), "experiment", "run.sh"), os.path.join(exp, "run.sh"))
@@ -1363,11 +1413,14 @@ def _case_run_sh(d):
     if sh() != 3:
         f.append("run.sh ran without a pre-registration file")
     good = freeze_hash(os.path.join(exp, "config.json"), os.path.join(exp, "SEED"))
-    for name, text in (("no marks", "# Pre-registration\n"), ("placeholders", "frozen_at: (to be filled in)\nsha256: (to be filled in)\n"),
+    variants = (("no marks", "# Pre-registration\n"), ("placeholders", "frozen_at: (to be filled in)\nsha256: (to be filled in)\n"),
                        ("empty values", "frozen_at:\nsha256:\n"), ("marks in a comment", "<!--\nfrozen_at: 2026-01-01\nsha256: %s\n-->\n" % good),
                        ("marks in a fence", "```\nfrozen_at: 2026-01-01\nsha256: %s\n```\n" % good),
                        ("two frozen_at lines", _prereg_text(good, "frozen_at: 2026-02-02\n")),
-                       ("a sha256 that does not match", _prereg_text("0" * 64))):
+                       ("a sha256 that does not match", _prereg_text("0" * 64)))
+    for name, text in variants:
+        if not FULL and name != "a sha256 that does not match":
+            continue
         _write(pr, text.encode("utf-8"))
         if sh() != 3:
             f.append("run.sh accepted: %s" % name)
@@ -1375,6 +1428,8 @@ def _case_run_sh(d):
     rc = sh()
     if rc != 0 or not os.path.isfile(os.path.join(root, "res", "e1_l1.json")):
         f.append("run.sh refused well-formed marks (rc %s)" % (rc,))
+    if not FULL:
+        return f
     with open(os.path.join(exp, "config.json"), "ab") as fh:
         fh.write(b" ")
     if sh() != 3:
@@ -1480,10 +1535,11 @@ def _case_deposit_runs(d):
     if _quiet(["--check-deposit", runs[1]])[0] != 0:
         f.append("a manifest with the paths replaced by ~ and <repo> was refused")
     _write(os.path.join(runs[1], MANIFEST), _json_bytes(m))
-    if _quiet(["--check-deposit", runs[1], "--also-user", "synthetic"])[0] != 1:
-        f.append("--also-user was not applied on the command line")
-    if _quiet(["--check-deposit", os.path.join(d, "no-such-dir")])[0] != 2:
-        f.append("a missing run directory should exit 2")
+    if FULL:
+        if _quiet(["--check-deposit", runs[1], "--also-user", "synthetic"])[0] != 1:
+            f.append("--also-user was not applied on the command line")
+        if _quiet(["--check-deposit", os.path.join(d, "no-such-dir")])[0] != 2:
+            f.append("a missing run directory should exit 2")
     # a log that changed after the run exits 2; a missing log whose hash is recorded exits 2
     with open(os.path.join(runs[1], "gt.jsonl"), "ab") as fh:
         fh.write(b"\n")
@@ -1492,27 +1548,9 @@ def _case_deposit_runs(d):
     os.remove(os.path.join(runs[1], "gt.jsonl"))
     if _quiet(["--check-deposit", runs[1]])[0] != 2:
         f.append("a missing log with a recorded hash was accepted")
-    # an aborted run whose manifest recorded no hash for a log need not have it
-    ab = make_synthetic(os.path.join(d, "dr-ab"), 3)[0]
-    ma = json.loads(open(os.path.join(ab, MANIFEST), "rb").read().decode("utf-8"))
-    for name in ("gt", "obs"):
-        ma["outputs"][name]["sha256"] = None
-        os.remove(os.path.join(ab, LOG_FILES[name]))
-    _set_manifest(ab, outputs=ma["outputs"], aborted=True)
-    if _quiet(["--check-deposit", ab])[0] != 0:
-        f.append("an aborted run without the logs that it recorded as absent was refused")
-    os.remove(os.path.join(ab, MANIFEST))
-    if _quiet(["--check-deposit", ab])[0] != 2:
-        f.append("a run directory without run.json was accepted")
-    # content in a log of a run that was not aborted is refused (with the hash updated, so only content is at fault)
-    ct = make_synthetic(os.path.join(d, "dr-ct"), 3)[0]
-    obs = open(os.path.join(ct, "obs.jsonl"), "rb").read()
-    _rewrite_log(ct, "obs", obs + b'{"type":"key","t":1700000000001,"category":"alphabetic","press":true,"char":"a"}\n')
-    rc, _o, err = _quiet(["--check-deposit", ct])
-    if rc != 1 or "obs.jsonl" not in err:
-        f.append("content in an observation log passed the deposit check (rc %d)" % rc)
-    # the archive
-    good = make_synthetic(os.path.join(d, "dr-pk"), 4)[0]
+    # the archive (the second run directory is used up by now, so the first one is packed)
+    good = runs[0]
+    m0 = json.loads(open(os.path.join(good, MANIFEST), "rb").read().decode("utf-8"))
     arch1, arch2 = os.path.join(d, "a1.zip"), os.path.join(d, "a2.zip")
     rc1, out1, _e = _quiet(["--pack", good, "--out", arch1])
     rc2, out2, _e = _quiet(["--pack", good, "--out", arch2])
@@ -1531,19 +1569,34 @@ def _case_deposit_runs(d):
     before = open(arch1, "rb").read()
     if _quiet(["--pack", good, "--out", arch1])[0] != 2 or open(arch1, "rb").read() != before:
         f.append("an existing archive was overwritten or not refused")
-    bad = make_synthetic(os.path.join(d, "dr-pb"), 4)[0]
-    mb = json.loads(open(os.path.join(bad, MANIFEST), "rb").read().decode("utf-8"))
-    _write(os.path.join(bad, MANIFEST), _json_bytes(dict(mb, note="/home/harry/x")))
+    _write(os.path.join(good, MANIFEST), _json_bytes(dict(m0, note="/home/harry/x")))
     arch3 = os.path.join(d, "a3.zip")
-    if _quiet(["--pack", bad, "--out", arch3])[0] != 1 or os.path.exists(arch3):
+    if _quiet(["--pack", good, "--out", arch3])[0] != 1 or os.path.exists(arch3):
         f.append("a run with an absolute path was packed")
-    extra = os.path.join(bad, "reset.stderr.txt")
-    _write(extra, b"x\n")
-    _write(os.path.join(bad, MANIFEST), _json_bytes(mb))
-    if _quiet(["--pack", bad, "--out", arch3])[0] != 0:
+    _write(os.path.join(good, "reset.stderr.txt"), b"x\n")
+    _write(os.path.join(good, MANIFEST), _json_bytes(m0))
+    if _quiet(["--pack", good, "--out", arch3])[0] != 0:
         f.append("a clean run was not packed")
     elif "reset.stderr.txt" in zipfile.ZipFile(arch3).namelist():
         f.append("a standard-error file was packed")
+    # content in a log of a run that was not aborted is refused (with the hash updated, so only content is at fault)
+    obs = open(os.path.join(good, "obs.jsonl"), "rb").read()
+    _rewrite_log(good, "obs", obs + b'{"type":"key","t":1700000000001,"category":"alphabetic","press":true,"char":"a"}\n')
+    rc, _o, err = _quiet(["--check-deposit", good])
+    if rc != 1 or "obs.jsonl" not in err:
+        f.append("content in an observation log passed the deposit check (rc %d)" % rc)
+    # an aborted run whose manifest recorded no hash for a log need not have it
+    ma = json.loads(open(os.path.join(good, MANIFEST), "rb").read().decode("utf-8"))
+    for name in ("gt", "obs"):
+        ma["outputs"][name]["sha256"] = None
+        os.remove(os.path.join(good, LOG_FILES[name]))
+    _set_manifest(good, outputs=ma["outputs"], aborted=True)
+    if _quiet(["--check-deposit", good])[0] != 0:
+        f.append("an aborted run without the logs that it recorded as absent was refused")
+    if FULL:
+        os.remove(os.path.join(good, MANIFEST))
+        if _quiet(["--check-deposit", good])[0] != 2:
+            f.append("a run directory without run.json was accepted")
     return f
 
 
@@ -1575,35 +1628,37 @@ def _case_lists_seeds_files(d):
         f.append("--runs-from did not run (rc %s): %s" % (rc, err[-200:]))
     elif "synthetic-a, synthetic-b" not in out:
         f.append("--runs-from did not print the labels that were used")
-    o2 = os.path.join(d, "outl2")
-    _quiet(["--runs"] + runs + ["--config", cfg, "--seed", "7", "--out", o2])
-    if _read_results(o) != _read_results(o2):
-        f.append("--runs-from and --runs give different results")
-    if _quiet(["--runs-from", listing, "--runs"] + runs + ["--config", cfg, "--seed", "7", "--out", o])[0] != 2:
-        f.append("--runs together with --runs-from was accepted")
+    if FULL:
+        o2 = os.path.join(d, "outl2")
+        _quiet(["--runs"] + runs + ["--config", cfg, "--seed", "7", "--out", o2])
+        if _read_results(o) != _read_results(o2):
+            f.append("--runs-from and --runs give different results")
+        if _quiet(["--runs-from", listing, "--runs"] + runs + ["--config", cfg, "--seed", "7", "--out", o])[0] != 2:
+            f.append("--runs together with --runs-from was accepted")
     for name, body in (("a line without the manifest hash", "- run_dir: %s\n" % runs[0]),
                        ("a different manifest hash", "- run_dir: %s  manifest_sha256: %s\n" % (runs[0], "0" * 64)),
                        ("a malformed manifest hash", "- run_dir: %s  manifest_sha256: xyz\n" % runs[0])):
         _write(listing, body.encode("utf-8"))
         if _quiet(["--runs-from", listing, "--config", cfg, "--seed", "7", "--out", os.path.join(d, "outl3")])[0] != 2:
             f.append("--runs-from accepted %s" % name)
-    # the seed file: exactly one integer, no spaces
-    for name, body, ok in (("one integer", "5\n", True), ("no line end", "5", True), ("two integers", "1 2\n", False),
-                           ("spaces around", " 5\n", False), ("two lines", "5\n6\n", False), ("empty", "", False),
-                           ("a sign", "-5\n", False), ("a word", "five\n", False)):
-        p = _seed_file(d, body)
-        try:
-            read_seed_file(p)
-            got = True
-        except InputError:
-            got = False
-        if got != ok:
-            f.append("the seed file check is wrong for %s" % name)
-    if _quiet(["--runs"] + runs + ["--config", cfg, "--seed", "5", "--seed-file", _seed_file(d, "6\n"), "--out", os.path.join(d, "outs")])[0] != 2:
-        f.append("--seed that differs from --seed-file was accepted")
+    if FULL:
+        # the seed file: exactly one integer, no spaces
+        for name, body, ok in (("one integer", "5\n", True), ("no line end", "5", True), ("two integers", "1 2\n", False),
+                               ("spaces around", " 5\n", False), ("two lines", "5\n6\n", False), ("empty", "", False),
+                               ("a sign", "-5\n", False), ("a word", "five\n", False)):
+            p = _seed_file(d, body)
+            try:
+                read_seed_file(p)
+                got = True
+            except InputError:
+                got = False
+            if got != ok:
+                f.append("the seed file check is wrong for %s" % name)
+        if _quiet(["--runs"] + runs + ["--config", cfg, "--seed", "5", "--seed-file", _seed_file(d, "6\n"), "--out", os.path.join(d, "outs")])[0] != 2:
+            f.append("--seed that differs from --seed-file was accepted")
     # a failure to write a result leaves no result of an earlier run
-    of = os.path.join(d, "outw")
-    if _quiet(["--runs"] + runs + ["--config", cfg, "--seed", "7", "--out", of])[0] != 0:
+    of = o
+    if not os.path.isfile(os.path.join(of, "e1_l1.json")):
         f.append("the first analysis failed")
     else:
         os.remove(os.path.join(of, "e1_detection.json"))
@@ -1613,24 +1668,26 @@ def _case_lists_seeds_files(d):
             f.append("a stale result was left after a failed write (rc %s)" % (rc,))
         if [n for n in os.listdir(of) if n.startswith(".pipeline_tmp_")]:
             f.append("a temporary directory was left in the results directory")
-    # synthetic results are not written under the results directory of the experiment
-    if _quiet(["--runs"] + runs + ["--config", cfg, "--seed", "7", "--out", os.path.join(EXPERIMENT_RESULTS, "selftest-refused")])[0] != 2 \
-            or os.path.exists(os.path.join(EXPERIMENT_RESULTS, "selftest-refused")):
-        f.append("synthetic results were written under the results directory of the experiment")
+    if FULL:
+        # synthetic results are not written under the results directory of the experiment
+        if _quiet(["--runs"] + runs + ["--config", cfg, "--seed", "7", "--out", os.path.join(EXPERIMENT_RESULTS, "selftest-refused")])[0] != 2 \
+                or os.path.exists(os.path.join(EXPERIMENT_RESULTS, "selftest-refused")):
+            f.append("synthetic results were written under the results directory of the experiment")
     # input files: a link is refused, and there is an upper limit on the size
     target = os.path.join(d, "target.jsonl")
     _write(target, b"x\n")
-    link = os.path.join(d, "link.jsonl")
-    try:
-        os.symlink(target, link)
-    except (OSError, NotImplementedError, AttributeError):
-        link = None
-    if link is not None:
+    if FULL:
+        link = os.path.join(d, "link.jsonl")
         try:
-            _read_regular(link, "link")
-            f.append("a symbolic link was read")
-        except InputError:
-            pass
+            os.symlink(target, link)
+        except (OSError, NotImplementedError, AttributeError):
+            link = None
+        if link is not None:
+            try:
+                _read_regular(link, "link")
+                f.append("a symbolic link was read")
+            except InputError:
+                pass
     global MAX_FILE_BYTES
     saved, MAX_FILE_BYTES = MAX_FILE_BYTES, 1
     try:
@@ -1662,6 +1719,15 @@ CASES = [
 
 
 def selftest():
+    global _READ_CACHE
+    _READ_CACHE = {}
+    try:
+        return _selftest()
+    finally:
+        _READ_CACHE = None
+
+
+def _selftest():
     bad = 0
     for name, fn in CASES:
         d = tempfile.mkdtemp(prefix="pipeline_selftest_")
