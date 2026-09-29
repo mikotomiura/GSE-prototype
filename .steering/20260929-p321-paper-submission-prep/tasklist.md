@@ -30,7 +30,7 @@
 - [x] `/cross-review` 2 巡目（Codex 2 回 ＋ code-reviewer）→ 裁定と修正（判断 12・論文用リポジトリ `75ce1ff`・手順書を「取り消せる検証を先に」へ組み直した）。3 巡目は回さない・Codex の上限は 300000 に戻した
 - [x] 投稿日の手順書（`submission-day-steps.md`）
 - [x] 投稿日の A〜E（判断 13）: タグ `submission-2026-09-29`・zip の照合・投稿用の原稿（`C:/wt/emse-upload/`）・GitHub の public 化・Zenodo の公開
-- [ ] DOI が doi.org で解決する（⚠️ DataCite の登録待ち）
+- [x] DOI が doi.org で解決する（2026-09-29 20:55 JST に確認・DataCite の登録は 20:34 JST）
 - [ ] F: 研究者が EMSE に投稿（確定）→ 受付の日付と原稿番号を記録
 - [ ] G: endorsement が取れたら arXiv（研究者）→ EMSE に申告・Zenodo と README に追記
 - [x] 論文用リポジトリを push（`75ce1ff`・タグ `submission-2026-09-29`）

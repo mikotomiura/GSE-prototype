@@ -183,3 +183,4 @@
   - ⚠️ doi.org は公開の 6 分後も 404（DataCite の API も 404 = まだ登録されていない）。→ 解決するまで EMSE の承認は待つ（手順書 F）。
 - 取り消せない操作の間隔: public 化から Zenodo の公開までは数分（安全確認の拒否と修正の分）。
 - ⚠️ **DOI の登録待ち**（20:12 JST = 公開の約 38 分後）: doi.org・DataCite の API とも 404。Zenodo の記録の API では `pids.doi` = `10.5281/zenodo.23029603`・provider `datacite`・published。研究者の既存の記録（22735437・22733449）の DOI は doi.org で解決し DataCite も 200 → 経路は正常で、この記録の登録だけが Zenodo 側の非同期の処理で遅れている。
+- ★ **DOI が解決した**（20:55 JST に確認）: doi.org → `https://zenodo.org/doi/10.5281/zenodo.23029603`（302）→ 記録のページ 200。DataCite の API: state `findable`・registered `2026-09-29T11:34:34Z`（= 20:34 JST・公開の約 1 時間後）・version `submission-2026-09-29`。→ 研究者の選択（逐語「解決するまで待つ」）どおり、ここから EMSE の確定（手順書 F）へ。
