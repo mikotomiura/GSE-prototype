@@ -1,5 +1,7 @@
 # 次セッション（G-GEAR）— IME 論文: W4（014 / 018 / 019）の merge ゲートから、W5 / W6 へ
 
+> ✅ **完了（2026-09-29）**: W4 の 3 本を merge した（base `ff2a392c`・判断 44〜46）。★ 後継は `.steering/_handoff/next-session-ime-paper-ggear-w5.md`。このメモは読まなくてよい。
+
 > 作成: 2026-09-29（前セッションの context が 90% に達したため切り替え）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `_issue-plan.md`（§2 波・§4 機械の割り当て・§5 マイルストーン）・`issues/NNN.md`・`decisions.md`（判断 1〜43）・`blockers.md`（B1〜B9）・`tasklist.md`。状態は着手時に測り直す。
 > ⚠️ Mac 側（004 / 007 / 012）は別の handoff: `.steering/_handoff/next-session-ime-paper-mac.md`。

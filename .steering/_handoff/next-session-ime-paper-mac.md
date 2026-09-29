@@ -1,14 +1,14 @@
 # 次セッション（Mac）— IME 論文: Mac の issue（004 / 007 / 012）をループで実行する
 
 > 作成: 2026-09-29。★ 前の Mac 用 handoff（`next-session-ime-paper-loop-w2-mac.md`）の後継。前のものは読まなくてよい。
-> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `_issue-plan.md`（§4 機械の割り当て・§7 config の注意）・`issues/004.md` `007.md` `012.md`・`decisions.md`（判断 1〜43）・`blockers.md`（B1〜B9）。状態は着手時に測り直す。
-> ⚠️ G-GEAR 側は別の handoff: `.steering/_handoff/next-session-ime-paper-ggear-w4.md`。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。
+> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `_issue-plan.md`（§4 機械の割り当て・§7 config の注意）・`issues/004.md` `007.md` `012.md`・`decisions.md`（判断 1〜46）・`blockers.md`（B1〜B9）。状態は着手時に測り直す。
+> ⚠️ G-GEAR 側は別の handoff: `.steering/_handoff/next-session-ime-paper-ggear-w5.md`（★ 2026-09-29 に W4〔014 / 018 / 019〕を merge し終え、base は `ff2a392c` 以降。判断 44〜46 が増えた。G-GEAR の 005 / 006 → 020 / 023 は **Mac の 004 が base に入るのを待っている**）。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。
 
 ## §0 打ち込む用（Mac で・`/clear` の直後に）
 
 ```
 .steering/_handoff/next-session-ime-paper-mac.md を読んで、IME 論文の評価一式の Mac の issue（004 / 007、続けて 012）をモード C で実行し、merge ゲートを通して base に入れてください。
-一次資料: .steering/20260927-ime-observation-paper-eval-design/ の _issue-plan.md（§4・§7）・issues/004.md 007.md 012.md・decisions.md（判断 34〜43）・blockers.md。
+一次資料: .steering/20260927-ime-observation-paper-eval-design/ の _issue-plan.md（§4・§7）・issues/004.md 007.md 012.md・decisions.md（判断 34〜46）・blockers.md。
 ⚠️ 実行の前に docs/loop-engineering.md を Read する。base は feature/ime-eval-kit（origin から pull してから回す）。
 ⚠️ _loop-config.json の events_path を Mac のパスへ書き換えてから回し、その変更はコミットしない。
 Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は日本語。研究者の判断が要ることは AskUserQuestion で聞く。
