@@ -19,6 +19,8 @@
 - ★ 研究者の指示で Windows のジョブだけを 1 回再実行した（attempt 2）が、**同じ形で再び cancelled**（build 2 分 58 秒・test 2 分 48 秒・clippy 1 分 18 秒と、Loop のゲート以外は緑の run とほぼ同じ）。→ ★ 遅いのは **Loop のゲート 2 本だけ**で、その 2 本が PC の負荷に特に弱い。git-workflow ルール 6 に従い、それ以上は回していない。
 
 - ★ Windows の runner（`gse-win`）は**研究者の作業用 PC（`mikoto-g-gear`）そのもの**で、打ち切られた時刻には並行する Claude のセッションの bash（IME 論文の loop-run・ディスク全体を走査する `find / -maxdepth 6 -iname *.cargo` など）が同じ PC で動いていた。→ ★ 遅くなった原因の見立て = **同じ PC での並行作業と CPU・ディスクを取り合った**（⚠️ 見立てであって計測ではない）。
+- ★ 追記（2026-09-29）: 本 PR の run `36431219194` の Windows ジョブは、attempt 1（2026-09-28 13:53〜14:24）が 30 分で cancelled。研究者が並行作業の無いことを確かめた後の **attempt 2**（job `109011037190`・2026-09-29 01:43〜01:56）は**緑・全体 13 分 37 秒**（build 1 分 49 秒・test 2 分 06 秒・**Loop run guard gate 5 分 37 秒**・**Loop spawn cleanup gate 2 分 28 秒**）。→ 見立てと矛盾しない（⚠️ 1 回の観測で、負荷は測っていない。上の「緑の run」の約半分なので、その run の時点でも何かと取り合っていた可能性がある）。
+- 同じく 2026-09-28 の main の run `36446484801`（PR #258 の merge）の Windows ジョブは、Loop run guard gate の途中で逐語 "The self-hosted runner lost communication with the server" により failure（検査ステップの失敗ではない）。
 - ★ 同じ Loop のゲート 3 本は ubuntu の `frontend-check`（`timeout-minutes: 15`）でも回っており、そちらはジョブ全体で約 2 分 → 時間を食っているのは **Windows の git-bash 上での実行**。
 - 同日の別の run（`36394632998`）では macOS の self-hosted runner が「Complete job」で通信を失って failure（検査はすべて緑）→ 1 回の再実行で success。
 
