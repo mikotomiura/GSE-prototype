@@ -171,8 +171,11 @@ This is the observation log format produced by the standalone logger.
   inter-trial wait is not included in the trial's own interval); `trial_end` is taken after the
   last dispatch; `block_begin` is taken before sending any marker, and `block_end` after the last
   trial; `reset` is taken after the reset command finishes.
-- **Row order**: header → for each block: (`reset`, when `reset_ime` is true) → `block_begin` →
-  `marker`… → for each trial: (`trial_begin` → `sent`… → `trial_end`) → `block_end`.
+- **Row order**: header → for each block: (`reset`, when `reset_ime` is true and the reset command
+  was run) → `block_begin` → `marker`… → for each trial: (`trial_begin` → `sent`… → `trial_end`) →
+  `block_end`. A reset that the plan asks for but that is not run (no reset command is configured,
+  or the run was not authorised to change the machine's state) leaves no `reset` row; the run
+  manifest records it as skipped, with the reason.
 - `trial_id` / `block_id` carry the same values as in the plan.
 
 ## `corpus/1` — phrases and readings
