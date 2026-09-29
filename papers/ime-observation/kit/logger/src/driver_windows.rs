@@ -1,10 +1,15 @@
-//! Windows driver of the standalone logger: the low-level keyboard hook and the input-method window
-//! events.
+//! Windows driver of the standalone logger: the low-level keyboard hook, the input-method window
+//! events, the window cloak events, and the observation of the candidate window.
 //!
-//! One thread installs both hooks and pumps its message queue, which the operating system requires
+//! One thread installs the three hooks and pumps its message queue, which the operating system requires
 //! before it delivers low-level hook calls and out-of-context WinEvent notifications. The thread
 //! polls the queue and the stop flag, so it ends well within the stop deadline of the driver
 //! contract. No code is injected into another process, and no callback argument carries text.
+//!
+//! The cloak events are resolved on a second thread, which the hook thread starts and joins, because the
+//! callback may not query the compositor; see `driver_windows::cloak`. The observation closure that
+//! `start` returns combines the state these paths write with two secondary signals; see
+//! `driver_windows::candidate`.
 //!
 //! Start-up is synchronous: `start` returns only after the hooks are installed, and reports a failed
 //! installation as an error instead of running silently without observing.
@@ -28,6 +33,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use crate::driver_api::{DriverCtx, DriverHandle, KeyEvent};
 
+mod candidate;
+mod cloak;
 mod ime_winevent;
 mod keyboard;
 
@@ -55,14 +62,19 @@ pub fn start(ctx: DriverCtx) -> Result<DriverHandle, String> {
     // possibly blocking, send, which is safe off the callback.
     let (key_tx, key_rx) = sync_channel::<KeyEvent>(KEY_QUEUE_CAPACITY);
     keyboard::set_sender(key_tx)?;
+    let (cloak_tx, cloak_rx) = cloak::channel();
+    cloak::set_sender(cloak_tx)?;
     let stop = Arc::clone(&ctx.stop);
     let (ack_tx, ack_rx) = sync_channel::<Result<(), String>>(1);
     let thread = thread::Builder::new()
         .name("ime-observation-driver".to_string())
-        .spawn(move || hook_thread(&stop, &ack_tx, key_rx, ctx.keys))
+        .spawn(move || hook_thread(&stop, &ack_tx, key_rx, cloak_rx, ctx.keys))
         .map_err(|e| format!("cannot spawn the hook thread: {e}"))?;
     match ack_rx.recv_timeout(START_TIMEOUT) {
-        Ok(Ok(())) => Ok(DriverHandle::new(thread)),
+        Ok(Ok(())) => Ok(DriverHandle {
+            thread,
+            candidate_window_observer: Some(candidate::observer()),
+        }),
         Ok(Err(e)) => {
             let _ = thread.join();
             Err(e)
@@ -100,13 +112,14 @@ impl<H: Copy, F: FnMut(H)> Drop for HookGuard<H, F> {
 
 /// Body of the hook thread: install, report, pump until stopped, uninstall.
 ///
-/// `key_rx` and `core_keys` are moved into the forwarding thread rather than shared by reference:
-/// `Receiver` and `Sender` are `Send` but not `Sync`, and nothing in this function needs them again
-/// after the forwarding thread starts draining the queue.
+/// `key_rx`, `cloak_rx` and `core_keys` are moved into the threads that use them rather than shared by
+/// reference: `Receiver` and `Sender` are `Send` but not `Sync`, and nothing in this function needs
+/// them again after those threads start draining their queues.
 fn hook_thread(
     stop: &AtomicBool,
     ack: &SyncSender<Result<(), String>>,
     key_rx: Receiver<KeyEvent>,
+    cloak_rx: Receiver<cloak::CloakEvent>,
     core_keys: Sender<KeyEvent>,
 ) {
     // SAFETY: `PeekMessageW` with a default `MSG` only creates the message queue of this thread,
@@ -124,9 +137,9 @@ fn hook_thread(
     };
     {
         // The keyboard hook is released when this block ends, whether by falling off its end or by
-        // an early `return` below (the `ime_hook` installation failing). `_ime_guard`, declared after
-        // `_keyboard_guard`, is dropped first, so the release order stays input-method window hook
-        // before keyboard hook.
+        // an early `return` below (an installation failing). The guards are dropped in the reverse
+        // order of their declaration, so the release order is cloak hook, input-method window hook,
+        // keyboard hook.
         let _keyboard_guard = HookGuard::new(keyboard_hook, keyboard::uninstall);
         let ime_hook = match ime_winevent::install() {
             Ok(h) => h,
@@ -136,13 +149,23 @@ fn hook_thread(
             }
         };
         let _ime_guard = HookGuard::new(ime_hook, ime_winevent::uninstall);
-        tracing::info!("keyboard and input-method window hooks installed");
+        let cloak_hook = match cloak::install() {
+            Ok(h) => h,
+            Err(e) => {
+                let _ = ack.send(Err(e));
+                return;
+            }
+        };
+        let _cloak_guard = HookGuard::new(cloak_hook, cloak::uninstall);
+        tracing::info!("keyboard, input-method window and cloak hooks installed");
         let _ = ack.send(Ok(()));
 
         thread::scope(|scope| {
             let forwarder = scope.spawn(move || forward_events(key_rx, core_keys, stop));
+            let resolver = scope.spawn(move || cloak::resolve_events(cloak_rx, stop));
             pump_until_stopped(stop);
             let _ = forwarder.join();
+            let _ = resolver.join();
         });
     }
     tracing::info!(
