@@ -30,7 +30,8 @@
     - [x] merge 後の base（`2a449dbf`）の clean な checkout で、Mac で回せる merge 済みの全 acceptance 16 本（001 002 003 004 007 010 011 012 015 016 017 018 019 021 022 028）が失敗 0 件（Windows 専用の 008 009 013 014 は exit 2 ＝対象外）・`_style_check.py` 違反 0 件 → push
     - [x] ⚠️ G-GEAR: 判断 51 で `main.rs` を変えた（macOS だけ `cfg` で分岐）→ 次の G-GEAR のセッションで 011 / 013 / 014 の acceptance を回し、Windows 側のコンパイルが壊れていないことを確かめる
       - [x] 2026-09-29（G-GEAR）: base `91289c09` の clean な checkout で 011 / 013 / 014 の cargo の項目（build・test）はすべて緑。ただし全 acceptance が `kit/check.sh` の 1 件で赤 → 004 の `emit.py` の selftest（Windows の Python 3.11 の時計が 16 ms 刻み・機械の負荷）→ 判断 52 / 53 で `emit.py` を直した（004 の追補）・判断 54 で 005 / 006 の依存から 004 を外した（B11）
-      - [ ] ⚠️ Mac: `emit.py` を変えたので、次の Mac のセッションで `004-acceptance.sh` を回し直す
+      - [x] ⚠️ Mac: `emit.py` を変えたので、次の Mac のセッションで `004-acceptance.sh` を回し直す
+        → 2026-09-29（Mac・Python 3.14.4）: base `af40cd12` の clean な worktree で `004-acceptance.sh` exit 0（失敗 0 件）・`emit.py --selftest --full` exit 0（48 件すべて ok・遅れの 95 パーセンタイル -0.00 ms・時計の分解能 1 ms 以下と高分解能の時計の検査も ok。`perf_counter` = `mach_absolute_time()`・`time` = `CLOCK_REALTIME` 1 µs）・`kit/check.sh` exit 0（22 本すべて緑）。`--full` なしでは遅れの上限が info 行に落ちることも確かめた
     - [x] 009: `issue_done`・clean な checkout で acceptance 失敗 0 件（✅ 16）
     - [x] 013: attempt 1 で worker が Stop（`is_observed_key` の抜粋が `crate::analysis::key_gate` を呼ぶ）→ 判断 35 でメインが 011 の追補（`key_gate.rs` の逐語コピー）を base に入れた（`dd58dd9d`）
     - [x] 013 を回し直す（止まったときの記録は `archive/ime-013-attempt1-stop` に残した）→ `issue_done`
