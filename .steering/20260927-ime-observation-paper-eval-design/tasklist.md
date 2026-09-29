@@ -30,11 +30,11 @@
     - [x] レビュー 5 本（code-reviewer 3・security-checker 2）→ 判断 37〜41 を研究者に問い確定。014 の仕様と acceptance を判断 41 に合わせて直した（`d2f596b1`）
     - [x] 5 本の直しを作業用エージェント（Sonnet）に渡し、メインが clean な checkout で acceptance を回して確かめてから merge（013 `a63b5976` / 009 `32d40022` / 017 `f6cf6fcb` / 022 `c5309fd5` / 021 `3fef7971`）
   - [x] ★ **判断 36 の整理（issue 028）**: 機械の門 `_style_check.py`・`style_ok` を置き、6 つの束を作業用エージェントが並列で直してメインが統合（違反 2,404 → 0 件・`74a2e028`）。判断 42（`--against-gse` → `--against-upstream`・`gse_*` → `upstream_*`）。判断 43（公開物から写した元との関係の説明も除き、照合の道具を公開用 `check_manifest.py --self` と内部用 `check_manifest_upstream.internal.py` に分けた・`e2633aae`）
-  - [ ] W4（G-GEAR: 014 018 019 ／ 023 は 006 待ち）
+  - [x] W4（G-GEAR: 014 018 019 ／ 023 は 006 待ち）
     - [x] 2026-09-29: 止めていた 014 の worktree を片付けて回し直し、3 本とも attempt 1 で `issue_done`（1 run・parallel=1・13.0M トークン・$5.53）
     - [x] clean な checkout で acceptance 失敗 0 件（014 ✅ 17 / 018 ✅ 12 / 019 ✅ 11）・レビュー 5 本（code-reviewer 3・security-checker 2）→ 判断 44〜46 を研究者に問い確定
     - [x] 3 本の直しを作業用エージェント（Sonnet）に渡し、メインが clean な checkout で acceptance を回し直し（3 本とも失敗 0 件）、HIGH の直しを写しへの変異で確かめてから merge（014 `b2d7373e` / 018 `5dbacf66` / 019 `e02dc266`）。判断 44 の写した元との違いを `kit/logger/PROVENANCE.internal.md` に記録
-    - [ ] merge 後の base で merge 済みの全 acceptance と `_style_check.py` → push → worktree の片付け
+    - [x] merge 後の base（`c5acf429`）の clean な checkout で merge 済みの全 acceptance 17 本（001 002 003 008 009 010 011 013 014 015 016 017 018 019 021 022 028）がすべて失敗 0 件・`_style_check.py` 違反 0 件（`--selftest` も緑）・入口の所要時間の警告なし → push → ループの worktree 3 本と検証用の checkout を片付けた
   - [ ] W5（020: 実験一式と 1 コマンドの再現・依存 006）／W6（024: 公開 repo への書き出し）。★ Mac の 004 → 006 が先に要る。着手の前に研究者に確認する
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
