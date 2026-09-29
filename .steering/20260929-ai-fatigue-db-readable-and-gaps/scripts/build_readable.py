@@ -102,6 +102,8 @@ PRIO_COLORS = {"高": "FFFDE2E1", "中": "FFFFF3CD", "低": "FFF1F3F5"}
 STATUS = "未着手,着手,完了,見送り"
 ISSUE_INPUTS = ("状態（記入欄）", "メモ（記入欄）")
 INQ_INPUT = "送付の記録（記入欄）"
+INQ_KEY = "対象論文（鍵）"
+ISSUE_REF = re.compile(r"(?<![A-Za-z0-9-])[NSI]-\d\d(?![0-9])")
 
 # 『証拠の地図』④: (空いている所, だから言えないこと, 埋める issue)
 GAPS = [
@@ -128,7 +130,8 @@ CONCL = [
 def check_refs():
     """issue 番号の相互参照がすべて実在することを確かめる（2026-09-29 のレビュー: SEEDS 以外は検査していなかった）。"""
     ids = {i["id"] for i in ID.ISSUES}
-    pat = re.compile(r"\b[NSI]-\d\d\b")
+    # ★ \b は Unicode の単語境界で、日本語に接した『S-99を』を拾えない（Codex 2 巡目）→ ASCII の英数字とハイフンだけを境界にする
+    pat = ISSUE_REF
     texts = []
     texts += [(f"PAPERS {p['id']}", p["issues"] + " " + p["open"]) for p in PP.PAPERS]
     texts += [(f"ISSUES {i['id']}", " ".join(str(v) for v in i.values())) for i in ID.ISSUES]
@@ -147,29 +150,48 @@ def check_refs():
         sys.exit(f"issue 番号が 1 つも無い欄: {empty}")
 
 
-def load_inputs(path):
-    """既存の xlsx から研究者の記入欄を読む（見出しの名前で列を探す。見つからなければ空）。"""
+def load_inputs(path, explicit=False):
+    """既存の xlsx から研究者の記入欄を読む（見出しの名前で列を探す）。
+    ★ 記入があるのに引き継げない（鍵の列が無い旧版・列の構成が違う）ときは、黙って捨てずに止まる（Codex 2 巡目 P1）。
+    ★ 明示した引き継ぎ元（--carry-from）は、ファイルと 2 枚のシートが無ければ止まる（打ち間違いで記入を初期化しない）。"""
     out = {"issue": {}, "inq": {}}
-    if not path or not os.path.exists(path):
+    if not path:
+        return out
+    if not os.path.exists(path):
+        if explicit:
+            sys.exit(f"引き継ぎ元が見つからない: {path}")
         return out
     wb = openpyxl.load_workbook(path)
-    if "調査不足とissue" in wb.sheetnames:
-        ws = wb["調査不足とissue"]
+    for sheet, key_header, inputs, dest in (("調査不足とissue", "番号", ISSUE_INPUTS, "issue"), ("照会の下書き", INQ_KEY, (INQ_INPUT,), "inq")):
+        if sheet not in wb.sheetnames:
+            if explicit:
+                sys.exit(f"引き継ぎ元に『{sheet}』シートが無い: {path}")
+            continue
+        ws = wb[sheet]
         head = {ws.cell(4, c).value: c for c in range(1, ws.max_column + 1)}
-        if all(h in head for h in ISSUE_INPUTS):
+        if key_header in head and all(h in head for h in inputs):
             for r in range(5, ws.max_row + 1):
-                key = ws.cell(r, 1).value
+                key = ws.cell(r, head[key_header]).value
                 if key:
-                    out["issue"][key] = tuple(ws.cell(r, head[h]).value for h in ISSUE_INPUTS)
-    if "照会の下書き" in wb.sheetnames:
-        ws = wb["照会の下書き"]
-        head = {ws.cell(4, c).value: c for c in range(1, ws.max_column + 1)}
-        if "対象論文（鍵）" in head and INQ_INPUT in head:
-            for r in range(5, ws.max_row + 1):
-                key = ws.cell(r, head["対象論文（鍵）"]).value
-                if key:
-                    out["inq"][key] = ws.cell(r, head[INQ_INPUT]).value
+                    vals = tuple(ws.cell(r, head[h]).value for h in inputs)
+                    out[dest][key] = vals if dest == "issue" else vals[0]
+            continue
+        # 鍵や記入欄の見出しが見つからない: 記入欄らしい列に何か書かれていれば止まる
+        marked = [c for h, c in head.items() if isinstance(h, str) and "記入欄" in h]
+        filled = [(r, c) for c in marked for r in range(5, ws.max_row + 1) if ws.cell(r, c).value not in (None, "", "未着手")]
+        if filled:
+            sys.exit(f"『{sheet}』の記入を引き継げない（列の構成が今の版と違う）: {path} の {len(filled)} セル。手で写すか、旧版の構成に合わせた移行を足してから作り直す")
     return out
+
+
+def check_orphans(carried):
+    """引き継ぎ元にあって今の版に無い issue・照会に記入があれば止まる（統合・削除で記入が消えるのを防ぐ）。"""
+    ids = {i["id"] for i in ID.ISSUES}
+    keys = {q["key"] for q in ID.INQUIRIES}
+    lost = [k for k, (st, memo) in carried["issue"].items() if k not in ids and (st not in (None, "", "未着手") or memo)]
+    lost += [k for k, rec in carried["inq"].items() if k not in keys and rec]
+    if lost:
+        sys.exit(f"今の版に無い issue・照会に記入がある（引き継ぐと消える）: {lost}")
 
 
 def sha256(path):
@@ -602,10 +624,11 @@ def main():
         # ★ 研究者が記入したファイルを黙って上書きしない（2026-09-29 のレビュー: Codex P1・security-checker MEDIUM）
         sys.exit(f"複製先に同名のファイルがある（記入済みかもしれない）: {copy_target}。記入を引き継ぐなら --carry-from で指定し、上書きしてよいなら --force-copy")
     if a.mutate_test == "refs":
-        PP.PAPERS[0]["issues"] += ", S-99"  # 変異: 存在しない issue 番号
+        PP.PAPERS[0]["open"] += "（詳細は S-99を参照）"  # 変異: 日本語に接した存在しない issue 番号（旧い \b の検査では拾えなかった形）
     check_refs()
     carry_path = a.carry_from or (DST if is_default_out and os.path.exists(DST) else None)
-    carried = load_inputs(carry_path)
+    carried = load_inputs(carry_path, explicit=bool(a.carry_from))
+    check_orphans(carried)
     wb = openpyxl.load_workbook(SRC)
     orig = list(wb.sheetnames)
     assert len(orig) == 26, len(orig)

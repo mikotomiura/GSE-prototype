@@ -51,6 +51,43 @@ def expected(path):
     }
 
 
+def recalc(path, outdir):
+    os.makedirs(outdir, exist_ok=True)
+    subprocess.run([soffice(), "--headless", "--norestore", "--calc", "--convert-to", "xlsx", "--outdir", outdir, path],
+                   check=True, capture_output=True)
+    return openpyxl.load_workbook(os.path.join(outdir, os.path.basename(path)), data_only=True)
+
+
+def start_values(calc, labels):
+    s = calc["★まず読む"]
+    got = {}
+    for r in range(1, s.max_row + 1):
+        label = s.cell(r, 1).value
+        if label in labels:
+            v = s.cell(r, 3).value
+            got[label] = int(v) if isinstance(v, float) and v.is_integer() else v
+    return got
+
+
+def formula_presence(form, labels):
+    """★ 数式が定数に置き換わっていないか（Codex 2 巡目: 残っている数式だけを見ると、定数に壊しても通る）。"""
+    miss = []
+    s = form["★まず読む"]
+    rows = {s.cell(r, 1).value: r for r in range(1, s.max_row + 1)}
+    miss += [f"★まず読む:{k}" for k in labels if k not in rows or s.cell(rows[k], 3).data_type != "f"]
+    m = form["証拠の地図"]
+    start = next(r for r in range(1, m.max_row + 1) if str(m.cell(r, 1).value or "").startswith("② 件数"))
+    r = start + 2  # 見出しの次の行から『計』の行まで
+    while True:
+        for c in range(2, m.max_column + 1):
+            if m.cell(start + 1, c).value and m.cell(r, c).data_type != "f":
+                miss.append(f"証拠の地図:{m.cell(r, c).coordinate}")
+        if m.cell(r, 1).value == "計":
+            break
+        r += 1
+    return miss
+
+
 def main():
     src = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else DST
     exp = expected(src)
@@ -58,12 +95,21 @@ def main():
     try:
         cp = os.path.join(tmp, "in.xlsx")
         shutil.copy2(src, cp)
-        outdir = os.path.join(tmp, "out")
-        os.makedirs(outdir)
-        subprocess.run([soffice(), "--headless", "--norestore", "--calc", "--convert-to", "xlsx", "--outdir", outdir, cp],
-                       check=True, capture_output=True)
-        calc = openpyxl.load_workbook(os.path.join(outdir, "in.xlsx"), data_only=True)
+        calc = recalc(cp, os.path.join(tmp, "out"))
         form = openpyxl.load_workbook(cp)
+        nonformula = formula_presence(form, exp)
+        # ★ 連動の確認: コピーの『論文ごとの要点』で AF006 のデザインを変え、再計算の値が動くことを見る
+        sens = os.path.join(tmp, "sens.xlsx")
+        wb2 = openpyxl.load_workbook(cp)
+        ws2 = wb2["論文ごとの要点"]
+        r6 = next(r for r in range(5, 39) if ws2.cell(r, 1).value == "AF006")
+        assert ws2.cell(r6, 13).value == "質的研究", ws2.cell(r6, 13).value
+        ws2.cell(r6, 13, "実験・介入")
+        wb2.save(sens)
+        moved = start_values(recalc(sens, os.path.join(tmp, "out2")), exp)
+        k_exp, k_cq = "中心候補のうち実験・介入", "中心候補のうち横断調査・質的研究"
+        sens_ok = moved.get(k_exp) == exp[k_exp] + 1 and moved.get(k_cq) == exp[k_cq] - 1
+        print(f"formula presence: missing={nonformula[:5]}  sensitivity: 実験・介入 {exp[k_exp]}→{moved.get(k_exp)}, 横断・質的 {exp[k_cq]}→{moved.get(k_cq)} {'OK' if sens_ok else 'NG'}")
         bad = []
         n = 0
         for name in NEW:
@@ -74,20 +120,14 @@ def main():
                         v = calc[name][c.coordinate].value
                         if v is None or (isinstance(v, str) and v.startswith("#")):
                             bad.append((name, c.coordinate, v))
-        s = calc["★まず読む"]
-        got = {}
-        for r in range(1, s.max_row + 1):
-            label = s.cell(r, 1).value
-            if label in exp:
-                v = s.cell(r, 3).value
-                got[label] = int(v) if isinstance(v, float) and v.is_integer() else v
+        got = start_values(calc, exp)
         miss = [k for k in exp if k not in got]
         wrong = [(k, got[k], exp[k]) for k in exp if k in got and got[k] != exp[k]]
         print(f"formulas in new sheets: {n}  errors/empty: {bad[:5]}")
         for k in exp:
             print(f"  {k}: {got.get(k)} (expected {exp[k]}) {'OK' if got.get(k) == exp[k] else 'NG'}")
-        if bad or miss or wrong:
-            print("FAILED", {"bad": bad[:5], "missing": miss, "wrong": wrong})
+        if bad or miss or wrong or nonformula or not sens_ok:
+            print("FAILED", {"bad": bad[:5], "missing": miss, "wrong": wrong, "not-formula": nonformula[:5], "sensitivity": sens_ok})
             sys.exit(1)
         print("ALL OK")
     finally:

@@ -20,7 +20,7 @@
 ## SHA-256
 
 ```
-3e865c5c3757a476d62a840bda898679eadb28a1518bafddb8afb985b60c6eb0  AI_fatigue_database_with_AI_appraisal_2026-09-29_claude.xlsx
+aa8b688b66181a24a4898e6540d547d39d3947e65309970943ae415d19b6e449  AI_fatigue_database_with_AI_appraisal_2026-09-29_claude.xlsx
 a84c6e3fac93bdc765d179a6b5ccb7bfbff94b3945203f10ee8d36874ecaf091  ../../20260928-ai-fatigue-db-appraisal/archive/AI_fatigue_database_with_AI_appraisal_2026-09-28_claude.xlsx（入力・変更なし）
 ```
 

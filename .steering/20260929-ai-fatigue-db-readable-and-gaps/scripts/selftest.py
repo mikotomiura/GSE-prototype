@@ -93,6 +93,34 @@ def main():
                 if not ok:
                     fails.append(("carry", str(got)))
 
+            # 2b. 引き継ぎの守り（Codex 2 巡目）: 止まって、出力を作らないこと
+            def must_stop(label, word, *args):
+                o = os.path.join(tmp, f"{label}.xlsx")
+                rc, log = run("--out", o, *args)
+                ok = rc != 0 and word in log and not os.path.exists(o)
+                print(f"[{label}] rc={rc} word={'yes' if word in log else 'NO'} out={'exists' if os.path.exists(o) else 'none'} -> {'OK' if ok else 'FAIL'}")
+                if not ok:
+                    fails.append((label, log[-400:]))
+
+            must_stop("carry-missing", "引き継ぎ元が見つからない", "--carry-from", os.path.join(tmp, "typo-no-such-file.xlsx"))
+            # 旧版（鍵の列が無い）に送付の記録がある → 黙って捨てずに止まる
+            wo = openpyxl.load_workbook(edited)
+            q = wo["照会の下書き"]
+            hk = {q.cell(4, c).value: c for c in range(1, q.max_column + 1)}
+            q.cell(4, hk["対象論文（鍵）"], "旧版の列")
+            old = os.path.join(tmp, "old-layout.xlsx")
+            wo.save(old)
+            must_stop("carry-oldlayout", "記入を引き継げない", "--carry-from", old)
+            # 今の版に無い issue に記入がある → 引き継ぐと消えるので止まる
+            wr = openpyxl.load_workbook(edited)
+            s = wr["調査不足とissue"]
+            hs = {s.cell(4, c).value: c for c in range(1, s.max_column + 1)}
+            s.cell(s.max_row + 1, 1, "S-99")
+            s.cell(s.max_row, hs["状態（記入欄）"], "完了")
+            orphan = os.path.join(tmp, "orphan.xlsx")
+            wr.save(orphan)
+            must_stop("carry-orphan", "今の版に無い issue・照会に記入がある", "--carry-from", orphan)
+
         # 3. 複製先の保護
         cdir = os.path.join(tmp, "copydir")
         os.makedirs(cdir)
