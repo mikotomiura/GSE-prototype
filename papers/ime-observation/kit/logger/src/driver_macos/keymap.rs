@@ -1,8 +1,8 @@
 //! Key-code handling of the macOS driver: which physical keys are observed, and how a macOS virtual
 //! key code is mapped to the Windows virtual-key space that the rest of the logger uses.
 //!
-//! The two functions between the excerpt markers are verbatim copies. The wrappers after them are the
-//! only items the parent module uses.
+//! The text between the excerpt markers is pinned by the manifest and is not edited by hand. The
+//! wrappers after it are the only items the parent module uses.
 
 use crate::input::hook::{VK_DBE_ALPHANUMERIC, VK_DBE_HIRAGANA, VK_DBE_KATAKANA};
 
