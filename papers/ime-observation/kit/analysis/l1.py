@@ -29,20 +29,36 @@ Measures (each is computed per stratum -- (cell, scenario, speed) -- and pooled 
   nav          exact-match rate with a Wilson interval, and the distribution of the difference
                (observed - true). The true count is the session's nav_true_cand when it is not null
                (sources with a candidate window: presses while the window was open), otherwise nav_true.
-  truncation   sessions longer than limit_ms (default 20000) are not expected to produce a row: reports how
-               many such sessions exist and how many of them nevertheless appear in a pair, split, or
-               merge; also the number of observed rows longer than the limit.
-  oracle       the plan-versus-ground-truth disagreements, by type, each with a Wilson interval. These
-               sessions are reported, never removed from the evaluation.
+  truncation   the observer stops a composition once its elapsed time reaches limit_ms (default 20000)
+               and emits no row, so a session of at least limit_ms is not expected to produce one.
+               Reports, over the sessions that entered the matching (pairs, split, merge, miss), how many
+               such sessions exist and how many of them nevertheless appear in a pair, split, or merge
+               (with their ground-truth durations); the long sessions the matcher excluded are counted
+               separately (n_long_excluded); also the number of observed rows of at least limit_ms.
+               Reported overall and per stratum (a false positive has no session, so it enters the
+               overall count only).
+  oracle       the plan-versus-ground-truth disagreements, by type, each with a Wilson interval, overall
+               and per stratum (the planned trials of the stratum are the denominator). These sessions
+               are reported, never removed from the evaluation. The oracle agreement is built from
+               every trial of the oracle and for every session definition, not only the definition
+               matched here.
+  zero_dwell_rows
+               the observed rows whose dwell_ms is 0, counted in every bucket (pairs, split, merge,
+               false positives), overall and per stratum for the buckets that carry a session. In the
+               present matching such a row has zero length, cannot overlap a session of positive
+               length, and therefore falls into the false positives and never into a pair; how these
+               rows enter the matching is to be fixed in the pre-registration. The matching is not
+               changed here.
 
-Configuration CFG (JSON): {"B": 2000, "seed": 1, "limit_ms": 20000}. Keys starting with "_" are
+Configuration CFG (JSON): {"B": 2000, "seed": 1, "limit_ms": 20000}; B is at most 100000. Keys starting with "_" are
 annotations and are not read.
 Written as estimation, not significance testing. A quantity that cannot be computed (no pairs, fewer
 than two blocks, zero variance) is null, never 0. Randomness uses only random.Random(seed) (through
 stats.cluster_bootstrap), so identical input always yields identical output bytes (sorted keys, LF,
 UTF-8, no BOM).
 
-Exit status: 0 on success; 2 if an input cannot be read, is inconsistent, or usage is incorrect.
+Exit status: 0 on success; 2 if an input cannot be read, is inconsistent or malformed, or usage is
+incorrect.
 """
 import argparse
 import hashlib
@@ -62,6 +78,7 @@ InputError = gt_sessions.InputError
 DEFAULT_B = 2000
 DEFAULT_SEED = 1
 DEFAULT_LIMIT_MS = 20000
+MAX_B = 100000
 
 
 # ---------------------------------------------------------------- measures
@@ -166,35 +183,131 @@ def nav_agreement(pairs):
             "diff_hist": [[d, hist[d]] for d in sorted(hist)]}
 
 
-def truncation_check(gt_sessions, match_result, limit_ms=DEFAULT_LIMIT_MS):
-    """The check of the cut-off: how many ground-truth sessions are longer than limit_ms, and how many
-    of those appear in a pair, split, or merge of match_result (a session that produced a row).
-    Returns {"limit_ms", "n_long", "n_long_with_row", "n_obs_over_limit"}; n_obs_over_limit counts
-    the observed rows (in any bucket) whose dwell_ms exceeds the limit. Both counts are expected to
-    be 0."""
-    seen = set()
+def _label(plan_trials, cell, tid):
+    info = plan_trials.get(tid)
+    return (cell, info["scenario"], info["speed"]) if info else (cell, None, None)
+
+
+def _label_key(lab):
+    return tuple((x is None, str(x)) for x in lab)
+
+
+def _stratum(lab):
+    return dict(zip(["cell", "scenario", "speed"], lab))
+
+
+def _bucket_rows(match_result):
+    """Every observed row of a matching as (bucket, ground-truth session or None, row)."""
+    out = [("pairs", p["gt"], p["obs"]) for p in match_result["pairs"]]
+    out += [("split", s["gt"], o) for s in match_result["split"] for o in s["obs"]]
+    out += [("merge", m["gt"][0] if m["gt"] else None, m["obs"]) for m in match_result["merge"]]
+    out += [("false_pos", None, r) for r in match_result["false_pos"]]
+    return out
+
+
+def truncation_check(gt_sessions, match_result, limit_ms=DEFAULT_LIMIT_MS, label=None):
+    """The check of the cut-off. The observer stops a composition when its elapsed time reaches
+    limit_ms and emits no row, so a ground-truth session of at least limit_ms should not produce one.
+    Over the sessions that entered the matching (a pair, split, merge, or miss of match_result) it
+    counts the long ones (dwell >= limit_ms) and those that nevertheless appear in a pair, split, or
+    merge; a long session that the matcher excluded is counted in n_long_excluded.
+    Returns {"limit_ms", "n_long", "n_long_excluded", "n_long_with_row", "with_row_gt_dwell_ms",
+    "n_obs_over_limit", "n_obs_over_limit_false_pos"}; with_row_gt_dwell_ms lists the ground-truth
+    durations of the long sessions that have a row (ascending); n_obs_over_limit counts the observed
+    rows (in any bucket) whose dwell_ms is at least limit_ms, of which n_obs_over_limit_false_pos are
+    false positives. n_long_with_row and n_obs_over_limit are expected to be 0.
+    label: an optional function taking a ground-truth session and returning its stratum tuple; when
+    given, "by_stratum" holds the same counts per stratum (the false positives, which have no
+    session, are left out of it; a merged row is attributed to its first session)."""
+    rowed = set()
     for p in match_result["pairs"]:
-        seen.add(match._dump(p["gt"]))
+        rowed.add(match._dump(p["gt"]))
     for s in match_result["split"]:
-        seen.add(match._dump(s["gt"]))
+        rowed.add(match._dump(s["gt"]))
     for m in match_result["merge"]:
         for g in m["gt"]:
-            seen.add(match._dump(g))
-    long_s = [s for s in gt_sessions
-              if s.get("end_wall_ms") is not None and _gt_dwell(s) > limit_ms]
-    rows = [p["obs"] for p in match_result["pairs"]]
-    rows += [o for s in match_result["split"] for o in s["obs"]]
-    rows += [m["obs"] for m in match_result["merge"]]
-    rows += list(match_result["false_pos"])
-    return {"limit_ms": limit_ms, "n_long": len(long_s),
-            "n_long_with_row": sum(1 for s in long_s if match._dump(s) in seen),
-            "n_obs_over_limit": sum(1 for r in rows if r["dwell_ms"] > limit_ms)}
+            rowed.add(match._dump(g))
+    entered = set(rowed)
+    for s in match_result["miss"]:
+        entered.add(match._dump(s))
+
+    def is_long(s):
+        return s.get("end_wall_ms") is not None and _gt_dwell(s) >= limit_ms
+
+    def counts(sessions, rows):
+        long_s = [s for s in sessions if is_long(s)]
+        inn = [s for s in long_s if match._dump(s) in entered]
+        with_row = sorted(_gt_dwell(s) for s in inn if match._dump(s) in rowed)
+        return {"n_long": len(inn), "n_long_excluded": len(long_s) - len(inn), "n_long_with_row": len(with_row),
+                "with_row_gt_dwell_ms": with_row, "n_obs_over_limit": sum(1 for r in rows if r["dwell_ms"] >= limit_ms)}
+
+    brows = _bucket_rows(match_result)
+    out = {"limit_ms": limit_ms}
+    out.update(counts(gt_sessions, [r for _b, _g, r in brows]))
+    out["n_obs_over_limit_false_pos"] = sum(1 for r in match_result["false_pos"] if r["dwell_ms"] >= limit_ms)
+    if label is not None:
+        labs = {label(s) for s in gt_sessions}
+        labs |= {label(g) for _b, g, _r in brows if g is not None}
+        by = []
+        for lab in sorted(labs, key=_label_key):
+            row = {"stratum": _stratum(lab)}
+            row.update(counts([s for s in gt_sessions if label(s) == lab],
+                              [r for _b, g, r in brows if g is not None and label(g) == lab]))
+            by.append(row)
+        out["by_stratum"] = by
+    return out
 
 
-def oracle_report(oracle_agreement):
+def zero_dwell_rows(match_result, label=None):
+    """The observed rows whose dwell_ms is 0, counted in every bucket of match_result.
+    Returns {"n", "in_pairs", "in_split", "in_merge", "in_false_pos"}; with label (a function taking a
+    ground-truth session and returning its stratum tuple) also "by_stratum", one entry
+    {"stratum", "n", "in_pairs", "in_split", "in_merge"} per stratum that has such a row (a false
+    positive carries no session and is counted overall only)."""
+    tot = {"pairs": 0, "split": 0, "merge": 0, "false_pos": 0}
+    per = {}
+    for b, g, r in _bucket_rows(match_result):
+        if r["dwell_ms"] != 0:
+            continue
+        tot[b] += 1
+        if label is not None and g is not None:
+            d = per.setdefault(label(g), {"pairs": 0, "split": 0, "merge": 0})
+            d[b] += 1
+    out = {"n": sum(tot.values()), "in_pairs": tot["pairs"], "in_split": tot["split"],
+           "in_merge": tot["merge"], "in_false_pos": tot["false_pos"]}
+    if label is not None:
+        out["by_stratum"] = [{"stratum": _stratum(lab), "n": sum(per[lab].values()), "in_pairs": per[lab]["pairs"],
+                              "in_split": per[lab]["split"], "in_merge": per[lab]["merge"]}
+                             for lab in sorted(per, key=_label_key)]
+    return out
+
+
+def _rate_ci(x, n):
+    """(rate, Wilson interval) of x / n; both null when n is 0 or smaller than x (a stratum whose
+    denominator is unknown)."""
+    if n <= 0 or x > n:
+        return None, [None, None]
+    return x / n, _ci(stats.wilson(x, n))
+
+
+def _oracle_counts(n, dis, by_type):
+    types = {}
+    for t in sorted(by_type):
+        rate, ci = _rate_ci(by_type[t], n)
+        types[t] = {"n": by_type[t], "rate": rate, "ci": ci}
+    rate, ci = _rate_ci(dis, n)
+    return {"n_trials": n, "n_disagree": dis, "disagree_rate": rate, "disagree_ci": ci, "by_type": types}
+
+
+def oracle_report(oracle_agreement, plan_trials=None, cell=None):
     """The plan-versus-ground-truth disagreements (gt_sessions.py's oracle_agreement): the count and
     rate of disagreements, and each type's count and rate, with Wilson intervals. The disagreeing
-    trials stay in the evaluation."""
+    trials stay in the evaluation. The report covers every trial of the oracle, for every session
+    definition.
+    With plan_trials ({trial_id: {"block_id", "scenario", "speed"}}) and cell, "by_stratum" gives the
+    same figures per stratum: the denominator is the number of planned trials of the stratum, and a
+    disagreeing trial that is not in the plan falls into the stratum (cell, null, null), whose
+    denominator is 0 (its rates are null)."""
     if not isinstance(oracle_agreement, dict):
         raise ValueError("oracle_agreement must be an object")
     if not oracle_agreement.get("plan_available"):
@@ -204,14 +317,29 @@ def oracle_report(oracle_agreement):
     except KeyError as e:
         raise ValueError("oracle_agreement is missing %s" % e)
     dis = n - agree
-    types = {}
-    for t in sorted(by_type):
-        c = by_type[t]
-        types[t] = {"n": c, "rate": (c / n if n else None), "ci": _ci(stats.wilson(c, n))}
-    return {"plan_available": True, "n_trials": n, "n_agree": agree, "n_disagree": dis,
-            "disagree_rate": (dis / n if n else None), "disagree_ci": _ci(stats.wilson(dis, n)),
-            "by_type": types, "unassigned_sessions": oracle_agreement.get("unassigned_sessions"),
-            "removed_from_evaluation": False}
+    out = {"plan_available": True, "n_agree": agree, "unassigned_sessions": oracle_agreement.get("unassigned_sessions"),
+           "removed_from_evaluation": False}
+    out.update(_oracle_counts(n, dis, by_type))
+    if plan_trials is not None:
+        mism = oracle_agreement.get("mismatches")
+        if not isinstance(mism, list):
+            raise ValueError("oracle_agreement is missing mismatches")
+        planned, dis_by = {}, {}
+        for tid in plan_trials:
+            lab = _label(plan_trials, cell, tid)
+            planned[lab] = planned.get(lab, 0) + 1
+        for m in mism:
+            lab = _label(plan_trials, cell, m["trial_id"])
+            d = dis_by.setdefault(lab, {})
+            d[m["type"]] = d.get(m["type"], 0) + 1
+        by = []
+        for lab in sorted(set(planned) | set(dis_by), key=_label_key):
+            c = dis_by.get(lab, {})
+            row = {"stratum": _stratum(lab)}
+            row.update(_oracle_counts(planned.get(lab, 0), sum(c.values()), c))
+            by.append(row)
+        out["by_stratum"] = by
+    return out
 
 
 def _measures(pairs, block_of, B, seed):
@@ -222,7 +350,7 @@ def _measures(pairs, block_of, B, seed):
 def l1_report(match_result, gt_sessions, oracle_agreement, plan_trials, cell, B, seed, limit_ms=DEFAULT_LIMIT_MS):
     """All the L1 measures, per stratum (cell, scenario, speed) and pooled.
 
-    match_result: match.py's "matching" object. gt_sessions: the sessions of the definition that was
+    match_result: match.py's "matching" object (with its miss list). gt_sessions: the sessions of the definition that was
     matched. plan_trials: {trial_id: {"block_id", "scenario", "speed"}} (match.parse_plan_strata).
     A pair whose session belongs to no planned trial falls into the stratum (cell, null, null) and
     into one block of its own (block null)."""
@@ -231,21 +359,21 @@ def l1_report(match_result, gt_sessions, oracle_agreement, plan_trials, cell, B,
         return None if info is None else info["block_id"]
 
     def label(gt):
-        info = plan_trials.get(gt.get("trial_id"))
-        return (cell, info["scenario"], info["speed"]) if info else (cell, None, None)
+        return _label(plan_trials, cell, gt.get("trial_id"))
 
     groups = {}
     for p in match_result["pairs"]:
         groups.setdefault(label(p["gt"]), []).append(p)
     by_stratum = []
-    for lab in sorted(groups, key=lambda L: tuple((x is None, str(x)) for x in L)):
-        row = {"stratum": dict(zip(["cell", "scenario", "speed"], lab))}
+    for lab in sorted(groups, key=_label_key):
+        row = {"stratum": _stratum(lab)}
         row.update(_measures(groups[lab], block_of, B, seed))
         by_stratum.append(row)
     return {
         "metrics": {"by_stratum": by_stratum, "pooled": _measures(match_result["pairs"], block_of, B, seed)},
-        "truncation": truncation_check(gt_sessions, match_result, limit_ms),
-        "oracle": oracle_report(oracle_agreement),
+        "truncation": truncation_check(gt_sessions, match_result, limit_ms, label),
+        "oracle": oracle_report(oracle_agreement, plan_trials, cell),
+        "zero_dwell_rows": zero_dwell_rows(match_result, label),
     }
 
 
@@ -266,6 +394,8 @@ def parse_config(data):
             raise InputError("config: unknown key '%s'" % k)
         if not match._is_int(v) or (k != "seed" and v < 1):
             raise InputError("config: %s must be an integer%s" % (k, "" if k == "seed" else " of at least 1"))
+        if k == "B" and v > MAX_B:
+            raise InputError("config: B must be at most %d" % MAX_B)
         cfg[k] = v
     return cfg
 
@@ -286,7 +416,7 @@ def evaluate(match_bytes, sessions_bytes, plan_bytes, oracle_bytes, config_bytes
     definition = m.get("definition")
     if definition not in match.DEFINITIONS:
         raise InputError("match: definition is not one of all, macos_def, windows_def")
-    for part in ("split", "merge", "false_pos"):
+    for part in ("split", "merge", "miss", "false_pos"):
         if not isinstance(m["matching"].get(part), list):
             raise InputError("match: matching.%s is missing" % part)
     plan = match.parse_plan_strata(plan_bytes)
@@ -311,8 +441,12 @@ def evaluate(match_bytes, sessions_bytes, plan_bytes, oracle_bytes, config_bytes
                           "oracle": have["oracle"], "config": None if config_bytes is None else _sha(config_bytes)},
         "used": {"n_pairs": len(m["matching"]["pairs"])},
         "note": "Pairs whose observed dwell_ms is 0 are left out of the dwell figures and counted in "
-                "n_zero_excluded. Intervals are cluster-bootstrap (blocks) for dwell_ms and Wilson for "
-                "proportions; read them as the width visible from this sample.",
+                "n_zero_excluded; in the present matching a row of dwell_ms 0 never enters a pair and is "
+                "counted in zero_dwell_rows (its place in the matching is to be fixed in the "
+                "pre-registration). Intervals are cluster-bootstrap (blocks) for dwell_ms and Wilson for "
+                "proportions; read them as the width visible from this sample. The oracle report is built "
+                "from every trial of the oracle and for every session definition, not only the definition "
+                "matched here.",
     })
     return rep
 
@@ -351,6 +485,9 @@ def main(argv):
         match._write_atomic(args.out, match.render(out))
     except (InputError, ValueError) as e:
         print("l1: %s" % e, file=sys.stderr)
+        return 2
+    except (KeyError, TypeError, AttributeError, IndexError) as e:
+        print("l1: an input has an unexpected shape (%s: %s)" % (type(e).__name__, e), file=sys.stderr)
         return 2
     except OSError as e:
         print("l1: could not write output (%s)" % type(e).__name__, file=sys.stderr)
@@ -409,8 +546,14 @@ def _case_dwell_bias():
     # the sign is observed - ground truth: an observation that is too long gives a positive bias
     if r["bland_altman"]["bias"] <= 0:
         f.append("the sign is not observed - ground truth")
-    # control: with no injected bias the interval must not contain 20 (the interval can tell the two apart)
-    pairs0, blk0 = _synth(1000, 1, bias=0, sigma=50)
+    # the interval of the median absolute error contains the point estimate and the theoretical value
+    # (the median of |N(20, 50)| is about 36.5)
+    mlo, mhi = r["mae_ci"]
+    if mlo is None or not (mlo <= r["mae"] <= mhi) or not (mlo <= 36.5 <= mhi) or mhi - mlo > 15:
+        f.append("mae_ci does not contain the point estimate %r and 36.5 (or is too wide): %r" % (r["mae"], r["mae_ci"]))
+    # control on an independent draw (another seed): with no injected bias the interval must not contain 20
+    # (the interval can tell the two apart)
+    pairs0, blk0 = _synth(1000, 101, bias=0, sigma=50)
     lo0, hi0 = dwell_error(pairs0, blk0, 500, 7)["bias_ci"]
     if not (lo0 <= 0 <= hi0) or lo0 <= 20 <= hi0:
         f.append("with no bias the interval should contain 0 and not 20: %r" % ([lo0, hi0],))
@@ -430,6 +573,13 @@ def _case_abandon_flip():
         f.append("kappa is not near 0.77 (10%% flip, 30%% cancel): %r" % (a["kappa"],))
     if a["n"] != 1000 or sum(sum(r) for r in a["table"]) != 1000:
         f.append("the table does not hold every pair")
+    # orientation (rows = ground truth, columns = observation), counted independently of the table code
+    fp = sum(1 for p in pairs if p["gt"]["outcome"] != "cancel" and p["obs"]["abandon"])
+    fn = sum(1 for p in pairs if p["gt"]["outcome"] == "cancel" and not p["obs"]["abandon"])
+    if fp == fn:
+        f.append("the fixture cannot tell a table from its transpose (%d = %d)" % (fp, fn))
+    if a["table"][0][1] != fp or a["table"][1][0] != fn:
+        f.append("the table is not [[tn, fp], [fn, tp]] with rows = ground truth: %r (fp %d, fn %d)" % (a["table"], fp, fn))
     # control: no flip gives perfect agreement
     p0, _b0 = _synth(1000, 2, flip=0.0)
     a0 = abandon_agreement(p0)
@@ -486,14 +636,16 @@ def _case_shuffle():
 def _case_nav():
     f = []
     P = lambda nt, ntc, nav: {"gt": match._gt("t1", 0, 1, nav_true=nt, nav_true_cand=ntc), "obs": {"nav": nav}, "iou": 1.0}
-    r = nav_agreement([P(4, 2, 2), P(4, None, 4), P(3, None, 5), P(3, 1, 0)])
-    if r["n"] != 4 or r["exact"] != 0.5:
-        f.append("exact is not 2/4: %r" % ((r["n"], r["exact"]),))
-    if r["diff_hist"] != [[-1, 1], [0, 2], [2, 1]]:
+    # the last pair has a candidate-window count of 0 (a real value, not a missing one): 0 - 0 = 0, whereas
+    # falling back to nav_true (3) would give -3
+    r = nav_agreement([P(4, 2, 2), P(4, None, 4), P(3, None, 5), P(3, 1, 0), P(3, 0, 0)])
+    if r["n"] != 5 or r["exact"] != 0.6:
+        f.append("exact is not 3/5: %r" % ((r["n"], r["exact"]),))
+    if r["diff_hist"] != [[-1, 1], [0, 3], [2, 1]]:
         f.append("diff_hist is wrong (observed - true; nav_true_cand first, else nav_true): %r" % (r["diff_hist"],))
     lo, hi = r["exact_ci"]
-    if not (0 < lo < 0.5 < hi < 1):
-        f.append("exact_ci is not a Wilson interval around 0.5: %r" % (r["exact_ci"],))
+    if not (0 < lo < 0.6 < hi < 1):
+        f.append("exact_ci is not a Wilson interval around 0.6: %r" % (r["exact_ci"],))
     e = nav_agreement([])
     if e["exact"] is not None or e["exact_ci"] != [None, None] or e["diff_hist"] != []:
         f.append("no pairs should give null, not 0: %r" % (e,))
@@ -510,24 +662,59 @@ def _case_truncation():
     long_a = match._gt("t1", 0, 25000)
     long_b = match._gt("t2", 100000, 130000)
     short = match._gt("t3", 200000, 201000)
+    long_x = match._gt("t6", 400000, 430000, excluded_by=["clock_jump"])   # the matcher left this one out
     ob = lambda lo, hi: {"type": "ime_shadow", "t": hi, "dwell_ms": hi - lo, "nav": 0, "abandon": False}
     res = {"pairs": [{"gt": short, "obs": ob(200000, 201000), "iou": 1.0}], "split": [], "merge": [],
            "miss": [long_a, long_b], "false_pos": []}
-    r = truncation_check([long_a, long_b, short], res)
-    if (r["n_long"], r["n_long_with_row"], r["n_obs_over_limit"]) != (2, 0, 0):
-        f.append("expected (2 long, 0 with a row, 0 over the limit): %r" % (r,))
+    r = truncation_check([long_a, long_b, short, long_x], res)
+    if (r["n_long"], r["n_long_excluded"], r["n_long_with_row"], r["n_obs_over_limit"]) != (2, 1, 0, 0):
+        f.append("expected (2 long, 1 excluded, 0 with a row, 0 over the limit): %r" % (r,))
     # positive control: a long session that did get a row, and an observed row over the limit
     res2 = {"pairs": [{"gt": long_a, "obs": ob(0, 25000), "iou": 1.0}], "split": [{"gt": long_b, "obs": [ob(100000, 110000)]}],
-            "merge": [], "miss": [], "false_pos": [ob(300000, 330000)]}
-    r2 = truncation_check([long_a, long_b, short], res2)
-    if (r2["n_long"], r2["n_long_with_row"], r2["n_obs_over_limit"]) != (2, 2, 2):
-        f.append("the check cannot fail: expected (2, 2, 2), got %r" % (r2,))
-    # the limit is exclusive ("longer than 20 s") and configurable
+            "merge": [], "miss": [short], "false_pos": [ob(300000, 330000)]}
+    r2 = truncation_check([long_a, long_b, short, long_x], res2)
+    if (r2["n_long"], r2["n_long_excluded"], r2["n_long_with_row"], r2["n_obs_over_limit"]) != (2, 1, 2, 2) \
+            or r2["n_obs_over_limit_false_pos"] != 1 or r2["with_row_gt_dwell_ms"] != [25000, 30000]:
+        f.append("the check cannot fail: expected (2, 1, 2, 2) with durations [25000, 30000], got %r" % (r2,))
+    # a session of exactly the limit is long (the observer stops at a duration of at least the limit and emits no row)
     edge = match._gt("t4", 0, 20000)
-    if truncation_check([edge], res)["n_long"] != 0 or truncation_check([edge], res, limit_ms=19999)["n_long"] != 1:
-        f.append("a session of exactly the limit should not count as long")
-    if truncation_check([match._gt("t5", 0, None, outcome="open_at_end")], res)["n_long"] != 0:
+    just = match._gt("t5", 0, 19999)
+    res3 = {"pairs": [{"gt": just, "obs": ob(0, 19999), "iou": 1.0}], "split": [], "merge": [], "miss": [edge], "false_pos": [ob(0, 20000)]}
+    r3 = truncation_check([edge, just], res3)
+    if (r3["n_long"], r3["n_long_with_row"], r3["n_obs_over_limit"]) != (1, 0, 1):
+        f.append("a session or row of exactly the limit should count, one just below should not: %r" % (r3,))
+    if truncation_check([edge], res3, limit_ms=20001)["n_long"] != 0 or truncation_check([edge], res3, limit_ms=20000)["n_long"] != 1:
+        f.append("the limit is not configurable or not inclusive")
+    open_s = match._gt("t7", 0, None, outcome="open_at_end")
+    if truncation_check([open_s], dict(res3, miss=[open_s]))["n_long"] != 0:
         f.append("an unclosed session should not count as long")
+    # per stratum
+    lab = lambda g: ("c", "S1" if g["trial_id"] == "t1" else "S2", "fast")
+    rs = truncation_check([long_a, long_b, short, long_x], res2, label=lab)["by_stratum"]
+    got = [(x["stratum"]["scenario"], x["n_long"], x["n_long_excluded"], x["n_long_with_row"], x["n_obs_over_limit"]) for x in rs]
+    if got != [("S1", 1, 0, 1, 1), ("S2", 1, 1, 1, 0)]:
+        f.append("the per-stratum counts are wrong: %r" % (got,))
+    return f
+
+
+def _case_zero_rows():
+    f = []
+    ob = lambda lo, hi: {"type": "ime_shadow", "t": hi, "dwell_ms": hi - lo, "nav": 0, "abandon": False}
+    g1, g2, g3, g4 = (match._gt("t1", 0, 1000), match._gt("t2", 10000, 11000),
+                      match._gt("t3", 20000, 21000), match._gt("t4", 20000, 21000))
+    res = {"pairs": [{"gt": g1, "obs": ob(500, 500), "iou": 1.0}, {"gt": g4, "obs": ob(20000, 21000), "iou": 1.0}],
+           "split": [{"gt": g2, "obs": [ob(10000, 10000), ob(10500, 11000)]}],
+           "merge": [{"gt": [g3, g4], "obs": ob(30000, 30000)}], "miss": [], "false_pos": [ob(40000, 40000), ob(50000, 50100)]}
+    lab = lambda g: ("c", "S1" if g["trial_id"] in ("t1", "t2") else "S2", "fast")
+    z = zero_dwell_rows(res, lab)
+    if (z["n"], z["in_pairs"], z["in_split"], z["in_merge"], z["in_false_pos"]) != (4, 1, 1, 1, 1):
+        f.append("a zero-dwell row is missed in some bucket: %r" % (z,))
+    got = [(x["stratum"]["scenario"], x["n"], x["in_pairs"], x["in_split"], x["in_merge"]) for x in z["by_stratum"]]
+    if got != [("S1", 2, 1, 1, 0), ("S2", 1, 0, 0, 1)]:
+        f.append("the per-stratum zero-dwell counts are wrong: %r" % (got,))
+    none = zero_dwell_rows(dict(res, pairs=[], split=[], merge=[], false_pos=[ob(1, 5)]), lab)
+    if none["n"] != 0 or none["by_stratum"] != []:
+        f.append("no zero-dwell rows should give zero counts: %r" % (none,))
     return f
 
 
@@ -542,6 +729,15 @@ def _case_oracle():
         f.append("disagree_ci does not surround 0.1: %r" % (r["disagree_ci"],))
     if list(r["by_type"]) != sorted(oa["by_type"]) or r["by_type"]["multiple_sessions"]["n"] != 5:
         f.append("by_type is wrong: %r" % (r["by_type"],))
+    plan = {"t1": {"block_id": 0, "scenario": "S1", "speed": "fast"}, "t2": {"block_id": 0, "scenario": "S1", "speed": "fast"},
+            "t3": {"block_id": 1, "scenario": "S2", "speed": "fast"}}
+    oa2 = {"plan_available": True, "n_trials": 3, "n_agree": 0, "by_type": {"no_session": 2, "multiple_sessions": 1},
+           "mismatches": [{"trial_id": "t1", "type": "no_session"}, {"trial_id": "t3", "type": "multiple_sessions"},
+                          {"trial_id": "t9", "type": "no_session"}]}
+    bs = oracle_report(oa2, plan, "c")["by_stratum"]
+    got = [(x["stratum"]["scenario"], x["n_trials"], x["n_disagree"], x["disagree_rate"]) for x in bs]
+    if got != [("S1", 2, 1, 0.5), ("S2", 1, 1, 1.0), (None, 0, 1, None)] or bs[0]["by_type"]["no_session"]["n"] != 1:
+        f.append("the per-stratum disagreement counts are wrong: %r" % (got,))
     if oracle_report({"plan_available": False, "n_trials": 7}) != {"plan_available": False, "n_trials": 7}:
         f.append("without a plan only the trial count is reported")
     try:
@@ -586,10 +782,15 @@ def _fixture_files(d):
     fx = match._cli_fixture()
     sobj = json.loads(fx["sessions"].decode("utf-8"))
     sobj["oracle_agreement"] = {"plan_available": True, "n_trials": 90, "n_agree": 88, "rate": 88 / 90,
-                                "by_type": {"multiple_sessions": 1, "no_session": 1}, "mismatches": [],
+                                "by_type": {"multiple_sessions": 1, "no_session": 1},
+                                "mismatches": [{"trial_id": "t00002", "type": "no_session"},
+                                               {"trial_id": "t00003", "type": "multiple_sessions"}],
                                 "unassigned_sessions": 0}
     sess_bytes = (json.dumps(sobj, indent=2) + "\n").encode("utf-8")
-    out = match.evaluate(sess_bytes, "all", fx["obs"], fx["plan"], fx["oracle"], fx["config"])
+    # a row of dwell_ms 0 inside trial t00002 (which lies after that trial's session, so it cannot be paired)
+    zt = 1700000000000 + 8000 + 4000
+    obs_bytes = fx["obs"] + (json.dumps(match._ob(zt, zt)) + "\n").encode("utf-8")
+    out = match.evaluate(sess_bytes, "all", obs_bytes, fx["plan"], fx["oracle"], fx["config"])
     files = {"match.json": match.render(out), "sessions.json": sess_bytes, "plan.jsonl": fx["plan"],
              "oracle.jsonl": fx["oracle"], "config.json": b'{"B": 200, "seed": 3}'}
     paths = {}
@@ -643,6 +844,26 @@ def _case_cli():
             f.append("expected 9 strata and 2 oracle disagreements: %r" % (len(out["metrics"]["by_stratum"]),))
         if sum(s["dwell"]["n"] for s in out["metrics"]["by_stratum"]) != 84:
             f.append("the strata do not add up to the pooled pairs")
+        # a row of dwell_ms 0 that went through match.py lands in the false positives and is counted, not lost
+        z = out["zero_dwell_rows"]
+        if (z["n"], z["in_pairs"], z["in_split"], z["in_merge"], z["in_false_pos"]) != (1, 0, 0, 0, 1) or pooled["dwell"]["n_zero_excluded"] != 0:
+            f.append("the zero-dwell row is not counted as a false positive: %r" % (z,))
+        mj = json.loads(open(p["match.json"], "rb").read().decode("utf-8"))
+        if sum(1 for r in mj["matching"]["false_pos"] if r["dwell_ms"] == 0) != 1:
+            f.append("the fixture's zero-dwell row did not fall into the false positives of match.py")
+        # the trials the oracle disagrees on have a pair each, and those pairs stay in the metrics
+        mm = {"t00002", "t00003"}
+        if sum(1 for q in mj["matching"]["pairs"] if q["gt"]["trial_id"] in mm) != 2:
+            f.append("the fixture's disagreeing trials do not each have a pair")
+        if out["oracle"]["n_disagree"] != 2 or out["oracle"]["removed_from_evaluation"] is not False or pooled["dwell"]["n"] != 84:
+            f.append("a trial the oracle disagrees on was dropped from the metrics")
+        ob_ = out["oracle"]["by_stratum"]
+        if len(ob_) != 9 or sum(x["n_disagree"] for x in ob_) != 2 or sum(x["n_trials"] for x in ob_) != 90:
+            f.append("the per-stratum oracle report is wrong: %r" % (ob_,))
+        if len(out["truncation"]["by_stratum"]) != 9 or out["truncation"]["n_long_excluded"] != 0:
+            f.append("the per-stratum cut-off report is wrong")
+        if "every session definition" not in out["note"] and "every trial of the oracle" not in out["note"]:
+            f.append("the note does not say what the oracle report covers")
         if any(s["dwell"]["bias_ci"] != [None, None] for s in out["metrics"]["by_stratum"]):
             f.append("a stratum with a single block should have a null interval")
         # unrelated inputs are refused (exit 2) and never combined
@@ -664,6 +885,25 @@ def _case_cli():
                 f.append("an invalid configuration was accepted: %r" % (text,))
         if run("o8.json", match=os.path.join(d, "absent.json"))[0] != 2:
             f.append("a missing input should exit 2")
+        with open(bad_cfg, "wb") as fh:
+            fh.write(b'{"B": %d}' % (MAX_B + 1))
+        if run("o9.json", config=bad_cfg)[0] != 2:
+            f.append("a B above the upper bound was accepted")
+        if parse_config(b'{"B": %d}' % MAX_B)["B"] != MAX_B:
+            f.append("the largest allowed B was refused")
+        # a malformed match output exits 2 with a message, not with a traceback
+        for name, edit in (("no obs", lambda m: m["matching"]["pairs"][0].pop("obs")),
+                           ("no dwell_ms", lambda m: m["matching"]["pairs"][0]["obs"].pop("dwell_ms")),
+                           ("null end", lambda m: m["matching"]["pairs"][0]["gt"].update(end_wall_ms=None)),
+                           ("no nav", lambda m: m["matching"]["pairs"][0]["obs"].pop("nav")),
+                           ("no gt", lambda m: m["matching"]["pairs"][0].pop("gt"))):
+            mj2 = json.loads(open(p["match.json"], "rb").read().decode("utf-8"))
+            edit(mj2)
+            bad_m = os.path.join(d, "badmatch.json")
+            with open(bad_m, "wb") as fh:
+                fh.write(match.render(mj2))
+            if run("o10.json", match=bad_m)[0] != 2:
+                f.append("a malformed match output (%s) did not exit 2" % name)
     return f
 
 
@@ -673,7 +913,8 @@ CASES = [
     ("excludes a dwell_ms of zero (and counts it)", _case_dwell_zero),
     ("shuffling widens the limits of agreement (negative control; the bias stays near 0)", _case_shuffle),
     ("navigation agreement (the true count, the difference distribution)", _case_nav),
-    ("cut-off check (long sessions, rows over the limit, positive control)", _case_truncation),
+    ("cut-off check (long sessions, excluded sessions, rows over the limit, the inclusive limit, strata)", _case_truncation),
+    ("rows of dwell_ms zero are counted in every bucket", _case_zero_rows),
     ("plan-versus-ground-truth report (counts, types, Wilson, not removed)", _case_oracle),
     ("small samples give null, never 0", _case_small_samples),
     ("byte-identical output for the same seed; the seed matters", _case_byte_identical),
