@@ -50,13 +50,13 @@
 - **制約**: 無料の学術 API だけ（判断 3）。検索式はサーヴェイごとに `design.md` に固定してから回す（前タスクの作法）。コンテキストが半分を超えたら、残りを引き継ぎに書いて区切る（記憶 `feedback_session_split_at_half_context`）。
 - 要件（`requirement.md`）のスコープを改めた。
 
-## 判断 8: S-14 の検索が種文献を 1 件も拾わなかったので、補いの検索を足した（design.md S2 からの逸脱・2026-09-30 04:05）
+## 判断 8: S-14 の検索が種文献を 1 件も拾わなかったので、補いの検索を足した（design.md S2 からの逸脱・2026-09-30）
 
 - **見つけ方**: S-14 の検索（04:01・`evidence/S-14/s14_results_2026-09-30.json`）の `seeds` で、種文献 3 件（AF019・S-02 #9 Kim & Lee 2024・S-02 #2 Honggang ほか 2026）がどれも `found_in_runs: false`。★ S-15 は種文献 2 件とも当たっていた。
 - **原因**（検索式と題名・抄録を突き合わせた）: (1) Europe PMC E1 と Semantic Scholar S1 の AI の語群に単独の `AI` が無い（Honggang の題名は「AI dependency」で、`"artificial intelligence"` を含まない）。(2)「AI の導入 → 仕事のストレス → 燃え尽き」の型（Kim & Lee 2024）は `technostress` 等の語を使わず `job stress` と書くが、その語が無い。(3) AF019 と Kim & Lee 2024 は Europe PMC に記録が無く、Semantic Scholar には抄録が無い（出版社が配っていない）ので、題名だけで当たる必要がある。
-- **採用**（補いの結果を見る前に固定）: 同じ 0 段目の 3 群のまま、補いの検索 2 本を `S-14s` として回し、S-14 の本検索と重複を除いて抽出に回す。
-  - Europe PMC E3: `TITLE_ABS:(technostress OR "job stress" OR "work stress" OR "occupational stress" OR "AI anxiety" OR "AI awareness" OR STARA) AND TITLE_ABS:(burnout OR "burn-out" OR exhaustion OR "emotional exhaustion") AND TITLE_ABS:(AI OR "artificial intelligence" OR "AI adoption" OR "AI dependency" OR "generative AI" OR ChatGPT)`
-  - Semantic Scholar S3: `("AI adoption" | "AI dependency" | "AI use" | "AI usage" | "AI implementation") + ("job stress" | technostress | "work stress") + (burnout | exhaustion)`
+- **採用**: 同じ 0 段目の 3 群のまま、補いの検索 2 本を `S-14s` として回し、S-14 の本検索と重複を除いて抽出に回す。★ 時刻の事実（2026-09-30 のレビューで直した）: 補いの検索式はスクリプトに書いてから回した（実行 04:02:50・`evidence/S-14/s14s_results_2026-09-30.json` の executed）。**この判断の記録は実行の後（04:05 ごろ）**で、実行前にコミットした記録は無い。
+  - Europe PMC（事実のファイルの記号は EP3・JSON では `S-14s` の E1）: `TITLE_ABS:(technostress OR "job stress" OR "work stress" OR "occupational stress" OR "AI anxiety" OR "AI awareness" OR STARA) AND TITLE_ABS:(burnout OR "burn-out" OR exhaustion OR "emotional exhaustion") AND TITLE_ABS:(AI OR "artificial intelligence" OR "AI adoption" OR "AI dependency" OR "generative AI" OR ChatGPT)`
+  - Semantic Scholar（事実のファイルの記号は SS3・JSON では `S-14s` の S1）: `("AI adoption" | "AI dependency" | "AI use" | "AI usage" | "AI implementation") + ("job stress" | technostress | "work stress") + (burnout | exhaustion)`
   - 0 段目のストレッサーの群はもとから `stress` を含むので変えない。
 - **失うもの**: 種文献が補いでも当たらなければ、題名に燃え尽きもストレスの語も無い研究（AF019 のように「幸福」「JD-R」と書くもの）は拾えないと事実のファイルに書く。
 
@@ -77,8 +77,38 @@
 
 - 内訳: 前タスクのサーヴェイ 66 件（S-02 11・S-12 9・S-04 の比較 33 と横断 4・S-05 §6 の 9。重なりは 1 行にまとめた）＋ 本タスクの S-15 17・S-14 34・S-13 15。
 - ★ 研究者が「別シートで判定する」を選んだ時点（判断 2 (c)）の見込みは約 67 件（24 ＋ (a) 34 ＋ (b) 9）で、サーヴェイを先に行う決定（判断 7）で倍になった。完了報告で件数と、出どころ（『出どころ』の列）ごとに分けて判定できることを伝える。
-- 事実の表の外（各サーヴェイの「表に載せなかったもの」）・AI を燃え尽きの対策に使う介入・従来の自動化は足していない（範囲の決定 (b) と各判定案のファイル §4）。
+- ⚠️ 当初は、事実の表の外（各サーヴェイの「表に載せなかったもの」）と AI を燃え尽きの対策に使う介入を足さなかった。★ その根拠を「範囲の決定 (b) と各判定案のファイル §4」と書いたが、(b) は自動化の監視についての決定で、根拠の取り違えだった。実際は AI の見立て（E1〜E3）で候補を絞っていた → レビューで HIGH として指摘され、判断 13 で直した（157 件）。
 
 ## 判断 6: 前タスクの事実のファイル `survey-S-08.md` の節の番号の誤りを直した（2026-09-30）
 
 - 「Table S6 は 30 項目版（本文 §4 の記述）」の §4 は、AF001 の出版社版 PDF では §3.2.2（研究 1 の結果）。§4 は研究 2 の EFA。補足資料（出版社の公開ファイル）の表題「30-Item Scale Used for EFA」でも確かめた。日付つきの注で直した。
+
+## 判断 12: 「既出」の定義が design.md S0 と違っていた（逸脱の記録・2026-09-30 のレビューで判明）
+
+- design.md S0 は、既出に「本タスクで先に回したサーヴェイの記録」も含めていた。★ 実装（`evidence/search_round.py` の `known_dois`）は、DB・前タスクの事実のファイル・本タスクの**事実のファイル**の DOI だけを見た。3 本の検索（04:01〜04:03）の時点では、本タスクの事実のファイルはまだ無かった。
+- 結果: サーヴェイの間で同じ記録が重ねて抽出に回った（code-reviewer が JSON から算出: S-13 と S-14 で 12 件・S-13 と S-14 の補いで 13 件・S-13 と S-15 で 4 件・S-14 と S-15 で 4 件）。抽出の作業が重なっただけで、事実の表では重なりを書いた（例: S-13 §2 の「S-14 の表と同じ研究 6 件」）。判定者用ファイルでは DOI で重なりを除いた（候補の DOI の重複は 0）。
+- 件数の注記: 各事実のファイルの「抽出に回した件数」は、サーヴェイごとの数（重なりを含む）。
+
+## 判断 13: 完了時のレビュー（code-reviewer・security-checker）への対応（2026-09-30）
+
+security-checker は CRITICAL・HIGH なし（LOW 4 件）。code-reviewer は HIGH 1 件・MEDIUM 11 件・LOW 7 件。
+
+| 指摘 | 出どころ | 一次の確認 | 対応 |
+|---|---|---|---|
+| 判定者に見せる候補を AI の見立てで絞っていた（AI を燃え尽きの対策に使う介入・抄録や方法が無いだけで落とした行） | code-reviewer HIGH | 範囲の決定 (a) の文言「AI の導入・利用を操作・比較し、使う人の…燃え尽きを測った研究」に、AI の CBT の RCT などが当たる | 事実のファイルの「表に載せなかった」行と AI の介入のうち、論文が AI と書く一次研究はすべて足した（S-15 §4 の 6・S-14 §4 の 4・S-14 §5 の 6・S-13 §4 の 5・S-04 §4 の残り 2）。外したのは AI でない系（決定 (b)・P）と一次研究でないものだけ。132 → 157 件 |
+| 3 件の記録を 1 行にまとめたのは AI の E5 の判断 | code-reviewer MEDIUM | 事実のファイル S-14 §2 の 1 行に 3 件の DOI | 記録ごとに 3 行に分けた（S14-02・S14-51・S14-52） |
+| 読めない XML が素通り・許す格納先の中身と場所に上限が無い（語を使わない塗り・条件付き書式で判定が伝わる）・変異試験の空振り（GPT の単独の検査・書誌の例外の境界・T5 が表の外） | code-reviewer MEDIUM | コードで確認 | 検査を words・structure・golden（生成物との一致比較）の 3 つに分け、変異は「どの検査が単独で赤にするか」を指定して確かめる形にした。読めない XML は赤。セルの単位でも常に禁止の語を当てる。変異 30・陽性対照 2（書誌の列の GPT-4・評価の語は緑） |
+| 判定者 2 に DB 34 件の AI の評価を開かない指示が無い | code-reviewer MEDIUM | `intro_rows` | 判定者 2 のファイルの『はじめに』に開かないもの（評価版の AI の評価のシート・memo-issues.md）を足した。memo-issues.md の冒頭に判定者 2 向けの警告 |
+| 既出の引き算・MBI の件数・卒業の遅れの分類・組織を単位とする研究の書き方・「S-14 と同じ 6 件」の数え方 | code-reviewer MEDIUM | JSON・抽出の表・事実のファイルで数え直した | 事実のファイル・判定案のファイルの数と書き方を直した（0 段目を通った既出 S-15 5 件・S-14 3 件、MBI 5 件、依存 → 燃え尽き 4 件と関係を書かない 4 件など） |
+| 既出の定義の逸脱が記録されていない | code-reviewer MEDIUM | コードで確認 | 判断 12 |
+| 判断 8 の「結果を見る前に固定」の時刻が合わない | code-reviewer MEDIUM | JSON の executed 04:02:50 | 判断 8 を事実どおりに直した |
+| 出力の保護の抜け（同じパス・確かめてから書くまでの間・--force の退避） | code-reviewer LOW・security-checker L-2 | コードで確認 | `place()`: 書く直前にもう一度確かめる・排他的に作る・--force では旧ファイルを時刻つきの名前で退避・--copy-to と --out が同じなら止まる。selftest に 2 項目 |
+| 表の区切りの行の判定が緩い・表記の列が検査の外 | code-reviewer LOW | コードで確認 | 区切りの行の正規表現を厳しくした。表記も抜き出し直して一致比較 |
+| 年の範囲の判定が効いていない（Europe PMC の年が文字列）・既出の集合の DOI の正規表現 | code-reviewer LOW | JSON で数え直した（2026 年より後は 0 件） | 実行した版は変えず、事実のファイルに数え直したことを書き、`evidence/README.md` に流用の注意を書いた |
+| 「repo の外」の確認がいまの worktree しか見ない | security-checker L-1 | 前タスクの `common.py` | 範囲外のファイルなので変えず、`evidence/README.md` に流用の注意を書いた |
+| ローカルの絶対パス（ユーザー名）がコミットされている | security-checker L-3 | 既存の運用（13 ファイル） | 既存の運用の続きとして残す |
+| 実行記録の書き換えの前例（判断 10） | security-checker L-4 | 中身は検索式だけ | 記録として残す（検査器は変えていない） |
+| survey-S-08.md の直しの根拠の書き方 | code-reviewer LOW | AF001 の PDF | §3.2.2 に何が書いてあるか（32 → 30 項目の段）を足した |
+| ラベル・件数の不一致（補いの記号・tasklist の変異の数・design の 66 件） | code-reviewer LOW | 各ファイル | 直した |
+
+- ★ 判定者用ファイルは作り直した（Downloads の写しに記入が無いことを確かめてから `--force`。旧ファイルは時刻つきの名前で退避）。

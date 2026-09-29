@@ -18,13 +18,13 @@
 - [x] `check_survey_files.py`（本タスクと前タスクのディレクトリ）が違反 0
 
 ## C. 判定者用ファイル
-- [x] `scripts/candidates.py`（追加候補のデータ・132 件）
+- [x] `scripts/candidates.py`（追加候補のデータ・132 件 → レビュー後 157 件・判断 13）
 - [x] `scripts/fetch_oa.py` → `evidence/oa_2026-09-30.json`（164 件すべて取得）
 - [x] `scripts/judge_xlsx.py`（出力の保護・DOI の quote・行の高さ）
-- [x] `scripts/check_judge_xlsx.py`（selftest: 陰性対照 0 件・変異 29 種が赤・出力の保護 4 種）
+- [x] `scripts/check_judge_xlsx.py`（レビュー後: 語・構造・生成物との一致の 3 検査。selftest 43 項目 = 陰性対照 1・変異 30〈それぞれ指定の検査だけで赤〉・陽性対照 2・zip の変異 4・出力の保護 6）
 - [x] 判定者 1 用のファイルを作り、Downloads に写した（`archive/judge/` と同一・違反 0・集計の数式を LibreOffice で再計算して確認）
 
 ## D. 完了
-- [ ] code-reviewer ＋ security-checker（並列）・指摘対応
+- [x] code-reviewer ＋ security-checker（並列）・指摘対応（判断 13）
 - [ ] /finish-task で /cross-review 2 巡（Codex の当日の実消費を先に確かめる）
 - [ ] 引き継ぎの更新・git-workflow ルール 6（push → PR → CI 緑なら merge）

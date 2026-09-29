@@ -39,8 +39,9 @@ import candidates as CAND  # noqa: E402
 DB_XLSX = os.path.join(STEER, "20260928-ai-fatigue-db-appraisal", "archive", "input",
                        "AI_fatigue_database_with_AI_appraisal_2026-09-18.xlsx")
 DB_SHA = "48ba8b908413fc8112ec35852d4317389500f577092e7be47384628b5f7ce8b0"  # Downloads の同名ファイルと一致（2026-09-30）
-# ★ 試しに作るときだけ環境変数で差し替える（本番の記録は evidence に 1 回だけ取る）
+# ★ 試しに作るときだけ環境変数で差し替える。本番は evidence の oa_*.json をすべて合わせて読む（記録は上書きせず、足りない DOI だけ別のファイルに足す）
 OA_JSON = os.environ.get("JUDGE_OA_JSON") or os.path.join(TASK, "evidence", "oa_2026-09-30.json")
+OA_GLOB = os.path.join(TASK, "evidence", "oa_*.json")
 EVID_PREV = os.path.join(STEER, "20260929-ai-fatigue-surveys", "evidence")
 
 # ---------------------------------------------------------------- 見た目（build_readable.py と同じ）
@@ -125,6 +126,9 @@ def _section(path, prefix):
     return lines[i + 1:j]
 
 
+SEP_RE = re.compile(r"^\|(\s*:?-+:?\s*\|)+\s*$")  # ★ 表の区切りの行だけ（『| -0.2 |』のような値の行を見出しと取り違えない）
+
+
 def cells(line):
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
@@ -138,10 +142,10 @@ def find_row(path, sec, mark):
         if not l.startswith("|"):
             header = None
             continue
-        if k + 1 < len(body) and re.match(r"^\|\s*-", body[k + 1]):
+        if k + 1 < len(body) and SEP_RE.match(body[k + 1]):
             header = cells(l)
             continue
-        if re.match(r"^\|\s*-", l):
+        if SEP_RE.match(l):
             continue
         if mark in l:
             hits.append((header, cells(l)))
@@ -298,6 +302,9 @@ def intro_rows(judge):
     if judge == 1:
         rows.append(["判定の前に読んだもの（記録）", "判定者 1 は、判定の前に、元の DB 34 件について評価版ファイルの AI の評価を読んでいる"
                                                "（2026-09-30 に研究者が決め、記録した）。"])
+    else:
+        rows.append(["判定の前に開かないもの", "判定が終わるまで、評価版ファイル（AI の評価のシートを足した xlsx）の AI の評価のシートと、元の DB の『AI…』のシート、"
+                                        "研究のメモの一次確認のファイル（memo-issues.md）を開かない。開いた場合は、判定の記録にそのことを書く。"])
     rows += [
         ["追加候補について", "『追加候補』シートの文献には、AI の出力（サーヴェイの AI の案・評価版ファイルの『検索漏れ候補』シート）が別に"
                          "あるが、このファイルには載せていない。判定が終わるまで、それらのファイルを開かない。"],
@@ -339,7 +346,9 @@ def build(judge):
         sys.exit(f"元の DB の SHA-256 が固定値と違う: {DB_XLSX}")
     if not os.path.exists(OA_JSON):
         sys.exit(f"OpenAlex の記録が無い（先に fetch_oa.py を回す）: {OA_JSON}")
-    oa = {k.lower(): v for k, v in json.load(open(OA_JSON, encoding="utf-8"))["records"].items()}
+    oa = {}
+    for p in ([OA_JSON] if os.environ.get("JUDGE_OA_JSON") else sorted(glob.glob(OA_GLOB))):
+        oa.update({k.lower(): v for k, v in json.load(open(p, encoding="utf-8"))["records"].items()})
     db = openpyxl.load_workbook(DB_XLSX, data_only=True)["文献DB"]
     wb = openpyxl.Workbook()
     text_sheet(wb, "はじめに", "AI 疲労 文献 DB｜判定者用ファイル", "黄色の欄だけを入力する。", intro_rows(judge), first=True)
@@ -434,6 +443,19 @@ def guard(dst, force):
             sys.exit(f"出力先に記入がある（--force でも上書きしない）: {dst}")
 
 
+def place(src, dst, force):
+    """src を dst に置く。★ 書く直前にもう一度確かめる（確かめてから書くまでの間の記入を消さない・security L-2）。
+    --force で既存を置き換えるときは、旧ファイルを時刻つきの名前で退避してから置く。"""
+    guard(dst, force)
+    if os.path.exists(dst):
+        import time
+        os.replace(dst, f"{dst}.bak-{time.strftime('%Y%m%d%H%M%S')}")
+    if os.path.exists(dst):
+        sys.exit(f"退避できなかった: {dst}")
+    with open(src, "rb") as fi, open(dst, "xb") as fo:  # ★ 排他的に作る（間に誰かが作っていたら止まる）
+        shutil.copyfileobj(fi, fo)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--judge", type=int, choices=(1, 2), required=True)
@@ -444,6 +466,8 @@ def main(argv=None):
     guard(a.out, a.force)
     copy_dst = os.path.join(a.copy_to, os.path.basename(a.out)) if a.copy_to else None
     if copy_dst:
+        if os.path.normcase(os.path.abspath(copy_dst)) == os.path.normcase(os.path.abspath(a.out)):
+            sys.exit("--copy-to の先が --out と同じ")
         guard(copy_dst, a.force)
     wb, ids = build(a.judge)
     import check_judge_xlsx as CHK
@@ -456,13 +480,13 @@ def main(argv=None):
             print("NG", e)
         if errs:
             sys.exit("判定者用ファイルの検査に失敗した（保存しない）")
-        os.replace(tmp, a.out)
+        place(tmp, a.out, a.force)
         print("saved:", a.out)
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
     if copy_dst:
-        shutil.copyfile(a.out, copy_dst)
+        place(a.out, copy_dst, a.force)
         print("copied:", copy_dst)
 
 

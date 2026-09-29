@@ -2,7 +2,7 @@
 
 ★ 無料の情報源（OpenAlex の `/works/doi:` の 1 件の取得）だけ。連絡先（メールアドレス）は送らない（`mailto` を付けない）。
 ★ 書き出すのは DOI・取得の状態・is_oa・oa_status・oa_url だけ（抄録の鍵を持たない）。既存の出力は上書きしない。
-使い方: python fetch_oa.py <出力 JSON>
+使い方: python fetch_oa.py <出力 JSON> [既存の記録 JSON ...]   # 既存の記録にある DOI は取り直さない（足りない分だけ）
 """
 import json
 import os
@@ -53,11 +53,16 @@ def fetch(doi):
     return {"status": "ERR 取得できず"}
 
 
-def main(out):
+def main(out, existing=()):
     if os.path.exists(out):
         sys.exit(f"出力先が既にある（上書きしない）: {out}")
+    have = set()
+    for p in existing:
+        have |= {k.lower() for k in json.load(open(p, encoding="utf-8"))["records"]}
     recs = {}
     for doi in all_dois():
+        if doi.lower() in have:
+            continue
         recs[doi] = fetch(doi)
         time.sleep(0.5)
     with common.open_exclusive(out) as fh:
@@ -67,6 +72,6 @@ def main(out):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         sys.exit(__doc__)
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2:])
