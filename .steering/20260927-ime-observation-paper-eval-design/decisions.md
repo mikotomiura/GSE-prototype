@@ -463,3 +463,14 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - ★ 仕様の範囲の直し（研究者に問わずメインが段取り）:
   - code-reviewer: H2 `repo_root()` を run_cell と同じ定義（`git rev-parse --show-toplevel`・無ければ 3 段上）に／H4 Step 0 は `ime_shadow` が gated で、正解のセッションが 1 件以上あるのに `ime_shadow` の行が 0 件なら「判定不能」の違反にする（合成のヘッダも実物と同じ `config_gated` に）／M4 各セルで OS の定義と共通の定義 `all` の両方を出す（design §1.2）／M5 `theta` と `drop_start_while_open` を設定で渡す（`clock_offsets_ms` の出どころは M1 / M3 で決める・⚠️ 未決・今は 0）／L4 seed の導き方を書き、合成の生成と注入の乱数を分ける／L6 `--synthetic` の出力先が本番の `results/` なら止め、結果に合成の印／L7 `SEED` の厳密な検査／L8 `CDPATH`／L9 想定外の例外は型名だけで exit 2・失敗したら古い結果を残さない。
   - security: M-A `--pack OUT.zip`（寄託する 5 ファイルだけを決定的に束ね、その束を検査し SHA-256 を出す・`data.md` の手順を「束ねる → 検査 → 寄託 → SHA-256 を記録」に）／M-B 機械に依存しない規則（5 ファイルの中の絶対パスの形〔ドライブ文字・UNC・`/Users/`・`/home/`・`/Volumes/`・MSYS の `/c/`〕をすべて拒み、`~` と `<repo>` で始まるものと相対パスだけを許す）と `--also-user` / `--also-home`（検査した機械を `data.md` に記録）／M-C 中断 run の null のログは無くてよい・`run.json` は必ず見る／M-D 寄託の門でも content-free の検査とハッシュの照合を通す／M-E `data.md` の行に `run.json` の SHA-256 を持たせて照合し、結果の `runs.list` に `manifest_sha256`／L-a `outputs.*.sha256` の書式／L-b `RecursionError`・想定外の例外／L-c 照合済みのバイト列を検査する／L-d 通常ファイルだけ・リンクを拒む・大きさの上限／L-e `--runs-from` はコメントとフェンスの中を読まない・使ったラベルを出す／L-f `--synthetic` は既存を上書きしない／L-h `mktemp` の失敗。
+
+## 判断 64: W5 の 023（回し直し）の merge ゲートのレビューを受けた裁定（2026-09-30・研究者の回答）
+
+★ 023 は判断 60 / 61 で仕様と acceptance を直してから回し直し、attempt 1 で `issue_done`。clean な checkout で `023-acceptance.sh` 失敗 0 件（✅ 27）。
+レビュー: code-reviewer 1 本（HIGH 3・MEDIUM 5・LOW 8）・security-checker 1 本（CRITICAL / HIGH なし・MEDIUM 2・LOW 7）。一次で確かめた: 元の `summarize.py` の床は 480 行で、元の計測は 8 時間で 731 行・周期の中央値 39 秒（`notes.md:883-885`）→ worker の README の「4 時間・30 秒間隔で 480 行」は届かず必ず `insufficient`／Windows のサンプラ（写しの実行行）は `Get-Counter` が読めないと CPU に 0 を書き、集計は RSS > 0 の行を在席として数える／観測器の bin 名は 22 文字（`kit/logger/Cargo.toml:18`）。
+
+| # | 論点 | 採用 | 理由 |
+|---|---|---|---|
+| 64 | E3 の 1 条件あたりの計測時間 | ★ **元の計器と同じ 8 時間・30 秒間隔**（1 晩 1 条件・2 条件 × 2 OS で計 4 晩・M10）。集計の床は**行数 480 と窓の長さ 4 時間以上の両方** | 元の計器の基準（8 時間で 731 行）に揃える。短い窓でレートを代表させない（`notes.md:906-907`） |
+
+- ★ 仕様の範囲の直し（メインが段取り・作業用エージェント）: macOS のプロセス名の切り詰め（Darwin の `p_comm` は 16 文字・`pgrep -x` は切れた名前と照合する見込み → `run_e3.sh` が Darwin では既定を先頭 16 文字に。⚠️ **Mac の実機でまだ確かめていない** → 次の Mac のセッションで `ps -c -o comm=` を見る）／`working` での観測器の入れ替わり（再起動を数え、RSS の傾きを区間ごとに or n/a）／窓の長さの床／OS ごとの量の違いの注記／`conditions.txt` にコア数・OS の版・実行ファイルの SHA-256／Windows のカウンタの事前確認と全部 0 の警告／同名のプロセスの数の事前確認（`idle` はちょうど 1・`working` は 0）／`E3_PROC` の検証・PowerShell へは環境変数で／出力はラベルと basename だけ／値の検査／`calibrate-cpu.sh` の trap と期限／出力先の作成の原子性／selftest の歪んだ列 ほか。★ 写しの実行行は変えない（判断 60）。
