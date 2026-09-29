@@ -6,14 +6,14 @@
 - [x] 引き継ぎ・issues.md・ideas.md・decisions.md（判断 11〜13）・評価プロトコル v1.0 を読む
 - [x] Skill: verify-before-claiming・subagent-delegation
 - [x] requirement.md / design.md §0（共通）/ §1（S-12 の手順・検索前に固定）
-- [ ] `scripts/check_survey_files.py`（禁止語・引用の長さ・注意書き・evidence の鍵）と `--selftest`
+- [x] `scripts/check_survey_files.py`（禁止語・引用の長さ・注意書き・evidence の鍵）と `--selftest`（初回は S-12 だけで緑・変異はすべて赤。最終の数は「検査」の節）
 
 ## サーヴェイ（A 群）
-- [ ] S-12 日本語の文献（検索 → ふるい → 事実 / 判定案 / GSE の 3 ファイル）→ コミット
-- [ ] S-02 検索漏れ候補 11 件の抄録（＋ Sci Rep と Acta Psychologica の標本の重なり・N-06 データセット 2 件）→ design §2 を先に固定 → コミット
-- [ ] S-08 AI 疲労の尺度の一覧（＋ N-07 AF001 の補足資料）→ design §3 を先に固定 → コミット
-- [ ] S-04 疲れが減る側の証拠 → design §4 を先に固定 → コミット
-- [ ] S-05 自動化を見張る疲労 → design §5 を先に固定 → コミット
+- [x] S-12 日本語の文献（検索 → ふるい → 事実 / 判定案 / GSE の 3 ファイル）→ コミット `5007316a`
+- [x] S-02 検索漏れ候補 11 件の抄録（＋ Sci Rep と Acta Psychologica の標本の重なり・N-06 データセット 2 件）→ design §2 を先に固定 → コミット `801a81d5`
+- [x] S-08 AI 疲労の尺度の一覧（＋ N-07 AF001 の補足資料）→ design §3 を先に固定 → コミット `1aea8597`
+- [x] S-04 疲れが減る側の証拠 → design §4 を先に固定 → 0 段目の機械ふるい（判断 9）・補い（判断 10）→ 抽出 4 本（うち抄録の直し 1 本・判断 11）→ メインの確認 → コミット
+- [x] S-05 自動化を見張る疲労 → design §5 を先に固定 → 検索（22:08）→ 抽出 → メインの確認 → コミット
 - [ ] `db-proposals.md`（DB への追加・修正の提案）
 - [ ] `researcher-requests.md`（[研究者] 本文の入手・有料データベース）
 

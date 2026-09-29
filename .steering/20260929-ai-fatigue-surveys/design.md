@@ -234,3 +234,34 @@ AI を導入した群・時期と、導入していない群・時期を比べ�
 - `survey-S-04.md`（事実）: 検索記録・研究の表（対象・デザイン・測定・著者が報告した向き）・向き別と設計別の数・系統的レビューの表。
 - `survey-S-04-ai-judgments.md`: DB の範囲に入れるなら何が中心-B になるか・研究の質の懸念・N-05 への材料。
 - `survey-S-04-gse.md`: roadmap §5.7・I-06 との関係。
+
+## 5. S-05 自動化を見張る疲労（2026-09-29・検索（`evidence/S-05` の executed）の前に固定）
+
+### 5.1 問い
+
+作業を自動化に任せて見張る側に回ったとき、人に生じる疲労（受動的疲労・覚醒の低下・自動化への慢心）について、(a) 能動的疲労との区別、(b) 主な実証、(c) 測り方は何か。★ DB の範囲に入れるかは N-05 で決める（本節は材料集め。範囲に入れない場合も理論の節 S-09 の背景になる）。
+
+### 5.2 情報源と検索
+
+- 種文献（issues.md 付録 C の [S-05] の 6 件）を Crossref で確かめ、抄録（取れれば本文）を読む。
+- Europe PMC（`TITLE_ABS`・`resultType=core`・全件）:
+  - `TITLE_ABS:"passive fatigue"`
+  - `TITLE_ABS:("automation complacency" OR "automation-induced complacency")`
+  - `TITLE_ABS:("vigilance decrement" OR "vigilance decline" OR underload) AND TITLE_ABS:(automation OR automated OR autonomous OR "artificial intelligence") AND TITLE_ABS:(fatigue OR sleepiness OR drowsiness OR arousal)`
+  - `TITLE_ABS:("human oversight" OR "human-in-the-loop" OR "human monitoring" OR supervisory OR supervision) AND TITLE_ABS:("artificial intelligence" OR "machine learning" OR "AI system" OR "AI-assisted") AND TITLE_ABS:(fatigue OR vigilance OR complacency)`
+- Semantic Scholar 一括検索:
+  - `"passive fatigue"`
+  - `("passive fatigue" | "task-induced fatigue" | "vigilance decrement" | underload) + (automation | automated | autonomous | "artificial intelligence")`
+  - `("human oversight" | "human-in-the-loop" | "AI-assisted" | "decision support") + (vigilance | "passive fatigue" | complacency) + ("artificial intelligence" | "machine learning")`
+- OpenAlex は使わない（S-04 で AND・OR の解釈が期待と違ったため。判断 9）。
+
+### 5.3 ふるいと抽出
+
+- 0 段目（機械）: 題名＋抄録に `passive fatigue|vigilance|complacen|underload|sleepiness|drowsiness|task-induced fatigue|fatigue` のどれかと、`automat|autonomous|artificial intelligence|machine learning|AI-assisted|decision support|supervis|monitoring|oversight` のどれかが当たる記録。
+- 抽出は Sonnet（抄録から: 課題・自動化の種類・操作・測定・著者が報告した結果）。メインが種文献と、AI の監督の文脈の研究を自分で確かめる。
+
+### 5.4 出すもの
+
+- `survey-S-05.md`（事実）: 概念の区別の表（出典つき）・主な実証の表・測り方の表・AI の監督の文脈の研究・検索記録。
+- `survey-S-05-ai-judgments.md`: DB の範囲に入れるなら何が入るか（N-05 の材料）・I-11 の序論の系譜の見立て。
+- `survey-S-05-gse.md`: I-03（生成的返権論 §6.3 の負担台帳の例）への材料。

@@ -1,0 +1,4216 @@
+{
+ "meta": {
+  "executed": "2026-09-29 22:08:22 +0900",
+  "design": "design.md §5"
+ },
+ "runs": [
+  {
+   "source": "Crossref",
+   "label": "種文献 6 件",
+   "query": "10.1201/b12791-3.1 10.1037/a0034386 10.1016/j.promfg.2015.07.499 10.1177/0018720811423261 10.1016/j.aap.2018.04.004 10.1177/0018720810376055",
+   "status": "ok",
+   "total": 6,
+   "records": [
+    {
+     "key": "10.1201/b12791-3.1",
+     "title": "Active and Passive Fatigue States",
+     "year": 2000,
+     "doi": "10.1201/b12791-3.1",
+     "journal": "Stress, Workload, and Fatigue",
+     "type": "book-chapter",
+     "authors": "Desmond Paula A., Hancock Peter A.",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/a0034386",
+     "title": "Active and passive fatigue in simulated driving: Discriminating styles of workload regulation and their safety impacts.",
+     "year": 2013,
+     "doi": "10.1037/a0034386",
+     "journal": "Journal of Experimental Psychology: Applied",
+     "type": "journal-article",
+     "authors": "Saxby Dyani J., Matthews Gerald, Warm Joel S., Hitchcock Edward M., Neubauer Catherine",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.promfg.2015.07.499",
+     "title": "Vigilance Decrement and Passive Fatigue Caused by Monotony in Automated Driving",
+     "year": 2015,
+     "doi": "10.1016/j.promfg.2015.07.499",
+     "journal": "Procedia Manufacturing",
+     "type": "journal-article",
+     "authors": "Körber Moritz, Cingel Andrea, Zimmermann Markus, Bengler Klaus",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720811423261",
+     "title": "Fatigue and Voluntary Utilization of Automation in Simulated Driving",
+     "year": 2011,
+     "doi": "10.1177/0018720811423261",
+     "journal": "Human Factors: The Journal of the Human Factors and Ergonomics Society",
+     "type": "journal-article",
+     "authors": "Neubauer Catherine, Matthews Gerald, Langheim Lisa, Saxby Dyani",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.aap.2018.04.004",
+     "title": "Dangerous intersections? A review of studies of fatigue and distraction in the automated vehicle",
+     "year": 2019,
+     "doi": "10.1016/j.aap.2018.04.004",
+     "journal": "Accident Analysis &amp; Prevention",
+     "type": "journal-article",
+     "authors": "Matthews Gerald, Neubauer Catherine, Saxby Dyani J., Wohleber Ryan W., Lin Jinchao",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720810376055",
+     "title": "Complacency and Bias in Human Use of Automation: An Attentional Integration",
+     "year": 2010,
+     "doi": "10.1177/0018720810376055",
+     "journal": "Human Factors: The Journal of the Human Factors and Ergonomics Society",
+     "type": "journal-article",
+     "authors": "Parasuraman Raja, Manzey Dietrich H.",
+     "stage0": true
+    }
+   ]
+  },
+  {
+   "source": "Europe PMC",
+   "label": "E1",
+   "query": "TITLE_ABS:\"passive fatigue\"",
+   "status": "ok",
+   "total": 26,
+   "records": [
+    {
+     "key": "10.1080/00140139.2026.2684756",
+     "title": "Underload in sky: reducing the passive fatigue of pilots during cruise through an attention guided - active interactive seating system.",
+     "year": "2026",
+     "doi": "10.1080/00140139.2026.2684756",
+     "pmcid": "",
+     "journal": "Ergonomics",
+     "authors": "Xu H, Wang L, Li R, Zhang J, Zou J, Ma X, Wang Y, Zhao Y.",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/brainsci16050508",
+     "title": "Comparative Prefrontal Multimodal Physiological Signatures Under Active- and Passive-Fatigue-Inducing Simulated Driving Paradigms.",
+     "year": "2026",
+     "doi": "10.3390/brainsci16050508",
+     "pmcid": "PMC13205062",
+     "journal": "Brain sciences",
+     "authors": "Zhang F, Fang D, Yuan S, Tang H, Liang X, Wang S, Ma K, Zheng D, Fan S.",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140139.2026.2662001",
+     "title": "Chatting with AI: enhancing the supervision safety of near-L3 automated driving by engaging in non-driving-related tasks.",
+     "year": "2026",
+     "doi": "10.1080/00140139.2026.2662001",
+     "pmcid": "",
+     "journal": "Ergonomics",
+     "authors": "Jiang T, Su Q, Tang R.",
+     "stage0": true
+    },
+    {
+     "key": "10.31234/osf.io/4fgcb",
+     "title": "[Accepted manuscript] It is time to stop using the terminology “passive\" fatigue.",
+     "year": "2024",
+     "doi": "10.31234/osf.io/4fgcb",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Mangin T, Pageaux B.",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/jbhi.2026.3707655",
+     "title": "EEG Connectivity Signatures in Active vs. Passive Mental Fatigue Settings.",
+     "year": "2026",
+     "doi": "10.1109/jbhi.2026.3707655",
+     "pmcid": "",
+     "journal": "IEEE journal of biomedical and health informatics",
+     "authors": "Kontopoulou V, Kakkos I, Miloulis ST, Vezakis IA, Sun Y, Ventouras EM, Matsopoulos GK.",
+     "stage0": true
+    },
+    {
+     "key": "10.1037/ocp0000409",
+     "title": "\"Zoom fatigue\" revisited: Are video meetings still exhausting post-COVID-19?",
+     "year": "2025",
+     "doi": "10.1037/ocp0000409",
+     "pmcid": "",
+     "journal": "Journal of occupational health psychology",
+     "authors": "Nesher Shoshan H, Wehrt W.",
+     "stage0": false
+    },
+    {
+     "key": "10.3389/fpsyt.2026.1776994",
+     "title": "The somatization of structural friction: deciphering the surge of adolescent self-harm in post-transition China.",
+     "year": "2026",
+     "doi": "10.3389/fpsyt.2026.1776994",
+     "pmcid": "PMC12992251",
+     "journal": "Frontiers in psychiatry",
+     "authors": "Yan WJ, Ruan QN, Xu D.",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/ocp0000362",
+     "title": "Virtual meeting fatigue: Exploring the impact of virtual meetings on cognitive performance and active versus passive fatigue.",
+     "year": "2023",
+     "doi": "10.1037/ocp0000362",
+     "pmcid": "",
+     "journal": "Journal of occupational health psychology",
+     "authors": "Nurmi N, Pakarinen S.",
+     "stage0": false
+    },
+    {
+     "key": "10.31234/osf.io/h4n2w_v1",
+     "title": "The Missing Link: Validating the Working Memory Adaptive Fatigue with N-Back Difficulty Protocol for Active Cognitive Fatigue Induction",
+     "year": "2026",
+     "doi": "10.31234/osf.io/h4n2w_v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Mangan BE, Tomaz S, Kourtis D.",
+     "stage0": false
+    },
+    {
+     "key": "10.1038/s41598-021-99680-4",
+     "title": "Electrophysiological frequency domain analysis of driver passive fatigue under automated driving conditions.",
+     "year": "2021",
+     "doi": "10.1038/s41598-021-99680-4",
+     "pmcid": "PMC8514533",
+     "journal": "Scientific reports",
+     "authors": "Zhang Y, Ma J, Zhang C, Chang R.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.psychsport.2024.102687",
+     "title": "Fatigued or bored? Investigating the effect of different types of mental fatigue on 3 km running performance.",
+     "year": "2024",
+     "doi": "10.1016/j.psychsport.2024.102687",
+     "pmcid": "",
+     "journal": "Psychology of sport and exercise",
+     "authors": "Pickering T, Wright B, MacMahon C.",
+     "stage0": false
+    },
+    {
+     "key": "10.21203/rs.3.rs-457935/v1",
+     "title": "Electroencephalography Sample Entropy of Driver Passive Fatigue Threshold in Automated Driving",
+     "year": "2021",
+     "doi": "10.21203/rs.3.rs-457935/v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Zhang Y, Ma J, Zhang C, Chang R.",
+     "stage0": true
+    },
+    {
+     "key": "10.1037/cep0000312",
+     "title": "Active or passive? Investigating different types of cognitive fatigue.",
+     "year": "2024",
+     "doi": "10.1037/cep0000312",
+     "pmcid": "",
+     "journal": "Canadian journal of experimental psychology = Revue canadienne de psychologie experimentale",
+     "authors": "Pickering T, Wright B, Schücker L, MacMahon C.",
+     "stage0": false
+    },
+    {
+     "key": "10.3389/fnrgo.2021.765322",
+     "title": "The Origins of Passive, Active, and Sleep-Related Fatigue.",
+     "year": "2021",
+     "doi": "10.3389/fnrgo.2021.765322",
+     "pmcid": "PMC10790914",
+     "journal": "Frontiers in neuroergonomics",
+     "authors": "Chong SD, Baldwin CL.",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.aap.2018.04.004",
+     "title": "Dangerous intersections? A review of studies of fatigue and distraction in the automated vehicle.",
+     "year": "2019",
+     "doi": "10.1016/j.aap.2018.04.004",
+     "pmcid": "",
+     "journal": "Accident; analysis and prevention",
+     "authors": "Matthews G, Neubauer C, Saxby DJ, Wohleber RW, Lin J.",
+     "stage0": true
+    },
+    {
+     "key": "10.1088/1741-2552/ab255d",
+     "title": "An iterative cross-subject negative-unlabeled learning algorithm for quantifying passive fatigue.",
+     "year": "2019",
+     "doi": "10.1088/1741-2552/ab255d",
+     "pmcid": "",
+     "journal": "Journal of neural engineering",
+     "authors": "Foong R, Ang KK, Zhang Z, Quek C.",
+     "stage0": false
+    },
+    {
+     "key": "10.3390/pharmacy11030084",
+     "title": "Subjective Perceptions of Occupational Fatigue in Community Pharmacists.",
+     "year": "2023",
+     "doi": "10.3390/pharmacy11030084",
+     "pmcid": "PMC10204370",
+     "journal": "Pharmacy (Basel, Switzerland)",
+     "authors": "Watterson TL, Chui MA.",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.jsr.2017.02.016",
+     "title": "The relationship between cell phone use and management of driver fatigue: It's complicated.",
+     "year": "2017",
+     "doi": "10.1016/j.jsr.2017.02.016",
+     "pmcid": "",
+     "journal": "Journal of safety research",
+     "authors": "Saxby DJ, Matthews G, Neubauer C.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.aap.2017.12.005",
+     "title": "Mitigating passive fatigue during monotonous drives with thermal stimuli: Insights into the effect of different stimulation durations.",
+     "year": "2019",
+     "doi": "10.1016/j.aap.2017.12.005",
+     "pmcid": "",
+     "journal": "Accident; analysis and prevention",
+     "authors": "Schmidt E, Bullinger AC.",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.jsr.2023.05.006",
+     "title": "The impact of non-driving related tasks on the development of driver sleepiness and takeover performances in prolonged automated driving.",
+     "year": "2023",
+     "doi": "10.1016/j.jsr.2023.05.006",
+     "pmcid": "",
+     "journal": "Journal of safety research",
+     "authors": "Pan H, He H, Wang Y, Cheng Y, Dai Z.",
+     "stage0": true
+    },
+    {
+     "key": "10.1037/a0034386",
+     "title": "Active and passive fatigue in simulated driving: discriminating styles of workload regulation and their safety impacts.",
+     "year": "2013",
+     "doi": "10.1037/a0034386",
+     "pmcid": "PMC4699167",
+     "journal": "Journal of experimental psychology. Applied",
+     "authors": "Saxby DJ, Matthews G, Warm JS, Hitchcock EM, Neubauer C.",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fpsyg.2022.1015190",
+     "title": "Analysis of influencing factors of subjective career unsuccessfulness of vocational college graduates from the Department of Navigation in China.",
+     "year": "2022",
+     "doi": "10.3389/fpsyg.2022.1015190",
+     "pmcid": "PMC9723457",
+     "journal": "Frontiers in psychology",
+     "authors": "Wang L, Ye JH, Lee YS, Miao CJ.",
+     "stage0": false
+    },
+    {
+     "key": "10.1080/15389588.2021.1904138",
+     "title": "Exploring the effectiveness of a digital voice assistant to maintain driver alertness in partially automated vehicles.",
+     "year": "2021",
+     "doi": "10.1080/15389588.2021.1904138",
+     "pmcid": "",
+     "journal": "Traffic injury prevention",
+     "authors": "Mahajan K, Large DR, Burnett G, Velaga NR.",
+     "stage0": true
+    },
+    {
+     "key": "10.1371/journal.pone.0123835",
+     "title": "The effect of low-frequency road noise on driver sleepiness and performance.",
+     "year": "2015",
+     "doi": "10.1371/journal.pone.0123835",
+     "pmcid": "PMC4398381",
+     "journal": "PloS one",
+     "authors": "Anund A, Lahti E, Fors C, Genell A.",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/embc.2017.8037360",
+     "title": "Correlation of reaction time and EEG log bandpower from dry frontal electrodes in a passive fatigue driving simulation experiment.",
+     "year": "2017",
+     "doi": "10.1109/embc.2017.8037360",
+     "pmcid": "",
+     "journal": "Annual International Conference of the IEEE Engineering in Medicine and Biology Society. IEEE Engineering in Medicine and Biology Society. Annual International Conference",
+     "authors": "Ruyi Foong, Kai Keng Ang, Chai Quek.",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/0018720811423261",
+     "title": "Fatigue and voluntary utilization of automation in simulated driving.",
+     "year": "2012",
+     "doi": "10.1177/0018720811423261",
+     "pmcid": "",
+     "journal": "Human factors",
+     "authors": "Neubauer C, Matthews G, Langheim L, Saxby D.",
+     "stage0": true
+    }
+   ]
+  },
+  {
+   "source": "Europe PMC",
+   "label": "E2",
+   "query": "TITLE_ABS:(\"automation complacency\" OR \"automation-induced complacency\")",
+   "status": "ok",
+   "total": 25,
+   "records": [
+    {
+     "key": "10.1097/aco.0000000000001707",
+     "title": "Technology fatigue, cognitive load, and clinician well-being in modern anesthesia practice.",
+     "year": "2026",
+     "doi": "10.1097/aco.0000000000001707",
+     "pmcid": "",
+     "journal": "Current opinion in anaesthesiology",
+     "authors": "Ruskin KJ, Clebone Ruskin A.",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140139.2026.2628873",
+     "title": "Threat-cued or action-cued? Effects of attention guidance strategy on decision-support in automated driving under complex takeover situations.",
+     "year": "2026",
+     "doi": "10.1080/00140139.2026.2628873",
+     "pmcid": "",
+     "journal": "Ergonomics",
+     "authors": "Dou J, Ayas S, Chen M, Sun C, Zhang J, Shi J, Zhang L, Xue C, Chen S, Donmez B.",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/s00464-026-13131-7",
+     "title": "The digital scalpel: navigating the future of surgical innovation.",
+     "year": "2026",
+     "doi": "10.1007/s00464-026-13131-7",
+     "pmcid": "PMC13582378",
+     "journal": "Surgical endoscopy",
+     "authors": "O'Keeffe DT.",
+     "stage0": true
+    },
+    {
+     "key": "10.1111/psyp.70354",
+     "title": "The Absent P3a. Performance Monitoring ERPs Differentiate Trust in Humans and Autonomous Systems.",
+     "year": "2026",
+     "doi": "10.1111/psyp.70354",
+     "pmcid": "PMC13353041",
+     "journal": "Psychophysiology",
+     "authors": "Rogers DA, Brooks KJ, Finn A, Schlesewsky M, Ullsperger M, Bornkessel-Schlesewsky I.",
+     "stage0": true
+    },
+    {
+     "key": "10.20944/preprints202606.1902.v1",
+     "title": "Digital Twins and Artificial Intelligence for HAZOP Enhancement in Process Safety: A Critical Literature Review",
+     "year": "2026",
+     "doi": "10.20944/preprints202606.1902.v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Alrowaie F.",
+     "stage0": true
+    },
+    {
+     "key": "10.20944/preprints202607.2097.v1",
+     "title": "Who Signs the Opinion? Agentic AI, Accountability, and the Delegation Boundary in Actuarial Work",
+     "year": "2026",
+     "doi": "10.20944/preprints202607.2097.v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Kojo O.",
+     "stage0": true
+    },
+    {
+     "key": "10.21203/rs.3.rs-10437454/v1",
+     "title": "Integrating Artificial Intelligence into Airline Operational Control Centers: Opportunities, Challenges, and Safety Implications for Flight Dispatch Operations",
+     "year": "2026",
+     "doi": "10.21203/rs.3.rs-10437454/v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Alim S, Akhtar J.",
+     "stage0": true
+    },
+    {
+     "key": "10.1097/aco.0000000000001580",
+     "title": "The double-edged sword: artificial intelligence's promise and perils in anesthesia patient safety.",
+     "year": "2025",
+     "doi": "10.1097/aco.0000000000001580",
+     "pmcid": "",
+     "journal": "Current opinion in anaesthesiology",
+     "authors": "Maloney JA, Johnson B, Harbell MW.",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140139.2022.2076906",
+     "title": "It practically drives itself: autonomous vehicle technology, psychological attitudes, and susceptibility to risky driving behaviors.",
+     "year": "2023",
+     "doi": "10.1080/00140139.2022.2076906",
+     "pmcid": "",
+     "journal": "Ergonomics",
+     "authors": "Azuma MC, Giordano FB, Stoffregen SA, Klos LS, Lee J.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.ijmedinf.2026.106419",
+     "title": "Socio-technical risks of clinical speech-to-text systems: Transparency, privacy, and reliability challenges in AI-driven documentation.",
+     "year": "2026",
+     "doi": "10.1016/j.ijmedinf.2026.106419",
+     "pmcid": "",
+     "journal": "International journal of medical informatics",
+     "authors": "Elsayed N.",
+     "stage0": true
+    },
+    {
+     "key": "10.1111/inr.70102",
+     "title": "Teaching Critical Thinking in the Age of AI: Safeguarding Clinical Reasoning in Healthcare Documentation.",
+     "year": "2025",
+     "doi": "10.1111/inr.70102",
+     "pmcid": "",
+     "journal": "International nursing review",
+     "authors": "Woo BFY, Song J, Middleton E, Fijačko N, Cato K.",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140139.2023.2210793",
+     "title": "Automation complacency on the road.",
+     "year": "2023",
+     "doi": "10.1080/00140139.2023.2210793",
+     "pmcid": "",
+     "journal": "Ergonomics",
+     "authors": "Chu Y, Liu P.",
+     "stage0": true
+    },
+    {
+     "key": "10.2196/85666",
+     "title": "Exploring Ambient Artificial Intelligence to Enhance Learning and Feedback During Operating Room-to-Intensive Care Unit Handoffs: Co-Design and Simulation Study.",
+     "year": "2026",
+     "doi": "10.2196/85666",
+     "pmcid": "PMC13326726",
+     "journal": "JMIR medical education",
+     "authors": "Jalilian L, Barra FL, Grogan T, Lee J, Kadambi A.",
+     "stage0": true
+    },
+    {
+     "key": "10.1101/2025.03.12.642947",
+     "title": "The absent P3a. Performance monitoring ERPs differentiate trust in humans and autonomous systems",
+     "year": "2025",
+     "doi": "10.1101/2025.03.12.642947",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Rogers DA, Brooks KJ, Finn A, Schlesewsky M, Ullsperger M, Bornkessel-Schlesewsky I.",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fpsyg.2019.00225",
+     "title": "Automation-Induced Complacency Potential: Development and Validation of a New Scale.",
+     "year": "2019",
+     "doi": "10.3389/fpsyg.2019.00225",
+     "pmcid": "PMC6389673",
+     "journal": "Frontiers in psychology",
+     "authors": "Merritt SM, Ako-Brew A, Bryant WJ, Staley A, McKenna M, Leone A, Shirase L.",
+     "stage0": true
+    },
+    {
+     "key": "10.1017/s0963180122000718",
+     "title": "Reflection Machines: Supporting Effective Human Oversight Over Medical Decision Support Systems.",
+     "year": "2024",
+     "doi": "10.1017/s0963180122000718",
+     "pmcid": "",
+     "journal": "Cambridge quarterly of healthcare ethics : CQ : the international journal of healthcare ethics committees",
+     "authors": "Haselager P, Schraffenberger H, Thill S, Fischer S, Lanillos P, van de Groes S, van Hooff M.",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/00187208231190980",
+     "title": "Reducing the Costs of Automation Failure by Providing Voluntary Automation Checking Tools.",
+     "year": "2024",
+     "doi": "10.1177/00187208231190980",
+     "pmcid": "PMC11089824",
+     "journal": "Human factors",
+     "authors": "Bowden V, Long D, Loft S.",
+     "stage0": true
+    },
+    {
+     "key": "med:29758141",
+     "title": "UNDERSTANDING HUMAN OVER-RELIANCE ON TECHNOLOGY.",
+     "year": "2017",
+     "doi": "",
+     "pmcid": "",
+     "journal": "Alberta RN",
+     "authors": "",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.aap.2017.03.023",
+     "title": "Distraction or cognitive overload? Using modulations of the autonomic nervous system to discriminate the possible negative effects of advanced assistance system.",
+     "year": "2017",
+     "doi": "10.1016/j.aap.2017.03.023",
+     "pmcid": "",
+     "journal": "Accident; analysis and prevention",
+     "authors": "Ruscio D, Bos AJ, Ciceri MR.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.patter.2022.100455",
+     "title": "How transparency modulates trust in artificial intelligence.",
+     "year": "2022",
+     "doi": "10.1016/j.patter.2022.100455",
+     "pmcid": "PMC9023880",
+     "journal": "Patterns (New York, N.Y.)",
+     "authors": "Zerilli J, Bhatt U, Weller A.",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720814566454",
+     "title": "Using Modeling and Simulation to Predict Operator Performance and Automation-Induced Complacency With Robotic Automation: A Case Study and Empirical Validation.",
+     "year": "2015",
+     "doi": "10.1177/0018720814566454",
+     "pmcid": "",
+     "journal": "Human factors",
+     "authors": "Wickens CD, Sebok A, Li H, Sarter N, Gacy AM.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.aap.2015.01.018",
+     "title": "How does a collision warning system shape driver's brake response time? The influence of expectancy and automation complacency on real-life emergency braking.",
+     "year": "2015",
+     "doi": "10.1016/j.aap.2015.01.018",
+     "pmcid": "",
+     "journal": "Accident; analysis and prevention",
+     "authors": "Ruscio D, Ciceri MR, Biassoni F.",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720814522830",
+     "title": "Stages and levels of automation in support of space teleoperations.",
+     "year": "2014",
+     "doi": "10.1177/0018720814522830",
+     "pmcid": "",
+     "journal": "Human factors",
+     "authors": "Li H, Wickens CD, Sarter N, Sebok A.",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720810376055",
+     "title": "Complacency and bias in human use of automation: an attentional integration.",
+     "year": "2010",
+     "doi": "10.1177/0018720810376055",
+     "pmcid": "",
+     "journal": "Human factors",
+     "authors": "Parasuraman R, Manzey DH.",
+     "stage0": true
+    },
+    {
+     "key": "10.1136/amiajnl-2011-000089",
+     "title": "Automation bias: a systematic review of frequency, effect mediators, and mitigators.",
+     "year": "2012",
+     "doi": "10.1136/amiajnl-2011-000089",
+     "pmcid": "PMC3240751",
+     "journal": "Journal of the American Medical Informatics Association : JAMIA",
+     "authors": "Goddard K, Roudsari A, Wyatt JC.",
+     "stage0": true
+    }
+   ]
+  },
+  {
+   "source": "Europe PMC",
+   "label": "E3",
+   "query": "TITLE_ABS:(\"vigilance decrement\" OR \"vigilance decline\" OR underload) AND TITLE_ABS:(automation OR automated OR autonomous OR \"artificial intelligence\") AND TITLE_ABS:(fatigue OR sleepiness OR drowsiness OR arousal)",
+   "status": "ok",
+   "total": 11,
+   "records": [
+    {
+     "key": "10.1080/00140139.2026.2684756",
+     "title": "Underload in sky: reducing the passive fatigue of pilots during cruise through an attention guided - active interactive seating system.",
+     "year": "2026",
+     "doi": "10.1080/00140139.2026.2684756",
+     "pmcid": "",
+     "journal": "Ergonomics",
+     "authors": "Xu H, Wang L, Li R, Zhang J, Zou J, Ma X, Wang Y, Zhao Y.",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fnbot.2026.1857548",
+     "title": "Confidence-driven adaptive time window for real-time driver fatigue detection in Level 2-3 autonomous vehicles: a multi-dataset validation study.",
+     "year": "2026",
+     "doi": "10.3389/fnbot.2026.1857548",
+     "pmcid": "PMC13337876",
+     "journal": "Frontiers in neurorobotics",
+     "authors": "Xie W, Xiao P.",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fnrgo.2025.1542379",
+     "title": "Mind the road: attention related neuromarkers during automated and manual simulated driving captured with a new mobile EEG sensor system.",
+     "year": "2025",
+     "doi": "10.3389/fnrgo.2025.1542379",
+     "pmcid": "PMC11937089",
+     "journal": "Frontiers in neuroergonomics",
+     "authors": "Scanlon JEM, Küppers D, Büürma A, Winneke AH.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.aap.2021.106058",
+     "title": "Effects of partially automated driving on the development of driver sleepiness.",
+     "year": "2021",
+     "doi": "10.1016/j.aap.2021.106058",
+     "pmcid": "",
+     "journal": "Accident; analysis and prevention",
+     "authors": "Ahlström C, Zemblys R, Jansson H, Forsberg C, Karlsson J, Anund A.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.apergo.2024.104244",
+     "title": "Comparison of concurrent cognitive load measures during n-back tasks.",
+     "year": "2024",
+     "doi": "10.1016/j.apergo.2024.104244",
+     "pmcid": "",
+     "journal": "Applied ergonomics",
+     "authors": "Pillai P, Balasingam B, Jaekel A, Biondi FN.",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fnhum.2017.00537",
+     "title": "Reduced Attention Allocation during Short Periods of Partially Automated Driving: An Event-Related Potentials Study.",
+     "year": "2017",
+     "doi": "10.3389/fnhum.2017.00537",
+     "pmcid": "PMC5681523",
+     "journal": "Frontiers in human neuroscience",
+     "authors": "Solís-Marcos I, Galvao-Carmona A, Kircher K.",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720819829949",
+     "title": "Computational Modeling of the Effects of Sleep Deprivation on the Vigilance Decrement.",
+     "year": "2019",
+     "doi": "10.1177/0018720819829949",
+     "pmcid": "",
+     "journal": "Human factors",
+     "authors": "Patterson RE, Lochtefeld D, Larson KG, Christensen-Salem A.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.aap.2018.04.004",
+     "title": "Dangerous intersections? A review of studies of fatigue and distraction in the automated vehicle.",
+     "year": "2019",
+     "doi": "10.1016/j.aap.2018.04.004",
+     "pmcid": "",
+     "journal": "Accident; analysis and prevention",
+     "authors": "Matthews G, Neubauer C, Saxby DJ, Wohleber RW, Lin J.",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720818799468",
+     "title": "Vigilance and Automation Dependence in Operation of Multiple Unmanned Aerial Systems (UAS): A Simulation Study.",
+     "year": "2019",
+     "doi": "10.1177/0018720818799468",
+     "pmcid": "",
+     "journal": "Human factors",
+     "authors": "Wohleber RW, Matthews G, Lin J, Szalma JL, Calhoun GL, Funke GJ, Chiu CP, Ruff HA.",
+     "stage0": true
+    },
+    {
+     "key": "10.1037/a0034386",
+     "title": "Active and passive fatigue in simulated driving: discriminating styles of workload regulation and their safety impacts.",
+     "year": "2013",
+     "doi": "10.1037/a0034386",
+     "pmcid": "PMC4699167",
+     "journal": "Journal of experimental psychology. Applied",
+     "authors": "Saxby DJ, Matthews G, Warm JS, Hitchcock EM, Neubauer C.",
+     "stage0": true
+    },
+    {
+     "key": "10.1518/001872008x312152",
+     "title": "Vigilance requires hard mental work and is stressful.",
+     "year": "2008",
+     "doi": "10.1518/001872008x312152",
+     "pmcid": "",
+     "journal": "Human factors",
+     "authors": "Warm JS, Parasuraman R, Matthews G.",
+     "stage0": true
+    }
+   ]
+  },
+  {
+   "source": "Europe PMC",
+   "label": "E4",
+   "query": "TITLE_ABS:(\"human oversight\" OR \"human-in-the-loop\" OR \"human monitoring\" OR supervisory OR supervision) AND TITLE_ABS:(\"artificial intelligence\" OR \"machine learning\" OR \"AI system\" OR \"AI-assisted\") AND TITLE_ABS:(fatigue OR vigilance OR complacency)",
+   "status": "ok",
+   "total": 36,
+   "records": [
+    {
+     "key": "10.21203/rs.3.rs-10767945/v1",
+     "title": "Human-Centered Decision Support for Flight Dispatch: A Scoping Review of Automation Bias, Workload, Situational Awareness, and AI-Assisted Airline Operations",
+     "year": "2026",
+     "doi": "10.21203/rs.3.rs-10767945/v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Akhtar J.",
+     "stage0": true
+    },
+    {
+     "key": "10.20944/preprints202606.1902.v1",
+     "title": "Digital Twins and Artificial Intelligence for HAZOP Enhancement in Process Safety: A Critical Literature Review",
+     "year": "2026",
+     "doi": "10.20944/preprints202606.1902.v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Alrowaie F.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.lpm.2026.104372",
+     "title": "Ethical, legal, and regulatory challenges in AI-based healthcare tools.",
+     "year": "2026",
+     "doi": "10.1016/j.lpm.2026.104372",
+     "pmcid": "",
+     "journal": "Presse medicale (Paris, France : 1983)",
+     "authors": "Dompmartin A, Haykal D.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.soin.2026.03.004",
+     "title": "[Ethics and human safeguards in AI for healthcare].",
+     "year": "2026",
+     "doi": "10.1016/j.soin.2026.03.004",
+     "pmcid": "",
+     "journal": "Soins; la revue de reference infirmiere",
+     "authors": "Alleaume L, Personat C.",
+     "stage0": true
+    },
+    {
+     "key": "10.20944/preprints202602.1949.v1",
+     "title": "From Human Oversight to Human-in-the-Loop: Evolving Governance of Human–AI Interaction in Healthcare and AI Development",
+     "year": "2026",
+     "doi": "10.20944/preprints202602.1949.v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Sharma KH, Sharma P, Sharma P.",
+     "stage0": true
+    },
+    {
+     "key": "10.31557/apjcp.2026.27.7.2437",
+     "title": "Artificial Intelligence in Skin Cancer Detection for Primary Care: A Review.",
+     "year": "2026",
+     "doi": "10.31557/apjcp.2026.27.7.2437",
+     "pmcid": "",
+     "journal": "Asian Pacific journal of cancer prevention : APJCP",
+     "authors": "Zakout S, Zaqout I.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.ijnurstu.2026.105656",
+     "title": "Artificial intelligence-based nurse scheduling in healthcare: A scoping review of functional features and empirical outcomes.",
+     "year": "2026",
+     "doi": "10.1016/j.ijnurstu.2026.105656",
+     "pmcid": "",
+     "journal": "International journal of nursing studies",
+     "authors": "Min A, Kim I, Lee M, Lee J, Kim S.",
+     "stage0": true
+    },
+    {
+     "key": "10.1097/nne.0000000000002188",
+     "title": "Exploring Dynamic Changes in Empathic Capability Among Postgraduate Nursing Students During Clinical Internships: An Artificial Intelligence-Assisted Qualitative Study With Human-in-the-Loop Validation.",
+     "year": "2026",
+     "doi": "10.1097/nne.0000000000002188",
+     "pmcid": "PMC13502375",
+     "journal": "Nurse educator",
+     "authors": "Li S, Ge L, Zheng J, Xiao H, Zeng Y.",
+     "stage0": true
+    },
+    {
+     "key": "10.7759/cureus.110205",
+     "title": "A Clinical-Operational Framework for Responsible Artificial Intelligence Use in Infection Risk Management Among Immunosuppressed Patients: A Technical Report.",
+     "year": "2026",
+     "doi": "10.7759/cureus.110205",
+     "pmcid": "PMC13332208",
+     "journal": "Cureus",
+     "authors": "Rodriguez Bobadilla A, Bobadilla Ocampo SA, Bobadilla Ocampo IC.",
+     "stage0": true
+    },
+    {
+     "key": "10.20944/preprints202607.2097.v1",
+     "title": "Who Signs the Opinion? Agentic AI, Accountability, and the Delegation Boundary in Actuarial Work",
+     "year": "2026",
+     "doi": "10.20944/preprints202607.2097.v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Kojo O.",
+     "stage0": true
+    },
+    {
+     "key": "10.7759/cureus.111390",
+     "title": "The Real \"Catch\" in Clinical Automation: Rethinking Artificial Intelligence for Healthcare Workflows.",
+     "year": "2026",
+     "doi": "10.7759/cureus.111390",
+     "pmcid": "PMC13395953",
+     "journal": "Cureus",
+     "authors": "Sathyakrishna BR, Lourdunathan A, Nagarajappa P, Vinson Iyapillai I, Subramaniam R.",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/s11606-026-10767-y",
+     "title": "Promoting Fairness in AI Implementation.",
+     "year": "2026",
+     "doi": "10.1007/s11606-026-10767-y",
+     "pmcid": "",
+     "journal": "Journal of general internal medicine",
+     "authors": "Owens K, Ramatowski M, Blecker SB.",
+     "stage0": true
+    },
+    {
+     "key": "10.21203/rs.3.rs-9670266/v1",
+     "title": "Enhancing the Morphological Detection of Cytomegalovirus in Gastrointestinal Biopsies: A Deep Learning Approach Trained on IHC-Validated Ground Truth",
+     "year": "2026",
+     "doi": "10.21203/rs.3.rs-9670266/v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Liang W, Wang H, Chang I.",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/s26175507",
+     "title": "Assessment of Visual Fatigue Caused by Eye-Controlled Interaction Based on Task Performance and Pupillary Response with GBDT-LR.",
+     "year": "2026",
+     "doi": "10.3390/s26175507",
+     "pmcid": "PMC13568059",
+     "journal": "Sensors (Basel, Switzerland)",
+     "authors": "Niu H, Zhao Z, Ai M, Yang X, Zhang X, Fang H.",
+     "stage0": true
+    },
+    {
+     "key": "10.17305/bb.2026.14264",
+     "title": "Letter regarding \"The role of reviewers in the era of systematic reviews and meta-analysis: A practical guide for researchers\".",
+     "year": "2026",
+     "doi": "10.17305/bb.2026.14264",
+     "pmcid": "",
+     "journal": "Biomolecules & biomedicine",
+     "authors": "Mondal H.",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/bios16020097",
+     "title": "Wearable Biosensing and Machine Learning for Data-Driven Training and Coaching Support.",
+     "year": "2026",
+     "doi": "10.3390/bios16020097",
+     "pmcid": "PMC12938206",
+     "journal": "Biosensors",
+     "authors": "Madrigal-Cerezo R, Domínguez-Sanz N, Martín-Rodríguez A.",
+     "stage0": true
+    },
+    {
+     "key": "10.15403/jgld-6709",
+     "title": "Beyond the Hype: Understanding the Limits, Errors and Risk Areas of Artificial Intelligence in Gastroenterology.",
+     "year": "2026",
+     "doi": "10.15403/jgld-6709",
+     "pmcid": "",
+     "journal": "Journal of gastrointestinal and liver diseases : JGLD",
+     "authors": "Popa SL.",
+     "stage0": true
+    },
+    {
+     "key": "10.20944/preprints202608.1136.v1",
+     "title": "Trustworthy AI for Sustainable Cities: A Multimodal Orchestration Agent-Based Framework for Civic Compliance",
+     "year": "2026",
+     "doi": "10.20944/preprints202608.1136.v1",
+     "pmcid": "",
+     "journal": "",
+     "authors": "A. R H, Amin Z, Mohamad Ali N, Zinaida RS.",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.ijmedinf.2026.106418",
+     "title": "Artificial intelligence in scholarly peer review: a scoping review of applications, risks, and governance challenges.",
+     "year": "2026",
+     "doi": "10.1016/j.ijmedinf.2026.106418",
+     "pmcid": "",
+     "journal": "International journal of medical informatics",
+     "authors": "Nabavi A, Safari F, Shmoury AH, Tabet S, Perdomo-Luna C, Celi LA.",
+     "stage0": true
+    },
+    {
+     "key": "10.2147/jmdh.s619318",
+     "title": "Artificial Intelligence Integration in Multidisciplinary Wound Management: A Scoping Review of Barriers and Facilitators in Clinical Workflows.",
+     "year": "2026",
+     "doi": "10.2147/jmdh.s619318",
+     "pmcid": "PMC13262566",
+     "journal": "Journal of multidisciplinary healthcare",
+     "authors": "Sa'ban FZ, Purba CIH, Rahayu U, Aziz MA, Afriana R, Yudha F.",
+     "stage0": true
+    },
+    {
+     "key": "10.7759/cureus.114581",
+     "title": "Clinical Applications, Opportunities, and Implementation Challenges of AI in Emergency Medicine: A Narrative Review.",
+     "year": "2026",
+     "doi": "10.7759/cureus.114581",
+     "pmcid": "PMC13575288",
+     "journal": "Cureus",
+     "authors": "Ashiq N, Munir F, Yousaf A.",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/healthcare14162627",
+     "title": "Explainable Machine Learning for Concurrent Screening of Elevated Work-Related Fatigue Using Routine Working-Hour and Occupational Health Data Among Manufacturing Workers: A Cross-Sectional Model Development and Internal Validation Study.",
+     "year": "2026",
+     "doi": "10.3390/healthcare14162627",
+     "pmcid": "PMC13512085",
+     "journal": "Healthcare (Basel, Switzerland)",
+     "authors": "Wang CC, Chen MS.",
+     "stage0": true
+    },
+    {
+     "key": "10.7759/cureus.96657",
+     "title": "Artificial Intelligence in Upper Gastrointestinal Endoscopy: Current Evidence, Practice, and Future Directions.",
+     "year": "2025",
+     "doi": "10.7759/cureus.96657",
+     "pmcid": "PMC12607239",
+     "journal": "Cureus",
+     "authors": "Alemam A, Tamanna R, Ali M, Ibraheem N, Swealem A.",
+     "stage0": true
+    },
+    {
+     "key": "10.1101/2025.03.28.25324843",
+     "title": "Unmet Needs in Acute Hepatic Porphyria Diagnosis: A Comparative Big Data Analysis of an AI-based Human-in-the-Loop Screening Versus Standard of Care",
+     "year": "2025",
+     "doi": "10.1101/2025.03.28.25324843",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Lin S, Strebinger G, Kaiser M, Blagec K, Pilgram V, Lutz T, Nateqi J.",
+     "stage0": true
+    },
+    {
+     "key": "10.2196/84145",
+     "title": "Training an AI Chatbot to Manage Health in Underserved Populations: Methodological Approach.",
+     "year": "2026",
+     "doi": "10.2196/84145",
+     "pmcid": "PMC13085989",
+     "journal": "JMIR AI",
+     "authors": "Ihle AD, Wicks B, Metsis V, Starfall A, Clapham F, Gorbachev A, Shanley S, Strauser C, McGrath JM.",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fmed.2026.1918150",
+     "title": "Endostrat: a multicenter study of AI-assisted two-level risk stratification for gastric precancerous and early neoplastic lesion screening.",
+     "year": "2026",
+     "doi": "10.3389/fmed.2026.1918150",
+     "pmcid": "PMC13561896",
+     "journal": "Frontiers in medicine",
+     "authors": "Chen Z, Ma H, Yang C, Hao H, Gu Q, Jia L, Lu Z, Ding R, Li R, Song L, Feng Z.",
+     "stage0": true
+    },
+    {
+     "key": "10.1101/2025.10.14.25338040",
+     "title": "Multidimensional Evaluation of Large Language Models on the AAP In-Service Examination: Assessing Accuracy, Calibration, and Citation Reliability",
+     "year": "2025",
+     "doi": "10.1101/2025.10.14.25338040",
+     "pmcid": "",
+     "journal": "",
+     "authors": "Dhaimade PA, Henderson R.",
+     "stage0": true
+    },
+    {
+     "key": "10.1515/jpm-2025-0285",
+     "title": "The FAIR framework: ethical hybrid peer review.",
+     "year": "2025",
+     "doi": "10.1515/jpm-2025-0285",
+     "pmcid": "",
+     "journal": "Journal of perinatal medicine",
+     "authors": "Grünebaum A, Dudenhausen J, Chervenak FA.",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/healthcare13162036",
+     "title": "Telemedicine in Obstetrics and Gynecology: A Scoping Review of Enhancing Access and Outcomes in Modern Healthcare.",
+     "year": "2025",
+     "doi": "10.3390/healthcare13162036",
+     "pmcid": "PMC12385597",
+     "journal": "Healthcare (Basel, Switzerland)",
+     "authors": "Medani IE, Hakami AM, Chourasia UH, Rahamtalla B, Adawi NM, Fadailu M, Salih A, Abdelmola A, Hashim KN, Dawelbait AM, Yousf NM, Hassan NM, Ali NA, Rizig AA.",
+     "stage0": true
+    },
+    {
+     "key": "10.1093/jncics/pkaf078",
+     "title": "Accelerating precision exercise medicine in cancer patients using pooled individual patient data: POLARIS experience.",
+     "year": "2025",
+     "doi": "10.1093/jncics/pkaf078",
+     "pmcid": "PMC12401491",
+     "journal": "JNCI cancer spectrum",
+     "authors": "Buffart LM, Kenkhuis MF, Newton RU, May AM, Galvão DA, Courneya KS.",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/s00330-025-11426-2",
+     "title": "Figure plagiarism and manipulation, an under-recognised problem in academia.",
+     "year": "2025",
+     "doi": "10.1007/s00330-025-11426-2",
+     "pmcid": "",
+     "journal": "European radiology",
+     "authors": "Saliba T, Rotzinger D.",
+     "stage0": true
+    },
+    {
+     "key": "10.1017/wtc.2023.9",
+     "title": "Evaluation of a machine-learning-driven active-passive upper-limb exoskeleton robot: Experimental human-in-the-loop study.",
+     "year": "2023",
+     "doi": "10.1017/wtc.2023.9",
+     "pmcid": "PMC10936398",
+     "journal": "Wearable technologies",
+     "authors": "Nasr A, Hunter J, Dickerson CR, McPhee J.",
+     "stage0": false
+    },
+    {
+     "key": "10.2196/72398",
+     "title": "AI in Medical Questionnaires: Scoping Review",
+     "year": "2025",
+     "doi": "10.2196/72398",
+     "pmcid": "PMC12235208",
+     "journal": "Journal of medical Internet research",
+     "authors": "Luo X, Li Y, Xu J, Zheng Z, Ying F, Huang G.",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/diagnostics12122943",
+     "title": "The Capacity of Artificial Intelligence in COVID-19 Response: A Review in Context of COVID-19 Screening and Diagnosis.",
+     "year": "2022",
+     "doi": "10.3390/diagnostics12122943",
+     "pmcid": "PMC9777320",
+     "journal": "Diagnostics (Basel, Switzerland)",
+     "authors": "Ozsahin DU, Isa NA, Uzun B.",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/frobt.2023.1166248",
+     "title": "Predicting the metabolic cost of exoskeleton-assisted squatting using foot pressure features and machine learning.",
+     "year": "2023",
+     "doi": "10.3389/frobt.2023.1166248",
+     "pmcid": "PMC10154631",
+     "journal": "Frontiers in robotics and AI",
+     "authors": "Ramadurai S, Jeong H, Kim M.",
+     "stage0": true
+    },
+    {
+     "key": "med:37128388",
+     "title": "Weakly Supervised Classification of Vital Sign Alerts as Real or Artifact.",
+     "year": "2022",
+     "doi": "",
+     "pmcid": "PMC10148368",
+     "journal": "AMIA ... Annual Symposium proceedings. AMIA Symposium",
+     "authors": "Dey A, Goswami M, Yoon JH, Clermont G, Pinsky M, Hravnak M, Dubrawski A.",
+     "stage0": true
+    }
+   ]
+  },
+  {
+   "source": "Semantic Scholar",
+   "label": "S1",
+   "query": "\"passive fatigue\"",
+   "status": "ok",
+   "total": 87,
+   "records": [
+    {
+     "key": "10.4271/12-09-03-0025",
+     "title": "Automosphere: Exploring Vehicle Heads-Up Display with Weather-Related\n Windshield Cues for Passive Fatigue Management",
+     "year": 2026,
+     "doi": "10.4271/12-09-03-0025",
+     "journal": "SAE International Journal of Connected and Automated Vehicles",
+     "authors": "Mohsen Ensafjoo, Jamy Li",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/cw64301.2024.00033",
+     "title": "Passive Fatigue Assessment in Augmented Reality Workspaces: Behavioral Cues Indicators for Workers with Intellectual Disabilities",
+     "year": 2024,
+     "doi": "10.1109/CW64301.2024.00033",
+     "journal": "International Conference on Cyberworlds",
+     "authors": "Kaishi Naito, D. Inoue, Prawit Buayai, Wan-Young Chung, Xiaoyang Mao",
+     "stage0": false
+    },
+    {
+     "key": "10.1371/journal.pone.0123835",
+     "title": "The Effect of Low-Frequency Road Noise on Driver Sleepiness and Performance",
+     "year": 2015,
+     "doi": "10.1371/journal.pone.0123835",
+     "journal": "PLoS ONE",
+     "authors": "A. Anund, Eva Lahti, C. Fors, A. Genell",
+     "stage0": false
+    },
+    {
+     "key": "10.1080/15389588.2021.1904138",
+     "title": "Exploring the effectiveness of a digital voice assistant to maintain driver alertness in partially automated vehicles",
+     "year": 2021,
+     "doi": "10.1080/15389588.2021.1904138",
+     "journal": "Traffic Injury Prevention",
+     "authors": "Kirti Mahajan, D. Large, G. Burnett, N. Velaga",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fpsyg.2022.1015190",
+     "title": "Analysis of influencing factors of subjective career unsuccessfulness of vocational college graduates from the Department of Navigation in China",
+     "year": 2022,
+     "doi": "10.3389/fpsyg.2022.1015190",
+     "journal": "Frontiers in Psychology",
+     "authors": "Li Wang, Jian-Hong Ye, Yi-Sang Lee, Cong Miao",
+     "stage0": false
+    },
+    {
+     "key": "10.48175/ijarsct-5452",
+     "title": "Man Machine Interaction in Autonomous Vehicles - 02",
+     "year": 2022,
+     "doi": "10.48175/ijarsct-5452",
+     "journal": "International Journal of Advanced Research in Science, Communication and Technology",
+     "authors": "Ajay Singh, Neha Sudhirkumar Agarwal, Kanak Narawade, G. Deshmukh, Shikha Pachouly",
+     "stage0": true
+    },
+    {
+     "key": "10.54941/ahfe1006536",
+     "title": "Analysis of Subjective Sleepiness Considering the Influences of Driving Workload, Duration between Stations, and Driving Duration in Railway Driving",
+     "year": 2025,
+     "doi": "10.54941/ahfe1006536",
+     "journal": "AHFE International",
+     "authors": "Daisuke Suzuki, Chizuru Nakagawa, H. Akatsuka, Naohiro Akiu",
+     "stage0": false
+    },
+    {
+     "key": "s2:175488fc057668b534635f5562af7fd286bb1ca7",
+     "title": "ACTIVE AND PASSIVE FATIGUE IN SIMULATED DRIVING",
+     "year": 2007,
+     "doi": "",
+     "journal": "",
+     "authors": "D. Saxby",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1071181319631106",
+     "title": "Differentiating Active and Passive Fatigue with the use of Electroencephalography",
+     "year": 2019,
+     "doi": "10.1177/1071181319631106",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "Kyle A. Bernhardt, Dmitri Poltavski, T. Petros, F. Ferraro",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/ner52421.2023.10123739",
+     "title": "Application of EEG-based Passive Mental Fatigue Detection Model to an Active Fatigue Task",
+     "year": 2023,
+     "doi": "10.1109/NER52421.2023.10123739",
+     "journal": "International IEEE/EMBS Conference on Neural Engineering",
+     "authors": "Ling Guo, Wenfei Fang, Chuan-Chu Wang, Zhuo Zhang, Keng-Ang Kai",
+     "stage0": false
+    },
+    {
+     "key": "10.1088/1741-2552/ab255d",
+     "title": "An iterative cross-subject negative-unlabeled learning algorithm for quantifying passive fatigue",
+     "year": 2019,
+     "doi": "10.1088/1741-2552/ab255d",
+     "journal": "Journal of Neural Engineering",
+     "authors": "Ruyi Foong, Keng-Ang Kai, Zhuo Zhang, C. Quek",
+     "stage0": false
+    },
+    {
+     "key": "10.1038/293139a0",
+     "title": "Moving and the motion after-effect",
+     "year": 1981,
+     "doi": "10.1038/293139A0",
+     "journal": "Nature",
+     "authors": "L. Harris, Michael J. Morgan, A. Still",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/978-3-030-50943-9_32",
+     "title": "Influence of Passive Fatigue and Take-Over Request Lead Time on Drivers' Take-Over Performance",
+     "year": 2020,
+     "doi": "10.1007/978-3-030-50943-9_32",
+     "journal": "International Conference on Applied Human Factors and Ergonomics",
+     "authors": "A. Hadi, Qingkun Li, Wenjun Wang, Quan Yuan, Bo Cheng",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/itsc55140.2022.9921761",
+     "title": "Mitigating passive fatigue of monotonous driving with finger activities: A driving simulator study",
+     "year": 2022,
+     "doi": "10.1109/ITSC55140.2022.9921761",
+     "journal": "2022 IEEE 25th International Conference on Intelligent Transportation Systems (ITSC)",
+     "authors": "Chao Liu, Bo Chen, Haobo Xing, Yi Guo, Wenbin Hou, R. Zheng",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/154193120805202113",
+     "title": "Effect of Active and Passive Fatigue on Performance Using a Driving Simulator",
+     "year": 2008,
+     "doi": "10.1177/154193120805202113",
+     "journal": "",
+     "authors": "D. Saxby, G. Matthews, Edward M. Hitchcock, J. Warm, G. Funke, Thomas Gantzer",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/embc.2017.8037360",
+     "title": "Correlation of reaction time and EEG log bandpower from dry frontal electrodes in a passive fatigue driving simulation experiment",
+     "year": 2017,
+     "doi": "10.1109/EMBC.2017.8037360",
+     "journal": "Annual International Conference of the IEEE Engineering in Medicine and Biology Society",
+     "authors": "Ruyi Foong, K. Ang, C. Quek",
+     "stage0": false
+    },
+    {
+     "key": "10.48550/arxiv.2512.09190",
+     "title": "Understanding Mental States in Active and Autonomous Driving with EEG",
+     "year": 2025,
+     "doi": "10.48550/arXiv.2512.09190",
+     "journal": "arXiv.org",
+     "authors": "Prithila Angkan, Paul Hungler, Ali Etemad",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/brainsci16050508",
+     "title": "Comparative Prefrontal Multimodal Physiological Signatures Under Active- and Passive-Fatigue-Inducing Simulated Driving Paradigms",
+     "year": 2026,
+     "doi": "10.3390/brainsci16050508",
+     "journal": "Brain Science",
+     "authors": "Feiyang Zhang, Dequan Fang, Shiji Yuan, Huaizhi Tang, Xiao Liang, Shuai Wang",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/jbhi.2026.3707655",
+     "title": "EEG Connectivity Signatures in Active vs. Passive Mental Fatigue Settings.",
+     "year": 2026,
+     "doi": "10.1109/JBHI.2026.3707655",
+     "journal": "IEEE journal of biomedical and health informatics",
+     "authors": "V. Kontopoulou, I. Kakkos, S. Miloulis, Ioannis A. Vezakis, Yu Sun, E. Ventouras",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.aap.2017.12.005",
+     "title": "Mitigating passive fatigue during monotonous drives with thermal stimuli: Insights into the effect of different stimulation durations.",
+     "year": 2017,
+     "doi": "10.1016/j.aap.2017.12.005",
+     "journal": "Accident Analysis and Prevention",
+     "authors": "Elisabeth Schmidt, A. Bullinger",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.jsr.2023.05.006",
+     "title": "The impact of non-driving related tasks on the development of driver sleepiness and takeover performances in prolonged automated driving.",
+     "year": 2023,
+     "doi": "10.1016/j.jsr.2023.05.006",
+     "journal": "Journal of Safety Research",
+     "authors": "Hengyan Pan, Haijing He, Yonggang Wang, Yanqiu Cheng, Zhe Dai",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/10711813251369479",
+     "title": "Beyond Detection: A Systematic Review of Driver Passive Fatigue Prevention and Mitigation Strategies",
+     "year": 2025,
+     "doi": "10.1177/10711813251369479",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "Shiva Rasouli, Areen Alsaid",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/978-3-031-35392-5_2",
+     "title": "Evaluating the Impact of Passive Fatigue on Pilots Using Performance and Subjective States Measures",
+     "year": 2023,
+     "doi": "10.1007/978-3-031-35392-5_2",
+     "journal": "Interacción",
+     "authors": "S. Conte, D. Harris, J. Blundell",
+     "stage0": false
+    },
+    {
+     "key": "10.3389/fnrgo.2021.765322",
+     "title": "The Origins of Passive, Active, and Sleep-Related Fatigue",
+     "year": 2021,
+     "doi": "10.3389/fnrgo.2021.765322",
+     "journal": "Frontiers in Neuroergonomics",
+     "authors": "Steven D. Chong, C. Baldwin",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.aap.2018.04.004",
+     "title": "Dangerous intersections? A review of studies of fatigue and distraction in the automated vehicle.",
+     "year": 2019,
+     "doi": "10.1016/j.aap.2018.04.004",
+     "journal": "Accident Analysis and Prevention",
+     "authors": "G. Matthews, Catherine Neubauer, D. Saxby, Ryan W. Wohleber, Jinchao Lin",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/thms.2021.3121665",
+     "title": "An Adaptive Time Budget Adjustment Strategy Based on a Take-Over Performance Model for Passive Fatigue",
+     "year": 2022,
+     "doi": "10.1109/THMS.2021.3121665",
+     "journal": "IEEE Transactions on Human-Machine Systems",
+     "authors": "Qingkun Li, Zhenyuan Wang, Wenjun Wang, Chao Zeng, Guo-Fa Li, Quan Yuan",
+     "stage0": true
+    },
+    {
+     "key": "10.1201/b12791-3.1",
+     "title": "ACTIVE AND PASSIVE FATIGUE STATES",
+     "year": 2001,
+     "doi": "10.1201/b12791-3.1",
+     "journal": "",
+     "authors": "P. Desmond, P. Hancock",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/ukricis.2008.4798946",
+     "title": "Models of cell assembly decay",
+     "year": 2008,
+     "doi": "10.1109/UKRICIS.2008.4798946",
+     "journal": "2008 7th IEEE International Conference on Cybernetic Intelligent Systems",
+     "authors": "P. Passmore, C. Huyck",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/smc.2016.7844749",
+     "title": "Evaluation of driver steering performance with haptic guidance under passive fatigued situation",
+     "year": 2016,
+     "doi": "10.1109/SMC.2016.7844749",
+     "journal": "IEEE International Conference on Systems, Man and Cybernetics",
+     "authors": "Zheng Wang, T. Kaizuka, Kimihiko Nakano, R. Zheng, K. Shimono",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/154193120705101839",
+     "title": "Development of Active and Passive Fatigue Manipulations Using a Driving Simulator",
+     "year": 2007,
+     "doi": "10.1177/154193120705101839",
+     "journal": "",
+     "authors": "D. Saxby, G. Matthews, Edward M. Hitchcock, J. Warm",
+     "stage0": false
+    },
+    {
+     "key": "10.3390/app16189049",
+     "title": "Multimodal Physiological Detection of Passive Fatigue in SAE Level 3 Automated Driving Using Eye-Movement and ECG Features",
+     "year": 2026,
+     "doi": "10.3390/app16189049",
+     "journal": "Applied Sciences",
+     "authors": "Jiang-Tian Li, Cheng-Hui Lan",
+     "stage0": true
+    },
+    {
+     "key": "10.1108/acmm-12-2025-3482",
+     "title": "Effect of glucose on corrosion fatigue behavior and crack propagation mechanism of Mg-xGa alloys in simulated body fluid",
+     "year": 2026,
+     "doi": "10.1108/acmm-12-2025-3482",
+     "journal": "Anti-Corrosion Methods and Materials",
+     "authors": "Y. Ma, Yue-Lin Ma, J. Zou, Masoud Shojaei, Q. Wang, Y. Li",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/978-3-658-28158-8",
+     "title": "Effects of Thermal Stimulation during Passive Driver Fatigue",
+     "year": 2020,
+     "doi": "10.1007/978-3-658-28158-8",
+     "journal": "",
+     "authors": "Elisabeth Schmidt",
+     "stage0": false
+    },
+    {
+     "key": "10.3389/fpsyt.2026.1776994",
+     "title": "The somatization of structural friction: deciphering the surge of adolescent self-harm in post-transition China",
+     "year": 2026,
+     "doi": "10.3389/fpsyt.2026.1776994",
+     "journal": "Frontiers in Psychiatry",
+     "authors": "Wen-Jing Yan, Qianan Ruan, Dongwu Xu",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/978-3-658-28158-8_3",
+     "title": "Tools and Methods",
+     "year": 2019,
+     "doi": "10.1007/978-3-658-28158-8_3",
+     "journal": "Gestaltung hybrider Mensch-Maschine-Systeme/Designing Hybrid Societies",
+     "authors": "Elisabeth Schmidt",
+     "stage0": false
+    },
+    {
+     "key": "10.17077/drivingassessment.1653",
+     "title": "It's Out of Our Hands Now! Effects of Non-Driving Related Tasks During Highly Automated Driving on Drivers' Fatigue",
+     "year": 2017,
+     "doi": "10.17077/DRIVINGASSESSMENT.1653",
+     "journal": "",
+     "authors": "Oliver Jarosch, M. Kuhnt, Svenja Paradies, K. Bengler",
+     "stage0": true
+    },
+    {
+     "key": "10.1117/12.2620038",
+     "title": "Research on driver's passive fatigue under the condition of autonomous driving based on eye movement and ECG",
+     "year": 2021,
+     "doi": "10.1117/12.2620038",
+     "journal": "Fifth International Conference on Traffic Engineering and Transportation System (ICTETS 2021)",
+     "authors": "Pengxu Huang, Jiang Li, Chenghui Lan, Junzhe Lu",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.psychsport.2024.102687",
+     "title": "Fatigued or Bored? Investigating the Effect of Different Types of Mental Fatigue on 3km Running Performance.",
+     "year": 2024,
+     "doi": "10.1016/j.psychsport.2024.102687",
+     "journal": "Psychology of Sport And Exercise",
+     "authors": "Todd Pickering, Bradley R. E. Wright, C. MacMahon",
+     "stage0": false
+    },
+    {
+     "key": "10.3390/app13021200",
+     "title": "Physiological and Behavioral Changes of Passive Fatigue on Drivers during On-Road Driving",
+     "year": 2023,
+     "doi": "10.3390/app13021200",
+     "journal": "Applied Sciences",
+     "authors": "Ji-Bo He, Zixu Li, Yidan Ma, Long Sun, Ko-Hsuan Ma",
+     "stage0": true
+    },
+    {
+     "key": "s2:78369ef23f4cc9ece287c26c263f836fe9a1aec7",
+     "title": "Fatigue States are Multidimensional: Evidence from Studies of Simulated Driving",
+     "year": 2007,
+     "doi": "",
+     "journal": "",
+     "authors": "D. Saxby, G. Matthews, Edward M. Hitchcock, J. Warm",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/978-3-658-28158-8_5",
+     "title": "Effect of Thermal Stimuli on Passive Fatigue While Driving",
+     "year": 2019,
+     "doi": "10.1007/978-3-658-28158-8_5",
+     "journal": "Gestaltung hybrider Mensch-Maschine-Systeme/Designing Hybrid Societies",
+     "authors": "Elisabeth Schmidt",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/cac67268.2025.11486595",
+     "title": "EFSTNN: Combining Frequency-Spatial-Temporal Features From EEG and Attention Mechanism for Simulated Flight Fatigue Recognition",
+     "year": 2025,
+     "doi": "10.1109/CAC67268.2025.11486595",
+     "journal": "ACM Cloud and Autonomic Computing Conference",
+     "authors": "Xige Wang, Ya-Dong Liu, Ying-Xin Liu, Si Wang, Jiaxiang Li",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/mot0000375",
+     "title": "It is time to stop using the terminology “passive” fatigue.",
+     "year": 2024,
+     "doi": "10.1037/mot0000375",
+     "journal": "Motivation Science",
+     "authors": "Thomas Mangin, Benjamin Pageaux",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/ocp0000409",
+     "title": "\"Zoom fatigue\" revisited: Are video meetings still exhausting post-COVID-19?",
+     "year": 2025,
+     "doi": "10.1037/ocp0000409",
+     "journal": "Journal of Occupational Health Psychology",
+     "authors": "Hadar Nesher Shoshan, Wilken Wehrt",
+     "stage0": false
+    },
+    {
+     "key": "10.2208/jscejpe.71.i_1",
+     "title": "EVALUATION OF SURFACE UNEVENNESS CONSIDERING MENTAL FATIGUE BASED ON HEART RATE VARIABILITY ANALYSIS",
+     "year": 2015,
+     "doi": "10.2208/JSCEJPE.71.I_1",
+     "journal": "",
+     "authors": "K. Tomiyama, A. Kawamura, R. Rossi, Massimiliano Gastaldi, C. Mulatti",
+     "stage0": false
+    },
+    {
+     "key": "10.1088/1742-6596/1037/4/042015",
+     "title": "Load Reduction in Wind Turbines with Bend-Twist Coupled Blades without Power Loss at Underrated Wind Speeds",
+     "year": 2018,
+     "doi": "10.1088/1742-6596/1037/4/042015",
+     "journal": "Journal of Physics: Conference Series",
+     "authors": "Oğuz Atalay, A. Kayran",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/cep0000312",
+     "title": "Active or passive? Investigating different types of cognitive fatigue.",
+     "year": 2023,
+     "doi": "10.1037/cep0000312",
+     "journal": "Canadian journal of experimental psychology = Revue canadienne de psychologie experimentale",
+     "authors": "Todd Pickering, Bradley J. Wright, Linda Schücker, C. MacMahon",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.ultras.2017.06.021",
+     "title": "Passive detection and localization of fatigue cracking in aluminum plates using Green's function reconstruction from ambient noise",
+     "year": 2017,
+     "doi": "10.1016/j.ultras.2017.06.021",
+     "journal": "Ultrasonics",
+     "authors": "Yang Yang, Li Xiao, Wen-Zhong Qu, Ye Lu",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.trf.2016.07.009",
+     "title": "The impact of roadside landscape colors on driver’s mean heart rate considering driving time",
+     "year": 2016,
+     "doi": "10.1016/J.TRF.2016.07.009",
+     "journal": "",
+     "authors": "Lin-Hong Wang, Bi Yiming, Shi-Wu Li",
+     "stage0": false
+    },
+    {
+     "key": "10.54941/ahfe1003824",
+     "title": "Communication Needs and the Drivers’ Activity in Platooning Systems",
+     "year": 2023,
+     "doi": "10.54941/ahfe1003824",
+     "journal": "Human Factors in Transportation",
+     "authors": "Catarina Neto, A. Simões, António Lobo",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/1071181320641464",
+     "title": "Secondary Task Engagement During Automated Drives: Friend and Foe?",
+     "year": 2020,
+     "doi": "10.1177/1071181320641464",
+     "journal": "",
+     "authors": "Taylor Shupsky, Kevin Morales, C. Baldwin, P. Hancock, Eric T. Greenlee, W. Horrey",
+     "stage0": true
+    },
+    {
+     "key": "s2:a9fbae02b075fc2f0d57c021c2af9ecdf84cfc51",
+     "title": "Passive Fatigue Threshold in Automated Driving",
+     "year": 2021,
+     "doi": "",
+     "journal": "",
+     "authors": "Yijing Zhang, Jin-Fei Ma",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140139.2026.2662001",
+     "title": "Chatting with AI: enhancing the supervision safety of near-L3 automated driving by engaging in non-driving-related tasks.",
+     "year": 2026,
+     "doi": "10.1080/00140139.2026.2662001",
+     "journal": "Ergonomics",
+     "authors": "Tingwei Jiang, Qirui Su, Rixin Tang",
+     "stage0": true
+    },
+    {
+     "key": "10.1201/b12791",
+     "title": "Stress, Workload, and Fatigue",
+     "year": 2009,
+     "doi": "10.1201/b12791",
+     "journal": "",
+     "authors": "P. Hancock, P. Desmond",
+     "stage0": false
+    },
+    {
+     "key": "10.1145/3349263.3351310",
+     "title": "Supervising the self-driving car: situation awareness and fatigue during automated driving",
+     "year": 2019,
+     "doi": "10.1145/3349263.3351310",
+     "journal": "International Conference on Automotive User Interfaces and Interactive Vehicular Applications",
+     "authors": "Angus McKerral, Nathaniel Boyce, K. Pammer",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/tits.2022.3189346",
+     "title": "A Systematic Survey of Driving Fatigue Monitoring",
+     "year": 2022,
+     "doi": "10.1109/TITS.2022.3189346",
+     "journal": "IEEE transactions on intelligent transportation systems (Print)",
+     "authors": "Zhimin Zhang, H. Ning, Fang Zhou",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/978-3-658-28158-8_7",
+     "title": "Driver Vitalization Through Fatigue-Based Climate Control",
+     "year": 2019,
+     "doi": "10.1007/978-3-658-28158-8_7",
+     "journal": "Gestaltung hybrider Mensch-Maschine-Systeme/Designing Hybrid Societies",
+     "authors": "Elisabeth Schmidt",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/978-3-658-28158-8_4",
+     "title": "Fatigue Induction in Simulated Driving",
+     "year": 2019,
+     "doi": "10.1007/978-3-658-28158-8_4",
+     "journal": "Gestaltung hybrider Mensch-Maschine-Systeme/Designing Hybrid Societies",
+     "authors": "Elisabeth Schmidt",
+     "stage0": false
+    },
+    {
+     "key": "10.21203/rs.3.rs-457935/v1",
+     "title": "Electroencephalography Sample Entropy of Driver Passive Fatigue Threshold in Automated Driving",
+     "year": 2021,
+     "doi": "10.21203/RS.3.RS-457935/V1",
+     "journal": "",
+     "authors": "Yijing Zhang, Jin-Fei Ma, Chi Zhang, Ruosong Chang",
+     "stage0": true
+    },
+    {
+     "key": "10.1145/3772318.3790972",
+     "title": "Small Talk, Big Impact? LLM-based Conversational Agents to Mitigate Passive Fatigue in Conditional Automated Driving",
+     "year": 2025,
+     "doi": "10.1145/3772318.3790972",
+     "journal": "International Conference on Human Factors in Computing Systems",
+     "authors": "Lewis Cockram, Yue-Teng Yu, Jorge Pardo, Xiaomeng Li, A. Rakotonirainy, Jonny Kuo",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140139.2026.2684756",
+     "title": "Underload in sky: reducing the passive fatigue of pilots during cruise through an attention guided - active interactive seating system.",
+     "year": 2026,
+     "doi": "10.1080/00140139.2026.2684756",
+     "journal": "Ergonomics",
+     "authors": "Hai-Xin Xu, Li-Jing Wang, Run-Hao Li, Jun Zhang, J. Zou, Xianchao Ma",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720811423261",
+     "title": "Fatigue and Voluntary Utilization of Automation in Simulated Driving",
+     "year": 2012,
+     "doi": "10.1177/0018720811423261",
+     "journal": "Hum. Factors",
+     "authors": "Catherine Neubauer, G. Matthews, Lisa Langheim, D. Saxby",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/itsc.2016.7795884",
+     "title": "Challenges using portable devices during Conditional Automation",
+     "year": 2016,
+     "doi": "10.1109/ITSC.2016.7795884",
+     "journal": "2016 IEEE 19th International Conference on Intelligent Transportation Systems (ITSC)",
+     "authors": "Joel Gonçalves, K. Bengler",
+     "stage0": false
+    },
+    {
+     "key": "10.1136/jnnp.55.3.237",
+     "title": "An intracerebral abscess following an aneurysm clipping.",
+     "year": 1992,
+     "doi": "10.1136/jnnp.55.3.237",
+     "journal": "Journal of Neurology Neurosurgery & Psychiatry",
+     "authors": "F. Kapasi",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.promfg.2015.07.499",
+     "title": "Vigilance Decrement and Passive Fatigue Caused by Monotony in Automated Driving",
+     "year": 2015,
+     "doi": "10.1016/J.PROMFG.2015.07.499",
+     "journal": "",
+     "authors": "Moritz Körber, Andrea Cingel, Markus Zimmermann, K. Bengler",
+     "stage0": true
+    },
+    {
+     "key": "10.2139/ssrn.4021960",
+     "title": "Passive Fatigue of Drivers? Physiological and Behavioral Changes of On-Road Driving",
+     "year": 2022,
+     "doi": "10.2139/ssrn.4021960",
+     "journal": "Social Science Research Network",
+     "authors": "Ko-Hsuan Ma, Zixu Li, Ji-Bo He",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/ocp0000362",
+     "title": "Virtual meeting fatigue: Exploring the impact of virtual meetings on cognitive performance and active versus passive fatigue.",
+     "year": 2023,
+     "doi": "10.1037/ocp0000362",
+     "journal": "Journal of Occupational Health Psychology",
+     "authors": "Niina Nurmi, S. Pakarinen",
+     "stage0": false
+    },
+    {
+     "key": "s2:d06df6529682c4cfc5666bc17fe245a49d1f7b7d",
+     "title": "Human Factors : The Journal of the Human Factors and Ergonomics Society",
+     "year": 2011,
+     "doi": "",
+     "journal": "",
+     "authors": "Catherine Neubauer, Gerald Matthews, Lisa Langheim, D. Saxby",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/scored68498.2025.11399092",
+     "title": "Dimensions of AI-Induced Fatigue Among Filipino Students: An Exploratory Study",
+     "year": 2025,
+     "doi": "10.1109/SCOReD68498.2025.11399092",
+     "journal": "Student Conference on Research and Development",
+     "authors": "J. P. P. Miranda, Madilaine Claire B. Nacianceno, Rhiziel P. Manalese, Ivan G. Liwanag, Laharni S. Simpao, Marie Angeli F. Peñaflor",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/thms.2017.2693230",
+     "title": "The Effect of a Haptic Guidance Steering System on Fatigue-Related Driver Behavior",
+     "year": 2017,
+     "doi": "10.1109/THMS.2017.2693230",
+     "journal": "IEEE Transactions on Human-Machine Systems",
+     "authors": "Zheng Wang, R. Zheng, T. Kaizuka, K. Shimono, Kimihiko Nakano",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/a0034386",
+     "title": "Active and Passive Fatigue in Simulated Driving: Discriminating Styles of Workload Regulation and Their Safety Impacts",
+     "year": 2013,
+     "doi": "10.1037/a0034386",
+     "journal": "Journal of experimental psychology. Applied",
+     "authors": "D. Saxby, G. Matthews, J. Warm, Edward M. Hitchcock, Catherine Neubauer",
+     "stage0": true
+    },
+    {
+     "key": "10.1145/3744335.3758493",
+     "title": "Leveraging LLM-based Conversational Agents to Combat Passive Fatigue in Conditional Automated Driving Contexts",
+     "year": 2025,
+     "doi": "10.1145/3744335.3758493",
+     "journal": "International Conference on Automotive User Interfaces and Interactive Vehicular Applications",
+     "authors": "Yue-Teng Yu, Lewis Cockram, Jorge Pardo, Xiao-Meng Li, A. Rakotonirainy, Jonny Kuo",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/embc.2017.8037360",
+     "title": "Correlation of reaction time and EEG log bandpower from dry frontal electrodes in a passive fatigue driving simulation experiment.",
+     "year": 2017,
+     "doi": "10.1109/EMBC.2017.8037360",
+     "journal": "Conference proceedings",
+     "authors": "Ruyi Foong, Keng-Ang Kai, C. Quek",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1071181312561415",
+     "title": "The Effects of Cell Phone Use and Automation on Driver Performance and Subjective State in Simulated Driving",
+     "year": 2012,
+     "doi": "10.1177/1071181312561415",
+     "journal": "",
+     "authors": "Catherine Neubauer, G. Matthews, D. Saxby",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1541931213601047",
+     "title": "The Impact of Automation Reliability and Operator Fatigue on Performance and Reliance",
+     "year": 2016,
+     "doi": "10.1177/1541931213601047",
+     "journal": "",
+     "authors": "Ryan W. Wohleber, G. Calhoun, G. Funke, H. Ruff, C. Chiu, Jinchao Lin",
+     "stage0": true
+    },
+    {
+     "key": "s2:eb34450ebd4179d3bc0d770874c40172fce94cb7",
+     "title": "Simulator Methodologies for Investigating Fatigue and Stress in the Automated Vehicle",
+     "year": 2010,
+     "doi": "",
+     "journal": "",
+     "authors": "Catherine Neubauer, G. Matthews, D. Saxby, Lisa Langheim",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/1071181320641328",
+     "title": "The Impact of Mental States on Semi-autonomous Driving Takeover Performance: A Systematic Review",
+     "year": 2020,
+     "doi": "10.1177/1071181320641328",
+     "journal": "",
+     "authors": "Gaojian Huang, Christine M. Petersen, Brandon J. Pitts",
+     "stage0": true
+    },
+    {
+     "key": "s2:edfc2766be8e192ab75be08e3d38e9657c6b49e6",
+     "title": "Study of Mental Fatigue Based on Heart Rate Variability",
+     "year": 2010,
+     "doi": "",
+     "journal": "",
+     "authors": "Yan Li",
+     "stage0": false
+    },
+    {
+     "key": "10.3390/pharmacy11030084",
+     "title": "Subjective Perceptions of Occupational Fatigue in Community Pharmacists",
+     "year": 2023,
+     "doi": "10.3390/pharmacy11030084",
+     "journal": "Pharmacy",
+     "authors": "T. Watterson, M. Chui",
+     "stage0": false
+    },
+    {
+     "key": "10.48175/ijarsct-2821",
+     "title": "Man Machine Interaction in Autonomous Vehicles",
+     "year": 2022,
+     "doi": "10.48175/ijarsct-2821",
+     "journal": "International Journal of Advanced Research in Science, Communication and Technology",
+     "authors": "Ajay Singh, Neha Sudhirkumar Agarwal, Kanak Narawade, G. Deshmukh, Shikha Pachouly",
+     "stage0": true
+    },
+    {
+     "key": "10.32657/10356/107596",
+     "title": "Detecting passive fatigue with brain-computer interface in drowsy driving and stroke rehabilitation",
+     "year": 2019,
+     "doi": "10.32657/10356/107596",
+     "journal": "",
+     "authors": "Ruyi Foong",
+     "stage0": false
+    },
+    {
+     "key": "10.1038/s41598-021-99680-4",
+     "title": "Electrophysiological frequency domain analysis of driver passive fatigue under automated driving conditions",
+     "year": 2021,
+     "doi": "10.1038/s41598-021-99680-4",
+     "journal": "Scientific Reports",
+     "authors": "Yijing Zhang, Jin-Fei Ma, Chi Zhang, Ruosong Chang",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.jsr.2017.02.016",
+     "title": "The relationship between cell phone use and management of driver fatigue: It's complicated.",
+     "year": 2017,
+     "doi": "10.1016/j.jsr.2017.02.016",
+     "journal": "Journal of Safety Research",
+     "authors": "D. Saxby, G. Matthews, Catherine Neubauer",
+     "stage0": false
+    },
+    {
+     "key": "10.3390/s25175589",
+     "title": "Research on Takeover Safety of Intelligent Vehicles Based on Accident Scenarios in Real-Vehicle Testing",
+     "year": 2025,
+     "doi": "10.3390/s25175589",
+     "journal": "Italian National Conference on Sensors",
+     "authors": "Ping-Fei Li, Meiling Zhou, Chang Xu, He’nan Li, Wenhao Hu, Zheng-Ping Tan",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/isctech63666.2024.10845430",
+     "title": "Research on Pilot Fatigue Model Based on Dynamic Workload",
+     "year": 2024,
+     "doi": "10.1109/ISCTech63666.2024.10845430",
+     "journal": "2024 12th International Conference on Information Systems and Computing Technology (ISCTech)",
+     "authors": "Yage Sun, Xiaoyan Zhang, Hongjun Xue",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/icmlca66850.2025.11336592",
+     "title": "Human-Machine Interaction Design in Autonomous Driving Takeover: Research on Optimization Strategies Based on Stress and Situational Awareness",
+     "year": 2025,
+     "doi": "10.1109/ICMLCA66850.2025.11336592",
+     "journal": "2025 6th International Conference on Machine Learning and Computer Application (ICMLCA)",
+     "authors": "Meiling Xiao, Jiang-Tian Li, Pengxu Huang",
+     "stage0": true
+    },
+    {
+     "key": "10.1037/mot0000375.supp",
+     "title": "Supplemental Material for It Is Time to Stop Using the Terminology “Passive” Fatigue",
+     "year": 2024,
+     "doi": "10.1037/mot0000375.supp",
+     "journal": "Motivation Science",
+     "authors": "",
+     "stage0": false
+    }
+   ]
+  },
+  {
+   "source": "Semantic Scholar",
+   "label": "S2",
+   "query": "(\"passive fatigue\" | \"task-induced fatigue\" | \"vigilance decrement\" | underload) + (automation | automated | autonomous | \"artificial intelligence\")",
+   "status": "ok",
+   "total": 205,
+   "records": [
+    {
+     "key": "10.4271/12-09-03-0025",
+     "title": "Automosphere: Exploring Vehicle Heads-Up Display with Weather-Related\n Windshield Cues for Passive Fatigue Management",
+     "year": 2026,
+     "doi": "10.4271/12-09-03-0025",
+     "journal": "SAE International Journal of Connected and Automated Vehicles",
+     "authors": "Mohsen Ensafjoo, Jamy Li",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/21577323.2016.1178191",
+     "title": "Defeating the Vigilance Decrement",
+     "year": 2016,
+     "doi": "10.1080/21577323.2016.1178191",
+     "journal": "",
+     "authors": "P. Hancock, W. Volante, J. Szalma",
+     "stage0": false
+    },
+    {
+     "key": "10.5100/jje.58.2f4-03",
+     "title": "An Attempt to Evaluate Vigilance Decrements in Automated and Manual Driving",
+     "year": 2022,
+     "doi": "10.5100/jje.58.2f4-03",
+     "journal": "The Japanese Journal of Ergonomics",
+     "authors": "Tomoya Susuki, A. Murata, Toshihisa Doi",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/15389588.2021.1904138",
+     "title": "Exploring the effectiveness of a digital voice assistant to maintain driver alertness in partially automated vehicles",
+     "year": 2021,
+     "doi": "10.1080/15389588.2021.1904138",
+     "journal": "Traffic Injury Prevention",
+     "authors": "Kirti Mahajan, D. Large, G. Burnett, N. Velaga",
+     "stage0": true
+    },
+    {
+     "key": "10.1002/jeab.832",
+     "title": "A laboratory model of canine search vigilance decrement, I.",
+     "year": 2023,
+     "doi": "10.1002/jeab.832",
+     "journal": "Journal of The Experimental Analysis of Behavior",
+     "authors": "E. Aviles-Rosa, M. DeChant, P. Prada-Tiedemann, N. Hall",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/978-3-658-27990-5_19",
+     "title": "Keeping the balance between overload and underload during partly automated driving: relevant secondary tasks",
+     "year": 2019,
+     "doi": "10.1007/978-3-658-27990-5_19",
+     "journal": "",
+     "authors": "Paula Laßmann, M. Fischer, Hans-Joachim Bieg, Marcus Jenke, F. Reichelt, G. Tuezuen",
+     "stage0": true
+    },
+    {
+     "key": "10.48175/ijarsct-5452",
+     "title": "Man Machine Interaction in Autonomous Vehicles - 02",
+     "year": 2022,
+     "doi": "10.48175/ijarsct-5452",
+     "journal": "International Journal of Advanced Research in Science, Communication and Technology",
+     "authors": "Ajay Singh, Neha Sudhirkumar Agarwal, Kanak Narawade, G. Deshmukh, Shikha Pachouly",
+     "stage0": true
+    },
+    {
+     "key": "10.35940/ijeat.c5920.029320",
+     "title": "Electrical Percent Loading Assessment for the Distribution Transformers Residential-Used of a Barangay",
+     "year": 2020,
+     "doi": "10.35940/ijeat.c5920.029320",
+     "journal": "International Journal of Engineering and Advanced Technology",
+     "authors": "",
+     "stage0": true
+    },
+    {
+     "key": "10.31979/etd.q3dt-95n9",
+     "title": "The Effect of Automating Routine Tasks on Air Traffic Controller Conflict Detection Performance",
+     "year": 2019,
+     "doi": "10.31979/etd.q3dt-95n9",
+     "journal": "",
+     "authors": "Sjsu Scholarworks, L. Claudatos, L. Claudatos",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/978-3-319-41691-5_24",
+     "title": "A New Method for the Objective Registration of Mental Workload",
+     "year": 2017,
+     "doi": "10.1007/978-3-319-41691-5_24",
+     "journal": "",
+     "authors": "T. Radüntz",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.trf.2016.04.001",
+     "title": "From Mackworth’s clock to the open road: A literature review on driver vigilance task operationalization",
+     "year": 2016,
+     "doi": "10.1016/J.TRF.2016.04.001",
+     "journal": "",
+     "authors": "Christopher D. D. Cabrall, R. Happee, J. D. de Winter",
+     "stage0": false
+    },
+    {
+     "key": "s2:180ae19a3da86e2257535ab50d716411b86de6b3",
+     "title": "A Systematic Approach for Real-Time Operator Functional State Assessment",
+     "year": 2012,
+     "doi": "",
+     "journal": "",
+     "authors": "Guangfan Zhang, Aaron Pepe, Roger Xu, Nick Anderson, D. Heitkamp, Frederic D. McKenzie",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/s10111-020-00636-x",
+     "title": "Modelling decision-making within rail maintenance control rooms",
+     "year": 2020,
+     "doi": "10.1007/s10111-020-00636-x",
+     "journal": "Cognition, Technology & Work",
+     "authors": "N. Dadashi, D. Golightly, Sarah Sharples",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720818761711",
+     "title": "Driver Vigilance in Automated Vehicles: Hazard Detection Failures Are a Matter of Time",
+     "year": 2018,
+     "doi": "10.1177/0018720818761711",
+     "journal": "Hum. Factors",
+     "authors": "Eric T. Greenlee, Patricia R. DeLucia, David C. Newton",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/978-3-662-02933-6_17",
+     "title": "The Human Component of System Validation",
+     "year": 1993,
+     "doi": "10.1007/978-3-662-02933-6_17",
+     "journal": "",
+     "authors": "P. Jorna",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1071181319631106",
+     "title": "Differentiating Active and Passive Fatigue with the use of Electroencephalography",
+     "year": 2019,
+     "doi": "10.1177/1071181319631106",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "Kyle A. Bernhardt, Dmitri Poltavski, T. Petros, F. Ferraro",
+     "stage0": true
+    },
+    {
+     "key": "s2:1ca07f195641ba298af29305f35cf7d5ca338b70",
+     "title": "Accountability and automation bias-LINDA",
+     "year": 2011,
+     "doi": "",
+     "journal": "",
+     "authors": "J. Skitka",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/b978-0-12-811926-6.00054-3",
+     "title": "Link Between Out-of-the-Loop Performance Problem and Mind Wandering: How to Keep the Operator in the Loop",
+     "year": 2018,
+     "doi": "10.1016/B978-0-12-811926-6.00054-3",
+     "journal": "",
+     "authors": "Jonas Gouraud, B. Berberian, A. Delorme",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/154193129203601833",
+     "title": "Monitoring Automation Failures: Effects of Automation Reliability and Task Complexity",
+     "year": 1992,
+     "doi": "10.1177/154193129203601833",
+     "journal": "",
+     "authors": "R. Molloy, R. Parasuraman",
+     "stage0": false
+    },
+    {
+     "key": "s2:24bd0fa4a165014d2d5286c1f51ef2ccbf258d2a",
+     "title": "Instrumentation, Control and Automation in Anaerobic Digestion",
+     "year": 2003,
+     "doi": "",
+     "journal": "",
+     "authors": "Jing Liu",
+     "stage0": false
+    },
+    {
+     "key": "10.1201/9781420038194",
+     "title": "Joint Cognitive Systems: Foundations of Cognitive Systems Engineering",
+     "year": 2005,
+     "doi": "10.1201/9781420038194",
+     "journal": "",
+     "authors": "E. Hollnagel, David D. Woods",
+     "stage0": false
+    },
+    {
+     "key": "10.3390/safety9010011",
+     "title": "Fatigue and Secondary Media Impacts in the Automated Vehicle: A Multidimensional State Perspective",
+     "year": 2023,
+     "doi": "10.3390/safety9010011",
+     "journal": "Safety",
+     "authors": "Catherine Neubauer, G. Matthews, Erika P. De Los Santos",
+     "stage0": true
+    },
+    {
+     "key": "s2:29584da20dedf9248c4f159ed005fd42de7690d0",
+     "title": "Highly Automated Vehicles for Intelligent Transport",
+     "year": 2020,
+     "doi": "",
+     "journal": "",
+     "authors": "Continental Ag, Knorr-Bremse Fekrendszerek Kft, Erwin Sick Strasse, Waldkirch Germany, Irion Management, Consult GmbH",
+     "stage0": false
+    },
+    {
+     "key": "10.1518/001872008x312152",
+     "title": "Vigilance Requires Hard Mental Work and Is Stressful",
+     "year": 2008,
+     "doi": "10.1518/001872008X312152",
+     "journal": "Hum. Factors",
+     "authors": "J. Warm, R. Parasuraman, G. Matthews",
+     "stage0": false
+    },
+    {
+     "key": "10.3389/fnhum.2017.00537",
+     "title": "Reduced Attention Allocation during Short Periods of Partially Automated Driving: An Event-Related Potentials Study",
+     "year": 2017,
+     "doi": "10.3389/fnhum.2017.00537",
+     "journal": "Frontiers in Human Neuroscience",
+     "authors": "I. Solís-Marcos, A. Galvao-Carmona, Katja Kircher",
+     "stage0": true
+    },
+    {
+     "key": "10.1088/1742-6596/2867/1/012024",
+     "title": "Boredom, vigilance, and repetition during remote control room work for autonomous ships",
+     "year": 2024,
+     "doi": "10.1088/1742-6596/2867/1/012024",
+     "journal": "Journal of Physics, Conference Series",
+     "authors": "Erik Veitch, Ole Andreas Alsos",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/14639220210123789",
+     "title": "Attention and automation: New perspectives on mental underload and performance",
+     "year": 2002,
+     "doi": "10.1080/14639220210123789",
+     "journal": "",
+     "authors": "M. Young, N. Stanton",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/brainsci10040199",
+     "title": "EEG Theta Power Activity Reflects Workload among Army Combat Drivers: An Experimental Study",
+     "year": 2020,
+     "doi": "10.3390/brainsci10040199",
+     "journal": "Brain Science",
+     "authors": "C. Díaz-Piedra, M. Sebastián, L. D. Di Stasi",
+     "stage0": true
+    },
+    {
+     "key": "s2:2dbca62093ba710d661664875829ccdf22b372c4",
+     "title": "Event Rate and Vigilance: A Psychophysiological Investigation of Mental Workload",
+     "year": 2016,
+     "doi": "",
+     "journal": "",
+     "authors": "A. Yadav, Shalini Dubey, I. Singh",
+     "stage0": false
+    },
+    {
+     "key": "s2:2ebd0447c7d0f99a87a1a4c3fb38e7b9b002e7a0",
+     "title": "Формування асинхронних дискретних систем бізнес-процесів підприємств",
+     "year": 2018,
+     "doi": "",
+     "journal": "",
+     "authors": "Петро Романович Базилевич",
+     "stage0": false
+    },
+    {
+     "key": "10.56201/ijssmr.vol.11no8.2025.pg565.608",
+     "title": "Human-In-The-Loop Decision Systems: Advances and Future Directions",
+     "year": 2026,
+     "doi": "10.56201/ijssmr.vol.11no8.2025.pg565.608",
+     "journal": "INTERNATIONAL JOURNAL OF SOCIAL SCIENCES AND MANAGEMENT RESEARCH",
+     "authors": "Ashore-Onisemo Funmilayo",
+     "stage0": true
+    },
+    {
+     "key": "s2:2f98de9b09d739093997f27dbc78711a21698351",
+     "title": "Psychophysiological Control of Acognitive Task Using Adaptive Automation",
+     "year": 2001,
+     "doi": "",
+     "journal": "",
+     "authors": "Frederick G. Freeman, A. Pope",
+     "stage0": false
+    },
+    {
+     "key": "10.1006/ijhc.1999.0349",
+     "title": "Accountability and automation bias",
+     "year": 2000,
+     "doi": "10.1006/ijhc.1999.0349",
+     "journal": "Int. J. Hum. Comput. Stud.",
+     "authors": "L. Skitka, K. Mosier, M. D. Burdick",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/xap0000075",
+     "title": "Vigilance in a dynamic environment.",
+     "year": 2016,
+     "doi": "10.1037/xap0000075",
+     "journal": "Journal of experimental psychology. Applied",
+     "authors": "Eric J. Stearman, F. Durso",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1071181322661099",
+     "title": "Countering Driver Vigilance Decrement for Partially Automated Vehicles",
+     "year": 2022,
+     "doi": "10.1177/1071181322661099",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "S. Mishler, Jing Chen",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/978-3-030-50943-9_32",
+     "title": "Influence of Passive Fatigue and Take-Over Request Lead Time on Drivers' Take-Over Performance",
+     "year": 2020,
+     "doi": "10.1007/978-3-030-50943-9_32",
+     "journal": "International Conference on Applied Human Factors and Ergonomics",
+     "authors": "A. Hadi, Qingkun Li, Wenjun Wang, Quan Yuan, Bo Cheng",
+     "stage0": false
+    },
+    {
+     "key": "10.1002/prs.680160304",
+     "title": "Out‐of‐the‐loop performance problems and the use of intermediate levels of automation for improved control system functioning and safety",
+     "year": 1997,
+     "doi": "10.1002/PRS.680160304",
+     "journal": "",
+     "authors": "D. Kaber, M. Endsley",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/978-3-319-96059-3_30",
+     "title": "Psychophysiological Cueing and the Vigilance Decrement Function",
+     "year": 2018,
+     "doi": "10.1007/978-3-319-96059-3_30",
+     "journal": "Advances in Intelligent Systems and Computing",
+     "authors": "G. Hancock",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/154193120805202113",
+     "title": "Effect of Active and Passive Fatigue on Performance Using a Driving Simulator",
+     "year": 2008,
+     "doi": "10.1177/154193120805202113",
+     "journal": "",
+     "authors": "D. Saxby, G. Matthews, Edward M. Hitchcock, J. Warm, G. Funke, Thomas Gantzer",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/tcds.2022.3231691",
+     "title": "Individual Susceptibility to Vigilance Decrement in Prolonged Assisted Driving Revealed by Alert-State Wearable EEG Assessment",
+     "year": 2023,
+     "doi": "10.1109/TCDS.2022.3231691",
+     "journal": "IEEE Transactions on Cognitive and Developmental Systems",
+     "authors": "Manuel S. Seet, Anastasios Bezerianos, M. Panou, E. Bekiaris, Nitish V. Thakor, Andrei Dragomir",
+     "stage0": true
+    },
+    {
+     "key": "10.48550/arxiv.2512.09190",
+     "title": "Understanding Mental States in Active and Autonomous Driving with EEG",
+     "year": 2025,
+     "doi": "10.48550/arXiv.2512.09190",
+     "journal": "arXiv.org",
+     "authors": "Prithila Angkan, Paul Hungler, Ali Etemad",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/1071181320641299",
+     "title": "Beyond the Vigilance End-Spurt with Event-Related Potentials",
+     "year": 2020,
+     "doi": "10.1177/1071181320641299",
+     "journal": "",
+     "authors": "Megan B. Morris, Ashley R. Haubert, G. Gunzelmann",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/0301-0511(95)05161-9",
+     "title": "Psychophysiology and adaptive automation.",
+     "year": 1996,
+     "doi": "10.1016/0301-0511(95)05161-9",
+     "journal": "Biological Psychology",
+     "authors": "E. Byrne, R. Parasuraman",
+     "stage0": false
+    },
+    {
+     "key": "s2:3ceac23a31354ffb8afff8e4fda4a1e36b81f171",
+     "title": "Hierarchical production planning with demand constraints q",
+     "year": 2015,
+     "doi": "",
+     "journal": "",
+     "authors": "Hong-Sen Yan, Xiao-Dong Zhang, Min Jiang",
+     "stage0": false
+    },
+    {
+     "key": "10.1136/military-2022-ukdsr.9",
+     "title": "9 Studying cognitive load in defence",
+     "year": 2023,
+     "doi": "10.1136/military-2022-ukdsr.9",
+     "journal": "BMJ Military Health",
+     "authors": "Matt T. Richins, Helen Taylor, S. Smith",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fnbot.2026.1857548",
+     "title": "Confidence-driven adaptive time window for real-time driver fatigue detection in Level 2-3 autonomous vehicles: a multi-dataset validation study",
+     "year": 2026,
+     "doi": "10.3389/fnbot.2026.1857548",
+     "journal": "Frontiers in Neurorobotics",
+     "authors": "Wantong Xie, Peng Xiao",
+     "stage0": true
+    },
+    {
+     "key": "s2:3fb50afe9fd3e2311d7f20652c6cb4692e2c7bf2",
+     "title": "COMPARING OVERLOAD-INDUCED RETARDATION MODELS ON FATIGUE CRACK PROPAGATION",
+     "year": null,
+     "doi": "",
+     "journal": "",
+     "authors": "M. Meggiolaro, J. D. de Castro",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/978-3-319-96074-6_43",
+     "title": "A Review of Driver State Monitoring Systems in the Context of Automated Driving",
+     "year": 2018,
+     "doi": "10.1007/978-3-319-96074-6_43",
+     "journal": "Advances in Intelligent Systems and Computing",
+     "authors": "T. Hecht, Anna Feldhütter, Jonas Radlmayr, Y. Nakano, Yoshikuni Miki, C. Henle",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1071181322661257",
+     "title": "Putting the Brain in the Driver’s Seat: Using Transcranial Doppler Sonography to Examine Vigilance in Automated Driving",
+     "year": 2022,
+     "doi": "10.1177/1071181322661257",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "Tiffany G. Lui, Eric T. Greenlee",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.apergo.2024.104244",
+     "title": "Comparison of concurrent cognitive load measures during n-back tasks.",
+     "year": 2024,
+     "doi": "10.1016/j.apergo.2024.104244",
+     "journal": "Applied Ergonomics",
+     "authors": "Prarthana Pillai, B. Balasingam, A. Jaekel, Francesco N. Biondi",
+     "stage0": true
+    },
+    {
+     "key": "10.1136/jech-2017-ssmabstracts.35",
+     "title": "OP35 Pragmatic integrated trials in screening: a breast screening example involving 1.2 million women",
+     "year": 2017,
+     "doi": "10.1136/JECH-2017-SSMABSTRACTS.35",
+     "journal": "Journal of Epidemiology and Community Health",
+     "authors": "Sian Taylor-Phillips, David J. Jenkinson, A. Clarke, Matthew G. Wallis",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.jsr.2023.05.006",
+     "title": "The impact of non-driving related tasks on the development of driver sleepiness and takeover performances in prolonged automated driving.",
+     "year": 2023,
+     "doi": "10.1016/j.jsr.2023.05.006",
+     "journal": "Journal of Safety Research",
+     "authors": "Hengyan Pan, Haijing He, Yonggang Wang, Yanqiu Cheng, Zhe Dai",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/10711813251369479",
+     "title": "Beyond Detection: A Systematic Review of Driver Passive Fatigue Prevention and Mitigation Strategies",
+     "year": 2025,
+     "doi": "10.1177/10711813251369479",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "Shiva Rasouli, Areen Alsaid",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.biortech.2015.12.010",
+     "title": "Biogas-pH automation control strategy for optimizing organic loading rate of anaerobic membrane bioreactor treating high COD wastewater.",
+     "year": 2016,
+     "doi": "10.1016/j.biortech.2015.12.010",
+     "journal": "Bioresource Technology",
+     "authors": "Dawei Yu, Ji-Bao Liu, Qian-Wen Sui, Yuan-Song Wei",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/154193129403801301",
+     "title": "Human Factors Issues for Resolving Adverse Effects of Human Work Underload and Workload Transitions in Advanced Transportation Systems*",
+     "year": 1994,
+     "doi": "10.1177/154193129403801301",
+     "journal": "",
+     "authors": "T. G. Ryan",
+     "stage0": false
+    },
+    {
+     "key": "10.15614/ijpp/2015/v6i2/73852",
+     "title": "Impact of Cognitive Demand on Vigilance Decrement: An Overview",
+     "year": 2015,
+     "doi": "10.15614/IJPP/2015/V6I2/73852",
+     "journal": "",
+     "authors": "A. Yadav, I. Singh, T. Tiwari",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1541931213571178",
+     "title": "Assessing Resource Utilization during Vigilance Using Transcranial Doppler",
+     "year": 2013,
+     "doi": "10.1177/1541931213571178",
+     "journal": "",
+     "authors": "Cynthia Nguyen, K. Satterfield, Brooke G. Bellows, Patrick E. McKnight, Tyler H. Shaw",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/e563452012-001",
+     "title": "An Investigation of Sensory Information, Levels of Automation, and Piloting Experience on Unmanned Aircraft Pilot Performance",
+     "year": 2012,
+     "doi": "10.1037/e563452012-001",
+     "journal": "",
+     "authors": "K. Williams",
+     "stage0": false
+    },
+    {
+     "key": "10.1145/3429551.3429555",
+     "title": "The Evaluation of Operator's Mental Workload in Operation Control Center Division in the Railway Industry",
+     "year": 2020,
+     "doi": "10.1145/3429551.3429555",
+     "journal": "2020 The 6th International Conference on Industrial and Business Engineerin",
+     "authors": "Livia Putri Sulistiyo, Maya Arlini Puspasari",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.aap.2018.04.004",
+     "title": "Dangerous intersections? A review of studies of fatigue and distraction in the automated vehicle.",
+     "year": 2019,
+     "doi": "10.1016/j.aap.2018.04.004",
+     "journal": "Accident Analysis and Prevention",
+     "authors": "G. Matthews, Catherine Neubauer, D. Saxby, Ryan W. Wohleber, Jinchao Lin",
+     "stage0": true
+    },
+    {
+     "key": "10.21427/d7k91z",
+     "title": "Moving Between Automated and Manual Driving: Mental Workload and Performance Implications",
+     "year": 2017,
+     "doi": "10.21427/D7K91Z",
+     "journal": "",
+     "authors": "Totsapon Butmee, T. Lansdown",
+     "stage0": false
+    },
+    {
+     "key": "s2:5320086ceadeb7ee07af2aa7d52c2f8c96b43b4c",
+     "title": "Unmanned Air Vehicles: A New Age in Human Factors Evaluations",
+     "year": 2003,
+     "doi": "",
+     "journal": "",
+     "authors": "John J. Spravka, D. Moisio, M. Payton",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/thms.2021.3121665",
+     "title": "An Adaptive Time Budget Adjustment Strategy Based on a Take-Over Performance Model for Passive Fatigue",
+     "year": 2022,
+     "doi": "10.1109/THMS.2021.3121665",
+     "journal": "IEEE Transactions on Human-Machine Systems",
+     "authors": "Qingkun Li, Zhenyuan Wang, Wenjun Wang, Chao Zeng, Guo-Fa Li, Quan Yuan",
+     "stage0": true
+    },
+    {
+     "key": "10.1201/b12791-3.1",
+     "title": "ACTIVE AND PASSIVE FATIGUE STATES",
+     "year": 2001,
+     "doi": "10.1201/b12791-3.1",
+     "journal": "",
+     "authors": "P. Desmond, P. Hancock",
+     "stage0": false
+    },
+    {
+     "key": "s2:5604bec44301ea7bdeaaf3904372eff7b61404b2",
+     "title": "SIZE MATTERS: THE ROLE 0F ATTENTIONAL CAPACITY IN EXPLAINING THE EFFECTS OF MENTAL UNDERLOAD ON PERFORMANCE. IN: ENGINEERING PSYCHOLOGY AND COGNITIVE ERGONOMICS. AEROSPACE AND TRANSPORTATION SYSTEMS",
+     "year": 2001,
+     "doi": "",
+     "journal": "",
+     "authors": "M. Young, N. Stanton",
+     "stage0": false
+    },
+    {
+     "key": "s2:560cefead3ff780d14dee1ac455beca0cd44dbfb",
+     "title": "Can brainwaves be used to activate driver support",
+     "year": 2012,
+     "doi": "",
+     "journal": "",
+     "authors": "C. Dijksterhuis, D. de Waard, R. Jong",
+     "stage0": false
+    },
+    {
+     "key": "10.1145/3828157.3828788",
+     "title": "The Role of Task Frequency and Complexity in Remote Assistance for Highly Automated Vehicles: Assessing Mental Load based on Eyetracking and Physiology",
+     "year": 2026,
+     "doi": "10.1145/3828157.3828788",
+     "journal": "Proceedings of the 18th International Conference on Automotive User Interfaces and Interactive Vehicular Applications",
+     "authors": "Fabian Walocha, Andrea Valerio, Hoai Phuong Nguyen, Klas Ihme",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/154193120705101839",
+     "title": "Development of Active and Passive Fatigue Manipulations Using a Driving Simulator",
+     "year": 2007,
+     "doi": "10.1177/154193120705101839",
+     "journal": "",
+     "authors": "D. Saxby, G. Matthews, Edward M. Hitchcock, J. Warm",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/access.2025.3570073",
+     "title": "The Effects of Countermeasures for Preventing Vigilance Decrement During Manual and Automated Driving",
+     "year": 2025,
+     "doi": "10.1109/ACCESS.2025.3570073",
+     "journal": "IEEE Access",
+     "authors": "Atsuo Murata, Toshihisa Doi, Waldemar Karwowski",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fnrgo.2025.1542379",
+     "title": "Mind the road: attention related neuromarkers during automated and manual simulated driving captured with a new mobile EEG sensor system",
+     "year": 2025,
+     "doi": "10.3389/fnrgo.2025.1542379",
+     "journal": "Frontiers in Neuroergonomics",
+     "authors": "Joanna E. M. Scanlon, Daniel Küppers, Anneke Büürma, A. H. Winneke",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/1071181322661006",
+     "title": "Safety Frameworks for Emerging Technologies",
+     "year": 2022,
+     "doi": "10.1177/1071181322661006",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "R. Boring, K. Neville, Z. Spielman, Devon Kelley, V. Gawron",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140139.2025.2609813",
+     "title": "Human vigilance in the age of intelligent machines: Challenges and prospects.",
+     "year": 2026,
+     "doi": "10.1080/00140139.2025.2609813",
+     "journal": "Ergonomics",
+     "authors": "P. A. Hancock",
+     "stage0": true
+    },
+    {
+     "key": "s2:5b3edaac8ec3e283e31d9a9b9c24077cd986b3c7",
+     "title": "The impact of rapid transItions in mental workload in a supervisory control setting",
+     "year": 2014,
+     "doi": "",
+     "journal": "",
+     "authors": "Mark W. Boyer",
+     "stage0": false
+    },
+    {
+     "key": "10.1051/itmconf/20246903006",
+     "title": "Towards cooperative management of fatigue and vigilance in railway operations",
+     "year": 2024,
+     "doi": "10.1051/itmconf/20246903006",
+     "journal": "ITM Web of Conferences",
+     "authors": "Quentin Berdal, Quentin Gadmer, Philippe Richard",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/icicct.2018.8472988",
+     "title": "Automated Intelligent Systems for Secure Live Migration",
+     "year": 2018,
+     "doi": "10.1109/ICICCT.2018.8472988",
+     "journal": "International Conference Inventive Communication and Computational Technologies",
+     "authors": "S. Merlin, N. Arunkumar, Miriam A Angela",
+     "stage0": false
+    },
+    {
+     "key": "10.1080/15389588.2020.1804060",
+     "title": "Promote or inhibit: An inverted U-shaped effect of workload on driver takeover performance",
+     "year": 2020,
+     "doi": "10.1080/15389588.2020.1804060",
+     "journal": "Traffic Injury Prevention",
+     "authors": "Shu Ma, Wei Zhang, Zhen Yang, Chunyan Kang, Changxu Wu, Chun-Lei Chai",
+     "stage0": true
+    },
+    {
+     "key": "10.54941/ahfe100702",
+     "title": "Development of a Concept for Ergonomic Design and Work Organization of Remote Lock Operation Centers",
+     "year": 2021,
+     "doi": "10.54941/ahfe100702",
+     "journal": "Advances in Human Aspects of Transportation: Part II",
+     "authors": "Jennifer Bützler, Alexander Mertens, C. Bröhl, F. Motz, H. Horoufchin, C. Schlick",
+     "stage0": true
+    },
+    {
+     "key": "s2:60575788797641ad2702a3b6d6fcea6ee5ad6d33",
+     "title": "Issues for resolving adverse effects on the safety culture of human work underload and workload transitions in complex human-machine systems",
+     "year": 1996,
+     "doi": "",
+     "journal": "",
+     "authors": "T. G. Ryan",
+     "stage0": false
+    },
+    {
+     "key": "s2:60c6e3f692e53b7f0de767aa15b0a836a2bb37b8",
+     "title": "Effects of control automation on operator attention and risk probability in high speed trains",
+     "year": 1997,
+     "doi": "",
+     "journal": "",
+     "authors": "H. Marinakos",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.trf.2025.01.033",
+     "title": "Secondary task solutions to acute and chronic automation-induced underload",
+     "year": 2025,
+     "doi": "10.1016/j.trf.2025.01.033",
+     "journal": "Transportation Research Part F: Traffic Psychology and Behaviour",
+     "authors": "Dan Boguslavsky, A. Borowsky, Hadas Chassidim, P. Hancock",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/app16189049",
+     "title": "Multimodal Physiological Detection of Passive Fatigue in SAE Level 3 Automated Driving Using Eye-Movement and ECG Features",
+     "year": 2026,
+     "doi": "10.3390/app16189049",
+     "journal": "Applied Sciences",
+     "authors": "Jiang-Tian Li, Cheng-Hui Lan",
+     "stage0": true
+    },
+    {
+     "key": "s2:6314b8d51a67d16a803a593c255c5feefddf0f3a",
+     "title": "Detection of Attentional State in Long-Distance Driving Settings Using Functional Near-Infrared Spectroscopy",
+     "year": 2016,
+     "doi": "",
+     "journal": "",
+     "authors": "Matthew B. Tucker, M. Aubert, V. S. de Almeida, Michael P. Clamann, M. Cummings",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.biopsycho.2004.01.002",
+     "title": "An evaluation of an adaptive automation system using a cognitive vigilance task.",
+     "year": 2004,
+     "doi": "10.1016/J.BIOPSYCHO.2004.01.002",
+     "journal": "Biological Psychology",
+     "authors": "Frederick G. Freeman, P. Mikulka, M. Scerbo, Lorissa A. Scott",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/21695067231192424",
+     "title": "On or Off Topic: Secondary Task Relevance, Visual Input, and the Vigilance Decrement",
+     "year": 2023,
+     "doi": "10.1177/21695067231192424",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "Brendan Schwartz, S. Mishler, Jing Chen",
+     "stage0": true
+    },
+    {
+     "key": "s2:6b64cdc0ec8fe0c070d2f88031317bc097be0229",
+     "title": "Driver behavior and workload in an on-road automated vehicle",
+     "year": 2017,
+     "doi": "",
+     "journal": "",
+     "authors": "Jork Stapel, F. A. Mullakkal-Babu, R. Happee",
+     "stage0": false
+    },
+    {
+     "key": "10.4233/uuid:9e5bc7a2-fc0e-47ef-aee3-f0fce4809e5c",
+     "title": "Human factors of monitoring driving automation : Eyes and Scenes",
+     "year": 2019,
+     "doi": "10.4233/UUID:9E5BC7A2-FC0E-47EF-AEE3-F0FCE4809E5C",
+     "journal": "",
+     "authors": "C. Cabrall",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1071181312561019",
+     "title": "Diagnostic Monitoring Of Vigilance Decrement Using EEG Workload Indices",
+     "year": 2012,
+     "doi": "10.1177/1071181312561019",
+     "journal": "",
+     "authors": "A. Kamzanova, A. Kustubayeva, G. Matthews",
+     "stage0": true
+    },
+    {
+     "key": "10.1093/cercor/bhad271",
+     "title": "Mapping between cognitive theories and psycho-physiological models of attention system performance",
+     "year": 2023,
+     "doi": "10.1093/cercor/bhad271",
+     "journal": "Cerebral Cortex",
+     "authors": "Oliver A. Guidetti, C. Speelman, Peter Bouhlas",
+     "stage0": true
+    },
+    {
+     "key": "10.17077/drivingassessment.1653",
+     "title": "It's Out of Our Hands Now! Effects of Non-Driving Related Tasks During Highly Automated Driving on Drivers' Fatigue",
+     "year": 2017,
+     "doi": "10.17077/DRIVINGASSESSMENT.1653",
+     "journal": "",
+     "authors": "Oliver Jarosch, M. Kuhnt, Svenja Paradies, K. Bengler",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720818799468",
+     "title": "Vigilance and Automation Dependence in Operation of Multiple Unmanned Aerial Systems (UAS): A Simulation Study",
+     "year": 2018,
+     "doi": "10.1177/0018720818799468",
+     "journal": "Hum. Factors",
+     "authors": "Ryan W. Wohleber, G. Matthews, Jinchao Lin, J. Szalma, G. Calhoun, G. Funke",
+     "stage0": true
+    },
+    {
+     "key": "10.1117/12.2620038",
+     "title": "Research on driver's passive fatigue under the condition of autonomous driving based on eye movement and ECG",
+     "year": 2021,
+     "doi": "10.1117/12.2620038",
+     "journal": "Fifth International Conference on Traffic Engineering and Transportation System (ICTETS 2021)",
+     "authors": "Pengxu Huang, Jiang Li, Chenghui Lan, Junzhe Lu",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/07408170304385",
+     "title": "Practical solution approaches to solve a hierarchical stochastic production planning problem in a flexible automated workshop in China",
+     "year": 2003,
+     "doi": "10.1080/07408170304385",
+     "journal": "",
+     "authors": "Hong-Sen Yan",
+     "stage0": false
+    },
+    {
+     "key": "s2:7576c51ff7f9bebedb1bfc22401750f2da409463",
+     "title": "Occupational stressors, biological stress and workers' health.",
+     "year": 1989,
+     "doi": "",
+     "journal": "Journal of UOEH",
+     "authors": "L. Levi",
+     "stage0": false
+    },
+    {
+     "key": "10.1145/3429551.3429555",
+     "title": "The Evaluation of Operator's Mental Workload in Operation Control Center Division in the Railway Industry",
+     "year": 2020,
+     "doi": "10.1145/3429551.3429555",
+     "journal": "ICIBE",
+     "authors": "Livia Putri Sulistiyo, M. A. Puspasari",
+     "stage0": false
+    },
+    {
+     "key": "10.54941/ahfe1008078",
+     "title": "To boldly go where AI must not go alone: Designing for non-delegable human authority in AI-assisted expert work",
+     "year": 2026,
+     "doi": "10.54941/ahfe1008078",
+     "journal": "AHFE International",
+     "authors": "Raimund Lehle, Julia Kaesmayr",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00207597708247381",
+     "title": "Quality of Life: Criteria for Behavioral Adjustment",
+     "year": 1977,
+     "doi": "10.1080/00207597708247381",
+     "journal": "",
+     "authors": "M. Frankenhaeuser",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/icsmc.2005.1571506",
+     "title": "A joint human-automation cognitive system to support rapid decision-making in hostile environments",
+     "year": 2005,
+     "doi": "10.1109/ICSMC.2005.1571506",
+     "journal": "IEEE International Conference on Systems, Man and Cybernetics",
+     "authors": "Michael C. Dorneich, P. Ververs, S. Mathan, S. Whitlow",
+     "stage0": false
+    },
+    {
+     "key": "10.3389/fpsyg.2021.631364",
+     "title": "Underload on the Road: Measuring Vigilance Decrements During Partially Automated Driving",
+     "year": 2021,
+     "doi": "10.3389/fpsyg.2021.631364",
+     "journal": "Frontiers in Psychology",
+     "authors": "Thomas McWilliams, N. Ward",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/1071181322661460",
+     "title": "An Online Method to Study Remote Operation of Automated Vehicles",
+     "year": 2022,
+     "doi": "10.1177/1071181322661460",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "D. Morrison, Lin-yang Cui, Jing Feng",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/hicss.2006.531",
+     "title": "Vigilance and Error Detection in an Automated Command and Control Environment",
+     "year": 2006,
+     "doi": "10.1109/HICSS.2006.531",
+     "journal": "Proceedings of the 39th Annual Hawaii International Conference on System Sciences (HICSS'06)",
+     "authors": "D. Biros, Kent Marett, Brent T. Langhals",
+     "stage0": true
+    },
+    {
+     "key": "10.58286/33389",
+     "title": "Human Factors in the Ultrasonic Testing of Railway Axles: Effects of Rare Signals and Automation Support",
+     "year": 2026,
+     "doi": "10.58286/33389",
+     "journal": "e-Journal of Nondestructive Testing",
+     "authors": "M. Bertovic, Momo Hegeler, Stefan Lichtnekert, L. Onnasch",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.trf.2021.08.005",
+     "title": "Measuring drivers’ takeover performance in varying levels of automation: Considering the influence of cognitive secondary task",
+     "year": 2021,
+     "doi": "10.1016/J.TRF.2021.08.005",
+     "journal": "",
+     "authors": "Guang-Quan Lu, Junda Zhai, Peng-Hui Li, Facheng Chen, Liming Liang",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.aap.2021.106058",
+     "title": "Effects of partially automated driving on the development of driver sleepiness.",
+     "year": 2021,
+     "doi": "10.1016/j.aap.2021.106058",
+     "journal": "Accident Analysis and Prevention",
+     "authors": "Christer Ahlstrom, R. Zemblys, Herman Jansson, Christian Forsberg, Johan Karlsson, A. Anund",
+     "stage0": true
+    },
+    {
+     "key": "10.5100/jje.58.2f4-06",
+     "title": "Effects of Simultaneous Presentation of Tactile and Auditory Stimulus on Prevention of Vigilance Decrements in Manual and Autonomous Driving",
+     "year": 2022,
+     "doi": "10.5100/jje.58.2f4-06",
+     "journal": "The Japanese Journal of Ergonomics",
+     "authors": "Kosuke C. Yamada, A. Murata, Toshihisa Doi",
+     "stage0": true
+    },
+    {
+     "key": "10.1518/0018720024497709",
+     "title": "Malleable Attentional Resources Theory: A New Explanation for the Effects of Mental Underload on Performance",
+     "year": 2002,
+     "doi": "10.1518/0018720024497709",
+     "journal": "Hum. Factors",
+     "authors": "M. Young, N. Stanton",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.trc.2013.02.008",
+     "title": "Behavioural changes in drivers experiencing highly-automated vehicle control in varying traffic conditions",
+     "year": 2013,
+     "doi": "10.1016/J.TRC.2013.02.008",
+     "journal": "",
+     "authors": "A. Jamson, N. Merat, Oliver Carsten, F. Lai",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/10447318.2012.634749",
+     "title": "Human Factors and Human–Computer Interaction Considerations in NextGen",
+     "year": 2012,
+     "doi": "10.1080/10447318.2012.634749",
+     "journal": "International journal of human computer interactions",
+     "authors": "Kim-Phuong L. Vu",
+     "stage0": false
+    },
+    {
+     "key": "s2:93a4b442cc949753d95a7aa424d23c5ae64e5081",
+     "title": "Automotive automation: Investigating the impact on drivers' mental workload",
+     "year": 1997,
+     "doi": "",
+     "journal": "",
+     "authors": "M. Young, N. Stanton",
+     "stage0": false
+    },
+    {
+     "key": "10.3389/fnins.2017.00541",
+     "title": "Autopilot, Mind Wandering, and the Out of the Loop Performance Problem",
+     "year": 2017,
+     "doi": "10.3389/fnins.2017.00541",
+     "journal": "Frontiers in Neuroscience",
+     "authors": "Jonas Gouraud, A. Delorme, B. Berberian",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/00187208231189658",
+     "title": "Vigilance Decrement During On-Road Partially Automated Driving Across Four Systems",
+     "year": 2023,
+     "doi": "10.1177/00187208231189658",
+     "journal": "Hum. Factors",
+     "authors": "F. Biondi, A. S. McDonnell, Mobina Mahmoodzadeh, Noor Jajo, B. Balasingam, David L. Strayer",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/rmkmate64874.2025.11042752",
+     "title": "Automated Load Management and Safety Enhancement System for Railway Wagons Using IoT and RFID Technology",
+     "year": 2025,
+     "doi": "10.1109/RMKMATE64874.2025.11042752",
+     "journal": "2025 2nd International Conference on Research Methodologies in Knowledge Management, Artificial Intelligence and Telecommunication Engineering (RMKMATE)",
+     "authors": "T. Magesh, Harini U, S. D, M. Thiyagesan, Divyadharshini N",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720818802095",
+     "title": "Driver Vigilance in Automated Vehicles: Effects of Demands on Hazard Detection Performance",
+     "year": 2018,
+     "doi": "10.1177/0018720818802095",
+     "journal": "Hum. Factors",
+     "authors": "Eric T. Greenlee, Patricia R. DeLucia, David C. Newton",
+     "stage0": true
+    },
+    {
+     "key": "10.5100/jje.58.1b3-05",
+     "title": "Relationship Between Level of Automated Driving and Vigilance Decrements in Long-Time Driving",
+     "year": 2022,
+     "doi": "10.5100/jje.58.1b3-05",
+     "journal": "The Japanese Journal of Ergonomics",
+     "authors": "Yuki Nishikura, A. Murata, Toshihisa Doi",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/978-3-319-40030-3_4",
+     "title": "A New Method for Mental Workload Registration",
+     "year": 2016,
+     "doi": "10.1007/978-3-319-40030-3_4",
+     "journal": "Interacción",
+     "authors": "T. Radüntz",
+     "stage0": false
+    },
+    {
+     "key": "10.5100/jje.58.2f4-04",
+     "title": "Influences of Combined Use of Level 2 Automated Driving and Manual Driving on Vigilance Decrements in Long Time Driving",
+     "year": 2022,
+     "doi": "10.5100/jje.58.2f4-04",
+     "journal": "The Japanese Journal of Ergonomics",
+     "authors": "Kohei Yoshiyama, Toshihisa Doi, A. Murata",
+     "stage0": true
+    },
+    {
+     "key": "s2:9ea91edccf2e651dc76e736ee45eefb251a67113",
+     "title": "Detection of workload elevation using different types of physiological measures for use in adaptive automation: some practical implications",
+     "year": 2004,
+     "doi": "",
+     "journal": "",
+     "authors": "P. Hoogeboom, L. Mulder",
+     "stage0": false
+    },
+    {
+     "key": "10.5100/jje.58.2e1-03",
+     "title": "Effect of Chewing Gum on Prevention of Vigilance Decrement in Manual and Autonomous Driving",
+     "year": 2022,
+     "doi": "10.5100/jje.58.2e1-03",
+     "journal": "The Japanese Journal of Ergonomics",
+     "authors": "T. Motoya, Atuso Murata, Toshihisa Doi",
+     "stage0": true
+    },
+    {
+     "key": "10.1207/sthf0102_7",
+     "title": "EFFECTS OF MANUAL AND AUTOPILOT CONTROL ON MENTAL WORKLOAD AND VIGILANCE DURING SIMULATED GENERAL AVIATION FLIGHT",
+     "year": 1999,
+     "doi": "10.1207/STHF0102_7",
+     "journal": "",
+     "authors": "A. Masalonis, J. Duley, R. Parasuraman",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/00187208211039453",
+     "title": "Preface to the Special Section on Measuring Cognitive Workload in Human Factors",
+     "year": 2021,
+     "doi": "10.1177/00187208211039453",
+     "journal": "Hum. Factors",
+     "authors": "F. Biondi, David L. Strayer, W. Horrey, J. Cooper, J. Cort",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/cvpr52734.2025.01791",
+     "title": "Can’t Slow Me Down: Learning Robust and Hardware-Adaptive Object Detectors against Latency Attacks for Edge Devices",
+     "year": 2024,
+     "doi": "10.1109/CVPR52734.2025.01791",
+     "journal": "Computer Vision and Pattern Recognition",
+     "authors": "Tian-Yi Wang, Zichen Wang, Cong Wang, Yuanchao Shu, Rui-Long Deng, Peng Cheng",
+     "stage0": true
+    },
+    {
+     "key": "10.54941/ahfe1003824",
+     "title": "Communication Needs and the Drivers’ Activity in Platooning Systems",
+     "year": 2023,
+     "doi": "10.54941/ahfe1003824",
+     "journal": "Human Factors in Transportation",
+     "authors": "Catarina Neto, A. Simões, António Lobo",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/1071181320641464",
+     "title": "Secondary Task Engagement During Automated Drives: Friend and Foe?",
+     "year": 2020,
+     "doi": "10.1177/1071181320641464",
+     "journal": "",
+     "authors": "Taylor Shupsky, Kevin Morales, C. Baldwin, P. Hancock, Eric T. Greenlee, W. Horrey",
+     "stage0": true
+    },
+    {
+     "key": "s2:a9fbae02b075fc2f0d57c021c2af9ecdf84cfc51",
+     "title": "Passive Fatigue Threshold in Automated Driving",
+     "year": 2021,
+     "doi": "",
+     "journal": "",
+     "authors": "Yijing Zhang, Jin-Fei Ma",
+     "stage0": true
+    },
+    {
+     "key": "s2:ab58667d19e7e0f184dd525e456da41c17d76d93",
+     "title": "Automation: Decision Aid or Decision Maker?",
+     "year": 1998,
+     "doi": "",
+     "journal": "",
+     "authors": "L. Skitka",
+     "stage0": false
+    },
+    {
+     "key": "10.1080/00140139.2026.2662001",
+     "title": "Chatting with AI: enhancing the supervision safety of near-L3 automated driving by engaging in non-driving-related tasks.",
+     "year": 2026,
+     "doi": "10.1080/00140139.2026.2662001",
+     "journal": "Ergonomics",
+     "authors": "Tingwei Jiang, Qirui Su, Rixin Tang",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.trf.2025.03.022",
+     "title": "Vigilance decrement in automated vs. manual driving: Insights from multimodal data",
+     "year": 2025,
+     "doi": "10.1016/j.trf.2025.03.022",
+     "journal": "Transportation Research Part F: Traffic Psychology and Behaviour",
+     "authors": "Chuanggao Lin, Fangda Zhang, Yong Zhang, Tingru Zhang",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140130701318855",
+     "title": "What's skill got to do with it? Vehicle automation and driver mental workload",
+     "year": 2007,
+     "doi": "10.1080/00140130701318855",
+     "journal": "Ergonomics",
+     "authors": "M. Young, N. A. Stanton",
+     "stage0": false
+    },
+    {
+     "key": "10.1201/b12791",
+     "title": "Stress, Workload, and Fatigue",
+     "year": 2009,
+     "doi": "10.1201/b12791",
+     "journal": "",
+     "authors": "P. Hancock, P. Desmond",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/s41315-024-00414-2",
+     "title": "Truck loading state estimation for autonomous operation of mining excavator",
+     "year": 2025,
+     "doi": "10.1007/s41315-024-00414-2",
+     "journal": "International Journal of Intelligent Robotics and Applications",
+     "authors": "Xu Yang, Yunhua Li, Yu Yao, Tao Qin, Liman Yang, Zhexuan Sheng",
+     "stage0": false
+    },
+    {
+     "key": "10.48550/arxiv.2602.18456",
+     "title": "Beyond single-channel agentic benchmarking",
+     "year": 2026,
+     "doi": "10.48550/arXiv.2602.18456",
+     "journal": "arXiv.org",
+     "authors": "Nelu D. Radpour",
+     "stage0": true
+    },
+    {
+     "key": "10.14257/ijhit.2016.9.8.07",
+     "title": "Autonomous Migration of Virtual Machine Based on OpenStack",
+     "year": 2016,
+     "doi": "10.14257/IJHIT.2016.9.8.07",
+     "journal": "",
+     "authors": "Li Zhou, Zhuo-Er Yu, Jilin Zhang, J. Wan, Yusen Wu",
+     "stage0": false
+    },
+    {
+     "key": "10.1145/3349263.3351310",
+     "title": "Supervising the self-driving car: situation awareness and fatigue during automated driving",
+     "year": 2019,
+     "doi": "10.1145/3349263.3351310",
+     "journal": "International Conference on Automotive User Interfaces and Interactive Vehicular Applications",
+     "authors": "Angus McKerral, Nathaniel Boyce, K. Pammer",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140130310001629748",
+     "title": "Factors affecting performance on a target monitoring task employing an automatic tracker",
+     "year": 2004,
+     "doi": "10.1080/00140130310001629748",
+     "journal": "Ergonomics",
+     "authors": "S. McFadden, Abhirami Vimalachandran, Elizabeth Blackmore",
+     "stage0": false
+    },
+    {
+     "key": "s2:b1c06169e88a41199bf3cd75046879a61fc22998",
+     "title": "Aerospace and transportation systems",
+     "year": 2001,
+     "doi": "",
+     "journal": "",
+     "authors": "D. Harris",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.promfg.2015.07.864",
+     "title": "Real Time Validation of Online Situation Awareness Questionnaires in Simulated Approach Air Traffic Control",
+     "year": 2015,
+     "doi": "10.1016/J.PROMFG.2015.07.864",
+     "journal": "",
+     "authors": "Jan Kraemer, Heinz Süss",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/02678373.2021.1888822",
+     "title": "Investigating the joint effects of overload and underload on chronic fatigue and wellbeing",
+     "year": 2021,
+     "doi": "10.1080/02678373.2021.1888822",
+     "journal": "Work & Stress",
+     "authors": "Belinda S. Cham, D. Andrei, M. Griffin, M. Grech, Andrew Neal",
+     "stage0": true
+    },
+    {
+     "key": "10.21203/rs.3.rs-457935/v1",
+     "title": "Electroencephalography Sample Entropy of Driver Passive Fatigue Threshold in Automated Driving",
+     "year": 2021,
+     "doi": "10.21203/RS.3.RS-457935/V1",
+     "journal": "",
+     "authors": "Yijing Zhang, Jin-Fei Ma, Chi Zhang, Ruosong Chang",
+     "stage0": true
+    },
+    {
+     "key": "10.54941/ahfe100364",
+     "title": "Enhancing the Vigilance of Car Drivers:a Review on Fatigue Caused by the Driving Task and Possible Countermeasures",
+     "year": 2020,
+     "doi": "10.54941/ahfe100364",
+     "journal": "Advances in Social and Organizational Factors",
+     "authors": "S. V. van Veen, P. Vink, M. Franz, Peer-Oliver Wagner",
+     "stage0": true
+    },
+    {
+     "key": "10.1145/3772318.3790972",
+     "title": "Small Talk, Big Impact? LLM-based Conversational Agents to Mitigate Passive Fatigue in Conditional Automated Driving",
+     "year": 2025,
+     "doi": "10.1145/3772318.3790972",
+     "journal": "International Conference on Human Factors in Computing Systems",
+     "authors": "Lewis Cockram, Yue-Teng Yu, Jorge Pardo, Xiaomeng Li, A. Rakotonirainy, Jonny Kuo",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/00140139.2026.2684756",
+     "title": "Underload in sky: reducing the passive fatigue of pilots during cruise through an attention guided - active interactive seating system.",
+     "year": 2026,
+     "doi": "10.1080/00140139.2026.2684756",
+     "journal": "Ergonomics",
+     "authors": "Hai-Xin Xu, Li-Jing Wang, Run-Hao Li, Jun Zhang, J. Zou, Xianchao Ma",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720811423261",
+     "title": "Fatigue and Voluntary Utilization of Automation in Simulated Driving",
+     "year": 2012,
+     "doi": "10.1177/0018720811423261",
+     "journal": "Hum. Factors",
+     "authors": "Catherine Neubauer, G. Matthews, Lisa Langheim, D. Saxby",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/10711813251367014",
+     "title": "Examining Driver Vigilance in Partially Automated Vehicles: The Impact of Push Notifications",
+     "year": 2025,
+     "doi": "10.1177/10711813251367014",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "Aleksei V. Proskurin, Eric T. Greenlee",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/1071181320641394",
+     "title": "Driver Vigilance in Automated and Manual Driving",
+     "year": 2020,
+     "doi": "10.1177/1071181320641394",
+     "journal": "",
+     "authors": "David C. Newton, Eric T. Greenlee, Patricia R. DeLucia",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/itsc.2016.7795884",
+     "title": "Challenges using portable devices during Conditional Automation",
+     "year": 2016,
+     "doi": "10.1109/ITSC.2016.7795884",
+     "journal": "2016 IEEE 19th International Conference on Intelligent Transportation Systems (ITSC)",
+     "authors": "Joel Gonçalves, K. Bengler",
+     "stage0": false
+    },
+    {
+     "key": "s2:c04cb9d723780bcd60bc8f2fa6c7c7053a7ee7b2",
+     "title": "AUTOMATED GUIDEWAY TRANSPORTATION BETWEEN AND WITHIN CITIES. VOLUME II",
+     "year": 1973,
+     "doi": "",
+     "journal": "",
+     "authors": "M. B. Godfrey, M. Tomizuka, W. Verplank, D. Whitney, D. G. Wilson",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/access.2023.3349350",
+     "title": "Decentralized Multi-Agent DQN-Based Resource Allocation for Heterogeneous Traffic in V2X Communications",
+     "year": 2024,
+     "doi": "10.1109/ACCESS.2023.3349350",
+     "journal": "IEEE Access",
+     "authors": "Insung Lee, Duk-Kyung Kim",
+     "stage0": true
+    },
+    {
+     "key": "10.1145/3581754.3584133",
+     "title": "Fatigue and mental underload further pronounced in L3 conditionally automated driving: Results from an EEG experiment on a test track",
+     "year": 2023,
+     "doi": "10.1145/3581754.3584133",
+     "journal": "IUI Companion",
+     "authors": "Nikol Figalová, Hans-Joachim Bieg, Michael Schulz, Jürgen Pichen, M. Baumann, L. Chuang",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.promfg.2015.07.499",
+     "title": "Vigilance Decrement and Passive Fatigue Caused by Monotony in Automated Driving",
+     "year": 2015,
+     "doi": "10.1016/J.PROMFG.2015.07.499",
+     "journal": "",
+     "authors": "Moritz Körber, Andrea Cingel, Markus Zimmermann, K. Bengler",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/s10111-020-00636-x",
+     "title": "Modelling decision-making within rail maintenance control rooms",
+     "year": 2020,
+     "doi": "10.1007/s10111-020-00636-x",
+     "journal": "Cognition, Technology & Work",
+     "authors": "N. Dadashi, D. Golightly, Sarah C. Sharples",
+     "stage0": true
+    },
+    {
+     "key": "10.4233/uuid:88dcb158-5fc3-4222-a402-4e484fa84414",
+     "title": "Human Factors of Transitions in Automated Driving",
+     "year": 2020,
+     "doi": "10.4233/UUID:88DCB158-5FC3-4222-A402-4E484FA84414",
+     "journal": "",
+     "authors": "Zhenji Lu",
+     "stage0": false
+    },
+    {
+     "key": "s2:c898eff170ba4e128bfe9a0f2b2e99579186e419",
+     "title": "Transmission Expansion Planning considering Contingency Criteria and Network Utilization",
+     "year": 2008,
+     "doi": "",
+     "journal": "",
+     "authors": "V. K. Murthy, A. Abhyankar, S. Khaparde",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/ispdc51135.2020.00025",
+     "title": "Towards a Cloud Native Big Data Platform using MiCADO",
+     "year": 2020,
+     "doi": "10.1109/ISPDC51135.2020.00025",
+     "journal": "International Symposium on Parallel and Distributed Computing",
+     "authors": "A. Mosa, Tamás Kiss, G. Pierantoni, James Deslauriers, D. Kagialis, G. Terstyánszky",
+     "stage0": true
+    },
+    {
+     "key": "10.2118/206067-ms",
+     "title": "The Role of Hybrid IoT with Cloud Computing and Fog Computing to Help the Oil and Gas Industry Recover from Covid-19 and Face Future Challenges",
+     "year": 2021,
+     "doi": "10.2118/206067-ms",
+     "journal": "Day 2 Wed, September 22, 2021",
+     "authors": "Ethar H. K. Alkamil, A. Mutlag, Haider W. Alsaffar, Mustafa H. Sabah",
+     "stage0": true
+    },
+    {
+     "key": "10.37665/ppkigbg76601",
+     "title": "Capacity Requirements Planning in a High Volume, Medium/High Mix EMS Provider's Environment",
+     "year": 2002,
+     "doi": "10.37665/ppkigbg76601",
+     "journal": "Pan Pacific Symposium",
+     "authors": "Parag Diwe, N. Kini, Raj Iyer, K. Srihari",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/1541931213601825",
+     "title": "Driver Vigilance in Automated Vehicles: Investigating Hazard Detection Performance",
+     "year": 2017,
+     "doi": "10.1177/1541931213601825",
+     "journal": "",
+     "authors": "Eric T. Greenlee, Patricia R. DeLucia, David C. Newton",
+     "stage0": true
+    },
+    {
+     "key": "s2:d06df6529682c4cfc5666bc17fe245a49d1f7b7d",
+     "title": "Human Factors : The Journal of the Human Factors and Ergonomics Society",
+     "year": 2011,
+     "doi": "",
+     "journal": "",
+     "authors": "Catherine Neubauer, Gerald Matthews, Lisa Langheim, D. Saxby",
+     "stage0": false
+    },
+    {
+     "key": "s2:d2763278234da9dc9a5fbfe3666b85fe60d9a720",
+     "title": "A Systematic Approach for Real-Time Operator Functional State A Systematic Approach for Real-Time Operator Functional State Assessment Assessment",
+     "year": null,
+     "doi": "",
+     "journal": "",
+     "authors": "Guangfan Zhang, Wei Wang, Aaron Pepe, Roger Xu, Tom Schnell, Dean Nick Anderson",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/stee63556.2024.10747993",
+     "title": "Power Quality Improvement Of Grid Tied Solar Inverter In Underload Zone Using The Adaptive PWM Frequency",
+     "year": 2024,
+     "doi": "10.1109/STEE63556.2024.10747993",
+     "journal": "2024 IEEE 7th International Conference on Smart Technologies in Power Engineering and Electronics (STEE)",
+     "authors": "O. Plakhtii, O. Zhuchenko, S. Mykhalkiv, Yurii Semenenko, Karyna Trubchaninova, O. Logvinenko",
+     "stage0": true
+    },
+    {
+     "key": "10.1155/er/3141157",
+     "title": "An Investigation Into the Energy Management Strategy for µPMU‐Supported Networked Microgrids",
+     "year": 2026,
+     "doi": "10.1155/er/3141157",
+     "journal": "International Journal of Energy Research",
+     "authors": "Sukalyan Maji, Rahul Nakka, Phan-Thanh Nguyen, T. Nguyen, Partha Kayal",
+     "stage0": true
+    },
+    {
+     "key": "10.54941/ahfe1006773",
+     "title": "State Based HMI Prototyping for Designing Adaptive HMIs",
+     "year": 2025,
+     "doi": "10.54941/ahfe1006773",
+     "journal": "AHFE International",
+     "authors": "Alexander Steinmetz, Marcel Saager, Jan Patrick Osterloh",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/070674376901400409",
+     "title": "The Biology of Dreaming and the Informational Underload (Sensory Deprivation) Theory of Psychosis*",
+     "year": 1969,
+     "doi": "10.1177/070674376901400409",
+     "journal": "Canadian Psychiatric Association Journal",
+     "authors": "R. Pos",
+     "stage0": false
+    },
+    {
+     "key": "10.1037/a0034386",
+     "title": "Active and Passive Fatigue in Simulated Driving: Discriminating Styles of Workload Regulation and Their Safety Impacts",
+     "year": 2013,
+     "doi": "10.1037/a0034386",
+     "journal": "Journal of experimental psychology. Applied",
+     "authors": "D. Saxby, G. Matthews, J. Warm, Edward M. Hitchcock, Catherine Neubauer",
+     "stage0": true
+    },
+    {
+     "key": "10.5120/ijca2025925036",
+     "title": "The Role of AI in Enhancing Teamwork, Resilience and Decision-Making: Review of Recent Developments",
+     "year": 2025,
+     "doi": "10.5120/ijca2025925036",
+     "journal": "International Journal of Computer Applications",
+     "authors": "Satyadhar Joshi",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/mits.2018.2842018",
+     "title": "Methodology for Railway Automation Study and Automatic Generation of PLC Programs",
+     "year": 2018,
+     "doi": "10.1109/MITS.2018.2842018",
+     "journal": "IEEE Intelligent Transportation Systems Magazine",
+     "authors": "R. Coupat, A. Philippot, Mohamed Niang, C. Courtois, D. Annebicque, B. Riera",
+     "stage0": false
+    },
+    {
+     "key": "10.1145/3744335.3758493",
+     "title": "Leveraging LLM-based Conversational Agents to Combat Passive Fatigue in Conditional Automated Driving Contexts",
+     "year": 2025,
+     "doi": "10.1145/3744335.3758493",
+     "journal": "International Conference on Automotive User Interfaces and Interactive Vehicular Applications",
+     "authors": "Yue-Teng Yu, Lewis Cockram, Jorge Pardo, Xiao-Meng Li, A. Rakotonirainy, Jonny Kuo",
+     "stage0": true
+    },
+    {
+     "key": "s2:df76651d29fa16d71ea7e5b45014817603f1b2b8",
+     "title": "TRANSPORTATION AND TRAFFIC IN THE INFORMATION SOCIETY : MONOTONY AND OVERLOAD AS SAFETY PROBLEMS",
+     "year": 1996,
+     "doi": "",
+     "journal": "",
+     "authors": "H. Summala",
+     "stage0": false
+    },
+    {
+     "key": "10.1002/spe.957",
+     "title": "Self‐adaptation of service level in distributed systems",
+     "year": 2010,
+     "doi": "10.1002/spe.957",
+     "journal": "Software, Practice & Experience",
+     "authors": "Jeremy Philippe, N. de Palma, F. Boyer, Et Olivier Gruber",
+     "stage0": false
+    },
+    {
+     "key": "10.7888/juoeh.11.229",
+     "title": "Occupational Stressors, Biological Stress and Workers&apos Health",
+     "year": 1989,
+     "doi": "10.7888/JUOEH.11.229",
+     "journal": "",
+     "authors": "L. Levi",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1541931218621019",
+     "title": "Supervising High Degree Automation in Simulated Air Traffic Control",
+     "year": 2018,
+     "doi": "10.1177/1541931218621019",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "V. Bowden, Luke Ren, Shayne Loft",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/001872088702900609",
+     "title": "Human-Computer Monitoring",
+     "year": 1987,
+     "doi": "10.1177/001872088702900609",
+     "journal": "",
+     "authors": "R. Parasuraman",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/0018720818816226",
+     "title": "Effects of Task-Induced Fatigue in Prolonged Conditional Automated Driving",
+     "year": 2019,
+     "doi": "10.1177/0018720818816226",
+     "journal": "Hum. Factors",
+     "authors": "Oliver Jarosch, Hanna Bellem, K. Bengler",
+     "stage0": true
+    },
+    {
+     "key": "s2:e5ea60bf49c7e86b77f572294a75f938f830c1ba",
+     "title": "AUTOMATED GUIDEWAY TRANSPORTATION BETWEEN AND WITHIN CITIES",
+     "year": 1973,
+     "doi": "",
+     "journal": "",
+     "authors": "M. B. Godfrey, D. G. Wilson, D. Whitney, W. Verplank, M. Tomizuka",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1071181312561415",
+     "title": "The Effects of Cell Phone Use and Automation on Driver Performance and Subjective State in Simulated Driving",
+     "year": 2012,
+     "doi": "10.1177/1071181312561415",
+     "journal": "",
+     "authors": "Catherine Neubauer, G. Matthews, D. Saxby",
+     "stage0": false
+    },
+    {
+     "key": "10.1007/s10111-019-00613-z",
+     "title": "Task-induced fatigue when implementing high grades of railway automation",
+     "year": 2019,
+     "doi": "10.1007/s10111-019-00613-z",
+     "journal": "Cognition, Technology & Work",
+     "authors": "N. Brandenburger, A. Naumann, M. Jipp",
+     "stage0": true
+    },
+    {
+     "key": "s2:e753291c2bf59ad2c0c93d9c9c1e10633a126d27",
+     "title": "Cancer detection using neural computing methodology",
+     "year": 2001,
+     "doi": "",
+     "journal": "",
+     "authors": "N. Toomarian, H. Kohen, G. Bearman, D. Seligson",
+     "stage0": false
+    },
+    {
+     "key": "s2:e80a41cf6aa6669dbc58d4dd2f1ad2c642d0b4e0",
+     "title": "Task analysis and decision support requirements for Dynamic Positioning operators",
+     "year": 2016,
+     "doi": "",
+     "journal": "",
+     "authors": "T. Hueting, J. Rypkema",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1071181319631523",
+     "title": "The Effect of Takeover Lead Time on Driver Workload",
+     "year": 2019,
+     "doi": "10.1177/1071181319631523",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "Yongwon Yun, Hyungseok Oh, Rohae Myung",
+     "stage0": true
+    },
+    {
+     "key": "s2:e8e5033d4ff8a57f32d2e4b9370af3a11fb4a2c7",
+     "title": "Development and Application of Automatic Loading Silo Network System",
+     "year": 2011,
+     "doi": "",
+     "journal": "",
+     "authors": "Lu-Bing Li",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1541931213601047",
+     "title": "The Impact of Automation Reliability and Operator Fatigue on Performance and Reliance",
+     "year": 2016,
+     "doi": "10.1177/1541931213601047",
+     "journal": "",
+     "authors": "Ryan W. Wohleber, G. Calhoun, G. Funke, H. Ruff, C. Chiu, Jinchao Lin",
+     "stage0": true
+    },
+    {
+     "key": "10.5281/zenodo.1316361",
+     "title": "Experimental Simulation Set-Up for Validating Out-Of-The-Loop Mitigation when Monitoring High Levels of Automation in Air Traffic Control",
+     "year": 2018,
+     "doi": "10.5281/ZENODO.1316361",
+     "journal": "",
+     "authors": "Oliver Ohneiser, F. D. Crescenzio, G. D. Flumeri, Jan Kraemer, B. Berberian, S. Bagassi",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/00187208221103922",
+     "title": "Driver Vigilance Decrement is More Severe During Automated Driving than Manual Driving",
+     "year": 2022,
+     "doi": "10.1177/00187208221103922",
+     "journal": "Hum. Factors",
+     "authors": "Eric T. Greenlee, Patricia R. DeLucia, David C. Newton",
+     "stage0": true
+    },
+    {
+     "key": "s2:eb34450ebd4179d3bc0d770874c40172fce94cb7",
+     "title": "Simulator Methodologies for Investigating Fatigue and Stress in the Automated Vehicle",
+     "year": 2010,
+     "doi": "",
+     "journal": "",
+     "authors": "Catherine Neubauer, G. Matthews, D. Saxby, Lisa Langheim",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/brainsci10010048",
+     "title": "Neurophysiological Vigilance Characterisation and Assessment: Laboratory and Realistic Validations Involving Professional Air Traffic Controllers",
+     "year": 2020,
+     "doi": "10.3390/brainsci10010048",
+     "journal": "Brain Science",
+     "authors": "M. Sebastiani, G. di Flumeri, P. Aricó, Nicolina Sciaraffa, F. Babiloni, G. Borghini",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fnhum.2016.00539",
+     "title": "Adaptive Automation Triggered by EEG-Based Mental Workload Index: A Passive Brain-Computer Interface Application in Realistic Air Traffic Control Environment",
+     "year": 2016,
+     "doi": "10.3389/fnhum.2016.00539",
+     "journal": "Frontiers in Human Neuroscience",
+     "authors": "P. Aricó, G. Borghini, G. di Flumeri, A. Colosimo, S. Bonelli, A. Golfetti",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.cie.2004.01.012",
+     "title": "Hierarchical production planning with demand constraints",
+     "year": 2004,
+     "doi": "10.1016/j.cie.2004.01.012",
+     "journal": "Computers & industrial engineering",
+     "authors": "Hong-Sen Yan, Xiao-Dong Zhang, Min Jiang",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/1071181320641328",
+     "title": "The Impact of Mental States on Semi-autonomous Driving Takeover Performance: A Systematic Review",
+     "year": 2020,
+     "doi": "10.1177/1071181320641328",
+     "journal": "",
+     "authors": "Gaojian Huang, Christine M. Petersen, Brandon J. Pitts",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/0018720819829949",
+     "title": "Computational Modeling of the Effects of Sleep Deprivation on the Vigilance Decrement",
+     "year": 2019,
+     "doi": "10.1177/0018720819829949",
+     "journal": "Hum. Factors",
+     "authors": "R. Patterson, Darrell F. Lochtefeld, Kathleen G. Larson, Amanda Christensen-Salem",
+     "stage0": true
+    },
+    {
+     "key": "10.1080/1463922x.2025.2608063",
+     "title": "Driver mental workload measurement trends and cognitive impacts: a literature review",
+     "year": 2026,
+     "doi": "10.1080/1463922X.2025.2608063",
+     "journal": "Theoretical Issues in Ergonomics Science",
+     "authors": "Uyun Nadzirotul Faidah, I. Maulana, RembaYanuar Efranto",
+     "stage0": true
+    },
+    {
+     "key": "10.48175/ijarsct-2821",
+     "title": "Man Machine Interaction in Autonomous Vehicles",
+     "year": 2022,
+     "doi": "10.48175/ijarsct-2821",
+     "journal": "International Journal of Advanced Research in Science, Communication and Technology",
+     "authors": "Ajay Singh, Neha Sudhirkumar Agarwal, Kanak Narawade, G. Deshmukh, Shikha Pachouly",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fnrgo.2026.1874304",
+     "title": "Vigilance decrements in air traffic control as an aviation safety risk: a systematic review of modeling and prediction approaches",
+     "year": 2026,
+     "doi": "10.3389/fnrgo.2026.1874304",
+     "journal": "Frontiers in Neuroergonomics",
+     "authors": "Manal Aich, J. El Aoufi, A. Moussa",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/1541931215591220",
+     "title": "Using Empirical Research and Human Performance Modeling to Predict Astronaut Performance in Long-Duration Space Missions",
+     "year": 2015,
+     "doi": "10.1177/1541931215591220",
+     "journal": "",
+     "authors": "B. Gore",
+     "stage0": false
+    },
+    {
+     "key": "10.1038/s41598-021-99680-4",
+     "title": "Electrophysiological frequency domain analysis of driver passive fatigue under automated driving conditions",
+     "year": 2021,
+     "doi": "10.1038/s41598-021-99680-4",
+     "journal": "Scientific Reports",
+     "authors": "Yijing Zhang, Jin-Fei Ma, Chi Zhang, Ruosong Chang",
+     "stage0": true
+    },
+    {
+     "key": "s2:f46c4f41f87dce4660e03343b21ceabe318adbd6",
+     "title": "The Role of EEG Biofeedback Training Preceding an Automated Monitoring Task",
+     "year": 2001,
+     "doi": "",
+     "journal": "",
+     "authors": "M. Hilscher",
+     "stage0": false
+    },
+    {
+     "key": "s2:f66e77460143a4775f649d9a1ee1aefd28ccfb1d",
+     "title": "AUTOMATION OF THE DRIVING TASK. FINAL REPORT",
+     "year": 1998,
+     "doi": "",
+     "journal": "",
+     "authors": "Tom den Heijer, K. Brookhuis, W. van Winsum, L. Duynstee",
+     "stage0": false
+    },
+    {
+     "key": "10.1016/j.jsr.2017.02.016",
+     "title": "The relationship between cell phone use and management of driver fatigue: It's complicated.",
+     "year": 2017,
+     "doi": "10.1016/j.jsr.2017.02.016",
+     "journal": "Journal of Safety Research",
+     "authors": "D. Saxby, G. Matthews, Catherine Neubauer",
+     "stage0": false
+    },
+    {
+     "key": "10.29118/ipa.1936.225",
+     "title": "The Development of KBS Modeling to Assist Matrix Acidizing Treatment (A Preliminary Study of the Zelda B-7 Well)",
+     "year": 2002,
+     "doi": "10.29118/ipa.1936.225",
+     "journal": "",
+     "authors": "N. Ardian",
+     "stage0": false
+    },
+    {
+     "key": "10.3390/s25175589",
+     "title": "Research on Takeover Safety of Intelligent Vehicles Based on Accident Scenarios in Real-Vehicle Testing",
+     "year": 2025,
+     "doi": "10.3390/s25175589",
+     "journal": "Italian National Conference on Sensors",
+     "authors": "Ping-Fei Li, Meiling Zhou, Chang Xu, He’nan Li, Wenhao Hu, Zheng-Ping Tan",
+     "stage0": true
+    },
+    {
+     "key": "s2:f9c6f24417009a685b2e749a5e9c59b6f6378751",
+     "title": "An efficient reactive model for resource discovery in DHT-based peer-to-peer networks",
+     "year": 2006,
+     "doi": "",
+     "journal": "",
+     "authors": "J. Salter",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/00187208231168697",
+     "title": "Boring But Demanding: Using Secondary Tasks to Counter the Driver Vigilance Decrement for Partially Automated Driving",
+     "year": 2023,
+     "doi": "10.1177/00187208231168697",
+     "journal": "Hum. Factors",
+     "authors": "S. Mishler, Jing Chen",
+     "stage0": true
+    },
+    {
+     "key": "s2:fa5c0d74a8fc7a7acc0843f604ef6f19325b4f07",
+     "title": "Human factors issues for resolving adverse effects of human work underload and workload transitions in complex human-machine systems",
+     "year": 1995,
+     "doi": "",
+     "journal": "",
+     "authors": "T. G. Ryan",
+     "stage0": false
+    },
+    {
+     "key": "10.1109/icmlca66850.2025.11336592",
+     "title": "Human-Machine Interaction Design in Autonomous Driving Takeover: Research on Optimization Strategies Based on Stress and Situational Awareness",
+     "year": 2025,
+     "doi": "10.1109/ICMLCA66850.2025.11336592",
+     "journal": "2025 6th International Conference on Machine Learning and Computer Application (ICMLCA)",
+     "authors": "Meiling Xiao, Jiang-Tian Li, Pengxu Huang",
+     "stage0": true
+    },
+    {
+     "key": "s2:fbeca5ce00736a5e77a030d692fb6b7961205083",
+     "title": "Investigating the Immediate Effects of Periodic Alerts to Assist in Maintenance of Vigilance During Automated Vehicle Operation",
+     "year": 2007,
+     "doi": "",
+     "journal": "",
+     "authors": "Ben Dow, T. Brown, Cheryl A. Roe, Chris Schwarz, Zachary Bonefas, Jerry Duncan",
+     "stage0": true
+    },
+    {
+     "key": "10.2118/222895-ms",
+     "title": "Enhancing Electrical Submersible Pump Operations: Leveraging Data-Driven Models Using Advanced Machine Learning and IoT Technologies for Effective Event Management",
+     "year": 2024,
+     "doi": "10.2118/222895-ms",
+     "journal": "ADIPEC",
+     "authors": "Yousof Al Mansoori, M. A. Al Shamsi, M. Lotfy, J. Cardozo, R. Alzurba, I. Rivadeneira",
+     "stage0": true
+    },
+    {
+     "key": "10.54941/ahfe1007828",
+     "title": "The Role of Fatigue Risk Management Systems (FRMS) in the Implementation of Human -AI teaming in the Aviation Ecosystem.",
+     "year": 2026,
+     "doi": "10.54941/ahfe1007828",
+     "journal": "AHFE International",
+     "authors": "Debra Henneberry, Dimitrios Ziakkas, Eleftherios Bokas, Anastasios Plioutsias",
+     "stage0": true
+    },
+    {
+     "key": "10.21236/ada397096",
+     "title": "AUTOMATION EFFECTS ON A DRIVER'S VIGILANCE IN THE AUTOMATED HIGHWAY SYSTEM. VOLUME 1, FINAL REPORT",
+     "year": 1997,
+     "doi": "10.21236/ada397096",
+     "journal": "",
+     "authors": "J. Cameron, Anthony J Sottile",
+     "stage0": true
+    }
+   ]
+  },
+  {
+   "source": "Semantic Scholar",
+   "label": "S3",
+   "query": "(\"human oversight\" | \"human-in-the-loop\" | \"AI-assisted\" | \"decision support\") + (vigilance | \"passive fatigue\" | complacency) + (\"artificial intelligence\" | \"machine learning\")",
+   "status": "ok",
+   "total": 52,
+   "records": [
+    {
+     "key": "s2:050557b5a14bf91b62bf4884d069ce1fa25a96d8",
+     "title": "Expert systems and artificial intelligence in decision support systems : proceedings of the Second Mini Euroconference, Lunteren, The Netherlands, 17-20 November, 1985",
+     "year": 1987,
+     "doi": "",
+     "journal": "",
+     "authors": "Mini Euroconference, H. Sol, Cees A. Th. Takkenberg, P. F. de Vries Robbé",
+     "stage0": false
+    },
+    {
+     "key": "10.30574/wjarr.2025.26.3.2126",
+     "title": "AI ethics and responsible ai development: Navigating the rapid evolution of artificial intelligence",
+     "year": 2025,
+     "doi": "10.30574/wjarr.2025.26.3.2126",
+     "journal": "World Journal of Advanced Research and Reviews",
+     "authors": "Gautam Tripathi",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.lpm.2026.104372",
+     "title": "Ethical, legal, and regulatory challenges in AI-based healthcare tools.",
+     "year": 2026,
+     "doi": "10.1016/j.lpm.2026.104372",
+     "journal": "Presse medicale",
+     "authors": "A. Dompmartin, D. Haykal",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/s42438-024-00491-3",
+     "title": "Generative AI’s Family Portraits of Whiteness: A Postdigital Semiotic Case Study",
+     "year": 2024,
+     "doi": "10.1007/s42438-024-00491-3",
+     "journal": "Postdigital Science and Education",
+     "authors": "Zoe Hurley",
+     "stage0": false
+    },
+    {
+     "key": "10.4103/jpo.jpo_6_25",
+     "title": "From Code to Care: A Practical Framework for Ethical Artificial Intelligence Integration in Clinical Settings",
+     "year": 2026,
+     "doi": "10.4103/jpo.jpo_6_25",
+     "journal": "Journal of Precision Oncology",
+     "authors": "S. Manjappa",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fcvm.2026.1838415",
+     "title": "From assistance to autonomy: AI agent systems in cardiovascular medicine—a review of paradigms, architectures, and clinical translation",
+     "year": 2026,
+     "doi": "10.3389/fcvm.2026.1838415",
+     "journal": "Frontiers in Cardiovascular Medicine",
+     "authors": "Ye Chen, Xiaoqun Qin, Shouping Chen",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/cbi54897.2022.10049",
+     "title": "A Global System for Avalanche Risk Assessment",
+     "year": 2022,
+     "doi": "10.1109/CBI54897.2022.10049",
+     "journal": "Conference on Business Informatics",
+     "authors": "F. Pagnier, Frédéric Pourraz, Hervé Verjus, D. Coquin, G. Mauris",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fpsyt.2020.622506",
+     "title": "Psychiatric Advance Directives and Artificial Intelligence: A Conceptual Framework for Theoretical and Ethical Principles",
+     "year": 2021,
+     "doi": "10.3389/fpsyt.2020.622506",
+     "journal": "Frontiers in Psychiatry",
+     "authors": "S. Mouchabac, Vladimir Adrien, Clara Falala-Séchet, O. Bonnot, R. Maatoug, B. Millet",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/s44163-024-00121-8",
+     "title": "Balancing the scale: navigating ethical and practical challenges of artificial intelligence (AI) integration in legal practices",
+     "year": 2024,
+     "doi": "10.1007/s44163-024-00121-8",
+     "journal": "Discover Artificial Intelligence",
+     "authors": "Ammar Zafar",
+     "stage0": true
+    },
+    {
+     "key": "10.56201/ijssmr.vol.11no8.2025.pg565.608",
+     "title": "Human-In-The-Loop Decision Systems: Advances and Future Directions",
+     "year": 2026,
+     "doi": "10.56201/ijssmr.vol.11no8.2025.pg565.608",
+     "journal": "INTERNATIONAL JOURNAL OF SOCIAL SCIENCES AND MANAGEMENT RESEARCH",
+     "authors": "Ashore-Onisemo Funmilayo",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/cogsima.2019.8724175",
+     "title": "Knowledge Complacency and Decision Support Systems",
+     "year": 2019,
+     "doi": "10.1109/COGSIMA.2019.8724175",
+     "journal": "Conference on Cognitive and Computational Aspects of Situation Management",
+     "authors": "S. Rodriguez, J. O'Donovan, J. Schaffer, Tobias Höllerer",
+     "stage0": true
+    },
+    {
+     "key": "10.63946/ehdi/16894",
+     "title": "Behavioral Impacts of AI Reliance in Diagnostics: Balancing Automation with Skill Retention",
+     "year": 2025,
+     "doi": "10.63946/ehdi/16894",
+     "journal": "Epidemiology and Health Data Insights",
+     "authors": "Omolayo Sunday",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/978-3-319-90403-0_14",
+     "title": "Trust and Transparency in Machine Learning-Based Clinical Decision Support",
+     "year": 2018,
+     "doi": "10.1007/978-3-319-90403-0_14",
+     "journal": "Human and Machine Learning",
+     "authors": "C. Gretton",
+     "stage0": false
+    },
+    {
+     "key": "10.25259/jhre_4_2025",
+     "title": "Biomedical research publication in the age of artificial intelligence: Current prospects for balancing integrity and innovation",
+     "year": 2025,
+     "doi": "10.25259/jhre_4_2025",
+     "journal": "Journal of Healthcare Research and Education",
+     "authors": "V. Bains, U. Bhawal",
+     "stage0": true
+    },
+    {
+     "key": "10.47760/cognizance.2026.v06i01.001",
+     "title": "Generative AI as the 'Third Eye' of Academic Advising: Ethical, Pedagogical, and Methodological Perspectives in Research Supervision",
+     "year": 2026,
+     "doi": "10.47760/cognizance.2026.v06i01.001",
+     "journal": "Cognizance Journal of Multidisciplinary Studies",
+     "authors": "John Cliford Alvero",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.apergo.2024.104346",
+     "title": "Cognitive and behavioral markers for human detection error in AI-assisted bridge inspection.",
+     "year": 2024,
+     "doi": "10.1016/j.apergo.2024.104346",
+     "journal": "Applied Ergonomics",
+     "authors": "Fatemeh Dalilian, David A. Nembhard",
+     "stage0": true
+    },
+    {
+     "key": "10.1117/12.2559474",
+     "title": "Measuring complacency in humans interacting with autonomous agents in a multi-agent system",
+     "year": 2020,
+     "doi": "10.1117/12.2559474",
+     "journal": "Artificial Intelligence and Machine Learning for Multi-Domain Operations Applications II",
+     "authors": "S. Rodriguez, Jacqueline Chen, Harsh Deep, Jaewook Lee, Derrik E. Asher, Erin G. Zaroukian",
+     "stage0": true
+    },
+    {
+     "key": "10.1186/s12913-026-14950-z",
+     "title": "Patient and staff acceptability of an artificial intelligence software to prioritize chest X-rays in an NHS setting: a qualitative evaluation",
+     "year": 2026,
+     "doi": "10.1186/s12913-026-14950-z",
+     "journal": "BMC Health Services Research",
+     "authors": "Emma J. Steel, Sean F. Duncan, M. Hall, J. MacLay, David B. Stobo, B. Gregory",
+     "stage0": true
+    },
+    {
+     "key": "10.14738/assrj.1211.19642",
+     "title": "“Trust, but Verify”: A Reflexive Thematic Analysis of Human–AI Interaction",
+     "year": 2025,
+     "doi": "10.14738/assrj.1211.19642",
+     "journal": "Advances in Social Sciences Research Journal",
+     "authors": "Mohammad Khan, Christopher Fong, Shilpi Tripathi",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fdgth.2026.1831150",
+     "title": "Integrating clinical decision support systems, nursing vigilance, and physician prescribing patterns to reduce preventable adverse drug events: a structured evidence-based narrative review on human-AI interface in medication safety",
+     "year": 2026,
+     "doi": "10.3389/fdgth.2026.1831150",
+     "journal": "Frontiers in Digital Health",
+     "authors": "M. Alruwaili, Ugwu Okechukwu Paul-Chima, Ugwu Chinyere Nneoma",
+     "stage0": true
+    },
+    {
+     "key": "10.1177/10711813251370724",
+     "title": "Designing for Artificial Intelligence in High-Risk Domains: A Case Study",
+     "year": 2025,
+     "doi": "10.1177/10711813251370724",
+     "journal": "Proceedings of the Human Factors and Ergonomics Society Annual Meeting",
+     "authors": "Tanay Arora",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/socsci15090577",
+     "title": "Legal Literacy, AI Risk Perception, and Digital Safety in UAE Universities: Testing a Trust-Calibrated Vigilance Model",
+     "year": 2026,
+     "doi": "10.3390/socsci15090577",
+     "journal": "The social science",
+     "authors": "Abdesselam Salmi, M. Mekheimer, Kayaty Ashour",
+     "stage0": true
+    },
+    {
+     "key": "10.1097/ta.0000000000004973",
+     "title": "Artificial intelligence for battlefield triage in large-scale combat operations: Opportunities, limits, and ethical considerations",
+     "year": 2026,
+     "doi": "10.1097/TA.0000000000004973",
+     "journal": "Journal of Trauma and Acute Care Surgery",
+     "authors": "Q. Mathais, P. Cungi, Antoine Lamblin, Olivier Dubourg, J. Bordes, Salah Boussen",
+     "stage0": true
+    },
+    {
+     "key": "10.4043/36918-ms",
+     "title": "Human Factors in Offshore Small Modular Reactors: A Review with Respect to Ambient Intelligence and Autonomous Systems Design and Operation",
+     "year": 2026,
+     "doi": "10.4043/36918-ms",
+     "journal": "Offshore Technology Conference",
+     "authors": "P. G. Fatolitis",
+     "stage0": true
+    },
+    {
+     "key": "10.32591/coas.ojls.0801.02013e",
+     "title": "Ethical Legal Practice and the Integration of AI into Legal Profession: Striking the Balance",
+     "year": 2025,
+     "doi": "10.32591/coas.ojls.0801.02013e",
+     "journal": "Open Journal for Legal Studies",
+     "authors": "U. Ehirim",
+     "stage0": true
+    },
+    {
+     "key": "10.1051/e3sconf/202131901089",
+     "title": "Health Vigilance for Medical Imaging Diagnostic Optimization: Automated segmentation of COVID-19 lung infection from CT images",
+     "year": 2021,
+     "doi": "10.1051/e3sconf/202131901089",
+     "journal": "E3S Web of Conferences",
+     "authors": "Chala Mohamed, B. Nsiri, Soulaymani Abdelmajid, Mokhtari Abdelghani, Benaji Brahim",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/s00330-025-11426-2",
+     "title": "Figure plagiarism and manipulation, an under-recognised problem in academia",
+     "year": 2025,
+     "doi": "10.1007/s00330-025-11426-2",
+     "journal": "European Radiology",
+     "authors": "T. Saliba, D. Rotzinger",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/16094069261431990",
+     "title": "Navigating the Rise of Artificial Intelligence and Imposter Participants in Qualitative Health Research",
+     "year": 2026,
+     "doi": "10.1177/16094069261431990",
+     "journal": "International Journal of Qualitative Methods",
+     "authors": "Sam Quinn, Naomi Richards, Joanne Williams, Caroline Mogan, Michelle Myall, Mari Lloyd-Williams",
+     "stage0": true
+    },
+    {
+     "key": "10.64898/2026.07.22.26358705",
+     "title": "Localizing epileptogenic zones using interictal intracranial electroencephalography and deep learning",
+     "year": 2026,
+     "doi": "10.64898/2026.07.22.26358705",
+     "journal": "medRxiv",
+     "authors": "Z. Qiang, F. Okoroafor, R. Piper, D. Velanoski, F. Moeller, G. Cooray",
+     "stage0": true
+    },
+    {
+     "key": "10.17749/2070-4909/farmakoekonomika.2026.403",
+     "title": "Challenges in the diagnosis of malignant skin neoplasms using artificial intelligence software and approaches to their resolution on the example of Derma Onko Melanoma Check software",
+     "year": 2026,
+     "doi": "10.17749/2070-4909/farmakoekonomika.2026.403",
+     "journal": "FARMAKOEKONOMIKA. Modern Pharmacoeconomics and Pharmacoepidemiology",
+     "authors": "D. Korabelnikov, A. Lamotkin",
+     "stage0": true
+    },
+    {
+     "key": "10.32628/cseit25113577",
+     "title": "Ethical Challenges in AI-Driven Cybersecurity Decision-Making",
+     "year": 2024,
+     "doi": "10.32628/cseit25113577",
+     "journal": "International Journal of Scientific Research in Computer Science Engineering and Information Technology",
+     "authors": "Emmanuel Cadet, Edima David Etim, Iboro Akpan Essien, Joshua Oluwagbenga Ajayi, Eseoghene Daniel Erigha",
+     "stage0": true
+    },
+    {
+     "key": "10.1017/glj.2026.10181",
+     "title": "Artificial Intelligence in Court Proceedings: Judge’s Little Helper or the Beginning of AI’s Hostile Takeover?",
+     "year": 2025,
+     "doi": "10.1017/glj.2026.10181",
+     "journal": "German Law Journal",
+     "authors": "Elisabeth Paar",
+     "stage0": true
+    },
+    {
+     "key": "10.64946/aiantiquity.v2i1.editorial",
+     "title": "When References Mislead: Verification, AI Attribution, and Academic Bullying in Scholarly Evaluation",
+     "year": 2026,
+     "doi": "10.64946/aiantiquity.v2i1.editorial",
+     "journal": "AI &amp; Antiquity",
+     "authors": "Carlos Heredia Chimeno",
+     "stage0": true
+    },
+    {
+     "key": "10.48550/arxiv.2602.18456",
+     "title": "Beyond single-channel agentic benchmarking",
+     "year": 2026,
+     "doi": "10.48550/arXiv.2602.18456",
+     "journal": "arXiv.org",
+     "authors": "Nelu D. Radpour",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/access.2025.3550378",
+     "title": "Leveraging Cyberattack News Tweets for Advanced Threat Detection and Classification Using Ensemble of Deep Learning Models With Wolverine Optimization Algorithm",
+     "year": 2025,
+     "doi": "10.1109/ACCESS.2025.3550378",
+     "journal": "IEEE Access",
+     "authors": "S. N. Ramesh, Bader Mohammed M. Al Fardan, C. Anupama, Kollati Vijaya Kumar, Seongsoo Cho, S. Acharya",
+     "stage0": true
+    },
+    {
+     "key": "10.52783/jisem.v9i4s.15050",
+     "title": "THE AI WORKFORCE PROBLEM: Decision Architecture and Governance Frameworks for Large-Scale Human AI Collaboration in Enterprise Consulting",
+     "year": 2024,
+     "doi": "10.52783/jisem.v9i4s.15050",
+     "journal": "Journal of Information Systems Engineering & Management",
+     "authors": "Karan Dhir",
+     "stage0": true
+    },
+    {
+     "key": "10.1016/j.soin.2026.03.004",
+     "title": "[Ethics and human safeguards in AI for healthcare].",
+     "year": 2026,
+     "doi": "10.1016/j.soin.2026.03.004",
+     "journal": "Soins",
+     "authors": "Lucie Alleaume, Clara Personat",
+     "stage0": true
+    },
+    {
+     "key": "10.55248/gengpi.07.0926.2712",
+     "title": "Agentic Artificial Intelligence in Business Decision-Making: A Framework for Human–AI Collaborative Governance and Strategic Value Creation",
+     "year": 2026,
+     "doi": "10.55248/gengpi.07.0926.2712",
+     "journal": "International Journal of Research Publication and Reviews",
+     "authors": "P. Amutha, M. Bhuvaneswari",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/computers13070165",
+     "title": "Automation Bias and Complacency in Security Operation Centers",
+     "year": 2024,
+     "doi": "10.3390/computers13070165",
+     "journal": "De Computis",
+     "authors": "J. Tilbury, Stephen V. Flowerday",
+     "stage0": true
+    },
+    {
+     "key": "10.7759/cureus.111026",
+     "title": "Precision Nursing Device Management and Artificial Intelligence-Integrated Early Warning Systems for Central Nervous System Infections in the Neurocritical Care Unit: A Scoping Review",
+     "year": 2026,
+     "doi": "10.7759/cureus.111026",
+     "journal": "Cureus",
+     "authors": "Youtian Zhou, Hong Xie, Meirong Hu, Gao-Quan Luo",
+     "stage0": true
+    },
+    {
+     "key": "10.1109/access.2026.3692425",
+     "title": "Artificial Intelligence in Organizations: A Systematic Review of Operationalizing Generative Artificial Intelligence Capabilities for Organizational Performance",
+     "year": 2026,
+     "doi": "10.1109/ACCESS.2026.3692425",
+     "journal": "IEEE Access",
+     "authors": "Badr Machkour, Ahmed Abriane",
+     "stage0": true
+    },
+    {
+     "key": "10.17721/ists.2024.8.42-48",
+     "title": "ARTIFICIAL INTELLIGENCE SYSTEMS IN CYBER SECURITY AND THEIR CAPABILITIESFRONT MODERN CYBER THREATS",
+     "year": 2024,
+     "doi": "10.17721/ists.2024.8.42-48",
+     "journal": "Information systems and technologies security",
+     "authors": "Serhii Dakov, D. Mankovskyi, I. Bilokon",
+     "stage0": true
+    },
+    {
+     "key": "10.1308/rcsann.2025.0110",
+     "title": "Ethical and legal challenges of integrating artificial intelligence into paediatric surgery.",
+     "year": 2026,
+     "doi": "10.1308/rcsann.2025.0110",
+     "journal": "Annals of the Royal College of Surgeons of England",
+     "authors": "A. Anand, C. Sinha",
+     "stage0": true
+    },
+    {
+     "key": "10.3389/fpsyg.2026.1900940",
+     "title": "The numb efficiency paradox: AI work pressure, affective numbing, and professional judgment in organizationally digitally mediated work",
+     "year": 2026,
+     "doi": "10.3389/fpsyg.2026.1900940",
+     "journal": "Frontiers in Psychology",
+     "authors": "Shi-Yao Yin, Wen-Xuan Hu, Zi-Rong Tian, Yi-Fan Zhang",
+     "stage0": true
+    },
+    {
+     "key": "10.11648/j.ajai.20250901.17",
+     "title": "Clinical Research and Artificial Intelligence: How AI Is Changing Clinical Research",
+     "year": 2025,
+     "doi": "10.11648/j.ajai.20250901.17",
+     "journal": "American Journal of Artificial Intelligence",
+     "authors": "Zomana Majid, M. Islam",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/biomedinformatics5040065",
+     "title": "The Role of Artificial Intelligence in Pharmacy Practice and Patient Care: Innovations and Implications",
+     "year": 2025,
+     "doi": "10.3390/biomedinformatics5040065",
+     "journal": "BioMedInformatics",
+     "authors": "Aftab Alam, Syed Sikandar Shah, S. A. Rabbani, M. El-Tanani",
+     "stage0": true
+    },
+    {
+     "key": "10.2196/85666",
+     "title": "Exploring Ambient Artificial Intelligence to Enhance Learning and Feedback During Operating Room-to-Intensive Care Unit Handoffs: Co-Design and Simulation Study",
+     "year": 2025,
+     "doi": "10.2196/85666",
+     "journal": "JMIR Medical Education",
+     "authors": "Laleh Jalilian, F. Barra, Tristan Grogan, Jason Lee, Achuta Kadambi",
+     "stage0": true
+    },
+    {
+     "key": "10.3390/pr14142334",
+     "title": "Digital Twins and Artificial Intelligence for HAZOP Enhancement in Process Safety: A Critical Literature Review",
+     "year": 2026,
+     "doi": "10.3390/pr14142334",
+     "journal": "Processes",
+     "authors": "F. Alrowaie",
+     "stage0": true
+    },
+    {
+     "key": "10.1007/s11606-026-10767-y",
+     "title": "Promoting Fairness in AI Implementation.",
+     "year": 2026,
+     "doi": "10.1007/s11606-026-10767-y",
+     "journal": "Journal of general internal medicine",
+     "authors": "Kellie Owens, Maggie Ramatowski, Saul Blecker",
+     "stage0": false
+    },
+    {
+     "key": "10.1177/10711813251358771",
+     "title": "Evaluating the Effects of Consequences of Error on Trust in AI-Aided Task: An Eye Tracking Study",
+     "year": 2025,
+     "doi": "10.1177/10711813251358771",
+     "journal": "",
+     "authors": "J. Kim, Catherine Kautz, Xi Jessie Yang",
+     "stage0": false
+    },
+    {
+     "key": "10.1093/jamia/ocaf123",
+     "title": "Artificial intelligence and computer-aided diagnosis in diagnostic decisions: 5 questions for medical informatics and human-computer interface research",
+     "year": 2025,
+     "doi": "10.1093/jamia/ocaf123",
+     "journal": "J. Am. Medical Informatics Assoc.",
+     "authors": "Tad T. Brunyé, Stephen R. Mitroff, Joann G. Elmore",
+     "stage0": true
+    },
+    {
+     "key": "10.54941/ahfe1007828",
+     "title": "The Role of Fatigue Risk Management Systems (FRMS) in the Implementation of Human -AI teaming in the Aviation Ecosystem.",
+     "year": 2026,
+     "doi": "10.54941/ahfe1007828",
+     "journal": "AHFE International",
+     "authors": "Debra Henneberry, Dimitrios Ziakkas, Eleftherios Bokas, Anastasios Plioutsias",
+     "stage0": true
+    }
+   ]
+  }
+ ]
+}
