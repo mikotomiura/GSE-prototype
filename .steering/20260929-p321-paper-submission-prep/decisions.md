@@ -219,3 +219,10 @@
 - **security-checker・test-runner は回していない**: GSE 側の差分（`origin/main` から 11 ファイル）は `.steering/` と台帳だけで、コード・外部入力・認証・データ保存に関わる変更が無い。論文用リポジトリの全履歴は公開前に security-checker で検査済み（判断 11）で、その後のコミットはコミットごとに私が同じ観点で検査した（判断 13 の A）。schema parity は skip（schema に触れていない）。
 - **Research Square のメール**（2026-09-29・RSID rs-1120754）: 投稿時に了承した本人だけのダッシュボードの案内と、そこから Research Square にプレプリントを載せられる、という案内。→ **何もしない**（研究者に伝えた）。Research Square へのプレプリントは、カバーレターで arXiv と書いたので今は載せない。⚠️ arXiv の endorsement が取れない場合の代わりの道になる（endorsement が要らない）→ その時に研究者が決める（引き継ぎ §2 A）。
 
+## 判断 17: 次のセッションは arXiv。下書きまで Claude、送信から研究者（2026-09-29・研究者の指示）
+
+- 研究者の逐語: 「次セッションからはARXIVに移ろうか.Draftまでは進めれるかな？後半のpublishから研究者にお願いする感じにして」。
+- **分担**: Claude = 規程の確かめ直し・ソースの一式（21 頁の版・cls と bst・`.bbl`）・研究者がログインしたタブ（このセッションのタブグループ）での新しい投稿の作成・ファイルの上げ込み・arXiv 側の組版のログと Preview の確認・メタデータの入力（それぞれ研究者に確かめてから）。研究者 = ログイン（パスワード）・ライセンスの確定（CC BY 4.0・版ごとに後から変えられない）・最後の Submit・endorsement の依頼。
+- 一次で確かめた arXiv の規程（`submit_tex.html`・逐語）: "We do not have your style files or macros" ／ "Do not submit in double-spaced "referee" mode" ／ "Include .bib or .bbl files if you use BibTeX/Biber" ／ "arXiv offers currently TeX Live 2023 and 2025 (the default)"。未確認: endorsement が無い状態で下書きをどこまで作れるか・2 つ目の `.tex` の扱い・cls の同梱の可否（配布条件の一文）→ 次のセッションの A-0。
+- 引き継ぎ: `.steering/_handoff/next-session-p321-arxiv-and-review.md` §2 A。
+
