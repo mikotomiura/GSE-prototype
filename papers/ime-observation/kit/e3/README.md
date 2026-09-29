@@ -69,17 +69,16 @@ SHA-256 of the measured executable (`unknown` if it cannot be read; the path is 
 
 ## The process name on macOS
 
-macOS keeps only the first 16 characters of a process name, and `pgrep -x` compares the kept name. The
-22-character name `ime-observation-logger` would therefore not match. On macOS `run_e3.sh` uses the first 16
-characters, `ime-observation-`, when `E3_PROC` is not set, and cuts a longer `E3_PROC` to 16 characters with a
-warning. Before the first run, start the observer and look at the name the system reports:
+On macOS `pgrep -x` compares the full executable name, so the 22-character name `ime-observation-logger`
+matches; only the COMMAND column of `top` shows the first 16 characters. `run_e3.sh` uses the full name when
+`E3_PROC` is not set. Before the first run, start the observer and look at the name the system reports:
 
 ```
 ps -c -o comm= -p <pid>
 ```
 
-If it differs from what `E3_PROC` will be, set `E3_PROC` to the printed name. The 16-character prefix must
-identify the observer alone; `run_e3.sh` counts the processes of that name before the run (see below).
+If it differs from what `E3_PROC` will be, set `E3_PROC` to the printed name. The name must identify the
+observer alone; `run_e3.sh` counts the processes of that name before the run (see below).
 
 ## Battery is not measured
 

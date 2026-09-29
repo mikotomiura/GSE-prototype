@@ -48,14 +48,14 @@ line contains `E3_PROC` and every removed line is the process-name line.
 
 ## Not verified here
 
-- The process-name match of `pgrep -x` on macOS for a 22-character name (`ime-observation-logger`) has NOT
-  been checked on a Mac; check it on the Mac. Darwin keeps 16 characters of a process name (`p_comm`,
-  `MAXCOMLEN`) and BSD `pgrep -x` compares the kept name, so a 22-character name very probably does not
-  match. This is handled in `run_e3.sh` (not in the sampler's executable lines, which stay as in the
-  original): on Darwin an unset `E3_PROC` defaults to the first 16 characters (`ime-observation-`) and a longer
-  one is cut to 16 with a warning; the README gives `ps -c -o comm= -p <pid>` to see the real name. A
-  `pgrep -f` fix is not taken: it matches the full command line and so can match other processes (an editor
-  that has the name in its arguments, the sampler itself). A shorter binary name would also work but changes
-  the observer (out of scope).
+- The process-name match of `pgrep -x` on macOS was first handled on an unchecked assumption (Darwin keeps
+  16 characters of a process name, so a 22-character name would not match; `run_e3.sh` defaulted to the
+  first 16 characters and cut a longer `E3_PROC`). Checked on a Mac on 2026-09-30 (macOS 27.0, the release
+  build of the observer): `ps -c -o comm=` prints the full 22-character name, `pgrep -x
+  ime-observation-logger` matches, and `pgrep -x ime-observation-` (with or without `-u <uid>`) matches
+  nothing; only the COMMAND column of `top -l 1 -pid` shows the first 16 characters. The assumption was
+  wrong and made the macOS run find no process, so `run_e3.sh` now uses the full name on both systems and
+  does not cut `E3_PROC`. A `pgrep -f` fix is still not taken: it matches the full command line and so can
+  match other processes (an editor that has the name in its arguments, the sampler itself).
 - `calibrate-cpu.sh` and the macOS sampler were not run on a Mac in this issue (the loop ran on Windows).
   The Windows sampler and `run_e3.sh` were run against an absent process only (all rows zero, `not measured`).

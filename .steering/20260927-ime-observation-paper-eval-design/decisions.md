@@ -480,3 +480,10 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - 事象: 020 の直しの後、`pipeline.py --selftest` が G-GEAR で約 56 秒（入口 `kit/check.sh` の目安 30 秒を超える）。ケースごとに測ると特定の 1 本ではなく分散していて（凍結の門 13.9 秒ほか）、書いた直後のファイルの読み込みが 1 回 60〜80 ms かかることが主因（Windows）。全 acceptance とループの verify が毎回回す。
 - 採用: 既定の `--selftest` は各門の代表の変種（陽性 1 つと主な陰性）だけにし（約 17 秒）、全変種は `--selftest --full`（約 29 秒）に回す（入口の規則「重い検査は `--full` へ」）。★ 既定で落とす前の変異 4 本（印の可視行の判定を素通し・`sha256` の照合を外す・gated の 0 行の判定を外す・JSON の復号を外す）がすべて**既定の selftest で赤**になることを確かめた（作業用エージェントとメインの両方）。selftest の間だけ、変わっていないファイルの読み込みを 1 回にするキャッシュ（鍵はパス・更新時刻・大きさ・inode、書いてから 0.3 秒未満のファイルは使わない、`lstat` の検査は毎回）を入れた。本番の解析では無効（`selftest()` が設定し `finally` で戻す）。
 - ⚠️ merge ゲートでは `--selftest --full` も回す（2026-09-30 は緑・30 秒）。
+
+## 判断 66: macOS の E3 のプロセス名は切り詰めず完全な名前で照合する（判断 64 の前提の訂正・2026-09-30・研究者の回答）
+
+- 事象: 判断 64 の直しは「Darwin の `p_comm` は 16 文字・`pgrep -x` は切れた名前と照合する見込み」を未確認の前提として、`run_e3.sh` の macOS の既定を `ime-observation-` にし、長い `E3_PROC` を 16 文字に切っていた。
+- 実測（Mac・macOS 27.0・単体ロガーの release ビルドを起動）: `ps -c -o comm= -p <pid>` = `ime-observation-logger`（22 文字）／`pgrep -x ime-observation-logger` は一致／`pgrep -x ime-observation-`（`-u <uid>` の有無とも）は一致なし／16 文字に切れるのは `top -l 1 -pid` の COMMAND 列だけ。→ ★ 前提が外れており、直す前の `run_e3.sh idle` は「found 0」で止まる（直す前の版で実測・対照）。
+- 採用: `run_e3.sh` の既定を両 OS とも `ime-observation-logger` にし、16 文字への切り詰めを外した。README の該当節と `PROVENANCE.internal.md` の「Not verified here」を実測に合わせた。`pgrep -f` を採らない理由（判断 64 のとき）は変わらない。
+- 確認: ロガーを動かした状態で直した `run_e3.sh idle 8 2 <dir>` が exit 0・「processes named ime-observation-logger before the run: 1」・`samples.tsv` に実際の値（CPU 0.17%・RSS 4897 KB）。直す前の版は同条件で exit 3。

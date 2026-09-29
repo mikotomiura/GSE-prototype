@@ -13,9 +13,7 @@
 #             long plan, not a repetition that starts the observer again).
 #
 # This script samples the process named by E3_PROC (default: ime-observation-logger; on Windows without the
-# .exe suffix; on macOS the default and any longer name are cut to the first 16 characters, because the
-# system keeps only that many characters of a process name). The name may contain letters, digits, dot,
-# underscore and hyphen. A running process of that name is counted before the run; the count must be exactly
+# .exe suffix). The name may contain letters, digits, dot, underscore and hyphen. A running process of that name is counted before the run; the count must be exactly
 # one for idle and zero for working. A duplicate that appears during the run is not detected.
 # Rows taken while the process is absent carry zero in every column and are left out by the summary.
 #
@@ -56,18 +54,10 @@ case "$(uname -s)" in
   *) echo "run_e3.sh: unsupported system: $(uname -s) (macOS and Windows only)" >&2; exit 2 ;;
 esac
 
-# The process name. macOS keeps 16 characters of a process name (MAXCOMLEN) and `pgrep -x` compares the
-# kept name, so a longer name never matches.
-if [ "${OS}" = "macos" ]; then
-  E3_PROC="${E3_PROC:-ime-observation-}"
-else
-  E3_PROC="${E3_PROC:-ime-observation-logger}"
-fi
+# The process name. On macOS `pgrep -x` compares the full executable name (22 characters here), not a
+# 16-character prefix; only the COMMAND column of `top` is cut to 16 characters.
+E3_PROC="${E3_PROC:-ime-observation-logger}"
 case "${E3_PROC}" in ''|-*|*[!A-Za-z0-9._-]*) usage ;; esac
-if [ "${OS}" = "macos" ] && [ "${#E3_PROC}" -gt 16 ]; then
-  E3_PROC="${E3_PROC:0:16}"
-  echo "warning: macOS keeps 16 characters of a process name; sampling the name cut to: ${E3_PROC}" >&2
-fi
 export E3_PROC
 
 # Optional executable path, used only to hash the file.

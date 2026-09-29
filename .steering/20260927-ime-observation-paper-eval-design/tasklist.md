@@ -54,7 +54,9 @@
     - [x] clean な checkout で acceptance 失敗 0 件（020 ✅ 28 / 023 ✅ 27）。レビュー 4 本（code-reviewer 2・security-checker 2）→ 判断 62〜64 を研究者に問い確定（セルの `label`〔006 の追補 `1c4b025e`〕・凍結の門・E3 は 8 時間）
     - [x] 直しを作業用エージェント（Sonnet）に渡し、メインが clean な checkout で acceptance を回し直し、写しへの変異で確かめてから merge（023: 4 本 / 020: 4 本がすべて赤 → 023 `038645a8` / 020 `82a74e22`）。020 の selftest は 56 秒 → 既定 17 秒と `--full` 29 秒に分けた
     - [x] merge 後の base（`82a74e22`）の clean な checkout で全 acceptance 21 本（G-GEAR で回るもの）が失敗 0 件・`_style_check.py` 違反 0 件 → push → 片付け（2026-09-30）
-    - [ ] ⚠️ Mac: `emit.py`（判断 59）を変えたので `004-acceptance.sh` を回し直す・E3 のプロセス名が 16 文字で切れるか（`ps -c -o comm= -p <pid>`）を確かめる（判断 64）
+    - [x] ⚠️ Mac: `emit.py`（判断 59）を変えたので `004-acceptance.sh` を回し直す・E3 のプロセス名が 16 文字で切れるか（`ps -c -o comm= -p <pid>`）を確かめる（判断 64）
+      → 2026-09-30（Mac・macOS 27.0・Python 3.14.4）: base `44241f49` の clean な worktree で、Mac で回せる merge 済みの全 acceptance 19 本（001 002 003 004 006 007 010 011 012 015〜023 028）が失敗 0 件（005 は exit 2 ＝対象外）。`emit.py --selftest --full` exit 0（49 件 ok・遅れの 95 パーセンタイル 0.01 ms）・`run_cell.py --selftest` exit 0（ok 51 件・★「a child that ignores the termination request is killed」も Mac では ok で実際に走った）・`pipeline.py --selftest --full` exit 0（9 ケース・Mac では 4 秒）・`summarize_e3.py --selftest` exit 0
+      → ⚠️ E3 のプロセス名は**前提が外れた**（`pgrep -x` は 22 文字の完全な名前で照合する）→ 判断 66 で `run_e3.sh` を完全な名前に直し、023 の acceptance を回し直した
   - [ ] W6（024: 公開 repo への書き出し）。★ 着手の前に研究者に確認する
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
