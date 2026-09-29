@@ -1,0 +1,35 @@
+{
+  "os": "macos",
+  "ime": "macOS Japanese (Hiragana) - version to be filled in from the machine",
+  "ime_settings": {
+    "layout": "US keyboard, Romaji input",
+    "predictive_candidates": "off",
+    "learning": "reset by reset_cmd before each block"
+  },
+  "refinput_cmd": [
+    "papers/ime-observation/kit/refinput-macos/.build/refinput-macos",
+    "--out",
+    "{out}"
+  ],
+  "logger_cmd": [
+    "papers/ime-observation/kit/logger/target/release/ime-observation-logger",
+    "--out",
+    "{out}"
+  ],
+  "reset_cmd": [
+    "echo",
+    "placeholder: replace with the command that clears the input method's dictionary and learning"
+  ],
+  "focus_cmd": [
+    "osascript",
+    "-e",
+    "tell application \"System Events\" to set frontmost of first process whose name is \"refinput-macos\" to true"
+  ],
+  "ready_wait_ms": 3000,
+  "backend": "macos",
+  "backend_opts": {
+    "focus_app": "placeholder.bundle.id.of.the.reference.input.field"
+  },
+  "clock_sync_disabled": false,
+  "auto_update_disabled": false
+}
