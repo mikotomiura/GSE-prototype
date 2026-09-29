@@ -1,5 +1,6 @@
 # 次セッション（Mac）— IME 論文: G-GEAR で merge した W3 の残り・W5 と、直した `emit.py` を Mac で確かめる
 
+> ✅ **2026-09-30: §0 / §1c の確認は完了**（Mac で全 acceptance 19 本が緑・E3 のプロセス名は判断 66 で直した・`e1744b98`〜`2c3a2781`）。G-GEAR で取り込み済み。**次の Mac の作業は未定**（W6 は G-GEAR: `next-session-ime-paper-ggear-w6.md`）。このメモの §0 を再び打ち込まない。
 > 作成: 2026-09-29。**2026-09-30 に §0 を書き換えた**: 前回の §0（`emit.py` の判断 52 / 53 の確認）は Mac で済んでいる（`36dd894e`）。今回やることは §1c の確認だけ（ループは回さない）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（判断 55〜65）・`blockers.md`（B10〜B12）・`tasklist.md`。状態は着手時に測り直す。
 > ⚠️ G-GEAR 側は別の handoff: `.steering/_handoff/next-session-ime-paper-ggear-w6.md`（G-GEAR の次は W6 = 024）。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。

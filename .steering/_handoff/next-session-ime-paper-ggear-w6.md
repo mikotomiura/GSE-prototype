@@ -2,14 +2,15 @@
 
 > 作成: 2026-09-30（W3 の残り 005 / 006 と W5 の 020 / 023 を merge したセッションの最後に・研究者の指示「コンテキスト的に次セッションで回す」）。前の G-GEAR 用 handoff（`next-session-ime-paper-ggear-w5.md`）の後継。前のものは読まなくてよい。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `_issue-plan.md`（§2 波・§5 マイルストーン）・`issues/024.md`・`decisions.md`（判断 1〜65）・`blockers.md`（B1〜B12）・`tasklist.md`。状態は着手時に測り直す。
-> ⚠️ Mac 側は別の handoff: `.steering/_handoff/next-session-ime-paper-mac.md`（`emit.py` の再確認・E3 のプロセス名）。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。
+> ★ **2026-09-30 03:4x 更新**: Mac の確認（`next-session-ime-paper-mac.md` の §0）は済んだ（Mac の push `e1744b98`〜`2c3a2781` を G-GEAR で取り込み・§1b）。**Mac 側に残りの作業は無い**。W6 は G-GEAR で回す。
+> ★ 両方の機械が同じ base に push するので、push の前に `git fetch` で相手の push を読み、`git pull --no-rebase` で取り込む（force しない）。
 
 ## §0 打ち込む用（G-GEAR で・`/clear` の直後に）
 
 ```
 .steering/_handoff/next-session-ime-paper-ggear-w6.md を読んで、IME 論文の評価一式の W6（issue 024 公開 repo への書き出し）を G-GEAR で進めてください。
-まず §1 の状態を測り直し（base feature/ime-eval-kit を origin から pull・§1 の「W5 の後の全 acceptance」が済んでいるか）、§2 の未決（024 の秘匿の検査と、merge 済みの公開物の架空のパスの衝突）を AskUserQuestion で研究者に聞いてから、024 の issue を直してループを回し、merge ゲートを通す。
-一次資料: .steering/20260927-ime-observation-paper-eval-design/ の _issue-plan.md・issues/024.md・decisions.md（判断 36 / 42 / 43 / 55〜65）・blockers.md（B1〜B12）。
+まず §1 の状態を測り直し（base feature/ime-eval-kit を origin から pull して 2c3a2781 以降であること・Mac から新しい push があれば先に読む）、§2 の未決（024 の秘匿の検査と、merge 済みの公開物の架空のパスの衝突）を AskUserQuestion で研究者に聞いてから、024 の issue を直してループを回し、merge ゲートを通す。
+一次資料: .steering/20260927-ime-observation-paper-eval-design/ の _issue-plan.md・issues/024.md・decisions.md（判断 36 / 42 / 43 / 55〜66）・blockers.md（B1〜B12）。
 ⚠️ 実行の前に docs/loop-engineering.md を Read する。Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は日本語。研究者の判断が要ることは AskUserQuestion で聞く。
 コミットは git add パス指定（-A 禁止）。main への merge はしない（W6 の後・研究者の判断）。新しい公開 repo を作らない・push しない・DOI を取らない（M12 は研究者）。
 ```
@@ -18,11 +19,15 @@
 
 - base `feature/ime-eval-kit`: 005（`9098e1ee`）・006（`5668dccd`）・023（`038645a8`）・020（`82a74e22`）を merge 済み。追補: FORMATS の reset 行の条件（001・`08541088`）・`emit.py` の送出の基準（004・判断 59・`96a19df6`）・セルの `label`（006・判断 62・`1c4b025e`）・`.gitattributes` の `experiment/` の `eol=lf`（判断 63）。
   - ✅ **merge 後の base（`82a74e22`）の clean な checkout で全 acceptance 24 本を回した**（2026-09-30）: G-GEAR で回る 21 本がすべて失敗 0 件（macOS 専用の 004 / 007 / 012 は exit 2 ＝対象外）・`_style_check.py papers/ime-observation` 違反 0 件 → push 済み。
+- ★ **§1b Mac の確認（2026-09-30・Mac が実施して push）**:
+  - Mac（macOS 27.0・Python 3.14.4）で base `44241f49` の clean な worktree から、Mac で回せる merge 済みの全 acceptance 19 本（001 002 003 004 006 007 010 011 012 015〜023 028）が失敗 0 件。`emit.py --selftest --full`（判断 59 の直しを含む・49 件 ok）・`run_cell.py --selftest`（G-GEAR では飛んでいた POSIX 専用の「a child that ignores the termination request is killed」も Mac で ok）・`pipeline.py --selftest --full`（Mac では 4 秒）・`summarize_e3.py --selftest` も緑。→ ★ **005 / 006 / 020 / 023 と判断 59 の `emit.py` は両 OS で緑**。
+  - ⚠️ **判断 64 の前提（macOS のプロセス名は 16 文字で切れる）が外れた** → **判断 66**: Mac の実測で `pgrep -x` は 22 文字の完全な名前 `ime-observation-logger` で一致し、`ime-observation-`（16 文字）では一致しない（16 文字に切れるのは `top` の COMMAND 列だけ）。`kit/e3/run_e3.sh` の既定を両 OS とも完全な名前にし、切り詰めを外した（`e1744b98`）。Mac で `/cross-review` を回して指摘を反映（`4b63384b`）・Codex の予算を記帳（`2c3a2781`）。
+  - G-GEAR で取り込んだ後（`2c3a2781`）、clean な checkout で `023-acceptance.sh` が失敗 0 件（Windows・2026-09-30）。`run_e3.sh` の変更は macOS の分岐を外しただけで、Windows の既定は変わらない。
 - 残りの issue: **024**（W6・依存 020 は merge 済み・`issue_done` は G-GEAR の events にある）。任意の 025 / 026 / 027 は `## Status: blocked`。
 - ★ ループ外の段取り（研究者と人の仕事・`_issue-plan.md` §5）: M0（コーパス）→ M1（macOS の較正パイロット）→ M2 → M3（事前登録の凍結）… 。W6 の後に main への merge を研究者が判断する。
 - 公開物の書き方（判断 36 / 42 / 43）: `papers/ime-observation/` は学術的な英語・GSE への言及なし・内部の番号（decision / issue / judgment・M0〜M13）なし・写した元との関係の語なし・★ ⚠ なし。各 acceptance の最後の `style_ok` が見る。出どころは `*.internal.md` と manifest の `upstream_*` の欄だけ（024 が落とす）。
 - このセッションの裁定の要点（判断 55〜65。詳細は decisions.md）:
-  - 55 実キーの前面の確認は runner（`run_cell.py`）がバックエンドの `focus_back` で・Windows のバックエンドは押下ごとに照合 ／ 56 IME のリセットは送出のフラグがあるときだけ ／ 57 run の manifest のホームと repo のルートを `~` / `<repo>` に置換＋寄託前の検査（020 の `--check-deposit` / `--pack`）／ 58 子の停止の記録を実態に ／ 59 `emit.py` の送出の基準を `trial_begin` の刻印に ／ 60 / 61 E3 の写しは実行行を保ち注釈だけ英訳・出典は `PROVENANCE.internal.md` ／ 62 セルの `label`（解析で必須）／ 63 凍結の門（印の書式・`sha256` = config.json / SEED / 正解の規則の SHA-256 の並びの SHA-256・実データは `--prereg` 必須）／ 64 E3 は 1 条件 8 時間 ／ 65 020 の selftest を既定 17 秒と `--full` に分けた。
+  - 55 実キーの前面の確認は runner（`run_cell.py`）がバックエンドの `focus_back` で・Windows のバックエンドは押下ごとに照合 ／ 56 IME のリセットは送出のフラグがあるときだけ ／ 57 run の manifest のホームと repo のルートを `~` / `<repo>` に置換＋寄託前の検査（020 の `--check-deposit` / `--pack`）／ 58 子の停止の記録を実態に ／ 59 `emit.py` の送出の基準を `trial_begin` の刻印に ／ 60 / 61 E3 の写しは実行行を保ち注釈だけ英訳・出典は `PROVENANCE.internal.md` ／ 62 セルの `label`（解析で必須）／ 63 凍結の門（印の書式・`sha256` = config.json / SEED / 正解の規則の SHA-256 の並びの SHA-256・実データは `--prereg` 必須）／ 64 E3 は 1 条件 8 時間 ／ 65 020 の selftest を既定 17 秒と `--full` に分けた ／ ★ 66（Mac）E3 のプロセス名は macOS でも完全な名前で照合する（64 の前提の訂正）。
   - ⚠️ 未決として残したもの: 照合器の `clock_offsets_ms`（run ごとの時計の差）の出どころ（M1 / M3 で決める・今は 0）／`dwell_ms == 0` の扱い（判断 45・M3）。
 
 ## §2 未決 —— 024 を回す前に研究者に聞く（2026-09-30 に聞こうとして、セッションを区切ったため未回答）
@@ -41,8 +46,8 @@
 ## §3 手順
 
 1. **状態を測る**: `git fetch` → `git log --oneline feature/ime-eval-kit..origin/feature/ime-eval-kit`（Mac の push を先に読む）→ `git pull --no-rebase`。`git worktree list`・`git branch --list 'loop/*'`（残っていたら §4 のとおり片付ける）。`tail -5 .steering/20260927-ime-observation-paper-eval-design/_loop-events.jsonl`。
-2. **§1 の全 acceptance**: `C:/wt/all-summary2.txt` を見る。無い・途中なら、base の clean な checkout（短いパス `C:/wt/clean-base`・B7）で 001〜028 を回し直す（出力はファイルへ・終了コードはパイプの後ろで取らない）。★ `_style_check.py papers/ime-observation` も違反 0 件。緑なら push（§4）。
-3. **§2 を研究者に聞く** → 答えに合わせて `issues/024.md` と `024-acceptance.sh` を直し（acceptance は旧い成果物・架空の成果物で陰性対照を確かめる）、判断 66 以降として `decisions.md` に記録 → コミット・push。
+2. **全 acceptance**: W5 の後の全 acceptance は両 OS で済んでいる（§1・§1b）。`2c3a2781` より後に `papers/` が変わっていれば（Mac の push など）、その分の acceptance を clean な checkout（短いパス・B7）で回し直す。
+3. **§2 を研究者に聞く** → 答えに合わせて `issues/024.md` と `024-acceptance.sh` を直し（acceptance は旧い成果物・架空の成果物で陰性対照を確かめる）、判断 67 以降として `decisions.md` に記録（★ 判断 66 は Mac が使った） → コミット・push。
 4. **ループ**: `LOOP_FORCE=1 bash scripts/loop-run.sh .steering/20260927-ime-observation-paper-eval-design --issues 024`（バックグラウンド・events を Monitor で見る）。⚠️ main checkout に別トラックの未追跡ディレクトリ（`.steering/20260921-media-expression-theory-audit/`）があるので `LOOP_FORCE=1` が要る（B1）。★ それには触らない。
 5. **merge ゲート**（これまでと同じ）:
    - worktree の `git status --porcelain --untracked-files=all` が空・コミットがある。
