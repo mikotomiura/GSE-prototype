@@ -37,3 +37,14 @@
 - [x] 完了時の `/cross-review`（Codex 1 回・README／code-reviewer・README と作業記録）→ 裁定と修正（判断 16・論文用リポジトリ `728e81c`）
 - [ ] endorsement の依頼（研究者）→ arXiv（引き継ぎ `next-session-p321-arxiv-and-review.md` §2 A）
 - [ ] GSE 側: `/finish-task` の出荷フロー
+
+## 6. arXiv（2026-09-30・引き継ぎ §2 A・研究者の指示「Draft まで Claude・publish から研究者」）
+- [x] A-0: 規程を一次で確かめ直す（判断 18: `results.tex` は最上位の候補にならない・cls と bst は同梱が必須・endorsement はカテゴリを選んだ時点）
+- [x] A-1: ソース一式（タグの 3 ファイル＋cls・bst＋`main.bbl`）を scratch で組む → 21 頁・BibTeX なしでも同じ（判断 19）。zip は `C:/wt/arxiv-upload/arxiv-source.zip`
+- [x] 研究者の選択: cls と bst を同梱・著者 Mikoto Miura・コメントに投稿先を書かない・cs.SE ＋ cs.HC（判断 19）
+- [x] A-2: 研究者のログイン（判断 20）
+- [x] Start の段（ライセンス CC BY 4.0・規約・著者・cs.SE）= 研究者 → "You are not endorsed for this archive"（判断 20）
+- [x] endorsement の依頼のメール（03:21 JST）→ 依頼文を埋めた版と添付 PDF（`C:/wt/arxiv-upload/`・判断 20）
+- [ ] 研究者が知り合いの CS の研究者 1 人に依頼を送る → endorse される
+- [ ] A-3: 下書き `submit/8151855`（期限 2026-10-13）の続き: Start → Add Files（zip）→ 組版のログと Preview（TeX Live 2025）→ メタデータ・cs.HC のクロスリスト
+- [ ] A-4: 研究者が最後に Submit → 公開後に EMSE へ申告・Zenodo の related_identifiers・README

@@ -226,3 +226,40 @@
 - 一次で確かめた arXiv の規程（`submit_tex.html`・逐語）: "We do not have your style files or macros" ／ "Do not submit in double-spaced "referee" mode" ／ "Include .bib or .bbl files if you use BibTeX/Biber" ／ "arXiv offers currently TeX Live 2023 and 2025 (the default)"。未確認: endorsement が無い状態で下書きをどこまで作れるか・2 つ目の `.tex` の扱い・cls の同梱の可否（配布条件の一文）→ 次のセッションの A-0。
 - 引き継ぎ: `.steering/_handoff/next-session-p321-arxiv-and-review.md` §2 A。
 
+## 判断 18: arXiv の規程を一次で確かめ直した結果（A-0・2026-09-30）
+
+- **方法**: `https://info.arxiv.org/help/` の `submit/index`・`submit_tex`・`submit_legacy_differences`・`endorsement`・`license/index`・`prep`・`submit_status`・`00README`・`faq/texlive`・`texlive_package_list` を curl で取得し、本文を抜き出して読んだ（各ページは見出しを全部出してから該当の節を読んだ）。
+- **2 つ目の `.tex`（未確認だった点）**: `submit/index` の Check Files の段（逐語）"Only TeX files containing \documentclass directives will be shown on this list." ／ `submit_legacy_differences` "At the start, assumes just one top-level TeX file." → `results.tex`（`\documentclass` なし・`\input{results}` で読まれる）は最上位の候補にならない。★ **EM のように埋め込む必要はなく、タグの 3 ファイルをそのまま使う。**
+- **cls と bst の同梱（未確認だった点）**: `submit_legacy_differences` の比較表（逐語）"Only provides packages included in the current TeX Live release. Authors with journal style files must now include them with their TeX source." ／ `submit_tex` "We don't provide any further packages besides what is provided by the TeX Live system. That means in particular that some publisher styles will not be available." ／ `sn-jnl` は CTAN に無い（`https://ctan.org/json/2.0/pkg/sn-jnl` = 404）・arXiv の TeX Live の一覧（`texlive_package_list`）にも無い。★ 同梱しないと arXiv では組めない。⚠️ TeX から作った PDF だけを上げる道も無い（`submit/index` 逐語 "We do not accept dvi, PS, or PDF created from TeX/LaTeX source"）。
+  - `sn-jnl.cls` の冒頭（逐語）: "It may be distributed and/or modified under the conditions of the LaTeX Project Public License, either version 1.3c …" ／ "This file may only be distributed together with a copy of the LaTeX base system. You may however distribute the LaTeX base system without such generated files."（`classes.dtx` から docstrip で作った旨の定型の見出しの中）。`sn-basic.bst` は "This file can be redistributed and/or modified under the terms of the LaTeX Project Public License" だけ。
+  - Springer Nature の LaTeX の案内のページ（`https://www.springernature.com/gp/authors/campaigns/latex-author-support`）・テンプレートの `user-manual.pdf`・`sn-article.pdf`・`sn-article.tex` に、arXiv・再配布・ライセンスの記述は無い（本文を抜き出して grep・`distribut` が当たったのはフォントの説明の 1 か所だけ）。
+- **endorsement（未確認だった点）**: `endorsement` の help（逐語）"To seek personal endorsement: Start a new submission and select the category you wish to submit to. Check your email for an endorsement request email." → ★ 依頼のコードは**新しい投稿でカテゴリを選んだ時点**でメールで来る。⚠️ endorsement が無いままファイルの上げ込み・組版・メタデータまで進めるかは help に書かれていない → 画面で確かめる。
+- **ライセンスを選ぶ段**: help に投稿画面の段の順序の記述は無い（未確認）→ 画面で確かめ、出てきたところで研究者に渡す。
+- **メタデータ**（`prep`・逐語）: "Our metadata fields only accept ASCII input." ／ 要旨 "abstracts longer than 1920 characters will not be accepted" ・"Do not include the word "Abstract"" ／ 著者 "Names must be given in the order: Firstname Lastname" ・所属は括弧で・"If desired, at most, include a city and country" ／ コメント "Indicate number of pages and number of figures." ・"submitted to" は "such entries will be frozen into this version, and are not editable after announcement." ／ ACM-class は cs で任意 ／ Journal-ref・DOI は公開後の出版物用（今は空）。
+  - EM に入れた要旨（`C:/wt/emse-upload-form-text.txt`）は **ASCII 以外 0 文字・1,582 字**（上限 1,920）→ そのまま使える。
+- **組版**: TeX Live 2025 が既定・2023 も選べる（`faq/texlive`）。TeX Live 2025 の既知の問題（cleveref・setspace の環境・minted・hyperxmp の読み込み順・array と revtex）はどれも原稿が使っていない（`main.tex` の grep で 0 件）。`.bbl` は "the name of the .bbl file must match the name of the main .tex file"（→ `main.bbl`）。
+- **その他**: Unsubmit で incomplete に戻せる（"This will return it to incomplete status and allow you to modify your files and resubmit."）／ incomplete は期限を過ぎると消える（`submit_status` "Submissions left incomplete past the expiration date will be deleted from arXiv."）。
+
+## 判断 19: arXiv 用のソース一式と、研究者が選んだメタデータ（A-1・2026-09-30）
+
+- **ソース一式**（scratch・repo の外）: タグ `submission-2026-09-29` の `paper/main.tex`・`results.tex`・`refs.bib`（`git cat-file blob` で取り出し、3 つとも blob ID がタグと一致）＋ `paper/build.sh` が固定する SHA-256 と一致する `sn-jnl.cls`・`sn-basic.bst` ＋ pdfLaTeX と BibTeX で作った `main.bbl`（EMSE に上げたものと `cmp` で同一）。★ `main.tex` はタグのまま（行間は 21 頁の版・`[referee,lineno]` なし・`\pdfoutput=1` も足さない）。
+- **組版の確認**（TinyTeX v2026.09・pdfTeX 1.40.29・TeX Live 2026）: `pdflatex → bibtex → pdflatex ×3` で **21 頁**・Overfull `\hbox` 0・Underfull `\hbox` 0・未定義 0・エラー 0。★ arXiv と同じく BibTeX を走らせず 6 ファイルだけの場所で `pdflatex ×3` → 21 頁・上の版と**全頁の抽出本文が一致**（58,576 文字）。
+- **上げる zip**: `arxiv-source.zip`（6 ファイルを最上位に・52,945 B・SHA-256 `b8bf5062185f81c34df58e703d2848409067d73a3a619edf7dddcb3badeffaa6`）。⚠️ arXiv 側は TeX Live 2025 → Preview で頁数と表を確かめる。
+- **研究者の選択**（AskUserQuestion・2026-09-30）:
+  1. **cls と bst を同梱する**。前タスク判断 5（GitHub の論文用リポジトリには入れない）とは扱いが分かれる: GitHub は同梱しなくても `build.sh` が公式の zip から取り出せるが、arXiv は同梱しないと組めず、代わりの道（PDF だけ）も無い（判断 18）。cls の一文の解釈は研究者の判断として記録する。
+  2. 著者欄 = **Mikoto Miura**（所属も都市も書かない）。
+  3. コメント欄 = **"21 pages, 5 tables. Replication package: https://doi.org/10.5281/zenodo.23029603"**（投稿先を書かない）。表は `main.tex` の `table` 環境が 5 つ・図は 0。
+  4. カテゴリ = **cs.SE（主）＋ cs.HC にクロスリスト**。ACM-class は空。
+- 題はメタデータでは直線の二重引用符（`When "no help" is not "solved": …`・EM に入れた文と同じ）。
+
+## 判断 20: arXiv の投稿画面の実物 —— ライセンスは最初の段・endorsement はファイルより前で止まる（A-2・A-3・2026-09-30）
+
+- **A-2**: 研究者がログインした（アカウント `mmiura`・Groups: cs・既定のカテゴリ cs.HC）。⚠️ 前セッションと同じく、タブグループが一度消えた（研究者がログインの途中でグループの最後のタブを閉じた形）→ `tabs_context_mcp` で作り直すと、ログインの状態はそのまま使えた。
+- **既存の下書き**: アカウントに incomplete の `submit/8151855`（題なし・期限 2026-10-13）があった（私は arXiv を操作していない）。研究者の選択「続きから使う」で resume → Start の段で、入力は何も無かった。
+- ★ **Start の段の実物**（`/submit/8151855/start`・フォームの欄を読んだ）: 連絡先の確認（`userinfo`）・Submittal Agreement への同意（`agree_terms_conditions`）・著者の申告（`is_author`）・**ライセンス**（`license`・CC BY / CC BY-SA / CC BY-NC-SA / CC BY-NC-ND / arXiv の非独占 / CC0 / "None of the above licenses apply"＝初期値）・Archive（選択肢は `cs` だけ）と Subject Class が **1 枚の画面**に並ぶ。→ ⚠️ 引き継ぎの「ライセンスは最後に研究者」は段の順序として誤り（help に順序の記述が無かった・判断 18）。★ 研究者の同意と申告を要する欄なので、**Start の段は研究者が操作した**（CC BY 4.0・著者・cs / cs.SE を選び Continue）。
+- ★ **endorsement**: Continue の結果（逐語）"You are not endorsed for this archive. See endorsement help or request endorsement" で Start の段に留まった（入力はフォームに残っている）。→ **endorsement が無いと Add Files（上げ込み・組版・Preview・メタデータ）へ進めない。** Preview の確認は endorsement の後になる。
+- 「request endorsement」のリンクは `arxiv.org/auth/need-endorsement.php`（引数は `category_id=cs.SE` と戻り先だけ）。⚠️ 予備のタブでこの URL を直接開くとログイン画面に戻された → ログインの入力は研究者の手なので、リンクを押すのは研究者に頼んだ。
+- ★ **endorsement の依頼のメールが届いた**（2026-09-30 03:21 JST・help@arxiv.org から研究者の gmail へ・cs.SE・endorse 用の URL と 6 文字のコード入り）。⚠️ コードはこの repo に書かない（repo の外の `C:/wt/arxiv-upload/` にだけ置く）。
+- **依頼の準備**（研究者が送る）: `C:/wt/arxiv-upload/endorsement-request-filled.txt`（`endorsement-request-draft.md` の `[link]`・`[code]` を埋め、DOI は解決済みなので「投稿日より前なら」の注記を外した版。相手の名前・挨拶・署名の氏名の 5 か所は研究者が埋める）。添付の PDF `C:/wt/arxiv-upload/Miura-no-help-is-not-solved.pdf`（判断 19 の 21 頁の版と同じもの・SHA-256 `eb4a5436…`・ローカルのパス・GSE・TinyTeX の文字列 0 件・メタデータは Producer と日付だけ）。上げる zip も同じ場所へ写した（SHA-256 が判断 19 と一致）。
+  - ⚠️ 依頼文を埋める途中で、署名の `[氏名]` に**私が漢字の氏名を推測で書いた**（研究者の漢字の氏名は一次のどこにも無い）→ 気づいて `[氏名]` に戻した。
+
