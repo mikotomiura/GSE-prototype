@@ -12,7 +12,7 @@
 
 ## 2. 原稿（論文用リポジトリ）
 - [x] Data availability に DOI・README の Licence（原稿 = CC BY 4.0）→ `e1e527b`（⚠️ 未 push）
-- [x] ORCID は本文に入れない（判断 7 の追記: テンプレートに仕組みが無い）→ 投稿システムと Zenodo に
+- [x] ORCID はタイトル頁に文字で（判断 7 の追記 2・`02380c5`。追記 1「本文に入れない」は規程の読み落としで取り消した）
 - [x] `bash run.sh` / `bash paper/build.sh` exit 0（21 頁・Overfull `\vbox` 1 件は HEAD にもある）
 - [x] 書いてはいけないことの grep（原稿・README・Zenodo の説明に GSE なし）
 
@@ -26,7 +26,8 @@
 - [x] endorsement の依頼文の下書き（`endorsement-request-draft.md`・判断 3）→ [ ] 研究者が確かめて送る
 
 ## 5. 完了
-- [ ] 原稿の変更に `/cross-review`（Codex ＋ code-reviewer ＋ security-checker。⚠️ Codex は予算が戻ってから・判断 9）
+- [x] `/cross-review` 1 巡目（code-reviewer ＋ security-checker（全履歴）＋ Codex 2 回・研究者の許可で予算を一時引き上げ）→ 裁定と修正（判断 11・論文用リポジトリ `02380c5`）
+- [ ] `/cross-review` 2 巡目（1 巡目で足した規則の境界条件）
 - [x] 投稿日の手順書（`submission-day-steps.md`）
 - [ ] 論文用リポジトリを push（レビューの後）
 - [ ] GSE 側: `/finish-task` の出荷フロー

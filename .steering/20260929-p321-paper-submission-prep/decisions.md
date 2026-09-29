@@ -8,9 +8,9 @@
 
 | 何 | 出典 | 逐語 |
 |---|---|---|
-| arXiv の endorsement（2026-01-21 改定） | `https://blog.arxiv.org/2026/01/21/attention-authors-updated-endorsement-policy` | "As of January 21, 2026, arXiv will no longer accept institutional email addresses (i.e., an email address associated with an academic or research institution) as the sole qualifier of endorsement for new authors." ／ "The first path requires both 1) an institutional email address from an academic/research institution and 2) previous authorship on an existing paper which has been accepted to the arXiv “endorsement domain” they wish to submit to … New submitters who cannot meet these requirements can pursue the second path, which is seeking personal endorsement directly from an established arXiv author in the same endorsement domain." |
+| arXiv の endorsement（2026-01-21 改定） | `https://blog.arxiv.org/2026/01/21/attention-authors-updated-endorsement-policy` | "As of January 21, 2026, arXiv will no longer accept institutional email addresses (i.e., an email address associated with an academic or research institution) as the sole qualifier of endorsement for new authors." ／ "The first path requires both 1) an institutional email address from an academic/research institution and 2) previous authorship on an existing paper which has been accepted to the arXiv “endorsement domain” * they wish to submit to … New submitters who cannot meet these requirements can pursue the second path, which is seeking personal endorsement directly from an established arXiv author in the same endorsement domain." |
 | arXiv の endorsement（help） | `https://info.arxiv.org/help/endorsement.html` | "it is best for you to find an endorser who you know personally and is knowledgeable in the subject area of your work." ／ "it is inappropriate to email large numbers of potential endorsers at once" |
-| arXiv のライセンス | `https://info.arxiv.org/help/license/index.html` | "The license chosen is irrevocable and cannot be changed." ／ CC BY 4.0・CC BY-SA 4.0・CC BY-NC-SA 4.0・CC BY-NC-ND 4.0・arXiv の非独占ライセンス・CC0 |
+| arXiv のライセンス | `https://info.arxiv.org/help/license/index.html` | "Please note that different versions of the work can have different licenses." ／ "The license chosen is irrevocable and cannot be changed." ／ "the license chosen for each version is irrevocable" ／ CC BY 4.0・CC BY-SA 4.0・CC BY-NC-SA 4.0・CC BY-NC-ND 4.0・arXiv の非独占ライセンス・CC0 |
 | Springer Nature のプレプリント | `https://www.springer.com/gp/editorial-policies/preprint-sharing` | "preprints may be posted at any time during the peer review process. Posting of preprints is not considered prior publication" ／ "Authors should disclose details of preprint posting, including DOI and licensing terms, upon submission of the manuscript or at any other point during consideration" ／ "Authors may choose any license of their choice for the preprint including Creative Commons licenses." |
 | Zenodo の GitHub 連携 | `https://support.zenodo.org/help/en-gb/24-github-integration/127-which-github-permissions-do-you-request-and-why` | "Private repositories (no access) We do not have access to your private repositories." |
 | Zenodo の DOI の予約 | `https://help.zenodo.org/docs/deposit/describe-records/reserve-doi/` | "In case you want to know the DOI in advance of publication, you can use the method described below to reserve a DOI." ／ "If you delete the draft upload, the reserved DOI is lost." ／（`create-new-upload`）"The DOI will only be registered once the record is published." |
@@ -96,7 +96,7 @@
 - **判断日時**: 2026-09-29
 - **背景**: 研究者は ZEN 大学の学生（学生用ドメインのメールを持つ）。前タスク判断 12 で所属なし（都市と国だけ）にしていた。
 - **採用**: 今のまま（研究者の選択）。この研究は大学とは別に行ったものとして扱う。
-- **影響範囲**: なし（原稿・Zenodo の著者情報は所属なし）。arXiv のアカウントのメールは、endorsement の経路（判断 3）では自動の条件に効かない。
+- **影響範囲**: 原稿は都市と国だけ（`ffil` に所属を書かない）。Zenodo の所属欄は、研究者の既存の Zenodo の記録 2 件に揃えて "Independent Researcher"（所属なしの書き方）にした（2026-09-29 に研究者が「このまま」と確認）。arXiv のアカウントのメールは、endorsement の経路（判断 3）では自動の条件に効かない。
 
 ## 判断 7: ORCID = 0009-0000-4196-0508 を原稿と Zenodo に入れる
 
@@ -111,6 +111,12 @@
 - **一次**: `sn-jnl.cls` の定義は `\gdef\orcidlogo{\includegraphics{Orcidlogo.eps}}`・`\gdef\orcid#1{\href{#1}{\orcidlogo}}`。★ `Orcidlogo.eps` は公式 zip（前タスク判断 1）に**入っていない**（zip の中身は `sn-jnl.cls`・`sn-article.tex`・`bst/` 9 本・`empty.eps`・`fig.eps`・`sn-article.pdf`・`sn-bibliography.bib`・`user-manual.pdf`）。見本の `sn-article.tex` と手引き `user-manual.pdf`（14 頁）には ORCID の記述が 1 つも無い。⚠️ Tectonic は EPS を扱えない（前タスク判断 2）。
 - **採用**: ORCID は**投稿システムと Zenodo**（下書きの creators に入れ済み）に入れ、原稿の本文には入れない。EMSE の規程も ORCID を「投稿の際に使う」ものとして書いている（前提の表）。
 - **見直しタイミング**: 採択後の組版で出版社が求めたとき、または研究者が本文への記載を求めたとき。
+
+### 判断 7 の追記 2: 上の追記を取り消し、ORCID をタイトル頁に入れる（2026-09-29・code-reviewer MEDIUM）
+
+- ⚠️★ **上の追記は EMSE の規程を 1 か所しか読んでいなかった**（`verify-before-claiming` ルール 7 の違反）。規程の Title Page の節（逐語）: "Please make sure your title page contains the following information. … Author information … If available, the 16-digit ORCID of the author(s)"。→ 規程は ORCID を**タイトル頁に載せる**よう求めている。
+- **採用**: タイトル頁の「Corresponding author(s). E-mail(s): …」の行に `ORCID: https://orcid.org/0009-0000-4196-0508` を文字で続ける（論文用リポジトリ `02380c5`・`\g@addto@macro\corrauthemail{…}`）。クラスの `\orcid` は同梱されない EPS を読むので使わない（上の追記の一次はそのまま正しい）。grill の答え（原稿・Zenodo に入れる）に戻った。
+- ⚠️ クラスの内部マクロ（`\corrauthemail`）に足す形。手引きは "non-standard packages and macros are frequent causes of error" と注意しているので、投稿システムが組んだ PDF でタイトル頁の ORCID を確かめる（`submission-day-steps.md` 手順 4）。Tectonic・pdfLaTeX の両方で組めることは確かめた。
 
 ## 判断 8: 推薦査読者は挙げない
 
@@ -128,3 +134,24 @@
 - **判断日時**: 2026-09-29
 - **採用**: 研究者の選択。1 頁程度（研究の要点・既存の公開データの再解析であること・データとコードの公開と DOI・投稿時点でプレプリントは無いこと（判断 3）・LLM の使用は本文 Sect. 5.5 に開示済み）。
 - ⚠️ 公開物と同じく、学術的な英語で書き、GSE に言及しない（memory `feedback_public_artifacts_academic_no_gse`）。
+
+## 判断 11: `/cross-review` 1 巡目の裁定と、投稿する版の行間（2026-09-29）
+
+- **レビュー**: Claude 系統 = code-reviewer（論文用リポジトリ `4a81a43..e1e527b` ＋ 本ディレクトリ 8 ファイル）と security-checker（論文用リポジトリの**全 11 コミット**・公開前提 ＋ `zen.py`・Zenodo のメタデータ）。Codex 系統 = 前タスク判断 9 の方法（GSE の worktree に `git fetch` してラッパーを範囲指定）で 2 回: ① 原稿 `4a81a43..e1e527b -- paper/main.tex README.md` ② 本ディレクトリの 5 ファイル。★ 入れ子を避けるため `cross-reviewer` エージェントは使わず、メインから起動した。**CRITICAL は 0 件**。
+- **Codex の予算**: 研究者の許可（逐語「Codexは必要であれば予算引き上げしていいよ」）で `daily_token_budget` を一時的に 450000 に上げた（台帳の `_comment_2026_09_29_temporary_raise`）。実消費 ① 20,864 ② 28,014（本ブランチの台帳 109,931 → 158,809 / 4 回）。同日の合算は約 314,136 / 6 回（他の 2 件は判断 9 のとおり）。
+- ★ **採用（両系統が一致）**:
+  1. カバーレターと Zenodo の説明が凍結を言い過ぎていた（"frozen before the results were produced"）—— code-reviewer HIGH・Codex P2。原稿 §5.1 の主語と限定（"committed … before the analysis code produced the results reported here"・既知だった推定値の開示）に揃えた。Zenodo の下書きは説明だけを差し替えた（DOI は不変・未公開のまま）。
+  2. endorsement の依頼を投稿日より前に送ると DOI がまだ解決しない —— code-reviewer MEDIUM・Codex P2 → 下書きに注意書きと書き換えの指示。
+  3. Zenodo に上げる zip の検証が無い —— code-reviewer MEDIUM・Codex P2（原稿の差分でも「アーカイブの中身との対応」を指摘）→ 手順書 2.2 に「展開して `git ls-tree` と照合・D1 を置いて `run.sh` exit 0」。
+  4. 「履歴が凍結と解析の順序を記録する」の言い方 —— Codex（原稿・低）・code-reviewer MEDIUM（README は zip に入ると履歴を失う）・LOW（参照先は 5.1 節）→ 原稿と README を「解析の設定が、解析のコードが結果を出す前にコミットされたことを記録する」に改め、README は開発用リポジトリの URL を名指しし、5.1 節に label を付けて参照した（論文用リポジトリ `02380c5`）。
+- ★ **採用（片方だけ）**:
+  - code-reviewer MEDIUM: 「すべての結果を再現一式から生成」に D1 のデータを取得してからの条件を付けた ／ 判断 6 の所属の記述と Zenodo の不一致 → 判断 6 を直し、研究者が "Independent Researcher" を「このまま」と確認 ／ ORCID → 判断 7 の追記 2 ／ `main.bbl` の出どころ → 手順書 3。
+  - code-reviewer LOW: arXiv のライセンスは版ごと（前提の表・手順書 5）／ arXiv ブログの引用の脚注の印 ／ Zenodo の説明を "Table 4 and three rows of Table 5" に ／ カバーレター "comes from a study published in this journal" ／ 手順 1 と 2 を続けて行う ／ EMSE と arXiv にも 🔒。
+  - Codex P1: 公開前に全履歴を検査すること・`--tags` を使わないこと → security-checker が全 11 コミットを検査済み（手順書 0.2 に記録し、それ以後のコミットは差分を検査する）・タグだけを push（手順書 0.3）。
+  - security-checker LOW 1: `zen.py` の token がリダイレクトで転送先に渡りうる → `add_unredirected_header` に変えた（scratch のスクリプト・リポジトリ外）。
+  - security-checker（セキュリティ外）: `4aab7f0` の「手で・2 人が独立に転記」という誤った記述が公開される履歴に残る → `NOTES.md` の D2 transcription の節に、誤りと `ae39be6` での訂正（値は不変・CSV は改名だけで 0 行の変更）を記録した（`02380c5`）。⚠️ 原稿の "Seven later changes" は解析の逸脱の数なので、`Deviations` には入れていない。
+- **採用しない**:
+  - code-reviewer LOW 15（requirement.md の ORCID の記述が古い）→ 判断 7 の追記 2 で原稿に入れたので、requirement.md は正しいまま。
+  - security-checker LOW 2（履歴に旧ディレクトリ名 `data/p434` が残る）→ 受け入れる。消すには履歴の書き換えが要り、原稿が根拠にする凍結の順序の記録と矛盾する（`NOTES.md` は旧名を別プロジェクトの引用キーと説明しており、プロジェクト名は出ない）。
+- **情報**: security-checker が見つけた到達不能なコミット `090be99`・`605103e` は、2026-09-29 13:02 に私が論文用リポジトリで余計に行った `git stash` → `git stash pop` の跡（ローカルだけ・どの ref にも無いので push されない・作業ツリーは元どおりと確認済み）。GitHub 側（security-checker は読んでいない）は `gh api` で確かめた: ブランチ main だけ・タグ・Release・PR・Issue・Actions の実行がいずれも 0。
+- ★ **投稿する版の行間**（`.bbl` を調べる途中で見つけた・研究者の選択）: テンプレートの手引き（逐語）"For the peer review and editorial stages you are requested to enable double-line spacing by using the [referee] option"（EMSE の規程自体には行間の指定が無い）。→ **投稿する版だけ `[referee,lineno]`**（pdfLaTeX で 32 頁・Overfull `\hbox` 0・未定義 0）。リポジトリと arXiv の原稿は今の行間（21 頁）のまま。投稿用の版は投稿日に scratch で作る（手順書 3）。

@@ -5,6 +5,7 @@
 - 相手の条件: arXiv の cs の分野で、3 か月〜5 年前に出した論文が一定数あり、著者として登録されている人（help "we only count papers that have been submitted between three months and five years ago"）。相手が endorse できるかは、相手の論文の abstract ページの "Which authors of this paper are endorsers?" で確かめられる。
 - ⚠️ arXiv の help: 個人的に知っていて分野に詳しい人に頼む・**大勢に一斉に送らない・同じ人に繰り返し送らない**。
 - ★ endorsement は査読ではない（help "The endorsement process is not peer review."）。相手に求めるのは「cs.SE にふさわしい論文か」の確認だけ。
+- ⚠️ **送る時点で再現一式が未公開なら**（Zenodo の公開と GitHub の public 化は投稿日・判断 4）、DOI はまだ解決しない（"The DOI will only be registered once the record is published."）。→ 再現一式の行を「投稿日に公開予定」と書き換え、原稿は PDF を添付する。投稿日の後に送るならそのままでよい。
 
 ---
 
@@ -22,7 +23,7 @@
 
 - 題: When "no help" is not "solved": outcome-agnostic self-resolution measures in two public debugging datasets
 - 原稿: [PDF を添付 / 共有リンク]
-- 再現一式: https://doi.org/10.5281/zenodo.23029603
+- 再現一式: https://doi.org/10.5281/zenodo.23029603（⚠️ 投稿日より前に送るなら「投稿日に公開予定」と書き換える）
 
 arXiv の案内によれば、endorsement は査読ではなく、分野にふさわしい論文かを見ていただくものとのことです。もし差し支えなければ、次のリンクから endorsement をお願いできますでしょうか。
 
@@ -49,7 +50,7 @@ The paper reanalyses two public observational datasets of professional debugging
 
 - Title: When "no help" is not "solved": outcome-agnostic self-resolution measures in two public debugging datasets
 - Manuscript: [attached / link]
-- Replication package: https://doi.org/10.5281/zenodo.23029603
+- Replication package: https://doi.org/10.5281/zenodo.23029603 [before the submission day: "to be released on the day of submission"]
 
 arXiv notes that endorsement is not peer review but a check that the paper is appropriate for the subject area. If you are willing, you can endorse me at [link] (endorsement code: [code]).
 
