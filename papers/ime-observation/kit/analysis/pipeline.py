@@ -503,7 +503,10 @@ def main(argv):
 def _quiet(argv):
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        rc = main(argv)
+        try:
+            rc = main(argv)
+        except SystemExit as e:  # argparse reports a usage error this way
+            rc = e.code
     return rc, out.getvalue(), err.getvalue()
 
 

@@ -64,12 +64,7 @@ if [ "${MODE}" = "synthetic" ]; then
   RESULTS="${IME_RESULTS_DIR:-${WORK}/results}"
   echo "run.sh: synthetic run (seed ${SEED})"
   "${PY}" "${PIPELINE}" --synthetic "${WORK}/runs" --seed "${SEED}" || exit $?
-  # The synthetic runs are listed in a file so that they go through the same option as the real ones.
-  : > "${WORK}/runs.md"
-  for d in "${WORK}"/runs/run-*; do
-    echo "- run_dir: ${d}" >> "${WORK}/runs.md"
-  done
-  "${PY}" "${PIPELINE}" --runs-from "${WORK}/runs.md" --config "${CONFIG}" --seed "${SEED}" --out "${RESULTS}"
+  "${PY}" "${PIPELINE}" --runs "${WORK}/runs/run-a" "${WORK}/runs/run-b" --config "${CONFIG}" --seed "${SEED}" --out "${RESULTS}"
   exit $?
 fi
 
