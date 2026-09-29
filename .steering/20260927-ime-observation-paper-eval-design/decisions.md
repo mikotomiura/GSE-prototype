@@ -358,3 +358,12 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
   - 018: 打ち切りの境界は観測器に合わせて `>= 20000` ms（design.md §1.3 の「20 秒超」の字面ではなく、観測器が打ち切る条件に揃える）／`truncation` の `n_long` は照合に入った正解だけを数え、除外されたものは別に数える／`truncation` と `oracle` を層ごとにも出す（issue 018 の Scope）／selftest の穴（`mae_ci`・表の向き・`nav_true_cand == 0`・対照の seed・不一致の試行が評価に残ること）／入力の不整合を exit 2 に／`B` の上限（100000）／出力に写る入力の欄（oracle の件数・種類・`cell`）を検証する。
   - 019: テキストごとの変換の数を固定値で検査（観測側は対・分割・併合・偽検出の全行、正解側は取り逃しを含む）／Bland–Altman と ICC を速さの層ごとにも出す（design.md §1.5「主推定値は層別」。CLI の要約は層別を主に表示）／`outside_texts` を理由別に／ICC の区間は未定義の再標本があれば出さず理由を残す／回復の許容幅を詰める／壊れた match.json・重みのオーバーフロー・`B` の上限・`definition` の照合を exit 2 に。
   - security LOW L-5（`--out` が既存ファイルを黙って上書きする）は直さない: `kit/analysis/` の 4 本（match / gt_sessions / l1 / l2）に共通の既存の方針で、出力は入力から再生成できる。
+
+## 判断 47: Mac の W2（004 / 007）を回す前の段取り 2 点（2026-09-29・メインの実装上の選択・研究者が覆せる）
+
+| 論点 | 採用 | 理由 |
+|---|---|---|
+| 004 / 007 の `## Dependencies` の `001` | ★ **外す**（判断 34 と同じ形・`issue_done` は手で書かない） | 001 の `issue_done` は G-GEAR の events にだけある。Mac の events は空なので、`deps_met` が永久に偽で一度も起動しない（`loop-run.sh:1072`）。成果物は base にある |
+| Mac の base で verify（`kit/check.sh`）が赤: `analysis/gt_sessions.py` の selftest「input hardening」の深い入れ子（3000 段）が Python 3.14.4 では `RecursionError` にならず受理される | ★ **selftest の深さを 1,000,000 段に上げる**（`gt_sessions.py` の 1 行）。拒否の実装（`RecursionError` を捕まえる）は変えない | 実測: Python 3.14.4 は 3000 / 10000 / 100000 段を解析し、1,000,000 段で `RecursionError`。3.9.6 も 1,000,000 段で `RecursionError`。G-GEAR の版でも同じ向き（深いほど必ず落ちる）。ベースラインの verify が赤だと Mac の全 attempt が verify で落ちる。★ 他の部品（`open_set` / `closed_set` / `build_corpus` / `seal_obs`）の同種の検査は、別の理由（型の検査など）でも拒否されるので 3.14 でも緑だった |
+
+- 確認: 直した後の base で `kit/check.sh` が 20 本すべて緑、`010-acceptance.sh` 失敗 0 件（Mac・Python 3.14.4）。

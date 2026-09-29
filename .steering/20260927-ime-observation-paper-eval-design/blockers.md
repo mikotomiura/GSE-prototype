@@ -63,3 +63,9 @@
 
 - 事象: 013 / 009 の直しのエージェントが、完了報告の後に「background work of its own still running」と通知された（cargo の実行が残っていた可能性）。
 - 対応: merge の前に、worktree の `git status` が空で HEAD が報告のコミットのままであることを確かめてから merge した（どちらも一致）。★ 次からも、報告の後で worktree が動いていないことを merge の直前に確かめる。
+
+## B10（2026-09-29・Mac の W2 の前）Mac の base で verify がベースラインから赤・この checkout は別セッションが使っている
+
+- 事象 1: `kit/check.sh` が `analysis/gt_sessions.py` の 1 ケースで赤（深い入れ子が拒否されない）。Python 3.14.4 の `json` は 3000 段で `RecursionError` を出さない。→ 判断 47 で selftest の深さを上げた。
+- 事象 2: main checkout（`/Users/johnd/GSE-prototype`）は別の対話セッションが別ブランチ（`docs/g1-o1-collection-readiness`）で未コミットの作業中だった。→ ★ ブランチを切り替えず、base を別 worktree（`/Users/johnd/GSE-ime-base`）に出し、`loop-run.sh` には **その worktree の task ディレクトリを絶対パスで渡す**（`TASK_DIR` は絶対パスならそのまま使われ、config・issue・acceptance はそこから読まれる）。events は §7 のとおり main checkout の絶対パス。spawn の dirty 検査は main checkout を見るので `LOOP_FORCE=1`（B1 と同じ）。
+- 事象 3: 004 / 007 の依存 `001` が Mac の events で満たされない → 判断 47。

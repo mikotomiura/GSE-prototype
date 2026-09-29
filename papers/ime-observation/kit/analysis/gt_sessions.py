@@ -1294,7 +1294,7 @@ def _case_input_hardening():
         f.append("JSON with the same key twice on one line is not rejected")
     except InputError:
         pass
-    deep = ("[" * 3000) + ("]" * 3000)
+    deep = ("[" * 1000000) + ("]" * 1000000)
     try:
         _loads(deep, "deep-test")
         f.append("excessively nested JSON (RecursionError) is not rejected")
