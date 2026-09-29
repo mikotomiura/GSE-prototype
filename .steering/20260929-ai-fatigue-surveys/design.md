@@ -122,3 +122,82 @@
 - J-STAGE の中間一致は `AI` を英単語の一部（例: maintain）にも当てる。題名ふるいの正規表現で落とす。
 - 抄録を持たない記録（CiNii・国立国会図書館サーチの多く）は題名ふるいだけになる。
 - 検索できなかった情報源がある（1.2 の末尾）。「見当たらない」は、この範囲での記述にとどめる。
+
+## 2. S-02 検索漏れ候補 11 件の抄録（＋ 標本の重なり・N-06）（2026-09-29 22:05 固定・抄録を読む前）
+
+### 2.1 対象
+
+`../20260929-ai-fatigue-db-readable-and-gaps/issues.md` 付録 C の [S-02] の 11 件（★ 印 8 件＋AF017 の引用追跡 3 件）。
+
+| # | 書誌（付録 C のまま） | DOI |
+|---|---|---|
+| 1 | Asmi ほか 2026, JEIM（意思決定疲労） | 10.1108/jeim-10-2025-1027 |
+| 2 | Honggang ほか 2026, Scientific Reports | 10.1038/s41598-026-45402-7 |
+| 3 | Khoso ほか 2026, Acta Psychologica | 10.1016/j.actpsy.2026.107396 |
+| 4 | Thorpe ほか 2025, AI & Society | 10.1007/s00146-025-02764-2 |
+| 5 | Kim & Kim 2026, Technology in Society | 10.1016/j.techsoc.2026.103553 |
+| 6 | Chung & Kwon 2025, Education and Information Technologies | 10.1007/s10639-024-13198-6 |
+| 7 | Kang & Li 2025, Journal of Business Convergence | 10.31152/jb.2025.12.10.6.297 |
+| 8 | Nobles 2026, Zenodo（系統的レビュー・非査読） | 10.5281/zenodo.22838191 |
+| 9 | Kim & Lee 2024, Humanit Soc Sci Commun | 10.1057/s41599-024-04018-w |
+| 10 | Hur & Shin 2024, J Serv Mark | 10.1108/JSM-03-2023-0115 |
+| 11 | Jeong, Kim & Lee 2024, Front Public Health | 10.3389/fpubh.2024.1343932 |
+
+N-06（同時に行う）: IEEE DataPort の 2 件 doi:10.21227/rz27-ze05・10.21227/94rd-ny74。
+
+### 2.2 手順
+
+1. **書誌**: Crossref（DataCite）で題名・著者・収録先・年・訂正の関係（`update-to`・`relation`）を取る。
+2. **抄録**: Crossref の `abstract` → Europe PMC（`resultType=core`）→ Semantic Scholar → 出版社の公開ページの順に、最初に取れたものを使う。抄録は scratchpad にだけ置く。
+3. **本文**: オープンアクセスのものは本文を取り（Europe PMC の全文・出版社の公開 HTML/PDF・Zenodo のファイル）、scratchpad に平文で置く。
+4. **抽出**（本文を取れたもの）: `general-purpose` のサブエージェント（model: sonnet）に、scratchpad の平文ファイルを渡して、下の項目を抜き出させる。★ サブエージェントにはウェブを使わせない（渡したファイルだけを読む）。判定の語を使わせない。
+   - デザイン・対象（N・母集団・国・収集の時期と場所）・疲労（または燃え尽き・消耗）の構成概念と尺度（出典・項目数・**項目が AI に触れているか**）・AI の利用の変数・疲労に関わる主な結果（数値つき）・データの公開・倫理の記載
+5. **メインの裏取り**: 抽出の「疲労の尺度」「AI に触れているか」「N・国」「主な結果」の 4 点は、メインが平文ファイルで該当箇所を開いて確かめる。確かめた点としていない点を判定案のファイルで分ける。
+6. **標本の重なり（#2 と #3）**: 著者・N・収集の時期・場所・尺度・募集の経路を並べて比べる（事実）。重なりの見立ては判定案。
+7. **Zenodo のレビュー（#8）**: 採択研究の一覧を本文から取り、DB の 34 件・09-28 の検索漏れ候補 145 件と DOI・題名で突き合わせる（事実）。
+8. **N-06**: DataCite の記述と DataPort のページで、データの生成方法（実測か合成か）・収集の手続き・倫理の記載を確かめる。
+
+### 2.3 判定（判定案のファイル）
+
+- TA 段は抄録で、全文段は本文を読めたものだけで判定する（v1.0 §3）。本文を読めないものは全文段を「保留」、全文確認は「入手不可」。
+- 中心-A / 中心-B の見立ては v1.0 §2 の表どおり（項目文・定義・質問文に AI が明示されるか）。
+
+### 2.4 出すもの
+
+- `survey-S-02.md`（事実）・`survey-S-02-ai-judgments.md`・`survey-S-02-gse.md`・`evidence/S-02/`（書誌とスクリプト）。
+
+## 3. S-08 AI 疲労の尺度の一覧（＋ N-07）（2026-09-29 22:30 固定・尺度の検索の前）
+
+### 3.1 問い
+
+AI に向けた疲労（項目文・定義に AI が出てくる疲労）は、何で測られてきたか。それぞれの項目数・下位尺度・AI への向け方・報告された信頼性・妥当性の検証・翻訳版。
+
+### 3.2 対象にする測定
+
+- **(a) AI に向けた疲労の測定**（一覧と COSMIN の評価の対象）: 項目文・定義・教示に AI（生成 AI・ChatGPT・AI の道具 等）が入る疲労・消耗・燃え尽きの測定。独自の尺度だけでなく、既存の尺度を AI に向けて書き換えたものも含める。
+- **(b) AI の文脈の研究で使われた一般的な疲労・燃え尽きの尺度**: 名前と出典・使った研究だけを並べる（COSMIN の評価はしない）。
+- ⚠️ テクノストレスの「ストレス要因」の尺度（過負荷・侵入など）、認知負荷、AI 不安は (a) に入れない（疲労ではない）。ただし (a) の研究の中で疲労と並べて測られていれば、その旨を書く。
+
+### 3.3 情報源
+
+1. DB の 34 件（評価版の抽出ノート `../20260928-ai-fatigue-db-appraisal/archive/evidence/extract-G*.md` を手がかりにし、数値は一次で確かめる）。
+2. S-02・S-12 で見つかった候補。
+3. 新しい検索（尺度の開発・検証）:
+   - Europe PMC: `TITLE_ABS:("AI fatigue" OR "artificial intelligence fatigue" OR "generative AI fatigue" OR "ChatGPT fatigue" OR "AI-induced fatigue" OR "AI-related fatigue" OR "chatbot fatigue" OR "GenAI fatigue" OR "AI exhaustion" OR "AI burnout") AND TITLE_ABS:(scale OR questionnaire OR inventory OR instrument OR psychometric OR validation OR "factor analysis")`
+   - Semantic Scholar 一括検索: 同じ語を `|` と `+` で。
+   - Crossref の題名の検索（`query.title`）: `AI fatigue scale`・`AI fatigue questionnaire`・`generative AI fatigue scale`（関連度検索なので件数は記録せず、上位 50 件を目で見る）。
+   - OpenAlex: 使えれば同じ式。使えなければ「使えなかった」と記録。
+4. AF001 の前方の引用（翻訳版・再検証の有無）: Semantic Scholar の citations API。
+
+### 3.4 抽出する項目（事実）
+
+尺度の名前・出典・項目数・下位尺度・回答形式・AI への向け方（教示・項目のどこに AI が入るか。★ 項目文は書かず、項目番号と「AI が入るか」だけ）・開発の標本（N・国・言語）・報告された信頼性（α・ω・再検査）・構造の検証（EFA/CFA と適合度）・収束・弁別の検証・翻訳版の有無・入手できる場所（補足資料・データ）。
+
+### 3.5 判定案のファイルで行う評価（COSMIN）
+
+- COSMIN の「良い測定特性の基準」（構造的妥当性・内的一貫性・信頼性・測定誤差・仮説検証・異文化間妥当性・基準関連妥当性・反応性）ごとに、報告された結果を `+`（基準を満たす）・`−`（満たさない）・`?`（判定できない）で評価する。★ 合計点は付けない。
+- 研究のバイアスのリスク（COSMIN RoB）は、本文を読めた研究だけ、特性ごとに `very good / adequate / doubtful / inadequate` で書く。読めない研究は「判定不能」。
+
+### 3.6 N-07（AF001 の補足資料）
+
+- 補足資料（Table S6 の全 15 項目）・ResearchBox 6748（事前登録・データ）で、項目と下位尺度の対応・採点・事前登録の範囲を確かめる。★ 項目文は repo に書かない（項目番号・下位尺度・AI が入る場所だけ）。
