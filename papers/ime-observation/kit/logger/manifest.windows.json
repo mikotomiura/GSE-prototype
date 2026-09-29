@@ -1,5 +1,5 @@
 {
-  "upstream_repo_commit": "d2aab20338c16e0658af80de7326cbdad160de7c",
+  "upstream_repo_commit": "7e9332d5fec37246e1935daf9c11d77a2318c464",
   "entries": [
     {
       "kind": "excerpt",
@@ -66,7 +66,7 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "a09c1968f1b5f5388bb58b4ef905588dd106ea4266f48c1551da10477102f000",
+      "sha256": "a7932fc986119d0b6dff07d6b536bdb11eacd2d9c04ec73ed7bf80cb6282bab9",
       "upstream_range_sha256": null,
       "check_decls": null,
       "reason": "Entry point of the Windows driver: synchronous start-up, the hook thread and its message pump, the resolver thread, and the observation closure handed to the core. Newly written; the hooks it installs live in the submodules."
@@ -136,7 +136,7 @@
       "start_anchor": "/// ⚠️★★★ **cloak/uncloak 用の 2 本目の WinEvent コールバック。**",
       "end_anchor": "/// Install WH_KEYBOARD_LL + WinEvent hooks and run the message loop.",
       "symbol": "cloak_event_callback",
-      "sha256": "1e9b0976c256c89866319c709e597b4c57131a8fbb5842f29c71127077a674f7",
+      "sha256": "83fb49c5292ac43e31c98a96a9ad30308b4db631a78fc8c8eafbdfa57ff1e8ca",
       "upstream_range_sha256": "af9fe223aa9ef1c75ac40919e145bdb15b122f606edc6877a67682c7fd47b908",
       "check_decls": null,
       "reason": "Out-of-context WinEvent hook for window cloak and uncloak events, and the resolver thread that folds them into conversion sessions. The callback only forwards a window handle; the class and the compositor state are read on the resolver thread, and the resulting state is written over injectable cells."
@@ -150,10 +150,10 @@
       "start_anchor": "    pub fn is_candidate_window_open(&self) -> bool {",
       "end_anchor": "/// Scan all top-level windows for visible IME candidate windows using EnumWindows.",
       "symbol": "is_candidate_window_open",
-      "sha256": "af6a043252952217966424d7224fc1afc15476de048308fdeea15bba8b39dfb4",
+      "sha256": "68dae923ba5bc4af27136fb9a267296ec0e93ec47948bafd99b8aa8b3b8c5fa2",
       "upstream_range_sha256": "a421dc458b5327956b9f9bf2fc56af21c928ef6c4b1d2138ebf4db23fff61eb6",
       "check_decls": null,
-      "reason": "Observation of whether a candidate window is open: the shared active flag, a window scan and a focus query combined by disjunction, with the reset of a stale flag. The judgments are excerpted; the scan and the focus query are newly written, and the combination runs over injectable probes."
+      "reason": "Observation of whether a candidate window is open: the shared active flag, a window scan and a focus query combined by disjunction, with the reset of a stale flag. The judgments are excerpted; the scan and the focus query are newly written and read class names only, never the accessible name of the focused element, and the combination runs over injectable probes."
     }
   ]
 }

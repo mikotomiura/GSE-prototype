@@ -17,7 +17,10 @@
 //!
 //! The resolver is the only writer of the session state on this path. When the input-method window
 //! events have arrived recently (`legacy_path_is_driving`), the resolver leaves the atomics alone and
-//! discards its fold, so that the two paths never write the same state.
+//! discards its fold. The check and the writes are not one atomic step: the class query and the
+//! compositor query sit between them, so a show event of the other path can still arrive in that short
+//! interval and the two paths can briefly write the same state. The timeout of the monitoring loop
+//! bounds the effect of such an overlap.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender, TrySendError};
@@ -116,8 +119,8 @@ unsafe extern "system" fn cloak_event_callback(
 
 /// Registers the notifications for a window being cloaked and uncloaked on the calling thread, which
 /// must pump its message queue. The two event identifiers are adjacent, so the registered interval
-/// contains nothing else. The events of the process's own windows are not skipped: a participant who
-/// types into a window of this process would otherwise produce no rows at all.
+/// contains nothing else. The events of the process's own windows are not skipped; this process owns
+/// no window, so skipping them would not change what is observed.
 pub(super) fn install() -> Result<HWINEVENTHOOK, String> {
     // SAFETY: `cloak_event_callback` matches the `WINEVENTPROC` signature and stays valid for the
     // lifetime of the process; the hook is removed by `uninstall` on the same thread.
@@ -275,75 +278,95 @@ fn apply_fold_action(action: FoldAction, c: &Cells<'_>) {
     }
 }
 
-/// Folds one notification into the session state. The class and the compositor's answer are passed in
-/// so that the decision can be tested without a window: a window that is not a candidate window is
-/// ignored, and the compositor's answer takes precedence over the edge the notification carried.
+/// Folds one notification of a candidate window into the session state. The compositor's answer takes
+/// precedence over the edge the notification carried.
 fn handle_event(
     fold: &mut CloakFold,
     ev: &CloakEvent,
     now_ms: u64,
-    class: Option<&str>,
     dwm: Option<bool>,
 ) -> Option<FoldAction> {
-    let class = class?;
-    if !is_ime_cloak_class(class) {
-        return None;
-    }
     let cloaked = resolved_cloak_state(dwm, ev.cloaked);
     fold.on_event(ev.hwnd, candidate_shown_from_cloak(cloaked), now_ms)
 }
 
+/// One turn of the resolver. Returns `true` when the input-method window events are driving the
+/// session state and the turn therefore left every atomic alone.
+///
+/// The class and the compositor are queried through `class_of` and `dwm` so that the turn can be
+/// tested without a window. A notification whose class cannot be read, or is not that of a candidate
+/// window, is dropped before anything else happens: neither the compositor is asked nor the active
+/// flag restated. For a candidate window, the compositor is asked for the current cloak state, the
+/// fold is advanced, and, while the fold is open, the active flag is restated because the monitoring
+/// loop may have lowered it and no further `Begin` follows in that case. Time is advanced on every
+/// turn, with or without a notification; without this the last uncloak of a session would never
+/// close it.
+fn step(
+    fold: &mut CloakFold,
+    received: Option<CloakEvent>,
+    now_ms: u64,
+    c: &Cells<'_>,
+    class_of: impl Fn(isize) -> Option<String>,
+    dwm: impl Fn(isize) -> Option<bool>,
+) -> bool {
+    // The callback checks this too, but a session can be open when the input-method window events
+    // start to arrive. The resolver then leaves every atomic alone: nothing records which path
+    // wrote a flag, and lowering the active flag here could cancel a session of the other path.
+    // A flag this path left raised is recovered by the timeout of the monitoring loop.
+    if legacy_path_is_driving(c.legacy_event_ms.load(Ordering::Acquire), now_ms) {
+        *fold = CloakFold::new();
+        return true;
+    }
+    if let Some(ev) = received {
+        let is_candidate = class_of(ev.hwnd).is_some_and(|class| is_ime_cloak_class(&class));
+        if is_candidate {
+            if let Some(action) = handle_event(fold, &ev, now_ms, dwm(ev.hwnd)) {
+                apply_fold_action(action, c);
+            }
+            if fold.is_active() {
+                c.active.store(true, Ordering::Release);
+            }
+        }
+    }
+    if let Some(action) = fold.on_tick(now_ms) {
+        apply_fold_action(action, c);
+    }
+    false
+}
+
 /// Body of the resolver thread: receives the notifications, folds them, and advances the fold in time.
-/// Returns once the stop flag is raised or the channel is disconnected.
-pub(super) fn resolve_events(rx: Receiver<CloakEvent>, stop: &AtomicBool) {
+/// Returns once the stop flag or the local stop flag is raised, or the channel is disconnected.
+pub(super) fn resolve_events(rx: Receiver<CloakEvent>, stop: &AtomicBool, local_stop: &AtomicBool) {
     tracing::info!("cloak resolver started");
     let c = Cells::shared();
     let mut fold = CloakFold::new();
     // Wake often enough not to miss the expiry of the debounce interval.
     let tick = Duration::from_millis(FOLD_GAP_MS.max(1) / 4 + 1);
     let mut warned_legacy = false;
-    while !stop.load(Ordering::Acquire) {
+    while !stop.load(Ordering::Acquire) && !local_stop.load(Ordering::Acquire) {
         let wait = if fold.is_active() { tick } else { IDLE_WAIT };
         let received = match rx.recv_timeout(wait) {
             Ok(ev) => Some(ev),
             Err(RecvTimeoutError::Timeout) => None,
             Err(RecvTimeoutError::Disconnected) => break,
         };
-        let now = super::wall_ms();
-        // The callback checks this too, but a session can be open when the input-method window events
-        // start to arrive. The resolver then leaves every atomic alone: nothing records which path
-        // wrote a flag, and lowering the active flag here could cancel a session of the other path.
-        // A flag this path left raised is recovered by the timeout of the monitoring loop.
-        if legacy_path_is_driving(c.legacy_event_ms.load(Ordering::Acquire), now) {
+        let stood_down = step(
+            &mut fold,
+            received,
+            super::wall_ms(),
+            &c,
+            |h| class_name_of(HWND(h as *mut std::ffi::c_void)),
+            |h| dwm_is_cloaked(HWND(h as *mut std::ffi::c_void)),
+        );
+        if stood_down {
             if !warned_legacy {
                 warned_legacy = true;
                 tracing::warn!(
                     "input-method window events are arriving; the cloak path stands down"
                 );
             }
-            fold = CloakFold::new();
-            continue;
-        }
-        warned_legacy = false;
-
-        if let Some(ev) = received {
-            let hwnd = HWND(ev.hwnd as *mut std::ffi::c_void);
-            let class = class_name_of(hwnd);
-            if let Some(action) =
-                handle_event(&mut fold, &ev, now, class.as_deref(), dwm_is_cloaked(hwnd))
-            {
-                apply_fold_action(action, &c);
-            }
-            // Restate the active flag: the monitoring loop may have lowered it while the session is
-            // still open, and no further `Begin` follows in that case.
-            if fold.is_active() {
-                c.active.store(true, Ordering::Release);
-            }
-        }
-        // Advance time whether or not a notification arrived; without this the last uncloak of a
-        // session would never close it.
-        if let Some(action) = fold.on_tick(now) {
-            apply_fold_action(action, &c);
+        } else {
+            warned_legacy = false;
         }
     }
     tracing::info!(
@@ -356,6 +379,7 @@ pub(super) fn resolve_events(rx: Receiver<CloakEvent>, stop: &AtomicBool) {
 mod tests {
     use super::*;
     use crate::input::ime_cloak::MAX_SESSION_MS;
+    use std::cell::Cell;
 
     struct Local {
         legacy: AtomicU64,
@@ -425,36 +449,57 @@ mod tests {
     }
 
     #[test]
-    fn a_window_of_another_class_is_ignored() {
+    fn a_window_of_another_class_is_dropped_before_the_compositor_is_asked() {
+        let l = Local::new();
         let mut fold = CloakFold::new();
-        let action = handle_event(
+        let asked = Cell::new(false);
+        let stood_down = step(
             &mut fold,
-            &ev(1, false),
+            Some(ev(1, false)),
             100,
-            Some("Chrome_WidgetWin_1"),
-            Some(false),
+            &l.cells(),
+            |_| Some("Chrome_WidgetWin_1".to_string()),
+            |_| {
+                asked.set(true);
+                Some(false)
+            },
         );
-        assert!(action.is_none());
+        assert!(!stood_down);
+        assert!(!asked.get());
         assert!(!fold.is_active());
+        assert!(!l.active.load(Ordering::Acquire));
     }
 
     #[test]
-    fn a_window_whose_class_cannot_be_read_is_ignored() {
+    fn a_window_whose_class_cannot_be_read_is_dropped_before_the_compositor_is_asked() {
+        let l = Local::new();
         let mut fold = CloakFold::new();
-        assert!(handle_event(&mut fold, &ev(1, false), 100, None, Some(false)).is_none());
+        let asked = Cell::new(false);
+        step(
+            &mut fold,
+            Some(ev(1, false)),
+            100,
+            &l.cells(),
+            |_| None,
+            |_| {
+                asked.set(true);
+                Some(false)
+            },
+        );
+        assert!(!asked.get());
         assert!(!fold.is_active());
+        assert!(!l.active.load(Ordering::Acquire));
     }
 
     #[test]
-    fn an_uncloak_of_a_candidate_window_begins_a_session_and_a_cloak_ends_it_after_the_gap() {
+    fn the_compositor_answer_wins_and_a_cloak_ends_the_session_after_the_gap() {
         let mut fold = CloakFold::new();
-        let class = Some("IME");
         // The notification says "cloaked" but the compositor says the window is visible: the
         // compositor wins and a session begins.
-        let begin = handle_event(&mut fold, &ev(7, true), 1_000, class, Some(false));
+        let begin = handle_event(&mut fold, &ev(7, true), 1_000, Some(false));
         assert!(matches!(begin, Some(FoldAction::Begin(1_000))));
         // The window is cloaked again; the session ends only after the debounce interval.
-        assert!(handle_event(&mut fold, &ev(7, false), 1_400, class, Some(true)).is_none());
+        assert!(handle_event(&mut fold, &ev(7, false), 1_400, Some(true)).is_none());
         assert!(fold.on_tick(1_400 + FOLD_GAP_MS - 1).is_none());
         let end = fold.on_tick(1_400 + FOLD_GAP_MS);
         assert!(matches!(
@@ -464,6 +509,97 @@ mod tests {
                 forced: false
             })
         ));
+    }
+
+    fn ime_class(_: isize) -> Option<String> {
+        Some("IME".to_string())
+    }
+
+    #[test]
+    fn while_the_legacy_path_drives_the_atomics_are_untouched_and_the_fold_is_dropped() {
+        let l = Local::new();
+        let now = 1_000_000;
+        l.legacy.store(now - 1_000, Ordering::Release);
+        let mut fold = CloakFold::new();
+        // A session opened before the other path started to arrive.
+        fold.on_event(7, true, now - 500);
+        assert!(fold.is_active());
+        let stood_down = step(
+            &mut fold,
+            Some(ev(7, false)),
+            now,
+            &l.cells(),
+            ime_class,
+            |_| Some(false),
+        );
+        assert!(stood_down);
+        assert!(!fold.is_active());
+        assert!(!l.active.load(Ordering::Acquire));
+        assert!(!l.ready.load(Ordering::Acquire));
+        assert_eq!(l.start.load(Ordering::Relaxed), 0);
+        assert_eq!(l.dwell.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn an_event_of_an_input_method_class_during_a_session_restates_the_active_flag() {
+        let l = Local::new();
+        let mut fold = CloakFold::new();
+        step(
+            &mut fold,
+            Some(ev(7, false)),
+            1_000,
+            &l.cells(),
+            ime_class,
+            |_| Some(false),
+        );
+        assert!(l.active.load(Ordering::Acquire));
+        // The monitoring loop lowers the flag while the session is still open.
+        l.active.store(false, Ordering::Release);
+        step(
+            &mut fold,
+            Some(ev(7, false)),
+            1_100,
+            &l.cells(),
+            ime_class,
+            |_| Some(false),
+        );
+        assert!(fold.is_active());
+        assert!(l.active.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn a_tick_without_a_notification_ends_the_session_and_publishes_it() {
+        let l = Local::new();
+        let mut fold = CloakFold::new();
+        step(
+            &mut fold,
+            Some(ev(7, false)),
+            1_000,
+            &l.cells(),
+            ime_class,
+            |_| Some(false),
+        );
+        step(
+            &mut fold,
+            Some(ev(7, true)),
+            1_400,
+            &l.cells(),
+            ime_class,
+            |_| Some(true),
+        );
+        assert!(l.active.load(Ordering::Acquire));
+        let stood_down = step(
+            &mut fold,
+            None,
+            1_400 + FOLD_GAP_MS,
+            &l.cells(),
+            |_| panic!("no notification, no class query"),
+            |_| panic!("no notification, no compositor query"),
+        );
+        assert!(!stood_down);
+        assert!(!l.active.load(Ordering::Acquire));
+        assert!(l.ready.load(Ordering::Acquire));
+        assert_eq!(l.dwell.load(Ordering::Relaxed), 400);
     }
 
     #[test]

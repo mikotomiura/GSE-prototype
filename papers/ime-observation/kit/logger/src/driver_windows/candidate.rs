@@ -6,8 +6,7 @@
 //! 1. the shared active flag, which the two WinEvent paths of this driver drive (the input-method
 //!    window events and the cloak events);
 //! 2. a scan of the top-level windows for a visible window whose class names a candidate window;
-//! 3. the class name and the accessible name of the element that has keyboard focus, read through UI
-//!    Automation.
+//! 3. the class name of the element that has keyboard focus, read through UI Automation.
 //!
 //! The scan and the focus query are secondary. The class of the language bar is deliberately not
 //! matched by the scan (see `is_ime_candidate_class_name`): that window is visible whenever a Japanese
@@ -22,8 +21,12 @@
 //! applied there, and the resolver's own time limit and the timeout of the monitoring loop bound a
 //! flag that stays raised.
 //!
+//! Only class names are read. The accessible name of the focused element is not queried, because it
+//! is arbitrary text of another application (a tab title, the body of a document) and none of it may
+//! enter this process.
+//!
 //! The closure runs on the thread of the monitoring loop. The UI Automation object is created on the
-//! first call, on that thread, because it is usable only from the thread that created it.
+//! first call, on that thread, and only that thread calls the closure afterwards.
 
 use std::sync::atomic::Ordering;
 
@@ -90,14 +93,19 @@ struct FocusProbe {
 }
 
 // SAFETY: a `FocusProbe` is constructed only inside the closure returned by `observer`, on the first
-// call, and is used only by later calls of that closure on the same thread. The closure holds `None`
-// until then, so no COM object crosses a thread boundary.
+// call. The closure holds `None` until then, so no COM object exists before that call, and the core
+// calls the closure from a single thread only (the calling-thread contract of the driver interface),
+// so the object is never used from a second thread. The initialisation below asks for a
+// multithreaded apartment, in which the object could be used from any thread; if the thread was
+// already initialised with another apartment model (a single-threaded one), the object is bound to
+// that thread, and the single-thread calling contract is what keeps its use sound.
 unsafe impl Send for FocusProbe {}
 
 impl FocusProbe {
     fn new() -> Self {
         // SAFETY: plain COM initialisation of the calling thread; a failure (for example a different
         // apartment model already set) is tolerated and the object creation below reports the outcome.
+        // The calling-thread contract of the driver interface keeps the object on this thread.
         let automation = unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
             CoCreateInstance::<_, IUIAutomation>(&CUIAutomation, None, CLSCTX_INPROC_SERVER).ok()
@@ -106,23 +114,20 @@ impl FocusProbe {
     }
 
     /// Whether the focused element is a candidate window. "Candidate" is matched on the class name
-    /// alone: a broader match such as "Ime" also matches the class names of ordinary web content.
+    /// alone: a broader match such as "Ime" also matches the class names of ordinary web content, and
+    /// the accessible name of the element is deliberately not read.
     fn focused_element_is_candidate(&self) -> bool {
         let Some(auto) = &self.automation else {
             return false;
         };
-        // SAFETY: the interface pointers are owned by this thread's COM apartment (see the type).
+        // SAFETY: the interface pointers are used only on the thread that created them (see the
+        // `Send` implementation above).
         unsafe {
             let Ok(element) = auto.GetFocusedElement() else {
                 return false;
             };
             if let Ok(class) = element.CurrentClassName() {
                 if class.to_string().contains("Candidate") {
-                    return true;
-                }
-            }
-            if let Ok(name) = element.CurrentName() {
-                if name.to_string().contains("候補") {
                     return true;
                 }
             }
@@ -282,6 +287,39 @@ mod tests {
             *log.borrow(),
             vec!["scan(active=true)", "focus(active=true)"]
         );
+        assert!(!l.active.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn the_flag_is_read_before_the_probes_run() {
+        // The probe raises the flag; the answer must still reflect the value read before it ran.
+        let l = Local::new(false, 0);
+        let got = observe(
+            &l.cells(),
+            NOW,
+            || {
+                l.active.store(true, Ordering::Release);
+                false
+            },
+            || false,
+        );
+        assert!(!got);
+    }
+
+    #[test]
+    fn the_legacy_timestamp_is_read_after_the_probes_run() {
+        // The probe records an input-method window event; the staleness test must see it.
+        let l = Local::new(true, 0);
+        let got = observe(
+            &l.cells(),
+            NOW,
+            || {
+                l.legacy.store(RECENT, Ordering::Release);
+                false
+            },
+            || false,
+        );
+        assert!(!got);
         assert!(!l.active.load(Ordering::Acquire));
     }
 
