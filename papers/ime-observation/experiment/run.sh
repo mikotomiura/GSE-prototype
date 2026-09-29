@@ -6,8 +6,11 @@
 #                             byte-identical.
 #   bash run.sh               The real analysis. The run directories are the "- run_dir:" lines of data.md.
 #                             It stops with exit status 3 unless preregistration.md carries the freeze
-#                             marks (a "frozen_at:" line and a "sha256:" line), so that no real data is
-#                             analysed before the analysis is frozen.
+#                             marks (exactly one "frozen_at: YYYY-MM-DD" line and one "sha256:" line, outside
+#                             comments and code fences) and the sha256 equals the value that
+#                             "pipeline.py --freeze-hash" computes from config.json, SEED and the ground-truth
+#                             rule file, so that no real data is analysed before the analysis is frozen and
+#                             the settings cannot change after the freeze.
 #
 # Environment: IME_RESULTS_DIR is where the result files are written (default: results/ next to this
 #   file for the real analysis, a temporary directory for --synthetic).
@@ -23,7 +26,11 @@
 # Must run under bash 3.2 (the macOS default): variables are always braced, and no arrays are used.
 set -u
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
+HERE="$(CDPATH= cd -- "$(dirname "$0")" >/dev/null && pwd)"
+if [ -z "${HERE}" ]; then
+  echo "run.sh: cannot locate its own directory" >&2
+  exit 2
+fi
 KIT="${HERE}/../kit"
 PIPELINE="${KIT}/analysis/pipeline.py"
 
@@ -51,15 +58,19 @@ if [ ! -f "${SEED_FILE}" ]; then
   echo "run.sh: SEED is missing" >&2
   exit 2
 fi
-SEED="$(tr -d ' \r\n\t' < "${SEED_FILE}")"
+SEED="$(tr -d '\r' < "${SEED_FILE}")"
 case "${SEED}" in
-  ""|*[!0-9]*) echo "run.sh: SEED must hold one non-negative integer" >&2; exit 2 ;;
+  ""|*[!0-9]*) echo "run.sh: SEED must hold one non-negative integer and nothing else (no spaces)" >&2; exit 2 ;;
 esac
 
 CONFIG="${HERE}/config.json"
 
 if [ "${MODE}" = "synthetic" ]; then
   WORK="$(mktemp -d)"
+  if [ -z "${WORK}" ] || [ ! -d "${WORK}" ]; then
+    echo "run.sh: could not create a temporary directory" >&2
+    exit 2
+  fi
   trap 'rm -rf "${WORK}"' EXIT
   RESULTS="${IME_RESULTS_DIR:-${WORK}/results}"
   echo "run.sh: synthetic run (seed ${SEED})"
@@ -74,12 +85,14 @@ if [ ! -f "${PREREG}" ]; then
   echo "run.sh: preregistration.md does not exist; the analysis is not frozen, so no real data is analysed" >&2
   exit 3
 fi
-if ! grep -Eq '^frozen_at:' "${PREREG}" || ! grep -Eq '^sha256:' "${PREREG}"; then
-  echo "run.sh: preregistration.md has no freeze marks (frozen_at: and sha256: lines); the analysis is not frozen" >&2
-  exit 3
+"${PY}" "${PIPELINE}" --check-prereg "${PREREG}" --config "${CONFIG}" --seed-file "${SEED_FILE}"
+RC=$?
+if [ "${RC}" -ne 0 ]; then
+  echo "run.sh: the freeze check failed (exit ${RC}); no real data is analysed" >&2
+  exit "${RC}"
 fi
 
 RESULTS="${IME_RESULTS_DIR:-${HERE}/results}"
 echo "run.sh: real analysis (seed ${SEED})"
-"${PY}" "${PIPELINE}" --runs-from "${HERE}/data.md" --config "${CONFIG}" --seed "${SEED}" --out "${RESULTS}"
+"${PY}" "${PIPELINE}" --runs-from "${HERE}/data.md" --config "${CONFIG}" --seed "${SEED}" --seed-file "${SEED_FILE}" --prereg "${PREREG}" --out "${RESULTS}"
 exit $?
