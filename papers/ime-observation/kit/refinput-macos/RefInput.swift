@@ -4,11 +4,16 @@
 // makes on that protocol is written as a content-free `gt/1` line (`src: "mac_nstic"`; the contract is
 // specified in ../formats/FORMATS.md): the kind of call, lengths, ranges and times, and nothing else.
 //
-// The text itself is kept in memory only, because the input method has to be answered truthfully
-// (marked range, selected range, substring queries). It is never written to the log.
+// The text under composition is kept in memory only, because the input method has to be answered truthfully
+// (marked range, selected range, substring queries). It is never written to the log. As soon as no
+// composition remains (after a commit or an unmark) the in-memory text and selection are emptied, so every
+// trial starts with no left context. Unlike an ordinary text field, this view does not retain committed text.
 //
-// The recording function takes an enumeration and integers only. There is deliberately no overload that
-// accepts a string, so a string cannot reach the log by construction.
+// The log is written by exactly two functions: `record`, whose parameters are an enumeration and integers
+// (there is no overload that accepts a string), and `writeHeader`, which takes no parameters. The byte-level
+// writer is private to `Sink`, so within the source no other path leads to the log. The recorded key codes
+// (`vk`) are a property of the physical typing, and the log of a person typing is to be handled as keystroke
+// content; see the README.
 //
 // Nothing here interprets the calls: they are written in the order received. Assigning meaning to that
 // order is left to downstream analysis.
@@ -19,7 +24,7 @@
 import AppKit
 import Foundation
 
-let appVersion = "0.1.0"
+let appVersion = "0.1.1"
 
 // MARK: - Log vocabulary
 
@@ -51,70 +56,92 @@ enum Cmd: String {
 
 // MARK: - Sink
 
-var sink: FileHandle?
-var writeFailed = false
+// The only owner of the log file descriptor. `write` is private: callers can only use `record`,
+// `writeHeader`, `create` and `close`.
+enum Sink {
+    private static var handle: FileHandle?
+    static var writeFailed = false
 
-func appendLine(_ text: String) {
-    guard let handle = sink else {
-        writeFailed = true
-        return
+    // Creates the file exclusively: an existing path (file, directory, or symbolic link) is refused.
+    static func create(path: String) -> Bool {
+        let fd = Darwin.open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        if fd < 0 { return false }
+        handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        writeHeader()
+        return !writeFailed
     }
-    do {
-        // One write per line, unbuffered, so a record survives if the process is killed later.
-        try handle.write(contentsOf: Data((text + "\n").utf8))
-    } catch {
-        writeFailed = true
-    }
-}
 
-func openSink(path: String, replaceExisting: Bool) -> Bool {
-    let fm = FileManager.default
-    if fm.fileExists(atPath: path) {
-        if !replaceExisting { return false }
-        try? fm.removeItem(atPath: path)
+    static func close() {
+        try? handle?.close()
+        handle = nil
     }
-    guard fm.createFile(atPath: path, contents: nil), let handle = FileHandle(forWritingAtPath: path) else {
-        return false
+
+    private static func write(_ bytes: [UInt8]) {
+        guard let h = handle else {
+            fail()
+            return
+        }
+        do {
+            // One write per line, unbuffered, so a record survives if the process is killed later.
+            try h.write(contentsOf: Data(bytes))
+        } catch {
+            fail()
+        }
     }
-    sink = handle
-    appendLine("{\"kind\":\"header\",\"format\":\"gt/1\",\"src\":\"mac_nstic\",\"app_version\":\"\(appVersion)\",\"os\":\"macos\"}")
-    return !writeFailed
-}
 
-func wallMs() -> Int64 {
-    return Int64((Date().timeIntervalSince1970 * 1000).rounded(.down))
-}
-
-func monoNs() -> UInt64 {
-    return clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
-}
-
-// The recording function. Arguments are an enumeration and integers only; `cmd` is emitted from the
-// enumeration's raw value.
-func record(ev: Ev, cmd: Cmd? = nil, vk: Int? = nil, len: Int? = nil, selLoc: Int? = nil, selLen: Int? = nil,
-            repLoc: Int? = nil, repLen: Int? = nil) {
-    var line = "{\"kind\":\"ev\",\"t_wall_ms\":\(wallMs()),\"t_mono_ns\":\(monoNs()),\"ev\":\"\(ev.rawValue)\""
-    if let cmd = cmd { line += ",\"cmd\":\"\(cmd.rawValue)\"" }
-    if let vk = vk { line += ",\"vk\":\(vk)" }
-    if let len = len { line += ",\"len\":\(len)" }
-    if let selLoc = selLoc { line += ",\"sel_loc\":\(selLoc)" }
-    if let selLen = selLen { line += ",\"sel_len\":\(selLen)" }
-    // NSNotFound means "no replacement range was given"; the field is left out in that case.
-    if let repLoc = repLoc, repLoc != NSNotFound, repLoc >= 0 {
-        line += ",\"rep_loc\":\(repLoc)"
-        if let repLen = repLen { line += ",\"rep_len\":\(repLen)" }
+    private static func fail() {
+        if !writeFailed {
+            writeFailed = true
+            // A fixed message: it never contains any content.
+            FileHandle.standardError.write(Data("refinput: writing the log failed\n".utf8))
+        }
     }
-    line += "}"
-    appendLine(line)
+
+    private static func wallMs() -> Int64 {
+        return Int64((Date().timeIntervalSince1970 * 1000).rounded(.down))
+    }
+
+    private static func monoNs() -> UInt64 {
+        return clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
+    }
+
+    static func writeHeader() {
+        let line = "{\"kind\":\"header\",\"format\":\"gt/1\",\"src\":\"mac_nstic\",\"app_version\":\"\(appVersion)\",\"os\":\"macos\"}\n"
+        write(Array(line.utf8))
+    }
+
+    // The recording function. Arguments are an enumeration and integers only; `cmd` is emitted from the
+    // enumeration's raw value.
+    static func record(ev: Ev, cmd: Cmd? = nil, vk: Int? = nil, len: Int? = nil, selLoc: Int? = nil,
+                       selLen: Int? = nil, repLoc: Int? = nil, repLen: Int? = nil) {
+        var line = "{\"kind\":\"ev\",\"t_wall_ms\":\(wallMs()),\"t_mono_ns\":\(monoNs()),\"ev\":\"\(ev.rawValue)\""
+        if let cmd = cmd { line += ",\"cmd\":\"\(cmd.rawValue)\"" }
+        if let vk = vk { line += ",\"vk\":\(vk)" }
+        if let len = len { line += ",\"len\":\(len)" }
+        if let selLoc = selLoc { line += ",\"sel_loc\":\(selLoc)" }
+        if let selLen = selLen { line += ",\"sel_len\":\(selLen)" }
+        // NSNotFound means "no replacement range was given"; the field is left out in that case.
+        if let repLoc = repLoc, repLoc != NSNotFound, repLoc >= 0 {
+            line += ",\"rep_loc\":\(repLoc)"
+            if let repLen = repLen { line += ",\"rep_len\":\(repLen)" }
+        }
+        line += "}\n"
+        write(Array(line.utf8))
+    }
 }
 
 // MARK: - The view
 
+private let noRange = NSRange(location: NSNotFound, length: 0)
+
 final class RefInputView: NSView, NSTextInputClient {
-    // The text lives in memory only (UTF-16 units, as the protocol counts them).
+    // The text under composition lives in memory only (UTF-16 units, as the protocol counts them).
+    // Invariant: whenever there is no marked text, `text` is empty and `selected` is (0, 0). Whenever there is,
+    // `text` consists of exactly the marked text.
     private let text = NSMutableString()
-    private var marked = NSRange(location: NSNotFound, length: 0)
+    private var marked = noRange
     private var selected = NSRange(location: 0, length: 0)
+    private var focused = false
 
     override var acceptsFirstResponder: Bool { return true }
 
@@ -122,12 +149,20 @@ final class RefInputView: NSView, NSTextInputClient {
         super.viewDidMoveToWindow()
         guard let win = window else { return }
         let center = NotificationCenter.default
-        center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: win, queue: nil) { _ in
-            record(ev: .focusIn)
+        center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: win, queue: nil) { [weak self] _ in
+            self?.setFocus(true)
         }
-        center.addObserver(forName: NSWindow.didResignKeyNotification, object: win, queue: nil) { _ in
-            record(ev: .focusOut)
+        center.addObserver(forName: NSWindow.didResignKeyNotification, object: win, queue: nil) { [weak self] _ in
+            self?.setFocus(false)
         }
+    }
+
+    // Records a focus event only when the state changes, so that the initial synchronisation and the
+    // notification do not both record the same transition.
+    func setFocus(_ now: Bool) {
+        if now == focused { return }
+        focused = now
+        Sink.record(ev: now ? .focusIn : .focusOut)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -138,17 +173,47 @@ final class RefInputView: NSView, NSTextInputClient {
     }
 
     override func keyDown(with event: NSEvent) {
-        record(ev: .keyDown, vk: Int(event.keyCode))
+        Sink.record(ev: .keyDown, vk: Int(event.keyCode))
         interpretKeyEvents([event])
+    }
+
+    // Mouse events go to the input method first (it may end or move a composition); otherwise to the view.
+    override func mouseDown(with event: NSEvent) {
+        if inputContext?.handleEvent(event) != true { super.mouseDown(with: event) }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if inputContext?.handleEvent(event) != true { super.mouseDragged(with: event) }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if inputContext?.handleEvent(event) != true { super.mouseUp(with: event) }
+    }
+
+    private func clamp(_ range: NSRange, to length: Int) -> NSRange {
+        let start = min(max(range.location, 0), length)
+        let len = min(max(range.length, 0), length - start)
+        return NSRange(location: start, length: len)
     }
 
     // Range the next edit replaces: the explicit range if given, else the marked range, else the selection.
     private func target(_ replacement: NSRange) -> NSRange {
         var r = replacement
         if r.location == NSNotFound { r = (marked.location != NSNotFound) ? marked : selected }
-        let end = min(max(r.location, 0) + max(r.length, 0), text.length)
-        let start = min(max(r.location, 0), text.length)
-        return NSRange(location: start, length: end - start)
+        return clamp(r, to: text.length)
+    }
+
+    // Restores the invariant after an edit: with no composition left, nothing is retained.
+    private func settle() {
+        if marked.location == NSNotFound || text.length == 0 {
+            text.setString("")
+            marked = noRange
+            selected = NSRange(location: 0, length: 0)
+        } else {
+            marked = NSRange(location: 0, length: text.length)
+            selected = clamp(selected, to: text.length)
+        }
+        needsDisplay = true
     }
 
     private func plain(_ value: Any) -> NSString {
@@ -161,59 +226,85 @@ final class RefInputView: NSView, NSTextInputClient {
 
     func insertText(_ string: Any, replacementRange: NSRange) {
         let s = plain(string)
-        record(ev: .insertText, len: s.length, repLoc: replacementRange.location, repLen: replacementRange.length)
+        Sink.record(ev: .insertText, len: s.length, repLoc: replacementRange.location, repLen: replacementRange.length)
         let r = target(replacementRange)
         text.replaceCharacters(in: r, with: s as String)
-        marked = NSRange(location: NSNotFound, length: 0)
-        selected = NSRange(location: r.location + s.length, length: 0)
-        needsDisplay = true
+        // The committed text is not retained.
+        marked = noRange
+        settle()
     }
 
-    func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+    func setMarkedText(_ string: Any, selectedRange selRange: NSRange, replacementRange: NSRange) {
         let s = plain(string)
-        record(ev: .setMarked, len: s.length, selLoc: selectedRange.location, selLen: selectedRange.length,
-               repLoc: replacementRange.location, repLen: replacementRange.length)
+        // The raw values are recorded; NSNotFound (Int.max) may arrive and is clamped before any arithmetic.
+        Sink.record(ev: .setMarked, len: s.length, selLoc: selRange.location, selLen: selRange.length,
+                    repLoc: replacementRange.location, repLen: replacementRange.length)
         let r = target(replacementRange)
         text.replaceCharacters(in: r, with: s as String)
-        marked = s.length > 0 ? NSRange(location: r.location, length: s.length) : NSRange(location: NSNotFound, length: 0)
-        selected = NSRange(location: r.location + max(selectedRange.location, 0), length: max(selectedRange.length, 0))
-        needsDisplay = true
+        marked = text.length > 0 ? NSRange(location: 0, length: text.length) : noRange
+        // The selection is relative to the new marked string, which starts at r.location.
+        let rel = clamp(selRange, to: s.length)
+        selected = NSRange(location: r.location + rel.location, length: rel.length)
+        settle()
     }
 
     func unmarkText() {
-        record(ev: .unmark)
-        marked = NSRange(location: NSNotFound, length: 0)
-        needsDisplay = true
+        Sink.record(ev: .unmark)
+        marked = noRange
+        settle()
     }
 
-    func selectedRange() -> NSRange { return selected }
+    func selectedRange() -> NSRange { return clamp(selected, to: text.length) }
 
     func markedRange() -> NSRange { return marked }
 
     func hasMarkedText() -> Bool { return marked.location != NSNotFound }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
-        let start = min(max(range.location, 0), text.length)
-        let end = min(start + max(range.length, 0), text.length)
-        let r = NSRange(location: start, length: end - start)
+        let r = clamp(range, to: text.length)
         actualRange?.pointee = r
         return NSAttributedString(string: text.substring(with: r))
     }
 
-    func validAttributesForMarkedText() -> [NSAttributedString.Key] { return [] }
+    func validAttributesForMarkedText() -> [NSAttributedString.Key] {
+        return [.markedClauseSegment, .underlineStyle, .underlineColor]
+    }
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
-        record(ev: .firstRect)
-        actualRange?.pointee = range
+        Sink.record(ev: .firstRect)
+        actualRange?.pointee = clamp(range, to: text.length)
         guard let win = window else { return .zero }
         let caret = NSRect(x: 12, y: bounds.height / 2 - 4, width: 1, height: 32)
         return win.convertToScreen(convert(caret, to: nil))
     }
 
-    func characterIndex(for point: NSPoint) -> Int { return 0 }
+    // The position of a character is not computed: no character index is reported.
+    func characterIndex(for point: NSPoint) -> Int { return NSNotFound }
 
     override func doCommand(by selector: Selector) {
-        record(ev: .doCommand, cmd: Cmd(rawValue: NSStringFromSelector(selector)) ?? .other)
+        let cmd = Cmd(rawValue: NSStringFromSelector(selector)) ?? .other
+        Sink.record(ev: .doCommand, cmd: cmd)
+        // Editing commands act on the (normally empty) text when no composition is active.
+        if marked.location != NSNotFound { return }
+        let sel = clamp(selected, to: text.length)
+        switch cmd {
+        case .deleteBackward:
+            let r = sel.length > 0 ? sel : NSRange(location: max(sel.location - 1, 0), length: sel.location > 0 ? 1 : 0)
+            text.replaceCharacters(in: r, with: "")
+            selected = NSRange(location: r.location, length: 0)
+        case .deleteForward:
+            let r = sel.length > 0 ? sel : NSRange(location: sel.location, length: min(1, text.length - sel.location))
+            text.replaceCharacters(in: r, with: "")
+            selected = NSRange(location: r.location, length: 0)
+        case .moveLeft:
+            selected = NSRange(location: sel.length > 0 ? sel.location : max(sel.location - 1, 0), length: 0)
+        case .moveRight:
+            let end = sel.location + sel.length
+            selected = NSRange(location: sel.length > 0 ? end : min(end + 1, text.length), length: 0)
+        default:
+            break
+        }
+        needsDisplay = true
     }
 }
 
@@ -224,36 +315,92 @@ func selftestFailure(_ what: String) -> Int32 {
     return 1
 }
 
+// Compares the protocol's answers with the expected state. Only booleans and lengths are compared.
+func checkState(_ view: RefInputView, _ step: String, marked: NSRange?, selected: NSRange, textLen: Int) -> String? {
+    if view.hasMarkedText() != (marked != nil) { return "\(step): hasMarkedText" }
+    if let m = marked {
+        if view.markedRange() != m { return "\(step): markedRange \(view.markedRange())" }
+    } else if view.markedRange().location != NSNotFound {
+        return "\(step): markedRange must be NSNotFound"
+    }
+    if view.selectedRange() != selected { return "\(step): selectedRange \(view.selectedRange())" }
+    var actual = NSRange(location: 0, length: 0)
+    let got = view.attributedSubstring(forProposedRange: NSRange(location: 0, length: textLen), actualRange: &actual)
+    if got?.length != textLen || actual != NSRange(location: 0, length: textLen) { return "\(step): substring length" }
+    // A request past the end is clamped to the same range.
+    let wide = view.attributedSubstring(forProposedRange: NSRange(location: 0, length: textLen + 5), actualRange: nil)
+    if wide?.length != textLen { return "\(step): clamped substring length" }
+    return nil
+}
+
 func runSelftest(outPath: String?) -> Int32 {
     let path = outPath ?? (NSTemporaryDirectory() + "refinput-selftest-\(getpid()).jsonl")
     let removeAfter = (outPath == nil)
+    // Only a file this function created itself is removed; an explicit --out is never removed or replaced.
+    guard Sink.create(path: path) else { return selftestFailure("cannot create the output (it may already exist)") }
     defer { if removeAfter { try? FileManager.default.removeItem(atPath: path) } }
-    guard openSink(path: path, replaceExisting: true) else { return selftestFailure("cannot open the output") }
 
     _ = NSApplication.shared
     let view = RefInputView(frame: NSRect(x: 0, y: 0, width: 400, height: 100))
     let none = NSRange(location: NSNotFound, length: 0)
+    let empty = NSRange(location: 0, length: 0)
+    var problem: String?
+    func expect(_ step: String, marked: NSRange?, selected: NSRange, textLen: Int) {
+        if problem == nil { problem = checkState(view, step, marked: marked, selected: selected, textLen: textLen) }
+    }
 
     // Strings are built from code points so that the read-back check below has a fixed thing to look for.
     let reading = String(String.UnicodeScalarView([0x306B, 0x307B, 0x3093, 0x3054].compactMap(Unicode.Scalar.init)))
     let kanji = String(String.UnicodeScalarView([0x65E5, 0x672C, 0x8A9E].compactMap(Unicode.Scalar.init)))
     let astral = String(String.UnicodeScalarView([0x20BB7, 0x61].compactMap(Unicode.Scalar.init)))
 
+    view.setFocus(true)
+    view.setFocus(true)  // a repeated state records nothing
     view.setMarkedText(reading, selectedRange: NSRange(location: 4, length: 0), replacementRange: none)
+    expect("after set_marked 1", marked: NSRange(location: 0, length: 4), selected: NSRange(location: 4, length: 0), textLen: 4)
     view.insertText(kanji, replacementRange: NSRange(location: 0, length: 4))
+    expect("after insert_text 1", marked: nil, selected: empty, textLen: 0)
     view.setMarkedText("", selectedRange: NSRange(location: 0, length: 0), replacementRange: none)
+    expect("after empty set_marked", marked: nil, selected: empty, textLen: 0)
     view.setMarkedText(astral, selectedRange: NSRange(location: 3, length: 0), replacementRange: NSRange(location: 3, length: 0))
+    expect("after set_marked 2", marked: NSRange(location: 0, length: 3), selected: NSRange(location: 3, length: 0), textLen: 3)
     view.setMarkedText(NSAttributedString(string: "\(kanji)"), selectedRange: NSRange(location: 0, length: 3), replacementRange: none)
+    expect("after set_marked 3", marked: NSRange(location: 0, length: 3), selected: NSRange(location: 0, length: 3), textLen: 3)
+    var actual = NSRange(location: 0, length: 0)
+    _ = view.firstRect(forCharacterRange: NSRange(location: 1, length: 99), actualRange: &actual)
+    if actual != NSRange(location: 1, length: 2) { return selftestFailure("firstRect actualRange \(actual)") }
     view.unmarkText()
-    _ = view.firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+    expect("after unmark", marked: nil, selected: empty, textLen: 0)
+    // NSNotFound and Int.max in the ranges must not trap, and the state must stay inside the text.
+    view.setMarkedText(reading, selectedRange: NSRange(location: Int.max, length: Int.max), replacementRange: none)
+    expect("after set_marked 4", marked: NSRange(location: 0, length: 4), selected: NSRange(location: 4, length: 0), textLen: 4)
+    // A replacement range that covers only part of the marked text.
+    view.setMarkedText(kanji, selectedRange: NSRange(location: 1, length: 1), replacementRange: NSRange(location: 2, length: 5))
+    expect("after set_marked 5", marked: NSRange(location: 0, length: 5), selected: NSRange(location: 3, length: 1), textLen: 5)
+    // A selection location of NSNotFound with a non-zero replacement start must not overflow.
+    view.setMarkedText(kanji, selectedRange: NSRange(location: Int.max, length: 1), replacementRange: NSRange(location: 2, length: 5))
+    expect("after set_marked 5b", marked: NSRange(location: 0, length: 5), selected: NSRange(location: 5, length: 0), textLen: 5)
+    // A commit that replaces a range covering only part of the marked text leaves nothing behind.
+    view.insertText(astral, replacementRange: NSRange(location: 1, length: 1))
+    expect("after insert_text 2", marked: nil, selected: empty, textLen: 0)
+    view.setMarkedText(astral, selectedRange: none, replacementRange: NSRange(location: Int.max, length: Int.max))
+    expect("after set_marked 6", marked: NSRange(location: 0, length: 3), selected: NSRange(location: 3, length: 0), textLen: 3)
+    view.insertText(kanji, replacementRange: none)
+    expect("after insert_text 3", marked: nil, selected: empty, textLen: 0)
+    if view.characterIndex(for: NSPoint(x: 1, y: 1)) != NSNotFound { return selftestFailure("characterIndex") }
+    if view.validAttributesForMarkedText().isEmpty { return selftestFailure("validAttributesForMarkedText") }
     view.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+    view.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+    view.doCommand(by: #selector(NSResponder.moveLeft(_:)))
+    view.doCommand(by: #selector(NSResponder.moveRight(_:)))
+    expect("after commands", marked: nil, selected: empty, textLen: 0)
     view.doCommand(by: #selector(NSResponder.selectAll(_:)))
-    record(ev: .keyDown, vk: 36)
-    record(ev: .focusOut)
-    record(ev: .focusIn)
-    if writeFailed { return selftestFailure("a write failed") }
-    try? sink?.close()
-    sink = nil
+    Sink.record(ev: .keyDown, vk: 36)
+    view.setFocus(false)
+    view.setFocus(false)
+    if let p = problem { return selftestFailure(p) }
+    if Sink.writeFailed { return selftestFailure("a write failed") }
+    Sink.close()
 
     guard let data = FileManager.default.contents(atPath: path) else { return selftestFailure("cannot read the output back") }
     // (b) Nothing that was passed in may appear: the whole output must be plain ASCII.
@@ -272,29 +419,34 @@ func runSelftest(outPath: String?) -> Int32 {
     }
     guard let header = rows.first, header["kind"] as? String == "header", header["src"] as? String == "mac_nstic",
           header["os"] as? String == "macos" else { return selftestFailure("bad header") }
-    let events = rows.dropFirst()
+    let events = Array(rows.dropFirst())
 
-    // (a) The recorded lengths equal the UTF-16 lengths of what was passed.
-    let expectedLens = [reading.utf16.count, kanji.utf16.count, 0, astral.utf16.count, kanji.utf16.count]
+    // (a) The recorded lengths equal the UTF-16 lengths of what was passed (see expectedLens).
+    // The supplementary-plane string has two characters but three UTF-16 units; the units are what is counted.
+    if astral.count != 2 { return selftestFailure("test string is not a supplementary-plane one") }
+    let expectedLens = [4, 3, 0, 3, 3, 4, 3, 3, 3, 3, 3]
     let lens = events.filter { $0["ev"] as? String == "set_marked" || $0["ev"] as? String == "insert_text" }
         .compactMap { $0["len"] as? Int }
-    // Order of the calls above: set_marked, insert_text, set_marked, set_marked, set_marked.
     if lens != expectedLens { return selftestFailure("lengths \(lens) differ from \(expectedLens)") }
-    if astral.utf16.count != 3 { return selftestFailure("a supplementary-plane character must count as 2 units") }
     let evNames = events.compactMap { $0["ev"] as? String }
-    let expectedEv = ["set_marked", "insert_text", "set_marked", "set_marked", "set_marked", "unmark", "first_rect",
-                      "do_command", "do_command", "key_down", "focus_out", "focus_in"]
+    let expectedEv = ["focus_in", "set_marked", "insert_text", "set_marked", "set_marked", "set_marked", "first_rect",
+                      "unmark", "set_marked", "set_marked", "set_marked", "insert_text", "set_marked", "insert_text", "do_command",
+                      "do_command", "do_command", "do_command", "do_command", "key_down", "focus_out"]
     if evNames != expectedEv { return selftestFailure("event order \(evNames)") }
     // An absent replacement range leaves rep_* out; a given one records it.
-    guard let firstSet = events.first, firstSet["rep_loc"] == nil, firstSet["rep_len"] == nil, firstSet["sel_loc"] as? Int == 4
-    else { return selftestFailure("replacement range handling") }
-    let insertRow = events[events.startIndex + 1]
+    let firstSet = events[1]
+    if firstSet["rep_loc"] != nil || firstSet["rep_len"] != nil || firstSet["sel_loc"] as? Int != 4 {
+        return selftestFailure("replacement range handling")
+    }
+    let insertRow = events[2]
     if insertRow["rep_loc"] as? Int != 0 || insertRow["rep_len"] as? Int != 4 {
         return selftestFailure("replacement range was not recorded")
     }
     // (c) A selector outside the enumeration is recorded as `other`.
     let cmds = events.filter { $0["ev"] as? String == "do_command" }.compactMap { $0["cmd"] as? String }
-    if cmds != ["cancelOperation:", "other"] { return selftestFailure("commands \(cmds)") }
+    if cmds != ["cancelOperation:", "deleteBackward:", "moveLeft:", "moveRight:", "other"] {
+        return selftestFailure("commands \(cmds)")
+    }
     return 0
 }
 
@@ -302,6 +454,11 @@ func runSelftest(outPath: String?) -> Int32 {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { return true }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        Sink.close()
+        if Sink.writeFailed { exit(1) }
+    }
 }
 
 var delegate: AppDelegate?
@@ -320,10 +477,10 @@ func runApp() -> Int32 {
     win.makeKeyAndOrderFront(nil)
     win.makeFirstResponder(view)
     app.activate(ignoringOtherApps: true)
-    // The window may already be key before the observers were registered.
-    if win.isKeyWindow { record(ev: .focusIn) }
+    // The window may already be key before the notification arrives; a repeated state is not recorded twice.
+    view.setFocus(win.isKeyWindow)
     app.run()
-    return writeFailed ? 1 : 0
+    return Sink.writeFailed ? 1 : 0
 }
 
 // MARK: - Entry
@@ -353,8 +510,8 @@ func main() -> Int32 {
     }
     if selftest { return runSelftest(outPath: outPath) }
     guard let path = outPath else { return usage() }
-    // A recording run never replaces an existing file, so that a raw log cannot be destroyed.
-    guard openSink(path: path, replaceExisting: false) else {
+    // A recording run never replaces an existing path, so that a raw log cannot be destroyed.
+    guard Sink.create(path: path) else {
         FileHandle.standardError.write(Data("cannot create the output (it may already exist)\n".utf8))
         return 1
     }

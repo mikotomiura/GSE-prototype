@@ -5,12 +5,22 @@ A minimal Cocoa application (one Swift file, no package dependencies) whose only
 line (`src: "mac_nstic"`). The contract for the log format is specified in
 [`../formats/FORMATS.md`](../formats/FORMATS.md).
 
-- **No text is ever written to the log.** The recording function accepts an enumeration and integers only;
-  no overload accepts a string. What is recorded is the kind of call, lengths (UTF-16 code units), ranges, and
-  times.
-- **The text is kept in memory only.** The input method has to be answered truthfully (marked range,
-  selected range, substring queries), so the view holds the text it is editing. That text is used to answer
-  the protocol and to draw the view. It is not logged.
+- **The text passed to the protocol is never written to the log.** The recording function accepts an
+  enumeration and integers only; no overload accepts a string. The byte-level writer is private to the `Sink`
+  type, and the only functions that write to the log are `record` and the parameterless header writer, so no
+  path in the source carries a string to the log. What is recorded is the kind of call, lengths (UTF-16 code
+  units), ranges, and times.
+- **The recorded key codes still reflect what was typed.** The `vk` values of the `key_down` lines form the
+  sequence of physical keys pressed, from which the typed keys (for romaji input, the reading) can be
+  reconstructed. A log of a person typing is therefore to be handled as keystroke content. The claim above is
+  limited to not writing the text.
+- **The text under composition is kept in memory only.** The input method has to be answered truthfully
+  (marked range, selected range, substring queries), so the view holds the text being composed. That text is
+  used to answer the protocol and to draw the view. It is not logged.
+- **Committed text is not retained.** Unlike an ordinary text field, the view empties its in-memory text and
+  selection as soon as no marked text remains (after `insertText` or `unmarkText`). The input method is
+  therefore given no left context, so that trials are independent of one another. The recorded lines (for
+  example the `len` of an `insert_text`) are unaffected.
 - **No interpretation is performed.** Calls are written in the order received. The protocol documentation
   does not state the order in which the input method calls `unmarkText()` and `insertText`, and it does not
   define what counts as the ground truth of a conversion; that definition is fixed by a calibration pilot with
@@ -37,16 +47,27 @@ python3 papers/ime-observation/kit/formats/validate_logs.py --kind gt /tmp/gt.js
 .build/refinput-macos --out gt_mac_nstic.jsonl                 # opens a window and records until it is closed
 ```
 
-- `--out <path>`: the output path. A recording run never replaces an existing file (it fails with exit code
-  1, so a raw log cannot be destroyed). `--selftest` recreates the given path; without `--out` it writes to a
-  temporary file and removes it.
+- `--out <path>`: the output path. The file is created exclusively (`O_EXCL`, no symbolic links followed,
+  mode 0600). An existing path of any kind, file or directory, is refused with exit code 1, so a raw log
+  cannot be destroyed. `--selftest` follows the same rule; without `--out` it writes to a temporary file that
+  it created itself and removes it.
+- If a write to the log fails, a fixed message (containing no content) is printed to standard error once, and
+  the process exits with code 1 when it terminates.
+- The application has no menu, so Cmd+Q and Cmd+W do not work. To end a run, click the window's close button
+  (closing the last window terminates the application), or terminate the process.
+- Mouse events (`mouseDown`, `mouseDragged`, `mouseUp`) are offered to the input method first and passed on to
+  the view only if it does not consume them.
 - `--selftest`: creates no window. It calls the protocol methods directly: a marked text of four characters,
   an insertion that replaces it, an emptying of the marked text, a marked text containing a supplementary-plane
-  character, an attributed string, `unmarkText()`, `firstRect`, and two `doCommand(by:)` calls (one selector
-  from the contract and one outside it). It then reads the output back and checks that (a) each recorded
-  `len` equals the UTF-16 length of what was passed, (b) the output is plain ASCII and contains none of the
-  strings that were passed, (c) a selector outside the contract is recorded as `other`, and that the event
-  order and the header are as expected. Exit code `0` means all checks passed, `1` a failure.
+  character, an attributed string, `unmarkText()`, `firstRect`, out-of-range and `NSNotFound` ranges,
+  partial replacement ranges, and several `doCommand(by:)` calls (selectors from the contract and one outside
+  it). After each step it compares `hasMarkedText`, `markedRange`, `selectedRange` and the length of
+  `attributedSubstring(forProposedRange:actualRange:)` with the expected values, including that the text is
+  empty after every commit (no string is written anywhere). It then reads the output back and checks that (a)
+  each recorded `len` equals the UTF-16 length of what was passed, (b) the output is plain ASCII and contains
+  none of the strings that were passed, (c) a selector outside the contract is recorded as `other`, and that
+  the event order, a repeated focus state recording nothing, and the header are as expected. Exit code `0`
+  means all checks passed, `1` a failure.
 - Nothing is written to standard output. Failures are described on standard error. Exit code `2` is a usage
   error or a missing `swiftc`.
 - Output is UTF-8 with no byte-order mark, LF line endings, one JSON object per line, and no spaces around
@@ -65,7 +86,7 @@ Both are recorded because the wall clock can jump.
 | `firstRect(forCharacterRange:actualRange:)` | `first_rect` | none |
 | `doCommand(by:)` | `do_command` | `cmd` (a selector from the contract, otherwise `other`) |
 | `keyDown(with:)` | `key_down` | `vk` (`NSEvent.keyCode`) |
-| the window becoming or ceasing to be the key window | `focus_in` / `focus_out` | none |
+| the window becoming or ceasing to be the key window | `focus_in` / `focus_out` | none (recorded on a change of state only) |
 
 `?` marks an optional field. `rep_loc` and `rep_len` are left out when the replacement range is `NSNotFound`.
 
