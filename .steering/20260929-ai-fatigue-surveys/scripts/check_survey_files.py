@@ -15,6 +15,7 @@
   python check_survey_files.py              # 本物を検査（違反があれば終了コード 1）
   python check_survey_files.py --selftest   # 一時ディレクトリで変異を作り、どれもが赤になることを確かめる
 """
+import csv
 import json
 import os
 import re
@@ -110,10 +111,13 @@ def check_evidence(root):
                 bad = keys & BAD_KEYS
                 values = list(walk_values(obj))
             elif fn.endswith((".tsv", ".csv")):
-                lines = open(p, encoding="utf-8").read().splitlines()
-                head = lines[0].lower() if lines else ""
-                bad = {c.strip() for c in re.split(r"[\t,]", head)} & BAD_KEYS
-                values = [c for ln in lines for c in ln.split("\t")]
+                # ★ 標準の csv で読む（引用符で囲んだ見出し "abstract" も見出しとして解釈する・判断 16）
+                delim = "\t" if fn.endswith(".tsv") else ","
+                with open(p, encoding="utf-8", newline="") as fh:
+                    table = list(csv.reader(fh, delimiter=delim))
+                head = [c.strip().lower() for c in (table[0] if table else [])]
+                bad = set(head) & BAD_KEYS
+                values = [c for row in table for c in row]
             else:
                 continue
             if bad:
@@ -211,7 +215,9 @@ def selftest():
         muts = [("evidence abstract key", "zz_mutant.json", {"runs": [{"records": [{"title": "x", "abstract": "y"}]}]}),
                 ("evidence email value", "zz_mutant.json", {"runs": [{"records": [{"affiliation": "Univ. a.b@example.com"}]}]}),
                 ("evidence long string", "zz_mutant.json", {"runs": [{"records": [{"title": "x" * 600}]}]}),
-                ("evidence tsv abstract column", "zz_mutant.tsv", "id\tabstract\n1\tx\n")]
+                ("evidence tsv abstract column", "zz_mutant.tsv", "id\tabstract\n1\tx\n"),
+                ("evidence tsv quoted abstract column", "zz_mutant.tsv", '"id"\t"Abstract"\n1\tx\n'),
+                ("evidence csv abstract column", "zz_mutant.csv", 'id,"abstract"\n1,x\n')]
         for label, name, content in muts:
             p = os.path.join(base, "evidence", name)
             os.makedirs(os.path.dirname(p), exist_ok=True)

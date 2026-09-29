@@ -15,10 +15,10 @@
 - [x] S-04 疲れが減る側の証拠 → design §4 を先に固定 → 0 段目の機械ふるい（判断 9）・補い（判断 10）→ 抽出 4 本（うち抄録の直し 1 本・判断 11）→ メインの確認 → コミット
 - [x] S-05 自動化を見張る疲労 → design §5 を先に固定 → 検索（22:08）→ 抽出 → メインの確認 → コミット
 - [x] `db-proposals.md`（DB への追加・修正の提案・A〜G 節）
-- [x] `researcher-requests.md`（[研究者] 有料データベース 3・本文の入手 9）
+- [x] `researcher-requests.md`（[研究者] 有料データベース 3・本文の入手 12）
 
 ## 検査
-- [x] `python scripts/check_survey_files.py` が緑（事実 7 本・判定案 6 本・違反 0）・`--selftest` で変異 141 種がすべて赤（レビュー後に検査を強めた・判断 13）
+- [x] `python scripts/check_survey_files.py` が緑（事実 7 本・判定案 6 本・違反 0）・`--selftest` で変異 143 種がすべて赤（レビュー後に検査を強めた・判断 13）
 - [ ] 本文・PDF・抄録の全文・尺度の項目文がコミットに無いこと（`git diff --stat` と evidence の鍵の検査）
 - [ ] DB の xlsx が変わっていないこと（`git diff --stat` に xlsx が無い）
 

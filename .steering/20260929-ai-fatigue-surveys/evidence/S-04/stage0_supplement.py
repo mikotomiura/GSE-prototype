@@ -44,5 +44,9 @@ def main(stage0, abs_all, out, out_abs):
     print(len(sel))
 
 
+RERUN_BLOCKED = ("この版は 2026-09-29 に実行した版の記録で、そのまま再実行しない（evidence/README.md・decisions.md 判断 16）。"
+                 "流用するときは evidence/common.py の関数（抄録を空で上書きしない・repo の外の確認・排他的な作成・URL の許可）で直した新しいスクリプトを作る。")
+
+
 if __name__ == "__main__":
-    main(*sys.argv[1:5])
+    sys.exit(RERUN_BLOCKED)  # 実行した時の呼び出し: main(*sys.argv[1:5])

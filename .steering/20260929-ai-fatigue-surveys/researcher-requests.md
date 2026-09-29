@@ -25,5 +25,8 @@
 | B7 | Kim & Kim 2026（Technology in Society, doi:10.1016/j.techsoc.2026.103553） | 抄録すら取れていない。疲労（消耗）の測定・標本 | S-02 |
 | B8 | Kang & Li 2025（Journal of Business Convergence, doi:10.31152/jb.2025.12.10.6.297・DBpia） | AI 疲労の尺度の出典・項目数・項目文（S-08 の一覧に入れるため） | S-02・S-08 |
 | B9 | Nobles 2026（Zenodo, doi:10.5281/zenodo.22838191） | 公開のファイルだが、2026-09-29 に Zenodo が 403（大量アクセスの制限）を返した。日をおいてこちらで再取得する（ブラウザで手で落とせるなら、その方が早い） | S-02 |
+| B10 | Ambient Artificial Intelligence Use and Clinician Documentation Burden, Productivity, and Efficiency（*JAMA Netw Open* 2026, doi:10.1001/jamanetworkopen.2026.15762） | 抄録が取れず、S-04 の機械のふるいを題名だけで受けた。比較の有無・燃え尽きや疲労の測定 | S-04 |
+| B11 | Reimagining Surgical Documentation: Implementing Ambient Artificial Intelligence…（*Plast Reconstr Surg* 2025, doi:10.1097/prs.0000000000012725） | 同上（題名に燃え尽きの語） | S-04 |
+| B12 | Impact of Ambient Artificial Intelligence Documentation on Cognitive Load（*Mayo Clin Proc Digit Health* 2025, doi:10.1016/j.mcpdig.2024.100193） | 同上 | S-04 |
 
 （S-08 以降で見つかったものは、このあとに足す。）
