@@ -429,3 +429,23 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
   - 005: 差し替えた api を捨てない（`close` の後の `open` で本物を作らない・二重の `open` は拒む）・selftest の冒頭で本物の `_Api` を番兵に替える（code-reviewer M1・security 補足）／keymap の網羅を核の `KEYNAMES` と比べる（常に真だった・M2）／窓は可視・完全一致のタイトルでちょうど 1 つ（`EnumWindows`）・最小化なら元に戻す（M3・L4）／管理者として動いていたら `open()` で止める（security L-e）／戻り値 0 の説明から UIPI の推測を外し `get_last_error()` を載せる・UIPI の取りこぼしは戻り値で見分けられないこと・前景ロック・Windows 11 のタイマー分解能・仮想キーの `wScan` が 0 であること（観測器は仮想キーで判定する）を docstring に（L1〜L3・L7）／selftest の穴（押下だけで前面化・`KEYUP`・keymap の値の型）。
   - 006: 想定外の例外を握りつぶさない（トレースバックを run ディレクトリと stderr に）／OS の版と Python の版を manifest に／`allow_send` がフラグから渡ることを selftest で確かめる／押下の直前に子の生死を同期で確かめる／`{out}` を絶対パスに／時計の分解能の検査を子を起こす前に／計画を 1 回だけ読む／commit を開始時に取り作業ツリーの変更の有無も残す／reset / focus の stderr と失敗の種類を残す／停止の間の SIGTERM・2 回目の Ctrl-C でも全員を止めて manifest を書く／stderr のファイルも排他で作る／Windows で `.bat` / `.cmd` を拒む／例のセルのリセットを失敗する仮コマンドに／README（スリープ・画面ロックを止める・F13〜F19 が他のアプリのホットキーを発火しうる・セルのファイルは実行されるコード・ラッパー経由で起動しない）。
   - 直さない: 006 L19（`emit.py` の私的な関数への依存と事前検査の重複）は核の issue を開き直すことになるので、次に核を触るときに回す。
+
+## 判断 59: `emit.py` の送出の基準を `trial_begin` の刻印そのものにする（2026-09-29・研究者の回答・004 の追補）
+
+- 事象と原因は `blockers.md` B12（既定の selftest が約 1% で「計画より早く送った」になる。基準の `perf_counter()` を刻印より先に取っていた）。
+- 選択肢: A = 基準を刻印に揃える／ B = selftest の許容を広げる（oracle のずれは残る）／ C = 記録だけして後で
+- **採用: A**。メインが base に入れた: `Emitter._emit` が書いた行を返し、`run_trial` は `start = <trial_begin の t_mono_ns> / 1e9` とする（刻印の単調時計 `perf_counter_ns` と待ちの `perf_counter` は同じ時計）。selftest に「keys are scheduled from the recorded trial_begin timestamp」（`trial_begin` の刻印だけを 5 ms 遅らせる `Emitter` の派生で 2 試行を送り、最小の遅れが -1 ms 以上）を足した。
+- 確認（G-GEAR・Python 3.11.9）: 既定の selftest 48 件が緑・style 違反 0 件。写しで基準を元の形に戻す変異で新しいケースが 3 回とも赤。
+- ⚠️ Mac: 次の Mac のセッションで `004-acceptance.sh` を回し直す（macOS では `perf_counter_ns` / `perf_counter` はどちらも `mach_absolute_time()`）。
+
+## 判断 60〜61: 023 の worker の Stop（写しと公開物の書き方が両立しない）を仕様の側で解く（2026-09-30・研究者の回答）
+
+- 事象: W5 の 023 の worker が attempt 1 で Status を `blocked` にして止まった（`blocked（受け入れ条件どうしの矛盾）`）。AC2「写しと元の差はプロセス名の行だけ」と判断 36 の書き方（`style_ok`）が両立しない（違反 166 件・すべて 3 本の写しの中）。一次で確かめた: 計測器 2 本（`sample-macos.sh` / `sample-windows.sh`）は注釈の行だけが違反（行末の注釈は無い）、`calibrate-cpu.sh` は画面に出す文言（`echo` / heredoc の本文）も日本語と ★。元の `summarize.py` は校正の値を掛け合わせておらず、`calibrate-cpu.sh` は測定器の陽性対照（手作業の確認）。
+- もう 1 点: issue 023 は「写しの表（元のパス・SHA-256・変えた行）を README に書く」としていて、worker の公開 README に GSE のパス（`experiments/20260903-o1-runtime-cost/...`）と「以前の計測から写した」が載った。判断 36 / 43 より前に書いた仕様（機械の門の禁止語には当たらないので `style_ok` は緑だった）。
+
+| # | 論点 | 採用 | 理由 |
+|---|---|---|---|
+| 60 | 写しと書き方 | ★ **計測器 2 本は実行される行を元と同じに保ち、注釈だけを学術的な英語に訳す**。AC2 を「注釈（`#` の行・`#!` を除く）と空行を除くと、元との差はプロセス名の行だけ」に改め、陽性対照（実行される行を 1 行足すと検出する）を acceptance に足した。★ **`calibrate-cpu.sh` は写さず、同じ測り方を英語で書き直す**（集計には使わない手作業の確認） | 計器の同一性（測るコード）を保ったまま公開物の書き方を守る。校正の文言は出力そのものなので、訳すと「写し」の検査が機械で書けない |
+| 61 | 出典の表の置き場 | ★ **`kit/e3/PROVENANCE.internal.md` に移す**（Allowed Files に足した・024 は書き出さない・`_style_check.py` の対象外）。公開の README は計器の中身だけを書き、元のパスと写した関係を書かない。acceptance: README と 4 本に `experiments/20260903` が 0 件・README に `copied` が 0 件・`PROVENANCE.internal.md` に 2 本の元のパスと元の SHA-256 | ロガーと同じ形（判断 43） |
+
+- 段取り: 023 の worktree（worker の `d70e30f4` / `30e321ec`）は片付け、直した issue と acceptance で `--issues 023` を回し直す。

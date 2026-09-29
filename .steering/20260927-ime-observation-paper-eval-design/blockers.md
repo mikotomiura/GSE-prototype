@@ -77,3 +77,11 @@
 - 原因 2: 同じ機械で別プロジェクト（`C:\ERRE-Sand_Box`）の計算が CPU を 82% 使っていて、送出の遅れの 95 パーセンタイルが 20 ms を超えた（高い優先度では 0.04 ms）。→ 判断 53。★ そのプロセスには触れていない。
 - 影響: 直すまでは 005 / 006 のループの verify がベースラインから赤になる（`docs/loop-engineering.md` のモード C の条件 ③）。
 - ★ 教訓: 004 の acceptance は `require_os macos` なので、`emit.py` の selftest は Windows では一度も回っていなかった。**「どちらの OS でも走る selftest」（`check.sh` が拾うもの）を片方の機械だけで merge したら、もう片方の機械で全 acceptance を回すまで完了としない。**
+
+## B12（2026-09-29・W3 の残りの merge の後）`emit.py` の既定の selftest が間欠的に赤（約 1%）
+
+- 事象: 005 / 006 を merge した後の base（`5668dccd`）の clean な checkout で全 acceptance を回すと、005 の AC5（`emit.py --selftest`）だけが 1 回赤になった（同じ acceptance の中の `kit/check.sh` と、回し直しは緑）。既定の selftest を 200 回回すと 2 回、どちらも「no key is sent before its planned time」で落ちた。
+- 原因: `run_trial` が送出の基準 `start = time.perf_counter()` を、`trial_begin` 行の刻印（`_emit` の中の `_stamp()`）より**先に**取っていた。その 2 つの文の間でプロセスが止められると、oracle 上の `trial_begin` が実際の基準より遅れ、鍵が「計画より早く送られた」ように見える。★ 実データでも oracle の試行の窓が実際の基準からずれる。
+- 再現の試み: 16 コアを埋めた負荷・低い優先度では再現しなかった（止められる位置が 2 文の間に当たる確率が低い）。200 回の繰り返しで捕捉した。
+- 対応: 判断 59（基準を刻印そのものにする・004 の追補）。★ 退行を決定的に捕まえるケースを selftest に足した（`trial_begin` の刻印だけを 5 ms 遅らせても早く送らない）。
+- ⚠️ `emit.py` を変えたので、Mac で `004-acceptance.sh` を回し直す（B11 の教訓）。

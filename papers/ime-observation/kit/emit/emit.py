@@ -347,6 +347,7 @@ class Emitter(object):
         row.update(fields)
         row.update(_stamp())
         self._row(row)
+        return row
 
     def write_reset(self, block_id, exit_code):
         self._emit("reset", block_id=block_id, exit_code=exit_code)
@@ -375,8 +376,10 @@ class Emitter(object):
     def run_trial(self, trial):
         trial_id = trial["trial_id"]
         _wait_ms(trial.get("gap_before_ms", 0))
-        start = time.perf_counter()
-        self._emit("trial_begin", trial_id=trial_id)
+        # The steps are scheduled from the recorded trial_begin timestamp itself (the monotonic timestamp and
+        # the waits use the same clock), so that a pause of the process between the two cannot make a key
+        # appear, in the oracle, to have been sent before its planned time.
+        start = self._emit("trial_begin", trial_id=trial_id)["t_mono_ns"] / 1e9
         for i, step in enumerate(trial["steps"]):
             _wait_until(start + step["at_ms"] / 1000.0)
             st = _stamp()
@@ -720,6 +723,31 @@ def selftest(full=False):
             print("info 95th percentile of send lateness: %.2f ms (the 20 ms bound depends on the load of the "
                   "machine and is checked by --selftest --full)" % p95)
         check("the inter-trial wait of the plan is honoured", all(g >= 49.0 for g in gaps) and len(gaps) >= 4)
+
+        # a pause of the process just before the trial_begin timestamp (simulated by delaying that one
+        # timestamp by 5 ms) must not make a key appear, in the oracle, to have been sent early
+        class _DelayedBegin(Emitter):
+            def _emit(self, kind, **fields):
+                if kind == "trial_begin":
+                    time.sleep(0.005)
+                return Emitter._emit(self, kind, **fields)
+
+        delayed = os.path.join(tmp, "delayed.jsonl")
+        plan_sha, plan_header, plan_blocks = read_plan(plan)
+        dry = load_backend("dryrun")
+        with _DelayedBegin(dry.Backend({}), delayed, plan_sha, plan_header["os"], "dryrun",
+                           supported_keys=dry.SUPPORTED_KEYS) as em:
+            first_block, first_trials = plan_blocks[0]
+            em.run_block(first_block, first_trials[:2])
+        begun, delayed_late = {}, []
+        for r in _load_rows(delayed):
+            if r["kind"] == "trial_begin":
+                begun[r["trial_id"]] = r["t_mono_ns"]
+            elif r["kind"] == "sent":
+                due = begun[r["trial_id"]] + planned[r["trial_id"]][r["step"]]["at_ms"] * 1000000
+                delayed_late.append((r["t_mono_ns"] - due) / 1e6)
+        check("keys are scheduled from the recorded trial_begin timestamp",
+              len(delayed_late) == 2 * 40 and min(delayed_late) >= -1.0)
 
         # negative controls for the validator
         text = open(out, encoding="utf-8").read()
