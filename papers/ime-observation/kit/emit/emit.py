@@ -4,12 +4,13 @@
 
   emit.py --plan PLAN --out ORACLE --backend dryrun|macos|windows [--backend-opt k=v ...]
   emit.py --validate ORACLE
-  emit.py --selftest
+  emit.py --selftest [--full]
 
 The emitter waits only for the intervals the plan gives (``gap_before_ms``, ``marker_gap_ms``, and the
 per-step ``at_ms``); it never chooses an interval itself. Every key it sends is recorded with the wall-clock
 and monotonic time taken immediately before dispatch, so the oracle states what was intended and when it was
 actually sent. The oracle is used only to verify the observed ground truth, never as an input to an observer.
+Both clocks must resolve 1 ms or better; the emitter refuses to start otherwise (``ClockTooCoarse``).
 
 Sending is opt-in, and the gate sits in ``Emitter`` itself: a backend other than ``dryrun`` is not opened
 unless the emitter was constructed with ``allow_send=True``, and no output file is created otherwise. The
@@ -77,6 +78,8 @@ MAX_PLAN_BYTES = 16 * 1024 * 1024   # size limit of a plan file
 MAX_AT_MS = 3600000                 # upper bound of a step time (one hour into a trial)
 MAX_GAP_MS = 3600000                # upper bound of gap_before_ms and marker_gap_ms
 SIGTERM_STATUS = 143
+MAX_CLOCK_RESOLUTION_S = 0.001      # coarsest clock resolution accepted for the oracle timestamps
+FILETIME_UNIX_EPOCH = 116444736000000000  # 1970-01-01 in 100 ns intervals since 1601-01-01
 
 
 class PlanError(Exception):
@@ -85,6 +88,10 @@ class PlanError(Exception):
 
 class SendRefused(Exception):
     """Raised when an emitter is asked to open a real backend without permission to send."""
+
+
+class ClockTooCoarse(Exception):
+    """Raised when a clock used for the oracle timestamps resolves coarser than MAX_CLOCK_RESOLUTION_S."""
 
 
 def _is_int(v):
@@ -240,8 +247,51 @@ def _wait_ms(ms):
     _wait_until(time.perf_counter() + ms / 1000.0)
 
 
+def _precise_wall_clock():
+    """On Windows, a function returning Unix time in nanoseconds from GetSystemTimePreciseAsFileTime;
+    elsewhere None. On Windows, time.time() and time.monotonic() of some Python versions (3.11 among them)
+    advance in steps of about 15.6 ms, which would quantise every timestamp of the oracle."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+        fn = ctypes.windll.kernel32.GetSystemTimePreciseAsFileTime
+    except (ImportError, AttributeError, OSError):
+        return None
+    fn.argtypes = [ctypes.POINTER(wintypes.FILETIME)]
+    fn.restype = None
+
+    def wall_ns():
+        ft = wintypes.FILETIME()
+        fn(ctypes.byref(ft))
+        ticks = (ft.dwHighDateTime << 32) | ft.dwLowDateTime
+        return (ticks - FILETIME_UNIX_EPOCH) * 100
+
+    return wall_ns
+
+
+_PRECISE_WALL_NS = _precise_wall_clock()
+
+
+def _wall_ns():
+    return _PRECISE_WALL_NS() if _PRECISE_WALL_NS is not None else time.time_ns()
+
+
+def clock_resolutions():
+    """The declared resolutions, in seconds, of the wall clock and of the monotonic clock used for timestamps."""
+    wall = 1e-7 if _PRECISE_WALL_NS is not None else time.get_clock_info("time").resolution
+    return wall, time.get_clock_info("perf_counter").resolution
+
+
+def _mono_ns():
+    """The monotonic timestamp: the clock that the waits use."""
+    return time.perf_counter_ns()
+
+
 def _stamp():
-    return {"t_wall_ms": time.time_ns() // 1000000, "t_mono_ns": time.monotonic_ns()}
+    """Both timestamps of a row."""
+    return {"t_wall_ms": _wall_ns() // 1000000, "t_mono_ns": _mono_ns()}
 
 
 class Emitter(object):
@@ -263,6 +313,10 @@ class Emitter(object):
             if self._supported is None:
                 raise SendRefused("backend %s needs supported_keys so that a block is checked before it is sent"
                                   % self._name)
+        wall, mono = clock_resolutions()
+        if max(wall, mono) > MAX_CLOCK_RESOLUTION_S:
+            raise ClockTooCoarse("the clocks for the timestamps resolve %.6f s (wall) and %.6f s (monotonic); "
+                                 "at most %.3f s is required" % (wall, mono, MAX_CLOCK_RESOLUTION_S))
         self._f = open(self.out, "x", encoding="utf-8", newline="\n")
         try:
             self._row(self._header)
@@ -538,7 +592,7 @@ def run(args):
                      allow_send=args.send_flag, supported_keys=module.SUPPORTED_KEYS) as em:
             for block, trials in blocks:
                 em.run_block(block, trials)
-    except (SendRefused, PlanError) as e:
+    except (SendRefused, ClockTooCoarse, PlanError) as e:
         print("emit: %s" % e, file=sys.stderr)
         return 2
     except (RuntimeError, OSError, subprocess.SubprocessError) as e:
@@ -559,9 +613,11 @@ def main(argv=None):
                     help="required for any backend that sends real key events")
     ap.add_argument("--validate", metavar="ORACLE")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--full", action="store_true",
+                    help="with --selftest: also check the upper bound on send lateness (run on an idle machine)")
     args = ap.parse_args(argv)
     if args.selftest:
-        return selftest()
+        return selftest(full=args.full)
     if args.validate:
         errors = validate_oracle(args.validate)
         for e in errors[:20]:
@@ -611,7 +667,9 @@ def _quiet_main(argv):
         return main(argv)
 
 
-def selftest():
+def selftest(full=False):
+    """Dryrun checks. The default run contains only checks that do not depend on the load of the machine;
+    full=True adds the upper bound on send lateness, which is meaningful only on an otherwise idle machine."""
     failures = []
 
     def check(name, cond):
@@ -655,7 +713,12 @@ def selftest():
                 late.append((r["t_mono_ns"] - due) / 1e6)
         late.sort()
         p95 = late[int(0.95 * (len(late) - 1))]
-        check("95th percentile of send lateness is under 20 ms (%.2f ms)" % p95, p95 < 20.0 and late[0] >= -1.0)
+        check("no key is sent before its planned time", late[0] >= -1.0)
+        if full:
+            check("95th percentile of send lateness is under 20 ms (%.2f ms)" % p95, p95 < 20.0)
+        else:
+            print("info 95th percentile of send lateness: %.2f ms (the 20 ms bound depends on the load of the "
+                  "machine and is checked by --selftest --full)" % p95)
         check("the inter-trial wait of the plan is honoured", all(g >= 49.0 for g in gaps) and len(gaps) >= 4)
 
         # negative controls for the validator
@@ -677,6 +740,36 @@ def selftest():
         marks = [r for r in rows if r["kind"] == "marker"]
         check("the marker gap of the plan is honoured",
               len(marks) >= 2 and (marks[1]["t_mono_ns"] - marks[0]["t_mono_ns"]) >= (5 - 1) * 1000000)
+
+        # the timestamp clocks: declared resolution, observed step, and the refusal of a coarse clock
+        check("the timestamp clocks declare a resolution of 1 ms or better",
+              max(clock_resolutions()) <= MAX_CLOCK_RESOLUTION_S)
+        steps, prev, deadline = [], _stamp()["t_wall_ms"], time.perf_counter() + 0.5
+        while len(steps) < 20 and time.perf_counter() < deadline:
+            cur = _stamp()["t_wall_ms"]
+            if cur != prev:
+                steps.append(cur - prev)
+                prev = cur
+        steps.sort()
+        check("the wall-clock timestamp of a row advances in steps of 1 ms",
+              len(steps) == 20 and steps[len(steps) // 2] <= 1)
+        # whether time.time() steps coarsely depends on the timer resolution other processes request, so the
+        # source of both timestamps is also checked directly
+        original_clocks = (globals()["_wall_ns"], globals()["_mono_ns"])
+        globals()["_wall_ns"], globals()["_mono_ns"] = (lambda: 1700000000123456789), (lambda: 42)
+        try:
+            check("row timestamps come from the high-resolution clocks",
+                  _stamp() == {"t_wall_ms": 1700000000123, "t_mono_ns": 42})
+        finally:
+            globals()["_wall_ns"], globals()["_mono_ns"] = original_clocks
+        original_resolutions = globals()["clock_resolutions"]
+        globals()["clock_resolutions"] = lambda: (0.015625, 1e-7)
+        try:
+            o = os.path.join(tmp, "coarse.jsonl")
+            check("a clock coarser than 1 ms stops the run before any output",
+                  _quiet_main(["--plan", plan, "--out", o, "--backend", "dryrun"]) == 2 and not os.path.exists(o))
+        finally:
+            globals()["clock_resolutions"] = original_resolutions
 
         # sending is opt-in: the real-backend path runs the real main() with load_backend replaced by a sentinel
         # that raises when called, so the check cannot reach a backend module at all

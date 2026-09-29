@@ -71,8 +71,17 @@ remainder. It waits only for the plan's `gap_before_ms` (before a trial), `marke
 and `at_ms` (within a trial, relative to the trial start). The plan reader accepts `at_ms` up to 3,600,000
 (one hour), `gap_before_ms` and `marker_gap_ms` up to 3,600,000, and a plan file up to 16 MiB. A marker key is released immediately after its press.
 Each `sent` and `marker` row carries `t_wall_ms` (Unix time in milliseconds) and `t_mono_ns` (monotonic clock in
-nanoseconds), both taken immediately before dispatch. The self-test requires the 95th percentile of the
-difference between actual and planned send time to stay under 20 ms.
+nanoseconds), both taken immediately before dispatch. The default self-test requires that no key is sent before
+its planned time and reports the 95th percentile of the difference between actual and planned send time. The
+full self-test (`--selftest --full`) also requires that percentile to stay under 20 ms; run it on an otherwise
+idle machine, since competing processes delay the wake-up of the emitter (on a heavily loaded machine the
+percentile exceeded 20 ms, and fell to about 0.03 ms when the emitter ran at high priority).
+
+Both clocks resolve 1 ms or better. `t_mono_ns` comes from `time.perf_counter_ns()`, the clock that the waits
+use. On Windows, `t_wall_ms` comes from `GetSystemTimePreciseAsFileTime`, because `time.time()` and
+`time.monotonic()` of some Python versions (3.11 among them) advance there in steps of about 15.6 ms (for
+`time.time()`, whenever no process has requested a finer system timer); elsewhere it comes from `time.time_ns()`. If either clock declares a resolution coarser than 1 ms, the emitter stops
+before it creates the output file (exit status 2).
 
 ## Plan checks before sending
 
