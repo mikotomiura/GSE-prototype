@@ -1,19 +1,20 @@
-# 次セッション（Mac）— IME 論文: Mac の issue（004 / 007 / 012）をループで実行する
+# 次セッション（Mac）— IME 論文: G-GEAR で直した実行器（`emit.py`）を Mac で確かめる（004 の acceptance の回し直し）
 
-> 作成: 2026-09-29。★ 前の Mac 用 handoff（`next-session-ime-paper-loop-w2-mac.md`）の後継。前のものは読まなくてよい。
-> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `_issue-plan.md`（§4 機械の割り当て・§7 config の注意）・`issues/004.md` `007.md` `012.md`・`decisions.md`（判断 1〜46）・`blockers.md`（B1〜B9）。状態は着手時に測り直す。
-> ⚠️ G-GEAR 側は別の handoff: `.steering/_handoff/next-session-ime-paper-ggear-w5.md`（★ 2026-09-29 に W4〔014 / 018 / 019〕を merge し終え、base は `ff2a392c` 以降。判断 44〜46 が増えた。G-GEAR の 005 / 006 → 020 / 023 は **Mac の 004 が base に入るのを待っている**）。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。
+> 作成: 2026-09-29。**2026-09-29 の夜に §0 を書き換えた**: Mac の 004 / 007 / 012 は merge 済み（前回の手順は下の §1〜§3 に参照用に残す・もう回さない）。今回やることは §1b の確認だけ。
+> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（判断 52〜54）・`blockers.md`（B10 / B11）・`tasklist.md`。状態は着手時に測り直す。
+> ⚠️ G-GEAR 側は別の handoff: `.steering/_handoff/next-session-ime-paper-ggear-w5.md`（base は `7f7551cc` 以降。G-GEAR の次は 005 / 006 のループ）。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。
 
 ## §0 打ち込む用（Mac で・`/clear` の直後に）
 
 ```
-.steering/_handoff/next-session-ime-paper-mac.md を読んで、IME 論文の評価一式の Mac の issue（004 / 007、続けて 012）をモード C で実行し、merge ゲートを通して base に入れてください。
-一次資料: .steering/20260927-ime-observation-paper-eval-design/ の _issue-plan.md（§4・§7）・issues/004.md 007.md 012.md・decisions.md（判断 34〜46）・blockers.md。
-⚠️ 実行の前に docs/loop-engineering.md を Read する。base は feature/ime-eval-kit（origin から pull してから回す）。
-⚠️ _loop-config.json の events_path を Mac のパスへ書き換えてから回し、その変更はコミットしない。
-Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は日本語。研究者の判断が要ることは AskUserQuestion で聞く。
-コミットは git add パス指定（-A 禁止）。main への merge は W6 まで終わってから（研究者の判断）。
+.steering/_handoff/next-session-ime-paper-mac.md を読んで、§1b のとおり G-GEAR で直した実行器（papers/ime-observation/kit/emit/emit.py・判断 52 / 53）を Mac で確かめてください。ループは回さない（004 / 007 / 012 は merge 済み）。
+手順: base（feature/ime-eval-kit）を origin から取り込む（main checkout を別セッションが使っていれば、B10 のとおり base 用の worktree で扱う・ブランチを切り替えない）。clean な checkout で bash .steering/20260927-ime-observation-paper-eval-design/issues/004-acceptance.sh を回す（出力はファイルへ・終了コードはパイプの後ろで取らない）。あわせて python3 papers/ime-observation/kit/emit/emit.py --selftest --full（機械が空いた状態で）と bash papers/ime-observation/kit/check.sh を回す。
+緑なら tasklist.md の「⚠️ Mac: 004-acceptance.sh を回し直す」に結果を書いてコミットし、git pull --no-rebase の後に push する。赤なら直さずに研究者に報告する。
+一次資料: .steering/20260927-ime-observation-paper-eval-design/ の decisions.md（判断 52〜54）・blockers.md（B10 / B11）。Skill: verify-before-claiming・git-workflow。応答は日本語。
+コミットは git add パス指定（-A 禁止）。main への merge はしない（W6 の後・研究者の判断）。
 ```
+
+## 以下 §1〜§3 は前回（2026-09-29 の昼）の手順。完了済み・参照用
 
 ## §1 状態（2026-09-29）
 

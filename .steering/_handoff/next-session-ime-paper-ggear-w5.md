@@ -19,6 +19,7 @@ Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は�
 - ★ **Mac の 004 / 007 / 012 は base に入った**（Mac が merge・G-GEAR で取り込んで確認）。base = **`3e078338`**（push 済み）。
 - G-GEAR で取り込んだとき、全 acceptance が `kit/check.sh` の 1 件で赤だった（004 の `emit.py` の selftest・B11）→ 判断 52 / 53 で `emit.py` を直した（oracle の時刻を高分解能の時計に・遅れの上限は `--selftest --full` へ）。直した後の base の clean な checkout で、G-GEAR で回る全 acceptance 17 本が失敗 0 件（macOS 専用の 004 / 007 / 012 は exit 2 ＝対象外）・ループの verify 3 本（`check.sh`・`check.sh --compile`・`check-shell-portability.sh`）が緑・`_style_check.py` 違反 0 件。
 - ★ 判断 54: 005 / 006 の `## Dependencies` から 004 を外した（004 の `issue_done` は Mac の events にだけある）。→ **§2 の手順 1 の「004 の merge」は満たされている。手順 2（`--issues 005,006`）から始めてよい**。
+- ★ 推奨の順番（2026-09-29 のセッションでメインが勧めた・研究者は未確定）: **Mac で `emit.py` の確認（`004-acceptance.sh` の回し直し）を先に済ませてから 005 / 006 を回す**。着手時に `git pull` して `tasklist.md` の「⚠️ Mac: `004-acceptance.sh` を回し直す」が済んでいるかを見る。済んでいなければ研究者に確認する。Mac で赤だったなら、005 / 006 の前にメインが `emit.py` を直す（`emit.py` は 005 / 006 の Allowed Files の外なので worker は直せない）。
 - ⚠️ 同じ機械で別プロジェクト（`C:\ERRE-Sand_Box`）の重い計算が走っていると CPU を奪う（2026-09-29 に 82%）。既定の selftest は負荷に左右されないようにしたが、ループや acceptance の所要時間は延びる。
 
 ## §1 状態（2026-09-29 の終わり）
