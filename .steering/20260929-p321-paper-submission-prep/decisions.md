@@ -171,3 +171,15 @@
   - Codex ① P2（ORCID がクラスの内部マクロに頼る）: 通常の版と投稿する版（`[referee,lineno]`）の両方の PDF で、タイトル頁に ORCID が 1 回・リンク先が `https://orcid.org/0009-0000-4196-0508` であることを確かめた。投稿システムが組んだ PDF でも見る（手順書 C.4）。
 - ★ 論文用リポジトリ `75ce1ff`: `bash run.sh` exit 0・`bash paper/build.sh` exit 0・pdfLaTeX で通常の版 21 頁／投稿する版 32 頁（どちらも Overfull `\hbox` 0・未定義 0）。
 - **3 巡目は回さない**: 2 巡目の指摘はすべて一次で確かめて直し、残る論点は投稿日に手順書のとおりに実物で確かめる段（zip の照合・投稿システムの PDF）へ収束した（memory `project_cross_review_two_rounds`「打ち切りは残る論点が別の段へ収束したから」）。→ Codex の上限を 300,000 に戻す。
+
+## 判断 13: 投稿日の実施記録（2026-09-29・研究者の選択「今日投稿まで進む」）
+
+- **A（確定）**: 論文用リポジトリ `75ce1ff`（clean・`run.sh` / `build.sh` exit 0）。security-checker の検査より後の 2 コミット（`02380c5`・`75ce1ff`）を**コミットごとに**検査した（差分とメッセージに秘密情報・ローカルパス・GSE への言及 0 件・著者とコミッタは Mikoto Miura だけ）。GitHub 側: ブランチ main だけ・タグ 0・Release 0・PR 0。注釈付きタグ `submission-2026-09-29` → `75ce1ff`（tagger Mikoto Miura）を手元で付けた。
+- **B（zip）**: `git -c core.autocrlf=false archive --format=zip --prefix=self-resolution-measure/ submission-2026-09-29` → `self-resolution-measure-submission-2026-09-29.zip`（90,183 B・SHA-256 `65a216b029ea99acae270dd88f4cc85b1d7c5ff7a2ee7f8a086c09c67b5b76c3`・MD5 `513601c006f39a6a409f512014e2121e`）。展開して **27 ファイルすべてが名前と blob ID（`git hash-object --no-filters`）でタグと一致**。展開したものに D1 の zip を置いて `run.sh` exit 0（同梱の `results/` と一致）・`build.sh` exit 0（21 頁）。Zenodo の下書きにアップロード（サーバの MD5 = 手元）・`version` = `submission-2026-09-29`・タグの URL を `isSupplementTo` に追加。
+- **C（投稿用の原稿）**: `C:/wt/emse-upload/` に 6 ファイル（`main.tex`・`results.tex`・`refs.bib`・`main.bbl`・`sn-jnl.cls`・`sn-basic.bst`）。`main.tex` はタグの版と `\documentclass[pdflatex,sn-basic,referee,lineno]{sn-jnl}` の 1 行だけ違う（`diff` で確認）・`results.tex` / `refs.bib` はタグと同一（`cmp`）・cls / bst は `build.sh` が固定する SHA-256 と一致。pdfLaTeX で 32 頁・Overfull `\hbox` 0・未定義 0・字形の欠落 0・タイトル頁に ORCID が 1 回。見本の PDF は `C:/wt/emse-preview-2026-09-29.pdf`（上げない）。
+- **D・E（研究者の確認の後・逐語の選択「D と E を続けて実行する」）**:
+  - タグだけを push → `gh repo edit --visibility public`（`{"private":false,"visibility":"public"}`）。認証なしで GitHub のページ 200・最上位に `raw/`・cls・bst なし・`paper/` は 5 ファイル・ブランチ main だけ。
+  - Zenodo の公開: ⚠️ 私が足した安全確認（下書きのファイルの MD5 が検証した zip と一致すること）が、下書きの一覧の MD5 に `md5:` の接頭辞が無いことで**一度拒否した**（ファイルは正しかった）→ 接頭辞を外して比べるよう直して公開（202・state `done`・10:34 UTC = 19:34 JST）。公開の API で DOI `10.5281/zenodo.23029603`・版・ファイル 1 つ・open を確認。
+  - ⚠️ doi.org は公開の 6 分後も 404（DataCite の API も 404 = まだ登録されていない）。→ 解決するまで EMSE の承認は待つ（手順書 F）。
+- 取り消せない操作の間隔: public 化から Zenodo の公開までは数分（安全確認の拒否と修正の分）。
+- ⚠️ **DOI の登録待ち**（20:12 JST = 公開の約 38 分後）: doi.org・DataCite の API とも 404。Zenodo の記録の API では `pids.doi` = `10.5281/zenodo.23029603`・provider `datacite`・published。研究者の既存の記録（22735437・22733449）の DOI は doi.org で解決し DataCite も 200 → 経路は正常で、この記録の登録だけが Zenodo 側の非同期の処理で遅れている。
