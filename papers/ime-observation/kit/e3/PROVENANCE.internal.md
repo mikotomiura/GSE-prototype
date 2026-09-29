@@ -3,28 +3,28 @@
 `*.internal.*` is dropped by the public export and is outside `_style_check.py`. This file records where the
 files of `kit/e3/` come from. The public `README.md` does not say so.
 
-## Copies (issue 023, decision 60 / 61)
+## Copies (the E3 kit, rulings of 2026-09-30)
 
 Both are copies of the samplers of the earlier run-time cost experiment, kept under `experiments/`. The
 executable lines are the same as the original. Differences:
 
-1. The process name. The original names it as a constant (`gse-next`); the copy reads the environment
+1. The process name. The original names it as a fixed constant (the product process name); the copy reads the environment
    variable `E3_PROC` (default `ime-observation-logger`).
 2. All comment lines (`#`) were translated into academic English and reworded so that they carry no
    project name, no mark characters and no reference to files that do not exist under `kit/`
-   (decision 60: the original comments are Japanese and mention the project, which conflicts with decision 36).
+   (the original comments are Japanese and name the project, which conflicts with the rule for published files).
 
 | Copy | Original | SHA-256 of the original | Changed executable lines |
 |---|---|---|---|
-| `sample-macos.sh` | `experiments/20260903-o1-runtime-cost/scripts/sample-macos.sh` | `244f79c34af93c4cd89bfe90c40a2fadeb1e4fcf73abbbc8e0f1f1389ce62f31` | `pgrep -x 'gse-next'` becomes `pgrep -x "${E3_PROC}"`; one line added: `E3_PROC="${E3_PROC:-ime-observation-logger}"` |
-| `sample-windows.sh` | `experiments/20260903-o1-runtime-cost/scripts/sample-windows.sh` | `a8f1ab2f078d9bd21c5c9a464f804eef13d8673318b88c6568d1664505a0589b` | `Get-Process -Name "gse-next"` becomes `Get-Process -Name $env:E3_PROC`; one line added: `E3_PROC="${E3_PROC:-ime-observation-logger}"; export E3_PROC` |
+| `sample-macos.sh` | `experiments/20260903-o1-runtime-cost/scripts/sample-macos.sh` | `244f79c34af93c4cd89bfe90c40a2fadeb1e4fcf73abbbc8e0f1f1389ce62f31` | the `pgrep -x` line with the fixed name becomes `pgrep -x "${E3_PROC}"`; one line added: `E3_PROC="${E3_PROC:-ime-observation-logger}"` |
+| `sample-windows.sh` | `experiments/20260903-o1-runtime-cost/scripts/sample-windows.sh` | `a8f1ab2f078d9bd21c5c9a464f804eef13d8673318b88c6568d1664505a0589b` | the `Get-Process -Name` line with the fixed name becomes `Get-Process -Name $env:E3_PROC`; one line added: `E3_PROC="${E3_PROC:-ime-observation-logger}"; export E3_PROC` |
 
 `023-acceptance.sh` (AC 2) checks this mechanically: with comment lines and blank lines removed, every added
 line contains `E3_PROC` and every removed line is the process-name line.
 
 ## Rewritten, not copied
 
-- `calibrate-cpu.sh` was written again in English (decision 60). Original:
+- `calibrate-cpu.sh` was written again in English. Original:
   `experiments/20260903-o1-runtime-cost/scripts/calibrate-cpu.sh`, SHA-256
   `a44cd1e900b11ed812726759c673a40120098b952ad2c52b2b73f03e113b96b1`. The way of measuring is the same
   (a busy loop saturates one core; ground truth = increase of `ps -o cputime` over wall-clock time; the readings
@@ -49,7 +49,7 @@ line contains `E3_PROC` and every removed line is the process-name line.
 - The process-name match of `pgrep -x` on macOS for a 22-character name (`ime-observation-logger`) was not
   checked on a Mac. If macOS compares only a truncated name, the sampler reports the process as absent and the
   summary says `not measured`; the fix would be `pgrep -f` or a shorter binary name, which goes beyond the
-  process-name line (decision 12) and must be reported. `run_e3.sh` prints a note at the start when it does
+  process-name line (the scope ruling of the E3 design) and must be reported. `run_e3.sh` prints a note at the start when it does
   not find the process. Check it at the start of the measurement.
 - `calibrate-cpu.sh` and the macOS sampler were not run on a Mac in this issue (the loop ran on Windows).
   The Windows sampler and `run_e3.sh` were run against an absent process only (all rows zero, `not measured`).
