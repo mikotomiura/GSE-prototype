@@ -449,3 +449,17 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 | 61 | 出典の表の置き場 | ★ **`kit/e3/PROVENANCE.internal.md` に移す**（Allowed Files に足した・024 は書き出さない・`_style_check.py` の対象外）。公開の README は計器の中身だけを書き、元のパスと写した関係を書かない。acceptance: README と 4 本に `experiments/20260903` が 0 件・README に `copied` が 0 件・`PROVENANCE.internal.md` に 2 本の元のパスと元の SHA-256 | ロガーと同じ形（判断 43） |
 
 - 段取り: 023 の worktree（worker の `d70e30f4` / `30e321ec`）は片付け、直した issue と acceptance で `--issues 023` を回し直す。
+
+## 判断 62〜63: W5 の 020 の merge ゲートのレビューを受けた裁定（2026-09-30・研究者の回答）
+
+★ 020 はループで attempt 1 の `issue_done`。clean な checkout で `020-acceptance.sh` 失敗 0 件（✅ 28）。寄託前の検査 `--check-deposit`（判断 57）も入っていた。
+レビュー: code-reviewer 1 本（HIGH 4・MEDIUM 5・LOW 9）・security-checker 1 本（CRITICAL / HIGH なし・MEDIUM 5・LOW 8）。一次で確かめた: `run.sh:77` は行頭の `frozen_at:` / `sha256:` だけを見る／`pipeline.py:124-126` の `repo_root()` は 2 段しか上がらず `<repo>/papers` を返す／`run_cell.py:141-165` はセルの `label` を未知のキーとして拒み、pipeline はラベルを `cell.label`（無ければ `os`）から取るので同じ OS の 2 セルが必ず重なる／ロガーは `ime_shadow` を `config_gated` に置く（`kit/logger/src/main.rs:71-73`・0 行は判定不能）が Step 0 はそれも「宣言あり」と数える／design.md §1.2 は両 OS 共通の定義 `all` の値も求める／`match.py` の `theta` / `drop_start_while_open` を設定で渡せない。
+
+| # | 論点（出どころ） | 採用 | 理由 |
+|---|---|---|---|
+| 62 | code-reviewer H3・M3: セルのラベルの出どころ | ★ **セルのファイルに任意のキー `label` を足す**（006 の追補としてメインが base に入れた: `OPTIONAL_KEYS` に `label`・書式は `^[A-Za-z0-9_.+-]{1,64}$`〔照合器の `CELL_RE` と同じ〕・selftest に陽性と陰性・README と例のセル）。★ pipeline は `cell.label` を**必須**にし、`os` への黙った代替をやめる。同じ label の run は**中止していないものが 1 つだけ**（撮り直しの中止分は件数に数える） | ラベルはセルの性質で、出どころの記録（`run.json`）に残るべき。run_cell では任意のまま（dryrun の検査のセルに要らない）にし、解析で必須にする |
+| 63 | code-reviewer H1・M1・M2: 凍結の門 | ★ **書式 ＋ 迂回の封じ ＋ 設定の照合**: 印は `frozen_at: YYYY-MM-DD…` と `sha256: <64 桁の 16 進>` をちょうど 1 行ずつ（プレースホルダ・空・コメントやフェンスの中は数えない）。`sha256` は「`config.json`・`SEED`・正解の規則ファイルの順に、各ファイルの SHA-256（16 進）に改行を付けて連ねたもの」の SHA-256 と定義し、`pipeline.py --freeze-hash` で出す。`run.sh` と `pipeline.py`（実データの解析では `--prereg PATH` を必須にする・合成の run だけ免除）の両方で再計算して一致を求める。解析コードの固定は凍結のコミットのタグで行う（M3）。★ `.gitattributes` に `experiment/*.json`・`SEED`・`*.sh`・`gt_rules*.json` の `eol=lf` を足した（機械ごとにハッシュが食い違わないように） | 凍結の後に解析の設定を変えられない・直接呼び出しでも迂回できないことを機械で保証する |
+
+- ★ 仕様の範囲の直し（研究者に問わずメインが段取り）:
+  - code-reviewer: H2 `repo_root()` を run_cell と同じ定義（`git rev-parse --show-toplevel`・無ければ 3 段上）に／H4 Step 0 は `ime_shadow` が gated で、正解のセッションが 1 件以上あるのに `ime_shadow` の行が 0 件なら「判定不能」の違反にする（合成のヘッダも実物と同じ `config_gated` に）／M4 各セルで OS の定義と共通の定義 `all` の両方を出す（design §1.2）／M5 `theta` と `drop_start_while_open` を設定で渡す（`clock_offsets_ms` の出どころは M1 / M3 で決める・⚠️ 未決・今は 0）／L4 seed の導き方を書き、合成の生成と注入の乱数を分ける／L6 `--synthetic` の出力先が本番の `results/` なら止め、結果に合成の印／L7 `SEED` の厳密な検査／L8 `CDPATH`／L9 想定外の例外は型名だけで exit 2・失敗したら古い結果を残さない。
+  - security: M-A `--pack OUT.zip`（寄託する 5 ファイルだけを決定的に束ね、その束を検査し SHA-256 を出す・`data.md` の手順を「束ねる → 検査 → 寄託 → SHA-256 を記録」に）／M-B 機械に依存しない規則（5 ファイルの中の絶対パスの形〔ドライブ文字・UNC・`/Users/`・`/home/`・`/Volumes/`・MSYS の `/c/`〕をすべて拒み、`~` と `<repo>` で始まるものと相対パスだけを許す）と `--also-user` / `--also-home`（検査した機械を `data.md` に記録）／M-C 中断 run の null のログは無くてよい・`run.json` は必ず見る／M-D 寄託の門でも content-free の検査とハッシュの照合を通す／M-E `data.md` の行に `run.json` の SHA-256 を持たせて照合し、結果の `runs.list` に `manifest_sha256`／L-a `outputs.*.sha256` の書式／L-b `RecursionError`・想定外の例外／L-c 照合済みのバイト列を検査する／L-d 通常ファイルだけ・リンクを拒む・大きさの上限／L-e `--runs-from` はコメントとフェンスの中を読まない・使ったラベルを出す／L-f `--synthetic` は既存を上書きしない／L-h `mktemp` の失敗。

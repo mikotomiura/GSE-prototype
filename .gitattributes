@@ -17,3 +17,9 @@ tests/fixtures/*.ndjson text eol=lf
 # mac の .command は bash 用なので LF 固定。
 *.bat text eol=crlf
 *.command text eol=lf
+# ★ 論文キットの凍結の印（experiment/preregistration.md の sha256:）は config.json・SEED・正解の規則ファイルの SHA-256 から作る。
+#   CRLF で checkout されると機械ごとに値が食い違い、凍結の照合が落ちる（IME 論文 判断 63・2026-09-30）。
+papers/ime-observation/experiment/*.json text eol=lf
+papers/ime-observation/experiment/SEED text eol=lf
+papers/ime-observation/experiment/*.sh text eol=lf
+papers/ime-observation/kit/analysis/gt_rules*.json text eol=lf
