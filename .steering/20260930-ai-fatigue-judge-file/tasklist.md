@@ -26,5 +26,6 @@
 
 ## D. 完了
 - [x] code-reviewer ＋ security-checker（並列）・指摘対応（判断 13）
-- [ ] /finish-task で /cross-review 2 巡（Codex の当日の実消費を先に確かめる）
-- [ ] 引き継ぎの更新・git-workflow ルール 6（push → PR → CI 緑なら merge）
+- [ ] /finish-task で /cross-review 2 巡 → ★ 次のセッション（当日の実消費が合算で約 304,946 / 300,000・研究者の決定 2026-09-30）
+- [x] 引き継ぎ `.steering/_handoff/next-session-ai-fatigue-crossreview.md` と索引の更新
+- [x] push（PR・merge は /cross-review の後 → 次のセッション）
