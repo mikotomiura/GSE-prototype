@@ -45,4 +45,4 @@
 - [x] 研究者の Downloads に新 xlsx を置く（別名・既存は上書きしない・SHA-256 は archive と一致）
 - [x] コミット → push → PR → CI → merge —— PR #261（PR の CI は全部緑・`9298e0a8` で merge）。⚠️ main の run 36520560407 は別セッションの PR #262 のマージで中断（`cancel-in-progress`）。今回の変更を含む後続の run 36522183905 で確認する
 - [x] 研究者へ報告 —— 研究者の返答で方針が決まった（判断 11）。前回の未コミットの下書きは `prior-draft/` に写した（元の worktree の扱いは研究者の判断待ち）
-- [ ] 判断 11 の追記（ideas.md・引き継ぎ・prior-draft）を PR で main へ
+- [ ] 判断 11〜13 の追記（ideas.md・引き継ぎ・prior-draft）を PR #263 で main へ（★ PR #261 の main の CI は run 36522183905 で全部緑を確認済み）
