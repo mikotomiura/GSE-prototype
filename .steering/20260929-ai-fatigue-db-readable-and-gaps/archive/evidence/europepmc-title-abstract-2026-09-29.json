@@ -1,0 +1,570 @@
+[
+ {
+  "theme": "S-04 AI scribe burnout (TA)",
+  "q": "TITLE_ABS:(\"ambient AI\" OR \"AI scribe\" OR \"ambient scribe\" OR \"ambient listening\" OR \"ambient artificial intelligence\") AND TITLE_ABS:(burnout OR fatigue OR \"cognitive load\" OR exhaustion)",
+  "hitCount": 89,
+  "top": [
+   [
+    "2025",
+    "10.1093/jamia/ocae295",
+    "Ambient artificial intelligence scribes: physician burnout and perspectives on usability and documentation burden.",
+    "J Am Med Inform Assoc",
+    142,
+    "brief-report; journal article"
+   ],
+   [
+    "2025",
+    "10.1001/jamanetworkopen.2025.8614",
+    "Evaluation of an Ambient Artificial Intelligence Documentation Platform for Clinicians.",
+    "JAMA Netw Open",
+    105,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2024",
+    "10.2196/54419",
+    "Using ChatGPT-4 to Create Structured Medical Notes From Audio Recordings of Physician-Patient Encounters: Comparative Study.",
+    "J Med Internet Res",
+    95,
+    "comparative study; research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2025",
+    "10.1001/jamanetworkopen.2025.34976",
+    "Use of Ambient AI Scribes to Reduce Administrative Burden and Professional Burnout.",
+    "JAMA Netw Open",
+    71,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2025",
+    "10.1093/jamiaopen/ooaf013",
+    "Enhancing clinical documentation with ambient artificial intelligence: a quality improvement survey assessing clinician perspectiv",
+    "JAMIA Open",
+    71,
+    "research-article; journal article"
+   ],
+   [
+    "2025",
+    "10.1007/s10916-025-02157-4",
+    "Artificial Intelligence (AI) - Powered Documentation Systems in Healthcare: A Systematic Review.",
+    "J Med Syst",
+    61,
+    "systematic review; review-article; journal article"
+   ],
+   [
+    "2025",
+    "10.1056/aioa2501000",
+    "Ambient AI Scribes in Clinical Practice: A Randomized Trial.",
+    "NEJM AI",
+    59,
+    "research-article; journal article"
+   ],
+   [
+    "2025",
+    "10.3390/healthcare13121447",
+    "The Impact of AI Scribes on Streamlining Clinical Documentation: A Systematic Review.",
+    "Healthcare (Basel)",
+    51,
+    "review-article; review; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-04 LLM draft replies burnout (TA)",
+  "q": "TITLE_ABS:(\"large language model\" OR \"generative AI\" OR \"AI-generated\" OR \"artificial intelligence\") AND TITLE_ABS:(\"draft replies\" OR \"draft responses\" OR \"in-basket\" OR inbox) AND TITLE_ABS:(burnout OR fatigue OR \"cognitive burden\" OR \"task load\")",
+  "hitCount": 18,
+  "top": [
+   [
+    "2023",
+    "10.1001/jamainternmed.2023.1838",
+    "Comparing Physician and Artificial Intelligence Chatbot Responses to Patient Questions Posted to a Public Social Media Forum.",
+    "JAMA Intern Med",
+    1478,
+    "research support, non-u.s. gov't; research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2024",
+    "10.1001/jamanetworkopen.2024.3201",
+    "Artificial Intelligence-Generated Draft Replies to Patient Inbox Messages.",
+    "JAMA Netw Open",
+    205,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2021",
+    "10.1093/jamia/ocaa238",
+    "Building the evidence-base to reduce electronic health record-related clinician burden.",
+    "J Am Med Inform Assoc",
+    54,
+    "article-commentary; research support, u.s. gov't, p.h.s.; research support, u.s. gov't, non-p.h.s.; journal article"
+   ],
+   [
+    "2024",
+    "10.1093/jamiaopen/ooae028",
+    "Generative artificial intelligence responses to patient messages in the electronic health record: early lessons learned.",
+    "JAMIA Open",
+    32,
+    "review-article; review; journal article"
+   ],
+   [
+    "2025",
+    "10.3389/fpubh.2025.1628831",
+    "Impact of artificial intelligence on electronic health record-related burnouts among healthcare professionals: systematic review.",
+    "Front Public Health",
+    20,
+    "systematic review; systematic-review; journal article"
+   ],
+   [
+    "2025",
+    "10.1038/s41746-025-01586-2",
+    "Opportunities and risks of artificial intelligence in patient portal messaging in primary care.",
+    "NPJ Digit Med",
+    17,
+    "research-article; journal article"
+   ],
+   [
+    "2024",
+    "10.1097/upj.0000000000000637",
+    "Assessing Artificial Intelligence-Generated Responses to Urology Patient In-Basket Messages.",
+    "Urol Pract",
+    16,
+    "journal article"
+   ],
+   [
+    "2025",
+    "10.1055/a-2576-0579",
+    "An AI-Powered Strategy for Managing Patient Messaging Load and Reducing Burnout.",
+    "Appl Clin Inform",
+    7,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-06 alert fatigue (TA)",
+  "q": "TITLE_ABS:\"alert fatigue\"",
+  "hitCount": 537,
+  "top": [
+   [
+    "2021",
+    "10.1001/jamainternmed.2021.2626",
+    "External Validation of a Widely Implemented Proprietary Sepsis Prediction Model in Hospitalized Patients.",
+    "JAMA Intern Med",
+    581,
+    "research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2017",
+    "10.1186/s12911-017-0430-8",
+    "Effects of workload, work complexity, and repeated alerts on alert fatigue in a clinical decision support system.",
+    "BMC Med Inform Decis Mak",
+    474,
+    "research support, u.s. gov't, p.h.s.; research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2011",
+    "10.1377/hlthaff.2010.1111",
+    "Clinical decision support systems could be modified to reduce 'alert fatigue' while still minimizing the risk of litigation.",
+    "Health Aff (Millwood)",
+    190,
+    "research support, u.s. gov't, p.h.s.; research support, non-u.s. gov't; journal article"
+   ],
+   [
+    "2014",
+    "10.1007/s11886-013-0441-8",
+    "Artificial intelligence in medicine and cardiac imaging: harnessing big data and advanced computing to provide personalized medica",
+    "Curr Cardiol Rep",
+    186,
+    "review; journal article"
+   ],
+   [
+    "2007",
+    null,
+    "Some unintended consequences of clinical decision support systems.",
+    "AMIA Annu Symp Proc",
+    176,
+    "research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2013",
+    "10.1136/amiajnl-2012-001089",
+    "Drug-drug interactions that should be non-interruptive in order to reduce alert fatigue in electronic health records.",
+    "J Am Med Inform Assoc",
+    169,
+    "research support, u.s. gov't, p.h.s.; research-article; journal article"
+   ],
+   [
+    "2012",
+    "10.1136/amiajnl-2011-000743",
+    "Evaluating alert fatigue over time to EHR-based clinical trial alerts: findings from a randomized controlled study.",
+    "J Am Med Inform Assoc",
+    160,
+    "research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2014",
+    "10.1136/amiajnl-2013-001813",
+    "Overrides of medication-related clinical decision support alerts in outpatients.",
+    "J Am Med Inform Assoc",
+    159,
+    "research support, u.s. gov't, p.h.s.; research-article; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-06 alert fatigue x AI (TA)",
+  "q": "TITLE_ABS:\"alert fatigue\" AND TITLE_ABS:(\"artificial intelligence\" OR \"machine learning\")",
+  "hitCount": 80,
+  "top": [
+   [
+    "2014",
+    "10.1007/s11886-013-0441-8",
+    "Artificial intelligence in medicine and cardiac imaging: harnessing big data and advanced computing to provide personalized medica",
+    "Curr Cardiol Rep",
+    186,
+    "review; journal article"
+   ],
+   [
+    "2024",
+    "10.1093/jamia/ocae076",
+    "The use of artificial intelligence to optimize medication alerts generated by clinical decision support systems: a scoping review.",
+    "J Am Med Inform Assoc",
+    39,
+    "scoping review; research support, non-u.s. gov't; review-article; journal article"
+   ],
+   [
+    "2024",
+    "10.1093/jamia/ocad224",
+    "Using artificial intelligence to promote equitable care for inpatients with language barriers and complex medical needs: clinical ",
+    "J Am Med Inform Assoc",
+    33,
+    "research support, u.s. gov't, p.h.s.; research-article; journal article"
+   ],
+   [
+    "2024",
+    "10.1093/jamia/ocad220",
+    "Systematic review and longitudinal analysis of implementing Artificial Intelligence to predict clinical deterioration in adult hos",
+    "J Am Med Inform Assoc",
+    30,
+    "research support, non-u.s. gov't; systematic review; review-article; journal article"
+   ],
+   [
+    "2021",
+    "10.1007/s11904-021-00552-3",
+    "Machine Learning and Clinical Informatics for Improving HIV Care Continuum Outcomes.",
+    "Curr HIV/AIDS Rep",
+    28,
+    "research-article; review; journal article"
+   ],
+   [
+    "2020",
+    "10.1109/jbhi.2019.2932740",
+    "Semi-Supervised Learning Algorithm for Identifying High-Priority Drug-Drug Interactions Through Adverse Event Reports.",
+    "IEEE J Biomed Health Inform",
+    25,
+    "research support, non-u.s. gov't; journal article"
+   ],
+   [
+    "2022",
+    "10.2196/30946",
+    "Implementing Machine Learning Models for Suicide Risk Prediction in Clinical Practice: Focus Group Study With Hospital Providers.",
+    "JMIR Form Res",
+    24,
+    "research-article; journal article"
+   ],
+   [
+    "2023",
+    "10.4258/hir.2023.29.1.64",
+    "Healthcare Professionals' Expectations of Medical Artificial Intelligence and Strategies for its Clinical Implementation: A Qualit",
+    "Healthc Inform Res",
+    22,
+    "research-article; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-05 passive fatigue (TA)",
+  "q": "TITLE_ABS:\"passive fatigue\"",
+  "hitCount": 26,
+  "top": [
+   [
+    "2013",
+    "10.1037/a0034386",
+    "Active and passive fatigue in simulated driving: discriminating styles of workload regulation and their safety impacts.",
+    "J Exp Psychol Appl",
+    66,
+    "research-article; journal article"
+   ],
+   [
+    "2012",
+    "10.1177/0018720811423261",
+    "Fatigue and voluntary utilization of automation in simulated driving.",
+    "Hum Factors",
+    34,
+    "journal article"
+   ],
+   [
+    "2019",
+    "10.1016/j.aap.2018.04.004",
+    "Dangerous intersections? A review of studies of fatigue and distraction in the automated vehicle.",
+    "Accid Anal Prev",
+    23,
+    "review; journal article"
+   ],
+   [
+    "2019",
+    "10.1088/1741-2552/ab255d",
+    "An iterative cross-subject negative-unlabeled learning algorithm for quantifying passive fatigue.",
+    "J Neural Eng",
+    15,
+    "research support, non-u.s. gov't; journal article"
+   ],
+   [
+    "2021",
+    "10.1038/s41598-021-99680-4",
+    "Electrophysiological frequency domain analysis of driver passive fatigue under automated driving conditions.",
+    "Sci Rep",
+    13,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2023",
+    "10.1016/j.jsr.2023.05.006",
+    "The impact of non-driving related tasks on the development of driver sleepiness and takeover performances in prolonged automated d",
+    "J Safety Res",
+    10,
+    "research support, non-u.s. gov't; randomized controlled trial; journal article"
+   ],
+   [
+    "2019",
+    "10.1016/j.aap.2017.12.005",
+    "Mitigating passive fatigue during monotonous drives with thermal stimuli: Insights into the effect of different stimulation durati",
+    "Accid Anal Prev",
+    10,
+    "journal article"
+   ],
+   [
+    "2024",
+    "10.1016/j.psychsport.2024.102687",
+    "Fatigued or bored? Investigating the effect of different types of mental fatigue on 3 km running performance.",
+    "Psychol Sport Exerc",
+    9,
+    "research support, non-u.s. gov't; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-05 automation complacency (TA)",
+  "q": "TITLE_ABS:(\"automation complacency\" OR \"automation-induced complacency\")",
+  "hitCount": 25,
+  "top": [
+   [
+    "2012",
+    "10.1136/amiajnl-2011-000089",
+    "Automation bias: a systematic review of frequency, effect mediators, and mitigators.",
+    "J Am Med Inform Assoc",
+    375,
+    "research support, non-u.s. gov't; systematic review; review-article; journal article"
+   ],
+   [
+    "2010",
+    "10.1177/0018720810376055",
+    "Complacency and bias in human use of automation: an attentional integration.",
+    "Hum Factors",
+    273,
+    "review; journal article"
+   ],
+   [
+    "2022",
+    "10.1016/j.patter.2022.100455",
+    "How transparency modulates trust in artificial intelligence.",
+    "Patterns (N Y)",
+    37,
+    "review-article; review; journal article"
+   ],
+   [
+    "2019",
+    "10.3389/fpsyg.2019.00225",
+    "Automation-Induced Complacency Potential: Development and Validation of a New Scale.",
+    "Front Psychol",
+    21,
+    "research-article; journal article"
+   ],
+   [
+    "2015",
+    "10.1016/j.aap.2015.01.018",
+    "How does a collision warning system shape driver's brake response time? The influence of expectancy and automation complacency on ",
+    "Accid Anal Prev",
+    20,
+    "journal article"
+   ],
+   [
+    "2017",
+    "10.1016/j.aap.2017.03.023",
+    "Distraction or cognitive overload? Using modulations of the autonomic nervous system to discriminate the possible negative effects",
+    "Accid Anal Prev",
+    18,
+    "journal article"
+   ],
+   [
+    "2015",
+    "10.1177/0018720814566454",
+    "Using Modeling and Simulation to Predict Operator Performance and Automation-Induced Complacency With Robotic Automation: A Case S",
+    "Hum Factors",
+    17,
+    "research support, non-u.s. gov't; validation study; journal article"
+   ],
+   [
+    "2014",
+    "10.1177/0018720814522830",
+    "Stages and levels of automation in support of space teleoperations.",
+    "Hum Factors",
+    15,
+    "research support, u.s. gov't, non-p.h.s.; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-10 genAI fatigue strong designs (TA)",
+  "q": "TITLE_ABS:(\"generative AI\" OR \"generative artificial intelligence\" OR ChatGPT OR \"large language model\") AND TITLE_ABS:(fatigue OR exhaustion OR burnout) AND TITLE_ABS:(longitudinal OR diary OR \"experience sampling\" OR randomized OR randomised OR \"multi-wave\" OR \"time-lagged\")",
+  "hitCount": 24,
+  "top": [
+   [
+    "2023",
+    "10.1001/jamainternmed.2023.1838",
+    "Comparing Physician and Artificial Intelligence Chatbot Responses to Patient Questions Posted to a Public Social Media Forum.",
+    "JAMA Intern Med",
+    1478,
+    "research support, non-u.s. gov't; research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2025",
+    "10.1056/aioa2500945",
+    "A Pragmatic Randomized Controlled Trial of Ambient Artificial Intelligence to Improve Health Practitioner Well-Being.",
+    "NEJM AI",
+    27,
+    "research-article; journal article"
+   ],
+   [
+    "2025",
+    "10.1093/jamiaopen/ooaf021",
+    "A proof-of-concept study for patient use of open notes with large language models.",
+    "JAMIA Open",
+    17,
+    "research-article; journal article"
+   ],
+   [
+    "2025",
+    "10.1055/a-2657-8087",
+    "The Influence of Artificial Intelligence Scribes on Clinician Experience and Efficiency among Pediatric Subspecialists: A Rapid, R",
+    "Appl Clin Inform",
+    16,
+    "research support, non-u.s. gov't; research-article; randomized controlled trial; journal article"
+   ],
+   [
+    "2025",
+    "10.1186/s12893-025-02792-1",
+    "The impact of death and caring for the dying and their families on surgeons - an AI assisted systematic scoping review.",
+    "BMC Surg",
+    3,
+    "scoping review; review-article; journal article"
+   ],
+   [
+    "2026",
+    "10.1016/j.jclinane.2026.112163",
+    "Generative AI in preanesthetic consultations: Effects on efficiency, documentation workload, quality, and physician-patient intera",
+    "J Clin Anesth",
+    2,
+    "randomized controlled trial; journal article"
+   ],
+   [
+    "2026",
+    "10.3389/fdgth.2026.1767648",
+    "Quality assessment of large language model-generated prior authorization letters in nephrology.",
+    "Front Digit Health",
+    1,
+    "brief-report; journal article"
+   ],
+   [
+    "2026",
+    "10.64898/2026.08.26.26361496",
+    "A Pragmatic Randomized Trial of an EHR-Integrated Generative AI Chart Summarization Tool for Ambulatory Clinicians",
+    null,
+    0,
+    "preprint"
+   ]
+  ]
+ },
+ {
+  "theme": "S-07 clinicians genAI fatigue (TA)",
+  "q": "TITLE_ABS:(\"generative AI\" OR ChatGPT OR \"large language model\") AND TITLE_ABS:(fatigue OR exhaustion OR burnout) AND TITLE_ABS:(physician OR nurse OR clinician OR radiologist)",
+  "hitCount": 67,
+  "top": [
+   [
+    "2023",
+    "10.1001/jamainternmed.2023.1838",
+    "Comparing Physician and Artificial Intelligence Chatbot Responses to Patient Questions Posted to a Public Social Media Forum.",
+    "JAMA Intern Med",
+    1478,
+    "research support, non-u.s. gov't; research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2024",
+    "10.1001/jamanetworkopen.2024.3201",
+    "Artificial Intelligence-Generated Draft Replies to Patient Inbox Messages.",
+    "JAMA Netw Open",
+    205,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2024",
+    "10.2196/54419",
+    "Using ChatGPT-4 to Create Structured Medical Notes From Audio Recordings of Physician-Patient Encounters: Comparative Study.",
+    "J Med Internet Res",
+    95,
+    "comparative study; research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2024",
+    "10.1007/s11606-024-08870-z",
+    "Can the Administrative Loads of Physicians be Alleviated by AI-Facilitated Clinical Documentation?",
+    "J Gen Intern Med",
+    53,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2025",
+    "10.1093/jamia/ocaf065",
+    "Adoption of artificial intelligence in healthcare: survey of health system priorities, successes, and challenges.",
+    "J Am Med Inform Assoc",
+    52,
+    "research-article; journal article"
+   ],
+   [
+    "2024",
+    "10.1016/j.annemergmed.2024.01.039",
+    "Harnessing the Power of Generative AI for Clinical Summaries: Perspectives From Emergency Physicians.",
+    "Ann Emerg Med",
+    46,
+    "journal article"
+   ],
+   [
+    "2025",
+    "10.2196/80898",
+    "AI Scribes in Health Care: Balancing Transformative Potential With Responsible Integration.",
+    "JMIR Med Inform",
+    35,
+    "editorial"
+   ],
+   [
+    "2025",
+    "10.2196/76743",
+    "Real-World Evidence Synthesis of Digital Scribes Using Ambient Listening and Generative Artificial Intelligence for Clinician Docu",
+    "JMIR AI",
+    26,
+    "review-article; review; journal article"
+   ]
+  ]
+ }
+]

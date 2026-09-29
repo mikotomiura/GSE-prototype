@@ -296,6 +296,20 @@ mutate "★ 空 P-ID 行の採番で例外を捕まえない（★ 中途半端�
 mutate "★ 登録経路のログ呼び出しだけ消す（★ 定義は残す = 件数ガードの単独検証）" \
   's/o1LogMgmt_\("register"/o1SkipLog_("register"/g'
 
+# ★ 2026-09-28 見た目（登録ログ・却下ログ）
+mutate "見た目: 書式を毎回付け直す（研究者の列幅を戻す）" \
+  's/  if \(sheet\.getFrozenRows\(\) === 2\) return false;\n  var U = O1_MGMT_UI;/  var U = O1_MGMT_UI;/'
+mutate "見た目: partial を緑にする" \
+  's/(=\$D3="partial".), result, U\.warnBg/$1, result, U.okBg/'
+mutate "見た目: 却下ログを登録ログと同じ色にする" \
+  's/sheet\.setTabColor\(rejected \? U\.dangerFg : U\.navy\);/sheet.setTabColor(U.navy);/'
+mutate "見た目: 既存タブには書式を付けない" \
+  's/    styled = o1StyleMgmtTab_\(sheet, tab === O1_MGMT_REJECT_TAB\);/    styled = false;/'
+mutate "見た目: system の灰を先に置く（満杯の警告行が埋もれる）" \
+  's/(    rule\(.=\$D3="ok".*?\n)(.*?\n)(.*?\n)(    rule\(.=\$B3="system".*?)\n/    rule(\x27=$B3="system"\x27, rows, U.grayBg, U.muted),\n$1$2$3/s'
+mutate "見た目: 書式の例外を捕まえない" \
+  's/  try \{\n    styled = o1StyleMgmtTab_/  { styled = o1StyleMgmtTab_/'
+
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"
 if [ "$FAIL" -eq 0 ]; then

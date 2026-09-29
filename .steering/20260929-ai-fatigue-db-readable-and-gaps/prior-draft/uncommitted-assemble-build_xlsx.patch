@@ -1,0 +1,161 @@
+diff --git a/.steering/20260928-ai-fatigue-db-appraisal/archive/scripts/assemble.py b/.steering/20260928-ai-fatigue-db-appraisal/archive/scripts/assemble.py
+index 78a8069f..bcd4836f 100644
+--- a/.steering/20260928-ai-fatigue-db-appraisal/archive/scripts/assemble.py
++++ b/.steering/20260928-ai-fatigue-db-appraisal/archive/scripts/assemble.py
+@@ -3,6 +3,7 @@ import json
+ import openpyxl
+ from data_b import R
+ from data_c import CHECKS, GSE_EXTRA, SG_BY_DOI, CHASE
++from data_d import SUMMARY, ISSUES, IDEAS
+ 
+ import os
+ HERE = os.path.dirname(os.path.abspath(__file__))
+@@ -170,7 +171,7 @@ ov = [
+  ["主な所見 6", "AF019・AF024", "同じ規則で AF019 は中心-B（MBI-GS の消耗を測定）。AF024 は GenAI に帰属した過負荷・関心の低下を代理として測るが情緒的消耗の項目がなく、境界例として保留（R-I11・C11）。"],
+  ["主な所見 7", "AF020（GSE 由来）", "著者は知覚された使いやすさの低下を限界に挙げ（DB の要約と一致）、条件間で有意だったのはシステムの複雑さのみ。2026 年の関連報告（本文未照合）の追記を提案（C15）。"],
+  ["主な所見 8", "検索漏れ", "中心的に見える未収録の候補が複数（査読論文: JEIM 2026 の意思決定疲労・Sci Rep 2026・Acta Psychologica 2026・AI & Society 2025、AF017 の引用追跡 3 件。非査読: 既存のシステマティックレビュー 1 件（Zenodo））。"],
+- ["読む順番", "Claude適格性評価 → Claude方法論評価 → Claude領域別評価 / Claude照合事項 → Claudeスクリーニング案", "Claude×GPT比較・GSE照合・検索漏れ候補は補助。基準は Claude評価基準。"],
++ ["読む順番", "Claudeまとめ（1 論文 1 行）→ 課題一覧 → アイディア（GSE由来）→ 詳細（Claude適格性評価 → 方法論 → 領域別 / 照合事項 → スクリーニング案）", "Claude×GPT比較・GSE照合・検索漏れ候補は補助。基準は Claude評価基準。"],
+  ["限界", "盲検ではない／全文未到達 9 件／一部は WebFetch 要約経由／検索漏れは題名段のみ／正式な JBI・COSMIN 判定ではない", "詳細は Claude評価基準。"],
+ ]
+ S.insert(0, dict(name="Claude評価概要", title="AI 疲労 文献 DB｜Claude による再評価（2026-09-28）",
+@@ -193,5 +194,38 @@ sg_rows = next(s for s in S if s["name"] == "検索漏れ候補")["rows"]
+ assert all(r[7] in ("含める", "除外", "保留") for r in sg_rows) and all(r[8] == "" or _re.match(r"^E[1-6]$", r[8]) for r in sg_rows)
+ assert all((r[7] == "除外") == bool(r[8]) for r in sg_rows), [r[0] for r in sg_rows if (r[7] == "除外") != bool(r[8])]
+ 
++# ---------- わかりやすさのためのシート（2026-09-29） ----------
++assert set(SUMMARY) == set(IDS)
++q = lambda name: "'" + name + "'!"
++rel = {i: [c[0] for c in CHECKS if i in c[1] or (c[1].startswith("AF006–AF009") and i in ("AF006", "AF007", "AF008", "AF009"))] for i in IDS}
++rows = []
++for k, i in enumerate(IDS, 5):
++    x, (short, use_, prob, nxt) = R[i], SUMMARY[i]
++    conc = x["dom"]["summ"] if x["dom"] else "—（評価の対象外）"
++    detail = {"text": "方法論の詳細", "link": q("Claude方法論評価") + f"A{k}"}
++    rows.append([{"text": i, "link": q("Claude適格性評価") + f"A{k}"}, short, x["tier"], x["final"], use_, prob, conc, nxt, detail,
++                 "・".join(rel[i]) if rel[i] else "—", TITLE[i], GPT[i]])
++S.insert(0, dict(name="Claudeまとめ", active=True, stripes=False, title="Claudeまとめ｜1 論文 1 行で見る結論（ここから読む）",
++    subtitle="【区分】中心-A＝疲労を AI に帰属させて測る／中心-B＝一般的な疲労を AI の利用と関係づける／中心（A/B 未確定）＝抄録だけで判断保留／境界＝範囲の判断待ち／背景＝証拠の外で保持。【Claude 案】緑＝含める・黄＝保留・灰＝除外（DB からは消さない）。【懸念】○低 △一部 ×高 ?判定不能 －非該当（赤＝×あり）。★＝特に注意。ID と『方法論の詳細』をクリックすると詳しいシートの該当行へ飛ぶ。★ AI の予備判定であり、人間の独立判定の代わりではない。",
++    subtitle_height=78,
++    headers=["ID（詳細へ）", "一言でいうと（何を調べたか）", "区分", "Claude 案", "使ってよい範囲", "主な問題", "懸念の要約（6 領域）", "次の作業", "詳しく見る", "関連する照合事項", "元の題名", "GPT の用途判定（参考）"],
++    widths=[11, 34, 13, 10, 30, 42, 22, 32, 13, 14, 40, 12], rows=rows,
++    cf=[dict(col=3, type="prefix", map={"中心-A": "FFD1FAE5", "中心-B": "FFE0F2FE", "中心（": "FFEDE9FE", "境界": "FFFEF3C7", "背景": "FFF3F4F6", "方法論": "FFF3F4F6", "訂正": "FFF3F4F6"}),
++        dict(col=4, map={"含める": "FFD1FAE5", "保留": "FFFEF3C7", "除外": "FFE5E7EB"}),
++        dict(col=6, type="contains", map={"★": "FFFEE2E2"}),
++        dict(col=7, type="contains", map={"×": "FFFEE2E2"})]))
++S.insert(1, dict(name="課題一覧", stripes=False, title=f"課題一覧｜次にやること {len(ISSUES)} 件（担当・優先度・状態）",
++    subtitle="『状態』はドロップダウンで更新できる（未着手／進行中／完了／保留／不要）。優先度: 赤＝高・黄＝中。根拠の番号は Claude照合事項（R-I・C）とアイディア（G）。★ 著者への照会・DB の修正は研究者の判断で行う（Claude は提案のみ）。",
++    headers=["番号", "種別", "対象", "やること（具体的に）", "なぜ（根拠）", "担当", "優先度", "状態", "期限", "メモ"],
++    widths=[7, 13, 20, 56, 30, 22, 8, 10, 10, 30], rows=[r + ["", ""] for r in ISSUES],
++    cf=[dict(col=7, map={"高": "FFFEE2E2", "中": "FFFEF3C7"}), dict(col=8, map={"完了": "FFD1FAE5", "進行中": "FFE0F2FE", "不要": "FFE5E7EB"})],
++    dv=[dict(col=8, list="未着手,進行中,完了,保留,不要")]))
++S.insert(2, dict(name="アイディア（GSE由来）", stripes=False, title=f"アイディア（GSE由来）｜サーベイ論文と GSE の両方に効く {len(IDEAS)} 件",
++    subtitle="GSE の既存の理論・調査（[Pn] は GSE の中央書誌 docs/references.md の番号）と、今回の DB の文献を組み合わせたアイディア。★ 採否の判定には使っていない（評価の基準と別）。『検討』列はドロップダウン（未検討／採用／保留／不採用）。",
++    headers=["番号", "アイディア", "根拠（DB の文献・GSE の産物）", "サーベイ論文での使い道", "GSE 側での使い道", "次の一歩", "優先度", "検討"],
++    widths=[7, 34, 50, 42, 32, 28, 8, 10], rows=[r + ["未検討"] for r in IDEAS],
++    cf=[dict(col=7, map={"高": "FFFEE2E2", "中": "FFFEF3C7"}), dict(col=8, map={"採用": "FFD1FAE5", "不採用": "FFE5E7EB"})],
++    dv=[dict(col=8, list="未検討,採用,保留,不採用")]))
++
+ json.dump(S, open(f"{SP}/claude_eval.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+ print("sheets:", [(s["name"], len(s["rows"])) for s in S])
+diff --git a/.steering/20260928-ai-fatigue-db-appraisal/archive/scripts/build_xlsx.py b/.steering/20260928-ai-fatigue-db-appraisal/archive/scripts/build_xlsx.py
+index fd174f19..8dcb80cb 100644
+--- a/.steering/20260928-ai-fatigue-db-appraisal/archive/scripts/build_xlsx.py
++++ b/.steering/20260928-ai-fatigue-db-appraisal/archive/scripts/build_xlsx.py
+@@ -10,7 +10,12 @@ import tempfile
+ import openpyxl
+ from openpyxl.styles import Alignment, Font, PatternFill
+ from openpyxl.workbook.properties import CalcProperties
++from openpyxl.workbook.views import BookView
+ from openpyxl.worksheet.table import Table, TableStyleInfo
++from openpyxl.formatting.rule import FormulaRule
++from openpyxl.worksheet.datavalidation import DataValidation
++from openpyxl.worksheet.hyperlink import Hyperlink
++import math
+ 
+ import os
+ HERE = os.path.dirname(os.path.abspath(__file__))
+@@ -27,6 +32,25 @@ HEAD_FILL = PatternFill("solid", fgColor="FF0F766E")
+ TAB = "FF7C3AED"  # 追加シートの識別用（元シートはタブ色なし）
+ WRAP_TOP = Alignment(wrap_text=True, vertical="top")
+ WRAP_CENTER = Alignment(wrap_text=True, vertical="center")
++LINK_FONT = Font(name=FONT, size=11, color="FF0563C1", underline="single")
++
++
++def text_units(v):
++    """列幅の単位でのおおよその文字幅（全角 ≈ 2、半角 ≈ 1.1）。"""
++    return sum(2.0 if ord(ch) > 0x2E7F else 1.1 for ch in str(v))
++
++
++def row_height(values, widths):
++    """折り返したときの行の高さ（pt）を見積もる。★ openpyxl は行の高さを書かず、Excel は開いたときに自動で広げないため。"""
++    lines = 1
++    for v, w in zip(values, widths):
++        if v is None or v == "":
++            continue
++        text = v["text"] if isinstance(v, dict) else v
++        per_line = max(1.0, w - 1.5)
++        n = sum(max(1, math.ceil(text_units(part) / per_line)) for part in str(text).splitlines() or [""])
++        lines = max(lines, n)
++    return min(409, max(18, 15 * lines + 3))
+ 
+ 
+ def snapshot(wb):
+@@ -107,18 +131,40 @@ def add_sheet(wb, spec, table_idx):
+         if len(row) != ncol:
+             raise ValueError(f"{spec['name']} row {i}: {len(row)} cols != {ncol}")
+         for j, v in enumerate(row, 1):
++            link = None
++            if isinstance(v, dict):  # {"text": 表示, "link": "'シート'!A5"}（ブック内のリンクだけ）
++                link, v = v["link"], v["text"]
+             c = ws.cell(i, j, v)
+             # 数式は spec の formula_cols（1 始まりの列番号）のセルだけに許す。題名など他の列が '=' で始まっても文字列として保存する
+             if isinstance(v, str) and v.startswith("=") and j not in spec.get("formula_cols", ()):
+                 c.data_type = "s"
+-            c.font = Font(name=FONT, size=11, color=TEXT)
++            c.font = LINK_FONT if link else Font(name=FONT, size=11, color=TEXT)
++            if link:
++                c.hyperlink = Hyperlink(ref=c.coordinate, location=link, display=str(v))
+             c.alignment = WRAP_TOP
++        ws.row_dimensions[i].height = row_height(row, spec["widths"])
+     for j, w in enumerate(spec["widths"], 1):
+         ws.column_dimensions[openpyxl.utils.get_column_letter(j)].width = w
++    last_row = 4 + len(spec["rows"])
++    for rule in spec.get("cf", []):  # 値に応じた色分け（研究者が編集しても追従するよう条件付き書式にする）
++        col = openpyxl.utils.get_column_letter(rule["col"])
++        for val, color in rule["map"].items():
++            if rule.get("type") == "contains":
++                f = f'ISNUMBER(SEARCH("{val}",{col}5))'
++            elif rule.get("type") == "prefix":
++                f = f'LEFT({col}5,{len(val)})="{val}"'
++            else:
++                f = f'{col}5="{val}"'
++            ws.conditional_formatting.add(f"{col}5:{col}{last_row}", FormulaRule(formula=[f], fill=PatternFill("solid", fgColor=color, bgColor=color)))
++    for d in spec.get("dv", []):  # 研究者が入力する列のドロップダウン
++        col = openpyxl.utils.get_column_letter(d["col"])
++        dv = DataValidation(type="list", formula1='"' + d["list"] + '"', allow_blank=True)
++        dv.add(f"{col}5:{col}{last_row}")
++        ws.add_data_validation(dv)
+     if spec.get("table", True) and spec["rows"]:
+         ref = f"A4:{last}{4 + len(spec['rows'])}"
+         t = Table(displayName=f"ClaudeEval{table_idx}", ref=ref)
+-        t.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
++        t.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=spec.get("stripes", True))  # 色分けするシートは縞を消す
+         ws.add_table(t)
+     ws.freeze_panes = "B5"
+     return ws
+@@ -138,6 +184,14 @@ def main():
+     orig_titles = [ws.title for ws in wb.worksheets]
+     for k, spec in enumerate(sheets, 1):
+         add_sheet(wb, spec, k)
++    active = [s["name"] for s in sheets if s.get("active")]
++    if active:  # 開いたときに最初に見えるシート（元シートの内容は変えない。選択状態だけ外す）
++        if not wb.views:  # 元ファイルにはブックの表示設定が無く、無いと openpyxl は開くシートを書き出さない
++            wb.views.append(BookView())
++        for ws in wb.worksheets:
++            ws.sheet_view.tabSelected = False
++        wb.active = wb.sheetnames.index(active[0])
++        wb.active.sheet_view.tabSelected = True
+     wb.calculation = CalcProperties(fullCalcOnLoad=True)
+     # 一時ファイルに保存して検算し、通ったときだけ出力先を置き換える（失敗時に既存の正常版を失わない）。
+     # ★ mkstemp で排他的に一意に作る（既存のリンクや並行実行の一時ファイルを踏まない）。openpyxl は拡張子 .xlsx を要求する
