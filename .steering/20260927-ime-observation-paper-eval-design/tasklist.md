@@ -48,7 +48,14 @@
     - [x] 2026-09-29: 1 run・parallel=1 で 2 本とも attempt 1 の `issue_done`（5.36M トークン・$2.60）。clean な checkout で acceptance 失敗 0 件（005 ✅ 19 / 006 ✅ 14）
     - [x] レビュー 3 本（code-reviewer 2・security-checker 1）→ 判断 55〜57 を研究者に問い確定（前面の確認は runner がバックエンドで・リセットは送出のフラグで門・manifest の置換＋寄託前の検査）・判断 58 はメインの判断（停止の記録を実態に）。FORMATS の reset 行の条件（001 の追補）と 020 の寄託前の検査を base に入れた（`08541088`）
     - [x] 直しを作業用エージェント（Sonnet）に渡し、メインが clean な checkout で acceptance を回し直し（2 本とも失敗 0 件）、写しへの変異で確かめてから merge（005: 4 本 / 006: 5 本がすべて赤 → 005 `9098e1ee` / 006 `5668dccd`）
-  - [ ] W5（020: 実験一式と 1 コマンドの再現・依存 006）／W6（024: 公開 repo への書き出し）。★ 006 が先に要る。着手の前に研究者に確認する
+    - [x] merge 後の全 acceptance で 005 の AC5（`emit.py --selftest`）が 1 回だけ赤 → 200 回で 2 回「計画より早く送った」を捕捉（B12）→ 判断 59 で送出の基準を `trial_begin` の刻印に（004 の追補・`96a19df6`・直した後は 200 回中 0 回）
+  - [x] W5（020 / 023）（2026-09-29〜30）
+    - [x] 1 run で 020 は attempt 1 の `issue_done`・023 は worker が Stop（AC2 と公開物の書き方の矛盾）→ 判断 60 / 61 で 023 の issue と acceptance を直し（`96a19df6`）、回し直して attempt 1 の `issue_done`（止まった記録は `archive/ime-023-attempt1-stop`）
+    - [x] clean な checkout で acceptance 失敗 0 件（020 ✅ 28 / 023 ✅ 27）。レビュー 4 本（code-reviewer 2・security-checker 2）→ 判断 62〜64 を研究者に問い確定（セルの `label`〔006 の追補 `1c4b025e`〕・凍結の門・E3 は 8 時間）
+    - [x] 直しを作業用エージェント（Sonnet）に渡し、メインが clean な checkout で acceptance を回し直し、写しへの変異で確かめてから merge（023: 4 本 / 020: 4 本がすべて赤 → 023 `038645a8` / 020 `82a74e22`）。020 の selftest は 56 秒 → 既定 17 秒と `--full` 29 秒に分けた
+    - [ ] merge 後の base の全 acceptance → push → 片付け
+    - [ ] ⚠️ Mac: `emit.py`（判断 59）を変えたので `004-acceptance.sh` を回し直す・E3 のプロセス名が 16 文字で切れるか（`ps -c -o comm= -p <pid>`）を確かめる（判断 64）
+  - [ ] W6（024: 公開 repo への書き出し）。★ 着手の前に研究者に確認する
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）

@@ -1,5 +1,6 @@
 # 次セッション（G-GEAR）— IME 論文: Mac の 004 が base に入った後の 005 / 006 → 020 / 023 → 024
 
+> ★ **2026-09-30: 完了・後継は `next-session-ime-paper-ggear-w6.md`**（005 / 006 / 020 / 023 は merge 済み）。このメモは読まなくてよい。
 > 作成: 2026-09-29（W4 を終えたセッションの最後に・研究者の指示）。前の G-GEAR 用 handoff（`next-session-ime-paper-ggear-w4.md`）の後継。前のものは読まなくてよい。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `_issue-plan.md`（§2 波・§4 機械の割り当て・§5 マイルストーン）・`issues/NNN.md`・`decisions.md`（判断 1〜54）・`blockers.md`（B1〜B11）・`tasklist.md`。状態は着手時に測り直す。
 > ⚠️ Mac 側（004 / 007 / 012）は別の handoff: `.steering/_handoff/next-session-ime-paper-mac.md`。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。

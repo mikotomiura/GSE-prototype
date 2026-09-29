@@ -1,18 +1,27 @@
-# 次セッション（Mac）— IME 論文: G-GEAR で直した実行器（`emit.py`）を Mac で確かめる（004 の acceptance の回し直し）
+# 次セッション（Mac）— IME 論文: G-GEAR で merge した W3 の残り・W5 と、直した `emit.py` を Mac で確かめる
 
-> 作成: 2026-09-29。**2026-09-29 の夜に §0 を書き換えた**: Mac の 004 / 007 / 012 は merge 済み（前回の手順は下の §1〜§3 に参照用に残す・もう回さない）。今回やることは §1b の確認だけ。
-> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（判断 52〜54）・`blockers.md`（B10 / B11）・`tasklist.md`。状態は着手時に測り直す。
-> ⚠️ G-GEAR 側は別の handoff: `.steering/_handoff/next-session-ime-paper-ggear-w5.md`（base は `7f7551cc` 以降。G-GEAR の次は 005 / 006 のループ）。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。
+> 作成: 2026-09-29。**2026-09-30 に §0 を書き換えた**: 前回の §0（`emit.py` の判断 52 / 53 の確認）は Mac で済んでいる（`36dd894e`）。今回やることは §1c の確認だけ（ループは回さない）。
+> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（判断 55〜65）・`blockers.md`（B10〜B12）・`tasklist.md`。状態は着手時に測り直す。
+> ⚠️ G-GEAR 側は別の handoff: `.steering/_handoff/next-session-ime-paper-ggear-w6.md`（G-GEAR の次は W6 = 024）。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。
 
 ## §0 打ち込む用（Mac で・`/clear` の直後に）
 
 ```
-.steering/_handoff/next-session-ime-paper-mac.md を読んで、§1b のとおり G-GEAR で直した実行器（papers/ime-observation/kit/emit/emit.py・判断 52 / 53）を Mac で確かめてください。ループは回さない（004 / 007 / 012 は merge 済み）。
-手順: base（feature/ime-eval-kit）を origin から取り込む（main checkout を別セッションが使っていれば、B10 のとおり base 用の worktree で扱う・ブランチを切り替えない）。clean な checkout で bash .steering/20260927-ime-observation-paper-eval-design/issues/004-acceptance.sh を回す（出力はファイルへ・終了コードはパイプの後ろで取らない）。あわせて python3 papers/ime-observation/kit/emit/emit.py --selftest --full（機械が空いた状態で）と bash papers/ime-observation/kit/check.sh を回す。
-緑なら tasklist.md の「⚠️ Mac: 004-acceptance.sh を回し直す」に結果を書いてコミットし、git pull --no-rebase の後に push する。赤なら直さずに研究者に報告する。
-一次資料: .steering/20260927-ime-observation-paper-eval-design/ の decisions.md（判断 52〜54）・blockers.md（B10 / B11）。Skill: verify-before-claiming・git-workflow。応答は日本語。
+.steering/_handoff/next-session-ime-paper-mac.md を読んで、§1c のとおり G-GEAR で merge した分（005 006 020 023 と、004 の emit.py の追補・判断 59）を Mac で確かめてください。ループは回さない。
+手順: base（feature/ime-eval-kit）を origin から取り込む（main checkout を別セッションが使っていれば、B10 のとおり base 用の worktree で扱う・ブランチを切り替えない）。clean な checkout で、Mac で回せる merge 済みの全 acceptance（001 002 003 004 006 007 010 011 012 015 016 017 018 019 020 021 022 023 028・Windows 専用の 005 008 009 013 014 は exit 2 ＝対象外）を回す（出力はファイルへ・終了コードはパイプの後ろで取らない）。あわせて python3 papers/ime-observation/kit/emit/emit.py --selftest --full（機械が空いた状態で）と python3 papers/ime-observation/kit/analysis/pipeline.py --selftest --full。§1c の 3（E3 のプロセス名）も確かめる。
+緑なら tasklist.md の「⚠️ Mac: …」の行に結果を書いてコミットし、git pull --no-rebase の後に push する。赤なら直さずに研究者に報告する（B11 の教訓: 片方の機械でしか回していない selftest が、もう片方で赤になりうる）。
+一次資料: .steering/20260927-ime-observation-paper-eval-design/ の decisions.md（判断 55〜65）・blockers.md（B10〜B12）。Skill: verify-before-claiming・git-workflow。応答は日本語。
 コミットは git add パス指定（-A 禁止）。main への merge はしない（W6 の後・研究者の判断）。
 ```
+
+## §1c 確認すること（2026-09-30）
+
+1. **`emit.py`（004 の追補・判断 59）**: 送出の基準を `trial_begin` の刻印（`t_mono_ns`）にした。selftest に「keys are scheduled from the recorded trial_begin timestamp」を足した。G-GEAR では既定の selftest が 200 回中 0 回赤（直す前は 2 回）。→ Mac で `004-acceptance.sh`・`emit.py --selftest --full`。macOS では `perf_counter_ns` / `perf_counter` はどちらも `mach_absolute_time()`。
+2. **G-GEAR で merge した any の issue（006 / 020 / 023）と、それらの追補（006 のセルの `label`〔判断 62〕・FORMATS の reset 行の条件〔判断 56〕・`.gitattributes` の `experiment/` の `eol=lf`〔判断 63〕）**: Mac で一度も acceptance を回していない（B11 の教訓）。特に:
+   - 006 `run_cell.py` の selftest は子プロセスの停止に POSIX の分岐（`start_new_session` と `os.killpg`・SIGTERM）を持ち、G-GEAR では「無視した子を kill する」ケースが info 行になって**走っていない**。→ Mac で `run_cell.py --selftest` の全ケースが ok か（info で飛ばしていないか）を確かめる。
+   - 020 `pipeline.py` の selftest の `run.sh` の門（子プロセス）と、`--selftest --full`（全変種）。
+   - 023 `summarize_e3.py --selftest`。
+3. **E3 のプロセス名（判断 64・未確認の前提）**: Darwin の `p_comm` は 16 文字で切れ、`pgrep -x` は切れた名前と照合する見込みなので、`kit/e3/run_e3.sh` は macOS では既定の `E3_PROC` を先頭 16 文字（`ime-observation-`）にしている。→ 単体ロガーを release ビルドして短く起動し（例 `ime-observation-logger --out /tmp/e3-name-check.jsonl --duration-s 60`・入力監視の権限の確認が出たら断ってよい〔プロセス名だけを見る〕）、別の端末で `ps -c -o comm= -p <pid>` と `pgrep -x ime-observation-` と `pgrep -x ime-observation-logger` の結果を記録する。★ 前提が外れていたら（22 文字のまま一致する等）、`run_e3.sh` の既定を直す必要があるので研究者に報告する（直さない）。終わったら `/tmp/e3-name-check.jsonl` を消す。
 
 ## 以下 §1〜§3 は前回（2026-09-29 の昼）の手順。完了済み・参照用
 
