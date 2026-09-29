@@ -34,3 +34,16 @@
 - 原稿を直すたびに `bash run.sh` と `bash paper/build.sh`（exit 0）。
 - pdfLaTeX の結果は Tectonic の結果と並べて記録する（頁数・警告）。
 - 公開物の書き方: 書いてはいけないことの grep（前タスクの 11 パターン・GSE への言及なし）を原稿・README・Zenodo の説明・カバーレターに当てる。
+
+## 結果（2026-09-29）
+
+- 手順 1〜7 をこの順に実施し、**EMSE に投稿した（EMSE-D-26-01273）**。投稿日の手順は `submission-day-steps.md` を 2 巡目のレビューで「取り消せる検証を先に」の順（A〜G）に組み直した版で進めた（判断 12・13）。
+- 計画から変わった点:
+  - 通読は研究者の返答「表記などで気になった個所はない」で原稿を変えなかった（判断 1 の追記）。
+  - ORCID は本文に入れない案 → EMSE の Title Page の規程を読み落としていたと分かり、タイトル頁に文字で入れた（判断 7 の追記 2）。
+  - 投稿する版だけ `[referee,lineno]`（テンプレートの手引きの依頼・研究者の選択・判断 11）。
+  - Editorial Manager の実物に合わせて、別添のタイトル頁（`title-page.docx`）を足し、`results.tex` を投稿用の `main.tex` に埋め込み、データへのリンクは GitHub のタグにした（判断 15）。
+  - Zenodo の DOI の登録（DataCite）は公開の約 1 時間後だった → 解決を確かめてから投稿を確定した（判断 13）。
+  - 公開後に README を書き直した（研究者の依頼・判断 14）。
+- 残り（引き継ぎ `.steering/_handoff/next-session-p321-arxiv-and-review.md`）: endorsement が取れたら arXiv（21 頁の版・CC BY 4.0）→ 編集部への申告・Zenodo と README への追記／査読の結果への対応。
+
