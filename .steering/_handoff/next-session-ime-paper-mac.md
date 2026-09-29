@@ -24,6 +24,12 @@ Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は�
 - 契約: `papers/ime-observation/kit/formats/FORMATS.md`（英語。`plan/1` のヘッダの `recipes_sha256` / `corpus_sha256`・試行は直前のブロック行を指す・`oracle/1` の型〔全行が 2 つの時刻・`trial_begin` は試行間の待ちの後・`marker` は押下ごとに 1 行・`reset` は `block_begin` の前〕・エスケープと BOM の禁止）。
 - 012 が使う照合の道具: 公開用 `kit/logger/check_manifest.py`（`--self`）／内部用 `kit/logger/check_manifest_upstream.internal.py`（`--against-upstream` / `--update --manifest manifest.macos.json --entries <spec>`）。★ 012 は macOS で初めて単体ロガーをコンパイルする（`Cargo.lock` は GSE と同じ版にそろえてある）。`main.rs` / `Cargo.toml` の直しが要れば Stop（011 の追補として研究者へ）。
 
+## §1b 追記（2026-09-29・G-GEAR で Mac の W2 / W3 を取り込んだ後）
+
+- ★ Mac の 004 / 007 / 012 は G-GEAR で取り込み済み（base `3e078338` 以降）。G-GEAR で `main.rs`（判断 51）の Windows のビルド・テストは緑。
+- ⚠️ **G-GEAR で 004 の `emit/emit.py` を直した**（判断 52 / 53・B11）: oracle の時刻を高分解能の時計から取る・時計が 1 ms より粗ければ止まる・遅れの 95 パーセンタイルの上限は `--selftest --full` へ。→ ★ **次の Mac のセッションでは、まず `004-acceptance.sh` を clean な checkout で回し直す**（macOS では `time.time_ns()` と `perf_counter_ns()` を使う）。赤なら研究者に報告する。
+- ★ 教訓（B11）: 片方の OS でしか acceptance が回らない issue でも、`check.sh` が拾う selftest は両方の OS で走る。merge したら、もう片方の機械で全 acceptance を回すまで完了としない。
+
 ## §2 手順
 
 1. `git fetch` → `git switch feature/ime-eval-kit`（無ければ `git switch -c feature/ime-eval-kit origin/feature/ime-eval-kit`）→ `git pull --ff-only`。
