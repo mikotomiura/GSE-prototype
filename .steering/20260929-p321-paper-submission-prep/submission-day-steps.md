@@ -35,6 +35,7 @@
 2. `https://doi.org/10.5281/zenodo.23029603` が記録のページに解決することを確かめる（★ DOI は公開した時点で登録される）。
 
 ## F. 🔒 EMSE に投稿する（研究者・E の後）
+⚠️ **実際に上げたものは判断 15 のとおり**（別添の `title-page.docx`・`results.tex` を埋め込んだ 1 ファイルの `main.tex`・リンクは GitHub のタグ）。改訂版で使うときは判断 15 を先に読む。
 - 上げるファイル（サブフォルダなし）: `main.tex`（C の版）・`results.tex`・`refs.bib`・`main.bbl`・`sn-jnl.cls`・`sn-basic.bst`。C.4 で途中まで進めていれば、その続きから。
 - システムが組んだ PDF を C.4 と同じ観点で見てから承認する。Data availability の DOI と GitHub の URL がこの時点で開けることも確かめる。
 - 入力: ORCID `0009-0000-4196-0508`（判断 7）・推薦査読者なし（判断 8）・カバーレター（`cover-letter-draft.md` を研究者が直したもの）・Statements は原稿のとおり。

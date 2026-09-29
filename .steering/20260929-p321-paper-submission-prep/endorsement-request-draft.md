@@ -20,7 +20,7 @@
 
 突然のお願いで恐縮です。単著の論文を arXiv の cs.SE に投稿したいのですが、arXiv に論文を出すのが初めてで、既存の著者の方からの endorsement が必要になりました（2026 年 1 月から、所属機関のメールだけでは自動の endorsement にならなくなりました）。
 
-論文は、公開されている 2 つの debugging の観察データの再解析で、「参照しなかった」を「自力で解決した」と読むと、未解決のまま終わった単位まで数えてしまうことを、その差の大きさとともに示したものです。*Empirical Software Engineering* に投稿済み（または投稿予定）です。
+論文は、公開されている 2 つの debugging の観察データの再解析で、「参照しなかった」を「自力で解決した」と読むと、未解決のまま終わった単位まで数えてしまうことを、その差の大きさとともに示したものです。*Empirical Software Engineering* に投稿済みで、査読中です。
 
 - 題: When "no help" is not "solved": outcome-agnostic self-resolution measures in two public debugging datasets
 - 原稿: [PDF を添付 / 共有リンク]
@@ -47,7 +47,7 @@ Dear [name],
 
 I would like to post a single-author paper to arXiv in cs.SE. As this is my first submission to arXiv, I need an endorsement from an established author; since January 2026 an institutional email address is no longer sufficient on its own.
 
-The paper reanalyses two public observational datasets of professional debugging and shows how far the share of units without consultation overstates the share resolved without consultation when units can also end unresolved. It has been [will be] submitted to *Empirical Software Engineering*.
+The paper reanalyses two public observational datasets of professional debugging and shows how far the share of units without consultation overstates the share resolved without consultation when units can also end unresolved. It has been submitted to *Empirical Software Engineering* and is under review.
 
 - Title: When "no help" is not "solved": outcome-agnostic self-resolution measures in two public debugging datasets
 - Manuscript: [attached / link]

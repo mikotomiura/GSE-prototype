@@ -7,7 +7,7 @@
 ## §0 打ち込む用
 
 ```
-git fetch origin してから git show origin/main:.steering/_handoff/next-session-p321-arxiv-and-review.md を読んで、§2 のうち研究者に言われたものを進めてください。
+git fetch origin してから git show origin/main:.steering/_handoff/next-session-p321-arxiv-and-review.md を読んで、§2 のうち研究者に言われたものを進めてください（⚠️ origin/main に無ければ、前セッションのブランチ docs/p321-paper-submission-prep の PR がまだ merge されていない → 先に確かめる）。
 ⚠️ main checkout（C:/GSE-prototype）は別ターミナルの IME 論文のセッションが使っているかもしれない。git status を見て、使っていれば GSE 側の作業は git worktree で切る。
 Skill: git-workflow・verify-before-claiming・subagent-delegation・citation-ssot（原稿を直すとき）・browser-verification（Chrome を使うとき）。
 応答は日本語。研究者の判断が要ることは AskUserQuestion で聞く。取り消しにくい操作（arXiv への投稿・Zenodo の新しい版の公開・EMSE への返信）はその場で研究者に確かめる。
@@ -24,16 +24,17 @@ Skill: git-workflow・verify-before-claiming・subagent-delegation・citation-ss
 ## §2 やること
 
 ### A. arXiv（endorsement が取れたら）
-1. arXiv 用のソースを作る: **今の行間（21 頁）の版**＝タグ `submission-2026-09-29` の `paper/`（`[referee,lineno]` を付けない）。⚠️ `.bbl` の同梱の要否・TeX Live の版・`\input{results}` の扱いは **arXiv の help を一次で確かめてから**（未確認）。pdfLaTeX で組めることは確かめ済み（判断 2 の追記）。
-2. 研究者が投稿する（ライセンス **CC BY 4.0**・⚠️ 版ごとに選び、後から変えられない）。
+1. arXiv 用のソースを作る: **今の行間（21 頁）の版**＝タグ `submission-2026-09-29` の `paper/`（`[referee,lineno]` を付けない）。⚠️ タグには `sn-jnl.cls`・`sn-basic.bst` が**入っていない**（再配布しない方針・前タスク判断 5）→ `paper/build.sh` が公式 zip から SHA-256 を照合して取り出したものを使う。⚠️ `sn-jnl.cls` の冒頭は "This file may only be distributed together with a copy of the LaTeX base system." と書く → arXiv はソースを公開するので、**同梱してよいか（arXiv の TeX Live に入っているか）を arXiv の help で一次で確かめ、研究者に判断してもらう**。⚠️ `.bbl` の同梱の要否・TeX Live の版・`results.tex` の扱い（EM では本体に埋め込んだ・判断 15）も **arXiv の help を一次で確かめてから**（未確認）。pdfLaTeX で組めることは、タグの版で確かめ済み（判断 12・判断 13 の C）。
+★ endorsement が取れないままなら、代わりに Research Square にプレプリントを載せる道がある（投稿後のメール・RSID rs-1120754・endorsement 不要・判断 16）→ 研究者が決め、載せたら編集部に知らせる。
+2. 研究者が投稿する（ライセンス **CC BY 4.0**・⚠️ 版ごとに選び、後から変えられない）。要旨の欄は R マクロを数値に置き換えた平文が要る → `C:/wt/emse-upload-form-text.txt` の要旨を使う（数値は PDF と照合済み）。
 3. 載ったら: EMSE の編集部に arXiv の ID とライセンスを知らせる（Springer の規程 "Authors should disclose details of preprint posting, including DOI and licensing terms"・EM の "View Submission Correspondence" か編集部への連絡の手段を一次で確かめる）／ Zenodo の記録の related_identifiers に arXiv を足す（メタデータは公開後も直せる）／ README にプレプリントを書く（公開物の規律・GSE に言及しない）。
 
 ### B. 査読の結果が来たら
 - 判定と査読コメントを読み、対応の方針を研究者と決める（grill）。原稿を直すなら、数値は `results/metrics.json` から生成し直書きしない（前タスク判断 6）・`bash run.sh` と `bash paper/build.sh` exit 0・`/cross-review`。
 - 改訂版を出すときも EM の落とし穴（別添のタイトル頁・`.tex` は 1 つ・キーワードはセミコロン・Zenodo のリンクは無効扱い）に注意（memory `reference_springer_editorial_manager`）。
-- 再現一式を変えたら、Zenodo は**新しい版**として出す（公開済みのファイルは差し替えられない）。
+- 再現一式を変えたら、Zenodo は**新しい版**として出す（公開済みのファイルは差し替えられない）。⚠️ 波及: (a) 新しい版には新しい DOI が付く → 原稿の Data availability・README のバッジと BibTeX・カバーレターが名指ししている 23029603 を、新しい版の DOI か concept DOI（全版をまとめる DOI・記録のページで一次で確かめる）に改める ／ (b) 解析を変えたら `NOTES.md` の Deviations に追記し、原稿 §5.1 の "Seven later changes … none changed a reported value" の件数と文を更新する（凍結の主張を守る要）／ (c) 改訂版にも新しいタグを付け、arXiv にも新しい版を出す（ライセンスは版ごと）／ (d) 査読への返答書（point-by-point）と EM の改訂期限を記録する。
 
 ## §3 気をつけること
 
-- ⚠️ Codex の台帳: 2026-09-29 は、本タスクのブランチで origin/main を merge して和を採った値が **372,458 / 10 回**（`_comment_merge_2026_09_29`）で、上限 300,000 を超えている。⚠️ PR #257 の 1 巡目 +81,661 / +1 回（G-GEAR で実行）は**どのブランチにも記帳されていない**（研究者の指示で Mac 側に渡したが、PR #257 の merge `7ae41eba` には入っていない）→ どちらか一方で 1 回だけ足す（二重に足さない）。merge で `today` が衝突したら和を採る（memory `feedback_codex_budget_is_a_ledger`）。
+- ⚠️ Codex の台帳: 2026-09-29 は、本タスクのブランチで origin/main を merge して和を採った値が **372,458 / 10 回**（`_comment_merge_2026_09_29`）、その後の完了時のレビュー 1 回を足して **395,426 / 11 回**で、上限 300,000 を超えている（記帳漏れの PR #257 の分を足すと実合算は **477,087 / 12 回**）。⚠️ PR #257 の 1 巡目 +81,661 / +1 回（G-GEAR で実行）は**どのブランチにも記帳されていない**（研究者の指示で Mac 側に渡したが、PR #257 の merge `7ae41eba` には入っていない）→ どちらか一方で 1 回だけ足す（二重に足さない）。merge で `today` が衝突したら和を採る（memory `feedback_codex_budget_is_a_ledger`）。
 - ⚠️ 公開物（README・Zenodo の説明・arXiv の要旨・編集部への連絡）は学術的な英語・GSE に言及しない（memory `feedback_public_artifacts_academic_no_gse`）。

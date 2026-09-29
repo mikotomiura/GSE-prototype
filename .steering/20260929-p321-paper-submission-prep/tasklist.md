@@ -34,4 +34,6 @@
 - [x] F: 研究者が EMSE に投稿（確定）→ **EMSE-D-26-01273**・2026-09-29（判断 15。タイトル頁の別添・results.tex の埋め込み・リンクは GitHub のタグ）
 - [ ] G: endorsement が取れたら arXiv（研究者）→ EMSE に申告・Zenodo と README に追記
 - [x] 論文用リポジトリを push（`75ce1ff`・タグ `submission-2026-09-29`）
+- [x] 完了時の `/cross-review`（Codex 1 回・README／code-reviewer・README と作業記録）→ 裁定と修正（判断 16・論文用リポジトリ `728e81c`）
+- [ ] endorsement の依頼（研究者）→ arXiv（引き継ぎ `next-session-p321-arxiv-and-review.md` §2 A）
 - [ ] GSE 側: `/finish-task` の出荷フロー

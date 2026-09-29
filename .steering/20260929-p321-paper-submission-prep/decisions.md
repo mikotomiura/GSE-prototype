@@ -159,7 +159,7 @@
 ## 判断 12: `/cross-review` 2 巡目の裁定（2026-09-29）
 
 - **範囲**: 1 巡目で足した規則の境界条件（memory `project_cross_review_two_rounds`）。Codex 2 回（① 論文用リポジトリ `e1e527b..02380c5 -- paper/main.tex README.md NOTES.md` ② 本ディレクトリ `e40940e2..017a4ee9` の 4 ファイル）＋ code-reviewer。**CRITICAL は 0 件**。
-- **Codex の予算**: 実消費 ① 22,169 ② 25,536（本ブランチの台帳 158,809 → 206,514 / 6 回）。同日の合算は約 361,841 / 8 回（引き上げた上限 450,000 の内）。
+- **Codex の予算**: 実消費 ① 22,169 ② 25,536（本ブランチの台帳 158,809 → 206,514 / 6 回）。同日の合算は約 361,841 / 8 回（引き上げた上限 450,000 の内）。⚠️ **訂正（判断 16）**: この合算は origin/main 側の同日の分を 73,666 / 1 回と見ていたが、merge で 165,944 / 4 回と分かった → 記帳漏れの PR #257（81,661）を含めた実合算はこの時点で 454,119 / 11 回で、一時上限 450,000 も超えていた（各呼び出しの時刻の前後は不明）。
 - ★ **採用（両系統が一致）**:
   1. ⚠️ **手順書の並び順**（code-reviewer HIGH・Codex P2）: 取り消せる検証（zip の検証・投稿用の原稿の組版・投稿システムの PDF の確認）が、取り消しにくい操作（GitHub の public 化）の後にあった。さらに「public 化と Zenodo の公開を間を置かずに」という自分で足した規則を、手順どおりに進めると必ず破る形だった。→ A（確定・履歴の検査・タグは手元だけ）→ B（zip の作成・中身の照合・Zenodo の下書きへのアップロード・研究者の確認）→ C（投稿用の原稿・投稿システムの PDF を承認せずに見る）→ D（push と public 化）→ E（Zenodo の公開）→ F（EMSE）→ G（arXiv）に組み直した。
   2. 履歴が示せる範囲（Codex ① P2・code-reviewer MEDIUM）: 凍結のコミット `416a0fc` は設定とデータだけで、解析のコードと結果は `834f16a` で入った（`git show --stat` で確認）。⚠️ 設定はその後も `ae39be6`・`098b01a` で変わった（`git log -- config.json`）。→ Data availability・README・カバーレター・Zenodo の説明を「設定は解析のコードと結果より**先に最初に**コミットされ、その後の変更は記録してある」に揃えた（論文用リポジトリ `75ce1ff`・Zenodo の下書きは説明だけ差し替え・DOI は不変）。原稿 §5.1 の文は変えていない（"Seven later changes … are logged" の限定を既に持つ）。
@@ -188,7 +188,7 @@
 ## 判断 14: 公開後の README の書き直し（2026-09-29・研究者の依頼「もうちょいおしゃれで門な感じに」）
 
 - ⚠️ 「門な感じ」は「モダンな感じ」と読んで進めた（研究者に伝えた・違えば直す）。
-- **形**: 題と副題を中央に・DOI（Zenodo）・ライセンス 2 つ・Python のバッジ／Overview（要旨の言い方に揃えた）／指標の表／データの表／Quick start（clone → D1 をブラウザで取得 → `bash run.sh`）／`run.sh` が確かめること 6 項目／原稿の組み直し／Freeze and provenance／ファイル配置の表／Citation（Zenodo の記録の BibTeX）／ライセンスの表。公開物の規律（学術的な英語・GSE への言及なし・絵文字や口語なし）を守った（grep と文字の走査で 0 件）。
+- **形**: 題と副題を中央に・DOI（Zenodo）・ライセンス 2 つ・Python のバッジ／Overview（要旨の言い方に揃えた）／指標の表／データの表／Quick start（clone → D1 をブラウザで取得 → `bash run.sh`）／`run.sh` が確かめること 6 項目／原稿の組み直し／Freeze and provenance／ファイル配置の表／Citation（Zenodo の記録に合わせて作った `@misc` の BibTeX・Zenodo の書き出しそのものではない）／ライセンスの表。公開物の規律（学術的な英語・GSE への言及なし・絵文字や口語なし）を守った（grep と文字の走査で 0 件）。
 - ★ **書き直しの途中で見つけた言い過ぎ 3 つも直した**（1・2 巡目の裁定と同じ型）: `config.json` の説明 "frozen before results were computed" → 「解析のコードと結果より先に最初にコミットされ、その後の変更は NOTES.md に記録」／D2 の抽出元 "Table 4 and Table 5 only" → 「Table 4・Table 5 の 3 行・本文の 3 文」（原稿 main.tex と一致）／転記を "independent" → 「同じ LLM の別々のインスタンス」（NOTES.md の限界と一致）。「原稿のすべての数値」→「解析の結果」（原著からの引用値を含まないため）。
 - 確かめたこと: バッジ 4 つが SVG で 200・相対リンク 12 件がすべて実在・制御文字 0。論文用リポジトリ `0e3c9ed`（main に push・タグ `submission-2026-09-29` と Zenodo の版は変わらない）。
 
@@ -206,4 +206,16 @@
   8. Comments の欄にカバーレターを貼った（添付の段にカバーレターの種類が無い）。完成版は `C:/wt/emse-cover-letter.txt`（日付 29 September 2026・プレプリントはまだ無く査読中に arXiv へ出す予定と明記）。
   9. Manuscript Data: 題は自動で入らない → 貼った（編集部品が末尾に U+200B を足すが題の組版には出ない）。要旨は用意した文と一字一句一致を確認。⚠️ **キーワードはセミコロン区切り**（"Keywords must be separated by semicolons."）。著者は登録情報から自動で入った。資金は "Funding information is not applicable / No funding was received."。
 - **EM が組んだ PDF の確認**（`EMSE-S-26-01791.pdf`・35 頁 = EM の表紙 1 ＋ タイトル頁 1 ＋ 原稿 32 ＋ リンクの頁 1）: EM の刻印（余白の行番号 1〜65・"Manuscript (LaTeX source)"）と下括弧の字形の違い（`|{z}` と `⏞⏟`・フォントの違い）を除くと、**原稿 32 頁が手元の投稿用の版と頁ごとに一致**（54,521 文字）。未定義の参照・LaTeX のエラーの表示 0。ORCID・DOI・GitHub の URL あり。原稿の部分のフォントは全埋め込み（埋め込みでないのは EM が作った表紙とタイトル頁の Verdana / Times New Roman だけ）。→ 研究者が承認して確定した。
+
+## 判断 16: 完了時の `/cross-review`（`/finish-task` Step 3）と、投稿後の Research Square のメール（2026-09-29）
+
+- **範囲**: 前の 2 巡の後に変わったもの＝論文用リポジトリの README の書き直し（`75ce1ff..0e3c9ed`・公開物）と、GSE 側の `017a4ee9` 以降の作業記録（手順書の組み直し・判断 12〜15・引き継ぎ・索引）。
+- **Codex**（README の差分だけ・1 回）: ⚠️ merge で台帳が 372,458 / 10 回になり上限を超えていた → 研究者の同日の許可（逐語「Codexは必要であれば予算引き上げしていいよ」）で上限を一時的に 420,000 にして 1 回回し（実消費 22,968 → 395,426 / 11 回）、300,000 に戻した（台帳の `_comment_2026_09_29_second_raise`）。指摘 LOW 2 件はどちらも採用しない: ① Overview の "That reading requires every unit without consultation to end in a fix." は原稿の要旨と同じ文で正しい ／ ② 版と DOI の対応は DataCite で確認済み（判断 13）。
+- **code-reviewer**（README ＋ 作業記録）: CRITICAL・HIGH 0。★ 採用:
+  - MEDIUM: README の「すべての入力のハッシュ」→ `run.sh` が SHA-256 を照合するのは D1 だけ（D2 は有無）と一次で確認して改めた ／ 「every later change」→「the later changes to the analysis」（Deviations は解析上の 7 件）／ 引き継ぎに改訂時の波及（新しい版の DOI か concept DOI・Deviations と §5.1 の件数・新しいタグと arXiv の新しい版・返答書と期限）／ 引き継ぎの arXiv の段に cls と bst の出どころと同梱の可否（`sn-jnl.cls` の配布条件の一文）。
+  - LOW: README の Overview に 3 つ目の指標・DATA.md と provenance.txt の役割の書き分け・自己検査は「relabelled or broken input」（`analyze.py` の "absent" はラベルの付け替え）／ 判断 12 の合算の訂正（実合算 454,119 / 11 回で一時上限 450,000 も超えていた）／ 判断 14 の BibTeX の書き方 ／ 依頼文の「投稿予定」を投稿済みに確定 ／ 手順書 F に「実際は判断 15」／ 引き継ぎの参照先・要旨の平文・merge の確認・実合算 477,087 / 12 回。
+  - 論文用リポジトリ `728e81c`（README・main に push）。README の書き直しでは公開物の規律（GSE への言及 0）を保った。
+- **採用しない**: なし（LOW 5 の「Zenodo の題にコロンがあるか」は、`design.md` の手順の書き方に「Replication package for: …」とあっただけで、下書きの実際の題にコロンは無い（`zenodo-meta.json`・DataCite の titles）→ README の BibTeX と一致）。
+- **security-checker・test-runner は回していない**: GSE 側の差分（`origin/main` から 11 ファイル）は `.steering/` と台帳だけで、コード・外部入力・認証・データ保存に関わる変更が無い。論文用リポジトリの全履歴は公開前に security-checker で検査済み（判断 11）で、その後のコミットはコミットごとに私が同じ観点で検査した（判断 13 の A）。schema parity は skip（schema に触れていない）。
+- **Research Square のメール**（2026-09-29・RSID rs-1120754）: 投稿時に了承した本人だけのダッシュボードの案内と、そこから Research Square にプレプリントを載せられる、という案内。→ **何もしない**（研究者に伝えた）。Research Square へのプレプリントは、カバーレターで arXiv と書いたので今は載せない。⚠️ arXiv の endorsement が取れない場合の代わりの道になる（endorsement が要らない）→ その時に研究者が決める（引き継ぎ §2 A）。
 
