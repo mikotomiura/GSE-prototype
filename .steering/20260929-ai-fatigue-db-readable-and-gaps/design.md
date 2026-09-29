@@ -8,7 +8,7 @@
 内容のデータは Python のモジュール 2 本に置き、xlsx のシートと repo の `issues.md` を同じデータから生成する（二重管理しない）。
 
 - `scripts/papers_plain.py` —— 34 件の平易な要約（誰を・どう／何が分かったか／どこまで引用してよいか／注意点／次の一手／対象者・デザイン・国）
-- `scripts/issues_data.py` —— issue 30 件（サーヴェイ 12・アイディア 8・通常 10）、用語の読み替え、照会の下書き 6 件、件数の目安、種文献
+- `scripts/issues_data.py` —— issue 34 件（サーヴェイ 12・アイディア 12・通常 10。★ 前回のセッションの未コミットの課題・アイディアを取り込んで 30 → 34）、用語の読み替え、照会の下書き 6 件、件数の目安、種文献
 - `scripts/build_readable.py` —— シートを足して検算し、`issues.md` を書く
 
 ### 追加するシート（Claude 評価のシート群の前に置き、開いたときは『★まず読む』を表示）
@@ -18,9 +18,9 @@
 | ★まず読む | 結論を 6 行で／数字で見る（他シートを数える数式）／おすすめの順番／どのシートを見ればよいか |
 | 論文ごとの要点 | 34 件 × 平易な要約。詳細は Claude適格性評価の同じ行へリンク |
 | 証拠の地図 | 一次研究の「対象者 × デザイン」の分布（ID の一覧と COUNTIFS の件数）、国・地域、空いている所 → issue |
-| 調査不足とissue | 30 件。種類・優先度・手間・なぜ・根拠の場所・判断材料・次の一手・完了条件・GSE との関係・依存。★ 状態とメモは研究者の記入欄（青字・状態はドロップダウン） |
+| 調査不足とissue | 34 件。種類・優先度・手間・なぜ・根拠の場所・判断材料・次の一手・完了条件・GSE との関係・依存。★ 状態とメモは研究者の記入欄（青字・状態はドロップダウン） |
 | 件数の目安と種文献 | 検索式つきの件数（情報源・日付）と、実在を確認した種文献 |
-| 照会の下書き | 著者照会 6 件の英文の下書きと、送る前に確かめること（★ 送るかは研究者が決める） |
+| 照会の下書き | 著者照会 5 通（7 論文）の英文の下書きと、送る前に確かめること（★ 送るかは研究者が決める） |
 | 用語の読み替え | 中心-A/B・E1〜E6・JBI・COSMIN・段階記号・R-I/C 番号などの平易な読み方 |
 
 ### 「調べる価値がある」の判断
@@ -42,7 +42,7 @@
 ### 新規作成するファイル
 - `.steering/20260929-ai-fatigue-db-readable-and-gaps/{requirement,design,tasklist,decisions}.md`
 - `.steering/20260929-ai-fatigue-db-readable-and-gaps/issues.md`（生成物）
-- `.steering/20260929-ai-fatigue-db-readable-and-gaps/scripts/{papers_plain,issues_data,build_readable}.py`
+- `.steering/20260929-ai-fatigue-db-readable-and-gaps/scripts/{papers_plain,issues_data,build_readable,selftest,verify_recalc}.py`（★ 後ろの 2 本は判断 9 で追加）
 - `.steering/20260929-ai-fatigue-db-readable-and-gaps/archive/AI_fatigue_database_with_AI_appraisal_2026-09-29_claude.xlsx`（＋ `C:\Users\johnd\Downloads\` に同じもの）
 - `.steering/20260929-ai-fatigue-db-readable-and-gaps/archive/evidence/`（件数調べの生の結果 JSON）
 
@@ -64,7 +64,7 @@ repo のコード・計測・CI には触れない。`.steering/` への追加�
 ## テスト戦略
 
 - 既存 26 シートの不変（セル値・構成）を機械で比較し、変異（既存セルへの書き込み）で赤になることを確かめる
-- 34 件・30 件の必須欄が空でないこと、issue 番号の相互参照がすべて実在すること（データモジュールの assert）
+- 34 件・34 件の必須欄が空でないこと、issue 番号の相互参照がすべて実在すること（`check_refs`・判断 9）
 - LibreOffice でコピーを再計算し、追加シートの数式にエラー・想定外の空がないこと、主要な数（中心-A 7 など）が期待値と一致すること
 - `issues.md` と xlsx の issue シートの行数・番号が一致すること
 

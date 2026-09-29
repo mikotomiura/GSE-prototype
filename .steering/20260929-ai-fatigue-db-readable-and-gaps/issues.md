@@ -23,7 +23,7 @@
 | I-01 | アイディア | 高 | 小 | 【GSE へ】この DB を、GSE のロードマップ最優先 5『AI 疲労を横断する scoping review』の AI 疲労の系統として扱うかを決める | — |
 | I-02 | アイディア | 高 | 中 | 【GSE へ】検証負担・やり取りの負担（verification / interaction burden）の自己報告項目の候補を、EVAL-NCC の測定辞書に足すか検討する | N-07（AF001 の項目を参照するなら） |
 | I-09 | アイディア | 高 | 中 | 【サーベイ論文へ】疲労の『源』で中心候補をコーディングする（プロンプトを作る負担／出力を確かめる負担／修正・やり直しの負担） | N-05・S-02 |
-| I-03 | アイディア | 中 | 小 | 【GSE へ】『能動的な疲労／受動的な疲労』の区別を、生成的返権論の負荷逆説（§6.3）の境界条件として書き足すか検討する | S-05 |
+| I-03 | アイディア | 中 | 小 | 【GSE へ】系の監督・確認が生む『受動的な疲労』を、生成的返権論の負荷逆説（§6.3）の負担台帳の項目の例として書き足すか検討する | S-05 |
 | I-04 | アイディア | 中 | 大 | 【両方】AF001 の AI 疲労尺度の日本語版を作り、検証する計画を立てる（独立した研究になりうる） | N-07・S-08 |
 | I-05 | アイディア | 中 | 小 | 【GSE へ】GR-H12 の反証表の交絡の欄に『睡眠』を足すか検討する（AF008 の所見から） | — |
 | I-10 | アイディア | 中 | 小 | 【サーベイ論文へ】『誰が負担を負うか』の列を抽出フォームに足す（解釈・確認・修正・帰結） | N-05 |
@@ -35,7 +35,7 @@
 | N-01 | 通常 | 高 | 小 | 中心候補のうち本文未入手の 3 件（AF002・AF003・AF009）の全文を入手し、中心-A か B かを確定する | — |
 | N-02 | 通常 | 高 | 中 | 人間 2 名の独立スクリーニングを行い、AI の予備判定と照らし合わせる（判定者用ファイルの仕上げ・AF024 の範囲判定を含む） | N-05 と同時に進めてよい（基準が変わるなら N-05 を先に） |
 | N-05 | 通常 | 高 | 中 | スコーピングレビューのプロトコルを確定し、事前登録する（OSF など） | I-01 の決定（GSE のレビューと共有するか）があれば反映 |
-| N-03 | 通常 | 中 | 小 | 報告値の食い違いを著者に照会するかを決め、送るなら送る（6 件・下書きあり） | — |
+| N-03 | 通常 | 中 | 小 | 報告値の食い違いを著者に照会するかを決め、送るなら送る（下書き 5 通・7 論文） | — |
 | N-04 | 通常 | 中 | 小 | 元 DB を v1.1 に更新する（書誌の補完・デザインや件数の修正を反映） | N-01 の結果も反映するなら N-01 の後 |
 | N-06 | 通常 | 中 | 小 | IEEE DataPort の『AI 疲労』データセット 2 件が実測か合成かを確かめる | — |
 | N-10 | 通常 | 中 | 小 | 【GSE】中央書誌 [P362]（AF001）の注記を一次に合わせる | — |
@@ -80,7 +80,7 @@
 - **調べる価値の判断材料**: Europe PMC（題名・抄録）で『AI 記録支援 × 燃え尽き・疲労・認知負荷』89 件、『AI の下書き返信 × 燃え尽き等』18 件（2026-09-29）。種文献（Crossref で確認）: Lukac et al. 2025 NEJM AI の RCT doi:10.1056/aioa2501000／Afshar et al. 2025 NEJM AI のプラグマティック RCT（ウェルビーイング）doi:10.1056/aioa2500945／Olson et al. 2025 JAMA Netw Open doi:10.1001/jamanetworkopen.2025.34976／Shah et al. JAMIA doi:10.1093/jamia/ocae295／Garcia et al. 2024 JAMA Netw Open doi:10.1001/jamanetworkopen.2024.3201／Tai-Seale et al. 2024 JAMA Netw Open（RCT）doi:10.1001/jamanetworkopen.2024.6565。
 - **次の一手**: N-05 で『AI が疲労を減らす介入研究』の扱いを決める → 医療・教育・一般業務で、AI 導入の前後または群間で疲労・燃え尽き・負担を測った研究を検索 → 向き（減る／差なし／増える）と測定尺度を表にする。
 - **完了の条件**: 向き別の件数と、測定尺度・デザインの表ができる。
-- **GSE との関係**: ★ GR-H11（負荷の最小化を普遍的な善にしない）・roadmap §5.7『負担最小化を普遍善にできない』と対になる証拠。AI が負担を『減らす』研究も『移す』研究も、GSE では interaction burden / verification burden の区別で読む。
+- **GSE との関係**: roadmap §5.7『負担最小化を普遍善にできない』と対になる証拠。AI が負担を『減らす』研究も『移す』研究も、GSE では interaction burden / verification burden の区別で読む。⚠️ GR-H11（生産的摩擦）は 2026-09-19 に保留（J-7）なので、GSE の実験案にはつなげない。
 - **依存・順序**: N-05
 
 ### S-05（優先度 高・手間 中）自動化を『見張る』疲労（受動的疲労・覚醒水準の低下・自動化への慢心）の研究を取り込む
@@ -125,9 +125,9 @@
 
 ### S-09（優先度 中・手間 小）『なぜ疲れるのか』の理論の節を作る（機会費用・補償的制御・能動／受動的疲労・自我消耗の再現性問題）
 
-- **なぜ必要か**: DB の『尺度・理論』は尺度の原著だけで、疲労が生じる仕組みの理論がない。AF004 は自我消耗理論に依拠しているが、その再現性には大規模な反証がある。
+- **なぜ必要か**: DB の『尺度・理論』は尺度の原著だけで、疲労が生じる仕組みの理論がない。AF004 は自我消耗理論に依拠しているが、事前登録の大規模な追試では効果がほぼ零から小さいにとどまっている。
 - **根拠の場所**: GSE照合 追加候補（[P205]・[P206]・[P209]）／Claude領域別評価 AF004
-- **調べる価値の判断材料**: GSE に既に精読済みの文献がある: Kurzban et al. 2013 の機会費用モデル [P205]、Agrawal et al. 2022 の規範的説明 [P206]、Hopstaken et al. 2015 の離脱の可逆性 [P209]、自我消耗の多施設の追試とメタ分析 [P199]・[P200]・[P201]・[P204]、そのグルコース説への反証 [P207]・[P208]（★ 前回の GSE照合シートは再現性問題を [P207]・[P208] としたが、この 2 件はグルコース説への反証である）。GSE に無いもの（Crossref で確認）: Hockey 1997 の補償的制御の枠組み doi:10.1016/S0301-0511(96)05223-4、Saxby et al. 2013 の能動的／受動的疲労 doi:10.1037/a0034386。
+- **調べる価値の判断材料**: GSE に既に精読済みの文献がある: Kurzban et al. 2013 の機会費用モデル [P205]、Agrawal et al. 2022 の規範的説明 [P206]、Hopstaken et al. 2015 の離脱の可逆性 [P209]、自我消耗の追試とメタ分析のうち効果がほぼ零の側 [P199]・[P200]・[P201]、小さいが零ではない効果を報告した事前登録の多施設追試 [P204]（★ GSE の中央書誌は [P204] を『無効果側で一括りに引いてはいけない』と注記している）、グルコース説への反証 [P207]・[P208]（★ 前回の GSE照合シートは再現性問題を [P207]・[P208] としたが、この 2 件はグルコース説への反証である）。GSE に無いもの（Crossref で確認）: Hockey 1997 の補償的制御の枠組み doi:10.1016/S0301-0511(96)05223-4、Saxby et al. 2013 の能動的／受動的疲労 doi:10.1037/a0034386。
 - **次の一手**: GSE の精読カードから要点を移し、Hockey 1997 と能動／受動的疲労を足して 1〜2 頁の理論の節にする。
 - **完了の条件**: 理論の節（出典つき）ができ、DB の『尺度・理論』に理論の文献が加わる。
 - **GSE との関係**: GSE の既存カードを再利用できる（新しく引く文献は citation-ssot で登録）。
@@ -135,7 +135,7 @@
 
 ### S-10（優先度 中・手間 小）強いデザイン（縦断・日誌法・実験）で AI と疲労を扱った研究を狙って探す
 
-- **なぜ必要か**: DB の一次研究は横断調査と質的研究がほとんどで、時間をずらして測ったのは AF019 と AF022 だけ（どちらも AI に向けた疲労ではない）。AI を操作して疲労を測った実験は 0。『AI を使うと疲れる』の因果には近づけていない。
+- **なぜ必要か**: DB の一次研究は横断調査と質的研究がほとんどで、時間をずらして測ったと確認できたのは AF019 と AF022 だけ（どちらも AI に向けた疲労ではない）。AF003 はデザインが未確認（本文未入手）。AI を操作して疲労を測った実験は 0。『AI を使うと疲れる』の因果には近づけていない。
 - **根拠の場所**: 証拠の地図シート／Claude領域別評価（時間順序・因果）
 - **調べる価値の判断材料**: Europe PMC（題名・抄録）で『生成 AI × 疲労・燃え尽き × 縦断・日誌・経験サンプリング・無作為化』24 件（2026-09-29）で、上位は医療の AI 記録支援の RCT（S-04 と重なる）。医療以外の強いデザインは見当たらない。
 - **次の一手**: S-01 の検索式に設計のフィルタ（longitudinal / diary / experience sampling / randomized）を足した検索ブロックを作り、医療以外を重点的に見る。
@@ -206,20 +206,20 @@
 - **GSE との関係**: ★ 論文では GSE に言及せず、公開文献（Tankelevitch et al. 2024 [P364]・Simkute et al. 2024 [P376] など）を出典に軸を立てる（公開する成果物に GSE を書かない方針）。
 - **依存・順序**: N-05・S-02
 
-### I-03（優先度 中・手間 小）【GSE へ】『能動的な疲労／受動的な疲労』の区別を、生成的返権論の負荷逆説（§6.3）の境界条件として書き足すか検討する
+### I-03（優先度 中・手間 小）【GSE へ】系の監督・確認が生む『受動的な疲労』を、生成的返権論の負荷逆説（§6.3）の負担台帳の項目の例として書き足すか検討する
 
-- **なぜ必要か**: GSE の [P376]（生成 AI の皮肉）は『利用者の役割が出力を作ることから評価することへ移った』とする。ヒューマンファクター研究では、作業を任せて見張るだけになると受動的疲労と覚醒低下が生じる（S-05）。GSE が守る生産的苦闘は能動的な関与であり、『摩擦を取り除いても負荷は消えず、種類が能動から受動に変わりうる』と書ければ、返権の負荷逆説の記述が具体的になる。
+- **なぜ必要か**: GSE の [P376]（生成 AI の皮肉）は『利用者の役割が出力を作ることから評価することへ移った』とする。ヒューマンファクター研究では、作業を系に任せて見張るだけになると受動的疲労と覚醒低下が生じる（S-05）。系が制作を引き受けたときに利用者に残る監督・確認は、負担台帳の内側（系とのやり取りが生む負担）にあたり、『負担は消えずに種類が変わりうる』ことを示す具体例になる。
 - **根拠の場所**: docs/theory/generative-relinquishment-theory.md §6.3／docs/references.md [P368]・[P369]・[P376]
 - **調べる価値の判断材料**: S-05 の種文献（Saxby et al. 2013 ほか）。
 - **次の一手**: S-05 の結果を読んでから、§6.3 の注記の案（2〜3 文・出典つき）を書き、研究者が採否を決める。
 - **完了の条件**: 注記の案と採否が記録される。
-- **GSE との関係**: ★ docs/theory は理論の候補（EH0）で SSOT の主張ではない。新しい理論名は付けない（返権の負荷逆説と同じく、先行の一般形があることを明記する）。引用は citation-ssot で登録する。
+- **GSE との関係**: ★ J-17: 負担台帳に載せるのは系とのやり取りが生む負担だけで、課題に内在する生産的苦闘は台帳の外（保護の対象）。→ ここで扱うのは監督・確認の負担だけで、生産的苦闘と同じ台帳の上で比べない。★ J-7: GR-H11（摩擦）は保留なので、摩擦の強さの実験にはつなげない。★ docs/theory は理論の候補（EH0）で SSOT の主張ではない。新しい理論名は付けない。引用は citation-ssot で登録する。
 - **依存・順序**: S-05
 
 ### I-04（優先度 中・手間 大）【両方】AF001 の AI 疲労尺度の日本語版を作り、検証する計画を立てる（独立した研究になりうる）
 
 - **なぜ必要か**: 日本語の AI 利用者の疲労の研究・尺度は見つからなかった（S-12）。GSE の理論文書は、日本語版は『翻訳・逆翻訳、認知インタビュー、因子構造の確認を経るまで確立尺度として扱わない』と定める。日本語版の検証は、それ自体が小さな独立した研究として成立しうる。
-- **根拠の場所**: docs/theory/theory-architecture-and-roadmap.md（§5.7 の後段・日本語版の条件）／Claude適格性評価 AF001（H 列）
+- **根拠の場所**: docs/theory/theory-architecture-and-roadmap.md Phase 5（l.801・日本語版の条件）／.steering/20260916-gse-theory-operationalization-review/gr-h4-h9-h11-h12-falsification-table.md（l.111）／Claude適格性評価 AF001（H 列）
 - **調べる価値の判断材料**: 翻訳の手順の標準（Crossref で確認）: Beaton et al. 2000 doi:10.1097/00007632-200012150-00014、Wild et al. 2005（ISPOR）doi:10.1111/j.1524-4733.2005.04054.x。⚠️ AF001 の論文のライセンスは CC BY-NC-ND（2026-09-28 の抽出で Unpaywall の表示）で、翻訳は改変に当たりうる → 先に著者の許諾を取る。
 - **次の一手**: 著者に許諾を依頼 → 順翻訳 2 名・逆翻訳 → 認知面接 → 確認的因子分析と原版との測定不変性 → 再検査。必要な標本数を見積もる。
 - **完了の条件**: 許諾の有無と、手順・標本数・倫理審査の見込みを書いた計画ができる。
@@ -329,13 +329,13 @@
 - **GSE との関係**: 前回の評価プロトコル（.steering/20260928-ai-fatigue-db-appraisal/design.md）をひな形にできる。★ GSE 照合は採否に使わない方針を引き継ぐ。
 - **依存・順序**: I-01 の決定（GSE のレビューと共有するか）があれば反映
 
-### N-03（優先度 中・手間 小）報告値の食い違いを著者に照会するかを決め、送るなら送る（6 件・下書きあり）
+### N-03（優先度 中・手間 小）報告値の食い違いを著者に照会するかを決め、送るなら送る（下書き 5 通・7 論文）
 
 - **なぜ必要か**: 引用できる範囲を狭めている食い違いが一次で確認された: AF006 の百分率の分母（1,054）と AF007 との標本の関係／AF004 の交互作用の向き／AF008 の項目数と推定の安定性／AF011 の分析単位／AF012 の倫理承認／AF014 の採択件数。
 - **根拠の場所**: Claude照合事項 C01・C02・C04・C05・R-I01・R-I03・C07／照会の下書きシート
 - **調べる価値の判断材料**: いずれもメインが一次（PDF・全文 HTML・Europe PMC）で確認し、算術で照合した。⚠️ 研究不正の認定ではない。
-- **次の一手**: 下書きを読み、送る相手（責任著者か編集部か）と差出人名を決める → 送る場合は送付日と返答を Claude照合事項に追記。送らない場合も、DB の引用制限（数値を引かない等）はそのまま有効。
-- **完了の条件**: 6 件それぞれに『送った／送らない』とその理由が記録される。
+- **次の一手**: 下書きを読み、送る相手（責任著者か編集部か）と差出人名を決める。★ AF006・AF007・AF008 は責任著者が同じ（Miranda）なので 1 通にまとめた（同じ人に何通も送ると糾弾のように見えやすい）→ 送る場合は送付日と返答を Claude照合事項に追記。送らない場合も、DB の引用制限（数値を引かない等）はそのまま有効。
+- **完了の条件**: 5 通それぞれに『送った／送らない』とその理由が記録される。
 - **GSE との関係**: —
 - **依存・順序**: —
 
@@ -402,70 +402,62 @@
 
 ## 付録 A：照会の下書き（未送信・送るかは研究者が決める）
 
-### Q1. AF006（Parreño et al. 2026）の責任著者。AF007 の著者にも写し —— Table 3 の百分率の分母と、AF007 との標本の関係（N-03・C01・R-I07）
+### Q1. AF006・AF007・AF008 の責任著者（3 本とも John Paul P. Miranda・抽出ノート extract-G2 の著者欄） —— AF006 の Table 3 の百分率の分母と AF007 との標本の関係／AF008 の項目数と混合モデルの推定の安定性（N-03・C01・R-I07・C04・C05・R-I08）
 
-- 送る前に確かめること: AF007 の著者と重なる人を確認して宛先を決める。Table 3 と Table 5 の注を送る前にもう一度読む。
+- 送る前に確かめること: 責任著者とメールアドレスを各論文の最新版で確認する。Table 3・Table 5 の注（AF006）と Table 1・Table 3（AF008）を送る前にもう一度読む。AIC・BIC からの対数尤度の逆算を確かめ直す。★ 同じ人への照会は 1 通にまとめる。
 
 ```text
-Dear Dr. Parreño,
+Dear Dr. Miranda,
 
-We are conducting a scoping review on fatigue related to AI use and are extracting data from your article "How do College Students Express AI Fatigue?" (IJLTER 25(3), doi:10.26803/ijlter.25.3.29). In Table 3, the percentages (e.g., 472 = 44.8%) correspond to a denominator of 1,054 rather than the 1,000 responses reported in the abstract, while the note to Table 5 (582 responses) is consistent with 1,000. Could you clarify (1) which denominator applies, (2) whether any responses were excluded and how many, and (3) whether the data overlap with the 1,054 responses analysed in Miranda et al. (IJLTER 25(5), doi:10.26803/ijlter.25.5.5)? This will help us avoid counting the same sample twice.
+We are conducting a scoping review on fatigue related to AI use and are extracting data from three articles for which you are the corresponding author. We would be grateful for clarification on the following points.
+
+1. Parreño et al., IJLTER 25(3), doi:10.26803/ijlter.25.3.29. The percentages in Table 3 (e.g., 472 = 44.8%) correspond to a denominator of 1,054, whereas the abstract reports 1,000 responses; the note to Table 5 (582 responses) is consistent with 1,000. Which denominator applies, were any responses excluded, and do these data overlap with the 1,054 responses analysed in Miranda et al., IJLTER 25(5), doi:10.26803/ijlter.25.5.5? This will help us avoid counting the same sample twice.
+
+2. Soriano et al., IAES IJ-AI, doi:10.11591/ijai.v15.i2.pp1963-1971. The text states that the instrument had 36 items, while the item counts in Table 1 sum to 24. Could you clarify the number of items per scale and whether reliability coefficients are available? In addition, the log-likelihoods implied by the AIC and BIC values in Table 3 appear to decrease from k = 3 to k = 4 and from k = 8 to k = 9; how many random initializations were used for the Gaussian mixture models?
 
 Thank you for your time.
 Kind regards,
 ```
 
-### Q2. AF004（Tian et al. 2025）の責任著者 —— 情報リテラシーの調整効果の向き（N-03・C02・C03）
+### Q2. AF004（Tian & Zhang 2025）の責任著者（★ 抽出ノートに記載がないため、送る前に論文で確認） —— 情報リテラシーの調整効果の向き（N-03・C02）
 
-- 送る前に確かめること: Acta Psychologica の訂正の手続き（編集部宛てにするか）を確認。§3.4・§4.1・§4.3 と Table 3 を送る前にもう一度読む。
+- 送る前に確かめること: 責任著者を論文で確認し、宛名を差し替える。§3.4・§4.1・§4.3 と Table 3 を送る前にもう一度読む。Acta Psychologica の訂正の手続き（編集部宛てにするか）を確認する。★ 経路係数の掛け算（09-28 の照合事項 C03）は、0.51 が相関か経路係数かを原文の表で確かめるまで照会に入れない。
 
 ```text
-Dear Dr. Tian,
+Dear Authors,
 
-We are reviewing your article in Acta Psychologica (doi:10.1016/j.actpsy.2025.105725) for a scoping review on AI-related fatigue. We would appreciate clarification on the direction of the moderation by information literacy. The abstract and Section 4.3 state that literacy amplified cognitive fatigue when AI reliance was high, whereas Sections 3.4 and 4.1 state that higher literacy attenuates the positive relationship, which appears consistent with the negative interaction coefficient (β = −0.06, p = .025). We also noted that the reported indirect effect (−0.14) differs from the product of the path coefficients (0.51 × −0.33 ≈ −0.17). Could you confirm which interpretation is intended, and whether a correction is planned? We note that the published corrigendum (doi:10.1016/j.actpsy.2026.107179) concerns references only.
+We are reviewing your article in Acta Psychologica (doi:10.1016/j.actpsy.2025.105725) for a scoping review on AI-related fatigue, and we would appreciate clarification on the direction of the moderation by information literacy. The abstract and Section 4.3 state that literacy amplified cognitive fatigue when AI reliance was high, whereas Sections 3.4 and 4.1 state that higher literacy attenuates the positive relationship, which appears consistent with the negative interaction coefficient (β = −0.06, p = .025). Could you confirm which interpretation is intended, and whether a correction is planned? We note that the published corrigendum (doi:10.1016/j.actpsy.2026.107179) concerns references only.
 
 Kind regards,
 ```
 
-### Q3. AF008（Soriano et al. 2026）の責任著者 —— 項目数（36 と 24）と、混合モデルの推定の安定性（N-03・C04・C05・R-I08）
+### Q3. AF011（Shalu & Verma・DB の年 2026／オンライン公開 2025-08-20）の責任著者 Nidhi Verma（抽出ノート extract-G3 の著者欄） —— 相関の分析の単位（参加者か項目か）と検定の N（N-03・R-I01・C06）
 
-- 送る前に確かめること: Table 3 の AIC・BIC から逆算した対数尤度の計算を送る前にもう一度確かめる。
+- 送る前に確かめること: 責任著者とメールアドレスを論文で確認する。Figure 1 の注と Table 3 を送る前にもう一度読む。p 値の再計算（N=6 で .053）を確かめ直す。
 
 ```text
-Dear Dr. Soriano,
+Dear Dr. Verma,
 
-We are extracting data from your article on AI-induced fatigue profiles (IAES IJ-AI, doi:10.11591/ijai.v15.i2.pp1963-1971). The text states that the instrument had 36 items, while the item counts in Table 1 sum to 24. Could you clarify the number of items per scale and whether reliability coefficients are available? In addition, the log-likelihoods implied by the AIC and BIC values in Table 3 appear to decrease when moving from k = 3 to k = 4 and from k = 8 to k = 9, which may indicate local optima. Could you tell us how many random initializations were used for the Gaussian mixture models?
+We are reviewing the article "The Cognitive Cost of AI" (Annals of Neurosciences, doi:10.1177/09727531251359872) for a scoping review. The note to Figure 1 indicates that the points represent individual survey items, and the reported p-value for r = .806 (p = .053) matches a test with N = 6 rather than N = 500. Could you clarify whether the correlations in Tables 3–6 were computed across participants or across items, and which N was used for the significance tests? We would also be grateful for the sources and reliability of the decision-fatigue measure, and for the ethics approval details.
 
 Kind regards,
 ```
 
-### Q4. AF011（Shalu et al. 2026）の責任著者 —— 相関の分析の単位（参加者か項目か）と検定の N（N-03・R-I01・C06）
+### Q4. AF012（Khan et al. 2025）の責任著者（★ 抽出ノートに記載がないため、送る前に論文で確認） —— 倫理承認の記載と標本抽出（N-03・R-I03）
 
-- 送る前に確かめること: Figure 1 の注と Table 3 を送る前にもう一度読む。p 値の再計算（N=6 で .053）を確かめる。
-
-```text
-Dear Dr. Shalu,
-
-We are reviewing your article "The Cognitive Cost of AI" (Annals of Neurosciences, doi:10.1177/09727531251359872) for a scoping review. The note to Figure 1 indicates that the points represent individual survey items, and the reported p-value for r = .806 (p = .053) matches a test with N = 6 rather than N = 500. Could you clarify whether the correlations in Tables 3–6 were computed across participants or across items, and which N was used for the significance tests? We would also be grateful for the sources and reliability of the decision-fatigue measure, and for the ethics approval details.
-
-Kind regards,
-```
-
-### Q5. AF012（Khan et al. 2025）の責任著者 —— 倫理承認の記載と標本抽出（N-03・R-I03）
-
-- 送る前に確かめること: MDPI の現行版で記載が直っていないかを先に確認（2026-09-28 は Wayback の保存版で確認）。
+- 送る前に確かめること: 責任著者を論文で確認し、宛名を差し替える。MDPI の現行版で記載が直っていないかを先に確認する（2026-09-28 は Wayback の保存版で確認）。
 
 ```text
-Dear Dr. Khan,
+Dear Authors,
 
 We are extracting data from your article in Technologies (doi:10.3390/technologies13110486). Section 3.4 states that the study had ethical approval from an institutional review board, whereas the Institutional Review Board Statement and Informed Consent Statement at the end of the article read "Not applicable". Could you tell us which statement is correct and, if approval was obtained, the name of the committee and the approval number? We would also appreciate clarification of how the stratified random sampling was implemented, given that recruitment was through personal contacts on social media.
 
 Kind regards,
 ```
 
-### Q6. AF014（Sosiński et al. 2026）の責任著者 —— 採択件数（22 と 30）と DOI の表記（N-03・C07）
+### Q5. AF014（Sosiński et al. 2026）の責任著者 Piotr Sosiński（抽出ノート extract-G3 の著者欄） —— 採択件数（22 と 30）と DOI の表記（N-03・C07）
 
-- 送る前に確かめること: 引用追跡に AF014 を使わないなら送らなくてよい（N-08）。
+- 送る前に確かめること: 引用追跡に AF014 を使わないなら送らなくてよい（N-08）。責任著者とメールアドレスを論文で確認する。
 
 ```text
 Dear Dr. Sosiński,

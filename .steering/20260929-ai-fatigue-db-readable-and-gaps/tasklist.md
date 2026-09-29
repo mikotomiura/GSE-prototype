@@ -15,20 +15,23 @@
 
 ## 作成
 - [x] `scripts/papers_plain.py`（34 件の平易な要約）
-- [x] `scripts/issues_data.py`（issue 34 件・用語 19・照会 6・件数・種文献）
-- [x] `scripts/build_readable.py`（7 シートの追加・検算・issues.md の生成）
+- [x] `scripts/issues_data.py`（issue 34 件・用語 19・照会 5 通・件数・種文献）
+- [x] `scripts/build_readable.py`（7 シートの追加・検算・issues.md の生成・記入欄の引き継ぎ）
+- [x] `scripts/selftest.py`・`scripts/verify_recalc.py`（判断 9 で追加）
 - [x] 新 xlsx（archive/）と `issues.md`
 
-## 検算
-- [x] 既存 26 シートのセル値・構成の不変（build 内の検算）
-- [x] 変異試験（`スクリーニング!F5` への書き込み）で止まり、出力も一時ファイルも残らない
-- [x] LibreOffice でコピーを再計算: 数式 175 個・エラー 0・主要な数 13 個が期待値どおり（空 34 個は元の `AI判定比較` の人間用欄）
-- [x] 追加シートを画像にして見た目を確認（横向き・幅に合わせて印刷の設定）
-- [x] issue 番号の相互参照がすべて実在（データモジュールの検査）
+## 検算（最終版）
+- [x] 既存 26 シートのセル値・構成の不変、シートの並び、判定欄が「未判定」のまま（build 内の検算）
+- [x] 追加シートに書いた 1,803 セルを保存・再読込後に照合（build 内の検算）
+- [x] issue 番号の相互参照（`check_refs`）
+- [x] `selftest.py`: 変異 5 種（セル・並び・構成・読み戻し・相互参照）がそれぞれ期待した検査で止まり、出力も一時ファイルも残らない／記入欄の引き継ぎ／複製先の保護と強制上書き → ALL OK
+- [x] `verify_recalc.py`: LibreOffice で再計算し、追加シートの数式 70 個にエラー・空なし、主要な数 14 個がデータから独立に数えた期待値と一致 → ALL OK
+- [x] 追加シートを画像にして見た目を確認（初回。横向き・幅に合わせて印刷の設定）
 
 ## レビュー
-- [ ] code-reviewer ＋ security-checker（並列）
-- [ ] /cross-review（Codex）
+- [x] code-reviewer（HIGH 2・MEDIUM 5・LOW 7）＋ security-checker（CRITICAL/HIGH 0・MEDIUM 1・LOW 4）を並列 → 判断 9 で対応
+- [x] /cross-review の Codex 系統（P1 1・P2 4）→ 判断 9 で対応（1 件は一部採用）
+- [ ] Codex 2 巡目（今回足した規則の境界条件）
 
 ## 完了処理
 - [x] 前回の tasklist の未チェック 2 項目を実態に合わせて閉じる

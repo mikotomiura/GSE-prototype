@@ -2,9 +2,12 @@
 あわせて issues.md（repo の記録）を同じデータから書く。
 
 使い方:
-  python build_readable.py                 # archive/ に出力し、issues.md を書く
-  python build_readable.py --copy-to DIR   # 出力を DIR にも複製する（研究者の Downloads など）
-  python build_readable.py --mutate-test   # 既存シートに 1 セル書き込む変異を入れ、検算が止まることを確かめる（出力は置き換えない）
+  python build_readable.py                          # archive/ に出力し、issues.md を書く
+  python build_readable.py --copy-to DIR            # 出力を DIR にも複製する（★ 同名のファイルがあれば止まる。上書きは --force-copy）
+  python build_readable.py --carry-from PATH        # 記入欄（状態・メモ・送付の記録）を PATH の xlsx から引き継ぐ（既定は既存の出力）
+  python build_readable.py --out PATH              # 出力先を変える（試験用。issues.md は書かない）
+  python build_readable.py --mutate-test KIND --out PATH   # 変異を入れ、検算が止まることを確かめる（KIND: cell / order / structure / readback / refs）
+  ★ 変異試験・引き継ぎ・コピー先の保護の試験は selftest.py がまとめて回す。数式の値の検算は verify_recalc.py（LibreOffice）。
 """
 import argparse
 import hashlib
@@ -38,10 +41,17 @@ sys.path.insert(0, HERE)
 import papers_plain as PP  # noqa: E402
 import issues_data as ID  # noqa: E402
 
-# 前回の検算の道具（snapshot / structure / same_file / row_height）を再利用する
-_spec = importlib.util.spec_from_file_location("bx", os.path.join(PREV, "scripts", "build_xlsx.py"))
+# 前回の検算の道具（snapshot / structure / same_file）を再利用する。★ 読み込むスクリプトも固定する（改行コードを揃えて比べる）
+BX_PATH = os.path.join(PREV, "scripts", "build_xlsx.py")
+BX_SHA = "d245633159eeb9e2433e7243e75d531b9a4065ef341bc97c3a2ecf8c63f9bfd9"  # 14ea0a7e の build_xlsx.py（LF）
+with open(BX_PATH, "rb") as _fp:
+    if hashlib.sha256(_fp.read().replace(b"\r\n", b"\n")).hexdigest() != BX_SHA:
+        sys.exit("前回の build_xlsx.py が 14ea0a7e の版と違う（検算の道具が変わっている）")
+_spec = importlib.util.spec_from_file_location("bx", BX_PATH)
 bx = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(bx)
+
+WRITTEN = {}  # (シート名, セル番地) -> 書いた値。保存・再読込の後に照合する（結合に飲まれた値などを見つける）
 
 FONT = "Noto Sans CJK JP"  # ★ 元のワークブック（はじめに〜確認事項）の書体に合わせる
 TEXT = "FF22364A"
@@ -90,6 +100,76 @@ CITE_COLORS = {  # 『どこまで引用してよいか』の色分け（条件�
 }
 PRIO_COLORS = {"高": "FFFDE2E1", "中": "FFFFF3CD", "低": "FFF1F3F5"}
 STATUS = "未着手,着手,完了,見送り"
+ISSUE_INPUTS = ("状態（記入欄）", "メモ（記入欄）")
+INQ_INPUT = "送付の記録（記入欄）"
+
+# 『証拠の地図』④: (空いている所, だから言えないこと, 埋める issue)
+GAPS = [
+    ("中心候補に実験・介入研究が 0 件", "『AI を使うと疲れる（または疲れが減る）』という因果。★ 医療では AI 記録支援で燃え尽き・ウェルビーイングを測った RCT が既にある。", "S-04・S-10"),
+    ("中心-A（AI に向けた疲労）で時間をずらして測った研究が 0 件", "疲労が先か AI 利用が先か。時間差があると確認できたのは中心-B の AF019 だけ（AF003 はデザイン未確認）。", "S-10・N-01"),
+    ("中心-A に『働く人』の標本が 0 件（大学生 3・一般の利用者 4）", "職場・専門職（医療者・開発者など）で AI 疲労がどう現れるか。", "S-07"),
+    ("AI を『見張る』人（監督）の研究が 0 件", "作業を任せて見張るだけになったときの疲労（受動的疲労）。対象の定義には『監督』が入っている。", "S-05"),
+    ("『疲労が減る』向きの結果が 0 件", "AI 疲労の証拠が一方向に偏っていないか。基準は負担低下・差なしも記録すると定めている。", "S-04"),
+    ("日本の対象者・日本語の文献が 0 件", "日本の利用者に当てはまるか。日本語で使える尺度もない（J-STAGE・CiNii の題名段で 0 件）。", "S-12・I-04"),
+    ("フィリピンの 4 件は同じ地域・重なる著者群", "独立した証拠の数。AF006 と AF007 は同じ回答データの強い手がかりがあり、実質の独立標本は見かけより少ない。", "N-03・N-02"),
+    ("本文未入手の中心候補が 3 件（AF002・AF003・AF009）", "中心-A の件数そのもの（全文で B になる可能性がある）。", "N-01"),
+]
+# 『★まず読む』の結論: (番号, 文, 関連 issue)
+CONCL = [
+    ("1", "AI に向けた疲労を正面から測った一次研究は 7 件（中心-A）。ほかに本文未入手で A か B か未確定が 3 件。まとまった検証のある尺度は AF001 の 1 本だけ。", "N-01・S-08"),
+    ("2", "中心候補 13 件のうち横断調査と質的研究が 9 件、デザイン未確認の調査が 1 件（AF003）。AI を使って疲労を測った実験は 0 件、時間をずらして測ったと確認できたのは AF019（中心-B）の 1 件だけ →『AI を使うと疲れる』という因果はまだ言えない。", "S-10"),
+    ("3", "中心候補のうち 4 件はフィリピンの大学生で、著者群が重なる。AF006 と AF007 は同じ回答データの強い手がかりがある → 独立した証拠は見かけより少ない。", "N-03"),
+    ("4", "数値をそのまま引けない研究がある: AF011（相関の単位が項目）・AF006（百分率の分母）・AF004（交互作用の向きが論文内で逆）・AF008（項目数・推定の安定性）。引ける範囲は『論文ごとの要点』の G 列。", "N-03"),
+    ("5", "DB には『AI で疲労が減る』向きの研究と、AI を『見張る』疲労の研究が入っていない。医療では AI 記録支援で燃え尽きを測った RCT が既にある → 証拠が一方向に偏って見える最大の穴。", "S-04・S-05"),
+    ("6", "日本語の文献・日本の対象者は 0 件（J-STAGE・CiNii の題名段）。検索漏れ候補には、査読誌の中心的な候補が 7 件（ほかに非査読の既存レビュー 1 件）ある。", "S-12・S-02"),
+]
+
+
+def check_refs():
+    """issue 番号の相互参照がすべて実在することを確かめる（2026-09-29 のレビュー: SEEDS 以外は検査していなかった）。"""
+    ids = {i["id"] for i in ID.ISSUES}
+    pat = re.compile(r"\b[NSI]-\d\d\b")
+    texts = []
+    texts += [(f"PAPERS {p['id']}", p["issues"] + " " + p["open"]) for p in PP.PAPERS]
+    texts += [(f"ISSUES {i['id']}", " ".join(str(v) for v in i.values())) for i in ID.ISSUES]
+    texts += [(f"INQUIRIES {q['key']}", q["issue"] + " " + q["check"]) for q in ID.INQUIRIES]
+    texts += [(f"ROADMAP {r[0]}", r[2]) for r in ID.ROADMAP]
+    texts += [(f"COUNTS {c[2][:20]}", c[0]) for c in ID.COUNTS]
+    texts += [(f"SEEDS {s[4]}", s[0]) for s in ID.SEEDS]
+    texts += [(f"GAPS {g[0][:12]}", g[2]) for g in GAPS]
+    texts += [(f"CONCL {c[0]}", c[2]) for c in CONCL]
+    bad = [(where, ref) for where, t in texts for ref in pat.findall(t) if ref not in ids]
+    if bad:
+        sys.exit(f"存在しない issue 番号への参照: {bad[:5]}")
+    # 参照が 1 つも無い欄（空の issue 列など）は見落としになりうるので、地図・結論・照会は必ず 1 つ以上
+    empty = [where for where, t in texts if where.startswith(("GAPS", "CONCL", "INQUIRIES")) and not pat.search(t)]
+    if empty:
+        sys.exit(f"issue 番号が 1 つも無い欄: {empty}")
+
+
+def load_inputs(path):
+    """既存の xlsx から研究者の記入欄を読む（見出しの名前で列を探す。見つからなければ空）。"""
+    out = {"issue": {}, "inq": {}}
+    if not path or not os.path.exists(path):
+        return out
+    wb = openpyxl.load_workbook(path)
+    if "調査不足とissue" in wb.sheetnames:
+        ws = wb["調査不足とissue"]
+        head = {ws.cell(4, c).value: c for c in range(1, ws.max_column + 1)}
+        if all(h in head for h in ISSUE_INPUTS):
+            for r in range(5, ws.max_row + 1):
+                key = ws.cell(r, 1).value
+                if key:
+                    out["issue"][key] = tuple(ws.cell(r, head[h]).value for h in ISSUE_INPUTS)
+    if "照会の下書き" in wb.sheetnames:
+        ws = wb["照会の下書き"]
+        head = {ws.cell(4, c).value: c for c in range(1, ws.max_column + 1)}
+        if "対象論文（鍵）" in head and INQ_INPUT in head:
+            for r in range(5, ws.max_row + 1):
+                key = ws.cell(r, head["対象論文（鍵）"]).value
+                if key:
+                    out["inq"][key] = ws.cell(r, head[INQ_INPUT]).value
+    return out
 
 
 def sha256(path):
@@ -102,15 +182,9 @@ def sha256(path):
 
 def header_block(ws, title, subtitle, ncol, sub_h=48):
     last = col(ncol)
-    ws["A1"] = title
-    ws["A1"].font = f(bold=True, color="FFFFFFFF")
-    ws["A1"].fill = TITLE_FILL
-    ws["A1"].alignment = WRAP_TOP
+    put(ws, 1, 1, title, font=f(bold=True, color="FFFFFFFF"), fill=TITLE_FILL)
     ws.merge_cells(f"A1:{last}1")
-    ws["A2"] = subtitle
-    ws["A2"].font = f()
-    ws["A2"].fill = SUB_FILL
-    ws["A2"].alignment = WRAP_TOP
+    put(ws, 2, 1, subtitle, fill=SUB_FILL)
     ws.merge_cells(f"A2:{last}2")
     ws.row_dimensions[1].height = 30
     ws.row_dimensions[2].height = sub_h
@@ -118,6 +192,7 @@ def header_block(ws, title, subtitle, ncol, sub_h=48):
 
 def put(ws, r, c, v, font=None, fill=None, link=None, align=WRAP_TOP, text_only=True):
     cell = ws.cell(r, c, v)
+    WRITTEN[(ws.title, cell.coordinate)] = v
     if text_only and isinstance(v, str) and v.startswith("="):
         cell.data_type = "s"  # 数式は明示した所だけに許す
     cell.font = font or f()
@@ -134,10 +209,7 @@ def table(ws, top, headers, widths, rows, name, formula_cols=(), links=None, inp
     """top 行に見出し、その下にデータを書き、Excel のテーブルにする。links = {(i, j): location}（i は 0 始まりの行）。"""
     links = links or {}
     for j, h in enumerate(headers, 1):
-        c = ws.cell(top, j, h)
-        c.font = f(bold=True, color="FFFFFFFF")
-        c.fill = HEAD_FILL
-        c.alignment = WRAP_CENTER
+        put(ws, top, j, h, font=f(bold=True, color="FFFFFFFF"), fill=HEAD_FILL, align=WRAP_CENTER)
     ws.row_dimensions[top].height = 36
     for i, row in enumerate(rows):
         assert len(row) == len(headers), (name, i, len(row), len(headers))
@@ -266,22 +338,15 @@ def sheet_map(wb):
     r = rr + 2
     section(ws, r, "④ 空いている所（＝調査不足）と、それを埋める issue", ncol)
     r += 1
-    for j, h in enumerate(["空いている所", "だから言えないこと", "埋める issue"], 1):
+    # ★ 説明は B〜(ncol-1) を結合し、issue は右端の列に置く（2026-09-29 のレビュー: C 列に書いた issue が B:G の結合に飲まれて消えていた）
+    for j, h in ((1, "空いている所"), (2, "だから言えないこと"), (ncol, "埋める issue")):
         put(ws, r, j, h, font=f(bold=True, color="FFFFFFFF"), fill=HEAD_FILL, align=WRAP_CENTER)
-    gaps = [
-        ("中心候補に実験・介入研究が 0 件", "『AI を使うと疲れる（または疲れが減る）』という因果。★ 医療では AI 記録支援で燃え尽き・ウェルビーイングを測った RCT が既にある。", "S-04・S-10"),
-        ("中心-A（AI に向けた疲労）で時間をずらして測った研究が 0 件", "疲労が先か AI 利用が先か。時間差があるのは中心-B の AF019 だけ。", "S-10"),
-        ("中心-A に『働く人』の標本が 0 件（大学生 3・一般の利用者 4）", "職場・専門職（医療者・開発者など）で AI 疲労がどう現れるか。", "S-07"),
-        ("AI を『見張る』人（監督）の研究が 0 件", "作業を任せて見張るだけになったときの疲労（受動的疲労）。対象の定義には『監督』が入っている。", "S-05"),
-        ("『疲労が減る』向きの結果が 0 件", "AI 疲労の証拠が一方向に偏っていないか。基準は負担低下・差なしも記録すると定めている。", "S-04"),
-        ("日本の対象者・日本語の文献が 0 件", "日本の利用者に当てはまるか。日本語で使える尺度もない（J-STAGE・CiNii の題名段で 0 件）。", "S-12・I-04"),
-        ("フィリピンの 4 件は同じ地域・重なる著者群", "独立した証拠の数。AF006 と AF007 は同じ回答データの強い手がかりがあり、実質の独立標本は見かけより少ない。", "N-03・N-02"),
-        ("本文未入手の中心候補が 3 件（AF002・AF003・AF009）", "中心-A の件数そのもの（全文で B になる可能性がある）。", "N-01"),
-    ]
-    for gi, g in enumerate(gaps):
+    ws.merge_cells(f"B{r}:{col(ncol - 1)}{r}")
+    for gi, (gap, why, iss) in enumerate(GAPS):
         rr = r + 1 + gi
-        for j, v in enumerate(g, 1):
-            put(ws, rr, j, v, font=f(bold=(j == 1)))
+        put(ws, rr, 1, gap, font=f(bold=True))
+        put(ws, rr, 2, why)
+        put(ws, rr, ncol, iss, link="'調査不足とissue'!A4")
         ws.merge_cells(f"B{rr}:{col(ncol - 1)}{rr}")
         ws.row_dimensions[rr].height = 48
     ws.freeze_panes = "B4"
@@ -292,10 +357,10 @@ def sort_key(i):
     return (["サーヴェイ", "アイディア", "通常"].index(i["type"]), ID.PRIORITIES.index(i["priority"]), i["id"])
 
 
-def sheet_issues(wb):
+def sheet_issues(wb, carried):
     ws = wb.create_sheet("調査不足とissue")
     headers = ["番号", "種類", "優先度", "手間", "タイトル", "なぜ必要か（何が足りないか）", "根拠の場所（シート・ID）", "調べる価値の判断材料（件数・種文献）",
-               "具体的な次の一手", "完了の条件", "GSE との関係（既決の禁止線を含む）", "依存・順序", "状態（記入欄）", "メモ（記入欄）"]
+               "具体的な次の一手", "完了の条件", "GSE との関係（既決の禁止線を含む）", "依存・順序"] + list(ISSUE_INPUTS)
     widths = [7, 10, 7, 6, 34, 48, 30, 56, 48, 32, 44, 18, 11, 22]
     header_block(ws, f"調査不足とissue｜{len(ID.ISSUES)} 件（サーヴェイ・アイディア・通常）",
                  "種類: サーヴェイ = 文献を探して読む／アイディア = GSE のこれまでの研究から出てきた着想（GSE の既決の禁止線に反しないものだけ）／通常 = 全文入手・照会・DB 更新・人間の判定など手を動かせば閉じる作業。"
@@ -303,8 +368,9 @@ def sheet_issues(wb):
                  len(headers), 64)
     rows = []
     for i in sorted(ID.ISSUES, key=sort_key):
+        status, memo = carried["issue"].get(i["id"], ("未着手", ""))  # ★ 記入欄は既存のファイルから番号で引き継ぐ
         rows.append([i["id"], i["type"], i["priority"], i["effort"], i["title"], i["why"], i["where"], i["evidence"], i["next"], i["done"],
-                     i["gse"], i["depends"], "未着手", ""])
+                     i["gse"], i["depends"], status or "未着手", memo or ""])
     last = table(ws, 4, headers, widths, rows, "Readable2", input_cols=(13, 14), stripes=False)
     cf_exact(ws, 3, 5, last, PRIO_COLORS)
     cf_exact(ws, 13, 5, last, {"完了": "FFD1FAE5", "見送り": "FFF1F3F5", "着手": "FFE3F2FD"})
@@ -335,15 +401,17 @@ def sheet_counts(wb):
     return ws
 
 
-def sheet_inquiries(wb):
+def sheet_inquiries(wb, carried):
     ws = wb.create_sheet("照会の下書き")
-    headers = ["番号", "宛先", "論点", "関連 issue", "照合事項", "送る前に確かめること", "下書き（英文）", "送付の記録（記入欄）"]
-    widths = [7, 24, 26, 9, 12, 34, 96, 22]
-    header_block(ws, "照会の下書き｜著者への問い合わせ 6 件（★ 送るかは研究者が決める）",
-                 "Claude照合事項で一次に確認した食い違いについて、中立的な確認の依頼として書いた下書き。★ 送信はしていない（外部に出る操作のため）。宛先のメールアドレス・差出人名・送る相手（責任著者か編集部か）は研究者が決める。⚠️ 不整合の指摘は研究不正の認定ではない。",
-                 len(headers), 56)
-    rows = [[f"Q{i + 1}", q["to"], q["about"], q["issue"], q["ref"], q["check"], q["draft"], ""] for i, q in enumerate(ID.INQUIRIES)]
-    table(ws, 4, headers, widths, rows, "Readable5", input_cols=(8,))
+    headers = ["番号", "対象論文（鍵）", "宛先", "論点", "関連 issue", "照合事項", "送る前に確かめること", "下書き（英文）", INQ_INPUT]
+    widths = [7, 16, 24, 26, 9, 12, 34, 96, 22]
+    header_block(ws, f"照会の下書き｜著者への問い合わせ {len(ID.INQUIRIES)} 通（★ 送るかは研究者が決める）",
+                 "Claude照合事項で一次に確認した食い違いについて、中立的な確認の依頼として書いた下書き。★ 送信はしていない（外部に出る操作のため）。宛先のメールアドレス・差出人名・送る相手（責任著者か編集部か）は研究者が決める。"
+                 "★ 同じ責任著者（AF006・AF007・AF008 の Miranda）への照会は 1 通にまとめた。⚠️ 不整合の指摘は研究不正の認定ではない。",
+                 len(headers), 64)
+    rows = [[f"Q{i + 1}", q["key"], q["to"], q["about"], q["issue"], q["ref"], q["check"], q["draft"], carried["inq"].get(q["key"]) or ""]
+            for i, q in enumerate(ID.INQUIRIES)]
+    table(ws, 4, headers, widths, rows, "Readable5", input_cols=(len(headers),))
     ws.freeze_panes = "C5"
     return ws
 
@@ -367,27 +435,19 @@ def sheet_start(wb, issues_last, map_total_cell):
     ws.column_dimensions["B"].width = 100
     ws.column_dimensions["C"].width = 22
     header_block(ws, "AI 疲労 文献 DB｜読みやすい版（Claude・2026-09-29）",
-                 "2026-09-28 の Claude 評価（右側の『Claude…』シート）を、記号を知らなくても読めるようにまとめ直し、調査が足りない所を issue にした。"
-                 "既存の 26 シート（元の 16＋Claude 10）は 1 セルも変えていない（機械で確認）。橙のタブが今回の追加。★ AI の予備判定であり、人間 2 名の独立判定の代わりにならない。"
-                 "⚠️ 判定者としてスクリーニングをする人は、判定が終わるまでこのシートと『論文ごとの要点』・Claude／GPT のシートを読まない（判定者用ファイルは AI の判定を含まない形で用意する・issue N-02）。",
+                 "⚠️ 判定者としてスクリーニングをする人へ: 判定が終わるまで、このシートと『論文ごとの要点』・Claude／GPT のシートを読まないでください（判定には AI の判定を含まない判定者用ファイルを使う・issue N-02）。"
+                 "——このファイルは、2026-09-28 の Claude 評価（右側の『Claude…』シート）を、記号を知らなくても読めるようにまとめ直し、調査が足りない所を issue にしたもの。"
+                 "既存の 26 シート（元の 16＋Claude 10）は 1 セルも変えていない（機械で確認）。橙のタブが今回の追加。★ AI の予備判定であり、人間 2 名の独立判定の代わりにならない。",
                  ncol, 80)
     r = 4
     section(ws, r, "結論を 6 行で", ncol)
-    concl = [
-        ("1", "AI に向けた疲労を正面から測った一次研究は 7 件（中心-A）。ほかに本文未入手で A か B か未確定が 3 件。まとまった検証のある尺度は AF001 の 1 本だけ。", "N-01・S-08"),
-        ("2", "中心候補 13 件は横断調査と質的研究が 10 件。AI を使って疲労を測った実験は 0 件、時間をずらして測ったのは AF019（中心-B）の 1 件だけ →『AI を使うと疲れる』という因果はまだ言えない。", "S-10"),
-        ("3", "中心候補のうち 4 件はフィリピンの大学生で、著者群が重なる。AF006 と AF007 は同じ回答データの強い手がかりがある → 独立した証拠は見かけより少ない。", "N-03"),
-        ("4", "数値をそのまま引けない研究がある: AF011（相関の単位が項目）・AF006（百分率の分母）・AF004（交互作用の向きが論文内で逆）・AF008（項目数・推定の安定性）。引ける範囲は『論文ごとの要点』の G 列。", "N-03"),
-        ("5", "DB には『AI で疲労が減る』向きの研究と、AI を『見張る』疲労の研究が入っていない。医療では AI 記録支援で燃え尽きを測った RCT が既にある → 証拠が一方向に偏って見える最大の穴。", "S-04・S-05"),
-        ("6", "日本語の文献・日本の対象者は 0 件（J-STAGE・CiNii の題名段）。検索漏れ候補には、査読誌の中心的な候補が 7 件（ほかに非査読の既存レビュー 1 件）ある。", "S-12・S-02"),
-    ]
-    for i, (n, t, iss) in enumerate(concl):
+    for i, (n, t, iss) in enumerate(CONCL):
         rr = r + 1 + i
         put(ws, rr, 1, n, font=f(bold=True), align=WRAP_CENTER)
         put(ws, rr, 2, t)
         put(ws, rr, 3, iss, link="'調査不足とissue'!A4")
         ws.row_dimensions[rr].height = row_height(["", t, ""], [30, 100, 22])
-    r = r + 1 + len(concl) + 1
+    r = r + 1 + len(CONCL) + 1
 
     section(ws, r, "数字で見る（数式。元のシートや『論文ごとの要点』の列を編集すると更新される）", ncol)
     K = "'Claude適格性評価'!$K$5:$K$38"
@@ -401,15 +461,16 @@ def sheet_start(wb, issues_last, map_total_cell):
         ("中心（A/B 未確定）", "本文未入手の AF002・AF003・AF009。", f'=COUNTIF({K},"中心（*")', 3),
         ("中心-B（一般的な疲労 × AI）", "AF004・AF012・AF019。中心-A と足し合わせない。", f'=COUNTIF({K},"中心-B")', 3),
         ("中心-A のうち大学生", "AF006・AF007・AF008（いずれもフィリピン）。", f'=COUNTIFS({D},"中心-A",{L},"大学生・学習者")', 3),
-        ("中心候補のうち横断調査・質的研究", "", f'=COUNTIFS({D},"中心*",{M},"横断調査")+COUNTIFS({D},"中心*",{M},"質的研究")', 10),
-        ("中心候補のうち時間差・縦断", "AF019 のみ（中心-B）。", f'=COUNTIFS({D},"中心*",{M},"時間差・縦断")', 1),
+        ("中心候補のうち横断調査・質的研究", "", f'=COUNTIFS({D},"中心*",{M},"横断調査")+COUNTIFS({D},"中心*",{M},"質的研究")', 9),
+        ("中心候補のうちデザイン未確認の調査", "AF003（本文未入手・単回か時間差か未確認）。", f'=COUNTIFS({D},"中心*",{M},"調査（デザイン未確認）")', 1),
+        ("中心候補のうち時間差・縦断（確認済み）", "AF019 のみ（中心-B）。", f'=COUNTIFS({D},"中心*",{M},"時間差・縦断")', 1),
         ("中心候補のうち実験・介入", "", f'=COUNTIFS({D},"中心*",{M},"実験・介入")', 0),
         ("中心候補のうちフィリピン／中国", "", f'=COUNTIFS({D},"中心*",{N},"フィリピン*")&" / "&COUNTIFS({D},"中心*",{N},"中国*")', "4 / 4"),
         ("中心候補（地図の計）", "『証拠の地図』② の合計。上の中心-A＋未確定＋中心-B と一致するはず。", f"='証拠の地図'!{map_total_cell}", 13),
         ("issue の数（サーヴェイ / アイディア / 通常）", "", f'=COUNTIF({IT},"サーヴェイ")&" / "&COUNTIF({IT},"アイディア")&" / "&COUNTIF({IT},"通常")', f"{NT['サーヴェイ']} / {NT['アイディア']} / {NT['通常']}"),
         ("issue の優先度（高 / 中 / 低）", "", f'=COUNTIF({IS},"高")&" / "&COUNTIF({IS},"中")&" / "&COUNTIF({IS},"低")',
          " / ".join(str(sum(1 for i in ID.ISSUES if i["priority"] == p)) for p in ID.PRIORITIES)),
-        ("issue の完了 / 全体", "『調査不足とissue』の状態の列（記入欄）を数える。", f'=COUNTIF({ST},"完了")&" / "&COUNTA(\'調査不足とissue\'!$A$5:$A${issues_last})', f"0 / {len(ID.ISSUES)}"),
+        ("issue の完了 / 全体", "『調査不足とissue』の状態の列（記入欄）を数える。", f'=COUNTIF({ST},"完了")&" / "&COUNTA(\'調査不足とissue\'!$A$5:$A${issues_last})', None),
     ]
     r += 1
     for j, h in enumerate(["項目", "説明", "値"], 1):
@@ -440,7 +501,7 @@ def sheet_start(wb, issues_last, map_total_cell):
         ("研究がどこに偏っているか", "対象者 × デザインの分布と、空いている所。", "証拠の地図"),
         ("次に何を調べるか", f"サーヴェイ {NT['サーヴェイ']}・アイディア {NT['アイディア']}・通常 {NT['通常']} の issue。状態を記入できる。", "調査不足とissue"),
         ("調べる価値の根拠", "検索式つきの件数と、実在を確かめた種文献。", "件数の目安と種文献"),
-        ("著者に問い合わせるなら", "英文の下書き 6 件（未送信）。", "照会の下書き"),
+        ("著者に問い合わせるなら", f"英文の下書き {len(ID.INQUIRIES)} 通（未送信）。", "照会の下書き"),
         ("記号の意味", "中心-A/B・E1〜E6・JBI・段階記号など。", "用語の読み替え"),
         ("判定の根拠・原文箇所", "2026-09-28 の Claude 評価の本体。", "Claude適格性評価"),
         ("判定のルール", "範囲・手順・限界。", "Claude評価基準"),
@@ -517,15 +578,34 @@ def write_issues_md():
 
 
 # ------------------------------------------------------------------ main
+MUTATIONS = ("cell", "order", "structure", "readback", "refs")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--copy-to")
-    ap.add_argument("--mutate-test", action="store_true")
+    ap.add_argument("--force-copy", action="store_true", help="--copy-to の複製先に同名のファイルがあっても上書きする")
+    ap.add_argument("--carry-from", help="記入欄（状態・メモ・送付の記録）を引き継ぐ xlsx。既定は既存の出力")
+    ap.add_argument("--out", help="出力先（試験用。指定すると issues.md は書かない）")
+    ap.add_argument("--mutate-test", choices=MUTATIONS)
     a = ap.parse_args()
+    out = os.path.abspath(a.out) if a.out else DST
+    is_default_out = os.path.normcase(out) == os.path.normcase(DST)
+    if a.mutate_test and is_default_out:
+        sys.exit("変異試験は --out で試験用の出力先を指定する（archive の成果物を触らない）")
     if sha256(SRC) != SRC_SHA:
         sys.exit("入力（09-28 版）の SHA-256 がアーカイブの記録と違う")
-    if bx.same_file(DST, SRC):
+    if bx.same_file(out, SRC):
         sys.exit("出力先が入力と同じ")
+    copy_target = os.path.join(a.copy_to, os.path.basename(DST)) if a.copy_to else None
+    if copy_target and os.path.exists(copy_target) and not a.force_copy:
+        # ★ 研究者が記入したファイルを黙って上書きしない（2026-09-29 のレビュー: Codex P1・security-checker MEDIUM）
+        sys.exit(f"複製先に同名のファイルがある（記入済みかもしれない）: {copy_target}。記入を引き継ぐなら --carry-from で指定し、上書きしてよいなら --force-copy")
+    if a.mutate_test == "refs":
+        PP.PAPERS[0]["issues"] += ", S-99"  # 変異: 存在しない issue 番号
+    check_refs()
+    carry_path = a.carry_from or (DST if is_default_out and os.path.exists(DST) else None)
+    carried = load_inputs(carry_path)
     wb = openpyxl.load_workbook(SRC)
     orig = list(wb.sheetnames)
     assert len(orig) == 26, len(orig)
@@ -546,9 +626,9 @@ def main():
 
     sheet_papers(wb, k_by_id)
     _, map_total = sheet_map(wb)
-    _, issues_last = sheet_issues(wb)
+    _, issues_last = sheet_issues(wb, carried)
     sheet_counts(wb)
-    sheet_inquiries(wb)
+    sheet_inquiries(wb, carried)
     sheet_glossary(wb)
     _, expect = sheet_start(wb, issues_last, map_total)
     for name in ORDER:
@@ -570,11 +650,19 @@ def main():
     wb.active = wb.sheetnames.index("★まず読む")
     wb.active.sheet_view.tabSelected = True
     wb.calculation = CalcProperties(fullCalcOnLoad=True)
-    if a.mutate_test:
-        wb["スクリーニング"]["F5"] = "含める"  # 変異: 人間の判定欄への書き込み
+    if a.mutate_test == "cell":
+        wb["スクリーニング"]["F5"] = "含める"  # 変異: 人間の判定欄への書き込み（セル値の比較で止まるはず）
+    elif a.mutate_test == "order":
+        wb._sheets.append(wb._sheets.pop(0))  # 変異: 元のシートの並びを崩す（並びの検査で止まるはず）
+    elif a.mutate_test == "structure":
+        wb["スクリーニング"].data_validations.dataValidation.pop(0)  # 変異: 入力規則を 1 つ消す（構成の比較で止まるはず）
+    elif a.mutate_test == "readback":
+        ws_m = wb["証拠の地図"]
+        put(ws_m, 3, 2, "変異")
+        ws_m.merge_cells("A3:B3")  # 変異: 書いた値を結合で飲み込む（読み戻しの照合で止まるはず）
 
-    os.makedirs(os.path.dirname(DST), exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix=".tmp-", suffix=".xlsx", dir=os.path.dirname(DST))
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".tmp-", suffix=".xlsx", dir=os.path.dirname(out))
     os.close(fd)
     try:
         wb.save(tmp)
@@ -587,19 +675,27 @@ def main():
             sys.exit("既存シートの構成（入力規則・条件付き書式・結合・テーブル・定義名）が変わった")
         if chk.sheetnames[:16] != orig[:16] or chk.sheetnames[16:23] != ORDER or chk.sheetnames[23:] != orig[16:]:
             sys.exit(f"シートの並びが想定と違う: {chk.sheetnames}")
-        assert all(v == "未判定" for r in range(5, 39) for v in (chk["スクリーニング"][f"{c}{r}"].value for c in "DEF"))
+        if not all(chk["スクリーニング"][f"{c}{r}"].value == "未判定" for r in range(5, 39) for c in "DEF"):
+            sys.exit("スクリーニングの判定者欄が『未判定』でない")  # ★ セル値の比較と重なる二重の守り（-O でも消えない）
+        norm = lambda x: None if x == "" else x  # noqa: E731  ★ 空文字は保存すると空セルになる
+        lost = [(k, v, chk[k[0]][k[1]].value) for k, v in WRITTEN.items() if norm(chk[k[0]][k[1]].value) != norm(v)]
+        if lost:
+            sys.exit(f"追加シートに書いた値が読み戻せない（結合に飲まれた等）: {lost[:3]}")
         if a.mutate_test:
             sys.exit("変異試験: 検算が止まらなかった（異常）")
-        os.replace(tmp, DST)
+        os.replace(tmp, out)
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
-    write_issues_md()
-    if a.copy_to:
-        shutil.copy2(DST, os.path.join(a.copy_to, os.path.basename(DST)))
-    print("OK", DST)
-    print("expect", expect)
-    print("sha256", sha256(DST))
+    if is_default_out:
+        write_issues_md()
+    if copy_target:
+        shutil.copy2(out, copy_target)
+    n_carried = sum(1 for v in carried["issue"].values() if v[0] not in (None, "未着手") or v[1]) + sum(1 for v in carried["inq"].values() if v)
+    print("OK", out)
+    print("carried-from", carry_path, "non-default inputs:", n_carried)
+    print("written cells verified:", len(WRITTEN))
+    print("sha256", sha256(out))
 
 
 if __name__ == "__main__":
