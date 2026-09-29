@@ -43,4 +43,13 @@
 | Hur & Shin 2024（JSM）・Jeong ほか 2024（FPH） | 追加しない（E2） | #10・#11 |
 | IEEE DataPort の 2 件（10.21227/rz27-ze05・94rd-ny74） | 追加しない（E4・由来の記載なし） | S-02 §3 |
 
-（S-08 以降の提案は、このあとに足す。）
+## E. S-08（AI 疲労の測定）から
+
+| 対象 | 提案 | 出どころ |
+|---|---|---|
+| AF001 の「次の確認・作業」 | 「補足 Table S6 の全項目を確認」→「15 項目は本文 Table 1 で確認済み（Table S6 は 30 項目版）。事前登録は研究 2〜4（AsPredicted #249,222・#249,751・#253,505）、研究 1 は無し」に直す（N-07 を閉じる） | S-08 §4 |
+| The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education（Mind & Society 2025, doi:10.56011/mind-mri-143-20259） | 一次研究の候補として追加（BAT-22・AI 利用者と非利用者の比較） | S-08 §5 |
+| Digital-Age Psychosocial Strain（IJRISS 2026, doi:10.47772/ijriss.2026.102400020）・Too Much, Too Fast（IJAHSS 2025, doi:10.56734/ijahss.v6n8a7） | 既存レビューとして保持（証拠集合の外） | S-08 §6 |
+| Synthetonia（Zenodo 2026, doi:10.5281/zenodo.22566309）・GenAI Fatigue の制御理論（Zenodo 2025, doi:10.5281/zenodo.17772700） | 保持しない。語の用法（S-11）の記録にだけ使う | S-08 §6 |
+
+（S-04 以降の提案は、このあとに足す。）

@@ -4,7 +4,7 @@
 （09-28 の評価プロトコル v1.0 と同じ作法）。固定した節は書き換えない。変えるときは `decisions.md` に「逸脱」として理由つきで書く。
 各節の見出しに固定した日時を書く。
 
-## 0. 共通の方針（2026-09-29 21:10 固定）
+## 0. 共通の方針（2026-09-29・S-12 の検索（21:12）の前に固定）
 
 ### 0.1 判定の規則
 
@@ -62,7 +62,7 @@
   scripts/check_survey_files.py
 ```
 
-## 1. S-12 日本語の文献・日本の対象者の研究（2026-09-29 21:10 固定・検索の実行前）
+## 1. S-12 日本語の文献・日本の対象者の研究（2026-09-29・検索の実行（`evidence/S-12` の executed 21:12）の前に固定）
 
 ### 1.1 問い
 
@@ -123,7 +123,7 @@
 - 抄録を持たない記録（CiNii・国立国会図書館サーチの多く）は題名ふるいだけになる。
 - 検索できなかった情報源がある（1.2 の末尾）。「見当たらない」は、この範囲での記述にとどめる。
 
-## 2. S-02 検索漏れ候補 11 件の抄録（＋ 標本の重なり・N-06）（2026-09-29 22:05 固定・抄録を読む前）
+## 2. S-02 検索漏れ候補 11 件の抄録（＋ 標本の重なり・N-06）（2026-09-29・書誌と抄録の取得（`evidence/S-02` の executed 21:38）の前に固定）
 
 ### 2.1 対象
 
@@ -166,7 +166,7 @@ N-06（同時に行う）: IEEE DataPort の 2 件 doi:10.21227/rz27-ze05・10.2
 
 - `survey-S-02.md`（事実）・`survey-S-02-ai-judgments.md`・`survey-S-02-gse.md`・`evidence/S-02/`（書誌とスクリプト）。
 
-## 3. S-08 AI 疲労の尺度の一覧（＋ N-07）（2026-09-29 22:30 固定・尺度の検索の前）
+## 3. S-08 AI 疲労の尺度の一覧（＋ N-07）（2026-09-29・尺度の検索（`evidence/S-08` の executed 21:46）の前に固定）
 
 ### 3.1 問い
 
@@ -201,3 +201,36 @@ AI に向けた疲労（項目文・定義に AI が出てくる疲労）は、�
 ### 3.6 N-07（AF001 の補足資料）
 
 - 補足資料（Table S6 の全 15 項目）・ResearchBox 6748（事前登録・データ）で、項目と下位尺度の対応・採点・事前登録の範囲を確かめる。★ 項目文は repo に書かない（項目番号・下位尺度・AI が入る場所だけ）。
+
+## 4. S-04 疲れが減る側の証拠（2026-09-29・検索（`evidence/S-04` の executed 21:58）の前に固定）
+
+### 4.1 問い
+
+AI を導入した群・時期と、導入していない群・時期を比べ、使う人の疲労・燃え尽き・消耗（または作業負荷・負担感）を測った研究は何を報告しているか（減る／差なし／増える）。★ DB の範囲に入れるかは N-05 で決める（判断 12 の逸脱の記録どおり、本節は材料集め）。
+
+### 4.2 含める研究の条件（事実の表に載せる条件。判定案とは別）
+
+- 比較がある: 無作為化（クロスオーバーを含む）／対照群のある非無作為化／同じ人の前後比較。★ 利用者と非利用者の横断の比較は「比較」として別の表に分ける（因果の向きが分からないため）。
+- 使う人の疲労・燃え尽き・消耗、または作業負荷・負担感を、尺度・項目で測っている。
+- 系統的レビュー・メタ分析は、採択研究の数と結論を別の表に並べる（個々の研究を二重に数えない）。
+
+### 4.3 検索
+
+- Europe PMC（`TITLE_ABS`・`resultType=core`・全件）:
+  - Q1 AI の記録支援: `TITLE_ABS:("ambient AI" OR "AI scribe" OR "ambient scribe" OR "ambient listening" OR "ambient artificial intelligence" OR "ambient documentation" OR "digital scribe") AND TITLE_ABS:(burnout OR fatigue OR exhaustion OR "cognitive load" OR "task load" OR workload OR "documentation burden")`
+  - Q2 AI の下書き返信: `TITLE_ABS:("large language model" OR "generative AI" OR "AI-generated" OR "artificial intelligence") AND TITLE_ABS:("draft replies" OR "draft responses" OR "in-basket" OR inbox OR "patient messages") AND TITLE_ABS:(burnout OR fatigue OR "cognitive burden" OR "task load" OR workload)`
+  - Q3 一般（医療以外を含む）: `TITLE_ABS:("generative AI" OR "large language model" OR ChatGPT OR Copilot OR "AI assistant" OR "AI tool" OR "artificial intelligence") AND TITLE_ABS:(burnout OR fatigue OR exhaustion) AND TITLE_ABS:(randomized OR randomised OR "controlled trial" OR crossover OR "pre-post" OR "before and after" OR "quasi-experimental" OR "difference-in-differences" OR "field experiment")`
+- Semantic Scholar 一括検索（医療以外を探す）: `("generative AI" | ChatGPT | Copilot | "large language model" | "AI assistant") + (burnout | fatigue | exhaustion | "cognitive load" | workload) + (randomized | experiment | "field experiment" | intervention | "quasi-experimental" | "difference-in-differences")`
+- OpenAlex（使えれば）: Q3 と同じ語。
+
+### 4.4 ふるいと抽出
+
+- 1 段目（メイン）: 題名で明らかに外れるもの（AI が疲労を検知する道具・動物・材料）を外す。★ 外した理由は語で記録（E1 などの判定の語は判定案のファイルにだけ書く）。
+- 2 段目（サブエージェント・Sonnet）: 残りの抄録（scratchpad の JSON）から、デザイン・N・場・国・測定・時点・著者が報告した向きと数値を表に抜き出す（判定はしない）。
+- 3 段目（メイン）: 抜き出しを抄録で確かめ、4.2 の条件に当たるかを決める。★ 無作為化の研究は、メインが抄録（公開なら本文）を自分で読む。
+
+### 4.5 出すもの
+
+- `survey-S-04.md`（事実）: 検索記録・研究の表（対象・デザイン・測定・著者が報告した向き）・向き別と設計別の数・系統的レビューの表。
+- `survey-S-04-ai-judgments.md`: DB の範囲に入れるなら何が中心-B になるか・研究の質の懸念・N-05 への材料。
+- `survey-S-04-gse.md`: roadmap §5.7・I-06 との関係。

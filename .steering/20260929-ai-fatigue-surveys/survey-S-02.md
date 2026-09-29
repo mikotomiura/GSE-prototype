@@ -1,6 +1,6 @@
 # S-02 検索漏れ候補 11 件の抄録（＋ 標本の比較・N-06）—— 書誌と要点（事実）
 
-> 取得日: 2026-09-29（日本時間 22:05〜22:50）。手順は `design.md` §2（抄録を読む前に固定）。
+> 取得日: 2026-09-29（日本時間。書誌と抄録 21:38＝JSON の executed。本文はその後）。手順は `design.md` §2（抄録を読む前に固定）。
 > ★ このファイルは事実だけを書く（書誌・抄録や本文に書いてあること）。判定に関わる記述は別のファイル（`survey-S-02-ai-judgments.md`）にある。
 > 書誌の生の結果: `evidence/S-02/s02_meta_2026-09-29.json`（書誌・訂正の関係・オープンアクセスの表示。抄録は repo に置かない）。スクリプト: `evidence/S-02/fetch_meta.py`。
 > 本文を読んだ 4 件は、サブエージェント（Sonnet）が平文から項目を抜き出し、メインが該当箇所を開いて確かめた（対象・N・国・疲労の尺度・AI が項目に入るか・主な結果）。
@@ -16,7 +16,7 @@
 | 5 | Kim B-J, Kim M-J 2026. Digital efficiency, human exhaustion: How human-centered AI buffers the impact of AI adoption on physical health via AI techarnostress（Crossref の題名の表記のまま）. *Technology in Society*. doi:10.1016/j.techsoc.2026.103553 | **取れなかった**（Crossref・Europe PMC・Semantic Scholar・OpenAlex に無く、出版社は 403） | 読めず（OpenAlex の表示は closed） |
 | 6 | Chung J, Kwon H 2025. Privacy fatigue and its effects on ChatGPT acceptance among undergraduate students: is privacy dead? *Education and Information Technologies*. doi:10.1007/s10639-024-13198-6 | Semantic Scholar | 読んだ（出版社の公開 HTML・CC BY-NC-ND） |
 | 7 | Kang I, Li D 2025. AI Anxiety to Fatigue and Its Consequences: The Moderating Role of AI Usage Motivation. *Journal of Business Convergence*. doi:10.31152/jb.2025.12.10.6.297 | 出版社の公開ページ（DBpia の `abstract` の meta） | 読めず（DBpia の会員制） |
-| 8 | Nobles C 2026. AI Fatigue in Higher Education: A Systematic Review of Associated Conditions, Manifestations, and Lifelong Learning Implications. *Zenodo*. doi:10.5281/zenodo.22838191（版の DOI 10.5281/zenodo.22838190） | DataCite（1 文だけ） | **読めず**（2026-09-29 22:20 に Zenodo のファイルの取得が 403「unusual traffic」。以後 API も応答せず） |
+| 8 | Nobles C 2026. AI Fatigue in Higher Education: A Systematic Review of Associated Conditions, Manifestations, and Lifelong Learning Implications. *Zenodo*. doi:10.5281/zenodo.22838191（版の DOI 10.5281/zenodo.22838190） | DataCite（1 文だけ） | **読めず**（2026-09-29 の S-02 の作業中に、Zenodo のファイルの取得が 403「unusual traffic」。以後 API も JSON を返さず） |
 | 9 | Kim B-J, Lee J 2024. The mental health implications of artificial intelligence adoption: the crucial role of self-efficacy. *Humanities and Social Sciences Communications*. doi:10.1057/s41599-024-04018-w | Semantic Scholar | 読んだ（出版社の公開 HTML・CC BY-NC-ND） |
 | 10 | Hur W-M, Shin Y 2024. Service employees' STARA awareness and proactive service performance. *J Services Marketing*. doi:10.1108/JSM-03-2023-0115 | Crossref | 読めず（購読制） |
 | 11 | Jeong J, Kim B-J, Lee J 2024. Navigating AI transitions: how coaching leadership buffers against job stress and protects employee physical health. *Frontiers in Public Health*. doi:10.3389/fpubh.2024.1343932 | Crossref | 読んだ（Europe PMC・CC BY） |
