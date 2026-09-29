@@ -1,14 +1,14 @@
 # 次セッション（G-GEAR）— IME 論文: Mac の 004 が base に入った後の 005 / 006 → 020 / 023 → 024
 
 > 作成: 2026-09-29（W4 を終えたセッションの最後に・研究者の指示）。前の G-GEAR 用 handoff（`next-session-ime-paper-ggear-w4.md`）の後継。前のものは読まなくてよい。
-> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `_issue-plan.md`（§2 波・§4 機械の割り当て・§5 マイルストーン）・`issues/NNN.md`・`decisions.md`（判断 1〜46）・`blockers.md`（B1〜B9）・`tasklist.md`。状態は着手時に測り直す。
+> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `_issue-plan.md`（§2 波・§4 機械の割り当て・§5 マイルストーン）・`issues/NNN.md`・`decisions.md`（判断 1〜54）・`blockers.md`（B1〜B11）・`tasklist.md`。状態は着手時に測り直す。
 > ⚠️ Mac 側（004 / 007 / 012）は別の handoff: `.steering/_handoff/next-session-ime-paper-mac.md`。★ 両方の機械が同じ base に push するので、push の前に `git pull --no-rebase` で取り込む（force しない）。
 
 ## §0 打ち込む用（G-GEAR で・`/clear` の直後に）
 
 ```
-.steering/_handoff/next-session-ime-paper-ggear-w5.md を読んで、IME 論文の評価一式の続きを G-GEAR で進めてください。まず Mac の 004 が base（origin/feature/ime-eval-kit）に入っているかを測り、入っていなければ研究者に確認して止まる。入っていれば 005 / 006 をループで回して merge ゲートを通し、続けて 020 / 023、最後に 024 の段取りに進む前に研究者に確認する。
-一次資料: .steering/20260927-ime-observation-paper-eval-design/ の _issue-plan.md・issues/005.md 006.md 020.md 023.md 024.md・decisions.md（判断 34〜46）・blockers.md。
+.steering/_handoff/next-session-ime-paper-ggear-w5.md を読んで、IME 論文の評価一式の続きを G-GEAR で進めてください。Mac の 004 / 007 / 012 の merge と、直した emit.py の両 OS での確認は済んでいる（§1a）。base（feature/ime-eval-kit）を origin から pull して 36dd894e 以降であることを確かめ、005 / 006 をループで回して merge ゲートを通し、続けて 020 / 023、最後に 024 の段取りに進む前に研究者に確認する。
+一次資料: .steering/20260927-ime-observation-paper-eval-design/ の _issue-plan.md・issues/005.md 006.md 020.md 023.md 024.md・decisions.md（判断 34〜54）・blockers.md（B1〜B11）。
 ⚠️ 実行の前に docs/loop-engineering.md を Read する。base は feature/ime-eval-kit（origin から pull してから回す）。
 Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は日本語。研究者の判断が要ることは AskUserQuestion で聞く。
 コミットは git add パス指定（-A 禁止）。main への merge は W6 まで終わってから（研究者の判断）。
@@ -16,10 +16,11 @@ Skill: subagent-delegation・verify-before-claiming・git-workflow。応答は�
 
 ## §1a 追記（2026-09-29・Mac の W2 / W3 を取り込んだ後）
 
-- ★ **Mac の 004 / 007 / 012 は base に入った**（Mac が merge・G-GEAR で取り込んで確認）。base = **`3e078338`**（push 済み）。
+- ★ **Mac の 004 / 007 / 012 は base に入った**（Mac が merge・G-GEAR で取り込んで確認）。`emit.py` の直しは `3e078338`、Mac の確認の記録は `36dd894e`（どちらも push 済み）。
 - G-GEAR で取り込んだとき、全 acceptance が `kit/check.sh` の 1 件で赤だった（004 の `emit.py` の selftest・B11）→ 判断 52 / 53 で `emit.py` を直した（oracle の時刻を高分解能の時計に・遅れの上限は `--selftest --full` へ）。直した後の base の clean な checkout で、G-GEAR で回る全 acceptance 17 本が失敗 0 件（macOS 専用の 004 / 007 / 012 は exit 2 ＝対象外）・ループの verify 3 本（`check.sh`・`check.sh --compile`・`check-shell-portability.sh`）が緑・`_style_check.py` 違反 0 件。
 - ★ 判断 54: 005 / 006 の `## Dependencies` から 004 を外した（004 の `issue_done` は Mac の events にだけある）。→ **§2 の手順 1 の「004 の merge」は満たされている。手順 2（`--issues 005,006`）から始めてよい**。
-- ★ 推奨の順番（2026-09-29 のセッションでメインが勧めた・研究者は未確定）: **Mac で `emit.py` の確認（`004-acceptance.sh` の回し直し）を先に済ませてから 005 / 006 を回す**。着手時に `git pull` して `tasklist.md` の「⚠️ Mac: `004-acceptance.sh` を回し直す」が済んでいるかを見る。済んでいなければ研究者に確認する。Mac で赤だったなら、005 / 006 の前にメインが `emit.py` を直す（`emit.py` は 005 / 006 の Allowed Files の外なので worker は直せない）。
+- ✅ **Mac での `emit.py` の確認は済んだ**（2026-09-29 21:07・`36dd894e`・研究者が Mac で実施）: base `af40cd12` の clean な worktree（Python 3.14.4）で `004-acceptance.sh` exit 0（失敗 0 件）・`emit.py --selftest --full` exit 0（48 件すべて ok・遅れの 95 パーセンタイル約 0 ms・時計は `mach_absolute_time()` と `CLOCK_REALTIME` 1 µs）・`kit/check.sh` exit 0（22 本すべて緑）。→ ★ 直した `emit.py` は **Windows と macOS の両方で緑**。**005 / 006 のループを始めてよい**（§2 の手順 2 から）。
+  - ⚠️ 着手時は `git pull` して、base が `36dd894e` 以降であることを確かめる（その後に Mac が何か push していれば、その内容を先に読む）。
 - ⚠️ 同じ機械で別プロジェクト（`C:\ERRE-Sand_Box`）の重い計算が走っていると CPU を奪う（2026-09-29 に 82%）。既定の selftest は負荷に左右されないようにしたが、ループや acceptance の所要時間は延びる。
 
 ## §1 状態（2026-09-29 の終わり）
