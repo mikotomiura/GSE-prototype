@@ -58,3 +58,24 @@ GSE 照合フラグ（ハイフン 2 つ + against + ハイフン + gse）→ `-
 変えない・別ディレクトリの拒否・判断 33 の範囲のずれは `check_manifest_upstream.internal.py --selftest`
 に、コピー側の 1 バイト違い・excerpt の目印欠落・path の安全性（NUL・絶対パス・entries が配列でない）は
 `check_manifest.py --selftest` に、それぞれ残した。
+
+## 写した元と意図的に違えた判断（判断 44）
+
+`new` エントリの `candidate_window_observer`（`src/driver_windows/candidate.rs`）は、GSE の
+`ImeMonitor::is_candidate_window_open`（`src-tauri/src/input/ime_windows.rs:72-129`）と同じ判断を同じ順で
+書く（cloak 状態・EnumWindows・UIA の OR と、旧来の経路が駆動しているときの stale のリセット）。ただし
+**UIA の判定だけ 1 点違える**（2026-09-29・判断 44・研究者の回答）:
+
+| | GSE | 単体ロガー |
+|---|---|---|
+| フォーカス要素のクラス名に `Candidate` を含む | 候補窓とみなす | 候補窓とみなす（同じ） |
+| フォーカス要素の名前（accessible name）に「候補」を含む | 候補窓とみなす（`ime_windows.rs:98-100`） | **読まない**（判定に使わない） |
+
+- 理由: 名前はアプリによってはタブ名・リンク文言・本文になり、他アプリの任意の文字列をプロセスのメモリに
+  読み込むことになる。一致すると `ime_shadow` 行の出力時刻が遅れる（1 ビット程度の副チャネル）。公開する
+  README の「content-free by construction」を構造で保つため外した。
+- 影響の見込み: GSE の実測（`ime_windows.rs:186-193`）では、cloak 経路の端末でこの UIA の裏取りは 0 件
+  なので、主な環境では差が出ない。⚠️ IMM 経路の端末で、名前でしか裏が取れない候補窓があると
+  `is_stale_winevent_active` の判断が GSE より早まりうる → M5（Windows の較正パイロット）で確かめる。
+- 照合: `upstream_range_sha256` は GSE 側の範囲（名前の判定を含む）のハッシュのまま。GSE 側がこの範囲を
+  変えると `--against-upstream` が赤になるので、そのときはこの違いを保ったまま追随する。
