@@ -25,4 +25,4 @@
 ## 完了処理
 - [x] 前回の steering の tasklist・issues の状態への反映 —— issues.md は再生成せず `issue-status.md` に状態と反映の候補を書いた（再生成は評価版の xlsx の作り直しを伴うため）。前回の tasklist の A 群の行を閉じた
 - [x] 引き継ぎ `.steering/_handoff/next-session-ai-fatigue-judge-file.md` と索引の更新
-- [ ] /finish-task（code-reviewer＋security-checker 並列 → /cross-review 2 巡）→ git-workflow ルール 6
+- [x] /finish-task（code-reviewer＋security-checker 並列 → /cross-review 2 巡）→ git-workflow ルール 6 —— 2026-09-30: Codex は 2 巡・3 回（判断 16・17）。PR #266 を CI 緑（Windows・macOS・frontend）で merge（`fca48e43`）。main の workflow run の起動を確認（1 件）
