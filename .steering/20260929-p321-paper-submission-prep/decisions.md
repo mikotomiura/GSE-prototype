@@ -96,7 +96,7 @@
 - **判断日時**: 2026-09-29
 - **背景**: 研究者は ZEN 大学の学生（学生用ドメインのメールを持つ）。前タスク判断 12 で所属なし（都市と国だけ）にしていた。
 - **採用**: 今のまま（研究者の選択）。この研究は大学とは別に行ったものとして扱う。
-- **影響範囲**: 原稿は都市と国だけ（`ffil` に所属を書かない）。Zenodo の所属欄は、研究者の既存の Zenodo の記録 2 件に揃えて "Independent Researcher"（所属なしの書き方）にした（2026-09-29 に研究者が「このまま」と確認）。arXiv のアカウントのメールは、endorsement の経路（判断 3）では自動の条件に効かない。
+- **影響範囲**: 原稿は都市と国だけ（`\affil` に所属を書かない）。Zenodo の所属欄は、研究者の既存の Zenodo の記録 2 件に揃えて "Independent Researcher"（所属なしの書き方）にした（2026-09-29 に研究者が「このまま」と確認）。arXiv のアカウントのメールは、endorsement の経路（判断 3）では自動の条件に効かない。
 
 ## 判断 7: ORCID = 0009-0000-4196-0508 を原稿と Zenodo に入れる
 
@@ -149,9 +149,25 @@
   - code-reviewer LOW: arXiv のライセンスは版ごと（前提の表・手順書 5）／ arXiv ブログの引用の脚注の印 ／ Zenodo の説明を "Table 4 and three rows of Table 5" に ／ カバーレター "comes from a study published in this journal" ／ 手順 1 と 2 を続けて行う ／ EMSE と arXiv にも 🔒。
   - Codex P1: 公開前に全履歴を検査すること・`--tags` を使わないこと → security-checker が全 11 コミットを検査済み（手順書 0.2 に記録し、それ以後のコミットは差分を検査する）・タグだけを push（手順書 0.3）。
   - security-checker LOW 1: `zen.py` の token がリダイレクトで転送先に渡りうる → `add_unredirected_header` に変えた（scratch のスクリプト・リポジトリ外）。
-  - security-checker（セキュリティ外）: `4aab7f0` の「手で・2 人が独立に転記」という誤った記述が公開される履歴に残る → `NOTES.md` の D2 transcription の節に、誤りと `ae39be6` での訂正（値は不変・CSV は改名だけで 0 行の変更）を記録した（`02380c5`）。⚠️ 原稿の "Seven later changes" は解析の逸脱の数なので、`Deviations` には入れていない。
+  - security-checker（セキュリティ外）: `4aab7f0` の「手で・2 人が独立に転記」という誤った記述が公開される履歴に残る → `NOTES.md` の D2 transcription の節に、誤りと `ae39be6` での訂正（値は不変・CSV は改名だけで 0 行の変更）を記録した（`02380c5`）。⚠️ 原稿の "Seven later changes" は解析の逸脱の数なので、`Deviations` には入れていない。⚠️ **出どころは `4aab7f0` だけではなかった**（2 巡目の code-reviewer・判断 12 で訂正）。
 - **採用しない**:
   - code-reviewer LOW 15（requirement.md の ORCID の記述が古い）→ 判断 7 の追記 2 で原稿に入れたので、requirement.md は正しいまま。
   - security-checker LOW 2（履歴に旧ディレクトリ名 `data/p434` が残る）→ 受け入れる。消すには履歴の書き換えが要り、原稿が根拠にする凍結の順序の記録と矛盾する（`NOTES.md` は旧名を別プロジェクトの引用キーと説明しており、プロジェクト名は出ない）。
 - **情報**: security-checker が見つけた到達不能なコミット `090be99`・`605103e` は、2026-09-29 13:02 に私が論文用リポジトリで余計に行った `git stash` → `git stash pop` の跡（ローカルだけ・どの ref にも無いので push されない・作業ツリーは元どおりと確認済み）。GitHub 側（security-checker は読んでいない）は `gh api` で確かめた: ブランチ main だけ・タグ・Release・PR・Issue・Actions の実行がいずれも 0。
 - ★ **投稿する版の行間**（`.bbl` を調べる途中で見つけた・研究者の選択）: テンプレートの手引き（逐語）"For the peer review and editorial stages you are requested to enable double-line spacing by using the [referee] option"（EMSE の規程自体には行間の指定が無い）。→ **投稿する版だけ `[referee,lineno]`**（pdfLaTeX で 32 頁・Overfull `\hbox` 0・未定義 0）。リポジトリと arXiv の原稿は今の行間（21 頁）のまま。投稿用の版は投稿日に scratch で作る（手順書 3）。
+
+## 判断 12: `/cross-review` 2 巡目の裁定（2026-09-29）
+
+- **範囲**: 1 巡目で足した規則の境界条件（memory `project_cross_review_two_rounds`）。Codex 2 回（① 論文用リポジトリ `e1e527b..02380c5 -- paper/main.tex README.md NOTES.md` ② 本ディレクトリ `e40940e2..017a4ee9` の 4 ファイル）＋ code-reviewer。**CRITICAL は 0 件**。
+- **Codex の予算**: 実消費 ① 22,169 ② 25,536（本ブランチの台帳 158,809 → 206,514 / 6 回）。同日の合算は約 361,841 / 8 回（引き上げた上限 450,000 の内）。
+- ★ **採用（両系統が一致）**:
+  1. ⚠️ **手順書の並び順**（code-reviewer HIGH・Codex P2）: 取り消せる検証（zip の検証・投稿用の原稿の組版・投稿システムの PDF の確認）が、取り消しにくい操作（GitHub の public 化）の後にあった。さらに「public 化と Zenodo の公開を間を置かずに」という自分で足した規則を、手順どおりに進めると必ず破る形だった。→ A（確定・履歴の検査・タグは手元だけ）→ B（zip の作成・中身の照合・Zenodo の下書きへのアップロード・研究者の確認）→ C（投稿用の原稿・投稿システムの PDF を承認せずに見る）→ D（push と public 化）→ E（Zenodo の公開）→ F（EMSE）→ G（arXiv）に組み直した。
+  2. 履歴が示せる範囲（Codex ① P2・code-reviewer MEDIUM）: 凍結のコミット `416a0fc` は設定とデータだけで、解析のコードと結果は `834f16a` で入った（`git show --stat` で確認）。⚠️ 設定はその後も `ae39be6`・`098b01a` で変わった（`git log -- config.json`）。→ Data availability・README・カバーレター・Zenodo の説明を「設定は解析のコードと結果より**先に最初に**コミットされ、その後の変更は記録してある」に揃えた（論文用リポジトリ `75ce1ff`・Zenodo の下書きは説明だけ差し替え・DOI は不変）。原稿 §5.1 の文は変えていない（"Seven later changes … are logged" の限定を既に持つ）。
+- ★ **採用（片方だけ）**:
+  - code-reviewer MEDIUM: `NOTES.md` の訂正文が誤りの出どころを取り違えていた。`git log -S` で確かめると "transcribed by hand"（`DATA.md`）は**凍結のコミット `416a0fc`** から、`ENV.md` の "by hand" と `NOTES.md` の "coder B independently" は `834f16a` から、"Two people transcribed independently" だけが `4aab7f0`。→ 3 つのコミットごとに挙げ直した（`75ce1ff`）。判断 11 の該当行にも訂正を注記した。
+  - Codex ② P2: 履歴の検査は**コミットごとに**（手順書 A.2）。
+  - Codex ② P3: ⚠️★ `decisions.md` 判断 6 の `\affil` が **BEL（0x07）** になっていた（heredoc 経由の Python で `\a` が制御文字に変わった・memory `feedback_backslash_via_bash_heredoc` と同じ型）→ Write で作ったスクリプトで直し、本ディレクトリと論文用リポジトリの全テキストに制御文字が無いことを走査で確かめた。
+  - code-reviewer LOW: ORCID の行は責任著者の `\email` の直後に置く必要がある（前に置く・`\email` を消すと区切れない・消える）→ `main.tex` のコメントに書いた ／ zip の照合は名前だけでなく blob ID で・`core.autocrlf=false` で作る・`build.sh` には Tectonic が要る（手順書 B）／ 依頼文の日本語版の注意書きを `[...]` の形に・添付 PDF の中のリンクもまだ開けない旨（`endorsement-request-draft.md`）／ public 化の後の実物の目視を戻した（手順書 D.4）。
+  - Codex ① P2（ORCID がクラスの内部マクロに頼る）: 通常の版と投稿する版（`[referee,lineno]`）の両方の PDF で、タイトル頁に ORCID が 1 回・リンク先が `https://orcid.org/0009-0000-4196-0508` であることを確かめた。投稿システムが組んだ PDF でも見る（手順書 C.4）。
+- ★ 論文用リポジトリ `75ce1ff`: `bash run.sh` exit 0・`bash paper/build.sh` exit 0・pdfLaTeX で通常の版 21 頁／投稿する版 32 頁（どちらも Overfull `\hbox` 0・未定義 0）。
+- **3 巡目は回さない**: 2 巡目の指摘はすべて一次で確かめて直し、残る論点は投稿日に手順書のとおりに実物で確かめる段（zip の照合・投稿システムの PDF）へ収束した（memory `project_cross_review_two_rounds`「打ち切りは残る論点が別の段へ収束したから」）。→ Codex の上限を 300,000 に戻す。
