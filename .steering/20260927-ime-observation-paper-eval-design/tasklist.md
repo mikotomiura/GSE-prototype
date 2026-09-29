@@ -28,7 +28,9 @@
   - [ ] W3（G-GEAR: 009 013 017 021 022 ／ Mac: 012・005 / 006 は 004 の後）
     - [x] Mac: 012（2026-09-29）: attempt 1 の `issue_done`・clean な checkout で acceptance 失敗 0 件（✅ 16・macOS で初めて単体ロガーをビルド）。レビュー 2 本 → HIGH（main queue が回らず入力ソースの問い合わせが完了しない）を判断 51 で 011 の追補として `main.rs` に入れた（`32e57125`・再現プログラムで陰性対照つきに実測）。残りの指摘は作業用エージェントが直し、メインが acceptance と変異で確かめて merge（`2a449dbf`）
     - [x] merge 後の base（`2a449dbf`）の clean な checkout で、Mac で回せる merge 済みの全 acceptance 16 本（001 002 003 004 007 010 011 012 015 016 017 018 019 021 022 028）が失敗 0 件（Windows 専用の 008 009 013 014 は exit 2 ＝対象外）・`_style_check.py` 違反 0 件 → push
-    - [ ] ⚠️ G-GEAR: 判断 51 で `main.rs` を変えた（macOS だけ `cfg` で分岐）→ 次の G-GEAR のセッションで 011 / 013 / 014 の acceptance を回し、Windows 側のコンパイルが壊れていないことを確かめる
+    - [x] ⚠️ G-GEAR: 判断 51 で `main.rs` を変えた（macOS だけ `cfg` で分岐）→ 次の G-GEAR のセッションで 011 / 013 / 014 の acceptance を回し、Windows 側のコンパイルが壊れていないことを確かめる
+      - [x] 2026-09-29（G-GEAR）: base `91289c09` の clean な checkout で 011 / 013 / 014 の cargo の項目（build・test）はすべて緑。ただし全 acceptance が `kit/check.sh` の 1 件で赤 → 004 の `emit.py` の selftest（Windows の Python 3.11 の時計が 16 ms 刻み・機械の負荷）→ 判断 52 / 53 で `emit.py` を直した（004 の追補）・判断 54 で 005 / 006 の依存から 004 を外した（B11）
+      - [ ] ⚠️ Mac: `emit.py` を変えたので、次の Mac のセッションで `004-acceptance.sh` を回し直す
     - [x] 009: `issue_done`・clean な checkout で acceptance 失敗 0 件（✅ 16）
     - [x] 013: attempt 1 で worker が Stop（`is_observed_key` の抜粋が `crate::analysis::key_gate` を呼ぶ）→ 判断 35 でメインが 011 の追補（`key_gate.rs` の逐語コピー）を base に入れた（`dd58dd9d`）
     - [x] 013 を回し直す（止まったときの記録は `archive/ime-013-attempt1-stop` に残した）→ `issue_done`
@@ -41,7 +43,8 @@
     - [x] clean な checkout で acceptance 失敗 0 件（014 ✅ 17 / 018 ✅ 12 / 019 ✅ 11）・レビュー 5 本（code-reviewer 3・security-checker 2）→ 判断 44〜46 を研究者に問い確定
     - [x] 3 本の直しを作業用エージェント（Sonnet）に渡し、メインが clean な checkout で acceptance を回し直し（3 本とも失敗 0 件）、HIGH の直しを写しへの変異で確かめてから merge（014 `b2d7373e` / 018 `5dbacf66` / 019 `e02dc266`）。判断 44 の写した元との違いを `kit/logger/PROVENANCE.internal.md` に記録
     - [x] merge 後の base（`c5acf429`）の clean な checkout で merge 済みの全 acceptance 17 本（001 002 003 008 009 010 011 013 014 015 016 017 018 019 021 022 028）がすべて失敗 0 件・`_style_check.py` 違反 0 件（`--selftest` も緑）・入口の所要時間の警告なし → push → ループの worktree 3 本と検証用の checkout を片付けた
-  - [ ] W5（020: 実験一式と 1 コマンドの再現・依存 006）／W6（024: 公開 repo への書き出し）。★ Mac の 004 → 006 が先に要る。着手の前に研究者に確認する
+  - [ ] W3 の残り（G-GEAR: 005 / 006）。★ 004 は base に入った（Mac・2026-09-29）。依存は判断 54 で解いた
+  - [ ] W5（020: 実験一式と 1 コマンドの再現・依存 006）／W6（024: 公開 repo への書き出し）。★ 006 が先に要る。着手の前に研究者に確認する
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）

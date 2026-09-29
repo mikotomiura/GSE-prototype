@@ -69,3 +69,11 @@
 - 事象 1: `kit/check.sh` が `analysis/gt_sessions.py` の 1 ケースで赤（深い入れ子が拒否されない）。Python 3.14.4 の `json` は 3000 段で `RecursionError` を出さない。→ 判断 47 で selftest の深さを上げた。
 - 事象 2: main checkout（`/Users/johnd/GSE-prototype`）は別の対話セッションが別ブランチ（`docs/g1-o1-collection-readiness`）で未コミットの作業中だった。→ ★ ブランチを切り替えず、base を別 worktree（`/Users/johnd/GSE-ime-base`）に出し、`loop-run.sh` には **その worktree の task ディレクトリを絶対パスで渡す**（`TASK_DIR` は絶対パスならそのまま使われ、config・issue・acceptance はそこから読まれる）。events は §7 のとおり main checkout の絶対パス。spawn の dirty 検査は main checkout を見るので `LOOP_FORCE=1`（B1 と同じ）。
 - 事象 3: 004 / 007 の依存 `001` が Mac の events で満たされない → 判断 47。
+
+## B11（2026-09-29・G-GEAR で Mac の W2 / W3 を取り込んだとき）Windows で `kit/check.sh` がベースラインから赤
+
+- 事象: G-GEAR で base（`91289c09`）の clean な checkout に全 acceptance を回すと、全 17 本（Windows で回るもの）が `kit/check.sh` の 1 件で赤。落ちていたのは 004 の `emit/emit.py` の selftest の時間の 3 ケース（遅れの 95 パーセンタイル・試行間の待ち・マーカーの間隔）。
+- 原因 1: Python 3.11 の Windows では `time.monotonic()` が 16 ms 刻み（`GetTickCount64`）、`time.time()` の宣言上の分解能が 15.6 ms。oracle の時刻がこれで取られていた。→ 判断 52。
+- 原因 2: 同じ機械で別プロジェクト（`C:\ERRE-Sand_Box`）の計算が CPU を 82% 使っていて、送出の遅れの 95 パーセンタイルが 20 ms を超えた（高い優先度では 0.04 ms）。→ 判断 53。★ そのプロセスには触れていない。
+- 影響: 直すまでは 005 / 006 のループの verify がベースラインから赤になる（`docs/loop-engineering.md` のモード C の条件 ③）。
+- ★ 教訓: 004 の acceptance は `require_os macos` なので、`emit.py` の selftest は Windows では一度も回っていなかった。**「どちらの OS でも走る selftest」（`check.sh` が拾うもの）を片方の機械だけで merge したら、もう片方の機械で全 acceptance を回すまで完了としない。**

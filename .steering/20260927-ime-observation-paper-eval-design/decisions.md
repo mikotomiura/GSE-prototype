@@ -399,3 +399,16 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - 確認（Mac）: release ビルド・clippy・`cargo test` 75 件が緑。再現プログラムで回す形が 10 / 10 件を実行（CPU 時間ほぼ 0）。
 - ⚠️ 残り: Windows 側は `cfg` で従来の経路のままだが、コンパイルは G-GEAR でしか確かめられない → 次の G-GEAR のセッションで 011 / 013 / 014 の acceptance を回す。012 はこの base を取り込んでから、残りの指摘（警告と件数・タップの復帰の件数と上限・競合・テスト・ドキュメント）を直す。
 - ★ 012 の仕様の範囲の直し（メインが段取り・作業用エージェントが `loop/012-issue` で `9bd278d8`）: 入力ソースの doc を実態に合わせ、問い合わせが 2 秒完了しなければ警告を 1 回・完了件数を停止時に出す／`IME_OPEN` への書き込みを `compare_exchange` に（モードキーの書き込みを上書きしない）／タップの再有効化を 2 系統で数えて停止時に出す・連続上限を写した元の 100 に・作り直しは入れず Known limits に／`handle_key` の判断を純粋関数に切り出してテスト（auto-repeat の除外を殺す変異で赤をメインが確認）／タイムアウト後に遅れてできたタップは installed を出さずに畳む／権限のダイアログと Secure Event Input を doc に。security は LOW 3 件だけ（上の doc の 2 件と、作り直しの層が無いこと）。clean な checkout で `012-acceptance.sh` 失敗 0 件（✅ 16）。
+
+## 判断 52〜54: Mac の W2 / W3 を G-GEAR で取り込んだときの直し（2026-09-29・52 / 53 は研究者の回答・54 はメインの実装上の選択）
+
+★ G-GEAR で base（`91289c09`）を取り込み、clean な checkout で merge 済みの全 acceptance 20 本を回した。判断 51 で変えた `main.rs` は Windows でもビルド・テストが通った（011 / 013 / 014 の cargo の項目がすべて緑）。一方で、**全 acceptance が共通の 1 件（`kit/check.sh`）で赤**になった。原因は 004 の `emit/emit.py` の selftest の時間の 3 ケース（Mac でしか検査されていなかった）。
+
+| # | 論点（出どころ） | 採用 | 理由 |
+|---|---|---|---|
+| 52 | `emit.py` は oracle の時刻を `time.monotonic_ns()` / `time.time_ns()` で取る。G-GEAR の Python 3.11.9 では `monotonic` が `GetTickCount64()`（実測 16 ms 刻み）、`time` が `GetSystemTimeAsFileTime()`（宣言上 15.6 ms。他のプロセスがタイマーを細かくしていると 1 ms）。selftest の試行間の待ち・マーカーの間隔・遅れが 16 ms 刻みで測られて赤。**実データでも Windows の試行の窓と矢印キーの時刻（`nav` の正解）が 16 ms 刻みになる** | ★ **`emit.py` を Python の版によらず高分解能の時計にする**: `t_mono_ns` は待ちと同じ `time.perf_counter_ns()`、Windows の `t_wall_ms` は `GetSystemTimePreciseAsFileTime`（ctypes・標準ライブラリ）。時計の宣言上の分解能が 1 ms より粗ければ `Emitter` が出力を作る前に止まる（`ClockTooCoarse`・exit 2）。004 の追補としてメインが base に入れた | 環境の要件を増やさずに（Python 3.13 以上を必須にせずに）oracle の時刻を 1 ms 以下にする。門は `Emitter` にあるので、006 が `Emitter` を直接使っても効く |
+| 53 | 時計を直すと、送出の遅れの 95 パーセンタイル（< 20 ms）が G-GEAR で 23〜56 ms の赤になった。原因は同じ機械で別プロジェクト（`C:\ERRE-Sand_Box`）の重い計算が CPU を 82% 使っていたこと。高い優先度で回すと 0.01〜0.04 ms | ★ **遅れの上限だけを `--selftest --full` に移す**。既定の selftest には負荷に左右されない検査（計画より早く送らない・待ちの下限・時計の分解能と出どころ・粗い時計で止まること）を残し、95 パーセンタイルは値を表示するだけにする。パイロット（M1 / M5）では空いた機械で `--full` を回す | 既定の selftest は全 acceptance とループの verify が毎回回す（入口の規則「重い・環境に左右される検査は既定で回さない」）。機械が忙しいと理由なく赤になり、ループが空回りする |
+| 54 | 005 / 006 の `## Dependencies` の `004`: 004 の `issue_done` は Mac の events にだけあり、G-GEAR の events（機械ごと・git 管理外）には無い → `deps_met` が永久に偽で起動しない | ★ **外す**（判断 34 / 47 と同じ形・`issue_done` は手で書かない）。006 の依存は 003 だけになる | 004 の成果物は base にある |
+
+- 確認（G-GEAR・Python 3.11.9）: 既定の selftest 47 件がすべて緑（負荷がある状態で）・`--full` は高い優先度で緑（95 パーセンタイル 0.04 ms）。写しへの変異 4 本がすべて赤: 時計を両方元に戻す／門を外す／行の壁時計だけ `time.time_ns()` に戻す（⚠️ 実測の刻みの検査だけでは、他のプロセスがタイマーを細かくしていると捕まらなかった → `_stamp()` が高分解能の 2 つの関数から時刻を取ることを関数の差し替えで確かめる検査を足した）／単調時計だけ元に戻す。
+- ⚠️ Mac: 次の Mac のセッションで `004-acceptance.sh` を回し直す（`emit.py` を変えたため。macOS では `time.time_ns()` と `perf_counter_ns()` を使う）。
