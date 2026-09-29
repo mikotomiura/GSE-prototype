@@ -8,7 +8,8 @@
 # reports for the absent process (the negative control).
 #
 # What to expect:
-#   - `top -l 3` and `top -l 4` agree with the ground truth. `top -l 2` reads low, about 0.48 times the
+#   - `top -l 3` is the reading used for memory and threads and is expected to agree with the ground truth;
+#     `top -l 4` is printed for reference. `top -l 2` reads low, about 0.48 times the
 #     ground truth, because the denominator of its second frame includes the start-up time of `top` itself.
 #   - `ps -o %cpu` is an average since the start of the process: it agrees for a steady load, but a burst
 #     disappears in it.
@@ -17,7 +18,8 @@
 # This is a manual check of the instrument. Its output is not used by summarize_e3.py.
 #
 # Usage:  bash calibrate-cpu.sh
-#   It uses one core at 100 % for about 15 seconds and stops it at the end (also when interrupted).
+#   It uses one core at 100 % for about 30 seconds. The busy loop ends by itself after 60 seconds at the
+#   latest, and it is stopped at the end of the script (also when interrupted).
 set -euo pipefail
 
 if [ "$(uname -s)" != "Darwin" ]; then
@@ -28,9 +30,13 @@ fi
 echo "logical processors: $(sysctl -n hw.logicalcpu 2>/dev/null || echo '?')"
 
 # Positive control: a single-threaded busy loop saturates exactly one core (the interpreter lock keeps it to one).
-python3 -c 'while True: pass' &
+SPIN=""
+trap 'if [ -n "${SPIN}" ]; then kill "${SPIN}" 2>/dev/null || true; fi' EXIT
+# The loop has a deadline of 60 seconds, so that it ends by itself if this script is killed.
+python3 -c 'import time
+end = time.time() + 60
+while time.time() < end: pass' &
 SPIN=$!
-trap 'kill "$SPIN" 2>/dev/null || true' EXIT
 sleep 5
 
 # Ground truth: increase of the CPU time / wall-clock time (depends on neither top nor ps %cpu).
@@ -57,7 +63,7 @@ done
 cat <<'NOTE'
 
 How to read this:
-  top -l 3 (and -l 4) should agree with the ground truth.
+  top -l 3 should agree with the ground truth (-l 4 is printed for reference).
   top -l 2 reads about 0.48 times the ground truth.
   ps -o %cpu agrees for a steady load, but it hides bursts.
 
@@ -66,3 +72,5 @@ NOTE
 kill "$SPIN" 2>/dev/null || true
 sleep 1
 echo "  top for the absent process: [$(top -l 3 -pid "$SPIN" -stats cpu -n 1 2>/dev/null | tail -1)]   (empty or 0 is correct)"
+wait "${SPIN}" 2>/dev/null || true
+trap - EXIT

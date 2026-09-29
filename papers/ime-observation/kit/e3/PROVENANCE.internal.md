@@ -38,7 +38,9 @@ line contains `E3_PROC` and every removed line is the process-name line.
   size; the `31/1` thread form; skipped lines counted; rows with the process absent (all columns zero) left out;
   the floor of 480 rows. Confirmed on 2026-09-30 from the original: it does not multiply any calibration value into the
   result (`calibrate-cpu.sh` is a manual check).
-  Added here: median, 95th percentile (linear interpolation) and maximum; per-condition blocks; the status
+  Added here: median and 95th percentile (linear interpolation) (the maximum is in the original too);
+  per-condition blocks; the window floor of 4 hours; the sampling interval from the timestamps; presence
+  transitions and per-stretch slopes; `cpu_all_zero`; the status
   `not measured` / `insufficient` / `measured` and exit codes. Not taken: thresholds and verdicts of the
   original table, the NDJSON size, the energy report, the start-up report and the battery.
 - `run_e3.sh` and `README.md` are new. `run_e3.sh` replaces `run.sh` of the original for one condition (it
@@ -46,10 +48,14 @@ line contains `E3_PROC` and every removed line is the process-name line.
 
 ## Not verified here
 
-- The process-name match of `pgrep -x` on macOS for a 22-character name (`ime-observation-logger`) was not
-  checked on a Mac. If macOS compares only a truncated name, the sampler reports the process as absent and the
-  summary says `not measured`; the fix would be `pgrep -f` or a shorter binary name, which goes beyond the
-  process-name line (the scope ruling of the E3 design) and must be reported. `run_e3.sh` prints a note at the start when it does
-  not find the process. Check it at the start of the measurement.
+- The process-name match of `pgrep -x` on macOS for a 22-character name (`ime-observation-logger`) has NOT
+  been checked on a Mac; check it on the Mac. Darwin keeps 16 characters of a process name (`p_comm`,
+  `MAXCOMLEN`) and BSD `pgrep -x` compares the kept name, so a 22-character name very probably does not
+  match. This is handled in `run_e3.sh` (not in the sampler's executable lines, which stay as in the
+  original): on Darwin an unset `E3_PROC` defaults to the first 16 characters (`ime-observation-`) and a longer
+  one is cut to 16 with a warning; the README gives `ps -c -o comm= -p <pid>` to see the real name. A
+  `pgrep -f` fix is not taken: it matches the full command line and so can match other processes (an editor
+  that has the name in its arguments, the sampler itself). A shorter binary name would also work but changes
+  the observer (out of scope).
 - `calibrate-cpu.sh` and the macOS sampler were not run on a Mac in this issue (the loop ran on Windows).
   The Windows sampler and `run_e3.sh` were run against an absent process only (all rows zero, `not measured`).
