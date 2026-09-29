@@ -35,6 +35,15 @@
 - **影響範囲**: `paper/build.sh` は Tectonic のまま。pdfLaTeX での確認は別の手順として記録する（結果は本ファイルに追記）。
 - **見直しタイミング**: pdfLaTeX で差が出たとき（原稿か `build.sh` を直す）。
 
+### 判断 2 の追記: pdfLaTeX で組んだ結果（2026-09-29・論文用リポジトリ `e1e527b`）
+
+- **道具**: TinyTeX v2026.09（`TinyTeX-v2026.09.zip`・246,897,183 B・SHA-256 `e82d8b78fcf5740639f10ac8518f0c83c9202830e6bba364c70104601c12c6be` = GitHub の release が示す digest と一致）を scratch に展開。pdfTeX 3.141592653-2.6-1.40.29（TeX Live 2026）。⚠️ 既定の取得先 `tlnet.yihui.org` は "not verified: pubkey missing" だったので、scratch の TinyTeX の取得先を CTAN 公式のミラー（`mirror.ctan.org`）に替えた（こちらも Windows の TinyTeX に gpg が無く署名は未検証）。足したパッケージは `ncctools`（`manyfoot.sty`）と `xurl` の 2 つ。
+- **手順**: `paper/` の 5 ファイル（`main.tex`・`refs.bib`・`results.tex`・`sn-jnl.cls`・`sn-basic.bst`）を scratch に複製し、`pdflatex → bibtex → pdflatex ×3`（3 回目の後に "Label(s) may have changed" が出たので 4 回目で収束）。
+- **結果**: すべて exit 0。**21 頁**（Tectonic と同じ）。未定義の参照・引用 0 ／ Overfull `\hbox` 0 ／ Underfull `\hbox` 0 ／ Missing character 0 ／ フォント 30 種すべて埋め込み。
+- 残る警告: Overfull `\vbox` 1 件（1.9pt・`\output` 中。★ Tectonic でも HEAD の原稿で同じ 1 件（2.05pt）が出る＝今回の変更とは無関係）／ hyperref のしおりの階層の飛び 8 件（Statements の `\bmhead`）／ `rsfs` の寸法の代用 4 件（`mathrsfs` を読み込んでいるが使っていない）。
+- ⚠️ 頁割りは XeTeX と一部ずれる（21 頁中 6 頁で頁の書き出しと終わりが一致・他は数行ずれる）。組版エンジンの字幅の違いで、内容の違いではない（本文の抽出で語の並びの違いは空白の入り方だけ）。
+- → **pdfLaTeX で組めない原因は見当たらない。** 投稿システムが組んだ PDF は、投稿時に研究者が承認する前に頁数と表の収まりを見る。
+
 ## 判断 3: arXiv の endorsement は並行して求め、EMSE への投稿を待たせない（前タスク判断 10 を改める）
 
 - **判断日時**: 2026-09-29
@@ -59,6 +68,14 @@
 - ⚠️ **トレードオフ**: GitHub を public にすると、`4a81a43` より前のコミットの著者（別のメールアドレス）も公開される（前タスク判断 12 で研究者が承知・履歴は書き換えない）。
 - **影響範囲**: `paper/main.tex` の Data availability・README（DOI・原稿のライセンス）・投稿日の手順。
 
+### 判断 4 の追記: Zenodo の下書きと DOI の予約（2026-09-29）
+
+- token が効くかを読み取りだけで確かめた（`GET /api/deposit/depositions` = 200・本番の zenodo.org・研究者の既存の公開済み記録 3 件には触れていない）。
+- **下書き**: deposition `23029603`・状態 `unsubmitted`（未公開）・**予約した DOI = `10.5281/zenodo.23029603`**。⚠️ Zenodo の規程では DOI は公開した時点で登録される（"The DOI will only be registered once the record is published."）→ **投稿日は Zenodo の公開を先に行い、DOI が解決することを確かめてから EMSE に投稿する**。⚠️ 下書きを消すと予約した DOI も失われる。
+- **メタデータ**（研究者の既存の記録 `22735437`・`22733449` に揃えた）: creators = "Miura, Mikoto"・affiliation "Independent Researcher"・ORCID `0009-0000-4196-0508` ／ license `cc-by-4.0` ／ access `open` ／ related_identifiers = `isSupplementTo` `https://github.com/mikotomiura/self-resolution-measure` ／ keywords は原稿と同じ 6 語 ／ 説明は学術的な英語（GSE への言及なし・grep 0 件）。
+- ★ **資源の種類 = dataset**（私の選択）: 中身が転記データ・結果・凍結した設定・解析コード・原稿の TeX で、原稿の Data availability が指す先だから。⚠️ Zenodo のメタデータは公開後も直せる（ファイルは直せない）。研究者が software などを望めば投稿日までに直す。
+- **原稿**: 論文用リポジトリ `e1e527b` —— Data availability の仮置きを DOI に置き換え、開発用リポジトリを「凍結と解析の順序を記録するコミット履歴の置き場所」として名指した。README: 原稿を CC BY 4.0 に（判断 5）・DOI を記載。`bash run.sh` exit 0・`bash paper/build.sh` exit 0（21 頁）。⚠️ まだ push していない（レビューの後）。
+
 ## 判断 5: 原稿のライセンス = CC BY 4.0（arXiv のプレプリントとリポジトリの `paper/`）
 
 - **判断日時**: 2026-09-29
@@ -82,6 +99,13 @@
 - **背景**: EMSE は ORCID の使用を推奨（前提の表）。研究者は ORCID を持っている。
 - **一次で確かめたこと**: 検査数字（ISO 7064 MOD 11-2）が一致。`https://pub.orcid.org/v3.0/0009-0000-4196-0508/person` の氏名 = Mikoto Miura。
 - **影響範囲**: `paper/main.tex` の著者情報（`sn-jnl` の書き方に合わせる）・Zenodo の creators・投稿システム。
+
+### 判断 7 の追記: 原稿の本文には ORCID を入れない（2026-09-29・テンプレートを一次で確かめた結果）
+
+- ⚠️ grill では「原稿・Zenodo の著者情報に入れる」と聞いていた。
+- **一次**: `sn-jnl.cls` の定義は `\gdef\orcidlogo{\includegraphics{Orcidlogo.eps}}`・`\gdef\orcid#1{\href{#1}{\orcidlogo}}`。★ `Orcidlogo.eps` は公式 zip（前タスク判断 1）に**入っていない**（zip の中身は `sn-jnl.cls`・`sn-article.tex`・`bst/` 9 本・`empty.eps`・`fig.eps`・`sn-article.pdf`・`sn-bibliography.bib`・`user-manual.pdf`）。見本の `sn-article.tex` と手引き `user-manual.pdf`（14 頁）には ORCID の記述が 1 つも無い。⚠️ Tectonic は EPS を扱えない（前タスク判断 2）。
+- **採用**: ORCID は**投稿システムと Zenodo**（下書きの creators に入れ済み）に入れ、原稿の本文には入れない。EMSE の規程も ORCID を「投稿の際に使う」ものとして書いている（前提の表）。
+- **見直しタイミング**: 採択後の組版で出版社が求めたとき、または研究者が本文への記載を求めたとき。
 
 ## 判断 8: 推薦査読者は挙げない
 

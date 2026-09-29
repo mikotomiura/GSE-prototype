@@ -7,23 +7,26 @@
 - [x] grill（判断 1–10）・`/start-task`（worktree `C:/wt/p321-submission`）
 
 ## 1. Zenodo（判断 4）
-- [ ] token が効くかを読み取りだけで確かめる
-- [ ] 下書きを作り DOI を予約する（公開しない）
+- [x] token が効くかを読み取りだけで確かめる（200・既存の記録には触れていない）
+- [x] 下書きを作り DOI を予約する（deposition `23029603`・DOI `10.5281/zenodo.23029603`・未公開）
 
 ## 2. 原稿（論文用リポジトリ）
-- [ ] Data availability に DOI・著者情報に ORCID・README の Licence（原稿 = CC BY 4.0）
-- [ ] `bash run.sh` / `bash paper/build.sh` exit 0
-- [ ] 書いてはいけないことの grep
+- [x] Data availability に DOI・README の Licence（原稿 = CC BY 4.0）→ `e1e527b`（⚠️ 未 push）
+- [x] ORCID は本文に入れない（判断 7 の追記: テンプレートに仕組みが無い）→ 投稿システムと Zenodo に
+- [x] `bash run.sh` / `bash paper/build.sh` exit 0（21 頁・Overfull `\vbox` 1 件は HEAD にもある）
+- [x] 書いてはいけないことの grep（原稿・README・Zenodo の説明に GSE なし）
 
 ## 3. pdfLaTeX（判断 2）
-- [ ] scratch に TinyTeX を置いて組む・結果を Tectonic と比べて記録
+- [x] scratch に TinyTeX v2026.09 を置いて組む → エラー 0・未定義 0・Overfull `\hbox` 0・21 頁・フォント全埋め込み（判断 2 の追記）
 
 ## 4. 研究者
-- [ ] 主張と根拠の対応表を渡す → 通読 → 指摘を反映 → 研究者が確かめる（判断 1）
-- [ ] カバーレターの下書き（判断 10）
-- [ ] endorsement の依頼文の下書き（判断 3）
+- [x] 通読の手引き（`reading-guide.md`・主張と根拠の対応表）
+- [ ] 研究者の通読 → 指摘を反映 → 研究者が確かめる（判断 1）
+- [x] カバーレターの下書き（`cover-letter-draft.md`・判断 10）→ [ ] 研究者が確かめる
+- [x] endorsement の依頼文の下書き（`endorsement-request-draft.md`・判断 3）→ [ ] 研究者が確かめて送る
 
 ## 5. 完了
-- [ ] 原稿の変更に `/cross-review`（⚠️ Codex は予算が戻ってから・判断 9）
-- [ ] 投稿日の手順書（GitHub の public 化・Zenodo の公開・申告）
+- [ ] 原稿の変更に `/cross-review`（Codex ＋ code-reviewer ＋ security-checker。⚠️ Codex は予算が戻ってから・判断 9）
+- [x] 投稿日の手順書（`submission-day-steps.md`）
+- [ ] 論文用リポジトリを push（レビューの後）
 - [ ] GSE 側: `/finish-task` の出荷フロー
