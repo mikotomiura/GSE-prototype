@@ -1,0 +1,396 @@
+{
+ "meta": {
+  "executed": "2026-09-29 21:38:40 +0900",
+  "design": "design.md §2"
+ },
+ "records": [
+  {
+   "doi": "10.1108/jeim-10-2025-1027",
+   "title": "Dark side of generative AI: a stressor–strain outcome and cognitive load theory explanation on decision fatigue and cognitive overload",
+   "container": "Journal of Enterprise Information Management",
+   "issued": [
+    2026,
+    8,
+    14
+   ],
+   "authors": [
+    "Asmi Fahad",
+    "Wong Alfred",
+    "Almugren Intesar",
+    "Chotia Varun",
+    "Bilinovics-Sipos Judit"
+   ],
+   "affiliations_first3": [
+    [
+     "Charles Sturt University–Bathurst Campus , ,"
+    ],
+    [
+     "Charles Sturt University–Bathurst Campus , ,"
+    ],
+    [
+     "Princess Nourah bint Abdulrahman University Department of Teaching and Learning, , ,"
+    ]
+   ],
+   "type": "journal-article",
+   "license": [],
+   "relation": {},
+   "update_to": [],
+   "links": [
+    "https://www.emerald.com/jeim/article-pdf/doi/10.1108/JEIM-10-2025-1027/11789472/jeim-10-2025-1027en.pdf",
+    "https://www.emerald.com/jeim/article-pdf/doi/10.1108/JEIM-10-2025-1027/11789472/jeim-10-2025-1027en.pdf"
+   ],
+   "s2_openAccessPdf": "",
+   "abstract_source": "crossref",
+   "abstract_chars": 1745
+  },
+  {
+   "doi": "10.1038/s41598-026-45402-7",
+   "title": "Technostress, digital fatigue, and AI dependency as antecedents of burnout and SDG-4 achievement in EFL classrooms",
+   "container": "Scientific Reports",
+   "issued": [
+    2026,
+    4,
+    1
+   ],
+   "authors": [
+    "Honggang Wang",
+    "Khoso Abdul Khalique",
+    "Althubyani Adel R."
+   ],
+   "affiliations_first3": [
+    [],
+    [],
+    []
+   ],
+   "type": "journal-article",
+   "license": [
+    "https://creativecommons.org/licenses/by/4.0",
+    "https://creativecommons.org/licenses/by/4.0"
+   ],
+   "relation": {},
+   "update_to": [],
+   "links": [
+    "https://www.nature.com/articles/s41598-026-45402-7",
+    "https://www.nature.com/articles/s41598-026-45402-7.pdf",
+    "https://www.nature.com/articles/s41598-026-45402-7.pdf"
+   ],
+   "pmcid": "PMC13184225",
+   "isOpenAccess": "Y",
+   "epmc_affiliation": "College of International Studies, Yangzhou University, Yangzhou City, China.",
+   "s2_openAccessPdf": "https://www.nature.com/articles/s41598-026-45402-7_reference.pdf",
+   "abstract_source": "crossref",
+   "abstract_chars": 1542
+  },
+  {
+   "doi": "10.1016/j.actpsy.2026.107396",
+   "title": "Technostress forecasting in EFL classrooms: How digital fatigue and perceived AI ethical concerns shape digital burnout and undermine SDG-4 achievement",
+   "container": "Acta Psychologica",
+   "issued": [
+    2026,
+    9
+   ],
+   "authors": [
+    "Khoso Abdul Khalique",
+    "Honggang Wang"
+   ],
+   "affiliations_first3": [
+    [],
+    []
+   ],
+   "type": "journal-article",
+   "license": [
+    "https://www.elsevier.com/tdm/userlicense/1.0/",
+    "https://www.elsevier.com/legal/tdmrep-license",
+    "http://creativecommons.org/licenses/by/4.0/"
+   ],
+   "relation": {},
+   "update_to": [],
+   "links": [
+    "https://api.elsevier.com/content/article/PII:S0001691826011972?httpAccept=text/xml",
+    "https://api.elsevier.com/content/article/PII:S0001691826011972?httpAccept=text/plain"
+   ],
+   "pmcid": null,
+   "isOpenAccess": "N",
+   "epmc_affiliation": "College of International Studies, Yangzhou University, China.",
+   "s2_openAccessPdf": "https://www.sciencedirect.com/science/article/pii/S0001691826011972/pdf",
+   "abstract_source": "europepmc",
+   "abstract_chars": 1560
+  },
+  {
+   "doi": "10.1007/s00146-025-02764-2",
+   "title": "Associations between generative artificial intelligence usage, Job Demands, Job Control and Burnout",
+   "container": "AI &amp; SOCIETY",
+   "issued": [
+    2025,
+    11,
+    26
+   ],
+   "authors": [
+    "Thorpe David",
+    "Bean Christopher",
+    "Krieg Josiah"
+   ],
+   "affiliations_first3": [
+    [],
+    [],
+    []
+   ],
+   "type": "journal-article",
+   "license": [
+    "https://www.springernature.com/gp/researchers/text-and-data-mining",
+    "https://www.springernature.com/gp/researchers/text-and-data-mining"
+   ],
+   "relation": {},
+   "update_to": [],
+   "links": [
+    "https://link.springer.com/content/pdf/10.1007/s00146-025-02764-2.pdf",
+    "https://link.springer.com/article/10.1007/s00146-025-02764-2",
+    "https://link.springer.com/content/pdf/10.1007/s00146-025-02764-2.pdf"
+   ],
+   "s2_openAccessPdf": "",
+   "abstract_source": "none",
+   "abstract_chars": 0
+  },
+  {
+   "doi": "10.1016/j.techsoc.2026.103553",
+   "title": "Digital efficiency, human exhaustion: How human-centered AI buffers the impact of AI adoption on physical health via AI techarnostress",
+   "container": "Technology in Society",
+   "issued": [
+    2026,
+    12
+   ],
+   "authors": [
+    "Kim Byung-Jik",
+    "Kim Min-Jik"
+   ],
+   "affiliations_first3": [
+    [],
+    []
+   ],
+   "type": "journal-article",
+   "license": [
+    "https://www.elsevier.com/tdm/userlicense/1.0/",
+    "https://www.elsevier.com/legal/tdmrep-license",
+    "https://doi.org/10.15223/policy-017",
+    "https://doi.org/10.15223/policy-037",
+    "https://doi.org/10.15223/policy-012",
+    "https://doi.org/10.15223/policy-029",
+    "https://doi.org/10.15223/policy-004"
+   ],
+   "relation": {},
+   "update_to": [],
+   "links": [
+    "https://api.elsevier.com/content/article/PII:S0160791X26003428?httpAccept=text/xml",
+    "https://api.elsevier.com/content/article/PII:S0160791X26003428?httpAccept=text/plain"
+   ],
+   "s2_openAccessPdf": "",
+   "abstract_source": "none",
+   "abstract_chars": 0
+  },
+  {
+   "doi": "10.1007/s10639-024-13198-6",
+   "title": "Privacy fatigue and its effects on ChatGPT acceptance among undergraduate students: is privacy dead?",
+   "container": "Education and Information Technologies",
+   "issued": [
+    2025,
+    1,
+    10
+   ],
+   "authors": [
+    "Chung Jiwon",
+    "Kwon Hun-yeong"
+   ],
+   "affiliations_first3": [
+    [],
+    []
+   ],
+   "type": "journal-article",
+   "license": [
+    "https://creativecommons.org/licenses/by-nc-nd/4.0",
+    "https://creativecommons.org/licenses/by-nc-nd/4.0"
+   ],
+   "relation": {},
+   "update_to": [],
+   "links": [
+    "https://link.springer.com/content/pdf/10.1007/s10639-024-13198-6.pdf",
+    "https://link.springer.com/article/10.1007/s10639-024-13198-6/fulltext.html",
+    "https://link.springer.com/content/pdf/10.1007/s10639-024-13198-6.pdf"
+   ],
+   "s2_openAccessPdf": "https://link.springer.com/content/pdf/10.1007/s10639-024-13198-6.pdf",
+   "abstract_source": "semanticscholar",
+   "abstract_chars": 1394
+  },
+  {
+   "doi": "10.31152/jb.2025.12.10.6.297",
+   "title": "AI Anxiety to Fatigue and Its Consequences: The Moderating Role of AI Usage Motivation",
+   "container": "Journal of Business Convergence",
+   "issued": [
+    2025,
+    12,
+    31
+   ],
+   "authors": [
+    "Kang Inwon",
+    "Li Dan"
+   ],
+   "affiliations_first3": [
+    [],
+    []
+   ],
+   "type": "journal-article",
+   "license": [],
+   "relation": {},
+   "update_to": [],
+   "links": [],
+   "s2_openAccessPdf": "",
+   "abstract_source": "none",
+   "abstract_chars": 0
+  },
+  {
+   "doi": "10.5281/zenodo.22838191",
+   "title": "AI Fatigue in Higher Education: A Systematic Review of Associated Conditions, Manifestations, and Lifelong Learning Implications",
+   "publisher": "Zenodo",
+   "year": 2026,
+   "creators": [
+    "Nobles, Calvin"
+   ],
+   "resourceType": "Other",
+   "url": "https://zenodo.org/doi/10.5281/zenodo.22838191",
+   "relatedIdentifiers": [
+    [
+     "IsVersionOf",
+     "10.5281/zenodo.22838190"
+    ]
+   ],
+   "abstract_source": "datacite",
+   "abstract_chars": 61
+  },
+  {
+   "doi": "10.1057/s41599-024-04018-w",
+   "title": "The mental health implications of artificial intelligence adoption: the crucial role of self-efficacy",
+   "container": "Humanities and Social Sciences Communications",
+   "issued": [
+    2024,
+    11,
+    17
+   ],
+   "authors": [
+    "Kim Byung-Jik",
+    "Lee Julak"
+   ],
+   "affiliations_first3": [
+    [],
+    []
+   ],
+   "type": "journal-article",
+   "license": [
+    "https://creativecommons.org/licenses/by-nc-nd/4.0",
+    "https://creativecommons.org/licenses/by-nc-nd/4.0"
+   ],
+   "relation": {},
+   "update_to": [],
+   "links": [
+    "https://www.nature.com/articles/s41599-024-04018-w.pdf",
+    "https://www.nature.com/articles/s41599-024-04018-w",
+    "https://www.nature.com/articles/s41599-024-04018-w.pdf"
+   ],
+   "s2_openAccessPdf": "https://www.nature.com/articles/s41599-024-04018-w.pdf",
+   "abstract_source": "semanticscholar",
+   "abstract_chars": 1747
+  },
+  {
+   "doi": "10.1108/JSM-03-2023-0115",
+   "title": "Service employees’ STARA awareness and proactive service performance",
+   "container": "Journal of Services Marketing",
+   "issued": [
+    2024,
+    3,
+    22
+   ],
+   "authors": [
+    "Hur Won-Moo",
+    "Shin Yuhyung"
+   ],
+   "affiliations_first3": [
+    [],
+    []
+   ],
+   "type": "journal-article",
+   "license": [
+    "https://www.emerald.com/insight/site-policies"
+   ],
+   "relation": {},
+   "update_to": [],
+   "links": [
+    "https://www.emerald.com/insight/content/doi/10.1108/JSM-03-2023-0115/full/xml",
+    "https://www.emerald.com/insight/content/doi/10.1108/JSM-03-2023-0115/full/html"
+   ],
+   "s2_openAccessPdf": "",
+   "abstract_source": "crossref",
+   "abstract_chars": 3166
+  },
+  {
+   "doi": "10.3389/fpubh.2024.1343932",
+   "title": "Navigating AI transitions: how coaching leadership buffers against job stress and protects employee physical health",
+   "container": "Frontiers in Public Health",
+   "issued": [
+    2024,
+    3,
+    27
+   ],
+   "authors": [
+    "Jeong Jeeyoon",
+    "Kim Byung-Jik",
+    "Lee Julak"
+   ],
+   "affiliations_first3": [
+    [],
+    [],
+    []
+   ],
+   "type": "journal-article",
+   "license": [
+    "https://creativecommons.org/licenses/by/4.0/"
+   ],
+   "relation": {},
+   "update_to": [],
+   "links": [
+    "https://www.frontiersin.org/articles/10.3389/fpubh.2024.1343932/full"
+   ],
+   "pmcid": "PMC11004349",
+   "isOpenAccess": "Y",
+   "epmc_affiliation": "Business School, Korea University, Seoul, Republic of Korea.",
+   "s2_openAccessPdf": "https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2024.1343932/pdf",
+   "abstract_source": "crossref",
+   "abstract_chars": 1384
+  },
+  {
+   "doi": "10.21227/rz27-ze05",
+   "title": "\"AI-Fatigue-Learning-6000: Measuring Artificial Intelligence Fatigue in AI-Assisted Learning Environments\"",
+   "publisher": "IEEE DataPort",
+   "year": 2026,
+   "creators": [
+    "Wael Badawy"
+   ],
+   "resourceType": "Dataset",
+   "url": "https://ieee-dataport.org/documents/ai-fatigue-learning-6000-measuring-artificial-intelligence-fatigue-ai-assisted-learning",
+   "relatedIdentifiers": [],
+   "abstract_source": "datacite-description",
+   "abstract_chars": 874
+  },
+  {
+   "doi": "10.21227/94rd-ny74",
+   "title": "\"AI-Fatigue-SEM-PLS-15000: A Large-Scale Dataset for Modeling Artificial Intelligence Fatigue in AI-Assisted Learning Environment\"",
+   "publisher": "IEEE DataPort",
+   "year": 2026,
+   "creators": [
+    "Wael Badawy"
+   ],
+   "resourceType": "Dataset",
+   "url": "https://ieee-dataport.org/documents/ai-fatigue-sem-pls-15000-large-scale-dataset-modeling-artificial-intelligence-fatigue-ai",
+   "relatedIdentifiers": [],
+   "abstract_source": "datacite-description",
+   "abstract_chars": 1283
+  }
+ ]
+}

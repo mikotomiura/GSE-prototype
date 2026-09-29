@@ -1,0 +1,2342 @@
+{
+ "meta": {
+  "executed": "2026-09-29 21:17:53 +0900",
+  "design": "design.md §1.4",
+  "note": "抄録は repo の外に保存。ここには一致した語と通過の真偽だけ。"
+ },
+ "results": [
+  {
+   "url": "https://www.jstage.jst.go.jp/article/ajg/2026s/0/2026s_335/_article/-char/ja/",
+   "title": "生成AIによる観光行動の質的シミュレーションと調査手法の検討",
+   "year": "2026",
+   "journal": "日本地理学会発表要旨集",
+   "queries": [
+    "AI 疲労",
+    "LLM 疲労",
+    "生成AI 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "生成AI"
+   ],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/ajscs/37/0/37_185/_article/-char/ja/",
+   "title": "調理実習動画を活用した生成AIによる事後学習支援システムの試作開発",
+   "year": "2026",
+   "journal": "日本調理科学会大会研究発表要旨集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/ajscs/37/0/37_20/_article/-char/ja/",
+   "title": "生成AIを用いたレシピ個別化における調理的整合性の向上",
+   "year": "2026",
+   "journal": "日本調理科学会大会研究発表要旨集",
+   "queries": [
+    "生成AI 負担",
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "LLM",
+    "大規模言語モデル",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/axies/2025/0/2025_702/_article/-char/ja/",
+   "title": "研究データのオープンアクセスを加速化する：生成AIを用いたメタデータ生成と機関リポジトリへの収載",
+   "year": "2025",
+   "journal": "大学ICT推進協議会年次大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/axies/2025/0/2025_95/_article/-char/ja/",
+   "title": "OpenPoseとMocapNETを用いた360度VR動画からモーションを生成するウェブサービス",
+   "year": "2025",
+   "journal": "大学ICT推進協議会年次大会論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/ciecspringconference/17/0/17_59/_article/-char/ja/",
+   "title": "データサイエンス教育における生成AIを活用した主成分分析学習の一検討",
+   "year": "2026",
+   "journal": "CIEC春季カンファレンス論文集",
+   "queries": [
+    "生成AI 負荷",
+    "ChatGPT 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "ChatGPT",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/cjpt/2012/0/2012_48101398/_article/-char/ja/",
+   "title": "足部アーチサポートを目的とした機能靴下の効果",
+   "year": "2013",
+   "journal": "理学療法学Supplement",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/conf/40/0/40_531/_article/-char/ja/",
+   "title": "2025S-GS6-2 スマートフォンによる3Dスキャンと機械学習を活用した溶接ビード形状の応力集中係数・応力勾配の自動推定",
+   "year": "2025",
+   "journal": "日本船舶海洋工学会講演会論文集",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/conf/41/0/41_527/_article/-char/ja/",
+   "title": "2025A-OS12-5 用途特化CADコード自動生成のためのコンテキスト準拠レイヤー構造の提案",
+   "year": "2025",
+   "journal": "日本船舶海洋工学会講演会論文集",
+   "queries": [
+    "大規模言語モデル 負荷",
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/fose/32/0/32_135/_article/-char/ja/",
+   "title": "生成AIを活用したプログラミング演習支援システムにおける可視化機能の構築と授業支援への活用可能性",
+   "year": "2025",
+   "journal": "ソフトウェア工学の基礎ワークショップ論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/fose/32/0/32_171/_article/-char/ja/",
+   "title": "LLMを用いた開発における設計文書を介したコード生成の有効性に関する調査",
+   "year": "2025",
+   "journal": "ソフトウェア工学の基礎ワークショップ論文集",
+   "queries": [
+    "大規模言語モデル 負荷",
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/fose/32/0/32_83/_article/-char/ja/",
+   "title": "生成AIが提示した複数のコード片に対して開発者による選択を支援する手法",
+   "year": "2025",
+   "journal": "ソフトウェア工学の基礎ワークショップ論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成 AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/generativeai/2/0/2_21/_article/-char/ja/",
+   "title": "プロンプトで診る，病院訪問の最適化",
+   "year": "2024",
+   "journal": "Generative AI",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "人工知能",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/gensoken/2023/21/2023_95/_article/-char/ja/",
+   "title": "生成AIと教育―武雄市小中学校教職員アンケート―",
+   "year": "2023",
+   "journal": "現代社会研究",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/gomu1944/60/9/60_9_538/_article/-char/ja/",
+   "title": "三次元ランダム応力疲労における異方性構造の変化",
+   "year": "1987",
+   "journal": "日本ゴム協会誌",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/gomu1944/62/1/62_1_22/_article/-char/ja/",
+   "title": "三次元ステップ応力疲労における物性の線形加算性に関する研究",
+   "year": "1989",
+   "journal": "日本ゴム協会誌",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/hannou/29/0/29_0_118/_article/-char/ja/",
+   "title": "ヒト脳研究を視野に入れた分子プローブ概念の構築と展開",
+   "year": "2003",
+   "journal": "反応と合成の進歩シンポジウム 発表要旨概要",
+   "queries": [
+    "人工知能 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "人工知能"
+   ],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/iiekake/36/0/36_31/_article/-char/ja/",
+   "title": "準備型スピーキング練習による英語発話意識の変化とAIを含むICT活用の効果",
+   "year": "2026",
+   "journal": "国際教育研究所紀要",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/isase/ISASE2026/0/ISASE2026_1_64/_article/-char/ja/",
+   "title": "Inferring Emotion Words in Occupational Fatalities Using a Large Language Model",
+   "year": "2026",
+   "journal": "International Symposium on Affective Science and Engineering",
+   "queries": [
+    "ChatGPT fatigue",
+    "large language model fatigue"
+   ],
+   "fetch": "no-abstract-meta",
+   "ai_terms": [],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jacn/28/1/28_174/_article/-char/ja/",
+   "title": "分散プロンプトエンジニアリングに基づく規格関連文章のための動的要約",
+   "year": "2024",
+   "journal": "学術情報処理研究",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jaemsstudy/60/0/60_114/_article/-char/ja/",
+   "title": "教員養成課程の学生を対象とした模擬授業の準備における情報探索の手段の利用意向に関する意識調査",
+   "year": "2026",
+   "journal": "日本教育メディア学会研究会論集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jaemsstudy/60/0/60_327/_article/-char/ja/",
+   "title": "小学校4年生の振り返りを活用した生成AIによる道徳科所見文作成支援ツールの効果検証",
+   "year": "2026",
+   "journal": "日本教育メディア学会研究会論集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jaer/13/1/13_13_49/_article/-char/ja/",
+   "title": "生成AI によるアンケート分析に基づく会計科目の満足度最大化にかかわる要因の探索",
+   "year": "2025",
+   "journal": "会計教育研究",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jahs/27/2/27_71/_article/-char/ja/",
+   "title": "砂漠の古地下水―その起源と流動―",
+   "year": "1997",
+   "journal": "日本水文科学会誌",
+   "queries": [
+    "large language model exhaustion"
+   ],
+   "fetch": "no-abstract-meta",
+   "ai_terms": [],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jamt/75/1/75_25-38/_article/-char/ja/",
+   "title": "臨地実習教育の血液検査分野におけるChatGPTの支援的役割",
+   "year": "2026",
+   "journal": "医学検査",
+   "queries": [
+    "ChatGPT 負担",
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "ChatGPT",
+    "LLM",
+    "large language model",
+    "大規模言語モデル",
+    "対話型AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jart/21/1/21_97/_article/-char/ja/",
+   "title": "深層学習技術を基盤とする自動作問研究の動向と展望",
+   "year": "2025",
+   "journal": "日本テスト学会誌",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "人工知能",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jasmin/202510/0/202510_170/_article/-char/ja/",
+   "title": "AIを活用したペット支援システム",
+   "year": "2026",
+   "journal": "経営情報学会　全国研究発表大会要旨集",
+   "queries": [
+    "ChatGPT 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "ChatGPT",
+    "チャットボット"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jbef/18/Special_issue/18_18.S11.pp.S1-S3/_article/-char/ja/",
+   "title": "生成AI利用によるフェイクへの反応の変化：フェイクニュースのオンライン実験",
+   "year": "2025",
+   "journal": "行動経済学",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jbm/19/1/19_5/_article/-char/ja/",
+   "title": "Development of Practical Artificial Intelligence System for Drug Discovery and Its Application to Activity Prediction of Small Molecule Protein-Protein Interaction Modulators",
+   "year": "2019",
+   "journal": "Journal of Biological Macromolecules",
+   "queries": [
+    "artificial intelligence exhaustion"
+   ],
+   "fetch": "no-abstract-meta",
+   "ai_terms": [],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jceeek/2025/0/2025_398/_article/-char/ja/",
+   "title": "LLMを活用した講義動画の確認テストの自動生成",
+   "year": "2025",
+   "journal": "電気関係学会九州支部連合大会講演論文集",
+   "queries": [
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jhep/45/3/45_485/_article/-char/ja/",
+   "title": "日本総合健診医学会　第45回大会・パネルディスカッション　健診・人間ドックにおける多職種連携　社会環境の変化に伴う多職種連携の必要性と職種間ジレンマについて",
+   "year": "2018",
+   "journal": "総合健診",
+   "queries": [
+    "人工知能 疲弊",
+    "artificial intelligence exhaustion"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "人工知能"
+   ],
+   "fatigue_terms": [
+    "疲弊"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jhep/51/2/51_209/_article/-char/ja/",
+   "title": "総合健診における人工知能への期待",
+   "year": "2024",
+   "journal": "総合健診",
+   "queries": [
+    "AI 疲れ",
+    "人工知能 疲れ",
+    "artificial intelligence fatigue"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "人工知能"
+   ],
+   "fatigue_terms": [
+    "疲れ"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jid/2/1/2_30/_article/-char/ja/",
+   "title": "保育学生の実習日誌作成に伴う負担感と困難に関する調査",
+   "year": "2026",
+   "journal": "情報デザイン研究",
+   "queries": [
+    "生成AI 負担",
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jje/61/Supplement/61_2F06-02/_article/-char/ja/",
+   "title": "レジリエンスの要因抽出を目的とするLLMを用いたインタビューシステム",
+   "year": "2025",
+   "journal": "人間工学",
+   "queries": [
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jjet/49/Suppl./49_S49046/_article/-char/ja/",
+   "title": "ルールベースと生成AIを併用した表計算課題の評価支援システム",
+   "year": "2025",
+   "journal": "日本教育工学会論文誌",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jjet/advpub/0/advpub_50014/_article/-char/ja/",
+   "title": "自己調整発達の源流とその構造的拡張",
+   "year": "2026",
+   "journal": "日本教育工学会論文誌",
+   "queries": [
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jjomh/33/1/33_49/_article/-char/ja/",
+   "title": "産業保健における生成AIの具体的な活用可能性を探る",
+   "year": "2025",
+   "journal": "産業精神保健",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jjsam/76/1/76_65/_article/-char/ja/",
+   "title": "第21回国際東洋医学学術大会 （ICOM 21st） 参加報告",
+   "year": "2026",
+   "journal": "全日本鍼灸学会雑誌",
+   "queries": [
+    "artificial intelligence fatigue"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jjste/67/4/67_271/_article/-char/ja/",
+   "title": "大学教育における課題解決型演習での生成AIを活用した自己特性に基づく企画提案支援の試行と評価",
+   "year": "2025",
+   "journal": "日本産業技術教育学会誌",
+   "queries": [
+    "生成AI 負担",
+    "ChatGPT 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "ChatGPT",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jkg/74/Special_Issue/74_2024-020/_article/-char/ja/",
+   "title": "生成AIによる大福帳の学習者向けコメント生成の試み",
+   "year": "2024",
+   "journal": "情報の科学と技術",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "artificial intelligence",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jkg/76/5/76_219/_article/-char/ja/",
+   "title": "特集：「TP&amp;Dフォーラム2025」の編集にあたって",
+   "year": "2026",
+   "journal": "情報の科学と技術",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jnse/12/0/12_76/_article/-char/ja/",
+   "title": "手術記録における音声認識AI を活用したシステムの有用性",
+   "year": "2025",
+   "journal": "看護理工学会誌",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "artificial intelligence",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jnse/13/0/13_272/_article/-char/ja/",
+   "title": "長勤を夜勤期間に組み込んだ昼夜遷移の少ない交代制勤務が看護師の睡眠の質に及ぼす影響",
+   "year": "2026",
+   "journal": "看護理工学会誌",
+   "queries": [
+    "人工知能 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "人工知能"
+   ],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsaisigtwo/2024/SWO-063/2024_10/_article/-char/ja/",
+   "title": "知識グラフと大規模言語モデルに基づく基礎疾患を有する患者を対象としたレシピ推薦システムの検討",
+   "year": "2024",
+   "journal": "人工知能学会第二種研究会資料",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsaisigtwo/2025/FIN-035/2025_75/_article/-char/ja/",
+   "title": "大規模言語モデルを用いたアンサンブル手法によるJ-REIT物件情報データセットの効率的な構築方法",
+   "year": "2025",
+   "journal": "人工知能学会第二種研究会資料",
+   "queries": [
+    "大規模言語モデル 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsaisigtwo/2026/AGI-032/2026_03/_article/-char/ja/",
+   "title": "LLMを活用したAI面接訓練による就職支援",
+   "year": "2026",
+   "journal": "人工知能学会第二種研究会資料",
+   "queries": [
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsaisigtwo/2026/BI-028/2026_31/_article/-char/ja/",
+   "title": "統合報告書トップメッセージにおける企業家機能表現の自動抽出・分類",
+   "year": "2026",
+   "journal": "人工知能学会第二種研究会資料",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsaisigtwo/2026/FIN-036/2026_171/_article/-char/ja/",
+   "title": "BERTを用いた強度付きマルチラベル分類による統合報告書テキストからの資本変換情報抽出の試み",
+   "year": "2026",
+   "journal": "人工知能学会第二種研究会資料",
+   "queries": [
+    "大規模言語モデル 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsceiii/5/1/5_33/_article/-char/ja/",
+   "title": "大規模言語モデルを用いた 通報音声からの事象発生地点予測",
+   "year": "2024",
+   "journal": "AI・データサイエンス論文集",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsceiii/6/2/6_95/_article/-char/ja/",
+   "title": "大規模言語モデルを活用した生成AI による土質名の相関性の分析",
+   "year": "2025",
+   "journal": "AI・データサイエンス論文集",
+   "queries": [
+    "ChatGPT 負担",
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "ChatGPT",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsceiii/6/3/6_183/_article/-char/ja/",
+   "title": "画像キャプションと大規模言語モデルを用いた橋梁の損傷画像に対する所見生成",
+   "year": "2025",
+   "journal": "AI・データサイエンス論文集",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsceiii/6/3/6_232/_article/-char/ja/",
+   "title": "物体検出と画像生成AIを用いた道路点検車載カメラ映像からの被り枝・枯れ枝の検出",
+   "year": "2025",
+   "journal": "AI・データサイエンス論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsceiii/6/3/6_380/_article/-char/ja/",
+   "title": "リアルタイム性と地名音声認識を考慮した通報音声からの事象発生地点予測",
+   "year": "2025",
+   "journal": "AI・データサイエンス論文集",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsels/5/4/5_5.4_223/_article/-char/ja/",
+   "title": "消防機関と医療機関における転院搬送の認識調査―全国アンケート調査―",
+   "year": "2025",
+   "journal": "救急救命士ジャーナル",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsem/29/1/29_1/_article/-char/ja/",
+   "title": "生成AIとデジタル技術で拓く臨床救急教育の新展開",
+   "year": "2026",
+   "journal": "日本臨床救急医学会雑誌",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsetstudy/2024/4/2024_JSET2024-4-A8/_article/-char/ja/",
+   "title": "中等教育の探究学習における生成AIの活用",
+   "year": "2024",
+   "journal": "日本教育工学会研究報告集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsetstudy/2024/4/2024_JSET2024-4-D1/_article/-char/ja/",
+   "title": "生成AIを活用した看護ゲーム教材『あせすまいる』のシナリオ自動生成",
+   "year": "2024",
+   "journal": "日本教育工学会研究報告集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsetstudy/2025/2/2025_JSET2025-2-A7/_article/-char/ja/",
+   "title": "生成AIとTTS技術を用いたオンライン動画教材の開発と学習効果の実証研究",
+   "year": "2025",
+   "journal": "日本教育工学会研究報告集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsetstudy/2025/4/2025_JSET2025-4-B13/_article/-char/ja/",
+   "title": "生成AIの正確さが学習者心理に及ぼす影響",
+   "year": "2025",
+   "journal": "日本教育工学会研究報告集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsetstudy/2025/4/2025_JSET2025-4-D1/_article/-char/ja/",
+   "title": "生成AIによるテスト項目生成，採点，即時フィードバックを統合したCBTシステムの開発",
+   "year": "2025",
+   "journal": "日本教育工学会研究報告集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsetstudy/2026/1/2026_JSET2026-1-A7/_article/-char/ja/",
+   "title": "中高英語記述問題における生成AI採点と手動採点の比較",
+   "year": "2026",
+   "journal": "日本教育工学会研究報告集",
+   "queries": [
+    "生成AI 負担",
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsetstudy/2026/1/2026_JSET2026-1-B2/_article/-char/ja/",
+   "title": "既習事項や経験を基にした記述を促す生成AI活用",
+   "year": "2026",
+   "journal": "日本教育工学会研究報告集",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsetstudy/2026/1/2026_JSET2026-1-B5/_article/-char/ja/",
+   "title": "生成AIの積極的活用と情報連携基盤による「スマート校務」の提言",
+   "year": "2026",
+   "journal": "日本教育工学会研究報告集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsetstudy/2026/2/2026_JSET2026-2-E7/_article/-char/ja/",
+   "title": "生成AIを用いた自作問題システムによる数学学習支援",
+   "year": "2026",
+   "journal": "日本教育工学会研究報告集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsidre1965/2005/235/2005_235_67/_article/-char/ja/",
+   "title": "農道用アスファルト舗装のわだち掘れに関する解析的検討",
+   "year": "2005",
+   "journal": "農業土木学会論文集",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsik/36/2/36_2026_031/_article/-char/ja/",
+   "title": "人間レビューを模倣した生成AIによる発注仕様書チェック支援手法",
+   "year": "2026",
+   "journal": "情報知識学会誌",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成 AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsmermd/2021/0/2021_2P3-B09/_article/-char/ja/",
+   "title": "自動化した機械操作に対する人間の信頼推定",
+   "year": "2021",
+   "journal": "ロボティクス・メカトロニクス講演会講演概要集",
+   "queries": [
+    "artificial intelligence fatigue"
+   ],
+   "fetch": "no-abstract-meta",
+   "ai_terms": [],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsms/73/2/73_157/_article/-char/ja/",
+   "title": "深層学習による回帰と不良品分類を両立するダクタイル鋳鉄管の鋳肌検査",
+   "year": "2024",
+   "journal": "材料",
+   "queries": [
+    "artificial intelligence fatigue"
+   ],
+   "fetch": "no-abstract-meta",
+   "ai_terms": [],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jspehssconf/75/0/75_65/_article/-char/ja/",
+   "title": "スポーツに対する肯定的評価に関連する要因の探索（生涯スポーツ）",
+   "year": "2025",
+   "journal": "日本体育・スポーツ・健康学会予稿集",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsptpsuppl/2.Suppl.No.1/0/2.Suppl.No.1_311/_article/-char/ja/",
+   "title": "内容分析手法を用いた形態素解析と構文分析及び共起分析の提案－仕事と腰痛のツイートデータを例として－",
+   "year": "2024",
+   "journal": "日本予防理学療法学会 学術大会プログラム・抄録集",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsptsuppl/45/0/45_27_/_article/-char/ja/",
+   "title": "臨床研究における生成AIの実践的活用とDX",
+   "year": "2024",
+   "journal": "日本臨床薬理学会学術総会抄録集",
+   "queries": [
+    "生成AI 負担",
+    "ChatGPT 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "ChatGPT",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsptsuppl/46/0/46_303/_article/-char/ja/",
+   "title": "生成AIを活用した食品の臨床試験における有害事象の情報収集の検討",
+   "year": "2025",
+   "journal": "日本臨床薬理学会学術総会抄録集",
+   "queries": [
+    "生成AI 負担",
+    "ChatGPT 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "ChatGPT",
+    "artificial intelligence",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsrpim/41/2/41_105/_article/-char/ja/",
+   "title": "コンピュータビジョンを中心とした機械学習における暗黙知の形式知化",
+   "year": "2026",
+   "journal": "研究 技術 計画",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jssst/43/1/43_1_15/_article/-char/ja/",
+   "title": "PP-Checker: LLMと協働する曖昧性を許容した自動採点システム",
+   "year": "2026",
+   "journal": "コンピュータ ソフトウェア",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/kampomed1982/56/6/56_6_927/_article/-char/ja/",
+   "title": "睡眠時無呼吸症候群 (SAS) に対する補中益気湯エキスの効果",
+   "year": "2005",
+   "journal": "日本東洋医学雑誌",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/konpyutariyoukyouiku/59/0/59_16/_article/-char/ja/",
+   "title": "探求学習におけるICTを活用した県立高校と大学以外の研究機関の連携",
+   "year": "2025",
+   "journal": "コンピュータ＆エデュケーション",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/kyushuptot/2016/0/2016_82/_article/-char/ja/",
+   "title": "新たな意思伝達手段の獲得における残存機能の利用と導入時期の検討",
+   "year": "2016",
+   "journal": "九州理学療法士・作業療法士合同学会誌",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/matertrans/67/6/67_MT-Z2026004/_article/-char/ja/",
+   "title": "Surface Inspection of Ductile Cast Iron Pipe for Both Regression and Defective Classification by Deep Learning",
+   "year": "2026",
+   "journal": "MATERIALS TRANSACTIONS",
+   "queries": [
+    "artificial intelligence fatigue"
+   ],
+   "fetch": "no-abstract-meta",
+   "ai_terms": [],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/mededjapan/57/3/57_152/_article/-char/ja/",
+   "title": "生成AIを用いた試験問題作成支援アプリケーションの有用性と受容に関する教員へのアンケート調査",
+   "year": "2026",
+   "journal": "医学教育",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/mededjapan/57/3/57_183/_article/-char/ja/",
+   "title": "「思考の代替」から「思考の支援」へ : 生成AIを認知的足場として活用した英語医療面接教育の実践",
+   "year": "2026",
+   "journal": "医学教育",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/mededjapan/57/3/57_195/_article/-char/ja/",
+   "title": "医学教育分野別評価における大規模言語モデルによる判定の量的・質的検証 : 役割分離に向けた探索的検討",
+   "year": "2026",
+   "journal": "医学教育",
+   "queries": [
+    "大規模言語モデル 疲れ",
+    "LLM 疲れ",
+    "large language model fatigue",
+    "large language model exhaustion"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [
+    "疲れ"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/mit/43/2/43_40/_article/-char/ja/",
+   "title": "医療言語処理の新展開",
+   "year": "2025",
+   "journal": "Medical Imaging Technology",
+   "queries": [
+    "生成AI 負担",
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "LLM",
+    "人工知能",
+    "大規模言語モデル",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/mjir/14/0/14_100_1/_article/-char/ja/",
+   "title": "生成AIを活用した大規模クラスの形成的評価と教育DX",
+   "year": "2025",
+   "journal": "大学情報・機関調査研究集会 論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/mjir/14/0/14_93_1/_article/-char/ja/",
+   "title": "国立大学法人評価業務への生成AIの活用可能性",
+   "year": "2025",
+   "journal": "大学情報・機関調査研究集会 論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/npc/2025.1/0/2025.1_S2-3/_article/-char/ja/",
+   "title": "看護分野でのAI活用最前線",
+   "year": "2025",
+   "journal": "看護薬理学カンファレンス",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成 AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2013/0/JSAI2013_3A1NFC032/_article/-char/ja/",
+   "title": "認知症の人の情動理解基盤技術とコミュニケーション支援への応用",
+   "year": "2013",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "AI 疲弊"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [
+    "疲弊"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2018/0/JSAI2018_2D405/_article/-char/ja/",
+   "title": "深層学習によるユーザ評価モデルを導入した遺伝的プログラミングによる音楽自動生成手法の提案",
+   "year": "2018",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "artificial intelligence fatigue"
+   ],
+   "fetch": "ok",
+   "ai_terms": [],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2018/0/JSAI2018_3H2OS25b03/_article/-char/ja/",
+   "title": "人工知能と報道倫理：「フェイクニュース」を中心として",
+   "year": "2018",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "AI 疲れ",
+    "人工知能 疲れ"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "人工知能"
+   ],
+   "fatigue_terms": [
+    "疲れ"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2023/0/JSAI2023_1N5GS1004/_article/-char/ja/",
+   "title": "創造性の支援のための物語構造を利用したプロットの自動生成",
+   "year": "2023",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2023/0/JSAI2023_4Xin111/_article/-char/ja/",
+   "title": "大規模言語モデルによる高品質反論文の自動生成",
+   "year": "2023",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2024/0/JSAI2024_1M4OS14a02/_article/-char/ja/",
+   "title": "ChatGPTの過剰回答に対する自動フィードバック機構を有する医療面接AI",
+   "year": "2024",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "ChatGPT 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "ChatGPT",
+    "人工知能"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2024/0/JSAI2024_1T3OS32a05/_article/-char/ja/",
+   "title": "物語構造分析に基づくLLMを活用した創作支援を目的とするインタラクティブストーリー生成システム",
+   "year": "2024",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2024/0/JSAI2024_1T4OS32b02/_article/-char/ja/",
+   "title": "アイデア提示により議論の活性化を支援するバーチャルエージェントの提案",
+   "year": "2024",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2024/0/JSAI2024_3S5OS7c01/_article/-char/ja/",
+   "title": "JGCLLM: 日本語遺伝カウンセリング大規模言語モデル",
+   "year": "2024",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2024/0/JSAI2024_3S5OS7c03/_article/-char/ja/",
+   "title": "大規模言語モデルを用いて診療録から生成した治療経過サマリの評価",
+   "year": "2024",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2024/0/JSAI2024_3Xin266/_article/-char/ja/",
+   "title": "360度評価における不適切コメントの自動判定とテキスト生成モデルによる学習データ拡張効果の検証",
+   "year": "2024",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2024/0/JSAI2024_4P3OS17c03/_article/-char/ja/",
+   "title": "対立する立場間でのコミュニケーションにおける生成 AI の介在による対立緩和",
+   "year": "2024",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2024/0/JSAI2024_4Xin265/_article/-char/ja/",
+   "title": "大規模言語モデルによるデータ拡張を利用した文章タグ付けタスクの距離学習への転換",
+   "year": "2024",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_1M4OS47b02/_article/-char/ja/",
+   "title": "分野横断検索を用いたHuman-in-the-loop にもとづく発想支援システム",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負荷",
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "チャットボット",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_1Win496/_article/-char/ja/",
+   "title": "管理栄養士支援のための献立自動生成システム",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "ChatGPT 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "ChatGPT"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_1Win498/_article/-char/ja/",
+   "title": "臨床フォームの自動入力における大規模言語モデルの活用",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_2A1GS1002/_article/-char/ja/",
+   "title": "大規模言語モデルを活用した我が国の対北朝鮮外交実務支援システム",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "人工知能",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_2I4GS301/_article/-char/ja/",
+   "title": "契約書リスクチェックのためのオントロジー自動構築とパターンマッチ手法",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_2P1OS2605/_article/-char/ja/",
+   "title": "偽情報・誤情報がむしばむ自律性",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "AI 疲れ"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [
+    "疲れ"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_2Win5102/_article/-char/ja/",
+   "title": "LLM-as-a-Judgeと継続的学習による評価フレームワークの提案",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_2Win593/_article/-char/ja/",
+   "title": "LLMを用いた有害なコンテンツを直接閲覧しない判断方法の検討",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_3A6GS1003/_article/-char/ja/",
+   "title": "ChatGPTを用いた個人書籍管理システムの提案",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "ChatGPT 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "ChatGPT",
+    "チャットボット"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_4G1GS601/_article/-char/ja/",
+   "title": "ローカル環境におけるファインチューニングした生成AIによる英語パフォーマンステスト採点支援システムの開発",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_4I1GS1104/_article/-char/ja/",
+   "title": "オブジェクト形式のノードによる簡易な因果グラフの生成と活用の一検討",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2025/0/JSAI2025_4O2OS29a04/_article/-char/ja/",
+   "title": "アリストテレス原文と古注を結ぶ統合デジタルプラットフォーム",
+   "year": "2025",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_1F4OS10b05/_article/-char/ja/",
+   "title": "少量の履歴書サンプルを用いたLLMによる履歴書自動評価フレームワークの開発",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_1H3OS4005/_article/-char/ja/",
+   "title": "MAPLE：複数評価基準と複数LLMを用いた自由記述回答の自動評価手法",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_1L5GS10q05/_article/-char/ja/",
+   "title": "LLM監査器による信号時相論理仕様の実行可能性検証",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負荷",
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_1YinA16/_article/-char/ja/",
+   "title": "AI音声日記アプリにおける感情可視化と対話介入効果",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_2F5OS19a03/_article/-char/ja/",
+   "title": "Lost in the Files：複数専門文書からの網羅的情報抽出における長コンテキストLLMとRAGの比較",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_2G1OS2102/_article/-char/ja/",
+   "title": "LLM恋愛シミュレーションゲームにおける入力形式の違いがゲーム体験と認知負荷に与える影響",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "LLM 負担",
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_2M4GS11a01/_article/-char/ja/",
+   "title": "我が国財務省における大規模言語モデルを利用したYouTube上の論調分析と対外応答要領作成の支援システム",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "生成AI 負担",
+    "大規模言語モデル 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "人工知能",
+    "大規模言語モデル",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_2N1GS6x05/_article/-char/ja/",
+   "title": "福祉現場におけるVR研修支援を目的としたシナリオ自動生成",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "Copilot",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_2N6GS2x04/_article/-char/ja/",
+   "title": "ChatGPTを用いた動画分析による個人書籍管理システムの提案",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "ChatGPT 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "ChatGPT",
+    "チャットボット"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_2YinB46/_article/-char/ja/",
+   "title": "軽量汎用時系列モデルを用いた再生可能エネルギーの発電予測",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_3YinA04/_article/-char/ja/",
+   "title": "LLM対話における四層外部構造化",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負荷",
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_3YinA60/_article/-char/ja/",
+   "title": "大規模言語モデルを用いた提案型観光案内システム",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_4J4OS34a05/_article/-char/ja/",
+   "title": "大規模事前学習済みモデルを活用した英語教育支援ロボットサービスの開発",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_4YinA30/_article/-char/ja/",
+   "title": "複数生成源のトークン候補による人間介入型LLMジェイルブレイク",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負担",
+    "大規模言語モデル 負荷",
+    "LLM 負担",
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_4YinA63/_article/-char/ja/",
+   "title": "自律的なWeb探索エー ジェントを用いた自動的なテーマ銘柄選定手法の提案",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_4YinB03/_article/-char/ja/",
+   "title": "文章で記述された論文チェックリストを用いたLLMに基づく反復型校正システムの試作",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_4YinB35/_article/-char/ja/",
+   "title": "闘病記RAGとペルソナに基づく乳がんピアサポートAIの構築と予備的評価",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_4YinB39/_article/-char/ja/",
+   "title": "大規模言語モデルによるブランド人格の相対的定量化",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "大規模言語モデル 負荷",
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_5G2OS37a05/_article/-char/ja/",
+   "title": "LLMを用いた関係精緻化によるコモンセンス知識の半オントロジー化",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_5J3OS31b06/_article/-char/ja/",
+   "title": "比較検討タスクにおけるツリー型生成AIチャットインタフェースの有効性検証",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pjsai/JSAI2026/0/JSAI2026_5L2OS6a04/_article/-char/ja/",
+   "title": "高等学校における探究学習の指導計画作成補助システムの試作",
+   "year": "2026",
+   "journal": "人工知能学会全国大会論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pscjspe/2025A/0/2025A_491/_article/-char/ja/",
+   "title": "設備故障診断AIエージェントの実証評価",
+   "year": "2025",
+   "journal": "精密工学会学術講演会講演論文集",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/pscjspe/2026S/0/2026S_69/_article/-char/ja/",
+   "title": "生成AIを利用した設備保全知識の抽出と構造化",
+   "year": "2026",
+   "journal": "精密工学会学術講演会講演論文集",
+   "queries": [
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/ptkanbloc/32/0/32_27/_article/-char/ja/",
+   "title": "走行疲労に伴う下腿筋活動と足部アーチの関係",
+   "year": "2013",
+   "journal": "関東甲信越ブロック理学療法士学会",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/repit/2024/0/2024_88/_article/-char/ja/",
+   "title": "多様な問題パターンおよび難易度を考慮した言語系生成AIによるプログラミング演習問題自動生成手法の検討",
+   "year": "2024",
+   "journal": "実践的IT教育シンポジウム rePiT 論文集",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/rrie/6/2/6_23/_article/-char/ja/",
+   "title": "メタバースと生成AIを統合した道徳学習環境の試作と実践分析",
+   "year": "2026",
+   "journal": "情報教育",
+   "queries": [
+    "生成AI 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI",
+    "生成 AI",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/sjse/3/1/3_1/_article/-char/ja/",
+   "title": "DETERMINISTIC AND PROBABILISTIC WIND SPEED FORECASTING EMPLOYING A HYBRID DEEP LEARNING MODEL AND QUANTILE REGRESSION",
+   "year": "2022",
+   "journal": "SEATUC journal of science and engineering",
+   "queries": [
+    "artificial intelligence exhaustion"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "artificial intelligence"
+   ],
+   "fatigue_terms": [
+    "exhaust"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/sobim/33/1/33_1_73/_article/-char/ja/",
+   "title": "マイクロモーションとvon Mises応力によって評価した AI-Hip cementless stem有限要素モデルの初期固定性",
+   "year": "2009",
+   "journal": "バイオメカニズム学会誌",
+   "queries": [
+    "AI 疲労"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [
+    "疲労"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/ssproceedings/202306/0/202306_13/_article/-char/ja/",
+   "title": "テストプロセスにおける「ChatGPT」の活用の提案",
+   "year": "2023",
+   "journal": "ソフトウェア・シンポジウム論文集",
+   "queries": [
+    "ChatGPT 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "ChatGPT",
+    "人工知能"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/stijournal/17/1/17_83/_article/-char/ja/",
+   "title": "Al デジタル顔はめパネルを用いた観光プロモーションの提案",
+   "year": "2021",
+   "journal": "観光と情報",
+   "queries": [
+    "AI 疲れ"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "AI"
+   ],
+   "fatigue_terms": [
+    "疲れ"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/vconf/2024/0/2024_130/_article/-char/ja/",
+   "title": "メタバースのビジネス活用支援のためのチャットボット試作",
+   "year": "2024",
+   "journal": "バーチャル学会発表概要集",
+   "queries": [
+    "生成AI 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "チャットボット",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/wii/20/0/20_113/_article/-char/ja/",
+   "title": "生成AIによる統計ポスターの評価支援方法の検討",
+   "year": "2024",
+   "journal": "Webインテリジェンスとインタラクション研究会 予稿集",
+   "queries": [
+    "生成AI 負担",
+    "ChatGPT 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "ChatGPT",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/wii/20/0/20_117/_article/-char/ja/",
+   "title": "機能分解木を用いたPBL演習のモデル化とLLMによる授業に対する助言生成方法の検討",
+   "year": "2024",
+   "journal": "Webインテリジェンスとインタラクション研究会 予稿集",
+   "queries": [
+    "生成AI 負担",
+    "LLM 負担"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "生成AI"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/wii/21/0/21_32/_article/-char/ja/",
+   "title": "外国語で教科を学ぶ学生を対象とした教育学習支援システムのためのJavaScript上で動作するエッジAIと複数指示追従問題",
+   "year": "2025",
+   "journal": "Webインテリジェンスとインタラクション研究会 予稿集",
+   "queries": [
+    "大規模言語モデル 負荷",
+    "LLM 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "LLM",
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/wii/21/0/21_82/_article/-char/ja/",
+   "title": "LLMを用いた介護スタッフの性格特性を考慮した作業負荷予測に関する研究",
+   "year": "2025",
+   "journal": "Webインテリジェンスとインタラクション研究会 予稿集",
+   "queries": [
+    "大規模言語モデル 負荷"
+   ],
+   "fetch": "ok",
+   "ai_terms": [
+    "大規模言語モデル"
+   ],
+   "fatigue_terms": [],
+   "abstract_filter": false
+  }
+ ]
+}

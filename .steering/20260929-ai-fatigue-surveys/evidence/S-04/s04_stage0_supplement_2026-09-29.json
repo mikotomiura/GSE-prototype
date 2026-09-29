@@ -1,0 +1,227 @@
+{
+ "design": "decisions.md 判断 10",
+ "records": [
+  {
+   "id": "C001",
+   "doi": "10.1007/s12553-021-00568-0",
+   "title": "Digital scribe utility and barriers to implementation in clinical practice: a scoping review.",
+   "year": "2021",
+   "journal": "Health and technology",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C002",
+   "doi": "10.1101/2023.12.06.23299573",
+   "title": "Development and Evaluation of a Digital Scribe: Conversation Summarization Pipeline for Emergency Department Counseling Sessions towards Reducing Documentation Burden",
+   "year": "2023",
+   "journal": "",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C003",
+   "doi": "10.1055/a-2327-4121",
+   "title": "Evaluation of a Digital Scribe: Conversation Summarization for Emergency Department Consultation Calls.",
+   "year": "2024",
+   "journal": "Applied clinical informatics",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C004",
+   "doi": "10.2196/54419",
+   "title": "Using ChatGPT-4 to Create Structured Medical Notes From Audio Recordings of Physician-Patient Encounters: Comparative Study.",
+   "year": "2024",
+   "journal": "Journal of medical Internet research",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援",
+    "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+   ]
+  },
+  {
+   "id": "C005",
+   "doi": "10.1097/JPN.0000000000000831",
+   "title": "Creating Perinatal Nursing Care Plans Using ChatGPT: A Pathway to Improve Nursing Care Plans and Reduce Documentation Burden",
+   "year": 2024,
+   "journal": "Journal of Perinatal & Neonatal Nursing",
+   "sources": [
+    "Semantic Scholar|bulk（医療以外）"
+   ]
+  },
+  {
+   "id": "C006",
+   "doi": "10.2196/68516",
+   "title": "Leveraging Artificial Intelligence for Digital Symptom Management in Oncology: The Development of CRCWeb",
+   "year": 2024,
+   "journal": "JMIR Cancer",
+   "sources": [
+    "Semantic Scholar|bulk（医療以外）"
+   ]
+  },
+  {
+   "id": "C007",
+   "doi": "10.1001/jamanetworkopen.2025.34976",
+   "title": "Use of Ambient AI Scribes to Reduce Administrative Burden and Professional Burnout.",
+   "year": "2025",
+   "journal": "JAMA network open",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援",
+    "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+   ]
+  },
+  {
+   "id": "C008",
+   "doi": "10.64898/2025.12.19.25342691",
+   "title": "The impact of an ambient documentation tool on the care experience of clinical pharmacists embedded in ambulatory clinics: A mixed methods evaluation",
+   "year": "2025",
+   "journal": "",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C009",
+   "doi": "10.64898/2025.12.06.25341757",
+   "title": "Impact of an AI medical scribe after 375 000 notes generated across care levels in a European health system",
+   "year": "2025",
+   "journal": "",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C010",
+   "doi": "10.3233/shti250857",
+   "title": "Documenting Care with AI: A Comparative Analysis of Commercial Scribe Tools.",
+   "year": "2025",
+   "journal": "Studies in health technology and informatics",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C011",
+   "doi": "10.1016/j.mcpdig.2025.100198",
+   "title": "Retrospective Comparative Analysis of Prostate Cancer In-Basket Messages: Responses From Closed-Domain Large Language Models Versus Clinical Teams.",
+   "year": "2025",
+   "journal": "Mayo Clinic proceedings. Digital health",
+   "sources": [
+    "Europe PMC|Q2 AI の下書き返信"
+   ]
+  },
+  {
+   "id": "C012",
+   "doi": "10.1200/jco.2025.43.5_suppl.42",
+   "title": "Utilizing ChatGPT for assessing disease volume in patients (pts) with metastatic prostate cancer (mPC).",
+   "year": 2025,
+   "journal": "Journal of Clinical Oncology",
+   "sources": [
+    "Semantic Scholar|bulk（医療以外）"
+   ]
+  },
+  {
+   "id": "C013",
+   "doi": "10.26766/pmgp.v10i3.648",
+   "title": "AI as a New Conversational Partner in the Era of Burnout: Psychological Mechanisms, Risks, and Opportunities for Medicine",
+   "year": 2025,
+   "journal": "Psychosomatic Medicine and General Practice",
+   "sources": [
+    "Semantic Scholar|bulk（医療以外）"
+   ]
+  },
+  {
+   "id": "C014",
+   "doi": "10.1097/og9.0000000000000131",
+   "title": "Evaluating Generative Artificial Intelligence–Drafted Responses for Patient Messages in Obstetrics and Gynecology",
+   "year": 2025,
+   "journal": "O&amp;G Open",
+   "sources": [
+    "Semantic Scholar|bulk（医療以外）"
+   ]
+  },
+  {
+   "id": "C015",
+   "doi": "10.1016/j.rcsop.2025.100655",
+   "title": "Comparative evaluation of artificial intelligence platforms and drug interaction screening databases using real-world patient data",
+   "year": 2025,
+   "journal": "Exploratory Research in Clinical and Social Pharmacy",
+   "sources": [
+    "Semantic Scholar|bulk（医療以外）"
+   ]
+  },
+  {
+   "id": "C016",
+   "doi": "10.2118/229396-ms",
+   "title": "Predictive Analytics for Mental Well-Being: An AI Approach to Suicide Prevention at Remote Oil & Gas Facilities",
+   "year": 2025,
+   "journal": "ADIPEC",
+   "sources": [
+    "Semantic Scholar|bulk（医療以外）"
+   ]
+  },
+  {
+   "id": "C017",
+   "doi": "10.1016/j.annemergmed.2026.04.022",
+   "title": "Medical Scribe and Ambient Artificial Intelligence Impact on Emergency Physician Documentation Burden and Clinical Productivity.",
+   "year": "2026",
+   "journal": "Annals of emergency medicine",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C018",
+   "doi": "10.1016/j.ijmedinf.2026.106584",
+   "title": "Deployment of an ambient AI scribe in emergency care: A 12-month evaluation in a large Spanish hospital network.",
+   "year": "2026",
+   "journal": "International journal of medical informatics",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C019",
+   "doi": "10.1007/s43678-026-01141-2",
+   "title": "Human vs. artificial intelligence in medical charting: a comparative study in the simulated emergency medicine context.",
+   "year": "2026",
+   "journal": "CJEM",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C020",
+   "doi": "10.1016/j.surge.2025.10.008",
+   "title": "Ambient AI reduces documentation time and enhances quality in a simulated inpatient setting.",
+   "year": "2026",
+   "journal": "The surgeon : journal of the Royal Colleges of Surgeons of Edinburgh and Ireland",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C021",
+   "doi": "10.1016/j.medcli.2026.107541",
+   "title": "Ambient AI scribe in pediatric outpatient visits: documentation burden, quality, and scale-up limits.",
+   "year": "2026",
+   "journal": "Medicina clinica",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  },
+  {
+   "id": "C022",
+   "doi": "10.64898/2026.08.14.26360467",
+   "title": "Performance of an Ambient Generative AI Documentation Tool in a Linguistically Diverse Clinical Setting",
+   "year": "2026",
+   "journal": "",
+   "sources": [
+    "Europe PMC|Q1 AI の記録支援"
+   ]
+  }
+ ]
+}

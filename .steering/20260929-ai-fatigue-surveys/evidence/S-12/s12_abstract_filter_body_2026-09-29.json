@@ -1,0 +1,111 @@
+{
+ "meta": {
+  "executed": "2026-09-29 21:19:26 +0900",
+  "design": "design.md §1.4・判断 2"
+ },
+ "results": [
+  {
+   "url": "https://www.jstage.jst.go.jp/article/isase/ISASE2026/0/ISASE2026_1_64/_article/-char/ja/",
+   "title": "Inferring Emotion Words in Occupational Fatalities Using a Large Language Model",
+   "year": "2026",
+   "journal": "International Symposium on Affective Science and Engineering",
+   "queries": [
+    "ChatGPT fatigue",
+    "large language model fatigue"
+   ],
+   "fetch": "body",
+   "ai_terms": [
+    "ChatGPT",
+    "large language model"
+   ],
+   "fatigue_terms": [
+    "fatigue"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jahs/27/2/27_71/_article/-char/ja/",
+   "title": "砂漠の古地下水―その起源と流動―",
+   "year": "1997",
+   "journal": "日本水文科学会誌",
+   "queries": [
+    "large language model exhaustion"
+   ],
+   "fetch": "body",
+   "ai_terms": [],
+   "fatigue_terms": [
+    "exhaust"
+   ],
+   "abstract_filter": false
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jbm/19/1/19_5/_article/-char/ja/",
+   "title": "Development of Practical Artificial Intelligence System for Drug Discovery and Its Application to Activity Prediction of Small Molecule Protein-Protein Interaction Modulators",
+   "year": "2019",
+   "journal": "Journal of Biological Macromolecules",
+   "queries": [
+    "artificial intelligence exhaustion"
+   ],
+   "fetch": "body",
+   "ai_terms": [
+    "AI",
+    "artificial intelligence"
+   ],
+   "fatigue_terms": [
+    "exhaust"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsmermd/2021/0/2021_2P3-B09/_article/-char/ja/",
+   "title": "自動化した機械操作に対する人間の信頼推定",
+   "year": "2021",
+   "journal": "ロボティクス・メカトロニクス講演会講演概要集",
+   "queries": [
+    "artificial intelligence fatigue"
+   ],
+   "fetch": "body",
+   "ai_terms": [
+    "artificial intelligence"
+   ],
+   "fatigue_terms": [
+    "fatigue"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/jsms/73/2/73_157/_article/-char/ja/",
+   "title": "深層学習による回帰と不良品分類を両立するダクタイル鋳鉄管の鋳肌検査",
+   "year": "2024",
+   "journal": "材料",
+   "queries": [
+    "artificial intelligence fatigue"
+   ],
+   "fetch": "body",
+   "ai_terms": [
+    "artificial intelligence"
+   ],
+   "fatigue_terms": [
+    "fatigue"
+   ],
+   "abstract_filter": true
+  },
+  {
+   "url": "https://www.jstage.jst.go.jp/article/matertrans/67/6/67_MT-Z2026004/_article/-char/ja/",
+   "title": "Surface Inspection of Ductile Cast Iron Pipe for Both Regression and Defective Classification by Deep Learning",
+   "year": "2026",
+   "journal": "MATERIALS TRANSACTIONS",
+   "queries": [
+    "artificial intelligence fatigue"
+   ],
+   "fetch": "body",
+   "ai_terms": [
+    "artificial intelligence"
+   ],
+   "fatigue_terms": [
+    "fatigue"
+   ],
+   "abstract_filter": true
+  }
+ ]
+}
