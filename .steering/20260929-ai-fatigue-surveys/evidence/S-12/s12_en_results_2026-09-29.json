@@ -1,0 +1,574 @@
+{
+ "meta": {
+  "executed": "2026-09-29 21:21:36 +0900",
+  "design": "design.md §1",
+  "note": "書誌だけ。抄録は repo の外。件数は目安で PRISMA の件数ではない。"
+ },
+ "runs": [
+  {
+   "source": "Europe PMC",
+   "field": "TITLE_ABS＋AFF",
+   "query": "TITLE_ABS:(\"generative AI\" OR ChatGPT OR \"large language model\" OR \"artificial intelligence\" OR chatbot) AND TITLE_ABS:(fatigue OR burnout OR exhaustion OR technostress) AND (TITLE_ABS:(Japan OR Japanese) OR AFF:Japan)",
+   "status": "ok",
+   "total": 22,
+   "records": [
+    {
+     "key": "10.3389/fpsyg.2026.1837484",
+     "title": "Profiles and transitions of psychological adaptation in AI-assisted Japanese language learning.",
+     "year": "2026",
+     "journal": "Frontiers in psychology",
+     "doi": "10.3389/fpsyg.2026.1837484",
+     "pmid": "42761284",
+     "pubType": "",
+     "authors": "Wu Y."
+    },
+    {
+     "key": "10.1186/s12912-024-02655-9",
+     "title": "Emotional analysis of operating room nurses in acute care hospitals in Japan: insights using ChatGPT.",
+     "year": "2025",
+     "journal": "BMC nursing",
+     "doi": "10.1186/s12912-024-02655-9",
+     "pmid": "39789556",
+     "pubType": "",
+     "authors": "Hara K, Tachibana R, Kumashiro R, Ichihara K, Uemura T, Maeda H, Yamaguchi M, Inoue T."
+    },
+    {
+     "key": "10.2196/99992",
+     "title": "Estimating Longitudinal Changes in Workday Happiness From Daily Report Texts Among Employees: Retrospective Feasibility Study.",
+     "year": "2026",
+     "journal": "JMIR formative research",
+     "doi": "10.2196/99992",
+     "pmid": "42641110",
+     "pubType": "",
+     "authors": "Hayashi J, Ito K, Manabe M, Watanabe Y, Nakayama M, Uchida Y, Wakamiya S, Aramaki E."
+    },
+    {
+     "key": "10.1159/000549894",
+     "title": "Exploring the Impact of an Artificial Intelligence-Based Intraoperative Image Navigation System in Laparoscopic Surgery on Clinical Outcomes: A Protocol for a Multicenter Randomized Controlled Trial.",
+     "year": "2026",
+     "journal": "European surgical research. Europaische chirurgische Forschung. Recherches chirurgicales europeennes",
+     "doi": "10.1159/000549894",
+     "pmid": "41452791",
+     "pubType": "",
+     "authors": "Kitaguchi D, Fuse N, Wakabayashi M, Kosugi N, Ishikawa Y, Hayashi K, Hasegawa H, Takeshita N, Ito M."
+    },
+    {
+     "key": "10.1038/s41598-026-60820-3",
+     "title": "Deep behavioral phenotyping reveals novel features in a mouse model of metabolic dysfunction-associated steatohepatitis.",
+     "year": "2026",
+     "journal": "Scientific reports",
+     "doi": "10.1038/s41598-026-60820-3",
+     "pmid": "42481582",
+     "pubType": "",
+     "authors": "Sakamoto N, Numano T, Kobayashi Y, Fukuda M, Osaki M, Omori K, Yamamoto T, Murata T."
+    },
+    {
+     "key": "10.11477/mf.030126030540030689",
+     "title": "[Current State and Challenges of Digital Health in Japan].",
+     "year": "2026",
+     "journal": "No shinkei geka. Neurological surgery",
+     "doi": "10.11477/mf.030126030540030689",
+     "pmid": "42220199",
+     "pubType": "",
+     "authors": "Ren N."
+    },
+    {
+     "key": "10.1016/j.acra.2026.03.037",
+     "title": "Predicting Radiology Burnout via Machine Learning: A Cohort Study.",
+     "year": "2026",
+     "journal": "Academic radiology",
+     "doi": "10.1016/j.acra.2026.03.037",
+     "pmid": "41963228",
+     "pubType": "",
+     "authors": "Ma C, Liu X, Su M, Fang X, Zhang M, Zhang T."
+    },
+    {
+     "key": "10.7759/cureus.109247",
+     "title": "Implementation of an AI-Assisted Workflow for Rehabilitation Discharge Summary Creation: Evaluation of Documentation Efficiency, Usability, and Hallucinations in a 290-Bed General Hospital in Japan.",
+     "year": "2026",
+     "journal": "Cureus",
+     "doi": "10.7759/cureus.109247",
+     "pmid": "42326256",
+     "pubType": "",
+     "authors": "Nakano M, Imura T."
+    },
+    {
+     "key": "10.21203/rs.3.rs-4505331/v1",
+     "title": "Sentiment Analysis of Operating Room Nurses in Acute Care Hospitals in Japan: Unveiling Passion for Perioperative Nursing Using ChatGPT",
+     "year": "2024",
+     "journal": "Research Square",
+     "doi": "10.21203/rs.3.rs-4505331/v1",
+     "pmid": "",
+     "pubType": "",
+     "authors": "Hara K, Tachibana R, Kumashiro R, Ichihara K, Uemura T, Maeda H, Yamaguchi M, Inoue T."
+    },
+    {
+     "key": "10.1161/jaha.125.045637",
+     "title": "Artificial Intelligence-Based Automated Echocardiographic Analysis and the Workflow of Sonographers: A Randomized Crossover Trial (AI-Echo RCT).",
+     "year": "2026",
+     "journal": "Journal of the American Heart Association",
+     "doi": "10.1161/jaha.125.045637",
+     "pmid": "41404733",
+     "pubType": "",
+     "authors": "Sakamoto A, Kagiyama N, Sato E, Nakamura Y, Murata A, Kaneko T, Miyazaki S, Ashikawa Y, Sugihara K, Minamino T."
+    },
+    {
+     "key": "10.1007/s11019-026-10372-0",
+     "title": "Ars Longa, Data Brevis: the science of disease and the art of care.",
+     "year": "2026",
+     "journal": "Medicine, health care, and philosophy",
+     "doi": "10.1007/s11019-026-10372-0",
+     "pmid": "42406323",
+     "pubType": "",
+     "authors": "Erbay H, Ghotbi N, Shamim MS."
+    },
+    {
+     "key": "10.3389/fphar.2026.1861637",
+     "title": "Continuous multidimensional physiological monitoring redefines early warning and preemptive treatment for neutropenic sepsis following cisplatin chemotherapy in non-small cell lung cancer.",
+     "year": "2026",
+     "journal": "Frontiers in pharmacology",
+     "doi": "10.3389/fphar.2026.1861637",
+     "pmid": "42698567",
+     "pubType": "",
+     "authors": "Wang Z, Yang K, Wang L, Zhao H, Lv P, Cai C, Sun W, Wang B."
+    },
+    {
+     "key": "10.7759/cureus.80373",
+     "title": "Effects of Long-Term Chatbot System Use on Healthcare Professionals' Professional Identity Formation and Stress: A Small-Scale Comparative Study.",
+     "year": "2025",
+     "journal": "Cureus",
+     "doi": "10.7759/cureus.80373",
+     "pmid": "40213764",
+     "pubType": "",
+     "authors": "Harada Y."
+    },
+    {
+     "key": "10.1111/jsr.70144",
+     "title": "A Participatory Artificial Intelligence Driven Shift-Scheduling Application for Improving Sleep Among Shift-Working Caregivers: A 4-Month Non-Randomised Controlled Study With Cross-Over Design.",
+     "year": "2026",
+     "journal": "Journal of sleep research",
+     "doi": "10.1111/jsr.70144",
+     "pmid": "40676768",
+     "pubType": "",
+     "authors": "Kubo T, Matsumoto S, Nishimura Y, Ikeda H, Izawa S, Sato F."
+    },
+    {
+     "key": "10.3390/s25216560",
+     "title": "Context-Aware Alerting in Elderly Care Facilities: A Hybrid Framework Integrating LLM Reasoning with Rule-Based Logic.",
+     "year": "2025",
+     "journal": "Sensors (Basel, Switzerland)",
+     "doi": "10.3390/s25216560",
+     "pmid": "41228783",
+     "pubType": "",
+     "authors": "Nahid N, Ahad MAR, Inoue S."
+    },
+    {
+     "key": "10.1007/s12574-023-00611-1",
+     "title": "Revolution of echocardiographic reporting: the new era of artificial intelligence and natural language processing.",
+     "year": "2023",
+     "journal": "Journal of echocardiography",
+     "doi": "10.1007/s12574-023-00611-1",
+     "pmid": "37312003",
+     "pubType": "",
+     "authors": "Kusunose K."
+    },
+    {
+     "key": "10.1101/2024.08.05.24310603",
+     "title": "Exploring the impact of an artificial intelligence-based intraoperative image navigation system in laparoscopic surgery on clinical outcomes: A protocol for a multicenter randomized controlled trial",
+     "year": "2024",
+     "journal": "medRxiv",
+     "doi": "10.1101/2024.08.05.24310603",
+     "pmid": "",
+     "pubType": "",
+     "authors": "Kitaguchi D, Fuse N, Wakabayashi M, Kosugi N, Ishikawa Y, Hayashi K, Hasegawa H, Takeshita N, Ito M."
+    },
+    {
+     "key": "10.1016/j.euros.2022.09.024",
+     "title": "Is Artificial Intelligence Replacing Our Radiology Stars? Not Yet!",
+     "year": "2023",
+     "journal": "European urology open science",
+     "doi": "10.1016/j.euros.2022.09.024",
+     "pmid": "36588775",
+     "pubType": "",
+     "authors": "Cacciamani GE, Sanford DI, Chu TN, Kaneko M, De Castro Abreu AL, Duddalwar V, Gill IS."
+    },
+    {
+     "key": "10.1200/cci.24.00119",
+     "title": "Application of Artificial Intelligence in Symptom Monitoring in Adult Cancer Survivorship: A Systematic Review.",
+     "year": "2024",
+     "journal": "JCO clinical cancer informatics",
+     "doi": "10.1200/cci.24.00119",
+     "pmid": "39621952",
+     "pubType": "",
+     "authors": "Tabataba Vakili S, Haywood D, Kirk D, Abdou AM, Gopalakrishnan R, Sadeghi S, Guedes H, Tan CJ, Thamm C, Bernard R, Wong HCY, Kuhn EP, Kwan JYY, Lee SF, Hart NH, Paterson C, Chopra DA, Drury A, Zhang E"
+    },
+    {
+     "key": "10.1136/bmjopen-2022-065477",
+     "title": "Effect of multimodal comprehensive communication skills training with video analysis by artificial intelligence for physicians on acute geriatric care: a mixed-methods study.",
+     "year": "2023",
+     "journal": "BMJ open",
+     "doi": "10.1136/bmjopen-2022-065477",
+     "pmid": "36868602",
+     "pubType": "",
+     "authors": "Kobayashi M, Katayama M, Hayashi T, Hashiyama T, Iyanagi T, Une S, Honda M."
+    },
+    {
+     "key": "PPR:PPR268625",
+     "title": "An Early Study on Intelligent Analysis of Speech under COVID-19: Severity, Sleep Quality, Fatigue, and Anxiety",
+     "year": "2020",
+     "journal": "arXiv",
+     "doi": "",
+     "pmid": "",
+     "pubType": "",
+     "authors": "Han J, Qian K, Song M, Yang Z, Ren Z, Liu S, Liu J, Zheng H, Ji W, Koike T, Li X, Zhang Z, Yamamoto Y, Schuller BW."
+    },
+    {
+     "key": "10.1109/jiot.2021.3067605",
+     "title": "Computer Audition for Fighting the SARS-CoV-2 Corona Crisis-Introducing the Multitask Speech Corpus for COVID-19.",
+     "year": "2021",
+     "journal": "IEEE internet of things journal",
+     "doi": "10.1109/jiot.2021.3067605",
+     "pmid": "35782182",
+     "pubType": "",
+     "authors": "Qian K, Schmitt M, Zheng H, Koike T, Han J, Liu J, Ji W, Duan J, Song M, Yang Z, Ren Z, Liu S, Zhang Z, Yamamoto Y, Schuller BW."
+    }
+   ]
+  },
+  {
+   "source": "Europe PMC",
+   "field": "TITLE_ABS",
+   "query": "TITLE_ABS:(\"generative AI\" OR ChatGPT OR \"large language model\" OR \"artificial intelligence\" OR chatbot) AND TITLE_ABS:(fatigue OR burnout OR exhaustion OR technostress) AND TITLE_ABS:(Japan OR Japanese)",
+   "status": "ok",
+   "total": 11,
+   "records": [
+    {
+     "key": "10.3389/fpsyg.2026.1837484",
+     "title": "Profiles and transitions of psychological adaptation in AI-assisted Japanese language learning.",
+     "year": "2026",
+     "journal": "Frontiers in psychology",
+     "doi": "10.3389/fpsyg.2026.1837484",
+     "pmid": "42761284",
+     "pubType": "",
+     "authors": "Wu Y."
+    },
+    {
+     "key": "10.1186/s12912-024-02655-9",
+     "title": "Emotional analysis of operating room nurses in acute care hospitals in Japan: insights using ChatGPT.",
+     "year": "2025",
+     "journal": "BMC nursing",
+     "doi": "10.1186/s12912-024-02655-9",
+     "pmid": "39789556",
+     "pubType": "",
+     "authors": "Hara K, Tachibana R, Kumashiro R, Ichihara K, Uemura T, Maeda H, Yamaguchi M, Inoue T."
+    },
+    {
+     "key": "10.11477/mf.030126030540030689",
+     "title": "[Current State and Challenges of Digital Health in Japan].",
+     "year": "2026",
+     "journal": "No shinkei geka. Neurological surgery",
+     "doi": "10.11477/mf.030126030540030689",
+     "pmid": "42220199",
+     "pubType": "",
+     "authors": "Ren N."
+    },
+    {
+     "key": "10.7759/cureus.109247",
+     "title": "Implementation of an AI-Assisted Workflow for Rehabilitation Discharge Summary Creation: Evaluation of Documentation Efficiency, Usability, and Hallucinations in a 290-Bed General Hospital in Japan.",
+     "year": "2026",
+     "journal": "Cureus",
+     "doi": "10.7759/cureus.109247",
+     "pmid": "42326256",
+     "pubType": "",
+     "authors": "Nakano M, Imura T."
+    },
+    {
+     "key": "10.2196/99992",
+     "title": "Estimating Longitudinal Changes in Workday Happiness From Daily Report Texts Among Employees: Retrospective Feasibility Study.",
+     "year": "2026",
+     "journal": "JMIR formative research",
+     "doi": "10.2196/99992",
+     "pmid": "42641110",
+     "pubType": "",
+     "authors": "Hayashi J, Ito K, Manabe M, Watanabe Y, Nakayama M, Uchida Y, Wakamiya S, Aramaki E."
+    },
+    {
+     "key": "10.21203/rs.3.rs-4505331/v1",
+     "title": "Sentiment Analysis of Operating Room Nurses in Acute Care Hospitals in Japan: Unveiling Passion for Perioperative Nursing Using ChatGPT",
+     "year": "2024",
+     "journal": "Research Square",
+     "doi": "10.21203/rs.3.rs-4505331/v1",
+     "pmid": "",
+     "pubType": "",
+     "authors": "Hara K, Tachibana R, Kumashiro R, Ichihara K, Uemura T, Maeda H, Yamaguchi M, Inoue T."
+    },
+    {
+     "key": "10.1159/000549894",
+     "title": "Exploring the Impact of an Artificial Intelligence-Based Intraoperative Image Navigation System in Laparoscopic Surgery on Clinical Outcomes: A Protocol for a Multicenter Randomized Controlled Trial.",
+     "year": "2026",
+     "journal": "European surgical research. Europaische chirurgische Forschung. Recherches chirurgicales europeennes",
+     "doi": "10.1159/000549894",
+     "pmid": "41452791",
+     "pubType": "",
+     "authors": "Kitaguchi D, Fuse N, Wakabayashi M, Kosugi N, Ishikawa Y, Hayashi K, Hasegawa H, Takeshita N, Ito M."
+    },
+    {
+     "key": "10.3389/fphar.2026.1861637",
+     "title": "Continuous multidimensional physiological monitoring redefines early warning and preemptive treatment for neutropenic sepsis following cisplatin chemotherapy in non-small cell lung cancer.",
+     "year": "2026",
+     "journal": "Frontiers in pharmacology",
+     "doi": "10.3389/fphar.2026.1861637",
+     "pmid": "42698567",
+     "pubType": "",
+     "authors": "Wang Z, Yang K, Wang L, Zhao H, Lv P, Cai C, Sun W, Wang B."
+    },
+    {
+     "key": "10.7759/cureus.80373",
+     "title": "Effects of Long-Term Chatbot System Use on Healthcare Professionals' Professional Identity Formation and Stress: A Small-Scale Comparative Study.",
+     "year": "2025",
+     "journal": "Cureus",
+     "doi": "10.7759/cureus.80373",
+     "pmid": "40213764",
+     "pubType": "",
+     "authors": "Harada Y."
+    },
+    {
+     "key": "10.1101/2024.08.05.24310603",
+     "title": "Exploring the impact of an artificial intelligence-based intraoperative image navigation system in laparoscopic surgery on clinical outcomes: A protocol for a multicenter randomized controlled trial",
+     "year": "2024",
+     "journal": "medRxiv",
+     "doi": "10.1101/2024.08.05.24310603",
+     "pmid": "",
+     "pubType": "",
+     "authors": "Kitaguchi D, Fuse N, Wakabayashi M, Kosugi N, Ishikawa Y, Hayashi K, Hasegawa H, Takeshita N, Ito M."
+    },
+    {
+     "key": "10.1200/cci.24.00119",
+     "title": "Application of Artificial Intelligence in Symptom Monitoring in Adult Cancer Survivorship: A Systematic Review.",
+     "year": "2024",
+     "journal": "JCO clinical cancer informatics",
+     "doi": "10.1200/cci.24.00119",
+     "pmid": "39621952",
+     "pubType": "",
+     "authors": "Tabataba Vakili S, Haywood D, Kirk D, Abdou AM, Gopalakrishnan R, Sadeghi S, Guedes H, Tan CJ, Thamm C, Bernard R, Wong HCY, Kuhn EP, Kwan JYY, Lee SF, Hart NH, Paterson C, Chopra DA, Drury A, Zhang E"
+    }
+   ]
+  },
+  {
+   "source": "Semantic Scholar",
+   "field": "bulk（題名・抄録）",
+   "query": "(\"generative AI\" | ChatGPT | \"large language model\" | \"artificial intelligence\" | chatbot) + (fatigue | burnout | exhaustion | technostress) + (Japan | Japanese)",
+   "status": "ok",
+   "total": 25,
+   "records": [
+    {
+     "key": "10.7759/cureus.80373",
+     "title": "Effects of Long-Term Chatbot System Use on Healthcare Professionals' Professional Identity Formation and Stress: A Small-Scale Comparative Study",
+     "year": 2025,
+     "journal": "Cureus",
+     "doi": "10.7759/cureus.80373",
+     "authors": "Yuusuke Harada"
+    },
+    {
+     "key": "10.11477/mf.030126030540030689",
+     "title": "[Current State and Challenges of Digital Health in Japan].",
+     "year": 2026,
+     "journal": "No shinkei geka. Neurological surgery",
+     "doi": "10.11477/mf.030126030540030689",
+     "authors": "Nice Ren"
+    },
+    {
+     "key": "10.1186/s12912-024-02655-9",
+     "title": "Emotional analysis of operating room nurses in acute care hospitals in Japan: insights using ChatGPT",
+     "year": 2025,
+     "journal": "BMC Nursing",
+     "doi": "10.1186/s12912-024-02655-9",
+     "authors": "Kentaro Hara, Reika Tachibana, Ryosuke Kumashiro, Kodai Ichihara, Takahiro Uemura, Hiroshi Maeda"
+    },
+    {
+     "key": "10.2196/99992",
+     "title": "Estimating Longitudinal Changes in Workday Happiness From Daily Report Texts Among Employees: Retrospective Feasibility Study",
+     "year": 2026,
+     "journal": "JMIR Formative Research",
+     "doi": "10.2196/99992",
+     "authors": "Junko Hayashi, Kazuhiro Ito, Masae Manabe, Y. Watanabe, Masataka Nakayama, Yukiko Uchida"
+    },
+    {
+     "key": "10.1007/s10396-021-01091-5",
+     "title": "Breast ultrasound in the age of advanced technology and artificial intelligence",
+     "year": 2021,
+     "journal": "Journal of medical ultrasonics",
+     "doi": "10.1007/s10396-021-01091-5",
+     "authors": "Kazunori Kubota"
+    },
+    {
+     "key": "10.3389/fphar.2026.1861637",
+     "title": "Continuous multidimensional physiological monitoring redefines early warning and preemptive treatment for neutropenic sepsis following cisplatin chemotherapy in non-small cell lung cancer",
+     "year": 2026,
+     "journal": "Frontiers in Pharmacology",
+     "doi": "10.3389/fphar.2026.1861637",
+     "authors": "Zhe Wang, Kun-Peng Yang, Lei Wang, Hui Zhao, Pei-Yun Lv, Cheng-Lun Cai"
+    },
+    {
+     "key": "10.5281/ZENODO.3938843",
+     "title": "Implementing a Physiotherapy Robot to Assist Disc Disease Patient",
+     "year": 2020,
+     "journal": "",
+     "doi": "10.5281/ZENODO.3938843",
+     "authors": "Banan Emad Alshahwan, Ohoud Almousa, Rasha Alnuwaiser, Samah Alsoghyer, Zubaydh Kenkar, N. Karim"
+    },
+    {
+     "key": "10.5204/mcj.3241",
+     "title": "Banana to the Multiverse",
+     "year": 2026,
+     "journal": "M/C Journal",
+     "doi": "10.5204/mcj.3241",
+     "authors": "A. Keene"
+    },
+    {
+     "key": "S2:35b0cba6886a19bb8df37ae763f640a5c259e6b5",
+     "title": "Fine-tuning LLMs for Tourist Trajectory Prediction using Field Experiment Data",
+     "year": 2026,
+     "journal": "",
+     "doi": "",
+     "authors": "Tatsuya Amano, Hirozumi Yamaguchi"
+    },
+    {
+     "key": "10.9790/1684-11483542",
+     "title": "Development of Expert System for Material and Welding rod Selection in Robotic Welding",
+     "year": 2014,
+     "journal": "",
+     "doi": "10.9790/1684-11483542",
+     "authors": "A. Adekunle, Samuel B. Adejuyigbe, O. Ismaila, A. Akinwale, O. Oyetunji"
+    },
+    {
+     "key": "10.37546/jaltpansigj11.1-6",
+     "title": "Crafting TBL Prompts for Classroom Activities that Support Self-Directed Learning in ESP Courses: Medical English Course Example",
+     "year": 2025,
+     "journal": "JALT PanSIG Journal",
+     "doi": "10.37546/jaltpansigj11.1-6",
+     "authors": "Jeanette Dennisson, Gary Ross"
+    },
+    {
+     "key": "10.1109/RAMS50514.2026.11424510",
+     "title": "Human Reliability Analysis for Repetitive Tasks Using the Phoenix Methodology: Approach, Results, and Possible Extensions to Human-AI Teaming",
+     "year": 2026,
+     "journal": "Reliability and Maintainability Symposium",
+     "doi": "10.1109/RAMS50514.2026.11424510",
+     "authors": "Theresa M. Stewart, Ali Mosleh"
+    },
+    {
+     "key": "S2:6750f0f6a1a9dec12d297d1c1893e6d8f139a05d",
+     "title": "Application of Arti ﬁ cial Intelligence in Symptom Monitoring in Adult Cancer Survivorship: A Systematic Review",
+     "year": null,
+     "journal": "",
+     "doi": "",
+     "authors": "Sanam Tabataba, M. Vakili, BPsychHons Darren Haywood, Dnp Fnp-Bc Deborah Kirk, A. Abdou, Ragisha Gopalakrishnan"
+    },
+    {
+     "key": "10.5204/mcj.3238",
+     "title": "Before the Multiverse",
+     "year": 2026,
+     "journal": "M/C Journal",
+     "doi": "10.5204/mcj.3238",
+     "authors": "H. Lo"
+    },
+    {
+     "key": "10.54097/b3g5x678",
+     "title": "Revolutionizing Resilience: A Comprehensive Review of Technological, AI-Driven Innovations in Anchorage Zone Design and Maintenance",
+     "year": 2025,
+     "journal": "Journal of Innovation and Development",
+     "doi": "10.54097/b3g5x678",
+     "authors": "Mercy Muroyiwa"
+    },
+    {
+     "key": "10.4995/eurocall.2025.23851",
+     "title": "Technostress and English Language Learning in the Age of Generative AI",
+     "year": 2025,
+     "journal": "The EUROCALL Review",
+     "doi": "10.4995/eurocall.2025.23851",
+     "authors": "Gilbert Dizon, Jason Gold, Ryan Barnes"
+    },
+    {
+     "key": "10.3389/fpsyg.2026.1837484",
+     "title": "Profiles and transitions of psychological adaptation in AI-assisted Japanese language learning",
+     "year": 2026,
+     "journal": "Frontiers in Psychology",
+     "doi": "10.3389/fpsyg.2026.1837484",
+     "authors": "Yuan-Yuan Wu"
+    },
+    {
+     "key": "S2:9cde1e003262c243873d4c655089f622a24124cc",
+     "title": "Safety, Reliability, Risk and Life-Cycle Performance of Structures and Infrastructures",
+     "year": 2014,
+     "journal": "",
+     "doi": "",
+     "authors": "K. Jaiswal, D. Wald, D. Perkins, W. Aspinall, A. Kiremidjian"
+    },
+    {
+     "key": "10.33593/iccp.v6i1.718",
+     "title": "SERVICEABILITY BASED CONCRETE PAVEMENT DESIGN : JSCE METHOD",
+     "year": 2025,
+     "journal": "Proceedings of the International Conference on Concrete Pavements",
+     "doi": "10.33593/iccp.v6i1.718",
+     "authors": "S. Nagataki, A. Kasahara, R. Sato, Yoshitaka Hachiya"
+    },
+    {
+     "key": "10.3390/su142013468",
+     "title": "Facial Feature Study of Cartoon and Real People with the Aid of Artificial Intelligence",
+     "year": 2022,
+     "journal": "Sustainability",
+     "doi": "10.3390/su142013468",
+     "authors": "Kun Liu, Kang-Ming Chang, Ying-Ju Liu"
+    },
+    {
+     "key": "10.1201/B12322",
+     "title": "Advances in Ergonomics in Manufacturing",
+     "year": 2012,
+     "journal": "",
+     "doi": "10.1201/B12322",
+     "authors": "S. Trzcielinski, W. Karwowski"
+    },
+    {
+     "key": "10.4018/jgcms.2012070106",
+     "title": "Virtual Restorative Environments: Preliminary Studies in Scene, Sound and Smell",
+     "year": 2012,
+     "journal": "Int. J. Gaming Comput. Mediat. Simulations",
+     "doi": "10.4018/jgcms.2012070106",
+     "authors": "James F. Knight, R. Stone, Cheng Qian"
+    },
+    {
+     "key": "10.32983/2222-4459-2026-6-544-554",
+     "title": "Foreign Experience of Human Resource Management in Organizations: Comparative Analysis and Adaptation in the Ukrainian Context",
+     "year": 2026,
+     "journal": "Business Inform",
+     "doi": "10.32983/2222-4459-2026-6-544-554",
+     "authors": "Y. Bolotina, S. Chimyshenko, O. Kondratenko"
+    },
+    {
+     "key": "10.7759/cureus.109247",
+     "title": "Implementation of an AI-Assisted Workflow for Rehabilitation Discharge Summary Creation: Evaluation of Documentation Efficiency, Usability, and Hallucinations in a 290-Bed General Hospital in Japan",
+     "year": 2026,
+     "journal": "Cureus",
+     "doi": "10.7759/cureus.109247",
+     "authors": "M. Nakano, Takuto Imura"
+    },
+    {
+     "key": "10.1101/2024.08.05.24310603",
+     "title": "Exploring the Impact of an Artificial Intelligence-Based Intraoperative Image Navigation System in Laparoscopic Surgery on Clinical Outcomes: A Protocol for a Multicenter Randomized Controlled Trial",
+     "year": 2024,
+     "journal": "medRxiv",
+     "doi": "10.1101/2024.08.05.24310603",
+     "authors": "D. Kitaguchi, N. Fuse, Masashi Wakabayashi, Norihito Kosugi, Y. Ishikawa, Kazuyuki Hayashi"
+    }
+   ]
+  },
+  {
+   "source": "OpenAlex",
+   "field": "search（題名・抄録・本文）",
+   "query": "(\"generative AI\" OR ChatGPT OR \"large language model\" OR \"artificial intelligence\" OR chatbot) AND (fatigue OR burnout OR exhaustion OR technostress) AND (Japan OR Japanese)",
+   "status": "ERR HTTP Error 503: Service Unavailable",
+   "total": null,
+   "records": []
+  }
+ ]
+}
