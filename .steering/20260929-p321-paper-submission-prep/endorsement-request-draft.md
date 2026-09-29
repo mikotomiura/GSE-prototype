@@ -5,6 +5,7 @@
 - 相手の条件: arXiv の cs の分野で、3 か月〜5 年前に出した論文が一定数あり、著者として登録されている人（help "we only count papers that have been submitted between three months and five years ago"）。相手が endorse できるかは、相手の論文の abstract ページの "Which authors of this paper are endorsers?" で確かめられる。
 - ⚠️ arXiv の help: 個人的に知っていて分野に詳しい人に頼む・**大勢に一斉に送らない・同じ人に繰り返し送らない**。
 - ★ endorsement は査読ではない（help "The endorsement process is not peer review."）。相手に求めるのは「cs.SE にふさわしい論文か」の確認だけ。
+- ★ 2026-09-29 20:55 JST に DOI の解決と GitHub の公開を確かめた → **以後に送るなら、下の「投稿日より前に送るなら」の書き換えは要らない。**
 - ⚠️ **送る時点で再現一式が未公開なら**（Zenodo の公開と GitHub の public 化は投稿日・判断 4）、DOI はまだ解決しない（"The DOI will only be registered once the record is published."）。→ 再現一式の行を「投稿日に公開予定」と書き換え、原稿は PDF を添付する。⚠️ 添付する PDF の中の DOI と GitHub の URL も、その時点ではまだ開けない（GitHub は private）→ 本文で一言断る。投稿日の後に送るならそのままでよい。★ 送る前に `[...]` が残っていないことを確かめる。
 
 ---

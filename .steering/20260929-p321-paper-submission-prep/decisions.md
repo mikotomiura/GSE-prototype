@@ -184,3 +184,10 @@
 - 取り消せない操作の間隔: public 化から Zenodo の公開までは数分（安全確認の拒否と修正の分）。
 - ⚠️ **DOI の登録待ち**（20:12 JST = 公開の約 38 分後）: doi.org・DataCite の API とも 404。Zenodo の記録の API では `pids.doi` = `10.5281/zenodo.23029603`・provider `datacite`・published。研究者の既存の記録（22735437・22733449）の DOI は doi.org で解決し DataCite も 200 → 経路は正常で、この記録の登録だけが Zenodo 側の非同期の処理で遅れている。
 - ★ **DOI が解決した**（20:55 JST に確認）: doi.org → `https://zenodo.org/doi/10.5281/zenodo.23029603`（302）→ 記録のページ 200。DataCite の API: state `findable`・registered `2026-09-29T11:34:34Z`（= 20:34 JST・公開の約 1 時間後）・version `submission-2026-09-29`。→ 研究者の選択（逐語「解決するまで待つ」）どおり、ここから EMSE の確定（手順書 F）へ。
+
+## 判断 14: 公開後の README の書き直し（2026-09-29・研究者の依頼「もうちょいおしゃれで門な感じに」）
+
+- ⚠️ 「門な感じ」は「モダンな感じ」と読んで進めた（研究者に伝えた・違えば直す）。
+- **形**: 題と副題を中央に・DOI（Zenodo）・ライセンス 2 つ・Python のバッジ／Overview（要旨の言い方に揃えた）／指標の表／データの表／Quick start（clone → D1 をブラウザで取得 → `bash run.sh`）／`run.sh` が確かめること 6 項目／原稿の組み直し／Freeze and provenance／ファイル配置の表／Citation（Zenodo の記録の BibTeX）／ライセンスの表。公開物の規律（学術的な英語・GSE への言及なし・絵文字や口語なし）を守った（grep と文字の走査で 0 件）。
+- ★ **書き直しの途中で見つけた言い過ぎ 3 つも直した**（1・2 巡目の裁定と同じ型）: `config.json` の説明 "frozen before results were computed" → 「解析のコードと結果より先に最初にコミットされ、その後の変更は NOTES.md に記録」／D2 の抽出元 "Table 4 and Table 5 only" → 「Table 4・Table 5 の 3 行・本文の 3 文」（原稿 main.tex と一致）／転記を "independent" → 「同じ LLM の別々のインスタンス」（NOTES.md の限界と一致）。「原稿のすべての数値」→「解析の結果」（原著からの引用値を含まないため）。
+- 確かめたこと: バッジ 4 つが SVG で 200・相対リンク 12 件がすべて実在・制御文字 0。論文用リポジトリ `0e3c9ed`（main に push・タグ `submission-2026-09-29` と Zenodo の版は変わらない）。
