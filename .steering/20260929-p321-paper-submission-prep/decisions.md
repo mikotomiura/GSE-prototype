@@ -191,3 +191,19 @@
 - **形**: 題と副題を中央に・DOI（Zenodo）・ライセンス 2 つ・Python のバッジ／Overview（要旨の言い方に揃えた）／指標の表／データの表／Quick start（clone → D1 をブラウザで取得 → `bash run.sh`）／`run.sh` が確かめること 6 項目／原稿の組み直し／Freeze and provenance／ファイル配置の表／Citation（Zenodo の記録の BibTeX）／ライセンスの表。公開物の規律（学術的な英語・GSE への言及なし・絵文字や口語なし）を守った（grep と文字の走査で 0 件）。
 - ★ **書き直しの途中で見つけた言い過ぎ 3 つも直した**（1・2 巡目の裁定と同じ型）: `config.json` の説明 "frozen before results were computed" → 「解析のコードと結果より先に最初にコミットされ、その後の変更は NOTES.md に記録」／D2 の抽出元 "Table 4 and Table 5 only" → 「Table 4・Table 5 の 3 行・本文の 3 文」（原稿 main.tex と一致）／転記を "independent" → 「同じ LLM の別々のインスタンス」（NOTES.md の限界と一致）。「原稿のすべての数値」→「解析の結果」（原著からの引用値を含まないため）。
 - 確かめたこと: バッジ 4 つが SVG で 200・相対リンク 12 件がすべて実在・制御文字 0。論文用リポジトリ `0e3c9ed`（main に push・タグ `submission-2026-09-29` と Zenodo の版は変わらない）。
+
+## 判断 15: EMSE への投稿の確定（2026-09-29・研究者が Editorial Manager で操作・私は研究者のタブを読んで案内）
+
+- ★ **投稿が確定した**: 原稿番号 **EMSE-D-26-01273**・Initial Date Submitted 29 Sep 2026・Current Status Submitted（研究者の画面のスクリーンショット）。下書きの間の番号は EMSE-S-26-01791。
+- **Editorial Manager の実物で分かったこと**（次に Springer の EM に出すときの参考）:
+  1. 登録: ORCID でログインすると「この ORCID はこの雑誌で未登録」と出る → "click here to register" で登録すると ORCID が自動で結び付く。必須欄に電話番号・住所・郵便番号・Institution がある（Institution は "Independent Researcher"）。
+  2. Article Type は None / Research Papers の 2 つ。
+  3. ⚠️ **添付の段で「Title Page containing ALL Author Contact Info.」が別の必須項目**だった → 題・著者・所属なし（Hiroshima, Japan）・メール・ORCID の 1 頁の `title-page.docx` を作って上げた（Springer は編集できる元ファイルを求めるので Word 形式）。
+  4. ⚠️ **`.tex` のファイルは「LaTeX Supporting File(s)」にできない**（種類の選択肢に出ない）→ 投稿用の `main.tex` に `results.tex` の中身（数値の定義だけ）を入れた 1 ファイル完結の版に差し替えた。pdfLaTeX で組んだ結果は前の版と **PDF の全頁の本文が一致**・`main.bbl` も同一（`cmp`）。`.bib`・`.bbl`・`.cls`・`.bst` は LaTeX Supporting File(s)。
+  5. ⚠️ 「Link(s) to supporting data」は **プロトコルをプルダウンで選び、残りだけを URL 欄に**入れる形。⚠️ それでも Zenodo の URL（doi.org 経由も記録のページ直も）は "Not Attached: Invalid URL" になった。★ 実測: Zenodo は User-Agent の無い取得に 403 を返す（名乗りを付ければ 200）・GitHub は名乗りなしでも 200 → EM の検査が名乗りなしで取得している可能性（推測）。→ GitHub のタグの URL（`github.com/mikotomiura/self-resolution-measure/tree/submission-2026-09-29`）をリンクにし、Description に DOI を書いた。
+  6. Review Preferences: 推薦査読者は任意（空のまま進めた）。
+  7. Additional Information の必須の質問: journal first（Yes）・自分の過去の出版物の再利用（なし・他者の公開データの再解析と説明）・**Research Square の著者用ダッシュボードへの共有の了承（選択肢は了承だけの必須項目）**・data availability statement の確認・データはリポジトリにある・特集号ではない・出版の利用規約への同意（AI の利用の条項は採択時の LTP に入る）。④と⑧は研究者が内容を確かめて選んだ。
+  8. Comments の欄にカバーレターを貼った（添付の段にカバーレターの種類が無い）。完成版は `C:/wt/emse-cover-letter.txt`（日付 29 September 2026・プレプリントはまだ無く査読中に arXiv へ出す予定と明記）。
+  9. Manuscript Data: 題は自動で入らない → 貼った（編集部品が末尾に U+200B を足すが題の組版には出ない）。要旨は用意した文と一字一句一致を確認。⚠️ **キーワードはセミコロン区切り**（"Keywords must be separated by semicolons."）。著者は登録情報から自動で入った。資金は "Funding information is not applicable / No funding was received."。
+- **EM が組んだ PDF の確認**（`EMSE-S-26-01791.pdf`・35 頁 = EM の表紙 1 ＋ タイトル頁 1 ＋ 原稿 32 ＋ リンクの頁 1）: EM の刻印（余白の行番号 1〜65・"Manuscript (LaTeX source)"）と下括弧の字形の違い（`|{z}` と `⏞⏟`・フォントの違い）を除くと、**原稿 32 頁が手元の投稿用の版と頁ごとに一致**（54,521 文字）。未定義の参照・LaTeX のエラーの表示 0。ORCID・DOI・GitHub の URL あり。原稿の部分のフォントは全埋め込み（埋め込みでないのは EM が作った表紙とタイトル頁の Verdana / Times New Roman だけ）。→ 研究者が承認して確定した。
+

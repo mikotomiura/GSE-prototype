@@ -31,7 +31,7 @@
 - [x] 投稿日の手順書（`submission-day-steps.md`）
 - [x] 投稿日の A〜E（判断 13）: タグ `submission-2026-09-29`・zip の照合・投稿用の原稿（`C:/wt/emse-upload/`）・GitHub の public 化・Zenodo の公開
 - [x] DOI が doi.org で解決する（2026-09-29 20:55 JST に確認・DataCite の登録は 20:34 JST）
-- [ ] F: 研究者が EMSE に投稿（確定）→ 受付の日付と原稿番号を記録
+- [x] F: 研究者が EMSE に投稿（確定）→ **EMSE-D-26-01273**・2026-09-29（判断 15。タイトル頁の別添・results.tex の埋め込み・リンクは GitHub のタグ）
 - [ ] G: endorsement が取れたら arXiv（研究者）→ EMSE に申告・Zenodo と README に追記
 - [x] 論文用リポジトリを push（`75ce1ff`・タグ `submission-2026-09-29`）
 - [ ] GSE 側: `/finish-task` の出荷フロー
