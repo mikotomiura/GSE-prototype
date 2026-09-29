@@ -12,8 +12,12 @@ concentrated in one condition, and then every aggregate is biased systematically
 computes the aggregates from both sides and compares them.
 
 Text (the unit of aggregation). Inside one block of the plan, in plan order, every consecutive run
-of `text_size_trials` trials forms one text; a remainder shorter than that is dropped and its size
-is reported. Every trial of a text must have the same speed (the plan builds blocks of one speed),
+of `text_size_trials` trials forms one text, so a text always has exactly that many trials. A text is
+discarded, and counted, when any of its trials was not run (it is in the plan but not in the oracle
+log) or was excluded (it is listed in the exclusion record of the sessions file, whatever the type);
+a remainder shorter than the text size is discarded too. The counts are reported by reason
+(not_run / excluded), by block and by speed. A text with both kinds of trial is counted under both
+reasons. Every trial of a text must have the same speed (the plan builds blocks of one speed),
 otherwise the input is rejected: a plan that mixes speeds inside a text is never handled silently.
 The stratum of a text is therefore its speed (slow / mid / fast).
 
@@ -25,6 +29,10 @@ Measures, computed per text from both sides (a session is a conversion):
   dwell_fraction  the total dwell divided by the duration of the text (the first trial begin to the
                   last trial end in the oracle log)
 A measure that cannot be computed for a text (no session, zero duration) is None, never 0.
+An observation row whose dwell_ms is 0 does not carry a measured dwell (the observer produces it
+when the clock steps backwards). Such a row is counted as a conversion and for the abandon rate, is
+left out of mean_dwell_ms and dwell_fraction, and is reported as n_dwell_zero per text and in total;
+how it is treated in the matching is decided when the analysis is frozen.
 
 Inputs. --match is match.py's output. The kept ground-truth sessions and the kept observation rows
 are read from its "matching" section (so the exclusions and the clock correction that were applied
@@ -32,14 +40,23 @@ there apply here unchanged). --sessions / --obs / --plan / --oracle are the file
 run on; their SHA-256 hashes must equal the ones recorded in --match, so a matching result can never
 be combined with other data. An observation row is attributed to the trial (in the oracle log) it
 overlaps most, exactly as match.py attributes rows to strata; a session or row that belongs to no
-trial of any text is counted under "outside_texts" and is not used.
+trial of any kept text is counted under "outside_texts" and is not used, by reason (inside a
+discarded remainder / a text discarded as not run / a text discarded as excluded / a trial that is
+not in the plan / overlapping no trial) and, where the trial is known, by speed.
 
 Agreement. The sign of every difference is observation minus ground truth. For each measure:
   bland_altman   bias and limits of agreement of the per-text differences
   icc21          ICC(2,1) (absolute agreement) over the texts, columns = (ground truth, observation)
   icc21_ci       a 95% percentile interval that resamples the blocks (the texts of one block are one
-                 cluster); [null, null] when it cannot be computed (fewer than two blocks, or a
-                 resample whose ICC is undefined)
+                 cluster); [null, null] when it cannot be computed, and then icc21_ci_status says
+                 why: "no_icc" (the ICC itself is undefined), "fewer_than_two_blocks", or
+                 "undefined_resample" (at least one resample has an undefined ICC; the interval is
+                 then withheld rather than computed from the remaining resamples). Any other error
+                 is not caught.
+The agreement is reported twice: "agreement" pools the texts of every speed, and
+"agreement_by_stratum" repeats it inside each speed. The stratified values are the primary
+estimates (a level difference between the speeds inflates the pooled ICC); the pooled values are
+kept for comparison.
 
 Mixture. A synthetic input has no natural mixing ratio, so the primary estimates are per stratum.
 "mixtures" in the configuration name weightings of the speeds; for each, the bias of a measure is
@@ -48,10 +65,11 @@ zero is not needed, and a needed stratum without data gives null). If a bias mov
 weightings, the error is concentrated in some strata.
 
 Configuration (JSON, every key optional): {"text_size_trials": 8, "B": 2000, "seed": 1,
-"mixtures": {"<name>": {"slow": w, "mid": w, "fast": w}}}. Keys starting with "_" are ignored.
+"mixtures": {"<name>": {"slow": w, "mid": w, "fast": w}}}. Keys starting with "_" are ignored. B is
+at most 100000; the weights must be finite and their sum must be finite and positive.
 
 The output never includes a path, and identical input always yields identical output bytes.
-Exit status: 0 on success; 2 if an input cannot be read or usage is incorrect.
+Exit status: 0 on success; 2 if an input cannot be read, is malformed or usage is incorrect.
 """
 import argparse
 import contextlib
@@ -75,6 +93,7 @@ import stats  # noqa: E402  Bland-Altman, ICC and the cluster bootstrap live the
 
 InputError = gt_sessions.InputError
 SPEEDS = match.SPEEDS
+MAX_B = 100000
 MEASURES = ("mean_dwell_ms", "n_conversions", "abandon_rate", "dwell_fraction")
 DEFAULT_MIXTURES = {
     "slow_heavy": {"slow": 0.6, "mid": 0.3, "fast": 0.1},
@@ -89,41 +108,57 @@ def _is_int(v):
 
 # ---------------------------------------------------------------- texts
 
-def text_layout(plan, oracle, text_size):
+def text_layout(plan, oracle, text_size, excluded_trials=None):
     """Bundle the trials of the plan into texts. plan is match.parse_plan_strata's output, oracle is
-    gt_sessions.parse_oracle's output. Returns {"texts": [...], "dropped_trials": {block_id: n}}.
+    gt_sessions.parse_oracle's output, excluded_trials is a collection of trial ids that were excluded.
 
-    Each text is {"text_id", "block_id", "speed", "trial_ids", "begin_wall_ms", "end_wall_ms",
-    "duration_ms"}. Texts follow the plan order inside a block; the blocks are visited in the order
-    of their first trial. Raises InputError when a text mixes speeds or a trial of a text is missing
-    from the oracle log, and ValueError when text_size is not a positive integer.
-    """
+    Returns {"texts": [...], "dropped_trials": {block_id: n}, "discarded_texts": [...],
+    "trial_status": {trial_id: status}}. Each kept text is {"text_id", "block_id", "speed",
+    "trial_ids", "begin_wall_ms", "end_wall_ms", "duration_ms"} and has exactly text_size trials, all
+    of them run and none excluded. Texts follow the plan order inside a block; the blocks are visited
+    in the order of their first trial. dropped_trials is the size of the remainder of each block.
+    A text with a trial that is not in the oracle log (not run) or is in excluded_trials is
+    discarded and appears in discarded_texts as {"text_id", "block_id", "speed", "reasons"} with the
+    reasons a subset of ["not_run", "excluded"]. trial_status maps every planned trial that is not in
+    a kept text to "remainder", "not_run" or "excluded" (a text with both reasons is "not_run").
+    Raises InputError when a text mixes speeds and ValueError when text_size is not a positive
+    integer."""
     if not _is_int(text_size) or text_size < 1:
         raise ValueError("text_size_trials must be an integer of at least 1")
+    excluded = set(excluded_trials or ())
     windows = dict((t["trial_id"], t) for t in oracle["trials"])
     by_block = {}
     for tid, info in plan["trials"].items():
         by_block.setdefault(info["block_id"], []).append(tid)
-    texts, dropped = [], {}
+    texts, dropped, discarded, status = [], {}, [], {}
     for block_id, tids in by_block.items():
         n_full = len(tids) // text_size
         dropped[block_id] = len(tids) - n_full * text_size
+        for t in tids[n_full * text_size:]:
+            status[t] = "remainder"
         for k in range(n_full):
             chunk = tids[k * text_size:(k + 1) * text_size]
             speeds = sorted(set(plan["trials"][t]["speed"] for t in chunk))
             if len(speeds) != 1:
                 raise InputError("plan: block %s text %d mixes speeds (%s); a text must have one speed" % (
                     block_id, k, ", ".join(speeds)))
-            missing = [t for t in chunk if t not in windows]
-            if missing:
-                raise InputError("oracle: trial %s of block %s text %d is not in the oracle log" % (
-                    missing[0], block_id, k))
+            reasons = []
+            if any(t not in windows for t in chunk):
+                reasons.append("not_run")
+            if any(t in excluded for t in chunk):
+                reasons.append("excluded")
+            text_id = "b%s.%d" % (block_id, k)
+            if reasons:
+                discarded.append({"text_id": text_id, "block_id": block_id, "speed": speeds[0], "reasons": reasons})
+                for t in chunk:
+                    status[t] = reasons[0]
+                continue
             begin = min(windows[t]["begin_wall_ms"] for t in chunk)
             end = max(windows[t]["end_wall_ms"] for t in chunk)
-            texts.append({"text_id": "b%s.%d" % (block_id, k), "block_id": block_id, "speed": speeds[0],
+            texts.append({"text_id": text_id, "block_id": block_id, "speed": speeds[0],
                           "trial_ids": chunk, "begin_wall_ms": begin, "end_wall_ms": end,
                           "duration_ms": end - begin})
-    return {"texts": texts, "dropped_trials": dropped}
+    return {"texts": texts, "dropped_trials": dropped, "discarded_texts": discarded, "trial_status": status}
 
 
 def texts(plan, oracle, text_size):
@@ -149,8 +184,11 @@ def aggregate(texts, sessions, obs_rows, side, obs_end_offset_ms=0):
     """The four measures for every text, from one side. side is "gt" (sessions are ground-truth
     sessions, obs_rows is ignored) or "obs" (obs_rows are observation rows carrying a "trial_id",
     see attach_trials; sessions is ignored). Returns {"texts": [...], "n_outside_texts": n}, the
-    texts in the order given, each {"text_id", "block_id", "speed", "duration_ms", <MEASURES>}.
-    A record whose trial belongs to no text is counted in n_outside_texts and not used.
+    texts in the order given, each {"text_id", "block_id", "speed", "duration_ms", <MEASURES>} (an
+    observation text also has "n_dwell_zero"). A record whose trial belongs to no text is counted in
+    n_outside_texts and not used; "outside_trials" gives those counts per trial id (None: no trial).
+    An observation row with dwell_ms == 0 is counted as a conversion and for the abandon rate but
+    not in mean_dwell_ms or dwell_fraction (its dwell is not a measurement); n_dwell_zero counts them.
     obs_end_offset_ms is accepted for symmetry with the pipeline and does not change the measures
     (the dwell of an observation is its dwell_ms)."""
     if side == "gt":
@@ -165,11 +203,13 @@ def aggregate(texts, sessions, obs_rows, side, obs_end_offset_ms=0):
             index[tid] = i
     dwells = [[] for _ in texts]
     cancels = [0] * len(texts)
-    outside = 0
+    zeros = [0] * len(texts)
+    outside, outside_trials = 0, {}
     for n, r in enumerate(records):
         i = index.get(r.get("trial_id"))
         if i is None:
             outside += 1
+            outside_trials[r.get("trial_id")] = outside_trials.get(r.get("trial_id"), 0) + 1
             continue
         if side == "gt":
             lo, hi = match.gt_interval(r, "sessions[%d]" % n)
@@ -180,21 +220,28 @@ def aggregate(texts, sessions, obs_rows, side, obs_end_offset_ms=0):
             dwell, cancelled = r.get("dwell_ms"), r.get("abandon")
             if not _is_int(dwell) or dwell < 0 or type(cancelled) is not bool:
                 raise ValueError("obs_rows[%d]: dwell_ms / abandon has the wrong type" % n)
+            if dwell == 0:
+                zeros[i] += 1
         dwells[i].append(dwell)
         cancels[i] += 1 if cancelled else 0
     out = []
     for i, t in enumerate(texts):
         n = len(dwells[i])
+        measured = n - zeros[i]
         total = sum(dwells[i])
-        out.append({
+        row = {
             "text_id": t["text_id"], "block_id": t["block_id"], "speed": t["speed"],
             "duration_ms": t["duration_ms"],
             "n_conversions": n,
-            "mean_dwell_ms": total / n if n else None,
+            "mean_dwell_ms": total / measured if measured else None,
             "abandon_rate": cancels[i] / n if n else None,
-            "dwell_fraction": total / t["duration_ms"] if t["duration_ms"] > 0 else None,
-        })
-    return {"texts": out, "n_outside_texts": outside}
+            "dwell_fraction": (total / t["duration_ms"] if (measured or not n) else None)
+            if t["duration_ms"] > 0 else None,
+        }
+        if side == "obs":
+            row["n_dwell_zero"] = zeros[i]
+        out.append(row)
+    return {"texts": out, "n_outside_texts": outside, "outside_trials": outside_trials}
 
 
 def _check_aligned(gt_agg, obs_agg):
@@ -206,45 +253,80 @@ def _check_aligned(gt_agg, obs_agg):
 
 # ---------------------------------------------------------------- agreement
 
+class _UndefinedICC(Exception):
+    """Raised inside a resample whose ICC is undefined (not a ValueError, so no other error is hidden)."""
+
+
 def _icc_interval(rows, B, seed):
-    """A block-level bootstrap interval for ICC(2,1); (None, None) when it cannot be computed."""
+    """A block-level bootstrap interval for ICC(2,1) as (lo, hi, status). status is "ok",
+    "fewer_than_two_blocks" or "undefined_resample"; the interval is (None, None) unless it is "ok".
+    One undefined resample withholds the interval: it is not computed from the other resamples."""
     blocks = {}
     for block_id, g, o in rows:
         blocks.setdefault(block_id, []).append((g, o))
+    if len(blocks) < 2:
+        return (None, None, "fewer_than_two_blocks")
     clusters = [blocks[b] for b in sorted(blocks)]
 
     def stat(sample):
         matrix = [[g, o] for c in sample for (g, o) in c]
-        if len(matrix) < 2:
-            return None
-        return stats.icc(matrix, "2,1")
+        v = stats.icc(matrix, "2,1") if len(matrix) >= 2 else None
+        if v is None:
+            raise _UndefinedICC()
+        return v
 
     try:
-        return stats.cluster_bootstrap(clusters, stat, B, seed)
-    except ValueError:  # a resample with an undefined ICC: the interval is not computable
-        return (None, None)
+        lo, hi = stats.cluster_bootstrap(clusters, stat, B, seed)
+    except _UndefinedICC:
+        return (None, None, "undefined_resample")
+    return (lo, hi, "ok")
+
+
+def _check_b_seed(B, seed):
+    if not _is_int(B) or B < 1 or B > MAX_B:
+        raise ValueError("B must be an integer from 1 to %d" % MAX_B)
+    if not _is_int(seed):
+        raise ValueError("seed must be an integer")
+
+
+def _agree(rows, B, seed):
+    ba = stats.bland_altman([o for _b, _g, o in rows], [g for _b, g, _o in rows])
+    value, ci, status = None, (None, None), "no_icc"
+    if len(rows) >= 2:
+        value = stats.icc([[g, o] for _b, g, o in rows], "2,1")
+        if value is not None:
+            lo, hi, status = _icc_interval(rows, B, seed)
+            ci = (lo, hi)
+    return {"n": len(rows), "bland_altman": ba, "icc21": value, "icc21_ci": [ci[0], ci[1]],
+            "icc21_ci_status": status}
 
 
 def agreement(gt_agg, obs_agg, B, seed):
-    """{measure: {"n", "bland_altman", "icc21", "icc21_ci"}} over the texts where both sides have
-    the measure. The difference is observation minus ground truth. icc21 is None when it cannot be
-    computed (fewer than two texts, or no variation at all)."""
-    if not _is_int(B) or B < 1:
-        raise ValueError("B must be an integer of at least 1")
-    if not _is_int(seed):
-        raise ValueError("seed must be an integer")
+    """{measure: {"n", "bland_altman", "icc21", "icc21_ci", "icc21_ci_status"}} over the texts where
+    both sides have the measure. The difference is observation minus ground truth. icc21 is None
+    when it cannot be computed (fewer than two texts, or no variation at all)."""
+    _check_b_seed(B, seed)
     _check_aligned(gt_agg, obs_agg)
     out = {}
     for m in MEASURES:
         rows = [(g["block_id"], g[m], o[m]) for g, o in zip(gt_agg["texts"], obs_agg["texts"])
                 if g[m] is not None and o[m] is not None]
-        ba = stats.bland_altman([o for _b, _g, o in rows], [g for _b, g, _o in rows])
-        value, ci = None, (None, None)
-        if len(rows) >= 2:
-            value = stats.icc([[g, o] for _b, g, o in rows], "2,1")
-            if value is not None:
-                ci = _icc_interval(rows, B, seed)
-        out[m] = {"n": len(rows), "bland_altman": ba, "icc21": value, "icc21_ci": [ci[0], ci[1]]}
+        out[m] = _agree(rows, B, seed)
+    return out
+
+
+def agreement_by_stratum(gt_agg, obs_agg, B, seed):
+    """{speed: agreement()'s value computed over the texts of that speed} for the speeds that have
+    texts (the primary estimates: no level difference between the speeds enters the ICC)."""
+    _check_b_seed(B, seed)
+    _check_aligned(gt_agg, obs_agg)
+    out = {}
+    for s in SPEEDS:
+        keep = [i for i, t in enumerate(gt_agg["texts"]) if t["speed"] == s]
+        if not keep:
+            continue
+        sub = lambda agg: {"texts": [agg["texts"][i] for i in keep], "n_outside_texts": 0}
+        out[s] = agreement(sub(gt_agg), sub(obs_agg), B, seed)
     return out
 
 
@@ -268,12 +350,18 @@ def _norm_weights(w, name):
     for k, v in w.items():
         if k not in SPEEDS:
             raise ValueError("mixture %s: unknown stratum %r (expected %s)" % (name, k, ", ".join(SPEEDS)))
-        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0:
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
             raise ValueError("mixture %s: a weight must be a finite non-negative number" % name)
-    total = sum(w.get(s, 0) for s in SPEEDS)
-    if total <= 0:
-        raise ValueError("mixture %s: the weights sum to zero" % name)
-    return dict((s, w.get(s, 0) / total) for s in SPEEDS)
+        try:
+            fv = float(v)
+        except OverflowError:
+            raise ValueError("mixture %s: a weight must be a finite non-negative number" % name)
+        if not math.isfinite(fv) or fv < 0:
+            raise ValueError("mixture %s: a weight must be a finite non-negative number" % name)
+    total = sum(float(w.get(s, 0)) for s in SPEEDS)
+    if not math.isfinite(total) or total <= 0:
+        raise ValueError("mixture %s: the weights must have a finite positive sum" % name)
+    return dict((s, float(w.get(s, 0)) / total) for s in SPEEDS)
 
 
 def mixture_bias(texts_by_stratum, mixtures):
@@ -331,6 +419,8 @@ def parse_config(data):
         if k in ("text_size_trials", "B"):
             if not _is_int(v) or v < 1:
                 raise InputError("config: %s must be an integer of at least 1" % k)
+            if k == "B" and v > MAX_B:
+                raise InputError("config: B must be at most %d" % MAX_B)
             cfg[k] = v
         elif k == "seed":
             if not _is_int(v):
@@ -354,6 +444,41 @@ def _sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def _is_obj(v):
+    return isinstance(v, dict)
+
+
+def _check_matching(m):
+    """Reject a match result whose records do not have the expected shape (InputError, never a crash)."""
+    ok = all(_is_obj(p) and _is_obj(p.get("gt")) and _is_obj(p.get("obs")) for p in m["pairs"]) \
+        and all(_is_obj(p) and _is_obj(p.get("gt")) and isinstance(p.get("obs"), list) and all(map(_is_obj, p["obs"]))
+                for p in m["split"]) \
+        and all(_is_obj(p) and _is_obj(p.get("obs")) and isinstance(p.get("gt"), list) and all(map(_is_obj, p["gt"]))
+                for p in m["merge"]) \
+        and all(map(_is_obj, m["miss"])) and all(map(_is_obj, m["false_pos"]))
+    if not ok:
+        raise InputError("match: an element of pairs / split / merge / miss / false_pos has the wrong shape")
+
+
+def _outside_report(agg, status, plan_trials):
+    """Count the records that fall outside the kept texts, by reason and by speed."""
+    by_reason, by_speed = {}, {}
+    for tid, n in agg["outside_trials"].items():
+        if tid is None:
+            reason = "no_trial"
+        elif tid in status:
+            reason = {"remainder": "discarded_remainder", "not_run": "discarded_text_not_run",
+                      "excluded": "discarded_text_excluded"}[status[tid]]
+        else:
+            reason = "trial_not_in_plan"
+        by_reason[reason] = by_reason.get(reason, 0) + n
+        if tid in plan_trials:
+            sp = plan_trials[tid]["speed"]
+            by_speed[sp] = by_speed.get(sp, 0) + n
+    return {"n": agg["n_outside_texts"], "by_reason": dict(sorted(by_reason.items())),
+            "by_speed": dict((s, by_speed[s]) for s in SPEEDS if s in by_speed)}
+
+
 def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, config_bytes=None):
     """The CLI's core logic (bytes in, an output dict out). Identical input always yields an
     identical dict."""
@@ -364,6 +489,10 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
         and all(isinstance(mo["matching"].get(k), list) for k in ("pairs", "split", "merge", "miss", "false_pos"))
     if not need:
         raise InputError("match: not match.py's output (missing matching / inputs_sha256 / config)")
+    definition = mo.get("definition")
+    if definition not in match.DEFINITIONS:
+        raise InputError("match: definition must be one of %s" % ", ".join(match.DEFINITIONS))
+    _check_matching(mo["matching"])
     for name, data in (("sessions", sessions_bytes), ("obs", obs_bytes), ("plan", plan_bytes), ("oracle", oracle_bytes)):
         if mo["inputs_sha256"].get(name) != _sha(data):
             raise InputError("%s: SHA-256 does not match the one recorded in the match result (another data set)" % name)
@@ -372,8 +501,12 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
     want = oracle["plan_sha256"]
     if not isinstance(want, str) or want.lower() != plan["sha256"]:
         raise InputError("plan: SHA-256 does not match the oracle header's plan_sha256 (unrelated plan)")
+    _src, _sess, exclusions = match.parse_sessions(sessions_bytes, definition)
+    excluded_trials = set(t for e in exclusions for t in e["trial_ids"] if isinstance(t, str))
 
     m = mo["matching"]
+    # The observation side is every row of the match (pairs, split, merge and false positives); the
+    # ground-truth side is every session of it (pairs, split, merge and misses).
     gt = [p["gt"] for p in m["pairs"]] + [p["gt"] for p in m["split"]] + \
         [g for p in m["merge"] for g in p["gt"]] + list(m["miss"])
     obs = [p["obs"] for p in m["pairs"]] + [o for p in m["split"] for o in p["obs"]] + \
@@ -381,28 +514,45 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
     off = mo["config"]["obs_end_offset_ms"]
     obs = attach_trials(obs, oracle, off)
 
-    layout = text_layout(plan, oracle, cfg["text_size_trials"])
+    layout = text_layout(plan, oracle, cfg["text_size_trials"], excluded_trials)
     tx = layout["texts"]
     gt_agg = aggregate(tx, gt, None, "gt")
     obs_agg = aggregate(tx, None, obs, "obs")
     by_speed = {}
     for t in tx:
         by_speed[t["speed"]] = by_speed.get(t["speed"], 0) + 1
+    disc = layout["discarded_texts"]
+    disc_reason, disc_block, disc_speed = {}, {}, {}
+    for d in disc:
+        for r in d["reasons"]:
+            disc_reason[r] = disc_reason.get(r, 0) + 1
+        disc_block[str(d["block_id"])] = disc_block.get(str(d["block_id"]), 0) + 1
+        disc_speed[d["speed"]] = disc_speed.get(d["speed"], 0) + 1
+    n_zero = sum(t["n_dwell_zero"] for t in obs_agg["texts"])
     return {
-        "definition": mo.get("definition"),
+        "definition": definition,
         "config": {"text_size_trials": cfg["text_size_trials"], "B": cfg["B"], "seed": cfg["seed"],
                    "mixtures": cfg["mixtures"], "obs_end_offset_ms": off},
         "inputs_sha256": {"match": _sha(match_bytes), "sessions": _sha(sessions_bytes), "obs": _sha(obs_bytes),
                           "plan": plan["sha256"], "oracle": _sha(oracle_bytes),
                           "config": None if config_bytes is None else _sha(config_bytes)},
         "texts": {"n": len(tx), "n_by_speed": dict((s, by_speed[s]) for s in SPEEDS if s in by_speed),
-                  "dropped_trials_by_block": dict((str(b), n) for b, n in layout["dropped_trials"].items())},
-        "outside_texts": {"gt": gt_agg["n_outside_texts"], "obs": obs_agg["n_outside_texts"]},
+                  "dropped_trials_by_block": dict((str(b), n) for b, n in layout["dropped_trials"].items()),
+                  "discarded": {"n": len(disc), "by_reason": dict(sorted(disc_reason.items())),
+                                "by_block": dict(sorted(disc_block.items())),
+                                "by_speed": dict((s, disc_speed[s]) for s in SPEEDS if s in disc_speed)}},
+        "outside_texts": {"gt": _outside_report(gt_agg, layout["trial_status"], plan["trials"]),
+                          "obs": _outside_report(obs_agg, layout["trial_status"], plan["trials"])},
+        "dwell_zero": {"n_obs_rows": n_zero,
+                       "note": "observation rows with dwell_ms == 0 are counted as conversions but are left out of "
+                               "mean_dwell_ms and dwell_fraction; their treatment in the matching is decided at freeze"},
         "aggregate": {"gt": gt_agg["texts"], "obs": obs_agg["texts"]},
         "agreement": agreement(gt_agg, obs_agg, cfg["B"], cfg["seed"]),
+        "agreement_by_stratum": agreement_by_stratum(gt_agg, obs_agg, cfg["B"], cfg["seed"]),
         "mixture_bias": mixture_bias(stratify(gt_agg, obs_agg), cfg["mixtures"]),
-        "note": "a synthetic input has no natural mixing proportion; read the per-stratum biases as the "
-                "primary estimates and each mixture as a sensitivity check of the aggregate bias",
+        "note": "a synthetic input has no natural mixing proportion; read the per-stratum biases and the "
+                "stratified agreement as the primary estimates, the pooled agreement and each mixture as "
+                "sensitivity checks",
     }
 
 
@@ -519,13 +669,28 @@ def _case_layout():
     # errors, not silent handling
     mixed = dict((t, dict(i)) for t, i in plan_trials.items())
     mixed["t00003"]["speed"] = "fast"
-    for name, fn in (("a text with mixed speeds", lambda: text_layout({"trials": mixed}, oracle, 8)),
-                     ("a trial missing from the oracle", lambda: text_layout(plan, {"trials": windows[1:]}, 8))):
-        try:
-            fn()
-            f.append("%s was accepted" % name)
-        except InputError:
-            pass
+    try:
+        text_layout({"trials": mixed}, oracle, 8)
+        f.append("a text with mixed speeds was accepted")
+    except InputError:
+        pass
+    # a text with a trial that was not run, or that was excluded, is discarded and counted (never an error)
+    not_run = text_layout(plan, {"trials": windows[1:]}, 8)
+    if len(not_run["texts"]) != 5 or not_run["discarded_texts"] != [
+            {"text_id": "b0.0", "block_id": 0, "speed": "slow", "reasons": ["not_run"]}]:
+        f.append("a text with a trial that was not run is not discarded as not_run: %r" % (not_run["discarded_texts"],))
+    if not_run["trial_status"].get("t00002") != "not_run" or not_run["trial_status"].get("t00017") != "remainder":
+        f.append("the status of the trials of a discarded text / of a remainder is wrong: %r" % (not_run["trial_status"],))
+    excl = text_layout(plan, oracle, 8, {"t00012"})
+    if len(excl["texts"]) != 5 or excl["discarded_texts"] != [
+            {"text_id": "b0.1", "block_id": 0, "speed": "slow", "reasons": ["excluded"]}]:
+        f.append("a text with an excluded trial is not discarded as excluded: %r" % (excl["discarded_texts"],))
+    both = text_layout(plan, {"trials": windows[1:]}, 8, {"t00004", "t00030"})
+    if [(d["text_id"], d["reasons"]) for d in both["discarded_texts"]] != [
+            ("b0.0", ["not_run", "excluded"]), ("b1.1", ["excluded"])]:
+        f.append("the reasons of the discarded texts are wrong: %r" % (both["discarded_texts"],))
+    if any(len(x["trial_ids"]) != 8 or set(x["trial_ids"]) & {"t00001", "t00004", "t00030"} for x in both["texts"]) or             any(len(x["trial_ids"]) != 8 or "t00012" in x["trial_ids"] for x in excl["texts"]):
+        f.append("a kept text is not a complete text of 8 trials that were run and not excluded")
     for bad in (0, -1, 1.5, True, "8"):
         try:
             text_layout(plan, oracle, bad)
@@ -557,6 +722,16 @@ def _case_definitions():
     z = aggregate([{"text_id": "z", "block_id": 0, "speed": "slow", "trial_ids": ["t00001"], "duration_ms": 0}], gt, None, "gt")
     if z["texts"][0]["dwell_fraction"] is not None:
         f.append("a zero-duration text must give dwell_fraction None")
+    # a row with dwell_ms == 0 is a conversion but not a measured dwell
+    zobs = attach_trials([match._ob(T0 + 100, T0 + 1100), match._ob(T0 + 10100, T0 + 10100, abandon=True),
+                          match._ob(T0 + 30100, T0 + 30600)], oracle)
+    zt = aggregate(tx, None, zobs, "obs")["texts"][0]
+    if zt["n_conversions"] != 3 or zt["n_dwell_zero"] != 1 or abs(zt["mean_dwell_ms"] - 750) > 1e-9 or \
+            abs(zt["abandon_rate"] - 1 / 3) > 1e-12 or abs(zt["dwell_fraction"] - 1500 / 35000) > 1e-12:
+        f.append("a dwell_ms of 0 is used as a measured dwell (or is not counted as a conversion): %r" % (zt,))
+    zonly = aggregate(tx, None, attach_trials([match._ob(T0 + 100, T0 + 100)], oracle), "obs")["texts"][0]
+    if zonly["n_conversions"] != 1 or zonly["mean_dwell_ms"] is not None or zonly["dwell_fraction"] is not None:
+        f.append("a text with only dwell_ms == 0 rows must give mean_dwell_ms and dwell_fraction None: %r" % (zonly,))
     for name, fn in (("an unknown side", lambda: aggregate(tx, gt, None, "both")),
                      ("an open ground-truth session", lambda: aggregate(tx, [match._gt("t00001", T0, None, outcome="open_at_end")], None, "gt")),
                      ("a non-integer dwell", lambda: aggregate(tx, None, [{"trial_id": "t00001", "dwell_ms": 1.5, "abandon": False}], "obs"))):
@@ -576,7 +751,7 @@ def _case_recovery():
     _tx, g, o = _aggs(w, _obs_from(w["gt"], dwell_delta=jitter))
     ag = agreement(g, o, 200, 1)
     ba = ag["mean_dwell_ms"]["bland_altman"]
-    if not (40 < ba["bias"] < 60 and ba["loa_lo"] <= 50 <= ba["loa_hi"]):
+    if not (abs(ba["bias"] - 50) < 0.2 and ba["loa_lo"] <= 50 <= ba["loa_hi"]):
         f.append("the dwell bias of +50 ms is not recovered by the mean conversion time: %r" % (ba,))
     for m in ("n_conversions", "abandon_rate"):
         b = ag[m]["bland_altman"]
@@ -623,7 +798,34 @@ def _case_perfect_and_shuffle():
     if vals and (max(vals) > 0.6 or abs(sum(vals) / len(vals)) > 0.15):
         f.append("shuffling the observations among texts leaves the ICC far from 0 (largest %.3f, mean %.3f)" % (
             max(vals), sum(vals) / len(vals)))
+    # the speeds sit at different levels, so a shuffle inside each speed keeps a high pooled ICC while
+    # the stratified ICC is near 0 (the stratified values are the primary estimates)
+    ps = agreement(g, _permuted_within_speed(o, 1), 10, 1)["mean_dwell_ms"]["icc21"]
+    st = agreement_by_stratum(g, _permuted_within_speed(o, 1), 10, 1)
+    if ps is None or ps < 0.8 or any(st[sp]["mean_dwell_ms"]["icc21"] is None or st[sp]["mean_dwell_ms"]["icc21"] > 0.6
+                                     for sp in SPEEDS):
+        f.append("the pooled ICC is not inflated by the level difference between speeds, or the stratified ICC is "
+                 "not low: pooled %r, stratified %r" % (ps, dict((sp, st[sp]["mean_dwell_ms"]["icc21"]) for sp in st)))
+    perfect = agreement_by_stratum(g, o, 10, 1)
+    if set(perfect) != set(SPEEDS) or any(perfect[sp]["mean_dwell_ms"]["n"] != 8 or
+                                         abs(perfect[sp]["mean_dwell_ms"]["icc21"] - 1.0) > 1e-9 for sp in perfect):
+        f.append("agreement_by_stratum does not give 8 texts and ICC 1 per speed under perfect agreement")
     return f
+
+
+def _permuted_within_speed(agg, seed):
+    """The per-text values permuted among the texts of the same speed (ids stay in place)."""
+    rng = random.Random(seed)
+    out = [dict(t) for t in agg["texts"]]
+    for sp in SPEEDS:
+        idx = [i for i, t in enumerate(agg["texts"]) if t["speed"] == sp]
+        order = list(idx)
+        for i in range(len(order) - 1, 0, -1):
+            j = int(rng.random() * (i + 1))
+            order[i], order[j] = order[j], order[i]
+        for i, src in zip(idx, order):
+            out[i].update((m, agg["texts"][src][m]) for m in MEASURES)
+    return {"texts": out, "n_outside_texts": agg["n_outside_texts"]}
 
 
 def _case_mixture():
@@ -662,7 +864,9 @@ def _case_mixture():
                      ("all-zero weights", lambda: mixture_bias({}, {"a": {"slow": 0}})),
                      ("an unknown stratum in the weights", lambda: mixture_bias({}, {"a": {"medium": 1}})),
                      ("an unknown stratum in the texts", lambda: mixture_bias({"medium": []}, {"a": {"slow": 1}})),
-                     ("a boolean weight", lambda: mixture_bias({}, {"a": {"slow": True}}))):
+                     ("a boolean weight", lambda: mixture_bias({}, {"a": {"slow": True}})),
+                     ("a weight too large for a float", lambda: mixture_bias({}, {"a": {"slow": 10 ** 400}})),
+                     ("weights whose sum overflows", lambda: mixture_bias({}, {"a": {"slow": 1e308, "mid": 1e308}}))):
         try:
             fn()
             f.append("%s was accepted" % name)
@@ -705,7 +909,21 @@ def _case_seed_and_bytes():
     s = agreement(g3, o3, 50, 1)["mean_dwell_ms"]
     if s["icc21"] is not None or s["icc21_ci"] != [None, None] or s["bland_altman"]["sd"] is not None:
         f.append("a single text must give no ICC, no interval and no limits of agreement: %r" % (s,))
-    for bad in (dict(B=0, seed=1), dict(B=10, seed="a"), dict(B=True, seed=1)):
+    # an undefined resample withholds the interval and says so; any other error is not swallowed
+    rows = [(0, 1.0, 1.0), (0, 2.0, 2.0), (1, 5.0, 5.0), (1, 5.0, 5.0)]
+    if _icc_interval(rows, 50, 1) != (None, None, "undefined_resample"):
+        f.append("a resample with an undefined ICC does not give a null interval with its reason: %r" % (
+            _icc_interval(rows, 50, 1),))
+    if _icc_interval([(0, 1.0, 1.0), (0, 2.0, 2.5), (1, 3.0, 3.5), (1, 4.0, 4.0)], 50, 1)[2] != "ok":
+        f.append("a well-defined ICC interval is not reported as ok")
+    try:
+        _icc_interval([(0, 1.0, 1.0), (0, 2.0, float("nan")), (1, 3.0, 3.5), (1, 4.0, 4.0)], 20, 1)
+        f.append("a non-finite value in the ICC interval was swallowed")
+    except ValueError:
+        pass
+    if r["icc21_ci_status"] != "fewer_than_two_blocks":
+        f.append("the reason for a missing interval is not reported: %r" % (r,))
+    for bad in (dict(B=0, seed=1), dict(B=10, seed="a"), dict(B=True, seed=1), dict(B=MAX_B + 1, seed=1)):
         try:
             agreement(g, o, **bad)
             f.append("agreement accepted %r" % (bad,))
@@ -735,15 +953,34 @@ def _case_cli():
     mbytes = match.render(match.evaluate(fx["sessions"], "all", fx["obs"], fx["plan"], fx["oracle"], fx["config"]))
     cfg = json.dumps({"B": 100, "seed": 3}).encode("utf-8")
     out = evaluate(mbytes, fx["sessions"], fx["obs"], fx["plan"], fx["oracle"], cfg)
-    if out["texts"] != {"n": 9, "n_by_speed": {"slow": 3, "mid": 3, "fast": 3},
-                        "dropped_trials_by_block": {"0": 6, "1": 6, "2": 6}}:
+    # Fixture premises (3 blocks of 30 trials, texts of 8): trials 6 and 7 are excluded (clock jump), so the
+    # first text of block 0 is discarded; trial 11 is a miss, trial 16 holds two sessions seen as one merged
+    # row, trial 21 is one session seen as three fragments, trial 45 has a false positive inside it, and one
+    # more false positive lies before every trial. Every other text has 8 sessions on both sides.
+    if out["texts"] != {"n": 8, "n_by_speed": {"slow": 2, "mid": 3, "fast": 3},
+                        "dropped_trials_by_block": {"0": 6, "1": 6, "2": 6},
+                        "discarded": {"n": 1, "by_reason": {"excluded": 1}, "by_block": {"0": 1},
+                                      "by_speed": {"slow": 1}}}:
         f.append("the text counts or the dropped trials are wrong: %r" % (out["texts"],))
-    if out["outside_texts"]["obs"] < 1 or out["outside_texts"]["gt"] < 1:
-        f.append("records in dropped trials / outside every trial are not reported: %r" % (out["outside_texts"],))
-    if any(t["n_conversions"] < 1 for t in out["aggregate"]["gt"]):
-        f.append("a text of the fixture has no ground-truth sessions")
-    if out["agreement"]["n_conversions"]["n"] != 9 or out["definition"] != "all":
-        f.append("the agreement is not over the 9 texts")
+    oo, og = out["outside_texts"]["obs"], out["outside_texts"]["gt"]
+    if oo["by_reason"].get("no_trial") != 1 or og["by_reason"].get("no_trial") is not None or \
+            not oo["by_reason"].get("discarded_remainder") or not og["by_reason"].get("discarded_text_excluded") or \
+            oo["n"] != sum(oo["by_reason"].values()) or og["n"] != sum(og["by_reason"].values()) or \
+            sum(oo["by_speed"].values()) != oo["n"] - 1:
+        f.append("records outside the kept texts are not reported by reason and speed: %r" % (out["outside_texts"],))
+    got_g = dict((t["text_id"], t["n_conversions"]) for t in out["aggregate"]["gt"])
+    got_o = dict((t["text_id"], t["n_conversions"]) for t in out["aggregate"]["obs"])
+    want_g = {"b0.1": 9, "b0.2": 8, "b1.0": 8, "b1.1": 8, "b1.2": 8, "b2.0": 8, "b2.1": 8, "b2.2": 8}
+    want_o = {"b0.1": 7, "b0.2": 10, "b1.0": 8, "b1.1": 9, "b1.2": 8, "b2.0": 8, "b2.1": 8, "b2.2": 8}
+    if got_g != want_g or got_o != want_o:
+        f.append("the conversions per text are wrong (ground truth takes pairs, split, merge and misses; observation "
+                 "takes pairs, split, merge and false positives): %r vs %r" % (got_g, got_o))
+    if out["agreement"]["n_conversions"]["n"] != 8 or out["definition"] != "all":
+        f.append("the agreement is not over the 8 texts")
+    if set(out["agreement_by_stratum"]) != set(SPEEDS) or out["agreement_by_stratum"]["slow"]["n_conversions"]["n"] != 2:
+        f.append("the agreement by speed is missing or over the wrong texts: %r" % (sorted(out["agreement_by_stratum"]),))
+    if out["dwell_zero"]["n_obs_rows"] != 0:
+        f.append("the fixture has no observation with dwell_ms == 0")
     if set(out["mixture_bias"]["mixtures"]) != set(DEFAULT_MIXTURES):
         f.append("the default mixtures are not reported")
     with tempfile.TemporaryDirectory() as d:
@@ -783,7 +1020,7 @@ def _case_cli():
             sub = subprocess.run([sys.executable, os.path.abspath(__file__), "--match", paths["match"],
                                   "--sessions", paths["sessions"], "--obs", paths["obs"], "--plan", paths["plan"],
                                   "--oracle", paths["oracle"], "--config", paths["config"],
-                                  "--out", os.path.join(d, "o3.json")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                  "--out", os.path.join(d, "o3.json")], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
             if sub.returncode != 0 or open(os.path.join(d, "o3.json"), "rb").read() != b1:
                 f.append("the CLI run as a subprocess does not exit 0, or is not byte-identical: %r" % sub.stderr[-200:])
 
@@ -802,11 +1039,27 @@ def _case_cli():
         rc_of("e2.json", 2, match=os.path.join(d, "no-such-file"))
         rc_of("e3.json", 2, match=paths["sessions"])
         bad_cfg = os.path.join(d, "bad_cfg.json")
-        for body in ({"text_size": 8}, {"text_size_trials": 0}, {"B": 0}, {"seed": 1.5}, {"mixtures": {}},
-                     {"mixtures": {"a": {"medium": 1}}}, {"mixtures": {"a": {"slow": 0}}}):
+        for body in ({"text_size": 8}, {"text_size_trials": 0}, {"B": 0}, {"B": MAX_B + 1}, {"seed": 1.5},
+                     {"mixtures": {}}, {"mixtures": {"a": {"medium": 1}}}, {"mixtures": {"a": {"slow": 0}}},
+                     {"mixtures": {"a": {"slow": 10 ** 400}}}, {"mixtures": {"a": {"slow": 1e308, "mid": 1e308}}}):
             with open(bad_cfg, "wb") as fh:
                 fh.write(json.dumps(body).encode("utf-8"))
             rc_of("c.json", 2, config=bad_cfg)
+        # a malformed match result is an input error (exit 2), never a traceback
+        good = json.loads(mbytes.decode("utf-8"))
+        for label, edit in (("pair_no_gt", lambda o: o["matching"]["pairs"].__setitem__(0, {"obs": {}})),
+                            ("pair_not_dict", lambda o: o["matching"]["pairs"].__setitem__(0, 5)),
+                            ("miss_not_dict", lambda o: o["matching"]["miss"].__setitem__(0, 5)),
+                            ("split_obs_not_dict", lambda o: o["matching"]["split"][0].__setitem__("obs", [5])),
+                            ("merge_gt_not_list", lambda o: o["matching"]["merge"][0].__setitem__("gt", 5)),
+                            ("bad_definition", lambda o: o.__setitem__("definition", "bogus")),
+                            ("no_definition", lambda o: o.pop("definition"))):
+            broken = json.loads(json.dumps(good))
+            edit(broken)
+            bp = os.path.join(d, "m_%s.dat" % label)
+            with open(bp, "wb") as fh:
+                fh.write(json.dumps(broken).encode("utf-8"))
+            rc_of("m_%s.json" % label, 2, match=bp)
         # a configuration that changes the text size changes the texts
         big = os.path.join(d, "big.json")
         with open(big, "wb") as fh:
@@ -814,7 +1067,8 @@ def _case_cli():
         rc_of("big_out.json", 0, config=big)
         if os.path.exists(os.path.join(d, "big_out.json")):
             o = json.loads(open(os.path.join(d, "big_out.json"), "rb").read().decode("utf-8"))
-            if o["texts"]["n"] != 6 or o["texts"]["dropped_trials_by_block"] != {"0": 0, "1": 0, "2": 0}:
+            # two texts of 15 trials per block; the excluded trials 6 / 7 and 90 discard one text each
+            if o["texts"]["n"] != 4 or o["texts"]["discarded"]["n"] != 2 or                     o["texts"]["dropped_trials_by_block"] != {"0": 0, "1": 0, "2": 0}:
                 f.append("text_size_trials in the configuration does not change the texts: %r" % (o["texts"],))
         rc_of("no_cfg.json", 0, config=None)
     return f
@@ -887,12 +1141,18 @@ def main(argv):
     except (InputError, ValueError) as e:
         print("l2: %s" % e, file=sys.stderr)
         return 2
+    except (KeyError, TypeError, AttributeError, IndexError) as e:  # a malformed input that no check caught
+        print("l2: malformed input (%s)" % type(e).__name__, file=sys.stderr)
+        return 2
     except OSError as e:
         print("l2: could not write output (%s)" % type(e).__name__, file=sys.stderr)
         return 2
-    print("l2: %d texts (%s); ICC(2,1) mean dwell %s, conversions %s" % (
-        out["texts"]["n"], ", ".join("%s %d" % (s, n) for s, n in out["texts"]["n_by_speed"].items()),
-        _fmt(out["agreement"]["mean_dwell_ms"]["icc21"]), _fmt(out["agreement"]["n_conversions"]["icc21"])))
+    print("l2: %d texts (%s), %d discarded; pooled ICC(2,1) mean dwell %s, conversions %s; "
+          "by speed (primary), mean dwell %s" % (
+              out["texts"]["n"], ", ".join("%s %d" % (s, n) for s, n in out["texts"]["n_by_speed"].items()),
+              out["texts"]["discarded"]["n"],
+              _fmt(out["agreement"]["mean_dwell_ms"]["icc21"]), _fmt(out["agreement"]["n_conversions"]["icc21"]),
+              ", ".join("%s %s" % (sp, _fmt(v["mean_dwell_ms"]["icc21"])) for sp, v in out["agreement_by_stratum"].items())))
     return 0
 
 
