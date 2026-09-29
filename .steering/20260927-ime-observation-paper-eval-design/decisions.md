@@ -390,3 +390,11 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 | 50 | code-reviewer MEDIUM: 参照入力欄は確定した文字をメモリ上の本文にため続け（`doCommand` は記録だけ）、IME は `attributedSubstring` 経由で前の試行の文字を左の文脈として読める。変換の結果が試行の順に依存しうる（design.md の「IME は学習する」と同じ型の独立性の崩れ） | ★ **確定のたびに本文を空にする**（未確定が無くなった時点で本文と選択を空に戻す）。README に「通常のテキスト欄と違い左の文脈を与えない」と書く。削除・移動のコマンドは最小限実装する | 試行の独立を保つ。本文がメモリに残る時間も最小になる |
 
 - ★ 仕様の範囲の直し（メインが段取り）: マウスイベントを入力コンテキストへ／`characterIndex(for:)` は `NSNotFound`・`firstRect` の `actualRange` をクランプ／`setMarkedText` の範囲の加算のオーバーフロー／selftest の `--out` が既存のパス（ディレクトリごと）を消す → 既存は拒否し `O_EXCL|O_NOFOLLOW`・0600 で作る（security MEDIUM）／書き込み失敗で exit 1／ログへ書く経路を `record` とヘッダに絞る／focus_in の二重記録／`validAttributesForMarkedText`／selftest で IME への答え（範囲・長さ）を検査／README の主張を「文字列を書かない」に絞り、`vk` の列から打鍵が復元できる旨を書く（security MEDIUM）。
+
+## 判断 51: 012 の merge ゲートの HIGH（main queue が回らない）を 011 の追補で解く（2026-09-29・研究者の回答）
+
+- 事象: 012 の code-reviewer HIGH。macOS のドライバは入力ソースの問い合わせを main queue に積むが、単体ロガーの `main()` はメインスレッドで監視ループを回し main queue を処理しない → 問い合わせが一度も完了せず、JIS のモードキー以外の切替・起動時点の日本語入力が黙って欠測になる（写した元は main queue が回る前提で同期に聞く）。一次で確認し、小さな再現プログラムで陰性対照（回さない → 0 / 10 件）も実測した。
+- 選択肢: A = 011 の追補で `main.rs` を直す（写した元と同じ判断に戻す）／ B = 仕様の範囲（警告・Known limits・M1 の手順で各ブロックの先頭に かな）
+- **採用: A**。メインが base に入れた: `main.rs` に `run_with_main_queue`（macOS だけ: 記録を別スレッドへ、メインスレッドは main run loop を最大 100 ms ずつ回す。他の OS は従来どおり）・`manifest.json` の `main.rs` を指す 3 エントリの `sha256` の更新（`--update`・`--self` / `--against-upstream` は一致）・`PROVENANCE.internal.md` に記録。
+- 確認（Mac）: release ビルド・clippy・`cargo test` 75 件が緑。再現プログラムで回す形が 10 / 10 件を実行（CPU 時間ほぼ 0）。
+- ⚠️ 残り: Windows 側は `cfg` で従来の経路のままだが、コンパイルは G-GEAR でしか確かめられない → 次の G-GEAR のセッションで 011 / 013 / 014 の acceptance を回す。012 はこの base を取り込んでから、残りの指摘（警告と件数・タップの復帰の件数と上限・競合・テスト・ドキュメント）を直す。

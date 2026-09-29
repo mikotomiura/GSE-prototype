@@ -79,3 +79,18 @@ GSE 照合フラグ（ハイフン 2 つ + against + ハイフン + gse）→ `-
   `is_stale_winevent_active` の判断が GSE より早まりうる → M5（Windows の較正パイロット）で確かめる。
 - 照合: `upstream_range_sha256` は GSE 側の範囲（名前の判定を含む）のハッシュのまま。GSE 側がこの範囲を
   変えると `--against-upstream` が赤になるので、そのときはこの違いを保ったまま追随する。
+
+## macOS: メインスレッドで main dispatch queue を回す（2026-09-29・判断 51・011 の追補・研究者の回答）
+
+- 事象（012 の merge ゲートの code-reviewer HIGH）: macOS のドライバは入力ソースの問い合わせ（TIS）を
+  `dispatch_async_f` で main queue に積むが、`main()` のメインスレッドは監視ループを回していて main queue を
+  処理しないので、問い合わせが一度も完了しない。→ JIS のモードキー以外で日本語入力に切り替えた場合と、
+  起動時点ですでに日本語が選ばれている場合に `IME_OPEN` が偽のまま黙って欠測になる。
+- GSE との関係: GSE は Tauri のメインスレッドが main queue を回す前提で `ime_macos.rs` が `dispatch_sync_f`
+  で同期的に聞く。→ ★ 単体ロガーも **macOS ではメインスレッドで main run loop を回し（最大 100 ms ずつ）、
+  記録（`run`）を別スレッドへ移した**（`main.rs` の `run_with_main_queue`）。他の OS は従来どおり。
+- 実測（小さな再現プログラム・Mac）: 別スレッドから main queue に 10 件積むと、run loop を回す形で 10 件
+  すべて実行（CPU 時間ほぼ 0・`Finished` での即時の戻りは 0 回）、回さない陰性対照で 0 件。
+- 照合: `manifest.json` の `main.rs` を指す 3 エントリの `sha256` を `--update` で更新した（範囲のハッシュは不変）。
+- ⚠️ Windows 側は `cfg` で従来の経路のままだが、コンパイルは G-GEAR でしか確かめられない → 次の G-GEAR の
+  セッションで 013 / 014 の acceptance を回す。

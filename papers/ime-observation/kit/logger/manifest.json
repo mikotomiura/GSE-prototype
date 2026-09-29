@@ -1,5 +1,5 @@
 {
-  "upstream_repo_commit": "bfa4329e39838dccda9704e9651a0c70655cb994",
+  "upstream_repo_commit": "d0e7ee7878baa7c37dd10331368fc9d129b73ef8",
   "entries": [
     {
       "kind": "file",
@@ -86,7 +86,7 @@
       "start_anchor": null,
       "end_anchor": null,
       "symbol": null,
-      "sha256": "098863ba05a1d37f0dc4837023e67000c5187de80dac43769ec481b660971e31",
+      "sha256": "5e66e99adaaf22c5a0ece0bf93a7adb803d578051251ba136295523ce9f6468f",
       "upstream_range_sha256": null,
       "check_decls": null,
       "reason": "Summary emission and the monitoring thread, omitting an unrelated experiment-mode branch (t is the time a summary was drained; the stale path and the active-to-false transition path are Windows-only), plus this logger's own meta/key line writers and a selftest. Whether a candidate window is open is read directly from an atomic flag by default, but a driver may plug in a stronger observation function through the contract in driver_api.rs. Declares the module carrying the key-gate copy."
@@ -128,7 +128,7 @@
       "start_anchor": "fn emit_ime_shadow(log_tx: &Sender<LogEntry>, timestamp: u64) {",
       "end_anchor": "// アプリ起動",
       "symbol": "emit_ime_shadow",
-      "sha256": "098863ba05a1d37f0dc4837023e67000c5187de80dac43769ec481b660971e31",
+      "sha256": "5e66e99adaaf22c5a0ece0bf93a7adb803d578051251ba136295523ce9f6468f",
       "upstream_range_sha256": "bbd0fcf76c30845444753c1323afa8998d1d928b53bf16dece1f1493e866308b",
       "check_decls": null,
       "reason": "Pins the ordering and branching of the summary-emission function that writes ime_shadow lines. The copy substitutes an injectable set of atomics for direct static access while carrying over the same branching."
@@ -142,7 +142,7 @@
       "start_anchor": "    // IME モニタースレッド",
       "end_anchor": "    // キーボードフック・IME ポーリングの Sender を setup() に渡すために保持。",
       "symbol": null,
-      "sha256": "098863ba05a1d37f0dc4837023e67000c5187de80dac43769ec481b660971e31",
+      "sha256": "5e66e99adaaf22c5a0ece0bf93a7adb803d578051251ba136295523ce9f6468f",
       "upstream_range_sha256": "c806eabc302eeb38dadb6b1dd3e45d4691cdadcc643781c4a8012e444d4564f4",
       "check_decls": null,
       "reason": "Pins the ordering of one monitoring-loop cycle (safety valve, then the active-to-false transition, then direct polling of the ready flag), as implemented by main.rs's monitoring-loop cycle function, omitting an unrelated experiment-mode branch."
