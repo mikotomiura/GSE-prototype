@@ -21,8 +21,14 @@
     - [x] 002 003 008 010 016 を base へ merge（`c968670b`）・merge 後の base で 6 本の acceptance が緑・push
     - [x] 判断 34: 未実行の recheck 14 本を parse に・009 / 020 の依存から 008 / 010 を外す（`1ab259b2`）
     - [x] 011 / 015 の直し（HIGH あり・判断 31〜33）→ メインが独立に検証（015: 封印の大きさが行数によらず 1 MiB・開封で元の SHA-256 ／ 011: 逐語コピーが GSE と一致・lock の共通 53 crate の版の差 0）→ merge。012 / 013 / 023 / 024 の依存から 011 を外した。merge 後の base（`7ed5e6c0`）で 8 本の acceptance・selftest 11 本・compile・lint・`--against-gse` が緑 → push（2026-09-28）
-    - [ ] Mac: 004 / 007（`.steering/_handoff/next-session-ime-paper-loop-w2-mac.md`）
+    - [x] Mac: 004 / 007（2026-09-29）。前段取り: Mac の base で verify が赤（Python 3.14 で `gt_sessions.py` の入れ子の検査が通らない）→ selftest の深さを上げた・004 / 007 の依存から 001 を外した（判断 47・B10）。main checkout を別セッションが使っていたので base は別 worktree で扱った（B10）
+      - [x] 1 run・parallel=1 で 2 本とも attempt 1 の `issue_done`。clean な checkout で acceptance 失敗 0 件（004 ✅ 28 / 007 ✅ 14）
+      - [x] レビュー 4 本（code-reviewer 2・security-checker 2）→ 判断 48〜50 を研究者に問い確定（送出の門は Emitter に・退避先の既定をなくし前面化を読み戻す・参照入力欄は確定のたびに本文を空に）
+      - [x] 直しを作業用エージェント（Sonnet）に渡し、メインが clean な checkout で acceptance を回し直し（004 ✅ 28 / 007 ✅ 14）、写しへの変異で確かめた（004: `run()` のフラグ検査を消すとバックエンドを読む前に番兵で赤 ／ 007: 本文の消去を殺すと selftest が赤）→ merge（004 `4dc39558` / 007 `d0e7ee78`）。004 の後の base を先に push（`06494ee5`）
   - [ ] W3（G-GEAR: 009 013 017 021 022 ／ Mac: 012・005 / 006 は 004 の後）
+    - [x] Mac: 012（2026-09-29）: attempt 1 の `issue_done`・clean な checkout で acceptance 失敗 0 件（✅ 16・macOS で初めて単体ロガーをビルド）。レビュー 2 本 → HIGH（main queue が回らず入力ソースの問い合わせが完了しない）を判断 51 で 011 の追補として `main.rs` に入れた（`32e57125`・再現プログラムで陰性対照つきに実測）。残りの指摘は作業用エージェントが直し、メインが acceptance と変異で確かめて merge（`2a449dbf`）
+    - [x] merge 後の base（`2a449dbf`）の clean な checkout で、Mac で回せる merge 済みの全 acceptance 16 本（001 002 003 004 007 010 011 012 015 016 017 018 019 021 022 028）が失敗 0 件（Windows 専用の 008 009 013 014 は exit 2 ＝対象外）・`_style_check.py` 違反 0 件 → push
+    - [ ] ⚠️ G-GEAR: 判断 51 で `main.rs` を変えた（macOS だけ `cfg` で分岐）→ 次の G-GEAR のセッションで 011 / 013 / 014 の acceptance を回し、Windows 側のコンパイルが壊れていないことを確かめる
     - [x] 009: `issue_done`・clean な checkout で acceptance 失敗 0 件（✅ 16）
     - [x] 013: attempt 1 で worker が Stop（`is_observed_key` の抜粋が `crate::analysis::key_gate` を呼ぶ）→ 判断 35 でメインが 011 の追補（`key_gate.rs` の逐語コピー）を base に入れた（`dd58dd9d`）
     - [x] 013 を回し直す（止まったときの記録は `archive/ime-013-attempt1-stop` に残した）→ `issue_done`
