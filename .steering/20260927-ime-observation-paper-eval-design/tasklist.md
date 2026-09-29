@@ -58,7 +58,11 @@
       → 2026-09-30（Mac・macOS 27.0・Python 3.14.4）: base `44241f49` の clean な worktree で、Mac で回せる merge 済みの全 acceptance 19 本（001 002 003 004 006 007 010 011 012 015〜023 028）が失敗 0 件（005 は exit 2 ＝対象外）。`emit.py --selftest --full` exit 0（49 件 ok・遅れの 95 パーセンタイル 0.01 ms）・`run_cell.py --selftest` exit 0（ok 51 件・★「a child that ignores the termination request is killed」も Mac では ok で実際に走った）・`pipeline.py --selftest --full` exit 0（9 ケース・Mac では 4 秒）・`summarize_e3.py --selftest` exit 0
       → ⚠️ E3 のプロセス名は**前提が外れた**（`pgrep -x` は 22 文字の完全な名前で照合する）→ 判断 66 で `run_e3.sh` を完全な名前に直し、023 の acceptance を回し直した
       → G-GEAR で Mac の push（`2c3a2781`）を取り込み、clean な checkout で `023-acceptance.sh` 失敗 0 件（Windows・2026-09-30）。W6 の引き継ぎ（`next-session-ime-paper-ggear-w6.md`）を更新
-  - [ ] W6（024: 公開 repo への書き出し）。★ 着手の前に研究者に確認する
+  - [ ] W6（024: 公開 repo への書き出し）（2026-09-30・G-GEAR）
+    - [x] 着手の前に研究者に 3 問 → 判断 67（絶対パスは実在の値＋名前つきの形・架空の名前の一覧だけ通す）・68（測定用のロガーは書き出しからビルド・機械によらずバイト一致）・69（逐語コピーの日本語の文字列リテラルは内部の対訳表で英訳）。issue 024 と acceptance を直し、判断 42 / 43 より前の記述を現行に合わせ、`_style_check.py` の明示パスの `*.internal.*` を対象外に
+    - [x] メインが使い捨ての試作 `export.py` で acceptance を通しで検証（失敗 0 件）→ 変異で陰性対照を確かめる
+    - [ ] ループ（`--issues 024`）→ merge ゲート（clean な checkout の acceptance・レビュー 2 本・対訳 72 項目の確認）→ merge → 全 acceptance
+    - [ ] ⚠️ Mac: `024-acceptance.sh` を回す（macOS の専用ファイルの書き出し後の `cargo test`・一覧の SHA-256 が G-GEAR と同じ commit で一致するか〔判断 68〕）
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）

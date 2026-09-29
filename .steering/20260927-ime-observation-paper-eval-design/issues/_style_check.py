@@ -304,7 +304,9 @@ def iter_files(root, paths):
     for p in paths:
         full = os.path.join(root, p)
         if os.path.isfile(full):
-            yield p.replace(os.sep, "/")
+            # 明示したファイルでも *.internal.* は対象外（判断 43。style_ok は git diff の名前を直接渡す）
+            if ".internal." not in os.path.basename(full):
+                yield p.replace(os.sep, "/")
             continue
         for d, dirs, files in os.walk(full):
             dirs[:] = sorted(x for x in dirs if x not in SKIP_DIRS)
@@ -404,11 +406,15 @@ def selftest():
             f.write("English only.\n")
         if run(tmp, ["papers/ime-observation"]):
             fails.append("走査: データ・生成物・*.internal.md は対象外のはず")
+        if run(tmp, ["papers/ime-observation/kit/x/NOTES.internal.md"]):
+            fails.append("走査: 明示したファイルでも *.internal.* は対象外のはず")
         with io.open(os.path.join(tmp, "papers", "ime-observation", "kit", "x", "bad.md"), "w",
                      encoding="utf-8") as f:
             f.write(J + "\n")
         if len(run(tmp, ["papers/ime-observation"])) != 1:
             fails.append("走査: 対象の中の違反を 1 件拾うはず")
+        if len(run(tmp, ["papers/ime-observation/kit/x/bad.md", "papers/ime-observation/kit/x/NOTES.internal.md"])) != 1:
+            fails.append("走査: 明示したファイルの違反は拾い、明示した *.internal.* は拾わないはず")
     finally:
         for d, _, files in os.walk(tmp, topdown=False):
             for f in files:
