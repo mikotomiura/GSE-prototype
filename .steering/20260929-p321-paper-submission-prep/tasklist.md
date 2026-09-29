@@ -23,7 +23,7 @@
 - [x] 通読の手引き（`reading-guide.md`・主張と根拠の対応表）
 - [x] 研究者の通読（2026-09-29・「表記などで気になった個所はない」→ 原稿は変えない・判断 1 の追記）
 - [x] カバーレターの下書き（`cover-letter-draft.md`・判断 10）→ [ ] 研究者が確かめる
-- [x] endorsement の依頼文の下書き（`endorsement-request-draft.md`・判断 3）→ [ ] 研究者が確かめて送る
+- [x] endorsement の依頼文の下書き（`endorsement-request-draft.md`・判断 3）→ 送るのは §6（コードと URL を埋めた版は判断 20）
 
 ## 5. 完了
 - [x] `/cross-review` 1 巡目（code-reviewer ＋ security-checker（全履歴）＋ Codex 2 回・研究者の許可で予算を一時引き上げ）→ 裁定と修正（判断 11・論文用リポジトリ `02380c5`）
@@ -32,8 +32,20 @@
 - [x] 投稿日の A〜E（判断 13）: タグ `submission-2026-09-29`・zip の照合・投稿用の原稿（`C:/wt/emse-upload/`）・GitHub の public 化・Zenodo の公開
 - [x] DOI が doi.org で解決する（2026-09-29 20:55 JST に確認・DataCite の登録は 20:34 JST）
 - [x] F: 研究者が EMSE に投稿（確定）→ **EMSE-D-26-01273**・2026-09-29（判断 15。タイトル頁の別添・results.tex の埋め込み・リンクは GitHub のタグ）
-- [ ] G: endorsement が取れたら arXiv（研究者）→ EMSE に申告・Zenodo と README に追記
+- [ ] G: arXiv → §6 に移した（2026-09-30）
 - [x] 論文用リポジトリを push（`75ce1ff`・タグ `submission-2026-09-29`）
 - [x] 完了時の `/cross-review`（Codex 1 回・README／code-reviewer・README と作業記録）→ 裁定と修正（判断 16・論文用リポジトリ `728e81c`）
-- [ ] endorsement の依頼（研究者）→ arXiv（引き継ぎ `next-session-p321-arxiv-and-review.md` §2 A）
+- [ ] endorsement の依頼（研究者）→ §6 に移した（2026-09-30）
 - [ ] GSE 側: `/finish-task` の出荷フロー
+
+## 6. arXiv（2026-09-30・引き継ぎ §2 A・研究者の指示「Draft まで Claude・publish から研究者」）
+- [x] A-0: 規程を一次で確かめ直す（判断 18: `results.tex` は最上位の候補にならない・cls と bst は同梱が必須・クロスリストと endorsement の関係は help に記述なし）
+- [x] A-1: ソース一式（タグの 3 ファイル＋cls・bst＋`main.bbl`）を scratch で組む → 21 頁・BibTeX なしでも同じ（判断 19）。zip は `C:/wt/arxiv-upload/arxiv-source.zip`
+- [x] 研究者の選択: cls と bst を同梱・著者 Mikoto Miura・コメントに投稿先を書かない・cs.SE ＋ cs.HC（判断 19）
+- [x] A-2: 研究者のログイン（判断 20）
+- [x] Start の段（ライセンス CC BY 4.0・規約・著者・cs.SE）= 研究者 → "You are not endorsed for this archive"（判断 20）
+- [x] endorsement の依頼のメール（03:21 JST）→ 依頼文を埋めた版と添付 PDF（`C:/wt/arxiv-upload/`・判断 20）
+- [ ] 研究者が知り合いの CS の研究者 1 人に依頼を送る（endorse できる条件は `endorsement-request-draft.md` の冒頭）→ endorse される
+- [ ] A-3: 下書き `submit/8151855`（期限 2026-10-13）の続き: Start（研究者）→ Add Files（zip）→ 組版のログと Preview（TeX Live 2025）→ メタデータ・cs.HC のクロスリスト
+- [ ] A-4: 研究者が cls と bst の同梱を再確認して最後に Submit（判断 19・21）→ 公開後に EMSE へ申告・Zenodo の related_identifiers・README
+- [x] 完了時の `/cross-review`（code-reviewer ＋ Codex 1 回・4 ファイル限定）→ 裁定と修正・zip の 6 ファイルの走査（判断 21）
