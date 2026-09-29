@@ -1,9 +1,14 @@
 """common.py のテスト（固定の入力だけ。ネットワークは使わない）。"""
+import io
+import json
 import os
 import tempfile
 import unittest
+import urllib.error
+import urllib.request
 
-from common import allowed_url, ensure_outside_repo, is_inside, merge_abstract, open_exclusive, repo_root, slice_between
+from common import (allowed_url, ensure_outside_repo, guarded_opener, is_inside, merge_abstract, open_exclusive,
+                    repo_root, same_run, slice_between, write_pair)
 
 
 class MergeAbstract(unittest.TestCase):
@@ -63,6 +68,30 @@ class Exclusive(unittest.TestCase):
             self.assertEqual(open(p, encoding="utf-8").read(), "1")
 
 
+class Pair(unittest.TestCase):
+    def test_pair_shares_run_id(self):
+        with tempfile.TemporaryDirectory() as td:
+            b, a = os.path.join(td, "bib.json"), os.path.join(td, "abs.json")
+            rid = write_pair(b, a, {"runs": []}, {"k": "text"})
+            bo, ao = json.load(open(b, encoding="utf-8")), json.load(open(a, encoding="utf-8"))
+            self.assertEqual(bo["run_id"], rid)
+            self.assertTrue(same_run(bo, ao))
+            self.assertEqual(ao["abstracts"], {"k": "text"})
+
+    def test_existing_abstract_file_blocks_both(self):
+        with tempfile.TemporaryDirectory() as td:
+            b, a = os.path.join(td, "bib.json"), os.path.join(td, "abs.json")
+            open(a, "w", encoding="utf-8").write("old")
+            with self.assertRaises(FileExistsError):
+                write_pair(b, a, {}, {})
+            self.assertFalse(os.path.exists(b))
+            self.assertEqual(open(a, encoding="utf-8").read(), "old")
+
+    def test_different_runs_do_not_match(self):
+        self.assertFalse(same_run({"run_id": "a"}, {"run_id": "b"}))
+        self.assertFalse(same_run({}, {}))
+
+
 class Urls(unittest.TestCase):
     def test_allow_only_prefix_https(self):
         pre = ["https://www.jstage.jst.go.jp/"]
@@ -71,6 +100,30 @@ class Urls(unittest.TestCase):
         self.assertFalse(allowed_url("http://www.jstage.jst.go.jp/article/x", pre))
         self.assertFalse(allowed_url("https://evil.example/https://www.jstage.jst.go.jp/", pre))
         self.assertFalse(allowed_url(None, pre))
+
+    def test_host_is_compared_structurally(self):
+        pre = ["https://trusted.example/article/"]
+        self.assertTrue(allowed_url("https://trusted.example/article/x", pre))
+        self.assertTrue(allowed_url("https://TRUSTED.example:443/article/x", pre))
+        for bad in ["https://trusted.example.evil/article/x", "https://trusted.example@evil/article/x",
+                    "https://user:pw@trusted.example/article/x", "https://trusted.example:8443/article/x",
+                    "https://trusted.example/other/x", "https://trusted.example/articlex"]:
+            self.assertFalse(allowed_url(bad, pre), bad)
+
+    def test_prefix_without_trailing_slash_uses_segments(self):
+        pre = ["https://trusted.example/article"]
+        self.assertTrue(allowed_url("https://trusted.example/article", pre))
+        self.assertTrue(allowed_url("https://trusted.example/article/x", pre))
+        self.assertFalse(allowed_url("https://trusted.example/article-evil", pre))
+
+    def test_redirect_to_other_host_is_refused(self):
+        opener = guarded_opener(["https://trusted.example/"])
+        h = next(x for x in opener.handlers if isinstance(x, urllib.request.HTTPRedirectHandler))
+        req = urllib.request.Request("https://trusted.example/a")
+        with self.assertRaises(urllib.error.URLError):
+            h.redirect_request(req, io.BytesIO(), 302, "Found", {}, "https://evil.example/a")
+        ok = h.redirect_request(req, io.BytesIO(), 302, "Found", {}, "https://trusted.example/b")
+        self.assertEqual(ok.full_url, "https://trusted.example/b")
 
 
 class Slice(unittest.TestCase):

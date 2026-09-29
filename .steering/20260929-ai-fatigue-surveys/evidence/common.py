@@ -3,9 +3,13 @@
 2026-09-29 に実行した版（`S-*/*.py`）は記録として残し、再実行しない。流用するときは、下の関数を使って書き直す。
 テストは `test_common.py`（`python -m unittest test_common` を、このディレクトリで実行）。
 """
+import json
 import os
 import subprocess
+import urllib.error
 import urllib.parse
+import urllib.request
+import uuid
 
 
 def merge_abstract(store, key, text):
@@ -67,10 +71,77 @@ def open_exclusive(path):
     return open(path, "x", encoding="utf-8")
 
 
+def write_pair(bib_path, abs_path, bib_obj, abs_obj):
+    """書誌（repo の中）と抄録（repo の外）を、同じ実行の対として書く。
+
+    ★ 両方を排他的に開けてから書く（片方が既にあれば、どちらも書かない）。両方の `run_id` に同じ値を入れるので、
+    後から対応を `same_run` で確かめられる（`open_exclusive` だけでは、別の実行の抄録と組み合わさるのを防げない）。
+    """
+    rid = uuid.uuid4().hex
+    bib_obj = {**bib_obj, "run_id": rid}
+    abs_obj = {"run_id": rid, "abstracts": abs_obj}
+    fb = open_exclusive(bib_path)
+    try:
+        fa = open_exclusive(abs_path)
+    except BaseException:
+        fb.close()
+        os.remove(bib_path)
+        raise
+    with fb, fa:
+        json.dump(abs_obj, fa, ensure_ascii=False, indent=1)
+        json.dump(bib_obj, fb, ensure_ascii=False, indent=1)
+    return rid
+
+
+def same_run(bib_obj, abs_obj):
+    """書誌と抄録が同じ実行の対か（`write_pair` の `run_id` で比べる）。"""
+    rid = bib_obj.get("run_id")
+    return bool(rid) and rid == abs_obj.get("run_id")
+
+
+def _parts(url):
+    u = urllib.parse.urlsplit(url or "")
+    try:
+        port = u.port
+    except ValueError:
+        return None
+    if u.username is not None or u.password is not None or not u.hostname:
+        return None
+    return u.scheme.lower(), u.hostname.lower(), port or (443 if u.scheme.lower() == "https" else None), u.path or "/"
+
+
 def allowed_url(url, prefixes):
-    """https で、許した接頭辞で始まる URL だけを開く。"""
-    u = urllib.parse.urlparse(url or "")
-    return u.scheme == "https" and any((url or "").startswith(p) for p in prefixes)
+    """https で、許した接頭辞の URL の下だけを開く。
+
+    ★ 文字列の前方一致ではなく、スキーム・ホスト・ポートを分けて完全一致で比べ、パスは区切りの単位で前方一致を見る
+    （`https://host.evil/`・`https://host@evil/` を通さない）。利用者情報（`user@`）の付いた URL は通さない。
+    ⚠️ 開いた後のリダイレクトは、この関数では見ない。開くときは `guarded_opener` を使う。
+    """
+    got = _parts(url)
+    if got is None or got[0] != "https":
+        return False
+    for p in prefixes:
+        want = _parts(p)
+        if want is None or want[:3] != got[:3]:
+            continue
+        base = want[3]
+        if base.endswith("/") and got[3].startswith(base):
+            return True
+        if got[3] == base or got[3].startswith(base + "/"):
+            return True
+    return False
+
+
+def guarded_opener(prefixes):
+    """リダイレクトの先も `allowed_url` で確かめる opener（許していない先へは要求を送らずに例外）。"""
+
+    class _Guard(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            if not allowed_url(newurl, prefixes):
+                raise urllib.error.URLError(f"許していない先へのリダイレクト: {newurl}")
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+    return urllib.request.build_opener(_Guard)
 
 
 def slice_between(page, start_marker, end_markers):

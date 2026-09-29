@@ -18,9 +18,9 @@
 - [x] `researcher-requests.md`（[研究者] 有料データベース 3・本文の入手 12）
 
 ## 検査
-- [x] `python scripts/check_survey_files.py` が緑（事実 7 本・判定案 6 本・違反 0）・`--selftest` で変異 143 種がすべて赤（レビュー後に検査を強めた・判断 13）
-- [ ] 本文・PDF・抄録の全文・尺度の項目文がコミットに無いこと（`git diff --stat` と evidence の鍵の検査）
-- [ ] DB の xlsx が変わっていないこと（`git diff --stat` に xlsx が無い）
+- [x] `python scripts/check_survey_files.py` が緑（事実 7 本・判定案 6 本・違反 0）・`--selftest` で変異 147 種がすべて赤（レビュー後に検査を強めた・判断 13・16・17）
+- [x] 本文・PDF・抄録の全文・尺度の項目文がコミットに無いこと（`git diff --stat` と evidence の鍵の検査）—— 2026-09-30: `origin/main...HEAD` の名前に pdf・xlsx・docx・html・abstracts が無い。evidence の鍵・値の検査は緑
+- [x] DB の xlsx が変わっていないこと（`git diff --stat` に xlsx が無い）—— 2026-09-30 に確認
 
 ## 完了処理
 - [x] 前回の steering の tasklist・issues の状態への反映 —— issues.md は再生成せず `issue-status.md` に状態と反映の候補を書いた（再生成は評価版の xlsx の作り直しを伴うため）。前回の tasklist の A 群の行を閉じた

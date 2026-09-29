@@ -106,14 +106,21 @@ def check_evidence(root):
             p = os.path.join(dp, fn)
             rel = os.path.relpath(p, root)
             if fn.endswith(".json"):
-                obj = json.load(open(p, encoding="utf-8"))
+                # ★ utf-8-sig で読む（BOM 付きでも鍵を見る・Codex 2 巡目）。読めない JSON は赤にする
+                try:
+                    with open(p, encoding="utf-8-sig") as fh:
+                        obj = json.load(fh)
+                except (ValueError, UnicodeDecodeError) as e:
+                    errs.append(f"{rel}: JSON として読めない（{type(e).__name__}）")
+                    continue
                 keys = {str(k).lower() for k in walk_keys(obj)}
                 bad = keys & BAD_KEYS
                 values = list(walk_values(obj))
             elif fn.endswith((".tsv", ".csv")):
                 # ★ 標準の csv で読む（引用符で囲んだ見出し "abstract" も見出しとして解釈する・判断 16）
                 delim = "\t" if fn.endswith(".tsv") else ","
-                with open(p, encoding="utf-8", newline="") as fh:
+                # ★ utf-8-sig: BOM が先頭の見出しに付いて "abstract" と一致しなくなるのを防ぐ（Codex 2 巡目）
+                with open(p, encoding="utf-8-sig", newline="") as fh:
                     table = list(csv.reader(fh, delimiter=delim))
                 head = [c.strip().lower() for c in (table[0] if table else [])]
                 bad = set(head) & BAD_KEYS
@@ -217,7 +224,11 @@ def selftest():
                 ("evidence long string", "zz_mutant.json", {"runs": [{"records": [{"title": "x" * 600}]}]}),
                 ("evidence tsv abstract column", "zz_mutant.tsv", "id\tabstract\n1\tx\n"),
                 ("evidence tsv quoted abstract column", "zz_mutant.tsv", '"id"\t"Abstract"\n1\tx\n'),
-                ("evidence csv abstract column", "zz_mutant.csv", 'id,"abstract"\n1,x\n')]
+                ("evidence csv abstract column", "zz_mutant.csv", 'id,"abstract"\n1,x\n'),
+                ("evidence tsv BOM abstract column", "zz_mutant.tsv", "\ufeffabstract\tid\nx\t1\n"),
+                ("evidence csv BOM abstract column", "zz_mutant.csv", "\ufeffabstract,id\nx,1\n"),
+                ("evidence json BOM abstract key", "zz_mutant.json", "\ufeff" + json.dumps({"abstract": "y"})),
+                ("evidence json unreadable", "zz_mutant.json", "{\"abstract\": ")]
         for label, name, content in muts:
             p = os.path.join(base, "evidence", name)
             os.makedirs(os.path.dirname(p), exist_ok=True)
