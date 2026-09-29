@@ -17,8 +17,7 @@
     "{out}"
   ],
   "reset_cmd": [
-    "echo",
-    "placeholder: replace with the command that clears the input method's dictionary and learning"
+    "false"
   ],
   "focus_cmd": [
     "osascript",
@@ -26,6 +25,7 @@
     "tell application \"System Events\" to set frontmost of first process whose name is \"refinput-macos\" to true"
   ],
   "ready_wait_ms": 3000,
+  "settle_ms": 1000,
   "backend": "macos",
   "backend_opts": {
     "focus_app": "placeholder.bundle.id.of.the.reference.input.field"

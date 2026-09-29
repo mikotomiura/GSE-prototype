@@ -16,10 +16,15 @@ python3 run_cell.py --selftest
 
 - The run directory must not exist; it is created by the runner and an existing one is never reused or
   changed. Run directories are ignored by git (`runs/`).
-- A backend other than `dryrun` sends real key events to the application in front, and the runner refuses to
-  start (exit status 2) without `--i-understand-this-sends-keys`. The flag check, the check of the cell file and
-  the plan, and the check that the run directory does not exist all come before the first child process is
-  started.
+- The flag `--i-understand-this-sends-keys` is the consent to every operation that changes the state of the
+  machine, that is, to typing and to the reset. A backend other than `dryrun` sends real key events to the
+  application in front, and the runner refuses to start (exit status 2) without the flag. `reset_cmd` is run
+  only with the flag, also with `dryrun`; without it the reset is not run, no `reset` row is written to the
+  oracle, and the manifest records the reset of that block as skipped, with the reason.
+- A real backend needs the backend option that its `focus_back` key uses (`focus_app` on macOS, `focus_window`
+  on Windows) in `backend_opts`; without it the runner exits with status 2. The flag check, the check of the
+  cell file and the plan, the clock check, and the check that the run directory does not exist all come before
+  the first child process is started.
 - Exit status: 0 the run completed; 1 the run was aborted (or the manifest could not be written); 2 the run was
   refused or could not start.
 
@@ -33,10 +38,19 @@ Check these by hand; the runner records the statements in the cell file and cann
    into the manifest).
 3. Nothing else is in front of the reference input field, and nobody touches the keyboard or the pointer while a
    real backend is sending: synthetic keys go to whatever application is in front.
-4. On macOS the terminal application that runs the runner holds the Accessibility permission.
-5. `reset_cmd` really clears the input method's dictionary and learning, and `focus_cmd` really brings the
+4. Sleep, the screen lock, and the screen saver are turned off for the duration of the run; a locked screen
+   receives the synthetic keys instead of the reference input field. On macOS the terminal application that runs the runner holds the Accessibility permission.
+5. The marker keys (F13 to F19) can trigger the global hotkeys of other applications; close or reconfigure any
+   application that registers them.
+6. `reset_cmd` really clears the input method's dictionary and learning, and `focus_cmd` really brings the
    reference input field to the front. Both differ by system and input method and are checked in a calibration
    pilot; `cell.example.json` gives placeholders only.
+7. A cell file is executable configuration: it names programs that are run with your privileges. Run only cell
+   files that you have read, and never one from another person unread.
+8. The child programs must be the programs themselves, not wrapper scripts (on Windows a `.bat` or `.cmd` file
+   is refused), so that stopping the child stops the observer. Each child must hand every record to the
+   operating system as it is produced (no buffering until exit), so that the lines written before a forced end
+   remain in the log.
 
 ## The cell file
 
@@ -47,37 +61,49 @@ A JSON object. Unknown keys and missing keys are refused.
 | `os` | `macos` or `windows`; must equal the plan's `os` |
 | `ime` | name and version of the input method (a string) |
 | `ime_settings` | the settings of the input method for this cell (an object; copied into the manifest) |
-| `refinput_cmd` | argument array that starts the reference input field; `{out}` is replaced by the path of its log |
-| `logger_cmd` | argument array that starts the observer; `{out}` is replaced by the path of its log |
-| `reset_cmd` | argument array run before each block whose plan row has `reset_ime` true; empty means no reset |
-| `focus_cmd` | argument array run before each block; empty means nothing is run |
+| `refinput_cmd` | argument array that starts the reference input field; `{out}` is replaced by the absolute path of its log |
+| `logger_cmd` | argument array that starts the observer; `{out}` is replaced by the absolute path of its log |
+| `reset_cmd` | argument array run before each block whose plan row has `reset_ime` true, and only with the send flag; empty means no reset (recorded as skipped) |
+| `focus_cmd` | optional preparation, an argument array run before each block; empty means nothing is run |
 | `ready_wait_ms` | how long to wait after starting the children before the first block |
 | `backend` | `dryrun`, `macos`, or `windows` |
 | `clock_sync_disabled`, `auto_update_disabled` | statements by the person who prepared the machine |
-| `backend_opts` | optional; options passed to the backend (for example the application to bring to the front) |
+| `backend_opts` | optional for `dryrun`; for a real backend it must give the option of its `focus_back` key (the application or window to bring to the front) |
 | `stop_wait_ms` | optional, default 5000; how long a child has to end after the termination request |
-| `settle_ms` | optional, default 0; a wait after the last block, before the children are stopped |
+| `settle_ms` | optional, default 1000; a wait after the last block, before the children are stopped |
 | `command_timeout_ms` | optional, default 60000; the limit for `reset_cmd` and `focus_cmd` |
 
 Commands are run without a shell, with standard input closed and standard output discarded.
 
 ## Sequence
 
-1. The plan and the cell are read and checked; a real backend is loaded and checked against the plan's keys.
+1. The plan and the cell are read and checked (the plan is read once, and the bytes that were checked are the
+   bytes that are copied); a real backend is loaded and checked against the plan's keys and options, and the
+   clock resolution is checked.
 2. The run directory is created and the plan is copied into it.
-3. The observer and then the reference input field are started; the runner waits `ready_wait_ms`.
-4. For each block: `reset_cmd` (if the block asks for it) with its exit status written to the oracle as a
-   `reset` row, then `focus_cmd`, then the block is played. A focus command that exits with a non-zero status
-   or times out aborts the run, because the keys would go to the wrong window. A reset command that cannot
-   start or times out is recorded with exit status -1 and the run continues (the analysis decides what to
-   exclude).
-5. Both children are asked to end (`SIGTERM`; on Windows `terminate`). A child that is still running after
-   `stop_wait_ms` is killed. The manifest records, for each child, its exit status and whether it had already
-   exited, was terminated, or was killed.
+3. The observer and then the reference input field are started, each in its own process group (POSIX); the
+   runner waits `ready_wait_ms`.
+4. For each block: `reset_cmd` (if the block asks for it and the flag was given) with its exit status written
+   to the oracle as a `reset` row; then `focus_cmd`; then, with a real backend, the front window is confirmed
+   (the backend brings the reference input field to the front and reads the front window back; if it differs,
+   nothing is sent to the block); then the block is played. A focus command that cannot start, times out, or
+   exits with a non-zero status aborts the run, and so does a failed confirmation, because the keys would go to
+   the wrong window. A reset command that fails is recorded with its kind of failure (`could_not_start`,
+   `timed_out`, `exit_status`) and the run continues (the analysis decides what to exclude). The standard error
+   of the two commands is appended to `reset.stderr.txt` and `focus.stderr.txt`.
+5. After `settle_ms`, the children are stopped in the reverse of the order in which they were started, each with
+   its descendants. On POSIX the process group receives `SIGTERM`, and the child is recorded as `terminated`
+   if it ends within `stop_wait_ms` and `killed` if it had to be killed. On Windows the process tree is ended
+   with `taskkill /T /F` and recorded as `forced` (`killed` if it still did not end in time). A child that had
+   already exited is recorded as `exited_before_stop`.
 
-If a child exits while the run is in progress, no further key is pressed (a key already held is released), the
-other child is stopped, and the manifest says `aborted` with the reason. A run in which a child wrote no output
-is aborted too.
+If a child exits while the run is in progress, no further key is pressed (the children are checked just before
+each key press; a key already held is released), the other child is stopped, and the manifest says `aborted`
+with the reason. A run in which a child wrote no output
+is aborted too. An unexpected error of the runner itself is recorded as `unexpected error (<type>)`, its
+traceback is written to `runner.error.txt` and to standard error, and the children are stopped. An interruption
+(Ctrl-C, SIGTERM) is recorded as `interrupted`, the children are stopped, the manifest is written, and the
+interruption is raised again; a second Ctrl-C during the stop still ends the remaining children.
 
 ## The run directory
 
@@ -88,13 +114,25 @@ is aborted too.
 | `gt.jsonl` | the reference input field's log (`gt/1`) |
 | `obs.jsonl` | the observer's log (`obs/1`) |
 | `run.json` | the manifest (`run/1`), below |
-| `logger.stderr.txt`, `refinput.stderr.txt` | what each child wrote to standard error |
+| `logger.stderr.txt`, `refinput.stderr.txt`, `reset.stderr.txt`, `focus.stderr.txt` | what each child and command wrote to standard error (created when used) |
+| `runner.error.txt` | the traceback of an unexpected error of the runner (only then) |
+
+Deposit `run.json` and the four logs only. The standard error files and `runner.error.txt` stay on the
+measuring machine: they may contain paths and user names.
 
 `run.json` holds: `cell` (as given, with the optional keys filled in), `plan_sha256`, `git_commit` (the
-commit of the checkout that holds the runner, or `null`), `started` and `ended` (`wall_ms`, and `mono_ns` from
+commit of the checkout that holds the runner, taken at the start, or `null`), `git_dirty` (whether
+`git status --porcelain` listed anything at the start, or `null`), `host` (the platform string, the operating
+system version, and the Python version), `started` and `ended` (`wall_ms`, and `mono_ns` from
 the same clock as the `t_mono_ns` of the oracle rows), `outputs` (`file`, `sha256`, and `lines` of each of the
 four logs; `null` for a log that is absent or empty), `children` (`exit_code`, `stopped`, `stderr_file`),
-`resets`, `focus_exit_codes`, `aborted`, and `abort_reason`.
+`resets` (per block: `exit_code`, `failure`, or `skipped` with the reason), `focus` (per block: the command's
+`exit_code` and `failure`, and `front_confirmed`, which is true only when a real backend confirmed the front
+window), `aborted`, and `abort_reason`.
+
+Before it is written, every string of the manifest is scanned: the home directory and the root of the checkout
+are replaced by `~` and `<repo>` (both spellings of the path separator, the longer path first), so that no user
+name or directory layout is deposited.
 
 The `gt` and `obs` logs use the clocks of their own processes, so their times are aligned to the oracle in
 the analysis, not by the runner.
