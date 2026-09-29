@@ -1,0 +1,436 @@
+[
+ {
+  "theme": "T0 anchor",
+  "q": "\"AI fatigue\"",
+  "filter": null,
+  "count": 158,
+  "top": [
+   {
+    "doi": "https://doi.org/10.56734/ijahss.v6n8a7",
+    "title": "Too Much, Too Fast: Understanding Ai Fatigue In The Digital Acceleration Era",
+    "year": 2025,
+    "cites": 3,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.26803/ijlter.25.3.29",
+    "title": "How do College Students Express AI Fatigue? A Content and Keyword-in-Context Analysis of Academic AI Use",
+    "year": 2026,
+    "cites": 3,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1016/j.chbr.2026.101186",
+    "title": "AI fatigue in human–AI interaction: Conceptual framework, scale development and validation, and associations with AI engagement",
+    "year": 2026,
+    "cites": 2,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1016/j.ijfatigue.2025.109068",
+    "title": "Pre-corrosion very-high-cycle AI-fatigue in completion string",
+    "year": 2025,
+    "cites": 1,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.26803/ijlter.25.5.5",
+    "title": "Defining AI Fatigue in Academic Contexts: Dimensions, Indicators, and a Stage-Based Model Using Grounded Theory",
+    "year": 2026,
+    "cites": 1,
+    "type": "article"
+   }
+  ]
+ },
+ {
+  "theme": "S3 passive fatigue automation",
+  "q": "\"passive fatigue\" automated driving",
+  "filter": null,
+  "count": 336,
+  "top": [
+   {
+    "doi": "https://doi.org/10.1016/j.promfg.2015.07.499",
+    "title": "Vigilance Decrement and Passive Fatigue Caused by Monotony in Automated Driving",
+    "year": 2015,
+    "cites": 251,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1016/j.trf.2014.06.016",
+    "title": "Effects of adaptive cruise control and highly automated driving on workload and situation awareness: A review of the empirical evidence",
+    "year": 2014,
+    "cites": 754,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1037/a0034386",
+    "title": "Active and passive fatigue in simulated driving: Discriminating styles of workload regulation and their safety impacts.",
+    "year": 2013,
+    "cites": 218,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1016/j.ssci.2017.07.018",
+    "title": "Automated driving: Safety blind spots",
+    "year": 2017,
+    "cites": 227,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1016/j.apergo.2017.11.010",
+    "title": "Is partially automated driving a bad idea? Observations from an on-road study",
+    "year": 2017,
+    "cites": 247,
+    "type": "article"
+   }
+  ]
+ },
+ {
+  "theme": "S3 passive fatigue",
+  "q": "\"passive fatigue\"",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S3 vigilance automation monitoring",
+  "q": "vigilance decrement automation monitoring",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S3 automation complacency",
+  "q": "\"automation complacency\"",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S4 alert fatigue CDSS",
+  "q": "\"alert fatigue\" \"clinical decision support\"",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S4 alert fatigue AI",
+  "q": "\"alert fatigue\" \"artificial intelligence\"",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S5 ambient AI scribe burnout",
+  "q": "\"ambient\" scribe burnout artificial intelligence",
+  "filter": null,
+  "count": 705,
+  "top": [
+   {
+    "doi": "https://doi.org/10.1093/jamia/ocae295",
+    "title": "Ambient artificial intelligence scribes: physician burnout and perspectives on usability and documentation burden",
+    "year": 2024,
+    "cites": 208,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1056/aioa2501000",
+    "title": "Ambient AI Scribes in Clinical Practice: A Randomized Trial",
+    "year": 2025,
+    "cites": 104,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1038/s41746-019-0190-1",
+    "title": "Challenges of developing a digital scribe to reduce clinical documentation burden",
+    "year": 2019,
+    "cites": 165,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1038/s41746-025-01895-6",
+    "title": "Beyond human ears: navigating the uncharted risks of AI scribes in clinical practice",
+    "year": 2025,
+    "cites": 73,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1101/2025.07.10.25331333",
+    "title": "A Randomized-Clinical Trial of Two Ambient Artificial Intelligence Scribes: Measuring Documentation Efficiency and Physician Burnout",
+    "year": 2025,
+    "cites": 15,
+    "type": "preprint"
+   }
+  ]
+ },
+ {
+  "theme": "S5 AI scribe randomized",
+  "q": "\"AI scribe\" randomized",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S5 AI drafted replies burnout",
+  "q": "large language model drafted patient messages burnout",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S6 developers AI assistant fatigue",
+  "q": "developers \"AI coding assistant\" fatigue OR burnout OR \"cognitive load\"",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S6 Copilot cognitive load",
+  "q": "Copilot \"cognitive load\" programmers",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S6 annotators fatigue",
+  "q": "annotators fatigue labeling \"large language model\"",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S6 content moderators burnout",
+  "q": "\"content moderators\" burnout",
+  "filter": null,
+  "count": 177,
+  "top": [
+   {
+    "doi": "https://doi.org/10.1177/14614448221138529",
+    "title": "Why do volunteer content moderators quit? Burnout, conflict, and harmful behaviors",
+    "year": 2022,
+    "cites": 37,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.5817/cp2023-4-8",
+    "title": "The psychological impacts of content moderation on content moderators: A qualitative study",
+    "year": 2023,
+    "cites": 48,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1145/3338243",
+    "title": "Human-Machine Collaboration for Content Regulation",
+    "year": 2019,
+    "cites": 295,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.54501/jots.v1i5.91",
+    "title": "Content Moderators’ Strategies for Coping with the Stress of Moderating Content Online",
+    "year": 2023,
+    "cites": 23,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1007/978-981-19-2397-5_27",
+    "title": "Effects of a Novel Resiliency Training Program for Social Media Content Moderators",
+    "year": 2022,
+    "cites": 3,
+    "type": "book-chapter"
+   }
+  ]
+ },
+ {
+  "theme": "S7 decision fatigue AI",
+  "q": "\"decision fatigue\" \"artificial intelligence\"",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S8 AI fatigue scale",
+  "q": "\"AI fatigue scale\"",
+  "filter": null,
+  "count": 6,
+  "top": [
+   {
+    "doi": "https://doi.org/10.1016/j.chbr.2026.101186",
+    "title": "AI fatigue in human–AI interaction: Conceptual framework, scale development and validation, and associations with AI engagement",
+    "year": 2026,
+    "cites": 2,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.5281/zenodo.21053220",
+    "title": "ResearchBox 6748, 'AI Fatigue Scale', https://researchbox.org/6748",
+    "year": 2026,
+    "cites": 0,
+    "type": "other"
+   },
+   {
+    "doi": "https://doi.org/10.5281/zenodo.21053221",
+    "title": "ResearchBox 6748, 'AI Fatigue Scale', https://researchbox.org/6748",
+    "year": 2026,
+    "cites": 0,
+    "type": "other"
+   },
+   {
+    "doi": "https://doi.org/10.31234/osf.io/kp7zs_v1",
+    "title": "AI Fatigue in Human–AI Interaction: Conceptual Framework, Scale Development and Validation, and Associations with AI Engagement",
+    "year": 2026,
+    "cites": 0,
+    "type": "preprint"
+   },
+   {
+    "doi": "https://doi.org/10.12775/qs.2026.54.70890",
+    "title": "AI Fatigue and Mental Health Implications: A Comprehensive Literature Review",
+    "year": 2026,
+    "cites": 0,
+    "type": "article"
+   }
+  ]
+ },
+ {
+  "theme": "S8 technostress generative AI scale",
+  "q": "\"generative AI\" technostress scale development",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S9 prompt fatigue",
+  "q": "\"prompt fatigue\"",
+  "filter": null,
+  "count": 139,
+  "top": [
+   {
+    "doi": "https://doi.org/10.1371/journal.pone.0048345",
+    "title": "Rats Bred for Low Aerobic Capacity Become Promptly Fatigued and Have Slow Metabolic Recovery after Stimulated, Maximal Muscle Contractions",
+    "year": 2012,
+    "cites": 14,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1017/s1463423615000109",
+    "title": "Embedding electronic decision-support tools for suspected cancer in primary care: a qualitative study of GPs’ experiences",
+    "year": 2015,
+    "cites": 49,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.3122/jabfm.2015.03.150097",
+    "title": "Electronic Health Record Innovations for Healthier Patients and Happier Doctors",
+    "year": 2015,
+    "cites": 28,
+    "type": "editorial"
+   },
+   {
+    "doi": "https://doi.org/10.1055/s-0038-1632595",
+    "title": "Fatigue Study of Six and Eight mm Diameter Interlocking Nails with Screw Holes of Variable Size and Number",
+    "year": 1997,
+    "cites": 32,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1097/mrr.0000000000000512",
+    "title": "Managing fatigue at work after traumatic brain injury: a qualitative descriptive study",
+    "year": 2021,
+    "cites": 2,
+    "type": "article"
+   }
+  ]
+ },
+ {
+  "theme": "S9 AI hype fatigue",
+  "q": "\"AI hype\" fatigue",
+  "filter": null,
+  "count": 124,
+  "top": [
+   {
+    "doi": "https://doi.org/10.1007/s43681-024-00419-4",
+    "title": "Anthropomorphism in AI: hype and fallacy",
+    "year": 2024,
+    "cites": 168,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1101/2023.03.30.23287899",
+    "title": "ChatGPT in Healthcare: A Taxonomy and Systematic Review",
+    "year": 2023,
+    "cites": 134,
+    "type": "preprint"
+   },
+   {
+    "doi": "https://doi.org/10.1080/1369118x.2025.2482666",
+    "title": "How journalism researchers navigate the AI hype: research orientations and intervention recommendations",
+    "year": 2025,
+    "cites": 2,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1093/jamia/ocaf065",
+    "title": "Adoption of artificial intelligence in healthcare: survey of health system priorities, successes, and challenges",
+    "year": 2025,
+    "cites": 137,
+    "type": "article"
+   },
+   {
+    "doi": "https://doi.org/10.1016/j.caeai.2024.100259",
+    "title": "Perceptions and usage of AI chatbots among students in higher education across genders, academic levels and fields of study",
+    "year": 2024,
+    "cites": 298,
+    "type": "article"
+   }
+  ]
+ },
+ {
+  "theme": "S10 AI fatigue longitudinal",
+  "q": "\"generative AI\" fatigue longitudinal",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S10 AI fatigue diary EMA",
+  "q": "\"generative AI\" (\"experience sampling\" OR diary) exhaustion",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S10 AI fatigue experiment",
+  "q": "\"generative AI\" fatigue \"randomized\"",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S11 verification burden",
+  "q": "\"verification burden\" AI",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S11 overreliance verification effort",
+  "q": "LLM output verification effort users experiment",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S12 Japanese AI fatigue",
+  "q": "AI疲労",
+  "filter": null,
+  "count": null,
+  "top": []
+ },
+ {
+  "theme": "S12 Japanese 生成AI 疲労",
+  "q": "生成AI 疲労",
+  "filter": null,
+  "count": null,
+  "top": []
+ }
+]
