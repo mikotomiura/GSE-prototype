@@ -57,3 +57,9 @@ Skill: verify-before-claiming・git-workflow。応答は日本語。コミット
 - ⚠️ heredoc の中のバックスラッシュは潰れる（今回も 2 回踏んだ）→ 文書は Write / Edit で書き、`od -c` で確かめる。
 - ⚠️ 書き出しの検査は `README.internal.md` に誤検知の例（`tokenizer_notes.txt`・`secret-sharing.md`・`*.asc`）と直さない形（空白を含むパス）を書いてある。止まったら規則を緩めず、名前か中身を直す。
 - ⚠️ 人の打鍵データを使わない。凍結（M3 / M6）の前に ImeShadow と正解を突き合わせない。新しい公開 repo を作らない（M12・研究者）。
+
+## §5 2026-09-30 の Mac の結果（このメモの §2・§3-1 を消化した）
+
+- ✅ §2: 024 の一覧の SHA-256 は `298a470b…4a0`（89 ファイル）で G-GEAR と一致・POSIX だけの検査は緑。Mac の全 acceptance 20 本は **SCOPE を除いて失敗 0 件**。⚠️ main の上では SCOPE がほぼ全本で赤になるが、測定器の適用範囲の外（B15）。
+- ✅ §3-1 M0: 12 作品・1,800 句・`c8f890cb…4620`（判断 79・`experiment/data.md` の「Phrase corpus」）。枝 `feature/ime-m0-corpus`（main へ PR）。生の `.txt` / zip は repo に入れていない（再取得は data.md の URL と SHA-256 で照合）。
+- ⏭ 次は **M1（macOS の較正パイロット・Mac・実際にキーを送る）**。★ ロガーは書き出しからビルドする（判断 68）。生成器の本番の config（速さ・think・n）は M1 の実測で決め、出典を `[Pn]` で接地してから M3 で凍結する（`kit/gen/README.md`）。
