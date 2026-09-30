@@ -1716,6 +1716,10 @@ def selftest():
             refused(name, {"README.md": "# Fake\nRun on gearbox9 twice.\n"}, "README.md", forbid=("gearbox9",))
             rcx, text, o = run("host-ok", {"README.md": "# Fake\nRun on gearbox90 and on %s twice.\n" % fake_host})
             ck(name + " (a longer word and a value that is not this machine's pass)", rcx == 0, text)
+            # a generic host name is not a private value of the machine
+            socket.gethostname = lambda: "localhost"
+            rcx, text, o = run("host-generic", {"README.md": "# Fake\nThe server listens on localhost only.\n"})
+            ck(name + " (the generic name localhost is not searched)", rcx == 0, text)
         finally:
             socket.gethostname = real_gethostname
             if saved_env is None:
