@@ -181,7 +181,9 @@ def count(source, query):
     raise ValueError(source)
 
 
-STATS = {}  # ★ 判断 18: 直前の fetch_ids の総数（情報源が返した数）と、受け取った件数（重なりを除く前）
+STATS = {}  # ★ 判断 18: 直前の fetch_ids の総数（最初のページで情報源が返した数）と、受け取った件数（重なりを除く前）
+# ★ 判断 19（Codex 2 巡目）: 受け取った件数が総数に届いたか（reached_total）は、完全に取れたことの保証ではない
+#   （ページの間の重なり・取得の間の結果の変動があると、届いても取りこぼしが残りうる）。届かなければ取りこぼしの印。
 
 
 def _stat(total=None, raw=0):
@@ -424,7 +426,7 @@ def main(argv=None):
                 continue
             t0 = now()
             subs = None
-            stats = []  # ★ 判断 18: 総数に届いたか（途中の空ページで黙って止まるのを記録に残す）
+            stats = []  # ★ 判断 18・19: 受け取った件数が総数に届いたか（途中の空ページで黙って止まるのを記録に残す）
             if src in SPLIT_BY_F and name == "main":  # ★ 判断 11: F の語ごとに分けて和を取る
                 v = VERSIONS[a.version]
                 subs = zenodo_subqueries(v["A"], v["F"])
@@ -436,13 +438,13 @@ def main(argv=None):
                 ids = fetch_ids(src, q)
                 stats.append(dict(STATS))
             for s in stats:
-                s["complete"] = s.get("total") is not None and s.get("raw", 0) >= s["total"]
-            complete = all(s["complete"] for s in stats)
+                s["reached_total"] = s.get("total") is not None and s.get("raw", 0) >= s["total"]
+            reached = all(s["reached_total"] for s in stats)
             path = os.path.join(store, f"ids_{a.version}_{src}_{name}.json")
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(dict(version=a.version, source=src, name=name, query=q, subqueries=subs, started=t0,
-                               finished=now(), stats=stats, complete=complete, ids=sorted(map(list, ids))), f)
-            print(src, name, len(ids), path, "" if complete else "★ 総数に届いていない")
+                               finished=now(), stats=stats, reached_total=reached, ids=sorted(map(list, ids))), f)
+            print(src, name, len(ids), path, "" if reached else "★ 総数に届いていない")
         return 0
 
     if a.cmd == "recall":
@@ -457,6 +459,7 @@ def main(argv=None):
             r = recall(ids, seeds)
             blob = "\n".join(sorted("\t".join(x) for x in ids)).encode("utf-8")
             rows.append(dict(source=src, name=name, query=q, subqueries=d.get("subqueries"),
+                             reached_total=d.get("reached_total"),  # ★ 判断 19: 記録に無い（v0 の取得）は None＝不明
                              started=d["started"], finished=d["finished"],
                              n_ids=len(ids), n_doi=sum(1 for x in ids if x[0] == "doi"),
                              ids_sha256=hashlib.sha256(blob).hexdigest(),

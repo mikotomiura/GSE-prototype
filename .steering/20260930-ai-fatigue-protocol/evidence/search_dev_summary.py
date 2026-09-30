@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import search_dev as S  # noqa: E402
 
+REACHED = {}  # (source, name) → 受け取った件数が総数に届いたか（True / False / None＝記録に無い）
 MAIN = [("epmc", "main"), ("s2", "main"), ("eric", "main"), ("arxiv", "main"), ("zenodo", "main")]
 
 
@@ -49,6 +50,7 @@ def load_store(store, version="v0"):
     """★ 判断 18（Codex 1 巡目）: 指定の版の記録だけを読み、式がいまのコードと同じことを確かめる（違えば止まる）。"""
     want = {(s, n): q for s, n, q in S.queries(version)}
     ids = {}
+    REACHED.clear()
     for fn in sorted(os.listdir(store)):
         if fn.startswith(f"ids_{version}_") and fn.endswith(".json"):
             d = json.load(open(os.path.join(store, fn), encoding="utf-8"))
@@ -59,6 +61,7 @@ def load_store(store, version="v0"):
             if key in ids:
                 raise SystemExit(f"同じ式の記録が 2 つある: {fn}")
             ids[key] = {tuple(x) for x in d["ids"]}
+            REACHED[key] = d.get("reached_total")  # ★ 判断 19: 下流に不明・届かないを持ち越す
     return ids
 
 
@@ -66,8 +69,9 @@ def dois(s):
     return {x[1] for x in s if x[0] == "doi"}
 
 
-def summarize(ids, recs259, noise, version="v0"):
-    runs = [dict(source=s, name=n, n_ids=len(v), n_doi=len(dois(v)), n_non_doi=len(v) - len(dois(v)))
+def summarize(ids, recs259, noise, version="v0", reached=None):
+    runs = [dict(source=s, name=n, n_ids=len(v), n_doi=len(dois(v)), n_non_doi=len(v) - len(dois(v)),
+                 reached_total=(reached or {}).get((s, n)))  # ★ 判断 19: None＝記録に無い（不明）
             for (s, n), v in sorted(ids.items())]
     union = set()
     non_doi = 0
@@ -111,7 +115,7 @@ def main(argv=None):
     import dedup as D
     ids = load_store(a.store)
     noise = {src: json.load(open(os.path.join(a.noise, f"noise_{src}_main.json"), encoding="utf-8")) for src in ("epmc", "s2")}
-    out = summarize(ids, D.load_259(), noise)
+    out = summarize(ids, D.load_259(), noise, reached=dict(REACHED))
     out["executed"] = S.now()
     S.write_json(a.out, out)
     print(json.dumps({k: out[k] for k in ("main_union", "b1_not_in_main", "s2_main_minus_v2")}, ensure_ascii=False))

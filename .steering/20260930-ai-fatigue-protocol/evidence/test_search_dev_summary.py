@@ -52,6 +52,7 @@ class TestLoadStore(unittest.TestCase):
             self._write(td, "ids_v1_epmc_main.json", version="v1", source="epmc", name="main", query="other")
             got = M.load_store(td, "v0")
             self.assertEqual(list(got), [("epmc", "main")])
+            self.assertIsNone(M.REACHED[("epmc", "main")])  # ★ 判断 19: 記録に無い＝不明（届いたとみなさない）
             self._write(td, "ids_v0_s2_main.json", version="v0", source="s2", name="main", query="changed")
             with self.assertRaises(SystemExit):
                 M.load_store(td, "v0")

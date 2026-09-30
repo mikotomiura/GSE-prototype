@@ -232,8 +232,9 @@ class TestRound1Fixes(unittest.TestCase):
         self.assertIn("/paper/ARXIV:hep-th/9901001v2?", seen[0])
 
     def test_fetch_records_whether_the_total_was_reached(self):
-        pages = [f"<opensearch:totalResults>3</opensearch:totalResults><id>http://arxiv.org/abs/2601.0000{i}v1</id>"
-                 for i in (1, 2)] + ["<opensearch:totalResults>3</opensearch:totalResults>"]
+        # ★ 判断 19: 総数 600 で 1 ページ目は 1 件・2 ページ目は空 → 2 ページ目を実際に通って、届かずに止まる
+        pages = ["<opensearch:totalResults>600</opensearch:totalResults><id>http://arxiv.org/abs/2601.00001v1</id>",
+                 "<opensearch:totalResults>600</opensearch:totalResults>"]
         calls = []
         orig, orig_sleep = S.get, S.time.sleep
         try:
@@ -242,7 +243,9 @@ class TestRound1Fixes(unittest.TestCase):
             S.fetch_ids("arxiv", "q")
         finally:
             S.get, S.time.sleep = orig, orig_sleep
-        self.assertEqual(S.STATS, {"total": 3, "raw": 1})  # 1 ページ目だけ受け取って 500 件ずつの次で終わる
+        self.assertEqual(len(calls), 2)
+        self.assertIn("start=500", calls[1])
+        self.assertEqual(S.STATS, {"total": 600, "raw": 1})
 
     def test_main_fetch_marks_incomplete(self):
         import tempfile
@@ -259,8 +262,8 @@ class TestRound1Fixes(unittest.TestCase):
                 d = json.load(open(os.path.join(td, "ids_v0_epmc_main.json"), encoding="utf-8"))
         finally:
             S.fetch_ids = orig
-        self.assertFalse(d["complete"])
-        self.assertEqual(d["stats"], [{"total": 5, "raw": 4, "complete": False}])
+        self.assertFalse(d["reached_total"])
+        self.assertEqual(d["stats"], [{"total": 5, "raw": 4, "reached_total": False}])
 
     def test_check_store_record_refuses_other_versions_and_queries(self):
         q = dict((f"{s} {n}", q) for s, n, q in S.queries("v0"))["epmc main"]
