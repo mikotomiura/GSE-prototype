@@ -29,6 +29,12 @@ a fictional name on the allow list passes
 line endings are normalized to LF
 non-ASCII string literals are replaced from the translation table
 an untranslated string literal stops the export
+an untracked or modified file in a git checkout stops the export
+a secret file name stops the export
+a file name is checked like its content
+an absolute path token with a user component stops the export
+a link that leaves the source stops the export
+an escaped spelling in JSON is checked after unescaping
 CASES
 run_ok "AC .zenodo.json が JSON" "${PY}" -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "${SRC}/.zenodo.json"
 run_ok "AC 判断 69: 対訳表が JSON で entries を持つ" "${PY}" -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); assert isinstance(d.get('entries'),list) and d['entries']" "${K}/export/translations.internal.json"
@@ -133,6 +139,15 @@ mkcopy () { rm -rf "${TMP}/c-$1"; "${PY}" -c "${COPY_PY}" "${SRC}" "${TMP}/c-$1/
 cx () { local n="$1"; shift; "${PY}" "${TMP}/c-${n}/papers/ime-observation/kit/export/export.py" --out "${TMP}/o-${n}" --allow-missing-license "$@"; }
 mkcopy p0
 run_ok "AC8 陽性対照: 混ぜない写しは書き出せる" cx p0
+# judge <期待する終了コード> <名前> <出力にあるべきファイル名> <説明>  ★ cx の結果を判定する（異常終了・書き出し先の残り・ファイル名）
+judge () {
+  local want="$1" name="$2" fname="$3" d="$4" rc="$5"
+  if [ "${rc}" -ne "${want}" ]; then ng "AC8 ${d}（exit ${rc}・期待 ${want}）"
+  elif grep -qE "Traceback|can't open file|No such file" "${TMP}/neg-${name}.out"; then ng "AC8 ${d}（拒否ではなく異常終了）"
+  elif [ -e "${TMP}/o-${name}" ]; then ng "AC8 ${d}（止まったのに書き出し先が残っている）"
+  elif ! grep -qF "${fname}" "${TMP}/neg-${name}.out"; then ng "AC8 ${d}（当たったファイル名 ${fname} が出力に無い）"
+  else ok "AC8 ${d}"; fi
+}
 # neg <名前> <写しの中のファイル> <足す 1 行> <説明> [export.py に足す引数...]
 neg () {
   local name="$1" rel="$2" line="$3" d="$4" rc
@@ -140,13 +155,44 @@ neg () {
   mkcopy "${name}"
   printf '%s\n' "${line}" >> "${TMP}/c-${name}/papers/ime-observation/${rel}"
   cx "${name}" "$@" > "${TMP}/neg-${name}.out" 2>&1; rc=$?
-  if [ "${rc}" -ne 1 ]; then ng "AC8 ${d}（exit ${rc}・期待 1）"
-  elif grep -qE "Traceback|can't open file|No such file" "${TMP}/neg-${name}.out"; then ng "AC8 ${d}（拒否ではなく異常終了）"
-  elif [ -e "${TMP}/o-${name}" ]; then ng "AC8 ${d}（止まったのに書き出し先が残っている）"
-  elif ! grep -qF "$(basename "${rel}")" "${TMP}/neg-${name}.out"; then ng "AC8 ${d}（当たったファイル名 $(basename "${rel}") が出力に無い）"
-  else ok "AC8 ${d}"; fi
+  judge 1 "${name}" "$(basename "${rel}")" "${d}" "${rc}"
+}
+# newf <期待する終了コード> <名前> <写しに足すファイル> <中身> <説明>
+newf () {
+  local want="$1" name="$2" rel="$3" body="$4" d="$5" rc
+  mkcopy "${name}"
+  printf '%s\n' "${body}" > "${TMP}/c-${name}/papers/ime-observation/${rel}"
+  cx "${name}" > "${TMP}/neg-${name}.out" 2>&1; rc=$?
+  judge "${want}" "${name}" "$(basename "${rel}")" "${d}" "${rc}"
 }
 neg pid "README.md" "Session recorded by P017." "被験者 ID を混ぜると exit 1"
+# ★ 追補（2026-09-30・レビュー）: `_` は被験者 ID の境界（P017_windows・run_P017）
+neg pid2 "kit/pilot/README.md" "Raw logs such as P017_windows were removed." "追補: P017_windows（_ 続き）を混ぜると exit 1"
+# ★ 判断 71: 絶対パスの字句の中の Users / home の成分の次の成分を名前として照合する
+neg fileurl "kit/e3/README.md" "The trace is at file:///Users/zed/notes.txt for reference." "判断 71: file:///Users/<名> を混ぜると exit 1"
+neg unc "kit/refinput-windows/README.md" 'The canonical path was \\?\C:\Users\zed\work.' "判断 71: \\\\?\\C:\\Users\\<名> を混ぜると exit 1"
+neg nonascii "kit/e2/README.md" "Data were copied from /Users/山田/work." "判断 71: ASCII でない名前の /Users/<名> を混ぜると exit 1"
+newf 1 fname "experiment/notes-P017.md" "Notes for one session." "追補: 名前に被験者 ID を持つファイルを足すと exit 1"
+newf 2 secret "experiment/.env" "API_KEY=placeholder" "判断 70: 秘密の名前の型（.env）のファイルがあれば exit 2"
+mkcopy short
+cx short --also-user mk > "${TMP}/neg-short.out" 2>&1; rc=$?
+if [ "${rc}" -eq 2 ] && ! grep -qE "Traceback" "${TMP}/neg-short.out" && [ ! -e "${TMP}/o-short" ]; then ok "AC8 追補: --also-user が 2 文字なら exit 2（黙って捨てない）"
+else ng "AC8 追補: --also-user が 2 文字でも止まらない（exit ${rc}）"; fi
+# ★ 判断 70: 写しを一時的な git repo にする（★ 作業中の repo ではない）。clean なら通り、追跡していないファイル・変更で exit 2
+mkcopy git
+G="${TMP}/c-git"
+if git -C "${G}" init -q >/dev/null 2>&1 && git -C "${G}" add papers >/dev/null 2>&1 \
+   && git -C "${G}" -c user.name=acceptance -c user.email=acceptance@example.invalid -c commit.gpgsign=false commit -q -m base >/dev/null 2>&1; then
+  run_ok "AC8 判断 70: 陽性対照: clean な git の写しは書き出せる" cx git
+  rm -rf "${TMP}/o-git"
+  printf '%s\n' "A draft note." > "${G}/papers/ime-observation/kit/draft-note.md"
+  cx git > "${TMP}/neg-git.out" 2>&1; rc=$?
+  judge 2 git "draft-note.md" "判断 70: git の写しに追跡していないファイルがあれば exit 2" "${rc}"
+  rm -f "${G}/papers/ime-observation/kit/draft-note.md"
+  printf '%s\n' "An uncommitted line." >> "${G}/papers/ime-observation/kit/gen/README.md"
+  cx git > "${TMP}/neg-git.out" 2>&1; rc=$?
+  judge 2 git "README.md" "判断 70: git の写しで追跡中のファイルに未コミットの変更があれば exit 2" "${rc}"
+else ng "AC8 判断 70: 陰性対照の準備（一時的な git repo）に失敗した"; fi
 HOME_NATIVE="$("${PY}" -c "import os; print(os.path.expanduser('~'))")"
 neg home "experiment/notes.md" "Output was written under ${HOME_NATIVE}/work." "書き出す機械のホームディレクトリを混ぜると exit 1"
 if [ -f "${TMP}/neg-home.out" ] && grep -qF "${HOME_NATIVE}/work" "${TMP}/neg-home.out"; then ng "AC8 当たった値（混ぜた行の中身）が出力に出ている"; else ok "AC8 当たった値（混ぜた行の中身）を出力に出さない"; fi
