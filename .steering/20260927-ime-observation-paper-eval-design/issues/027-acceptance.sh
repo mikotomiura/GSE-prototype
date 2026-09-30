@@ -12,4 +12,5 @@ forbid_grep "${F}" '^def [A-Za-z_]*reading' "AC2 読みの付与を再実装し�
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/corpus/build_modern\.py$'
+style_ok
 finish

@@ -1,0 +1,6 @@
+# papers/ 全体で生ログを git に入れない（論文ごとの .gitignore が無い場所でも効かせる）。
+# 論文ごとの例外（例: ime-observation の kit/corpus/data/*.jsonl）は、その論文の .gitignore が上書きする。
+*.jsonl
+*.ndjson
+*.jsonl.*
+*.ndjson.*

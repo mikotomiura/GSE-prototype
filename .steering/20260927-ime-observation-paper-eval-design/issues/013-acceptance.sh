@@ -3,7 +3,7 @@
 set -u
 . "$(dirname "$0")/_acceptance-lib.sh"
 require_os windows
-L="${K}/logger"; M="${L}/Cargo.toml"; C="${L}/check_manifest.py"; DW="${L}/src/driver_windows.rs"; SUB="${L}/src/driver_windows"
+L="${K}/logger"; M="${L}/Cargo.toml"; C="${L}/check_manifest.py"; CU="${L}/check_manifest_upstream.internal.py"; DW="${L}/src/driver_windows.rs"; SUB="${L}/src/driver_windows"
 
 echo "[013] 単体ロガーの Windows ドライバ (1)"
 for f in "${DW}" "${SUB}/keyboard.rs" "${SUB}/ime_winevent.rs" "${L}/manifest.windows.json"; do need_file "${f}"; done
@@ -12,13 +12,13 @@ for f in "${DW}" "${SUB}/keyboard.rs" "${SUB}/ime_winevent.rs" "${L}/manifest.wi
 run_ok "AC1 cargo test が緑（Windows）" cargo test --manifest-path "${M}"
 run_ok "AC2 cargo build --release が緑（Windows）" cargo build --release --manifest-path "${M}"
 run_ok "AC3 check_manifest.py --self が緑" "${PY}" "${C}" --self
-run_ok "AC3 check_manifest.py --against-gse が緑" "${PY}" "${C}" --against-gse
+run_ok "AC3 check_manifest_upstream.internal.py --against-upstream が緑" "${PY}" "${CU}" --against-upstream
 
 # AC4
 cat > "${TMP}/m4.py" <<'EOF'
 import json, sys
 m = json.load(open(sys.argv[1], encoding="utf-8"))
-ex = [e for e in m.get("entries", []) if e.get("kind") == "excerpt" and str(e.get("gse_path", "")).endswith("hook_windows.rs")]
+ex = [e for e in m.get("entries", []) if e.get("kind") == "excerpt" and str(e.get("upstream_path", "")).endswith("hook_windows.rs")]
 syms = set(str(e.get("symbol")) for e in ex)
 print("hook_windows excerpts:", len(ex), sorted(syms))
 sys.exit(0 if {"is_observed_key", "classify_ime_nav_key"} <= syms else 1)

@@ -10,9 +10,9 @@ need_file "${B}"; need_file "${K}/corpus/README.md"
 
 # AC1-3
 selftest_ok "${B}"
-need_grep "${B}" "注記とルビを除く" "AC2 selftest ケース: 注記とルビを除く"
-need_grep "${B}" "同じ seed でバイト一致" "AC3 selftest ケース: 同じ seed でバイト一致"
-need_grep "${B}" "seed を変えると変わる" "AC3 selftest ケース: seed を変えると変わる（陰性対照）"
+need_grep "${B}" "annotations and ruby are removed" "AC2 selftest ケース: annotations and ruby are removed"
+need_grep "${B}" "same seed yields byte-identical output" "AC3 selftest ケース: same seed yields byte-identical output"
+need_grep "${B}" "a different seed changes the output" "AC3 selftest ケース: a different seed changes the output（陰性対照）"
 
 # AC4: 壊れた corpus を拒否する
 printf '%s\n' '{"kind":"header","format":"corpus/1","source":"aozora","tokenizer":"table","dict":"none"}' \

@@ -131,20 +131,22 @@ bash scripts/loop-run.sh "$T" --issues 024
 | id | 何を | どこで | 前提 | Done（観測できる条件） |
 |---|---|---|---|---|
 | **M0** | コーパスの確定: 作品を選ぶ・青空文庫から取得（★ 研究者の承認）・venv に `sudachipy` / `sudachidict_core` を入れて版を `kit/corpus/requirements.txt` に pin・`build_corpus.py` を回す | どちらでも | 002 | `kit/corpus/data/phrases.jsonl` がコミットされ `build_corpus.py --validate` が exit 0、SHA-256 と版が記録されている |
-| **M1** | ★ macOS の較正パイロット（design.md §1.1a）: 参照入力欄 ＋ 実行器（**実際に送る**）＋ 単体ロガー（**`seal_obs.py` で ImeShadow を封印**）で S1–S15 を各数回・3 速さ。IME のリセット手段・マーカーのキー・前面化の手段を確かめる | Mac | 003 004 006 007 010 011 012 015 ＋ M0 | `experiment/pilot-macos.md`（呼び出し列の型・oracle 一致率・時計の差とドリフト・フックへの到達率・1 試行の実時間）と封印の `seal.json`。⚠️ **封印を開けていない** |
+| **M1** | ★ macOS の較正パイロット（design.md §1.1a）: 参照入力欄 ＋ 実行器（**実際に送る**）＋ 単体ロガー（**`seal_obs.py` で ImeShadow を封印**）で S1–S15 を各数回・3 速さ。IME のリセット手段・マーカーのキー・前面化の手段を確かめる | Mac | 003 004 006 007 010 011 012 015 024 ＋ M0 | `experiment/pilot-macos.md`（呼び出し列の型・oracle 一致率・時計の差とドリフト・フックへの到達率・1 試行の実時間）と封印の `seal.json`。⚠️ **封印を開けていない** |
 | **M2** | macOS の正解の定義を決める（`gt_rules` の `mac_nstic`）・recipes とマーカーを直す・n を 1 試行の実時間で見直す（判断 14） | Mac | M1 | `experiment/gt_rules.json` と `kit/gen/recipes.json` の差分がコミットされ、根拠が `pilot-macos.md` にある |
-| **M3** | ★ **preregistration の凍結（macOS 版）**: 手順・定義・指標・n・速さの値（`[Pn]` で接地・citation-ssot）・除外規則・E2 の段・解析コードの commit | Mac | M2 ＋ 016 017 018 019 021 022 | `experiment/preregistration.md` に `frozen_at:` と `sha256:` の行があり、`run.sh`（020）が本番を止めなくなる。★ 凍結の commit にタグ |
+| **M3** | ★ **preregistration の凍結（macOS 版）**: 手順・定義・指標・n・速さの値（`[Pn]` で接地・citation-ssot）・除外規則・E2 の段・解析コードの commit | Mac | M2 ＋ 016 017 018 019 021 022 | `experiment/preregistration.md` に `frozen_at:` と `sha256:` の行があり、`run.sh`（020）が本番を止めなくなる。★ 凍結の commit にタグ。★ **凍結した事前登録を OSF Registries に登録し（判断 73・研究者が行う）、登録の URL・登録の日時・凍結の commit の書き出しの一覧の SHA-256 を `experiment/notes.md` に記録する。登録の日時が M4 の最初の run より前** |
 | **M4** | macOS 本計測（1 晩 1 セル: 標準 IME のライブ変換 ON / OFF・〔任意〕Google 日本語入力） | Mac | M3 ＋ 012 | 全 run ディレクトリが `validate_logs.py` / `emit.py --validate` を通り、`run.json` の SHA-256 が `data.md` にある |
-| **M5** | ★ Windows の較正パイロット（(a) IMM / (b) TSF の両経路・両者の区間が同じか） | G-GEAR | 005 008 009 013 014 015 ＋ M0 | `experiment/pilot-windows.md` と封印 |
-| **M6** | ★ **preregistration の追補の凍結（Windows 版）**: 正解の経路の選択と定義 | G-GEAR | M5 | 追補に `frozen_at:` と `sha256:`、実測より前であることの記録 |
+| **M5** | ★ Windows の較正パイロット（(a) IMM / (b) TSF の両経路・両者の区間が同じか） | G-GEAR | 005 008 009 013 014 015 024 ＋ M0 | `experiment/pilot-windows.md` と封印 |
+| **M6** | ★ **preregistration の追補の凍結（Windows 版）**: 正解の経路の選択と定義 | G-GEAR | M5 | 追補に `frozen_at:` と `sha256:`、実測より前であることの記録。★ **追補も OSF に登録し（判断 73・別の登録か更新かは M6 の前に一次で確かめる）、URL と登録の日時を `experiment/notes.md` に記録する。登録の日時が M7 の最初の run より前** |
 | **M7** | Windows 本計測（MS-IME 必須・〔任意〕Google 日本語入力） | G-GEAR（研究者） | M6 | M4 と同じ |
 | **M8** | E1 の解析（`run.sh`）と E2 の実行（021 / 022 を本番のログに） | どちらでも | M4 M7 ＋ 020 | `experiment/results/*.json` と E2 の結果 JSON がコミットされる |
-| **M10** | E3 の計測（両 OS・作業中 / 無操作） | 両方 | 023 ＋ 012 014 | `summarize_e3.py` の結果 JSON（「測れていない」でない） |
+| **M10** | E3 の計測（両 OS・作業中 / 無操作） | 両方 | 023 024 ＋ 012 014 | `summarize_e3.py` の結果 JSON（「測れていない」でない） |
 | **M11** | 〔任意〕実アプリへの転移確認 | 両方 | 025 ＋ M4 / M7 | 比較の結果 JSON |
 | **M12** | 公開: ライセンス全文を置く → `export.py` → **研究者が新しい公開 repo を作る** → push → リリース → Zenodo の DOI | どちらでも | 024 ＋ M8 M10 | DOI が `CITATION.cff` と原稿にある。⚠️ 外部への操作なので研究者が行う（または承認を得て行う） |
 | **M13** | 執筆と BRM への投稿（12 月）・〔任意〕CHI 2027 Posters（2027-01-21）—— カバーレターで併願を開示（判断 13） | — | M8 M10 M12 | 投稿の受付 |
 
 ★ M9 は欠番（design.md §8 の 9 を M8 に統合した）。
+★ 2026-09-30・判断 68: パイロットと本計測（M1 / M4 / M5 / M7 / M10）のロガーは **024 の `export.py` の書き出しからビルドする**（ログの `manifest_sha256` が公開の manifest と一致する）。→ M1 / M5 / M10 の前提に 024 を足した（M4 / M7 は M3 / M6 を経て同じ）。
+★ 2026-09-30・判断 73: 凍結（M3 / M6）は OSF Registries への登録で公開の日時を示す（private の GSE のタグだけでは読者が確かめられない）。→ M3 / M6 の Done に登録と記録を足した。
 
 ## 6. 縮退順（判断 14）と優先度
 

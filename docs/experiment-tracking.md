@@ -6,6 +6,7 @@ GSE の実験は主に (a) 較正スモーク（criterion label と MhD 二軸�
 (d) v0.4 アウトカム指標の閾値感度分析、である。再現性の単一真実源は本ファイル。
 検証の全体設計（X1/X2/Y 三層・GATE1–3・26 週 M0–M5）は `docs/research-positioning.md` §5/§6 と
 ユーザー検証 v0.4 設計 / 半年版 WBS を参照。方法論の出典は `docs/references.md` の V 名前空間 [V1][V4] 等。
+論文用の実験は `papers/<paper>/experiment/` に置いてよい。その場合も本規約（SEED / env.md / data.md / run.sh / notes.md）に従う（`.steering/20260927-ime-observation-paper-eval-design/decisions.md` 判断 21）。
 
 ## 検証方法論アンカー（X1/X2/Y を取り違えない）
 

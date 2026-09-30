@@ -1,0 +1,89 @@
+{
+  "upstream_repo_commit": "3fec903c82553f92b2fd8be94db1679edc26ed1d",
+  "entries": [
+    {
+      "kind": "excerpt",
+      "id": "is_observed_key",
+      "path": "src/driver_macos/keymap.rs",
+      "upstream_path": "src-tauri/src/input/hook_macos.rs",
+      "upstream_last_commit": "58e18f359ebd4eec645821e7031b5ec3f0706e01",
+      "start_anchor": "/// ★★★ **分析チャネルへ送るキー**かどうか（macOS の生 `CGKeyCode`）。",
+      "end_anchor": "// macOS CGKeyCode → Windows VK equivalent mapping",
+      "symbol": "is_observed_key",
+      "sha256": "7dc5ac13ace944c18d5f4429238168775c0b738e8bc4dff64ee997658aed12e2",
+      "upstream_range_sha256": null,
+      "check_decls": null,
+      "reason": null
+    },
+    {
+      "kind": "excerpt",
+      "id": "macos_vk_to_vk",
+      "path": "src/driver_macos/keymap.rs",
+      "upstream_path": "src-tauri/src/input/hook_macos.rs",
+      "upstream_last_commit": "58e18f359ebd4eec645821e7031b5ec3f0706e01",
+      "start_anchor": "// macOS CGKeyCode → Windows VK equivalent mapping",
+      "end_anchor": "// 層 2: runloop watchdog timer / 層 3: 再設置要求",
+      "symbol": "macos_vk_to_vk",
+      "sha256": "2379e3e9ec7d053d7d80acda7168947806d4e33c5d56d691eba8567b2d96bdee",
+      "upstream_range_sha256": null,
+      "check_decls": null,
+      "reason": null
+    },
+    {
+      "kind": "excerpt",
+      "id": "select_ime_source",
+      "path": "src/driver_macos/ime_source.rs",
+      "upstream_path": "src-tauri/src/input/ime_macos.rs",
+      "upstream_last_commit": "5aa05e4d81f62c8ba49c01362c45cb5a3ff23a6b",
+      "start_anchor": "/// どちらの情報源から IME 開閉状態を読むべきか。",
+      "end_anchor": "fn emit_ime_state(log_tx: &Sender<LogEntry>, on: bool, active: bool) {",
+      "symbol": "select_ime_source",
+      "sha256": "9c83cf583c58afdce8955fa1e7819236682d2c6423f9c738b923f69f853e388b",
+      "upstream_range_sha256": null,
+      "check_decls": null,
+      "reason": null
+    },
+    {
+      "kind": "new",
+      "id": "driver_macos",
+      "path": "src/driver_macos.rs",
+      "upstream_path": null,
+      "upstream_last_commit": null,
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "28773ca204e85fe3befc5f7c345a8af1633313d229bdbae6e7b09a2ff39c5253",
+      "upstream_range_sha256": null,
+      "check_decls": null,
+      "reason": "Entry point of the macOS driver: the listen-only event tap, its run-loop thread and start-up handshake, the forwarding thread, the tap callback, and the modifier and input-mode handling that feeds the conversion-session state machine. Newly written; the key-code tables and the input-source selection live in the submodules."
+    },
+    {
+      "kind": "new",
+      "id": "ime_source_poll",
+      "path": "src/driver_macos/ime_source.rs",
+      "upstream_path": "src-tauri/src/input/ime_macos.rs",
+      "upstream_last_commit": "5aa05e4d81f62c8ba49c01362c45cb5a3ff23a6b",
+      "start_anchor": "pub fn spawn_ime_open_polling_thread(",
+      "end_anchor": "// IME state source selection (pure — テストできる形に切り出す)",
+      "symbol": "spawn_ime_open_polling_thread",
+      "sha256": "fd711cc1024b450b3c8358589dd9d4e45a6ac5e8ea194a320f140bc0b9f42e9f",
+      "upstream_range_sha256": "abd9d1fdd8aee8cf4657dc9d7a80eb7b00066448329a3f3af11512c21b64378f",
+      "check_decls": null,
+      "reason": "Polling of the input source. The selection between the mode-key flag and the input-source query is excerpted; the polling loop and the query are newly written, because the query is submitted to the main dispatch queue without blocking, and the loop writes the flag only from a completed query."
+    },
+    {
+      "kind": "new",
+      "id": "driver_macos_tests",
+      "path": "src/driver_macos/tests.rs",
+      "upstream_path": null,
+      "upstream_last_commit": null,
+      "start_anchor": null,
+      "end_anchor": null,
+      "symbol": null,
+      "sha256": "49eef1059da8139e66f04188eed23acbaee788b48a20fb760d98686b9201e690",
+      "upstream_range_sha256": null,
+      "check_decls": null,
+      "reason": "Unit tests of the pure parts of the macOS driver, on cells and channels local to each test."
+    }
+  ]
+}

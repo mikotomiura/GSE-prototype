@@ -48,4 +48,5 @@ run_ok "AC7 check-shell-portability が緑" bash scripts/check-shell-portability
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/(kit/analysis/pipeline\.py|experiment/(run\.sh|config\.json|SEED|env\.md|data\.md|notes\.md))$'
+style_ok
 finish

@@ -10,7 +10,7 @@ need_file "${RC}"; need_file "${EX}"; need_file "${K}/run/README.md"
 
 # AC1 / AC2
 selftest_ok "${RC}"
-need_grep "${RC}" "子プロセスが死んだら aborted" "AC2 selftest ケース: 子プロセスが死んだら aborted（陰性対照）"
+need_grep "${RC}" "a dead child process marks the run aborted" "AC2 selftest ケース: 子プロセスが死んだら aborted（陰性対照）"
 
 # 最小の計画
 printf '%s\n' '{"kind":"header","format":"plan/1","os":"macos","seed":1,"generator_version":"0","config_sha256":"0000000000000000000000000000000000000000000000000000000000000000"}' \
@@ -39,4 +39,5 @@ run_ok "AC5 cell.example.json が JSON として読める" "${PY}" -c "import js
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/run/(run_cell\.py|cell\.example\.json|README\.md)$'
+style_ok
 finish

@@ -37,4 +37,5 @@ fi
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/refinput-macos/(RefInput\.swift|build\.sh|README\.md)$'
+style_ok
 finish
