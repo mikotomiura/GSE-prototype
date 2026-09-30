@@ -78,9 +78,11 @@
   - [x] 研究者に 3 問 → 判断 74〜76（書き出し器を公開しない・書き出しが全規則を回す・角括弧の例外をやめる）＋ 仕様の範囲の直し (a)〜(m)。024 の issue と acceptance に追補 2（`3eb83d84`）。直す前の版（引数だけ受け取る差し替え）で既存の検査 80 件は緑・追補 2 の陰性対照 37 件はすべて赤（`9023ca30`）
   - [x] 作業用エージェント（Sonnet）が `loop/024-fix2` で直す（約 22 分）。字義どおりの (f) は実物の `pipeline.py:1481` に当たり Stop → 同じ区切り文字の連なりだけを飛ばす読みを採った（判断 77・`e6932553`）。メインが説明を直した（`d8db7a80`）
     → clean な checkout（base と merge した木）で 024-acceptance.sh 失敗 0 件（✅ 117・一覧の SHA-256 `74e48394b9ed51de505257d1791df891997a1bada1e6049fe0c6875162ee4ac0`・89 ファイル・Windows）。直しを 1 つずつ戻す変異 18 本がすべて狙った selftest のケースで赤 → base へ merge（`b33e0818`）
-    → ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が同じ値になるか・POSIX だけの (c)(j) の検査が緑か（判断 68）
-  - [ ] /cross-review 2 巡目（直しの境界条件）→ 上限を 300,000 に戻す
-  - [ ] PR → CI 緑なら merge → main の CI を確かめる
+  - [x] /cross-review 2 巡目（直しの境界条件）: Codex ∥ code-reviewer ∥ security-checker → CRITICAL / HIGH 0 → 研究者に 1 問 → 判断 78（混ざった区切りも飛ばし、pipeline.py の selftest の架空の名前を一覧の名前に）＋ 仕様の範囲の直し (a)〜(n)（`70b4a8a8`・`192219a3`）。直す前の版で既存 118 件は緑・新しい 21 件は赤
+  - [x] 作業用エージェント（Sonnet）が `loop/024-fix3` で直す（約 21 分・名前は `harry`〔`alice` は pipeline の selftest のログイン名と重なる〕）→ base と merge した木の clean な checkout で 024-acceptance.sh 失敗 0 件（✅ 139・一覧の SHA-256 `298a470b94f0fe6a5b0d953ff0b37c0420e38afaedca757b0f227e309d5ca4a0`・89 ファイル）。変異 17 本: 15 本が赤・`localhost` はケースを足して赤（`4a610eb1`）・消した対訳表は git status の削除の検出と重なる → base へ merge（`403a7933`）
+  - [x] Codex の上限を 300,000 に戻した（2 巡・計 93,392 トークン・当日の合算 639,593 / 11 回）
+  - [ ] clean な checkout で Windows で回る全 acceptance → PR → CI 緑なら merge → main の CI を確かめる
+  - [ ] ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が Windows と一致するか・POSIX だけの検査（読めない dir・実行権限）が緑か（判断 68）
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
