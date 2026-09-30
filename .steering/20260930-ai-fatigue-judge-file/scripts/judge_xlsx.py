@@ -8,6 +8,11 @@
   5 AI の判定・懸念の語が無いことは check_judge_xlsx.py が確かめる（本スクリプトも保存前に呼ぶ）
   6 data_d.py の文面を使い回さない（使っていない）
 
+2026-10-01: 259 件の間引き（../20260930-ai-fatigue-protocol の decisions.md 判断 3〜8・dedup-259.md）を反映した。
+  同じ報告の版違い 5 件を『追加候補』から外して『寄せた記録』シートに移し、両方の判定シートに「同じ研究の群」の列、
+  判定者 1 のファイルだけに「内容の群」の列を足す（判定者 2 のファイルに出すかは研究者の確認待ち・判断 8）。
+  ★ candidate_records() は追加候補の評価版と共有なので 225 件のまま返し、外すのは build() の中だけ。
+
 使い方（uv で openpyxl を入れて実行する）:
   python judge_xlsx.py --judge 1 --out <出力 .xlsx> [--copy-to <ディレクトリ>] [--force]
 """
@@ -74,7 +79,20 @@ CAND_HEADERS = ["候補番号", "出どころ", "事実のファイルでの表�
 CAND_WIDTHS = [9, 12, 30, 40, 6, 20, 24, 16, 70]
 INPUT_WIDTHS = [13, 11, 14, 10, 12, 36, 11]
 BIB_COLUMNS = {"判定シート": {"論文タイトル", "掲載誌・媒体"},
-               "追加候補": {"事実のファイルでの表記", "題名（書誌の記録）", "掲載誌", "要点（事実のファイルの記述）"}}
+               "追加候補": {"事実のファイルでの表記", "題名（書誌の記録）", "掲載誌", "要点（事実のファイルの記述）"},
+               "寄せた記録": {"題名（書誌の記録）", "掲載誌"}}
+
+# ---------------------------------------------------------------- 間引き（../20260930-ai-fatigue-protocol の判断 3〜8）
+PROTO = os.path.join(STEER, "20260930-ai-fatigue-protocol")
+DEDUP_JSON = os.path.join(PROTO, "evidence", "dedup", "classification_2026-09-30_final.json")
+CONTENT_JSON = os.path.join(PROTO, "evidence", "dedup", "content_groups_2026-09-30_final.json")
+DEDUP_MD = os.path.join(PROTO, "dedup-259.md")
+KEY_RE = re.compile(r"(?<![A-Za-z0-9-])(?:AF\d{3}|S\d\d-\d\d)(?![0-9])")
+GROUP_HEADER = "同じ研究の群"
+CONTENT_HEADER = "内容の群（機械の分類・並べ替えのため・判定の材料ではない）"
+GROUP_WIDTH, CONTENT_WIDTH = 34, 22
+MERGED_HEADERS = ["寄せた記録", "版", "題名（書誌の記録）", "年", "掲載誌", "DOI", "代表（残した記録）", "一致点"]
+MERGED_WIDTHS = [11, 22, 50, 6, 22, 26, 13, 60]
 LABEL_HEADERS = {"研究", "書誌", "年"}
 SKIP_HEADERS = {"読んだ範囲"}  # サーヴェイで読んだ範囲（判定者の記入欄『読んだ範囲』と紛らわしいので要点に入れない）
 
@@ -241,6 +259,91 @@ def doi_url(doi):
     return "https://doi.org/" + urllib.parse.quote(doi, safe="/:;()._-")
 
 
+def md_table(path, heading):
+    """見出し（番号から始まる。ちょうど 1 つ）の直後の最初の表を、列の見出し → 値の辞書の列で返す（次の見出しで止まる）。"""
+    lines = open(path, encoding="utf-8").read().split("\n")
+    heads = [i for i, l in enumerate(lines) if l.startswith("#") and l.lstrip("#").strip().startswith(heading)]
+    if len(heads) != 1:
+        raise ValueError(f"{path}: 節『{heading}』がちょうど 1 つではない（{len(heads)}）")
+    header, rows = None, []
+    for l in lines[heads[0] + 1:]:
+        if l.startswith("#"):
+            break
+        if not l.startswith("|"):
+            if rows:
+                break  # 最初の表だけ
+            continue
+        if SEP_RE.match(l):
+            continue
+        v = [strip_md(x).replace("★", "").strip() for x in cells(l)]
+        if header is None:
+            header = v
+            continue
+        if len(v) != len(header):
+            raise ValueError(f"{path} {heading}: 列の数が見出しと違う: {l[:40]}")
+        rows.append(dict(zip(header, v)))
+    if not rows:
+        raise ValueError(f"{path} {heading}: 表が無い")
+    return rows
+
+
+def one_key(text, where):
+    keys = KEY_RE.findall(text)
+    if len(keys) != 1:
+        raise ValueError(f"dedup-259.md {where}: 記録の鍵がちょうど 1 つではない: {text}")
+    return keys[0]
+
+
+def dedup():
+    """間引きの結果（dedup-259.md・decisions.md 判断 3〜7）。
+    merged: 寄せた鍵 → (代表の鍵, 一致点, 版)。groups: 残る行の鍵 → 「同じ研究の群」の列の文。content: 鍵 → 内容の群。
+    ★ 分けの記録（JSON）と、判定者に写す文（dedup-259.md の表）の鍵が一致しなければ止まる。"""
+    pairs = json.load(open(DEDUP_JSON, encoding="utf-8"))["pairs"]
+    merged = {}
+    for p in pairs:
+        if p["cls"] != "同じ報告":
+            continue
+        rep = p["representative"]
+        if rep not in (p["a"], p["b"]):
+            raise ValueError(f"同じ報告の代表が組の中に無い: {p['a']}・{p['b']}")
+        drop = p["b"] if rep == p["a"] else p["a"]
+        if drop.startswith("AF") or drop in merged:
+            raise ValueError(f"DB の行・2 回目は寄せない: {drop}")  # design.md §7.3: DB の行は消さない
+        merged[drop] = rep
+    if set(merged) & set(merged.values()):
+        raise ValueError("代表が別の組で寄せられている")
+    md = {}
+    for r in md_table(DEDUP_MD, "2. "):
+        ver = re.fullmatch(r"\S+（(.+)）", r["寄せる記録"])  # 例: S04-44（medRxiv の前刷り）
+        if ver is None:
+            raise ValueError(f"dedup-259.md §2: 寄せる記録に版の括弧が無い: {r['寄せる記録']}")
+        md[one_key(r["寄せる記録"], "§2")] = (one_key(r["代表（残す）"], "§2"), r["一致点"], ver.group(1))
+    if {k: v[0] for k, v in md.items()} != merged:
+        raise ValueError("dedup-259.md §2 の寄せる記録・代表が JSON と違う")
+    raw = {}
+    for p in pairs:
+        if p["group"]:
+            raw.setdefault(p["group"], set()).update((p["a"], p["b"]))
+    texts = {}
+    for r in md_table(DEDUP_MD, "3. "):
+        texts[r["群"]] = (r["記録"], f"{r['群']}: {r['記録']} ／ 一致点: {r['一致点（事実）']} ／ 違う点: {r['違う点（事実）']}")
+    for r in md_table(DEDUP_MD, "3.1 "):
+        texts[r["群"]] = (r["記録"], f"{r['群']}（要確認）: {r['記録']} ／ 分からないこと: {r['何が分からないか']}")
+    if set(texts) != set(raw):
+        raise ValueError(f"dedup-259.md の群が JSON と違う: {sorted(set(texts) ^ set(raw))}")
+    groups = {}
+    for g, keys in sorted(raw.items()):
+        shown = {merged.get(k, k) for k in keys}
+        if set(KEY_RE.findall(texts[g][0])) != keys | shown:
+            raise ValueError(f"dedup-259.md の {g} の記録が JSON と違う")
+        for k in shown:
+            if k in groups:
+                raise ValueError(f"{k} が 2 つの群にある")
+            groups[k] = texts[g][1]
+    content = {k: v["group"] for k, v in json.load(open(CONTENT_JSON, encoding="utf-8"))["groups"].items()}
+    return {"merged": md, "groups": groups, "content": content}
+
+
 # ---------------------------------------------------------------- シート
 def header_block(ws, title, subtitle, ncol):
     last = col(ncol)
@@ -309,8 +412,9 @@ def link(cell, url):
 
 def intro_rows(judge):
     rows = [
-        ["このファイル", f"判定者 {judge} が、AI 疲労の文献を独立に判定するためのファイル。書誌・リンク・事実の要点・判定の基準だけを載せ、"
-                        "AI が出した判定や評価は載せていない。"],
+        ["このファイル", f"判定者 {judge} が、AI 疲労の文献を独立に判定するためのファイル。書誌・リンク・事実の要点・間引きの事実・判定の基準だけを載せ、"
+                        "AI が出した判定や評価は載せていない。"
+                        + ("（『内容の群』の列は機械の分類で、判定や評価ではない。）" if judge == 1 else "")],
         ["判定者", f"判定者 {judge}"],
     ]
     # ★ 2026-09-30: 追加候補にも AI の評価版を作り、判定者 1 は判定の前に読む（研究者の決定・decisions.md 判断 21）。
@@ -321,13 +425,31 @@ def intro_rows(judge):
                                                f"追加候補についても、判定の前に、{cand_file}を判断材料として読んだ（どちらも 2026-09-30 に研究者が決め、記録した）。"])
         rows.append(["追加候補について", f"『追加候補』シートの文献の AI の評価は、{cand_file}にあり、このファイルには載せていない。"
                                      "評価版は、サーヴェイの AI の案（元の案のファイルの場所も評価版に書いてある）を 1 件ずつ見直したもので、"
-                                     "元の案のファイルと評価版ファイルの『検索漏れ候補』シートも同じ種類の AI の出力にあたる。"])
+                                     "元の案のファイルと評価版ファイルの『検索漏れ候補』シートも同じ種類の AI の出力にあたる。"
+                                     "評価版は間引きの前に作ったもので作り直していないので、『寄せた記録』の 5 件の行が残っている"
+                                     "（このファイルではその 5 件を判定しない）。"])
     else:
         rows.append(["判定の前に開かないもの", "判定が終わるまで、評価版ファイル（AI の評価のシートを足した xlsx）の AI の評価のシートと、元の DB の『AI…』のシート、"
                                         f"{cand_file}、研究のメモの一次確認のファイル（memo-issues.md）を開かない。開いた場合は、判定の記録にそのことを書く。"])
         rows.append(["追加候補について", "『追加候補』シートの文献には、AI の出力（サーヴェイの AI の案・評価版ファイルの『検索漏れ候補』シート・"
                                      f"{cand_file}）が別にあるが、このファイルには載せていない。判定が終わるまで、それらのファイルを開かない。"])
     rows += [
+        ["間引き（2026-09-30）", "同じ論文の版違い（前刷りと雑誌の版・リポジトリの写し）の 5 件を、判定の前に 1 件に寄せ、『追加候補』から外した"
+                              "（225 件 → 220 件）。寄せた記録と、残した記録（代表）・一致点は『寄せた記録』シートにある。残す記録は、"
+                              "雑誌の版 ＞ 会議録 ＞ 前刷り ＞ リポジトリの写しの順で選んだ（元の DB の行は消していない）。"
+                              "同じ標本の別の論文と、内容が近い研究は消していない。"],
+        ["『同じ研究の群』の列", "著者が重なり、標本の N・国・対象・収集の時期のうち 2 つ以上が一致するなど、同じ標本の別の論文である可能性を示す"
+                             "事実がある記録を、群（G01〜G11）で結んだ（行は消していない）。U1・U2 は、抄録に標本の情報が無く確かめられなかった組"
+                             "（要確認）。列には一致点と違う点の事実だけを書いた。同じ標本として扱うかは、判定者が本文で確かめて決める"
+                             "（『判定基準』シートの「同じ研究の群と版違い」）。"],
+    ]
+    if judge == 1:
+        rows.append(["『内容の群』の列", "対象｜AI の種類｜デザイン（一次研究でない記録は「レビュー等」）を、題名・抄録の語から機械で付け、"
+                                     "一部を作成者が読んで直したもの。元の DB の 34 件は、DB の『研究情報』と『分類』（尺度・理論・既存レビュー）も使った。"
+                                     "無作為の 30 件の確かめでは、3 つとも合っていたのは 20 件で、間違いがありうる。"
+                                     "並べ替え・見比べのためのもので、判定の材料ではない。"])
+    rows += [
+        ["間引きの記録", "間引きの手順・件数・調べて別の研究と分かった組は、研究の記録（dedup-259.md）にある。判定者 1・2 とも読んでよい。"],
         ["進め方", "『判定基準』シートの手順に従う。黄色の欄だけを入力する（ドロップダウンから選ぶ）。書誌と要点の欄は変えない。"],
         ["本文の入手", "有料の本文は入手しない（2026-09-30 の研究者の決定）。『本文の入手（OpenAlex）』の欄は OpenAlex の記録（2026-09-30）で、"
                     "無料の版が無いものは本文を読めない。"],
@@ -356,6 +478,9 @@ CRITERIA = [
     ["除外理由", "E1＝AI が人の疲労を検出・予測する道具であるだけ／E2＝疲労を定義・測定・質的分析していない（認知負荷・不安・過信だけなど）／"
              "E3＝疲労を測るが AI の利用・監督と関係づけていない／E4＝一次研究でない／E5＝重複出版・同じ標本・版違い／"
              "E6＝全文が手に入らず判定できない（→ 保留）。この表に無い理由で除外しない。"],
+    ["同じ研究の群と版違い（2026-09-30）", "版違い（同じ論文の前刷りと雑誌の版など）の 5 件は、判定の前に 1 件に寄せた（『寄せた記録』シート。"
+                                       "寄せた記録は判定しない）。『同じ研究の群』の列は、同じ標本の別の論文である可能性を示す事実で、"
+                                       "E5 に当たるかは判定者が本文で確かめて決める。"],
     ["注意", "研究デザインや報告の水準は、範囲の判断に使わない（引用の範囲で扱う）。結果の向き（疲労が増える・減る）で範囲を変えない。"],
     ["根拠メモ", "選んだ理由を短く書く（例: 項目文に AI が入る・疲労は一般の尺度・本文は有料で読めない）。"],
 ]
@@ -393,48 +518,82 @@ def build(judge):
     if sha256(DB_XLSX) != DB_SHA:
         sys.exit(f"元の DB の SHA-256 が固定値と違う: {DB_XLSX}")
     oa = load_oa()
+    dd = dedup()
     db = openpyxl.load_workbook(DB_XLSX, data_only=True)["文献DB"]
     wb = openpyxl.Workbook()
     text_sheet(wb, "はじめに", "AI 疲労 文献 DB｜判定者用ファイル", "黄色の欄だけを入力する。", intro_rows(judge), first=True)
     text_sheet(wb, "判定基準", "判定基準（評価プロトコル v1.0 ＋ 2026-09-30 の範囲の決定）", "判定者 1・2 で共通の基準。", CRITERIA)
 
+    # 間引きの列（書誌・要点と記入欄の間）。★ 内容の群は判定者 1 だけ（判断 8）
+    extra = [GROUP_HEADER] + ([CONTENT_HEADER] if judge == 1 else [])
+    extra_w = [GROUP_WIDTH] + ([CONTENT_WIDTH] if judge == 1 else [])
+
+    def extra_vals(key):
+        if key not in dd["content"]:
+            raise ValueError(f"内容の群に {key} が無い")
+        return [dd["groups"].get(key)] + ([dd["content"][key]] if judge == 1 else [])
+
     # DB 34 件
     ws = wb.create_sheet("判定シート")
-    headers = DB_HEADERS + INPUT_HEADERS
+    headers = DB_HEADERS + extra + INPUT_HEADERS
+    widths = DB_WIDTHS + extra_w + INPUT_WIDTHS
     rows, ids = [], []
     for r in range(5, 39):
         v = [db.cell(r, c).value for c in range(1, 15)]
         ids.append(v[0])
         doi = v[7] if v[7] and str(v[7]).startswith("10.") else None
-        rows.append([v[0], v[4], v[5], v[3], v[6], v[8], v[7], v[10], oa_label(oa, doi)] + [None] * len(INPUT_HEADERS))
+        rows.append([v[0], v[4], v[5], v[3], v[6], v[8], v[7], v[10], oa_label(oa, doi)] + extra_vals(v[0]) + [None] * len(INPUT_HEADERS))
     header_block(ws, "判定シート｜元の DB 34 件", "DOI・URL から論文のページを開く。選択肢は『判定基準』シート。", len(headers))
-    put_table(ws, headers, DB_WIDTHS + INPUT_WIDTHS, rows)
+    put_table(ws, headers, widths, rows)
+    ws.row_dimensions[4].height = max(36, row_height(headers, widths))  # 長い列の見出し（put_table は評価版と共有なので変えない）
     last = 4 + len(rows)
     for r in range(5, last + 1):
         d = ws.cell(r, 7).value
         link(ws.cell(r, 7), doi_url(d) if d and str(d).startswith("10.") else None)
         link(ws.cell(r, 8), ws.cell(r, 8).value)
-    input_columns(ws, headers, len(DB_HEADERS) + 1, last, "JudgeDB")
+    input_columns(ws, headers, len(DB_HEADERS) + len(extra) + 1, last, "JudgeDB")
 
-    # 追加候補
+    # 追加候補（★ 同じ報告の版違いを外す・判断 3）
+    recs = candidate_records(oa)
+    keep = [m for m in recs if m["cid"] not in dd["merged"]]
+    if len(recs) - len(keep) != len(dd["merged"]) or any(v[0] not in {m["cid"] for m in keep} for v in dd["merged"].values()):
+        raise ValueError("寄せる記録・代表が追加候補に無い")
     wc = wb.create_sheet("追加候補")
-    cheaders = CAND_HEADERS + INPUT_HEADERS
+    cheaders = CAND_HEADERS + extra + INPUT_HEADERS
+    cwidths = CAND_WIDTHS + extra_w + INPUT_WIDTHS
     crows = []
-    for m in candidate_records(oa):
+    for m in keep:
         crows.append([m["cid"], m["src"], m["label"], m["title"], m["year"], m["journal"], m["doi"] or "", m["oa"], m["points"]]
-                     + [None] * len(INPUT_HEADERS))
+                     + extra_vals(m["cid"]) + [None] * len(INPUT_HEADERS))
     header_block(wc, f"追加候補｜サーヴェイで見つかった DB に無い文献（{len(crows)} 件）",
-                 "DB の行には足していない。要点はサーヴェイの事実のファイルの記述の写し。判定はリンク先の抄録・本文で行う。", len(cheaders))
-    put_table(wc, cheaders, CAND_WIDTHS + INPUT_WIDTHS, crows)
+                 f"DB の行には足していない。版違いの {len(dd['merged'])} 件は『寄せた記録』シートに移した。"
+                 "要点はサーヴェイの事実のファイルの記述の写し。判定はリンク先の抄録・本文で行う。", len(cheaders))
+    put_table(wc, cheaders, cwidths, crows)
+    wc.row_dimensions[4].height = max(36, row_height(cheaders, cwidths))
     clast = 4 + len(crows)
     for r in range(5, clast + 1):
         d = wc.cell(r, 7).value
         link(wc.cell(r, 7), doi_url(d) if d else None)
-    input_columns(wc, cheaders, len(CAND_HEADERS) + 1, clast, "JudgeExtra")
+    input_columns(wc, cheaders, len(CAND_HEADERS) + len(extra) + 1, clast, "JudgeExtra")
+
+    # 寄せた記録（候補の並びの順）
+    wm = wb.create_sheet("寄せた記録")
+    mrows = []
+    for m in recs:
+        if m["cid"] in dd["merged"]:
+            rep, match, ver = dd["merged"][m["cid"]]
+            mrows.append([m["cid"], ver, m["title"], m["year"], m["journal"], m["doi"] or "", rep, match])
+    header_block(wm, f"寄せた記録｜同じ論文の版違い（{len(mrows)} 件）",
+                 "判定の前に 1 件に寄せ、『追加候補』から外した記録。代表（残した記録）の行で判定する。", len(MERGED_HEADERS))
+    put_table(wm, MERGED_HEADERS, MERGED_WIDTHS, mrows)
+    jd = MERGED_HEADERS.index("DOI") + 1
+    for r in range(5, 5 + len(mrows)):
+        d = wm.cell(r, jd).value
+        link(wm.cell(r, jd), doi_url(d) if d else None)
 
     # 集計
     agg = []
-    for sheet, n_last, n_in in (("判定シート", last, len(DB_HEADERS)), ("追加候補", clast, len(CAND_HEADERS))):
+    for sheet, n_last, n_in in (("判定シート", last, len(DB_HEADERS) + len(extra)), ("追加候補", clast, len(CAND_HEADERS) + len(extra))):
         for h in ("題名・抄録段", "全文段"):
             L = col(n_in + INPUT_HEADERS.index(h) + 1)
             for v in ("含める", "除外", "保留", UNDECIDED):
