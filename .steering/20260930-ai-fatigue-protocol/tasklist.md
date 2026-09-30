@@ -21,20 +21,20 @@
 ## 検索式の開発
 - [x] ERIC・arXiv・Zenodo の検索の構文を一次で確かめる
 - [x] `evidence/search_dev.py` と `test_search_dev.py`（11 本緑・変異 5 件がすべて赤）
-- [ ] 種 25 件が各情報源に記録されているかを DOI で確かめる
-- [ ] v0 を回す（件数・種の再現）→ 必要なら版を上げる（`evidence/search-dev.md`・判断）
+- [x] 種 25 件が各情報源に記録されているかを DOI で確かめる（Europe PMC 7・Semantic Scholar 22〜23・arXiv 1・Zenodo 4。ERIC は DOI で引く口が無い）
+- [x] v0 を回す（件数・種の再現・雑音の見積もり）。取得の直し（Zenodo・ERIC・Semantic Scholar の種の確かめ・途中で切れた応答）を実行の後に入れた（判断 11）。語の欠けによる落ちは無く、版は上げていない（`evidence/search-dev.md`）
 
 ## プロトコル
-- [ ] 登録前の段の年表を一次（ノート・コミット時刻）で裏取りして付録 A に書く（間引きも含める）
-- [ ] `protocol-ja.md` §0〜§6・付録 B〜E（重複除去の節に §7 の規則）
-- [ ] `scripts/check_protocol_here.py`（禁止語・GSRR の 65 項目）
+- [x] 登録前の段の年表を一次（判断の記録の行・コミット時刻）で書いた（付録 A・A0〜A30。サブエージェントの材料は使わず、一次から書き直した）
+- [x] `protocol-ja.md` §0〜§7・付録 A〜G（重複除去の節に §7 の規則・AI の予備評価の節・確認待ちの一覧）
+- [x] `scripts/check_protocol_here.py`（記録の鍵の行の禁止語・内部の語・GSRR の 65 項目と対応表。違反 0・陰性対照 2 と変異 28 がすべて期待どおり・判断 12）
 
 ## 理論の文献（S-09）
-- [ ] 書誌を Crossref で取る → `evidence/theory_rows.py` で xlsx
-- [ ] `scripts/check_theory_rows.py`（変異で赤）→ archive と Downloads
+- [x] 書誌を Crossref で取る → `evidence/theory_rows.py` で xlsx（23 件・判断 15）
+- [x] `scripts/check_theory_rows.py`（違反 0・陰性対照 2 と変異 15 がすべて期待どおり）→ archive と Downloads
 
 ## 検査とレビュー
-- [ ] issue-status.md
+- [x] issue-status.md
 - [ ] code-reviewer・security-checker（並列）
 - [ ] `/cross-review` 2 巡（Codex の当日の実消費を先に確かめる）
 

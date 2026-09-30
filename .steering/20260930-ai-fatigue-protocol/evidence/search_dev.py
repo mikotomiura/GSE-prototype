@@ -13,6 +13,7 @@
 import argparse
 import datetime
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -87,6 +88,23 @@ def zenodo_query(a, f):
     return f"({' OR '.join(map(quote, a))}) AND ({' OR '.join(map(quote, f))})"
 
 
+def zenodo_subqueries(a, f):
+    """★ 2026-10-01（decisions.md 判断 11）: Zenodo は A AND F の 1 本の式に 500 を返した。
+    F の語ごとの (A) AND (f) に分け、結果の和を取る（A AND (f1 OR … OR fn) と論理的に同じ）。語は変えない。"""
+    return [f"({' OR '.join(map(quote, a))}) AND ({quote(t)})" for t in f]
+
+
+SPLIT_BY_F = {"zenodo"}  # 取得で F の語ごとに分けて和を取る情報源（判断 11）
+ZENODO_PAGE = 25  # 判断 11: Zenodo の匿名の問い合わせの 1 ページの上限
+
+
+def eric_doi(url):
+    """★ 判断 11: ERIC の API は DOI の欄を返さない。url の欄が doi.org のリンクのときだけ DOI とみなす。"""
+    if url and re.match(r"^https?://(dx\.)?doi\.org/", url.strip(), re.I):
+        return norm_doi(url)
+    return None
+
+
 def queries(version):
     """版の検索式を (source, name, query) の並びで返す。"""
     v = VERSIONS[version]
@@ -118,7 +136,7 @@ def get(url, tries=6):
                 wait *= 2
                 continue
             raise
-        except (urllib.error.URLError, TimeoutError):
+        except (urllib.error.URLError, TimeoutError, http.client.IncompleteRead):  # ★ 判断 11: 途中で切れた応答も再試行
             if i < tries - 1:
                 time.sleep(wait)
                 wait *= 2
@@ -203,6 +221,9 @@ def fetch_ids(source, query):
             d = json.loads(get(u))["response"]
             for x in d["docs"]:
                 ids.add(("eric", x["id"]))
+                doi = eric_doi(x.get("url"))  # ★ 判断 11: 種の再現を DOI で数えるため
+                if doi:
+                    ids.add(("doi", doi))
             start += 2000
             if start >= d["numFound"]:
                 break
@@ -225,13 +246,15 @@ def fetch_ids(source, query):
     if source == "zenodo":
         page = 1
         while True:
-            u = "https://zenodo.org/api/records?" + urllib.parse.urlencode({"q": query, "size": 100, "page": page})
+            # ★ 判断 11: 匿名の問い合わせは 1 ページ 25 件まで（26 以上は 400「Page size cannot be greater than 25」）
+            u = "https://zenodo.org/api/records?" + urllib.parse.urlencode(
+                {"q": query, "size": ZENODO_PAGE, "page": page})
             d = json.loads(get(u))
             hits = d["hits"]["hits"]
             for h in hits:
                 doi = h.get("doi") or (h.get("metadata") or {}).get("doi")
                 ids.add(("doi", norm_doi(doi)) if doi else ("zenodo", str(h.get("id"))))
-            if not hits or page * 100 >= d["hits"]["total"]:
+            if not hits or page * ZENODO_PAGE >= d["hits"]["total"]:
                 break
             page += 1
             time.sleep(1.0)
@@ -247,7 +270,10 @@ def seed_presence(source, doi):
             {"query": f'DOI:"{d}"', "format": "json", "resultType": "idlist", "pageSize": 1})
         return json.loads(get(u))["hitCount"] > 0
     if source == "s2":
-        u = "https://api.semanticscholar.org/graph/v1/paper/DOI:" + urllib.parse.quote(d, safe="/") + "?fields=title"
+        # ★ 判断 11: Semantic Scholar は arXiv の記録を DataCite の DOI でなく arXiv の ID で持つ
+        m = re.match(r"10\.48550/arxiv\.(.+)$", d)
+        key = f"ARXIV:{m.group(1)}" if m else "DOI:" + urllib.parse.quote(d, safe="/")
+        u = "https://api.semanticscholar.org/graph/v1/paper/" + key + "?fields=title"
         try:
             get(u, tries=4)
             return True
@@ -271,9 +297,32 @@ def now():
     return datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).isoformat(timespec="seconds")
 
 
+def qsha(q):
+    return hashlib.sha256(q.encode("utf-8")).hexdigest()
+
+
+def by_ref(obj):
+    """★ 2026-10-01（decisions.md 判断 13）: 記録の JSON では、検索式を SHA-256 で持つ（式の本文は search-dev.md と
+    protocol-ja.md の付録 D。前タスクの検査器が JSON の 500 字を超える文字列を抄録の混入として止めるため）。
+    `query`（文字列）を `query_sha256` に、`subqueries`（文字列の並び）を `subqueries_sha256` に置き換える。"""
+    if isinstance(obj, list):
+        return [by_ref(x) for x in obj]
+    if not isinstance(obj, dict):
+        return obj
+    out = {}
+    for k, v in obj.items():
+        if k == "query" and isinstance(v, str):
+            out["query_sha256"] = qsha(v)
+        elif k == "subqueries" and isinstance(v, list):
+            out["subqueries_sha256"] = [qsha(x) for x in v]
+        else:
+            out[k] = by_ref(v)
+    return out
+
+
 def write_json(path, obj):
     with open(path, "x", encoding="utf-8", newline="\n") as f:  # 既存の記録を上書きしない
-        json.dump(obj, f, ensure_ascii=False, indent=1)
+        json.dump(by_ref(obj), f, ensure_ascii=False, indent=1)
         f.write("\n")
 
 
@@ -329,11 +378,19 @@ def main(argv=None):
             if src != a.source or (a.name and name != a.name):
                 continue
             t0 = now()
-            ids = fetch_ids(src, q)
+            subs = None
+            if src in SPLIT_BY_F and name == "main":  # ★ 判断 11: F の語ごとに分けて和を取る
+                v = VERSIONS[a.version]
+                subs = zenodo_subqueries(v["A"], v["F"])
+                ids = set()
+                for sq in subs:
+                    ids |= fetch_ids(src, sq)
+            else:
+                ids = fetch_ids(src, q)
             path = os.path.join(store, f"ids_{a.version}_{src}_{name}.json")
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(dict(version=a.version, source=src, name=name, query=q, started=t0, finished=now(),
-                               ids=sorted(map(list, ids))), f)
+                json.dump(dict(version=a.version, source=src, name=name, query=q, subqueries=subs, started=t0,
+                               finished=now(), ids=sorted(map(list, ids))), f)
             print(src, name, len(ids), path)
         return 0
 
@@ -347,7 +404,8 @@ def main(argv=None):
             ids = {tuple(x) for x in d["ids"]}
             r = recall(ids, seeds)
             blob = "\n".join(sorted("\t".join(x) for x in ids)).encode("utf-8")
-            rows.append(dict(source=src, name=name, query=q, started=d["started"], finished=d["finished"],
+            rows.append(dict(source=src, name=name, query=q, subqueries=d.get("subqueries"),
+                             started=d["started"], finished=d["finished"],
                              n_ids=len(ids), n_doi=sum(1 for x in ids if x[0] == "doi"),
                              ids_sha256=hashlib.sha256(blob).hexdigest(),
                              seeds_found=sorted(k for k, v in r.items() if v),

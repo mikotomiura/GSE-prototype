@@ -1,0 +1,9 @@
+{
+ "executed": "2026-10-01T02:32:37+09:00",
+ "note": "2026-10-01b の Semantic Scholar の S08-02 が 429 で確かめられなかったので、arXiv の ID（ARXIV:2609.00506）で 1 件だけ引き直した（decisions.md 判断 11）",
+ "presence": {
+  "s2": {
+   "S08-02": true
+  }
+ }
+}

@@ -73,6 +73,107 @@ class TestSeeds(unittest.TestCase):
         self.assertEqual(len({v["doi"] for v in d.values()}), 25)
 
 
+class TestFetchFixes(unittest.TestCase):
+    """★ 2026-10-01（decisions.md 判断 11）の取得の直し。語は v0 のまま変えない。"""
+
+    def test_zenodo_split_keeps_every_F_term_and_the_whole_A_block(self):
+        v = S.VERSIONS["v0"]
+        subs = S.zenodo_subqueries(v["A"], v["F"])
+        self.assertEqual(len(subs), len(v["F"]))
+        a_block = "(" + " OR ".join(map(S.quote, v["A"])) + ")"
+        for t, sq in zip(v["F"], subs):
+            self.assertEqual(sq, f"{a_block} AND ({S.quote(t)})")
+        self.assertIn("zenodo", S.SPLIT_BY_F)
+
+    def test_zenodo_pages_within_the_anonymous_limit(self):
+        self.assertLessEqual(S.ZENODO_PAGE, 25)
+        seen = []
+        orig = S.get
+        try:
+            S.get = lambda url, tries=6: seen.append(url) or json.dumps({"hits": {"total": 30, "hits": [
+                {"doi": f"10.5281/zenodo.{len(seen)}{i}"} for i in range(25 if len(seen) == 1 else 5)]}})
+            ids = S.fetch_ids("zenodo", "(AI) AND (fatigue)")
+        finally:
+            S.get = orig
+        self.assertEqual(len(seen), 2)  # 30 件を 25 件ずつ 2 ページ
+        self.assertTrue(all("size=25" in u for u in seen))
+        self.assertEqual(len(ids), 30)
+
+    def test_get_retries_an_incomplete_read(self):
+        import http.client
+        calls = []
+
+        class _R:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self):
+                calls.append(1)
+                if len(calls) == 1:
+                    raise http.client.IncompleteRead(b"x", 10)
+                return b'{"ok": 1}'
+
+        orig_open, orig_sleep = S.OPENER.open, S.time.sleep
+        try:
+            S.OPENER.open = lambda req, timeout=90: _R()
+            S.time.sleep = lambda s: None
+            self.assertEqual(S.get("https://zenodo.org/api/records?q=x"), '{"ok": 1}')
+        finally:
+            S.OPENER.open, S.time.sleep = orig_open, orig_sleep
+        self.assertEqual(len(calls), 2)
+
+    def test_eric_doi_only_from_doi_links(self):
+        self.assertEqual(S.eric_doi("http://dx.doi.org/10.1111/BJET.70043"), "10.1111/bjet.70043")
+        self.assertEqual(S.eric_doi("https://doi.org/10.1/x"), "10.1/x")
+        self.assertIsNone(S.eric_doi("https://files.eric.ed.gov/fulltext/ED1.pdf"))
+        self.assertIsNone(S.eric_doi("https://example.org/doi.org/10.1/x"))
+        self.assertIsNone(S.eric_doi(None))
+
+    def test_s2_presence_uses_arxiv_id_for_arxiv_dois(self):
+        seen = []
+        orig = S.get
+        try:
+            S.get = lambda url, tries=6: seen.append(url) or "{}"
+            self.assertTrue(S.seed_presence("s2", "10.48550/arXiv.2609.00506"))
+            self.assertTrue(S.seed_presence("s2", "10.1016/j.x.1"))
+        finally:
+            S.get = orig
+        self.assertTrue(seen[0].startswith("https://api.semanticscholar.org/graph/v1/paper/ARXIV:2609.00506?"))
+        self.assertTrue(seen[1].startswith("https://api.semanticscholar.org/graph/v1/paper/DOI:10.1016/j.x.1?"))
+
+
+class TestRecordsByRef(unittest.TestCase):
+    """★ 判断 13: 記録の JSON は検索式を SHA-256 で持ち、式の本文は search-dev.md にある。"""
+
+    def test_by_ref_replaces_queries_and_keeps_the_rest(self):
+        obj = {"version": "v0", "runs": [{"source": "epmc", "query": "q1", "count": 3,
+                                          "subqueries": ["a", "b"], "nested": {"query": "q2"}}]}
+        got = S.by_ref(obj)
+        r = got["runs"][0]
+        self.assertNotIn("query", r)
+        self.assertEqual(r["query_sha256"], S.qsha("q1"))
+        self.assertEqual(r["subqueries_sha256"], [S.qsha("a"), S.qsha("b")])
+        self.assertEqual(r["nested"], {"query_sha256": S.qsha("q2")})
+        self.assertEqual(r["count"], 3)
+
+    def test_committed_records_match_the_code_and_search_dev_md(self):
+        want = {(s, n): S.qsha(q) for s, n, q in S.queries("v0")}
+        md = open(os.path.join(HERE, "search-dev.md"), encoding="utf-8").read()
+        for s, n, q in S.queries("v0"):
+            self.assertIn(q, md, f"search-dev.md に {s} {n} の式の本文が無い")
+            self.assertIn(S.qsha(q), md)
+        for fn in sorted(os.listdir(HERE)):
+            if not (fn.startswith("search_dev_") and fn.endswith(".json")) or "seeds" in fn:
+                continue
+            d = json.load(open(os.path.join(HERE, fn), encoding="utf-8"))
+            for r in d["runs"]:
+                self.assertNotIn("query", r, fn)
+                self.assertEqual(r["query_sha256"], want[(r["source"], r["name"])], fn)
+
+
 class TestGuard(unittest.TestCase):
     def test_get_refuses_urls_outside_the_allow_list(self):
         with self.assertRaises(ValueError):
