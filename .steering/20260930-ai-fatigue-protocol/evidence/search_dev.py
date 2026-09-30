@@ -1,0 +1,362 @@
+"""N-05 の検索式の開発（design.md §2・2026-09-30 固定）: 情報源ごとの件数と、種 25 件の再現を試す。
+
+★ 検索式の開発であってスクリーニングではない。件数と、種の DOI が結果に含まれるかだけを見る（題名・抄録で記録を選ばない）。
+★ 取得した記録の ID の一覧は scratchpad（repo の外）に置き、repo には件数・種の再現・一覧の SHA-256 だけを書く。
+★ 連絡先（メールアドレス）を送らない。User-Agent は道具名だけ。
+
+使い方（このディレクトリで）:
+  python search_dev.py counts  --version v0 --out search_dev_counts_v0.json
+  python search_dev.py seeds   --seeds seeds.json --out search_dev_seeds.json
+  python search_dev.py fetch   --version v0 --source epmc --store <scratchpad の dir>
+  python search_dev.py recall  --version v0 --seeds seeds.json --store <dir> --out search_dev_recall_v0.json
+"""
+import argparse
+import datetime
+import hashlib
+import json
+import os
+import re
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PREV = os.path.join(os.path.dirname(os.path.dirname(HERE)), "20260929-ai-fatigue-surveys", "evidence")
+sys.path.insert(0, PREV)
+from common import allowed_url, ensure_outside_repo, guarded_opener  # noqa: E402
+
+UA = {"User-Agent": "gse-protocol-search-dev/0.1"}
+ALLOWED = [
+    "https://www.ebi.ac.uk/europepmc/webservices/rest/",
+    "https://api.semanticscholar.org/graph/v1/",
+    "https://api.ies.ed.gov/eric/",
+    "https://export.arxiv.org/api/",
+    "https://zenodo.org/api/records",
+]
+OPENER = guarded_opener(ALLOWED)
+
+# ---- design.md §2.1 の概念のブロック（版ごと。v0 は固定の値そのまま） ----
+A_V0 = ["artificial intelligence", "AI", "generative AI", "GenAI", "generative artificial intelligence", "ChatGPT",
+        "large language model", "large language models", "LLM", "LLMs", "chatbot", "chatbots",
+        "conversational agent", "conversational agents", "AI assistant", "AI assistants", "Copilot",
+        "machine learning", "AI-assisted", "AI-based", "AI scribe", "ambient AI", "algorithmic management"]
+F_V0 = ["fatigue", "fatigued", "exhaustion", "exhausted", "burnout", "burn-out", "burned out", "burnt out",
+        "weariness", "tiredness", "depletion", "depleted", "drained"]
+B1_V0 = ["AI scribe", "ambient scribe", "ambient listening", "digital scribe", "AI-drafted", "AI-generated draft",
+         "draft replies", "coding assistant", "GitHub Copilot", "code generation"]
+MATERIAL_V0 = ["fatigue life", "fatigue crack", "fatigue strength", "fatigue damage", "alloy", "weld", "concrete",
+               "composite"]
+
+VERSIONS = {
+    "v0": dict(A=A_V0, F=F_V0, B1=B1_V0, MATERIAL=MATERIAL_V0),
+}
+
+
+def quote(term):
+    """空白・ハイフンを含む語は引用符で囲む（句として検索する）。"""
+    return f'"{term}"' if re.search(r"[\s-]", term) else term
+
+
+def epmc_query(a, f):
+    return f"TITLE_ABS:({' OR '.join(map(quote, a))}) AND TITLE_ABS:({' OR '.join(map(quote, f))})"
+
+
+def s2_query(a, f, neg=None):
+    q = f"({' | '.join(map(quote, a))}) + ({' | '.join(map(quote, f))})"
+    if neg:
+        q += f" + -({' | '.join(map(quote, neg))})"
+    return q
+
+
+def eric_query(a, f):
+    def both(terms):
+        g = " OR ".join(map(quote, terms))
+        return f"(title:({g}) OR description:({g}))"
+    return f"{both(a)} AND {both(f)}"
+
+
+def arxiv_query(a, f):
+    def both(terms):
+        return "(" + " OR ".join(f"{fld}:{quote(t)}" for t in terms for fld in ("ti", "abs")) + ")"
+    return f"{both(a)} AND {both(f)}"
+
+
+def zenodo_query(a, f):
+    return f"({' OR '.join(map(quote, a))}) AND ({' OR '.join(map(quote, f))})"
+
+
+def queries(version):
+    """版の検索式を (source, name, query) の並びで返す。"""
+    v = VERSIONS[version]
+    A, F, B1, M = v["A"], v["F"], v["B1"], v["MATERIAL"]
+    return [
+        ("epmc", "main", epmc_query(A, F)),
+        ("epmc", "b1", epmc_query(B1, F)),
+        ("s2", "main", s2_query(A, F)),
+        ("s2", "main_v2", s2_query(A, F, M)),
+        ("s2", "b1", s2_query(B1, F)),
+        ("eric", "main", eric_query(A, F)),
+        ("arxiv", "main", arxiv_query(A, F)),
+        ("zenodo", "main", zenodo_query(A, F)),
+    ]
+
+
+# ---- 取得 ----
+def get(url, tries=6):
+    if not allowed_url(url, ALLOWED):
+        raise ValueError(f"許していない URL: {url}")
+    wait = 2.0
+    for i in range(tries):
+        try:
+            with OPENER.open(urllib.request.Request(url, headers=UA), timeout=90) as r:
+                return r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503, 504) and i < tries - 1:
+                time.sleep(wait)
+                wait *= 2
+                continue
+            raise
+        except (urllib.error.URLError, TimeoutError):
+            if i < tries - 1:
+                time.sleep(wait)
+                wait *= 2
+                continue
+            raise
+    raise RuntimeError("到達しない")
+
+
+def norm_doi(doi):
+    if not doi:
+        return None
+    d = doi.strip().lower()
+    d = re.sub(r"^https?://(dx\.)?doi\.org/", "", d)
+    d = re.sub(r"^doi:\s*", "", d)
+    return d or None
+
+
+def count(source, query):
+    """件数だけを 1 回の問い合わせで取る。"""
+    if source == "epmc":
+        u = "https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + urllib.parse.urlencode(
+            {"query": query, "format": "json", "resultType": "idlist", "pageSize": 1})
+        return json.loads(get(u))["hitCount"]
+    if source == "s2":
+        u = "https://api.semanticscholar.org/graph/v1/paper/search/bulk?" + urllib.parse.urlencode(
+            {"query": query, "fields": "externalIds"})
+        return json.loads(get(u))["total"]
+    if source == "eric":
+        u = "https://api.ies.ed.gov/eric/?" + urllib.parse.urlencode(
+            {"search": query, "format": "json", "rows": 1, "fields": "id"})
+        return json.loads(get(u))["response"]["numFound"]
+    if source == "arxiv":
+        u = "https://export.arxiv.org/api/query?" + urllib.parse.urlencode({"search_query": query, "max_results": 1})
+        m = re.search(r"<opensearch:totalResults[^>]*>(\d+)<", get(u))
+        return int(m.group(1)) if m else None
+    if source == "zenodo":
+        u = "https://zenodo.org/api/records?" + urllib.parse.urlencode({"q": query, "size": 1})
+        return json.loads(get(u))["hits"]["total"]
+    raise ValueError(source)
+
+
+def fetch_ids(source, query):
+    """結果の ID（DOI を優先。無ければ情報源の ID）を全部取る。戻り値は (ids の集合, 取れた件数)。"""
+    ids = set()
+    if source == "epmc":
+        cursor = "*"
+        while True:
+            u = "https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + urllib.parse.urlencode(
+                {"query": query, "format": "json", "resultType": "lite", "pageSize": 1000, "cursorMark": cursor})
+            d = json.loads(get(u))
+            res = d.get("resultList", {}).get("result", [])
+            for x in res:
+                ids.add(("doi", norm_doi(x.get("doi"))) if x.get("doi") else ("epmc", f"{x.get('source')}:{x.get('id')}"))
+            nxt = d.get("nextCursorMark")
+            if not res or not nxt or nxt == cursor:
+                break
+            cursor = nxt
+            time.sleep(0.3)
+        return ids
+    if source == "s2":
+        token = None
+        while True:
+            p = {"query": query, "fields": "externalIds"}
+            if token:
+                p["token"] = token
+            d = json.loads(get("https://api.semanticscholar.org/graph/v1/paper/search/bulk?" + urllib.parse.urlencode(p)))
+            for x in d.get("data", []):
+                ext = x.get("externalIds") or {}
+                ids.add(("doi", norm_doi(ext["DOI"])) if ext.get("DOI") else ("s2", x.get("paperId")))
+                if ext.get("ArXiv"):
+                    ids.add(("doi", f"10.48550/arxiv.{ext['ArXiv'].lower()}"))
+            token = d.get("token")
+            if not token:
+                break
+            time.sleep(1.2)
+        return ids
+    if source == "eric":
+        start = 0
+        while True:
+            u = "https://api.ies.ed.gov/eric/?" + urllib.parse.urlencode(
+                {"search": query, "format": "json", "rows": 2000, "start": start, "fields": "id,url"})
+            d = json.loads(get(u))["response"]
+            for x in d["docs"]:
+                ids.add(("eric", x["id"]))
+            start += 2000
+            if start >= d["numFound"]:
+                break
+        return ids
+    if source == "arxiv":
+        start = 0
+        while True:
+            u = "https://export.arxiv.org/api/query?" + urllib.parse.urlencode(
+                {"search_query": query, "start": start, "max_results": 500})
+            t = get(u)
+            got = re.findall(r"<id>https?://arxiv\.org/abs/([^<]+?)(v\d+)?</id>", t)
+            for aid, _v in got:
+                ids.add(("doi", f"10.48550/arxiv.{aid.lower()}"))
+            total = int(re.search(r"<opensearch:totalResults[^>]*>(\d+)<", t).group(1))
+            start += 500
+            if not got or start >= total:
+                break
+            time.sleep(3.1)
+        return ids
+    if source == "zenodo":
+        page = 1
+        while True:
+            u = "https://zenodo.org/api/records?" + urllib.parse.urlencode({"q": query, "size": 100, "page": page})
+            d = json.loads(get(u))
+            hits = d["hits"]["hits"]
+            for h in hits:
+                doi = h.get("doi") or (h.get("metadata") or {}).get("doi")
+                ids.add(("doi", norm_doi(doi)) if doi else ("zenodo", str(h.get("id"))))
+            if not hits or page * 100 >= d["hits"]["total"]:
+                break
+            page += 1
+            time.sleep(1.0)
+        return ids
+    raise ValueError(source)
+
+
+def seed_presence(source, doi):
+    """種の DOI が情報源に記録されているか（検索式の外で 1 件ずつ）。True / False / None（確かめる口が無い）。"""
+    d = norm_doi(doi)
+    if source == "epmc":
+        u = "https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + urllib.parse.urlencode(
+            {"query": f'DOI:"{d}"', "format": "json", "resultType": "idlist", "pageSize": 1})
+        return json.loads(get(u))["hitCount"] > 0
+    if source == "s2":
+        u = "https://api.semanticscholar.org/graph/v1/paper/DOI:" + urllib.parse.quote(d, safe="/") + "?fields=title"
+        try:
+            get(u, tries=4)
+            return True
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return False
+            raise
+    if source == "arxiv":
+        m = re.match(r"10\.48550/arxiv\.(.+)$", d)
+        if not m:
+            return False
+        t = get("https://export.arxiv.org/api/query?" + urllib.parse.urlencode({"id_list": m.group(1)}))
+        return "<entry>" in t and "<title>Error</title>" not in t
+    if source == "zenodo":
+        u = "https://zenodo.org/api/records?" + urllib.parse.urlencode({"q": f'doi:"{d}"', "size": 1})
+        return json.loads(get(u))["hits"]["total"] > 0
+    return None  # ERIC は DOI で引く口を確かめていない
+
+
+def now():
+    return datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).isoformat(timespec="seconds")
+
+
+def write_json(path, obj):
+    with open(path, "x", encoding="utf-8", newline="\n") as f:  # 既存の記録を上書きしない
+        json.dump(obj, f, ensure_ascii=False, indent=1)
+        f.write("\n")
+
+
+def recall(ids, seeds):
+    """種のうち、結果の ID の集合に DOI が含まれるもの。"""
+    got = {i[1] for i in ids if i[0] == "doi"}
+    return {k: (norm_doi(v["doi"]) in got) for k, v in seeds.items() if v.get("doi")}
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=["counts", "seeds", "fetch", "recall"])
+    ap.add_argument("--version", default="v0")
+    ap.add_argument("--source")
+    ap.add_argument("--name")
+    ap.add_argument("--seeds")
+    ap.add_argument("--store")
+    ap.add_argument("--out")
+    a = ap.parse_args(argv)
+
+    if a.cmd == "counts":
+        rows = []
+        for src, name, q in queries(a.version):
+            try:
+                n, err = count(src, q), None
+            except Exception as e:  # 失敗は欠測として記録する（0 件に化けさせない）
+                n, err = None, f"{type(e).__name__}: {e}"
+            rows.append(dict(source=src, name=name, query=q, count=n, error=err, executed=now()))
+            print(src, name, n, err or "")
+            time.sleep(1.5)
+        write_json(a.out, dict(version=a.version, runs=rows))
+        return 0
+
+    seeds = json.load(open(a.seeds, encoding="utf-8")) if a.seeds else {}
+    if a.cmd == "seeds":
+        out = {}
+        for src in ("epmc", "s2", "arxiv", "zenodo"):
+            out[src] = {}
+            for k, v in seeds.items():
+                try:
+                    out[src][k] = seed_presence(src, v["doi"])
+                except Exception as e:
+                    out[src][k] = f"ERR {type(e).__name__}: {e}"
+                time.sleep(1.2 if src == "s2" else 0.4)
+            print(src, sum(1 for x in out[src].values() if x is True), "/", len(seeds))
+        write_json(a.out, dict(executed=now(), presence=out))
+        return 0
+
+    store = ensure_outside_repo(a.store)
+    os.makedirs(store, exist_ok=True)
+    if a.cmd == "fetch":
+        for src, name, q in queries(a.version):
+            if src != a.source or (a.name and name != a.name):
+                continue
+            t0 = now()
+            ids = fetch_ids(src, q)
+            path = os.path.join(store, f"ids_{a.version}_{src}_{name}.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(dict(version=a.version, source=src, name=name, query=q, started=t0, finished=now(),
+                               ids=sorted(map(list, ids))), f)
+            print(src, name, len(ids), path)
+        return 0
+
+    if a.cmd == "recall":
+        rows = []
+        for src, name, q in queries(a.version):
+            path = os.path.join(store, f"ids_{a.version}_{src}_{name}.json")
+            if not os.path.exists(path):
+                continue
+            d = json.load(open(path, encoding="utf-8"))
+            ids = {tuple(x) for x in d["ids"]}
+            r = recall(ids, seeds)
+            blob = "\n".join(sorted("\t".join(x) for x in ids)).encode("utf-8")
+            rows.append(dict(source=src, name=name, query=q, started=d["started"], finished=d["finished"],
+                             n_ids=len(ids), n_doi=sum(1 for x in ids if x[0] == "doi"),
+                             ids_sha256=hashlib.sha256(blob).hexdigest(),
+                             seeds_found=sorted(k for k, v in r.items() if v),
+                             seeds_missing=sorted(k for k, v in r.items() if not v)))
+            print(src, name, len(ids), "種", sum(r.values()), "/", len(r))
+        write_json(a.out, dict(version=a.version, runs=rows))
+        return 0
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
