@@ -1,0 +1,70 @@
+{
+ "version": "v0",
+ "runs": [
+  {
+   "source": "epmc",
+   "name": "main",
+   "query_sha256": "f017112dad9dda1e24ba2c394fc243b809a01c6b482907003f931f50f701525e",
+   "count": 4349,
+   "error": null,
+   "executed": "2026-10-01T01:37:11+09:00"
+  },
+  {
+   "source": "epmc",
+   "name": "b1",
+   "query_sha256": "184a111e56236ba63542476a30f475d5d21c3f84a3f0f0017b8650cdd8330328",
+   "count": 64,
+   "error": null,
+   "executed": "2026-10-01T01:37:14+09:00"
+  },
+  {
+   "source": "s2",
+   "name": "main",
+   "query_sha256": "ceaecdcf80b29131efc3e2f1d6206436b60326bbbb2a7d61b7366f61d09b65a6",
+   "count": 18274,
+   "error": null,
+   "executed": "2026-10-01T01:37:16+09:00"
+  },
+  {
+   "source": "s2",
+   "name": "main_v2",
+   "query_sha256": "779a98fe9084292dec0a2c565cf98ce2cfc53ce4aedfbc9475f918c43fe8f2ca",
+   "count": 16504,
+   "error": null,
+   "executed": "2026-10-01T01:37:19+09:00"
+  },
+  {
+   "source": "s2",
+   "name": "b1",
+   "query_sha256": "1ceaeb88bbb7eac15b40b3a93b45d8b6c010ffdedc0e9379bd5539572404ad36",
+   "count": 147,
+   "error": null,
+   "executed": "2026-10-01T01:37:22+09:00"
+  },
+  {
+   "source": "eric",
+   "name": "main",
+   "query_sha256": "a33571cb4389c830311a8d5e2c7e11a3306b680c00745329d1b200f26c15b565",
+   "count": 61,
+   "error": null,
+   "executed": "2026-10-01T01:37:24+09:00"
+  },
+  {
+   "source": "arxiv",
+   "name": "main",
+   "query_sha256": "0c797f87e9dd9afd9bac15d1d46493ac42ae34945ec591c5d9e52e8a6f8dd54b",
+   "count": 1858,
+   "error": null,
+   "executed": "2026-10-01T01:37:27+09:00"
+  },
+  {
+   "source": "zenodo",
+   "name": "main",
+   "query_sha256": "cc8c5c617cfbe3dc8e1dd3073286faa7f14de1ef9889b61e3d571004f823f9c3",
+   "count": null,
+   "error": "HTTPError: HTTP Error 500: INTERNAL SERVER ERROR",
+   "executed": "2026-10-01T01:38:36+09:00"
+  }
+ ],
+ "query_note": "2026-10-01: 記録した式が search_dev.queries('v0') と一字一句同じことを確かめてから、式を SHA-256 に置き換えた（decisions.md 判断 13）。式の本文は search-dev.md。"
+}

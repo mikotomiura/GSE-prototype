@@ -9,7 +9,9 @@
      入力規則の案内にも無い。
    - 単独の GPT: 書誌と要点の列の外に無い（題名の ChatGPT・GPT-4 は書誌なので書誌の列では許す）。
 2. structure（構造の検査）: 記入欄の初期値が『未判定』か空・判定シートの ID が元の DB の 34 件と同じ順・追加候補の番号が
-   candidates.py と同じ順・要点と表記が事実のファイルから抜き出し直したものと一致し、要点の各値が事実のファイルの本文にある。
+   candidates.py から寄せた記録を除いたものと同じ順・要点と表記が事実のファイルから抜き出し直したものと一致し、要点の各値が
+   事実のファイルの本文にある。★ 2026-10-01（間引き）: 『寄せた記録』の鍵と代表が分けの記録（JSON）と一致・「同じ研究の群」の列が
+   JSON の群の記録の行にだけあり、群の番号と群のすべての記録を書く・「内容の群」の列は判定者 1 だけにあり、値が JSON と一致する。
 3. golden（生成物との一致）: judge_xlsx.build() が作るもの（一度保存して読み直したもの）と、記入欄以外のすべてのセルの値、
    すべてのセルの塗り・文字（字体名・色〈tint を含む〉・太字ほか）・表示形式・罫線・配置・リンク、結合・入力規則・条件付き書式
    （文字色を含む）・シートと行と列の表示と大きさ・表、zip のパーツの名前・リッチテキストの run の数が一致する
@@ -21,6 +23,7 @@
   python check_judge_xlsx.py --selftest   # 陰性対照が緑・変異がそれぞれ指定の検査で赤・出力の保護
 """
 import io
+import json
 import os
 import re
 import shutil
@@ -119,7 +122,7 @@ def check_words(path, wb):
                         errs.append(f"{ws.title}!{c.coordinate}: 常に禁止の語『{h}』")
                     judge_ok = (ws.title == "判定基準" or (ws.title in JUDGE_SHEETS and c.row == 4)
                                 or (ws.title == "集計" and (c.column == 1 or v.startswith("="))))
-                    gpt_ok = ws.title in JUDGE_SHEETS and c.row >= 5 and c.column <= len(head) and head[c.column - 1] in bib_cols
+                    gpt_ok = c.row >= 5 and c.column <= len(head) and head[c.column - 1] in bib_cols  # 書誌の列（『寄せた記録』を含む）
                     if not gpt_ok:  # 書誌と要点の列の外では評価の語も禁止
                         for h in hits(v, EVAL_WORDS, EVAL_RE):
                             errs.append(f"{ws.title}!{c.coordinate}: 評価の語『{h}』")
@@ -190,17 +193,19 @@ def check_structure(wb):
         got = [wb["判定シート"].cell(r, 1).value for r in range(5, 5 + len(want))]
         if got != want or wb["判定シート"].max_row != 4 + len(want):
             errs.append("判定シートの ID が元の DB の 34 件と違う")
+    merged, groups, content = _dedup_expect()
     if "追加候補" in wb.sheetnames:
         ws = wb["追加候補"]
         head = [ws.cell(4, c).value for c in range(1, ws.max_column + 1)]
         jp = head.index("要点（事実のファイルの記述）") + 1
         jl = head.index("事実のファイルでの表記") + 1
-        cids = [c["cid"] for c in CAND.CANDIDATES]
+        kept = [c for c in CAND.CANDIDATES if c["cid"] not in merged]
+        cids = [c["cid"] for c in kept]
         got = [ws.cell(r, 1).value for r in range(5, ws.max_row + 1)]
         if got != cids:
-            errs.append("追加候補の番号が candidates.py と違う")
+            errs.append("追加候補の番号が candidates.py から寄せた記録を除いたものと違う")
         facts = {}
-        for r, c in zip(range(5, ws.max_row + 1), CAND.CANDIDATES):
+        for r, c in zip(range(5, ws.max_row + 1), kept):
             e = J.extract(c)
             v = ws.cell(r, jp).value or ""
             if v != e["points"]:
@@ -216,6 +221,73 @@ def check_structure(wb):
                     val = seg.split(": ", 1)[1] if re.match(r"^[^:：]{1,20}: ", seg) else seg
                     if val and not any(val in t for t in facts.values()):
                         errs.append(f"追加候補 {c['cid']}: 要点の値が事実のファイルに無い: {val[:30]}…")
+    errs += _check_dedup(wb, merged, groups, content)
+    return errs
+
+
+N_MERGED = 5  # dedup-259.md §2（追加候補 225 → 220）。★ 分けの記録が変わったら、ここと dedup-259.md を一緒に直す
+
+
+def _dedup_expect():
+    """分けの記録（JSON）を、judge_xlsx.dedup() とは別に読む: 寄せた鍵 → 代表、残る行の鍵 → 群の番号、群 → 残る行の鍵、鍵 → 内容の群。"""
+    pairs = json.load(open(J.DEDUP_JSON, encoding="utf-8"))["pairs"]
+    merged = {}
+    for p in pairs:
+        if p["cls"] == "同じ報告":
+            merged[p["a"] if p["representative"] == p["b"] else p["b"]] = p["representative"]
+    members = {}
+    for p in pairs:
+        if p["group"]:
+            members.setdefault(p["group"], set()).update(merged.get(k, k) for k in (p["a"], p["b"]))
+    content = {k: v["group"] for k, v in json.load(open(J.CONTENT_JSON, encoding="utf-8"))["groups"].items()}
+    return merged, members, content
+
+
+def _check_dedup(wb, merged, members, content):
+    errs = []
+    if len(merged) != N_MERGED:
+        errs.append(f"寄せた記録の数が {len(merged)}（dedup-259.md は {N_MERGED}）")
+    if "寄せた記録" not in wb.sheetnames:
+        return errs + ["シート『寄せた記録』が無い"]
+    wm = wb["寄せた記録"]
+    mh = [wm.cell(4, c).value for c in range(1, wm.max_column + 1)]
+    got = {wm.cell(r, 1).value: wm.cell(r, mh.index("代表（残した記録）") + 1).value for r in range(5, wm.max_row + 1)}
+    if got != merged or wm.max_row != 4 + len(merged):
+        errs.append("『寄せた記録』の鍵・代表が分けの記録と違う")
+    in_group = {k: g for g, ks in members.items() for k in ks}
+    judge = judge_of(wb)
+    for name in JUDGE_SHEETS:
+        if name not in wb.sheetnames:
+            continue
+        ws = wb[name]
+        head = [ws.cell(4, c).value for c in range(1, ws.max_column + 1)]
+        keys = [ws.cell(r, 1).value for r in range(5, ws.max_row + 1)]
+        if name == "追加候補" and set(keys) & set(merged):
+            errs.append(f"追加候補に寄せた記録が残る: {sorted(set(keys) & set(merged))}")
+        if J.GROUP_HEADER not in head:
+            errs.append(f"{name}: 『{J.GROUP_HEADER}』の列が無い")
+        else:
+            j = head.index(J.GROUP_HEADER) + 1
+            for r, k in zip(range(5, ws.max_row + 1), keys):
+                v = ws.cell(r, j).value
+                g = in_group.get(k)
+                if g is None and v not in (None, ""):
+                    errs.append(f"{name} {k}: 群の外の行に『{J.GROUP_HEADER}』が書かれている")
+                elif g is not None and not (isinstance(v, str) and re.match(rf"{g}[:（]", v)
+                                            and all(m in v for m in members[g])):
+                    errs.append(f"{name} {k}: 『{J.GROUP_HEADER}』が群 {g} の番号とすべての記録を書いていない")
+        has_content = J.CONTENT_HEADER in head
+        if judge != 1:
+            if has_content:
+                errs.append(f"{name}: 判定者 {judge} のファイルに内容の群の列がある（判定者 1 だけ・判断 8）")
+            continue
+        if not has_content:
+            errs.append(f"{name}: 判定者 1 のファイルに内容の群の列が無い")
+            continue
+        j = head.index(J.CONTENT_HEADER) + 1
+        for r, k in zip(range(5, ws.max_row + 1), keys):
+            if ws.cell(r, j).value != content.get(k):
+                errs.append(f"{name} {k}: 内容の群が分けの記録と違う")
     return errs
 
 
@@ -392,6 +464,30 @@ def _mut_cell(sheet, coord, val):
     return f
 
 
+def _addr(ws, header, key=None, row=5):
+    """見出しの名前（と A 列の鍵）でセルの座標を引く（★ 2026-10-01: 列を足して座標がずれ、変異が別の列に当たって空振りしないように）。"""
+    head = [ws.cell(4, c).value for c in range(1, ws.max_column + 1)]
+    if key is not None:
+        row = [ws.cell(r, 1).value for r in range(1, ws.max_row + 1)].index(key) + 1
+    return f"{J.col(head.index(header) + 1)}{row}"
+
+
+def _mut_at(sheet, header, val, key=None, row=5):
+    def f(wb):
+        wb[sheet][_addr(wb[sheet], header, key, row)].value = val
+    return f
+
+
+def _mut_judge2(wb):
+    """判定者 1 のファイルの『はじめに』の番号だけを 2 にする（内容の群の列が残る）。"""
+    ws = wb["はじめに"]
+    for r in range(5, ws.max_row + 1):
+        if ws.cell(r, 1).value == "判定者":
+            ws.cell(r, 2).value = "判定者 2"
+            return
+    raise RuntimeError("『はじめに』に判定者の行が無い（変異が空振りする）")
+
+
 def _mut_comment(wb):
     from openpyxl.comments import Comment
     wb["判定シート"]["B5"].comment = Comment("中心-A と思う", "x")
@@ -501,7 +597,7 @@ def _mut_font_tint(wb):
 def _mut_fill_tint(wb):
     """入力欄の塗りの RGB は同じまま tint だけを変える。"""
     import copy
-    c = wb["追加候補"]["J7"]
+    c = wb["追加候補"][_addr(wb["追加候補"], "題名・抄録段", row=7)]
     fl, col = copy.copy(c.fill), copy.copy(c.fill.fgColor)
     col.tint = -0.5
     fl.fgColor = col
@@ -590,7 +686,10 @@ MUTANTS = [
     ("はじめにのセルに判定の語", _mut_cell("はじめに", "B7", "含める"), "words"),
     ("判定シートの公表区分に GPT（書誌でも記入欄でもない列）", _mut_cell("判定シート", "F5", "GPT の分類"), "words"),
     ("追加候補の出どころに E コード（書誌でも記入欄でもない列）", _mut_cell("追加候補", "B5", "S-02 §2 E2"), "words"),
-    ("判定シートの根拠メモに評価の語（記入欄）", _mut_cell("判定シート", "O5", "十分な研究"), "words"),
+    ("判定シートの根拠メモに評価の語（記入欄）", _mut_at("判定シート", "根拠メモ", "十分な研究"), "words"),
+    ("寄せた記録の一致点に評価の語（書誌でない列）", _mut_at("寄せた記録", "一致点", "弱い一致"), "words"),
+    ("同じ研究の群の列に判定の語", _mut_at("追加候補", J.GROUP_HEADER, "G04: S04-15・S04-27 ／ E5", key="S04-15"), "words"),
+    ("内容の群の列に AI の名前", _mut_at("追加候補", J.CONTENT_HEADER, "GPT の分類", key="S04-15"), "words"),
     ("判定基準（許す格納先）に GSE の語", _mut_cell("判定基準", "B6", "GSE の観点"), "words"),
     ("集計の A 列に AI の名前（小文字）", _mut_cell("集計", "A5", "claude の数"), "words"),
     ("記入欄でも書誌でもない列に評価の語", _mut_cell("判定シート", "I5", "弱い研究"), "words"),
@@ -605,8 +704,17 @@ MUTANTS = [
     ("入力規則の案内", _mut_dv_prompt, "words"),
     ("入力規則の式に評価の語", _mut_dv_formula, "words"),
     ("条件付き書式の式に GSE の語", _mut_cf_word, "words"),
-    ("判定シートの記入欄に判定の既定値", _mut_cell("判定シート", "J5", "含める"), "structure"),
-    ("追加候補の根拠メモに記入", _mut_cell("追加候補", "O5", "メモ"), "structure"),
+    ("判定シートの記入欄に判定の既定値", _mut_at("判定シート", "題名・抄録段", "含める"), "structure"),
+    ("追加候補の根拠メモに記入", _mut_at("追加候補", "根拠メモ", "メモ"), "structure"),
+    # ★ 2026-10-01（間引き）
+    ("寄せた記録が追加候補に残る", _mut_cell("追加候補", "A5", "S12-12"), "structure"),
+    ("寄せた記録の代表を変える", _mut_at("寄せた記録", "代表（残した記録）", "S04-48"), "structure"),
+    ("群の記録の行の群の列を消す", _mut_at("判定シート", J.GROUP_HEADER, None, key="AF006"), "structure"),
+    ("群の外の行に群を書く", _mut_at("判定シート", J.GROUP_HEADER, "G01: AF006・AF007・AF009", key="AF001"), "structure"),
+    ("群の番号を取り違える", _mut_at("追加候補", J.GROUP_HEADER, "G05: S04-15・S04-27 ／ 一致点: 著者 2 名", key="S04-15"), "structure"),
+    ("群の文から記録を 1 つ落とす", _mut_at("判定シート", J.GROUP_HEADER, "G01: AF006・AF007 ／ 一致点: 著者 2 名", key="AF009"), "structure"),
+    ("内容の群の値を変える", _mut_at("追加候補", J.CONTENT_HEADER, "レビュー等", key="S04-15"), "structure"),
+    ("判定者 2 のファイルに内容の群の列", _mut_judge2, "structure"),
     ("要点の改変", _mut_points, "structure"),
     ("表記の改変", _mut_label, "structure"),
     ("判定シートの ID の入れ替え", _mut_swap_ids, "structure"),
@@ -641,6 +749,11 @@ EXPECT = {
     "文字色の tint だけを変える（RGB は同じ）": "文字または表示形式", "入力欄の塗りの tint だけを変える（RGB は同じ）": "塗り",
     "要点を白い文字の run のリッチテキストに": "リッチテキスト", "表記のセルを太い赤の罫線で囲む": "罫線",
     "語を含まないコメント（印だけ）": "zip のパーツ", "要点の字体を記号の字体に": "文字または表示形式", "要点を字下げで画面の外に": "配置",
+    # ★ 2026-10-01: 間引きの structure の変異も、意図した理由で赤になることを確かめる
+    "寄せた記録が追加候補に残る": "寄せた記録が残る", "寄せた記録の代表を変える": "『寄せた記録』の鍵・代表",
+    "群の記録の行の群の列を消す": "群 G01 の番号", "群の外の行に群を書く": "群の外の行",
+    "群の番号を取り違える": "群 G04 の番号", "群の文から記録を 1 つ落とす": "群 G01 の番号",
+    "内容の群の値を変える": "内容の群が分けの記録と違う", "判定者 2 のファイルに内容の群の列": "内容の群の列がある",
 }
 ZIP_MUTANTS = [
     ("docProps/app.xml の会社名", _zip_mut("docProps/app.xml", "</Properties>", "<Company>GSE</Company></Properties>"), "words"),
@@ -653,6 +766,7 @@ ZIP_MUTANTS = [
 # 陽性対照（赤にならないこと）: 書誌の列の GPT-4・評価の語（著者の語）は words で緑
 GREEN = [("書誌の列の GPT-4（題名）", _mut_cell("判定シート", "B5", "Evaluating GPT-4 in writing"), "words"),
          ("書誌の列の評価の語（題名の insufficient）", _mut_cell("判定シート", "B5", "Why AI support is insufficient"), "words"),
+         ("寄せた記録の題名の GPT-4・insufficient（書誌の列）", _mut_at("寄せた記録", "題名（書誌の記録）", "GPT-4 is insufficient"), "words"),
          # ★ 読んで保存し直すだけで golden が赤なら、golden の変異は保存し直しの差で赤になっている（空振り）
          ("変異なしで読んで保存し直す", lambda wb: None, "golden")]
 
@@ -669,6 +783,14 @@ def selftest():
         for e in e0[:10]:
             print("   ", e)
         ok &= not e0
+        # ★ 2026-10-01: 判定者 2 のファイル（内容の群の列が無い）も陰性対照で緑
+        base2 = os.path.join(tmpdir, "base2.xlsx")
+        J.build(2)[0].save(base2)
+        e2 = check(base2)
+        print(("OK " if not e2 else "NG ") + f"判定者 2 の変異なし（陰性対照）: 違反 {len(e2)} 件")
+        for e in e2[:10]:
+            print("   ", e)
+        ok &= not e2
         for label, fn, part in MUTANTS + GREEN:
             p = os.path.join(tmpdir, "m.xlsx")
             w = openpyxl.load_workbook(base)
@@ -692,7 +814,7 @@ def selftest():
         # 出力の保護（下書きの直すこと 1・3・security L-2）
         filled = os.path.join(tmpdir, "filled.xlsx")
         w = openpyxl.load_workbook(base)
-        w["判定シート"]["J5"].value = "含める"
+        w["判定シート"][_addr(w["判定シート"], "題名・抄録段")].value = "含める"
         w.save(filled)
         cases = [
             ("既存の出力先で止まる", lambda: J.guard(base, False), True),
@@ -710,6 +832,31 @@ def selftest():
             good = stopped == want_exit
             print(("OK " if good else "NG ") + label)
             ok &= good
+        # ★ 2026-10-01: 判定者に写す文（dedup-259.md）と分けの記録（JSON）が食い違えば、生成が止まる
+        md_src = open(J.DEDUP_MD, encoding="utf-8").read()
+        md_cases = [
+            ("群の記録から 1 件落とすと止まる", "| G04 | S04-15・S04-27 |", "| G04 | S04-15 |"),
+            ("代表を変えると止まる", "| S04-79（medRxiv の前刷り） | S04-61", "| S04-79（medRxiv の前刷り） | S04-49"),
+            ("群を 1 つ消すと止まる", "| G11 | S14-05・S15-05 |", "| X11 | S14-05・S15-05 |"),
+        ]
+        saved = J.DEDUP_MD
+        for label, find, repl in md_cases:
+            p = os.path.join(tmpdir, "dedup.md")
+            if find not in md_src:
+                print("NG " + label + "（変異の対象が無い）")
+                ok = False
+                continue
+            open(p, "w", encoding="utf-8").write(md_src.replace(find, repl, 1))
+            J.DEDUP_MD = p
+            try:
+                J.dedup()
+                stopped = False
+            except ValueError:
+                stopped = True
+            finally:
+                J.DEDUP_MD = saved
+            print(("OK " if stopped else "NG ") + label)
+            ok &= stopped
         # --force で置き換えると旧ファイルが退避される
         dst = os.path.join(tmpdir, "dst.xlsx")
         shutil.copyfile(base, dst)

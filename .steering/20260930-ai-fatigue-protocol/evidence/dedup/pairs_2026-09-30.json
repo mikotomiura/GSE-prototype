@@ -1,0 +1,3959 @@
+{
+ "executed": "2026-09-30T23:40:09+09:00",
+ "input_sha256": "6984472edeef3794a9ed075076568aaca8373c4fb675afba608cdba280e6c883",
+ "abs_run_id": "1980b7a2a275414d973174c6c3d918e3",
+ "n_pairs": 159,
+ "pairs": [
+  {
+   "a": "AF002",
+   "b": "AF003",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "hu",
+     "yang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.356,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF002",
+   "b": "S04-13",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "hu",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.264,
+    "n_a": [],
+    "n_b": [
+     597
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF002",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "hu",
+     "yang",
+     "zeng"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.302,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "AF003",
+   "b": "AF016",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.258,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF003",
+   "b": "S04-13",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "hu",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.219,
+    "n_a": [],
+    "n_b": [
+     597
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF003",
+   "b": "S04-48",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "hu",
+     "wang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.194,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF003",
+   "b": "S04-58",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "hu",
+     "wang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.104,
+    "n_a": [],
+    "n_b": [
+     65,
+     167
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF003",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "hu",
+     "wang",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.265,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "AF003",
+   "b": "S15-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.23,
+    "n_a": [],
+    "n_b": [
+     1623
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF004",
+   "b": "AF034",
+   "perspectives": [
+    "P2",
+    "P3"
+   ],
+   "info": {
+    "title_ratio": 0.839,
+    "shared_authors": [
+     "tian",
+     "zhang"
+    ],
+    "first_author_same": true,
+    "n_a": [
+     580
+    ],
+    "n_b": [],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF004",
+   "b": "S05-08",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "tian",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.323,
+    "n_a": [
+     580
+    ],
+    "n_b": [
+     361,
+     417,
+     512
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF005",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "zhao"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.182,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "AF006",
+   "b": "AF007",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "miranda",
+     "parreno"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.303,
+    "n_a": [],
+    "n_b": [
+     1054
+    ],
+    "countries_a": [
+     "filipino",
+     "philippines"
+    ],
+    "countries_b": [
+     "philippines"
+    ]
+   }
+  },
+  {
+   "a": "AF006",
+   "b": "AF009",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "manalese",
+     "miranda"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.289,
+    "n_a": [],
+    "n_b": [
+     594
+    ],
+    "countries_a": [
+     "filipino",
+     "philippines"
+    ],
+    "countries_b": [
+     "philippines"
+    ]
+   }
+  },
+  {
+   "a": "AF007",
+   "b": "AF009",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "miranda"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.259,
+    "n_a": [
+     1054
+    ],
+    "n_b": [
+     594
+    ],
+    "countries_a": [
+     "philippines"
+    ],
+    "countries_b": [
+     "philippines"
+    ]
+   }
+  },
+  {
+   "a": "AF016",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.182,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "AF016",
+   "b": "S12-25",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "qian",
+     "yang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.251,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "AF016",
+   "b": "S15-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.374,
+    "n_a": [],
+    "n_b": [
+     1623
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF023",
+   "b": "S15-11",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "lee"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.257,
+    "n_a": [
+     319
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF024",
+   "b": "S04-12",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "dong"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.321,
+    "n_a": [
+     143
+    ],
+    "n_b": [],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF024",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "dong",
+     "wang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.167,
+    "n_a": [
+     143
+    ],
+    "n_b": [],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "AF024",
+   "b": "S14-03",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "dong"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.252,
+    "n_a": [
+     143
+    ],
+    "n_b": [
+     528
+    ],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF030",
+   "b": "AF031",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "godfrey",
+     "peters",
+     "tricco"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.36,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "canadian",
+     "south africa"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "AF030",
+   "b": "AF033",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "aldcroft",
+     "colquhoun",
+     "garritty",
+     "godfrey",
+     "hartling",
+     "horsley",
+     "langlois",
+     "mcgowan",
+     "moher",
+     "peters",
+     "straus",
+     "tricco",
+     "weeks",
+     "wilson"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.537,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "canadian",
+     "south africa"
+    ],
+    "countries_b": [
+     "canada"
+    ]
+   }
+  },
+  {
+   "a": "AF031",
+   "b": "AF033",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "alexander",
+     "godfrey",
+     "khalil",
+     "munn",
+     "peters",
+     "pollock",
+     "tricco"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.521,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "canada"
+    ]
+   }
+  },
+  {
+   "a": "AF034",
+   "b": "S05-08",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "tian",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.298,
+    "n_a": [],
+    "n_b": [
+     361,
+     417,
+     512
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S02-02",
+   "b": "S02-03",
+   "perspectives": [
+    "P3",
+    "P5"
+   ],
+   "info": {
+    "shared_authors": [
+     "honggang",
+     "khoso"
+    ],
+    "first_author_same": false,
+    "same_n": [
+     545
+    ],
+    "shared_countries": [],
+    "title_ratio": 0.542,
+    "n_a": [
+     545
+    ],
+    "n_b": [
+     545
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S02-02",
+   "b": "S15-04",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "honggang",
+     "khoso"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.409,
+    "n_a": [
+     545
+    ],
+    "n_b": [
+     450
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S02-03",
+   "b": "S15-04",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "honggang",
+     "khoso"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.432,
+    "n_a": [
+     545
+    ],
+    "n_b": [
+     450
+    ],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S02-05",
+   "b": "S14-35",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "kim"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.271,
+    "n_a": [],
+    "n_b": [
+     62,
+     63,
+     125
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S02-09",
+   "b": "S02-11",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "kim",
+     "lee"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.121,
+    "n_a": [
+     416
+    ],
+    "n_b": [
+     375
+    ],
+    "countries_a": [
+     "korea"
+    ],
+    "countries_b": [
+     "korean"
+    ]
+   }
+  },
+  {
+   "a": "S02-09",
+   "b": "S15-11",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "kim",
+     "lee"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.274,
+    "n_a": [
+     416
+    ],
+    "n_b": [],
+    "countries_a": [
+     "korea"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S02-11",
+   "b": "S15-11",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "kim",
+     "lee"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.235,
+    "n_a": [
+     375
+    ],
+    "n_b": [],
+    "countries_a": [
+     "korean"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S02-13",
+   "b": "S04-06",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.293,
+    "n_a": [
+     392
+    ],
+    "n_b": [
+     36511
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S02-13",
+   "b": "S14-21",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.199,
+    "n_a": [
+     392
+    ],
+    "n_b": [
+     346
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-01",
+   "b": "S04-05",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "chin",
+     "lukac",
+     "mafi",
+     "vangala"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.291,
+    "n_a": [
+     238,
+     23653
+    ],
+    "n_b": [
+     284
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "u.s."
+    ]
+   }
+  },
+  {
+   "a": "S04-04",
+   "b": "S04-25",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "casey",
+     "chowdhury",
+     "pollak"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.324,
+    "n_a": [
+     136,
+     160
+    ],
+    "n_b": [
+     30
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S04-13",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liang",
+     "yang",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.216,
+    "n_a": [
+     36511
+    ],
+    "n_b": [
+     597
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S04-14",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "li",
+     "wu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.317,
+    "n_a": [
+     36511
+    ],
+    "n_b": [
+     167
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "li",
+     "liu",
+     "pan",
+     "shi",
+     "tang",
+     "wen",
+     "wu",
+     "yang",
+     "yu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.354,
+    "n_a": [
+     36511
+    ],
+    "n_b": [],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S05-01",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "li",
+     "yu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.219,
+    "n_a": [
+     36511
+    ],
+    "n_b": [
+     40
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S12-07",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "li",
+     "liu"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.239,
+    "n_a": [
+     36511
+    ],
+    "n_b": [],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S12-25",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "yang",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.174,
+    "n_a": [
+     36511
+    ],
+    "n_b": [],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S13-09",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "shi"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.257,
+    "n_a": [
+     36511
+    ],
+    "n_b": [
+     32
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S14-03",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "li",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.211,
+    "n_a": [
+     36511
+    ],
+    "n_b": [
+     528
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S14-11",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "yu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.283,
+    "n_a": [
+     36511
+    ],
+    "n_b": [
+     327
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S14-12",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.191,
+    "n_a": [
+     36511
+    ],
+    "n_b": [
+     94,
+     402
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S14-21",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.188,
+    "n_a": [
+     36511
+    ],
+    "n_b": [
+     346
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S14-26",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "yu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.271,
+    "n_a": [
+     36511
+    ],
+    "n_b": [],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-06",
+   "b": "S15-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wen",
+     "wu",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.21,
+    "n_a": [
+     36511
+    ],
+    "n_b": [
+     1623
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-12",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "dong",
+     "li"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.248,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-12",
+   "b": "S14-03",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "dong",
+     "li"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.352,
+    "n_a": [],
+    "n_b": [
+     528
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-13",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "deng",
+     "hu",
+     "yang",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.298,
+    "n_a": [
+     597
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-13",
+   "b": "S05-08",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "hu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.354,
+    "n_a": [
+     597
+    ],
+    "n_b": [
+     361,
+     417,
+     512
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-13",
+   "b": "S12-25",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "yang",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.317,
+    "n_a": [
+     597
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-14",
+   "b": "S04-70",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "duan",
+     "meng"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.311,
+    "n_a": [
+     167
+    ],
+    "n_b": [
+     214
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-14",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "li",
+     "wu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.355,
+    "n_a": [
+     167
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-15",
+   "b": "S04-27",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jones",
+     "stults"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.369,
+    "n_a": [
+     168,
+     232,
+     451
+    ],
+    "n_b": [
+     33,
+     57,
+     58,
+     92,
+     100
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-15",
+   "b": "S04-31",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jones",
+     "stults"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.346,
+    "n_a": [
+     168,
+     232,
+     451
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-15",
+   "b": "S04-32",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "olson"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.304,
+    "n_a": [
+     168,
+     232,
+     451
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-16",
+   "b": "S04-66",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "mishuris",
+     "you"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.574,
+    "n_a": [
+     62,
+     192,
+     264,
+     265,
+     557,
+     873,
+     1430
+    ],
+    "n_b": [
+     65,
+     68
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-16",
+   "b": "S14-35",
+   "perspectives": [
+    "P5"
+   ],
+   "info": {
+    "same_n": [
+     62
+    ],
+    "shared_countries": [],
+    "shared_authors": [
+     "kim"
+    ],
+    "title_ratio": 0.149,
+    "n_a": [
+     62,
+     192,
+     264,
+     265,
+     557,
+     873,
+     1430
+    ],
+    "n_b": [
+     62,
+     63,
+     125
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-18",
+   "b": "S04-19",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "devonsand",
+     "garcia",
+     "jeong",
+     "lin",
+     "ma",
+     "pfeffer",
+     "shah",
+     "shanafelt",
+     "sharp",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.422,
+    "n_a": [
+     35,
+     58,
+     73,
+     83,
+     162,
+     197
+    ],
+    "n_b": [
+     38,
+     46,
+     48
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-18",
+   "b": "S04-44",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "shah",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.358,
+    "n_a": [
+     35,
+     58,
+     73,
+     83,
+     162,
+     197
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-18",
+   "b": "S04-46",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "devonsand",
+     "garcia",
+     "jeong",
+     "lin",
+     "ma",
+     "pfeffer",
+     "shah",
+     "shanafelt",
+     "sharp",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.51,
+    "n_a": [
+     35,
+     58,
+     73,
+     83,
+     162,
+     197
+    ],
+    "n_b": [
+     45
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-18",
+   "b": "S04-49",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "shah",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.331,
+    "n_a": [
+     35,
+     58,
+     73,
+     83,
+     162,
+     197
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-18",
+   "b": "S04-52",
+   "perspectives": [
+    "P2"
+   ],
+   "info": {
+    "title_ratio": 0.87,
+    "shared_authors": [],
+    "n_a": [
+     35,
+     58,
+     73,
+     83,
+     162,
+     197
+    ],
+    "n_b": [
+     61
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-18",
+   "b": "S04-74",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "shah",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.466,
+    "n_a": [
+     35,
+     58,
+     73,
+     83,
+     162,
+     197
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-18",
+   "b": "S04-87",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "sharp",
+     "taiseale"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.412,
+    "n_a": [
+     35,
+     58,
+     73,
+     83,
+     162,
+     197
+    ],
+    "n_b": [
+     70
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-19",
+   "b": "S04-44",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "shah",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.498,
+    "n_a": [
+     38,
+     46,
+     48
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-19",
+   "b": "S04-46",
+   "perspectives": [
+    "P2",
+    "P3"
+   ],
+   "info": {
+    "title_ratio": 0.704,
+    "shared_authors": [
+     "crowell",
+     "delahaie",
+     "devonsand",
+     "garcia",
+     "hsia",
+     "jeong",
+     "liang",
+     "lin",
+     "ma",
+     "pfeffer",
+     "shah",
+     "shanafelt",
+     "sharp",
+     "smith"
+    ],
+    "first_author_same": false,
+    "n_a": [
+     38,
+     46,
+     48
+    ],
+    "n_b": [
+     45
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-19",
+   "b": "S04-49",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "shah",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.467,
+    "n_a": [
+     38,
+     46,
+     48
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-19",
+   "b": "S04-74",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "shah",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.508,
+    "n_a": [
+     38,
+     46,
+     48
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-21",
+   "b": "S04-28",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "harvey",
+     "huynh",
+     "lee",
+     "woo"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.426,
+    "n_a": [],
+    "n_b": [
+     39
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-22",
+   "b": "S04-87",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "gross",
+     "longhurst",
+     "millen",
+     "taiseale"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.419,
+    "n_a": [],
+    "n_b": [
+     70
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-22",
+   "b": "S12-19",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "gupta",
+     "yadav"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.331,
+    "n_a": [],
+    "n_b": [
+     900
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "india"
+    ]
+   }
+  },
+  {
+   "a": "S04-25",
+   "b": "S04-86",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "lo",
+     "wang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.218,
+    "n_a": [
+     30
+    ],
+    "n_b": [
+     148,
+     156
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "taiwan"
+    ]
+   }
+  },
+  {
+   "a": "S04-27",
+   "b": "S04-31",
+   "perspectives": [
+    "P2",
+    "P3"
+   ],
+   "info": {
+    "title_ratio": 0.613,
+    "shared_authors": [
+     "deng",
+     "driscoll",
+     "jones",
+     "martinez",
+     "stults",
+     "szwerinski",
+     "wilcox"
+    ],
+    "first_author_same": true,
+    "n_a": [
+     33,
+     57,
+     58,
+     92,
+     100
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-27",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "chen",
+     "deng"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.28,
+    "n_a": [
+     33,
+     57,
+     58,
+     92,
+     100
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-29",
+   "b": "S04-44",
+   "perspectives": [
+    "P4"
+   ],
+   "info": {
+    "title_ratio": 0.625,
+    "shared_authors": [],
+    "n_a": [
+     172,
+     1600
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-31",
+   "b": "S04-73",
+   "perspectives": [
+    "P2"
+   ],
+   "info": {
+    "title_ratio": 0.616,
+    "shared_authors": [
+     "martinez"
+    ],
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-31",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "deng",
+     "liu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.221,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-44",
+   "b": "S04-46",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "shah",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.445,
+    "n_a": [],
+    "n_b": [
+     45
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-44",
+   "b": "S04-49",
+   "perspectives": [
+    "P2",
+    "P3",
+    "P4"
+   ],
+   "info": {
+    "title_ratio": 0.85,
+    "shared_authors": [
+     "albrecht",
+     "ator",
+     "filardi",
+     "hudson",
+     "shah",
+     "shanks",
+     "smith",
+     "thompson",
+     "wright"
+    ],
+    "first_author_same": true,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-44",
+   "b": "S04-74",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "albrecht",
+     "ator",
+     "hudson",
+     "shah",
+     "shanks",
+     "smith",
+     "thompson"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.45,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-45",
+   "b": "S04-83",
+   "perspectives": [
+    "P4"
+   ],
+   "info": {
+    "title_ratio": 0.6,
+    "shared_authors": [],
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-46",
+   "b": "S04-49",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "shah",
+     "smith"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.409,
+    "n_a": [
+     45
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-46",
+   "b": "S04-74",
+   "perspectives": [
+    "P2",
+    "P3"
+   ],
+   "info": {
+    "title_ratio": 0.624,
+    "shared_authors": [
+     "shah",
+     "smith"
+    ],
+    "first_author_same": false,
+    "n_a": [
+     45
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-46",
+   "b": "S14-12",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "ma"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.189,
+    "n_a": [
+     45
+    ],
+    "n_b": [
+     94,
+     402
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-47",
+   "b": "S04-55",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "schwamm",
+     "wright"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.416,
+    "n_a": [
+     47
+    ],
+    "n_b": [
+     94
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-47",
+   "b": "S04-62",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wright"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.163,
+    "n_a": [
+     47
+    ],
+    "n_b": [
+     5403
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-48",
+   "b": "S04-58",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "guo",
+     "hu",
+     "pandita",
+     "perret",
+     "tam",
+     "wang",
+     "zheng"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.347,
+    "n_a": [],
+    "n_b": [
+     65,
+     167
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-48",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "guo",
+     "hu",
+     "wang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.339,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-48",
+   "b": "S13-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "zheng"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.248,
+    "n_a": [],
+    "n_b": [
+     34,
+     219
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-49",
+   "b": "S04-74",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "albrecht",
+     "ator",
+     "hudson",
+     "shah",
+     "shanks",
+     "smith",
+     "thompson"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.444,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-54",
+   "b": "S14-19",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "kelly"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.207,
+    "n_a": [
+     49,
+     98
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-55",
+   "b": "S14-12",
+   "perspectives": [
+    "P5"
+   ],
+   "info": {
+    "same_n": [
+     94
+    ],
+    "shared_countries": [],
+    "shared_authors": [
+     "zhang"
+    ],
+    "title_ratio": 0.153,
+    "n_a": [
+     94
+    ],
+    "n_b": [
+     94,
+     402
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-57",
+   "b": "S12-15",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "stewart"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.095,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "japanese"
+    ]
+   }
+  },
+  {
+   "a": "S04-58",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "guo",
+     "hu",
+     "wang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.194,
+    "n_a": [
+     65,
+     167
+    ],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-58",
+   "b": "S13-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "zheng"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.372,
+    "n_a": [
+     65,
+     167
+    ],
+    "n_b": [
+     34,
+     219
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-61",
+   "b": "S04-79",
+   "perspectives": [
+    "P2",
+    "P3",
+    "P4"
+   ],
+   "info": {
+    "title_ratio": 1.0,
+    "shared_authors": [
+     "bischoff",
+     "joanknecht",
+     "vanlinschoten",
+     "vanloon"
+    ],
+    "first_author_same": true,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "netherlands"
+    ],
+    "countries_b": [
+     "netherlands"
+    ]
+   }
+  },
+  {
+   "a": "S04-70",
+   "b": "S04-84",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "chen",
+     "yu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.267,
+    "n_a": [
+     214
+    ],
+    "n_b": [],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-70",
+   "b": "S12-25",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "duan",
+     "ren"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.254,
+    "n_a": [
+     214
+    ],
+    "n_b": [],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-70",
+   "b": "S13-03",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "yu"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.156,
+    "n_a": [
+     214
+    ],
+    "n_b": [
+     460
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S04-86",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.365,
+    "n_a": [],
+    "n_b": [
+     148,
+     156
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "taiwan"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S05-01",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "li",
+     "yu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.19,
+    "n_a": [],
+    "n_b": [
+     40
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S05-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang",
+     "tang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.274,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S05-08",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "hu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.243,
+    "n_a": [],
+    "n_b": [
+     361,
+     417,
+     512
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S12-07",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "chen",
+     "jin",
+     "li",
+     "liu",
+     "ye"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.26,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S12-25",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "yang",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.393,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S13-01",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "li",
+     "wang",
+     "zhao"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.354,
+    "n_a": [],
+    "n_b": [
+     895
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S13-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.206,
+    "n_a": [],
+    "n_b": [
+     34,
+     219
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S13-03",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang",
+     "yu",
+     "zhou"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.158,
+    "n_a": [],
+    "n_b": [
+     460
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S13-09",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang",
+     "liu",
+     "shi",
+     "wang",
+     "ye"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.241,
+    "n_a": [],
+    "n_b": [
+     32
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-03",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "dong",
+     "li",
+     "yang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.295,
+    "n_a": [],
+    "n_b": [
+     528
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-04",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang",
+     "liu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.186,
+    "n_a": [],
+    "n_b": [
+     285
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-08",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "chen",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.115,
+    "n_a": [],
+    "n_b": [
+     430
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-09",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "chen",
+     "hu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.171,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-11",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "yu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.212,
+    "n_a": [],
+    "n_b": [
+     327
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-12",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.292,
+    "n_a": [],
+    "n_b": [
+     94,
+     402
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-14",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "bu",
+     "jiang",
+     "wang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.247,
+    "n_a": [],
+    "n_b": [
+     432
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-16",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "qin",
+     "shi"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.239,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-18",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang",
+     "li"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.231,
+    "n_a": [],
+    "n_b": [
+     683
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-21",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "tan"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.154,
+    "n_a": [],
+    "n_b": [
+     346
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-25",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "zhou"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.14,
+    "n_a": [],
+    "n_b": [
+     434
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S14-26",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "yu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.269,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S15-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "wen",
+     "wu",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.248,
+    "n_a": [],
+    "n_b": [
+     1623
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S04-84",
+   "b": "S15-03",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "chen",
+     "liu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.201,
+    "n_a": [],
+    "n_b": [
+     412
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S04-86",
+   "b": "S13-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.2,
+    "n_a": [
+     148,
+     156
+    ],
+    "n_b": [
+     34,
+     219
+    ],
+    "countries_a": [
+     "taiwan"
+    ],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S05-02",
+   "b": "S14-04",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.344,
+    "n_a": [],
+    "n_b": [
+     285
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S05-02",
+   "b": "S14-18",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.167,
+    "n_a": [],
+    "n_b": [
+     683
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S05-04",
+   "b": "S05-05",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "rodriguez"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.5,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S12-05",
+   "b": "S12-16",
+   "perspectives": [
+    "P2",
+    "P3",
+    "P4"
+   ],
+   "info": {
+    "title_ratio": 1.0,
+    "shared_authors": [
+     "fuse",
+     "hasegawa",
+     "hayashi",
+     "ishikawa",
+     "ito",
+     "kitaguchi",
+     "kosugi",
+     "takeshita",
+     "wakabayashi"
+    ],
+    "first_author_same": true,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "japan",
+     "japanese"
+    ],
+    "countries_b": [
+     "japan",
+     "japanese"
+    ]
+   }
+  },
+  {
+   "a": "S12-07",
+   "b": "S13-09",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "ye"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.354,
+    "n_a": [],
+    "n_b": [
+     32
+    ],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": [
+     "china",
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S12-07",
+   "b": "S14-09",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "chen",
+     "ding"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.237,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S12-07",
+   "b": "S15-03",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "chen",
+     "liu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.297,
+    "n_a": [],
+    "n_b": [
+     412
+    ],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S12-11",
+   "b": "S12-12",
+   "perspectives": [
+    "P1",
+    "P2",
+    "P3",
+    "P4"
+   ],
+   "info": {
+    "relation": "is-preprint-of",
+    "title_ratio": 0.781,
+    "shared_authors": [
+     "hara",
+     "ichihara",
+     "inoue",
+     "kumashiro",
+     "maeda",
+     "tachibana",
+     "uemura",
+     "yamaguchi"
+    ],
+    "first_author_same": true,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "japan"
+    ],
+    "countries_b": [
+     "japan"
+    ]
+   }
+  },
+  {
+   "a": "S12-24",
+   "b": "S12-25",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "han",
+     "qian",
+     "song"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.358,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S12-25",
+   "b": "S13-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "zhang",
+     "zheng"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.262,
+    "n_a": [],
+    "n_b": [
+     34,
+     219
+    ],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": [
+     "chinese"
+    ]
+   }
+  },
+  {
+   "a": "S12-25",
+   "b": "S14-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "zhang",
+     "zheng"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.289,
+    "n_a": [],
+    "n_b": [
+     303
+    ],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S12-25",
+   "b": "S14-12",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.318,
+    "n_a": [],
+    "n_b": [
+     94,
+     402
+    ],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S12-25",
+   "b": "S14-26",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.152,
+    "n_a": [],
+    "n_b": [],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S13-01",
+   "b": "S14-25",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.409,
+    "n_a": [
+     895
+    ],
+    "n_b": [
+     434
+    ],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S13-01",
+   "b": "S15-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.26,
+    "n_a": [
+     895
+    ],
+    "n_b": [
+     1623
+    ],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S13-02",
+   "b": "S14-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "zhang",
+     "zheng"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.232,
+    "n_a": [
+     34,
+     219
+    ],
+    "n_b": [
+     303
+    ],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S13-09",
+   "b": "S14-04",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang",
+     "liu"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.293,
+    "n_a": [
+     32
+    ],
+    "n_b": [
+     285
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S13-09",
+   "b": "S14-14",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang",
+     "wang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.422,
+    "n_a": [
+     32
+    ],
+    "n_b": [
+     432
+    ],
+    "countries_a": [
+     "china",
+     "chinese"
+    ],
+    "countries_b": [
+     "china"
+    ]
+   }
+  },
+  {
+   "a": "S14-01",
+   "b": "S14-07",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "nguyen",
+     "pham"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.251,
+    "n_a": [
+     456
+    ],
+    "n_b": [
+     459
+    ],
+    "countries_a": [],
+    "countries_b": [
+     "vietnamese"
+    ]
+   }
+  },
+  {
+   "a": "S14-02",
+   "b": "S14-51",
+   "perspectives": [
+    "P4"
+   ],
+   "info": {
+    "title_ratio": 0.627,
+    "shared_authors": [],
+    "n_a": [
+     303
+    ],
+    "n_b": [
+     303
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S14-03",
+   "b": "S15-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "fang",
+     "yang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.418,
+    "n_a": [
+     528
+    ],
+    "n_b": [
+     1623
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S14-04",
+   "b": "S14-18",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "jiang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.262,
+    "n_a": [
+     285
+    ],
+    "n_b": [
+     683
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S14-05",
+   "b": "S15-05",
+   "perspectives": [
+    "P3",
+    "P5"
+   ],
+   "info": {
+    "shared_authors": [
+     "clej",
+     "fizedean",
+     "ilie"
+    ],
+    "first_author_same": true,
+    "same_n": [
+     239
+    ],
+    "shared_countries": [
+     "romania"
+    ],
+    "title_ratio": 0.421,
+    "n_a": [
+     60,
+     179,
+     239
+    ],
+    "n_b": [
+     239
+    ],
+    "countries_a": [
+     "romania"
+    ],
+    "countries_b": [
+     "romania"
+    ]
+   }
+  },
+  {
+   "a": "S14-11",
+   "b": "S14-26",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "yu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.398,
+    "n_a": [
+     327
+    ],
+    "n_b": [],
+    "countries_a": [
+     "chinese"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S14-12",
+   "b": "S14-26",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "liu",
+     "zhang"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.387,
+    "n_a": [
+     94,
+     402
+    ],
+    "n_b": [],
+    "countries_a": [
+     "china"
+    ],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S14-25",
+   "b": "S15-02",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "wang"
+    ],
+    "first_author_same": true,
+    "title_ratio": 0.275,
+    "n_a": [
+     434
+    ],
+    "n_b": [
+     1623
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S14-35",
+   "b": "S14-36",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "baek",
+     "cha"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.492,
+    "n_a": [
+     62,
+     63,
+     125
+    ],
+    "n_b": [
+     120
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S14-35",
+   "b": "S14-37",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "baek",
+     "cha"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.504,
+    "n_a": [
+     62,
+     63,
+     125
+    ],
+    "n_b": [
+     300
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S14-36",
+   "b": "S14-37",
+   "perspectives": [
+    "P3"
+   ],
+   "info": {
+    "shared_authors": [
+     "baek",
+     "cha"
+    ],
+    "first_author_same": false,
+    "title_ratio": 0.549,
+    "n_a": [
+     120
+    ],
+    "n_b": [
+     300
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  },
+  {
+   "a": "S14-51",
+   "b": "S14-52",
+   "perspectives": [
+    "P2",
+    "P3",
+    "P4",
+    "P5"
+   ],
+   "info": {
+    "title_ratio": 1.0,
+    "shared_authors": [
+     "balthazaar"
+    ],
+    "first_author_same": true,
+    "same_n": [
+     303
+    ],
+    "shared_countries": [],
+    "n_a": [
+     303
+    ],
+    "n_b": [
+     303
+    ],
+    "countries_a": [],
+    "countries_b": []
+   }
+  }
+ ]
+}
