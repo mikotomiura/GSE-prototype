@@ -12,5 +12,5 @@
   - [x] 完了時レビュー 1 巡目: code-reviewer ∥ security-checker ∥ Codex（パス限定・30,667 トークン）→ HIGH 5 件（重なりを除く）ほか。すべて一次で裏取りし、偽陽性 1 件（部分）→ 判断 1 で直した（`paper-reviewer` の新設ほか）
   - [x] empirical-prompt-tuning iter 4（改訂後の文面・Lite・同じシナリオ）→ `tuning.md`（○ 8/8・不明瞭点 7 件を文言で潰した）
   - [x] 完了時レビュー 2 巡目（直した規則の境界条件）: code-reviewer ∥ security-checker ∥ Codex（35,751 トークン・今日の合計 66,418 / 2 回）→ HIGH 2 件ほか → 判断 2 で直した（`allowed-tools` の絞り込み・応答の保存の機械の検査・有効な査読と判定保留・範囲の外の `run-codex-consult.sh` の history の切り捨て）
-  - [ ] PR → CI 緑なら merge → main の CI
+  - [ ] PR #279 → CI 緑なら merge → main の CI
 - [ ] ★ 最初の実戦: IME 論文の M3 の事前登録の下書き（stage `prereg`・凍結の前）
