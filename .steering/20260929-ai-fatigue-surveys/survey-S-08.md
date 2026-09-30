@@ -90,7 +90,7 @@
 | Too Much, Too Fast: Understanding AI Fatigue in the Digital Acceleration Era（IJAHSS 2025・doi:10.56734/ijahss.v6n8a7） | 叙述的な文献レビュー。AI 疲労をテクノストレス・認知的過負荷・情動的消耗の組み合わせとして概念化 |
 | Digital-Age Psychosocial Strain: A Systematic Literature Review …（IJRISS 2026・doi:10.47772/ijriss.2026.102400020） | Scopus・WoS・ScienceDirect の系統的レビュー（2022〜2026 年の 24 研究）。テクノストレス・デジタル燃え尽き・AI 疲労などの構成概念の次元と測定の方法を整理 |
 | RecalibrateGPT: AI Fatigue Resilient Conversational Interfaces（arXiv 2026・doi:10.48550/arxiv.2609.00506） | 題名だけ（AI 疲労に配慮した対話の画面）。★ 2026-09-30 に抄録を読んだ（§8） |
-| Anti-Design Approach in Countering AI Fatigue（International Design Journal 2026） | 題名だけ |
+| Anti-Design Approach in Countering AI Fatigue（International Design Journal 2026） | 題名だけ。★ 2026-09-30 に記録を見直した（§8） |
 | AI Fatigue: Views From the Trenches（Editorial Office News 2026） | 題名だけ |
 
 ## 7. 数のまとめ

@@ -17,7 +17,7 @@
 - [x] design.md で形と語彙を固定してから書く
 - [x] 225 件の 1 件ずつの案（`scripts/appraisal_data.py`）。種類ごとの案は写さず 1 件ずつ判定。薄い行（S-05 §6・S-13〜S-15 の表に載せなかった行・質的研究）は抄録を取り直して確かめた
 - [x] 生成（`scripts/appraisal_xlsx.py`）と検査（`scripts/check_appraisal_xlsx.py`・data / rows / cells / golden / words）
-- [x] 変異試験（`--selftest` PASS・陰性対照 6・変異 20）。空振り 2 件（読み直しで増える空の行・同じ値の変異）を直した
+- [x] 変異試験（`--selftest` PASS・レビュー後 38 項目）。空振り 2 件（読み直しで増える空の行・同じ値の変異）を直した
 - [x] LibreOffice で概要の数式を再計算（エラーなし）
 - [x] archive に置き、Downloads に写す（SHA-256 が同じ）
 
@@ -26,8 +26,8 @@
 - [x] 作り直す（`check_judge_xlsx.py` 違反 0・`--selftest` PASS・集計の数式を再計算）
 
 ## レビュー
-- [ ] code-reviewer ＋ security-checker（並列）
-- [ ] HIGH 指摘への対応
+- [x] code-reviewer ＋ security-checker（並列・HIGH なし）
+- [x] 指摘への対応（MEDIUM 6・LOW 13 を一次で確かめて直した・判断 6）・作り直し
 - [ ] /cross-review 2 巡（Codex の予算を先に確かめる）
 
 ## 完了処理

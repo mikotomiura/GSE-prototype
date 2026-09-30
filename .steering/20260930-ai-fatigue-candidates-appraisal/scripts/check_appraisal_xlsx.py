@@ -76,8 +76,8 @@ def check_data(A=None, C=None):
                 errs.append(f"{where}: 除外なのに中心の段が背景・除外でない（{e.get('c')}）")
             elif CODE[e["c"]] not in codes:
                 errs.append(f"{where}: 中心の段（{e['c']}）と除外理由の E コード（{codes}）が合わない")
-        elif e.get("c") in ("除外（E1）", "除外（E3）"):
-            errs.append(f"{where}: 除外していないのに中心の段が {e['c']}")
+        elif e.get("c") in CODE:
+            errs.append(f"{where}: 除外していないのに中心の段が {e['c']}（背景・除外は題名・抄録段か全文段で除外する）")
         if e.get("ta") == "保留" and not e.get("r"):
             errs.append(f"{where}: 保留なのに理由が無い")
         if e.get("c", "").startswith("中心") and e.get("ta") != "含める":
@@ -106,9 +106,21 @@ def check_data(A=None, C=None):
             if ref not in cids_c:
                 errs.append(f"{where}: 照合事項 {ref} が無い")
     for c in C:
-        for t in re.findall(r"[A-Z]\d\d-\d\d", c[1]):
+        targets = re.findall(r"[A-Z]\d\d-\d\d", c[1])
+        for t in targets:
             if t not in A:
                 errs.append(f"data {c[0]}: 対象の候補 {t} が案に無い")
+        # 照合事項の「扱いの案」と各行の値が合うこと（「どちらも E2 の見立て」「どちらも境界（保留）」「どちらも計画として保留」）
+        m = re.search(r"どちらも (E\d) の見立て", c[4])
+        for t in targets:
+            if t not in A:
+                continue
+            if m and m.group(1) not in ECODE.findall(A[t].get("r", "")):
+                errs.append(f"data {c[0]}: 扱いの案は {m.group(1)} の見立てだが、{t} の除外理由は『{A[t].get('r', '')}』")
+            if "どちらも境界（保留）" in c[4] and A[t].get("c") != "境界（保留）":
+                errs.append(f"data {c[0]}: 扱いの案は境界（保留）だが、{t} の中心の段は {A[t].get('c')}")
+            if "どちらも計画として保留" in c[4] and A[t].get("ta") != "保留":
+                errs.append(f"data {c[0]}: 扱いの案は保留だが、{t} の題名・抄録段は {A[t].get('ta')}")
     # 出どころ（事実のファイルの行）が今も引けること
     for c in CAND.CANDIDATES:
         try:
@@ -167,6 +179,9 @@ def check_cells(wb):
             errs.append(f"cells 適格性 {r['候補番号']}: 用途判定『{r['用途判定（Claude）']}』が中心の段『{c}』と合わない")
         if r["原文確認レベル"] not in X.LEVEL:
             errs.append(f"cells 適格性 {r['候補番号']}: 原文確認レベル『{r['原文確認レベル']}』")
+        link = wb["Claude適格性評価"].cell(X.FIRST + tabs["Claude適格性評価"].index(r), X.ELIG_HEADERS.index("DOI") + 1).hyperlink
+        if (link is not None) != bool(r.get("DOI")):
+            errs.append(f"cells 適格性 {r['候補番号']}: DOI とリンクの有無が合わない")
     for r in tabs["Claudeスクリーニング案"]:
         cid = r["候補番号"]
         ta, ft, final, full = r["Claude予備判定（題名・抄録段）"], r["Claude予備判定（全文段）"], r["Claude案（現時点）"], r["全文確認・抽出"]
@@ -175,6 +190,8 @@ def check_cells(wb):
         for v, vocab, label in ((ta, X.TA, "題名・抄録段"), (ft, X.FT, "全文段"), (final, X.FINAL, "Claude案"), (full, X.FULLTEXT, "全文確認")):
             if v not in vocab:
                 errs.append(f"cells スクリーニング {cid}: {label}『{v}』")
+        level = (elig.get(cid) or {}).get("原文確認レベル")
+        center = r["中心範囲の段"]
         if ta == "除外":
             if not ECODE.search(reason):
                 errs.append(f"cells スクリーニング {cid}: 除外なのに除外理由に E コードが無い")
@@ -184,10 +201,27 @@ def check_cells(wb):
             errs.append(f"cells スクリーニング {cid}: 除外でないのに全文段が『—』")
         if ft == "除外" and not ECODE.search(reason):
             errs.append(f"cells スクリーニング {cid}: 全文段で除外なのに E コードが無い")
+        if (ta == "除外" or ft == "除外") and ECODE.search(reason):
+            if center not in CODE or CODE[center] not in ECODE.findall(reason):
+                errs.append(f"cells スクリーニング {cid}: 除外の E コード（{ECODE.findall(reason)}）と中心の段（{center}）が合わない")
+        elif center in CODE:
+            errs.append(f"cells スクリーニング {cid}: 除外していないのに中心の段が {center}")
+        # 本文を読んだ記録（原文確認レベル）と、全文段・全文確認の結びつき
+        read = level == "本文関連箇所確認"
+        if ta != "除外" and read != (full == "完了"):
+            errs.append(f"cells スクリーニング {cid}: 全文確認『{full}』と原文確認レベル『{level}』が合わない")
+        if ft in ("含める", "除外") and not read:
+            errs.append(f"cells スクリーニング {cid}: 本文を読んでいないのに全文段が『{ft}』")
+        if ft == "保留" and "E6" not in reason and not read:
+            errs.append(f"cells スクリーニング {cid}: E6 でない全文段の保留なのに本文を読んでいない")
         if ft == "未実施" and oa == "無料の版なし":
             errs.append(f"cells スクリーニング {cid}: 無料の版が無いのに全文段が未実施")
         if full == "入手不可" and oa != "無料の版なし":
             errs.append(f"cells スクリーニング {cid}: 入手不可なのに本文の入手が『{oa}』")
+        if full == "未完了" and not oa.startswith("無料の版あり"):
+            errs.append(f"cells スクリーニング {cid}: 未完了（無料の版あり）なのに本文の入手が『{oa}』")
+        if full == "入手不明" and oa not in X.UNKNOWN_OA:
+            errs.append(f"cells スクリーニング {cid}: 入手不明なのに本文の入手が『{oa}』")
         if "E6" in reason and oa != "無料の版なし":
             errs.append(f"cells スクリーニング {cid}: E6 なのに本文の入手が『{oa}』")
         if ft in ("含める", "除外", "保留") and final != ft:
@@ -202,6 +236,80 @@ def check_cells(wb):
         for ref in re.findall(r"C\d\d", str(r.get("自由記入") or "")):
             if ref not in known:
                 errs.append(f"cells スクリーニング {r['候補番号']}: 自由記入の {ref} が照合事項に無い")
+    return errs
+
+
+def expected_derived(e, oa):
+    """派生の列の期待値（★ appraisal_xlsx.fill() を呼ばずに、design.md の語彙の表から独立に書いた）。"""
+    ta, lv = e["ta"], e.get("lv", "抄録")
+    if "ft" in e:
+        ft = e["ft"]
+    elif ta == "除外":
+        ft = "—"
+    elif oa == "無料の版なし":
+        ft = "保留"
+    else:
+        ft = "未実施"
+    if ta == "除外":
+        full = "対象外"
+    elif lv == "本文関連箇所確認":
+        full = "完了"
+    elif oa == "無料の版なし":
+        full = "入手不可"
+    elif oa.startswith("無料の版あり"):
+        full = "未完了"
+    else:
+        full = "入手不明"
+    final = ft if ft in ("含める", "除外", "保留") else ta
+    return ft, full, final
+
+
+def check_match(wb):
+    """案のデータ（appraisal_data.A）と xlsx の各セルを、候補番号ごとに直に比べる（golden は build() 自身と比べるので、build の列の取り違えを捕まえない）。"""
+    errs = []
+    if wb.sheetnames != SHEETS:
+        return ["match: シートの並びが違う"]
+    tabs = {name: {r["候補番号"]: r for r in table(wb[name], headers)[1]} for name, headers in PER_CAND.items()}
+    for cid, e in D.A.items():
+        el, sc, me = (tabs[n].get(cid) for n in PER_CAND)
+        if el is None or sc is None or me is None:
+            errs.append(f"match {cid}: 行が無い")
+            continue
+        oa = str(el.get("本文の入手（OpenAlex）") or "")
+        pairs = [("適格性 中心範囲の段", el["中心範囲の段"], e["c"]), ("適格性 判定根拠", el["判定根拠（プロトコル §2）"], e["b"]),
+                 ("適格性 原文確認レベル", el["原文確認レベル"], e.get("lv", "抄録")), ("適格性 確認経路", el["確認経路"], e.get("rt", D.RT_FACT)),
+                 ("適格性 次の確認", el["次の確認・作業"], e.get("n") or "—"), ("適格性 既存の案との違い", el["既存の案との違い"] or "", e.get("df", "")),
+                 ("方法論 研究デザイン", me["研究デザイン（抄録・本文で確かめた範囲）"], e["d"]), ("方法論 懸念", me["懸念・限界（判定には使わない）"], e.get("k") or "—"),
+                 ("スクリーニング 題名・抄録段", sc["Claude予備判定（題名・抄録段）"], e["ta"]), ("スクリーニング 中心範囲の段", sc["中心範囲の段"], e["c"])]
+        ft, full, final = expected_derived(e, oa)
+        pairs += [("スクリーニング 全文段", sc["Claude予備判定（全文段）"], ft), ("スクリーニング 全文確認", sc["全文確認・抽出"], full),
+                  ("スクリーニング 案", sc["Claude案（現時点）"], final)]
+        for label, got, want in pairs:
+            if got != want:
+                errs.append(f"match {cid}: {label} が案のデータと違う")
+        reason = str(sc.get("除外理由") or "")
+        if e.get("r") and e["r"] not in reason:
+            errs.append(f"match {cid}: 除外理由に案のデータの理由が無い")
+        if ft == "保留" and "ft" not in e and "E6" not in reason:
+            errs.append(f"match {cid}: 無料の版が無いのに E6 が無い")
+    return errs
+
+
+def check_formulas(wb):
+    """概要の数式の範囲が、各シートの表の行（FIRST〜最後の行）と合うこと。"""
+    errs = []
+    n = {name: len(table(wb[name], headers)[1]) for name, headers in PER_CAND.items()}
+    n["Claude照合事項"] = len(table(wb["Claude照合事項"], X.CHK_HEADERS)[1])
+    ws = wb["Claude評価概要"]
+    for r in range(X.FIRST, ws.max_row + 1):
+        v = ws.cell(r, 2).value
+        if not (isinstance(v, str) and v.startswith("=")):
+            continue
+        for sheet, a, b in re.findall(r"'([^']+)'!\$?[A-Z]+\$?(\d+):\$?[A-Z]+\$?(\d+)", v):
+            if sheet not in n:
+                errs.append(f"formulas 概要 B{r}: 知らないシート『{sheet}』")
+            elif int(a) != X.FIRST or int(b) != X.FIRST + n[sheet] - 1:
+                errs.append(f"formulas 概要 B{r}: 範囲 {a}:{b} が表の行 {X.FIRST}:{X.FIRST + n[sheet] - 1} と合わない")
     return errs
 
 
@@ -255,12 +363,28 @@ def check_words(wb):
                 errs.append(f"words {where}: GSE の語『{m.group(0)}』")
         if EMAIL.search(t):
             errs.append(f"words {where}: メールアドレス")
+        m = LOCAL_PATH.search(t)
+        if m:
+            errs.append(f"words {where}: ローカルのパス『{m.group(0)}』")
+    # リンクは DOI の解決先だけ（security-checker L-3）
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for c in row:
+                if c.hyperlink is not None:
+                    target = c.hyperlink.target or ""
+                    if not target.startswith("https://doi.org/"):
+                        errs.append(f"words {ws.title}!{c.coordinate}: リンク先が DOI の解決先でない『{target[:60]}』")
+                    if LOCAL_PATH.search(target) or LOCAL_PATH.search(c.hyperlink.display or ""):
+                        errs.append(f"words {ws.title}!{c.coordinate}: リンクにローカルのパス")
     return errs
+
+
+LOCAL_PATH = re.compile(r"(?<![A-Za-z])[A-Za-z]:[\\/]|[\\/]Users[\\/]|AppData|file:/", re.I)
 
 
 def check(path):
     wb = openpyxl.load_workbook(path)
-    return check_rows(wb) + check_cells(wb) + check_golden(path, wb) + check_words(wb)
+    return check_rows(wb) + check_cells(wb) + check_match(wb) + check_formulas(wb) + check_golden(path, wb) + check_words(wb)
 
 
 # ---------------------------------------------------------------- selftest
@@ -289,7 +413,7 @@ def selftest():
     os.close(fd)
     X.build().save(base)
     ok = True
-    runs = {"rows": check_rows, "cells": check_cells, "golden": None, "words": check_words}
+    runs = {"rows": check_rows, "cells": check_cells, "match": check_match, "formulas": check_formulas, "golden": None, "words": check_words}
 
     def run(kind, path):
         wb = openpyxl.load_workbook(path)
@@ -306,6 +430,8 @@ def selftest():
     free_cid = next(c for c, e in D.A.items() if e["ta"] != "除外" and "lv" not in e and "ft" not in e
                     and J.oa_label(J.load_oa(), J.extract(next(x for x in CAND.CANDIDATES if x["cid"] == c))["doi"]).startswith("無料の版あり"))
     excl_cid = next(c for c, e in D.A.items() if e["ta"] == "除外")
+    unknown_cid = next(c for c, e in D.A.items() if e["ta"] != "除外" and "lv" not in e
+                       and J.extract(next(x for x in CAND.CANDIDATES if x["cid"] == c))["doi"] is None)
 
     def delete_row(wb):
         wb[SC].delete_rows(_find(wb[SC], "S04-10"), 1)
@@ -359,6 +485,47 @@ def selftest():
         c = ws.cell(_find(ws, "S14-03"), _col(X.METH_HEADERS, "懸念・限界（判定には使わない）"))
         c.value = str(c.value) + " GSE の Nudge"
 
+    def basis_is_design(wb):  # build の列の取り違えを模す（判定根拠の欄に研究デザインの値）
+        ws, wm = wb[E], wb[M]
+        r = _find(ws, "S14-01")
+        ws.cell(r, _col(X.ELIG_HEADERS, "判定根拠（プロトコル §2）")).value = wm.cell(_find(wm, "S14-01"), _col(X.METH_HEADERS, "研究デザイン（抄録・本文で確かめた範囲）")).value
+
+    def unknown_as_free(wb):  # DOI の無い行を「未完了（無料の版あり）」に
+        ws = wb[SC]
+        ws.cell(_find(ws, unknown_cid), _col(X.SCR_HEADERS, "全文確認・抽出")).value = "未完了"
+
+    def read_not_done(wb):  # 本文を読んだ行の全文確認を未完了に
+        ws = wb[SC]
+        ws.cell(_find(ws, "S02-02"), _col(X.SCR_HEADERS, "全文確認・抽出")).value = "未完了"
+
+    def background_included(wb):  # 背景（E2）の行を題名・抄録段で含める（全文段は未実施）に
+        ws = wb[SC]
+        r = _find(ws, "S04-41")
+        for h, v in (("Claude予備判定（題名・抄録段）", "含める"), ("Claude予備判定（全文段）", "未実施"), ("Claude案（現時点）", "含める"),
+                     ("全文確認・抽出", "未完了"), ("除外理由", None)):
+            ws.cell(r, _col(X.SCR_HEADERS, h)).value = v
+
+    def code_mismatch(wb):  # 背景（E2）の行の除外理由を E4 に
+        ws = wb[SC]
+        ws.cell(_find(ws, "S02-10"), _col(X.SCR_HEADERS, "除外理由")).value = "E4（食い違い）"
+
+    def formula_range(wb):
+        ws = wb["Claude評価概要"]
+        for r in range(X.FIRST, ws.max_row + 1):
+            v = ws.cell(r, 2).value
+            if isinstance(v, str) and "Claude適格性評価'!K" not in v and "'Claude適格性評価'!" in v:
+                ws.cell(r, 2).value = re.sub(r":([A-Z]+)(\d+)\)", lambda m: f":{m.group(1)}{int(m.group(2)) - 1})", v, count=1)
+                return
+
+    def local_link(wb):
+        ws = wb[E]
+        ws.cell(_find(ws, "S14-01"), _col(X.ELIG_HEADERS, "DOI")).hyperlink = "file:///C:/Users/someone/x.pdf"
+
+    def local_path(wb):
+        ws = wb[M]
+        c = ws.cell(_find(ws, "S14-03"), _col(X.METH_HEADERS, "懸念・限界（判定には使わない）"))
+        c.value = str(c.value) + " " + "\\".join(["C:", "Users", "someone", "x.pdf"])
+
     def email(wb):
         wb.properties.creator = "someone@example.com"
 
@@ -366,7 +533,11 @@ def selftest():
              ("cells", "判定根拠を空に", empty_basis), ("cells", "中心の段を語彙の外に", bad_vocab), ("cells", "用途判定を中心の段と合わない値に", use_mismatch),
              ("cells", "除外の理由から E コードを消す", excl_no_code), ("cells", "無料の版があるのに入手不可", unavailable_but_free),
              ("cells", "案を全文段・題名段と違う値に", final_mismatch), ("cells", "中心の段をシートの間で食い違わせる", center_differs),
-             ("golden", "懸念の文を書き換える（ほかの検査は緑のはず）", text_edit), ("words", "GSE の語を入れる", gse), ("words", "作成者にメールアドレス", email)]
+             ("golden", "懸念の文を書き換える（ほかの検査は緑のはず）", text_edit), ("words", "GSE の語を入れる", gse), ("words", "作成者にメールアドレス", email),
+             ("match", "判定根拠の欄に研究デザインの値（build の列の取り違え）", basis_is_design), ("cells", "DOI の無い行を未完了（無料の版あり）に", unknown_as_free),
+             ("cells", "本文を読んだ行の全文確認を未完了に", read_not_done), ("cells", "背景（E2）の行を題名・抄録段で含めるに", background_included),
+             ("cells", "除外の E コードを中心の段と食い違わせる", code_mismatch), ("formulas", "概要の数式の範囲を 1 行短く", formula_range),
+             ("words", "リンク先をローカルのファイルに", local_link), ("words", "セルにローカルのパス", local_path)]
     for kind, label, fn in cases:
         tmp = _mutate(base, fn)
         try:
@@ -397,6 +568,8 @@ def selftest():
         ("照合事項の対象に無い候補", lambda A, C: C.append(("C99", "S99-01", "x", "x", "x", "x"))),
         ("本文に無い照合事項の番号を引く", lambda A, C: A["S14-03"].__setitem__("k", "照合事項 C98 を見る")),
         ("中心の段なのに題名・抄録段が除外", lambda A, C: A["S14-03"].__setitem__("ta", "除外")),
+        ("背景（E2）なのに題名・抄録段を含めるに", lambda A, C: (A["S04-41"].__setitem__("ta", "含める"), A["S04-41"].pop("r"))),
+        ("照合事項の扱いの案（どちらも E2）と行の除外理由が合わない", lambda A, C: (A["S04-48"].__setitem__("c", "除外（E1）"), A["S04-48"].__setitem__("r", "E1（食い違い）"))),
     ]
     if check_data():
         ok = False

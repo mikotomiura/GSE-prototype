@@ -27,7 +27,8 @@ OUT_NAME = "AI_fatigue_candidates_AI_appraisal_2026-09-30_claude.xlsx"
 TA = ("含める", "除外", "保留")
 FT = ("含める", "除外", "保留", "未実施", "—")
 FINAL = ("含める", "除外", "保留")
-FULLTEXT = ("完了", "未完了", "入手不可", "対象外")
+FULLTEXT = ("完了", "未完了", "入手不可", "入手不明", "対象外")
+UNKNOWN_OA = ("DOI なし", "未確認", "未確認（取得できず）")  # OpenAlex の記録で本文の入手が分からないもの
 LEVEL = ("題名のみ", "抄録", "本文関連箇所確認")
 USE = {"中心-A": "中心候補", "中心-B": "中心候補", "中心（A/B 未確定）": "中心候補", "境界（保留）": "保留",
        "背景（E2）": "背景保持", "背景（E4）": "背景保持", "除外（E1）": "除外", "除外（E3）": "除外"}
@@ -75,20 +76,22 @@ def fill(cid, entry, oa):
             ft = "—"
         elif closed:
             ft = "保留"
-            reason = reason or E6
+            reason = f"{reason}／{E6}" if reason else E6  # ★ 既存の理由（計画の論文など）があっても E6 を落とさない
         else:
-            ft = "未実施"
+            ft = "未実施"  # 無料の版がある、または本文の入手が分からない（DOI なし・OpenAlex に記録なし）
     if ta == "除外":
         full = "対象外"
     elif entry.get("lv") == "本文関連箇所確認":
         full = "完了"
     elif closed:
         full = "入手不可"
-    else:
+    elif free:
         full = "未完了"
+    else:
+        full = "入手不明"  # ★ DOI なし・OpenAlex に記録なしを「無料の版あり」と同じに扱わない（2026-09-30 の code-reviewer の指摘）
     final = ft if ft in FINAL else ta
     # 自由記入の C 番号: 照合事項の表の対象に挙がるもの（と、案の文で触れたもの）
-    notes = sorted(set(re.findall(r"照合事項 (C\d\d)", " ".join(str(entry.get(k, "")) for k in ("k", "n", "b", "r"))))
+    notes = sorted(set(re.findall(r"照合事項 (C\d\d)", " ".join(str(entry.get(k, "")) for k in ("k", "n", "b", "r", "df"))))
                    | {c[0] for c in D.C if cid in re.findall(r"[A-Z]\d\d-\d\d", c[1])})
     return dict(ft=ft, reason=reason, full=full, final=final, use=USE[entry["c"]], free=free,
                 level=entry.get("lv", "抄録"), route=entry.get("rt", D.RT_FACT), note="・".join(notes))
@@ -111,7 +114,9 @@ def overview_rows(data):
         by.setdefault(e["c"], []).append(m["cid"])
     s04_load = [m["cid"] for m, e, _ in data if re.search(r"S-04 §3\.[12]", m["src"])]
     s04_b = [c for c in s04_load if c in by.get("中心-B", [])]
-    s04_h = [c for c in s04_load if c in by.get("境界（保留）", [])]
+    # 境界のうち、評価項目（疲労系の測定の有無）が抄録から分からないもの。S04-77 は燃え尽きを測るが AI の役割が決まらない別の理由なので分けて書く
+    s04_h = [c for c in s04_load if c in by.get("境界（保留）", []) and D.A[c].get("p") == D.P04_LOAD]
+    s04_o = [c for c in s04_load if c in by.get("境界（保留）", []) and c not in s04_h]
 
     def cnt(sheet, colname, val, headers):
         L = J.col(headers.index(colname) + 1)
@@ -123,7 +128,7 @@ def overview_rows(data):
         r.append([f"題名・抄録段: {v}", cnt(S, "Claude予備判定（題名・抄録段）", v, SCR_HEADERS), ""])
     for v in FT:
         r.append([f"全文段: {v}", cnt(S, "Claude予備判定（全文段）", v, SCR_HEADERS),
-                  {"未実施": "無料の版があるが本文を読んでいない（研究者の決定で抄録段）。", "保留": "本文を読めない（E6）か、本文を読んでも決まらない。",
+                  {"未実施": "本文を読んでいない（研究者の決定で抄録段）。無料の版がある、または本文の入手が分からない（全文確認の列で分ける）。", "保留": "本文を読めない（E6）か、本文を読んでも決まらない。",
                    "—": "題名・抄録段で除外。"}.get(v, "前のタスクで本文を読んだもの。")])
     for v in FULLTEXT:
         r.append([f"全文確認・抽出: {v}", cnt(S, "全文確認・抽出", v, SCR_HEADERS), ""])
@@ -137,7 +142,8 @@ def overview_rows(data):
         ["主な所見 2", "中心-B の多くは、AI への気づき・不安と情動的消耗・燃え尽きの横断の調査（S-14）と、医療の AI の記録支援の試験・前後比較（S-04 §2）。",
          "前後比較は対照が無く、回答者の偏りを避けられない。"],
         ["主な所見 3", f"作業負荷・時間だけの比較（S-04 §3.1・§3.2 の {len(s04_load)} 件）の多くは E2（疲労系の測定が抄録に無い）。燃え尽きを問う "
-                       f"{len(s04_b)} 件（{'・'.join(s04_b)}）は中心-B、調査の中身・測定が抄録から分からない {len(s04_h)} 件（{'・'.join(s04_h)}）は境界。",
+                       f"{len(s04_b)} 件（{'・'.join(s04_b)}）は中心-B、調査の中身・測定が抄録から分からない {len(s04_h)} 件（{'・'.join(s04_h)}）は境界。"
+                       + (f"{'・'.join(s04_o)} は燃え尽きを測るが、AI の役割が抄録から決まらないので境界。" if s04_o else ""),
          "研究者が候補にした種類（前タスクの判断 17）。"],
         ["主な所見 4", "境界（保留）が多い型: AI を疲労の対策に使う介入（範囲の決定 (a) と v1.0 の E3 の読み分け）・アラート疲労・変化の疲れ・AI に評価される側・データの由来が不明・抄録が無い。",
          "判定者の判断が要る論点。"],
@@ -147,9 +153,9 @@ def overview_rows(data):
     return r
 
 
-def criteria_rows():
+def criteria_rows(n):
     return [
-        ["評価の対象", "判定者用ファイルの『追加候補』の 225 件（サーヴェイで見つかった DB に無い文献）。2026-09-30 に 19 件を足した（206 → 225・S-08 の 3 件と S-12 の 16 件）。",
+        ["評価の対象", f"判定者用ファイルの『追加候補』の {n} 件（サーヴェイで見つかった DB に無い文献）。2026-09-30 に 19 件を足した（206 → 225・S-08 の 3 件と S-12 の 16 件）。",
          "元の DB 34 件は 2026-09-29 の評価版（AI_fatigue_database_with_AI_appraisal_2026-09-29_claude.xlsx）。"],
         ["評価日・評価主体", "2026-09-30。判定: Claude Opus 5.5（メイン）。抄録の取得はスクリプト、読むのと判定はメイン。サブエージェントは使っていない。", "温度などの実行設定は取得していない。"],
         ["盲検性", "盲検ではない。メインは判定の前に、前のタスクの AI の判定案（サーヴェイごとの Markdown）と、元の DB の評価版を読んだ。既存の案と違う判定は『既存の案との違い』の列に理由を書いた。", ""],
@@ -173,10 +179,10 @@ def criteria_rows():
         ["除外理由コード", "E1〜E6（プロトコル v1.0 §3）。E5＝重複出版・同じ標本・版違い、E6＝全文を入手できず全文段は判定できない（→ 保留）。この表に無い理由で除外しない。",
          "質の低さは除外の理由にしない（『懸念・限界』は判定に使わない）。"],
         ["題名・抄録段", "P と C に当たる可能性のある一次研究は『含める』（迷ったら含める）。", ""],
-        ["全文段", "前のタスクで本文を読んだものだけ『含める／除外／保留』。無料の版があるが読んでいないものは『未実施』、OpenAlex に無料の版の記録が無いものは『保留』＋ E6、題名・抄録段で除外したものは『—』。",
+        ["全文段", "前のタスクで本文を読んだものだけ『含める／除外／保留』。読んでいないものは『未実施』（無料の版がある、または本文の入手が分からない）、OpenAlex に無料の版の記録が無いものは『保留』＋ E6、題名・抄録段で除外したものは『—』。",
          "「無料の版なし」は OpenAlex に記録が無いという意味で、存在しないことの確認ではない。"],
         ["Claude案（現時点）", "全文段を判定したものはその値、未実施は題名・抄録段の値、E6 は『保留』。", ""],
-        ["全文確認・抽出", "完了＝前のタスクで本文の該当の節を読んだ／未完了＝無料の版がある／入手不可＝OpenAlex に無料の版の記録が無い／対象外＝題名・抄録段で除外。", ""],
+        ["全文確認・抽出", "完了＝前のタスクで本文の該当の節を読んだ／未完了＝無料の版がある／入手不可＝OpenAlex に無料の版の記録が無い／入手不明＝DOI が無い・OpenAlex に記録が無く、本文の入手が分からない／対象外＝題名・抄録段で除外。", ""],
         ["確認経路", f"『{D.RT_FACT}』／『{D.RT_BODY}』／『{D.RT_NEW}』／題名だけ。", "抄録は無料の学術 API（Europe PMC・Semantic Scholar・OpenAlex・Crossref・CiNii Research）から取り、連絡先は送っていない。抄録・本文は保存していない（作業の場所の外）。"],
         ["既存の AI の案", "前のタスクのサーヴェイの判定案（Markdown）。1 件ずつの案・種類ごとの案（S-04・S-05・S-14 の既定など）・足しただけ（案なし）・なし（2026-09-30 に足した候補）。種類ごとの案は写さず、1 件ずつ本評価で判定した。",
          "既存の案と違う判定は『既存の案との違い』の列。"],
@@ -227,7 +233,7 @@ def build():
 
     wsc = wb.create_sheet("Claude評価基準")
     J.header_block(wsc, "Claude評価基準｜範囲・手順・限界", "今回の評価で用いた操作的基準（design.md に書いてから判定した）。", 3)
-    J.put_table(wsc, ["項目", "規則・説明", "備考"], [22, 90, 50], criteria_rows())
+    J.put_table(wsc, ["項目", "規則・説明", "備考"], [22, 90, 50], criteria_rows(len(data)))
 
     wb.active = 1
     for w in wb.worksheets:
@@ -249,6 +255,11 @@ def main(argv=None):
         if os.path.normcase(os.path.abspath(copy_dst)) == os.path.normcase(os.path.abspath(a.out)):
             sys.exit("--copy-to の先が --out と同じ")
         J.guard(copy_dst, a.force)
+        # ★ judge_xlsx.guard の「記入のあるファイルは上書きしない」は判定の 2 シートしか見ず、評価版には効かない（security-checker L-1）。
+        #   評価版の写しは、archive の版（--out）と同じバイト列のときだけ置き換える（判定者 1 がメモを書いた写しを消さない）。
+        if os.path.exists(copy_dst):
+            if not os.path.exists(a.out) or J.sha256(copy_dst) != J.sha256(a.out):
+                sys.exit(f"写しが archive の版と違う（書き込まれた可能性があるので置き換えない）: {copy_dst}")
     import check_appraisal_xlsx as CHK
     errs = CHK.check_data()
     if errs:
