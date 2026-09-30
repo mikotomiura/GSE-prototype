@@ -4,6 +4,7 @@
 
 - 形: Skill 1 本（`.claude/skills/attack-me/SKILL.md`）。コマンド（`.claude/commands/`）は作らない（Skill 名で呼べる・`/attack-me` の入口は Skill で足りる）。
 - 役: **立場の査読者 3 人**（R1 手法の核・R2 隣接分野・R3 投稿先の方法論と再現性）＋ **意図の監査役 1 人**。すべて `general-purpose`・`model: opus` を明示・1 メッセージで並列・入れ子禁止（`subagent-delegation`）。編集者の判定はメインが書く。
+  - ★ 2026-10-01 改訂（`decisions.md` 判断 1）: 4 本とも専用エージェント **`paper-reviewer`**（`.claude/agents/paper-reviewer.md`・道具は Read・Grep・Glob だけ・`model: opus`）で起動する。論文の取得と本文の抽出はメインが行い、`round-<N>/tmp/sources/`（git が無視する）に置く。査読者役は結果を応答で返し、メインが目で見てから保存する。読んでよいファイルはメインが `context-A.md` に絶対パスで列挙する。round 2 以降は役ごとの引き継ぎ（`carryover-*.md`）を渡す。記録の置き場は `attack-me/<stage>-<略名>/round-<N>/`。
 - 接地: 各立場に実在の論文 2〜3 本（無料で読める版だけ・OpenAlex / WebSearch）。査読者役は先にその論文から「この立場が求める基準」を逐語で抜き出してから査読する。★ 実在の個人を名乗らせない（研究者の回答）。
 - 分離: 査読者役には本物の査読者が見るもの（対象物・公開物・投稿規程の一次）だけ。内部の意図（設計文書・判断）は監査役にだけ渡す。混ぜると、読者に見えない穴を査読者が埋めてしまう。
 - 品質の担保: 指摘は「位置と逐語・理由（接地の引用）・解消の条件・自信」の型で出させ、メインが一次で裏取り（`verify-before-claiming`）してから採る。査読の結果は研究の証拠にしない。
@@ -15,6 +16,7 @@
 
 - 新規: `.claude/skills/attack-me/SKILL.md`
 - 変更: `CLAUDE.md` の「研究トラック Skill」の表に 1 行
+- ★ 2026-10-01 追加（判断 1）: 新規 `.claude/agents/paper-reviewer.md`・`docs/loop-engineering.md` のモデル割当の表に 1 行・`CLAUDE.md` のサブエージェント一覧に 1 行
 - 新規: `.steering/20260930-attack-me-skill/`（requirement / design / tasklist / tuning の記録）
 
 ## テスト戦略

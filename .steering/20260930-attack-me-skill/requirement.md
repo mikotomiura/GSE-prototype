@@ -29,10 +29,12 @@
 
 ## 受け入れ条件
 
-- [ ] SKILL.md の frontmatter の description と本文の範囲が一致する（Iteration 0）
-- [ ] 白紙の実行者が SKILL.md だけで、IME 論文の設計（design.md §0）を対象物に見立てた計画（context pack の目録・panel の 3 つの立場と接地の文献の探し方・依頼文 4 本）を作れ、`[critical]` 項目がすべて ○
-- [ ] 実行者の不明瞭点を潰した差分が入っている（または不明瞭点ゼロ）
-- [ ] 作業記録（requirement / design / tasklist）と commit（PR は出さない）
+- [x] SKILL.md の frontmatter の description と本文の範囲が一致する（Iteration 0）
+- [x] 白紙の実行者が SKILL.md だけで、IME 論文の設計（design.md §0）を対象物に見立てた計画（context pack の目録・panel の 3 つの立場と接地の文献の探し方・依頼文 4 本）を作れ、`[critical]` 項目がすべて ○
+  - ★ 2026-10-01 注記（完了時レビューの指摘 M10）: 実際に回したシナリオは、公開 README（`papers/ime-observation/README.md`）を対象物にし、`design.md` §0・§4・§5 は意図の資料（B）に入れた形（`tuning.md`）。SKILL.md は内部の設計文書を A（査読者に渡すもの）に入れることを禁じるので、上の文面の「design.md §0 を対象物に見立てた」はその規則と合わない。→ 受け入れ条件は tuning.md のシナリオで満たしたと読む（文面は当時のまま残す）。
+  - ⚠️ iter 3 の差分と、完了時レビューを受けた改訂（`decisions.md` 判断 1）の後の文面の評価は `tuning.md` の iter 4 に書く。
+- [x] 実行者の不明瞭点を潰した差分が入っている（または不明瞭点ゼロ）
+- [x] 作業記録（requirement / design / tasklist）と commit（PR は出さない）
 
 ## 関連ドキュメント
 
