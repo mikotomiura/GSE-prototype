@@ -8,7 +8,8 @@ from that output with a fresh history. The script uses only the Python standard 
 git only to check that a source inside a git work tree is committed (see the procedure below).
 
 ```
-python3 kit/export/export.internal.py --out DIR [--allow-missing-license] [--style-check PATH]     [--also-user NAME ...] [--also-home PATH ...]
+python3 kit/export/export.internal.py --out DIR [--allow-missing-license] [--style-check PATH]
+                                      [--also-user NAME ...] [--also-home PATH ...]
 python3 kit/export/export.internal.py --selftest
 ```
 
@@ -133,7 +134,7 @@ characters.
   (prefixes such as `file://`, the extended-length prefix of Windows and `/mnt/c/` are part of
   it). A colon does not join a name, so a path after `host:` and the path of a URL are tokens too. When a component of the token is `Users` or `home` (any case), the whole next component
   (not cut at a punctuation mark, non-ASCII characters included, only a trailing `.,;:)` dropped;
-  empty components of a doubled separator are skipped) is the name. A relative path such as `./Users/y` or `kit/home/x` is not a token. The only names
+  a run of the same separator character before it is skipped, a run that mixes `/` and a backslash is not) is the name. A relative path such as `./Users/y` or `kit/home/x` is not a token. The only names
   that pass are these fictional ones, fixed in the script and not
   extendable by an option: `alice`, `alice2`, `bob`, `carol`, `dave`, `erin`, `gina`, `harry`,
   `YAMADA~1` and `name`. A prefix without a name (`/Users/` alone) also passes.

@@ -727,7 +727,11 @@ def unescape(line):
 
 
 def names_a_user(text):
-    """EXPERIMENT: empty components are skipped only when the run of separators is one character."""
+    """True when an absolute-path token of the text has a Users or home component that is followed by
+    a name that is not one of the fictional names. A run of the same separator character after the
+    component (a doubled separator) is skipped before the name; a run that mixes the two characters
+    is not. A singly escaped path is found after the line is unescaped; a doubly escaped one is a
+    known limitation."""
     for m in ABS_TOKEN.finditer(text):
         tok = m.group()
         for mm in re.finditer(r"(?:^|[/\\])(?:[Uu][Ss][Ee][Rr][Ss]|[Hh][Oo][Mm][Ee])(([/\\])\2*)([^/\\]*)", tok):
