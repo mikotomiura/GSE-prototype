@@ -1478,7 +1478,7 @@ def _case_deposit_paths(d):
             f.append("%s is reported as %r, expected %r" % (name, got, sorted(want)))
     # an escape that a JSON string uses for a separator is decoded before the search
     mm = dict(files)
-    for name, spelling in (("unicode escapes", b"\\u002fhome\\u002fx"), ("escaped slashes", b"\\/home\\/x"),
+    for name, spelling in (("unicode escapes", b"\\u002fhome\\u002falice"), ("escaped slashes", b"\\/home\\/alice"),
                            ("a drive with a unicode escape", b"C:\\u005cx")):
         mm[MANIFEST] = files[MANIFEST].replace(b'"format"', b'"note":"' + spelling + b'","format"', 1)
         if [k for _f, _n, k in scan_files(mm, pats)] != [ap_]:

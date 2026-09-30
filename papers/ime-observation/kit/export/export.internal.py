@@ -78,14 +78,17 @@ SECRET_NAMES = (".env", ".env.*", "*.pem", "*.key", "*age-identity*", "*.agekey"
                 "credentials*.json", "client_secret*", "g1-submit*.json", "o1_submit*.json", "*.log",
                 "*token*.txt", "*.token", "*.env", "key.txt", "id_rsa*", "id_ed25519*", "id_ecdsa*", "id_dsa*",
                 ".netrc", "_netrc", ".npmrc", ".pypirc", ".git-credentials", "credentials", "*.ppk", "*.asc",
-                "*secret*")
+                "*secret*", ".ssh", ".gnupg", ".aws", ".docker", ".kube", ".pgpass")
 # Signatures of secrets in the content of a file. Built from pieces so that this file does not spell them.
 SECRET_CONTENT = (
     re.compile("AGE-SEC" + "RET-KEY-1"),
-    re.compile("-----BEG" + "IN[A-Z ]*PRIV" + "ATE KEY-----"),
-    re.compile(r"(?<![A-Za-z0-9_])(?:gh" + "[pous]_|github" + "_pat_)[A-Za-z0-9_]{8,}"),
+    re.compile("-----BEG" + "IN[A-Z ]*PRIV" + "ATE KEY(?: BLO" + "CK)?-----"),
+    re.compile(r"(?<![A-Za-z0-9_])(?:gh" + "[prous]_|github" + "_pat_)[A-Za-z0-9_]{8,}"),
     re.compile(r"(?<![A-Za-z0-9_])gl" + r"pat-[A-Za-z0-9_\-]{8,}"),
-    re.compile(r"(?<![A-Z0-9])AK" + r"IA[A-Z0-9]{16}(?![A-Z0-9])"),
+    re.compile(r"(?<![A-Z0-9])A(?:K" + "IA|S" + r"IA)[A-Z0-9]{16}(?![A-Z0-9])"),
+    re.compile(r"(?<![A-Za-z0-9_])sk" + r"-ant-[A-Za-z0-9_\-]{20,}"),
+    re.compile(r"(?<![A-Za-z0-9_])sk" + r"-proj-[A-Za-z0-9_\-]{20,}"),
+    re.compile(r"(?<![A-Za-z0-9_])AI" + r"za[A-Za-z0-9_\-]{35}"),
     re.compile(r"(?<![A-Za-z0-9])xo" + r"x[abprs]-[A-Za-z0-9\-]{8,}"),
 )
 STYLE_REL = ".steering/20260927-ime-observation-paper-eval-design/issues/_style_check.py"
@@ -347,7 +350,9 @@ _CORPUS_JSONL = re.compile(r"^kit/corpus/data/[^/]+\.jsonl$")
 _REPARSE_POINT = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT (symbolic links, junctions, mount points)
 # A name that holds the word "internal" but not in the internal form (".internal.") is neither exported
 # nor skipped silently.
-_INTERNAL_NAME = re.compile(r"(^|[._-])internal([._-]|$)", re.I)
+# (a letter on either side makes another word: internals, international; a lower-case letter directly before a
+# capital I is a camel-case join: notesInternal)
+_INTERNAL_NAME = re.compile(r"(?i:(?<![A-Za-z])internal(?![A-Za-z]))|(?<=[a-z])Internal(?![a-z])")
 
 
 def excluded(rel, is_dir):
@@ -402,6 +407,26 @@ def is_link(full, root):
     return bool(attrs & _REPARSE_POINT) or not _inside(full, root)
 
 
+# The kinds of file that the checker of the writing rules reads (its TEXT_SUFFIX, its ignore-file name) and the
+# names of the other files of the source that are allowed. Anything else would be exported without being checked.
+CHECKED_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff")
+CHECKED_NAMES = (".gitignore", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA")
+
+
+def check_file_type(rel):
+    """A file that the checker of the writing rules does not read is not exported (exit 2). Under
+    kit/corpus/data/ only the *.jsonl files directly in it are allowed."""
+    name = rel.rsplit("/", 1)[-1]
+    if rel.startswith("kit/corpus/data/"):
+        if _CORPUS_JSONL.match(rel):
+            return
+        raise Stop(2, "a file in the corpus data that is not a jsonl file directly in it is not exported: " + rel)
+    if name.endswith(CHECKED_SUFFIX) or name in CHECKED_NAMES:
+        return
+    raise Stop(2, "a file of a kind that the checker of the writing rules does not read is not exported"
+               " (add the kind to the checker, or leave the file out): " + rel)
+
+
 def collect(root):
     """Returns {relative path: LF-normalized text} for every file that is exported."""
     files = {}
@@ -426,6 +451,8 @@ def collect(root):
                 raise Stop(2, "a name that holds the word internal outside the internal form is neither exported nor skipped (rename it): " + rel)
             if is_link(os.path.join(d, x), root):
                 raise Stop(2, "a link is not exported: " + rel)
+            if is_secret_name(x):
+                raise Stop(2, "a directory with the name of a secret is not exported (remove it from the source, or rename it if the name matched by chance): " + rel)
             keep.append(x)
         dirs[:] = keep
         for x in sorted(names):
@@ -439,6 +466,7 @@ def collect(root):
                 raise Stop(2, "a link is not exported: " + rel)
             if is_secret_name(x):
                 raise Stop(2, "a file with the name of a secret is not exported (remove it from the source, or rename it if the name matched by chance): " + rel)
+            check_file_type(rel)
             try:
                 with open(full, "rb") as f:
                     raw = f.read()
@@ -466,25 +494,35 @@ def _git(root, *args):
     return r.returncode, r.stdout.decode("utf-8", errors="replace"), r.stderr.decode("utf-8", errors="replace")
 
 
+def _dot_git_above(root):
+    """True when a .git (a directory or a file) exists in root or above it."""
+    d = os.path.abspath(root)
+    while True:
+        if os.path.lexists(os.path.join(d, ".git")):
+            return True
+        parent = os.path.dirname(d)
+        if parent == d:
+            return False
+        d = parent
+
+
 def git_top(root):
     """The top directory of the git work tree that contains root, or None when there is none."""
     try:
         rc, out, err = _git(root, "rev-parse", "--show-toplevel")
     except FileNotFoundError:
         # git cannot be found: a source inside a git work tree cannot be checked, so it cannot be exported
-        d = os.path.abspath(root)
-        while True:
-            if os.path.lexists(os.path.join(d, ".git")):
-                raise Stop(2, "git cannot be run, and the source is inside a git work tree (the committed state cannot be checked)")
-            parent = os.path.dirname(d)
-            if parent == d:
-                return None
-            d = parent
+        if _dot_git_above(root):
+            raise Stop(2, "git cannot be run, and the source is inside a git work tree (the committed state cannot be checked)")
+        return None
     except (OSError, subprocess.SubprocessError):
         raise Stop(2, "git could not be run")
     if rc == 0:
         return out.strip()
     if "not a git repository" in err.lower():
+        # a pruned work tree, a broken .git or a file system boundary looks like this too: never trust it
+        if _dot_git_above(root):
+            raise Stop(2, "git reports no repository, but a .git exists above the source (the committed state cannot be checked)")
         return None
     raise Stop(2, "git could not determine the work tree of the source (exit %d)" % rc)
 
@@ -503,7 +541,8 @@ def check_committed(root, files, extras=()):
     for x in run("ls-files", "-v", "-z", "--full-name", "--", ".").split("\0"):
         if len(x) > 2 + len(prefix) and x[1] == " " and x[2:].startswith(prefix):
             tracked[x[2 + len(prefix):]] = x[0]
-    want = set(files) | set(extras)
+    # an extra input counts when it is there or when git tracks it (a deleted one must not escape the check)
+    want = set(files) | set(x for x in extras if x in tracked or os.path.lexists(os.path.join(root, *x.split("/"))))
     changed = set()
     for ent in run("status", "--porcelain", "-z", "--no-renames", "--untracked-files=no", "--", ".").split("\0"):
         rel = ent[3:]
@@ -654,7 +693,7 @@ def check_secret_content(files):
     hits = []
     for rel in sorted(files):
         for no, ln in enumerate(files[rel].split("\n"), 1):
-            if any(rx.search(ln) for rx in SECRET_CONTENT):
+            if any(rx.search(ln) for rx in SECRET_CONTENT) or ("\\" in ln and any(rx.search(unescape(ln)) for rx in SECRET_CONTENT)):
                 hits.append("  %s:%d" % (rel, no))
     if hits:
         raise Stop(2, "content that looks like a secret is not exported (the text is not shown; remove it from the source,"
@@ -710,7 +749,7 @@ def machine_rules(top, also_users, also_homes):
             hosts.add(h.strip())
             hosts.add(h.strip().split(".")[0])
     for h in sorted(hosts):
-        if len(h) >= 3:
+        if len(h) >= 3 and h.lower() != "localhost":  # a generic name is not this machine's private value
             rules.append(("host-name", re.compile(r"(?<![A-Za-z0-9_])" + re.escape(h) + r"(?![A-Za-z0-9_])", re.I)))
     return rules
 
@@ -726,18 +765,48 @@ def unescape(line):
     return _ESC_RE.sub(rep, line)
 
 
+_COMPONENT = re.compile(r"(?:^|[/\\])(?:[Uu][Ss][Ee][Rr][Ss]|[Hh][Oo][Mm][Ee])(?=[/\\])")
+_FLAG_TOKEN = re.compile(r"(?:^|(?<=[\s\"'`=]))-[ILF]((?:[/\\]|[A-Za-z]:)[^\s\"'`<>|*?]*)")
+_WEB_SCHEME = re.compile(r"[Hh][Tt][Tt][Pp][Ss]?:$")
+_DRIVE_IN_PATH = re.compile(r"/[A-Za-z]:(?=[/\\])")
+
+
+def _user_in_token(tok):
+    """True when a Users or home component of the token is followed by a name that is not fictional.
+    After the component, every run of separator characters (of either kind, mixed or not) and every
+    component that is a single dot is skipped; the next component is the name."""
+    for m in _COMPONENT.finditer(tok):
+        parts = _COMP_SPLIT.split(tok[m.end():])
+        name = ""
+        for part in parts[1:]:
+            if part in ("", "."):
+                continue
+            name = part.rstrip(_NAME_TAIL)
+            break
+        if name and name not in FICTIONAL:
+            return True
+    return False
+
+
 def names_a_user(text):
     """True when an absolute-path token of the text has a Users or home component that is followed by
-    a name that is not one of the fictional names. A run of the same separator character after the
-    component (a doubled separator) is skipped before the name; a run that mixes the two characters
-    is not. A singly escaped path is found after the line is unescaped; a doubly escaped one is a
-    known limitation."""
+    a name that is not one of the fictional names (separator runs and dot components are skipped
+    before the name). Besides the tokens, the path after a -I / -L / -F compiler flag is checked. In
+    the path of an http or https URL only a drive-letter form (/C:/Users/name) counts: the Users and
+    home of a web path are not directories. A singly escaped path is found after the line is
+    unescaped; a doubly escaped one is a known limitation."""
     for m in ABS_TOKEN.finditer(text):
         tok = m.group()
-        for mm in re.finditer(r"(?:^|[/\\])(?:[Uu][Ss][Ee][Rr][Ss]|[Hh][Oo][Mm][Ee])(([/\\])\2*)([^/\\]*)", tok):
-            name = mm.group(3).rstrip(_NAME_TAIL)
-            if name and name not in FICTIONAL:
-                return True
+        if tok.startswith("//") and _WEB_SCHEME.search(text[:m.start()]):
+            for d in _DRIVE_IN_PATH.finditer(tok):
+                if _user_in_token(tok[d.start() + 1:]):
+                    return True
+            continue
+        if _user_in_token(tok):
+            return True
+    for m in _FLAG_TOKEN.finditer(text):
+        if _user_in_token(m.group(1)):
+            return True
     return False
 
 
@@ -811,6 +880,32 @@ def _py_check_manifest(cwd_logger):
                           capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=300)
 
 
+def check_tool_committed(tool):
+    """The source is inside a git work tree: the checker must be tracked in the git work tree that
+    holds it, equal to HEAD and free of an assume-unchanged or skip-worktree mark (exit 2)."""
+    tdir, tname = os.path.dirname(tool), os.path.basename(tool)
+    try:
+        rc, out, _ = _git(tdir, "rev-parse", "--show-toplevel")
+    except (OSError, subprocess.SubprocessError):
+        raise Stop(2, "git could not be run on the checker of the writing rules")
+    if rc != 0 or not out.strip():
+        raise Stop(2, "the checker of the writing rules is not inside a git work tree (the source is; commit the checker there): " + tool)
+    try:
+        rc1, listed, _ = _git(tdir, "ls-files", "-v", "--", tname)
+        rc2, status, _ = _git(tdir, "status", "--porcelain", "--untracked-files=no", "--", tname)
+    except (OSError, subprocess.SubprocessError):
+        raise Stop(2, "git could not be run on the checker of the writing rules")
+    if rc1 != 0 or rc2 != 0:
+        raise Stop(2, "git could not inspect the checker of the writing rules")
+    tag = listed[:1]
+    if not listed.strip() or listed[1:2] != " ":
+        raise Stop(2, "the checker of the writing rules is not tracked by git (commit it): " + tool)
+    if tag.islower() or tag == "S":
+        raise Stop(2, "the checker of the writing rules carries an assume-unchanged or skip-worktree mark in the git index (clear the mark): " + tool)
+    if status.strip():
+        raise Stop(2, "the checker of the writing rules differs from the committed version (commit or restore it): " + tool)
+
+
 def resolve_style_tool(top, given):
     """The checker of the writing rules of published files: the given path, or the fixed place in the
     git work tree of the source. It is never skipped silently."""
@@ -825,6 +920,8 @@ def resolve_style_tool(top, given):
     return path
 
 
+# An executable file starts with "#!", optional blanks and a "/" ("#![" of a Rust attribute does not).
+_SHEBANG = re.compile(r"#![ \t]*/")
 _VIOLATION = re.compile(r"^(.+?:\d+: \[[^\]\r\n]+\])")
 
 
@@ -885,11 +982,12 @@ def export(root, out, allow_missing_license, also_users, also_homes, style_check
     if top and _inside(out, top):
         raise Stop(2, "the output path is inside the git work tree of the source")
     style_tool = resolve_style_tool(top, style_check)
+    if top:
+        check_tool_committed(style_tool)
     files = collect(root)
     check_secret_content(files)
-    table_path = os.path.join(root, *TRANSLATIONS.split("/"))
     if top:
-        check_committed(root, files, [TRANSLATIONS] if os.path.lexists(table_path) else [])
+        check_committed(root, files, [TRANSLATIONS])
     r = _py_check_manifest(ldir)
     if r.returncode != 0:
         raise Stop(1, "the source manifests do not match their files; nothing was exported:\n" + (r.stdout + r.stderr).strip()[-600:])
@@ -898,6 +996,7 @@ def export(root, out, allow_missing_license, also_users, also_homes, style_check
     convert_sources(files, manifests, table)
     verify_ascii(files, manifests)
     rewrite_manifests(files, manifests)
+    check_secret_content(files)  # again, after the translation and the comment removal
     hits = scan(files, machine_rules(top or os.path.dirname(os.path.dirname(root)), also_users, also_homes))
     if hits:
         lines = ["the export contains content that must not be published (the matched text is not shown):"]
@@ -908,26 +1007,37 @@ def export(root, out, allow_missing_license, also_users, also_homes, style_check
     for rel in (".zenodo.json", "CITATION.cff"):
         if rel in files and "TODO" in files[rel]:
             print("WARNING: %s still contains TODO placeholders; fill them in before publishing." % rel)
+    # The output is written to a sibling directory (same parent, a name that starts with a dot) and gets its
+    # name only after every check has passed, so that an interrupted export never leaves something that
+    # looks finished.
+    work = os.path.join(os.path.dirname(out), "." + os.path.basename(out) + ".tmp-%d-%s" % (os.getpid(), os.urandom(4).hex()))
     created = False
     try:
-        os.mkdir(out)
+        os.mkdir(work)
         created = True
         for rel in sorted(files):
-            p = os.path.join(out, *rel.split("/"))
+            p = os.path.join(work, *rel.split("/"))
             os.makedirs(os.path.dirname(p), exist_ok=True)
             with open(p, "wb") as f:
                 f.write(files[rel].encode("utf-8"))
-            if files[rel].startswith("#!/"):
+            if _SHEBANG.match(files[rel]):
                 os.chmod(p, 0o755)
-        r = _py_check_manifest(os.path.join(out, *LOGGER.split("/")))
+        r = _py_check_manifest(os.path.join(work, *LOGGER.split("/")))
         if r.returncode != 0:
             raise Stop(1, "the exported manifests do not match the exported files:\n" + (r.stdout + r.stderr).strip()[-600:])
-        run_style_check(style_tool, out)
+        run_style_check(style_tool, work)
+        if os.path.lexists(out):
+            raise Stop(2, "the output path appeared while the export was running (it is never overwritten)")
+        try:
+            os.rename(work, out)
+        except OSError:
+            raise Stop(2, "the output could not be moved to its final name")
+        created = False
     except BaseException:
         if created:
-            shutil.rmtree(out, ignore_errors=True)
-            if os.path.lexists(out):
-                print("WARNING: the partial output could not be removed completely; delete it before another export: " + out, file=sys.stderr)
+            shutil.rmtree(work, ignore_errors=True)
+            if os.path.lexists(work):
+                print("WARNING: the partial output could not be removed completely; delete it before another export: " + work, file=sys.stderr)
         raise
     print("exported %d files to %s" % (len(files), out))
     return 0
@@ -987,11 +1097,29 @@ def selftest():
     style_bad = stub("style_bad.py", head + "print('x.md:3: [forbidden:gse] SECRETDETAIL ' + chr(0x26A0))\n"
                      "print('y.md:9: [japanese-prose] SECRETDETAIL')\n"
                      "print(chr(0x9055) + chr(0x53CD) + ' 2 ' + chr(0x4EF6))\nsys.exit(1)\n")
+    loose_tool = os.path.join(tmp, "loose-style-ok.py")  # outside every git work tree
+    with open(loose_tool, "wb") as f:
+        f.write(open(style_ok, "rb").read())
     style_exit2 = stub("style_exit2.py", head + "sys.exit(2)\n")
     style_exit3 = stub("style_exit3.py", head + "sys.exit(3)\n")
     style_crash = stub("style_crash.py", head + "raise RuntimeError('boom')\n")
     style_hang = stub("style_hang.py", head + "import time\ntime.sleep(60)\n")
+    style_probe = stub("style_probe.py", head + "root, want = os.path.abspath(sys.argv[2]), os.path.abspath(os.environ['EXPECT_OUT'])\n"
+                       "assert os.path.basename(root).startswith('.') and os.path.dirname(root) == os.path.dirname(want), (root, want)\n"
+                       "assert not os.path.exists(want), want\nsys.exit(0)\n")
     SA = ["--style-check", style_ok]
+
+    def git_here(cwd, *args):
+        return subprocess.run(["git", "-c", "user.name=selftest", "-c", "user.email=selftest" + AT + "example.invalid",
+                               "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", "-C", cwd] + list(args),
+                              capture_output=True, env=_git_env())
+    try:
+        have_git = subprocess.run(["git", "--version"], capture_output=True).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        have_git = False
+    if have_git:  # the checkers are committed: a source inside a git work tree needs a committed checker
+        have_git = git_here(tools, "init", "-q").returncode == 0 and git_here(tools, "add", ".").returncode == 0 \
+            and git_here(tools, "commit", "-q", "-m", "tools").returncode == 0
     try:
         real_top = git_top(SOURCE_ROOT)
     except Stop:
@@ -1191,16 +1319,7 @@ def selftest():
                 rcx = export_main(["--out", o, "--allow-missing-license"] + SA + list(argv), base)
             return rcx, buf.getvalue(), o
 
-        def git_here(cwd, *args):
-            return subprocess.run(["git", "-c", "user.name=selftest", "-c", "user.email=selftest" + AT + "example.invalid",
-                                   "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", "-C", cwd] + list(args),
-                                  capture_output=True, env=_git_env())
-
         name = "an untracked or modified file in a git checkout stops the export"
-        try:
-            have_git = subprocess.run(["git", "--version"], capture_output=True).returncode == 0
-        except (OSError, subprocess.SubprocessError):
-            have_git = False
         if not have_git:
             print("note: git is not available; the case '%s' is skipped" % name)
         else:
@@ -1367,6 +1486,14 @@ def selftest():
             git_here(gtop, "add", "papers/ime-observation/" + TRANSLATIONS)
             rcx, text, o = export_at(gb)
             ck(name + " (clean again)", rcx == 0, text)
+            name = "a deleted tracked translation table stops the export"
+            os.remove(tp)
+            rcx, text, o = export_at(gb)
+            ck(name, rcx == 2 and "translations" in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+            with open(tp, "wb") as f:
+                f.write(orig)
+            rcx, text, o = export_at(gb)
+            ck(name + " (restored)", rcx == 0, text)
         lb = build("linked-table")
         ltp = os.path.join(lb, *TRANSLATIONS.split("/"))
         put(lb, "kit/export/real-table.json", json.dumps(trans))
@@ -1451,10 +1578,13 @@ def selftest():
         sigs = ["AGE-SEC" + "RET-KEY-1" + "Q" * 58, "-----BEG" + "IN OPENSSH PRIV" + "ATE KEY-----", "-----BEG" + "IN PRIV" + "ATE KEY-----"]
         sigs += ["gh" + c + "_" + "a1" * 15 for c in "pous"] + ["github" + "_pat_" + "b2" * 15, "gl" + "pat-" + "c3" * 10]
         sigs += ["AK" + "IA" + "ABCDEFGHIJKLMNOP", "xo" + "xb-" + "1234567890abcd"]
+        sigs += ["-----BEG" + "IN PGP PRIV" + "ATE KEY BLO" + "CK-----", "sk" + "-ant-" + "a1" * 12, "sk" + "-proj-" + "b2" * 12,
+                 "AI" + "za" + "c3" * 18, "gh" + "r_" + "d4" * 10, "AS" + "IA" + "ABCDEFGHIJKLMNOP"]
         for i, sig in enumerate(sigs):
             rcx, text, o = run("sig%d" % i, {"README.md": "# Fake\nToken: %s\n" % sig})
             ck(name + " (%d)" % i, rcx == 2 and "README.md:2" in text and sig[-12:] not in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
-        harmless = ("the prefix gh" + "p_ names a token", "AK" + "IA is a prefix", "-----BEG" + "IN PUBLIC KEY-----", "xo" + "xb- alone")
+        harmless = ("the prefix gh" + "p_ names a token", "AK" + "IA is a prefix", "-----BEG" + "IN PUBLIC KEY-----", "xo" + "xb- alone",
+                    "sk" + "-ant- alone", "AI" + "za is a prefix", "AS" + "IA is a prefix")
         rcx, text, o = run("sig-ok", {"README.md": "# Fake\n" + "\n".join(harmless) + "\n"})
         ck(name + " (prose that only names a prefix passes)", rcx == 0, text)
         for i, nm in enumerate(("zenodo-token.txt", "a.TOKEN", "prod.env", "Key.txt", "id_rsa", "id_rsa.pub", "id_ed25519", "id_ecdsa", "id_dsa",
@@ -1476,6 +1606,100 @@ def selftest():
         ok_forms = ("https://example.org/Users/alice/x", "see:/Users/", "a_/Users/" + zed, "x-/home/" + zed, "https://example.org/home", "host:/home/bob")
         rcx, text, o = run("colon-ok", {"README.md": "# Fake\n" + "\n".join("Path %s here." % t for t in ok_forms) + "\n"})
         ck(name + " (relative and fictional forms pass)", rcx == 0, text)
+        # secret-looking content that appears only in the converted output, or only after the escapes are decoded
+        name = "secret-looking content in the converted output stops the export"
+        sig = "AGE-SEC" + "RET-KEY-1" + "Q" * 58
+        tb = {"entries": [dict(trans["entries"][0], to='"Japanese text {} {x} ' + sig + '"'), trans["entries"][1]]}
+        rcx, text, o = run("convsig", table=tb)
+        ck(name + " (from the translation table)", rcx == 2 and "t.rs" in text and sig[-12:] not in text and not os.path.exists(o),
+           "exit %d %s" % (rcx, text.strip()[-200:]))
+        rcx, text, o = run("escsig", {"experiment/data.json": '{"k": "' + "\\" + "u0041" + "GE-SEC" + "RET-KEY-1" + "Q" * 58 + '"}\n'})
+        ck(name + " (spelled with an escape)", rcx == 2 and "data.json" in text and "QQQQQQQQ" not in text and not os.path.exists(o),
+           "exit %d %s" % (rcx, text.strip()[-200:]))
+        # a mixed or dotted separator
+        name = "a mixed or dotted separator does not hide a user path"
+        for form in ("C:/Users/\\" + zed + "/x", "/Users/\\/" + zed, "/Users/./" + zed + "/x", "\\Users\\/" + zed, "/home/./\\" + zed, "/Users/././" + zed):
+            refused(name, {"README.md": "# Fake\nPath %s here.\n" % form}, "README.md", forbid=(form,))
+        rcx, text, o = run("mix-ok", {"README.md": "# Fake\nPath /Users/./alice/x and /Users/\\/bob and /Users/. and /home/./ end.\n"})
+        ck(name + " (fictional names and prefixes pass)", rcx == 0, text)
+        # a web URL path
+        name = "a web URL path is not a user path"
+        rcx, text, o = run("web-ok", {"README.md": "# Fake\nSee https://stackoverflow.com/users/12345/name and https://github.com/users/octocat/projects/1,\n"
+                                      "https://example.org/home/docs and HTTP://example.org/Users/zed/x for reference.\n"})
+        ck(name + " (web paths pass)", rcx == 0, text)
+        for form in ("https://host/C:/Users/" + zed, "http://host/c:/Users/" + zed + "/x", "https://host/a/b/D:\\Users\\" + zed,
+                     "scp://host/home/" + zed, "sftp://host/Users/" + zed):
+            refused(name, {"README.md": "# Fake\nCopied from %s today.\n" % form}, "README.md", forbid=(form,))
+        # a compiler flag
+        name = "a compiler flag does not hide a user path"
+        for form in ("cc -L/Users/" + zed + "/lib", "-I/home/" + zed + "/include", 'gcc "-F/Users/' + zed + '/f"', "CFLAGS=-L/Users/" + zed + "/lib",
+                     "-LC:\\Users\\" + zed + "\\lib", "make LDFLAGS='-L/home/" + zed + "'"):
+            refused(name, {"README.md": "# Fake\n%s\n" % form}, "README.md", forbid=(form,))
+        rcx, text, o = run("flag-ok", {"README.md": "# Fake\n-L/Users/alice/lib -Lrelative/Users/" + zed + " -I/usr/include cc -I/home/bob/x\n"})
+        ck(name + " (fictional names and other paths pass)", rcx == 0, text)
+        # a .git above the source while git reports no repository
+        name = "git that reports no repository under a .git stops the export"
+        real_git_fn = globals()["_git"]
+        globals()["_git"] = lambda root, *args: (128, "", "fatal: not a git repository (or any parent up to mount point /)\n")
+        try:
+            dg = build("dotgit-dir")
+            os.makedirs(os.path.join(os.path.dirname(os.path.dirname(dg)), ".git"))
+            rcx, text, o = export_at(dg)
+            ck(name + " (a .git directory)", rcx == 2 and ".git" in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+            rcx, text, o = export_at(build("dotgit-none"))
+            ck(name + " (no .git anywhere: exported)", rcx == 0, text)
+        finally:
+            globals()["_git"] = real_git_fn
+        if have_git:
+            dg = build("dotgit-file")
+            put(os.path.dirname(os.path.dirname(dg)), ".git", "gitdir: " + os.path.join(tmp, "no-such-gitdir") + "\n")
+            rcx, text, o = export_at(dg)
+            ck(name + " (a .git file that points nowhere)", rcx == 2 and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+        # a kind of file that the style checker does not read
+        name = "a file type that the style checker does not read stops the export"
+        for nm in ("manuscript/draft.tex", "kit/ci.yml", "kit/noext", "kit/README.MD", "kit/.gitattributes", "kit/data.csv"):
+            rcx, text, o = run("type-" + nm.replace("/", "_"), {nm: "x\n"})
+            ck(name + " (%s)" % nm, rcx == 2 and os.path.basename(nm) in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+        kinds_ok = dict(("kit/kinds/" + n, "x\n") for n in ("a.py", "a.rs", "a.sh", "a.md", "a.json", "a.toml", "a.swift", "a.txt", "a.cff",
+                                                           ".gitignore", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA"))
+        rcx, text, o = run("kinds-ok", kinds_ok)
+        ck(name + " (the allowed kinds pass)", rcx == 0, text)
+        # a secret-looking directory name
+        name = "a secret-looking directory name stops the export"
+        for nm in ("kit/.aws/config.md", "kit/.ssh/x.md", "kit/.gnupg/x.md", "kit/.docker/x.md", "kit/.kube/x.md", "kit/.pgpass/x.md", "kit/my-secret/x.md",
+                   "kit/keys.pem/x.md", "kit/.env/x.md"):
+            rcx, text, o = run("sdir-" + nm.replace("/", "_"), {nm: "x\n"})
+            d = nm.split("/")[1]
+            ck(name + " (%s)" % d, rcx == 2 and d in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+        rcx, text, o = run("sdir-ok", {"kit/tokenizer/x.md": "x\n"})
+        ck(name + " (a name that does not match passes)", rcx == 0, text)
+        # the output is renamed into place only after every check has passed
+        name = "the output appears only after every check passed"
+
+        def dotted():
+            return sorted(n for n in os.listdir(tmp) if n.startswith("."))
+        counter[0] += 1
+        os.environ["EXPECT_OUT"] = os.path.join(tmp, "out%d" % counter[0])
+        try:
+            counter[0] -= 1
+            rcx, text, o = run("probe", argv=["--style-check", style_probe])
+        finally:
+            os.environ.pop("EXPECT_OUT", None)
+        ck(name, rcx == 0 and os.path.isdir(o) and dotted() == [], "exit %d %s %s" % (rcx, text.strip()[-300:], dotted()))
+        rcx, text, o = run("probe-bad", argv=["--style-check", style_bad])
+        ck(name + " (a violation leaves nothing)", rcx == 1 and not os.path.exists(o) and dotted() == [], "exit %d %s" % (rcx, dotted()))
+        real_rename = os.rename
+
+        def bad_rename(a, b, *args, **kw):
+            raise OSError(13, "denied")
+        os.rename = bad_rename
+        try:
+            rcx, text, o = run("probe-rename")
+        finally:
+            os.rename = real_rename
+        ck(name + " (a failed rename leaves nothing)", rcx == 2 and not os.path.exists(o) and dotted() == [], "exit %d %s" % (rcx, dotted()))
+        rcx, text, o = run("probe-exists")
+        ck(name + " (nothing is left after a success)", rcx == 0 and dotted() == [], "exit %d %s" % (rcx, dotted()))
         # the host name of the machine that runs the export
         name = "the host name stops the export"
         fake_host = "labhost" + "-7"
@@ -1498,38 +1722,44 @@ def selftest():
         name = "the word check is skipped only for corpus data files"
         rcx, text, o = run("corpus-ok", {"kit/corpus/data/q.jsonl": "a line about %s\n" % _ORG})
         ck(name + " (a corpus data file)", rcx == 0 and os.path.exists(os.path.join(o, "kit", "corpus", "data", "q.jsonl")), text)
-        refused(name, {"kit/corpus/data/notes.md": "About %s.\n" % _ORG}, "notes.md")
+        name = "a file in the corpus data other than a jsonl stops the export"
+        for nm in ("kit/corpus/data/notes.md", "kit/corpus/data/sub/q.md", "kit/corpus/data/q.txt"):
+            rcx, text, o = run("corp-" + nm.replace("/", "_"), {nm: "About %s.\n" % _ORG})
+            ck(name + " (%s)" % nm, rcx == 2 and os.path.basename(nm) in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+        name = "the word check is skipped only for corpus data files"
         refused(name, {"kit/corpus/data/q.jsonl": "a line about %s and %s\n" % (_ORG, pid)}, "q.jsonl")
         # a name with internal outside the internal form
         name = "a name with internal outside the internal form stops the export"
-        for nm in ("kit/notes_internal.md", "kit/internal/x.md", "kit/Internal.md", "kit/a-internal", "kit/notes.internal"):
+        for nm in ("kit/notes_internal.md", "kit/internal/x.md", "kit/Internal.md", "kit/a-internal", "kit/notes.internal",
+                   "kit/internal2.md", "kit/internal notes.md", "kit/notes(internal).md", "kit/notesInternal.md", "kit/INTERNAL-x.md"):
             rcx, text, o = run("int-" + nm.replace("/", "_"), {nm: "x\n"})
             ck(name + " (%s)" % nm, rcx == 2 and "internal" in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
-        rcx, text, o = run("int-ok", {"kit/internals.md": "x\n", "kit/international.md": "x\n"})
+        rcx, text, o = run("int-ok", {"kit/internals.md": "x\n", "kit/international.md": "x\n", "kit/Internals.md": "x\n", "kit/notesInternals.md": "x\n"})
         ck(name + " (a longer word passes)", rcx == 0, text)
         # only files that start with a shebang are made executable (the calls are recorded: Windows has no such bit)
         name = "only files starting with a shebang are made executable"
         real_chmod, calls = os.chmod, []
 
         def rec_chmod(path, mode, *a, **k):
-            calls.append(os.path.relpath(path, made[0]).replace(os.sep, "/"))
+            # the output is written to a sibling directory first: the path below it is what counts
+            calls.append(os.path.relpath(path, os.path.dirname(made[0])).replace(os.sep, "/").split("/", 1)[1])
             return real_chmod(path, mode, *a, **k)
         made = [""]
         counter[0] += 1
         made[0] = os.path.join(tmp, "out%d" % counter[0])
         sb = build("shebang", {"kit/tool.sh": "#!/bin/sh\necho ok\n", "kit/attr.rs": "#![allow(dead_code)]\nfn f() {}\n",
-                               "kit/bang.txt": "#! not a shebang\n", "kit/plain.sh": "echo ok\n"})
+                               "kit/bang.txt": "#! not a shebang\n", "kit/plain.sh": "echo ok\n", "kit/spaced.sh": "#! /bin/sh\necho ok\n"})
         os.chmod = rec_chmod
         try:
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 rcx = export_main(["--out", made[0], "--allow-missing-license"] + SA, sb)
         finally:
             os.chmod = real_chmod
-        ck(name, rcx == 0 and "kit/tool.sh" in calls and not any(c in calls for c in ("kit/attr.rs", "kit/bang.txt", "kit/plain.sh")),
+        ck(name, rcx == 0 and "kit/tool.sh" in calls and "kit/spaced.sh" in calls and not any(c in calls for c in ("kit/attr.rs", "kit/bang.txt", "kit/plain.sh")),
            "exit %d %s" % (rcx, calls))
         if os.name != "nt" and rcx == 0:
-            modes = dict((r, os.stat(os.path.join(made[0], *r.split("/"))).st_mode & 0o111) for r in ("kit/tool.sh", "kit/attr.rs", "kit/plain.sh"))
-            ck(name + " (the mode bits)", modes["kit/tool.sh"] and not modes["kit/attr.rs"] and not modes["kit/plain.sh"], str(modes))
+            modes = dict((r, os.stat(os.path.join(made[0], *r.split("/"))).st_mode & 0o111) for r in ("kit/tool.sh", "kit/spaced.sh", "kit/attr.rs", "kit/plain.sh"))
+            ck(name + " (the mode bits)", modes["kit/tool.sh"] and modes["kit/spaced.sh"] and not modes["kit/attr.rs"] and not modes["kit/plain.sh"], str(modes))
         # the checker of the writing rules runs on the output
         name = "a style violation in the output stops the export"
         rcx, text, o = run("style-bad", argv=["--style-check", style_bad])
@@ -1561,11 +1791,37 @@ def selftest():
             default_tool = os.path.join(gtop, *STYLE_REL.split("/"))
             os.makedirs(os.path.dirname(default_tool))
             shutil.copy(style_ok, default_tool)
-            counter[0] += 1
-            o = os.path.join(tmp, "out%d" % counter[0])
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                rcx = export_main(["--out", o, "--allow-missing-license"], gb)
+            rel_tool = os.path.relpath(default_tool, gtop).replace(os.sep, "/")
+
+            def export_default():
+                counter[0] += 1
+                od = os.path.join(tmp, "out%d" % counter[0])
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    rcd = export_main(["--out", od, "--allow-missing-license"], gb)
+                return rcd, od
+            # a style checker that is not committed stops the export
+            name2 = "a style checker that is not committed stops the export"
+            rcx, o = export_default()
+            ck(name2 + " (untracked, at the default place)", rcx == 2 and not os.path.exists(o), "exit %d" % rcx)
+            ck(name2 + " (a loose file outside git, given)", export_at(gb, ["--style-check", loose_tool])[0] == 2)
+            git_here(gtop, "add", rel_tool)
+            rcx, o = export_default()
+            ck(name2 + " (staged only)", rcx == 2 and not os.path.exists(o), "exit %d" % rcx)
+            ok = git_here(gtop, "commit", "-q", "-m", "checker").returncode == 0
+            ck(name2 + " (the checker is committed)", ok)
+            rcx, o = export_default()
             ck(name + " (the checker at the default place in the work tree is used)", rcx == 0 and os.path.isdir(o), "exit %d" % rcx)
+            with open(default_tool, "ab") as f:
+                f.write(b"# edited\n")
+            rcx, o = export_default()
+            ck(name2 + " (modified)", rcx == 2 and not os.path.exists(o), "exit %d" % rcx)
+            git_here(gtop, "update-index", "--assume-unchanged", rel_tool)
+            rcx, o = export_default()
+            ck(name2 + " (flagged as unchanged)", rcx == 2 and not os.path.exists(o), "exit %d" % rcx)
+            git_here(gtop, "update-index", "--no-assume-unchanged", rel_tool)
+            git_here(gtop, "checkout", "-q", "--", rel_tool)
+            rcx, o = export_default()
+            ck(name2 + " (restored)", rcx == 0, "exit %d" % rcx)
         real_timeout = STYLE_TIMEOUT
         try:
             globals()["STYLE_TIMEOUT"] = 2
