@@ -160,8 +160,12 @@ Other entries:
   conversion takes up to three; the procedure presses four, since an extra Escape outside a composition only reaches
   the field as a command. The same behaviour was seen with keys
   typed by hand, so it belongs to the input method, not to the synthetic events. A cell with live conversion off
-  has not been piloted and may need its own recipes file (`--recipes`), since an extra Return there would insert
-  a line break.
+  uses its own recipes file, `recipes.macos-live-off.json` (pass it with `--recipes`). With live conversion off, a
+  single Space shows the conversion in place and one Return commits it (a second Return would insert a line
+  break), a second Space opens the candidate window (so the multi-Space scenario keeps two Returns), and one
+  Escape cancels. That file also disables the live-conversion scenario by default. Its Windows section is identical
+  to `recipes.json`. The generator's selftest checks `recipes.json` only; the live-off file was checked on the
+  device (every scenario committed or cancelled as intended, with no composition carried into the next trial).
 - The default procedures (number of Escape presses, the predictive-candidate key, the IME on/off keys, and
   similar details) are **hypotheses** that are expected to vary by OS and IME and to be revised after a
   calibration pilot.

@@ -63,3 +63,9 @@ Skill: verify-before-claiming・git-workflow。応答は日本語。コミット
 - ✅ §2: 024 の一覧の SHA-256 は `298a470b…4a0`（89 ファイル）で G-GEAR と一致・POSIX だけの検査は緑。Mac の全 acceptance 20 本は **SCOPE を除いて失敗 0 件**。⚠️ main の上では SCOPE がほぼ全本で赤になるが、測定器の適用範囲の外（B15）。
 - ✅ §3-1 M0: 12 作品・1,800 句・`c8f890cb…4620`（判断 79・`experiment/data.md` の「Phrase corpus」）。枝 `feature/ime-m0-corpus`（main へ PR）。生の `.txt` / zip は repo に入れていない（再取得は data.md の URL と SHA-256 で照合）。
 - ⏭ 次は **M1（macOS の較正パイロット・Mac・実際にキーを送る）**。★ ロガーは書き出しからビルドする（判断 68）。生成器の本番の config（速さ・think・n）は M1 の実測で決め、出典を `[Pn]` で接地してから M3 で凍結する（`kit/gen/README.md`）。
+
+## §6 2026-10-01 の Mac の結果（M1 と M2 の一部）
+
+- ✅ M1 macOS の較正パイロット（`pilot-macos-1-notes.md`）→ 手順とマーカーの直し（判断 80）→ ON / OFF の再パイロットで試行の持ち越しがほぼ消えた。枝 `feature/ime-m1-pilot`。
+- ★ 計測の段取り: 単体ロガーは書き出しからビルド・参照入力欄は `build.sh` の `.app`（bundle id `local.ime-observation.refinput`）・`focus_cmd` でかなキー・マーカー ← → ←・OFF のセルは `--recipes kit/gen/recipes.macos-live-off.json`。生ログと道具は `~/ime-pilot/`（git の外）。
+- ⏭ M2 の残り: 正解の定義（`gt_rules`）・本番の n / think の上限（研究者の判断・1 セル約 10 時間）・公開用の `experiment/pilot-macos.md`。その後 M3（凍結・OSF）。

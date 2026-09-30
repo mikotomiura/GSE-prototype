@@ -89,6 +89,8 @@
 - [ ] M0〜M13（`_issue-plan.md` §5）。
   - [x] M0 コーパスの確定（2026-09-30・Mac・判断 79）: 研究者の承認で新字新仮名の 12 作品を青空文庫から取得 → `--seed 1 --per-work 150`（読み 6〜30・既定）で 1,800 句・SHA-256 `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620`・`SudachiPy==0.7.0` / `sudachidict-core==20260723.1` を `kit/corpus/requirements.txt` に pin・`--validate` exit 0・2 回の書き出しでバイト一致・`experiment/data.md` に 6 項目と出典の作品表（`fece8020`）。`kit/check.sh` 緑・書き出し器が通る（91 ファイル）・仮の config で両 OS の計画の各シナリオ 225 試行がすべて別の句
     → PR #278。⚠️ /cross-review は**研究者の判断でスキップ**（コードの変更 0 行・差分はコーパスのデータと data.md と steering）。CI: Mac の check の 1 回目は runner の通信切れ（"lost communication with the server"・手順は未実行）→ 失敗ジョブだけ再実行して緑
+  - [x] M1 macOS の較正パイロット（2026-10-01・Mac・`pilot-macos-1-notes.md`）: 1 回目で所見 6 件（変換後の Enter が確定しない・マーカー F13 が観測されない・bundle id・最初の IME の状態・自動確定・所要時間）→ 原因を実機で切り分け（IME 本来の挙動・研究者の手打ちでも同じ）→ recipes とマーカーを直して（判断 80・`b38b9904`・`3e729f99`）ON / OFF の再パイロットで確認（持ち越し ON 2 / 126・OFF 0 / 39）。ImeShadow は封印して読んでいない
+  - [ ] M2 の残り: 正解の定義（`gt_rules` の `mac_nstic`・ON の型は 2 形）・本番の n / think の上限（1 セル約 10 時間・研究者）・`experiment/pilot-macos.md`（公開用の英語）・パイロットの生ログの置き場（公開物に含める）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
