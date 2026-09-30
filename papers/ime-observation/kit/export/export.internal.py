@@ -29,7 +29,11 @@ The export
      pass). Every line is also checked after its JSON / string escapes are decoded;
   5. verifies the exported logger manifests with check_manifest.py --self;
   6. runs the checker of the writing rules of published files (_style_check.py, located with
-     --style-check or in the git work tree of the source) on the output.
+     --style-check or in the git work tree of the source; inside a git work tree it must be committed)
+     on the output.
+
+The output is written to a sibling directory and renamed to --out only after steps 5 and 6 passed. A file
+of a kind that the checker does not read is refused (exit 2).
 
 The output is byte-identical for the same source on any machine (LF line endings, sorted order, no
 timestamps, no host-dependent content).
