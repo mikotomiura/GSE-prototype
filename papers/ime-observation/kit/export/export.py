@@ -5,31 +5,36 @@
   export.py --out DIR [--allow-missing-license] [--also-user NAME ...] [--also-home PATH ...]
   export.py --selftest
 
-The source is the directory two levels above kit/export/ (no version-control state is read). The
-export
+The source is the directory two levels above kit/export/. When the source lies inside a git work
+tree, every exported file must be tracked and equal to the committed version (otherwise exit 2), so
+that one commit always yields one output. A file whose name looks like a secret (environment files,
+keys, tokens, credentials, logs) stops the export in every case. The export
 
   1. leaves out raw logs, build products, sealed material and internal notes (every path the
      top-level ignore file names, plus *.internal.* and .DS_Store);
   2. removes the comments of the files and marked excerpts that the logger manifests pin to a
      checksum, replaces their non-ASCII string literals with the English literals of a translation
-     table (kit/export/translations.internal.json, which is itself not exported), and adds a short
-     English header to every whole pinned file;
+     table (kit/export/translations.internal.json, which is itself not exported), adds a short
+     English header to every whole pinned file, and checks that the pinned ranges are ASCII only;
   3. rewrites the manifests so that they keep only kind / id / path / symbol / sha256 / reason and
      recomputes every checksum from the exported bytes;
-  4. rejects the export when any exported text contains a participant identifier, an e-mail address,
-     an internal dataset or session name, an internal marker word or symbol, a home or repository
-     path of the machine that runs the export, the login name of that machine, or a path that
-     names a user (the fictional names in FICTIONAL are the only names that pass);
+  4. rejects the export when any exported text or file name contains a participant identifier, an
+     e-mail address, an internal dataset or session name, an internal marker word or symbol, a home
+     or repository path of the machine that runs the export, the login name of that machine, or an
+     absolute path that names a user (the fictional names in FICTIONAL are the only names that
+     pass). Every line is also checked after its JSON / string escapes are decoded;
   5. verifies the exported logger manifests with check_manifest.py --self.
 
 The output is byte-identical for the same source on any machine (LF line endings, sorted order, no
 timestamps, no host-dependent content).
 
 Exit code: 0 = exported / 1 = the export was refused because of its content (the partial export is
-removed) / 2 = usage error, missing license text, unreadable or unsafe input.
+removed) / 2 = usage error, missing license text, unreadable or unsafe input, a source that is not
+committed, an unexpected failure.
 """
 import argparse
 import contextlib
+import fnmatch
 import getpass
 import io
 import json
@@ -48,12 +53,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCE_ROOT = os.path.dirname(os.path.dirname(HERE))
 LOGGER = "kit/logger"
 TRANSLATIONS = "kit/export/translations.internal.json"
-HEADER = "// This file is checked against the manifest in this directory."
+HEADER = "// The checksum of this file is pinned by the manifests in kit/logger (manifest*.json)."
 KEEP = ("kind", "id", "path", "symbol", "sha256", "reason")
 # The only user names that may follow a home-directory prefix. Fictional examples used by the
 # checkers and documents of this directory. It is a constant: nothing extends it at run time.
 FICTIONAL = ("alice", "alice2", "bob", "carol", "dave", "erin", "gina", "harry", "YAMADA~1", "name")
 LICENSES = ("LICENSE-CODE", "LICENSE-DATA")
+# The effective lines of the ignore file of the source directory. The export mirrors exactly this
+# set (see excluded()); a line added to or removed from the ignore file stops the export.
+IGNORE_FILE = ".gitignore"
+IGNORE_LINES = frozenset((
+    "**/target/", "**/.build/", "**/__pycache__/", "*.jsonl", "*.ndjson", "runs/", "sealed/",
+    "experiment/raw/", "*.jsonl.*", "*.ndjson.*", "*.zip", "*.tar", "*.tar.gz", "*.tgz", "*.zst",
+    ".venv/", "venv/", "!kit/corpus/data/*.jsonl"))
+# File names (case-insensitive) that look like secrets. They are never exported and never skipped.
+SECRET_NAMES = (".env", ".env.*", "*.pem", "*.key", "*age-identity*", "*.agekey", "*.age", "*token*.json",
+                "credentials*.json", "client_secret*", "g1-submit*.json", "o1_submit*.json", "*.log")
 NO_WORD_CHECK_PREFIX = "kit/corpus/data/"
 
 # Words that must not reach the export. Built from pieces so that this file does not contain them.
@@ -72,22 +87,21 @@ WORD_RULES = (
     ("internal-symbol", re.compile("[" + _STAR + _WARN + "]")),
 )
 ALWAYS_RULES = (
-    ("participant-id", re.compile(r"(?<![A-Za-z0-9_])P\d{3}(?![A-Za-z0-9_])")),
+    ("participant-id", re.compile(r"(?<![A-Za-z0-9])P\d{3}(?![A-Za-z0-9])")),
     ("email-address", re.compile(r"[A-Za-z0-9._%+\-]+" + AT + r"[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")),
     ("dataset-name", re.compile(re.escape(_DATASET), re.I)),
     ("session-name", re.compile(_SESSION, re.I)),
     ("internal-path", re.compile(re.escape(_STEER))),
 )
 BRACKETED_REF = re.compile(r"\[[PV]\d+(?:[,;\s\-]+[PV]?\d+)*\]")
-_LB = r"(?<![A-Za-z0-9._~\-/\\])"
-_NAME = r"([A-Za-z0-9_.~\-]+)"
-_SEP = r"(?:\\\\|\\|/)"
-USER_PATHS = (
-    re.compile(_LB + r"[A-Za-z]:" + _SEP + r"(?i:Users)" + _SEP + _NAME),
-    re.compile(_LB + r"/[A-Za-z]/(?i:Users)/" + _NAME),
-    re.compile(_LB + r"/(?i:Users)/" + _NAME),
-    re.compile(_LB + r"/home/" + _NAME),
-)
+# An absolute-path token starts at "/", "\", a drive letter ("X:") or "file:" that does not follow a
+# character of a name, and runs to the next space, quote, angle bracket, "|", "*" or "?".
+_TOKEN_START = r"(?<![A-Za-z0-9._~\-/\\:])(?:[/\\]|[A-Za-z]:|[Ff][Ii][Ll][Ee]:)"
+ABS_TOKEN = re.compile(_TOKEN_START + r"[^\s\"'`<>|*?]*")
+_COMP_SPLIT = re.compile(r"[/\\]")
+_NAME_TAIL = ".,;:)"
+_ESC_RE = re.compile(r"\\(u[0-9a-fA-F]{4}|.)", re.DOTALL)
+_SIMPLE_ESC = {"b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
 MARKER = re.compile(r"^//\s*@excerpt-(?:begin|end)\s+\S+\s*$")
 SL, SB = "\x00", "\x01"  # stand-ins for a removed line comment / block comment
 
@@ -189,6 +203,23 @@ def literal_kind(src):
     return src.split('"', 1)[0].replace("#", "")
 
 
+def literal_closed(src):
+    """True when the string literal src ends exactly at its own closing quote (and, for a raw string,
+    the closing run of hash marks)."""
+    head = src.split('"', 1)[0]
+    if '"' not in src:
+        return False
+    hashes = len(head) - len(head.rstrip("#"))
+    body_start = len(head) + 1
+    if head.rstrip("#").endswith("r"):
+        close = src.find('"' + "#" * hashes, body_start)
+        return close >= 0 and close + 1 + hashes == len(src)
+    k = body_start
+    while k < len(src) and src[k] != '"':
+        k += 2 if src[k] == "\\" else 1
+    return k == len(src) - 1
+
+
 def placeholders(src):
     body = src.replace("{{", "").replace("}}", "")
     return re.findall(r"\{[^{}]*\}", body)
@@ -202,9 +233,10 @@ class Table(object):
     """The translation table: {(path, from): to}, plus which entries were used."""
 
     def __init__(self, entries):
-        self.map, self.used = {}, set()
-        for e in entries:
+        self.map, self.used, self.index = {}, set(), {}
+        for i, e in enumerate(entries):
             self.map[(e["path"], e["from"])] = e["to"]
+            self.index[(e["path"], e["from"])] = i + 1
 
     def get(self, path, src):
         to = self.map.get((path, src))
@@ -213,12 +245,15 @@ class Table(object):
         return to
 
     def unused(self):
-        return sorted(k for k in self.map if k not in self.used)
+        """[(entry number, path)] of the entries that matched nothing."""
+        return sorted((self.index[k], k[0]) for k in self.map if k not in self.used)
 
 
 def transform_rust(text, path, table, missing, base_line):
     """Removes comments and translates non-ASCII string literals. `missing` collects
     (line, path) for each untranslated literal. Returns the new text (with a final newline)."""
+    if SL in text or SB in text:
+        raise Stop(2, "%s contains a control character that the comment removal uses as a marker" % (LOGGER + "/" + path))
     out, line = [], base_line
     for kind, s in lex_rust(text):
         if kind == "lc":
@@ -238,10 +273,12 @@ def transform_rust(text, path, table, missing, base_line):
     kept = []
     for ln in "".join(out).split("\n"):
         if SL in ln or SB in ln:
+            # Only the white space directly before a comment that ends the line is dropped, so that
+            # trailing spaces inside a string that continues on the next line stay.
+            ln = re.sub("[ \t]*[" + SL + SB + "]+[ \t]*$", "", ln)
             ln = ln.replace(SL, "").replace(SB, " ")
             if not ln.strip():
                 continue
-            ln = ln.rstrip()
         kept.append(ln)
     return "\n".join(kept)
 
@@ -287,22 +324,59 @@ def sha256_hex(b):
 _DIR_NAMES = frozenset(("target", ".build", "__pycache__", "runs", "sealed", ".venv", "venv", ".git"))
 _ARCHIVE = (".zip", ".tar", ".tar.gz", ".tgz", ".zst")
 _CORPUS_JSONL = re.compile(r"^kit/corpus/data/[^/]+\.jsonl$")
+_REPARSE_POINT = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT (symbolic links, junctions, mount points)
 
 
 def excluded(rel, is_dir):
-    parts = rel.split("/")
+    """True when the path is left out of the export. Names are compared without regard to case."""
+    low = rel.lower()
+    parts = low.split("/")
     if any(p in _DIR_NAMES or ".internal." in p for p in parts):
         return True
-    if rel == "experiment/raw" or rel.startswith("experiment/raw/"):
+    if low == "experiment/raw" or low.startswith("experiment/raw/"):
         return True
     if is_dir:
         return False
     name = parts[-1]
-    if name == ".DS_Store" or name.endswith(".ndjson") or ".ndjson." in name or ".jsonl." in name:
+    if name == ".ds_store" or name.endswith(".ndjson") or ".ndjson." in name or ".jsonl." in name:
         return True
     if name.endswith(".jsonl"):
-        return not _CORPUS_JSONL.match(rel)
+        return not _CORPUS_JSONL.match(low)
     return name.endswith(_ARCHIVE)
+
+
+def check_ignore_file(root):
+    """The effective lines of the ignore file must be exactly the rules that excluded() implements."""
+    try:
+        with open(os.path.join(root, IGNORE_FILE), "rb") as f:
+            text = f.read().decode("utf-8")
+    except (OSError, ValueError):
+        raise Stop(2, "the ignore file is missing or unreadable: " + IGNORE_FILE)
+    lines = set()
+    for ln in text.replace("\r\n", "\n").split("\n"):
+        ln = ln.strip()
+        if ln and not ln.startswith("#"):
+            lines.add(ln)
+    if lines != IGNORE_LINES:
+        raise Stop(2, "the ignore file and the exclusion rules of the export differ (%d lines): %s"
+                   % (len(lines ^ IGNORE_LINES), ", ".join(sorted(lines ^ IGNORE_LINES))))
+
+
+def is_secret_name(name):
+    low = name.lower()
+    return any(fnmatch.fnmatchcase(low, pat) for pat in SECRET_NAMES)
+
+
+def is_link(full, root):
+    """True for a symbolic link, a reparse point (a junction on Windows), or anything that resolves
+    to a place outside the source."""
+    if os.path.islink(full):
+        return True
+    try:
+        attrs = getattr(os.lstat(full), "st_file_attributes", 0)
+    except OSError:
+        return True
+    return bool(attrs & _REPARSE_POINT) or not _inside(full, root)
 
 
 def collect(root):
@@ -316,8 +390,8 @@ def collect(root):
             rel = (reld + "/" + x) if reld else x
             if excluded(rel, True):
                 continue
-            if os.path.islink(os.path.join(d, x)):
-                raise Stop(2, "a symbolic link is not exported: " + rel)
+            if is_link(os.path.join(d, x), root):
+                raise Stop(2, "a link is not exported: " + rel)
             keep.append(x)
         dirs[:] = keep
         for x in sorted(names):
@@ -325,10 +399,15 @@ def collect(root):
             if excluded(rel, False):
                 continue
             full = os.path.join(d, x)
-            if os.path.islink(full):
-                raise Stop(2, "a symbolic link is not exported: " + rel)
-            with open(full, "rb") as f:
-                raw = f.read()
+            if is_link(full, root):
+                raise Stop(2, "a link is not exported: " + rel)
+            if is_secret_name(x):
+                raise Stop(2, "a file with the name of a secret is not exported (remove it from the source): " + rel)
+            try:
+                with open(full, "rb") as f:
+                    raw = f.read()
+            except OSError:
+                raise Stop(2, "unreadable file: " + rel)
             try:
                 if b"\x00" in raw:
                     raise ValueError("NUL")
@@ -337,6 +416,59 @@ def collect(root):
                 raise Stop(2, "not a UTF-8 text file: " + rel)
             files[rel] = text.replace("\r\n", "\n").replace("\r", "\n")
     return files
+
+
+def _git_env():
+    env = dict((k, v) for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"))
+    env["LC_ALL"] = "C"
+    return env
+
+
+def _git(root, *args):
+    r = subprocess.run(["git", "-C", root] + list(args), capture_output=True, env=_git_env(), timeout=120)
+    return r.returncode, r.stdout.decode("utf-8", errors="replace"), r.stderr.decode("utf-8", errors="replace")
+
+
+def git_top(root):
+    """The top directory of the git work tree that contains root, or None when there is none."""
+    try:
+        rc, out, err = _git(root, "rev-parse", "--show-toplevel")
+    except FileNotFoundError:
+        return None
+    except (OSError, subprocess.SubprocessError):
+        raise Stop(2, "git could not be run")
+    if rc == 0:
+        return out.strip()
+    if "not a git repository" in err.lower():
+        return None
+    raise Stop(2, "git could not determine the work tree of the source (exit %d)" % rc)
+
+
+def check_committed(root, files):
+    """The source is inside a git work tree: every exported file must be tracked and equal to HEAD."""
+    def run(*args):
+        rc, out, _ = _git(root, *args)
+        if rc != 0:
+            raise Stop(2, "git %s failed (exit %d)" % (args[0], rc))
+        return out
+    prefix = run("rev-parse", "--show-prefix").strip()
+    tracked = set()
+    for x in run("ls-files", "-z", "--full-name", "--", ".").split("\0"):
+        if x.startswith(prefix) and len(x) > len(prefix):
+            tracked.add(x[len(prefix):])
+    changed = set()
+    for ent in run("status", "--porcelain", "-z", "--no-renames", "--untracked-files=no", "--", ".").split("\0"):
+        rel = ent[3:]
+        if len(ent) > 3 and rel.startswith(prefix) and not excluded(rel[len(prefix):], False):
+            changed.add(rel[len(prefix):])
+    bad = sorted(set(rel for rel in files if rel not in tracked) | changed)
+    if bad:
+        lines = ["the source is inside a git work tree, and these files are not committed as they are"
+                 " (export from a clean checkout of the commit to release):"]
+        lines += ["  " + rel for rel in bad[:100]]
+        if len(bad) > 100:
+            lines.append("  ... %d more" % (len(bad) - 100))
+        raise Stop(2, "\n".join(lines))
 
 
 def load_table(root):
@@ -352,14 +484,20 @@ def load_table(root):
                 raise TypeError("entry")
     except (ValueError, KeyError, TypeError, OSError):
         raise Stop(2, "the translation table is malformed: " + TRANSLATIONS)
+    seen = set()
     for i, e in enumerate(entries):
         where = "translation entry %d (%s)" % (i + 1, e["path"])
         to, src = e["to"], e["from"]
+        if (e["path"], src) in seen:
+            raise Stop(2, where + ": the same original literal occurs in an earlier entry")
+        seen.add((e["path"], src))
         if has_non_ascii(to):
             raise Stop(2, where + ": the replacement is not ASCII")
+        if any((ord(ch) < 32 and ch != "\n") or ord(ch) == 127 for ch in to):
+            raise Stop(2, where + ": the replacement contains a control character")
         pieces = lex_rust(to)
-        if len(pieces) != 1 or pieces[0][0] != "str":
-            raise Stop(2, where + ": the replacement is not a single string literal")
+        if len(pieces) != 1 or pieces[0][0] != "str" or not literal_closed(to):
+            raise Stop(2, where + ": the replacement is not a single, terminated string literal")
         if literal_kind(to) != literal_kind(src):
             raise Stop(2, where + ": the replacement is a different kind of literal")
         if placeholders(to) != placeholders(src):
@@ -406,10 +544,14 @@ def convert_sources(files, manifests, table):
             files[rel] = HEADER + "\n" + body
             continue
         lines = to_lines(files[rel])
-        ranges = []
+        ranges = set()
         for e in ents:
             if e["kind"] == "excerpt":
-                ranges.append(excerpt_bounds(lines, e["id"], rel) + (e["id"],))
+                ranges.add(excerpt_bounds(lines, e["id"], rel) + (e["id"],))
+        ordered = sorted(ranges)
+        for (b1, e1, id1), (b2, e2, id2) in zip(ordered, ordered[1:]):
+            if b2 <= e1:
+                raise Stop(2, "%s: the excerpts %s and %s overlap" % (rel, id1, id2))
         for b, e, eid in sorted(ranges, reverse=True):
             inner = "\n".join(lines[b + 1:e]) + "\n"
             new = transform_rust(inner, path, table, missing, b + 2).split("\n")
@@ -423,7 +565,7 @@ def convert_sources(files, manifests, table):
         raise Stop(1, "\n".join(msg))
     unused = table.unused()
     if unused:
-        raise Stop(1, "translation entries that match nothing (update the table):\n" + "\n".join("  " + p for p, _ in unused))
+        raise Stop(1, "translation entries that match nothing (update the table):\n" + "\n".join("  entry %d (%s)" % (n, p) for n, p in unused))
 
 
 def rewrite_manifests(files, manifests):
@@ -452,24 +594,18 @@ def path_forms(p):
     return sorted(f for f in forms if len(f) >= 4)
 
 
-def machine_rules(root, also_users, also_homes):
-    """Patterns for the values of the machine that runs the export: (kind, compiled pattern)."""
+def machine_rules(top, also_users, also_homes):
+    """Patterns for the values of the machine that runs the export: (kind, compiled pattern).
+    A value is searched for wherever it occurs, with no boundary on its left."""
     homes = [os.path.expanduser("~"), os.environ.get("HOME", "")] + list(also_homes)
-    top = ""
-    try:
-        r = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=root, capture_output=True, text=True, timeout=30)
-        top = r.stdout.strip() if r.returncode == 0 else ""
-    except (OSError, subprocess.SubprocessError):
-        pass
-    tops = [top or os.path.dirname(os.path.dirname(os.path.abspath(root)))]
     rules = []
-    for kind, values in (("home-directory", homes), ("repository-root", tops)):
+    for kind, values in (("home-directory", homes), ("repository-root", [top])):
         forms = set()
         for v in values:
             if v and v not in ("~", "/"):
                 forms.update(path_forms(v))
         for f in sorted(forms):
-            rules.append((kind, re.compile(_LB + re.escape(f) + r"(?![A-Za-z0-9_])", re.I)))
+            rules.append((kind, re.compile(re.escape(f) + r"(?![A-Za-z0-9_])", re.I)))
     names = set(n for n in also_users if n)
     for n in (os.environ.get("USERNAME"), os.environ.get("USER"), os.environ.get("LOGNAME")):
         if n:
@@ -484,32 +620,82 @@ def machine_rules(root, also_users, also_homes):
     return rules
 
 
+def unescape(line):
+    """The line with the escapes of a JSON or program string decoded (so that C:\\\\Users, \\u002f and
+    \\/ are seen as the characters they stand for)."""
+    def rep(m):
+        g = m.group(1)
+        if g[0] == "u" and len(g) == 5:
+            return chr(int(g[1:], 16))
+        return _SIMPLE_ESC.get(g, g)
+    return _ESC_RE.sub(rep, line)
+
+
+def names_a_user(text):
+    """True when an absolute-path token of the text has a Users or home component that is followed by
+    a name that is not one of the fictional names."""
+    for m in ABS_TOKEN.finditer(text):
+        comps = _COMP_SPLIT.split(m.group())  # an empty component (a doubled separator) names nothing
+        for i in range(len(comps) - 1):
+            if comps[i].lower() in ("users", "home"):
+                name = comps[i + 1].rstrip(_NAME_TAIL)
+                if name and name not in FICTIONAL:
+                    return True
+    return False
+
+
+def line_kinds(text, word_check, rules):
+    kinds = set()
+    plain = BRACKETED_REF.sub(lambda m: " " * len(m.group()), text)
+    for kind, rx in ALWAYS_RULES:
+        if rx.search(plain if kind == "participant-id" else text):
+            kinds.add(kind)
+    if word_check:
+        for kind, rx in WORD_RULES:
+            if rx.search(text):
+                kinds.add(kind)
+    for kind, rx in rules:
+        if rx.search(text):
+            kinds.add(kind)
+    if names_a_user(text):
+        kinds.add("user-path")
+    return kinds
+
+
 def scan(files, rules):
-    """Returns [(path, line, kind)] for every hit. Values that matched are never reported."""
+    """Returns [(path, line, kind)] for every hit; line 0 is the file name itself. Every line is
+    checked as written and with its escapes decoded. Values that matched are never reported."""
     hits = []
     for rel in sorted(files):
         word_check = not rel.startswith(NO_WORD_CHECK_PREFIX)
-        for no, ln in enumerate(files[rel].split("\n"), 1):
-            kinds = set()
-            plain = BRACKETED_REF.sub(lambda m: " " * len(m.group()), ln)
-            for kind, rx in ALWAYS_RULES:
-                if rx.search(plain if kind == "participant-id" else ln):
-                    kinds.add(kind)
-            if word_check:
-                for kind, rx in WORD_RULES:
-                    if rx.search(ln):
-                        kinds.add(kind)
-            for kind, rx in rules:
-                if rx.search(ln):
-                    kinds.add(kind)
-            for rx in USER_PATHS:
-                for m in rx.finditer(ln):
-                    name = m.group(1).rstrip(".")
-                    if name and name not in FICTIONAL:
-                        kinds.add("user-path")
+        for no, ln in [(0, rel)] + list(enumerate(files[rel].split("\n"), 1)):
+            kinds = line_kinds(ln, word_check, rules)
+            if "\\" in ln:
+                kinds |= line_kinds(unescape(ln), word_check, rules)
             for kind in sorted(kinds):
                 hits.append((rel, no, kind))
     return hits
+
+
+def verify_ascii(files, manifests):
+    """The exported range of every pinned file and excerpt must be ASCII only."""
+    bad = []
+    for _, m in manifests:
+        for e in m["entries"]:
+            if e["kind"] not in ("file", "excerpt"):
+                continue
+            rel = LOGGER + "/" + e["path"]
+            lines = to_lines(files[rel])
+            lo, hi = 0, len(lines)
+            if e["kind"] == "excerpt":
+                b, en = excerpt_bounds(lines, e["id"], rel)
+                lo, hi = b + 1, en
+            for i in range(lo, hi):
+                if has_non_ascii(lines[i]):
+                    bad.append("%s:%d" % (rel, i + 1))
+    if bad:
+        bad = sorted(set(bad))
+        raise Stop(1, "the pinned range still holds non-ASCII text:\n" + "\n".join("  " + b for b in bad[:100]))
 
 
 # ---------------------------------------------------------------------------
@@ -531,25 +717,35 @@ def _py_check_manifest(cwd_logger):
 
 def export(root, out, allow_missing_license, also_users, also_homes):
     root = os.path.abspath(root)
+    for n in also_users:
+        if len(n) < 3:
+            raise Stop(2, "--also-user: a name of fewer than 3 characters cannot be searched for reliably")
     if os.path.lexists(out):
         raise Stop(2, "the output path already exists (it is never overwritten)")
     if _inside(out, root):
         raise Stop(2, "the output path is inside the source directory")
+    if not os.path.isdir(os.path.dirname(out)):
+        raise Stop(2, "the parent directory of the output path does not exist (it is not created)")
     missing = [n for n in LICENSES if not os.path.isfile(os.path.join(root, n))]
     if missing and not allow_missing_license:
         raise Stop(2, "license text is missing: %s (place the official texts, or pass --allow-missing-license for a trial export)" % ", ".join(missing))
     ldir = os.path.join(root, *LOGGER.split("/"))
     if not os.path.isfile(os.path.join(ldir, "check_manifest.py")):
         raise Stop(2, "the source has no check_manifest.py under " + LOGGER)
+    check_ignore_file(root)
+    files = collect(root)
+    top = git_top(root)
+    if top:
+        check_committed(root, files)
     r = _py_check_manifest(ldir)
     if r.returncode != 0:
         raise Stop(1, "the source manifests do not match their files; nothing was exported:\n" + (r.stdout + r.stderr).strip()[-600:])
-    files = collect(root)
     table = load_table(root)
     manifests = load_manifests(files)
     convert_sources(files, manifests, table)
+    verify_ascii(files, manifests)
     rewrite_manifests(files, manifests)
-    hits = scan(files, machine_rules(root, also_users, also_homes))
+    hits = scan(files, machine_rules(top or os.path.dirname(os.path.dirname(root)), also_users, also_homes))
     if hits:
         lines = ["the export contains content that must not be published (the matched text is not shown):"]
         lines += ["  %s:%d: %s" % h for h in hits[:200]]
@@ -561,7 +757,7 @@ def export(root, out, allow_missing_license, also_users, also_homes):
             print("WARNING: %s still contains TODO placeholders; fill them in before publishing." % rel)
     created = False
     try:
-        os.makedirs(out)
+        os.mkdir(out)
         created = True
         for rel in sorted(files):
             p = os.path.join(out, *rel.split("/"))
@@ -576,6 +772,8 @@ def export(root, out, allow_missing_license, also_users, also_homes):
     except BaseException:
         if created:
             shutil.rmtree(out, ignore_errors=True)
+            if os.path.lexists(out):
+                print("WARNING: the partial output could not be removed completely; delete it before another export: " + out, file=sys.stderr)
         raise
     print("exported %d files to %s" % (len(files), out))
     return 0
@@ -596,6 +794,9 @@ def export_main(argv, root):
     except Stop as e:
         print(("ERROR: " if e.code == 2 else "REFUSED: ") + e.msg, file=sys.stderr)
         return e.code
+    except Exception as e:  # the message of an unexpected failure may hold a private value
+        print("ERROR: unexpected failure (%s); nothing was exported" % type(e).__name__, file=sys.stderr)
+        return 2
 
 
 # ---------------------------------------------------------------------------
@@ -655,6 +856,7 @@ def selftest():
                  "kit/corpus/data/p.jsonl": "{}\n", "src.txt": "x\n",
                  "kit/logger/src/a.rs": a_rs, "kit/logger/src/e.rs": e_rs, "kit/logger/src/t.rs": t_rs, "kit/logger/src/n.rs": n_rs}
         files.update(extra or {})
+        files[IGNORE_FILE] = "\n".join(sorted(IGNORE_LINES, key=lambda x: (x.startswith("!"), x))) + "\n"
         for rel, text in files.items():
             put(base, rel, text.replace("\n", "\r\n") if rel in crlf else text)
         put(base, TRANSLATIONS, json.dumps(table))
@@ -798,6 +1000,141 @@ def selftest():
             ck("a symbolic link stops the export", rc6 == 2 and not os.path.exists(o3), "exit %d" % rc6)
         except (OSError, NotImplementedError):
             pass
+        # a git checkout: only committed files are exported
+        def export_at(base, argv=()):
+            counter[0] += 1
+            o = os.path.join(tmp, "out%d" % counter[0])
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                rcx = export_main(["--out", o, "--allow-missing-license"] + list(argv), base)
+            return rcx, buf.getvalue(), o
+
+        def git_here(cwd, *args):
+            return subprocess.run(["git", "-c", "user.name=selftest", "-c", "user.email=selftest@example.invalid",
+                                   "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", "-C", cwd] + list(args),
+                                  capture_output=True, env=_git_env())
+
+        name = "an untracked or modified file in a git checkout stops the export"
+        try:
+            have_git = subprocess.run(["git", "--version"], capture_output=True).returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            have_git = False
+        if not have_git:
+            print("note: git is not available; the case '%s' is skipped" % name)
+        else:
+            gb = build("gitrepo")
+            gtop = os.path.join(tmp, "gitrepo")
+            ok = git_here(gtop, "init", "-q").returncode == 0 and git_here(gtop, "add", "papers").returncode == 0 \
+                and git_here(gtop, "commit", "-q", "-m", "base").returncode == 0
+            ck(name + " (the checkout is prepared)", ok)
+            rcx, text, o = export_at(gb)
+            ck(name + " (a committed checkout is exported)", rcx == 0, text)
+            put(gb, "kit/draft-note.md", "A draft.\n")
+            rcx, text, o = export_at(gb)
+            ck(name + " (untracked)", rcx == 2 and "draft-note.md" in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+            os.remove(os.path.join(gb, "kit", "draft-note.md"))
+            put(gb, "README.md", "# Fake\nEdited after the commit.\n")
+            rcx, text, o = export_at(gb)
+            ck(name + " (modified)", rcx == 2 and "README.md" in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+            put(gb, "README.md", "# Fake\n")
+            os.remove(os.path.join(gb, "src.txt"))
+            rcx, text, o = export_at(gb)
+            ck(name + " (deleted)", rcx == 2 and "src.txt" in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+            put(gb, "src.txt", "x\n")
+            rcx, text, o = export_at(gb)
+            ck(name + " (clean again)", rcx == 0, text)
+        # a secret file name
+        for i, nm in enumerate((".env", ".ENV.local", "keys/deploy.pem", "notes/site-token-1.json", "Credentials.JSON", "run.LOG",
+                                "my-age-identity.txt", "client_secret_1.txt")):
+            rcx, text, o = run("secret%d" % i, {"kit/" + nm: "x\n"})
+            ck("a secret file name stops the export (%s)" % nm, rcx == 2 and os.path.basename(nm) in text and not os.path.exists(o),
+               "exit %d %s" % (rcx, text.strip()[-200:]))
+        # a file name is checked like its content
+        for i, nm in enumerate(("experiment/notes-" + pid + ".md", "experiment/" + _ORG + "-notes.md", "experiment/notes-" + _STEER + ".md")):
+            rcx, text, o = run("fname%d" % i, {nm: "x\n"})
+            ck("a file name is checked like its content (%d)" % i, rcx == 1 and os.path.basename(nm) in text and not os.path.exists(o),
+               "exit %d %s" % (rcx, text.strip()[-200:]))
+        rcx, text, o = run("fname-ok", {"experiment/notes-[P269].md": "x\n"})
+        ck("a file name is checked like its content (a bracketed reference passes)", rcx == 0, text)
+        # absolute path tokens with a user component
+        bad_tokens = ("file://" + "/Users/" + zed + "/notes.txt", "\\\\?\\C:\\" + "Users\\" + zed + "\\w", "/mnt/c/Users/" + zed,
+                      "/var/home/" + zed, "/Users/" + JP1 + "/x", "/Users/" + "alice+" + zed + "/x", "C:/Users/" + zed, "(see /home/" + zed + ")")
+        for i, tok in enumerate(bad_tokens):
+            rcx, text, o = run("tok%d" % i, {"README.md": "# Fake\nPath %s here.\n" % tok})
+            ck("an absolute path token with a user component stops the export (%d)" % i, rcx == 1 and "README.md" in text and not os.path.exists(o),
+               "exit %d %s" % (rcx, text.strip()[-200:]))
+        ok_tokens = ("kit/home/x", "./Users/y", "Users/y", "/Users/", "/home/", "file:///Users/alice/x", "\\\\?\\C:\\Users\\bob\\w", "/mnt/c/Users/name/")
+        rcx, text, o = run("tok-ok", {"README.md": "# Fake\n" + "\n".join("Path %s here." % t for t in ok_tokens) + "\n"})
+        ck("an absolute path token with a user component stops the export (fictional and relative paths pass)", rcx == 0, text)
+        # a link that leaves the source
+        b5 = build("outlink")
+        outside = os.path.join(tmp, "outside-dir")
+        put(outside, "f.txt", "x\n")
+        link = os.path.join(b5, "kit", "linked")
+        linked = False
+        if os.name == "nt":
+            try:
+                linked = subprocess.run(["cmd", "/c", "mklink", "/J", link, outside], capture_output=True).returncode == 0 and os.path.isdir(link)
+            except (OSError, subprocess.SubprocessError):
+                linked = False
+        if not linked:
+            try:
+                os.symlink(outside, link, target_is_directory=True)
+                linked = True
+            except (OSError, NotImplementedError):
+                linked = False
+        if linked:
+            rcx, text, o = export_at(b5)
+            ck("a link that leaves the source stops the export", rcx == 2 and "linked" in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+            try:
+                os.rmdir(link)
+            except OSError:
+                os.remove(link)
+        else:
+            print("note: a directory link could not be created here; the case 'a link that leaves the source stops the export' is skipped")
+        # escaped spellings are decoded before the check
+        u = "\\u"
+        esc_bad = ('{"note": "' + u + '0050' + '017"}', '{"path": "' + u + '002fUsers' + u + '002f' + zed + '"}', '{"path": "\\/home\\/' + zed + '"}',
+                   '{"path": "C:\\\\Users\\\\' + zed + '"}')
+        for i, txt in enumerate(esc_bad):
+            rcx, text, o = run("esc%d" % i, {"experiment/data.json": txt + "\n"})
+            ck("an escaped spelling in JSON is checked after unescaping (%d)" % i, rcx == 1 and "data.json" in text and not os.path.exists(o),
+               "exit %d %s" % (rcx, text.strip()[-200:]))
+        rcx, text, o = run("esc-ok", {"experiment/data.json": '{"path": "' + u + '002fUsers' + u + '002falice", "v": "\\/home\\/bob"}\n'})
+        ck("an escaped spelling in JSON is checked after unescaping (fictional names pass)", rcx == 0, text)
+        # smaller checks of the input rules
+        got = transform_rust('let s = /* c */ "abc   \n def";\nlet t = 1; /* d */\n', "src/a.rs", Table([]), [], 1)
+        ck("the trailing spaces of a continued string are kept", '"abc   \n' in got and got.endswith("let t = 1;\n"), repr(got))
+        rcx, text, o = run("short-user", argv=["--also-user", "ab"])
+        ck("a short --also-user is a usage error", rcx == 2 and not os.path.exists(o), text)
+        try:
+            transform_rust("fn f() {}\n// \x01\n", "src/a.rs", Table([]), [], 1)
+            ck("a marker control character in a pinned source is a usage error", False)
+        except Stop as e:
+            ck("a marker control character in a pinned source is a usage error", e.code == 2, e.msg)
+        rcx, text, o = run("badclose", table={"entries": [dict(trans["entries"][0], to='"Japanese text {} {x}'), trans["entries"][1]]})
+        ck("an unterminated replacement is a usage error", rcx == 2, text)
+        rcx, text, o = run("dup", table={"entries": trans["entries"] + [trans["entries"][0]]})
+        ck("a duplicate translation entry is a usage error", rcx == 2, text)
+        rcx, text, o = run("ctrlto", table={"entries": [dict(trans["entries"][0], to='"Japanese\ttext {} {x}"'), trans["entries"][1]]})
+        ck("a control character in a replacement is a usage error", rcx == 2, text)
+        bx = build("ignore-file")
+        put(bx, ".gitignore", "*.jsonl\n")
+        rcx, text, o = export_at(bx)
+        ck("an ignore file that differs from the exclusion rules is a usage error", rcx == 2 and not os.path.exists(o), text)
+        bx = build("noparent")
+        counter[0] += 1
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            rcx = export_main(["--out", os.path.join(tmp, "no-such-dir", "out"), "--allow-missing-license"], bx)
+        ck("a missing parent of the output path is a usage error", rcx == 2 and not os.path.exists(os.path.join(tmp, "no-such-dir")), "exit %d" % rcx)
+        both = {"kit/logger/src/x.rs": "// @excerpt-begin a\nfn f() {}\n// @excerpt-begin b\n// @excerpt-end a\n// @excerpt-end b\n"}
+        try:
+            convert_sources(dict(both), [("m", {"entries": [{"kind": "excerpt", "id": "a", "path": "src/x.rs"}, {"kind": "excerpt", "id": "b", "path": "src/x.rs"}]})], Table([]))
+            ck("overlapping excerpts are a usage error", False)
+        except Stop as e:
+            ck("overlapping excerpts are a usage error", e.code == 2, e.msg)
+        rcx, text, o = run("upper", {"Runs/x.txt": "x\n", "kit/X.NDJSON": "{}\n", "kit/a.INTERNAL.md": "i\n", "kit/.ds_store": "x\n"})
+        ck("names are excluded without regard to case", rcx == 0 and not any(os.path.exists(os.path.join(o, *r.split("/"))) for r in ("Runs/x.txt", "kit/X.NDJSON", "kit/a.INTERNAL.md", "kit/.ds_store")), text)
         # a manifest that no longer matches the source
         b4 = build("stale")
         put(b4, "kit/logger/src/n.rs", n_rs + "// changed\n")

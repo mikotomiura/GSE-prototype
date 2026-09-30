@@ -1,8 +1,8 @@
 # Export to the public repository
 
 `export.py` writes the public form of this directory to a new location. The public repository starts
-from that output with a fresh history. The script uses only the Python standard library and reads
-no version-control state.
+from that output with a fresh history. The script uses only the Python standard library. It calls
+git only to check that a source inside a git work tree is committed (see the procedure below).
 
 ```
 python3 kit/export/export.py --out DIR [--allow-missing-license] [--also-user NAME ...] [--also-home PATH ...]
@@ -10,21 +10,28 @@ python3 kit/export/export.py --selftest
 ```
 
 The source is the directory two levels above `kit/export/`. `--out` must name a path that does not
-exist and that lies outside the source; an existing path is never overwritten. If the export is
-refused, the partial output is removed.
+exist, whose parent directory exists (it is not created), and that lies outside the source; an
+existing path is never overwritten. If the export is refused, the partial output is removed.
 
 Exit code: 0 = exported; 1 = refused because of the content (a private value was found, a
 manifest does not match its files, a string literal has no translation); 2 = usage error, missing
-license text, or unreadable or unsafe input (a symbolic link, a binary file).
+license text, or unreadable or unsafe input (a link that leaves the source, a binary file, a file
+with the name of a secret, a source that is not committed, an ignore file that differs from the
+exclusion rules), or an unexpected failure (only the type of the error is printed).
 
 ## Publication procedure
 
 1. Place the official texts as `LICENSE-CODE` (Apache-2.0) and `LICENSE-DATA` (CC BY 4.0) in the
    root of this directory. The script stops with exit code 2 if either is missing.
 2. Fill in the author names and affiliations in `CITATION.cff` and `.zenodo.json`. The script warns
-   while a `TODO` placeholder remains.
-3. Run `export.py --out DIR`. The output is byte-identical for the same source on any machine.
-4. Create the new repository from `DIR`, tag a release, and deposit the release with the archive
+   while a `TODO` placeholder remains. Commit the result.
+3. Make a fresh clone of the commit to release and run the export from that clone. Inside a git
+   work tree the script exports only files that are tracked and equal to the committed version; it
+   stops with exit code 2 and lists the offending files when a file it would export is untracked,
+   changed or deleted. A fresh clone also guarantees that the same commit yields the same bytes
+   on every machine.
+4. Run `export.py --out DIR`. The output is byte-identical for the same source on any machine.
+5. Create the new repository from `DIR`, tag a release, and deposit the release with the archive
    service to obtain a DOI. Then add the DOI to `CITATION.cff`.
 
 `--allow-missing-license` is not for publication. It is for trial exports and for building the
@@ -49,6 +56,8 @@ machine that runs the export.
 Everything the ignore file of this directory excludes: build products (`target/`, `.build/`,
 `__pycache__/`), raw logs (`*.jsonl`, `*.ndjson`, `runs/`, `sealed/`, `experiment/raw/`), archives
 (`*.jsonl.*`, `*.ndjson.*`, `*.zip`, `*.tar`, `*.tar.gz`, `*.tgz`, `*.zst`) and virtual environments.
+Names are compared without regard to case, and the script stops (exit code 2) if the ignore file
+does not list exactly the rules it implements.
 Corpus files `kit/corpus/data/*.jsonl` are kept. In addition, every file with `.internal.` in its
 name (internal notes and the translation table) and `.DS_Store` are left out. The aggregate results
 under `experiment/results/` are kept because the results section of the paper rests on them.
@@ -69,21 +78,36 @@ under `experiment/results/` are kept because the results section of the paper re
 
 ## What stops the export
 
-The scan runs on all exported text after the changes above. A finding is reported as a file name,
-a line number and a kind; the matched text is never printed.
+Before the scan, the script stops with exit code 2 (nothing is skipped silently) when the source
+holds a file whose name looks like a secret (`.env`, `.env.*`, `*.pem`, `*.key`, `*age-identity*`,
+`*.agekey`, `*.age`, `*token*.json`, `credentials*.json`, `client_secret*`, `g1-submit*.json`,
+`o1_submit*.json`, `*.log`; case-insensitive), or a link that leaves the source (a symbolic link,
+or on Windows a junction or any other reparse point).
 
-* A participant identifier (the letter P and three digits; a bracketed reference number such as
-  `[P269]` is allowed), an e-mail address, the name of the private dataset repository, a session
+The scan runs on all exported text after the changes above, and on every relative file name
+(reported as line 0). Each line is checked as written and again with its JSON and string escapes
+decoded. A finding is reported as a file name, a line number and a kind; the matched text is never
+printed. The script also verifies that the copied ranges of the pinned sources contain only ASCII
+characters.
+
+* A participant identifier (the letter P and three digits, not adjoining a letter or digit, so
+  that a name such as `P017_run` is found; a bracketed reference number such as `[P269]` is
+  allowed), an e-mail address, the name of the private dataset repository, a session
   name of the private recordings, and the private working directories.
 * The words that name the private project, the name of its source directory, and two internal
   marker symbols (not applied to `kit/corpus/data/`).
 * Values of the machine that runs the export: the home directory, the repository root, and the
   login name (three characters or more). `--also-home` and `--also-user` add the values of other
-  machines. Every spelling of a path is checked: forward and backward slashes, doubled backslashes,
+  machines (`--also-user` with fewer than three characters is a usage error). These values are
+  found wherever they occur, with no boundary on the left. Every spelling of a path is checked: forward and backward slashes, doubled backslashes,
   and the `/c/...` form of a drive path.
-* A home path that names a user: a drive path such as `C:\Users\<name>`, `/c/Users/<name>`,
-  `/Users/<name>` and `/home/<name>`. A relative path such as `./Users/y` or `kit/home/x` is not
-  a home path. The only names that pass are these fictional ones, fixed in the script and not
+* An absolute path that names a user. A path token starts with `/`, a backslash, a drive letter
+  such as `C:` or `file:` and runs to the next space, quote, angle bracket, `|`, `*` or `?`
+  (prefixes such as `file://`, the extended-length prefix of Windows and `/mnt/c/` are part of
+  it). When a component of the token is `Users` or `home` (any case), the whole next component
+  (not cut at a punctuation mark, non-ASCII characters included, only a trailing `.,;:)` dropped)
+  is the name. A relative path such as `./Users/y` or `kit/home/x` is not a token. The only names
+  that pass are these fictional ones, fixed in the script and not
   extendable by an option: `alice`, `alice2`, `bob`, `carol`, `dave`, `erin`, `gina`, `harry`,
   `YAMADA~1` and `name`. A prefix without a name (`/Users/` alone) also passes.
 
