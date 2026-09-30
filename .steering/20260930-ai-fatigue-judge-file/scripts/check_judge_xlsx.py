@@ -10,8 +10,10 @@
    - 単独の GPT: 書誌と要点の列の外に無い（題名の ChatGPT・GPT-4 は書誌なので書誌の列では許す）。
 2. structure（構造の検査）: 記入欄の初期値が『未判定』か空・判定シートの ID が元の DB の 34 件と同じ順・追加候補の番号が
    candidates.py と同じ順・要点と表記が事実のファイルから抜き出し直したものと一致し、要点の各値が事実のファイルの本文にある。
-3. golden（生成物との一致）: judge_xlsx.build() が作るものと、記入欄以外のすべてのセルの値・塗り・リンク・結合・入力規則・
-   条件付き書式が一致する（許す格納先の中身・語を使わない塗りで AI の判定が伝わるのを防ぐ）。
+3. golden（生成物との一致）: judge_xlsx.build() が作るもの（一度保存して読み直したもの）と、記入欄以外のすべてのセルの値、
+   すべてのセルの塗り・文字（字体名・色〈tint を含む〉・太字ほか）・表示形式・罫線・配置・リンク、結合・入力規則・条件付き書式
+   （文字色を含む）・シートと行と列の表示と大きさ・表、zip のパーツの名前・リッチテキストの run の数が一致する
+   （許す格納先の中身・語を使わない塗りや文字の見え方・隠す操作で AI の判定が伝わるのを防ぐ・判断 13・16・19・20）。
 ★ 語の一覧は前タスクの check_survey_files.py（SSOT）を import し、ここでは判定者用ファイル固有の語だけを足す。
 
 使い方:
@@ -226,16 +228,37 @@ def _val(v):
 
 def _fill(c):
     f = c.fill
-    return (f.fill_type, getattr(f.fgColor, "rgb", None)) if f is not None and f.fill_type else None
+    return (f.fill_type, _color(f.fgColor), _color(f.bgColor)) if f is not None and f.fill_type else None
 
 
 def _color(c):
-    return None if c is None else (str(getattr(c, "rgb", None)), getattr(c, "theme", None), getattr(c, "indexed", None))
+    """色の種類（rgb・theme・indexed・auto）と値に加え、tint（明るさの調整）も比べる。
+    ★ tint だけを変えれば RGB が同じでも白く見せられる（2026-09-30 の /cross-review 2 巡目）。"""
+    if c is None:
+        return None
+    return (getattr(c, "type", None), str(getattr(c, "rgb", None)), getattr(c, "theme", None), getattr(c, "indexed", None),
+            getattr(c, "auto", None), getattr(c, "tint", None))
 
 
 def _font(f):
-    """文字の見え方（色・太字・斜体・取り消し線・下線・上下付き・大きさ）。白い文字で隠すなどを捉える（2026-09-30 の /cross-review）。"""
-    return None if f is None else (_color(f.color), f.b, f.i, f.strike, f.u, f.vertAlign, f.sz)
+    """文字の見え方（字体名・色・太字・斜体・取り消し線・下線・上下付き・大きさ）。白い文字や記号の字体で隠すなどを捉える（2026-09-30 の /cross-review・code-reviewer）。"""
+    return None if f is None else (f.name, _color(f.color), f.b, f.i, f.strike, f.u, f.vertAlign, f.sz)
+
+
+def _border(c):
+    """罫線（太い色つきの枠で目立たせるのを捉える）。"""
+    b = c.border
+    if b is None:
+        return None
+    sides = tuple((getattr(getattr(b, n), "style", None), _color(getattr(getattr(b, n), "color", None)))
+                  for n in ("left", "right", "top", "bottom", "diagonal"))
+    return sides + (b.diagonalUp, b.diagonalDown, b.outline)
+
+
+def _align(c):
+    """配置（字下げで文字を画面の外に出す・回転などを捉える）。"""
+    a = c.alignment
+    return None if a is None else (a.horizontal, a.vertical, a.indent, a.textRotation, a.wrap_text, a.shrink_to_fit, a.readingOrder)
 
 
 def _dxf(d):
@@ -259,31 +282,55 @@ def _layout(ws):
     """シートの非表示・行と列の非表示と大きさ・表の範囲と様式（値と塗りが同じでも、隠せば判定者に見えなくなる）。"""
     rows = sorted((k, bool(d.hidden), d.ht if d.customHeight else None, d.outlineLevel)
                   for k, d in ws.row_dimensions.items() if d.hidden or d.customHeight or d.outlineLevel)
-    cols = sorted((k, bool(d.hidden), d.width, d.outlineLevel) for k, d in ws.column_dimensions.items())
+    cols = sorted((k, d.min, d.max, bool(d.hidden), d.width if d.customWidth else None, d.outlineLevel)
+                  for k, d in ws.column_dimensions.items() if d.hidden or d.customWidth or d.outlineLevel)  # ★ 既定値の列は除く（参照しただけで作られるため）
     tables = sorted((t.displayName, t.ref, getattr(t.tableStyleInfo, "name", None)) for t in ws.tables.values())
     return ws.sheet_state, rows, cols, tables
 
 
 def _reload(wb):
-    """生成物を一度保存して読み直す（比べる相手と同じ表現にそろえる。既定の文字色などが読み込みで付くため）。"""
+    """生成物を一度保存して読み直す（比べる相手と同じ表現にそろえる。既定の文字色などが読み込みで付くため）。
+    保存したものの zip の中身の要約（パーツの名前と、リッチテキストの run の数）も返す。"""
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return openpyxl.load_workbook(buf)
+    parts = _parts(buf)
+    buf.seek(0)
+    return openpyxl.load_workbook(buf), parts
+
+
+_RUN = re.compile(r"<(?:\w+:)?r[ >]")
+
+
+def _parts(src):
+    """zip のパーツの名前と、共有文字列・シートの XML の中のリッチテキストの run（<r>）の数。
+    ★ コメント・図・画像の追加はパーツの名前で、1 つの run だけの白い文字などは run の数で捉える（既定の読み込みでは平文に
+    まとめられて値も同じになるため・2026-09-30 の code-reviewer）。"""
+    with zipfile.ZipFile(src) as z:
+        names = sorted(z.namelist())
+        runs = {n: len(_RUN.findall(z.read(n).decode("utf-8", "replace")))
+                for n in names if n == "xl/sharedStrings.xml" or n.startswith("xl/worksheets/sheet")}
+    return names, runs
 
 
 def _dv(ws):
     return sorted((str(dv.sqref), dv.type, dv.formula1) for dv in ws.data_validations.dataValidation)
 
 
-def check_golden(wb):
+def check_golden(wb, path=None):
     judge = judge_of(wb)
     if judge not in (1, 2):
         return ["『はじめに』に判定者の番号が無い"]
     if judge not in _GOLDEN:
         _GOLDEN[judge] = _reload(J.build(judge)[0])
-    exp = _GOLDEN[judge]
+    exp, exp_parts = _GOLDEN[judge]
     errs = []
+    if path is not None:
+        names, runs = _parts(path)
+        if names != exp_parts[0]:
+            errs.append(f"zip のパーツが生成物と違う: 増えた {sorted(set(names) - set(exp_parts[0]))}・減った {sorted(set(exp_parts[0]) - set(names))}")
+        if runs != exp_parts[1]:
+            errs.append("リッチテキストの run が生成物と違う")
     if wb.sheetnames != exp.sheetnames:
         return [f"シートの並びが生成物と違う: {wb.sheetnames}"]
     for name in exp.sheetnames:
@@ -303,6 +350,10 @@ def check_golden(wb):
                     errs.append(f"{name}!{ce.coordinate}: 塗りが生成物と違う")
                 if _font(ca.font) != _font(ce.font) or ca.number_format != ce.number_format:
                     errs.append(f"{name}!{ce.coordinate}: 文字または表示形式が生成物と違う")
+                if _border(ca) != _border(ce):
+                    errs.append(f"{name}!{ce.coordinate}: 罫線が生成物と違う")
+                if _align(ca) != _align(ce):
+                    errs.append(f"{name}!{ce.coordinate}: 配置が生成物と違う")
                 ta = ca.hyperlink.target if ca.hyperlink is not None else None
                 te = ce.hyperlink.target if ce.hyperlink is not None else None
                 if ta != te:
@@ -330,7 +381,7 @@ def check(path, parts=("words", "structure", "golden")):
     if "structure" in parts:
         errs += check_structure(wb)
     if "golden" in parts:
-        errs += check_golden(wb)
+        errs += check_golden(wb, path)
     return errs
 
 
@@ -437,6 +488,26 @@ def _mut_white_font(wb):
     c.font = Font(name=c.font.name, size=c.font.sz, color="FFFFFFFF")
 
 
+def _mut_font_tint(wb):
+    """文字の RGB は同じまま tint だけを変える（白に近く見える）。"""
+    import copy
+    c = wb["追加候補"]["I7"]
+    f, col = copy.copy(c.font), copy.copy(c.font.color)
+    col.tint = 0.95
+    f.color = col
+    c.font = f
+
+
+def _mut_fill_tint(wb):
+    """入力欄の塗りの RGB は同じまま tint だけを変える。"""
+    import copy
+    c = wb["追加候補"]["J7"]
+    fl, col = copy.copy(c.fill), copy.copy(c.fill.fgColor)
+    col.tint = -0.5
+    fl.fgColor = col
+    c.fill = fl
+
+
 def _mut_numfmt(wb):
     wb["追加候補"]["I7"].number_format = ";;;"
 
@@ -446,11 +517,49 @@ def _mut_hide_sheet(wb):
 
 
 def _mut_col_width(wb):
-    wb["追加候補"].column_dimensions["I"].width = 0
+    # ★ openpyxl は幅 0 を書き出さない（読み直すと既定の幅になる）ので、0.1 で「ほぼ見えない列」を作る（code-reviewer LOW）
+    wb["追加候補"].column_dimensions["I"].width = 0.1
+
+
+def _mut_rich_white(wb):
+    """要点のセルを、白い文字の run 1 つのリッチテキストにする（既定の読み込みでは平文と同じ値になる）。"""
+    from openpyxl.cell.rich_text import CellRichText, TextBlock
+    from openpyxl.cell.text import InlineFont
+    c = wb["追加候補"]["I7"]
+    c.value = CellRichText([TextBlock(InlineFont(color="FFFFFFFF"), c.value)])
+
+
+def _mut_border(wb):
+    from openpyxl.styles import Border, Side
+    s = Side(style="thick", color="FFFF0000")
+    wb["追加候補"]["C7"].border = Border(left=s, right=s, top=s, bottom=s)
+
+
+def _mut_comment_mark(wb):
+    """語を含まないコメント（印だけ）を付ける。"""
+    from openpyxl.comments import Comment
+    wb["追加候補"]["A7"].comment = Comment("*", "a")
+
+
+def _mut_font_name(wb):
+    import copy
+    c = wb["追加候補"]["I7"]
+    f = copy.copy(c.font)
+    f.name = "Wingdings"
+    c.font = f
+
+
+def _mut_indent(wb):
+    import copy
+    c = wb["追加候補"]["I7"]
+    a = copy.copy(c.alignment)
+    a.indent = 200
+    c.alignment = a
 
 
 def _mut_cf_font(wb):
-    """既存の条件付き書式の文字色だけを変える（塗り・式・範囲は同じ）。"""
+    """既存の条件付き書式の文字色だけを変える（塗り・式・範囲は同じ）。
+    ★ 書式の定義は読み込み後に 2 枚のシートの条件付き書式で共有されるので、両方のシートが赤になる。"""
     from openpyxl.styles import Font
     for rng in wb["判定シート"].conditional_formatting:
         for rule in rng.rules:
@@ -515,7 +624,24 @@ MUTANTS = [
     ("追加候補のシートを非表示", _mut_hide_sheet, "golden"),
     ("要点の列の幅を 0 に", _mut_col_width, "golden"),
     ("条件付き書式の文字色だけを変える", _mut_cf_font, "golden"),
+    ("文字色の tint だけを変える（RGB は同じ）", _mut_font_tint, "golden"),
+    ("入力欄の塗りの tint だけを変える（RGB は同じ）", _mut_fill_tint, "golden"),
+    # ★ 2026-09-30 の code-reviewer（2 回目）: 語も塗りも使わずに隠す・目立たせる残りの手段
+    ("要点を白い文字の run のリッチテキストに", _mut_rich_white, "golden"),
+    ("表記のセルを太い赤の罫線で囲む", _mut_border, "golden"),
+    ("語を含まないコメント（印だけ）", _mut_comment_mark, "golden"),
+    ("要点の字体を記号の字体に", _mut_font_name, "golden"),
+    ("要点を字下げで画面の外に", _mut_indent, "golden"),
 ]
+# ★ golden の変異が「意図した理由」で赤になることを確かめる（メッセージの一部・code-reviewer LOW）
+EXPECT = {
+    "追加候補の行を非表示": "表示または表", "要点の文字を白に（値と塗りは同じ）": "文字または表示形式",
+    "表示形式で値を隠す（;;;）": "文字または表示形式", "追加候補のシートを非表示": "表示または表",
+    "要点の列の幅を 0 に": "表示または表", "条件付き書式の文字色だけを変える": "条件付き書式",
+    "文字色の tint だけを変える（RGB は同じ）": "文字または表示形式", "入力欄の塗りの tint だけを変える（RGB は同じ）": "塗り",
+    "要点を白い文字の run のリッチテキストに": "リッチテキスト", "表記のセルを太い赤の罫線で囲む": "罫線",
+    "語を含まないコメント（印だけ）": "zip のパーツ", "要点の字体を記号の字体に": "文字または表示形式", "要点を字下げで画面の外に": "配置",
+}
 ZIP_MUTANTS = [
     ("docProps/app.xml の会社名", _zip_mut("docProps/app.xml", "</Properties>", "<Company>GSE</Company></Properties>"), "words"),
     ("シートの XML に直接文字列（懸念）", _zip_mut("xl/worksheets/sheet1.xml", "</sheetData>",
@@ -548,7 +674,8 @@ def selftest():
             w = openpyxl.load_workbook(base)
             fn(w)
             w.save(p)
-            hit = bool(check(p, parts=(part,)))
+            errs = check(p, parts=(part,))
+            hit = bool(errs) and (label not in EXPECT or any(EXPECT[label] in e for e in errs))
             want = (label, fn, part) not in GREEN
             print(("OK " if hit == want else "NG ") + f"[{part}] {label}" + ("" if want else "（緑であること）"))
             ok &= hit == want

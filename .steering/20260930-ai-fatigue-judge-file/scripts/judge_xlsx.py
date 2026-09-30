@@ -206,7 +206,8 @@ def bib_index():
     for p in (sorted(glob.glob(os.path.join(EVID_PREV, "S-12", "*_results_*.json")))
               + sorted(glob.glob(os.path.join(TASK, "evidence", "S-1*", "*_results_*.json")))
               + sorted(glob.glob(os.path.join(TASK, "evidence", "B9", "*_screen_*.json")))  # B9 の採択研究のふるい（判断 15）
-              + sorted(glob.glob(os.path.join(EVID_PREV, "S-04", "*_results_*.json")))):  # S-04 の検索の記録（B10・B12 の書誌・判断 17）
+              + sorted(glob.glob(os.path.join(EVID_PREV, "S-04", "*_results_*.json")))  # S-04 の検索の記録（B10・B12 の書誌・判断 17）
+              + sorted(glob.glob(os.path.join(TASK, "evidence", "bib", "*_bib_*.json")))):  # 検索に当たらなかった種文献の書誌（判断 20）
         d = json.load(open(p, encoding="utf-8"))
         for run in d.get("runs", []):
             for r in run.get("records", []):

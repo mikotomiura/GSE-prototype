@@ -19,14 +19,14 @@
 - [x] `check_survey_files.py`（本タスクと前タスクのディレクトリ）が違反 0
 
 ## C. 判定者用ファイル
-- [x] `scripts/candidates.py`（追加候補のデータ・132 件 → レビュー後 157 件・判断 13 → 159 件・判断 15 → 193 件・判断 17）
+- [x] `scripts/candidates.py`（追加候補のデータ・132 件 → レビュー後 157 件・判断 13 → 159 件・判断 15 → 193 件・判断 17 → 206 件・判断 20）
 - [x] `scripts/fetch_oa.py` → `evidence/oa_2026-09-30.json`（164 件すべて取得）
 - [x] `scripts/judge_xlsx.py`（出力の保護・DOI の quote・行の高さ）
-- [x] `scripts/check_judge_xlsx.py`（レビュー後: 語・構造・生成物との一致の 3 検査。selftest 43 項目 = 陰性対照 1・変異 30〈それぞれ指定の検査だけで赤〉・陽性対照 2・zip の変異 4・出力の保護 6）
+- [x] `scripts/check_judge_xlsx.py`（レビュー後: 語・構造・生成物との一致の 3 検査。selftest 43 項目 → ★ 2026-09-30 の完了時のレビューで 57 項目 = 陰性対照 1・変異 43〈それぞれ指定の検査だけで赤・golden の変異は期待するメッセージまで〉・陽性対照 3・zip の変異 4・出力の保護 6）
 - [x] 判定者 1 用のファイルを作り、Downloads に写した（`archive/judge/` と同一・違反 0・集計の数式を LibreOffice で再計算して確認）
 
 ## D. 完了
-- [x] code-reviewer ＋ security-checker（並列）・指摘対応（判断 13）
-- [ ] /finish-task で /cross-review 2 巡 → ★ 次のセッション（当日の実消費が合算で約 304,946 / 300,000・研究者の決定 2026-09-30）→ ★ 同日のうちに上限を一時的に引き上げて回す（判断 14）
+- [x] code-reviewer ＋ security-checker（並列）・指摘対応（判断 13）→ ★ 2026-09-30 の追加分にも 2 回（判断 18・20）
+- [x] /finish-task で /cross-review 2 巡（同日のうちに上限を一時的に引き上げて回した・判断 14・16・19。Codex 計 3 回・241,255。上限は 300,000 に戻した）
 - [x] 引き継ぎ `.steering/_handoff/next-session-ai-fatigue-crossreview.md` と索引の更新
 - [x] push（PR・merge は /cross-review の後 → 次のセッション）
