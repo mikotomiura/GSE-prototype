@@ -15,7 +15,7 @@
 | Europe PMC | 147 |
 | **どれかで取れた** | **246** |
 
-- 取得のエラーは 0 件。
+- 取得の例外（接続の失敗・429 の再試行の尽きなど）は 0 件。★ 400・404・410 の応答は「その情報源に記録なし」として扱い、件数としては残していない（`evidence/fetch_abstracts.py` の `get()`）。
 - **抄録が取れなかった 13 件**（題名だけをふるいに当てた）: AF002・AF003・AF017（DOI なし）・AF034（訂正通知）・S02-04・S02-05・S14-43・S13-20・S08-03・S12-18・S12-21・S12-22・S12-23（DOI なし）。★ AF002（*Int J Inf Manage* 2026）と AF003（*Comput Hum Behav* 2026）は、4 つの情報源のどれにも抄録が無かった。
 - DOI の無い 4 件のうち、S04-30 と S12-24 は Europe PMC で題名（S12-24 は前刷りの識別子）が一致し、抄録を使った。AF017・S12-23 は一致しなかった。
 - DOI で引いた 7 件（AF026・S04-21・S04-36・S04-76・S04-80・S14-21・S14-36）で、情報源の題名が判定者用ファイルの題名と一致しなかった。Crossref と OpenAlex の題名で 1 件ずつ見ると、7 件とも同じ文献で、違いは HTML の実体参照（`&amp;`・`<scp>`）・綴り（assited／assisted）・言語（S04-76 はスペイン語の題名）・版による題名の違い（S04-36）だった。情報源の間で抄録の長さはほぼ同じだった。
@@ -97,13 +97,14 @@
 
 - ★ 上の表の「それ以外」の列は、`evidence/S-11/terms_2026-09-30.json` の `count_general_not_uses_term`（補いを分ける前の 243 件で数えた値）から、補いの 3 件の分を引いた値（`decisions.md` 判断 4）。
 - 抄録があり、上の語がどれも出ない記録は 25 件（方法論の 4 件・記録の負担や時間だけを測る記録 など）。「負担（burden）」の語は区分に入れていない。
+- 「疲れ（tired）」の正規表現は左の境界を持たない（retired なども当たりうる）。当たった 3 件の抄録の文字列は、AF006「mental tiredness」・AF014「tired from」・S15-07「Psychosomatic tiredness」で、retired などは無かった（抄録で確かめた）。
 
 ## 5. サーヴェイで記録した用法の例（259 件の外を含む）
 
 | 記録 | 語 | 何を指すか（出どころに書いてあること） | 出どころ |
 |---|---|---|---|
 | Synthetonia: Tonal Strain as a Candidate Facet of AI Fatigue（Zenodo 2026, doi:10.5281/zenodo.22566309） | AI fatigue・Synthetonia | 立場表明の論文。既存の尺度は “interaction cost: volume of generated output, the burden of verification, and prompt iteration” を測るとし、会話 AI の単調な文体に長くさらされることによる飽き（Synthetonia）を別の源として提案する | Zenodo の記録の説明文（2026-09-30 に読み直した）・A 群の `survey-S-08.md` §6 |
-| A Control-Theoretic Approach to GenAI Fatigue（Zenodo 2025, doi:10.5281/zenodo.17772700） | GenAI Fatigue | “the measurable degradation in recall and contextual fidelity within long, multi-turn histories”（人ではなく、モデルの側の現象の名） | 同上 |
+| A Control-Theoretic Approach to GenAI Fatigue（Zenodo 2025, doi:10.5281/zenodo.17772700） | GenAI Fatigue | 説明文は GenAI Fatigue を “the measurable degradation in recall and contextual fidelity within long, multi-turn histories” と書き、LLM の応用の側の問題として扱う | 同上 |
 | 医学教育 2026（doi:10.11307/mededjapan.57.3_195・候補 S12-21） | 評価疲れ | 医学教育の分野別評価で、評価を担う側の組織・人が疲れること。LLM による判定を人の判定と比べた | A 群の `survey-S-12.md`（J-STAGE の抄録。4 つの情報源には抄録が無かった） |
 | 人工知能学会 全国大会 2025（doi:10.11517/pjsai.JSAI2025.0_2P1OS2605） | 精査疲れ | 偽情報・誤情報の広がる情報環境で、情報を精査し続けることへの疲れ（理論的な発表） | 同上 |
 | 公研 2026（雑誌のインタビュー記事） | 「それっぽい嘘」に疲弊 | 生成 AI のもっともらしい嘘への対応で、研究者の側が疲弊する（題名） | 同上（題名だけ） |

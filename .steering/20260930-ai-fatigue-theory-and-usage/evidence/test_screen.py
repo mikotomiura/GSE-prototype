@@ -78,6 +78,25 @@ class FrameworksTest(unittest.TestCase):
                 self.assertNotIn(key, S.frameworks(text))
 
 
+class KnownFalsePositivesTest(unittest.TestCase):
+    """固定した正規表現の既知の誤検出（design.md §1.2・§2.3 は変えない）。いまの振る舞いを記録する。
+
+    ここが赤になったら、正規表現が変わった（固定した手順からの逸脱）ということ。
+    """
+
+    def test_n2_matches_detection_context(self):
+        # 人の疲労を検知する AI の句も N2 に当たる（語を使う記録に入りうる。意味の区分は判定案のファイルで行う）
+        self.assertIn("N2", S.terms("driver fatigue with AI-based detection"))
+
+    def test_tired_has_no_left_boundary(self):
+        # 「疲れ」は左の境界を持たないので retired にも当たる（2026-09-30 の 3 件は抄録で確かめて誤検出なし）
+        self.assertIn("疲れ", S.general("retired employees"))
+
+    def test_sdt_acronym_is_ambiguous(self):
+        # SDT は signal detection theory にも当たる（2026-09-30 は F-SDT 0 件）
+        self.assertIn("F-SDT", S.frameworks("signal detection theory (SDT)"))
+
+
 class SentencesTest(unittest.TestCase):
     def test_cue(self):
         text = "Background text here. AI fatigue is defined as a state of weariness. We measured AI fatigue weekly."

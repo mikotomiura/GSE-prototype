@@ -18,3 +18,11 @@
 - 抄録・本文の置き場は本セッションの scratchpad（git の外）。連絡先（メールアドレス）は学術 API に送っていない。
 - ⚠️ `fetch_abstracts.py` の `get()` は、259 件と原典の取得を回した後に、許す URL の一覧と opener を引数で受け取る形に直した（`trace_prompt_fatigue.py` が Zenodo の API の根を足すため・`decisions.md` 判断 9）。既定の引数での動きは、回した版と同じ。`theory2` の一覧も回した後に足した（判断 3）。
 - ⚠️ `run_screen.py`・`fetch_abstracts.py` は出力先が既にあると止まる（上書きしない）。
+- ⚠️ 流用するときの注意（2026-09-30 の完了時レビュー・code-reviewer と security-checker。実行した版の振る舞いは変えていない）:
+  1. `get()` は 400・404・410 を黙って `None` にし、`errors` に残さない。「エラー 0 件」は「例外 0 件」の意味にしかならない（400 は Europe PMC の TITLE の式や S2 の DOI のパスが不正でも隠れる）。流用するときは、4xx を情報源・鍵ごとに数えて書誌の JSON に残す。
+  2. `get()` の `allowed` と `opener` は対で渡す約束で、コードでは強制していない（別の一覧の opener を渡すとリダイレクトの柵が崩れる。`allowed=[]` は既定の 4 つに広がる）。流用するときは opener の引数をなくし、`allowed` から `guarded_opener` を中で作る。`Retry-After` が日付の形だと `int()` で落ちる。許可外へのリダイレクトも再試行する。
+  3. `title_match` は、正規化で空になる題名で `None` を返し、`fetch()` は不一致として扱わない（DOI の無い題名の検索が確かめずに採られうる。今回の DOI の無い 4 件は英語・日本語の題名で、該当しない）。Europe PMC の `rs[0]` は DOI の一致を確かめていない。DOI で引いた記録は、題名が合わなくても抄録を統合する（今回は判断 7 で事後に確かめた）。
+  4. `trace_prompt_fatigue.py` は Zenodo と Crossref の失敗を捕まえず（S2 の `HTTPError` だけ）、書誌の JSON の置き場も確かめない（抄録に当たる説明文は検査済みの `abs_dir` にだけ書く）。
+  5. `run_screen.py` は 2 つの出力を順に排他的に開くので、2 つ目が既にあると片方だけが残る。`load_pair` は `mode` と `input_sha256` を確かめない。
+  6. `common.ensure_outside_repo` は、いまの worktree の根しか比べない（別の worktree の中は「外」と判定される）。抄録・本文の置き場は scratchpad など git の外にする（前タスクの README の注意 (1) と同じ）。
+  7. `load_records()` の `open(...).read()` はファイルを閉じていない。`fetch()` の `abs_dir` の引数は使っていない。

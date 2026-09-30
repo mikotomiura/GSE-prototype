@@ -60,7 +60,7 @@
 | F-TS | テクノストレス | 29 | DB 8（AF001・AF007・AF008・AF013・AF015・AF017・AF019・AF027）／ S02-02・S02-03・S12-03・S12-04・S12-06・S14-04・S14-05・S14-06・S14-15・S14-18・S14-24・S14-29・S14-31・S14-32・S14-33・S14-34・S14-39・S14-40・S14-41・S14-42・S14-44 |
 | F-JDR | 仕事の要求－資源モデル | 14 | DB 1（AF019）／ S02-03・S12-06・S04-11・S14-01・S14-07・S14-09・S14-20・S14-21・S14-24・S14-28・S13-06・S13-09・S14-44 |
 | F-COR | 資源保存理論 | 10 | ／ S02-11・S04-14・S14-03・S14-07・S14-10・S14-11・S14-26・S14-29・S13-02・S13-03 |
-| F-AUT | 自動化への慢心・自動化バイアス | 10（うち 1 件は別の意味） | DB 1（AF004・automation bias）／ S05-04・S05-05・S05-06・S05-07・S05-09・S15-09・S15-10・S15-23・S12-20。★ S12-20 の complacency は、死亡災害の記述から推定した感情語の 9 区分の 1 つで、自動化への慢心ではない |
+| F-AUT | 自動化への慢心・自動化バイアス | 10 | DB 1（AF004・automation bias）／ S05-04・S05-05・S05-06・S05-07・S05-09・S15-09・S15-10・S15-23・S12-20。★ S12-20 の抄録では、complacency は、死亡災害の記述から LLM で推定した感情語の 9 区分（complacency・haste・shock・fear・focus・anxiety・tension・fatigue・other）の 1 つとして出る |
 | F-IO | 情報過多 | 6 | DB 4（AF006・AF010・AF011・AF024）／ S15-09・S15-19 |
 | F-CLT | 認知負荷理論 | 4 | DB 3（AF013・AF016・AF029）／ S02-01 |
 | F-AP | 能動／受動的疲労 | 3 | DB 1（AF009・尺度の因子名 “Passive Fatigue”）／ S05-01・S05-02 |
@@ -83,7 +83,22 @@
 | S04-37 | 自己決定理論・認知負荷理論・社会的認知理論 | 抄録 “Drawing from self-determination, cognitive load, and social cognitive theories” | 名を並べて theories を最後に 1 回だけ書く形 |
 | S02-07 | stress-response-outcome framework・theory of technological stress | 抄録 | 語形が一覧に無い |
 
-### 3.2 AF004 と自我消耗
+### 3.2 記録ごとの記述（抄録・AI の見立てのファイルが引くもの）
+
+| 記録 | 抄録に書いてあること |
+|---|---|
+| AF001 | “Greater AI fatigue was associated with lower self-reported current AI use and stronger intentions to reduce use in the next three months” |
+| AF011 | “prolonged AI use may impose cognitive strain, attention depletion, information overload, and decision fatigue” |
+| S14-03 | “translating resource depletion into a cognitive deficit (eroded self-efficacy), which ultimately drives behavioral withdrawal” |
+| S14-20 | “integrating FTM as a depleted psychological resource that amplifies teachers’ vulnerability to technological demands” |
+| AF019 | “to examine the impact of AI demands (i.e., technostress) and resources (i.e., efficacy and generative AI) on employees' work and life domains”。媒介は engagement と exhaustion |
+| S14-01 | “how AI-enabled job demands influence employee well-being and turnover intention” |
+| S13-09 | “the dual impact mechanism of this technology on physicians’ job resources and job demands remains unclear” |
+| AF016・AF029 | DB の分類と題名: AF016 は既存レビュー（生成 AI と教育の認知負荷の系統的レビュー）、AF029 は尺度・理論（認知負荷の種類を測る尺度の開発） |
+
+- JD-R を挙げる 14 件のうち、抄録で AI（または技術）を要求・資源と書くのは上の 4 件（AF019・S14-01・S13-09・S14-20）。ほかの 10 件は、抄録では JD-R を枠組みの名として挙げるだけか、要求・資源の中身を AI と結びつけて書いていない（S14-28 は抄録に demand・resource の語が無い）。
+
+### 3.3 AF004 と自我消耗
 
 - issue の記述（「AF004 は自我消耗理論に依拠している」）の出どころは、09-28 の評価の注記（`../20260928-ai-fatigue-db-appraisal/archive/scripts/data_c.py` l.151）で、そこに本文の箇所は書かれていない。
 - AF004 の抄録（*Acta Psychol* 2025, doi:10.1016/j.actpsy.2025.105725）は、AI への依存と批判的思考の関係の媒介として認知的疲労（cognitive fatigue）を置き、情報リテラシーを調整変数とする。抄録に自我消耗・資源・強度モデルの語は無い。

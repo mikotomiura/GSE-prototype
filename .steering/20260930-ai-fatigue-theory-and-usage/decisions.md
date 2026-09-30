@@ -59,3 +59,22 @@
 ## 判断 9: `fetch_abstracts.py` の `get()` を回した後に直した（2026-09-30）
 
 - 259 件と原典の取得を回した後、`get()` が許す URL の一覧と opener を引数で受け取る形に直した（`trace_prompt_fatigue.py` が Zenodo の API の根を足すため。最初の版は別モジュールの許可の一覧を書き換えていた）。既定の引数での動きは回した版と同じ。`evidence/README.md` に書いた。
+
+## 判断 10: 【逸脱】記録していなかった逸脱 2 件（2026-09-30・完了時レビューで指摘）
+
+- (a) `design.md` §0.3 は書誌の JSON の欄に「年」を固定したが、`records`・`theory`・`theory2` の JSON に年は無い（`fetch_abstracts.py` が年を取り出していない）。年は判定者用ファイル（入力の xlsx）と事実のファイルの書誌にある。取り直しはしない。
+- (b) `design.md` §1.4 は Crossref・Semantic Scholar を「1 回ずつ」引くと固定したが、Semantic Scholar が 429 だったため、同じスクリプトを 2 回回した（`prompt_fatigue_trace_2026-09-30_retry.json`・Zenodo と Crossref も再度引いた・結果は同じ）。事実のファイル §6 と README には書いてあったが、逸脱として記録していなかった。
+
+## 判断 11: 完了時レビュー（code-reviewer・security-checker）の指摘の扱い（2026-09-30）
+
+- HIGH は両者とも 0。code-reviewer の MEDIUM 4・LOW 9、security-checker の LOW 3 を一次で確かめてから対応した。
+- **直したもの**:
+  - MEDIUM 1（S-09 の判定案が、事実のファイルに無い記録ごとの記述を根拠にしていた）: 事実のファイル `survey-S-09.md` §3.2 に、AF001・AF011・S14-03・S14-20・AF019・S14-01・S13-09 の抄録の句と AF016・AF029 の分類を足した。★ 抄録で確かめると、JD-R を挙げる 14 件のうち AI（技術）を要求・資源と書くのは 4 件で、判定案の「DB の研究の多くは」は確かめられなかったので「少なくとも 4 件」に直した。
+  - MEDIUM 2: 判断 10 に記録した。
+  - MEDIUM 3（4xx を「エラー 0 件」に数えていない）: 事実のファイル §1 の文言を「例外 0 件・400/404/410 は記録なしとして扱う」に直し、README の流用の注意 1 に書いた。
+  - MEDIUM 4（`tired` の左の境界）: 当たった 3 件の文字列を抄録で確かめ（AF006・AF014・S15-07 とも tiredness・tired）、誤検出は無かった。事実のファイル §4 に注を足し、既知の誤検出として `test_screen.py` に記録した。
+  - LOW 10（検査の陰性の例に当たりようのないものがある・既知の誤検出の検査が無い）: `KnownFalsePositivesTest` を足した（N2 の検知の文脈・`tired`・`SDT`）。12 本緑。
+  - LOW 11（事実のファイルに意味の区分が混じる）: `survey-S-09.md` §3 の S12-20 と `survey-S-11.md` §5 の GenAI Fatigue を、抄録・説明文に書いてあることだけに直した。
+  - LOW 12（入手の状態をまとめて書いた）: 判定案のファイル §3 を記録ごとに書き分けた。
+  - LOW 5 の docstring の食い違い: docstring を実装に合わせた（振る舞いは変えていない）。
+- **README の流用の注意に回したもの**（実行した版の振る舞いを変えない・前タスクと同じ扱い）: code-reviewer の LOW 5〜9・13、security-checker の LOW 1〜3。
