@@ -21,15 +21,14 @@ import fetch_abstracts as F  # noqa: E402  common・clean・get の柵を共有�
 common = F.common
 
 ZEN = "https://zenodo.org/api/"
-ALLOWED = F.ALLOWED + [ZEN]  # 4 つの API の根に Zenodo の API の根だけを足す
-OPENER = common.guarded_opener(ALLOWED)
+ALLOWED = F.ALLOWED + [ZEN]  # 4 つの API の根に Zenodo の API の根だけを足す（opener は F.get が一覧から作る）
 
 RECORDS = ["21384564", "21384565"]
 TITLE_Q = "Concept Analysis of Prompt Fatigue"
 
 
 def get(url):
-    return F.get(url, allowed=ALLOWED, opener=OPENER)
+    return F.get(url, allowed=ALLOWED)
 
 
 def main():

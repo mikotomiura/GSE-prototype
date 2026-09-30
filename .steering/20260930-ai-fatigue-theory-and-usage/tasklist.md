@@ -29,9 +29,9 @@
 - [x] `survey-S-09.md`・`survey-S-09-ai-judgments.md`（理論の節の草稿・DB への提案）・`survey-S-09-gse.md`
 
 ## 検査とレビュー
-- [ ] `check_surveys_here.py` 違反 0・`test_screen.py` 緑
-- [ ] code-reviewer・security-checker（並列）
-- [ ] `/cross-review` 2 巡（Codex の当日の実消費を先に確かめる）
+- [x] `check_surveys_here.py` 違反 0・`test_screen.py` 12 本・`test_fetch.py` 11 本緑
+- [x] code-reviewer・security-checker（並列）→ HIGH 0。判断 11
+- [ ] `/cross-review` 2 巡（Codex の当日の実消費を先に確かめる）→ 1 巡目済み（判断 12・13）
 
 ## 完了処理
 - [ ] issue の状態（`issue-status` 相当）・引き継ぎ

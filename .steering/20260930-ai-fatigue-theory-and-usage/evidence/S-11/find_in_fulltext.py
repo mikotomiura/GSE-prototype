@@ -23,7 +23,10 @@ def text_of(path):
     if low.endswith(".docx"):
         with zipfile.ZipFile(path) as z:
             xml = z.read("word/document.xml").decode("utf-8")
-        return html.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"</w:p>", "\n", xml)))
+        # ★ 段落の中の <w:t> は空白を入れずに連結する（語の途中で run が分かれても語を壊さない・Codex 1 巡目）
+        paras = re.findall(r"<w:p[ >].*?</w:p>", xml, flags=re.S)
+        return "\n".join("".join(html.unescape(t) for t in re.findall(r"<w:t(?:\s[^>]*)?>(.*?)</w:t>", p, flags=re.S))
+                         for p in paras)
     raw = open(path, encoding="utf-8", errors="replace").read()
     raw = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
     return html.unescape(re.sub(r"<[^>]+>", " ", raw))

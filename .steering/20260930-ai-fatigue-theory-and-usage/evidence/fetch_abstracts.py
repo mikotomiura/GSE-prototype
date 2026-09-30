@@ -9,6 +9,7 @@
   python fetch_abstracts.py theory2 <書誌の出力 JSON（repo の中）> <抄録の置き場（repo の外のディレクトリ）>   # 逸脱で足した 2 件（判断 3）
 """
 import datetime
+import email.utils
 import hashlib
 import json
 import os
@@ -37,7 +38,6 @@ S2 = "https://api.semanticscholar.org/graph/v1/"
 OA = "https://api.openalex.org/"
 CR = "https://api.crossref.org/"
 ALLOWED = [EPMC, S2, OA, CR]
-OPENER = common.guarded_opener(ALLOWED)
 UA = {"User-Agent": "Mozilla/5.0 (literature-search script)"}
 
 # design.md §2.2・§2.4 の固定の一覧（鍵, DOI, 題名の目印）。書籍で DOI の無いものは載せない（書誌だけを事実のファイルに書く）
@@ -78,11 +78,47 @@ THEORY2 = [
 ]
 
 
-def get(url, tries=4, allowed=None, opener=None):
-    """許した接頭辞の URL だけを開く（allowed と opener は対で渡す。既定は 4 つの API）。"""
-    allowed, opener = (allowed, opener) if allowed else (ALLOWED, OPENER)
+_OPENERS = {}
+
+
+class FenceError(ValueError):
+    """許していない URL・リダイレクト・空の許可の一覧（決定的な失敗なので再試行しない）。"""
+
+
+def _opener_for(allowed):
+    """許す一覧から、リダイレクトの先も同じ一覧で確かめる opener を作る（一覧ごとに 1 つ）。"""
+    key = tuple(allowed)
+    if key not in _OPENERS:
+        _OPENERS[key] = common.guarded_opener(list(key))
+    return _OPENERS[key]
+
+
+def retry_after_seconds(value, k):
+    """Retry-After（秒数または HTTP の日付）を待つ秒に直す。読めなければ 8×(k+1) 秒。上限 60 秒。"""
+    if value:
+        try:
+            return min(60, max(0, int(value)))
+        except ValueError:
+            try:
+                dt = email.utils.parsedate_to_datetime(value)
+                return min(60, max(0, int((dt - datetime.datetime.now(dt.tzinfo)).total_seconds())))
+            except (TypeError, ValueError):
+                pass
+    return min(60, 8 * (k + 1))
+
+
+def get(url, tries=4, allowed=None):
+    """許した接頭辞の URL だけを開く。allowed を省くと 4 つの API。opener は allowed から中で作る（一覧と柵が崩れない）。
+
+    ★ 空の一覧は何も許さない（既定に広がらない）。400・404・410 は None（その情報源に記録なし・errors に残らない）。
+    ★ 2026-09-30 の取得を回した後に、この形に直した（decisions.md 判断 9・12）。既定の引数での振る舞いは回した版と同じ。
+    """
+    allowed = ALLOWED if allowed is None else list(allowed)
+    if not allowed:
+        raise FenceError("許す URL の一覧が空")
     if not common.allowed_url(url, allowed):
-        raise ValueError(f"許していない URL: {url}")
+        raise FenceError(f"許していない URL: {url}")
+    opener = _opener_for(allowed)
     err = None
     for k in range(tries):
         try:
@@ -92,10 +128,17 @@ def get(url, tries=4, allowed=None, opener=None):
             err = e
             if e.code in (400, 404, 410):
                 return None
-            time.sleep(min(60, int(e.headers.get("Retry-After") or 8 * (k + 1))))
-        except (urllib.error.URLError, TimeoutError, ValueError) as e:
+            wait = retry_after_seconds(e.headers.get("Retry-After"), k)
+        except urllib.error.URLError as e:
+            if str(e.reason).startswith("許していない先へのリダイレクト"):
+                raise FenceError(str(e.reason)) from e
             err = e
-            time.sleep(8 * (k + 1))
+            wait = 8 * (k + 1)
+        except (TimeoutError, ValueError) as e:
+            err = e
+            wait = 8 * (k + 1)
+        if k < tries - 1:
+            time.sleep(wait)
     raise err
 
 

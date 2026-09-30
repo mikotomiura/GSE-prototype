@@ -116,11 +116,23 @@
 | F-COR | Hobfoll ほか 2018（*Annu Rev Organ Psychol Organ Behav*・逸脱で足した） | 資源保存理論は、燃え尽きから外傷的ストレスまでのストレスの領域で使われ、“COR theory is largely the basis for the more work-specific leading theory of organizational stress, namely the job demands-resources model”。理論の原則と系（corollaries）は本文にあり、抄録には書かれていない（本文は読んでいない） |
 | F-AUT | Parasuraman & Manzey 2010（*Hum Factors*・逸脱で足した） | 自動化への慢心は、複数の課題の負荷の下で、手作業の課題が自動化された課題と操作者の注意を奪い合うときに生じ、初心者にも熟練者にも見られ、単純な練習では消えない。自動化バイアスは、決定支援が不完全なときの見落とし（omission）と誤った採用（commission）のエラーとして現れ、訓練や教示では防げない。“Complacency and automation bias represent different manifestations of overlapping automation-induced phenomena, with attention playing a central role.” 抄録に疲労の語は無い |
 
+### 4.1 補正の集計（§3.1 の目で見た記録を足した場合・`decisions.md` 判断 13）
+
+| 枠組み | 機械の集計（§3） | 目で見て足す記録（§3.1・抄録の記述に限る） | 補正の集計 |
+|---|---|---|---|
+| F-CLT 認知負荷理論 | 4 | S04-37（“Drawing from self-determination, cognitive load, and social cognitive theories”） | 5 |
+| F-SDT 自己決定理論 | 0 | S04-37（同じ文） | 1 |
+| F-TS テクノストレス | 29 | S02-07（“the theory of technological stress”） | 30 |
+| F-SSO ストレッサー－ストレイン－結果 | 1 | S02-07（“the stress-response-outcome framework”・語は stress-response-outcome） | 2 |
+
+- AF001 の本文だけにある枠組み（限定容量モデル・ストレスの交流モデル）は、抄録に無いので補正の集計にも入れていない。
+- 補正の集計で 5 件に届くのは F-CLT だけで、原著（Sweller 1988, *Cogn Sci*, doi:10.1207/s15516709cog1202_4）の抄録は取得済みだった: 専門家と初心者の問題解決の技能を分ける主な要因はスキーマの形の領域の知識で、手段－目標分析による通常の問題解決は “a relatively large amount of cognitive processing capacity which is consequently unavailable for schema acquisition” を要する、とする。抄録に疲労の語は無い。
+
 - F-IO（情報過多・6 件）は `design.md` §2.4 に従い原著を読んでいない（疲労の仕組みの理論でないため件数だけ）。
-- 5 件未満の枠組みの原著（Sweller 1988・Koeske & Koeske 1993・Cavanaugh ほか 2000）は抄録を取ったが、`design.md` §2.4 に従い要点を書いていない。Ryan & Deci 2000・Siegrist 1996 は抄録が取れず、対応する枠組みは 0 件だった。
+- 5 件未満の枠組みの原著（Koeske & Koeske 1993・Cavanaugh ほか 2000）は抄録を取ったが、`design.md` §2.4 に従い要点を書いていない（Sweller 1988 は §4.1 の補正の集計で 5 件に届いたので書いた）。Ryan & Deci 2000・Siegrist 1996 は抄録が取れず、対応する枠組みは 0 件だった。
 
 ## 5. 限界（事実として）
 
-- 枠組みの件数は「抄録で名を挙げた記録の数」で、依拠している記録の数ではない。§3.1 のとおり、本文だけで名を挙げる記録（AF001）や、名の書き方が一覧に無い記録（S04-37・S02-07）は数えていない。
+- 枠組みの件数は「抄録で名を挙げた記録の数」で、依拠している研究の数ではない。同じ研究の別の記録（前刷りと雑誌の版など）は記録ごとに数えている。§3.1 のとおり、本文だけで名を挙げる記録（AF001）や、名の書き方が一覧に無い記録（S04-37・S02-07）は数えていない。
 - 抄録が取れなかった 13 件（`survey-S-11.md` §1）は題名だけを見た。
 - 原典・原著は抄録で読んだ（Kurzban ほか 2013・Saxby ほか 2013 の本文は無料の版があるが、本タスクでは抄録の範囲の要点だけを書いた）。資源保存理論の原則は一次で確かめていない。
