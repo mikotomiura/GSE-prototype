@@ -155,8 +155,10 @@ Other entries:
 
 - The macOS procedures were revised after the first calibration pilot (macOS 27, the standard Japanese input
   method, live conversion on). There, after a conversion, a Return in the candidate window only picks the
-  candidate and a second Return commits; a digit pick is likewise followed by Return; and the first Escape only
-  reverts the live conversion, so cancelling before a conversion takes two. The same behaviour was seen with keys
+  candidate and a second Return commits; a digit pick is likewise followed by Return; and each Escape steps the live
+  conversion back one stage (converted text, then kana, then the romaji spelling), so cancelling before a
+  conversion takes up to three; the procedure presses four, since an extra Escape outside a composition only reaches
+  the field as a command. The same behaviour was seen with keys
   typed by hand, so it belongs to the input method, not to the synthetic events. A cell with live conversion off
   has not been piloted and may need its own recipes file (`--recipes`), since an extra Return there would insert
   a line break.

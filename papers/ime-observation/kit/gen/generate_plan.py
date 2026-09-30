@@ -883,7 +883,8 @@ def _scenario_checks(rows, phrases, recipes, cfg, fails, os_name="macos"):
 
     On macOS (live conversion on) a Return in the candidate window only picks the candidate, so a commit
     after a conversion takes a second Return, a digit pick is followed by Return, and the first Escape only
-    reverts the live conversion; the default Windows procedures use one key each.
+    steps the live conversion back one stage (kanji, kana, spelling), so an unconverted cancel presses Escape
+    four times (extra presses only reach the field as a command); the default Windows procedures use one key each.
     """
     mac = os_name == "macos"
     enter = ["enter", "enter"] if mac else ["enter"]
@@ -909,7 +910,7 @@ def _scenario_checks(rows, phrases, recipes, cfg, fails, os_name="macos"):
         elif sc == "S4":
             ok = downs == full + ["space", "esc", "esc"] and it["abandon"] is True
         elif sc == "S5":
-            ok = downs == full + (["esc", "esc"] if mac else ["esc"])
+            ok = downs == full + (["esc"] * 4 if mac else ["esc"])
         elif sc == "S6":
             ok = downs == full + ["backspace"] * len(rd)
         elif sc == "S7":

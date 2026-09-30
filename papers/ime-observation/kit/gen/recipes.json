@@ -27,7 +27,7 @@
         "intent": {"commit": "none", "cand_index": null, "nav_count": 0, "abandon": true, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S5": {
-        "steps": [{"type_reading": true}, {"key": "esc"}, {"key": "esc"}],
+        "steps": [{"type_reading": true}, {"repeat": "esc", "times": 4}],
         "intent": {"commit": "none", "cand_index": null, "nav_count": 0, "abandon": true, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S6": {

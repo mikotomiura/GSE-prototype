@@ -606,3 +606,11 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - **結果**: 1,800 句（各作品 150・候補は最少の『堕落論』で 241）・読みの長さ 6〜30（中央値 16）・SHA-256 `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620`・`SudachiPy==0.7.0`・`sudachidict-core==20260723.1`。2 回の書き出しでバイト一致・`--validate` exit 0・`kit/check.sh` 緑・`_style_check.py` 違反 0 件・書き出し器が通る（91 ファイル）。仮の config（selftest の値・n = 75）で両 OS の計画を作ると、どのシナリオでも 225 試行がすべて別の句（`--validate` exit 0）。
 - **トレードオフ**: ⚠️ 読みの誤りが残る（無作為 40 句の目視で `絞罪→しぼりざい`・`この室→むろ`・`女学校→おんながっこう`）。E1 は打鍵列として妥当なかなで足り、E2 の正解は打った読み（判断 19）なので直さない。同じ読みの句が 9 組（README の既知の限界）。
 - **影響範囲**: `kit/corpus/data/phrases.jsonl`・`kit/corpus/requirements.txt`・`experiment/data.md`（「Phrase corpus」節に 6 項目と出典の作品表）。生の `.txt` / zip は repo に入れない（archive の SHA-256 だけを記録）。
+
+## 判断 80: M1 の所見を受けた macOS の手順とマーカーの直し（2026-10-01・研究者の選択と実測）
+
+- **背景**: M1 の 1 回目（`pilot-macos-1-notes.md`）で、変換後の Enter が確定せず試行が持ち越される・マーカー F13 / F14 が観測側に届かない、が見つかった。
+- **採用**: (1) macOS の recipes をライブ変換 ON の IME の実際の挙動に合わせる（候補の窓の Enter は選ぶだけ → Enter 2 回・数字の後に Enter・Esc 4 回）。★ 研究者の手打ちでも同じ挙動を確認したので、合成キーの人工物ではない。(2) マーカーは**矢印キー（← → ←）**（研究者が AskUserQuestion で推奨を選択。他の案: F13 のまま時計を試行の打鍵で合わせる / F1〜F12 を語彙に足す）。
+- **理由**: (1) README（`kit/gen/README.md`）の想定どおり、パイロットの後に直すのは recipes のデータ。(2) 矢印キーは既に語彙にあり観測され、変換中でなければ IME の状態も文字も変えない。E2 は既存の `--markers-in-obs` で扱える（コードの変更なし）。
+- **トレードオフ**: ⚠️ ライブ変換 OFF では余分な Enter が改行になりうる → OFF のセルは別の recipes ファイル（パイロットしてから）。⚠️ E2 を本番のログに回すときは `--markers-in-obs` を付ける。
+- **影響範囲**: `kit/gen/recipes.json`（macOS のみ）・`generate_plan.py` / `simulate_obs.py` の selftest・`refinput-macos/build.sh`・pilot / run / e2 / gen / refinput-macos の README・`run/cell.example.json`。
