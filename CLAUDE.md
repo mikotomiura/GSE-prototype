@@ -130,8 +130,8 @@ Hook は 3 層で動作し、全層の出力がユーザーに明示される (W
   研究=`/literature-review` (サーヴェイ 1 ラウンド) (詳細は `.claude/commands/`)
 - **サブエージェント**: 収集=`file-finder` `dependency-checker` `impact-analyzer` /
   レビュー=`code-reviewer` `test-analyzer` `security-checker` `cross-reviewer` /
-  研究=`paper-reviewer` (`attack-me` の査読者役・監査役。道具は Read・Grep・Glob だけ) /
-  実行=`test-runner` `build-executor` `log-analyzer` (詳細は `.claude/agents/`)
+  実行=`test-runner` `build-executor` `log-analyzer` /
+  研究=`paper-reviewer` (`attack-me` の査読者役・監査役。道具は Read・Grep・Glob だけ) (詳細は `.claude/agents/`)
 
 <!-- loop:begin -->
 ## Loop Engineering (issue 単位ループ)
