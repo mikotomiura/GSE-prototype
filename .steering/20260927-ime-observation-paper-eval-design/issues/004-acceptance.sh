@@ -60,4 +60,5 @@ forbid_grep "${E}" 'i-understand-this-sends-keys.*selftest|selftest.*i-understan
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/emit/(emit\.py|backend_dryrun\.py|backend_macos\.py|keymap_macos\.json|README\.md)$'
+style_ok
 finish

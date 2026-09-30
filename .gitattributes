@@ -7,6 +7,9 @@ src-tauri/schema/current.json text eol=lf
 #   CRLF で checkout されると OS ごとに sha が食い違う（code-reviewer M1・2026-09-25）。
 src-tauri/prereg/*.json text eol=lf
 tests/snapshots/*.json text eol=lf
+# ★ 論文キットの単体ロガーは manifest.json を include_bytes! で埋め込み、その SHA-256 を出力のヘッダ（manifest_sha256）に
+#   書く。CRLF で checkout されると OS ごとに値が食い違う（IME 論文 判断 32・2026-09-28）。
+papers/ime-observation/kit/logger/manifest*.json text eol=lf
 tests/fixtures/*.ndjson text eol=lf
 
 # 提出ランチャ: Windows cmd は CRLF 前提。checkout 時に LF 化されると cmd の
@@ -14,3 +17,9 @@ tests/fixtures/*.ndjson text eol=lf
 # mac の .command は bash 用なので LF 固定。
 *.bat text eol=crlf
 *.command text eol=lf
+# ★ 論文キットの凍結の印（experiment/preregistration.md の sha256:）は config.json・SEED・正解の規則ファイルの SHA-256 から作る。
+#   CRLF で checkout されると機械ごとに値が食い違い、凍結の照合が落ちる（IME 論文 判断 63・2026-09-30）。
+papers/ime-observation/experiment/*.json text eol=lf
+papers/ime-observation/experiment/SEED text eol=lf
+papers/ime-observation/experiment/*.sh text eol=lf
+papers/ime-observation/kit/analysis/gt_rules*.json text eol=lf

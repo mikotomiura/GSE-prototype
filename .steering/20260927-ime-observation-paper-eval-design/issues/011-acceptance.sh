@@ -3,7 +3,7 @@
 set -u
 . "$(dirname "$0")/_acceptance-lib.sh"
 require_os any
-L="${K}/logger"; M="${L}/Cargo.toml"; C="${L}/check_manifest.py"
+L="${K}/logger"; M="${L}/Cargo.toml"; C="${L}/check_manifest.py"; CU="${L}/check_manifest_upstream.internal.py"
 
 echo "[011] 単体ロガーの核"
 for f in "${M}" "${L}/Cargo.lock" "${L}/README.md" "${L}/manifest.json" "${C}" "${L}/src/main.rs" "${L}/src/driver_api.rs" \
@@ -20,7 +20,7 @@ run_ok "AC1 cargo test が緑（コピーした状態機械のテストを含む
 
 # AC2-4
 run_ok "AC2 check_manifest.py --self が緑" "${PY}" "${C}" --self
-run_ok "AC3 check_manifest.py --against-gse が緑" "${PY}" "${C}" --against-gse
+run_ok "AC3 check_manifest_upstream.internal.py --against-upstream が緑" "${PY}" "${CU}" --against-upstream
 selftest_ok "${C}"
 
 # AC5

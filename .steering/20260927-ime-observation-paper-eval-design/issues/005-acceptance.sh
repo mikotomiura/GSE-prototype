@@ -47,4 +47,5 @@ run_ok "AC4 keymap_windows.json が keyname を網羅" "${PY}" "${TMP}/cover.py"
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/emit/(backend_windows\.py|keymap_windows\.json)$'
+style_ok
 finish

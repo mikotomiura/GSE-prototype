@@ -85,6 +85,23 @@ only_allowed () { # only_allowed <拡張正規表現>
 
 check_entry_green () { run_ok "kit/check.sh が緑" bash "${K}/check.sh"; }
 
+# ★ 判断 36（2026-09-28）: この issue が足した・変えた papers/ime-observation の中のファイルに、禁止語
+#   （GSE・src-tauri・.steering・★・⚠）と地の文の日本語が無いこと。検査器は同じ場所の _style_check.py。
+#   ⚠️ 逐語コピー（manifest の file / excerpt の範囲）とコーパスのデータは検査器の側で除く。
+style_ok () {
+  local base files
+  base="$(_base)"
+  if [ -z "${base}" ]; then ok "STYLE base が見つからない（検査を飛ばす）"; return; fi
+  files="$(git diff --name-only --diff-filter=AM "${base}"..HEAD -- papers/ime-observation | tr '\n' ' ')"
+  if [ -z "${files}" ]; then ok "STYLE papers/ime-observation の変更が無い"; return; fi
+  # shellcheck disable=SC2086
+  if "${PY}" "$(dirname "$0")/_style_check.py" ${files} > "${TMP}/style.out" 2>&1; then
+    ok "STYLE 公開物の書き方（判断 36）"
+  else
+    ng "STYLE 公開物の書き方に違反（$(tail -n 1 "${TMP}/style.out")。例: $(head -n 2 "${TMP}/style.out" | tr '\n' ' ')）"
+  fi
+}
+
 finish () {
   echo "  ---- 失敗 ${FAILS} 件 ----"
   [ "${FAILS}" -eq 0 ] || exit 1

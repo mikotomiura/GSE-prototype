@@ -3,7 +3,7 @@
 set -u
 . "$(dirname "$0")/_acceptance-lib.sh"
 require_os macos
-L="${K}/logger"; M="${L}/Cargo.toml"; C="${L}/check_manifest.py"; DM="${L}/src/driver_macos.rs"
+L="${K}/logger"; M="${L}/Cargo.toml"; C="${L}/check_manifest.py"; CU="${L}/check_manifest_upstream.internal.py"; DM="${L}/src/driver_macos.rs"
 
 echo "[012] 単体ロガーの macOS ドライバ"
 for f in "${DM}" "${L}/src/driver_macos/keymap.rs" "${L}/src/driver_macos/ime_source.rs" "${L}/manifest.macos.json"; do need_file "${f}"; done
@@ -14,13 +14,13 @@ run_ok "AC2 cargo build --release が緑（macOS）" cargo build --release --man
 
 # AC3
 run_ok "AC3 check_manifest.py --self が緑" "${PY}" "${C}" --self
-run_ok "AC3 check_manifest.py --against-gse が緑" "${PY}" "${C}" --against-gse
+run_ok "AC3 check_manifest_upstream.internal.py --against-upstream が緑" "${PY}" "${CU}" --against-upstream
 
 # AC4: hook_macos.rs の抜粋が 2 件で、2 つの関数を含む
 cat > "${TMP}/m4.py" <<'EOF'
 import json, sys
 m = json.load(open(sys.argv[1], encoding="utf-8"))
-ex = [e for e in m.get("entries", []) if e.get("kind") == "excerpt" and str(e.get("gse_path", "")).endswith("hook_macos.rs")]
+ex = [e for e in m.get("entries", []) if e.get("kind") == "excerpt" and str(e.get("upstream_path", "")).endswith("hook_macos.rs")]
 syms = sorted(str(e.get("symbol")) for e in ex)
 ok = {"is_observed_key", "macos_vk_to_vk"} <= set(syms)
 print("hook_macos excerpts:", len(ex), syms)
@@ -76,4 +76,5 @@ run_ok "AC7 selftest の出力が obs/1 の検査を通る" "${PY}" "${K}/format
 check_entry_green
 forbid_gse_changes
 only_allowed '^papers/ime-observation/kit/logger/(manifest\.macos\.json|src/driver_macos\.rs|src/driver_macos/(keymap|ime_source|tests)\.rs)$'
+style_ok
 finish

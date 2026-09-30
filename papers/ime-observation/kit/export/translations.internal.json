@@ -1,0 +1,364 @@
+{
+  "entries": [
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"1 変換 = 1 行でなければならない\"",
+      "to": "\"Each conversion must produce exactly one row.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"Backspace で行が出てはならない\"",
+      "to": "\"Backspace must not produce a row.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"前セッションの nav が漏れている\"",
+      "to": "\"Navigation state from the previous session has leaked.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"前セッションの abandon が漏れている\"",
+      "to": "\"Abandon state from the previous session has leaked.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"ショートカットでセッションが始まっている\"",
+      "to": "\"A session was started by a shortcut key.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"修飾付き ESC で放棄行が出た\"",
+      "to": "\"A modified Escape key produced an abandon row.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"セッションが不当に閉じられた\"",
+      "to": "\"The session was closed improperly.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"修飾付き打鍵が dwell を汚している\"",
+      "to": "\"A modified keystroke has corrupted the dwell time.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"モードを抜けたのにセッションが閉じていない (dwell が伸び続ける)\"",
+      "to": "\"The session is still open after leaving the mode (the dwell time would keep growing).\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"2 変換が 1 行に合算される (既知の限界)\"",
+      "to": "\"Two conversions are merged into one row (a known limitation).\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"⚠️ dwell は 2 変換ぶんを覆う。1 変換分と誤読してはならない\"",
+      "to": "\"The dwell time spans two conversions and must not be read as one.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"打ち切りで行を出してはならない\"",
+      "to": "\"A forced termination must not produce a row.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"active なのにセッションが無い (不変条件 1 違反)\"",
+      "to": "\"Composition is active but no session exists (invariant 1 is violated).\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"vk=0x{vk:02X} で拭えていない\"",
+      "to": "\"The state was not cleared at vk=0x{vk:02X}.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"セッションが無いのに行を出してはならない\"",
+      "to": "\"A row must not be produced when there is no session.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"回収前の打鍵で放棄フラグが消えている\"",
+      "to": "\"The abandon flag was cleared by a keystroke before it was collected.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"次の変換の開始で、回収待ちの行が偽装された\"",
+      "to": "\"The start of the next conversion has disguised a row that was waiting to be collected.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"Space で候補表示になる\"",
+      "to": "\"Space opens the candidate window.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"セッション途中で行が出てはならない\"",
+      "to": "\"A row must not be produced in the middle of a session.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"1 本目が出ていない\"",
+      "to": "\"The first row was not produced.\""
+    },
+    {
+      "path": "src/input/ime_compose.rs",
+      "from": "\"2 本目が出ていない\"",
+      "to": "\"The second row was not produced.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"CloakFold の上限は lib.rs の safety valve より 1 秒以上内側でなければならない\"",
+      "to": "\"The CloakFold limit must be at least one second inside the safety limit of the monitoring loop.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"ツールチップ・メニュー・フライアウトと同じクラス → 誤検知する\"",
+      "to": "\"The window shares its class with tooltips, menus and flyouts, so it would be detected falsely.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"全 UWP のホストフレーム → 誤検知する\"",
+      "to": "\"The host frame of every UWP application would be detected falsely.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"DWM 逐語: cloaked=0 は「cloak されていない」= 描画されている\"",
+      "to": "\"By the DWM definition, cloaked=0 means that the window is not cloaked, that is, it is being drawn.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"cloaked=1 は DWM が描画していない = 候補は見えていない\"",
+      "to": "\"cloaked=1 means that the DWM is not drawing the window, so the candidates are not visible.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"★ 即座には終わらせない\"",
+      "to": "\"It must not end immediately.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"★ dwell は debounce の待ち時間を含めない\"",
+      "to": "\"The dwell time excludes the debounce wait.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"★ 2 周期がまとめて 1 行 (dwell は最後に消えた時刻まで)\"",
+      "to": "\"Two cycles are merged into one row (the dwell time runs to the last disappearance).\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"★ 2 個目で Begin は出ない\"",
+      "to": "\"The second one does not produce a Begin.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"★ まだ空ではない\"",
+      "to": "\"It is not empty yet.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"⚠️★★★ 打ち切りは forced=true でなければならない (行を出させないため)\"",
+      "to": "\"A forced termination must set forced=true so that it produces no row.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"★ 上限で必ず解ける\"",
+      "to": "\"The limit always releases it.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"★ 実測の変換回数と一致しなければならない (得られた dwell: {dwells:?})\"",
+      "to": "\"The count must equal the measured number of conversions (dwell times obtained: {dwells:?}).\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"⚠️ 実データで打ち切りが出てはならない\"",
+      "to": "\"A forced termination must not occur on real data.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"⚠️ 300ms 未満の行は明滅の取り込みを疑う: {dwells:?}\"",
+      "to": "\"A row shorter than 300 ms suggests a captured flicker: {dwells:?}\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"★ 採用値では 12 行\"",
+      "to": "\"The adopted value yields 12 rows.\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"⚠️ 400ms では融合が起きるはず (この境界が動いたら FOLD_GAP_MS の根拠を測り直す)\"",
+      "to": "\"Merging should occur at 400 ms (if this boundary moves, re-measure the basis of FOLD_GAP_MS).\""
+    },
+    {
+      "path": "src/input/ime_cloak.rs",
+      "from": "\"★ 何も起きない\"",
+      "to": "\"Nothing happens.\""
+    },
+    {
+      "path": "src/input/ime_mode.rs",
+      "from": "\"A キーは IME モードキーではない\"",
+      "to": "\"The A key is not an IME mode key.\""
+    },
+    {
+      "path": "src/input/ime_mode.rs",
+      "from": "\"⚠️ かな を Toggle にすると偶数回押下で IME_OPEN が実体と反転する \\\n             (2026-09-12 実測: その間の変換が ime_shadow から丸ごと欠測した)\"",
+      "to": "\"Treating the Kana key as a toggle inverts IME_OPEN relative to the actual state after an even number of presses (measured: the conversions in that interval were missing entirely from ime_shadow).\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"Numpad 0 (下端)\"",
+      "to": "\"Numpad 0 (lower bound)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"Numpad Divide (上端)\"",
+      "to": "\"Numpad Divide (upper bound)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"OEM 記号 1 群目 (下端)\"",
+      "to": "\"OEM symbols, first group (lower bound)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"OEM 記号 1 群目 (上端)\"",
+      "to": "\"OEM symbols, first group (upper bound)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"OEM 記号 2 群目 (下端)\"",
+      "to": "\"OEM symbols, second group (lower bound)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"OEM 記号 2 群目 (上端)\"",
+      "to": "\"OEM symbols, second group (upper bound)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"{why} は特徴量キーである\"",
+      "to": "\"{why} is a feature key\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"A-Z の直前\"",
+      "to": "\"just before A-Z\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"A-Z の直後 (VK_LWIN)\"",
+      "to": "\"just after A-Z (VK_LWIN)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"0-9 の直前\"",
+      "to": "\"just before 0-9\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"0-9 の直後\"",
+      "to": "\"just after 0-9\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"Numpad の直前\"",
+      "to": "\"just before Numpad\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"Numpad の直後 (VK_F1)\"",
+      "to": "\"just after Numpad (VK_F1)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"OEM 1 群目の直前\"",
+      "to": "\"just before the first OEM group\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"OEM 1 群目の直後\"",
+      "to": "\"just after the first OEM group\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"OEM 2 群目の直前\"",
+      "to": "\"just before the second OEM group\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"OEM 2 群目の直後\"",
+      "to": "\"just after the second OEM group\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"{why} は特徴量キーではない\"",
+      "to": "\"{why} is not a feature key\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"VK_LSHIFT (LL フックが返す形)\"",
+      "to": "\"VK_LSHIFT (the form returned by the low-level hook)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"VK_PRIOR (Navigation 下端)\"",
+      "to": "\"VK_PRIOR (Navigation lower bound)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"VK_DOWN (Navigation 上端)\"",
+      "to": "\"VK_DOWN (Navigation upper bound)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"replay の `other` 代表 VK\"",
+      "to": "\"representative VK of `other` in replay\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"{why} が特徴量へ流れてしまう\"",
+      "to": "\"{why} flows into the features\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"VK_R (英字)\"",
+      "to": "\"VK_R (Latin letter)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"VK_S (英字)\"",
+      "to": "\"VK_S (Latin letter)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"VK_A (英字)\"",
+      "to": "\"VK_A (Latin letter)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"VK_K (英字)\"",
+      "to": "\"VK_K (Latin letter)\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"mac のテンキー {mac_keycode:#04X} は素通しで {collides_with} と衝突し特徴量へ入る\"",
+      "to": "\"The macOS keypad key {mac_keycode:#04X} passes through, collides with {collides_with} and enters the features\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"Windows テンキー VK {vk:#04X} は特徴量集合の中にある\"",
+      "to": "\"The Windows keypad VK {vk:#04X} is inside the feature set\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"category {category:?} の代表 VK {vk:#04X} が特徴量へ流れる\"",
+      "to": "\"For category {category:?}, the representative VK {vk:#04X} flows into the features\""
+    },
+    {
+      "path": "src/analysis/key_gate.rs",
+      "from": "\"category {category:?} の代表 VK {vk:#04X} が特徴量から外れた (非回帰違反)\"",
+      "to": "\"For category {category:?}, the representative VK {vk:#04X} dropped out of the features (a regression)\""
+    }
+  ]
+}
