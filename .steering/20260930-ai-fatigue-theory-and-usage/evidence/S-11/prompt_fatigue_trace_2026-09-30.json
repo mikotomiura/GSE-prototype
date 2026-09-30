@@ -1,0 +1,63 @@
+{
+ "executed": "2026-09-30T18:28:21+09:00",
+ "zenodo": [
+  {
+   "record": "21384564",
+   "doi": "10.5281/zenodo.21384565",
+   "title": "Supplementary Materials for: A Concept Analysis of Prompt Fatigue in Generative-AI-Supported Learning",
+   "resource_type": "publication",
+   "publication_date": "2026-07-15",
+   "related_identifiers": [],
+   "conceptdoi": "10.5281/zenodo.21384564"
+  },
+  {
+   "record": "21384565",
+   "doi": "10.5281/zenodo.21384565",
+   "title": "Supplementary Materials for: A Concept Analysis of Prompt Fatigue in Generative-AI-Supported Learning",
+   "resource_type": "publication",
+   "publication_date": "2026-07-15",
+   "related_identifiers": [],
+   "conceptdoi": "10.5281/zenodo.21384564"
+  }
+ ],
+ "crossref": [
+  {
+   "doi": "10.4069/kjwhn.2003.9.1.61",
+   "title": "Concept Analysis: Fatigue",
+   "type": "journal-article",
+   "year": 2003,
+   "container": "Korean Journal of Women Health Nursing"
+  },
+  {
+   "doi": "10.1046/j.1365-2648.2000.01583.x",
+   "title": "Concept analysis: chronic fatigue",
+   "type": "journal-article",
+   "year": 2000,
+   "container": "Journal of Advanced Nursing"
+  },
+  {
+   "doi": "10.1016/0020-7489(96)00004-1",
+   "title": "Fatigue: a concept analysis",
+   "type": "journal-article",
+   "year": 1996,
+   "container": "International Journal of Nursing Studies"
+  },
+  {
+   "doi": "10.52403/ijhsr.20220312",
+   "title": "Pandemic Fatigue: A Concept Analysis",
+   "type": "journal-article",
+   "year": 2022,
+   "container": "International Journal of Health Sciences and Research"
+  },
+  {
+   "doi": "10.1111/j.1365-2648.2008.04649.x",
+   "title": "Chronic fatigue: an evolutionary concept analysis",
+   "type": "journal-article",
+   "year": 2008,
+   "container": "Journal of Advanced Nursing"
+  }
+ ],
+ "s2": [],
+ "s2_error": "HTTP 429",
+ "run_id": "4e252778ba8b48438a0247e72ee1ecef"
+}

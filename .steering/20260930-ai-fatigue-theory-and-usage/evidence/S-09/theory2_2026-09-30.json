@@ -1,0 +1,46 @@
+{
+ "executed": "2026-09-30T18:28:16+09:00",
+ "mode": "theory2",
+ "input_sha256": null,
+ "n": 2,
+ "errors": [],
+ "records": [
+  {
+   "key": "Hobfoll2018",
+   "doi": "10.1146/annurev-orgpsych-032117-104640",
+   "title": "Conservation of Resources in the Organizational Context",
+   "sources_with_text": [
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 921,
+    "crossref": 921
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 921
+  },
+  {
+   "key": "ParasuramanManzey2010",
+   "doi": "10.1177/0018720810376055",
+   "title": "Complacency and Bias in Human Use of Automation",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1778,
+    "openalex": 1784,
+    "crossref": 1782
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1784
+  }
+ ],
+ "run_id": "08ad84a853e34be3b7ae1042b5fab0e0"
+}

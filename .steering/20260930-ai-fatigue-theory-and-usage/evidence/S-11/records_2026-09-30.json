@@ -1,0 +1,4858 @@
+{
+ "executed": "2026-09-30T18:13:22+09:00",
+ "mode": "records",
+ "input_sha256": "6984472edeef3794a9ed075076568aaca8373c4fb675afba608cdba280e6c883",
+ "n": 259,
+ "errors": [],
+ "records": [
+  {
+   "key": "AF001",
+   "doi": "10.1016/j.chbr.2026.101186",
+   "title": "AI fatigue in human–AI interaction: Conceptual framework, scale development and validation, and associations with AI engagement",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1844
+   },
+   "oa_url": "https://doi.org/10.1016/j.chbr.2026.101186",
+   "oa_status": "gold",
+   "chars": 1844
+  },
+  {
+   "key": "AF002",
+   "doi": "10.1016/j.ijinfomgt.2025.103010",
+   "title": "Fatigued by uncertainties: Exploring the cognitive and emotional costs of generative AI usage",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 0
+  },
+  {
+   "key": "AF003",
+   "doi": "10.1016/j.chb.2026.109097",
+   "title": "Trust erodes, fatigue builds: How prompt uncertainty traps users in recrafting loops",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 0
+  },
+  {
+   "key": "AF004",
+   "doi": "10.1016/j.actpsy.2025.105725",
+   "title": "Learners' AI dependence and critical thinking: The psychological mechanism of fatigue and the social buffering role of AI literacy",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1087,
+    "s2": 1087,
+    "openalex": 1087
+   },
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2025.105725",
+   "oa_status": "gold",
+   "chars": 1087
+  },
+  {
+   "key": "AF005",
+   "doi": "10.3389/fpsyg.2026.1879080",
+   "title": "Risk perception and generative AI discontinuance intention: mediating effect of cognitive fatigue and moderating effect of AI dependence",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1491,
+    "s2": 1491,
+    "openalex": 1491,
+    "crossref": 1491
+   },
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1879080/pdf",
+   "oa_status": "gold",
+   "chars": 1491
+  },
+  {
+   "key": "AF006",
+   "doi": "10.26803/ijlter.25.3.29",
+   "title": "How do College Students Express AI Fatigue? A Content and Keyword-in-Context Analysis of Academic AI Use",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1436,
+    "openalex": 1436,
+    "crossref": 1436
+   },
+   "oa_url": "https://www.ijlter.org/index.php/ijlter/article/download/16238/pdf",
+   "oa_status": "diamond",
+   "chars": 1436
+  },
+  {
+   "key": "AF007",
+   "doi": "10.26803/ijlter.25.5.5",
+   "title": "Defining AI Fatigue in Academic Contexts: Dimensions, Indicators, and a Stage-Based Model Using Grounded Theory",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1317,
+    "openalex": 1317,
+    "crossref": 1317
+   },
+   "oa_url": "https://www.ijlter.org/index.php/ijlter/article/download/16944/pdf",
+   "oa_status": "diamond",
+   "chars": 1317
+  },
+  {
+   "key": "AF008",
+   "doi": "10.11591/ijai.v15.i2.pp1963-1971",
+   "title": "AI-induced fatigue among students in higher education: a latent profile analysis",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1598,
+    "openalex": 1598,
+    "crossref": 1598
+   },
+   "oa_url": "https://ijai.iaescore.com/index.php/IJAI/article/download/27716/15171",
+   "oa_status": "diamond",
+   "chars": 1598
+  },
+  {
+   "key": "AF009",
+   "doi": "10.1109/SCOReD68498.2025.11399092",
+   "title": "Dimensions of AI-Induced Fatigue Among Filipino Students: An Exploratory Study",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1067,
+    "openalex": 1067
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1067
+  },
+  {
+   "key": "AF010",
+   "doi": "10.47772/IJRISS.2025.910000615",
+   "title": "Between Cognitive Overload and Dehumanization: Exploring the Dimensions of Consumer Fatigue with Artificial Intelligence",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1021,
+    "openalex": 1021,
+    "crossref": 1021
+   },
+   "oa_url": "https://rsisinternational.org/journals/ijriss/uploads/vol9-iss10-pg7551-7564-202511_pdf.pdf",
+   "oa_status": "bronze",
+   "chars": 1021
+  },
+  {
+   "key": "AF011",
+   "doi": "10.1177/09727531251359872",
+   "title": "The Cognitive Cost of AI: How AI Anxiety and Attitudes Influence Decision Fatigue in Daily Technology Use",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1993,
+    "s2": 1987,
+    "openalex": 1993,
+    "crossref": 1993
+   },
+   "oa_url": "https://doi.org/10.1177/09727531251359872",
+   "oa_status": "gold",
+   "chars": 1993
+  },
+  {
+   "key": "AF012",
+   "doi": "10.3390/technologies13110486",
+   "title": "Generative AI and Cognitive Challenges in Research: Balancing Cognitive Load, Fatigue, and Human Resilience",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1361,
+    "openalex": 1361,
+    "crossref": 1361
+   },
+   "oa_url": "https://www.mdpi.com/2227-7080/13/11/486/pdf?version=1761626025",
+   "oa_status": "gold",
+   "chars": 1361
+  },
+  {
+   "key": "AF013",
+   "doi": "10.56734/ijahss.v6n8a7",
+   "title": "Too Much, Too Fast: Understanding AI Fatigue in the Digital Acceleration Era",
+   "sources_with_text": [
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1430,
+    "crossref": 1430
+   },
+   "oa_url": "https://ijahss.net/assets/files/1755327497.pdf",
+   "oa_status": "hybrid",
+   "chars": 1430
+  },
+  {
+   "key": "AF014",
+   "doi": "10.12775/QS.2026.54.70890",
+   "title": "AI Fatigue and Mental Health Implications: A Comprehensive Literature Review",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1914,
+    "openalex": 1914,
+    "crossref": 1914
+   },
+   "oa_url": "https://apcz.umk.pl/QS/article/download/70890/46360",
+   "oa_status": "diamond",
+   "chars": 1914
+  },
+  {
+   "key": "AF015",
+   "doi": "10.1007/s44163-026-01855-3",
+   "title": "A systematic review of AI induced technostress and human resource development interventions",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1781
+   },
+   "oa_url": "https://doi.org/10.1007/s44163-026-01855-3",
+   "oa_status": "gold",
+   "chars": 1781
+  },
+  {
+   "key": "AF016",
+   "doi": "10.3389/fpsyg.2026.1921504",
+   "title": "Generative AI and cognitive load in education: a systematic review of WoS/SSCI-indexed studies through the lens of cognitive load theory",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1849,
+    "s2": 1849,
+    "openalex": 1849,
+    "crossref": 1849
+   },
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1921504/pdf",
+   "oa_status": "gold",
+   "chars": 1849
+  },
+  {
+   "key": "AF017",
+   "doi": null,
+   "title": "From Technostressors to AI-Stressors: A Systematic Literature Review of Stressors Associated with AI Systems",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "chars": 0
+  },
+  {
+   "key": "AF018",
+   "doi": "10.1186/s40561-024-00316-7",
+   "title": "The effects of over-reliance on AI dialogue systems on students' cognitive abilities: a systematic review",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1809,
+    "openalex": 1818,
+    "crossref": 1818
+   },
+   "oa_url": "https://doi.org/10.1186/s40561-024-00316-7",
+   "oa_status": "gold",
+   "chars": 1818
+  },
+  {
+   "key": "AF019",
+   "doi": "10.1016/j.ijinfomgt.2025.102887",
+   "title": "Insights from the Job Demands–Resources Model: AI's dual impact on employees’ work and life well-being",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 2154
+   },
+   "oa_url": "https://doi.org/10.1016/j.ijinfomgt.2025.102887",
+   "oa_status": "hybrid",
+   "chars": 2154
+  },
+  {
+   "key": "AF020",
+   "doi": "10.1145/3449287",
+   "title": "To Trust or to Think: Cognitive Forcing Functions Can Reduce Overreliance on AI in AI-assisted Decision-making",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1622,
+    "openalex": 1622,
+    "crossref": 1622
+   },
+   "oa_url": "https://arxiv.org/pdf/2102.09692",
+   "oa_status": "green",
+   "chars": 1622
+  },
+  {
+   "key": "AF021",
+   "doi": "10.1016/j.nepr.2026.104949",
+   "title": "Comparing individual and peer-supported ChatGPT use in nursing case analysis: Effects on nursing diagnostic skills and cognitive load in a randomized controlled trial",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1791,
+    "s2": 1791
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1791
+  },
+  {
+   "key": "AF022",
+   "doi": "10.1186/s41239-024-00444-7",
+   "title": "Is it harmful or helpful? Examining the causes and consequences of generative AI usage among university students",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1585,
+    "openalex": 1594,
+    "crossref": 1594
+   },
+   "oa_url": "https://educationaltechnologyjournal.springeropen.com/counter/pdf/10.1186/s41239-024-00444-7",
+   "oa_status": "diamond",
+   "chars": 1594
+  },
+  {
+   "key": "AF023",
+   "doi": "10.1145/3706598.3713778",
+   "title": "The Impact of Generative AI on Critical Thinking: Self-Reported Reductions in Cognitive Effort and Confidence Effects From a Survey of Knowledge Workers",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1034,
+    "openalex": 1027
+   },
+   "oa_url": "https://dl.acm.org/doi/pdf/10.1145/3706598.3713778",
+   "oa_status": "gold",
+   "chars": 1034
+  },
+  {
+   "key": "AF024",
+   "doi": "10.3390/informatics12020051",
+   "title": "Mitigating Learning Burnout Caused by Generative Artificial Intelligence Misuse in Higher Education: A Case Study in Programming Language Teaching",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1644,
+    "openalex": 1644,
+    "crossref": 1644
+   },
+   "oa_url": "https://www.mdpi.com/2227-9709/12/2/51/pdf?version=1747728262",
+   "oa_status": "gold",
+   "chars": 1644
+  },
+  {
+   "key": "AF025",
+   "doi": "10.1080/10494820.2019.1674887",
+   "title": "Development and validation of an artificial intelligence anxiety scale: an initial application in predicting motivated learning behavior",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1256,
+    "openalex": 1247
+   },
+   "oa_url": "https://doi.org/10.1080/10494820.2019.1674887",
+   "oa_status": "hybrid",
+   "chars": 1256
+  },
+  {
+   "key": "AF026",
+   "doi": "10.1016/j.chbr.2021.100119",
+   "title": "Zoom Exhaustion & Fatigue Scale",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [
+    "crossref"
+   ],
+   "len": {
+    "openalex": 1292
+   },
+   "oa_url": "https://www.sciencedirect.com/science/article/pii/S2451958821000671/pdf",
+   "oa_status": "gold",
+   "chars": 1292
+  },
+  {
+   "key": "AF027",
+   "doi": "10.1287/isre.1070.0165",
+   "title": "The Consequences of Technostress for End Users in Organizations: Conceptual Development and Empirical Validation",
+   "sources_with_text": [
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1533,
+    "crossref": 1533
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1533
+  },
+  {
+   "key": "AF028",
+   "doi": "10.1016/S0022-3999(02)00392-6",
+   "title": "Psychometric qualities of a brief self-rated fatigue measure: The Fatigue Assessment Scale",
+   "sources_with_text": [
+    "epmc"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1189
+   },
+   "oa_url": "https://research.tilburguniversity.edu/en/publications/10f9c0a5-6173-4252-b376-ff4caf20a525",
+   "oa_status": "green",
+   "chars": 1189
+  },
+  {
+   "key": "AF029",
+   "doi": "10.3758/s13428-013-0334-1",
+   "title": "Development of an instrument for measuring different types of cognitive load",
+   "sources_with_text": [
+    "epmc"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1059
+   },
+   "oa_url": "https://link.springer.com/content/pdf/10.3758/s13428-013-0334-1.pdf",
+   "oa_status": "bronze",
+   "chars": 1059
+  },
+  {
+   "key": "AF030",
+   "doi": "10.7326/M18-0850",
+   "title": "PRISMA Extension for Scoping Reviews (PRISMA-ScR): Checklist and Explanation",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1095,
+    "s2": 10000,
+    "openalex": 1095
+   },
+   "oa_url": "https://eprints.whiterose.ac.uk/id/eprint/136633/1/PRISMA_ScR_Manuscript_July6th_clean_1_.pdf",
+   "oa_status": "green",
+   "chars": 10000
+  },
+  {
+   "key": "AF031",
+   "doi": "10.11124/JBIES-20-00167",
+   "title": "Updated methodological guidance for the conduct of scoping reviews",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2734,
+    "s2": 2748,
+    "openalex": 2739
+   },
+   "oa_url": "https://rgu-repository.worktribe.com/output/979072",
+   "oa_status": "green",
+   "chars": 2748
+  },
+  {
+   "key": "AF032",
+   "doi": "10.1007/s11136-018-1798-3",
+   "title": "COSMIN guideline for systematic reviews of patient-reported outcome measures",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1626,
+    "s2": 1619,
+    "openalex": 1630
+   },
+   "oa_url": "https://link.springer.com/content/pdf/10.1007%2Fs11136-018-1798-3.pdf",
+   "oa_status": "hybrid",
+   "chars": 1630
+  },
+  {
+   "key": "AF033",
+   "doi": "10.1016/j.jclinepi.2026.112314",
+   "title": "Updating the PRISMA reporting guideline for scoping reviews: a scoping review",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 4296,
+    "s2": 4296
+   },
+   "oa_url": "https://pure.amsterdamumc.nl/ws/files/217632679/Updating-the-prisma-reporting-guideline-for-scoping-reviews.pdf",
+   "oa_status": "green",
+   "chars": 4296
+  },
+  {
+   "key": "AF034",
+   "doi": "10.1016/j.actpsy.2026.107179",
+   "title": "Corrigendum to \"Learners’ AI dependence and critical thinking: The psychological mechanism of fatigue and the social buffering role of AI literacy\" [Acta Psychologica 260 (2025) 105725]",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2026.107179",
+   "oa_status": "gold",
+   "chars": 0
+  },
+  {
+   "key": "S02-01",
+   "doi": "10.1108/jeim-10-2025-1027",
+   "title": "Dark side of generative AI: a stressor–strain outcome and cognitive load theory explanation on decision fatigue and cognitive overload",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1659,
+    "openalex": 1745,
+    "crossref": 1745
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1745
+  },
+  {
+   "key": "S02-02",
+   "doi": "10.1038/s41598-026-45402-7",
+   "title": "Technostress, digital fatigue, and AI dependency as antecedents of burnout and SDG-4 achievement in EFL classrooms",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1533,
+    "s2": 1533,
+    "openalex": 1533,
+    "crossref": 1542
+   },
+   "oa_url": "https://www.nature.com/articles/s41598-026-45402-7_reference.pdf",
+   "oa_status": "gold",
+   "chars": 1542
+  },
+  {
+   "key": "S02-03",
+   "doi": "10.1016/j.actpsy.2026.107396",
+   "title": "Technostress forecasting in EFL classrooms: How digital fatigue and perceived AI ethical concerns shape digital burnout and undermine SDG-4 achievement",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1560,
+    "s2": 1560,
+    "openalex": 1560
+   },
+   "oa_url": "https://www.sciencedirect.com/science/article/pii/S0001691826011972/pdf",
+   "oa_status": "gold",
+   "chars": 1560
+  },
+  {
+   "key": "S02-04",
+   "doi": "10.1007/s00146-025-02764-2",
+   "title": "Associations between generative artificial intelligence usage, Job Demands, Job Control and Burnout",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 0
+  },
+  {
+   "key": "S02-05",
+   "doi": "10.1016/j.techsoc.2026.103553",
+   "title": "Digital efficiency, human exhaustion: How human-centered AI buffers the impact of AI adoption on physical health via AI techarnostress",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 0
+  },
+  {
+   "key": "S02-06",
+   "doi": "10.1007/s10639-024-13198-6",
+   "title": "Privacy fatigue and its effects on ChatGPT acceptance among undergraduate students: is privacy dead?",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1394,
+    "openalex": 1394
+   },
+   "oa_url": "https://link.springer.com/content/pdf/10.1007/s10639-024-13198-6.pdf",
+   "oa_status": "hybrid",
+   "chars": 1394
+  },
+  {
+   "key": "S02-07",
+   "doi": "10.31152/jb.2025.12.10.6.297",
+   "title": "AI Anxiety to Fatigue and Its Consequences: The Moderating Role of AI Usage Motivation",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1366
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1366
+  },
+  {
+   "key": "S02-08",
+   "doi": "10.5281/zenodo.22838191",
+   "title": "AI Fatigue in Higher Education: A Systematic Review of Associated Conditions, Manifestations, and Lifelong Learning Implications",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 61
+   },
+   "oa_url": "https://doi.org/10.5281/zenodo.22838191",
+   "oa_status": "green",
+   "chars": 61
+  },
+  {
+   "key": "S02-09",
+   "doi": "10.1057/s41599-024-04018-w",
+   "title": "The mental health implications of artificial intelligence adoption: the crucial role of self-efficacy",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1747,
+    "openalex": 1747
+   },
+   "oa_url": "https://www.nature.com/articles/s41599-024-04018-w.pdf",
+   "oa_status": "gold",
+   "chars": 1747
+  },
+  {
+   "key": "S02-10",
+   "doi": "10.1108/JSM-03-2023-0115",
+   "title": "Service employees’ STARA awareness and proactive service performance",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 3166,
+    "openalex": 3166,
+    "crossref": 3166
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 3166
+  },
+  {
+   "key": "S02-11",
+   "doi": "10.3389/fpubh.2024.1343932",
+   "title": "Navigating AI transitions: how coaching leadership buffers against job stress and protects employee physical health",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1384,
+    "s2": 1384,
+    "openalex": 1384,
+    "crossref": 1384
+   },
+   "oa_url": "https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2024.1343932/pdf",
+   "oa_status": "gold",
+   "chars": 1384
+  },
+  {
+   "key": "S02-12",
+   "doi": "10.70670/sra.v4i1.1983",
+   "title": "Digital Literacy as a Predictor of Academic Resilience: Exploring the Interplay between AI-Induced Cognitive Overload and Digital Fatigue in Hybrid Higher Education",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2077,
+    "openalex": 2077,
+    "crossref": 2077
+   },
+   "oa_url": "https://doi.org/10.70670/sra.v4i1.1983",
+   "oa_status": "diamond",
+   "chars": 2077
+  },
+  {
+   "key": "S02-13",
+   "doi": "10.3389/fpsyg.2026.1795301",
+   "title": "AI literacy and foreign language boredom in AI-assisted academic English learning: the roles of engagement and task value",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1720,
+    "s2": 1720,
+    "openalex": 1720,
+    "crossref": 1720
+   },
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1795301/pdf",
+   "oa_status": "gold",
+   "chars": 1720
+  },
+  {
+   "key": "S12-01",
+   "doi": "10.1161/jaha.125.045637",
+   "title": "Artificial Intelligence-Based Automated Echocardiographic Analysis and the Workflow of Sonographers: A Randomized Crossover Trial (AI-Echo RCT).",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1993,
+    "s2": 1987,
+    "openalex": 1994,
+    "crossref": 2003
+   },
+   "oa_url": "https://doi.org/10.1161/jaha.125.045637",
+   "oa_status": "gold",
+   "chars": 2003
+  },
+  {
+   "key": "S12-02",
+   "doi": "10.7759/cureus.80373",
+   "title": "Effects of Long-Term Chatbot System Use on Healthcare Professionals' Professional Identity Formation and Stress: A Small-Scale Comparative Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2757,
+    "s2": 2757,
+    "openalex": 2757
+   },
+   "oa_url": "https://doi.org/10.7759/cureus.80373",
+   "oa_status": "diamond",
+   "chars": 2757
+  },
+  {
+   "key": "S12-03",
+   "doi": "10.4995/eurocall.2025.23851",
+   "title": "Technostress and English Language Learning in the Age of Generative AI",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1550,
+    "openalex": 1550,
+    "crossref": 1550
+   },
+   "oa_url": "https://polipapers.upv.es/index.php/eurocall/article/download/23851/17995",
+   "oa_status": "diamond",
+   "chars": 1550
+  },
+  {
+   "key": "S12-04",
+   "doi": "10.37546/jaltpansigj11.1-6",
+   "title": "Crafting TBL Prompts for Classroom Activities that Support Self-Directed Learning in ESP Courses: Medical English Course Example",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 955,
+    "openalex": 955,
+    "crossref": 955
+   },
+   "oa_url": "https://doi.org/10.37546/jaltpansigj11.1-6",
+   "oa_status": "bronze",
+   "chars": 955
+  },
+  {
+   "key": "S12-05",
+   "doi": "10.1159/000549894",
+   "title": "Exploring the Impact of an Artificial Intelligence-Based Intraoperative Image Navigation System in Laparoscopic Surgery on Clinical Outcomes: A Protocol for a Multicenter Randomized Controlled Trial.",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2273,
+    "openalex": 2276,
+    "crossref": 2279
+   },
+   "oa_url": "https://karger.com/esr/article-pdf/doi/10.1159/000549894/4485261/000549894.pdf",
+   "oa_status": "diamond",
+   "chars": 2279
+  },
+  {
+   "key": "S12-06",
+   "doi": "10.3389/fpsyg.2026.1837484",
+   "title": "Profiles and transitions of psychological adaptation in AI-assisted Japanese language learning.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1515,
+    "s2": 1515,
+    "openalex": 1515,
+    "crossref": 1515
+   },
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1837484/pdf",
+   "oa_status": "gold",
+   "chars": 1515
+  },
+  {
+   "key": "S12-07",
+   "doi": "10.1001/jamanetworkopen.2024.48714",
+   "title": "Artificial Intelligence and Radiologist Burnout",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2641,
+    "s2": 529,
+    "openalex": 2648,
+    "crossref": 2664
+   },
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2826721/liu_2024_oi_241365_1731684043.4639.pdf",
+   "oa_status": "gold",
+   "chars": 2664
+  },
+  {
+   "key": "S12-08",
+   "doi": "10.1016/j.actpsy.2024.104622",
+   "title": "Compulsive ChatGPT usage, anxiety, burnout, and sleep disturbance: A serial mediation model based on stimulus-organism-response perspective",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1324,
+    "s2": 1324,
+    "openalex": 1324
+   },
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2024.104622",
+   "oa_status": "gold",
+   "chars": 1324
+  },
+  {
+   "key": "S12-09",
+   "doi": "10.58459/rptel.2024.19023",
+   "title": "AI to the rescue: Exploring the potential of ChatGPT as a teacher ally for workload relief and burnout prevention",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1001,
+    "openalex": 1001,
+    "crossref": 1001
+   },
+   "oa_url": "https://rptel.apsce.net/index.php/RPTEL/article/download/2024-19023/2024-19023",
+   "oa_status": "diamond",
+   "chars": 1001
+  },
+  {
+   "key": "S04-01",
+   "doi": "10.1056/aioa2501000",
+   "title": "Ambient AI Scribes in Clinical Practice: A Randomized Trial.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2588,
+    "s2": 2587,
+    "openalex": 2592
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12768499/",
+   "oa_status": "green",
+   "chars": 2592
+  },
+  {
+   "key": "S04-02",
+   "doi": "10.1056/aioa2500945",
+   "title": "A Pragmatic Randomized Controlled Trial of Ambient Artificial Intelligence to Improve Health Practitioner Well-Being.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2464,
+    "s2": 2463,
+    "openalex": 2468
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12858090/",
+   "oa_status": "green",
+   "chars": 2468
+  },
+  {
+   "key": "S04-03",
+   "doi": "10.1055/a-2657-8087",
+   "title": "The Influence of Artificial Intelligence Scribes on Clinician Experience and Efficiency among Pediatric Subspecialists: A Rapid, Randomized Quality Improvement Trial.",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2255,
+    "openalex": 2255,
+    "crossref": 2268
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12425613/pdf/10-1055-a-2657-8087.pdf",
+   "oa_status": "green",
+   "chars": 2268
+  },
+  {
+   "key": "S04-04",
+   "doi": "10.1093/jamia/ocag018",
+   "title": "Comparing ambient scribes: a randomized crossover clinical trial addressing ambient scribe technologies' impact on physician burnout.",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1793,
+    "openalex": 1798,
+    "crossref": 1802
+   },
+   "oa_url": "https://pubmed.ncbi.nlm.nih.gov/41729180/",
+   "oa_status": "green",
+   "chars": 1802
+  },
+  {
+   "key": "S04-05",
+   "doi": "10.64898/2026.08.26.26361496",
+   "title": "A Pragmatic Randomized Trial of an EHR-Integrated Generative AI Chart Summarization Tool for Ambulatory Clinicians",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2353,
+    "s2": 2290,
+    "openalex": 2362,
+    "crossref": 2362
+   },
+   "oa_url": "https://doi.org/10.64898/2026.08.26.26361496",
+   "oa_status": "green",
+   "chars": 2362
+  },
+  {
+   "key": "S04-06",
+   "doi": "10.1186/s12967-026-07738-6",
+   "title": "A fine-tuned large language model chatbot for multi-scenario radiology cancer care: randomized controlled trial on interaction optimization, emotional support, and provider burnout reduction.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2978,
+    "s2": 2830,
+    "openalex": 2986
+   },
+   "oa_url": "https://doi.org/10.1186/s12967-026-07738-6",
+   "oa_status": "gold",
+   "chars": 2986
+  },
+  {
+   "key": "S04-07",
+   "doi": "10.1002/jdd.70304",
+   "title": "Impact of AI-Generated Feedback on Dental Student Performance in Preclinical Prosthodontics Education.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2361,
+    "s2": 2361,
+    "openalex": 2365,
+    "crossref": 2376
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2376
+  },
+  {
+   "key": "S04-08",
+   "doi": "10.1016/j.giq.2024.101911",
+   "title": "Creating a workforce of fatigued cynics? A randomized controlled trial of implementing an algorithmic decision-making support tool",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1029
+   },
+   "oa_url": "https://doi.org/10.1016/j.giq.2024.101911",
+   "oa_status": "hybrid",
+   "chars": 1029
+  },
+  {
+   "key": "S04-09",
+   "doi": "10.19173/irrodl.v25i3.7659",
+   "title": "The Effects of Educational Artificial Intelligence-Powered Applications on Teachers’ Perceived Autonomy, Professional Development for Online Teaching, and Digital Burnout",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1836,
+    "openalex": 1836,
+    "crossref": 1836
+   },
+   "oa_url": "https://www.irrodl.org/index.php/irrodl/article/download/7659/6106",
+   "oa_status": "diamond",
+   "chars": 1836
+  },
+  {
+   "key": "S04-10",
+   "doi": "10.46303/jcsr.2026.24",
+   "title": "The Effectiveness of an AI-Supported Neurolinguistic Strategy in Developing Functional Vocabulary and Reducing Digital Fatigue Among Non-Native Learners of Arabic",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1621,
+    "openalex": 1621,
+    "crossref": 1621
+   },
+   "oa_url": "https://curriculumstudies.org/index.php/CS/article/download/876/173",
+   "oa_status": "gold",
+   "chars": 1621
+  },
+  {
+   "key": "S04-11",
+   "doi": "10.3390/educsci15091223",
+   "title": "Can ChatGPT Ease Digital Fatigue? Short-Cycle Content Curation for University Instructors",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1419,
+    "openalex": 1419,
+    "crossref": 1419
+   },
+   "oa_url": "https://www.mdpi.com/2227-7102/15/9/1223/pdf?version=1758015986",
+   "oa_status": "gold",
+   "chars": 1419
+  },
+  {
+   "key": "S04-12",
+   "doi": "10.3389/fpubh.2026.1926167",
+   "title": "Research on the impact of generative AI interaction modes on the improvement of school-age children’s early reading ability and college students’ auxiliary intervention",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 4674,
+    "openalex": 4712,
+    "crossref": 4747
+   },
+   "oa_url": "https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2026.1926167/pdf",
+   "oa_status": "gold",
+   "chars": 4747
+  },
+  {
+   "key": "S04-13",
+   "doi": "10.3389/fpubh.2025.1649342",
+   "title": "The impact of generative AI’S information delivery methods on emotional exhaustion among bullying roles in the medical workplace",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1281,
+    "s2": 1281,
+    "openalex": 1281,
+    "crossref": 1281
+   },
+   "oa_url": "https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2025.1649342/pdf",
+   "oa_status": "gold",
+   "chars": 1281
+  },
+  {
+   "key": "S04-14",
+   "doi": "10.3390/bs15050696",
+   "title": "Effects of Employee–Artificial Intelligence (AI) Collaboration on Counterproductive Work Behaviors (CWBs): Leader Emotional Support as a Moderator",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1410,
+    "s2": 1410,
+    "openalex": 1410,
+    "crossref": 1410
+   },
+   "oa_url": "https://www.mdpi.com/2076-328X/15/5/696/pdf?version=1747476524",
+   "oa_status": "gold",
+   "chars": 1410
+  },
+  {
+   "key": "S04-15",
+   "doi": "10.1001/jamanetworkopen.2025.34976",
+   "title": "Use of Ambient AI Scribes to Reduce Administrative Burden and Professional Burnout.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3299,
+    "s2": 831,
+    "openalex": 3306,
+    "crossref": 3299
+   },
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2839542/olson_2025_oi_250979_1758815527.03283.pdf",
+   "oa_status": "gold",
+   "chars": 3306
+  },
+  {
+   "key": "S04-16",
+   "doi": "10.1001/jamanetworkopen.2025.28056",
+   "title": "Ambient Documentation Technology in Clinician Experience of Documentation Burden and Burnout.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2917,
+    "s2": 495,
+    "openalex": 2924,
+    "crossref": 2986
+   },
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2837847/you_2025_oi_250796_1755115742.48441.pdf",
+   "oa_status": "gold",
+   "chars": 2986
+  },
+  {
+   "key": "S04-17",
+   "doi": "10.1055/a-2461-4576",
+   "title": "The Effect of Ambient Artificial Intelligence Notes on Provider Burnout.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2207,
+    "s2": 2216,
+    "openalex": 2215,
+    "crossref": 2218
+   },
+   "oa_url": "https://pubmed.ncbi.nlm.nih.gov/39500346/",
+   "oa_status": "green",
+   "chars": 2218
+  },
+  {
+   "key": "S04-18",
+   "doi": "10.1001/jamanetworkopen.2024.3201",
+   "title": "Artificial Intelligence-Generated Draft Replies to Patient Inbox Messages.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2619,
+    "s2": 609,
+    "openalex": 2626,
+    "crossref": 2641
+   },
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2816494/garcia_2024_oi_240141_1710263176.75207.pdf",
+   "oa_status": "gold",
+   "chars": 2641
+  },
+  {
+   "key": "S04-19",
+   "doi": "10.1093/jamia/ocae295",
+   "title": "Ambient artificial intelligence scribes: physician burnout and perspectives on usability and documentation burden.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1132,
+    "s2": 1132,
+    "openalex": 1137,
+    "crossref": 1162
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11756571/pdf/ocae295.pdf",
+   "oa_status": "green",
+   "chars": 1162
+  },
+  {
+   "key": "S04-20",
+   "doi": "10.1093/jamiaopen/ooaf068",
+   "title": "Effect of a generative artificial intelligence digital scribe on pediatric provider documentation time, cognitive burden, and burnout.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1765,
+    "s2": 1774,
+    "openalex": 1774,
+    "crossref": 1781
+   },
+   "oa_url": "https://doi.org/10.1093/jamiaopen/ooaf068",
+   "oa_status": "gold",
+   "chars": 1781
+  },
+  {
+   "key": "S04-21",
+   "doi": "10.1136/wjps-2025-001073",
+   "title": "Ambient AI-assited clinical documentation in surgical outpatient care: a preliminary study of usability, workflow, and patient experience.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "len": {
+    "epmc": 1307,
+    "s2": 1299,
+    "openalex": 1307,
+    "crossref": 1310
+   },
+   "oa_url": "https://wjps.bmj.com/content/8/5/e001073.full.pdf",
+   "oa_status": "diamond",
+   "chars": 1310
+  },
+  {
+   "key": "S04-22",
+   "doi": "10.1097/og9.0000000000000131",
+   "title": "Evaluating Generative Artificial Intelligence–Drafted Responses for Patient Messages in Obstetrics and Gynecology",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2570,
+    "openalex": 2611,
+    "crossref": 2614
+   },
+   "oa_url": "https://doi.org/10.1097/og9.0000000000000131",
+   "oa_status": "diamond",
+   "chars": 2614
+  },
+  {
+   "key": "S04-23",
+   "doi": "10.64898/2026.06.30.26356723",
+   "title": "Ambient AI Documentation in Clinical Genetics: Perspectives on Implementation and Impact on Burnout",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1849,
+    "s2": 1844,
+    "openalex": 1849,
+    "crossref": 1849
+   },
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2026/07/02/2026.06.30.26356723.full.pdf",
+   "oa_status": "green",
+   "chars": 1849
+  },
+  {
+   "key": "S04-24",
+   "doi": "10.22454/primer.2026.393770",
+   "title": "The Impact of Ambient AI on Resident Documentation and Well-Being: A Pilot Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1723,
+    "s2": 1719,
+    "openalex": 1723,
+    "crossref": 1723
+   },
+   "oa_url": "https://journals.stfm.org:/media/0mfhiys2/primer-10-21.pdf",
+   "oa_status": "diamond",
+   "chars": 1723
+  },
+  {
+   "key": "S04-25",
+   "doi": "10.21203/rs.3.rs-9929134/v1",
+   "title": "The Impact of AI Scribes on Patient and Clinician Satisfaction and Communication",
+   "sources_with_text": [
+    "epmc",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2086,
+    "crossref": 2086
+   },
+   "oa_url": "https://www.researchsquare.com/article/rs-9929134/latest.pdf",
+   "oa_status": "green",
+   "chars": 2086
+  },
+  {
+   "key": "S04-26",
+   "doi": "10.1177/20552076251395588",
+   "title": "Evaluating an artificial intelligence scribe for clinical documentation.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1683,
+    "s2": 1683,
+    "openalex": 1519,
+    "crossref": 1683
+   },
+   "oa_url": "https://doi.org/10.1177/20552076251395588",
+   "oa_status": "gold",
+   "chars": 1683
+  },
+  {
+   "key": "S04-27",
+   "doi": "10.1001/jamanetworkopen.2025.8614",
+   "title": "Evaluation of an Ambient Artificial Intelligence Documentation Platform for Clinicians.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3129,
+    "s2": 161,
+    "openalex": 3136,
+    "crossref": 3177
+   },
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2833433/stults_2025_oi_250316_1745525878.50138.pdf",
+   "oa_status": "gold",
+   "chars": 3177
+  },
+  {
+   "key": "S04-28",
+   "doi": "10.2196/84104",
+   "title": "Ambient AI Scribe Implementation in an Ambulatory Setting in a Single Medical Group: Prospective Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2589,
+    "s2": 2598,
+    "openalex": 2594,
+    "crossref": 2600
+   },
+   "oa_url": "https://doi.org/10.2196/84104",
+   "oa_status": "gold",
+   "chars": 2600
+  },
+  {
+   "key": "S04-29",
+   "doi": "10.1055/a-2892-7988",
+   "title": "From Burden to Balance: Trends in Documentation Workload with Ambient Artificial Intelligence Scribe Adoption.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2386,
+    "s2": 2395,
+    "openalex": 2342,
+    "crossref": 2357
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13290361/",
+   "oa_status": "green",
+   "chars": 2395
+  },
+  {
+   "key": "S04-30",
+   "doi": null,
+   "title": "Pre-Post Evaluation of Documentation Burden, Time Perception, and Cognitive Workload of Ambient AI Scribe Tools.",
+   "sources_with_text": [
+    "epmc"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1360
+   },
+   "chars": 1360
+  },
+  {
+   "key": "S04-31",
+   "doi": "10.1002/jhm.70451",
+   "title": "Ambient artificial intelligence scribe implementation in inpatient setting.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1761,
+    "s2": 1761,
+    "openalex": 1766,
+    "crossref": 1772
+   },
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1002/jhm.70451",
+   "oa_status": "hybrid",
+   "chars": 1772
+  },
+  {
+   "key": "S04-32",
+   "doi": "10.1093/ajhp/zxag176",
+   "title": "The impact of an ambient documentation tool on the care experience of clinical pharmacists embedded in ambulatory clinics: A mixed-methods evaluation.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1920,
+    "s2": 1920,
+    "openalex": 1924,
+    "crossref": 1950
+   },
+   "oa_url": "https://doi.org/10.1093/ajhp/zxag176",
+   "oa_status": "hybrid",
+   "chars": 1950
+  },
+  {
+   "key": "S04-33",
+   "doi": "10.1109/ICARAI70085.2026.11635386",
+   "title": "Invasive Hybrid Recommendation-Based Scheduling with Pomodoro and Genetic Algorithm for Improving Office Worker Productivity",
+   "sources_with_text": [
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1265
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1265
+  },
+  {
+   "key": "S04-35",
+   "doi": "10.3389/fmed.2026.1875075",
+   "title": "The double-edged sword of generative AI in dermatology: a multi-component cross-sectional study on physician burnout, patient satisfaction, and communication quality.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2806,
+    "s2": 2799,
+    "openalex": 2806,
+    "crossref": 2820
+   },
+   "oa_url": "https://www.frontiersin.org/journals/medicine/articles/10.3389/fmed.2026.1875075/pdf",
+   "oa_status": "gold",
+   "chars": 2820
+  },
+  {
+   "key": "S04-36",
+   "doi": "10.65864/zpxksxfkfk",
+   "title": "Organizational Transmission of AI: Managerial Influence on Generative AI Adoption",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [
+    "openalex",
+    "crossref"
+   ],
+   "len": {
+    "s2": 1438,
+    "openalex": 1065,
+    "crossref": 1806
+   },
+   "oa_url": "https://www.ifo.de/sites/default/files/docbase/docs/cesifo1_wp12373.pdf",
+   "oa_status": "bronze",
+   "chars": 1806
+  },
+  {
+   "key": "S04-37",
+   "doi": "10.3389/fpsyg.2026.1859401",
+   "title": "Modeling learning engagement in AI-supported education: a crossover enabler-inhibitor framework.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1764,
+    "s2": 1764,
+    "openalex": 1764,
+    "crossref": 1764
+   },
+   "oa_url": "https://doi.org/10.3389/fpsyg.2026.1859401",
+   "oa_status": "gold",
+   "chars": 1764
+  },
+  {
+   "key": "S04-38",
+   "doi": "10.62712/juktisi.v5i2.1366",
+   "title": "Komparasi Algoritma Machine Learning untuk Prediksi Risiko Burnout Akademis Akibat Penggunaan Generative AI",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1928,
+    "openalex": 1928,
+    "crossref": 1928
+   },
+   "oa_url": "https://ejurnal.lkpkaryaprima.id/index.php/juktisi/article/download/1366/888",
+   "oa_status": "hybrid",
+   "chars": 1928
+  },
+  {
+   "key": "S04-41",
+   "doi": "10.64898/2025.12.06.25341757",
+   "title": "Impact of an AI medical scribe after 375 000 notes generated across care levels in a European health system",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3311,
+    "s2": 2392,
+    "openalex": 3315,
+    "crossref": 3315
+   },
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2025/12/08/2025.12.06.25341757.full.pdf",
+   "oa_status": "green",
+   "chars": 3315
+  },
+  {
+   "key": "S04-42",
+   "doi": "10.1016/j.annemergmed.2026.04.022",
+   "title": "Medical Scribe and Ambient Artificial Intelligence Impact on Emergency Physician Documentation Burden and Clinical Productivity.",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2004,
+    "s2": 2004
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2004
+  },
+  {
+   "key": "S04-43",
+   "doi": "10.1016/j.surge.2025.10.008",
+   "title": "Ambient AI reduces documentation time and enhances quality in a simulated inpatient setting.",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2044,
+    "s2": 2044
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2044
+  },
+  {
+   "key": "S04-44",
+   "doi": "10.1101/2024.08.12.24311883",
+   "title": "Enhancing Clinical Documentation Workflow with Ambient Artificial Intelligence: Clinician Perspectives on Work Burden, Burnout, and Job Satisfaction",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1816,
+    "openalex": 1816,
+    "crossref": 1822
+   },
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2024/08/13/2024.08.12.24311883.full.pdf",
+   "oa_status": "green",
+   "chars": 1822
+  },
+  {
+   "key": "S04-45",
+   "doi": "10.1101/2025.09.21.25336260",
+   "title": "Evaluating an Ambient Artificial Intelligence Scribe for Documentation Quality and Efficiency in Psychiatric Consultations: A Simulation-based Study",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2356,
+    "s2": 2115,
+    "openalex": 2365,
+    "crossref": 2371
+   },
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2025/09/22/2025.09.21.25336260.full.pdf",
+   "oa_status": "green",
+   "chars": 2371
+  },
+  {
+   "key": "S04-46",
+   "doi": "10.1093/jamia/ocae304",
+   "title": "Ambient artificial intelligence scribes: utilization and impact on documentation time.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1194,
+    "s2": 1194,
+    "openalex": 1199,
+    "crossref": 1203
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11756633/pdf/ocae304.pdf",
+   "oa_status": "green",
+   "chars": 1203
+  },
+  {
+   "key": "S04-47",
+   "doi": "10.1055/a-2647-1142",
+   "title": "The Effect of Ambient Artificial Intelligence Scribes on Trainee Documentation Burden.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1563,
+    "s2": 1625,
+    "openalex": 1574,
+    "crossref": 1577
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12367366/",
+   "oa_status": "green",
+   "chars": 1625
+  },
+  {
+   "key": "S04-48",
+   "doi": "10.3233/shti250921",
+   "title": "Ambient Listening in Clinical Practice: Evaluating EPIC Signal Data Before and After Implementation and Its Impact on Physician Workload.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 904,
+    "s2": 904,
+    "openalex": 904,
+    "crossref": 904
+   },
+   "oa_url": "https://doi.org/10.3233/shti250921",
+   "oa_status": "hybrid",
+   "chars": 904
+  },
+  {
+   "key": "S04-49",
+   "doi": "10.1093/jamiaopen/ooaf013",
+   "title": "Enhancing clinical documentation with ambient artificial intelligence: a quality improvement survey assessing clinician perspectives on work burden, burnout, and job satisfaction.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1780,
+    "s2": 1789,
+    "openalex": 1494,
+    "crossref": 1803
+   },
+   "oa_url": "https://academic.oup.com/jamiaopen/article-pdf/8/1/ooaf013/62044238/ooaf013.pdf",
+   "oa_status": "gold",
+   "chars": 1803
+  },
+  {
+   "key": "S04-50",
+   "doi": "10.1016/j.msksp.2025.103333",
+   "title": "Impact of using an AI scribe on clinical documentation and clinician-patient interactions in allied health private practice: perspectives of clinicians and patients.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1901,
+    "s2": 1901,
+    "openalex": 1907
+   },
+   "oa_url": "https://doi.org/10.1016/j.msksp.2025.103333",
+   "oa_status": "hybrid",
+   "chars": 1907
+  },
+  {
+   "key": "S04-51",
+   "doi": "10.1055/a-2559-5791",
+   "title": "The STREAMLINE Pilot Study on Time Reduction and Efficiency in AI-Mediated Logging for Improved Note-Taking Experience.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1788,
+    "s2": 1838,
+    "openalex": 1794,
+    "crossref": 1797
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12240662/",
+   "oa_status": "green",
+   "chars": 1838
+  },
+  {
+   "key": "S04-52",
+   "doi": "10.1093/jamiaopen/ooaf159",
+   "title": "Artificial intelligence-generated draft replies to patient messages in pediatrics.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1748,
+    "s2": 1757,
+    "openalex": 1757,
+    "crossref": 1764
+   },
+   "oa_url": "https://doi.org/10.1093/jamiaopen/ooaf159",
+   "oa_status": "gold",
+   "chars": 1764
+  },
+  {
+   "key": "S04-53",
+   "doi": "10.1055/a-2576-0579",
+   "title": "An AI-Powered Strategy for Managing Patient Messaging Load and Reducing Burnout.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1632,
+    "s2": 1681,
+    "openalex": 1632,
+    "crossref": 1644
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12328029/",
+   "oa_status": "green",
+   "chars": 1681
+  },
+  {
+   "key": "S04-54",
+   "doi": "10.1177/19322968231183436",
+   "title": "Delivering Biopsychosocial Health Care Within Routine Care: Spotlight-AQ Pivotal Multicenter Randomized Controlled Trial Results.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2670,
+    "s2": 2674,
+    "openalex": 2578,
+    "crossref": 2675
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11688703/pdf/10.1177_19322968231183436.pdf",
+   "oa_status": "green",
+   "chars": 2675
+  },
+  {
+   "key": "S04-55",
+   "doi": "10.2196/89996",
+   "title": "Ambient AI Scribes to Create Educational Feedback Notes for Medical Students: Randomized Trial.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2365,
+    "s2": 2374,
+    "openalex": 2423,
+    "crossref": 2386
+   },
+   "oa_url": "https://doi.org/10.2196/89996",
+   "oa_status": "gold",
+   "chars": 2423
+  },
+  {
+   "key": "S04-56",
+   "doi": "10.2196/85580",
+   "title": "Impact of an Ambient AI Scribe Among Clinicians and Patients: Real-World Prospective Observational Time-Motion Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2560,
+    "s2": 2569,
+    "openalex": 2565,
+    "crossref": 2573
+   },
+   "oa_url": "https://doi.org/10.2196/85580",
+   "oa_status": "gold",
+   "chars": 2573
+  },
+  {
+   "key": "S04-57",
+   "doi": "10.1002/jac5.70242",
+   "title": "Using an Ambient Artificial Intelligence Tool to Document Clinical Pharmacist Patient Encounters: Real-World Evidence From a Federally Qualified Health Center.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2048,
+    "s2": 461,
+    "openalex": 2052,
+    "crossref": 2064
+   },
+   "oa_url": "https://doi.org/10.1002/jac5.70242",
+   "oa_status": "hybrid",
+   "chars": 2064
+  },
+  {
+   "key": "S04-58",
+   "doi": "10.1093/jamia/ocaf180",
+   "title": "Evaluating ambient artificial intelligence documentation: effects on work efficiency, documentation burden, and patient-centered care.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2085,
+    "s2": 2090,
+    "openalex": 2090,
+    "crossref": 2094
+   },
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12844569/pdf/nihms-2155699.pdf",
+   "oa_status": "green",
+   "chars": 2094
+  },
+  {
+   "key": "S04-59",
+   "doi": "10.1016/j.artd.2026.102095",
+   "title": "Optimizing Hip and Knee Arthroplasty Clinic Flow: A Prospective Evaluation of Artificial Intelligence Scribe Technology.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2073,
+    "s2": 2071,
+    "openalex": 2073
+   },
+   "oa_url": "https://doi.org/10.1016/j.artd.2026.102095",
+   "oa_status": "gold",
+   "chars": 2073
+  },
+  {
+   "key": "S04-60",
+   "doi": "10.1055/a-2818-1706",
+   "title": "Crossover Evaluation of Two Ambient AI Scribe Tools in the Emergency Department.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1864,
+    "s2": 1914,
+    "openalex": 1876,
+    "crossref": 1876
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1914
+  },
+  {
+   "key": "S04-61",
+   "doi": "10.1038/s41746-026-02454-3",
+   "title": "Ambient scribe in general practice: a multi-perspective before-after longitudinal mixed-methods study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1469,
+    "s2": 1940,
+    "openalex": 1469,
+    "crossref": 1481
+   },
+   "oa_url": "https://www.nature.com/articles/s41746-026-02454-3_reference.pdf",
+   "oa_status": "gold",
+   "chars": 1940
+  },
+  {
+   "key": "S04-62",
+   "doi": "10.2196/92364",
+   "title": "Navigating Collective Bargaining Barriers to the Implementation of AI Scribe Technology Among Ambulatory Advanced Practice Providers: Mixed Methods Quality Improvement Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3038,
+    "s2": 3038,
+    "openalex": 3043,
+    "crossref": 3038
+   },
+   "oa_url": "https://doi.org/10.2196/92364",
+   "oa_status": "gold",
+   "chars": 3043
+  },
+  {
+   "key": "S04-63",
+   "doi": "10.3233/shti260257",
+   "title": "Integrating AI Scribe Technology into Public Health Workflows: Simulation and Field Evaluation in Disease Case Management.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1276,
+    "s2": 1276,
+    "openalex": 1276,
+    "crossref": 1282
+   },
+   "oa_url": "https://doi.org/10.3233/shti260257",
+   "oa_status": "hybrid",
+   "chars": 1282
+  },
+  {
+   "key": "S04-64",
+   "doi": "10.64898/2026.02.19.26346634",
+   "title": "Impact of an ambient digital scribe on typing and note quality: the AutoscriberValidate study",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1884,
+    "s2": 1889,
+    "openalex": 1893,
+    "crossref": 1893
+   },
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2026/02/24/2026.02.19.26346634.full.pdf",
+   "oa_status": "green",
+   "chars": 1893
+  },
+  {
+   "key": "S04-65",
+   "doi": "10.1007/s11606-026-10448-w",
+   "title": "Implementing Artificial Intelligence-Enabled Ambient Documentation Technology for Ambulatory Clinicians: An Innovation Evaluation.",
+   "sources_with_text": [
+    "epmc"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1904
+   },
+   "oa_url": "https://pubmed.ncbi.nlm.nih.gov/42225877/",
+   "oa_status": "green",
+   "chars": 1904
+  },
+  {
+   "key": "S04-66",
+   "doi": "10.1093/jamiaopen/ooag155",
+   "title": "Comparative effectiveness of ambient documentation tools in primary care tool-specific variations in efficiency, documentation burden, and productivity over time.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2069,
+    "s2": 2074,
+    "openalex": 1731,
+    "crossref": 2074
+   },
+   "oa_url": "https://doi.org/10.1093/jamiaopen/ooag155",
+   "oa_status": "gold",
+   "chars": 2074
+  },
+  {
+   "key": "S04-67",
+   "doi": "10.5435/jaaos-d-24-01321",
+   "title": "Utilization of an Artificial Intelligence-Based Documentation System Improves Provider Efficiency in Outpatient Orthopaedic Clinics: Reducing the Afterhours Burden of the Electronic Health Record-A Pilot Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1967,
+    "s2": 1966,
+    "openalex": 1971,
+    "crossref": 1971
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1971
+  },
+  {
+   "key": "S04-68",
+   "doi": "10.1016/j.surg.2025.109700",
+   "title": "Easing the burden: A pilot study evaluating AI-generated In-Basket message drafts to streamline perioperative endocrine surgical care.",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1919,
+    "s2": 1919
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1919
+  },
+  {
+   "key": "S04-69",
+   "doi": "10.1016/j.jclinane.2026.112163",
+   "title": "Generative AI in preanesthetic consultations: Effects on efficiency, documentation workload, quality, and physician-patient interaction: A simulation trial.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2236,
+    "s2": 2236,
+    "openalex": 2241
+   },
+   "oa_url": "https://doi.org/10.1016/j.jclinane.2026.112163",
+   "oa_status": "hybrid",
+   "chars": 2241
+  },
+  {
+   "key": "S04-70",
+   "doi": "10.2196/94140",
+   "title": "Effects of a Safety User Interface Bundle on Verification Intentions in Generative AI Chat Use Among Older Chinese Adults: Randomized Vignette Survey.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3353,
+    "s2": 3362,
+    "openalex": 3358,
+    "crossref": 3370
+   },
+   "oa_url": "https://doi.org/10.2196/94140",
+   "oa_status": "gold",
+   "chars": 3370
+  },
+  {
+   "key": "S04-71",
+   "doi": "10.64898/2026.06.23.26355993",
+   "title": "A Natural Experiment Reveals Clinically Essential and Compliance-Driven Nursing Documentation",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1288,
+    "s2": 1284,
+    "openalex": 1288,
+    "crossref": 1292
+   },
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2026/06/25/2026.06.23.26355993.full.pdf",
+   "oa_status": "green",
+   "chars": 1292
+  },
+  {
+   "key": "S04-72",
+   "doi": "10.7759/cureus.109247",
+   "title": "Implementation of an AI-Assisted Workflow for Rehabilitation Discharge Summary Creation: Evaluation of Documentation Efficiency, Usability, and Hallucinations in a 290-Bed General Hospital in Japan",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3497,
+    "s2": 3497,
+    "openalex": 3497
+   },
+   "oa_url": "https://www.cureus.com/articles/493029-implementation-of-an-ai-assisted-workflow-for-rehabilitation-discharge-summary-creation-evaluation-of-documentation-efficiency-usability-and-hallucinations-in-a-290-bed-general-hospital-in-japan.pdf",
+   "oa_status": "diamond",
+   "chars": 3497
+  },
+  {
+   "key": "S04-73",
+   "doi": "10.1001/jamanetworkopen.2026.15762",
+   "title": "Ambient Artificial Intelligence Use and Clinician Documentation Burden, Productivity, and Efficiency.",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 184,
+    "openalex": 184,
+    "crossref": 184
+   },
+   "oa_url": "https://doi.org/10.1001/jamanetworkopen.2026.15762",
+   "oa_status": "gold",
+   "chars": 184
+  },
+  {
+   "key": "S04-74",
+   "doi": "10.1016/j.mcpdig.2024.100193",
+   "title": "Impact of Ambient Artificial Intelligence Documentation on Cognitive Load.",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 529
+   },
+   "oa_url": "http://www.mcpdigitalhealth.org/article/S2949761224001263/pdf",
+   "oa_status": "gold",
+   "chars": 529
+  },
+  {
+   "key": "S04-75",
+   "doi": "10.1007/s43678-026-01141-2",
+   "title": "Human vs. artificial intelligence in medical charting: a comparative study in the simulated emergency medicine context.",
+   "sources_with_text": [
+    "epmc"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2066
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2066
+  },
+  {
+   "key": "S04-76",
+   "doi": "10.1016/j.medcli.2026.107541",
+   "title": "Ambient AI scribe in pediatric outpatient visits: documentation burden, quality, and scale-up limits.",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [
+    "crossref"
+   ],
+   "len": {
+    "epmc": 1744,
+    "s2": 1744
+   },
+   "chars": 1744
+  },
+  {
+   "key": "S04-77",
+   "doi": "10.1136/bmjopen-2022-065477",
+   "title": "Effect of multimodal comprehensive communication skills training with video analysis by artificial intelligence for physicians on acute geriatric care: a mixed-methods study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2375,
+    "s2": 2375,
+    "openalex": 2384,
+    "crossref": 2379
+   },
+   "oa_url": "https://bmjopen.bmj.com/content/bmjopen/13/3/e065477.full.pdf",
+   "oa_status": "gold",
+   "chars": 2384
+  },
+  {
+   "key": "S04-78",
+   "doi": "10.3390/healthcare13172118",
+   "title": "Ambient Artificial Intelligence Scribes: A Pilot Survey of Perspectives on the Utility and Documentation Burden in Palliative Medicine.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2071,
+    "s2": 2074,
+    "openalex": 1942,
+    "crossref": 2077
+   },
+   "oa_url": "https://www.mdpi.com/2227-9032/13/17/2118/pdf?version=1756211830",
+   "oa_status": "gold",
+   "chars": 2077
+  },
+  {
+   "key": "S04-79",
+   "doi": "10.1101/2025.10.30.25339135",
+   "title": "Ambient scribe in general practice: a multi-perspective before-after longitudinal mixed-methods study",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1948,
+    "openalex": 1957,
+    "crossref": 1960
+   },
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2025/10/31/2025.10.30.25339135.full.pdf",
+   "oa_status": "green",
+   "chars": 1960
+  },
+  {
+   "key": "S04-80",
+   "doi": "10.64898/2026.01.12.26343538",
+   "title": "Longitudinal effects of ambient AI scribe use on documentation burden and financial productivity in primary care: A quasi-experimental study",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [
+    "s2"
+   ],
+   "len": {
+    "epmc": 1634,
+    "openalex": 1643,
+    "crossref": 1646
+   },
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2026/01/14/2026.01.12.26343538.full.pdf",
+   "oa_status": "green",
+   "chars": 1646
+  },
+  {
+   "key": "S04-81",
+   "doi": "10.5435/jaaos-d-25-01245",
+   "title": "Reduction of Electronic Medical Record Documentation Time and Burden Using an Artificial Intelligence Scribe Tool in an Orthopaedic Clinic.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2077,
+    "s2": 2077,
+    "openalex": 2081,
+    "crossref": 2091
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2091
+  },
+  {
+   "key": "S04-82",
+   "doi": "10.1200/op-25-00612",
+   "title": "Impact of AI Scribes on Physician Productivity and Workflow in Medical Oncology.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1885,
+    "s2": 1884,
+    "openalex": 1885,
+    "crossref": 1888
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1888
+  },
+  {
+   "key": "S04-83",
+   "doi": "10.1016/j.arth.2026.03.069",
+   "title": "Evaluating the Impact of Artificial Intelligence Scribes on Clinical Workflow and Documentation Quality: A Randomized Controlled Trial.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2381,
+    "s2": 2381,
+    "openalex": 2385
+   },
+   "oa_url": "https://www.arthroplastyjournal.org/article/S0883-5403(26)00272-X/pdf",
+   "oa_status": "hybrid",
+   "chars": 2385
+  },
+  {
+   "key": "S04-84",
+   "doi": "10.1053/j.gastro.2025.12.020",
+   "title": "Effect of a Computer-Aided Device for Detecting Gastric Neoplasms: A Multicenter, Randomized Controlled Trial.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1942,
+    "s2": 1942,
+    "openalex": 1946
+   },
+   "oa_url": "https://www.gastrojournal.org/article/S0016-5085(25)06661-2/pdf",
+   "oa_status": "hybrid",
+   "chars": 1946
+  },
+  {
+   "key": "S04-85",
+   "doi": "10.21203/rs.3.rs-9820618/v1",
+   "title": "Development of Intelligent Learning Environments: Methodology for Integrating Artificial Intelligence Systems Into the Higher Education Biophysics Curriculum",
+   "sources_with_text": [
+    "epmc",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1823,
+    "crossref": 1826
+   },
+   "oa_url": "https://www.researchsquare.com/article/rs-9820618/latest.pdf",
+   "oa_status": "green",
+   "chars": 1826
+  },
+  {
+   "key": "S04-86",
+   "doi": "10.2196/94450",
+   "title": "Explainable AI for Equitable Nurse Scheduling: Pragmatic Pre-Post Implementation Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3318,
+    "s2": 3327,
+    "openalex": 3323,
+    "crossref": 3355
+   },
+   "oa_url": "https://doi.org/10.2196/94450",
+   "oa_status": "gold",
+   "chars": 3355
+  },
+  {
+   "key": "S04-87",
+   "doi": "10.1001/jamanetworkopen.2024.6565",
+   "title": "AI-Generated Draft Replies Integrated Into Health Records and Physicians' Electronic Communication.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2702,
+    "s2": 213,
+    "openalex": 2709,
+    "crossref": 2713
+   },
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2817615/taiseale_2024_oi_240254_1712593629.08202.pdf",
+   "oa_status": "gold",
+   "chars": 2713
+  },
+  {
+   "key": "S05-01",
+   "doi": "10.1145/3772318.3790972",
+   "title": "Small Talk, Big Impact? LLM-based Conversational Agents to Mitigate Passive Fatigue in Conditional Automated Driving",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1104,
+    "openalex": 1104
+   },
+   "oa_url": "https://doi.org/10.1145/3772318.3790972",
+   "oa_status": "gold",
+   "chars": 1104
+  },
+  {
+   "key": "S05-02",
+   "doi": "10.1080/00140139.2026.2662001",
+   "title": "Chatting with AI: enhancing the supervision safety of near-L3 automated driving by engaging in non-driving-related tasks.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1122,
+    "s2": 1122,
+    "openalex": 1122
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1122
+  },
+  {
+   "key": "S05-03",
+   "doi": "10.1016/j.apergo.2024.104346",
+   "title": "Cognitive and behavioral markers for human detection error in AI-assisted bridge inspection.",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1449,
+    "s2": 1449
+   },
+   "oa_url": "https://doi.org/10.1016/j.apergo.2024.104346",
+   "oa_status": "bronze",
+   "chars": 1449
+  },
+  {
+   "key": "S05-04",
+   "doi": "10.1109/COGSIMA.2019.8724175",
+   "title": "Knowledge Complacency and Decision Support Systems",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 947,
+    "openalex": 947
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 947
+  },
+  {
+   "key": "S05-05",
+   "doi": "10.1117/12.2559474",
+   "title": "Measuring complacency in humans interacting with autonomous agents in a multi-agent system",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1573,
+    "openalex": 1573
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1573
+  },
+  {
+   "key": "S05-06",
+   "doi": "10.2196/85666",
+   "title": "Exploring Ambient Artificial Intelligence to Enhance Learning and Feedback During Operating Room-to-Intensive Care Unit Handoffs: Co-Design and Simulation Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3287,
+    "s2": 3296,
+    "openalex": 3292,
+    "crossref": 3296
+   },
+   "oa_url": "https://doi.org/10.2196/85666",
+   "oa_status": "gold",
+   "chars": 3296
+  },
+  {
+   "key": "S05-07",
+   "doi": "10.1186/s12913-026-14950-z",
+   "title": "Patient and staff acceptability of an artificial intelligence software to prioritize chest X-rays in an NHS setting: a qualitative evaluation",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2377,
+    "s2": 2338,
+    "openalex": 2381,
+    "crossref": 2386
+   },
+   "oa_url": "https://doi.org/10.1186/s12913-026-14950-z",
+   "oa_status": "gold",
+   "chars": 2386
+  },
+  {
+   "key": "S05-08",
+   "doi": "10.3389/fpsyg.2026.1900940",
+   "title": "The numb efficiency paradox: AI work pressure, affective numbing, and professional judgment in organizationally digitally mediated work",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2045,
+    "s2": 2045,
+    "openalex": 2045,
+    "crossref": 2045
+   },
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1900940/pdf",
+   "oa_status": "gold",
+   "chars": 2045
+  },
+  {
+   "key": "S05-09",
+   "doi": "10.14738/assrj.1211.19642",
+   "title": "“Trust, but Verify”: A Reflexive Thematic Analysis of Human–AI Interaction",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1341,
+    "openalex": 1341,
+    "crossref": 1341
+   },
+   "oa_url": "https://journals.scholarpublishing.org/index.php/ASSRJ/article/download/19642/11640",
+   "oa_status": "diamond",
+   "chars": 1341
+  },
+  {
+   "key": "S15-01",
+   "doi": "10.3390/ejihpe16090130",
+   "title": "From Critical Thinking to Passive Acceptance: The Moderating Role of Decision Fatigue in Students' Use of Generative AI.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1672,
+    "s2": 1672,
+    "openalex": 1672,
+    "crossref": 1672
+   },
+   "oa_url": "https://doi.org/10.3390/ejihpe16090130",
+   "oa_status": "gold",
+   "chars": 1672
+  },
+  {
+   "key": "S15-02",
+   "doi": "10.1186/s40359-026-04911-w",
+   "title": "When cognitive offloading becomes dependence: how AI dependence mediates the pathway from academic stress to burnout and anxiety.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1406,
+    "s2": 1406,
+    "openalex": 1406,
+    "crossref": 1415
+   },
+   "oa_url": "https://doi.org/10.1186/s40359-026-04911-w",
+   "oa_status": "gold",
+   "chars": 1415
+  },
+  {
+   "key": "S15-03",
+   "doi": "10.3389/fcomp.2026.1756441",
+   "title": "Exploring the formation of learning burnout among college students in AI context: a serial mediation mechanism of AI dependence and addiction based on I-PACE model",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2144,
+    "openalex": 2184,
+    "crossref": 2184
+   },
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/computer-science/articles/10.3389/fcomp.2026.1756441/pdf",
+   "oa_status": "gold",
+   "chars": 2184
+  },
+  {
+   "key": "S15-04",
+   "doi": "10.3791/69637",
+   "title": "The Dual Forces of AI: How Generative AI and Perceived AI Dependency Influence Fear of Missing Out (FoMO) and EFL Students' Vocabulary Acquisition.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1581,
+    "s2": 1581,
+    "openalex": 1581
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1581
+  },
+  {
+   "key": "S15-05",
+   "doi": "10.3390/healthcare14142063",
+   "title": "Why Nurses Intend to Override AI Alerts: How Alert Fatigue, Moral Distress, and Team Psychological Safety Shape Self-Reported Trust Calibration Toward Clinical Decision Support.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1809,
+    "s2": 1809,
+    "openalex": 1809,
+    "crossref": 1809
+   },
+   "oa_url": "https://www.mdpi.com/2227-9032/14/14/2063/pdf?version=1783593055",
+   "oa_status": "gold",
+   "chars": 1809
+  },
+  {
+   "key": "S15-06",
+   "doi": "10.47067/ramss.v8i1.458",
+   "title": "Psychological Impacts of AI Dependence: Assessing the Cognitive and Emotional Costs of Intelligent Systems in Daily Life",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2350,
+    "openalex": 2350,
+    "crossref": 2350
+   },
+   "oa_url": "https://ramss.spcrd.org/index.php/ramss/article/download/458/479",
+   "oa_status": "diamond",
+   "chars": 2350
+  },
+  {
+   "key": "S15-07",
+   "doi": "10.35814/asiimetrik.v8i2.9876",
+   "title": "Predicting Graduation Timeliness: A Multidisciplinary Study on Logistic Mobility, Psychosomatic Fatigue, and AI-Assistance Dependency among Information Systems Students",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1248,
+    "openalex": 1248,
+    "crossref": 1248
+   },
+   "oa_url": "https://doi.org/10.35814/asiimetrik.v8i2.9876",
+   "oa_status": "diamond",
+   "chars": 1248
+  },
+  {
+   "key": "S15-08",
+   "doi": "10.31305/rrijm.2026.v11.n07.009",
+   "title": "Generative AI Use and Burnout Risk in Higher Education: A Cross-Sectional Analysis of 50,000 Students",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1161,
+    "openalex": 1161,
+    "crossref": 1161
+   },
+   "oa_url": "https://doi.org/10.31305/rrijm.2026.v11.n07.009",
+   "oa_status": "diamond",
+   "chars": 1161
+  },
+  {
+   "key": "S15-09",
+   "doi": "10.3390/data11090215",
+   "title": "Multidimensional Cognitive-State Modeling and an Adaptive Cognitive Load Twin for AI-Supported Managerial Decision-Making",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1942,
+    "openalex": 1942,
+    "crossref": 1942
+   },
+   "oa_url": "https://doi.org/10.3390/data11090215",
+   "oa_status": "gold",
+   "chars": 1942
+  },
+  {
+   "key": "S15-10",
+   "doi": "10.1155/hbe2/9977058",
+   "title": "A (Mid)journey Through Reality: Assessing Accuracy, Impostor Bias, and Automation Bias in Human Detection of AI‐Generated Images",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2142,
+    "openalex": 2142,
+    "crossref": 2142
+   },
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1155/hbe2/9977058",
+   "oa_status": "gold",
+   "chars": 2142
+  },
+  {
+   "key": "S15-11",
+   "doi": "10.1145/3706599.3719875",
+   "title": "Does GenAI Deplete Us? The Effects of Using GenAI for Writing on Identity and Ego Depletion",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1032,
+    "openalex": 1027
+   },
+   "oa_url": "https://dl.acm.org/doi/pdf/10.1145/3706599.3719875",
+   "oa_status": "gold",
+   "chars": 1032
+  },
+  {
+   "key": "S15-12",
+   "doi": "10.23887/ijee.v10i2.115254",
+   "title": "Students’ Perceptions and Adaptive Learning Strategies in Using Digital Platforms for Online Learning: A Social Action Perspective",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1458,
+    "openalex": 1458,
+    "crossref": 1458
+   },
+   "oa_url": "https://doi.org/10.23887/ijee.v10i2.115254",
+   "oa_status": "diamond",
+   "chars": 1458
+  },
+  {
+   "key": "S15-13",
+   "doi": "10.1002/nse2.70003",
+   "title": "ChatGPT for natural sciences course design: Insights from a strengths, weaknesses, opportunities, and threats analysis",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1740,
+    "openalex": 1750,
+    "crossref": 1750
+   },
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1002/nse2.70003",
+   "oa_status": "hybrid",
+   "chars": 1750
+  },
+  {
+   "key": "S15-14",
+   "doi": "10.37859/ijetl.v1i1.10836",
+   "title": "Consequences of Overdependence on Technology in English Learning Practices",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1726,
+    "openalex": 1726,
+    "crossref": 1726
+   },
+   "oa_url": "https://ejurnal.umri.ac.id/index.php/IJETL/article/download/10836/4129",
+   "oa_status": "hybrid",
+   "chars": 1726
+  },
+  {
+   "key": "S15-15",
+   "doi": "10.37497/rev.artif.intell.educ.v7ii.1413",
+   "title": "Vietnamese University Students’ Perceptions of Generative Artificial Intelligence in Higher Education: A Qualitative Study Through the Technology Acceptance Model",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2450,
+    "openalex": 2450,
+    "crossref": 2450
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2450
+  },
+  {
+   "key": "S15-16",
+   "doi": "10.63056/academia.5.3(a).2026.1672",
+   "title": "Nurses' Experiences with Artificial Intelligence in Clinical Settings: A Qualitative Exploration of Advantages, Limitations, and Ethical Dimensions",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1144,
+    "openalex": 1144,
+    "crossref": 1144
+   },
+   "oa_url": "https://academia.edu.pk/index.php/Journals/article/download/1672/2626",
+   "oa_status": "hybrid",
+   "chars": 1144
+  },
+  {
+   "key": "S15-17",
+   "doi": "10.5539/hes.v16n2p430",
+   "title": "Synergizing AI and Human Feedback: Effects of ChatGPT-generated and Teacher Corrective Feedback on Thai EFL Students’ Cause-and-Effect Writing",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1737,
+    "openalex": 1737,
+    "crossref": 1784
+   },
+   "oa_url": "https://ccsenet.org/journal/index.php/hes/article/download/0/0/53225/58049",
+   "oa_status": "diamond",
+   "chars": 1784
+  },
+  {
+   "key": "S14-01",
+   "doi": "10.1016/j.actpsy.2026.107428",
+   "title": "AI-enabled job demands and employee well-being: Emotional exhaustion and turnover across organizational contexts.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1919,
+    "s2": 1919,
+    "openalex": 1919
+   },
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2026.107428",
+   "oa_status": "gold",
+   "chars": 1919
+  },
+  {
+   "key": "S14-02",
+   "doi": "10.3390/bs15040401",
+   "title": "Association Between AI Awareness and Emotional Exhaustion: The Serial Mediation of Job Insecurity and Work Interference with Family.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1397,
+    "s2": 1397,
+    "openalex": 1397,
+    "crossref": 1397
+   },
+   "oa_url": "https://doi.org/10.3390/bs15040401",
+   "oa_status": "gold",
+   "chars": 1397
+  },
+  {
+   "key": "S14-03",
+   "doi": "10.3389/fpsyg.2026.1828689",
+   "title": "AI anxiety and teacher innovative intentions: a moderated serial mediation model of burnout and creative self-efficacy.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1645,
+    "s2": 1645,
+    "openalex": 1649,
+    "crossref": 1645
+   },
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1828689/pdf",
+   "oa_status": "gold",
+   "chars": 1649
+  },
+  {
+   "key": "S14-04",
+   "doi": "10.3389/fpubh.2026.1695066",
+   "title": "Autonomous enhancement or emotional depletion? The dual-path mechanism of AI usage on employees' work behavior.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 800,
+    "s2": 800,
+    "openalex": 800,
+    "crossref": 800
+   },
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2026.1695066/pdf",
+   "oa_status": "gold",
+   "chars": 800
+  },
+  {
+   "key": "S14-05",
+   "doi": "10.3390/healthcare14080996",
+   "title": "How Digital Stress and eHealth Literacy Relate to Missed Nursing Care and Willingness to Use AI Decision Support.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2525,
+    "s2": 2519,
+    "openalex": 2519,
+    "crossref": 2525
+   },
+   "oa_url": "https://www.mdpi.com/2227-9032/14/8/996/pdf?version=1775804007",
+   "oa_status": "gold",
+   "chars": 2525
+  },
+  {
+   "key": "S14-06",
+   "doi": "10.1038/s41598-026-47683-4",
+   "title": "The impact of technostress and generative AI on EFL mathematic metacognitive reading strategies and digital classroom burnout in SDG-aligned education.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1619,
+    "s2": 1619,
+    "openalex": 1619
+   },
+   "oa_url": "https://www.nature.com/articles/s41598-026-47683-4.pdf",
+   "oa_status": "gold",
+   "chars": 1619
+  },
+  {
+   "key": "S14-07",
+   "doi": "10.1016/j.actpsy.2026.107517",
+   "title": "AI awareness, AI fear of missing out, and work demotivation as pathways to occupational strain in Vietnamese hospitality employees.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2038,
+    "s2": 2038,
+    "openalex": 2038
+   },
+   "oa_url": "https://www.sciencedirect.com/science/article/pii/S0001691826013181/pdf",
+   "oa_status": "gold",
+   "chars": 2038
+  },
+  {
+   "key": "S14-08",
+   "doi": "10.1016/j.actpsy.2025.105487",
+   "title": "The impact of AI anxiety on employees' work passion: A moderated mediated effect model.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1269,
+    "s2": 1269,
+    "openalex": 1269
+   },
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2025.105487",
+   "oa_status": "gold",
+   "chars": 1269
+  },
+  {
+   "key": "S14-09",
+   "doi": "10.1016/j.actpsy.2025.105650",
+   "title": "The design industry in the AI era: How AI awareness and AI literacy influence the innovative work behavior of Chinese Generation Y designers.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1310,
+    "s2": 1310,
+    "openalex": 1741
+   },
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2025.105650",
+   "oa_status": "gold",
+   "chars": 1741
+  },
+  {
+   "key": "S14-10",
+   "doi": "10.3390/ijerph20065147",
+   "title": "The Association between Artificial Intelligence Awareness and Employee Depression: The Mediating Role of Emotional Exhaustion and the Moderating Role of Perceived Organizational Support.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1188,
+    "s2": 1188,
+    "openalex": 1188,
+    "crossref": 1188
+   },
+   "oa_url": "https://www.mdpi.com/1660-4601/20/6/5147/pdf?version=1678853288",
+   "oa_status": "gold",
+   "chars": 1188
+  },
+  {
+   "key": "S14-11",
+   "doi": "10.3389/fpubh.2024.1449561",
+   "title": "Assist me or replace me? Uncovering the influence of AI awareness on employees' counterproductive work behaviors.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1413,
+    "s2": 1412,
+    "openalex": 1348,
+    "crossref": 1420
+   },
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2024.1449561/pdf",
+   "oa_status": "gold",
+   "chars": 1420
+  },
+  {
+   "key": "S14-12",
+   "doi": "10.1016/j.acra.2026.03.037",
+   "title": "Predicting Radiology Burnout via Machine Learning: A Cohort Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1928,
+    "s2": 1928
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1928
+  },
+  {
+   "key": "S14-13",
+   "doi": "10.1108/ijoa-09-2024-4847",
+   "title": "A moderated mediation model of relationship between artificial intelligence awareness and withdrawal behaviors",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2561,
+    "openalex": 2561,
+    "crossref": 2561
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2561
+  },
+  {
+   "key": "S14-14",
+   "doi": "10.1108/IJCHM-07-2020-0789",
+   "title": "Influences of artificial intelligence (AI) awareness on career competency and job burnout",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1856,
+    "openalex": 1856,
+    "crossref": 1856
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1856
+  },
+  {
+   "key": "S14-15",
+   "doi": "10.1109/AIMV66517.2025.11203345",
+   "title": "Analyzing the Impact of Digital Transformation on Mental Health of IT Professionals Using Machine Learning Methods",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1275,
+    "openalex": 1275
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1275
+  },
+  {
+   "key": "S14-16",
+   "doi": "10.1108/md-08-2024-1820",
+   "title": "The hidden facets of artificial intelligence: delivery employees’ insights into service sabotage",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1680,
+    "openalex": 1766,
+    "crossref": 1766
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1766
+  },
+  {
+   "key": "S14-17",
+   "doi": "10.3390/su172210338",
+   "title": "The Smart Shift: A Knowledge Management and Industrial–Organizational Psychology Perspective on Digital Transformation and Sustainable Well-Being Among SMEs",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1664,
+    "openalex": 1664,
+    "crossref": 1664
+   },
+   "oa_url": "https://www.mdpi.com/2071-1050/17/22/10338/pdf",
+   "oa_status": "gold",
+   "chars": 1664
+  },
+  {
+   "key": "S14-18",
+   "doi": "10.55214/25768484.v9i6.8184",
+   "title": "Generative AI tools and career burnout: The chain mediating effect of technology stress perception on turnover intention among young tech talents",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1262,
+    "openalex": 1262,
+    "crossref": 1271
+   },
+   "oa_url": "https://learning-gate.com/index.php/2576-8484/article/download/8184/2757",
+   "oa_status": "diamond",
+   "chars": 1271
+  },
+  {
+   "key": "S14-19",
+   "doi": "10.1080/08824096.2025.2578439",
+   "title": "Supervisor use of artificial intelligence (AI) in email writing: the impact on subordinate burnout",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 525,
+    "openalex": 516
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 525
+  },
+  {
+   "key": "S14-20",
+   "doi": "10.1177/21582440261462225",
+   "title": "The Mediating Effect of Fixed Teaching Mindset on the Relationship Between AI Anxiety and Professional Burnout Among English as a Foreign Language Teachers",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 3946,
+    "openalex": 1833,
+    "crossref": 1833
+   },
+   "oa_url": "https://doi.org/10.1177/21582440261462225",
+   "oa_status": "gold",
+   "chars": 3946
+  },
+  {
+   "key": "S14-21",
+   "doi": "10.1111/1744-7941.70072",
+   "title": "Proactive or Defensive? How AI Awareness Influences Employees' Innovative Behavior and Knowledge Hiding",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [
+    "crossref"
+   ],
+   "len": {
+    "s2": 1571,
+    "openalex": 1580,
+    "crossref": 1580
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1580
+  },
+  {
+   "key": "S14-22",
+   "doi": "10.3389/fpsyg.2026.1943409",
+   "title": "Artificial intelligence anxiety and academic burnout among Chinese postgraduate students: perceived stress and rumination as serial mediators",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1282,
+    "openalex": 1322,
+    "crossref": 1322
+   },
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1943409/pdf",
+   "oa_status": "gold",
+   "chars": 1322
+  },
+  {
+   "key": "S14-23",
+   "doi": "10.1108/ijchm-02-2023-0240",
+   "title": "Artificial intelligence (AI) awareness and work withdrawal: evaluating chained mediation through negative work-related rumination and emotional exhaustion",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1266,
+    "openalex": 1266,
+    "crossref": 1266
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1266
+  },
+  {
+   "key": "S14-24",
+   "doi": "10.24250/jpe/si/2026/gsv/lrm/",
+   "title": "TECHNOSTRESS AND PROFESSIONAL PERFORMANCE: ASSESSING THE IMPACT OF AI PLATFORMS ON HIGHER EDUCATION STAFF",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1063
+   },
+   "oa_url": "https://doi.org/10.24250/jpe/si/2026/gsv/lrm/",
+   "oa_status": "diamond",
+   "chars": 1063
+  },
+  {
+   "key": "S14-25",
+   "doi": "10.1177/21582440251400532",
+   "title": "The Impact of AI Awareness on Employees’ Job Burnout: A Chain Mediation of Perceived Organizational Support and Organizational Commitment",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1663,
+    "openalex": 1663,
+    "crossref": 1663
+   },
+   "oa_url": "https://doi.org/10.1177/21582440251400532",
+   "oa_status": "gold",
+   "chars": 1663
+  },
+  {
+   "key": "S14-26",
+   "doi": "10.1109/IC4e69618.2026.11631530",
+   "title": "The Impact of AI Anxiety on Emotional Burnout of Cross-Border E-Commerce Practitioners",
+   "sources_with_text": [
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1339
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1339
+  },
+  {
+   "key": "S14-27",
+   "doi": "10.31306/s.67.2.4",
+   "title": "Prospective effects of artificial intelligence on burnout syndrome",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1640,
+    "openalex": 1640,
+    "crossref": 1640
+   },
+   "oa_url": "https://hrcak.srce.hr/file/481668",
+   "oa_status": "diamond",
+   "chars": 1640
+  },
+  {
+   "key": "S14-28",
+   "doi": "10.62836/emi.v5i2.0014",
+   "title": "The Dual Cognitive and Emotional Pathways Linking AI Awareness and Knowledge Sharing Intention: Evidence from Private Higher Education Institutions in China",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2310,
+    "openalex": 2310,
+    "crossref": 2310
+   },
+   "oa_url": "https://ojs.sgsci.org/journals/emi/article/download/631/432",
+   "oa_status": "diamond",
+   "chars": 2310
+  },
+  {
+   "key": "S14-29",
+   "doi": "10.1108/ijwhm-09-2025-0252",
+   "title": "How digital leadership and innovative climate interact to lessen AI-related job insecurity, AI use anxiety, technostress, and emotional exhaustion",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1560,
+    "openalex": 1623,
+    "crossref": 1623
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1623
+  },
+  {
+   "key": "S14-30",
+   "doi": "10.21203/rs.3.rs-10628079/v1",
+   "title": "Comfortable Helplessness: Proxy Control and the Making of Dormant Psychological Needs in AI-Delegated Work",
+   "sources_with_text": [
+    "epmc",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1140,
+    "crossref": 1140
+   },
+   "oa_url": "https://www.researchsquare.com/article/rs-10628079/latest.pdf",
+   "oa_status": "green",
+   "chars": 1140
+  },
+  {
+   "key": "S14-31",
+   "doi": "10.1177/10482911261474923",
+   "title": "Faculty Burnout at the Intersection of Artificial Intelligence Adoption and Academic Integrity Measures: A Thematic Analysis in Higher Education.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1469,
+    "s2": 1469,
+    "openalex": 1469,
+    "crossref": 1469
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1469
+  },
+  {
+   "key": "S14-32",
+   "doi": "10.69889/sr7m0r83",
+   "title": "The Psychological Consequences of Technology Integration in the Workplace : How do public sector workers in East Jerusalem perceive the influence of technology integration on their job burnout, innovation orientation and personal and professional developm",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1732,
+    "openalex": 1732,
+    "crossref": 1732
+   },
+   "oa_url": "https://economic-sciences.com/index.php/journal/article/download/383/323",
+   "oa_status": "diamond",
+   "chars": 1732
+  },
+  {
+   "key": "S14-33",
+   "doi": "10.1108/he-06-2025-0101",
+   "title": "Impact of AI- driven technostress on students’ mental health and psychological wellbeing: contextual insights",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2365,
+    "openalex": 2451,
+    "crossref": 2451
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2451
+  },
+  {
+   "key": "S14-34",
+   "doi": "10.29140/9780648184485-17",
+   "title": "How GenAI impacts technostress among secondary school English teachers",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 635,
+    "openalex": 635,
+    "crossref": 635
+   },
+   "oa_url": "https://www.castledown.com/proceedings/call-research/article/download/9780648184485-17/37",
+   "oa_status": "hybrid",
+   "chars": 635
+  },
+  {
+   "key": "S13-01",
+   "doi": "10.3389/fpsyg.2026.1901039",
+   "title": "Perceived fairness of algorithmic decision-making and university teachers' job burnout: a moderated chain-mediation model.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2137,
+    "s2": 2137,
+    "openalex": 2137,
+    "crossref": 2137
+   },
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1901039/pdf",
+   "oa_status": "gold",
+   "chars": 2137
+  },
+  {
+   "key": "S13-02",
+   "doi": "10.1016/j.actpsy.2026.107840",
+   "title": "Abusive supervision and AI adoption in Chinese higher education workplaces: Psychological mechanisms of resource disillusionment and organizational dynamics.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1494,
+    "s2": 1494,
+    "openalex": 1494
+   },
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2026.107840",
+   "oa_status": "gold",
+   "chars": 1494
+  },
+  {
+   "key": "S13-03",
+   "doi": "10.1155/jonm/4386800",
+   "title": "Change Fatigue and Attitudes Toward AI in County-Level Nurses: The Mediating Role of AI Literacy.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2271,
+    "s2": 2271,
+    "openalex": 2277,
+    "crossref": 2279
+   },
+   "oa_url": "https://doi.org/10.1155/jonm/4386800",
+   "oa_status": "hybrid",
+   "chars": 2279
+  },
+  {
+   "key": "S13-04",
+   "doi": "10.1186/s40359-026-04706-z",
+   "title": "The conditional indirect effect of perceived robot threat on employees' proactive behavior: the moderating role of human-robot interaction.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1526,
+    "s2": 1526,
+    "openalex": 1526
+   },
+   "oa_url": "https://doi.org/10.1186/s40359-026-04706-z",
+   "oa_status": "gold",
+   "chars": 1526
+  },
+  {
+   "key": "S13-05",
+   "doi": "10.20944/preprints202410.0106.v1",
+   "title": "Future of Work: Enhancing Human Resource Development Strategies for the Age of Automation and Digital Transformation",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 870,
+    "openalex": 870,
+    "crossref": 870
+   },
+   "oa_url": "https://www.preprints.org/frontend/manuscript/94e2bc7856de6450203fdbd37c7ef311/download_pub",
+   "oa_status": "green",
+   "chars": 870
+  },
+  {
+   "key": "S13-06",
+   "doi": "10.55493/5007.v16i2.5810",
+   "title": "AI customer service and hidden triggers of burnout: Evidence from Malaysia’s e-commerce sector",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1871,
+    "openalex": 1871,
+    "crossref": 1871
+   },
+   "oa_url": "https://archive.aessweb.com/index.php/5007/article/download/5810/8614",
+   "oa_status": "diamond",
+   "chars": 1871
+  },
+  {
+   "key": "S13-07",
+   "doi": "10.3389/fpubh.2026.1866364",
+   "title": "The anatomy of AI implementation skepticism in Polish healthcare: an explanatory mixed-methods analysis of psychographic barriers among healthcare professionals.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1193,
+    "s2": 1193,
+    "openalex": 1193,
+    "crossref": 1193
+   },
+   "oa_url": "https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2026.1866364/pdf",
+   "oa_status": "gold",
+   "chars": 1193
+  },
+  {
+   "key": "S13-08",
+   "doi": "10.1016/j.outlook.2025.102484",
+   "title": "Education, empowerment, and elevating nursing voices: Nursing informatics leaders' perspectives on the path forward with artificial intelligence in nursing.",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1150,
+    "s2": 1153
+   },
+   "oa_url": "https://doi.org/10.1016/j.outlook.2025.102484",
+   "oa_status": "bronze",
+   "chars": 1153
+  },
+  {
+   "key": "S13-09",
+   "doi": "10.1186/s12913-025-13876-2",
+   "title": "Physicians' perceptions of how digital-intelligent medical technology reshapes job characteristics: a qualitative study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3673,
+    "s2": 3631,
+    "openalex": 3673
+   },
+   "oa_url": "https://doi.org/10.1186/s12913-025-13876-2",
+   "oa_status": "gold",
+   "chars": 3673
+  },
+  {
+   "key": "S13-10",
+   "doi": "10.34140/bjbv8n1-016",
+   "title": "Understanding strategic leadership strategy related to artificial intelligence (AI) applications in supply chain pandemic logistics",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2182,
+    "openalex": 2182,
+    "crossref": 2182
+   },
+   "oa_url": "https://ojs.brazilianjournals.com.br/ojs/index.php/BJB/article/download/85318/58179",
+   "oa_status": "diamond",
+   "chars": 2182
+  },
+  {
+   "key": "S13-11",
+   "doi": "10.61838/kman.hn.3.3.12",
+   "title": "Exploring the Factors Influencing AI Integration in Clinical Diagnostic Decision-Making",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2081,
+    "openalex": 2081,
+    "crossref": 2081
+   },
+   "oa_url": "https://journals.kmanpub.com/index.php/Health-Nexus/article/download/4280/7503",
+   "oa_status": "diamond",
+   "chars": 2081
+  },
+  {
+   "key": "S13-12",
+   "doi": "10.2196/45032",
+   "title": "An Assessment of How Clinicians and Staff Members Use a Diabetes Artificial Intelligence Prediction Tool: Mixed Methods Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2873,
+    "s2": 2871,
+    "openalex": 2796,
+    "crossref": 2871
+   },
+   "oa_url": "https://doi.org/10.2196/45032",
+   "oa_status": "diamond",
+   "chars": 2873
+  },
+  {
+   "key": "S13-13",
+   "doi": "10.26756/th.2023.814",
+   "title": "Can AI Save Us from Burnout? Exploring Developer and QA Engineer Well-being",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1348,
+    "openalex": 1348,
+    "crossref": 1348
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1348
+  },
+  {
+   "key": "S13-14",
+   "doi": "10.54536/ajet.v5i1.6407",
+   "title": "Teacher Motivation in AI-Integrated School Environments",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1868,
+    "openalex": 1868,
+    "crossref": 1868
+   },
+   "oa_url": "https://journals.e-palli.com/home/index.php/ajet/article/download/6407/3135",
+   "oa_status": "diamond",
+   "chars": 1868
+  },
+  {
+   "key": "S13-15",
+   "doi": "10.38124/ijisrt/25oct658",
+   "title": "Optimizing Employee Motivation in the Era of Artificial Intelligence: Evidence from MH Raroma, a Digital Creative Enterprise in Vietnam",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1640,
+    "openalex": 1640,
+    "crossref": 1640
+   },
+   "oa_url": "https://www.ijisrt.com/assets/upload/files/IJISRT25OCT658.pdf",
+   "oa_status": "gold",
+   "chars": 1640
+  },
+  {
+   "key": "S15-18",
+   "doi": "10.1097/ajn.0000000000000364",
+   "title": "AI Dependency and Brain Rot Among Nursing Students: A Mixed-Methods Study.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2291,
+    "s2": 2291,
+    "openalex": 2296,
+    "crossref": 2306
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2306
+  },
+  {
+   "key": "S15-19",
+   "doi": "10.47672/ajdikm.2865",
+   "title": "The Changing Cognitive Role of Product Managers in the Age of AI: Why Human Judgment Alone Is No Longer Sufficient",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2685,
+    "openalex": 2685,
+    "crossref": 2685
+   },
+   "oa_url": "https://ajpojournals.org/journals/AJDIKM/article/download/2865/4331",
+   "oa_status": "diamond",
+   "chars": 2685
+  },
+  {
+   "key": "S15-20",
+   "doi": "10.61838/japes.254",
+   "title": "Opportunities and Challenges of Using Artificial Intelligence for Grammar Assessment: A Case Study on the Perspectives of English Language Teachers in Ilam City",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2585,
+    "openalex": 2585,
+    "crossref": 2585
+   },
+   "oa_url": "https://journalapes.com/index.php/apes/article/download/254/222",
+   "oa_status": "hybrid",
+   "chars": 2585
+  },
+  {
+   "key": "S15-21",
+   "doi": "10.1007/s44163-026-01678-2",
+   "title": "Palestinian mothers’ mediation of generative AI in home learning practices a qualitative study",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1196,
+    "openalex": 1196
+   },
+   "oa_url": "https://doi.org/10.1007/s44163-026-01678-2",
+   "oa_status": "gold",
+   "chars": 1196
+  },
+  {
+   "key": "S15-22",
+   "doi": "10.18421/tem153-85",
+   "title": "The Capabilities of Large Language Models for Reducing Learning Fatigue",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1191,
+    "openalex": 1191,
+    "crossref": 1191
+   },
+   "oa_url": "https://www.temjournal.com/content/153/TEMJournalAugust2026_3058_3064.pdf",
+   "oa_status": "gold",
+   "chars": 1191
+  },
+  {
+   "key": "S15-23",
+   "doi": "10.54941/ahfe1007464",
+   "title": "Human Factors in AI-Driven Antimicrobial Stewardship: Clinician Decision-Making, Automation Bias, and Patient Safety Risks",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 995,
+    "openalex": 995,
+    "crossref": 995
+   },
+   "oa_url": "https://openaccess-api.cms-conferences.org/articles/download/978-1-964867-87-8_1",
+   "oa_status": "bronze",
+   "chars": 995
+  },
+  {
+   "key": "S14-35",
+   "doi": "10.2196/85986",
+   "title": "Alleviating Nurse Burnout With an Artificial Intelligence-Selected Mobile Cognitive Behavioral Therapy-Based Intervention: Mixed Methods Randomized Controlled Trial.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3197,
+    "s2": 3206,
+    "openalex": 3202,
+    "crossref": 3221
+   },
+   "oa_url": "https://doi.org/10.2196/85986",
+   "oa_status": "gold",
+   "chars": 3221
+  },
+  {
+   "key": "S14-36",
+   "doi": "10.1111/wvn.70003",
+   "title": "AI-Assisted Tailored Intervention for Nurse Burnout: A Three-Group Randomized Controlled Trial.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [
+    "crossref"
+   ],
+   "len": {
+    "epmc": 2331,
+    "s2": 2339,
+    "openalex": 2337,
+    "crossref": 2345
+   },
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/wvn.70003",
+   "oa_status": "hybrid",
+   "chars": 2345
+  },
+  {
+   "key": "S14-37",
+   "doi": "10.2196/54029",
+   "title": "Development of an Artificial Intelligence–Based Tailored Mobile Intervention for Nurse Burnout: Single-Arm Trial",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 3218,
+    "s2": 3218,
+    "openalex": 3223,
+    "crossref": 3227
+   },
+   "oa_url": "https://doi.org/10.2196/54029",
+   "oa_status": "gold",
+   "chars": 3227
+  },
+  {
+   "key": "S14-38",
+   "doi": "10.3389/fdgth.2025.1665457",
+   "title": "Exploring AI-personalized visualization of the safe place in virtual reality versus imagination of the safe place for stress, burnout, and relaxation in psychotherapists: a case series",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1935,
+    "s2": 1935,
+    "openalex": 1939,
+    "crossref": 1935
+   },
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/digital-health/articles/10.3389/fdgth.2025.1665457/pdf",
+   "oa_status": "gold",
+   "chars": 1939
+  },
+  {
+   "key": "S14-39",
+   "doi": "10.1080/10447318.2024.2429889",
+   "title": "The Technostress of ChatGPT Usage: How Do Perceived AI Characteristics Affect User Discontinuous Usage Through AI Anxiety and User Negative Attitudes?",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1168,
+    "openalex": 1159
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1168
+  },
+  {
+   "key": "S14-40",
+   "doi": "10.1109/IC4e69618.2026.11631611",
+   "title": "The Dark Side of Conversational AI: Chatgpt Frequency, Technostress, and WHO-5 Well-Being",
+   "sources_with_text": [
+    "s2"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1330
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1330
+  },
+  {
+   "key": "S14-41",
+   "doi": "10.1109/iraset64571.2025.11008039",
+   "title": "Balancing AI Engagement: How AI Experience and Satisfaction Reduce Technostress among Indonesian Employees",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1488,
+    "openalex": 1488
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1488
+  },
+  {
+   "key": "S14-42",
+   "doi": "10.34190/ecie.20.1.3863",
+   "title": "The Dual Impact of AI on Burnout and Technostress in Manufacturing Workplaces",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2220,
+    "openalex": 2220,
+    "crossref": 2220
+   },
+   "oa_url": "https://papers.academic-conferences.org/index.php/ecie/article/download/3863/3633",
+   "oa_status": "diamond",
+   "chars": 2220
+  },
+  {
+   "key": "S14-43",
+   "doi": "10.1007/s12144-026-09580-x",
+   "title": "How AI literacy decreases job burnout among employees in new forms of employment in China? the roles of STARA awareness and organizational AI adoption",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 0
+  },
+  {
+   "key": "S14-44",
+   "doi": "10.47233/jsit.v5i3.3711",
+   "title": "Burnout Akademik di Era Digital dan Persepsi Mahasiswa terhadap Peluang Pemanfaatan Artificial Intelligence untuk Deteksi Dini",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1581,
+    "openalex": 1581,
+    "crossref": 1585
+   },
+   "oa_url": "https://jurnal.minartis.com/index.php/jsit/article/download/3711/2911",
+   "oa_status": "diamond",
+   "chars": 1585
+  },
+  {
+   "key": "S13-16",
+   "doi": "10.21203/rs.3.rs-9540650/v1",
+   "title": "A Multi-Model XAI Framework for Identifying Burnout and Mental Health Triggers in Technology-Driven Workspaces",
+   "sources_with_text": [
+    "epmc",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1584,
+    "crossref": 1584
+   },
+   "oa_url": "https://www.researchsquare.com/article/rs-9540650/latest.pdf",
+   "oa_status": "green",
+   "chars": 1584
+  },
+  {
+   "key": "S13-17",
+   "doi": "10.3389/fpsyg.2026.1792200",
+   "title": "A machine learning approach to behavioral signals of burnout in audit and control professions.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2394,
+    "s2": 2394,
+    "openalex": 2394,
+    "crossref": 2394
+   },
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1792200/pdf",
+   "oa_status": "gold",
+   "chars": 2394
+  },
+  {
+   "key": "S13-18",
+   "doi": "10.22541/au.172114373.32212020/v1",
+   "title": "A Centralized Approach to Reducing Burnouts in the IT industry Using Work Pattern Monitoring Using Artificial Intelligence (Vector Search, Semantic Search, Python, Large Language Models, Mongo DB Atlas)",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1742,
+    "openalex": 1742,
+    "crossref": 1746
+   },
+   "oa_url": "https://www.authorea.com/doi/pdf/10.22541/au.172114373.32212020",
+   "oa_status": "gold",
+   "chars": 1746
+  },
+  {
+   "key": "S13-19",
+   "doi": "10.20944/preprints202407.2277.v1",
+   "title": "Investigating School Principals' Burnout: A Cross-Cultural Perspective on Stress, Sustainability, and Organizational Climate",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1781,
+    "openalex": 1766,
+    "crossref": 1793
+   },
+   "oa_url": "https://doi.org/10.20944/preprints202407.2277.v1",
+   "oa_status": "green",
+   "chars": 1793
+  },
+  {
+   "key": "S13-20",
+   "doi": "10.68159/j612488059",
+   "title": "Digital Transformation Fatigue in Organizations: A Management Viewpoint on Initiative Overload, Employee Resistance, and Declining Strategic Focus",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "https://imbaspub.com/storage/pub-article-files/article-j612488059.pdf?ts=1788793090",
+   "oa_status": "hybrid",
+   "chars": 0
+  },
+  {
+   "key": "S04-39",
+   "doi": "10.1371/journal.pone.0303370",
+   "title": "Effectiveness of a chatbot in improving the mental wellbeing of health workers in Malawi during the COVID-19 pandemic: A randomized, controlled trial",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2048,
+    "s2": 2090,
+    "openalex": 2048,
+    "crossref": 2048
+   },
+   "oa_url": "https://doi.org/10.1371/journal.pone.0303370",
+   "oa_status": "gold",
+   "chars": 2090
+  },
+  {
+   "key": "S04-40",
+   "doi": "10.35510/jer.2026.48.2.5",
+   "title": "Development and Effects of a Generative AI-Assisted Mindful Self-Compassion Program for Professional School Counselors",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1790,
+    "openalex": 1790,
+    "crossref": 1790
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1790
+  },
+  {
+   "key": "S14-51",
+   "doi": "10.21203/rs.3.rs-9220394/v1",
+   "title": "AI Awareness as a Workplace Stressor Examining Emotional Exhaustion Through Job Insecurity and Work Family Interference",
+   "sources_with_text": [
+    "epmc",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2232,
+    "crossref": 2232
+   },
+   "oa_url": "https://doi.org/10.21203/rs.3.rs-9220394/v1",
+   "oa_status": "green",
+   "chars": 2232
+  },
+  {
+   "key": "S14-52",
+   "doi": "10.70301/jour/sbs-jabr/2026/14/3/2",
+   "title": "AI Awareness as a Workplace Stressor: Examining Emotional Exhaustion Through Job Insecurity and Work–Family Interference",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2128,
+    "openalex": 2128,
+    "crossref": 2128
+   },
+   "oa_url": "https://doi.org/10.70301/jour/sbs-jabr/2026/14/3/2",
+   "oa_status": "diamond",
+   "chars": 2128
+  },
+  {
+   "key": "S08-01",
+   "doi": "10.56011/mind-mri-143-20259",
+   "title": "The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1599,
+    "openalex": 1599,
+    "crossref": 1605
+   },
+   "oa_url": "https://mindandsociety.in/index.php/MAS/article/download/934/454",
+   "oa_status": "bronze",
+   "chars": 1605
+  },
+  {
+   "key": "S08-02",
+   "doi": "10.48550/arxiv.2609.00506",
+   "title": "RecalibrateGPT: AI Fatigue Resilient Conversational Interfaces",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1158
+   },
+   "oa_url": "https://arxiv.org/pdf/2609.00506",
+   "oa_status": "green",
+   "chars": 1158
+  },
+  {
+   "key": "S08-03",
+   "doi": "10.21608/idj.2026.525979.1661",
+   "title": "Anti-Design Approach in Countering AI Fatigue",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 0
+  },
+  {
+   "key": "S12-10",
+   "doi": "10.7759/cureus.81313",
+   "title": "Effects of Introducing Generative AI in Rehabilitation Clinical Documentation.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2754,
+    "s2": 2754,
+    "openalex": 2754
+   },
+   "oa_url": "https://doi.org/10.7759/cureus.81313",
+   "oa_status": "diamond",
+   "chars": 2754
+  },
+  {
+   "key": "S12-11",
+   "doi": "10.1186/s12912-024-02655-9",
+   "title": "Emotional analysis of operating room nurses in acute care hospitals in Japan: insights using ChatGPT.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1756,
+    "s2": 1724,
+    "openalex": 1760
+   },
+   "oa_url": "https://bmcnurs.biomedcentral.com/counter/pdf/10.1186/s12912-024-02655-9",
+   "oa_status": "gold",
+   "chars": 1760
+  },
+  {
+   "key": "S12-12",
+   "doi": "10.21203/rs.3.rs-4505331/v1",
+   "title": "Sentiment Analysis of Operating Room Nurses in Acute Care Hospitals in Japan: Unveiling Passion for Perioperative Nursing Using ChatGPT",
+   "sources_with_text": [
+    "epmc",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2040,
+    "crossref": 2040
+   },
+   "oa_url": "https://www.researchsquare.com/article/rs-4505331/latest.pdf",
+   "oa_status": "green",
+   "chars": 2040
+  },
+  {
+   "key": "S12-13",
+   "doi": "10.1111/jsr.70144",
+   "title": "A Participatory Artificial Intelligence Driven Shift-Scheduling Application for Improving Sleep Among Shift-Working Caregivers: A 4-Month Non-Randomised Controlled Study With Cross-Over Design.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1943,
+    "s2": 1877,
+    "openalex": 1943,
+    "crossref": 1955
+   },
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jsr.70144",
+   "oa_status": "hybrid",
+   "chars": 1955
+  },
+  {
+   "key": "S12-14",
+   "doi": "10.3390/s25216560",
+   "title": "Context-Aware Alerting in Elderly Care Facilities: A Hybrid Framework Integrating LLM Reasoning with Rule-Based Logic.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2299,
+    "s2": 2299,
+    "openalex": 2299,
+    "crossref": 2299
+   },
+   "oa_url": "https://www.mdpi.com/1424-8220/25/21/6560/pdf?version=1761733031",
+   "oa_status": "gold",
+   "chars": 2299
+  },
+  {
+   "key": "S12-15",
+   "doi": "10.1109/RAMS50514.2026.11424510",
+   "title": "Human Reliability Analysis for Repetitive Tasks Using the Phoenix Methodology: Approach, Results, and Possible Extensions to Human-AI Teaming",
+   "sources_with_text": [
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 2278,
+    "openalex": 2278
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 2278
+  },
+  {
+   "key": "S12-16",
+   "doi": "10.1101/2024.08.05.24310603",
+   "title": "Exploring the impact of an artificial intelligence-based intraoperative image navigation system in laparoscopic surgery on clinical outcomes: A protocol for a multicenter randomized controlled trial",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 2255,
+    "s2": 2052,
+    "openalex": 2264,
+    "crossref": 2267
+   },
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2024/08/06/2024.08.05.24310603.full.pdf",
+   "oa_status": "green",
+   "chars": 2267
+  },
+  {
+   "key": "S12-17",
+   "doi": "10.3390/s25113324",
+   "title": "Few-Shot Optimization for Sensor Data Using Large Language Models: A Case Study on Fatigue Detection",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1509,
+    "s2": 1509,
+    "openalex": 1509,
+    "crossref": 1509
+   },
+   "oa_url": "https://www.mdpi.com/1424-8220/25/11/3324/pdf?version=1748169079",
+   "oa_status": "gold",
+   "chars": 1509
+  },
+  {
+   "key": "S12-18",
+   "doi": "10.60401/ijabc.18",
+   "title": "Improving Fatigue Detection with Feature Engineering on Physical Activity Accelerometer Data Using Large Language Models",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "chars": 0
+  },
+  {
+   "key": "S12-19",
+   "doi": "10.1016/j.ihj.2020.11.145",
+   "title": "Design and rationale of an intelligent algorithm to detect BuRnoUt in HeaLthcare workers in COVID era using ECG and artificiaL intelligence: The BRUCEE-LI study",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1592,
+    "s2": 1592,
+    "openalex": 1596
+   },
+   "oa_url": "https://www.sciencedirect.com/science/article/pii/S0019483220304119/pdf",
+   "oa_status": "gold",
+   "chars": 1596
+  },
+  {
+   "key": "S12-20",
+   "doi": "10.5057/isase.2026-C000057",
+   "title": "Inferring Emotion Words in Occupational Fatalities Using a Large Language Model",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1282
+   },
+   "oa_url": "https://www.jstage.jst.go.jp/article/isase/ISASE2026/0/ISASE2026_1_64/_pdf",
+   "oa_status": "diamond",
+   "chars": 1282
+  },
+  {
+   "key": "S12-21",
+   "doi": "10.11307/mededjapan.57.3_195",
+   "title": "医学教育分野別評価における大規模言語モデルによる判定の量的・質的検証 : 役割分離に向けた探索的検討",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "chars": 0
+  },
+  {
+   "key": "S12-22",
+   "doi": "10.57488/descente.47.0_155",
+   "title": "筋・軟部組織の滑走性から筋疲労度を判定するAIシステムの構築",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "chars": 0
+  },
+  {
+   "key": "S12-23",
+   "doi": null,
+   "title": "AI音声解析を用いたバーンアウト検知の可能性と持続的な働き方に関する検討",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "chars": 0
+  },
+  {
+   "key": "S12-24",
+   "doi": null,
+   "title": "An Early Study on Intelligent Analysis of Speech under COVID-19: Severity, Sleep Quality, Fatigue, and Anxiety",
+   "sources_with_text": [
+    "epmc"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1103
+   },
+   "chars": 1103
+  },
+  {
+   "key": "S12-25",
+   "doi": "10.1109/jiot.2021.3067605",
+   "title": "Computer Audition for Fighting the SARS-CoV-2 Corona Crisis-Introducing the Multitask Speech Corpus for COVID-19.",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1623,
+    "s2": 1623,
+    "openalex": 1623
+   },
+   "oa_url": "https://www.ncbi.nlm.nih.gov/pmc/articles/8768988",
+   "oa_status": "green",
+   "chars": 1623
+  }
+ ],
+ "run_id": "1980b7a2a275414d973174c6c3d918e3"
+}
