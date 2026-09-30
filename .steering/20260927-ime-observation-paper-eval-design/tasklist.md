@@ -88,6 +88,7 @@
     → あわせて Mac で回せる全 acceptance 20 本（001〜004 006 007 010〜012 015〜024 028）: **SCOPE を除く失敗 0 件**。SCOPE は 028 を除く 19 本で 1 件ずつ ❌ ＝ main の上では base が定まらない測定器の適用範囲の外（B15）。`_style_check.py papers/ime-observation` 違反 0 件
 - [ ] M0〜M13（`_issue-plan.md` §5）。
   - [x] M0 コーパスの確定（2026-09-30・Mac・判断 79）: 研究者の承認で新字新仮名の 12 作品を青空文庫から取得 → `--seed 1 --per-work 150`（読み 6〜30・既定）で 1,800 句・SHA-256 `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620`・`SudachiPy==0.7.0` / `sudachidict-core==20260723.1` を `kit/corpus/requirements.txt` に pin・`--validate` exit 0・2 回の書き出しでバイト一致・`experiment/data.md` に 6 項目と出典の作品表（`fece8020`）。`kit/check.sh` 緑・書き出し器が通る（91 ファイル）・仮の config で両 OS の計画の各シナリオ 225 試行がすべて別の句
+    → PR #278。⚠️ /cross-review は**研究者の判断でスキップ**（コードの変更 0 行・差分はコーパスのデータと data.md と steering）。CI: Mac の check の 1 回目は runner の通信切れ（"lost communication with the server"・手順は未実行）→ 失敗ジョブだけ再実行して緑
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
