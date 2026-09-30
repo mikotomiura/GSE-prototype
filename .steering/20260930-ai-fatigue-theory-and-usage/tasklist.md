@@ -31,7 +31,7 @@
 ## 検査とレビュー
 - [x] `check_surveys_here.py` 違反 0・`test_screen.py` 12 本・`test_fetch.py` 11 本緑
 - [x] code-reviewer・security-checker（並列）→ HIGH 0。判断 11
-- [ ] `/cross-review` 2 巡（Codex の当日の実消費を先に確かめる）→ 1 巡目済み（判断 12・13）
+- [x] `/cross-review` 2 巡 → 1 巡目は Codex（判断 12・13）。2 巡目は予算ガードで Codex を回せず、研究者の決定で Claude 単独（code-reviewer・判断 14・15）
 
 ## 完了処理
 - [ ] issue の状態（`issue-status` 相当）・引き継ぎ

@@ -94,17 +94,25 @@ def _opener_for(allowed):
 
 
 def retry_after_seconds(value, k):
-    """Retry-After（秒数または HTTP の日付）を待つ秒に直す。読めなければ 8×(k+1) 秒。上限 60 秒。"""
-    if value:
-        try:
-            return min(60, max(0, int(value)))
-        except ValueError:
-            try:
-                dt = email.utils.parsedate_to_datetime(value)
-                return min(60, max(0, int((dt - datetime.datetime.now(dt.tzinfo)).total_seconds())))
-            except (TypeError, ValueError):
-                pass
-    return min(60, 8 * (k + 1))
+    """Retry-After（秒数または HTTP の日付）を待つ秒に直す。読めない・負の値は 8×(k+1) 秒。上限 60 秒。
+
+    タイムゾーンの無い日付（`-0000` を含む）は UTC とみなす（HTTP の日付は GMT）。過去の日付は 0 秒。
+    """
+    default = min(60, 8 * (k + 1))
+    if not value:
+        return default
+    try:
+        n = int(value)
+        return default if n < 0 else min(60, n)
+    except ValueError:
+        pass
+    try:
+        dt = email.utils.parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return default
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return min(60, max(0, int((dt - datetime.datetime.now(datetime.timezone.utc)).total_seconds())))
 
 
 def get(url, tries=4, allowed=None):
@@ -113,6 +121,8 @@ def get(url, tries=4, allowed=None):
     ★ 空の一覧は何も許さない（既定に広がらない）。400・404・410 は None（その情報源に記録なし・errors に残らない）。
     ★ 2026-09-30 の取得を回した後に、この形に直した（decisions.md 判断 9・12）。既定の引数での振る舞いは回した版と同じ。
     """
+    if tries < 1:
+        raise ValueError("tries は 1 以上")
     allowed = ALLOWED if allowed is None else list(allowed)
     if not allowed:
         raise FenceError("許す URL の一覧が空")

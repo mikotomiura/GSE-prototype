@@ -15,6 +15,48 @@ import fetch_abstracts as F  # noqa: E402
 import screen as S  # noqa: E402
 
 
+W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def docx_text(xml_bytes):
+    """docx の本文 XML から段落ごとの文字列を作る（1 段落 1 行・文書の順）。
+
+    ★ 段落の中の w:t は空白を入れずに連結する（語の途中で run が分かれても語を壊さない・Codex 1 巡目）。
+    ★ w:tab・w:br・w:cr は空白にする（前後の語をつなげない）。入れ子の段落（テキストボックスの中など）は
+      外の段落から外して別の行にする（外の段落の後ろの文を落とさない・Claude 2 巡目）。
+    """
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(xml_bytes)
+    lines = []
+
+    def para(p):
+        buf = []
+        idx = len(lines)
+        lines.append("")  # 外の段落の行の位置を先に取る（入れ子の段落はその後ろの行になる）
+
+        def walk(e):
+            for c in e:
+                if c.tag == W + "p":
+                    para(c)
+                elif c.tag == W + "t":
+                    buf.append(c.text or "")
+                elif c.tag in (W + "tab", W + "br", W + "cr"):
+                    buf.append(" ")
+                else:
+                    walk(c)
+        walk(p)
+        lines[idx] = "".join(buf)
+
+    def top(e):
+        for c in e:
+            if c.tag == W + "p":
+                para(c)
+            else:
+                top(c)
+    top(root)
+    return "\n".join(lines)
+
+
 def text_of(path):
     low = path.lower()
     if low.endswith(".pdf"):
@@ -22,11 +64,7 @@ def text_of(path):
         return "\n".join((p.extract_text() or "") for p in PdfReader(path).pages)
     if low.endswith(".docx"):
         with zipfile.ZipFile(path) as z:
-            xml = z.read("word/document.xml").decode("utf-8")
-        # ★ 段落の中の <w:t> は空白を入れずに連結する（語の途中で run が分かれても語を壊さない・Codex 1 巡目）
-        paras = re.findall(r"<w:p[ >].*?</w:p>", xml, flags=re.S)
-        return "\n".join("".join(html.unescape(t) for t in re.findall(r"<w:t(?:\s[^>]*)?>(.*?)</w:t>", p, flags=re.S))
-                         for p in paras)
+            return docx_text(z.read("word/document.xml"))
     raw = open(path, encoding="utf-8", errors="replace").read()
     raw = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
     return html.unescape(re.sub(r"<[^>]+>", " ", raw))

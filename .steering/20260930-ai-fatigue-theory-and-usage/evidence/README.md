@@ -2,7 +2,8 @@
 
 | ファイル | 何か |
 |---|---|
-| `test_fetch.py` | `get()` の URL の柵と再試行の検査（ネットワークに出ない・判断 12） |
+| `test_fetch.py` | `get()` の URL の柵と再試行の検査（ネットワークに出ない・14 本・判断 12・15） |
+| `S-11/test_find_in_fulltext.py` | docx の読み方の検査（合成した XML・6 本・判断 15） |
 | `screen.py`・`test_screen.py` | 語形（N1〜N5）・一般の構成概念の語・枠組み（F-*）の正規表現（design.md §1.2・§2.3 に固定）と、その陽性・陰性の検査（`python -m unittest test_screen`）。★ 判定ではない。当たった語の文字列だけを返す |
 | `fetch_abstracts.py` | 抄録を DOI で取り直す（Europe PMC・Semantic Scholar・OpenAlex・Crossref。design.md §0.3）。`records` は判定者用ファイルの archive の写しの 259 件（SHA-256 を確かめる）、`theory` は S-09 の原典・原著の固定の一覧。書誌だけを repo に、抄録は repo の外に `common.write_pair` で対にして書く |
 | `run_screen.py` | 取得した抄録にふるいを当て、書誌だけの結果を `S-11/`・`S-09/` に書く。メインが読む束（抄録の全文と印）は repo の外 |
@@ -28,4 +29,4 @@
   6. `common.ensure_outside_repo` は、いまの worktree の根しか比べない（別の worktree の中は「外」と判定される）。抄録・本文の置き場は scratchpad など git の外にする（前タスクの README の注意 (1) と同じ）。
   7. `load_records()` の `open(...).read()` はファイルを閉じていない。`fetch()` の `abs_dir` の引数は使っていない。
   8. `load_records()` は DOI の末尾から `.,;)` を削る。括弧で終わる DOI は閉じ括弧を失う（2026-09-30 の 259 件では、削られた DOI は 0 件だった・Codex 1 巡目）。流用するときは、書誌の欄が DOI 単体なら末尾を削らない。
-- ★ `S-11/find_in_fulltext.py` の docx の読み方は、Codex 1 巡目の指摘で、段落の中の `<w:t>` を空白なしで連結する形に直した（語の途中で run が分かれても語を壊さない）。直す前と後で、S02-08 の原稿の語を含む文は同じ 36 文で、事実のファイルに写した 2 文（[10]・[73]）も同じだった（`decisions.md` 判断 12）。
+- ★ `S-11/find_in_fulltext.py` の docx の読み方は 2 度直した（`decisions.md` 判断 12・15）。いまは `xml.etree` で段落（`w:p`）を文書の順に走査し、段落の中の `w:t` を空白なしで連結し（run で分かれた語を壊さない）、`w:tab`・`w:br`・`w:cr` を空白にし、入れ子の段落（テキストボックスの中など）を別の行にする。検査は `S-11/test_find_in_fulltext.py`（合成した XML）。S02-08 の原稿の語を含む文は、最初の版・2 版・3 版とも同じ 36 文で、事実のファイルに写した 2 文（[10]・[73]）も同じだった。

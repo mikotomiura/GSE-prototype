@@ -122,8 +122,8 @@
 |---|---|---|---|
 | F-CLT 認知負荷理論 | 4 | S04-37（“Drawing from self-determination, cognitive load, and social cognitive theories”） | 5 |
 | F-SDT 自己決定理論 | 0 | S04-37（同じ文） | 1 |
-| F-TS テクノストレス | 29 | S02-07（“the theory of technological stress”） | 30 |
-| F-SSO ストレッサー－ストレイン－結果 | 1 | S02-07（“the stress-response-outcome framework”・語は stress-response-outcome） | 2 |
+| F-TS テクノストレス | 29 | S02-07（“the theory of technological stress”・語形は technostress ではない） | 30 |
+| F-SSO ストレッサー－ストレイン－結果 | 1 | （足さない）S02-07 は “the stress-response-outcome framework” と書く。中の語が strain でなく response で、同じ枠組みの名かは抄録から分からない | 1 |
 
 - AF001 の本文だけにある枠組み（限定容量モデル・ストレスの交流モデル）は、抄録に無いので補正の集計にも入れていない。
 - 補正の集計で 5 件に届くのは F-CLT だけで、原著（Sweller 1988, *Cogn Sci*, doi:10.1207/s15516709cog1202_4）の抄録は取得済みだった: 専門家と初心者の問題解決の技能を分ける主な要因はスキーマの形の領域の知識で、手段－目標分析による通常の問題解決は “a relatively large amount of cognitive processing capacity which is consequently unavailable for schema acquisition” を要する、とする。抄録に疲労の語は無い。
