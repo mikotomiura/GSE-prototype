@@ -36,5 +36,26 @@ class TestSummarize(unittest.TestCase):
         self.assertEqual((n["titles"], n["a_in_title"], n["f_in_title"], n["both"]), (2, 1, 2, 1))
 
 
+class TestLoadStore(unittest.TestCase):
+    """★ 判断 18: 版を混ぜない・式がコードと違う記録で止まる。"""
+
+    def _write(self, td, fn, **kw):
+        import json
+        import os
+        json.dump(dict(ids=[["doi", "10.1234/a"]], **kw), open(os.path.join(td, fn), "w", encoding="utf-8"))
+
+    def test_reads_only_the_version_and_checks_queries(self):
+        import tempfile
+        q = {(s, n): q for s, n, q in M.S.queries("v0")}
+        with tempfile.TemporaryDirectory() as td:
+            self._write(td, "ids_v0_epmc_main.json", version="v0", source="epmc", name="main", query=q[("epmc", "main")])
+            self._write(td, "ids_v1_epmc_main.json", version="v1", source="epmc", name="main", query="other")
+            got = M.load_store(td, "v0")
+            self.assertEqual(list(got), [("epmc", "main")])
+            self._write(td, "ids_v0_s2_main.json", version="v0", source="s2", name="main", query="changed")
+            with self.assertRaises(SystemExit):
+                M.load_store(td, "v0")
+
+
 if __name__ == "__main__":
     unittest.main()

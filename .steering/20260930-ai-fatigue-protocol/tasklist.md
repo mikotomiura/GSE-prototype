@@ -36,7 +36,7 @@
 ## 検査とレビュー
 - [x] issue-status.md
 - [x] code-reviewer・security-checker（並列・範囲 6bf24b59..189b6159）→ HIGH 1・MEDIUM 4・LOW 15 を一次で確かめて対応（判断 17）
-- [ ] `/cross-review` 2 巡（Codex の当日の実消費を先に確かめる）
+- [ ] `/cross-review` 2 巡（Codex の当日の実消費を先に確かめる）→ 1 巡目済み（計 101,900・判断 18）
 
 ## 完了処理
 - [ ] 引き継ぎ（次の段: 研究者の確認 → attack-me → 英語の登録版）

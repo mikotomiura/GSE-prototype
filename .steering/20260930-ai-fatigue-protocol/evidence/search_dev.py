@@ -96,6 +96,7 @@ def zenodo_subqueries(a, f):
     return [f"({' OR '.join(map(quote, a))}) AND ({quote(t)})" for t in f]
 
 
+ARXIV_ID_RE = re.compile(r"^(\d{4}\.\d{4,5}|[a-z][a-z.-]*/\d{7})(v\d+)?$", re.I)  # 新旧の arXiv の ID
 SPLIT_BY_F = {"zenodo"}  # 取得で F の語ごとに分けて和を取る情報源（判断 11）
 ZENODO_PAGE = 25  # 判断 11: Zenodo の匿名の問い合わせの 1 ページの上限
 
@@ -180,9 +181,19 @@ def count(source, query):
     raise ValueError(source)
 
 
+STATS = {}  # ★ 判断 18: 直前の fetch_ids の総数（情報源が返した数）と、受け取った件数（重なりを除く前）
+
+
+def _stat(total=None, raw=0):
+    if total is not None and STATS.get("total") is None:
+        STATS["total"] = int(total)
+    STATS["raw"] = STATS.get("raw", 0) + raw
+
+
 def fetch_ids(source, query):
     """結果の ID（DOI を優先。無ければ情報源の ID）を全部取る。戻り値は (ids の集合, 取れた件数)。"""
     ids = set()
+    STATS.clear()
     if source == "epmc":
         cursor = "*"
         while True:
@@ -190,6 +201,7 @@ def fetch_ids(source, query):
                 {"query": query, "format": "json", "resultType": "lite", "pageSize": 1000, "cursorMark": cursor})
             d = json.loads(get(u))
             res = d.get("resultList", {}).get("result", [])
+            _stat(d.get("hitCount"), len(res))
             for x in res:
                 ids.add(("doi", norm_doi(x.get("doi"))) if x.get("doi") else ("epmc", f"{x.get('source')}:{x.get('id')}"))
             nxt = d.get("nextCursorMark")
@@ -205,6 +217,7 @@ def fetch_ids(source, query):
             if token:
                 p["token"] = token
             d = json.loads(get("https://api.semanticscholar.org/graph/v1/paper/search/bulk?" + urllib.parse.urlencode(p)))
+            _stat(d.get("total"), len(d.get("data", [])))
             for x in d.get("data", []):
                 ext = x.get("externalIds") or {}
                 ids.add(("doi", norm_doi(ext["DOI"])) if ext.get("DOI") else ("s2", x.get("paperId")))
@@ -221,6 +234,7 @@ def fetch_ids(source, query):
             u = "https://api.ies.ed.gov/eric/?" + urllib.parse.urlencode(
                 {"search": query, "format": "json", "rows": 2000, "start": start, "fields": "id,url"})
             d = json.loads(get(u))["response"]
+            _stat(d["numFound"], len(d["docs"]))
             for x in d["docs"]:
                 ids.add(("eric", x["id"]))
                 doi = eric_doi(x.get("url"))  # ★ 判断 11: 種の再現を DOI で数えるため
@@ -240,6 +254,7 @@ def fetch_ids(source, query):
             for aid, _v in got:
                 ids.add(("doi", f"10.48550/arxiv.{aid.lower()}"))
             total = int(re.search(r"<opensearch:totalResults[^>]*>(\d+)<", t).group(1))
+            _stat(total, len(got))
             start += 500
             if not got or start >= total:
                 break
@@ -253,6 +268,7 @@ def fetch_ids(source, query):
                 {"q": query, "size": ZENODO_PAGE, "page": page})
             d = json.loads(get(u))
             hits = d["hits"]["hits"]
+            _stat(d["hits"]["total"], len(hits))
             for h in hits:
                 doi = h.get("doi") or (h.get("metadata") or {}).get("doi")
                 ids.add(("doi", norm_doi(doi)) if doi else ("zenodo", str(h.get("id"))))
@@ -274,7 +290,9 @@ def seed_presence(source, doi):
     if source == "s2":
         # ★ 判断 11: Semantic Scholar は arXiv の記録を DataCite の DOI でなく arXiv の ID で持つ
         m = re.match(r"10\.48550/arxiv\.(.+)$", d)
-        key = f"ARXIV:{m.group(1)}" if m else "DOI:" + doi_path(d)
+        if m and not ARXIV_ID_RE.match(m.group(1)):  # ★ 判断 18: arXiv の ID の形を確かめてから路に入れる
+            raise ValueError(f"arXiv の ID の形でない: {m.group(1)!r}")
+        key = f"ARXIV:{urllib.parse.quote(m.group(1), safe='/')}" if m else "DOI:" + doi_path(d)
         u = "https://api.semanticscholar.org/graph/v1/paper/" + key + "?fields=title"
         try:
             get(u, tries=4)
@@ -326,6 +344,18 @@ def write_json(path, obj):
     with open(path, "x", encoding="utf-8", newline="\n") as f:  # 既存の記録を上書きしない
         json.dump(by_ref(obj), f, ensure_ascii=False, indent=1)
         f.write("\n")
+
+
+def check_store_record(d, version, src, name, q):
+    """★ 判断 18（Codex 1 巡目）: 取得の記録の版・情報源・式が、いまのコードの式と同じかを確かめる（違えば止まる）。"""
+    if (d.get("version"), d.get("source"), d.get("name")) != (version, src, name):
+        raise SystemExit(f"取得の記録の版・情報源が違う: {d.get('version')} {d.get('source')} {d.get('name')}")
+    if d.get("query") != q:
+        raise SystemExit(f"取得の記録の式がコードの式と違う: {version} {src} {name}")
+    if src in SPLIT_BY_F and name == "main":
+        v = VERSIONS[version]
+        if d.get("subqueries") != zenodo_subqueries(v["A"], v["F"]):
+            raise SystemExit(f"取得の記録の分けた式がコードと違う: {version} {src} {name}")
 
 
 def recall(ids, seeds):
@@ -394,19 +424,25 @@ def main(argv=None):
                 continue
             t0 = now()
             subs = None
+            stats = []  # ★ 判断 18: 総数に届いたか（途中の空ページで黙って止まるのを記録に残す）
             if src in SPLIT_BY_F and name == "main":  # ★ 判断 11: F の語ごとに分けて和を取る
                 v = VERSIONS[a.version]
                 subs = zenodo_subqueries(v["A"], v["F"])
                 ids = set()
                 for sq in subs:
                     ids |= fetch_ids(src, sq)
+                    stats.append(dict(STATS))
             else:
                 ids = fetch_ids(src, q)
+                stats.append(dict(STATS))
+            for s in stats:
+                s["complete"] = s.get("total") is not None and s.get("raw", 0) >= s["total"]
+            complete = all(s["complete"] for s in stats)
             path = os.path.join(store, f"ids_{a.version}_{src}_{name}.json")
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(dict(version=a.version, source=src, name=name, query=q, subqueries=subs, started=t0,
-                               finished=now(), ids=sorted(map(list, ids))), f)
-            print(src, name, len(ids), path)
+                               finished=now(), stats=stats, complete=complete, ids=sorted(map(list, ids))), f)
+            print(src, name, len(ids), path, "" if complete else "★ 総数に届いていない")
         return 0
 
     if a.cmd == "recall":
@@ -416,6 +452,7 @@ def main(argv=None):
             if not os.path.exists(path):
                 continue
             d = json.load(open(path, encoding="utf-8"))
+            check_store_record(d, a.version, src, name, q)  # ★ 判断 18: 版と式がコードと同じ記録だけを数える
             ids = {tuple(x) for x in d["ids"]}
             r = recall(ids, seeds)
             blob = "\n".join(sorted("\t".join(x) for x in ids)).encode("utf-8")

@@ -215,6 +215,62 @@ class TestDoiGuard(unittest.TestCase):
             S.seed_presence("s2", "10.1234/../../x")
 
 
+class TestRound1Fixes(unittest.TestCase):
+    """★ 判断 18（Codex 1 巡目）: arXiv の ID の形・取得が総数に届いたか・記録の版と式の一致。"""
+
+    def test_s2_presence_rejects_bad_arxiv_ids(self):
+        for bad in ["10.48550/arxiv.x/../../members", "10.48550/arxiv.2609.00506?x=1", "10.48550/arxiv.2609.00506#a"]:
+            with self.assertRaises(ValueError):
+                S.seed_presence("s2", bad)
+        seen = []
+        orig = S.get
+        try:
+            S.get = lambda url, tries=6: seen.append(url) or "{}"
+            self.assertTrue(S.seed_presence("s2", "10.48550/arxiv.hep-th/9901001v2"))
+        finally:
+            S.get = orig
+        self.assertIn("/paper/ARXIV:hep-th/9901001v2?", seen[0])
+
+    def test_fetch_records_whether_the_total_was_reached(self):
+        pages = [f"<opensearch:totalResults>3</opensearch:totalResults><id>http://arxiv.org/abs/2601.0000{i}v1</id>"
+                 for i in (1, 2)] + ["<opensearch:totalResults>3</opensearch:totalResults>"]
+        calls = []
+        orig, orig_sleep = S.get, S.time.sleep
+        try:
+            S.get = lambda url, tries=6: calls.append(url) or pages[len(calls) - 1]
+            S.time.sleep = lambda s: None
+            S.fetch_ids("arxiv", "q")
+        finally:
+            S.get, S.time.sleep = orig, orig_sleep
+        self.assertEqual(S.STATS, {"total": 3, "raw": 1})  # 1 ページ目だけ受け取って 500 件ずつの次で終わる
+
+    def test_main_fetch_marks_incomplete(self):
+        import tempfile
+        orig = S.fetch_ids
+
+        def fake(src, q):
+            S.STATS.clear()
+            S.STATS.update(total=5, raw=4)
+            return {("doi", "10.1234/x")}
+        try:
+            S.fetch_ids = fake
+            with tempfile.TemporaryDirectory() as td:
+                S.main(["fetch", "--version", "v0", "--source", "epmc", "--name", "main", "--store", td])
+                d = json.load(open(os.path.join(td, "ids_v0_epmc_main.json"), encoding="utf-8"))
+        finally:
+            S.fetch_ids = orig
+        self.assertFalse(d["complete"])
+        self.assertEqual(d["stats"], [{"total": 5, "raw": 4, "complete": False}])
+
+    def test_check_store_record_refuses_other_versions_and_queries(self):
+        q = dict((f"{s} {n}", q) for s, n, q in S.queries("v0"))["epmc main"]
+        ok = {"version": "v0", "source": "epmc", "name": "main", "query": q}
+        S.check_store_record(ok, "v0", "epmc", "main", q)
+        for bad in [dict(ok, version="v1"), dict(ok, query=q + " x"), dict(ok, name="b1")]:
+            with self.assertRaises(SystemExit):
+                S.check_store_record(bad, "v0", "epmc", "main", q)
+
+
 class TestRecordsByRef(unittest.TestCase):
     """★ 判断 13: 記録の JSON は検索式を SHA-256 で持ち、式の本文は search-dev.md にある。"""
 

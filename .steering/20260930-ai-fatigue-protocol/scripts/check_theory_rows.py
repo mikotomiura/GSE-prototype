@@ -143,6 +143,10 @@ def check(xlsx, crossref_path=CROSSREF, db=DB_XLSX):
         errs.append("DOI に重複がある")
     if sorted(dois) != sorted(d for d, _g in EXPECTED):
         errs.append(f"DOI の集合が期待の 23 件と違う: 余り {sorted(set(dois) - {d for d, _ in EXPECTED})}")
+    # ★ 判断 18（Codex 1 巡目）: ID ごとの DOI の対応も確かめる（2 つの行の書誌を入れ替えて要約だけ残す取り違えを止める）
+    for i, (d_want, _g) in enumerate(EXPECTED):
+        if i < len(dois) and dois[i] != d_want:
+            errs.append(f"{lit[i]['ID']}: DOI『{dois[i]}』が期待の『{d_want}』と違う（ID と文献の対応）")
     by_doi = {d: i for i, d in enumerate(dois)}
     group_of = dict(EXPECTED)
     for i, r in enumerate(lit):
@@ -240,6 +244,13 @@ def selftest():
     mut("内部の語", lambda wb: setattr(cell(wb, "研究情報", "限界・要確認点", "TH01"), "value", "GSE で使う"), "内部の語『GSE』")
     mut("内部の語（正規表現）", lambda wb: setattr(cell(wb, "研究情報", "限界・要確認点", "TH02"), "value", "[P362] と同じ"),
         "内部の語『[P362]』")
+    def swap(wb):  # TH05 と TH06 の書誌（文献DB・書誌・出典）を入れ替え、研究情報は元のまま
+        for s in ("文献DB", "書誌・出典"):
+            ws = wb[s]
+            rows = {r[0].value: r for r in ws.iter_rows(min_row=2)}
+            for c5, c6 in zip(rows["TH05"][1:], rows["TH06"][1:]):
+                c5.value, c6.value = c6.value, c5.value
+    mut("2 つの行の書誌の入れ替え", swap, "TH05: DOI『10.1037/xge0000083』が期待の")
     mut("シートを消す", lambda wb: wb.remove(wb["書誌・出典"]), "シートの名と順が違う")
     mut("Crossref の JSON に抄録", None, "抄録の欄",
         cr_fn=lambda d: d["records"]["10.1037/rev0000309"].__setitem__("abstract", "x"))

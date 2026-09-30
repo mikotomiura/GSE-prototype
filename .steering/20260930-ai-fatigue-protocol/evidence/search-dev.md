@@ -19,10 +19,10 @@
 | Zenodo | main | 1 本の式は HTTP 500（F の語ごとの 13 本の総数の和は 4,109〈重なりを除く前・`search_dev_counts_v0_2026-10-01b.json`〉） | 3,326（13 本の和・重なりを除いた数） | 3,326 | 02:04:51〜02:31:50 |
 
 - Semantic Scholar の「取った ID」が総数より多いのは、arXiv の ID を持つ記録を、情報源の DOI と arXiv の DOI の 2 つで数えるため。
-- main の 5 本の和: DOI で重なりを除くと **21,686 件**（一覧の SHA-256 `0356cde195806bf1…`）。ほかに DOI の無い ID が 2,185 件（情報源をまたいで重なりを除いていない）。
+- main の 5 本の和: DOI で重なりを除くと **21,686 個**（一覧の SHA-256 `0356cde195806bf1…`）。ほかに DOI の無い ID が 2,185 個（情報源をまたいで重なりを除いていない）。★ どちらも**識別子の個数で、記録の数ではない**（Semantic Scholar の arXiv の記録は出版の DOI と arXiv の DOI の 2 つを持ちうる・ERIC は DOI のある 26 件も ERIC の ID を持つ・判断 18）。記録と別名の対応は取得で持っていない。
 - ★ 件数の 2 回目（`search_dev_counts_v0_2026-10-01b.json`・2026-10-01 02:58〜03:00）: Semantic Scholar の main は 18,275（1 回目 18,274）、ほかは同じ。Zenodo は 1 本の式が同じく HTTP 500 で、F の語ごとの 13 本の総数（fatigue 1,438 など）を記録した。
 - ⚠️ 取った ID の数が総数より少ない情報源がある（Europe PMC 4,349 に対し 4,342・arXiv 1,858 に対し 1,856）。同じ DOI の記録が 2 つある（Europe PMC の別の出どころの記録・arXiv の版）と見られるが、確かめていない。arXiv と Zenodo の取得は、空のページで黙って止まる（総数に届かなくても止まる）。
-- b1 の DOI 139 件のうち、main の和に無いのは 19 件。
+- b1 の DOI 139 個のうち、main の和に無いのは 19 個。
 - main_v2 は main から DOI で 1,556 件を除いた。⚠️ 除きの語の `composite`・`concrete` は人の研究の抄録にも出うる（例: 構造方程式の composite reliability）。Semantic Scholar で `(A) + (F) + "composite reliability"` は 1 件（02:14:30・記録は手元の件数だけで JSON は無い・判断 17）。
 - 記録: 再現の数え直しの版は `search_dev_recall_v0_2026-10-01{,b,c,d}.json`（d が最終。取得の直しのたびに新しい名前で書いた）。
 

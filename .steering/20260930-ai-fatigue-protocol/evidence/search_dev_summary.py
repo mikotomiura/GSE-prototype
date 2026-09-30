@@ -45,12 +45,20 @@ def sha(items):
     return hashlib.sha256("\n".join(sorted(items)).encode("utf-8")).hexdigest()
 
 
-def load_store(store):
+def load_store(store, version="v0"):
+    """★ 判断 18（Codex 1 巡目）: 指定の版の記録だけを読み、式がいまのコードと同じことを確かめる（違えば止まる）。"""
+    want = {(s, n): q for s, n, q in S.queries(version)}
     ids = {}
     for fn in sorted(os.listdir(store)):
-        if fn.startswith("ids_") and fn.endswith(".json"):
+        if fn.startswith(f"ids_{version}_") and fn.endswith(".json"):
             d = json.load(open(os.path.join(store, fn), encoding="utf-8"))
-            ids[(d["source"], d["name"])] = {tuple(x) for x in d["ids"]}
+            key = (d.get("source"), d.get("name"))
+            if key not in want:
+                raise SystemExit(f"コードに無い式の記録: {fn}")
+            S.check_store_record(d, version, key[0], key[1], want[key])
+            if key in ids:
+                raise SystemExit(f"同じ式の記録が 2 つある: {fn}")
+            ids[key] = {tuple(x) for x in d["ids"]}
     return ids
 
 
