@@ -566,3 +566,29 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - 背景: 作業用エージェント（Sonnet・`loop/024-fix2`）が (f) を字義どおり「空の成分をすべて飛ばす」で実装すると、実物の公開物 `kit/analysis/pipeline.py:1481` に当たって書き出しが止まった（Stop 条件・acceptance 29 件の赤はすべてこの波及）。当たったのは 020 の寄託の検査の selftest の綴り `b"\\/home\\/x"`（Python のバイト列のリテラルで、中身は JSON の中でさらにエスケープした `/home/x`・名前 `x` は架空）。
 - 採用: 空の成分を飛ばすのは、`Users` / `home` の後が**同じ区切り文字の連なり**（`//`・`\\`・`///`）のときだけ。`/` と `\` が混ざった連なり（`\/`・`\\/`）は飛ばさない（エージェントの読み・`e6932553`。メインが docstring と README.internal を実装に合わせた・`d8db7a80`）。
 - 理由: 指摘の形（Codex・security: `/Users//zed`・`/home//zed`）はすべて同じ文字の連なり。混ぜた連なりは JSON の二重エスケープの綴りで、判断 70〜71 で「直さない LOW」と記録した形と同じ範囲（一重のエスケープ `\/home\/zed` はアンエスケープした行で捕まる）。★ merge 済みのファイルを変えない（判断 67）。架空の名前の一覧を広げない。
+
+## 判断 78: /cross-review 2 巡目を受けた裁定 —— 混ざった区切りも飛ばし、テストの架空の名前を一覧の名前にする（2026-09-30・研究者の回答）
+
+★ レビュー（範囲は `3ba24091..41516d71` の直し・6 ファイル）: Codex（P1 2・P2 1・43,075 トークン・機密フィルタは当たりなし）・code-reviewer（CRITICAL / HIGH 0・MEDIUM 4・LOW 8）・security-checker（CRITICAL / HIGH 0・MEDIUM 1・LOW 5）。
+一次で確かめた（関数を読み込んで実測）: `names_a_user` は `C:/Users/\zed/x`・`/Users/./zed` を通す／`https://stackoverflow.com/users/12345/name`・`https://github.com/users/octocat/projects/1`・`https://example.org/home/docs` を利用者のパスとして止める（★ 追補 2 の (f) で `:` の直後を字句にした副作用の誤検知）／PGP の秘密鍵の BEGIN 行（`… KEY BLOCK-----`）に当たらない／`check_secret_content` は対訳の置き換えの前だけ（`export.internal.py:889` → 変換は `:893`）／`resolve_style_tool` はファイルの有無しか見ない／`git_top` の「not a git repository」の枝は `.git` を探さずに `None`（`:487-488`）。
+
+| # | 論点 | 採用 | 理由 |
+|---|---|---|---|
+| 78 | Codex P1: `/` と `\` が混ざった区切り（`C:/Users/\zed/x`）の後の名前を見逃す（判断 77 で狭めたため） | ★ **テストの名前を変えて塞ぐ**: `kit/analysis/pipeline.py:1481` の selftest の架空の名前 `x`（`b"\\u002fhome\\u002fx"`・`b"\\/home\\/x"`）を一覧の名前 `alice` に変え、書き出しの (f) は**区切りの連なりを混ざっていても飛ばし、`.` だけの成分も飛ばして**次の成分を名前にする。判断 77 を置き換える | pipeline.py の寄託の検査は名前によらず絶対パスの形をすべて拒むので、名前を変えても selftest の意味は変わらない。混ざった区切りと、判断 70〜71 で記録した LOW（JSON の二重エスケープ）の両方が閉じる。変えるのはテストの文字列 2 つだけ（★ 判断 67 の「merge 済みのファイルは変えない」の例外として研究者が認めた） |
+
+- ★ 仕様の範囲の直し（研究者に問わずメインが段取り・024.md の追補 3 に書いた）:
+  - (a) 中身の署名を足す: PGP の秘密鍵の BEGIN 行（`PRIVATE KEY BLOCK-----` も）・Anthropic（`sk-ant-`）・OpenAI（`sk-proj-`）・Google（`AIza`）・GitHub の refresh token（`ghr_`）・AWS の一時キー（`ASIA`）。★ 署名の検査を**対訳の置き換えの後の出力**にも、**エスケープを戻した行**にもかける（exit 2・値は出さない）。
+  - (b) `git_top` の「not a git repository」の枝でも上へ `.git` を探し、あれば exit 2（prune された worktree・壊れた `.git`・ファイルシステムの境界）。
+  - (c) 検査の道具を commit に固定する: 元が git の作業ツリーの中なら、道具（既定の場所でも `--style-check` でも）は**道具を含む git の作業ツリーで追跡済み・HEAD と一致・index の印なし**でなければ exit 2。元が git の外（一時的な写し）なら今のまま。
+  - (d) 検査の道具が読まない種類のファイルを書き出さない: 書き出すファイルは、拡張子が `.py`・`.rs`・`.sh`・`.md`・`.json`・`.toml`・`.swift`・`.txt`・`.cff` か、名前が `.gitignore`・`SEED`・`Cargo.lock`・`LICENSE-CODE`・`LICENSE-DATA` のどれか（違えば exit 2・「道具に種類を足すか、ファイルを除く」）。`kit/corpus/data/` の下は直下の `*.jsonl` だけ（それ以外は exit 2）。
+  - (e) URL の誤検知: `http://`・`https://` の URL の path では、ドライブ文字の形（`/C:/Users/<名>`）だけを利用者のパスとして扱う（web の `/users/<id>`・`/home/<x>` は通す）。他の scheme（`file`・`sftp`・`scp`・`ssh`・`smb`・`vscode` など）は今の規則のまま。
+  - (f) 出力を一時的な兄弟の dir に書き、manifest の照合と書き方の検査を通ってから `--out` へ改名する（途中で止められても「完成品に見える」出力を残さない）。
+  - (g) コンパイラのフラグの形（空白・行頭・引用符の直後の `-I` / `-L` / `-F` に続く絶対パス・`-L/Users/zed/lib`）も字句にする。
+  - (h) `internal` を含む名前を広げる: 英字に挟まれていない `internal`（大文字小文字を問わない・`internal2.md`・`internal notes.md`・`notes(internal).md`）と、英小文字の直後の `Internal`（`notesInternal.md`）。`internals`・`international` は通す。
+  - (i) 秘密の名前の型を dir 名にも当てる。足す: `.ssh`・`.gnupg`・`.aws`・`.docker`・`.kube`・`.pgpass`。
+  - (j) ホスト名の規則は `localhost` を探さない。README.internal の手順に「もう片方の開発機のホスト名も `--also-user` で渡す」。
+  - (k) 実行権限は 1 行目が `#!` ＋ 任意の空白 ＋ `/` のファイル（`#! /bin/sh` も）。`#![` は除く。
+  - (l) 対訳表が追跡済みなら、作業ツリーに無くても commit の検査の対象にする（消した表が検査から漏れない）。
+  - (m) README.internal: 名前の型の誤検知の例（`tokenizer_notes.txt`・`secret-sharing.md`・`*.asc` の公開署名）と、直さない形を書く。
+  - (n) acceptance（メインが書く）: `kit/export` の grep を書き出しの全体に・追補 3 の陰性対照（混ざった区切り・`/./`・`-L/Users/<名>`・PGP と `sk-ant-` の中身・秘密の dir 名・読まない種類 `.tex`・corpus の `.jsonl` でないファイル〔追補 2 の (h) の期待を exit 2 に改める〕・git の元で追跡されていない検査の道具）と、URL の陽性対照 3 本。
+- 直さない（記録だけ）: 空白を含むパス（`C:\Documents and Settings\<名>`・字句は空白で切れる）／`_style_check.py` が JSON の日本語を `reason` / `_note` だけで見て、`.txt` / `.cff` の日本語を見ないこと（シナリオの JSON は日本語のデータを正当に持つ・道具の設計）／`localhost` 以外のよくある語のホスト名（止める側に倒れる）。

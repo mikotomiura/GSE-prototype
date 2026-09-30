@@ -55,6 +55,17 @@ only files starting with a shebang are made executable
 an output path inside the work tree stops the export
 a style violation in the output stops the export
 a missing or failing style checker stops the export
+secret-looking content in the converted output stops the export
+a mixed or dotted separator does not hide a user path
+a web URL path is not a user path
+a compiler flag does not hide a user path
+git that reports no repository under a .git stops the export
+a style checker that is not committed stops the export
+a file type that the style checker does not read stops the export
+a file in the corpus data other than a jsonl stops the export
+the output appears only after every check passed
+a secret-looking directory name stops the export
+a deleted tracked translation table stops the export
 CASES
 if grep -qF "a bracketed reference number passes" "${X}"; then ng "判断 76: 旧ケース（角括弧の番号を通す）が残っている"; else ok "判断 76: 旧ケース（角括弧の番号を通す）が無い"; fi
 run_ok "AC .zenodo.json が JSON" "${PY}" -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "${SRC}/.zenodo.json"
@@ -68,7 +79,7 @@ BAD="$(cd "${TMP}/e1" 2>/dev/null && find . \( -name '*.jsonl' -o -name '*.ndjso
   -o -type d \( -name target -o -name sealed -o -name runs -o -name .build -o -name __pycache__ \) \) -print | grep -v '^\./kit/corpus/data/[^/]*\.jsonl$' || true)"
 if [ -d "${TMP}/e1" ] && [ -z "${BAD}" ]; then ok "AC3 生ログ・生成物・内部の記録が無い"; else ng "AC3 除外されていない: $(echo "${BAD}" | tr '\n' ' ')"; fi
 if [ -d "${TMP}/e1" ] && [ ! -e "${TMP}/e1/kit/export" ]; then ok "AC8c 判断 74: 書き出しに kit/export/ が無い（書き出し器は公開しない）"; else ng "AC8c 判断 74: 書き出しに kit/export/ がある、または書き出しが無い"; fi
-if [ -f "${TMP}/e1/README.md" ] && ! grep -qF "kit/export" "${TMP}/e1/README.md"; then ok "AC8c 判断 74: 公開の README に kit/export が無い"; else ng "AC8c 判断 74: 公開の README に kit/export がある、または README が無い"; fi
+if [ -f "${TMP}/e1/README.md" ] && ! grep -rqF "kit/export" "${TMP}/e1"; then ok "AC8c 判断 74: 書き出しの全体に kit/export が無い"; else ng "AC8c 判断 74: 書き出しに kit/export がある、または README が無い: $(grep -rlF "kit/export" "${TMP}/e1" 2>/dev/null | head -n 3 | tr '\n' ' ')"; fi
 if [ -f "${TMP}/e1/kit/logger/check_manifest.py" ] && (cd "${TMP}/e1" && "${PY}" kit/logger/check_manifest.py --self >/dev/null 2>&1); then
   ok "AC4 書き出した側で check_manifest.py --self が緑"
 else ng "AC4 書き出した側で manifest が照合できない"; fi
@@ -285,7 +296,8 @@ mkcopy corpus
 mkdir -p "${TMP}/c-corpus/papers/ime-observation/kit/corpus/data"
 printf '%s\n' "Built for GSE." > "${TMP}/c-corpus/papers/ime-observation/kit/corpus/data/notes.md"
 cx corpus > "${TMP}/neg-corpus.out" 2>&1; rc=$?
-judge 1 corpus "notes.md" "(h) kit/corpus/data/ の .jsonl でないファイルの GSE で exit 1" "${rc}"
+# ★ 追補 3 (d): kit/corpus/data/ の下は直下の *.jsonl だけ（それ以外は検査の道具が読まないので exit 2）
+judge 2 corpus "notes.md" "(h)(d) kit/corpus/data/ の .jsonl でないファイルで exit 2" "${rc}"
 newf 2 tokentxt "experiment/zenodo_token.txt" "placeholder" "(e) 秘密の名前の型（*token*.txt）で exit 2"
 newf 2 idrsa "kit/id_rsa" "placeholder" "(e) 秘密の名前の型（id_rsa）で exit 2"
 AGEK="$(printf '%s%s%s' 'AGE-SEC' 'RET-KEY-' '1')$(printf 'Q%.0s' $(seq 1 58))"
@@ -329,6 +341,12 @@ if git -C "${G2}" init -q >/dev/null 2>&1 && git -C "${G2}" add papers >/dev/nul
   git -C "${G2}" update-index --no-assume-unchanged papers/ime-observation/kit/gen/README.md
   git -C "${G2}" checkout -q -- papers/ime-observation/kit/gen/README.md
   rm -rf "${TMP}/o-git2"
+  # ★ 追補 3 (c): 元が git の作業ツリーなら、検査の道具も追跡済み・HEAD と一致でなければ exit 2（git の外の写しを渡す）
+  cp "${SC}" "${TMP}/sc-loose.py"
+  "${PY}" "${G2}/papers/ime-observation/${XC}" --out "${TMP}/o-git2" --allow-missing-license --style-check "${TMP}/sc-loose.py" > "${TMP}/neg-scloose.out" 2>&1; rc=$?
+  if [ "${rc}" -eq 2 ] && ! grep -q Traceback "${TMP}/neg-scloose.out" && [ ! -e "${TMP}/o-git2" ]; then ok "AC8d (c) git の元で、追跡されていない検査の道具なら exit 2"
+  else ng "AC8d (c) git の元で、追跡されていない検査の道具でも止まらない（exit ${rc}）"; fi
+  rm -rf "${TMP}/o-git2"
   case "$(uname -s 2>/dev/null)" in
     Darwin|Linux)
       if [ "$(id -u)" != "0" ]; then
@@ -345,8 +363,37 @@ if git -C "${G2}" init -q >/dev/null 2>&1 && git -C "${G2}" add papers >/dev/nul
   else ng "AC8c (k) --out が作業ツリーの中でも止まらない（exit ${rc}）"; fi
 else ng "AC8c 陰性対照の準備（一時的な git repo・2）に失敗した"; fi
 
+# ---- AC8d: 追補 3（判断 78・decisions.md の (a)〜(n)）の陰性対照と陽性対照（2026-09-30・/cross-review 2 巡目）
+neg mixsep "kit/e3/README.md" 'The trace was under C:/Users/\zed/work.' "判断 78: 混ざった区切りの C:/Users/<区切り><名> を混ぜると exit 1"
+neg dotsep "kit/e2/README.md" "The trace was under /Users/./zed/work." "判断 78: /Users/./<名> を混ぜると exit 1"
+neg flagpath "kit/run/README.md" "Link with -L/Users/zed/lib when needed." "(g) -L/Users/<名> を混ぜると exit 1"
+mkcopy urlok
+printf '%s\n' "See https://stackoverflow.com/users/12345/name and https://github.com/users/octocat/projects/1." "Docs are at https://example.org/home/docs for reference." >> "${TMP}/c-urlok/papers/ime-observation/kit/formats/FORMATS.md"
+run_ok "AC8d (e) 陽性対照: web の URL の /users/<id>・/home/<x> は通る" cx urlok
+PGPL="$(printf '%s%s%s' '-----BEGIN PGP PRIV' 'ATE KEY BL' 'OCK-----')"
+newf 2 pgp "experiment/keys2.md" "${PGPL}" "(a) PGP の秘密鍵の BEGIN 行で exit 2"
+SKA="$(printf '%s%s' 'sk-' 'ant-')$(printf 'a%.0s' $(seq 1 30))"
+newf 2 skant "experiment/keys3.md" "The key ${SKA} was used." "(a) sk-ant- の鍵に見える中身で exit 2"
+if [ -f "${TMP}/neg-skant.out" ] && grep -qF "aaaaaaaaaaaa" "${TMP}/neg-skant.out"; then ng "(a) 当たった値（鍵に見える中身）が出力に出ている"; else ok "(a) 当たった値（sk-ant- の中身）を出力に出さない"; fi
+mkcopy secdir
+mkdir -p "${TMP}/c-secdir/papers/ime-observation/kit/.aws"
+printf '%s\n' "[default]" > "${TMP}/c-secdir/papers/ime-observation/kit/.aws/config"
+cx secdir > "${TMP}/neg-secdir.out" 2>&1; rc=$?
+judge 2 secdir ".aws" "(i) 秘密の名前の型の dir（.aws）で exit 2" "${rc}"
+mkcopy tex
+mkdir -p "${TMP}/c-tex/papers/ime-observation/manuscript"
+printf '%s\n' "Introduction." > "${TMP}/c-tex/papers/ime-observation/manuscript/draft.tex"
+cx tex > "${TMP}/neg-tex.out" 2>&1; rc=$?
+judge 2 tex "draft.tex" "(d) 検査の道具が読まない種類（.tex）で exit 2" "${rc}"
+# (b) .git が壊れている（指す先が無い）と git は「not a git repository」を返す → exit 2
+mkcopy brokengit
+printf 'gitdir: %s\n' "${TMP}/no-such-gitdir" > "${TMP}/c-brokengit/.git"
+cx brokengit > "${TMP}/neg-brokengit.out" 2>&1; rc=$?
+if [ "${rc}" -eq 2 ] && ! grep -q Traceback "${TMP}/neg-brokengit.out" && [ ! -e "${TMP}/o-brokengit" ]; then ok "AC8d (b) 壊れた .git の下では exit 2"
+else ng "AC8d (b) 壊れた .git の下でも止まらない（exit ${rc}）"; fi
+
 check_entry_green
 forbid_gse_changes
-only_allowed '^papers/ime-observation/(kit/export/(export\.py|README\.md|export\.internal\.py|README\.internal\.md|translations\.internal\.json)|README\.md|CITATION\.cff|\.zenodo\.json)$'
+only_allowed '^papers/ime-observation/(kit/export/(export\.py|README\.md|export\.internal\.py|README\.internal\.md|translations\.internal\.json)|kit/analysis/pipeline\.py|README\.md|CITATION\.cff|\.zenodo\.json)$'
 style_ok
 finish
