@@ -274,12 +274,20 @@ def check_match(wb):
     if wb.sheetnames != SHEETS:
         return ["match: シートの並びが違う"]
     tabs = {name: {r["候補番号"]: r for r in table(wb[name], headers)[1]} for name, headers in PER_CAND.items()}
+    # ★ 書誌（出どころ・題名・DOI・本文の入手）も候補番号から独立に引いて比べる（build が別の候補の書誌を割り当てても捕まえる・Codex 2 巡目）
+    recs = {m["cid"]: m for m in J.candidate_records(J.load_oa())}
     for cid, e in D.A.items():
         el, sc, me = (tabs[n].get(cid) for n in PER_CAND)
         if el is None or sc is None or me is None:
             errs.append(f"match {cid}: 行が無い")
             continue
-        oa = str(el.get("本文の入手（OpenAlex）") or "")
+        m = recs[cid]
+        oa = m["oa"]
+        title = m["title"] or m["label"]
+        for label, got, want in (("適格性 出どころ", el["出どころ"], m["src"]), ("適格性 題名", el["題名"], title), ("適格性 DOI", el["DOI"] or "", m["doi"] or ""),
+                                 ("適格性 本文の入手", el["本文の入手（OpenAlex）"], oa), ("スクリーニング 題名", sc["題名"], title), ("方法論 題名", me["題名"], title)):
+            if got != want:
+                errs.append(f"match {cid}: {label} が候補の一覧と違う")
         pairs = [("適格性 中心範囲の段", el["中心範囲の段"], e["c"]), ("適格性 判定根拠", el["判定根拠（プロトコル §2）"], e["b"]),
                  ("適格性 原文確認レベル", el["原文確認レベル"], e.get("lv", "抄録")), ("適格性 確認経路", el["確認経路"], e.get("rt", D.RT_FACT)),
                  ("適格性 次の確認", el["次の確認・作業"], e.get("n") or "—"), ("適格性 既存の案との違い", el["既存の案との違い"] or "", e.get("df", "")),
@@ -545,6 +553,13 @@ def selftest():
         ws = wb[E]
         ws.cell(_find(ws, "S14-01"), _col(X.ELIG_HEADERS, "題名")).value = '=HYPERLINK("https://example.org","x")'
 
+    def swap_bib(wb):  # 2 つの候補の題名と DOI を入れ替える（別の候補の書誌の割り当て）
+        ws = wb[E]
+        r1, r2 = _find(ws, "S14-01"), _find(ws, "S14-02")
+        for h in ("題名", "DOI"):
+            j = _col(X.ELIG_HEADERS, h)
+            ws.cell(r1, j).value, ws.cell(r2, j).value = ws.cell(r2, j).value, ws.cell(r1, j).value
+
     def drop_sheet(wb):
         del wb["Claude方法論メモ"]
 
@@ -561,7 +576,7 @@ def selftest():
              ("cells", "除外の E コードを中心の段と食い違わせる", code_mismatch), ("formulas", "概要の数式の範囲を 1 行短く", formula_range),
              ("words", "リンク先をローカルのファイルに", local_link), ("words", "セルにローカルのパス", local_path),
              ("cells", "本文を読んだ行の全文段を未実施に", read_but_not_done), ("words", "題名のセルを数式に", formula_in_data),
-             ("check", "シートを 1 枚消す（例外で止まらず赤）", drop_sheet)]
+             ("check", "シートを 1 枚消す（例外で止まらず赤）", drop_sheet), ("match", "2 つの候補の題名と DOI を入れ替える", swap_bib)]
     for kind, label, fn in cases:
         tmp = _mutate(base, fn)
         try:

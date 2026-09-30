@@ -243,6 +243,20 @@ def build():
     return wb
 
 
+def committed_sha(path):
+    """path のコミット済み（HEAD）の版の SHA-256。git が無い・追跡されていないときは空。"""
+    import hashlib
+    import subprocess
+    try:
+        top = subprocess.run(["git", "-C", os.path.dirname(os.path.abspath(path)), "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True, check=True).stdout.strip()
+        rel = os.path.relpath(os.path.abspath(path), top).replace(os.sep, "/")
+        blob = subprocess.run(["git", "-C", top, "show", f"HEAD:{rel}"], capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        return set()
+    return {hashlib.sha256(blob).hexdigest()}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
@@ -259,9 +273,12 @@ def main(argv=None):
         #   評価版の写しは、archive の版（--out）と同じバイト列のときだけ置き換える（判定者 1 がメモを書いた写しを消さない）。
         copy_sha = None
         if os.path.exists(copy_dst):
-            if not os.path.exists(a.out) or J.sha256(copy_dst) != J.sha256(a.out):
-                sys.exit(f"写しが archive の版と違う（書き込まれた可能性があるので置き換えない）: {copy_dst}")
-            copy_sha = J.sha256(copy_dst)
+            copy_sha = J.sha256(copy_dst)  # ★ 1 回だけ読み、比べた値をそのまま置き換える直前の再確認に使う（Codex 2 巡目）
+            # 置き換えてよい写し = archive の今の版か、コミット済みの版（archive を更新した後に写しの置き換えだけ失敗したときの再実行の道・Codex 2 巡目）
+            known = {J.sha256(a.out)} if os.path.exists(a.out) else set()
+            known |= committed_sha(a.out)
+            if copy_sha not in known:
+                sys.exit(f"写しが archive の版ともコミット済みの版とも違う（書き込まれた可能性があるので置き換えない）: {copy_dst}")
     import check_appraisal_xlsx as CHK
     errs = CHK.check_data()
     if errs:
