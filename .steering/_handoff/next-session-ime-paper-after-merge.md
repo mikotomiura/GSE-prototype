@@ -3,6 +3,7 @@
 > 作成: 2026-09-30（G-GEAR で `feature/ime-eval-kit` を main へ merge したセッションの最後に）。前の handoff（`next-session-ime-paper-after-w6.md`）の後継。前のものは読まなくてよい。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（判断 72〜78）・`blockers.md`（B14）・`issues/024.md`（追補 2・3）・`tasklist.md`・`_issue-plan.md` §5。状態は着手時に測り直す。
 > ★ 評価一式は **main に入った**（PR #276）。以後の作業は main から枝を切る（`feature/ime-*` など）。両方の機械が同じ枝に push するときは、push の前に `git fetch` → `git pull --no-rebase`（force しない）。
+> ★★ **2026-09-30 追記（同じセッションの最後）: 新しい Skill `attack-me`（論文のプレ査読）を `feature/attack-me-skill` の枝に作った（push 済み・PR はまだ）。** 研究者の指示: **次のセッションのタスクが終わった後に、この枝の PR もまとめて出す**（git-workflow ルール 6: push → PR → CI 緑なら merge → main の CI）。作業記録は `.steering/20260930-attack-me-skill/`。⚠️ この枝は main（`2319a1cb`）から切った。次のタスクの枝とは別の PR にする（混ぜない）。★ 最初の実戦は M3 の事前登録の下書き（stage `prereg`・凍結の前）。
 
 ## §0 打ち込む用
 

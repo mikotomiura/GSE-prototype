@@ -71,7 +71,7 @@
     - [x] ⚠️ G-GEAR: 直した `024-acceptance.sh` を回し、一覧の SHA-256 が Mac と同じ `577caafffe2c0aa743f34ae1491cdaa8297d119296e72f03a42d29200936f34a`（91 ファイル）になるかを確かめる（B13・`papers/` が `c6305340` と同じ内容の commit で）
       → 2026-09-30（G-GEAR・Windows 11・Python 3.11.9）: Mac の push `b2e284e2` を取り込み（`c6305340` からの `papers/` の差は 0）、clean な checkout（`C:/wt/clean-024m`）で `024-acceptance.sh` exit 0（✅ 74・失敗 0 件）。★ 一覧の SHA-256 = `577caafffe2c0aa743f34ae1491cdaa8297d119296e72f03a42d29200936f34a`（91 ファイル）で **Mac と一致** → 判断 68（同じ commit の書き出しは機械によらず同じバイト列）を両 OS で確かめた。⚠️ 以前の G-GEAR の値 `9e586e52…` は測定器の CRLF を含んだ値（B13）で、比べる値としては使わない
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
-- [ ] ★ main への merge（判断 72・2026-09-30・研究者が「今日・Codex の上限を一時的に引き上げる」を選択）
+- [x] ★ main への merge（判断 72・2026-09-30・研究者が「今日・Codex の上限を一時的に引き上げる」を選択）
   - [x] 研究者に 2 問（merge するか・凍結を公開で示す方法）→ 判断 72 / 73。M3 / M6 の Done に OSF の登録を足した
   - [x] origin/main（`c11b8b80`）を base に取り込む（衝突 2 件: 台帳は合算 546,201 / 9 回・Mac の handoff は base の新しい方）→ `c8eb467d` → push（ブランチの CI 緑）
   - [x] Codex の上限を 750,000 に一時的に引き上げ（`3ba24091`）→ /cross-review 1 巡目: code-reviewer ∥ security-checker ∥ Codex（機密フィルタが受け入れ検査の架空の値に当たり、研究者の承認で `--ack-filtered`・B14）→ CRITICAL / HIGH 0
@@ -82,7 +82,7 @@
   - [x] 作業用エージェント（Sonnet）が `loop/024-fix3` で直す（約 21 分・名前は `harry`〔`alice` は pipeline の selftest のログイン名と重なる〕）→ base と merge した木の clean な checkout で 024-acceptance.sh 失敗 0 件（✅ 139・一覧の SHA-256 `298a470b94f0fe6a5b0d953ff0b37c0420e38afaedca757b0f227e309d5ca4a0`・89 ファイル）。変異 17 本: 15 本が赤・`localhost` はケースを足して赤（`4a610eb1`）・消した対訳表は git status の削除の検出と重なる → base へ merge（`403a7933`）
   - [x] Codex の上限を 300,000 に戻した（2 巡・計 93,392 トークン・当日の合算 639,593 / 11 回）
   - [x] clean な checkout で Windows で回る全 acceptance: G-GEAR（Windows 11・`5eda5dca` の clean な checkout）で Windows で回る 22 本（001〜003 005 006 008〜011 013〜024 028）がすべて失敗 0 件・macOS 専用の 004 / 007 / 012 は exit 2（対象外）・`_style_check.py papers/ime-observation` 違反 0 件。 origin/main（`1653e8b8`）を 2 度目に取り込み（台帳の合算 800,363 / 14 回・`6b5973a4`）→ PR #276
-  - [ ] PR #276 の CI 緑なら merge → main の CI を確かめる
+  - [x] PR #276 の CI 緑（head `57210663`）→ merge（`2319a1cb`・2026-09-30）→ main の CI（run 36708619521）緑
   - [ ] ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が Windows と一致するか・POSIX だけの検査（読めない dir・実行権限）が緑か（判断 68）
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
