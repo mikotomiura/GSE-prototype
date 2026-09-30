@@ -18,6 +18,7 @@
   python check_judge_xlsx.py <xlsx>
   python check_judge_xlsx.py --selftest   # 陰性対照が緑・変異がそれぞれ指定の検査で赤・出力の保護
 """
+import io
 import os
 import re
 import shutil
@@ -228,13 +229,47 @@ def _fill(c):
     return (f.fill_type, getattr(f.fgColor, "rgb", None)) if f is not None and f.fill_type else None
 
 
+def _color(c):
+    return None if c is None else (str(getattr(c, "rgb", None)), getattr(c, "theme", None), getattr(c, "indexed", None))
+
+
+def _font(f):
+    """文字の見え方（色・太字・斜体・取り消し線・下線・上下付き・大きさ）。白い文字で隠すなどを捉える（2026-09-30 の /cross-review）。"""
+    return None if f is None else (_color(f.color), f.b, f.i, f.strike, f.u, f.vertAlign, f.sz)
+
+
+def _dxf(d):
+    if d is None:
+        return None
+    fl = d.fill
+    fill = None if fl is None else (getattr(fl, "fill_type", None), _color(getattr(fl, "fgColor", None)), _color(getattr(fl, "bgColor", None)))
+    return (fill, _font(d.font), d.numFmt.formatCode if d.numFmt is not None else None)
+
+
 def _cf(ws):
+    """条件付き書式の範囲・種類・式・止めるか・書式（塗りだけでなく文字と表示形式も）。"""
     out = []
     for rng in ws.conditional_formatting:
         for rule in rng.rules:
-            color = getattr(getattr(rule.dxf, "fill", None), "bgColor", None) if rule.dxf else None
-            out.append((str(rng.sqref), tuple(rule.formula or ()), getattr(color, "rgb", None)))
+            out.append((str(rng.sqref), rule.type, rule.operator, bool(rule.stopIfTrue), tuple(rule.formula or ()), repr(_dxf(rule.dxf))))
     return sorted(out)
+
+
+def _layout(ws):
+    """シートの非表示・行と列の非表示と大きさ・表の範囲と様式（値と塗りが同じでも、隠せば判定者に見えなくなる）。"""
+    rows = sorted((k, bool(d.hidden), d.ht if d.customHeight else None, d.outlineLevel)
+                  for k, d in ws.row_dimensions.items() if d.hidden or d.customHeight or d.outlineLevel)
+    cols = sorted((k, bool(d.hidden), d.width, d.outlineLevel) for k, d in ws.column_dimensions.items())
+    tables = sorted((t.displayName, t.ref, getattr(t.tableStyleInfo, "name", None)) for t in ws.tables.values())
+    return ws.sheet_state, rows, cols, tables
+
+
+def _reload(wb):
+    """生成物を一度保存して読み直す（比べる相手と同じ表現にそろえる。既定の文字色などが読み込みで付くため）。"""
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return openpyxl.load_workbook(buf)
 
 
 def _dv(ws):
@@ -246,7 +281,7 @@ def check_golden(wb):
     if judge not in (1, 2):
         return ["『はじめに』に判定者の番号が無い"]
     if judge not in _GOLDEN:
-        _GOLDEN[judge] = J.build(judge)[0]
+        _GOLDEN[judge] = _reload(J.build(judge)[0])
     exp = _GOLDEN[judge]
     errs = []
     if wb.sheetnames != exp.sheetnames:
@@ -266,6 +301,8 @@ def check_golden(wb):
                     errs.append(f"{name}!{ce.coordinate}: 値が生成物と違う")
                 if _fill(ca) != _fill(ce):
                     errs.append(f"{name}!{ce.coordinate}: 塗りが生成物と違う")
+                if _font(ca.font) != _font(ce.font) or ca.number_format != ce.number_format:
+                    errs.append(f"{name}!{ce.coordinate}: 文字または表示形式が生成物と違う")
                 ta = ca.hyperlink.target if ca.hyperlink is not None else None
                 te = ce.hyperlink.target if ce.hyperlink is not None else None
                 if ta != te:
@@ -276,6 +313,8 @@ def check_golden(wb):
             errs.append(f"{name}: 入力規則が生成物と違う")
         if _cf(a) != _cf(e):
             errs.append(f"{name}: 条件付き書式が生成物と違う")
+        if _layout(a) != _layout(e):
+            errs.append(f"{name}: シート・行・列の表示または表が生成物と違う")
     return errs
 
 
@@ -388,6 +427,38 @@ def _mut_cand_order(wb):
     ws["A5"].value, ws["A6"].value = ws["A6"].value, ws["A5"].value
 
 
+def _mut_hide_row(wb):
+    wb["追加候補"].row_dimensions[7].hidden = True
+
+
+def _mut_white_font(wb):
+    from openpyxl.styles import Font
+    c = wb["追加候補"]["I7"]
+    c.font = Font(name=c.font.name, size=c.font.sz, color="FFFFFFFF")
+
+
+def _mut_numfmt(wb):
+    wb["追加候補"]["I7"].number_format = ";;;"
+
+
+def _mut_hide_sheet(wb):
+    wb["追加候補"].sheet_state = "hidden"
+
+
+def _mut_col_width(wb):
+    wb["追加候補"].column_dimensions["I"].width = 0
+
+
+def _mut_cf_font(wb):
+    """既存の条件付き書式の文字色だけを変える（塗り・式・範囲は同じ）。"""
+    from openpyxl.styles import Font
+    for rng in wb["判定シート"].conditional_formatting:
+        for rule in rng.rules:
+            rule.dxf.font = Font(color="FFFFFFFF")
+            return
+    raise RuntimeError("判定シートに条件付き書式が無い（変異が空振りする）")
+
+
 def _zip_mut(part, find, repl):
     """zip のパーツを直接書き換える変異（openpyxl を通らない格納先）。"""
     def f(src, dst):
@@ -437,6 +508,13 @@ MUTANTS = [
     ("書誌のセルに塗り（語を使わない）", _mut_static_fill, "golden"),
     ("入力規則の並びを変える（語は許す格納先の中）", _mut_dv_formula_plain, "golden"),
     ("書誌の列に評価の語（語の検査では許す列）", _mut_cell("判定シート", "B5", "弱い研究"), "golden"),
+    # ★ 語も塗りも使わずに候補を隠す・目立たせる変異（2026-09-30 の /cross-review・判断 16）
+    ("追加候補の行を非表示", _mut_hide_row, "golden"),
+    ("要点の文字を白に（値と塗りは同じ）", _mut_white_font, "golden"),
+    ("表示形式で値を隠す（;;;）", _mut_numfmt, "golden"),
+    ("追加候補のシートを非表示", _mut_hide_sheet, "golden"),
+    ("要点の列の幅を 0 に", _mut_col_width, "golden"),
+    ("条件付き書式の文字色だけを変える", _mut_cf_font, "golden"),
 ]
 ZIP_MUTANTS = [
     ("docProps/app.xml の会社名", _zip_mut("docProps/app.xml", "</Properties>", "<Company>GSE</Company></Properties>"), "words"),
@@ -448,7 +526,9 @@ ZIP_MUTANTS = [
 ]
 # 陽性対照（赤にならないこと）: 書誌の列の GPT-4・評価の語（著者の語）は words で緑
 GREEN = [("書誌の列の GPT-4（題名）", _mut_cell("判定シート", "B5", "Evaluating GPT-4 in writing"), "words"),
-         ("書誌の列の評価の語（題名の insufficient）", _mut_cell("判定シート", "B5", "Why AI support is insufficient"), "words")]
+         ("書誌の列の評価の語（題名の insufficient）", _mut_cell("判定シート", "B5", "Why AI support is insufficient"), "words"),
+         # ★ 読んで保存し直すだけで golden が赤なら、golden の変異は保存し直しの差で赤になっている（空振り）
+         ("変異なしで読んで保存し直す", lambda wb: None, "golden")]
 
 
 def selftest():

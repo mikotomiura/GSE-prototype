@@ -194,7 +194,7 @@ def extract(c):
 def bib_index():
     """DOI → (題名, 年, 掲載誌)。前タスクと本タスクの evidence の書誌の記録だけを使う（抄録は使わない）。"""
     idx, by_tsv = {}, {}
-    for p in glob.glob(os.path.join(EVID_PREV, "S-0[45]", "*_extraction_*.tsv")):
+    for p in sorted(glob.glob(os.path.join(EVID_PREV, "S-0[45]", "*_extraction_*.tsv"))):  # ★ 並びを固定（setdefault で先の記録が勝つ）
         with open(p, encoding="utf-8-sig", newline="") as fh:
             for r in csv.DictReader(fh, delimiter="\t"):
                 if r.get("doi"):
@@ -203,8 +203,10 @@ def bib_index():
     meta = json.load(open(os.path.join(EVID_PREV, "S-02", "s02_meta_2026-09-29.json"), encoding="utf-8"))
     for r in meta["records"]:
         idx.setdefault(r["doi"].lower(), (r["title"], (r.get("issued") or [None])[0], r.get("container", "")))
-    for p in (glob.glob(os.path.join(EVID_PREV, "S-12", "*_results_*.json")) + glob.glob(os.path.join(TASK, "evidence", "S-1*", "*_results_*.json"))
-              + glob.glob(os.path.join(TASK, "evidence", "B9", "*_screen_*.json"))):  # B9 の採択研究のふるい（判断 15）
+    for p in (sorted(glob.glob(os.path.join(EVID_PREV, "S-12", "*_results_*.json")))
+              + sorted(glob.glob(os.path.join(TASK, "evidence", "S-1*", "*_results_*.json")))
+              + sorted(glob.glob(os.path.join(TASK, "evidence", "B9", "*_screen_*.json")))  # B9 の採択研究のふるい（判断 15）
+              + sorted(glob.glob(os.path.join(EVID_PREV, "S-04", "*_results_*.json")))):  # S-04 の検索の記録（B10・B12 の書誌・判断 17）
         d = json.load(open(p, encoding="utf-8"))
         for run in d.get("runs", []):
             for r in run.get("records", []):

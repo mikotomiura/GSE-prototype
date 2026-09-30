@@ -1,6 +1,7 @@
 """B9（Nobles 2026・Zenodo の再現パッケージ）の採択 32 件のうち、DB と追加候補に無い 28 件のふるい（decisions.md 判断 15）。
 
-★ 手順: 28 件の題名と抄録（OpenAlex の /works/doi:）に、S-15 の 0 段目と同じ AI の語群と疲労の語群を当てる（search_round.py から import）。
+★ 手順: 28 件の題名と抄録（OpenAlex の /works/doi:）に、S-15 の 0 段目の 3 群（依存・疲労・AI）のうち AI と疲労の 2 群を当てる
+  （search_round.py から import）。⚠️ 0 段目の定義（3 群すべて）どおりではない。出力の `stage0` は「2 群がどちらも当たった」の意味。
   ⚠️ 結果を見る前に固定した手順ではない（2026-09-30 に、突き合わせの結果を見てから、既存の 0 段目の語群をそのまま当てた）。
 書誌だけを repo の JSON に書き、抄録は repo の外（第 2 引数のディレクトリ）にだけ書く（common.write_pair で対にする）。
 連絡先（メールアドレス）は送らない。
@@ -24,7 +25,9 @@ ALLOWED = ["https://api.openalex.org/works/"]
 OPENER = common.guarded_opener(ALLOWED)
 GROUPS = {"AI": SR.AI_RE, "疲労": SR.SURVEYS["S-15"]["groups"]["疲労"]}
 
-# 採択 32 件（原稿の文献一覧）から、DB の 3 件（AF006〜AF008）と S-02 #2 の 1 件を除いた 28 件の DOI（方法の文献 5 件は採択に入らない）
+# 採択 32 件（原稿の文献一覧）から、DB の 3 件（AF006 10.26803/ijlter.25.3.29・AF007 10.26803/ijlter.25.5.5・
+# AF008 10.11591/ijai.v15.i2.pp1963-1971）と S-02 #2 の 1 件（10.1038/s41598-026-45402-7）を除いた 28 件の DOI（方法の文献 5 件は採択に入らない）
+# ⚠️ 取得の失敗は例外のクラス名だけを記録する（2026-09-30 の実行では 28 件とも ok）
 DOIS = [
     "10.26803/ijlter.23.11.22", "10.1016/j.heliyon.2024.e40025", "10.47604/ajikm.2735", "10.70670/sra.v4i1.1983",
     "10.1080/10494820.2025.2492785", "10.1038/s41598-025-19851-5", "10.52783/jisem.v10i19s.3052", "10.5281/zenodo.3878572",
@@ -68,7 +71,7 @@ def main(bib_path, abs_dir):
            "runs": [{"id": "B9", "records": recs}]}
     common.write_pair(bib_path, os.path.join(abs_dir, os.path.basename(bib_path).replace(".json", "_abstracts.json")), bib, abstracts)
     n = sum(r.get("stage0", False) for r in recs)
-    print(len(recs), "件・0 段目の通過", n, "件・取得の失敗", sum(r["status"] != "ok" for r in recs), "件")
+    print(len(recs), "件・2 群（AI・疲労）の両方に当たった", n, "件・取得の失敗", sum(r["status"] != "ok" for r in recs), "件")
 
 
 if __name__ == "__main__":
