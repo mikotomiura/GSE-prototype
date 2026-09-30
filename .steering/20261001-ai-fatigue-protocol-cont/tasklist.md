@@ -9,18 +9,18 @@
 - [x] requirement.md・design.md（変更の前に固定）・decisions.md
 
 ## 判定者用ファイル（F19・F10）
-- [ ] `judge_xlsx.py`: 除外理由の選択肢に E7・『判定基準』の基準の版・尺度の原著の行・E7・『はじめに』の版の行
-- [ ] `check_judge_xlsx.py`: E7 を判定の語に・変異 3 つ
-- [ ] `check_judge_xlsx.py --selftest` PASS・`check_appraisal_xlsx.py` 違反 0
-- [ ] 作り直す直前に Downloads の写しの SHA-256 → `--force --copy-to` → archive と Downloads の SHA-256 が一致・検査 違反 0
+- [x] `judge_xlsx.py`: 除外理由の選択肢に E7・『判定基準』の基準の版・尺度の原著の行・E7・『はじめに』の版の行
+- [x] `check_judge_xlsx.py`: E7 を判定の語に・変異 3 つ
+- [x] `check_judge_xlsx.py --selftest` PASS・`check_appraisal_xlsx.py` 違反 0
+- [x] 作り直す直前に Downloads の写しの SHA-256 → `--force --copy-to` → archive と Downloads の SHA-256 が一致・検査 違反 0
 
 ## プロトコル v0.2
-- [ ] protocol-ja.md（冒頭・[GSRR-7]・[GSRR-35]・[GSRR-42]・付録 A の A31・付録 B・付録 F）
-- [ ] `check_protocol_here.py` 違反 0・`--selftest` PASS
+- [x] protocol-ja.md（冒頭・[GSRR-7]・[GSRR-35]・[GSRR-42]・付録 A の A31・付録 B・付録 F）
+- [x] `check_protocol_here.py` 違反 0・`--selftest` PASS
 
 ## 研究者の確認票
-- [ ] `researcher-check.md`（期限ごとの表・判定者 1 が決めたこと・【案】の一覧）
-- [ ] `scripts/check_here.py`（鍵の行・内部の語・メール・F の番号・【案】の数）と `--selftest`
+- [x] `researcher-check.md`（期限ごとの表・判定者 1 が決めたこと・【案】の一覧）
+- [x] `scripts/check_here.py`（鍵の行・内部の語・メール・F の番号・【案】の数）と `--selftest`
 
 ## 検査とレビュー
 - [ ] code-reviewer・security-checker（並列）→ 一次で確かめて対応

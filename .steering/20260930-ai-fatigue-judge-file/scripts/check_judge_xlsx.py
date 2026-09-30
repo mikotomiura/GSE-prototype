@@ -50,7 +50,8 @@ EVAL_WORDS = S.EVAL
 EVAL_RE = S.EVAL_RE
 SHEET_PART = re.compile(r"^xl/worksheets/sheet\d+\.xml$")
 JUDGE_WORDS = S.JUDGE
-JUDGE_RE = S.JUDGE_RE
+# ★ 2026-10-01: 除外理由に E7（言語）を足したので、E7 も判定の語にする（前タスクの SSOT の E[1-6] は範囲の外なので、ここで足す）
+JUDGE_RE = S.JUDGE_RE + [r"(?<![A-Za-z0-9])E7(?![0-9])"]
 GPT_RE = r"(?<![A-Za-z])GPT(?![A-Za-z])"
 HUMAN_ATTRS = {"name", "display", "tooltip", "prompt", "error", "promptTitle", "errorTitle", "title", "description", "comment"}
 META_PARTS = re.compile(r"^(docProps/|customXml/|xl/workbook\.xml$|xl/comments|xl/threadedComments|xl/persons)")
@@ -664,6 +665,25 @@ def _mut_cf_font(wb):
     raise RuntimeError("判定シートに条件付き書式が無い（変異が空振りする）")
 
 
+def _mut_dv_drop_e7(wb):
+    """除外理由の入力規則から E7 を落とす（語は許す格納先の中・選択肢だけが違う）。"""
+    for dv in wb["判定シート"].data_validations.dataValidation:
+        if dv.formula1 and "E7" in dv.formula1:
+            dv.formula1 = dv.formula1.replace(",E7", "")
+            return
+    raise RuntimeError("除外理由の入力規則（E7 を含む）が無い")
+
+
+def _mut_scale_row(wb):
+    """『判定基準』の尺度の原著の読み方を、字面どおりの読み（尺度の開発は全部 E4）に書き換える。"""
+    ws = wb["判定基準"]
+    for r in range(1, ws.max_row + 1):
+        if ws.cell(r, 1).value == "E4 の『尺度の原著』（2026-10-01）":
+            ws.cell(r, 2).value = "尺度を開発・検証した研究は、AI に関わるものも E4 とする。"
+            return
+    raise RuntimeError("『判定基準』に尺度の原著の行が無い")
+
+
 def _zip_mut(part, find, repl):
     """zip のパーツを直接書き換える変異（openpyxl を通らない格納先）。"""
     def f(src, dst):
@@ -740,6 +760,10 @@ MUTANTS = [
     ("語を含まないコメント（印だけ）", _mut_comment_mark, "golden"),
     ("要点の字体を記号の字体に", _mut_font_name, "golden"),
     ("要点を字下げで画面の外に", _mut_indent, "golden"),
+    # ★ 2026-10-01: E7 と尺度の原著の読み方（../20261001-ai-fatigue-protocol-cont 判断 1）
+    ("『はじめに』に E7（判定の語）", _mut_cell("はじめに", "B7", "E7 の記録は読まない"), "words"),
+    ("除外理由の選択肢から E7 を落とす", _mut_dv_drop_e7, "golden"),
+    ("尺度の原著の読み方を字面どおりに書き換える", _mut_scale_row, "golden"),
 ]
 # ★ golden の変異が「意図した理由」で赤になることを確かめる（メッセージの一部・code-reviewer LOW）
 EXPECT = {
@@ -754,6 +778,8 @@ EXPECT = {
     "群の記録の行の群の列を消す": "群 G01 の番号", "群の外の行に群を書く": "群の外の行",
     "群の番号を取り違える": "群 G04 の番号", "群の文から記録を 1 つ落とす": "群 G01 の番号",
     "内容の群の値を変える": "内容の群が分けの記録と違う", "判定者 2 のファイルに内容の群の列": "内容の群の列がある",
+    "『はじめに』に E7（判定の語）": "判定の語『E7』", "除外理由の選択肢から E7 を落とす": "入力規則が生成物と違う",
+    "尺度の原著の読み方を字面どおりに書き換える": "判定基準!B",
 }
 ZIP_MUTANTS = [
     ("docProps/app.xml の会社名", _zip_mut("docProps/app.xml", "</Properties>", "<Company>GSE</Company></Properties>"), "words"),
