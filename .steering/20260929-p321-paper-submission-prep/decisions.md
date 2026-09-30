@@ -277,3 +277,12 @@
 - **採用しない**: なし。
 - **2 巡目は回さない**: 直したのは「確定の書き方を未確認に弱める」「ハッシュと参照先を足す」「研究者の再確認を 1 つ足す」だけで、新しい手順の規則は足していない。残る論点（クロスリストの endorsement・ACM-class・Start の段の入力の残り方・Preview の頁数）はすべて次のセッションが画面で確かめる段へ収束した（memory `project_cross_review_two_rounds`「打ち切りは残る論点が別の段へ収束したから」）。
 
+
+## 判断 22: 知り合いに endorser の資格が無かった → 別の endorser を探す（2026-09-30・研究者の選択）
+
+- **経緯**: 研究者の報告（逐語の要旨）「知り合いの研究者は endorse の権限を持っていなかったっぽい」。
+- **選択肢**（AskUserQuestion）: A: 別の endorser を探す ／ B: Research Square に載せる ／ C: 今は出さない（原稿の TeX ソースはタグの `paper/` として GitHub と Zenodo で CC BY 4.0 で公開済み）。
+- **採用**: A（研究者の選択・私の推奨）。取れなければ、その時に B か C を選ぶ。下書き `submit/8151855` は 2026-10-13 まで残り、消えても投稿を始め直せる。
+- **B の一次**（2026-09-30・`https://www.researchsquare.com/legal/editorial` ほか・逐語）: "Research Square does not conduct peer review on preprints prior to posting." ／ "All preprints on the platform are published under a CC-BY 4.0 license." ／ "Preprints posted on Research Square receive a DOI" ・"Once preprints receive a DOI, we cannot remove them from the platform without cause." ／ "typically posted within 72 business hours" ／ "Our policies currently do not preclude posting submissions whose titles match those of preprints posted to other servers."。endorsement の仕組みの記述は無い。⚠️ 後から arXiv にも出すとき、arXiv 側が他のサーバとの重複をどう扱うかは確かめていない。
+- **候補の探し方**（arXiv の endorsement の help）: ① 指導教員・学科の教員（"A good choice for graduate students would be your thesis advisor or another professor in your department/institution working in your field who is also an active author on arXiv."）② 自分の論文が引いている arXiv 上の論文の著者（"If your article has citations to recent papers in arXiv, look for those papers in arXiv to find an endorser." → abstract ページの "Which authors of this paper are endorsers?"）。⚠️ 大勢に一斉に送らない・同じ人に繰り返し送らない。endorser は "should know the person that you endorse or you should see the paper" → 知らない相手には原稿を添える。
+- **② の候補**（arXiv の API で題を検索・2026-09-30）: `li2026` = arXiv 2602.11435（cs.SE・2026-02-11・Haolin Li, Michael Coblenz）／ `hellas2023` = arXiv 2306.05715（cs.CY ほか cs.SE・cs.HC を含む・2023-06-09・6 名）。どちらも "papers that have been submitted between three months and five years ago" の範囲内。`alaboudi2021` = arXiv 2105.02162（2021-05-05）は 5 年を超えていて数えられない。`sjoberg2023`・`ralph2018` は arXiv に見つからなかった。⚠️ 著者の誰が endorser かは `https://arxiv.org/auth/show-endorsers/<id>` で見られるが**ログインが要る**（ログインなしで 401・Chrome の研究者のセッションでもログイン画面に回された）→ 研究者が見る。⚠️ Li & Coblenz は原稿が再解析したデータ（D2）の著者で、原稿は D2 の表が参照を書き漏らしうると述べている。頼むかは研究者の判断。
