@@ -64,7 +64,11 @@
     - [x] ループ（`--issues 024`）: 1 run・attempt 1 の `issue_done`（約 17 分・`a193c751`）。clean な checkout で acceptance 失敗 0 件（✅ 58）
     - [x] merge ゲート: 対訳 72 項目をメインが全件確認・レビュー 2 本（CRITICAL なし・HIGH 3）→ 判断 70 / 71 を研究者に問い確定 → acceptance に追補（陰性対照 10 本・ケース 6 つ）→ 作業用エージェント（Sonnet）が直し（`24264d40`・`d8e3f1d9`・`9cf4eac9`）→ 直した版の clean な checkout で失敗 0 件（✅ 74）・変異 7 本がすべて赤 → merge（`c6305340`）
     - [x] merge 後の base（`c6305340`）の clean な checkout で全 acceptance 25 本: G-GEAR で回る 22 本がすべて失敗 0 件（024 ✅ 74・一覧の SHA-256 `9e586e5254063ec6a27ef50971ab83557da17d0c1343bc046faa8682b8b0b3b5`・91 ファイル）、macOS 専用の 004 / 007 / 012 は exit 2（対象外）。`_style_check.py papers/ime-observation` 違反 0 件 → push → 片付け（2026-09-30）
-    - [ ] ⚠️ Mac: `024-acceptance.sh` を回す（macOS の専用ファイルの書き出し後の `cargo test`・一覧の SHA-256 が G-GEAR と同じ commit で一致するか〔判断 68〕）
+    - [x] ⚠️ Mac: `024-acceptance.sh` を回す（macOS の専用ファイルの書き出し後の `cargo test`・一覧の SHA-256 が G-GEAR と同じ commit で一致するか〔判断 68〕）
+      → 2026-09-30（Mac・macOS 27.0・Python 3.14.4）: base `8bcf2a81`（`c6305340` との差は `.steering/` だけ）の clean な worktree で `024-acceptance.sh` exit 0（✅ 74・失敗 0 件・書き出した側の `cargo test` も緑）。★ 一覧の SHA-256 は Mac `577caaff…`・G-GEAR `9e586e52…` で**不一致に見えたが、書き出しの中身は一致**: Mac の一覧を「行の区切り CRLF・末尾 LF」にすると `9e586e52…` と完全一致した → 原因は測定器（一覧を Python のテキストの stdout に書いていて、Windows で改行が CRLF になる）。判断 68 は成り立っている（B13）
+      → 測定器を直した: 一覧を `sys.stdout.buffer` にバイトで書く＋一覧に CR があれば ❌ にする検査を足した。直した版は Mac で ✅ 74・失敗 0 件・`577caafffe2c0aa743f34ae1491cdaa8297d119296e72f03a42d29200936f34a`（91 ファイル）。陰性対照（一覧を CRLF で書く写し）は新しい検査で ❌ になった
+      → あわせて Mac で回せる merge 済みの全 acceptance 22 本（001〜004 006 007 010〜012 015〜024 028）が失敗 0 件（Windows 専用の 005 008 009 013 014 は exit 2 ＝対象外・blocked の 025〜027 は未実装で赤）。`_style_check.py papers/ime-observation` 違反 0 件
+    - [ ] ⚠️ G-GEAR: 直した `024-acceptance.sh` を回し、一覧の SHA-256 が Mac と同じ `577caafffe2c0aa743f34ae1491cdaa8297d119296e72f03a42d29200936f34a`（91 ファイル）になるかを確かめる（B13・`papers/` が `c6305340` と同じ内容の commit で）
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）

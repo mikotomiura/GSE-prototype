@@ -102,12 +102,15 @@ for d,ds,fs in os.walk(r):
     for f in fs:
         p=os.path.join(d,f); rel=os.path.relpath(p,r).replace(os.sep,"/")
         out.append((rel.encode("utf-8"), rel+" "+hashlib.sha256(open(p,"rb").read()).hexdigest()))
-sys.stdout.write("".join(x[1]+"\n" for x in sorted(out)))'
+sys.stdout.buffer.write("".join(x[1]+"\n" for x in sorted(out)).encode("utf-8"))'
+# ★ 2026-09-30: 一覧はバイトで書く。テキストの stdout だと Windows の Python が改行を CRLF にし、
+#   下の「別の機械と比べる」値だけが機械によって変わっていた（中身は一致していた・B13）。
 list () { "${PY}" -c "${LIST_PY}" "$1"; }
 L1="$( [ -d "${TMP}/e1" ] && list "${TMP}/e1" )"
 if [ -n "${L1}" ] && [ "${L1}" = "$( [ -d "${TMP}/e2" ] && list "${TMP}/e2" )" ]; then ok "AC5 2 回の書き出しがバイト一致"; else ng "AC5 書き出しが無い、または 2 回が一致しない"; fi
 if [ -d "${TMP}/e1" ] && [ -z "$(grep -rlI "$(printf '\r')" "${TMP}/e1" 2>/dev/null)" ]; then ok "AC5 判断 68: 書き出しのテキストに CR が無い"; else ng "AC5 判断 68: CR を含むファイルがある: $(grep -rlI "$(printf '\r')" "${TMP}/e1" 2>/dev/null | head -n 3 | tr '\n' ' ')"; fi
 # ★ 判断 68: 別の機械の acceptance と同じ commit で比べる値（一致しなければ機械に依存する内容が混ざっている）
+case "${L1}" in *"$(printf '\r')"*) ng "AC5 判断 68: 一覧そのものに CR がある（比べる値が機械に依存する・B13）" ;; esac
 [ -n "${L1}" ] && echo "  ℹ️ 書き出しの一覧の SHA-256（別の機械と比べる）: $(printf '%s\n' "${L1}" | "${PY}" -c "import hashlib,sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())")（$(printf '%s\n' "${L1}" | wc -l | tr -d ' ') ファイル）"
 
 # ---- AC6: ライセンスが無ければ止まる・既存の書き出し先を消さない

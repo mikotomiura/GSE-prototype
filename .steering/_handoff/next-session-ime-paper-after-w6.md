@@ -16,7 +16,19 @@
 コミットは git add パス指定（-A 禁止）。main への merge はしない（研究者の判断）。新しい公開 repo を作らない・DOI を取らない（M12 は研究者）。
 ```
 
-### どちらの機械でも（Mac の確認の後）
+### ★ G-GEAR で（Mac の確認の後・2026-09-30 追記）
+
+> ✅ Mac の確認は済んだ（tasklist・blockers B13）。書き出しの中身は一致していたが、比べる値の測定器が Windows で CRLF を混ぜていたので直した。残りは G-GEAR での 1 回の確認だけ。
+
+```
+.steering/_handoff/next-session-ime-paper-after-w6.md の §0「G-GEAR で」を実施してください。
+base（feature/ime-eval-kit）を git fetch → git pull --no-rebase で取り込み、clean な checkout（短いパス）で .steering/20260927-ime-observation-paper-eval-design/issues/024-acceptance.sh を回す。
+★ 失敗 0 件で、最後の「書き出しの一覧の SHA-256」が Mac の値 577caafffe2c0aa743f34ae1491cdaa8297d119296e72f03a42d29200936f34a（91 ファイル）と一致するかを見る（blockers.md B13）。
+一致なら tasklist.md の「⚠️ G-GEAR: 直した 024-acceptance.sh を回し…」の行に結果を書いてコミットし、git pull --no-rebase の後に push する。不一致なら直さずに原因を読み、研究者に報告する。
+コミットは git add パス指定（-A 禁止）。main への merge はしない（研究者の判断）。応答は日本語。
+```
+
+### どちらの機械でも（Mac と G-GEAR の確認の後）
 
 ```
 .steering/_handoff/next-session-ime-paper-after-w6.md の §2 を読んで、IME 論文の評価一式（feature/ime-eval-kit）を main へ merge するかを研究者に AskUserQuestion で確かめてください（勝手に merge しない）。merge するなら git-workflow のルール 6（push → PR → CI 緑なら merge）と /finish-task の手順で、タスク完了時の /cross-review（Codex）も回す。
@@ -27,6 +39,7 @@
 - base `feature/ime-eval-kit`: W1〜W6 の 25 本（任意の 025 / 026 / 027 は `## Status: blocked`）がすべて merge 済み。W6 の 024 は `c6305340`（`a193c751` ＋ merge ゲートの直し `24264d40`・`d8e3f1d9`・`9cf4eac9`）。
 - ✅ merge 後の base（`c6305340`）の clean な checkout で全 acceptance 25 本: G-GEAR で回る 22 本がすべて失敗 0 件、macOS 専用の 004 / 007 / 012 は exit 2（対象外）。`_style_check.py papers/ime-observation` 違反 0 件。
 - ★ **024 の書き出しの一覧の SHA-256（G-GEAR・Windows・`c6305340`）**: `9e586e5254063ec6a27ef50971ab83557da17d0c1343bc046faa8682b8b0b3b5`（91 ファイル）。★ 判断 68 により、同じ commit なら Mac でも同じ値になるはず。⚠️ 024 以外の `papers/` を変える commit の後では値が変わるので、比べるのは同じ commit どうし。
+  - ★ **2026-09-30 追記（Mac）: この値は測定器の改行（Windows の CRLF）を含んでいた（B13）。** 中身はバイト一致で、直した測定器での値は `577caafffe2c0aa743f34ae1491cdaa8297d119296e72f03a42d29200936f34a`（Mac で確認済み・G-GEAR で確認待ち）。
 - このセッションの裁定（判断 67〜71・詳細は decisions.md）:
   - 67 秘匿の検査の絶対パス: 書き出す機械の実在の値＋ユーザー名を伴うホームの形を拒み、明示した架空の名前の一覧（alice / alice2 / bob / carol / dave / erin / gina / harry / YAMADA~1 / name）だけ通す。
   - 68 ★ **パイロットと本計測（M1 / M4 / M5 / M7 / M10）のロガーは `export.py` の書き出しからビルドする**（ログの `manifest_sha256` が公開の manifest と一致する）。同じ commit の書き出しは機械によらず同じバイト列（LF）。`_issue-plan.md` §5 の M1 / M5 / M10 の前提に 024 を足した。
