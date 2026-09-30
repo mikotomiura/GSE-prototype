@@ -47,7 +47,8 @@
 - [x] endorsement の依頼のメール（03:21 JST）→ 依頼文を埋めた版と添付 PDF（`C:/wt/arxiv-upload/`・判断 20）
 - [x] 最初の知り合い → endorser の資格が無かった（判断 22）
 - [x] 候補の短いリスト（`C:/wt/arxiv-upload/endorser-shortlist.md`）・Authorea は今は使えない（判断 23）
-- [ ] 研究者がリストの上から 1 人ずつ依頼を送る（endorse できる条件は `endorsement-request-draft.md` の冒頭）→ endorse される
+- [x] show-endorsers の確認: Sjøberg の論文は該当者なし・2511.12635 は Madeyski と Shepperd が可（判断 23）
+- [ ] 研究者が Madeyski に依頼を送る（返事が無ければ 1 週間ほどで Shepperd）（endorse できる条件は `endorsement-request-draft.md` の冒頭）→ endorse される
 - [ ] A-3: 下書き `submit/8151855`（期限 2026-10-13）の続き: Start（研究者）→ Add Files（zip）→ 組版のログと Preview（TeX Live 2025）→ メタデータ・cs.HC のクロスリスト
 - [ ] A-4: 研究者が cls と bst の同梱を再確認して最後に Submit（判断 19・21）→ 公開後に EMSE へ申告・Zenodo の related_identifiers・README
 - [x] 完了時の `/cross-review`（code-reviewer ＋ Codex 1 回・4 ファイル限定）→ 裁定と修正・zip の 6 ファイルの走査（判断 21）
