@@ -297,6 +297,7 @@ mkcopy nosc
 "${PY}" "${TMP}/c-nosc/papers/ime-observation/${XC}" --out "${TMP}/o-nosc" --allow-missing-license > "${TMP}/neg-nosc.out" 2>&1; rc=$?
 if [ "${rc}" -eq 2 ] && ! grep -q Traceback "${TMP}/neg-nosc.out" && [ ! -e "${TMP}/o-nosc" ]; then ok "AC8c 判断 75: git の無い写しで --style-check を省くと exit 2（黙って飛ばさない）"
 else ng "AC8c 判断 75: 検査の道具を引けないのに止まらない（exit ${rc}）"; fi
+rm -rf "${TMP}/o-nosc"   # ★ 直す前の版が 1 つ目で書き出した場合に、次の判定へ波及させない
 "${PY}" "${TMP}/c-nosc/papers/ime-observation/${XC}" --out "${TMP}/o-nosc" --allow-missing-license --style-check "${TMP}/no-such-style-check.py" > "${TMP}/neg-nosc2.out" 2>&1; rc=$?
 if [ "${rc}" -eq 2 ] && ! grep -q Traceback "${TMP}/neg-nosc2.out" && [ ! -e "${TMP}/o-nosc" ]; then ok "AC8c 判断 75: --style-check のファイルが無ければ exit 2"
 else ng "AC8c 判断 75: --style-check のファイルが無いのに止まらない（exit ${rc}）"; fi
