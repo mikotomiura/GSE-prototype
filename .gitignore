@@ -265,3 +265,9 @@ experiments/**/ndjson-size-start.tsv
 #   ★ 抽出は scratchpad で行い、残すのは `docs/literature/` のカードと
 #   `docs/references.md` の書誌である。
 out.txt
+
+# 2026-09-30 追加（.steering/20260930-ai-fatigue-candidates-appraisal/ の security-checker L-2）。
+#   判定者用ファイル・評価版の生成スクリプト（judge_xlsx.place）が archive/ に作る退避ファイルと一時ファイル。
+#   中身は直前の版と同じなので、誤って重複のバイナリをコミットしないよう追跡から外す。
+.steering/**/*.xlsx.bak-*
+.steering/**/.tmp-*.xlsx

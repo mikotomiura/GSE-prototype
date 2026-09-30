@@ -177,4 +177,35 @@ _S04_S32_DOIS = [
 ]
 S04Y = [dict(cid=f"S04-{41 + len(S04Z) + i:02d}", refs=[(f"{PREV}/survey-S-04.md", "### 3.2", d)]) for i, d in enumerate(_S04_S32_DOIS)]
 
-CANDIDATES = S02 + S02X + S12 + S04 + S04X + S04Z + S04Y + S05 + NEW
+# ★ 2026-09-30（../20260930-ai-fatigue-candidates-appraisal/decisions.md 判断 2・3・研究者の決定）:
+#   追加候補に入っていなかった記録を足す。S-08 の一次研究（§5 の 1 件・§6 の 2 件）と、S-12 の記録に判断 13 の規則
+#   （論文が AI と書く一次研究は AI の見立てで絞らない）を当てたもの。既存の cid は変えない（末尾に足す）。
+S08N = [
+    dict(cid="S08-01", refs=[(f"{PREV}/survey-S-08.md", "## 8.", "mind-mri-143-20259")]),
+    dict(cid="S08-02", refs=[(f"{PREV}/survey-S-08.md", "## 8.", "arxiv.2609.00506")]),
+    dict(cid="S08-03", refs=[(f"{PREV}/survey-S-08.md", "## 8.", "Anti-Design")]),
+]
+S12N = [
+    dict(cid="S12-10", refs=[(f"{PREV}/survey-S-12.md", "### 4.1", "Omon")]),
+    dict(cid="S12-11", refs=[(f"{PREV}/survey-S-12.md", "### 4.2", "s12912-024-02655-9")]),
+    dict(cid="S12-12", refs=[(f"{PREV}/survey-S-12.md", "### 4.2", "s12912-024-02655-9")],
+         doi="10.21203/rs.3.rs-4505331/v1", doi_from="事実のファイルの同じ行の 2 件目の記録（前刷り）"),
+    dict(cid="S12-13", refs=[(f"{PREV}/survey-S-12.md", "### 4.2", "jsr.70144")]),
+    dict(cid="S12-14", refs=[(f"{PREV}/survey-S-12.md", "### 4.2", "s25216560")]),
+    dict(cid="S12-15", refs=[(f"{PREV}/survey-S-12.md", "### 4.2", "RAMS50514.2026.11424510")]),
+    dict(cid="S12-16", refs=[(f"{PREV}/survey-S-12.md", "### 4.1", "ImNavi")],
+         doi="10.1101/2024.08.05.24310603", doi_from="事実のファイルの同じ行の 2 件目の記録（medRxiv の版）"),
+    dict(cid="S12-17", refs=[(f"{PREV}/survey-S-12.md", "### 3.2", "s25113324")]),
+    dict(cid="S12-18", refs=[(f"{PREV}/survey-S-12.md", "### 3.2", "ijabc.18")]),
+    dict(cid="S12-19", refs=[(f"{PREV}/survey-S-12.md", "### 3.2", "BRUCEE-LI")]),
+    dict(cid="S12-20", refs=[(f"{PREV}/survey-S-12.md", "### 3.2", "isase.2026-C000057")]),
+    dict(cid="S12-21", refs=[(f"{PREV}/survey-S-12.md", "### 3.3", "mededjapan.57.3_195")]),
+    dict(cid="S12-22", refs=[(f"{PREV}/survey-S-12.md", "### 3.2", "descente.47.0_155")]),
+    dict(cid="S12-23", refs=[(f"{PREV}/survey-S-12.md", "### 3.2", "AI音声解析")],
+         doi=None, doi_from="DOI の記録なし（CiNii Research crid 1520867819566779776）", bib_key="crid:1520867819566779776"),
+    dict(cid="S12-24", refs=[(f"{PREV}/survey-S-12.md", "### 4.3", "PPR268625")],
+         doi=None, doi_from="DOI の記録なし（Europe PMC の前刷りの記録 PPR268625）", bib_key="PPR:PPR268625"),
+    dict(cid="S12-25", refs=[(f"{PREV}/survey-S-12.md", "### 4.3", "jiot.2021.3067605")]),
+]
+
+CANDIDATES = S02 + S02X + S12 + S04 + S04X + S04Z + S04Y + S05 + NEW + S08N + S12N

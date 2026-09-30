@@ -72,13 +72,13 @@
 
 | 年 | 題名 | 収録先・種別 | 読んだ範囲 | 書いてあること |
 |---|---|---|---|---|
-| 2026 | 筋・軟部組織の滑走性から筋疲労度を判定するAIシステムの構築 | デサントスポーツ科学 | 題名 | 筋疲労度を判定する AI システムの構築 |
+| 2026 | 筋・軟部組織の滑走性から筋疲労度を判定するAIシステムの構築 | デサントスポーツ科学 doi:10.57488/descente.47.0_155 | 題名 | 筋疲労度を判定する AI システムの構築 |
 | 2025 | AI音声解析を用いたバーンアウト検知の可能性と持続的な働き方に関する検討 | 蓮花寺佛教研究所 紀要 | 題名 | 音声解析 AI によるバーンアウトの検知 |
 | 2025 | AIによるドライバーの疲労・眠気検知技術 | 検査技術（商業誌の記事） | 題名 | 運転者の疲労・眠気を検知する AI ソフトウェアの紹介 |
-| 2025 | Few-Shot Optimization for Sensor Data Using Large Language Models: A Case Study on Fatigue Detection | Sensors（同じ題名の記録がもう 1 件・機関リポジトリ） | 題名 | LLM によるセンサーデータからの疲労検知 |
-| 2024 | Improving Fatigue Detection with Feature Engineering on Physical Activity Accelerometer Data Using Large Language Models | Int J Activity and Behavior Computing | 題名 | 加速度データと LLM による疲労検知 |
-| 2021 | Design and rationale of an intelligent algorithm to detect burnout in healthcare workers … (BRUCEE-LI) | Indian Heart Journal | 題名 | 心電図と AI で医療者のバーンアウトを検知する研究の計画 |
-| 2026 | Inferring Emotion Words in Occupational Fatalities Using a Large Language Model | ISASE 2026 | 抄録 | 労働災害の記述から LLM で感情語を推定し、「疲労」などの 9 区分に集計 |
+| 2025 | Few-Shot Optimization for Sensor Data Using Large Language Models: A Case Study on Fatigue Detection | Sensors doi:10.3390/s25113324（同じ題名の記録がもう 1 件・機関リポジトリ） | 抄録（2026-09-30） | 加速度データからの疲労の検知の課題に、LLM の few-shot の例の選び方（ユークリッド距離の絞り込みと LLM による文脈の関連の順位づけ）を当てた。マクロ F1 は 69.13±10.71%（無作為の選び方 59.30%・距離だけ 67.61%） |
+| 2024 | Improving Fatigue Detection with Feature Engineering on Physical Activity Accelerometer Data Using Large Language Models | Int J Activity and Behavior Computing doi:10.60401/ijabc.18 | 題名 | 加速度データと LLM による疲労検知 |
+| 2021 | Design and rationale of an intelligent algorithm to detect burnout in healthcare workers … (BRUCEE-LI) | Indian Heart Journal doi:10.1016/j.ihj.2020.11.145 | 抄録（2026-09-30） | 研究の計画。北インドの 4 施設の医療者 900 名以上（予定）の横断の観察研究で、燃え尽きを Mini Z で測り、心電図から燃え尽きを予測する畳み込みニューラルネットワークのモデルを作る |
+| 2026 | Inferring Emotion Words in Occupational Fatalities Using a Large Language Model | ISASE 2026 doi:10.5057/isase.2026-C000057 | 抄録 | 労働災害の記述から LLM で感情語を推定し、「疲労」などの 9 区分に集計 |
 | — | KAKEN: AI瞳孔計測システムを用いた医師の身体的・精神的疲労度評価 | 研究課題 | 題名・概要 | 瞳孔計測 AI で外科医の疲労度を評価するシステムの開発 |
 | — | KAKEN: AI瞳孔計測を活用した看護師の疲労の客観的評価と労働環境改善モデルの構築 | 研究課題 | 題名 | 同上（看護師） |
 | — | KAKEN: 顎関節症ならびに疲労愁訴を伴う疾患における，AIを用いた筋疲労の定量評価 | 研究課題 | 題名・概要 | AI による筋疲労の定量評価 |
@@ -86,11 +86,13 @@
 | — | KAKEN: AIを用いた操船者の肉体的疲労を対象とした遠隔アラームシステム | 研究課題 | 題名 | 操船者の肉体的疲労を AI で検知する警報 |
 | — | KAKEN: 因果推論と生成AIで切り拓く子育てバーンアウト・周産期うつ予防 | 研究課題 | 題名 | 子育てのバーンアウトの予防に生成 AI を用いる |
 
+★ 2026-09-30: 表の DOI は CiNii Research・J-STAGE の書誌の記録（`evidence/S-12/s12_ja_results_2026-09-29.json`）から足した。Few-Shot と BRUCEE-LI は抄録を取り直して「書いてあること」を足した（repo の外に置いた）。
+
 ### 3.3 AI の導入で人の疲労・負担を減らすことを題名・抄録に掲げたもの（6 件）
 
 | 年 | 題名 | 収録先・種別 | 読んだ範囲 | 書いてあること |
 |---|---|---|---|---|
-| 2026 | 医学教育分野別評価における大規模言語モデルによる判定の量的・質的検証：役割分離に向けた探索的検討 | 医学教育 57(3) | 抄録 | 分野別評価の「評価疲れ」への対応として、LLM による評価基準への適合性の判定を人間の判定と比べた（Gwet の AC2 = 0.91）。抄録は、疲労を測ったとは書いていない |
+| 2026 | 医学教育分野別評価における大規模言語モデルによる判定の量的・質的検証：役割分離に向けた探索的検討 | 医学教育 57(3) doi:10.11307/mededjapan.57.3_195 | 抄録 | 分野別評価の「評価疲れ」への対応として、LLM による評価基準への適合性の判定を人間の判定と比べた（Gwet の AC2 = 0.91）。抄録は、疲労を測ったとは書いていない |
 | — | Dataset and Prompts for "Utility of Large Language Models in Medical Education Accreditation: Human-in-the-loop Evaluation Process for Mitigating Evaluation Exhaustion" | Zenodo（データセット）doi:10.5281/zenodo.19479135 | 題名 | 上の論文のデータとプロンプト（と題名から読める） |
 | 2024 | 現場を疲弊させる目視検査のすべてをMR空間で支える人間中心型の外観検査AIシステム | 機関リポジトリ（CiNii の種別は Article） | 題名 | 目視検査を支援する AI システム |
 | 2022 | 医師の燃え尽きを防ぐ：臨床現場を救うAI活用（医療情報サイト「時事メディカル」より） | 厚生福祉（記事の転載） | 題名 | 医師の燃え尽きを防ぐための AI の活用 |
@@ -159,10 +161,10 @@ CiNii Research の英語の組（19 件）には、日本の研究機関に限�
 |---|---|
 | Wu Y. 2026. Profiles and transitions of psychological adaptation in AI-assisted Japanese language learning. *Front Psychol*. doi:10.3389/fpsyg.2026.1837484 | 対象は中国本土の公立大学で日本語を学ぶ学生 457 名（日本の対象者ではない）。3 時点の縦断調査。テクノストレス（技術ストレス要因の尺度 22 項目を「AI を使った日本語学習」に向けて書き換え）と、学習の燃え尽き（MBI-SS 15 項目・第 3 時点のみ）を測った |
 | Cureus 2026. Implementation of an AI-Assisted Workflow for Rehabilitation Discharge Summary Creation … doi:10.7759/cureus.109247 | 京都の病院のリハビリテーション部門の前後比較。測ったのは記録の作成時間・使いやすさ（SUS）・幻覚（hallucination）と記載漏れの評価で、疲労・燃え尽き・負担感の尺度は本文に無い（燃え尽きは背景の記述だけ） |
-| BMC Nursing 2025. Emotional analysis of operating room nurses in acute care hospitals in Japan: insights using ChatGPT. doi:10.1186/s12912-024-02655-9（と Research Square の前刷り） | 日本の手術室看護師 10 名への面接を、ChatGPT と研究者が分析した。ChatGPT は分析の道具で、看護師が AI を使ったわけではない |
-| J Sleep Res 2026. A Participatory AI Driven Shift-Scheduling Application for Improving Sleep Among Shift-Working Caregivers. doi:10.1111/jsr.70144 | 介護職 35 名のクロスオーバー介入。AI が作った勤務表と手作業の勤務表を比べ、睡眠を指輪型の計測器で測った |
-| Sensors 2025. Context-Aware Alerting in Elderly Care Facilities … LLM Reasoning with Rule-Based Logic. doi:10.3390/s25216560 | 介護施設の通知を LLM で絞る仕組み。測ったのは通知の量と判定の精度で、看護職の疲労は測っていない |
-| RAMS 2026. Human Reliability Analysis for Repetitive Tasks … Human-AI Teaming. doi:10.1109/RAMS50514.2026.11424510 | 日本の原子力施設の点検の事例で、反復作業の認知的疲労を人間信頼性解析でモデル化 |
+| BMC Nursing 2025. Emotional analysis of operating room nurses in acute care hospitals in Japan: insights using ChatGPT. doi:10.1186/s12912-024-02655-9（と Research Square の前刷り doi:10.21203/rs.3.rs-4505331/v1） | 日本の手術室看護師 10 名への面接を、ChatGPT と研究者が分析した。ChatGPT は分析の道具で、看護師が AI を使ったわけではない。★ 抄録（2026-09-30）: 目的に「燃え尽きと離職につながる要因を明らかにする」を掲げる。前刷りも同じ 10 名・同じ期間（2023-02〜2024-02） |
+| J Sleep Res 2026. A Participatory AI Driven Shift-Scheduling Application for Improving Sleep Among Shift-Working Caregivers. doi:10.1111/jsr.70144 | 介護職 35 名のクロスオーバー介入。AI が作った勤務表と手作業の勤務表を比べ、睡眠を指輪型の計測器で測った。★ 抄録（2026-09-30）: 勤務表の改善の必要（逆回りの交代を避けるなど）は、職業上の疲労の相談から導いた。深い睡眠とレム睡眠が介入の条件で多かった |
+| Sensors 2025. Context-Aware Alerting in Elderly Care Facilities … LLM Reasoning with Rule-Based Logic. doi:10.3390/s25216560 | 介護施設の通知を LLM で絞る仕組み。測ったのは通知の量と判定の精度で、看護職の疲労は測っていない。★ 抄録（2026-09-30）: 目的に「アラーム疲労を減らす」を掲げる。入居者 28 名・看護職 4 名・7 日の実地の実験で、通知の量は 27.5% になった |
+| RAMS 2026. Human Reliability Analysis for Repetitive Tasks … Human-AI Teaming. doi:10.1109/RAMS50514.2026.11424510 | 日本の原子力施設の点検の事例で、反復作業の認知的疲労を人間信頼性解析でモデル化。★ 抄録（2026-09-30）: Phoenix の手法で、繰り返しによる認知的疲労と注意の逸れが人の過誤の確率に及ぼす影響を扱い、反復作業への AI による解決の可能性と課題を論じる |
 | BMJ Open 2023. Effect of multimodal comprehensive communication skills training with video analysis by artificial intelligence for physicians on acute geriatric care … doi:10.1136/bmjopen-2022-065477 | 日本（所属は東京医療センター）の医師へのコミュニケーション技能の研修。AI は研修の前後の面接の動画を分析する道具で、副次評価項目に医師の燃え尽きの得点がある |
 | Liu H ほか 2024. Artificial Intelligence and Radiologist Burnout. *JAMA Netw Open*. doi:10.1001/jamanetworkopen.2024.48714 | 中国の放射線科医の調査（日本の対象者ではない） |
 | Duong CD ほか 2024. Compulsive ChatGPT usage, anxiety, burnout, and sleep disturbance … *Acta Psychologica*. doi:10.1016/j.actpsy.2024.104622 | ベトナムの ChatGPT の利用者 2,602 名の横断調査（構造方程式モデリング・日本の対象者ではない）。強迫的な ChatGPT の利用 → 不安・燃え尽き → 睡眠障害の経路 |
@@ -172,6 +174,15 @@ CiNii Research の英語の組（19 件）には、日本の研究機関に限�
 | そのほか 25 件 | 日本の語が別の文脈（例: アニメ・橋梁・日本の有害事象データベース）で出るもの、AI が道具として疲労・燃え尽きを検知・予測するもの、総説・論説など。一覧は `evidence/S-12/s12_en_results_2026-09-29.json` |
 
 ⚠️ 4.2 の国の記述は、抄録と著者の所属（Europe PMC・Crossref・Semantic Scholar）で確かめた（Liu 2024 = 中国・Duong 2024 = ベトナム・Chung 2025 = 韓国・Shah 2024 = 米国・Hashem 2023 = 抄録の記述だけ）。本文は読んでいない。
+
+### 4.3 4.2 の「そのほか 25 件」から、1 件ずつの行に起こしたもの（2026-09-30）
+
+★ 2026-09-30 に、25 件の抄録を取り直して読み、AI が人の疲労を検知・分類する研究の 2 件を 1 件ずつの行にした（残りの 23 件の内訳は `../20260930-ai-fatigue-candidates-appraisal/decisions.md` 判断 3）。抄録は repo の外に置いた。
+
+| 書誌 | 抄録に書いてあること |
+|---|---|
+| Han J, Qian K, Song M ほか 2020. An Early Study on Intelligent Analysis of Speech under COVID-19: Severity, Sleep Quality, Fatigue, and Anxiety. arXiv（Europe PMC の前刷りの記録 PPR268625・DOI の記録なし） | COVID-19 と診断された患者の音声から、病気の重さ・睡眠の質・疲労・不安の 4 つの面を自動で分類するモデルを作った（2 種の音響特徴量とサポートベクターマシン）。病気の重さの推定の平均の正解率は .69 |
+| Qian K, Schmitt M, Zheng H ほか 2021. Computer Audition for Fighting the SARS-CoV-2 Corona Crisis: Introducing the Multitask Speech Corpus for COVID-19. *IEEE Internet of Things Journal*. doi:10.1109/jiot.2021.3067605 | 武漢の COVID-19 の患者 51 名の音声の資料を作り、睡眠の質・疲労・不安の 3 区分の分類の課題を定めて、従来の機械学習と深層学習の基準値を示した |
 
 ## 5. KAKEN の研究課題（CiNii Research の projects で当たった 11 件）
 
