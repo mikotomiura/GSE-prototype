@@ -78,6 +78,8 @@ def check_data(A=None, C=None):
                 errs.append(f"{where}: 中心の段（{e['c']}）と除外理由の E コード（{codes}）が合わない")
         elif e.get("c") in CODE:
             errs.append(f"{where}: 除外していないのに中心の段が {e['c']}（背景・除外は題名・抄録段か全文段で除外する）")
+        if e.get("lv") == "本文関連箇所確認" and e.get("ta") != "除外" and "ft" not in e:
+            errs.append(f"{where}: 本文を読んだ記録があるのに全文段の案（ft）が無い（未実施・E6 に落ちる）")
         if e.get("ta") == "保留" and not e.get("r"):
             errs.append(f"{where}: 保留なのに理由が無い")
         if e.get("c", "").startswith("中心") and e.get("ta") != "含める":
@@ -214,6 +216,8 @@ def check_cells(wb):
             errs.append(f"cells スクリーニング {cid}: 本文を読んでいないのに全文段が『{ft}』")
         if ft == "保留" and "E6" not in reason and not read:
             errs.append(f"cells スクリーニング {cid}: E6 でない全文段の保留なのに本文を読んでいない")
+        if full == "完了" and (ft not in ("含める", "除外", "保留") or "E6" in reason):
+            errs.append(f"cells スクリーニング {cid}: 本文を読んだ（完了）のに全文段が『{ft}』・理由が『{reason[:20]}』")
         if ft == "未実施" and oa == "無料の版なし":
             errs.append(f"cells スクリーニング {cid}: 無料の版が無いのに全文段が未実施")
         if full == "入手不可" and oa != "無料の版なし":
@@ -366,10 +370,12 @@ def check_words(wb):
         m = LOCAL_PATH.search(t)
         if m:
             errs.append(f"words {where}: ローカルのパス『{m.group(0)}』")
-    # リンクは DOI の解決先だけ（security-checker L-3）
+    # リンクは DOI の解決先だけ（security-checker L-3）。数式は概要の B 列だけ（外部の書誌の文字列が数式にならない・Codex 1 巡目）
     for ws in wb.worksheets:
         for row in ws.iter_rows():
             for c in row:
+                if c.data_type == "f" and not (ws.title == "Claude評価概要" and c.column == 2):
+                    errs.append(f"words {ws.title}!{c.coordinate}: 概要の B 列の外の数式")
                 if c.hyperlink is not None:
                     target = c.hyperlink.target or ""
                     if not target.startswith("https://doi.org/"):
@@ -384,7 +390,10 @@ LOCAL_PATH = re.compile(r"(?<![A-Za-z])[A-Za-z]:[\\/]|[\\/]Users[\\/]|AppData|fi
 
 def check(path):
     wb = openpyxl.load_workbook(path)
-    return check_rows(wb) + check_cells(wb) + check_match(wb) + check_formulas(wb) + check_golden(path, wb) + check_words(wb)
+    rows = check_rows(wb)
+    if wb.sheetnames != SHEETS:  # ★ シートが欠けた・名前が違うときは後続の検査を打ち切る（例外で止まらない・Codex 1 巡目の指摘）
+        return rows
+    return rows + check_cells(wb) + check_match(wb) + check_formulas(wb) + check_golden(path, wb) + check_words(wb)
 
 
 # ---------------------------------------------------------------- selftest
@@ -417,6 +426,8 @@ def selftest():
 
     def run(kind, path):
         wb = openpyxl.load_workbook(path)
+        if kind == "check":
+            return check(path)
         return check_golden(path, wb) if kind == "golden" else runs[kind](wb)
 
     for kind in runs:
@@ -526,6 +537,17 @@ def selftest():
         c = ws.cell(_find(ws, "S14-03"), _col(X.METH_HEADERS, "懸念・限界（判定には使わない）"))
         c.value = str(c.value) + " " + "\\".join(["C:", "Users", "someone", "x.pdf"])
 
+    def read_but_not_done(wb):  # 本文を読んだ行の全文段を未実施に（全文確認は完了のまま）
+        ws = wb[SC]
+        ws.cell(_find(ws, "S02-02"), _col(X.SCR_HEADERS, "Claude予備判定（全文段）")).value = "未実施"
+
+    def formula_in_data(wb):  # 題名のセルを数式に
+        ws = wb[E]
+        ws.cell(_find(ws, "S14-01"), _col(X.ELIG_HEADERS, "題名")).value = '=HYPERLINK("https://example.org","x")'
+
+    def drop_sheet(wb):
+        del wb["Claude方法論メモ"]
+
     def email(wb):
         wb.properties.creator = "someone@example.com"
 
@@ -537,7 +559,9 @@ def selftest():
              ("match", "判定根拠の欄に研究デザインの値（build の列の取り違え）", basis_is_design), ("cells", "DOI の無い行を未完了（無料の版あり）に", unknown_as_free),
              ("cells", "本文を読んだ行の全文確認を未完了に", read_not_done), ("cells", "背景（E2）の行を題名・抄録段で含めるに", background_included),
              ("cells", "除外の E コードを中心の段と食い違わせる", code_mismatch), ("formulas", "概要の数式の範囲を 1 行短く", formula_range),
-             ("words", "リンク先をローカルのファイルに", local_link), ("words", "セルにローカルのパス", local_path)]
+             ("words", "リンク先をローカルのファイルに", local_link), ("words", "セルにローカルのパス", local_path),
+             ("cells", "本文を読んだ行の全文段を未実施に", read_but_not_done), ("words", "題名のセルを数式に", formula_in_data),
+             ("check", "シートを 1 枚消す（例外で止まらず赤）", drop_sheet)]
     for kind, label, fn in cases:
         tmp = _mutate(base, fn)
         try:
@@ -568,6 +592,7 @@ def selftest():
         ("照合事項の対象に無い候補", lambda A, C: C.append(("C99", "S99-01", "x", "x", "x", "x"))),
         ("本文に無い照合事項の番号を引く", lambda A, C: A["S14-03"].__setitem__("k", "照合事項 C98 を見る")),
         ("中心の段なのに題名・抄録段が除外", lambda A, C: A["S14-03"].__setitem__("ta", "除外")),
+        ("本文を読んだ記録があるのに全文段の案が無い", lambda A, C: A["S02-02"].pop("ft")),
         ("背景（E2）なのに題名・抄録段を含めるに", lambda A, C: (A["S04-41"].__setitem__("ta", "含める"), A["S04-41"].pop("r"))),
         ("照合事項の扱いの案（どちらも E2）と行の除外理由が合わない", lambda A, C: (A["S04-48"].__setitem__("c", "除外（E1）"), A["S04-48"].__setitem__("r", "E1（食い違い）"))),
     ]
