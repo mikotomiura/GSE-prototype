@@ -9,7 +9,7 @@ separately, and their locations and SHA-256 digests are recorded in `experiment/
 
 | Directory | Role |
 |---|---|
-| `kit/` | The reproducible toolset (log formats, generator, emitter, reference input field, standalone logger, analysis, export). |
+| `kit/` | The reproducible toolset (log formats, generator, emitter, reference input field, standalone logger, analysis). |
 | `experiment/` | Experiment records (SEED / env.md / data.md / run.sh / notes.md). Raw logs are not stored here (`experiment/raw/` is ignored); the deposit location and its SHA-256 are recorded in `data.md`. |
 | `manuscript/` | The manuscript. |
 
@@ -37,7 +37,6 @@ Subsequent components are built at the following locations.
 | `kit/pilot/` | Calibration pilot tooling |
 | `kit/analysis/` | Ground-truth assembly, matching, L1, L2, pipeline |
 | `kit/e2/` / `kit/e3/` | Leakage evaluation / execution cost |
-| `kit/export/` | Export to the public repository |
 
 ## Verification
 

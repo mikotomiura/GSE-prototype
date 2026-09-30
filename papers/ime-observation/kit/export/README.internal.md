@@ -1,12 +1,16 @@
 # Export to the public repository
 
-`export.py` writes the public form of this directory to a new location. The public repository starts
+This note and `export.internal.py` are internal: they are never exported (their names have the
+internal form), so the public repository does not contain the exporter.
+
+`export.internal.py` writes the public form of this directory to a new location. The public repository starts
 from that output with a fresh history. The script uses only the Python standard library. It calls
 git only to check that a source inside a git work tree is committed (see the procedure below).
 
 ```
-python3 kit/export/export.py --out DIR [--allow-missing-license] [--also-user NAME ...] [--also-home PATH ...]
-python3 kit/export/export.py --selftest
+python3 kit/export/export.internal.py --out DIR [--allow-missing-license] [--style-check PATH]
+                                      [--also-user NAME ...] [--also-home PATH ...]
+python3 kit/export/export.internal.py --selftest
 ```
 
 The source is the directory two levels above `kit/export/`. `--out` must name a path that does not
@@ -17,7 +21,8 @@ Exit code: 0 = exported; 1 = refused because of the content (a private value was
 manifest does not match its files, a string literal has no translation); 2 = usage error, missing
 license text, or unreadable or unsafe input (a link that leaves the source, a binary file, a file
 with the name of a secret, a source that is not committed, an ignore file that differs from the
-exclusion rules), or an unexpected failure (only the type of the error is printed).
+exclusion rules, an output path inside the git work tree of the source, a checker of the writing
+rules that is missing or fails), or an unexpected failure (only the type of the error is printed).
 
 ## Publication procedure
 
@@ -30,7 +35,18 @@ exclusion rules), or an unexpected failure (only the type of the error is printe
    stops with exit code 2 and lists the offending files when a file it would export is untracked,
    changed or deleted. A fresh clone also guarantees that the same commit yields the same bytes
    on every machine.
-4. Run `export.py --out DIR`. The output is byte-identical for the same source on any machine.
+4. Run `export.internal.py --out DIR`, and pass the values of both development machines: every
+   `--also-user` (login name) and every `--also-home` (home directory) of the other machine, in
+   addition to the ones the script reads from the machine that runs it (its host name is read too).
+   Make the public repository on macOS or Linux. A checkout or export written on Windows does not
+   carry the executable bit, so the shell scripts (the files that start with `#!/`) would lose it;
+   on Windows run `git update-index --chmod=+x <file>` for each of them before the first commit.
+   The output is byte-identical for the same source on any machine.
+   The last step of the export runs the checker of the writing rules of published files
+   (`_style_check.py`) on the output: forbidden words, internal numbers, relation words and Japanese
+   prose. The checker is found in the git work tree of the source, or given with `--style-check PATH`;
+   if it cannot be found or fails, the export stops with exit code 2 and the output is removed; a
+   violation stops it with exit code 1 (only the file, line and kind are printed).
 5. Create the new repository from `DIR`, tag a release, and deposit the release with the archive
    service to obtain a DOI. Then add the DOI to `CITATION.cff`.
 
@@ -79,10 +95,21 @@ under `experiment/results/` are kept because the results section of the paper re
 ## What stops the export
 
 Before the scan, the script stops with exit code 2 (nothing is skipped silently) when the source
-holds a file whose name looks like a secret (`.env`, `.env.*`, `*.pem`, `*.key`, `*age-identity*`,
-`*.agekey`, `*.age`, `*token*.json`, `credentials*.json`, `client_secret*`, `g1-submit*.json`,
-`o1_submit*.json`, `*.log`; case-insensitive), or a link that leaves the source (a symbolic link,
-or on Windows a junction or any other reparse point).
+holds a file whose name looks like a secret (`.env`, `.env.*`, `*.env`, `*.pem`, `*.key`, `*.ppk`,
+`*.asc`, `*age-identity*`, `*.agekey`, `*.age`, `*token*.json`, `*token*.txt`, `*.token`,
+`credentials*.json`, `credentials`, `client_secret*`, `*secret*`, `key.txt`, `id_rsa*`,
+`id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `.netrc`, `_netrc`, `.npmrc`, `.pypirc`, `.git-credentials`,
+`g1-submit*.json`, `o1_submit*.json`, `*.log`; case-insensitive; rename the file if the name matched
+by chance), a file whose content carries the signature of a secret (the head of an age secret key,
+the begin line of a PEM private key, a GitHub / GitLab token head, the shape of an AWS access key
+id, a Slack token head; the text is never printed), a name that holds the word `internal` in
+another form than `.internal.` (rename it), an unreadable directory, or a link that leaves the
+source (a symbolic link, or on Windows a junction or any other reparse point).
+
+Inside a git work tree the script also stops when git cannot be run (a source under a `.git` is
+never exported without the check), when the translation table is not tracked or differs from the
+commit or is a link, when a file it would export (or the table) carries an `assume-unchanged` or
+`skip-worktree` mark in the index, and when a tracked file that is not excluded was not collected.
 
 The scan runs on all exported text after the changes above, and on every relative file name
 (reported as line 0). Each line is checked as written and again with its JSON and string escapes
@@ -91,27 +118,28 @@ printed. The script also verifies that the copied ranges of the pinned sources c
 characters.
 
 * A participant identifier (the letter P and three digits, not adjoining a letter or digit, so
-  that the identifier is found inside a longer name joined by an underscore; a bracketed reference number such as `[P269]` is
-  allowed), an e-mail address, the name of the private dataset repository, a session
+  that the identifier is found inside a longer name joined by an underscore; inside brackets too,
+  as in `[P017]`, and in file names), an e-mail address, the name of the private dataset repository, a session
   name of the private recordings, and the private working directories.
 * The words that name the private project, the name of its source directory, and two internal
-  marker symbols (not applied to `kit/corpus/data/`).
-* Values of the machine that runs the export: the home directory, the repository root, and the
-  login name (three characters or more). `--also-home` and `--also-user` add the values of other
+  marker symbols (not applied to the `.jsonl` files directly in `kit/corpus/data/`; other files there are checked).
+* Values of the machine that runs the export: the home directory, the repository root, the
+  login name and the host name (three characters or more; the part of the host name before the first
+  dot is taken too). `--also-home` and `--also-user` add the values of other
   machines (`--also-user` with fewer than three characters is a usage error). These values are
   found wherever they occur, with no boundary on the left. Every spelling of a path is checked: forward and backward slashes, doubled backslashes,
   and the `/c/...` form of a drive path.
 * An absolute path that names a user. A path token starts with `/`, a backslash, a drive letter
   such as `C:` or `file:` and runs to the next space, quote, angle bracket, `|`, `*` or `?`
   (prefixes such as `file://`, the extended-length prefix of Windows and `/mnt/c/` are part of
-  it). When a component of the token is `Users` or `home` (any case), the whole next component
-  (not cut at a punctuation mark, non-ASCII characters included, only a trailing `.,;:)` dropped)
-  is the name. A relative path such as `./Users/y` or `kit/home/x` is not a token. The only names
+  it). A colon does not join a name, so a path after `host:` and the path of a URL are tokens too. When a component of the token is `Users` or `home` (any case), the whole next component
+  (not cut at a punctuation mark, non-ASCII characters included, only a trailing `.,;:)` dropped;
+  a run of the same separator character before it is skipped, a run that mixes `/` and a backslash is not) is the name. A relative path such as `./Users/y` or `kit/home/x` is not a token. The only names
   that pass are these fictional ones, fixed in the script and not
   extendable by an option: `alice`, `alice2`, `bob`, `carol`, `dave`, `erin`, `gina`, `harry`,
   `YAMADA~1` and `name`. A prefix without a name (`/Users/` alone) also passes.
 
 ## Continuous integration of the public repository
 
-The public repository runs `bash kit/check.sh` (the selftests of every tool, including this one)
+The public repository runs `bash kit/check.sh` (the selftests of the tools that are exported; this exporter is not one of them)
 and `python3 kit/logger/check_manifest.py --self`.
