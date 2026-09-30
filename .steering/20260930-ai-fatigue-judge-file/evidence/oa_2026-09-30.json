@@ -1,0 +1,992 @@
+{
+ "meta": {
+  "executed": "2026-09-30 04:29:07 +0900",
+  "source": "OpenAlex /works/doi:（open_access）"
+ },
+ "records": {
+  "10.1016/j.chbr.2026.101186": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1016/j.chbr.2026.101186"
+  },
+  "10.1016/j.ijinfomgt.2025.103010": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.chb.2026.109097": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.actpsy.2025.105725": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2025.105725"
+  },
+  "10.3389/fpsyg.2026.1879080": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1879080/pdf"
+  },
+  "10.26803/ijlter.25.3.29": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://www.ijlter.org/index.php/ijlter/article/download/16238/pdf"
+  },
+  "10.26803/ijlter.25.5.5": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://www.ijlter.org/index.php/ijlter/article/download/16944/pdf"
+  },
+  "10.11591/ijai.v15.i2.pp1963-1971": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://ijai.iaescore.com/index.php/IJAI/article/download/27716/15171"
+  },
+  "10.1109/SCOReD68498.2025.11399092": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.47772/IJRISS.2025.910000615": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "bronze",
+   "oa_url": "https://rsisinternational.org/journals/ijriss/uploads/vol9-iss10-pg7551-7564-202511_pdf.pdf"
+  },
+  "10.1177/09727531251359872": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1177/09727531251359872"
+  },
+  "10.3390/technologies13110486": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/2227-7080/13/11/486/pdf?version=1761626025"
+  },
+  "10.56734/ijahss.v6n8a7": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://ijahss.net/assets/files/1755327497.pdf"
+  },
+  "10.12775/QS.2026.54.70890": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://apcz.umk.pl/QS/article/download/70890/46360"
+  },
+  "10.1007/s44163-026-01855-3": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1007/s44163-026-01855-3"
+  },
+  "10.3389/fpsyg.2026.1921504": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1921504/pdf"
+  },
+  "10.1186/s40561-024-00316-7": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1186/s40561-024-00316-7"
+  },
+  "10.1016/j.ijinfomgt.2025.102887": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.1016/j.ijinfomgt.2025.102887"
+  },
+  "10.1145/3449287": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://arxiv.org/pdf/2102.09692"
+  },
+  "10.1016/j.nepr.2026.104949": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1186/s41239-024-00444-7": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://educationaltechnologyjournal.springeropen.com/counter/pdf/10.1186/s41239-024-00444-7"
+  },
+  "10.1145/3706598.3713778": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://dl.acm.org/doi/pdf/10.1145/3706598.3713778"
+  },
+  "10.3390/informatics12020051": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/2227-9709/12/2/51/pdf?version=1747728262"
+  },
+  "10.1080/10494820.2019.1674887": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.1080/10494820.2019.1674887"
+  },
+  "10.1016/j.chbr.2021.100119": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.sciencedirect.com/science/article/pii/S2451958821000671/pdf"
+  },
+  "10.1287/isre.1070.0165": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/S0022-3999(02)00392-6": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://research.tilburguniversity.edu/en/publications/10f9c0a5-6173-4252-b376-ff4caf20a525"
+  },
+  "10.3758/s13428-013-0334-1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "bronze",
+   "oa_url": "https://link.springer.com/content/pdf/10.3758/s13428-013-0334-1.pdf"
+  },
+  "10.7326/M18-0850": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://eprints.whiterose.ac.uk/id/eprint/136633/1/PRISMA_ScR_Manuscript_July6th_clean_1_.pdf"
+  },
+  "10.11124/JBIES-20-00167": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://rgu-repository.worktribe.com/output/979072"
+  },
+  "10.1007/s11136-018-1798-3": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://link.springer.com/content/pdf/10.1007%2Fs11136-018-1798-3.pdf"
+  },
+  "10.1016/j.jclinepi.2026.112314": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pure.amsterdamumc.nl/ws/files/217632679/Updating-the-prisma-reporting-guideline-for-scoping-reviews.pdf"
+  },
+  "10.1016/j.actpsy.2026.107179": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2026.107179"
+  },
+  "10.1108/jeim-10-2025-1027": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1038/s41598-026-45402-7": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.nature.com/articles/s41598-026-45402-7_reference.pdf"
+  },
+  "10.1016/j.actpsy.2026.107396": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.sciencedirect.com/science/article/pii/S0001691826011972/pdf"
+  },
+  "10.1007/s00146-025-02764-2": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.techsoc.2026.103553": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1007/s10639-024-13198-6": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://link.springer.com/content/pdf/10.1007/s10639-024-13198-6.pdf"
+  },
+  "10.31152/jb.2025.12.10.6.297": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.5281/zenodo.22838191": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://doi.org/10.5281/zenodo.22838191"
+  },
+  "10.1057/s41599-024-04018-w": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.nature.com/articles/s41599-024-04018-w.pdf"
+  },
+  "10.1108/JSM-03-2023-0115": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.3389/fpubh.2024.1343932": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2024.1343932/pdf"
+  },
+  "10.1161/jaha.125.045637": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1161/jaha.125.045637"
+  },
+  "10.7759/cureus.80373": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.7759/cureus.80373"
+  },
+  "10.4995/eurocall.2025.23851": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://polipapers.upv.es/index.php/eurocall/article/download/23851/17995"
+  },
+  "10.37546/jaltpansigj11.1-6": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "bronze",
+   "oa_url": "https://doi.org/10.37546/jaltpansigj11.1-6"
+  },
+  "10.1159/000549894": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://karger.com/esr/article-pdf/doi/10.1159/000549894/4485261/000549894.pdf"
+  },
+  "10.3389/fpsyg.2026.1837484": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1837484/pdf"
+  },
+  "10.1001/jamanetworkopen.2024.48714": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2826721/liu_2024_oi_241365_1731684043.4639.pdf"
+  },
+  "10.1016/j.actpsy.2024.104622": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2024.104622"
+  },
+  "10.58459/rptel.2024.19023": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://rptel.apsce.net/index.php/RPTEL/article/download/2024-19023/2024-19023"
+  },
+  "10.1056/aioa2501000": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12768499/"
+  },
+  "10.1056/aioa2500945": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12858090/"
+  },
+  "10.1055/a-2657-8087": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12425613/pdf/10-1055-a-2657-8087.pdf"
+  },
+  "10.1093/jamia/ocag018": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pubmed.ncbi.nlm.nih.gov/41729180/"
+  },
+  "10.64898/2026.08.26.26361496": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://doi.org/10.64898/2026.08.26.26361496"
+  },
+  "10.1186/s12967-026-07738-6": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1186/s12967-026-07738-6"
+  },
+  "10.1002/jdd.70304": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.giq.2024.101911": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.1016/j.giq.2024.101911"
+  },
+  "10.19173/irrodl.v25i3.7659": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://www.irrodl.org/index.php/irrodl/article/download/7659/6106"
+  },
+  "10.46303/jcsr.2026.24": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://curriculumstudies.org/index.php/CS/article/download/876/173"
+  },
+  "10.3390/educsci15091223": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/2227-7102/15/9/1223/pdf?version=1758015986"
+  },
+  "10.3389/fpubh.2026.1926167": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2026.1926167/pdf"
+  },
+  "10.3389/fpubh.2025.1649342": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2025.1649342/pdf"
+  },
+  "10.3390/bs15050696": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/2076-328X/15/5/696/pdf?version=1747476524"
+  },
+  "10.1001/jamanetworkopen.2025.34976": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2839542/olson_2025_oi_250979_1758815527.03283.pdf"
+  },
+  "10.1001/jamanetworkopen.2025.28056": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2837847/you_2025_oi_250796_1755115742.48441.pdf"
+  },
+  "10.1055/a-2461-4576": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pubmed.ncbi.nlm.nih.gov/39500346/"
+  },
+  "10.1001/jamanetworkopen.2024.3201": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2816494/garcia_2024_oi_240141_1710263176.75207.pdf"
+  },
+  "10.1093/jamia/ocae295": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11756571/pdf/ocae295.pdf"
+  },
+  "10.1093/jamiaopen/ooaf068": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1093/jamiaopen/ooaf068"
+  },
+  "10.1136/wjps-2025-001073": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://wjps.bmj.com/content/8/5/e001073.full.pdf"
+  },
+  "10.1097/og9.0000000000000131": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.1097/og9.0000000000000131"
+  },
+  "10.64898/2026.06.30.26356723": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2026/07/02/2026.06.30.26356723.full.pdf"
+  },
+  "10.22454/primer.2026.393770": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://journals.stfm.org:/media/0mfhiys2/primer-10-21.pdf"
+  },
+  "10.21203/rs.3.rs-9929134/v1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.researchsquare.com/article/rs-9929134/latest.pdf"
+  },
+  "10.1177/20552076251395588": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1177/20552076251395588"
+  },
+  "10.1001/jamanetworkopen.2025.8614": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2833433/stults_2025_oi_250316_1745525878.50138.pdf"
+  },
+  "10.2196/84104": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.2196/84104"
+  },
+  "10.1055/a-2892-7988": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13290361/"
+  },
+  "10.1002/jhm.70451": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1002/jhm.70451"
+  },
+  "10.1093/ajhp/zxag176": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.1093/ajhp/zxag176"
+  },
+  "10.1109/ICARAI70085.2026.11635386": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.3389/fmed.2026.1875075": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/medicine/articles/10.3389/fmed.2026.1875075/pdf"
+  },
+  "10.65864/zpxksxfkfk": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "bronze",
+   "oa_url": "https://www.ifo.de/sites/default/files/docbase/docs/cesifo1_wp12373.pdf"
+  },
+  "10.3389/fpsyg.2026.1859401": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.3389/fpsyg.2026.1859401"
+  },
+  "10.62712/juktisi.v5i2.1366": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://ejurnal.lkpkaryaprima.id/index.php/juktisi/article/download/1366/888"
+  },
+  "10.1145/3772318.3790972": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1145/3772318.3790972"
+  },
+  "10.1080/00140139.2026.2662001": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.apergo.2024.104346": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "bronze",
+   "oa_url": "https://doi.org/10.1016/j.apergo.2024.104346"
+  },
+  "10.1109/COGSIMA.2019.8724175": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1117/12.2559474": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.2196/85666": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.2196/85666"
+  },
+  "10.1186/s12913-026-14950-z": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1186/s12913-026-14950-z"
+  },
+  "10.3389/fpsyg.2026.1900940": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1900940/pdf"
+  },
+  "10.14738/assrj.1211.19642": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://journals.scholarpublishing.org/index.php/ASSRJ/article/download/19642/11640"
+  },
+  "10.3390/ejihpe16090130": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.3390/ejihpe16090130"
+  },
+  "10.1186/s40359-026-04911-w": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1186/s40359-026-04911-w"
+  },
+  "10.3389/fcomp.2026.1756441": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/computer-science/articles/10.3389/fcomp.2026.1756441/pdf"
+  },
+  "10.3791/69637": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.3390/healthcare14142063": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/2227-9032/14/14/2063/pdf?version=1783593055"
+  },
+  "10.47067/ramss.v8i1.458": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://ramss.spcrd.org/index.php/ramss/article/download/458/479"
+  },
+  "10.35814/asiimetrik.v8i2.9876": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.35814/asiimetrik.v8i2.9876"
+  },
+  "10.31305/rrijm.2026.v11.n07.009": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.31305/rrijm.2026.v11.n07.009"
+  },
+  "10.3390/data11090215": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.3390/data11090215"
+  },
+  "10.1155/hbe2/9977058": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1155/hbe2/9977058"
+  },
+  "10.1145/3706599.3719875": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://dl.acm.org/doi/pdf/10.1145/3706599.3719875"
+  },
+  "10.23887/ijee.v10i2.115254": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.23887/ijee.v10i2.115254"
+  },
+  "10.1002/nse2.70003": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1002/nse2.70003"
+  },
+  "10.37859/ijetl.v1i1.10836": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://ejurnal.umri.ac.id/index.php/IJETL/article/download/10836/4129"
+  },
+  "10.37497/rev.artif.intell.educ.v7ii.1413": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.63056/academia.5.3(a).2026.1672": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://academia.edu.pk/index.php/Journals/article/download/1672/2626"
+  },
+  "10.5539/hes.v16n2p430": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://ccsenet.org/journal/index.php/hes/article/download/0/0/53225/58049"
+  },
+  "10.1016/j.actpsy.2026.107428": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2026.107428"
+  },
+  "10.3390/bs15040401": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.3390/bs15040401"
+  },
+  "10.3389/fpsyg.2026.1828689": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1828689/pdf"
+  },
+  "10.3389/fpubh.2026.1695066": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2026.1695066/pdf"
+  },
+  "10.3390/healthcare14080996": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/2227-9032/14/8/996/pdf?version=1775804007"
+  },
+  "10.1038/s41598-026-47683-4": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.nature.com/articles/s41598-026-47683-4.pdf"
+  },
+  "10.1016/j.actpsy.2026.107517": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.sciencedirect.com/science/article/pii/S0001691826013181/pdf"
+  },
+  "10.1016/j.actpsy.2025.105487": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2025.105487"
+  },
+  "10.1016/j.actpsy.2025.105650": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2025.105650"
+  },
+  "10.3390/ijerph20065147": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/1660-4601/20/6/5147/pdf?version=1678853288"
+  },
+  "10.3389/fpubh.2024.1449561": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2024.1449561/pdf"
+  },
+  "10.1016/j.acra.2026.03.037": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1108/ijoa-09-2024-4847": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1108/IJCHM-07-2020-0789": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1109/AIMV66517.2025.11203345": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1108/md-08-2024-1820": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.3390/su172210338": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/2071-1050/17/22/10338/pdf"
+  },
+  "10.55214/25768484.v9i6.8184": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://learning-gate.com/index.php/2576-8484/article/download/8184/2757"
+  },
+  "10.1080/08824096.2025.2578439": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1177/21582440261462225": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1177/21582440261462225"
+  },
+  "10.1111/1744-7941.70072": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.3389/fpsyg.2026.1943409": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1943409/pdf"
+  },
+  "10.1108/ijchm-02-2023-0240": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.24250/jpe/si/2026/gsv/lrm/": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.24250/jpe/si/2026/gsv/lrm/"
+  },
+  "10.1177/21582440251400532": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1177/21582440251400532"
+  },
+  "10.1109/IC4e69618.2026.11631530": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.31306/s.67.2.4": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://hrcak.srce.hr/file/481668"
+  },
+  "10.62836/emi.v5i2.0014": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://ojs.sgsci.org/journals/emi/article/download/631/432"
+  },
+  "10.1108/ijwhm-09-2025-0252": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.21203/rs.3.rs-10628079/v1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.researchsquare.com/article/rs-10628079/latest.pdf"
+  },
+  "10.1177/10482911261474923": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.69889/sr7m0r83": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://economic-sciences.com/index.php/journal/article/download/383/323"
+  },
+  "10.1108/he-06-2025-0101": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.29140/9780648184485-17": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://www.castledown.com/proceedings/call-research/article/download/9780648184485-17/37"
+  },
+  "10.3389/fpsyg.2026.1901039": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1901039/pdf"
+  },
+  "10.1016/j.actpsy.2026.107840": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1016/j.actpsy.2026.107840"
+  },
+  "10.1155/jonm/4386800": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.1155/jonm/4386800"
+  },
+  "10.1186/s40359-026-04706-z": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1186/s40359-026-04706-z"
+  },
+  "10.20944/preprints202410.0106.v1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.preprints.org/frontend/manuscript/94e2bc7856de6450203fdbd37c7ef311/download_pub"
+  },
+  "10.55493/5007.v16i2.5810": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://archive.aessweb.com/index.php/5007/article/download/5810/8614"
+  },
+  "10.3389/fpubh.2026.1866364": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2026.1866364/pdf"
+  },
+  "10.1016/j.outlook.2025.102484": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "bronze",
+   "oa_url": "https://doi.org/10.1016/j.outlook.2025.102484"
+  },
+  "10.1186/s12913-025-13876-2": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1186/s12913-025-13876-2"
+  },
+  "10.34140/bjbv8n1-016": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://ojs.brazilianjournals.com.br/ojs/index.php/BJB/article/download/85318/58179"
+  },
+  "10.61838/kman.hn.3.3.12": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://journals.kmanpub.com/index.php/Health-Nexus/article/download/4280/7503"
+  },
+  "10.2196/45032": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.2196/45032"
+  },
+  "10.26756/th.2023.814": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.54536/ajet.v5i1.6407": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://journals.e-palli.com/home/index.php/ajet/article/download/6407/3135"
+  },
+  "10.38124/ijisrt/25oct658": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.ijisrt.com/assets/upload/files/IJISRT25OCT658.pdf"
+  }
+ }
+}

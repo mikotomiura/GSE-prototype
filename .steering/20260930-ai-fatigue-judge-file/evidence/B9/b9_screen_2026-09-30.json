@@ -1,0 +1,411 @@
+{
+ "meta": {
+  "executed": "2026-09-30 11:01:55 +0900",
+  "source": "OpenAlex /works/doi:（題名・年・掲載誌・抄録）",
+  "groups": {
+   "AI": "(?i)artificial intelligence|\\bAI\\b|machine learning|algorithm|decision support|automat|large language model|\\bLLM|ChatGPT|generative",
+   "疲労": "(?i)fatigue|depletion|exhaust|burn-?out|sleep|tired|drowsi"
+  },
+  "note": "抄録はこの JSON に持たない（repo の外に対で書いた）"
+ },
+ "runs": [
+  {
+   "id": "B9",
+   "records": [
+    {
+     "doi": "10.26803/ijlter.23.11.22",
+     "status": "ok",
+     "title": "Challenges and Opportunities of Artificial Intelligence Adoption in Islamic Education in Indonesian Higher Education Institutions",
+     "year": 2024,
+     "journal": "International Journal of Learning Teaching and Educational Research",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.1016/j.heliyon.2024.e40025",
+     "status": "ok",
+     "title": "Impact of artificial intelligence adoption on students' academic performance in open and distance learning: A systematic literature review",
+     "year": 2024,
+     "journal": "Heliyon",
+     "type": "review",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.47604/ajikm.2735",
+     "status": "ok",
+     "title": "Ethical Issues in Artificial Intelligence Adoption in African Higher Education Institutions in Nigeria",
+     "year": 2024,
+     "journal": "African Journal of Information and Knowledge Management",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.70670/sra.v4i1.1983",
+     "status": "ok",
+     "title": "Digital Literacy as a Predictor of Academic Resilience: Exploring the Interplay between AI-Induced Cognitive Overload and Digital Fatigue in Hybrid Higher Education",
+     "year": 2026,
+     "journal": "Social science review archives.",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": true
+     },
+     "stage0": true
+    },
+    {
+     "doi": "10.1080/10494820.2025.2492785",
+     "status": "ok",
+     "title": "Determinants of Generative Artificial Intelligence (GenAI) adoption among university students and its impact on academic performance: the mediating role of trust in technology",
+     "year": 2025,
+     "journal": "Interactive Learning Environments",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.1038/s41598-025-19851-5",
+     "status": "ok",
+     "title": "Determinants of student adoption of artificial intelligence applications in higher education",
+     "year": 2025,
+     "journal": "Scientific Reports",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.52783/jisem.v10i19s.3052",
+     "status": "ok",
+     "title": "Exploring the Adoption of Generative Artificial Intelligence by TVET Students: A UTAUT Analysis of Perceptions, Benefits, and Implementation Challenges",
+     "year": 2025,
+     "journal": "Journal of Information Systems Engineering & Management",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.5281/zenodo.3878572",
+     "status": "ok",
+     "title": "A global outlook to the interruption of education due to COVID-19 pandemic: Navigating in a time of uncertainty and crisis",
+     "year": 2020,
+     "journal": "UVic’s Research and Learning Repository (University of Victoria)",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": false,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.1007/s43681-025-00688-7",
+     "status": "ok",
+     "title": "Generative artificial intelligence for academic research: evidence from guidance issued for researchers by higher education institutions in the United States",
+     "year": 2025,
+     "journal": "AI and Ethics",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.7176/JEP/11-18-02",
+     "status": "ok",
+     "title": "Technology Fatigue of Faculty in Higher Education",
+     "year": 2020,
+     "journal": "",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": false,
+      "疲労": true
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.36922/AIH025180038",
+     "status": "ok",
+     "title": "Innovation management for artificial intelligence adoption in healthcare and biopharma: A mini-systematic review",
+     "year": 2025,
+     "journal": "Artificial Intelligence in Health",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.48550/arXiv.2402.08143",
+     "status": "ok",
+     "title": "Artificial intelligence and the transformation of higher education institutions",
+     "year": 2024,
+     "journal": "RePEc: Research Papers in Economics",
+     "type": "preprint",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.3389/feduc.2025.1548104",
+     "status": "ok",
+     "title": "Implementing artificial intelligence in academic and administrative processes through responsible strategic leadership in the higher education institutions",
+     "year": 2025,
+     "journal": "Frontiers in Education",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.52206/jsmc.2024.14.4.957",
+     "status": "ok",
+     "title": "The Barriers and Solution to Artificial Intelligence Adoption in Medical Education: A Qualitative Study",
+     "year": 2024,
+     "journal": "Journal of Saidu Medical College",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.3389/fpsyg.2025.1498132",
+     "status": "ok",
+     "title": "Exploring the effects of artificial intelligence on student and academic well-being in higher education: a mini-review",
+     "year": 2025,
+     "journal": "Frontiers in Psychology",
+     "type": "review",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": true
+     },
+     "stage0": true
+    },
+    {
+     "doi": "10.3389/fpsyg.2026.1795301",
+     "status": "ok",
+     "title": "AI literacy and foreign language boredom in AI-assisted academic English learning: the roles of engagement and task value",
+     "year": 2026,
+     "journal": "Frontiers in Psychology",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": true
+     },
+     "stage0": true
+    },
+    {
+     "doi": "10.1109/EMR.2024.3394540",
+     "status": "ok",
+     "title": "Pros and Cons of Artificial Intelligence–ChatGPT Adoption in Education Settings: A Literature Review and Future Research Agendas",
+     "year": 2024,
+     "journal": "IEEE Engineering Management Review",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.1177/03400352241301780",
+     "status": "ok",
+     "title": "Use of artificial intelligence innovations in public academic libraries",
+     "year": 2025,
+     "journal": "IFLA Journal",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.1109/SESAI61023.2024.10599402",
+     "status": "ok",
+     "title": "Integration of Artificial Intelligence for educational excellence and innovation in higher education institutions",
+     "year": 2024,
+     "journal": "",
+     "type": "conference-paper",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.1080/2331186X.2024.2386892",
+     "status": "ok",
+     "title": "An exploratory study of artificial intelligence adoption in higher education",
+     "year": 2024,
+     "journal": "Cogent Education",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.1016/S2468-2667(25)00036-2",
+     "status": "ok",
+     "title": "Artificial intelligence in public health: promises, challenges, and an agenda for policy makers and public health institutions",
+     "year": 2025,
+     "journal": "The Lancet Public Health",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.47772/IJRISS.2025.908000051",
+     "status": "ok",
+     "title": "Artificial Intelligence Adoption for Skills Development in Nigeria: A Systematic Review and Roadmap for TVET Transformation",
+     "year": 2025,
+     "journal": "International Journal of Research and Innovation in Social Science",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.47772/IJRISS.2025.90300209",
+     "status": "ok",
+     "title": "Fostering Learning Motivation: The Effects of AI (Artificial Intelligence) Adoption among Students in Higher Education Institutions",
+     "year": 2025,
+     "journal": "International Journal of Research and Innovation in Social Science",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.15575/join.v10i1.1549",
+     "status": "ok",
+     "title": "Adoption of Artificial Intelligence and Digital Resources among Academicians of Islamic Higher Education Institutions in Indonesia",
+     "year": 2025,
+     "journal": "Jurnal Online Informatika",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.55056/cte.616",
+     "status": "ok",
+     "title": "Strategic leadership for responsible artificial intelligence adoption in higher education",
+     "year": 2023,
+     "journal": "CTE Workshop Proceedings",
+     "type": "conference-paper",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.17573/cepar.2024.1.05",
+     "status": "ok",
+     "title": "Organisational Enablers of Artificial Intelligence Adoption in Public Institutions: A Systematic Literature Review",
+     "year": 2024,
+     "journal": "Central European Public Administration Review",
+     "type": "review",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    },
+    {
+     "doi": "10.30773/pi.2026.0068",
+     "status": "ok",
+     "title": "Technostress in the Era of Generative Artificial Intelligence: Mental Health Implications in Medical Education",
+     "year": 2026,
+     "journal": "Psychiatry Investigation",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": true
+     },
+     "stage0": true
+    },
+    {
+     "doi": "10.3390/jrfm18040217",
+     "status": "ok",
+     "title": "Adoption of Artificial Intelligence-Driven Fraud Detection in Banking: The Role of Trust, Transparency, and Fairness Perception in Financial Institutions in the United Arab Emirates and Qatar",
+     "year": 2025,
+     "journal": "Journal of risk and financial management",
+     "type": "article",
+     "has_abstract": true,
+     "hit": {
+      "AI": true,
+      "疲労": false
+     },
+     "stage0": false
+    }
+   ]
+  }
+ ],
+ "run_id": "4eea1161e0564682b4fc84aed5799e2c"
+}

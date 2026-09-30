@@ -4,6 +4,7 @@
 > ★ このファイルは事実だけを書く（書誌・抄録や本文に書いてあること）。判定に関わる記述は別のファイル（`survey-S-02-ai-judgments.md`）にある。
 > 書誌の生の結果: `evidence/S-02/s02_meta_2026-09-29.json`（書誌・訂正の関係・オープンアクセスの表示。抄録は repo に置かない）。スクリプト: `evidence/S-02/fetch_meta.py`。
 > 本文を読んだ 4 件は、サブエージェント（Sonnet）が平文から項目を抜き出し、メインが該当箇所を開いて確かめた（対象・N・国・疲労の尺度・AI が項目に入るか・主な結果）。
+> ★ 2026-09-30 追記: #3（出版社のページをブラウザで読んだ）と #8（Zenodo のファイル）の本文はメインが直接読み、§1・§2・§3・§6・§7 に足した。本文・資料の写しは repo に置かない。
 
 ## 1. 対象と入手の状況
 
@@ -11,17 +12,17 @@
 |---|---|---|---|
 | 1 | Asmi F, Wong A, Almugren I, Chotia V ほか 2026. Dark side of generative AI: a stressor–strain outcome and cognitive load theory explanation on decision fatigue and cognitive overload. *J Enterprise Information Management*. doi:10.1108/jeim-10-2025-1027（訂正: Corrigendum, doi:10.1108/jeim-08-2026-1628, 2026-09-07） | Crossref | 読めず（出版社が 403）。訂正の中身も読めず |
 | 2 | Honggang W, Khoso AK, Althubyani AR 2026. Technostress, digital fatigue, and AI dependency as antecedents of burnout and SDG-4 achievement in EFL classrooms. *Scientific Reports* 16. doi:10.1038/s41598-026-45402-7 | Crossref | 読んだ（Europe PMC・CC BY） |
-| 3 | Khoso AK, Honggang W ほか 2026. Technostress forecasting in EFL classrooms: How digital fatigue and perceived AI ethical concerns shape digital burnout and undermine SDG-4 achievement. *Acta Psychologica*. doi:10.1016/j.actpsy.2026.107396 | Europe PMC | 読めず（CC BY の表示があるが、出版社のページがスクリプトを弾く） |
+| 3 | Khoso AK, Honggang W ほか 2026. Technostress forecasting in EFL classrooms: How digital fatigue and perceived AI ethical concerns shape digital burnout and undermine SDG-4 achievement. *Acta Psychologica*. doi:10.1016/j.actpsy.2026.107396 | Europe PMC | 読んだ（2026-09-30・出版社のページをブラウザで・CC BY。2026-09-29 はスクリプトが弾かれて読めず） |
 | 4 | Thorpe D, Bean C, Krieg J ほか 2025. Associations between generative artificial intelligence usage, Job Demands, Job Control and Burnout. *AI & Society*. doi:10.1007/s00146-025-02764-2 | 出版社の公開ページ（`dc.description`） | 読めず（購読制） |
 | 5 | Kim B-J, Kim M-J 2026. Digital efficiency, human exhaustion: How human-centered AI buffers the impact of AI adoption on physical health via AI techarnostress（Crossref の題名の表記のまま）. *Technology in Society*. doi:10.1016/j.techsoc.2026.103553 | **取れなかった**（Crossref・Europe PMC・Semantic Scholar・OpenAlex に無く、出版社は 403） | 読めず（OpenAlex の表示は closed） |
 | 6 | Chung J, Kwon H 2025. Privacy fatigue and its effects on ChatGPT acceptance among undergraduate students: is privacy dead? *Education and Information Technologies*. doi:10.1007/s10639-024-13198-6 | Semantic Scholar | 読んだ（出版社の公開 HTML・CC BY-NC-ND） |
 | 7 | Kang I, Li D 2025. AI Anxiety to Fatigue and Its Consequences: The Moderating Role of AI Usage Motivation. *Journal of Business Convergence*. doi:10.31152/jb.2025.12.10.6.297 | 出版社の公開ページ（DBpia の `abstract` の meta） | 読めず（DBpia の会員制） |
-| 8 | Nobles C 2026. AI Fatigue in Higher Education: A Systematic Review of Associated Conditions, Manifestations, and Lifelong Learning Implications. *Zenodo*. doi:10.5281/zenodo.22838191（版の DOI 10.5281/zenodo.22838190） | DataCite（1 文だけ） | **読めず**（2026-09-29 の S-02 の作業中に、Zenodo のファイルの取得が 403「unusual traffic」。以後 API も JSON を返さず） |
+| 8 | Nobles C 2026. AI Fatigue in Higher Education: A Systematic Review of Associated Conditions, Manifestations, and Lifelong Learning Implications. *Zenodo*. doi:10.5281/zenodo.22838191（版の DOI 10.5281/zenodo.22838190） | DataCite（1 文だけ） | 読んだ（2026-09-30・Zenodo のファイル〈原稿の写しと表〉。2026-09-29 は S-02 の作業中に取得が 403「unusual traffic」で、以後 API も JSON を返さず読めず） |
 | 9 | Kim B-J, Lee J 2024. The mental health implications of artificial intelligence adoption: the crucial role of self-efficacy. *Humanities and Social Sciences Communications*. doi:10.1057/s41599-024-04018-w | Semantic Scholar | 読んだ（出版社の公開 HTML・CC BY-NC-ND） |
 | 10 | Hur W-M, Shin Y 2024. Service employees' STARA awareness and proactive service performance. *J Services Marketing*. doi:10.1108/JSM-03-2023-0115 | Crossref | 読めず（購読制） |
 | 11 | Jeong J, Kim B-J, Lee J 2024. Navigating AI transitions: how coaching leadership buffers against job stress and protects employee physical health. *Frontiers in Public Health*. doi:10.3389/fpubh.2024.1343932 | Crossref | 読んだ（Europe PMC・CC BY） |
 
-- 抄録を取れたもの 10 件（うち #8 は 1 文だけ）・取れなかったもの 1 件（#5）。本文を読んだもの 4 件（#2・#6・#9・#11）。
+- 抄録を取れたもの 10 件（うち #8 は 1 文だけ）・取れなかったもの 1 件（#5）。本文を読んだもの 4 件（#2・#6・#9・#11）→ ★ 2026-09-30 に #3・#8 を足して 6 件（この 2 件はメインが直接読んだ。サブエージェントは使っていない）。
 
 ## 2. 1 件ごとの要点
 
@@ -40,12 +41,16 @@
 - 著者が報告した結果: デジタル疲労 → 外国語不安 β=0.35（p<0.001）、AI 依存 → 外国語不安 β=0.15（p<0.05）、デジタル燃え尽き → SDG の達成 β=−0.32（p<0.001）。
 - データ: 求めに応じて提供。
 
-### #3 Khoso ほか 2026（Acta Psychologica）—— 抄録
+### #3 Khoso ほか 2026（Acta Psychologica）—— 本文（2026-09-30）
 
-- 横断調査（PLS-SEM）。中国の大学の英語学習者 **N=545**（国内の学生と留学生）。
+- 横断調査（PLS-SEM・調整つきの直列媒介）。中国の公立大学 4 校（北京・上海・広州・成都）の英語の単位科目を取る学部生 **N=545**（中国の学生 412・留学生 133〈17 か国〉）。層化無作為抽出（国籍・学年・語学学習でのデジタルツールの使用頻度）。適格の条件に「AI の学習基盤を週 2 回以上使う」を含む（選別に答えた 600 名のうち 545 名）。2025 年 3〜4 月に Qualtrics で収集（本文の §3.3 は 4 週間、§3.5 は 3 週間と書く）。倫理: 主たる大学の IRB（承認番号 202505・大学名の記載なし）。資金: 江蘇省社会科学基金（23YYB011）。
+- 質問紙の言語: 本文の §3.3 は英語だけで実施し中国語訳は用意しなかったと書き、本文の §3.4 は簡体字中国語への翻訳と逆翻訳を行い中国の学生への補助として残したと書く。予備調査の人数も本文の §3.3 は 38 名、§3.4 は 35 名。
+- 疲労系の測定: **デジタル疲労** 6 項目（Sarangal & Nargotra 2022 から。項目例は「オンラインの授業の後に消耗を感じる」）・α=0.89（本文の §3.4.2）、本文の表 4 では 0.871／**デジタル燃え尽き** 24 項目（Erten & Özdemir 2020: デジタル老化 12・デジタル剥奪 6・情動的消耗 6。英語の授業と学習基盤を指すよう書き換えた）・α=0.913（本文の表 4）。5 件法。本文に載る項目例（デジタル疲労 1・デジタル燃え尽き 3）は AI に触れない。全項目は補足資料 1 にあると書く（読んでいない）。
+- AI の変数: **AI の倫理への心配（知覚）** 26 項目（Kim & Ko 2022: 透明性 8・公平 5・安全 5・責任 8）・α=0.94。テクノストレス（Wang ほか 2020 から・2 次元）は「AI の道具」などを含むよう項目を書き換えた。
 - テクノストレス・**デジタル疲労**・AI の倫理への心配（知覚）→ 外国語学習不安 → **デジタル燃え尽き** → 学業成績 → SDG-4 の達成。テクノロジーの自己効力感が、燃え尽きと成績の負の関係を調整（留学生で大きい）。
 - 著者が報告した値: テクノストレス β=0.41・デジタル疲労 β=0.33・AI の倫理への心配 β=0.22（外国語学習不安へ）。間接効果 0.10〜0.19。
-- 尺度の出典・項目は抄録からは分からない。
+- S-02 #2（Honggang ほか 2026, Scientific Reports）との関係: 本文は #2 を序論と文献の節で 3 回引く。同じ標本・同じデータという記述は無い（このファイルの §3 の比較表）。
+- データ: 求めに応じて提供。
 
 ### #4 Thorpe ほか 2025（AI & Society）—— 抄録
 
@@ -71,10 +76,15 @@
 - 著者が報告した結果: 3 つの不安はいずれも AI 疲労に寄与し、職の置き換えへの不安の影響が最も大きい。
 - AI 疲労の尺度の出典・項目数は抄録からは分からない。
 
-### #8 Nobles 2026（Zenodo）—— メタデータだけ
+### #8 Nobles 2026（Zenodo）—— 再現パッケージ（原稿の写しと表・2026-09-30）
 
-- 公開 2026-09-19。資料の種別は「Other」。説明は 1 文（系統的レビューの研究論文であるという記述）。ファイルは `AI_Fatigue_Reproducibility_Package_v1.0.zip`（244,667 バイト）1 つ。
-- レビューの本文・採択研究の一覧は読めていない（DB・検索漏れ候補との突き合わせは未実施）。
+- 公開 2026-09-19。資料の種別は「Other」。利用許諾は Zenodo の表示で CC BY 4.0（同梱のメタデータの JSON は「著者が選ぶ」のまま）。ファイルは `AI_Fatigue_Reproducibility_Package_v1.0.zip`（244,667 バイト・Zenodo の MD5 と一致）1 つ。中身は原稿の写し（docx）・表 4 本（検索・選別・抽出と評価・コード化）・README など。
+- README は、表は原稿の記録から組み立て直したもので、データベースからの元の書き出しや当時の選別の記録ではないと書く。選別で外した記録の 1 件ごとの記録は無い。
+- 原稿: 単著の系統的レビュー（米国の大学の所属）。受理・公開の日付の欄は「X of Month, 2026」、データの公開先の欄は識別子を「挿入する」という指示のまま（欄が埋まっていない）。PRISMA 2020 に沿うと書き、統合は物語的・主題的。対象は高等教育の学生と教員。
+- 検索: 9 つの情報源（Scopus・Web of Science・ERIC・Education Source・PsycINFO・PubMed・IEEE Xplore・ACM DL・Google Scholar）・2026-07-06〜10・英語・2020 年〜2026 年 7 月。AI × 疲労系の語（technostress・burnout・dependency・well-being などを含む）× 高等教育。
+- 選別の数: 304 → 重複 49 を除き 255 → 題名・抄録で 205 → 50 → 取得できず 5 → 45 ＋ 引用の追跡 1 ＝ 46 → 全文で 14 → **32 件**。32 件は一次の実証研究・レビュー・方針や指針の分析・隣の分野の組織の研究を含む。著者の表は 32 件それぞれに統合での役割と評価を付けている（評価はここに写さない）。
+- 採択 32 件の DOI と DB・追加候補の突き合わせ（2026-09-30・DOI の一致）: DB にあるもの 3 件（AF006 Parreño ほか 2026・AF007 Miranda ほか 2026・AF008 Soriano ほか 2026）。S-02 #2 と同じ DOI が 1 件（原稿の文献一覧は著者を「Wang, H.」と書く・doi:10.1038/s41598-026-45402-7）。ほかの 28 件は、DB と追加候補の事実のファイルに DOI が無い（うち 2 件〈Um 2026・Klimova & Pikhart 2025〉は S-14・S-15 の抽出の表にレビューとして記録がある）。28 件のふるいは、このファイルの §7。
+- 原稿は、改稿で ChatGPT（構成・言語・表の下書き）と Grammarly を使ったと書く。
 
 ### #9 Kim & Lee 2024（Humanities and Social Sciences Communications）—— 本文
 
@@ -102,14 +112,18 @@
 | 項目 | #2 Scientific Reports | #3 Acta Psychologica |
 |---|---|---|
 | 著者 | Honggang W・Khoso AK・Althubyani AR | Khoso AK・Honggang W ほか |
-| N | 545（中国の学生 412・留学生 133） | 545（国内の学生と留学生） |
-| 場所 | 中国の公立大学 4 校 | 中国の大学 |
+| N | 545（中国の学生 412・留学生 133） | 545（中国の学生 412・留学生 133）（2026-09-30 に本文で確かめた） |
+| 場所 | 中国の公立大学 4 校 | 中国の公立大学 4 校（北京・上海・広州・成都） |
+| 層化の基準 | 熟達度・専攻・デジタルツールの使用頻度 | 国籍・学年・デジタルツールの使用頻度 |
+| 質問紙の方式 | オンラインと紙 | オンライン（Qualtrics） |
+| 収集の時期 | 本文に無い | 2025 年 3〜4 月 |
+| 倫理の記載 | 揚州大学の IRB（番号の記載なし） | 主たる大学の IRB（承認番号 202505・大学名の記載なし） |
 | デザイン・解析 | 横断・PLS-SEM・多群分析 | 横断・PLS-SEM（調整つきの直列媒介） |
-| 疲労系の変数 | デジタル疲労・デジタル燃え尽き | デジタル疲労・デジタル燃え尽き |
+| 疲労系の変数 | デジタル疲労（Sarangal & Nargotra 2022 の 6 項目・α=0.90）・デジタル燃え尽き（Erten & Özdemir 2020 の 24 項目・α=0.92） | デジタル疲労（同じ出典の 6 項目・α=0.89、表 4 では 0.871）・デジタル燃え尽き（同じ出典の 24 項目・α=0.913） |
 | AI の変数 | AI 依存の知覚 | AI の倫理への心配（知覚） |
 | そのほか共通の変数 | テクノストレス・外国語不安・テクノロジーの自己効力感（調整）・SDG の達成 | テクノストレス・外国語学習不安・テクノロジーの自己効力感（調整）・学業成績・SDG-4 の達成 |
 | デジタル疲労 → 不安 | β=0.35 | β=0.33 |
-| 同じデータへの言及 | 本文に無い（サブエージェントとメインの検索で見つからなかった） | 本文を読めていない |
+| 同じデータへの言及 | 本文に無い（サブエージェントとメインの検索で見つからなかった） | 本文に無い。#2 を序論と文献の節で 3 回引く（2026-09-30・「same sample」「dataset」などの語でも本文を探した） |
 | 公開 | 2026-04-01 | 2026 年 9 月号（Crossref） |
 
 ## 4. 同じ著者が複数ある候補
@@ -133,6 +147,18 @@
 
 ## 6. 数のまとめ
 
-- 11 件: 抄録 10（1 件は 1 文だけ）・抄録なし 1・本文 4。
+- 11 件: 抄録 10（1 件は 1 文だけ）・抄録なし 1・本文 4（★ 2026-09-30 に #3・#8 を足して 6）。
 - 疲労系の構成概念を測ったと抄録・本文に書いてあるもの: #1（意思決定疲労）・#2（デジタル疲労・デジタル燃え尽き）・#3（同）・#4（燃え尽き）・#6（プライバシー疲労）・#7（AI 疲労）・#9（燃え尽き）の 7 件。#5 は題名だけ（「exhaustion」を含む）。#10・#11 は疲労系の測定が挙がっていない。#8 はレビュー。
-- 項目文・教示に AI が入ると本文で確かめられたもの: #6（ChatGPT を項目に組み込んだと本文が書く）。AI が入らないと本文で確かめられたもの: #9（燃え尽き）。本文を読めず分からないもの: #1・#3・#4・#5・#7。#2 はデジタル疲労の定義がデジタルの学習基盤に向き、項目文は本文に無い。
+- 項目文・教示に AI が入ると本文で確かめられたもの: #6（ChatGPT を項目に組み込んだと本文が書く）。AI が入らないと本文で確かめられたもの: #9（燃え尽き）。本文を読めず分からないもの: #1・#4・#5・#7。#2 はデジタル疲労の定義がデジタルの学習基盤に向き、項目文は本文に無い。#3 は本文に載る項目例（デジタル疲労 1・デジタル燃え尽き 3）が AI に触れず、全項目は補足資料にある（読んでいない・2026-09-30）。
+
+## 7. #8 の採択研究のうち、DB と追加候補に無かった 28 件（2026-09-30 の突き合わせの時点）
+
+- 手順: 28 件の題名と抄録（OpenAlex・28 件すべて抄録あり）に、S-15 の 0 段目の 3 群（依存・疲労・AI）のうち **AI と疲労の 2 群**（疲労の群は fatigue・depletion・exhaust・burnout・sleep・tired・drowsi）を当てた。依存の群は外した（問いは「AI × 疲労」で、依存は S-15 だけの条件のため）。★ 0 段目の定義（問いごとの 3 群がすべて当たる）どおりではない（2026-09-30 のレビューで書き方を直した）。書誌の記録は次のタスク（20260930-ai-fatigue-judge-file）の `evidence/B9/b9_screen_2026-09-30.json`、スクリプトは同じ場所の `screen_b9.py`（抄録は repo に置かない）。⚠️ 検索の前に固定した手順ではない（#8 の突き合わせの結果を見てから、既存の語群をそのまま当てた・同タスクの `decisions.md` 判断 15）。
+- 2 群に当たったもの 4 件。うち一次研究の 2 件を下の表に載せ、追加候補に足した。残る 2 件はレビュー（Um 2026 *Psychiatry Investigation* は S-14 の抽出の表の S-14-009 と S-15 の S-15-179、Klimova & Pikhart 2025 *Frontiers in Psychology* は S-15 の S-15-030 に、抽出の表の `kind` がレビューとして記録がある。OpenAlex の `type` は Um 2026 が article）。
+- 疲労の群を S-13・S-14 の群（burnout・exhaust・strain・fatigue）に替えても、増えるのは 1 件（銀行の AI の不正検知の研究・doi:10.3390/jrfm18040217）で、当たった語は `constrain`（「制約する」）の一部の `strain` だった。
+- 当たらなかったもの 24 件: AI の語だけ 22 件（AI の導入・方針・指針・レビューなど）、疲労の語だけ 1 件（Halupa & Bolliger 2020: 米国の私立大学 3 校の教員 171 名の技術疲労〈テクノストレスと変化の疲れ〉。抄録に AI の語は無い）、どちらも無し 1 件（Bozkurt ほか 2020: COVID-19 による教育の中断）。
+
+| 研究 | 抄録にあること |
+|---|---|
+| Alkhatib ほか 2026（Social science review archives.〈OpenAlex の表記〉, doi:10.70670/sra.v4i1.1983） | 横断調査。大学の学部生と大学院生 120 名（18〜30 歳・目的に沿った層化無作為抽出。国は抄録に無い）。尺度: デジタルリテラシー・学業のレジリエンス・認知的過負荷・**デジタル疲労**（出典は抄録に無い）。相関・回帰・媒介の分析。著者は、AI による認知的過負荷とデジタル疲労が学業の困難への対処に負の影響を持ち、デジタルリテラシーとレジリエンスの関係を部分的に媒介したと書く |
+| Liu 2026（*Frontiers in Psychology*, doi:10.3389/fpsyg.2026.1795301） | 調査（EFA・SEM）。大学院生 392 名。AI の支援のある英語の学習で、AI リテラシー → 学習への関与・課題の価値 → 外国語の退屈（学業の圧力も）。疲労の尺度は抄録に無い（「emotional fatigue」の語は、課題の価値と退屈の関係を解釈する文にだけ出る） |

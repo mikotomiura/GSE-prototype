@@ -1,0 +1,158 @@
+{
+ "meta": {
+  "executed": "2026-09-30 07:48:09 +0900",
+  "source": "OpenAlex /works/doi:（open_access）"
+ },
+ "records": {
+  "10.1097/ajn.0000000000000364": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.47672/ajdikm.2865": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://ajpojournals.org/journals/AJDIKM/article/download/2865/4331"
+  },
+  "10.61838/japes.254": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://journalapes.com/index.php/apes/article/download/254/222"
+  },
+  "10.1007/s44163-026-01678-2": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1007/s44163-026-01678-2"
+  },
+  "10.18421/tem153-85": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.temjournal.com/content/153/TEMJournalAugust2026_3058_3064.pdf"
+  },
+  "10.54941/ahfe1007464": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "bronze",
+   "oa_url": "https://openaccess-api.cms-conferences.org/articles/download/978-1-964867-87-8_1"
+  },
+  "10.2196/85986": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.2196/85986"
+  },
+  "10.1111/wvn.70003": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/wvn.70003"
+  },
+  "10.2196/54029": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.2196/54029"
+  },
+  "10.3389/fdgth.2025.1665457": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/digital-health/articles/10.3389/fdgth.2025.1665457/pdf"
+  },
+  "10.1080/10447318.2024.2429889": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1109/IC4e69618.2026.11631611": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1109/iraset64571.2025.11008039": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.34190/ecie.20.1.3863": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://papers.academic-conferences.org/index.php/ecie/article/download/3863/3633"
+  },
+  "10.1007/s12144-026-09580-x": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.47233/jsit.v5i3.3711": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://jurnal.minartis.com/index.php/jsit/article/download/3711/2911"
+  },
+  "10.21203/rs.3.rs-9540650/v1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.researchsquare.com/article/rs-9540650/latest.pdf"
+  },
+  "10.3389/fpsyg.2026.1792200": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1792200/pdf"
+  },
+  "10.22541/au.172114373.32212020/v1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.authorea.com/doi/pdf/10.22541/au.172114373.32212020"
+  },
+  "10.20944/preprints202407.2277.v1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://doi.org/10.20944/preprints202407.2277.v1"
+  },
+  "10.68159/j612488059": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://imbaspub.com/storage/pub-article-files/article-j612488059.pdf?ts=1788793090"
+  },
+  "10.1371/journal.pone.0303370": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1371/journal.pone.0303370"
+  },
+  "10.35510/jer.2026.48.2.5": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.21203/rs.3.rs-9220394/v1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://doi.org/10.21203/rs.3.rs-9220394/v1"
+  },
+  "10.70301/jour/sbs-jabr/2026/14/3/2": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.70301/jour/sbs-jabr/2026/14/3/2"
+  }
+ }
+}

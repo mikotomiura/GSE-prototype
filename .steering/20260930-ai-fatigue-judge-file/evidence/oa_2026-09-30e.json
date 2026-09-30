@@ -1,0 +1,83 @@
+{
+ "meta": {
+  "executed": "2026-09-30 11:47:19 +0900",
+  "source": "OpenAlex /works/doi:（open_access）"
+ },
+ "records": {
+  "10.1007/s43678-026-01141-2": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.medcli.2026.107541": {
+   "status": "not found"
+  },
+  "10.1136/bmjopen-2022-065477": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://bmjopen.bmj.com/content/bmjopen/13/3/e065477.full.pdf"
+  },
+  "10.3390/healthcare13172118": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/2227-9032/13/17/2118/pdf?version=1756211830"
+  },
+  "10.1101/2025.10.30.25339135": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2025/10/31/2025.10.30.25339135.full.pdf"
+  },
+  "10.64898/2026.01.12.26343538": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2026/01/14/2026.01.12.26343538.full.pdf"
+  },
+  "10.5435/jaaos-d-25-01245": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1200/op-25-00612": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.arth.2026.03.069": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://www.arthroplastyjournal.org/article/S0883-5403(26)00272-X/pdf"
+  },
+  "10.1053/j.gastro.2025.12.020": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://www.gastrojournal.org/article/S0016-5085(25)06661-2/pdf"
+  },
+  "10.21203/rs.3.rs-9820618/v1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.researchsquare.com/article/rs-9820618/latest.pdf"
+  },
+  "10.2196/94450": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.2196/94450"
+  },
+  "10.1001/jamanetworkopen.2024.6565": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://jamanetwork.com/journals/jamanetworkopen/articlepdf/2817615/taiseale_2024_oi_240254_1712593629.08202.pdf"
+  }
+ }
+}
