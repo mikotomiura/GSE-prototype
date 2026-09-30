@@ -32,6 +32,8 @@ from common import allowed_url, ensure_outside_repo, guarded_opener  # noqa: E40
 JUDGE_XLSX = os.path.join(STEER, "20260930-ai-fatigue-judge-file", "archive", "judge",
                           "AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx")
 JUDGE_SHA = "6984472edeef3794a9ed075076568aaca8373c4fb675afba608cdba280e6c883"
+# ★ 2026-10-01 に判定者用ファイルを作り直した（判断 8）ので、入力の版（上の SHA-256）は作業ツリーに無い。git の記録から読む
+JUDGE_COMMIT = "d9354547"
 ABS_RUN_ID = "1980b7a2a275414d973174c6c3d918e3"
 
 UA = {"User-Agent": "gse-protocol-dedup/0.1"}
@@ -142,11 +144,24 @@ def countries(text):
 
 
 # ---- 入力 ----
-def load_259():
+def judge_input():
+    """間引きの入力（判定者用ファイルの SHA-256 が JUDGE_SHA の版）を開く。
+    作業ツリーの版が違えば（2026-10-01 に作り直した後）、JUDGE_COMMIT の記録から読み、同じ SHA-256 かを確かめる。"""
+    import io
+    import subprocess
     import openpyxl
-    if sha256(JUDGE_XLSX) != JUDGE_SHA:
-        sys.exit("判定者用ファイルの archive の写しの SHA-256 が固定値と違う")
-    wb = openpyxl.load_workbook(JUDGE_XLSX, read_only=True, data_only=True)
+    data = open(JUDGE_XLSX, "rb").read()
+    if hashlib.sha256(data).hexdigest() != JUDGE_SHA:
+        repo = os.path.dirname(STEER)
+        rel = os.path.relpath(JUDGE_XLSX, repo).replace(os.sep, "/")
+        data = subprocess.run(["git", "-C", repo, "show", f"{JUDGE_COMMIT}:{rel}"], capture_output=True, check=True).stdout
+        if hashlib.sha256(data).hexdigest() != JUDGE_SHA:
+            sys.exit("判定者用ファイルの入力の版（作業ツリー・git の記録とも）の SHA-256 が固定値と違う")
+    return openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+
+
+def load_259():
+    wb = judge_input()
     recs = []
     for r in wb["判定シート"].iter_rows(min_row=5, values_only=True):
         if r[0]:

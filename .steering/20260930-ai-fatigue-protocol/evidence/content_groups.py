@@ -73,9 +73,9 @@ def db_fields():
 
 
 def points():
-    """判定者用ファイルの archive の写しの『追加候補』の要点の欄。"""
-    import openpyxl
-    ws = openpyxl.load_workbook(D.JUDGE_XLSX, read_only=True, data_only=True)["追加候補"]
+    """判定者用ファイルの入力の版（D.JUDGE_SHA・225 件）の『追加候補』の要点の欄。
+    ★ 2026-10-01: 作り直した後の版（220 件）を読まないように、dedup.judge_input() から開く（SHA-256 を確かめる）。"""
+    ws = D.judge_input()["追加候補"]
     return {r[0]: r[8] or "" for r in ws.iter_rows(min_row=5, values_only=True) if r[0]}
 
 
