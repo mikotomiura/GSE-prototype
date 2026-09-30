@@ -2,15 +2,20 @@
 # issue 024 acceptance — 公開 repo への書き出し
 # ★ 2026-09-30 に判断 67（絶対パスの規則）・68（測定用のロガーは書き出しからビルド・機械によらずバイト一致）・
 #   69（逐語コピーの文字列リテラルを対訳表で英訳）に合わせて書き直した。
+# ★ 2026-09-30 追補 2（判断 74〜76・main への merge の前の /cross-review 1 巡目）: 書き出し器は *.internal.* に改名して
+#   公開しない（74）・書き出しの最後に _style_check.py を回す（75）・角括弧の被験者 ID も止める（76）・(a)〜(k) の陰性対照。
 set -u
 . "$(dirname "$0")/_acceptance-lib.sh"
 require_os any
-X="${K}/export/export.py"
+X="${K}/export/export.internal.py"
 SC="$(cd "$(dirname "$0")" && pwd)/_style_check.py"
 SRC="papers/ime-observation"
 
 echo "[024] 公開 repo への書き出し"
-for f in "${X}" "${K}/export/README.md" "${K}/export/translations.internal.json" "${SRC}/CITATION.cff" "${SRC}/.zenodo.json"; do need_file "${f}"; done
+for f in "${X}" "${K}/export/README.internal.md" "${K}/export/translations.internal.json" "${SRC}/CITATION.cff" "${SRC}/.zenodo.json"; do need_file "${f}"; done
+for f in "${K}/export/export.py" "${K}/export/README.md"; do
+  if [ ! -e "${f}" ]; then ok "判断 74: 旧名が無い: ${f}"; else ng "判断 74: 旧名が残っている: ${f}"; fi
+done
 selftest_ok "${X}"
 # ★ ケース名は英語（判断 36）。逐語コピーはコメントを除き、日本語の文字列は対訳で置き換えて書き出す（判断 69）。
 while IFS= read -r c; do
@@ -18,7 +23,7 @@ while IFS= read -r c; do
 done <<'CASES'
 a participant identifier stops the export
 an email address stops the export
-a bracketed reference number passes
+a bracketed participant identifier stops the export
 an internal marker word stops the export
 comments are stripped from manifest-listed sources
 internal fields are dropped from the public manifest
@@ -35,7 +40,23 @@ a file name is checked like its content
 an absolute path token with a user component stops the export
 a link that leaves the source stops the export
 an escaped spelling in JSON is checked after unescaping
+git that cannot be run inside a work tree stops the export
+a modified or linked translation table stops the export
+an unreadable directory stops the export
+a tracked file that was not collected stops the export
+a file flagged as unchanged in the index stops the export
+secret-looking content stops the export
+a doubled separator does not hide a user path
+a user path after a colon or inside a URL stops the export
+the host name stops the export
+the word check is skipped only for corpus data files
+a name with internal outside the internal form stops the export
+only files starting with a shebang are made executable
+an output path inside the work tree stops the export
+a style violation in the output stops the export
+a missing or failing style checker stops the export
 CASES
+if grep -qF "a bracketed reference number passes" "${X}"; then ng "判断 76: 旧ケース（角括弧の番号を通す）が残っている"; else ok "判断 76: 旧ケース（角括弧の番号を通す）が無い"; fi
 run_ok "AC .zenodo.json が JSON" "${PY}" -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "${SRC}/.zenodo.json"
 run_ok "AC 判断 69: 対訳表が JSON で entries を持つ" "${PY}" -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); assert isinstance(d.get('entries'),list) and d['entries']" "${K}/export/translations.internal.json"
 
@@ -46,6 +67,8 @@ if [ -f "${TMP}/e1/kit/logger/manifest.json" ]; then ok "AC3 manifest.json が�
 BAD="$(cd "${TMP}/e1" 2>/dev/null && find . \( -name '*.jsonl' -o -name '*.ndjson' -o -name '*.internal.*' -o -name '*.zip' -o -name '.DS_Store' \
   -o -type d \( -name target -o -name sealed -o -name runs -o -name .build -o -name __pycache__ \) \) -print | grep -v '^\./kit/corpus/data/[^/]*\.jsonl$' || true)"
 if [ -d "${TMP}/e1" ] && [ -z "${BAD}" ]; then ok "AC3 生ログ・生成物・内部の記録が無い"; else ng "AC3 除外されていない: $(echo "${BAD}" | tr '\n' ' ')"; fi
+if [ -d "${TMP}/e1" ] && [ ! -e "${TMP}/e1/kit/export" ]; then ok "AC8c 判断 74: 書き出しに kit/export/ が無い（書き出し器は公開しない）"; else ng "AC8c 判断 74: 書き出しに kit/export/ がある、または書き出しが無い"; fi
+if [ -f "${TMP}/e1/README.md" ] && ! grep -qF "kit/export" "${TMP}/e1/README.md"; then ok "AC8c 判断 74: 公開の README に kit/export が無い"; else ng "AC8c 判断 74: 公開の README に kit/export がある、または README が無い"; fi
 if [ -f "${TMP}/e1/kit/logger/check_manifest.py" ] && (cd "${TMP}/e1" && "${PY}" kit/logger/check_manifest.py --self >/dev/null 2>&1); then
   ok "AC4 書き出した側で check_manifest.py --self が緑"
 else ng "AC4 書き出した側で manifest が照合できない"; fi
@@ -90,8 +113,10 @@ else ng "AC8b 判断 69: 書き出した逐語コピーの範囲に ASCII 以外
 # ★ 判断 36 / 69: 写した元のファイル名（公開物に無いファイル）を書き出しに残さない（例 ime_cloak.rs のコンパイル時の assert の訳）
 UP_HITS=""
 if [ -d "${TMP}/e1" ]; then
+  # ★ 追補 2 (l): 語として探す（run_logger.rs の中の logger.rs に当てない）・書き出しに実在するファイル名は除く
   for n in lib.rs ime_windows.rs hook_windows.rs hook_macos.rs anonymize.rs capabilities.rs logger.rs schema_dto.rs; do
-    grep -rqF "${n}" "${TMP}/e1" 2>/dev/null && UP_HITS="${UP_HITS} ${n}"
+    [ -n "$(find "${TMP}/e1" -name "${n}" -print 2>/dev/null | head -n 1)" ] && continue
+    grep -rqwF "${n}" "${TMP}/e1" 2>/dev/null && UP_HITS="${UP_HITS} ${n}"
   done
 fi
 if [ -d "${TMP}/e1" ] && [ -z "${UP_HITS}" ]; then ok "AC8b 判断 69: 写した元のファイル名が書き出しに無い"; else ng "AC8b 判断 69: 写した元のファイル名が書き出しにある:${UP_HITS}"; fi
@@ -135,11 +160,21 @@ EOF_RS
   else ng "AC7 rustfmt が構文解析できない *.rs がある、または対象が無い（${RF_N} 本）:${RF_BAD}"; fi
 else ng "AC7 rustfmt が無い（別の OS の専用ファイルの構文を確かめられない）"; fi
 run_ok "AC7 書き出した側で kit/check.sh が緑" env PYTHONDONTWRITEBYTECODE=1 bash "${TMP}/e1/kit/check.sh"
+# ★ 追補 2 (j): 実行権限は #!/ で始まるファイルだけ（POSIX で。Windows では実行権限の印を持たない）
+case "$(uname -s 2>/dev/null)" in
+  Darwin|Linux)
+    XRS="$(find "${TMP}/e1" -name '*.rs' -type f -perm -u+x -print 2>/dev/null | head -n 3)"
+    XSH="$(find "${TMP}/e1" -name '*.sh' -type f -perm -u+x -print 2>/dev/null | head -n 1)"
+    if [ -d "${TMP}/e1" ] && [ -z "${XRS}" ] && [ -n "${XSH}" ]; then ok "AC8c (j) *.rs に実行権限が無く、*.sh にはある"
+    else ng "AC8c (j) 実行権限が #!/ の規則と違う（*.rs: ${XRS:-なし}・*.sh: ${XSH:-なし}）"; fi ;;
+  *) echo "  ℹ️ AC8c (j) 実行権限の検査は POSIX だけ（この OS では飛ばす）" ;;
+esac
 
 # ---- AC8: 実物の写しで秘匿の検査が効く（陰性対照）。★ 写しは git の外に作る（export.py は git に依存しない）
 COPY_PY='import shutil,sys; shutil.copytree(sys.argv[1], sys.argv[2], ignore=shutil.ignore_patterns("target","__pycache__",".build","runs","sealed"))'
 mkcopy () { rm -rf "${TMP}/c-$1"; "${PY}" -c "${COPY_PY}" "${SRC}" "${TMP}/c-$1/papers/ime-observation"; }
-cx () { local n="$1"; shift; "${PY}" "${TMP}/c-${n}/papers/ime-observation/kit/export/export.py" --out "${TMP}/o-${n}" --allow-missing-license "$@"; }
+XC="kit/export/export.internal.py"
+cx () { local n="$1"; shift; "${PY}" "${TMP}/c-${n}/papers/ime-observation/${XC}" --out "${TMP}/o-${n}" --allow-missing-license --style-check "${SC}" "$@"; }
 mkcopy p0
 run_ok "AC8 陽性対照: 混ぜない写しは書き出せる" cx p0
 # judge <期待する終了コード> <名前> <出力にあるべきファイル名> <説明>  ★ cx の結果を判定する（異常終了・書き出し先の残り・ファイル名）
@@ -234,8 +269,83 @@ if "${PY}" -c "${FIX_PY}" "${LD}" >/dev/null 2>&1 && (cd "${LD}" && "${PY}" chec
   else ng "AC8 判断 69: 対訳の無いリテラルで止まらない（exit ${rc}・$(tail -n 2 "${TMP}/neg-untr.out" | tr '\n' ' ')）"; fi
 else ng "AC8 判断 69: 陰性対照の準備（写しの manifest の直し）に失敗した"; fi
 
+# ---- AC8c: 追補 2（判断 74〜76・decisions.md の (a)〜(k)）の陰性対照（2026-09-30・main への merge の前）
+neg brpid "kit/e2/README.md" "Sessions [P017, P021] were excluded." "判断 76: 角括弧の被験者 ID を混ぜると exit 1"
+neg dblsep "kit/e3/README.md" "The trace was under /Users//zed/work." "(f) 連続する区切りの /Users//<名> を混ぜると exit 1"
+neg colon "kit/pilot/README.md" "Copied with scp from zed@labhost:/home/zed/data." "(f) : の直後の /home/<名> を混ぜると exit 1"
+neg url "kit/formats/FORMATS.md" "A mirror is at https://host/C:/Users/zed/x for reference." "(f) URL の path の C:/Users/<名> を混ぜると exit 1"
+HOST_NATIVE="$("${PY}" -c "import socket; print(socket.gethostname().split('.')[0])")"
+if [ "${#HOST_NATIVE}" -ge 3 ]; then neg host "experiment/env.md" "Measured on ${HOST_NATIVE} last week." "(g) 書き出す機械のホスト名を混ぜると exit 1"
+else echo "  ℹ️ (g) ホスト名が 3 文字未満なので飛ばす"; fi
+neg styleja "experiment/notes.md" "パイロットの結果はここに書く。" "判断 75: 地の文の日本語を混ぜると exit 1（書き出しの最後の検査）"
+if [ -f "${TMP}/neg-styleja.out" ] && grep -qF "パイロットの結果" "${TMP}/neg-styleja.out"; then ng "判断 75: 当たった値（日本語の文）が出力に出ている"; else ok "判断 75: 当たった値（日本語の文）を出力に出さない"; fi
+neg styleref "kit/run/README.md" "This was settled in decision 72." "判断 75: 内部の番号を混ぜると exit 1"
+neg stylerel "kit/gen/README.md" "The upstream copy is identical." "判断 75: 関係の語を混ぜると exit 1"
+mkcopy corpus
+mkdir -p "${TMP}/c-corpus/papers/ime-observation/kit/corpus/data"
+printf '%s\n' "Built for GSE." > "${TMP}/c-corpus/papers/ime-observation/kit/corpus/data/notes.md"
+cx corpus > "${TMP}/neg-corpus.out" 2>&1; rc=$?
+judge 1 corpus "notes.md" "(h) kit/corpus/data/ の .jsonl でないファイルの GSE で exit 1" "${rc}"
+newf 2 tokentxt "experiment/zenodo_token.txt" "placeholder" "(e) 秘密の名前の型（*token*.txt）で exit 2"
+newf 2 idrsa "kit/id_rsa" "placeholder" "(e) 秘密の名前の型（id_rsa）で exit 2"
+AGEK="$(printf '%s%s%s' 'AGE-SEC' 'RET-KEY-' '1')$(printf 'Q%.0s' $(seq 1 58))"
+newf 2 agekey "experiment/keys.md" "The key is ${AGEK} here." "(e) 秘密鍵に見える中身で exit 2"
+if [ -f "${TMP}/neg-agekey.out" ] && grep -qF "QQQQQQQQ" "${TMP}/neg-agekey.out"; then ng "(e) 当たった値（鍵に見える中身）が出力に出ている"; else ok "(e) 当たった値（鍵に見える中身）を出力に出さない"; fi
+newf 2 intname "kit/notes_internal.md" "Notes." "(i) .internal. の形でない internal を語として含む名前で exit 2"
+# 判断 75: 検査の道具が無ければ exit 2（git の無い写しは既定の場所を引けない・明示した道具が無い）
+mkcopy nosc
+"${PY}" "${TMP}/c-nosc/papers/ime-observation/${XC}" --out "${TMP}/o-nosc" --allow-missing-license > "${TMP}/neg-nosc.out" 2>&1; rc=$?
+if [ "${rc}" -eq 2 ] && ! grep -q Traceback "${TMP}/neg-nosc.out" && [ ! -e "${TMP}/o-nosc" ]; then ok "AC8c 判断 75: git の無い写しで --style-check を省くと exit 2（黙って飛ばさない）"
+else ng "AC8c 判断 75: 検査の道具を引けないのに止まらない（exit ${rc}）"; fi
+"${PY}" "${TMP}/c-nosc/papers/ime-observation/${XC}" --out "${TMP}/o-nosc" --allow-missing-license --style-check "${TMP}/no-such-style-check.py" > "${TMP}/neg-nosc2.out" 2>&1; rc=$?
+if [ "${rc}" -eq 2 ] && ! grep -q Traceback "${TMP}/neg-nosc2.out" && [ ! -e "${TMP}/o-nosc" ]; then ok "AC8c 判断 75: --style-check のファイルが無ければ exit 2"
+else ng "AC8c 判断 75: --style-check のファイルが無いのに止まらない（exit ${rc}）"; fi
+# ★ git の写し（2）: (a) git が PATH に無い・(b) 対訳表の変更・(d) assume-unchanged・(c) 読めない dir（POSIX）・(k) 作業ツリーの中の --out
+mkcopy git2
+G2="${TMP}/c-git2"
+if git -C "${G2}" init -q >/dev/null 2>&1 && git -C "${G2}" add papers >/dev/null 2>&1 \
+   && git -C "${G2}" -c user.name=acceptance -c user.email=acceptance@example.invalid -c commit.gpgsign=false commit -q -m base >/dev/null 2>&1; then
+  run_ok "AC8c 陽性対照: clean な git の写し（2）は書き出せる" cx git2
+  rm -rf "${TMP}/o-git2"
+  PYX="$("${PY}" -c 'import sys; print(sys.executable)')"
+  mkdir -p "${TMP}/nogit"
+  env PATH="${TMP}/nogit" "${PYX}" "${G2}/papers/ime-observation/${XC}" --out "${TMP}/o-git2" --allow-missing-license --style-check "${SC}" > "${TMP}/neg-nogit.out" 2>&1; rc=$?
+  if [ "${rc}" -eq 2 ] && ! grep -q Traceback "${TMP}/neg-nogit.out" && [ ! -e "${TMP}/o-git2" ]; then ok "AC8c (a) git の作業ツリーで git が PATH に無ければ exit 2"
+  else ng "AC8c (a) git の作業ツリーなのに git が無くても止まらない（exit ${rc}）"; fi
+  rm -rf "${TMP}/o-git2"
+  env PATH="${TMP}/nogit" "${PYX}" "${TMP}/c-p0/papers/ime-observation/${XC}" --out "${TMP}/o-nogit-p0" --allow-missing-license --style-check "${SC}" > "${TMP}/pos-nogit.out" 2>&1; rc=$?
+  if [ "${rc}" -eq 0 ]; then ok "AC8c (a) 陽性対照: git の無い写しは git が PATH に無くても書き出せる"
+  else ng "AC8c (a) 陽性対照: git の無い写しが git 無しで書き出せない（exit ${rc}・$(tail -n 1 "${TMP}/pos-nogit.out")）"; fi
+  printf '\n' >> "${G2}/papers/ime-observation/kit/export/translations.internal.json"
+  cx git2 > "${TMP}/neg-git2.out" 2>&1; rc=$?
+  judge 2 git2 "translations.internal.json" "(b) git の写しで対訳表に未コミットの変更があれば exit 2" "${rc}"
+  git -C "${G2}" checkout -q -- papers/ime-observation/kit/export/translations.internal.json
+  rm -rf "${TMP}/o-git2"
+  git -C "${G2}" update-index --assume-unchanged papers/ime-observation/kit/gen/README.md
+  printf '%s\n' "A hidden change." >> "${G2}/papers/ime-observation/kit/gen/README.md"
+  cx git2 > "${TMP}/neg-git2.out" 2>&1; rc=$?
+  judge 2 git2 "kit/gen/README.md" "(d) assume-unchanged の印を付けて変えたファイルがあれば exit 2" "${rc}"
+  git -C "${G2}" update-index --no-assume-unchanged papers/ime-observation/kit/gen/README.md
+  git -C "${G2}" checkout -q -- papers/ime-observation/kit/gen/README.md
+  rm -rf "${TMP}/o-git2"
+  case "$(uname -s 2>/dev/null)" in
+    Darwin|Linux)
+      if [ "$(id -u)" != "0" ]; then
+        chmod 000 "${G2}/papers/ime-observation/kit/gen"
+        cx git2 > "${TMP}/neg-git2.out" 2>&1; rc=$?
+        chmod 755 "${G2}/papers/ime-observation/kit/gen"
+        judge 2 git2 "gen" "(c) 読めない dir があれば exit 2" "${rc}"
+        rm -rf "${TMP}/o-git2"
+      else echo "  ℹ️ (c) root では読めない dir を作れないので飛ばす"; fi ;;
+    *) echo "  ℹ️ (c) 読めない dir の検査は POSIX だけ（この OS では selftest の差し替えで確かめる）" ;;
+  esac
+  "${PY}" "${G2}/papers/ime-observation/${XC}" --out "${G2}/pub" --allow-missing-license --style-check "${SC}" > "${TMP}/neg-outin.out" 2>&1; rc=$?
+  if [ "${rc}" -eq 2 ] && ! grep -q Traceback "${TMP}/neg-outin.out" && [ ! -e "${G2}/pub" ]; then ok "AC8c (k) --out が元を含む git の作業ツリーの中なら exit 2"
+  else ng "AC8c (k) --out が作業ツリーの中でも止まらない（exit ${rc}）"; fi
+else ng "AC8c 陰性対照の準備（一時的な git repo・2）に失敗した"; fi
+
 check_entry_green
 forbid_gse_changes
-only_allowed '^papers/ime-observation/(kit/export/(export\.py|README\.md|translations\.internal\.json)|CITATION\.cff|\.zenodo\.json)$'
+only_allowed '^papers/ime-observation/(kit/export/(export\.py|README\.md|export\.internal\.py|README\.internal\.md|translations\.internal\.json)|README\.md|CITATION\.cff|\.zenodo\.json)$'
 style_ok
 finish

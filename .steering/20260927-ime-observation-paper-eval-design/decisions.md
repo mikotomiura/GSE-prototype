@@ -533,3 +533,30 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 
 - ★ 未決（M3 / M6 で研究者が決める）: (1) エンバーゴ（本計測の間は中身を伏せる・最長 4 年）を使うか、すぐ公開するか。(2) M6 の追補を別の登録にするか、OSF の登録の更新の仕組みを使うか（⚠️ 更新の仕組みは一次で確かめていない → M6 の前に確かめる）。(3) 登録する文書は公開物と同じ規約（学術的な英語・GSE への言及なし）で書く —— `preregistration.md` は `papers/` の中にあるので `_style_check.py` と書き出しの検査を通る。
 - `_issue-plan.md` §5 の M3 / M6 の Done に「OSF の登録の URL と登録の日時を `experiment/notes.md` に記録し、登録の日時が最初の本計測の run より前」を足した。
+
+## 判断 74〜76: main への merge の前の /cross-review 1 巡目を受けた裁定（2026-09-30・研究者の回答）
+
+★ レビュー（範囲は判断 72 の 6 ファイル・`c11b8b80..3ba24091`）: code-reviewer（CRITICAL / HIGH 0・MEDIUM 2・LOW 8）・security-checker（CRITICAL / HIGH 0・MEDIUM 4・LOW 6）・Codex（P1 2・P2 1・`--ack-filtered`〔B14〕・50,317 トークン）。
+一次で確かめた: `git_top`（`export.py:436-437`）は git が見つからないと `None` を返し、判断 70 の `check_committed` を飛ばす（両 Claude が一致）／`WORD_RULES`（`:83-95`）は `_style_check.py` の `FORBIDDEN`（`:31-45`）の internal-ref・relation と地の文の日本語を持たない（両 Claude が一致）／対訳表は `excluded()` の `.internal.` に当たるので `check_committed` の対象外で、`load_table`（`:474-`）はリンクを確かめない（Codex）／`collect()`（`:382-`）の `os.walk` に `onerror` が無い（Codex）／`names_a_user`（`:634-`）は空の成分を名前にしない（`/Users//zed`・Codex と security が一致）・`_TOKEN_START`（`:99`）の後読みが `:` と `/` を除くので `root:/Users/zed`・`https://host/C:/Users/zed` が字句にならない（両 Claude）／`BRACKETED_REF`（`:96`）で `[P017]` が通る（両 Claude）／`SECRET_NAMES`（`:70-71`）に `*token*.txt`・`id_rsa*` などが無く、中身の署名も見ない（両 Claude）／`#!` で始まる `.rs`（`#![…]`）も 0755（`:767`）／`--out` は元の dir の外なら repo の中でも通る（`:725`）／acceptance の写した元のファイル名の grep が部分一致（`024-acceptance.sh:91-95`・`run_logger.rs` で誤って赤）。
+
+| # | 論点 | 採用 | 理由 |
+|---|---|---|---|
+| 74 | security M4: 公開する `export.py` 自身が、禁止語を連結で作る形（`"G"+"SE"`・`"src"+"-tauri"`・`"."+"steering"`・データ用 repo の名前・`g1-submit` / `o1_submit`・`upstream` の欄名）で内部の名前を運び、読者は非公開の元から写したことも読める（判断 36 / 43 と衝突・連結の形は 024.md の仕様どおり） | ★ **書き出し器を公開しない**: `kit/export/` の 3 ファイルを `*.internal.*` に改名する（`export.py` → `export.internal.py`・`README.md` → `README.internal.md`・対訳表はそのまま）。公開の `README.md` の表から `kit/export/` の行を消す | 読者は非公開の元を持たないので書き出し器を動かせず、公開しても役に立たない一方で、写した元との関係だけを明かす。★ 書き出し器の中には内部の語をそのまま書いてよくなる |
+| 75 | code M2・security M3: 公開の最後の門（書き出し）は `_style_check.py` の規則の一部しか見ない。M1〜M11 で直接コミットした文書が acceptance を通らずに M12 の公開まで届く | ★ **書き出しが全規則を回す**: 書き出しの最後に、出力の dir に `_style_check.py --root <出力> .` を回し、違反が 1 件でもあれば出力を消して exit 1（ファイルと行と種類だけを出し、当たった値は出さない）。道具の場所は `--style-check PATH`、省けば元を含む git の作業ツリーの頂点からの `.steering/20260927-ime-observation-paper-eval-design/issues/_style_check.py`（`papers/README.md` が機械の門として名指す場所）。見つからない・道具が exit 2・異常終了のときは出力を消して exit 2（★ 黙って飛ばさない） | 公開は研究者が手で行うので、手順の段ではなく機械の門にする。★ 規則を書き出し器に写さない（写すと 2 つが食い違う） |
+| 76 | 両 Claude の LOW: 被験者 ID の検査は角括弧の `[P…]` を文献番号として先に消すので、`[P017]`・`[P017, P021]` が通る | ★ **例外をやめる**: `BRACKETED_REF` による消去をやめ、角括弧の中の被験者 ID の形も止める。`papers/README.md` の「文献番号のように角括弧で囲んだ `[P…]` は別」を直し、公開物では非公開の書誌の番号 `[Pn]` を使わない（普通の学術的な引用を使う）と書く | `[Pn]` は非公開の書誌の番号で、公開物の読者に意味が無い。一次で数えると、公開物の中の `[Pn]` は逐語コピーのコメント（書き出しで消える）と selftest だけで、地の文には 0 件 |
+
+- ★ 仕様の範囲の直し（研究者に問わずメインが段取り・024.md の追補に書いた）:
+  - (a) git が見つからない（`FileNotFoundError`）ときは、元の dir から上へ `.git`（dir でも file でも）を探し、あれば exit 2（git の作業ツリーの中では git が要る）。`_git_env` は `GIT_CEILING_DIRECTORIES`・`GIT_DISCOVERY_ACROSS_FILESYSTEM` も消す。git の無い一時的な写しは今のまま。
+  - (b) 対訳表は書き出さないが出力を変える入力なので、git の作業ツリーの中なら追跡済みで HEAD と一致を求める。リンクなら exit 2。
+  - (c) `os.walk` の `onerror` で exit 2（読めない dir）。git の作業ツリーの中なら、追跡済みで除外に当たらないファイルがすべて集められたことを確かめる（欠けたら exit 2）。
+  - (d) index の `assume-unchanged` / `skip-worktree` の印（`git ls-files -v` の小文字・`S`）が書き出すファイルか対訳表にあれば exit 2。
+  - (e) 秘密の名前の型を足す（大文字小文字を問わない）: `*token*.txt`・`*.token`・`*.env`・`key.txt`・`id_rsa*`・`id_ed25519*`・`id_ecdsa*`・`id_dsa*`・`.netrc`・`_netrc`・`.npmrc`・`.pypirc`・`.git-credentials`・`credentials`・`*.ppk`・`*.asc`・`*secret*`。中身の署名（age の秘密鍵の頭・PEM の秘密鍵の BEGIN 行・GitHub / GitLab のトークンの頭・AWS のアクセスキーの形・Slack のトークンの頭）に当たれば exit 2（値は出さない）。止めるときの文言に「名前が偶然当たったなら改名する」。★ 署名は連結などで組み立て、差分に秘密に見える綴りをそのまま書かない（Codex の前の機密フィルタが止める・B14）。
+  - (f) 絶対パスの字句: 連続する区切り（`/Users//zed`）は空の成分を飛ばして次の成分を名前にする。`:` の直後の絶対パス（`zed@labhost:/home/zed`・`root:/Users/zed`・`path:C:\Users\zed`）と URL の path（`https://host/C:/Users/zed`・`sftp://host/Users/zed`・`vscode://file/C:/Users/zed`）も字句として拾う。相対パス（直前が英数字・`.`・`~`）は今のまま当てない。
+  - (g) 書き出す機械のホスト名（`socket.gethostname()` と環境変数 `COMPUTERNAME` / `HOSTNAME`・3 文字以上・語として・大文字小文字を問わない）を実在の値の規則に足す。README.internal の手順に「両方の開発機の `--also-user` / `--also-home` を渡す」。
+  - (h) 語の検査を外すのは `kit/corpus/data/` の `*.jsonl`（`_CORPUS_JSONL` に一致するファイル）だけにする。
+  - (i) `.internal.` の形でないのに名前に `internal` を語として含むファイル（`(^|[._-])internal([._-]|$)`・大文字小文字を問わない）は exit 2（黙って書き出さず、黙って除かず、改名を求める）。
+  - (j) 実行権限は 1 行目が `#!/` で始まるファイルだけ（`#![` を除く）。
+  - (k) `--out` が元を含む git の作業ツリーの中なら exit 2。
+  - (l) acceptance（メインが書く）: 写した元のファイル名の grep を語として行い、書き出しに実在するファイル名は除く。
+  - (m) 文書（メインが直す）: `docs/repository-structure.md` の「置くべきでないもの: 生ログ」に corpus の例外。`papers/README.md` の逐語コピーの例外の文（判断 69 の後）・`[P…]` の例外（判断 76）・書き出し器（判断 74）。
+- 直さない（記録だけ）: `.csv` / `.tsv` / `.json` / `.txt` の生データがコミットされていれば書き出される（拡張子で判定し、`papers/README.md` の約束に頼る。content-free の集計 JSON を公開するため）／Windows で書き出すと実行権限が付かない（README.internal に「公開 repo は macOS か Linux で作る、または `git update-index --chmod=+x`」と書く）。
