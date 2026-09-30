@@ -61,7 +61,9 @@
   - [ ] W6（024: 公開 repo への書き出し）（2026-09-30・G-GEAR）
     - [x] 着手の前に研究者に 3 問 → 判断 67（絶対パスは実在の値＋名前つきの形・架空の名前の一覧だけ通す）・68（測定用のロガーは書き出しからビルド・機械によらずバイト一致）・69（逐語コピーの日本語の文字列リテラルは内部の対訳表で英訳）。issue 024 と acceptance を直し、判断 42 / 43 より前の記述を現行に合わせ、`_style_check.py` の明示パスの `*.internal.*` を対象外に
     - [x] メインが使い捨ての試作 `export.py` で acceptance を通しで検証（失敗 0 件）→ 変異で陰性対照を確かめる
-    - [ ] ループ（`--issues 024`）→ merge ゲート（clean な checkout の acceptance・レビュー 2 本・対訳 72 項目の確認）→ merge → 全 acceptance
+    - [x] ループ（`--issues 024`）: 1 run・attempt 1 の `issue_done`（約 17 分・`a193c751`）。clean な checkout で acceptance 失敗 0 件（✅ 58）
+    - [x] merge ゲート: 対訳 72 項目をメインが全件確認・レビュー 2 本（CRITICAL なし・HIGH 3）→ 判断 70 / 71 を研究者に問い確定 → acceptance に追補（陰性対照 10 本・ケース 6 つ）→ 作業用エージェント（Sonnet）が直し（`24264d40`・`d8e3f1d9`・`9cf4eac9`）→ 直した版の clean な checkout で失敗 0 件（✅ 74）・変異 7 本がすべて赤 → merge（`c6305340`）
+    - [x] merge 後の base（`c6305340`）の clean な checkout で全 acceptance 25 本: G-GEAR で回る 22 本がすべて失敗 0 件（024 ✅ 74・一覧の SHA-256 `9e586e5254063ec6a27ef50971ab83557da17d0c1343bc046faa8682b8b0b3b5`・91 ファイル）、macOS 専用の 004 / 007 / 012 は exit 2（対象外）。`_style_check.py papers/ime-observation` 違反 0 件 → push → 片付け（2026-09-30）
     - [ ] ⚠️ Mac: `024-acceptance.sh` を回す（macOS の専用ファイルの書き出し後の `cargo test`・一覧の SHA-256 が G-GEAR と同じ commit で一致するか〔判断 68〕）
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）

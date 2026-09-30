@@ -1,5 +1,7 @@
 # 次セッション（G-GEAR）— IME 論文: W6（024 公開 repo への書き出し）
 
+> ✅ **2026-09-30: 完了**（024 を `c6305340` で base へ merge・判断 67〜71）。次は `next-session-ime-paper-after-w6.md`（Mac の確認と main への merge の判断）。
+
 > 作成: 2026-09-30（W3 の残り 005 / 006 と W5 の 020 / 023 を merge したセッションの最後に・研究者の指示「コンテキスト的に次セッションで回す」）。前の G-GEAR 用 handoff（`next-session-ime-paper-ggear-w5.md`）の後継。前のものは読まなくてよい。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `_issue-plan.md`（§2 波・§5 マイルストーン）・`issues/024.md`・`decisions.md`（判断 1〜65）・`blockers.md`（B1〜B12）・`tasklist.md`。状態は着手時に測り直す。
 > ★ **2026-09-30 03:4x 更新**: Mac の確認（`next-session-ime-paper-mac.md` の §0）は済んだ（Mac の push `e1744b98`〜`2c3a2781` を G-GEAR で取り込み・§1b）。**Mac 側に残りの作業は無い**。W6 は G-GEAR で回す。
