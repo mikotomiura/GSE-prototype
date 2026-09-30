@@ -1,5 +1,7 @@
 # 次セッション — IME 論文: main への merge の後 —— Mac の確認と M0（コーパスの確定）
 
+> ⚠️ **2026-10-01: このメモは終わった。後継は `next-session-ime-paper-m2.md`**（M1 の枝の PR → M2 の残り → M3）。
+
 > 作成: 2026-09-30（G-GEAR で `feature/ime-eval-kit` を main へ merge したセッションの最後に）。前の handoff（`next-session-ime-paper-after-w6.md`）の後継。前のものは読まなくてよい。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（判断 72〜78）・`blockers.md`（B14）・`issues/024.md`（追補 2・3）・`tasklist.md`・`_issue-plan.md` §5。状態は着手時に測り直す。
 > ★ 評価一式は **main に入った**（PR #276）。以後の作業は main から枝を切る（`feature/ime-*` など）。両方の機械が同じ枝に push するときは、push の前に `git fetch` → `git pull --no-rebase`（force しない）。
