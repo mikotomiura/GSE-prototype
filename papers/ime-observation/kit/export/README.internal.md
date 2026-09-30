@@ -15,7 +15,10 @@ python3 kit/export/export.internal.py --selftest
 
 The source is the directory two levels above `kit/export/`. `--out` must name a path that does not
 exist, whose parent directory exists (it is not created), and that lies outside the source; an
-existing path is never overwritten. If the export is refused, the partial output is removed.
+existing path is never overwritten. The output is written to a sibling directory (same parent, a name that
+starts with a dot) and is renamed to `--out` only after the manifest check and the check of the writing
+rules have passed; if the export is refused, that directory is removed, so nothing that looks finished is
+left behind.
 
 Exit code: 0 = exported; 1 = refused because of the content (a private value was found, a
 manifest does not match its files, a string literal has no translation); 2 = usage error, missing
@@ -38,15 +41,21 @@ rules that is missing or fails), or an unexpected failure (only the type of the 
 4. Run `export.internal.py --out DIR`, and pass the values of both development machines: every
    `--also-user` (login name) and every `--also-home` (home directory) of the other machine, in
    addition to the ones the script reads from the machine that runs it (its host name is read too).
+   Also pass the host name of the other development machine with `--also-user` (the host name of the machine
+   that runs the export is read by the script, but `localhost` is never searched for).
    Make the public repository on macOS or Linux. A checkout or export written on Windows does not
-   carry the executable bit, so the shell scripts (the files that start with `#!/`) would lose it;
-   on Windows run `git update-index --chmod=+x <file>` for each of them before the first commit.
+   carry the executable bit, so the shell scripts (the files that start with `#!`, optional blanks and
+   `/`) would lose it; on Windows run `git update-index --chmod=+x <file>` for each of them before the
+   first commit.
    The output is byte-identical for the same source on any machine.
    The last step of the export runs the checker of the writing rules of published files
    (`_style_check.py`) on the output: forbidden words, internal numbers, relation words and Japanese
    prose. The checker is found in the git work tree of the source, or given with `--style-check PATH`;
    if it cannot be found or fails, the export stops with exit code 2 and the output is removed; a
-   violation stops it with exit code 1 (only the file, line and kind are printed).
+   violation stops it with exit code 1 (only the file, line and kind are printed). When the source is
+   inside a git work tree, the checker must itself be tracked in the git work tree that holds it, equal to
+   HEAD and free of an `assume-unchanged` or `skip-worktree` mark (a checker outside git stops the
+   export with exit code 2), so that one commit yields one verdict.
 5. Create the new repository from `DIR`, tag a release, and deposit the release with the archive
    service to obtain a DOI. Then add the DOI to `CITATION.cff`.
 
@@ -99,16 +108,26 @@ holds a file whose name looks like a secret (`.env`, `.env.*`, `*.env`, `*.pem`,
 `*.asc`, `*age-identity*`, `*.agekey`, `*.age`, `*token*.json`, `*token*.txt`, `*.token`,
 `credentials*.json`, `credentials`, `client_secret*`, `*secret*`, `key.txt`, `id_rsa*`,
 `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `.netrc`, `_netrc`, `.npmrc`, `.pypirc`, `.git-credentials`,
-`g1-submit*.json`, `o1_submit*.json`, `*.log`; case-insensitive; rename the file if the name matched
-by chance), a file whose content carries the signature of a secret (the head of an age secret key,
-the begin line of a PEM private key, a GitHub / GitLab token head, the shape of an AWS access key
-id, a Slack token head; the text is never printed), a name that holds the word `internal` in
-another form than `.internal.` (rename it), an unreadable directory, or a link that leaves the
+`g1-submit*.json`, `o1_submit*.json`, `*.log`; case-insensitive; the directory names `.ssh`, `.gnupg`, `.aws`, `.docker`, `.kube` and `.pgpass`
+are matched too, and the whole set applies to directory names as well as file names; rename the file or
+directory if the name matched by chance), a file whose content carries the signature of a secret (the head of an age secret key,
+the begin line of a PEM or PGP private key, a GitHub / GitLab token head, the shape of an AWS access key
+id (long-term or temporary), an Anthropic or OpenAI key head, the shape of a Google API key, a Slack
+token head; the check runs on the source and again on the converted output, and each line is also
+checked with its escapes decoded; the text is never printed), a file of a kind that the checker of
+the writing rules does not read (the file must have the extension `.py`, `.rs`, `.sh`, `.md`,
+`.json`, `.toml`, `.swift`, `.txt` or `.cff`, or be named `.gitignore`, `SEED`, `Cargo.lock`,
+`LICENSE-CODE` or `LICENSE-DATA`; under `kit/corpus/data/` only the `*.jsonl` files directly in it;
+add the kind to the checker or leave the file out), a name that holds the word `internal` in
+another form than `.internal.` (a word that no letter touches, in any case, as in `notes_internal.md`,
+`internal2.md` or `notes(internal).md`, or `Internal` right after a lower-case letter, as in
+`notesInternal.md`; `internals` and `international` pass; rename it), an unreadable directory, or a link that leaves the
 source (a symbolic link, or on Windows a junction or any other reparse point).
 
-Inside a git work tree the script also stops when git cannot be run (a source under a `.git` is
-never exported without the check), when the translation table is not tracked or differs from the
-commit or is a link, when a file it would export (or the table) carries an `assume-unchanged` or
+Inside a git work tree the script also stops when git cannot be run or reports no repository while a
+`.git` (a directory or a file) exists in the source or above it (a source under a `.git` is never
+exported without the check), when the translation table is not tracked or differs from the
+commit (a deleted tracked table too) or is a link, when a file it would export (or the table) carries an `assume-unchanged` or
 `skip-worktree` mark in the index, and when a tracked file that is not excluded was not collected.
 
 The scan runs on all exported text after the changes above, and on every relative file name
@@ -125,7 +144,7 @@ characters.
   marker symbols (not applied to the `.jsonl` files directly in `kit/corpus/data/`; other files there are checked).
 * Values of the machine that runs the export: the home directory, the repository root, the
   login name and the host name (three characters or more; the part of the host name before the first
-  dot is taken too). `--also-home` and `--also-user` add the values of other
+  dot is taken too; `localhost` is never searched for). `--also-home` and `--also-user` add the values of other
   machines (`--also-user` with fewer than three characters is a usage error). These values are
   found wherever they occur, with no boundary on the left. Every spelling of a path is checked: forward and backward slashes, doubled backslashes,
   and the `/c/...` form of a drive path.
@@ -134,7 +153,11 @@ characters.
   (prefixes such as `file://`, the extended-length prefix of Windows and `/mnt/c/` are part of
   it). A colon does not join a name, so a path after `host:` and the path of a URL are tokens too. When a component of the token is `Users` or `home` (any case), the whole next component
   (not cut at a punctuation mark, non-ASCII characters included, only a trailing `.,;:)` dropped;
-  a run of the same separator character before it is skipped, a run that mixes `/` and a backslash is not) is the name. A relative path such as `./Users/y` or `kit/home/x` is not a token. The only names
+  every run of separator characters before it, of either kind and mixed or not, and every component that is
+  a single dot are skipped) is the name. The path that follows a `-I`, `-L` or `-F` compiler flag (after
+  the start of the line, a blank, a quote or `=`) is checked as a token too. In the path of an `http` or
+  `https` URL only a drive-letter form (`/C:/Users/name`) counts as a user path; the `/users/<id>` or
+  `/home/<x>` of a web address does not. A relative path such as `./Users/y` or `kit/home/x` is not a token. The only names
   that pass are these fictional ones, fixed in the script and not
   extendable by an option: `alice`, `alice2`, `bob`, `carol`, `dave`, `erin`, `gina`, `harry`,
   `YAMADA~1` and `name`. A prefix without a name (`/Users/` alone) also passes.
@@ -143,3 +166,13 @@ characters.
 
 The public repository runs `bash kit/check.sh` (the selftests of the tools that are exported; this exporter is not one of them)
 and `python3 kit/logger/check_manifest.py --self`.
+
+## Known false alarms and forms that are not caught
+
+* The secret-name patterns are broad on purpose, so a harmless name can match: `tokenizer_notes.txt`
+  (`*token*.txt`), `secret-sharing.md` (`*secret*`), and the public signature file of a release
+  (`*.asc`). The export stops with exit code 2 and asks for a rename; nothing is skipped silently.
+* A path with a space in it (`C:\Documents and Settings\<name>`) is cut at the space by the token
+  rule, so its user name is not seen. This form is not handled; do not put such a path in a published file.
+* A host name that is a common word (other than `localhost`) is searched for like any other value and
+  stops the export when it occurs as a word; rename the host or reword the text.
