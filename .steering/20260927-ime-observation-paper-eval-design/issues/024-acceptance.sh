@@ -364,7 +364,8 @@ if git -C "${G2}" init -q >/dev/null 2>&1 && git -C "${G2}" add papers >/dev/nul
 else ng "AC8c 陰性対照の準備（一時的な git repo・2）に失敗した"; fi
 
 # ---- AC8d: 追補 3（判断 78・decisions.md の (a)〜(n)）の陰性対照と陽性対照（2026-09-30・/cross-review 2 巡目）
-neg mixsep "kit/e3/README.md" 'The trace was under C:/Users/\zed/work.' "判断 78: 混ざった区切りの C:/Users/<区切り><名> を混ぜると exit 1"
+# ⚠️ `/\zed` は直す前でも捕まる（エスケープを戻す処理が `\z` の `\` を落とす）。戻した後も混ざったままの `/\\` で確かめる
+neg mixsep "kit/e3/README.md" 'The trace was under C:/Users/\\zed/work.' "判断 78: 混ざった区切りの C:/Users/<区切り><名> を混ぜると exit 1"
 neg dotsep "kit/e2/README.md" "The trace was under /Users/./zed/work." "判断 78: /Users/./<名> を混ぜると exit 1"
 neg flagpath "kit/run/README.md" "Link with -L/Users/zed/lib when needed." "(g) -L/Users/<名> を混ぜると exit 1"
 mkcopy urlok
