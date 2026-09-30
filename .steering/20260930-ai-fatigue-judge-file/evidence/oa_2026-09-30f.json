@@ -1,0 +1,101 @@
+{
+ "meta": {
+  "executed": "2026-09-30 14:42:02 +0900",
+  "source": "OpenAlex /works/doi:（open_access）"
+ },
+ "records": {
+  "10.56011/mind-mri-143-20259": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "bronze",
+   "oa_url": "https://mindandsociety.in/index.php/MAS/article/download/934/454"
+  },
+  "10.48550/arxiv.2609.00506": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://arxiv.org/pdf/2609.00506"
+  },
+  "10.21608/idj.2026.525979.1661": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.7759/cureus.81313": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.7759/cureus.81313"
+  },
+  "10.1186/s12912-024-02655-9": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://bmcnurs.biomedcentral.com/counter/pdf/10.1186/s12912-024-02655-9"
+  },
+  "10.21203/rs.3.rs-4505331/v1": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.researchsquare.com/article/rs-4505331/latest.pdf"
+  },
+  "10.1111/jsr.70144": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jsr.70144"
+  },
+  "10.3390/s25216560": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/1424-8220/25/21/6560/pdf?version=1761733031"
+  },
+  "10.1109/RAMS50514.2026.11424510": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1101/2024.08.05.24310603": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2024/08/06/2024.08.05.24310603.full.pdf"
+  },
+  "10.3390/s25113324": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.mdpi.com/1424-8220/25/11/3324/pdf?version=1748169079"
+  },
+  "10.60401/ijabc.18": {
+   "status": "not found"
+  },
+  "10.1016/j.ihj.2020.11.145": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.sciencedirect.com/science/article/pii/S0019483220304119/pdf"
+  },
+  "10.5057/isase.2026-C000057": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://www.jstage.jst.go.jp/article/isase/ISASE2026/0/ISASE2026_1_64/_pdf"
+  },
+  "10.11307/mededjapan.57.3_195": {
+   "status": "not found"
+  },
+  "10.57488/descente.47.0_155": {
+   "status": "not found"
+  },
+  "10.1109/jiot.2021.3067605": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.ncbi.nlm.nih.gov/pmc/articles/8768988"
+  }
+ }
+}
