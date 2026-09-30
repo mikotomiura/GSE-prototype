@@ -727,17 +727,13 @@ def unescape(line):
 
 
 def names_a_user(text):
-    """True when an absolute-path token of the text has a Users or home component that is followed by
-    a name that is not one of the fictional names."""
+    """EXPERIMENT: empty components are skipped only when the run of separators is one character."""
     for m in ABS_TOKEN.finditer(text):
-        comps = _COMP_SPLIT.split(m.group())
-        for i in range(len(comps) - 1):
-            if comps[i].lower() in ("users", "home"):
-                # a doubled separator gives empty components; the next component that is not empty is the name
-                nxt = [c for c in comps[i + 1:] if c]
-                name = nxt[0].rstrip(_NAME_TAIL) if nxt else ""
-                if name and name not in FICTIONAL:
-                    return True
+        tok = m.group()
+        for mm in re.finditer(r"(?:^|[/\\])(?:[Uu][Ss][Ee][Rr][Ss]|[Hh][Oo][Mm][Ee])(([/\\])\2*)([^/\\]*)", tok):
+            name = mm.group(3).rstrip(_NAME_TAIL)
+            if name and name not in FICTIONAL:
+                return True
     return False
 
 
