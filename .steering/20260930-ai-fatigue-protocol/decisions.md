@@ -51,6 +51,7 @@ AskUserQuestion で 2 回に分けて聞いた（推奨とその理由を添え�
 - **採用**: P3 だけで当たった組は、**姓と名の頭文字の組**で 2 名以上が重なるときだけ読む（同じ人と示す事実の最小の単位）。ほかの観点（P1・P2・P4・P5）でも当たった組は外さない。→ 159 組のうち **45 組を読み、114 組は「別の研究（名の頭文字が違う＝同じ人と示す事実が無い）」**とした（`evidence/dedup.py refine`・`evidence/dedup/refine_2026-09-30.json`）。
 - ★ 結果（件数）を見た後の変更。規則は scratchpad の使い捨てで先に回し、同じ規則を `dedup.py` に入れて回し直し、keep・drop が一致することを確かめた（`test_dedup.py` の `TestRefine`）。
 - **失うもの**: 名の表記が情報源で違う同じ人（例: 名を略さない記録と略す記録で頭文字が違う・名と姓の順が逆）は落ちうる。Crossref の著者の欄は大半が `family`・`given` に分かれていた。
+- ★ 2026-10-01 のレビューで分かった失うもの（判断 17）: P3 の「筆頭の著者の姓が同じで年の差 1 以内」の枝は、この絞り（姓＋名の頭文字で 2 名以上）で働かなくなる。読まなかった 114 組のうち 21 組が、筆頭の著者の姓が同じで重なる姓が 2 つ未満の組だった（`pairs_2026-09-30.json` の `first_author_same` と `shared_authors` から数えた）。単著どうしなど、筆頭の著者だけが重なる同じ標本の論文を落としうる。本検索で筆頭の枝を残すかは確認待ち（プロトコル §5.1・F18）。
 
 ### 分け方（§7.3）の読み方として決めたこと（45 組を読んで）
 
@@ -135,6 +136,7 @@ AskUserQuestion で 2 回に分けて聞いた（推奨とその理由を添え�
 ## 判断 13: 検索の記録の JSON は、検索式を SHA-256 で持つ（2026-10-01・前タスクの判断 10 の先例と違う形）
 
 - **見つけ方**: 前タスクの検査器の `check_evidence`（JSON の値に 500 字を超える文字列があれば抄録の混入として赤）を本タスクの evidence に当てると、`search_dev_counts_v0_2026-10-01.json` と `search_dev_recall_v0_*.json` が赤（検索式の長さは 346〜1,425 字）。
+- ★ **実行の記録の書き換え**にあたる（前例の judge-file 判断 10 と同じ扱い・2026-10-01 のレビューで印を足した）。
 - **採用**: `search_dev.py` の `write_json` が、`query` を `query_sha256` に、`subqueries` を `subqueries_sha256` に置き換えて書く（`by_ref`）。式の本文は `evidence/search-dev.md`（と `protocol-ja.md` 付録 D）に置く。★ 既に書いた 4 本（counts・recall・recall b・recall c）は、記録された式が `search_dev.queries("v0")` と一字一句同じことを確かめてから、同じ変換で書き直した（コミットの前）。`test_search_dev.py` の `TestRecordsByRef` が、記録の SHA-256 がコードの式と一致し、`search-dev.md` に式の本文と SHA-256 があることを確かめる。
 - **前例との違い**: judge-file の判断 10 は、長い式を AND の節の並びに書き換えた。本タスクの式は AND の節だけでも 500 字を超える（arXiv の A のブロック 995 字）ので、この形にした。
 - **失うもの**: JSON だけでは式が読めない（search-dev.md と突き合わせる必要がある）。
@@ -162,3 +164,22 @@ AskUserQuestion で 2 回に分けて聞いた（推奨とその理由を添え�
 - **書かなかった**: AI の評価の集計（1 件ずつの判定の分布）。判定者 2 に見せないため（付録 A の末尾に、書かないことと理由を書いた）。
 - **判定者 2 が開かないものの案**に、付録 A の出どころの作業記録を足した（AI の 1 件ずつの判定を含むため）。開いてよいのは、プロトコル・判定者用ファイル・`dedup-259.md`・サーヴェイの事実のファイル。
 - **予想（GSRR-13）**は、登録前の段で 259 件を見た後のものと明記した。数を添えたのは事実のファイル（語の用法）の数だけ。
+
+## 判断 17: 完了時のレビュー（code-reviewer・security-checker）への対応（2026-10-01・範囲 6bf24b59..189b6159）
+
+security-checker は CRITICAL・HIGH・MEDIUM なし（LOW 3 件）。code-reviewer は HIGH 1・MEDIUM 4・LOW 12。付録 A の 20 行近くと本文の出どころは一次で一致と確かめられた。すべて一次（ファイル・JSON・コード）で確かめてから対応した。
+
+| 指摘 | 出どころ・重さ | 一次の確認 | 対応 |
+|---|---|---|---|
+| 判定者 2 も読む `dedup-259.md` §6.1 に、1 件の内容の群の値と、P に関わる読み（参加者が AI を使っていない）がある | code-reviewer HIGH | `dedup-259.md:81` | 件数だけにし、鍵・値・理由は判断 10 の 3 に寄せた（判定者用ファイルは §2・§3・§3.1 の表だけを読むので作り直しは要らない） |
+| 検査が `dedup-259.md` を見ず、内容の群の値だけの書き方も通る | code-reviewer MEDIUM | `run()` を読んだ | `check_protocol_here.py` の対象に `dedup-259.md` を足し（鍵の行・内部の語・メール）、内容の群の値（§7.7）を鍵の行の禁止語に足した。★ 当てると 4 行が当たった: 要確認の群の名 U1・U2（用法の区分ではない → dedup-259.md だけ U の規則を外した）・訂正の関係の行の E4・自分の書き違いを指す「誤り」→ 2 行を言い換えた。変異 4 つ（dedup の内容の群の値・判定の語・内部の語・ファイルが無い）を足し、陰性対照を規則の語と群の値を含む行にした（計 32 通りが赤・陰性対照 2 が緑） |
+| P3 の筆頭の著者の枝が絞りで働かなくなることが開示されていない | code-reviewer MEDIUM | `pairs_2026-09-30.json` で数えた: 114 組のうち 21 組 | 判断 4 に失うものを足し、プロトコル §5.1 に書き、付録 F に F18（本検索で筆頭の枝を残すか）を足した |
+| search-dev.md の和・突き合わせ・雑音の機械の数が、どの JSON にもスクリプトにも無い | code-reviewer MEDIUM | grep で 0 件 | `search_dev_summary.py`（ネットワークに出ない・テスト 2 本）を置き、`summary_search_dev_v0_2026-10-01.json` に件数と一覧の SHA-256 を書いた（値は search-dev.md と同じ）。Zenodo の 13 本の総数は件数の 2 回目（`search_dev_counts_v0_2026-10-01b.json`・02:58〜03:00）に記録した（和 4,109。1 回目の手元の確かめは 4,108）。`"composite reliability"` の 1 件は手元の件数で JSON が無いと書いた |
+| 直しのテストが補助の関数にしか届かず、配線を外す変異が通る | code-reviewer MEDIUM | テストを読んだ | `TestWiring`（ERIC の取得が url の DOI を足す・Semantic Scholar の取得が arXiv の DOI を足す・`main fetch` が Zenodo を F の語で分ける）を足した。配線を外す変異 3 つが赤 |
+| User-Agent に内部の語（gse） | security-checker L-1 | `search_dev.py:31`・`dedup.py:39` | `protocol-search-dev/0.1`・`protocol-dedup/0.1` に改めた。★ 相手のサーバのログに残った分は戻せない（2026-09-30〜10-01 の実行） |
+| DOI の `..` の区切りがパスの柵を通りうる | security-checker L-2 | `common.allowed_url` はパスを正規化しない | `evidence/doi_guard.py`（DOI の形を確かめ、`.`・`..` の区切りを拒んでから quote）を、`dedup.py`・`search_noise.py`・`theory_rows.py`・`search_dev.py` の Semantic Scholar の DOI の引き方に入れた。259 件・種・理論の文献の DOI はすべて通る（実行した版の振る舞いは変わらない）。テストと変異（柵を外すと赤）。★ 前タスクの `common.py` は範囲の外なので変えていない |
+| 理論の xlsx の最後の置き方が排他的でない | security-checker L-3 | `theory_rows.py` の `build` | 一時ファイルを一意の名で作り、最後を `open(out, "xb")` にした。scratchpad で 2 回目が止まることを確かめた（archive と Downloads の版は作り直していない・中身は同じ） |
+| 節番号（本検索は §4）・A13 の出どころ（issue の起票は判断 5）・A29 の漏れ（表記ゆれの対応表・締切の超過）・付録 D に種の表が無い・Zenodo の件数の列の意味・design.md §2.2 の S-12 の件数を引いていない | code-reviewer LOW | 各所 | 直した（付録 D.0 に種の表・D.6 に S-12 の件数・D.3 に Zenodo の注） |
+| 陰性対照が「含める」を含まない・subqueries の SHA-256 をコードと突き合わせない・理論の検査が内部の語の正規表現を当てない | code-reviewer LOW | 各所 | 直した（陰性対照の行・`TestRecordsByRef`・`check_theory_rows.py` に `C.GSE_RE` と変異 1 つ） |
+| 取った ID が総数より少ない（Europe PMC 7・arXiv 2）・空のページで黙って止まる | code-reviewer LOW | 記録で確かめた | search-dev.md §1 に書いた（確かめていないことも書いた）。コードは変えていない |
+| 判断 13 に「実行の記録の書き換え」の印が無い | code-reviewer LOW | 判断 13 | 印を足した |

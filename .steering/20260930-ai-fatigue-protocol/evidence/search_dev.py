@@ -27,8 +27,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PREV = os.path.join(os.path.dirname(os.path.dirname(HERE)), "20260929-ai-fatigue-surveys", "evidence")
 sys.path.insert(0, PREV)
 from common import allowed_url, ensure_outside_repo, guarded_opener  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from doi_guard import doi_path  # noqa: E402  ★ 判断 17: DOI の . と .. の区切りを拒む
 
-UA = {"User-Agent": "gse-protocol-search-dev/0.1"}
+UA = {"User-Agent": "protocol-search-dev/0.1"}  # ★ 判断 17: 内部の語を外した
 ALLOWED = [
     "https://www.ebi.ac.uk/europepmc/webservices/rest/",
     "https://api.semanticscholar.org/graph/v1/",
@@ -272,7 +274,7 @@ def seed_presence(source, doi):
     if source == "s2":
         # ★ 判断 11: Semantic Scholar は arXiv の記録を DataCite の DOI でなく arXiv の ID で持つ
         m = re.match(r"10\.48550/arxiv\.(.+)$", d)
-        key = f"ARXIV:{m.group(1)}" if m else "DOI:" + urllib.parse.quote(d, safe="/")
+        key = f"ARXIV:{m.group(1)}" if m else "DOI:" + doi_path(d)
         u = "https://api.semanticscholar.org/graph/v1/paper/" + key + "?fields=title"
         try:
             get(u, tries=4)
@@ -350,8 +352,21 @@ def main(argv=None):
                 n, err = count(src, q), None
             except Exception as e:  # 失敗は欠測として記録する（0 件に化けさせない）
                 n, err = None, f"{type(e).__name__}: {e}"
-            rows.append(dict(source=src, name=name, query=q, count=n, error=err, executed=now()))
-            print(src, name, n, err or "")
+            row = dict(source=src, name=name, query=q, count=n, error=err, executed=now())
+            if src in SPLIT_BY_F and name == "main":  # ★ 判断 17: 分けた式ごとの件数も記録する（和の前の総数）
+                v = VERSIONS[a.version]
+                subs = zenodo_subqueries(v["A"], v["F"])
+                sub_counts = []
+                for sq in subs:
+                    try:
+                        sub_counts.append(count(src, sq))
+                    except Exception as e:  # 失敗は欠測（0 件に化けさせない）
+                        sub_counts.append(None)
+                        print("sub", type(e).__name__, e)
+                    time.sleep(1.0)
+                row.update(subqueries=subs, sub_counts=sub_counts)
+            rows.append(row)
+            print(src, name, n, err or "", row.get("sub_counts", ""))
             time.sleep(1.5)
         write_json(a.out, dict(version=a.version, runs=rows))
         return 0

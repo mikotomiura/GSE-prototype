@@ -23,6 +23,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PREV = os.path.join(os.path.dirname(os.path.dirname(HERE)), "20260929-ai-fatigue-surveys", "evidence")
 sys.path.insert(0, PREV)
 from common import allowed_url, ensure_outside_repo, guarded_opener  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from doi_guard import doi_path  # noqa: E402  ★ 判断 17: DOI の . と .. の区切りを拒む
 
 UA = {"User-Agent": "protocol-search-noise/0.1"}
 ALLOWED = ["https://api.crossref.org/works/", "https://api.datacite.org/dois/"]
@@ -39,7 +41,7 @@ def get_json(url):
 
 
 def title_of(doi):
-    q = urllib.parse.quote(doi, safe="/")
+    q = doi_path(doi)
     try:
         t = get_json("https://api.crossref.org/works/" + q)["message"].get("title") or []
         return ("crossref", t[0] if t else "")

@@ -35,7 +35,7 @@
 
 ## 検査とレビュー
 - [x] issue-status.md
-- [ ] code-reviewer・security-checker（並列）
+- [x] code-reviewer・security-checker（並列・範囲 6bf24b59..189b6159）→ HIGH 1・MEDIUM 4・LOW 15 を一次で確かめて対応（判断 17）
 - [ ] `/cross-review` 2 巡（Codex の当日の実消費を先に確かめる）
 
 ## 完了処理

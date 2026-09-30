@@ -126,6 +126,10 @@ def check(xlsx, crossref_path=CROSSREF, db=DB_XLSX):
                     for w in C.GSE:
                         if w in c.value:
                             errs.append(f"『{s}』{c.coordinate} に別の研究の内部の語『{w}』")
+                    for p in C.GSE_RE:  # ★ 判断 17（code-reviewer LOW）: [Pn]・O1 などの正規表現も当てる
+                        m = re.search(p, c.value)
+                        if m:
+                            errs.append(f"『{s}』{c.coordinate} に別の研究の内部の語『{m.group(0)}』")
     ids = [f"TH{i:02d}" for i in range(1, len(EXPECTED) + 1)]
     for s in SHEETS:
         got = [r.get("ID") for r in data[s]]
@@ -234,6 +238,8 @@ def selftest():
     mut("ID の並び", lambda wb: setattr(cell(wb, "研究情報", "ID", "TH02"), "value", "TH99"), "『研究情報』の ID の並び")
     mut("数式", lambda wb: setattr(cell(wb, "研究情報", "限界・要確認点", "TH01"), "value", "=1+1"), "に数式がある")
     mut("内部の語", lambda wb: setattr(cell(wb, "研究情報", "限界・要確認点", "TH01"), "value", "GSE で使う"), "内部の語『GSE』")
+    mut("内部の語（正規表現）", lambda wb: setattr(cell(wb, "研究情報", "限界・要確認点", "TH02"), "value", "[P362] と同じ"),
+        "内部の語『[P362]』")
     mut("シートを消す", lambda wb: wb.remove(wb["書誌・出典"]), "シートの名と順が違う")
     mut("Crossref の JSON に抄録", None, "抄録の欄",
         cr_fn=lambda d: d["records"]["10.1037/rev0000309"].__setitem__("abstract", "x"))

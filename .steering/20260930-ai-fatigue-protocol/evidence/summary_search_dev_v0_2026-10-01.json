@@ -1,0 +1,141 @@
+{
+ "version": "v0",
+ "runs": [
+  {
+   "source": "arxiv",
+   "name": "main",
+   "n_ids": 1856,
+   "n_doi": 1856,
+   "n_non_doi": 0
+  },
+  {
+   "source": "epmc",
+   "name": "b1",
+   "n_ids": 64,
+   "n_doi": 60,
+   "n_non_doi": 4
+  },
+  {
+   "source": "epmc",
+   "name": "main",
+   "n_ids": 4342,
+   "n_doi": 4177,
+   "n_non_doi": 165
+  },
+  {
+   "source": "eric",
+   "name": "main",
+   "n_ids": 87,
+   "n_doi": 26,
+   "n_non_doi": 61
+  },
+  {
+   "source": "s2",
+   "name": "b1",
+   "n_ids": 150,
+   "n_doi": 132,
+   "n_non_doi": 18
+  },
+  {
+   "source": "s2",
+   "name": "main",
+   "n_ids": 18680,
+   "n_doi": 16721,
+   "n_non_doi": 1959
+  },
+  {
+   "source": "s2",
+   "name": "main_v2",
+   "n_ids": 16877,
+   "n_doi": 15165,
+   "n_non_doi": 1712
+  },
+  {
+   "source": "zenodo",
+   "name": "main",
+   "n_ids": 3326,
+   "n_doi": 3326,
+   "n_non_doi": 0
+  }
+ ],
+ "main_union": {
+  "n_doi": 21686,
+  "doi_sha256": "0356cde195806bf174b0a984c8bc894c36edece3e51c66c7ea3082282358bca4",
+  "n_non_doi_not_deduplicated": 2185
+ },
+ "b1_doi": 139,
+ "b1_not_in_main": 19,
+ "s2_main_minus_v2": 1556,
+ "overlap_259": {
+  "n": 259,
+  "with_doi": 255,
+  "without_doi": 4,
+  "in_main_union": 194,
+  "per_source": {
+   "epmc": 111,
+   "s2": 181,
+   "eric": 4,
+   "arxiv": 1,
+   "zenodo": 5
+  },
+  "groups": {
+   "DB": {
+    "total": 34,
+    "not_in_union": 20
+   },
+   "S02": {
+    "total": 13,
+    "not_in_union": 2
+   },
+   "S12": {
+    "total": 25,
+    "not_in_union": 9
+   },
+   "S04 のほか": {
+    "total": 39,
+    "not_in_union": 3
+   },
+   "S04 作業負荷・時間の比較（S04-41〜S04-87）": {
+    "total": 47,
+    "not_in_union": 22
+   },
+   "S05": {
+    "total": 9,
+    "not_in_union": 6
+   },
+   "S08・S15": {
+    "total": 26,
+    "not_in_union": 0
+   },
+   "S14": {
+    "total": 46,
+    "not_in_union": 2
+   },
+   "S13": {
+    "total": 20,
+    "not_in_union": 1
+   }
+  }
+ },
+ "noise": {
+  "epmc": {
+   "n": 50,
+   "population": 4177,
+   "sample_sha256": "8f5114851d55ce41fb711af9dd0bc7a9deba8c966856501db83388ecdfac2bf1",
+   "titles": 50,
+   "a_in_title": 20,
+   "f_in_title": 10,
+   "both": 3
+  },
+  "s2": {
+   "n": 50,
+   "population": 16721,
+   "sample_sha256": "332a8a73453dfe348e08d78da455b981ec7a06fea457708c46bc46701a40bb63",
+   "titles": 48,
+   "a_in_title": 19,
+   "f_in_title": 6,
+   "both": 4
+  }
+ },
+ "executed": "2026-10-01T03:02:33+09:00"
+}

@@ -145,6 +145,76 @@ class TestFetchFixes(unittest.TestCase):
         self.assertTrue(seen[1].startswith("https://api.semanticscholar.org/graph/v1/paper/DOI:10.1016/j.x.1?"))
 
 
+class TestWiring(unittest.TestCase):
+    """★ 判断 17（code-reviewer MEDIUM）: 直しが補助の関数だけでなく、取得の経路に配線されていること。"""
+
+    def _with_get(self, payloads):
+        seen = []
+        orig = S.get
+
+        def fake(url, tries=6):
+            seen.append(url)
+            return json.dumps(payloads[min(len(seen), len(payloads)) - 1])
+        S.get = fake
+        return seen, orig
+
+    def test_fetch_eric_adds_dois_from_url(self):
+        seen, orig = self._with_get([{"response": {"numFound": 2, "docs": [
+            {"id": "EJ1", "url": "http://dx.doi.org/10.1/AB"}, {"id": "EJ2", "url": "https://files.eric.ed.gov/x.pdf"}]}}])
+        try:
+            ids = S.fetch_ids("eric", "q")
+        finally:
+            S.get = orig
+        self.assertEqual(ids, {("eric", "EJ1"), ("eric", "EJ2"), ("doi", "10.1/ab")})
+        self.assertIn("fields=id%2Curl", seen[0])
+
+    def test_fetch_s2_adds_arxiv_dois(self):
+        seen, orig = self._with_get([{"data": [{"paperId": "p1", "externalIds": {"ArXiv": "2609.00506"}},
+                                               {"paperId": "p2", "externalIds": {"DOI": "10.1/X"}}]}])
+        orig_sleep = S.time.sleep
+        try:
+            S.time.sleep = lambda s: None
+            ids = S.fetch_ids("s2", "q")
+        finally:
+            S.get, S.time.sleep = orig, orig_sleep
+        self.assertIn(("doi", "10.48550/arxiv.2609.00506"), ids)
+        self.assertIn(("doi", "10.1/x"), ids)
+        self.assertIn(("s2", "p1"), ids)
+
+    def test_main_fetch_splits_zenodo_by_F(self):
+        import tempfile
+        calls = []
+        orig = S.fetch_ids
+        try:
+            S.fetch_ids = lambda src, q: calls.append((src, q)) or {("doi", f"10.1/{len(calls)}")}
+            with tempfile.TemporaryDirectory() as td:
+                S.main(["fetch", "--version", "v0", "--source", "zenodo", "--store", td])
+                d = json.load(open(os.path.join(td, "ids_v0_zenodo_main.json"), encoding="utf-8"))
+        finally:
+            S.fetch_ids = orig
+        v = S.VERSIONS["v0"]
+        self.assertEqual([q for _s, q in calls], S.zenodo_subqueries(v["A"], v["F"]))
+        self.assertEqual(d["subqueries"], S.zenodo_subqueries(v["A"], v["F"]))
+        self.assertEqual(len(d["ids"]), len(v["F"]))
+
+
+class TestDoiGuard(unittest.TestCase):
+    """★ 判断 17（security-checker L-2）: DOI の . と .. の区切りをパスに入れない。"""
+
+    def test_accepts_real_dois_and_rejects_dot_segments(self):
+        import doi_guard as G
+        self.assertEqual(G.doi_path("10.1016/S0301-0511(96)05223-4", safe="/()"), "10.1016/S0301-0511(96)05223-4")
+        self.assertEqual(G.doi_path("10.1234/AB"), "10.1234/AB")
+        for bad in ["10.1234/../../members", "10.1234/./x", "10.1234/x/..", "11.1234/x", "10.1/x", "10.1234/", "", None,
+                    "10.1234/a b"]:
+            with self.assertRaises(ValueError):
+                G.doi_path(bad)
+
+    def test_seed_presence_uses_the_guard(self):
+        with self.assertRaises(ValueError):
+            S.seed_presence("s2", "10.1234/../../x")
+
+
 class TestRecordsByRef(unittest.TestCase):
     """★ 判断 13: 記録の JSON は検索式を SHA-256 で持ち、式の本文は search-dev.md にある。"""
 
@@ -172,6 +242,11 @@ class TestRecordsByRef(unittest.TestCase):
             for r in d["runs"]:
                 self.assertNotIn("query", r, fn)
                 self.assertEqual(r["query_sha256"], want[(r["source"], r["name"])], fn)
+                if r.get("subqueries_sha256") is not None:  # ★ 判断 17: 分けた式もコードと突き合わせる
+                    v = S.VERSIONS["v0"]
+                    self.assertEqual(r["subqueries_sha256"], [S.qsha(q) for q in S.zenodo_subqueries(v["A"], v["F"])], fn)
+                    for q in S.zenodo_subqueries(v["A"], v["F"]):
+                        self.assertIn(S.qsha(q), md)
 
 
 class TestGuard(unittest.TestCase):

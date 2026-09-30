@@ -32,9 +32,14 @@ import check_survey_files as C  # noqa: E402
 
 PROTOCOL = "protocol-ja.md"
 ISSUE_STATUS = "issue-status.md"
+DEDUP = "dedup-259.md"  # ★ 判断 17: 判定者 2 も読むので、鍵の行・内部の語・メールの規則を当てる
 
 KEY_RE = re.compile(r"(?<![A-Za-z0-9])(?:AF\d{3}|S\d{2}-\d{2}|TH\d{2})(?![0-9])")
-KEY_WORDS = list(C.JUDGE) + list(C.EVAL) + ["見立て", "｜"]
+# ★ 判断 17（2026-10-01 のレビュー）: 内容の群の値（design.md §7.7 の値）も鍵の行で止める（区切りの｜だけでは値の書き方が通った）
+CONTENT_VALUES = ["レビュー等", "一次研究", "医療者", "教員・研究者", "学生・学習者", "働く人（医療・教育の外）",
+                  "消費者・一般の利用者", "記録支援・下書き", "意思決定支援・警報・予測", "生成 AI・対話", "生成AI・対話",
+                  "AI 一般・導入", "AI一般・導入", "比較（非無作為化・前後）", "尺度開発", "実験・模擬", "横断調査", "不明"]
+KEY_WORDS = list(C.JUDGE) + list(C.EVAL) + ["見立て", "｜"] + CONTENT_VALUES
 KEY_PATS = [r"(?<![A-Za-z0-9])E[1-7](?![0-9])", r"(?<![A-Za-z0-9])U[1-5](?![0-9])"] + list(C.EVAL_RE)
 
 # GSRR の 65 項目の英語の名（PMC10514995 の本文の様式から。2026-10-01 に XML から抜き出した）
@@ -67,7 +72,7 @@ APPX_E = "## 付録 E"
 ROW_E = re.compile(r"^\| (\d+) \| (.+?) \| §(\d+) \|$")
 
 
-def check_key_lines(lines, name):
+def check_key_lines(lines, name, pats=None):
     errs = []
     for i, line in enumerate(lines, 1):
         if not KEY_RE.search(line):
@@ -75,7 +80,7 @@ def check_key_lines(lines, name):
         for w in KEY_WORDS:
             if w in line:
                 errs.append(f"{name}:{i}: 記録の鍵と同じ行に『{w}』（1 件ずつの判定・見立て）")
-        for p in KEY_PATS:
+        for p in (KEY_PATS if pats is None else pats):
             m = re.search(p, line)
             if m:
                 errs.append(f"{name}:{i}: 記録の鍵と同じ行に『{m.group(0)}』（1 件ずつの判定・見立て）")
@@ -169,6 +174,15 @@ def run(root):
     errs += check_gse(text, PROTOCOL)
     errs += check_quotes_and_email(text, PROTOCOL)
     errs += check_gsrr(lines, PROTOCOL)
+    d = os.path.join(root, DEDUP)
+    if os.path.exists(d):
+        dt = open(d, encoding="utf-8").read()
+        # dedup-259.md の U1・U2 は「同じ研究の群」の要確認の群の名（用法の区分ではない）ので、U の規則だけ外す
+        errs += check_key_lines(dt.splitlines(), DEDUP, pats=[p for p in KEY_PATS if "U[1-5]" not in p])
+        errs += check_gse(dt, DEDUP)
+        errs += check_quotes_and_email(dt, DEDUP)
+    else:
+        errs.append(f"{DEDUP} が無い")
     s = os.path.join(root, ISSUE_STATUS)
     if os.path.exists(s):
         errs += C.check_fact(s)
@@ -185,7 +199,7 @@ def selftest():
     with tempfile.TemporaryDirectory() as td:
         base = os.path.join(td, "t")
         os.makedirs(base)
-        for fn in (PROTOCOL, ISSUE_STATUS):
+        for fn in (PROTOCOL, ISSUE_STATUS, DEDUP):
             shutil.copy(os.path.join(TASK, fn), base)
         errs = run(base)
         print(("OK " if not errs else "NG ") + "陰性対照（変異なしで緑）", errs[:3])
@@ -231,6 +245,18 @@ def selftest():
                "付録 E に項目 64 の行が無い")
         mutate("見出しを付録へ動かす", lambda t: t.replace("### [GSRR-65] ", "### ", 1) + "\n### [GSRR-65] x\n",
                "本文の節の外にある")
+        # 4b. dedup-259.md（判定者 2 も読む）の鍵の行と内部の語
+        mutate("dedup の鍵の行の内容の群の値", lambda t: t + "\n- S12-11 は生成 AI・対話から不明にした\n", "『生成 AI・対話』", fn=DEDUP)
+        mutate("dedup の鍵の行の判定の語", lambda t: t + "\n- S04-44 は除外\n", "『除外』", fn=DEDUP)
+        mutate("dedup の内部の語", lambda t: t + "\n- GSE\n", "別の研究の内部の語『GSE』", fn=DEDUP)
+        dp = os.path.join(base, DEDUP)
+        keep = open(dp, encoding="utf-8").read()
+        os.remove(dp)
+        e = run(base)
+        open(dp, "w", encoding="utf-8", newline="\n").write(keep)
+        hit = any(f"{DEDUP} が無い" in x for x in e)
+        print(("OK " if hit else "NG ") + "dedup が無い", "" if hit else e[:3])
+        ok &= hit
         # 5. issue-status.md は前タスクの事実のファイルと同じ検査
         mutate("issue-status の判定の語", lambda t: t + "\n- 含める\n", "禁止語（judge）", fn=ISSUE_STATUS)
         mutate("issue-status の内部の語", lambda t: t + "\n- GSE\n", "禁止語（gse）", fn=ISSUE_STATUS)
@@ -238,10 +264,12 @@ def selftest():
     with tempfile.TemporaryDirectory() as td:
         base = os.path.join(td, "t")
         os.makedirs(base)
-        for fn in (PROTOCOL, ISSUE_STATUS):
+        for fn in (PROTOCOL, ISSUE_STATUS, DEDUP):
             shutil.copy(os.path.join(TASK, fn), base)
         p = os.path.join(base, PROTOCOL)
-        open(p, "a", encoding="utf-8", newline="\n").write("\n- E4 は含めない。懸念は文章で書く。\n")
+        # ★ 判断 17: 規則の語（含める・除外・中心-A・E4・U1・懸念・内容の群の値）が鍵の無い行なら緑
+        open(p, "a", encoding="utf-8", newline="\n").write(
+            "\n- 含める・除外・中心-A・E4・U1 の規則。懸念は文章で書く。医療者｜記録支援・下書き｜横断調査 の群。\n")
         e = run(base)
         print(("OK " if not e else "NG ") + "鍵の無い行の規則の語は赤にしない", e[:3])
         ok &= not e

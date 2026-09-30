@@ -27,6 +27,8 @@ STEER = os.path.dirname(TASK)
 PREV = os.path.join(STEER, "20260929-ai-fatigue-surveys", "evidence")
 sys.path.insert(0, PREV)
 from common import allowed_url, guarded_opener  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from doi_guard import doi_path  # noqa: E402  ★ 判断 17: DOI の . と .. の区切りを拒む
 
 DB_XLSX = os.path.join(STEER, "20260928-ai-fatigue-db-appraisal", "archive", "input",
                        "AI_fatigue_database_with_AI_appraisal_2026-09-18.xlsx")
@@ -172,7 +174,7 @@ def fetch(out):
         sys.exit(f"既にある（上書きしない）: {out}")
     recs = {}
     for r in ROWS:
-        u = "https://api.crossref.org/works/" + urllib.parse.quote(r["doi"], safe="/()")
+        u = "https://api.crossref.org/works/" + doi_path(r["doi"], safe="/()")
         if not allowed_url(u, ALLOWED):
             raise ValueError(u)
         with OPENER.open(urllib.request.Request(u, headers=UA), timeout=60) as resp:
@@ -276,9 +278,17 @@ def build(crossref_path, out, copy_to=None):
         for i, _h in enumerate(heads[s], 1):
             w.column_dimensions[openpyxl.utils.get_column_letter(i)].width = 18 if i > 1 else 8
         w.freeze_panes = "B2"
-    tmp = out + ".tmp.xlsx"
-    wb.save(tmp)
-    os.replace(tmp, out)
+    # ★ 判断 17（security-checker L-3）: 一時ファイルは一意の名で作り、最後の置き場は排他的に作る（確かめた後にできた
+    #   ファイルを上書きしない）
+    import tempfile
+    fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=os.path.dirname(os.path.abspath(out)))
+    os.close(fd)
+    try:
+        wb.save(tmp)
+        with open(tmp, "rb") as src, open(out, "xb") as dst:
+            shutil.copyfileobj(src, dst)
+    finally:
+        os.remove(tmp)
     print("作った", out, sha256(out))
     if copy_to:
         dst = os.path.join(copy_to, os.path.basename(out))

@@ -28,6 +28,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STEER = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(STEER, "20260929-ai-fatigue-surveys", "evidence"))
 from common import allowed_url, ensure_outside_repo, guarded_opener  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from doi_guard import doi_path  # noqa: E402  ★ 判断 17: DOI の . と .. の区切りを拒む
 
 JUDGE_XLSX = os.path.join(STEER, "20260930-ai-fatigue-judge-file", "archive", "judge",
                           "AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx")
@@ -36,7 +38,7 @@ JUDGE_SHA = "6984472edeef3794a9ed075076568aaca8373c4fb675afba608cdba280e6c883"
 JUDGE_COMMIT = "d9354547"
 ABS_RUN_ID = "1980b7a2a275414d973174c6c3d918e3"
 
-UA = {"User-Agent": "gse-protocol-dedup/0.1"}
+UA = {"User-Agent": "protocol-dedup/0.1"}  # ★ 判断 17: 内部の語を外した
 ALLOWED = ["https://api.crossref.org/works/", "https://api.datacite.org/dois/"]
 OPENER = guarded_opener(ALLOWED)
 
@@ -203,7 +205,7 @@ def get_json(url, tries=5):
 
 def meta_for(doi):
     """Crossref → DataCite の順に書誌を取る（抄録は取らない）。"""
-    m = get_json("https://api.crossref.org/works/" + urllib.parse.quote(doi, safe="/"))
+    m = get_json("https://api.crossref.org/works/" + doi_path(doi))
     if m and m.get("message"):
         x = m["message"]
         rel = []
@@ -216,7 +218,7 @@ def meta_for(doi):
                     issued=(x.get("issued") or {}).get("date-parts"),
                     authors=[[a.get("family") or a.get("name") or "", a.get("given") or ""] for a in x.get("author", [])],
                     relations=rel)
-    d = get_json("https://api.datacite.org/dois/" + urllib.parse.quote(doi, safe="/"))
+    d = get_json("https://api.datacite.org/dois/" + doi_path(doi))
     if d and d.get("data"):
         at = d["data"]["attributes"]
         rel = [[(r.get("relationType") or "").lower(), (r.get("relatedIdentifier") or "").lower()]
