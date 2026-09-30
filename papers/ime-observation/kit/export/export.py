@@ -1010,7 +1010,7 @@ def selftest():
             return rcx, buf.getvalue(), o
 
         def git_here(cwd, *args):
-            return subprocess.run(["git", "-c", "user.name=selftest", "-c", "user.email=selftest@example.invalid",
+            return subprocess.run(["git", "-c", "user.name=selftest", "-c", "user.email=selftest" + AT + "example.invalid",
                                    "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", "-C", cwd] + list(args),
                                   capture_output=True, env=_git_env())
 

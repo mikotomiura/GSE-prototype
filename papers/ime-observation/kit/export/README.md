@@ -91,7 +91,7 @@ printed. The script also verifies that the copied ranges of the pinned sources c
 characters.
 
 * A participant identifier (the letter P and three digits, not adjoining a letter or digit, so
-  that a name such as `P017_run` is found; a bracketed reference number such as `[P269]` is
+  that the identifier is found inside a longer name joined by an underscore; a bracketed reference number such as `[P269]` is
   allowed), an e-mail address, the name of the private dataset repository, a session
   name of the private recordings, and the private working directories.
 * The words that name the private project, the name of its source directory, and two internal
