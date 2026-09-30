@@ -58,7 +58,7 @@
       → 2026-09-30（Mac・macOS 27.0・Python 3.14.4）: base `44241f49` の clean な worktree で、Mac で回せる merge 済みの全 acceptance 19 本（001 002 003 004 006 007 010 011 012 015〜023 028）が失敗 0 件（005 は exit 2 ＝対象外）。`emit.py --selftest --full` exit 0（49 件 ok・遅れの 95 パーセンタイル 0.01 ms）・`run_cell.py --selftest` exit 0（ok 51 件・★「a child that ignores the termination request is killed」も Mac では ok で実際に走った）・`pipeline.py --selftest --full` exit 0（9 ケース・Mac では 4 秒）・`summarize_e3.py --selftest` exit 0
       → ⚠️ E3 のプロセス名は**前提が外れた**（`pgrep -x` は 22 文字の完全な名前で照合する）→ 判断 66 で `run_e3.sh` を完全な名前に直し、023 の acceptance を回し直した
       → G-GEAR で Mac の push（`2c3a2781`）を取り込み、clean な checkout で `023-acceptance.sh` 失敗 0 件（Windows・2026-09-30）。W6 の引き継ぎ（`next-session-ime-paper-ggear-w6.md`）を更新
-  - [ ] W6（024: 公開 repo への書き出し）（2026-09-30・G-GEAR）
+  - [x] W6（024: 公開 repo への書き出し）（2026-09-30・G-GEAR）
     - [x] 着手の前に研究者に 3 問 → 判断 67（絶対パスは実在の値＋名前つきの形・架空の名前の一覧だけ通す）・68（測定用のロガーは書き出しからビルド・機械によらずバイト一致）・69（逐語コピーの日本語の文字列リテラルは内部の対訳表で英訳）。issue 024 と acceptance を直し、判断 42 / 43 より前の記述を現行に合わせ、`_style_check.py` の明示パスの `*.internal.*` を対象外に
     - [x] メインが使い捨ての試作 `export.py` で acceptance を通しで検証（失敗 0 件）→ 変異で陰性対照を確かめる
     - [x] ループ（`--issues 024`）: 1 run・attempt 1 の `issue_done`（約 17 分・`a193c751`）。clean な checkout で acceptance 失敗 0 件（✅ 58）
@@ -71,6 +71,11 @@
     - [x] ⚠️ G-GEAR: 直した `024-acceptance.sh` を回し、一覧の SHA-256 が Mac と同じ `577caafffe2c0aa743f34ae1491cdaa8297d119296e72f03a42d29200936f34a`（91 ファイル）になるかを確かめる（B13・`papers/` が `c6305340` と同じ内容の commit で）
       → 2026-09-30（G-GEAR・Windows 11・Python 3.11.9）: Mac の push `b2e284e2` を取り込み（`c6305340` からの `papers/` の差は 0）、clean な checkout（`C:/wt/clean-024m`）で `024-acceptance.sh` exit 0（✅ 74・失敗 0 件）。★ 一覧の SHA-256 = `577caafffe2c0aa743f34ae1491cdaa8297d119296e72f03a42d29200936f34a`（91 ファイル）で **Mac と一致** → 判断 68（同じ commit の書き出しは機械によらず同じバイト列）を両 OS で確かめた。⚠️ 以前の G-GEAR の値 `9e586e52…` は測定器の CRLF を含んだ値（B13）で、比べる値としては使わない
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
+- [ ] ★ main への merge（判断 72・2026-09-30・研究者が「今日・Codex の上限を一時的に引き上げる」を選択）
+  - [x] 研究者に 2 問（merge するか・凍結を公開で示す方法）→ 判断 72 / 73。M3 / M6 の Done に OSF の登録を足した
+  - [ ] origin/main を base に取り込む（衝突 2 件: 台帳は合算・Mac の handoff は base の新しい方）→ push
+  - [ ] Codex の上限を 750,000 に一時的に引き上げ → /cross-review 2 巡（6 ファイル・1,774 行）∥ security-checker → 上限を 300,000 に戻す
+  - [ ] PR → CI 緑なら merge → main の CI を確かめる
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
