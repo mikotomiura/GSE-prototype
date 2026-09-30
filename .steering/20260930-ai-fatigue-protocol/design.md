@@ -154,3 +154,20 @@
 - `evidence/dedup.py`（検出・書誌の取得）・`evidence/test_dedup.py`（各観点の陽性・陰性）・`evidence/dedup/`（書誌と組の JSON。抄録なし）。
 - `dedup-259.md`（事実: 組・観点・区分・一致点。判定者 1・2 が読んでよい。1 件ずつの範囲の判定案を書かない）。
 - 判定者用ファイルの作り直し: `judge_xlsx.py`（judge-file タスク）に、`dedup-259` の結果（寄せる記録・群）を読む処理を足す。『追加候補』から寄せた記録を外し、両方のシートに「同じ研究の群」の列を足し、『寄せた記録』シートを足す。`check_judge_xlsx.py` を合わせる。作り直す直前に Downloads の写しが archive と同じ SHA-256 かを確かめる（違えば止まって聞く）。
+
+### 7.6 内容の群（★ 2026-09-30、付ける前に固定・`decisions.md` 判断 5）
+
+- **目的**: 標本は別だが内容がほぼ同じ研究を、消さずに並べて見られるようにする（判定の材料ではなく並べ替えのため）。判定者用ファイルの列「内容の群（機械の分類）」に出す。
+- **入力**: 題名・抄録（7.1 の抄録）・判定者用ファイルの要点の欄（追加候補）・元の DB の『研究情報』の「研究デザイン」「対象集団」「AI・利用環境」（DB 34 件）。抄録と要点は repo に写さない。
+- **3 つの軸**（正規表現。大文字小文字を区別しない。各軸で上から順に最初に当たった値を採る）:
+
+| 軸 | 値（優先の順）と語 |
+|---|---|
+| 文献の種類 | `レビュー等`: review・meta-analy・scoping・systematic review・guideline・checklist・corrigendum・erratum・correction・protocol for・framework（題名）／ それ以外は一次研究として下の 3 軸を付ける |
+| 対象 | `医療者`: physician・clinician・nurse・doctor・radiolog・resident・surgeon・pharmacist・health care worker・healthcare professional・medical staff・general practitioner・provider・看護・医師 ／ `教員・研究者`: teacher・faculty・educator・instructor・academic staff・researcher・lecturer・教員 ／ `学生・学習者`: student・learner・undergraduate・pupil・EFL・学生 ／ `働く人（医療・教育の外）`: employee・worker・staff・knowledge worker・manager・developer・programmer・professional・accountant・banker・従業員・労働 ／ `消費者・一般の利用者`: consumer・customer・user・adult・public・citizen ／ `不明` |
+| AI の種類 | `記録支援・下書き`: scribe・ambient・documentation・draft repl・draft respon・inbox・chart summar ／ `意思決定支援・警報・予測`: decision support・CDSS・AI-DSS・alert・alarm・predict・early warning・diagnos・computer-aided・triage ／ `生成 AI・対話`: generative・ChatGPT・LLM・large language model・chatbot・conversational・GPT・Copilot・GenAI ／ `AI 一般・導入`: artificial intelligence・AI・automation・robot・algorithm ／ `不明` |
+| デザイン | `無作為化`: randomi[sz]ed・RCT・crossover trial ／ `比較（非無作為化・前後）`: pre-post・pre- and post・before and after・before-after・preintervention・quasi-experiment・controlled trial・comparative ／ `縦断`: longitudinal・time-lagged・three-wave・two-wave・panel・cohort・diary・experience sampling ／ `尺度開発`: scale development・validation・psychometric・factor analysis ／ `質的`: qualitative・interview・focus group・thematic・grounded theory・content analysis ／ `実験・模擬`: experiment・simulation ／ `横断調査`: cross-sectional・survey・questionnaire・structural equation・SEM・PLS・regression ／ `不明` |
+
+- **群の名**: 一次研究は `対象｜AI の種類｜デザイン`、レビュー等は `レビュー等`。
+- **メインの確かめ**: (a) どれかの軸が `不明` の記録はすべて、題名・抄録・要点・DB の欄を読んで直す（直したことを記録）。(b) 不明でない記録から無作為の 30 件（seed 20260930）を読み、3 軸の一致の数を書く（機械の分類の確からしさの目安）。直すのは (a) と、(b) で誤りと分かった記録だけ。
+- ★ 範囲の判断（E1〜E3）はしない。群は判定の材料ではないと『はじめに』と列の見出しに書く。
