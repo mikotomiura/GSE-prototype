@@ -82,8 +82,12 @@
   - [x] 作業用エージェント（Sonnet）が `loop/024-fix3` で直す（約 21 分・名前は `harry`〔`alice` は pipeline の selftest のログイン名と重なる〕）→ base と merge した木の clean な checkout で 024-acceptance.sh 失敗 0 件（✅ 139・一覧の SHA-256 `298a470b94f0fe6a5b0d953ff0b37c0420e38afaedca757b0f227e309d5ca4a0`・89 ファイル）。変異 17 本: 15 本が赤・`localhost` はケースを足して赤（`4a610eb1`）・消した対訳表は git status の削除の検出と重なる → base へ merge（`403a7933`）
   - [x] Codex の上限を 300,000 に戻した（2 巡・計 93,392 トークン・当日の合算 639,593 / 11 回）
   - [x] clean な checkout で Windows で回る全 acceptance: G-GEAR（Windows 11・`5eda5dca` の clean な checkout）で Windows で回る 22 本（001〜003 005 006 008〜011 013〜024 028）がすべて失敗 0 件・macOS 専用の 004 / 007 / 012 は exit 2（対象外）・`_style_check.py papers/ime-observation` 違反 0 件。 origin/main（`1653e8b8`）を 2 度目に取り込み（台帳の合算 800,363 / 14 回・`6b5973a4`）→ PR #276
-  - [ ] PR #276 の CI 緑なら merge → main の CI を確かめる
-  - [ ] ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が Windows と一致するか・POSIX だけの検査（読めない dir・実行権限）が緑か（判断 68）
-- [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
+  - [x] PR #276 の CI 緑なら merge → main の CI を確かめる（`2319a1cb`・main の CI success。続く #277 の `6bf24b59` も success）
+  - [x] ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が Windows と一致するか・POSIX だけの検査（読めない dir・実行権限）が緑か（判断 68）
+    → 2026-09-30（Mac・macOS 27.0・Python 3.14.4）: main（`6bf24b59`・`57210663` からの `papers/` の差は 0）の clean な worktree で 024 は ✅ 140・❌ 1（SCOPE だけ・B15）。★ 一覧の SHA-256 = `298a470b94f0fe6a5b0d953ff0b37c0420e38afaedca757b0f227e309d5ca4a0`（89 ファイル）で **G-GEAR と一致**。POSIX だけの検査（(c) 読めない dir で exit 2・(j) `*.rs` に実行権限なし・`*.sh` にあり）と (g) ホスト名の陰性対照は緑
+    → あわせて Mac で回せる全 acceptance 20 本（001〜004 006 007 010〜012 015〜024 028）: **SCOPE を除く失敗 0 件**。SCOPE は 028 を除く 19 本で 1 件ずつ ❌ ＝ main の上では base が定まらない測定器の適用範囲の外（B15）。`_style_check.py papers/ime-observation` 違反 0 件
+- [ ] M0〜M13（`_issue-plan.md` §5）。
+  - [x] M0 コーパスの確定（2026-09-30・Mac・判断 79）: 研究者の承認で新字新仮名の 12 作品を青空文庫から取得 → `--seed 1 --per-work 150`（読み 6〜30・既定）で 1,800 句・SHA-256 `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620`・`SudachiPy==0.7.0` / `sudachidict-core==20260723.1` を `kit/corpus/requirements.txt` に pin・`--validate` exit 0・2 回の書き出しでバイト一致・`experiment/data.md` に 6 項目と出典の作品表（`fece8020`）。`kit/check.sh` 緑・書き出し器が通る（91 ファイル）・仮の config で両 OS の計画の各シナリオ 225 試行がすべて別の句
+  - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
