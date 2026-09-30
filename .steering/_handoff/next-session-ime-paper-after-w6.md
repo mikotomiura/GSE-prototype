@@ -1,5 +1,7 @@
 # 次セッション — IME 論文: W6（024）の後 —— main への merge の判断と、次のマイルストーン
 
+> ⛔ **2026-09-30: 完了・後継は `next-session-ime-paper-after-merge.md`**（§2 の 1 は merge〔PR #276〕、2 は OSF Registries〔判断 73〕で決着）。このメモの §0 を再び打ち込まない。
+
 > 作成: 2026-09-30（G-GEAR で W6 の 024 を merge したセッションの最後に）。前の handoff（`next-session-ime-paper-ggear-w6.md`・`next-session-ime-paper-mac.md`）の後継。前のものは読まなくてよい。
 > ✅ **2026-09-30 更新（G-GEAR）**: Mac の確認（`b2e284e2`・B13）と G-GEAR の確認がどちらも済んだ。★ 024 の書き出しは両 OS で同じバイト列（一覧の SHA-256 `577caaff…`・91 ファイルが一致・判断 68）。**残りの機械ごとの作業は無い**。次は §2（研究者の判断）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（判断 67〜71）・`blockers.md`（B13）・`issues/024.md`・`tasklist.md`・`_issue-plan.md` §5。状態は着手時に測り直す。

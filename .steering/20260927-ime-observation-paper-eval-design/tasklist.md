@@ -81,7 +81,8 @@
   - [x] /cross-review 2 巡目（直しの境界条件）: Codex ∥ code-reviewer ∥ security-checker → CRITICAL / HIGH 0 → 研究者に 1 問 → 判断 78（混ざった区切りも飛ばし、pipeline.py の selftest の架空の名前を一覧の名前に）＋ 仕様の範囲の直し (a)〜(n)（`70b4a8a8`・`192219a3`）。直す前の版で既存 118 件は緑・新しい 21 件は赤
   - [x] 作業用エージェント（Sonnet）が `loop/024-fix3` で直す（約 21 分・名前は `harry`〔`alice` は pipeline の selftest のログイン名と重なる〕）→ base と merge した木の clean な checkout で 024-acceptance.sh 失敗 0 件（✅ 139・一覧の SHA-256 `298a470b94f0fe6a5b0d953ff0b37c0420e38afaedca757b0f227e309d5ca4a0`・89 ファイル）。変異 17 本: 15 本が赤・`localhost` はケースを足して赤（`4a610eb1`）・消した対訳表は git status の削除の検出と重なる → base へ merge（`403a7933`）
   - [x] Codex の上限を 300,000 に戻した（2 巡・計 93,392 トークン・当日の合算 639,593 / 11 回）
-  - [ ] clean な checkout で Windows で回る全 acceptance → PR → CI 緑なら merge → main の CI を確かめる
+  - [x] clean な checkout で Windows で回る全 acceptance: G-GEAR（Windows 11・`5eda5dca` の clean な checkout）で Windows で回る 22 本（001〜003 005 006 008〜011 013〜024 028）がすべて失敗 0 件・macOS 専用の 004 / 007 / 012 は exit 2（対象外）・`_style_check.py papers/ime-observation` 違反 0 件。 origin/main（`1653e8b8`）を 2 度目に取り込み（台帳の合算 800,363 / 14 回・`6b5973a4`）→ PR #276
+  - [ ] PR #276 の CI 緑なら merge → main の CI を確かめる
   - [ ] ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が Windows と一致するか・POSIX だけの検査（読めない dir・実行権限）が緑か（判断 68）
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
