@@ -94,3 +94,9 @@
 - ⚠️ 残り: G-GEAR で直した版を回し、同じ値になるかを確かめる（tasklist）。
   → ✅ 2026-09-30: G-GEAR（`b2e284e2` の clean な checkout）で失敗 0 件・`577caaff…`（91 ファイル）で Mac と一致した。
 - ★ 教訓: 「機械によらず同じ」を確かめる値は、値を作る道具そのものが機械によらないことを先に確かめる。不一致を見たら、まず測定器を対照で検算する。
+
+## B14（2026-09-30・main への merge の前の /cross-review 1 巡目）機密フィルタが受け入れ検査の架空の値に当たって Codex の呼び出しの前に止まった
+
+- 事象: 範囲 `c11b8b80..3ba24091` の 6 ファイル（判断 72）でラッパーを回すと `BLOCKED: secrets-filter detected sensitive content`（exit 2・Codex は呼ばれていない・トークン消費 0）。
+- 当たった行（フィルタの報告は差分の 220 行目の 1 件だけ）: `issues/024-acceptance.sh` の陰性対照 `newf 2 secret "experiment/.env" "API_KEY=placeholder" "判断 70: …"`。判断 70 の「秘密の名前の型（`.env`）のファイルがあれば exit 2」を確かめるための**架空の中身**で、実在の鍵ではない（値は `placeholder`）。
+- 対応: メインが差分の該当行を目で見て確かめ、研究者に示して承認を得た（AskUserQuestion「`--ack-filtered` で通す」）。→ ラッパーの `--ack-filtered` で回す（フィルタの置換は適用されたまま＝この行は `[REDACTED]` で送られる）。範囲は変えない。
