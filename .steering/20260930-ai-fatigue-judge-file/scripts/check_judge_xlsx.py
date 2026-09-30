@@ -4,7 +4,7 @@
 1. words（語の検査）
    - 常に禁止の語（評価の語・GSE の語・AI の名前と AI の評価の痕跡の語）: zip の全パーツの文字列と、セルの値（リッチテキストを
      結合した値）に 1 つも無い。読めない XML のパーツは赤。
-   - 判定の語（含める・除外・保留・中心-A・全文段・E1〜E6 など）: 許す格納先（『判定基準』・判定の 2 シートの見出しの行・
+   - 判定の語（含める・除外・保留・中心-A・全文段・E1〜E7 など。E7 は 2026-10-01 に足した）: 許す格納先（『判定基準』・判定の 2 シートの見出しの行・
      『集計』の A 列と数式）の外に無い。コメント・定義名・文書のプロパティ・シート名・ヘッダー／フッター・リンクの表示・
      入力規則の案内にも無い。
    - 単独の GPT: 書誌と要点の列の外に無い（題名の ChatGPT・GPT-4 は書誌なので書誌の列では許す）。
@@ -669,7 +669,10 @@ def _mut_dv_drop_e7(wb):
     """除外理由の入力規則から E7 を落とす（語は許す格納先の中・選択肢だけが違う）。"""
     for dv in wb["判定シート"].data_validations.dataValidation:
         if dv.formula1 and "E7" in dv.formula1:
+            before = dv.formula1
             dv.formula1 = dv.formula1.replace(",E7", "")
+            if dv.formula1 == before:  # 置き換えが起きない＝変異が空振り
+                raise RuntimeError(f"除外理由の入力規則から E7 を落とせない: {before}")
             return
     raise RuntimeError("除外理由の入力規則（E7 を含む）が無い")
 

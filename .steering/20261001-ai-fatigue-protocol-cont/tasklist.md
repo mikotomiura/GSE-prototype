@@ -23,7 +23,7 @@
 - [x] `scripts/check_here.py`（鍵の行・内部の語・メール・F の番号・【案】の数）と `--selftest`
 
 ## 検査とレビュー
-- [ ] code-reviewer・security-checker（並列）→ 一次で確かめて対応
+- [x] code-reviewer・security-checker（並列）→ 一次で確かめて対応（判断 5・判定者用ファイルを 04:22 に作り直した）
 - [ ] `/cross-review` 2 巡（Codex の当日の実消費を先に確かめる）
 
 ## 完了処理
