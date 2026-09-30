@@ -73,8 +73,13 @@
   - [ ] （旧項目）判断 36 の整理の issue（W3 の後に切る）: merge 済みの W1〜W3 の `papers/ime-observation/` を学術的な英語にし、GSE への言及・★ ⚠️ を除く。acceptance が名指す日本語の文字列と GSE を指す識別子（`--against-gse` など）も同時に直す。024 の acceptance に判断 36 の検査を足す
 - [ ] ★ main への merge（判断 72・2026-09-30・研究者が「今日・Codex の上限を一時的に引き上げる」を選択）
   - [x] 研究者に 2 問（merge するか・凍結を公開で示す方法）→ 判断 72 / 73。M3 / M6 の Done に OSF の登録を足した
-  - [ ] origin/main を base に取り込む（衝突 2 件: 台帳は合算・Mac の handoff は base の新しい方）→ push
-  - [ ] Codex の上限を 750,000 に一時的に引き上げ → /cross-review 2 巡（6 ファイル・1,774 行）∥ security-checker → 上限を 300,000 に戻す
+  - [x] origin/main（`c11b8b80`）を base に取り込む（衝突 2 件: 台帳は合算 546,201 / 9 回・Mac の handoff は base の新しい方）→ `c8eb467d` → push（ブランチの CI 緑）
+  - [x] Codex の上限を 750,000 に一時的に引き上げ（`3ba24091`）→ /cross-review 1 巡目: code-reviewer ∥ security-checker ∥ Codex（機密フィルタが受け入れ検査の架空の値に当たり、研究者の承認で `--ack-filtered`・B14）→ CRITICAL / HIGH 0
+  - [x] 研究者に 3 問 → 判断 74〜76（書き出し器を公開しない・書き出しが全規則を回す・角括弧の例外をやめる）＋ 仕様の範囲の直し (a)〜(m)。024 の issue と acceptance に追補 2（`3eb83d84`）。直す前の版（引数だけ受け取る差し替え）で既存の検査 80 件は緑・追補 2 の陰性対照 37 件はすべて赤（`9023ca30`）
+  - [x] 作業用エージェント（Sonnet）が `loop/024-fix2` で直す（約 22 分）。字義どおりの (f) は実物の `pipeline.py:1481` に当たり Stop → 同じ区切り文字の連なりだけを飛ばす読みを採った（判断 77・`e6932553`）。メインが説明を直した（`d8db7a80`）
+    → clean な checkout（base と merge した木）で 024-acceptance.sh 失敗 0 件（✅ 117・一覧の SHA-256 `74e48394b9ed51de505257d1791df891997a1bada1e6049fe0c6875162ee4ac0`・89 ファイル・Windows）。直しを 1 つずつ戻す変異 18 本がすべて狙った selftest のケースで赤 → base へ merge（`b33e0818`）
+    → ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が同じ値になるか・POSIX だけの (c)(j) の検査が緑か（判断 68）
+  - [ ] /cross-review 2 巡目（直しの境界条件）→ 上限を 300,000 に戻す
   - [ ] PR → CI 緑なら merge → main の CI を確かめる
 - [ ] M0〜M13（`_issue-plan.md` §5）。★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
