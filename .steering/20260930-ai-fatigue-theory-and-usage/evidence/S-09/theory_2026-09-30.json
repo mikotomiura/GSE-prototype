@@ -1,0 +1,457 @@
+{
+ "executed": "2026-09-30T18:25:45+09:00",
+ "mode": "theory",
+ "input_sha256": null,
+ "n": 26,
+ "errors": [],
+ "records": [
+  {
+   "key": "Kurzban2013",
+   "doi": "10.1017/S0140525X12003196",
+   "title": "opportunity cost model of subjective effort",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1671,
+    "s2": 1665,
+    "openalex": 1671,
+    "crossref": 1681
+   },
+   "oa_url": "https://www.ncbi.nlm.nih.gov/pmc/articles/3856320",
+   "oa_status": "green",
+   "chars": 1681
+  },
+  {
+   "key": "Agrawal2022",
+   "doi": "10.1037/rev0000309",
+   "title": "temporal dynamics of opportunity costs",
+   "sources_with_text": [
+    "epmc",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1371,
+    "openalex": 1371
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1371
+  },
+  {
+   "key": "Hockey1997",
+   "doi": "10.1016/S0301-0511(96)05223-4",
+   "title": "Compensatory control",
+   "sources_with_text": [
+    "epmc"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1419
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1419
+  },
+  {
+   "key": "DesmondHancock2000",
+   "doi": "10.1201/b12791-3.1",
+   "title": "Active and Passive Fatigue",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1305
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1305
+  },
+  {
+   "key": "Saxby2013",
+   "doi": "10.1037/a0034386",
+   "title": "Active and passive fatigue in simulated driving",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1804,
+    "s2": 1804,
+    "openalex": 1804
+   },
+   "oa_url": "https://stars.library.ucf.edu/facultybib2010/4649",
+   "oa_status": "green",
+   "chars": 1804
+  },
+  {
+   "key": "Matthews2019",
+   "doi": "10.1016/j.aap.2018.04.004",
+   "title": "passive fatigue",
+   "sources_with_text": [
+    "epmc",
+    "s2"
+   ],
+   "title_mismatch": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "len": {
+    "epmc": 1565,
+    "s2": 1565
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1565
+  },
+  {
+   "key": "Baumeister1998",
+   "doi": "10.1037/0022-3514.74.5.1252",
+   "title": "Ego depletion",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 842
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 842
+  },
+  {
+   "key": "Hagger2016",
+   "doi": "10.1177/1745691616652873",
+   "title": "Multilab Preregistered Replication",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1653,
+    "openalex": 1653,
+    "crossref": 1656
+   },
+   "oa_url": "https://journals.sagepub.com/doi/pdf/10.1177/1745691616652873",
+   "oa_status": "bronze",
+   "chars": 1656
+  },
+  {
+   "key": "Carter2015",
+   "doi": "10.1037/xge0000083",
+   "title": "meta-analytic tests of the depletion effect",
+   "sources_with_text": [
+    "epmc",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1006,
+    "openalex": 1006
+   },
+   "oa_url": "https://doi.org/10.1037/xge0000083",
+   "oa_status": "hybrid",
+   "chars": 1006
+  },
+  {
+   "key": "Friese2019",
+   "doi": "10.1177/1088868318762183",
+   "title": "Is Ego Depletion Real",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 918,
+    "openalex": 918,
+    "crossref": 918
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 918
+  },
+  {
+   "key": "Vohs2021",
+   "doi": "10.1177/0956797621989733",
+   "title": "Multisite Preregistered Paradigmatic Test",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1142,
+    "s2": 1138,
+    "openalex": 1141,
+    "crossref": 1141
+   },
+   "oa_url": "https://research.rug.nl/en/publications/2a6e4e59-a2c0-4f2b-9d32-d36ee7d69c17",
+   "oa_status": "green",
+   "chars": 1142
+  },
+  {
+   "key": "Dang2021",
+   "doi": "10.1177/1948550619887702",
+   "title": "Multilab Replication of the Ego Depletion",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 725,
+    "s2": 724,
+    "openalex": 725,
+    "crossref": 725
+   },
+   "oa_url": "https://doi.org/10.1177/1948550619887702",
+   "oa_status": "hybrid",
+   "chars": 725
+  },
+  {
+   "key": "Vadillo2016",
+   "doi": "10.1177/0956797616654911",
+   "title": "Sugar and Willpower",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1002,
+    "openalex": 1002,
+    "crossref": 1002
+   },
+   "oa_url": "http://eprints.lse.ac.uk/109256/1/Bitter_truth_about_glucose_and_willpower_Vadillo_et_al.pdf",
+   "oa_status": "green",
+   "chars": 1002
+  },
+  {
+   "key": "Finley2019",
+   "doi": "10.1027/1864-9335/a000376",
+   "title": "Sweet Nothings",
+   "sources_with_text": [
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 715,
+    "crossref": 715
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 715
+  },
+  {
+   "key": "Hopstaken2015",
+   "doi": "10.1111/psyp.12339",
+   "title": "mental fatigue and task disengagement",
+   "sources_with_text": [
+    "epmc",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 777,
+    "openalex": 777,
+    "crossref": 790
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 790
+  },
+  {
+   "key": "Lin2020",
+   "doi": "10.1177/0956797620904990",
+   "title": "Strong Effort Manipulations",
+   "sources_with_text": [
+    "epmc",
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 1134,
+    "s2": 1133,
+    "openalex": 1134,
+    "crossref": 1134
+   },
+   "oa_url": "https://journals.sagepub.com/doi/pdf/10.1177/0956797620904990",
+   "oa_status": "hybrid",
+   "chars": 1134
+  },
+  {
+   "key": "Demerouti2001",
+   "doi": "10.1037/0021-9010.86.3.499",
+   "title": "job demands-resources model of burnout",
+   "sources_with_text": [
+    "epmc",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 855,
+    "openalex": 855
+   },
+   "oa_url": "https://hdl.handle.net/2027.42/176893",
+   "oa_status": "green",
+   "chars": 855
+  },
+  {
+   "key": "BakkerDemerouti2007",
+   "doi": "10.1108/02683940710733115",
+   "title": "Job Demands-Resources model: state of the art",
+   "sources_with_text": [
+    "s2",
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "s2": 1023,
+    "openalex": 1058,
+    "crossref": 1058
+   },
+   "oa_url": "https://repositorio.usil.edu.pe/bitstreams/530498b6-1981-4214-b414-01b61994038e/download",
+   "oa_status": "green",
+   "chars": 1058
+  },
+  {
+   "key": "Hobfoll1989",
+   "doi": "10.1037/0003-066X.44.3.513",
+   "title": "Conservation of resources",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 0
+  },
+  {
+   "key": "Tarafdar2007",
+   "doi": "10.2753/MIS0742-1222240109",
+   "title": "Impact of Technostress",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1626
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1626
+  },
+  {
+   "key": "RaguNathan2008",
+   "doi": "10.1287/isre.1070.0165",
+   "title": "Consequences of Technostress",
+   "sources_with_text": [
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1533,
+    "crossref": 1533
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1533
+  },
+  {
+   "key": "Sweller1988",
+   "doi": "10.1207/s15516709cog1202_4",
+   "title": "Cognitive load during problem solving",
+   "sources_with_text": [
+    "openalex",
+    "crossref"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 808,
+    "crossref": 808
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 808
+  },
+  {
+   "key": "Koeske1993",
+   "doi": "10.1300/J079v17n03_06",
+   "title": "Stress-Strain-Outcome",
+   "sources_with_text": [
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "openalex": 1131
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 1131
+  },
+  {
+   "key": "Cavanaugh2000",
+   "doi": "10.1037/0021-9010.85.1.65",
+   "title": "self-reported work stress",
+   "sources_with_text": [
+    "epmc",
+    "openalex"
+   ],
+   "title_mismatch": [],
+   "len": {
+    "epmc": 668,
+    "openalex": 668
+   },
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 668
+  },
+  {
+   "key": "RyanDeci2000",
+   "doi": "10.1037/0003-066X.55.1.68",
+   "title": "Self-determination theory",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 0
+  },
+  {
+   "key": "Siegrist1996",
+   "doi": "10.1037/1076-8998.1.1.27",
+   "title": "effort/low-reward",
+   "sources_with_text": [],
+   "title_mismatch": [],
+   "len": {},
+   "oa_url": "",
+   "oa_status": "closed",
+   "chars": 0
+  }
+ ],
+ "run_id": "8eee28e9bea24e6385971319d1f40c8a"
+}

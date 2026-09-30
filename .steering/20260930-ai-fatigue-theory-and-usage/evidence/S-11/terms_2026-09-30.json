@@ -1,0 +1,2972 @@
+{
+ "executed": "2026-09-30T18:26:52+09:00",
+ "input": "records_2026-09-30.json",
+ "input_run_id": "1980b7a2a275414d973174c6c3d918e3",
+ "n": 259,
+ "n_uses_term": 16,
+ "count_terms": {
+  "N1": 15,
+  "N5": 20,
+  "N2": 2
+ },
+ "count_general_uses_term": {
+  "テクノストレス": 5,
+  "消耗": 2,
+  "疲労": 14,
+  "負担（strain）": 6,
+  "情報過多": 2,
+  "疲れ": 2,
+  "精神的・認知的疲労": 1,
+  "認知負荷": 6,
+  "情動的消耗": 1,
+  "燃え尽き": 4,
+  "作業負荷": 3
+ },
+ "count_general_not_uses_term": {
+  "疲労": 60,
+  "精神的・認知的疲労": 9,
+  "情報過多": 4,
+  "決定疲れ": 5,
+  "消耗": 50,
+  "負担（strain）": 13,
+  "認知負荷": 27,
+  "テクノストレス": 24,
+  "作業負荷": 41,
+  "燃え尽き": 109,
+  "情動的消耗": 31,
+  "疲れ": 1
+ },
+ "records": [
+  {
+   "key": "AF001",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI Fatigue",
+     "AI fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "テクノストレス",
+    "消耗",
+    "疲労",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "AF002",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "AF003",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "AF004",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "精神的・認知的疲労"
+   ]
+  },
+  {
+   "key": "AF005",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI anxiety"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "精神的・認知的疲労"
+   ]
+  },
+  {
+   "key": "AF006",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI Fatigue",
+     "AI fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "情報過多",
+    "疲れ",
+    "疲労",
+    "精神的・認知的疲労",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "AF007",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI Fatigue",
+     "AI fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "テクノストレス",
+    "疲労",
+    "認知負荷",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "AF008",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI-induced fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "テクノストレス",
+    "疲労",
+    "認知負荷",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "AF009",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI-Induced Fatigue",
+     "AI-induced fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "AF010",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI fatigue",
+     "AI-fatigue"
+    ],
+    "N2": [
+     "Fatigue with Artificial Intelligence"
+    ]
+   },
+   "terms_in_title": [
+    "N2"
+   ],
+   "uses_term": true,
+   "general": [
+    "情報過多",
+    "疲労",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "AF011",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI Anxiety",
+     "AI anxiety"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": [
+    "情報過多",
+    "決定疲れ",
+    "消耗",
+    "疲労",
+    "精神的・認知的疲労",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "AF012",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "認知負荷",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "AF013",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI Fatigue",
+     "AI fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "テクノストレス",
+    "情動的消耗",
+    "消耗",
+    "燃え尽き",
+    "疲労",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "AF014",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI Fatigue",
+     "AI fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "作業負荷",
+    "燃え尽き",
+    "疲れ",
+    "疲労"
+   ]
+  },
+  {
+   "key": "AF015",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI induced technostress"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": [
+    "テクノストレス"
+   ]
+  },
+  {
+   "key": "AF016",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "AF017",
+   "has_text": false,
+   "terms": {
+    "N5": [
+     "AI-Stressors"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": [
+    "テクノストレス"
+   ]
+  },
+  {
+   "key": "AF018",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "AF019",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI technostress"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "作業負荷",
+    "消耗"
+   ]
+  },
+  {
+   "key": "AF020",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "AF021",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "AF022",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "AF023",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "AF024",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情報過多",
+    "燃え尽き",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "AF025",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI anxiety",
+     "artificial intelligence anxiety"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "AF026",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "疲労"
+   ]
+  },
+  {
+   "key": "AF027",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス"
+   ]
+  },
+  {
+   "key": "AF028",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "AF029",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "AF030",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "AF031",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "AF032",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "AF033",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "AF034",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S02-01",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "決定疲れ",
+    "疲労",
+    "認知負荷",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S02-02",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "燃え尽き",
+    "疲労"
+   ]
+  },
+  {
+   "key": "S02-03",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "燃え尽き",
+    "疲労"
+   ]
+  },
+  {
+   "key": "S02-04",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S02-05",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗"
+   ]
+  },
+  {
+   "key": "S02-06",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S02-07",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI fatigue"
+    ],
+    "N5": [
+     "AI Anxiety"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": true,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S02-08",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI Fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S02-09",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S02-10",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S02-11",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S02-12",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "疲労",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S02-13",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-01",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "疲労",
+    "精神的・認知的疲労"
+   ]
+  },
+  {
+   "key": "S12-02",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-03",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI-related technostress"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス"
+   ]
+  },
+  {
+   "key": "S12-04",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S12-05",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-06",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S12-07",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S12-08",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S12-09",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-01",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-02",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-03",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-04",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-05",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-06",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-07",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "燃え尽き",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S04-08",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S04-09",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-10",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S04-11",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S04-12",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S04-13",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S04-14",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S04-15",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-16",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-17",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-18",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-19",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-20",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-21",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-22",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-23",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-24",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-25",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-26",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-27",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-28",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-29",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-30",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-31",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-32",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-33",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-35",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-36",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-37",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI fatigue"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": true,
+   "general": [
+    "疲労",
+    "認知負荷",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S04-38",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-41",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-42",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-43",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "S04-44",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-45",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-46",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-47",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-48",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-49",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-50",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "S04-51",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-52",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-53",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-54",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-55",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-56",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-57",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-58",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-59",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-60",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-61",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "S04-62",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-63",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "S04-64",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-65",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-66",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-67",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-68",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-69",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-70",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-71",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-72",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-73",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-74",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-75",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-76",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-77",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-78",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-79",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "S04-80",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-81",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "S04-82",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S04-83",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "S04-84",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S04-85",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S04-86",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-87",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S05-01",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S05-02",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S05-03",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S05-04",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S05-05",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S05-06",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "S05-07",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S05-08",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S05-09",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S15-01",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "決定疲れ",
+    "疲労",
+    "精神的・認知的疲労"
+   ]
+  },
+  {
+   "key": "S15-02",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S15-03",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き",
+    "疲労"
+   ]
+  },
+  {
+   "key": "S15-04",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S15-05",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "疲労",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S15-06",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S15-07",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "燃え尽き",
+    "疲れ",
+    "疲労"
+   ]
+  },
+  {
+   "key": "S15-08",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S15-09",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情報過多",
+    "決定疲れ",
+    "疲労",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S15-10",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S15-11",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "精神的・認知的疲労"
+   ]
+  },
+  {
+   "key": "S15-12",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S15-13",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "精神的・認知的疲労"
+   ]
+  },
+  {
+   "key": "S15-14",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S15-15",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI fatigue"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": true,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S15-16",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S15-17",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S14-01",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-02",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI-related stress"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-03",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI Anxiety",
+     "AI anxiety"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-04",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-05",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "情動的消耗",
+    "消耗",
+    "燃え尽き",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S14-06",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-07",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S14-08",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI anxiety"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-09",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-10",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-11",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-12",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-13",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-14",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-15",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-16",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-17",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-18",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-19",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI anxiety"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-20",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI Anxiety",
+     "AI anxiety",
+     "AI-related anxiety",
+     "Artificial Intelligence Anxiety",
+     "artificial intelligence anxiety"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-21",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-22",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI anxiety",
+     "Artificial intelligence anxiety"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-23",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-24",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI-induced technostress"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-25",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI-related burnout"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": true,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-26",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI Anxiety",
+     "AI anxiety"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-27",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-28",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-29",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "情動的消耗",
+    "消耗",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S14-30",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-31",
+   "has_text": true,
+   "terms": {
+    "N2": [
+     "burnout associated with AI"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": true,
+   "general": [
+    "テクノストレス",
+    "作業負荷",
+    "燃え尽き",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S14-32",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-33",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI-Technostress"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-34",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-01",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-02",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S13-03",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S13-04",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S13-05",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S13-06",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-07",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗"
+   ]
+  },
+  {
+   "key": "S13-08",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-09",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-10",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S13-11",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S13-12",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S13-13",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-14",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-15",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S15-18",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗",
+    "疲労",
+    "精神的・認知的疲労"
+   ]
+  },
+  {
+   "key": "S15-19",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情報過多",
+    "決定疲れ",
+    "疲労",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S15-20",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S15-21",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "消耗"
+   ]
+  },
+  {
+   "key": "S15-22",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗",
+    "疲労"
+   ]
+  },
+  {
+   "key": "S15-23",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S14-35",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-36",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-37",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-38",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-39",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI Anxiety",
+     "AI anxiety"
+    ]
+   },
+   "terms_in_title": [
+    "N5"
+   ],
+   "uses_term": false,
+   "general": [
+    "テクノストレス"
+   ]
+  },
+  {
+   "key": "S14-40",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "負担（strain）"
+   ]
+  },
+  {
+   "key": "S14-41",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-42",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "作業負荷",
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-43",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-44",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "テクノストレス",
+    "燃え尽き",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S13-16",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-17",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-18",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗",
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-19",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S13-20",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S04-39",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S04-40",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S14-51",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI stress"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S14-52",
+   "has_text": true,
+   "terms": {
+    "N5": [
+     "AI-related stressors"
+    ]
+   },
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "情動的消耗",
+    "消耗"
+   ]
+  },
+  {
+   "key": "S08-01",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S08-02",
+   "has_text": true,
+   "terms": {
+    "N1": [
+     "AI Fatigue",
+     "AI fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "作業負荷",
+    "疲労",
+    "認知負荷"
+   ]
+  },
+  {
+   "key": "S08-03",
+   "has_text": false,
+   "terms": {
+    "N1": [
+     "AI Fatigue"
+    ]
+   },
+   "terms_in_title": [
+    "N1"
+   ],
+   "uses_term": true,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-10",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "作業負荷"
+   ]
+  },
+  {
+   "key": "S12-11",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S12-12",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S12-13",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-14",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-15",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労",
+    "精神的・認知的疲労"
+   ]
+  },
+  {
+   "key": "S12-16",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-17",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-18",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-19",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "燃え尽き"
+   ]
+  },
+  {
+   "key": "S12-20",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-21",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S12-22",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S12-23",
+   "has_text": false,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": []
+  },
+  {
+   "key": "S12-24",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  },
+  {
+   "key": "S12-25",
+   "has_text": true,
+   "terms": {},
+   "terms_in_title": [],
+   "uses_term": false,
+   "general": [
+    "疲労"
+   ]
+  }
+ ]
+}
