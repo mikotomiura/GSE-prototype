@@ -878,8 +878,15 @@ def _sha_file(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
-def _scenario_checks(rows, phrases, recipes, cfg, fails):
-    """Checks that each scenario's procedure matches recipes' intent (a positive content check)."""
+def _scenario_checks(rows, phrases, recipes, cfg, fails, os_name="macos"):
+    """Checks that each scenario's procedure matches recipes' intent (a positive content check).
+
+    On macOS (live conversion on) a Return in the candidate window only picks the candidate, so a commit
+    after a conversion takes a second Return, a digit pick is followed by Return, and the first Escape only
+    reverts the live conversion; the default Windows procedures use one key each.
+    """
+    mac = os_name == "macos"
+    enter = ["enter", "enter"] if mac else ["enter"]
     inv = dict((c, k) for k, c in recipes["kana_layout"].items())
     seen = set()
     for r in rows:
@@ -893,37 +900,39 @@ def _scenario_checks(rows, phrases, recipes, cfg, fails):
         seen.add(sc)
         ok = True
         if sc == "S1":
-            ok = downs == full + ["space", "enter"] and cfg["think_ms"]["min"] <= r["think_ms"] <= cfg["think_ms"]["max"]
+            ok = downs == full + ["space"] + enter and cfg["think_ms"]["min"] <= r["think_ms"] <= cfg["think_ms"]["max"]
         elif sc == "S2":
             k = it["cand_index"] + 1
-            ok = 1 <= it["cand_index"] <= cfg["cand_index_max"] and downs == full + ["space"] * k + ["enter"]
+            ok = 1 <= it["cand_index"] <= cfg["cand_index_max"] and downs == full + ["space"] * k + enter
         elif sc == "S3":
             ok = downs == full + ["enter"] and r["think_ms"] == 0
         elif sc == "S4":
             ok = downs == full + ["space", "esc", "esc"] and it["abandon"] is True
         elif sc == "S5":
-            ok = downs == full + ["esc"]
+            ok = downs == full + (["esc", "esc"] if mac else ["esc"])
         elif sc == "S6":
             ok = downs == full + ["backspace"] * len(rd)
         elif sc == "S7":
-            ok = downs == full + ["space"] + ["right"] * it["nav_count"] + ["enter"] \
+            ok = downs == full + ["space"] + ["right"] * it["nav_count"] + enter \
                 and 1 <= it["nav_count"] <= cfg["nav_count_max"]
         elif sc == "S8":
-            ok = downs == full + ["space", "space", str(it["cand_index"] + 1)] and it["commit"] == "digit"
+            ok = downs == full + ["space", "space", str(it["cand_index"] + 1)] + (["enter"] if mac else []) and it["commit"] == "digit"
         elif sc == "S10":
             ok = downs == romaji.to_keys(rd[:max(1, len(rd) // 2)]) + ["tab", "enter"] and it["predictive"] is True
         elif sc == "S11":
             ok = downs == full + ["enter"]
         elif sc == "S12":
-            ok = downs[-2:] == ["space", "enter"] and all(k in recipes["kana_layout"] for k in downs[:-2]) \
-                and "".join(recipes["kana_layout"][k] for k in downs[:-2]) == rd
+            m = 1 + len(enter)
+            ok = downs[-m:] == ["space"] + enter and all(k in recipes["kana_layout"] for k in downs[:-m]) \
+                and "".join(recipes["kana_layout"][k] for k in downs[:-m]) == rd
         elif sc == "S13":
-            ok = downs[-2:] == ["space", "enter"] and at[-1] - at[-2] == 21000
+            m = 1 + len(enter)
+            ok = downs[-m:] == ["space"] + enter and at[-m + 1] - at[-m] == 21000
         elif sc == "S14":
             ok = downs == full + ["space", "ime_off", "ime_on"] and it["ime_toggle_mid"] is True
         elif sc == "S15":
             i = downs.index("focus_away")
-            ok = downs[i:] == ["focus_away", "focus_back", "enter"] and at[i + 1] - at[i] == 1000
+            ok = downs[i:] == ["focus_away", "focus_back"] + enter and at[i + 1] - at[i] == 1000
         if not ok:
             fails.append("scenario %s's procedure does not match recipes' intent (%s)" % (sc, r["trial_id"]))
             return
@@ -1032,7 +1041,7 @@ def selftest():
         seen = _scenario_checks(rows1, ph1, recipes, ncfg, fails)
         n[0] += 1
         check("all 14 scenarios appear under the macos default", seen == set(scen_mac), str(sorted(seen or [])))
-        _scenario_checks(rows_w, gen("windows")[1], recipes, ncfg, fails)
+        _scenario_checks(rows_w, gen("windows")[1], recipes, ncfg, fails, "windows")
         check("one scenario falls back to a synthetic kana string (kana-) when typable phrases run out",
               any(t["phrase_id"].startswith("kana-") for t in trials if t["scenario"] == "S12"))
         check("no other scenario uses a kana- phrase_id", all(not t["phrase_id"].startswith("kana-") for t in trials if t["scenario"] != "S12"))

@@ -156,7 +156,11 @@ set of key names of the generator. A change in either therefore turns the selfte
 The last row is the one place this assumption about the logger is stated: the IME toggles and F13 to F19 (the
 block-start markers) are assumed to lie outside the observed key set of the Windows logger (`is_observed_key`), and the
 last three names are pseudo keys of the runner that produce no key event on either OS. This has not been verified
-against a logger run; it is to be confirmed in the calibration pilot. The virtual-key codes of the IME toggles and of
+against a logger run; it is to be confirmed in the calibration pilot. The first macOS calibration pilot confirmed it
+on macOS: the IME toggles and F13 to F19 produced no row (the macOS logger observes F1 to F12 only), and 18 of
+4,000 presses, all of them IME toggles, were the only presses without a row. Because an unobserved marker cannot
+align the observation's clock, the block-start markers are now arrow keys (`left`, `right`, `left`), which are
+observed as `navigation`; runs that use them need `--markers-in-obs`. The virtual-key codes of the IME toggles and of
 F13 map to `other` in `from_vk`, which is the category `read_obs`/`segment_by_plan` expect from them when a log is found
 to include them after all (see `--ime-toggle-in-obs` and `--markers-in-obs` below). If a listed key does produce a row
 and neither switch is used, the prediction misses that row for every candidate alike, so the effect on the ranking of

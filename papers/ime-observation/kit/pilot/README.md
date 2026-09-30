@@ -125,9 +125,14 @@ not committed to git.
 Marker specification (JSON):
 
 ```json
-{"oracle_keys": ["f13", "f14", "f15"], "gt_vks": [105, 107, 113], "obs_categories": ["function", "function", "function"], "max_gap_ms": 150}
+{"oracle_keys": ["left", "right", "left"], "gt_vks": [123, 124, 123], "obs_categories": ["navigation", "navigation", "navigation"], "max_gap_ms": 300}
 ```
 
+- `max_gap_ms` must exceed the plan's `marker_gap_ms`: the measured press-to-press gap of a 150 ms marker gap was
+  152 to 227 ms in the first macOS pilot, so a limit of 150 ms matched no marker at all.
+- On macOS the logger observes F1 to F12 but not F13 to F19, so F13 to F19 cannot serve as markers there (the
+  example above uses arrow keys, which move the caret of an empty field and are observed as `navigation`; macOS
+  key codes 123 and 124). A marker is pressed outside a composition, at the start of a block.
 - A marker key must **appear in the observation's `key` rows** and must **not change IME state** (a key the
   observation side does not observe never produces a `key` row and therefore cannot serve as a marker). The first
   entries of the three lists correspond to the same press.

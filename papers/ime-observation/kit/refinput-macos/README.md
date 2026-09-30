@@ -41,12 +41,17 @@ written.
 ## Build, run, self-test
 
 ```bash
-bash papers/ime-observation/kit/refinput-macos/build.sh        # produces .build/refinput-macos
+bash papers/ime-observation/kit/refinput-macos/build.sh        # produces .build/refinput-macos and .build/RefInput.app
 .build/refinput-macos --selftest --out /tmp/gt.jsonl           # no window; see below
 python3 papers/ime-observation/kit/formats/validate_logs.py --kind gt /tmp/gt.jsonl
 .build/refinput-macos --out gt_mac_nstic.jsonl                 # opens a window and records until it is closed
 ```
 
+- `build.sh` also wraps the executable in `.build/RefInput.app` with the bundle identifier
+  `local.ime-observation.refinput` (override it with `REFINPUT_BUNDLE_ID`). The emitter brings the field to the
+  front with `tell application id "<bundle id>"` and reads the front application's bundle identifier back, which a
+  bare executable does not have; a measurement therefore runs `.build/RefInput.app/Contents/MacOS/refinput-macos`
+  and names the bundle identifier as `focus_app`.
 - `--out <path>`: the output path. The file is created exclusively (`O_EXCL`, no symbolic links followed,
   mode 0600). An existing path of any kind, file or directory, is refused with exit code 1, so a raw log
   cannot be destroyed. `--selftest` follows the same rule; without `--out` it writes to a temporary file that

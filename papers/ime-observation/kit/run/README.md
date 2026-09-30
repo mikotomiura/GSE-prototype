@@ -40,8 +40,12 @@ Check these by hand; the runner records the statements in the cell file and cann
    real backend is sending: synthetic keys go to whatever application is in front.
 4. Sleep, the screen lock, and the screen saver are turned off for the duration of the run; a locked screen
    receives the synthetic keys instead of the reference input field. On macOS the terminal application that runs the runner holds the Accessibility permission.
-5. The marker keys (F13 to F19) can trigger the global hotkeys of other applications; close or reconfigure any
-   application that registers them.
+4a. The input method is on (for example Japanese, not the Latin layout) when each block starts. The plan does not
+   switch it on; a `focus_cmd` that brings the field forward and then presses the input-method-on key does, provided
+   the system keeps one input source for all documents (on macOS, "Automatically switch to a document's input source"
+   is off). Record in `ime_settings` how the input method was switched on and whether live conversion is on.
+5. The marker keys can trigger the global hotkeys of other applications; close or reconfigure any application that
+   registers them. Markers must be keys the observer records (see `../pilot/README.md`); arrow keys are used.
 6. `reset_cmd` really clears the input method's dictionary and learning, and `focus_cmd` really brings the
    reference input field to the front. Both differ by system and input method and are checked in a calibration
    pilot; `cell.example.json` gives placeholders only.

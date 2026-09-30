@@ -153,6 +153,13 @@ Other entries:
 
 ## Limitations and open questions
 
+- The macOS procedures were revised after the first calibration pilot (macOS 27, the standard Japanese input
+  method, live conversion on). There, after a conversion, a Return in the candidate window only picks the
+  candidate and a second Return commits; a digit pick is likewise followed by Return; and the first Escape only
+  reverts the live conversion, so cancelling before a conversion takes two. The same behaviour was seen with keys
+  typed by hand, so it belongs to the input method, not to the synthetic events. A cell with live conversion off
+  has not been piloted and may need its own recipes file (`--recipes`), since an extra Return there would insert
+  a line break.
 - The default procedures (number of Escape presses, the predictive-candidate key, the IME on/off keys, and
   similar details) are **hypotheses** that are expected to vary by OS and IME and to be revised after a
   calibration pilot.
