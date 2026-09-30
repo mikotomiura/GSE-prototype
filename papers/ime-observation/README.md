@@ -37,7 +37,6 @@ Subsequent components are built at the following locations.
 | `kit/pilot/` | Calibration pilot tooling |
 | `kit/analysis/` | Ground-truth assembly, matching, L1, L2, pipeline |
 | `kit/e2/` / `kit/e3/` | Leakage evaluation / execution cost |
-| `kit/export/` | Export to the public repository |
 
 ## Verification
 
