@@ -1,0 +1,20 @@
+{
+ "meta": {
+  "executed": "2026-09-30 11:46:40 +0900",
+  "note": "S-04 の種文献で、検索に当たらず抽出の表に無いものの書誌（判定者用ファイルの題名・年・掲載誌の欄のため・判断 20）"
+ },
+ "runs": [
+  {
+   "id": "seed",
+   "records": [
+    {
+     "doi": "10.1001/jamanetworkopen.2024.6565",
+     "title": "AI-Generated Draft Replies Integrated Into Health Records and Physicians' Electronic Communication.",
+     "year": "2024",
+     "journal": "JAMA Netw Open",
+     "source": "Europe PMC の search（DOI・題名・年・掲載誌の略称だけ。抄録は持たない）"
+    }
+   ]
+  }
+ ]
+}

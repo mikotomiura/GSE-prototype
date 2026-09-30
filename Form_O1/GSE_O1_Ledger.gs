@@ -29,7 +29,9 @@
  *     理由: 受け口は稼働中の Web App、ビルダーは同意フォームのトリガーを持つ。
  *     ★ 本ファイルは Drive / Sheets / Mail / Trigger の 4 つのスコープを要するので、
  *       どちらに足しても**稼働中のものへスコープが増える**。
- *   ★ 受け口の `doPost` は**変えない**（本ファイルは Drive を**読むだけ**）。
+ *   ★ 本ファイルは Drive を**読むだけ**。
+ *   ⚠️ 2026-09-28: 受け口が `<受け取りフォルダ>/<P-ID>/` に保存する版になった（`GSE_O1_Submit.gs` V-3）。
+ *     ★ 本ファイルは直下 ＋ サブフォルダ 1 段を読む（`o1LedgerAllFiles_`）。**受け口と同時に差し替える。**
  *
  * ============================================================================
  * 配備手順（研究者が手で行う。⚠️ ★ 自動操作しない・承認が要る）
@@ -560,12 +562,62 @@ function o1LedgerRun() {
 }
 
 /**
+ * 受領フォルダの **直下 ＋ 直下のサブフォルダ（1 段）** のファイルを順に返すイテレータ。
+ *
+ * ★ 受け口は `<受け取りフォルダ>/<P-ID>/` に保存する（2026-09-28・`GSE_O1_Submit.gs` V-3）。
+ *   ⚠️★★★ **直下だけを読むと、受け口の変更後に全員が「未受領・途絶」と誤報される。**
+ * ★ 直下も読む（旧形式・手で置かれたもの＝「対象外」の検知を保つ）。
+ * ⚠️ ごみ箱のサブフォルダは飛ばす（削除要求で捨てたフォルダの中身を受領に数えない）。
+ *   ファイル単位のごみ箱判定は呼び側が従来どおり行う。
+ * ★ 再帰しない（受け口が作るのは 1 段だけ・decisions D4）。
+ */
+function o1LedgerAllFiles_(root, deadlineMs) {
+  // ⚠️★★ **サブフォルダの列挙も時間予算の中で遅延に行う**（2026-09-28 security-checker MEDIUM）。
+  //   ★ フォルダはシークレット保持者なら P-ID を変えて**いくらでも作れる**。列挙を先にまとめて行うと、
+  //   ⚠️ 数千フォルダで 6 分の実行上限に当たり**台帳の実行ごと落ちる**（＝全員の途絶通知が止まる）。
+  //   → ★ 期限を過ぎたら `timedOut()` を立てて止まる（呼び側は「打ち切り」として扱う）。
+  var sub = null;
+  var cur = root.getFiles();
+  var timedOut = false;
+  function advance() {
+    while (!cur.hasNext()) {
+      if (new Date().getTime() > deadlineMs) {
+        timedOut = true;
+        return false;
+      }
+      if (!sub) sub = root.getFolders();
+      if (!sub.hasNext()) return false;
+      var d = sub.next();
+      if (d.isTrashed()) continue;
+      cur = d.getFiles();
+    }
+    return true;
+  }
+  return {
+    hasNext: advance,
+    next: function () {
+      if (!advance()) throw new Error("no more files");
+      return cur.next();
+    },
+    timedOut: function () {
+      return timedOut;
+    }
+  };
+}
+
+/**
  * Drive の受領フォルダを走査し、**新しいファイルだけ**台帳へ追記する。
  * ★ Drive ファイル ID で冪等（何度回しても行が増えない）。⚠️ 行は消さない。
  * ★ ⚠️ 走査は**全走査**（Drive の ID は時刻順である保証がない・判断 5）。時間予算で打ち切る。
  */
 function o1LedgerSync_(cfg, ss) {
   var sheet = o1LedgerEnsureTab_(ss, O1_LEDGER_TAB, O1_LEDGER_BANNER, O1_LEDGER_HEAD);
+  try {
+    o1LedgerStyleLedgerTab_(sheet); // ★ 初回だけ（固定行が 2 でないとき）・値には触れない
+  } catch (e) {
+    // ⚠️ 見た目の失敗で走査・通知を止めない（code-reviewer MEDIUM・2026-09-28）。
+    console.log("⚠️ 受領台帳の見た目を整えられませんでした（★ 値と通知には影響しません）: " + e);
+  }
   var known = {};
   var last = sheet.getLastRow();
   if (last >= 3) {
@@ -574,8 +626,8 @@ function o1LedgerSync_(cfg, ss) {
   }
 
   var folder = DriveApp.getFolderById(cfg.folderId);
-  var it = folder.getFiles();
   var t0 = new Date().getTime();
+  var it = o1LedgerAllFiles_(folder, t0 + O1_LEDGER_TIME_BUDGET_MS);
   var truncated = false;
   var rows = [];
   while (it.hasNext()) {
@@ -609,6 +661,7 @@ function o1LedgerSync_(cfg, ss) {
     for (var ci = 1; ci < row.length; ci++) row[ci] = o1LedgerSafeCell_(row[ci]); // 0 列目（ID）は除く
     rows.push(row);
   }
+  if (it.timedOut()) truncated = true; // ★ 空のサブフォルダを辿る途中で期限を過ぎた
 
   if (rows.length > 0) {
     var start = sheet.getLastRow() + 1;
@@ -711,17 +764,139 @@ function o1LedgerDashboard_(cfg, ss, scan) {
   var rows = o1LedgerJudge_(files, regInfo.registered, nowMs);
 
   var dash = ss.getSheetByName(O1_LEDGER_DASH_TAB) || ss.insertSheet(O1_LEDGER_DASH_TAB);
-  dash.clearContents();
-  var banner =
-    "⚠ 派生表（毎回上書き・研究者のみ）。更新 " + o1LedgerFmt_(nowMs) +
-    " ／ 走査 " + (scan && scan.truncated ? "⚠️打ち切り（次回へ持ち越し）" : "完了") +
-    " ／ 対象外の名前 " + foreignCount + " 件" +
-    (badRows ? " ／ ⚠️台帳の読めない行 " + badRows : "") +
-    (regInfo.skipped ? " ／ ⚠️登録ログの日時が読めない行 " + regInfo.skipped : "") +
-    " ／ ★ 言えるのは「届いたか」だけ・「やめた」ではない ／ 表示専用（全て文字列）";
-  var out = [[banner], O1_LEDGER_DASH_HEAD.slice()];
+  o1LedgerWriteBoard_(dash, rows, {
+    nowMs: nowMs,
+    truncated: !!(scan && scan.truncated),
+    foreignCount: foreignCount,
+    badRows: badRows,
+    regSkipped: regInfo.skipped
+  });
+  console.log("途絶: " + rows.length + " 人・判定あり " + rows.filter(function (r) { return r.flags.length; }).length + " 人");
+  return {
+    rows: rows,
+    foreignCount: foreignCount,
+    ops: { truncated: !!(scan && scan.truncated), regSkipped: regInfo.skipped, badRows: badRows }
+  };
+}
+
+// ============================================================
+// 見た目（★ 値の意味は変えない・書式だけ）
+// ============================================================
+//
+// ★ 2026-09-28 研究者依頼「視覚的にも理解しやすい形に」（`.steering/20260928-o1-mgmt-sheet-design/`）。
+// ★ 配色は Phase1 管理シート（`Form_Phase1/GSE_Phase1_Form_Builder.gs` の `UI_*`）に揃える。
+// ⚠️ 判定の**文字列**（途絶・欠番・未受領・正常）は変えない。色は付けるが値に絵文字は入れない（D3）。
+
+var O1_UI = {
+  navy: "#1a3a5c", // 見出し帯
+  white: "#ffffff",
+  accent: "#eaf2fb", // 淡青（バナー・サマリ）
+  ink: "#333333",
+  muted: "#8a97a5",
+  okBg: "#e8f5e9", okFg: "#1e7e34",
+  warnBg: "#fff8e1", warnFg: "#8a6d00",
+  gapBg: "#fff3e0", gapFg: "#e65100",
+  dangerBg: "#fdecea", dangerFg: "#b71c1c",
+  grayBg: "#f1f3f4"
+};
+
+/** 判定 → 色。★ 複数の判定を持つ行は**いちばん重い**判定の色にする。 */
+var O1_LEDGER_FLAG_STYLE = [
+  { flag: O1_LEDGER_FLAG_STALE, bg: O1_UI.dangerBg, fg: O1_UI.dangerFg },
+  { flag: O1_LEDGER_FLAG_GAP, bg: O1_UI.gapBg, fg: O1_UI.gapFg },
+  { flag: O1_LEDGER_FLAG_NEVER, bg: O1_UI.warnBg, fg: O1_UI.warnFg }
+];
+
+/** 途絶タブの見出し行（★ 1 表題 / 2 件数 / 3 凡例 / 4 注意 / 5 見出し / 6〜 データ）。 */
+var O1_LEDGER_DASH_HEAD_ROW = 5;
+
+/** 途絶タブの列幅（px・`O1_LEDGER_DASH_HEAD` と同じ順）。 */
+var O1_LEDGER_DASH_WIDTHS = [80, 120, 150, 80, 90, 60, 80, 130, 110];
+
+/** 受領台帳の列幅（px・`O1_LEDGER_HEAD` と同じ順）。 */
+var O1_LEDGER_WIDTHS = [110, 340, 70, 60, 150, 150, 110, 90, 50, 70];
+
+/** 行の重さ（小さいほど要対応）。途絶 0 / 欠番 1 / 未受領 2 / 正常 3。 */
+function o1LedgerSeverity_(flags) {
+  for (var i = 0; i < O1_LEDGER_FLAG_STYLE.length; i++) {
+    if ((flags || []).indexOf(O1_LEDGER_FLAG_STYLE[i].flag) >= 0) return i;
+  }
+  return O1_LEDGER_FLAG_STYLE.length;
+}
+
+/** 表示の並び: 要対応順 → P-ID（★ 数字部分を数として比べる: P9 < P10）。⚠️ 元の配列は変えない。 */
+function o1LedgerBoardOrder_(rows) {
+  var num = function (pid) {
+    var m = /(\d+)$/.exec(String(pid));
+    return m ? parseInt(m[1], 10) : Infinity;
+  };
+  return rows.slice().sort(function (a, b) {
+    var d = o1LedgerSeverity_(a.flags) - o1LedgerSeverity_(b.flags);
+    if (d) return d;
+    var n = num(a.pid) - num(b.pid);
+    if (n) return n;
+    return String(a.pid) < String(b.pid) ? -1 : String(a.pid) > String(b.pid) ? 1 : 0;
+  });
+}
+
+/**
+ * 「O1 途絶」タブを**状況ボード**として書き直す（★ 毎回 `clear()` ＝値と書式を消して作り直す・派生表）。
+ *
+ *   行 1  表題帯（紺）: O1 受領状況 ／ 更新 ／ 走査の状態
+ *   行 2  件数: 要対応 N 人（内訳）／ 正常 M 人 ／ 対象外の名前 ／ ⚠️ 台帳・登録ログの異常
+ *   行 3  凡例（判定の色と意味・日数は定数から）
+ *   行 4  注意（★ 言えるのは「届いたか」だけ）
+ *   行 5  見出し（固定）
+ *   行 6〜 P-ID ごと（要対応順）。判定セルを色分け・経過日数が途絶の日数以上なら赤字
+ */
+function o1LedgerWriteBoard_(dash, rows, info) {
   var width = O1_LEDGER_DASH_HEAD.length;
-  rows.forEach(function (r) {
+  var ordered = o1LedgerBoardOrder_(rows);
+  var counts = [0, 0, 0];
+  var attention = 0;
+  // ★ 内訳は**いちばん重い判定**で 1 人 1 回数える（行の色と同じ）。⚠️ 判定ごとに数えると
+  //   「途絶・欠番」の人が 2 回数えられ、内訳の和が要対応の人数と合わない（プレビューで実測）。
+  ordered.forEach(function (r) {
+    var sev = o1LedgerSeverity_(r.flags);
+    if (sev < O1_LEDGER_FLAG_STYLE.length) {
+      attention++;
+      counts[sev]++;
+    }
+  });
+  var okCount = ordered.length - attention;
+  var anomalies = [];
+  if (info.badRows) anomalies.push("⚠️台帳の読めない行 " + info.badRows);
+  if (info.regSkipped) anomalies.push("⚠️登録ログの日時が読めない行 " + info.regSkipped);
+
+  var blank = function () {
+    var r = [];
+    for (var i = 0; i < width; i++) r.push("");
+    return r;
+  };
+  var title = blank();
+  title[0] =
+    "O1 受領状況（途絶の検知）　更新 " + o1LedgerFmt_(info.nowMs) +
+    "　／　走査 " + (info.truncated ? "⚠️打ち切り（次回へ持ち越し・判定の通知は保留）" : "完了");
+  var summary = blank();
+  summary[0] =
+    "要対応 " + attention + " 人（" + O1_LEDGER_FLAG_STALE + " " + counts[0] + "・" + O1_LEDGER_FLAG_GAP + " " + counts[1] +
+    "・" + O1_LEDGER_FLAG_NEVER + " " + counts[2] + "）　／　正常 " + okCount + " 人　／　対象外の名前 " +
+    info.foreignCount + " 件" + (anomalies.length ? "　／　" + anomalies.join("　／　") : "");
+  var legend = blank();
+  legend[0] = "凡例";
+  legend[1] = O1_LEDGER_FLAG_STALE;
+  legend[2] = "最終受領から " + O1_LEDGER_STALE_DAYS + " 日以上届かない";
+  legend[4] = O1_LEDGER_FLAG_GAP;
+  legend[5] = "後の番号から " + O1_LEDGER_GAP_DAYS + " 日埋まらない";
+  legend[7] = O1_LEDGER_FLAG_NEVER;
+  legend[8] = "登録から " + O1_LEDGER_NEVER_DAYS + " 日で 0 件";
+  var note = blank();
+  note[0] =
+    "★ 言えるのは「届いたか」だけ（アプリ未起動・回線断・容量超過は区別できない）。「やめた」ではない —— やめたは本人の申し出だけで決まる。" +
+    "　表示専用・毎回上書き（手で書き込まない）。";
+
+  var out = [title, summary, legend, note, O1_LEDGER_DASH_HEAD.slice()];
+  ordered.forEach(function (r) {
     out.push([
       r.pid,
       r.flags.length ? r.flags.join("・") : "正常",
@@ -734,26 +909,121 @@ function o1LedgerDashboard_(cfg, ss, scan) {
       r.sinceRegDays === null ? "" : r.sinceRegDays
     ]);
   });
+  if (ordered.length === 0) {
+    var none = blank();
+    none[0] = "（まだ登録も受領もありません）";
+    out.push(none);
+  }
   out = out.map(function (r) {
-    var padded = r.slice();
-    while (padded.length < width) padded.push("");
-    return padded.map(function (c) {
+    return r.map(function (c) {
       // ⚠️★ **台帳と同じ無害化を通す**（security-checker L-1 指摘・2026-09-27）。
-      //   ★ ここは `pid` / 数値の整形結果が主だが、研究者の手編集（tombstone 作業中の半端な値等）で
-      //   先頭が `=` 等になりうる。テキスト形式（下の `setNumberFormat("@")`）だけに頼らない。
       return o1LedgerSafeCell_(String(c));
     });
   });
+
+  dash.clear(); // ★ 値と書式の両方（派生表・前回の色を残さない）
   o1LedgerEnsureRows_(dash, out.length);
-  var range = dash.getRange(1, 1, out.length, width);
-  range.setNumberFormat("@"); // ★ 表示専用。すべて文字列で書く（数式注入を避ける）。
-  range.setValues(out);
-  console.log("途絶: " + rows.length + " 人・判定あり " + rows.filter(function (r) { return r.flags.length; }).length + " 人");
-  return {
-    rows: rows,
-    foreignCount: foreignCount,
-    ops: { truncated: !!(scan && scan.truncated), regSkipped: regInfo.skipped, badRows: badRows }
+  var all = dash.getRange(1, 1, out.length, width);
+  all.setNumberFormat("@"); // ★ 表示専用。すべて文字列で書く（数式注入を避ける）。
+  all.setValues(out);
+  // ⚠️★ **ここから先は見た目だけ。失敗しても通知を止めない**（code-reviewer MEDIUM・2026-09-28）。
+  //   ★ 値は上で書き終えている。書式の例外（手で結合されたセル等）で `o1LedgerNotify_` に届かなくなるのを防ぐ。
+  try {
+    o1LedgerPaintBoard_(dash, ordered, attention, width);
+  } catch (e) {
+    console.log("⚠️ 途絶タブの見た目を整えられませんでした（★ 値と通知には影響しません）: " + e);
+  }
+}
+
+/** 途絶タブの書式（★ 値は `o1LedgerWriteBoard_` が書き終えた後に呼ぶ）。 */
+function o1LedgerPaintBoard_(dash, ordered, attention, width) {
+  dash.getRange(1, 1, dash.getLastRow(), width).setFontColor(O1_UI.ink).setVerticalAlignment("middle");
+
+  var H = O1_LEDGER_DASH_HEAD_ROW;
+  // ⚠️ `clear()` が結合を解く保証は無い（未確認）→ **使っている全行**の結合を明示的に解く
+  //   （さもないと「空」のときに結合した案内行が、次にデータが入っても結合されたまま残る）。
+  dash.getRange(1, 1, dash.getMaxRows(), width).breakApart();
+  dash.getRange(1, 1, 1, width).merge()
+    .setBackground(O1_UI.navy).setFontColor(O1_UI.white).setFontWeight("bold").setFontSize(13);
+  dash.getRange(2, 1, 1, width).merge()
+    .setBackground(attention ? O1_UI.dangerBg : O1_UI.okBg)
+    .setFontColor(attention ? O1_UI.dangerFg : O1_UI.okFg).setFontWeight("bold");
+  dash.getRange(3, 1, 1, width).setBackground(O1_UI.accent).setFontSize(9);
+  dash.getRange(3, 1).setFontWeight("bold");
+  [[3, 4], [6, 7]].forEach(function (m) {
+    dash.getRange(3, m[0], 1, 2).merge();
+  });
+  [[2, 0], [5, 1], [8, 2]].forEach(function (p) {
+    var st = O1_LEDGER_FLAG_STYLE[p[1]];
+    dash.getRange(3, p[0]).setBackground(st.bg).setFontColor(st.fg).setFontWeight("bold").setHorizontalAlignment("center");
+  });
+  dash.getRange(4, 1, 1, width).merge().setFontColor(O1_UI.muted).setFontSize(9).setWrap(true);
+  dash.getRange(H, 1, 1, width)
+    .setBackground(O1_UI.navy).setFontColor(O1_UI.white).setFontWeight("bold").setHorizontalAlignment("center");
+
+  for (var i = 0; i < ordered.length; i++) {
+    var row = H + 1 + i;
+    var sev = o1LedgerSeverity_(ordered[i].flags);
+    var cell = dash.getRange(row, 2);
+    if (sev < O1_LEDGER_FLAG_STYLE.length) {
+      var st2 = O1_LEDGER_FLAG_STYLE[sev];
+      cell.setBackground(st2.bg).setFontColor(st2.fg).setFontWeight("bold");
+    } else {
+      cell.setFontColor(O1_UI.okFg);
+    }
+    if (ordered[i].elapsedDays !== null && ordered[i].elapsedDays >= O1_LEDGER_STALE_DAYS) {
+      dash.getRange(row, 4).setFontColor(O1_UI.dangerFg).setFontWeight("bold");
+    }
+  }
+  if (ordered.length === 0) dash.getRange(H + 1, 1, 1, width).merge().setFontColor(O1_UI.muted);
+  if (ordered.length > 0) {
+    dash.getRange(H + 1, 1, ordered.length, width).setBorder(
+      null, null, true, null, null, true, "#dde3ea", SpreadsheetApp.BorderStyle.SOLID
+    );
+    dash.getRange(H + 1, 3, ordered.length, width - 2).setHorizontalAlignment("center");
+    dash.getRange(H + 1, 1, ordered.length, 1).setFontWeight("bold");
+  }
+  for (var c = 0; c < width; c++) dash.setColumnWidth(c + 1, O1_LEDGER_DASH_WIDTHS[c]);
+  dash.setRowHeight(1, 34);
+  dash.setRowHeight(4, 36);
+  dash.setFrozenRows(H);
+  dash.setTabColor(attention ? O1_UI.dangerFg : O1_UI.okFg);
+}
+
+/**
+ * 受領台帳（追記のみ）の見た目を整える。★ **値には触れない**（D2）。
+ * ★ 固定行が 2 でないとき（＝初回）だけ付ける —— 研究者が列幅を変えても毎回戻さない。
+ * ★ 色は**条件付き書式**なので、これから追記される行にも効く。
+ */
+function o1LedgerStyleLedgerTab_(sheet) {
+  if (sheet.getFrozenRows() === 2) return false;
+  var width = O1_LEDGER_HEAD.length;
+  sheet.getRange(1, 1, 1, width).setBackground(O1_UI.accent).setFontColor(O1_UI.ink).setFontWeight("bold");
+  sheet.getRange(2, 1, 1, width)
+    .setBackground(O1_UI.navy).setFontColor(O1_UI.white).setFontWeight("bold").setHorizontalAlignment("center");
+  for (var c = 0; c < width; c++) sheet.setColumnWidth(c + 1, O1_LEDGER_WIDTHS[c]);
+  sheet.setFrozenRows(2);
+  sheet.setTabColor(O1_UI.navy);
+
+  // ★ 列の位置は `O1_LEDGER_COL` から作る（列を足したときにずれない）。
+  var colLetter = function (i) {
+    return String.fromCharCode(65 + i);
   };
+  // ⚠️ 行数で範囲を切らない（`o1LedgerEnsureRows_` が行を足すと、その先に色が付かない）→ 列だけで開いた範囲。
+  var data = sheet.getRange("A3:" + colLetter(width - 1));
+  var kind = "$" + colLetter(O1_LEDGER_COL.kind) + "3";
+  var dup = "$" + colLetter(O1_LEDGER_COL.dup) + "3";
+  var rule = function (formula, bg, fg) {
+    return SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(formula).setBackground(bg).setFontColor(fg).setRanges([data]).build();
+  };
+  // ⚠️ このタブの**既存の条件付き書式は置き換わる**（初回だけ・研究者手順に明記）。
+  sheet.setConditionalFormatRules([
+    rule("=" + kind + '="' + O1_LEDGER_KIND_ERASED + '"', O1_UI.grayBg, O1_UI.muted),
+    rule("=" + kind + '="' + O1_LEDGER_KIND_FOREIGN + '"', O1_UI.gapBg, O1_UI.gapFg),
+    rule("=" + dup + '="dup"', O1_UI.warnBg, O1_UI.warnFg)
+  ]);
+  return true;
 }
 
 /** スクリプト プロパティの JSON を読む。壊れていたら null（= 初回扱い・現在の異常を 1 回通知し直す）。 */
@@ -889,7 +1159,7 @@ function o1LedgerCheck() {
   console.log("このプロジェクトのタイムゾーン: " + Session.getScriptTimeZone() + "（★ ビルダーのプロジェクトと同じか確かめること）");
 
   var t0 = new Date().getTime();
-  var it = folder.getFiles();
+  var it = o1LedgerAllFiles_(folder, t0 + O1_LEDGER_TIME_BUDGET_MS);
   var ok = 0;
   var foreignCount = 0;
   var foreign = [];
@@ -914,6 +1184,7 @@ function o1LedgerCheck() {
       if (foreign.length < 20) foreign.push(name + " (" + f.getSize() + " B)");
     }
   }
+  if (it.timedOut()) truncated = true; // ★ 空のサブフォルダを辿る途中で期限を過ぎた
   var elapsed = new Date().getTime() - t0;
   console.log(
     "O1 の形: " + ok + " 件 ／ 対象外: " + foreignCount + " 件（表示は 20 まで）" +

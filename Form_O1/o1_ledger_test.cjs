@@ -93,10 +93,46 @@ function makeSheet(name, opts) {
       s.rows = [];
       s.cells = {};
     },
+    // ★ 書式（2026-09-28 見た目の改修）。値とは別に記録し、テストで配置・色を確かめる。
+    style: {}, // "r,c" → { bg, fg, bold, size, halign, wrap }
+    merges: [], // "r,c,nr,nc"
+    frozen: 0,
+    widths: {},
+    heights: {},
+    tabColor: null,
+    rules: [],
+    clear() {
+      s.rows = [];
+      s.cells = {};
+      s.formats = {};
+      s.style = {};
+      s.merges = [];
+    },
+    getFrozenRows: () => s.frozen,
+    setFrozenRows: (n) => {
+      s.frozen = n;
+    },
+    setColumnWidth: (c, w) => {
+      s.widths[c] = w;
+    },
+    setRowHeight: (r, h) => {
+      s.heights[r] = h;
+    },
+    setTabColor: (c) => {
+      s.tabColor = c;
+    },
+    setConditionalFormatRules: (rules) => {
+      s.rules = rules.slice();
+    },
+    getConditionalFormatRules: () => s.rules.slice(),
+    styleAt: (r, c) => s.style[r + "," + c] || {},
     getRange(r, c, nr, nc) {
+      if (typeof r === "string") return { __a1: r }; // 条件付き書式の範囲だけに使う
+      if (nr === undefined) nr = 1;
+      if (nc === undefined) nc = 1;
       if (r < 1 || c < 1 || nr < 1 || nc < 1) throw new Error("range 引数が不正");
       if (r + nr - 1 > s.maxRows) throw new Error("The coordinates of the range are outside the dimensions of the sheet.");
-      return {
+      const rng = {
         getValues() {
           const out = [];
           for (let i = 0; i < nr; i++) {
@@ -131,6 +167,37 @@ function makeSheet(name, opts) {
           for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) s.formats[r + i + "," + (c + j)] = f;
         },
       };
+      const range = rng;
+      const paint = (k, v) => {
+        for (let i = 0; i < nr; i++)
+          for (let j = 0; j < nc; j++) {
+            const key = r + i + "," + (c + j);
+            s.style[key] = Object.assign({}, s.style[key], { [k]: v });
+          }
+        return range;
+      };
+      Object.assign(range, {
+        setBackground: (v) => paint("bg", v),
+        setFontColor: (v) => paint("fg", v),
+        setFontWeight: (v) => paint("bold", v === "bold"),
+        setFontSize: (v) => paint("size", v),
+        setHorizontalAlignment: (v) => paint("halign", v),
+        setVerticalAlignment: (v) => paint("valign", v),
+        setWrap: (v) => paint("wrap", v),
+        setBorder: () => range,
+        merge: () => {
+          s.merges.push([r, c, nr, nc].join(","));
+          return range;
+        },
+        breakApart: () => {
+          s.merges = s.merges.filter((m) => {
+            const [mr] = m.split(",").map(Number);
+            return mr < r || mr >= r + nr;
+          });
+          return range;
+        },
+      });
+      return range;
     },
   };
   return s;
@@ -200,6 +267,18 @@ function makeEnv(o) {
       getScriptLock: () => ({ tryLock: () => lockOk, releaseLock: () => {} }),
     },
     SpreadsheetApp: {
+      BorderStyle: { SOLID: "SOLID" },
+      newConditionalFormatRule() {
+        const rule = {};
+        const b = {
+          whenFormulaSatisfied: (f) => ((rule.formula = f), b),
+          setBackground: (v) => ((rule.bg = v), b),
+          setFontColor: (v) => ((rule.fg = v), b),
+          setRanges: (rs) => ((rule.ranges = rs.map((x) => x.__a1 || "?")), b),
+          build: () => rule,
+        };
+        return b;
+      },
       openById(id) {
         opened++;
         if (id !== "SHEET") throw new Error("no such spreadsheet " + id);
@@ -209,15 +288,31 @@ function makeEnv(o) {
     DriveApp: {
       getFolderById(id) {
         if (id !== "FOLDER") throw new Error("no such folder");
+        // ★ `opt.subfolders` = [{ trashed?, files: [...] }]（受け口が作る `<P-ID>/`・2026-09-28）。
+        const iterOf = (list) => {
+          let i = 0;
+          return {
+            hasNext: () => i < list.length,
+            next: () => {
+              if (opt.tickPerFile) NOW += opt.tickPerFile;
+              return list[i++];
+            },
+          };
+        };
+        const subs = (opt.subfolders || []).map((d) => ({
+          isTrashed: () => !!d.trashed,
+          getFiles: () => iterOf(d.files),
+        }));
         return {
           getName: () => "STUB-FOLDER",
-          getFiles() {
+          getFiles: () => iterOf(files),
+          getFolders() {
             let i = 0;
             return {
-              hasNext: () => i < files.length,
+              hasNext: () => i < subs.length,
               next: () => {
-                if (opt.tickPerFile) NOW += opt.tickPerFile;
-                return files[i++];
+                if (opt.tickPerFolder) NOW += opt.tickPerFolder;
+                return subs[i++];
               },
             };
           },
@@ -467,6 +562,11 @@ check("§5 宛先がメールの形でなければ問題（値は出さない）
 // ---------------------------------------------------------------------------
 const LEDGER = "O1 受領台帳";
 const DASH = "O1 途絶";
+// ★ 途絶タブは状況ボード（行 1〜4 が表題・件数・凡例・注意、行 5 が見出し、行 6〜 がデータ）。2026-09-28
+const DASH_HEAD_ROW = 5;
+const DASH_EMPTY = "（まだ登録も受領もありません）";
+const dashData = (ss) => ss.sheets[DASH].rows.slice(DASH_HEAD_ROW).filter((r) => r[0] !== DASH_EMPTY);
+const dashTop = (ss) => ss.sheets[DASH].rows.slice(0, DASH_HEAD_ROW - 1).map((r) => r.join(" ")).join("\n");
 const regTab = (ss, rows) => {
   const s = ss.sheets["O1 登録ログ"];
   s.appendRow(["banner"]);
@@ -491,7 +591,7 @@ const stamp = (d) => "202609" + String(d).padStart(2, "0") + "_101112";
   check("§6 台帳に 2 行が追記される（見出し 2 行＋データ 2 行）", n1, 4);
   check("§6★ 2 回回しても行が増えない（Drive ファイル ID で冪等）", n2, n1);
   check("§6 台帳は 10 列の見出しを持つ", ss.sheets[LEDGER].rows[1].length, 10);
-  check("§6 途絶タブに P001 が正常で載る", ss.sheets[DASH].rows[2].slice(0, 2), ["P001", "正常"]);
+  check("§6 途絶タブに P001 が正常で載る", dashData(ss)[0].slice(0, 2), ["P001", "正常"]);
   check("§6 正常のときはメールを送らない（陰性対照）", env.mails.length, 0);
 
   // 新着だけが足される
@@ -517,7 +617,7 @@ const stamp = (d) => "202609" + String(d).padStart(2, "0") + "_101112";
   files.push(makeFile("a2", goodName("P002", 2, stamp(29)), 100, ago(0.1)));
   call(env, "o1LedgerRun");
   check("§6 復帰（新しい受領）ではメールを送らない", env.mails.length, 1);
-  check("§6 復帰後は途絶タブが正常に戻る", ss.sheets[DASH].rows[2][1], "正常");
+  check("§6 復帰後は途絶タブが正常に戻る", dashData(ss)[0][1], "正常");
   NOW += 6 * DAY;
   call(env, "o1LedgerRun");
   check("§6★ 復帰の後にまた途絶になれば再送する", env.mails.length, 2);
@@ -559,7 +659,7 @@ const stamp = (d) => "202609" + String(d).padStart(2, "0") + "_101112";
   ]);
   const env = makeEnv({ spreadsheet: ss, files: [] });
   call(env, "o1LedgerRun");
-  const dash = ss.sheets[DASH].rows.slice(2).map((r) => [r[0], r[1]]);
+  const dash = dashData(ss).map((r) => [r[0], r[1]]);
   check("§6★ 登録から 9 日・受領 0 件は未受領、2 日は正常", dash, [["P030", "未受領"], ["P031", "正常"]]);
   check("§6 未受領でメールが 1 通届く", [env.mails.length, /P030: 未受領/.test(env.mails[0].body)], [1, true]);
 }
@@ -581,9 +681,9 @@ const stamp = (d) => "202609" + String(d).padStart(2, "0") + "_101112";
   check("§6 対象外の行は P-ID が空・形式が「対象外」", [led.rows[2][2], led.rows[2][9]], ["", "対象外"]);
   const formulaCells = Object.values(led.cells).filter((c) => c.kind === "formula");
   check("§6★ 数式の形のファイル名がセルの数式にならない（テキスト形式）", formulaCells.length, 0);
-  check("§6 対象外の名前がある旨を途絶タブのバナーに出す", /対象外の名前 2 件/.test(ss.sheets[DASH].rows[0][0]), true);
+  check("§6 対象外の名前がある旨を途絶タブのバナーに出す", /対象外の名前 2 件/.test(dashTop(ss)), true);
   check("§6★ 対象外の名前で通知する（P-ID とは別枠）", env.mails.length === 1 && /O1 の形でないファイルが 2 件/.test(env.mails[0].body), true);
-  check("§6 対象外のファイルは P-ID の集計に混ざらない", ss.sheets[DASH].rows.slice(2).map((r) => r[0]), ["P005"]);
+  check("§6 対象外のファイルは P-ID の集計に混ざらない", dashData(ss).map((r) => r[0]), ["P005"]);
 }
 
 {
@@ -607,7 +707,7 @@ const stamp = (d) => "202609" + String(d).padStart(2, "0") + "_101112";
   call(env, "o1LedgerRun");
   const first = ss.sheets[LEDGER].getLastRow() - 2;
   check("§6★ 時間予算（240 秒）を超えたら打ち切る（6 件中 3 件だけ）", first, 3);
-  check("§6 打ち切ったことを途絶タブのバナーに出す", /打ち切り/.test(ss.sheets[DASH].rows[0][0]), true);
+  check("§6 打ち切ったことを途絶タブのバナーに出す", /打ち切り/.test(dashTop(ss)), true);
   // 次回: 既知は飛ばされ、残りが足される
   const env2 = makeEnv({ spreadsheet: ss, files, tickPerFile: 0 });
   call(env2, "o1LedgerRun");
@@ -766,7 +866,7 @@ const sharedProps = (extra) =>
   call(env, "o1LedgerRun");
   check(
     "§9★ 台帳の P-ID を手編集で「=EVIL()」にしても、途絶タブへ数式の形のまま転記されない",
-    /^[=+\-@\t\r]/.test(ss.sheets[DASH].rows[2][0]),
+    /^[=+\-@\t\r]/.test(dashData(ss)[0][0]),
     false
   );
 }
@@ -808,7 +908,7 @@ const sharedProps = (extra) =>
   regTab(ss, [[`${d30.getFullYear()}-${p2(d30.getMonth() + 1)}-${p2(d30.getDate())} 09:00:00`, "register", "P051", "ok", "", ""]]);
   const env = makeEnv({ spreadsheet: ss, files: [makeFile("d0", "P051_o1day00_gse_o1_20260920_101112.age", 10, ago(1))] });
   call(env, "o1LedgerRun");
-  check("§8★ 通し: 日番号 0 だけ届いている人は未受領にならず、不読行にもならない", [env.mails.length, /読めない行/.test(ss.sheets[DASH].rows[0][0]), ss.sheets[DASH].rows[2][1]], [0, false, "正常"]);
+  check("§8★ 通し: 日番号 0 だけ届いている人は未受領にならず、不読行にもならない", [env.mails.length, /読めない行/.test(dashTop(ss)), dashData(ss)[0][1]], [0, false, "正常"]);
 }
 
 // 8-5 受け口との突合を、生成した大量の名前で（手選びの 15 件だけに頼らない）
@@ -873,7 +973,7 @@ const sharedProps = (extra) =>
   const body = (env.mails[0] || {}).body || "";
   check("§8★ 登録ログの日時が読めない行は、バナーだけでなく通知する", /登録ログに日時を読めない行/.test(body), true);
   check("§8★ 台帳の読めない行も通知する", /台帳に読めない行/.test(body), true);
-  check("§8 バナーにも件数が出る", /読めない行 1/.test(ss.sheets[DASH].rows[0][0]) && /日時が読めない行 1/.test(ss.sheets[DASH].rows[0][0]), true);
+  check("§8 バナーにも件数が出る", /読めない行 1/.test(dashTop(ss)) && /日時が読めない行 1/.test(dashTop(ss)), true);
 }
 
 // 8-8 削除済み（tombstone）: 数えない・不読行にしない・復活しない
@@ -886,9 +986,9 @@ const sharedProps = (extra) =>
   led.appendRow(["tomb1", "", "", "", "", "2026-09-20 10:11:12", ago(30), 5, "", "削除済"]);
   const env = makeEnv({ spreadsheet: ss, files: [makeFile("tomb1", goodName("P070", 1, stamp(20)), 5, ago(30))] });
   call(env, "o1LedgerRun");
-  check("§8★ 削除済みの行は不読行に数えず、通知もしない", [env.mails.length, /読めない行/.test(ss.sheets[DASH].rows[0][0])], [0, false]);
+  check("§8★ 削除済みの行は不読行に数えず、通知もしない", [env.mails.length, /読めない行/.test(dashTop(ss))], [0, false]);
   check("§8★ 削除済みの Drive ファイル ID は残り、同じファイルが別の行として復活しない", led.getLastRow(), 3);
-  check("§8 削除済みは P-ID の集計に出ない", ss.sheets[DASH].rows.slice(2).length, 0);
+  check("§8 削除済みは P-ID の集計に出ない", dashData(ss).length, 0);
 }
 
 // 8-9 実行の失敗: 研究者へ 1 回通知・同じ原因では再送しない・直ったら解消・例外は再送出
@@ -987,6 +1087,9 @@ const sharedProps = (extra) =>
   call(env, "o1LedgerCheck");
   const log = env.logs.join("\n");
   check("§8★ o1LedgerCheck も時間予算で打ち切り、打ち切ったことと件数を出す", [/時間予算で打ち切り/.test(log), /O1 の形: \d+ 件 ／ 対象外: \d+ 件/.test(log)], [true, true]);
+  // ★ 件数まで固定する（2026-09-28）: 走査の期限はイテレータ側にもあるので、ループの予算検査を外しても
+  //   「打ち切り」の文言だけは出てしまう（変異が素通りした）。★ 予算内に読めたのは 3 本（100 秒 × 3 > 240 秒）。
+  check("§8★ o1LedgerCheck は予算を超えた時点で止まる（6 本中 3 本だけ読む）", /O1 の形: 2 件 ／ 対象外: 1 件/.test(log), true);
   check("§8 o1LedgerCheck はタイムゾーンを出す", /タイムゾーン: Asia\/Tokyo/.test(log), true);
   check("§8 o1LedgerCheck は実行ログに P-ID が残りうる注意を出す", /A-10/.test(log), true);
   NOW = startNow;
@@ -1079,7 +1182,7 @@ const sharedProps = (extra) =>
     led.appendRow(["x1", "P099_o1day01_gse_o1_20260920_101112.age", "P099", dayCell, "", "2026-09-20 10:11:12", ago(1), 5, "", "O1"]);
     const env = makeEnv({ spreadsheet: ss, files: [] });
     call(env, "o1LedgerRun");
-    return { mails: env.mails, banner: ss.sheets[DASH].rows[0][0], dashRows: ss.sheets[DASH].rows.slice(2) };
+    return { mails: env.mails, banner: dashTop(ss), dashRows: dashData(ss) };
   };
   const empty = mk("");
   check("§9★ 日番号セルが空なら「受領 0 件」（day 0 に化けず不読行として数える・行も作らない）", [empty.dashRows.length, /読めない行 1/.test(empty.banner), /読めない行/.test((empty.mails[0] || {}).body || "")], [0, true, true]);
@@ -1139,7 +1242,236 @@ const sharedProps = (extra) =>
   }
   const elapsedMs = Date.now() - t0;
   check("§9★ 桁あふれの日番号（Number が Infinity）でもハングしない（1 秒未満で返る）", elapsedMs < 1000, true);
-  check("§9★ 桁あふれの日番号は不読行として扱う（欠番ループへ Infinity を渡さない）", /読めない行 1/.test(ss.sheets[DASH].rows[0][0]), true);
+  check("§9★ 桁あふれの日番号は不読行として扱う（欠番ループへ Infinity を渡さない）", /読めない行 1/.test(dashTop(ss)), true);
+}
+
+// ---------------------------------------------------------------------------
+// §10 2026-09-28 受け口が `<受け取りフォルダ>/<P-ID>/` に保存する版になった（受け口 V-3）
+//   ⚠️★★★ 直下しか読まない台帳だと、全員が「未受領・途絶」と誤報される。その陰性対照を含む。
+// ---------------------------------------------------------------------------
+{
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  const d9 = new Date(ago(9));
+  const p2 = (n) => String(n).padStart(2, "0");
+  const reg9 = `${d9.getFullYear()}-${p2(d9.getMonth() + 1)}-${p2(d9.getDate())} 09:00:00`;
+  regTab(ss, [
+    [reg9, "register", "P070", "ok", "", ""],
+    [reg9, "register", "P071", "ok", "", ""],
+    [reg9, "register", "P072", "ok", "", ""],
+  ]);
+  const env = makeEnv({
+    spreadsheet: ss,
+    // 直下 = 旧形式の P071 ＋ 対象外 1 本
+    files: [makeFile("r1", goodName("P071", 1, stamp(26)), 10, ago(1)), makeFile("r2", "memo.txt", 3, ago(1))],
+    subfolders: [
+      { files: [] }, // 空のサブフォルダでも壊れない
+      { files: [makeFile("s1", goodName("P070", 1, stamp(26)), 10, ago(2)), makeFile("s2", goodName("P070", 2, stamp(27)), 10, ago(1))] },
+      // ⚠️ ごみ箱のサブフォルダ（削除要求で捨てた P072）は受領に数えない
+      { trashed: true, files: [makeFile("t1", goodName("P072", 1, stamp(26)), 10, ago(1))] },
+    ],
+  });
+  call(env, "o1LedgerRun");
+  const ids = ss.sheets[LEDGER].rows.slice(2).map((r) => r[0]).sort();
+  check("§10★ サブフォルダ内のファイルも台帳に載る（直下の旧形式・対象外も載る）", ids, ["r1", "r2", "s1", "s2"]);
+  const dash = Object.fromEntries(dashData(ss).map((r) => [r[0], r[1]]));
+  check("§10★ サブフォルダにだけ届いた P070 は未受領にならない", dash.P070, "正常");
+  check("§10 直下の旧形式の P071 も正常", dash.P071, "正常");
+  check("§10★ ごみ箱のサブフォルダにしか無い P072 は受領に数えない（未受領）", dash.P072, "未受領");
+  call(env, "o1LedgerRun");
+  check("§10 サブフォルダを含めても 2 回目で行が増えない（冪等）", ss.sheets[LEDGER].rows.length - 2, 4);
+
+  const env2 = makeEnv({
+    spreadsheet: makeSpreadsheet(["O1 登録ログ"]),
+    files: [],
+    subfolders: [{ files: [makeFile("s1", goodName("P070", 1, stamp(26)), 10, ago(2))] }, { files: [makeFile("s9", "x.bin", 1, ago(2))] }],
+  });
+  call(env2, "o1LedgerCheck");
+  check("§10★ o1LedgerCheck もサブフォルダを数える", env2.logs.some((l) => /O1 の形: 1 件 ／ 対象外: 1 件/.test(l)), true);
+}
+
+{
+  // ⚠️★★ 空のサブフォルダが大量にある（シークレット保持者が P-ID を変えて作れる）→
+  //   列挙も時間予算の中で打ち切り、実行ごと落ちない（2026-09-28 security-checker MEDIUM）
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const empties = Array.from({ length: 50 }, () => ({ files: [] }));
+  const env = makeEnv({
+    spreadsheet: ss,
+    files: [makeFile("r1", goodName("P080", 1, stamp(26)), 10, ago(1))],
+    subfolders: empties.concat([{ files: [makeFile("s1", goodName("P081", 1, stamp(26)), 10, ago(1))] }]),
+    tickPerFolder: 10000, // 50 × 10 秒 = 500 秒 > 予算 240 秒
+  });
+  let threw = null;
+  try {
+    call(env, "o1LedgerRun");
+  } catch (e) {
+    threw = String(e);
+  }
+  check("§10★ 空フォルダの列挙が予算を超えても例外で落ちない", threw, null);
+  check("§10★ その場合は「打ち切り」としてバナーに出る（完走と偽らない）", /打ち切り/.test(dashTop(ss)), true);
+  check("§10 打ち切りの前に読めた直下のファイルは台帳に載る", ss.sheets[LEDGER].rows.slice(2).map((r) => r[0]), ["r1"]);
+  const env2 = makeEnv({
+    spreadsheet: makeSpreadsheet(["O1 登録ログ"]),
+    files: [],
+    subfolders: empties,
+    tickPerFolder: 10000,
+  });
+  call(env2, "o1LedgerCheck");
+  check("§10★ o1LedgerCheck も空フォルダの列挙で打ち切りを出す", env2.logs.some((l) => /時間予算で打ち切り/.test(l)), true);
+}
+
+// ---------------------------------------------------------------------------
+// §11 見た目（2026-09-28 状況ボード・`.steering/20260928-o1-mgmt-sheet-design/`）
+//   ★ 値の意味は変えず、配置・並び・色だけを固定する。
+// ---------------------------------------------------------------------------
+{
+  const UI = plain(E.ctx.O1_UI);
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  const p2 = (n) => String(n).padStart(2, "0");
+  const regAt = (daysAgo) => {
+    const d = new Date(ago(daysAgo));
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} 09:00:00`;
+  };
+  regTab(ss, [[regAt(9), "register", "P012", "ok", "", ""]]);
+  const files = [
+    makeFile("n1", goodName("P010", 1, stamp(20)), 10, ago(8)), // 途絶
+    makeFile("g1", goodName("P011", 1, stamp(20)), 10, ago(8)), // 欠番（2 が抜け・3 が 6 日前）
+    makeFile("g3", goodName("P011", 3, stamp(22)), 10, ago(6)),
+    makeFile("g4", goodName("P011", 4, stamp(23)), 10, ago(1)),
+    makeFile("a1", goodName("P10", 1, stamp(27)), 10, ago(0.5)), // 正常
+    makeFile("b1", goodName("P9", 1, stamp(27)), 10, ago(0.5)), // 正常
+  ];
+  const env = makeEnv({ spreadsheet: ss, files });
+  call(env, "o1LedgerRun");
+  const D = ss.sheets[DASH];
+  const H = DASH_HEAD_ROW;
+  check("§11 行 5 が見出し・見出しより上は固定される", [D.rows[H - 1].slice(0, 2), D.frozen], [["P-ID", "判定"], H]);
+  check("§11 表題帯に「O1 受領状況」と更新時刻が出る", /^O1 受領状況.*更新 \d{4}-\d{2}-\d{2}/.test(D.rows[0][0]), true);
+  check("§11★ 要対応順（途絶 → 欠番 → 未受領 → 正常）、同順位は P-ID の数字順（P9 < P10）", dashData(ss).map((r) => [r[0], r[1]]), [
+    ["P010", "途絶"], ["P011", "欠番"], ["P012", "未受領"], ["P9", "正常"], ["P10", "正常"],
+  ]);
+  check("§11 件数の行に内訳が出る", /要対応 3 人（途絶 1・欠番 1・未受領 1）.*正常 2 人/.test(D.rows[1][0]), true);
+  {
+    // ★ 内訳は 1 人 1 回（いちばん重い判定）。「途絶・欠番」の人は途絶に数える → 内訳の和 = 要対応の人数
+    const sh = makeSpreadsheet([]).insertSheet("B");
+    call(E, "o1LedgerWriteBoard_", sh, [
+      { pid: "P1", flags: ["途絶", "欠番"], lastReceivedMs: ago(6), elapsedDays: 6, uniqueDays: 1, dupCount: 0, totalBytes: 0, gaps: [2], sinceRegDays: 9 },
+      { pid: "P2", flags: ["欠番"], lastReceivedMs: ago(1), elapsedDays: 1, uniqueDays: 2, dupCount: 0, totalBytes: 0, gaps: [1], sinceRegDays: 9 },
+    ], { nowMs: NOW, truncated: false, foreignCount: 0, badRows: 0, regSkipped: 0 });
+    check("§11★ 内訳は 1 人 1 回（途絶・欠番の人は途絶）＝内訳の和が要対応の人数", /要対応 2 人（途絶 1・欠番 1・未受領 0）/.test(sh.rows[1][0]), true);
+  }
+  check("§11 要対応がいれば件数の行は赤地", D.styleAt(2, 1).bg, UI.dangerBg);
+  check("§11 凡例の日数は定数から（途絶 5・欠番 5・未受領 7）", [D.rows[2][2], D.rows[2][5], D.rows[2][8]], [
+    "最終受領から 5 日以上届かない", "後の番号から 5 日埋まらない", "登録から 7 日で 0 件",
+  ]);
+  check("§11 凡例の色見本は判定の色と同じ", [D.styleAt(3, 2).bg, D.styleAt(3, 5).bg, D.styleAt(3, 8).bg], [UI.dangerBg, UI.gapBg, UI.warnBg]);
+  const flagBg = (i) => D.styleAt(H + 1 + i, 2).bg;
+  check("§11★ 判定セルの色（途絶=赤・欠番=橙・未受領=黄・正常=塗らない）", [flagBg(0), flagBg(1), flagBg(2), flagBg(3) || null], [
+    UI.dangerBg, UI.gapBg, UI.warnBg, null,
+  ]);
+  check("§11 正常は緑字", D.styleAt(H + 4, 2).fg, UI.okFg);
+  check("§11 経過日数が途絶の日数以上なら赤字（途絶の行）", D.styleAt(H + 1, 4).fg, UI.dangerFg);
+  check("§11 見出しは紺帯・白字", [D.styleAt(H, 1).bg, D.styleAt(H, 1).fg], [UI.navy, UI.white]);
+  check("§11 表題帯・件数・注意の行は結合される", ["1,1,1,9", "2,1,1,9", "4,1,1,9"].every((m) => D.merges.includes(m)), true);
+  check("§11 タブの色は要対応があれば赤", D.tabColor, UI.dangerFg);
+  check("§11★ 通知メールの判定は並べ替えに影響されない（同じ 3 人）", /P010: 途絶/.test(env.mails[0].body) && /P011: 欠番/.test(env.mails[0].body) && /P012: 未受領/.test(env.mails[0].body), true);
+
+  // 再実行: P010 が復帰 → 前回の赤が残らない（clear で書式も消す）
+  files.push(makeFile("n2", goodName("P010", 2, stamp(28)), 10, ago(0.1)));
+  call(env, "o1LedgerRun");
+  const row010 = dashData(ss).findIndex((r) => r[0] === "P010");
+  check("§11★ 復帰した行に前回の赤が残らない", [dashData(ss)[row010][1], D.styleAt(H + 1 + row010, 2).bg || null], ["正常", null]);
+  check("§11 結合が重ならない（再実行しても表題帯の結合は 1 つ）", D.merges.filter((m) => m === "1,1,1,9").length, 1);
+
+  // 受領台帳: 値に触れず、見出し・固定・条件付き書式
+  const L = ss.sheets[LEDGER];
+  check("§11 受領台帳: 2 行を固定・見出しは紺帯", [L.frozen, L.styleAt(2, 1).bg], [2, UI.navy]);
+  check("§11★ 受領台帳: 条件付き書式は列だけで開いた範囲（追記した行にも効く）", plain(L.rules).map((r) => r.ranges[0]), ["A3:J", "A3:J", "A3:J"]);
+  check("§11 受領台帳: 削除済は灰・対象外は橙・dup は黄（列は形式=J・重複=I）", plain(L.rules).map((r) => [r.formula, r.bg]), [
+    ['=$J3="削除済"', UI.grayBg], ['=$J3="対象外"', UI.gapBg], ['=$I3="dup"', UI.warnBg],
+  ]);
+  L.widths[2] = 999; // 研究者が列幅を変えた
+  call(env, "o1LedgerRun");
+  check("§11★ 受領台帳: 2 回目以降は書式を付け直さない（研究者の列幅を戻さない）", L.widths[2], 999);
+}
+{
+  // ★ 同じ位置の行が「途絶 → 正常」になる: 前回の赤が残らない（⚠️ clearContents だと書式が残る）
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const files = [makeFile("q1", goodName("P050", 1, stamp(20)), 10, ago(8))];
+  const env = makeEnv({ spreadsheet: ss, files });
+  call(env, "o1LedgerRun");
+  const D = ss.sheets[DASH];
+  const was = D.styleAt(DASH_HEAD_ROW + 1, 2).bg;
+  files.push(makeFile("q2", goodName("P050", 2, stamp(28)), 10, ago(0.1)));
+  call(env, "o1LedgerRun");
+  check("§11★ 途絶 → 正常になった同じ位置の行に赤が残らない", [was, dashData(ss)[0][1], D.styleAt(DASH_HEAD_ROW + 1, 2).bg || null], [
+    plain(E.ctx.O1_UI).dangerBg, "正常", null,
+  ]);
+}
+{
+  // 空: 見出しの下に案内の 1 行・件数の行は緑地
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const env = makeEnv({ spreadsheet: ss, files: [] });
+  call(env, "o1LedgerRun");
+  const D = ss.sheets[DASH];
+  const UI = plain(E.ctx.O1_UI);
+  check("§11 空: 見出しの下に「まだ無い」の 1 行", D.rows[DASH_HEAD_ROW][0], DASH_EMPTY);
+  check("§11 空: 件数の行は緑地・タブは緑", [D.styleAt(2, 1).bg, D.tabColor], [UI.okBg, UI.okFg]);
+  // 空 → データが入る: 案内行の結合が残らない（fake の clear は結合を消さない側に倒す）
+  const keep = D.clear;
+  D.clear = () => {
+    const m = D.merges.slice();
+    keep();
+    D.merges = m; // ★ 実物で clear が結合を解かない場合を再現する
+  };
+  env.files.push(makeFile("e1", goodName("P001", 1, stamp(27)), 10, ago(0.1)));
+  call(env, "o1LedgerRun");
+  check("§11★ 空 → データ: 案内行の結合が残らない（clear が結合を解かなくても）", D.merges.includes(DASH_HEAD_ROW + 1 + ",1,1,9"), false);
+}
+{
+  // ⚠️ 見た目の処理が例外でも、値は書かれ・通知は届く（code-reviewer MEDIUM・2026-09-28）
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const D = ss.insertSheet(DASH);
+  const orig = D.getRange;
+  D.getRange = (...a) => {
+    const r = orig(...a);
+    if (typeof a[0] !== "string") r.merge = () => { throw new Error("手で結合されたセルと重なる"); };
+    return r;
+  };
+  const env = makeEnv({ spreadsheet: ss, files: [makeFile("m1", goodName("P060", 1, stamp(20)), 10, ago(8))] });
+  let threw = null;
+  try { call(env, "o1LedgerRun"); } catch (e) { threw = String(e); }
+  check("§11★ 途絶タブの書式が例外でも実行は落ちず、値は書かれ、途絶の通知が届く", [threw, dashData(ss)[0].slice(0, 2), env.mails.length, env.logs.some((l) => /見た目を整えられませんでした/.test(l))], [
+    null, ["P060", "途絶"], 1, true,
+  ]);
+}
+{
+  // ⚠️ 受領台帳の書式が例外でも、走査と通知は続く
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const L = ss.insertSheet(LEDGER);
+  L.appendRow(["banner"]);
+  L.appendRow(plain(E.ctx.O1_LEDGER_HEAD));
+  L.setConditionalFormatRules = () => { throw new Error("rules quota"); };
+  const env = makeEnv({ spreadsheet: ss, files: [makeFile("m2", goodName("P061", 1, stamp(20)), 10, ago(8))] });
+  let threw = null;
+  try { call(env, "o1LedgerRun"); } catch (e) { threw = String(e); }
+  check("§11★ 受領台帳の書式が例外でも走査は続き、途絶の通知が届く", [threw, L.rows.length - 2, env.mails.length], [null, 1, 1]);
+}
+{
+  // ★ 受領台帳の既存行の値は書式付けで変わらない（追記のみの約束）
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const env = makeEnv({ spreadsheet: ss, files: [makeFile("x1", goodName("P001", 1, stamp(27)), 10, ago(1))] });
+  call(env, "o1LedgerRun");
+  const before = JSON.stringify(ss.sheets[LEDGER].rows);
+  ss.sheets[LEDGER].frozen = 0; // 固定が外された → 次回に書式を付け直す
+  call(env, "o1LedgerRun");
+  check("§11★ 書式を付け直しても受領台帳の値は 1 つも変わらない", JSON.stringify(ss.sheets[LEDGER].rows), before);
+  check("§11 固定が外れていれば付け直す", ss.sheets[LEDGER].frozen, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -1162,7 +1494,7 @@ const sharedProps = (extra) =>
     const m = /var O1_MGMT_TAB = "([^"]+)"/.exec(b);
     return m ? m[1] : null;
   })(), E.ctx.O1_LEDGER_REG_TAB);
-  check("§7 受け口のソースに台帳の語が無い（doPost を触っていない）", /O1_LEDGER|o1Ledger/.test(submitSrc), false);
+  check("§7 受け口のソースに台帳の語が無い（受け口は台帳の関数・状態に依存しない）", /O1_LEDGER|o1Ledger/.test(submitSrc), false);
 }
 
 // ---------------------------------------------------------------------------

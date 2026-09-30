@@ -1,0 +1,2972 @@
+{
+ "meta": {
+  "executed": "2026-09-29 21:46:49 +0900",
+  "design": "design.md §3"
+ },
+ "runs": [
+  {
+   "source": "Europe PMC",
+   "field": "TITLE_ABS",
+   "query": "TITLE_ABS:(\"AI fatigue\" OR \"artificial intelligence fatigue\" OR \"generative AI fatigue\" OR \"ChatGPT fatigue\" OR \"AI-induced fatigue\" OR \"AI-related fatigue\" OR \"chatbot fatigue\" OR \"GenAI fatigue\" OR \"AI exhaustion\" OR \"AI burnout\") AND TITLE_ABS:(scale OR questionnaire OR inventory OR instrument OR psychometric OR validation OR \"factor analysis\")",
+   "status": "ok",
+   "total": 2,
+   "records": [
+    {
+     "key": "10.31234/osf.io/kp7zs_v1",
+     "title": "AI Fatigue in Human–AI Interaction: Conceptual Framework, Scale Development and Validation, and Associations with AI Engagement",
+     "year": "2026",
+     "doi": "10.31234/osf.io/kp7zs_v1",
+     "journal": "",
+     "pubType": "",
+     "authors": "Lau GR, Kasturiratna KTAS, Goh AYH, Tong EMW, Hartanto A."
+    },
+    {
+     "key": "10.31234/osf.io/jqxh9_v1",
+     "title": "AI Learning Strategies Scale: Development and Validation for Individual Differences in Self-Regulated Learning with AI",
+     "year": "2026",
+     "doi": "10.31234/osf.io/jqxh9_v1",
+     "journal": "",
+     "pubType": "",
+     "authors": "Lau GR, Liow CJM, Gasevic D, Hartanto A."
+    }
+   ]
+  },
+  {
+   "source": "Semantic Scholar",
+   "field": "bulk",
+   "query": "(\"AI fatigue\" | \"artificial intelligence fatigue\" | \"generative AI fatigue\" | \"ChatGPT fatigue\" | \"AI-induced fatigue\" | \"AI-related fatigue\" | \"chatbot fatigue\" | \"GenAI fatigue\" | \"AI exhaustion\" | \"AI burnout\") + (scale | questionnaire | inventory | instrument | psychometric | validation | \"factor analysis\")",
+   "status": "ok",
+   "total": 6,
+   "records": [
+    {
+     "key": "10.1016/j.chbr.2026.101186",
+     "title": "AI Fatigue in Human–AI Interaction: Conceptual Framework, Scale Development and Validation, and Associations with AI Engagement",
+     "year": 2026,
+     "doi": "10.1016/j.chbr.2026.101186",
+     "journal": "Computers in Human Behavior Reports",
+     "authors": "G. Lau, K. T. A. Sandeeshwara Kasturiratna, Adalia Y. H. Goh, Eddie M. W. Tong, Andree Hartanto"
+    },
+    {
+     "key": "10.47772/ijriss.2026.102400020",
+     "title": "Digital-Age Psychosocial Strain: A Systematic Literature Review of Conceptual Dimensions, Measurement Approaches, and Emerging Research Directions",
+     "year": 2026,
+     "doi": "10.47772/ijriss.2026.102400020",
+     "journal": "International journal of research and innovation in social science",
+     "authors": "Habibi Rahim, Liley Afzani Saidi"
+    },
+    {
+     "key": "10.56011/mind-mri-143-20259",
+     "title": "The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education",
+     "year": 2025,
+     "doi": "10.56011/mind-mri-143-20259",
+     "journal": "Mind & Society",
+     "authors": "Manya Sharma, Seema Singh"
+    },
+    {
+     "key": "S2:947f916e82a7c36c002ceef8c25f07815b378b48",
+     "title": "A Control-Theoretic Approach to GenAI Fatigue: A Systemic Constraint-Compliance Model ( sC 2 M ) Framework with PI-inspired Governance",
+     "year": null,
+     "doi": "",
+     "journal": "",
+     "authors": "C. Tantisukarom"
+    },
+    {
+     "key": "10.1109/SCOReD68498.2025.11399092",
+     "title": "Dimensions of AI-Induced Fatigue Among Filipino Students: An Exploratory Study",
+     "year": 2025,
+     "doi": "10.1109/SCOReD68498.2025.11399092",
+     "journal": "Student Conference on Research and Development",
+     "authors": "J. P. P. Miranda, Madilaine Claire B. Nacianceno, Rhiziel P. Manalese, Ivan G. Liwanag, Laharni S. Simpao, Marie Angeli F. Peñaflor"
+    },
+    {
+     "key": "10.26803/ijlter.25.5.5",
+     "title": "Defining AI Fatigue in Academic Contexts: Dimensions, Indicators, and a Stage-Based Model Using Grounded Theory",
+     "year": 2026,
+     "doi": "10.26803/ijlter.25.5.5",
+     "journal": "International Journal of Learning, Teaching and Educational Research",
+     "authors": "J. P. Miranda, Emmanuel B. Parreño, Jovita G. Rivera"
+    }
+   ]
+  },
+  {
+   "source": "Crossref",
+   "field": "query.title（上位 50・件数なし）",
+   "query": "AI fatigue scale",
+   "status": "ok",
+   "total": null,
+   "records": [
+    {
+     "key": "10.31234/osf.io/kp7zs_v1",
+     "title": "AI Fatigue in Human–AI Interaction: Conceptual Framework, Scale Development and Validation, and Associations with AI Engagement",
+     "year": 2026,
+     "doi": "10.31234/osf.io/kp7zs_v1",
+     "journal": "",
+     "type": "posted-content"
+    },
+    {
+     "key": "10.1016/j.chbr.2026.101186",
+     "title": "AI fatigue in human–AI interaction: Conceptual framework, scale development and validation, and associations with AI engagement",
+     "year": 2026,
+     "doi": "10.1016/j.chbr.2026.101186",
+     "journal": "Computers in Human Behavior Reports",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t10588-000",
+     "title": "Fatigue Scale",
+     "year": 1993,
+     "doi": "10.1037/t10588-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t14460-000",
+     "title": "Fatigue Scale",
+     "year": 1998,
+     "doi": "10.1037/t14460-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t81152-000",
+     "title": "Diversity Fatigue Scale",
+     "year": 2021,
+     "doi": "10.1037/t81152-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-3-319-69909-7_1018-2",
+     "title": "Fatigue Severity Scale",
+     "year": 2021,
+     "doi": "10.1007/978-3-319-69909-7_1018-2",
+     "journal": "Encyclopedia of Quality of Life and Well-Being Research",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t03811-000",
+     "title": "Fatigue Assessment Scale",
+     "year": 2004,
+     "doi": "10.1037/t03811-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t87562-000",
+     "title": "Pandemic Fatigue Scale",
+     "year": 2021,
+     "doi": "10.1037/t87562-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t70408-000",
+     "title": "Dutch Fatigue Scale",
+     "year": 1998,
+     "doi": "10.1037/t70408-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t35165-000",
+     "title": "Parkinson Fatigue Scale",
+     "year": 2005,
+     "doi": "10.1037/t35165-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-3-662-65186-5_418",
+     "title": "Fatigue Impact Scale",
+     "year": 2025,
+     "doi": "10.1007/978-3-662-65186-5_418",
+     "journal": "Springer Reference Medizin",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t64248-000",
+     "title": "Parent Fatigue Scale",
+     "year": 2003,
+     "doi": "10.1037/t64248-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1093/occmed/kqp180",
+     "title": "Fatigue Impact Scale",
+     "year": 2010,
+     "doi": "10.1093/occmed/kqp180",
+     "journal": "Occupational Medicine",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t64612-000",
+     "title": "Cessation Fatigue Scale",
+     "year": 2017,
+     "doi": "10.1037/t64612-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-94-007-0753-5_1018",
+     "title": "Fatigue Severity Scale",
+     "year": 2014,
+     "doi": "10.1007/978-94-007-0753-5_1018",
+     "journal": "Encyclopedia of Quality of Life and Well-Being Research",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t49198-000",
+     "title": "Cancer Fatigue Scale",
+     "year": 2000,
+     "doi": "10.1037/t49198-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-1-4419-9893-4_17",
+     "title": "Chalder Fatigue Scale",
+     "year": 2011,
+     "doi": "10.1007/978-1-4419-9893-4_17",
+     "journal": "STOP, THAT and One Hundred Other Sleep Scales",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.32388/nmuac3",
+     "title": "Fatigue Severity Scale",
+     "year": 2020,
+     "doi": "10.32388/nmuac3",
+     "journal": "Definitions",
+     "type": "reference-entry"
+    },
+    {
+     "key": "10.1007/978-3-031-17299-1_1018",
+     "title": "Fatigue Severity Scale",
+     "year": 2023,
+     "doi": "10.1007/978-3-031-17299-1_1018",
+     "journal": "Encyclopedia of Quality of Life and Well-Being Research",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t77772-000",
+     "title": "Silhouettes Fatigue Scale",
+     "year": 2020,
+     "doi": "10.1037/t77772-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t77802-000",
+     "title": "Lee Fatigue Scale",
+     "year": 1991,
+     "doi": "10.1037/t77802-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-3-642-54672-3_418-1",
+     "title": "Fatigue Impact Scale",
+     "year": 2023,
+     "doi": "10.1007/978-3-642-54672-3_418-1",
+     "journal": "Springer Reference Medizin",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t25491-000",
+     "title": "Fatigue Severity Scale",
+     "year": 1989,
+     "doi": "10.1037/t25491-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t37458-000",
+     "title": "Childhood Fatigue Scale",
+     "year": 2003,
+     "doi": "10.1037/t37458-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t78962-000",
+     "title": "Brugmann Fatigue Scale",
+     "year": 2019,
+     "doi": "10.1037/t78962-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-3-662-65186-5_301544",
+     "title": "Piper Fatigue Scale",
+     "year": 2025,
+     "doi": "10.1007/978-3-662-65186-5_301544",
+     "journal": "Springer Reference Medizin",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t37463-000",
+     "title": "Fatigue Coping Scale",
+     "year": 2008,
+     "doi": "10.1037/t37463-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t77329-000",
+     "title": "Tourism Fatigue Scale",
+     "year": 2020,
+     "doi": "10.1037/t77329-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t38198-000",
+     "title": "Citizenship Fatigue Scale",
+     "year": 2015,
+     "doi": "10.1037/t38198-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t28582-000",
+     "title": "Fatigue Impact Scale",
+     "year": 1994,
+     "doi": "10.1037/t28582-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t62218-000",
+     "title": "Staff Fatigue Scale",
+     "year": 2003,
+     "doi": "10.1037/t62218-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t12541-000",
+     "title": "Fatigue Severity Scale",
+     "year": 2002,
+     "doi": "10.1037/t12541-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.32388/00iir9",
+     "title": "FACIT Fatigue Scale",
+     "year": 2020,
+     "doi": "10.32388/00iir9",
+     "journal": "Definitions",
+     "type": "reference-entry"
+    },
+    {
+     "key": "10.1007/978-3-319-69909-7_1018-3",
+     "title": "Fatigue Severity Scale",
+     "year": 2021,
+     "doi": "10.1007/978-3-319-69909-7_1018-3",
+     "journal": "Encyclopedia of Quality of Life and Well-Being Research",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t69027-000",
+     "title": "Change Fatigue Scale",
+     "year": 2011,
+     "doi": "10.1037/t69027-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-981-10-2143-5_17",
+     "title": "Full-Scale Fatigue Testing",
+     "year": 2016,
+     "doi": "10.1007/978-981-10-2143-5_17",
+     "journal": "Indian Institute of Metals Series",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1007/978-1-4419-9893-4_34",
+     "title": "Fatigue Impact Scale (FIS)",
+     "year": 2011,
+     "doi": "10.1007/978-1-4419-9893-4_34",
+     "journal": "STOP, THAT and One Hundred Other Sleep Scales",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1007/978-94-007-0753-5_104277",
+     "title": "Trauma/Compassion Fatigue Scale",
+     "year": 2014,
+     "doi": "10.1007/978-94-007-0753-5_104277",
+     "journal": "Encyclopedia of Quality of Life and Well-Being Research",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t60961-000",
+     "title": "Racial Battle Fatigue Scale",
+     "year": 2014,
+     "doi": "10.1037/t60961-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-1-4419-9893-4_35",
+     "title": "Fatigue Severity Scale (FSS)",
+     "year": 2011,
+     "doi": "10.1007/978-1-4419-9893-4_35",
+     "journal": "STOP, THAT and One Hundred Other Sleep Scales",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t70409-000",
+     "title": "Dutch Exertion Fatigue Scale",
+     "year": 1998,
+     "doi": "10.1037/t70409-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t18854-000",
+     "title": "Piper Fatigue Scale—Revised",
+     "year": 1998,
+     "doi": "10.1037/t18854-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t87538-000",
+     "title": "Sexual Harassment Fatigue Scale",
+     "year": 2020,
+     "doi": "10.1037/t87538-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-3-211-79280-3_897",
+     "title": "Piper fatigue scale (PFS)",
+     "year": 2009,
+     "doi": "10.1007/978-3-211-79280-3_897",
+     "journal": "Dictionary of Rheumatology",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1097/mcp.0000000000000496",
+     "title": "The Fatigue Assessment Scale",
+     "year": 2018,
+     "doi": "10.1097/mcp.0000000000000496",
+     "journal": "Current Opinion in Pulmonary Medicine",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1001/archneur.1989.00520460115022",
+     "title": "The Fatigue Severity Scale",
+     "year": 1989,
+     "doi": "10.1001/archneur.1989.00520460115022",
+     "journal": "Archives of Neurology",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t46026-000",
+     "title": "Hirai Cancer Fatigue Scale",
+     "year": 2015,
+     "doi": "10.1037/t46026-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t58735-000",
+     "title": "Modified Fatigue Impact Scale",
+     "year": 1998,
+     "doi": "10.1037/t58735-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t73967-000",
+     "title": "Fatigue Severity Scale--Revised",
+     "year": 2018,
+     "doi": "10.1037/t73967-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t62426-000",
+     "title": "Postnatal Accumulated Fatigue Scale",
+     "year": 2016,
+     "doi": "10.1037/t62426-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    }
+   ]
+  },
+  {
+   "source": "Crossref",
+   "field": "query.title（上位 50・件数なし）",
+   "query": "AI fatigue questionnaire",
+   "status": "ok",
+   "total": null,
+   "records": [
+    {
+     "key": "10.1037/t17216-000",
+     "title": "Fatigue Questionnaire",
+     "year": 2008,
+     "doi": "10.1037/t17216-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t73459-000",
+     "title": "Fatigue Sensitivity Questionnaire",
+     "year": 2019,
+     "doi": "10.1037/t73459-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1016/j.jpsychores.2022.111130",
+     "title": "Paediatric short fatigue questionnaire, a 4-item fatigue questionnaire for children",
+     "year": 2023,
+     "doi": "10.1016/j.jpsychores.2022.111130",
+     "journal": "Journal of Psychosomatic Research",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t41132-000",
+     "title": "Voice Fatigue Handicap Questionnaire",
+     "year": 2015,
+     "doi": "10.1037/t41132-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t22245-000",
+     "title": "Chronic Fatigue Syndrome Questionnaire",
+     "year": 1992,
+     "doi": "10.1037/t22245-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t12157-000",
+     "title": "Types of Fatigue Questionnaire",
+     "year": 2011,
+     "doi": "10.1037/t12157-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t88146-000",
+     "title": "Paediatric Short Fatigue Questionnaire",
+     "year": 2023,
+     "doi": "10.1037/t88146-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1016/j.jpsychores.2020.110229",
+     "title": "Short fatigue questionnaire: Screening for severe fatigue.",
+     "year": 2020,
+     "doi": "10.1016/j.jpsychores.2020.110229",
+     "journal": "Journal of Psychosomatic Research",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t9999-98163-000",
+     "title": "AI Competence Educators Questionnaire",
+     "year": 2025,
+     "doi": "10.1037/t9999-98163-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t21239-000",
+     "title": "Visual Fatigue Questionnaire--English Translation",
+     "year": 2009,
+     "doi": "10.1037/t21239-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t07505-000",
+     "title": "Fatigue Associated with Depression Questionnaire",
+     "year": 2011,
+     "doi": "10.1037/t07505-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1111/j.2044-8260.1993.tb01070.x",
+     "title": "A brief mental fatigue questionnaire",
+     "year": 1993,
+     "doi": "10.1111/j.2044-8260.1993.tb01070.x",
+     "journal": "British Journal of Clinical Psychology",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t82129-000",
+     "title": "Goal Pursuit Questionnaire for Fatigue",
+     "year": 2021,
+     "doi": "10.1037/t82129-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.53841/bpscpr.1999.14.1.31",
+     "title": "Questionnaire fatigue and other research concerns",
+     "year": 1999,
+     "doi": "10.53841/bpscpr.1999.14.1.31",
+     "journal": "Counselling Psychology Review",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t37360-000",
+     "title": "Questionnaire About Factors That Affect Fatigue",
+     "year": 2009,
+     "doi": "10.1037/t37360-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1186/s12909-026-08641-w",
+     "title": "Virtual &amp; mixed reality fatigue questionnaire",
+     "year": 2026,
+     "doi": "10.1186/s12909-026-08641-w",
+     "journal": "BMC Medical Education",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1300/j092v13n04_05",
+     "title": "Reliability of a Chronic Fatigue Syndrome Questionnaire",
+     "year": 2006,
+     "doi": "10.1300/j092v13n04_05",
+     "journal": "Journal Of Chronic Fatigue Syndrome",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t31895-000",
+     "title": "Voice and Fatigue Study Background Information Questionnaire",
+     "year": 2011,
+     "doi": "10.1037/t31895-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.21236/ada612125",
+     "title": "U-2 Pilot Post-Mission Fatigue Questionnaire",
+     "year": 2014,
+     "doi": "10.21236/ada612125",
+     "journal": "",
+     "type": "report"
+    },
+    {
+     "key": "10.1037/t52745-000",
+     "title": "Fatigue Associated With Depression Questionnaire--Version 2",
+     "year": 2015,
+     "doi": "10.1037/t52745-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t79397-000",
+     "title": "Bristol Rheumatoid Arthritis Fatigue Multi-Dimensional Questionnaire",
+     "year": 2010,
+     "doi": "10.1037/t79397-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1007/978-3-642-51466-1_4",
+     "title": "Construction of a New Fatigue Assessment Questionnaire",
+     "year": 1998,
+     "doi": "10.1007/978-3-642-51466-1_4",
+     "journal": "Recent Results in Cancer Research",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t15965-000",
+     "title": "Interpretation of Symptoms Questionnaire--Chronic Fatigue Syndrome",
+     "year": 2001,
+     "doi": "10.1037/t15965-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.7717/peerj.1818/table-3",
+     "title": "Table 3: Correlations between different fatigue questionnaire results.",
+     "year": null,
+     "doi": "10.7717/peerj.1818/table-3",
+     "journal": "",
+     "type": "component"
+    },
+    {
+     "key": "10.1037/t22157-000",
+     "title": "Questionnaire about Chronic Fatigue Syndrome for General Practitioners",
+     "year": 2007,
+     "doi": "10.1037/t22157-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.62517/jike.202404207",
+     "title": "A Questionnaire Survey on AI+Education Counting",
+     "year": 2024,
+     "doi": "10.62517/jike.202404207",
+     "journal": "Journal of Intelligence and Knowledge Engineering",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1007/978-3-030-89738-3_62-1",
+     "title": "AI in Questionnaire Creation: Guidelines Illustrated in AI Acceptability Instrument Development",
+     "year": 2023,
+     "doi": "10.1007/978-3-030-89738-3_62-1",
+     "journal": "International Handbook of Behavioral Health Assessment",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1037/t75495-000",
+     "title": "AI Voice-User Interface Feedback Acceptance Questionnaire",
+     "year": 2019,
+     "doi": "10.1037/t75495-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.18243/eon/2026.19.5.5",
+     "title": "AI Fatigue: Views From the Trenches",
+     "year": 2026,
+     "doi": "10.18243/eon/2026.19.5.5",
+     "journal": "Editorial Office News",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1201/9781003774679-8",
+     "title": "AI Enhanced Driver Fatigue Monitoring System",
+     "year": 2026,
+     "doi": "10.1201/9781003774679-8",
+     "journal": "Advances in Science and Technology",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.31234/osf.io/b2nk6_v1",
+     "title": "A Measurement Framework for Significant Other AI (SO-AI): Development of the SO-AI Questionnaire",
+     "year": 2026,
+     "doi": "10.31234/osf.io/b2nk6_v1",
+     "journal": "",
+     "type": "posted-content"
+    },
+    {
+     "key": "10.1007/s10877-016-9958-x",
+     "title": "A nurses’ alarm fatigue questionnaire: development and psychometric properties",
+     "year": 2016,
+     "doi": "10.1007/s10877-016-9958-x",
+     "journal": "Journal of Clinical Monitoring and Computing",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1136/oem.57.5.353",
+     "title": "Fatigue among working people: validity of a questionnaire measure",
+     "year": 2000,
+     "doi": "10.1136/oem.57.5.353",
+     "journal": "Occupational and Environmental Medicine",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1016/j.ijnurstu.2019.06.011",
+     "title": "Fatigue and nurses’ work patterns: An online questionnaire survey",
+     "year": 2019,
+     "doi": "10.1016/j.ijnurstu.2019.06.011",
+     "journal": "International Journal of Nursing Studies",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.26419/res.01048.002",
+     "title": "2026 AARP AI and Health Survey: Annotated Questionnaire",
+     "year": 2026,
+     "doi": "10.26419/res.01048.002",
+     "journal": "",
+     "type": "report"
+    },
+    {
+     "key": "10.1016/j.psychres.2009.01.029",
+     "title": "The Fatigue Questionnaire: Standardization in patients with major depression",
+     "year": 2010,
+     "doi": "10.1016/j.psychres.2009.01.029",
+     "journal": "Psychiatry Research",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1080/10803548.2018.1456796",
+     "title": "Developing a fatigue questionnaire for Chinese civil aviation pilots",
+     "year": 2018,
+     "doi": "10.1080/10803548.2018.1456796",
+     "journal": "International Journal of Occupational Safety and Ergonomics",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t86359-000",
+     "title": "Fatigue Symptoms and Impacts Questionnaire--Relapsing Remitting Multiple Sclerosis",
+     "year": 2019,
+     "doi": "10.1037/t86359-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1016/j.jpsychores.2016.03.124",
+     "title": "Measuring fatigue in haemodialysis patients: The factor structure of the Chalder Fatigue Questionnaire (CFQ)",
+     "year": 2016,
+     "doi": "10.1016/j.jpsychores.2016.03.124",
+     "journal": "Journal of Psychosomatic Research",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1007/s12282-014-0527-1",
+     "title": "Fatigue in breast cancer patients: psychometric evaluation of the fatigue questionnaire EORTC QLQ-FA13",
+     "year": 2014,
+     "doi": "10.1007/s12282-014-0527-1",
+     "journal": "Breast Cancer",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1037/t9999-99308-000",
+     "title": "Achievement Emotions Questionnaire for AI-Assisted Language Learning",
+     "year": 2026,
+     "doi": "10.1037/t9999-99308-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.4135/9781036253899",
+     "title": "Using AI for Survey Questionnaire Evaluation and Testing",
+     "year": 2026,
+     "doi": "10.4135/9781036253899",
+     "journal": "",
+     "type": "database"
+    },
+    {
+     "key": "10.21608/idj.2026.525979.1661",
+     "title": "Anti-Design Approach in Countering AI Fatigue",
+     "year": 2026,
+     "doi": "10.21608/idj.2026.525979.1661",
+     "journal": "International Design Journal",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.31274/itaa.18623",
+     "title": "Privacy Fatigue: AI-powered 3D Visualization Services",
+     "year": 2025,
+     "doi": "10.31274/itaa.18623",
+     "journal": "Making Waves Toward A Sustainable and Equitable Future",
+     "type": "proceedings-article"
+    },
+    {
+     "key": "10.1007/978-981-97-2902-9_10",
+     "title": "Do You Have an AI Mindset? Development and Validation of AI Mindset Questionnaire",
+     "year": 2024,
+     "doi": "10.1007/978-981-97-2902-9_10",
+     "journal": "Data-Driven Decision Making",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1016/j.jvoice.2025.03.014",
+     "title": "Validation and Development of Vocal Fatigue Handicap Questionnaire for Koreans",
+     "year": 2025,
+     "doi": "10.1016/j.jvoice.2025.03.014",
+     "journal": "Journal of Voice",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1186/s12991-020-00311-5",
+     "title": "Norwegian reference data on the Fatigue Questionnaire and the Patient Health Questionnaire-9 and their interrelationship",
+     "year": 2020,
+     "doi": "10.1186/s12991-020-00311-5",
+     "journal": "Annals of General Psychiatry",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.5812/zjrms.69187",
+     "title": "Iranian Version of Cancer-Related Fatigue Questionnaire: Construction and Validation",
+     "year": 2019,
+     "doi": "10.5812/zjrms.69187",
+     "journal": "Zahedan Journal of Research in Medical Sciences",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.35750/2713-0622-2024-2-144-160",
+     "title": "Subjective Assessment of Personal Fatigue Questionnaire: development, psychometric characterisation, application",
+     "year": 2024,
+     "doi": "10.35750/2713-0622-2024-2-144-160",
+     "journal": "Russian Journal of Deviant Behavior",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1186/s12913-026-15222-6",
+     "title": "Slovak cross-cultural adaptation of the Alarm Fatigue Assessment Questionnaire",
+     "year": 2026,
+     "doi": "10.1186/s12913-026-15222-6",
+     "journal": "BMC Health Services Research",
+     "type": "journal-article"
+    }
+   ]
+  },
+  {
+   "source": "Crossref",
+   "field": "query.title（上位 50・件数なし）",
+   "query": "generative AI fatigue scale",
+   "status": "ok",
+   "total": null,
+   "records": [
+    {
+     "key": "10.1037/t9999-99155-000",
+     "title": "Generative AI Literacy Scale",
+     "year": 2025,
+     "doi": "10.1037/t9999-99155-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1037/t9999-98954-000",
+     "title": "Generative AI Engagement Scale",
+     "year": 2025,
+     "doi": "10.1037/t9999-98954-000",
+     "journal": "PsycTESTS Dataset",
+     "type": "dataset"
+    },
+    {
+     "key": "10.63383/vvef4479",
+     "title": "Create Generative AI Value at Scale",
+     "year": 2026,
+     "doi": "10.63383/vvef4479",
+     "journal": "MIT Sloan Management Review",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1515/9780691200231-012",
+     "title": "10 Generative AI: Unprecedented Scale, Surprising Simplicity",
+     "year": 2026,
+     "doi": "10.1515/9780691200231-012",
+     "journal": "Thinking AI",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1007/978-3-032-19763-4_35",
+     "title": "Generative AI Use Scale Indicators in Higher Education",
+     "year": 2026,
+     "doi": "10.1007/978-3-032-19763-4_35",
+     "journal": "Communications in Computer and Information Science",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.17760/d20669654",
+     "title": "Accelerating large scale generative AI: a comprehensive study",
+     "year": null,
+     "doi": "10.17760/d20669654",
+     "journal": "",
+     "type": "dissertation"
+    },
+    {
+     "key": "10.1016/j.jretconser.2026.105125",
+     "title": "Should generative AI be responsible to users? Developing and validating the user-generative AI psychological contract scale",
+     "year": 2027,
+     "doi": "10.1016/j.jretconser.2026.105125",
+     "journal": "Journal of Retailing and Consumer Services",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.31234/osf.io/3kxag_v1",
+     "title": "Development and Validation of the Generative AI Engagement Scale",
+     "year": 2025,
+     "doi": "10.31234/osf.io/3kxag_v1",
+     "journal": "",
+     "type": "posted-content"
+    },
+    {
+     "key": "10.2139/ssrn.5401033",
+     "title": "Development and Validation of the Generative Ai Engagement Scale",
+     "year": 2025,
+     "doi": "10.2139/ssrn.5401033",
+     "journal": "",
+     "type": "posted-content"
+    },
+    {
+     "key": "10.1016/j.chbah.2025.100221",
+     "title": "Development and validation of the generative AI engagement scale",
+     "year": 2025,
+     "doi": "10.1016/j.chbah.2025.100221",
+     "journal": "Computers in Human Behavior: Artificial Humans",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.3102/2282945",
+     "title": "Measuring teachers’ generative AI use: Scale Development and Validation",
+     "year": 2026,
+     "doi": "10.3102/2282945",
+     "journal": "Proceedings of the 2026 AERA Annual Meeting",
+     "type": "proceedings-article"
+    },
+    {
+     "key": "10.5465/amproc.2026.14472abstract",
+     "title": "Employee-Generative AI Collaboration Characteristics: Scale Development and Validation",
+     "year": 2026,
+     "doi": "10.5465/amproc.2026.14472abstract",
+     "journal": "Academy of Management Proceedings",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1109/icapai61893.2024.10541170",
+     "title": "Generative AI: Threatening Established Human Rights Instruments at Scale",
+     "year": 2024,
+     "doi": "10.1109/icapai61893.2024.10541170",
+     "journal": "2024 4th International Conference on Applied Artificial Intelligence (ICAPAI)",
+     "type": "proceedings-article"
+    },
+    {
+     "key": "10.1007/s00146-025-02566-6",
+     "title": "Epistemic trust in generative AI for higher education scale (ETGAI-HE scale)",
+     "year": 2025,
+     "doi": "10.1007/s00146-025-02566-6",
+     "journal": "AI &amp; SOCIETY",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.5040/9781350927995.45",
+     "title": "Generative AI",
+     "year": 2021,
+     "doi": "10.5040/9781350927995.45",
+     "journal": "Cite Them Right online - IEEE",
+     "type": "other"
+    },
+    {
+     "key": "10.1201/9781003563945-6",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.1201/9781003563945-6",
+     "journal": "Practical Guide to Machine Learning, NLP, and Generative AI: Libraries, Algorithms, and Applications",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1007/978-3-032-07453-9_3",
+     "title": "Generative AI",
+     "year": 2026,
+     "doi": "10.1007/978-3-032-07453-9_3",
+     "journal": "Undergraduate Topics in Computer Science",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.4018/404022",
+     "title": "Generative AI",
+     "year": 2026,
+     "doi": "10.4018/404022",
+     "journal": "Advances in Computational Intelligence and Robotics",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.4018/979-8-3693-5623-4.ch006",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.4018/979-8-3693-5623-4.ch006",
+     "journal": "Advances in Computational Intelligence and Robotics",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1017/9781009492553.018",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.1017/9781009492553.018",
+     "journal": "The Cambridge Handbook of Generative AI and the Law",
+     "type": "book-part"
+    },
+    {
+     "key": "10.56726/irjmets99051",
+     "title": "Generative Ai",
+     "year": 2026,
+     "doi": "10.56726/irjmets99051",
+     "journal": "International Research Journal of Modernization in Engineering Technology &amp; Science",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.4324/9781003674498-14",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.4324/9781003674498-14",
+     "journal": "Critiquing Generative AI in Africa’s Media Ecosystems",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.4018/979-8-3693-5762-0.ch002",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.4018/979-8-3693-5762-0.ch002",
+     "journal": "Advances in Computer and Electrical Engineering",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1201/9781003633266-1",
+     "title": "Generative AI",
+     "year": 2026,
+     "doi": "10.1201/9781003633266-1",
+     "journal": "Generative AI and the Nature of Creativity",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1080/08956308.2023.2188861",
+     "title": "Generative AI",
+     "year": 2023,
+     "doi": "10.1080/08956308.2023.2188861",
+     "journal": "Research-Technology Management",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1093/9780197852712.003.0088",
+     "title": "Generative AI",
+     "year": 2026,
+     "doi": "10.1093/9780197852712.003.0088",
+     "journal": "Oxford Research Encyclopedia of Science, Technology, and Society",
+     "type": "reference-entry"
+    },
+    {
+     "key": "10.4018/979-8-3693-9246-1.ch001",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.4018/979-8-3693-9246-1.ch001",
+     "journal": "Advances in Linguistics and Communication Studies",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1007/978-3-031-51447-0_100-1",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.1007/978-3-031-51447-0_100-1",
+     "journal": "The Palgrave Encyclopedia of Computer-Assisted Language Learning",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.35940/ijaent.g0474.0810823",
+     "title": "Generative AI",
+     "year": 2023,
+     "doi": "10.35940/ijaent.g0474.0810823",
+     "journal": "International Journal of Advanced Engineering and Nano Technology",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.5040/9781350928039.48",
+     "title": "Generative AI",
+     "year": 2021,
+     "doi": "10.5040/9781350928039.48",
+     "journal": "Cite Them Right online - Vancouver",
+     "type": "other"
+    },
+    {
+     "key": "10.1201/9781003503781",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.1201/9781003503781",
+     "journal": "",
+     "type": "monograph"
+    },
+    {
+     "key": "10.1002/9781394464302.ch8",
+     "title": "Generative AI",
+     "year": 2026,
+     "doi": "10.1002/9781394464302.ch8",
+     "journal": "Testing Innovation Digital Modes and Models",
+     "type": "other"
+    },
+    {
+     "key": "10.4324/9781003463979-3",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.4324/9781003463979-3",
+     "journal": "AI Management System Certification According to the ISO/IEC 42001 Standard",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.4324/9781003591023-3",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.4324/9781003591023-3",
+     "journal": "Generative AI, Media, and Society",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1007/978-981-95-1378-9",
+     "title": "Generative AI",
+     "year": 2026,
+     "doi": "10.1007/978-981-95-1378-9",
+     "journal": "",
+     "type": "book"
+    },
+    {
+     "key": "10.1007/978-1-4842-9367-6",
+     "title": "Generative AI",
+     "year": 2023,
+     "doi": "10.1007/978-1-4842-9367-6",
+     "journal": "",
+     "type": "book"
+    },
+    {
+     "key": "10.1201/9781003533009-18",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.1201/9781003533009-18",
+     "journal": "Generative AI and Creativity",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.4337/9781035317189.ch241",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.4337/9781035317189.ch241",
+     "journal": "Encyclopedia of Sport Management",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.14742/apubs.2024.1408",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.14742/apubs.2024.1408",
+     "journal": "ASCILITE Publications",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.54337/nlc.v14i1.8091",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.54337/nlc.v14i1.8091",
+     "journal": "Proceedings of the International Conference on Networked Learning",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.4324/9781003665434",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.4324/9781003665434",
+     "journal": "",
+     "type": "monograph"
+    },
+    {
+     "key": "10.1201/9781003455905-16",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.1201/9781003455905-16",
+     "journal": "AI in Chemical Engineering",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.4018/979-8-3693-8557-9.ch002",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.4018/979-8-3693-8557-9.ch002",
+     "journal": "Advances in Computational Intelligence and Robotics",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1007/s12599-023-00834-7",
+     "title": "Generative AI",
+     "year": 2023,
+     "doi": "10.1007/s12599-023-00834-7",
+     "journal": "Business &amp; Information Systems Engineering",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.1201/9781003533160-6",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.1201/9781003533160-6",
+     "journal": "Augmented",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.1515/9783035629422-008",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.1515/9783035629422-008",
+     "journal": "Artificial Intelligence and Architecture",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.14742/apubs.2024.730",
+     "title": "Generative AI",
+     "year": 2024,
+     "doi": "10.14742/apubs.2024.730",
+     "journal": "ASCILITE Publications",
+     "type": "journal-article"
+    },
+    {
+     "key": "10.5040/9781350534797.187",
+     "title": "Generative AI",
+     "year": 2021,
+     "doi": "10.5040/9781350534797.187",
+     "journal": "Cite Them Right online - Chicago 18th",
+     "type": "other"
+    },
+    {
+     "key": "10.2139/ssrn.5425094",
+     "title": "Generative AI",
+     "year": 2025,
+     "doi": "10.2139/ssrn.5425094",
+     "journal": "",
+     "type": "posted-content"
+    },
+    {
+     "key": "10.5040/9781350928015.121",
+     "title": "Generative AI",
+     "year": 2021,
+     "doi": "10.5040/9781350928015.121",
+     "journal": "Cite Them Right online - MLA 9th",
+     "type": "other"
+    }
+   ]
+  },
+  {
+   "source": "OpenAlex",
+   "field": "search",
+   "query": "(\"AI fatigue\" OR \"artificial intelligence fatigue\" OR \"generative AI fatigue\" OR \"ChatGPT fatigue\" OR \"AI-induced fatigue\" OR \"AI-related fatigue\" OR \"chatbot fatigue\" OR \"GenAI fatigue\" OR \"AI exhaustion\" OR \"AI burnout\") AND (scale OR questionnaire OR inventory OR instrument OR psychometric OR validation OR \"factor analysis\")",
+   "status": "ok",
+   "total": 350,
+   "records": [
+    {
+     "key": "10.1371/journal.pone.0261271",
+     "title": "Validation and measurement invariance of the Occupational Depression Inventory in South Africa",
+     "year": 2021,
+     "doi": "10.1371/journal.pone.0261271",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.1590/1518-8345.2550.3022",
+     "title": "Burnout Syndrome and shift work among the nursing staff",
+     "year": 2018,
+     "doi": "10.1590/1518-8345.2550.3022",
+     "journal": "Revista Latino-Americana de Enfermagem",
+     "type": "article"
+    },
+    {
+     "key": "10.13075/ijomeh.1896.01323",
+     "title": "Occupational burnout and its overlapping effect with depression and anxiety",
+     "year": 2019,
+     "doi": "10.13075/ijomeh.1896.01323",
+     "journal": "International Journal of Occupational Medicine and Environmental Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/s10815-014-0352-7",
+     "title": "Embryologists’ health: a nationwide online questionnaire",
+     "year": 2014,
+     "doi": "10.1007/s10815-014-0352-7",
+     "journal": "Journal of Assisted Reproduction and Genetics",
+     "type": "article"
+    },
+    {
+     "key": "10.1590/s0080-623420150000200010",
+     "title": "Prevalence of Burnout syndrome in health professionals of an onco-hematological pediatric hospital",
+     "year": 2015,
+     "doi": "10.1590/s0080-623420150000200010",
+     "journal": "Revista da Escola de Enfermagem da USP",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12960-023-00886-6",
+     "title": "Engaging leadership and nurse well-being: the role of the work environment and work motivation—a cross-sectional study",
+     "year": 2024,
+     "doi": "10.1186/s12960-023-00886-6",
+     "journal": "Human Resources for Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1590/0034-7167-2019-0535",
+     "title": "Burnout Syndrome and Associated Factors in Intensive Care Unit Nurses",
+     "year": 2021,
+     "doi": "10.1590/0034-7167-2019-0535",
+     "journal": "Revista Brasileira de Enfermagem",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12913-017-2319-8",
+     "title": "Prevalence of and factors associated with burnout among health care professionals in Arab countries: a systematic review",
+     "year": 2017,
+     "doi": "10.1186/s12913-017-2319-8",
+     "journal": "BMC Health Services Research",
+     "type": "review"
+    },
+    {
+     "key": "10.1016/j.chbr.2026.101186",
+     "title": "AI fatigue in human–AI interaction: Conceptual framework, scale development and validation, and associations with AI engagement",
+     "year": 2026,
+     "doi": "10.1016/j.chbr.2026.101186",
+     "journal": "Computers in Human Behavior Reports",
+     "type": "article"
+    },
+    {
+     "key": "10.1109/scored68498.2025.11399092",
+     "title": "Dimensions of AI-Induced Fatigue Among Filipino Students: An Exploratory Study",
+     "year": 2025,
+     "doi": "10.1109/scored68498.2025.11399092",
+     "journal": "",
+     "type": "conference-paper"
+    },
+    {
+     "key": "10.1590/s1980-220x2018002103443",
+     "title": "Shift work of nursing professionals and blood pressure, burnout and common mental disorders",
+     "year": 2019,
+     "doi": "10.1590/s1980-220x2018002103443",
+     "journal": "Revista da Escola de Enfermagem da USP",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12889-019-7713-1",
+     "title": "Burnout among healthcare providers in the complex environment of the Middle East: a systematic review",
+     "year": 2019,
+     "doi": "10.1186/s12889-019-7713-1",
+     "journal": "BMC Public Health",
+     "type": "review"
+    },
+    {
+     "key": "10.1186/s12903-021-01766-y",
+     "title": "Work engagement and associated factors among dental nurses in China",
+     "year": 2021,
+     "doi": "10.1186/s12903-021-01766-y",
+     "journal": "BMC Oral Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12995-016-0091-z",
+     "title": "Burnout among young physicians and its association with physicians’ wishes to leave: results of a survey in Saxony, Germany",
+     "year": 2016,
+     "doi": "10.1186/s12995-016-0091-z",
+     "journal": "Journal of Occupational Medicine and Toxicology",
+     "type": "article"
+    },
+    {
+     "key": "10.56734/ijahss.v6n8a7",
+     "title": "Too Much, Too Fast: Understanding Ai Fatigue In The Digital Acceleration Era",
+     "year": 2025,
+     "doi": "10.56734/ijahss.v6n8a7",
+     "journal": "International Journal of Arts Humanities & Social Science",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpsyt.2023.1202048",
+     "title": "Resilience and stress as predictors of work engagement: the mediating role of self-efficacy in nurses",
+     "year": 2023,
+     "doi": "10.3389/fpsyt.2023.1202048",
+     "journal": "Frontiers in Psychiatry",
+     "type": "article"
+    },
+    {
+     "key": "10.26803/ijlter.25.5.5",
+     "title": "Defining AI Fatigue in Academic Contexts: Dimensions, Indicators, and a Stage-Based Model Using Grounded Theory",
+     "year": 2026,
+     "doi": "10.26803/ijlter.25.5.5",
+     "journal": "International Journal of Learning Teaching and Educational Research",
+     "type": "article"
+    },
+    {
+     "key": "10.26803/ijlter.25.3.29",
+     "title": "How do College Students Express AI Fatigue? A Content and Keyword-in-Context Analysis of Academic AI Use",
+     "year": 2026,
+     "doi": "10.26803/ijlter.25.3.29",
+     "journal": "International Journal of Learning Teaching and Educational Research",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/s12529-017-9638-3",
+     "title": "High Job Demands, Still Engaged and Not Burned Out? The Role of Job Crafting",
+     "year": 2017,
+     "doi": "10.1007/s12529-017-9638-3",
+     "journal": "International Journal of Behavioral Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.1590/s1980-220x2016023403235",
+     "title": "Occupational Burnout Syndrome in the nursing context: an integrative literature review",
+     "year": 2017,
+     "doi": "10.1590/s1980-220x2016023403235",
+     "journal": "Revista da Escola de Enfermagem da USP",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12888-020-02603-2",
+     "title": "Anxiety symptoms and burnout among Chinese medical staff of intensive care unit: the moderating effect of social support",
+     "year": 2020,
+     "doi": "10.1186/s12888-020-02603-2",
+     "journal": "BMC Psychiatry",
+     "type": "article"
+    },
+    {
+     "key": "10.1017/s0890060424000027",
+     "title": "Evaluating large-language-model chatbots to engage communities in large-scale design projects",
+     "year": 2024,
+     "doi": "10.1017/s0890060424000027",
+     "journal": "Artificial intelligence for engineering design analysis and manufacturing",
+     "type": "article"
+    },
+    {
+     "key": "10.2147/rmhp.s395918",
+     "title": "Relationships Between Perceived Organizational Support, Psychological Capital and Work Engagement Among Chinese Infection Control Nurses",
+     "year": 2023,
+     "doi": "10.2147/rmhp.s395918",
+     "journal": "Risk Management and Healthcare Policy",
+     "type": "article"
+    },
+    {
+     "key": "10.5116/ijme.5e3e.7f16",
+     "title": "Work engagement, job satisfaction, and turnover intentions among family medicine residency program managers",
+     "year": 2020,
+     "doi": "10.5116/ijme.5e3e.7f16",
+     "journal": "International Journal of Medical Education",
+     "type": "article"
+    },
+    {
+     "key": "10.1136/bmjopen-2017-021366",
+     "title": "Identifying cut-off scores for job demands and job control in nursing professionals: a cross-sectional survey in Germany",
+     "year": 2018,
+     "doi": "10.1136/bmjopen-2017-021366",
+     "journal": "BMJ Open",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12909-023-04604-7",
+     "title": "Exploring the relationship between burnout and emotional intelligence among academics and clinicians at King Saud University",
+     "year": 2023,
+     "doi": "10.1186/s12909-023-04604-7",
+     "journal": "BMC Medical Education",
+     "type": "article"
+    },
+    {
+     "key": "10.13174/pjambp.07.12.2020.01",
+     "title": "POLISH ADAPTATION OF THE COPENHAGEN PSYCHOSOCIAL QUESTIONNAIRE II (COPSOQ II) IN POLISH PRISON SERVICE STAFF - A TOOL FOR PSYCHOSOCIAL RISK ASSESSMENT AT THE WORKPLACE",
+     "year": 2020,
+     "doi": "10.13174/pjambp.07.12.2020.01",
+     "journal": "The Polish Journal of Aviation Medicine Bioengineering and Psychology",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12889-021-10453-0",
+     "title": "Psychological and physiological stress and burnout among maternity providers in a rural county in Kenya: individual and situational predictors",
+     "year": 2021,
+     "doi": "10.1186/s12889-021-10453-0",
+     "journal": "BMC Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.12957/reuerj.2017.28842",
+     "title": "Estresse ocupacional e burnout em enfermeiros de um serviço de emergência: a organização do trabalho [Occupational stress and burnout in nurses of an emergency service: the organization of work]",
+     "year": 2017,
+     "doi": "10.12957/reuerj.2017.28842",
+     "journal": "Revista Enfermagem UERJ",
+     "type": "article"
+    },
+    {
+     "key": "10.5205/1981-8963.2019.241609",
+     "title": "Risco de Síndrome de Burnout em enfermeiros da saúde mental",
+     "year": 2019,
+     "doi": "10.5205/1981-8963.2019.241609",
+     "journal": "Revista de Enfermagem UFPE on line",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/s12160-016-9830-8",
+     "title": "Just-in-Time Adaptive Interventions (JITAIs) in Mobile Health: Key Components and Design Principles for Ongoing Health Behavior Support",
+     "year": 2016,
+     "doi": "10.1007/s12160-016-9830-8",
+     "journal": "Annals of Behavioral Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.1016/j.shaw.2022.07.001",
+     "title": "The Moderating Role of Emotional Intelligence on the Relationship Between Conflict Management Styles and Burnout among Firefighters",
+     "year": 2022,
+     "doi": "10.1016/j.shaw.2022.07.001",
+     "journal": "Safety and Health at Work",
+     "type": "article"
+    },
+    {
+     "key": "10.5327/z1679443520180127",
+     "title": "Burnout e a organização do trabalho na Enfermagem",
+     "year": 2018,
+     "doi": "10.5327/z1679443520180127",
+     "journal": "Revista Brasileira de Medicina do Trabalho",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12912-024-02313-0",
+     "title": "Effects of job demands, job resources, personal resources on night-shift alertness of ICU shift nurses: a cross‑sectional survey study based on the job demands-resources model",
+     "year": 2024,
+     "doi": "10.1186/s12912-024-02313-0",
+     "journal": "BMC Nursing",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpubh.2025.1658020",
+     "title": "How does physical activity alleviate nurse job burnout? The important role of recovery experiences",
+     "year": 2025,
+     "doi": "10.3389/fpubh.2025.1658020",
+     "journal": "Frontiers in Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1590/1981-52712015v42n2rb20170112",
+     "title": "Engajamento entre Estudantes do Ensino Superior nas Ciências da Saúde (Validação do Questionário Ultrecht Work Engagement Scale (UWES-S) com Estudantes do Ensino Superior nas Ciências da Saúde)",
+     "year": 2018,
+     "doi": "10.1590/1981-52712015v42n2rb20170112",
+     "journal": "Revista Brasileira de Educação Médica",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0258100",
+     "title": "Burnout, does the university entrance test failing attribute? A Bangladeshi exploratory study",
+     "year": 2021,
+     "doi": "10.1371/journal.pone.0258100",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpsyt.2019.00166",
+     "title": "Effect Modification by Attention Deficit Hyperactivity Disorder (ADHD) Symptoms on the Association of Psychosocial Work Environments With Psychological Distress and Work Engagement",
+     "year": 2019,
+     "doi": "10.3389/fpsyt.2019.00166",
+     "journal": "Frontiers in Psychiatry",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s40359-023-01402-0",
+     "title": "Are algorithmically controlled gig workers deeply burned out? An empirical study on employee work engagement",
+     "year": 2023,
+     "doi": "10.1186/s40359-023-01402-0",
+     "journal": "BMC Psychology",
+     "type": "article"
+    },
+    {
+     "key": "10.1212/wnl.0000000000002911",
+     "title": "Residency Training: Work engagement during neurology training",
+     "year": 2016,
+     "doi": "10.1212/wnl.0000000000002911",
+     "journal": "Neurology",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12912-025-03780-9",
+     "title": "The relationship between oncology nurses’ emotional intelligence, burnout, and patient-centered communication: a cross-sectional study",
+     "year": 2025,
+     "doi": "10.1186/s12912-025-03780-9",
+     "journal": "BMC Nursing",
+     "type": "article"
+    },
+    {
+     "key": "10.1097/jom.0000000000001132",
+     "title": "Not Extent of Telecommuting, But Job Characteristics as Proximal Predictors of Work-Related Well-Being",
+     "year": 2017,
+     "doi": "10.1097/jom.0000000000001132",
+     "journal": "Journal of Occupational and Environmental Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpubh.2022.1019635",
+     "title": "Burnout, depression, anxiety and insomnia among medical staff during the COVID-19 epidemic in Shanghai",
+     "year": 2023,
+     "doi": "10.3389/fpubh.2022.1019635",
+     "journal": "Frontiers in Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/978-3-030-94212-0_4",
+     "title": "Quantifying Energy and Fatigue: Classification and Assessment of Energy and Fatigue Using Subjective, Objective, and Mixed Methods towards Health and Quality of Life",
+     "year": 2022,
+     "doi": "10.1007/978-3-030-94212-0_4",
+     "journal": "Health informatics",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.7705/biomedica.6158",
+     "title": "Clima de aprendizaje y enganche al trabajo del residente clínico: relación con la autodeterminación humana",
+     "year": 2022,
+     "doi": "10.7705/biomedica.6158",
+     "journal": "Biomédica",
+     "type": "article"
+    },
+    {
+     "key": "10.36472/msd.v10i10.1084",
+     "title": "Assessment of Cynicism and Burnout Syndrome Among Nurses; A Descriptive Study",
+     "year": 2023,
+     "doi": "10.36472/msd.v10i10.1084",
+     "journal": "Medical Science and Discovery",
+     "type": "article"
+    },
+    {
+     "key": "10.5116/ijme.622d.e2f6",
+     "title": "Supervisors’ transformational leadership style and residents’ job crafting in surgical training: the residents’ views",
+     "year": 2022,
+     "doi": "10.5116/ijme.622d.e2f6",
+     "journal": "International Journal of Medical Education",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0255191",
+     "title": "Factors influencing study engagement during the COVID-19 pandemic: A cross-sectional study among health and social professions students",
+     "year": 2021,
+     "doi": "10.1371/journal.pone.0255191",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.9734/ajmah/2023/v21i9853",
+     "title": "Prevalence of Burnout Syndrome among Working Physicians in Family Health Centres and Units in Port Said Governorate",
+     "year": 2023,
+     "doi": "10.9734/ajmah/2023/v21i9853",
+     "journal": "Asian Journal of Medicine and Health",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpsyt.2024.1392811",
+     "title": "Organizational support enhances nurses’ work-family enrichment: a person–context interactionist perspective",
+     "year": 2024,
+     "doi": "10.3389/fpsyt.2024.1392811",
+     "journal": "Frontiers in Psychiatry",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0271195",
+     "title": "Promoting teaching innovation of Chinese public-school teachers by team temporal leadership: The mediation of job autonomy and the moderation of work stress",
+     "year": 2022,
+     "doi": "10.1371/journal.pone.0271195",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.21227/94rd-ny74",
+     "title": "\"AI-Fatigue-SEM-PLS-15000: A Large-Scale Dataset for Modeling Artificial Intelligence Fatigue in AI-Assisted Learning Environment\"",
+     "year": 2026,
+     "doi": "10.21227/94rd-ny74",
+     "journal": "IEEE DataPort",
+     "type": "dataset"
+    },
+    {
+     "key": "10.1097/ijg.0000000000002163",
+     "title": "Usability and Clinician Acceptance of a Deep Learning-Based Clinical Decision Support Tool for Predicting Glaucomatous Visual Field Progression",
+     "year": 2022,
+     "doi": "10.1097/ijg.0000000000002163",
+     "journal": "Journal of Glaucoma",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12909-025-07435-w",
+     "title": "Revamping the educational environment and engagement: How ACGME-I accreditation transforming training programs in Qatar",
+     "year": 2025,
+     "doi": "10.1186/s12909-025-07435-w",
+     "journal": "BMC Medical Education",
+     "type": "article"
+    },
+    {
+     "key": "10.31363/2313-7053-2022-56-1-63-78",
+     "title": "Characteristics and determinants of professional burnout among early career psychiatrists in Russia — results of a cross-sectional study",
+     "year": 2022,
+     "doi": "10.31363/2313-7053-2022-56-1-63-78",
+     "journal": "V M BEKHTEREV REVIEW OF PSYCHIATRY AND MEDICAL PSYCHOLOGY",
+     "type": "article"
+    },
+    {
+     "key": "10.52507/2345-1106.2021-2.32",
+     "title": "Burnout syndrome in medical staff",
+     "year": 2021,
+     "doi": "10.52507/2345-1106.2021-2.32",
+     "journal": "Vector European",
+     "type": "article"
+    },
+    {
+     "key": "10.2174/0118744346312308240905052110",
+     "title": "Cultivating Work Engagement and its Related Factors in Saudi Nurses: A Cross-Sectional Study",
+     "year": 2024,
+     "doi": "10.2174/0118744346312308240905052110",
+     "journal": "The Open Nursing Journal",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0321055",
+     "title": "Job satisfaction mediates the effect of self-efficacy on work engagement among physical education teachers in economically disadvantaged areas",
+     "year": 2025,
+     "doi": "10.1371/journal.pone.0321055",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.2147/prbm.s359624",
+     "title": "Moderating Effects of Self-Efficacy and Time Pressure on the Relationship Between Employee Aging and Work Performance",
+     "year": 2022,
+     "doi": "10.2147/prbm.s359624",
+     "journal": "Psychology Research and Behavior Management",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0278457",
+     "title": "Individual and situational predictors of psychological and physiological stress and burnout among maternity providers in Northern Ghana",
+     "year": 2022,
+     "doi": "10.1371/journal.pone.0278457",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0285345",
+     "title": "Impact of workplace bullying on work engagement among early career employees",
+     "year": 2023,
+     "doi": "10.1371/journal.pone.0285345",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.1002/crt2.41",
+     "title": "Development of a Mitochondrial Myopathy‐Composite Assessment Tool",
+     "year": 2021,
+     "doi": "10.1002/crt2.41",
+     "journal": "JCSM Clinical Reports",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12995-021-00294-3",
+     "title": "Comparing burnout and work-life balance among specialists in internal medicine: the role of inpatient vs. outpatient workplace",
+     "year": 2021,
+     "doi": "10.1186/s12995-021-00294-3",
+     "journal": "Journal of Occupational Medicine and Toxicology",
+     "type": "article"
+    },
+    {
+     "key": "10.21203/rs.3.rs-243167/v1",
+     "title": "Work Engagement and Associated Factors Among Dental Nurses in China",
+     "year": 2021,
+     "doi": "10.21203/rs.3.rs-243167/v1",
+     "journal": "Research Square",
+     "type": "preprint"
+    },
+    {
+     "key": "10.1186/s12912-025-03058-0",
+     "title": "Impact of job crafting and work engagement on the mental and physical health of palliative care nurses",
+     "year": 2025,
+     "doi": "10.1186/s12912-025-03058-0",
+     "journal": "BMC Nursing",
+     "type": "article"
+    },
+    {
+     "key": "10.65564/pjim.cf10819761",
+     "title": "Degree Of Burnout and Its Association with Depression, Anxiety and Stress Among Health Care Workers in a Tertiary Hospital in Mandaue City During The COVID-19 Pandemic",
+     "year": 2022,
+     "doi": "10.65564/pjim.cf10819761",
+     "journal": "Philippine Journal of Internal Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpubh.2024.1437112",
+     "title": "Sensitivity analysis of human error in the steel industry: exploring the effects of psychosocial and mental health risk factors and burnout using Bayesian networks",
+     "year": 2024,
+     "doi": "10.3389/fpubh.2024.1437112",
+     "journal": "Frontiers in Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12913-021-06413-4",
+     "title": "Effectiveness of a group intervention to reduce the psychological distress of healthcare staff: a pre-post quasi-experimental evaluation",
+     "year": 2021,
+     "doi": "10.1186/s12913-021-06413-4",
+     "journal": "BMC Health Services Research",
+     "type": "article"
+    },
+    {
+     "key": "10.23749/mdl.v112i3.9907",
+     "title": "How workers’ emotional dissonance explains the association between customers’ relations, burnout and health in an Italian supermarket chain",
+     "year": 2021,
+     "doi": "10.23749/mdl.v112i3.9907",
+     "journal": "La Medicina del lavoro",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12888-020-02673-2",
+     "title": "The role of social support and emotional exhaustion in the association between work-family conflict and anxiety symptoms among female medical staff: a moderated mediation model",
+     "year": 2020,
+     "doi": "10.1186/s12888-020-02673-2",
+     "journal": "BMC Psychiatry",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0172291",
+     "title": "The impact of job and family demands on partner’s fatigue: A study of Japanese dual-earner parents",
+     "year": 2017,
+     "doi": "10.1371/journal.pone.0172291",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.2147/rmhp.s330217",
+     "title": "Explaining Job Satisfaction Among Residents in Standardized Residency Training Programs: A Serial Multiple Mediation Model",
+     "year": 2021,
+     "doi": "10.2147/rmhp.s330217",
+     "journal": "Risk Management and Healthcare Policy",
+     "type": "article"
+    },
+    {
+     "key": "10.2147/prbm.s448844",
+     "title": "Challenge-Hindrance Stressors and Academic Engagement Among Medical Postgraduates in China: A Moderated Mediation Model",
+     "year": 2024,
+     "doi": "10.2147/prbm.s448844",
+     "journal": "Psychology Research and Behavior Management",
+     "type": "article"
+    },
+    {
+     "key": "10.31234/osf.io/kp7zs_v1",
+     "title": "AI Fatigue in Human–AI Interaction: Conceptual Framework, Scale Development and Validation, and Associations with AI Engagement",
+     "year": 2026,
+     "doi": "10.31234/osf.io/kp7zs_v1",
+     "journal": "",
+     "type": "preprint"
+    },
+    {
+     "key": "10.2478/fon-2022-0048",
+     "title": "Predictive roles of organizational and personal factors in work engagement among nurses",
+     "year": 2022,
+     "doi": "10.2478/fon-2022-0048",
+     "journal": "Frontiers of Nursing",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0225103",
+     "title": "Who is more susceptible to job stressors and resources? Sensory-processing sensitivity as a personal resource and vulnerability factor",
+     "year": 2019,
+     "doi": "10.1371/journal.pone.0225103",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.37464/2020.384.355",
+     "title": "Reflective practice groups and nurse professional quality of life",
+     "year": 2021,
+     "doi": "10.37464/2020.384.355",
+     "journal": "Australian journal of advanced nursing",
+     "type": "article"
+    },
+    {
+     "key": "10.1136/bmjopen-2019-030142",
+     "title": "Mental well-being and job satisfaction in general practitioners in Denmark and their patients’ change of general practitioner: a cohort study combining survey data and register data",
+     "year": 2019,
+     "doi": "10.1136/bmjopen-2019-030142",
+     "journal": "BMJ Open",
+     "type": "article"
+    },
+    {
+     "key": "10.1016/j.jtumed.2019.04.006",
+     "title": "Exploring nurses' work-related stress in an acute care hospital in KSA",
+     "year": 2019,
+     "doi": "10.1016/j.jtumed.2019.04.006",
+     "journal": "Journal of Taibah University Medical Sciences",
+     "type": "article"
+    },
+    {
+     "key": "10.63282/3050-9416.ijaibdcms-v5i4p106",
+     "title": "Using LLMs as Incident Prevention Copilots in Cloud Infrastructure",
+     "year": 2024,
+     "doi": "10.63282/3050-9416.ijaibdcms-v5i4p106",
+     "journal": "International Journal of AI BigData Computational and Management Studies",
+     "type": "article"
+    },
+    {
+     "key": "10.3390/nursrep15110373",
+     "title": "Passive AI Detection of Stress and Burnout Among Frontline Workers",
+     "year": 2025,
+     "doi": "10.3390/nursrep15110373",
+     "journal": "Nursing Reports",
+     "type": "article"
+    },
+    {
+     "key": "10.5281/zenodo.21053220",
+     "title": "ResearchBox 6748, 'AI Fatigue Scale', https://researchbox.org/6748",
+     "year": 2026,
+     "doi": "10.5281/zenodo.21053220",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "other"
+    },
+    {
+     "key": "10.5281/zenodo.21053221",
+     "title": "ResearchBox 6748, 'AI Fatigue Scale', https://researchbox.org/6748",
+     "year": 2026,
+     "doi": "10.5281/zenodo.21053221",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "other"
+    },
+    {
+     "key": "10.1371/journal.pone.0295305",
+     "title": "Factors affecting job performance of Sri Lankan IT professionals working from home",
+     "year": 2023,
+     "doi": "10.1371/journal.pone.0295305",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fmed.2023.1125133",
+     "title": "Burnout syndrome and work engagement in nursing staff: a systematic review and meta-analysis",
+     "year": 2023,
+     "doi": "10.3389/fmed.2023.1125133",
+     "journal": "Frontiers in Medicine",
+     "type": "review"
+    },
+    {
+     "key": "10.1007/s44217-025-00937-1",
+     "title": "Applying job demands resources theory to innovative work behavior in early childhood education via structural equation modeling",
+     "year": 2025,
+     "doi": "10.1007/s44217-025-00937-1",
+     "journal": "Discover Education",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0259800",
+     "title": "The mediating role of residents’ wellbeing between program leadership and quality of care: A cross-sectional study",
+     "year": 2021,
+     "doi": "10.1371/journal.pone.0259800",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.5812/mejrh-139573",
+     "title": "Structural Equation Model for Nursing’s Spiritual Commitment, Religious Adaptation, and Their Relationship to Quality of Life and Burnout",
+     "year": 2023,
+     "doi": "10.5812/mejrh-139573",
+     "journal": "Middle East Journal of Rehabilitation and Health Studies",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpubh.2022.908921",
+     "title": "Job demands, resources, and task performance in Chinese social workers: Roles of burnout and work engagement",
+     "year": 2022,
+     "doi": "10.3389/fpubh.2022.908921",
+     "journal": "Frontiers in Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.11591/ijai.v15.i2.pp1963-1971",
+     "title": "AI-induced fatigue among students in higher education: a latent profile analysis",
+     "year": 2026,
+     "doi": "10.11591/ijai.v15.i2.pp1963-1971",
+     "journal": "IAES International Journal of Artificial Intelligence",
+     "type": "article"
+    },
+    {
+     "key": "10.47895/amp.vi0.4426",
+     "title": "Relationship of Work Engagement with Nurse-work and Patient Outcomes among Nurses in Central Philippines",
+     "year": 2022,
+     "doi": "10.47895/amp.vi0.4426",
+     "journal": "Acta Medica Philippina",
+     "type": "article"
+    },
+    {
+     "key": "10.1108/trc-12-2021-0026",
+     "title": "Effect of hotel overall service quality on customers’ attitudinal and behavioural loyalty: perspectives from Zimbabwe",
+     "year": 2022,
+     "doi": "10.1108/trc-12-2021-0026",
+     "journal": "Tourism Critiques Practice and Theory",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12995-021-00303-5",
+     "title": "Effects of person-environment fit of gender-role orientation on burnout, engagement and hair steroids as stress biomarkers among women",
+     "year": 2021,
+     "doi": "10.1186/s12995-021-00303-5",
+     "journal": "Journal of Occupational Medicine and Toxicology",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0155884",
+     "title": "Fatigue following Acute Q-Fever: A Systematic Literature Review",
+     "year": 2016,
+     "doi": "10.1371/journal.pone.0155884",
+     "journal": "PLoS ONE",
+     "type": "review"
+    },
+    {
+     "key": "10.21203/rs.3.rs-52900/v1",
+     "title": "Transformational leadership encourages residents’ job crafting in surgical training: A mixed-methods study of residents’ perceptions",
+     "year": 2020,
+     "doi": "10.21203/rs.3.rs-52900/v1",
+     "journal": "",
+     "type": "preprint"
+    },
+    {
+     "key": "10.56011/mind-mri-143-20259",
+     "title": "The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education",
+     "year": 2025,
+     "doi": "10.56011/mind-mri-143-20259",
+     "journal": "Mind and Society",
+     "type": "article"
+    },
+    {
+     "key": "10.5281/zenodo.22566309",
+     "title": "Synthetonia: Tonal Strain as a Candidate Facet of AI Fatigue",
+     "year": 2026,
+     "doi": "10.5281/zenodo.22566309",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "preprint"
+    },
+    {
+     "key": "10.5281/zenodo.22928281",
+     "title": "Synthetonia: Tonal Strain as a Candidate Facet of AI Fatigue",
+     "year": 2026,
+     "doi": "10.5281/zenodo.22928281",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "preprint"
+    },
+    {
+     "key": "10.5281/zenodo.22566310",
+     "title": "Synthetonia: Tonal Strain as a Candidate Facet of AI Fatigue",
+     "year": 2026,
+     "doi": "10.5281/zenodo.22566310",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "preprint"
+    },
+    {
+     "key": "10.1136/bmjopen-2024-089885",
+     "title": "Gender differences in burnout among US nurse leaders during COVID-19 pandemic: an online cross-sectional survey study",
+     "year": 2024,
+     "doi": "10.1136/bmjopen-2024-089885",
+     "journal": "BMJ Open",
+     "type": "article"
+    },
+    {
+     "key": "10.25259/ijpc_155_2025",
+     "title": "Burnout among Palliative Care Physicians in India: A Multicentric Cross-sectional Study",
+     "year": 2025,
+     "doi": "10.25259/ijpc_155_2025",
+     "journal": "Indian Journal of Palliative Care",
+     "type": "article"
+    },
+    {
+     "key": "10.1016/j.jen.2024.10.007",
+     "title": "Job-Related Factors Associated with Burnout and Work Engagement in Emergency Nurses: Evidence to Inform Systems-Focused Interventions",
+     "year": 2024,
+     "doi": "10.1016/j.jen.2024.10.007",
+     "journal": "Journal of Emergency Nursing",
+     "type": "article"
+    },
+    {
+     "key": "10.48550/arxiv.2605.23123",
+     "title": "Defining AI Fatigue in Academic Contexts: Dimensions, Indicators, and a Stage-Based Model Using Grounded Theory",
+     "year": 2026,
+     "doi": "10.48550/arxiv.2605.23123",
+     "journal": "arXiv (Cornell University)",
+     "type": "preprint"
+    },
+    {
+     "key": "10.31234/osf.io/jqxh9_v1",
+     "title": "AI Learning Strategies Scale: Development and Validation for Individual Differences in Self-Regulated Learning with AI",
+     "year": 2026,
+     "doi": "10.31234/osf.io/jqxh9_v1",
+     "journal": "",
+     "type": "preprint"
+    },
+    {
+     "key": "10.3399/bjgpo.2023.0171",
+     "title": "Multidimensional factors of burnout in general practice: a cross sectional survey",
+     "year": 2024,
+     "doi": "10.3399/bjgpo.2023.0171",
+     "journal": "BJGP Open",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12913-023-09680-5",
+     "title": "Work engagement among health professionals in public health facilities of Bench-Sheko zone, southwest Ethiopia",
+     "year": 2023,
+     "doi": "10.1186/s12913-023-09680-5",
+     "journal": "BMC Health Services Research",
+     "type": "article"
+    },
+    {
+     "key": "10.3122/jabfm.2018.05.180203",
+     "title": "Family Medicine Hospitalists Three Years Out of Residency: Career Flexibility or a Threat to Office-Based Family Medicine?",
+     "year": 2018,
+     "doi": "10.3122/jabfm.2018.05.180203",
+     "journal": "The Journal of the American Board of Family Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpubh.2023.1220301",
+     "title": "Workplace wellbeing among health care workers providing HIV services in primary care in Johannesburg: a mixed methods study",
+     "year": 2023,
+     "doi": "10.3389/fpubh.2023.1220301",
+     "journal": "Frontiers in Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1101/2024.07.18.24310656",
+     "title": "Impact of Ambient Artificial Intelligence Notes on Provider Burnout",
+     "year": 2024,
+     "doi": "10.1101/2024.07.18.24310656",
+     "journal": "medRxiv",
+     "type": "preprint"
+    },
+    {
+     "key": "10.48550/arxiv.2609.00506",
+     "title": "RecalibrateGPT: AI Fatigue Resilient Conversational Interfaces",
+     "year": 2026,
+     "doi": "10.48550/arxiv.2609.00506",
+     "journal": "arXiv (Cornell University)",
+     "type": "preprint"
+    },
+    {
+     "key": "10.47191/etj/v10i04.09",
+     "title": "AI-Driven Burnout Management System: A Novel Approach Using Generative AI, MongoDB Atlas, Python, And Training Large Language Models (LLMs) - Version 3",
+     "year": 2025,
+     "doi": "10.47191/etj/v10i04.09",
+     "journal": "Engineering and Technology Journal",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12912-025-03586-9",
+     "title": "What matters most? Identifying key resource gain and loss factors affecting nurses’ work engagement and job burnout in digital healthcare contexts",
+     "year": 2025,
+     "doi": "10.1186/s12912-025-03586-9",
+     "journal": "BMC Nursing",
+     "type": "article"
+    },
+    {
+     "key": "10.26481/dis.20210223ld",
+     "title": "Persistence in surgical training",
+     "year": 2021,
+     "doi": "10.26481/dis.20210223ld",
+     "journal": "",
+     "type": "dissertation"
+    },
+    {
+     "key": "10.1016/j.ymssp.2015.02.016",
+     "title": "A review on prognostic techniques for non-stationary and non-linear rotating systems",
+     "year": 2015,
+     "doi": "10.1016/j.ymssp.2015.02.016",
+     "journal": "Mechanical Systems and Signal Processing",
+     "type": "article"
+    },
+    {
+     "key": "10.12775/qs.2026.54.70890",
+     "title": "AI Fatigue and Mental Health Implications: A Comprehensive Literature Review",
+     "year": 2026,
+     "doi": "10.12775/qs.2026.54.70890",
+     "journal": "Quality in Sport",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/s12160-015-9746-8",
+     "title": "Stressors, Appraisal of Stressors, Experienced Stress and Cardiac Response: A Real-Time, Real-Life Investigation of Work Stress in Nurses",
+     "year": 2015,
+     "doi": "10.1007/s12160-015-9746-8",
+     "journal": "Annals of Behavioral Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12913-026-14158-1",
+     "title": "Intensified job demands among general practitioners in Finland: associations with work engagement, job satisfaction, and recovery",
+     "year": 2026,
+     "doi": "10.1186/s12913-026-14158-1",
+     "journal": "BMC Health Services Research",
+     "type": "article"
+    },
+    {
+     "key": "10.32604/ijmhp.2025.068251",
+     "title": "Protecting the Mental Health of Esports Players: A Qualitative Case Study on Their Stress, Coping Strategies, and Social Support Systems",
+     "year": 2025,
+     "doi": "10.32604/ijmhp.2025.068251",
+     "journal": "International Journal of Mental Health Promotion",
+     "type": "article"
+    },
+    {
+     "key": "10.31098/ijebce.v6i1.3454",
+     "title": "Human-AI Resilience in Project Management: A Framework For Post-Ai Digital Transformation",
+     "year": 2026,
+     "doi": "10.31098/ijebce.v6i1.3454",
+     "journal": "International Journal of Entrepreneurship Business and Creative Economy",
+     "type": "article"
+    },
+    {
+     "key": "10.5281/zenodo.17772700",
+     "title": "A Control-Theoretic Approach to GenAI Fatigue: \\\\ A Systemic Constraint-Compliance Model ($\\mathbf{sC}^2\\mathbf{M}$) Framework with PI-inspired Governance",
+     "year": 2025,
+     "doi": "10.5281/zenodo.17772700",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "preprint"
+    },
+    {
+     "key": "10.5281/zenodo.17772701",
+     "title": "A Control-Theoretic Approach to GenAI Fatigue: \\\\ A Systemic Constraint-Compliance Model ($\\mathbf{sC}^2\\mathbf{M}$) Framework with PI-inspired Governance",
+     "year": 2025,
+     "doi": "10.5281/zenodo.17772701",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "preprint"
+    },
+    {
+     "key": "10.1371/journal.pone.0249457",
+     "title": "Determinants of content marketing effectiveness: Conceptual framework and empirical findings from a managerial perspective",
+     "year": 2021,
+     "doi": "10.1371/journal.pone.0249457",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.34172/rdme.2023.33127",
+     "title": "Burnout and professional commitment in medical faculty students in Türkiye: A cross-sectional analysis",
+     "year": 2023,
+     "doi": "10.34172/rdme.2023.33127",
+     "journal": "Research and Development in Medical Education",
+     "type": "article"
+    },
+    {
+     "key": "10.47772/ijriss.2026.102400020",
+     "title": "Digital-Age Psychosocial Strain: A Systematic Literature Review of Conceptual Dimensions, Measurement Approaches, and Emerging Research Directions",
+     "year": 2026,
+     "doi": "10.47772/ijriss.2026.102400020",
+     "journal": "International Journal of Research and Innovation in Social Science",
+     "type": "review"
+    },
+    {
+     "key": "10.3389/fpsyt.2023.1289906",
+     "title": "Effect of fear of missing out on learning burnout in medical students: a moderated mediation",
+     "year": 2023,
+     "doi": "10.3389/fpsyt.2023.1289906",
+     "journal": "Frontiers in Psychiatry",
+     "type": "article"
+    },
+    {
+     "key": "10.21203/rs.3.rs-5038512/v1",
+     "title": "Influencing Factors of Nurses’ Work Engagement and Job Burnout in the Context of ICT Use: A Perspective from COR Theory",
+     "year": 2025,
+     "doi": "10.21203/rs.3.rs-5038512/v1",
+     "journal": "Research Square",
+     "type": "preprint"
+    },
+    {
+     "key": "",
+     "title": "The Frequency and Intensity of Job Burnout and Its Determinants in First Level Healthcare Employees in Islamabad- e Gharb in 2015",
+     "year": 2018,
+     "doi": "",
+     "journal": "Research Information System of Ardabil University of Medical Sciences (Ardabil University of Medical Sciences)",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/s43621-025-01224-7",
+     "title": "The impact of online social capital on innovative job performance: mediated by work engagement",
+     "year": 2025,
+     "doi": "10.1007/s43621-025-01224-7",
+     "journal": "Discover Sustainability",
+     "type": "article"
+    },
+    {
+     "key": "10.2147/rmhp.s392523",
+     "title": "Hospital Work Conditions and the Mediation Role of Burnout: Residents and Practicing Physicians Reporting Adverse Events",
+     "year": 2023,
+     "doi": "10.2147/rmhp.s392523",
+     "journal": "Risk Management and Healthcare Policy",
+     "type": "article"
+    },
+    {
+     "key": "10.64091/atihl.2025.000116",
+     "title": "Assessing the Effectiveness of AI Chatbots in Reducing No-Shows and Improving Patient Satisfaction in U.S. Primary and Specialized Health Care",
+     "year": 2025,
+     "doi": "10.64091/atihl.2025.000116",
+     "journal": "AVE Trends in Intelligent Health Letters",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/frcha.2024.1269606",
+     "title": "High school students' social media use predicts school engagement and burnout: the moderating role of social media self-control",
+     "year": 2024,
+     "doi": "10.3389/frcha.2024.1269606",
+     "journal": "Frontiers in Child and Adolescent Psychiatry",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpubh.2022.1018599",
+     "title": "“Doing good and feeling good” Relationship between authentic leadership with followers' work engagement: The mediating role of hedonic and eudaimonic wellbeing",
+     "year": 2022,
+     "doi": "10.3389/fpubh.2022.1018599",
+     "journal": "Frontiers in Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s40359-024-01854-y",
+     "title": "RETRACTED ARTICLE: Pets at work: integrating pet-friendly initiatives into human resources for enhanced workplace harmony",
+     "year": 2024,
+     "doi": "10.1186/s40359-024-01854-y",
+     "journal": "BMC Psychology",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12912-023-01568-3",
+     "title": "Job demand and job resource factors explaining stress and job satisfaction among home care nurses – a mixed-methods sequential explanatory study",
+     "year": 2023,
+     "doi": "10.1186/s12912-023-01568-3",
+     "journal": "BMC Nursing",
+     "type": "article"
+    },
+    {
+     "key": "10.5281/zenodo.18180962",
+     "title": "PUE_326: AI Drift Detection Dataset (r=-0.95)",
+     "year": 2026,
+     "doi": "10.5281/zenodo.18180962",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "dataset"
+    },
+    {
+     "key": "10.47772/ijriss.2025.910000615",
+     "title": "Between Cognitive Overload and Dehumanization: Exploring the Dimensions of Consumer Fatigue with Artificial Intelligence",
+     "year": 2025,
+     "doi": "10.47772/ijriss.2025.910000615",
+     "journal": "International Journal of Research and Innovation in Social Science",
+     "type": "article"
+    },
+    {
+     "key": "10.5281/zenodo.18180961",
+     "title": "PUE_326: AI Drift Detection Dataset (r=-0.95)",
+     "year": 2026,
+     "doi": "10.5281/zenodo.18180961",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "dataset"
+    },
+    {
+     "key": "10.3389/fpubh.2023.1183483",
+     "title": "Health-related quality of life in Chinese medical staff: a latent profile analysis",
+     "year": 2023,
+     "doi": "10.3389/fpubh.2023.1183483",
+     "journal": "Frontiers in Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.59429/esp.v9i11.3280",
+     "title": "Investigating Macao migrant workers’ job burnout in food and beverage industry: A perceived stigma perspective",
+     "year": 2024,
+     "doi": "10.59429/esp.v9i11.3280",
+     "journal": "Environment and Social Psychology",
+     "type": "article"
+    },
+    {
+     "key": "10.1016/j.mayocp.2021.03.039",
+     "title": "How Feedback Is Given Matters: A Cross-Sectional Survey of Patient Satisfaction Feedback Delivery and Physician Well-being",
+     "year": 2021,
+     "doi": "10.1016/j.mayocp.2021.03.039",
+     "journal": "Mayo Clinic Proceedings",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fneur.2024.1485799",
+     "title": "Harnessing artificial intelligence for the diagnosis and treatment of neurological emergencies: a comprehensive review of recent advances and future directions",
+     "year": 2024,
+     "doi": "10.3389/fneur.2024.1485799",
+     "journal": "Frontiers in Neurology",
+     "type": "article"
+    },
+    {
+     "key": "10.46634/riics.350",
+     "title": "Occupational Health Conditions Among Healthcare Workers During the COVID-19 Pandemic",
+     "year": 2025,
+     "doi": "10.46634/riics.350",
+     "journal": "Revista de Investigación e Innovación en Ciencias de la Salud",
+     "type": "article"
+    },
+    {
+     "key": "10.1016/j.zefq.2021.09.008",
+     "title": "Wie sind Schlüsselressourcen und -anforderungen mit dem Arbeitsengagement Pflegender während der COVID-19-Pandemie assoziiert? Eine Querschnittstudie",
+     "year": 2021,
+     "doi": "10.1016/j.zefq.2021.09.008",
+     "journal": "Zeitschrift für Evidenz Fortbildung und Qualität im Gesundheitswesen",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12888-025-06470-7",
+     "title": "The imposter phenomenon in psychiatrists: relationships among compassion fatigue, burnout, and maladaptive perfectionism",
+     "year": 2025,
+     "doi": "10.1186/s12888-025-06470-7",
+     "journal": "BMC Psychiatry",
+     "type": "article"
+    },
+    {
+     "key": "10.1145/3715111",
+     "title": "Software Engineering by and for Humans in an AI Era",
+     "year": 2025,
+     "doi": "10.1145/3715111",
+     "journal": "ACM Transactions on Software Engineering and Methodology",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpsyt.2021.713251",
+     "title": "The Rapid Implementation of a Psychological Support Model for Frontline Healthcare Workers During the COVID-19 Pandemic: A Case Study and Process Evaluation",
+     "year": 2021,
+     "doi": "10.3389/fpsyt.2021.713251",
+     "journal": "Frontiers in Psychiatry",
+     "type": "article"
+    },
+    {
+     "key": "10.9734/arjass/2023/v20i3447",
+     "title": "Secondary School Teachers’ Perception of Occupational Stress Causes in Mwanza Region, Tanzania",
+     "year": 2023,
+     "doi": "10.9734/arjass/2023/v20i3447",
+     "journal": "Asian Research Journal of Arts & Social Sciences",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/s10278-025-01724-y",
+     "title": "Patch-Wise Approach with Vision Transformer for Detecting Implant Failure in Spinal Radiography",
+     "year": 2025,
+     "doi": "10.1007/s10278-025-01724-y",
+     "journal": "Journal of Imaging Informatics in Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.1136/bmjopen-2021-049090",
+     "title": "Vitality, resilience and the need for support among hospital employees during the COVID-19 pandemic: study protocol of a mixed-methods study",
+     "year": 2021,
+     "doi": "10.1136/bmjopen-2021-049090",
+     "journal": "BMJ Open",
+     "type": "article"
+    },
+    {
+     "key": "10.5281/zenodo.19744985",
+     "title": "Volume 3: The Soul of the System: A Structural Sovereignty Blueprint for the Leader Who Is Done Being the Load Path (The UNMASK Blueprint)",
+     "year": 2026,
+     "doi": "10.5281/zenodo.19744985",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "book"
+    },
+    {
+     "key": "10.5281/zenodo.19744986",
+     "title": "Volume 3: The Soul of the System: A Structural Sovereignty Blueprint for the Leader Who Is Done Being the Load Path (The UNMASK Blueprint)",
+     "year": 2026,
+     "doi": "10.5281/zenodo.19744986",
+     "journal": "Zenodo (CERN European Organization for Nuclear Research)",
+     "type": "book"
+    },
+    {
+     "key": "10.1371/journal.pgph.0005510",
+     "title": "Well-being and quality of life of Kenyan nurses, midwives and community health volunteers: Measurement properties and correlates of the BBQ and WHO-5",
+     "year": 2025,
+     "doi": "10.1371/journal.pgph.0005510",
+     "journal": "PLOS Global Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.3389/fpubh.2026.1871339",
+     "title": "Machine learning analysis of the association between psychosocial risks and burnout syndrome in mining workers",
+     "year": 2026,
+     "doi": "10.3389/fpubh.2026.1871339",
+     "journal": "Frontiers in Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1016/j.zefq.2021.09.008",
+     "title": "[How are key resources and key demands associated with nurses' work engagement during the COVID-19 pandemic? A cross-sectional study].",
+     "year": 2021,
+     "doi": "10.1016/j.zefq.2021.09.008",
+     "journal": "PubMed",
+     "type": "article"
+    },
+    {
+     "key": "10.37506/ijone.v14i2.17982",
+     "title": "Nurses’ Burnout and Its Associated Factors and Impact on the Quality of Nursing Services",
+     "year": 2022,
+     "doi": "10.37506/ijone.v14i2.17982",
+     "journal": "International Journal of Nursing Education",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12889-024-17896-1",
+     "title": "Maintaining the working state of firefighters by utilizing self-concept clarity as a resource",
+     "year": 2024,
+     "doi": "10.1186/s12889-024-17896-1",
+     "journal": "BMC Public Health",
+     "type": "article"
+    },
+    {
+     "key": "10.1088/1361-665x/ac099f",
+     "title": "Artificial intelligence in real-time diagnostics and prognostics of composite materials and its uncertainties—a review",
+     "year": 2021,
+     "doi": "10.1088/1361-665x/ac099f",
+     "journal": "Smart Materials and Structures",
+     "type": "article"
+    },
+    {
+     "key": "10.3233/wor-193013",
+     "title": "Do personal resources matter beyond job demands and job resources? Main and interaction effects on health-related outcomes among women working within the welfare sector",
+     "year": 2019,
+     "doi": "10.3233/wor-193013",
+     "journal": "Work",
+     "type": "article"
+    },
+    {
+     "key": "",
+     "title": "THE MODERATING ROLE OF PSYCHOLOGICAL CAPITAL AND ORGANIZATIONAL SUPPORT IN WORK-FAMILY CONFLICT AND THE WELL-BEING OF NURSES",
+     "year": 2025,
+     "doi": "",
+     "journal": "Scientific Electronic Library Online (Scientific Electronic Library Online)",
+     "type": "article"
+    },
+    {
+     "key": "10.9789/2175-5361.rpcfo.v12.7986",
+     "title": "Burnout syndrome among critical care nursing professionals",
+     "year": 2020,
+     "doi": "10.9789/2175-5361.rpcfo.v12.7986",
+     "journal": "Revista de Pesquisa Cuidado é Fundamental Online",
+     "type": "article"
+    },
+    {
+     "key": "10.37193/bs-ppm.25.09",
+     "title": "Mentoratul educațional ca mecanism de reducere a sindromului de burnout în rândul cadrelor didactice debutante: analiză corelațională asupra sprijinului perceput și a nivelului de epuizare profesională",
+     "year": 2025,
+     "doi": "10.37193/bs-ppm.25.09",
+     "journal": "BULETIN ŞTIINŢIFIC SERIA A Fascicula Pedagogie-Psihologie-Metodică",
+     "type": "article"
+    },
+    {
+     "key": "10.1093/occmed/kqaa203",
+     "title": "Engagement among physicians fighting COVID-19: the mediating role of autonomy",
+     "year": 2020,
+     "doi": "10.1093/occmed/kqaa203",
+     "journal": "Occupational Medicine",
+     "type": "article"
+    },
+    {
+     "key": "",
+     "title": "Factores predictores de los niveles de burnout y work engagement en médicos y enfermeras: una revisión sistemática",
+     "year": 2021,
+     "doi": "",
+     "journal": "Repositorio Institucional de la Universidad de Huelva (Universidad de Huelva)",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0319038",
+     "title": "The WellNext Scan: Validity evidence of a new team-based tool to map and support physicians’ well-being in the clinical working context",
+     "year": 2025,
+     "doi": "10.1371/journal.pone.0319038",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12995-024-00403-y",
+     "title": "Interrelations of managing position with person-environment fit of gender-role orientation, and burnout",
+     "year": 2024,
+     "doi": "10.1186/s12995-024-00403-y",
+     "journal": "Journal of Occupational Medicine and Toxicology",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/s00146-025-02814-9",
+     "title": "The competence paradox: when psychologists overestimate their understanding of Artificial Intelligence",
+     "year": 2026,
+     "doi": "10.1007/s00146-025-02814-9",
+     "journal": "AI & Society",
+     "type": "article"
+    },
+    {
+     "key": "",
+     "title": "Mechanistic-empirical failure prediction models for spring weight restricted flexible pavements in Manitoba using Manitoba and MnROAD instrumented test sites",
+     "year": 2013,
+     "doi": "",
+     "journal": "Mspace (University of Manitoba)",
+     "type": "dissertation"
+    },
+    {
+     "key": "10.15354/si.23.re820",
+     "title": "The Role of Artificial Intelligence in Mental Health: A Review",
+     "year": 2023,
+     "doi": "10.15354/si.23.re820",
+     "journal": "Science Insights",
+     "type": "article"
+    },
+    {
+     "key": "10.3390/jcm14103518",
+     "title": "Osilodrostat Safety Profile: Findings from Real-World Data in the FAERS Database",
+     "year": 2025,
+     "doi": "10.3390/jcm14103518",
+     "journal": "Journal of Clinical Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.3390/technologies13090396",
+     "title": "Rewired Leadership: Integrating AI-Powered Mediation and Decision-Making in Higher Education Institutions",
+     "year": 2025,
+     "doi": "10.3390/technologies13090396",
+     "journal": "Technologies",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0306453",
+     "title": "Exploring the effects of web-based psychological capitals training on teachers’ PsyCap development, emotional stability, and support: Evidence from Chinese inclusive education",
+     "year": 2024,
+     "doi": "10.1371/journal.pone.0306453",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.1002/pon.6200",
+     "title": "Outcomes of psychological support skills training for cancer care staff: Skill acquisition, work engagement, mental wellbeing and burnout",
+     "year": 2023,
+     "doi": "10.1002/pon.6200",
+     "journal": "Psycho-Oncology",
+     "type": "article"
+    },
+    {
+     "key": "10.1371/journal.pone.0303855",
+     "title": "Psychological well-being and job performance of nurses and midwives amidst COVID-19 in Ghana; a multi-group analysis",
+     "year": 2024,
+     "doi": "10.1371/journal.pone.0303855",
+     "journal": "PLoS ONE",
+     "type": "article"
+    },
+    {
+     "key": "10.24926/iip.v6i3.387",
+     "title": "Rules of Engagement: The Why, What, and How of Professional Engagement for Pharmacy",
+     "year": 2015,
+     "doi": "10.24926/iip.v6i3.387",
+     "journal": "INNOVATIONS in pharmacy",
+     "type": "article"
+    },
+    {
+     "key": "10.1111/psyp.14370",
+     "title": "Psychophysiological models of hypovigilance detection: A scoping review",
+     "year": 2023,
+     "doi": "10.1111/psyp.14370",
+     "journal": "Psychophysiology",
+     "type": "article"
+    },
+    {
+     "key": "10.13075/mp.5893.00978",
+     "title": "Anxiety disorders and mood disorders in hospital doctors: a literature review",
+     "year": 2020,
+     "doi": "10.13075/mp.5893.00978",
+     "journal": "Medycyna Pracy",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/s11606-023-08034-5",
+     "title": "Patient Enrollment Growth and Burnout in Primary Care at the Veterans Health Administration",
+     "year": 2023,
+     "doi": "10.1007/s11606-023-08034-5",
+     "journal": "Journal of General Internal Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.1016/j.compstruct.2020.113295",
+     "title": "Fatigue behaviour and design of corroded reinforced concrete beams intervened by ICCP-SS",
+     "year": 2020,
+     "doi": "10.1016/j.compstruct.2020.113295",
+     "journal": "Composite Structures",
+     "type": "article"
+    },
+    {
+     "key": "10.1186/s12913-023-10270-8",
+     "title": "Burnout, employee engagement, and changing organizational contexts in VA primary care during the early COVID-19 pandemic",
+     "year": 2023,
+     "doi": "10.1186/s12913-023-10270-8",
+     "journal": "BMC Health Services Research",
+     "type": "article"
+    },
+    {
+     "key": "10.5334/pme.1899",
+     "title": "Gender Disparities in Mental Health and Study Demands among Medical Students: A Three-Cohort Study at Two German Universities",
+     "year": 2025,
+     "doi": "10.5334/pme.1899",
+     "journal": "Perspectives on Medical Education",
+     "type": "article"
+    },
+    {
+     "key": "10.21203/rs.3.rs-4825399/v1",
+     "title": "Network analysis of perceived stress and burnout among Chinese nurses",
+     "year": 2024,
+     "doi": "10.21203/rs.3.rs-4825399/v1",
+     "journal": "Research Square",
+     "type": "preprint"
+    },
+    {
+     "key": "10.66793/bioterra1proceeding44",
+     "title": "BURNOUT-UL PERSONALULUI MEDICAL ȘI IMPACTUL ASUPRA CALITĂȚII SERVICIILOR DE SĂNĂTATE",
+     "year": 2025,
+     "doi": "10.66793/bioterra1proceeding44",
+     "journal": "",
+     "type": "conference-paper"
+    },
+    {
+     "key": "10.21203/rs.3.rs-10419887/v1",
+     "title": "A Double-Sided Walrasian Auction Mechanism for Decentralized Resource Allocation in Collaborative Multi-Access Edge Computing",
+     "year": 2026,
+     "doi": "10.21203/rs.3.rs-10419887/v1",
+     "journal": "Research Square",
+     "type": "preprint"
+    },
+    {
+     "key": "10.1051/matecconf/201927003006",
+     "title": "Verification of modulus and fatigue cracking models for hot-mix asphalt with asbuton in laboratory scale",
+     "year": 2019,
+     "doi": "10.1051/matecconf/201927003006",
+     "journal": "MATEC Web of Conferences",
+     "type": "conference-paper"
+    },
+    {
+     "key": "10.4324/9781003770596",
+     "title": "The AI Strategy Playbook",
+     "year": 2026,
+     "doi": "10.4324/9781003770596",
+     "journal": "",
+     "type": "book"
+    },
+    {
+     "key": "10.2139/ssrn.6741545",
+     "title": "A Double-Sided Walrasian Auction Mechanism for Decentralized Resource Allocation in Collaborative Multi-Access Edge Computing",
+     "year": 2026,
+     "doi": "10.2139/ssrn.6741545",
+     "journal": "SSRN Electronic Journal",
+     "type": "preprint"
+    },
+    {
+     "key": "10.48550/arxiv.2406.14494",
+     "title": "Teaching Software Metrology: The Science of Measurement for Software Engineering",
+     "year": 2024,
+     "doi": "10.48550/arxiv.2406.14494",
+     "journal": "arXiv (Cornell University)",
+     "type": "preprint"
+    },
+    {
+     "key": "10.1016/j.jss.2019.02.005",
+     "title": "Job Crafting to Persist in Surgical Training: A Qualitative Study From the Resident's Perspective",
+     "year": 2019,
+     "doi": "10.1016/j.jss.2019.02.005",
+     "journal": "Journal of Surgical Research",
+     "type": "article"
+    },
+    {
+     "key": "10.32598/jnacs.2025.1197",
+     "title": "Designing a structural equation model for the relationship between quality of working life and job involvement among nurses, with the mediating role of job burnout and job identity: A cross-sectional study",
+     "year": 2025,
+     "doi": "10.32598/jnacs.2025.1197",
+     "journal": "Journal of Nursing Advances in Clinical Sciences.",
+     "type": "article"
+    },
+    {
+     "key": "10.1024/1016-264x/a000398",
+     "title": "Psychotherapeutische Interventionen bei Personen mit Multipler Sklerose (MS)",
+     "year": 2024,
+     "doi": "10.1024/1016-264x/a000398",
+     "journal": "Zeitschrift für Neuropsychologie",
+     "type": "article"
+    },
+    {
+     "key": "10.1177/08919887261486060",
+     "title": "Dementia Carers’ Perspectives on Paper- and Artificial Intelligence (AI)-Based Assessment Tools: A Qualitative Think-Aloud Study Using the COM-B Framework",
+     "year": 2026,
+     "doi": "10.1177/08919887261486060",
+     "journal": "Journal of Geriatric Psychiatry and Neurology",
+     "type": "article"
+    },
+    {
+     "key": "10.1016/j.mcpdig.2024.08.004",
+     "title": "Challenges and Limitations of Human Oversight in Ethical Artificial Intelligence Implementation in Health Care: Balancing Digital Literacy and Professional Strain",
+     "year": 2024,
+     "doi": "10.1016/j.mcpdig.2024.08.004",
+     "journal": "Mayo Clinic Proceedings Digital Health",
+     "type": "article"
+    },
+    {
+     "key": "10.5772/67507",
+     "title": "Work-Related Well-Being: From Qualitative Job Insecurity to Cognitive Reappraisal",
+     "year": 2017,
+     "doi": "10.5772/67507",
+     "journal": "InTech eBooks",
+     "type": "book-chapter"
+    },
+    {
+     "key": "10.71000/q8v3p",
+     "title": "THE RELATIONSHIP BETWEEN BURNOUT AND WORK LIFE BALANCE IN OCCUPATIONAL THERAPISTS AND SPEECH THERAPISTS WORKING WITH PEDIATRIC POPULATION",
+     "year": 2025,
+     "doi": "10.71000/q8v3p",
+     "journal": "Ghurki Journal of Medical and Health Sciences",
+     "type": "article"
+    },
+    {
+     "key": "10.21203/rs.3.rs-10708878/v1",
+     "title": "Learning Energy for Sustainable Learning with Artificial Intelligence in Higher Education",
+     "year": 2026,
+     "doi": "10.21203/rs.3.rs-10708878/v1",
+     "journal": "Research Square",
+     "type": "preprint"
+    },
+    {
+     "key": "10.1080/07380569.2026.2712296",
+     "title": "Adopting Artificial Intelligence in Schools: Opportunities and Challenges in the Diffusion of a Commercial Large Language Model Across a Teaching Population",
+     "year": 2026,
+     "doi": "10.1080/07380569.2026.2712296",
+     "journal": "Computers in the Schools",
+     "type": "article"
+    },
+    {
+     "key": "10.17085/apm.25244",
+     "title": "Introduction to burnout and well-being for anesthesiologists in South Korea: narrative and brief review",
+     "year": 2025,
+     "doi": "10.17085/apm.25244",
+     "journal": "Anesthesia and Pain Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.1007/s11606-024-08802-x",
+     "title": "The “Difficult” Inpatient, a Qualitative Study of Physician Perspectives",
+     "year": 2024,
+     "doi": "10.1007/s11606-024-08802-x",
+     "journal": "Journal of General Internal Medicine",
+     "type": "article"
+    },
+    {
+     "key": "10.2196/68858",
+     "title": "Secure Messages, Video Visits, and Burnout Among Primary Care Providers in the Veterans Health Administration: National Survey Study",
+     "year": 2025,
+     "doi": "10.2196/68858",
+     "journal": "Journal of Medical Internet Research",
+     "type": "article"
+    },
+    {
+     "key": "10.34178/jbth.v6i4.338",
+     "title": "The Role of Social Skills in Work Engagement and Burnout: A Systematic Review",
+     "year": 2024,
+     "doi": "10.34178/jbth.v6i4.338",
+     "journal": "Journal of Bioengineering, Technologies and Health",
+     "type": "review"
+    }
+   ]
+  },
+  {
+   "source": "Semantic Scholar",
+   "field": "citations of AF001",
+   "query": "10.1016/j.chbr.2026.101186",
+   "status": "ok",
+   "total": 5,
+   "records": [
+    {
+     "key": "10.3390/bs16091633",
+     "title": "Digital Artifacts in Education: How Design Properties Are Associated with Self-Regulated Learning, Participation, and Performance",
+     "year": 2026,
+     "doi": "10.3390/bs16091633",
+     "journal": "Behavioral Science"
+    },
+    {
+     "key": "10.3390/bs16091460",
+     "title": "Beyond Positive or Negative: Latent Profiles of University Students’ AI Attitude and Their Career-Development Correlates",
+     "year": 2026,
+     "doi": "10.3390/bs16091460",
+     "journal": "Behavioral Science"
+    },
+    {
+     "key": "10.3390/bs16081294",
+     "title": "How AI Awareness Impacts Employee Adaptive Performance: A Moderated Mediation Model",
+     "year": 2026,
+     "doi": "10.3390/bs16081294",
+     "journal": "Behavioral Science"
+    },
+    {
+     "key": "10.2196/96935",
+     "title": "Video and App-Based Games for Youth Emotion Regulation: Scoping Review",
+     "year": 2026,
+     "doi": "10.2196/96935",
+     "journal": "JMIR Mental Health"
+    },
+    {
+     "key": "10.1016/j.chbr.2026.101103",
+     "title": "Understanding Critical Thinking in Generative Artificial Intelligence Use: Development, Validation, and Correlates of the Critical Thinking in AI Use Scale",
+     "year": 2025,
+     "doi": "10.1016/j.chbr.2026.101103",
+     "journal": "Computers in Human Behavior Reports"
+    }
+   ]
+  }
+ ]
+}

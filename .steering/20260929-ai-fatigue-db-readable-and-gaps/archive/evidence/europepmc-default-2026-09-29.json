@@ -1,0 +1,570 @@
+[
+ {
+  "theme": "S-04 AI scribe burnout",
+  "q": "(\"ambient AI\" OR \"AI scribe\" OR \"ambient scribe\" OR \"ambient listening\") AND (burnout OR \"cognitive load\" OR fatigue)",
+  "hitCount": 399,
+  "top": [
+   [
+    "2025",
+    "10.1093/jamia/ocae295",
+    "Ambient artificial intelligence scribes: physician burnout and perspectives on usability and documentation burden.",
+    "J Am Med Inform Assoc",
+    142,
+    "brief-report; journal article"
+   ],
+   [
+    "2025",
+    "10.1001/jamanetworkopen.2024.60637",
+    "Clinician Experiences With Ambient Scribe Technology to Assist With Documentation Burden and Efficiency.",
+    "JAMA Netw Open",
+    133,
+    "research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2025",
+    "10.1038/s41591-024-03456-y",
+    "GPT-4 assistance for improvement of physician performance on patient care tasks: a randomized controlled trial.",
+    "Nat Med",
+    117,
+    "research-article; randomized controlled trial; journal article"
+   ],
+   [
+    "2025",
+    "10.1093/jamia/ocae304",
+    "Ambient artificial intelligence scribes: utilization and impact on documentation time.",
+    "J Am Med Inform Assoc",
+    113,
+    "brief-report; journal article"
+   ],
+   [
+    "2024",
+    "10.1093/jamia/ocae022",
+    "The impact of nuance DAX ambient listening AI documentation: a cohort study.",
+    "J Am Med Inform Assoc",
+    111,
+    "research-article; journal article"
+   ],
+   [
+    "2025",
+    "10.1001/jamanetworkopen.2025.8614",
+    "Evaluation of an Ambient Artificial Intelligence Documentation Platform for Clinicians.",
+    "JAMA Netw Open",
+    105,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2025",
+    "10.1001/jamanetworkopen.2025.1904",
+    "Physician Perspectives on Ambient AI Scribes.",
+    "JAMA Netw Open",
+    98,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2024",
+    "10.2196/54419",
+    "Using ChatGPT-4 to Create Structured Medical Notes From Audio Recordings of Physician-Patient Encounters: Comparative Study.",
+    "J Med Internet Res",
+    95,
+    "comparative study; research support, non-u.s. gov't; research-article; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-04 AI scribe RCT",
+  "q": "(\"ambient AI\" OR \"AI scribe\" OR \"ambient scribe\") AND (burnout OR fatigue) AND (randomized OR randomised)",
+  "hitCount": 114,
+  "top": [
+   [
+    "2026",
+    "10.1080/13814788.2026.2708494",
+    "EGPRN primary care research at a crossroads advancing research on interprofessional collaboration and on integrated, equitable and",
+    "Eur J Gen Pract",
+    0,
+    "article-commentary; journal article"
+   ],
+   [
+    "2026",
+    "10.1016/j.annonc.2026.05.709",
+    "Prompt-directed ambient artificial intelligence for automated multidisciplinary tumor board documentation.",
+    "Ann Oncol",
+    0,
+    "research-article; journal article"
+   ],
+   [
+    "2026",
+    "10.3390/bioengineering13091034",
+    "Perspectives on the Limits and Clinical Alignment of Medical AI from Population Statistics to Individual Care.",
+    "Bioengineering (Basel)",
+    0,
+    "other; journal article"
+   ],
+   [
+    "2026",
+    "10.2196/88725",
+    "The Promise of Ambient AI Technology in Medical Education: Opportunities and Guardrails.",
+    "JMIR Med Inform",
+    0,
+    "research-article; journal article"
+   ],
+   [
+    "2026",
+    "10.7759/cureus.115367",
+    "Embracing Large Language Models for Medical Applications, Part II: Building a Framework for Clinical Stewardship. ",
+    "Cureus",
+    0,
+    "editorial"
+   ],
+   [
+    "2026",
+    "10.3390/nu18162638",
+    "Artificial Intelligence in Clinical Nutrition: Current Uses, Challenges, and Opportunities.",
+    "Nutrients",
+    0,
+    "review-article; review; journal article"
+   ],
+   [
+    "2026",
+    "10.3390/nu18162613",
+    "Reimagining Home Enteral Nutrition Through Artificial Intelligence: A Narrative Review of Clinical, Operational, and Patient-Cente",
+    "Nutrients",
+    0,
+    "review-article; review; journal article"
+   ],
+   [
+    "2026",
+    "10.1038/s43856-026-01823-z",
+    "Evidence, use cases, and implementation safeguards of large language models in primary care.",
+    "Commun Med (Lond)",
+    0,
+    "review-article; review; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-04 LLM draft replies",
+  "q": "(\"large language model\" OR \"generative AI\" OR \"AI-generated\") AND (\"draft replies\" OR \"draft responses\" OR \"inbox\") AND burnout",
+  "hitCount": 117,
+  "top": [
+   [
+    "2023",
+    "10.1001/jamainternmed.2023.1838",
+    "Comparing Physician and Artificial Intelligence Chatbot Responses to Patient Questions Posted to a Public Social Media Forum.",
+    "JAMA Intern Med",
+    1478,
+    "research support, non-u.s. gov't; research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2024",
+    "10.1001/jamanetworkopen.2024.3201",
+    "Artificial Intelligence-Generated Draft Replies to Patient Inbox Messages.",
+    "JAMA Netw Open",
+    205,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2023",
+    "10.2196/46939",
+    "Putting ChatGPT's Medical Advice to the (Turing) Test: Survey Study.",
+    "JMIR Med Educ",
+    114,
+    "research-article; journal article"
+   ],
+   [
+    "2024",
+    "10.1001/jamanetworkopen.2024.6565",
+    "AI-Generated Draft Replies Integrated Into Health Records and Physicians' Electronic Communication.",
+    "JAMA Netw Open",
+    113,
+    "research support, u.s. gov't, p.h.s.; research-article; randomized controlled trial; journal article"
+   ],
+   [
+    "2025",
+    "10.1001/jamanetworkopen.2025.1904",
+    "Physician Perspectives on Ambient AI Scribes.",
+    "JAMA Netw Open",
+    98,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ],
+   [
+    "2024",
+    "10.1001/jamanetworkopen.2024.4630",
+    "Quality of Large Language Model Responses to Radiation Oncology Patient Care Questions.",
+    "JAMA Netw Open",
+    79,
+    "research support, non-u.s. gov't; research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2024",
+    "10.1093/jamia/ocae052",
+    "Leveraging large language models for generating responses to patient messages-a subjective analysis.",
+    "J Am Med Inform Assoc",
+    77,
+    "research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2024",
+    "10.1001/jamanetworkopen.2024.22399",
+    "Large Language Model-Based Responses to Patients' In-Basket Messages.",
+    "JAMA Netw Open",
+    72,
+    "research support, non-u.s. gov't; research-article; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-06 alert fatigue",
+  "q": "\"alert fatigue\"",
+  "hitCount": 4438,
+  "top": [
+   [
+    "2016",
+    "10.1093/cid/ciw118",
+    "Implementing an Antibiotic Stewardship Program: Guidelines by the Infectious Diseases Society of America and the Society for Healt",
+    "Clin Infect Dis",
+    2162,
+    "research support, non-u.s. gov't; research-article; practice guideline; journal article"
+   ],
+   [
+    "2020",
+    "10.1038/s41746-020-0221-y",
+    "An overview of clinical decision support systems: benefits, risks, and strategies for success.",
+    "NPJ Digit Med",
+    1616,
+    "review-article; review; journal article"
+   ],
+   [
+    "2019",
+    "10.1186/s12916-019-1426-2",
+    "Key challenges for delivering clinical impact with artificial intelligence.",
+    "BMC Med",
+    1391,
+    "brief-report; research support, non-u.s. gov't; journal article"
+   ],
+   [
+    "2018",
+    "10.1038/s41746-018-0029-1",
+    "Scalable and accurate deep learning with electronic health records.",
+    "NPJ Digit Med",
+    1369,
+    "research-article; journal article"
+   ],
+   [
+    "2006",
+    "10.1197/jamia.m1809",
+    "Overriding of drug safety alerts in computerized physician order entry.",
+    "J Am Med Inform Assoc",
+    752,
+    "research-article; journal article"
+   ],
+   [
+    "2018",
+    "10.7326/m18-1990",
+    "Ensuring Fairness in Machine Learning to Advance Health Equity.",
+    "Ann Intern Med",
+    629,
+    "research support, non-u.s. gov't; research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2011",
+    "10.1371/journal.pmed.1000387",
+    "The impact of eHealth on the quality and safety of health care: a systematic overview.",
+    "PLoS Med",
+    619,
+    "research support, non-u.s. gov't; research-article; systematic review; journal article"
+   ],
+   [
+    "2021",
+    "10.1001/jamainternmed.2021.2626",
+    "External Validation of a Widely Implemented Proprietary Sepsis Prediction Model in Hospitalized Patients.",
+    "JAMA Intern Med",
+    581,
+    "research-article; journal article; research support, n.i.h., extramural"
+   ]
+  ]
+ },
+ {
+  "theme": "S-06 alert fatigue AI",
+  "q": "\"alert fatigue\" AND (\"artificial intelligence\" OR \"machine learning\")",
+  "hitCount": 1868,
+  "top": [
+   [
+    "2020",
+    "10.1038/s41746-020-0221-y",
+    "An overview of clinical decision support systems: benefits, risks, and strategies for success.",
+    "NPJ Digit Med",
+    1616,
+    "review-article; review; journal article"
+   ],
+   [
+    "2019",
+    "10.1186/s12916-019-1426-2",
+    "Key challenges for delivering clinical impact with artificial intelligence.",
+    "BMC Med",
+    1391,
+    "brief-report; research support, non-u.s. gov't; journal article"
+   ],
+   [
+    "2018",
+    "10.1038/s41746-018-0029-1",
+    "Scalable and accurate deep learning with electronic health records.",
+    "NPJ Digit Med",
+    1369,
+    "research-article; journal article"
+   ],
+   [
+    "2018",
+    "10.7326/m18-1990",
+    "Ensuring Fairness in Machine Learning to Advance Health Equity.",
+    "Ann Intern Med",
+    629,
+    "research support, non-u.s. gov't; research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2023",
+    "10.1210/endrev/bnac022",
+    "Consensus Recommendations for the Use of Automated Insulin Delivery Technologies in Clinical Practice.",
+    "Endocr Rev",
+    338,
+    "research support, non-u.s. gov't; review-article; consensus statement; journal article"
+   ],
+   [
+    "2018",
+    "10.1097/pas.0000000000001151",
+    "Impact of Deep Learning Assistance on the Histopathologic Review of Lymph Nodes for Metastatic Breast Cancer.",
+    "Am J Surg Pathol",
+    308,
+    "research-article; evaluation study; journal article"
+   ],
+   [
+    "2020",
+    "10.1136/bmj.m3216",
+    "Computerised clinical decision support systems and absolute improvements in care: meta-analysis of controlled clinical trials.",
+    "BMJ",
+    279,
+    "meta-analysis; research-article; systematic review; journal article"
+   ],
+   [
+    "2009",
+    "10.1002/14651858.cd001096.pub2",
+    "The effects of on-screen, point of care computer reminders on processes and outcomes of care.",
+    "Cochrane Database Syst Rev",
+    279,
+    "meta-analysis; systematic review; systematic-review; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-05 passive fatigue",
+  "q": "\"passive fatigue\"",
+  "hitCount": 101,
+  "top": [
+   [
+    "2021",
+    "10.3390/s21113786",
+    "A Review of EEG Signal Features and their Application in Driver Drowsiness Detection Systems.",
+    "Sensors (Basel)",
+    69,
+    "review-article; review; journal article"
+   ],
+   [
+    "2013",
+    "10.1037/a0034386",
+    "Active and passive fatigue in simulated driving: discriminating styles of workload regulation and their safety impacts.",
+    "J Exp Psychol Appl",
+    66,
+    "research-article; journal article"
+   ],
+   [
+    "2023",
+    "10.7717/peerj.15744",
+    "Understanding mental fatigue and its detection: a comparative analysis of assessments and tools.",
+    "PeerJ",
+    64,
+    "research support, non-u.s. gov't; research-article; review; journal article"
+   ],
+   [
+    "2021",
+    "10.3389/fphys.2021.790292",
+    "Fatigue Monitoring Through Wearables: A State-of-the-Art Review.",
+    "Front Physiol",
+    62,
+    "systematic review; systematic-review; journal article"
+   ],
+   [
+    "2018",
+    "10.3389/fpsyg.2018.01246",
+    "Bridging Exercise Science, Cognitive Psychology, and Medical Practice: Is \"Cognitive Fatigue\" a Remake of \"The Emperor's New Cloth",
+    "Front Psychol",
+    54,
+    "research-article; journal article"
+   ],
+   [
+    "2021",
+    "10.3389/fphys.2021.712628",
+    "Fatigue in Aviation: Safety Risks, Preventive Strategies and Pharmacological Interventions.",
+    "Front Physiol",
+    45,
+    "review-article; review; journal article"
+   ],
+   [
+    "2021",
+    "10.3389/fpsyg.2021.739764",
+    "A Proposal for a Unifying Set of Definitions of Fatigue.",
+    "Front Psychol",
+    41,
+    "research-article; journal article"
+   ],
+   [
+    "2021",
+    "10.1186/s12889-021-11595-x",
+    "Monitoring stress and allostatic load in first responders and tactical operators using heart rate variability: a systematic review",
+    "BMC Public Health",
+    35,
+    "research-article; systematic review; journal article"
+   ]
+  ]
+ },
+ {
+  "theme": "S-07 radiologist AI fatigue",
+  "q": "radiologist AND (\"artificial intelligence\") AND (fatigue OR burnout OR workload) AND (reader OR reading)",
+  "hitCount": 2091,
+  "top": [
+   [
+    "2018",
+    "10.1038/s41568-018-0016-5",
+    "Artificial intelligence in radiology.",
+    "Nat Rev Cancer",
+    2107,
+    "research-article; review; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2020",
+    "10.1038/s41586-019-1799-6",
+    "International evaluation of an AI system for breast cancer screening.",
+    "Nature",
+    1436,
+    "evaluation study; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2019",
+    "10.3322/caac.21552",
+    "Artificial intelligence in cancer imaging: Clinical challenges and applications.",
+    "CA Cancer J Clin",
+    1227,
+    "research support, non-u.s. gov't; review-article; review; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2009",
+    "10.1109/rbme.2009.2034865",
+    "Histopathological image analysis: a review.",
+    "IEEE Rev Biomed Eng",
+    896,
+    "research support, american recovery and reinvestment act; research support, non-u.s. gov't; research-article; review; research support, u.s. gov't, non-p.h.s.; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2019",
+    "10.1016/s1470-2045(19)30154-8",
+    "Digital pathology and artificial intelligence.",
+    "Lancet Oncol",
+    765,
+    "research support, non-u.s. gov't; research-article; review; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2025",
+    "10.1038/s41392-024-02108-4",
+    "Breast cancer: pathogenesis and treatments.",
+    "Signal Transduct Target Ther",
+    741,
+    "research support, non-u.s. gov't; review-article; review; journal article"
+   ],
+   [
+    "2018",
+    "10.1371/journal.pmed.1002686",
+    "Deep learning for chest radiograph diagnosis: A retrospective comparison of the CheXNeXt algorithm to practicing radiologists.",
+    "PLoS Med",
+    681,
+    "comparative study; research support, non-u.s. gov't; research-article; validation study; journal article"
+   ],
+   [
+    "2024",
+    "10.1038/s41591-024-02855-5",
+    "Adapted large language models can outperform medical experts in clinical text summarization.",
+    "Nat Med",
+    537,
+    "research support, non-u.s. gov't; research-article; journal article; research support, n.i.h., extramural"
+   ]
+  ]
+ },
+ {
+  "theme": "S-10 genAI fatigue longitudinal",
+  "q": "(\"generative AI\" OR ChatGPT) AND (fatigue OR exhaustion OR burnout) AND (longitudinal OR diary OR \"experience sampling\" OR randomized)",
+  "hitCount": 19984,
+  "top": [
+   [
+    "2023",
+    "10.1001/jamainternmed.2023.1838",
+    "Comparing Physician and Artificial Intelligence Chatbot Responses to Patient Questions Posted to a Public Social Media Forum.",
+    "JAMA Intern Med",
+    1478,
+    "research support, non-u.s. gov't; research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2023",
+    "10.1186/s12909-023-04698-z",
+    "Revolutionizing healthcare: the role of artificial intelligence in clinical practice.",
+    "BMC Med Educ",
+    1454,
+    "review-article; review; journal article"
+   ],
+   [
+    "2023",
+    "10.1038/s41746-023-00873-0",
+    "The imperative for regulatory oversight of large language models (or generative AI) in healthcare.",
+    "NPJ Digit Med",
+    492,
+    "review-article; review; journal article"
+   ],
+   [
+    "2024",
+    "10.1001/jama.2023.26074",
+    "Age-Related Macular Degeneration: A Review.",
+    "JAMA",
+    451,
+    "research support, non-u.s. gov't; research-article; review; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2023",
+    "10.2196/46885",
+    "The Role of ChatGPT, Generative Language Models, and Artificial Intelligence in Medical Education: A Conversation With ChatGPT and",
+    "JMIR Med Educ",
+    353,
+    "editorial"
+   ],
+   [
+    "2023",
+    "10.1093/jamia/ocad072",
+    "Using AI-generated suggestions from ChatGPT to optimize clinical decision support.",
+    "J Am Med Inform Assoc",
+    250,
+    "research-article; journal article; research support, n.i.h., extramural"
+   ],
+   [
+    "2024",
+    "10.1007/s11604-023-01474-3",
+    "Fairness of artificial intelligence in healthcare: review and recommendations.",
+    "Jpn J Radiol",
+    249,
+    "review-article; review; journal article"
+   ],
+   [
+    "2024",
+    "10.1161/cir.0000000000001201",
+    "Use of Artificial Intelligence in Improving Outcomes in Heart Disease: A Scientific Statement From the American Heart Association.",
+    "Circulation",
+    230,
+    "research-article; review; journal article"
+   ]
+  ]
+ }
+]

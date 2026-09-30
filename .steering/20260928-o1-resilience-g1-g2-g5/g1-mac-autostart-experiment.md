@@ -83,3 +83,36 @@ rm -rf "$HOME/GSE-autostart-exp"
 - 片付け: plist・実験用コピー・実験で増えた NDJSON 2 本を削除済み。`GSE-submissions` は増えていない。
 
 未実施: 段階 B（本当のログイン）。★ 実装後の新しいビルドが**自分で plist を書く**形で確かめるほうが本番に近いので、そちらでまとめて行う。
+
+## 結果（段階 B・2026-09-29 13:35〜14:22 JST・配布 zip v0.1.38 が自分で plist を書く形）
+> 手順は `.steering/_handoff/next-session-o1-stage-b-mac.md` §2。ログアウトをまたぐため 3 セッションに分けて行い、状態は `~/GSE-autostart-exp/STATE.md` に書き継いだ（片付けで削除済み・中身は下に転記）。
+> 安全策: 既存の `~/.gse/o1_participant_id`（P009）・`o1_consent_ack`（08-30）を退避してから実験用 P-ID `P998` で同意し、最後に戻した。`g1-submit.json` は `http://127.0.0.1:9/exec` に差し替え（`script.google.com` 0 件）。zip の SHA-256 `f5ad9a90…` は `docs/o1-distribution-tag.md` と一致。
+
+| 確かめたこと | 結果 | 根拠 |
+|---|---|---|
+| 同意の後に登録されるか（Register） | ✅ `~/Library/LaunchAgents/com.johnd.gse-next.o1.plist`（`RunAtLoad=true` のみ・`ProgramArguments` = 展開先 A の `gse-next.app/Contents/MacOS/gse-next`）・A に `o1.autostart`（同じパス）・`~/.gse/o1_autostart_registered` | `plutil -p`・applog `O1 autostart: registered the login entry (LaunchAgent com.johnd.gse-next.o1)` |
+| 登録の直後に launchd へロードされるか | ロードしない（`launchctl print` → not found）。効くのは次のログインから。★ 実装（登録側に `launchctl` の呼び出しが無く plist を置くだけ）と整合 | `launchctl print` |
+| 被験者に見える通知 | ✅ 出た。研究者の記録は「gse-next はバックグラウンドで…」（見出しの文言は控えていない） | 研究者の目視 |
+| システム設定の表示名 | ✅ 「バックグラウンドでの実行を許可」に **`gse-next`**・スイッチ ON（README【3】の名前と一致）。副題は「バックグラウンドで実行されていません」・アイコンは汎用の実行ファイル | 研究者の目視 |
+| 本当のログインで自動起動するか | ✅ 13:51 のログイン → `gse-next` が 13:51:51 に起動・親 pid = 1・`launchctl print` で `state = running`・`runs = 1` | `last`・`ps -o ppid`・`launchctl print` |
+| 自動起動で O1 として記録するか | ✅ 新しい NDJSON の meta に `app_version = 0.1.38`・`o1_mode = marker`・`key` 60 行（フィールドは `category`/`press`/`t` のみ＝内容なし）。陰性対照: 打鍵しない 45 秒で 60 → 60 | NDJSON（片付けで削除済み） |
+| トレイ | ✅ 「計測中」 | 研究者の目視（⚠️ 画面の「記録中 · 作業の種類」の印は見ていない） |
+| システム設定でオフにしたとき | ★ **その瞬間に動いていた gse-next が終了**した。`launchctl print` → Could not find service（bootout された）。plist は残る | 研究者の体感・`pgrep`・`ls` |
+| ★★ オフのまま別フォルダ B から開く（Repoint） | ✅ applog `re-pointed the login entry` → plist の `ProgramArguments` が B を指す・B に `o1.autostart`。同意画面は出ない（`~/.gse` の同意を再利用）。**スイッチはオフのまま・通知も出ない** | applog・`plutil -p`・研究者の目視 |
+| ★★ オフ＋Repoint の後のログインで立ち上がらないか | ✅ 14:20 のログイン → 14:21 に `pgrep` 0 件・`launchctl print` not found・`print-disabled` に行なし・B の起動（`…051211`）より新しい `gse_o1_*` が無い・applog の最終行は 05:12:12Z。陽性対照 = 上の 13:51（オン）では立ち上がった | `last`・`pgrep`・`launchctl`・`ls` |
+| Self-hosted runner | ログアウト前に `busy=false` を確認・どちらのログインの後も `online` に戻った（13:5x は `busy=false`・14:2x は `busy=true`＝ジョブを受けて動いている） | `gh api …/actions/runners` |
+
+→ ★ **README【3】の「オフにしたあと、アプリが勝手にオンに戻すことはありません」は、Repoint（別フォルダに置き直した）場合も含めて macOS 実機で成り立つ**（1 回のログインでの実測・陽性対照あり）。 security-checker の未確認点はこれで閉じた（Mac のみ。Windows は別）。
+
+副次的な観察:
+- ⚠️ **ログアウトはきれいな終了にならない。** ログアウト前に動いていたセッションには終了行が無く、次の起動の orphan sweep が閉じた。そのとき `session_end` は **sweep した時刻**になり、実際の最終イベント（例: 04:56 台）とは違う（`…045158` は 05:12:11Z で閉じられた）。→ 自動起動の運用では「ログアウト／再起動のたびに 1 本ずつ孤児ができて、終了時刻が次の起動まで延びる」。集計でセッションの長さに `session_end` を使うなら要注意（★ 影響の有無は未調査・別タスク候補）。
+- 初回、入力監視を許可したあとの終了は異常終了扱いになり、次の起動の orphan sweep がそのファイルを閉じた（段階 A と同じ）。
+- ログイン項目のアイコンが汎用の実行ファイルになるのは、plist が `.app` ではなく中の実行ファイルを指すためとみられる（未検証）。副題「バックグラウンドで実行されていません」は登録直後（未ロード）の表示で、ログイン後にどう変わるかは見ていない。
+- `log show`（unified log）で launchd / BTM の記録を探したが、陽性対照（13:51 の起動）でも 0 件だった → 根拠には使っていない。
+
+README との食い違い（配布物の直し方）:
+- **食い違いはない**（表示名 `gse-next`・手順 1〜3・「勝手にオンに戻さない」）。⚠️ 通知は出たが、README の「バックグラウンド項目が追加されました」と**見出しの文言が一致するかは照合していない**（研究者の記録は本文の「gse-next はバックグラウンドで…」のみ）。
+- 補足の候補（★ 研究者の判断・直すなら両 OS）: 「オフにすると、**その場で**アプリも終了し、記録も止まります」。今の文は、オフにしても今日の記録は続くと読める。Windows で同じ挙動かは未確認（スタートアップアプリの無効化は動いているプロセスを止めない可能性がある）→ Windows 側で測ってから書く。
+- README は zip の中にだけあり、アプリのバイナリに埋め込まれていない → 直すなら **版を上げずに** zip を作り直せる。ただし zip の SHA-256 が変わるので、`docs/o1-distribution-tag.md` に新しい値を追記する必要がある。
+
+片付け（14:22 に完了）: `pkill` / `launchctl bootout` → plist・`~/.gse/o1_autostart_registered`・P998 の `o1_participant_id` / `o1_consent_ack` を削除 → 退避した 2 つを `~/.gse/` に戻した（`o1_participant_id` = P009 を確認）→ `~/Documents/GSE-sessions/` の実験 NDJSON 4 本を研究者の確認のうえ削除（`.o1_clock_hwm`・`gse-app.log` は既存ファイルで更新されただけなので残した。`GSE-submissions` は増えていない）→ `~/GSE-autostart-exp` を削除。システム設定のログイン項目から gse-next が消えたことを研究者が確認した。

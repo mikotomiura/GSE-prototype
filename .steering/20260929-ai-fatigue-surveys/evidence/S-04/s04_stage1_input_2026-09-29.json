@@ -1,0 +1,2739 @@
+[
+ {
+  "id": "R001",
+  "doi": "10.4050/vfs-f65-000128",
+  "title": "Techniques for Measuring Workload for the CH-47F Coupled Flight Director Developmental Testing",
+  "year": 2009,
+  "journal": "Proceedings of the Vertical Flight Society 65th Annual Forum, Grapevine, Texas, May 27-29, 2009",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R002",
+  "doi": "10.7326/m18-0139",
+  "title": "Physician Burnout in the Electronic Health Record Era: Are We Ignoring the Real Cause?",
+  "year": 2018,
+  "journal": "Annals of Internal Medicine",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R003",
+  "doi": "10.1136/postgradmedj-2020-139016",
+  "title": "Piloting lessons for doctors?",
+  "year": 2020,
+  "journal": "Postgraduate medical journal",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R004",
+  "doi": "10.1016/j.ijfatigue.2021.106580",
+  "title": "Artificial intelligence assisted fatigue failure prediction",
+  "year": 2021,
+  "journal": "International Journal of Fatigue",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R005",
+  "doi": "10.1038/s41598-021-93546-5",
+  "title": "Clinical characterization of dysautonomia in long COVID-19 patients",
+  "year": 2021,
+  "journal": "Scientific Reports",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R006",
+  "doi": "10.1016/j.apjon.2022.100127",
+  "title": "Artificial intelligence empowered digital health technologies in cancer survivorship care: A scoping review.",
+  "year": "2022",
+  "journal": "Asia-Pacific journal of oncology nursing",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R007",
+  "doi": "10.1714/3856.38391",
+  "title": "[Scientific communication to \"my\" patient].",
+  "year": "2022",
+  "journal": "Giornale italiano di cardiologia (2006)",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R008",
+  "doi": "10.3390/math10183395",
+  "title": "ECG Signal Features Classification for the Mental Fatigue Recognition",
+  "year": 2022,
+  "journal": "Mathematics",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R009",
+  "doi": "10.1016/j.ijfatigue.2022.106999",
+  "title": "Artificial intelligence modeling of ultrasonic fatigue test to predict the temperature increase",
+  "year": 2022,
+  "journal": "International Journal of Fatigue",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R010",
+  "doi": "10.1001/jamainternmed.2023.1838",
+  "title": "Comparing Physician and Artificial Intelligence Chatbot Responses to Patient Questions Posted to a Public Social Media Forum.",
+  "year": "2023",
+  "journal": "JAMA internal medicine",
+  "sources": [
+   "Europe PMC|Q2 AI の下書き返信",
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R011",
+  "doi": "10.1136/bmjopen-2022-065477",
+  "title": "Effect of multimodal comprehensive communication skills training with video analysis by artificial intelligence for physicians on acute geriatric care: a mixed-methods study.",
+  "year": "2023",
+  "journal": "BMJ open",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R012",
+  "doi": "10.3390/nu15040986",
+  "title": "Improved Strength Recovery and Reduced Fatigue with Suppressed Plasma Myostatin Following Supplementation of a <i>Vicia faba</i> Hydrolysate, in a Healthy Male Population.",
+  "year": "2023",
+  "journal": "Nutrients",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R013",
+  "doi": "10.1016/j.artmed.2023.102693",
+  "title": "Artificial intelligence in physical rehabilitation: A systematic review.",
+  "year": "2023",
+  "journal": "Artificial intelligence in medicine",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R014",
+  "doi": "10.3390/s23167238",
+  "title": "Telerehabilitation with ARC Intellicare to Cope with Motor and Respiratory Disabilities: Results about the Process, Usability, and Clinical Effect of the \"Ricominciare\" Pilot Study.",
+  "year": "2023",
+  "journal": "Sensors (Basel, Switzerland)",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R015",
+  "doi": "10.30744/brjac.2179-3425.point-of-view-mpiston.n41",
+  "title": "How has the pandemic accelerated the transformation of Analytical Chemistry education from Generation Z to Alpha?",
+  "year": 2023,
+  "journal": "Brazilian Journal of Analytical Chemistry",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R016",
+  "doi": "10.48550/arXiv.2307.09758",
+  "title": "Longitudinal Data and a Semantic Similarity Reward for Chest X-Ray Report Generation",
+  "year": 2023,
+  "journal": "Informatics in Medicine Unlocked",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R017",
+  "doi": "10.48550/arXiv.2306.13986",
+  "title": "Large Language Models as Sous Chefs: Revising Recipes with GPT-3",
+  "year": 2023,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R018",
+  "doi": "10.1016/j.softx.2023.101601",
+  "title": "IRB-draft-generator: A generative AI tool to streamline the creation of institutional review board applications",
+  "year": 2023,
+  "journal": "SoftwareX",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R019",
+  "doi": "10.1093/jamia/ocad220",
+  "title": "Systematic review and longitudinal analysis of implementing Artificial Intelligence to predict clinical deterioration in adult hospitals: what is known and what remains uncertain",
+  "year": 2023,
+  "journal": "Journal of the American Medical Informatics Association",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R020",
+  "doi": "10.1101/2024.07.18.24310656",
+  "title": "Impact of Ambient Artificial Intelligence Notes on Provider Burnout",
+  "year": "2024",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R021",
+  "doi": "10.1101/2024.08.12.24311883",
+  "title": "Enhancing Clinical Documentation Workflow with Ambient Artificial Intelligence: Clinician Perspectives on Work Burden, Burnout, and Job Satisfaction",
+  "year": "2024",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R022",
+  "doi": "10.1101/2024.12.27.24319685",
+  "title": "A Novel Playbook for Pragmatic Trial Operations to Monitor and Evaluate Ambient Artificial Intelligence in Clinical Practice",
+  "year": "2024",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R023",
+  "doi": "10.1001/jamanetworkopen.2024.3201",
+  "title": "Artificial Intelligence-Generated Draft Replies to Patient Inbox Messages.",
+  "year": "2024",
+  "journal": "JAMA network open",
+  "sources": [
+   "Europe PMC|Q2 AI の下書き返信",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R024",
+  "doi": "",
+  "title": "When AI Writes Back: Ethical Considerations by Physicians on AI-Drafted Patient Message Replies.",
+  "year": "2024",
+  "journal": "AMIA ... Annual Symposium proceedings. AMIA Symposium",
+  "sources": [
+   "Europe PMC|Q2 AI の下書き返信"
+  ]
+ },
+ {
+  "id": "R025",
+  "doi": "10.21203/rs.3.rs-5032655/v1",
+  "title": "Embracing Innovation in Education: Investigating the Use and Impact of Artificial Intelligent Assistants Among Preservice Teachers",
+  "year": "2024",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R026",
+  "doi": "10.1101/2024.10.25.24316128",
+  "title": "Design and implementation of Electronic Health Record Computerised Decision Support System (CDSS) trials: A Systematic Review",
+  "year": "2024",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R027",
+  "doi": "10.1101/2024.08.05.24310603",
+  "title": "Exploring the impact of an artificial intelligence-based intraoperative image navigation system in laparoscopic surgery on clinical outcomes: A protocol for a multicenter randomized controlled trial",
+  "year": "2024",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R028",
+  "doi": "10.1016/j.semarthrit.2024.152385",
+  "title": "Identification of outcome domains in primary Sjögren's disease: A scoping review by the OMERACT Sjögren disease working group.",
+  "year": "2024",
+  "journal": "Seminars in arthritis and rheumatism",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R029",
+  "doi": "10.7717/peerj-cs.1857",
+  "title": "Development of an expert system for the classification of myalgic encephalomyelitis/chronic fatigue syndrome.",
+  "year": "2024",
+  "journal": "PeerJ. Computer science",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R030",
+  "doi": "10.1158/1078-0432.ccr-23-3249",
+  "title": "A Phase II Open-Label Randomized Clinical Trial of Preoperative Durvalumab or Durvalumab plus Tremelimumab in Resectable Head and Neck Squamous Cell Carcinoma.",
+  "year": "2024",
+  "journal": "Clinical cancer research : an official journal of the American Association for Cancer Research",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R031",
+  "doi": "10.1101/2024.08.21.608938",
+  "title": "Conventional therapy induces tumor immunoediting and modulates the immune contexture in colorectal cancer",
+  "year": "2024",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R032",
+  "doi": "10.2196/56969",
+  "title": "Telemedicine Applications for Cancer Rehabilitation: Scoping Review.",
+  "year": "2024",
+  "journal": "JMIR cancer",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R033",
+  "doi": "10.1101/2024.09.18.24313918",
+  "title": "Preventive interventions for post Covid-19 condition: systematic review update",
+  "year": "2024",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R034",
+  "doi": "10.1109/TDSC.2026.3665277",
+  "title": "Federated TrustChain: Blockchain-Enhanced LLM Training and Unlearning",
+  "year": 2024,
+  "journal": "IEEE Transactions on Dependable and Secure Computing",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R035",
+  "doi": "10.1145/3674805.3690744",
+  "title": "Can ChatGPT emulate humans in software engineering surveys?",
+  "year": 2024,
+  "journal": "International Symposium on Empirical Software Engineering and Measurement",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R036",
+  "doi": "10.3390/computers13020043",
+  "title": "A User-Centered Privacy Policy Management System for Automatic Consent on Cookie Banners",
+  "year": 2024,
+  "journal": "De Computis",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R037",
+  "doi": "10.1109/CLOUD62652.2024.00062",
+  "title": "Carbon-Aware and Fault-Tolerant Migration of Deep Learning Workloads in the Geo-Distributed Cloud",
+  "year": 2024,
+  "journal": "IEEE International Conference on Cloud Computing",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R038",
+  "doi": "10.48550/arXiv.2409.00630",
+  "title": "LLMs as Evaluators: A Novel Approach to Evaluate Bug Report Summarization",
+  "year": 2024,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R039",
+  "doi": "10.48550/arXiv.2402.17531",
+  "title": "Nissist: An Incident Mitigation Copilot based on Troubleshooting Guides",
+  "year": 2024,
+  "journal": "European Conference on Artificial Intelligence",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R040",
+  "doi": "10.1001/jamanetworkopen.2024.48714",
+  "title": "Artificial Intelligence and Radiologist Burnout",
+  "year": 2024,
+  "journal": "JAMA Network Open",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R041",
+  "doi": "10.19173/irrodl.v25i3.7659",
+  "title": "The Effects of Educational Artificial Intelligence-Powered Applications on Teachers’ Perceived Autonomy, Professional Development for Online Teaching, and Digital Burnout",
+  "year": 2024,
+  "journal": "The International Review of Research in Open and Distributed Learning",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R042",
+  "doi": "10.1371/journal.pone.0303370",
+  "title": "Effectiveness of a chatbot in improving the mental wellbeing of health workers in Malawi during the COVID-19 pandemic: A randomized, controlled trial",
+  "year": 2024,
+  "journal": "PLoS ONE",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R043",
+  "doi": "10.2196/54029",
+  "title": "Development of an Artificial Intelligence–Based Tailored Mobile Intervention for Nurse Burnout: Single-Arm Trial",
+  "year": 2024,
+  "journal": "Journal of Medical Internet Research",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R044",
+  "doi": "10.1016/j.giq.2024.101911",
+  "title": "Creating a workforce of fatigued cynics? A randomized controlled trial of implementing an algorithmic decision-making support tool",
+  "year": 2024,
+  "journal": "Government Information Quarterly",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R045",
+  "doi": "10.1097/cm9.0000000000003018",
+  "title": "Application of artificial intelligence in diagnosis of pulmonary tuberculosis",
+  "year": 2024,
+  "journal": "Chinese Medical Journal",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R046",
+  "doi": "10.1101/2025.09.21.25336260",
+  "title": "Evaluating an Ambient Artificial Intelligence Scribe for Documentation Quality and Efficiency in Psychiatric Consultations: A Simulation-based Study",
+  "year": "2025",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R047",
+  "doi": "10.1136/wjps-2025-001073",
+  "title": "Ambient AI-assited clinical documentation in surgical outpatient care: a preliminary study of usability, workflow, and patient experience.",
+  "year": "2025",
+  "journal": "World journal of pediatric surgery",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R048",
+  "doi": "10.1093/jamia/ocae295",
+  "title": "Ambient artificial intelligence scribes: physician burnout and perspectives on usability and documentation burden.",
+  "year": "2025",
+  "journal": "Journal of the American Medical Informatics Association : JAMIA",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R049",
+  "doi": "10.3390/healthcare13172118",
+  "title": "Ambient Artificial Intelligence Scribes: A Pilot Survey of Perspectives on the Utility and Documentation Burden in Palliative Medicine.",
+  "year": "2025",
+  "journal": "Healthcare (Basel, Switzerland)",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R050",
+  "doi": "10.1056/aioa2501000",
+  "title": "Ambient AI Scribes in Clinical Practice: A Randomized Trial.",
+  "year": "2025",
+  "journal": "NEJM AI",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R051",
+  "doi": "10.1093/jamia/ocae304",
+  "title": "Ambient artificial intelligence scribes: utilization and impact on documentation time.",
+  "year": "2025",
+  "journal": "Journal of the American Medical Informatics Association : JAMIA",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R052",
+  "doi": "10.1101/2025.07.10.25331333",
+  "title": "A Randomized-Clinical Trial of Two Ambient Artificial Intelligence Scribes: Measuring Documentation Efficiency and Physician Burnout",
+  "year": "2025",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R053",
+  "doi": "10.1093/jamiaopen/ooaf068",
+  "title": "Effect of a generative artificial intelligence digital scribe on pediatric provider documentation time, cognitive burden, and burnout.",
+  "year": "2025",
+  "journal": "JAMIA open",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R054",
+  "doi": "10.1055/a-2647-1142",
+  "title": "The Effect of Ambient Artificial Intelligence Scribes on Trainee Documentation Burden.",
+  "year": "2025",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R055",
+  "doi": "10.1001/jamanetworkopen.2025.1904",
+  "title": "Physician Perspectives on Ambient AI Scribes.",
+  "year": "2025",
+  "journal": "JAMA network open",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R056",
+  "doi": "10.3233/shti250921",
+  "title": "Ambient Listening in Clinical Practice: Evaluating EPIC Signal Data Before and After Implementation and Its Impact on Physician Workload.",
+  "year": "2025",
+  "journal": "Studies in health technology and informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R057",
+  "doi": "10.1055/a-2461-4576",
+  "title": "The Effect of Ambient Artificial Intelligence Notes on Provider Burnout.",
+  "year": "2025",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R058",
+  "doi": "10.1093/jamiaopen/ooaf013",
+  "title": "Enhancing clinical documentation with ambient artificial intelligence: a quality improvement survey assessing clinician perspectives on work burden, burnout, and job satisfaction.",
+  "year": "2025",
+  "journal": "JAMIA open",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R059",
+  "doi": "10.1177/20552076251395588",
+  "title": "Evaluating an artificial intelligence scribe for clinical documentation.",
+  "year": "2025",
+  "journal": "Digital health",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R060",
+  "doi": "10.1056/aioa2500945",
+  "title": "A Pragmatic Randomized Controlled Trial of Ambient Artificial Intelligence to Improve Health Practitioner Well-Being.",
+  "year": "2025",
+  "journal": "NEJM AI",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R061",
+  "doi": "10.1001/jamanetworkopen.2025.37000",
+  "title": "Use of an AI Scribe and Electronic Health Record Efficiency.",
+  "year": "2025",
+  "journal": "JAMA network open",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R062",
+  "doi": "10.1001/jamanetworkopen.2025.28056",
+  "title": "Ambient Documentation Technology in Clinician Experience of Documentation Burden and Burnout.",
+  "year": "2025",
+  "journal": "JAMA network open",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R063",
+  "doi": "10.1001/jamanetworkopen.2025.8614",
+  "title": "Evaluation of an Ambient Artificial Intelligence Documentation Platform for Clinicians.",
+  "year": "2025",
+  "journal": "JAMA network open",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R064",
+  "doi": "10.1056/aidbp2401267",
+  "title": "A Novel Playbook for Pragmatic Trial Operations to Monitor and Evaluate Ambient Artificial Intelligence in Clinical Practice.",
+  "year": "2025",
+  "journal": "NEJM AI",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R065",
+  "doi": "10.3389/fpubh.2025.1628831",
+  "title": "Impact of artificial intelligence on electronic health record-related burnouts among healthcare professionals: systematic review.",
+  "year": "2025",
+  "journal": "Frontiers in public health",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q2 AI の下書き返信",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R066",
+  "doi": "10.2196/76743",
+  "title": "Real-World Evidence Synthesis of Digital Scribes Using Ambient Listening and Generative Artificial Intelligence for Clinician Documentation Workflows: Rapid Review.",
+  "year": "2025",
+  "journal": "JMIR AI",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R067",
+  "doi": "10.1101/2025.11.07.25339620",
+  "title": "Ambient Only vs. Longitudinal Data-Enhanced AI Documentation: A Pilot Study Quantifying the Value of Historical Clinical Context in Primary Care",
+  "year": "2025",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R068",
+  "doi": "10.1101/2025.10.30.25339135",
+  "title": "Ambient scribe in general practice: a multi-perspective before-after longitudinal mixed-methods study",
+  "year": "2025",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R069",
+  "doi": "10.1016/j.msksp.2025.103333",
+  "title": "Impact of using an AI scribe on clinical documentation and clinician-patient interactions in allied health private practice: perspectives of clinicians and patients.",
+  "year": "2025",
+  "journal": "Musculoskeletal science & practice",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R070",
+  "doi": "10.1001/jamanetworkopen.2025.22400",
+  "title": "Informed Consent for Ambient Documentation Using Generative AI in Ambulatory Care.",
+  "year": "2025",
+  "journal": "JAMA network open",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R071",
+  "doi": "10.1001/jamanetworkopen.2024.60637",
+  "title": "Clinician Experiences With Ambient Scribe Technology to Assist With Documentation Burden and Efficiency.",
+  "year": "2025",
+  "journal": "JAMA network open",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R072",
+  "doi": "10.1055/a-2559-5791",
+  "title": "The STREAMLINE Pilot Study on Time Reduction and Efficiency in AI-Mediated Logging for Improved Note-Taking Experience.",
+  "year": "2025",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R073",
+  "doi": "10.1093/jamiaopen/ooaf159",
+  "title": "Artificial intelligence-generated draft replies to patient messages in pediatrics.",
+  "year": "2025",
+  "journal": "JAMIA open",
+  "sources": [
+   "Europe PMC|Q2 AI の下書き返信"
+  ]
+ },
+ {
+  "id": "R074",
+  "doi": "10.1055/a-2576-0579",
+  "title": "An AI-Powered Strategy for Managing Patient Messaging Load and Reducing Burnout.",
+  "year": "2025",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q2 AI の下書き返信"
+  ]
+ },
+ {
+  "id": "R075",
+  "doi": "10.1001/jamanetworkopen.2025.0449",
+  "title": "Ethics in Patient Preferences for Artificial Intelligence-Drafted Responses to Electronic Messages.",
+  "year": "2025",
+  "journal": "JAMA network open",
+  "sources": [
+   "Europe PMC|Q2 AI の下書き返信"
+  ]
+ },
+ {
+  "id": "R076",
+  "doi": "10.1055/a-2657-8087",
+  "title": "The Influence of Artificial Intelligence Scribes on Clinician Experience and Efficiency among Pediatric Subspecialists: A Rapid, Randomized Quality Improvement Trial.",
+  "year": "2025",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R077",
+  "doi": "10.1186/s12911-025-03324-w",
+  "title": "Application of artificial intelligence tools and clinical documentation burden: a systematic review and meta-analysis.",
+  "year": "2025",
+  "journal": "BMC medical informatics and decision making",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R078",
+  "doi": "10.1101/2025.08.20.25334115",
+  "title": "Artificial Intelligence-based Automated Echocardiographic Analysis and the Workflow of Sonographers: A randomized crossover trial",
+  "year": "2025",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R079",
+  "doi": "10.21203/rs.3.rs-8368116/v1",
+  "title": "Effectiveness of Artificial Intelligence Mobile App-Guided Prevention and Treatment Protocols on Cancer Patients and Their Impact on Healthcare Workers' Competence",
+  "year": "2025",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R080",
+  "doi": "10.1111/wvn.70003",
+  "title": "AI-Assisted Tailored Intervention for Nurse Burnout: A Three-Group Randomized Controlled Trial.",
+  "year": "2025",
+  "journal": "Worldviews on evidence-based nursing",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R081",
+  "doi": "10.1038/s41598-025-19413-9",
+  "title": "An AIoT enabled system for optimizing data retrieval in the intensive care unit evaluated in a randomized crossover pilot trial.",
+  "year": "2025",
+  "journal": "Scientific reports",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R082",
+  "doi": "10.3390/healthcare13121417",
+  "title": "Artificial Intelligence Applications to Personalized Dietary Recommendations: A Systematic Review.",
+  "year": "2025",
+  "journal": "Healthcare (Basel, Switzerland)",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R083",
+  "doi": "10.1080/0142159x.2025.2473620",
+  "title": "Introducing AI as members of script concordance test expert reference panel: A comparative analysis.",
+  "year": "2025",
+  "journal": "Medical teacher",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R084",
+  "doi": "10.2196/77140",
+  "title": "Machine Learning Approach for Frailty Detection in Long-Term Care Using Accelerometer-Measured Gait and Daily Physical Activity: Model Development and Validation Study.",
+  "year": "2025",
+  "journal": "JMIR aging",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R085",
+  "doi": "10.1101/2025.02.10.25321977",
+  "title": "Large language model-assisted causal machine learning for identifying fatigue-related poor glycated hemoglobin in type 2 diabetes",
+  "year": "2025",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R086",
+  "doi": "10.2196/60115",
+  "title": "Digital Therapeutics-Based Cardio-Oncology Rehabilitation for Lung Cancer Survivors: Randomized Controlled Trial.",
+  "year": "2025",
+  "journal": "JMIR mHealth and uHealth",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R087",
+  "doi": "10.3899/jrheum.2024-1012",
+  "title": "A Systematic Review of Clinical Trial Designs and Outcome Measures in Sjögren Disease Randomized Controlled Trials.",
+  "year": "2025",
+  "journal": "The Journal of rheumatology",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R088",
+  "doi": "10.1080/10543406.2025.2469884",
+  "title": "Recurrent neural networks and attention scores for personalized prediction and interpretation of patient-reported outcomes.",
+  "year": "2025",
+  "journal": "Journal of biopharmaceutical statistics",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R089",
+  "doi": "10.1016/j.bja.2024.10.045",
+  "title": "Continuous vital sign monitoring of patients recovering from surgery on general wards: a narrative review.",
+  "year": "2025",
+  "journal": "British journal of anaesthesia",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R090",
+  "doi": "10.1093/jamiaopen/ooaf021",
+  "title": "A proof-of-concept study for patient use of open notes with large language models.",
+  "year": "2025",
+  "journal": "JAMIA open",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R091",
+  "doi": "10.2196/47951",
+  "title": "Home-Based Intervention Tool for Cardiac Telerehabilitation: Protocol for a Controlled Trial.",
+  "year": "2025",
+  "journal": "JMIR research protocols",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R092",
+  "doi": "10.1177/19322968231183436",
+  "title": "Delivering Biopsychosocial Health Care Within Routine Care: Spotlight-AQ Pivotal Multicenter Randomized Controlled Trial Results.",
+  "year": "2025",
+  "journal": "Journal of diabetes science and technology",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R093",
+  "doi": "10.1148/radiol.240701",
+  "title": "Large-Scale Validation of the Feasibility of GPT-4 as a Proofreading Tool for Head CT Reports.",
+  "year": 2025,
+  "journal": "Radiology",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R094",
+  "doi": "10.1109/BdKCSE67969.2025.11300494",
+  "title": "Predictive Wellness Analytics Through Hybrid Sensor-LLM Integration",
+  "year": 2025,
+  "journal": "2025 International Conference on Big Data, Knowledge and Control Systems Engineering (BdKCSE)",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R095",
+  "doi": "10.1109/AIIoT65859.2025.11105274",
+  "title": "Integrating Large Language Models (LLMs) and Vector Databases into Healthcare Operations",
+  "year": 2025,
+  "journal": "2025 IEEE World AI IoT Congress (AIIoT)",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R096",
+  "doi": "10.1109/IConSCEPT66142.2025.11437344",
+  "title": "AI for Personalized Mental Health Support – Early Intervention in Rural/Underserved India",
+  "year": 2025,
+  "journal": "2025 International Conference on Signal Processing, Computation, Electronics, Power and Telecommunication (IConSCEPT)",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R097",
+  "doi": "",
+  "title": "Position: The ML Community Must Build an AI-Augmented Peer-Review Ecosystem",
+  "year": 2025,
+  "journal": "",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R098",
+  "doi": "10.3389/fpubh.2025.1649342",
+  "title": "The impact of generative AI’S information delivery methods on emotional exhaustion among bullying roles in the medical workplace",
+  "year": 2025,
+  "journal": "Frontiers in Public Health",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R099",
+  "doi": "10.48550/arXiv.2505.23295",
+  "title": "How Does Response Length Affect Long-Form Factuality",
+  "year": 2025,
+  "journal": "Annual Meeting of the Association for Computational Linguistics",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R100",
+  "doi": "10.33593/iccp.v6i1.702",
+  "title": "PAVEMENT FATIGUE CONCEPTS: A HISTORICAL REVIEW",
+  "year": 2025,
+  "journal": "Proceedings of the International Conference on Concrete Pavements",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R101",
+  "doi": "10.1093/neuonc/noaf201.1270",
+  "title": "NCOG-03. Scalable Tracking of Symptoms in the Electronic Health Record using Large Language Models in Patients with Central Nervous System Cancers Undergoing Therapy",
+  "year": 2025,
+  "journal": "Neuro-Oncology",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R102",
+  "doi": "10.33593/iccp.v5i1.796",
+  "title": "Experiment of concrete pavements at LCPC's fatigue test track",
+  "year": 2025,
+  "journal": "Proceedings of the International Conference on Concrete Pavements",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R103",
+  "doi": "10.1145/3774904.3792144",
+  "title": "FedSRD: Sparsify-Reconstruct-Decompose for Communication-Efficient Federated Large Language Models Fine-Tuning",
+  "year": 2025,
+  "journal": "The Web Conference",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R104",
+  "doi": "10.1109/ICDE65706.2026.00220",
+  "title": "Llmia: an Out-Of-The-Box Index Advisor Via in-Context Learning With Llms",
+  "year": 2025,
+  "journal": "IEEE International Conference on Data Engineering",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R105",
+  "doi": "10.1145/3714394.3756161",
+  "title": "Biosensing-Driven Cognitive Augmentation: Real-Time Mind Wandering Detection and Robot Intervention",
+  "year": 2025,
+  "journal": "UbiComp Companion",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R106",
+  "doi": "",
+  "title": "Can Large Language Models Simulate Human Responses? A Case Study of Stated Preference Experiments in the Context of Heating-related Choices",
+  "year": 2025,
+  "journal": "",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R107",
+  "doi": "",
+  "title": "When Relevance Meets Novelty: Dual-Stable Periodic Optimization for Serendipitous Recommendation",
+  "year": 2025,
+  "journal": "",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R108",
+  "doi": "10.2196/73672",
+  "title": "Using Large Language Models to Assess Burnout Among Health Care Workers in the Context of COVID-19 Vaccine Decisions and Health Beliefs: Retrospective Cohort Study",
+  "year": 2025,
+  "journal": "JMIR Nursing",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R109",
+  "doi": "10.1093/neuonc/noaf223",
+  "title": "Scalable tracking of symptoms in the electronic health record using large language models in patients with central nervous system cancers undergoing therapy",
+  "year": 2025,
+  "journal": "Neuro-Oncology",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R110",
+  "doi": "10.3390/s25113324",
+  "title": "Few-Shot Optimization for Sensor Data Using Large Language Models: A Case Study on Fatigue Detection",
+  "year": 2025,
+  "journal": "Italian National Conference on Sensors",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R111",
+  "doi": "10.47191/etj/v10i04.09",
+  "title": "AI-Driven Burnout Management System: A Novel Approach Using Generative AI, MongoDB Atlas, Python, And Training Large Language Models (LLMs) - Version 3",
+  "year": 2025,
+  "journal": "Engineering and Technology Journal",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R112",
+  "doi": "10.1007/s10916-025-02269-x",
+  "title": "Reference and Solution Architecture for GenAI- and GIS-Enhanced Physical Activity Interventions: Towards Implementing the AI4Motion Platform",
+  "year": 2025,
+  "journal": "Journal of medical systems",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R113",
+  "doi": "10.54941/ahfe1007021",
+  "title": "Digital Copilots: Advancing Pilot Mental Health Through AI Chatbots and Systems",
+  "year": 2025,
+  "journal": "AHFE International",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R114",
+  "doi": "10.3389/fdgth.2025.1665457",
+  "title": "Exploring AI-personalized visualization of the safe place in virtual reality versus imagination of the safe place for stress, burnout, and relaxation in psychotherapists: a case series",
+  "year": 2025,
+  "journal": "Frontiers Digit. Health",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R115",
+  "doi": "10.48550/arXiv.2510.27119",
+  "title": "Unstructured Data Analysis using LLMs: A Comprehensive Benchmark",
+  "year": 2025,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R116",
+  "doi": "10.48550/arXiv.2502.14948",
+  "title": "Learning to Solve and Verify: A Self-Play Framework for Code and Test Generation",
+  "year": 2025,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R117",
+  "doi": "10.48550/arXiv.2506.11635",
+  "title": "FAA Framework: A Large Language Model-Based Approach for Credit Card Fraud Investigations",
+  "year": 2025,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R118",
+  "doi": "10.1038/s41467-026-74077-x",
+  "title": "Benchmarking large language models for cell-free RNA diagnostic biomarker discovery",
+  "year": 2025,
+  "journal": "bioRxiv",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R119",
+  "doi": "10.1109/ICCIT68739.2025.11491524",
+  "title": "X-SIEM Framework: Integrating Rule-Based, ML, and LLMs for Cyber Threat Intelligence",
+  "year": 2025,
+  "journal": "2025 28th International Conference on Computer and Information Technology (ICCIT)",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R120",
+  "doi": "10.48550/arXiv.2506.14493",
+  "title": "LingoLoop Attack: Trapping MLLMs via Linguistic Context and State Entrapment into Endless Loops",
+  "year": 2025,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R121",
+  "doi": "10.2196/72398",
+  "title": "AI in Medical Questionnaires: Scoping Review",
+  "year": 2025,
+  "journal": "Journal of Medical Internet Research",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R122",
+  "doi": "10.1145/3706599.3720269",
+  "title": "Redefining Research Crowdsourcing: Incorporating Human Feedback with LLM-Powered Digital Twins: Incorporating Human Feedback with LLM-Powered Digital Twins",
+  "year": 2025,
+  "journal": "CHI Extended Abstracts",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R123",
+  "doi": "10.3390/educsci15091223",
+  "title": "Can ChatGPT Ease Digital Fatigue? Short-Cycle Content Curation for University Instructors",
+  "year": 2025,
+  "journal": "Education sciences",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R124",
+  "doi": "10.1186/s12911-025-03061-0",
+  "title": "Evaluating the performance of artificial intelligence-based speech recognition for clinical documentation: a systematic review",
+  "year": 2025,
+  "journal": "BMC Medical Informatics and Decision Making",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R125",
+  "doi": "10.3389/fpubh.2025.1619378",
+  "title": "Integrative review of artificial intelligence applications in nursing: education, clinical practice, workload management, and professional perceptions",
+  "year": 2025,
+  "journal": "Frontiers in Public Health",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R126",
+  "doi": "10.3390/bs15050696",
+  "title": "Effects of Employee–Artificial Intelligence (AI) Collaboration on Counterproductive Work Behaviors (CWBs): Leader Emotional Support as a Moderator",
+  "year": 2025,
+  "journal": "Behavioral Sciences",
+  "sources": [
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R127",
+  "doi": "",
+  "title": "Pre-Post Evaluation of Documentation Burden, Time Perception, and Cognitive Workload of Ambient AI Scribe Tools.",
+  "year": "2026",
+  "journal": "AMIA Joint Summits on Translational Science proceedings. AMIA Joint Summits on Translational Science",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R128",
+  "doi": "10.2196/92193",
+  "title": "Ambient AI Scribes and Emergency Department Documentation Burden: Retrospective Cohort Study.",
+  "year": "2026",
+  "journal": "JMIR AI",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R129",
+  "doi": "10.3389/fdgth.2026.1764465",
+  "title": "The MediVoice implementation journey: ambient artificial intelligence for clinical documentation.",
+  "year": "2026",
+  "journal": "Frontiers in digital health",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R130",
+  "doi": "10.1055/a-2892-7988",
+  "title": "From Burden to Balance: Trends in Documentation Workload with Ambient Artificial Intelligence Scribe Adoption.",
+  "year": "2026",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R131",
+  "doi": "10.1002/jhm.70451",
+  "title": "Ambient artificial intelligence scribe implementation in inpatient setting.",
+  "year": "2026",
+  "journal": "Journal of hospital medicine",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R132",
+  "doi": "10.2196/89996",
+  "title": "Ambient AI Scribes to Create Educational Feedback Notes for Medical Students: Randomized Trial.",
+  "year": "2026",
+  "journal": "JMIR medical education",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R133",
+  "doi": "10.2196/85580",
+  "title": "Impact of an Ambient AI Scribe Among Clinicians and Patients: Real-World Prospective Observational Time-Motion Study.",
+  "year": "2026",
+  "journal": "JMIR medical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R134",
+  "doi": "10.3389/fpsyt.2026.1821065",
+  "title": "Clinician and simulated patient perspectives on ambient AI scribes in psychiatric consultations: a qualitative study.",
+  "year": "2026",
+  "journal": "Frontiers in psychiatry",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R135",
+  "doi": "10.21203/rs.3.rs-10252410/v1",
+  "title": "Clinician Perspectives on an Ambient AI Scribe in the Emergency Department: A Cross-Sectional Pilot Survey",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R136",
+  "doi": "10.1002/lary.70625",
+  "title": "Ambient Artificial Intelligence Scribes: A Scoping Review With Implications for Otolaryngology.",
+  "year": "2026",
+  "journal": "The Laryngoscope",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R137",
+  "doi": "10.2196/93618",
+  "title": "Cognitive Workload and Mental Burden in Health Care Professionals Interacting With AI: Systematic Review and Meta-Analysis.",
+  "year": "2026",
+  "journal": "Journal of medical Internet research",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R138",
+  "doi": "10.2196/83335",
+  "title": "A Bilingual Arabic-English Ambient AI Scribe for Clinical Documentation: Prospective Evaluation Study.",
+  "year": "2026",
+  "journal": "JMIR medical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R139",
+  "doi": "10.1002/jac5.70242",
+  "title": "Using an Ambient Artificial Intelligence Tool to Document Clinical Pharmacist Patient Encounters: Real-World Evidence From a Federally Qualified Health Center.",
+  "year": "2026",
+  "journal": "Journal of the American College of Clinical Pharmacy : JACCP",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q2 AI の下書き返信",
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R140",
+  "doi": "10.7759/cureus.106643",
+  "title": "Ambient Documentation Systems in Emergency Medicine: A Scoping Review of Clinical Precision, Patient Experience, Throughput, and Quality.",
+  "year": "2026",
+  "journal": "Cureus",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R141",
+  "doi": "10.1055/a-2939-3038",
+  "title": "The Effect of Ambient Artificial Intelligence Documentation on Clinician Workload, Efficiency, and Patient Experience in a Multisite Emergency Department Network.",
+  "year": "2026",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R142",
+  "doi": "10.2196/84104",
+  "title": "Ambient AI Scribe Implementation in an Ambulatory Setting in a Single Medical Group: Prospective Study.",
+  "year": "2026",
+  "journal": "JMIR medical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R143",
+  "doi": "10.21037/cdt-2025-454",
+  "title": "Transforming clinical documentation with ambient artificial intelligence (AI) scribes: a narrative review of technology, impact, and implementation.",
+  "year": "2026",
+  "journal": "Cardiovascular diagnosis and therapy",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R144",
+  "doi": "10.1093/jamia/ocaf180",
+  "title": "Evaluating ambient artificial intelligence documentation: effects on work efficiency, documentation burden, and patient-centered care.",
+  "year": "2026",
+  "journal": "Journal of the American Medical Informatics Association : JAMIA",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R145",
+  "doi": "10.1177/15589447251389661",
+  "title": "Ambient Artificial Intelligence in Hand Surgery: Insights, Pearls, and Pitfalls From Real-World Use.",
+  "year": "2026",
+  "journal": "Hand (New York, N.Y.)",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R146",
+  "doi": "10.1093/jamia/ocag018",
+  "title": "Comparing ambient scribes: a randomized crossover clinical trial addressing ambient scribe technologies' impact on physician burnout.",
+  "year": "2026",
+  "journal": "Journal of the American Medical Informatics Association : JAMIA",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R147",
+  "doi": "10.22454/primer.2026.393770",
+  "title": "The Impact of Ambient AI on Resident Documentation and Well-Being: A Pilot Study.",
+  "year": "2026",
+  "journal": "PRiMER (Leawood, Kan.)",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R148",
+  "doi": "10.64898/2026.06.30.26356723",
+  "title": "Ambient AI Documentation in Clinical Genetics: Perspectives on Implementation and Impact on Burnout",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R149",
+  "doi": "10.1177/15305627261424693",
+  "title": "Adoption of AI-Based Scribes in Telemedicine: Provider Attitudes and Insights.",
+  "year": "2026",
+  "journal": "Telemedicine journal and e-health : the official journal of the American Telemedicine Association",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R150",
+  "doi": "10.3389/fpsyg.2026.1840884",
+  "title": "Evidence on artificial intelligence-assisted clinical documentation and healthcare workers' emotional wellbeing at work: a scoping review.",
+  "year": "2026",
+  "journal": "Frontiers in psychology",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R151",
+  "doi": "10.1016/j.artd.2026.102095",
+  "title": "Optimizing Hip and Knee Arthroplasty Clinic Flow: A Prospective Evaluation of Artificial Intelligence Scribe Technology.",
+  "year": "2026",
+  "journal": "Arthroplasty today",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R152",
+  "doi": "10.64898/2026.01.12.26343538",
+  "title": "Longitudinal effects of ambient AI scribe use on documentation burden and financial productivity in primary care: A quasi-experimental study",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R153",
+  "doi": "10.2196/86474",
+  "title": "Quality of Clinical Notes Created by Ambient Listening Generative AI: Pragmatic Prospective Pilot Study.",
+  "year": "2026",
+  "journal": "JMIR medical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R154",
+  "doi": "10.1093/jamia/ocaf214",
+  "title": "Listening to the note: clinician perspectives on ambient artificial intelligence scribes in medical documentation.",
+  "year": "2026",
+  "journal": "Journal of the American Medical Informatics Association : JAMIA",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R155",
+  "doi": "10.1093/acamed/wvag287",
+  "title": "When the scribe does the reasoning: ambient artificial intelligence, inference impersonation, and the development of trainees' clinical judgment.",
+  "year": "2026",
+  "journal": "Academic medicine : journal of the Association of American Medical Colleges",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R156",
+  "doi": "10.21203/rs.3.rs-10173128/v1",
+  "title": "Cognitive Load Shedding and Workflow Transformation: A Longitudinal Action Learning Study of AI Scribe Adoption in Residential Aged Care General Practice",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R157",
+  "doi": "10.1055/a-2818-1706",
+  "title": "Crossover Evaluation of Two Ambient AI Scribe Tools in the Emergency Department.",
+  "year": "2026",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R158",
+  "doi": "10.1038/s41746-026-02454-3",
+  "title": "Ambient scribe in general practice: a multi-perspective before-after longitudinal mixed-methods study.",
+  "year": "2026",
+  "journal": "NPJ digital medicine",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R159",
+  "doi": "10.5435/jaaos-d-25-01245",
+  "title": "Reduction of Electronic Medical Record Documentation Time and Burden Using an Artificial Intelligence Scribe Tool in an Orthopaedic Clinic.",
+  "year": "2026",
+  "journal": "The Journal of the American Academy of Orthopaedic Surgeons",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R160",
+  "doi": "10.64898/2026.07.09.26357653",
+  "title": "Protocol for an EHR-embedded pragmatic randomized control trial of Ambient AI to Reduce Nursing Staff Documentation Time",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R161",
+  "doi": "10.2196/92364",
+  "title": "Navigating Collective Bargaining Barriers to the Implementation of AI Scribe Technology Among Ambulatory Advanced Practice Providers: Mixed Methods Quality Improvement Study.",
+  "year": "2026",
+  "journal": "JMIR formative research",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R162",
+  "doi": "10.21203/rs.3.rs-9929134/v1",
+  "title": "The Impact of AI Scribes on Patient and Clinician Satisfaction and Communication",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R163",
+  "doi": "10.1055/a-2936-7516",
+  "title": "Large-Scale Implementation of Ambient Artificial Intelligence Documentation and Its Effects on Electronic Health Record Efficiency and Clinician Well-Being.",
+  "year": "2026",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R164",
+  "doi": "10.21203/rs.3.rs-9524907/v1",
+  "title": "Implementing AI‑Powered Ambient Listening in Medication Reviews: Study Protocol and Pilot Evaluation in Belgian Community Pharmacies",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R165",
+  "doi": "10.64898/2026.02.16.26346370",
+  "title": "Linguistic Effects of Ambient AI on Clinical Documentation: A Matched Pre-Post Study",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R166",
+  "doi": "10.2196/88472",
+  "title": "The Regional Implementation of an Electronic Health Record-Integrated Ambient Scribe in Primary and Secondary Care in England: Real-Time Qualitative Evaluation.",
+  "year": "2026",
+  "journal": "JMIR medical informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R167",
+  "doi": "10.1200/op-25-00612",
+  "title": "Impact of AI Scribes on Physician Productivity and Workflow in Medical Oncology.",
+  "year": "2026",
+  "journal": "JCO oncology practice",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R168",
+  "doi": "10.3233/shti260257",
+  "title": "Integrating AI Scribe Technology into Public Health Workflows: Simulation and Field Evaluation in Disease Case Management.",
+  "year": "2026",
+  "journal": "Studies in health technology and informatics",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R169",
+  "doi": "10.1093/ajhp/zxag176",
+  "title": "The impact of an ambient documentation tool on the care experience of clinical pharmacists embedded in ambulatory clinics: A mixed-methods evaluation.",
+  "year": "2026",
+  "journal": "American journal of health-system pharmacy : AJHP : official journal of the American Society of Health-System Pharmacists",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R170",
+  "doi": "10.1515/dx-2026-0112",
+  "title": "The CODEX action incubator: a consensus-driven approach to identify and implement diagnostic excellence measures in the context of artificial intelligence.",
+  "year": "2026",
+  "journal": "Diagnosis (Berlin, Germany)",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R171",
+  "doi": "10.64898/2026.02.19.26346634",
+  "title": "Impact of an ambient digital scribe on typing and note quality: the AutoscriberValidate study",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R172",
+  "doi": "10.1007/s11606-026-10448-w",
+  "title": "Implementing Artificial Intelligence-Enabled Ambient Documentation Technology for Ambulatory Clinicians: An Innovation Evaluation.",
+  "year": "2026",
+  "journal": "Journal of general internal medicine",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R173",
+  "doi": "10.1016/j.arth.2026.03.069",
+  "title": "Evaluating the Impact of Artificial Intelligence Scribes on Clinical Workflow and Documentation Quality: A Randomized Controlled Trial.",
+  "year": "2026",
+  "journal": "The Journal of arthroplasty",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R174",
+  "doi": "10.1093/jamiaopen/ooag155",
+  "title": "Comparative effectiveness of ambient documentation tools in primary care tool-specific variations in efficiency, documentation burden, and productivity over time.",
+  "year": "2026",
+  "journal": "JAMIA open",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R175",
+  "doi": "10.12688/hrbopenres.14302.2",
+  "title": "AI Digital Scribe Template Enhancement for Non-Specific Symptom Documentation in Irish General Practice: A Mixed-Methods Feasibility Protocol",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R176",
+  "doi": "10.1002/cncr.70307",
+  "title": "Deriving wisdom from data: The value and continued rationale for structured data in the era of artificial intelligence-driven oncology care.",
+  "year": "2026",
+  "journal": "Cancer",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R177",
+  "doi": "10.12688/hrbopenres.14302.1",
+  "title": "AI Digital Scribe Template Enhancement for Non-Specific Symptom Documentation in Irish General Practice: A Mixed-Methods Feasibility Protocol",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R178",
+  "doi": "10.5435/jaaos-d-24-01321",
+  "title": "Utilization of an Artificial Intelligence-Based Documentation System Improves Provider Efficiency in Outpatient Orthopaedic Clinics: Reducing the Afterhours Burden of the Electronic Health Record-A Pilot Study.",
+  "year": "2026",
+  "journal": "The Journal of the American Academy of Orthopaedic Surgeons",
+  "sources": [
+   "Europe PMC|Q1 AI の記録支援"
+  ]
+ },
+ {
+  "id": "R179",
+  "doi": "10.1055/a-2893-7363",
+  "title": "Usage of and Satisfaction with Artificial Intelligence-Generated Draft Replies to Patient Portal Messages.",
+  "year": "2026",
+  "journal": "Applied clinical informatics",
+  "sources": [
+   "Europe PMC|Q2 AI の下書き返信"
+  ]
+ },
+ {
+  "id": "R180",
+  "doi": "10.1016/j.surg.2025.109700",
+  "title": "Easing the burden: A pilot study evaluating AI-generated In-Basket message drafts to streamline perioperative endocrine surgical care.",
+  "year": "2026",
+  "journal": "Surgery",
+  "sources": [
+   "Europe PMC|Q2 AI の下書き返信"
+  ]
+ },
+ {
+  "id": "R181",
+  "doi": "10.20944/preprints202609.0782.v1",
+  "title": "Artificial Intelligence and Surface Electromyography for Assessing Quadriceps Neuromuscular Fatigue and Knee Injury Risk in Professional Basketball Players: A Pilot Study",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q2 AI の下書き返信"
+  ]
+ },
+ {
+  "id": "R182",
+  "doi": "10.7759/cureus.112814",
+  "title": "Artificial Intelligence and Clinician Burnout in the United States: A Narrative Review.",
+  "year": "2026",
+  "journal": "Cureus",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R183",
+  "doi": "10.64898/2026.02.20.26346503",
+  "title": "Randomized Trial Protocol: Epic Generative AI Chart Summarization Tool to Reduce Ambulatory Provider Cognitive Task Load",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R184",
+  "doi": "10.1016/j.jclinane.2026.112163",
+  "title": "Generative AI in preanesthetic consultations: Effects on efficiency, documentation workload, quality, and physician-patient interaction: A simulation trial.",
+  "year": "2026",
+  "journal": "Journal of clinical anesthesia",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R185",
+  "doi": "10.2196/85986",
+  "title": "Alleviating Nurse Burnout With an Artificial Intelligence-Selected Mobile Cognitive Behavioral Therapy-Based Intervention: Mixed Methods Randomized Controlled Trial.",
+  "year": "2026",
+  "journal": "JMIR mHealth and uHealth",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R186",
+  "doi": "10.1371/journal.pone.0355376",
+  "title": "Protocol for a pilot effectiveness and feasibility randomized controlled trial of an advanced telerehabilitation system for people with multiple sclerosis (PLATINUMS project).",
+  "year": "2026",
+  "journal": "PloS one",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R187",
+  "doi": "10.3389/fpsyg.2026.1800027",
+  "title": "AI-enabled instructor care and physical fitness performance in police cadets: the mediating roles of emotions, engagement, and recovery.",
+  "year": "2026",
+  "journal": "Frontiers in psychology",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R188",
+  "doi": "10.64898/2026.08.26.26361496",
+  "title": "A Pragmatic Randomized Trial of an EHR-Integrated Generative AI Chart Summarization Tool for Ambulatory Clinicians",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R189",
+  "doi": "10.1161/jaha.125.045637",
+  "title": "Artificial Intelligence-Based Automated Echocardiographic Analysis and the Workflow of Sonographers: A Randomized Crossover Trial (AI-Echo RCT).",
+  "year": "2026",
+  "journal": "Journal of the American Heart Association",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "OpenAlex|search（Q3 と同じ語・最大 1,000 件）"
+  ]
+ },
+ {
+  "id": "R190",
+  "doi": "10.3389/fdgth.2026.1767648",
+  "title": "Quality assessment of large language model-generated prior authorization letters in nephrology.",
+  "year": "2026",
+  "journal": "Frontiers in digital health",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R191",
+  "doi": "10.1038/s41598-026-63711-9",
+  "title": "Effect of pilates exercises plus breastfeeding positioning adjustment on artificial intelligence-assessed craniovertebral angle in breastfeeding women with forward head posture: a randomized controlled trial.",
+  "year": "2026",
+  "journal": "Scientific reports",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R192",
+  "doi": "10.1186/s12967-026-07738-6",
+  "title": "A fine-tuned large language model chatbot for multi-scenario radiology cancer care: randomized controlled trial on interaction optimization, emotional support, and provider burnout reduction.",
+  "year": "2026",
+  "journal": "Journal of translational medicine",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R193",
+  "doi": "10.3389/fpsyg.2026.1859401",
+  "title": "Modeling learning engagement in AI-supported education: a crossover enabler-inhibitor framework.",
+  "year": "2026",
+  "journal": "Frontiers in psychology",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R194",
+  "doi": "10.3389/fmed.2026.1875075",
+  "title": "The double-edged sword of generative AI in dermatology: a multi-component cross-sectional study on physician burnout, patient satisfaction, and communication quality.",
+  "year": "2026",
+  "journal": "Frontiers in medicine",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R195",
+  "doi": "10.1002/jdd.70304",
+  "title": "Impact of AI-Generated Feedback on Dental Student Performance in Preclinical Prosthodontics Education.",
+  "year": "2026",
+  "journal": "Journal of dental education",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R196",
+  "doi": "10.1053/j.gastro.2025.12.020",
+  "title": "Effect of a Computer-Aided Device for Detecting Gastric Neoplasms: A Multicenter, Randomized Controlled Trial.",
+  "year": "2026",
+  "journal": "Gastroenterology",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R197",
+  "doi": "10.21203/rs.3.rs-9820618/v1",
+  "title": "Development of Intelligent Learning Environments: Methodology for Integrating Artificial Intelligence Systems Into the Higher Education Biophysics Curriculum",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R198",
+  "doi": "10.1136/bmjopen-2025-108821",
+  "title": "Investigating the feasibility and acceptability of the TeleRehabilitation of balance clinical and economic Decision Support System (TeleRehaB DSS) in adults at risk of falls: study protocol for a multicentre clinical trial.",
+  "year": "2026",
+  "journal": "BMJ open",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R199",
+  "doi": "10.1186/s12909-026-09285-6",
+  "title": "Evaluation of basic life support practice skills based on artificial intelligence technology: system construction and evaluation equivalence validation.",
+  "year": "2026",
+  "journal": "BMC medical education",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R200",
+  "doi": "10.2196/94140",
+  "title": "Effects of a Safety User Interface Bundle on Verification Intentions in Generative AI Chat Use Among Older Chinese Adults: Randomized Vignette Survey.",
+  "year": "2026",
+  "journal": "Journal of medical Internet research",
+  "sources": [
+   "Europe PMC|Q3 一般",
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R201",
+  "doi": "10.3389/frai.2026.1837887",
+  "title": "Artificial intelligence-assisted endoscopic diagnosis of esophageal squamous cell carcinoma.",
+  "year": "2026",
+  "journal": "Frontiers in artificial intelligence",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R202",
+  "doi": "10.12688/f1000research.178438.2",
+  "title": "Improving Medication Safety in Chronic Kidney Disease Using Rule-Based and Artificial Intelligence-Based Clinical Decision Support Systems: A Systematic Review of Randomized Controlled Trials.",
+  "year": "2026",
+  "journal": "F1000Research",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R203",
+  "doi": "10.2196/86149",
+  "title": "Feasibility and Preliminary Effectiveness of the ChulaCancer Mobile Chatbot for Supportive Care of Patients With Breast or Colorectal Cancer Receiving Chemotherapy: Pilot Randomized Controlled Trial.",
+  "year": "2026",
+  "journal": "JMIR formative research",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R204",
+  "doi": "10.1001/jamanetworkopen.2026.16556",
+  "title": "Physician-Reported Safety Outcomes of AI-Generated Hospital Course Summaries.",
+  "year": "2026",
+  "journal": "JAMA network open",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R205",
+  "doi": "10.1159/000549894",
+  "title": "Exploring the Impact of an Artificial Intelligence-Based Intraoperative Image Navigation System in Laparoscopic Surgery on Clinical Outcomes: A Protocol for a Multicenter Randomized Controlled Trial.",
+  "year": "2026",
+  "journal": "European surgical research. Europaische chirurgische Forschung. Recherches chirurgicales europeennes",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R206",
+  "doi": "10.2196/81066",
+  "title": "Human-AI Interaction With AI-Assisted Tumor Overlays in Pediatric Whole-Body Magnetic Resonance Imaging: Exploratory Reader Study.",
+  "year": "2026",
+  "journal": "JMIR human factors",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R207",
+  "doi": "10.1111/jnu.70123",
+  "title": "Machine Learning Models for Predicting Pain, Fatigue, Depression, Anxiety, and Malnutrition in Cancer Patients: A Systematic Review and Meta-Analysis.",
+  "year": "2026",
+  "journal": "Journal of nursing scholarship : an official publication of Sigma Theta Tau International Honor Society of Nursing",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R208",
+  "doi": "",
+  "title": "The Immediate Impact of Hemodialysis on Gait Metrics.",
+  "year": "2026",
+  "journal": "The Israel Medical Association journal : IMAJ",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R209",
+  "doi": "10.1111/jsr.70144",
+  "title": "A Participatory Artificial Intelligence Driven Shift-Scheduling Application for Improving Sleep Among Shift-Working Caregivers: A 4-Month Non-Randomised Controlled Study With Cross-Over Design.",
+  "year": "2026",
+  "journal": "Journal of sleep research",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R210",
+  "doi": "10.1038/s41598-026-62084-3",
+  "title": "Development and validation of an AI-driven multimodal system for assessing aerobic gymnastics training using video analysis, motion capture, and physiological signals.",
+  "year": "2026",
+  "journal": "Scientific reports",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R211",
+  "doi": "10.3389/fneur.2026.1861673",
+  "title": "Advancing stroke rehabilitation: the potential and challenges of closed-loop brain-computer interface technology.",
+  "year": "2026",
+  "journal": "Frontiers in neurology",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R212",
+  "doi": "10.2196/94450",
+  "title": "Explainable AI for Equitable Nurse Scheduling: Pragmatic Pre-Post Implementation Study.",
+  "year": "2026",
+  "journal": "JMIR nursing",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R213",
+  "doi": "10.21203/rs.3.rs-10526316/v1",
+  "title": "The AI-CDSS Evidence Gap: A Critical Analysis of Outcome Measurement, Human-AI Interaction, and Implementation Validation",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R214",
+  "doi": "10.12688/f1000research.178438.1",
+  "title": "Improving Medication Safety in Chronic Kidney Disease Using Rule-Based and Artificial Intelligence–Based Clinical Decision Support Systems: A Systematic Review of Randomized Controlled Trials",
+  "year": "2026",
+  "journal": "",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R215",
+  "doi": "10.2196/90784",
+  "title": "An Intelligent Interactive Management Platform for Rheumatoid Arthritis Care: Real-World Observational Study.",
+  "year": "2026",
+  "journal": "JMIR medical informatics",
+  "sources": [
+   "Europe PMC|Q3 一般"
+  ]
+ },
+ {
+  "id": "R216",
+  "doi": "10.37547/tajet/volume08issue02-17",
+  "title": "Enhancing Enterprise Security Management Using Hybrid Machine Learning and Large Language Model–Assisted Intrusion Detection",
+  "year": 2026,
+  "journal": "The American Journal of Engineering and Technology",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R217",
+  "doi": "10.48550/arXiv.2603.01154",
+  "title": "vEcho: A Paradigm Shift from Vulnerability Verification to Proactive Discovery with Large Language Models",
+  "year": 2026,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R218",
+  "doi": "10.4238/g2dwfg74",
+  "title": "EFFECTIVENESS OF ARTIFICIAL INTELLIGENCE-BASED TOOLS IN MONITORING AND REDUCING BURNOUT AMONG HEALTHCARE WORKERS: A SYSTEMATIC REVIEW",
+  "year": 2026,
+  "journal": "Genetics and Molecular Research",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R219",
+  "doi": "10.1109/ICBASE70763.2026.11619482",
+  "title": "Web Log Anomaly Detection via Multi-Agent RAG",
+  "year": 2026,
+  "journal": "2026 7th International Conference on Big Data & Artificial Intelligence & Software Engineering (ICBASE)",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R220",
+  "doi": "10.35510/jer.2026.48.2.5",
+  "title": "Development and Effects of a Generative AI-Assisted Mindful Self-Compassion Program for Professional School Counselors",
+  "year": 2026,
+  "journal": "The Institute of Educational Research Chonnam National University",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R221",
+  "doi": "10.62762/bish.2026.397062",
+  "title": "Advanced Architectures in Preventive Health Informatics: A Hybrid Clinical Decision Support System for Early Endocrine and Metabolic Risk Screening",
+  "year": 2026,
+  "journal": "Biomedical Informatics and Smart Healthcare",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R222",
+  "doi": "10.1109/INFOCOM59046.2026.11571297",
+  "title": "LRAF: LLM-Assisted Risk-Attribute Framework for Phishing Email Detection",
+  "year": 2026,
+  "journal": "IEEE Conference on Computer Communications",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R223",
+  "doi": "10.1145/3774904.3792683",
+  "title": "Inference Cost Attacks for Retrieval-Augmented Large Language Models",
+  "year": 2026,
+  "journal": "The Web Conference",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R224",
+  "doi": "",
+  "title": "A Control-Theoretic Approach for Resource-Aware Consensus in Multi-Agent AI",
+  "year": 2026,
+  "journal": "",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R225",
+  "doi": "10.1177/03635465261463006",
+  "title": "Artificial Intelligence Cannot Replace Peer Reviewers but May Help Editors Triage: A Comparative Analysis of a Large Language Model and Human Reviewer Recommendations at the American Journal of Sports Medicine",
+  "year": 2026,
+  "journal": "American Journal of Sports Medicine",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R226",
+  "doi": "10.1109/JIOT.2026.3716973",
+  "title": "Intent-Driven Task Coordination in Low-Altitude IoT Networks: Autonomous Cognitive Agents via LLMs and Distributed Active Inference",
+  "year": 2026,
+  "journal": "IEEE Internet of Things Journal",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R227",
+  "doi": "10.3389/fpubh.2026.1926167",
+  "title": "Research on the impact of generative AI interaction modes on the improvement of school-age children’s early reading ability and college students’ auxiliary intervention",
+  "year": 2026,
+  "journal": "Frontiers in Public Health",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R228",
+  "doi": "",
+  "title": "Fine-tuning LLMs for Tourist Trajectory Prediction using Field Experiment Data",
+  "year": 2026,
+  "journal": "",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R229",
+  "doi": "10.64898/2026.02.05.26345607",
+  "title": "Safety and Utility of an Agentic Large Language Model-Based Hospital Course Summarizer: A Prospective Real-World Pilot Study",
+  "year": 2026,
+  "journal": "medRxiv",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R230",
+  "doi": "10.48550/arXiv.2605.12916",
+  "title": "SHM-Agents: A Generalist-Specialist Integrated Agent System for Structural Health Monitoring",
+  "year": 2026,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R231",
+  "doi": "10.55041/ijsrem58319",
+  "title": "AI-Powered SOC Analyst Assistant",
+  "year": 2026,
+  "journal": "INTERNATIONAL JOURNAL OF SCIENTIFIC RESEARCH IN ENGINEERING AND MANAGEMENT",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R232",
+  "doi": "10.21686/6/1818-4243-2026-3-58-72",
+  "title": "Artificial Intelligence and Virtual Reality in Teaching of Language Phraseology: Cognitive-Digital Model and Its Effectiveness",
+  "year": 2026,
+  "journal": "Open Education",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R233",
+  "doi": "10.48550/arXiv.2603.13698",
+  "title": "SAATT Nav: a Socially Aware Autonomous Transparent Transportation Navigation Framework for Wheelchairs",
+  "year": 2026,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R234",
+  "doi": "10.46303/jcsr.2026.24",
+  "title": "The Effectiveness of an AI-Supported Neurolinguistic Strategy in Developing Functional Vocabulary and Reducing Digital Fatigue Among Non-Native Learners of Arabic",
+  "year": 2026,
+  "journal": "Journal of Curriculum Studies Research",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R235",
+  "doi": "10.48550/arXiv.2602.18750",
+  "title": "HillInfer: Efficient Long-Context LLM Inference on the Edge with Hierarchical KV Eviction using SmartSSD",
+  "year": 2026,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R236",
+  "doi": "10.48550/arXiv.2606.08162",
+  "title": "Silent Failure in LLM Agent Systems: The Entropy Principle and the Inevitable Disorder of Autonomous Agents",
+  "year": 2026,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R237",
+  "doi": "10.54254/2977-3903/2026.35813",
+  "title": "When may LLM outputs influence software requirements? A human-in-the-loop governance framework",
+  "year": 2026,
+  "journal": "Advances in Engineering Innovation",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R238",
+  "doi": "10.1109/TDSC.2026.3689535",
+  "title": "On the Availability Risks of Production LLM Services Under Unbounded Inference",
+  "year": 2026,
+  "journal": "IEEE Transactions on Dependable and Secure Computing",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R239",
+  "doi": "10.62712/juktisi.v5i2.1366",
+  "title": "Komparasi Algoritma Machine Learning untuk Prediksi Risiko Burnout Akademis Akibat Penggunaan Generative AI",
+  "year": 2026,
+  "journal": "Jurnal Komputer Teknologi Informasi Sistem Komputer (JUKTISI)",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R240",
+  "doi": "10.26817/16925777.2230",
+  "title": "Editorial",
+  "year": 2026,
+  "journal": "GiST Education and Learning Research Journal",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R241",
+  "doi": "10.59992/ijci.2026.v5n5p3",
+  "title": "A Cost-Effective Framework for Transforming Conventional Microscopes into Intelligent Diagnostic Platforms using Systematic Multi-Field Acquisition Protocol and Multimodal LLMs",
+  "year": 2026,
+  "journal": "International Journal of Computers and Informatics",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R242",
+  "doi": "10.55504/2578-9333.1355",
+  "title": "Wellness Literature Review – 2025",
+  "year": 2026,
+  "journal": "Journal of Wellness",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R243",
+  "doi": "10.2196/85015",
+  "title": "Feasibility of Tailoring Artificial Intelligence–Assisted Ambient Scribes for Intensive Care Unit Rounds: Algorithm Development and Validation",
+  "year": 2026,
+  "journal": "JMIR Medical Informatics",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R244",
+  "doi": "10.3390/s26072034",
+  "title": "From Sensing to Sense-Making: A Framework for On-Person Intelligence with Wearable Biosensors and Edge LLMs",
+  "year": 2026,
+  "journal": "Italian National Conference on Sensors",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R245",
+  "doi": "10.14722/wosoc.2026.23016",
+  "title": "Experiences of Using Agentic AI to Fill Tooling Gaps in a Security Operations Centers",
+  "year": 2026,
+  "journal": "Proceedings 2026 Workshop on Security Operation Center Operations and Construction",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R246",
+  "doi": "10.1109/TAFFC.2026.3691816",
+  "title": "Development of the Fully Automatic Robotic Storyteller—Comparing Manual, Semi-Automatic, and LLM-Based Emotional Story Annotation for Multimodal Robotic Storytelling",
+  "year": 2026,
+  "journal": "IEEE Transactions on Affective Computing",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R247",
+  "doi": "10.1158/1557-3265.d32026-b008",
+  "title": "Abstract B008:\n The Sum of Its Parts\n : The Prevalence of\n Contribution of Effect\n through an Evaluation of Combination Clinical Trial Regimens of Immune Checkpoint Inhibitors and the VEGF Tyrosine Kinase Inhibitor Axitinib",
+  "year": 2026,
+  "journal": "Clinical Cancer Research",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R248",
+  "doi": "10.1177/20514158261445149",
+  "title": "Generative artificial intelligence in the daily urology unit: A practical, patient-centered framework",
+  "year": 2026,
+  "journal": "Journal of Clinical Urology",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R249",
+  "doi": "10.1109/INSECT68872.2026.11663704",
+  "title": "EcoTracker: A Cyber-Physical System Integrating IoT Sensing, Multimodal AI, and Predictive Analytics for Automated Personal Carbon Footprint Management",
+  "year": 2026,
+  "journal": "2026 International Conference on Intelligent and Sustainable Electronics & Computing Technologies (INSECT)",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R250",
+  "doi": "10.1109/ICARAI70085.2026.11635386",
+  "title": "Invasive Hybrid Recommendation-Based Scheduling with Pomodoro and Genetic Algorithm for Improving Office Worker Productivity",
+  "year": 2026,
+  "journal": "2026 International Conference Automatics, Robotics and Artificial Intelligence (ICARAI)",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R251",
+  "doi": "10.14778/3819518.3819559",
+  "title": "Unstructured Data Analysis using LLMs: A Comprehensive Benchmark",
+  "year": 2026,
+  "journal": "Proceedings of the VLDB Endowment",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R252",
+  "doi": "",
+  "title": "SherpaAI: A Multi-modal Solution for Delivering Personalized and Adaptive Fitness Interventions",
+  "year": 2026,
+  "journal": "",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R253",
+  "doi": "",
+  "title": "MITRE-SAGE: A Multi-Agent Cybersecurity Question-Answering Model",
+  "year": 2026,
+  "journal": "",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R254",
+  "doi": "10.64898/2026.06.23.26355993",
+  "title": "A Natural Experiment Reveals Clinically Essential and Compliance-Driven Nursing Documentation",
+  "year": 2026,
+  "journal": "medRxiv",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R255",
+  "doi": "10.48550/arXiv.2603.09536",
+  "title": "Dynamic Multimodal Expression Generation for LLM-Driven Pedagogical Agents: From User Experience Perspective",
+  "year": 2026,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R256",
+  "doi": "10.1038/s41746-026-02522-8",
+  "title": "Artificial Intelligence-powered tiered early warning framework addressing high false alarm rates for in-hospital mortality prediction",
+  "year": 2026,
+  "journal": "npj Digit. Medicine",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R257",
+  "doi": "10.1371/journal.pcbi.1014480",
+  "title": "A parallel dual-stream state-space module for reliable and efficient biomedical relation extraction",
+  "year": 2026,
+  "journal": "PLoS Computational Biology",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R258",
+  "doi": "10.3390/technologies14010035",
+  "title": "NeuroStrainSense: A Transformer-Generative AI Framework for Stress Detection Using Heterogeneous Multimodal Datasets",
+  "year": 2026,
+  "journal": "Technologies",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R259",
+  "doi": "10.1109/GAIIS69281.2026.11519273",
+  "title": "Learning to Debate: Optimal Stopping Strategies for Multi-Agent LLM Deliberation",
+  "year": 2026,
+  "journal": "2026 International Conference on Generative Artificial Intelligence and Information Security (GAIIS)",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R260",
+  "doi": "10.48550/arXiv.2605.04595",
+  "title": "A Queueing-Theoretic Framework for Stability Analysis of LLM Inference with KV Cache Memory Constraints",
+  "year": 2026,
+  "journal": "arXiv.org",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R261",
+  "doi": "10.56201/ijmepr.v9.no7.2025.pg165.185",
+  "title": "Advances, Risks, And Implementation Challenges of Artificial Intelligence as A Force Multiplier for Clinical Decision Making and Health System Efficiency",
+  "year": 2026,
+  "journal": "International Journal of Medical Evaluation and Physical Report",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R262",
+  "doi": "10.65864/zpxksxfkfk",
+  "title": "Organizational Transmission of AI: Managerial Influence on Generative AI Adoption",
+  "year": 2026,
+  "journal": "CESifo working papers",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R263",
+  "doi": "10.1186/s12909-026-09932-y",
+  "title": "The role of physician apprenticeship models in the cost of caring: an AI-assisted systematic scoping review",
+  "year": 2026,
+  "journal": "BMC Medical Education",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R264",
+  "doi": "10.1158/1538-7445.am2026-1340",
+  "title": "Abstract 1340: The zinc finger 7 motif of TNFAIP3/A20 enforces a critical block in exhausted CD8 T cell degranulation and represents a potent target for enhancing adoptive cellular therapies for cancer.",
+  "year": 2026,
+  "journal": "Cancer Research",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R265",
+  "doi": "10.3389/frai.2026.1820827",
+  "title": "From LLM narratives to parameterized cooperation policies in multi-agent systems",
+  "year": 2026,
+  "journal": "Frontiers in Artificial Intelligence",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R266",
+  "doi": "10.5539/hes.v16n2p430",
+  "title": "Synergizing AI and Human Feedback: Effects of ChatGPT-generated and Teacher Corrective Feedback on Thai EFL Students’ Cause-and-Effect Writing",
+  "year": 2026,
+  "journal": "Higher Education Studies",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ },
+ {
+  "id": "R267",
+  "doi": "10.7759/cureus.109247",
+  "title": "Implementation of an AI-Assisted Workflow for Rehabilitation Discharge Summary Creation: Evaluation of Documentation Efficiency, Usability, and Hallucinations in a 290-Bed General Hospital in Japan",
+  "year": 2026,
+  "journal": "Cureus",
+  "sources": [
+   "Semantic Scholar|bulk（医療以外）"
+  ]
+ }
+]

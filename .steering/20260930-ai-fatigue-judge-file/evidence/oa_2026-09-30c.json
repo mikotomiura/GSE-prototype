@@ -1,0 +1,20 @@
+{
+ "meta": {
+  "executed": "2026-09-30 11:03:03 +0900",
+  "source": "OpenAlex /works/doi:（open_access）"
+ },
+ "records": {
+  "10.70670/sra.v4i1.1983": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://doi.org/10.70670/sra.v4i1.1983"
+  },
+  "10.3389/fpsyg.2026.1795301": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://public-pages-files-2025.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2026.1795301/pdf"
+  }
+ }
+}

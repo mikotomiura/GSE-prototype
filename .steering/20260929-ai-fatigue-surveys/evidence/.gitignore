@@ -1,0 +1,3 @@
+# 抄録・本文は repo に置かない（decisions.md 判断 1）
+*_abstracts*.json
+*.pdf

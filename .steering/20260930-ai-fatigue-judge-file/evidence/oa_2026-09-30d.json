@@ -1,0 +1,212 @@
+{
+ "meta": {
+  "executed": "2026-09-30 11:28:15 +0900",
+  "source": "OpenAlex /works/doi:（open_access）"
+ },
+ "records": {
+  "10.64898/2025.12.06.25341757": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2025/12/08/2025.12.06.25341757.full.pdf"
+  },
+  "10.1016/j.annemergmed.2026.04.022": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.surge.2025.10.008": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1101/2024.08.12.24311883": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2024/08/13/2024.08.12.24311883.full.pdf"
+  },
+  "10.1101/2025.09.21.25336260": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2025/09/22/2025.09.21.25336260.full.pdf"
+  },
+  "10.1093/jamia/ocae304": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11756633/pdf/ocae304.pdf"
+  },
+  "10.1055/a-2647-1142": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12367366/"
+  },
+  "10.3233/shti250921": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.3233/shti250921"
+  },
+  "10.1093/jamiaopen/ooaf013": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://academic.oup.com/jamiaopen/article-pdf/8/1/ooaf013/62044238/ooaf013.pdf"
+  },
+  "10.1016/j.msksp.2025.103333": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.1016/j.msksp.2025.103333"
+  },
+  "10.1055/a-2559-5791": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12240662/"
+  },
+  "10.1093/jamiaopen/ooaf159": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1093/jamiaopen/ooaf159"
+  },
+  "10.1055/a-2576-0579": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12328029/"
+  },
+  "10.1177/19322968231183436": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11688703/pdf/10.1177_19322968231183436.pdf"
+  },
+  "10.2196/89996": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.2196/89996"
+  },
+  "10.2196/85580": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.2196/85580"
+  },
+  "10.1002/jac5.70242": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.1002/jac5.70242"
+  },
+  "10.1093/jamia/ocaf180": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12844569/pdf/nihms-2155699.pdf"
+  },
+  "10.1016/j.artd.2026.102095": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1016/j.artd.2026.102095"
+  },
+  "10.1055/a-2818-1706": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1038/s41746-026-02454-3": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://www.nature.com/articles/s41746-026-02454-3_reference.pdf"
+  },
+  "10.2196/92364": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.2196/92364"
+  },
+  "10.3233/shti260257": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.3233/shti260257"
+  },
+  "10.64898/2026.02.19.26346634": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2026/02/24/2026.02.19.26346634.full.pdf"
+  },
+  "10.1007/s11606-026-10448-w": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://pubmed.ncbi.nlm.nih.gov/42225877/"
+  },
+  "10.1093/jamiaopen/ooag155": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1093/jamiaopen/ooag155"
+  },
+  "10.5435/jaaos-d-24-01321": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.surg.2025.109700": {
+   "status": "ok",
+   "is_oa": false,
+   "oa_status": "closed",
+   "oa_url": ""
+  },
+  "10.1016/j.jclinane.2026.112163": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "hybrid",
+   "oa_url": "https://doi.org/10.1016/j.jclinane.2026.112163"
+  },
+  "10.2196/94140": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.2196/94140"
+  },
+  "10.64898/2026.06.23.26355993": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "green",
+   "oa_url": "https://www.medrxiv.org/content/medrxiv/early/2026/06/25/2026.06.23.26355993.full.pdf"
+  },
+  "10.7759/cureus.109247": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "diamond",
+   "oa_url": "https://www.cureus.com/articles/493029-implementation-of-an-ai-assisted-workflow-for-rehabilitation-discharge-summary-creation-evaluation-of-documentation-efficiency-usability-and-hallucinations-in-a-290-bed-general-hospital-in-japan.pdf"
+  },
+  "10.1001/jamanetworkopen.2026.15762": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "https://doi.org/10.1001/jamanetworkopen.2026.15762"
+  },
+  "10.1016/j.mcpdig.2024.100193": {
+   "status": "ok",
+   "is_oa": true,
+   "oa_status": "gold",
+   "oa_url": "http://www.mcpdigitalhealth.org/article/S2949761224001263/pdf"
+  }
+ }
+}
