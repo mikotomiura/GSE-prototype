@@ -203,7 +203,8 @@ def bib_index():
     meta = json.load(open(os.path.join(EVID_PREV, "S-02", "s02_meta_2026-09-29.json"), encoding="utf-8"))
     for r in meta["records"]:
         idx.setdefault(r["doi"].lower(), (r["title"], (r.get("issued") or [None])[0], r.get("container", "")))
-    for p in glob.glob(os.path.join(EVID_PREV, "S-12", "*_results_*.json")) + glob.glob(os.path.join(TASK, "evidence", "S-1*", "*_results_*.json")):
+    for p in (glob.glob(os.path.join(EVID_PREV, "S-12", "*_results_*.json")) + glob.glob(os.path.join(TASK, "evidence", "S-1*", "*_results_*.json"))
+              + glob.glob(os.path.join(TASK, "evidence", "B9", "*_screen_*.json"))):  # B9 の採択研究のふるい（判断 15）
         d = json.load(open(p, encoding="utf-8"))
         for run in d.get("runs", []):
             for r in run.get("records", []):

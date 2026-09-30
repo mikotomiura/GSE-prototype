@@ -15,6 +15,11 @@ PREV = "../20260929-ai-fatigue-surveys"
 
 S02 = [dict(cid=f"S02-{n:02d}", refs=[(f"{PREV}/survey-S-02.md", "§2 #%d" % n, "### #%d " % n)],  # 2 つ目は出どころの表記だけに使う
             bib=(f"{PREV}/survey-S-02.md", "## 1.", "| %d |" % n)) for n in range(1, 12)]
+# S-02 #8（Nobles 2026）の採択研究のうち、0 段目を通った一次研究（S-02 §7・decisions.md 判断 15・2026-09-30）
+S02X = [
+    dict(cid="S02-12", refs=[(f"{PREV}/survey-S-02.md", "## 7.", "Alkhatib ほか 2026")]),
+    dict(cid="S02-13", refs=[(f"{PREV}/survey-S-02.md", "## 7.", "Liu 2026")]),
+]
 
 S12 = [
     dict(cid="S12-01", refs=[(f"{PREV}/survey-S-12.md", "### 4.1", "AI-Echo RCT"), (f"{PREV}/survey-S-04.md", "### 2.1", "AI-Echo RCT")]),
@@ -151,4 +156,4 @@ ADDED += [
 ]
 NEW += ADDED
 
-CANDIDATES = S02 + S12 + S04 + S04X + S05 + NEW
+CANDIDATES = S02 + S02X + S12 + S04 + S04X + S05 + NEW
