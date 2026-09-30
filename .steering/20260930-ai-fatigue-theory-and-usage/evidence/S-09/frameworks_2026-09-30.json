@@ -1,0 +1,1699 @@
+{
+ "executed": "2026-09-30T18:26:52+09:00",
+ "input": "records_2026-09-30.json",
+ "input_run_id": "1980b7a2a275414d973174c6c3d918e3",
+ "n": 259,
+ "count_frameworks": {
+  "F-TS": 29,
+  "F-AUT": 10,
+  "F-IO": 6,
+  "F-AP": 3,
+  "F-CLT": 4,
+  "F-JDR": 14,
+  "F-SSO": 1,
+  "F-TMS": 3,
+  "F-COR": 10,
+  "F-SOR": 3,
+  "F-EGO": 1,
+  "F-ACC": 3
+ },
+ "records": [
+  {
+   "key": "AF001",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "AF002",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "AF003",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "AF004",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "automation bias"
+    ]
+   }
+  },
+  {
+   "key": "AF005",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF006",
+   "has_text": true,
+   "frameworks": {
+    "F-IO": [
+     "information overload"
+    ]
+   }
+  },
+  {
+   "key": "AF007",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "AF008",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "AF009",
+   "has_text": true,
+   "frameworks": {
+    "F-AP": [
+     "Passive Fatigue"
+    ]
+   }
+  },
+  {
+   "key": "AF010",
+   "has_text": true,
+   "frameworks": {
+    "F-IO": [
+     "information overload"
+    ]
+   }
+  },
+  {
+   "key": "AF011",
+   "has_text": true,
+   "frameworks": {
+    "F-IO": [
+     "information overload"
+    ]
+   }
+  },
+  {
+   "key": "AF012",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF013",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ],
+    "F-CLT": [
+     "Cognitive Load Theory"
+    ]
+   }
+  },
+  {
+   "key": "AF014",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF015",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "techno-complexity",
+     "techno-insecurity",
+     "techno-overload",
+     "techno-uncertainty",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "AF016",
+   "has_text": true,
+   "frameworks": {
+    "F-CLT": [
+     "CLT",
+     "Cognitive Load Theory",
+     "cognitive load theory"
+    ]
+   }
+  },
+  {
+   "key": "AF017",
+   "has_text": false,
+   "frameworks": {
+    "F-TS": [
+     "Technostress"
+    ]
+   }
+  },
+  {
+   "key": "AF018",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF019",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "Job Demands–Resources",
+     "job demands–resources"
+    ],
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "AF020",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF021",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF022",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF023",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF024",
+   "has_text": true,
+   "frameworks": {
+    "F-IO": [
+     "information overload"
+    ]
+   }
+  },
+  {
+   "key": "AF025",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF026",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF027",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "AF028",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF029",
+   "has_text": true,
+   "frameworks": {
+    "F-CLT": [
+     "cognitive load theory"
+    ]
+   }
+  },
+  {
+   "key": "AF030",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF031",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF032",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF033",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "AF034",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S02-01",
+   "has_text": true,
+   "frameworks": {
+    "F-CLT": [
+     "CLT",
+     "cognitive load theory"
+    ],
+    "F-SSO": [
+     "SSO",
+     "stressor–strain outcome"
+    ]
+   }
+  },
+  {
+   "key": "S02-02",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S02-03",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "job demands-resources"
+    ],
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S02-04",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S02-05",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S02-06",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S02-07",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S02-08",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S02-09",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S02-10",
+   "has_text": true,
+   "frameworks": {
+    "F-TMS": [
+     "cognitive appraisal"
+    ]
+   }
+  },
+  {
+   "key": "S02-11",
+   "has_text": true,
+   "frameworks": {
+    "F-COR": [
+     "conservation of resource"
+    ]
+   }
+  },
+  {
+   "key": "S02-12",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S02-13",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-01",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-02",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-03",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S12-04",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S12-05",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-06",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "Job Demands-Resources"
+    ],
+    "F-TS": [
+     "Technostress"
+    ]
+   }
+  },
+  {
+   "key": "S12-07",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-08",
+   "has_text": true,
+   "frameworks": {
+    "F-SOR": [
+     "SOR",
+     "stimulus-organism-response"
+    ]
+   }
+  },
+  {
+   "key": "S12-09",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-01",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-02",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-03",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-04",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-05",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-06",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-07",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-08",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-09",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-10",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-11",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "Job Demands–Resources"
+    ]
+   }
+  },
+  {
+   "key": "S04-12",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-13",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-14",
+   "has_text": true,
+   "frameworks": {
+    "F-COR": [
+     "conservation of resources"
+    ]
+   }
+  },
+  {
+   "key": "S04-15",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-16",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-17",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-18",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-19",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-20",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-21",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-22",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-23",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-24",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-25",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-26",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-27",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-28",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-29",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-30",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-31",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-32",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-33",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-35",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-36",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-37",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-38",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-41",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-42",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-43",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-44",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-45",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-46",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-47",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-48",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-49",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-50",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-51",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-52",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-53",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-54",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-55",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-56",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-57",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-58",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-59",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-60",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-61",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-62",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-63",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-64",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-65",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-66",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-67",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-68",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-69",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-70",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-71",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-72",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-73",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-74",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-75",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-76",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-77",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-78",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-79",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-80",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-81",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-82",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-83",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-84",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-85",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-86",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-87",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S05-01",
+   "has_text": true,
+   "frameworks": {
+    "F-AP": [
+     "Passive Fatigue",
+     "Passive fatigue",
+     "passive fatigue"
+    ]
+   }
+  },
+  {
+   "key": "S05-02",
+   "has_text": true,
+   "frameworks": {
+    "F-AP": [
+     "passive fatigue"
+    ]
+   }
+  },
+  {
+   "key": "S05-03",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S05-04",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "Automation complacency",
+     "Complacency",
+     "automation complacency"
+    ]
+   }
+  },
+  {
+   "key": "S05-05",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "complacency"
+    ]
+   }
+  },
+  {
+   "key": "S05-06",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "automation complacency"
+    ]
+   }
+  },
+  {
+   "key": "S05-07",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "complacency"
+    ]
+   }
+  },
+  {
+   "key": "S05-08",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S05-09",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "complacency"
+    ]
+   }
+  },
+  {
+   "key": "S15-01",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-02",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-03",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-04",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-05",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-06",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-07",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-08",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-09",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "automation bias",
+     "automation-bias"
+    ],
+    "F-IO": [
+     "information overload"
+    ]
+   }
+  },
+  {
+   "key": "S15-10",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "Automation Bias",
+     "automation bias"
+    ]
+   }
+  },
+  {
+   "key": "S15-11",
+   "has_text": true,
+   "frameworks": {
+    "F-EGO": [
+     "Ego Depletion"
+    ]
+   }
+  },
+  {
+   "key": "S15-12",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-13",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-14",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-15",
+   "has_text": true,
+   "frameworks": {
+    "F-ACC": [
+     "TAM",
+     "Technology Acceptance Model"
+    ]
+   }
+  },
+  {
+   "key": "S15-16",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-17",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-01",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "JD-R",
+     "Job Demands-Resources"
+    ]
+   }
+  },
+  {
+   "key": "S14-02",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-03",
+   "has_text": true,
+   "frameworks": {
+    "F-COR": [
+     "Conservation of Resources"
+    ]
+   }
+  },
+  {
+   "key": "S14-04",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ],
+    "F-SOR": [
+     "SOR"
+    ]
+   }
+  },
+  {
+   "key": "S14-05",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-06",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-07",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "Job Demands-Resources"
+    ],
+    "F-COR": [
+     "Conservation of Resources"
+    ]
+   }
+  },
+  {
+   "key": "S14-08",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-09",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "JD-R",
+     "Job Demands-Resources"
+    ]
+   }
+  },
+  {
+   "key": "S14-10",
+   "has_text": true,
+   "frameworks": {
+    "F-COR": [
+     "Conservation of Resources"
+    ]
+   }
+  },
+  {
+   "key": "S14-11",
+   "has_text": true,
+   "frameworks": {
+    "F-COR": [
+     "conservation of resources"
+    ]
+   }
+  },
+  {
+   "key": "S14-12",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-13",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-14",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-15",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-16",
+   "has_text": true,
+   "frameworks": {
+    "F-SOR": [
+     "S-O-R",
+     "SOR"
+    ]
+   }
+  },
+  {
+   "key": "S14-17",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-18",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-19",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-20",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "JD-R",
+     "Job Demands-Resources"
+    ]
+   }
+  },
+  {
+   "key": "S14-21",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "Job Demands–Resources"
+    ]
+   }
+  },
+  {
+   "key": "S14-22",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-23",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-24",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "JD-R",
+     "Job Demands-Resources"
+    ],
+    "F-TS": [
+     "TECHNOSTRESS",
+     "techno-complexity",
+     "techno-insecurity",
+     "techno-invasion",
+     "techno-overload",
+     "techno-uncertainty",
+     "technostress"
+    ],
+    "F-TMS": [
+     "Transactional Model"
+    ]
+   }
+  },
+  {
+   "key": "S14-25",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-26",
+   "has_text": true,
+   "frameworks": {
+    "F-COR": [
+     "Conservation of Resources"
+    ]
+   }
+  },
+  {
+   "key": "S14-27",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-28",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "JD-R"
+    ]
+   }
+  },
+  {
+   "key": "S14-29",
+   "has_text": true,
+   "frameworks": {
+    "F-COR": [
+     "conservation of resources"
+    ],
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-30",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-31",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-32",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-33",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Techno-complexity",
+     "Techno-insecurity",
+     "Techno-invasion",
+     "Techno-overload",
+     "Techno-stress",
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-34",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S13-01",
+   "has_text": true,
+   "frameworks": {
+    "F-TMS": [
+     "transactional theory"
+    ]
+   }
+  },
+  {
+   "key": "S13-02",
+   "has_text": true,
+   "frameworks": {
+    "F-COR": [
+     "Conservation of Resources"
+    ],
+    "F-ACC": [
+     "Technology Acceptance Model"
+    ]
+   }
+  },
+  {
+   "key": "S13-03",
+   "has_text": true,
+   "frameworks": {
+    "F-COR": [
+     "conservation of resources"
+    ]
+   }
+  },
+  {
+   "key": "S13-04",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-05",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-06",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "Job Demands-Resources"
+    ]
+   }
+  },
+  {
+   "key": "S13-07",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-08",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-09",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "JD-R",
+     "Job Demands–Resources"
+    ]
+   }
+  },
+  {
+   "key": "S13-10",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-11",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-12",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-13",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-14",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-15",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-18",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-19",
+   "has_text": true,
+   "frameworks": {
+    "F-IO": [
+     "information overload"
+    ]
+   }
+  },
+  {
+   "key": "S15-20",
+   "has_text": true,
+   "frameworks": {
+    "F-ACC": [
+     "TAM",
+     "Technology Acceptance Model"
+    ]
+   }
+  },
+  {
+   "key": "S15-21",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-22",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S15-23",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "Automation Bias",
+     "automation bias"
+    ]
+   }
+  },
+  {
+   "key": "S14-35",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-36",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-37",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-38",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-39",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-40",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-41",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-42",
+   "has_text": true,
+   "frameworks": {
+    "F-TS": [
+     "Technostress",
+     "technostress"
+    ]
+   }
+  },
+  {
+   "key": "S14-43",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-44",
+   "has_text": true,
+   "frameworks": {
+    "F-JDR": [
+     "Job Demands-Resources"
+    ],
+    "F-TS": [
+     "Technostress"
+    ]
+   }
+  },
+  {
+   "key": "S13-16",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-17",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-18",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-19",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S13-20",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-39",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S04-40",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-51",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S14-52",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S08-01",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S08-02",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S08-03",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-10",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-11",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-12",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-13",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-14",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-15",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-16",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-17",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-18",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-19",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-20",
+   "has_text": true,
+   "frameworks": {
+    "F-AUT": [
+     "complacency"
+    ]
+   }
+  },
+  {
+   "key": "S12-21",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-22",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-23",
+   "has_text": false,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-24",
+   "has_text": true,
+   "frameworks": {}
+  },
+  {
+   "key": "S12-25",
+   "has_text": true,
+   "frameworks": {}
+  }
+ ]
+}
