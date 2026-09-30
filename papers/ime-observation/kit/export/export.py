@@ -911,6 +911,8 @@ def selftest():
         # a participant identifier stops the export
         pid = "P" + "017"
         refused("a participant identifier stops the export", {"README.md": "# Fake\nSession recorded by %s.\n" % pid}, "README.md", forbid=(pid,))
+        for joined in (pid + "_windows", "run_" + pid, "a-" + pid + ".json"):
+            refused("a participant identifier stops the export", {"README.md": "# Fake\nSee %s here.\n" % joined}, "README.md")
         addr = "who" + AT + "example.org"
         refused("an email address stops the export", {"README.md": "# Fake\nWrite to %s.\n" % addr}, "README.md", forbid=(addr,))
         rc, text, _ = run("ref", {"README.md": "# Fake\nSee [P269] and [V5].\n"})
