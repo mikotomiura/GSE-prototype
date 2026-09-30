@@ -189,6 +189,7 @@ if git -C "${G}" init -q >/dev/null 2>&1 && git -C "${G}" add papers >/dev/null 
   cx git > "${TMP}/neg-git.out" 2>&1; rc=$?
   judge 2 git "draft-note.md" "判断 70: git の写しに追跡していないファイルがあれば exit 2" "${rc}"
   rm -f "${G}/papers/ime-observation/kit/draft-note.md"
+  rm -rf "${TMP}/o-git"   # ★ 前の試行が（直す前の成果物で）書き出してしまった場合に、次の判定へ波及させない
   printf '%s\n' "An uncommitted line." >> "${G}/papers/ime-observation/kit/gen/README.md"
   cx git > "${TMP}/neg-git.out" 2>&1; rc=$?
   judge 2 git "README.md" "判断 70: git の写しで追跡中のファイルに未コミットの変更があれば exit 2" "${rc}"
