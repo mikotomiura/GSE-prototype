@@ -207,12 +207,22 @@ def bib_index():
               + sorted(glob.glob(os.path.join(TASK, "evidence", "S-1*", "*_results_*.json")))
               + sorted(glob.glob(os.path.join(TASK, "evidence", "B9", "*_screen_*.json")))  # B9 の採択研究のふるい（判断 15）
               + sorted(glob.glob(os.path.join(EVID_PREV, "S-04", "*_results_*.json")))  # S-04 の検索の記録（B10・B12 の書誌・判断 17）
+              + sorted(glob.glob(os.path.join(EVID_PREV, "S-08", "*_results_*.json")))  # S-08 の記録（S08-01〜03・2026-09-30）
               + sorted(glob.glob(os.path.join(TASK, "evidence", "bib", "*_bib_*.json")))):  # 検索に当たらなかった種文献の書誌（判断 20）
         d = json.load(open(p, encoding="utf-8"))
         for run in d.get("runs", []):
             for r in run.get("records", []):
+                title = r.get("title") or ""
+                if not title:
+                    continue  # ★ 題名の無い記録（J-STAGE の title_ja/title_en の形）が、後の記録の題名を塞がないように（2026-09-30）
                 if r.get("doi"):
-                    idx.setdefault(r["doi"].lower(), (r.get("title", ""), r.get("year"), r.get("journal", "")))
+                    idx.setdefault(r["doi"].lower(), (title, r.get("year"), r.get("journal", "")))
+                # DOI の無い記録は、記録の鍵（Europe PMC の PPR など）と CiNii の crid でも引けるようにする（candidates.py の bib_key）
+                if r.get("key") and not str(r["key"]).startswith("10."):
+                    idx.setdefault(str(r["key"]).lower(), (title, r.get("year"), r.get("journal", "")))
+                m = re.match(r"https://cir\.nii\.ac\.jp/crid/(\d+)$", r.get("url") or "")
+                if m:
+                    idx.setdefault("crid:" + m.group(1), (title, r.get("year"), r.get("journal", "")))
     return idx, by_tsv
 
 
@@ -303,15 +313,19 @@ def intro_rows(judge):
                         "AI が出した判定や評価は載せていない。"],
         ["判定者", f"判定者 {judge}"],
     ]
+    # ★ 2026-09-30: 追加候補にも AI の評価版を作り、判定者 1 は判定の前に読む（研究者の決定・decisions.md 判断 21）。
+    #   判定者 2 は、追加候補の評価版も開かない。評価版のファイル名は語の検査に当たらない形（先頭の部分）で書く。
+    cand_file = "追加候補の評価版ファイル（ファイル名が AI_fatigue_candidates_AI_appraisal で始まる xlsx）"
     if judge == 1:
-        rows.append(["判定の前に読んだもの（記録）", "判定者 1 は、判定の前に、元の DB 34 件について評価版ファイルの AI の評価を読んでいる"
-                                               "（2026-09-30 に研究者が決め、記録した）。"])
+        rows.append(["判定の前に読んだもの（記録）", "判定者 1 は、判定の前に、元の DB 34 件について評価版ファイルの AI の評価を読んでいる。"
+                                               f"追加候補についても、判定の前に、{cand_file}を判断材料として読んだ（どちらも 2026-09-30 に研究者が決め、記録した）。"])
+        rows.append(["追加候補について", f"『追加候補』シートの文献の AI の評価は、{cand_file}にあり、このファイルには載せていない。"])
     else:
         rows.append(["判定の前に開かないもの", "判定が終わるまで、評価版ファイル（AI の評価のシートを足した xlsx）の AI の評価のシートと、元の DB の『AI…』のシート、"
-                                        "研究のメモの一次確認のファイル（memo-issues.md）を開かない。開いた場合は、判定の記録にそのことを書く。"])
+                                        f"{cand_file}、研究のメモの一次確認のファイル（memo-issues.md）を開かない。開いた場合は、判定の記録にそのことを書く。"])
+        rows.append(["追加候補について", "『追加候補』シートの文献には、AI の出力（サーヴェイの AI の案・評価版ファイルの『検索漏れ候補』シート・"
+                                     f"{cand_file}）が別にあるが、このファイルには載せていない。判定が終わるまで、それらのファイルを開かない。"])
     rows += [
-        ["追加候補について", "『追加候補』シートの文献には、AI の出力（サーヴェイの AI の案・評価版ファイルの『検索漏れ候補』シート）が別に"
-                         "あるが、このファイルには載せていない。判定が終わるまで、それらのファイルを開かない。"],
         ["進め方", "『判定基準』シートの手順に従う。黄色の欄だけを入力する（ドロップダウンから選ぶ）。書誌と要点の欄は変えない。"],
         ["本文の入手", "有料の本文は入手しない（2026-09-30 の研究者の決定）。『本文の入手（OpenAlex）』の欄は OpenAlex の記録（2026-09-30）で、"
                     "無料の版が無いものは本文を読めない。"],
@@ -345,14 +359,38 @@ CRITERIA = [
 ]
 
 
-def build(judge):
-    if sha256(DB_XLSX) != DB_SHA:
-        sys.exit(f"元の DB の SHA-256 が固定値と違う: {DB_XLSX}")
+def load_oa():
     if not os.path.exists(OA_JSON):
         sys.exit(f"OpenAlex の記録が無い（先に fetch_oa.py を回す）: {OA_JSON}")
     oa = {}
     for p in ([OA_JSON] if os.environ.get("JUDGE_OA_JSON") else sorted(glob.glob(OA_GLOB))):
         oa.update({k.lower(): v for k, v in json.load(open(p, encoding="utf-8"))["records"].items()})
+    return oa
+
+
+def candidate_records(oa):
+    """追加候補の 1 件ずつの書誌と要点（判定者用ファイルと、追加候補の評価版〈../20260930-ai-fatigue-candidates-appraisal〉で共通）。"""
+    idx, by_tsv = bib_index()
+    out = []
+    for c in CAND.CANDIDATES:
+        e = extract(c)
+        doi = e["doi"]
+        t = idx.get(doi.lower()) if doi else None
+        if t is None and c.get("tsv_id"):
+            t = by_tsv.get(c["tsv_id"])
+        if t is None and c.get("bib_key"):
+            t = idx.get(c["bib_key"].lower())
+        title, year, journal = t if t else ("", "", "")
+        src = " ／ ".join(dict.fromkeys(tag(p, s) for p, s, _ in c["refs"]))
+        out.append(dict(cid=c["cid"], src=src, label=e["label"], title=title, year=year, journal=journal, doi=doi,
+                        oa=oa_label(oa, doi), points=e["points"]))
+    return out
+
+
+def build(judge):
+    if sha256(DB_XLSX) != DB_SHA:
+        sys.exit(f"元の DB の SHA-256 が固定値と違う: {DB_XLSX}")
+    oa = load_oa()
     db = openpyxl.load_workbook(DB_XLSX, data_only=True)["文献DB"]
     wb = openpyxl.Workbook()
     text_sheet(wb, "はじめに", "AI 疲労 文献 DB｜判定者用ファイル", "黄色の欄だけを入力する。", intro_rows(judge), first=True)
@@ -377,19 +415,12 @@ def build(judge):
     input_columns(ws, headers, len(DB_HEADERS) + 1, last, "JudgeDB")
 
     # 追加候補
-    idx, by_tsv = bib_index()
     wc = wb.create_sheet("追加候補")
     cheaders = CAND_HEADERS + INPUT_HEADERS
     crows = []
-    for c in CAND.CANDIDATES:
-        e = extract(c)
-        doi = e["doi"]
-        t = idx.get(doi.lower()) if doi else None
-        if t is None and c.get("tsv_id"):
-            t = by_tsv.get(c["tsv_id"])
-        title, year, journal = t if t else ("", "", "")
-        src = " ／ ".join(dict.fromkeys(tag(p, s) for p, s, _ in c["refs"]))
-        crows.append([c["cid"], src, e["label"], title, year, journal, doi or "", oa_label(oa, doi), e["points"]] + [None] * len(INPUT_HEADERS))
+    for m in candidate_records(oa):
+        crows.append([m["cid"], m["src"], m["label"], m["title"], m["year"], m["journal"], m["doi"] or "", m["oa"], m["points"]]
+                     + [None] * len(INPUT_HEADERS))
     header_block(wc, f"追加候補｜サーヴェイで見つかった DB に無い文献（{len(crows)} 件）",
                  "DB の行には足していない。要点はサーヴェイの事実のファイルの記述の写し。判定はリンク先の抄録・本文で行う。", len(cheaders))
     put_table(wc, cheaders, CAND_WIDTHS + INPUT_WIDTHS, crows)

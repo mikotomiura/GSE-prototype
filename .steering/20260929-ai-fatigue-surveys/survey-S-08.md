@@ -89,7 +89,7 @@
 | A Control-Theoretic Approach to GenAI Fatigue（Zenodo 2025・doi:10.5281/zenodo.17772700） | 「GenAI Fatigue」を、長い多回の対話で LLM の想起・文脈の忠実さが落ちる現象（人ではなくモデルの側）の名として使う |
 | Too Much, Too Fast: Understanding AI Fatigue in the Digital Acceleration Era（IJAHSS 2025・doi:10.56734/ijahss.v6n8a7） | 叙述的な文献レビュー。AI 疲労をテクノストレス・認知的過負荷・情動的消耗の組み合わせとして概念化 |
 | Digital-Age Psychosocial Strain: A Systematic Literature Review …（IJRISS 2026・doi:10.47772/ijriss.2026.102400020） | Scopus・WoS・ScienceDirect の系統的レビュー（2022〜2026 年の 24 研究）。テクノストレス・デジタル燃え尽き・AI 疲労などの構成概念の次元と測定の方法を整理 |
-| RecalibrateGPT: AI Fatigue Resilient Conversational Interfaces（arXiv 2026・doi:10.48550/arxiv.2609.00506） | 題名だけ（AI 疲労に配慮した対話の画面） |
+| RecalibrateGPT: AI Fatigue Resilient Conversational Interfaces（arXiv 2026・doi:10.48550/arxiv.2609.00506） | 題名だけ（AI 疲労に配慮した対話の画面）。★ 2026-09-30 に抄録を読んだ（§8） |
 | Anti-Design Approach in Countering AI Fatigue（International Design Journal 2026） | 題名だけ |
 | AI Fatigue: Views From the Trenches（Editorial Office News 2026） | 題名だけ |
 
@@ -99,3 +99,13 @@
 - 項目文・前文に AI が入ることを一次で確かめたもの: AF001（15/15）・AF005（16/16）。本文の記述で確かめたもの: Chung & Kwon。
 - 翻訳版: 0。
 - AI の文脈の研究で使われた一般的な疲労・燃え尽きの測定: 13 種類（§5 の表の 10 行。MFI・Chalder・スクリーン疲労・SNS 疲労・デジタル燃え尽き・デジタル疲労を別に数える）。作業負荷の NASA-TLX は別。
+
+## 8. 2026-09-30 に抄録を取り直した記録（判定者用ファイルの追加候補に足したもの）
+
+★ §5・§6 の記録のうち、AI に関わる一次研究と読める 3 件の抄録を取り直した（Europe PMC・Semantic Scholar・OpenAlex・Crossref・連絡先は送らない・抄録は repo の外）。足した理由と、足さなかった §6 の記録の内訳は `../20260930-ai-fatigue-candidates-appraisal/decisions.md` 判断 3。
+
+| 書誌 | 抄録に書いてあること |
+|---|---|
+| The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education. *Mind and Society* 2025. doi:10.56011/mind-mri-143-20259 | 大学生 401 名（18〜35 歳）のオンラインの横断調査。燃え尽き（BAT-22）・実行機能の困難（BDEFS-SF）・AI の利用と有用性の知覚（翻案した尺度）。AI の利用者 332 名は非利用者 69 名より燃え尽きと実行機能の困難の得点が高い（Cohen の d > 1.80）。燃え尽きは実行機能の困難を予測し（β = .88）、AI の有用性の知覚は燃え尽きと実行機能の関係を調整しなかった |
+| RecalibrateGPT: AI Fatigue Resilient Conversational Interfaces. arXiv 2026. doi:10.48550/arxiv.2609.00506 | LLM の対話の「打つ → 読む → 打ち直す」の繰り返しが対話の AI 疲労・認知負荷・課題の放棄を生むとし、会話の履歴に働く 5 つの操作を持つ画面を作った。同じ上級の LLM 利用者 12 名で 2 つの予備研究: 質的な研究で疲労の 4 類型（打ち直し・読み流し・決めきれなさ・文脈のずれ）を導き、量的な評価で NASA-TLX 2.7・SUS 86.5 を報告 |
+| Anti-Design Approach in Countering AI Fatigue. *International Design Journal* 2026. doi:10.21608/idj.2026.525979.1661（DOI は `evidence/S-08/s08_results_2026-09-29.json` の記録） | 抄録を取れなかった（Europe PMC に記録が無く、Semantic Scholar・OpenAlex・Crossref の記録に抄録が無い）。題名だけ |
