@@ -200,11 +200,15 @@ boundaries: the observed presses are cut into trials in plan order and compared 
   is left unscored (reason `block_mismatch`) and counted, and the next block is found again by its own marker, so one
   dropped press in some 100,000 loses one block and shifts no other. An observed press that is added or duplicated
   (including one that forms a run of four arrow presses inside a trial, which is then an anchor that matches nothing and
-  is passed over) also loses only that block. A marker counts as an anchor only as a run of
-  exactly its length (the press before it is not of its first category and the press after it is not of its last), so a
-  run of at most three arrow presses inside a trial is never mistaken for the four-key marker. Presses that no scored
-  block covers (stray presses between blocks, the presses of an unscored block, presses after the last block) are
-  counted as unassigned, without an error. A marker key without a table entry (F13 to F19) is expected as `other`.
+  is passed over) also loses only that block, and a press added between two blocks loses no block. A marker counts as
+  an anchor at the right end of a run of its category (the press after it is not of its last category), so arrow
+  presses just before it do not hide it: when the last trial of a block ends in arrow presses and its closing Return
+  is missing, those arrows join the next marker into a longer run, and only the block that lost the Return is
+  unscored, not the next block. A run of at most three arrow presses inside a trial is never mistaken for the four-key
+  marker. These properties are checked by the selftest on the cases it constructs, not proved in general. Presses
+  that no scored block covers (stray presses between blocks, the presses of an unscored block, presses after the last
+  block) are counted as unassigned, without an error. A marker key without a table entry (F13 to F19) is expected as
+  `other`.
 - Without `--markers-in-obs` the observation holds no marker to resynchronise to, so the assignment is as before: the
   number of presses and the category sequence of every trial must agree with the plan, otherwise the run stops with
   exit code 2 and names the trial, and a dropped key never shifts later trials silently.
@@ -325,10 +329,11 @@ typed). It checks the following.
   the same clean error, not an uncaught exception).
 - Block resynchronisation (`--markers-in-obs`): one missing press, one extra press, a damaged marker, or a swapped
   category inside a block leaves only that block unscored, with the counts of unscored blocks and trials (by scenario
-  and by speed) and of unassigned presses right; a stray press between blocks and presses after the last block lose no
-  block and are counted as unassigned; a damaged marker and a missing press in the next block leave both unscored and
-  never shift or crash; with four-key arrow markers a run of three arrows inside a trial is not an anchor; without
-  `--markers-in-obs` a missing or extra press still stops the run.
+  and by speed) and of unassigned presses right; a stray press between blocks (also an arrow press right before a
+  marker) and presses after the last block lose no block and are counted as unassigned; a missing closing Return
+  after one to three arrow presses at the end of a block loses that block only; a damaged marker and a missing press
+  in the next block leave both unscored and never shift or crash; with four-key arrow markers a run of three arrows
+  inside a trial is not an anchor; without `--markers-in-obs` a missing or extra press still stops the run.
 - The block bootstrap: deterministic for a fixed seed, equal to `stats.cluster_bootstrap` over the blocks' own counts,
   the interval of the maximum not below that of the raw accuracy, `[null, null]` with a status for one block; `by_speed`
   counts add up.

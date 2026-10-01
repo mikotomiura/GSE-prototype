@@ -30,6 +30,24 @@ Definitions.
     reached = sum over trials of min(sent, received), reach_rate = reached / sent_presses, excess_rows = sum of
     max(0, received - sent), rows_outside_trials (rows that fall inside no interval), trials_with_loss
     (received < sent) and trials_with_excess (received > sent).
+  * Segments, per side. The block_begin rows of the oracle divide the time of the log into half-open segments:
+    one from the start up to the first block_begin (block_id null), then, for each block, one from its own
+    block_begin time (included) to the next block_begin time (excluded), the last one to the end; a log with no
+    block_begin is one segment with block_id null. For each segment, in time order and also when it holds no row:
+    n_rows = the rows that fall in it, inside a trial's interval or outside every one; n_reached = the sum, over
+    the measured trials whose trial_begin wall time lies in the segment, of min(sent, the number of rows assigned
+    to the trial (as for reach) that lie in the segment); n_unexplained = n_rows - n_reached (never negative);
+    n_marker_presses = the length of the marker array the plan gives the block (0 for the first segment and for
+    a block with no marker); n_unexplained_beyond_markers = max(0, n_unexplained - n_marker_presses).
+    n_segments and max_unexplained_beyond_markers (the largest of the latter over the segments) head the list.
+    A press that the runner makes outside the oracle, such as the key that selects the input method before a
+    block, has no oracle row; wherever it falls, inside the interval of the last trial of the segment or outside
+    every interval, it adds one to n_unexplained of the same segment, because min(sent, received) of a trial is
+    capped at sent; where it falls changes the count only when a press of that trial was lost (the blind spot
+    below). Blind spot: when, in one trial, a
+    sent press does not arrive and a press from outside arrives in its place, the two cancel in n_reached and
+    n_unexplained does not change; a replaced press is not detected. This tool only counts: the bounds on
+    n_unexplained and the decision on a run belong to the pre-registration (section 3.4) and to pipeline.py.
   * Delay and interval error, per side, only in trials in which the number of received rows equals the number of
     presses excluding the mode keys (and is at least one); such a trial is "paired" and its i-th press is matched
     with its i-th row in time order (presses in the order of the oracle file). delay_ms = row wall time - sent
@@ -51,9 +69,11 @@ Definitions.
     its own interval (the focus came back within the trial); any other loss, including an S15 switch that does
     not return inside the trial, is listed together with every trial it reaches.
 
-Refused (exit 2): a plan whose SHA-256 differs from the oracle header's plan_sha256; a sent row whose trial or
-step is absent from the plan, or whose key or down flag disagrees with the plan step; a sent row of a trial with
-no trial_begin; a duplicated trial_begin or trial_end; and malformed input. Error messages carry only row numbers
+Refused (exit 2): a block row of the plan whose block_id is repeated or whose marker is not an array of strings; a
+block_begin whose block_id is not in the plan or that appears twice for one block; a plan whose SHA-256 differs
+from the oracle header's plan_sha256; a sent row whose trial or step is absent from the plan, or whose key or down
+flag disagrees with the plan step; a sent row of a trial with no trial_begin; a duplicated trial_begin or
+trial_end; and malformed input. Error messages carry only row numbers
 and field names, never a value read from a log.
 
 The output holds no path and identical input yields identical output bytes (sorted keys, LF, UTF-8, no BOM). The
@@ -125,7 +145,9 @@ def _loads(line, where, strict):
 # --- readers ---------------------------------------------------------------------------------------------------
 
 def read_plan(data):
-    """Return {trial_id: {"scenario", "speed", "steps": [(key, at_ms, down)]}} from a plan/1 byte string."""
+    """Return (trials, markers) from a plan/1 byte string. trials is {trial_id: {"scenario", "speed", "steps":
+    [(key, at_ms, down)]}}; markers is {block_id: the number of marker presses the plan puts at the head of the
+    block} (0 when the block row has no marker)."""
     lines = _lines(data, "plan")
     if not lines:
         raise InputError("plan: empty file")
@@ -133,11 +155,21 @@ def read_plan(data):
     if not isinstance(hdr, dict) or hdr.get("kind") != "header" or hdr.get("format") != "plan/1":
         raise InputError("plan: line 1 is not a plan/1 header")
     trials = {}
+    markers = {}
     for n, raw in lines[1:]:
         where = "plan:%d" % n
         row = _loads(raw, where, True)
         if not isinstance(row, dict) or not isinstance(row.get("kind"), str):
             raise InputError("%s: missing kind" % where)
+        if row["kind"] == "block":
+            bid = row.get("block_id")
+            if not (_is_int(bid) or isinstance(bid, str)) or bid in markers:
+                raise InputError("%s: block_id is missing, not an integer or a string, or repeated" % where)
+            marker = row.get("marker", [])
+            if not isinstance(marker, list) or not all(isinstance(k, str) for k in marker):
+                raise InputError("%s: marker is not an array of strings" % where)
+            markers[bid] = len(marker)
+            continue
         if row["kind"] != "trial":
             continue
         tid = row.get("trial_id")
@@ -157,13 +189,15 @@ def read_plan(data):
                 raise InputError("%s: a step is malformed (key, at_ms, down)" % where)
             parsed.append((st["key"], st["at_ms"], st["down"]))
         trials[tid] = {"scenario": row["scenario"], "speed": row["speed"], "steps": parsed}
-    return trials
+    return trials, markers
 
 
-def read_oracle(data, plan, plan_sha256):
-    """Return (trials, cuts). trials is a list, in file order, of {trial_id, begin_wall, begin_mono, end_wall,
-    sent: [{key, step, wall, mono, down}]}; cuts is the sorted list of wall times of the oracle rows that end a
-    trial's interval (reset / block_begin / marker / trial_begin). The sent rows are checked against the plan."""
+def read_oracle(data, plan, plan_sha256, blocks):
+    """Return (trials, cuts, begins). trials is a list, in file order, of {trial_id, begin_wall, begin_mono,
+    end_wall, sent: [{key, step, wall, mono, down}]}; cuts is the sorted list of wall times of the oracle rows that
+    end a trial's interval (reset / block_begin / marker / trial_begin); begins is the list of (wall time,
+    block_id) of the block_begin rows, sorted by time. blocks is the set of the block_ids of the plan. The sent
+    rows are checked against the plan, and a block_begin against the blocks."""
     lines = _lines(data, "oracle")
     if not lines:
         raise InputError("oracle: empty file")
@@ -175,6 +209,7 @@ def read_oracle(data, plan, plan_sha256):
     trials = {}
     order = []
     cuts = []
+    begins = []
     for n, raw in lines[1:]:
         where = "oracle:%d" % n
         row = _loads(raw, where, True)
@@ -185,6 +220,13 @@ def read_oracle(data, plan, plan_sha256):
             if not _is_int(row.get("t_wall_ms")):
                 raise InputError("%s: t_wall_ms is missing or not an integer" % where)
             cuts.append(row["t_wall_ms"])
+            if kind == "block_begin":
+                bid = row.get("block_id")
+                if not (_is_int(bid) or isinstance(bid, str)) or bid not in blocks:
+                    raise InputError("%s: block_id of a block_begin is missing or not in the plan" % where)
+                if any(b == bid for _t, b in begins):
+                    raise InputError("%s: block_begin appears twice for one block" % where)
+                begins.append((row["t_wall_ms"], bid))
             continue
         if kind not in ("trial_begin", "trial_end", "sent"):
             continue
@@ -218,7 +260,8 @@ def read_oracle(data, plan, plan_sha256):
         t["sent"].append({"key": key, "step": step, "down": down, "wall": row["t_wall_ms"],
                           "mono": row["t_mono_ns"]})
     cuts.sort()
-    return [trials[k] for k in order], cuts
+    begins.sort(key=lambda b: b[0])
+    return [trials[k] for k in order], cuts, begins
 
 
 def read_obs_presses(data):
@@ -395,13 +438,39 @@ def _timing(done, speeds, got_rows):
             "delay_ms": _by_speed(delays), "interval_error_ms": _by_speed(errors)}
 
 
-def _side(done, speeds, times, starts, ends):
+def _segments(done, times, rows, begins, markers):
+    """Per segment (see Definitions): the rows that fall in it, those explained by a press that was sent, and the
+    rest. begins = [(wall time, block_id)] sorted by time; markers = {block_id: marker presses}."""
+    cut_times = [b[0] for b in begins]
+    n_rows = [0] * (len(begins) + 1)
+    reached = [0] * (len(begins) + 1)
+    for ts in times:
+        n_rows[bisect.bisect_right(cut_times, ts)] += 1
+    for t, got in zip(done, rows):
+        seg = bisect.bisect_right(cut_times, t["begin_wall"])
+        inside = sum(1 for ts in got if bisect.bisect_right(cut_times, ts) == seg)
+        reached[seg] += min(len(_presses(t)), inside)
+    by_segment = []
+    for i in range(len(begins) + 1):
+        bid = begins[i - 1][1] if i else None
+        marker = markers[bid] if i else 0
+        unexplained = n_rows[i] - reached[i]
+        by_segment.append({"block_id": bid, "n_rows": n_rows[i], "n_reached": reached[i],
+                           "n_unexplained": unexplained, "n_marker_presses": marker,
+                           "n_unexplained_beyond_markers": max(0, unexplained - marker)})
+    return {"n_segments": len(by_segment),
+            "max_unexplained_beyond_markers": max(b["n_unexplained_beyond_markers"] for b in by_segment),
+            "by_segment": by_segment}
+
+
+def _side(done, speeds, times, starts, ends, begins, markers):
     rows, outside = _assign(times, starts, ends)
     all_counts = [len(_presses(t)) for t in done]
     excl_counts = [len([s for s in _presses(t) if s["key"] not in MODE_KEYS]) for t in done]
     return {"reach": {"all_presses": _reach(all_counts, rows, outside),
                       "excluding_mode_keys": _reach(excl_counts, rows, outside)},
-            "timing": _timing(done, speeds, rows)}
+            "timing": _timing(done, speeds, rows),
+            "segments": _segments(done, times, rows, begins, markers)}
 
 
 def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=300):
@@ -410,8 +479,8 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
         raise InputError("pre_ms and tail_ms must be integers of 0 or greater")
     sha = {"plan": hashlib.sha256(plan_bytes).hexdigest(), "oracle": hashlib.sha256(oracle_bytes).hexdigest(),
            "obs": hashlib.sha256(obs_bytes).hexdigest(), "gt": hashlib.sha256(gt_bytes).hexdigest()}
-    plan = read_plan(plan_bytes)
-    trials, cuts = read_oracle(oracle_bytes, plan, sha["plan"])
+    plan, markers = read_plan(plan_bytes)
+    trials, cuts, begins = read_oracle(oracle_bytes, plan, sha["plan"], markers)
     obs_times = read_obs_presses(obs_bytes)
     gt_times = read_gt_key_downs(gt_bytes)
 
@@ -436,8 +505,8 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
                    "incomplete": len(trials) - len(done)},
         "presses": {"all": n_all, "excluding_mode_keys": n_excl},
         "send_lateness_ms": _by_speed(lateness),
-        "observation": _side(done, speeds, obs_times, starts, ends),
-        "reference": _side(done, speeds, gt_times, starts, ends),
+        "observation": _side(done, speeds, obs_times, starts, ends, begins, markers),
+        "reference": _side(done, speeds, gt_times, starts, ends, begins, markers),
         "reference_focus_loss": _focus_losses(done, plan, read_gt_events(gt_bytes, "focus_out"),
                                               read_gt_events(gt_bytes, "focus_in"), starts, ends),
     }
@@ -509,6 +578,53 @@ def _fixture(plan_edit=None, oracle_edit=None, extra_obs=(), obs_drop=None):
            {"kind": "ev", "t_wall_ms": W0 + 6, "t_mono_ns": 1, "ev": "key_up", "vk": 65},
            {"kind": "ev", "t_wall_ms": W0 + 4110, "t_mono_ns": 1, "ev": "focus_out"},
            {"kind": "ev", "t_wall_ms": W0 + 5000, "t_mono_ns": 1, "ev": "focus_out"}]
+    return plan, _jl(ora), _jl(obs), _jl(gt)
+
+
+SEG_TRIALS = (("a0", 0, 1000, 1200), ("a1", 0, 2000, 2200), ("b0", 1, 4500, 4700))
+SEG_BEGIN = {0: 0, 1: 3500}
+
+
+def _seg_fixture(gt_extra=(), gt_drop=(), plan_edit=None, oracle_edit=None):
+    """Two blocks of four marker presses each (an oracle marker row per press, a reference key_down 2 ms after it)
+    and three one-press trials (a0, a1 in block 0; b0 in block 1; the key_down is 5 ms after the send). Times are
+    ms from W0. The reference rows of the default fixture: 4 + 2 of block 0, 4 + 1 of block 1. gt_extra adds
+    key_down rows, gt_drop removes the ones at the times given."""
+    plan_rows = [{"kind": "header", "format": "plan/1", "os": "macos"}]
+    for b in (0, 1):
+        plan_rows.append({"kind": "block", "block_id": b, "marker": ["m1", "m2", "m3", "m4"]})
+    for tid, b, _bg, _en in SEG_TRIALS:
+        plan_rows.append({"kind": "trial", "trial_id": tid, "block_id": b, "scenario": "S1", "speed": "mid",
+                          "steps": [{"key": "a", "at_ms": 0, "down": True}, {"key": "a", "at_ms": 50, "down": False}]})
+    if plan_edit:
+        plan_edit(plan_rows)
+    plan = _jl(plan_rows)
+    ora = [{"kind": "header", "format": "oracle/1", "plan_sha256": hashlib.sha256(plan).hexdigest()}]
+    gt_t, obs_t = [], []
+    for b in (0, 1):
+        ora.append({"kind": "block_begin", "block_id": b, "t_wall_ms": W0 + SEG_BEGIN[b], "t_mono_ns": 1})
+        for i in range(4):
+            ora.append({"kind": "marker", "block_id": b, "seq": i, "t_wall_ms": W0 + SEG_BEGIN[b] + 10 * (i + 1),
+                        "t_mono_ns": 1})
+            gt_t.append(SEG_BEGIN[b] + 10 * (i + 1) + 2)
+        for tid, tb, bg, en in SEG_TRIALS:
+            if tb != b:
+                continue
+            ora.append({"kind": "trial_begin", "trial_id": tid, "t_wall_ms": W0 + bg, "t_mono_ns": (W0 + bg) * 1000000})
+            for i, down in enumerate((True, False)):
+                ora.append({"kind": "sent", "trial_id": tid, "step": i, "key": "a", "down": down,
+                            "t_wall_ms": W0 + bg + 50 * i, "t_mono_ns": (W0 + bg + 50 * i) * 1000000})
+            ora.append({"kind": "trial_end", "trial_id": tid, "t_wall_ms": W0 + en, "t_mono_ns": (W0 + en) * 1000000})
+            gt_t.append(bg + 5)
+            obs_t.append(bg + 5)
+        ora.append({"kind": "block_end", "block_id": b, "t_wall_ms": W0 + SEG_BEGIN[b] + 1900, "t_mono_ns": 1})
+    if oracle_edit:
+        oracle_edit(ora)
+    gt_t = [t for t in gt_t if t not in gt_drop] + list(gt_extra)
+    obs = [{"type": "meta", "format": "obs/1"}] + [{"type": "key", "t": W0 + t, "category": "alphabetic", "press": True}
+                                                    for t in obs_t]
+    gt = [{"kind": "header", "format": "gt/1", "src": "x"}] + [
+        {"kind": "ev", "t_wall_ms": W0 + t, "t_mono_ns": 1, "ev": "key_down", "vk": 65} for t in gt_t]
     return plan, _jl(ora), _jl(obs), _jl(gt)
 
 
@@ -681,6 +797,79 @@ def _selftest():
     check(refused(_oracle_with(fx, no_begin)), "a sent row without its trial_begin is refused")
     check(refused(_oracle_with(fx, two_ends)), "a repeated trial_end is refused")
     check(refused((fx[0], fx[1][:-1] + b"x\n", fx[2], fx[3])), "malformed oracle is refused")
+
+    # segments. Reference rows per segment: the first holds the key outside any block (kana1), block 0 holds its four
+    # marker presses and two trial presses, block 1 four marker presses and one trial press.
+    def segs(*args, **kw):
+        return evaluate(*_seg_fixture(*args, **kw))["reference"]["segments"]
+
+    def row(bid, n_rows, n_reached, marker):
+        un = n_rows - n_reached
+        return {"block_id": bid, "n_rows": n_rows, "n_reached": n_reached, "n_unexplained": un,
+                "n_marker_presses": marker, "n_unexplained_beyond_markers": max(0, un - marker)}
+    base = segs()
+    check(base["by_segment"] == [row(None, 0, 0, 0), row(0, 6, 2, 4), row(1, 5, 1, 4)] and base["n_segments"] == 3
+          and base["max_unexplained_beyond_markers"] == 0, "segments: marker presses are explained by the plan")
+    kana_in, kana_out = segs(gt_extra=(-500, 2300)), segs(gt_extra=(-500, 2900))
+    want = [row(None, 1, 0, 0), row(0, 7, 2, 4), row(1, 5, 1, 4)]
+    check(kana_in["by_segment"] == want and kana_out["by_segment"] == want and kana_in == kana_out
+          and kana_in["max_unexplained_beyond_markers"] == 1,
+          "segments: a key without an oracle row counts once in its segment, inside or outside the last trial's window")
+    full_in = evaluate(*_seg_fixture(gt_extra=(-500, 2300)))["reference"]["reach"]["all_presses"]
+    full_out = evaluate(*_seg_fixture(gt_extra=(-500, 2900)))["reference"]["reach"]["all_presses"]
+    check(full_in["excess_rows"] == 1 and full_out["excess_rows"] == 0
+          and full_in["rows_outside_trials"] + 1 == full_out["rows_outside_trials"],
+          "segments: the whole-run counts of reach do depend on where such a key falls (the reason for the segments)")
+    at_begin = segs(gt_extra=(SEG_BEGIN[1],))["by_segment"]
+    check(at_begin == [row(None, 0, 0, 0), row(0, 6, 2, 4), row(1, 6, 1, 4)],
+          "segments: a row at the time of a block_begin belongs to the new block")
+    before_begin = segs(gt_extra=(SEG_BEGIN[1] - 1,))["by_segment"]
+    check(before_begin[1] == row(0, 7, 2, 4) and before_begin[2] == row(1, 5, 1, 4),
+          "segments: a row one millisecond before a block_begin belongs to the previous block")
+    swap = segs(gt_drop=(2005,), gt_extra=(2300,))["by_segment"]
+    check(swap == base["by_segment"],
+          "segments: a press that does not arrive, replaced by one from outside in the same trial, is not detected")
+    lost = segs(gt_drop=(2005,))["by_segment"]
+    check(lost[1] == row(0, 5, 1, 4) and lost[1]["n_unexplained"] == base["by_segment"][1]["n_unexplained"],
+          "segments: a press that does not arrive adds nothing to n_unexplained")
+    obs_seg = evaluate(*_seg_fixture())["observation"]["segments"]
+    check(obs_seg["by_segment"] == [row(None, 0, 0, 0), row(0, 2, 2, 4), row(1, 1, 1, 4)]
+          and obs_seg["max_unexplained_beyond_markers"] == 0, "segments: the observation side is counted the same way")
+    nob = evaluate(_seg_fixture()[0], _oracle_with(_seg_fixture(), lambda rows: rows.__setitem__(
+        slice(None), [r for r in rows if r.get("kind") != "block_begin"]))[1], *_seg_fixture()[2:])
+    check(nob["reference"]["segments"]["n_segments"] == 1
+          and nob["reference"]["segments"]["by_segment"] == [row(None, 11, 3, 0)],
+          "segments: with no block_begin the whole log is one segment with a null block_id")
+
+    def plan_with(edit):
+        return _seg_fixture(plan_edit=edit)
+
+    def bad_marker(rows):
+        rows[1]["marker"] = "zzmarker"
+
+    def bad_marker_item(rows):
+        rows[1]["marker"] = ["m1", 7]
+
+    def dup_block(rows):
+        rows.insert(2, dict(rows[1]))
+
+    def extra_begin(ora):
+        ora.append({"kind": "block_begin", "block_id": "zzblock", "t_wall_ms": W0 + 5000, "t_mono_ns": 1})
+
+    def twice_begin(ora):
+        ora.append({"kind": "block_begin", "block_id": 0, "t_wall_ms": W0 + 5000, "t_mono_ns": 1})
+
+    def no_id_begin(ora):
+        ora.append({"kind": "block_begin", "t_wall_ms": W0 + 5000, "t_mono_ns": 1})
+    check(refused(plan_with(bad_marker), "zzmarker"), "a block row whose marker is not an array is refused, value not echoed")
+    check(refused(plan_with(bad_marker_item)), "a block row whose marker holds a non-string is refused")
+    check(refused(plan_with(dup_block)), "a repeated block_id in the plan is refused")
+    check(refused(_oracle_with(_seg_fixture(), extra_begin), "zzblock"),
+          "a block_begin of a block that is not in the plan is refused, value not echoed")
+    check(refused(_oracle_with(_seg_fixture(), twice_begin)), "a repeated block_begin is refused")
+    check(refused(_oracle_with(_seg_fixture(), no_id_begin)), "a block_begin without a block_id is refused")
+    check(json.loads(render(evaluate(*_seg_fixture())).decode("utf-8"))["reference"]["segments"] == base,
+          "segments: the rendered output holds the same figures")
 
     # command line.
     me = os.path.abspath(__file__)

@@ -81,6 +81,16 @@ exit status 3 when a mark is missing, malformed, duplicated or different. Only r
 rehearsals, not a defence against a person who edits a manifest. A synthetic result also carries
 "synthetic": true and is never written under experiment/results.
 
+Abort rule for the reference input field (pre-registration section 3.4). The delivery report divides the
+reference log into segments at the block_begin rows of the oracle (delivery.py, Definitions) and counts in
+each the key_down rows that no press sent by the executor explains (n_unexplained). A run is refused (exit
+status 2, the run counts as aborted and is not analysed) when, in any segment, that count exceeds the number of
+marker presses the plan puts at the head of the block, plus RUNNER_KANA_PRESSES_PER_BLOCK for every segment
+that a later block follows (the runner selects the input method with one key before each block; the last
+segment has no such key after it, and the segment before the first block has the key of the first block).
+Extra rows in the observation log never refuse a run. The message names the cell and the block, never a value
+of a log. The rule and its constants are recorded in e1_delivery.json ("abort_rule").
+
 Outputs (RESULTS_DIR): e1_l1.json, e1_l2.json, e1_detection.json and e1_delivery.json (the per-press delivery
 report of delivery.py, per cell: cells[label]). Each one carries the seed, the
 SHA-256 of the configuration, of the rule file, of the key map, of every manifest and of every input log,
@@ -187,6 +197,13 @@ L2_SCOPES = ("under_limit", "all_trials")
 PRIMARY = {"detection": {"comparison": "gt_obs", "scope": "under_limit"},
            "l1": {"comparison": "gt_obs", "scope": "under_limit"},
            "l2": {"comparison": "gt_obs", "scope": "under_limit"}}
+# Provisional. The number of input-method keys that the runner's focus command presses before each block and that
+# remain in the reference log as key_down rows. Before the freeze, set it to 0 or 1 from the result of delivery.py
+# on the reference log of a pilot run on the measuring machine, and record the grounds in section 3.1 of the
+# pre-registration.
+RUNNER_KANA_PRESSES_PER_BLOCK = 1
+DELIVERY_PRE_MS = 20
+DELIVERY_TAIL_MS = 300
 PRIMARY_NOTE = ("the primary estimates are the comparison and scope named here, per stratum; every other comparison "
                 "and scope is secondary. A cell without a prediction (the prediction models the macOS observer only) "
                 "has the comparison gt_obs and the scope all_trials only. Values under all_trials depend on this "
@@ -772,6 +789,19 @@ def _write_results(out_dir, blobs):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def reference_abort_segments(dlv):
+    """The block_ids (None for the segment before the first block) of the segments of the reference log in which
+    the key_down rows that no sent press explains exceed the allowance (see the abort rule in the module
+    description). Empty when the run is not to be counted as aborted."""
+    segs = dlv["reference"]["segments"]["by_segment"]
+    over = []
+    for i, seg in enumerate(segs):
+        allowance = seg["n_marker_presses"] + (0 if i == len(segs) - 1 else RUNNER_KANA_PRESSES_PER_BLOCK)
+        if seg["n_unexplained"] > allowance:
+            over.append(seg["block_id"])
+    return over
+
+
 def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, manifest_shas=None):
     """The whole pipeline. Writes the three result files; raises CheckFailed / NotFrozen / InputError."""
     if not _is_int(seed):
@@ -822,13 +852,20 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
     res = dict((key, dict(head, primary=dict(PRIMARY[key], note=PRIMARY_NOTE), cells={})) for key in PRIMARY)
     res["detection"]["predictions"] = {}
     res["detection"]["same_sessions_as_all"] = {}
-    res["delivery"] = dict(head, cells={})
+    res["delivery"] = dict(head, abort_rule={"runner_kana_presses_per_block": RUNNER_KANA_PRESSES_PER_BLOCK,
+                                             "pre_ms": DELIVERY_PRE_MS, "tail_ms": DELIVERY_TAIL_MS}, cells={})
     for r in used:
         f = r["files"]
         try:
-            dlv = delivery.evaluate(f["plan"], f["oracle"], f["obs"], f["gt"])
+            dlv = delivery.evaluate(f["plan"], f["oracle"], f["obs"], f["gt"], DELIVERY_PRE_MS, DELIVERY_TAIL_MS)
         except delivery.InputError as e:
             raise InputError("delivery: %s" % e)
+        over = reference_abort_segments(dlv)
+        if over:
+            raise InputError("run %s: the reference log holds key presses that the executor did not send and the "
+                             "runner does not add (%s); under section 3.4 of the pre-registration the run counts as "
+                             "aborted and is not analysed"
+                             % (r["label"], "before the first block" if over[0] is None else "segment of block %s" % over[0]))
         res["delivery"]["cells"][r["label"]] = dlv
         st = run_stages(r, cfg, rules_bytes, seed, keymap, dlv["reference_focus_loss"]["trials_with_focus_loss"])
         res["detection"]["predictions"][r["label"]] = st["prediction"]
@@ -2048,7 +2085,73 @@ def _case_focus_and_composition(d):
     return f
 
 
+def _case_reference_abort_rule(d):
+    """The reference input field's abort rule: unexplained key_down rows per segment of the reference log."""
+    f = []
+    cfg = _config_file(d)
+
+    def run_with(name, rel_times):
+        """A synthetic run (cell a) whose reference log gets key_down rows at WALL0 + the times given."""
+        base = make_synthetic(os.path.join(d, name), 2)[:1]
+        gt = open(os.path.join(base[0], LOG_FILES["gt"]), "rb").read()
+        sent = [json.loads(x.decode("utf-8")) for x in open(os.path.join(base[0], LOG_FILES["oracle"]), "rb").read().splitlines() if x]
+        rows = [json.loads(x.decode("utf-8")) for x in gt.splitlines() if x]
+        # every press the executor sent arrives 5 ms later, as in a run that delivers faithfully
+        rows += [{"kind": "ev", "t_wall_ms": x["t_wall_ms"] + 5, "t_mono_ns": x["t_mono_ns"] + 5000000, "ev": "key_down", "vk": 65}
+                 for x in sent if x.get("kind") == "sent" and x["down"] and x["key"] not in delivery.PSEUDO_KEYS]
+        rows += [{"kind": "ev", "t_wall_ms": WALL0 + t, "t_mono_ns": (MONO0 + t) * 1000000, "ev": "key_down", "vk": 65}
+                 for t in rel_times]
+        rows = rows[:1] + sorted(rows[1:], key=lambda r: r["t_wall_ms"])
+        _rewrite_log(base[0], "gt", _jl(rows))
+        return base
+
+    def rc_of(run_dirs, out):
+        return _quiet(["--runs"] + run_dirs + ["--config", cfg, "--seed", "1", "--out", os.path.join(d, out)])
+
+    base = make_synthetic(os.path.join(d, "probe"), 2)[:1]
+    ora = [json.loads(x.decode("utf-8")) for x in open(os.path.join(base[0], LOG_FILES["oracle"]), "rb").read().split(b"\n") if x]
+    begins = [x["t_wall_ms"] - WALL0 for x in ora if x.get("kind") == "block_begin"]
+    ends0 = [x["t_wall_ms"] - WALL0 for x in ora if x.get("kind") == "trial_end" and x["t_wall_ms"] - WALL0 < begins[1]]
+    last_end0, last_end1 = max(ends0), max(x["t_wall_ms"] - WALL0 for x in ora if x.get("kind") == "trial_end")
+    first, second = begins[0] - 1000, begins[1] + 500
+
+    rc, _o, err = rc_of(run_with("k0", []), "o0")
+    if rc != 0:
+        f.append("a run with no unexplained key_down was refused (rc %d)" % rc)
+    rc, _o, err = rc_of(run_with("k1", [first]), "o1")
+    if rc != 0:
+        f.append("one key before the first block (the runner's key) was refused (rc %d)" % rc)
+    rc, _o, err = rc_of(run_with("k2", [first, first + 1]), "o2")
+    if rc != 2 or "before the first block" not in err or str(WALL0 + first) in err or str(first) in err:
+        f.append("two keys before the first block were accepted, or the message is wrong (rc %d)" % rc)
+    if os.path.exists(os.path.join(d, "o2", "e1_delivery.json")):
+        f.append("a result was written although the run counts as aborted")
+    rc, _o, err = rc_of(run_with("k3", [second]), "o3")
+    if rc != 2 or "block 1" not in err or str(second) in err:
+        f.append("one key in the last block's segment was accepted, or the message is wrong (rc %d)" % rc)
+    for name, t in (("k4", last_end0 + 100), ("k5", last_end0 + 1000)):
+        rc = rc_of(run_with(name, [t]), "o" + name)[0]
+        if rc != 0:
+            f.append("the runner's key after a block (%s its last trial's window) was refused (rc %d)"
+                     % ("inside" if t == last_end0 + 100 else "outside", rc))
+    rc, _o, err = rc_of(run_with("k6", [last_end0 + 100, last_end0 + 1000]), "ok6")
+    if rc != 2 or "block 0" not in err:
+        f.append("two unexplained keys after a block were accepted (rc %d)" % rc)
+    rc = rc_of(run_with("k7", [last_end1 + 100]), "ok7")[0]
+    if rc != 2:
+        f.append("a key after the last trial of the last block was accepted (rc %d)" % rc)
+    rc = rc_of(run_with("k8", [first, last_end0 + 100]), "ok8")[0]
+    if rc != 0:
+        f.append("the runner's key in two different segments was refused (rc %d)" % rc)
+    rc = rc_of(run_with("k9", []), "ok9")[0]
+    res = json.loads(open(os.path.join(d, "ok9", "e1_delivery.json"), "rb").read().decode("utf-8")) if rc == 0 else {}
+    if res.get("abort_rule") != {"runner_kana_presses_per_block": RUNNER_KANA_PRESSES_PER_BLOCK, "pre_ms": 20, "tail_ms": 300}:
+        f.append("the abort rule is not recorded in the delivery results")
+    return f
+
+
 CASES = [
+    ("the abort rule of the reference input field (unexplained key presses per block)", _case_reference_abort_rule),
     ("the rows of the trials that lost focus, and the composition of the scopes", _case_focus_and_composition),
     ("synthetic run directories (form, cell accepted by the run-cell tool, determinism, seed, no overwrite)", _case_synthetic_form),
     ("one command reproduces the results (byte-identical, no paths, both definitions, seed matters)", _case_reproduces),

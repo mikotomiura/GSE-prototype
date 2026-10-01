@@ -103,8 +103,13 @@ conversion time (ground truth: end - start; observation: dwell_ms) and the numbe
 conversions. Per stratum: the number of trials and of blocks, the mean on each side, and the mean,
 standard deviation and block-clustered 95% percentile bootstrap interval of the per-trial difference
 (observation minus ground truth), and the number of observation rows with dwell_ms == 0 (they add 0
-to the summed time). A trial is used when it is in the plan, was run, is not excluded and is in the
-scope; a trial with no session or row on a side counts 0 there. Sessions and rows are attributed to
+to the summed time). Every (scenario, speed) layer of the plan has a row. A layer with no trial used
+has "status": "no_trial", n_trials, n_blocks and n_dwell_zero 0 and null for each of the three
+quantities (never 0: a quantity that cannot be computed is null); every row ("status": "ok" or
+"no_trial") also gives "trials_not_used", the number of the layer's trials that were not used by
+reason (not_run / excluded / out_of_scope, and outside_layer when a list of trials is given), so the
+reason a layer is empty is in the row. A trial is used when it is in the plan, was run, is not
+excluded and is in the scope; a trial with no session or row on a side counts 0 there. Sessions and rows are attributed to
 trials as for the texts. The per-trial differences include contamination by sessions carried over from
 an earlier trial (a session that began in one trial and is seen in the next). Two restricted views
 repeat the quantities over a list of trials of the match result's scope (null when the list is null,
@@ -617,7 +622,9 @@ def per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, B, seed, onl
     """The per-trial quantities of PER_TRIAL on both sides, by (scenario, speed). gt: ground-truth
     sessions; obs: observation rows carrying a "trial_id" (attach_trials). Returns {"n_trials",
     "trials_not_used": {"not_run", "excluded", "out_of_scope"}, "n_outside": {"gt", "obs"},
-    "by_stratum": [...]}; see "Per trial" in the module docstring. only_trials (a collection of trial
+    "by_stratum": [...]}, one row per (scenario, speed) of the plan, with "status" ("ok", or "no_trial"
+    when no trial of the layer is used), the layer's own "trials_not_used" and, for a "no_trial" row,
+    null for each quantity of PER_TRIAL; see "Per trial" in the module docstring. only_trials (a collection of trial
     ids, default None: no restriction) keeps only those trials: a trial that would otherwise be used
     but is not in it is counted under trials_not_used["outside_layer"] (a key that is present only
     when only_trials is given), and its sessions and rows count as outside."""
@@ -629,17 +636,23 @@ def per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, B, seed, onl
     if only is not None:
         not_used["outside_layer"] = 0
     acc = {}
-    for tid in plan["trials"]:
+    layer_not_used = {}
+    for tid, info in plan["trials"].items():
+        lnu = layer_not_used.setdefault((info["scenario"], info["speed"]), dict.fromkeys(not_used, 0))
+        reason = None
         if tid not in run:
-            not_used["not_run"] += 1
+            reason = "not_run"
         elif tid in excluded:
-            not_used["excluded"] += 1
+            reason = "excluded"
         elif tid in out_scope:
-            not_used["out_of_scope"] += 1
+            reason = "out_of_scope"
         elif only is not None and tid not in only:
-            not_used["outside_layer"] += 1
-        else:
+            reason = "outside_layer"
+        if reason is None:
             acc[tid] = {"gt": [0, 0, 0], "obs": [0, 0, 0], "zero": 0}
+        else:
+            not_used[reason] += 1
+            lnu[reason] += 1
     outside = {"gt": 0, "obs": 0}
     for n, s in enumerate(gt):
         a = acc.get(s.get("trial_id"))
@@ -667,11 +680,17 @@ def per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, B, seed, onl
         info = plan["trials"][tid]
         groups.setdefault((info["scenario"], info["speed"]), []).append((info["block_id"], a))
     out = []
-    for sc, sp in sorted(groups, key=lambda k: (_scenario_key(k[0]), SPEEDS.index(k[1]) if k[1] in SPEEDS else 9)):
-        items = groups[(sc, sp)]
+    for sc, sp in sorted(layer_not_used, key=lambda k: (_scenario_key(k[0]), SPEEDS.index(k[1]) if k[1] in SPEEDS else 9)):
+        items = groups.get((sc, sp), [])
         blocks = sorted(set(b for b, _a in items), key=str)
-        row = {"stratum": {"scenario": sc, "speed": sp}, "n_trials": len(items), "n_blocks": len(blocks),
-               "n_dwell_zero": sum(a["zero"] for _b, a in items)}
+        row = {"stratum": {"scenario": sc, "speed": sp}, "status": "ok" if items else "no_trial",
+               "n_trials": len(items), "n_blocks": len(blocks),
+               "n_dwell_zero": sum(a["zero"] for _b, a in items), "trials_not_used": layer_not_used[(sc, sp)]}
+        if not items:
+            for q in PER_TRIAL:
+                row[q] = None
+            out.append(row)
+            continue
         for i, q in enumerate(PER_TRIAL):
             diffs = [a["obs"][i] - a["gt"][i] for _b, a in items]
             by_block = {}
@@ -1773,11 +1792,60 @@ def _case_layer_none():
         f.append("the sessions of trials outside the layer should count as outside: %r" % (r["n_outside"],))
     if sum(x["n_trials"] for x in r["by_stratum"]) != 58:
         f.append("the strata should hold the 58 trials in the layer")
+    # layers of the plan with nothing used: reported, null, with the layer's own reasons
+    plan_l = dict(plan, trials=dict(plan["trials"], t09998={"block_id": 7, "scenario": "S9", "speed": "fast"}))
+    only_l = set(plan["trials"]) - {tid for tid, i in plan["trials"].items() if i["scenario"] == "S3"}
+    rl = per_trial(plan_l, w["oracle"], gt, obs, {"t00001"}, {"t00002"}, 50, 1, only_trials=only_l)
+    bl = per_trial(plan_l, w["oracle"], gt, obs, {"t00001"}, {"t00002"}, 50, 1)
+    labs_l = [(x["stratum"]["scenario"], x["stratum"]["speed"]) for x in rl["by_stratum"]]
+    if labs_l != [(s_, sp) for s_ in ("S1", "S2", "S3") for sp in SPEEDS] + [("S9", "fast")]:
+        f.append("one row per layer of the plan, in scenario then speed order: %r" % (labs_l,))
+    for x in rl["by_stratum"]:
+        k = (x["stratum"]["scenario"], x["stratum"]["speed"])
+        mine = [t for t, i in plan_l["trials"].items() if (i["scenario"], i["speed"]) == k]
+        if k[0] in ("S3", "S9"):
+            want_nu = {"not_run": len(mine) if k[0] == "S9" else 0, "excluded": 0, "out_of_scope": 0,
+                       "outside_layer": 0 if k[0] == "S9" else len(mine)}
+            if x["status"] != "no_trial" or x["n_trials"] != 0 or x["n_blocks"] != 0 or x["n_dwell_zero"] != 0 or \
+                    any(x[q] is not None for q in PER_TRIAL) or x["trials_not_used"] != want_nu:
+                f.append("an empty layer %r should be no_trial with null quantities and its own counts %r: %r" % (
+                    k, want_nu, x))
+        else:
+            nu = x["trials_not_used"]
+            if x["status"] != "ok" or x["n_trials"] < 1 or any(x[q] is None for q in PER_TRIAL):
+                f.append("a layer with trials should be ok with values: %r" % (x,))
+            if nu["outside_layer"] != 0 or nu["not_run"] + nu["excluded"] + nu["out_of_scope"] > 2 or \
+                    x["n_trials"] + sum(nu.values()) != len(mine):
+                f.append("a layer of S1 / S2 should count its own trials only: %r" % (x,))
+    if rl["trials_not_used"]["outside_layer"] != sum(x["trials_not_used"]["outside_layer"] for x in rl["by_stratum"]) or \
+            rl["trials_not_used"]["not_run"] != sum(x["trials_not_used"]["not_run"] for x in rl["by_stratum"]) or \
+            rl["trials_not_used"]["excluded"] != 1 or rl["trials_not_used"]["out_of_scope"] != 1:
+        f.append("the layer counts should add up to the total counts: %r" % (rl["trials_not_used"],))
+    # a layer that has trials keeps its values, whether or not an empty layer is shown beside it
+    vb = dict(((x["stratum"]["scenario"], x["stratum"]["speed"]), x) for x in bl["by_stratum"])
+    for x in rl["by_stratum"]:
+        k = (x["stratum"]["scenario"], x["stratum"]["speed"])
+        if x["status"] == "ok" and dict((q, x[q]) for q in PER_TRIAL) != dict((q, vb[k][q]) for q in PER_TRIAL):
+            f.append("the values of a layer with trials changed: %r" % (k,))
+    if [x["status"] for x in bl["by_stratum"]] != ["ok"] * 9 + ["no_trial"]:
+        f.append("status of the layers without only_trials: %r" % ([x["status"] for x in bl["by_stratum"]],))
     e = per_trial(plan, w["oracle"], gt, obs, set(), set(), 50, 1, only_trials=set())
-    if e["n_trials"] != 0 or e["by_stratum"] != [] or e["trials_not_used"]["outside_layer"] != 192:
+    if e["n_trials"] != 0 or e["trials_not_used"]["outside_layer"] != 192:
         f.append("an empty only_trials should leave no trial: %r" % (e["trials_not_used"],))
+    if len(e["by_stratum"]) != len(base["by_stratum"]) or \
+            any(x["status"] != "no_trial" or x["n_trials"] != 0 or x["n_blocks"] != 0 or x["n_dwell_zero"] != 0 or
+                any(x[q] is not None for q in PER_TRIAL) or
+                sum(x["trials_not_used"].values()) != sum(
+                    1 for i in plan["trials"].values()
+                    if (i["scenario"], i["speed"]) == (x["stratum"]["scenario"], x["stratum"]["speed"]))
+                for x in e["by_stratum"]):
+        f.append("an only_trials that leaves nothing should still give a no_trial row per layer of the plan, with the "
+                 "layer's own counts: %r" % (e["by_stratum"],))
     full = per_trial(plan, w["oracle"], gt, obs, {"t00001"}, {"t00002"}, 50, 1, only_trials=set(plan["trials"]))
-    if full["by_stratum"] != base["by_stratum"] or full["trials_not_used"]["outside_layer"] != 0:
+    strip = lambda rows: [dict((k, v) for k, v in x.items() if k != "trials_not_used") for x in rows]
+    if strip(full["by_stratum"]) != strip(base["by_stratum"]) or full["trials_not_used"]["outside_layer"] != 0 or \
+            [x["trials_not_used"] for x in full["by_stratum"]] != \
+            [dict(x["trials_not_used"], outside_layer=0) for x in base["by_stratum"]]:
         f.append("only_trials covering every trial must change nothing but the extra count")
     # through evaluate: the scope's list of trials in none of the layers
     fx = match._cli_fixture()

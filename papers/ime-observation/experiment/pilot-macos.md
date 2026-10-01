@@ -169,8 +169,9 @@ pre-registration.
 
 ## Raw logs
 
-The raw logs of the pilot runs are kept on the measuring machine and are not yet deposited. Before they are, the
-criteria for which runs are deposited, and the tool that checks them, will be written here. Both logs can carry
+The raw logs of the pilot runs are kept on the measuring machine and are not yet deposited. Before the freeze of the
+pre-registration, the criteria for which runs are deposited, and the tool that checks them, will be written here
+(section 3.1 of the pre-registration). Both logs can carry
 a person's typing: the observation records every key press on the machine, and the reference input field records
 the key code of every key-down it receives. The criteria will therefore require at least the following.
 

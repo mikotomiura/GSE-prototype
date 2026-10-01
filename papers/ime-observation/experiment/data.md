@@ -22,20 +22,27 @@ used are printed when the analysis ends.
 
 ## Run checks (section 3.4 of the pre-registration)
 
-| Cell label | Attempt | Checked at | Reference `excess_rows` (all presses) | Reference `rows_outside_trials` / limit | Counts as aborted |
-|---|---|---|---|---|---|
-| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
+| Cell label | Attempt | Checked at | SHA-256 of the plan | `delivery.py` exit status | Largest `n_unexplained_beyond_markers`, segments before the last / k | `n_unexplained_beyond_markers`, last segment | Counts as aborted |
+|---|---|---|---|---|---|---|---|
+| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
 
 ## Deposit procedure
 
 1. Right after the run, before the next run of the order (section 3.2 of the pre-registration), and before any
-   analysis of the run, run `python3 kit/analysis/delivery.py` on the run directory alone (it reads the key rows of
-   the logs, not the session rows). If, over all presses, the reference's `excess_rows` is greater than 0, or the
-   reference's `rows_outside_trials` exceeds five per block (four marker presses and one kana press), the
-   reference received a key press from outside the executor: the run counts as an aborted attempt, is not analysed
-   and is not deposited, since its reference log may hold a person's key presses (section 3.4 of the
-   pre-registration). No other reason and no explanation is admitted. Record the result of this check and its time
-   in the table of run checks above before any analysis. Rows of the observation
+   analysis of the run, run on the run directory alone (it reads the key rows of the logs, not the session rows)
+
+   ```
+   python3 kit/analysis/delivery.py --plan <run>/plan.jsonl --oracle <run>/oracle.jsonl --obs <run>/obs.jsonl \
+     --gt <run>/gt.jsonl --pre-ms 20 --tail-ms 300 --out <report>
+   ```
+
+   and check the plan's SHA-256 against section 2.4 of the pre-registration. The run counts as an aborted attempt
+   when the plan's SHA-256 differs, when the command exits with status 2, or when, in
+   `reference.segments.by_segment` of the report, `n_unexplained_beyond_markers` exceeds k in any segment but the
+   last, or exceeds 0 in the last segment (k is fixed in section 3.1 of the pre-registration). Such a run is
+   neither analysed nor deposited, since its reference log may hold a person's key presses (section 3.4 of the
+   pre-registration). No other reason and no explanation is admitted. Record the
+   result of this check and its time in the table of run checks above before any analysis. Rows of the observation
    without a sent press are a result of the observer under test: they are reported (section 6.3) and do not stop
    the run from being analysed or deposited.
 2. Deposit only `run.json` and the four logs of a run directory: `plan.jsonl`, `oracle.jsonl`,

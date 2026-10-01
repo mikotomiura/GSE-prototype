@@ -46,10 +46,11 @@ order (the evaluator supplies the trial boundaries). With --markers-in-obs the b
 observation and serve as anchors: a block whose presses (its marker and its trials, compared by category) equal the
 plan is scored; a block with a missing, extra or different press is left unscored and counted, and the next block is
 found again by its own marker, so one dropped press loses one block and never shifts the others (align_blocks). A
-marker is recognised only as a run of exactly its length (the neighbouring presses are not of its first or last
-category), which a run of arrow presses inside a trial, at most three, cannot be mistaken for when the marker is
-longer. Presses that no scored block covers are counted as unassigned. The output holds an `alignment` object (blocks,
-unscored blocks and trials by scenario and by speed, unassigned presses); n, the accuracies and the intervals are
+marker is recognised at the right end of a run of its category (the press after it is not of its last category), so
+arrow presses just before it do not hide it, and a run of arrow presses inside a trial, at most three, cannot be
+mistaken for it when the marker is longer; a block is placed only where its whole sequence matches. Presses that no
+scored block covers are counted as unassigned. The output holds an `alignment` object (blocks, unscored blocks and
+trials by scenario and by speed, unassigned presses); n, the accuracies and the intervals are
 computed over the scored trials only. Without --markers-in-obs there is no anchor to resynchronise to, so any mismatch
 stops the run (exit 2).
 
@@ -578,12 +579,13 @@ def marker_categories(marker, keycat=KEYCAT):
 
 
 def _is_anchor(cats, i, marker):
-    """True when cats[i:i+len(marker)] is the marker as a run of exactly that length: the press before it is not
-    of the marker's first category and the press after it is not of its last category."""
+    """True when cats[i:i+len(marker)] is the marker and the press after it, if there is one, is not of the
+    marker's last category. The test is anchored on the right: within a run of presses of the marker's category
+    that is longer than the marker, only the last len(marker) presses of the run stand as the marker, so a press
+    added in front of a marker, or the arrow presses that end the last trial of the block before it, do not hide
+    the marker. A run of fewer presses than the marker is not the marker."""
     n = len(marker)
     if n == 0 or cats[i:i + n] != marker:
-        return False
-    if i > 0 and cats[i - 1] == marker[0]:
         return False
     if i + n < len(cats) and cats[i + n] == marker[-1]:
         return False
@@ -591,8 +593,7 @@ def _is_anchor(cats, i, marker):
 
 
 def _next_anchor(cats, marker, start):
-    """The first index at or after `start` at which the marker stands as a run of exactly its length (see
-    _is_anchor), or None."""
+    """The first index at or after `start` at which the marker stands as an anchor (see _is_anchor), or None."""
     for i in range(max(start, 0), len(cats) - len(marker) + 1):
         if _is_anchor(cats, i, marker):
             return i
@@ -609,14 +610,17 @@ def align_blocks(cats, blocks):
 
     A cursor walks the observation. When the expected sequence of a block equals cats at the cursor, the block is
     placed there. Otherwise the anchors at or after the cursor are scanned in order, an anchor being a position at
-    which the marker of the block or the marker of the following block stands as a run of exactly its length (see
+    which the marker of the block or the marker of the following block stands at the right end of a run (see
     _is_anchor); the markers may differ between blocks. At each anchor: when the whole expected sequence of the block
     matches there, the block is placed there (the presses before it stay unassigned); otherwise, when the whole
     expected sequence of the following block matches there, the block is left unscored and the cursor moves to that
-    anchor. An anchor at which neither matches (a run of exactly the marker's length that arises inside a trial, for
+    anchor. An anchor at which neither matches (a run of the marker's length that arises inside a trial, for
     instance three arrow presses and one added) is passed over. When no anchor qualifies, the block is left
-    unscored and the cursor stays, so the next block scans from the same place. Hence a block whose presses do not
-    match the plan (a missing, added or changed press, a damaged marker) is the only block lost.
+    unscored and the cursor stays, so the next block scans from the same place. Hence one difference (a missing,
+    added or changed press, a damaged marker) loses only the block whose presses contain it, also when a missing
+    press at the end of a block leaves arrow presses next to the marker of the next block; a press added between two
+    blocks loses no block and is counted as unassigned. These properties are checked by the selftest's cases; they
+    are not proved in general.
     n_unassigned is the number of presses that no placed block covers (stray presses, the presses of unscored
     blocks, presses after the last block).
     """
@@ -1327,7 +1331,7 @@ def selftest():
         check("alignment: with every marker press missing no block can be found again: all unscored, no error",
               tr_g == [] and al_g["n_blocks_unscored"] == len(layout) and al_g["n_trials_unscored"] == n_all
               and al_g["n_presses_unassigned"] == len(gone), repr(al_g))
-        # navigation marker (macOS): a run of exactly the marker's length, never a run of arrows inside a trial
+        # navigation marker (macOS): anchored at the right end of a run, never a run of arrows inside a trial
         nav = "navigation"
         mk4 = [nav] * 4
         t1 = ["alphabetic", "space", nav, nav, nav, "enter"]
@@ -1341,11 +1345,13 @@ def selftest():
         check("align_blocks: a press missing from a navigation marker (a run of three) leaves that block unscored; "
               "the next block is found by its own marker",
               align_blocks(full[:cut] + full[cut + 1:], nb) == ([0, None, len(sq[0]) + len(sq[1]) - 1], len(sq[1]) - 1))
-        check("align_blocks: an extra navigation press in a marker (a run of five) is not an anchor either",
-              align_blocks(full[:cut] + [nav] + full[cut:], nb)[0][1] is None
-              and align_blocks(full[:cut] + [nav] + full[cut:], nb)[0][2] is not None)
-        check("_is_anchor: a run of exactly the marker's length is an anchor; a longer run is not, at either end",
-              _is_anchor([nav] * 4, 0, mk4) and not _is_anchor([nav] * 5, 0, mk4) and not _is_anchor([nav] * 5, 1, mk4)
+        check("align_blocks: an extra navigation press in front of a marker (a run of five) hides nothing: the "
+              "block is placed after the added press, which is unassigned",
+              align_blocks(full[:cut] + [nav] + full[cut:], nb) == ([0, cut + 1, len(sq[0]) + len(sq[1]) + 1], 1))
+        check("_is_anchor: the marker is an anchor at the right end of a run; in a longer run only the last "
+              "len(marker) presses are; a shorter run is not",
+              _is_anchor([nav] * 4, 0, mk4) and not _is_anchor([nav] * 5, 0, mk4) and _is_anchor([nav] * 5, 1, mk4)
+              and _is_anchor([nav] * 7, 3, mk4) and not _is_anchor([nav] * 7, 2, mk4)
               and _is_anchor(["space"] + [nav] * 4 + ["enter"], 1, mk4) and not _is_anchor([nav] * 3, 0, mk4))
         mid = cut + 4 + len(t2) + 3
         check("align_blocks: a missing press among the arrows of a trial leaves only that block unscored",
@@ -1375,9 +1381,32 @@ def selftest():
               rst == [roff[0], None] + [roff[j] + 1 for j in range(2, 8)], repr(rst))
         rpos = roff[rb + 1]                                 # an added arrow right before the marker of block 2
         rst, rn = align_blocks(rcats[:rpos] + ["nav"] + rcats[rpos:], rbl)
-        check("align_blocks: an added arrow right before a marker (a run of five) loses the block of that marker "
-              "and nothing else",
-              rst == [roff[0], roff[1], None] + [roff[j] + 1 for j in range(3, 8)], repr(rst))
+        check("align_blocks: an added arrow right before a marker (a run of five) loses no block; the added press "
+              "is unassigned and the blocks after it are placed one press later",
+              rst == [roff[0], roff[1], roff[2] + 1] + [roff[j] + 1 for j in range(3, 8)] and rn == 1, repr((rst, rn)))
+        # a block whose last trial ends in arrow presses (as the macOS live-conversion-off recipe does) and whose
+        # closing Enter is missing: the arrows join the marker of the next block into a run of five to seven
+        for na in (1, 2, 3):
+            ends = [("L", "sp") + ("nav",) * na + ("ret",)]
+            eb = [(rm, [["L"] * (1 + k) + ["ret"], list(ends[0])]) for k in range(4)]
+            esq = [list(m) + [c for t in ts for c in t] for m, ts in eb]
+            eoff = [sum(len(x) for x in esq[:j]) for j in range(len(esq))]
+            ecats = [c for x in esq for c in x]
+            for lost_b in (0, 1, 2):
+                cutat = eoff[lost_b] + len(esq[lost_b]) - 1          # the last Enter of block lost_b
+                est, en = align_blocks(ecats[:cutat] + ecats[cutat + 1:], eb)
+                want = [None if j == lost_b else (eoff[j] if j < lost_b else eoff[j] - 1) for j in range(4)]
+                check("align_blocks: the closing Enter of block %d missing after %d arrows loses that block only"
+                      % (lost_b, na), est == want and en == len(esq[lost_b]) - 1, repr((est, en)))
+        # a press added after the last trial of a block (between two blocks) loses no block
+        epos = eoff[2]
+        est, en = align_blocks(ecats[:epos] + ["nav"] + ecats[epos:], eb)
+        check("align_blocks: an arrow added between two blocks loses no block and is counted as unassigned",
+              est == [eoff[0], eoff[1], eoff[2] + 1, eoff[3] + 1] and en == 1, repr((est, en)))
+        # an arrow added in front of the marker of the first block: the block is scored
+        est, en = align_blocks(["nav"] + ecats, eb)
+        check("align_blocks: an arrow added in front of the first marker leaves every block scored",
+              est == [eoff[j] + 1 for j in range(4)] and en == 1, repr((est, en)))
         rst, rn = align_blocks(rcats[:roff[3]] + rcats[roff[3] + 1:], rbl)
         check("align_blocks: with an unscored block the next block scans from the same place (a damaged marker in "
               "block 3 loses block 3 only)",
