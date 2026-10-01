@@ -32,7 +32,8 @@ STAGE1_OPTIONS = {
     "other": ["含める（一次研究として読む）", "除外 E4（保持の区分は対応表で決まる）", "除外（E4 以外）", "保留"],
 }
 # ★ 製品名の ChatGPT（項目文の逐語に出る・AF004）は GPT 版の判定ではないので除く（decisions.md 判断 4）
-STAGE1_BANNED = re.compile(r"Recommended|推奨|AI の判定|AIの判定|(?<!Chat)GPT|Claude|中心候補")
+# ★ 手引きの中身「一般に推奨」（AF032 の Step 4 の要約）は AI の推奨ではないので除く（decisions.md 判断 9）
+STAGE1_BANNED = re.compile(r"Recommended|(?<!一般に)推奨|AI の判定|AIの判定|(?<!Chat)GPT|Claude|中心候補")
 # 答え → 期待（design.md §2.2）。★ 書き込み側（write_workbook.py）とは別に持つ
 EXPECT_HUMAN = {
     ("含める", "中心-A"): "中心候補", ("含める", "中心-B"): "中心候補",
@@ -245,6 +246,16 @@ def selftest():
                                 ensure_ascii=False) + "\n" for x in read_log(base_log))
     if check(base_copy, lg_ok):
         print("FAIL 製品名 ChatGPT だけで赤になる")
+        bad += 1
+    mutate("recommend-after-guideline", fn_log=lambda L: [dict(x, question=x["question"] + " 一般に推奨。推奨は除外")
+                                                          if x["stage"] == "1" else x for x in L])
+    # 陰性対照: 手引きの中身の「一般に推奨」だけなら緑のまま
+    lg_ok2 = os.path.join(tmpd, "guideline-only.jsonl")
+    with open(lg_ok2, "w", encoding="utf-8") as f:
+        f.writelines(json.dumps(dict(x, question=x["question"] + " 選別は 2 名が独立に行うのが一般に推奨") if x["stage"] == "1" else x,
+                                ensure_ascii=False) + "\n" for x in read_log(base_log))
+    if check(base_copy, lg_ok2):
+        print("FAIL 手引きの中身の「一般に推奨」だけで赤になる")
         bad += 1
     mutate("stage2-first", fn_log=lambda L: list(reversed(L)))
     mutate("extra-sheet", fn_wb=lambda w: w.create_sheet("メモ"))
