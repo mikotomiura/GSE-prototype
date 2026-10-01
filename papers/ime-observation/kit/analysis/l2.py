@@ -21,14 +21,21 @@ reasons. Every trial of a text must have the same speed (the plan builds blocks 
 otherwise the input is rejected: a plan that mixes speeds inside a text is never handled silently.
 The stratum of a text is therefore its speed (slow / mid / fast).
 
-Measures, computed per text from both sides (a session is a conversion):
-  n_conversions   the number of sessions in the text
+Measures, computed per text from both sides (a session is a conversion). They are taken over the
+trials of the text that are in the scope (see "Scope"; with the scope all_trials, every trial of the
+text), and the definition is the same in every scope:
+  conversions_per_trial   the number of sessions of the text divided by its number of trials in scope
   mean_dwell_ms   the mean dwell of the sessions (ground truth: end - start; observation: dwell_ms)
   abandon_rate    the fraction of sessions that were cancelled (ground truth: outcome == "cancel";
                   observation: abandon)
-  dwell_fraction  the total dwell divided by the duration of the text (the first trial begin to the
-                  last trial end in the oracle log)
-A measure that cannot be computed for a text (no session, zero duration) is None, never 0.
+  dwell_fraction  the total dwell divided by the scope duration of the text: the sum, over its trials
+                  in scope, of the trial window (end - begin in the oracle log). The gaps between the
+                  trials are not in it, so even a text with every trial in scope has a shorter
+                  denominator than the span from its first trial begin to its last trial end.
+A measure that cannot be computed for a text (no session, zero scope duration) is None, never 0; a
+text with no trial in scope has all four measures None. Each aggregated text carries n_trials_in_scope
+and scope_duration_ms, and "texts" in the output reports, per speed, the histogram of n_trials_in_scope
+over the kept texts and the number of texts without a trial in scope.
 An observation row whose dwell_ms is 0 does not carry a measured dwell (the observer produces it
 when the clock steps backwards). Such a row is counted as a conversion and for the abandon rate, is
 left out of mean_dwell_ms and dwell_fraction, and is reported as n_dwell_zero per text and in total;
@@ -41,8 +48,10 @@ run on; their SHA-256 hashes must equal the ones recorded in --match, so a match
 be combined with other data. An observation row is attributed to the trial (in the oracle log) it
 overlaps most, exactly as match.py attributes rows to strata; a session or row that belongs to no
 trial of any kept text is counted under "outside_texts" and is not used, by reason (inside a
-discarded remainder / a text discarded as not run / a text discarded as excluded / a trial that is
-not in the plan / overlapping no trial) and, where the trial is known, by speed.
+discarded remainder / a text discarded as not run / a text discarded as excluded / a trial of a kept
+text that is out of the scope / a trial that is not in the plan / overlapping no trial) and, where the
+trial is known, by speed. (The matching holds only trials in scope, so the out-of-scope reason is
+normally empty; it is a guard.)
 
 Agreement. The sign of every difference is observation minus ground truth. For each measure:
   bland_altman   bias and limits of agreement of the per-text differences
@@ -74,13 +83,15 @@ Mixture. A synthetic input has no natural mixing ratio, so the primary estimates
 "mixtures" in the configuration name weightings of the speeds; for each, the bias of a measure is
 the weighted mean of the per-stratum mean differences (weights are normalised, a stratum with weight
 zero is not needed, and a needed stratum without data gives null). If a bias moves between
-weightings, the error is concentrated in some strata. Every per-stratum bias and every mixture's bias
-carries a 95% percentile interval ("bias_ci" with "bias_ci_status") from a stratified block bootstrap:
-within each speed, that speed's blocks (a block holds one speed) are resampled independently; in one
-replicate every stratum's bias is recomputed and each mixture is formed from that replicate with its
-weights, so a mixture that puts all weight on one speed has that speed's interval. The interval is
-withheld ([null, null]) with the status "no_data" (the point estimate is null), "fewer_than_two_blocks"
-(a needed stratum has fewer than two blocks), or "undefined_resample" (in some replicate a needed
+weightings, the error is concentrated in some strata. Every mixture's bias carries a 95% percentile
+interval ("bias_ci" with "bias_ci_status") from a stratified block bootstrap: within each speed, that
+speed's blocks (a block holds one speed) are resampled independently; in one replicate every
+stratum's bias is recomputed and each mixture is formed from that replicate with its weights, so a
+mixture that puts all weight on one speed has the percentile interval of that speed's replicate
+biases. The per-speed bias has one registered interval, the one in agreement_by_stratum; "mixture_bias"
+gives the per-speed bias and n without an interval of its own. The mixture interval is withheld
+([null, null]) with the status "no_data" (the point estimate is null), "fewer_than_two_blocks" (a
+needed stratum has fewer than two blocks), or "undefined_resample" (in some replicate a needed
 stratum has no text with the measure). Only random() draws of Random(seed) are used, as in the ICC.
 A text mixes the scenarios of its block in the plan's order; the plan orders the trials by the seed and
 does not balance them within a text, so the scenarios of a block are mixed about equally only in
@@ -95,18 +106,24 @@ standard deviation and block-clustered 95% percentile bootstrap interval of the 
 to the summed time). A trial is used when it is in the plan, was run, is not excluded and is in the
 scope; a trial with no session or row on a side counts 0 there. Sessions and rows are attributed to
 trials as for the texts. The per-trial differences include contamination by sessions carried over from
-an earlier trial (a session that began in one trial and is seen in the next). "per_trial_layer_none"
-repeats the quantities over only the trials in none of the prediction's layers (the match result's
-scope.layer_none_trials; null when it has none, also when the key is missing in an older result); a
-trial that is otherwise used but is not in that list is counted in trials_not_used["outside_layer"] and
-its sessions and rows count as outside. The reweighting to another mix is meant for that view.
+an earlier trial (a session that began in one trial and is seen in the next). Two restricted views
+repeat the quantities over a list of trials of the match result's scope (null when the list is null,
+also when the key is missing in an older result); a trial that is otherwise used but is not in the
+list is counted in trials_not_used["outside_layer"] and its sessions and rows count as outside.
+"per_trial_uncontaminated" uses scope.uncontaminated_trials, the trials in neither the carried_out nor
+the received_carry layer of the prediction; the closing-key trials stay in it, because their
+disagreement is the trial's own and not a contamination from another trial. The reweighting to
+another mix of scenarios is meant for that view. "per_trial_layer_none" uses scope.layer_none_trials,
+the trials in none of the prediction's layers (the closing-key trials are out); it is a diagnostic.
 
 Scope. The match result names its scope (match.py --scope; all_trials when it has none). Its
 matching holds only the sessions and rows of the trials in the scope, so under the scope
-under_limit, which sets aside the trials whose session the observer is specified to cut off, the
-texts are kept and their measures cover the remaining trials on both sides (the duration of a text,
-the denominator of dwell_fraction, is unchanged); per_trial leaves the set-aside trials out. scope.layer_none_trials (a list of trial ids, or null or
-missing) must be a list of strings when it is present and not null, otherwise the input is rejected.
+under_limit, which sets aside the trials whose presses went into a session that the observer is
+specified to cut off, the texts are kept whole and the measures of a text are computed over its
+trials in the scope (see "Measures": per text, the same definition in every scope, so the values
+do not scale with how many of its trials remain); per_trial leaves the set-aside trials out.
+scope.layer_none_trials and scope.uncontaminated_trials (each a list of trial ids, or null or
+missing) must be a list of strings when present and not null, otherwise the input is rejected.
 
 Configuration (JSON, every key optional): {"text_size_trials": 8, "B": 2000, "seed": 1,
 "mixtures": {"<name>": {"slow": w, "mid": w, "fast": w}}}. Keys starting with "_" are ignored. B is
@@ -138,7 +155,7 @@ import stats  # noqa: E402  Bland-Altman, ICC and the cluster bootstrap live the
 InputError = gt_sessions.InputError
 SPEEDS = match.SPEEDS
 MAX_B = 100000
-MEASURES = ("mean_dwell_ms", "n_conversions", "abandon_rate", "dwell_fraction")
+MEASURES = ("mean_dwell_ms", "conversions_per_trial", "abandon_rate", "dwell_fraction")
 DEFAULT_MIXTURES = {
     "slow_heavy": {"slow": 0.6, "mid": 0.3, "fast": 0.1},
     "uniform": {"slow": 1, "mid": 1, "fast": 1},
@@ -152,14 +169,17 @@ def _is_int(v):
 
 # ---------------------------------------------------------------- texts
 
-def text_layout(plan, oracle, text_size, excluded_trials=None):
+def text_layout(plan, oracle, text_size, excluded_trials=None, out_of_scope=None):
     """Bundle the trials of the plan into texts. plan is match.parse_plan_strata's output, oracle is
     gt_sessions.parse_oracle's output, excluded_trials is a collection of trial ids that were excluded.
 
     Returns {"texts": [...], "dropped_trials": {block_id: n}, "discarded_texts": [...],
     "trial_status": {trial_id: status}}. Each kept text is {"text_id", "block_id", "speed",
-    "trial_ids", "begin_wall_ms", "end_wall_ms", "duration_ms"} and has exactly text_size trials, all
-    of them run and none excluded. Texts follow the plan order inside a block; the blocks are visited
+    "trial_ids", "begin_wall_ms", "end_wall_ms", "duration_ms", "trials_in_scope", "n_trials_in_scope",
+    "scope_duration_ms"} and has exactly text_size trials, all of them run and none excluded.
+    trials_in_scope are its trials that are not in out_of_scope (a collection of trial ids, default
+    none) and scope_duration_ms is the sum of their oracle windows (end - begin); duration_ms is the
+    span from the first trial begin to the last trial end. Texts follow the plan order inside a block; the blocks are visited
     in the order of their first trial. dropped_trials is the size of the remainder of each block.
     A text with a trial that is not in the oracle log (not run) or is in excluded_trials is
     discarded and appears in discarded_texts as {"text_id", "block_id", "speed", "reasons"} with the
@@ -170,6 +190,7 @@ def text_layout(plan, oracle, text_size, excluded_trials=None):
     if not _is_int(text_size) or text_size < 1:
         raise ValueError("text_size_trials must be an integer of at least 1")
     excluded = set(excluded_trials or ())
+    out_scope = set(out_of_scope or ())
     windows = dict((t["trial_id"], t) for t in oracle["trials"])
     by_block = {}
     for tid, info in plan["trials"].items():
@@ -199,9 +220,13 @@ def text_layout(plan, oracle, text_size, excluded_trials=None):
                 continue
             begin = min(windows[t]["begin_wall_ms"] for t in chunk)
             end = max(windows[t]["end_wall_ms"] for t in chunk)
+            in_scope = [t for t in chunk if t not in out_scope]
             texts.append({"text_id": text_id, "block_id": block_id, "speed": speeds[0],
                           "trial_ids": chunk, "begin_wall_ms": begin, "end_wall_ms": end,
-                          "duration_ms": end - begin})
+                          "duration_ms": end - begin, "trials_in_scope": in_scope,
+                          "n_trials_in_scope": len(in_scope),
+                          "scope_duration_ms": sum(windows[t]["end_wall_ms"] - windows[t]["begin_wall_ms"]
+                                                   for t in in_scope)})
     return {"texts": texts, "dropped_trials": dropped, "discarded_texts": discarded, "trial_status": status}
 
 
@@ -228,9 +253,14 @@ def aggregate(texts, sessions, obs_rows, side, obs_end_offset_ms=0):
     """The four measures for every text, from one side. side is "gt" (sessions are ground-truth
     sessions, obs_rows is ignored) or "obs" (obs_rows are observation rows carrying a "trial_id",
     see attach_trials; sessions is ignored). Returns {"texts": [...], "n_outside_texts": n}, the
-    texts in the order given, each {"text_id", "block_id", "speed", "duration_ms", <MEASURES>} (an
-    observation text also has "n_dwell_zero"). A record whose trial belongs to no text is counted in
-    n_outside_texts and not used; "outside_trials" gives those counts per trial id (None: no trial).
+    texts in the order given (text_layout's texts, with their trials_in_scope and scope_duration_ms),
+    each {"text_id", "block_id", "speed", "duration_ms", "n_trials_in_scope", "scope_duration_ms",
+    <MEASURES>} (an observation text also has "n_dwell_zero"). The measures cover the trials of the
+    text in scope (see "Measures" in the module docstring): conversions_per_trial is the number of
+    sessions over n_trials_in_scope and dwell_fraction the total dwell over scope_duration_ms; a text
+    with no trial in scope has all four None. A record whose trial belongs to no text, or to a trial of
+    a text that is not in scope, is counted in n_outside_texts and not used; "outside_trials" gives
+    those counts per trial id (None: no trial).
     An observation row with dwell_ms == 0 is counted as a conversion and for the abandon rate but
     not in mean_dwell_ms or dwell_fraction (its dwell is not a measurement); n_dwell_zero counts them.
     obs_end_offset_ms is accepted for symmetry with the pipeline and does not change the measures
@@ -243,7 +273,7 @@ def aggregate(texts, sessions, obs_rows, side, obs_end_offset_ms=0):
         raise ValueError('side must be "gt" or "obs"')
     index = {}
     for i, t in enumerate(texts):
-        for tid in t["trial_ids"]:
+        for tid in t["trials_in_scope"]:
             index[tid] = i
     dwells = [[] for _ in texts]
     cancels = [0] * len(texts)
@@ -273,14 +303,14 @@ def aggregate(texts, sessions, obs_rows, side, obs_end_offset_ms=0):
         n = len(dwells[i])
         measured = n - zeros[i]
         total = sum(dwells[i])
+        nt, span = t["n_trials_in_scope"], t["scope_duration_ms"]
         row = {
             "text_id": t["text_id"], "block_id": t["block_id"], "speed": t["speed"],
-            "duration_ms": t["duration_ms"],
-            "n_conversions": n,
-            "mean_dwell_ms": total / measured if measured else None,
-            "abandon_rate": cancels[i] / n if n else None,
-            "dwell_fraction": (total / t["duration_ms"] if (measured or not n) else None)
-            if t["duration_ms"] > 0 else None,
+            "duration_ms": t["duration_ms"], "n_trials_in_scope": nt, "scope_duration_ms": span,
+            "conversions_per_trial": n / nt if nt else None,
+            "mean_dwell_ms": total / measured if (nt and measured) else None,
+            "abandon_rate": cancels[i] / n if (nt and n) else None,
+            "dwell_fraction": (total / span if (measured or not n) else None) if (nt and span > 0) else None,
         }
         if side == "obs":
             row["n_dwell_zero"] = zeros[i]
@@ -525,20 +555,22 @@ def mixture_bias(texts_by_stratum, mixtures, B=None, seed=None):
     """The bias (observation minus ground truth) of every measure under each weighting of the strata.
 
     texts_by_stratum is stratify()'s output; mixtures is {name: {stratum: weight}}. Returns
-    {"by_stratum": {speed: {measure: {"bias", "n", "bias_ci", "bias_ci_status"}}}, "mixtures": {name:
+    {"by_stratum": {speed: {measure: {"bias", "n"}}}, "mixtures": {name:
     {"weights", "bias": {measure: value}, "bias_ci": {measure: [lo, hi]}, "bias_ci_status": {measure:
     status}}}}. A stratum's bias is the mean per-text difference over the texts where both sides have
     the measure. A mixture's bias is the normalised-weight sum of the strata biases; it is None when a
     stratum with positive weight has no data for the measure.
 
-    The intervals (given B and seed; otherwise they are [None, None] with the status "not_requested")
-    are 95% percentile intervals of a stratified block bootstrap: within each speed that speed's blocks
+    The per-stratum entries carry no interval: the registered interval of a per-speed bias is the one
+    in agreement_by_stratum. The mixture intervals (given B and seed; otherwise they are [None, None]
+    with the status "not_requested") are 95% percentile intervals of a stratified block bootstrap: within each speed that speed's blocks
     are resampled independently, and in one replicate every stratum's bias is recomputed and the
     mixtures are formed from the same replicate with the same weights. The status is "no_data" (the
     point estimate is None), "fewer_than_two_blocks" (a stratum that is needed has fewer than two
     blocks; for a mixture, only the strata with positive weight are needed), "undefined_resample" (in
     some replicate a needed stratum has no text with the measure; the interval is withheld) or "ok".
-    The interval of a mixture with the weight 1 on one speed is that speed's interval."""
+    The interval of a mixture with the weight 1 on one speed is the percentile interval of that
+    speed's replicate biases."""
     for s in texts_by_stratum:
         if s not in SPEEDS:
             raise ValueError("unknown stratum %r" % (s,))
@@ -555,10 +587,7 @@ def mixture_bias(texts_by_stratum, mixtures, B=None, seed=None):
         for m in MEASURES:
             diffs = [t["obs"][m] - t["gt"][m] for t in texts_by_stratum[s]
                      if t["obs"][m] is not None and t["gt"][m] is not None]
-            point = statistics.fmean(diffs) if diffs else None
-            ci, status = _ci_status(point, len(blocks[s]), [r[s][m] for r in reps]) if boot \
-                else ([None, None], "not_requested")
-            by_stratum[s][m] = {"bias": point, "n": len(diffs), "bias_ci": ci, "bias_ci_status": status}
+            by_stratum[s][m] = {"bias": statistics.fmean(diffs) if diffs else None, "n": len(diffs)}
     out = {}
     for name, w in weights.items():
         bias, cis, statuses = {}, {}, {}
@@ -716,8 +745,8 @@ def _check_matching(m):
         raise InputError("match: an element of pairs / split / merge / miss / false_pos has the wrong shape")
 
 
-def _outside_report(agg, status, plan_trials):
-    """Count the records that fall outside the kept texts, by reason and by speed."""
+def _outside_report(agg, status, plan_trials, out_scope):
+    """Count the records that fall outside the kept texts or outside the scope, by reason and by speed."""
     by_reason, by_speed = {}, {}
     for tid, n in agg["outside_trials"].items():
         if tid is None:
@@ -725,6 +754,8 @@ def _outside_report(agg, status, plan_trials):
         elif tid in status:
             reason = {"remainder": "discarded_remainder", "not_run": "discarded_text_not_run",
                       "excluded": "discarded_text_excluded"}[status[tid]]
+        elif tid in out_scope and tid in plan_trials:
+            reason = "out_of_scope"
         else:
             reason = "trial_not_in_plan"
         by_reason[reason] = by_reason.get(reason, 0) + n
@@ -768,6 +799,10 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
     layer_none = sc.get("layer_none_trials")  # missing (an older match result) is the same as null
     if layer_none is not None and not (isinstance(layer_none, list) and all(isinstance(t, str) for t in layer_none)):
         raise InputError("match: scope.layer_none_trials must be a list of trial ids or null")
+    uncontaminated = sc.get("uncontaminated_trials")  # likewise
+    if uncontaminated is not None and not (isinstance(uncontaminated, list) and
+                                           all(isinstance(t, str) for t in uncontaminated)):
+        raise InputError("match: scope.uncontaminated_trials must be a list of trial ids or null")
     long_set = set(long_trials or ())
     out_of_scope = set() if scope == "all_trials" else \
         set(t for t in plan["trials"] if (t in long_set) != (scope == "over_limit"))
@@ -782,13 +817,16 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
     off = mo["config"]["obs_end_offset_ms"]
     obs = attach_trials(obs, oracle, off)
 
-    layout = text_layout(plan, oracle, cfg["text_size_trials"], excluded_trials)
+    layout = text_layout(plan, oracle, cfg["text_size_trials"], excluded_trials, out_of_scope)
     tx = layout["texts"]
     gt_agg = aggregate(tx, gt, None, "gt")
     obs_agg = aggregate(tx, None, obs, "obs")
-    by_speed = {}
+    by_speed, in_scope_hist, no_scope = {}, {}, {}
     for t in tx:
         by_speed[t["speed"]] = by_speed.get(t["speed"], 0) + 1
+        h = in_scope_hist.setdefault(t["speed"], {})
+        h[t["n_trials_in_scope"]] = h.get(t["n_trials_in_scope"], 0) + 1
+        no_scope[t["speed"]] = no_scope.get(t["speed"], 0) + (1 if t["n_trials_in_scope"] == 0 else 0)
     disc = layout["discarded_texts"]
     disc_reason, disc_block, disc_speed = {}, {}, {}
     for d in disc:
@@ -809,9 +847,13 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
                   "dropped_trials_by_block": dict((str(b), n) for b, n in layout["dropped_trials"].items()),
                   "discarded": {"n": len(disc), "by_reason": dict(sorted(disc_reason.items())),
                                 "by_block": dict(sorted(disc_block.items())),
-                                "by_speed": dict((s, disc_speed[s]) for s in SPEEDS if s in disc_speed)}},
-        "outside_texts": {"gt": _outside_report(gt_agg, layout["trial_status"], plan["trials"]),
-                          "obs": _outside_report(obs_agg, layout["trial_status"], plan["trials"])},
+                                "by_speed": dict((s, disc_speed[s]) for s in SPEEDS if s in disc_speed)},
+                  "trials_in_scope_by_speed": dict(
+                      (s, dict((str(k), in_scope_hist[s][k]) for k in sorted(in_scope_hist[s])))
+                      for s in SPEEDS if s in in_scope_hist),
+                  "n_without_trials_in_scope_by_speed": dict((s, no_scope[s]) for s in SPEEDS if s in no_scope)},
+        "outside_texts": {"gt": _outside_report(gt_agg, layout["trial_status"], plan["trials"], out_of_scope),
+                          "obs": _outside_report(obs_agg, layout["trial_status"], plan["trials"], out_of_scope)},
         "dwell_zero": {"n_obs_rows": n_zero,
                        "note": "observation rows with dwell_ms == 0 are counted as conversions but are left out of "
                                "mean_dwell_ms and dwell_fraction; in the matching they stay zero-length intervals "
@@ -821,6 +863,9 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
         "agreement_by_stratum": agreement_by_stratum(gt_agg, obs_agg, cfg["B"], cfg["seed"]),
         "mixture_bias": mixture_bias(stratify(gt_agg, obs_agg), cfg["mixtures"], cfg["B"], cfg["seed"]),
         "per_trial": per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, cfg["B"], cfg["seed"]),
+        "per_trial_uncontaminated": None if uncontaminated is None else
+        per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, cfg["B"], cfg["seed"],
+                  only_trials=set(uncontaminated)),
         "per_trial_layer_none": None if layer_none is None else
         per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, cfg["B"], cfg["seed"],
                   only_trials=set(layer_none)),
@@ -831,8 +876,11 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
                 "by the seed and does not balance them within a text); per_trial gives the per-trial "
                 "differences by scenario and speed for reweighting to another mix. The per-trial "
                 "differences include contamination by sessions carried over from an earlier trial; "
-                "per_trial_layer_none restricts them to the trials in none of the prediction's layers "
-                "(null without a prediction), and the reweighting is meant for that view",
+                "per_trial_uncontaminated restricts them to the trials in neither the carried_out nor the "
+                "received_carry layer of the prediction (the closing-key trials stay in), and the reweighting "
+                "to another mix of scenarios is meant for that view; per_trial_layer_none (the trials in none "
+                "of the prediction's layers) is a diagnostic. Both are null without a prediction. Per-text "
+                "measures cover the text's trials in the scope",
     }
 
 
@@ -941,11 +989,22 @@ def _case_layout():
     # sessions and rows in dropped trials are not counted (and are reported as outside the texts)
     gt = [match._gt("t00001", T0 + 100, T0 + 500), match._gt("t00018", T0 + 17000 + 100, T0 + 17000 + 500)]
     agg = aggregate(tx, gt, None, "gt")
-    if agg["n_outside_texts"] != 1 or agg["texts"][0]["n_conversions"] != 1 or sum(t["n_conversions"] for t in agg["texts"]) != 1:
+    if agg["n_outside_texts"] != 1 or agg["texts"][0]["conversions_per_trial"] != 1 / 8 or \
+            sum(t["conversions_per_trial"] for t in agg["texts"]) != 1 / 8:
         f.append("a session in a dropped trial is counted: %r" % agg["n_outside_texts"])
     if agg["texts"][1]["mean_dwell_ms"] is not None or agg["texts"][1]["abandon_rate"] is not None or \
-            agg["texts"][1]["n_conversions"] != 0:
-        f.append("a text without sessions must have n_conversions 0 and the other measures None")
+            agg["texts"][1]["conversions_per_trial"] != 0:
+        f.append("a text without sessions must have conversions_per_trial 0 and the other measures None")
+    # the scope fields: without a scope every trial is in scope and the scope duration is the sum of the windows
+    if tx[0]["trials_in_scope"] != tx[0]["trial_ids"] or tx[0]["n_trials_in_scope"] != 8 or \
+            tx[0]["scope_duration_ms"] != 8 * 800:
+        f.append("a text without a scope must have all its trials in scope and the sum of the windows: %r" % tx[0])
+    sc = text_layout(plan, oracle, 8, None, {"t00002", "t00003", "t00050"})["texts"]
+    if (sc[0]["n_trials_in_scope"], sc[0]["scope_duration_ms"]) != (6, 6 * 800) or \
+            sc[0]["trials_in_scope"] != ["t00001"] + ["t%05d" % k for k in range(4, 9)] or \
+            sc[0]["trial_ids"] != tx[0]["trial_ids"] or sc[0]["duration_ms"] != 7800 or \
+            (sc[5]["n_trials_in_scope"], sc[5]["scope_duration_ms"]) != (7, 7 * 800):
+        f.append("the trials in scope / the scope duration of a text are wrong: %r" % ([(t["text_id"], t["n_trials_in_scope"], t["scope_duration_ms"]) for t in sc],))
     # errors, not silent handling
     mixed = dict((t, dict(i)) for t, i in plan_trials.items())
     mixed["t00003"]["speed"] = "fast"
@@ -980,6 +1039,51 @@ def _case_layout():
     return f
 
 
+def _case_scope_measures_body(plan, oracle):
+    """The measures of a text over its trials in scope (4 trials of 5000 ms each, a span of 35000 ms)."""
+    f = []
+    # sessions in t00001 (1000 ms, commit) and t00002 (2000 ms, cancel); t00003 and t00004 are out of scope
+    gt = [match._gt("t00001", T0 + 100, T0 + 1100), match._gt("t00002", T0 + 10100, T0 + 12100, outcome="cancel")]
+    tx = text_layout(plan, oracle, 4, None, {"t00003", "t00004"})["texts"]
+    a = aggregate(tx, gt, None, "gt")["texts"][0]
+    if a["n_trials_in_scope"] != 2 or a["scope_duration_ms"] != 10000:
+        f.append("the trials in scope / the scope duration are wrong: %r" % (a,))
+    if a["dwell_fraction"] is None or abs(a["dwell_fraction"] - 3000 / 10000) > 1e-12:
+        f.append("the denominator of dwell_fraction must be the duration of the trials in scope, not the text span: %r" % (a,))
+    if a["conversions_per_trial"] != 1.0:
+        f.append("conversions must be divided by the trials in scope (2 sessions over 2 trials): %r" % (a,))
+    if abs(a["mean_dwell_ms"] - 1500) > 1e-9 or abs(a["abandon_rate"] - 0.5) > 1e-12:
+        f.append("mean_dwell_ms and abandon_rate must not depend on the scope: %r" % (a,))
+    # the same sessions with every trial in scope: the speed of conversion halves, the time fraction too
+    full = aggregate(text_layout(plan, oracle, 4)["texts"], gt, None, "gt")["texts"][0]
+    if full["conversions_per_trial"] != 0.5 or abs(full["dwell_fraction"] - 3000 / 20000) > 1e-12:
+        f.append("the same sessions over all 4 trials must give 0.5 conversions per trial: %r" % (full,))
+    # a text with no trial in scope gives None for all four measures (never 0), even with a session on it
+    none_tx = text_layout(plan, oracle, 4, None, set(plan["trials"]))["texts"]
+    n = aggregate(none_tx, [], None, "gt")["texts"][0]
+    if n["n_trials_in_scope"] != 0 or n["scope_duration_ms"] != 0 or any(n[m] is not None for m in MEASURES):
+        f.append("a text with no trial in scope must give None for every measure: %r" % (n,))
+    nn = aggregate(none_tx, gt, None, "gt")
+    if nn["texts"][0]["conversions_per_trial"] is not None or nn["n_outside_texts"] != 2:
+        f.append("a session on a text with no trial in scope must be outside, and the measures None: %r" % (nn,))
+    # a session of an out-of-scope trial is not used: not in the counts, not in the dwell, counted as outside
+    more = gt + [match._gt("t00003", T0 + 20100, T0 + 29100, outcome="cancel")]
+    m = aggregate(tx, more, None, "gt")
+    if m["texts"][0] != a or m["n_outside_texts"] != 1 or m["outside_trials"] != {"t00003": 1}:
+        f.append("a session of an out-of-scope trial was used or not counted as outside: %r" % (m,))
+    obs = attach_trials([match._ob(T0 + 100, T0 + 1100), match._ob(T0 + 10100, T0 + 12100, abandon=True),
+                         match._ob(T0 + 30100, T0 + 30600)], oracle)
+    mo = aggregate(tx, None, obs, "obs")
+    if mo["n_outside_texts"] != 1 or mo["texts"][0]["conversions_per_trial"] != 1.0 or \
+            abs(mo["texts"][0]["dwell_fraction"] - 3000 / 10000) > 1e-12:
+        f.append("an observation row of an out-of-scope trial was used: %r" % (mo,))
+    # the reason is reported (a guard: the matching normally holds no such record)
+    rep_ = _outside_report(m, {}, plan["trials"], {"t00003", "t00004"})
+    if rep_ != {"n": 1, "by_reason": {"out_of_scope": 1}, "by_speed": {"slow": 1}}:
+        f.append("an out-of-scope record must be reported under out_of_scope: %r" % (rep_,))
+    return f
+
+
 def _case_definitions():
     f = []
     plan = {"trials": dict(("t%05d" % (k + 1), {"block_id": 0, "scenario": "S1", "speed": "slow"}) for k in range(4))}
@@ -988,30 +1092,33 @@ def _case_definitions():
     gt = [match._gt("t00001", T0 + 100, T0 + 1100), match._gt("t00002", T0 + 10100, T0 + 12100, outcome="cancel"),
           match._gt("t00004", T0 + 30100, T0 + 30600)]
     a = aggregate(tx, gt, None, "gt")["texts"][0]
-    # dwell 1000, 2000, 500 -> mean 1166.67; 1 of 3 cancelled; text time = 35000 - 0 ms
-    if a["n_conversions"] != 3 or abs(a["mean_dwell_ms"] - 3500 / 3) > 1e-9 or abs(a["abandon_rate"] - 1 / 3) > 1e-12 or \
-            abs(a["dwell_fraction"] - 3500 / 35000) > 1e-12:
+    # dwell 1000, 2000, 500 -> mean 1166.67; 1 of 3 cancelled; 3 sessions over 4 trials; the scope
+    # duration is 4 windows of 5000 ms (the span, 35000 ms, is not the denominator)
+    if a["conversions_per_trial"] != 3 / 4 or abs(a["mean_dwell_ms"] - 3500 / 3) > 1e-9 or abs(a["abandon_rate"] - 1 / 3) > 1e-12 or \
+            abs(a["dwell_fraction"] - 3500 / 20000) > 1e-12 or a["n_trials_in_scope"] != 4 or a["scope_duration_ms"] != 20000:
         f.append("the ground-truth measures are wrong: %r" % (a,))
     obs = attach_trials([match._ob(T0 + 100, T0 + 1100), match._ob(T0 + 10100, T0 + 12100, abandon=True),
                          match._ob(T0 + 30100, T0 + 30600), match._ob(T0 - 9000, T0 - 8000)], oracle)
     ob = aggregate(tx, None, obs, "obs")
-    if ob["n_outside_texts"] != 1 or ob["texts"][0]["n_conversions"] != 3 or \
+    if ob["n_outside_texts"] != 1 or ob["texts"][0]["conversions_per_trial"] != 3 / 4 or \
             abs(ob["texts"][0]["abandon_rate"] - 1 / 3) > 1e-12 or abs(ob["texts"][0]["mean_dwell_ms"] - 3500 / 3) > 1e-9:
         f.append("the observation measures (or the attribution to trials) are wrong: %r" % (ob,))
     # a text of zero duration cannot give a time fraction
-    z = aggregate([{"text_id": "z", "block_id": 0, "speed": "slow", "trial_ids": ["t00001"], "duration_ms": 0}], gt, None, "gt")
+    z = aggregate([{"text_id": "z", "block_id": 0, "speed": "slow", "trial_ids": ["t00001"], "duration_ms": 0,
+                    "trials_in_scope": ["t00001"], "n_trials_in_scope": 1, "scope_duration_ms": 0}], gt, None, "gt")
     if z["texts"][0]["dwell_fraction"] is not None:
         f.append("a zero-duration text must give dwell_fraction None")
     # a row with dwell_ms == 0 is a conversion but not a measured dwell
     zobs = attach_trials([match._ob(T0 + 100, T0 + 1100), match._ob(T0 + 10100, T0 + 10100, abandon=True),
                           match._ob(T0 + 30100, T0 + 30600)], oracle)
     zt = aggregate(tx, None, zobs, "obs")["texts"][0]
-    if zt["n_conversions"] != 3 or zt["n_dwell_zero"] != 1 or abs(zt["mean_dwell_ms"] - 750) > 1e-9 or \
-            abs(zt["abandon_rate"] - 1 / 3) > 1e-12 or abs(zt["dwell_fraction"] - 1500 / 35000) > 1e-12:
+    if zt["conversions_per_trial"] != 3 / 4 or zt["n_dwell_zero"] != 1 or abs(zt["mean_dwell_ms"] - 750) > 1e-9 or \
+            abs(zt["abandon_rate"] - 1 / 3) > 1e-12 or abs(zt["dwell_fraction"] - 1500 / 20000) > 1e-12:
         f.append("a dwell_ms of 0 is used as a measured dwell (or is not counted as a conversion): %r" % (zt,))
     zonly = aggregate(tx, None, attach_trials([match._ob(T0 + 100, T0 + 100)], oracle), "obs")["texts"][0]
-    if zonly["n_conversions"] != 1 or zonly["mean_dwell_ms"] is not None or zonly["dwell_fraction"] is not None:
+    if zonly["conversions_per_trial"] != 1 / 4 or zonly["mean_dwell_ms"] is not None or zonly["dwell_fraction"] is not None:
         f.append("a text with only dwell_ms == 0 rows must give mean_dwell_ms and dwell_fraction None: %r" % (zonly,))
+    f += _case_scope_measures_body(plan, oracle)
     for name, fn in (("an unknown side", lambda: aggregate(tx, gt, None, "both")),
                      ("an open ground-truth session", lambda: aggregate(tx, [match._gt("t00001", T0, None, outcome="open_at_end")], None, "gt")),
                      ("a non-integer dwell", lambda: aggregate(tx, None, [{"trial_id": "t00001", "dwell_ms": 1.5, "abandon": False}], "obs"))):
@@ -1033,7 +1140,7 @@ def _case_recovery():
     ba = ag["mean_dwell_ms"]["bland_altman"]
     if not (abs(ba["bias"] - 50) < 0.2 and ba["loa_lo"] <= 50 <= ba["loa_hi"]):
         f.append("the dwell bias of +50 ms is not recovered by the mean conversion time: %r" % (ba,))
-    for m in ("n_conversions", "abandon_rate"):
+    for m in ("conversions_per_trial", "abandon_rate"):
         b = ag[m]["bland_altman"]
         if b["bias"] != 0 or b["sd"] != 0:
             f.append("the dwell bias leaks into %s: %r" % (m, b))
@@ -1117,10 +1224,10 @@ def _case_mixture():
     _tx, g, o = _aggs(w, _obs_from(w["gt"], keep=keep))
     mb = mixture_bias(stratify(g, o), DEFAULT_MIXTURES)
     st = mb["by_stratum"]
-    b = dict((s, st[s]["n_conversions"]["bias"]) for s in SPEEDS)
-    if b["slow"] != 0 or b["mid"] != 0 or not b["fast"] < -3:
-        f.append("the misses are not confined to the fast stratum (per-stratum n_conversions bias): %r" % (b,))
-    got = dict((n, mb["mixtures"][n]["bias"]["n_conversions"]) for n in DEFAULT_MIXTURES)
+    b = dict((s, st[s]["conversions_per_trial"]["bias"]) for s in SPEEDS)
+    if b["slow"] != 0 or b["mid"] != 0 or not b["fast"] < -0.3:
+        f.append("the misses are not confined to the fast stratum (per-stratum conversions_per_trial bias): %r" % (b,))
+    got = dict((n, mb["mixtures"][n]["bias"]["conversions_per_trial"]) for n in DEFAULT_MIXTURES)
     if not (abs(got["fast_heavy"]) > abs(got["uniform"]) > abs(got["slow_heavy"]) > 0):
         f.append("the bias does not grow from slow-heavy to uniform to fast-heavy: %r" % (got,))
     for name, wt in (("fast_heavy", 0.6), ("uniform", 1 / 3), ("slow_heavy", 0.1)):
@@ -1129,7 +1236,7 @@ def _case_mixture():
     # the same texts without misses: no mixture moves the bias
     _tx2, g2, o2 = _aggs(w, _obs_from(w["gt"]))
     clean = mixture_bias(stratify(g2, o2), DEFAULT_MIXTURES)
-    if any(clean["mixtures"][n]["bias"]["n_conversions"] != 0 for n in DEFAULT_MIXTURES):
+    if any(clean["mixtures"][n]["bias"]["conversions_per_trial"] != 0 for n in DEFAULT_MIXTURES):
         f.append("a mixture moved the bias although the observation is exact")
     # weights are normalised; zero-weight strata are not needed; a needed empty stratum gives None
     half = mixture_bias(stratify(g, o), {"x": {"fast": 3}, "y": {"fast": 1, "slow": 0}})
@@ -1137,8 +1244,8 @@ def _case_mixture():
             half["mixtures"]["x"]["bias"] != half["mixtures"]["y"]["bias"]:
         f.append("weights are not normalised / a zero weight changes the result")
     only_slow = mixture_bias({"slow": stratify(g, o)["slow"]}, {"fast_only": {"fast": 1}, "slow_only": {"slow": 1}})
-    if only_slow["mixtures"]["fast_only"]["bias"]["n_conversions"] is not None or \
-            only_slow["mixtures"]["slow_only"]["bias"]["n_conversions"] != 0:
+    if only_slow["mixtures"]["fast_only"]["bias"]["conversions_per_trial"] is not None or \
+            only_slow["mixtures"]["slow_only"]["bias"]["conversions_per_trial"] != 0:
         f.append("a needed stratum without data must give None (and an available one a value)")
     for name, fn in (("a negative weight", lambda: mixture_bias({}, {"a": {"slow": -1, "fast": 2}})),
                      ("all-zero weights", lambda: mixture_bias({}, {"a": {"slow": 0}})),
@@ -1240,7 +1347,9 @@ def _case_cli():
     if out["texts"] != {"n": 8, "n_by_speed": {"slow": 2, "mid": 3, "fast": 3},
                         "dropped_trials_by_block": {"0": 6, "1": 6, "2": 6},
                         "discarded": {"n": 1, "by_reason": {"excluded": 1}, "by_block": {"0": 1},
-                                      "by_speed": {"slow": 1}}}:
+                                      "by_speed": {"slow": 1}},
+                        "trials_in_scope_by_speed": {"slow": {"8": 2}, "mid": {"8": 3}, "fast": {"8": 3}},
+                        "n_without_trials_in_scope_by_speed": {"slow": 0, "mid": 0, "fast": 0}}:
         f.append("the text counts or the dropped trials are wrong: %r" % (out["texts"],))
     oo, og = out["outside_texts"]["obs"], out["outside_texts"]["gt"]
     if oo["by_reason"].get("no_trial") != 1 or og["by_reason"].get("no_trial") is not None or \
@@ -1248,16 +1357,16 @@ def _case_cli():
             oo["n"] != sum(oo["by_reason"].values()) or og["n"] != sum(og["by_reason"].values()) or \
             sum(oo["by_speed"].values()) != oo["n"] - 1:
         f.append("records outside the kept texts are not reported by reason and speed: %r" % (out["outside_texts"],))
-    got_g = dict((t["text_id"], t["n_conversions"]) for t in out["aggregate"]["gt"])
-    got_o = dict((t["text_id"], t["n_conversions"]) for t in out["aggregate"]["obs"])
+    got_g = dict((t["text_id"], round(t["conversions_per_trial"] * t["n_trials_in_scope"])) for t in out["aggregate"]["gt"])
+    got_o = dict((t["text_id"], round(t["conversions_per_trial"] * t["n_trials_in_scope"])) for t in out["aggregate"]["obs"])
     want_g = {"b0.1": 9, "b0.2": 8, "b1.0": 8, "b1.1": 8, "b1.2": 8, "b2.0": 8, "b2.1": 8, "b2.2": 8}
     want_o = {"b0.1": 7, "b0.2": 10, "b1.0": 8, "b1.1": 9, "b1.2": 8, "b2.0": 8, "b2.1": 8, "b2.2": 8}
     if got_g != want_g or got_o != want_o:
         f.append("the conversions per text are wrong (ground truth takes pairs, split, merge and misses; observation "
                  "takes pairs, split, merge and false positives): %r vs %r" % (got_g, got_o))
-    if out["agreement"]["n_conversions"]["n"] != 8 or out["definition"] != "all":
+    if out["agreement"]["conversions_per_trial"]["n"] != 8 or out["definition"] != "all":
         f.append("the agreement is not over the 8 texts")
-    if set(out["agreement_by_stratum"]) != set(SPEEDS) or out["agreement_by_stratum"]["slow"]["n_conversions"]["n"] != 2:
+    if set(out["agreement_by_stratum"]) != set(SPEEDS) or out["agreement_by_stratum"]["slow"]["conversions_per_trial"]["n"] != 2:
         f.append("the agreement by speed is missing or over the wrong texts: %r" % (sorted(out["agreement_by_stratum"]),))
     if out["dwell_zero"]["n_obs_rows"] != 0:
         f.append("the fixture has no observation with dwell_ms == 0")
@@ -1409,11 +1518,47 @@ def _case_scope():
     a, u = outs["all_trials"], outs["under_limit"]
     if a["texts"]["n"] != u["texts"]["n"] or u["scope"] != {"name": "under_limit", "n_trials_out_of_scope": 2}:
         f.append("texts should be kept under under_limit: %r / %r" % (a["texts"]["n"], u["scope"]))
-    ga = dict((t["text_id"], t["n_conversions"]) for t in a["aggregate"]["gt"])
-    gu = dict((t["text_id"], t["n_conversions"]) for t in u["aggregate"]["gt"])
+    count = lambda out, side: dict((t["text_id"], round(t["conversions_per_trial"] * t["n_trials_in_scope"]))
+                                   for t in out["aggregate"][side])
+    ga, gu = count(a, "gt"), count(u, "gt")
     diff = dict((k, ga[k] - gu[k]) for k in ga if ga[k] != gu[k])
     if diff != {"b1.1": 2}:
         f.append("the two long trials (block 1, text 1) should be absent on the ground-truth side: %r" % diff)
+    # the texts stay whole; a text keeps its trials in scope, and the histogram and the per-trial speed follow
+    nts = dict((t["text_id"], t["n_trials_in_scope"]) for t in u["aggregate"]["gt"])
+    if nts != dict((k, 6 if k == "b1.1" else 8) for k in nts) or \
+            set(t["n_trials_in_scope"] for t in a["aggregate"]["gt"]) != {8} or \
+            u["texts"]["trials_in_scope_by_speed"] != {"slow": {"8": 2}, "mid": {"6": 1, "8": 2}, "fast": {"8": 3}} or \
+            u["texts"]["n_without_trials_in_scope_by_speed"] != {"slow": 0, "mid": 0, "fast": 0}:
+        f.append("n_trials_in_scope / its histogram under under_limit are wrong: %r / %r" % (nts, u["texts"]))
+    pz = match._prediction_fixture(fx, long_trials=["t%05d" % k for k in range(31, 39)])
+    mz = match.render(match.evaluate(fx["sessions"], "all", fx["obs"], fx["plan"], fx["oracle"], fx["config"], pz, "under_limit"))
+    z0 = evaluate(mz, fx["sessions"], fx["obs"], fx["plan"], fx["oracle"], cfg)
+    zrow = [t for t in z0["aggregate"]["obs"] if t["text_id"] == "b1.0"][0]
+    if z0["texts"]["n_without_trials_in_scope_by_speed"] != {"slow": 0, "mid": 1, "fast": 0} or \
+            z0["texts"]["trials_in_scope_by_speed"]["mid"] != {"0": 1, "8": 2} or \
+            zrow["n_trials_in_scope"] != 0 or any(zrow[m] is not None for m in MEASURES):
+        f.append("a text with no trial in scope must be counted and have None measures: %r / %r" % (z0["texts"], zrow))
+    row = [t for t in u["aggregate"]["gt"] if t["text_id"] == "b1.1"][0]
+    if row["scope_duration_ms"] >= row["duration_ms"] or row["conversions_per_trial"] * 6 != gu["b1.1"]:
+        f.append("the scope duration of a text with trials set aside must be below its span: %r" % (row,))
+    # a record that the matching holds for an out-of-scope trial (it normally holds none) is not used
+    mo = json.loads(match.render(match.evaluate(fx["sessions"], "all", fx["obs"], fx["plan"], fx["oracle"], fx["config"],
+                                                pb, "under_limit")).decode("utf-8"))
+    mall = json.loads(match.render(match.evaluate(fx["sessions"], "all", fx["obs"], fx["plan"], fx["oracle"], fx["config"],
+                                                  pb, "all_trials")).decode("utf-8"))
+    stray = [s for p in mall["matching"]["pairs"] for s in [p["gt"]] if s.get("trial_id") in long_t]
+    if not stray:
+        stray = [g for p in mall["matching"]["merge"] for g in p["gt"] if g.get("trial_id") in long_t]
+    if not stray:
+        f.append("the scope fixture has no ground-truth session in a long trial to inject")
+    else:
+        mo["matching"]["miss"].append(stray[0])
+        z = evaluate(json.dumps(mo).encode("utf-8"), fx["sessions"], fx["obs"], fx["plan"], fx["oracle"], cfg)
+        zg = z["outside_texts"]["gt"]
+        if zg["by_reason"].get("out_of_scope") != 1 or zg["by_speed"].get("mid") != u["outside_texts"]["gt"]["by_speed"].get("mid", 0) + 1 \
+                or count(z, "gt") != gu:
+            f.append("a session of an out-of-scope trial in the matching must be outside (out_of_scope) and unused: %r" % (zg,))
     if u["per_trial"]["trials_not_used"]["out_of_scope"] != 2 or a["per_trial"]["trials_not_used"]["out_of_scope"] != 0:
         f.append("per_trial should leave out the out-of-scope trials: %r" % u["per_trial"]["trials_not_used"])
     mo = json.loads(match.render(match.evaluate(fx["sessions"], "all", fx["obs"], fx["plan"], fx["oracle"], fx["config"],
@@ -1530,21 +1675,23 @@ def _case_mixture_intervals():
     if json.dumps(mb, sort_keys=True) != json.dumps(mixture_bias(sx, mixes, 200, 3), sort_keys=True):
         f.append("the same B and seed do not give identical mixture intervals")
     other = mixture_bias(sx, mixes, 200, 4)
-    if all(mb["by_stratum"][s][m]["bias_ci"] == other["by_stratum"][s][m]["bias_ci"] for s in SPEEDS for m in MEASURES):
-        f.append("a different seed gives the same stratum intervals (the seed has no effect)")
+    if all(mb["mixtures"][n]["bias_ci"] == other["mixtures"][n]["bias_ci"] for n in mixes):
+        f.append("a different seed gives the same mixture intervals (the seed has no effect)")
+    # the per-speed bias has one registered interval (agreement_by_stratum's): none here
+    if any(set(mb["by_stratum"][s][m]) != {"bias", "n"} for s in SPEEDS for m in MEASURES):
+        f.append("a per-stratum entry of mixture_bias must hold only bias and n: %r" % (mb["by_stratum"]["slow"]["mean_dwell_ms"],))
+    # a mixture with all weight on one speed has the percentile interval of that speed's replicate biases
+    _blocks, reps = _stratified_replicates(sx, 200, 3)
     for s, name in (("slow", "only_slow"), ("mid", "only_mid"), ("fast", "only_fast")):
         for m in MEASURES:
             cell, mix = mb["by_stratum"][s][m], mb["mixtures"][name]
-            if mix["bias_ci"][m] != cell["bias_ci"] or mix["bias_ci_status"][m] != cell["bias_ci_status"] or \
-                    mix["bias"][m] != cell["bias"]:
-                f.append("the mixture with all weight on %s does not give that speed's bias and interval for %s: %r vs %r" % (
-                    s, m, (mix["bias"][m], mix["bias_ci"][m]), (cell["bias"], cell["bias_ci"])))
-    for s in SPEEDS:
-        for m in MEASURES:
-            c = mb["by_stratum"][s][m]
-            lo, hi = c["bias_ci"]
-            if c["bias_ci_status"] != "ok" or lo is None or not (lo - 1e-9 <= c["bias"] <= hi + 1e-9):
-                f.append("the %s interval of %s does not contain its bias or is missing: %r" % (s, m, c))
+            want = _percentile_interval([r[s][m] for r in reps])
+            if mix["bias_ci"][m] != want or mix["bias_ci_status"][m] != "ok" or mix["bias"][m] != cell["bias"]:
+                f.append("the mixture with all weight on %s is not that speed's bias with the percentile interval of its "
+                         "replicate biases for %s: %r vs %r" % (s, m, (mix["bias"][m], mix["bias_ci"][m]), (cell["bias"], want)))
+            lo, hi = mix["bias_ci"][m]
+            if lo is None or not (lo - 1e-9 <= cell["bias"] <= hi + 1e-9):
+                f.append("the %s interval of %s does not contain its bias or is missing: %r" % (s, m, (cell, mix["bias_ci"][m])))
     for name in DEFAULT_MIXTURES:
         for m in MEASURES:
             lo, hi = mb["mixtures"][name]["bias_ci"][m]
@@ -1552,8 +1699,9 @@ def _case_mixture_intervals():
                 f.append("the interval of the mixture %s for %s does not contain its bias: %r" % (name, m, (lo, hi)))
     # without B the intervals are not requested; the points do not change
     plain = mixture_bias(sx, mixes)
-    if plain["by_stratum"]["fast"]["n_conversions"]["bias_ci_status"] != "not_requested" or \
-            plain["mixtures"]["uniform"]["bias"] != mb["mixtures"]["uniform"]["bias"]:
+    if plain["mixtures"]["uniform"]["bias_ci_status"]["conversions_per_trial"] != "not_requested" or \
+            plain["mixtures"]["uniform"]["bias_ci"]["conversions_per_trial"] != [None, None] or \
+            plain["by_stratum"] != mb["by_stratum"] or plain["mixtures"]["uniform"]["bias"] != mb["mixtures"]["uniform"]["bias"]:
         f.append("without B the intervals must be not_requested and the points unchanged")
     for bad in (dict(B=0, seed=1), dict(B=5, seed="a"), dict(B=True, seed=1), dict(B=MAX_B + 1, seed=1)):
         try:
@@ -1566,13 +1714,13 @@ def _case_mixture_intervals():
     syn = _syn_texts({"slow": [(0, 0, 10), (0, 0, 10), (1, 0, 10), (1, 0, 10)],
                       "fast": [(2, 10, 0), (2, 10, 0), (3, 10, 0), (3, 10, 0)]})
     sm = mixture_bias(syn, {"both": {"slow": 1, "fast": 1}, "slow": {"slow": 1}, "fast": {"fast": 1}}, 100, 1)
-    if sm["mixtures"]["both"]["bias_ci"]["n_conversions"] != [0.0, 0.0] or \
-            sm["mixtures"]["slow"]["bias_ci"]["n_conversions"] != [10.0, 10.0] or \
-            sm["mixtures"]["fast"]["bias_ci"]["n_conversions"] != [-10.0, -10.0]:
+    if sm["mixtures"]["both"]["bias_ci"]["conversions_per_trial"] != [0.0, 0.0] or \
+            sm["mixtures"]["slow"]["bias_ci"]["conversions_per_trial"] != [10.0, 10.0] or \
+            sm["mixtures"]["fast"]["bias_ci"]["conversions_per_trial"] != [-10.0, -10.0]:
         f.append("the bootstrap is not stratified (a replicate mixed texts of different speeds): %r" % (sm["mixtures"],))
     # two blocks per speed whose means are 0 and 10: the uniform mixture's interval reaches 0 and 10
     syn2 = _syn_texts({"slow": [(0, 0, 0), (1, 0, 10)], "fast": [(2, 0, 0), (3, 0, 10)]})
-    lo, hi = mixture_bias(syn2, {"u": {"slow": 1, "fast": 1}}, 400, 1)["mixtures"]["u"]["bias_ci"]["n_conversions"]
+    lo, hi = mixture_bias(syn2, {"u": {"slow": 1, "fast": 1}}, 400, 1)["mixtures"]["u"]["bias_ci"]["conversions_per_trial"]
     if not (lo == 0.0 and hi == 10.0):
         f.append("the mixture interval does not span the strata's block means: %r" % ((lo, hi),))
     # withheld intervals and their reasons
@@ -1581,25 +1729,21 @@ def _case_mixture_intervals():
                              "zero_slow": {"slow": 0, "mid": 1}}, 50, 1)
     if len(set(t["block_id"] for t in thin["slow"])) != 1:
         f.append("the thin-stratum fixture should have one slow block")
-    if tb["by_stratum"]["slow"]["n_conversions"]["bias_ci"] != [None, None] or \
-            tb["by_stratum"]["slow"]["n_conversions"]["bias_ci_status"] != "fewer_than_two_blocks" or \
-            tb["mixtures"]["needs_slow"]["bias_ci_status"]["n_conversions"] != "fewer_than_two_blocks" or \
-            tb["mixtures"]["needs_slow"]["bias_ci"]["n_conversions"] != [None, None]:
+    if tb["mixtures"]["needs_slow"]["bias_ci_status"]["conversions_per_trial"] != "fewer_than_two_blocks" or \
+            tb["mixtures"]["needs_slow"]["bias_ci"]["conversions_per_trial"] != [None, None]:
         f.append("a needed stratum with one block must withhold the interval: %r" % (tb["mixtures"]["needs_slow"],))
-    if tb["mixtures"]["mid_only"]["bias_ci_status"]["n_conversions"] != "ok" or \
-            tb["mixtures"]["zero_slow"]["bias_ci_status"]["n_conversions"] != "ok":
+    if tb["mixtures"]["mid_only"]["bias_ci_status"]["conversions_per_trial"] != "ok" or \
+            tb["mixtures"]["zero_slow"]["bias_ci_status"]["conversions_per_trial"] != "ok":
         f.append("a stratum that is not needed (weight 0 or absent from the weights) must not withhold the interval")
     nd = mixture_bias(_syn_texts({"slow": [(0, 1, None), (1, 1, None)]}), {"s": {"slow": 1}, "f": {"fast": 1}}, 20, 1)
-    if nd["by_stratum"]["slow"]["n_conversions"]["bias_ci_status"] != "no_data" or \
-            nd["mixtures"]["s"]["bias_ci_status"]["n_conversions"] != "no_data" or \
-            nd["mixtures"]["f"]["bias_ci_status"]["n_conversions"] != "no_data":
+    if nd["mixtures"]["s"]["bias_ci_status"]["conversions_per_trial"] != "no_data" or \
+            nd["mixtures"]["f"]["bias_ci_status"]["conversions_per_trial"] != "no_data":
         f.append("a null bias must give the status no_data: %r" % (nd,))
     # a replicate in which a needed stratum has no text with the measure is undefined: withheld, not dropped
     und = _syn_texts({"slow": [(0, 1, None), (1, 1, 3)]})
     ub = mixture_bias(und, {"s": {"slow": 1}}, 200, 1)
-    if ub["by_stratum"]["slow"]["n_conversions"]["bias_ci_status"] != "undefined_resample" or \
-            ub["mixtures"]["s"]["bias_ci_status"]["n_conversions"] != "undefined_resample" or \
-            ub["mixtures"]["s"]["bias_ci"]["n_conversions"] != [None, None]:
+    if ub["mixtures"]["s"]["bias_ci_status"]["conversions_per_trial"] != "undefined_resample" or \
+            ub["mixtures"]["s"]["bias_ci"]["conversions_per_trial"] != [None, None]:
         f.append("an undefined replicate must withhold the interval with undefined_resample: %r" % (ub,))
     # the global random state is not touched
     state = random.getstate()
@@ -1673,6 +1817,45 @@ def _case_layer_none():
             f.append("a malformed layer_none_trials %r was accepted" % (bad,))
         except InputError:
             pass
+    # the uncontaminated view: its own list, independent of layer_none_trials
+    for label, scope in (("a missing scope", "__drop__"), ("a scope without the key", dict(base_scope)),
+                         ("a null list", dict(base_scope, uncontaminated_trials=None))):
+        if run(scope)["per_trial_uncontaminated"] is not None:
+            f.append("%s must give per_trial_uncontaminated null" % label)
+    unc = ["t%05d" % k for k in range(31, 61)]
+    both = run(dict(base_scope, layer_none_trials=lst, uncontaminated_trials=unc))
+    pu = both["per_trial_uncontaminated"]
+    if pu is None or pu["n_trials"] != 30 or pu["trials_not_used"]["outside_layer"] != pa["n_trials"] - 30 or \
+            pu["n_trials"] != sum(x["n_trials"] for x in pu["by_stratum"]):
+        f.append("per_trial_uncontaminated does not use exactly the listed trials: %r" % (
+            None if pu is None else (pu["n_trials"], pu["trials_not_used"]),))
+    if both["per_trial_layer_none"] != out["per_trial_layer_none"] or both["per_trial"] != out["per_trial"]:
+        f.append("per_trial_layer_none / per_trial must not depend on uncontaminated_trials")
+    if run(dict(base_scope, uncontaminated_trials=unc))["per_trial_layer_none"] is not None:
+        f.append("an uncontaminated list alone must not fill per_trial_layer_none")
+    if json.dumps(both, sort_keys=True) != json.dumps(run(dict(base_scope, layer_none_trials=lst, uncontaminated_trials=unc)),
+                                                       sort_keys=True):
+        f.append("evaluate with uncontaminated_trials is not deterministic")
+    if run(dict(base_scope, uncontaminated_trials=[]))["per_trial_uncontaminated"]["n_trials"] != 0:
+        f.append("an empty uncontaminated list should give an empty view, not null")
+    for bad in ([1, 2], "t00001", {"a": 1}, ["t00001", None], 0, True):
+        try:
+            run(dict(base_scope, uncontaminated_trials=bad))
+            f.append("a malformed uncontaminated_trials %r was accepted" % (bad,))
+        except InputError:
+            pass
+    # through match.py: the list of the prediction fixture (t00016 carried out, t00017 received a carry,
+    # t00021 and t00017 closing key) feeds the view; the closing-key trial t00021 is in it, t00016 / t00017 are not
+    pb = match._prediction_fixture(fx, carried=("t00016",), none_started=("t00017",), closing=("t00021", "t00017"))
+    mp = json.loads(match.render(match.evaluate(fx["sessions"], "all", fx["obs"], fx["plan"], fx["oracle"], fx["config"],
+                                                pb, "all_trials")).decode("utf-8"))
+    ev = evaluate(json.dumps(mp).encode("utf-8"), fx["sessions"], fx["obs"], fx["plan"], fx["oracle"], cfg)
+    pu, pl, pa = ev["per_trial_uncontaminated"], ev["per_trial_layer_none"], ev["per_trial"]
+    if pu is None or pl is None or pu["n_trials"] != pa["n_trials"] - 2 or pu["trials_not_used"]["outside_layer"] != 2 or \
+            pl["n_trials"] != pa["n_trials"] - 3 or pu["n_trials"] != pl["n_trials"] + 1:
+        f.append("the uncontaminated view should hold every used trial but the two carry trials (the layer-none view "
+                 "one fewer, the closing-key trial): %r / %r" % (None if pu is None else pu["trials_not_used"],
+                                                                 None if pl is None else pl["trials_not_used"]))
     return f
 
 
@@ -1687,7 +1870,7 @@ CASES = [
     ("same seed gives byte-identical results; not computable cases are None", _case_seed_and_bytes),
     ("intervals for the bias and the limits of agreement (block bootstrap, statuses)", _case_agreement_intervals),
     ("intervals for the mixture biases (stratified block bootstrap, statuses)", _case_mixture_intervals),
-    ("per_trial restricted to the trials in no layer (only_trials / per_trial_layer_none)", _case_layer_none),
+    ("per_trial restricted to a list of trials (only_trials / per_trial_layer_none / per_trial_uncontaminated)", _case_layer_none),
     ("CLI (hash binding, byte-identical output, exit 2)", _case_cli),
 ]
 
@@ -1758,7 +1941,7 @@ def main(argv):
           "by speed (primary), mean dwell %s" % (
               out["texts"]["n"], ", ".join("%s %d" % (s, n) for s, n in out["texts"]["n_by_speed"].items()),
               out["texts"]["discarded"]["n"],
-              _fmt(out["agreement"]["mean_dwell_ms"]["icc21"]), _fmt(out["agreement"]["n_conversions"]["icc21"]),
+              _fmt(out["agreement"]["mean_dwell_ms"]["icc21"]), _fmt(out["agreement"]["conversions_per_trial"]["icc21"]),
               ", ".join("%s %s" % (sp, _fmt(v["mean_dwell_ms"]["icc21"])) for sp, v in out["agreement_by_stratum"].items())))
     return 0
 

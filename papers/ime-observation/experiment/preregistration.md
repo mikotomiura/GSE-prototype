@@ -36,8 +36,9 @@ typed text can be recovered from a published log, and what the observer costs th
 ### 1.2 Questions
 
 The study estimates; it tests no hypothesis. Every estimate of agreement (questions 1 to 3) and every accuracy and
-error rate of question 4 is reported with an interval; F1, the counts, the mean rank of question 4 and the
-descriptive figures of sections 6.3, 6.9 and 6.10 are reported without one (section 6.1). No estimate is turned
+error rate of question 4 is reported with an interval; F1, the counts, the mean rank and the per-scenario and
+per-speed accuracies of question 4, the delivery figures of section 6.3 and the figures of sections 6.9 and 6.10
+are reported without one (section 6.1). No estimate is turned
 into a pass or fail decision, except the near-chance rule of the text-recoverability study, which decides which log
 granularity is recommended (section 6.8).
 
@@ -46,14 +47,15 @@ granularity is recommended (section 6.8).
    the observer split one session into several rows, or merge several sessions into one?
 2. Per-session agreement. For sessions the observer reports as one row, how does `dwell_ms` differ from the
    session's duration, how often does `abandon` agree with the session's outcome, and how often does `nav` equal
-   the number of arrow keys pressed during the session? For the trials whose session reaches the 20-second cut-off,
-   does the observer write no row for that session, as specified?
+   the number of arrow keys pressed during the session? For the sessions that reach the 20-second cut-off, does the
+   observer write no row, as specified?
 3. Per-text agreement. When trials are grouped into texts, how closely do four aggregates a writing researcher
-   might compute (number of conversions, mean conversion time, abandonment rate, fraction of time spent converting)
+   might compute (conversions per trial, mean conversion time, abandonment rate, fraction of time spent converting)
    agree between the observation and the ground truth?
-4. Text recoverability. Given only a published log, how accurately can an attacker identify which of K candidate
-   phrases was typed, and how far can an attacker with a language model reconstruct the typed reading? Which
-   granularity of the published log keeps identification near chance?
+4. Text recoverability. Given only the key rows of a published log, how accurately can an attacker identify which
+   of K candidate phrases was typed in a trial, and how far can an attacker with a language model reconstruct the
+   typed reading? Which of two granularities of the key rows that keep no time keeps the identification of a
+   phrase near chance?
 5. Runtime cost. What CPU time and resident memory does the observer use while the machine is idle and while
    synthetic typing is played?
 
@@ -184,9 +186,10 @@ measurement is read before the freeze.
 ### 3.1 Data that exist before the freeze
 
 A calibration pilot was run on the measuring machine before the freeze; it is reported in
-`experiment/pilot-macos.md`. The raw logs of its runs that meet the criteria set out there are deposited with the
-measurement data. The observation logs of the pilot are deposited whole, so their sealed session rows (section 2.5)
-are unsealed after the measurement only to be deposited; they are not analysed, not even in an exploratory analysis.
+`experiment/pilot-macos.md`. The raw logs of its runs that meet the criteria set out there, which are written before
+the freeze, are deposited with the measurement data. The observation logs of the pilot are deposited whole, so their
+sealed session rows (section 2.5) are unsealed after the measurement only to be deposited; they are not analysed,
+not even in an exploratory analysis.
 Its runs used provisional settings: one to three trials per scenario and speed,
 key-interval medians of 300, 200 and 120 ms, a three-key block-start marker (F13, F14, F13 in the first pilot and
 `left`, `right`, `left` from then on), and seeds 1 to 6 instead of the one in `experiment/SEED`. Their other
@@ -214,7 +217,9 @@ after a conversion depended on how the key was sent (it did not). These checks w
 not part of the data and are not deposited.
 
 No session row of the observation was read, no agreement between the observation and the ground truth was
-computed, and no text-recoverability or runtime analysis was run on pilot data.
+computed, and no text-recoverability or runtime analysis was run on pilot data. Before the freeze, the assignment of
+observed key presses to trials that both attacks of question 4 use (section 6.8) is run, without any attack, on the
+key rows of the pilot's observation logs, and the fraction of blocks it scores is reported here.
 
 Before the freeze, the prediction of section 4.5 was also computed on the two measurement plans, with an oracle
 built from the plans' own times (no sending delay; 2 s between blocks), by
@@ -242,7 +247,8 @@ The runs are made on separate nights in this order: the cell with live conversio
 conversion off, then the two conditions of question 5 (section 6.10), `idle` and then `working`. The order is
 fixed so that the replay of section 6.10 adds no learning before the cells of questions 1 to 4 are measured. An
 attempt that has to be repeated (section 3.4) is repeated before the next item of this order is run, so the order
-is kept; the learning that the repeated attempt added is not undone (section 7).
+is kept; the learning that the repeated attempt added is not undone (section 7). The check of section 3.4 is made
+right after each run, before the next item of this order.
 
 Before each block the runner switches the input method to Japanese by pressing the kana key, after confirming that
 the reference input field is in front. A block begins with a marker of four arrow presses (left, right, left,
@@ -277,12 +283,14 @@ ms.
   With 75 trials a stratum's recall near 0.95 is located to within about 5 points; this does not guarantee that
   0.95 and 0.90 are told apart (71 of 75 gives the interval 0.871 to 0.979). With 31 trials it is located to within
   about 9 points (31 of 31 gives a lower end of 0.890). In the primary scope a speed level holds 603 (slow), 852
-  (mid) and 940 (fast) trials with live conversion on and 553, 783 and 876 with it off, which locate a recall near
-  0.95 to within 1.4 to 1.8 points. Pooled values carry intervals that ignore the clustering of trials in blocks
-  (section 6.1) and are read as lower bounds of the uncertainty.
+  (mid) and 940 (fast) trials with live conversion on and 553, 783 and 876 with it off (about one session each),
+  which locate a recall near 0.95 to within 1.4 to 1.8 points if the trials are treated as independent; a speed
+  level is made of whole blocks, so its design effect can reach 25 (below). Pooled values carry intervals that
+  ignore the clustering of trials in blocks (section 6.1) and are read as lower bounds of the uncertainty.
 - **Trials under the cut-off**: questions 1 to 3 are answered primarily over the trials whose presses went into no
   session that the observer's rules cut off (section 6.4), so their strata are smaller than 75. From the prediction
-  on the measurement plans (section 3.1), the trials that remain per scenario and speed (slow / mid / fast) are:
+  on the measurement plans (section 3.1), the trials that remain per scenario and speed (slow / mid / fast), before
+  the exclusions of section 6.2, which can only reduce them, are:
 
   | Scenario | on | off |
   |---|---|---|
@@ -306,16 +314,20 @@ ms.
   and the trial that received it is set aside with it. Outside S6 and S13, six strata of each cell (all slow) hold
   fewer than 50 trials. Strata are reported with their numbers and intervals, or as null when they are empty
   (section 6.11).
-- **Precision of continuous measures**: for a mean difference (the bias of `dwell_ms`, a per-text bias), the
-  half-width of the 95% interval is about 1.96 x SD x sqrt(D / n), where SD is the standard deviation of the
-  differences, n the number of pairs or texts, and D the design effect of the blocks, 1 + (m - 1) x rho, with m the
-  mean number of items per block and rho the correlation within a block. In a planned stratum the 75 trials are
-  spread over about 42 blocks (m about 1.8), so D is at most about 1.8 and usually near 1: the half-width is about
-  0.23 x SD (for example 2.3 ms when SD is 10 ms, 11 ms when it is 50 ms), and at most about 1.34 times that. Over a
-  speed level (about 1,050 pairs, m about 25) it is about 0.06 x SD x sqrt(D), with D between 1 and 25. Per speed
-  there are 126 texts (on) and 117 (off) in 42 and 39 blocks (three texts per block). No width is predicted for the
-  limits of agreement, kappa and the ICC, because it depends on the values estimated; they are read through the
-  intervals reported with them.
+- **Precision of continuous measures and the design effect**: for a mean difference (the bias of `dwell_ms`, a
+  per-text bias), the half-width of the 95% interval is about 1.96 x SD x sqrt(D / n), where SD is the standard
+  deviation of the differences, n the number of pairs or texts, and D the design effect of the blocks. With m_j
+  items in block j, D = 1 + (sum of m_j squared / sum of m_j - 1) x rho, where rho is the correlation within a block
+  (for blocks of equal size m, 1 + (m - 1) x rho). The plan shuffles the trials of a speed before cutting them into
+  blocks, so the 75 trials of a planned stratum fall unevenly into 33 to 39 of the 42 blocks of their speed with
+  live conversion on and into 30 to 37 of the 39 blocks with it off; computed from the two measurement plans, sum
+  of m_j squared over sum of m_j is 2.4 to 3.1 (on) and 2.5 to 3.4 (off) across the strata. D is therefore at most
+  about 3.4 and usually near 1: the half-width is about 0.23 x SD (for example 2.3 ms when SD is 10 ms, 11 ms when
+  it is 50 ms), and at most about 1.8 times that. Over a speed level (about 1,050 pairs, m about 25) it is about
+  0.06 x SD x sqrt(D), with D between 1 and 25. Per speed there are 126 texts (on) and 117 (off) in 42 and 39 blocks
+  (three texts per block). The limits of agreement (the bias plus or minus 1.96 SD) are located to about 1.96 x SD x
+  sqrt(3 x D / n) (Bland & Altman, 1986), about 0.39 x SD with 75 pairs and D = 1. No width is predicted for kappa
+  and the ICC, because it depends on the values estimated; they are read through the intervals reported with them.
 - **Key intervals**: log-normal, with medians of 480 ms (slow), 240 ms (middle) and 120 ms (fast) and a log-scale
   standard deviation of 0.3. The medians follow the per-participant mean inter-key intervals that Dhakal, Feit,
   Kristensson and Oulasvirta (2018) report for the slowest tenth of their participants (481 ms), for all
@@ -335,9 +347,14 @@ ms.
 
 Each cell is run once to completion. If a run is aborted (the runner stops it), the cell is run again from the
 start with the same plan, in a new run directory, up to three attempts. A completed run counts as aborted when its
-plan has another SHA-256 than the plan of section 2.4, or when one of its logs holds a row without a press the
-executor sent that cannot be explained (the check of `experiment/data.md`, made before the logs are deposited).
-Aborted runs are reported with their reason and are not analysed. A cell that is not completed in three attempts is
+plan has another SHA-256 than the plan of section 2.4, or when the reference log shows a key press from outside the
+executor: in the delivery report of `kit/analysis/delivery.py`, run on the run directory alone (it reads the key
+rows of the logs, not the session rows), the reference's `excess_rows` over all presses is greater than zero, or
+its `rows_outside_trials` exceeds the five presses made outside the trials in each block (four marker presses and
+one kana press). No other reason and no explanation is admitted. The check is made right after the run (section
+3.2), and its result and time are recorded in `experiment/data.md` before any analysis of the run. Rows of the
+observation without a sent press are a result of the observer under test (section 6.3) and never make a run count
+as aborted. Aborted runs are reported with their reason and their delivery figures, and are not analysed. A cell that is not completed in three attempts is
 reported as not measured. The same rule applies to each condition of question 5: a condition that is aborted or
 insufficient (section 6.10) is run again on another night, up to three attempts in all, and every attempt is
 reported.
@@ -395,7 +412,8 @@ appears as a missed row in `pred_obs` (section 6.4).
 macOS key codes to virtual-key codes, the order in which a key updates the input-mode flag and then drives the
 session, the transitions of the session and the 20-second cut-off) to every press in the oracle, in the order and
 at the times the oracle records. It also models what the oracle does not record: the kana key that the runner
-presses at the start of every block, and the marker presses (from the plan). Presses that send no key event (the
+presses at the start of every block, and the keys of the marker presses (the oracle records their times; the keys
+come from the plan). Presses that send no key event (the
 switch to another application in S15) are skipped. The result is, per run, the list of sessions the observer is
 specified to form, each with its start, end, `nav`, `abandon`, how it ended (a row, cut off, or open at the end of
 the log) and the trials whose presses entered it (the press that cuts a session off does not enter it), and per
@@ -403,7 +421,8 @@ trial:
 
 - **long**: a press of the trial entered a session that is cut off at 20 seconds (the session may have started in
   the trial or have been carried over from an earlier one);
-- **carried out**: a session that the trial started ends in a later trial;
+- **carried out**: a session that the trial started does not end in the trial (it ends in a later trial, is cut off
+  by a press outside the trials, such as a marker press, or is still open at the end of the log);
 - **received carry**: a press of the trial entered a session started by an earlier trial;
 - **closing key in reading**: the trial sends the minus, comma or period key, which closes a session under the
   observer's rules (in Romaji input these keys type a long-vowel mark, a comma and a full stop; in the kana layout
@@ -418,12 +437,14 @@ was collected (section 4.4).
 
 For the per-text measures, the trials of each block are cut, in plan order, into texts of eight consecutive
 trials; the remainder of a block (one trial with blocks of 25) is not used. Every text is of one speed. The four
-measures are computed for every text on both sides: the number of conversions (sessions or rows), the mean
+measures are computed for every text on both sides, over the trials of the text that are in the scope of the
+analysis (section 6.4): the conversions per trial (sessions or rows over the number of those trials), the mean
 conversion time (total duration over the sessions, or over the rows with a non-zero `dwell_ms`; every session has a
 positive duration), the abandonment rate (cancelled sessions, or rows with `abandon` set, over all), and the
-fraction of time spent converting (total duration over the time from the first trial's begin to the last trial's
-end). The four measures are examples of aggregates a writing researcher might compute from such a log; they were
-not selected from a review of the writing literature.
+fraction of time spent converting (total duration over the summed duration of those trials, each from its begin to
+its end). A text with no trial in the scope has no value (section 6.11). The four measures are examples of
+aggregates a writing researcher might compute from such a log; they were not selected from a review of the writing
+literature.
 
 ## 5. Analysis code and settings
 
@@ -458,16 +479,19 @@ difference between speeds is not an effect of speed alone. The number of letter 
 trials in each scope are reported per stratum, from the plan.
 
 Proportions carry 95% Wilson intervals (Wilson, 1927), which treat trials as independent: within a planned stratum
-the 75 trials are spread over about 42 blocks, so the design effect is at most about 1.8 (an interval at most about
-1.34 times wider), and for pooled proportions the interval is read as a lower bound of the uncertainty. Continuous
-measures, the bias and the limits of agreement, kappa, the ICC and the biases under the mixtures of speeds carry 95%
-percentile bootstrap intervals (Efron, 1979) that resample whole blocks (Cameron, Gelbach, & Miller, 2008), because
-trials in one block share the state of the input method; the biases under the mixtures resample the blocks of each
-speed separately. F1, counts, the mean rank of question 4 and the descriptive figures of sections 6.3, 6.9 and
-6.10 carry no interval. All resampling uses the seed in `experiment/SEED`, with 2,000 resamples.
+the design effect of the blocks is at most about 3.4, an interval at most about 1.8 times wider (section 3.3), and
+for pooled proportions the interval is read as a lower bound of the uncertainty. Continuous measures, the bias and
+the limits of agreement, kappa, the ICC and the biases under the mixtures of speeds carry 95% percentile bootstrap
+intervals (Efron, 1979) that resample whole blocks (Cameron, Gelbach, & Miller, 2008), because trials in one block
+share the state of the input method; the biases under the mixtures resample the blocks of each speed separately.
+F1, counts, the mean rank and the per-scenario and per-speed accuracies of question 4, the delivery figures of
+section 6.3 and the figures of sections 6.9 and 6.10 carry no interval. All resampling uses the seed in
+`experiment/SEED`, with 2,000 resamples.
 
 In the abstract and the conclusions, estimates are given as the ranges of their intervals, without evaluative
-words (such as good, high or acceptable agreement); no threshold of adequate agreement is set.
+words (such as good, high or acceptable agreement); no threshold of adequate agreement is set. An estimate in the
+primary scope is given together with the fraction of trials that the scope sets aside and the estimate under
+`all_trials` (section 6.4).
 
 ### 6.2 Exclusions and other contingencies
 
@@ -478,7 +502,7 @@ Applied before matching, and reported by reason, stratum and number. These are t
   threshold equals the wait between trials, so a step of the wall clock that could move an event into another trial
   is caught; a smaller step is not excluded, and with network time synchronisation turned off (section 3.2) none is
   expected.
-- `log_truncated`: a session still open when the log ends.
+- `log_truncated`: a session of the ground truth (assembled from the reference log) still open when that log ends.
 - `carry_over`: a session of the ground truth that overlaps two or more trials. The composition was not closed in its
   own trial and ran on into the next, so it cannot be assigned to one trial, and every trial it overlaps is excluded
   (in the pilot, two carry-overs with live conversion on, in S8 and S10, excluded four trials). This is the only
@@ -497,9 +521,12 @@ Other contingencies:
 
 - A loss of focus of the reference input field inside a block, other than the planned switch of S15, is not
   excluded: the reference then receives no call, so the trial appears as a plan-versus-ground-truth disagreement
-  (section 6.3); the trials with such a loss are counted per stratum in the delivery report, and the observation
-  rows assigned to them, and how many of these are false positives, are reported with the detection results, so
-  that a failure of the reference is not read as one of the observer.
+  (section 6.3). A loss lasts from a focus-out of the reference to its next focus-in (to the end of the log when
+  none follows), so it can cover several trials, because the runner confirms the focus only before each block; an
+  S15 trial counts when its switch does not return inside the trial. The trials that overlap a loss are counted
+  per stratum in the delivery report, and the observation rows assigned to them, and how many of these are false
+  positives, are reported with the detection results, in total and per speed, so that a failure of the reference
+  is not read as one of the observer.
 - If the input method stops responding or restarts during a run, the affected trials are not excluded; they appear
   as disagreements and are reported. A run that the runner aborts is handled by section 3.4.
 - If the system or input-method version recorded in a run manifest differs from that of an earlier run, the run is
@@ -507,8 +534,8 @@ Other contingencies:
 - A text whose measure cannot be computed on one side is left out of that measure's figures and counted (section
   6.11).
 - If the observed key presses of a block do not agree with the plan (a press missing, added or changed), the
-  attacks of question 4 leave the trials of that block unscored, resume at the next block-start marker, and report
-  the unscored blocks and trials (section 6.8).
+  attacks of question 4 leave the trials of that block unscored, continue with the next block that matches, and
+  report the unscored blocks and trials (section 6.8).
 - The run of the `working` condition of question 5 is not used for questions 1 to 4.
 
 ### 6.3 Plan versus ground truth, and delivery of the presses
@@ -524,8 +551,10 @@ each press against the plan's schedule; for the observation's key rows and for t
 fraction of sent presses that arrived and the number of rows without a sent press (inside trials, and outside them,
 where the block markers and the runner's kana presses fall); and, in the trials where every press arrived, the delay
 of each row after its press and the error of each interval between consecutive rows. Input-mode keys, which the
-observer does not record by design, are reported with and without. These figures concern events generated in
-software; no claim is made about the path from a physical keyboard (section 7).
+observer does not record by design, are reported with and without. Rows of the observation without a sent press
+are a result of the observer and stay in the analysis; rows of the reference without one show input from outside
+the executor and make the run count as aborted (section 3.4). These figures concern events generated in software;
+no claim is made about the path from a physical keyboard (section 7).
 
 ### 6.4 Scopes and comparisons
 
@@ -536,19 +565,21 @@ exclusions, at the level of a trial (the sessions and the rows of a trial go tog
 - `under_limit`: the trials that are not long. **The primary scope of questions 1, 2 and 3.**
 - `over_limit`: the long trials only. For these trials the specified behaviour is that the session that is cut off
   produces no row; a letter or digit pressed after the cut-off opens a fresh session (for example the digit of S8
-  after a long pause), whose row is a row of the trial in which that press falls.
+  after a long pause), whose row is assigned, like every row, to the trial it overlaps most (usually the trial in
+  which that press falls).
 - `all_trials`: every trial, reported as secondary.
 
 The scope is decided from the oracle and the plan alone, so it does not depend on the observation. A session or row
 that belongs to no trial is in `under_limit`. Question 1 is computed under all three scopes; question 2 under
 `under_limit` and `all_trials`, with the checks of the cut-off under `over_limit` (section 6.6). Question 3 is
-answered under `under_limit` (primary), in which the sessions and rows of the long trials are left out on both sides
-while the texts are kept (the duration of a text, the denominator of the fraction of time spent converting, does not
-change), and under `all_trials` (secondary). The values under `all_trials` depend on this design's fraction of long
-trials (section 3.1), which follows from its think times, speeds and procedures and is not a property of natural
-typing; the effect of the cut-off on a researcher's aggregates follows from the rule itself, which a reader can
-apply to the lengths of the sessions in their own data: a session of 20 seconds or more has no row, and a letter or
-digit pressed after the cut-off opens a fresh session.
+answered under `under_limit` (primary), in which the long trials are left out on both sides while the texts are
+kept, and every measure of a text is computed over its remaining trials (section 4.6), and under `all_trials`
+(secondary). The values under `all_trials` depend on this design's fraction of long trials (section 3.1), which
+follows from its think times, speeds and procedures and is not a property of natural typing. The effect of the
+cut-off on a researcher's aggregates follows from the rule stated in section 1.1. An observer's log does not show
+which sessions were cut off, because they have no row, so a reader who wants to apply the rule to their own data
+has to estimate from another source how often a conversion lasts 20 seconds or more; these are the longest
+conversions.
 
 **Comparisons.** The prediction also allows the disagreement between the ground truth and the observation to be
 traced. Questions 1 and 2 are computed for three comparisons, with the same matching and the same measures, and
@@ -611,7 +642,9 @@ Over the one-to-one pairs of each stratum, per speed and per cell, for each comp
   rows of those trials (`pred_obs`; specified: the same rows); in every scope, the number of rows of 20 seconds or
   more (specified: zero). The number of ground-truth sessions of 20 seconds or more that nonetheless appear in a pair,
   split or merge is reported as well; it is not specified to be zero, because the ground truth's session can last
-  longer than the observer's (for example when the observer closes it at the first of two Returns).
+  longer than the observer's (for example when the observer closes it at the first of two Returns). Agreement with
+  the specified rows is read from the numbers of rows per trial; a pair of a short row can fail for timing alone
+  (section 6.9).
 
 ### 6.7 Question 3: per-text agreement
 
@@ -625,18 +658,22 @@ variance with the two methods as columns, with a 95% interval from resampling bl
 the reason, when its statistic is undefined in the sample or in any resample. The per-speed values are primary;
 values pooled over speeds are reported for comparison, because a difference in level between speeds inflates a
 pooled ICC. A text is not used if any of its trials was not run or was excluded; the numbers of such texts are
-reported by reason, block and speed. The bias of each measure is also reported for three mixtures of speeds (slow,
-middle and fast in proportions 0.6/0.3/0.1, equal, and 0.1/0.3/0.6), with intervals that resample the blocks of each
-speed separately, to show whether the aggregate's bias moves with the mix.
+reported by reason, block and speed. The number of a text's trials in the scope is reported per speed, and the
+texts with none are counted (section 6.11). The bias of each measure is also reported for three mixtures of speeds
+(slow, middle and fast in proportions 0.6/0.3/0.1, equal, and 0.1/0.3/0.6), with intervals that resample the blocks
+of each speed separately, to show whether the aggregate's bias moves with the mix; the interval of a single speed's
+bias is the one reported with that speed's agreement.
 
 The plan orders the trials of a block by the seed and does not balance the scenarios within a text, so a text mixes
 the scenarios about equally only in expectation, and every per-text value and ICC holds for this design's mix of
 scenarios only. So that a reader can weight the scenarios differently, three per-trial differences (observation
 minus ground truth) are also reported per scenario and speed, with the mean on each side and a block-bootstrap
 interval: the number of conversions, the summed conversion time and the number of cancelled conversions; the trials
-outside the scope are left out. These differences include sessions carried over from an earlier trial, so they are
-reported twice: over every trial of the scope, and over the trials of the scope in none of the layers of section 6.4,
-for which reweighting to another mix of scenarios is meant.
+outside the scope are left out. These differences include sessions carried over from one trial into another, so
+they are reported over every trial of the scope and over the trials of the scope that are in neither the
+carried-out nor the received-carry layer of section 6.4, for which reweighting to another mix of scenarios is
+meant; the trials that send a closing key in their reading stay in that view, because their disagreement is
+their own. As a diagnostic, they are also reported over the trials in none of the four layers.
 
 ### 6.8 Question 4: text recoverability
 
@@ -646,11 +683,14 @@ Run on the observation logs of each cell separately, with the plan, procedure fi
 reading that was typed, not the original sentence. The attacks read the category and time of every key row; they
 do not use the session rows, so the session rows are outside the scope of the recommendation below.
 
-Both attacks assign the observed key presses to the trials in plan order, block by block. A block whose observed
+Both attacks assign the observed key presses to the trials in plan order, block by block. A block is placed where
+its block-start marker (four arrow presses) and all its trials match the observed presses. A block whose observed
 presses do not agree with the plan (a press missing, added or changed) is not scored: its trials are counted as
-unscored, and the assignment resumes at the next block-start marker, which the observer records as four arrow presses,
-more than any trial sends in a row. Presses outside every block are counted. Accuracies and error rates are over the
-scored trials, and the numbers of unscored blocks and trials are reported per cell.
+unscored, and the assignment continues with the next block that matches; a run of four arrow presses inside a trial
+(for example a duplicated row in a trial that sends three) is not taken for a marker unless the next block matches
+there, so a difference loses one block only (the block that holds it, or the next block when an added arrow press
+joins that block's marker). Presses outside every block are counted. Accuracies and error
+rates are over the scored trials, and the numbers of unscored blocks and trials are reported per cell.
 
 **Closed set.** For each trial the attacker is given K candidate phrases, the true one and K - 1 decoys drawn from
 the phrases the trial's scenario could have produced (excluding phrases with the same typed reading), and knows
@@ -667,8 +707,8 @@ The attack is repeated for six feature sets that remove information from the log
 bins without run lengths (`bin1s_count`), and neither (`counts_only`). An attacker given a detailed log can always
 discard information, so the accuracy reported for a feature set is the maximum over that set and every coarser set
 derivable from it. Reported: the accuracy with its Wilson interval and, descriptively, a 95% percentile interval
-that resamples blocks; the chance level 1/K; the mean rank of the true phrase; and the accuracy per scenario and per
-speed. A trial whose phrase is a generated kana string (S12) is not counted, which leaves 2,925 trials with live
+that resamples blocks; the chance level 1/K; the mean rank of the true phrase; and, descriptively and without an
+interval, the accuracy of the feature set alone per scenario and per speed. A trial whose phrase is a generated kana string (S12) is not counted, which leaves 2,925 trials with live
 conversion on and 2,700 with it off when every block is scored.
 
 The synthetic key intervals are drawn independently of the keys and the pauses follow the procedures (section 3.3),
@@ -702,11 +742,14 @@ in both cells. The recommended granularity is the most detailed of the two sets 
 this sense (`no_time`, of which `counts_only` is a coarsening); if neither is, no granularity is recommended, and
 this is reported. The recommendation concerns the key rows of a log published without its session rows: the session
 rows carry their times and durations in milliseconds, were not given to the attacks, and could undo the coarsening of
-the key rows, so publishing them is not evaluated. The Wilson interval treats trials as independent. Dependence
-within a block would widen the interval and make the rule easier to meet; it is expected to be small, because the
-key rows of a trial follow from its own phrase and procedure, and the phrase, intervals and decoys of each trial are
-drawn independently, but it is not ruled out, and the block-resampled interval is reported next to the Wilson
-interval for this reason (section 7).
+the key rows, so publishing them is not evaluated. The rule judges the identification of one phrase among K
+candidates in one trial; combining several trials of one writer, or matching a log against known final texts, is
+not evaluated, and the recommendation makes no claim about the safety of a whole log (section 7). The Wilson
+interval treats trials as independent. With dependence within a block, the true uncertainty of an accuracy is
+larger than its Wilson interval shows, so a rule that reads the Wilson upper end is met more easily than it should
+be; the dependence is expected to be small, because the key rows of a trial follow from its own phrase and
+procedure, and the phrase, intervals and decoys of each trial are drawn independently, but it is not ruled out, and
+the block-resampled interval is reported next to the Wilson interval for this reason (section 7).
 
 **Open set.** The attacker sees only the categories of the key presses and, with a character language model,
 searches for the kana string that the romanisation would spell with exactly the observed letter keys and the
@@ -740,7 +783,7 @@ and per-block values). They are not used to correct the matching: the duration e
 and does not depend on them. A pair needs an intersection over union of at least 0.5; two intervals of the same
 length still reach it when one is shifted by up to a third of that length, and intervals of different lengths
 tolerate less. In the pilot the largest difference between the observation and the reference was 22 ms; the
-collection delay of a row (section 4.4) adds up to about 100 ms to the end of an observation interval, so a session
+collection delay of a row (section 4.4) shifts an observation interval by up to about 100 ms, so a session
 shorter than about 370 ms could fail to pair for these reasons alone, and one whose two intervals differ in length
 could fail when longer. In `pred_obs` the predicted rows carry the executor's dispatch times, so the difference
 between the executor's clock and the observation's (measured at the same markers) adds to the collection delay:
@@ -760,8 +803,9 @@ measured.
 
 ### 6.11 Missing data
 
-A stratum with no pair, a measure that cannot be computed (no session, zero variance, fewer than two blocks) and an
-interval that cannot be formed are reported as null with the reason, never as zero. Trials of a plan that were not
+A stratum with no pair, a measure that cannot be computed (no session, no trial of a text in the scope, zero
+variance, fewer than two blocks) and an interval that cannot be formed are reported as null with the reason, never
+as zero. Trials of a plan that were not
 run are reported by stratum.
 
 ### 6.12 Exploratory analyses
@@ -785,10 +829,11 @@ between the two cells) is reported as exploratory.
   stream where it posts them; the path from a physical keyboard through its hardware and driver is not exercised,
   and no claim is made about it. Key intervals are drawn independently of the keys and pauses follow the procedures,
   so human timing structure (the timing of particular key pairs, pauses between words) is absent; this limits the
-  text-recoverability results, whose recommendation keeps no time (section 6.8): finer granularities are not
-  evaluated. The input mode is switched only by the kana key at the start of each block, so the observer's other
-  way of following the input mode, polling the input source, is not exercised. Error correction is limited to the
-  scenarios.
+  text-recoverability results, whose recommendation keeps no time (section 6.8): the feature sets that keep times
+  are reported as estimates only, and granularities between milliseconds and one-second bins are not evaluated. The
+  input mode is switched only by the mode keys (the kana key at the start of each block, and the alphanumeric and
+  kana keys of S14), so a switch made otherwise (from a menu or with a shortcut), which the observer follows by
+  polling the input source, is not exercised. Error correction is limited to the scenarios.
 - **The input method's learning is not reset.** Candidate order and the position of automatic commits may change
   over the runs as the input method learns, also through attempts that are repeated (section 3.4). The run order is
   fixed (section 3.2). Intervals resample blocks, which covers dependence within a block but not dependence that runs
@@ -814,9 +859,13 @@ between the two cells) is reported as exploratory.
   `all_trials`, those of question 3 in particular, hold for this design's fraction of long trials only.
 - **Intervals that treat trials as independent.** The Wilson intervals of pooled proportions ignore the clustering of
   trials in blocks and are read as lower bounds of the uncertainty (section 6.1). The near-chance rule of question 4
-  uses the Wilson interval; dependence within a block would make the rule easier to meet, and the block-resampled
-  interval is reported next to it (section 6.8). The margin of the rule (2/K) and the values of K are design choices,
-  not derived from a criterion of privacy.
+  uses the Wilson interval; with dependence within a block the rule is met more easily than it should be, and the
+  block-resampled interval is reported next to it (section 6.8). The margin of the rule (2/K) and the values of K are
+  design choices, not derived from a criterion of privacy.
+- **The text-recoverability study judges one phrase at a time.** Its attacks identify the phrase of one trial among K
+  candidates, or reconstruct the reading of one trial. Combining the trials of one writer, matching a log against
+  known final texts, and attacks other than these two are not evaluated, so the recommended granularity is not a
+  claim that a whole log is safe to publish (section 6.8).
 
 ## 8. Deviations and addenda
 

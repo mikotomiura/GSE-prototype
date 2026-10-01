@@ -114,7 +114,11 @@ CLI (--sessions is gt_sessions.py's output; --definition selects one of its defi
     trials that are not long) or over_limit (the long trials only: their sessions, and the rows
     assigned to them, including the fragments that follow a cut-off). The items of the other trials
     are set aside and counted (scope.set_aside); scope.long_trials lists the long trials and
-    scope.layer_none_trials the trials of the layer none (below), for the level-2 per-trial view. A
+    scope.layer_none_trials the trials of the layer none (below), a diagnostic view for level 2, and
+    scope.uncontaminated_trials the trials of the prediction that are in neither the carried_out nor
+    the received_carry layer (the closing_key_in_reading trials are kept: their disagreement is the
+    trial's own, not a contamination from another trial), the view for level 2 to reweight the
+    scenarios on (both lists are null without a prediction). A
     ground-truth session or row that belongs to no trial is under the limit.
     With a prediction the output also holds diagnostics.prediction_layers: the detection metrics
     restricted to the trials of each layer (pooled and per speed, counted from the same matching):
@@ -746,7 +750,9 @@ def parse_prediction(data, oracle_sha256, plan_sha256):
             layers["closing_key_in_reading"].add(tid)
     marked = layers["carried_out"] | layers["received_carry"] | layers["closing_key_in_reading"]
     layers["none"] = set(by) - marked
-    return {"sha256": hashlib.sha256(data).hexdigest(), "long": long_trials, "layers": layers}
+    uncontaminated = set(by) - layers["carried_out"] - layers["received_carry"]
+    return {"sha256": hashlib.sha256(data).hexdigest(), "long": long_trials, "layers": layers,
+            "uncontaminated": uncontaminated}
 
 
 def _layer_metrics(result, members, gt_tid, obs_tid, speed_of, theta, off_end, recount):
@@ -932,7 +938,8 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
             "trials": {"n": len(trial_types), "by_type": _count_types(excluded)}},
         "scope": {"name": scope, "set_aside": set_aside,
                   "long_trials": None if pred is None else sorted(pred["long"]),
-                  "layer_none_trials": None if pred is None else sorted(pred["layers"]["none"])},
+                  "layer_none_trials": None if pred is None else sorted(pred["layers"]["none"]),
+                  "uncontaminated_trials": None if pred is None else sorted(pred["uncontaminated"])},
         "used": {"n_gt": len(kept_gt), "n_obs": len(kept_obs)},
         "diagnostics": {"start_while_open": {"n": sum(swo_counts.values()), "by_stratum": swo_by_stratum},
                         "prediction_layers": layers},
@@ -1618,6 +1625,13 @@ def _case_prediction_scope():
             f.append("scope.layer_none_trials should list the 87 trials of no layer: %r" % (none_ids,))
         if plain["scope"]["layer_none_trials"] is not None:
             f.append("scope.layer_none_trials should be null without a prediction")
+        # uncontaminated: neither carried_out (t00016) nor received_carry (t00017); the closing-key trial
+        # t00021 stays in, so the list is the 88 trials that are in no carry layer
+        unc = under["scope"]["uncontaminated_trials"]
+        if not isinstance(unc, list) or len(unc) != 88 or unc != sorted(unc) or "t00016" in unc or                 "t00017" in unc or "t00021" not in unc or set(none_ids) - set(unc):
+            f.append("scope.uncontaminated_trials should list the 88 trials in no carry layer: %r" % (unc,))
+        if plain["scope"]["uncontaminated_trials"] is not None:
+            f.append("scope.uncontaminated_trials should be null without a prediction")
         # received_carry comes from the prediction's flag, not from n_started: a trial that received a
         # carried session and also started one of its own is in the layer
         flag = ev("all_trials", _prediction_fixture(fx, received=("t00030",)))["diagnostics"]["prediction_layers"]

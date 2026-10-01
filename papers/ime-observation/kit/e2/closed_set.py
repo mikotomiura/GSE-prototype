@@ -608,12 +608,15 @@ def align_blocks(cats, blocks):
     unscored (its observed presses do not match the plan).
 
     A cursor walks the observation. When the expected sequence of a block equals cats at the cursor, the block is
-    placed there. Otherwise the block's own marker is looked for at or after the cursor (a run of exactly the
-    marker's length, see _is_anchor); if the whole expected sequence matches at that anchor, the block is placed
-    there and the presses before it are left unassigned. If not, the block is unscored and the cursor moves to the
-    marker of the following block: to the anchor just found when the following block's whole expected sequence
-    matches there (the anchor found was that block's own marker, the unscored block's marker being damaged or
-    absent), otherwise to the next anchor after it. When no anchor is left, every remaining block is unscored.
+    placed there. Otherwise the anchors at or after the cursor are scanned in order, an anchor being a position at
+    which the marker of the block or the marker of the following block stands as a run of exactly its length (see
+    _is_anchor); the markers may differ between blocks. At each anchor: when the whole expected sequence of the block
+    matches there, the block is placed there (the presses before it stay unassigned); otherwise, when the whole
+    expected sequence of the following block matches there, the block is left unscored and the cursor moves to that
+    anchor. An anchor at which neither matches (a run of exactly the marker's length that arises inside a trial, for
+    instance three arrow presses and one added) is passed over. When no anchor qualifies, the block is left
+    unscored and the cursor stays, so the next block scans from the same place. Hence a block whose presses do not
+    match the plan (a missing, added or changed press, a damaged marker) is the only block lost.
     n_unassigned is the number of presses that no placed block covers (stray presses, the presses of unscored
     blocks, presses after the last block).
     """
@@ -621,28 +624,22 @@ def align_blocks(cats, blocks):
     starts = [None] * len(blocks)
     cursor = 0
     for i, (marker, _) in enumerate(blocks):
-        if cursor is None:
-            continue
         exp = seqs[i]
         if cats[cursor:cursor + len(exp)] == exp:
             starts[i] = cursor
             cursor += len(exp)
             continue
-        a = _next_anchor(cats, marker, cursor)
-        if a is not None and cats[a:a + len(exp)] == exp:
-            starts[i] = a
-            cursor = a + len(exp)
-            continue
-        if i + 1 >= len(blocks):
-            cursor = None
-            continue
-        nxt_marker, nxt_seq = blocks[i + 1][0], seqs[i + 1]
-        if a is None:
-            cursor = _next_anchor(cats, nxt_marker, cursor)
-        elif cats[a:a + len(nxt_seq)] == nxt_seq:
-            cursor = a
-        else:
-            cursor = _next_anchor(cats, nxt_marker, a + 1)
+        nxt = blocks[i + 1][0] if i + 1 < len(blocks) else None
+        for p in range(cursor, len(cats)):
+            if not (_is_anchor(cats, p, marker) or (nxt is not None and _is_anchor(cats, p, nxt))):
+                continue
+            if cats[p:p + len(exp)] == exp:
+                starts[i] = p
+                cursor = p + len(exp)
+                break
+            if nxt is not None and cats[p:p + len(seqs[i + 1])] == seqs[i + 1]:
+                cursor = p
+                break
     covered = sum(len(seqs[i]) for i, s in enumerate(starts) if s is not None)
     return starts, len(cats) - covered
 
@@ -1356,6 +1353,52 @@ def selftest():
         check("align_blocks: a run of three arrows inside a trial is never taken for a marker (nothing placed when "
               "only trial presses are present)",
               align_blocks(t1 + t1, nb)[0] == [None, None, None])
+        # a run of exactly four navigation presses inside a trial that is not a marker (an added press) loses that block only
+        rm = ["nav"] * 4
+
+        def rblk(k):
+            return (rm, [["L"] * (3 + k) + ["sp", "ret"], ["L"] * (2 + k % 3) + ["sp", "nav", "nav", "nav", "ret"],
+                         ["L"] * (1 + (k * 2) % 5) + ["bs", "ret"]])
+        rbl = [rblk(k) for k in range(8)]
+        rsq = [list(m) + [c for t in ts for c in t] for m, ts in rbl]
+        roff = [sum(len(x) for x in rsq[:j]) for j in range(len(rsq))]
+        rcats = [c for x in rsq for c in x]
+        rb = 1
+        rpos = roff[rb] + 4 + len(rbl[rb][1][0]) + (2 + rb % 3) + 2     # after the third arrow of trial 2 of block 1
+        rst, rn = align_blocks(rcats[:rpos] + ["nav"] + rcats[rpos:], rbl)
+        check("align_blocks: an added arrow that makes a run of four inside a trial loses that block only; the blocks "
+              "after it are placed one press later, and the lost block's presses and the added one are unassigned",
+              rst == [roff[0], None] + [roff[j] + 1 for j in range(2, 8)] and rn == len(rsq[rb]) + 1, repr((rst, rn)))
+        rpos = roff[rb] + len(rsq[rb]) - 1                  # an added arrow before the last press of block 1
+        rst, rn = align_blocks(rcats[:rpos] + ["nav"] + rcats[rpos:], rbl)
+        check("align_blocks: an added arrow before the last press of a block loses that block only",
+              rst == [roff[0], None] + [roff[j] + 1 for j in range(2, 8)], repr(rst))
+        rpos = roff[rb + 1]                                 # an added arrow right before the marker of block 2
+        rst, rn = align_blocks(rcats[:rpos] + ["nav"] + rcats[rpos:], rbl)
+        check("align_blocks: an added arrow right before a marker (a run of five) loses the block of that marker "
+              "and nothing else",
+              rst == [roff[0], roff[1], None] + [roff[j] + 1 for j in range(3, 8)], repr(rst))
+        rst, rn = align_blocks(rcats[:roff[3]] + rcats[roff[3] + 1:], rbl)
+        check("align_blocks: with an unscored block the next block scans from the same place (a damaged marker in "
+              "block 3 loses block 3 only)",
+              rst == [roff[0], roff[1], roff[2], None] + [roff[j] - 1 for j in range(4, 8)], repr(rst))
+        # the following block, found whole at an anchor, takes the cursor even when block i would match further on
+        sw = align_blocks(sq[1] + sq[0], nb[:2])
+        check("align_blocks: when the following block matches at an anchor, the block before it is left unscored "
+              "even if its own sequence stands later in the observation",
+              sw == ([None, 0], len(sq[0])), repr(sw))
+        mk3 = [nav] * 3
+        s3 = mk3 + t2 + t1
+        sw2 = align_blocks(s3 + sq[0], [(mk4, [t1, t2]), (mk3, [t2, t1])])
+        check("align_blocks: the marker of the following block is an anchor too, when the markers differ",
+              sw2 == ([None, 0], len(sq[0])), repr(sw2))
+        nb4 = nb + [(mk4, [t2])]
+        sq4 = sq + [mk4 + t2]
+        full4 = sq4[0] + sq4[1][:4] + sq4[1][5:] + sq4[2][:4] + sq4[2][5:] + sq4[3]
+        al4 = align_blocks(full4, nb4)
+        check("align_blocks: two blocks lost in a row leave the blocks after them scored (no anchor qualifies for "
+              "the first one; the cursor stays)",
+              al4[0] == [0, None, None, len(sq4[0]) + len(sq4[1]) + len(sq4[2]) - 2], repr(al4))
         check("align_blocks: an empty observation places nothing and does not fail",
               align_blocks([], nb) == ([None, None, None], 0))
         last = bstart[1] + blen[1] - 1

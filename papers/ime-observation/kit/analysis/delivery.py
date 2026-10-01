@@ -10,8 +10,8 @@ decision.
 Inputs: the plan (plan/1), the oracle (oracle/1; one row per press as sent by the runner), the observation log
 (obs/1) and the reference log (gt/1). From the observation log only the rows whose type is "key" are read (fields
 t and press); every other row is skipped without its other fields being inspected, so this tool does not depend on
-the session rows. From the reference log only the rows whose ev is "key_down" or "focus_out" are read (field
-t_wall_ms); the key code a key_down carries is not interpreted. A row that does not parse as JSON, or a row that is not an object, is refused.
+the session rows. From the reference log only the rows whose ev is "key_down", "focus_out" or "focus_in" are read
+(field t_wall_ms); the key code a key_down carries is not interpreted. A row that does not parse as JSON, or a row that is not an object, is refused.
 
 Definitions.
   * A press is an oracle "sent" row with down = true whose key is not a pseudo-key (PSEUDO_KEYS: focus_away,
@@ -39,11 +39,17 @@ Definitions.
   * Summary = {n, mean, min, p05, median, p95, max}, all null when n = 0. Percentiles use linear interpolation
     between order statistics at position p * (n - 1) (the "type 7" rule); the median is the p = 0.5 case.
     Values are rounded to six decimals.
-  * Focus losses of the reference input field: the focus_out rows of the reference log are assigned to the trial
-    intervals in the same way. Reported: the number of such rows, the number outside every interval, the trials
-    with at least one focus_out (trials_with_focus_out, sorted), and per stratum (scenario, speed) the number of
-    measured trials and of trials with at least one focus_out. A planned switch to another application (scenario
-    S15) produces one; any other is a loss of focus inside a block.
+  * Focus losses of the reference input field: a loss interval runs from a focus_out row to the next focus_in row
+    (to the end of the log when none follows); a focus_out inside a loss interval already open starts no new one.
+    A loss that is not regained therefore covers every later trial, although the reference field no longer
+    receives their keys. A loss interval overlaps a trial when it shares at least one millisecond with the
+    trial's interval (as defined for reach). Reported: the numbers of focus_out and of focus_in rows, the number
+    of loss intervals, the number of loss intervals that overlap no trial interval, the trials that overlap at
+    least one loss interval (trials_with_focus_loss, sorted) and per stratum (scenario, speed) the number of
+    measured trials and of trials with a focus loss. A planned switch to another application (scenario S15) is
+    not counted: an S15 trial is left out of the list when every loss interval it overlaps begins and ends inside
+    its own interval (the focus came back within the trial); any other loss, including an S15 switch that does
+    not return inside the trial, is listed together with every trial it reaches.
 
 Refused (exit 2): a plan whose SHA-256 differs from the oracle header's plan_sha256; a sent row whose trial or
 step is absent from the plan, or whose key or down flag disagrees with the plan step; a sent row of a trial with
@@ -256,10 +262,37 @@ def read_gt_key_downs(data):
     return read_gt_events(data, "key_down")
 
 
-def _focus_losses(done, plan, times, starts, ends):
-    rows, outside = _assign(times, starts, ends)
+def _loss_intervals(outs, ins):
+    """Return [(begin, end)] of the focus loss intervals: from a focus_out to the next focus_in, or to None (the
+    end of the log) when none follows. A focus_out while a loss is open and a focus_in while none is open add
+    nothing. On equal times a focus_out is taken before a focus_in."""
+    events = sorted([(t, 0) for t in outs] + [(t, 1) for t in ins])
+    out, begin = [], None
+    for t, kind in events:
+        if kind == 0 and begin is None:
+            begin = t
+        elif kind == 1 and begin is not None:
+            out.append((begin, t))
+            begin = None
+    if begin is not None:
+        out.append((begin, None))
+    return out
+
+
+def _focus_losses(done, plan, outs, ins, starts, ends):
+    losses = _loss_intervals(outs, ins)
+    def overlap(loss, i):
+        return loss[0] <= ends[i] and (loss[1] is None or loss[1] >= starts[i])
+    def inside(loss, i):
+        return loss[0] >= starts[i] and loss[1] is not None and loss[1] <= ends[i]
+    hit = []
+    for i, t in enumerate(done):
+        mine = [loss for loss in losses if overlap(loss, i)]
+        planned = plan[t["trial_id"]]["scenario"] == "S15" and all(inside(loss, i) for loss in mine)
+        hit.append(bool(mine) and not planned)
+    outside = sum(1 for loss in losses if not any(overlap(loss, i) for i in range(len(done))))
     per = {}
-    for t, got in zip(done, rows):
+    for t, got in zip(done, hit):
         info = plan[t["trial_id"]]
         c = per.setdefault((info["scenario"], info["speed"]), [0, 0])
         c[0] += 1
@@ -267,9 +300,10 @@ def _focus_losses(done, plan, times, starts, ends):
     def order(k):
         sc = k[0][1:]
         return (int(sc) if sc.isdigit() else 0, k[0], SPEEDS.index(k[1]))
-    return {"n_rows": len(times), "n_outside_trials": outside, "n_trials_with_focus_out": sum(1 for g in rows if g),
-            "trials_with_focus_out": sorted(t["trial_id"] for t, got in zip(done, rows) if got),
-            "by_stratum": [{"scenario": k[0], "speed": k[1], "n_trials": per[k][0], "n_trials_with_focus_out": per[k][1]}
+    return {"n_focus_out": len(outs), "n_focus_in": len(ins), "n_loss_intervals": len(losses),
+            "n_loss_intervals_outside_trials": outside, "n_trials_with_focus_loss": sum(1 for g in hit if g),
+            "trials_with_focus_loss": sorted(t["trial_id"] for t, got in zip(done, hit) if got),
+            "by_stratum": [{"scenario": k[0], "speed": k[1], "n_trials": per[k][0], "n_trials_with_focus_loss": per[k][1]}
                            for k in sorted(per, key=order)]}
 
 
@@ -404,7 +438,8 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
         "send_lateness_ms": _by_speed(lateness),
         "observation": _side(done, speeds, obs_times, starts, ends),
         "reference": _side(done, speeds, gt_times, starts, ends),
-        "reference_focus_out": _focus_losses(done, plan, read_gt_events(gt_bytes, "focus_out"), starts, ends),
+        "reference_focus_loss": _focus_losses(done, plan, read_gt_events(gt_bytes, "focus_out"),
+                                              read_gt_events(gt_bytes, "focus_in"), starts, ends),
     }
 
 
@@ -542,13 +577,53 @@ def _selftest():
           and summ_is(gt_["interval_error_ms"]["overall"], 1, 0, 0, 0, 0, 0, 0)
           and summ_is(gt_["interval_error_ms"]["by_speed"]["fast"], 1, 0, 0, 0, 0, 0, 0)
           and gt_["interval_error_ms"]["by_speed"]["mid"]["n"] == 0, "reference timing (mode-key trial not paired)")
-    fo = out["reference_focus_out"]
-    want_fo = [{"scenario": "S1", "speed": "slow", "n_trials": 1, "n_trials_with_focus_out": 0},
-               {"scenario": "S1", "speed": "mid", "n_trials": 1, "n_trials_with_focus_out": 1},
-               {"scenario": "S1", "speed": "fast", "n_trials": 1, "n_trials_with_focus_out": 0}]
-    check(fo["trials_with_focus_out"] == ["t3"], "the trials with a focus_out are listed: %r" % (fo["trials_with_focus_out"],))
-    check(fo["n_rows"] == 2 and fo["n_outside_trials"] == 1 and fo["n_trials_with_focus_out"] == 1
+    fo = out["reference_focus_loss"]
+    want_fo = [{"scenario": "S1", "speed": "slow", "n_trials": 1, "n_trials_with_focus_loss": 0},
+               {"scenario": "S1", "speed": "mid", "n_trials": 1, "n_trials_with_focus_loss": 1},
+               {"scenario": "S1", "speed": "fast", "n_trials": 1, "n_trials_with_focus_loss": 0}]
+    check(fo["trials_with_focus_loss"] == ["t3"], "the trials with a focus loss are listed: %r" % (fo["trials_with_focus_loss"],))
+    check(fo["n_focus_out"] == 2 and fo["n_focus_in"] == 0 and fo["n_loss_intervals"] == 1
+          and fo["n_loss_intervals_outside_trials"] == 0 and fo["n_trials_with_focus_loss"] == 1
           and fo["by_stratum"] == want_fo, "focus losses of the reference are counted per trial and stratum")
+
+    # Focus loss intervals, on the fixture without its own focus_out rows. Trial intervals (ms from W0): t1 -20..800,
+    # t2 1980..2209, t3 3980..4600. s15 turns t2 into a scenario S15 trial.
+    def loss(events, s15=False):
+        def edit(rows):
+            if s15:
+                rows[3]["scenario"] = "S15"
+        f = _fixture(plan_edit=edit)
+        keep = [r for r in (json.loads(x) for x in f[3].decode("utf-8").split("\n") if x) if r.get("ev") != "focus_out"]
+        keep += [{"kind": "ev", "t_wall_ms": W0 + t, "t_mono_ns": 1, "ev": ev} for t, ev in events]
+        return evaluate(f[0], f[1], f[2], _jl(keep))["reference_focus_loss"]
+    r = loss([(2100, "focus_out")])
+    check(r["trials_with_focus_loss"] == ["t2", "t3"] and r["n_loss_intervals"] == 1 and r["n_focus_in"] == 0,
+          "a loss that is not regained covers the following trials up to the end of the log")
+    r = loss([(700, "focus_out"), (2100, "focus_in")])
+    check(r["trials_with_focus_loss"] == ["t1", "t2"] and r["n_focus_in"] == 1,
+          "a loss regained in the next trial covers both trials and not the one after")
+    r = loss([(2050, "focus_out"), (2150, "focus_in")], s15=True)
+    check(r["trials_with_focus_loss"] == [] and r["n_loss_intervals"] == 1 and r["n_loss_intervals_outside_trials"] == 0,
+          "a planned S15 switch that returns inside the trial is not listed")
+    r = loss([(2050, "focus_out"), (2150, "focus_in")])
+    check(r["trials_with_focus_loss"] == ["t2"], "the same switch in a scenario other than S15 is listed")
+    r = loss([(2050, "focus_out")], s15=True)
+    check(r["trials_with_focus_loss"] == ["t2", "t3"],
+          "an S15 switch that does not return is listed together with the following trials")
+    r = loss([(2050, "focus_out"), (2300, "focus_in")], s15=True)
+    check(r["trials_with_focus_loss"] == ["t2"], "an S15 switch that returns only after the trial's interval is listed")
+    r = loss([(2050, "focus_out"), (2100, "focus_in"), (2150, "focus_out")], s15=True)
+    check(r["trials_with_focus_loss"] == ["t2", "t3"],
+          "an S15 switch that returns, followed by a second loss that does not, is listed with the following trials")
+    r = loss([(2300, "focus_out"), (3500, "focus_in")])
+    check(r["trials_with_focus_loss"] == [] and r["n_loss_intervals"] == 1 and r["n_loss_intervals_outside_trials"] == 1,
+          "a loss between two trials that is regained before the next trial overlaps no trial")
+    r = loss([(3500, "focus_in"), (2050, "focus_out"), (2060, "focus_out"), (2100, "focus_in")])
+    check(r["n_loss_intervals"] == 1 and r["n_focus_out"] == 2 and r["n_focus_in"] == 2
+          and r["trials_with_focus_loss"] == ["t2"]
+          and [(b["speed"], b["n_trials_with_focus_loss"]) for b in r["by_stratum"]]
+          == [("slow", 0), ("mid", 0), ("fast", 1)],
+          "a focus_in with no loss open and a repeated focus_out add no interval")
     check(out["trials"] == {"planned": 3, "begun": 3, "measured": 3, "incomplete": 0}
           and out["inputs_sha256"]["plan"] == hashlib.sha256(fx[0]).hexdigest(), "trial counts and input hashes")
 

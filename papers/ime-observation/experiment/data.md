@@ -20,12 +20,28 @@ used are printed when the analysis ends.
 |---|---|---|---|
 | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
 
+## Run checks (section 3.4 of the pre-registration)
+
+| Cell label | Attempt | Checked at | Reference `excess_rows` (all presses) | Reference `rows_outside_trials` / limit | Counts as aborted |
+|---|---|---|---|---|---|
+| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
+
 ## Deposit procedure
 
-1. Deposit only `run.json` and the four logs of a run directory: `plan.jsonl`, `oracle.jsonl`,
+1. Right after the run, before the next run of the order (section 3.2 of the pre-registration), and before any
+   analysis of the run, run `python3 kit/analysis/delivery.py` on the run directory alone (it reads the key rows of
+   the logs, not the session rows). If, over all presses, the reference's `excess_rows` is greater than 0, or the
+   reference's `rows_outside_trials` exceeds five per block (four marker presses and one kana press), the
+   reference received a key press from outside the executor: the run counts as an aborted attempt, is not analysed
+   and is not deposited, since its reference log may hold a person's key presses (section 3.4 of the
+   pre-registration). No other reason and no explanation is admitted. Record the result of this check and its time
+   in the table of run checks above before any analysis. Rows of the observation
+   without a sent press are a result of the observer under test: they are reported (section 6.3) and do not stop
+   the run from being analysed or deposited.
+2. Deposit only `run.json` and the four logs of a run directory: `plan.jsonl`, `oracle.jsonl`,
    `gt.jsonl` and `obs.jsonl`. A log that an aborted run recorded with a null hash need not exist.
-2. Do not deposit the `*.stderr.txt` files or `runner.error.txt`. They stay on the measuring machine.
-3. On the measuring machine, bundle the files with
+3. Do not deposit the `*.stderr.txt` files or `runner.error.txt`. They stay on the measuring machine.
+4. On the measuring machine, bundle the files with
    `python3 kit/analysis/pipeline.py --pack <run-dir> --out <archive.zip> [--also-user NAME ...] [--also-home PATH ...]`.
    Pass the login name and the home directory of the measuring machine with `--also-user` and `--also-home`
    (each may be given more than once). The command refuses, with exit status 1 and without writing the
@@ -36,14 +52,6 @@ used are printed when the analysis ends.
    relative paths, are allowed. It never overwrites an existing archive, writes the files in a fixed order
    with fixed times so that packing twice gives the same bytes, checks the contents of the archive again,
    and prints the archive's SHA-256.
-4. Before packing, check that no row of either log is without a press the executor sent: in the delivery report
-   of the run (`results/e1_delivery.json`, or `python3 kit/analysis/delivery.py` on the run directory),
-   `excess_rows` over all presses must be 0 for the observation and for the reference, and `rows_outside_trials`
-   must not exceed the presses made outside the trials that each log records: four marker presses per block for
-   the observation, which does not record the kana key, and four marker presses and one kana press per block for
-   the reference. A run that does not meet this is not deposited until the extra rows are explained, and the
-   finding is reported; a run whose extra rows cannot be explained counts as an aborted attempt and is not
-   analysed (section 3.4 of the pre-registration).
 5. Record the printed SHA-256 in the table above, together with the hash of `run.json`
    (`manifest_sha256` in the line of the list above).
 6. Deposit that archive, unchanged. `python3 kit/analysis/pipeline.py --check-deposit <run-dir> ...` runs the

@@ -16,8 +16,9 @@ are stated in `preregistration.md`. The result files are:
 
 The comparisons are ground truth against observation (`gt_obs`, primary), ground truth against the observer's
 specified rows (`gt_pred`) and those rows against the observation (`pred_obs`); the scopes are `under_limit`,
-`all_trials` and `over_limit` (section 6.4 of the pre-registration). Every result file names its primary
-comparison and scope (`gt_obs` under `under_limit`). The values under `all_trials` depend on the design's fraction
+`all_trials` and `over_limit` (section 6.4 of the pre-registration). The result files of questions 1 to 3
+(`e1_detection.json`, `e1_l1.json` and `e1_l2.json`) name their primary comparison and scope (`gt_obs` under
+`under_limit`). The values under `all_trials` depend on the design's fraction
 of long trials.
 
 ## Pre-registration

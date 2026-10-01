@@ -45,16 +45,17 @@ and pred_obs (the predicted rows against the observation: whether the observer c
 Each is matched under three scopes, which set aside, at the level of a trial, the trials whose presses
 went into a session the observer is specified to cut off at 20 seconds (match.py --scope): under_limit,
 all_trials and over_limit. Level 1 is computed for every comparison under under_limit and all_trials,
-level 2 for gt_obs only, under under_limit and all_trials. The primary estimates are named in every
-result file ("primary"): gt_obs under under_limit. A plan for another system has no prediction: only
+level 2 for gt_obs only, under under_limit and all_trials. The primary estimates are named in e1_l1.json,
+e1_l2.json and e1_detection.json ("primary"): gt_obs under under_limit. A plan for another system has no prediction: only
 gt_obs under all_trials is run.
 Every result file holds cells[label][definition][comparison][scope]; a comparison that needs the
 prediction is null when there is none. e1_detection.json also holds, per cell, a summary of the
 prediction ("predictions": its hash, counts, the long trials per stratum, and per stratum and scope the
 number of letter keys and the think time of the trials, from the plan) and whether the two definitions
 hold the same sessions ("same_sessions_as_all"). Every detection view carries focus_loss: the rows
-assigned to the trials (other than S15, which switches applications by design) in which the reference
-input field lost focus, according to the delivery report, and how many of them are false positives.
+assigned to the trials in which the reference input field lost focus, according to the delivery report
+(a loss that is not regained covers the later trials too; the planned switch of S15 that returns inside
+its trial is not counted there), and how many of them are false positives, as totals and per speed.
 
 Configuration CFG (JSON; keys starting with "_" are annotations and are not read):
   {"iou_min": 0.5, "obs_end_offset_ms": 0, "theta": 0.5, "drop_start_while_open": false,
@@ -83,7 +84,8 @@ rehearsals, not a defence against a person who edits a manifest. A synthetic res
 Outputs (RESULTS_DIR): e1_l1.json, e1_l2.json, e1_detection.json and e1_delivery.json (the per-press delivery
 report of delivery.py, per cell: cells[label]). Each one carries the seed, the
 SHA-256 of the configuration, of the rule file, of the key map, of every manifest and of every input log,
-the primary comparison and scope, and the per-cell results. No path is written to any of them, and identical inputs always give identical bytes
+and the per-cell results; e1_l1.json, e1_l2.json and e1_detection.json also carry the primary comparison
+and scope. No path is written to any of them, and identical inputs always give identical bytes
 (sorted keys, LF, UTF-8, no BOM). The files are written to a temporary directory and moved into place; when
 the move fails, no result of an earlier run is left behind.
 
@@ -642,18 +644,38 @@ def _prediction_summary(pred, pred_bytes, plan, plan_bytes):
             "composition": _composition(plan_bytes, pred)}
 
 
-def _focus_loss(m_out, oracle, focus_trials):
+def _focus_loss(m_out, oracle, focus_trials, strata):
     """The rows of a match output that are assigned to the trials in focus_trials (the trials in which the
-    reference input field lost focus, other than S15), and how many of them are false positives: in such a
-    trial the reference receives no call, so its rows show a failure of the reference, not of the observer."""
+    reference input field lost focus, from the delivery report), and how many of them are false positives: in
+    such a trial the reference receives no call, so its rows show a failure of the reference, not of the
+    observer. Given as totals and, in by_speed, per speed ({speed: {n_trials, n_rows, n_false_pos}}, only the
+    speeds that occur among focus_trials; strata is the plan's {trial_id: {scenario, speed}})."""
     m = m_out["matching"]
     rows = [p["obs"] for p in m["pairs"]] + [o for p in m["split"] for o in p["obs"]] + [p["obs"] for p in m["merge"]]
     fps = list(m["false_pos"])
     off = m_out["config"]["obs_end_offset_ms"]
     tid = lambda rs: [r.get("trial_id") for r in l2.attach_trials(rs, oracle, off)]
-    in_rows = sum(1 for t in tid(rows) if t in focus_trials)
-    in_fp = sum(1 for t in tid(fps) if t in focus_trials)
-    return {"n_trials": len(focus_trials), "n_rows": in_rows + in_fp, "n_false_pos": in_fp}
+    speed = lambda t: strata.get(t, {}).get("speed")
+    by = {}
+    def cell(sp):
+        return by.setdefault(sp, {"n_trials": 0, "n_rows": 0, "n_false_pos": 0})
+    for t in focus_trials:
+        if speed(t) is not None:
+            cell(speed(t))["n_trials"] += 1
+    in_rows = in_fp = 0
+    for t in tid(rows):
+        if t in focus_trials:
+            in_rows += 1
+            if speed(t) is not None:
+                cell(speed(t))["n_rows"] += 1
+    for t in tid(fps):
+        if t in focus_trials:
+            in_fp += 1
+            if speed(t) is not None:
+                cell(speed(t))["n_rows"] += 1
+                cell(speed(t))["n_false_pos"] += 1
+    return {"n_trials": len(focus_trials), "n_rows": in_rows + in_fp, "n_false_pos": in_fp,
+            "by_speed": dict((sp, by[sp]) for sp in sorted(by, key=match.SPEEDS.index))}
 
 
 def _detection_view(m_out, focus):
@@ -680,8 +702,9 @@ def run_stages(run, cfg, rules_bytes, seed, keymap, focus_trials=()):
     and pred_obs (the predicted rows against the observation: whether the observer carries out its
     rules). Scopes (match.py): under_limit, all_trials and over_limit for the detection; under_limit and
     all_trials for level 1 and for level 2, which is run on gt_obs only. Without a prediction (a Windows
-    plan) only gt_obs over all_trials is run. focus_trials: the trials (other than S15) in which the
-    reference input field lost focus, from the delivery report; every detection view counts their rows."""
+    plan) only gt_obs over all_trials is run. focus_trials: the trials in which the reference input
+    field lost focus, from the delivery report (it leaves out a planned S15 switch that returns inside
+    its trial); every detection view counts their rows, in total and per speed of the plan."""
     f = run["files"]
     plan = match.parse_plan_strata(f["plan"])
     oracle = gt_sessions.parse_oracle(f["oracle"])
@@ -713,7 +736,7 @@ def run_stages(run, cfg, rules_bytes, seed, keymap, focus_trials=()):
             det[comp], l1o[comp] = {}, {}
             for scope in scopes:
                 m_out = match.evaluate(sb, definition, ob, f["plan"], f["oracle"], sc["match"], pred_bytes, scope)
-                det[comp][scope] = _detection_view(m_out, _focus_loss(m_out, oracle, focus_trials))
+                det[comp][scope] = _detection_view(m_out, _focus_loss(m_out, oracle, focus_trials, plan["trials"]))
                 if scope in L1_SCOPES:
                     m_bytes = match.render(m_out)
                     l1o[comp][scope] = l1.evaluate(m_bytes, sb, f["plan"], f["oracle"], sc["l1"])
@@ -807,10 +830,7 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
         except delivery.InputError as e:
             raise InputError("delivery: %s" % e)
         res["delivery"]["cells"][r["label"]] = dlv
-        strata = match.parse_plan_strata(f["plan"])["trials"]
-        focus = [t for t in dlv["reference_focus_out"]["trials_with_focus_out"]
-                 if strata.get(t, {}).get("scenario") != "S15"]
-        st = run_stages(r, cfg, rules_bytes, seed, keymap, focus)
+        st = run_stages(r, cfg, rules_bytes, seed, keymap, dlv["reference_focus_loss"]["trials_with_focus_loss"])
         res["detection"]["predictions"][r["label"]] = st["prediction"]
         res["detection"]["same_sessions_as_all"][r["label"]] = st["same_sessions_as_all"]
         for key in PRIMARY:
@@ -1399,12 +1419,17 @@ def _case_reproduces(d):
     nl = dg["scope"]
     if not (isinstance(nl.get("n_layer_none_trials"), int) and 0 < nl["n_layer_none_trials"] < 2 * SYN_TRIALS_PER_BLOCK):
         f.append("the detection view should carry the number of trials of the layer none: %r" % (nl,))
-    if dg.get("focus_loss") != {"n_trials": 0, "n_rows": 0, "n_false_pos": 0}:
+    if dg.get("focus_loss") != {"n_trials": 0, "n_rows": 0, "n_false_pos": 0, "by_speed": {}}:
         f.append("the synthetic reference loses no focus: %r" % (dg.get("focus_loss"),))
     pl = l2p["under_limit"].get("per_trial_layer_none")
     if not (isinstance(pl, dict) and pl["trials_not_used"].get("outside_layer", 0) > 0
             and pl["n_trials"] < l2p["under_limit"]["per_trial"]["n_trials"]):
         f.append("level 2 should give the per-trial table restricted to the layer none: %r" % (pl and pl["trials_not_used"],))
+    pu = l2p["under_limit"].get("per_trial_uncontaminated")
+    if not (isinstance(pu, dict) and isinstance(pl, dict) and pu["trials_not_used"].get("outside_layer", 0) > 0
+            and pl["n_trials"] < pu["n_trials"] < l2p["under_limit"]["per_trial"]["n_trials"]):
+        f.append("level 2 should give the per-trial table without the contaminated trials, between the layer none and "
+                 "every trial: %r" % (pu and pu["trials_not_used"],))
     if deto.get("same_sessions_as_all") != {"synthetic-a": True, "synthetic-b": True}:
         f.append("the check that the two definitions hold the same sessions is missing")
     d_ = cell["detection"]
@@ -1992,10 +2017,17 @@ def _case_focus_and_composition(d):
              "matching": {"pairs": [{"gt": {}, "obs": row(1800, 500)}, {"gt": {}, "obs": row(3800, 500)}],
                           "split": [{"gt": {}, "obs": [row(3500, 100), row(3700, 100)]}], "merge": [],
                           "miss": [], "false_pos": [row(3900, 50), row(1500, 50)]}}
-    got = _focus_loss(m_out, oracle, {"t2"})
-    if got != {"n_trials": 1, "n_rows": 4, "n_false_pos": 1}:
+    strata = {"t1": {"scenario": "S1", "speed": "slow"}, "t2": {"scenario": "S1", "speed": "fast"}}
+    got = _focus_loss(m_out, oracle, {"t2"}, strata)
+    if got != {"n_trials": 1, "n_rows": 4, "n_false_pos": 1,
+               "by_speed": {"fast": {"n_trials": 1, "n_rows": 4, "n_false_pos": 1}}}:
         f.append("rows of the trial that lost focus: %r" % (got,))
-    if _focus_loss(m_out, oracle, set()) != {"n_trials": 0, "n_rows": 0, "n_false_pos": 0}:
+    got = _focus_loss(m_out, oracle, {"t1", "t2"}, strata)
+    if got != {"n_trials": 2, "n_rows": 6, "n_false_pos": 2,
+               "by_speed": {"slow": {"n_trials": 1, "n_rows": 2, "n_false_pos": 1},
+                            "fast": {"n_trials": 1, "n_rows": 4, "n_false_pos": 1}}}:
+        f.append("rows of two trials that lost focus, per speed: %r" % (got,))
+    if _focus_loss(m_out, oracle, set(), strata) != {"n_trials": 0, "n_rows": 0, "n_false_pos": 0, "by_speed": {}}:
         f.append("no trial lost focus, no row should be counted")
     plan = _jl([{"kind": "header", "format": "plan/1"},
                 {"kind": "trial", "trial_id": "t1", "scenario": "S1", "speed": "slow", "think_ms": 900,

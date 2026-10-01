@@ -15,8 +15,9 @@ All files use the Python standard library only. Each has a fast default `--selft
 
 ## What the attacker sees
 
-The attacker sees the publishable form of a log: the category and the time of each key row, and the rows of type
-`ime_shadow`. The raw key code is not part of it. There are 14 categories, and every letter key falls into the single
+The attacker sees the key rows of a log: the category and the time of each key row. The raw key code is not part of
+it. The rows of type `ime_shadow` (the session rows) are in the log but are not given to the attack; the recommendation
+below concerns the key rows of a log published without its session rows. There are 14 categories, and every letter key falls into the single
 category `alphabetic`. The format is `obs/1` in [`../formats/FORMATS.md`](../formats/FORMATS.md).
 
 The reader `read_obs` accepts the header, `key` rows and `ime_shadow` rows of a standalone-logger output and rejects
@@ -95,7 +96,7 @@ rank of the typed phrase, and a `by_speed` breakdown of the same form. Trials wh
 plan are not scored at all (see [Usage](#usage)); they are counted in `alignment`, not in `n`.
 
 The Wilson interval treats every counted trial as an independent Bernoulli draw. The plan generator groups trials into
-blocks (`block_id`) that share context (a marker reset, the same run of the generator's random state); trials within a
+blocks (`block_id`) that share context (the state of the input method and the block's marker; each trial draws from its own random state, derived from the seed and the trial identifier, so the trials of a block do not share a random state); trials within a
 block are not independent of each other in general, so the reported interval understates the true uncertainty to the
 extent trials within a block are correlated. Next to the Wilson intervals, every feature set therefore reports a
 descriptive 95% percentile interval from a block bootstrap (`stats.cluster_bootstrap` of `../analysis/stats.py`):
@@ -104,8 +105,9 @@ different clusters), `--bootstrap B` resamples (default 2000) with the seed of `
 maximum over the feature set and the coarser ones is recomputed inside every resample) and for `acc_ci_raw_block` (the
 feature set alone). With fewer than two blocks the interval is `[null, null]` and `ci_block_status` reads
 `fewer_than_two_blocks`; `n_blocks` is the number of blocks. These intervals are descriptive: the decision rule below
-still reads the Wilson interval, and a numeric acceptance margin set by the analysis plan should allow for the block
-dependence.
+still reads the upper end of the Wilson interval with the margin 2/K, which is a design choice, not derived from the
+block dependence or from a criterion of privacy. Dependence within a block would make a rule that reads the Wilson
+interval easier to meet, which is why the block-resampled interval is reported next to it, descriptively.
 
 ## Feature sets and the removal experiment
 
@@ -196,7 +198,9 @@ boundaries: the observed presses are cut into trials in plan order and compared 
 - With `--markers-in-obs` (the block-start marker presses appear in the observation) the markers are anchors. A block
   whose presses (its marker, then its trials) equal the plan is scored. A block with a missing, extra or different press
   is left unscored (reason `block_mismatch`) and counted, and the next block is found again by its own marker, so one
-  dropped press in some 100,000 loses one block and shifts no other. A marker counts as an anchor only as a run of
+  dropped press in some 100,000 loses one block and shifts no other. An observed press that is added or duplicated
+  (including one that forms a run of four arrow presses inside a trial, which is then an anchor that matches nothing and
+  is passed over) also loses only that block. A marker counts as an anchor only as a run of
   exactly its length (the press before it is not of its first category and the press after it is not of its last), so a
   run of at most three arrow presses inside a trial is never mistaken for the four-key marker. Presses that no scored
   block covers (stray presses between blocks, the presses of an unscored block, presses after the last block) are
@@ -252,8 +256,11 @@ language model over candidate readings, estimate the trial boundaries itself, ma
 count features, or combine several trials of the same typist; none of these is included. Giving the attacker the
 trial boundaries, the scenario, the OS and the speed level strengthens the attack, and the use of a single predicted
 sample per candidate weakens it. The rows of type `ime_shadow` are read but not used: `nav` and `abandon` follow from
-the intent of the scenario and not from the phrase, and `dwell_ms` is a function of key times that the timing feature
-already uses. The gain of using `dwell_ms` separately was not measured.
+the intent of the scenario and not from the phrase, and the session rows carry their times and durations in
+milliseconds, were not given to the attack, and could undo the coarsening of the key rows, so publishing them is not
+evaluated. The rule judges the identification of one phrase among K candidates per trial; combining several trials of
+one writer, or matching a log against known final texts, is not evaluated, and the recommendation makes no claim about
+the safety of a whole log.
 
 If identification succeeds at rates well above chance, the result is reported as it is.
 
@@ -269,14 +276,17 @@ feature set is replaced by a coarser one, the feature sets within the margin abo
 declares acceptable are closed under coarsening. The recommended granularity is therefore the most detailed feature
 set within the margin (the maximal elements of that set in the coarsening order; there may be more than one, since
 the order is partial: for example, `no_runs` is ordered against neither `no_time` nor `bin1s`).
-The margin is fixed before the real logs are analysed, and should allow for the block-level dependence the Wilson
-interval does not (see [Candidates and accuracy](#candidates-and-accuracy)). This kit reports the accuracy, the
+The margin is fixed before the real logs are analysed. The pre-registered rule reads the upper end of the Wilson
+interval with the margin 2/K, which is a design choice, not derived from the block dependence or from a criterion of
+privacy (see [Candidates and accuracy](#candidates-and-accuracy)). This kit reports the accuracy, the
 interval, `acc_source` and the chance level, and does not decide the margin.
 
 The pre-registration of the first experiment fixes the rule for its logs: a feature set is near chance at K = 10 or
 K = 100 when the upper end of its Wilson interval is at most 2/K, and it must be near chance at both values of K in
 both cells; K = 1000 is reported descriptively, because at the planned numbers of trials an attack at the chance
-level would rarely meet the rule there. The recommendation considers only `no_time` and `counts_only`. The feature
+level would rarely meet the rule there. The recommendation considers only `no_time` and `counts_only`. These two sets are ordered (`counts_only` is a
+coarsening of `no_time`), so for the first experiment the recommendation is the more detailed of the two that is near
+chance. The feature
 sets that keep millisecond times (`all`, `no_runs`) and the feature sets with 1-second bins (`bin1s`, `bin1s_count`)
 are reported as estimates only and are excluded from the recommendation: the synthetic key intervals are drawn
 independently of the keys (see above), and the synthetic design models no human pause structure either, so the timing
