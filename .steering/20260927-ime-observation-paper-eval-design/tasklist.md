@@ -126,18 +126,19 @@
       → (2) パイロットの生成の config（`~/ime-pilot/*-config.json`・計画のヘッダーと run の `plan_sha256` で 7 run すべて対応を確かめた）: `cand_index_max` 4・`key_hold_ms` 60・`iki_sigma` 0.3・`inter_trial_ms` 1,000・`marker_gap_ms` 150 は**本番と同じ**。think 0.2〜20 s・`nav_count_max` 3・`block_size` 25・`kana_len` 4〜8（パイロットは未指定で既定値）も同じ。違うのは速さ（300 / 200 / 120）・n（3。`verify-1` / `verify-off` は 1・`short-1` は 1 で 3 シナリオ）・マーカー（`pilot-1` / `short-1` は F13 / F14 / F13、以後 ← → ← の 3 キー）・`reset_ime_every_block`（パイロットは true だが cell の `reset_cmd` が空で、run.json の `resets` は全ブロック `skipped`）・seed（`pilot-1` と `pilot2-on` が 1・`pilot2-off` が 5・短い run が 2〜6）・`pilot2-off` は `recipes.json` に `scenarios` で 13 シナリオに絞った。→ 事前登録 §3.1 に、速さ・n・マーカー・seed・reset の要求と不実施、それ以外は本番と同じことを書いた。★ `pilot-macos.md` の Setup の Plan の行が「seed 1」「n = 3」と書いていて、`pilot2-off`（seed 5）と verify の run（n = 1）に合わなかった → 直した。⚠️ `pilot-config.json` の今の中身（マーカー F1 / F2 / F1・`7f019af9…`）は `pilot-1` の計画のヘッダーの `config_sha256`（`7e507351…`）と合わない（後から書き換えた）。計画のほうがマーカー F13 / F14 / F13 を持つので、記録は計画に依った
       → (3) macOS（Python 3.14.4）で `gt_sessions.py --selftest` 14 件・`l1.py --selftest` 12 件・`kit/check.sh` 27 本がすべて緑。直した後の `_style_check.py` 違反 0 件・`check_citations.py` 違反なし
     - [x] attack-me round 1（stage `prereg`・`paper-reviewer` 4 本・2026-10-01・G-GEAR）→ 記録 `attack-me/prereg-ime-macos/round-1/`（`c5bfbc65`）。3 人とも major・fatal 0 → 判定 major revision。指摘はメインが一次で裏取り（接地の引用の捏造 0・部分的な偽陽性 1）。研究者に 8 問 → 判断 99〜105（すべて推奨どおり）
-    - [ ] round 1 の直し（判断 99〜105）
+    - [x] round 1 の直し（判断 99〜106・実装の選択は判断 107・2026-10-01・G-GEAR）
       - [x] 予測器（判断 100）→ `kit/analysis/spec_predict.py`（`f3c08a68`）。送出の記録に観測器の状態機械（`keymap.rs` の 73 本の写像と素通し・`handle_key` の順序〔モードの更新 → 押下だけ駆動〕・`ime_mode` の開閉・`ime_compose` の表・20 秒の打ち切りと当て直し）を当て、予測の行と試行ごとの `long`（始めたセッションが打ち切り）・`carried_out`・`n_started` を出す。ブロックの先頭で「かな」の押下を置く（runner の契約）。`focus_away` / `focus_back` は飛ばし、修飾キーを送る計画は拒む
         → selftest 8 件（Rust の源との照合を含む: 写像・定数・遷移の各行・`handle_key` の順序）。変異 10 本のうち 9 本が赤、1 本（セッションの外の矢印を数える）は開始時に `nav` を 0 に戻すので等価。`kit/check.sh` 28 本が緑・`_style_check.py` 違反 0 件
         → 本番の計画に当てた値（計画の時刻から組んだ擬似の oracle・使い捨て・送出の遅れは入らない）: ON は予測の行 2,638・打ち切り 719、試行 3,150 のうち `long` 677・`carried_out` 188（すべて S6）・分割 314・自分のセッションを始めない 113（S6 の持ち越しを受けた試行）。OFF は行 2,417・打ち切り 682・`long` 650・`carried_out` 186・分割 280・なし 109。slow の `long` は ON 423 / 1,050。分割の多くは、打っている途中の打ち切りの後に残りが新しいセッションになる断片（S1 でも 21・S8 は思考の後の数字キーで 58）
         → ⚠️ 事前登録に書くこと: S6 の持ち越しは次の試行（どのシナリオでも）を汚す。判断 99 の分割は「打ち切り」だけに当てる（持ち越し・Tab・記号による分割は推論規則の限界で、段 (i) で数える実際の誤り）
-      - [ ] 照合の 2 段（正解 対 予測・予測 対 観測）と、20 秒の打ち切りでの分母の分割（Q1・Q2 の主は 20 秒未満・断片の行を数える・L2 は全試行が主で 20 秒以上を除いた版が副）を pipeline に入れる
-      - [ ] `l2.py` に試行ごとの差をシナリオ × 速さ別に（判断 104）
-      - [ ] E2: near chance の性質の表（K = 10・100 で真の正解率 1/K〜3/K のときの通る確率・予定の n）・K = 1000 は記述・2 セルの両方・ms の時刻を持つ集合は対象外・セッションの行は対象外（判断 101・102）
-      - [ ] 精度の幅の表と「形容しない」の約束・Q3 を how closely に・n の根拠の書き直し（判断 103）
-      - [ ] 妥当性への脅威と限界の節・目的の文（判断 105）
-      - [ ] `verdict.md` §3 の minor 19 件・nit 9 件（ハッシュに入る `_note` を含む）
-      - [ ] 確認: selftest 全部・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`
+      - [x] 照合の 2 段（正解 対 予測・予測 対 観測）と、20 秒の打ち切りでの分母の分割（Q1・Q2 の主は 20 秒未満・断片の行を数える・L2 は全試行が主で 20 秒以上を除いた版が副）を pipeline に入れる
+        → `match.py --prediction --scope`・`spec_predict.as_obs_bytes / as_sessions_bytes`・`pipeline.run_stages` の 3 比較 × 3 範囲・診断の層 4 つ・`closing_key_in_reading`。合成の run に打鍵と特別な試行（長音・21 s・Backspace）を足した
+      - [x] `l2.py` に試行ごとの差をシナリオ × 速さ別に（判断 104）→ `per_trial`（3 量・ブロックのブートストラップ）
+      - [x] E2: near chance の性質の表（K = 10・100 で真の正解率 1/K〜3/K のときの通る確率・予定の n）・K = 1000 は記述・2 セルの両方・ms の時刻を持つ集合は対象外・セッションの行は対象外（判断 101・102）→ 事前登録 §6.8・`e2/README.md`
+      - [x] 精度の幅の表と「形容しない」の約束・Q3 を how closely に・n の根拠の書き直し（判断 103）→ §3.3・§6.1（打ち切りの後に残る試行数の表も）
+      - [x] 妥当性への脅威と限界の節・目的の文（判断 105）→ §1.1・§7（節番号を振り直した: 予測 §4.5・範囲と比較 §6.4・E2 §6.8・追補 §8・凍結 §9）
+      - [x] `verdict.md` §3 の minor 19 件・nit 9 件（ハッシュに入る `_note` を含む）→ L1 の LoA / kappa の区間と速さ別・`delivery.py`（配送・焦点の喪失）・公開物の古い記述。群 M の文献の段落だけ原稿へ回した（判断 107 の 8）
+      - [x] 確認: selftest 全部・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py` → 29 本緑・4 ファイルともバイト一致・違反 0・違反なし・`--check-prereg` exit 3。変異 31 本（生き残り 5 → 4 本はテストを足して赤・1 本は等価で条件を削除）
     - [ ] attack-me round 2（同じ立場・同じ接地・`carryover-*.md`）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
