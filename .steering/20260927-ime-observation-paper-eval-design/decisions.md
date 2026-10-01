@@ -703,4 +703,18 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - **実装**: `gt_sessions.py` で、セッションの区間（閉じていなければログの最後の事象まで）が 2 つ以上の試行の trial_begin..trial_end と重なるとき（両端を含む）、`excluded` に `{"type": "carry_over", "log": "gt", "trial_ids": [重なった試行すべて]}` を足す。下流の `match.py` は除外を試行の単位で扱うので（`trial_ids` に入った試行の観測も落とす）、変更は要らない。`l2.py` は型によらず除外を数える。
   - `oracle_agreement` は変えない（持ち越した試行は `no_session` の不一致として残る）。一致率は「手順が意図どおりに IME を動かしたか」の量で、持ち越しはその失敗だから。
   - 判定は壁時計で行う。試行の割り当て（`_assign_trial`）と同じ時計に揃えた。gt 側の壁時計の飛びがセッションの中にあると、区間が伸びて carry_over にも当たる。どちらにしても除外なので、結果は変わらない。既存の陰性対照（clock_jump_ms を変えると excluded が変わる）は、clock_jump の項目だけを比べる形に直した。
-- **確認**: 実データで、2 組（`t00098`/`t00099`・`t00119`/`t00120`）だけが carry_over になった。OFF の 2 run は 0 件。selftest に `_case_carry_over` を足した。持ち越しの検出、試行の後・次の試行の前に落ちる確定は対象外（陰性対照）、一致率は変わらない、閉じないセッションは log_truncated と carry_over の両方、を確かめる。変異 3 本（追加を外す・2 を 3 にする・重なりの判定を包含に変える）はどれもこのケースだけが赤。`gt_sessions.py --selftest` 14 件・`kit/check.sh` 27 本・`run.sh --synthetic` が緑。
+- **確認**: 実データで、2 組（`t00098`/`t00099`・`t00119`/`t00120`）だけが carry_over になった。OFF の 2 run は 0 件。selftest に `_case_carry_over` を足した。持ち越しの検出、試行の後・次の試行の前に落ちる確定は対象外（陰性対照）、一致率は変わらない、閉じないセッションは log_truncated と carry_over の両方、を確かめる。変異 3 本（追加を外す・2 を 3 にする・重なりの判定を包含に変える）はどれもこのケースだけが赤。⚠️ 〔判断 88 で訂正〕この 3 本では、3 試行にまたがる場合と端ちょうどの場合が試されていなかった（code-reviewer が、両端だけを見る変異と端を含まない変異が通ることを示した）。`gt_sessions.py --selftest` 14 件・`kit/check.sh` 27 本・`run.sh --synthetic` が緑。
+
+## 判断 88: M2 の完了時レビュー（Claude の 2 系統）への対応（2026-10-01・Mac・メインの実装上の選択・研究者が覆せる）
+
+- **結果**: security-checker は CRITICAL / HIGH 0・MEDIUM 1・LOW 2。code-reviewer は CRITICAL / HIGH 0・MEDIUM 2・LOW 4。すべて一次で確かめた。
+- **直したもの**:
+  1. 〔MEDIUM・security〕`pilot-macos.md` の生ログの預け方の基準が、観測側の key 行しか押さえていなかった。参照入力欄も `keyDown` ごとに物理キーの `vk` を記録する（`RefInput.swift:176`、ソースの冒頭に「人が打ったログは打鍵内容として扱う」とある）。→ 基準に次の 3 点を足した。観測の key 行と gt の `key_down` の両方が、送出の記録に対応すること。今の `reach.py` は逆向きしか数えないこと。手打ちの対照と Enter・Esc の探査は runner の run ではなく、預けないこと。手打ちの記録（`manual-*.jsonl`・`enter-probe*`・`esc-probe*`）が `~/ime-pilot/runs/` の外にあることも確かめた。
+  2. 〔MEDIUM・code〕`_case_carry_over` が、両端だけを見る変異と端を含まない変異を見逃した（元の場所で再現した）。→ 3 試行にまたがるケース（真ん中の試行に事象が無い）と、終端が次の trial_begin とちょうど同じ ms のケースを足した。2 本の変異はどちらも赤になった。
+  3. 〔MEDIUM・code〕ライブ変換 ON では、先頭が自動確定した後に残りを取り消しても、セッションの outcome は `cancel` になる。数えると、`pilot2-on` の取り消しの 27 試行のうち 11 試行（S4: 3・S5: 3・S6: 5）がこれに当たった。→ `gt_rules.json` の `_note` と `pilot-macos.md` に、「outcome は最後に閉じた理由で、途中の自動確定は数えない」と件数を書いた。観測側の放棄とどう照合するか（診断用のフィールドを足すかを含む）は、M3 の事前登録で決める（引き継ぎ）。
+  4. 〔LOW〕50 ms の窓の端ちょうどのケースを足した（50 ms は続き、51 ms は別のセッション）。`> limit` を `>= limit` にする変異で赤になる。
+  5. 〔LOW〕docstring に 2 点書いた。壁時計の飛びで、次のブロックの最初の試行まで carry_over になりうること（除外が増える向き）。窓の中でログが終わると、log_truncated ではなく確定として閉じること。
+  6. 〔LOW〕`_note` の最大値を 7.85 ms に揃えた。README の「frozen with the protocol」を「will be / to be frozen」にした（生成の config はまだ無い・判断 85）。
+- **直さないもの**: 〔LOW・security〕carry_over の判定は、試行数とセッション数の総当たりになっている。1 セル約 3,150 試行では実害が無いので、そのままにする。
+- **確認**: `gt_sessions.py --selftest` 14 件・`kit/check.sh` 27 本・`run.sh --synthetic`・`_style_check.py` 違反 0 件。実データの組み立ては変わらなかった（ON 124 セッション・除外 2、OFF 117・0、`verify-off` 39・0）。
+- **Codex**: 今日（10-01）の実消費は 324,731 で、上限 300,000 を超えている → 研究者に確かめる。

@@ -164,7 +164,7 @@ align the observation's clock, the block-start markers are now arrow keys (`left
 which are observed as `navigation`; runs that use them need `--markers-in-obs`. Such a marker must be longer than
 every run of arrow presses inside a trial (see `../pilot/README.md`), so the three-key marker of the pilot serves
 only while no trial presses three arrows in a row; the measurement uses the four-key marker `left`, `right`, `left`,
-`right` (frozen with the protocol), which `--markers-in-obs` handles in the same way. The virtual-key codes of the IME toggles and of
+`right` (to be frozen with the protocol), which `--markers-in-obs` handles in the same way. The virtual-key codes of the IME toggles and of
 F13 map to `other` in `from_vk`, which is the category `read_obs`/`segment_by_plan` expect from them when a log is found
 to include them after all (see `--ime-toggle-in-obs` and `--markers-in-obs` below). If a listed key does produce a row
 and neither switch is used, the prediction misses that row for every candidate alike, so the effect on the ranking of

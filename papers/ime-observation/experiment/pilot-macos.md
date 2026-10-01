@@ -86,6 +86,11 @@ automatic commit by 0.50 to 7.85 ms (median 1.0 ms) with no key press in between
 at least 958 ms after a final commit. Every threshold from 10 to 900 ms gave byte-identical sessions and
 exclusions in all three runs analysed (`pilot2-on`, `pilot2-off`, `verify-off`).
 
+A session's outcome is the reason it finally closed. Text committed automatically earlier in the same session is
+not counted, so when the head of a reading was committed and the rest was then cancelled, the session is a
+cancellation. With live conversion on this happened in 11 of the 27 cancelled trials (S4: 3, S5: 3, S6: 5 of 9
+each). How the observation's abandonment is compared with such sessions is fixed in the pre-registration.
+
 A session that overlaps two or more trials is excluded, with every trial it overlaps (`carry_over` in
 `kit/analysis/gt_sessions.py`), and the number of such trials is reported separately. The carried trial is left
 without a session of its own, and the later trial's session contains the earlier trial's text, so neither is an
@@ -149,6 +154,14 @@ These settings are frozen with the pre-registration.
 ## Raw logs
 
 The raw logs of the pilot runs are kept on the measuring machine and are not yet deposited. Before they are, the
-criteria for which runs are deposited will be written here. Only planned runs that completed are candidates, and
-each must contain no observed key row without a matching press by the executor, because the observation records
-every key press on the machine.
+criteria for which runs are deposited, and the tool that checks them, will be written here. Both logs can carry
+a person's typing: the observation records every key press on the machine, and the reference input field records
+the key code of every key-down it receives. The criteria will therefore require at least the following.
+
+- Only planned runs are candidates: runs started by the runner from a plan, with a manifest, that were not
+  aborted.
+- In each run, every key row of the observation and every `key_down` of the reference log is matched, within a
+  stated tolerance, by a press the executor recorded as sent. The present reach count (`kit/pilot/reach.py`)
+  checks only the opposite direction, from the executor to the observation.
+- The hand-typed checks described above (in the reference input field and in TextEdit) and the hand-run probes
+  of the Enter and Escape behaviour were not runs of the runner and are not deposited.

@@ -140,8 +140,8 @@ Marker specification (JSON):
   and one scenario presses the right arrow up to `nav_count_max` times in a row (the limit comes from the
   procedures). A marker whose observed keys are all arrows must therefore be longer than every run of arrow presses
   inside a trial of the plan; the generator refuses to build a plan that breaks this, counting only the keys the
-  observation records. The four-key marker of the example is the one chosen for the measurement (it is frozen with
-  the protocol): it is longer than the three arrow presses in a row that `nav_count_max` = 3 allows. The macOS
+  observation records. The four-key marker of the example is the one chosen for the measurement (it will be frozen
+  with the protocol): it is longer than the three arrow presses in a row that `nav_count_max` = 3 allows. The macOS
   pilots used the three-key marker `left`, `right`, `left`, which serves only while no trial presses three arrows
   in a row (for example with `nav_count_max` at 2 or below).
   Otherwise those presses inside a trial count as marker occurrences, and if a block's real marker is lost, an

@@ -30,6 +30,8 @@ Rule file (one block per source; keys starting with `_` are annotations and are 
                                        this event
       within_ms is required whenever not_followed_by is given, and vice versa. If no matching event
       arrives before the end of the log, it counts as "does not arrive".
+      The window includes its end (an event exactly within_ms later still arrives). A log that ends
+      within the window therefore closes the session as if nothing followed, not as log_truncated.
     - A trial with abandon = false and commit = none is counted as agreeing in oracle_agreement
       regardless of the assembled session's actual outcome, because the intent is "neither a commit
       nor a cancellation is expected" (see _classify).
@@ -109,6 +111,10 @@ Output (SESSIONS, JSON):
     overlaps, in order, so that both the trial the text was carried from and the trial it was carried
     into are excluded. The times are the session's own. The agreement rate (oracle_agreement) is not
     changed by this entry: a carried trial still counts as a disagreement there.
+    The check uses the gt wall clock, like the trial assignment. A forward clock jump inside a session
+    lengthens its interval, so a session near the end of a block can also be reported as carry_over with the
+    first trial of the next block, which the clock_jump entry (limited to its own block) does not list; this
+    errs towards excluding more.
 
 Only the reference side (gt / oracle / plan) is read here; the observation-side log is never read.
 Validating the shape of gt / oracle rows is the job of the shared format validator; this module
@@ -1158,6 +1164,16 @@ def _case_carry_over():
         f.append("an open session that runs into the next trial is not both carry_over and log_truncated: %r" % (r2["excluded"],))
     elif [x["trial_ids"] for x in r2["excluded"] if x["type"] == "carry_over"] != [["t00001", "t00002"]]:
         f.append("the open session's carry_over trial_ids is not [t00001, t00002]: %r" % (r2["excluded"],))
+    # A session over three trials lists the middle one too, although no event of it falls there.
+    three = [("t00001", 0, 900), ("t00002", 1000, 1900), ("t00003", 2000, 2900)]
+    r3 = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _ins(2500, 1)]), _oracle_bytes(three), _example_rules())
+    if [x["trial_ids"] for x in r3["excluded"]] != [["t00001", "t00002", "t00003"]]:
+        f.append("a session over three trials does not list all three: %r" % (r3["excluded"],))
+    # Both ends are inclusive: a session that ends at the very millisecond the next trial begins spans it.
+    r4 = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _ins(1000, 1)]),
+                  _oracle_bytes([("t00001", 0, 900), ("t00002", 1000, 1900)]), _example_rules())
+    if [x["trial_ids"] for x in r4["excluded"]] != [["t00001", "t00002"]]:
+        f.append("a session that ends exactly at the next trial_begin is not carry_over: %r" % (r4["excluded"],))
     return f
 
 
@@ -1184,6 +1200,13 @@ def _case_experiment_rules():
     want = [("t00001", "commit", 100, 900), ("t00002", "commit", 2100, 2500), ("t00002", "commit", 2600, 2900)]
     if got != want:
         f.append("the experiment rules do not keep the auto-commit inside one session: %r" % (got,))
+    # The window includes its end: a continuation exactly 50 ms after the commit keeps the session open,
+    # one at 51 ms does not.
+    for gap, want_n in ((50, 1), (51, 2)):
+        rb = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _ins(500, 1), _sm(500 + gap, 1), _ins(900, 1)]),
+                      _oracle_bytes([("t00001", 0, 1900)]), rules)
+        if len(rb["definitions"]["all"]) != want_n:
+            f.append("a continuation %d ms after the commit gives %d sessions, not %d" % (gap, len(rb["definitions"]["all"]), want_n))
     r0 = assemble(_gt_bytes("mac_nstic", evs), _oracle_bytes(trials), _example_rules())
     if len(_wins(("t00001",), r0["definitions"]["all"])) != 2:
         f.append("control: the example rules no longer split at the auto-commit, so this case tests nothing")
