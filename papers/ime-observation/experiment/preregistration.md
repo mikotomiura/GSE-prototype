@@ -158,7 +158,13 @@ measurement is read before the freeze.
 A calibration pilot was run on the measuring machine before the freeze; it is reported in
 `experiment/pilot-macos.md`, and its raw logs will be deposited with the measurement data after the check that
 report describes. Its runs used provisional
-settings (three trials per scenario and speed). Only the reference side was analysed: the reference input field's
+settings: one to three trials per scenario and speed, key-interval medians of 300, 200 and 120 ms, a three-key
+block-start marker (F13, F14, F13 in the first pilot and `left`, `right`, `left` from then on), and seeds 1 to 6
+instead of the one in `experiment/SEED`. Their other
+generator settings (the spread of the key intervals, the key hold, the think time, the candidate index, the
+arrow count, the phrase length, and the gaps between trials and between marker presses) were those of
+`experiment/plan_config.macos.json`. Their plans requested an input-method reset before each block, but no reset
+command was given, so no reset was made. Only the reference side was analysed: the reference input field's
 calls, the oracle, the plan, and the key rows of the observation. The following were computed from it and
 informed this protocol:
 

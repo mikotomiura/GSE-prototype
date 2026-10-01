@@ -21,7 +21,7 @@ reference to the system under test.
 | Initial state | Before each block, `focus_cmd` brings the reference input field to the front, confirms it is in front, and presses the kana key (key code 104) so that the block starts in Japanese input |
 | Observation | The stand-alone logger built from an export of this repository |
 | Reference input field | `kit/refinput-macos`, wrapped in an application bundle by `build.sh` so that the front-window check can name it |
-| Plan | Corpus `c8f890cb…` (see `data.md`), seed 1, provisional settings: n = 3 per scenario and speed, key intervals with medians of 300, 200 and 120 ms, think time 0.2 to 20 s, 25 trials per block |
+| Plan | Corpus `c8f890cb…` (see `data.md`), seed 1 for `pilot-1` and `pilot2-on`, 5 for `pilot2-off` and 2 to 6 for the shorter runs, provisional settings: n = 3 per scenario and speed (1 in `verify-1` and `verify-off`), key intervals with medians of 300, 200 and 120 ms, think time 0.2 to 20 s, 25 trials per block. The other generator settings are those of the measurement (`experiment/plan_config.macos.json`) except the marker (see the findings) and the reset request, which the plans made but no reset command carried out (see Learning) |
 
 Scenario S9 is disabled by default in both procedure files, and S11 (which needs live conversion) is not run
 with live conversion off, so a cell has 14 or 13 scenarios.
