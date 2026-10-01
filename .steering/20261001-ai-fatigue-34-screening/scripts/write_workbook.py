@@ -26,6 +26,13 @@ E4_KIND = {"既存レビュー": "背景保持", "尺度・理論": "背景保�
            "直接研究": "背景保持", "隣接研究": "背景保持"}
 PRIMARY = {"直接研究", "隣接研究"}
 CRITERIA_VERSION = "評価プロトコル v1.0＋2026-09-30 の範囲の決定＋2026-10-01 の読み方"
+# ★ 2 回目の前後に、AI の判定（GPT 版・Claude 版）のほかに本セッションの Claude の見立て・計算を判定者 1 が見た件
+#   （ログの note に逐語。decisions.md 判断 4 の 2・4・5。security-checker の指摘で写しにも書く・判断 12）
+CLAUDE_SHOWN = {
+    "AF002": "2 回目の前に、判定者 1 の問いに答えて Claude（このセッション）が見立て（関係の深さは高い・証拠としての強さは中〜低）を会話で示した",
+    "AF003": "2 回目の前に、判定者 1 の問いに答えて Claude（このセッション）が見立て（関係の深さは高い・証拠としての強さは中〜低）を会話で示した",
+    "AF004": "2 回目の後の確認の前に、Claude が論文の数値から媒介を計算し直した結果と、AI に結びつく変数が AI 依存だけであることを会話で示した",
+}
 
 DATA_FILES = {
     "extract": os.path.join(C.TASK, "data", "extract-rows.json"),
@@ -92,7 +99,7 @@ def cells_for(i, kind, first, final, quality, xconf):
         q = quality.get(i)
         if q is None:
             ival = "未実施"
-        elif basis == "抄録" or q.get("answer") == "保留":
+        elif basis == "抄録" or str(q.get("answer", "")).startswith("保留"):  # ★ 選択肢は「保留（判定不能のまま）」
             ival = "進行中"
         else:
             ival = "完了"
@@ -110,7 +117,9 @@ def cells_for(i, kind, first, final, quality, xconf):
 
     changed = "" if label(f0) == label(f1) else f"（変えた理由: {f1.get('reason', '')}）"
     j = (f"用途: {use} ／ 1回目: {label(f0)} → 最終: {label(f1)}{changed} ／ 材料: {basis} ／ "
-         f"{f1.get('date', '')} ／ ログ: screening-log.jsonl")
+         f"{f1.get('date', '')} ／ ログ: 『判定者1_問いと答え』")
+    if i in CLAUDE_SHOWN:
+        j += f" ／ Claude の関与: {CLAUDE_SHOWN[i]}"
     return {"D": f1["verdict"], "G": g, "H": h, "I": ival, "J": j,
             "human_use": USE_TO_HUMAN[use], "reason": f1.get("reason_summary", ""), "next": f1.get("next", "")}
 
@@ -176,10 +185,22 @@ def build(dst):
                          "除外 E1・E3・E5・E7 → 除外／保留（E6 を含む）→ 保留"),
         ("品質評価", "判定で含めた一次研究だけ確定した（JBI・尺度開発は COSMIN・6 領域・合計点なし）。背景・方法論・訂正・除外は対象外。"),
         ("無料の本文", "有料の本文は使っていない。無料の全文が無い件は全文確認を入手不可とし、抄録を材料に判定した（自由記入に「材料: 抄録」）。"),
-        ("記録", "質問と答えの逐語は repo の .steering/20261001-ai-fatigue-34-screening/screening-log.jsonl。"),
+        ("Claude の関与", "本文の取得・抽出と品質評価の下書き・原文との照合は Claude（メインとサブエージェント）が行い、判定者 1 が確かめて確定した。"
+                        "1 回目の問いには事実だけを載せ、2 回目に AI の判定（GPT 版・Claude 版）を見せた。このほか AF002・AF003 では 2 回目の前に Claude の見立てを、"
+                        "AF004 では 2 回目の後の確認の前に Claude の再計算を、判定者 1 が見ている（各行の自由記入と『判定者1_問いと答え』の補足）。"),
+        ("判定者 2 に渡すとき", "この写しは判定者 2 に渡さない（判定者1 の欄と 判定者1_ のシートがあると、2 人の判定が独立でなくなる）。"
+                             "判定者 2 には、元のファイル（09-18）か、判定者1 の列と 判定者1_ のシートを除いた版を渡す。"),
+        ("記録", "質問と答えの逐語は『判定者1_問いと答え』（作業記録 screening-log.jsonl の写し・1 行 1 問）。"),
+        ("元の『はじめに』の数式", "openpyxl で保存したため、元の『はじめに』シートの数式は計算済みの値を持たない。Excel で開くと再計算される"
+                               "（プレビューや他の閲覧ソフトでは空に見えることがある）。"),
         ("進み具合", f"判定済み {len(done)} / 34 件" + ("" if all_done else "（『AI判定比較』は 34 件の後に記入する）")),
     ]
     add_sheet(wb, C.ADDED_PREFIX + "はじめに", "判定者 1 の記入｜何をしたか", "このシートは判定者 1 が足した。", ["項目", "説明"], intro)
+    add_sheet(wb, C.ADDED_PREFIX + "問いと答え", "判定者 1 の問いと答え｜作業記録の写し（1 行 1 問）",
+              "段: 1 = 1 回目（AI の判定を見ない）・1e = 除外の理由・2 = 2 回目（AI の判定を見た）・q = 品質評価の確定・x = 抽出の確定。",
+              ["seq", "ID", "段", "問い（逐語）", "選択肢", "答え", "補足（note）"],
+              [[r.get("seq"), r["item"], r["stage"], r["question"], " ／ ".join(r.get("options") or []), r["answer"], r.get("note", "")]
+               for r in log])
     ex = load_rows("extract")
     if ex:
         add_sheet(wb, C.ADDED_PREFIX + "全文抽出", "判定者 1 の全文抽出｜『研究情報』と同じ列の形",
@@ -202,15 +223,30 @@ def main(dry):
     for p in (C.COPY_ARCHIVE, C.COPY_DOWNLOADS):
         if C.sha256(p) != last:
             sys.exit(f"写しが最後に書いたものと違う（手で記入された可能性・止まって聞く）: {p}")
-    fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=os.path.dirname(C.COPY_ARCHIVE), prefix=".tmp-")
-    os.close(fd)
-    build(tmp)
+    # ★ dry-run の出力は repo の外（OS の一時フォルダ）。本番は同じフォルダの一時ファイル → os.replace（途中で止まっても半端な写しを残さない）
     if dry:
-        print("dry-run ok", tmp)
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx", prefix="judge1-dry-")
+        os.close(fd)
+        build(tmp)
+        print("dry-run ok（repo の外）", tmp)
         return
-    shutil.copyfile(C.COPY_DOWNLOADS, C.COPY_DOWNLOADS + ".bak-" + last[:12])
-    shutil.copyfile(tmp, C.COPY_DOWNLOADS)
-    os.replace(tmp, C.COPY_ARCHIVE)
+    tmps = []
+    try:
+        fd, tmp_a = tempfile.mkstemp(suffix=".xlsx", dir=os.path.dirname(C.COPY_ARCHIVE), prefix=".tmp-")
+        os.close(fd)
+        tmps.append(tmp_a)
+        build(tmp_a)
+        fd, tmp_d = tempfile.mkstemp(suffix=".xlsx", dir=os.path.dirname(C.COPY_DOWNLOADS), prefix=".tmp-judge1-")
+        os.close(fd)
+        tmps.append(tmp_d)
+        shutil.copyfile(tmp_a, tmp_d)
+        shutil.copyfile(C.COPY_DOWNLOADS, C.COPY_DOWNLOADS + ".bak-" + last[:12])
+        os.replace(tmp_d, C.COPY_DOWNLOADS)
+        os.replace(tmp_a, C.COPY_ARCHIVE)
+    finally:
+        for t in tmps:
+            if os.path.exists(t):
+                os.remove(t)
     new = C.sha256(C.COPY_ARCHIVE)
     if C.sha256(C.COPY_DOWNLOADS) != new:
         sys.exit("archive と Downloads の写しが合わない")

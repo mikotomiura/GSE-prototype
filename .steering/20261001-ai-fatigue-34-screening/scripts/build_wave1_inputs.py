@@ -60,6 +60,9 @@ def main(outdir):
                 if w in nxt.replace("適用除外", ""):  # 倫理の「適用除外理由」は用途の語ではない
                     sys.exit(f"{i}: 次の確認・作業に用途の語「{w}」がある（渡す前に止まる）")
             o = oa.get(doi.lower(), oa.get(doi, {}))
+            for r in issues:  # ★ 『確認事項』の行にも同じ検査をかける（2026-10-02 のレビュー・今の行には用途の語は 0 件）
+                if any(w in " ".join(str(v or "") for v in r[1:4]).replace("適用除外", "") for w in BANNED):
+                    sys.exit(f"『確認事項』{r[0]} に用途の語がある（渡す前に止まる）")
             lines += [f"## {i}", f"- 題名: {L.get('論文タイトル') or L.get('タイトル')}",
                       f"- DOI: {doi or 'なし'}",
                       f"- 一次情報 URL（DB）: {E.get('主な参照URL') or ''}",

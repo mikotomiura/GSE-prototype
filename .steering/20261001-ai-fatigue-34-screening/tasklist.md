@@ -31,8 +31,8 @@
 
 ## 完了
 - [x] `check_workbook.py --final` 違反 0・`--selftest` PASS（実の写しとログで通し・2026-10-02）
-- [ ] 元のファイルの SHA-256 が変わっていない・ステージに本文が無い
-- [ ] code-reviewer ＋ security-checker（並列）
+- [x] 元のファイルの SHA-256 が変わっていない・ステージに本文が無い（2026-10-02）
+- [x] code-reviewer ＋ security-checker（並列・判断 12 で全件対応）
 - [ ] /cross-review 2 巡（Codex の当日の実消費を先に確かめる）
-- [ ] 引き継ぎ（次のタスク: D・C・提案のドキュメント）
+- [x] 引き継ぎ（次のタスク: C の決定・提案のドキュメント・D）→ `_handoff/next-session-ai-fatigue-after-34.md`
 - [ ] 出荷（git-workflow ルール 6）

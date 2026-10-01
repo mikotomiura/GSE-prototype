@@ -4,16 +4,22 @@
 使い方: python ai_judgments.py <出力 JSON（repo の外）>
 """
 import json
+import os
 import sys
 
 import openpyxl
+
+# repo（この worktree）の根。ここより下には書かない
+C_TASK_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 GPT = r"C:\Users\johnd\Downloads\AI_fatigue_database_with_AI_appraisal_2026-09-18.xlsx"
 CLAUDE = r"C:\Users\johnd\Downloads\AI_fatigue_database_with_AI_appraisal_2026-09-29_claude.xlsx"
 
 
 def main(out):
-    if "GSE-prototype" in out or out.replace("\\", "/").startswith("C:/wt/"):
+    # ★ 絶対パスに直して小文字で比べる（相対パス・c:\wt\ の書き方でも repo の中に書かない・2026-10-02 のレビュー）
+    p = os.path.abspath(out).replace("\\", "/").lower()
+    if "gse-prototype" in p or p.startswith("c:/wt/") or p.startswith(os.path.abspath(C_TASK_ROOT).replace("\\", "/").lower()):
         sys.exit("出力は repo の外に置く")
     g = openpyxl.load_workbook(GPT, read_only=True, data_only=True)
     c = openpyxl.load_workbook(CLAUDE, read_only=True, data_only=True)
