@@ -140,13 +140,13 @@
       - [x] `verdict.md` §3 の minor 19 件・nit 9 件（ハッシュに入る `_note` を含む）→ L1 の LoA / kappa の区間と速さ別・`delivery.py`（配送・焦点の喪失）・公開物の古い記述。群 M の文献の段落だけ原稿へ回した（判断 107 の 8）
       - [x] 確認: selftest 全部・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py` → 29 本緑・4 ファイルともバイト一致・違反 0・違反なし・`--check-prereg` exit 3。変異 31 本（生き残り 5 → 4 本はテストを足して赤・1 本は等価で条件を削除）
     - [x] attack-me round 2（同じ立場・同じ接地・`carryover-*.md`・2026-10-01・G-GEAR）→ 記録 `attack-me/prereg-ime-macos/round-2/`。R1 minor・R2 major・R3 minor（条件つき）・fatal 0・捏造 0 → 判定 major revision。研究者に 10 問 → 判断 108〜110（すべて推奨どおり）
-    - [ ] round 2 の直し（判断 108〜110・`verdict.md` §3）
-      - [ ] X2 `long` を打鍵が入った試行すべてに・持ち越しを受けた層の定義し直し（`spec_predict.py`・`match.py`）→ §3.1・§3.3 の数の計算し直し
-      - [ ] X1 問 3 の主を `under_limit` に（`pipeline.py` の `PRIMARY`）・X5 問 3 の偏り・一致の限界・混合の偏りの区間（`l2.py`）・minor 15 試行ごとの差を層 none に限った版
-      - [ ] X4 E2 をブロックで合わせ直す（`closed_set.py`・`open_set.py`）・minor 3 正解率のブロック区間（記述）・nit 速さ別の正解率
-      - [ ] minor 4（層と範囲ごとの読みの長さと思考時間）・10（焦点を失った試行の観測の行）・13（`carry_over` で除いた試行の観測の行）
-      - [ ] 事前登録の文（X1〜X8・minor・nit）と公開物（`notes.md`・`pilot-macos.md`・`data.md`・`kit/refinput-macos/README.md`・`kit/gen/README.md`・`kit/e2/README.md`・`gt_rules.json` の `_note`・`stats.py` の docstring）
-      - [ ] 確認（selftest・`kit/check.sh`・`run.sh --synthetic` 2 回・`_style_check.py`・`check_citations.py`・`--check-prereg`・変異）
+    - [x] round 2 の直し（判断 108〜110・実装の選択は判断 111・2026-10-01・G-GEAR）
+      - [x] X2 `long` を打鍵が入った試行すべてに・持ち越しを受けた層の定義し直し（`spec_predict.py`・`match.py`）→ §3.1・§3.3 の数の計算し直し（`--from-plan` で再現できる形にした）
+      - [x] X1 問 3 の主を `under_limit` に（`pipeline.py` の `PRIMARY`）・X5 問 3 の偏り・一致の限界・混合の偏りの区間（`l2.py`）・minor 15 試行ごとの差を層 none に限った版
+      - [x] X4 E2 をブロックで合わせ直す（`closed_set.py`・`open_set.py`）・minor 3 正解率のブロック区間（記述）・nit 速さ別の正解率
+      - [x] minor 4（層と範囲ごとの読みの長さと思考時間）・10（焦点を失った試行の観測の行）・13（文だけ: `match.py` が既に数える）
+      - [x] 事前登録の文（X1〜X8・minor・nit）と公開物（`notes.md`・`pilot-macos.md`・`data.md`・`kit/refinput-macos/README.md`・`kit/e2/README.md`・`gt_rules.json` の `_note`・`stats.py` の docstring）。`kit/gen/README.md` は §8 の新しい範囲と合うので変えていない
+      - [x] 確認（`kit/check.sh` 29 本・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py` 0 件・`check_citations.py` 違反なし・`--check-prereg` exit 3・変異 17 本すべて赤）
     - [ ] attack-me round 3（変わった節とコードに絞る）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
