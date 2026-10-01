@@ -61,6 +61,41 @@ def read_log(path):
     return [json.loads(x) for x in open(path, encoding="utf-8") if x.strip()]
 
 
+# 『判定者1_確認の結果』の形（design.md §2.1・requirement の受け入れ条件 5・2026-10-02 に足した）
+CHECKS_SHEET = C.ADDED_PREFIX + "確認の結果"
+CHECKS_HEADER = ["区分", "対象ID", "確認すべきこと（逐語）", "結果", "分かったこと", "原文の箇所", "確かめた経路", "記録の場所"]
+CHECKS_RESULT = {"一次で確認", "一次で一部確認", "一次で否定", "入手不可", "研究者の確認待ち", "未着手"}
+CHECKS_ROUTE = {"メインが原文で", "メインが要点を原文で（細部は抽出だけ）", "サブエージェントの抽出だけ",
+                "抄録・無料のプレビューだけ", "該当なし（作業の記録）"}
+CHECKS_PARTS = [("確認事項", 12), ("次の確認・作業", 34), ("メモ", 8)]
+
+
+def check_checks_sheet(w, final):
+    if CHECKS_SHEET not in w.sheetnames:
+        return [f"{CHECKS_SHEET} が無い（--final）"] if final else []
+    ws, errs = w[CHECKS_SHEET], []
+    if [ws.cell(4, c).value for c in range(1, len(CHECKS_HEADER) + 1)] != CHECKS_HEADER:
+        errs.append(f"{CHECKS_SHEET}: 見出しが違う")
+        return errs
+    rows = [[ws.cell(r, c).value for c in range(1, len(CHECKS_HEADER) + 1)] for r in range(5, ws.max_row + 1)]
+    rows = [x for x in rows if any(v not in (None, "") for v in x)]
+    want = [p for p, n in CHECKS_PARTS for _ in range(n)]
+    if [x[0] for x in rows] != want:
+        errs.append(f"{CHECKS_SHEET}: 区分の並び・件数が 確認事項 12／次の確認・作業 34／メモ 8 でない（{len(rows)} 行）")
+    nxt = [x[1] for x in rows if x[0] == "次の確認・作業"]
+    if nxt != C.IDS:
+        errs.append(f"{CHECKS_SHEET}: 次の確認・作業の対象IDが AF001〜AF034 の順でない")
+    for n, x in enumerate(rows, 5):
+        if x[3] not in CHECKS_RESULT:
+            errs.append(f"{CHECKS_SHEET}!D{n}: 結果が語彙の外 {x[3]!r}")
+        if x[6] not in CHECKS_ROUTE:
+            errs.append(f"{CHECKS_SHEET}!G{n}: 経路が語彙の外 {x[6]!r}")
+        for c, name in ((2, "確認すべきこと"), (4, "分かったこと"), (5, "原文の箇所"), (7, "記録の場所")):
+            if not (x[c] or "").strip():
+                errs.append(f"{CHECKS_SHEET}!{'ABCDEFGH'[c]}{n}: {name}が空")
+    return errs
+
+
 def check(copy_path, log_path, final=False, original=C.ORIGINAL):
     errs = []
     o = openpyxl.load_workbook(original)
@@ -145,6 +180,8 @@ def check(copy_path, log_path, final=False, original=C.ORIGINAL):
         hu = cmp_[f"D{r}"].value
         if hu is not None and hu != expect_human(res, kind[i]):
             errs.append(f"{i}: 人間用途判定 {hu!r} が期待 {expect_human(res, kind[i])!r} と違う")
+    # (6) 『判定者1_確認の結果』（あれば常に・--final では必須）
+    errs += check_checks_sheet(w, final)
     # (5)
     if final:
         for k, i in enumerate(C.IDS):
@@ -256,6 +293,34 @@ def selftest():
                                 ensure_ascii=False) + "\n" for x in read_log(base_log))
     if check(base_copy, lg_ok2):
         print("FAIL 手引きの中身の「一般に推奨」だけで赤になる")
+        bad += 1
+    # 『判定者1_確認の結果』: 実の data で作ったシートは緑（陰性対照）・1 か所ずらすと赤
+    ch = json.load(open(os.path.join(C.TASK, "data", "checks-rows.json"), encoding="utf-8"))
+
+    def add_checks(w2, edit=None):
+        ws = w2.create_sheet(CHECKS_SHEET)
+        for c, h in enumerate(ch["header"], 1):
+            ws.cell(4, c, h)
+        for rr, row in enumerate(ch["rows"], 5):
+            for c, v in enumerate(row, 1):
+                ws.cell(rr, c, v)
+        if edit:
+            edit(ws)
+    w_ok = openpyxl.load_workbook(base_copy)
+    add_checks(w_ok)
+    cp_ok = os.path.join(tmpd, "checks-ok.xlsx")
+    w_ok.save(cp_ok)
+    if check(cp_ok, base_log):
+        print("FAIL 実の確認の結果のシートで赤になる", check(cp_ok, base_log)[:3])
+        bad += 1
+    mutate("checks-result-vocab", fn_wb=lambda w: add_checks(w, lambda ws: ws.cell(10, 4, "済み")))
+    mutate("checks-route-vocab", fn_wb=lambda w: add_checks(w, lambda ws: ws.cell(10, 7, "メインが確認")))
+    # ★ ws.cell(r, c, None) は値を書き換えない（None は「指定なし」）。空にするのは .value に代入する
+    mutate("checks-empty-location", fn_wb=lambda w: add_checks(w, lambda ws: setattr(ws.cell(20, 8), "value", None)))
+    mutate("checks-row-missing", fn_wb=lambda w: add_checks(w, lambda ws: ws.delete_rows(30)))
+    mutate("checks-id-order", fn_wb=lambda w: add_checks(w, lambda ws: ws.cell(5 + 12, 2, "AF002")))
+    if not check(base_copy, base_log, final=True) or not any("確認の結果" in e for e in check(base_copy, base_log, final=True)):
+        print("FAIL --final で確認の結果のシートが無いのに赤にならない")
         bad += 1
     mutate("stage2-first", fn_log=lambda L: list(reversed(L)))
     mutate("extra-sheet", fn_wb=lambda w: w.create_sheet("メモ"))
