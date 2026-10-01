@@ -57,3 +57,10 @@ Skill: verify-before-claiming・data-privacy・subagent-delegation・git-workflo
 - ⚠️ 作業ツリーに別トラックの未追跡 `.steering/20260921-media-expression-theory-audit/` がある。`git add` はパス指定で。G-GEAR では main は別の worktree が checkout している。
 - ⚠️ git-bash で `git show origin/main:<path>` は MSYS がパスを書き換える → `MSYS_NO_PATHCONV=1`。heredoc にバックスラッシュを書かない（Windows のパスや行末の `\` を含む文書は Write / Edit で書く）。
 - ⚠️ round 1〜4 の `tmp/` は attack-me を閉じるまで消さない。
+
+## §5 Mac の作業の結果（2026-10-02・Mac）と round 5 への追加
+
+- §2 は済み（一次は `decisions.md` の**判断 121・122**・`tasklist.md` の M3 の Mac の項目）。k = 0・`REFERENCE_RECEIVES_MODE_KEYS = False`・合わせ直しは 15 / 15 ブロック採点。
+- ⚠️ §2 (d) が 0 でなかった（`pilot2-off` に S15 以外の焦点の喪失 1 回・31 ms・打鍵なし）→ 研究者の選択で**焦点の規則を「計画外の喪失の区間〔前後 500 ms〕に観測の key 行があるときだけ中止」に改めた**（判断 121）。`delivery.py` に `FOCUS_MARGIN_MS`・`n_loss_intervals_unplanned_with_presses`・`n_presses_in_unplanned_losses`、`pipeline.py` の規則と `abort_rule` の名前が変わった（判断 122 の 6）。
+- **round 5 の対象に足す**: §3.4 の焦点の段落・§3.1 の 2 つの項目の結果・§6.2 の焦点の項・§7 の盲点の項・`data.md` の Run checks・`pilot-macos.md` の Raw logs・`delivery.py` の `_focus_losses` と余裕・`pipeline.py` の `reference_abort_reasons`。`git diff 40ad7801..<head> -- papers/` で測るので自動的に入るが、carryover に「判断 121 で焦点の規則を変えた理由（パイロットの 31 ms の喪失と頻度の見積もり）」を書く。
+- ⚠️ 本文の語数は `round-4/tmp/measure.py` が Mac の Python で SyntaxError で測れていない → G-GEAR で測る。

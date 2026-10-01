@@ -169,8 +169,9 @@
       - [x] 確認（selftest・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・§9 の SHA-256・節の参照・変異） → 29 本緑・4 ファイルともバイト一致・違反 0・違反なし・exit 3・5 ファイル一致・節の参照はすべて実在。変異: 作業用エージェントの自己申告 16 本・メインの抜き取り 3 本ですべて赤。本文 13,422 語
       - [x] 作業中の点検（code-reviewer ∥ security-checker・`b1c3f213..4bd6cacd`）→ security HIGH 1・MEDIUM 2・LOW 3、code-reviewer MEDIUM 4・LOW 8（M2 の一部と範囲外の気づきは偽）。研究者に 2 問 → 判断 119（`--pack` で全 run に §3.4 を強制・S15 以外の焦点の喪失を中止に足す）。直しは作業用エージェント D ＋ メイン（判断 120）
       - [x] 点検の指摘の直しの確認（29 本緑・バイト一致・違反 0・違反なし・exit 3・節の参照・本文 13,902 語）
-    - [ ] ★ Mac（判断 113 の Y4 ＋ 判断 117 の Z3 ＋ 判断 119・120・凍結の前・引き継ぎ `next-session-ime-paper-m3-mac-work.md`）: (1) `pilot-macos.md` の Raw logs に預ける基準（時点は凍結の前・観測の余分な行は本計測と同じ扱い）と「封印したセッション行は預けるときだけ開け、解析しない」 (2) `pilot2-on`・`pilot2-off`・`verify-off` の観測の key 行に `align_plan` だけを `--markers-in-obs` とパイロットの 3 打鍵の印で流し、採点されたブロックの割合を §3.1 に（診断） (3) 同じ run の参照のログに `delivery.py` → かなキーと S14 のモードキーが参照に残るか・ブロックごとの「説明されない数」を §3.1 に書き、Z1 の上限を決める
-    - [ ] attack-me round 5（§3.4・§3.1・§6.7・`delivery.py`・`closed_set.py` に絞る・G-GEAR・判断 117）
+    - [x] ★ Mac（判断 113 の Y4 ＋ 判断 117 の Z3 ＋ 判断 119・120・凍結の前・引き継ぎ `next-session-ime-paper-m3-mac-work.md`）: (1) `pilot-macos.md` の Raw logs に預ける基準（時点は凍結の前・観測の余分な行は本計測と同じ扱い）と「封印したセッション行は預けるときだけ開け、解析しない」 (2) `pilot2-on`・`pilot2-off`・`verify-off` の観測の key 行に `align_plan` だけを `--markers-in-obs` とパイロットの 3 打鍵の印で流し、採点されたブロックの割合を §3.1 に（診断） (3) 同じ run の参照のログに `delivery.py` → かなキーと S14 のモードキーが参照に残るか・ブロックごとの「説明されない数」を §3.1 に書き、Z1 の上限を決める
+      → 2026-10-02（Mac・macOS 27.0・Python 3.14.4）: (2) 3 本とも全ブロック採点（15 / 15・282 試行・割り当てのない打鍵 0）(3) k = 0・`REFERENCE_RECEIVES_MODE_KEYS = False`・滑りの最小 1,582 ms・区間の規則に当たらない。⚠️ `pilot2-off` に S15 以外の焦点の喪失 1 回（31 ms・打鍵なし）→ 研究者に戻し、焦点の規則を「喪失中の観測の打鍵で中止」に改めた（判断 121・余裕 500 ms は判断 122）。(1) `pilot-macos.md` の Raw logs を本計測と揃えた基準に。確認は判断 122 の 9
+    - [ ] attack-me round 5（§3.4・§3.1・§6.7・`delivery.py`・`closed_set.py` に絞る・G-GEAR・判断 117）。★ 判断 121・122 の焦点の規則（喪失中の観測の打鍵・余裕 500 ms）と `pilot-macos.md` の Raw logs も対象に
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
