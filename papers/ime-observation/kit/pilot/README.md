@@ -125,7 +125,7 @@ not committed to git.
 Marker specification (JSON):
 
 ```json
-{"oracle_keys": ["left", "right", "left"], "gt_vks": [123, 124, 123], "obs_categories": ["navigation", "navigation", "navigation"], "max_gap_ms": 300}
+{"oracle_keys": ["left", "right", "left", "right"], "gt_vks": [123, 124, 123, 124], "obs_categories": ["navigation", "navigation", "navigation", "navigation"], "max_gap_ms": 300}
 ```
 
 - `max_gap_ms` must exceed the plan's `marker_gap_ms`: the measured press-to-press gap of a 150 ms marker gap was
@@ -140,8 +140,10 @@ Marker specification (JSON):
   and one scenario presses the right arrow up to `nav_count_max` times in a row (the limit comes from the
   procedures). A marker whose observed keys are all arrows must therefore be longer than every run of arrow presses
   inside a trial of the plan; the generator refuses to build a plan that breaks this, counting only the keys the
-  observation records. The three-key marker of the example serves only while no trial presses three arrows in a row
-  (for example with `nav_count_max` at 2 or below); the marker for the measurement is fixed with the protocol.
+  observation records. The four-key marker of the example is the one chosen for the measurement (it is frozen with
+  the protocol): it is longer than the three arrow presses in a row that `nav_count_max` = 3 allows. The macOS
+  pilots used the three-key marker `left`, `right`, `left`, which serves only while no trial presses three arrows
+  in a row (for example with `nav_count_max` at 2 or below).
   Otherwise those presses inside a trial count as marker occurrences, and if a block's real marker is lost, an
   occurrence inside its first trial can be matched to that block instead of the block appearing in `missing`. gt
   matches on virtual-key codes, and that scenario presses only the right arrow, so gt is not affected.

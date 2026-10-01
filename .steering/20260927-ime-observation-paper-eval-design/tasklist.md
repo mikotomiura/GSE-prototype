@@ -99,8 +99,16 @@
     - [x] 完了時レビュー 2 巡目（code-reviewer・`5a9cc805..8ae9ccd1`）: HIGH 1（手順書の改行で SHA-256 が変わる → `.gitattributes`）・MEDIUM 5（マーカーの検査を `plan_rows` へ移して観測に残る並びと計画の実際の連続で判定・E2 は config も照合・前面の確認を 5 回まで読み直す ほか）→ 判断 84 のとおり直した
     - [x] origin/main（#281）を 2 度目に取り込む（衝突は Codex の台帳の today だけ → 和 324,731 / 8 回・`f2c98d22`）。最後の commit の clean な checkout で Windows で回る全 acceptance 22 本: 失敗は SCOPE と GUARD だけ（B15）・macOS 専用の 004 / 007 / 012 は exit 2。024 の一覧の SHA-256 `f3271b3aa4700d7e515954736c8540a8ef11c7276c5a4389c6ca345a7f44a118`（92 ファイル・Windows）
     - [x] push → PR #283 → CI → merge → main の CI（2026-10-01）: PR のイベントの run（36814196074）で Mac の check が **runner の通信切れ**（`Cargo test` の途中・"The self-hosted runner lost communication with the server"）で赤 → 研究者に AskUserQuestion で確かめ、失敗したジョブだけを再実行して緑（attempt 2・5 分 44 秒）。同じ commit の push のイベントの run（36814170682）は Mac も Windows も緑だった → merge（`0081efe7`）→ main の CI（36817877790）success（Mac / Windows の check・frontend-check）
-    - [ ] ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が G-GEAR の `f3271b3a…a118`（92 ファイル）と一致するか（判断 68・`papers/` が `f2c98d22` と同じ内容の commit で）。あわせて `build.sh` と、例の `focus_cmd` の前面の確認（引き継ぎ §3-7）
+    - [x] ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が G-GEAR の `f3271b3a…a118`（92 ファイル）と一致するか（判断 68・`papers/` が `f2c98d22` と同じ内容の commit で）。あわせて `build.sh` と、例の `focus_cmd` の前面の確認（引き継ぎ §3-7）
+      → 2026-10-01（Mac・macOS 27.0・Python 3.14.4）: main（`eb8409b3`・`f2c98d22` からの `papers/` の差は 0）の clean な worktree で 024 は ✅ 139・❌ 2（SCOPE と GUARD だけ・B15）。★ 一覧の SHA-256 = `f3271b3aa4700d7e515954736c8540a8ef11c7276c5a4389c6ca345a7f44a118`（92 ファイル）で **G-GEAR と一致**
+      → `build.sh` を `/bin/bash` 3.2.57 で回して exit 0（bundle id `local.ime-observation.refinput` を PlistBuddy で読み戻した）。不正な `REFINPUT_BUNDLE_ID`（空白・先頭の `-`・`/`・非 ASCII・129 文字）はすべて exit 2、`ok-1.2` は exit 0
+      → 例の `focus_cmd`: 参照入力欄（`--out` 付きで起動）が前面のとき exit 0、Finder が前面から呼んでも前面にして exit 0、前面化の文を抜いて Finder を前面にしたままでは約 2 秒（5 回の読み直し）で exit 1（`the reference input field is not in front`）。`run_cell.py --selftest` の「前面の確認の失敗でブロックの前に abort」「focus の失敗で abort」も ok。⚠️ 最初の試行は `open RefInput.app`（`--out` なし → usage で即終了）で組んだため `activate` が返らなかった（測定器の誤り・`focus_cmd` の欠陥ではない）
   - [ ] M2 の残り: 正解の定義（`gt_rules` の `mac_nstic`・ON の型は 2 形）・本番の n / think の上限（1 セル約 10 時間・研究者）・`experiment/pilot-macos.md`（公開用の英語）・パイロットの生ログの置き場（公開物に含める）
+    - [x] 本番の n / think / マーカー（判断 85・研究者）: n = 75・think 0.2〜20 秒・マーカー ← → ← →
+    - [x] 正解の定義（判断 86）: `experiment/gt_rules.json`（`mac_nstic` の commit に「50 ms 以内に `set_marked` が続かない」）・`config.json` をこれに向けた。一致率 ON 124 / 126・OFF 117 / 117・`verify-off` 39 / 39
+    - [x] 持ち越し（判断 87・研究者）: `gt_sessions.py` に除外の理由 `carry_over`（2 試行とも）
+    - [ ] `experiment/pilot-macos.md`（公開用の英語）
+    - [ ] パイロットの生ログの置き場（除外の基準を先に書く・逆向きの到達を数える道具）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
