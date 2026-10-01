@@ -21,6 +21,11 @@
 > - **残り（M2）**: パイロットの生ログの預け方。`pilot-macos.md` の「Raw logs」に書いた基準（runner の run だけ・観測の key 行と gt の `key_down` の両方が送出に対応・手打ちは預けない）を検査する道具（`reach.py` の逆向き）を作り、`experiment/data.md` の手順（`pipeline.py --pack`）で預ける。
 > - **M3 に持ち越す論点**: (1) ライブ変換 ON で、先頭が自動確定した後に取り消したセッション（`pilot2-on` の取り消し 27 試行中 11）を、観測側の放棄とどう照合するか。診断用のフィールドを足すかも含めて決める（判断 88）。(2) `settle_ms` を事前登録で固定する（50 ms の窓の前提・判断 89）。(3) 本番の生成の config（n・think・マーカー・`nav_count_max`）のファイルを作って凍結する（判断 85）。(4) `cell.example.json` の `learning`・`predictive_candidates` の記述を、パイロットの実際に合わせる。
 
+> ★★★ **2026-10-01（G-GEAR）**: PR #285 の後の main（`500c5685`）で G-GEAR の確認が済んだ（024 の一覧の SHA-256 が Mac の `bc2e6816…5f3c` と一致・Windows で回る 22 本は SCOPE / GUARD を除いて失敗 0 件・`tasklist.md`）。
+> - **M3（事前登録の下書き）を G-GEAR で始めた**。研究者に 8 問 → 判断 90〜97（上の (1) は判断 96 で「照合はそのまま・層別の診断を足す」に決まった）。残りの段取りは `tasklist.md` の M3 の項目。
+> - ⚠️ M2 の残り（生ログの預け方）は、生ログが Mac にしか無いので Mac で行う。M3 と並行してよい（触るファイルが重なるのは `pilot-macos.md` だけで、こちらは Clocks の 1 文、Mac は Raw logs の節）。
+> - ⚠️ Mac で確かめること: パイロットの生成の config の全体（`cand_index_max`・`key_hold_ms`・`iki_sigma`・`inter_trial_ms`・`marker_gap_ms`）。repo の記録は速さ・think・n・マーカーだけ（判断 90）。
+
 ### A. M1 の枝の PR（どちらの機械でも・先に）〔済み・PR #283〕
 
 ```
