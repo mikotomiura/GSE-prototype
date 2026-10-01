@@ -29,6 +29,8 @@
     "-e",
     "delay 0.7",
     "-e",
+    "if id of application (path to frontmost application as text) is not \"local.ime-observation.refinput\" then error \"the reference input field is not in front\"",
+    "-e",
     "tell application \"System Events\" to key code 104",
     "-e",
     "delay 0.3"

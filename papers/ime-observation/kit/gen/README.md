@@ -42,7 +42,7 @@ authoritative. A key starting with `_` is treated as a note and ignored.
 |---|---|---|---|
 | `n_per_cell_scenario_speed` | integer >= 1 | 75 | Trials per scenario-speed cell |
 | `block_size` | integer >= 1 | 25 | Trials per block (the last block may hold fewer) |
-| `scenarios` | array | every scenario enabled by default in recipes | Enabled scenarios (`S1`-`S15`). A scenario with no procedure for the OS (e.g. `S11` on windows) is skipped. `S11` assumes live conversion is on. With `recipes.json`, the implicit default (when `scenarios` is omitted) includes `S11` on macOS, so a live-off cell built from that file must exclude it explicitly; `recipes.macos-live-off.json` disables it by default |
+| `scenarios` | array | every scenario enabled by default in recipes | Enabled scenarios (`S1`-`S15`). A scenario with no procedure for the OS (e.g. `S11` on windows) is skipped. `S11` assumes live conversion is on. With `recipes.json`, the implicit default (when `scenarios` is omitted) includes `S11` on macOS, so a live-off cell built from that file must exclude it explicitly; `recipes.macos-live-off.json` defines no procedure for it (it is left out by default, and naming it stops the build) |
 | `speeds` | object | required | `slow` / `mid` / `fast`, each with `iki_median_ms` (> 0) and `iki_sigma` (>= 0). Key interval is log-normal |
 | `key_hold_ms` | integer >= 1 | required | Time from key-down to key-up |
 | `think_ms` | `{min, max}` | required | Think time (log-uniform). Used wherever the procedure has `pause: think` |
@@ -166,10 +166,12 @@ Other entries:
   uses its own recipes file, `recipes.macos-live-off.json` (pass it with `--recipes`). With live conversion off, a
   single Space shows the conversion in place and one Return commits it (a second Return would insert a line
   break), a second Space opens the candidate window (so the multi-Space scenario keeps two Returns), and one
-  Escape cancels. That file also disables the live-conversion scenario by default. Its Windows section is identical
+  Escape cancels. That file defines no procedure for the live-conversion scenario, so it is left out by default and
+  naming it explicitly in `scenarios` stops the build. Its Windows section is identical
   to `recipes.json`. The generator's selftest checks both files: each scenario's procedure against the profile
   its file is written for (live conversion on, live conversion off, or Windows), that the live-off file leaves the
-  live-conversion scenario out by default and keeps the Windows section and the kana layout of `recipes.json`, and,
+  live-conversion scenario out by default and refuses it when named, that it keeps the Windows section and the kana
+  layout of `recipes.json`, and,
   as a negative control, that each macOS profile rejects a plan built from the other file. The live-off file was
   also checked on the device (39 trials: every scenario committed or cancelled as intended, with no composition
   carried into the next trial).

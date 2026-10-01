@@ -643,3 +643,16 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
   - 〔LOW・security〕`focus_cmd` のかなキーが前面の確認より前に押される → 例の osascript に前面の bundle id の確認を足すのは、Windows では試せない。引き継ぎの Mac の項目にした。`run_cell.py` で `focus_cmd` を送出フラグの対象にする案は、既存の acceptance の挙動を変えるので採らず、README に書くだけにした。
   - 〔範囲外〕`cell.example.json` の `predictive_candidates: "off"` と、既定で有効な S10（予測候補）の食い違い → パイロットの実際の設定を `pilot-macos.md` の条件に書くときに確かめる（引き継ぎ）。
 - **確認**: `generate_plan.py --selftest` 108 件が緑。新しい検査への変異 4 本（検査を外す・`<=` を `<` にする・Windows の照合に OFF の型を渡す・Windows の計画から S2 を抜く）がすべて赤。`kit/check.sh` の 27 本・`--compile` が緑、`_style_check.py` の違反 0 件。
+
+## 判断 83: M1 の枝の完了時レビュー（Codex）—— 上限の一時的な引き上げと、指摘 4 件への対応（2026-10-01・G-GEAR・上限は研究者の選択・対応はメインの実装上の選択で研究者が覆せる）
+
+- **予算**: 同日の Codex の実消費は、並行セッション（`docs/ai-fatigue-protocol-cont`）の台帳で 291,174 / 7 回だった。こちらで 1 回回すと上限 300,000 を超える。予算ガードの hook は `C:\GSE-prototype` の台帳（66,418）を読むので止まらない。研究者に AskUserQuestion で 3 案を出した（推奨は「今日は PR まで・Codex は 10-02」、ほかに「今日だけ 350,000 に上げる」「Codex を省く」）。研究者は「今日だけ上限を 350,000 に上げる」を選んだ。台帳に `_comment_2026_10_01_m1_pr_raise` を足した。並行セッションには、今日はこれ以上回さないよう SendMessage で知らせた。
+- **実行**: `scripts/run-codex-review.sh 97381a7b..6fa44a6a -- papers/ime-observation`（12 ファイル・772 行）。機密フィルタは素通りした。消費は 33,557（本ブランチの台帳 199,404 → 232,961・5 → 6 回）。同日の合計の見込みは 291,174 + 33,557 = 324,731。
+- **指摘と対応**（4 件とも一次で確かめた）:
+  1. 〔P1〕`closed_set.py` が計画と違う手順書を黙って使う。code-reviewer の MEDIUM と一致したので、判断 82 の「README だけ」を改め、コードで止める。`run()` で、各計画のヘッダーの `recipes_sha256` と `--recipes` のファイルの SHA-256 を比べ、違えば exit 2 にした。selftest の計画は `recipes.json` の実際の SHA-256 で作るように直し、OFF 用の手順書を渡すと exit 2 になるケースを足した（83 件緑・照合を外す変異で赤）。021 の acceptance は selftest とケース名の grep だけなので、影響しない。`open_set.py` は、2 つのファイルで同一の `kana_layout` / `typed_reading` しか使わないので照合しない（README に書いた）。
+  2. 〔P1〕例の `focus_cmd` が、前面の確認の前にキーを送る。`dryrun` では同意なしで送る。security-checker の LOW と同じ。
+     - (i) 同意: `run_cell.py` で、`focus_cmd` を `reset_cmd` と同じく送出フラグの対象にした。フラグが無ければ実行せず、manifest に skipped と理由を書く。README の「フラグは機械の状態を変える操作すべてへの同意」に合わせた。既存の「focus の失敗で abort」のケースはフラグありに直した。フラグなしでは走らない・フラグありでは走る、の 2 ケースを足した（53 件緑・ゲートを外す変異で赤）。manifest の `focus` を読む処理は `run_cell.py` の外に無い（grep）。
+     - (ii) 順序: 例の osascript に、かなキーを押す前の前面の確認を 1 行足した。式は送出側 `backend_macos.py` の `FRONT_QUERY`（`id of application (path to frontmost application as text)`）で、パイロットの実機で動いたもの。違えば `error` で非 0 になり、`run_cell.py` がブロックの前に abort する。⚠️ この 1 行は実機で試していない → Mac で確かめる（引き継ぎ）。README の前提 6 に「パイロットの後に足した 1 行」と書いた。
+  3. 〔P2〕持ち越しは、キー列の照合（`_scenario_checks`）では見つからない。`gt_sessions.py` の `oracle_agreement` は不一致を型ごとに数えるが、除外はしない。→ 持ち越した試行（と次の試行）をどう扱うかは、正解の定義と事前登録で決める（M2 / M3・引き継ぎ §3）。今回はコードを変えない。
+  4. 〔P2〕OFF 用の手順書でも、S11 を `scenarios` で名指しすれば生成できる。→ OFF 用の手順書の S11 を S9 と同じ形（`steps` が空・既定で無効）にし、名指しすると生成が止まるようにした。selftest に 1 ケース足した（109 件緑・直す前の手順書で赤）。⚠️ これで OFF 用の手順書の SHA-256 が変わる。パイロットの `verify-off` の計画は、`19c537c0` の版を指す（生ログを預けるときは、その版を添える）。
+- **2 巡目**: Codex の 2 巡目は回さない。同日の合計の見込み（324,731）に 1 回（3〜4 万）を足すと、研究者が選んだ 350,000 を超えるため。2 巡目の観点（今回足した規則の境界条件）は、Claude の code-reviewer で見る。

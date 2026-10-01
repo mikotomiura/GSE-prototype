@@ -17,10 +17,11 @@ python3 run_cell.py --selftest
 - The run directory must not exist; it is created by the runner and an existing one is never reused or
   changed. Run directories are ignored by git (`runs/`).
 - The flag `--i-understand-this-sends-keys` is the consent to every operation that changes the state of the
-  machine, that is, to typing and to the reset. A backend other than `dryrun` sends real key events to the
-  application in front, and the runner refuses to start (exit status 2) without the flag. `reset_cmd` is run
-  only with the flag, also with `dryrun`; without it the reset is not run, no `reset` row is written to the
-  oracle, and the manifest records the reset of that block as skipped, with the reason.
+  machine, that is, to typing, to the reset, and to the focus command (which may press a key). A backend other
+  than `dryrun` sends real key events to the application in front, and the runner refuses to start (exit status
+  2) without the flag. `reset_cmd` and `focus_cmd` are run only with the flag, also with `dryrun`; without it
+  neither is run, no `reset` row is written to the oracle, and the manifest records the reset and the focus
+  command of each block as skipped, with the reason.
 - A real backend needs the backend option that its `focus_back` key uses (`focus_app` on macOS, `focus_window`
   on Windows) in `backend_opts`; without it the runner exits with status 2. The flag check, the check of the
   cell file and the plan, the clock check, and the check that the run directory does not exist all come before
@@ -54,7 +55,10 @@ Check these by hand; the runner records the statements in the cell file and cann
    reference input field to the front. Both differ by system and input method and are checked in a calibration
    pilot. In `cell.example.json`, `reset_cmd` (`false`), the `learning` entry of `ime_settings` (which states the
    intended reset), and the version in `ime` are placeholders; the other commands and options are the ones used in
-   the macOS calibration pilot, where the input method's learning was not reset.
+   the macOS calibration pilot, where the input method's learning was not reset, except one line added to
+   `focus_cmd` after the pilot: it checks, with the query the emitter uses to read the front application, that the
+   reference input field is in front before the input-method key is pressed, and fails otherwise (which aborts the
+   run before the block).
 7. A cell file is executable configuration: it names programs that are run with your privileges. Run only cell
    files that you have read, and never one from another person unread.
 8. The child programs must be the programs themselves, not wrapper scripts (on Windows a `.bat` or `.cmd` file
@@ -74,7 +78,7 @@ A JSON object. Unknown keys and missing keys are refused.
 | `refinput_cmd` | argument array that starts the reference input field; `{out}` is replaced by the absolute path of its log |
 | `logger_cmd` | argument array that starts the observer; `{out}` is replaced by the absolute path of its log |
 | `reset_cmd` | argument array run before each block whose plan row has `reset_ime` true, and only with the send flag; empty means no reset (recorded as skipped) |
-| `focus_cmd` | optional preparation, an argument array run before each block; empty means nothing is run. It is run whether or not the send flag is given (a real backend refuses to start without the flag, but `dryrun` does not), and before the runner confirms which application is in front, so a `focus_cmd` that presses a key, as in `cell.example.json`, belongs only in a cell for a real backend |
+| `focus_cmd` | optional preparation, an argument array run before each block, and only with the send flag; empty means nothing is run. It runs before the runner confirms which application is in front, so a key it presses (as in `cell.example.json`, the key that switches the input method on) reaches whatever application is in front at that moment, unless the command checks the front application first, as `cell.example.json` does |
 | `ready_wait_ms` | how long to wait after starting the children before the first block |
 | `backend` | `dryrun`, `macos`, or `windows` |
 | `clock_sync_disabled`, `auto_update_disabled` | statements by the person who prepared the machine |

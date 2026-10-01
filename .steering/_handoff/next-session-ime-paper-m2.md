@@ -67,7 +67,7 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応�
 
 ## §2 M1 の枝の PR（`feature/ime-m1-pilot` → main）の前にすること
 
-> ★ **2026-10-01（G-GEAR）に 1〜7 を進めた**（判断 81・82）。1〜4 は `5e9f873a`。6 の merge は `5a9cc805`（衝突は Mac の §6 を §7 にした）。5 の Claude の 2 系統は CRITICAL / HIGH 0 で、指摘は判断 82 のとおり直した。Codex は研究者の選択で上限を一時的に 350,000 に上げて回す。結果と PR の番号は `tasklist.md` を見る。下の本文は当時の指示として残す。
+> ★ **2026-10-01（G-GEAR）に 1〜7 を進めた**（判断 81〜83）。1〜4 は `5e9f873a`。6 の merge は `5a9cc805`（衝突は Mac の §6 を §7 にした）。5 の Claude の 2 系統は CRITICAL / HIGH 0 で、指摘は判断 82 のとおり直した。Codex は研究者の選択で上限を一時的に 350,000 に上げて 1 回回した（P1 2 件・P2 2 件を判断 83 のとおり直し、上限は 300,000 に戻した）。結果と PR の番号は `tasklist.md` を見る。下の本文は当時の指示として残す。
 
 1. **`GENERATOR_VERSION` を上げる**（今は `"1.1.0"`・`kit/gen/generate_plan.py:45`）。
    - `kit/gen/README.md:92-93` は「`recipes.json` の手順の意味が変わったら上げる」と定めている。
@@ -117,7 +117,10 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応�
    - マーカーを変えたら、`pilot/README.md` の例の JSON（`oracle_keys` / `gt_vks` / `obs_categories`）と e2/README の記述も合わせる。
 7. Mac で確かめること（G-GEAR では試せない）:
    - `refinput-macos/build.sh` を回す（bundle id の検査を `[[ =~ ]]` と `LC_ALL=C` にした。macOS の bash 3.2 で通るか）。
-   - 〔任意〕`cell.example.json` の `focus_cmd` で、かなキーを押す前に前面の bundle id を確かめる形にする（security-checker の LOW。今は前面の確認より前に押される）。実機で試してから直す。
+   - ⚠️ `cell.example.json` の `focus_cmd` に、かなキーを押す前の前面の確認を 1 行足した（判断 83・Codex の P1）。式は送出側の `FRONT_QUERY` と同じだが、**この 1 行は実機で試していない**。参照入力欄を前面にした状態で通ること・別のアプリが前面だと非 0 で止まること（`run_cell.py` がブロックの前に abort）を、短い run で確かめる。
+   - ⚠️ `focus_cmd` は送出フラグがあるときだけ走るようになった（判断 83）。`dryrun` で前面化を試すときもフラグが要る。
+8. **持ち越しの扱い**（Codex の P2・判断 83）。ON の再パイロットで S8 / S10 が各 1 件、未確定の文字列を次の試行へ持ち越した。キー列の照合では見つからず、`gt_sessions.py` の `oracle_agreement` は不一致を数えるだけで除外はしない。
+   - 正解の定義（`gt_rules`）と事前登録（M3）で、持ち越した試行と次の試行をどう扱うか（除外か・別に数えるか）を決める。
 
 ## §4 その先のマイルストーン
 
@@ -135,7 +138,7 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応�
 - ⚠️ **OFF のセルは、同じ手順書を最後まで通して使う**。
   - 計画の生成も E2 の閉集合の攻撃（予想ログを recipes から作る）も、`--recipes kit/gen/recipes.macos-live-off.json` を渡す。
   - 観測側のマーカー（← → ←）は、E2 で `--markers-in-obs` を付けて扱う（判断 80）。
-  - ⚠️ E2 を本番のログに回す前に、`closed_set.py` に「計画のヘッダーの `recipes_sha256` と `--recipes` のファイルの SHA-256 が違えば exit 2」を足す（code-reviewer の MEDIUM・判断 82。今は README に書いただけ）。selftest の計画は `recipes_sha256` が `"0" * 64` なので、closed_set / open_set の selftest と 021 / 022 の fixture も直す範囲になる。
+  - ★ `closed_set.py` は、計画のヘッダーの `recipes_sha256` と `--recipes` のファイルの SHA-256 が違えば exit 2 で止まるようになった（判断 83）。⚠️ OFF 用の手順書は判断 83 で S11 を空にしたので、SHA-256 が `19c537c0` の版から変わった。パイロットの `verify-off` の計画はその古い版を指す（E2 にかけるなら、その版を `git show 19c537c0:…` で取り出して渡す）。
 - ⚠️ Codex の台帳は枝ごとに記帳される。merge では両側の増分を合算する（`git checkout --` で戻さない）。回す前に origin/main の台帳も見る。
 - ⚠️ 両方の機械が同じ枝に push するときは、push の前に `git fetch` → `git pull --no-rebase`（force しない）。
 - ⚠️ heredoc の中のバックスラッシュは潰れる → 文書は Write / Edit で書き、`od -c` で確かめる。

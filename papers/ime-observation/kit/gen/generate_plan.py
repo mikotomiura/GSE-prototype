@@ -1112,6 +1112,13 @@ def selftest():
                     if s in recipes_off["os"]["macos"] and recipes_off["os"]["macos"][s].get("default_enabled", True)]
         check("the live-off recipes leave the live-conversion scenario out by default",
               "S11" not in scen_off and "S11" not in set(t["scenario"] for t in rows_off if t["kind"] == "trial"))
+        try:
+            plan_rows(corpus, recipes_off, dict(cfg, scenarios=["S1", "S11"]), "macos", 7, sha, _sha_file(off_path), csha)
+            s11_named = "built"
+        except ValueError as e:
+            s11_named = str(e)
+        check("naming the live-conversion scenario explicitly with the live-off recipes stops the build",
+              "S11" in s11_named and "no defined procedure" in s11_named, s11_named)
         seen_off = _scenario_checks(rows_off, ph_off, recipes_off, ncfg, fails, "macos-live-off")
         n[0] += 1
         check("all 13 scenarios appear under the live-off macos default", seen_off == set(scen_off),

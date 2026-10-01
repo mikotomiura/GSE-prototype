@@ -8,7 +8,8 @@
 The runner starts the standalone observer (``logger_cmd``) and the reference input field (``refinput_cmd``) as
 child processes, waits ``ready_wait_ms``, and then plays the plan block by block through the scenario emitter
 (``kit/emit/emit.py``, used as a library). Before each block whose plan row asks for it (``reset_ime``), it runs
-``reset_cmd`` and records the exit status in the oracle; before every block it runs ``focus_cmd`` and then, with
+``reset_cmd`` and records the exit status in the oracle; before every block it runs ``focus_cmd`` (both commands
+only with the send flag) and then, with
 a real backend, confirms through the backend that the reference input field is in front (the backend's
 ``focus_back`` key, which brings the window forward, reads the front window back, and stops if it differs).
 After the last block the children are stopped in the reverse of the order in which they were started (the
@@ -44,9 +45,11 @@ machine; the runner records them and cannot check them. A cell file is executabl
 programs that are run with the privileges of the person who runs the runner.
 
 The flag named by ``SEND_FLAG`` is the consent to every operation that changes the state of the machine: it is
-required for a backend other than ``dryrun`` (which sends keys) and for ``reset_cmd`` (which changes the input
-method's stored state), also with ``dryrun``. Without it the runner exits with status 2 for a real backend, and
-a reset is not run: the manifest records it as skipped with the reason, and the oracle gets no reset row. A real
+required for a backend other than ``dryrun`` (which sends keys), for ``reset_cmd`` (which changes the input
+method's stored state), and for ``focus_cmd`` (which may press a key, such as the one that switches the input
+method on), also with ``dryrun``. Without it the runner exits with status 2 for a real backend, and neither a
+reset nor a focus command is run: the manifest records each as skipped with the reason, and the oracle gets no
+reset row. A real
 backend also needs the backend option that its ``focus_back`` key uses (the application or window to bring to
 the front); without it the runner exits with status 2 before any child is started. The flag check, the plan
 check, the clock check, and the check that the run directory does not exist all happen before any child process
@@ -576,7 +579,10 @@ def play(cell, header, blocks, plan_sha, backend, module, allow_send, run_dir, c
                         resets.append({"block_id": block_id, "exit_code": code, "failure": failure})
                 entry = {"block_id": block_id, "exit_code": None, "failure": None, "front_confirmed": False}
                 focus.append(entry)
-                if cell["focus_cmd"]:
+                if cell["focus_cmd"] and not allow_send:
+                    entry["skipped"] = ("the send flag was not given; a focus command may press a key and is not "
+                                        "run without it")
+                elif cell["focus_cmd"]:
                     code, failure = commands.run("focus", cell["focus_cmd"])
                     entry["exit_code"], entry["failure"] = code, failure
                     if failure is not None:
@@ -1054,11 +1060,25 @@ def _selftest_body(tmp, check, exit_with):
     check("allow_send is False without the flag and True with it", seen == [False, True])
 
     # a failing focus command stops the run before anything is sent
-    rc, d = go("focus", _cell(stub, {"focus_cmd": exit_with(4)}))
+    rc, d = go("focus", _cell(stub, {"focus_cmd": exit_with(4)}), flag=True)
     m = manifest_of(d)
     check("a focus command that fails aborts the run before any key",
           rc == 1 and m.get("aborted") is True and "focus" in (m.get("abort_reason") or "")
           and m["focus"][0]["failure"] == "exit_status" and not pressed(d))
+
+    # the focus command: gated by the flag, like the reset command (it may press a key)
+    focus_marker = os.path.join(tmp, "focus-ran.txt")
+    focus_touch = [sys.executable, "-c", "import sys; open(sys.argv[1], 'w').write('x')", focus_marker]
+    rc, d = go("focus_gated", _cell(stub, {"focus_cmd": focus_touch}))
+    m = manifest_of(d)
+    check("without the flag the focus command is not run, and the manifest records it as skipped",
+          rc == 0 and not os.path.exists(focus_marker) and all(f.get("skipped") for f in m["focus"])
+          and all(f["exit_code"] is None for f in m["focus"]))
+    rc, d = go("focus_flag", _cell(stub, {"focus_cmd": focus_touch}), flag=True)
+    m = manifest_of(d)
+    check("with the flag the focus command is run before each block",
+          rc == 0 and os.path.exists(focus_marker) and all(f["exit_code"] == 0 and "skipped" not in f
+                                                           for f in m["focus"]))
 
     # a real backend: the front window is confirmed before each block (a fake backend; nothing is sent)
     def with_fake(name, opts, fail_on=None, flag=True):

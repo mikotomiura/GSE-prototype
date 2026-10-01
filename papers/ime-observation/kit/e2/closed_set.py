@@ -562,6 +562,7 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, Ks, featu
     if len(obs_paths) != len(plan_paths):
         raise ValueError("--obs and --plan differ in count (%d and %d)" % (len(obs_paths), len(plan_paths)))
     recipes = generate_plan.load_recipes(recipes_path)
+    recipes_sha256 = _sha_file(recipes_path)
     with open(config_path, "rb") as f:
         try:
             config = _loads(f.read().decode("utf-8"))
@@ -572,10 +573,15 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, Ks, featu
     trials = []
     n_shadow = 0
     for i, (op, pp) in enumerate(zip(obs_paths, plan_paths)):
+        plan = read_plan(pp)
+        # The candidates' key presses are predicted from these procedures, so they must be the ones the plan was
+        # built from (a macOS cell with live conversion off has its own recipes file).
+        if plan[0]["recipes_sha256"] != recipes_sha256:
+            raise ValueError("plan %d was built from a different recipes file than --recipes (its recipes_sha256 "
+                             "differs); pass the recipes file the plan was built from" % (i + 1))
         events, sh, obs_os = read_obs(op)
         n_shadow += sh
-        trials.extend(segment_by_plan(events, read_plan(pp), obs_os, markers_in_obs, ime_toggle_in_obs,
-                                      tag="s%d-" % i))
+        trials.extend(segment_by_plan(events, plan, obs_os, markers_in_obs, ime_toggle_in_obs, tag="s%d-" % i))
     results = {}
     for K in Ks:
         results[str(K)] = evaluate(trials, corpus, K, features_list, seed, recipes, config)
@@ -583,7 +589,7 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, Ks, featu
             "n_trials": len(trials), "n_ime_shadow_rows_unused": n_shadow, "features": dict(
                 (f, {"timing": FEATURE_SETS[f][0], "runs": FEATURE_SETS[f][1]}) for f in features_list),
             "params": {"pause_ms": PAUSE_MS, "tau_ms": TAU_MS, "w_time": W_TIME, "phase_step_ms": PHASE_STEP_MS},
-            "corpus_sha256": _sha_file(corpus_path), "recipes_sha256": _sha_file(recipes_path),
+            "corpus_sha256": _sha_file(corpus_path), "recipes_sha256": recipes_sha256,
             "config_sha256": _sha_file(config_path), "results": results}
 
 
@@ -897,7 +903,8 @@ def selftest():
 
         # command line, end to end (plan -> observation -> attack -> JSON)
         rows, _ = generate_plan.plan_rows(corpus, recipes, dict(cfg, scenarios=["S1", "S2", "S3"], n_per_cell_scenario_speed=4),
-                                          "macos", 3, "0" * 64, "0" * 64, "0" * 64)
+                                          "macos", 3, "0" * 64, _sha_file(os.path.join(_KIT, "gen", "recipes.json")),
+                                          "0" * 64)
         plan_path = os.path.join(tmp, "plan.jsonl")
         with open(plan_path, "wb") as f:
             f.write(generate_plan.render_plan(rows))
@@ -970,6 +977,13 @@ def selftest():
         check("command line: a corpus too small for K stops the run (exit 2)",
               main(["--obs", obs_p] + [a if a != "10,40" else "1000" for a in base] + ["--out", new_out()]) == 2)
         check("command line: no arguments exit 2", main([]) == 2)
+        with open(plan_path, "rb") as f:
+            plan_bytes = f.read()
+        off_path = os.path.join(_KIT, "gen", "recipes.macos-live-off.json")
+        check("negative: command line: a plan built from another recipes file than --recipes stops the run (exit 2)",
+              plan_bytes.count(_sha_file(os.path.join(_KIT, "gen", "recipes.json")).encode("ascii")) == 1
+              and main(["--obs", obs_p] + [a if a != os.path.join(_KIT, "gen", "recipes.json") else off_path
+                                           for a in base] + ["--out", new_out()]) == 2)
         check("positive: command line: --ime-toggle-in-obs is accepted and does not break a run whose plan has no "
               "IME toggle key (this plan's scenarios are S1/S2/S3)",
               main(["--obs", obs_p] + base + ["--out", new_out(), "--ime-toggle-in-obs"]) == 0)

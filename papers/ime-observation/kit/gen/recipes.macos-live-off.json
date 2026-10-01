@@ -54,7 +54,7 @@
         "steps": [{"type_reading": true, "part": "first_half"}, {"key": "tab"}, {"pause": "think"}, {"key": "enter"}],
         "intent": {"commit": "enter", "cand_index": null, "nav_count": 0, "abandon": false, "predictive": true, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
-      "S11": {"default_enabled": false, "steps": [{"type_reading": true}, {"key": "enter"}],
+      "S11": {"default_enabled": false, "steps": [],
         "intent": {"commit": "enter", "cand_index": null, "nav_count": 0, "abandon": false, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S12": {

@@ -187,10 +187,10 @@ an existing path is a usage error. Exit codes: 0 success, 2 usage error or unrea
 
 `--recipes` must be the file the plans were built from (the plan header's `recipes_sha256` is the SHA-256 of that
 file): for a macOS cell with live conversion off, pass `../gen/recipes.macos-live-off.json`. `closed_set.py`
-predicts each candidate's key presses from these procedures, so a different file builds the predictions from the
-wrong procedures. It does not yet compare the file with the plan headers; its output records the hash of the file
-passed (`recipes_sha256`), so a mismatch can be found afterwards by comparing the two. (`open_set.py` reads only
-the kana layout and the typed reading from the recipes, which are the same in both files.)
+predicts each candidate's key presses from these procedures, so it compares the SHA-256 of the file passed with
+every plan's header and stops with exit code 2 when they differ, rather than building the predictions from the wrong
+procedures. (`open_set.py` reads only the kana layout and the typed reading from the recipes, which are the same in
+both files, and does not make this comparison.)
 
 The output is one JSON file with `assumptions`, `params` (including `phase_step_ms`), the hashes of the inputs, and
 `results[K][feature set]` with `acc`, `acc_ci`, `acc_source`, `acc_raw`, `acc_ci_raw`, `chance`, `n`, `n_skipped`,
