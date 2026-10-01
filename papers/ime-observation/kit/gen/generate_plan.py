@@ -52,6 +52,7 @@ KEYNAMES = frozenset(
        "ime_on", "ime_off"] + ["f%d" % i for i in range(13, 20)]
     + ["shift", "mouse_click", "focus_away", "focus_back"]
 )
+ARROW_KEYS = ("left", "up", "right", "down")
 COMMITS = ("enter", "digit", "mouse", "none")
 INTENT_KEYS = ("commit", "cand_index", "nav_count", "abandon", "predictive", "ime_toggle_mid", "focus_switch_mid",
                "expect_session")
@@ -190,6 +191,12 @@ def normalize_config(config):
     mk = cfg["marker"]
     if not isinstance(mk, list) or any(k not in KEYNAMES for k in mk):
         raise ValueError("config marker must be an array of keynames")
+    # The observation records only a key's category, so a marker made only of arrow keys is found there as a run of
+    # navigation rows, and one scenario presses the right arrow up to nav_count_max times in a row. Such a marker
+    # stays unique in the observation only when it is longer than that run (see ../pilot/README.md).
+    if mk and all(k in ARROW_KEYS for k in mk) and len(mk) <= cfg["nav_count_max"]:
+        raise ValueError("config marker made only of arrow keys must be longer than nav_count_max (%d), or the "
+                         "arrow presses inside a trial can be taken for a marker" % cfg["nav_count_max"])
     if cfg.get("scenarios") is not None:
         sc = cfg["scenarios"]
         if not isinstance(sc, list) or not sc or len(set(sc)) != len(sc) or any(s not in SCENARIOS for s in sc):
@@ -881,13 +888,16 @@ def _sha_file(path):
 # Keys each procedure profile ends a scenario with (see the README's Limitations). "commit" follows a conversion
 # after one Space (and, in S7 / S15, the arrows or the focus switch that come after it), "commit_cands" follows the
 # candidate window opened by two or more Spaces, "after_digit" follows a digit pick, and "cancel" cancels an
-# unconverted reading.
+# unconverted reading. A commit that follows no Space (S3, S10, S11) takes one Return under every profile and is not
+# listed here.
 # - macos-live-on (recipes.json): one Space already opens the candidate window, where a Return only picks the
-#   candidate, so every commit takes a second Return; each Escape steps the live conversion back one stage (kanji,
-#   kana, spelling), so the cancel presses four (extra presses only reach the field as a command).
+#   candidate, so every commit after a Space takes a second Return, and so does a digit pick; each Escape steps the
+#   live conversion back one stage (kanji, kana, spelling), so the cancel presses four (extra presses only reach the
+#   field as a command).
 # - macos-live-off (recipes.macos-live-off.json): one Space shows the conversion in place and one Return commits
-#   it; a second Space opens the candidate window, which still takes two Returns; one Escape cancels.
-# - windows (either file): one key each.
+#   it; a second Space opens the candidate window, which still takes two Returns, and a digit pick is followed by one
+#   Return; one Escape cancels.
+# - windows (either file): one Return for each commit and one Escape for the cancel; a digit pick commits by itself.
 _PROFILES = {
     "windows": {"commit": ["enter"], "commit_cands": ["enter"], "after_digit": [], "cancel": ["esc"]},
     "macos-live-on": {"commit": ["enter", "enter"], "commit_cands": ["enter", "enter"], "after_digit": ["enter"],
@@ -950,7 +960,8 @@ def _scenario_checks(rows, phrases, recipes, cfg, fails, profile):
             i = downs.index("focus_away")
             ok = downs[i:] == ["focus_away", "focus_back"] + enter and at[i + 1] - at[i] == 1000
         if not ok:
-            fails.append("scenario %s's procedure does not match recipes' intent (%s)" % (sc, r["trial_id"]))
+            fails.append("scenario %s's procedure does not match recipes' intent under the %s profile (%s)"
+                         % (sc, profile, r["trial_id"]))
             return
     return seen
 
@@ -1057,7 +1068,12 @@ def selftest():
         seen = _scenario_checks(rows1, ph1, recipes, ncfg, fails, "macos-live-on")
         n[0] += 1
         check("all 14 scenarios appear under the macos default", seen == set(scen_mac), str(sorted(seen or [])))
-        _scenario_checks(rows_w, gen("windows")[1], recipes, ncfg, fails, "windows")
+        seen_w = _scenario_checks(rows_w, ph_w, recipes, ncfg, fails, "windows")
+        n[0] += 1
+        scen_win = [s for s in SCENARIOS
+                    if s in recipes["os"]["windows"] and recipes["os"]["windows"][s].get("default_enabled", True)]
+        check("every scenario enabled by default appears under the windows default", seen_w == set(scen_win),
+              str(sorted(seen_w or [])))
         check("one scenario falls back to a synthetic kana string (kana-) when typable phrases run out",
               any(t["phrase_id"].startswith("kana-") for t in trials if t["scenario"] == "S12"))
         check("no other scenario uses a kana- phrase_id", all(not t["phrase_id"].startswith("kana-") for t in trials if t["scenario"] != "S12"))
@@ -1295,6 +1311,26 @@ def selftest():
         rc, msg = run("--corpus", corpus_path, "--recipes", recipes_path, "--config", bad_cfg, "--os", "macos",
                       "--seed", "1", "--out", os.path.join(tmp, "x.jsonl"))
         check("a config missing keys exits 2", rc == 2, "exit %d" % rc)
+
+        # --- an arrow-key marker must be longer than the longest arrow run inside a trial (nav_count_max)
+        def _marker_ok(marker, nav):
+            try:
+                normalize_config(dict(cfg, marker=marker, nav_count_max=nav))
+                return True
+            except ValueError:
+                return False
+        check("an arrow-key marker no longer than nav_count_max is rejected",
+              not _marker_ok(["left", "right", "left"], 3) and not _marker_ok(["up"], 1))
+        check("an arrow-key marker longer than nav_count_max, or one with a non-arrow key, is accepted",
+              _marker_ok(["left", "right", "left", "right"], 3) and _marker_ok(["left", "right", "left"], 2)
+              and _marker_ok(["f13", "f14", "f13"], 3) and _marker_ok(["left", "f13"], 3) and _marker_ok([], 3))
+        bad_mk = os.path.join(tmp, "bad_marker.json")
+        with open(bad_mk, "wb") as f:
+            f.write(json.dumps(dict(cfg, marker=["left", "right", "left"], nav_count_max=3)).encode("utf-8"))
+        rc, msg = run("--corpus", corpus_path, "--recipes", recipes_path, "--config", bad_mk, "--os", "macos",
+                      "--seed", "1", "--out", os.path.join(tmp, "x.jsonl"))
+        check("a config whose arrow-key marker is too short exits 2", rc == 2 and "nav_count_max" in msg,
+              "exit %d" % rc)
         rc, msg = run("--validate", os.path.join(tmp, "no-such-file.jsonl"))
         check("--validate on a nonexistent plan exits 2", rc == 2, "exit %d" % rc)
         mut_path = os.path.join(tmp, "mut.jsonl")

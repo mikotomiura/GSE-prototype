@@ -39,8 +39,12 @@ Check these by hand; the runner records the statements in the cell file and cann
 3. Nothing else is in front of the reference input field, and nobody touches the keyboard or the pointer while a
    real backend is sending: synthetic keys go to whatever application is in front.
 4. Sleep, the screen lock, and the screen saver are turned off for the duration of the run; a locked screen
-   receives the synthetic keys instead of the reference input field. On macOS the terminal application that runs the runner holds the Accessibility permission.
-4a. The input method is on (for example Japanese, not the Latin layout) when each block starts. The plan does not
+   receives the synthetic keys instead of the reference input field. On macOS the terminal application that runs
+   the runner holds the Accessibility permission and, when `focus_cmd` drives System Events (as in
+   `cell.example.json`), the Automation permission for System Events; both permissions can be withdrawn after the
+   measurement.
+
+   The input method is on (for example Japanese, not the Latin layout) when each block starts. The plan does not
    switch it on; a `focus_cmd` that brings the field forward and then presses the input-method-on key does, provided
    the system keeps one input source for all documents (on macOS, "Automatically switch to a document's input source"
    is off). Record in `ime_settings` how the input method was switched on and whether live conversion is on.
@@ -48,7 +52,9 @@ Check these by hand; the runner records the statements in the cell file and cann
    registers them. Markers must be keys the observer records (see `../pilot/README.md`); arrow keys are used.
 6. `reset_cmd` really clears the input method's dictionary and learning, and `focus_cmd` really brings the
    reference input field to the front. Both differ by system and input method and are checked in a calibration
-   pilot; `cell.example.json` gives placeholders only.
+   pilot. In `cell.example.json`, `reset_cmd` (`false`), the `learning` entry of `ime_settings` (which states the
+   intended reset), and the version in `ime` are placeholders; the other commands and options are the ones used in
+   the macOS calibration pilot, where the input method's learning was not reset.
 7. A cell file is executable configuration: it names programs that are run with your privileges. Run only cell
    files that you have read, and never one from another person unread.
 8. The child programs must be the programs themselves, not wrapper scripts (on Windows a `.bat` or `.cmd` file
@@ -68,7 +74,7 @@ A JSON object. Unknown keys and missing keys are refused.
 | `refinput_cmd` | argument array that starts the reference input field; `{out}` is replaced by the absolute path of its log |
 | `logger_cmd` | argument array that starts the observer; `{out}` is replaced by the absolute path of its log |
 | `reset_cmd` | argument array run before each block whose plan row has `reset_ime` true, and only with the send flag; empty means no reset (recorded as skipped) |
-| `focus_cmd` | optional preparation, an argument array run before each block; empty means nothing is run |
+| `focus_cmd` | optional preparation, an argument array run before each block; empty means nothing is run. It is run whether or not the send flag is given (a real backend refuses to start without the flag, but `dryrun` does not), and before the runner confirms which application is in front, so a `focus_cmd` that presses a key, as in `cell.example.json`, belongs only in a cell for a real backend |
 | `ready_wait_ms` | how long to wait after starting the children before the first block |
 | `backend` | `dryrun`, `macos`, or `windows` |
 | `clock_sync_disabled`, `auto_update_disabled` | statements by the person who prepared the machine |

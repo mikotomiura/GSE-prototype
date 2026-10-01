@@ -67,6 +67,8 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応�
 
 ## §2 M1 の枝の PR（`feature/ime-m1-pilot` → main）の前にすること
 
+> ★ **2026-10-01（G-GEAR）に 1〜7 を進めた**（判断 81・82）。1〜4 は `5e9f873a`。6 の merge は `5a9cc805`（衝突は Mac の §6 を §7 にした）。5 の Claude の 2 系統は CRITICAL / HIGH 0 で、指摘は判断 82 のとおり直した。Codex は研究者の選択で上限を一時的に 350,000 に上げて回す。結果と PR の番号は `tasklist.md` を見る。下の本文は当時の指示として残す。
+
 1. **`GENERATOR_VERSION` を上げる**（今は `"1.1.0"`・`kit/gen/generate_plan.py:45`）。
    - `kit/gen/README.md:92-93` は「`recipes.json` の手順の意味が変わったら上げる」と定めている。
    - M1 で macOS の手順を変え、OFF 用の手順書も足したので、この規則に当たる。
@@ -104,7 +106,18 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応�
 4. **パイロットの生ログの置き場**。design.md §1.1a は「パイロットの生ログも公開物に含める」と書く。
    - `experiment/data.md` の預け方に従う（`kit/analysis/pipeline.py --pack`）。
    - 生ログは今 Mac の `~/ime-pilot/runs/` にあり、git の外。
+   - ⚠️ **預ける前に除外の基準を決めて書く**（security-checker の MEDIUM・判断 82）。研究者は参照入力欄とテキストエディットで手打ちの対照をしている（`pilot-macos-1-notes.md`）。単体ロガーはシステム全体の打鍵を観測するので、人が触った run を預けると研究者本人の打鍵の時刻と長さが公開される（Zenodo の DOI は取り消せない）。
+     - (a) 預けるのは計画どおりの run（runner の manifest があり、aborted でないもの）だけ。
+     - (b) 各 run で「oracle に対応する押下が無い観測の key 行」が 0 件であることを確かめる。⚠️ 今の `reach.py` は oracle → 観測の向きしか数えない（逆向きを数える道具が要る）。
+     - (c) 手打ちの探査（`enter_probe*`・`esc_probe*`）の出力と、手打ちの対照の記録は対象外と明記する。
 5. IME の学習をリセットしなかった（研究者の判断）ことは、`pilot-macos.md` の条件に書く。
+   - あわせて、パイロットの実際の IME の設定を書く。`cell.example.json` の `predictive_candidates` は `"off"` だが、S10（予測候補を Tab で選ぶ）は両方の macOS の手順書で既定で有効（code-reviewer の範囲外の指摘）。
+6. ⚠️ **マーカーの長さ**（判断 82）。生成器は「矢印だけのマーカーは `nav_count_max` より長い」を検査するようになった。パイロットの ← → ← は、`nav_count_max` ≥ 3 の config では exit 2 になる。
+   - 本番の config を決めるときに、研究者が次のどちらかを選ぶ（推奨と理由を添えて AskUserQuestion）: 4 打鍵のマーカー（← → ← →）にする／`nav_count_max` を 2 以下にする。
+   - マーカーを変えたら、`pilot/README.md` の例の JSON（`oracle_keys` / `gt_vks` / `obs_categories`）と e2/README の記述も合わせる。
+7. Mac で確かめること（G-GEAR では試せない）:
+   - `refinput-macos/build.sh` を回す（bundle id の検査を `[[ =~ ]]` と `LC_ALL=C` にした。macOS の bash 3.2 で通るか）。
+   - 〔任意〕`cell.example.json` の `focus_cmd` で、かなキーを押す前に前面の bundle id を確かめる形にする（security-checker の LOW。今は前面の確認より前に押される）。実機で試してから直す。
 
 ## §4 その先のマイルストーン
 
@@ -122,6 +135,7 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応�
 - ⚠️ **OFF のセルは、同じ手順書を最後まで通して使う**。
   - 計画の生成も E2 の閉集合の攻撃（予想ログを recipes から作る）も、`--recipes kit/gen/recipes.macos-live-off.json` を渡す。
   - 観測側のマーカー（← → ←）は、E2 で `--markers-in-obs` を付けて扱う（判断 80）。
+  - ⚠️ E2 を本番のログに回す前に、`closed_set.py` に「計画のヘッダーの `recipes_sha256` と `--recipes` のファイルの SHA-256 が違えば exit 2」を足す（code-reviewer の MEDIUM・判断 82。今は README に書いただけ）。selftest の計画は `recipes_sha256` が `"0" * 64` なので、closed_set / open_set の selftest と 021 / 022 の fixture も直す範囲になる。
 - ⚠️ Codex の台帳は枝ごとに記帳される。merge では両側の増分を合算する（`git checkout --` で戻さない）。回す前に origin/main の台帳も見る。
 - ⚠️ 両方の機械が同じ枝に push するときは、push の前に `git fetch` → `git pull --no-rebase`（force しない）。
 - ⚠️ heredoc の中のバックスラッシュは潰れる → 文書は Write / Edit で書き、`od -c` で確かめる。

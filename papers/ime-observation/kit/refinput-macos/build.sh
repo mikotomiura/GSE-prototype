@@ -10,9 +10,14 @@ if ! command -v swiftc >/dev/null 2>&1; then
   exit 2
 fi
 BUNDLE_ID="${REFINPUT_BUNDLE_ID:-local.ime-observation.refinput}"
-case "${BUNDLE_ID}" in
-  *[!A-Za-z0-9.-]*|"") echo "build.sh: REFINPUT_BUNDLE_ID must use letters, digits, '.' and '-' only" >&2; exit 2 ;;
-esac
+# The same form the emitter accepts for focus_app (kit/emit/backend_macos.py); LC_ALL=C keeps the ranges ASCII.
+LC_ALL=C
+BUNDLE_RE='^[A-Za-z0-9][A-Za-z0-9.-]{0,127}$'
+if ! [[ "${BUNDLE_ID}" =~ ${BUNDLE_RE} ]]; then
+  echo "build.sh: REFINPUT_BUNDLE_ID must start with a letter or digit and use letters, digits, '.' and '-' only" \
+       "(at most 128 characters)" >&2
+  exit 2
+fi
 mkdir -p .build
 swiftc -O RefInput.swift -o .build/refinput-macos
 APP=".build/RefInput.app"

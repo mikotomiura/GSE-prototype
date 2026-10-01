@@ -157,8 +157,9 @@ The last row is the one place this assumption about the logger is stated: the IM
 block-start markers) are assumed to lie outside the observed key set of the Windows logger (`is_observed_key`), and the
 last three names are pseudo keys of the runner that produce no key event on either OS. This has not been verified
 against a logger run; it is to be confirmed in the calibration pilot. The first macOS calibration pilot confirmed it
-on macOS: the IME toggles and F13 to F19 produced no row (the macOS logger observes F1 to F12 only), and 18 of
-4,000 presses, all of them IME toggles, were the only presses without a row. Because an unobserved marker cannot
+on macOS: the IME toggles and F13 and F14, the markers sent, produced no row (the macOS logger observes F1 to F12
+only, so F15 to F19 cannot produce one either), and of the 4,000 presses inside trials, the 18 without a row were
+all IME toggles. Because an unobserved marker cannot
 align the observation's clock, the block-start markers are now arrow keys (`left`, `right`, `left`), which are
 observed as `navigation`; runs that use them need `--markers-in-obs`. The virtual-key codes of the IME toggles and of
 F13 map to `other` in `from_vk`, which is the category `read_obs`/`segment_by_plan` expect from them when a log is found
@@ -183,6 +184,13 @@ never shifts later trials silently. If the block-start marker presses appear in 
 `--markers-in-obs`; if the IME toggle presses (`ime_on`, `ime_off`, as category `other`) appear in the observation, add
 `--ime-toggle-in-obs`. Both default to off (see the key table above). `--out` is only ever created, never overwritten;
 an existing path is a usage error. Exit codes: 0 success, 2 usage error or unreadable input.
+
+`--recipes` must be the file the plans were built from (the plan header's `recipes_sha256` is the SHA-256 of that
+file): for a macOS cell with live conversion off, pass `../gen/recipes.macos-live-off.json`. `closed_set.py`
+predicts each candidate's key presses from these procedures, so a different file builds the predictions from the
+wrong procedures. It does not yet compare the file with the plan headers; its output records the hash of the file
+passed (`recipes_sha256`), so a mismatch can be found afterwards by comparing the two. (`open_set.py` reads only
+the kana layout and the typed reading from the recipes, which are the same in both files.)
 
 The output is one JSON file with `assumptions`, `params` (including `phase_step_ms`), the hashes of the inputs, and
 `results[K][feature set]` with `acc`, `acc_ci`, `acc_source`, `acc_raw`, `acc_ci_raw`, `chance`, `n`, `n_skipped`,

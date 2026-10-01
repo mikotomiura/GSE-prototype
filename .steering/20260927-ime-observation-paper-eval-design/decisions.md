@@ -625,3 +625,21 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
   4. `run/cell.example.json` の `layout` を `US keyboard` → `JIS keyboard` に直した。`focus_cmd` の key code 104 は JIS のかなキー、S12 の `kana_layout` は JIS のかな配列、両パイロットとも JIS で、例のほうが食い違っていた。⚠️ `learning`（「毎ブロックでリセット」）は直さない。例は設計（design.md「ブロックの先頭で辞書・学習状態をリセット」）を示していて、`reset_cmd` は仮（`run/README.md` の前提 6「`cell.example.json` gives placeholders only」）。パイロットでリセットしなかったことは、M2 で `pilot-macos.md` の条件に書く（引き継ぎ §3.5）。本番でリセットするかどうかは M3 の事前登録で決める。
 - **確認（G-GEAR・Windows 11・Python 3.11.9）**: `generate_plan.py --selftest` 103 件が緑（直す前は 96 件）。OFF 用の手順書に変異を 7 本入れると、7 本とも selftest が赤になった（S1 の Enter を 2 回・S5 の Esc を 2 回・S2 の Enter を 1 回・S8 の数字の後の Enter を削る・S11 を既定で有効・Windows の節を変える・`kana_layout` を変える）。`kit/check.sh` の 27 本と `--compile` が緑、`_style_check.py papers/ime-observation` の違反は 0 件。
 - **経緯**: 1〜3 の差分は、worktree `C:/wt/ime-m1-pilot` に未コミットで残っていた（`generate_plan.py` の mtime は 2026-10-01 04:11 で、引き継ぎの commit `0da36bcc` の 6 分後。書いた記録は無く、前のセッションの書きかけと見られる）。メインが全行を読んで採用し、README を合わせ、4 を足した。
+
+## 判断 82: M1 の枝の完了時レビュー 1 巡目（Claude の 2 系統）の指摘への対応（2026-10-01・G-GEAR・メインの実装上の選択・研究者が覆せる）
+
+- **背景**: `97381a7b..5a9cc805`（この枝だけの差分・17 ファイル）に code-reviewer ∥ security-checker を回した。どちらも CRITICAL / HIGH は 0。指摘はすべて一次（コード・`pilot-macos-1-notes.md`・`clock_sync.py`・`run_cell.py`）で裏を取った。
+- **直したもの**（papers/ の 7 ファイル）:
+  1. 〔MEDIUM・コード〕矢印だけのマーカーが観測側で一意でない: 観測は種類しか持たないので、← → ← は `navigation` × 3 として探される。S7 は → を `nav_count` 回続けて押すので、`nav_count_max` ≥ 3 なら試行の中にも同じ並びが現れる。本物のマーカーが欠けたブロックでは、それが割り当てられて `missing` に出ない（`clock_sync.py` の README の約束に反する）。→ `normalize_config` が「矢印だけのマーカーは `nav_count_max` より長い」を検査して、破る config を拒む（exit 2）。gen / pilot の README に規則を書いた。⚠️ パイロットの config（← → ←）は `nav_count_max` によっては拒まれる → M2 で研究者が「4 打鍵のマーカー（← → ← →）」か「`nav_count_max` ≤ 2」かを決める（引き継ぎ §3）。
+  2. 〔MEDIUM・文書〕ライブ変換 ON で残った食い違いが gen/README に無かった → 「126 試行のうち、かな入力の 9 試行中 2 件は 1 回目の Return で確定・数字選択と予測候補の各 1 件が持ち越し」を Limitations に足した。OFF の確認には n = 39 を添えた。
+  3. 〔MEDIUM・文書〕e2/README が証拠より強かった（送ったのは F13 / F14 だけ・4,000 は試行の中の押下だけ）→ 書き分けた。
+  4. 〔MEDIUM・文書〕OFF のセルの計画を ON 用の手順書で攻撃しても `closed_set.py` は止まらない → e2/README の Usage に「`--recipes` は計画を作ったファイル（OFF なら `recipes.macos-live-off.json`）」と、照合がまだ無いこと・出力の `recipes_sha256` で後から比べられることを書いた。⚠️ コードの照合は今回入れない: selftest の計画は `recipes_sha256` が `"0" * 64` で、照合を入れると closed_set / open_set の selftest と 021 / 022 の fixture を直す範囲になる → E2 を本番のログに回す前の項目として引き継ぎ §5 に書いた。`open_set.py` は手順書から `kana_layout` と `typed_reading` しか使わず、2 つのファイルで同一なので実害は無い。
+  5. 〔LOW〕gen/README: 手順の終わりのキーを変えたら `_PROFILES` も直す・S11 の行の条件を前に出す・「仮説」は Windows の手順だけ（macOS は 1 台・1 版の実測）。`generate_plan.py`: 型の表のコメントの不正確さ（Windows の数字選択は 0 キー・Space の無い確定は全型で Return 1 回）・失敗の文言に型の名前・Windows の照合でも全シナリオが現れたかを確かめる。
+  6. 〔LOW〕run/README: `4a.` は CommonMark でリストの印にならない → 4 の 2 段落目にした（番号 5〜8 は変えない）。前提 6 の「placeholders only」を、仮の値（`reset_cmd`・`ime_settings.learning`・`ime` の版）の名指しに直した。`focus_cmd` は送出フラグの有無によらず、前面の確認より前に実行される（`run_cell.py:579-587` で確認）ことを表に書いた。前提 4 に System Events の Automation の許可と、計測の後に外せることを書いた。
+  7. 〔LOW〕pilot/README: 「空の欄のキャレットを動かす」は不正確（確定のたびに欄は空になり、矢印は命令として届く）・「変換の外で押す」は持ち越しのブロックでは成り立たない → 事実として書き直した。`open_set.py` の docstring の「function keys」を直した。
+  8. 〔LOW・security〕`build.sh` の bundle id の検査を送出側（`backend_macos.py:39` の `[A-Za-z0-9][A-Za-z0-9.-]{0,127}`）と同じ形にし、`LC_ALL=C` で範囲を ASCII に固定した。検査の部分だけを git-bash 5.2 で 11 通り試した（128 文字は通し 129 文字・先頭の `.` / `-`・空・空白・`"`・`<`・非 ASCII は拒む）。⚠️ macOS の bash 3.2 と `build.sh` 全体（`swiftc`）は Mac で確かめる。
+- **直さないもの（理由）**:
+  - 〔MEDIUM・security〕パイロットの生ログを公開物に含めるときの除外の基準が無い → M2 の §3-4 の作業そのもの。基準（計画どおりで aborted でない run だけ・oracle に対応しない観測の key 行が 0 件・手打ちの探査と手打ちの対照は除く）を引き継ぎに書いた。
+  - 〔LOW・security〕`focus_cmd` のかなキーが前面の確認より前に押される → 例の osascript に前面の bundle id の確認を足すのは、Windows では試せない。引き継ぎの Mac の項目にした。`run_cell.py` で `focus_cmd` を送出フラグの対象にする案は、既存の acceptance の挙動を変えるので採らず、README に書くだけにした。
+  - 〔範囲外〕`cell.example.json` の `predictive_candidates: "off"` と、既定で有効な S10（予測候補）の食い違い → パイロットの実際の設定を `pilot-macos.md` の条件に書くときに確かめる（引き継ぎ）。
+- **確認**: `generate_plan.py --selftest` 108 件が緑。新しい検査への変異 4 本（検査を外す・`<=` を `<` にする・Windows の照合に OFF の型を渡す・Windows の計画から S2 を抜く）がすべて赤。`kit/check.sh` の 27 本・`--compile` が緑、`_style_check.py` の違反 0 件。
