@@ -33,10 +33,10 @@
 
 ## 受け入れ条件
 
-- [ ] 判定者 1 のファイルの『判定基準』に E4 の尺度の原著の読み方と E7 があり、除外理由の選択肢が E1〜E7 である。`check_judge_xlsx.py` が違反 0、`--selftest` が PASS（新しい変異を含む）。評価版の検査（`check_appraisal_xlsx.py`）も違反 0 のまま。
-- [ ] 作り直した判定者 1 のファイルの SHA-256 が archive と Downloads で一致し、作り直す直前の Downloads の写しが `48af51d3…` だったことを記録している。
-- [ ] `protocol-ja.md` が v0.2 で、F10・F19 を決定として書き、`check_protocol_here.py` が違反 0・`--selftest` が PASS。
-- [ ] `researcher-check.md` が付録 F の残り 18 項目と【案】の一覧を持ち、記録の鍵と判定の語が同じ行に無い（機械検査）。
+- [x] 判定者 1 のファイルの『判定基準』に E4 の尺度の原著の読み方と E7 があり、除外理由の選択肢が E1〜E7 である。`check_judge_xlsx.py` が違反 0、`--selftest` が PASS（新しい変異を含む）。評価版の検査（`check_appraisal_xlsx.py`）も違反 0 のまま。
+- [x] 作り直した判定者 1 のファイルの SHA-256 が archive と Downloads で一致し、作り直す直前の Downloads の写しが `48af51d3…` だったことを記録している。
+- [x] `protocol-ja.md` が v0.2 で、F10・F19 を決定として書き、`check_protocol_here.py` が違反 0・`--selftest` が PASS。
+- [x] `researcher-check.md` が付録 F の残り 18 項目と【案】の一覧を持ち、記録の鍵と判定の語が同じ行に無い（機械検査）。
 - [ ] code-reviewer・security-checker（並列）と `/cross-review` 2 巡（Codex の当日の実消費を先に確かめる）。出荷（push → PR → CI 緑なら merge → main の CI 発火確認）。
 
 ## 関連ドキュメント

@@ -47,6 +47,16 @@ DECIDED_SECTION = "## 1. "
 PENDING_SECTIONS = ("## 2. ", "## 3. ", "## 4. ")
 B_ROWS = ["基準の版", "E4 の『尺度の原著』（2026-10-01）"]
 E7_OPERATION = re.compile(r"(題名・抄録の言語だけでは[^）]*)）")  # 除外理由の行の E7 の当て方（括弧の中は入れ子にしない）
+# ★ E6 と E7 の順の固定の期待（行, 正規表現, 規則の名）。道具と草稿の付録 B の両方に、それぞれ独立に当てる
+#   （2026-10-01 の独立の AI のレビューの 2 巡目: 道具と付録 B の一致だけでは、両方から規則が消えても通る）
+E7_RULES = [
+    ("除外理由", r"E7＝本文の言語が英語・日本語以外", "E7 の定義"),
+    ("除外理由", r"ほかの除外理由 E1〜E5 にも当たるときは、その理由を選ぶ", "E1〜E5 にも当たればその理由"),
+    ("除外理由", r"本文が英語・日本語以外と分かっていて英語・日本語の版も無ければ、本文が手に入らなくても E6 の保留にせず E7 を選ぶ",
+     "対象外の言語で本文なしは E7"),
+    ("手順 2: 全文段", r"本文を読めなかった件は『?保留』? ?＋ ?E6", "本文なしは E6"),
+    ("手順 2: 全文段", r"本文が英語・日本語以外と分かっていて英語・日本語の版も無ければ E7", "本文なしの E7 の例外"),
+]
 PROPOSAL = "【案"
 APPX_6 = "## 6. "
 ROW_F = re.compile(r"^\| (F\d+) \|")
@@ -168,6 +178,10 @@ def check_judge_tool(protocol_text, judge_path):
         errs.append("judge_xlsx.py か草稿の付録 B の除外理由の行に E7 の当て方（題名・抄録の言語だけでは…）が無い")
     elif t_op.group(1) != b_op.group(1):
         errs.append("judge_xlsx.py の E7 の当て方が草稿の付録 B と違う")
+    for name, rows in (("judge_xlsx.py", crit), ("草稿の付録 B", b)):
+        for row, pat, label in E7_RULES:
+            if not re.search(pat, rows.get(row, "")):
+                errs.append(f"{name} の『{row}』に「{label}」の規則が無い（固定の期待）")
     return errs
 
 
@@ -243,21 +257,31 @@ def selftest():
         ok &= not errs
         paths = {"proto": proto, "judge": judge}
 
-        def mutate(label, new, expect, fn=CHECK):
+        def mutate_many(label, changes, expect):
+            """changes＝[(fn, new), ...] を同時に当てて検査し、元に戻す（道具と草稿の両方を変える変異のため）。"""
             nonlocal ok
-            path = paths.get(fn) or os.path.join(base, fn)
-            before = open(path, encoding="utf-8").read()
-            after = new(before)
-            if after == before:  # 変異の対象が無い＝検査を確かめられていない
-                print("NG " + label + "（変異の対象が無い）")
-                ok = False
-                return
-            open(path, "w", encoding="utf-8", newline="\n").write(after)
+            saved = []
+            for fn, new in changes:
+                path = paths.get(fn) or os.path.join(base, fn)
+                before = open(path, encoding="utf-8").read()
+                after = new(before)
+                if after == before:  # 変異の対象が無い＝検査を確かめられていない
+                    for p, b in saved:
+                        open(p, "w", encoding="utf-8", newline="\n").write(b)
+                    print("NG " + label + f"（{fn} に変異の対象が無い）")
+                    ok = False
+                    return
+                saved.append((path, before))
+                open(path, "w", encoding="utf-8", newline="\n").write(after)
             e = run(base, proto, judge)
-            open(path, "w", encoding="utf-8", newline="\n").write(before)
+            for p, b in saved:
+                open(p, "w", encoding="utf-8", newline="\n").write(b)
             hit = any(expect in x for x in e)
             print(("OK " if hit else "NG ") + label, "" if hit else e[:3])
             ok &= hit
+
+        def mutate(label, new, expect, fn=CHECK):
+            mutate_many(label, [(fn, new)], expect)
 
         # 1〜3. 鍵の行・内部の語・メール
         mutate("鍵の行の判定の語", lambda t: t + "\n- AF001 は含める\n", "『含める』")
@@ -302,9 +326,25 @@ def selftest():
                "除外理由の選択肢", fn="proto")
         mutate("道具の E7 の当て方から英日の版の文を消す", lambda t: t.replace("英語・日本語の版が別にあれば、", "", 1),
                "E7 の当て方が草稿の付録 B と違う", fn="judge")
-        mutate("道具の E7 の当て方から E6 との順を消す",
-               lambda t: t.replace("本文の言語が分かっていれば、本文が手に入らなくても E6 の保留にせず E7 を選ぶ", "", 1),
+        e6e7 = "本文が英語・日本語以外と分かっていて英語・日本語の版も無ければ、本文が手に入らなくても E6 の保留にせず E7 を選ぶ"
+        mutate("道具の E7 の当て方から E6 との順を消す", lambda t: t.replace(e6e7, "", 1),
                "E7 の当て方が草稿の付録 B と違う", fn="judge")
+        # 6b. E6 と E7 の順の固定の期待（道具と草稿の両方から同じように消しても赤）
+        mutate_many("道具と草稿の両方から E6 との順を消す",
+                    [("judge", lambda t: t.replace(e6e7, "", 1)), ("proto", lambda t: t.replace(e6e7, "", 1))],
+                    "judge_xlsx.py の『除外理由』に「対象外の言語で本文なしは E7」の規則が無い")
+        mutate_many("道具と草稿の両方で E7 の先の条件から言語を落とす（2 巡目の指摘の形）",
+                    [(f, lambda t: t.replace(e6e7, e6e7.replace("本文が英語・日本語以外と分かっていて英語・日本語の版も無ければ",
+                                                                "本文の言語が分かっていれば"), 1)) for f in ("judge", "proto")],
+                    "草稿の付録 B の『除外理由』に「対象外の言語で本文なしは E7」の規則が無い")
+        mutate_many("道具と草稿の両方から E1〜E5 の先を消す",
+                    [(f, lambda t: t.replace("ほかの除外理由 E1〜E5 にも当たるときは、その理由を選ぶ。", "", 1)) for f in ("judge", "proto")],
+                    "「E1〜E5 にも当たればその理由」の規則が無い")
+        mutate("道具の手順 2 から E6 を消す", lambda t: t.replace("本文を読めなかった件は『保留』＋ E6", "本文を読めなかった件は『保留』", 1),
+               "judge_xlsx.py の『手順 2: 全文段』に「本文なしは E6」の規則が無い", fn="judge")
+        mutate("草稿の手順 2 から E7 の例外を消す",
+               lambda t: t.replace("（本文が英語・日本語以外と分かっていて英語・日本語の版も無ければ E7。下の除外理由） |", " |", 1),
+               "草稿の付録 B の『手順 2: 全文段』に「本文なしの E7 の例外」の規則が無い", fn="proto")
         mutate("草稿の付録 B の E7 の当て方を変える",
                lambda t: t.replace("ほかの除外理由 E1〜E5 にも当たるときは", "ほかの理由にも当たるときは", 1),
                "E7 の当て方が草稿の付録 B と違う", fn="proto")

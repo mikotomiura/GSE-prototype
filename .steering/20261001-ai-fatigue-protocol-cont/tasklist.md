@@ -26,8 +26,8 @@
 - [x] code-reviewer・security-checker（並列）→ 一次で確かめて対応（判断 5・判定者用ファイルを 04:22 に作り直した）
 - [x] Codex の当日の実消費（origin/main の台帳で 199,404 / 300,000・並行セッションに予定を知らせた）
 - [x] `/cross-review` 1 巡目（56,346）→ 4 件を一次で確かめて対応（判断 6・判定者用ファイルを 10:15 に作り直した）
-- [ ] `/cross-review` 2 巡目（1 巡目の直しの境界条件）
+- [x] `/cross-review` 2 巡目（35,424）→ 3 件を一次で確かめて対応（判断 7・判定者用ファイルを 10:21 に作り直した・当日の上限で 2 巡目の直しは Codex に回していない）
 
 ## 完了処理
-- [ ] 引き継ぎを次の段に差し替える
+- [x] 引き継ぎを次の段に差し替える（`_handoff/next-session-ai-fatigue-researcher-answers.md`・README の現行の行）
 - [ ] コミット → push → PR → CI 緑なら merge → main の CI 発火確認
