@@ -91,10 +91,11 @@ puts at the head of the block, plus RUNNER_KANA_PRESSES_PER_BLOCK for every segm
 last block (the runner selects the input method with one key before each block; the segment of the last block
 has no such key after it, and the segment before the first block has the key of the first block; when the
 oracle has no block_begin the one segment counts as the segment before the first block). A run is also
-refused when the reference input field lost focus other than by the planned switch of scenario S15
-(reference_focus_loss.n_loss_intervals_unplanned is above 0): to type into another application a person must
-take the focus from the reference, and the observation records every key of the machine, so such a run is not
-deposited. Extra rows in the observation log never refuse a run. The message names the cell and the block,
+refused when the reference input field lost focus other than by the planned switch of scenario S15 and the
+observation log holds a key press within that loss, widened by delivery.FOCUS_MARGIN_MS on both sides
+(reference_focus_loss.n_loss_intervals_unplanned_with_presses is above 0): to type into another application a
+person must take the focus from the reference, and the observation records every key of the machine, so such a
+run is not deposited. A loss in which no key is pressed puts no press of a person into either log. Extra rows in the observation log never refuse a run. The message names the cell and the block,
 never a value of a log. The rule and its constants are recorded in e1_delivery.json ("abort_rule").
 
 Outputs (RESULTS_DIR): e1_l1.json, e1_l2.json, e1_detection.json and e1_delivery.json (the per-press delivery
@@ -209,17 +210,15 @@ L2_SCOPES = ("under_limit", "all_trials")
 PRIMARY = {"detection": {"comparison": "gt_obs", "scope": "under_limit"},
            "l1": {"comparison": "gt_obs", "scope": "under_limit"},
            "l2": {"comparison": "gt_obs", "scope": "under_limit"}}
-# Provisional. The number of input-method keys that the runner's focus command presses before each block and that
-# remain in the reference log as key_down rows. Before the freeze, set it to 0 or 1 from the result of delivery.py
-# on the reference log of a pilot run on the measuring machine, and record the grounds in section 3.1 of the
-# pre-registration.
-RUNNER_KANA_PRESSES_PER_BLOCK = 1
-# Provisional. Whether the reference receives the mode keys (ime_on, ime_off) of the runner as key_down rows. True
-# uses the version "all_presses" of the delivery report in the abort rule, false the version "excluding_mode_keys".
-# Before the freeze, decide it from the reference log of a pilot run on the measuring machine (does the mode key of
-# scenario S14 leave a key_down row? see the difference between the two versions in the reach figures of
-# delivery.py) and record the grounds in section 3.1 of the pre-registration.
-REFERENCE_RECEIVES_MODE_KEYS = True
+# The number of key_down rows that the input-method key the runner's focus command presses before each block leaves
+# in the reference log. Fixed before the freeze from the pilot (pre-registration section 3.1): in the three pilot
+# runs, none of the 15 such presses left a key_down row in the reference log.
+RUNNER_KANA_PRESSES_PER_BLOCK = 0
+# Whether the reference receives the mode keys (ime_on, ime_off) of the runner as key_down rows. True uses the
+# version "all_presses" of the delivery report in the abort rule, false the version "excluding_mode_keys". Fixed
+# before the freeze from the pilot (section 3.1): in the three pilot runs, neither mode key of any S14 trial left a
+# key_down row in the reference log.
+REFERENCE_RECEIVES_MODE_KEYS = False
 DELIVERY_PRE_MS = 20
 DELIVERY_TAIL_MS = 300
 PRIMARY_NOTE = ("the primary estimates are the comparison and scope named here, per stratum; every other comparison "
@@ -831,8 +830,9 @@ def reference_abort_reasons(dlv):
     for bid in reference_abort_segments(dlv):
         out.append("the reference log holds key presses that the measured trials and the procedure do not explain, %s"
                    % ("before the first block" if bid is None else "in the segment of block %s" % bid))
-    if dlv["reference_focus_loss"]["n_loss_intervals_unplanned"] > 0:
-        out.append("the reference input field lost focus other than by the planned switch of S15")
+    if dlv["reference_focus_loss"]["n_loss_intervals_unplanned_with_presses"] > 0:
+        out.append("the reference input field lost focus other than by the planned switch of S15, and the observation"
+                   " log holds a key press within the loss")
     return out
 
 
@@ -888,7 +888,8 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
     res["detection"]["same_sessions_as_all"] = {}
     res["delivery"] = dict(head, abort_rule={"runner_kana_presses_per_block": RUNNER_KANA_PRESSES_PER_BLOCK,
                                              "reference_receives_mode_keys": REFERENCE_RECEIVES_MODE_KEYS,
-                                             "unplanned_focus_loss_aborts": True,
+                                             "unplanned_focus_loss_with_presses_aborts": True,
+                                             "focus_margin_ms": delivery.FOCUS_MARGIN_MS,
                                              "pre_ms": DELIVERY_PRE_MS, "tail_ms": DELIVERY_TAIL_MS}, cells={})
     for r in used:
         f = r["files"]
@@ -2218,7 +2219,8 @@ def _case_reference_abort_rule(d):
             rc = rc_of(run_with(tag + "i", []), "o" + tag + "i")[0]
             res = json.loads(open(os.path.join(d, "o" + tag + "i", "e1_delivery.json"), "rb").read().decode("utf-8")) if rc == 0 else {}
             if res.get("abort_rule") != {"runner_kana_presses_per_block": k, "reference_receives_mode_keys": REFERENCE_RECEIVES_MODE_KEYS,
-                                         "unplanned_focus_loss_aborts": True, "pre_ms": 20, "tail_ms": 300}:
+                                         "unplanned_focus_loss_with_presses_aborts": True,
+                                         "focus_margin_ms": delivery.FOCUS_MARGIN_MS, "pre_ms": 20, "tail_ms": 300}:
                 f.append("[%d] the abort rule is not recorded in the delivery results" % k)
         finally:
             _set_constant("RUNNER_KANA_PRESSES_PER_BLOCK", old)
@@ -2230,7 +2232,7 @@ def _case_reference_abort_rule(d):
     def report(by_segment, excluding=None, unplanned=0):
         return {"reference": {"segments": {"all_presses": {"by_segment": by_segment},
                                            "excluding_mode_keys": {"by_segment": excluding or by_segment}}},
-                "reference_focus_loss": {"n_loss_intervals_unplanned": unplanned}}
+                "reference_focus_loss": {"n_loss_intervals_unplanned_with_presses": unplanned}}
 
     for k in (0, 1):
         old = _set_constant("RUNNER_KANA_PRESSES_PER_BLOCK", k)
@@ -2259,7 +2261,7 @@ def _case_reference_abort_rule(d):
         _set_constant("REFERENCE_RECEIVES_MODE_KEYS", old_mode)
         why = reference_abort_reasons(report([seg(None, 0, 0)], unplanned=1))
         if len(why) != 1 or "S15" not in why[0]:
-            f.append("an unplanned focus loss is not a reason to refuse")
+            f.append("an unplanned focus loss with a key press is not a reason to refuse")
         if len(reference_abort_reasons(report([seg(None, 3, 0), seg(0, 0, 4)], unplanned=2))) != 2:
             f.append("the two parts of the rule are not reported separately")
     finally:
@@ -2269,7 +2271,8 @@ def _case_reference_abort_rule(d):
 
 
 def _case_section34_enforcement(d):
-    """Section 3.4 before a deposit: a focus loss other than by S15 refuses the analysis, and the deposit check and
+    """Section 3.4 before a deposit: a focus loss other than by S15 with a key press in it refuses the analysis (one
+    without a press does not), and the deposit check and
     the archive apply the abort rule to every run with a reference log, aborted by the runner or not."""
     f = []
     cfg = _config_file(d)
@@ -2311,6 +2314,13 @@ def _case_section34_enforcement(d):
     arch = os.path.join(d, "loss.zip")
     if _quiet(["--pack", dst, "--out", arch])[0] != 1 or os.path.exists(arch):
         f.append("a run whose reference lost focus other than by S15 was packed")
+    # a loss other than by S15 with no key press of the observation within it (and its margins) refuses nothing
+    quiet_loss = [(last_end + 1000, "focus_out", {}), (last_end + 1031, "focus_in", {})]
+    dst = variant("qloss", quiet_loss)
+    if _quiet(["--runs", dst, "--config", cfg, "--seed", "1", "--out", os.path.join(d, "oq")])[0] != 0:
+        f.append("a run whose reference lost focus with no key press near the loss was not analysed")
+    if _quiet(["--check-deposit", dst])[0] != 0:
+        f.append("a run whose reference lost focus with no key press near the loss was refused by the deposit check")
     # a run aborted by the runner is checked in the same way
     dst = variant("a1", key, aborted=True)
     rc, _o, err = _quiet(["--check-deposit", dst])

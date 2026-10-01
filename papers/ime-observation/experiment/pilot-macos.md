@@ -169,18 +169,35 @@ pre-registration.
 
 ## Raw logs
 
-The raw logs of the pilot runs are kept on the measuring machine and are not yet deposited. Before the freeze of the
-pre-registration, the criteria for which runs are deposited, and the tool that checks them, will be written here
-(section 3.1 of the pre-registration). Both logs can carry
-a person's typing: the observation records every key press on the machine, and the reference input field records
-the key code of every key-down it receives. The criteria will therefore require at least the following.
+The raw logs of the pilot runs are kept on the measuring machine and are not yet deposited. They are deposited with
+the measurement data under the following criteria, which were written before the freeze of the pre-registration and
+are those of the measurement (section 3.4 of the pre-registration). Both logs can carry a person's typing: the
+observation records every key press on the machine, and the reference input field records the key code of every
+key-down it receives.
 
-- Only planned runs are candidates: runs started by the runner from a plan, with a manifest, that were not
-  aborted.
-- In each run, every key row of the observation and every `key_down` of the reference log is matched, within a
-  stated tolerance, by a press the executor recorded as sent. `kit/analysis/delivery.py` counts both directions
-  for both logs (rows without a sent press inside the trials, and rows outside the trials, where the block
-  markers and the runner's kana presses fall); the pilot's reach count (`kit/pilot/reach.py`) checked only the
-  direction from the executor to the observation.
-- The hand-typed checks described above (in the reference input field and in TextEdit) and the hand-run probes
-  of the Enter and Escape behaviour were not runs of the runner and are not deposited.
+- Only runs of the runner are candidates: runs started by the runner from a plan, with a manifest (`run.json`). A
+  run that the runner aborted is a candidate on the same terms as in the measurement.
+- The rules of section 3.4 of the pre-registration do not catch the run, with the settings fixed from this pilot
+  (k = 0, and the input-mode keys of S14 do not count among the presses sent) and the run's own marker, which its
+  plan states (three presses in these runs): in no segment of the reference log do the key-downs that the sent
+  presses do not explain exceed the marker presses of the block, and the observation holds no key press within a
+  loss of focus of the reference other than a planned switch of S15. The rules rest on two facts: a person's typing
+  into the reference input field leaves key-downs that no sent press explains, and typing into any other
+  application takes the focus away from the reference. Their blind spots are those of the measurement (section 7 of
+  the pre-registration): a press from outside that replaces a press that was lost, and a shortcut that the system
+  consumes without moving the focus.
+- `kit/analysis/pipeline.py --check-deposit` passes on the run directory. It applies the same rules and also checks
+  the files for paths and names and the logs for the content-free form.
+- Rows of the observation without a sent press do not stop a run from being deposited; they are a result of the
+  observer under test, as in the measurement.
+
+The observation logs were sealed (`kit/pilot/seal_obs.py`) and only their key rows were read. Their sealed session
+rows are unsealed after the freeze and the measurement only to be deposited; they are not analysed (section 3.1 of
+the pre-registration). `--check-deposit` is therefore run at deposit time, after the unsealing. Before the
+freeze, the rules of section 3.4 were applied to the key rows of the observation and to the reference logs of the
+six runs listed above and of a short run made before the first pilot, and caught none of them; the one loss of
+focus outside the planned switches (`pilot2-off`, 31 ms) had no key press within it (section 3.1 of the
+pre-registration). A dry run that was interrupted before the first pilot is subject to the same criteria.
+
+The hand-typed checks described above (in the reference input field and in TextEdit) and the hand-run probes of the
+Enter and Escape behaviour were not runs of the runner and are not deposited.

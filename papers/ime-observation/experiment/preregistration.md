@@ -227,15 +227,30 @@ made on the pilot's logs before the freeze and reported here; neither reads a se
   marker (`pilot2-on`, `pilot2-off` and `verify-off`; the F13 and F14 presses of the first pilot's marker produce
   no row in the observation), with `--markers-in-obs` and the pilot's three-press marker, and the fraction of blocks
   it scores is reported. This is a diagnostic of the code: if it reveals a defect, the defect is corrected before
-  the freeze, and the fractions before and after the correction are reported.
+  the freeze, and the fractions before and after the correction are reported. It scored every block of the three
+  runs (15 of 15 blocks, 282 trials) and left no press unassigned, so no defect was found and the code was not
+  changed. These logs had no missing or added press, so the check shows that the assignment scores clean logs
+  whole; it does not exercise the resynchronisation, which only the selftest's cases do.
 - `kit/analysis/delivery.py` is run with the arguments of section 3.4 on the same three runs, and it is reported
   whether the runner's kana press before each block and the input-mode keys of S14 leave key-downs in the reference
   log, the largest count per segment of the reference's key-downs that the sent presses do not explain, the least
   time between the last key-down of a segment and the start of the next block, and the number of losses of focus
   of the reference outside the planned switches of S15. From these the two settings of the rule on presses of
-  section 3.4 are fixed: k, and whether the input-mode keys of S14 count among the presses sent. If the pilot runs
-  show a loss of focus outside the planned switches, the rule on the loss of focus is reconsidered before the
-  freeze. Only counts and times are reported; no key code is read or written.
+  section 3.4 are fixed: k, and whether the input-mode keys of S14 count among the presses sent. Only counts and
+  times are reported; no key code is read or written. The kana press left no key-down in the reference log: in
+  every segment of a block the key-downs that the sent presses do not explain were the block's three marker
+  presses, and the segment before the first block held no key-down (15 kana presses in all). Neither input-mode key
+  of any S14 trial left a key-down either: of the presses sent inside the trials, 4,072 of 4,090, 3,972 of 3,990
+  and 1,174 of 1,180 reached the reference, and the 18, 18 and 6 that did not are the two input-mode keys of each
+  S14 trial. Hence k = 0, and the input-mode keys of S14 do not count among the presses sent. With these settings
+  no segment of the three runs exceeds its bound (the largest count beyond the marker presses is 0). The least time
+  between the last key-down of a segment and the start of the next block was 1,582 ms. The reference lost the focus
+  outside the planned switches once, in `pilot2-off`: for 31 ms, in the think time of an S1 trial, 2.7 seconds
+  after the last press sent; the observation holds no key row within 3 seconds of the loss. There was no such loss
+  in the other two runs, nor in the three other runs of the pilot to which the same report was applied (`pilot-1`,
+  `verify-1` and `verify-s5`; about 87 minutes in the six runs). A rule that aborts a run at any such loss could
+  therefore abort most runs of about 12 hours, so before the freeze the rule on the loss of focus was changed to
+  abort a run only when the observation records a key press within the loss (section 3.4).
 
 Before the freeze, the prediction of section 4.5 was also computed on the two measurement plans, with an oracle
 built from the plans' own times (no sending delay; 2 s between blocks), by
@@ -369,12 +384,12 @@ ms.
 
 ### 3.4 Stopping rule
 
-Each cell is run once to completion. If a run is aborted (the runner stops it), the cell is run again from the
-start with the same plan, in a new run directory, up to three attempts. A completed run also counts as aborted for
-any of three reasons: its plan has another SHA-256 than the plan of section 2.4; its reference log holds a key press
-from outside the executor; or the reference input field lost the focus other than in the planned switch of S15. The
-last two are decided by closed rules from the delivery report of the run directory alone. Right after the run
-(section 3.2), and before any analysis of it, the report is made with
+Each cell is run once to completion. If a run is aborted (the runner stops it), the cell is run again from the start
+with the same plan, in a new run directory, up to three attempts. A completed run also counts as aborted for any of
+three reasons: its plan has another SHA-256 than the plan of section 2.4; its reference log holds a key press from
+outside the executor; or a key was pressed while the reference input field had lost the focus other than in the
+planned switch of S15. The last two are decided by closed rules from the delivery report of the run directory alone.
+Right after the run (section 3.2), and before any analysis of it, the report is made with
 
     python3 kit/analysis/delivery.py --plan <run>/plan.jsonl --oracle <run>/oracle.jsonl --obs <run>/obs.jsonl \
       --gt <run>/gt.jsonl --pre-ms 20 --tail-ms 300 --out <report>
@@ -394,42 +409,46 @@ plan states) and the kana press with which the runner switches the input method 
 as aborted when the count of any segment exceeds the presses that the procedure makes in it: k for the segment
 before the first block, the marker presses of the block plus k for every other segment except the last, and the
 marker presses alone for the segment of the last block, after which no kana press is made. Two settings of the rule
-are fixed before the freeze from the logs of the pilot (section 3.1): k (0 or 1), and whether the input-mode keys of
-S14 count among the presses sent. They count only if the pilot shows that they leave key-downs in the reference log;
-otherwise every trial of S14 would leave room for a press from outside. The rule assumes that the kana press before a
-block is recorded before the block starts: the runner's focus command waits 0.3 seconds after the press, and the
-pilot reports the least time between the last key-down of a segment and the start of the next block. A kana press
-recorded after the start would fall into the next segment and make the run count as aborted; it cannot let a press
-from outside pass.
+were fixed before the freeze from the logs of the pilot (section 3.1): k = 0, because the kana press left no key-down
+in the reference log, and the input-mode keys of S14 do not count among the presses sent, because they left none
+either (counting them would leave room for a press from outside in every trial of S14). The count of every segment
+is therefore bounded by the marker presses of its block (0 for the segment before the first block), and the version
+`excluding_mode_keys` of the report applies. A kana press that does leave a key-down in a run of the measurement
+makes the run count as aborted wherever it falls; it cannot let a press from outside pass.
 
-**Loss of focus.** The run also counts as aborted when the reference input field lost the focus at any time other
-than in a planned switch of S15 (a loss that begins and ends inside the interval of an S15 trial): a person who types
-into another application takes the focus away from the reference, and the observation records every key press on
-the machine.
+**Loss of focus.** The run also counts as aborted when the observation log holds a key press within a loss of focus
+of the reference input field other than a planned switch of S15 (a loss that begins and ends inside the interval of
+an S15 trial). A loss runs from a focus-out of the reference to its next focus-in, or to the end of the logs when the
+focus does not come back, and it is widened by 500 ms on each side for this rule: the margin covers the offset
+between the clocks of the two logs, the delay with which the observation collects a row, and a key that moves the
+focus, which is pressed just before the loss. A person who types into another application takes the focus away
+from the reference, and the observation records every key press on the machine. A loss in which no key is pressed
+puts no press of a person into either log and does not make the run count as aborted; the pilot had one such loss,
+of 31 ms (section 3.1).
 
 A run for which `delivery.py` refuses its input (exit status 2) also counts as aborted. No other reason and no
 explanation is admitted. The rules apply to the runs of the two cells and of the `working` condition of question 5;
 the `idle` condition sends no key and has no plan.
 
 The result of the check, its time, the SHA-256 of the plan, the largest count per segment beyond the marker presses
-and the number of losses of focus outside the planned switches are recorded in the table of run checks in
-`experiment/data.md` before any analysis of the run. `kit/analysis/pipeline.py` applies the same rules to the
-delivery report it computes and refuses to analyse a run that they catch. A completed run that counts as aborted for
-any of these reasons is not deposited, because its reference log records the key code of every key-down it received
-and its observation log records every key press on the machine, so either may hold a person's key presses. The same
-check is made on a run that the runner aborted: such a run is never analysed, and it is deposited only if the check
-passes or if it left neither a reference log nor an observation log. `pipeline.py --pack` and `--check-deposit`
-apply the rules to every run directory, completed or aborted, and refuse one that the rules catch or that cannot be
-checked (an observation log without a reference log, or logs that `delivery.py` refuses). The rule on presses
-counts the key-downs that remain beyond the presses that reached the reference, so a lost press and a press from
-outside cancel out: a press of the procedure (a marker or kana press) that does not reach the reference against a
-press from outside anywhere in the same segment, and a press of a trial that does not reach it against a press from
-outside in the interval of the same trial. Such a replacement is not detected (section 7). Rows of the observation
-without a sent press are a result of the observer under test (section 6.3) and never make a run count as aborted.
-Aborted runs are reported with their reason and their delivery figures, and are not analysed. A cell that is not
-completed in three attempts is reported as not measured. The same rules apply to each condition of question 5: a
-condition that is aborted or insufficient (section 6.10) is run again on another night, up to three attempts in all,
-and every attempt is reported.
+and the number of losses of focus outside the planned switches within which the observation holds a key press are
+recorded in the table of run checks in `experiment/data.md` before any analysis of the run.
+`kit/analysis/pipeline.py` applies the same rules to the delivery report it computes and refuses to analyse a run
+that they catch. A completed run that counts as aborted for any of these reasons is not deposited, because its
+reference log records the key code of every key-down it received and its observation log records every key press on
+the machine, so either may hold a person's key presses. The same check is made on a run that the runner aborted:
+such a run is never analysed, and it is deposited only if the check passes or if it left neither a reference log nor
+an observation log. `pipeline.py --pack` and `--check-deposit` apply the rules to every run directory, completed or
+aborted, and refuse one that the rules catch or that cannot be checked (an observation log without a reference log,
+or logs that `delivery.py` refuses). The rule on presses counts the key-downs that remain beyond the presses that
+reached the reference, so a lost press and a press from outside cancel out: a marker press that does not reach the
+reference against a press from outside anywhere in the same segment, and a press of a trial that does not reach it
+against a press from outside in the interval of the same trial. Such a replacement is not detected (section 7). Rows
+of the observation without a sent press are a result of the observer under test (section 6.3) and never make a run
+count as aborted. Aborted runs are reported with their reason and their delivery figures, and are not analysed. A
+cell that is not completed in three attempts is reported as not measured. The same rules apply to each condition of
+question 5: a condition that is aborted or insufficient (section 6.10) is run again on another night, up to three
+attempts in all, and every attempt is reported.
 
 ## 4. Variables
 
@@ -593,11 +612,12 @@ analysed (section 6.4).
 Other contingencies:
 
 - A loss of focus of the reference input field, other than the planned switch of S15, makes the run count as
-  aborted (section 3.4), so no analysed run has one. A loss lasts from a focus-out of the reference to its next
+  aborted when the observation holds a key press within it (section 3.4), so an analysed run can have a loss only
+  without a key press. A loss lasts from a focus-out of the reference to its next
   focus-in (to the end of the log when none follows), so it can cover several trials, because the runner confirms
   the focus only before each block; an S15 switch is planned only when it returns inside its own trial. The
   delivery report and the detection results still count the trials that overlap a loss, and the observation rows
-  assigned to them, per stratum and per speed; in an analysed run these counts are zero.
+  assigned to them, per stratum and per speed, and these trials are not excluded.
 - If the input method stops responding or restarts during a run, the affected trials are not excluded; they appear
   as disagreements and are reported. A run that the runner aborts is handled by section 3.4.
 - If the system or input-method version recorded in a run manifest differs from that of an earlier run, the run is
@@ -953,10 +973,11 @@ between the two cells) is reported as exploratory.
   log the sessions that are cut off cannot be confirmed from the key rows alone (section 6.4).
 - **The stopping rule counts presses, not keys.** The rule of section 3.4 counts the key-downs of the reference
   that remain beyond the presses that reached it, so a press that does not reach the reference and a press from
-  outside cancel out (a marker or kana press against a press anywhere in the same segment, a press of a trial
-  against a press in the same trial), and such a replacement is not detected. A person's key presses that reach
-  neither the reference nor another application, such as a shortcut that the system consumes without moving the
-  focus, are caught by neither rule of section 3.4.
+  outside cancel out (a marker press against a press anywhere in the same segment, a press of a trial against a
+  press in the same trial), and such a replacement is not detected. A person's key presses that reach neither the
+  reference nor another application, such as a shortcut that the system consumes without moving the focus, are
+  caught by neither rule of section 3.4. A person who moves the focus away and back without pressing a key is not
+  caught either, and puts no key press into the logs.
 - **Intervals that treat trials as independent.** The Wilson intervals of pooled proportions ignore the clustering of
   trials in blocks and are read as lower bounds of the uncertainty (section 6.1). The near-chance rule of question 4
   uses the Wilson interval; with dependence within a block the rule is met more easily than it should be, and the

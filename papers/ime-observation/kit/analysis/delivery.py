@@ -82,7 +82,11 @@ Definitions.
     intervals (n_loss_intervals_planned: those that begin and end inside the interval of a trial of scenario S15)
     and of unplanned ones (n_loss_intervals_unplanned: all the others, including a loss between trials, before
     the first block, in a trial of another scenario, or one that is not regained; the two add up to
-    n_loss_intervals), the trials that overlap at least one loss interval (trials_with_focus_loss, sorted) and
+    n_loss_intervals), the number of unplanned loss intervals in which the observation log holds a key press
+    (n_loss_intervals_unplanned_with_presses) and the number of such presses (n_presses_in_unplanned_losses); a
+    press counts for a loss when its time lies from FOCUS_MARGIN_MS before the focus_out to FOCUS_MARGIN_MS after
+    the focus_in (to the end of the log when the loss is not regained), and a press that lies in two such spans is
+    counted once; the trials that overlap at least one loss interval (trials_with_focus_loss, sorted) and
     per stratum (scenario, speed) the number of measured trials and of trials with a focus loss. A planned
     switch to another application (scenario S15) is not counted in the list of trials: an S15 trial is left out
     of the list when every loss interval it overlaps begins and ends inside
@@ -120,6 +124,10 @@ PSEUDO_KEYS = ("focus_away", "focus_back", "mouse_click")
 MODE_KEYS = ("ime_on", "ime_off")
 SPEEDS = ("slow", "mid", "fast")
 CUT_KINDS = ("reset", "block_begin", "marker")
+# The margin around an unplanned loss of focus of the reference within which a key press of the observation log is
+# counted for the loss (pre-registration section 3.4): it covers the offset between the two logs' clocks and the
+# delay with which the observation collects a row, and a key that moves the focus is pressed just before the loss.
+FOCUS_MARGIN_MS = 500
 
 
 class InputError(Exception):
@@ -342,7 +350,7 @@ def _loss_intervals(outs, ins):
     return out
 
 
-def _focus_losses(done, plan, outs, ins, starts, ends):
+def _focus_losses(done, plan, outs, ins, starts, ends, obs_times):
     losses = _loss_intervals(outs, ins)
     def overlap(loss, i):
         return loss[0] <= ends[i] and (loss[1] is None or loss[1] >= starts[i])
@@ -354,8 +362,15 @@ def _focus_losses(done, plan, outs, ins, starts, ends):
         planned = plan[t["trial_id"]]["scenario"] == "S15" and all(inside(loss, i) for loss in mine)
         hit.append(bool(mine) and not planned)
     outside = sum(1 for loss in losses if not any(overlap(loss, i) for i in range(len(done))))
-    planned_losses = sum(1 for loss in losses
-                         if any(plan[t["trial_id"]]["scenario"] == "S15" and inside(loss, i) for i, t in enumerate(done)))
+    planned = [any(plan[t["trial_id"]]["scenario"] == "S15" and inside(loss, i) for i, t in enumerate(done))
+               for loss in losses]
+    planned_losses = sum(1 for p in planned if p)
+    spans = [(loss[0] - FOCUS_MARGIN_MS, None if loss[1] is None else loss[1] + FOCUS_MARGIN_MS)
+             for loss, p in zip(losses, planned) if not p]
+    def within(t, span):
+        return t >= span[0] and (span[1] is None or t <= span[1])
+    with_presses = sum(1 for span in spans if any(within(t, span) for t in obs_times))
+    n_presses = sum(1 for t in obs_times if any(within(t, span) for span in spans))
     per = {}
     for t, got in zip(done, hit):
         info = plan[t["trial_id"]]
@@ -367,7 +382,9 @@ def _focus_losses(done, plan, outs, ins, starts, ends):
         return (int(sc) if sc.isdigit() else 0, k[0], SPEEDS.index(k[1]))
     return {"n_focus_out": len(outs), "n_focus_in": len(ins), "n_loss_intervals": len(losses),
             "n_loss_intervals_outside_trials": outside, "n_loss_intervals_planned": planned_losses,
-            "n_loss_intervals_unplanned": len(losses) - planned_losses, "n_trials_with_focus_loss": sum(1 for g in hit if g),
+            "n_loss_intervals_unplanned": len(losses) - planned_losses,
+            "n_loss_intervals_unplanned_with_presses": with_presses, "n_presses_in_unplanned_losses": n_presses,
+            "n_trials_with_focus_loss": sum(1 for g in hit if g),
             "trials_with_focus_loss": sorted(t["trial_id"] for t, got in zip(done, hit) if got),
             "by_stratum": [{"scenario": k[0], "speed": k[1], "n_trials": per[k][0], "n_trials_with_focus_loss": per[k][1]}
                            for k in sorted(per, key=order)]}
@@ -532,7 +549,7 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
     return {
         "format": FORMAT,
         "params": {"pre_ms": pre_ms, "tail_ms": tail_ms, "pseudo_keys": sorted(PSEUDO_KEYS),
-                   "mode_keys": sorted(MODE_KEYS)},
+                   "mode_keys": sorted(MODE_KEYS), "focus_margin_ms": FOCUS_MARGIN_MS},
         "inputs_sha256": sha,
         "trials": {"planned": len(plan), "begun": len(trials), "measured": len(done),
                    "incomplete": len(trials) - len(done)},
@@ -541,7 +558,7 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
         "observation": _side(done, speeds, obs_times, starts, ends, begins, markers),
         "reference": _side(done, speeds, gt_times, starts, ends, begins, markers),
         "reference_focus_loss": _focus_losses(done, plan, read_gt_events(gt_bytes, "focus_out"),
-                                              read_gt_events(gt_bytes, "focus_in"), starts, ends),
+                                              read_gt_events(gt_bytes, "focus_in"), starts, ends, obs_times),
     }
 
 
@@ -1027,6 +1044,27 @@ def _selftest():
     check(loss_counts([(-300, "focus_out"), (-200, "focus_in"), (1200, "focus_out"), (1500, "focus_in")]) == (1, 1, 2),
           "focus loss: planned and unplanned losses add up to the loss intervals")
     check(loss_counts([]) == (0, 0, 0), "focus loss: no loss, no interval")
+
+    # focus losses: key presses of the observation in an unplanned loss, with the margin FOCUS_MARGIN_MS around it.
+    def loss_presses(events, obs, s15_events=()):
+        rows = _kd(1015, 4015) + [(t, ev) for t, ev in list(events) + list(s15_events)]
+        got = evaluate(*_mini([(0, 0)], [("x", 0, "S15", 1000, 2000, ["a"]), ("y", 0, "S1", 4000, 4500, ["a"])],
+                              sorted(rows), obs))["reference_focus_loss"]
+        return got["n_loss_intervals_unplanned_with_presses"], got["n_presses_in_unplanned_losses"]
+    m = FOCUS_MARGIN_MS
+    gap = [(3000, "focus_out"), (3031, "focus_in")]
+    check(loss_presses(gap, [1015, 4015]) == (0, 0), "focus loss: an unplanned loss with no press near it has none")
+    check(loss_presses(gap, [3010]) == (1, 1), "focus loss: a press inside an unplanned loss is counted")
+    check(loss_presses(gap, [3000 - m, 3031 + m]) == (1, 2) and loss_presses(gap, [3000 - m - 1, 3031 + m + 1]) == (0, 0),
+          "focus loss: the margin reaches exactly FOCUS_MARGIN_MS before the focus_out and after the focus_in")
+    check(loss_presses([(3000, "focus_out")], [9000]) == (1, 1),
+          "focus loss: a loss that is not regained counts the presses up to the end of the log")
+    check(loss_presses([], [1300], s15_events=[(1200, "focus_out"), (1500, "focus_in")]) == (0, 0),
+          "focus loss: presses during a planned S15 switch are not counted")
+    check(loss_presses([(2900, "focus_out"), (2950, "focus_in"), (3100, "focus_out"), (3150, "focus_in")], [3020]) == (2, 1),
+          "focus loss: a press within the margins of two losses counts for both losses and once among the presses")
+    check(evaluate(*_mini([(0, 0)], [("y", 0, "S1", 4000, 4500, ["a"])], _kd(4015)))["params"]["focus_margin_ms"] == m,
+          "focus loss: the margin is recorded in the parameters")
 
     # block ids must be integers (a string and a boolean are refused, no value is echoed).
     def with_block_id(value):
