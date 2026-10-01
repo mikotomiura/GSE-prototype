@@ -125,9 +125,26 @@ not committed to git.
 Marker specification (JSON):
 
 ```json
-{"oracle_keys": ["f13", "f14", "f15"], "gt_vks": [105, 107, 113], "obs_categories": ["function", "function", "function"], "max_gap_ms": 150}
+{"oracle_keys": ["left", "right", "left"], "gt_vks": [123, 124, 123], "obs_categories": ["navigation", "navigation", "navigation"], "max_gap_ms": 300}
 ```
 
+- `max_gap_ms` must exceed the plan's `marker_gap_ms`: the measured press-to-press gap of a 150 ms marker gap was
+  152 to 227 ms in the first macOS pilot, so a limit of 150 ms matched no marker at all.
+- On macOS the logger observes F1 to F12 but not F13 to F19, so F13 to F19 cannot serve as markers there (the
+  example above uses arrow keys, which are observed as `navigation`; macOS key codes 123 and 124). A marker is
+  pressed at the start of a block, after the previous trial has committed, so the field is empty and the arrows
+  reach it as commands (in the gt log, `do_command` rows outside every trial). When a composition is carried over
+  from the previous trial (2 of 126 trials in the second macOS pilot with live conversion on), the arrows act on
+  that composition instead.
+- The observation records only a category, so an arrow-key marker is found there as a run of `navigation` rows,
+  and one scenario presses the right arrow up to `nav_count_max` times in a row (the limit comes from the
+  procedures). A marker whose observed keys are all arrows must therefore be longer than every run of arrow presses
+  inside a trial of the plan; the generator refuses to build a plan that breaks this, counting only the keys the
+  observation records. The three-key marker of the example serves only while no trial presses three arrows in a row
+  (for example with `nav_count_max` at 2 or below); the marker for the measurement is fixed with the protocol.
+  Otherwise those presses inside a trial count as marker occurrences, and if a block's real marker is lost, an
+  occurrence inside its first trial can be matched to that block instead of the block appearing in `missing`. gt
+  matches on virtual-key codes, and that scenario presses only the right arrow, so gt is not affected.
 - A marker key must **appear in the observation's `key` rows** and must **not change IME state** (a key the
   observation side does not observe never produces a `key` row and therefore cannot serve as a marker). The first
   entries of the three lists correspond to the same press.

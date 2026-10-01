@@ -606,3 +606,67 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - **結果**: 1,800 句（各作品 150・候補は最少の『堕落論』で 241）・読みの長さ 6〜30（中央値 16）・SHA-256 `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620`・`SudachiPy==0.7.0`・`sudachidict-core==20260723.1`。2 回の書き出しでバイト一致・`--validate` exit 0・`kit/check.sh` 緑・`_style_check.py` 違反 0 件・書き出し器が通る（91 ファイル）。仮の config（selftest の値・n = 75）で両 OS の計画を作ると、どのシナリオでも 225 試行がすべて別の句（`--validate` exit 0）。
 - **トレードオフ**: ⚠️ 読みの誤りが残る（無作為 40 句の目視で `絞罪→しぼりざい`・`この室→むろ`・`女学校→おんながっこう`）。E1 は打鍵列として妥当なかなで足り、E2 の正解は打った読み（判断 19）なので直さない。同じ読みの句が 9 組（README の既知の限界）。
 - **影響範囲**: `kit/corpus/data/phrases.jsonl`・`kit/corpus/requirements.txt`・`experiment/data.md`（「Phrase corpus」節に 6 項目と出典の作品表）。生の `.txt` / zip は repo に入れない（archive の SHA-256 だけを記録）。
+
+## 判断 80: M1 の所見を受けた macOS の手順とマーカーの直し（2026-10-01・研究者の選択と実測）
+
+- **背景**: M1 の 1 回目（`pilot-macos-1-notes.md`）で、変換後の Enter が確定せず試行が持ち越される・マーカー F13 / F14 が観測側に届かない、が見つかった。
+- **採用**: (1) macOS の recipes をライブ変換 ON の IME の実際の挙動に合わせる（候補の窓の Enter は選ぶだけ → Enter 2 回・数字の後に Enter・Esc 4 回）。★ 研究者の手打ちでも同じ挙動を確認したので、合成キーの人工物ではない。(2) マーカーは**矢印キー（← → ←）**（研究者が AskUserQuestion で推奨を選択。他の案: F13 のまま時計を試行の打鍵で合わせる / F1〜F12 を語彙に足す）。
+- **理由**: (1) README（`kit/gen/README.md`）の想定どおり、パイロットの後に直すのは recipes のデータ。(2) 矢印キーは既に語彙にあり観測され、変換中でなければ IME の状態も文字も変えない。E2 は既存の `--markers-in-obs` で扱える（コードの変更なし）。
+- **トレードオフ**: ⚠️ ライブ変換 OFF では余分な Enter が改行になりうる → OFF のセルは別の recipes ファイル（パイロットしてから）。⚠️ E2 を本番のログに回すときは `--markers-in-obs` を付ける。
+- **影響範囲**: `kit/gen/recipes.json`（macOS のみ）・`generate_plan.py` / `simulate_obs.py` の selftest・`refinput-macos/build.sh`・pilot / run / e2 / gen / refinput-macos の README・`run/cell.example.json`。
+
+## 判断 81: M1 の枝の PR の前の整え —— 生成器の版を上げ、OFF 用の手順書も selftest で照合する（2026-10-01・G-GEAR・メインの実装上の選択・研究者が覆せる）
+
+- **背景**: 引き継ぎ（`next-session-ime-paper-m2.md` §2）の 1〜4。M1 で macOS の手順を変え、OFF 用の手順書 `recipes.macos-live-off.json` を足したが、生成器の版は `1.1.0` のままで、OFF 用の手順書は selftest の外にあった。
+- **採用**:
+  1. `GENERATOR_VERSION` を `1.1.0` → `1.2.0`。`kit/gen/README.md` の規則（「recipes の手順の意味が変わったら上げる」）に当たる。`plan/1` の書式は変わらないので minor。この値を固定している検査は無い（`grep -rn "GENERATOR_VERSION\|generator_version\|1\.1\.0"`。selftest の架空の計画は `"0"` / `"0.1"` を使う）。
+  2. OFF 用の手順書も selftest で照合する。`_scenario_checks` の終わりのキーを、手順の型ごとの表 `_PROFILES`（`windows` / `macos-live-on` / `macos-live-off`）から引く形にした。足した検査: OFF の 13 シナリオの照合・S11 が既定で外れる・Windows の節と `kana_layout` が `recipes.json` と同一・2 つの macOS の型が互いの計画を拒む（陰性対照）・`--validate`・`typed_reading`。README の「selftest は `recipes.json` だけを見る」を直し、ファイルの表と `scenarios` の行に OFF 用の手順書を足した。
+  3. `_scenario_checks(..., os_name="macos")` の既定を無くし、型を必須の引数にした（呼び出しは selftest の 5 か所だけ・どれも型を渡す）。
+  4. `run/cell.example.json` の `layout` を `US keyboard` → `JIS keyboard` に直した。`focus_cmd` の key code 104 は JIS のかなキー、S12 の `kana_layout` は JIS のかな配列、両パイロットとも JIS で、例のほうが食い違っていた。⚠️ `learning`（「毎ブロックでリセット」）は直さない。例は設計（design.md「ブロックの先頭で辞書・学習状態をリセット」）を示していて、`reset_cmd` は仮（`run/README.md` の前提 6「`cell.example.json` gives placeholders only」）。パイロットでリセットしなかったことは、M2 で `pilot-macos.md` の条件に書く（引き継ぎ §3.5）。本番でリセットするかどうかは M3 の事前登録で決める。
+- **確認（G-GEAR・Windows 11・Python 3.11.9）**: `generate_plan.py --selftest` 103 件が緑（直す前は 96 件）。OFF 用の手順書に変異を 7 本入れると、7 本とも selftest が赤になった（S1 の Enter を 2 回・S5 の Esc を 2 回・S2 の Enter を 1 回・S8 の数字の後の Enter を削る・S11 を既定で有効・Windows の節を変える・`kana_layout` を変える）。`kit/check.sh` の 27 本と `--compile` が緑、`_style_check.py papers/ime-observation` の違反は 0 件。
+- **経緯**: 1〜3 の差分は、worktree `C:/wt/ime-m1-pilot` に未コミットで残っていた（`generate_plan.py` の mtime は 2026-10-01 04:11 で、引き継ぎの commit `0da36bcc` の 6 分後。書いた記録は無く、前のセッションの書きかけと見られる）。メインが全行を読んで採用し、README を合わせ、4 を足した。
+
+## 判断 82: M1 の枝の完了時レビュー 1 巡目（Claude の 2 系統）の指摘への対応（2026-10-01・G-GEAR・メインの実装上の選択・研究者が覆せる）
+
+- **背景**: `97381a7b..5a9cc805`（この枝だけの差分・17 ファイル）に code-reviewer ∥ security-checker を回した。どちらも CRITICAL / HIGH は 0。指摘はすべて一次（コード・`pilot-macos-1-notes.md`・`clock_sync.py`・`run_cell.py`）で裏を取った。
+- **直したもの**（papers/ の 7 ファイル）:
+  1. 〔MEDIUM・コード〕矢印だけのマーカーが観測側で一意でない: 観測は種類しか持たないので、← → ← は `navigation` × 3 として探される。S7 は → を `nav_count` 回続けて押すので、`nav_count_max` ≥ 3 なら試行の中にも同じ並びが現れる。本物のマーカーが欠けたブロックでは、それが割り当てられて `missing` に出ない（`clock_sync.py` の README の約束に反する）。→ `normalize_config` が「矢印だけのマーカーは `nav_count_max` より長い」を検査して、破る config を拒む（exit 2）。gen / pilot の README に規則を書いた。⚠️ パイロットの config（← → ←）は `nav_count_max` によっては拒まれる → M2 で研究者が「4 打鍵のマーカー（← → ← →）」か「`nav_count_max` ≤ 2」かを決める（引き継ぎ §3）。
+  2. 〔MEDIUM・文書〕ライブ変換 ON で残った食い違いが gen/README に無かった → 「126 試行のうち、かな入力の 9 試行中 2 件は 1 回目の Return で確定・数字選択と予測候補の各 1 件が持ち越し」を Limitations に足した。OFF の確認には n = 39 を添えた。
+  3. 〔MEDIUM・文書〕e2/README が証拠より強かった（送ったのは F13 / F14 だけ・4,000 は試行の中の押下だけ）→ 書き分けた。
+  4. 〔MEDIUM・文書〕OFF のセルの計画を ON 用の手順書で攻撃しても `closed_set.py` は止まらない → e2/README の Usage に「`--recipes` は計画を作ったファイル（OFF なら `recipes.macos-live-off.json`）」と、照合がまだ無いこと・出力の `recipes_sha256` で後から比べられることを書いた。⚠️ コードの照合は今回入れない: selftest の計画は `recipes_sha256` が `"0" * 64` で、照合を入れると closed_set / open_set の selftest と 021 / 022 の fixture を直す範囲になる → E2 を本番のログに回す前の項目として引き継ぎ §5 に書いた。`open_set.py` は手順書から `kana_layout` と `typed_reading` しか使わず、2 つのファイルで同一なので実害は無い。
+  5. 〔LOW〕gen/README: 手順の終わりのキーを変えたら `_PROFILES` も直す・S11 の行の条件を前に出す・「仮説」は Windows の手順だけ（macOS は 1 台・1 版の実測）。`generate_plan.py`: 型の表のコメントの不正確さ（Windows の数字選択は 0 キー・Space の無い確定は全型で Return 1 回）・失敗の文言に型の名前・Windows の照合でも全シナリオが現れたかを確かめる。
+  6. 〔LOW〕run/README: `4a.` は CommonMark でリストの印にならない → 4 の 2 段落目にした（番号 5〜8 は変えない）。前提 6 の「placeholders only」を、仮の値（`reset_cmd`・`ime_settings.learning`・`ime` の版）の名指しに直した。`focus_cmd` は送出フラグの有無によらず、前面の確認より前に実行される（`run_cell.py:579-587` で確認）ことを表に書いた。前提 4 に System Events の Automation の許可と、計測の後に外せることを書いた。
+  7. 〔LOW〕pilot/README: 「空の欄のキャレットを動かす」は不正確（確定のたびに欄は空になり、矢印は命令として届く）・「変換の外で押す」は持ち越しのブロックでは成り立たない → 事実として書き直した。`open_set.py` の docstring の「function keys」を直した。
+  8. 〔LOW・security〕`build.sh` の bundle id の検査を送出側（`backend_macos.py:39` の `[A-Za-z0-9][A-Za-z0-9.-]{0,127}`）と同じ形にし、`LC_ALL=C` で範囲を ASCII に固定した。検査の部分だけを git-bash 5.2 で 11 通り試した（128 文字は通し 129 文字・先頭の `.` / `-`・空・空白・`"`・`<`・非 ASCII は拒む）。⚠️ macOS の bash 3.2 と `build.sh` 全体（`swiftc`）は Mac で確かめる。
+- **直さないもの（理由）**:
+  - 〔MEDIUM・security〕パイロットの生ログを公開物に含めるときの除外の基準が無い → M2 の §3-4 の作業そのもの。基準（計画どおりで aborted でない run だけ・oracle に対応しない観測の key 行が 0 件・手打ちの探査と手打ちの対照は除く）を引き継ぎに書いた。
+  - 〔LOW・security〕`focus_cmd` のかなキーが前面の確認より前に押される → 例の osascript に前面の bundle id の確認を足すのは、Windows では試せない。引き継ぎの Mac の項目にした。`run_cell.py` で `focus_cmd` を送出フラグの対象にする案は、既存の acceptance の挙動を変えるので採らず、README に書くだけにした。
+  - 〔範囲外〕`cell.example.json` の `predictive_candidates: "off"` と、既定で有効な S10（予測候補）の食い違い → パイロットの実際の設定を `pilot-macos.md` の条件に書くときに確かめる（引き継ぎ）。
+- **確認**: `generate_plan.py --selftest` 108 件が緑。新しい検査への変異 4 本（検査を外す・`<=` を `<` にする・Windows の照合に OFF の型を渡す・Windows の計画から S2 を抜く）がすべて赤。`kit/check.sh` の 27 本・`--compile` が緑、`_style_check.py` の違反 0 件。
+
+## 判断 83: M1 の枝の完了時レビュー（Codex）—— 上限の一時的な引き上げと、指摘 4 件への対応（2026-10-01・G-GEAR・上限は研究者の選択・対応はメインの実装上の選択で研究者が覆せる）
+
+- **予算**: 同日の Codex の実消費は、並行セッション（`docs/ai-fatigue-protocol-cont`）の台帳で 291,174 / 7 回だった。こちらで 1 回回すと上限 300,000 を超える。予算ガードの hook は `C:\GSE-prototype` の台帳（66,418）を読むので止まらない。研究者に AskUserQuestion で 3 案を出した（推奨は「今日は PR まで・Codex は 10-02」、ほかに「今日だけ 350,000 に上げる」「Codex を省く」）。研究者は「今日だけ上限を 350,000 に上げる」を選んだ。台帳に `_comment_2026_10_01_m1_pr_raise` を足した。並行セッションには、今日はこれ以上回さないよう SendMessage で知らせた。
+- **実行**: `scripts/run-codex-review.sh 97381a7b..6fa44a6a -- papers/ime-observation`（12 ファイル・772 行）。機密フィルタは素通りした。消費は 33,557（本ブランチの台帳 199,404 → 232,961・5 → 6 回）。同日の合計の見込みは 291,174 + 33,557 = 324,731。
+- **指摘と対応**（4 件とも一次で確かめた）:
+  1. 〔P1〕`closed_set.py` が計画と違う手順書を黙って使う。code-reviewer の MEDIUM と一致したので、判断 82 の「README だけ」を改め、コードで止める。`run()` で、各計画のヘッダーの `recipes_sha256` と `--recipes` のファイルの SHA-256 を比べ、違えば exit 2 にした。selftest の計画は `recipes.json` の実際の SHA-256 で作るように直し、OFF 用の手順書を渡すと exit 2 になるケースを足した（83 件緑・照合を外す変異で赤）。021 の acceptance は selftest とケース名の grep だけなので、影響しない。`open_set.py` は、2 つのファイルで同一の `kana_layout` / `typed_reading` しか使わないので照合しない（README に書いた）。
+  2. 〔P1〕例の `focus_cmd` が、前面の確認の前にキーを送る。`dryrun` では同意なしで送る。security-checker の LOW と同じ。
+     - (i) 同意: `run_cell.py` で、`focus_cmd` を `reset_cmd` と同じく送出フラグの対象にした。フラグが無ければ実行せず、manifest に skipped と理由を書く。README の「フラグは機械の状態を変える操作すべてへの同意」に合わせた。既存の「focus の失敗で abort」のケースはフラグありに直した。フラグなしでは走らない・フラグありでは走る、の 2 ケースを足した（53 件緑・ゲートを外す変異で赤）。manifest の `focus` を読む処理は `run_cell.py` の外に無い（grep）。
+     - (ii) 順序: 例の osascript に、かなキーを押す前の前面の確認を 1 行足した。式は送出側 `backend_macos.py` の `FRONT_QUERY`（`id of application (path to frontmost application as text)`）で、パイロットの実機で動いたもの。違えば `error` で非 0 になり、`run_cell.py` がブロックの前に abort する。⚠️ この 1 行は実機で試していない → Mac で確かめる（引き継ぎ）。README の前提 6 に「パイロットの後に足した 1 行」と書いた。
+  3. 〔P2〕持ち越しは、キー列の照合（`_scenario_checks`）では見つからない。`gt_sessions.py` の `oracle_agreement` は不一致を型ごとに数えるが、除外はしない。→ 持ち越した試行（と次の試行）をどう扱うかは、正解の定義と事前登録で決める（M2 / M3・引き継ぎ §3）。今回はコードを変えない。
+  4. 〔P2〕OFF 用の手順書でも、S11 を `scenarios` で名指しすれば生成できる。→ OFF 用の手順書の S11 を S9 と同じ形（`steps` が空・既定で無効）にし、名指しすると生成が止まるようにした。selftest に 1 ケース足した（109 件緑・直す前の手順書で赤）。⚠️ これで OFF 用の手順書の SHA-256 が変わる。パイロットの `verify-off` の計画は、`19c537c0` の版を指す（生ログを預けるときは、その版を添える）。
+- **2 巡目**: Codex の 2 巡目は回さない。同日の合計の見込み（324,731）に 1 回（3〜4 万）を足すと、研究者が選んだ 350,000 を超えるため。2 巡目の観点（今回足した規則の境界条件）は、Claude の code-reviewer で見る。
+
+## 判断 84: M1 の枝の完了時レビュー 2 巡目（code-reviewer・足した規則の境界条件）への対応（2026-10-01・G-GEAR・メインの実装上の選択・研究者が覆せる）
+
+- **背景**: 判断 82・83 で足した 5 つの規則（マーカーの長さ・E2 の手順書の照合・`focus_cmd` の同意・前面の確認・OFF の S11）の境界条件を、`5a9cc805..8ae9ccd1` で code-reviewer に攻めさせた。CRITICAL 0・HIGH 1・MEDIUM 5・LOW 5。すべて一次で確かめた。
+- **直したもの**:
+  1. 〔HIGH〕E2 の照合はファイルのバイト列で SHA-256 を比べる。ところが `recipes*.json` に `eol` の指定が無く、`core.autocrlf=true`（Git for Windows の既定）で clone すると CRLF になる。そうなると、正しい手順書を渡しても止まる。⚠️ この機械（`autocrlf=input`）では LF だった。od と Python でバイトを数えて確かめた（`git ls-files --eol` も `i/lf w/lf`）。なお、`grep -c $'\r'` は行数を返していて、測定器のほうが誤っていた。→ 先例（判断 32・63）に倣い、repo 直下の `.gitattributes` に `kit/gen/recipes*.json` と `kit/corpus/data/*.jsonl` の `eol=lf` を足した。コーパスの SHA-256 は `experiment/data.md` にも書いてある。index はもとから LF なので、中身は変わらない。⚠️ 書き出し器は公開 repo 用の `.gitattributes` を作らない（既存の先例のファイルも同じ）→ M12 の項目として引き継ぎに書いた。
+  2. 〔MEDIUM〕マーカーの検査は、書かれたマーカーを見ていて、観測に残る並びを見ていなかった（`["left","f13","right","left"]` が通る）。また、上限は config の `nav_count_max` ではなく手順書の `params` で決まる（整数も書ける）。さらに、検査が `normalize_config` の中にあったため、E2 もこれを呼んでいた。E2 はマーカーを個数で読み飛ばすだけなので、パイロットの config で E2 が誤って止まる。→ 検査を `plan_rows`（生成のときだけ）に移した。観測されないキーの集合 `UNOBSERVED_KEYS`（e2/README のキーの表と同じ前提）を除いたマーカーが矢印だけなら、作った計画の試行の中の矢印の最長の連続（観測されないキーは飛ばして数える）より長いことを求める。S7 の無い計画では検査しない。selftest: 前提（nav 3 で連続 3 が実際にある）・拒否 3 通り（`["left","f13"]` を拒否側へ移した）・受理 6 通り・手順書で上限 5 にした S7・`normalize_config` が判定しないこと。
+  3. 〔MEDIUM〕E2 は `config_sha256` を照合していなかった。K2（`ASSUMPTIONS`）は config も攻撃者の知識に挙げている → 手順書と同じく照合する。selftest は、計画を作った config を実際にファイルに書き、それを `--config` に渡す形に直した（もとは「計画は部分集合の config・`--config` は別のファイル」だった）。⚠️ コーパスは照合しない。設計（design.md §2）に「E2 だけ現代文のコーパスを足す」という任意の案があり、計画と違うコーパスを渡す正当な使い方がありうる。README に書いた。
+  4. 〔MEDIUM〕例の前面の確認が 1 回だけで、送出側（0.2 秒おきに 5 回）より誤って中断しやすい → `repeat 5 times … exit repeat … delay 0.2 … end repeat` の後で確かめる形にした。⚠️ 実機では試していない（引き継ぎ）。
+  5. 〔LOW〕run/README: manifest の `focus` に `skipped` を書いた（`focus_cmd` が空でなく、フラグが無いとき）。フラグの節の「skipped と記録」を、「計画が求めた reset と、空でない `focus_cmd`」に正した。前提 4 に「手順書はライブ変換の設定に合わせる・runner は確かめられない」を足した。前提 6 に「bundle id は例の 3 か所」を足した。
+  6. 〔LOW〕e2 / pilot の README: ← → ← は、どの試行も矢印を 3 回続けて押さない間だけ使える、と注記した。本番のマーカーは事前登録で決める。
+  7. 〔LOW〕`open_set.py` は、手順のうち「どのシナリオがかなで打つか」も読む → 2 つの手順書でこれが一致することを selftest で確かめる。
+- **確認**: `generate_plan.py --selftest` 113 件・`closed_set.py --selftest` 84 件が緑。変異 5 本がすべて赤: 検査の呼び出しを外す・射影をやめる・上限を 3 に固定する・OFF の S12 のかな入力を外す・照合から config を外す。S12 の変異は、最初の文字列の置き換えが Windows の節にも当たって不発だったので、JSON として macOS の S12 だけを変えてやり直した。`kit/check.sh` の 27 本と `--compile` が緑、`_style_check.py` の違反 0 件。
+- **直さないもの**: なし（引き継ぎに回したのは、M12 の公開 repo の `.gitattributes` と、実機での前面の確認の 2 つ）。

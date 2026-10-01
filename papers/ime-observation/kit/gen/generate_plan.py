@@ -42,7 +42,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import romaji  # noqa: E402
 
-GENERATOR_VERSION = "1.1.0"
+GENERATOR_VERSION = "1.2.0"
 SPEEDS = ("slow", "mid", "fast")
 SCENARIOS = tuple("S%d" % i for i in range(1, 16))
 OS_NAMES = ("macos", "windows")
@@ -52,6 +52,11 @@ KEYNAMES = frozenset(
        "ime_on", "ime_off"] + ["f%d" % i for i in range(13, 20)]
     + ["shift", "mouse_click", "focus_away", "focus_back"]
 )
+ARROW_KEYS = ("left", "up", "right", "down")
+# Keys the observation is assumed not to record (the key table in ../e2/README.md: the IME toggles, F13 to F19, and
+# the runner's pseudo keys produce no row).
+UNOBSERVED_KEYS = frozenset(["ime_on", "ime_off", "mouse_click", "focus_away", "focus_back"]
+                            + ["f%d" % i for i in range(13, 20)])
 COMMITS = ("enter", "digit", "mouse", "none")
 INTENT_KEYS = ("commit", "cand_index", "nav_count", "abandon", "predictive", "ime_toggle_mid", "focus_switch_mid",
                "expect_session")
@@ -607,7 +612,34 @@ def plan_rows(corpus, recipes, config, os_name, seed, config_sha256, recipes_sha
             tid = "t%05d" % n_trial
             rows.append(build_trial(ph, s, sp, os_name, recipes, cfg, trial_rng(seed, tid), tid, bid))
             phrases[tid] = ph
+    _check_marker(cfg["marker"], rows)
     return rows, phrases
+
+
+def _arrow_run(keys):
+    """The longest run of arrow keys among the observed keys of a key sequence (unobserved keys are skipped)."""
+    best = cur = 0
+    for k in keys:
+        if k in UNOBSERVED_KEYS:
+            continue
+        cur = cur + 1 if k in ARROW_KEYS else 0
+        best = max(best, cur)
+    return best
+
+
+def _check_marker(marker, rows):
+    """The observation records only a key's category, so a marker whose observed keys are all arrow keys is found
+    there as a run of navigation rows. It stays unique only when it is longer than every run of arrow presses inside
+    a trial of the plan (see ../pilot/README.md); otherwise the plan is refused."""
+    seen = [k for k in marker if k not in UNOBSERVED_KEYS]
+    if not seen or any(k not in ARROW_KEYS for k in seen):
+        return
+    longest = max([_arrow_run([s["key"] for s in r["steps"] if s["down"]]) for r in rows if r["kind"] == "trial"]
+                  or [0])
+    if len(seen) <= longest:
+        raise ValueError("the marker leaves %d arrow keys in the observation, but a trial of this plan presses %d arrow "
+                         "keys in a row, so the two cannot be told apart; make the marker longer or lower "
+                         "nav_count_max" % (len(seen), longest))
 
 
 def render_plan(rows):
@@ -878,9 +910,35 @@ def _sha_file(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
-def _scenario_checks(rows, phrases, recipes, cfg, fails):
-    """Checks that each scenario's procedure matches recipes' intent (a positive content check)."""
-    inv = dict((c, k) for k, c in recipes["kana_layout"].items())
+# Keys each procedure profile ends a scenario with (see the README's Limitations). "commit" follows a conversion
+# after one Space (and, in S7 / S15, the arrows or the focus switch that come after it), "commit_cands" follows the
+# candidate window opened by two or more Spaces, "after_digit" follows a digit pick, and "cancel" cancels an
+# unconverted reading. A commit that follows no Space (S3, S10, S11) takes one Return under every profile and is not
+# listed here.
+# - macos-live-on (recipes.json): one Space already opens the candidate window, where a Return only picks the
+#   candidate, so every commit after a Space takes a second Return, and so does a digit pick; each Escape steps the
+#   live conversion back one stage (kanji, kana, spelling), so the cancel presses four (extra presses only reach the
+#   field as a command).
+# - macos-live-off (recipes.macos-live-off.json): one Space shows the conversion in place and one Return commits
+#   it; a second Space opens the candidate window, which still takes two Returns, and a digit pick is followed by one
+#   Return; one Escape cancels.
+# - windows (either file): one Return for each commit and one Escape for the cancel; a digit pick commits by itself.
+_PROFILES = {
+    "windows": {"commit": ["enter"], "commit_cands": ["enter"], "after_digit": [], "cancel": ["esc"]},
+    "macos-live-on": {"commit": ["enter", "enter"], "commit_cands": ["enter", "enter"], "after_digit": ["enter"],
+                      "cancel": ["esc"] * 4},
+    "macos-live-off": {"commit": ["enter"], "commit_cands": ["enter", "enter"], "after_digit": ["enter"],
+                       "cancel": ["esc"]},
+}
+
+
+def _scenario_checks(rows, phrases, recipes, cfg, fails, profile):
+    """Checks that each scenario's procedure matches recipes' intent (a positive content check).
+
+    ``profile`` is a key of ``_PROFILES`` and must match the recipes file and the OS the plan was built for.
+    """
+    tail = _PROFILES[profile]
+    enter = tail["commit"]
     seen = set()
     for r in rows:
         if r["kind"] != "trial":
@@ -893,39 +951,42 @@ def _scenario_checks(rows, phrases, recipes, cfg, fails):
         seen.add(sc)
         ok = True
         if sc == "S1":
-            ok = downs == full + ["space", "enter"] and cfg["think_ms"]["min"] <= r["think_ms"] <= cfg["think_ms"]["max"]
+            ok = downs == full + ["space"] + enter and cfg["think_ms"]["min"] <= r["think_ms"] <= cfg["think_ms"]["max"]
         elif sc == "S2":
             k = it["cand_index"] + 1
-            ok = 1 <= it["cand_index"] <= cfg["cand_index_max"] and downs == full + ["space"] * k + ["enter"]
+            ok = 1 <= it["cand_index"] <= cfg["cand_index_max"] and downs == full + ["space"] * k + tail["commit_cands"]
         elif sc == "S3":
             ok = downs == full + ["enter"] and r["think_ms"] == 0
         elif sc == "S4":
             ok = downs == full + ["space", "esc", "esc"] and it["abandon"] is True
         elif sc == "S5":
-            ok = downs == full + ["esc"]
+            ok = downs == full + tail["cancel"]
         elif sc == "S6":
             ok = downs == full + ["backspace"] * len(rd)
         elif sc == "S7":
-            ok = downs == full + ["space"] + ["right"] * it["nav_count"] + ["enter"] \
+            ok = downs == full + ["space"] + ["right"] * it["nav_count"] + enter \
                 and 1 <= it["nav_count"] <= cfg["nav_count_max"]
         elif sc == "S8":
-            ok = downs == full + ["space", "space", str(it["cand_index"] + 1)] and it["commit"] == "digit"
+            ok = downs == full + ["space", "space", str(it["cand_index"] + 1)] + tail["after_digit"] and it["commit"] == "digit"
         elif sc == "S10":
             ok = downs == romaji.to_keys(rd[:max(1, len(rd) // 2)]) + ["tab", "enter"] and it["predictive"] is True
         elif sc == "S11":
             ok = downs == full + ["enter"]
         elif sc == "S12":
-            ok = downs[-2:] == ["space", "enter"] and all(k in recipes["kana_layout"] for k in downs[:-2]) \
-                and "".join(recipes["kana_layout"][k] for k in downs[:-2]) == rd
+            m = 1 + len(enter)
+            ok = downs[-m:] == ["space"] + enter and all(k in recipes["kana_layout"] for k in downs[:-m]) \
+                and "".join(recipes["kana_layout"][k] for k in downs[:-m]) == rd
         elif sc == "S13":
-            ok = downs[-2:] == ["space", "enter"] and at[-1] - at[-2] == 21000
+            m = 1 + len(enter)
+            ok = downs[-m:] == ["space"] + enter and at[-m + 1] - at[-m] == 21000
         elif sc == "S14":
             ok = downs == full + ["space", "ime_off", "ime_on"] and it["ime_toggle_mid"] is True
         elif sc == "S15":
             i = downs.index("focus_away")
-            ok = downs[i:] == ["focus_away", "focus_back", "enter"] and at[i + 1] - at[i] == 1000
+            ok = downs[i:] == ["focus_away", "focus_back"] + enter and at[i + 1] - at[i] == 1000
         if not ok:
-            fails.append("scenario %s's procedure does not match recipes' intent (%s)" % (sc, r["trial_id"]))
+            fails.append("scenario %s's procedure does not match recipes' intent under the %s profile (%s)"
+                         % (sc, profile, r["trial_id"]))
             return
     return seen
 
@@ -1029,10 +1090,15 @@ def selftest():
                   for sp in SPEEDS), str(med))
 
         # --- per-scenario procedures (recipes' intent)
-        seen = _scenario_checks(rows1, ph1, recipes, ncfg, fails)
+        seen = _scenario_checks(rows1, ph1, recipes, ncfg, fails, "macos-live-on")
         n[0] += 1
         check("all 14 scenarios appear under the macos default", seen == set(scen_mac), str(sorted(seen or [])))
-        _scenario_checks(rows_w, gen("windows")[1], recipes, ncfg, fails)
+        seen_w = _scenario_checks(rows_w, ph_w, recipes, ncfg, fails, "windows")
+        n[0] += 1
+        scen_win = [s for s in SCENARIOS
+                    if s in recipes["os"]["windows"] and recipes["os"]["windows"][s].get("default_enabled", True)]
+        check("every scenario enabled by default appears under the windows default", seen_w == set(scen_win),
+              str(sorted(seen_w or [])))
         check("one scenario falls back to a synthetic kana string (kana-) when typable phrases run out",
               any(t["phrase_id"].startswith("kana-") for t in trials if t["scenario"] == "S12"))
         check("no other scenario uses a kana- phrase_id", all(not t["phrase_id"].startswith("kana-") for t in trials if t["scenario"] != "S12"))
@@ -1042,14 +1108,14 @@ def selftest():
         check("at_ms is relative to the start of the trial (the first is 0)", all(t["steps"][0]["at_ms"] == 0 for t in trials))
 
         # --- typed_reading: matches expectations across every scenario and both operating systems
-        def _typed_mismatches(rows, phrases):
+        def _typed_mismatches(rows, phrases, rec=recipes):
             bad = []
             for t in rows:
                 if t["kind"] != "trial":
                     continue
                 rd = phrases[t["trial_id"]]["reading"]
                 want = rd[:max(1, len(rd) // 2)] if t["scenario"] == "S10" else rd
-                got = typed_reading(t, recipes)
+                got = typed_reading(t, rec)
                 if got != want:
                     bad.append((t["trial_id"], t["scenario"], want, got))
             return bad
@@ -1059,6 +1125,42 @@ def selftest():
               not bad_mac, str(bad_mac[:3]))
         bad_win = _typed_mismatches(rows_w, ph_w)
         check("typed_reading matches expectations for every scenario (windows)", not bad_win, str(bad_win[:3]))
+
+        # --- the recipes file for a macOS cell with live conversion off (the README's Limitations)
+        off_path = os.path.join(_HERE, "recipes.macos-live-off.json")
+        recipes_off = load_recipes(off_path)
+        check("the live-off recipes keep the windows procedures and the kana layout of recipes.json",
+              recipes_off["os"]["windows"] == recipes["os"]["windows"]
+              and recipes_off["kana_layout"] == recipes["kana_layout"])
+        check("both macOS files type the reading through the kana layout in the same scenarios (the open-set attack "
+              "reads only this and the kana layout from the recipes)",
+              sorted(recipes["os"]["macos"]) == sorted(recipes_off["os"]["macos"])
+              and all(_uses_kana(recipes["os"]["macos"][s]) == _uses_kana(recipes_off["os"]["macos"][s])
+                      for s in recipes["os"]["macos"]))
+        rows_off, ph_off = plan_rows(corpus, recipes_off, cfg, "macos", 7, sha, _sha_file(off_path), csha)
+        scen_off = [s for s in SCENARIOS
+                    if s in recipes_off["os"]["macos"] and recipes_off["os"]["macos"][s].get("default_enabled", True)]
+        check("the live-off recipes leave the live-conversion scenario out by default",
+              "S11" not in scen_off and "S11" not in set(t["scenario"] for t in rows_off if t["kind"] == "trial"))
+        try:
+            plan_rows(corpus, recipes_off, dict(cfg, scenarios=["S1", "S11"]), "macos", 7, sha, _sha_file(off_path), csha)
+            s11_named = "built"
+        except ValueError as e:
+            s11_named = str(e)
+        check("naming the live-conversion scenario explicitly with the live-off recipes stops the build",
+              "S11" in s11_named and "no defined procedure" in s11_named, s11_named)
+        seen_off = _scenario_checks(rows_off, ph_off, recipes_off, ncfg, fails, "macos-live-off")
+        n[0] += 1
+        check("all 13 scenarios appear under the live-off macos default", seen_off == set(scen_off),
+              str(sorted(seen_off or [])))
+        cross_on, cross_off = [], []
+        _scenario_checks(rows_off, ph_off, recipes_off, ncfg, cross_on, "macos-live-on")
+        _scenario_checks(rows1, ph1, recipes, ncfg, cross_off, "macos-live-off")
+        check("each macos profile rejects the plan built from the other recipes file (negative control)",
+              bool(cross_on) and bool(cross_off))
+        check("the generated plan (macos, live off) passes --validate", validate_plan(render_plan(rows_off)) == [])
+        bad_off = _typed_mismatches(rows_off, ph_off, recipes_off)
+        check("typed_reading matches expectations for every scenario (macos, live off)", not bad_off, str(bad_off[:3]))
 
         # --- public functions do not write to standard error; warnings are returned instead
         _buf = io.StringIO()
@@ -1246,6 +1348,42 @@ def selftest():
         rc, msg = run("--corpus", corpus_path, "--recipes", recipes_path, "--config", bad_cfg, "--os", "macos",
                       "--seed", "1", "--out", os.path.join(tmp, "x.jsonl"))
         check("a config missing keys exits 2", rc == 2, "exit %d" % rc)
+
+        # --- a marker whose observed keys are all arrows must be longer than every arrow run inside a trial
+        def _marker_ok(marker, nav, rec=recipes, scenarios=None):
+            c = dict(cfg, marker=marker, nav_count_max=nav)
+            if scenarios is not None:
+                c["scenarios"] = scenarios
+            try:
+                plan_rows(corpus, rec, c, "macos", 7, sha, rsha, csha)
+                return True
+            except ValueError:
+                return False
+        runs3 = max(_arrow_run([s["key"] for s in t["steps"] if s["down"]])
+                    for t in gen(config=dict(cfg, nav_count_max=3))[0] if t["kind"] == "trial")
+        check("precondition: with nav_count_max 3 some trial presses three arrow keys in a row", runs3 == 3, str(runs3))
+        check("a marker leaving no more arrows in the observation than the longest arrow run of a trial is refused",
+              not _marker_ok(["left", "right", "left"], 3) and not _marker_ok(["left", "f13", "right", "left"], 3)
+              and not _marker_ok(["left", "f13"], 3))
+        check("a longer arrow marker, a lower nav_count_max, a marker with an observed non-arrow key, a marker the "
+              "observation never records, and a plan without the arrow scenario are accepted",
+              _marker_ok(["left", "right", "left", "right"], 3) and _marker_ok(["left", "right", "left"], 2)
+              and _marker_ok(["left", "space", "left"], 3) and _marker_ok(["f13", "f14", "f13"], 3)
+              and _marker_ok([], 3) and _marker_ok(["left", "right", "left"], 3, scenarios=["S1", "S2"]))
+        rec5 = json.loads(json.dumps(recipes))
+        rec5["os"]["macos"]["S7"]["params"]["nav_count"]["max"] = 5
+        check("the limit follows the procedures: an S7 that allows five arrows refuses a three-arrow marker even "
+              "with nav_count_max 2", not _marker_ok(["left", "right", "left"], 2, rec=rec5))
+        check("normalize_config does not judge the marker (the attack reads the configs of plans already run)",
+              normalize_config(dict(cfg, marker=["left", "right", "left"], nav_count_max=3))["marker"]
+              == ["left", "right", "left"])
+        bad_mk = os.path.join(tmp, "bad_marker.json")
+        with open(bad_mk, "wb") as f:
+            f.write(json.dumps(dict(cfg, marker=["left", "right", "left"], nav_count_max=3)).encode("utf-8"))
+        rc, msg = run("--corpus", corpus_path, "--recipes", recipes_path, "--config", bad_mk, "--os", "macos",
+                      "--seed", "1", "--out", os.path.join(tmp, "x.jsonl"))
+        check("a config whose arrow-key marker is too short exits 2", rc == 2 and "nav_count_max" in msg,
+              "exit %d" % rc)
         rc, msg = run("--validate", os.path.join(tmp, "no-such-file.jsonl"))
         check("--validate on a nonexistent plan exits 2", rc == 2, "exit %d" % rc)
         mut_path = os.path.join(tmp, "mut.jsonl")
