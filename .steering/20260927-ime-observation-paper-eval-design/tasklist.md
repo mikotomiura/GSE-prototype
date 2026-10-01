@@ -116,9 +116,10 @@
     - [x] 完了時レビュー（Claude の 2 系統・判断 88）: MEDIUM 3 件・LOW 4 件を直した。Codex は判断 89（研究者の選択で今日だけ上限を 360,000 にして 1 回・P2 2 件・P3 1 件に対応・上限は 300,000 に戻した）
   - [ ] M3 事前登録（macOS 版）の下書き → attack-me（stage `prereg`）→ 凍結 → OSF の登録（研究者）
     - [x] 研究者に 8 問（2026-10-01・G-GEAR）→ 判断 90〜97（速さ 480 / 240 / 120 ms・学習はリセットしない・段階凍結は追補で印を更新・OSF はすぐ公開・時計のずれは補正しない・`dwell_ms == 0` は今のまま・自動確定の後の取り消しは層別の診断を足す・E2 は上端 ≤ 2/K）
-    - [ ] 凍結の前の直し: `gt_sessions.py` / `l1.py` に自動確定の層別の診断（判断 96）・`pilot-macos.md` の時計の一文（判断 94）・`e2/README.md` の「coarsest」（判断 97）・`notes.md` の主張の対応表と借りた手法の出典・`l1.py` / `l2.py` の「事前登録で決める」（判断 95）・`cell.example.json` の `learning` / `predictive_candidates`（判断 91）
-    - [ ] 本番の生成の config（判断 85・90）と、各 run の seed（計画・E2）を決めてファイルにする
-    - [ ] `experiment/preregistration.md` の下書き（学術的な英語・OSF Preregistration の節立て・凍結の前に計算した値をすべて開示）と、書誌の登録（`docs/references.md` に `[V184]` 以降）
+    - [x] 凍結の前の直し: `gt_sessions.py` / `l1.py` に自動確定の層別の診断（判断 96）・`pilot-macos.md` の時計の一文（判断 94）・`e2/README.md` の「coarsest」（判断 97）・`notes.md` の主張の対応表と借りた手法の出典・`l1.py` / `l2.py` の「事前登録で決める」（判断 95）・`cell.example.json` の `learning` / `predictive_candidates`（判断 91）
+      → `gt_sessions.py --selftest` 14 件・`l1.py --selftest` 12 件（1 件足した）が緑。変異: 数える処理を外す・閉じた確定まで数える（gt）、層の境界 `> 0` を `>= 0`・欄の無いものを「無し」に・unknown を数えない・`_measures` から外す（l1）→ 6 本すべて赤。`nfb` の条件を外す変異は等価（`nfb` の無い確定は必ず閉じる）。`kit/check.sh` 27 本緑・`run.sh --synthetic` 2 回でバイト一致（L1 の出力に新しい表・unknown 0 件）・`run_cell.py --selftest` 53 件 ok・`_style_check.py` 違反 0 件
+    - [x] 本番の生成の config（判断 85・90）と、各 run の seed（計画・E2）を決めてファイルにする → `experiment/plan_config.macos.json`・seed はすべて `SEED`（判断 98）。G-GEAR で両セルの計画の生成と `--validate` が exit 0
+    - [x] `experiment/preregistration.md` の下書き（学術的な英語・OSF Preregistration の節立て・凍結の前に計算した値をすべて開示）と、書誌の登録（`docs/references.md` に `[V184]`〜`[V189]`・判断 98）→ `--check-prereg` は exit 3（印なし＝未凍結を正しく判定）・`check_citations.py` 違反なし
     - [ ] attack-me（stage `prereg`・`paper-reviewer`・起動の前に下書きを commit・封印物 `sealed/` がある時期なので研究者に知らせる）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
