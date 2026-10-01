@@ -1,0 +1,9502 @@
+{
+ "executed": "2026-09-30T23:39:53+09:00",
+ "input_sha256": "6984472edeef3794a9ed075076568aaca8373c4fb675afba608cdba280e6c883",
+ "n": 259,
+ "n_with_doi": 255,
+ "errors": [],
+ "meta": {
+  "AF001": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI fatigue in human–AI interaction: Conceptual framework, scale development and validation, and associations with AI engagement",
+   "container": "Computers in Human Behavior Reports",
+   "issued": [
+    [
+     2026,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Lau",
+     "Gabriel R."
+    ],
+    [
+     "Sandeeshwara Kasturiratna",
+     "K.T.A."
+    ],
+    [
+     "Goh",
+     "Adalia Y.H."
+    ],
+    [
+     "Tong",
+     "Eddie M.W."
+    ],
+    [
+     "Hartanto",
+     "Andree"
+    ]
+   ],
+   "relations": []
+  },
+  "AF002": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Fatigued by uncertainties: Exploring the cognitive and emotional costs of generative AI usage",
+   "container": "International Journal of Information Management",
+   "issued": [
+    [
+     2026,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Yang",
+     "Hui"
+    ],
+    [
+     "Zeng",
+     "Yu"
+    ],
+    [
+     "Xing",
+     "Huizi"
+    ],
+    [
+     "Hu",
+     "Peng"
+    ]
+   ],
+   "relations": []
+  },
+  "AF003": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Trust erodes, fatigue builds: How prompt uncertainty traps users in recrafting loops",
+   "container": "Computers in Human Behavior",
+   "issued": [
+    [
+     2026,
+     12
+    ]
+   ],
+   "authors": [
+    [
+     "Yang",
+     "Hui"
+    ],
+    [
+     "Wang",
+     "Jinqiang"
+    ],
+    [
+     "Hu",
+     "Peng"
+    ]
+   ],
+   "relations": []
+  },
+  "AF004": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Learners' AI dependence and critical thinking: The psychological mechanism of fatigue and the social buffering role of AI literacy",
+   "container": "Acta Psychologica",
+   "issued": [
+    [
+     2025,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Tian",
+     "Jinrui"
+    ],
+    [
+     "Zhang",
+     "Ronghua"
+    ]
+   ],
+   "relations": []
+  },
+  "AF005": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Risk perception and generative AI discontinuance intention: mediating effect of cognitive fatigue and moderating effect of AI dependence",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     8,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Zhao",
+     "Wenwen"
+    ],
+    [
+     "Liu",
+     "Jiawen"
+    ]
+   ],
+   "relations": []
+  },
+  "AF006": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "How do College Students Express AI Fatigue? A Content and Keyword-in-Context Analysis of Academic AI Use",
+   "container": "International Journal of Learning, Teaching and Educational Research",
+   "issued": [
+    [
+     2026,
+     3,
+     30
+    ]
+   ],
+   "authors": [
+    [
+     "Parreño",
+     "Emmanuel B."
+    ],
+    [
+     "Miranda",
+     "John Paul P."
+    ],
+    [
+     "Manalese",
+     "Rhiziel P."
+    ],
+    [
+     "Salenga-Mendez",
+     "Jeanky"
+    ],
+    [
+     "Miller",
+     "Jumel C."
+    ],
+    [
+     "Payumo",
+     "Argel S."
+    ]
+   ],
+   "relations": []
+  },
+  "AF007": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Defining AI Fatigue in Academic Contexts: Dimensions, Indicators, and a Stage-Based Model Using Grounded Theory",
+   "container": "International Journal of Learning, Teaching and Educational Research",
+   "issued": [
+    [
+     2026,
+     5,
+     30
+    ]
+   ],
+   "authors": [
+    [
+     "Miranda",
+     "John Paul P."
+    ],
+    [
+     "Parreño",
+     "Emmanuel B."
+    ],
+    [
+     "Rivera",
+     "Jovita G."
+    ]
+   ],
+   "relations": []
+  },
+  "AF008": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI-induced fatigue among students in higher education: a latent  profile analysis",
+   "container": "IAES International Journal of Artificial Intelligence (IJ-AI)",
+   "issued": [
+    [
+     2026,
+     4,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Soriano",
+     "Dynah D."
+    ],
+    [
+     "Salenga",
+     "Jordan L."
+    ],
+    [
+     "Miranda",
+     "John Paul P."
+    ],
+    [
+     "Grume",
+     "Juvy C."
+    ],
+    [
+     "Fernando",
+     "Emerson Q."
+    ],
+    [
+     "Martinez, Jr.",
+     "Amado B."
+    ],
+    [
+     "Cabrera",
+     "Raymond A."
+    ],
+    [
+     "Yambao",
+     "Jaymark A."
+    ]
+   ],
+   "relations": []
+  },
+  "AF009": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Dimensions of AI-Induced Fatigue Among Filipino Students: An Exploratory Study",
+   "container": "2025 IEEE 23rd Student Conference on Research and Development (SCOReD)",
+   "issued": [
+    [
+     2025,
+     11,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Miranda",
+     "John Paul P."
+    ],
+    [
+     "Nacianceno",
+     "Madilaine Claire B."
+    ],
+    [
+     "Manalese",
+     "Rhiziel P."
+    ],
+    [
+     "Liwanag",
+     "Ivan G."
+    ],
+    [
+     "Simpao",
+     "Laharni S."
+    ],
+    [
+     "Peñaflor",
+     "Marie Angeli F."
+    ],
+    [
+     "Valdez",
+     "Vasco Vic G."
+    ],
+    [
+     "Acoba",
+     "Marlon T."
+    ]
+   ],
+   "relations": []
+  },
+  "AF010": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Between Cognitive Overload and Dehumanization: Exploring the Dimensions of Consumer Fatigue with Artificial Intelligence",
+   "container": "International Journal of Research and Innovation in Social Science",
+   "issued": [
+    [
+     2025,
+     11,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Triki",
+     "Molka"
+    ],
+    [
+     "Turki",
+     "Amal Makni"
+    ]
+   ],
+   "relations": []
+  },
+  "AF011": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Cognitive Cost of AI: How AI Anxiety and Attitudes Influence Decision Fatigue in Daily Technology Use",
+   "container": "Annals of Neurosciences",
+   "issued": [
+    [
+     2025,
+     8,
+     20
+    ]
+   ],
+   "authors": [
+    [
+     "Shalu",
+     ""
+    ],
+    [
+     "Verma",
+     "Nidhi"
+    ],
+    [
+     "Dev",
+     "Kapil"
+    ],
+    [
+     "Bhardwaj",
+     "Aradhana Balodi"
+    ],
+    [
+     "Kumar",
+     "Krishan"
+    ]
+   ],
+   "relations": []
+  },
+  "AF012": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Generative AI and Cognitive Challenges in Research: Balancing Cognitive Load, Fatigue, and Human Resilience",
+   "container": "Technologies",
+   "issued": [
+    [
+     2025,
+     10,
+     28
+    ]
+   ],
+   "authors": [
+    [
+     "Khan",
+     "Syed Md Faisal Ali"
+    ],
+    [
+     "Suhluli",
+     "Salem"
+    ]
+   ],
+   "relations": []
+  },
+  "AF013": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Too Much, Too Fast: Understanding Ai Fatigue In The Digital Acceleration Era",
+   "container": "International Journal of Arts , Humanities &amp; Social Science",
+   "issued": [
+    [
+     2025,
+     8,
+     16
+    ]
+   ],
+   "authors": [
+    [
+     "Ragolane",
+     "Mahlatse"
+    ],
+    [
+     "Patel",
+     "Shahiem"
+    ]
+   ],
+   "relations": []
+  },
+  "AF014": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI Fatigue and Mental Health Implications: A Comprehensive Literature Review",
+   "container": "Quality in Sport",
+   "issued": [
+    [
+     2026,
+     5,
+     6
+    ]
+   ],
+   "authors": [
+    [
+     "Sosiński",
+     "Piotr"
+    ],
+    [
+     "Piasecka",
+     "Natalia"
+    ]
+   ],
+   "relations": []
+  },
+  "AF015": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "A systematic review of AI induced technostress and human resource development interventions",
+   "container": "Discover Artificial Intelligence",
+   "issued": [
+    [
+     2026,
+     7,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Wankhede",
+     "Vaishali"
+    ],
+    [
+     "Khandelwal",
+     "Komal"
+    ]
+   ],
+   "relations": []
+  },
+  "AF016": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Generative AI and cognitive load in education: a systematic review of WoS/SSCI-indexed studies through the lens of cognitive load theory",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     8,
+     27
+    ]
+   ],
+   "authors": [
+    [
+     "Qian",
+     "Weixu"
+    ],
+    [
+     "Yang",
+     "Feng"
+    ],
+    [
+     "Cao",
+     "Yaming"
+    ],
+    [
+     "Yi",
+     "Liangliang"
+    ],
+    [
+     "Gu",
+     "Run"
+    ],
+    [
+     "Wang",
+     "Zhuo"
+    ]
+   ],
+   "relations": []
+  },
+  "AF018": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The effects of over-reliance on AI dialogue systems on students' cognitive abilities: a systematic review",
+   "container": "Smart Learning Environments",
+   "issued": [
+    [
+     2024,
+     6,
+     18
+    ]
+   ],
+   "authors": [
+    [
+     "Zhai",
+     "Chunpeng"
+    ],
+    [
+     "Wibowo",
+     "Santoso"
+    ],
+    [
+     "Li",
+     "Lily D."
+    ]
+   ],
+   "relations": []
+  },
+  "AF019": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Insights from the Job Demands–Resources Model: AI's dual impact on employees’ work and life well-being",
+   "container": "International Journal of Information Management",
+   "issued": [
+    [
+     2025,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Chuang",
+     "Ya-Ting"
+    ],
+    [
+     "Chiang",
+     "Hua-Ling"
+    ],
+    [
+     "Lin",
+     "An-Pan"
+    ]
+   ],
+   "relations": []
+  },
+  "AF020": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "To Trust or to Think",
+   "container": "Proceedings of the ACM on Human-Computer Interaction",
+   "issued": [
+    [
+     2021,
+     4,
+     13
+    ]
+   ],
+   "authors": [
+    [
+     "Buçinca",
+     "Zana"
+    ],
+    [
+     "Malaya",
+     "Maja Barbara"
+    ],
+    [
+     "Gajos",
+     "Krzysztof Z."
+    ]
+   ],
+   "relations": []
+  },
+  "AF021": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Comparing individual and peer-supported ChatGPT use in nursing case analysis: Effects on nursing diagnostic skills and cognitive load in a randomized controlled trial",
+   "container": "Nurse Education in Practice",
+   "issued": [
+    [
+     2026,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Meşe",
+     "Sevinç"
+    ],
+    [
+     "Pan",
+     "Yanjun"
+    ],
+    [
+     "Meşe",
+     "Can"
+    ],
+    [
+     "Sirganci",
+     "Gözde"
+    ]
+   ],
+   "relations": []
+  },
+  "AF022": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Is it harmful or helpful? Examining the causes and consequences of generative AI usage among university students",
+   "container": "International Journal of Educational Technology in Higher Education",
+   "issued": [
+    [
+     2024,
+     2,
+     16
+    ]
+   ],
+   "authors": [
+    [
+     "Abbas",
+     "Muhammad"
+    ],
+    [
+     "Jam",
+     "Farooq Ahmed"
+    ],
+    [
+     "Khan",
+     "Tariq Iqbal"
+    ]
+   ],
+   "relations": []
+  },
+  "AF023": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "The Impact of Generative AI on Critical Thinking: Self-Reported Reductions in Cognitive Effort and Confidence Effects From a Survey of Knowledge Workers",
+   "container": "Proceedings of the 2025 CHI Conference on Human Factors in Computing Systems",
+   "issued": [
+    [
+     2025,
+     4,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Lee",
+     "Hao-Ping (Hank)"
+    ],
+    [
+     "Sarkar",
+     "Advait"
+    ],
+    [
+     "Tankelevitch",
+     "Lev"
+    ],
+    [
+     "Drosos",
+     "Ian"
+    ],
+    [
+     "Rintel",
+     "Sean"
+    ],
+    [
+     "Banks",
+     "Richard"
+    ],
+    [
+     "Wilson",
+     "Nicholas"
+    ]
+   ],
+   "relations": []
+  },
+  "AF024": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Mitigating Learning Burnout Caused by Generative Artificial Intelligence Misuse in Higher Education: A Case Study in Programming Language Teaching",
+   "container": "Informatics",
+   "issued": [
+    [
+     2025,
+     5,
+     20
+    ]
+   ],
+   "authors": [
+    [
+     "Dong",
+     "Xiaorui"
+    ],
+    [
+     "Wang",
+     "Zhen"
+    ],
+    [
+     "Han",
+     "Shijing"
+    ]
+   ],
+   "relations": []
+  },
+  "AF025": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Development and validation of an artificial intelligence anxiety scale: an initial application in predicting motivated learning behavior",
+   "container": "Interactive Learning Environments",
+   "issued": [
+    [
+     2019,
+     10,
+     14
+    ]
+   ],
+   "authors": [
+    [
+     "Wang",
+     "Yu-Yin"
+    ],
+    [
+     "Wang",
+     "Yi-Shun"
+    ]
+   ],
+   "relations": []
+  },
+  "AF026": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Zoom Exhaustion &amp; Fatigue Scale",
+   "container": "Computers in Human Behavior Reports",
+   "issued": [
+    [
+     2021,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Fauville",
+     "G."
+    ],
+    [
+     "Luo",
+     "M."
+    ],
+    [
+     "Queiroz",
+     "A.C.M."
+    ],
+    [
+     "Bailenson",
+     "J.N."
+    ],
+    [
+     "Hancock",
+     "J."
+    ]
+   ],
+   "relations": []
+  },
+  "AF027": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Consequences of Technostress for End Users in Organizations: Conceptual Development and Empirical Validation",
+   "container": "Information Systems Research",
+   "issued": [
+    [
+     2008,
+     12
+    ]
+   ],
+   "authors": [
+    [
+     "Ragu-Nathan",
+     "T. S."
+    ],
+    [
+     "Tarafdar",
+     "Monideepa"
+    ],
+    [
+     "Ragu-Nathan",
+     "Bhanu S."
+    ],
+    [
+     "Tu",
+     "Qiang"
+    ]
+   ],
+   "relations": []
+  },
+  "AF028": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Psychometric qualities of a brief self-rated fatigue measure",
+   "container": "Journal of Psychosomatic Research",
+   "issued": [
+    [
+     2003,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Michielsen",
+     "Helen J"
+    ],
+    [
+     "De Vries",
+     "Jolanda"
+    ],
+    [
+     "Van Heck",
+     "Guus L"
+    ]
+   ],
+   "relations": []
+  },
+  "AF029": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Development of an instrument for measuring different types of cognitive load",
+   "container": "Behavior Research Methods",
+   "issued": [
+    [
+     2013,
+     4,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Leppink",
+     "Jimmie"
+    ],
+    [
+     "Paas",
+     "Fred"
+    ],
+    [
+     "Van der Vleuten",
+     "Cees P. M."
+    ],
+    [
+     "Van Gog",
+     "Tamara"
+    ],
+    [
+     "Van Merriënboer",
+     "Jeroen J. G."
+    ]
+   ],
+   "relations": []
+  },
+  "AF030": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "PRISMA Extension for Scoping Reviews (PRISMA-ScR): Checklist and Explanation",
+   "container": "Annals of Internal Medicine",
+   "issued": [
+    [
+     2018,
+     10,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "Tricco",
+     "Andrea C."
+    ],
+    [
+     "Lillie",
+     "Erin"
+    ],
+    [
+     "Zarin",
+     "Wasifa"
+    ],
+    [
+     "O'Brien",
+     "Kelly K."
+    ],
+    [
+     "Colquhoun",
+     "Heather"
+    ],
+    [
+     "Levac",
+     "Danielle"
+    ],
+    [
+     "Moher",
+     "David"
+    ],
+    [
+     "Peters",
+     "Micah D.J."
+    ],
+    [
+     "Horsley",
+     "Tanya"
+    ],
+    [
+     "Weeks",
+     "Laura"
+    ],
+    [
+     "Hempel",
+     "Susanne"
+    ],
+    [
+     "Akl",
+     "Elie A."
+    ],
+    [
+     "Chang",
+     "Christine"
+    ],
+    [
+     "McGowan",
+     "Jessie"
+    ],
+    [
+     "Stewart",
+     "Lesley"
+    ],
+    [
+     "Hartling",
+     "Lisa"
+    ],
+    [
+     "Aldcroft",
+     "Adrian"
+    ],
+    [
+     "Wilson",
+     "Michael G."
+    ],
+    [
+     "Garritty",
+     "Chantelle"
+    ],
+    [
+     "Lewin",
+     "Simon"
+    ],
+    [
+     "Godfrey",
+     "Christina M."
+    ],
+    [
+     "Macdonald",
+     "Marilyn T."
+    ],
+    [
+     "Langlois",
+     "Etienne V."
+    ],
+    [
+     "Soares-Weiser",
+     "Karla"
+    ],
+    [
+     "Moriarty",
+     "Jo"
+    ],
+    [
+     "Clifford",
+     "Tammy"
+    ],
+    [
+     "Tunçalp",
+     "Özge"
+    ],
+    [
+     "Straus",
+     "Sharon E."
+    ]
+   ],
+   "relations": []
+  },
+  "AF031": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Updated methodological guidance for the conduct of scoping reviews",
+   "container": "JBI Evidence Synthesis",
+   "issued": [
+    [
+     2020,
+     9,
+     22
+    ]
+   ],
+   "authors": [
+    [
+     "Peters",
+     "Micah D.J."
+    ],
+    [
+     "Marnie",
+     "Casey"
+    ],
+    [
+     "Tricco",
+     "Andrea C."
+    ],
+    [
+     "Pollock",
+     "Danielle"
+    ],
+    [
+     "Munn",
+     "Zachary"
+    ],
+    [
+     "Alexander",
+     "Lyndsay"
+    ],
+    [
+     "McInerney",
+     "Patricia"
+    ],
+    [
+     "Godfrey",
+     "Christina M."
+    ],
+    [
+     "Khalil",
+     "Hanan"
+    ]
+   ],
+   "relations": []
+  },
+  "AF032": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "COSMIN guideline for systematic reviews of patient-reported outcome measures",
+   "container": "Quality of Life Research",
+   "issued": [
+    [
+     2018,
+     2,
+     12
+    ]
+   ],
+   "authors": [
+    [
+     "Prinsen",
+     "C. A. C."
+    ],
+    [
+     "Mokkink",
+     "L. B."
+    ],
+    [
+     "Bouter",
+     "L. M."
+    ],
+    [
+     "Alonso",
+     "J."
+    ],
+    [
+     "Patrick",
+     "D. L."
+    ],
+    [
+     "de Vet",
+     "H. C. W."
+    ],
+    [
+     "Terwee",
+     "C. B."
+    ]
+   ],
+   "relations": []
+  },
+  "AF033": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Updating the PRISMA reporting guideline for scoping reviews: a scoping review",
+   "container": "Journal of Clinical Epidemiology",
+   "issued": [
+    [
+     2026,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Tricco",
+     "Andrea C."
+    ],
+    [
+     "Robinson",
+     "Emily"
+    ],
+    [
+     "Straus",
+     "Sharon E."
+    ],
+    [
+     "Colquhoun",
+     "Heather"
+    ],
+    [
+     "Godfrey",
+     "Christina M."
+    ],
+    [
+     "Moher",
+     "David"
+    ],
+    [
+     "Munn",
+     "Zachary"
+    ],
+    [
+     "Pollock",
+     "Danielle"
+    ],
+    [
+     "Logan",
+     "Sherrie"
+    ],
+    [
+     "Elsman",
+     "Ellen B.M."
+    ],
+    [
+     "Hasanoff",
+     "Sabira"
+    ],
+    [
+     "Lai",
+     "Yonda"
+    ],
+    [
+     "McMahon",
+     "James"
+    ],
+    [
+     "Dourka",
+     "Jasmeen"
+    ],
+    [
+     "Neupane",
+     "Dipika"
+    ],
+    [
+     "Khalil",
+     "Hanan"
+    ],
+    [
+     "Peters",
+     "Micah D.J."
+    ],
+    [
+     "Alexander",
+     "Lyndsay"
+    ],
+    [
+     "Jia",
+     "Romy M."
+    ],
+    [
+     "Saran",
+     "Ashrita"
+    ],
+    [
+     "Evans",
+     "Catrin"
+    ],
+    [
+     "Pieper",
+     "Dawid"
+    ],
+    [
+     "de Moraes",
+     "Érica Brandão"
+    ],
+    [
+     "Campbell",
+     "Fiona"
+    ],
+    [
+     "Hartling",
+     "Lisa"
+    ],
+    [
+     "Wilson",
+     "Michael G."
+    ],
+    [
+     "Welch",
+     "Vivian"
+    ],
+    [
+     "Horsley",
+     "Tanya"
+    ],
+    [
+     "Garritty",
+     "Chantelle"
+    ],
+    [
+     "Weeks",
+     "Laura"
+    ],
+    [
+     "Aldcroft",
+     "Adrian"
+    ],
+    [
+     "Langlois",
+     "Etienne V."
+    ],
+    [
+     "McGowan",
+     "Jessie"
+    ],
+    [
+     "Stevens",
+     "Adrienne"
+    ],
+    [
+     "Hutton",
+     "Brian"
+    ],
+    [
+     "Offringa",
+     "Martin"
+    ],
+    [
+     "Veroniki",
+     "Areti Angeliki"
+    ]
+   ],
+   "relations": []
+  },
+  "AF034": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Corrigendum to “Learners' AI dependence and critical thinking: The psychological mechanism of fatigue and the social buffering role of AI literacy” [Acta Psychologica 260 (2025) 105725]",
+   "container": "Acta Psychologica",
+   "issued": [
+    [
+     2026,
+     7
+    ]
+   ],
+   "authors": [
+    [
+     "Tian",
+     "Jinrui"
+    ],
+    [
+     "Zhang",
+     "Ronghua"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-01": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Dark side of generative AI: a stressor–strain outcome and cognitive load theory explanation on decision fatigue and cognitive overload",
+   "container": "Journal of Enterprise Information Management",
+   "issued": [
+    [
+     2026,
+     8,
+     14
+    ]
+   ],
+   "authors": [
+    [
+     "Asmi",
+     "Fahad"
+    ],
+    [
+     "Wong",
+     "Alfred"
+    ],
+    [
+     "Almugren",
+     "Intesar"
+    ],
+    [
+     "Chotia",
+     "Varun"
+    ],
+    [
+     "Bilinovics-Sipos",
+     "Judit"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-02": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Technostress, digital fatigue, and AI dependency as antecedents of burnout and SDG-4 achievement in EFL classrooms",
+   "container": "Scientific Reports",
+   "issued": [
+    [
+     2026,
+     4,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Honggang",
+     "Wang"
+    ],
+    [
+     "Khoso",
+     "Abdul Khalique"
+    ],
+    [
+     "Althubyani",
+     "Adel R."
+    ]
+   ],
+   "relations": []
+  },
+  "S02-03": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Technostress forecasting in EFL classrooms: How digital fatigue and perceived AI ethical concerns shape digital burnout and undermine SDG-4 achievement",
+   "container": "Acta Psychologica",
+   "issued": [
+    [
+     2026,
+     9
+    ]
+   ],
+   "authors": [
+    [
+     "Khoso",
+     "Abdul Khalique"
+    ],
+    [
+     "Honggang",
+     "Wang"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-04": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Associations between generative artificial intelligence usage, Job Demands, Job Control and Burnout",
+   "container": "AI &amp; SOCIETY",
+   "issued": [
+    [
+     2025,
+     11,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Thorpe",
+     "David"
+    ],
+    [
+     "Bean",
+     "Christopher"
+    ],
+    [
+     "Krieg",
+     "Josiah"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-05": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Digital efficiency, human exhaustion: How human-centered AI buffers the impact of AI adoption on physical health via AI techarnostress",
+   "container": "Technology in Society",
+   "issued": [
+    [
+     2026,
+     12
+    ]
+   ],
+   "authors": [
+    [
+     "Kim",
+     "Byung-Jik"
+    ],
+    [
+     "Kim",
+     "Min-Jik"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-06": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Privacy fatigue and its effects on ChatGPT acceptance among undergraduate students: is privacy dead?",
+   "container": "Education and Information Technologies",
+   "issued": [
+    [
+     2025,
+     1,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Chung",
+     "Jiwon"
+    ],
+    [
+     "Kwon",
+     "Hun-yeong"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-07": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI Anxiety to Fatigue and Its Consequences: The Moderating Role of AI Usage Motivation",
+   "container": "Journal of Business Convergence",
+   "issued": [
+    [
+     2025,
+     12,
+     31
+    ]
+   ],
+   "authors": [
+    [
+     "Kang",
+     "Inwon"
+    ],
+    [
+     "Li",
+     "Dan"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-08": {
+   "source": "datacite",
+   "type": "Other",
+   "title": "AI Fatigue in Higher Education: A Systematic Review of Associated Conditions, Manifestations, and Lifelong Learning Implications",
+   "container": "Zenodo",
+   "issued": 2026,
+   "authors": [
+    [
+     "Nobles",
+     "Calvin"
+    ]
+   ],
+   "relations": [
+    [
+     "isversionof",
+     "10.5281/zenodo.22838190"
+    ]
+   ]
+  },
+  "S02-09": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The mental health implications of artificial intelligence adoption: the crucial role of self-efficacy",
+   "container": "Humanities and Social Sciences Communications",
+   "issued": [
+    [
+     2024,
+     11,
+     17
+    ]
+   ],
+   "authors": [
+    [
+     "Kim",
+     "Byung-Jik"
+    ],
+    [
+     "Lee",
+     "Julak"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-10": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Service employees’ STARA awareness and proactive service performance",
+   "container": "Journal of Services Marketing",
+   "issued": [
+    [
+     2024,
+     3,
+     22
+    ]
+   ],
+   "authors": [
+    [
+     "Hur",
+     "Won-Moo"
+    ],
+    [
+     "Shin",
+     "Yuhyung"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-11": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Navigating AI transitions: how coaching leadership buffers against job stress and protects employee physical health",
+   "container": "Frontiers in Public Health",
+   "issued": [
+    [
+     2024,
+     3,
+     27
+    ]
+   ],
+   "authors": [
+    [
+     "Jeong",
+     "Jeeyoon"
+    ],
+    [
+     "Kim",
+     "Byung-Jik"
+    ],
+    [
+     "Lee",
+     "Julak"
+    ]
+   ],
+   "relations": []
+  },
+  "S02-12": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Digital Literacy as a Predictor of Academic Resilience: Exploring the Interplay between AI-Induced Cognitive Overload and Digital Fatigue in Hybrid Higher Education",
+   "container": "Social Science Review Archives",
+   "issued": [
+    [
+     2026,
+     2,
+     20
+    ]
+   ],
+   "authors": [
+    [
+     "Omar J. Alkhatib",
+     ""
+    ],
+    [
+     "Sawaira Maula Dad",
+     ""
+    ],
+    [
+     "Mehran Ali",
+     ""
+    ],
+    [
+     "Iqra Akram",
+     ""
+    ]
+   ],
+   "relations": []
+  },
+  "S02-13": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI literacy and foreign language boredom in AI-assisted academic English learning: the roles of engagement and task value",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     4,
+     13
+    ]
+   ],
+   "authors": [
+    [
+     "Liu",
+     "Fang"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-01": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Artificial Intelligence–Based Automated Echocardiographic Analysis and the Workflow of Sonographers: A Randomized Crossover Trial (AI‐Echo RCT)",
+   "container": "Journal of the American Heart Association",
+   "issued": [
+    [
+     2026,
+     1,
+     6
+    ]
+   ],
+   "authors": [
+    [
+     "Sakamoto",
+     "Akira"
+    ],
+    [
+     "Kagiyama",
+     "Nobuyuki"
+    ],
+    [
+     "Sato",
+     "Eiichiro"
+    ],
+    [
+     "Nakamura",
+     "Yutaka"
+    ],
+    [
+     "Murata",
+     "Azusa"
+    ],
+    [
+     "Kaneko",
+     "Tomohiro"
+    ],
+    [
+     "Miyazaki",
+     "Sakiko"
+    ],
+    [
+     "Ashikawa",
+     "Yuko"
+    ],
+    [
+     "Sugihara",
+     "Kenichi"
+    ],
+    [
+     "Minamino",
+     "Tohru"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-02": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Effects of Long-Term Chatbot System Use on Healthcare Professionals' Professional Identity Formation and Stress: A Small-Scale Comparative Study",
+   "container": "Cureus",
+   "issued": [
+    [
+     2025,
+     3,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Harada",
+     "Yuusuke"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-03": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Technostress and English Language Learning in the Age of Generative AI",
+   "container": "The EuroCALL Review",
+   "issued": [
+    [
+     2025,
+     12,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Dizon",
+     "Gilbert"
+    ],
+    [
+     "Gold",
+     "Jason"
+    ],
+    [
+     "Barnes",
+     "Ryan"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-04": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Crafting TBL Prompts for Classroom Activities that Support Self-Directed  Learning in ESP Courses: Medical English Course Example",
+   "container": "JALT PanSIG Journal",
+   "issued": [
+    [
+     2025,
+     5,
+     18
+    ]
+   ],
+   "authors": [
+    [
+     "Dennisson",
+     "Jeanette"
+    ],
+    [
+     "Ross",
+     "Gary"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-05": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Exploring the Impact of an Artificial Intelligence-Based Intraoperative Image Navigation System in Laparoscopic Surgery on Clinical Outcomes: A Protocol for a Multicenter Randomized Controlled Trial",
+   "container": "European Surgical Research",
+   "issued": [
+    [
+     2025,
+     12,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Kitaguchi",
+     "Daichi"
+    ],
+    [
+     "Fuse",
+     "Nozomu"
+    ],
+    [
+     "Wakabayashi",
+     "Masashi"
+    ],
+    [
+     "Kosugi",
+     "Norihito"
+    ],
+    [
+     "Ishikawa",
+     "Yuto"
+    ],
+    [
+     "Hayashi",
+     "Kazuyuki"
+    ],
+    [
+     "Hasegawa",
+     "Hiro"
+    ],
+    [
+     "Takeshita",
+     "Nobuyoshi"
+    ],
+    [
+     "Ito",
+     "Masaaki"
+    ]
+   ],
+   "relations": [
+    [
+     "is-supplemented-by",
+     "10.6084/m9.figshare.30940748"
+    ]
+   ]
+  },
+  "S12-06": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Profiles and transitions of psychological adaptation in AI-assisted Japanese language learning",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     9,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Wu",
+     "Yuanyuan"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-07": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Artificial Intelligence and Radiologist Burnout",
+   "container": "JAMA Network Open",
+   "issued": [
+    [
+     2024,
+     11,
+     22
+    ]
+   ],
+   "authors": [
+    [
+     "Liu",
+     "Hui"
+    ],
+    [
+     "Ding",
+     "Ning"
+    ],
+    [
+     "Li",
+     "Xinying"
+    ],
+    [
+     "Chen",
+     "Yunli"
+    ],
+    [
+     "Sun",
+     "Hao"
+    ],
+    [
+     "Huang",
+     "Yuanyuan"
+    ],
+    [
+     "Liu",
+     "Chen"
+    ],
+    [
+     "Ye",
+     "Pengpeng"
+    ],
+    [
+     "Jin",
+     "Zhengyu"
+    ],
+    [
+     "Bao",
+     "Heling"
+    ],
+    [
+     "Xue",
+     "Huadan"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-08": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Compulsive ChatGPT usage, anxiety, burnout, and sleep disturbance: A serial mediation model based on stimulus-organism-response perspective",
+   "container": "Acta Psychologica",
+   "issued": [
+    [
+     2024,
+     11
+    ]
+   ],
+   "authors": [
+    [
+     "Duong",
+     "Cong Doanh"
+    ],
+    [
+     "Dao",
+     "Thanh Tung"
+    ],
+    [
+     "Vu",
+     "Trong Nghia"
+    ],
+    [
+     "Ngo",
+     "Thi Viet Nga"
+    ],
+    [
+     "Tran",
+     "Quang Yen"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-09": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI to the rescue: Exploring the potential of ChatGPT as a teacher ally for workload relief and burnout prevention",
+   "container": "Research and Practice in Technology Enhanced Learning",
+   "issued": [
+    [
+     2023,
+     9,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Hashem",
+     "Reem"
+    ],
+    [
+     "Ali",
+     "Nagla"
+    ],
+    [
+     "El Zein",
+     "Farah"
+    ],
+    [
+     "Fidalgo",
+     "Patricia"
+    ],
+    [
+     "Abu Khurma",
+     "Othman"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-01": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient AI Scribes in Clinical Practice: A Randomized Trial",
+   "container": "NEJM AI",
+   "issued": [
+    [
+     2025,
+     11,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Lukac",
+     "Paul J."
+    ],
+    [
+     "Turner",
+     "William"
+    ],
+    [
+     "Vangala",
+     "Sitaram"
+    ],
+    [
+     "Chin",
+     "Aaron T."
+    ],
+    [
+     "Khalili",
+     "Joshua"
+    ],
+    [
+     "Shih",
+     "Ya-Chen Tina"
+    ],
+    [
+     "Sarkisian",
+     "Catherine"
+    ],
+    [
+     "Cheng",
+     "Eric M."
+    ],
+    [
+     "Mafi",
+     "John N."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-02": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "A Pragmatic Randomized Controlled Trial of Ambient Artificial Intelligence to Improve Health Practitioner Well-Being",
+   "container": "NEJM AI",
+   "issued": [
+    [
+     2025,
+     11,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Afshar",
+     "Majid"
+    ],
+    [
+     "Ryan Baumann",
+     "Mary"
+    ],
+    [
+     "Resnik",
+     "Felice"
+    ],
+    [
+     "Hintzke",
+     "Josie"
+    ],
+    [
+     "Gravel Sullivan",
+     "Anne"
+    ],
+    [
+     "Wills",
+     "Graham"
+    ],
+    [
+     "Lemmon",
+     "Kayla"
+    ],
+    [
+     "Dambach",
+     "Jason"
+    ],
+    [
+     "Mrotek",
+     "Leigh Ann"
+    ],
+    [
+     "Quinn",
+     "Mariah"
+    ],
+    [
+     "Abramson",
+     "Kirsten"
+    ],
+    [
+     "Kleinschmidt",
+     "Peter"
+    ],
+    [
+     "Brazelton",
+     "Thomas B."
+    ],
+    [
+     "Leaf",
+     "Margaret A."
+    ],
+    [
+     "Twedt",
+     "Heidi"
+    ],
+    [
+     "Kunstman",
+     "David"
+    ],
+    [
+     "Patterson",
+     "Brian"
+    ],
+    [
+     "Liao",
+     "Frank"
+    ],
+    [
+     "Rasmussen",
+     "Stacy"
+    ],
+    [
+     "Burnside",
+     "Elizabeth S."
+    ],
+    [
+     "Goswami",
+     "Cherodeep"
+    ],
+    [
+     "Gordon",
+     "Joel"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-03": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Influence of Artificial Intelligence Scribes on Clinician Experience and Efficiency among Pediatric Subspecialists: A Rapid, Randomized Quality Improvement Trial",
+   "container": "Applied Clinical Informatics",
+   "issued": [
+    [
+     2025,
+     7,
+     17
+    ]
+   ],
+   "authors": [
+    [
+     "Shin",
+     "H. Stella"
+    ],
+    [
+     "Williams",
+     "Herb"
+    ],
+    [
+     "Braykov",
+     "Nikolay"
+    ],
+    [
+     "Jahan",
+     "Afrin"
+    ],
+    [
+     "Meller",
+     "Jeremy"
+    ],
+    [
+     "Orenstein",
+     "Evan W."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-04": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Comparing ambient scribes: a randomized crossover clinical trial addressing ambient scribe technologies’ impact on physician burnout",
+   "container": "Journal of the American Medical Informatics Association",
+   "issued": [
+    [
+     2026,
+     2,
+     23
+    ]
+   ],
+   "authors": [
+    [
+     "Chowdhury",
+     "Anand"
+    ],
+    [
+     "Casey",
+     "Michele"
+    ],
+    [
+     "Wilson",
+     "Jonathan"
+    ],
+    [
+     "Pollak",
+     "Kathryn I"
+    ],
+    [
+     "Goldstein",
+     "Benjamin A"
+    ],
+    [
+     "Bedoya",
+     "Armando"
+    ],
+    [
+     "Poon",
+     "Eric G"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-05": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "A Pragmatic Randomized Trial of an EHR-Integrated Generative AI Chart Summarization Tool for Ambulatory Clinicians",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     8,
+     31
+    ]
+   ],
+   "authors": [
+    [
+     "Chin",
+     "Aaron T."
+    ],
+    [
+     "Zhu",
+     "Nina"
+    ],
+    [
+     "Vangala",
+     "Sitaram"
+    ],
+    [
+     "Woo",
+     "Hawkin"
+    ],
+    [
+     "Wisk",
+     "Lauren E."
+    ],
+    [
+     "Kingsley",
+     "Thomas"
+    ],
+    [
+     "Mafi",
+     "John N."
+    ],
+    [
+     "Lukac",
+     "Paul J."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-06": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "A fine-tuned large language model chatbot for multi-scenario radiology cancer care: randomized controlled trial on interaction optimization, emotional support, and provider burnout reduction",
+   "container": "Journal of Translational Medicine",
+   "issued": [
+    [
+     2026,
+     2,
+     14
+    ]
+   ],
+   "authors": [
+    [
+     "Liu",
+     "Zhi"
+    ],
+    [
+     "Orouji",
+     "Farrin"
+    ],
+    [
+     "Yang",
+     "Fan"
+    ],
+    [
+     "Shi",
+     "Zhuowei"
+    ],
+    [
+     "Liang",
+     "Hongwei"
+    ],
+    [
+     "Yu",
+     "Bing"
+    ],
+    [
+     "Wu",
+     "Jiahui"
+    ],
+    [
+     "Wen",
+     "Zhipeng"
+    ],
+    [
+     "Tang",
+     "Long"
+    ],
+    [
+     "Pan",
+     "Hongyu"
+    ],
+    [
+     "Zhang",
+     "Zhiwei"
+    ],
+    [
+     "Li",
+     "Yongmei"
+    ],
+    [
+     "Zhang",
+     "Liqiang"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-07": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Impact of AI‐Generated Feedback on Dental Student Performance in Preclinical Prosthodontics Education",
+   "container": "Journal of Dental Education",
+   "issued": [
+    [
+     2026,
+     6,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Benli",
+     "Merve"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-08": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Creating a workforce of fatigued cynics? A randomized controlled trial of implementing an algorithmic decision-making support tool",
+   "container": "Government Information Quarterly",
+   "issued": [
+    [
+     2024,
+     3
+    ]
+   ],
+   "authors": [
+    [
+     "Döring",
+     "Matthias"
+    ],
+    [
+     "Mikkelsen",
+     "Kim Sass"
+    ],
+    [
+     "Madsen",
+     "Jonas Krogh"
+    ],
+    [
+     "Haug",
+     "Kristian Bloch"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-09": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Effects of Educational Artificial Intelligence-Powered Applications on Teachers’ Perceived Autonomy, Professional Development for Online Teaching, and Digital Burnout",
+   "container": "The International Review of Research in Open and Distributed Learning",
+   "issued": [
+    [
+     2024,
+     8,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Duan",
+     "Hong"
+    ],
+    [
+     "Zhao",
+     "Wei"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-10": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Effectiveness of an AI-Supported Neurolinguistic Strategy in Developing Functional Vocabulary and Reducing Digital Fatigue Among Non-Native Learners of Arabic",
+   "container": "Journal of Curriculum Studies Research",
+   "issued": [
+    [
+     2026,
+     7,
+     5
+    ]
+   ],
+   "authors": [
+    [
+     "Khalifa",
+     "Bahaa Fathy"
+    ],
+    [
+     "Ismail Ali",
+     "Ahmed Saad"
+    ],
+    [
+     "AL Sulaiti",
+     "Dhabya Saed"
+    ],
+    [
+     "Ahmed Shaaban",
+     "Ahmed Shaaban"
+    ],
+    [
+     "Abdelalim Abdelghaffar Algharpawy",
+     "Abdelalim Ahmad"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-11": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Can ChatGPT Ease Digital Fatigue? Short-Cycle Content Curation for University Instructors",
+   "container": "Education Sciences",
+   "issued": [
+    [
+     2025,
+     9,
+     16
+    ]
+   ],
+   "authors": [
+    [
+     "Cajas Bravo",
+     "Verónica Tomasa"
+    ],
+    [
+     "Huanca Rojas",
+     "Lupe Marilu"
+    ],
+    [
+     "Arias Lizares",
+     "Andrés"
+    ],
+    [
+     "Ramírez Cajamarca",
+     "Juan Cielo"
+    ],
+    [
+     "Vasquez Perdomo",
+     "Fernando"
+    ],
+    [
+     "De la Cruz Cruz",
+     "Miguel Angel"
+    ],
+    [
+     "Romero Girón",
+     "Hilario"
+    ],
+    [
+     "Guerrero Millones",
+     "Ana María"
+    ],
+    [
+     "Dávila-Morán",
+     "Roberto Carlos"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-12": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Research on the impact of generative AI interaction modes on the improvement of school-age children’s early reading ability and college students’ auxiliary intervention",
+   "container": "Frontiers in Public Health",
+   "issued": [
+    [
+     2026,
+     9,
+     23
+    ]
+   ],
+   "authors": [
+    [
+     "Dong",
+     "Yanjiao"
+    ],
+    [
+     "Li",
+     "Guoyan"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-13": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The impact of generative AI’S information delivery methods on emotional exhaustion among bullying roles in the medical workplace",
+   "container": "Frontiers in Public Health",
+   "issued": [
+    [
+     2025,
+     9,
+     15
+    ]
+   ],
+   "authors": [
+    [
+     "Deng",
+     "Lihong"
+    ],
+    [
+     "Yang",
+     "Dajun"
+    ],
+    [
+     "Liang",
+     "Gongzhuoran"
+    ],
+    [
+     "Hu",
+     "Chang"
+    ],
+    [
+     "Zhang",
+     "Pengcheng"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-14": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Effects of Employee–Artificial Intelligence (AI) Collaboration on Counterproductive Work Behaviors (CWBs): Leader Emotional Support as a Moderator",
+   "container": "Behavioral Sciences",
+   "issued": [
+    [
+     2025,
+     5,
+     17
+    ]
+   ],
+   "authors": [
+    [
+     "Meng",
+     "Qingqi"
+    ],
+    [
+     "Wu",
+     "Tung-Ju"
+    ],
+    [
+     "Duan",
+     "Wenyan"
+    ],
+    [
+     "Li",
+     "Shijia"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-15": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Use of Ambient AI Scribes to Reduce Administrative Burden and Professional Burnout",
+   "container": "JAMA Network Open",
+   "issued": [
+    [
+     2025,
+     10,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "Olson",
+     "Kristine D."
+    ],
+    [
+     "Meeker",
+     "Daniella"
+    ],
+    [
+     "Troup",
+     "Matt"
+    ],
+    [
+     "Barker",
+     "Timothy D."
+    ],
+    [
+     "Nguyen",
+     "Vinh H."
+    ],
+    [
+     "Manders",
+     "Jennifer B."
+    ],
+    [
+     "Stults",
+     "Cheryl D."
+    ],
+    [
+     "Jones",
+     "Veena G."
+    ],
+    [
+     "Shah",
+     "Sachin D."
+    ],
+    [
+     "Shah",
+     "Tina"
+    ],
+    [
+     "Schwamm",
+     "Lee H."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-16": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient Documentation Technology in Clinician Experience of Documentation Burden and Burnout",
+   "container": "JAMA Network Open",
+   "issued": [
+    [
+     2025,
+     8,
+     21
+    ]
+   ],
+   "authors": [
+    [
+     "You",
+     "Jacqueline G."
+    ],
+    [
+     "Dbouk",
+     "Reema H."
+    ],
+    [
+     "Landman",
+     "Adam"
+    ],
+    [
+     "Ting",
+     "David Y."
+    ],
+    [
+     "Dutta",
+     "Sayon"
+    ],
+    [
+     "Wang",
+     "Julie C."
+    ],
+    [
+     "Centi",
+     "Amanda J."
+    ],
+    [
+     "Macfarlane",
+     "Molly"
+    ],
+    [
+     "Bechor",
+     "Eran"
+    ],
+    [
+     "Letourneau",
+     "Jonathan"
+    ],
+    [
+     "Choo-Kang",
+     "Gabrielle"
+    ],
+    [
+     "Kim",
+     "Esther H."
+    ],
+    [
+     "Magee",
+     "Cordula"
+    ],
+    [
+     "Lang",
+     "Brian J."
+    ],
+    [
+     "Angelo",
+     "Laura"
+    ],
+    [
+     "Olin",
+     "Jackson"
+    ],
+    [
+     "Frits",
+     "Michelle"
+    ],
+    [
+     "Iannaccone",
+     "Christine"
+    ],
+    [
+     "Rui",
+     "Angela"
+    ],
+    [
+     "Salmikova",
+     "Ivana"
+    ],
+    [
+     "Holland",
+     "Christopher"
+    ],
+    [
+     "Blanchette",
+     "Bryan"
+    ],
+    [
+     "Silverman",
+     "Rachel"
+    ],
+    [
+     "Bates",
+     "David W."
+    ],
+    [
+     "Rotenstein",
+     "Lisa"
+    ],
+    [
+     "Mishuris",
+     "Rebecca G."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-17": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Effect of Ambient Artificial Intelligence Notes on Provider Burnout",
+   "container": "Applied Clinical Informatics",
+   "issued": [
+    [
+     2024,
+     11,
+     5
+    ]
+   ],
+   "authors": [
+    [
+     "Misurac",
+     "Jason"
+    ],
+    [
+     "Knake",
+     "Lindsey A."
+    ],
+    [
+     "Blum",
+     "James M."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-18": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Artificial Intelligence–Generated Draft Replies to Patient Inbox Messages",
+   "container": "JAMA Network Open",
+   "issued": [
+    [
+     2024,
+     3,
+     20
+    ]
+   ],
+   "authors": [
+    [
+     "Garcia",
+     "Patricia"
+    ],
+    [
+     "Ma",
+     "Stephen P."
+    ],
+    [
+     "Shah",
+     "Shreya"
+    ],
+    [
+     "Smith",
+     "Margaret"
+    ],
+    [
+     "Jeong",
+     "Yejin"
+    ],
+    [
+     "Devon-Sand",
+     "Anna"
+    ],
+    [
+     "Tai-Seale",
+     "Ming"
+    ],
+    [
+     "Takazawa",
+     "Kevin"
+    ],
+    [
+     "Clutter",
+     "Danyelle"
+    ],
+    [
+     "Vogt",
+     "Kyle"
+    ],
+    [
+     "Lugtu",
+     "Carlene"
+    ],
+    [
+     "Rojo",
+     "Matthew"
+    ],
+    [
+     "Lin",
+     "Steven"
+    ],
+    [
+     "Shanafelt",
+     "Tait"
+    ],
+    [
+     "Pfeffer",
+     "Michael A."
+    ],
+    [
+     "Sharp",
+     "Christopher"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-19": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient artificial intelligence scribes: physician burnout and perspectives on usability and documentation burden",
+   "container": "Journal of the American Medical Informatics Association",
+   "issued": [
+    [
+     2024,
+     12,
+     5
+    ]
+   ],
+   "authors": [
+    [
+     "Shah",
+     "Shreya J"
+    ],
+    [
+     "Devon-Sand",
+     "Anna"
+    ],
+    [
+     "Ma",
+     "Stephen P"
+    ],
+    [
+     "Jeong",
+     "Yejin"
+    ],
+    [
+     "Crowell",
+     "Trevor"
+    ],
+    [
+     "Smith",
+     "Margaret"
+    ],
+    [
+     "Liang",
+     "April S"
+    ],
+    [
+     "Delahaie",
+     "Clarissa"
+    ],
+    [
+     "Hsia",
+     "Caroline"
+    ],
+    [
+     "Shanafelt",
+     "Tait"
+    ],
+    [
+     "Pfeffer",
+     "Michael A"
+    ],
+    [
+     "Sharp",
+     "Christopher"
+    ],
+    [
+     "Lin",
+     "Steven"
+    ],
+    [
+     "Garcia",
+     "Patricia"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-20": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Effect of a generative artificial intelligence digital scribe on pediatric provider documentation time, cognitive burden, and burnout",
+   "container": "JAMIA Open",
+   "issued": [
+    [
+     2025,
+     7,
+     3
+    ]
+   ],
+   "authors": [
+    [
+     "Pelletier",
+     "Jonathan H"
+    ],
+    [
+     "Watson",
+     "Kevin"
+    ],
+    [
+     "Michel",
+     "Jenny"
+    ],
+    [
+     "McGregor",
+     "Robert"
+    ],
+    [
+     "Rush",
+     "Sarah Z"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-21": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient AI-assisted clinical documentation in surgical outpatient care: a preliminary study of usability, workflow, and patient experience",
+   "container": "World Journal of Pediatric Surgery",
+   "issued": [
+    [
+     2025,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Harvey",
+     "Cameron J"
+    ],
+    [
+     "Wong",
+     "Victor"
+    ],
+    [
+     "Huynh",
+     "William"
+    ],
+    [
+     "Lee",
+     "Jerome P"
+    ],
+    [
+     "Woo",
+     "Russell K"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-22": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Evaluating Generative Artificial Intelligence–Drafted Responses for Patient Messages in Obstetrics and Gynecology",
+   "container": "O&amp;G Open",
+   "issued": [
+    [
+     2025,
+     10,
+     23
+    ]
+   ],
+   "authors": [
+    [
+     "Yadav",
+     "Ghanshyam S."
+    ],
+    [
+     "Pandit",
+     "Kshitij"
+    ],
+    [
+     "Gross",
+     "Erin A."
+    ],
+    [
+     "Singh",
+     "Karandeep"
+    ],
+    [
+     "LaCoursiere",
+     "D. Yvette"
+    ],
+    [
+     "Tai-Seale",
+     "Ming"
+    ],
+    [
+     "Millen",
+     "Marlene"
+    ],
+    [
+     "Gyamfi-Bannerman",
+     "Cynthia"
+    ],
+    [
+     "Parker",
+     "Sarah"
+    ],
+    [
+     "Gupta",
+     "Divya"
+    ],
+    [
+     "Longhurst",
+     "Christopher A."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-23": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Ambient AI Documentation in Clinical Genetics: Perspectives on Implementation and Impact on Burnout",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     7,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "Narain",
+     "Anjali"
+    ],
+    [
+     "Misurac",
+     "Jason"
+    ],
+    [
+     "Van Tiem",
+     "Jennifer"
+    ],
+    [
+     "LaSpisa",
+     "Chase"
+    ],
+    [
+     "Campbell",
+     "Colleen A."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-24": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Impact of Ambient AI on Resident Documentation and Well-Being: A Pilot Study",
+   "container": "PRiMER",
+   "issued": [
+    [
+     2026,
+     6,
+     18
+    ]
+   ],
+   "authors": [
+    [
+     "Anderson",
+     "Wayne"
+    ],
+    [
+     "Koran-Scholl",
+     "Jessica B."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-25": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "The Impact of AI Scribes on Patient and Clinician Satisfaction and Communication",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     6,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Pollak",
+     "Kathryn I."
+    ],
+    [
+     "Coffman",
+     "Cynthia J."
+    ],
+    [
+     "Casey",
+     "Michele"
+    ],
+    [
+     "Patel",
+     "Manesh R."
+    ],
+    [
+     "Shah",
+     "Kevin"
+    ],
+    [
+     "Dolor",
+     "Rowena J."
+    ],
+    [
+     "Hantzmon",
+     "Sarah"
+    ],
+    [
+     "Richardson",
+     "Brianna"
+    ],
+    [
+     "Pearce",
+     "Nathan"
+    ],
+    [
+     "Lo",
+     "Anta"
+    ],
+    [
+     "Coy",
+     "Henry P."
+    ],
+    [
+     "Bailey",
+     "Akilah"
+    ],
+    [
+     "Shibeika",
+     "Sahar"
+    ],
+    [
+     "Hong",
+     "Chuan"
+    ],
+    [
+     "Wang",
+     "Haoyuan"
+    ],
+    [
+     "Chowdhury",
+     "Anand"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-26": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Evaluating an artificial intelligence scribe for clinical documentation",
+   "container": "DIGITAL HEALTH",
+   "issued": [
+    [
+     2025,
+     5
+    ]
+   ],
+   "authors": [
+    [
+     "Alpert",
+     "Jordan M."
+    ],
+    [
+     "Saper",
+     "Robert"
+    ],
+    [
+     "Boose",
+     "Eric"
+    ],
+    [
+     "Ruff",
+     "Jessica"
+    ],
+    [
+     "Hopkins",
+     "Kevin"
+    ],
+    [
+     "Gaskins",
+     "Devyn"
+    ],
+    [
+     "Guo",
+     "Ning"
+    ],
+    [
+     "Schneider",
+     "Jakob P."
+    ],
+    [
+     "Giffi Scibona",
+     "Aryn"
+    ],
+    [
+     "Gutierrez",
+     "James"
+    ],
+    [
+     "Rothberg",
+     "Michael B."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-27": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Evaluation of an Ambient Artificial Intelligence Documentation Platform for Clinicians",
+   "container": "JAMA Network Open",
+   "issued": [
+    [
+     2025,
+     5,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "Stults",
+     "Cheryl D."
+    ],
+    [
+     "Deng",
+     "Sien"
+    ],
+    [
+     "Martinez",
+     "Meghan C."
+    ],
+    [
+     "Wilcox",
+     "Joseph"
+    ],
+    [
+     "Szwerinski",
+     "Nina"
+    ],
+    [
+     "Chen",
+     "Kevin H."
+    ],
+    [
+     "Driscoll",
+     "Stephanie"
+    ],
+    [
+     "Washburn",
+     "Joanna"
+    ],
+    [
+     "Jones",
+     "Veena G."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-28": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient AI Scribe Implementation in an Ambulatory Setting in a Single Medical Group: Prospective Study",
+   "container": "JMIR Medical Informatics",
+   "issued": [
+    [
+     2026,
+     6,
+     23
+    ]
+   ],
+   "authors": [
+    [
+     "Harvey",
+     "Cameron J"
+    ],
+    [
+     "Morita",
+     "Josiah"
+    ],
+    [
+     "Huynh",
+     "William"
+    ],
+    [
+     "Woo",
+     "Russell K"
+    ],
+    [
+     "Lee",
+     "Jerome P"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-29": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "From Burden to Balance: Trends in Documentation Workload with Ambient Artificial Intelligence Scribe Adoption",
+   "container": "Applied Clinical Informatics",
+   "issued": [
+    [
+     2026,
+     5
+    ]
+   ],
+   "authors": [
+    [
+     "Wojda",
+     "Thomas"
+    ],
+    [
+     "Berliner",
+     "Jennifer"
+    ],
+    [
+     "Fischer",
+     "Gary S."
+    ],
+    [
+     "Curren",
+     "Michael"
+    ],
+    [
+     "Arnold",
+     "Jonathan"
+    ],
+    [
+     "Giugale",
+     "Lauren"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-31": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient artificial intelligence scribe implementation in inpatient setting",
+   "container": "Journal of Hospital Medicine",
+   "issued": [
+    [
+     2026,
+     9,
+     14
+    ]
+   ],
+   "authors": [
+    [
+     "Stults",
+     "Cheryl D."
+    ],
+    [
+     "Deng",
+     "Sien"
+    ],
+    [
+     "Martinez",
+     "Meghan C."
+    ],
+    [
+     "Wilcox",
+     "Joseph"
+    ],
+    [
+     "Szwerinski",
+     "Nina"
+    ],
+    [
+     "Wilde",
+     "Jackson"
+    ],
+    [
+     "Liu",
+     "Richard C."
+    ],
+    [
+     "Rabbani",
+     "Naveed"
+    ],
+    [
+     "Driscoll",
+     "Stephanie"
+    ],
+    [
+     "Jones",
+     "Veena G."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-32": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The impact of an ambient documentation tool on the care experience of clinical pharmacists embedded in ambulatory clinics: A mixed-methods evaluation",
+   "container": "American Journal of Health-System Pharmacy",
+   "issued": [
+    [
+     2026,
+     6,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Olson",
+     "Anthony W"
+    ],
+    [
+     "Pradhan",
+     "Apoorva"
+    ],
+    [
+     "Whary",
+     "Payton"
+    ],
+    [
+     "Dombrowski",
+     "Sarah Krahe"
+    ],
+    [
+     "Dobbins",
+     "Duncan"
+    ],
+    [
+     "Ward",
+     "Theron"
+    ],
+    [
+     "Obert",
+     "Kimberly"
+    ],
+    [
+     "Siegrist",
+     "Cory N"
+    ],
+    [
+     "Wright",
+     "Eric A"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-33": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Invasive Hybrid Recommendation-Based Scheduling with Pomodoro and Genetic Algorithm for Improving Office Worker Productivity",
+   "container": "2026 International Conference Automatics, Robotics and Artificial Intelligence (ICARAI)",
+   "issued": [
+    [
+     2026,
+     6
+    ]
+   ],
+   "authors": [
+    [
+     "Alas-as",
+     "John Kyle T."
+    ],
+    [
+     "Abalos",
+     "Ruderick A."
+    ],
+    [
+     "Esteban",
+     "Adreanna Jade A."
+    ],
+    [
+     "Catadman",
+     "Jason A."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-35": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The double-edged sword of generative AI in dermatology: a multi-component cross-sectional study on physician burnout, patient satisfaction, and communication quality",
+   "container": "Frontiers in Medicine",
+   "issued": [
+    [
+     2026,
+     7,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Wei",
+     "Yunpeng"
+    ],
+    [
+     "Xu",
+     "Hong"
+    ],
+    [
+     "Hu",
+     "Yuan"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-36": {
+   "source": "crossref",
+   "type": "report",
+   "title": "The Organizational Transmission of AI: The Role of Managers on AI Adoption and Impact",
+   "container": "CESifo Working Papers",
+   "issued": [
+    [
+     2026,
+     4,
+     24
+    ]
+   ],
+   "authors": [
+    [
+     "Makridis",
+     "Christos A."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-37": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Modeling learning engagement in AI-supported education: a crossover enabler–inhibitor framework",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     6,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Alwahaishi",
+     "Saleh"
+    ],
+    [
+     "Ahmed",
+     "Waqas"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-38": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Komparasi Algoritma Machine Learning untuk Prediksi Risiko Burnout Akademis Akibat Penggunaan Generative AI",
+   "container": "Jurnal Komputer Teknologi Informasi Sistem Komputer (JUKTISI)",
+   "issued": [
+    [
+     2026,
+     7,
+     7
+    ]
+   ],
+   "authors": [
+    [
+     "Rinyuakng Rolin",
+     "Ophelius Savero"
+    ],
+    [
+     "Wahyu Nugraha",
+     ""
+    ],
+    [
+     "Rabiatus Sa'adah",
+     ""
+    ]
+   ],
+   "relations": []
+  },
+  "S04-41": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Impact of an AI medical scribe after 375 000 notes generated across care levels in a European health system",
+   "container": "",
+   "issued": [
+    [
+     2025,
+     12,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Sanmark",
+     "Enni"
+    ],
+    [
+     "Vartiainen",
+     "Ville"
+    ],
+    [
+     "Sanmark",
+     "Johan"
+    ],
+    [
+     "Wettin",
+     "Katarina"
+    ],
+    [
+     "Saari",
+     "Lukas"
+    ],
+    [
+     "Entezarjou",
+     "Artin"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-42": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Medical Scribe and Ambient Artificial Intelligence Impact on Emergency Physician Documentation Burden and Clinical Productivity",
+   "container": "Annals of Emergency Medicine",
+   "issued": [
+    [
+     2026,
+     6
+    ]
+   ],
+   "authors": [
+    [
+     "Dutta",
+     "Sayon"
+    ],
+    [
+     "Guan-Ting You",
+     "Jacqueline"
+    ],
+    [
+     "Dunham",
+     "Lisette"
+    ],
+    [
+     "Cash",
+     "Rebecca"
+    ],
+    [
+     "Meeker",
+     "Melissa"
+    ],
+    [
+     "White",
+     "Benjamin A."
+    ],
+    [
+     "Joseph",
+     "Joshua W."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-43": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient AI reduces documentation time and enhances quality in a simulated inpatient setting",
+   "container": "The Surgeon",
+   "issued": [
+    [
+     2026,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Bracken",
+     "Aisling"
+    ],
+    [
+     "Babu",
+     "Anita Rose"
+    ],
+    [
+     "Whelehan",
+     "Seán"
+    ],
+    [
+     "Merghani",
+     "Khalid"
+    ],
+    [
+     "Sheehan",
+     "Eoin"
+    ],
+    [
+     "Feeley",
+     "Iain"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-44": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Enhancing Clinical Documentation Workflow with Ambient Artificial Intelligence: Clinician Perspectives on Work Burden, Burnout, and Job Satisfaction",
+   "container": "",
+   "issued": [
+    [
+     2024,
+     8,
+     13
+    ]
+   ],
+   "authors": [
+    [
+     "Albrecht",
+     "Michael"
+    ],
+    [
+     "Shanks",
+     "Denton"
+    ],
+    [
+     "Shah",
+     "Tina"
+    ],
+    [
+     "Hudson",
+     "Taina"
+    ],
+    [
+     "Thompson",
+     "Jeffrey"
+    ],
+    [
+     "Filardi",
+     "Tanya"
+    ],
+    [
+     "Wright",
+     "Kelli"
+    ],
+    [
+     "Ator",
+     "Greg"
+    ],
+    [
+     "Smith",
+     "Timothy Ryan"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-45": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Evaluating an Ambient Artificial Intelligence Scribe for Documentation Quality and Efficiency in Psychiatric Consultations: A Simulation-based Study",
+   "container": "",
+   "issued": [
+    [
+     2025,
+     9,
+     22
+    ]
+   ],
+   "authors": [
+    [
+     "Nawaz",
+     "Faisal A."
+    ],
+    [
+     "Bokhari",
+     "Syed Ali"
+    ],
+    [
+     "Usman",
+     "Firdous M."
+    ],
+    [
+     "Arshad",
+     "Zara"
+    ],
+    [
+     "Sudhir",
+     "Meghana"
+    ],
+    [
+     "Krage",
+     "Ralf"
+    ],
+    [
+     "Kashyap",
+     "Rahul"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-46": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient artificial intelligence scribes: utilization and impact on documentation time",
+   "container": "Journal of the American Medical Informatics Association",
+   "issued": [
+    [
+     2024,
+     12,
+     17
+    ]
+   ],
+   "authors": [
+    [
+     "Ma",
+     "Stephen P"
+    ],
+    [
+     "Liang",
+     "April S"
+    ],
+    [
+     "Shah",
+     "Shreya J"
+    ],
+    [
+     "Smith",
+     "Margaret"
+    ],
+    [
+     "Jeong",
+     "Yejin"
+    ],
+    [
+     "Devon-Sand",
+     "Anna"
+    ],
+    [
+     "Crowell",
+     "Trevor"
+    ],
+    [
+     "Delahaie",
+     "Clarissa"
+    ],
+    [
+     "Hsia",
+     "Caroline"
+    ],
+    [
+     "Lin",
+     "Steven"
+    ],
+    [
+     "Shanafelt",
+     "Tait"
+    ],
+    [
+     "Pfeffer",
+     "Michael A"
+    ],
+    [
+     "Sharp",
+     "Christopher"
+    ],
+    [
+     "Garcia",
+     "Patricia"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-47": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Effect of Ambient Artificial Intelligence Scribes on Trainee Documentation Burden",
+   "container": "Applied Clinical Informatics",
+   "issued": [
+    [
+     2025,
+     7,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "Wright",
+     "Donald S."
+    ],
+    [
+     "Kanaparthy",
+     "Naga S."
+    ],
+    [
+     "Melnick",
+     "Edward R."
+    ],
+    [
+     "Levy",
+     "Deborah R."
+    ],
+    [
+     "Huot",
+     "Stephen J."
+    ],
+    [
+     "Hsiao",
+     "Allen"
+    ],
+    [
+     "Schwamm",
+     "Lee H."
+    ],
+    [
+     "Ong",
+     "Shawn Y."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-48": {
+   "source": "crossref",
+   "type": "book-chapter",
+   "title": "Ambient Listening in Clinical Practice: Evaluating EPIC Signal Data Before and After Implementation and Its Impact on Physician Workload",
+   "container": "Studies in Health Technology and Informatics",
+   "issued": [
+    [
+     2025,
+     8,
+     7
+    ]
+   ],
+   "authors": [
+    [
+     "Guo",
+     "Yawen"
+    ],
+    [
+     "Hu",
+     "Di"
+    ],
+    [
+     "Wang",
+     "Jiayuan"
+    ],
+    [
+     "Zheng",
+     "Kai"
+    ],
+    [
+     "Perret",
+     "Danielle"
+    ],
+    [
+     "Pandita",
+     "Deepti"
+    ],
+    [
+     "Tam",
+     "Steven"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-49": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Enhancing clinical documentation with ambient artificial intelligence: a quality improvement survey assessing clinician perspectives on work burden, burnout, and job satisfaction",
+   "container": "JAMIA Open",
+   "issued": [
+    [
+     2024,
+     12,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Albrecht",
+     "Michael"
+    ],
+    [
+     "Shanks",
+     "Denton"
+    ],
+    [
+     "Shah",
+     "Tina"
+    ],
+    [
+     "Hudson",
+     "Taina"
+    ],
+    [
+     "Thompson",
+     "Jeffrey"
+    ],
+    [
+     "Filardi",
+     "Tanya"
+    ],
+    [
+     "Wright",
+     "Kelli"
+    ],
+    [
+     "Ator",
+     "Gregory A"
+    ],
+    [
+     "Smith",
+     "Timothy Ryan"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-50": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Impact of using an AI scribe on clinical documentation and clinician-patient interactions in allied health private practice: perspectives of clinicians and patients",
+   "container": "Musculoskeletal Science and Practice",
+   "issued": [
+    [
+     2025,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Evans",
+     "Kerrie"
+    ],
+    [
+     "Papinniemi",
+     "Amy"
+    ],
+    [
+     "Ploderer",
+     "Bernd"
+    ],
+    [
+     "Nicholson",
+     "Vaughan"
+    ],
+    [
+     "Hindhaugh",
+     "Tom"
+    ],
+    [
+     "Vuvan",
+     "Viana"
+    ],
+    [
+     "Cowley",
+     "Nicholas"
+    ],
+    [
+     "Tariq",
+     "Amina"
+    ],
+    [
+     "Thomson",
+     "Hayley"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-51": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The STREAMLINE Pilot Study on Time Reduction and Efficiency in AI-Mediated Logging for Improved Note-Taking Experience",
+   "container": "Applied Clinical Informatics",
+   "issued": [
+    [
+     2025,
+     3,
+     17
+    ]
+   ],
+   "authors": [
+    [
+     "Kakaday",
+     "Roheet"
+    ],
+    [
+     "Herrera",
+     "Elizabeth Zoe"
+    ],
+    [
+     "Coskey",
+     "Olivia"
+    ],
+    [
+     "Hertel",
+     "Andrew W."
+    ],
+    [
+     "Kaiser",
+     "Paulina"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-52": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Artificial intelligence-generated draft replies to patient messages in pediatrics",
+   "container": "JAMIA Open",
+   "issued": [
+    [
+     2025,
+     11,
+     3
+    ]
+   ],
+   "authors": [
+    [
+     "Liang",
+     "April S"
+    ],
+    [
+     "Vedak",
+     "Shivam"
+    ],
+    [
+     "Dussaq",
+     "Alex"
+    ],
+    [
+     "Yao",
+     "Dong-Han"
+    ],
+    [
+     "Villarreal",
+     "Joshua A"
+    ],
+    [
+     "Thomas",
+     "Sijo"
+    ],
+    [
+     "Chen",
+     "Nicholas"
+    ],
+    [
+     "Townsend",
+     "Tanya"
+    ],
+    [
+     "Pageler",
+     "Natalie M"
+    ],
+    [
+     "Morse",
+     "Keith"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-53": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "An AI-Powered Strategy for Managing Patient Messaging Load and Reducing Burnout",
+   "container": "Applied Clinical Informatics",
+   "issued": [
+    [
+     2025,
+     4,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Proctor",
+     "Stephon"
+    ],
+    [
+     "Lawton",
+     "Greg"
+    ],
+    [
+     "Sinha",
+     "Shikha"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-54": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Delivering Biopsychosocial Health Care Within Routine Care: Spotlight-AQ Pivotal Multicenter Randomized Controlled Trial Results",
+   "container": "Journal of Diabetes Science and Technology",
+   "issued": [
+    [
+     2023,
+     6,
+     23
+    ]
+   ],
+   "authors": [
+    [
+     "Kelly",
+     "Ryan Charles"
+    ],
+    [
+     "Price",
+     "Hermione"
+    ],
+    [
+     "Phiri",
+     "Peter"
+    ],
+    [
+     "Cummings",
+     "Michael"
+    ],
+    [
+     "Ali",
+     "Amar"
+    ],
+    [
+     "Patel",
+     "Mayank"
+    ],
+    [
+     "Barnard",
+     "Ethan"
+    ],
+    [
+     "Liu",
+     "Yufan"
+    ],
+    [
+     "Mendez",
+     "Oscar"
+    ],
+    [
+     "Barnard-Kelly",
+     "Katharine"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-55": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient AI Scribes to Create Educational Feedback Notes for Medical Students: Randomized Trial",
+   "container": "JMIR Medical Education",
+   "issued": [
+    [
+     2026,
+     5,
+     28
+    ]
+   ],
+   "authors": [
+    [
+     "Talwalkar",
+     "Jaideep S"
+    ],
+    [
+     "Chartash",
+     "David"
+    ],
+    [
+     "Zhang",
+     "Lisa"
+    ],
+    [
+     "Makutonin",
+     "Michael"
+    ],
+    [
+     "Safranek",
+     "Conrad W"
+    ],
+    [
+     "Sidamon-Eristoff",
+     "Anne Elizabeth"
+    ],
+    [
+     "Schwamm",
+     "Lee H"
+    ],
+    [
+     "Wright",
+     "Donald S"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-56": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Impact of an Ambient AI Scribe Among Clinicians and Patients: Real-World Prospective Observational Time-Motion Study",
+   "container": "JMIR Medical Informatics",
+   "issued": [
+    [
+     2026,
+     3,
+     31
+    ]
+   ],
+   "authors": [
+    [
+     "Tan",
+     "Jonathan Yue En"
+    ],
+    [
+     "Rafi",
+     "Iffat Bin Mohammad"
+    ],
+    [
+     "Sng",
+     "Gerald Gui Ren"
+    ],
+    [
+     "Tung",
+     "Joshua Yi Min"
+    ],
+    [
+     "Lim",
+     "Daniel Yan Zheng"
+    ],
+    [
+     "Ong",
+     "Jasmine Chiat Ling"
+    ],
+    [
+     "Lim",
+     "Gek Hsiang"
+    ],
+    [
+     "Lew",
+     "Eileen Yi Lee"
+    ],
+    [
+     "Chia",
+     "Kuok Wei"
+    ],
+    [
+     "Heng",
+     "Mark Kok Hong"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-57": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Using an Ambient Artificial Intelligence Tool to Document Clinical Pharmacist Patient Encounters: Real‐World Evidence From a Federally Qualified Health Center",
+   "container": "JACCP:  JOURNAL OF THE AMERICAN COLLEGE OF CLINICAL PHARMACY",
+   "issued": [
+    [
+     2026,
+     6,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Stewart",
+     "Morgan P."
+    ],
+    [
+     "Lin",
+     "Kathryn P."
+    ],
+    [
+     "Hinds",
+     "April"
+    ],
+    [
+     "Linedecker‐Smith",
+     "Sara"
+    ],
+    [
+     "Welch",
+     "Karen"
+    ],
+    [
+     "Garza",
+     "Aida"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-58": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Evaluating ambient artificial intelligence documentation: effects on work efficiency, documentation burden, and patient-centered care",
+   "container": "Journal of the American Medical Informatics Association",
+   "issued": [
+    [
+     2025,
+     10,
+     16
+    ]
+   ],
+   "authors": [
+    [
+     "Guo",
+     "Yawen"
+    ],
+    [
+     "Wang",
+     "Jiayuan"
+    ],
+    [
+     "Hu",
+     "Di"
+    ],
+    [
+     "Tam",
+     "Steven"
+    ],
+    [
+     "Gilman",
+     "Charles"
+    ],
+    [
+     "Chow",
+     "Emilie"
+    ],
+    [
+     "Perret",
+     "Danielle"
+    ],
+    [
+     "Pandita",
+     "Deepti"
+    ],
+    [
+     "Zheng",
+     "Kai"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-59": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Optimizing Hip and Knee Arthroplasty Clinic Flow: A Prospective Evaluation of Artificial Intelligence Scribe Technology",
+   "container": "Arthroplasty Today",
+   "issued": [
+    [
+     2026,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Grand",
+     "Zachary"
+    ],
+    [
+     "Brutti",
+     "Jonathan"
+    ],
+    [
+     "Greer",
+     "Klaudia"
+    ],
+    [
+     "Mirharooni",
+     "Jason"
+    ],
+    [
+     "McDaid",
+     "Andrew"
+    ],
+    [
+     "Lawrie",
+     "Charles M."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-60": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Crossover Evaluation of Two Ambient AI Scribe Tools in the Emergency Department",
+   "container": "Applied Clinical Informatics",
+   "issued": [
+    [
+     2026,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Webb",
+     "Janet"
+    ],
+    [
+     "Chu",
+     "Ling"
+    ],
+    [
+     "Turer",
+     "Robert W."
+    ],
+    [
+     "Chen",
+     "Catherine"
+    ],
+    [
+     "Rousseau",
+     "Justin F."
+    ],
+    [
+     "Salter",
+     "Amber"
+    ],
+    [
+     "Courtney",
+     "D. Mark"
+    ],
+    [
+     "Higashi",
+     "Robin T."
+    ],
+    [
+     "Guzman",
+     "Nardabel"
+    ],
+    [
+     "Chapman",
+     "Wendy W."
+    ],
+    [
+     "Willett",
+     "DuWayne"
+    ],
+    [
+     "McDonald",
+     "Samuel A."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-61": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient scribe in general practice: a multi-perspective before-after longitudinal mixed-methods study",
+   "container": "npj Digital Medicine",
+   "issued": [
+    [
+     2026,
+     3,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "van Linschoten",
+     "R. C. A."
+    ],
+    [
+     "van Loon",
+     "C. M."
+    ],
+    [
+     "Joanknecht",
+     "L."
+    ],
+    [
+     "Bischoff",
+     "E. W. M. A."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-62": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Navigating Collective Bargaining Barriers to the Implementation of AI Scribe Technology Among Ambulatory Advanced Practice Providers: Mixed Methods Quality Improvement Study",
+   "container": "JMIR Formative Research",
+   "issued": [
+    [
+     2026,
+     9,
+     17
+    ]
+   ],
+   "authors": [
+    [
+     "Wright",
+     "Aaron"
+    ],
+    [
+     "Seaters",
+     "Danise"
+    ],
+    [
+     "DeLemos",
+     "Christi"
+    ]
+   ],
+   "relations": [
+    [
+     "has-preprint",
+     "10.2196/preprints.92364"
+    ]
+   ]
+  },
+  "S04-63": {
+   "source": "crossref",
+   "type": "book-chapter",
+   "title": "Integrating AI Scribe Technology into Public Health Workflows: Simulation and Field Evaluation in Disease Case Management",
+   "container": "Studies in Health Technology and Informatics",
+   "issued": [
+    [
+     2026,
+     5,
+     21
+    ]
+   ],
+   "authors": [
+    [
+     "Shakeel",
+     "Nauman"
+    ],
+    [
+     "Riewe",
+     "Natalie"
+    ],
+    [
+     "Rebellato",
+     "Steven"
+    ],
+    [
+     "Hirschfeld",
+     "Casey"
+    ],
+    [
+     "Shah",
+     "Ravi"
+    ],
+    [
+     "Whyte",
+     "Michael"
+    ],
+    [
+     "Takei",
+     "Edson Kenzo"
+    ],
+    [
+     "Baisalov",
+     "Raushan"
+    ],
+    [
+     "Chen",
+     "Helen"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-64": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Impact of an ambient digital scribe on typing and note quality: the AutoscriberValidate study",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     2,
+     24
+    ]
+   ],
+   "authors": [
+    [
+     "Bauer",
+     "Martijn P."
+    ],
+    [
+     "van Tol",
+     "Esther M."
+    ],
+    [
+     "Constansia",
+     "Tarisha K.M."
+    ],
+    [
+     "King",
+     "Liza"
+    ],
+    [
+     "van Buchem",
+     "Marieke M."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-65": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Implementing Artificial Intelligence-Enabled Ambient Documentation Technology for Ambulatory Clinicians: An Innovation Evaluation",
+   "container": "Journal of General Internal Medicine",
+   "issued": [
+    [
+     2026,
+     6,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Lawrence",
+     "Katharine"
+    ],
+    [
+     "Polet",
+     "Conner"
+    ],
+    [
+     "Malhotra",
+     "Kiran"
+    ],
+    [
+     "Kuram",
+     "Vasudev"
+    ],
+    [
+     "Sharif",
+     "Sarah"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-66": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Comparative effectiveness of ambient documentation tools in primary care tool-specific variations in efficiency, documentation burden, and productivity over time",
+   "container": "JAMIA Open",
+   "issued": [
+    [
+     2026,
+     7,
+     7
+    ]
+   ],
+   "authors": [
+    [
+     "Moura",
+     "Lidia"
+    ],
+    [
+     "Mishuris",
+     "Rebecca G"
+    ],
+    [
+     "Metlay",
+     "Joshua P"
+    ],
+    [
+     "Habib",
+     "Mamoon"
+    ],
+    [
+     "You",
+     "Jacqueline G"
+    ],
+    [
+     "Gallagher",
+     "Katherine L"
+    ],
+    [
+     "Brodney",
+     "Suzanne"
+    ],
+    [
+     "Rieu-Werden",
+     "Meghan L"
+    ],
+    [
+     "Haas",
+     "Jennifer S"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-67": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Utilization of an Artificial Intelligence–Based Documentation System Improves Provider Efficiency in Outpatient Orthopaedic Clinics: Reducing the Afterhours Burden of the Electronic Health Record—A Pilot Study",
+   "container": "Journal of the American Academy of Orthopaedic Surgeons",
+   "issued": [
+    [
+     2025,
+     9,
+     16
+    ]
+   ],
+   "authors": [
+    [
+     "Rodenhouse",
+     "Andrew J."
+    ],
+    [
+     "Davis",
+     "Eric"
+    ],
+    [
+     "Burger",
+     "Philomena"
+    ],
+    [
+     "Nicandri",
+     "Gregg"
+    ],
+    [
+     "DiGiovanni",
+     "Benedict"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-68": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Easing the burden: A pilot study evaluating AI-generated In-Basket message drafts to streamline perioperative endocrine surgical care",
+   "container": "Surgery",
+   "issued": [
+    [
+     2026,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Whitehouse",
+     "Katherine R."
+    ],
+    [
+     "Heslin",
+     "Ryan T."
+    ],
+    [
+     "Desir",
+     "Alexis"
+    ],
+    [
+     "Raghunathan",
+     "Rajam"
+    ],
+    [
+     "Islam",
+     "Ana K."
+    ],
+    [
+     "Lallky",
+     "Sarah"
+    ],
+    [
+     "Philip",
+     "Priscilla"
+    ],
+    [
+     "Reedy",
+     "Nicole"
+    ],
+    [
+     "Mehta",
+     "Ankeeta"
+    ],
+    [
+     "Parmer",
+     "Megan"
+    ],
+    [
+     "Piersall",
+     "Marlen V."
+    ],
+    [
+     "Oltmann",
+     "Sarah C."
+    ],
+    [
+     "Dackiw",
+     "Alan P.B."
+    ],
+    [
+     "Maalouf",
+     "Naim M."
+    ],
+    [
+     "Sant",
+     "Vivek R."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-69": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Generative AI in preanesthetic consultations: Effects on efficiency, documentation workload, quality, and physician–patient interaction: A simulation trial",
+   "container": "Journal of Clinical Anesthesia",
+   "issued": [
+    [
+     2026,
+     3
+    ]
+   ],
+   "authors": [
+    [
+     "Rahrisch",
+     "Arend"
+    ],
+    [
+     "Braun",
+     "Julia"
+    ],
+    [
+     "Ganter",
+     "Michael T."
+    ],
+    [
+     "Roche",
+     "Tadzio R."
+    ],
+    [
+     "Spahn",
+     "Donat R."
+    ],
+    [
+     "Tscholl",
+     "David W."
+    ],
+    [
+     "Kaserer",
+     "Alexander"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-70": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Effects of a Safety User Interface Bundle on Verification Intentions in Generative AI Chat Use Among Older Chinese Adults: Randomized Vignette Survey",
+   "container": "Journal of Medical Internet Research",
+   "issued": [
+    [
+     2026,
+     8,
+     14
+    ]
+   ],
+   "authors": [
+    [
+     "Yu",
+     "Jun'an"
+    ],
+    [
+     "Chen",
+     "Jun"
+    ],
+    [
+     "Ren",
+     "Anjie"
+    ],
+    [
+     "Duan",
+     "Hui"
+    ],
+    [
+     "Meng",
+     "Hua"
+    ],
+    [
+     "Gao",
+     "Zhuo"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-71": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "A Natural Experiment Reveals Clinically Essential and Compliance-Driven Nursing Documentation",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     6,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Fan",
+     "Hao"
+    ],
+    [
+     "Mugoya",
+     "Rosemary"
+    ],
+    [
+     "Finnegan",
+     "Amy"
+    ],
+    [
+     "Thate",
+     "Jennifer"
+    ],
+    [
+     "Jia",
+     "Haomiao"
+    ],
+    [
+     "Rossetti",
+     "Sarah"
+    ],
+    [
+     "Yen",
+     "Po-Yin"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-72": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Implementation of an AI-Assisted Workflow for Rehabilitation Discharge Summary Creation: Evaluation of Documentation Efficiency, Usability, and Hallucinations in a 290-Bed General Hospital in Japan",
+   "container": "Cureus",
+   "issued": [
+    [
+     2026,
+     5,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Nakano",
+     "Masaji"
+    ],
+    [
+     "Imura",
+     "Takuto"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-73": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient Artificial Intelligence Use and Clinician Documentation Burden, Productivity, and Efficiency",
+   "container": "JAMA Network Open",
+   "issued": [
+    [
+     2026,
+     5,
+     29
+    ]
+   ],
+   "authors": [
+    [
+     "Husa",
+     "Robyn A."
+    ],
+    [
+     "Haggerty",
+     "John"
+    ],
+    [
+     "Nute",
+     "Andrew W."
+    ],
+    [
+     "Levine",
+     "Julie"
+    ],
+    [
+     "Love",
+     "Kevin"
+    ],
+    [
+     "Martinez",
+     "Xochitl"
+    ],
+    [
+     "Parrish",
+     "Canada"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-74": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Impact of Ambient Artificial Intelligence Documentation on Cognitive Load",
+   "container": "Mayo Clinic Proceedings: Digital Health",
+   "issued": [
+    [
+     2025,
+     3
+    ]
+   ],
+   "authors": [
+    [
+     "Hudson",
+     "Taina J."
+    ],
+    [
+     "Albrecht",
+     "Michael"
+    ],
+    [
+     "Smith",
+     "Timothy R."
+    ],
+    [
+     "Ator",
+     "Gregory A."
+    ],
+    [
+     "Thompson",
+     "Jeffrey A."
+    ],
+    [
+     "Shah",
+     "Tina"
+    ],
+    [
+     "Shanks",
+     "Denton"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-75": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Human vs. artificial intelligence in medical charting: a comparative study in the simulated emergency medicine context",
+   "container": "Canadian Journal of Emergency Medicine",
+   "issued": [
+    [
+     2026,
+     3,
+     31
+    ]
+   ],
+   "authors": [
+    [
+     "Lipinski",
+     "Matthew"
+    ],
+    [
+     "Smith",
+     "Emma"
+    ],
+    [
+     "Vaillancourt",
+     "Christian"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-76": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Escriba médico con IA en consultas pediátricas: carga documental, calidad y límites de escalado",
+   "container": "Medicina Clínica",
+   "issued": [
+    [
+     2026,
+     8
+    ]
+   ],
+   "authors": [
+    [
+     "Vallejo",
+     "Violeta"
+    ],
+    [
+     "Farreras",
+     "Jordi"
+    ],
+    [
+     "Valero",
+     "Laura"
+    ],
+    [
+     "González-Grado",
+     "Carla"
+    ],
+    [
+     "Peral",
+     "Irene"
+    ],
+    [
+     "Cano",
+     "Iván"
+    ],
+    [
+     "Launes",
+     "Cristian"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-77": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Effect of multimodal comprehensive communication skills training with video analysis by artificial intelligence for physicians on acute geriatric care: a mixed-methods study",
+   "container": "BMJ Open",
+   "issued": [
+    [
+     2023,
+     3
+    ]
+   ],
+   "authors": [
+    [
+     "Kobayashi",
+     "Masaki"
+    ],
+    [
+     "Katayama",
+     "Mitsuya"
+    ],
+    [
+     "Hayashi",
+     "Tomofumi"
+    ],
+    [
+     "Hashiyama",
+     "Takuhiro"
+    ],
+    [
+     "Iyanagi",
+     "Toshinori"
+    ],
+    [
+     "Une",
+     "Saki"
+    ],
+    [
+     "Honda",
+     "Miwako"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-78": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Ambient Artificial Intelligence Scribes: A Pilot Survey of Perspectives on the Utility and Documentation Burden in Palliative Medicine",
+   "container": "Healthcare",
+   "issued": [
+    [
+     2025,
+     8,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Patterson",
+     "James"
+    ],
+    [
+     "Kovacs",
+     "Maya"
+    ],
+    [
+     "Lees",
+     "Caitlin"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-79": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Ambient scribe in general practice: a multi-perspective before-after longitudinal mixed-methods study",
+   "container": "",
+   "issued": [
+    [
+     2025,
+     10,
+     31
+    ]
+   ],
+   "authors": [
+    [
+     "van Linschoten",
+     "R.C.A."
+    ],
+    [
+     "van Loon",
+     "C.M."
+    ],
+    [
+     "Joanknecht",
+     "L."
+    ],
+    [
+     "Bischoff",
+     "E.W.M.A."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-80": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Longitudinal effects of ambient AI scribe use on documentation burden and financial productivity in primary care: A quasi-experimental study",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     1,
+     13
+    ]
+   ],
+   "authors": [
+    [
+     "Waken",
+     "RJ"
+    ],
+    [
+     "Lou",
+     "Sunny S."
+    ],
+    [
+     "Hofford",
+     "Mackenzie"
+    ],
+    [
+     "Eiden",
+     "Elise"
+    ],
+    [
+     "Burk",
+     "Carrie"
+    ],
+    [
+     "Kim",
+     "Seunghwan"
+    ],
+    [
+     "Esker",
+     "Jared"
+    ],
+    [
+     "Zhang",
+     "Linying"
+    ],
+    [
+     "Maddox",
+     "Thomas M."
+    ],
+    [
+     "Abraham",
+     "Joanna"
+    ],
+    [
+     "Lai",
+     "Albert M."
+    ],
+    [
+     "Bhayani",
+     "Sam"
+    ],
+    [
+     "O’Dell",
+     "Deborah"
+    ],
+    [
+     "Schmidt",
+     "Jennifer"
+    ],
+    [
+     "Paynter",
+     "Kayla"
+    ],
+    [
+     "Thomas",
+     "Michele"
+    ],
+    [
+     "Gerling",
+     "Matthew"
+    ],
+    [
+     "Payne",
+     "Philip R.O."
+    ],
+    [
+     "Kannampallil",
+     "Thomas"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-81": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Reduction of Electronic Medical Record Documentation Time and Burden Using an Artificial Intelligence Scribe Tool in an Orthopaedic Clinic",
+   "container": "Journal of the American Academy of Orthopaedic Surgeons",
+   "issued": [
+    [
+     2026,
+     5,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Vallabhaneni",
+     "Nikhil"
+    ],
+    [
+     "Ingawa",
+     "H. Sadiyya"
+    ],
+    [
+     "Blackburn",
+     "Brenna E."
+    ],
+    [
+     "Pelt",
+     "Christopher E."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-82": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Impact of AI Scribes on Physician Productivity and Workflow in Medical Oncology",
+   "container": "JCO Oncology Practice",
+   "issued": [
+    [
+     2026,
+     2,
+     11
+    ]
+   ],
+   "authors": [
+    [
+     "Toussi",
+     "Nima"
+    ],
+    [
+     "Zhang",
+     "Caroline"
+    ],
+    [
+     "Kang",
+     "Jocelyn"
+    ],
+    [
+     "Licitra",
+     "Edward J."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-83": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Evaluating the Impact of Artificial Intelligence Scribes on Clinical Workflow and Documentation Quality: A Randomized Controlled Trial",
+   "container": "The Journal of Arthroplasty",
+   "issued": [
+    [
+     2026,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Etagiuri",
+     "Abdu"
+    ],
+    [
+     "Chaudhry",
+     "Daniel"
+    ],
+    [
+     "van der Merwe",
+     "Jano"
+    ],
+    [
+     "Nickol",
+     "Michaela"
+    ],
+    [
+     "van der Merwe",
+     "Johannes M."
+    ]
+   ],
+   "relations": []
+  },
+  "S04-84": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Effect of a Computer-Aided Device for Detecting Gastric Neoplasms: A Multicenter, Randomized Controlled Trial",
+   "container": "Gastroenterology",
+   "issued": [
+    [
+     2026,
+     6
+    ]
+   ],
+   "authors": [
+    [
+     "Dong",
+     "Zehua"
+    ],
+    [
+     "Wu",
+     "Lianlian"
+    ],
+    [
+     "Du",
+     "Hongliu"
+    ],
+    [
+     "Tao",
+     "Xiao"
+    ],
+    [
+     "Wang",
+     "Junxiao"
+    ],
+    [
+     "Zeng",
+     "Xiaoquan"
+    ],
+    [
+     "Zhu",
+     "Yijie"
+    ],
+    [
+     "Tan",
+     "Shuzhe"
+    ],
+    [
+     "Wang",
+     "Jiamin"
+    ],
+    [
+     "Deng",
+     "Mei"
+    ],
+    [
+     "Yang",
+     "Ting"
+    ],
+    [
+     "Chen",
+     "Chen"
+    ],
+    [
+     "Wen",
+     "Liming"
+    ],
+    [
+     "Li",
+     "Ying"
+    ],
+    [
+     "Jiang",
+     "Congyao"
+    ],
+    [
+     "Tang",
+     "Chuang"
+    ],
+    [
+     "Wang",
+     "Yulin"
+    ],
+    [
+     "Zhao",
+     "Zhifeng"
+    ],
+    [
+     "Wang",
+     "Qinghua"
+    ],
+    [
+     "Yu",
+     "Haodong"
+    ],
+    [
+     "Chen",
+     "Chaoyuan"
+    ],
+    [
+     "Ai",
+     "Yaowei"
+    ],
+    [
+     "Pan",
+     "Jie"
+    ],
+    [
+     "Chen",
+     "Fengsong"
+    ],
+    [
+     "Guo",
+     "Qiang"
+    ],
+    [
+     "Mao",
+     "Xinli"
+    ],
+    [
+     "Li",
+     "Junhong"
+    ],
+    [
+     "Pang",
+     "Huifang"
+    ],
+    [
+     "Hao",
+     "Jianyu"
+    ],
+    [
+     "Jiao",
+     "Yan"
+    ],
+    [
+     "Wang",
+     "Qizhi"
+    ],
+    [
+     "Zhang",
+     "Heng"
+    ],
+    [
+     "Ye",
+     "Shicai"
+    ],
+    [
+     "Dang",
+     "Tong"
+    ],
+    [
+     "Yu",
+     "Liangliang"
+    ],
+    [
+     "Hu",
+     "Shan"
+    ],
+    [
+     "Zhou",
+     "Wei"
+    ],
+    [
+     "Deng",
+     "Yunchao"
+    ],
+    [
+     "Li",
+     "Yanxia"
+    ],
+    [
+     "Chen",
+     "Boru"
+    ],
+    [
+     "Xiao",
+     "Bing"
+    ],
+    [
+     "Liu",
+     "Jun"
+    ],
+    [
+     "Qin",
+     "Jiamin"
+    ],
+    [
+     "Zhang",
+     "Ting"
+    ],
+    [
+     "Bu",
+     "Tong"
+    ],
+    [
+     "Shi",
+     "Jiayi"
+    ],
+    [
+     "Wang",
+     "Yumei"
+    ],
+    [
+     "Zhang",
+     "Hong"
+    ],
+    [
+     "Lin",
+     "Jiejun"
+    ],
+    [
+     "Jin",
+     "Lei"
+    ],
+    [
+     "Yu",
+     "Jianfeng"
+    ],
+    [
+     "Tang",
+     "Bofu"
+    ],
+    [
+     "Tan",
+     "Xia"
+    ],
+    [
+     "Yu",
+     "Lilei"
+    ],
+    [
+     "Yu",
+     "Honggang"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-85": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Development of Intelligent Learning Environments: Methodology for Integrating Artificial Intelligence Systems Into the Higher Education Biophysics Curriculum",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     6,
+     17
+    ]
+   ],
+   "authors": [
+    [
+     "Jongoboyevich",
+     "Ergashev Asqar"
+    ],
+    [
+     "Khojievich",
+     "Bozorov Erkin"
+    ],
+    [
+     "qizi",
+     "Boymatova Nargiza Fayzulla"
+    ],
+    [
+     "Quldoshevich",
+     "Ergashev Jamshid"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-86": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Explainable AI for Equitable Nurse Scheduling: Pragmatic Pre-Post Implementation Study",
+   "container": "JMIR Nursing",
+   "issued": [
+    [
+     2026,
+     7,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "Shia",
+     "Ben-Chang"
+    ],
+    [
+     "Peng",
+     "Szu-Ming"
+    ],
+    [
+     "Zhang",
+     "Qui-Yang"
+    ],
+    [
+     "Lo",
+     "Chiung-Yun"
+    ],
+    [
+     "Wang",
+     "Sheng-Ru"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-87": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI-Generated Draft Replies Integrated Into Health Records and Physicians’ Electronic Communication",
+   "container": "JAMA Network Open",
+   "issued": [
+    [
+     2024,
+     4,
+     15
+    ]
+   ],
+   "authors": [
+    [
+     "Tai-Seale",
+     "Ming"
+    ],
+    [
+     "Baxter",
+     "Sally L."
+    ],
+    [
+     "Vaida",
+     "Florin"
+    ],
+    [
+     "Walker",
+     "Amanda"
+    ],
+    [
+     "Sitapati",
+     "Amy M."
+    ],
+    [
+     "Osborne",
+     "Chad"
+    ],
+    [
+     "Diaz",
+     "Joseph"
+    ],
+    [
+     "Desai",
+     "Nimit"
+    ],
+    [
+     "Webb",
+     "Sophie"
+    ],
+    [
+     "Polston",
+     "Gregory"
+    ],
+    [
+     "Helsten",
+     "Teresa"
+    ],
+    [
+     "Gross",
+     "Erin"
+    ],
+    [
+     "Thackaberry",
+     "Jessica"
+    ],
+    [
+     "Mandvi",
+     "Ammar"
+    ],
+    [
+     "Lillie",
+     "Dustin"
+    ],
+    [
+     "Li",
+     "Steve"
+    ],
+    [
+     "Gin",
+     "Geneen"
+    ],
+    [
+     "Achar",
+     "Suraj"
+    ],
+    [
+     "Hofflich",
+     "Heather"
+    ],
+    [
+     "Sharp",
+     "Christopher"
+    ],
+    [
+     "Millen",
+     "Marlene"
+    ],
+    [
+     "Longhurst",
+     "Christopher A."
+    ]
+   ],
+   "relations": []
+  },
+  "S05-01": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Small Talk, Big Impact? LLM-based Conversational Agents to Mitigate Passive Fatigue in Conditional Automated Driving",
+   "container": "Proceedings of the 2026 CHI Conference on Human Factors in Computing Systems",
+   "issued": [
+    [
+     2026,
+     4,
+     13
+    ]
+   ],
+   "authors": [
+    [
+     "Cockram",
+     "Lewis"
+    ],
+    [
+     "Yu",
+     "Yueteng"
+    ],
+    [
+     "Pardo",
+     "Jorge"
+    ],
+    [
+     "Li",
+     "Xiaomeng"
+    ],
+    [
+     "Rakotonirainy",
+     "Andry"
+    ],
+    [
+     "Kuo",
+     "Jonny"
+    ],
+    [
+     "Demmel",
+     "Sebastien"
+    ],
+    [
+     "Lenné",
+     "Mike"
+    ],
+    [
+     "Schroeter",
+     "Ronald"
+    ]
+   ],
+   "relations": []
+  },
+  "S05-02": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Chatting with AI: enhancing the supervision safety of near-L3 automated driving by engaging in non-driving–related tasks",
+   "container": "Ergonomics",
+   "issued": [
+    [
+     2026,
+     5,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Jiang",
+     "Tingwei"
+    ],
+    [
+     "Su",
+     "Qirui"
+    ],
+    [
+     "Tang",
+     "Rixin"
+    ]
+   ],
+   "relations": []
+  },
+  "S05-03": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Cognitive and behavioral markers for human detection error in AI-assisted bridge inspection",
+   "container": "Applied Ergonomics",
+   "issued": [
+    [
+     2024,
+     11
+    ]
+   ],
+   "authors": [
+    [
+     "Dalilian",
+     "Fatemeh"
+    ],
+    [
+     "Nembhard",
+     "David"
+    ]
+   ],
+   "relations": []
+  },
+  "S05-04": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Knowledge Complacency and Decision Support Systems",
+   "container": "2019 IEEE Conference on Cognitive and Computational Aspects of Situation Management (CogSIMA)",
+   "issued": [
+    [
+     2019,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Rodriguez",
+     "Sebastian S."
+    ],
+    [
+     "O'Donovan",
+     "John"
+    ],
+    [
+     "Schaffer",
+     "James Austin"
+    ],
+    [
+     "Hollerer",
+     "Tobias"
+    ]
+   ],
+   "relations": []
+  },
+  "S05-05": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Measuring complacency in humans interacting with autonomous agents in a multi-agent system",
+   "container": "Artificial Intelligence and Machine Learning for Multi-Domain Operations Applications II",
+   "issued": [
+    [
+     2020,
+     4,
+     21
+    ]
+   ],
+   "authors": [
+    [
+     "Rodriguez",
+     "Sebastian S."
+    ],
+    [
+     "Chen",
+     "Jacqueline"
+    ],
+    [
+     "Deep",
+     "Harsh"
+    ],
+    [
+     "Lee",
+     "Jaewook"
+    ],
+    [
+     "Asher",
+     "Derrik E."
+    ],
+    [
+     "Zaroukian",
+     "Erin G."
+    ]
+   ],
+   "relations": []
+  },
+  "S05-06": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Exploring Ambient Artificial Intelligence to Enhance Learning and Feedback During Operating Room-to-Intensive Care Unit Handoffs: Co-Design and Simulation Study",
+   "container": "JMIR Medical Education",
+   "issued": [
+    [
+     2026,
+     7,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "Jalilian",
+     "Laleh"
+    ],
+    [
+     "Barra",
+     "Federico Lorenzo"
+    ],
+    [
+     "Grogan",
+     "Tristan"
+    ],
+    [
+     "Lee",
+     "Jason"
+    ],
+    [
+     "Kadambi",
+     "Achuta"
+    ]
+   ],
+   "relations": []
+  },
+  "S05-07": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Patient and staff acceptability of an artificial intelligence software to prioritize chest X-rays in an NHS setting: a qualitative evaluation",
+   "container": "BMC Health Services Research",
+   "issued": [
+    [
+     2026,
+     6,
+     18
+    ]
+   ],
+   "authors": [
+    [
+     "Steel",
+     "Emma J."
+    ],
+    [
+     "Duncan",
+     "Sean F."
+    ],
+    [
+     "Hall",
+     "Mark"
+    ],
+    [
+     "Maclay",
+     "John D."
+    ],
+    [
+     "Stobo",
+     "David B."
+    ],
+    [
+     "Gregory",
+     "Benjamin"
+    ],
+    [
+     "Lowe",
+     "David J."
+    ],
+    [
+     "Germeni",
+     "Evi"
+    ]
+   ],
+   "relations": [
+    [
+     "has-preprint",
+     "10.21203/rs.3.rs-9179943/v1"
+    ]
+   ]
+  },
+  "S05-08": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The numb efficiency paradox: AI work pressure, affective numbing, and professional judgment in organizationally digitally mediated work",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     8,
+     28
+    ]
+   ],
+   "authors": [
+    [
+     "Yin",
+     "Shiyao"
+    ],
+    [
+     "Hu",
+     "Wenxuan"
+    ],
+    [
+     "Tian",
+     "Zirong"
+    ],
+    [
+     "Zhang",
+     "Yifan"
+    ]
+   ],
+   "relations": []
+  },
+  "S05-09": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "“Trust, but Verify”: A Reflexive Thematic Analysis of Human–AI Interaction",
+   "container": "Advances in Social Sciences Research Journal",
+   "issued": [
+    [
+     2025,
+     12,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Tayyab Khan",
+     "Mohammed"
+    ],
+    [
+     "Fong",
+     "Christopher"
+    ],
+    [
+     "Tripathi",
+     "Shilpi"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-01": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "From Critical Thinking to Passive Acceptance: The Moderating Role of Decision Fatigue in Students’ Use of Generative AI",
+   "container": "European Journal of Investigation in Health, Psychology and Education",
+   "issued": [
+    [
+     2026,
+     8,
+     29
+    ]
+   ],
+   "authors": [
+    [
+     "Zuin",
+     "Marco"
+    ],
+    [
+     "Donadel",
+     "Vanessa"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-02": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "When cognitive offloading becomes dependence: how AI dependence mediates the pathway from academic stress to burnout and anxiety",
+   "container": "BMC Psychology",
+   "issued": [
+    [
+     2026,
+     5,
+     30
+    ]
+   ],
+   "authors": [
+    [
+     "Wang",
+     "Wenlong"
+    ],
+    [
+     "Wu",
+     "Yuhang"
+    ],
+    [
+     "Fang",
+     "Jie"
+    ],
+    [
+     "Yang",
+     "Chong"
+    ],
+    [
+     "Wen",
+     "Langyi"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-03": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Exploring the formation of learning burnout among college students in AI context: a serial mediation mechanism of AI dependence and addiction based on I-PACE model",
+   "container": "Frontiers in Computer Science",
+   "issued": [
+    [
+     2026,
+     3,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Lan",
+     "Yanling"
+    ],
+    [
+     "Liu",
+     "Sihang"
+    ],
+    [
+     "Chen",
+     "Hao"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-04": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Dual Forces of AI: How Generative AI and Perceived AI Dependency Influence Fear of Missing Out (FoMO) and EFL Students' Vocabulary Acquisition",
+   "container": "Journal of Visualized Experiments",
+   "issued": [
+    [
+     2025,
+     12,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Khoso",
+     "Abdul Khalique"
+    ],
+    [
+     "Honggang",
+     "Wang"
+    ],
+    [
+     "Younas",
+     "Muhammad"
+    ],
+    [
+     "Salam El-Dakhs",
+     "Dina Abdel"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-05": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Why Nurses Intend to Override AI Alerts: How Alert Fatigue, Moral Distress, and Team Psychological Safety Shape Self-Reported Trust Calibration Toward Clinical Decision Support",
+   "container": "Healthcare",
+   "issued": [
+    [
+     2026,
+     7,
+     9
+    ]
+   ],
+   "authors": [
+    [
+     "Clej",
+     "Emilia"
+    ],
+    [
+     "Fizedean",
+     "Camelia"
+    ],
+    [
+     "Gherman",
+     "Adelina"
+    ],
+    [
+     "Ilie",
+     "Adrian Cosmin"
+    ],
+    [
+     "Bratu",
+     "Melania Lavinia"
+    ],
+    [
+     "Marc",
+     "Felicia"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-06": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Psychological Impacts of AI Dependence: Assessing the Cognitive and Emotional Costs of Intelligent Systems in Daily Life",
+   "container": "Review of Applied Management and Social Sciences",
+   "issued": [
+    [
+     2025,
+     2,
+     5
+    ]
+   ],
+   "authors": [
+    [
+     "Naseer",
+     "Aliza"
+    ],
+    [
+     "Ahmad",
+     "Naveed Rafaqat"
+    ],
+    [
+     "Chishti",
+     "Muhammad Amjad"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-07": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Predicting Graduation Timeliness: A Multidisciplinary Study on Logistic Mobility, Psychosomatic Fatigue, and AI-Assistance Dependency among Information Systems Students",
+   "container": "Jurnal ASIIMETRIK Jurnal Ilmiah Rekayasa &amp; Inovasi",
+   "issued": [
+    [
+     2026,
+     7,
+     31
+    ]
+   ],
+   "authors": [
+    [
+     "Fahrudin",
+     "Endin"
+    ],
+    [
+     "Suharyanto",
+     "Eko"
+    ],
+    [
+     "Wijayanto",
+     "Santosa"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-08": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Generative AI Use and Burnout Risk in Higher Education: A Cross-Sectional Analysis of 50,000 Students",
+   "container": "RESEARCH REVIEW International Journal of Multidisciplinary",
+   "issued": [
+    [
+     2026,
+     7,
+     15
+    ]
+   ],
+   "authors": [
+    [
+     "Kapustynska",
+     "Viroslava"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-09": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Multidimensional Cognitive-State Modeling and an Adaptive Cognitive Load Twin for AI-Supported Managerial Decision-Making",
+   "container": "Data",
+   "issued": [
+    [
+     2026,
+     8,
+     27
+    ]
+   ],
+   "authors": [
+    [
+     "Mizrak",
+     "Filiz"
+    ],
+    [
+     "Karakaya",
+     "Turhan"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-10": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "A (Mid)journey Through Reality: Assessing Accuracy, Impostor Bias, and Automation Bias in Human Detection of AI‐Generated Images",
+   "container": "Human Behavior and Emerging Technologies",
+   "issued": [
+    [
+     2025,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Casu",
+     "Mirko"
+    ],
+    [
+     "Guarnera",
+     "Luca"
+    ],
+    [
+     "Zangara",
+     "Ignazio"
+    ],
+    [
+     "Caponnetto",
+     "Pasquale"
+    ],
+    [
+     "Battiato",
+     "Sebastiano"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-11": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Does GenAI Deplete Us? The Effects of Using GenAI for Writing on Identity and Ego Depletion",
+   "container": "Proceedings of the Extended Abstracts of the CHI Conference on Human Factors in Computing Systems",
+   "issued": [
+    [
+     2025,
+     4,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Lee",
+     "Sangwook"
+    ],
+    [
+     "Kim",
+     "Taenyun"
+    ],
+    [
+     "Moon",
+     "Won-Ki"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-12": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Students’ Perceptions and Adaptive Learning Strategies in Using Digital Platforms for Online Learning: A Social Action Perspective",
+   "container": "International Journal of Elementary Education",
+   "issued": [
+    [
+     2026,
+     5,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Rahma  Safitriana",
+     ""
+    ],
+    [
+     "Agus Machfud Fauzi",
+     ""
+    ],
+    [
+     "Moh. Mudzakkir",
+     ""
+    ],
+    [
+     "Putri Dwi Permata Indah",
+     ""
+    ]
+   ],
+   "relations": []
+  },
+  "S15-13": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "ChatGPT for natural sciences course design: Insights from a strengths, weaknesses, opportunities, and threats analysis",
+   "container": "Natural Sciences Education",
+   "issued": [
+    [
+     2024,
+     12
+    ]
+   ],
+   "authors": [
+    [
+     "Kumar",
+     "Jeya Amantha"
+    ],
+    [
+     "Zhuang",
+     "Min"
+    ],
+    [
+     "Thomas",
+     "Stephen"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-14": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Consequences of Overdependence on Technology in English Learning Practices",
+   "container": "International Journal of English Teaching and Linguistics",
+   "issued": [
+    [
+     2026,
+     4,
+     30
+    ]
+   ],
+   "authors": [
+    [
+     "Febrian",
+     "Tengku Ibra"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-15": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Vietnamese University Students’ Perceptions of Generative Artificial Intelligence in Higher Education: A Qualitative Study Through the Technology Acceptance Model",
+   "container": "Review of Artificial Intelligence in Education",
+   "issued": [
+    [
+     2026,
+     9,
+     13
+    ]
+   ],
+   "authors": [
+    [
+     "Quan",
+     "Nguyen Phuc"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-16": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Nurses' Experiences with Artificial Intelligence in Clinical Settings: A Qualitative Exploration of Advantages, Limitations, and Ethical Dimensions",
+   "container": "ACADEMIA International Journal for Social Sciences",
+   "issued": [
+    [
+     2025,
+     3,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Parveen",
+     "Shahida"
+    ],
+    [
+     "Akbar",
+     "Saeeda"
+    ],
+    [
+     "Yasmin",
+     "Sobia"
+    ],
+    [
+     "Jabin",
+     "Qudsia"
+    ],
+    [
+     "Zulfiqar",
+     "Areeba"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-17": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Synergizing AI and Human Feedback: Effects of ChatGPT-generated and Teacher Corrective Feedback on Thai EFL Students’ Cause-and-Effect Writing",
+   "container": "Higher Education Studies",
+   "issued": [
+    [
+     2026,
+     5,
+     7
+    ]
+   ],
+   "authors": [
+    [
+     "Sripradith",
+     "Raweewat"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-01": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI-enabled job demands and employee well-being: Emotional exhaustion and turnover across organizational contexts",
+   "container": "Acta Psychologica",
+   "issued": [
+    [
+     2026,
+     9
+    ]
+   ],
+   "authors": [
+    [
+     "Pham",
+     "Nhat Tan"
+    ],
+    [
+     "Phan",
+     "Thi-Thanh-Hien"
+    ],
+    [
+     "Nguyen",
+     "Thao P.H."
+    ],
+    [
+     "Tran",
+     "Thi Tuyet"
+    ],
+    [
+     "Tang",
+     "Au Due"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-02": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Association Between AI Awareness and Emotional Exhaustion: The Serial Mediation of Job Insecurity and Work Interference with Family",
+   "container": "Behavioral Sciences",
+   "issued": [
+    [
+     2025,
+     3,
+     21
+    ]
+   ],
+   "authors": [
+    [
+     "Zheng",
+     "Jiansong"
+    ],
+    [
+     "Zhang",
+     "Tao"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-03": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI anxiety and teacher innovative intentions: a moderated serial mediation model of burnout and creative self-efficacy",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     5,
+     28
+    ]
+   ],
+   "authors": [
+    [
+     "Dong",
+     "Tongqiang"
+    ],
+    [
+     "Yang",
+     "Ziyi"
+    ],
+    [
+     "Fang",
+     "Yu"
+    ],
+    [
+     "Che",
+     "Jianying"
+    ],
+    [
+     "Li",
+     "Lanxin"
+    ],
+    [
+     "Kong",
+     "Yong"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-04": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Autonomous enhancement or emotional depletion? The dual-path mechanism of AI usage on employees’ work behavior",
+   "container": "Frontiers in Public Health",
+   "issued": [
+    [
+     2026,
+     3,
+     18
+    ]
+   ],
+   "authors": [
+    [
+     "Jiang",
+     "Daokui"
+    ],
+    [
+     "Liu",
+     "Yaru"
+    ],
+    [
+     "Gu",
+     "Xuan"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-05": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "How Digital Stress and eHealth Literacy Relate to Missed Nursing Care and Willingness to Use AI Decision Support",
+   "container": "Healthcare",
+   "issued": [
+    [
+     2026,
+     4,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Clej",
+     "Emilia"
+    ],
+    [
+     "Mavrea",
+     "Adelina"
+    ],
+    [
+     "Fizedean",
+     "Camelia"
+    ],
+    [
+     "Tănase",
+     "Alina Doina"
+    ],
+    [
+     "Ilie",
+     "Adrian Cosmin"
+    ],
+    [
+     "Tischer",
+     "Alina"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-06": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The impact of technostress and generative AI on EFL mathematic metacognitive reading strategies and digital classroom burnout in SDG-aligned education",
+   "container": "Scientific Reports",
+   "issued": [
+    [
+     2026,
+     4,
+     11
+    ]
+   ],
+   "authors": [
+    [
+     "Jingjing",
+     "Qiao"
+    ],
+    [
+     "Yan",
+     "Zhao"
+    ],
+    [
+     "Xiaobing",
+     "Xu"
+    ],
+    [
+     "Li",
+     "Li"
+    ],
+    [
+     "Nusrat",
+     "Aasia"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-07": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI awareness, AI fear of missing out, and work demotivation as pathways to occupational strain in Vietnamese hospitality employees",
+   "container": "Acta Psychologica",
+   "issued": [
+    [
+     2026,
+     9
+    ]
+   ],
+   "authors": [
+    [
+     "Pham",
+     "Tin Quang"
+    ],
+    [
+     "Nguyen",
+     "Thai-Ha"
+    ],
+    [
+     "Nguyen",
+     "Ha-Vi"
+    ],
+    [
+     "Le",
+     "Toan Duc"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-08": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The impact of AI anxiety on employees' work passion: A moderated mediated effect model",
+   "container": "Acta Psychologica",
+   "issued": [
+    [
+     2025,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Chen",
+     "Xinqiang"
+    ],
+    [
+     "Ke",
+     "Jingying"
+    ],
+    [
+     "Zhang",
+     "Xiu-e"
+    ],
+    [
+     "Chen",
+     "Jiangjie"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-09": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The design industry in the AI era: How AI awareness and AI literacy influence the innovative work behavior of Chinese Generation Y designers",
+   "container": "Acta Psychologica",
+   "issued": [
+    [
+     2025,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Ding",
+     "Ning"
+    ],
+    [
+     "Chen",
+     "Maowei"
+    ],
+    [
+     "Hu",
+     "Liling"
+    ]
+   ],
+   "relations": [
+    [
+     "is-supplemented-by",
+     "10.6084/m9.figshare.28822925"
+    ]
+   ]
+  },
+  "S14-10": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Association between Artificial Intelligence Awareness and Employee Depression: The Mediating Role of Emotional Exhaustion and the Moderating Role of Perceived Organizational Support",
+   "container": "International Journal of Environmental Research and Public Health",
+   "issued": [
+    [
+     2023,
+     3,
+     15
+    ]
+   ],
+   "authors": [
+    [
+     "Xu",
+     "Guanglu"
+    ],
+    [
+     "Xue",
+     "Ming"
+    ],
+    [
+     "Zhao",
+     "Jidi"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-11": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Assist me or replace me? Uncovering the influence of AI awareness on employees’ counterproductive work behaviors",
+   "container": "Frontiers in Public Health",
+   "issued": [
+    [
+     2024,
+     10,
+     3
+    ]
+   ],
+   "authors": [
+    [
+     "Bai",
+     "Shizhen"
+    ],
+    [
+     "Zhang",
+     "Xiaoxue"
+    ],
+    [
+     "Yu",
+     "Dingyao"
+    ],
+    [
+     "Yao",
+     "Junru"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-12": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Predicting Radiology Burnout via Machine Learning: A Cohort Study",
+   "container": "Academic Radiology",
+   "issued": [
+    [
+     2026,
+     6
+    ]
+   ],
+   "authors": [
+    [
+     "Ma",
+     "Can"
+    ],
+    [
+     "Liu",
+     "Xia"
+    ],
+    [
+     "Su",
+     "Mi"
+    ],
+    [
+     "Fang",
+     "Xiao"
+    ],
+    [
+     "Zhang",
+     "Ming"
+    ],
+    [
+     "Zhang",
+     "Tianyang"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-13": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "A moderated mediation model of relationship between artificial intelligence awareness and withdrawal behaviors",
+   "container": "International Journal of Organizational Analysis",
+   "issued": [
+    [
+     2025,
+     2,
+     14
+    ]
+   ],
+   "authors": [
+    [
+     "Nguyen",
+     "Thi Phuong Linh"
+    ],
+    [
+     "Nguyen",
+     "Dinh Trung"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-14": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Influences of artificial intelligence (AI) awareness on career competency and job burnout",
+   "container": "International Journal of Contemporary Hospitality Management",
+   "issued": [
+    [
+     2021,
+     1,
+     18
+    ]
+   ],
+   "authors": [
+    [
+     "Kong",
+     "Haiyan"
+    ],
+    [
+     "Yuan",
+     "Yue"
+    ],
+    [
+     "Baruch",
+     "Yehuda"
+    ],
+    [
+     "Bu",
+     "Naipeng"
+    ],
+    [
+     "Jiang",
+     "Xinyu"
+    ],
+    [
+     "Wang",
+     "Kangping"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-15": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Analyzing the Impact of Digital Transformation on Mental Health of IT Professionals Using Machine Learning Methods",
+   "container": "2025 International Conference on Artificial Intelligence and Machine Vision (AIMV)",
+   "issued": [
+    [
+     2025,
+     8,
+     16
+    ]
+   ],
+   "authors": [
+    [
+     "Patel",
+     "Tanish"
+    ],
+    [
+     "Jhaveri",
+     "Rutvij H"
+    ],
+    [
+     "Bvuma",
+     "Stella"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-16": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The hidden facets of artificial intelligence: delivery employees’ insights into service sabotage",
+   "container": "Management Decision",
+   "issued": [
+    [
+     2025,
+     11,
+     6
+    ]
+   ],
+   "authors": [
+    [
+     "Song",
+     "Rui"
+    ],
+    [
+     "Qin",
+     "Wanyi"
+    ],
+    [
+     "Shi",
+     "Wen"
+    ],
+    [
+     "Xue",
+     "Xingjian"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-17": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Smart Shift: A Knowledge Management and Industrial–Organizational Psychology Perspective on Digital Transformation and Sustainable Well-Being Among SMEs",
+   "container": "Sustainability",
+   "issued": [
+    [
+     2025,
+     11,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Sabawon",
+     "Ziaulhaq"
+    ],
+    [
+     "Caglar Onbaşıoğlu",
+     "Dilber"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-18": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Generative AI tools and career burnout: The chain mediating effect of technology stress perception on turnover intention among young tech talents",
+   "container": "Edelweiss Applied Science and Technology",
+   "issued": [
+    [
+     2025,
+     6,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Jiang",
+     "Yiru"
+    ],
+    [
+     "Alias",
+     "Bity Salwana"
+    ],
+    [
+     "Li",
+     "Bo"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-19": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Supervisor use of artificial intelligence (AI) in email writing: the impact on subordinate burnout",
+   "container": "Communication Research Reports",
+   "issued": [
+    [
+     2025,
+     10,
+     20
+    ]
+   ],
+   "authors": [
+    [
+     "Kelly",
+     "Stephanie"
+    ],
+    [
+     "Goke",
+     "Ryan"
+    ],
+    [
+     "Winchester",
+     "Danielle"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-20": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Mediating Effect of Fixed Teaching Mindset on the Relationship Between AI Anxiety and Professional Burnout Among English as a Foreign Language Teachers",
+   "container": "Sage Open",
+   "issued": [
+    [
+     2026,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Korkmaz",
+     "Hüsem"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-21": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Proactive or Defensive? How\n                    <scp>AI</scp>\n                    Awareness Influences Employees' Innovative Behavior and Knowledge Hiding",
+   "container": "Asia Pacific Journal of Human Resources",
+   "issued": [
+    [
+     2026,
+     3,
+     27
+    ]
+   ],
+   "authors": [
+    [
+     "Liu",
+     "Ping"
+    ],
+    [
+     "Yuan",
+     "Ling"
+    ],
+    [
+     "Tan",
+     "Zhihong"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-22": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Artificial intelligence anxiety and academic burnout among Chinese postgraduate students: perceived stress and rumination as serial mediators",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     9,
+     22
+    ]
+   ],
+   "authors": [
+    [
+     "Long",
+     "Maosen"
+    ],
+    [
+     "Xiong",
+     "Lina"
+    ],
+    [
+     "Li",
+     "Junhua"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-23": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Artificial intelligence (AI) awareness and work withdrawal: evaluating chained mediation through negative work-related rumination and emotional exhaustion",
+   "container": "International Journal of Contemporary Hospitality Management",
+   "issued": [
+    [
+     2023,
+     10,
+     9
+    ]
+   ],
+   "authors": [
+    [
+     "Teng",
+     "Rongrong"
+    ],
+    [
+     "Zhou",
+     "Shuai"
+    ],
+    [
+     "Zheng",
+     "Wang"
+    ],
+    [
+     "Ma",
+     "Chunhao"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-24": null,
+  "S14-25": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Impact of AI Awareness on Employees’ Job Burnout: A Chain Mediation of Perceived Organizational Support and Organizational Commitment",
+   "container": "Sage Open",
+   "issued": [
+    [
+     2025,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Wang",
+     "Dongsheng"
+    ],
+    [
+     "Zhou",
+     "Xingyu"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-26": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "The Impact of AI Anxiety on Emotional Burnout of Cross-Border E-Commerce Practitioners",
+   "container": "2026 17th International Conference on E-Education, E-Business, E-Management and E-Learning (IC4e)",
+   "issued": [
+    [
+     2026,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Zhang",
+     "Qi"
+    ],
+    [
+     "Bian",
+     "Linghe"
+    ],
+    [
+     "Zhang",
+     "Kexin"
+    ],
+    [
+     "Yu",
+     "Qianhui"
+    ],
+    [
+     "Liu",
+     "NianCi"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-27": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Prospective effects of artificial intelligence on burnout syndrome",
+   "container": "Sigurnost",
+   "issued": [
+    [
+     2025,
+     7,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Babiker",
+     "Marwan"
+    ],
+    [
+     "Merisalu",
+     "Eda"
+    ],
+    [
+     "Roja",
+     "Ženija"
+    ],
+    [
+     "Kalkis",
+     "Henrijs"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-28": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Dual Cognitive and Emotional Pathways Linking AI Awareness and Knowledge Sharing Intention: Evidence from Private Higher Education Institutions in China",
+   "container": "Economics &amp; Management Information",
+   "issued": [
+    [
+     2026,
+     6,
+     12
+    ]
+   ],
+   "authors": [
+    [
+     "Ge",
+     "Yunhong"
+    ],
+    [
+     "Chen",
+     "Pei"
+    ],
+    [
+     "Marimuthu",
+     "Anbalagan"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-29": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "How digital leadership and innovative climate interact to lessen AI-related job insecurity, AI use anxiety, technostress, and emotional exhaustion",
+   "container": "International Journal of Workplace Health Management",
+   "issued": [
+    [
+     2026,
+     2,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Huvanandana",
+     "Gorn"
+    ],
+    [
+     "Charoensukmongkol",
+     "Peerayuth"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-30": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Comfortable Helplessness: Proxy Control and the Making of Dormant Psychological Needs in AI-Delegated Work",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     8,
+     24
+    ]
+   ],
+   "authors": [
+    [
+     "Tsaban",
+     "Shay"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-31": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Faculty Burnout at the Intersection of Artificial Intelligence Adoption and Academic Integrity Measures: A Thematic Analysis in Higher Education",
+   "container": "NEW SOLUTIONS: A Journal of Environmental and Occupational Health Policy",
+   "issued": [
+    [
+     2026,
+     8,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Sifat",
+     "Ridwan Islam"
+    ],
+    [
+     "Jowarder",
+     "Mohaimenul Islam"
+    ],
+    [
+     "Jowarder",
+     "Rafiul Azim"
+    ],
+    [
+     "Habibullah",
+     "Fnu"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-32": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Psychological Consequences of Technology Integration in the Workplace : How do public sector workers in East Jerusalem perceive the influence of technology integration on their job burnout, innovation orientation and personal and professional developm",
+   "container": "Economic Sciences",
+   "issued": [
+    [
+     2025,
+     10,
+     21
+    ]
+   ],
+   "authors": [
+    [
+     "Nahla Salama",
+     ""
+    ]
+   ],
+   "relations": []
+  },
+  "S14-33": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Impact of AI- driven technostress on students’ mental health and psychological wellbeing: contextual insights",
+   "container": "Health Education",
+   "issued": [
+    [
+     2026,
+     5,
+     6
+    ]
+   ],
+   "authors": [
+    [
+     "Asad",
+     "Muhammad Mujtaba"
+    ],
+    [
+     "Erum",
+     "Darakhshan"
+    ],
+    [
+     "Nawab",
+     "Ali"
+    ],
+    [
+     "Almusharraf",
+     "Norah"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-34": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "How GenAI impacts technostress among secondary school English teachers",
+   "container": "Proceedings of the International CALL Research Conference",
+   "issued": [
+    [
+     2024,
+     9,
+     21
+    ]
+   ],
+   "authors": [
+    [
+     "Kohnke",
+     "Lucas"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-01": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Perceived fairness of algorithmic decision-making and university teachers’ job burnout: a moderated chain-mediation model",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     8,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Wang",
+     "Jiwei"
+    ],
+    [
+     "Li",
+     "Decheng"
+    ],
+    [
+     "Zhao",
+     "Xin"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-02": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Abusive supervision and AI adoption in Chinese higher education workplaces: Psychological mechanisms of resource disillusionment and organizational dynamics",
+   "container": "Acta Psychologica",
+   "issued": [
+    [
+     2026,
+     10
+    ]
+   ],
+   "authors": [
+    [
+     "Zheng",
+     "Rong"
+    ],
+    [
+     "Wang",
+     "Bin"
+    ],
+    [
+     "Wang",
+     "Xibing"
+    ],
+    [
+     "Zhang",
+     "Yinyu"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-03": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Change Fatigue and Attitudes Toward AI in County‐Level Nurses: The Mediating Role of AI Literacy",
+   "container": "Journal of Nursing Management",
+   "issued": [
+    [
+     2026,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Yu",
+     "Ming"
+    ],
+    [
+     "Zhou",
+     "Mengjia"
+    ],
+    [
+     "Yu",
+     "Rong"
+    ],
+    [
+     "Fan",
+     "Xiaoli"
+    ],
+    [
+     "Geng",
+     "Ronghui"
+    ],
+    [
+     "Ji",
+     "Jing"
+    ],
+    [
+     "Cai",
+     "Suping"
+    ],
+    [
+     "Jiang",
+     "Lili"
+    ],
+    [
+     "Jiang",
+     "Lingling"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-04": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The conditional indirect effect of perceived robot threat on employees’ proactive behavior: the moderating role of human–robot interaction",
+   "container": "BMC Psychology",
+   "issued": [
+    [
+     2026,
+     5,
+     11
+    ]
+   ],
+   "authors": [
+    [
+     "Cheng",
+     "Songsong"
+    ],
+    [
+     "Fan",
+     "Qunpeng"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-05": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Future of Work: Enhancing Human Resource Development Strategies for the Age of Automation and Digital Transformation",
+   "container": "",
+   "issued": [
+    [
+     2024,
+     10,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "Jubouri",
+     "Hassan Abed Ali Alwan"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-06": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI customer service and hidden triggers of burnout: Evidence from Malaysia’s e-commerce sector",
+   "container": "International Journal of Asian Social Science",
+   "issued": [
+    [
+     2026,
+     1,
+     14
+    ]
+   ],
+   "authors": [
+    [
+     "Hamedani",
+     "Sharareh Shahidi"
+    ],
+    [
+     "Ee",
+     "Tan Zhen"
+    ],
+    [
+     "Eranza",
+     "Dayang Khaleeda Binti Datu"
+    ],
+    [
+     "Earn",
+     "Tee Kit"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-07": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The anatomy of AI implementation skepticism in Polish healthcare: an explanatory mixed-methods analysis of psychographic barriers among healthcare professionals",
+   "container": "Frontiers in Public Health",
+   "issued": [
+    [
+     2026,
+     6,
+     15
+    ]
+   ],
+   "authors": [
+    [
+     "Garski",
+     "Jarosław"
+    ],
+    [
+     "Walkowiak",
+     "Dariusz"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-08": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Education, empowerment, and elevating nursing voices: Nursing informatics leaders’ perspectives on the path forward with artificial intelligence in nursing",
+   "container": "Nursing Outlook",
+   "issued": [
+    [
+     2025,
+     9
+    ]
+   ],
+   "authors": [
+    [
+     "Reading Turchioe",
+     "Meghan"
+    ],
+    [
+     "Pepingco",
+     "Christianna"
+    ],
+    [
+     "Ronquillo",
+     "Charlene"
+    ],
+    [
+     "Ferrara",
+     "Stephen A."
+    ],
+    [
+     "Topaz",
+     "Max"
+    ],
+    [
+     "Austin",
+     "Robin"
+    ],
+    [
+     "Lytle",
+     "Kay"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-09": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Physicians’ perceptions of how digital-intelligent medical technology reshapes job characteristics: a qualitative study",
+   "container": "BMC Health Services Research",
+   "issued": [
+    [
+     2025,
+     12,
+     20
+    ]
+   ],
+   "authors": [
+    [
+     "Yan",
+     "Hongli"
+    ],
+    [
+     "Liu",
+     "Zhen"
+    ],
+    [
+     "Shi",
+     "Zengping"
+    ],
+    [
+     "Jiang",
+     "Qinqin"
+    ],
+    [
+     "Shi",
+     "Lushaobo"
+    ],
+    [
+     "Ye",
+     "Yizhong"
+    ],
+    [
+     "Wang",
+     "Dong"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-10": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Understanding strategic leadership strategy related to artificial intelligence (AI) applications in supply chain pandemic logistics",
+   "container": "Brazilian Journal of Business",
+   "issued": [
+    [
+     2026,
+     1,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Burrell",
+     "Darrell Norman"
+    ],
+    [
+     "Nobles",
+     "Calvin"
+    ],
+    [
+     "Welch",
+     "Nevel"
+    ],
+    [
+     "Hart",
+     "Garrett"
+    ],
+    [
+     "Eke",
+     "Hilda"
+    ],
+    [
+     "Harris",
+     "Natasha"
+    ],
+    [
+     "Prunella",
+     "KerriLaine"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-11": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Exploring the Factors Influencing AI Integration in Clinical Diagnostic Decision-Making",
+   "container": "Health Nexus",
+   "issued": [
+    [
+     2025
+    ]
+   ],
+   "authors": [
+    [
+     "Saadati",
+     "Seyed Amir"
+    ],
+    [
+     "Ma",
+     "James"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-12": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "An Assessment of How Clinicians and Staff Members Use a Diabetes Artificial Intelligence Prediction Tool: Mixed Methods Study",
+   "container": "JMIR AI",
+   "issued": [
+    [
+     2023,
+     5,
+     29
+    ]
+   ],
+   "authors": [
+    [
+     "Liaw",
+     "Winston R"
+    ],
+    [
+     "Ramos Silva",
+     "Yessenia"
+    ],
+    [
+     "Soltero",
+     "Erica G"
+    ],
+    [
+     "Krist",
+     "Alex"
+    ],
+    [
+     "Stotts",
+     "Angela L"
+    ]
+   ],
+   "relations": [
+    [
+     "has-preprint",
+     "10.2196/preprints.45032"
+    ]
+   ]
+  },
+  "S13-13": {
+   "source": "crossref",
+   "type": "dissertation",
+   "title": "Can AI Save Us from Burnout? Exploring Developer and QA Engineer Well-being",
+   "container": "",
+   "issued": [
+    [
+     null
+    ]
+   ],
+   "authors": [
+    [
+     "",
+     ""
+    ],
+    [
+     "Lebanese American University -- Chouran Beirut",
+     ""
+    ],
+    [
+     "Hamzeh",
+     "Sara"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-14": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Teacher Motivation in AI-Integrated School Environments",
+   "container": "American Journal of Education and Technology",
+   "issued": [
+    [
+     2026,
+     3,
+     11
+    ]
+   ],
+   "authors": [
+    [
+     "Alasgarova",
+     "Rena"
+    ],
+    [
+     "Rzayev",
+     "Jeyhun"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-15": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Optimizing Employee Motivation in the Era of Artificial Intelligence: Evidence from MH Raroma, a Digital Creative Enterprise in Vietnam",
+   "container": "International Journal of Innovative Science and Research Technology",
+   "issued": [
+    [
+     2025,
+     10,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Thao",
+     "Nguyen Vu Hieu"
+    ],
+    [
+     "Mai",
+     "Luu Thi Thanh"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-18": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI Dependency and Brain Rot Among Nursing Students: A Mixed-Methods Study",
+   "container": "AJN, American Journal of Nursing",
+   "issued": [
+    [
+     2026,
+     8,
+     20
+    ]
+   ],
+   "authors": [
+    [
+     "Sağlam",
+     "Rukiye Kevser"
+    ],
+    [
+     "Kalanlar",
+     "Bilge"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-19": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Changing Cognitive Role of Product Managers in the Age of AI: Why Human Judgment Alone Is No Longer Sufficient",
+   "container": "American Journal of Data, Information and Knowledge Management",
+   "issued": [
+    [
+     2026,
+     2,
+     11
+    ]
+   ],
+   "authors": [
+    [
+     "Oladeji",
+     "Babalola"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-20": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Opportunities and Challenges of Using Artificial Intelligence for Grammar Assessment: A Case Study on the Perspectives of English Language Teachers in Ilam City",
+   "container": "Assessment and Practice in Educational Sciences",
+   "issued": [
+    [
+     2025
+    ]
+   ],
+   "authors": [
+    [
+     "Tajbakhsh",
+     "Tanin"
+    ],
+    [
+     "Khoshbakht",
+     "Tayyebeh"
+    ],
+    [
+     "Jamali",
+     "Ali"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-21": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Palestinian mothers’ mediation of generative AI in home learning practices a qualitative study",
+   "container": "Discover Artificial Intelligence",
+   "issued": [
+    [
+     2026,
+     6,
+     29
+    ]
+   ],
+   "authors": [
+    [
+     "Hamamra",
+     "Bilal"
+    ],
+    [
+     "Khlaif",
+     "Zuheir N."
+    ],
+    [
+     "Al-Asi",
+     "Aya"
+    ],
+    [
+     "Daraghmeh",
+     "Hiba"
+    ],
+    [
+     "Diak",
+     "Rania Abu"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-22": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Capabilities of Large Language Models for Reducing Learning Fatigue",
+   "container": "TEM Journal",
+   "issued": [
+    [
+     2026,
+     8,
+     27
+    ]
+   ],
+   "authors": [
+    [
+     "Atanasova",
+     "Galina"
+    ],
+    [
+     "Ilieva",
+     "Bagryana"
+    ]
+   ],
+   "relations": []
+  },
+  "S15-23": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Human Factors in AI-Driven Antimicrobial Stewardship: Clinician Decision-Making, Automation Bias, and Patient Safety Risks",
+   "container": "AHFE International",
+   "issued": [
+    [
+     2026
+    ]
+   ],
+   "authors": [
+    [
+     "Marzi",
+     "Mahdi"
+    ],
+    [
+     "Karacalı Tunç",
+     "Ayşe"
+    ],
+    [
+     "MARZİ",
+     "Şebnem"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-35": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Alleviating Nurse Burnout With an Artificial Intelligence–Selected Mobile Cognitive Behavioral Therapy–Based Intervention: Mixed Methods Randomized Controlled Trial",
+   "container": "JMIR mHealth and uHealth",
+   "issued": [
+    [
+     2026,
+     7,
+     3
+    ]
+   ],
+   "authors": [
+    [
+     "Kim",
+     "Yeongeun"
+    ],
+    [
+     "Cha",
+     "Chiyoung"
+    ],
+    [
+     "Baek",
+     "Gumhee"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-36": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "<scp>AI</scp>‐Assisted Tailored Intervention for Nurse Burnout: A Three‐Group Randomized Controlled Trial",
+   "container": "Worldviews on Evidence-Based Nursing",
+   "issued": [
+    [
+     2025,
+     2
+    ]
+   ],
+   "authors": [
+    [
+     "Baek",
+     "Gumhee"
+    ],
+    [
+     "Cha",
+     "Chiyoung"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-37": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Development of an Artificial Intelligence–Based Tailored Mobile Intervention for Nurse Burnout: Single-Arm Trial",
+   "container": "Journal of Medical Internet Research",
+   "issued": [
+    [
+     2024,
+     6,
+     21
+    ]
+   ],
+   "authors": [
+    [
+     "Cho",
+     "Aram"
+    ],
+    [
+     "Cha",
+     "Chiyoung"
+    ],
+    [
+     "Baek",
+     "Gumhee"
+    ]
+   ],
+   "relations": [
+    [
+     "has-preprint",
+     "10.2196/preprints.54029"
+    ]
+   ]
+  },
+  "S14-38": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Exploring AI-personalized visualization of the safe place in virtual reality versus imagination of the safe place for stress, burnout, and relaxation in psychotherapists: a case series",
+   "container": "Frontiers in Digital Health",
+   "issued": [
+    [
+     2025,
+     11,
+     20
+    ]
+   ],
+   "authors": [
+    [
+     "Wollweber",
+     "Viktoria"
+    ],
+    [
+     "Pfannerstill",
+     "Franziska"
+    ],
+    [
+     "Probst",
+     "Thomas"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-39": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Technostress of ChatGPT Usage: How Do Perceived AI Characteristics Affect User Discontinuous Usage Through AI Anxiety and User Negative Attitudes?",
+   "container": "International Journal of Human–Computer Interaction",
+   "issued": [
+    [
+     2024,
+     11,
+     22
+    ]
+   ],
+   "authors": [
+    [
+     "Zhang",
+     "Tingwan"
+    ],
+    [
+     "Tong",
+     "Qingyan"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-40": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "The Dark Side of Conversational AI: Chatgpt Frequency, Technostress, and WHO-5 Well-Being",
+   "container": "2026 17th International Conference on E-Education, E-Business, E-Management and E-Learning (IC4e)",
+   "issued": [
+    [
+     2026,
+     4
+    ]
+   ],
+   "authors": [
+    [
+     "Alhosani",
+     "Sara"
+    ],
+    [
+     "Alyafei",
+     "Reem Ahmed Saleh Mohamed"
+    ],
+    [
+     "Al-kfairy",
+     "Mousa"
+    ],
+    [
+     "Alfandi",
+     "Omar"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-41": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Balancing AI Engagement: How AI Experience and Satisfaction Reduce Technostress among Indonesian Employees",
+   "container": "2025 5th International Conference on Innovative Research in Applied Science, Engineering and Technology (IRASET)",
+   "issued": [
+    [
+     2025,
+     5,
+     15
+    ]
+   ],
+   "authors": [
+    [
+     "Emmanuel",
+     "Marvine Aldrich"
+    ],
+    [
+     "Sandi",
+     "Ryan"
+    ],
+    [
+     "Herlina",
+     "Maria Grace"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-42": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Dual Impact of AI on Burnout and Technostress in Manufacturing Workplaces",
+   "container": "European Conference on Innovation and Entrepreneurship",
+   "issued": [
+    [
+     2025,
+     9,
+     19
+    ]
+   ],
+   "authors": [
+    [
+     "Figueroa",
+     "Alonso"
+    ],
+    [
+     "Garcia",
+     "Angello"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-43": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "How AI literacy decreases job burnout among employees in new forms of employment in China? the roles of STARA awareness and organizational AI adoption",
+   "container": "Current Psychology",
+   "issued": [
+    [
+     2026,
+     5
+    ]
+   ],
+   "authors": [
+    [
+     "Fu",
+     "Zhaoyu"
+    ],
+    [
+     "Liang",
+     "Xinyu"
+    ],
+    [
+     "Xie",
+     "Xiaochun"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-44": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Burnout Akademik di Era Digital dan Persepsi Mahasiswa terhadap Peluang Pemanfaatan Artificial Intelligence untuk Deteksi Dini",
+   "container": "Jurnal Sains dan Teknologi (JSIT)",
+   "issued": [
+    [
+     2025,
+     11,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Wafiq",
+     "Ainun"
+    ],
+    [
+     "Syawal",
+     "Ahmad"
+    ],
+    [
+     ".",
+     "Ikrar"
+    ],
+    [
+     "Ahmad",
+     "Zainal Arifin"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-16": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "A Multi-Model XAI Framework for Identifying Burnout and Mental Health Triggers in Technology-Driven Workspaces",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     4,
+     28
+    ]
+   ],
+   "authors": [
+    [
+     "Makhijani",
+     "Jagdish"
+    ],
+    [
+     "Pathak",
+     "Yashawant"
+    ],
+    [
+     "Sharma",
+     "Yograj"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-17": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "A machine learning approach to behavioral signals of burnout in audit and control professions",
+   "container": "Frontiers in Psychology",
+   "issued": [
+    [
+     2026,
+     8,
+     27
+    ]
+   ],
+   "authors": [
+    [
+     "Atılgan Sarıdoğan",
+     "Ayşe"
+    ],
+    [
+     "Erkal",
+     "Zekeriya Emre"
+    ],
+    [
+     "Küçükgergerli",
+     "Nabi"
+    ],
+    [
+     "Ertürk",
+     "Muzaffer"
+    ],
+    [
+     "Emeç",
+     "Murat"
+    ],
+    [
+     "Yaman",
+     "Adem"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-18": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "A Centralized Approach to Reducing Burnouts in the IT industry Using Work Pattern Monitoring Using Artificial Intelligence (Vector Search, Semantic Search, Python, Large Language Models, Mongo DB Atlas)",
+   "container": "",
+   "issued": [
+    [
+     2024,
+     7,
+     16
+    ]
+   ],
+   "authors": [
+    [
+     "Chanthati",
+     "Sasibhushan Rao"
+    ]
+   ],
+   "relations": []
+  },
+  "S13-19": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Investigating School Principals' Burnout: A Cross-Cultural Perspective on Stress, Sustainability, and Organizational Climate",
+   "container": "",
+   "issued": [
+    [
+     2024,
+     7,
+     29
+    ]
+   ],
+   "authors": [
+    [
+     "Sibisanu",
+     "Remus"
+    ],
+    [
+     "Cseminschi",
+     "Stanislav"
+    ],
+    [
+     "Ionica",
+     "Andreea"
+    ],
+    [
+     "Leba",
+     "Monica"
+    ],
+    [
+     "Draghici",
+     "Anca"
+    ],
+    [
+     "Nassar",
+     "Yunis"
+    ]
+   ],
+   "relations": [
+    [
+     "is-preprint-of",
+     "10.3390/su16167016"
+    ]
+   ]
+  },
+  "S13-20": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Digital Transformation Fatigue in Organizations: A Management Viewpoint on Initiative Overload, Employee Resistance, and Declining Strategic Focus",
+   "container": "Journal of Digital Business and Management Studies",
+   "issued": [
+    [
+     2024
+    ]
+   ],
+   "authors": [
+    [
+     "Takeda",
+     "Mina"
+    ],
+    [
+     "Suzuki",
+     "Haruto"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-39": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Effectiveness of a chatbot in improving the mental wellbeing of health workers in Malawi during the COVID-19 pandemic: A randomized, controlled trial",
+   "container": "PLOS ONE",
+   "issued": [
+    [
+     2024,
+     5,
+     28
+    ]
+   ],
+   "authors": [
+    [
+     "Kleinau",
+     "Eckhard"
+    ],
+    [
+     "Lamba",
+     "Tilinao"
+    ],
+    [
+     "Jaskiewicz",
+     "Wanda"
+    ],
+    [
+     "Gorentz",
+     "Katy"
+    ],
+    [
+     "Hungerbuehler",
+     "Ines"
+    ],
+    [
+     "Rahimi",
+     "Donya"
+    ],
+    [
+     "Kokota",
+     "Demoubly"
+    ],
+    [
+     "Maliwichi",
+     "Limbika"
+    ],
+    [
+     "Jamu",
+     "Edister"
+    ],
+    [
+     "Zumazuma",
+     "Alex"
+    ],
+    [
+     "Negrão",
+     "Mariana"
+    ],
+    [
+     "Mota",
+     "Raphael"
+    ],
+    [
+     "Khouri",
+     "Yasmine"
+    ],
+    [
+     "Kapps",
+     "Michael"
+    ]
+   ],
+   "relations": []
+  },
+  "S04-40": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Development and Effects of a Generative AI-Assisted Mindful Self-Compassion Program for Professional School Counselors",
+   "container": "The Institute of Educational Research Chonnam National University",
+   "issued": [
+    [
+     2026,
+     7,
+     31
+    ]
+   ],
+   "authors": [
+    [
+     "The Institute of Educational research Chonnam National University",
+     ""
+    ],
+    [
+     "Lee",
+     "Jihye"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-51": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "AI Awareness as a Workplace Stressor Examining Emotional Exhaustion Through Job Insecurity and Work Family Interference",
+   "container": "",
+   "issued": [
+    [
+     2026,
+     4,
+     29
+    ]
+   ],
+   "authors": [
+    [
+     "Balthazaar",
+     "Diyani"
+    ],
+    [
+     "Wibowo",
+     "Radna Andi"
+    ]
+   ],
+   "relations": []
+  },
+  "S14-52": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "AI Awareness as a Workplace Stressor: Examining Emotional Exhaustion Through Job Insecurity and Work–Family Interference",
+   "container": "SBS Journal of Applied Business Research",
+   "issued": [
+    [
+     2026,
+     8,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Balthazaar",
+     "Diyani"
+    ],
+    [
+     "Andi Wibowo",
+     "Radna"
+    ]
+   ],
+   "relations": []
+  },
+  "S08-01": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "The Cognitive Costs of AI: Burnout and Executive Functioning in Higher Education",
+   "container": "Mind and Society",
+   "issued": [
+    [
+     2025,
+     10,
+     15
+    ]
+   ],
+   "authors": [
+    [
+     "Sharma",
+     "Manya"
+    ],
+    [
+     "Singh",
+     "Seema"
+    ]
+   ],
+   "relations": []
+  },
+  "S08-02": {
+   "source": "datacite",
+   "type": "Preprint",
+   "title": "RecalibrateGPT: AI Fatigue Resilient Conversational Interfaces",
+   "container": "arXiv",
+   "issued": 2026,
+   "authors": [
+    [
+     "Wani",
+     "Nikhil"
+    ]
+   ],
+   "relations": [
+    [
+     "isversionof",
+     "10.1145/3830397.3841834"
+    ]
+   ]
+  },
+  "S08-03": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Anti-Design Approach in Countering AI Fatigue",
+   "container": "International Design Journal",
+   "issued": [
+    [
+     2026,
+     11,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Abdo",
+     "Alla Abdo"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-10": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Effects of Introducing Generative AI in Rehabilitation Clinical Documentation",
+   "container": "Cureus",
+   "issued": [
+    [
+     2025,
+     3,
+     27
+    ]
+   ],
+   "authors": [
+    [
+     "Omon",
+     "Kyohei"
+    ],
+    [
+     "Sasaki",
+     "Tomohiko"
+    ],
+    [
+     "Koshiro",
+     "Ryota"
+    ],
+    [
+     "Fuchigami",
+     "Takeshi"
+    ],
+    [
+     "Hamashima",
+     "Masahiro"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-11": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Emotional analysis of operating room nurses in acute care hospitals in Japan: insights using ChatGPT",
+   "container": "BMC Nursing",
+   "issued": [
+    [
+     2025,
+     1,
+     9
+    ]
+   ],
+   "authors": [
+    [
+     "Hara",
+     "Kentaro"
+    ],
+    [
+     "Tachibana",
+     "Reika"
+    ],
+    [
+     "Kumashiro",
+     "Ryosuke"
+    ],
+    [
+     "Ichihara",
+     "Kodai"
+    ],
+    [
+     "Uemura",
+     "Takahiro"
+    ],
+    [
+     "Maeda",
+     "Hiroshi"
+    ],
+    [
+     "Yamaguchi",
+     "Michiko"
+    ],
+    [
+     "Inoue",
+     "Takahiro"
+    ]
+   ],
+   "relations": [
+    [
+     "has-preprint",
+     "10.21203/rs.3.rs-4505331/v1"
+    ]
+   ]
+  },
+  "S12-12": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Sentiment Analysis of Operating Room Nurses in Acute Care Hospitals in Japan: Unveiling Passion for Perioperative Nursing Using ChatGPT",
+   "container": "",
+   "issued": [
+    [
+     2024,
+     6,
+     28
+    ]
+   ],
+   "authors": [
+    [
+     "Hara",
+     "Kentaro"
+    ],
+    [
+     "Tachibana",
+     "Reika"
+    ],
+    [
+     "Kumashiro",
+     "Ryosuke"
+    ],
+    [
+     "Ichihara",
+     "Kodai"
+    ],
+    [
+     "Uemura",
+     "Takahiro"
+    ],
+    [
+     "Maeda",
+     "Hiroshi"
+    ],
+    [
+     "Yamaguchi",
+     "Michiko"
+    ],
+    [
+     "Inoue",
+     "Takahiro"
+    ]
+   ],
+   "relations": [
+    [
+     "is-preprint-of",
+     "10.1186/s12912-024-02655-9"
+    ]
+   ]
+  },
+  "S12-13": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "A Participatory Artificial Intelligence Driven Shift‐Scheduling Application for Improving Sleep Among Shift‐Working Caregivers: A 4‐Month Non‐Randomised Controlled Study With Cross‐Over Design",
+   "container": "Journal of Sleep Research",
+   "issued": [
+    [
+     2025,
+     7,
+     17
+    ]
+   ],
+   "authors": [
+    [
+     "Kubo",
+     "Tomohide"
+    ],
+    [
+     "Matsumoto",
+     "Shun"
+    ],
+    [
+     "Nishimura",
+     "Yuki"
+    ],
+    [
+     "Ikeda",
+     "Hiroki"
+    ],
+    [
+     "Izawa",
+     "Shuhei"
+    ],
+    [
+     "Sato",
+     "Fumihiko"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-14": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Context-Aware Alerting in Elderly Care Facilities: A Hybrid Framework Integrating LLM Reasoning with Rule-Based Logic",
+   "container": "Sensors",
+   "issued": [
+    [
+     2025,
+     10,
+     24
+    ]
+   ],
+   "authors": [
+    [
+     "Nahid",
+     "Nazmun"
+    ],
+    [
+     "Ahad",
+     "Md Atiqur Rahman"
+    ],
+    [
+     "Inoue",
+     "Sozo"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-15": {
+   "source": "crossref",
+   "type": "proceedings-article",
+   "title": "Human Reliability Analysis for Repetitive Tasks Using the Phoenix Methodology: Approach, Results, and Possible Extensions to Human-AI Teaming",
+   "container": "2026 Annual Reliability and Maintainability Symposium (RAMS)",
+   "issued": [
+    [
+     2026,
+     1,
+     26
+    ]
+   ],
+   "authors": [
+    [
+     "Stewart",
+     "Theresa M."
+    ],
+    [
+     "Mosleh",
+     "Ali"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-16": {
+   "source": "crossref",
+   "type": "posted-content",
+   "title": "Exploring the impact of an artificial intelligence-based intraoperative image navigation system in laparoscopic surgery on clinical outcomes: A protocol for a multicenter randomized controlled trial",
+   "container": "",
+   "issued": [
+    [
+     2024,
+     8,
+     5
+    ]
+   ],
+   "authors": [
+    [
+     "Kitaguchi",
+     "Daichi"
+    ],
+    [
+     "Fuse",
+     "Nozomu"
+    ],
+    [
+     "Wakabayashi",
+     "Masashi"
+    ],
+    [
+     "Kosugi",
+     "Norihito"
+    ],
+    [
+     "Ishikawa",
+     "Yuto"
+    ],
+    [
+     "Hayashi",
+     "Kazuyuki"
+    ],
+    [
+     "Hasegawa",
+     "Hiro"
+    ],
+    [
+     "Takeshita",
+     "Nobuyoshi"
+    ],
+    [
+     "Ito",
+     "Masaaki"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-17": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Few-Shot Optimization for Sensor Data Using Large Language Models: A Case Study on Fatigue Detection",
+   "container": "Sensors",
+   "issued": [
+    [
+     2025,
+     5,
+     25
+    ]
+   ],
+   "authors": [
+    [
+     "Ronando",
+     "Elsen"
+    ],
+    [
+     "Inoue",
+     "Sozo"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-18": null,
+  "S12-19": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Design and rationale of an intelligent algorithm to detect BuRnoUt in HeaLthcare workers in COVID era using ECG and artificiaL intelligence: The BRUCEE-LI study",
+   "container": "Indian Heart Journal",
+   "issued": [
+    [
+     2021,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Gupta",
+     "Mohit D."
+    ],
+    [
+     "Bansal",
+     "Ankit"
+    ],
+    [
+     "Sarkar",
+     "Prattay G."
+    ],
+    [
+     "Girish",
+     "M.P."
+    ],
+    [
+     "Jha",
+     "Manish"
+    ],
+    [
+     "Yusuf",
+     "Jamal"
+    ],
+    [
+     "Kumar",
+     "Suresh"
+    ],
+    [
+     "Kumar",
+     "Satish"
+    ],
+    [
+     "Jain",
+     "Ajeet"
+    ],
+    [
+     "Kathuria",
+     "Sanjeev"
+    ],
+    [
+     "Saijpaul",
+     "Rajni"
+    ],
+    [
+     "Mishra",
+     "Anurag"
+    ],
+    [
+     "Malhotra",
+     "Vikas"
+    ],
+    [
+     "Yadav",
+     "Rakesh"
+    ],
+    [
+     "Ramakrishanan",
+     "S."
+    ],
+    [
+     "Malhotra",
+     "Rajeev K."
+    ],
+    [
+     "Batra",
+     "Vishal"
+    ],
+    [
+     "Shetty",
+     "Manu Kumar"
+    ],
+    [
+     "Sharma",
+     "Nandini"
+    ],
+    [
+     "Mukhopadhyay",
+     "Saibal"
+    ],
+    [
+     "Garg",
+     "Sandeep"
+    ],
+    [
+     "Gupta",
+     "Anubha"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-20": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Inferring Emotion Words in Occupational Fatalities Using a Large Language Model",
+   "container": "International Symposium on Affective Science and Engineering",
+   "issued": [
+    [
+     2026
+    ]
+   ],
+   "authors": [
+    [
+     "SATO",
+     "Masaru"
+    ]
+   ],
+   "relations": []
+  },
+  "S12-21": null,
+  "S12-22": null,
+  "S12-25": {
+   "source": "crossref",
+   "type": "journal-article",
+   "title": "Computer Audition for Fighting the SARS-CoV-2 Corona Crisis—Introducing the Multitask Speech Corpus for COVID-19",
+   "container": "IEEE Internet of Things Journal",
+   "issued": [
+    [
+     2021,
+     11,
+     1
+    ]
+   ],
+   "authors": [
+    [
+     "Qian",
+     "Kun"
+    ],
+    [
+     "Schmitt",
+     "Maximilian"
+    ],
+    [
+     "Zheng",
+     "Huaiyuan"
+    ],
+    [
+     "Koike",
+     "Tomoya"
+    ],
+    [
+     "Han",
+     "Jing"
+    ],
+    [
+     "Liu",
+     "Juan"
+    ],
+    [
+     "Ji",
+     "Wei"
+    ],
+    [
+     "Duan",
+     "Junjun"
+    ],
+    [
+     "Song",
+     "Meishu"
+    ],
+    [
+     "Yang",
+     "Zijiang"
+    ],
+    [
+     "Ren",
+     "Zhao"
+    ],
+    [
+     "Liu",
+     "Shuo"
+    ],
+    [
+     "Zhang",
+     "Zixing"
+    ],
+    [
+     "Yamamoto",
+     "Yoshiharu"
+    ],
+    [
+     "Schuller",
+     "Bjorn W."
+    ]
+   ],
+   "relations": []
+  }
+ }
+}

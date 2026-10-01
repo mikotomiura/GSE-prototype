@@ -1,0 +1,5271 @@
+{
+ "executed": "2026-10-01T02:07:24+09:00",
+ "records": {
+  "10.1017/s0140525x12003196": {
+   "DOI": "10.1017/s0140525x12003196",
+   "type": "journal-article",
+   "title": [
+    "An opportunity cost model of subjective effort and task performance"
+   ],
+   "container-title": [
+    "Behavioral and Brain Sciences"
+   ],
+   "volume": "36",
+   "issue": "6",
+   "page": "661-679",
+   "author": [
+    {
+     "given": "Robert",
+     "family": "Kurzban",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Angela",
+     "family": "Duckworth",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Joseph W.",
+     "family": "Kable",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Justus",
+     "family": "Myers",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2013,
+      12
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2013,
+      12,
+      4
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2013,
+      12
+     ]
+    ]
+   },
+   "publisher": "Cambridge University Press (CUP)",
+   "relation": {}
+  },
+  "10.1037/rev0000309": {
+   "DOI": "10.1037/rev0000309",
+   "type": "journal-article",
+   "title": [
+    "The temporal dynamics of opportunity costs: A normative account of cognitive fatigue and boredom."
+   ],
+   "container-title": [
+    "Psychological Review"
+   ],
+   "volume": "129",
+   "issue": "3",
+   "page": "564-585",
+   "author": [
+    {
+     "ORCID": "https://orcid.org/0000-0003-3541-1427",
+     "authenticated-orcid": false,
+     "given": "Mayank",
+     "family": "Agrawal",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0003-3303-2490",
+     "authenticated-orcid": false,
+     "given": "Marcelo G.",
+     "family": "Mattar",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jonathan D.",
+     "family": "Cohen",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0001-5029-1430",
+     "authenticated-orcid": false,
+     "given": "Nathaniel D.",
+     "family": "Daw",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-online": {
+    "date-parts": [
+     [
+      2022,
+      4
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2022,
+      4
+     ]
+    ]
+   },
+   "publisher": "American Psychological Association (APA)",
+   "relation": {
+    "has-preprint": [
+     {
+      "id-type": "doi",
+      "id": "10.1101/2020.09.08.287276",
+      "asserted-by": "object"
+     }
+    ]
+   }
+  },
+  "10.1016/s0301-0511(96)05223-4": {
+   "DOI": "10.1016/s0301-0511(96)05223-4",
+   "type": "journal-article",
+   "title": [
+    "Compensatory control in the regulation of human performance under stress and high workload: A cognitive-energetical framework"
+   ],
+   "container-title": [
+    "Biological Psychology"
+   ],
+   "volume": "45",
+   "issue": "1-3",
+   "page": "73-93",
+   "author": [
+    {
+     "given": "G.",
+     "family": "Robert J. Hockey",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      1997,
+      3
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      1997,
+      3
+     ]
+    ]
+   },
+   "publisher": "Elsevier BV",
+   "relation": {}
+  },
+  "10.1037/0022-3514.74.5.1252": {
+   "DOI": "10.1037/0022-3514.74.5.1252",
+   "type": "journal-article",
+   "title": [
+    "Ego depletion: Is the active self a limited resource?"
+   ],
+   "container-title": [
+    "Journal of Personality and Social Psychology"
+   ],
+   "volume": "74",
+   "issue": "5",
+   "page": "1252-1265",
+   "author": [
+    {
+     "given": "Roy F.",
+     "family": "Baumeister",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Ellen",
+     "family": "Bratslavsky",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Mark",
+     "family": "Muraven",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Dianne M.",
+     "family": "Tice",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-online": {
+    "date-parts": [
+     [
+      1998
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      1998
+     ]
+    ]
+   },
+   "publisher": "American Psychological Association (APA)",
+   "relation": {}
+  },
+  "10.1177/1745691616652873": {
+   "DOI": "10.1177/1745691616652873",
+   "type": "journal-article",
+   "title": [
+    "A Multilab Preregistered Replication of the Ego-Depletion Effect"
+   ],
+   "container-title": [
+    "Perspectives on Psychological Science"
+   ],
+   "volume": "11",
+   "issue": "4",
+   "page": "546-573",
+   "author": [
+    {
+     "given": "M. S.",
+     "family": "Hagger",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "N. L. D.",
+     "family": "Chatzisarantis",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "H.",
+     "family": "Alberts",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "C. O.",
+     "family": "Anggono",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "C.",
+     "family": "Batailler",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "A. R.",
+     "family": "Birt",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "R.",
+     "family": "Brand",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M. J.",
+     "family": "Brandt",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "G.",
+     "family": "Brewer",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "S.",
+     "family": "Bruyneel",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "D. P.",
+     "family": "Calvillo",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "W. K.",
+     "family": "Campbell",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "P. R.",
+     "family": "Cannon",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M.",
+     "family": "Carlucci",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "N. P.",
+     "family": "Carruth",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "T.",
+     "family": "Cheung",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "A.",
+     "family": "Crowell",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "D. T. D.",
+     "family": "De Ridder",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "S.",
+     "family": "Dewitte",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M.",
+     "family": "Elson",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "J. R.",
+     "family": "Evans",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "B. A.",
+     "family": "Fay",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "B. M.",
+     "family": "Fennis",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "A.",
+     "family": "Finley",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Z.",
+     "family": "Francis",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "E.",
+     "family": "Heise",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "H.",
+     "family": "Hoemann",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M.",
+     "family": "Inzlicht",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "S. L.",
+     "family": "Koole",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "L.",
+     "family": "Koppel",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "F.",
+     "family": "Kroese",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "F.",
+     "family": "Lange",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "K.",
+     "family": "Lau",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "B. P.",
+     "family": "Lynch",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "C.",
+     "family": "Martijn",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "H.",
+     "family": "Merckelbach",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "N. V.",
+     "family": "Mills",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "A.",
+     "family": "Michirev",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "A.",
+     "family": "Miyake",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "A. E.",
+     "family": "Mosser",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M.",
+     "family": "Muise",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "D.",
+     "family": "Muller",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M.",
+     "family": "Muzi",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "D.",
+     "family": "Nalis",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "R.",
+     "family": "Nurwanti",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "H.",
+     "family": "Otgaar",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M. C.",
+     "family": "Philipp",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "P.",
+     "family": "Primoceri",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "K.",
+     "family": "Rentzsch",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "L.",
+     "family": "Ringos",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "C.",
+     "family": "Schlinkert",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "B. J.",
+     "family": "Schmeichel",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "S. F.",
+     "family": "Schoch",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M.",
+     "family": "Schrama",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "A.",
+     "family": "Schütz",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "A.",
+     "family": "Stamos",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "G.",
+     "family": "Tinghög",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "J.",
+     "family": "Ullrich",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M.",
+     "family": "vanDellen",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "S.",
+     "family": "Wimbarti",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "W.",
+     "family": "Wolff",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "C.",
+     "family": "Yusainy",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "O.",
+     "family": "Zerhouni",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "M.",
+     "family": "Zwienenberg",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2016,
+      7
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2016,
+      7,
+      29
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2016,
+      7
+     ]
+    ]
+   },
+   "publisher": "SAGE Publications",
+   "relation": {}
+  },
+  "10.1037/xge0000083": {
+   "DOI": "10.1037/xge0000083",
+   "type": "journal-article",
+   "title": [
+    "A series of meta-analytic tests of the depletion effect: Self-control does not seem to rely on a limited resource."
+   ],
+   "container-title": [
+    "Journal of Experimental Psychology: General"
+   ],
+   "volume": "144",
+   "issue": "4",
+   "page": "796-815",
+   "author": [
+    {
+     "given": "Evan C.",
+     "family": "Carter",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Lilly M.",
+     "family": "Kofler",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Daniel E.",
+     "family": "Forster",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Michael E.",
+     "family": "McCullough",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-online": {
+    "date-parts": [
+     [
+      2015,
+      8
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2015,
+      8
+     ]
+    ]
+   },
+   "publisher": "American Psychological Association (APA)",
+   "relation": {}
+  },
+  "10.1177/0956797621989733": {
+   "DOI": "10.1177/0956797621989733",
+   "type": "journal-article",
+   "title": [
+    "A Multisite Preregistered Paradigmatic Test of the Ego-Depletion Effect"
+   ],
+   "container-title": [
+    "Psychological Science"
+   ],
+   "volume": "32",
+   "issue": "10",
+   "page": "1566-1581",
+   "author": [
+    {
+     "ORCID": "https://orcid.org/0000-0001-5858-2603",
+     "authenticated-orcid": false,
+     "given": "Kathleen D.",
+     "family": "Vohs",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "Department of Marketing, Carlson School of Management, University of Minnesota"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Brandon J.",
+     "family": "Schmeichel",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological and Brain Sciences, Texas A&M University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0001-9852-7684",
+     "authenticated-orcid": false,
+     "given": "Sophie",
+     "family": "Lohmann",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Max Planck Institute for Demographic Research, Rostock, Germany"
+      },
+      {
+       "name": "Department of Psychology, University of Illinois at Urbana-Champaign"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0001-5510-6943",
+     "authenticated-orcid": false,
+     "given": "Quentin F.",
+     "family": "Gronau",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Social and Behavioural Sciences, University of Amsterdam"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Anna J.",
+     "family": "Finley",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Center for Healthy Minds, University of Wisconsin-Madison"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Sarah E.",
+     "family": "Ainsworth",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Behavioral Sciences Department, Tallahassee Community College"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jessica L.",
+     "family": "Alquist",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological Sciences, Texas Tech University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Michael D.",
+     "family": "Baker",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, East Carolina University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Ambra",
+     "family": "Brizi",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Sapienza University of Rome"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Angelica",
+     "family": "Bunyi",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of North Florida"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Grant J.",
+     "family": "Butschek",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Georgia"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Collier",
+     "family": "Campbell",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological Sciences, Texas Tech University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jonathan",
+     "family": "Capaldi",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Carleton University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Chuting",
+     "family": "Cau",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Toronto"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Heather",
+     "family": "Chambers",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological and Brain Sciences, Texas A&M University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Nikos L. D.",
+     "family": "Chatzisarantis",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "School of Psychology, Curtin University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Weston J.",
+     "family": "Christensen",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Brigham Young University-Idaho"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Samuel L.",
+     "family": "Clay",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Brigham Young University-Idaho"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jessica",
+     "family": "Curtis",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology & Counseling, Arkansas State University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Valeria",
+     "family": "De Cristofaro",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Sapienza University of Rome"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Kareena",
+     "family": "del Rosario",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, New York University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Katharina",
+     "family": "Diel",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Faculty of Psychology, Ruhr University Bochum"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Yasemin",
+     "family": "Doğruol",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Northwestern University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Megan",
+     "family": "Doi",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Marketing, Carlson School of Management, University of Minnesota"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Tina L.",
+     "family": "Donaldson",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University at Albany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Andreas B.",
+     "family": "Eder",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Würzburg"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Mia",
+     "family": "Ersoff",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Florida State University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Julie R.",
+     "family": "Eyink",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological and Brain Sciences, Indiana University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Angelica",
+     "family": "Falkenstein",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of California, Riverside"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Bob M.",
+     "family": "Fennis",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Marketing, University of Groningen"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Matthew B.",
+     "family": "Findley",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Austin College"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Eli J.",
+     "family": "Finkel",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Northwestern University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Victoria",
+     "family": "Forgea",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Georgia Southern University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Malte",
+     "family": "Friese",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Saarland University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Paul",
+     "family": "Fuglestad",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of North Florida"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Natasha E.",
+     "family": "Garcia-Willingham",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Kentucky"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Lea F.",
+     "family": "Geraedts",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Würzburg"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Will M.",
+     "family": "Gervais",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Centre for Culture and Evolution, Psychology, Brunel University London"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Mauro",
+     "family": "Giacomantonio",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Sapienza University of Rome"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Bryan",
+     "family": "Gibson",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Central Michigan University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Karolin",
+     "family": "Gieseler",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Saarland University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Justina",
+     "family": "Gineikiene",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Marketing, ISM University of Management and Economics"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Elana M.",
+     "family": "Gloger",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Kentucky"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Carina M.",
+     "family": "Gobes",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Florida State University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Maria",
+     "family": "Grande",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Cologne"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Martin S.",
+     "family": "Hagger",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychological Sciences, University of California, Merced"
+      },
+      {
+       "name": "Faculty of Sport and Health Sciences, University of Jyväskylä"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Bethany",
+     "family": "Hartsell",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of North Florida"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Anthony D.",
+     "family": "Hermann",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Bradley University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jasper J.",
+     "family": "Hidding",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Marketing, University of Groningen"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Edward R.",
+     "family": "Hirt",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological and Brain Sciences, Indiana University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Josh",
+     "family": "Hodge",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "School of Psychological Sciences, University of Melbourne"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Wilhelm",
+     "family": "Hofmann",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Faculty of Psychology, Ruhr University Bochum"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jennifer L.",
+     "family": "Howell",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychological Sciences, University of California, Merced"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Robert D.",
+     "family": "Hutton",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Bradley University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Michael",
+     "family": "Inzlicht",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Toronto"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Lily",
+     "family": "James",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "London College of Fashion, University of the Arts London"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Emily",
+     "family": "Johnson",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology & Counseling, Arkansas State University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Hannah L.",
+     "family": "Johnson",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Brigham Young University-Idaho"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Sarah M.",
+     "family": "Joyce",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Florida State University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Yannick",
+     "family": "Joye",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Management, ISM University of Management and Economics"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jan Helge",
+     "family": "Kaben",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Saarland University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Lara K.",
+     "family": "Kammrath",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Wake Forest University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Caitlin N.",
+     "family": "Kelly",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Florida State University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Brian L.",
+     "family": "Kissell",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Central Michigan University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Sander L.",
+     "family": "Koole",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Clinical Psychology, Vrije Universiteit Amsterdam"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Anand",
+     "family": "Krishna",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Würzburg"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Christine",
+     "family": "Lam",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of California, Riverside"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Kelemen T.",
+     "family": "Lee",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Bradley University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Nick",
+     "family": "Lee",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "School of Psychology, Curtin University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Dana C.",
+     "family": "Leighton",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "College of Arts, Sciences, and Education, Texas A&M University, Texarkana"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "David D.",
+     "family": "Loschelder",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Institute of Psychology, Leuphana University Lüneburg"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Heather M.",
+     "family": "Maranges",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Florida State University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "E. J.",
+     "family": "Masicampo",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Wake Forest University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "suffix": "Jr.",
+     "given": "Kennedy",
+     "family": "Mazara",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Austin College"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Samantha",
+     "family": "McCarthy",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University at Albany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Ian",
+     "family": "McGregor",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Waterloo"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Nicole L.",
+     "family": "Mead",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Schulich School of Business, York University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Wendy B.",
+     "family": "Mendes",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychiatry and Behavioral Sciences, University of California, San Francisco"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Carine",
+     "family": "Meslot",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "School of Psychology, Curtin University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Nicholas M.",
+     "family": "Michalak",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Michigan"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Marina",
+     "family": "Milyavskaya",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Carleton University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Akira",
+     "family": "Miyake",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology and Neuroscience, University of Colorado Boulder"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Mehrad",
+     "family": "Moeini-Jazani",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Marketing, University of Groningen"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Mark",
+     "family": "Muraven",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University at Albany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Erin",
+     "family": "Nakahara",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychiatry and Behavioral Sciences, University of California, San Francisco"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Krishna",
+     "family": "Patel",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Toronto"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "John V.",
+     "family": "Petrocelli",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Wake Forest University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Katja M.",
+     "family": "Pollak",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Institute of Psychology, Leuphana University Lüneburg"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Mindi M.",
+     "family": "Price",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological Sciences, Texas Tech University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Haley J.",
+     "family": "Ramsey",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Western Kentucky University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Maximilian",
+     "family": "Rath",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Institute of Psychology, Leuphana University Lüneburg"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jacob A.",
+     "family": "Robertson",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology and Neuroscience, University of Colorado Boulder"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Rachael",
+     "family": "Rockwell",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Ohio University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Isabella F.",
+     "family": "Russ",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Würzburg"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Marco",
+     "family": "Salvati",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Sapienza University of Rome"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Blair",
+     "family": "Saunders",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "School of Social Sciences, University of Dundee"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Anne",
+     "family": "Scherer",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Wake Forest University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Astrid",
+     "family": "Schütz",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Bamberg"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Kristin N.",
+     "family": "Schmitt",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology and Neuroscience, University of Colorado Boulder"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Suzanne C.",
+     "family": "Segerstrom",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Kentucky"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Benjamin",
+     "family": "Serenka",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University at Albany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Konstantyn",
+     "family": "Sharpinskyi",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Waterloo"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Meaghan",
+     "family": "Shaw",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Carleton University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Janelle",
+     "family": "Sherman",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological and Brain Sciences, Indiana University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Yu",
+     "family": "Song",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Wake Forest University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Nicholas",
+     "family": "Sosa",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Ohio University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Kaitlyn",
+     "family": "Spillane",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of California, Riverside"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Julia",
+     "family": "Stapels",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Cologne"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Alec J.",
+     "family": "Stinnett",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological Sciences, Texas Tech University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Hannah R.",
+     "family": "Strawser",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological and Brain Sciences, Texas A&M University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Kate",
+     "family": "Sweeny",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of California, Riverside"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Dominic",
+     "family": "Theodore",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Psychology Department, Ohio University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Karine",
+     "family": "Tonnu",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychological Sciences, Texas Tech University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Yasmijn",
+     "family": "van Oldenbeuving",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Clinical Psychology, Vrije Universiteit Amsterdam"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Michelle R.",
+     "family": "vanDellen",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Georgia"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Raiza C.",
+     "family": "Vergara",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Florida State University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jasmine S.",
+     "family": "Walker",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, East Carolina University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Christian E.",
+     "family": "Waugh",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Wake Forest University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Feline",
+     "family": "Weise",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Clinical Psychology, Vrije Universiteit Amsterdam"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Kaitlyn M.",
+     "family": "Werner",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Carleton University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Craig",
+     "family": "Wheeler",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Waterloo"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Rachel A.",
+     "family": "White",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, East Carolina University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Aaron L.",
+     "family": "Wichman",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Western Kentucky University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Bradford J.",
+     "family": "Wiggins",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Brigham Young University-Idaho"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Julian A.",
+     "family": "Wills",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, New York University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Janie H.",
+     "family": "Wilson",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Georgia Southern University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0003-1596-1034",
+     "authenticated-orcid": false,
+     "given": "Eric-Jan",
+     "family": "Wagenmakers",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Amsterdam"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Dolores",
+     "family": "Albarracín",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Illinois at Urbana-Champaign"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2021,
+      10
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2021,
+      9,
+      14
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2021,
+      9,
+      14
+     ]
+    ]
+   },
+   "publisher": "SAGE Publications",
+   "relation": {
+    "has-preprint": [
+     {
+      "id-type": "doi",
+      "id": "10.31234/osf.io/e497p",
+      "asserted-by": "object"
+     }
+    ]
+   }
+  },
+  "10.1177/1948550619887702": {
+   "DOI": "10.1177/1948550619887702",
+   "type": "journal-article",
+   "title": [
+    "A Multilab Replication of the Ego Depletion Effect"
+   ],
+   "container-title": [
+    "Social Psychological and Personality Science"
+   ],
+   "volume": "12",
+   "issue": "1",
+   "page": "14-24",
+   "author": [
+    {
+     "ORCID": "https://orcid.org/0000-0002-0194-8608",
+     "authenticated-orcid": false,
+     "given": "Junhua",
+     "family": "Dang",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "Department of Neuroscience, Uppsala University, Sweden"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Paul",
+     "family": "Barker",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Social Cognition Center Cologne, University of Cologne, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Anna",
+     "family": "Baumert",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Max Planck Institute for Research on Collective Goods, Germany"
+      },
+      {
+       "name": "TUM School of Education, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Margriet",
+     "family": "Bentvelzen",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Amsterdam Business School, University of Amsterdam, the Netherlands"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Elliot",
+     "family": "Berkman",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Oregon, US"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Nita",
+     "family": "Buchholz",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Koblenz-Landau, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jacek",
+     "family": "Buczny",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Experimental and Applied Psychology, VU University Amsterdam, the Netherlands"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Zhansheng",
+     "family": "Chen",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, The University of Hong Kong, Hong Kong"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Valeria",
+     "family": "De Cristofaro",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Social and Developmental Psychology, University of Rome “Sapienza”, Italy"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Lianne",
+     "family": "de Vries",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Biological Psychology, VU University Amsterdam, the Netherlands"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Siegfried",
+     "family": "Dewitte",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Behavioral Engineering Research Group, KU Leuven, Belgium"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Mauro",
+     "family": "Giacomantonio",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Social and Developmental Psychology, University of Rome “Sapienza”, Italy"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Ran",
+     "family": "Gong",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Beijing Sport University, China"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Maaike",
+     "family": "Homan",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Amsterdam Institute for Social Science Research, University of Amsterdam, the Netherlands"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0003-0807-463X",
+     "authenticated-orcid": false,
+     "given": "Roland",
+     "family": "Imhoff",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Social and Legal Psychology, Johannes Gutenberg University Mainz, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Ismaharif",
+     "family": "Ismail",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, National University of Singapore, Singapore"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Lile",
+     "family": "Jia",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, National University of Singapore, Singapore"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Thomas",
+     "family": "Kubiak",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Institute of Psychology, Johannes Gutenberg University Mainz, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Florian",
+     "family": "Lange",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Behavioral Engineering Research Group, KU Leuven, Belgium"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Dan-yang",
+     "family": "Li",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Beijing Sport University, China"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jordan",
+     "family": "Livingston",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Oregon, US"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Rita",
+     "family": "Ludwig",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Oregon, US"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Angelo",
+     "family": "Panno",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Human Science, European University of Rome, Italy"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0003-1529-2061",
+     "authenticated-orcid": false,
+     "given": "Joshua",
+     "family": "Pearman",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Oregon, US"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Niklas",
+     "family": "Rassi",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Institute of Psychology, University of Hamburg, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Helgi B.",
+     "family": "Schiöth",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Neuroscience, Uppsala University, Sweden"
+      },
+      {
+       "name": "Institute for Translational Medicine and Biotechnology, Sechenov First Moscow State Medical University, Russia"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Manfred",
+     "family": "Schmitt",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Koblenz-Landau, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "A. Timur",
+     "family": "Sevincer",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Institute of Psychology, University of Hamburg, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jiaxin",
+     "family": "Shi",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, The University of Hong Kong, Hong Kong"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Angelos",
+     "family": "Stamos",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Behavioral Engineering Research Group, KU Leuven, Belgium"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Yia Chin",
+     "family": "Tan",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, National University of Singapore, Singapore"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0003-2839-9482",
+     "authenticated-orcid": false,
+     "given": "Mario",
+     "family": "Wenzel",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Institute of Psychology, Johannes Gutenberg University Mainz, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Oulmann",
+     "family": "Zerhouni",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Laboratoire Parisien de Psychologie Sociale, University Paris Nanterre, France"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Li-wei",
+     "family": "Zhang",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Beijing Sport University, China"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Yi-jia",
+     "family": "Zhang",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Beijing Sport University, China"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Axel",
+     "family": "Zinkernagel",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Koblenz-Landau, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2021,
+      1
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2020,
+      4,
+      3
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2020,
+      4,
+      3
+     ]
+    ]
+   },
+   "publisher": "SAGE Publications",
+   "relation": {}
+  },
+  "10.1177/1088868318762183": {
+   "DOI": "10.1177/1088868318762183",
+   "type": "journal-article",
+   "title": [
+    "Is Ego Depletion Real? An Analysis of Arguments"
+   ],
+   "container-title": [
+    "Personality and Social Psychology Review"
+   ],
+   "volume": "23",
+   "issue": "2",
+   "page": "107-131",
+   "author": [
+    {
+     "ORCID": "https://orcid.org/0000-0003-0055-513X",
+     "authenticated-orcid": false,
+     "given": "Malte",
+     "family": "Friese",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "Saarland University, Saarbrücken, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0001-5818-0559",
+     "authenticated-orcid": false,
+     "given": "David D.",
+     "family": "Loschelder",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Leuphana University of Lüneburg, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Karolin",
+     "family": "Gieseler",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Saarland University, Saarbrücken, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0002-1627-8803",
+     "authenticated-orcid": false,
+     "given": "Julius",
+     "family": "Frankenbach",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Saarland University, Saarbrücken, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Michael",
+     "family": "Inzlicht",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "University of Toronto, Ontario, Canada"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2019,
+      5
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2018,
+      3,
+      29
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2018,
+      3,
+      29
+     ]
+    ]
+   },
+   "publisher": "SAGE Publications",
+   "relation": {}
+  },
+  "10.1177/0956797616654911": {
+   "DOI": "10.1177/0956797616654911",
+   "type": "journal-article",
+   "title": [
+    "The Bitter Truth About Sugar and Willpower"
+   ],
+   "container-title": [
+    "Psychological Science"
+   ],
+   "volume": "27",
+   "issue": "9",
+   "page": "1207-1214",
+   "author": [
+    {
+     "given": "Miguel A.",
+     "family": "Vadillo",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "Department of Primary Care and Public Health Sciences, King’s College London"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Natalie",
+     "family": "Gold",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Philosophy, King’s College London"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Magda",
+     "family": "Osman",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Biological and Experimental Psychology Group, School of Biological and Chemical Sciences, Queen Mary University of London"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2016,
+      9
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2016,
+      7,
+      20
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2016,
+      7,
+      20
+     ]
+    ]
+   },
+   "publisher": "SAGE Publications",
+   "relation": {}
+  },
+  "10.1027/1864-9335/a000376": {
+   "DOI": "10.1027/1864-9335/a000376",
+   "type": "journal-article",
+   "title": [
+    "Sweet Nothings"
+   ],
+   "container-title": [
+    "Social Psychology"
+   ],
+   "volume": "50",
+   "issue": "5-6",
+   "page": "322-331",
+   "author": [
+    {
+     "ORCID": "https://orcid.org/0000-0002-0881-9147",
+     "authenticated-orcid": true,
+     "given": "Anna J.",
+     "family": "Finley",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Texas A&M University, College Station, TX, USA"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "David",
+     "family": "Tang",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Texas A&M University, College Station, TX, USA"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Brandon J.",
+     "family": "Schmeichel",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Texas A&M University, College Station, TX, USA"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2019,
+      9
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2019,
+      9
+     ]
+    ]
+   },
+   "publisher": "Hogrefe Publishing Group",
+   "relation": {
+    "has-preprint": [
+     {
+      "id-type": "doi",
+      "id": "10.31234/osf.io/568wp",
+      "asserted-by": "object"
+     }
+    ]
+   }
+  },
+  "10.1111/psyp.12339": {
+   "DOI": "10.1111/psyp.12339",
+   "type": "journal-article",
+   "title": [
+    "A multifaceted investigation of the link between mental fatigue and task disengagement"
+   ],
+   "container-title": [
+    "Psychophysiology"
+   ],
+   "volume": "52",
+   "issue": "3",
+   "page": "305-315",
+   "author": [
+    {
+     "given": "Jesper F.",
+     "family": "Hopstaken",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "Department of Work and Organizational Psychology Institute of Psychology Erasmus University Rotterdam  Rotterdam The Netherlands"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Dimitri",
+     "family": "van der Linden",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Work and Organizational Psychology Institute of Psychology Erasmus University Rotterdam  Rotterdam The Netherlands"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Arnold B.",
+     "family": "Bakker",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Work and Organizational Psychology Institute of Psychology Erasmus University Rotterdam  Rotterdam The Netherlands"
+      },
+      {
+       "name": "Department of Applied Psychology Lingnan University  Hong Kong China"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Michiel A. J.",
+     "family": "Kompier",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Work and Organizational Psychology Behavioural Science Institute Radboud University Nijmegen  Nijmegen The Netherlands"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2015,
+      3
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2014,
+      9,
+      26
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2014,
+      9,
+      26
+     ]
+    ]
+   },
+   "publisher": "Wiley",
+   "relation": {}
+  },
+  "10.1177/0956797620904990": {
+   "DOI": "10.1177/0956797620904990",
+   "type": "journal-article",
+   "title": [
+    "Strong Effort Manipulations Reduce Response Caution: A Preregistered Reinvention of the Ego-Depletion Paradigm"
+   ],
+   "container-title": [
+    "Psychological Science"
+   ],
+   "volume": "31",
+   "issue": "5",
+   "page": "531-547",
+   "author": [
+    {
+     "ORCID": "https://orcid.org/0000-0003-4590-7039",
+     "authenticated-orcid": false,
+     "given": "Hause",
+     "family": "Lin",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Toronto Scarborough"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Blair",
+     "family": "Saunders",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "School of Social Sciences, University of Dundee"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0003-0055-513X",
+     "authenticated-orcid": false,
+     "given": "Malte",
+     "family": "Friese",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, Saarland University"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Nathan J.",
+     "family": "Evans",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Amsterdam"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0001-9297-6497",
+     "authenticated-orcid": false,
+     "given": "Michael",
+     "family": "Inzlicht",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Psychology, University of Toronto Scarborough"
+      },
+      {
+       "name": "Rotman School of Management, University of Toronto"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2020,
+      5
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2020,
+      4,
+      21
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2020,
+      4,
+      21
+     ]
+    ]
+   },
+   "publisher": "SAGE Publications",
+   "relation": {
+    "has-preprint": [
+     {
+      "id-type": "doi",
+      "id": "10.31234/osf.io/dysa5",
+      "asserted-by": "object"
+     }
+    ]
+   }
+  },
+  "10.1207/s15516709cog1202_4": {
+   "DOI": "10.1207/s15516709cog1202_4",
+   "type": "journal-article",
+   "title": [
+    "Cognitive Load During Problem Solving: Effects on Learning"
+   ],
+   "container-title": [
+    "Cognitive Science"
+   ],
+   "volume": "12",
+   "issue": "2",
+   "page": "257-285",
+   "author": [
+    {
+     "given": "John",
+     "family": "Sweller",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      1988,
+      4
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2010,
+      2,
+      11
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      1988,
+      4
+     ]
+    ]
+   },
+   "publisher": "Wiley",
+   "relation": {}
+  },
+  "10.1201/b12791-3.1": {
+   "DOI": "10.1201/b12791-3.1",
+   "type": "book-chapter",
+   "title": [
+    "Active and Passive Fatigue States"
+   ],
+   "container-title": [
+    "Stress, Workload, and Fatigue"
+   ],
+   "page": "455-465",
+   "author": [
+    {
+     "given": "Paula A.",
+     "family": "Desmond",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Peter A.",
+     "family": "Hancock",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2000,
+      11,
+      1
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2000,
+      11,
+      1
+     ]
+    ]
+   },
+   "publisher": "CRC Press",
+   "relation": {}
+  },
+  "10.1037/a0034386": {
+   "DOI": "10.1037/a0034386",
+   "type": "journal-article",
+   "title": [
+    "Active and passive fatigue in simulated driving: Discriminating styles of workload regulation and their safety impacts."
+   ],
+   "container-title": [
+    "Journal of Experimental Psychology: Applied"
+   ],
+   "volume": "19",
+   "issue": "4",
+   "page": "287-300",
+   "author": [
+    {
+     "given": "Dyani J.",
+     "family": "Saxby",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Gerald",
+     "family": "Matthews",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Joel S.",
+     "family": "Warm",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Edward M.",
+     "family": "Hitchcock",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Catherine",
+     "family": "Neubauer",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-online": {
+    "date-parts": [
+     [
+      2013
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2013
+     ]
+    ]
+   },
+   "publisher": "American Psychological Association (APA)",
+   "relation": {}
+  },
+  "10.1016/j.aap.2018.04.004": {
+   "DOI": "10.1016/j.aap.2018.04.004",
+   "type": "journal-article",
+   "title": [
+    "Dangerous intersections? A review of studies of fatigue and distraction in the automated vehicle"
+   ],
+   "container-title": [
+    "Accident Analysis &amp; Prevention"
+   ],
+   "volume": "126",
+   "page": "85-94",
+   "author": [
+    {
+     "given": "Gerald",
+     "family": "Matthews",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Catherine",
+     "family": "Neubauer",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Dyani J.",
+     "family": "Saxby",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Ryan W.",
+     "family": "Wohleber",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jinchao",
+     "family": "Lin",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2019,
+      5
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2019,
+      5
+     ]
+    ]
+   },
+   "publisher": "Elsevier BV",
+   "relation": {}
+  },
+  "10.1177/0018720810376055": {
+   "DOI": "10.1177/0018720810376055",
+   "type": "journal-article",
+   "title": [
+    "Complacency and Bias in Human Use of Automation: An Attentional Integration"
+   ],
+   "container-title": [
+    "Human Factors: The Journal of the Human Factors and Ergonomics Society"
+   ],
+   "volume": "52",
+   "issue": "3",
+   "page": "381-410",
+   "author": [
+    {
+     "given": "Raja",
+     "family": "Parasuraman",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "George Mason University, Fairfax, Virginia,"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Dietrich H.",
+     "family": "Manzey",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Berlin Institute of Technology, Berlin, Germany"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2010,
+      6
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2010,
+      10,
+      20
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2010,
+      6
+     ]
+    ]
+   },
+   "publisher": "SAGE Publications",
+   "relation": {}
+  },
+  "10.1037/0021-9010.86.3.499": {
+   "DOI": "10.1037/0021-9010.86.3.499",
+   "type": "journal-article",
+   "title": [
+    "The job demands-resources model of burnout."
+   ],
+   "container-title": [
+    "Journal of Applied Psychology"
+   ],
+   "volume": "86",
+   "issue": "3",
+   "page": "499-512",
+   "author": [
+    {
+     "given": "Evangelia",
+     "family": "Demerouti",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "ORCID": "https://orcid.org/0000-0003-1489-1847",
+     "authenticated-orcid": false,
+     "given": "Arnold B.",
+     "family": "Bakker",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Friedhelm",
+     "family": "Nachreiner",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Wilmar B.",
+     "family": "Schaufeli",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-online": {
+    "date-parts": [
+     [
+      2001,
+      6
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2001,
+      6
+     ]
+    ]
+   },
+   "publisher": "American Psychological Association (APA)",
+   "relation": {}
+  },
+  "10.1108/02683940710733115": {
+   "DOI": "10.1108/02683940710733115",
+   "type": "journal-article",
+   "title": [
+    "The Job Demands‐Resources model: state of the art"
+   ],
+   "container-title": [
+    "Journal of Managerial Psychology"
+   ],
+   "volume": "22",
+   "issue": "3",
+   "page": "309-328",
+   "author": [
+    {
+     "given": "Arnold B.",
+     "family": "Bakker",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Evangelia",
+     "family": "Demerouti",
+     "sequence": "additional",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2007,
+      4,
+      3
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2007,
+      4,
+      3
+     ]
+    ]
+   },
+   "publisher": "Emerald",
+   "relation": {}
+  },
+  "10.1037/0003-066x.44.3.513": {
+   "DOI": "10.1037/0003-066x.44.3.513",
+   "type": "journal-article",
+   "title": [
+    "Conservation of resources: A new attempt at conceptualizing stress."
+   ],
+   "container-title": [
+    "American Psychologist"
+   ],
+   "volume": "44",
+   "issue": "3",
+   "page": "513-524",
+   "author": [
+    {
+     "given": "Stevan E.",
+     "family": "Hobfoll",
+     "sequence": "first",
+     "affiliation": [],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-online": {
+    "date-parts": [
+     [
+      1989
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      1989
+     ]
+    ]
+   },
+   "publisher": "American Psychological Association (APA)",
+   "relation": {}
+  },
+  "10.1146/annurev-orgpsych-032117-104640": {
+   "DOI": "10.1146/annurev-orgpsych-032117-104640",
+   "type": "journal-article",
+   "title": [
+    "Conservation of Resources in the Organizational Context: The Reality of Resources and Their Consequences"
+   ],
+   "container-title": [
+    "Annual Review of Organizational Psychology and Organizational Behavior"
+   ],
+   "volume": "5",
+   "issue": "1",
+   "page": "103-128",
+   "author": [
+    {
+     "given": "Stevan E.",
+     "family": "Hobfoll",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "Rush University Medical Center, Department of Behavioral Sciences, Rush Medical College, Rush University, Chicago, Illinois 60612, USA;"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jonathon",
+     "family": "Halbesleben",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Management, Culverhouse College of Commerce, University of Alabama, Tuscaloosa, Alabama 35487, USA;"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Jean-Pierre",
+     "family": "Neveu",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Institut d'Administration des Entreprises, Université de Pau et des Pays de l'Adour, 64100 Bayonne, France;"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Mina",
+     "family": "Westman",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "Department of Organizational Behavior, Tel Aviv University, 69978 Ramat Aviv, Israel;"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2018,
+      1,
+      21
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2018,
+      1,
+      21
+     ]
+    ]
+   },
+   "publisher": "Annual Reviews",
+   "relation": {}
+  },
+  "10.2753/mis0742-1222240109": {
+   "DOI": "10.2753/mis0742-1222240109",
+   "type": "journal-article",
+   "title": [
+    "The Impact of Technostress on Role Stress and Productivity"
+   ],
+   "container-title": [
+    "Journal of Management Information Systems"
+   ],
+   "volume": "24",
+   "issue": "1",
+   "page": "301-328",
+   "author": [
+    {
+     "given": "Monideepa",
+     "family": "Tarafdar",
+     "sequence": "first",
+     "affiliation": [
+      {
+       "name": "a Information Systems, University of Toledo, Indian, Calcutta"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Qiang",
+     "family": "Tu",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "b Management Information Systems, Jiaotong University, China"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "Bhanu S.",
+     "family": "Ragu-Nathan",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "c College of Business Administration, University of Toledo, Pittsburgh"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    },
+    {
+     "given": "T. S.",
+     "family": "Ragu-Nathan",
+     "sequence": "additional",
+     "affiliation": [
+      {
+       "name": "a Information Systems, University of Toledo, Indian, Calcutta"
+      }
+     ],
+     "role": [
+      {
+       "vocabulary": "crossref",
+       "role": "author"
+      }
+     ]
+    }
+   ],
+   "published-print": {
+    "date-parts": [
+     [
+      2007,
+      7
+     ]
+    ]
+   },
+   "published-online": {
+    "date-parts": [
+     [
+      2014,
+      12,
+      8
+     ]
+    ]
+   },
+   "issued": {
+    "date-parts": [
+     [
+      2007,
+      7
+     ]
+    ]
+   },
+   "publisher": "Informa UK Limited",
+   "relation": {}
+  }
+ }
+}

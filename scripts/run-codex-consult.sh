@@ -187,7 +187,9 @@ if d['today'].get('date') == today:
     d['today']['invocations'] += 1
 else:
     d.setdefault('history', []).append(d['today'])
-    d['history'] = sorted(d['history'], key=lambda x: x.get('date', ''))[-30:]
+    # ⚠️ history は append-only（消さない）。run-codex-review.sh と同じ直し（2026-09-21 に review 側だけ
+    #   `[-30:]` を外し、こちらに残っていた —— 2026-10-01 の attack-me の完了時レビューで発見）。
+    d['history'] = sorted(d['history'], key=lambda x: x.get('date', ''))
     d['today'] = {'date': today, 'tokens_used': tokens, 'invocations': 1}
 # 同ディレクトリの一時ファイル + os.replace で atomic に差し替える。
 # `open(p, 'w')` は開いた瞬間に truncate するため、中断で budget.json が壊れる。

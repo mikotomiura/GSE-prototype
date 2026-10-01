@@ -5,6 +5,7 @@
 > 作成: 2026-09-30（G-GEAR で `feature/ime-eval-kit` を main へ merge したセッションの最後に）。前の handoff（`next-session-ime-paper-after-w6.md`）の後継。前のものは読まなくてよい。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（判断 72〜78）・`blockers.md`（B14）・`issues/024.md`（追補 2・3）・`tasklist.md`・`_issue-plan.md` §5。状態は着手時に測り直す。
 > ★ 評価一式は **main に入った**（PR #276）。以後の作業は main から枝を切る（`feature/ime-*` など）。両方の機械が同じ枝に push するときは、push の前に `git fetch` → `git pull --no-rebase`（force しない）。
+> ★★ **2026-09-30 追記（同じセッションの最後）: 新しい Skill `attack-me`（論文のプレ査読）を `feature/attack-me-skill` の枝に作った（push 済み・PR はまだ → 2026-10-01 に PR #279・§6）。** 研究者の指示: **次のセッションのタスクが終わった後に、この枝の PR もまとめて出す**（git-workflow ルール 6: push → PR → CI 緑なら merge → main の CI）。作業記録は `.steering/20260930-attack-me-skill/`。⚠️ この枝は main（`2319a1cb`）から切った。次のタスクの枝とは別の PR にする（混ぜない）。★ 最初の実戦は M3 の事前登録の下書き（stage `prereg`・凍結の前）。
 
 ## §0 打ち込む用
 
@@ -66,7 +67,20 @@ Skill: verify-before-claiming・git-workflow。応答は日本語。コミット
 - ✅ §3-1 M0: 12 作品・1,800 句・`c8f890cb…4620`（判断 79・`experiment/data.md` の「Phrase corpus」）。枝 `feature/ime-m0-corpus`（main へ PR）。生の `.txt` / zip は repo に入れていない（再取得は data.md の URL と SHA-256 で照合）。
 - ⏭ 次は **M1（macOS の較正パイロット・Mac・実際にキーを送る）**。★ ロガーは書き出しからビルドする（判断 68）。生成器の本番の config（速さ・think・n）は M1 の実測で決め、出典を `[Pn]` で接地してから M3 で凍結する（`kit/gen/README.md`）。
 
-## §6 2026-10-01 の Mac の結果（M1 と M2 の一部）
+## §6 2026-10-01 の G-GEAR（同期と attack-me の PR）
+
+- G-GEAR で origin/main（`9f1d28dc`・#278 まで）に揃えた（ローカルの `main` は `C:/wt/p321-submission` の worktree で fast-forward）。G-GEAR では M0 を進めていない（Mac の #278 が先に入った）。
+- `feature/attack-me-skill` に main を取り込み、完了時レビューを 2 巡回して直し、**PR #279** を出した（作業記録は `.steering/20260930-attack-me-skill/`・判断 1・2）。
+- ★ attack-me は査読者役・監査役を新しい **`paper-reviewer`**（道具は Read・Grep・Glob だけ・opus）で起動する。接地の論文の取得と本文の抽出はメインが行う（`round-<N>/tmp/sources/`・git が無視する）。記録の置き場は `.steering/<task>/attack-me/<stage>-<略名>/round-<N>/`。
+- ★ M3 の事前登録の下書きで最初の実戦をするときの注意:
+  - 下書きを commit してから起動する。
+  - `prereg` では、固定の根拠のファイル（`run.sh` → `pipeline.py` → 部品・`config.json`・`SEED`）まで一覧に入れる。
+  - 較正パイロットの封印物（`sealed/`）がある時期なので、起動の前に研究者に知らせる。`Read` は構造では縛れない。
+- ⚠️ `scripts/run-codex-consult.sh` にも台帳の history の切り捨て（`[-30:]`）が残っていたので、同じ PR で外した。
+
+## §7 2026-10-01 の Mac の結果（M1 と M2 の一部）
+
+> merge で §6 が 2 つになった（main は G-GEAR の §6、`feature/ime-m1-pilot` は Mac の §6）。両方を残し、Mac の方を §7 にした（2026-10-01・G-GEAR）。
 
 - ✅ M1 macOS の較正パイロット（`pilot-macos-1-notes.md`）→ 手順とマーカーの直し（判断 80）→ ON / OFF の再パイロットで試行の持ち越しがほぼ消えた。枝 `feature/ime-m1-pilot`。
 - ★ 計測の段取り: 単体ロガーは書き出しからビルド・参照入力欄は `build.sh` の `.app`（bundle id `local.ime-observation.refinput`）・`focus_cmd` でかなキー・マーカー ← → ←・OFF のセルは `--recipes kit/gen/recipes.macos-live-off.json`。生ログと道具は `~/ime-pilot/`（git の外）。

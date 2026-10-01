@@ -1,0 +1,99 @@
+{
+ "version": "v0",
+ "runs": [
+  {
+   "source": "epmc",
+   "name": "main",
+   "query_sha256": "f017112dad9dda1e24ba2c394fc243b809a01c6b482907003f931f50f701525e",
+   "count": 4349,
+   "error": null,
+   "executed": "2026-10-01T02:58:33+09:00"
+  },
+  {
+   "source": "epmc",
+   "name": "b1",
+   "query_sha256": "184a111e56236ba63542476a30f475d5d21c3f84a3f0f0017b8650cdd8330328",
+   "count": 64,
+   "error": null,
+   "executed": "2026-10-01T02:58:36+09:00"
+  },
+  {
+   "source": "s2",
+   "name": "main",
+   "query_sha256": "ceaecdcf80b29131efc3e2f1d6206436b60326bbbb2a7d61b7366f61d09b65a6",
+   "count": 18275,
+   "error": null,
+   "executed": "2026-10-01T02:58:39+09:00"
+  },
+  {
+   "source": "s2",
+   "name": "main_v2",
+   "query_sha256": "779a98fe9084292dec0a2c565cf98ce2cfc53ce4aedfbc9475f918c43fe8f2ca",
+   "count": 16504,
+   "error": null,
+   "executed": "2026-10-01T02:58:41+09:00"
+  },
+  {
+   "source": "s2",
+   "name": "b1",
+   "query_sha256": "1ceaeb88bbb7eac15b40b3a93b45d8b6c010ffdedc0e9379bd5539572404ad36",
+   "count": 147,
+   "error": null,
+   "executed": "2026-10-01T02:58:44+09:00"
+  },
+  {
+   "source": "eric",
+   "name": "main",
+   "query_sha256": "a33571cb4389c830311a8d5e2c7e11a3306b680c00745329d1b200f26c15b565",
+   "count": 61,
+   "error": null,
+   "executed": "2026-10-01T02:58:46+09:00"
+  },
+  {
+   "source": "arxiv",
+   "name": "main",
+   "query_sha256": "0c797f87e9dd9afd9bac15d1d46493ac42ae34945ec591c5d9e52e8a6f8dd54b",
+   "count": 1858,
+   "error": null,
+   "executed": "2026-10-01T02:59:49+09:00"
+  },
+  {
+   "source": "zenodo",
+   "name": "main",
+   "query_sha256": "cc8c5c617cfbe3dc8e1dd3073286faa7f14de1ef9889b61e3d571004f823f9c3",
+   "count": null,
+   "error": "HTTPError: HTTP Error 500: INTERNAL SERVER ERROR",
+   "executed": "2026-10-01T03:00:59+09:00",
+   "subqueries_sha256": [
+    "fe8920b9a61efacc46d73dcfb22f8b16481710c12d92ea18a0b96e6f899295f3",
+    "1d32e03fda2498c92732466d1ead12bdcca28f021d64fe9a79b2e2f1ef7bfd8d",
+    "91d739021504cf9922ad611d8f52b311db6aaf4e388a206dc60c62eda2759914",
+    "d5b919e23c31d592d59ee26496e1f28aaaa4fb62bd683a9be42a42f251372560",
+    "682ce4eecf529227d68c5b33958f802c039687918730972376e3d246b25588d6",
+    "9dd9199b4d2fefd73dc960b6adabf3e1bd402481e01a2f2324cc524c4570af41",
+    "0717fa93ad69ecaa35befe73c13b2bc407d30fe2fb012a664b24548df1653ad3",
+    "61bdaa2cf3470407d2add3422236c6d7c404ffc7a8fa518117a90b88ed64d5f2",
+    "542861ceead292bf0ef0a230d0e67fcee11baf710b5cdb16b8f94538ebab03cf",
+    "7b2080853f1294679b36c7af5f455b63c04614f05149d20e285414a3127cb5e0",
+    "aa24afebb0bb7b554d072e741d73d09517d0d61ea6c289f9e7a84f87ac66fceb",
+    "9fbf6d2354ddfec192cd86d09fc5a0a22f85f84c60008d0a49bc70072b72f322",
+    "bb65dc49eb3d85faddd5726ff5d6eaecc9d370a28053b1805bac93fc6ab713d3"
+   ],
+   "sub_counts": [
+    1438,
+    36,
+    629,
+    233,
+    504,
+    375,
+    6,
+    2,
+    9,
+    32,
+    666,
+    127,
+    52
+   ]
+  }
+ ]
+}

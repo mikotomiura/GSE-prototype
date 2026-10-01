@@ -75,6 +75,7 @@
 | `literature-card` | 論文/文献を精読してカード化する (`docs/literature/`・落合フォーマット) |
 | `reproducibility-discipline` | `experiments/` 配下・較正スモーク・seed/lockfile/HMM_VERSION 固定 |
 | `empirical-prompt-tuning` | Skill / コマンド / プロンプトを新規作成・大幅改訂した直後の検証 |
+| `attack-me` | 論文（`papers/`）の**事前登録を凍結する前**・原稿の外枠を書いた後・投稿の前・改訂の後のプレ査読（実在の論文で接地した立場の査読者 3 人＋意図の監査役・指摘は一次で裏取り）。⚠️ 実在の個人を名乗らせない・査読の結果を証拠にしない |
 
 ## 作業記録の運用ルール (重要)
 
@@ -129,7 +130,8 @@ Hook は 3 層で動作し、全層の出力がユーザーに明示される (W
   研究=`/literature-review` (サーヴェイ 1 ラウンド) (詳細は `.claude/commands/`)
 - **サブエージェント**: 収集=`file-finder` `dependency-checker` `impact-analyzer` /
   レビュー=`code-reviewer` `test-analyzer` `security-checker` `cross-reviewer` /
-  実行=`test-runner` `build-executor` `log-analyzer` (詳細は `.claude/agents/`)
+  実行=`test-runner` `build-executor` `log-analyzer` /
+  研究=`paper-reviewer` (`attack-me` の査読者役・監査役。道具は Read・Grep・Glob だけ) (詳細は `.claude/agents/`)
 
 <!-- loop:begin -->
 ## Loop Engineering (issue 単位ループ)
