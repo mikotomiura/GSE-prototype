@@ -7,12 +7,16 @@
 3. メールアドレスが無い・引用符の中の逐語が長すぎない
 加えて、確認票が草稿と食い違わないことを確かめる:
 4. 草稿の付録 F の番号（`| F<n> |` の行）が、確認票の表の行にすべて出る。付録 F で「決定」の印の番号は確認票の §1
-   （判定者 1 が決めたこと）に、ほかは §2〜§4 に出る（★ 2026-10-01 のレビュー: 番号を固定で持たない）
+   （判定者 1 が決めたこと）に、ほかは §2〜§4 に出る（★ 2026-10-01 のレビュー: 番号を固定で持たない）。
+   ★ 1 つの番号は 1 つの節にだけ出る（同じ節の中の複数の行〈F9〉はよい。2026-10-01 の独立の AI のレビューの 1 巡目:
+   決定の番号を §1 に残したまま §2 にも足すと、決定と確認待ちの両方に見える）
 5. 確認票の【案】の表（§6）の節ごとの行の数が、草稿の本文の【案】の数と節ごとに一致する
    （最初の見出しより前〈版と印の説明〉と付録 F の中は数えない。★ 節の中の引用の行は数える）
 6. 判定者用ファイルの道具（judge_xlsx.py）の『判定基準』と選択肢が、草稿の付録 B と一致する: 「基準の版」と
-   「E4 の『尺度の原著』」の行の文・除外理由の選択肢（付録 B の「除外理由＝E1〜En」）。★ 道具は import せず（openpyxl が要る）
-   ast で定数を読む（2026-10-01 のレビュー: golden は build() との比較なので、決定が道具に入っていることを確かめない）
+   「E4 の『尺度の原著』」の行の文・除外理由の選択肢（付録 B の「除外理由＝E1〜En」）・除外理由の行の E7 の当て方
+   （「題名・抄録の言語だけでは」から閉じ括弧まで。★ 2026-10-01 の独立の AI のレビューの 1 巡目: 当て方の文が道具から
+   消えても選択肢が E1〜E7 なら通っていた）。★ 道具は import せず（openpyxl が要る）ast で定数を読む
+   （2026-10-01 のレビュー: golden は build() との比較なので、決定が道具に入っていることを確かめない）
 issue-status.md には、前タスクの事実のファイルと同じ検査（check_fact）を当てる。
 
 使い方:
@@ -42,6 +46,7 @@ JUDGE_PY = os.path.join(STEER, "20260930-ai-fatigue-judge-file", "scripts", "jud
 DECIDED_SECTION = "## 1. "
 PENDING_SECTIONS = ("## 2. ", "## 3. ", "## 4. ")
 B_ROWS = ["基準の版", "E4 の『尺度の原著』（2026-10-01）"]
+E7_OPERATION = re.compile(r"(題名・抄録の言語だけでは[^）]*)）")  # 除外理由の行の E7 の当て方（括弧の中は入れ子にしない）
 PROPOSAL = "【案"
 APPX_6 = "## 6. "
 ROW_F = re.compile(r"^\| (F\d+) \|")
@@ -157,6 +162,12 @@ def check_judge_tool(protocol_text, judge_path):
         errs.append("草稿の付録 B に「除外理由＝E1〜En」が無い")
     elif got != want:
         errs.append(f"judge_xlsx.py の除外理由の選択肢 {got} が草稿の付録 B（{want[0]}〜{want[-1]}）と違う")
+    t_op = E7_OPERATION.search(crit.get("除外理由", ""))
+    b_op = E7_OPERATION.search(b.get("除外理由", ""))
+    if not t_op or not b_op:
+        errs.append("judge_xlsx.py か草稿の付録 B の除外理由の行に E7 の当て方（題名・抄録の言語だけでは…）が無い")
+    elif t_op.group(1) != b_op.group(1):
+        errs.append("judge_xlsx.py の E7 の当て方が草稿の付録 B と違う")
     return errs
 
 
@@ -178,10 +189,17 @@ def check_sheet(root, protocol_path):
     by_sec = sheet_f_rows(lines)
     in_decided = by_sec.get(DECIDED_SECTION, set())
     in_pending = set().union(*(by_sec.get(s, set()) for s in PENDING_SECTIONS))
+    secs_of = collections.defaultdict(set)
+    for sec, fs in by_sec.items():
+        for f in fs:
+            secs_of[f].add(sec)
     for f in sorted(rows, key=lambda x: int(x[1:])):
         want_sec = "§1（判定者 1 が決めたこと）" if f in decided else "§2〜§4"
         if f not in (in_decided if f in decided else in_pending):
             errs.append(f"{CHECK}: 付録 F の {f} の行が {want_sec} に無い")
+        if len(secs_of.get(f, ())) > 1:
+            where = "・".join("§" + s[3:].strip().rstrip(".") for s in sorted(secs_of[f]))
+            errs.append(f"{CHECK}: 付録 F の {f} の行が複数の節（{where}）に出る")
     for f in sorted((in_decided | in_pending) - set(rows)):
         errs.append(f"{CHECK}: 草稿の付録 F に無い番号 {f} の行がある")
     want = proposal_counts(ptext)
@@ -258,6 +276,10 @@ def selftest():
                "F21 の行が §2〜§4 に無い", fn="proto")
         mutate("草稿の F18 を決定にする", lambda t: re.sub(r"(?m)^(\| F18 \| [^|]*?) \|", r"\1 → **2026-10-01 に決定** |", t),
                "F18 の行が §1", fn="proto")
+        mutate("F10 を §1 に残したまま §2 にも足す", lambda t: t.replace("| F11 |", "| F10 | 重ねた行 | | | | |\n| F11 |", 1),
+               "F10 の行が複数の節（§1・§2）")
+        mutate("F18 を §2 に残したまま §1 にも足す", lambda t: t.replace("| F19 |", "| F18 | 重ねた行 | | | |\n| F19 |", 1),
+               "F18 の行が複数の節（§1・§2）")
         # 5. 【案】の数
         mutate("票の【案】の行を 1 つ落とす", lambda t: re.sub(r"(?m)^\| \[GSRR-60\] \|.*\n", "", t), "節 [GSRR-60] で草稿と違う")
         mutate("票に【案】の行を足す", lambda t: t + "| [GSRR-9] | 終わる日を 2027 年 3 月にする | |\n", "節 [GSRR-9] で草稿と違う")
@@ -278,6 +300,16 @@ def selftest():
                "『基準の版』の文が草稿の付録 B と違う", fn="proto")
         mutate("草稿の付録 B の選択肢を E1〜E6 に", lambda t: t.replace("除外理由＝E1〜E7", "除外理由＝E1〜E6", 1),
                "除外理由の選択肢", fn="proto")
+        mutate("道具の E7 の当て方から英日の版の文を消す", lambda t: t.replace("英語・日本語の版が別にあれば、", "", 1),
+               "E7 の当て方が草稿の付録 B と違う", fn="judge")
+        mutate("道具の E7 の当て方から E6 との順を消す",
+               lambda t: t.replace("本文の言語が分かっていれば、本文が手に入らなくても E6 の保留にせず E7 を選ぶ", "", 1),
+               "E7 の当て方が草稿の付録 B と違う", fn="judge")
+        mutate("草稿の付録 B の E7 の当て方を変える",
+               lambda t: t.replace("ほかの除外理由 E1〜E5 にも当たるときは", "ほかの理由にも当たるときは", 1),
+               "E7 の当て方が草稿の付録 B と違う", fn="proto")
+        mutate("道具の除外理由の行から E7 の当て方を消す", lambda t: t.replace("題名・抄録の言語だけでは決めず", "", 1),
+               "E7 の当て方（題名・抄録の言語だけでは…）が無い", fn="judge")
         # 7. issue-status.md は前タスクの事実のファイルと同じ検査（と E7）
         mutate("issue-status の判定の語", lambda t: t + "\n- 含める\n", "禁止語（judge）", fn=ISSUE_STATUS)
         mutate("issue-status の E7", lambda t: t + "\n- E7\n", "『E7』", fn=ISSUE_STATUS)
