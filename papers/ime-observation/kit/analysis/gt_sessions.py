@@ -1200,6 +1200,21 @@ def _case_experiment_rules():
     want = [("t00001", "commit", 100, 900), ("t00002", "commit", 2100, 2500), ("t00002", "commit", 2600, 2900)]
     if got != want:
         f.append("the experiment rules do not keep the auto-commit inside one session: %r" % (got,))
+    # The head committed automatically and the rest cancelled: one session, a cancellation (11 of the 27
+    # cancelled trials of the pilot with live conversion on took this path).
+    rc = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _sm(300, 4), _ins(500, 2), _sm(501, 2), _sm(700, 0)]),
+                  _oracle_bytes([("t00001", 0, 1900)]), rules)
+    got_c = [(s["outcome"], s["start_wall_ms"] - WALL0, s["end_wall_ms"] - WALL0) for s in rc["definitions"]["all"]]
+    if got_c != [("cancel", 100, 700)]:
+        f.append("an automatic commit followed by a cancellation is not one cancelled session: %r" % (got_c,))
+    # unmark follows the same rule: with a continuation the session stays open, without one it closes.
+    for evs_u, want_u in (([_sm(100, 1), (500, "unmark", {}), _sm(510, 1), _ins(900, 1)], [("commit", 100, 900)]),
+                          ([_sm(100, 1), (500, "unmark", {}), _sm(700, 1), _ins(900, 1)],
+                           [("commit", 100, 500), ("commit", 700, 900)])):
+        ru = assemble(_gt_bytes("mac_nstic", evs_u), _oracle_bytes([("t00001", 0, 1900)]), rules)
+        got_u = [(s["outcome"], s["start_wall_ms"] - WALL0, s["end_wall_ms"] - WALL0) for s in ru["definitions"]["all"]]
+        if got_u != want_u:
+            f.append("unmark does not follow the continuation rule: %r, not %r" % (got_u, want_u))
     # The window includes its end: a continuation exactly 50 ms after the commit keeps the session open,
     # one at 51 ms does not.
     for gap, want_n in ((50, 1), (51, 2)):

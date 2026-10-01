@@ -91,6 +91,11 @@ not counted, so when the head of a reading was committed and the rest was then c
 cancellation. With live conversion on this happened in 11 of the 27 cancelled trials (S4: 3, S5: 3, S6: 5 of 9
 each). How the observation's abandonment is compared with such sessions is fixed in the pre-registration.
 
+The 50 ms window needs the reference log to keep running after a commit. Within a trial no procedure types
+again after its committing or cancelling key, and trials are 1,000 ms apart. After the last trial the runner
+keeps the reference input field running for `settle_ms` (1,000 ms by default; about 1,070 ms in these runs), so
+the window after the last commit is observed; `settle_ms` must not be set below the window.
+
 A session that overlaps two or more trials is excluded, with every trial it overlaps (`carry_over` in
 `kit/analysis/gt_sessions.py`), and the number of such trials is reported separately. The carried trial is left
 without a session of its own, and the later trial's session contains the earlier trial's text, so neither is an

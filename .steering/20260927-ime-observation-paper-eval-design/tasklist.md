@@ -109,7 +109,7 @@
     - [x] 持ち越し（判断 87・研究者）: `gt_sessions.py` に除外の理由 `carry_over`（2 試行とも）
     - [x] `experiment/pilot-macos.md`（公開用の英語）: 条件・run・1 回目の所見と直し・呼び出し列の型（途中の自動確定を畳むと各シナリオ 1 形・例外 3 種を一次で数え直した）・正解の定義・oracle 一致率（example の規則と本実験の規則）・時計（ブロック 1〜5 のドリフトは ±5 ms/時以内・−200 ms/時はブロック 0 の起動直後の約 100 ms による）・到達・1 試行の時間・本番の設定
     - [ ] パイロットの生ログの置き場（除外の基準を先に書く・逆向きの到達を数える道具）
-    - [x] 完了時レビュー（Claude の 2 系統・判断 88）: MEDIUM 3 件・LOW 4 件を直した。Codex は予算の超過で保留（研究者に確かめる）
+    - [x] 完了時レビュー（Claude の 2 系統・判断 88）: MEDIUM 3 件・LOW 4 件を直した。Codex は判断 89（研究者の選択で今日だけ上限を 360,000 にして 1 回・P2 2 件・P3 1 件に対応・上限は 300,000 に戻した）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
