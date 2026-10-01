@@ -159,15 +159,17 @@
       - [x] minor 3・5・7〜16・nit（文）
       - [x] 確認（selftest・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・§9 の SHA-256・変異）→ 29 本緑・4 ファイルともバイト一致・違反 0・違反なし・exit 3・5 ファイル一致・節の参照はすべて実在。変異: 作業用エージェントの自己申告 19 本（赤 17・等価 1・pipeline の配線 1 は赤にならず判断 115 の 3 に記録）、メインの抜き取り 4 本（`l2.py` 1・`closed_set.py` 1・pipeline の新しい検査 1 は赤、`delivery.py` 1 は生き残り → selftest を足して赤）。本文 12,143 語
     - [x] attack-me round 4（round 3 の直しで変わった箇所だけ・判断 114・2026-10-02・G-GEAR）→ 記録 `attack-me/prereg-ime-macos/round-4/`。R1 major・R2 major・R3 minor・fatal 0・捏造 0 → 判定 major revision。研究者に 5 問 → 判断 116・117（すべて推奨どおり）
-    - [ ] round 4 の直し（判断 116・117・G-GEAR）
-      - [ ] Z1 §3.4 の中止の規則をブロックごとの区間で（`delivery.py` に区間ごとの「説明されない参照の key_down の数」・`pipeline.py` が同じ規則で拒む・selftest・§3.4 に命令行と窓の値・拒否の扱い・検査の対象・§6.3 は参照だけ・§3.2）〔コード〕。⚠️ 上限の数（かなキーを数えるか）は Mac の結果で決める
-      - [ ] Z2 問 3 のテキストの大きさの開示（§6.7・§7）
-      - [ ] minor 1 合わせ直しの錨を右に揃える・selftest（ブロック末の S7 の Enter の欠け）・§6.8・README〔コード〕
-      - [ ] minor 2 `per_trial` の空の層を null で・§6.7 に汚染の無い版で空の場面（S6・S13）〔コード〕
-      - [ ] minor 5 `spec_predict.py --from-plan` に層ごとの Σm²/Σm（計画・主の範囲）・§3.3 の「usually near 1」・最小の主の層の半幅〔コード〕
-      - [ ] minor 3・4・6・7・8・nit 8 件（文）
-      - [ ] 確認（selftest・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・§9 の SHA-256・節の参照・変異）
-    - [ ] ★ Mac（判断 113 の Y4 ＋ 判断 117 の Z3・凍結の前）: (1) `pilot-macos.md` の Raw logs に預ける基準（時点は凍結の前・観測の余分な行は本計測と同じ扱い）と「封印したセッション行は預けるときだけ開け、解析しない」 (2) `pilot2-on`・`pilot2-off`・`verify-off` の観測の key 行に `align_plan` だけを `--markers-in-obs` とパイロットの 3 打鍵の印で流し、採点されたブロックの割合を §3.1 に（診断） (3) 同じ run の参照のログに `delivery.py` → かなキーと S14 のモードキーが参照に残るか・ブロックごとの「説明されない数」を §3.1 に書き、Z1 の上限を決める
+    - [x] round 4 の直し（判断 116・117・G-GEAR・実装の選択は判断 118・`4bd6cacd`・点検の後は判断 119・120）
+      - [x] Z1 §3.4 の中止の規則をブロックごとの区間で（`delivery.py` に区間ごとの「説明されない参照の key_down の数」・`pipeline.py` が同じ規則で拒む・selftest・§3.4 に命令行と窓の値・拒否の扱い・検査の対象・§6.3 は参照だけ・§3.2）〔コード〕。⚠️ 上限の数（かなキーを数えるか）は Mac の結果で決める → 作業用エージェント A（Sonnet）。`delivery.py` に `segments`（両側）・`pipeline.py` に `reference_abort_segments` と暫定の `RUNNER_KANA_PRESSES_PER_BLOCK = 1`
+      - [x] Z2 問 3 のテキストの大きさの開示（§6.7・§7）→ k の数は `plan_figures` から再現（作業用エージェント C・メインが出力で照合）
+      - [x] minor 1 合わせ直しの錨を右に揃える・selftest（ブロック末の S7 の Enter の欠け）・§6.8・README〔コード〕→ 作業用エージェント B（Sonnet）。selftest 151 件・open_set 133 件が緑。メインの変異 1 本（左端の条件を戻す）で 14 件が赤
+      - [x] minor 2 `per_trial` の空の層を null で・§6.7 に汚染の無い版で空の場面（S6・S13）〔コード〕→ 作業用エージェント C（`status`・層ごとの `trials_not_used`）。S6・S13 が 0 試行なことはメインが予測の出力で数えた
+      - [x] minor 5 `spec_predict.py --from-plan` に層ごとの Σm²/Σm（計画・主の範囲）・§3.3 の「usually near 1」・最小の主の層の半幅〔コード〕→ `plan_figures`。本番の 2 計画（SHA-256 一致）で 2.36〜3.13 / 2.47〜3.43・33〜39 / 30〜37 ブロック・主の範囲の最大 3.05（S14 mid）/ 3.22（S15 mid）・k の分布がすべて再現
+      - [x] minor 3・4・6・7・8・nit 8 件（文）→ OFF の carried out 186 のうち 185 が後の試行へ続く（残る 1 つは試行の外の打鍵で打ち切り）をメインが予測の出力で数えた
+      - [x] 確認（selftest・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・§9 の SHA-256・節の参照・変異） → 29 本緑・4 ファイルともバイト一致・違反 0・違反なし・exit 3・5 ファイル一致・節の参照はすべて実在。変異: 作業用エージェントの自己申告 16 本・メインの抜き取り 3 本ですべて赤。本文 13,422 語
+      - [x] 作業中の点検（code-reviewer ∥ security-checker・`b1c3f213..4bd6cacd`）→ security HIGH 1・MEDIUM 2・LOW 3、code-reviewer MEDIUM 4・LOW 8（M2 の一部と範囲外の気づきは偽）。研究者に 2 問 → 判断 119（`--pack` で全 run に §3.4 を強制・S15 以外の焦点の喪失を中止に足す）。直しは作業用エージェント D ＋ メイン（判断 120）
+      - [x] 点検の指摘の直しの確認（29 本緑・バイト一致・違反 0・違反なし・exit 3・節の参照・本文 13,902 語）
+    - [ ] ★ Mac（判断 113 の Y4 ＋ 判断 117 の Z3 ＋ 判断 119・120・凍結の前・引き継ぎ `next-session-ime-paper-m3-mac-work.md`）: (1) `pilot-macos.md` の Raw logs に預ける基準（時点は凍結の前・観測の余分な行は本計測と同じ扱い）と「封印したセッション行は預けるときだけ開け、解析しない」 (2) `pilot2-on`・`pilot2-off`・`verify-off` の観測の key 行に `align_plan` だけを `--markers-in-obs` とパイロットの 3 打鍵の印で流し、採点されたブロックの割合を §3.1 に（診断） (3) 同じ run の参照のログに `delivery.py` → かなキーと S14 のモードキーが参照に残るか・ブロックごとの「説明されない数」を §3.1 に書き、Z1 の上限を決める
     - [ ] attack-me round 5（§3.4・§3.1・§6.7・`delivery.py`・`closed_set.py` に絞る・G-GEAR・判断 117）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
