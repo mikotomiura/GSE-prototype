@@ -12,7 +12,11 @@
 
 ## §0 打ち込む用
 
-### A. M1 の枝の PR（どちらの機械でも・先に）
+> ★★★ **A は 2026-10-01 に終わった**（G-GEAR）。PR #283 で main に入った（merge `0081efe7`・main の CI success）。経緯は判断 81〜84 と `tasklist.md`。→ **次は B**。B は main から新しい枝を切って始める。
+> ⚠️ B を始めたら、最初に `tasklist.md` の「⚠️ Mac: 024-acceptance.sh を回し…」の項目を済ませる。一覧の SHA-256 を G-GEAR の値と比べる（判断 68）。あわせて `build.sh` と、例の `focus_cmd` の前面の確認（§3-7）を確かめる。
+> ⚠️ 生成器は、パイロットの config（マーカー ← → ←・`nav_count_max` ≥ 3）だと計画を作らずに止まるようになった（§3-6・判断 84）。本番の n・think を研究者に確かめるときに、マーカーの長さもあわせて決める。
+
+### A. M1 の枝の PR（どちらの機械でも・先に）〔済み・PR #283〕
 
 ```
 git fetch → git switch feature/ime-m1-pilot → git pull --no-rebase（force しない）。

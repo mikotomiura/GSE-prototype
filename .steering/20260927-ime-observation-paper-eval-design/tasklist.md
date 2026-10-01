@@ -90,14 +90,16 @@
   - [x] M0 コーパスの確定（2026-09-30・Mac・判断 79）: 研究者の承認で新字新仮名の 12 作品を青空文庫から取得 → `--seed 1 --per-work 150`（読み 6〜30・既定）で 1,800 句・SHA-256 `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620`・`SudachiPy==0.7.0` / `sudachidict-core==20260723.1` を `kit/corpus/requirements.txt` に pin・`--validate` exit 0・2 回の書き出しでバイト一致・`experiment/data.md` に 6 項目と出典の作品表（`fece8020`）。`kit/check.sh` 緑・書き出し器が通る（91 ファイル）・仮の config で両 OS の計画の各シナリオ 225 試行がすべて別の句
     → PR #278。⚠️ /cross-review は**研究者の判断でスキップ**（コードの変更 0 行・差分はコーパスのデータと data.md と steering）。CI: Mac の check の 1 回目は runner の通信切れ（"lost communication with the server"・手順は未実行）→ 失敗ジョブだけ再実行して緑
   - [x] M1 macOS の較正パイロット（2026-10-01・Mac・`pilot-macos-1-notes.md`）: 1 回目で所見 6 件（変換後の Enter が確定しない・マーカー F13 が観測されない・bundle id・最初の IME の状態・自動確定・所要時間）→ 原因を実機で切り分け（IME 本来の挙動・研究者の手打ちでも同じ）→ recipes とマーカーを直して（判断 80・`b38b9904`・`3e729f99`）ON / OFF の再パイロットで確認（持ち越し ON 2 / 126・OFF 0 / 39）。ImeShadow は封印して読んでいない
-  - [ ] M1 の枝 `feature/ime-m1-pilot` の PR（2026-10-01・G-GEAR・引き継ぎ `next-session-ime-paper-m2.md` §2）
+  - [x] M1 の枝 `feature/ime-m1-pilot` の PR（2026-10-01・G-GEAR・引き継ぎ `next-session-ime-paper-m2.md` §2）→ **PR #283・merge `0081efe7`**
     - [x] PR の前の整え: `GENERATOR_VERSION` 1.2.0・OFF 用の手順書も selftest で照合・`_scenario_checks` の既定を無くす・`cell.example.json` の layout を JIS に（判断 81・`5e9f873a`）
     - [x] origin/main（`97381a7b`）を取り込む（衝突 1 件: after-merge の handoff の §6 → Mac の方を §7 に・`5a9cc805`）
     - [x] clean な checkout（`5a9cc805`）で Windows で回る全 acceptance 22 本: 失敗は SCOPE と GUARD だけ（どちらも main の上で比較の基準が `feature/ime-eval-kit` の merge-base になるため・B15 の型）。GUARD は #279 の `scripts/run-codex-consult.sh` を拾った。この枝だけの差分（`97381a7b..5a9cc805`）に `src-tauri/` `src/` `scripts/` `.github/` は 0 件。macOS 専用の 004 / 007 / 012 は exit 2。024 の一覧の SHA-256 `4f7c7bea9f35ef489f501ad1f1dbbc97402d02d8af08f9a6365ae89f3603dbb5`（92 ファイル・直す前の値）
     - [x] 完了時レビュー 1 巡目（Claude）: code-reviewer ∥ security-checker → CRITICAL / HIGH 0 → 指摘を判断 82 のとおり直した（マーカーの長さの検査ほか）
     - [x] 完了時レビュー（Codex）: 研究者の選択で上限を一時的に 350,000 に上げて 1 回（33,557）→ P1 2 件（`closed_set.py` の手順書の照合・`focus_cmd` の同意と順序）・P2 2 件（持ち越し → M2 へ・OFF の S11 を空に）→ 判断 83 のとおり直し、上限を 300,000 に戻した。2 巡目（今回足した規則の境界条件）は予算の都合で Claude の code-reviewer で見る
     - [x] 完了時レビュー 2 巡目（code-reviewer・`5a9cc805..8ae9ccd1`）: HIGH 1（手順書の改行で SHA-256 が変わる → `.gitattributes`）・MEDIUM 5（マーカーの検査を `plan_rows` へ移して観測に残る並びと計画の実際の連続で判定・E2 は config も照合・前面の確認を 5 回まで読み直す ほか）→ 判断 84 のとおり直した
-    - [ ] push → PR → CI 緑なら merge → main の CI
+    - [x] origin/main（#281）を 2 度目に取り込む（衝突は Codex の台帳の today だけ → 和 324,731 / 8 回・`f2c98d22`）。最後の commit の clean な checkout で Windows で回る全 acceptance 22 本: 失敗は SCOPE と GUARD だけ（B15）・macOS 専用の 004 / 007 / 012 は exit 2。024 の一覧の SHA-256 `f3271b3aa4700d7e515954736c8540a8ef11c7276c5a4389c6ca345a7f44a118`（92 ファイル・Windows）
+    - [x] push → PR #283 → CI → merge → main の CI（2026-10-01）: PR のイベントの run（36814196074）で Mac の check が **runner の通信切れ**（`Cargo test` の途中・"The self-hosted runner lost communication with the server"）で赤 → 研究者に AskUserQuestion で確かめ、失敗したジョブだけを再実行して緑（attempt 2・5 分 44 秒）。同じ commit の push のイベントの run（36814170682）は Mac も Windows も緑だった → merge（`0081efe7`）→ main の CI（36817877790）success（Mac / Windows の check・frontend-check）
+    - [ ] ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が G-GEAR の `f3271b3a…a118`（92 ファイル）と一致するか（判断 68・`papers/` が `f2c98d22` と同じ内容の commit で）。あわせて `build.sh` と、例の `focus_cmd` の前面の確認（引き継ぎ §3-7）
   - [ ] M2 の残り: 正解の定義（`gt_rules` の `mac_nstic`・ON の型は 2 形）・本番の n / think の上限（1 セル約 10 時間・研究者）・`experiment/pilot-macos.md`（公開用の英語）・パイロットの生ログの置き場（公開物に含める）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
