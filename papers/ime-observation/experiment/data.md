@@ -22,29 +22,36 @@ used are printed when the analysis ends.
 
 ## Run checks (section 3.4 of the pre-registration)
 
-| Cell label | Attempt | Checked at | SHA-256 of the plan | `delivery.py` exit status | Largest `n_unexplained_beyond_markers`, segments before the last / k | `n_unexplained_beyond_markers`, last segment | Counts as aborted |
-|---|---|---|---|---|---|---|---|
-| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
+One line per attempt, also for an attempt that the runner aborted. The two settings of the rule on presses (k, and
+whether the input-mode keys of S14 count among the presses sent) are fixed in section 3.1 of the pre-registration;
+they select the version of the segments (`all_presses` when the input-mode keys count, `excluding_mode_keys` when
+they do not) and the bound.
+
+| Cell label | Attempt | Aborted by the runner | Checked at | SHA-256 of the plan | `delivery.py` exit status | `max_beyond_markers_before_last_block` / k | `beyond_markers_last_block` | `n_loss_intervals_unplanned` | Counts as aborted | Deposited |
+|---|---|---|---|---|---|---|---|---|---|---|
+| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
 
 ## Deposit procedure
 
-1. Right after the run, before the next run of the order (section 3.2 of the pre-registration), and before any
-   analysis of the run, run on the run directory alone (it reads the key rows of the logs, not the session rows)
+1. Right after every attempt, also one that the runner aborted, before the next run of the order (section 3.2 of
+   the pre-registration), and before any analysis of the run, run on the run directory alone (it reads the key
+   rows of the logs and the focus changes of the reference, not the session rows)
 
    ```
    python3 kit/analysis/delivery.py --plan <run>/plan.jsonl --oracle <run>/oracle.jsonl --obs <run>/obs.jsonl \
      --gt <run>/gt.jsonl --pre-ms 20 --tail-ms 300 --out <report>
    ```
 
-   and check the plan's SHA-256 against section 2.4 of the pre-registration. The run counts as an aborted attempt
-   when the plan's SHA-256 differs, when the command exits with status 2, or when, in
-   `reference.segments.by_segment` of the report, `n_unexplained_beyond_markers` exceeds k in any segment but the
-   last, or exceeds 0 in the last segment (k is fixed in section 3.1 of the pre-registration). Such a run is
-   neither analysed nor deposited, since its reference log may hold a person's key presses (section 3.4 of the
-   pre-registration). No other reason and no explanation is admitted. Record the
-   result of this check and its time in the table of run checks above before any analysis. Rows of the observation
-   without a sent press are a result of the observer under test: they are reported (section 6.3) and do not stop
-   the run from being analysed or deposited.
+   and check the plan's SHA-256 against section 2.4 of the pre-registration. A completed run counts as an aborted
+   attempt when the plan's SHA-256 differs, when the command exits with status 2, when, in the version of
+   `reference.segments` that section 3.1 selects, `max_beyond_markers_before_last_block` exceeds k or
+   `beyond_markers_last_block` exceeds 0, or when `reference_focus_loss.n_loss_intervals_unplanned` is greater than
+   0. Such a run is neither analysed nor deposited, since its logs may hold a person's key presses (section 3.4 of
+   the pre-registration). A run that the runner aborted is never analysed; it is deposited only when the same check
+   passes, or when it left neither a reference log nor an observation log. No other reason and no explanation is admitted. Record the result
+   of this check and its time in the table of run checks above before any analysis. Rows of the observation without
+   a sent press are a result of the observer under test: they are reported (section 6.3) and do not stop the run
+   from being analysed or deposited.
 2. Deposit only `run.json` and the four logs of a run directory: `plan.jsonl`, `oracle.jsonl`,
    `gt.jsonl` and `obs.jsonl`. A log that an aborted run recorded with a null hash need not exist.
 3. Do not deposit the `*.stderr.txt` files or `runner.error.txt`. They stay on the measuring machine.
@@ -54,7 +61,9 @@ used are printed when the analysis ends.
    (each may be given more than once). The command refuses, with exit status 1 and without writing the
    archive, a run in which any of the five files contains an absolute path (a drive letter, a UNC path,
    `/Users/`, `/home/`, `/Volumes/`, an MSYS drive path such as `/c/`), the home directory, the repository
-   path, a login name, or content in the ground-truth or observation log; it exits with status 2 when a log
+   path, a login name, or content in the ground-truth or observation log, and a run, completed or aborted by the
+   runner, that the rules of section 3.4 of the pre-registration catch or that cannot be checked (an observation
+   log without a reference log, or logs that `delivery.py` refuses); it exits with status 2 when a log
    no longer matches the hash recorded in `run.json`. Only paths that begin with `~` or `<repo>`, and
    relative paths, are allowed. It never overwrites an existing archive, writes the files in a fixed order
    with fixed times so that packing twice gives the same bytes, checks the contents of the archive again,

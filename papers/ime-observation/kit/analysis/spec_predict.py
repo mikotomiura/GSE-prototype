@@ -560,11 +560,12 @@ def _layer_figures(blocks):
 
 def _range_figures(layers):
     """The smallest and the largest sum_m2_over_sum_m, and of n_blocks, over the layers with a trial;
-    max_layer names the layer of the largest sum_m2_over_sum_m ("S14/mid"). All null without such a layer."""
+    max_layer names the layer of the largest sum_m2_over_sum_m ("S14/mid"; when several layers share it, the first
+    in the order of the layers). All null without such a layer."""
     have = [(k, v) for k, v in layers if v["n_trials"] > 0]
     if not have:
         return {"min": None, "max": None, "max_layer": None, "n_blocks_min": None, "n_blocks_max": None}
-    top = max(have, key=lambda kv: (kv[1]["sum_m2_over_sum_m"], kv[0]))
+    top = max(have, key=lambda kv: kv[1]["sum_m2_over_sum_m"])
     return {"min": min(v["sum_m2_over_sum_m"] for _k, v in have), "max": top[1]["sum_m2_over_sum_m"],
             "max_layer": "%s/%s" % top[0],
             "n_blocks_min": min(v["n_blocks"] for _k, v in have), "n_blocks_max": max(v["n_blocks"] for _k, v in have)}
