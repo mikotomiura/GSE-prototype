@@ -7,6 +7,17 @@ and the plan. The observation is not read. Uses only the Python standard library
   spec_predict.py --oracle ORACLE --plan PLAN [--keymap KEYMAP.json] --out OUT.json
   spec_predict.py --selftest
 
+The output (format spec_predict/1) holds every predicted session (its start and end on the oracle's
+wall clock, nav, abandon, how it ended: row, truncated or open, and the trials in which it started and
+ended), the counts, and per trial: whether a session it started reaches the cut-off (long), whether one
+ends after the trial (carried_out), how many it started (n_started; 0 for a trial whose presses all
+went into a session carried over from an earlier trial), and whether the trial sends one of the keys
+that type a long-vowel mark, comma or full stop (closing_key_in_reading; the observer's rules close a
+session at these keys, so a reading that contains one is split). Two adapters put the prediction into
+the shapes the matcher reads: as_obs_bytes (the predicted rows as an observation log, obs/1) and
+as_sessions_bytes (the predicted rows as reference sessions, in the form of gt_sessions.py's output,
+with the exclusions of the ground truth).
+
 Why this exists. On macOS the observer infers each conversion session from key presses, so some
 disagreements with the ground truth follow from its rules alone and can be predicted before any
 observation is read (for example, Backspace keeps a session open, and Tab or a punctuation key
@@ -67,11 +78,16 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import gt_sessions  # noqa: E402  oracle parser
+import match  # noqa: E402  trial attribution (the same rule as for the ground truth and the observation)
 
 LIMIT_MS = 20000
 DEFAULT_KEYMAP = os.path.join(_HERE, "..", "emit", "keymap_macos.json")
 PSEUDO_KEYS = ("focus_away", "focus_back")
 MODIFIER_KEYS = ("shift",)
+# The keys that type a long-vowel mark, a comma and a full stop, in Romaji and in kana input alike. They
+# are the only keys of a typed reading that the observer's rules treat as closing a session (the
+# selftest checks their class).
+READING_CLOSERS = ("minus", "comma", "period")
 
 # macos_vk_to_vk's explicit entries (macOS key code -> virtual-key code). Any other code passes
 # through unchanged. The selftest compares this table with kit/logger/src/driver_macos/keymap.rs.
@@ -286,10 +302,19 @@ def predict_rows(oracle, plan, keymap, limit_ms=LIMIT_MS):
     return m.sessions
 
 
-def summarise_trials(sessions, trial_ids):
+def closer_trials(oracle):
+    """The trials that send a press of one of READING_CLOSERS."""
+    return set(r.get("trial_id") for r in oracle["rows"]
+               if r["kind"] == "sent" and r.get("down") is True and r.get("key") in READING_CLOSERS)
+
+
+def summarise_trials(sessions, trial_ids, closers=()):
     """Per trial: the predicted sessions it started, whether one of them reaches the cut-off (long),
-    whether one ends after the trial (carried_out), and how many it started (split when > 1)."""
-    out = dict((tid, {"sessions": [], "long": False, "carried_out": False}) for tid in trial_ids)
+    whether one ends after the trial (carried_out), how many it started (split when > 1), and
+    whether it is in closers (closing_key_in_reading)."""
+    closers = set(closers)
+    out = dict((tid, {"sessions": [], "long": False, "carried_out": False,
+                      "closing_key_in_reading": tid in closers}) for tid in trial_ids)
     for i, s in enumerate(sessions):
         tid = s["start_trial"]
         if tid not in out:
@@ -312,6 +337,54 @@ def as_obs_rows(sessions):
              "abandon": s["abandon"]} for s in sessions if s["end"] == "row"]
 
 
+def _lines(rows):
+    return ("\n".join(json.dumps(r, sort_keys=True, separators=(",", ":")) for r in rows) + "\n").encode("utf-8")
+
+
+def as_obs_bytes(pred):
+    """The predicted rows as an observation log (obs/1: a header, then the ime_shadow rows in time
+    order). The matcher reads only the rows; the header names the source."""
+    hdr = {"type": "meta", "format": "obs/1", "os": "macos", "source": "spec_predict",
+           "inputs_sha256": pred["inputs_sha256"]}
+    rows = sorted(as_obs_rows(pred["sessions"]), key=lambda r: (r["t"], r["dwell_ms"], r["nav"], r["abandon"]))
+    return _lines([hdr] + rows)
+
+
+def as_sessions_bytes(pred, sessions_bytes, oracle_bytes):
+    """The predicted rows as reference sessions, in the form of gt_sessions.py's output, so that the
+    observation can be matched against the prediction. Each row becomes a session over [start, end]
+    (outcome cancel when abandon is set, otherwise commit; nav_true = the predicted nav), attributed to
+    the trial it overlaps most, as the ground truth is. The exclusions of the ground truth
+    (sessions_bytes) are carried over unchanged, so that every comparison covers the same trials. The
+    oracle must be the one the prediction was made from."""
+    if hashlib.sha256(oracle_bytes).hexdigest() != pred["inputs_sha256"]["oracle"]:
+        raise InputError("oracle: not the oracle the prediction was made from")
+    try:
+        gt = json.loads(sessions_bytes.decode("utf-8"))
+        oracle = gt_sessions.parse_oracle(oracle_bytes)
+    except (ValueError, UnicodeDecodeError, gt_sessions.InputError) as e:
+        raise InputError("sessions / oracle: %s" % e)
+    if not isinstance(gt, dict) or not isinstance(gt.get("excluded"), list):
+        raise InputError("sessions: not gt_sessions.py's output (no excluded list)")
+    trials = sorted(oracle["trials"], key=lambda t: (t["begin_wall_ms"], t["end_wall_ms"]))
+    begins = [t["begin_wall_ms"] for t in trials]
+    rows = []
+    for s in pred["sessions"]:
+        if s["end"] != "row":
+            continue
+        lo, hi = s["start_wall_ms"], s["end_wall_ms"]
+        rows.append({"trial_id": match._assign_trial(lo, hi, trials, begins), "start_wall_ms": lo, "end_wall_ms": hi,
+                     "start_mono_ns": None, "end_mono_ns": None,
+                     "outcome": "cancel" if s["abandon"] else "commit", "candidate_shown": None,
+                     "nav_true": s["nav"], "nav_true_cand": None, "excluded_by": [], "n_start_while_open": 0})
+    rows.sort(key=lambda r: (r["start_wall_ms"], r["end_wall_ms"], json.dumps(r, sort_keys=True)))
+    out = {"src": "spec_predict", "rules_sha256": None,
+           "definitions": {"all": rows, "macos_def": rows, "windows_def": None},
+           "oracle_agreement": {"plan_available": False, "n_trials": None},
+           "excluded": gt["excluded"]}
+    return (json.dumps(out, sort_keys=True, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
 def predict(oracle_bytes, plan_bytes, keymap, limit_ms=LIMIT_MS):
     """The CLI's core (bytes in, an output dict out). Identical input always yields an identical dict."""
     plan = parse_plan(plan_bytes)
@@ -325,7 +398,7 @@ def predict(oracle_bytes, plan_bytes, keymap, limit_ms=LIMIT_MS):
     if not isinstance(want, str) or want.lower() != plan["sha256"]:
         raise InputError("plan: SHA-256 does not match the oracle header's plan_sha256 (unrelated plan)")
     sessions = predict_rows(oracle, plan, keymap, limit_ms)
-    trials = summarise_trials(sessions, [t["trial_id"] for t in oracle["trials"]])
+    trials = summarise_trials(sessions, [t["trial_id"] for t in oracle["trials"]], closer_trials(oracle))
     counts = {"row": 0, "truncated": 0, "open": 0}
     for s in sessions:
         counts[s["end"]] += 1
@@ -336,6 +409,7 @@ def predict(oracle_bytes, plan_bytes, keymap, limit_ms=LIMIT_MS):
                        "n_carried_out": sum(1 for d in trials.values() if d["carried_out"]),
                        "n_split": sum(1 for d in trials.values() if d["n_started"] > 1),
                        "n_none": sum(1 for d in trials.values() if d["n_started"] == 0),
+                       "n_closing_key_in_reading": sum(1 for d in trials.values() if d["closing_key_in_reading"]),
                        "by_trial": trials},
             "sessions": sessions}
 
@@ -434,6 +508,10 @@ def _case_keymap():
         f.append("Eisu should close and Kana should open the input mode")
     if mode_after(VK_KANJI, True, False) is not True or mode_after(VK_KANJI, False, False) is not False:
         f.append("the Kanji key should toggle on press only")
+    km = load_keymap(DEFAULT_KEYMAP)
+    for name in READING_CLOSERS:
+        if vk_class(mac_to_vk(km[name])) != OTHER:
+            f.append("%s (in READING_CLOSERS) should close a session under the emitter's key map" % name)
     return f
 
 
@@ -547,7 +625,7 @@ def _fixture():
 
 def _keymap_fixture():
     return {"k": 0x28, "a": 0x00, "space": 0x31, "enter": 0x24, "backspace": 0x33, "tab": 0x30,
-            "left": 0x7B, "right": 0x7C, "shift": 0x38}
+            "left": 0x7B, "right": 0x7C, "shift": 0x38, "minus": 0x1B}
 
 
 def _case_end_to_end():
@@ -585,6 +663,49 @@ def _case_marker_inside_session():
     s = out["sessions"][1]
     if not (s["start_trial"] == "t2" and s["nav"] == 2 and s["end"] == "truncated" and s["end_trial"] == "t4"):
         f.append("a session open across the block boundary: %r" % s)
+    return f
+
+
+def _case_closers_and_adapters():
+    """closing_key_in_reading marks only the trial that sends a closer; the two adapters give what the
+    matcher reads (rows in time order; sessions attributed by overlap, with the ground truth's
+    exclusions), and a foreign oracle is refused."""
+    f = []
+    plan, oracle = _fixture()
+    if predict(oracle, plan, _keymap_fixture())["trials"]["n_closing_key_in_reading"] != 0:
+        f.append("Tab is not one of the reading's closers (t3 sends Tab only)")
+    oracle = oracle.replace(b'"key": "tab"', b'"key": "minus"')
+    pred = predict(oracle, plan, _keymap_fixture())
+    flags = dict((t, d["closing_key_in_reading"]) for t, d in pred["trials"]["by_trial"].items())
+    if flags != {"t1": False, "t2": False, "t3": True, "t4": False} or pred["trials"]["n_closing_key_in_reading"] != 1:
+        f.append("closing_key_in_reading: %r" % flags)
+    rows = match.parse_obs(as_obs_bytes(pred))
+    if [(r["t"], r["dwell_ms"]) for r in rows] != [(3000, 1000), (7200, 2200)]:
+        f.append("as_obs_bytes rows: %r" % rows)
+    excluded = [{"type": "clock_jump", "log": "gt", "trial_ids": ["t4"]}]
+    gt = json.dumps({"definitions": {"all": []}, "excluded": excluded}).encode("utf-8")
+    sb = as_sessions_bytes(pred, gt, oracle)
+    _src, sess, exc = match.parse_sessions(sb, "macos_def")
+    got = [(s["trial_id"], s["start_wall_ms"], s["end_wall_ms"], s["outcome"], s["nav_true"]) for s in sess]
+    # the second row spans t2 (700 ms of overlap) and t3 (200 ms): it belongs to t2
+    if got != [("t1", 2000, 3000, "commit", 0), ("t2", 5000, 7200, "commit", 0)] or exc != excluded:
+        f.append("as_sessions_bytes: %r / %r" % (got, exc))
+    if as_sessions_bytes(pred, gt, oracle) != sb or as_obs_bytes(pred) != as_obs_bytes(predict(oracle, plan, _keymap_fixture())):
+        f.append("the adapters should give the same bytes for the same input")
+    # attribution is by overlap, not by the trial the session started in: a row from the end of t1
+    # (2000-3600) into t2 (5000-5700) overlaps t1 by 100 ms and t2 by 600 ms
+    moved = dict(pred, sessions=[{"start_wall_ms": 3500, "end_wall_ms": 5600, "dwell_ms": 2100, "nav": 1, "abandon": True,
+                                  "end": "row", "start_trial": "t1", "end_trial": "t2"},
+                                 {"start_wall_ms": 100, "end_wall_ms": 200, "dwell_ms": 100, "nav": 0, "abandon": False,
+                                  "end": "truncated", "start_trial": None, "end_trial": None}])
+    _src, sess2, _exc = match.parse_sessions(as_sessions_bytes(moved, gt, oracle), "all")
+    if [(s["trial_id"], s["outcome"], s["nav_true"]) for s in sess2] != [("t2", "cancel", 1)]:
+        f.append("as_sessions_bytes should attribute by overlap and leave out sessions that are not rows: %r" % sess2)
+    try:
+        as_sessions_bytes(pred, gt, oracle + b"\n")
+        f.append("a foreign oracle was not refused")
+    except InputError:
+        pass
     return f
 
 
@@ -629,7 +750,8 @@ def _case_cli():
 def selftest():
     cases = [("rules", _case_rules), ("cutoff", _case_cutoff), ("keymap", _case_keymap),
              ("source", _case_source), ("end_to_end", _case_end_to_end),
-             ("marker_inside_session", _case_marker_inside_session), ("refusals", _case_refusals),
+             ("marker_inside_session", _case_marker_inside_session),
+             ("closers_and_adapters", _case_closers_and_adapters), ("refusals", _case_refusals),
              ("cli", _case_cli)]
     bad = 0
     for name, fn in cases:

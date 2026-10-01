@@ -7,7 +7,7 @@ Wilson 95% confidence interval. Uses only the Python standard library (statistic
 stats.py and are not reimplemented here).
 
   match.py --sessions S.json --definition all|macos_def|windows_def --obs OBS --plan PLAN --oracle ORACLE
-           [--config CFG.json] --out OUT.json
+           [--config CFG.json] [--prediction P.json [--scope all_trials|under_limit|over_limit]] --out OUT.json
   match.py --selftest      fast default (a few seconds)
 
 Interval geometry and matching (see the design document):
@@ -105,6 +105,21 @@ CLI (--sessions is gt_sessions.py's output; --definition selects one of its defi
     may end up false_pos). n_start_while_open (a diagnostic field) is not used to exclude anything by
     default; kept-session counts with n_start_while_open > 0 are reported per stratum in the output
     under "diagnostics.start_while_open".
+  - Prediction (--prediction, spec_predict.py's output for the same oracle and plan). The prediction
+    marks, from what was sent and the observer's specified rules alone, the trials whose session the
+    observer is specified to cut off at 20 seconds (long). --scope then selects the trials that enter
+    the matching, after the exclusions above and at the level of a trial, as exclusion does:
+    all_trials (every trial; the default and the only scope without a prediction), under_limit (the
+    trials that are not long) or over_limit (the long trials only: their sessions, and the rows
+    assigned to them, including the fragments that follow a cut-off). The items of the other trials
+    are set aside and counted (scope.set_aside); scope.long_trials lists the long trials. A ground-truth
+    session or row that belongs to no trial is under the limit.
+    With a prediction the output also holds diagnostics.prediction_layers: the detection metrics
+    restricted to the trials of each layer (pooled and per speed, counted from the same matching):
+    carried_out (the trial started a session that ends in a later trial), received_carry (the trial
+    started no session, n_started == 0; in this design, its presses went into a session carried over
+    from an earlier trial), closing_key_in_reading (the trial sends a key that types a long-vowel mark,
+    comma or full stop) and none (a trial in none of the three). A trial can be in several layers.
   - The output never includes a path, and identical input always yields identical output bytes
     (sort_keys, LF, UTF-8, no BOM). The input files' SHA-256 hashes are retained.
 
@@ -130,6 +145,9 @@ SCENARIO_RE = re.compile(r"^S([1-9]|1[0-5])$")
 SPEEDS = ("slow", "mid", "fast")
 CELL_RE = re.compile(r"^[A-Za-z0-9_.+-]{1,64}$")
 DEFINITIONS = ("all", "macos_def", "windows_def")
+SCOPES = ("all_trials", "under_limit", "over_limit")
+PREDICTION_LAYERS = ("carried_out", "received_carry", "closing_key_in_reading", "none")
+PREDICTION_FORMAT = "spec_predict/1"
 
 
 # ---------------------------------------------------------------- interval geometry
@@ -455,7 +473,7 @@ def _metrics_row(label, c, names):
     }
 
 
-def detection_metrics(result, strata=None, theta=0.5, obs_end_offset_ms=0):
+def detection_metrics(result, strata=None, theta=0.5, obs_end_offset_ms=0, recount=None):
     """Turn match()'s return value into per-stratum detection metrics; see the module docstring.
 
     strata: None (everything in a single stratum, "all") or {"gt": session -> label, "obs":
@@ -468,6 +486,8 @@ def detection_metrics(result, strata=None, theta=0.5, obs_end_offset_ms=0):
     theta / obs_end_offset_ms: passed straight through to recount_split_merge() to compute the
     n_split_gt_recount / n_merge_obs_recount / n_fp_as_split / n_miss_as_merge fields and split_rate /
     merge_rate. They do not affect n_gt, n_obs, n_pairs, precision, recall or F1.
+    recount: recount_split_merge(result, theta, obs_end_offset_ms) when the caller already has it (the
+    same matching counted under several strata); computed here when None.
     """
     if strata is None:
         def gl(_s):
@@ -499,7 +519,7 @@ def detection_metrics(result, strata=None, theta=0.5, obs_end_offset_ms=0):
     for r in result["false_pos"]:
         bucket(ol(r))["fp"] += 1
 
-    rc = recount_split_merge(result, theta, obs_end_offset_ms)
+    rc = recount_split_merge(result, theta, obs_end_offset_ms) if recount is None else recount
     split_recount_seen = {}
     for e in rc["split"]:
         bucket(ol(e["obs"]))["fp_as_split"] += 1
@@ -693,6 +713,52 @@ def parse_config(data):
     return cfg
 
 
+def parse_prediction(data, oracle_sha256, plan_sha256):
+    """Parse spec_predict.py's output into {"sha256", "long": set of trial ids, "layers": {layer: set of
+    trial ids}} (see PREDICTION_LAYERS). A prediction made from another oracle or plan is refused."""
+    obj = _json_loads(_decode(data, "prediction"), "prediction", True)
+    if not isinstance(obj, dict) or obj.get("format") != PREDICTION_FORMAT:
+        raise InputError("prediction: not spec_predict.py's output (format %s)" % PREDICTION_FORMAT)
+    ins = obj.get("inputs_sha256")
+    if not isinstance(ins, dict) or ins.get("oracle") != oracle_sha256 or ins.get("plan") != plan_sha256:
+        raise InputError("prediction: made from another oracle or plan (unrelated input)")
+    trials = obj.get("trials")
+    by = trials.get("by_trial") if isinstance(trials, dict) else None
+    if not isinstance(by, dict):
+        raise InputError("prediction: trials.by_trial is missing")
+    long_trials = set()
+    layers = dict((k, set()) for k in PREDICTION_LAYERS)
+    for tid, d in by.items():
+        if not isinstance(d, dict) or any(type(d.get(k)) is not bool for k in ("long", "carried_out", "closing_key_in_reading")) \
+                or not (_is_int(d.get("n_started")) and d["n_started"] >= 0):
+            raise InputError("prediction: an entry of trials.by_trial has the wrong shape")
+        if d["long"]:
+            long_trials.add(tid)
+        if d["carried_out"]:
+            layers["carried_out"].add(tid)
+        if d["n_started"] == 0:
+            layers["received_carry"].add(tid)
+        if d["closing_key_in_reading"]:
+            layers["closing_key_in_reading"].add(tid)
+    marked = layers["carried_out"] | layers["received_carry"] | layers["closing_key_in_reading"]
+    layers["none"] = set(by) - marked
+    return {"sha256": hashlib.sha256(data).hexdigest(), "long": long_trials, "layers": layers}
+
+
+def _layer_metrics(result, members, gt_tid, obs_tid, speed_of, theta, off_end, recount):
+    """The detection metrics of the items whose trial is in members: pooled and per speed, counted from
+    the same matching (nothing is matched again)."""
+    def only(lab_of):
+        return lambda tid: lab_of(tid) if tid in members else None
+    by = detection_metrics(result, {"gt": lambda s: only(speed_of)(gt_tid(s)), "obs": lambda r: only(speed_of)(obs_tid(r))},
+                           theta, off_end, recount)
+    pooled = detection_metrics(result, {"gt": lambda s: only(lambda _t: "layer")(gt_tid(s)),
+                                        "obs": lambda r: only(lambda _t: "layer")(obs_tid(r))}, theta, off_end, recount)
+    pooled = [x for x in pooled if x["stratum"] == "layer"]
+    return {"n_trials": len(members), "pooled": pooled[0] if pooled else None,
+            "by_speed": [dict(x, stratum={"speed": x["stratum"]}) for x in by if x["stratum"] is not None]}
+
+
 def _block_windows(oracle):
     wins = {}
     for row in oracle["rows"]:
@@ -739,9 +805,10 @@ def _assign_trial(lo, hi, trials, begins):
     return None if best is None else best["trial_id"]
 
 
-def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, config_bytes=None):
+def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, config_bytes=None,
+             prediction_bytes=None, scope="all_trials"):
     """The CLI's core logic (bytes in, an output dict out). Identical input always yields an
-    identical dict."""
+    identical dict. prediction_bytes / scope: see "Prediction" in the module docstring."""
     src, sess, excluded = parse_sessions(sessions_bytes, definition)
     cfg = parse_config(config_bytes)
     plan = parse_plan_strata(plan_bytes)
@@ -749,6 +816,13 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
     want = oracle["plan_sha256"]
     if not isinstance(want, str) or want.lower() != plan["sha256"]:
         raise InputError("plan: SHA-256 does not match the oracle header's plan_sha256 (unrelated plan)")
+    if scope not in SCOPES:
+        raise InputError("scope must be one of %s" % ", ".join(SCOPES))
+    pred = None
+    if prediction_bytes is not None:
+        pred = parse_prediction(prediction_bytes, hashlib.sha256(oracle_bytes).hexdigest(), plan["sha256"])
+    elif scope != "all_trials":
+        raise InputError("scope %s needs a prediction (the long trials come from it)" % scope)
     rows = parse_obs(obs_bytes)
     cell = cfg["cell"] if cfg["cell"] is not None else plan["os"]
     off_end = cfg["obs_end_offset_ms"]
@@ -798,6 +872,15 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
             kept_obs.append(r)
             obs_tid[id(r)] = tid
 
+    # The scope (after the exclusions, at the level of a trial): the long trials come from the prediction.
+    set_aside = {"n_gt": 0, "n_obs": 0}
+    if scope != "all_trials":
+        want_long = scope == "over_limit"
+        in_gt = [s for s in kept_gt if (s.get("trial_id") in pred["long"]) == want_long]
+        in_obs = [r for r in kept_obs if (obs_tid[id(r)] in pred["long"]) == want_long]
+        set_aside = {"n_gt": len(kept_gt) - len(in_gt), "n_obs": len(kept_obs) - len(in_obs)}
+        kept_gt, kept_obs = in_gt, in_obs
+
     result = match(kept_gt, kept_obs, iou_min=cfg["iou_min"], obs_end_offset_ms=off_end)
 
     def label(tid):
@@ -806,6 +889,16 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
 
     strata = {"gt": lambda s: label(s.get("trial_id")), "obs": lambda r: label(obs_tid.get(id(r))),
               "names": ["cell", "scenario", "speed"]}
+    theta = cfg["theta"]
+    recount = recount_split_merge(result, theta, off_end)
+    layers = None
+    if pred is not None:
+        def speed_of(tid):
+            info = plan["trials"].get(tid)
+            return info["speed"] if info else None
+        layers = dict((L, _layer_metrics(result, pred["layers"][L], lambda s: s.get("trial_id"),
+                                         lambda r: obs_tid.get(id(r)), speed_of, theta, off_end, recount))
+                      for L in PREDICTION_LAYERS)
 
     # Diagnostic only: counts, per stratum, of kept ground-truth sessions with n_start_while_open > 0.
     # Not used to exclude anything unless config.drop_start_while_open is true.
@@ -817,7 +910,6 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
     swo_labels = sorted(swo_counts, key=lambda L: (L is None, _dump(L)))
     swo_by_stratum = [{"stratum": dict(zip(["cell", "scenario", "speed"], L)), "n": swo_counts[L]} for L in swo_labels]
 
-    theta = cfg["theta"]
     return {
         "src": src,
         "definition": definition,
@@ -827,16 +919,20 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
         "inputs_sha256": {
             "sessions": hashlib.sha256(sessions_bytes).hexdigest(), "obs": hashlib.sha256(obs_bytes).hexdigest(),
             "plan": plan["sha256"], "oracle": hashlib.sha256(oracle_bytes).hexdigest(),
-            "config": None if config_bytes is None else hashlib.sha256(config_bytes).hexdigest()},
+            "config": None if config_bytes is None else hashlib.sha256(config_bytes).hexdigest(),
+            "prediction": None if pred is None else pred["sha256"]},
         "input": {"n_gt": len(sess), "n_obs": len(rows)},
         "excluded": {
             "gt": {"n": n_gt_dropped, "by_reason": gt_reasons},
             "obs": {"n": n_obs_dropped, "by_reason": obs_reasons},
             "trials": {"n": len(trial_types), "by_type": _count_types(excluded)}},
+        "scope": {"name": scope, "set_aside": set_aside,
+                  "long_trials": None if pred is None else sorted(pred["long"])},
         "used": {"n_gt": len(kept_gt), "n_obs": len(kept_obs)},
-        "diagnostics": {"start_while_open": {"n": sum(swo_counts.values()), "by_stratum": swo_by_stratum}},
-        "metrics": {"by_stratum": detection_metrics(result, strata, theta, off_end),
-                    "pooled": detection_metrics(result, None, theta, off_end)[0] if (kept_gt or kept_obs) else None,
+        "diagnostics": {"start_while_open": {"n": sum(swo_counts.values()), "by_stratum": swo_by_stratum},
+                        "prediction_layers": layers},
+        "metrics": {"by_stratum": detection_metrics(result, strata, theta, off_end, recount),
+                    "pooled": detection_metrics(result, None, theta, off_end, recount)[0] if (kept_gt or kept_obs) else None,
                     "note": "pooled sums counts across strata without weighting them (a synthetic input has no "
                             "natural mixing proportion); treat the per-stratum figures as the primary estimates"},
         "matching": result,
@@ -1456,6 +1552,97 @@ def _cli_fixture():
             "oracle": oracle_bytes, "config": json.dumps({"clock_offsets_ms": {"1": 700}, "cell": "mac-std"}).encode("utf-8")}
 
 
+def _prediction_fixture(fx, long_trials=(), carried=(), none_started=(), closing=()):
+    """A spec_predict/1 object for _cli_fixture's oracle and plan (only the fields the matcher reads)."""
+    tids = ["t%05d" % i for i in range(1, 91)]
+    by = dict((t, {"long": t in long_trials, "carried_out": t in carried, "n_started": 0 if t in none_started else 1,
+                   "closing_key_in_reading": t in closing, "sessions": []}) for t in tids)
+    obj = {"format": PREDICTION_FORMAT, "limit_ms": 20000,
+           "inputs_sha256": {"oracle": hashlib.sha256(fx["oracle"]).hexdigest(), "plan": hashlib.sha256(fx["plan"]).hexdigest()},
+           "trials": {"n": len(tids), "by_trial": by}, "sessions": []}
+    return json.dumps(obj, sort_keys=True).encode("utf-8")
+
+
+def _case_prediction_scope():
+    """The scopes partition the kept trials by the prediction's long trials (under_limit + over_limit =
+    all_trials, including a false positive inside a long trial and a merge), all_trials with a
+    prediction gives the same metrics as without one, the layers count only their trials, and a missing
+    or foreign prediction is refused."""
+    f = []
+    fx = _cli_fixture()
+    long_t = ("t00016", "t00045", "t00050")
+    pb = _prediction_fixture(fx, long_trials=long_t, carried=("t00016",), none_started=("t00017",),
+                             closing=("t00021", "t00017"))
+
+    def ev(scope, pred=pb):
+        return evaluate(fx["sessions"], "macos_def", fx["obs"], fx["plan"], fx["oracle"], fx["config"], pred, scope)
+
+    plain, full, under, over = ev("all_trials", None), ev("all_trials"), ev("under_limit"), ev("over_limit")
+    if full["metrics"] != plain["metrics"] or plain["diagnostics"]["prediction_layers"] is not None:
+        f.append("all_trials with a prediction should give the metrics of no prediction")
+    if under["scope"]["long_trials"] != list(long_t) or under["scope"]["name"] != "under_limit":
+        f.append("scope.long_trials / name: %r" % under["scope"])
+    # t00016: two sessions and one merged row; t00045: one pair and a false positive; t00050: one pair
+    if over["used"] != {"n_gt": 4, "n_obs": 4} or under["scope"]["set_aside"] != {"n_gt": 4, "n_obs": 4}:
+        f.append("over_limit used %r / under_limit set aside %r" % (over["used"], under["scope"]["set_aside"]))
+    for k in ("n_gt", "n_obs"):
+        if under["used"][k] + over["used"][k] != full["used"][k]:
+            f.append("under_limit + over_limit should partition %s" % k)
+    po, pu, pf = over["metrics"]["pooled"], under["metrics"]["pooled"], full["metrics"]["pooled"]
+    if (po["n_merge_obs"], po["n_false_pos"], po["n_pairs"]) != (1, 1, 2) or pu["n_merge_obs"] != 0:
+        f.append("over_limit should hold the merge, the false positive and two pairs: %r" % po)
+    if pu["n_pairs"] + po["n_pairs"] != pf["n_pairs"]:
+        f.append("the pairs of the two scopes should add up to all_trials")
+    lay = full["diagnostics"]["prediction_layers"]
+    if sorted(lay) != sorted(PREDICTION_LAYERS):
+        f.append("layers: %r" % sorted(lay))
+    else:
+        if lay["carried_out"]["n_trials"] != 1 or lay["carried_out"]["pooled"]["n_merge_gt"] != 2:
+            f.append("carried_out layer: %r" % lay["carried_out"]["pooled"])
+        cl = lay["closing_key_in_reading"]["pooled"]
+        if lay["closing_key_in_reading"]["n_trials"] != 2 or (cl["n_split_gt"], cl["n_pairs"], cl["n_gt"]) != (1, 1, 2):
+            f.append("closing layer (a split and a pair): %r" % cl)
+        if lay["none"]["n_trials"] != 87 or lay["received_carry"]["n_trials"] != 1:
+            f.append("none / received_carry n_trials: %r / %r" % (lay["none"]["n_trials"], lay["received_carry"]["n_trials"]))
+        if lay["none"]["pooled"]["n_false_pos"] != pf["n_false_pos"] - 1:
+            f.append("the none layer should hold every false positive inside a trial of no layer")
+        by = lay["closing_key_in_reading"]["by_speed"]
+        if [(r["stratum"], r["n_gt"]) for r in by] != [({"speed": "slow"}, 2)]:
+            f.append("a layer's speeds should hold only its trials (both are in the slow block): %r" % by)
+    for name, fn in (("under_limit without a prediction", lambda: ev("under_limit", None)),
+                     ("an unknown scope", lambda: ev("some")),
+                     ("a prediction of another oracle", lambda: evaluate(fx["sessions"], "macos_def", fx["obs"], fx["plan"],
+                                                                       fx["oracle"] + b"\n", fx["config"], pb, "under_limit")),
+                     ("a malformed by_trial", lambda: ev("under_limit", pb.replace(b'"long": false', b'"long": 0', 1))),
+                     ("another format", lambda: ev("under_limit", pb.replace(PREDICTION_FORMAT.encode(), b"spec_predict/0")))):
+        try:
+            fn()
+            f.append("%s was not refused" % name)
+        except InputError:
+            pass
+    import contextlib
+    import io
+    with tempfile.TemporaryDirectory() as d:
+        paths = {}
+        for k in ("sessions", "obs", "plan", "oracle", "config"):
+            paths[k] = os.path.join(d, k)
+            with open(paths[k], "wb") as fh:
+                fh.write(fx[k])
+        paths["prediction"] = os.path.join(d, "prediction")
+        with open(paths["prediction"], "wb") as fh:
+            fh.write(pb)
+        base = ["--sessions", paths["sessions"], "--definition", "macos_def", "--obs", paths["obs"], "--plan", paths["plan"],
+                "--oracle", paths["oracle"], "--config", paths["config"]]
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            rc_ok = main(base + ["--prediction", paths["prediction"], "--scope", "over_limit", "--out", os.path.join(d, "o1")])
+            rc_bad = main(base + ["--scope", "over_limit", "--out", os.path.join(d, "o2")])
+        if rc_ok != 0 or json.loads(open(os.path.join(d, "o1"), encoding="utf-8").read())["used"] != over["used"]:
+            f.append("the CLI with --prediction / --scope should write the over_limit result")
+        if rc_bad != 2:
+            f.append("the CLI should exit 2 for --scope over_limit without --prediction")
+    return f
+
+
 def _case_cli():
     import contextlib
     import io
@@ -1614,6 +1801,7 @@ CASES = [
     ("F1's interval is always None", _case_f1_interval),
     ("t_gt_clock takes priority; t is never rewritten", _case_t_gt_clock),
     ("n_start_while_open's diagnostic role and drop_start_while_open", _case_start_while_open),
+    ("prediction: scopes partition the trials, layers count only their trials, refusals", _case_prediction_scope),
     ("CLI (exclusion, strata, clock correction, byte-identical output, exit 2)", _case_cli),
 ]
 
@@ -1654,21 +1842,24 @@ def main(argv):
     ap.add_argument("--plan")
     ap.add_argument("--oracle")
     ap.add_argument("--config")
+    ap.add_argument("--prediction")
+    ap.add_argument("--scope", choices=SCOPES, default="all_trials")
     ap.add_argument("--out")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
     if not (args.sessions and args.definition and args.obs and args.plan and args.oracle and args.out):
-        ap.error("--sessions / --definition / --obs / --plan / --oracle / --out are required (--config is optional)")
-    for inp in (args.sessions, args.obs, args.plan, args.oracle, args.config):
+        ap.error("--sessions / --definition / --obs / --plan / --oracle / --out are required (--config and --prediction are optional)")
+    for inp in (args.sessions, args.obs, args.plan, args.oracle, args.config, args.prediction):
         if inp and _same_file(inp, args.out):
             print("match: --out names the same file as an input (%s)" % inp, file=sys.stderr)
             return 2
     try:
         out = evaluate(_read(args.sessions, "sessions"), args.definition, _read(args.obs, "obs"),
                        _read(args.plan, "plan"), _read(args.oracle, "oracle"),
-                       None if args.config is None else _read(args.config, "config"))
+                       None if args.config is None else _read(args.config, "config"),
+                       None if args.prediction is None else _read(args.prediction, "prediction"), args.scope)
         _write_atomic(args.out, render(out))
     except (InputError, ValueError) as e:
         print("match: %s" % e, file=sys.stderr)

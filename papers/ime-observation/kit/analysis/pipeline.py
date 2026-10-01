@@ -35,10 +35,23 @@ channels among its capabilities. When the header places "ime_shadow" among the g
 ground-truth sessions but no "ime_shadow" row at all is then refused, because agreement cannot be
 judged from an empty channel. Any violation is listed and the run stops with exit status 1.
 
-Stages, per run directory (one cell): ground-truth sessions from gt, oracle and plan; then, for each of
-two session definitions (the one that follows the operating system in the plan header, macos_def or
-windows_def, and the common definition "all"), matching against the observation log, level 1 and level 2.
-Every result file holds cells[label][definition].
+Stages, per run directory (one cell): ground-truth sessions from gt, oracle and plan; for a macOS plan,
+the observer's specified rows predicted from the oracle and the plan (spec_predict.py, with the emitter's
+key map kit/emit/keymap_macos.json); then, for each of two session definitions (the one that follows the
+operating system in the plan header, macos_def or windows_def, and the common definition "all"),
+matching, level 1 and level 2 (run_stages). Three comparisons are matched: gt_obs (ground truth against
+the observation), gt_pred (ground truth against the predicted rows: the validity of the observer's rules)
+and pred_obs (the predicted rows against the observation: whether the observer carries out its rules).
+Each is matched under three scopes, which set aside, at the level of a trial, the trials whose session
+the observer is specified to cut off at 20 seconds (match.py --scope): under_limit, all_trials and
+over_limit. Level 1 is computed for every comparison under under_limit and all_trials, level 2 for gt_obs
+under all_trials and under_limit. The primary estimates are named in every result file ("primary"):
+gt_obs under under_limit for the detection and level 1, gt_obs under all_trials for level 2. A plan for
+another system has no prediction: only gt_obs under all_trials is run.
+Every result file holds cells[label][definition][comparison][scope]; a comparison that needs the
+prediction is null when there is none. e1_detection.json also holds, per cell, a summary of the
+prediction ("predictions": its hash, counts and the long trials per stratum) and whether the two
+definitions hold the same sessions ("same_sessions_as_all").
 
 Configuration CFG (JSON; keys starting with "_" are annotations and are not read):
   {"iou_min": 0.5, "obs_end_offset_ms": 0, "theta": 0.5, "drop_start_while_open": false,
@@ -64,9 +77,10 @@ exit status 3 when a mark is missing, malformed, duplicated or different. Only r
 rehearsals, not a defence against a person who edits a manifest. A synthetic result also carries
 "synthetic": true and is never written under experiment/results.
 
-Outputs (RESULTS_DIR): e1_l1.json, e1_l2.json and e1_detection.json. Each one carries the seed, the
-SHA-256 of the configuration, of the rule file, of every manifest and of every input log, and the
-per-cell results. No path is written to any of them, and identical inputs always give identical bytes
+Outputs (RESULTS_DIR): e1_l1.json, e1_l2.json, e1_detection.json and e1_delivery.json (the per-press delivery
+report of delivery.py, per cell: cells[label]). Each one carries the seed, the
+SHA-256 of the configuration, of the rule file, of the key map, of every manifest and of every input log,
+the primary comparison and scope, and the per-cell results. No path is written to any of them, and identical inputs always give identical bytes
 (sorted keys, LF, UTF-8, no BOM). The files are written to a temporary directory and moved into place; when
 the move fails, no result of an earlier run is left behind.
 
@@ -131,11 +145,13 @@ import zipfile
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
+import delivery  # noqa: E402  per-press delivery of the scripted input
 import gt_sessions  # noqa: E402  ground-truth sessions
 import inject  # noqa: E402  synthetic observation rows with known errors
 import l1  # noqa: E402  level 1
 import l2  # noqa: E402  level 2
 import match  # noqa: E402  pairing, detection metrics, file helpers
+import spec_predict  # noqa: E402  the observer's specified rows (the reference of the two-stage comparison)
 
 InputError = gt_sessions.InputError
 KIT = os.path.dirname(_HERE)
@@ -157,7 +173,18 @@ FROZEN_RE = re.compile(r"^frozen_at:[ \t]*[0-9]{4}-[0-9]{2}-[0-9]{2}")
 SHA_LINE_RE = re.compile(r"^sha256:[ \t]*([0-9a-f]{64})[ \t]*$")
 RUN_LINE_RE = re.compile(r"^- run_dir:[ \t]*(\S.*?)[ \t]+manifest_sha256:[ \t]*([0-9a-f]{64})[ \t]*$")
 ZIP_TIME = (1980, 1, 1, 0, 0, 0)
-RESULT_FILES = (("l1", "e1_l1.json"), ("l2", "e1_l2.json"), ("detection", "e1_detection.json"))
+RESULT_FILES = (("l1", "e1_l1.json"), ("l2", "e1_l2.json"), ("detection", "e1_detection.json"),
+                ("delivery", "e1_delivery.json"))
+COMPARISONS = ("gt_obs", "gt_pred", "pred_obs")
+L1_SCOPES = ("under_limit", "all_trials")
+L2_SCOPES = ("all_trials", "under_limit")
+PRIMARY = {"detection": {"comparison": "gt_obs", "scope": "under_limit"},
+           "l1": {"comparison": "gt_obs", "scope": "under_limit"},
+           "l2": {"comparison": "gt_obs", "scope": "all_trials"}}
+PRIMARY_NOTE = ("the primary estimates are the comparison and scope named here, per stratum; every other comparison "
+                "and scope is secondary. A cell without a prediction (the prediction models the macOS observer only) "
+                "has the comparison gt_obs and the scope all_trials only")
+DETECTION_KEYS = ("definition", "config", "inputs_sha256", "input", "excluded", "used", "diagnostics", "metrics")
 
 
 class CheckFailed(Exception):
@@ -557,9 +584,45 @@ def check_run(run, rules_bytes):
 
 # ---------------------------------------------------------------- stages
 
-def run_stages(run, cfg, rules_bytes, seed):
+def _prediction_summary(pred, pred_bytes, plan):
+    """What the result files keep of the prediction: its hash, counts and the long trials per stratum."""
+    if pred is None:
+        return {"available": False, "reason": "the prediction models the macOS observer only"}
+    per = {}
+    for tid, d in pred["trials"]["by_trial"].items():
+        info = plan["trials"].get(tid)
+        key = (info["scenario"], info["speed"]) if info else (None, None)
+        c = per.setdefault(key, [0, 0])
+        c[0] += 1
+        c[1] += 1 if d["long"] else 0
+    order = sorted(per, key=lambda k: (l2._scenario_key(k[0]), match.SPEEDS.index(k[1]) if k[1] in match.SPEEDS else 9))
+    return {"available": True, "sha256": _sha(pred_bytes), "limit_ms": pred["limit_ms"], "counts": pred["counts"],
+            "trials": dict((k, v) for k, v in pred["trials"].items() if k != "by_trial"),
+            "long_by_stratum": [{"scenario": k[0], "speed": k[1], "n_trials": per[k][0], "n_long": per[k][1]} for k in order]}
+
+
+def _detection_view(m_out):
+    """The part of a match output that the detection result keeps (the matching itself is not written;
+    the list of long trials is reduced to its number)."""
+    d = dict((k, m_out[k]) for k in DETECTION_KEYS)
+    s = m_out["scope"]
+    d["scope"] = {"name": s["name"], "set_aside": s["set_aside"],
+                  "n_long_trials": None if s["long_trials"] is None else len(s["long_trials"])}
+    return d
+
+
+def run_stages(run, cfg, rules_bytes, seed, keymap):
     """The stages for one run, for the definition of its operating system and for "all". Returns
-    {definition: (l1 output, l2 output, match output)} (JSON-ready dicts)."""
+    {"prediction": summary, "same_sessions_as_all": bool, "definitions": {definition: {"detection",
+    "l1", "l2"}}}; each of those maps a comparison to {scope: JSON-ready output} (None when the
+    comparison needs a prediction and there is none).
+
+    Comparisons: gt_obs (the ground truth against the observation), gt_pred (the ground truth against
+    the observer's specified rows, predicted from what was sent: the validity of the observer's rules)
+    and pred_obs (the predicted rows against the observation: whether the observer carries out its
+    rules). Scopes (match.py): under_limit, all_trials and over_limit for the detection; under_limit and
+    all_trials for level 1; all_trials and under_limit for level 2, which is run on gt_obs only. Without
+    a prediction (a Windows plan) only gt_obs over all_trials is run."""
     f = run["files"]
     plan = match.parse_plan_strata(f["plan"])
     if plan["os"] not in DEFINITION_OF_OS:
@@ -567,13 +630,35 @@ def run_stages(run, cfg, rules_bytes, seed):
     sc = _stage_configs(cfg, seed, run["label"])
     sessions = gt_sessions.assemble(f["gt"], f["oracle"], rules_bytes, f["plan"])
     sess_bytes = gt_sessions.render(sessions)
-    out = {}
-    for definition in (DEFINITION_OF_OS[plan["os"]], "all"):
-        m_out = match.evaluate(sess_bytes, definition, f["obs"], f["plan"], f["oracle"], sc["match"])
-        m_bytes = match.render(m_out)
-        l1_out = l1.evaluate(m_bytes, sess_bytes, f["plan"], f["oracle"], sc["l1"])
-        l2_out = l2.evaluate(m_bytes, sess_bytes, f["obs"], f["plan"], f["oracle"], sc["l2"])
-        out[definition] = (l1_out, l2_out, m_out)
+    pred = pred_bytes = None
+    comps = {"gt_obs": (sess_bytes, f["obs"])}
+    if plan["os"] == "macos":
+        pred = spec_predict.predict(f["oracle"], f["plan"], keymap, cfg["limit_ms"])
+        pred_bytes = spec_predict.render(pred)
+        comps["gt_pred"] = (sess_bytes, spec_predict.as_obs_bytes(pred))
+        comps["pred_obs"] = (spec_predict.as_sessions_bytes(pred, sess_bytes, f["oracle"]), f["obs"])
+    scopes = match.SCOPES if pred is not None else ("all_trials",)
+    def_os = DEFINITION_OF_OS[plan["os"]]
+    out = {"prediction": _prediction_summary(pred, pred_bytes, plan),
+           "same_sessions_as_all": sessions["definitions"][def_os] == sessions["definitions"]["all"],
+           "definitions": {}}
+    for definition in (def_os, "all"):
+        det, l1o, l2o = {}, {}, {}
+        for comp in COMPARISONS:
+            if comp not in comps:
+                det[comp] = l1o[comp] = None
+                continue
+            sb, ob = comps[comp]
+            det[comp], l1o[comp] = {}, {}
+            for scope in scopes:
+                m_out = match.evaluate(sb, definition, ob, f["plan"], f["oracle"], sc["match"], pred_bytes, scope)
+                det[comp][scope] = _detection_view(m_out)
+                if scope in L1_SCOPES:
+                    m_bytes = match.render(m_out)
+                    l1o[comp][scope] = l1.evaluate(m_bytes, sb, f["plan"], f["oracle"], sc["l1"])
+                    if comp == "gt_obs" and scope in L2_SCOPES:
+                        l2o.setdefault(comp, {})[scope] = l2.evaluate(m_bytes, sb, ob, f["plan"], f["oracle"], sc["l2"])
+        out["definitions"][definition] = {"detection": det, "l1": l1o, "l2": l2o}
     return out
 
 
@@ -644,19 +729,27 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
         raise CheckFailed(findings)
     listing = [{"cell": r["label"], "aborted": r["aborted"], "logs_sha256": r["sha"], "manifest_sha256": r["manifest_sha"]}
                for r in sorted(runs, key=lambda r: (r["label"], r["aborted"], r["manifest_sha"]))]
+    keymap_bytes = _read_regular(spec_predict.DEFAULT_KEYMAP, "keymap")
+    keymap = spec_predict.load_keymap(spec_predict.DEFAULT_KEYMAP)
     head = {"seed": seed, "synthetic": synthetic, "config_sha256": _sha(cfg_bytes), "rules_sha256": _sha(rules_bytes),
+            "keymap_sha256": _sha(keymap_bytes),
             "runs": {"n": len(runs), "n_aborted": sum(1 for r in runs if r["aborted"]),
                      "n_used": len(used), "list": listing}}
-    res = {"l1": dict(head, cells={}), "l2": dict(head, cells={}), "detection": dict(head, cells={})}
+    res = dict((key, dict(head, primary=dict(PRIMARY[key], note=PRIMARY_NOTE), cells={})) for key in PRIMARY)
+    res["detection"]["predictions"] = {}
+    res["detection"]["same_sessions_as_all"] = {}
+    res["delivery"] = dict(head, cells={})
     for r in used:
-        per_def = run_stages(r, cfg, rules_bytes, seed)
-        for key in res:
-            res[key]["cells"][r["label"]] = {}
-        for definition, (l1_out, l2_out, m_out) in per_def.items():
-            res["l1"]["cells"][r["label"]][definition] = l1_out
-            res["l2"]["cells"][r["label"]][definition] = l2_out
-            res["detection"]["cells"][r["label"]][definition] = dict((k, m_out[k]) for k in (
-                "definition", "config", "inputs_sha256", "input", "excluded", "used", "diagnostics", "metrics"))
+        st = run_stages(r, cfg, rules_bytes, seed, keymap)
+        res["detection"]["predictions"][r["label"]] = st["prediction"]
+        res["detection"]["same_sessions_as_all"][r["label"]] = st["same_sessions_as_all"]
+        for key in PRIMARY:
+            res[key]["cells"][r["label"]] = dict((definition, d[key]) for definition, d in st["definitions"].items())
+        f = r["files"]
+        try:
+            res["delivery"]["cells"][r["label"]] = delivery.evaluate(f["plan"], f["oracle"], f["obs"], f["gt"])
+        except delivery.InputError as e:
+            raise InputError("delivery: %s" % e)
     _write_results(out_dir, [(fname, match.render(res[key])) for key, fname in RESULT_FILES])
     return res
 
@@ -818,29 +911,69 @@ SYN_SPECS = (("synthetic-a", ("slow", "mid")), ("synthetic-b", ("mid", "fast")))
 INJECT_XOR = 0x5eed
 
 
+SYN_KINDS = {3: "closer", 7: "long", 11: "backspace"}   # k % 16 -> a trial kind other than "plain"
+SYN_LONG_MS = 21000
+
+
+def _syn_presses(kind, lo, length, cancel, arrow):
+    """The presses of one synthetic trial as (time, key): a letter just before the composition opens,
+    and the key that closes it just before it closes. A "closer" trial also types a long-vowel mark and a
+    second letter (the observer's rules split its session), a "long" trial a digit after 20 s (its session
+    is cut off and the digit opens a fragment), and a "backspace" trial cancels with Backspace (the
+    observer's rules keep its session open into the next trial)."""
+    presses = [(lo - 2, "a")]
+    if kind == "closer":
+        presses += [(lo + 200, "minus"), (lo + 400, "a")]
+    if arrow:
+        presses.append((lo + 300, "left"))
+    if kind == "long":
+        presses += [(lo + 20500, "1"), (lo + length - 2, "enter")]
+    elif kind == "backspace":
+        presses.append((lo + length - 2, "backspace"))
+    else:
+        presses.append((lo + length - 2, "esc" if cancel else "enter"))
+    return sorted(presses)
+
+
 def make_synthetic_run(run_dir, seed, label, speeds):
     """A complete synthetic run directory in the form the run-cell tool writes: two blocks of
     SYN_TRIALS_PER_BLOCK trials, one composition per trial (a quarter of them cancelled), a few arrow
-    presses, and an observation log made by inject.py from the assembled ground truth. The ground truth is
-    generated from the seed and the observation errors from the seed xor INJECT_XOR."""
+    presses, and an observation log made by inject.py from the assembled ground truth. The oracle records
+    the presses each composition needs (_syn_presses), so that the observer's specified rows can be
+    predicted from it; in every 16 trials one types a long-vowel mark, one lasts SYN_LONG_MS (beyond the
+    observer's 20-second cut-off) and one is cancelled with Backspace. The observation is made from the
+    sessions shorter than 20 s (the observer reports no longer session); it does not depend on the
+    prediction. The ground truth is generated from the seed and the observation errors from the seed xor
+    INJECT_XOR."""
     rng = random.Random(seed)
     os.mkdir(run_dir)
     plan_rows = [{"kind": "header", "format": "plan/1", "os": "macos", "seed": seed, "generator_version": "0.1",
                   "config_sha256": "0" * 64, "recipes_sha256": "0" * 64, "corpus_sha256": "0" * 64}]
-    steps = [{"key": "a", "at_ms": 0, "down": True}, {"key": "a", "at_ms": 50, "down": False}]
-    trials = []                                   # (trial_id, block, begin_rel, end_rel, lo_rel, length, cancel, arrow)
-    idx = 0
+    trials = []                                   # (trial_id, block, begin_rel, end_rel, lo_rel, length, cancel, arrow, events)
+    idx, t = 0, 0
     for b, speed in enumerate(speeds):
         plan_rows.append({"kind": "block", "block_id": b, "speed": speed, "reset_ime": False, "marker": [],
                           "marker_gap_ms": 0})
+        t += 5000
         for k in range(SYN_TRIALS_PER_BLOCK):
             idx += 1
             tid = "t%05d" % idx
-            begin = (idx - 1) * 10000 + b * 5000
+            kind = SYN_KINDS.get(k % 16, "plain")
             length = 800 + int(rng.random() * 1500)
             cancel = rng.random() < 0.25
+            if kind == "long":
+                length, cancel = SYN_LONG_MS, False
+            elif kind == "backspace":
+                cancel = True
             arrow = (idx % 5 == 0)
-            trials.append((tid, b, begin, begin + 6000, begin + 500, length, cancel, arrow))
+            begin = t
+            end = begin + 500 + length + 1000
+            # the presses, as (time, release?, key) in time order: the plan's steps and the oracle's sent rows
+            events = sorted((at + (40 if up else 0), up, key)
+                            for at, key in _syn_presses(kind, begin + 500, length, cancel, arrow) for up in (False, True))
+            trials.append((tid, b, begin, end, begin + 500, length, cancel, arrow, events))
+            t = end + 3000
+            steps = [{"key": key, "at_ms": at - begin, "down": not up} for at, up, key in events]
             plan_rows.append({"kind": "trial", "trial_id": tid, "block_id": b, "scenario": "S%d" % (k % 3 + 1),
                               "speed": speed, "gap_before_ms": 1000, "think_ms": 500, "phrase_id": "kana-%d" % idx,
                               "reading_len": 4, "steps": steps,
@@ -855,17 +988,13 @@ def make_synthetic_run(run_dir, seed, label, speeds):
     orows = [{"kind": "header", "format": "oracle/1", "plan_sha256": _sha(plan_bytes), "os": "macos",
               "emitter_version": "0.1", "backend": "dryrun"}]
     grows = [{"kind": "header", "format": "gt/1", "src": "mac_nstic", "app_version": "0.1.0", "os": "macos"}]
-    step = 0
     for b in range(len(speeds)):
-        mine = [t for t in trials if t[1] == b]
+        mine = [x for x in trials if x[1] == b]
         orows.append(orow("block_begin", mine[0][2] - 100, block_id=b))
-        for tid, _b, begin, end, lo, length, cancel, arrow in mine:
+        for tid, _b, begin, end, lo, length, cancel, arrow, events in mine:
             orows.append(orow("trial_begin", begin, trial_id=tid))
-            if arrow:
-                step = 0
-                for down, dt in ((True, 300), (False, 340)):
-                    orows.append(orow("sent", lo + dt, trial_id=tid, step=step, key="left", down=down))
-                    step += 1
+            for step, (at, up, key) in enumerate(events):
+                orows.append(orow("sent", at, trial_id=tid, step=step, key=key, down=not up))
             orows.append(orow("trial_end", end, trial_id=tid))
             grows.append(orow("ev", lo, ev="set_marked", len=3, sel_loc=3, sel_len=0))
             if cancel:
@@ -877,7 +1006,8 @@ def make_synthetic_run(run_dir, seed, label, speeds):
 
     rules = _read_regular(os.path.join(_HERE, "gt_rules.example.json"), "rules")
     sess = gt_sessions.assemble(gt_bytes, oracle_bytes, rules, plan_bytes)["definitions"]["macos_def"]
-    obs_ime, _truth = inject.inject(sess, {"miss": 0.05, "split": 0.04, "merge": 0.04, "false_pos": 0.05},
+    reported = [s for s in sess if s["end_wall_ms"] is not None and s["end_wall_ms"] - s["start_wall_ms"] < spec_predict.LIMIT_MS]
+    obs_ime, _truth = inject.inject(reported, {"miss": 0.05, "split": 0.04, "merge": 0.04, "false_pos": 0.05},
                                     {"bias_ms": 20, "sd_ms": 10, "end_lag_ms_max": 30}, seed ^ INJECT_XOR)
     obs_rows = [{"type": "meta", "format": "obs/1", "os": "macos", "logger_version": "0.1.0",
                  "manifest_sha256": "0" * 64,
@@ -1061,7 +1191,7 @@ def _seed_file(d, text="7\n"):
 
 
 def _read_results(d):
-    return dict((n, open(os.path.join(d, n), "rb").read()) for n in ("e1_l1.json", "e1_l2.json", "e1_detection.json"))
+    return dict((n, open(os.path.join(d, n), "rb").read()) for _k, n in RESULT_FILES)
 
 
 def _rewrite_log(run_dir, name, data):
@@ -1155,12 +1285,70 @@ def _case_reproduces(d):
             f.append("%s does not hold both the operating-system definition and the common definition per cell" % name)
         if any(not re.fullmatch(r"[0-9a-f]{64}", x.get("manifest_sha256", "")) for x in o["runs"]["list"]):
             f.append("%s lists a run without its manifest hash" % name)
-    pooled = l1o["cells"]["synthetic-a"]["macos_def"]["metrics"]["pooled"]
+    dlv = json.loads(outs[0]["e1_delivery.json"].decode("utf-8"))
+    if sorted(dlv["cells"]) != ["synthetic-a", "synthetic-b"] or any(
+            c.get("format") != delivery.FORMAT or c["trials"]["measured"] != 2 * SYN_TRIALS_PER_BLOCK for c in dlv["cells"].values()):
+        f.append("e1_delivery.json does not hold the delivery report of both cells")
+    # the synthetic observation holds one key row per trial and the synthetic reference log no key-down
+    elif any(c["observation"]["reach"]["all_presses"]["reached"] != 2 * SYN_TRIALS_PER_BLOCK
+             or c["reference"]["reach"]["all_presses"]["reached"] != 0 for c in dlv["cells"].values()):
+        f.append("the delivery report does not read the observation and the reference from their own logs")
+    # the synthetic oracle sends every press at its planned time (the plan's steps are the oracle's presses)
+    elif any((c["send_lateness_ms"]["overall"]["min"], c["send_lateness_ms"]["overall"]["max"]) != (0, 0)
+             for c in dlv["cells"].values()):
+        f.append("the synthetic plan's schedule and the synthetic oracle disagree")
+    for name, o in (("e1_l1", l1o), ("e1_l2", l2o), ("e1_detection", deto)):
+        key = name[3:]
+        if o.get("primary", {}).get("comparison") != PRIMARY[key]["comparison"] or o["primary"].get("scope") != PRIMARY[key]["scope"]:
+            f.append("%s does not name its primary comparison and scope" % name)
+    cell = dict((k, o["cells"]["synthetic-a"]["macos_def"]) for k, o in (("l1", l1o), ("l2", l2o), ("detection", deto)))
+    if sorted(cell["detection"]) != sorted(COMPARISONS) or any(sorted(v) != sorted(match.SCOPES) for v in cell["detection"].values()):
+        f.append("the detection result does not hold every comparison and scope")
+    if sorted(cell["l1"]) != sorted(COMPARISONS) or any(sorted(v) != sorted(L1_SCOPES) for v in cell["l1"].values()):
+        f.append("level 1 does not hold every comparison over under_limit and all_trials")
+    if sorted(cell["l2"]) != ["gt_obs"] or sorted(cell["l2"]["gt_obs"]) != sorted(L2_SCOPES):
+        f.append("level 2 does not hold gt_obs over all_trials and under_limit")
+    pooled = cell["l1"]["gt_obs"]["under_limit"]["metrics"]["pooled"]
     if not pooled["dwell"]["n"] > 30 or pooled["dwell"]["mae"] is None:
         f.append("level 1 has too few pairs in a synthetic cell: %r" % (pooled["dwell"]["n"],))
-    if not l2o["cells"]["synthetic-a"]["macos_def"]["texts"]["n"] == 8:
-        f.append("level 2 should hold 8 texts per synthetic cell: %r" % (l2o["cells"]["synthetic-a"]["macos_def"]["texts"]["n"],))
-    det = deto["cells"]["synthetic-a"]["macos_def"]["metrics"]["pooled"]
+    l2p = cell["l2"]["gt_obs"]
+    if not (l2p["all_trials"]["texts"]["n"] == l2p["under_limit"]["texts"]["n"] == 8):
+        f.append("level 2 should hold 8 texts per synthetic cell in both scopes")
+    pred = deto["predictions"]["synthetic-a"]
+    n_special = 2 * SYN_TRIALS_PER_BLOCK // 16
+    if not pred.get("available") or pred["trials"]["n_long"] != n_special or pred["trials"]["n_carried_out"] != n_special \
+            or pred["trials"]["n_none"] != n_special or pred["trials"]["n_closing_key_in_reading"] != n_special:
+        f.append("the prediction does not mark the synthetic run's long, Backspace and long-vowel trials: %r" % (pred.get("trials"),))
+    if l2p["under_limit"]["per_trial"]["trials_not_used"]["out_of_scope"] != n_special:
+        f.append("level 2's per-trial table under under_limit does not leave out the long trials")
+    if deto.get("same_sessions_as_all") != {"synthetic-a": True, "synthetic-b": True}:
+        f.append("the check that the two definitions hold the same sessions is missing")
+    d_ = cell["detection"]
+    for comp in COMPARISONS:
+        u, a, o_ = (d_[comp][s]["used"] for s in ("under_limit", "all_trials", "over_limit"))
+        if u["n_gt"] + o_["n_gt"] != a["n_gt"] or u["n_obs"] + o_["n_obs"] != a["n_obs"]:
+            f.append("%s: under_limit and over_limit do not partition all_trials" % comp)
+    # a long trial's session has no predicted row; the digit after the cut-off opens a fragment row
+    gp = d_["gt_pred"]["over_limit"]["metrics"]["pooled"]
+    if (gp["n_gt"], gp["n_pairs"], gp["n_false_pos"]) != (n_special, 0, n_special):
+        f.append("gt_pred over_limit should hold the long sessions unpaired and one fragment each: %r" % (gp,))
+    # pred_obs takes the predicted rows as the reference: every predicted row, and the fragments of the long trials
+    po = d_["pred_obs"]
+    if po["all_trials"]["input"]["n_gt"] != pred["counts"]["row"] or po["over_limit"]["used"]["n_gt"] != n_special:
+        f.append("pred_obs does not take the predicted rows as its reference: %r" % (po["all_trials"]["input"],))
+    sha = dict((c, d_[c]["all_trials"]["inputs_sha256"]) for c in COMPARISONS)
+    if sha["pred_obs"]["sessions"] == sha["gt_obs"]["sessions"] or sha["pred_obs"]["obs"] != sha["gt_obs"]["obs"] \
+            or sha["gt_pred"]["obs"] == sha["gt_obs"]["obs"] or sha["gt_pred"]["sessions"] != sha["gt_obs"]["sessions"]:
+        f.append("the comparisons do not take their reference and their observed side from the right inputs")
+    # the synthetic observation, like the observer, reports no session of 20 s or more
+    if cell["l1"]["gt_obs"]["all_trials"]["truncation"]["n_obs_over_limit"] != 0:
+        f.append("the synthetic observation holds a row of 20 s or more")
+    if any(cell["l1"][c][s]["scope"] != s for c in COMPARISONS for s in L1_SCOPES):
+        f.append("a level-1 result is not computed over the scope it is filed under")
+    lay = d_["gt_pred"]["all_trials"]["diagnostics"]["prediction_layers"]
+    if lay["closing_key_in_reading"]["pooled"]["n_false_pos"] != n_special or lay["carried_out"]["pooled"]["n_pairs"] != 0:
+        f.append("the layers do not show the split and the carried-over sessions of the prediction")
+    det = d_["gt_obs"]["under_limit"]["metrics"]["pooled"]
     if det is None or not det["recall"]["value"] > 0.7 or not det["precision"]["value"] > 0.7:
         f.append("detection on a synthetic cell is implausibly low: %r" % (det and det["recall"]["value"],))
     # the seed matters, and the injected errors are visible (a run with no misses would not show them)
@@ -1176,7 +1364,7 @@ def _case_reproduces(d):
     cfg4 = _config_file(d, {"theta": 0.9, "drop_start_while_open": True})
     if _quiet(["--runs"] + runs + ["--config", cfg4, "--seed", "7", "--out", o4])[0] != 0:
         f.append("a configuration with theta and drop_start_while_open was refused")
-    elif json.loads(_read_results(o4)["e1_detection.json"].decode("utf-8"))["cells"]["synthetic-a"]["macos_def"]["config"].get("theta") != 0.9:
+    elif json.loads(_read_results(o4)["e1_detection.json"].decode("utf-8"))["cells"]["synthetic-a"]["macos_def"]["gt_obs"]["under_limit"]["config"].get("theta") != 0.9:
         f.append("theta from the configuration did not reach the matcher")
     return f
 
