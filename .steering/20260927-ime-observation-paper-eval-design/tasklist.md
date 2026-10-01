@@ -108,6 +108,8 @@
     - [x] 正解の定義（判断 86）: `experiment/gt_rules.json`（`mac_nstic` の commit に「50 ms 以内に `set_marked` が続かない」）・`config.json` をこれに向けた。一致率 ON 124 / 126・OFF 117 / 117・`verify-off` 39 / 39
     - [x] 持ち越し（判断 87・研究者）: `gt_sessions.py` に除外の理由 `carry_over`（2 試行とも）
     - [x] `experiment/pilot-macos.md`（公開用の英語）: 条件・run・1 回目の所見と直し・呼び出し列の型（途中の自動確定を畳むと各シナリオ 1 形・例外 3 種を一次で数え直した）・正解の定義・oracle 一致率（example の規則と本実験の規則）・時計（ブロック 1〜5 のドリフトは ±5 ms/時以内・−200 ms/時はブロック 0 の起動直後の約 100 ms による）・到達・1 試行の時間・本番の設定
+    - [x] 最後の commit（`6ecfa5b4`）の clean な worktree で 004・010・020・021・024: 失敗は SCOPE と GUARD だけ（B15）。024 の一覧の SHA-256 = `bc2e68162d118e3e1de25a77869dbc9a3c86980b057a93a707a3c9b3c7385f3c`（94 ファイル・Mac）
+    - [ ] ⚠️ G-GEAR: 024 を回し、一覧の SHA-256 が Mac の `bc2e6816…5f3c`（94 ファイル）と一致するか（判断 68・`papers/` が `6ecfa5b4` と同じ内容の commit で）
     - [ ] パイロットの生ログの置き場（除外の基準を先に書く・逆向きの到達を数える道具）
     - [x] 完了時レビュー（Claude の 2 系統・判断 88）: MEDIUM 3 件・LOW 4 件を直した。Codex は判断 89（研究者の選択で今日だけ上限を 360,000 にして 1 回・P2 2 件・P3 1 件に対応・上限は 300,000 に戻した）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
