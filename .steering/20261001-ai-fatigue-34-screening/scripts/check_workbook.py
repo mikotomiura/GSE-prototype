@@ -31,7 +31,8 @@ STAGE1_OPTIONS = {
     "primary": ["含める（中心-A）", "含める（中心-B）", "除外", "保留"],
     "other": ["含める（一次研究として読む）", "除外 E4（保持の区分は対応表で決まる）", "除外（E4 以外）", "保留"],
 }
-STAGE1_BANNED = re.compile(r"Recommended|推奨|AI の判定|AIの判定|GPT|Claude|中心候補")
+# ★ 製品名の ChatGPT（項目文の逐語に出る・AF004）は GPT 版の判定ではないので除く（decisions.md 判断 4）
+STAGE1_BANNED = re.compile(r"Recommended|推奨|AI の判定|AIの判定|(?<!Chat)GPT|Claude|中心候補")
 # 答え → 期待（design.md §2.2）。★ 書き込み側（write_workbook.py）とは別に持つ
 EXPECT_HUMAN = {
     ("含める", "中心-A"): "中心候補", ("含める", "中心-B"): "中心候補",
@@ -235,6 +236,16 @@ def selftest():
     mutate("recommend-mark", fn_log=lambda L: [dict(x, options=[x["options"][0] + " (Recommended)"] + x["options"][1:])
                                                if x["stage"] == "1" else x for x in L])
     mutate("ai-in-stage1", fn_log=lambda L: [dict(x, question=x["question"] + " GPT 版は") if x["stage"] == "1" else x for x in L])
+    mutate("ai-in-stage1-after-chatgpt", fn_log=lambda L: [dict(x, question=x["question"] + " ChatGPT の項目。GPT 版は")
+                                                           if x["stage"] == "1" else x for x in L])
+    # 陰性対照: 項目文の製品名 ChatGPT だけなら緑のまま
+    lg_ok = os.path.join(tmpd, "chatgpt-only.jsonl")
+    with open(lg_ok, "w", encoding="utf-8") as f:
+        f.writelines(json.dumps(dict(x, question=x["question"] + " 例 \"my use of ChatGPT\"") if x["stage"] == "1" else x,
+                                ensure_ascii=False) + "\n" for x in read_log(base_log))
+    if check(base_copy, lg_ok):
+        print("FAIL 製品名 ChatGPT だけで赤になる")
+        bad += 1
     mutate("stage2-first", fn_log=lambda L: list(reversed(L)))
     mutate("extra-sheet", fn_wb=lambda w: w.create_sheet("メモ"))
     mutate("human-use-wrong", fn_wb=lambda w: w["AI判定比較"].cell(r, 4, "背景保持"))
