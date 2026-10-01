@@ -234,8 +234,11 @@ coarsest. On the real logs, run the attack for every feature set and every K, an
 feature set and every feature set derivable from it, of the raw accuracy an attacker would measure -- next to its
 Wilson interval (`acc_ci`) and the chance level 1/K; `acc_raw` and `acc_ci_raw` are kept alongside for inspection but
 are not the basis of the recommendation, because an attacker who is given a detailed log can always throw information
-away, so `acc_raw` alone can understate what publishing that much detail permits. The recommended granularity is the
-coarsest feature set whose `acc` is still within the margin above chance that the analysis plan declares acceptable.
+away, so `acc_raw` alone can understate what publishing that much detail permits. Because `acc` never increases when a
+feature set is replaced by a coarser one, the feature sets within the margin above chance that the analysis plan
+declares acceptable are closed under coarsening. The recommended granularity is therefore the most detailed feature
+set within the margin (the maximal elements of that set in the coarsening order; there may be more than one, since
+the order is partial: for example, `no_runs` is ordered against neither `no_time` nor `bin1s`).
 The margin is fixed before the real logs are analysed, and should allow for the block-level dependence the Wilson
 interval does not (see [Candidates and accuracy](#candidates-and-accuracy)). This kit reports the accuracy, the
 interval, `acc_source` and the chance level, and does not decide the margin.

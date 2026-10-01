@@ -1,23 +1,24 @@
 # Notes
 
-## Claims under test
+## Questions and result files
 
-The claims are C3, C4 and C5 of the design document, section 0. For each one, state here the measure that
-decides it, the comparison it is read against, and the width of the interval that would count as
-informative (to be filled in when the pre-registration is written).
+The questions, the estimates that answer them, and the precision that counts as informative are stated in
+`preregistration.md`. The result files are:
 
-| Claim | Measure | Result file |
+| Question | Estimates | Result file |
 |---|---|---|
-| C3 | Detection of compositions (precision, recall, split and merge rates) | `results/e1_detection.json` |
-| C4 | Level-1 agreement (dwell error, abandonment, navigation counts) | `results/e1_l1.json` |
-| C5 | Level-2 agreement (per-text aggregates, ICC(2,1), Bland-Altman) | `results/e1_l2.json` |
+| Does the observer detect the compositions the input method performs? | Precision, recall, split and merge rates | `results/e1_detection.json` |
+| Do the per-composition records agree with the input method's own state? | Dwell error, abandonment, navigation counts, the 20-second cut-off, plan-versus-ground-truth disagreements | `results/e1_l1.json` |
+| Do the per-text aggregates a writing researcher computes agree? | Bland-Altman limits and ICC(2,1) of four per-text measures | `results/e1_l2.json` |
+| How much of the typed text can be recovered from a published log? | Closed-set identification accuracy against chance, open-set character error rate against a prior-only baseline | `results/e2_closed_set.json`, `results/e2_open_set.json` |
+| What does the observer cost the machine? | CPU and resident memory under two conditions | `results/e3_<system>_<condition>.json` |
 
 ## Pre-registration
 
-The analysis is frozen in `preregistration.md` (not yet written). `run.sh` and `pipeline.py` refuse to
-analyse real data until that file carries, outside HTML comments and code fences, exactly one line
-`frozen_at: YYYY-MM-DD` and exactly one line `sha256: <64 lowercase hex digits>`. Placeholders and empty
-values are not marks. The recorded `sha256` must equal the value printed by
+The analysis is frozen in `preregistration.md`. `run.sh` and `pipeline.py` refuse to analyse real data until
+that file carries, outside HTML comments and code fences, exactly one line starting `frozen_at: YYYY-MM-DD`
+and exactly one line `sha256: <64 lowercase hex digits>`. Placeholders and empty values are not marks. The
+recorded `sha256` must equal the value printed by
 
     python3 kit/analysis/pipeline.py --freeze-hash --config experiment/config.json --seed-file experiment/SEED
 
@@ -28,6 +29,12 @@ when it differs, so that the analysis settings cannot change after the freeze. A
 tag of the freezing commit. `config.json`, `SEED` and the rule file are stored with LF line ends so that the
 hash is the same on every machine. Synthetic runs (`bash run.sh --synthetic`) do not need the freeze because
 they read no real data.
+
+The protocol is frozen in two stages. The first freeze covers the macOS cells. The addendum for the Windows
+cells, frozen before the first Windows measurement, may change only the Windows blocks of the rule file and
+its own section of `preregistration.md`; it then rewrites the two marks. That `config.json`, `SEED`, the
+macOS block of the rule file and the macOS sections are unchanged is shown by the difference between the two
+freezing tags.
 
 ## Step 0 replaced
 
@@ -42,25 +49,34 @@ its own), so Step 0 is replaced by checks that `pipeline.py` performs before any
 3. when the header places `ime_shadow` among the gated channels and the ground truth holds sessions, at
    least one `ime_shadow` row must exist: a gated channel that produced no row cannot be judged.
 
+Before these, `pipeline.py` checks the freeze marks, the run manifests, and the SHA-256 of every log against
+its manifest.
+
 ## Analysis settings
 
 Every cell is analysed under two session definitions: the one that follows the operating system of the
 cell (`macos_def` or `windows_def`) and the common definition `all`; the results are stored as
-`cells[label][definition]`. The cell label comes from the `label` of the cell file recorded in `run.json`.
-`theta` (default 0.5) and `drop_start_while_open` (default false) are passed to the matcher.
+`cells[label][definition]`. On the reference side of a macOS cell the two definitions hold the same
+sessions. The cell label comes from the `label` of the cell file recorded in `run.json`. `iou_min`,
+`obs_end_offset_ms`, `theta` and `drop_start_while_open` are passed to the matcher; `bootstrap_B`, `limit_ms`,
+`text_size_trials` and `mixtures` to the level-1 and level-2 stages.
 
-Unresolved: `clock_offsets_ms`, the correction for the gap between the clock of the ground-truth side and the
-clock of the observation side, is not passed to the matcher, so every block is compared with a zero offset.
-Where the offsets come from is to be decided after the calibration pilot.
+Clock offsets are not corrected: every block is compared with a zero offset (`clock_offsets_ms` is not passed
+to the matcher). The dwell error is a difference of durations and does not depend on the offset, and a session
+pairs under the overlap criterion while the offset stays at or below a third of its length. The per-block
+offsets between the observation, the reference input field and the executor are measured at the block-start
+markers with `kit/pilot/clock_sync.py` in every run and reported with the results.
 
 ## Borrowed methods
 
-Sources are added here as `[Pn]` identifiers when the pre-registration is written.
-
 | Method | Where it is used | Source |
 |---|---|---|
-| Wilson score interval | proportions in all three results | (to be filled in) |
-| Cluster bootstrap over blocks | dwell error, ICC intervals | (to be filled in) |
-| Bland-Altman limits of agreement | dwell error, per-text aggregates | (to be filled in) |
-| ICC(2,1), absolute agreement | per-text aggregates | (to be filled in) |
-| Cohen's kappa | abandonment | (to be filled in) |
+| Wilson score interval | detection rates, abandonment and navigation agreement, plan-versus-ground-truth disagreements, closed-set accuracy | Wilson (1927) |
+| Percentile bootstrap | intervals of the dwell error, the ICC and the open-set error rate | Efron (1979) |
+| Resampling whole blocks (cluster bootstrap) | the same intervals | Cameron, Gelbach and Miller (2008) |
+| Bland-Altman limits of agreement | dwell error, per-text aggregates | Bland and Altman (1986) |
+| ICC(2,1), absolute agreement | per-text aggregates | Shrout and Fleiss (1979); McGraw and Wong (1996) |
+| Cohen's kappa | abandonment | Cohen (1960) |
+| Witten-Bell smoothing | the open-set attacker's character language model | Witten and Bell (1991) |
+
+Full references are listed in `preregistration.md`.

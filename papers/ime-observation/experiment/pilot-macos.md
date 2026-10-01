@@ -127,7 +127,11 @@ In both runs the first block, at the start of the run, differed by about
 100 ms from the executor on both the observation and the reference side; the observation and the reference
 agreed with each other there to within 22 ms. A line fitted to all six blocks gives a drift of about −200 ms per
 hour, but this comes from block 0 alone: over blocks 1 to 5 (15 minutes) the fitted drift is within ±5 ms per
-hour. Analyses that align the observation with the reference use the per-block offsets.
+hour. The analysis does not correct for these offsets. The dwell error is a difference of durations and does
+not depend on them, and a session still pairs under the overlap criterion of the matching as long as the offset
+stays at or below a third of its length, so the largest difference seen here (22 ms) could affect only sessions
+shorter than about 66 ms. The per-block offsets are measured in the same way in every run of the measurement and
+reported with the results.
 
 ### Reaching the observation
 
