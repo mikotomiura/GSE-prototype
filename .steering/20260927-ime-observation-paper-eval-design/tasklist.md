@@ -147,7 +147,19 @@
       - [x] minor 4（層と範囲ごとの読みの長さと思考時間）・10（焦点を失った試行の観測の行）・13（文だけ: `match.py` が既に数える）
       - [x] 事前登録の文（X1〜X8・minor・nit）と公開物（`notes.md`・`pilot-macos.md`・`data.md`・`kit/refinput-macos/README.md`・`kit/e2/README.md`・`gt_rules.json` の `_note`・`stats.py` の docstring）。`kit/gen/README.md` は §8 の新しい範囲と合うので変えていない
       - [x] 確認（`kit/check.sh` 29 本・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py` 0 件・`check_citations.py` 違反なし・`--check-prereg` exit 3・変異 17 本すべて赤）
-    - [ ] attack-me round 3（変わった節とコードに絞る）
+    - [x] attack-me round 3（変わった節とコードに絞る・2026-10-02・G-GEAR）→ 記録 `attack-me/prereg-ime-macos/round-3/`（`5fd17972`）。R1 minor・R2 major・R3 major・fatal 0・捏造 0 → 判定 major revision。研究者に 6 問 → 判断 112〜114（すべて推奨どおり）
+    - [x] round 3 の直し（判断 112〜114・実装の選択は判断 115・2026-10-02・G-GEAR）
+      - [x] Y1 問 3 の `n_conversions` と `dwell_fraction` を範囲の上で定義し直す（`l2.py` の `aggregate`・selftest・§4.6・§6.4・§6.7）
+      - [x] Y2 §3.4 の中止を参照の外からの入力だけ・閉じた規則・`delivery.py` 単体・各 run の直後に（§3.4・§3.2・§6.2・§6.3・`data.md` 手順 4）
+      - [x] Y3 推奨の単位（§6.8・§1.2 の問 4・§7・`kit/e2/README.md`）
+      - [x] minor 1 `align_blocks` の再開（偽の錨）・selftest〔コード〕
+      - [x] minor 2 焦点の喪失の区間（`delivery.py`・`pipeline.py`）〔コード〕
+      - [x] minor 4 速さごとの偏りの区間を 1 つに（`l2.py`）〔コード〕
+      - [x] minor 6 重み付けし直しの版を汚染の層だけ除いたものに（`match.py`・`l2.py`）〔コード〕
+      - [x] minor 3・5・7〜16・nit（文）
+      - [x] 確認（selftest・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・§9 の SHA-256・変異）→ 29 本緑・4 ファイルともバイト一致・違反 0・違反なし・exit 3・5 ファイル一致・節の参照はすべて実在。変異: 作業用エージェントの自己申告 19 本（赤 17・等価 1・pipeline の配線 1 は赤にならず判断 115 の 3 に記録）、メインの抜き取り 4 本（`l2.py` 1・`closed_set.py` 1・pipeline の新しい検査 1 は赤、`delivery.py` 1 は生き残り → selftest を足して赤）。本文 12,143 語
+    - [ ] ★ Mac（判断 113 の Y4・凍結の前）: `pilot-macos.md` の Raw logs に預ける基準と「封印したセッション行は預けるときだけ開け、解析しない」／パイロットの key 行に `align_plan` だけを流して採点されたブロックの割合を §3.1 に
+    - [ ] attack-me round 4（round 3 の直しで変わった箇所だけ・判断 114）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
