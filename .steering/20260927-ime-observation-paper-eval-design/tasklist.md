@@ -112,6 +112,7 @@
     - [x] ⚠️ G-GEAR: 024 を回し、一覧の SHA-256 が Mac の `bc2e6816…5f3c`（94 ファイル）と一致するか（判断 68・`papers/` が `6ecfa5b4` と同じ内容の commit で）
       → 2026-10-01（G-GEAR・Windows 11・Python 3.11.9）: PR #285 の merge 後の main（`500c5685`・`6ecfa5b4` からの `papers/` の差は 0）の clean な worktree（`C:/wt/clean-m2`）で 024 は ✅ 137・❌ 2（SCOPE と GUARD だけ・B15）。★ 一覧の SHA-256 = `bc2e68162d118e3e1de25a77869dbc9a3c86980b057a93a707a3c9b3c7385f3c`（94 ファイル）で **Mac と一致**
       → あわせて Windows で回る残りの acceptance 21 本（001〜003 005 006 008〜011 013〜023 028）: **SCOPE と GUARD を除く失敗 0 件**（028 は SCOPE を持たないので GUARD の 1 件だけ）。`_style_check.py papers/ime-observation` 違反 0 件
+      → 記録の PR #286（`.steering/` だけ・判断 90〜97 も同じ PR）: CI 緑（Windows の check 12 分 51 秒）→ merge `538517a1` → main の CI（run 36841292986）success（Mac / Windows の check・frontend-check）
     - [ ] パイロットの生ログの置き場（除外の基準を先に書く・逆向きの到達を数える道具）
     - [x] 完了時レビュー（Claude の 2 系統・判断 88）: MEDIUM 3 件・LOW 4 件を直した。Codex は判断 89（研究者の選択で今日だけ上限を 360,000 にして 1 回・P2 2 件・P3 1 件に対応・上限は 300,000 に戻した）
   - [ ] M3 事前登録（macOS 版）の下書き → attack-me（stage `prereg`）→ 凍結 → OSF の登録（研究者）
