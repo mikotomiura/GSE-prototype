@@ -46,6 +46,18 @@ not in the plan / overlapping no trial) and, where the trial is known, by speed.
 
 Agreement. The sign of every difference is observation minus ground truth. For each measure:
   bland_altman   bias and limits of agreement of the per-text differences
+  bias_ci, loa_lo_ci, loa_hi_ci
+                 95% percentile intervals for the bias and for the lower and upper limit of agreement
+                 that resample the blocks (the texts of one block are one cluster; the same B and seed as
+                 the ICC). [null, null] when one cannot be computed, and then <name>_status
+                 (bias_ci_status, loa_lo_ci_status, loa_hi_ci_status) says why: "no_bland_altman" (the point
+                 estimate is undefined: no text for the bias, fewer than two texts for the limits),
+                 "fewer_than_two_blocks", or "undefined_resample" (a resample has fewer than two texts, so
+                 its limits are undefined; the interval is withheld, not computed from the other
+                 resamples). The bias has its own status because it is defined in every resample that has a
+                 text, so it is withheld only for the first two reasons. With two or more blocks every
+                 resample has at least two texts, so "undefined_resample" is a guard that cannot be reached
+                 through agreement(); it is kept so that no undefined resample is ever dropped silently.
   icc21          ICC(2,1) (absolute agreement) over the texts, columns = (ground truth, observation)
   icc21_ci       a 95% percentile interval that resamples the blocks (the texts of one block are one
                  cluster); [null, null] when it cannot be computed, and then icc21_ci_status says
@@ -62,9 +74,17 @@ Mixture. A synthetic input has no natural mixing ratio, so the primary estimates
 "mixtures" in the configuration name weightings of the speeds; for each, the bias of a measure is
 the weighted mean of the per-stratum mean differences (weights are normalised, a stratum with weight
 zero is not needed, and a needed stratum without data gives null). If a bias moves between
-weightings, the error is concentrated in some strata. A text mixes the scenarios of its block in the
-plan's order (about equally, by the plan's design), so every per-text value and ICC holds for that
-mix of scenarios only.
+weightings, the error is concentrated in some strata. Every per-stratum bias and every mixture's bias
+carries a 95% percentile interval ("bias_ci" with "bias_ci_status") from a stratified block bootstrap:
+within each speed, that speed's blocks (a block holds one speed) are resampled independently; in one
+replicate every stratum's bias is recomputed and each mixture is formed from that replicate with its
+weights, so a mixture that puts all weight on one speed has that speed's interval. The interval is
+withheld ([null, null]) with the status "no_data" (the point estimate is null), "fewer_than_two_blocks"
+(a needed stratum has fewer than two blocks), or "undefined_resample" (in some replicate a needed
+stratum has no text with the measure). Only random() draws of Random(seed) are used, as in the ICC.
+A text mixes the scenarios of its block in the plan's order; the plan orders the trials by the seed and
+does not balance them within a text, so the scenarios of a block are mixed about equally only in
+expectation, and every per-text value and ICC holds for that mix of scenarios only.
 
 Per trial ("per_trial"). So that a reader can reweight the scenarios to another mix, three per-trial
 quantities are also given on both sides, by scenario and speed: the number of conversions, the summed
@@ -74,13 +94,19 @@ standard deviation and block-clustered 95% percentile bootstrap interval of the 
 (observation minus ground truth), and the number of observation rows with dwell_ms == 0 (they add 0
 to the summed time). A trial is used when it is in the plan, was run, is not excluded and is in the
 scope; a trial with no session or row on a side counts 0 there. Sessions and rows are attributed to
-trials as for the texts.
+trials as for the texts. The per-trial differences include contamination by sessions carried over from
+an earlier trial (a session that began in one trial and is seen in the next). "per_trial_layer_none"
+repeats the quantities over only the trials in none of the prediction's layers (the match result's
+scope.layer_none_trials; null when it has none, also when the key is missing in an older result); a
+trial that is otherwise used but is not in that list is counted in trials_not_used["outside_layer"] and
+its sessions and rows count as outside. The reweighting to another mix is meant for that view.
 
 Scope. The match result names its scope (match.py --scope; all_trials when it has none). Its
 matching holds only the sessions and rows of the trials in the scope, so under the scope
 under_limit, which sets aside the trials whose session the observer is specified to cut off, the
 texts are kept and their measures cover the remaining trials on both sides (the duration of a text,
-the denominator of dwell_fraction, is unchanged); per_trial leaves the set-aside trials out.
+the denominator of dwell_fraction, is unchanged); per_trial leaves the set-aside trials out. scope.layer_none_trials (a list of trial ids, or null or
+missing) must be a list of strings when it is present and not null, otherwise the input is rejected.
 
 Configuration (JSON, every key optional): {"text_size_trials": 8, "B": 2000, "seed": 1,
 "mixtures": {"<name>": {"slow": w, "mid": w, "fast": w}}}. Keys starting with "_" are ignored. B is
@@ -307,22 +333,67 @@ def _check_b_seed(B, seed):
         raise ValueError("seed must be an integer")
 
 
+def _ba_stat(kind):
+    """The statistic of a resample of blocks (clusters of per-text differences): the bias, or a limit of
+    agreement (bias -/+ BA_Z * sd). A resample with fewer than two texts has no limits."""
+    def stat(sample):
+        vals = [v for c in sample for v in c]
+        if kind == "bias":
+            if not vals:
+                raise _UndefinedICC()
+            return statistics.fmean(vals)
+        if len(vals) < 2:
+            raise _UndefinedICC()
+        sign = -1 if kind == "loa_lo" else 1
+        return statistics.fmean(vals) + sign * stats.BA_Z * statistics.stdev(vals)
+    return stat
+
+
+def _ba_interval(rows, kind, point, B, seed):
+    """A block-level bootstrap interval for the bias ("bias") or a limit of agreement ("loa_lo" /
+    "loa_hi") of the per-text differences (observation minus ground truth) as (lo, hi, status). rows
+    are (block, gt, obs). status is "no_bland_altman" (the point estimate is None), "fewer_than_two_blocks",
+    "undefined_resample" (a resample has no limits because it holds fewer than two texts; the interval is
+    withheld) or "ok"; the interval is (None, None) unless it is "ok"."""
+    if point is None:
+        return (None, None, "no_bland_altman")
+    blocks = {}
+    for block_id, g, o in rows:
+        blocks.setdefault(block_id, []).append(o - g)
+    if len(blocks) < 2:
+        return (None, None, "fewer_than_two_blocks")
+    clusters = [blocks[b] for b in sorted(blocks)]
+    try:
+        lo, hi = stats.cluster_bootstrap(clusters, _ba_stat(kind), B, seed)
+    except _UndefinedICC:
+        return (None, None, "undefined_resample")
+    return (lo, hi, "ok")
+
+
 def _agree(rows, B, seed):
     ba = stats.bland_altman([o for _b, _g, o in rows], [g for _b, g, _o in rows])
+    bias_lo, bias_hi, bias_status = _ba_interval(rows, "bias", ba["bias"], B, seed)
+    lo_lo, lo_hi, lo_status = _ba_interval(rows, "loa_lo", ba["loa_lo"], B, seed)
+    hi_lo, hi_hi, hi_status = _ba_interval(rows, "loa_hi", ba["loa_hi"], B, seed)
     value, ci, status = None, (None, None), "no_icc"
     if len(rows) >= 2:
         value = stats.icc([[g, o] for _b, g, o in rows], "2,1")
         if value is not None:
             lo, hi, status = _icc_interval(rows, B, seed)
             ci = (lo, hi)
-    return {"n": len(rows), "bland_altman": ba, "icc21": value, "icc21_ci": [ci[0], ci[1]],
-            "icc21_ci_status": status}
+    return {"n": len(rows), "bland_altman": ba,
+            "bias_ci": [bias_lo, bias_hi], "bias_ci_status": bias_status,
+            "loa_lo_ci": [lo_lo, lo_hi], "loa_lo_ci_status": lo_status,
+            "loa_hi_ci": [hi_lo, hi_hi], "loa_hi_ci_status": hi_status,
+            "icc21": value, "icc21_ci": [ci[0], ci[1]], "icc21_ci_status": status}
 
 
 def agreement(gt_agg, obs_agg, B, seed):
-    """{measure: {"n", "bland_altman", "icc21", "icc21_ci", "icc21_ci_status"}} over the texts where
+    """{measure: {"n", "bland_altman", "bias_ci", "bias_ci_status", "loa_lo_ci", "loa_lo_ci_status",
+    "loa_hi_ci", "loa_hi_ci_status", "icc21", "icc21_ci", "icc21_ci_status"}} over the texts where
     both sides have the measure. The difference is observation minus ground truth. icc21 is None
-    when it cannot be computed (fewer than two texts, or no variation at all)."""
+    when it cannot be computed (fewer than two texts, or no variation at all); the intervals are
+    [None, None] with a status when they cannot be computed (see "Agreement" in the module docstring)."""
     _check_b_seed(B, seed)
     _check_aligned(gt_agg, obs_agg)
     out = {}
@@ -351,12 +422,13 @@ def agreement_by_stratum(gt_agg, obs_agg, B, seed):
 # ---------------------------------------------------------------- mixtures
 
 def stratify(gt_agg, obs_agg):
-    """{speed: [{"text_id", "gt": {measure: v}, "obs": {measure: v}}]} for the speeds that have texts."""
+    """{speed: [{"text_id", "block_id", "gt": {measure: v}, "obs": {measure: v}}]} for the speeds that
+    have texts."""
     _check_aligned(gt_agg, obs_agg)
     out = {}
     for g, o in zip(gt_agg["texts"], obs_agg["texts"]):
         out.setdefault(g["speed"], []).append({
-            "text_id": g["text_id"],
+            "text_id": g["text_id"], "block_id": g["block_id"],
             "gt": dict((m, g[m]) for m in MEASURES),
             "obs": dict((m, o[m]) for m in MEASURES)})
     return out
@@ -382,17 +454,99 @@ def _norm_weights(w, name):
     return dict((s, float(w.get(s, 0)) / total) for s in SPEEDS)
 
 
-def mixture_bias(texts_by_stratum, mixtures):
+def _mix_total(w, get):
+    """The normalised-weight sum of the strata values get(speed), None when a stratum with positive
+    weight has none."""
+    total = 0.0
+    for s in SPEEDS:
+        if w[s] == 0:
+            continue
+        b = get(s)
+        if b is None:
+            return None
+        total += w[s] * b
+    return total
+
+
+def _stratified_replicates(texts_by_stratum, B, seed):
+    """B replicates of a stratified block bootstrap: within each speed, that speed's blocks are
+    resampled with replacement independently of the other speeds (a block holds one speed). Returns
+    ({speed: [blocks]}, [{speed: {measure: bias or None}}]) with the replicates in draw order. Only
+    Random(seed).random() is used (the draw is the one of stats.cluster_bootstrap), and the speeds
+    are visited in SPEEDS order, so the result is deterministic for a fixed B and seed. A stratum's
+    bias is None in a replicate where none of its resampled texts has the measure."""
+    blocks = {}
+    for s in SPEEDS:
+        by_block = {}
+        for t in texts_by_stratum.get(s, ()):
+            d = by_block.setdefault(t["block_id"], dict((m, []) for m in MEASURES))
+            for m in MEASURES:
+                if t["obs"][m] is not None and t["gt"][m] is not None:
+                    d[m].append(t["obs"][m] - t["gt"][m])
+        if by_block:
+            blocks[s] = [by_block[b] for b in sorted(by_block, key=str)]
+    rng = random.Random(seed)
+    reps = []
+    for _ in range(B):
+        rep = {}
+        for s in SPEEDS:
+            if s not in blocks:
+                continue
+            k = len(blocks[s])
+            sample = [blocks[s][min(k - 1, int(rng.random() * k))] for _ in range(k)]
+            rep[s] = {}
+            for m in MEASURES:
+                vals = [v for c in sample for v in c[m]]
+                rep[s][m] = statistics.fmean(vals) if vals else None
+        reps.append(rep)
+    return blocks, reps
+
+
+def _percentile_interval(values, conf=0.95):
+    values = sorted(values)
+    a = (1.0 - conf) / 2.0
+    return [stats._percentile(values, a), stats._percentile(values, 1.0 - a)]
+
+
+def _ci_status(point, n_blocks, values):
+    """(interval, status) of one quantity: "no_data" when the point estimate is None,
+    "fewer_than_two_blocks" when a needed stratum has fewer than two blocks, "undefined_resample" when a
+    replicate is undefined (the interval is withheld, not computed from the rest), else "ok"."""
+    if point is None:
+        return [None, None], "no_data"
+    if n_blocks < 2:
+        return [None, None], "fewer_than_two_blocks"
+    if any(v is None for v in values):
+        return [None, None], "undefined_resample"
+    return _percentile_interval(values), "ok"
+
+
+def mixture_bias(texts_by_stratum, mixtures, B=None, seed=None):
     """The bias (observation minus ground truth) of every measure under each weighting of the strata.
 
     texts_by_stratum is stratify()'s output; mixtures is {name: {stratum: weight}}. Returns
-    {"by_stratum": {speed: {measure: {"bias", "n"}}}, "mixtures": {name: {"weights", "bias":
-    {measure: value}}}}. A stratum's bias is the mean per-text difference over the texts where both
-    sides have the measure. A mixture's bias is the normalised-weight sum of the strata biases; it is
-    None when a stratum with positive weight has no data for the measure."""
+    {"by_stratum": {speed: {measure: {"bias", "n", "bias_ci", "bias_ci_status"}}}, "mixtures": {name:
+    {"weights", "bias": {measure: value}, "bias_ci": {measure: [lo, hi]}, "bias_ci_status": {measure:
+    status}}}}. A stratum's bias is the mean per-text difference over the texts where both sides have
+    the measure. A mixture's bias is the normalised-weight sum of the strata biases; it is None when a
+    stratum with positive weight has no data for the measure.
+
+    The intervals (given B and seed; otherwise they are [None, None] with the status "not_requested")
+    are 95% percentile intervals of a stratified block bootstrap: within each speed that speed's blocks
+    are resampled independently, and in one replicate every stratum's bias is recomputed and the
+    mixtures are formed from the same replicate with the same weights. The status is "no_data" (the
+    point estimate is None), "fewer_than_two_blocks" (a stratum that is needed has fewer than two
+    blocks; for a mixture, only the strata with positive weight are needed), "undefined_resample" (in
+    some replicate a needed stratum has no text with the measure; the interval is withheld) or "ok".
+    The interval of a mixture with the weight 1 on one speed is that speed's interval."""
     for s in texts_by_stratum:
         if s not in SPEEDS:
             raise ValueError("unknown stratum %r" % (s,))
+    boot = B is not None
+    if boot:
+        _check_b_seed(B, seed)
+    weights = dict((name, _norm_weights(mixtures[name], name)) for name in sorted(mixtures))
+    blocks, reps = _stratified_replicates(texts_by_stratum, B, seed) if boot else ({}, [])
     by_stratum = {}
     for s in SPEEDS:
         if s not in texts_by_stratum:
@@ -401,23 +555,23 @@ def mixture_bias(texts_by_stratum, mixtures):
         for m in MEASURES:
             diffs = [t["obs"][m] - t["gt"][m] for t in texts_by_stratum[s]
                      if t["obs"][m] is not None and t["gt"][m] is not None]
-            by_stratum[s][m] = {"bias": statistics.fmean(diffs) if diffs else None, "n": len(diffs)}
+            point = statistics.fmean(diffs) if diffs else None
+            ci, status = _ci_status(point, len(blocks[s]), [r[s][m] for r in reps]) if boot \
+                else ([None, None], "not_requested")
+            by_stratum[s][m] = {"bias": point, "n": len(diffs), "bias_ci": ci, "bias_ci_status": status}
     out = {}
-    for name in sorted(mixtures):
-        w = _norm_weights(mixtures[name], name)
-        bias = {}
+    for name, w in weights.items():
+        bias, cis, statuses = {}, {}, {}
         for m in MEASURES:
-            total, ok = 0.0, True
-            for s in SPEEDS:
-                if w[s] == 0:
-                    continue
-                b = by_stratum.get(s, {}).get(m, {}).get("bias")
-                if b is None:
-                    ok = False
-                    break
-                total += w[s] * b
-            bias[m] = total if ok else None
-        out[name] = {"weights": w, "bias": bias}
+            bias[m] = _mix_total(w, lambda s: by_stratum.get(s, {}).get(m, {}).get("bias"))
+            if not boot:
+                cis[m], statuses[m] = [None, None], "not_requested"
+                continue
+            needed = [s for s in SPEEDS if w[s] != 0]
+            thin = min((len(blocks.get(s, ())) for s in needed), default=0)
+            values = [_mix_total(w, lambda s: r[s][m] if s in r else None) for r in reps]
+            cis[m], statuses[m] = _ci_status(bias[m], thin, values)
+        out[name] = {"weights": w, "bias": bias, "bias_ci": cis, "bias_ci_status": statuses}
     return {"by_stratum": by_stratum, "mixtures": out}
 
 
@@ -430,15 +584,21 @@ def _scenario_key(sc):
     return (int(sc[1:]) if isinstance(sc, str) and sc[1:].isdigit() else 0, str(sc))
 
 
-def per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, B, seed):
+def per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, B, seed, only_trials=None):
     """The per-trial quantities of PER_TRIAL on both sides, by (scenario, speed). gt: ground-truth
     sessions; obs: observation rows carrying a "trial_id" (attach_trials). Returns {"n_trials",
     "trials_not_used": {"not_run", "excluded", "out_of_scope"}, "n_outside": {"gt", "obs"},
-    "by_stratum": [...]}; see "Per trial" in the module docstring."""
+    "by_stratum": [...]}; see "Per trial" in the module docstring. only_trials (a collection of trial
+    ids, default None: no restriction) keeps only those trials: a trial that would otherwise be used
+    but is not in it is counted under trials_not_used["outside_layer"] (a key that is present only
+    when only_trials is given), and its sessions and rows count as outside."""
     _check_b_seed(B, seed)
     run = set(t["trial_id"] for t in oracle["trials"])
     excluded, out_scope = set(excluded_trials), set(out_of_scope)
+    only = None if only_trials is None else set(only_trials)
     not_used = {"not_run": 0, "excluded": 0, "out_of_scope": 0}
+    if only is not None:
+        not_used["outside_layer"] = 0
     acc = {}
     for tid in plan["trials"]:
         if tid not in run:
@@ -447,6 +607,8 @@ def per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, B, seed):
             not_used["excluded"] += 1
         elif tid in out_scope:
             not_used["out_of_scope"] += 1
+        elif only is not None and tid not in only:
+            not_used["outside_layer"] += 1
         else:
             acc[tid] = {"gt": [0, 0, 0], "obs": [0, 0, 0], "zero": 0}
     outside = {"gt": 0, "obs": 0}
@@ -603,6 +765,9 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
         raise InputError("match: scope.name must be one of %s" % ", ".join(match.SCOPES))
     if scope != "all_trials" and not (isinstance(long_trials, list) and all(isinstance(t, str) for t in long_trials)):
         raise InputError("match: scope %s needs the list scope.long_trials" % scope)
+    layer_none = sc.get("layer_none_trials")  # missing (an older match result) is the same as null
+    if layer_none is not None and not (isinstance(layer_none, list) and all(isinstance(t, str) for t in layer_none)):
+        raise InputError("match: scope.layer_none_trials must be a list of trial ids or null")
     long_set = set(long_trials or ())
     out_of_scope = set() if scope == "all_trials" else \
         set(t for t in plan["trials"] if (t in long_set) != (scope == "over_limit"))
@@ -654,13 +819,20 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
         "aggregate": {"gt": gt_agg["texts"], "obs": obs_agg["texts"]},
         "agreement": agreement(gt_agg, obs_agg, cfg["B"], cfg["seed"]),
         "agreement_by_stratum": agreement_by_stratum(gt_agg, obs_agg, cfg["B"], cfg["seed"]),
-        "mixture_bias": mixture_bias(stratify(gt_agg, obs_agg), cfg["mixtures"]),
+        "mixture_bias": mixture_bias(stratify(gt_agg, obs_agg), cfg["mixtures"], cfg["B"], cfg["seed"]),
         "per_trial": per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, cfg["B"], cfg["seed"]),
+        "per_trial_layer_none": None if layer_none is None else
+        per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, cfg["B"], cfg["seed"],
+                  only_trials=set(layer_none)),
         "note": "a synthetic input has no natural mixing proportion; read the per-stratum biases and the "
                 "stratified agreement as the primary estimates, the pooled agreement and each mixture as "
                 "sensitivity checks. Every per-text value and ICC holds for this design's mix of scenarios "
-                "(a text mixes the scenarios of its block about equally); per_trial gives the per-trial "
-                "differences by scenario and speed for reweighting to another mix",
+                "(a text mixes the scenarios of its block only in expectation: the plan orders the trials "
+                "by the seed and does not balance them within a text); per_trial gives the per-trial "
+                "differences by scenario and speed for reweighting to another mix. The per-trial "
+                "differences include contamination by sessions carried over from an earlier trial; "
+                "per_trial_layer_none restricts them to the trials in none of the prediction's layers "
+                "(null without a prediction), and the reweighting is meant for that view",
     }
 
 
@@ -1255,6 +1427,255 @@ def _case_scope():
     return f
 
 
+def _case_agreement_intervals():
+    """Block-bootstrap intervals for the bias and the limits of agreement."""
+    f = []
+    w = _world()
+    jitter = lambda i, s: 50 + ((i * 13) % 5 - 2) * 10
+    _tx, g, o = _aggs(w, _obs_from(w["gt"], dwell_delta=jitter, keep=lambda i, s: i % 9 != 0))
+    a = agreement(g, o, 300, 7)
+    if json.dumps(a, sort_keys=True) != json.dumps(agreement(g, o, 300, 7), sort_keys=True):
+        f.append("the same seed does not give identical bias / limit intervals")
+    c = agreement(g, o, 300, 8)
+    if all(a[m][k] == c[m][k] for m in MEASURES for k in ("bias_ci", "loa_lo_ci", "loa_hi_ci")):
+        f.append("a different seed gives the same bias / limit intervals (the seed has no effect)")
+    for m in MEASURES:
+        ba = a[m]["bland_altman"]
+        for name, point in (("bias", ba["bias"]), ("loa_lo", ba["loa_lo"]), ("loa_hi", ba["loa_hi"])):
+            lo, hi = a[m][name + "_ci"]
+            if a[m][name + "_ci_status"] != "ok" or lo is None or not (lo <= hi):
+                f.append("the %s interval of %s is missing or unordered in a well-behaved world: %r / %r" % (
+                    name, m, a[m][name + "_ci"], a[m][name + "_ci_status"]))
+            elif not (lo - 1e-9 <= point <= hi + 1e-9):
+                f.append("the %s interval of %s does not contain the point estimate %r: %r" % (name, m, point, (lo, hi)))
+    # a perfect observation: every difference is 0, so every interval is [0, 0]
+    _tx, g0, o0 = _aggs(w, _obs_from(w["gt"]))
+    p0 = agreement(g0, o0, 50, 1)["mean_dwell_ms"]
+    if any(p0[k] != [0, 0] for k in ("bias_ci", "loa_lo_ci", "loa_hi_ci")):
+        f.append("a perfect observation does not give zero-width intervals at 0: %r" % (p0,))
+    # the stratified agreement carries the intervals too (2 blocks per speed)
+    st = agreement_by_stratum(g, o, 50, 1)["slow"]["mean_dwell_ms"]
+    if st["bias_ci_status"] != "ok" or st["loa_lo_ci_status"] != "ok" or st["loa_hi_ci_status"] != "ok":
+        f.append("agreement_by_stratum does not carry the bias / limit intervals: %r" % (st,))
+    # one block: the point estimates exist, the intervals are withheld and say why
+    one = _world(n_blocks=1, per_block=32)
+    _t, g1, o1 = _aggs(one, _obs_from(one["gt"], dwell_delta=jitter))
+    r = agreement(g1, o1, 50, 1)["mean_dwell_ms"]
+    if r["bland_altman"]["loa_lo"] is None or any(
+            r[k + "_ci"] != [None, None] or r[k + "_ci_status"] != "fewer_than_two_blocks"
+            for k in ("bias", "loa_lo", "loa_hi")):
+        f.append("one block must give null intervals with fewer_than_two_blocks: %r" % (r,))
+    # one text: the bias exists but the limits do not (n < 2); no text: nothing exists
+    two_blocks = [(0, 1.0, 2.0), (1, 1.0, 4.0)]
+    r1 = _agree(two_blocks[:1], 20, 1)
+    if r1["bias_ci_status"] != "fewer_than_two_blocks":
+        f.append("one text (one block) must give bias_ci_status fewer_than_two_blocks: %r" % (r1,))
+    if r1["loa_lo_ci_status"] != "no_bland_altman" or r1["loa_hi_ci_status"] != "no_bland_altman" or \
+            r1["loa_lo_ci"] != [None, None]:
+        f.append("one text must give the limit intervals no_bland_altman: %r" % (r1,))
+    r0 = _agree([], 20, 1)
+    if any(r0[k + "_ci_status"] != "no_bland_altman" or r0[k + "_ci"] != [None, None]
+           for k in ("bias", "loa_lo", "loa_hi")):
+        f.append("no texts must give no_bland_altman for every interval: %r" % (r0,))
+    # two blocks of one text each: every resample has two texts, so the limits are defined
+    r2 = _agree(two_blocks, 100, 1)
+    if r2["bias_ci_status"] != "ok" or r2["loa_lo_ci_status"] != "ok" or not r2["bias_ci"][0] <= 2.0 <= r2["bias_ci"][1]:
+        f.append("two blocks of one text each must give intervals: %r" % (r2,))
+    # a resample without enough texts is undefined (the guard), never a value
+    for kind, sample in (("bias", []), ("loa_lo", [[1.0]]), ("loa_hi", [[1.0], []])):
+        try:
+            _ba_stat(kind)(sample)
+            f.append("a resample with too few texts gave a value for %s" % kind)
+        except _UndefinedICC:
+            pass
+    if abs(_ba_stat("loa_hi")([[1.0, 3.0], [5.0]]) - (3.0 + stats.BA_Z * 2.0)) > 1e-12 or \
+            abs(_ba_stat("loa_lo")([[1.0, 3.0], [5.0]]) - (3.0 - stats.BA_Z * 2.0)) > 1e-12 or \
+            abs(_ba_stat("bias")([[1.0, 3.0], [5.0]]) - 3.0) > 1e-12:
+        f.append("the resample statistics are not bias and bias -/+ 1.96 sd")
+    # the interval resamples blocks: identical differences give a zero-width interval, and two blocks
+    # whose means differ give an interval that reaches both block means
+    same = [(0, 0.0, 5.0), (0, 0.0, 5.0), (1, 0.0, 5.0), (1, 0.0, 5.0)]
+    if _agree(same, 50, 1)["bias_ci"] != [5.0, 5.0]:
+        f.append("identical differences must give a zero-width bias interval")
+    spread = [(0, 0.0, 0.0), (0, 0.0, 0.0), (1, 0.0, 10.0), (1, 0.0, 10.0)]
+    lo, hi = _agree(spread, 300, 1)["bias_ci"]
+    if not (lo == 0.0 and hi == 10.0):
+        f.append("a bias interval over two blocks that differ should span both block means: %r" % ((lo, hi),))
+    return f
+
+
+def _syn_texts(layout):
+    """{speed: [text]} from {speed: [(block_id, gt_value, obs_value or None)]}; every measure alike."""
+    out = {}
+    for sp, items in layout.items():
+        for k, (b, gv, ov) in enumerate(items):
+            out.setdefault(sp, []).append({"text_id": "%s%d" % (sp, k), "block_id": b,
+                                           "gt": dict((m, gv) for m in MEASURES),
+                                           "obs": dict((m, ov) for m in MEASURES)})
+    return out
+
+
+def _case_mixture_intervals():
+    f = []
+    w = _world(n_blocks=18)  # 6 blocks of 4 texts per speed (with 2 blocks a seed could not change a percentile)
+    fast_tids = set(t for t, i in w["plan"]["trials"].items() if i["speed"] == "fast")
+    keep = lambda i, s: not (s["trial_id"] in fast_tids and i % 2 == 0)
+    jitter = lambda i, s: 20 + ((i * 7) % 5) * 10
+    _tx, g, o = _aggs(w, _obs_from(w["gt"], dwell_delta=jitter, keep=keep))
+    sx = stratify(g, o)
+    if any("block_id" not in t for ts in sx.values() for t in ts):
+        f.append("stratify does not carry the block of every text")
+    mixes = dict(DEFAULT_MIXTURES, only_fast={"fast": 5}, only_slow={"slow": 1}, only_mid={"mid": 0.2})
+    mb = mixture_bias(sx, mixes, 200, 3)
+    if json.dumps(mb, sort_keys=True) != json.dumps(mixture_bias(sx, mixes, 200, 3), sort_keys=True):
+        f.append("the same B and seed do not give identical mixture intervals")
+    other = mixture_bias(sx, mixes, 200, 4)
+    if all(mb["by_stratum"][s][m]["bias_ci"] == other["by_stratum"][s][m]["bias_ci"] for s in SPEEDS for m in MEASURES):
+        f.append("a different seed gives the same stratum intervals (the seed has no effect)")
+    for s, name in (("slow", "only_slow"), ("mid", "only_mid"), ("fast", "only_fast")):
+        for m in MEASURES:
+            cell, mix = mb["by_stratum"][s][m], mb["mixtures"][name]
+            if mix["bias_ci"][m] != cell["bias_ci"] or mix["bias_ci_status"][m] != cell["bias_ci_status"] or \
+                    mix["bias"][m] != cell["bias"]:
+                f.append("the mixture with all weight on %s does not give that speed's bias and interval for %s: %r vs %r" % (
+                    s, m, (mix["bias"][m], mix["bias_ci"][m]), (cell["bias"], cell["bias_ci"])))
+    for s in SPEEDS:
+        for m in MEASURES:
+            c = mb["by_stratum"][s][m]
+            lo, hi = c["bias_ci"]
+            if c["bias_ci_status"] != "ok" or lo is None or not (lo - 1e-9 <= c["bias"] <= hi + 1e-9):
+                f.append("the %s interval of %s does not contain its bias or is missing: %r" % (s, m, c))
+    for name in DEFAULT_MIXTURES:
+        for m in MEASURES:
+            lo, hi = mb["mixtures"][name]["bias_ci"][m]
+            if mb["mixtures"][name]["bias_ci_status"][m] != "ok" or not (lo - 1e-9 <= mb["mixtures"][name]["bias"][m] <= hi + 1e-9):
+                f.append("the interval of the mixture %s for %s does not contain its bias: %r" % (name, m, (lo, hi)))
+    # without B the intervals are not requested; the points do not change
+    plain = mixture_bias(sx, mixes)
+    if plain["by_stratum"]["fast"]["n_conversions"]["bias_ci_status"] != "not_requested" or \
+            plain["mixtures"]["uniform"]["bias"] != mb["mixtures"]["uniform"]["bias"]:
+        f.append("without B the intervals must be not_requested and the points unchanged")
+    for bad in (dict(B=0, seed=1), dict(B=5, seed="a"), dict(B=True, seed=1), dict(B=MAX_B + 1, seed=1)):
+        try:
+            mixture_bias(sx, mixes, **bad)
+            f.append("mixture_bias accepted %r" % (bad,))
+        except ValueError:
+            pass
+    # stratification: slow texts differ by +10 and fast texts by -10 in every block, so any resample
+    # that stays inside the speeds gives exactly +10 / -10 and a mixture of the two exactly 0
+    syn = _syn_texts({"slow": [(0, 0, 10), (0, 0, 10), (1, 0, 10), (1, 0, 10)],
+                      "fast": [(2, 10, 0), (2, 10, 0), (3, 10, 0), (3, 10, 0)]})
+    sm = mixture_bias(syn, {"both": {"slow": 1, "fast": 1}, "slow": {"slow": 1}, "fast": {"fast": 1}}, 100, 1)
+    if sm["mixtures"]["both"]["bias_ci"]["n_conversions"] != [0.0, 0.0] or \
+            sm["mixtures"]["slow"]["bias_ci"]["n_conversions"] != [10.0, 10.0] or \
+            sm["mixtures"]["fast"]["bias_ci"]["n_conversions"] != [-10.0, -10.0]:
+        f.append("the bootstrap is not stratified (a replicate mixed texts of different speeds): %r" % (sm["mixtures"],))
+    # two blocks per speed whose means are 0 and 10: the uniform mixture's interval reaches 0 and 10
+    syn2 = _syn_texts({"slow": [(0, 0, 0), (1, 0, 10)], "fast": [(2, 0, 0), (3, 0, 10)]})
+    lo, hi = mixture_bias(syn2, {"u": {"slow": 1, "fast": 1}}, 400, 1)["mixtures"]["u"]["bias_ci"]["n_conversions"]
+    if not (lo == 0.0 and hi == 10.0):
+        f.append("the mixture interval does not span the strata's block means: %r" % ((lo, hi),))
+    # withheld intervals and their reasons
+    thin = {"slow": sx["slow"][:4], "mid": sx["mid"], "fast": sx["fast"]}  # slow: the 4 texts of one block
+    tb = mixture_bias(thin, {"needs_slow": {"slow": 1, "mid": 1}, "mid_only": {"mid": 1},
+                             "zero_slow": {"slow": 0, "mid": 1}}, 50, 1)
+    if len(set(t["block_id"] for t in thin["slow"])) != 1:
+        f.append("the thin-stratum fixture should have one slow block")
+    if tb["by_stratum"]["slow"]["n_conversions"]["bias_ci"] != [None, None] or \
+            tb["by_stratum"]["slow"]["n_conversions"]["bias_ci_status"] != "fewer_than_two_blocks" or \
+            tb["mixtures"]["needs_slow"]["bias_ci_status"]["n_conversions"] != "fewer_than_two_blocks" or \
+            tb["mixtures"]["needs_slow"]["bias_ci"]["n_conversions"] != [None, None]:
+        f.append("a needed stratum with one block must withhold the interval: %r" % (tb["mixtures"]["needs_slow"],))
+    if tb["mixtures"]["mid_only"]["bias_ci_status"]["n_conversions"] != "ok" or \
+            tb["mixtures"]["zero_slow"]["bias_ci_status"]["n_conversions"] != "ok":
+        f.append("a stratum that is not needed (weight 0 or absent from the weights) must not withhold the interval")
+    nd = mixture_bias(_syn_texts({"slow": [(0, 1, None), (1, 1, None)]}), {"s": {"slow": 1}, "f": {"fast": 1}}, 20, 1)
+    if nd["by_stratum"]["slow"]["n_conversions"]["bias_ci_status"] != "no_data" or \
+            nd["mixtures"]["s"]["bias_ci_status"]["n_conversions"] != "no_data" or \
+            nd["mixtures"]["f"]["bias_ci_status"]["n_conversions"] != "no_data":
+        f.append("a null bias must give the status no_data: %r" % (nd,))
+    # a replicate in which a needed stratum has no text with the measure is undefined: withheld, not dropped
+    und = _syn_texts({"slow": [(0, 1, None), (1, 1, 3)]})
+    ub = mixture_bias(und, {"s": {"slow": 1}}, 200, 1)
+    if ub["by_stratum"]["slow"]["n_conversions"]["bias_ci_status"] != "undefined_resample" or \
+            ub["mixtures"]["s"]["bias_ci_status"]["n_conversions"] != "undefined_resample" or \
+            ub["mixtures"]["s"]["bias_ci"]["n_conversions"] != [None, None]:
+        f.append("an undefined replicate must withhold the interval with undefined_resample: %r" % (ub,))
+    # the global random state is not touched
+    state = random.getstate()
+    mixture_bias(sx, mixes, 20, 1)
+    if random.getstate() != state:
+        f.append("the global random state was touched by the mixture bootstrap")
+    return f
+
+
+def _case_layer_none():
+    f = []
+    w = _world()
+    gt = w["gt"]
+    obs = attach_trials(_obs_from(gt), w["oracle"])
+    plan = {"trials": dict(w["plan"]["trials"], t09999={"block_id": 0, "scenario": "S1", "speed": "slow"})}
+    base = per_trial(plan, w["oracle"], gt, obs, {"t00001"}, {"t00002"}, 50, 1)
+    if "outside_layer" in base["trials_not_used"]:
+        f.append("per_trial without only_trials must not have an outside_layer count: %r" % (base["trials_not_used"],))
+    # trial 1 is excluded, 2 is out of scope, 9999 was not run; 58 of 60 listed trials are used (3..60)
+    only = set("t%05d" % k for k in range(1, 61)) | {"t09999"}
+    r = per_trial(plan, w["oracle"], gt, obs, {"t00001"}, {"t00002"}, 50, 1, only_trials=only)
+    if r["trials_not_used"] != {"not_run": 1, "excluded": 1, "out_of_scope": 1, "outside_layer": 190 - 58} or \
+            r["n_trials"] != 58:
+        f.append("only_trials: trials not used / n_trials: %r / %r" % (r["trials_not_used"], r["n_trials"]))
+    n_in = sum(1 for s in gt if s["trial_id"] in only and s["trial_id"] not in ("t00001", "t00002"))
+    if r["n_outside"]["gt"] != len(gt) - n_in:
+        f.append("the sessions of trials outside the layer should count as outside: %r" % (r["n_outside"],))
+    if sum(x["n_trials"] for x in r["by_stratum"]) != 58:
+        f.append("the strata should hold the 58 trials in the layer")
+    e = per_trial(plan, w["oracle"], gt, obs, set(), set(), 50, 1, only_trials=set())
+    if e["n_trials"] != 0 or e["by_stratum"] != [] or e["trials_not_used"]["outside_layer"] != 192:
+        f.append("an empty only_trials should leave no trial: %r" % (e["trials_not_used"],))
+    full = per_trial(plan, w["oracle"], gt, obs, {"t00001"}, {"t00002"}, 50, 1, only_trials=set(plan["trials"]))
+    if full["by_stratum"] != base["by_stratum"] or full["trials_not_used"]["outside_layer"] != 0:
+        f.append("only_trials covering every trial must change nothing but the extra count")
+    # through evaluate: the scope's list of trials in none of the layers
+    fx = match._cli_fixture()
+    cfg = json.dumps({"B": 30, "seed": 3}).encode("utf-8")
+    mo = json.loads(match.render(match.evaluate(fx["sessions"], "all", fx["obs"], fx["plan"], fx["oracle"],
+                                                fx["config"])).decode("utf-8"))
+
+    def run(scope):
+        m2 = json.loads(json.dumps(mo))
+        if scope == "__drop__":
+            m2.pop("scope", None)
+        else:
+            m2["scope"] = scope
+        return evaluate(json.dumps(m2).encode("utf-8"), fx["sessions"], fx["obs"], fx["plan"], fx["oracle"], cfg)
+
+    base_scope = {"name": "all_trials", "long_trials": None}
+    for label, scope in (("a missing scope", "__drop__"), ("a scope without the key", dict(base_scope)),
+                         ("a null list", dict(base_scope, layer_none_trials=None))):
+        if run(scope)["per_trial_layer_none"] is not None:
+            f.append("%s must give per_trial_layer_none null" % label)
+    lst = ["t%05d" % k for k in range(1, 46)]
+    out = run(dict(base_scope, layer_none_trials=lst))
+    pl, pa = out["per_trial_layer_none"], out["per_trial"]
+    if pl is None or pl["n_trials"] + pl["trials_not_used"]["outside_layer"] != pa["n_trials"] or \
+            pl["n_trials"] != sum(x["n_trials"] for x in pl["by_stratum"]) or "outside_layer" in pa["trials_not_used"]:
+        f.append("per_trial_layer_none does not split the used trials of per_trial: %r / %r" % (
+            None if pl is None else pl["trials_not_used"], pa["trials_not_used"]))
+    if pl is not None and not (0 < pl["n_trials"] < pa["n_trials"]):
+        f.append("the layer-none view should hold some but not all trials: %r" % (pl["n_trials"],))
+    if json.dumps(out, sort_keys=True) != json.dumps(run(dict(base_scope, layer_none_trials=lst)), sort_keys=True):
+        f.append("evaluate with layer_none_trials is not deterministic")
+    if run(dict(base_scope, layer_none_trials=[]))["per_trial_layer_none"]["n_trials"] != 0:
+        f.append("an empty list should give an empty view, not null")
+    for bad in ([1, 2], "t00001", {"a": 1}, ["t00001", None], 0, True):
+        try:
+            run(dict(base_scope, layer_none_trials=bad))
+            f.append("a malformed layer_none_trials %r was accepted" % (bad,))
+        except InputError:
+            pass
+    return f
+
+
 CASES = [
     ("texts (bundling in plan order, dropped remainder counted, one speed per text, errors)", _case_layout),
     ("per trial: differences by scenario and speed, clustered by block", _case_per_trial),
@@ -1264,6 +1685,9 @@ CASES = [
     ("perfect agreement gives ICC 1; shuffling lowers the ICC (negative control)", _case_perfect_and_shuffle),
     ("positive control: the bias moves with the mixture ratio", _case_mixture),
     ("same seed gives byte-identical results; not computable cases are None", _case_seed_and_bytes),
+    ("intervals for the bias and the limits of agreement (block bootstrap, statuses)", _case_agreement_intervals),
+    ("intervals for the mixture biases (stratified block bootstrap, statuses)", _case_mixture_intervals),
+    ("per_trial restricted to the trials in no layer (only_trials / per_trial_layer_none)", _case_layer_none),
     ("CLI (hash binding, byte-identical output, exit 2)", _case_cli),
 ]
 

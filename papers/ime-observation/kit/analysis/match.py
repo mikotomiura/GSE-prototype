@@ -106,20 +106,23 @@ CLI (--sessions is gt_sessions.py's output; --definition selects one of its defi
     default; kept-session counts with n_start_while_open > 0 are reported per stratum in the output
     under "diagnostics.start_while_open".
   - Prediction (--prediction, spec_predict.py's output for the same oracle and plan). The prediction
-    marks, from what was sent and the observer's specified rules alone, the trials whose session the
-    observer is specified to cut off at 20 seconds (long). --scope then selects the trials that enter
+    marks, from what was sent and the observer's specified rules alone, the trials whose presses entered
+    a session that the observer is specified to cut off at 20 seconds (long; the session may have started
+    in the trial or have been carried over from an earlier one). --scope then selects the trials that enter
     the matching, after the exclusions above and at the level of a trial, as exclusion does:
     all_trials (every trial; the default and the only scope without a prediction), under_limit (the
     trials that are not long) or over_limit (the long trials only: their sessions, and the rows
     assigned to them, including the fragments that follow a cut-off). The items of the other trials
-    are set aside and counted (scope.set_aside); scope.long_trials lists the long trials. A ground-truth
-    session or row that belongs to no trial is under the limit.
+    are set aside and counted (scope.set_aside); scope.long_trials lists the long trials and
+    scope.layer_none_trials the trials of the layer none (below), for the level-2 per-trial view. A
+    ground-truth session or row that belongs to no trial is under the limit.
     With a prediction the output also holds diagnostics.prediction_layers: the detection metrics
     restricted to the trials of each layer (pooled and per speed, counted from the same matching):
-    carried_out (the trial started a session that ends in a later trial), received_carry (the trial
-    started no session, n_started == 0; in this design, its presses went into a session carried over
-    from an earlier trial), closing_key_in_reading (the trial sends a key that types a long-vowel mark,
-    comma or full stop) and none (a trial in none of the three). A trial can be in several layers.
+    carried_out (the trial started a session that ends in a later trial), received_carry (a press of the
+    trial entered a session started by an earlier trial), closing_key_in_reading (the trial sends the
+    minus, comma or period key, which closes a session under the observer's rules: a long-vowel mark,
+    comma or full stop in Romaji input, and ho, ne or ru in kana input) and none (a trial in none of the
+    three). A trial can be in several layers.
   - The output never includes a path, and identical input always yields identical output bytes
     (sort_keys, LF, UTF-8, no BOM). The input files' SHA-256 hashes are retained.
 
@@ -147,7 +150,7 @@ CELL_RE = re.compile(r"^[A-Za-z0-9_.+-]{1,64}$")
 DEFINITIONS = ("all", "macos_def", "windows_def")
 SCOPES = ("all_trials", "under_limit", "over_limit")
 PREDICTION_LAYERS = ("carried_out", "received_carry", "closing_key_in_reading", "none")
-PREDICTION_FORMAT = "spec_predict/1"
+PREDICTION_FORMAT = "spec_predict/2"
 
 
 # ---------------------------------------------------------------- interval geometry
@@ -729,14 +732,15 @@ def parse_prediction(data, oracle_sha256, plan_sha256):
     long_trials = set()
     layers = dict((k, set()) for k in PREDICTION_LAYERS)
     for tid, d in by.items():
-        if not isinstance(d, dict) or any(type(d.get(k)) is not bool for k in ("long", "carried_out", "closing_key_in_reading")) \
+        if not isinstance(d, dict) or any(type(d.get(k)) is not bool
+                                          for k in ("long", "carried_out", "received_carry", "closing_key_in_reading")) \
                 or not (_is_int(d.get("n_started")) and d["n_started"] >= 0):
             raise InputError("prediction: an entry of trials.by_trial has the wrong shape")
         if d["long"]:
             long_trials.add(tid)
         if d["carried_out"]:
             layers["carried_out"].add(tid)
-        if d["n_started"] == 0:
+        if d["received_carry"]:
             layers["received_carry"].add(tid)
         if d["closing_key_in_reading"]:
             layers["closing_key_in_reading"].add(tid)
@@ -927,7 +931,8 @@ def evaluate(sessions_bytes, definition, obs_bytes, plan_bytes, oracle_bytes, co
             "obs": {"n": n_obs_dropped, "by_reason": obs_reasons},
             "trials": {"n": len(trial_types), "by_type": _count_types(excluded)}},
         "scope": {"name": scope, "set_aside": set_aside,
-                  "long_trials": None if pred is None else sorted(pred["long"])},
+                  "long_trials": None if pred is None else sorted(pred["long"]),
+                  "layer_none_trials": None if pred is None else sorted(pred["layers"]["none"])},
         "used": {"n_gt": len(kept_gt), "n_obs": len(kept_obs)},
         "diagnostics": {"start_while_open": {"n": sum(swo_counts.values()), "by_stratum": swo_by_stratum},
                         "prediction_layers": layers},
@@ -1552,11 +1557,14 @@ def _cli_fixture():
             "oracle": oracle_bytes, "config": json.dumps({"clock_offsets_ms": {"1": 700}, "cell": "mac-std"}).encode("utf-8")}
 
 
-def _prediction_fixture(fx, long_trials=(), carried=(), none_started=(), closing=()):
-    """A spec_predict/1 object for _cli_fixture's oracle and plan (only the fields the matcher reads)."""
+def _prediction_fixture(fx, long_trials=(), carried=(), none_started=(), closing=(), received=None):
+    """A spec_predict/2 object for _cli_fixture's oracle and plan (only the fields the matcher reads).
+    received defaults to none_started (a trial that started nothing received a carried session)."""
     tids = ["t%05d" % i for i in range(1, 91)]
+    received = none_started if received is None else received
     by = dict((t, {"long": t in long_trials, "carried_out": t in carried, "n_started": 0 if t in none_started else 1,
-                   "closing_key_in_reading": t in closing, "sessions": []}) for t in tids)
+                   "received_carry": t in received, "closing_key_in_reading": t in closing, "sessions": []})
+              for t in tids)
     obj = {"format": PREDICTION_FORMAT, "limit_ms": 20000,
            "inputs_sha256": {"oracle": hashlib.sha256(fx["oracle"]).hexdigest(), "plan": hashlib.sha256(fx["plan"]).hexdigest()},
            "trials": {"n": len(tids), "by_trial": by}, "sessions": []}
@@ -1604,6 +1612,18 @@ def _case_prediction_scope():
             f.append("closing layer (a split and a pair): %r" % cl)
         if lay["none"]["n_trials"] != 87 or lay["received_carry"]["n_trials"] != 1:
             f.append("none / received_carry n_trials: %r / %r" % (lay["none"]["n_trials"], lay["received_carry"]["n_trials"]))
+        none_ids = under["scope"]["layer_none_trials"]
+        if not isinstance(none_ids, list) or len(none_ids) != 87 or none_ids != sorted(none_ids) \
+                or "t00016" in none_ids or "t00017" in none_ids or "t00021" in none_ids:
+            f.append("scope.layer_none_trials should list the 87 trials of no layer: %r" % (none_ids,))
+        if plain["scope"]["layer_none_trials"] is not None:
+            f.append("scope.layer_none_trials should be null without a prediction")
+        # received_carry comes from the prediction's flag, not from n_started: a trial that received a
+        # carried session and also started one of its own is in the layer
+        flag = ev("all_trials", _prediction_fixture(fx, received=("t00030",)))["diagnostics"]["prediction_layers"]
+        if flag["received_carry"]["n_trials"] != 1 or flag["none"]["n_trials"] != 89:
+            f.append("received_carry should follow the flag: %r / %r" % (flag["received_carry"]["n_trials"],
+                                                                         flag["none"]["n_trials"]))
         if lay["none"]["pooled"]["n_false_pos"] != pf["n_false_pos"] - 1:
             f.append("the none layer should hold every false positive inside a trial of no layer")
         by = lay["closing_key_in_reading"]["by_speed"]
@@ -1614,6 +1634,8 @@ def _case_prediction_scope():
                      ("a prediction of another oracle", lambda: evaluate(fx["sessions"], "macos_def", fx["obs"], fx["plan"],
                                                                        fx["oracle"] + b"\n", fx["config"], pb, "under_limit")),
                      ("a malformed by_trial", lambda: ev("under_limit", pb.replace(b'"long": false', b'"long": 0', 1))),
+                     ("a by_trial without received_carry",
+                      lambda: ev("under_limit", pb.replace(b'"received_carry": false, ', b'', 1))),
                      ("another format", lambda: ev("under_limit", pb.replace(PREDICTION_FORMAT.encode(), b"spec_predict/0")))):
         try:
             fn()

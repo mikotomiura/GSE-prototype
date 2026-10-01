@@ -40,9 +40,10 @@ Definitions.
     between order statistics at position p * (n - 1) (the "type 7" rule); the median is the p = 0.5 case.
     Values are rounded to six decimals.
   * Focus losses of the reference input field: the focus_out rows of the reference log are assigned to the trial
-    intervals in the same way. Reported: the number of such rows, the number outside every interval, and per
-    stratum (scenario, speed) the number of measured trials and of trials with at least one focus_out. A planned
-    switch to another application (scenario S15) produces one; any other is a loss of focus inside a block.
+    intervals in the same way. Reported: the number of such rows, the number outside every interval, the trials
+    with at least one focus_out (trials_with_focus_out, sorted), and per stratum (scenario, speed) the number of
+    measured trials and of trials with at least one focus_out. A planned switch to another application (scenario
+    S15) produces one; any other is a loss of focus inside a block.
 
 Refused (exit 2): a plan whose SHA-256 differs from the oracle header's plan_sha256; a sent row whose trial or
 step is absent from the plan, or whose key or down flag disagrees with the plan step; a sent row of a trial with
@@ -267,6 +268,7 @@ def _focus_losses(done, plan, times, starts, ends):
         sc = k[0][1:]
         return (int(sc) if sc.isdigit() else 0, k[0], SPEEDS.index(k[1]))
     return {"n_rows": len(times), "n_outside_trials": outside, "n_trials_with_focus_out": sum(1 for g in rows if g),
+            "trials_with_focus_out": sorted(t["trial_id"] for t, got in zip(done, rows) if got),
             "by_stratum": [{"scenario": k[0], "speed": k[1], "n_trials": per[k][0], "n_trials_with_focus_out": per[k][1]}
                            for k in sorted(per, key=order)]}
 
@@ -544,6 +546,7 @@ def _selftest():
     want_fo = [{"scenario": "S1", "speed": "slow", "n_trials": 1, "n_trials_with_focus_out": 0},
                {"scenario": "S1", "speed": "mid", "n_trials": 1, "n_trials_with_focus_out": 1},
                {"scenario": "S1", "speed": "fast", "n_trials": 1, "n_trials_with_focus_out": 0}]
+    check(fo["trials_with_focus_out"] == ["t3"], "the trials with a focus_out are listed: %r" % (fo["trials_with_focus_out"],))
     check(fo["n_rows"] == 2 and fo["n_outside_trials"] == 1 and fo["n_trials_with_focus_out"] == 1
           and fo["by_stratum"] == want_fo, "focus losses of the reference are counted per trial and stratum")
     check(out["trials"] == {"planned": 3, "begun": 3, "measured": 3, "incomplete": 0}
