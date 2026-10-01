@@ -2,6 +2,7 @@
 
 > 作成: 2026-10-01（G-GEAR で、M2 の確認と M3 の下書きを行ったセッションの最後に）。
 > 前の handoff（`next-session-ime-paper-m2.md`）の後継。M2 の残り（生ログの預け方・Mac）は前の handoff の §0 B と `tasklist.md` を見る。
+> ★ **2026-10-01 追記**: §2 の attack-me round 1 と §4 の Mac の確認は済んだ。続きは **`next-session-ime-paper-m3-fixes.md`**（round 1 の直し → round 2）。§3・§5 はこのメモのまま使う。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（判断 90〜98）・`tasklist.md`（M3 の項目）と、枝の `papers/ime-observation/experiment/preregistration.md`。状態は着手時に `git fetch` で測り直す。
 
 ## §0 打ち込む用
