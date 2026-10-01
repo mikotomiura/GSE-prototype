@@ -25,7 +25,10 @@ Measures (each is computed per stratum -- (cell, scenario, speed) -- and pooled 
                is left out of every error figure and counted separately (n_zero_excluded).
   abandon      ground truth = the session ended in a cancel; observation = the row's abandon flag.
                Reported: the 2 x 2 table (rows = ground truth, columns = observation, index 1 = abandon),
-               Cohen's kappa, and the raw agreement with a Wilson interval.
+               Cohen's kappa, and the raw agreement with a Wilson interval. The same figures are also
+               reported, as a diagnostic, separately for sessions with and without a commit that did
+               not close the session because the composition continued (n_continued_commits > 0);
+               pairs whose session lacks that field are counted as n_unknown.
   nav          exact-match rate with a Wilson interval, and the distribution of the difference
                (observed - true). The true count is the session's nav_true_cand when it is not null
                (sources with a candidate window: presses while the window was open), otherwise nav_true.
@@ -45,10 +48,10 @@ Measures (each is computed per stratum -- (cell, scenario, speed) -- and pooled 
   zero_dwell_rows
                the observed rows whose dwell_ms is 0, counted in every bucket (pairs, split, merge,
                false positives), overall and per stratum for the buckets that carry a session. In the
-               present matching such a row has zero length, cannot overlap a session of positive
-               length, and therefore falls into the false positives and never into a pair; how these
-               rows enter the matching is to be fixed in the pre-registration. The matching is not
-               changed here.
+               matching such a row has zero length, cannot overlap a session of positive length, and
+               therefore falls into the false positives and never into a pair. The pre-registration
+               keeps this treatment: such a row stays in the matching as a zero-length interval, so it
+               counts against precision, and the number of such rows is reported.
 
 Configuration CFG (JSON): {"B": 2000, "seed": 1, "limit_ms": 20000}; B is at most 100000. Keys starting with "_" are
 annotations and are not read.
@@ -156,6 +159,28 @@ def abandon_agreement(pairs):
     x = table[0][0] + table[1][1]
     return {"table": table, "n": n, "kappa": stats.cohen_kappa(table),
             "agree": (x / n if n else None), "agree_ci": _ci(stats.wilson(x, n))}
+
+
+def abandon_by_continued_commit(pairs):
+    """Agreement on abandonment over 1:1 pairs, split by whether the ground-truth session held a
+    commit that did not close it because the composition continued within the rule's window
+    (gt_sessions.py's n_continued_commits > 0). With live conversion the input method commits the
+    head of a reading while the rest is still being typed; when the rest is then cancelled, the
+    session is a cancel on the ground-truth side. This is a diagnostic split of the abandon measure,
+    which it does not replace.
+    Returns {"with", "without", "n_unknown"}: "with" and "without" have the form of
+    abandon_agreement; n_unknown counts the pairs whose session carries no n_continued_commits (a
+    non-negative integer), which enter neither stratum."""
+    with_c, without_c, unknown = [], [], 0
+    for p in pairs:
+        k = p["gt"].get("n_continued_commits")
+        if not (match._is_int(k) and k >= 0):
+            unknown += 1
+        elif k > 0:
+            with_c.append(p)
+        else:
+            without_c.append(p)
+    return {"with": abandon_agreement(with_c), "without": abandon_agreement(without_c), "n_unknown": unknown}
 
 
 def _nav_true(gt):
@@ -355,7 +380,7 @@ def oracle_report(oracle_agreement, plan_trials=None, cell=None):
 
 def _measures(pairs, block_of, B, seed):
     return {"dwell": dwell_error(pairs, block_of, B, seed), "abandon": abandon_agreement(pairs),
-            "nav": nav_agreement(pairs)}
+            "abandon_by_continued_commit": abandon_by_continued_commit(pairs), "nav": nav_agreement(pairs)}
 
 
 def l1_report(match_result, gt_sessions, oracle_agreement, plan_trials, cell, B, seed, limit_ms=DEFAULT_LIMIT_MS):
@@ -452,9 +477,9 @@ def evaluate(match_bytes, sessions_bytes, plan_bytes, oracle_bytes, config_bytes
                           "oracle": have["oracle"], "config": None if config_bytes is None else _sha(config_bytes)},
         "used": {"n_pairs": len(m["matching"]["pairs"])},
         "note": "Pairs whose observed dwell_ms is 0 are left out of the dwell figures and counted in "
-                "n_zero_excluded; in the present matching a row of dwell_ms 0 never enters a pair and is "
-                "counted in zero_dwell_rows (its place in the matching is to be fixed in the "
-                "pre-registration). Intervals are cluster-bootstrap (blocks) for dwell_ms and Wilson for "
+                "n_zero_excluded; in the matching a row of dwell_ms 0 is a zero-length interval that never "
+                "enters a pair, so it counts as a false positive (as pre-registered), and it is counted in "
+                "zero_dwell_rows. Intervals are cluster-bootstrap (blocks) for dwell_ms and Wilson for "
                 "proportions; read them as the width visible from this sample. The oracle report is built "
                 "from every trial of the oracle and for every session definition, not only the definition "
                 "matched here.",
@@ -596,6 +621,41 @@ def _case_abandon_flip():
     a0 = abandon_agreement(p0)
     if a0["agree"] != 1.0 or a0["kappa"] != 1.0 or a0["table"][0][1] != 0 or a0["table"][1][0] != 0:
         f.append("with no flip agreement and kappa should be exactly 1: %r" % (a0,))
+    return f
+
+
+def _case_abandon_by_continued_commit():
+    """The diagnostic split puts each pair in the stratum its session's n_continued_commits selects,
+    counts a missing or malformed field as unknown, and leaves the pooled abandon measure unchanged."""
+    f = []
+    pairs, _blk = _synth(300, 4, flip=0.0)
+    marked = []
+    for i, p in enumerate(pairs):
+        k = None if i % 30 == 0 else (2 if i % 3 == 0 else 0)  # 10 unknown, 90 with, 200 without
+        gt = dict(p["gt"])
+        if k is not None:
+            gt["n_continued_commits"] = k
+        obs = dict(p["obs"])
+        if k == 2:  # disagree on every pair of the "with" stratum, and nowhere else
+            obs["abandon"] = not obs["abandon"]
+        marked.append(dict(p, gt=gt, obs=obs))
+    marked[1]["gt"]["n_continued_commits"] = -1  # malformed: unknown, not "without"
+    r = abandon_by_continued_commit(marked)
+    if (r["with"]["n"], r["without"]["n"], r["n_unknown"]) != (90, 199, 11):
+        f.append("the strata do not hold (with, without, unknown) = (90, 199, 11): %r"
+                 % ((r["with"]["n"], r["without"]["n"], r["n_unknown"]),))
+    if r["with"]["agree"] != 0.0 or r["without"]["agree"] != 1.0:
+        f.append("the disagreement is not confined to the stratum it was put in: with %r, without %r"
+                 % (r["with"]["agree"], r["without"]["agree"]))
+    whole = abandon_agreement(marked)
+    if whole["n"] != 300 or whole["agree"] != 210 / 300:
+        f.append("the pooled abandon measure changed or lost pairs: %r" % ((whole["n"], whole["agree"]),))
+    e = abandon_by_continued_commit([])
+    if e["with"]["n"] != 0 or e["with"]["agree"] is not None or e["n_unknown"] != 0:
+        f.append("with no pairs the strata should be empty and null: %r" % (e,))
+    m = _measures(marked, _blk, 50, 1)
+    if not _same(m.get("abandon_by_continued_commit"), r) or not _same(m.get("abandon"), whole):
+        f.append("the per-stratum and pooled measures do not carry the split next to the abandon measure")
     return f
 
 
@@ -935,6 +995,7 @@ def _case_cli():
 CASES = [
     ("recovers a dwell bias (+20 ms, sigma 50 ms; the interval and the SD)", _case_dwell_bias),
     ("recovers an abandon flip (10% flipped; the agreement interval and kappa)", _case_abandon_flip),
+    ("abandon agreement split by continued commits (strata, unknown, pooled unchanged)", _case_abandon_by_continued_commit),
     ("excludes a dwell_ms of zero (and counts it)", _case_dwell_zero),
     ("shuffling widens the limits of agreement (negative control; the bias stays near 0)", _case_shuffle),
     ("navigation agreement (the true count, the difference distribution)", _case_nav),

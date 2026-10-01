@@ -32,7 +32,7 @@ A measure that cannot be computed for a text (no session, zero duration) is None
 An observation row whose dwell_ms is 0 does not carry a measured dwell (the observer produces it
 when the clock steps backwards). Such a row is counted as a conversion and for the abandon rate, is
 left out of mean_dwell_ms and dwell_fraction, and is reported as n_dwell_zero per text and in total;
-how it is treated in the matching is decided when the analysis is frozen.
+in the matching it stays a zero-length interval and so counts as a false positive (as pre-registered).
 
 Inputs. --match is match.py's output. The kept ground-truth sessions and the kept observation rows
 are read from its "matching" section (so the exclusions and the clock correction that were applied
@@ -545,7 +545,8 @@ def evaluate(match_bytes, sessions_bytes, obs_bytes, plan_bytes, oracle_bytes, c
                           "obs": _outside_report(obs_agg, layout["trial_status"], plan["trials"])},
         "dwell_zero": {"n_obs_rows": n_zero,
                        "note": "observation rows with dwell_ms == 0 are counted as conversions but are left out of "
-                               "mean_dwell_ms and dwell_fraction; their treatment in the matching is decided at freeze"},
+                               "mean_dwell_ms and dwell_fraction; in the matching they stay zero-length intervals "
+                               "and count as false positives (as pre-registered)"},
         "aggregate": {"gt": gt_agg["texts"], "obs": obs_agg["texts"]},
         "agreement": agreement(gt_agg, obs_agg, cfg["B"], cfg["seed"]),
         "agreement_by_stratum": agreement_by_stratum(gt_agg, obs_agg, cfg["B"], cfg["seed"]),
