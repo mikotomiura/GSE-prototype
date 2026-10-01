@@ -1,5 +1,5 @@
 {
-  "_note": "Analysis settings. The values are provisional and are frozen when the pre-registration is frozen; after that they are not edited. gt_rules is resolved relative to this file; the rule file is revised against the calibration pilots before the freeze (the macOS block is revised; the Windows blocks are still the working hypothesis).",
+  "_note": "Analysis settings, frozen with the pre-registration of the macOS cells (preregistration.md, section 9) and not edited after the freeze. gt_rules is resolved relative to this file. The Windows blocks of the rule file are the only part of these files that the Windows addendum may revise (preregistration.md, section 8).",
   "iou_min": 0.5,
   "obs_end_offset_ms": 0,
   "theta": 0.5,

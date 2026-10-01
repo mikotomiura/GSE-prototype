@@ -243,6 +243,14 @@ The margin is fixed before the real logs are analysed, and should allow for the 
 interval does not (see [Candidates and accuracy](#candidates-and-accuracy)). This kit reports the accuracy, the
 interval, `acc_source` and the chance level, and does not decide the margin.
 
+The pre-registration of the first experiment fixes the rule for its logs: a feature set is near chance at K = 10 or
+K = 100 when the upper end of its Wilson interval is at most 2/K, and it must be near chance at both values of K in
+both cells; K = 1000 is reported descriptively, because at the planned numbers of trials an attack at the chance
+level would rarely meet the rule there. The feature sets that keep millisecond times (`all`, `no_runs`) are
+excluded from the recommendation and reported as estimates only, because the synthetic key intervals are drawn
+independently of the keys (see above), so the timing of particular key pairs that human logs carry is absent. The
+session rows are not used by the attack and are outside the recommendation.
+
 ## Verification
 
 ```sh

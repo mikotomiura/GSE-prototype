@@ -157,5 +157,6 @@ Before it is written, every string of the manifest is scanned: the home director
 are replaced by `~` and `<repo>` (both spellings of the path separator, the longer path first), so that no user
 name or directory layout is deposited.
 
-The `gt` and `obs` logs use the clocks of their own processes, so their times are aligned to the oracle in
-the analysis, not by the runner.
+The `gt` and `obs` logs use the clocks of their own processes. The runner does not align them, and the analysis
+does not correct them either: the differences between the logs are measured at the block-start markers
+(`kit/pilot/clock_sync.py`) and reported.

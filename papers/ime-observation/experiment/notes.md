@@ -2,16 +2,22 @@
 
 ## Questions and result files
 
-The questions, the estimates that answer them, and the precision that counts as informative are stated in
-`preregistration.md`. The result files are:
+The questions, the estimates that answer them, and the precision expected at the planned numbers of trials
+are stated in `preregistration.md`. The result files are:
 
 | Question | Estimates | Result file |
 |---|---|---|
-| Does the observer detect the compositions the input method performs? | Precision, recall, split and merge rates | `results/e1_detection.json` |
-| Do the per-composition records agree with the input method's own state? | Dwell error, abandonment, navigation counts, the 20-second cut-off, plan-versus-ground-truth disagreements | `results/e1_l1.json` |
-| Do the per-text aggregates a writing researcher computes agree? | Bland-Altman limits and ICC(2,1) of four per-text measures | `results/e1_l2.json` |
-| How much of the typed text can be recovered from a published log? | Closed-set identification accuracy against chance, open-set character error rate against a prior-only baseline | `results/e2_closed_set.json`, `results/e2_open_set.json` |
-| What does the observer cost the machine? | CPU and resident memory under two conditions | `results/e3_<system>_<condition>.json` |
+| Does the observer detect the compositions the input method performs? | Precision, recall, split and merge rates, per comparison and scope; the prediction's summary per cell | `results/e1_detection.json` |
+| Do the per-composition records agree with the sessions of the reference input field? | Dwell error, abandonment, navigation counts, the 20-second cut-off, plan-versus-ground-truth disagreements | `results/e1_l1.json` |
+| Do the per-text aggregates a writing researcher might compute agree? | Bland-Altman limits and ICC(2,1) of four per-text measures, per-trial differences by scenario and speed | `results/e1_l2.json` |
+| Did the scripted presses arrive as planned? | Send delay, reach in both directions, delay and interval error of the rows, focus losses of the reference | `results/e1_delivery.json` |
+| How much of the typed text can be recovered from a published log? | Closed-set identification accuracy against chance, open-set character error rate against a prior-only baseline | `results/e2_closed_set_<cell>.json`, `results/e2_open_set_<cell>.json` |
+| What does the observer cost the machine? | CPU and resident memory under two conditions | `results/e3_<system>.txt` (the standard output of `kit/e3/summarize_e3.py` for both conditions) |
+
+The comparisons are ground truth against observation (`gt_obs`, primary), ground truth against the observer's
+specified rows (`gt_pred`) and those rows against the observation (`pred_obs`); the scopes are `under_limit`,
+`all_trials` and `over_limit` (section 6.4 of the pre-registration). Every result file names its primary
+comparison and scope.
 
 ## Pre-registration
 
@@ -31,10 +37,11 @@ hash is the same on every machine. Synthetic runs (`bash run.sh --synthetic`) do
 they read no real data.
 
 The protocol is frozen in two stages. The first freeze covers the macOS cells. The addendum for the Windows
-cells, frozen before the first Windows measurement, may change only the Windows blocks of the rule file and
-its own section of `preregistration.md`; it then rewrites the two marks. That `config.json`, `SEED`, the
-macOS block of the rule file and the macOS sections are unchanged is shown by the difference between the two
-freezing tags.
+cells and the runtime cost on Windows, frozen before the first Windows measurement, may change only the Windows
+blocks of the rule file and add its own section to `preregistration.md` and new files that only the Windows cells
+use; it then rewrites the two marks. That `config.json`, `SEED`, the macOS block of the rule file, the files of
+the macOS cells and the macOS sections are unchanged is shown by the difference between the two freezing tags.
+The macOS analysis is run from the macOS freezing tag.
 
 ## Step 0 replaced
 
@@ -54,10 +61,10 @@ its manifest.
 
 ## Analysis settings
 
-Every cell is analysed under two session definitions: the one that follows the operating system of the
-cell (`macos_def` or `windows_def`) and the common definition `all`; the results are stored as
-`cells[label][definition]`. On the reference side of a macOS cell the two definitions hold the same
-sessions. The cell label comes from the `label` of the cell file recorded in `run.json`. `iou_min`,
+Every cell is analysed under the session definition that follows the operating system of the cell
+(`macos_def` or `windows_def`), which is the definition of the analysis, and under the common definition `all`;
+the results are stored as `cells[label][definition][comparison][scope]`. On the reference side of a macOS cell
+the two definitions hold the same sessions; `e1_detection.json` reports this check (`same_sessions_as_all`). The cell label comes from the `label` of the cell file recorded in `run.json`. `iou_min`,
 `obs_end_offset_ms`, `theta` and `drop_start_while_open` are passed to the matcher; `bootstrap_B`, `limit_ms`,
 `text_size_trials` and `mixtures` to the level-1 and level-2 stages.
 
@@ -72,7 +79,7 @@ markers with `kit/pilot/clock_sync.py` in every run and reported with the result
 | Method | Where it is used | Source |
 |---|---|---|
 | Wilson score interval | detection rates, abandonment and navigation agreement, plan-versus-ground-truth disagreements, closed-set accuracy | Wilson (1927) |
-| Percentile bootstrap | intervals of the dwell error, the ICC and the open-set error rate | Efron (1979) |
+| Percentile bootstrap | intervals of the dwell error and its limits of agreement, kappa, the ICC, the per-trial differences and the open-set error rate | Efron (1979) |
 | Resampling whole blocks (cluster bootstrap) | the same intervals | Cameron, Gelbach and Miller (2008) |
 | Bland-Altman limits of agreement | dwell error, per-text aggregates | Bland and Altman (1986) |
 | ICC(2,1), absolute agreement | per-text aggregates | Shrout and Fleiss (1979); McGraw and Wong (1996) |

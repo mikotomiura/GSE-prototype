@@ -36,9 +36,14 @@ used are printed when the analysis ends.
    relative paths, are allowed. It never overwrites an existing archive, writes the files in a fixed order
    with fixed times so that packing twice gives the same bytes, checks the contents of the archive again,
    and prints the archive's SHA-256.
-4. Record the printed SHA-256 in the table above, together with the hash of `run.json`
+4. Before packing, check that no row of either log is without a press the executor sent: in the delivery report
+   of the run (`results/e1_delivery.json`, or `python3 kit/analysis/delivery.py` on the run directory),
+   `excess_rows` over all presses must be 0 for the observation and for the reference, and `rows_outside_trials`
+   must not exceed the presses made outside the trials (four marker presses and one kana press per block). A run
+   that does not meet this is not deposited until the extra rows are explained, and the finding is reported.
+5. Record the printed SHA-256 in the table above, together with the hash of `run.json`
    (`manifest_sha256` in the line of the list above).
-5. Deposit that archive, unchanged. `python3 kit/analysis/pipeline.py --check-deposit <run-dir> ...` runs the
+6. Deposit that archive, unchanged. `python3 kit/analysis/pipeline.py --check-deposit <run-dir> ...` runs the
    same check on unpacked directories without writing an archive.
 
 ## Machine that ran the deposit check

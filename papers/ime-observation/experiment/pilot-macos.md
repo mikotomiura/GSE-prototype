@@ -17,7 +17,7 @@ reference to the system under test.
 | Input method | macOS Japanese, Romaji input (`com.apple.inputmethod.Kotoeri.RomajiTyping`), ABC layout as the other input source |
 | Live conversion | On in the first pilot and in one cell of the second; off in the other cell. Set through the input menu and read back from it |
 | Predictive candidates | Not changed from the input method's default (no override is stored in its preferences). Scenario S10 selects a predictive candidate |
-| Learning | Not reset between blocks or runs (a method of resetting it is still being examined). The example cell file (`kit/run/cell.example.json`) describes a reset at every block, which the pilot did not do |
+| Learning | Not reset between blocks or runs. No method of resetting the learning of this input method was found, and the measurement does not reset it either (see the pre-registration) |
 | Initial state | Before each block, `focus_cmd` brings the reference input field to the front, confirms it is in front, and presses the kana key (key code 104) so that the block starts in Japanese input |
 | Observation | The stand-alone logger built from an export of this repository |
 | Reference input field | `kit/refinput-macos`, wrapped in an application bundle by `build.sh` so that the front-window check can name it |
@@ -89,7 +89,7 @@ exclusions in all three runs analysed (`pilot2-on`, `pilot2-off`, `verify-off`).
 A session's outcome is the reason it finally closed. Text committed automatically earlier in the same session is
 not counted, so when the head of a reading was committed and the rest was then cancelled, the session is a
 cancellation. With live conversion on this happened in 11 of the 27 cancelled trials (S4: 3, S5: 3, S6: 5 of 9
-each). How the observation's abandonment is compared with such sessions is fixed in the pre-registration.
+each). How the observation's abandonment is compared with such sessions is set out in the pre-registration.
 
 The 50 ms window needs the reference log to keep running after a commit. Within a trial no procedure types
 again after its committing or cancelling key, and trials are 1,000 ms apart. After the last trial the runner
@@ -145,20 +145,25 @@ the number of marker presses (six blocks of three).
 
 Including the waits and markers, 126 trials took 23.2 minutes with live conversion on (11.0 s per trial) and 117
 trials took 23.2 minutes with it off (11.9 s per trial). The median trial lasted 7.9 s (on) and 9.5 s (off); the 95th percentile was
-26.3 s and 26.7 s, set by S13, which waits more than 20 s. For the measurement settings (below), the generator's estimate (`generate_plan.py --estimate`) is 11.2 s per trial
-with live conversion on and 11.4 s with it off.
+26.3 s and 26.7 s, set by S13, which waits more than 20 s. For the pilot's key intervals the generator's estimate
+(`generate_plan.py --estimate`) is 11.2 s per trial with live conversion on and 11.4 s with it off, close to the
+measured times.
 
 ## Consequences for the measurement
 
-- n = 75 per scenario and speed, with think time from 0.2 to 20 s. One macOS cell then takes about 9.8 hours
-  with live conversion on and 9.3 hours with it off. Lowering the upper limit of think time to 5 s would save
-  about one hour per cell and would remove the range in which the 20-second cut-off is examined.
+- n = 75 per scenario and speed, with think time from 0.2 to 20 s. With the pilot's key intervals one macOS cell
+  would take about 9.8 hours with live conversion on and 9.3 hours with it off; lowering the upper limit of think
+  time to 5 s would save about one hour per cell and would remove the range in which the 20-second cut-off is
+  examined. The key intervals of the measurement were set afterwards (medians of 480, 240 and 120 ms; see the
+  pre-registration), for which the generator estimates 13.6 and 13.8 s per trial and 11.9 and 11.2 hours per
+  cell.
 - The block-start marker is `left`, `right`, `left`, `right`. The three-key marker of the pilot cannot be told
   apart from the three arrow presses in a row that scenario S7 may make.
 - Cells with live conversion off use `kit/gen/recipes.macos-live-off.json` throughout: for the plan, and for the
   closed-set attack, which checks that the plan and the procedure file match.
 
-These settings are frozen with the pre-registration.
+The settings of the measurement are in `experiment/plan_config.macos.json` and are frozen with the
+pre-registration.
 
 ## Raw logs
 
@@ -170,7 +175,9 @@ the key code of every key-down it receives. The criteria will therefore require 
 - Only planned runs are candidates: runs started by the runner from a plan, with a manifest, that were not
   aborted.
 - In each run, every key row of the observation and every `key_down` of the reference log is matched, within a
-  stated tolerance, by a press the executor recorded as sent. The present reach count (`kit/pilot/reach.py`)
-  checks only the opposite direction, from the executor to the observation.
+  stated tolerance, by a press the executor recorded as sent. `kit/analysis/delivery.py` counts both directions
+  for both logs (rows without a sent press inside the trials, and rows outside the trials, where the block
+  markers and the runner's kana presses fall); the pilot's reach count (`kit/pilot/reach.py`) checked only the
+  direction from the executor to the observation.
 - The hand-typed checks described above (in the reference input field and in TextEdit) and the hand-run probes
   of the Enter and Escape behaviour were not runs of the runner and are not deposited.
