@@ -9,6 +9,7 @@ executor reads only this plan when sending input.
 | `generate_plan.py` | Generation, validation (`--validate`), duration estimation (`--estimate`), and the selftest |
 | `romaji.py` | Hiragana-to-key-sequence conversion (one deterministic table). Try it with `--keys 'がっこう'` |
 | `recipes.json` | The procedure data (OS x scenario) and the kana layout used by one scenario |
+| `recipes.macos-live-off.json` | The same data for a macOS cell with live conversion off (see Limitations) |
 
 Python standard library only. Every check runs as `python3 <file> --selftest` (fast default, a few
 seconds at most).
@@ -41,7 +42,7 @@ authoritative. A key starting with `_` is treated as a note and ignored.
 |---|---|---|---|
 | `n_per_cell_scenario_speed` | integer >= 1 | 75 | Trials per scenario-speed cell |
 | `block_size` | integer >= 1 | 25 | Trials per block (the last block may hold fewer) |
-| `scenarios` | array | every scenario enabled by default in recipes | Enabled scenarios (`S1`-`S15`). A scenario with no procedure for the OS (e.g. `S11` on windows) is skipped. `S11` assumes live conversion is on, so it must be explicitly excluded from `scenarios` in a cell where live conversion is off (the implicit default, when `scenarios` is omitted, includes `S11` on macOS) |
+| `scenarios` | array | every scenario enabled by default in recipes | Enabled scenarios (`S1`-`S15`). A scenario with no procedure for the OS (e.g. `S11` on windows) is skipped. `S11` assumes live conversion is on, so it must be explicitly excluded from `scenarios` in a cell where live conversion is off (the implicit default, when `scenarios` is omitted, includes `S11` on macOS with `recipes.json`; `recipes.macos-live-off.json` disables it by default) |
 | `speeds` | object | required | `slow` / `mid` / `fast`, each with `iki_median_ms` (> 0) and `iki_sigma` (>= 0). Key interval is log-normal |
 | `key_hold_ms` | integer >= 1 | required | Time from key-down to key-up |
 | `think_ms` | `{min, max}` | required | Think time (log-uniform). Used wherever the procedure has `pause: think` |
@@ -164,8 +165,12 @@ Other entries:
   single Space shows the conversion in place and one Return commits it (a second Return would insert a line
   break), a second Space opens the candidate window (so the multi-Space scenario keeps two Returns), and one
   Escape cancels. That file also disables the live-conversion scenario by default. Its Windows section is identical
-  to `recipes.json`. The generator's selftest checks `recipes.json` only; the live-off file was checked on the
-  device (every scenario committed or cancelled as intended, with no composition carried into the next trial).
+  to `recipes.json`. The generator's selftest checks both files: each scenario's procedure against the profile
+  its file is written for (live conversion on, live conversion off, or Windows), that the live-off file leaves the
+  live-conversion scenario out by default and keeps the Windows section and the kana layout of `recipes.json`, and,
+  as a negative control, that each macOS profile rejects a plan built from the other file. The live-off file was
+  also checked on the device (every scenario committed or cancelled as intended, with no composition carried into
+  the next trial).
 - The default procedures (number of Escape presses, the predictive-candidate key, the IME on/off keys, and
   similar details) are **hypotheses** that are expected to vary by OS and IME and to be revised after a
   calibration pilot.

@@ -42,7 +42,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import romaji  # noqa: E402
 
-GENERATOR_VERSION = "1.1.0"
+GENERATOR_VERSION = "1.2.0"
 SPEEDS = ("slow", "mid", "fast")
 SCENARIOS = tuple("S%d" % i for i in range(1, 16))
 OS_NAMES = ("macos", "windows")
@@ -878,17 +878,32 @@ def _sha_file(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
-def _scenario_checks(rows, phrases, recipes, cfg, fails, os_name="macos"):
+# Keys each procedure profile ends a scenario with (see the README's Limitations). "commit" follows a conversion
+# after one Space (and, in S7 / S15, the arrows or the focus switch that come after it), "commit_cands" follows the
+# candidate window opened by two or more Spaces, "after_digit" follows a digit pick, and "cancel" cancels an
+# unconverted reading.
+# - macos-live-on (recipes.json): one Space already opens the candidate window, where a Return only picks the
+#   candidate, so every commit takes a second Return; each Escape steps the live conversion back one stage (kanji,
+#   kana, spelling), so the cancel presses four (extra presses only reach the field as a command).
+# - macos-live-off (recipes.macos-live-off.json): one Space shows the conversion in place and one Return commits
+#   it; a second Space opens the candidate window, which still takes two Returns; one Escape cancels.
+# - windows (either file): one key each.
+_PROFILES = {
+    "windows": {"commit": ["enter"], "commit_cands": ["enter"], "after_digit": [], "cancel": ["esc"]},
+    "macos-live-on": {"commit": ["enter", "enter"], "commit_cands": ["enter", "enter"], "after_digit": ["enter"],
+                      "cancel": ["esc"] * 4},
+    "macos-live-off": {"commit": ["enter"], "commit_cands": ["enter", "enter"], "after_digit": ["enter"],
+                       "cancel": ["esc"]},
+}
+
+
+def _scenario_checks(rows, phrases, recipes, cfg, fails, profile):
     """Checks that each scenario's procedure matches recipes' intent (a positive content check).
 
-    On macOS (live conversion on) a Return in the candidate window only picks the candidate, so a commit
-    after a conversion takes a second Return, a digit pick is followed by Return, and the first Escape only
-    steps the live conversion back one stage (kanji, kana, spelling), so an unconverted cancel presses Escape
-    four times (extra presses only reach the field as a command); the default Windows procedures use one key each.
+    ``profile`` is a key of ``_PROFILES`` and must match the recipes file and the OS the plan was built for.
     """
-    mac = os_name == "macos"
-    enter = ["enter", "enter"] if mac else ["enter"]
-    inv = dict((c, k) for k, c in recipes["kana_layout"].items())
+    tail = _PROFILES[profile]
+    enter = tail["commit"]
     seen = set()
     for r in rows:
         if r["kind"] != "trial":
@@ -904,20 +919,20 @@ def _scenario_checks(rows, phrases, recipes, cfg, fails, os_name="macos"):
             ok = downs == full + ["space"] + enter and cfg["think_ms"]["min"] <= r["think_ms"] <= cfg["think_ms"]["max"]
         elif sc == "S2":
             k = it["cand_index"] + 1
-            ok = 1 <= it["cand_index"] <= cfg["cand_index_max"] and downs == full + ["space"] * k + enter
+            ok = 1 <= it["cand_index"] <= cfg["cand_index_max"] and downs == full + ["space"] * k + tail["commit_cands"]
         elif sc == "S3":
             ok = downs == full + ["enter"] and r["think_ms"] == 0
         elif sc == "S4":
             ok = downs == full + ["space", "esc", "esc"] and it["abandon"] is True
         elif sc == "S5":
-            ok = downs == full + (["esc"] * 4 if mac else ["esc"])
+            ok = downs == full + tail["cancel"]
         elif sc == "S6":
             ok = downs == full + ["backspace"] * len(rd)
         elif sc == "S7":
             ok = downs == full + ["space"] + ["right"] * it["nav_count"] + enter \
                 and 1 <= it["nav_count"] <= cfg["nav_count_max"]
         elif sc == "S8":
-            ok = downs == full + ["space", "space", str(it["cand_index"] + 1)] + (["enter"] if mac else []) and it["commit"] == "digit"
+            ok = downs == full + ["space", "space", str(it["cand_index"] + 1)] + tail["after_digit"] and it["commit"] == "digit"
         elif sc == "S10":
             ok = downs == romaji.to_keys(rd[:max(1, len(rd) // 2)]) + ["tab", "enter"] and it["predictive"] is True
         elif sc == "S11":
@@ -1039,7 +1054,7 @@ def selftest():
                   for sp in SPEEDS), str(med))
 
         # --- per-scenario procedures (recipes' intent)
-        seen = _scenario_checks(rows1, ph1, recipes, ncfg, fails)
+        seen = _scenario_checks(rows1, ph1, recipes, ncfg, fails, "macos-live-on")
         n[0] += 1
         check("all 14 scenarios appear under the macos default", seen == set(scen_mac), str(sorted(seen or [])))
         _scenario_checks(rows_w, gen("windows")[1], recipes, ncfg, fails, "windows")
@@ -1052,14 +1067,14 @@ def selftest():
         check("at_ms is relative to the start of the trial (the first is 0)", all(t["steps"][0]["at_ms"] == 0 for t in trials))
 
         # --- typed_reading: matches expectations across every scenario and both operating systems
-        def _typed_mismatches(rows, phrases):
+        def _typed_mismatches(rows, phrases, rec=recipes):
             bad = []
             for t in rows:
                 if t["kind"] != "trial":
                     continue
                 rd = phrases[t["trial_id"]]["reading"]
                 want = rd[:max(1, len(rd) // 2)] if t["scenario"] == "S10" else rd
-                got = typed_reading(t, recipes)
+                got = typed_reading(t, rec)
                 if got != want:
                     bad.append((t["trial_id"], t["scenario"], want, got))
             return bad
@@ -1069,6 +1084,30 @@ def selftest():
               not bad_mac, str(bad_mac[:3]))
         bad_win = _typed_mismatches(rows_w, ph_w)
         check("typed_reading matches expectations for every scenario (windows)", not bad_win, str(bad_win[:3]))
+
+        # --- the recipes file for a macOS cell with live conversion off (the README's Limitations)
+        off_path = os.path.join(_HERE, "recipes.macos-live-off.json")
+        recipes_off = load_recipes(off_path)
+        check("the live-off recipes keep the windows procedures and the kana layout of recipes.json",
+              recipes_off["os"]["windows"] == recipes["os"]["windows"]
+              and recipes_off["kana_layout"] == recipes["kana_layout"])
+        rows_off, ph_off = plan_rows(corpus, recipes_off, cfg, "macos", 7, sha, _sha_file(off_path), csha)
+        scen_off = [s for s in SCENARIOS
+                    if s in recipes_off["os"]["macos"] and recipes_off["os"]["macos"][s].get("default_enabled", True)]
+        check("the live-off recipes leave the live-conversion scenario out by default",
+              "S11" not in scen_off and "S11" not in set(t["scenario"] for t in rows_off if t["kind"] == "trial"))
+        seen_off = _scenario_checks(rows_off, ph_off, recipes_off, ncfg, fails, "macos-live-off")
+        n[0] += 1
+        check("all 13 scenarios appear under the live-off macos default", seen_off == set(scen_off),
+              str(sorted(seen_off or [])))
+        cross_on, cross_off = [], []
+        _scenario_checks(rows_off, ph_off, recipes_off, ncfg, cross_on, "macos-live-on")
+        _scenario_checks(rows1, ph1, recipes, ncfg, cross_off, "macos-live-off")
+        check("each macos profile rejects the plan built from the other recipes file (negative control)",
+              bool(cross_on) and bool(cross_off))
+        check("the generated plan (macos, live off) passes --validate", validate_plan(render_plan(rows_off)) == [])
+        bad_off = _typed_mismatches(rows_off, ph_off, recipes_off)
+        check("typed_reading matches expectations for every scenario (macos, live off)", not bad_off, str(bad_off[:3]))
 
         # --- public functions do not write to standard error; warnings are returned instead
         _buf = io.StringIO()

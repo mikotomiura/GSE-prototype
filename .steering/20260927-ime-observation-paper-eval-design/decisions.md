@@ -614,3 +614,14 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - **理由**: (1) README（`kit/gen/README.md`）の想定どおり、パイロットの後に直すのは recipes のデータ。(2) 矢印キーは既に語彙にあり観測され、変換中でなければ IME の状態も文字も変えない。E2 は既存の `--markers-in-obs` で扱える（コードの変更なし）。
 - **トレードオフ**: ⚠️ ライブ変換 OFF では余分な Enter が改行になりうる → OFF のセルは別の recipes ファイル（パイロットしてから）。⚠️ E2 を本番のログに回すときは `--markers-in-obs` を付ける。
 - **影響範囲**: `kit/gen/recipes.json`（macOS のみ）・`generate_plan.py` / `simulate_obs.py` の selftest・`refinput-macos/build.sh`・pilot / run / e2 / gen / refinput-macos の README・`run/cell.example.json`。
+
+## 判断 81: M1 の枝の PR の前の整え —— 生成器の版を上げ、OFF 用の手順書も selftest で照合する（2026-10-01・G-GEAR・メインの実装上の選択・研究者が覆せる）
+
+- **背景**: 引き継ぎ（`next-session-ime-paper-m2.md` §2）の 1〜4。M1 で macOS の手順を変え、OFF 用の手順書 `recipes.macos-live-off.json` を足したが、生成器の版は `1.1.0` のままで、OFF 用の手順書は selftest の外にあった。
+- **採用**:
+  1. `GENERATOR_VERSION` を `1.1.0` → `1.2.0`。`kit/gen/README.md` の規則（「recipes の手順の意味が変わったら上げる」）に当たる。`plan/1` の書式は変わらないので minor。この値を固定している検査は無い（`grep -rn "GENERATOR_VERSION\|generator_version\|1\.1\.0"`。selftest の架空の計画は `"0"` / `"0.1"` を使う）。
+  2. OFF 用の手順書も selftest で照合する。`_scenario_checks` の終わりのキーを、手順の型ごとの表 `_PROFILES`（`windows` / `macos-live-on` / `macos-live-off`）から引く形にした。足した検査: OFF の 13 シナリオの照合・S11 が既定で外れる・Windows の節と `kana_layout` が `recipes.json` と同一・2 つの macOS の型が互いの計画を拒む（陰性対照）・`--validate`・`typed_reading`。README の「selftest は `recipes.json` だけを見る」を直し、ファイルの表と `scenarios` の行に OFF 用の手順書を足した。
+  3. `_scenario_checks(..., os_name="macos")` の既定を無くし、型を必須の引数にした（呼び出しは selftest の 5 か所だけ・どれも型を渡す）。
+  4. `run/cell.example.json` の `layout` を `US keyboard` → `JIS keyboard` に直した。`focus_cmd` の key code 104 は JIS のかなキー、S12 の `kana_layout` は JIS のかな配列、両パイロットとも JIS で、例のほうが食い違っていた。⚠️ `learning`（「毎ブロックでリセット」）は直さない。例は設計（design.md「ブロックの先頭で辞書・学習状態をリセット」）を示していて、`reset_cmd` は仮（`run/README.md` の前提 6「`cell.example.json` gives placeholders only」）。パイロットでリセットしなかったことは、M2 で `pilot-macos.md` の条件に書く（引き継ぎ §3.5）。本番でリセットするかどうかは M3 の事前登録で決める。
+- **確認（G-GEAR・Windows 11・Python 3.11.9）**: `generate_plan.py --selftest` 103 件が緑（直す前は 96 件）。OFF 用の手順書に変異を 7 本入れると、7 本とも selftest が赤になった（S1 の Enter を 2 回・S5 の Esc を 2 回・S2 の Enter を 1 回・S8 の数字の後の Enter を削る・S11 を既定で有効・Windows の節を変える・`kana_layout` を変える）。`kit/check.sh` の 27 本と `--compile` が緑、`_style_check.py papers/ime-observation` の違反は 0 件。
+- **経緯**: 1〜3 の差分は、worktree `C:/wt/ime-m1-pilot` に未コミットで残っていた（`generate_plan.py` の mtime は 2026-10-01 04:11 で、引き継ぎの commit `0da36bcc` の 6 分後。書いた記録は無く、前のセッションの書きかけと見られる）。メインが全行を読んで採用し、README を合わせ、4 を足した。

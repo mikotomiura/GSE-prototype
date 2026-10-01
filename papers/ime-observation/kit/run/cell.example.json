@@ -3,7 +3,7 @@
   "os": "macos",
   "ime": "macOS Japanese (Hiragana) - version to be filled in from the machine",
   "ime_settings": {
-    "layout": "US keyboard, Romaji input",
+    "layout": "JIS keyboard, Romaji input",
     "predictive_candidates": "off",
     "learning": "reset by reset_cmd before each block",
     "live_conversion": "on",
