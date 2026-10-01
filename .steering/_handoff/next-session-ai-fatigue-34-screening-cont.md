@@ -13,7 +13,7 @@
 ⚠️ 研究者の元のファイル（09-18・48ba8b90…）は変えない。写しは scripts/write_workbook.py だけで書く（Downloads の写しが最後に書いたものと違えば止まる → 止まったら聞く）。
 ⚠️ 外部に出る操作（著者への照会・フォーム・OSF）はしない。学術 API にメールアドレスを送らない。本文・PDF・抄録の全文はコミットしない（本文は git の外の C:\Users\johnd\Downloads\ai-fatigue-fulltext\）。有料の本文は使わない。
 ⚠️ Chrome（mcp__claude-in-chrome__*）を使う前に browser-verification Skill を読む。サブエージェントに渡すなら subagent-delegation Skill（model 明示・入れ子禁止・締切・Chrome の可否を書く）。
-★ 完了時は code-reviewer ＋ security-checker（並列）・/cross-review 2 巡（Codex の当日の実消費を先に確かめる）・git-workflow ルール 6。応答は日本語。コンテキストが半分ほどで群の切れ目なら引き継ぎを書いて区切る。
+★ 完了時は code-reviewer ＋ security-checker（並列）・/cross-review 2 巡（Codex の当日の実消費を先に確かめる。足りなければ上限を引き上げてよい＝2026-10-01 ユーザーの指示・§4）・git-workflow ルール 6。応答は日本語。コンテキストが半分ほどで群の切れ目なら引き継ぎを書いて区切る。
 ```
 
 ## §1 いまの状態（2026-10-01）
@@ -68,4 +68,4 @@
 - Python の出力は cp932 で落ちる → `PYTHONIOENCODING=utf-8`。openpyxl は `uv run --with openpyxl`。
 - ScienceDirect は curl で 403・ブラウザで CAPTCHA（AF002・003・004・019・034）。回避しない。
 - Bash の自動判定が一時的に止まることがある（「no verdict」）→ Read・Grep で代わりに読む。
-- Codex: 2026-10-01 は当日の上限にほぼ到達（origin/main の台帳 291,174）。/cross-review は日を改めて（回す前に main と本ブランチの台帳を合算で見る）。
+- Codex: 2026-10-01 は当日の上限にほぼ到達（origin/main の台帳 291,174）。★ **ユーザーの指示（2026-10-01）「codexは必要に応じて予算引き上げしていいよ」**: 残りが足りなければ聞かずに `.codex/budget.json` の `daily_token_budget` を上げてよい（`tokens_used` は触らない・理由と前後の値を `_comment_budget_<日付>` に残してコミット）。予算ガードの hook は `C:\GSE-prototype` の台帳を読むので、上げるのはそちらにも要るかを回す前に確かめる。回す前に main と本ブランチの台帳を合算で見る。
