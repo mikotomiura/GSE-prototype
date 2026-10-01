@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import tempfile
+import unicodedata
 
 import openpyxl
 
@@ -39,19 +40,27 @@ STAGE1_OPTIONS = {
 }
 # ★ 1 回目（stage 1・1e）の問いと選択肢に出てはいけない語。大文字小文字を区別しない（2026-10-02 に広げた・判断 12）
 # ★ 製品名の ChatGPT（項目文の逐語に出る・AF004）は GPT 版の判定ではないので除く（判断 4）。ただし「ChatGPT 版」は赤
-STAGE1_BANNED = re.compile(r"recommend|推奨|おすすめ|勧め|AI\s*の?\s*(判定|評価|2\s*版)|適格性評価|(?<!Chat)GPT|ChatGPT\s*版|"
-                           r"Claude|中心候補", re.I)
-# ★ 文献の中身として問いに載せた句（AI の推奨ではない）。件と逐語の句を対で限る（判断 9・12）
+# ★ 2026-10-02 の 2 巡目で語の間を広げた（ChatGPT・LLM・AI の後に「の／による／が」と 4 字までを挟む）・全角は NFKC で寄せる（判断 13）
+STAGE1_BANNED = re.compile(r"recommend|推奨|おすすめ|勧め|(AI|LLM)\s*(の|による|が)?\s*\S{0,4}?(判定|評価|判断|2\s*版)|適格性評価|"
+                           r"(?<!Chat)GPT|ChatGPT\s*(の|による)?\s*(版|判定|評価|見立て)|Claude|中心候補", re.I)
+# ★ 文献の中身として問いに載せた句（AI の推奨ではない）。件と逐語の句を対で限り、問いの文だけに効かせる（判断 9・12・13）
 STAGE1_EXEMPT = {
     "AF031": ["（公開・登録を勧める）"],
     "AF032": ["選別は 2 名が独立に行うのが一般に推奨"],
 }
 
 
+def _nfkc(s):
+    return unicodedata.normalize("NFKC", s or "")
+
+
 def stage1_banned(item, question, options):
-    t = (question or "") + "\n" + "\n".join(options or [])  # ★ 区切りを入れる（問いの末尾と選択肢の先頭がつながらない）
+    if not isinstance(options, list):
+        return re.search(".", "選択肢が list でない")  # ★ 文字列だと 1 字ずつに割れて禁止語が素通りする
+    q = _nfkc(question)
     for p in STAGE1_EXEMPT.get(item, []):
-        t = t.replace(p, "")
+        q = q.replace(_nfkc(p), "\n")  # ★ 空文字で消すと前後がつながる（「Chat…GPT」が ChatGPT になる）
+    t = q + "\n" + "\n".join(_nfkc(o) for o in options)  # ★ 問いの末尾と選択肢の先頭がつながらない
     return STAGE1_BANNED.search(t)
 # 答え → 期待（design.md §2.2）。★ 書き込み側（write_workbook.py）とは別に持つ
 EXPECT_HUMAN = {
@@ -91,7 +100,8 @@ CHECKS_PARTS = [("確認事項", 12), ("次の確認・作業", 34), ("メモ", 
 
 QUALITY_SHEET = C.ADDED_PREFIX + "品質評価"
 INTRO_SHEET = C.ADDED_PREFIX + "はじめに"
-INTRO_MUST = ["判定者 2 に渡さない", "Claude の関与"]
+# ★ 2 回目の前後に Claude の見立て・計算を判定者 1 が見た件（ログの note・decisions 判断 4。書き込み側の CLAUDE_SHOWN とは別に持つ）
+EXPECT_CLAUDE_SHOWN = {"AF002", "AF003", "AF004"}
 LOG_SHEET = C.ADDED_PREFIX + "問いと答え"
 LOG_HEADER = ["seq", "ID", "段", "問い（逐語）", "選択肢", "答え", "補足（note）"]
 
@@ -109,7 +119,9 @@ def check_log_sheet(w, log, final):
         return [f"{LOG_SHEET}: 行数 {len(rows)} がログの {len(log)} と違う"]
     errs = []
     for n, (x, rec) in enumerate(zip(rows, log), 5):
-        if [x[0], x[1], x[2], x[3], x[5]] != [rec.get("seq"), rec.get("item"), rec.get("stage"), rec.get("question"), rec.get("answer")]:
+        want = [rec.get("seq"), rec.get("item"), rec.get("stage"), rec.get("question"),
+                " ／ ".join(rec.get("options") or []), rec.get("answer"), rec.get("note") or ""]
+        if [x[0], x[1], x[2], x[3], x[4] or "", x[5], x[6] or ""] != want:  # ★ 選択肢と補足（Claude の関与の開示）も見る
             errs.append(f"{LOG_SHEET}!A{n}: ログの seq {rec.get('seq')} と一致しない")
     return errs
 
@@ -256,11 +268,15 @@ def check(copy_path, log_path, final=False, original=C.ORIGINAL):
         want_h = "入手不可" if res.get("basis") == "抄録" else ("完了" if i in xitems else "進行中")
         if scr[f"H{r}"].value != want_h:
             errs.append(f"{i}: 全文確認={scr[f'H{r}'].value!r} がログからの期待 {want_h!r} と違う")
+        # ★ design §2.1 の順に書き起こす: 含める一次研究で抄録だけ → 進行中（q の有無によらない）／q で確定 → 完了／
+        #   q が無い → 未実施（まだ聞いていない）／q で保留 → 進行中。保留の件は 未実施（§2.1 に無い規則・判断 13 で決めた）
         if res["verdict"] == "含める" and kind[i] in PRIMARY:
             q = qrec.get(i)
-            if q is None:
+            if res.get("basis") == "抄録":
+                want_i = "進行中"
+            elif q is None:
                 want_i = "未実施"
-            elif res.get("basis") == "抄録" or str(q.get("answer", "")).startswith("保留"):
+            elif str(q.get("answer", "")).startswith("保留"):
                 want_i = "進行中"
             else:
                 want_i = "完了"
@@ -270,8 +286,12 @@ def check(copy_path, log_path, final=False, original=C.ORIGINAL):
             want_i = "対象外"
         if iv != want_i:
             errs.append(f"{i}: 品質評価={iv!r} がログからの期待 {want_i!r} と違う")
-        if not (scr[f"J{r}"].value or "").startswith("用途: "):
+        jv = scr[f"J{r}"].value or ""
+        if not jv.startswith("用途: "):
             errs.append(f"{i}: 自由記入が規則の形でない")
+        # ★ Claude の見立て・計算を判定者 1 が見た件（検査器が独立に持つ・判断 12・13）だけが「Claude の関与」を持つ
+        if ("Claude の関与" in jv) != (i in EXPECT_CLAUDE_SHOWN):
+            errs.append(f"{i}: 自由記入の「Claude の関与」の有無が期待（{sorted(EXPECT_CLAUDE_SHOWN)} だけ）と違う")
         hu = cmp_[f"D{r}"].value
         if hu is not None and hu != expect_human(res, kind[i]):
             errs.append(f"{i}: 人間用途判定 {hu!r} が期待 {expect_human(res, kind[i])!r} と違う")
@@ -280,18 +300,27 @@ def check(copy_path, log_path, final=False, original=C.ORIGINAL):
     # (7) 『判定者1_問いと答え』（研究者が読めるログの写し）: ログと 1 行ずつ一致する
     errs += check_log_sheet(w, log, final)
     # (8) 『判定者1_品質評価』の ID = 含めた一次研究で品質を確定（q）した件
+    want_q = {i for i in qrec if i in final_res and final_res[i]["verdict"] == "含める" and kind[i] in PRIMARY}
     if QUALITY_SHEET in w.sheetnames:
         ws = w[QUALITY_SHEET]
         got = {ws.cell(rr, 1).value for rr in range(5, ws.max_row + 1)} - {None}
-        want_q = {i for i in qrec if i in final_res and final_res[i]["verdict"] == "含める" and kind[i] in PRIMARY}
         if got != want_q:
             errs.append(f"{QUALITY_SHEET}: ID {sorted(got)} が品質を確定した含める一次研究 {sorted(want_q)} と違う")
-    # (9) 『判定者1_はじめに』に研究者への注意がある（判定者 2 に渡さない・Claude の関与）
+    elif final and want_q:
+        errs.append(f"{QUALITY_SHEET} が無い（品質を確定した件 {len(want_q)} があるのに・--final）")
+    # (9) 『判定者1_はじめに』に研究者への注意がある（判定者 2 に渡さない・Claude の関与）。★ 見出し（A 列）だけでなく説明（B 列）を見る
     if final:
-        intro = " ".join(str(c.value or "") for row in w[INTRO_SHEET].iter_rows() for c in row) if INTRO_SHEET in w.sheetnames else ""
-        for must in INTRO_MUST:
-            if must not in intro:
-                errs.append(f"{INTRO_SHEET}: 「{must}」の行が無い（--final）")
+        intro = {}
+        if INTRO_SHEET in w.sheetnames:
+            for row in w[INTRO_SHEET].iter_rows(min_row=5, values_only=True):
+                if row and row[0]:
+                    intro[str(row[0])] = str(row[1] or "")
+        body = " ".join(intro.values())
+        if "判定者 2 に渡さない" not in body:
+            errs.append(f"{INTRO_SHEET}: 「判定者 2 に渡さない」の行が無い（--final）")
+        claude_row = intro.get("Claude の関与", "")
+        if not claude_row or any(i not in claude_row for i in EXPECT_CLAUDE_SHOWN):
+            errs.append(f"{INTRO_SHEET}: 「Claude の関与」の行の説明に {sorted(EXPECT_CLAUDE_SHOWN)} が無い（--final）")
     # (5)
     if final:
         for k, i in enumerate(C.IDS):
@@ -351,10 +380,17 @@ def selftest():
             "result": {"verdict": "除外", "ecode": "E4", "elabel": "方法論", "basis": "全文", "date": "2026-10-01"}}
     rec2 = dict(rec1, stage="2", question="AI の判定を見て", options=["1 回目のまま", "変える（Other に）"],
                 answer="1 回目のまま")
+    # ★ 含める一次研究の件（AF001・中心-A・全文・品質を確定）も基準に入れる（品質評価の分岐を赤で見るため・判断 13）
+    res_a = {"verdict": "含める", "use": "中心-A", "basis": "全文", "date": "2026-10-01"}
+    recA1 = {"item": "AF001", "stage": "1", "question": "AF001 の判定（事実のみ）", "options": STAGE1_OPTIONS["primary"],
+             "answer": STAGE1_OPTIONS["primary"][0], "result": res_a}
+    recA2 = dict(recA1, stage="2", question="AI の判定を見て", options=["1 回目のまま", "変える"], answer="1 回目のまま")
+    recAq = {"item": "AF001", "stage": "q", "question": "品質評価の確定", "options": ["下書きどおり確定 (Recommended)", "直す", "保留（判定不能のまま）"],
+             "answer": "下書きどおり確定 (Recommended)", "result": {"answer": "確定"}}
     recx = {"item": "AF030", "stage": "x", "question": "抽出の確定", "options": ["確定"], "answer": "確定",
-            "result": {"items": ["AF030"]}}
+            "result": {"items": ["AF030", "AF001"]}}
     with open(base_log, "w", encoding="utf-8") as f:
-        f.writelines(json.dumps(x, ensure_ascii=False) + "\n" for x in (rec1, rec2, recx))
+        f.writelines(json.dumps(x, ensure_ascii=False) + "\n" for x in (rec1, rec2, recA1, recA2, recAq, recx))
     wb = openpyxl.load_workbook(C.ORIGINAL)
     r = C.FIRST_ROW + C.IDS.index("AF030")
     wb["スクリーニング"][f"D{r}"] = "除外"
@@ -362,6 +398,11 @@ def selftest():
     wb["スクリーニング"][f"H{r}"] = "完了"
     wb["スクリーニング"][f"I{r}"] = "対象外"
     wb["スクリーニング"][f"J{r}"] = "用途: 方法論保持 ／ 1回目: 除外 E4 → 最終: 除外 E4"
+    rA = C.FIRST_ROW + C.IDS.index("AF001")
+    wb["スクリーニング"][f"D{rA}"] = "含める"
+    wb["スクリーニング"][f"H{rA}"] = "完了"
+    wb["スクリーニング"][f"I{rA}"] = "完了"
+    wb["スクリーニング"][f"J{rA}"] = "用途: 中心-A ／ 1回目: 含める（中心-A） → 最終: 含める（中心-A）"
     wb.create_sheet(C.ADDED_PREFIX + "はじめに")
     wb.save(base_copy)
     e0 = check(base_copy, base_log)
@@ -405,11 +446,23 @@ def selftest():
     if check(base_copy, lg_ok):
         print("FAIL 製品名 ChatGPT だけで赤になる")
         bad += 1
-    mutate("recommend-after-guideline", fn_log=lambda L: [dict(x, question=x["question"] + " 一般に推奨。推奨は除外")
-                                                          if x["stage"] == "1" else x for x in L])
-    # 禁止語の規則（判断 12）: 除外は件と逐語の句の対だけに効く。区切りで境目を跨がない。1e にも効く。大文字小文字を区別しない
+    # 禁止語の規則（判断 12・13）: 除外は件と逐語の句の対だけ・問いの文だけに効く。区切りで境目を跨がない。1e にも効く。大文字小文字・全角を区別しない
     o_other = STAGE1_OPTIONS["other"]
     unit = [
+        ("AF032 の句を問いと選択肢に割る → 赤", stage1_banned("AF032", "選別は 2 名が独立に行うのが一般に", ["推奨: 除外"] + o_other[1:]), True),
+        ("AF032 の句が選択肢にあるだけ → 赤（除外は問いの文だけ）", stage1_banned("AF032", "事実", ["選別は 2 名が独立に行うのが一般に推奨"]), True),
+        ("除外の句を消して前後がつながる → 赤", stage1_banned("AF031", "Chat（公開・登録を勧める）GPT は除外", o_other), True),
+        ("選択肢が文字列 → 赤", stage1_banned("AF030", "事実", "推奨"), True),
+        ("全角の ＧＰＴ → 赤", stage1_banned("AF030", "ＧＰＴ版", o_other), True),
+        ("全角の Ｃｌａｕｄｅ → 赤", stage1_banned("AF030", "Ｃｌａｕｄｅ版", o_other), True),
+        ("ChatGPT の判定 → 赤", stage1_banned("AF030", "ChatGPT の判定は", o_other), True),
+        ("ChatGPT による評価 → 赤", stage1_banned("AF030", "ChatGPT による評価", o_other), True),
+        ("AI の用途判定 → 赤", stage1_banned("AF030", "AI の用途判定", o_other), True),
+        ("AI による判定 → 赤", stage1_banned("AF030", "AI による判定", o_other), True),
+        ("AI の判断 → 赤", stage1_banned("AF030", "AI の判断", o_other), True),
+        ("LLM の判定 → 赤", stage1_banned("AF030", "LLM の判定", o_other), True),
+        ("AI の利用（事実の語）→ 緑", stage1_banned("AF030", "AI の利用と疲労", o_other), False),
+        ("AI 疲労の尺度の評価（事実の語）→ 緑", stage1_banned("AF030", "AI 疲労の尺度の評価", o_other), False),
         ("AF032 の手引きの句だけ → 緑", stage1_banned("AF032", "・中身: 選別は 2 名が独立に行うのが一般に推奨・研究の質", o_other), False),
         ("同じ句でも別の件 → 赤", stage1_banned("AF030", "選別は 2 名が独立に行うのが一般に推奨", o_other), True),
         ("AF032 でも句の外の推奨 → 赤", stage1_banned("AF032", "選別は 2 名が独立に行うのが一般に推奨。推奨は除外", o_other), True),
@@ -454,11 +507,42 @@ def selftest():
         print("FAIL --final で確認の結果のシートが無いのに赤にならない")
         bad += 1
     mutate("checks-text-swap", fn_wb=lambda w: add_checks(w, lambda ws: ws.cell(5 + 12, 3, "別の文")))
+
+    def mutate_named(name, must, fn_wb=None, fn_log=None, final=False):
+        """★ 変異が「その規則で」赤になることを、エラーの文言で名指しして見る（別の理由の赤で通らない）。"""
+        nonlocal bad
+        cp, lg = os.path.join(tmpd, name + ".xlsx"), os.path.join(tmpd, name + ".jsonl")
+        w2 = openpyxl.load_workbook(base_copy)
+        if fn_wb:
+            fn_wb(w2)
+        w2.save(cp)
+        recs = read_log(base_log)
+        if fn_log:
+            recs = fn_log(copy.deepcopy(recs))
+        with open(lg, "w", encoding="utf-8") as f:
+            f.writelines(json.dumps(x, ensure_ascii=False) + "\n" for x in recs)
+        es = check(cp, lg, final=final)
+        hit = [e for e in es if must in e]
+        if not hit:
+            print("FAIL 変異が名指しの規則で赤にならない:", name, "| 期待:", must, "| 実際:", es[:2])
+            bad += 1
+        else:
+            print(f"  赤 {name}: {hit[0]}")
+
+    mutate_named("checks-kakunin-swap", "確認事項",
+                 fn_wb=lambda w: add_checks(w, lambda ws: (ws.cell(5, 2, "AF006–AF009"), ws.cell(6, 2, "AF004 / AF034"))))
     # 全文確認・品質評価をログ（x・q）から独立に計算する
-    mutate("fulltext-not-logged", fn_log=lambda L: [x for x in L if x["stage"] != "x"])
-    mutate("quality-done-without-q", fn_wb=lambda w: w["スクリーニング"].cell(r, 9, "完了"))
-    mutate("quality-sheet-extra-id", fn_wb=lambda w: (lambda ws: (ws.cell(4, 1, "ID"), ws.cell(5, 1, "AF001")))(
-        w.create_sheet(QUALITY_SHEET)))
+    mutate_named("fulltext-not-logged", "AF030: 全文確認='完了' がログからの期待 '進行中'",
+                 fn_log=lambda L: [x for x in L if x["stage"] != "x"])
+    mutate_named("quality-done-no-q", "AF001: 品質評価='完了' がログからの期待 '未実施'",
+                 fn_log=lambda L: [x for x in L if x["stage"] != "q"])
+    mutate_named("quality-done-q-hold", "AF001: 品質評価='完了' がログからの期待 '進行中'",
+                 fn_log=lambda L: [dict(x, answer="保留（判定不能のまま）", result={"answer": "保留"}) if x["stage"] == "q" else x for x in L])
+    mutate_named("quality-sheet-extra-id", "判定者1_品質評価: ID",
+                 fn_wb=lambda w: (lambda ws: (ws.cell(4, 1, "ID"), ws.cell(5, 1, "AF002")))(w.create_sheet(QUALITY_SHEET)))
+    mutate_named("quality-sheet-missing-final", "判定者1_品質評価 が無い", final=True)
+    mutate_named("claude-shown-not-expected", "「Claude の関与」の有無",
+                 fn_wb=lambda w: w["スクリーニング"].cell(r, 10, "用途: 方法論保持 ／ Claude の関与: 見立て"))
     # 『判定者1_問いと答え』: ログと同じなら緑・1 か所ずらすと赤
 
     def add_log_sheet(w2, edit=None):
@@ -478,6 +562,8 @@ def selftest():
         print("FAIL ログと同じ問いと答えのシートで赤になる", check(cp_ok2, base_log)[:3])
         bad += 1
     mutate("logsheet-answer-diff", fn_wb=lambda w: add_log_sheet(w, lambda ws: ws.cell(5, 6, "保留")))
+    mutate_named("logsheet-note-diff", "判定者1_問いと答え", fn_wb=lambda w: add_log_sheet(w, lambda ws: ws.cell(6, 7, "Claude の見立てを見た")))
+    mutate_named("logsheet-options-diff", "判定者1_問いと答え", fn_wb=lambda w: add_log_sheet(w, lambda ws: ws.cell(5, 5, "別の選択肢")))
     # --final の受け入れ条件 4（1 回目と 2 回目の両方）と『はじめに』の注意: その件・その行の赤を名指しで見る（対照つき）
 
     def final_errs(fn_log=None, fn_wb=None):
@@ -506,19 +592,24 @@ def selftest():
     def intro_with(rows):
         def f(w2):
             ws = w2[INTRO_SHEET]
-            for rr, v in enumerate(rows, 5):
+            for rr, (k, v) in enumerate(rows, 5):
+                ws.cell(rr, 1, k)
                 ws.cell(rr, 2, v)
         return f
-    if any("「判定者 2 に渡さない」" in e for e in final_errs(fn_wb=intro_with(["この写しは判定者 2 に渡さない", "Claude の関与"]))):
-        print("FAIL 対照: 『はじめに』に注意があるのに赤")
+    good = [("判定者 2 に渡すとき", "この写しは判定者 2 に渡さない"), ("Claude の関与", "AF002・AF003 の見立て・AF004 の再計算")]
+    if any(INTRO_SHEET in e for e in final_errs(fn_wb=intro_with(good))):
+        print("FAIL 対照: 『はじめに』に注意があるのに赤", [e for e in final_errs(fn_wb=intro_with(good)) if INTRO_SHEET in e])
         bad += 1
-    if not any("「判定者 2 に渡さない」" in e for e in final_errs(fn_wb=intro_with(["Claude の関与"]))):
-        print("FAIL 『はじめに』に判定者 2 の注意が無いのに --final で赤にならない")
-        bad += 1
+    for nm, rows_, must in (("判定者 2 の注意が無い", good[1:], "「判定者 2 に渡さない」"),
+                            ("Claude の関与が見出しだけ", [good[0], ("Claude の関与", "")], "「Claude の関与」"),
+                            ("Claude の関与に AF004 が無い", [good[0], ("Claude の関与", "AF002・AF003 の見立て")], "「Claude の関与」")):
+        if not any(must in e for e in final_errs(fn_wb=intro_with(rows_))):
+            print("FAIL 『はじめに』の変異が --final で赤にならない:", nm)
+            bad += 1
     mutate("stage2-first", fn_log=lambda L: list(reversed(L)))
     mutate("extra-sheet", fn_wb=lambda w: w.create_sheet("メモ"))
     mutate("human-use-wrong", fn_wb=lambda w: w["AI判定比較"].cell(r, 4, "背景保持"))
-    mutate("unlogged-verdict", fn_wb=lambda w: w["スクリーニング"].cell(C.FIRST_ROW, 4, "含める"))
+    mutate("unlogged-verdict", fn_wb=lambda w: w["スクリーニング"].cell(C.FIRST_ROW + 1, 4, "含める"))  # AF002（基準のログに無い件）
     print("selftest", "PASS" if bad == 0 else f"FAIL {bad}")
     return bad == 0
 

@@ -26,6 +26,11 @@
 
 ## §2 次にやること（順）
 
+0. ⚠️★ **PR #288（`docs/ai-fatigue-34-screening`）がまだ merge されていなければ、これが先**（判断 13）。Codex は 2026-10-02 02:04 に提供元の利用上限で回らず、ユーザーの決定で「PR まで・merge は Codex 2 巡の後」。worktree `C:\wt\ai-fatigue-judge-file` で:
+   - 1 巡目（道具）: `bash scripts/run-codex-review.sh 9f5796d5..<HEAD> -- <scripts 7 本・requirement.md・design.md>`（出力は scratchpad）。2 回目（記録）: `decisions.md・novelty-check.md・tasklist.md・measurement-issues.md・requirement.md・_handoff の 2 ファイル`。⚠️ `.xlsx`・`wave1/`・`screening-log.jsonl`・`data/*.json` は渡さない。
+   - 2 巡目: 1 巡目の直しで足した規則の境界条件だけ（パスを絞る）。Claude 側の 2 巡は判断 12・13 で済んでいる。
+   - 「codex exec error」なら、最小のプロンプトで `codex exec --json` を 1 回試して JSON の `error` を読む（ラッパーは標準エラーを捨てる）。上限なら止まって聞く。
+   - 指摘に対応 → `check_workbook.py --final`・`--selftest` → commit・push → CI 緑 → `gh pr merge 288 --merge` → main の CI 発火確認（git-workflow ルール 6）。台帳（`.codex/budget.json`）の記帳もコミットに含める。
 1. **C に進むか**（ユーザーが決める・推奨と理由を添えて聞く）。材料: novelty-check.md §5。前提: (a) 追加候補（D）の中の既存レビューを先に当たる、(b) 基準の読み方（M1: 定義の段の AI 帰属だけで中心-A か）は研究者の決定待ち、(c) Nobles の Zenodo の公開版を確かめる。
 2. **研究者への提案のドキュメント**（判断 8 の「次のタスク」）。入れるもの:
    - 写しの渡し方: ⚠️ **判定者 2 に写しを渡さない**（『判定者1_はじめに』に書いた）。判定者 2 には元のファイルか、判定者 1 の列と `判定者1_` のシートを除いた版。

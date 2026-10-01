@@ -47,6 +47,9 @@ def main(outdir):
     bib = rows(wb["書誌・出典"])
     elig = rows(wb["AI適格性評価"])
     issues = [r for r in wb["確認事項"].iter_rows(min_row=5, values_only=True) if r[0]]
+    for r in issues:  # ★ 『確認事項』の行にも同じ検査をかける（2026-10-02 のレビュー・今の行には用途の語は 0 件・ループの外で 1 回）
+        if any(w in " ".join(str(v or "") for v in r[1:4]).replace("適用除外", "") for w in BANNED):
+            sys.exit(f"『確認事項』{r[0]} に用途の語がある（渡す前に止まる）")
     oa = {}
     for p in sorted(glob.glob(OA_GLOB)):
         oa.update(json.load(open(p, encoding="utf-8"))["records"])
@@ -60,9 +63,6 @@ def main(outdir):
                 if w in nxt.replace("適用除外", ""):  # 倫理の「適用除外理由」は用途の語ではない
                     sys.exit(f"{i}: 次の確認・作業に用途の語「{w}」がある（渡す前に止まる）")
             o = oa.get(doi.lower(), oa.get(doi, {}))
-            for r in issues:  # ★ 『確認事項』の行にも同じ検査をかける（2026-10-02 のレビュー・今の行には用途の語は 0 件）
-                if any(w in " ".join(str(v or "") for v in r[1:4]).replace("適用除外", "") for w in BANNED):
-                    sys.exit(f"『確認事項』{r[0]} に用途の語がある（渡す前に止まる）")
             lines += [f"## {i}", f"- 題名: {L.get('論文タイトル') or L.get('タイトル')}",
                       f"- DOI: {doi or 'なし'}",
                       f"- 一次情報 URL（DB）: {E.get('主な参照URL') or ''}",

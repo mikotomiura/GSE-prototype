@@ -18,8 +18,8 @@ CLAUDE = r"C:\Users\johnd\Downloads\AI_fatigue_database_with_AI_appraisal_2026-0
 
 def main(out):
     # ★ 絶対パスに直して小文字で比べる（相対パス・c:\wt\ の書き方でも repo の中に書かない・2026-10-02 のレビュー）
-    p = os.path.abspath(out).replace("\\", "/").lower()
-    if "gse-prototype" in p or p.startswith("c:/wt/") or p.startswith(os.path.abspath(C_TASK_ROOT).replace("\\", "/").lower()):
+    p = os.path.realpath(out).replace("\\", "/").lower()  # ★ realpath（8.3 の短い名前・リンクも解く・判断 13）
+    if "gse-prototype" in p or p.startswith("c:/wt/") or p.startswith(os.path.realpath(C_TASK_ROOT).replace("\\", "/").lower()):
         sys.exit("出力は repo の外に置く")
     g = openpyxl.load_workbook(GPT, read_only=True, data_only=True)
     c = openpyxl.load_workbook(CLAUDE, read_only=True, data_only=True)

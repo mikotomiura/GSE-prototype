@@ -97,9 +97,11 @@ def cells_for(i, kind, first, final, quality, xconf):
     h = "入手不可" if basis == "抄録" else ("完了" if i in xconf else "進行中")
     if f1["verdict"] == "含める" and kind in PRIMARY:
         q = quality.get(i)
-        if q is None:
+        if basis == "抄録":  # ★ design §2.1: 含める一次研究で抄録だけ → 進行中（q の有無によらない・判断 13）
+            ival = "進行中"
+        elif q is None:
             ival = "未実施"
-        elif basis == "抄録" or str(q.get("answer", "")).startswith("保留"):  # ★ 選択肢は「保留（判定不能のまま）」
+        elif str(q.get("answer", "")).startswith("保留"):  # ★ 選択肢は「保留（判定不能のまま）」
             ival = "進行中"
         else:
             ival = "完了"
@@ -240,9 +242,17 @@ def main(dry):
         os.close(fd)
         tmps.append(tmp_d)
         shutil.copyfile(tmp_a, tmp_d)
-        shutil.copyfile(C.COPY_DOWNLOADS, C.COPY_DOWNLOADS + ".bak-" + last[:12])
+        # ★ 退避の直前にもう一度確かめる（冒頭の照合から今までに Excel で保存されていないか・判断 13）
+        if C.sha256(C.COPY_DOWNLOADS) != last:
+            sys.exit(f"写しが最後に書いたものと違う（手で記入された可能性・止まって聞く）: {C.COPY_DOWNLOADS}")
+        bak = C.COPY_DOWNLOADS + ".bak-" + last[:12]
+        shutil.copyfile(C.COPY_DOWNLOADS, bak)
         os.replace(tmp_d, C.COPY_DOWNLOADS)
-        os.replace(tmp_a, C.COPY_ARCHIVE)
+        try:
+            os.replace(tmp_a, C.COPY_ARCHIVE)
+        except OSError:
+            shutil.copyfile(bak, C.COPY_DOWNLOADS)  # ★ archive が置き換わらなければ Downloads も前の写しに戻す（2 つの写しと記録の SHA を揃える）
+            raise
     finally:
         for t in tmps:
             if os.path.exists(t):
