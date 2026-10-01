@@ -30,6 +30,8 @@ Rule file (one block per source; keys starting with `_` are annotations and are 
                                        this event
       within_ms is required whenever not_followed_by is given, and vice versa. If no matching event
       arrives before the end of the log, it counts as "does not arrive".
+      The window includes its end (an event exactly within_ms later still arrives). A log that ends
+      within the window therefore closes the session as if nothing followed, not as log_truncated.
     - A trial with abandon = false and commit = none is counted as agreeing in oracle_agreement
       regardless of the assembled session's actual outcome, because the intent is "neither a commit
       nor a cancellation is expected" (see _classify).
@@ -72,8 +74,8 @@ Output (SESSIONS, JSON):
     (mac_nstic). The reference definition of the Windows nav count follows the design document: the
     number of arrow presses while the candidate window was open; downstream analyses use this field
     for that quantity.
-    excluded_by is an array of reasons this session was flagged for exclusion ("clock_jump" or
-    "log_truncated"; empty if none apply). A session is flagged when its trial_id appears in the
+    excluded_by is an array of reasons this session was flagged for exclusion ("clock_jump",
+    "log_truncated", or "carry_over"; empty if none apply). A session is flagged when its trial_id appears in the
     trial_ids of one of the excluded entries below, or when the session interval directly spans a
     clock jump.
     n_start_while_open is a diagnostic integer: the number of start events that arrived while this
@@ -101,6 +103,18 @@ Output (SESSIONS, JSON):
     the jump onto the oracle trial intervals; the trial_id of any session whose interval spans the
     jump is added as well. log_truncated carries the trial_id of the session that never closed
     (empty if that trial_id is null).
+    carry_over: a session whose interval (start to end, or to the last event of the log if it never
+    closed) overlaps the trial_begin..trial_end intervals of two or more trials (inclusive of both
+    ends). The composition was not closed within its own trial and ran on into the next, so the
+    trials are no longer independent: the earlier trial is left without a session of its own, and the
+    later trial's session holds the earlier trial's text. Its trial_ids are every trial the session
+    overlaps, in order, so that both the trial the text was carried from and the trial it was carried
+    into are excluded. The times are the session's own. The agreement rate (oracle_agreement) is not
+    changed by this entry: a carried trial still counts as a disagreement there.
+    The check uses the gt wall clock, like the trial assignment. A forward clock jump inside a session
+    lengthens its interval, so a session near the end of a block can also be reported as carry_over with the
+    first trial of the next block, which the clock_jump entry (limited to its own block) does not list; this
+    errs towards excluding more.
 
 Only the reference side (gt / oracle / plan) is read here; the observation-side log is never read.
 Validating the shape of gt / oracle rows is the job of the shared format validator; this module
@@ -562,6 +576,14 @@ def _assign_trial(lo_wall, hi_wall, trials):
     return None if best is None else best["trial_id"]
 
 
+def _spanned_trial_ids(lo_wall, hi_wall, trials):
+    """The trial_ids whose trial_begin..trial_end interval overlaps [lo_wall, hi_wall] (inclusive of
+    both ends), in the oracle's order. Two or more means the session ran on from one trial into the
+    next (carry_over)."""
+    return [tr["trial_id"] for tr in trials
+            if lo_wall <= tr["end_wall_ms"] and hi_wall >= tr["begin_wall_ms"]]
+
+
 def _count_arrows(arrows, lo, hi, trial_id):
     """arrows is [(t_wall_ms, trial_id), ...]. Within the interval [lo, hi] (inclusive of both
     ends), count only presses sent for the given trial_id when one is supplied, so that a delayed
@@ -699,6 +721,14 @@ def assemble(gt_bytes, oracle_bytes, rules_bytes, plan_bytes=None):
                          "start_wall_ms": s["start_wall_ms"], "end_wall_ms": last_wall,
                          "start_mono_ns": s["start_mono_ns"], "end_mono_ns": events[-1]["t_mono_ns"],
                          "trial_ids": [] if s["trial_id"] is None else [s["trial_id"]]})
+    for s in sessions:
+        spanned = _spanned_trial_ids(s["start_wall_ms"], s["_hi"], oracle["trials"])
+        if len(spanned) >= 2:
+            excluded.append({"type": "carry_over", "log": "gt",
+                             "start_wall_ms": s["start_wall_ms"], "end_wall_ms": s["_hi"],
+                             "start_mono_ns": s["start_mono_ns"],
+                             "end_mono_ns": events[-1]["t_mono_ns"] if s["end_mono_ns"] is None else s["end_mono_ns"],
+                             "trial_ids": spanned})
 
     for s in sessions:
         reasons = set()
@@ -1096,6 +1126,108 @@ def _case_excluded_by():
     return f
 
 
+def _case_carry_over():
+    """A session that runs on from one trial into the next is excluded as carry_over, with both
+    trials in trial_ids; a commit that lands after its own trial_end but before the next trial
+    begins is not (negative control)."""
+    f = []
+    trials = [("t00001", 0, 900), ("t00002", 1000, 1900), ("t00003", 2000, 2900), ("t00004", 3000, 3900)]
+    evs = [_sm(100, 1), _ins(950, 2),                                  # t00001: commits 50 ms after its trial_end
+           _sm(1700, 1), _sm(1800, 3),                                 # t00002: left uncommitted ...
+           _sm(2100, 5), _ins(2500, 5),                                # ... and committed inside t00003, which it overlaps most
+           _sm(3100, 1), _ins(3500, 1)]                                # t00004: independent
+    plan = _plan_bytes([(t, (True, False, "enter")) for t, _b, _e in trials])
+    r = assemble(_gt_bytes("mac_nstic", evs),
+                 _oracle_bytes(trials, plan_sha=hashlib.sha256(plan).hexdigest()), _example_rules(), plan)
+    carry = [x for x in r["excluded"] if x["type"] == "carry_over"]
+    if len(r["excluded"]) != 1 or len(carry) != 1:
+        f.append("not exactly one carry_over entry: %r" % (r["excluded"],))
+    elif carry[0]["trial_ids"] != ["t00002", "t00003"] or carry[0]["log"] != "gt":
+        f.append("carry_over's trial_ids is not [t00002, t00003] from gt: %r" % (carry[0],))
+    elif (carry[0]["start_wall_ms"] - WALL0, carry[0]["end_wall_ms"] - WALL0) != (1700, 2500):
+        f.append("carry_over's times are not the session's own (1700, 2500): %r" % (carry[0],))
+    by_tid = dict((s["trial_id"], s) for s in r["definitions"]["all"])
+    if sorted(by_tid) != ["t00001", "t00003", "t00004"]:
+        f.append("the carried session is not assigned to the later trial: %r" % (sorted(by_tid),))
+    elif by_tid["t00003"]["excluded_by"] != ["carry_over"]:
+        f.append("the carried session's excluded_by is not [carry_over]: %r" % (by_tid["t00003"]["excluded_by"],))
+    elif by_tid["t00001"]["excluded_by"] != [] or by_tid["t00004"]["excluded_by"] != []:
+        f.append("a session that stayed out of the next trial is flagged: %r / %r" %
+                 (by_tid["t00001"]["excluded_by"], by_tid["t00004"]["excluded_by"]))
+    agr = r["oracle_agreement"]
+    if (agr["n_agree"], agr["mismatches"]) != (3, [{"trial_id": "t00002", "type": "no_session"}]):
+        f.append("the agreement rate is changed by carry_over (the carried trial must still count as no_session): %r" % (agr,))
+    # A session that never closes and runs into the next trial is carry_over as well as log_truncated.
+    r2 = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), (1200, "focus_out", {})]),
+                  _oracle_bytes([("t00001", 0, 900), ("t00002", 1000, 1900)]), _example_rules())
+    if sorted(x["type"] for x in r2["excluded"]) != ["carry_over", "log_truncated"]:
+        f.append("an open session that runs into the next trial is not both carry_over and log_truncated: %r" % (r2["excluded"],))
+    elif [x["trial_ids"] for x in r2["excluded"] if x["type"] == "carry_over"] != [["t00001", "t00002"]]:
+        f.append("the open session's carry_over trial_ids is not [t00001, t00002]: %r" % (r2["excluded"],))
+    # A session over three trials lists the middle one too, although no event of it falls there.
+    three = [("t00001", 0, 900), ("t00002", 1000, 1900), ("t00003", 2000, 2900)]
+    r3 = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _ins(2500, 1)]), _oracle_bytes(three), _example_rules())
+    if [x["trial_ids"] for x in r3["excluded"]] != [["t00001", "t00002", "t00003"]]:
+        f.append("a session over three trials does not list all three: %r" % (r3["excluded"],))
+    # Both ends are inclusive: a session that ends at the very millisecond the next trial begins spans it.
+    r4 = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _ins(1000, 1)]),
+                  _oracle_bytes([("t00001", 0, 900), ("t00002", 1000, 1900)]), _example_rules())
+    if [x["trial_ids"] for x in r4["excluded"]] != [["t00001", "t00002"]]:
+        f.append("a session that ends exactly at the next trial_begin is not carry_over: %r" % (r4["excluded"],))
+    return f
+
+
+def _experiment_rules():
+    with open(os.path.join(_HERE, "..", "..", "experiment", "gt_rules.json"), "rb") as f:
+        return f.read()
+
+
+def _case_experiment_rules():
+    """The experiment's rule file (experiment/gt_rules.json) keeps one session across an automatic
+    commit in the middle of typing (insert_text followed by set_marked within 50 ms, as live
+    conversion does on macOS), and still closes a session at a commit with no continuation; the
+    example rule set splits the same input in two (control)."""
+    f = []
+    trials = [("t00001", 0, 1900), ("t00002", 2000, 3900)]
+    evs = [_sm(100, 1), _sm(300, 4), _ins(500, 2), _sm(501, 2), _sm(700, 4), _ins(900, 4),   # one composition, auto-commit at 500
+           _sm(2100, 1), _ins(2500, 1), _sm(2600, 1), _ins(2900, 1)]                       # two compositions 100 ms apart
+    try:
+        rules = _experiment_rules()
+    except OSError as e:
+        return ["experiment/gt_rules.json cannot be read (%s)" % type(e).__name__]
+    r = assemble(_gt_bytes("mac_nstic", evs), _oracle_bytes(trials), rules)
+    got = [(s["trial_id"], s["outcome"], s["start_wall_ms"] - WALL0, s["end_wall_ms"] - WALL0) for s in r["definitions"]["all"]]
+    want = [("t00001", "commit", 100, 900), ("t00002", "commit", 2100, 2500), ("t00002", "commit", 2600, 2900)]
+    if got != want:
+        f.append("the experiment rules do not keep the auto-commit inside one session: %r" % (got,))
+    # The head committed automatically and the rest cancelled: one session, a cancellation (11 of the 27
+    # cancelled trials of the pilot with live conversion on took this path).
+    rc = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _sm(300, 4), _ins(500, 2), _sm(501, 2), _sm(700, 0)]),
+                  _oracle_bytes([("t00001", 0, 1900)]), rules)
+    got_c = [(s["outcome"], s["start_wall_ms"] - WALL0, s["end_wall_ms"] - WALL0) for s in rc["definitions"]["all"]]
+    if got_c != [("cancel", 100, 700)]:
+        f.append("an automatic commit followed by a cancellation is not one cancelled session: %r" % (got_c,))
+    # unmark follows the same rule: with a continuation the session stays open, without one it closes.
+    for evs_u, want_u in (([_sm(100, 1), (500, "unmark", {}), _sm(510, 1), _ins(900, 1)], [("commit", 100, 900)]),
+                          ([_sm(100, 1), (500, "unmark", {}), _sm(700, 1), _ins(900, 1)],
+                           [("commit", 100, 500), ("commit", 700, 900)])):
+        ru = assemble(_gt_bytes("mac_nstic", evs_u), _oracle_bytes([("t00001", 0, 1900)]), rules)
+        got_u = [(s["outcome"], s["start_wall_ms"] - WALL0, s["end_wall_ms"] - WALL0) for s in ru["definitions"]["all"]]
+        if got_u != want_u:
+            f.append("unmark does not follow the continuation rule: %r, not %r" % (got_u, want_u))
+    # The window includes its end: a continuation exactly 50 ms after the commit keeps the session open,
+    # one at 51 ms does not.
+    for gap, want_n in ((50, 1), (51, 2)):
+        rb = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _ins(500, 1), _sm(500 + gap, 1), _ins(900, 1)]),
+                      _oracle_bytes([("t00001", 0, 1900)]), rules)
+        if len(rb["definitions"]["all"]) != want_n:
+            f.append("a continuation %d ms after the commit gives %d sessions, not %d" % (gap, len(rb["definitions"]["all"]), want_n))
+    r0 = assemble(_gt_bytes("mac_nstic", evs), _oracle_bytes(trials), _example_rules())
+    if len(_wins(("t00001",), r0["definitions"]["all"])) != 2:
+        f.append("control: the example rules no longer split at the auto-commit, so this case tests nothing")
+    return f
+
+
 def _case_rules_change_result():
     """Changing the rules changes the result, confirming that the rules are actually being read
     (negative control)."""
@@ -1148,8 +1280,12 @@ def _case_rules_change_result():
     # clock-jump threshold
     evs = [_sm(100, 1), _ins(500, 2)]
     gt_j = _gt_bytes("mac_nstic", evs, {1: 3000})
-    if not (assemble(gt_j, orc, base_rules)["excluded"]
-            and not assemble(gt_j, orc, _rules_with(lambda o: o["mac_nstic"].__setitem__("clock_jump_ms", 10000)))["excluded"]):
+    # Only the clock_jump entries are compared: the shifted wall clock also stretches the session over
+    # the next trial, which is reported as carry_over under either threshold.
+    def jumps_of(rules):
+        return [x for x in assemble(gt_j, orc, rules)["excluded"] if x["type"] == "clock_jump"]
+    if not (jumps_of(base_rules)
+            and not jumps_of(_rules_with(lambda o: o["mac_nstic"].__setitem__("clock_jump_ms", 10000)))):
         f.append("changing clock_jump_ms does not change excluded")
     return f
 
@@ -1432,6 +1568,8 @@ CASES = (
     ("nav_true / nav_true_cand count only the sent events belonging to the assigned trial (trial scoping)", _case_nav_trial_scope),
     ("a clock jump (the wall clock advances alone) appears in excluded", _case_clock_jump),
     ("excluded entries' trial_ids and each session's excluded_by / n_start_while_open", _case_excluded_by),
+    ("a session that runs on into the next trial is excluded as carry_over with both trials", _case_carry_over),
+    ("the experiment rule file keeps an automatic commit in the middle of typing inside one session", _case_experiment_rules),
     ("changing the rules changes the result (negative control)", _case_rules_change_result),
     ("the oracle-to-ground-truth agreement rate and the disagreement types", _case_agreement),
     ("malformed rules and inputs are rejected", _case_rules_validation),

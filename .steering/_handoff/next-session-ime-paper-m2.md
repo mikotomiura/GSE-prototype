@@ -16,6 +16,11 @@
 > ⚠️ B を始めたら、最初に `tasklist.md` の「⚠️ Mac: 024-acceptance.sh を回し…」の項目を済ませる。一覧の SHA-256 を G-GEAR の値と比べる（判断 68）。あわせて `build.sh` と、例の `focus_cmd` の前面の確認（§3-7）を確かめる。
 > ⚠️ 生成器は、パイロットの config（マーカー ← → ←・`nav_count_max` ≥ 3）だと計画を作らずに止まるようになった（§3-6・判断 84）。本番の n・think を研究者に確かめるときに、マーカーの長さもあわせて決める。
 
+> ★★★ **B の大半は 2026-10-01 に終わった**（Mac・枝 `feature/ime-m2-gt-rules`・判断 85〜89）。
+> - 済み: Mac の確認（024 の SHA-256 一致・`build.sh`・`focus_cmd`）／本番の n = 75・think 0.2〜20 秒・マーカー ← → ← →（判断 85）／`experiment/gt_rules.json`（判断 86）／持ち越しの除外 `carry_over`（判断 87）／`experiment/pilot-macos.md`／完了時レビュー 3 系統（判断 88・89）。
+> - **残り（M2）**: パイロットの生ログの預け方。`pilot-macos.md` の「Raw logs」に書いた基準（runner の run だけ・観測の key 行と gt の `key_down` の両方が送出に対応・手打ちは預けない）を検査する道具（`reach.py` の逆向き）を作り、`experiment/data.md` の手順（`pipeline.py --pack`）で預ける。
+> - **M3 に持ち越す論点**: (1) ライブ変換 ON で、先頭が自動確定した後に取り消したセッション（`pilot2-on` の取り消し 27 試行中 11）を、観測側の放棄とどう照合するか。診断用のフィールドを足すかも含めて決める（判断 88）。(2) `settle_ms` を事前登録で固定する（50 ms の窓の前提・判断 89）。(3) 本番の生成の config（n・think・マーカー・`nav_count_max`）のファイルを作って凍結する（判断 85）。(4) `cell.example.json` の `learning`・`predictive_candidates` の記述を、パイロットの実際に合わせる。
+
 ### A. M1 の枝の PR（どちらの機械でも・先に）〔済み・PR #283〕
 
 ```
