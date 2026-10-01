@@ -137,11 +137,14 @@ Marker specification (JSON):
   from the previous trial (2 of 126 trials in the second macOS pilot with live conversion on), the arrows act on
   that composition instead.
 - The observation records only a category, so an arrow-key marker is found there as a run of `navigation` rows,
-  and one scenario presses the right arrow up to `nav_count_max` times in a row. An arrow-key marker must therefore
-  be longer than `nav_count_max` (the generator rejects a config that breaks this). Otherwise those presses inside a
-  trial count as marker occurrences, and if a block's real marker is lost, an occurrence inside its first trial can
-  be matched to that block instead of the block appearing in `missing`. gt matches on virtual-key codes, and that
-  scenario presses only the right arrow, so gt is not affected.
+  and one scenario presses the right arrow up to `nav_count_max` times in a row (the limit comes from the
+  procedures). A marker whose observed keys are all arrows must therefore be longer than every run of arrow presses
+  inside a trial of the plan; the generator refuses to build a plan that breaks this, counting only the keys the
+  observation records. The three-key marker of the example serves only while no trial presses three arrows in a row
+  (for example with `nav_count_max` at 2 or below); the marker for the measurement is fixed with the protocol.
+  Otherwise those presses inside a trial count as marker occurrences, and if a block's real marker is lost, an
+  occurrence inside its first trial can be matched to that block instead of the block appearing in `missing`. gt
+  matches on virtual-key codes, and that scenario presses only the right arrow, so gt is not affected.
 - A marker key must **appear in the observation's `key` rows** and must **not change IME state** (a key the
   observation side does not observe never produces a `key` row and therefore cannot serve as a marker). The first
   entries of the three lists correspond to the same press.

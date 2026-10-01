@@ -53,6 +53,10 @@ KEYNAMES = frozenset(
     + ["shift", "mouse_click", "focus_away", "focus_back"]
 )
 ARROW_KEYS = ("left", "up", "right", "down")
+# Keys the observation is assumed not to record (the key table in ../e2/README.md: the IME toggles, F13 to F19, and
+# the runner's pseudo keys produce no row).
+UNOBSERVED_KEYS = frozenset(["ime_on", "ime_off", "mouse_click", "focus_away", "focus_back"]
+                            + ["f%d" % i for i in range(13, 20)])
 COMMITS = ("enter", "digit", "mouse", "none")
 INTENT_KEYS = ("commit", "cand_index", "nav_count", "abandon", "predictive", "ime_toggle_mid", "focus_switch_mid",
                "expect_session")
@@ -191,12 +195,6 @@ def normalize_config(config):
     mk = cfg["marker"]
     if not isinstance(mk, list) or any(k not in KEYNAMES for k in mk):
         raise ValueError("config marker must be an array of keynames")
-    # The observation records only a key's category, so a marker made only of arrow keys is found there as a run of
-    # navigation rows, and one scenario presses the right arrow up to nav_count_max times in a row. Such a marker
-    # stays unique in the observation only when it is longer than that run (see ../pilot/README.md).
-    if mk and all(k in ARROW_KEYS for k in mk) and len(mk) <= cfg["nav_count_max"]:
-        raise ValueError("config marker made only of arrow keys must be longer than nav_count_max (%d), or the "
-                         "arrow presses inside a trial can be taken for a marker" % cfg["nav_count_max"])
     if cfg.get("scenarios") is not None:
         sc = cfg["scenarios"]
         if not isinstance(sc, list) or not sc or len(set(sc)) != len(sc) or any(s not in SCENARIOS for s in sc):
@@ -614,7 +612,34 @@ def plan_rows(corpus, recipes, config, os_name, seed, config_sha256, recipes_sha
             tid = "t%05d" % n_trial
             rows.append(build_trial(ph, s, sp, os_name, recipes, cfg, trial_rng(seed, tid), tid, bid))
             phrases[tid] = ph
+    _check_marker(cfg["marker"], rows)
     return rows, phrases
+
+
+def _arrow_run(keys):
+    """The longest run of arrow keys among the observed keys of a key sequence (unobserved keys are skipped)."""
+    best = cur = 0
+    for k in keys:
+        if k in UNOBSERVED_KEYS:
+            continue
+        cur = cur + 1 if k in ARROW_KEYS else 0
+        best = max(best, cur)
+    return best
+
+
+def _check_marker(marker, rows):
+    """The observation records only a key's category, so a marker whose observed keys are all arrow keys is found
+    there as a run of navigation rows. It stays unique only when it is longer than every run of arrow presses inside
+    a trial of the plan (see ../pilot/README.md); otherwise the plan is refused."""
+    seen = [k for k in marker if k not in UNOBSERVED_KEYS]
+    if not seen or any(k not in ARROW_KEYS for k in seen):
+        return
+    longest = max([_arrow_run([s["key"] for s in r["steps"] if s["down"]]) for r in rows if r["kind"] == "trial"]
+                  or [0])
+    if len(seen) <= longest:
+        raise ValueError("the marker leaves %d arrow keys in the observation, but a trial of this plan presses %d arrow "
+                         "keys in a row, so the two cannot be told apart; make the marker longer or lower "
+                         "nav_count_max" % (len(seen), longest))
 
 
 def render_plan(rows):
@@ -1107,6 +1132,11 @@ def selftest():
         check("the live-off recipes keep the windows procedures and the kana layout of recipes.json",
               recipes_off["os"]["windows"] == recipes["os"]["windows"]
               and recipes_off["kana_layout"] == recipes["kana_layout"])
+        check("both macOS files type the reading through the kana layout in the same scenarios (the open-set attack "
+              "reads only this and the kana layout from the recipes)",
+              sorted(recipes["os"]["macos"]) == sorted(recipes_off["os"]["macos"])
+              and all(_uses_kana(recipes["os"]["macos"][s]) == _uses_kana(recipes_off["os"]["macos"][s])
+                      for s in recipes["os"]["macos"]))
         rows_off, ph_off = plan_rows(corpus, recipes_off, cfg, "macos", 7, sha, _sha_file(off_path), csha)
         scen_off = [s for s in SCENARIOS
                     if s in recipes_off["os"]["macos"] and recipes_off["os"]["macos"][s].get("default_enabled", True)]
@@ -1319,18 +1349,34 @@ def selftest():
                       "--seed", "1", "--out", os.path.join(tmp, "x.jsonl"))
         check("a config missing keys exits 2", rc == 2, "exit %d" % rc)
 
-        # --- an arrow-key marker must be longer than the longest arrow run inside a trial (nav_count_max)
-        def _marker_ok(marker, nav):
+        # --- a marker whose observed keys are all arrows must be longer than every arrow run inside a trial
+        def _marker_ok(marker, nav, rec=recipes, scenarios=None):
+            c = dict(cfg, marker=marker, nav_count_max=nav)
+            if scenarios is not None:
+                c["scenarios"] = scenarios
             try:
-                normalize_config(dict(cfg, marker=marker, nav_count_max=nav))
+                plan_rows(corpus, rec, c, "macos", 7, sha, rsha, csha)
                 return True
             except ValueError:
                 return False
-        check("an arrow-key marker no longer than nav_count_max is rejected",
-              not _marker_ok(["left", "right", "left"], 3) and not _marker_ok(["up"], 1))
-        check("an arrow-key marker longer than nav_count_max, or one with a non-arrow key, is accepted",
+        runs3 = max(_arrow_run([s["key"] for s in t["steps"] if s["down"]])
+                    for t in gen(config=dict(cfg, nav_count_max=3))[0] if t["kind"] == "trial")
+        check("precondition: with nav_count_max 3 some trial presses three arrow keys in a row", runs3 == 3, str(runs3))
+        check("a marker leaving no more arrows in the observation than the longest arrow run of a trial is refused",
+              not _marker_ok(["left", "right", "left"], 3) and not _marker_ok(["left", "f13", "right", "left"], 3)
+              and not _marker_ok(["left", "f13"], 3))
+        check("a longer arrow marker, a lower nav_count_max, a marker with an observed non-arrow key, a marker the "
+              "observation never records, and a plan without the arrow scenario are accepted",
               _marker_ok(["left", "right", "left", "right"], 3) and _marker_ok(["left", "right", "left"], 2)
-              and _marker_ok(["f13", "f14", "f13"], 3) and _marker_ok(["left", "f13"], 3) and _marker_ok([], 3))
+              and _marker_ok(["left", "space", "left"], 3) and _marker_ok(["f13", "f14", "f13"], 3)
+              and _marker_ok([], 3) and _marker_ok(["left", "right", "left"], 3, scenarios=["S1", "S2"]))
+        rec5 = json.loads(json.dumps(recipes))
+        rec5["os"]["macos"]["S7"]["params"]["nav_count"]["max"] = 5
+        check("the limit follows the procedures: an S7 that allows five arrows refuses a three-arrow marker even "
+              "with nav_count_max 2", not _marker_ok(["left", "right", "left"], 2, rec=rec5))
+        check("normalize_config does not judge the marker (the attack reads the configs of plans already run)",
+              normalize_config(dict(cfg, marker=["left", "right", "left"], nav_count_max=3))["marker"]
+              == ["left", "right", "left"])
         bad_mk = os.path.join(tmp, "bad_marker.json")
         with open(bad_mk, "wb") as f:
             f.write(json.dumps(dict(cfg, marker=["left", "right", "left"], nav_count_max=3)).encode("utf-8"))

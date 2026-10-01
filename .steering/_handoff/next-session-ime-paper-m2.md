@@ -67,7 +67,7 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応�
 
 ## §2 M1 の枝の PR（`feature/ime-m1-pilot` → main）の前にすること
 
-> ★ **2026-10-01（G-GEAR）に 1〜7 を進めた**（判断 81〜83）。1〜4 は `5e9f873a`。6 の merge は `5a9cc805`（衝突は Mac の §6 を §7 にした）。5 の Claude の 2 系統は CRITICAL / HIGH 0 で、指摘は判断 82 のとおり直した。Codex は研究者の選択で上限を一時的に 350,000 に上げて 1 回回した（P1 2 件・P2 2 件を判断 83 のとおり直し、上限は 300,000 に戻した）。結果と PR の番号は `tasklist.md` を見る。下の本文は当時の指示として残す。
+> ★ **2026-10-01（G-GEAR）に 1〜7 を進めた**（判断 81〜83）。1〜4 は `5e9f873a`。6 の merge は `5a9cc805`（衝突は Mac の §6 を §7 にした）。5 の Claude の 2 系統は CRITICAL / HIGH 0 で、指摘は判断 82 のとおり直した。Codex は研究者の選択で上限を一時的に 350,000 に上げて 1 回回した（P1 2 件・P2 2 件を判断 83 のとおり直し、上限は 300,000 に戻した）。2 巡目は code-reviewer で、足した規則の境界条件を見た（HIGH 1・MEDIUM 5 を判断 84 のとおり直した）。結果と PR の番号は `tasklist.md` を見る。下の本文は当時の指示として残す。
 
 1. **`GENERATOR_VERSION` を上げる**（今は `"1.1.0"`・`kit/gen/generate_plan.py:45`）。
    - `kit/gen/README.md:92-93` は「`recipes.json` の手順の意味が変わったら上げる」と定めている。
@@ -112,12 +112,12 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応�
      - (c) 手打ちの探査（`enter_probe*`・`esc_probe*`）の出力と、手打ちの対照の記録は対象外と明記する。
 5. IME の学習をリセットしなかった（研究者の判断）ことは、`pilot-macos.md` の条件に書く。
    - あわせて、パイロットの実際の IME の設定を書く。`cell.example.json` の `predictive_candidates` は `"off"` だが、S10（予測候補を Tab で選ぶ）は両方の macOS の手順書で既定で有効（code-reviewer の範囲外の指摘）。
-6. ⚠️ **マーカーの長さ**（判断 82）。生成器は「矢印だけのマーカーは `nav_count_max` より長い」を検査するようになった。パイロットの ← → ← は、`nav_count_max` ≥ 3 の config では exit 2 になる。
+6. ⚠️ **マーカーの長さ**（判断 82・84）。生成器は、計画を作るときに「観測に残るマーカーが矢印だけなら、試行の中の矢印の最長の連続より長い」を検査するようになった。パイロットの ← → ← は、S7 が矢印を 3 回続けて押す計画（`nav_count_max` ≥ 3）では exit 2 になる。E2 は検査しない（すでに走った計画を読むため）。
    - 本番の config を決めるときに、研究者が次のどちらかを選ぶ（推奨と理由を添えて AskUserQuestion）: 4 打鍵のマーカー（← → ← →）にする／`nav_count_max` を 2 以下にする。
    - マーカーを変えたら、`pilot/README.md` の例の JSON（`oracle_keys` / `gt_vks` / `obs_categories`）と e2/README の記述も合わせる。
 7. Mac で確かめること（G-GEAR では試せない）:
    - `refinput-macos/build.sh` を回す（bundle id の検査を `[[ =~ ]]` と `LC_ALL=C` にした。macOS の bash 3.2 で通るか）。
-   - ⚠️ `cell.example.json` の `focus_cmd` に、かなキーを押す前の前面の確認を 1 行足した（判断 83・Codex の P1）。式は送出側の `FRONT_QUERY` と同じだが、**この 1 行は実機で試していない**。参照入力欄を前面にした状態で通ること・別のアプリが前面だと非 0 で止まること（`run_cell.py` がブロックの前に abort）を、短い run で確かめる。
+   - ⚠️ `cell.example.json` の `focus_cmd` に、かなキーを押す前の前面の確認を足した（判断 83・84。0.2 秒おきに 5 回まで読み直してから確かめる）。式は送出側の `FRONT_QUERY` と同じだが、**この数行は実機で試していない**。参照入力欄を前面にした状態で通ること、別のアプリが前面だと非 0 で止まること（`run_cell.py` がブロックの前に abort する）を、短い run で確かめる。
    - ⚠️ `focus_cmd` は送出フラグがあるときだけ走るようになった（判断 83）。`dryrun` で前面化を試すときもフラグが要る。
 8. **持ち越しの扱い**（Codex の P2・判断 83）。ON の再パイロットで S8 / S10 が各 1 件、未確定の文字列を次の試行へ持ち越した。キー列の照合では見つからず、`gt_sessions.py` の `oracle_agreement` は不一致を数えるだけで除外はしない。
    - 正解の定義（`gt_rules`）と事前登録（M3）で、持ち越した試行と次の試行をどう扱うか（除外か・別に数えるか）を決める。
@@ -130,6 +130,7 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応�
   - `prereg` では、固定の根拠のファイルまで「読んでよいファイルの一覧」に入れる（`run.sh` → `pipeline.py` → 部品・`config.json`・`SEED`）。
   - 封印物（`sealed/`）がある時期なので、起動の前に研究者に知らせる。`Read` は構造では縛れない。
 - **M5: Windows の較正パイロット**（G-GEAR）。Windows の recipes はまだ仮説のまま。MS-IME でも Enter や Esc の効き方が想定と違う可能性がある。
+- **M12（公開）の前に直すこと**: 書き出し器は公開 repo 用の `.gitattributes` を作らない（判断 84）。手順書・コーパス・ロガーの manifest・`experiment/*.json` などは SHA-256 を比べるので、公開 repo を `core.autocrlf=true` で clone すると値が食い違う。書き出しに `.gitattributes`（`eol=lf`）を足す。
 - **M12（公開）の前の確認**（研究者・未回答）。M0 の作品のうち『人間失格』『斜陽』『堕落論』『夫婦善哉』は、著者が 1945 年より後に没し、1931 年以降に出版されている。このため米国で保護が復活している可能性がある（私の法的な読みで、専門家の判断ではない）。
 
 ## §5 気をつけること

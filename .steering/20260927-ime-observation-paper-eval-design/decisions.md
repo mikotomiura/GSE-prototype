@@ -656,3 +656,17 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
   3. 〔P2〕持ち越しは、キー列の照合（`_scenario_checks`）では見つからない。`gt_sessions.py` の `oracle_agreement` は不一致を型ごとに数えるが、除外はしない。→ 持ち越した試行（と次の試行）をどう扱うかは、正解の定義と事前登録で決める（M2 / M3・引き継ぎ §3）。今回はコードを変えない。
   4. 〔P2〕OFF 用の手順書でも、S11 を `scenarios` で名指しすれば生成できる。→ OFF 用の手順書の S11 を S9 と同じ形（`steps` が空・既定で無効）にし、名指しすると生成が止まるようにした。selftest に 1 ケース足した（109 件緑・直す前の手順書で赤）。⚠️ これで OFF 用の手順書の SHA-256 が変わる。パイロットの `verify-off` の計画は、`19c537c0` の版を指す（生ログを預けるときは、その版を添える）。
 - **2 巡目**: Codex の 2 巡目は回さない。同日の合計の見込み（324,731）に 1 回（3〜4 万）を足すと、研究者が選んだ 350,000 を超えるため。2 巡目の観点（今回足した規則の境界条件）は、Claude の code-reviewer で見る。
+
+## 判断 84: M1 の枝の完了時レビュー 2 巡目（code-reviewer・足した規則の境界条件）への対応（2026-10-01・G-GEAR・メインの実装上の選択・研究者が覆せる）
+
+- **背景**: 判断 82・83 で足した 5 つの規則（マーカーの長さ・E2 の手順書の照合・`focus_cmd` の同意・前面の確認・OFF の S11）の境界条件を、`5a9cc805..8ae9ccd1` で code-reviewer に攻めさせた。CRITICAL 0・HIGH 1・MEDIUM 5・LOW 5。すべて一次で確かめた。
+- **直したもの**:
+  1. 〔HIGH〕E2 の照合はファイルのバイト列で SHA-256 を比べる。ところが `recipes*.json` に `eol` の指定が無く、`core.autocrlf=true`（Git for Windows の既定）で clone すると CRLF になる。そうなると、正しい手順書を渡しても止まる。⚠️ この機械（`autocrlf=input`）では LF だった。od と Python でバイトを数えて確かめた（`git ls-files --eol` も `i/lf w/lf`）。なお、`grep -c $'\r'` は行数を返していて、測定器のほうが誤っていた。→ 先例（判断 32・63）に倣い、repo 直下の `.gitattributes` に `kit/gen/recipes*.json` と `kit/corpus/data/*.jsonl` の `eol=lf` を足した。コーパスの SHA-256 は `experiment/data.md` にも書いてある。index はもとから LF なので、中身は変わらない。⚠️ 書き出し器は公開 repo 用の `.gitattributes` を作らない（既存の先例のファイルも同じ）→ M12 の項目として引き継ぎに書いた。
+  2. 〔MEDIUM〕マーカーの検査は、書かれたマーカーを見ていて、観測に残る並びを見ていなかった（`["left","f13","right","left"]` が通る）。また、上限は config の `nav_count_max` ではなく手順書の `params` で決まる（整数も書ける）。さらに、検査が `normalize_config` の中にあったため、E2 もこれを呼んでいた。E2 はマーカーを個数で読み飛ばすだけなので、パイロットの config で E2 が誤って止まる。→ 検査を `plan_rows`（生成のときだけ）に移した。観測されないキーの集合 `UNOBSERVED_KEYS`（e2/README のキーの表と同じ前提）を除いたマーカーが矢印だけなら、作った計画の試行の中の矢印の最長の連続（観測されないキーは飛ばして数える）より長いことを求める。S7 の無い計画では検査しない。selftest: 前提（nav 3 で連続 3 が実際にある）・拒否 3 通り（`["left","f13"]` を拒否側へ移した）・受理 6 通り・手順書で上限 5 にした S7・`normalize_config` が判定しないこと。
+  3. 〔MEDIUM〕E2 は `config_sha256` を照合していなかった。K2（`ASSUMPTIONS`）は config も攻撃者の知識に挙げている → 手順書と同じく照合する。selftest は、計画を作った config を実際にファイルに書き、それを `--config` に渡す形に直した（もとは「計画は部分集合の config・`--config` は別のファイル」だった）。⚠️ コーパスは照合しない。設計（design.md §2）に「E2 だけ現代文のコーパスを足す」という任意の案があり、計画と違うコーパスを渡す正当な使い方がありうる。README に書いた。
+  4. 〔MEDIUM〕例の前面の確認が 1 回だけで、送出側（0.2 秒おきに 5 回）より誤って中断しやすい → `repeat 5 times … exit repeat … delay 0.2 … end repeat` の後で確かめる形にした。⚠️ 実機では試していない（引き継ぎ）。
+  5. 〔LOW〕run/README: manifest の `focus` に `skipped` を書いた（`focus_cmd` が空でなく、フラグが無いとき）。フラグの節の「skipped と記録」を、「計画が求めた reset と、空でない `focus_cmd`」に正した。前提 4 に「手順書はライブ変換の設定に合わせる・runner は確かめられない」を足した。前提 6 に「bundle id は例の 3 か所」を足した。
+  6. 〔LOW〕e2 / pilot の README: ← → ← は、どの試行も矢印を 3 回続けて押さない間だけ使える、と注記した。本番のマーカーは事前登録で決める。
+  7. 〔LOW〕`open_set.py` は、手順のうち「どのシナリオがかなで打つか」も読む → 2 つの手順書でこれが一致することを selftest で確かめる。
+- **確認**: `generate_plan.py --selftest` 113 件・`closed_set.py --selftest` 84 件が緑。変異 5 本がすべて赤: 検査の呼び出しを外す・射影をやめる・上限を 3 に固定する・OFF の S12 のかな入力を外す・照合から config を外す。S12 の変異は、最初の文字列の置き換えが Windows の節にも当たって不発だったので、JSON として macOS の S12 だけを変えてやり直した。`kit/check.sh` の 27 本と `--compile` が緑、`_style_check.py` の違反 0 件。
+- **直さないもの**: なし（引き継ぎに回したのは、M12 の公開 repo の `.gitattributes` と、実機での前面の確認の 2 つ）。

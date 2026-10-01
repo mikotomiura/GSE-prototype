@@ -563,6 +563,7 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, Ks, featu
         raise ValueError("--obs and --plan differ in count (%d and %d)" % (len(obs_paths), len(plan_paths)))
     recipes = generate_plan.load_recipes(recipes_path)
     recipes_sha256 = _sha_file(recipes_path)
+    config_sha256 = _sha_file(config_path)
     with open(config_path, "rb") as f:
         try:
             config = _loads(f.read().decode("utf-8"))
@@ -574,11 +575,13 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, Ks, featu
     n_shadow = 0
     for i, (op, pp) in enumerate(zip(obs_paths, plan_paths)):
         plan = read_plan(pp)
-        # The candidates' key presses are predicted from these procedures, so they must be the ones the plan was
-        # built from (a macOS cell with live conversion off has its own recipes file).
-        if plan[0]["recipes_sha256"] != recipes_sha256:
-            raise ValueError("plan %d was built from a different recipes file than --recipes (its recipes_sha256 "
-                             "differs); pass the recipes file the plan was built from" % (i + 1))
+        # The candidates' key presses are predicted from these procedures and this configuration (K2), so they must
+        # be the ones the plan was built from (a macOS cell with live conversion off has its own recipes file). The
+        # corpus is not compared: the candidates are drawn from the corpus passed.
+        for what, mine in (("recipes", recipes_sha256), ("config", config_sha256)):
+            if plan[0]["%s_sha256" % what] != mine:
+                raise ValueError("plan %d was built from a different %s file than --%s (its %s_sha256 differs); pass "
+                                 "the file the plan was built from" % (i + 1, what, what, what))
         events, sh, obs_os = read_obs(op)
         n_shadow += sh
         trials.extend(segment_by_plan(events, plan, obs_os, markers_in_obs, ime_toggle_in_obs, tag="s%d-" % i))
@@ -590,7 +593,7 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, Ks, featu
                 (f, {"timing": FEATURE_SETS[f][0], "runs": FEATURE_SETS[f][1]}) for f in features_list),
             "params": {"pause_ms": PAUSE_MS, "tau_ms": TAU_MS, "w_time": W_TIME, "phase_step_ms": PHASE_STEP_MS},
             "corpus_sha256": _sha_file(corpus_path), "recipes_sha256": recipes_sha256,
-            "config_sha256": _sha_file(config_path), "results": results}
+            "config_sha256": config_sha256, "results": results}
 
 
 def render(result):
@@ -902,9 +905,13 @@ def selftest():
                lambda: read_obs(obs_file(good + [("[" * 4000) + ("]" * 4000)])))
 
         # command line, end to end (plan -> observation -> attack -> JSON)
-        rows, _ = generate_plan.plan_rows(corpus, recipes, dict(cfg, scenarios=["S1", "S2", "S3"], n_per_cell_scenario_speed=4),
-                                          "macos", 3, "0" * 64, _sha_file(os.path.join(_KIT, "gen", "recipes.json")),
-                                          "0" * 64)
+        cli_cfg_path = os.path.join(tmp, "cfg_cli.json")
+        with open(cli_cfg_path, "wb") as f:
+            f.write(json.dumps(dict(cfg, scenarios=["S1", "S2", "S3"], n_per_cell_scenario_speed=4)).encode("utf-8"))
+        with open(cli_cfg_path, "rb") as f:
+            cli_cfg = _loads(f.read().decode("utf-8"))
+        rows, _ = generate_plan.plan_rows(corpus, recipes, cli_cfg, "macos", 3, _sha_file(cli_cfg_path),
+                                          _sha_file(os.path.join(_KIT, "gen", "recipes.json")), "0" * 64)
         plan_path = os.path.join(tmp, "plan.jsonl")
         with open(plan_path, "wb") as f:
             f.write(generate_plan.render_plan(rows))
@@ -945,7 +952,7 @@ def selftest():
 
         out_a, out_b = new_out(), new_out()
         base = ["--plan", plan_path, "--corpus", corpus_path, "--recipes", os.path.join(_KIT, "gen", "recipes.json"),
-                "--config", cfg_path, "--K", "10,40", "--seed", "3"]
+                "--config", cli_cfg_path, "--K", "10,40", "--seed", "3"]
         rc_a = main(["--obs", obs_p] + base + ["--out", out_a])
         rc_b = main(["--obs", obs_p] + base + ["--out", out_b])
         check("command line: an end-to-end run exits 0", rc_a == 0 and rc_b == 0, "%r %r" % (rc_a, rc_b))
@@ -984,6 +991,11 @@ def selftest():
               plan_bytes.count(_sha_file(os.path.join(_KIT, "gen", "recipes.json")).encode("ascii")) == 1
               and main(["--obs", obs_p] + [a if a != os.path.join(_KIT, "gen", "recipes.json") else off_path
                                            for a in base] + ["--out", new_out()]) == 2)
+        check("negative: command line: a plan built from another config file than --config stops the run (exit 2)",
+              plan_bytes.count(_sha_file(cli_cfg_path).encode("ascii")) == 1
+              and _sha_file(cfg_path) != _sha_file(cli_cfg_path)
+              and main(["--obs", obs_p] + [a if a != cli_cfg_path else cfg_path for a in base]
+                       + ["--out", new_out()]) == 2)
         check("positive: command line: --ime-toggle-in-obs is accepted and does not break a run whose plan has no "
               "IME toggle key (this plan's scenarios are S1/S2/S3)",
               main(["--obs", obs_p] + base + ["--out", new_out(), "--ime-toggle-in-obs"]) == 0)

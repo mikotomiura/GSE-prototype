@@ -96,6 +96,7 @@
     - [x] clean な checkout（`5a9cc805`）で Windows で回る全 acceptance 22 本: 失敗は SCOPE と GUARD だけ（どちらも main の上で比較の基準が `feature/ime-eval-kit` の merge-base になるため・B15 の型）。GUARD は #279 の `scripts/run-codex-consult.sh` を拾った。この枝だけの差分（`97381a7b..5a9cc805`）に `src-tauri/` `src/` `scripts/` `.github/` は 0 件。macOS 専用の 004 / 007 / 012 は exit 2。024 の一覧の SHA-256 `4f7c7bea9f35ef489f501ad1f1dbbc97402d02d8af08f9a6365ae89f3603dbb5`（92 ファイル・直す前の値）
     - [x] 完了時レビュー 1 巡目（Claude）: code-reviewer ∥ security-checker → CRITICAL / HIGH 0 → 指摘を判断 82 のとおり直した（マーカーの長さの検査ほか）
     - [x] 完了時レビュー（Codex）: 研究者の選択で上限を一時的に 350,000 に上げて 1 回（33,557）→ P1 2 件（`closed_set.py` の手順書の照合・`focus_cmd` の同意と順序）・P2 2 件（持ち越し → M2 へ・OFF の S11 を空に）→ 判断 83 のとおり直し、上限を 300,000 に戻した。2 巡目（今回足した規則の境界条件）は予算の都合で Claude の code-reviewer で見る
+    - [x] 完了時レビュー 2 巡目（code-reviewer・`5a9cc805..8ae9ccd1`）: HIGH 1（手順書の改行で SHA-256 が変わる → `.gitattributes`）・MEDIUM 5（マーカーの検査を `plan_rows` へ移して観測に残る並びと計画の実際の連続で判定・E2 は config も照合・前面の確認を 5 回まで読み直す ほか）→ 判断 84 のとおり直した
     - [ ] push → PR → CI 緑なら merge → main の CI
   - [ ] M2 の残り: 正解の定義（`gt_rules` の `mac_nstic`・ON の型は 2 形）・本番の n / think の上限（1 セル約 10 時間・研究者）・`experiment/pilot-macos.md`（公開用の英語）・パイロットの生ログの置き場（公開物に含める）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）

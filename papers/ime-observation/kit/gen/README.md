@@ -48,7 +48,7 @@ authoritative. A key starting with `_` is treated as a note and ignored.
 | `think_ms` | `{min, max}` | required | Think time (log-uniform). Used wherever the procedure has `pause: think` |
 | `cand_index_max` / `nav_count_max` | integer >= 0 | required | Upper bound on the candidate index / arrow-key count |
 | `inter_trial_ms` | integer >= 0 | required | Written to the trial row's `gap_before_ms` |
-| `marker` / `marker_gap_ms` | array of keynames / integer | required | Written directly to the block row. A marker made only of arrow keys must be longer than `nav_count_max` (otherwise the config is rejected): the observation records only the category `navigation` for every arrow key, and one scenario presses the right arrow up to `nav_count_max` times in a row |
+| `marker` / `marker_gap_ms` | array of keynames / integer | required | Written directly to the block row. A marker whose observed keys (the marker without the keys the observation does not record, such as `f13` to `f19`) are all arrow keys must be longer than every run of arrow presses inside a trial of the plan, or the plan is not built: the observation records only the category `navigation` for every arrow key, and one scenario presses the right arrow up to `nav_count_max` times in a row |
 | `reset_ime_every_block` | boolean | required | Written to the block row's `reset_ime` |
 | `assumed_reading_len` | integer >= 2 | 12 | Reading length assumed by `--estimate` when `--corpus` is omitted |
 | `kana_len_min` / `kana_len_max` | integer | 4 / 8 | Length range for the synthetic kana strings used by one scenario |

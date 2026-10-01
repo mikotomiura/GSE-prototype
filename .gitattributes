@@ -23,3 +23,8 @@ papers/ime-observation/experiment/*.json text eol=lf
 papers/ime-observation/experiment/SEED text eol=lf
 papers/ime-observation/experiment/*.sh text eol=lf
 papers/ime-observation/kit/analysis/gt_rules*.json text eol=lf
+# ★ 論文キットの計画（plan/1）のヘッダーは手順書とコーパスのファイルの SHA-256（recipes_sha256 / corpus_sha256）を持ち、
+#   E2 の閉集合の攻撃は手順書の SHA-256 を計画と照合して違えば止まる。コーパスの SHA-256 は experiment/data.md にも書いてある。
+#   CRLF で checkout されると機械ごとに値が食い違う（IME 論文 判断 84・2026-10-01）。
+papers/ime-observation/kit/gen/recipes*.json text eol=lf
+papers/ime-observation/kit/corpus/data/*.jsonl text eol=lf

@@ -20,8 +20,8 @@ python3 run_cell.py --selftest
   machine, that is, to typing, to the reset, and to the focus command (which may press a key). A backend other
   than `dryrun` sends real key events to the application in front, and the runner refuses to start (exit status
   2) without the flag. `reset_cmd` and `focus_cmd` are run only with the flag, also with `dryrun`; without it
-  neither is run, no `reset` row is written to the oracle, and the manifest records the reset and the focus
-  command of each block as skipped, with the reason.
+  neither is run, no `reset` row is written to the oracle, and the manifest records each reset the plan asks for,
+  and each focus command when `focus_cmd` is not empty, as skipped, with the reason.
 - A real backend needs the backend option that its `focus_back` key uses (`focus_app` on macOS, `focus_window`
   on Windows) in `backend_opts`; without it the runner exits with status 2. The flag check, the check of the
   cell file and the plan, the clock check, and the check that the run directory does not exist all come before
@@ -48,17 +48,21 @@ Check these by hand; the runner records the statements in the cell file and cann
    The input method is on (for example Japanese, not the Latin layout) when each block starts. The plan does not
    switch it on; a `focus_cmd` that brings the field forward and then presses the input-method-on key does, provided
    the system keeps one input source for all documents (on macOS, "Automatically switch to a document's input source"
-   is off). Record in `ime_settings` how the input method was switched on and whether live conversion is on.
+   is off). Record in `ime_settings` how the input method was switched on and whether live conversion is on, and
+   build the plan from the recipes file for that setting (on macOS, `recipes.json` with live conversion on and
+   `recipes.macos-live-off.json` with it off); the runner cannot check that the plan and the machine agree.
 5. The marker keys can trigger the global hotkeys of other applications; close or reconfigure any application that
    registers them. Markers must be keys the observer records (see `../pilot/README.md`); arrow keys are used.
 6. `reset_cmd` really clears the input method's dictionary and learning, and `focus_cmd` really brings the
    reference input field to the front. Both differ by system and input method and are checked in a calibration
    pilot. In `cell.example.json`, `reset_cmd` (`false`), the `learning` entry of `ime_settings` (which states the
    intended reset), and the version in `ime` are placeholders; the other commands and options are the ones used in
-   the macOS calibration pilot, where the input method's learning was not reset, except one line added to
-   `focus_cmd` after the pilot: it checks, with the query the emitter uses to read the front application, that the
-   reference input field is in front before the input-method key is pressed, and fails otherwise (which aborts the
-   run before the block).
+   the macOS calibration pilot, where the input method's learning was not reset, except lines added to `focus_cmd`
+   after the pilot: they check, with the query the emitter uses to read the front application (up to five reads 0.2
+   seconds apart, as the emitter does), that the reference input field is in front before the input-method key is
+   pressed, and fail otherwise (which aborts the run before the block). The bundle identifier of the reference input
+   field appears three times in the example (`focus_cmd` twice and `backend_opts.focus_app`); if it is changed through
+   `REFINPUT_BUNDLE_ID` when building, change all three.
 7. A cell file is executable configuration: it names programs that are run with your privileges. Run only cell
    files that you have read, and never one from another person unread.
 8. The child programs must be the programs themselves, not wrapper scripts (on Windows a `.bat` or `.cmd` file
@@ -142,8 +146,9 @@ system version, and the Python version), `started` and `ended` (`wall_ms`, and `
 the same clock as the `t_mono_ns` of the oracle rows), `outputs` (`file`, `sha256`, and `lines` of each of the
 four logs; `null` for a log that is absent or empty), `children` (`exit_code`, `stopped`, `stderr_file`),
 `resets` (per block: `exit_code`, `failure`, or `skipped` with the reason), `focus` (per block: the command's
-`exit_code` and `failure`, and `front_confirmed`, which is true only when a real backend confirmed the front
-window), `aborted`, and `abort_reason`.
+`exit_code` and `failure`, `skipped` with the reason when `focus_cmd` is not empty and the send flag was not given,
+and `front_confirmed`, which is true only when a real backend confirmed the front window), `aborted`, and
+`abort_reason`.
 
 Before it is written, every string of the manifest is scanned: the home directory and the root of the checkout
 are replaced by `~` and `<repo>` (both spellings of the path separator, the longer path first), so that no user
