@@ -3,15 +3,15 @@
 ## 準備
 - [x] requirement.md・decisions.md 判断 1（ヒアリング 7 問）
 - [x] design.md（聞く前に固定）・ユーザーの承認（2026-10-01）
-- [ ] ワークブックの写しを作る（`make_copy.py`・元の SHA-256 を確かめる）
-- [ ] 波 1 の入力（束 X1〜X5・用途の判定を含まない）を作る
-- [ ] 波 1 を投げる（5 本並列・sonnet・入れ子禁止・締切 25 分）
-- [ ] 待つ間: `write_workbook.py`・`check_workbook.py`（`--selftest` つき）・ログの形
-- [ ] 戻りを確かめる（1 回目に載せる事実をメインが本文で確かめる）→ `extract/AF0xx.md`
+- [x] ワークブックの写しを作る（`make_copy.py`・元の SHA-256 を確かめる）
+- [x] 波 1 の入力（束 X1〜X5・用途の判定を含まない）を作る
+- [x] 波 1 を投げる（5 本並列・sonnet・入れ子禁止・締切 25 分）
+- [x] 待つ間: `write_workbook.py`・`check_workbook.py`（`--selftest` つき）・ログの形
+- [x] 戻りを確かめる → `wave1/extract-X*.md`（下書き）。1 回目に載せる事実は件ごとにメインが本文で照合（群 1・2 は済み）
 
 ## 34 件（群の順・design.md §4）
-- [ ] 群 1 AF001
-- [ ] 群 2 AF007・AF006・AF009・AF008
+- [x] 群 1 AF001
+- [x] 群 2 AF007・AF006・AF009・AF008
 - [ ] 群 3 AF002・AF003
 - [ ] 群 4 AF004・AF034
 - [ ] 群 5 AF005・AF011・AF010
