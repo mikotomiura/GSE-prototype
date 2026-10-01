@@ -19,8 +19,10 @@ Skill: attack-me・verify-before-claiming・subagent-delegation・citation-ssot�
 ### B. Mac で確かめること（A と並行してよい）
 
 ```
-git fetch → main の最新を見る。feature/ime-m3-prereg の §4 の 3 点を Mac で確かめ、結果を tasklist.md に書いて push。
-M2 の残り（パイロットの生ログの預け方）も Mac で。前の handoff（next-session-ime-paper-m2.md）の §0 B を見る。
+git fetch → git switch feature/ime-m3-prereg → git pull --no-rebase（force しない。このメモと plan_config.macos.json はこの枝にだけある）。
+.steering/_handoff/next-session-ime-paper-m3.md の §4 の 3 点を Mac で確かめ、結果を tasklist.md に書く。
+push の前に git fetch → git pull --no-rebase（G-GEAR も同じ枝に attack-me の記録を push する）。
+M2 の残り（パイロットの生ログの預け方）は、この枝ではなく main から別の枝を切って行う。前の handoff（next-session-ime-paper-m2.md）の §0 B を見る。
 Skill: verify-before-claiming・reproducibility-discipline・git-workflow。応答は日本語。
 ```
 
