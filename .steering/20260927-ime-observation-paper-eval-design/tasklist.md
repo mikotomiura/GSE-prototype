@@ -107,7 +107,7 @@
     - [x] 本番の n / think / マーカー（判断 85・研究者）: n = 75・think 0.2〜20 秒・マーカー ← → ← →
     - [x] 正解の定義（判断 86）: `experiment/gt_rules.json`（`mac_nstic` の commit に「50 ms 以内に `set_marked` が続かない」）・`config.json` をこれに向けた。一致率 ON 124 / 126・OFF 117 / 117・`verify-off` 39 / 39
     - [x] 持ち越し（判断 87・研究者）: `gt_sessions.py` に除外の理由 `carry_over`（2 試行とも）
-    - [ ] `experiment/pilot-macos.md`（公開用の英語）
+    - [x] `experiment/pilot-macos.md`（公開用の英語）: 条件・run・1 回目の所見と直し・呼び出し列の型（途中の自動確定を畳むと各シナリオ 1 形・例外 3 種を一次で数え直した）・正解の定義・oracle 一致率（example の規則と本実験の規則）・時計（ブロック 1〜5 のドリフトは ±5 ms/時以内・−200 ms/時はブロック 0 の起動直後の約 100 ms による）・到達・1 試行の時間・本番の設定
     - [ ] パイロットの生ログの置き場（除外の基準を先に書く・逆向きの到達を数える道具）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
