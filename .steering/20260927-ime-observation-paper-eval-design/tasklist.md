@@ -125,7 +125,17 @@
       → (1) 本番の計画を事前登録 §2.4 のコマンド（`--seed 20260929`）で各 2 回生成: ON `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba`・OFF `3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2` で、**G-GEAR（Python 3.11.9）とバイト一致**・2 回の生成でも一致・`--validate` exit 0。コーパスの SHA-256 も `c8f890cb…` で事前登録の値と一致
       → (2) パイロットの生成の config（`~/ime-pilot/*-config.json`・計画のヘッダーと run の `plan_sha256` で 7 run すべて対応を確かめた）: `cand_index_max` 4・`key_hold_ms` 60・`iki_sigma` 0.3・`inter_trial_ms` 1,000・`marker_gap_ms` 150 は**本番と同じ**。think 0.2〜20 s・`nav_count_max` 3・`block_size` 25・`kana_len` 4〜8（パイロットは未指定で既定値）も同じ。違うのは速さ（300 / 200 / 120）・n（3。`verify-1` / `verify-off` は 1・`short-1` は 1 で 3 シナリオ）・マーカー（`pilot-1` / `short-1` は F13 / F14 / F13、以後 ← → ← の 3 キー）・`reset_ime_every_block`（パイロットは true だが cell の `reset_cmd` が空で、run.json の `resets` は全ブロック `skipped`）・seed（`pilot-1` と `pilot2-on` が 1・`pilot2-off` が 5・短い run が 2〜6）・`pilot2-off` は `recipes.json` に `scenarios` で 13 シナリオに絞った。→ 事前登録 §3.1 に、速さ・n・マーカー・seed・reset の要求と不実施、それ以外は本番と同じことを書いた。★ `pilot-macos.md` の Setup の Plan の行が「seed 1」「n = 3」と書いていて、`pilot2-off`（seed 5）と verify の run（n = 1）に合わなかった → 直した。⚠️ `pilot-config.json` の今の中身（マーカー F1 / F2 / F1・`7f019af9…`）は `pilot-1` の計画のヘッダーの `config_sha256`（`7e507351…`）と合わない（後から書き換えた）。計画のほうがマーカー F13 / F14 / F13 を持つので、記録は計画に依った
       → (3) macOS（Python 3.14.4）で `gt_sessions.py --selftest` 14 件・`l1.py --selftest` 12 件・`kit/check.sh` 27 本がすべて緑。直した後の `_style_check.py` 違反 0 件・`check_citations.py` 違反なし
-    - [ ] attack-me（stage `prereg`・`paper-reviewer`・起動の前に下書きを commit・封印物 `sealed/` がある時期なので研究者に知らせる）
+    - [x] attack-me round 1（stage `prereg`・`paper-reviewer` 4 本・2026-10-01・G-GEAR）→ 記録 `attack-me/prereg-ime-macos/round-1/`（`c5bfbc65`）。3 人とも major・fatal 0 → 判定 major revision。指摘はメインが一次で裏取り（接地の引用の捏造 0・部分的な偽陽性 1）。研究者に 8 問 → 判断 99〜105（すべて推奨どおり）
+    - [ ] round 1 の直し（判断 99〜105）
+      - [ ] 予測器（判断 100）: 送出の記録に観測器の状態機械（`ime_compose.rs` の `step` と同じ表・macOS のキーの写像）を当てた予測の行。試行ごとの仕様の期間と打ち切りの印（判断 99）。selftest は Rust のテストの入力と同じ例で照合し、変異で赤を確かめる
+      - [ ] 照合の 2 段（正解 対 予測・予測 対 観測）と、20 秒の打ち切りでの分母の分割（Q1・Q2 の主は 20 秒未満・断片の行を数える・L2 は全試行が主で 20 秒以上を除いた版が副）を pipeline に入れる
+      - [ ] `l2.py` に試行ごとの差をシナリオ × 速さ別に（判断 104）
+      - [ ] E2: near chance の性質の表（K = 10・100 で真の正解率 1/K〜3/K のときの通る確率・予定の n）・K = 1000 は記述・2 セルの両方・ms の時刻を持つ集合は対象外・セッションの行は対象外（判断 101・102）
+      - [ ] 精度の幅の表と「形容しない」の約束・Q3 を how closely に・n の根拠の書き直し（判断 103）
+      - [ ] 妥当性への脅威と限界の節・目的の文（判断 105）
+      - [ ] `verdict.md` §3 の minor 19 件・nit 9 件（ハッシュに入る `_note` を含む）
+      - [ ] 確認: selftest 全部・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`
+    - [ ] attack-me round 2（同じ立場・同じ接地・`carryover-*.md`）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
