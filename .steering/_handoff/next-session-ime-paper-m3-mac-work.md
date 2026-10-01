@@ -60,6 +60,8 @@ Skill: verify-before-claiming・data-privacy・subagent-delegation・git-workflo
 
 ## §5 Mac の作業の結果（2026-10-02・Mac）と round 5 への追加
 
+> ★ 後継の引き継ぎは `next-session-ime-paper-m3-round5.md`（G-GEAR 用）。
+
 - §2 は済み（一次は `decisions.md` の**判断 121・122**・`tasklist.md` の M3 の Mac の項目）。k = 0・`REFERENCE_RECEIVES_MODE_KEYS = False`・合わせ直しは 15 / 15 ブロック採点。
 - ⚠️ §2 (d) が 0 でなかった（`pilot2-off` に S15 以外の焦点の喪失 1 回・31 ms・打鍵なし）→ 研究者の選択で**焦点の規則を「計画外の喪失の区間〔前後 500 ms〕に観測の key 行があるときだけ中止」に改めた**（判断 121）。`delivery.py` に `FOCUS_MARGIN_MS`・`n_loss_intervals_unplanned_with_presses`・`n_presses_in_unplanned_losses`、`pipeline.py` の規則と `abort_rule` の名前が変わった（判断 122 の 6）。
 - **round 5 の対象に足す**: §3.4 の焦点の段落・§3.1 の 2 つの項目の結果・§6.2 の焦点の項・§7 の盲点の項・`data.md` の Run checks・`pilot-macos.md` の Raw logs・`delivery.py` の `_focus_losses` と余裕・`pipeline.py` の `reference_abort_reasons`。`git diff 40ad7801..<head> -- papers/` で測るので自動的に入るが、carryover に「判断 121 で焦点の規則を変えた理由（パイロットの 31 ms の喪失と頻度の見積もり）」を書く。
