@@ -31,8 +31,8 @@
 ## 完了（→ 次のセッション・引き継ぎ `_handoff/next-session-ai-fatigue-after-34-finish.md`）
 - [x] PR #288 の Codex 2 巡（道具・記録）→ 指摘への対応 → #288 の merge（`8cf19570`・34 件のタスクの判断 14・15）
 - [x] 同じ型の穴を本タスクの道具にも当てる（答えと判定・式・全文抽出・判定者 2 に渡す版の列）→ 表を作り直し（`2d681d6f…`）・提案のドキュメントの直し（判断 10）
-- [ ] 元の資料の SHA-256 が変わっていない・前のタスクの `check_workbook.py --final` 違反 0・ステージに本文が無い
+- [x] 元の資料の SHA-256 が変わっていない・前のタスクの `check_workbook.py --final` 違反 0・ステージに本文が無い（2026-10-02・各コミットの前に確かめた）
 - [x] code-reviewer ＋ security-checker（並列）＋ Codex 1 巡目（道具・記録）→ 指摘に対応（判断 11）
-- [ ] /cross-review 2 巡（Codex の当日の実消費を先に確かめる）
-- [ ] 引き継ぎ（次のタスク: 残りの 213 件・提案のドキュメント v2）
+- [x] /cross-review 2 巡（Codex 4 回・当日計 263,512・1 巡目 = 判断 11・2 巡目 = 判断 12）
+- [x] 引き継ぎ（次のタスク: 残りの 213 件・提案のドキュメント v2）→ `_handoff/next-session-ai-fatigue-v2.md`・索引を更新
 - [ ] 出荷（git-workflow ルール 6）
