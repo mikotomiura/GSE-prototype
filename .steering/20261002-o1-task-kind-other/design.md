@@ -77,3 +77,13 @@ G1 の開始画面（`App.tsx` の `TASK_KINDS`・argumentative lock）は触ら
 - `node Form_O1/o1_form_builder_test.cjs`
 - 手動（目視）: O1 モードで宣言 UI を開き、5 つ目が出て選べ、「現在の作業」に「その他・細切れの作業」と出る
   （`ui-changes-need-eyes`。Tauri の shim で実マウントする手順を使う）
+
+## 実装中に判明したこと（2026-10-02）
+
+- ⚠️ **schemars は enum の variant に doc コメントがあると `enum` を `oneOf` に組み替える**。
+  → `TaskKindDto::Other` に doc を付けず、説明は型の doc に置いた（schema の差分は enum に 1 値足すだけ）。
+- ⚠️ **同意文の上流は `consent-draft-o1.md`**（`.gs:543-546`「先にあちらを直してからここへ写す」）。
+  当初 `.gs` だけを直し、code-reviewer に HIGH で指摘された → 雛形 §2 を 5 択にして整合させた。
+- ★ UI は補足を「（…）」で囲んで描くので、補足の文言は括弧を含まない形にした（二重括弧の回避）。
+- ★ 目視確認: Tauri の shim で実マウントし、5 択・`declare_task_kind {taskKind:"other"}`・表示「作業の種類: その他・細切れの作業」・文字と背景の輝度差 232 を確認（既存 4 択と同値＝対照）。
+- ⚠️ G1 で `other` を出さないのは frontend の lock だけ（`record_session_meta` は 5 値を受け付ける・既存の状態）。ADR-037 の切り分け表に注記した。
