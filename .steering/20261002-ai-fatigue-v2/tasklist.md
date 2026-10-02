@@ -33,4 +33,4 @@
 - [x] 判断 9 の 1〜17 を直す → 表（`93bcc9ba…`）と提案（`ae632d2b…`）を作り直す → 3 本の selftest・メタ変異・`--final` 違反 0 → 判断 10
 - [x] コミット（`eb11c8b9`）
 - [x] Codex 2 巡目（直しの差分・足した規則の境界条件）→ 判断 11（指摘 4 件: 3 件を直した・1 件は理由を書いてコードを変えない）
-- [ ] 出荷（git-workflow ルール 6）
+- [x] 出荷（git-workflow ルール 6）: origin/main を取り込み（台帳は和・`7174ca9c`）→ push → PR #301 → CI 緑（mac・win・frontend）→ merge
