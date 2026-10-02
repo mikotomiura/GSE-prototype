@@ -2,19 +2,22 @@
 
 This directory holds the closed-set part of the leakage evaluation: given the publishable form of a log, decide which
 of K candidate phrases was typed, and measure how much of this identification survives when features of the log are
-removed. The open-set reconstruction of the typed reading is a separate component.
+removed. The open-set reconstruction of the typed reading (`open_set.py`) is a separate component; it shares the assignment of
+presses to the plan with `closed_set.py` (block resynchronisation at the markers, see Usage).
 
 | File | Content |
 |---|---|
 | `simulate_obs.py` | Predicted observation of one planned trial, and the feature transforms of the removal experiment |
-| `closed_set.py` | The attack, the evaluation, and the command line |
+| `closed_set.py` | The attack, the evaluation, the assignment of presses to the plan (`align_plan`, which `open_set.py` imports), and the command line |
+| `open_set.py` | The open-set reconstruction of the typed reading (documented in its own module docstring) |
 
-Both files use the Python standard library only. Each has a fast default `--selftest` (a few seconds).
+All files use the Python standard library only. Each has a fast default `--selftest` (a few seconds to some twenty seconds).
 
 ## What the attacker sees
 
-The attacker sees the publishable form of a log: the category and the time of each key row, and the rows of type
-`ime_shadow`. The raw key code is not part of it. There are 14 categories, and every letter key falls into the single
+The attacker sees the key rows of a log: the category and the time of each key row. The raw key code is not part of
+it. The rows of type `ime_shadow` (the session rows) are in the log but are not given to the attack; the recommendation
+below concerns the key rows of a log published without its session rows. There are 14 categories, and every letter key falls into the single
 category `alphabetic`. The format is `obs/1` in [`../formats/FORMATS.md`](../formats/FORMATS.md).
 
 The reader `read_obs` accepts the header, `key` rows and `ime_shadow` rows of a standalone-logger output and rejects
@@ -88,14 +91,23 @@ phrase identity or on the full reading.
 
 A run's accuracy is the fraction of counted trials judged correct this way. It is reported next to the chance level
 1/K, with a Wilson 95% interval, a `by_scenario` breakdown (raw accuracy and trial count per scenario), and the mean
-rank of the typed phrase. Trials whose phrase is not in the corpus (synthetic kana strings) are not counted and are
-reported as `n_skipped`.
+rank of the typed phrase, and a `by_speed` breakdown of the same form. Trials whose phrase is not in the corpus
+(synthetic kana strings) are not counted and are reported as `n_skipped`. Trials of a block that does not match the
+plan are not scored at all (see [Usage](#usage)); they are counted in `alignment`, not in `n`.
 
 The Wilson interval treats every counted trial as an independent Bernoulli draw. The plan generator groups trials into
-blocks (`block_id`) that share context (a marker reset, the same run of the generator's random state); trials within a
+blocks (`block_id`) that share context (the state of the input method and the block's marker; each trial draws from its own random state, derived from the seed and the trial identifier, so the trials of a block do not share a random state); trials within a
 block are not independent of each other in general, so the reported interval understates the true uncertainty to the
-extent trials within a block are correlated. This kit does not implement a block-clustered interval; a numeric
-acceptance margin set by the analysis plan should allow for this.
+extent trials within a block are correlated. Next to the Wilson intervals, every feature set therefore reports a
+descriptive 95% percentile interval from a block bootstrap (`stats.cluster_bootstrap` of `../analysis/stats.py`):
+blocks are resampled with replacement (a trial's cluster is its block; blocks of different sessions or plans are
+different clusters), `--bootstrap B` resamples (default 2000) with the seed of `--seed`, for `acc_ci_block` (the
+maximum over the feature set and the coarser ones is recomputed inside every resample) and for `acc_ci_raw_block` (the
+feature set alone). With fewer than two blocks the interval is `[null, null]` and `ci_block_status` reads
+`fewer_than_two_blocks`; `n_blocks` is the number of blocks. These intervals are descriptive: the decision rule below
+still reads the upper end of the Wilson interval with the margin 2/K, which is a design choice, not derived from the
+block dependence or from a criterion of privacy. Dependence within a block would make a rule that reads the Wilson
+interval easier to meet, which is why the block-resampled interval is reported next to it, descriptively.
 
 ## Feature sets and the removal experiment
 
@@ -181,12 +193,30 @@ python3 closed_set.py --obs obs1.ndjson [obs2.ndjson ...] --plan plan1.jsonl [pl
 
 `--obs` and `--plan` are paired in order. Every observation's header `os` must agree with its plan's header `os`;
 otherwise the run stops rather than scoring the pair under the wrong OS's rules. The evaluator supplies the trial
-boundaries: the observed presses are cut into trials in plan order, and the number of presses and the category
-sequence of every trial must agree with the plan. Otherwise the run stops with exit code 2 and names the trial, and it
-never shifts later trials silently. If the block-start marker presses appear in the observation, add
-`--markers-in-obs`; if the IME toggle presses (`ime_on`, `ime_off`, as category `other`) appear in the observation, add
-`--ime-toggle-in-obs`. Both default to off (see the key table above). `--out` is only ever created, never overwritten;
-an existing path is a usage error. Exit codes: 0 success, 2 usage error or unreadable input.
+boundaries: the observed presses are cut into trials in plan order and compared with the plan by category.
+
+- With `--markers-in-obs` (the block-start marker presses appear in the observation) the markers are anchors. A block
+  whose presses (its marker, then its trials) equal the plan is scored. A block with a missing, extra or different press
+  is left unscored (reason `block_mismatch`) and counted, and the next block is found again by its own marker, so one
+  dropped press in some 100,000 loses one block and shifts no other. An observed press that is added or duplicated
+  (including one that forms a run of four arrow presses inside a trial, which is then an anchor that matches nothing and
+  is passed over) also loses only that block, and a press added between two blocks loses no block. A marker counts as
+  an anchor at the right end of a run of its category (the press after it is not of its last category), so arrow
+  presses just before it do not hide it: when the last trial of a block ends in arrow presses and its closing Return
+  is missing, those arrows join the next marker into a longer run, and only the block that lost the Return is
+  unscored, not the next block. A run of at most three arrow presses inside a trial is never mistaken for the four-key
+  marker. These properties are checked by the selftest on the cases it constructs, not proved in general. Presses
+  that no scored block covers (stray presses between blocks, the presses of an unscored block, presses after the last
+  block) are counted as unassigned, without an error. A marker key without a table entry (F13 to F19) is expected as
+  `other`.
+- Without `--markers-in-obs` the observation holds no marker to resynchronise to, so the assignment is as before: the
+  number of presses and the category sequence of every trial must agree with the plan, otherwise the run stops with
+  exit code 2 and names the trial, and a dropped key never shifts later trials silently.
+
+If the IME toggle presses (`ime_on`, `ime_off`, as category `other`) appear in the observation, add
+`--ime-toggle-in-obs`. Both switches default to off (see the key table above). `--bootstrap B` sets the resamples of the
+block bootstrap (default 2000). `--out` is only ever created, never overwritten; an existing path is a usage error. Exit
+codes: 0 success, 2 usage error or unreadable input.
 
 `--recipes` and `--config` must be the files the plans were built from (the plan header's `recipes_sha256` and
 `config_sha256` are the SHA-256 of those files): for a macOS cell with live conversion off, pass
@@ -199,10 +229,18 @@ deliberately differ from the one the plans were built from. (`open_set.py` reads
 scenarios type through it from the recipes, which are the same in both files, and does not make this comparison.)
 
 The output is one JSON file with `assumptions`, `params` (including `phase_step_ms`), the hashes of the inputs, and
-`results[K][feature set]` with `acc`, `acc_ci`, `acc_source`, `acc_raw`, `acc_ci_raw`, `chance`, `n`, `n_skipped`,
-`mean_rank` and `by_scenario` (see [Candidates and accuracy](#candidates-and-accuracy) and
-[Feature sets and the removal experiment](#feature-sets-and-the-removal-experiment)). The same inputs and seed give
-byte-identical output on the same machine and Python version.
+`results[K][feature set]` with `acc`, `acc_ci`, `acc_source`, `acc_raw`, `acc_ci_raw`, `acc_ci_block`,
+`acc_ci_raw_block`, `ci_block_status`, `n_blocks`, `chance`, `n`, `n_skipped`, `mean_rank`, `by_scenario` and `by_speed`
+(see [Candidates and accuracy](#candidates-and-accuracy) and
+[Feature sets and the removal experiment](#feature-sets-and-the-removal-experiment)), and the top-level `bootstrap` and
+`alignment`. `alignment` holds `n_blocks`, `n_blocks_unscored`, `unscored_block_ids` (qualified by the session, `s0-`
+for the first `--obs`), `n_trials`, `n_trials_unscored`, `unscored_by_scenario`, `unscored_by_speed`,
+`unscored_reason`, `n_presses` and `n_presses_unassigned` (the presses that no scored block covers, which include those
+of the unscored blocks). `n_trials` of the output and every `n` count the scored trials only. The same inputs and seed
+give byte-identical output on the same machine and Python version. `open_set.py` assigns the presses in the same way
+(it calls `align_plan`, comparing the whole category sequence of each trial instead of the count and the number of
+alphabetic keys) and writes the same `alignment` object at the top level of its report; without `--markers-in-obs` a
+mismatch is an input error (exit 2) there as well.
 
 On a synthetic world of 1200 candidate phrases and K = 1000, `evaluate` measured about 0.03 s per trial for a feature
 set with `timing != "bin1s"` and about 0.11 s per trial for a `timing="bin1s"` feature set (the ten-phase search of the
@@ -222,8 +260,11 @@ language model over candidate readings, estimate the trial boundaries itself, ma
 count features, or combine several trials of the same typist; none of these is included. Giving the attacker the
 trial boundaries, the scenario, the OS and the speed level strengthens the attack, and the use of a single predicted
 sample per candidate weakens it. The rows of type `ime_shadow` are read but not used: `nav` and `abandon` follow from
-the intent of the scenario and not from the phrase, and `dwell_ms` is a function of key times that the timing feature
-already uses. The gain of using `dwell_ms` separately was not measured.
+the intent of the scenario and not from the phrase, and the session rows carry their times and durations in
+milliseconds, were not given to the attack, and could undo the coarsening of the key rows, so publishing them is not
+evaluated. The rule judges the identification of one phrase among K candidates per trial; combining several trials of
+one writer, or matching a log against known final texts, is not evaluated, and the recommendation makes no claim about
+the safety of a whole log.
 
 If identification succeeds at rates well above chance, the result is reported as it is.
 
@@ -234,11 +275,28 @@ coarsest. On the real logs, run the attack for every feature set and every K, an
 feature set and every feature set derivable from it, of the raw accuracy an attacker would measure -- next to its
 Wilson interval (`acc_ci`) and the chance level 1/K; `acc_raw` and `acc_ci_raw` are kept alongside for inspection but
 are not the basis of the recommendation, because an attacker who is given a detailed log can always throw information
-away, so `acc_raw` alone can understate what publishing that much detail permits. The recommended granularity is the
-coarsest feature set whose `acc` is still within the margin above chance that the analysis plan declares acceptable.
-The margin is fixed before the real logs are analysed, and should allow for the block-level dependence the Wilson
-interval does not (see [Candidates and accuracy](#candidates-and-accuracy)). This kit reports the accuracy, the
+away, so `acc_raw` alone can understate what publishing that much detail permits. Because `acc` never increases when a
+feature set is replaced by a coarser one, the feature sets within the margin above chance that the analysis plan
+declares acceptable are closed under coarsening. The recommended granularity is therefore the most detailed feature
+set within the margin (the maximal elements of that set in the coarsening order; there may be more than one, since
+the order is partial: for example, `no_runs` is ordered against neither `no_time` nor `bin1s`).
+The margin is fixed before the real logs are analysed. The pre-registered rule reads the upper end of the Wilson
+interval with the margin 2/K, which is a design choice, not derived from the block dependence or from a criterion of
+privacy (see [Candidates and accuracy](#candidates-and-accuracy)). This kit reports the accuracy, the
 interval, `acc_source` and the chance level, and does not decide the margin.
+
+The pre-registration of the first experiment fixes the rule for its logs: a feature set is near chance at K = 10 or
+K = 100 when the upper end of its Wilson interval is at most 2/K, and it must be near chance at both values of K in
+both cells; K = 1000 is reported descriptively, because at the planned numbers of trials an attack at the chance
+level would rarely meet the rule there. The recommendation considers only `no_time` and `counts_only`. These two sets are ordered (`counts_only` is a
+coarsening of `no_time`), so for the first experiment the recommendation is the more detailed of the two that is near
+chance. The feature
+sets that keep millisecond times (`all`, `no_runs`) and the feature sets with 1-second bins (`bin1s`, `bin1s_count`)
+are reported as estimates only and are excluded from the recommendation: the synthetic key intervals are drawn
+independently of the keys (see above), and the synthetic design models no human pause structure either, so the timing
+of particular key pairs and the pauses that human logs carry are absent. Blocks that do not match the plan are left
+unscored and counted (`alignment`); the rule is applied to the scored trials. The session rows are not used by the
+attack and are outside the recommendation.
 
 ## Verification
 
@@ -269,6 +327,16 @@ typed). It checks the following.
 - The observation reader rejects other row types, unknown keys, categories outside the enumeration, a header whose `os`
   is not `macos`/`windows`, a malformed `ime_shadow` row, a duplicate JSON object key and deeply nested JSON (all as
   the same clean error, not an uncaught exception).
-- The command line runs end to end, and it stops on a dropped press, on unpaired inputs, on a corpus that is too small,
+- Block resynchronisation (`--markers-in-obs`): one missing press, one extra press, a damaged marker, or a swapped
+  category inside a block leaves only that block unscored, with the counts of unscored blocks and trials (by scenario
+  and by speed) and of unassigned presses right; a stray press between blocks (also an arrow press right before a
+  marker) and presses after the last block lose no block and are counted as unassigned; a missing closing Return
+  after one to three arrow presses at the end of a block loses that block only; a damaged marker and a missing press
+  in the next block leave both unscored and never shift or crash; with four-key arrow markers a run of three arrows
+  inside a trial is not an anchor; without `--markers-in-obs` a missing or extra press still stops the run.
+- The block bootstrap: deterministic for a fixed seed, equal to `stats.cluster_bootstrap` over the blocks' own counts,
+  the interval of the maximum not below that of the raw accuracy, `[null, null]` with a status for one block; `by_speed`
+  counts add up.
+- The command line runs end to end, and it stops on a dropped press (without `--markers-in-obs`), on unpaired inputs, on a corpus that is too small,
   on mismatched marker or IME-toggle switches, on an observation/plan `os` mismatch, and on an existing `--out` path
   (which is left untouched).

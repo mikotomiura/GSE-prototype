@@ -34,8 +34,8 @@ corpus, or recipes) could not be read.
 
 ## Configuration keys
 
-`config.json` describes one cell. Production values are not yet fixed (speed, think time, and n will be
-added with a citation when the protocol is frozen). This tool only reads the file; the key names below are
+`config.json` describes one cell. The values of the measurement are in `experiment/plan_config.macos.json`,
+and their sources are given in the pre-registration. This tool only reads the file; the key names below are
 authoritative. A key starting with `_` is treated as a note and ignored.
 
 | Key | Type | Default | Meaning |
@@ -186,5 +186,5 @@ Other entries:
   spelling of contracted sounds, and so on) match how a real IME interprets them can only be confirmed on
   real hardware. Editing the table immediately shows up as a failure in the reverse-mapping uniqueness
   check of the selftest.
-- Production speed, think time, and n are not yet fixed. `--estimate` computes a duration strictly from the
-  config and recipes as written; it does not include IME reset time or window-activation time.
+- `--estimate` computes a duration strictly from the config and recipes as written; it does not include IME
+  reset time or window-activation time.

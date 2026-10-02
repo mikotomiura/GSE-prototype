@@ -107,7 +107,9 @@ it is below 480 rows or the window is shorter than four hours. Both are floors o
    ```
 
    and leave the keyboard and the pointer alone. `run_e3.sh` stops if the number of processes with the
-   sampled name is not exactly one.
+   sampled name is not exactly one. The observation log that the observer writes in this condition is not
+   deposited: the observer is started before this command is typed, so the log holds those key presses. Only
+   `samples.tsv` and `conditions.txt` are deposited.
 3. `working`: stop the observer of the `idle` condition first, because the cell runner starts its own and
    `run_e3.sh` stops if a process of that name is already running. Start the sampler first,
 

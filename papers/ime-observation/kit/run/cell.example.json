@@ -4,8 +4,8 @@
   "ime": "macOS Japanese (Hiragana) - version to be filled in from the machine",
   "ime_settings": {
     "layout": "JIS keyboard, Romaji input",
-    "predictive_candidates": "off",
-    "learning": "reset by reset_cmd before each block",
+    "predictive_candidates": "input method default (shown; not changed)",
+    "learning": "not reset; no method of resetting it was found, and the plan requests no reset",
     "live_conversion": "on",
     "initial_state": "Japanese, switched on by the kana key in focus_cmd before each block"
   },
@@ -19,9 +19,7 @@
     "--out",
     "{out}"
   ],
-  "reset_cmd": [
-    "false"
-  ],
+  "reset_cmd": [],
   "focus_cmd": [
     "/usr/bin/osascript",
     "-e",

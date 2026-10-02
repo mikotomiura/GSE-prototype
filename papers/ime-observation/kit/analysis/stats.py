@@ -189,8 +189,11 @@ def icc(matrix, kind="2,1"):
     computed from the mean squares of a two-way analysis of variance.
 
       "1,1"  ICC(1,1)  one-way, single rater (does not separate out a rater effect)
-      "2,1"  ICC(2,1)  two-way random, single rater, absolute agreement (a systematic difference
-                        between raters also counts as disagreement); this is the primary L2 metric
+      "2,1"  ICC(2,1)  two-way model, single rater, absolute agreement (a systematic difference
+                        between raters also counts as disagreement); this is the primary L2 metric. Its
+                        value is the same whether the raters are random (Shrout & Fleiss's ICC(2,1)) or the
+                        only raters of interest (McGraw & Wong's mixed-model ICC(A,1)), as for the two
+                        methods compared here
       "3,1"  ICC(3,1)  two-way mixed, single rater, consistency (a rater's constant offset does not
                         count as disagreement)
 

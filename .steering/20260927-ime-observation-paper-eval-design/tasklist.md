@@ -112,14 +112,73 @@
     - [x] ⚠️ G-GEAR: 024 を回し、一覧の SHA-256 が Mac の `bc2e6816…5f3c`（94 ファイル）と一致するか（判断 68・`papers/` が `6ecfa5b4` と同じ内容の commit で）
       → 2026-10-01（G-GEAR・Windows 11・Python 3.11.9）: PR #285 の merge 後の main（`500c5685`・`6ecfa5b4` からの `papers/` の差は 0）の clean な worktree（`C:/wt/clean-m2`）で 024 は ✅ 137・❌ 2（SCOPE と GUARD だけ・B15）。★ 一覧の SHA-256 = `bc2e68162d118e3e1de25a77869dbc9a3c86980b057a93a707a3c9b3c7385f3c`（94 ファイル）で **Mac と一致**
       → あわせて Windows で回る残りの acceptance 21 本（001〜003 005 006 008〜011 013〜023 028）: **SCOPE と GUARD を除く失敗 0 件**（028 は SCOPE を持たないので GUARD の 1 件だけ）。`_style_check.py papers/ime-observation` 違反 0 件
+      → 記録の PR #286（`.steering/` だけ・判断 90〜97 も同じ PR）: CI 緑（Windows の check 12 分 51 秒）→ merge `538517a1` → main の CI（run 36841292986）success（Mac / Windows の check・frontend-check）
     - [ ] パイロットの生ログの置き場（除外の基準を先に書く・逆向きの到達を数える道具）
     - [x] 完了時レビュー（Claude の 2 系統・判断 88）: MEDIUM 3 件・LOW 4 件を直した。Codex は判断 89（研究者の選択で今日だけ上限を 360,000 にして 1 回・P2 2 件・P3 1 件に対応・上限は 300,000 に戻した）
   - [ ] M3 事前登録（macOS 版）の下書き → attack-me（stage `prereg`）→ 凍結 → OSF の登録（研究者）
     - [x] 研究者に 8 問（2026-10-01・G-GEAR）→ 判断 90〜97（速さ 480 / 240 / 120 ms・学習はリセットしない・段階凍結は追補で印を更新・OSF はすぐ公開・時計のずれは補正しない・`dwell_ms == 0` は今のまま・自動確定の後の取り消しは層別の診断を足す・E2 は上端 ≤ 2/K）
-    - [ ] 凍結の前の直し: `gt_sessions.py` / `l1.py` に自動確定の層別の診断（判断 96）・`pilot-macos.md` の時計の一文（判断 94）・`e2/README.md` の「coarsest」（判断 97）・`notes.md` の主張の対応表と借りた手法の出典・`l1.py` / `l2.py` の「事前登録で決める」（判断 95）・`cell.example.json` の `learning` / `predictive_candidates`（判断 91）
-    - [ ] 本番の生成の config（判断 85・90）と、各 run の seed（計画・E2）を決めてファイルにする
-    - [ ] `experiment/preregistration.md` の下書き（学術的な英語・OSF Preregistration の節立て・凍結の前に計算した値をすべて開示）と、書誌の登録（`docs/references.md` に `[V184]` 以降）
-    - [ ] attack-me（stage `prereg`・`paper-reviewer`・起動の前に下書きを commit・封印物 `sealed/` がある時期なので研究者に知らせる）
+    - [x] 凍結の前の直し: `gt_sessions.py` / `l1.py` に自動確定の層別の診断（判断 96）・`pilot-macos.md` の時計の一文（判断 94）・`e2/README.md` の「coarsest」（判断 97）・`notes.md` の主張の対応表と借りた手法の出典・`l1.py` / `l2.py` の「事前登録で決める」（判断 95）・`cell.example.json` の `learning` / `predictive_candidates`（判断 91）
+      → `gt_sessions.py --selftest` 14 件・`l1.py --selftest` 12 件（1 件足した）が緑。変異: 数える処理を外す・閉じた確定まで数える（gt）、層の境界 `> 0` を `>= 0`・欄の無いものを「無し」に・unknown を数えない・`_measures` から外す（l1）→ 6 本すべて赤。`nfb` の条件を外す変異は等価（`nfb` の無い確定は必ず閉じる）。`kit/check.sh` 27 本緑・`run.sh --synthetic` 2 回でバイト一致（L1 の出力に新しい表・unknown 0 件）・`run_cell.py --selftest` 53 件 ok・`_style_check.py` 違反 0 件
+    - [x] 本番の生成の config（判断 85・90）と、各 run の seed（計画・E2）を決めてファイルにする → `experiment/plan_config.macos.json`・seed はすべて `SEED`（判断 98）。G-GEAR で両セルの計画の生成と `--validate` が exit 0
+    - [x] `experiment/preregistration.md` の下書き（学術的な英語・OSF Preregistration の節立て・凍結の前に計算した値をすべて開示）と、書誌の登録（`docs/references.md` に `[V184]`〜`[V189]`・判断 98）→ `--check-prereg` は exit 3（印なし＝未凍結を正しく判定）・`check_citations.py` 違反なし
+    - [x] Mac で確かめる 3 点（引き継ぎ `next-session-ime-paper-m3.md` §4）→ 2026-10-01（Mac・macOS 27.0・Python 3.14.4・枝 `feature/ime-m3-prereg` の `d564c3a6`）
+      → (1) 本番の計画を事前登録 §2.4 のコマンド（`--seed 20260929`）で各 2 回生成: ON `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba`・OFF `3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2` で、**G-GEAR（Python 3.11.9）とバイト一致**・2 回の生成でも一致・`--validate` exit 0。コーパスの SHA-256 も `c8f890cb…` で事前登録の値と一致
+      → (2) パイロットの生成の config（`~/ime-pilot/*-config.json`・計画のヘッダーと run の `plan_sha256` で 7 run すべて対応を確かめた）: `cand_index_max` 4・`key_hold_ms` 60・`iki_sigma` 0.3・`inter_trial_ms` 1,000・`marker_gap_ms` 150 は**本番と同じ**。think 0.2〜20 s・`nav_count_max` 3・`block_size` 25・`kana_len` 4〜8（パイロットは未指定で既定値）も同じ。違うのは速さ（300 / 200 / 120）・n（3。`verify-1` / `verify-off` は 1・`short-1` は 1 で 3 シナリオ）・マーカー（`pilot-1` / `short-1` は F13 / F14 / F13、以後 ← → ← の 3 キー）・`reset_ime_every_block`（パイロットは true だが cell の `reset_cmd` が空で、run.json の `resets` は全ブロック `skipped`）・seed（`pilot-1` と `pilot2-on` が 1・`pilot2-off` が 5・短い run が 2〜6）・`pilot2-off` は `recipes.json` に `scenarios` で 13 シナリオに絞った。→ 事前登録 §3.1 に、速さ・n・マーカー・seed・reset の要求と不実施、それ以外は本番と同じことを書いた。★ `pilot-macos.md` の Setup の Plan の行が「seed 1」「n = 3」と書いていて、`pilot2-off`（seed 5）と verify の run（n = 1）に合わなかった → 直した。⚠️ `pilot-config.json` の今の中身（マーカー F1 / F2 / F1・`7f019af9…`）は `pilot-1` の計画のヘッダーの `config_sha256`（`7e507351…`）と合わない（後から書き換えた）。計画のほうがマーカー F13 / F14 / F13 を持つので、記録は計画に依った
+      → (3) macOS（Python 3.14.4）で `gt_sessions.py --selftest` 14 件・`l1.py --selftest` 12 件・`kit/check.sh` 27 本がすべて緑。直した後の `_style_check.py` 違反 0 件・`check_citations.py` 違反なし
+    - [x] attack-me round 1（stage `prereg`・`paper-reviewer` 4 本・2026-10-01・G-GEAR）→ 記録 `attack-me/prereg-ime-macos/round-1/`（`c5bfbc65`）。3 人とも major・fatal 0 → 判定 major revision。指摘はメインが一次で裏取り（接地の引用の捏造 0・部分的な偽陽性 1）。研究者に 8 問 → 判断 99〜105（すべて推奨どおり）
+    - [x] round 1 の直し（判断 99〜106・実装の選択は判断 107・2026-10-01・G-GEAR）
+      - [x] 予測器（判断 100）→ `kit/analysis/spec_predict.py`（`f3c08a68`）。送出の記録に観測器の状態機械（`keymap.rs` の 73 本の写像と素通し・`handle_key` の順序〔モードの更新 → 押下だけ駆動〕・`ime_mode` の開閉・`ime_compose` の表・20 秒の打ち切りと当て直し）を当て、予測の行と試行ごとの `long`（始めたセッションが打ち切り）・`carried_out`・`n_started` を出す。ブロックの先頭で「かな」の押下を置く（runner の契約）。`focus_away` / `focus_back` は飛ばし、修飾キーを送る計画は拒む
+        → selftest 8 件（Rust の源との照合を含む: 写像・定数・遷移の各行・`handle_key` の順序）。変異 10 本のうち 9 本が赤、1 本（セッションの外の矢印を数える）は開始時に `nav` を 0 に戻すので等価。`kit/check.sh` 28 本が緑・`_style_check.py` 違反 0 件
+        → 本番の計画に当てた値（計画の時刻から組んだ擬似の oracle・使い捨て・送出の遅れは入らない）: ON は予測の行 2,638・打ち切り 719、試行 3,150 のうち `long` 677・`carried_out` 188（すべて S6）・分割 314・自分のセッションを始めない 113（S6 の持ち越しを受けた試行）。OFF は行 2,417・打ち切り 682・`long` 650・`carried_out` 186・分割 280・なし 109。slow の `long` は ON 423 / 1,050。分割の多くは、打っている途中の打ち切りの後に残りが新しいセッションになる断片（S1 でも 21・S8 は思考の後の数字キーで 58）
+        → ⚠️ 事前登録に書くこと: S6 の持ち越しは次の試行（どのシナリオでも）を汚す。判断 99 の分割は「打ち切り」だけに当てる（持ち越し・Tab・記号による分割は推論規則の限界で、段 (i) で数える実際の誤り）
+      - [x] 照合の 2 段（正解 対 予測・予測 対 観測）と、20 秒の打ち切りでの分母の分割（Q1・Q2 の主は 20 秒未満・断片の行を数える・L2 は全試行が主で 20 秒以上を除いた版が副）を pipeline に入れる
+        → `match.py --prediction --scope`・`spec_predict.as_obs_bytes / as_sessions_bytes`・`pipeline.run_stages` の 3 比較 × 3 範囲・診断の層 4 つ・`closing_key_in_reading`。合成の run に打鍵と特別な試行（長音・21 s・Backspace）を足した
+      - [x] `l2.py` に試行ごとの差をシナリオ × 速さ別に（判断 104）→ `per_trial`（3 量・ブロックのブートストラップ）
+      - [x] E2: near chance の性質の表（K = 10・100 で真の正解率 1/K〜3/K のときの通る確率・予定の n）・K = 1000 は記述・2 セルの両方・ms の時刻を持つ集合は対象外・セッションの行は対象外（判断 101・102）→ 事前登録 §6.8・`e2/README.md`
+      - [x] 精度の幅の表と「形容しない」の約束・Q3 を how closely に・n の根拠の書き直し（判断 103）→ §3.3・§6.1（打ち切りの後に残る試行数の表も）
+      - [x] 妥当性への脅威と限界の節・目的の文（判断 105）→ §1.1・§7（節番号を振り直した: 予測 §4.5・範囲と比較 §6.4・E2 §6.8・追補 §8・凍結 §9）
+      - [x] `verdict.md` §3 の minor 19 件・nit 9 件（ハッシュに入る `_note` を含む）→ L1 の LoA / kappa の区間と速さ別・`delivery.py`（配送・焦点の喪失）・公開物の古い記述。群 M の文献の段落だけ原稿へ回した（判断 107 の 8）
+      - [x] 確認: selftest 全部・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py` → 29 本緑・4 ファイルともバイト一致・違反 0・違反なし・`--check-prereg` exit 3。変異 31 本（生き残り 5 → 4 本はテストを足して赤・1 本は等価で条件を削除）
+    - [x] attack-me round 2（同じ立場・同じ接地・`carryover-*.md`・2026-10-01・G-GEAR）→ 記録 `attack-me/prereg-ime-macos/round-2/`。R1 minor・R2 major・R3 minor（条件つき）・fatal 0・捏造 0 → 判定 major revision。研究者に 10 問 → 判断 108〜110（すべて推奨どおり）
+    - [x] round 2 の直し（判断 108〜110・実装の選択は判断 111・2026-10-01・G-GEAR）
+      - [x] X2 `long` を打鍵が入った試行すべてに・持ち越しを受けた層の定義し直し（`spec_predict.py`・`match.py`）→ §3.1・§3.3 の数の計算し直し（`--from-plan` で再現できる形にした）
+      - [x] X1 問 3 の主を `under_limit` に（`pipeline.py` の `PRIMARY`）・X5 問 3 の偏り・一致の限界・混合の偏りの区間（`l2.py`）・minor 15 試行ごとの差を層 none に限った版
+      - [x] X4 E2 をブロックで合わせ直す（`closed_set.py`・`open_set.py`）・minor 3 正解率のブロック区間（記述）・nit 速さ別の正解率
+      - [x] minor 4（層と範囲ごとの読みの長さと思考時間）・10（焦点を失った試行の観測の行）・13（文だけ: `match.py` が既に数える）
+      - [x] 事前登録の文（X1〜X8・minor・nit）と公開物（`notes.md`・`pilot-macos.md`・`data.md`・`kit/refinput-macos/README.md`・`kit/e2/README.md`・`gt_rules.json` の `_note`・`stats.py` の docstring）。`kit/gen/README.md` は §8 の新しい範囲と合うので変えていない
+      - [x] 確認（`kit/check.sh` 29 本・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py` 0 件・`check_citations.py` 違反なし・`--check-prereg` exit 3・変異 17 本すべて赤）
+    - [x] attack-me round 3（変わった節とコードに絞る・2026-10-02・G-GEAR）→ 記録 `attack-me/prereg-ime-macos/round-3/`（`5fd17972`）。R1 minor・R2 major・R3 major・fatal 0・捏造 0 → 判定 major revision。研究者に 6 問 → 判断 112〜114（すべて推奨どおり）
+    - [x] round 3 の直し（判断 112〜114・実装の選択は判断 115・2026-10-02・G-GEAR）
+      - [x] Y1 問 3 の `n_conversions` と `dwell_fraction` を範囲の上で定義し直す（`l2.py` の `aggregate`・selftest・§4.6・§6.4・§6.7）
+      - [x] Y2 §3.4 の中止を参照の外からの入力だけ・閉じた規則・`delivery.py` 単体・各 run の直後に（§3.4・§3.2・§6.2・§6.3・`data.md` 手順 4）
+      - [x] Y3 推奨の単位（§6.8・§1.2 の問 4・§7・`kit/e2/README.md`）
+      - [x] minor 1 `align_blocks` の再開（偽の錨）・selftest〔コード〕
+      - [x] minor 2 焦点の喪失の区間（`delivery.py`・`pipeline.py`）〔コード〕
+      - [x] minor 4 速さごとの偏りの区間を 1 つに（`l2.py`）〔コード〕
+      - [x] minor 6 重み付けし直しの版を汚染の層だけ除いたものに（`match.py`・`l2.py`）〔コード〕
+      - [x] minor 3・5・7〜16・nit（文）
+      - [x] 確認（selftest・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・§9 の SHA-256・変異）→ 29 本緑・4 ファイルともバイト一致・違反 0・違反なし・exit 3・5 ファイル一致・節の参照はすべて実在。変異: 作業用エージェントの自己申告 19 本（赤 17・等価 1・pipeline の配線 1 は赤にならず判断 115 の 3 に記録）、メインの抜き取り 4 本（`l2.py` 1・`closed_set.py` 1・pipeline の新しい検査 1 は赤、`delivery.py` 1 は生き残り → selftest を足して赤）。本文 12,143 語
+    - [x] attack-me round 4（round 3 の直しで変わった箇所だけ・判断 114・2026-10-02・G-GEAR）→ 記録 `attack-me/prereg-ime-macos/round-4/`。R1 major・R2 major・R3 minor・fatal 0・捏造 0 → 判定 major revision。研究者に 5 問 → 判断 116・117（すべて推奨どおり）
+    - [x] round 4 の直し（判断 116・117・G-GEAR・実装の選択は判断 118・`4bd6cacd`・点検の後は判断 119・120）
+      - [x] Z1 §3.4 の中止の規則をブロックごとの区間で（`delivery.py` に区間ごとの「説明されない参照の key_down の数」・`pipeline.py` が同じ規則で拒む・selftest・§3.4 に命令行と窓の値・拒否の扱い・検査の対象・§6.3 は参照だけ・§3.2）〔コード〕。⚠️ 上限の数（かなキーを数えるか）は Mac の結果で決める → 作業用エージェント A（Sonnet）。`delivery.py` に `segments`（両側）・`pipeline.py` に `reference_abort_segments` と暫定の `RUNNER_KANA_PRESSES_PER_BLOCK = 1`
+      - [x] Z2 問 3 のテキストの大きさの開示（§6.7・§7）→ k の数は `plan_figures` から再現（作業用エージェント C・メインが出力で照合）
+      - [x] minor 1 合わせ直しの錨を右に揃える・selftest（ブロック末の S7 の Enter の欠け）・§6.8・README〔コード〕→ 作業用エージェント B（Sonnet）。selftest 151 件・open_set 133 件が緑。メインの変異 1 本（左端の条件を戻す）で 14 件が赤
+      - [x] minor 2 `per_trial` の空の層を null で・§6.7 に汚染の無い版で空の場面（S6・S13）〔コード〕→ 作業用エージェント C（`status`・層ごとの `trials_not_used`）。S6・S13 が 0 試行なことはメインが予測の出力で数えた
+      - [x] minor 5 `spec_predict.py --from-plan` に層ごとの Σm²/Σm（計画・主の範囲）・§3.3 の「usually near 1」・最小の主の層の半幅〔コード〕→ `plan_figures`。本番の 2 計画（SHA-256 一致）で 2.36〜3.13 / 2.47〜3.43・33〜39 / 30〜37 ブロック・主の範囲の最大 3.05（S14 mid）/ 3.22（S15 mid）・k の分布がすべて再現
+      - [x] minor 3・4・6・7・8・nit 8 件（文）→ OFF の carried out 186 のうち 185 が後の試行へ続く（残る 1 つは試行の外の打鍵で打ち切り）をメインが予測の出力で数えた
+      - [x] 確認（selftest・`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・§9 の SHA-256・節の参照・変異） → 29 本緑・4 ファイルともバイト一致・違反 0・違反なし・exit 3・5 ファイル一致・節の参照はすべて実在。変異: 作業用エージェントの自己申告 16 本・メインの抜き取り 3 本ですべて赤。本文 13,422 語
+      - [x] 作業中の点検（code-reviewer ∥ security-checker・`b1c3f213..4bd6cacd`）→ security HIGH 1・MEDIUM 2・LOW 3、code-reviewer MEDIUM 4・LOW 8（M2 の一部と範囲外の気づきは偽）。研究者に 2 問 → 判断 119（`--pack` で全 run に §3.4 を強制・S15 以外の焦点の喪失を中止に足す）。直しは作業用エージェント D ＋ メイン（判断 120）
+      - [x] 点検の指摘の直しの確認（29 本緑・バイト一致・違反 0・違反なし・exit 3・節の参照・本文 13,902 語）
+    - [x] ★ Mac（判断 113 の Y4 ＋ 判断 117 の Z3 ＋ 判断 119・120・凍結の前・引き継ぎ `next-session-ime-paper-m3-mac-work.md`）: (1) `pilot-macos.md` の Raw logs に預ける基準（時点は凍結の前・観測の余分な行は本計測と同じ扱い）と「封印したセッション行は預けるときだけ開け、解析しない」 (2) `pilot2-on`・`pilot2-off`・`verify-off` の観測の key 行に `align_plan` だけを `--markers-in-obs` とパイロットの 3 打鍵の印で流し、採点されたブロックの割合を §3.1 に（診断） (3) 同じ run の参照のログに `delivery.py` → かなキーと S14 のモードキーが参照に残るか・ブロックごとの「説明されない数」を §3.1 に書き、Z1 の上限を決める
+      → 2026-10-02（Mac・macOS 27.0・Python 3.14.4）: (2) 3 本とも全ブロック採点（15 / 15・282 試行・割り当てのない打鍵 0）(3) k = 0・`REFERENCE_RECEIVES_MODE_KEYS = False`・滑りの最小 1,582 ms・区間の規則に当たらない。⚠️ `pilot2-off` に S15 以外の焦点の喪失 1 回（31 ms・打鍵なし）→ 研究者に戻し、焦点の規則を「喪失中の観測の打鍵で中止」に改めた（判断 121・余裕 500 ms は判断 122）。(1) `pilot-macos.md` の Raw logs を本計測と揃えた基準に。確認は判断 122 の 9
+    - [x] G-GEAR で Mac の作業を取り込んで確かめた（2026-10-02・29 本緑・バイト一致・定数と文の一致・§3.1 の数の整合・本文 14,369 語）→ ⚠️ 判断 121 の焦点の規則が送った打鍵も数えていた（run の約 78% の時間が当たる）→ 研究者に問い判断 123（送った打鍵を差し引く）・実装は判断 124（作業用エージェント E・`OBS_SEND_DELAY_MS = 100`）→ 29 本緑・バイト一致・違反 0・違反なし・exit 3・本文 14,665 語
+    - [x] attack-me round 5（§3.4・§3.1・§6.7・`delivery.py`・`closed_set.py` に絞る・G-GEAR・判断 117）。★ 判断 121〜124 の焦点の規則（喪失の区間の観測の行と送った打鍵の差し引き・余裕 500 ms・遅れ 100 ms）と `pilot-macos.md` の Raw logs も対象に・引き継ぎ `next-session-ime-paper-m3-round5.md`
+      → 2026-10-02（G-GEAR）: 判定 minor revision（R1・R2・R3 とも minor・fatal 0・major 0・捏造 0・注入 0・有効な査読 3 / 3）。研究者の採否は判断 125（Y1 焦点の規則をコードで閉じる・Y2 計画の SHA-256 を解析で照合・Y3 感度は §7 に開示・直す一覧を全部承認・round 6 なし）
+    - [x] round 5 の直し: Y1〔コード: `delivery.py`・`pipeline.py`〕・Y2〔コード: `pipeline.py`〕・Y3（§7）・minor 7 件（1 content-free を中止した run にも〔コード〕・5 78% を `plan_figures` に〔コード〕）・nit 14 件 → 確認（`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・節の参照・語数・定数と文の目視の照合）
+      → 2026-10-02: 判断 126。29 本緑・バイト一致・exit 3・違反 0・違反なし・節の参照・本文 15,265 語・変異はすべて赤
+    - [x] 完了時レビュー（code-reviewer ∥ security-checker は `965486554..f02cb49a` の公開物 24 ファイル・Codex は研究者の選択で直近の `kit/` に絞って 2 巡）
+      → code-reviewer MEDIUM 1・LOW 6、security MEDIUM 1・LOW 4・範囲外 1、Codex 1 巡目 P1 1・P2 2（すべて真）→ 研究者に 4 問 → 判断 127（起動の前と止めた後も喪失・数える終わりの延長・計画をセルと対応・残り 12 件）・実装は判断 128。Codex 2 巡目 P1 1・P2 2 → 判断 129（文を揃える・FORMAT とテストは足さない）。29 本緑・バイト一致・exit 3・違反 0・違反なし・節の参照・本文 15,469 語
+    - [ ] PR → CI 緑なら merge → main の CI
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task

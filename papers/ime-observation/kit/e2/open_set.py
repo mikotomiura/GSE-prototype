@@ -68,10 +68,16 @@ Inputs of the command line. Each `--obs` file (obs/1) and `--plan` file (plan/1)
 re-implemented) before it is read; an unknown key, a category outside the fourteen-value enum, a header whose
 format is not obs/1, a repeated key on one line and JSON nested past the recursion limit are all refused as
 input errors, not read. The key presses of the observation are assigned to the plan in order (block markers
-first, then the keys of each trial); the assignment is refused when the counts or the number of alphabetic
-keys differ, never guessed. The block marker keys and the mid-conversion IME toggle keys are not typing keys;
-by default no row is expected for them in the observation (`--markers-in-obs` / `--ime-toggle-in-obs` opt in
-to an observation that does record them). The typed reading of a trial comes from the plan (`typed_reading`)
+first, then the keys of each trial) by `closed_set.align_plan`, comparing the whole category sequence of every
+trial. The block marker keys and the mid-conversion IME toggle keys are not typing keys; by default no row is
+expected for them in the observation (`--markers-in-obs` / `--ime-toggle-in-obs` opt in to an observation that does
+record them). With `--markers-in-obs` the markers serve as anchors: a block whose presses do not match the plan (a
+missing, extra or different press) is left unscored and counted, the blocks after it are found again by their own
+markers, and the other blocks are scored, so one dropped press loses one block, never the run and never the
+alignment of later blocks. Presses that no scored block covers are counted as unassigned. The report holds an
+`alignment` object (blocks, unscored blocks and trials by scenario and by speed, unassigned presses); n, the error
+rates and the intervals are computed over the scored trials only. Without `--markers-in-obs` there is no anchor to
+resynchronise to, so any mismatch, or any press left over, is refused as an input error, never guessed. The typed reading of a trial comes from the plan (`typed_reading`)
 and is used only for scoring; a trial without a typed reading is dropped and counted (`n_no_typed_reading`).
 Trials whose scenario types the reading with the kana layout are outside the attack model (the key count does
 not follow the romanisation) and are excluded. Only trials of evaluation phrases are scored. The output file
@@ -96,6 +102,7 @@ for _d in (_HERE, os.path.join(_KIT, "gen"), os.path.join(_KIT, "analysis"), os.
     if _d not in sys.path:
         sys.path.insert(0, _d)
 import charlm  # noqa: E402
+import closed_set  # noqa: E402  (align_plan, merge_alignments: the assignment of presses to the plan)
 import generate_plan  # noqa: E402
 import romaji  # noqa: E402
 import stats  # noqa: E402
@@ -526,59 +533,55 @@ def _kana_scenarios(recipes):
 
 
 def load_trials(obs_paths, plan_paths, recipes, phrase_ids=None, markers_in_obs=False, ime_toggle_in_obs=False):
-    """Trials from obs/1 + plan/1 pairs. Returns (trials, n_excluded_kana, n_other_phrases, n_no_typed_reading).
+    """Trials from obs/1 + plan/1 pairs. Returns (trials, n_excluded_kana, n_other_phrases, n_no_typed_reading,
+    alignment).
 
     phrase_ids: if given, only trials of these phrases are kept (the others count in n_other_phrases).
     markers_in_obs / ime_toggle_in_obs: whether the block marker keys (keys pressed only to mark block boundaries,
     arrow keys on macOS) and the mid-conversion IME toggle keys are expected to appear as key rows in the observation.
     Both default to False (neither is a typing key, and by default no row is consumed for them); passing a
-    flag expects an observation that does record the matching keys, and the assignment is refused when the
-    observation and this expectation disagree."""
+    flag expects an observation that does record the matching keys.
+
+    The key presses are assigned to the plan by `closed_set.align_plan`, comparing the whole category sequence of
+    every trial (not only its count). With markers_in_obs, a block whose presses do not match the plan is left
+    unscored and counted, and the blocks after it are found again by their markers; the other blocks are scored.
+    Without markers_in_obs the observation holds no marker to resynchronise to, so any mismatch or any press left
+    over is refused (InputError). `alignment` is the merged alignment object of all sessions (unscored blocks and
+    trials, unassigned presses); the counts n_excluded_kana, n_other_phrases and n_no_typed_reading refer to the
+    trials of the scored blocks."""
     if len(obs_paths) != len(plan_paths) or not obs_paths:
         raise InputError("--obs and --plan must be given the same (non-zero) number of files")
     kana = _kana_scenarios(recipes)
-    exclude = _PSEUDO_KEYS if ime_toggle_in_obs else (_PSEUDO_KEYS | _IME_TOGGLE_KEYS)
     trials, n_kana, n_other, n_no_truth = [], 0, 0, 0
+    alignments = []
     for idx, (obs_path, plan_path) in enumerate(zip(obs_paths, plan_paths)):
         obs = _read_obs(obs_path)
         cats = [r.get("category") for r in obs[1:] if isinstance(r, dict) and r.get("type") == "key" and r.get("press") is True]
         plan = _read_plan(plan_path)
-        cursor = 0
-
-        def take(n, what):
-            nonlocal cursor
-            if cursor + n > len(cats):
-                raise InputError("the observation has fewer key presses than the plan (%s)" % what)
-            chunk = cats[cursor:cursor + n]
-            cursor += n
-            return chunk
-
-        for row in plan[1:]:
-            kind = row.get("kind") if isinstance(row, dict) else None
-            if kind == "block":
-                if markers_in_obs:
-                    take(len(row["marker"]), "block %s marker" % row["block_id"])
-            elif kind == "trial":
-                keys = [s["key"] for s in row["steps"] if s["down"] and s["key"] not in exclude]
-                chunk = take(len(keys), "trial %s" % row["trial_id"])
-                letters = sum(1 for k in keys if len(k) == 1 and "a" <= k <= "z")
-                if chunk.count("alphabetic") != letters:
-                    raise InputError("the observation does not line up with the plan at trial %s" % row["trial_id"])
-                if row["scenario"] in kana:
-                    n_kana += 1
-                    continue
-                if phrase_ids is not None and row["phrase_id"] not in phrase_ids:
-                    n_other += 1
-                    continue
-                truth = generate_plan.typed_reading(row, recipes)
-                if not truth:
-                    n_no_truth += 1
-                    continue
-                trials.append({"segments": segment_categories(chunk), "truth": truth,
-                               "cluster": (idx, row["block_id"]), "trial_id": row["trial_id"]})
-        if cursor != len(cats):
-            raise InputError("the observation has more key presses than the plan")
-    return trials, n_kana, n_other, n_no_truth
+        # the os the observation's own header declares (validated above), so that the check against the plan's os can fail
+        obs_os = obs[0].get("os") if obs and isinstance(obs[0], dict) else None
+        try:
+            scored, alignment = closed_set.align_plan(cats, plan, obs_os, markers_in_obs, ime_toggle_in_obs,
+                                                      tag="s%d-" % idx)
+        except ValueError as e:
+            raise InputError("the observation does not line up with the plan: %s" % e)
+        alignments.append(alignment)
+        for s in scored:
+            row = s["row"]
+            chunk = cats[s["start"]:s["start"] + s["n"]]
+            if row["scenario"] in kana:
+                n_kana += 1
+                continue
+            if phrase_ids is not None and row["phrase_id"] not in phrase_ids:
+                n_other += 1
+                continue
+            truth = generate_plan.typed_reading(row, recipes)
+            if not truth:
+                n_no_truth += 1
+                continue
+            trials.append({"segments": segment_categories(chunk), "truth": truth,
+                           "cluster": (idx, row["block_id"]), "trial_id": row["trial_id"]})
+    return trials, n_kana, n_other, n_no_truth, closed_set.merge_alignments(alignments)
 
 
 def _dumps_report(obj):
@@ -599,7 +602,7 @@ def run(args):
         train, evaluation, dropped = split_phrases(corpus, args.split_seed, args.eval_fraction, unit=unit,
                                                     warnings=split_warnings)
         try:
-            trials, n_kana, n_other, n_no_truth = load_trials(
+            trials, n_kana, n_other, n_no_truth, alignment = load_trials(
                 args.obs, args.plan, recipes, set(ph["phrase_id"] for ph in evaluation),
                 markers_in_obs=args.markers_in_obs, ime_toggle_in_obs=args.ime_toggle_in_obs)
         except (KeyError, TypeError, AttributeError):
@@ -616,7 +619,7 @@ def run(args):
                       "n_dropped_duplicate_readings": dropped, "n_excluded_kana_layout": n_kana,
                       "n_other_phrases": n_other, "n_no_typed_reading": n_no_truth,
                       "split_warnings": split_warnings}
-    report = {"splits": splits, "data": data,
+    report = {"splits": splits, "data": data, "alignment": alignment,
              "params": {"split_seed": args.split_seed, "eval_fraction": args.eval_fraction, "n": args.n,
                         "smoothing": args.smoothing, "markers_in_obs": args.markers_in_obs,
                         "ime_toggle_in_obs": args.ime_toggle_in_obs}}
@@ -995,6 +998,135 @@ def selftest():
                   rep_m["splits"] == rep["splits"] and rep_m["data"] == rep["data"]
                   and rep_i["splits"] == rep["splits"] and rep_i["data"] == rep["data"])
 
+        # --- blocks that do not match the plan are left unscored (--markers-in-obs) and counted; the others are scored
+        layout = []    # [marker presses, trial presses, [trial ids], block_id] of every block
+        for r in rows[1:]:
+            if r["kind"] == "block":
+                layout.append([len(r["marker"]), 0, [], r["block_id"]])
+            else:
+                layout[-1][1] += len(closed_set.expected_categories(r))
+                layout[-1][2].append(r["trial_id"])
+        blen = [m + k for m, k, _, _ in layout]
+        bstart = [sum(blen[:i]) for i in range(len(blen))]
+        mk_header = _synth_obs(rows, "macos", markers_in_obs=True).split("\n")[0]
+        mk_cats = [json.loads(ln)["category"] for ln in _synth_obs(rows, "macos", markers_in_obs=True).split("\n")[1:]
+                   if ln and json.loads(ln)["press"]]
+        check("alignment setup: several blocks, and the category list is the plan's presses",
+              len(layout) >= 3 and len(mk_cats) == sum(blen))
+
+        def _cats_no_markers(cats, lay):
+            """The same presses without the block markers (the default observation)."""
+            out = []
+            for i, (m, k, _, _) in enumerate(lay):
+                st = sum(m2 + k2 for m2, k2, _, _ in lay[:i])
+                out.extend(cats[st + m:st + m + k])
+            return out
+
+        def obs_of(cats, name):
+            p = os.path.join(tmp, name)
+            lines = [mk_header] + [generate_plan.dumps({"type": "key", "t": i + 1, "category": c, "press": True})
+                                   for i, c in enumerate(cats)]
+            with open(p, "wb") as fh:
+                fh.write(("\n".join(lines) + "\n").encode("utf-8"))
+            return p
+
+        def load(cats, name="al.jsonl", markers=True):
+            return load_trials([obs_of(cats, name)], [plan_path], recipes, None, markers_in_obs=markers)
+
+        t_ok, k_ok, o_ok, nt_ok, al_ok = load(mk_cats)
+        ids_ok = set(t["trial_id"] for t in t_ok)
+        row_of = dict((r["trial_id"], r) for r in rows[1:] if r["kind"] == "trial")
+        check("alignment: the segments of a scored trial are those of its own presses",
+              all(t["segments"] == segment_categories(closed_set.expected_categories(row_of[t["trial_id"]]))
+                  for t in t_ok))
+        check("alignment: an intact observation scores every trial outside the kana layout and loses no block",
+              al_ok["n_blocks"] == len(layout) and al_ok["n_blocks_unscored"] == 0 and al_ok["n_presses_unassigned"] == 0
+              and al_ok["n_trials_unscored"] == 0 and len(ids_ok) > 0 and k_ok > 0)
+
+        # the observation's header os must agree with the plan's os (the same refusal the closed set gives)
+        os_other = "windows" if rows[0]["os"] != "windows" else "macos"
+        obs_os_path = os.path.join(tmp, "obs_other_os.jsonl")
+        with open(obs_os_path, "wb") as fh:
+            fh.write(("\n".join([mk_header.replace('"os":"%s"' % rows[0]["os"], '"os":"%s"' % os_other)]
+                                + [generate_plan.dumps({"type": "key", "t": i + 1, "category": c, "press": True})
+                                   for i, c in enumerate(mk_cats)]) + "\n").encode("utf-8"))
+        try:
+            load_trials([obs_os_path], [plan_path], recipes, None, markers_in_obs=True)
+            check("an observation header with another os than the plan is refused", False, "no exception")
+        except InputError as e:
+            check("an observation header with another os than the plan is refused",
+                  "does not match the plan's os" in str(e) and os_other in str(e), repr(str(e)))
+
+        def lost_ids(i):
+            return set(layout[i][2])
+
+        def only_block_lost(cats, i, name):
+            t, k, o, nt, al = load(cats, name)
+            ids = set(x["trial_id"] for x in t)
+            return (al["unscored_block_ids"] == ["s0-" + str(layout[i][3])] and al["n_blocks_unscored"] == 1
+                    and al["n_trials_unscored"] == len(layout[i][2]) and ids == ids_ok - lost_ids(i)
+                    and sum(al["unscored_by_scenario"].values()) == len(layout[i][2])
+                    and sum(al["unscored_by_speed"].values()) == len(layout[i][2])), al
+
+        check("alignment: no trial of a kana-layout scenario is scored (as before)",
+              all(next(r for r in rows[1:] if r.get("trial_id") == i)["scenario"] not in _kana_scenarios(recipes)
+                  for i in ids_ok))
+        for i in (0, 1, len(layout) - 1):
+            c = bstart[i] + layout[i][0] + 2
+            ok, al = only_block_lost(mk_cats[:c] + mk_cats[c + 1:], i, "al_miss.jsonl")
+            check("alignment: one missing press inside block %d leaves only that block unscored" % i, ok, repr(al))
+            check("alignment: that block's presses are counted as unassigned (block %d)" % i,
+                  al["n_presses_unassigned"] == blen[i] - 1, repr(al))
+        c = bstart[1] + layout[1][0] + 2
+        ok, al = only_block_lost(mk_cats[:c] + ["enter"] + mk_cats[c:], 1, "al_extra.jsonl")
+        check("alignment: one extra press inside a block leaves only that block unscored", ok, repr(al))
+        check("alignment: the extra press and the block's presses are counted as unassigned",
+              al["n_presses_unassigned"] == blen[1] + 1, repr(al))
+        t_s, k_s, o_s, nt_s, al_s = load(mk_cats[:bstart[1]] + ["escape"] + mk_cats[bstart[1]:], "al_stray.jsonl")
+        check("alignment: a stray press between two blocks loses no block and is counted as one unassigned press",
+              set(x["trial_id"] for x in t_s) == ids_ok and al_s["n_blocks_unscored"] == 0
+              and al_s["n_presses_unassigned"] == 1, repr(al_s))
+        t_t, k_t, o_t, nt_t, al_t = load(mk_cats + ["escape"] * 4, "al_tail.jsonl")
+        check("alignment: presses left after the last block are counted as unassigned, without an error",
+              set(x["trial_id"] for x in t_t) == ids_ok and al_t["n_blocks_unscored"] == 0
+              and al_t["n_presses_unassigned"] == 4, repr(al_t))
+        for i in (0, 1, len(layout) - 1):
+            ok, al = only_block_lost(mk_cats[:bstart[i]] + mk_cats[bstart[i] + 1:], i, "al_marker.jsonl")
+            check("alignment: a press missing from the marker of block %d leaves that block unscored and no other" % i,
+                  ok, repr(al))
+        c = bstart[1] + layout[1][0] + 2
+        d = bstart[2] + layout[2][0] + 2
+        t_b, k_b, o_b, nt_b, al_b = load(mk_cats[:bstart[1]] + mk_cats[bstart[1] + 1:d] + mk_cats[d + 1:], "al_two.jsonl")
+        check("alignment: a damaged marker and a missing press in the next block leave both unscored, the others scored",
+              al_b["unscored_block_ids"] == ["s0-%s" % layout[1][3], "s0-%s" % layout[2][3]]
+              and set(x["trial_id"] for x in t_b) == ids_ok - lost_ids(1) - lost_ids(2), repr(al_b))
+        # the whole category sequence is compared (the count and the number of alphabetic keys are not enough)
+        sw = next(i for i in range(bstart[1] + layout[1][0], bstart[1] + blen[1] - layout[1][0]) if mk_cats[i] == "space")
+        swapped = mk_cats[:sw] + ["enter"] + mk_cats[sw + 1:]
+        ok, al = only_block_lost(swapped, 1, "al_swap.jsonl")
+        check("alignment: a press of another category with the same count and the same alphabetic keys leaves its "
+              "block unscored", ok, repr(al))
+        raises("without --markers-in-obs the same swapped category is refused (no anchor to resynchronise to)",
+               lambda: load(_cats_no_markers(swapped, layout), "al_swap_nm.jsonl", markers=False), InputError)
+        raises("without --markers-in-obs a missing press is refused",
+               lambda: load(_cats_no_markers(mk_cats, layout)[:5] + _cats_no_markers(mk_cats, layout)[6:],
+                            "al_nm_miss.jsonl", markers=False), InputError)
+        raises("without --markers-in-obs presses left after the last trial are refused",
+               lambda: load(_cats_no_markers(mk_cats, layout) + ["space"], "al_nm_tail.jsonl", markers=False), InputError)
+        out_al = os.path.join(tmp, "al_out.json")
+        rc_al = main(["--obs", obs_of(mk_cats[:bstart[1] + layout[1][0] + 2] + mk_cats[bstart[1] + layout[1][0] + 3:],
+                                      "al_cli.jsonl")] + common[2:] + ["--out", out_al, "--markers-in-obs"])
+        check("command line: with --markers-in-obs one missing press does not stop the run (exit 0)", rc_al == 0,
+              "exit %r" % rc_al)
+        if rc_al == 0:
+            with open(out_al, "rb") as fh:
+                rep_al = json.loads(fh.read().decode("utf-8"))
+            check("command line: the report holds the alignment object and n counts the scored trials only",
+                  rep_al["alignment"]["n_blocks_unscored"] == 1
+                  and rep_al["alignment"]["unscored_block_ids"] == ["s0-%s" % layout[1][3]]
+                  and rep_al["alignment"]["n_presses_unassigned"] == blen[1] - 1
+                  and rep_al["splits"]["work"]["count"]["n"] <= rep["splits"]["work"]["count"]["n"], repr(rep_al["alignment"]))
+
         # --- the assignment is refused, not guessed, when the counts differ
         short = os.path.join(tmp, "short.jsonl")
         with open(short, "wb") as f:
@@ -1077,8 +1209,14 @@ def main(argv):
     ap.add_argument("--smoothing", choices=charlm.SMOOTHINGS, default="wb")
     ap.add_argument("--beam", type=int, default=DEFAULT_BEAM)
     ap.add_argument("--length-info", choices=LENGTH_INFO + ("both",), default="both")
-    ap.add_argument("--markers-in-obs", action="store_true")
-    ap.add_argument("--ime-toggle-in-obs", action="store_true")
+    ap.add_argument("--markers-in-obs", action="store_true",
+                    help="the presses of the block-start markers appear in the observation (default: they do not). "
+                         "With this flag a block whose presses do not match the plan is left unscored and counted "
+                         "(alignment in the report) and the blocks after it are found again by their markers; "
+                         "without it any mismatch is refused (exit 2)")
+    ap.add_argument("--ime-toggle-in-obs", action="store_true",
+                    help="the presses of the IME toggle keys (ime_on, ime_off) appear in the observation, as "
+                         "category other (default: they do not)")
     ap.add_argument("--bootstrap", type=int, default=DEFAULT_BOOTSTRAP)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out")
