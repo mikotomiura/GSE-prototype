@@ -1256,8 +1256,10 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
     {}
   );
   push(
-    "§6 ★ 宣言の 4 択が同意文書と同じ語で載っている",
-    ["論述", "通信文", "デザイン・映像・制作作業", "vibe coding"].every((s) => desc.indexOf(s) >= 0),
+    "§6 ★ 宣言の 5 択が同意文書と同じ語で載っている（ADR-037）",
+    ["論述", "通信文", "デザイン・映像・制作作業", "vibe coding", "その他・細切れの作業"].every(
+      (s) => desc.indexOf(s) >= 0
+    ),
     {}
   );
 }

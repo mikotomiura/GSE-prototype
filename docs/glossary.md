@@ -30,7 +30,7 @@
 | プローブ参照 | ProbeRef | `random_probe` には `probe_id` が必ず付き、`self_marker` には付かないという不変条件を型で表す (`logger::ProbeRef`) | 「ProbeRef により probe_id の有無を型で保証」 |
 | skip 理由 | SkipReason | プローブ回答の skip 種別 enum (`logger::SkipReason`)。`none` (回答済) / `dont_remember` / `dismissed`。MNAR 対策 (PreReg-2/7) の分析軸 | 「dont_remember と dismissed を分けて skip bias を見る」 |
 | トラック | Track | 較正スモークのセッション種別 enum (`logger::Track`)。`main` (本作業) / `exploratory` (探索)。`session_meta` に記録 | 「session_meta の track を main に設定」 |
-| 課題種別 | TaskKind | 較正スモークの作業内容分類 enum (`logger::TaskKind`)。`argumentative` / `correspondence` / `creative` / `vibe_coding`。`session_meta` に記録 | 「TaskKind=vibe_coding で β を coding 寄りに」 |
+| 課題種別 | TaskKind | 較正スモークの作業内容分類 enum (`logger::TaskKind`)。`argumentative` / `correspondence` / `creative` / `vibe_coding` / `other`（★ `other` = O1 の「その他・細切れの作業」。O1 の宣言 UI にだけ出し、Writing fallback で採点する・ADR-037）。`session_meta` に記録 | 「TaskKind=vibe_coding で β を coding 寄りに」 |
 | 想定象限 | ExpectedQuadrant | 尺度理解テスト (ビネット) の正解ラベル enum (`logger::ExpectedQuadrant`)。`flow` / `stuck` / `incubation` / `idle` の 4 値。Q1/Q2 の 2 軸とは別物 (教示の正解) | 「ビネット回答を ExpectedQuadrant と照合し理解度を測る」 |
 | 介入応答 | InterventionResponse | 介入提示に対するユーザー側の応答を残す NDJSON 行 (`intervention_response`)。判定側 `intervention_decision` とは別の「ユーザー応答側」ログ。固定カテゴリ + 時刻のみ (WBS 0.8 / v0.4 §9) | 「Nudge dismiss を intervention_response として記録」 |
 | dismiss 理由 | DismissReason | 介入を閉じた理由の固定カテゴリ enum (`logger::DismissReason`)。`not_stuck` (詰まってない=Need 誤り) / `want_to_struggle` (今はもがきたい=Opportunity 誤り) / `just_close` / `silent` (理由未選択)。Need 誤りと Opportunity 誤りを分離する (WBS 0.8 / v0.4 §9) | 「dismiss_reason=not_stuck は Need 過検出の証拠」 |
