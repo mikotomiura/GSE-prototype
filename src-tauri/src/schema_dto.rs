@@ -508,6 +508,10 @@ pub enum TrackDto {
 }
 
 /// v0.3 較正スモークの課題種別 (session_meta)。
+///
+/// `other` = O1 の「その他・細切れの作業」(ADR-037)。
+// ⚠️ variant に doc コメントを付けると schemars が `enum` を `oneOf` に組み替える
+//    (gse-dataset 側の schema の形が変わる) ので、説明は型の doc に置く。
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskKindDto {
@@ -515,14 +519,15 @@ pub enum TaskKindDto {
     Correspondence,
     Creative,
     VibeCoding,
+    Other,
 }
 
 /// ADR-006 Phase 2b: どの domain head がセッションを採点したか (session_meta)。
 ///
 /// `task_kind` (被験者の宣言) と対にして残す。ルーティング表が変われば
 /// 同じ `task_kind` でも別の head になるため、実際に走った推論器を記録する。
-/// `writing_fallback` = Creative を Writing head で採点している状態
-/// (ADR-006 #3 からの意図的な逸脱)。
+/// `writing_fallback` = Creative / Other を Writing head で採点している状態
+/// (Creative は ADR-006 #3 からの意図的な逸脱、Other は ADR-037 D2)。
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HeadIdDto {

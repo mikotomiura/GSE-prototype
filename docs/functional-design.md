@@ -453,7 +453,7 @@ methodology は `docs/preregistration-v0.3.md` (PreReg-1..8) と設計書 v0.3 �
 - **対応デバイス**: Windows 11（Surface Pro 8 + Type Cover）/ macOS 13 Ventura 以降（MacBook Pro/Air — JIS / ANSI 両キーボード対応）
 - **UI**: ダッシュボードウィンドウ + オーバーレイウィンドウの 2 ウィンドウ構成
 - **操作**: 通常運用は**セッション開始/終了**のみ。加えて **記録の一時停止・再開**（`set_recording_paused`）、
-  **区間指定削除**（`delete_time_range`）、**作業の種類の宣言**（`declare_task_kind`）、
+  **区間指定削除**（`delete_time_range`）、**作業の種類の宣言**（`declare_task_kind`・O1 のみ。5 択 = 論述 / 通信文 / デザイン・映像・制作作業 / vibe coding / その他・細切れの作業 —— ADR-016 判断 4b-2・ADR-037）、
   **参加者 ID 入力と提出**（`submit_latest_session` / `approve_pending_submissions`）、
   **自己マーカー**（`record_self_marker`）、macOS の**権限リセット / システム設定を開く**を持つ
   （★ モードごとに表示を出し分ける）。

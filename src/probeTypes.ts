@@ -8,7 +8,9 @@ export type TaskKind =
   | "argumentative"
   | "correspondence"
   | "creative"
-  | "vibe_coding";
+  | "vibe_coding"
+  // ★ O1 の宣言 UI だけに出す (ADR-037)。G1 の開始画面には出さない。
+  | "other";
 export type Track = "main" | "exploratory";
 export type ExpectedQuadrant = "flow" | "stuck" | "incubation" | "idle";
 
