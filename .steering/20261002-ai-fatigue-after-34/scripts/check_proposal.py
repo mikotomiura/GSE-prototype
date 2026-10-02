@@ -27,17 +27,17 @@ DOCX_ARCHIVE = os.path.join(C.TASK, "archive", DOCX_NAME)
 DOCX_DOWNLOADS = os.path.join(C.DOWNLOADS, DOCX_NAME)
 SHA_RECORD = os.path.join(C.TASK, "archive", "proposal-sha256.txt")
 WARN = "判定者 2 に渡さない"
-# ★ パスは「\」と「/」の両方の区切り・git-bash の /c/Users・ユーザー名も（code-reviewer・security-checker・判断 11）。
-#   ドライブ文字は前が英字でないときだけ（「systems:/」「https://」に当てない）
-BANNED = re.compile(r"GSE|\.steering|(?<![A-Za-z])[A-Za-z]:[\\/]|Downloads[\\/]|/c/Users|\bjohnd\b|scratchpad|screening-log|/cross-review|"
-                    r"cross-review|Codex|worktree|[\w.+-]+@[\w-]+\.[\w.]+|\.jsonl|check_\w+\.py|build_\w+\.py", re.I)
+# ★ 作業の語（GSE・道具の名前など）は BANNED、手元のパス・ユーザー名・メールアドレスは common.find_local（判断 11・12）
+BANNED = re.compile(r"GSE|\.steering|scratchpad|screening-log|/cross-review|cross-review|Codex|worktree|\.jsonl|"
+                    r"check_\w+\.py|build_\w+\.py", re.I)
 LOG34 = os.path.join(C.STEER, "20261001-ai-fatigue-34-screening", "screening-log.jsonl")
 # 付録の用途（★ build_proposal.py は写しの自由記入から読む。本検査器はログの最終の判定から独立に組む）
 USE34_E4 = {"既存レビュー": "背景保持", "尺度・理論": "背景保持", "方法論": "方法論保持", "訂正通知": "訂正連結",
             "直接研究": "背景保持", "隣接研究": "背景保持"}
 USEC_E4 = {"レビュー": "背景保持", "論考": "背景保持", "研究計画": "背景保持", "一次研究": "背景保持",
            "方法論": "方法論保持", "訂正通知": "訂正連結"}
-BASIS_LABEL = {"全文": "全文", "抄録": "抄録", "なし": "題名と書誌だけ"}
+BASIS_LABEL = {"全文": "全文", "抄録": "抄録", "なし": "題名と書誌だけ"}  # 追加候補の表の自由記入の書き方
+BASIS34 = {"全文": "全文", "抄録": "抄録", "なし": "なし"}  # 34 件の写しの自由記入の書き方（前のタスクの道具は生の値を書く）
 
 
 def norm(s):
@@ -111,8 +111,11 @@ def expected_appendix():
     ★ 判定者1 は表から、用途・材料・AI の判定はログの最終の判定から（書き込み側は自由記入を正規表現で切り出す・判断 11）。"""
     w = openpyxl.load_workbook(C.COPY34_ARCHIVE, read_only=True)["スクリーニング"]
     res34, _ = final_results(LOG34)
-    a = [(r[0], r[3], use_label(res34[r[0]], USE34_E4.get(r[2])), BASIS_LABEL[res34[r[0]].get("basis", "全文")])
-         for r in w.iter_rows(min_row=5, max_row=38, values_only=True)]
+    a = []
+    for r in w.iter_rows(min_row=5, max_row=38, values_only=True):
+        x = res34.get(r[0])
+        a.append((r[0], r[3], use_label(x, USE34_E4.get(r[2])) if x else "（ログに無い）",
+                  BASIS34.get(x.get("basis", "全文"), "（語彙の外）") if x else "（ログに無い）"))
     resc, has2 = final_results(C.LOG)
     c = openpyxl.load_workbook(C.CAND_ARCHIVE, read_only=True)["スクリーニング"]
     b = []
@@ -120,8 +123,11 @@ def expected_appendix():
         if r[0] is None:
             break
         if r[3] != "未判定":
-            x = resc[r[0]]
-            b.append((r[0], r[3], use_label(x, USEC_E4.get(x.get("kind_detail"))), BASIS_LABEL[x.get("basis", "全文")],
+            x = resc.get(r[0])
+            if x is None:
+                b.append((r[0], r[3], "（ログに無い）", "（ログに無い）", "（ログに無い）"))
+                continue
+            b.append((r[0], r[3], use_label(x, USEC_E4.get(x.get("kind_detail"))), BASIS_LABEL.get(x.get("basis", "全文"), "（語彙の外）"),
                       "Claude 版" if r[0] in has2 else "なし"))
     return a, b
 
@@ -130,7 +136,7 @@ def appendix_rows(md, title):
     i = md.index(title)
     rows = []
     for line in md[i:].splitlines()[1:]:
-        if line.startswith("### "):
+        if line.startswith("### ") or line.startswith("## "):  # ★ 付録の後の節の表を混ぜない（code-reviewer・判断 12）
             break
         if line.startswith("| ") and not line.startswith("| ID") and not line.startswith("|---"):
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
@@ -148,6 +154,10 @@ def check(md, docx_path):
         errs.append("冒頭の 5 段落に「判定者 2 に渡さない」が無い")
     for m in BANNED.finditer(md):
         errs.append(f"禁止の語: {m.group(0)}")
+    for line in md.splitlines():
+        m = C.find_local(line)
+        if m:
+            errs.append(f"禁止の語（手元のパス・ユーザー名・メールアドレス）: {m.group(0)}")
     a, b = expected_appendix()
     if "### 9.1" not in md or appendix_rows(md, "### 9.1") != a:
         errs.append("付録 9.1 が 34 件の判定（写しの判定者1・ログの用途と材料）と違う")
@@ -161,6 +171,8 @@ def check(md, docx_path):
     for v_ in (cp.title, cp.subject, cp.keywords, cp.comments, cp.category, cp.author, cp.last_modified_by):
         if v_ and BANNED.search(v_):
             errs.append(".docx の属性に禁止の語")
+    # ★ 属性（core・app）・本文・リンク先など、zip の XML の部品をすべて見る（security-checker・判断 12）
+    errs += [f".docx に手元のパス・メールアドレスの形・外へのリンク: {x}" for x in C.scan_package(docx_path)]
     mt, dt = md_texts(md), docx_texts(docx_path)
     if mt != dt:
         k = next((k for k, (x, y) in enumerate(zip(mt, dt)) if x != y), min(len(mt), len(dt)))
@@ -194,6 +206,14 @@ def selftest():
     run("banned-gse", md + "\nGSE の話\n", red=True, must="禁止の語")
     run("banned-forward-slash-path", md + "\nC:/wt/x を見た\n", red=True, must="禁止の語")
     run("banned-gitbash-path", md + "\n/c/Users/x を見た\n", red=True, must="禁止の語")
+    run("banned-yen-path", md + "\nC:¥wt¥x を見た\n", red=True, must="禁止の語")
+    run("banned-fullwidth-path（全角）", md + "\nＣ：＼ｗｔ を見た\n", red=True, must="禁止の語")
+
+    def prop_path(d):
+        d.core_properties.category = "C:/wt/x"  # ★ 本文の外（属性）は zip の XML でしか見えない
+    run("docx-path-in-properties", md, red=True, mutate_docx=prop_path, must=".docx に手元のパス")
+    run("banned-username-next-to-kana", md + "\n" + os.path.basename(os.path.expanduser("~")) + "のフォルダ\n", red=True, must="禁止の語")
+    run("recall-at-not-email（対照）", md.replace("## 0 この文書について", "## 0 この文書について（Recall@0.5・ASE@ICSE.2024）", 1), red=False)
     run("colon-slash-not-path（対照）", md.replace("## 0 この文書について", "## 0 この文書について（systems:/ と https://x）", 1), red=False)
 
     def cell_line(md_, idx, col, new):
@@ -206,6 +226,8 @@ def selftest():
     run("appendix-use-shifted（9.1 の用途）", cell_line(md, "AF001", 3, "中心-B"), red=True, must="付録 9.1")
     run("appendix-basis-shifted（9.1 の材料）", cell_line(md, "AF002", 4, "全文"), red=True, must="付録 9.1")
     run("appendix-ai-shifted（9.2 の AI の判定）", cell_line(md, "X01", 5, "Claude 版"), red=True, must="付録 9.2")
+    run("appendix-use-shifted（9.2 の用途）", cell_line(md, "X01", 3, "方法論保持"), red=True, must="付録 9.2")
+    run("appendix-basis-shifted（9.2 の材料）", cell_line(md, "S08-03", 4, "全文"), red=True, must="付録 9.2")
 
     def meta(d):
         d.core_properties.comments = "generated by python-docx"

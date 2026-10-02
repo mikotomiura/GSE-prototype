@@ -210,6 +210,7 @@ def build(dst):
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
+    wb.properties.creator = wb.properties.lastModifiedBy = "判定者 1"  # ★ 提案のドキュメントと揃える（判断 12）
     done = [i for i in ids if i in final]
     with_ai = [i for i in done if i in ai_use]
     add_sheet(wb, "はじめに", "追加候補（判定者 1）｜何のファイルか", "このファイルは判定者 1 が作った。研究者の DB とは別のファイル。",
@@ -290,21 +291,23 @@ def main(dry):
         if not os.path.exists(p) and last is not None:
             sys.exit(f"記録があるのに表が無い（止まって聞く）: {p}")
     os.makedirs(os.path.dirname(C.CAND_ARCHIVE), exist_ok=True)
-    tmps = []
+    tmps, bak = [], None
     try:
-        fd, tmp_a = tempfile.mkstemp(suffix=".xlsx", dir=os.path.dirname(C.CAND_ARCHIVE), prefix=".tmp-")
+        # ★ 一時ファイルは .part・退避は Downloads の外・置き換えの直前に両方を再照合（判断 12）
+        fd, tmp_a = tempfile.mkstemp(suffix=".part", dir=os.path.dirname(C.CAND_ARCHIVE), prefix=".tmp-")
         os.close(fd)
         tmps.append(tmp_a)
         build(tmp_a)
-        fd, tmp_d = tempfile.mkstemp(suffix=".xlsx", dir=C.DOWNLOADS, prefix=".tmp-cand-")
+        fd, tmp_d = tempfile.mkstemp(suffix=".part", dir=C.DOWNLOADS, prefix=".tmp-cand-")
         os.close(fd)
         tmps.append(tmp_d)
         shutil.copyfile(tmp_a, tmp_d)
-        bak = None
+        for p in (C.CAND_ARCHIVE, C.CAND_DOWNLOADS):
+            if (os.path.exists(p) and C.sha256(p) != last) or (not os.path.exists(p) and last is not None):
+                sys.exit(f"表が最後に書いたものと違う・無い（止まって聞く）: {p}")
         if os.path.exists(C.CAND_DOWNLOADS):
-            if C.sha256(C.CAND_DOWNLOADS) != last:  # ★ 退避の直前にもう一度
-                sys.exit(f"表が最後に書いたものと違う（止まって聞く）: {C.CAND_DOWNLOADS}")
-            bak = C.CAND_DOWNLOADS + ".bak-" + last[:12]
+            fd, bak = tempfile.mkstemp(suffix=".part", prefix="cand-bak-")
+            os.close(fd)
             shutil.copyfile(C.CAND_DOWNLOADS, bak)
         os.replace(tmp_d, C.CAND_DOWNLOADS)
         try:
@@ -324,6 +327,8 @@ def main(dry):
         sys.exit("archive と Downloads の表が合わない")
     with open(C.CAND_SHA_RECORD, "w", encoding="utf-8", newline="\n") as f:
         f.write(new + "\n")
+    if bak and os.path.exists(bak):
+        os.remove(bak)
     print("ok", new)
 
 

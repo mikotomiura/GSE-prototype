@@ -54,9 +54,10 @@ DV_VOCAB = {"D": '"未判定,含める,除外,保留"', "E": '"未判定,含め�
             "H": '"未完了,進行中,完了,入手不可,対象外"', "I": '"未実施,進行中,完了,対象外"'}
 CMP_DV_VOCAB = '"中心候補,背景保持,方法論保持,訂正連結,除外,保留"'
 KINDS = set(EXPECT_E4)  # 含めた件の研究の種類（kind_detail）の語彙
-# ★ 研究者に渡す表に、手元のパス・ユーザー名・メールアドレスを入れない（security-checker・判断 11）。
-#   ドライブ文字は前が英字でないときだけ（題名の「systems:/」や URL の「https://」に当てない）
-LOCAL = re.compile(r"(?<![A-Za-z])[A-Za-z]:[\\/]|Downloads[\\/]|/c/Users|\bjohnd\b|[\w.+-]+@[\w-]+\.[\w.]+", re.I)
+# ★ 研究者に渡す表に、手元のパス・ユーザー名・メールアドレスを入れない（判断 11・12）。形は common.find_local（検査器 2 本で同じ）
+# 『探索の検索式』『探索の一覧』の見出し（★ build_candidates.py とは別に持つ）
+RUN_HEADER = ["API", "検索式（逐語）", "実行日時", "総数", "取得", "条件を通った", "打ち切り", "エラー"]
+LIST_HEADER = ["key", "題名", "年", "種別（API）", "掲載", "言語", "無料の版", "重なり", "見つかった API", "層", "読む一覧", "足した（ID）"]
 
 
 def read_log(path):
@@ -158,6 +159,9 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
     for col in VALIDATED:
         if covered.get(col) != (f"{col}5:{col}{4 + len(expect_rows)}", DV_VOCAB[col]):
             errs.append(f"入力規則が無い・範囲や語彙が違う: {col}（{covered.get(col)}）")
+    # ★ 種類は一覧（list）。エラーの表示は研究者の元のファイルと同じく出さない（候補を示すだけ・判断 12）
+    if any(dv.type != "list" for dv in ws.data_validations.dataValidation):
+        errs.append("入力規則の種類が一覧（list）でない")
     # ログから最終と段
     first, final_res, stages, quality, xconf = {}, {}, {}, {}, set()
     first_ans, prev_res, seen2 = {}, {}, set()
@@ -168,6 +172,8 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
             errs.append(f"{i}: 1 回目（{st}）が 2 回目の後にある")
         if st in ("2", "2e"):
             seen2.add(i)
+            if not rec["result"].get("basis"):  # ★ 2 回目に材料が無いと、書き込み側も検査器も「全文」に倒れる（code-reviewer・判断 12）
+                errs.append(f"{i}: 2 回目の判定に材料（basis）が無い")
         if st in ("1", "1e", "2", "2e"):  # (9) 答えの逐語と判定（result）
             why = answer_mismatch(st, rec["answer"], rec["result"], first.get(i), prev_res.get(i), first_ans.get(i))
             if why:
@@ -272,16 +278,17 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
     for ws_ in w.worksheets:
         for row in ws_.iter_rows():
             for c in row:
-                if isinstance(c.value, str) and LOCAL.search(c.value):
+                if isinstance(c.value, str) and C.find_local(c.value):
                     errs.append(f"手元のパス・メールアドレスの形: {ws_.title}!{c.coordinate}")
-    for k_ in ("creator", "lastModifiedBy", "title", "subject", "description", "keywords"):
-        v_ = getattr(w.properties, k_, None)
-        if isinstance(v_, str) and LOCAL.search(v_):
-            errs.append(f"手元のパス・メールアドレスの形: 文書の属性 {k_}")
+                if c.hyperlink is not None:  # ★ リンク先は値に出ない（Codex・判断 12）。表にリンクは置かない
+                    errs.append(f"リンクのセル: {ws_.title}!{c.coordinate}")
+    # ★ 属性・コメント・リンク先・入力規則の文など、zip の XML の部品をすべて見る（security-checker・判断 12）
+    errs += [f"手元のパス・メールアドレスの形・外へのリンク: {x}" for x in C.scan_package(path)]
     # (10) 『品質評価』: 含めた一次研究で品質を確定した件と、data/quality-rows.json と一致（data に行があるときだけシートを置く）
     qd = load_json(quality_path or C.QUALITY_ROWS, None)
-    want_q = sorted(i for i in final_res if final_res[i]["verdict"] == "含める"
-                    and final_res[i].get("kind_detail") == "一次研究" and i in quality)
+    # ★ 確定した件だけ（q が「保留」の件は数えない・code-reviewer・判断 12）
+    want_q = sorted(i for i in final_res if final_res[i]["verdict"] == "含める" and final_res[i].get("kind_detail") == "一次研究"
+                    and i in quality and not str(quality[i].get("answer", "")).startswith("保留"))
     if "品質評価" in w.sheetnames:
         wq_ = w["品質評価"]
         n_ = max(wq_.max_column, len((qd or {}).get("header") or []))
@@ -333,13 +340,13 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
     # ★ 全列を data から独立に組んで比べる（検索式・層・読む一覧だけだと件数・日時・題名・重なり・足した ID の誤記が通る・Codex・判断 11）
     want_r = [norm_row([x["api"], x["query"], x["executed_at"], x.get("total_hits"), x.get("fetched"), x.get("passed_filter"),
                         "はい" if x.get("truncated") else "いいえ", x.get("error")], 8) for x in runs]
-    if sheet_body(wr, 8) != want_r:
-        errs.append("探索の検索式が data と違う（全列）")
+    if sheet_body(wr, 8) != want_r or [wr.cell(4, c).value for c in range(1, 9)] != RUN_HEADER or wr.max_column > 8:
+        errs.append("探索の検索式が data と違う（全列・見出し・余分な列）")
     want_l = [norm_row([x["key"], x["title"], x.get("year"), x.get("type"), x.get("venue"), x.get("language"), x.get("oa"),
                         x.get("overlap"), x.get("sources"), x.get("layer"), x.get("reading"), x.get("added_as") or "いいえ"], 12)
               for x in recs]
-    if sheet_body(wq, 12) != want_l:
-        errs.append("探索の一覧が data と違う（全列）")
+    if sheet_body(wq, 12) != want_l or [wq.cell(4, c).value for c in range(1, 13)] != LIST_HEADER or wq.max_column > 12:
+        errs.append("探索の一覧が data と違う（全列・見出し・余分な列）")
     for x in recs:
         if x.get("added_as") and x["added_as"] not in ids:
             errs.append(f"探索で足したとする {x['added_as']} が表の行に無い")
@@ -486,6 +493,22 @@ def selftest():
            lambda wb: setattr(next(dv for dv in wb["スクリーニング"].data_validations.dataValidation if str(dv.sqref).startswith("D5")),
                               "formula1", '"未判定,含める,除外,保留,中心候補"'), must="入力規則")
     expect("local-path-in-cell", base_log, cell("問いと答え", "G5", "C:\\Users\\someone\\Downloads\\x.pdf"), must="手元のパス")
+    expect("yen-path-in-cell（¥ 区切り）", base_log, cell("問いと答え", "G5", "C:¥wt¥x"), must="手元のパス")
+    expect("gitbash-path-in-cell（/c/…）", base_log, cell("問いと答え", "G5", "/c/wt/x.json を見た"), must="手元のパス")
+    expect("username-next-to-kana（実行時のユーザー名）", base_log,
+           cell("問いと答え", "G5", os.path.basename(os.path.expanduser("~")) + "のフォルダ"), must="手元のパス")
+    expect("email-percent40", base_log, cell("問いと答え", "G5", "a.b%40example.org"), must="手元のパス")
+    expect("fullwidth-path-and-email（全角）", base_log, cell("問いと答え", "G5", "Ｃ：＼Ｕｓｅｒｓ と ａ．ｂ＠ｅｘａｍｐｌｅ．ｏｒｇ"), must="手元のパス")
+    expect("recall-at-not-email（対照）", base_log, cell("はじめに", "C41", "Recall@0.5・ASE@ICSE.2024・Scholarship@Western"), red=False)
+    expect("hyperlink-cell", base_log, lambda wb: setattr(wb["探索の一覧"]["B5"], "hyperlink", "https://example.org/x"), must="リンクのセル")
+    expect("search-list-header-swapped", base_log,
+           lambda wb: [wb["探索の一覧"].__setitem__(k, v) for k, v in (("C4", "種別（API）"), ("D4", "年"))], must="探索の一覧が data と違う")
+    expect("search-list-extra-column", base_log, cell("探索の一覧", "M5", "メモ"), must="探索の一覧が data と違う")
+    expect("dv-type-changed", base_log,
+           lambda wb: setattr(next(dv for dv in wb["スクリーニング"].data_validations.dataValidation if str(dv.sqref).startswith("H5")),
+                              "type", "textLength"), must="種類が一覧")
+    expect("stage2-without-basis", logm(lambda lg: lg[1].__setitem__("result", {k: v for k, v in lg[1]["result"].items() if k != "basis"})),
+           must="材料（basis）が無い")
     expect("email-in-cell", base_log, cell("探索の一覧", "B6", "contact a.b@example.org"), must="手元のパス")
     # 対照: 題名の「systems:/」・URL の「https://」は手元のパスに当てない
     expect("url-and-colon-slash-not-local（対照）", base_log,
@@ -502,6 +525,10 @@ def selftest():
     xp, lp = build_with(logm(lambda lg: lg.extend(copy.deepcopy(prim) + [qhold])))
     good = any("品質評価が完了でない" in e for e in check(xp, lp, final=True))
     print(("PASS" if good else "FAIL"), "final-quality-hold（q が保留なら --final で赤）")
+    ok &= good
+    # 対照: q が保留の件は「品質を確定した件」に数えない（--final でなければ『品質評価』のシートが無くても緑の規則）
+    good = not any("品質評価" in e for e in check(xp, lp, final=False))
+    print(("PASS" if good else "FAIL"), "quality-hold-not-confirmed（対照）", "" if good else [e for e in check(xp, lp) if "品質評価" in e][:2])
     ok &= good
     C.EXTRACT_ROWS = old_ex
     # --final の緑の対照: 対象（群 1〜3 と X の行）をすべて判定し、抽出を確定した自前のログ（★ 常に赤の --final を見逃さない）

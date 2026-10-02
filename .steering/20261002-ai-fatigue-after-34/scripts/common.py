@@ -4,9 +4,13 @@
   （check_candidates.py）がそれぞれ独立に持つ（片方から消えても、もう片方の固定の期待で赤になる）。
 ★ 前のタスクの道具（34 件）は import するだけで変えない。
 """
+import getpass
 import hashlib
 import os
+import re
 import sys
+import unicodedata
+import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TASK = os.path.dirname(HERE)
@@ -49,6 +53,55 @@ SEARCH_RECORDS = os.path.join(DATA, "search-records.json")  # 探索の一覧（
 JUDGE_SHEET = "追加候補"
 JUDGE_HEADER_ROW = 4
 N_CANDIDATES = 220
+
+
+def _user_names():
+    """この機のユーザー名（★ repo に直書きしない・実行時に組む・security-checker・判断 12）。"""
+    names = set()
+    try:
+        names.add(getpass.getuser())
+    except Exception:
+        pass
+    names.add(os.path.basename(os.path.expanduser("~")))
+    return sorted(n for n in names if n and len(n) >= 3)
+
+
+_USERS = "|".join(re.escape(n) for n in _user_names())
+# ★ 研究者に渡すものに入れない形（判断 11・12）。NFKC で全角を半角に寄せてから当てる（＼・：・＠・ｊｏｈｎｄ）。
+#   ドライブ文字（前が英字でない・区切りは \ / ¥）・UNC・環境変数・~・git-bash のドライブ（/c/…）・macOS と Linux のホーム・
+#   Downloads のフォルダ（大文字の D・区切りに挟まれたときだけ。URL の /downloads/ に当てない）・メールアドレス（@ と %40・
+#   ドメインの末尾が英字 2 字以上。Recall@0.5・ASE@ICSE.2024・Scholarship@Western に当てない）・この機のユーザー名
+LOCAL_RE = re.compile(
+    r"(?<![A-Za-z])[A-Za-z]:[\\/¥]"
+    r"|\\\\[\w.$-]+\\"
+    r"|%[A-Za-z_]+%"
+    r"|(?<![\w.])~[\\/¥]"
+    r"|(?<![\w.:/])/[a-z]/"
+    r"|(?<![\w.])/(?:Users|home)/"
+    r"|[\\/¥](?-i:Downloads)[\\/¥]"
+    r"|[\w.+-]+(?:@|%40)[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}"
+    + (rf"|(?<![A-Za-z0-9])(?:{_USERS})(?![A-Za-z0-9])" if _USERS else ""),
+    re.I)
+
+
+def find_local(s):
+    """手元のパス・ユーザー名・メールアドレスの形を探す（無ければ None）。"""
+    return LOCAL_RE.search(unicodedata.normalize("NFKC", s or ""))
+
+
+def scan_package(path):
+    """xlsx・docx（zip）の XML の部品をすべて見て、手元の形と外へのリンクを返す（属性・コメント・リンク先・入力規則の文も含む）。"""
+    out = []
+    with zipfile.ZipFile(path) as z:
+        for n in z.namelist():
+            if n.endswith((".xml", ".rels")):
+                t = z.read(n).decode("utf-8", "replace")
+                m = find_local(t)
+                if m:
+                    out.append(f"{n}: {m.group(0)}")
+                if 'TargetMode="External"' in t:
+                    out.append(f"{n}: 外へのリンク")
+    return out
 
 
 def sha256(path):

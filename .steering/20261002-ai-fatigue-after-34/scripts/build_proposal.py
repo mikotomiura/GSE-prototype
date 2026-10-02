@@ -198,22 +198,25 @@ def main(dry):
             sys.exit(f".docx が最後に書いたものと違う（手で直された可能性・止まって聞く）: {p}")
         if not os.path.exists(p) and last is not None:
             sys.exit(f"記録があるのに .docx が無い（止まって聞く）: {p}")
-    write_md(old_md, md)  # ★ 止まる判定を通った後で原稿を書き戻す
-    tmps = []
+    # ★ 順: 一時ファイルに作る → 置き換えの直前に両方を再照合（存在と SHA）→ Downloads を退避（Downloads の外）して置き換え →
+    #   archive を置き換え（失敗したら Downloads を戻す）→ 原稿を書き戻す → SHA を記録 → 退避を消す（Codex・code-reviewer・判断 12）。
+    #   一時ファイルは .part（途中で止まっても .docx として開けない・security-checker）
+    tmps, bak = [], None
     try:
-        fd, tmp_a = tempfile.mkstemp(suffix=".docx", dir=os.path.dirname(DOCX_ARCHIVE), prefix=".tmp-")
+        fd, tmp_a = tempfile.mkstemp(suffix=".part", dir=os.path.dirname(DOCX_ARCHIVE), prefix=".tmp-")
         os.close(fd)
         tmps.append(tmp_a)
         build_docx(md, tmp_a)
-        fd, tmp_d = tempfile.mkstemp(suffix=".docx", dir=C.DOWNLOADS, prefix=".tmp-proposal-")
+        fd, tmp_d = tempfile.mkstemp(suffix=".part", dir=C.DOWNLOADS, prefix=".tmp-proposal-")
         os.close(fd)
         tmps.append(tmp_d)
         shutil.copyfile(tmp_a, tmp_d)
-        bak = None
+        for p in (DOCX_ARCHIVE, DOCX_DOWNLOADS):  # ★ 置き換えの直前にもう一度（作っている間に保存・削除されていないか）
+            if (os.path.exists(p) and C.sha256(p) != last) or (not os.path.exists(p) and last is not None):
+                sys.exit(f".docx が最後に書いたものと違う・無い（止まって聞く）: {p}")
         if os.path.exists(DOCX_DOWNLOADS):
-            if C.sha256(DOCX_DOWNLOADS) != last:  # ★ 置き換えの直前にもう一度
-                sys.exit(f".docx が最後に書いたものと違う（止まって聞く）: {DOCX_DOWNLOADS}")
-            bak = DOCX_DOWNLOADS + ".bak-" + last[:12]
+            fd, bak = tempfile.mkstemp(suffix=".part", prefix="proposal-bak-")  # ★ 研究者に渡すフォルダに古い版を残さない
+            os.close(fd)
             shutil.copyfile(DOCX_DOWNLOADS, bak)
         os.replace(tmp_d, DOCX_DOWNLOADS)
         try:
@@ -224,6 +227,7 @@ def main(dry):
             else:
                 os.remove(DOCX_DOWNLOADS)
             raise
+        write_md(old_md, md)  # ★ 2 つの置き換えが済んでから原稿を書き戻す
     finally:
         for t in tmps:
             if os.path.exists(t):
@@ -233,6 +237,8 @@ def main(dry):
         sys.exit("archive と Downloads の .docx が合わない")
     with open(SHA_RECORD, "w", encoding="utf-8", newline="\n") as f:
         f.write(new + "\n")
+    if bak and os.path.exists(bak):
+        os.remove(bak)
     print("ok", new)
 
 
