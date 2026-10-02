@@ -10,8 +10,14 @@
 (6) 『判定者1_確認の結果』: 区分ごとの件数（12／34／8）・ID の順・結果と経路の語彙・空欄・元の DB の文との対応（--final では必須）。
 (7) 『判定者1_問いと答え』: ログと 1 行ずつ一致する（--final では必須）。
 (8) 『判定者1_品質評価』の ID = 品質を確定した含める一次研究。
+(10) 答えの逐語と判定（result）が合う（答えの文だけから期待を読む・読めない答えは赤）。一次研究でない件を含めたら赤（規則が未実装）。
+(11) 『判定者1_全文抽出』の ID = 抽出を確定した件（重複なし）・中身は data/extract-rows.json と同じ（--final では必須）。
+(12) 『AI判定比較』は 34 件すべての 2 回目の後に記入する。足したシートと入力欄に式のセルが無い。
+(13) 理由の問いの復元（reason-questions-restored.jsonl）: 答えがログの同じ seq の note と一致し、note に答えのある行はどれも復元を持つ。
+     『判定者1_理由の問い』は復元と 1 行ずつ一致する（--final では必須）。『はじめに』の「判定者 2 に渡すとき」が戻す列を名指しする。
 --selftest: 既知の答えの検算と、変異（入力欄の外のセル・判定者2・ログと写しのずれ・推奨の印・余分なシート・確認の結果・問いと答え・
-    品質評価のシート・H と I）がそれぞれ赤になること。禁止語の規則の単体の検査と、--final の対照つきの検査。
+    品質評価のシート・H と I・答えと判定・全文抽出・理由の問い・式・2 回目の前の記入）がそれぞれ赤になること。
+    禁止語の規則と答えの読み方の単体の検査と、--final の対照つきの検査。
 使い方: python check_workbook.py [--final] [--selftest]
 """
 import copy
@@ -83,6 +89,79 @@ def expect_human(result, kind):
     return EXPECT_HUMAN[(v, e)]
 
 
+# ★ 答えの逐語 → 期待の判定（判断 14・15）。result を見ずに、答えの文が既知の形のどれかに**全体一致**するときだけ読む。
+#   形は実ログの答え（34 件の 76 問と、次のタスクの追加候補の答え）から起こした。NFKC で全角の括弧は半角になる。
+#   どれにも一致しない答え（Other の自由記入・否定文・中心やコードが 2 つ）は読めない＝赤。読み方を足すときは、
+#   その答えの判定を確かめてから形を足す。(段の集合, 形, 判定, 参照)。u = 中心の A/B、e = コード。
+#   参照: None = 答えだけで決まる／"first" = 1 回目（1・1e）と同じであること／"prev" = 直前の判定と同じであること
+ANSWER_FORMS = [
+    ({"1"}, r"保留", "保留", None),
+    ({"1"}, r"含める\(中心-(?P<u>[AB])\)", "含める", None),
+    ({"1"}, r"除外", "除外", None),
+    ({"1"}, r"除外\(E4 以外\)", "除外", None),
+    ({"1"}, r"除外 (?P<e>E4)\(保持の区分は対応表で決まる\)", "除外", None),
+    ({"1e"}, r"(?P<e>E[1-7])", "除外", None),
+    ({"2", "2e"}, r"1 回目のまま", None, "first"),
+    ({"2", "2e"}, r"1 回目のまま\(中心-(?P<u>[AB])\)", "含める", "first"),
+    ({"2", "2e"}, r"1 回目のまま\(保留(?:・(?P<e>E6))?\)", "保留", "first"),
+    ({"2", "2e"}, r"1 回目のまま\(除外 (?P<e>E[1-7])\)", "除外", "first"),
+    ({"2", "2e"}, r"AI の判定\(含める・中心-(?P<u>[AB])\)に変える", "含める", None),
+    ({"2", "2e"}, r"AI の判定\(除外 (?P<e>E[1-7])(?:・(?:背景保持|方法論保持|訂正連結))?\)に変える", "除外", None),
+    ({"2", "2e"}, r"AI の判定\(保留(?:・(?P<e>E6))?\)に変える", "保留", None),
+    ({"2", "2e"}, r"Claude 版\(中心-(?P<u>[AB])\)に変える", "含める", None),
+    ({"2", "2e"}, r"中心-(?P<u>[AB]) のまま", "含める", "prev"),
+]
+NO_TEXT_BASIS = ("抄録", "なし")  # ★ 保留の E6（全文入手不可）を答えに書かずに付けてよいのは、材料が抄録・なしのときだけ
+
+
+def read_answer(stage, answer):
+    """答えの文 → (判定, 中心, コード, 参照)。既知の形のどれにも全体一致しなければ None。"""
+    a = _nfkc(answer).strip()
+    for stages, form, verdict, ref in ANSWER_FORMS:
+        m = re.fullmatch(form, a)
+        if stage in stages and m:
+            g = m.groupdict()
+            return verdict, (f"中心-{g['u']}" if g.get("u") else None), g.get("e"), ref
+    return None
+
+
+def answer_mismatch(stage, answer, res, first_res, prev_res=None, first_answer=None):
+    """答えの文と判定（result）が合わなければ理由の文を返す（合えば None）。
+    first_res = その件の 1 回目（1・1e）の最後の result・prev_res = その件の直前の判定（1/1e/2/2e）の result・
+    first_answer = その件の stage 1 の答えの文。"""
+    if "一次研究として読む" in _nfkc(answer):
+        return "『含める（一次研究として読む）』の規則は未実装（用途・品質評価が決まっていない）"
+    got = read_answer(stage, answer)
+    if got is None:
+        return f"答え {answer!r} を読めない（既知の形のどれにも全体一致しない。Other の自由記入は判定を確かめて形を足す）"
+    v, use, ecode, ref = got
+    if stage == "1e":  # ★ 除外のコードの問いは、コードを決めていない除外（「除外」「除外（E4 以外）」）の後だけ
+        if not first_res or first_res.get("verdict") != "除外" or first_res.get("ecode"):
+            return "除外のコードの答えの前の 1 回目が、コードの無い除外でない"
+        if ecode == "E4" and "E4 以外" in _nfkc(first_answer):
+            return "1 回目が「除外（E4 以外）」なのにコードが E4"
+    if ref:
+        base = first_res if ref == "first" else prev_res
+        if base is None:
+            return f"答え {answer!r} の参照先（{'1 回目' if ref == 'first' else '直前の判定'}）が無い"
+        bv, bu, be = base.get("verdict"), base.get("use"), base.get("ecode")
+        if v is None:  # 括弧の無い「1 回目のまま」→ 1 回目の判定そのもの
+            v, use, ecode = bv, bu, be
+        elif v != bv or (v == "含める" and use != bu) or (v == "除外" and ecode != be):
+            return f"答え {answer!r} が{'1 回目' if ref == 'first' else '直前'}の判定（{bv} {bu or be or ''}）と食い違う"
+    if res.get("verdict") != v:
+        return f"答えは {v!r}・判定は {res.get('verdict')!r}"
+    if v == "含める" and (use is None or res.get("use") != use):
+        return f"答えの中心 {use!r}・判定の中心 {res.get('use')!r}"
+    if v == "除外" and res.get("ecode") != ecode:
+        return f"答えのコード {ecode!r}・判定のコード {res.get('ecode')!r}"
+    if v == "保留":
+        ok = {ecode} if ecode else ({None, "E6"} if res.get("basis") in NO_TEXT_BASIS else {None})
+        if res.get("ecode") not in ok:
+            return f"保留のコード {res.get('ecode')!r} が答え {answer!r}・材料 {res.get('basis')!r} と合わない"
+    return None
+
+
 def read_log(path):
     if not os.path.exists(path):
         return []
@@ -102,6 +181,20 @@ QUALITY_SHEET = C.ADDED_PREFIX + "品質評価"
 INTRO_SHEET = C.ADDED_PREFIX + "はじめに"
 # ★ 2 回目の前後に Claude の見立て・計算を判定者 1 が見た件（ログの note・decisions 判断 4。書き込み側の CLAUDE_SHOWN とは別に持つ）
 EXPECT_CLAUDE_SHOWN = {"AF002", "AF003", "AF004"}
+EXTRACT_SHEET = C.ADDED_PREFIX + "全文抽出"
+EXTRACT_DATA = os.path.join(C.TASK, "data", "extract-rows.json")
+REASON_SHEET = C.ADDED_PREFIX + "理由の問い"
+REASON_HEADER = ["seq（答えのログ）", "ID", "問い（逐語）", "選択肢", "複数選択", "答え", "補足（note）", "答えた時刻"]
+REASONS = os.path.join(C.TASK, "reason-questions-restored.jsonl")
+REASON_TIME = "（UTC）"
+
+
+def note_reason_answer(note):
+    """note の「理由の問い … の答え: X」の X（「。」か末尾まで）。理由の問いが無い・問うていない note は None。"""
+    note = note or ""
+    m = re.search(r"理由の問い", note)
+    m2 = re.compile(r"の答え: ([^。]*)").search(note, m.end()) if m else None
+    return m2.group(1).strip() if m2 else None
 LOG_SHEET = C.ADDED_PREFIX + "問いと答え"
 LOG_HEADER = ["seq", "ID", "段", "問い（逐語）", "選択肢", "答え", "補足（note）"]
 
@@ -124,6 +217,92 @@ def check_log_sheet(w, log, final):
         if [x[0], x[1], x[2], x[3], x[4] or "", x[5], x[6] or ""] != want:  # ★ 選択肢と補足（Claude の関与の開示）も見る
             errs.append(f"{LOG_SHEET}!A{n}: ログの seq {rec.get('seq')} と一致しない")
     return errs
+
+
+def sheet_rows(ws, ncol):
+    rows = [[ws.cell(r, c).value for c in range(1, ncol + 1)] for r in range(5, ws.max_row + 1)]
+    return [x for x in rows if any(v not in (None, "") for v in x)]
+
+
+def check_extract_sheet(w, xitems, final, data_path=None):
+    """『判定者1_全文抽出』: ID = 抽出を確定した件（重複なし）・中身は data の行と同じ（--final では必須）。"""
+    if EXTRACT_SHEET not in w.sheetnames:
+        return [f"{EXTRACT_SHEET} が無い（抽出を確定した件 {len(xitems)} があるのに・--final）"] if final and xitems else []
+    ws = w[EXTRACT_SHEET]
+    if ws.cell(4, 1).value != "ID":
+        return [f"{EXTRACT_SHEET}: 見出しの A 列が ID でない"]
+    ncol = ws.max_column
+    rows = sheet_rows(ws, ncol)
+    ids = [x[0] for x in rows]
+    errs = []
+    dup = sorted({i for i in ids if ids.count(i) > 1})
+    if dup:
+        errs.append(f"{EXTRACT_SHEET}: ID が重複 {dup}")
+    if set(ids) != set(xitems):
+        errs.append(f"{EXTRACT_SHEET}: ID が抽出を確定した件と違う（多い {sorted(set(ids) - set(xitems))}・無い {sorted(set(xitems) - set(ids))}）")
+    if data_path and not os.path.exists(data_path):
+        return errs + [f"{EXTRACT_SHEET}: 中身を比べる data が無い: {os.path.basename(data_path)}"]
+    if data_path:
+        d = json.load(open(data_path, encoding="utf-8"))
+        hdr = [ws.cell(4, c).value for c in range(1, ncol + 1)]
+
+        def norm(row):
+            return [None if v in (None, "") else v for v in row] + [None] * (ncol - len(row))
+        if norm(d["header"]) != norm(hdr) or [norm(x) for x in d["rows"]] != [norm(x) for x in rows]:
+            errs.append(f"{EXTRACT_SHEET}: 中身が data/extract-rows.json と違う")
+    return errs
+
+
+def check_reasons(w, log, reasons_path, final):
+    """理由の問いの復元: 答え = ログの同じ seq の note の答え・note に答えのある行はどれも復元を持つ・シートは復元と 1 行ずつ一致。"""
+    if reasons_path is None:
+        return []
+    recs = read_log(reasons_path)
+    by_seq = {r.get("seq"): r for r in log}
+    answered = {r.get("seq") for r in log if r.get("stage") in ("2", "2e") and note_reason_answer(r.get("note")) is not None}
+    errs, got = [], set()
+    for x in recs:
+        r, sq = by_seq.get(x.get("log_seq")), x.get("log_seq")
+        if not r or r.get("item") != x.get("item") or r.get("stage") not in ("2", "2e"):
+            errs.append(f"理由の問い {x.get('item')}: ログの seq {sq} が同じ件の 2 回目でない")
+            continue
+        if not x.get("answer") or note_reason_answer(r.get("note")) != x["answer"]:  # ★ 完全一致（前方一致だと多選択の欠けが通る）
+            errs.append(f"理由の問い {x.get('item')}: 答え {x.get('answer')!r} がログの seq {sq} の note と合わない")
+        q, opts = x.get("question") or "", x.get("options")
+        m = re.match(r"【(AF\d{3})", q)
+        if "理由はどれに近いですか" not in q or not m or m.group(1) != x.get("item"):  # ★ 問いの文が件と結び付く
+            errs.append(f"理由の問い {x.get('item')}: 問いの文の形・件が違う")
+        if not isinstance(opts, list) or any(part not in opts for part in str(x.get("answer") or "").split(", ")):
+            errs.append(f"理由の問い {x.get('item')}: 答えが選択肢に無い（選択肢の形が違う）")
+        un = x.get("user_note") or ""
+        if un and un not in (r.get("note") or ""):  # ★ 判定者 1 の補足は、ログに残したものだけ外に出す（security-checker）
+            errs.append(f"理由の問い {x.get('item')}: 補足（user_note）がログの note に無い")
+        if sq in got:
+            errs.append(f"理由の問い: seq {sq} が重複")
+        got.add(sq)
+    if answered - got:
+        errs.append(f"理由の問い: note に答えがあるのに復元が無い seq {sorted(answered - got)}")
+    if REASON_SHEET not in w.sheetnames:
+        return errs + ([f"{REASON_SHEET} が無い（復元 {len(recs)} 件があるのに・--final）"] if final and recs else [])
+    ws = w[REASON_SHEET]
+    if [ws.cell(4, c).value for c in range(1, len(REASON_HEADER) + 1)] != REASON_HEADER:
+        return errs + [f"{REASON_SHEET}: 見出しが違う"]
+    rows = sheet_rows(ws, len(REASON_HEADER))
+    want = [[x.get("log_seq"), x.get("item"), x.get("question"), " ／ ".join(x.get("options") or []),
+             "可" if x.get("multiSelect") else "不可", x.get("answer"), x.get("user_note") or "",
+             (x.get("answered_at") or "")[:16].replace("T", " ") + REASON_TIME] for x in recs]
+    if [[x[0], x[1], x[2], x[3], x[4], x[5], x[6] or "", x[7]] for x in rows] != want:
+        errs.append(f"{REASON_SHEET}: 復元（reason-questions-restored.jsonl）と 1 行ずつ一致しない（{len(rows)} 行・復元 {len(recs)} 件）")
+    return errs
+
+
+def check_cmp_timing(cmp_, o_cmp, seen2):
+    """『AI判定比較』の入力欄（D・F・G）は、34 件すべてに 2 回目があるまで元のファイルの値のまま。"""
+    if all(i in seen2 for i in C.IDS):
+        return []
+    early = [f"{col}{C.FIRST_ROW + k}" for k in range(len(C.IDS)) for col in C.INPUT_COLS["AI判定比較"]
+             if cmp_[f"{col}{C.FIRST_ROW + k}"].value != o_cmp[f"{col}{C.FIRST_ROW + k}"].value]
+    return [f"『AI判定比較』が 34 件の 2 回目の前に記入されている: {early[:3]}"] if early else []
 
 
 def original_checks_texts(o):
@@ -174,7 +353,7 @@ def check_checks_sheet(w, final, o=None):
     return errs
 
 
-def check(copy_path, log_path, final=False, original=C.ORIGINAL):
+def check(copy_path, log_path, final=False, original=C.ORIGINAL, reasons_path=None, extract_path=None):
     errs = []
     o = openpyxl.load_workbook(original)
     w = openpyxl.load_workbook(copy_path)
@@ -213,12 +392,21 @@ def check(copy_path, log_path, final=False, original=C.ORIGINAL):
                 errs.append(f"判定者2・最終判定が未判定でない: スクリーニング!{col}{r}={scr[f'{col}{r}'].value!r}")
     # (3)(4)
     log = read_log(log_path)
-    seen1, seen2, final_res, qrec, xitems = {}, {}, {}, {}, set()
+    seen1, seen2, final_res, qrec, xitems, first_res, first_ans, prev_res = {}, {}, {}, {}, set(), {}, {}, {}
     for n, rec in enumerate(log, 1):
         i, st = rec.get("item"), rec.get("stage")
         if i not in kind:
             errs.append(f"ログ {n}: 知らない件 {i}")
             continue
+        if st in ("1", "1e", "2", "2e"):  # (10) 答えの逐語と判定（result）
+            why = answer_mismatch(st, rec.get("answer"), rec.get("result") or {}, first_res.get(i), prev_res.get(i), first_ans.get(i))
+            if why:
+                errs.append(f"ログ {n} {i}: 答えと判定が合わない（{why}）")
+            if st in ("1", "1e"):
+                first_res[i] = rec.get("result") or {}
+            if st == "1":
+                first_ans[i] = rec.get("answer")
+            prev_res[i] = rec.get("result") or {}
         if st == "1":
             want = STAGE1_OPTIONS["primary" if kind[i] in PRIMARY else "other"]
             if rec.get("options") != want:
@@ -260,8 +448,8 @@ def check(copy_path, log_path, final=False, original=C.ORIGINAL):
         iv = scr[f"I{r}"].value
         if res["verdict"] == "除外" and iv != "対象外":
             errs.append(f"{i}: 除外なのに品質評価={iv!r}")
-        if res["verdict"] == "含める" and kind[i] not in PRIMARY and iv != "対象外":
-            errs.append(f"{i}: 一次研究でない件の品質評価={iv!r}")
+        if res["verdict"] == "含める" and kind[i] not in PRIMARY:  # ★ 規則が未実装（判断 14）
+            errs.append(f"{i}: 一次研究でない件を含めた（『一次研究として読む』の規則は未実装）")
         if res.get("basis") == "抄録" and scr[f"H{r}"].value != "入手不可":
             errs.append(f"{i}: 材料が抄録なのに全文確認={scr[f'H{r}'].value!r}")
         # 全文確認（H）・品質評価（I）を、ログの x（抽出の確定）と q（品質の確定）から独立に計算する（design §2.1）
@@ -308,6 +496,21 @@ def check(copy_path, log_path, final=False, original=C.ORIGINAL):
             errs.append(f"{QUALITY_SHEET}: ID {sorted(got)} が品質を確定した含める一次研究 {sorted(want_q)} と違う")
     elif final and want_q:
         errs.append(f"{QUALITY_SHEET} が無い（品質を確定した件 {len(want_q)} があるのに・--final）")
+    # (11) 『判定者1_全文抽出』
+    errs += check_extract_sheet(w, xitems, final, extract_path)
+    # (12) 『AI判定比較』は 34 件すべての 2 回目の後（1 回目だけの件があるうちは空）
+    errs += check_cmp_timing(cmp_, o["AI判定比較"], seen2)
+    # (12) 式のセル（足したシートと入力欄）。★ 外の文の先頭の = が式になるのを防ぐ
+    for s in w.sheetnames:
+        if s.startswith(C.ADDED_PREFIX):
+            cells = [c for row in w[s].iter_rows() for c in row]
+        elif s in C.INPUT_COLS:
+            cells = [w[s][f"{col}{r}"] for col in C.INPUT_COLS[s] for r in range(C.FIRST_ROW, C.FIRST_ROW + 34)]
+        else:
+            continue
+        errs += [f"式のセル: {s}!{c.coordinate}" for c in cells if c.data_type == "f"]
+    # (13) 理由の問いの復元と『判定者1_理由の問い』
+    errs += check_reasons(w, log, reasons_path, final)
     # (9) 『判定者1_はじめに』に研究者への注意がある（判定者 2 に渡さない・Claude の関与）。★ 見出し（A 列）だけでなく説明（B 列）を見る
     if final:
         intro = {}
@@ -318,6 +521,12 @@ def check(copy_path, log_path, final=False, original=C.ORIGINAL):
         body = " ".join(intro.values())
         if "判定者 2 に渡さない" not in body:
             errs.append(f"{INTRO_SHEET}: 「判定者 2 に渡さない」の行が無い（--final）")
+        hand = intro.get("判定者 2 に渡すとき", "")
+        if "で始まるシートをすべて消す" not in hand:
+            errs.append(f"{INTRO_SHEET}: 「判定者 2 に渡すとき」に 判定者1_ のシートをすべて消すことが無い（--final）")
+        for s_, cols in C.INPUT_COLS.items():  # ★ 戻す列を名指しする（「判定者1 の列」だけでは G〜J・『AI判定比較』が残る・判断 14）
+            if f"『{s_}』の {'・'.join(cols)} 列" not in hand:
+                errs.append(f"{INTRO_SHEET}: 「判定者 2 に渡すとき」に『{s_}』の {'・'.join(cols)} 列が無い（--final）")
         claude_row = intro.get("Claude の関与", "")
         if not claude_row or any(i not in claude_row for i in EXPECT_CLAUDE_SHOWN):
             errs.append(f"{INTRO_SHEET}: 「Claude の関与」の行の説明に {sorted(EXPECT_CLAUDE_SHOWN)} が無い（--final）")
@@ -596,13 +805,21 @@ def selftest():
                 ws.cell(rr, 1, k)
                 ws.cell(rr, 2, v)
         return f
-    good = [("判定者 2 に渡すとき", "この写しは判定者 2 に渡さない"), ("Claude の関与", "AF002・AF003 の見立て・AF004 の再計算")]
+    good = [("判定者 2 に渡すとき", "この写しは判定者 2 に渡さない。『スクリーニング』の D・G・H・I・J 列と『AI判定比較』の D・F・G 列を戻し、"
+                                 "名前が 判定者1_ で始まるシートをすべて消す"),
+            ("Claude の関与", "AF002・AF003 の見立て・AF004 の再計算")]
     if any(INTRO_SHEET in e for e in final_errs(fn_wb=intro_with(good))):
         print("FAIL 対照: 『はじめに』に注意があるのに赤", [e for e in final_errs(fn_wb=intro_with(good)) if INTRO_SHEET in e])
         bad += 1
     for nm, rows_, must in (("判定者 2 の注意が無い", good[1:], "「判定者 2 に渡さない」"),
                             ("Claude の関与が見出しだけ", [good[0], ("Claude の関与", "")], "「Claude の関与」"),
-                            ("Claude の関与に AF004 が無い", [good[0], ("Claude の関与", "AF002・AF003 の見立て")], "「Claude の関与」")):
+                            ("Claude の関与に AF004 が無い", [good[0], ("Claude の関与", "AF002・AF003 の見立て")], "「Claude の関与」"),
+                            ("戻す列が D だけ", [("判定者 2 に渡すとき", "この写しは判定者 2 に渡さない。『スクリーニング』の D 列"), good[1]],
+                             "『スクリーニング』の D・G・H・I・J 列が無い"),
+                            ("『AI判定比較』の列が無い", [("判定者 2 に渡すとき", "この写しは判定者 2 に渡さない。『スクリーニング』の D・G・H・I・J 列"),
+                                                     good[1]], "『AI判定比較』の D・F・G 列が無い"),
+                            ("シートを消す句が無い", [("判定者 2 に渡すとき", "この写しは判定者 2 に渡さない。『スクリーニング』の D・G・H・I・J 列と"
+                                                                   "『AI判定比較』の D・F・G 列を戻す"), good[1]], "シートをすべて消すことが無い")):
         if not any(must in e for e in final_errs(fn_wb=intro_with(rows_))):
             print("FAIL 『はじめに』の変異が --final で赤にならない:", nm)
             bad += 1
@@ -610,6 +827,194 @@ def selftest():
     mutate("extra-sheet", fn_wb=lambda w: w.create_sheet("メモ"))
     mutate("human-use-wrong", fn_wb=lambda w: w["AI判定比較"].cell(r, 4, "背景保持"))
     mutate("unlogged-verdict", fn_wb=lambda w: w["スクリーニング"].cell(C.FIRST_ROW + 1, 4, "含める"))  # AF002（基準のログに無い件）
+
+    # ---- 2026-10-02 Codex の指摘への対応（判断 14） ----
+    # (10) 答えの読み方: 実データの答えの形（陰性対照）と、答え・判定の片方だけをずらした形・既知の形の外（判断 14・15）
+    f_hold, f_e2, f_b = {"verdict": "保留"}, {"verdict": "除外", "ecode": "E2"}, {"verdict": "含める", "use": "中心-B"}
+    f_ex = {"verdict": "除外"}  # コードを決めていない除外（1e の前）
+    h6 = {"verdict": "保留", "ecode": "E6", "basis": "抄録"}
+    # (名前, 段, 答え, result, 1 回目, 直前の判定, 1 回目の答え, 赤になるべきか)
+    ans_unit = [
+        ("保留 → 緑", "1", "保留", {"verdict": "保留"}, None, None, None, False),
+        ("保留で E6・材料なし → 緑（次のタスクの形）", "1", "保留", {"verdict": "保留", "ecode": "E6", "basis": "なし"}, None, None, None, False),
+        ("保留で E6・材料が全文 → 赤", "1", "保留", {"verdict": "保留", "ecode": "E6", "basis": "全文"}, None, None, None, True),
+        ("含める（中心-B）→ 緑", "1", "含める（中心-B）", f_b, None, None, None, False),
+        ("除外（E4 以外）でコード無し → 緑", "1", "除外（E4 以外）", f_ex, None, None, None, False),
+        ("除外（E4 以外）なのに E4 → 赤", "1", "除外（E4 以外）", {"verdict": "除外", "ecode": "E4"}, None, None, None, True),
+        ("除外 E4（保持の区分は対応表で決まる）→ 緑", "1", STAGE1_OPTIONS["other"][1], {"verdict": "除外", "ecode": "E4"}, None, None, None, False),
+        ("1e の E2（除外（E4 以外）の後）→ 緑", "1e", "E2", f_e2, f_ex, f_ex, "除外（E4 以外）", False),
+        ("1e の答え E2・判定 E3 → 赤", "1e", "E2", {"verdict": "除外", "ecode": "E3"}, f_ex, f_ex, "除外", True),
+        ("1e が保留の後 → 赤", "1e", "E2", f_e2, f_hold, f_hold, "保留", True),
+        ("1e が 1 回目の無いまま → 赤", "1e", "E2", f_e2, None, None, None, True),
+        ("1e の E4 が「除外（E4 以外）」の後 → 赤", "1e", "E4", {"verdict": "除外", "ecode": "E4"}, f_ex, f_ex, "除外（E4 以外）", True),
+        ("1e がコードを決めた除外の後 → 赤", "1e", "E2", f_e2, {"verdict": "除外", "ecode": "E4"}, None, STAGE1_OPTIONS["other"][1], True),
+        ("1 回目のまま（保留・E6）→ 緑", "2", "1 回目のまま（保留・E6）", {"verdict": "保留", "ecode": "E6"}, f_hold, f_hold, "保留", False),
+        ("1 回目のまま（保留）で E6・材料が抄録 → 緑", "2", "1 回目のまま（保留）", h6, f_hold, f_hold, "保留", False),
+        ("1 回目のまま（保留）で E6・材料が全文 → 赤", "2", "1 回目のまま（保留）", dict(h6, basis="全文"), f_hold, f_hold, "保留", True),
+        ("1 回目のまま（保留・E6）でコード無し → 赤", "2", "1 回目のまま（保留・E6）", {"verdict": "保留"}, f_hold, f_hold, "保留", True),
+        ("保留に E2 → 赤", "2", "1 回目のまま（保留）", {"verdict": "保留", "ecode": "E2"}, f_hold, f_hold, "保留", True),
+        ("括弧の無い 1 回目のまま → 緑", "2", "1 回目のまま", dict(f_e2), f_e2, f_e2, "除外", False),
+        ("括弧の無い 1 回目のまま・判定が違う → 赤", "2", "1 回目のまま", {"verdict": "除外", "ecode": "E4"}, f_e2, f_e2, "除外", True),
+        ("1 回目のまま（除外 E2）だが 1 回目は保留 → 赤", "2", "1 回目のまま（除外 E2）", f_e2, f_hold, f_hold, "保留", True),
+        ("1 回目のまま（除外 E3）だが 1 回目は E2 → 赤", "2", "1 回目のまま（除外 E3）", {"verdict": "除外", "ecode": "E3"}, f_e2, f_e2, "除外", True),
+        ("1 回目のまま（除外 E2）だが 1 回目はコード無し → 赤", "2", "1 回目のまま（除外 E2）", f_e2, f_ex, f_ex, "除外", True),
+        ("1 回目のまま（中心-A）だが 1 回目は中心-B → 赤", "2", "1 回目のまま（中心-A）", {"verdict": "含める", "use": "中心-A"}, f_b, f_b, "含める（中心-B）", True),
+        ("AI の判定（除外 E4・背景保持）に変える → 緑", "2", "AI の判定（除外 E4・背景保持）に変える", {"verdict": "除外", "ecode": "E4"}, f_hold, f_hold, "保留", False),
+        ("AI の判定（含める・中心-A）に変える → 緑", "2", "AI の判定（含める・中心-A）に変える", {"verdict": "含める", "use": "中心-A"}, f_hold, f_hold, "保留", False),
+        ("AI の判定（保留）に変える → 緑（次のタスクの形）", "2", "AI の判定（保留）に変える", {"verdict": "保留"}, f_e2, f_e2, "除外", False),
+        ("AI の判定（除外 E2・E4）に変える → 赤（コードが 2 つ）", "2", "AI の判定（除外 E2・E4）に変える", f_e2, f_hold, f_hold, "保留", True),
+        ("Claude 版（中心-A）に変える → 緑", "2", "Claude 版（中心-A）に変える", {"verdict": "含める", "use": "中心-A"}, f_b, f_b, "含める（中心-B）", False),
+        ("Claude 版（中心-A）・判定は中心-B → 赤", "2", "Claude 版（中心-A）に変える", f_b, f_b, f_b, "含める（中心-B）", True),
+        ("中心-B のまま（直前が中心-B）→ 緑", "2", "中心-B のまま", f_b, f_hold, f_b, "保留", False),
+        ("中心-B のまま（直前が中心-A）→ 赤", "2", "中心-B のまま", f_b, f_hold, {"verdict": "含める", "use": "中心-A"}, "保留", True),
+        ("中心-A と中心-B のまま → 赤（中心が 2 つ）", "2", "中心-A と中心-B のまま", {"verdict": "含める", "use": "中心-A"}, f_b, f_b, "含める（中心-B）", True),
+        ("含める（中心-A）ではない → 赤（否定文）", "1", "含める（中心-A）ではない", {"verdict": "含める", "use": "中心-A"}, None, None, None, True),
+        ("別の判定に変える（Other）→ 赤", "2", "別の判定に変える", {"verdict": "保留"}, f_hold, f_hold, "保留", True),
+        ("一次研究として読む → 赤", "1", STAGE1_OPTIONS["other"][0], {"verdict": "含める", "use": "中心-A"}, None, None, None, True),
+        ("判定の語が 2 つ → 赤", "2", "含めるか除外", {"verdict": "含める", "use": "中心-A"}, f_hold, f_hold, "保留", True),
+        ("1 回目が無いのに 1 回目のまま → 赤", "2", "1 回目のまま", {"verdict": "保留"}, None, None, None, True),
+        ("2e も 2 と同じ読み方 → 緑", "2e", "1 回目のまま（除外 E2）", f_e2, f_e2, f_e2, "除外", False),
+        ("全角の Ａ の含める（中心-Ａ）→ 緑", "1", "含める（中心-Ａ）", {"verdict": "含める", "use": "中心-A"}, None, None, None, False),
+    ]
+    for name, st_, ans, res_, first_, prev_, fans, want_red in ans_unit:
+        got_ = answer_mismatch(st_, ans, res_, first_, prev_, fans)
+        if bool(got_) != want_red:
+            print("FAIL 答えの読み方:", name, got_)
+            bad += 1
+    mutate_named("answer-only-diff", "AF030: 答えと判定が合わない",
+                 fn_log=lambda L: [dict(x, answer="保留") if (x["item"], x["stage"]) == ("AF030", "1") else x for x in L])
+    mutate_named("result-only-diff", "AF030: 答えと判定が合わない",
+                 fn_log=lambda L: [dict(x, result={"verdict": "保留", "basis": "全文"}) if (x["item"], x["stage"]) == ("AF030", "2") else x
+                                   for x in L])
+    mutate_named("read-as-primary", "AF030: 一次研究でない件を含めた",
+                 fn_log=lambda L: [dict(x, answer=STAGE1_OPTIONS["other"][0] if x["stage"] == "1" else x["answer"],
+                                        result={"verdict": "含める", "use": "中心-A", "basis": "全文"})
+                                   if x["item"] == "AF030" and x["stage"] in ("1", "2") else x for x in L])
+    # (12) 『AI判定比較』は 34 件の 2 回目の後: 期待どおりの値でも、2 回目の無い件があるうちは赤
+    mutate_named("cmp-before-all-stage2", "34 件の 2 回目の前に記入", fn_wb=lambda w: w["AI判定比較"].cell(r, 4, "方法論保持"))
+    mutate_named("cmp-before-all-stage2-fg", "34 件の 2 回目の前に記入", fn_wb=lambda w: w["AI判定比較"].cell(r, 7, "次の作業: 何か"))
+    o_cmp = openpyxl.load_workbook(C.ORIGINAL)["AI判定比較"]
+    w_cmp = openpyxl.load_workbook(base_copy)["AI判定比較"]
+    w_cmp.cell(r, 6, "理由")
+    if check_cmp_timing(w_cmp, o_cmp, set(C.IDS)) or not check_cmp_timing(w_cmp, o_cmp, set(C.IDS) - {"AF002"}):
+        print("FAIL 『AI判定比較』の記入の時期: 34 件に 2 回目があるのに赤・1 件欠けても緑")
+        bad += 1
+    # (12) 式のセル: 足したシートと入力欄の = は赤・書き込み側の put() で書いた = は文字列のまま（緑）
+    mutate_named("formula-added-sheet", "式のセル: 判定者1_はじめに", fn_wb=lambda w: w[INTRO_SHEET].cell(10, 1, "=1+1"))
+    mutate_named("formula-input-cell", f"式のセル: スクリーニング!J{r}", fn_wb=lambda w: w["スクリーニング"].cell(r, 10, "=A1"))
+    w_put = openpyxl.load_workbook(base_copy)
+    W.put(w_put[INTRO_SHEET].cell(10, 1), "=1+1")
+    cp_put = os.path.join(tmpd, "put-string.xlsx")
+    w_put.save(cp_put)
+    if any("式のセル" in e for e in check(cp_put, base_log)) or openpyxl.load_workbook(cp_put)[INTRO_SHEET].cell(10, 1).value != "=1+1":
+        print("FAIL 書き込み側の put() で書いた = が式になる・値が変わる")
+        bad += 1
+    # (11) 『判定者1_全文抽出』: 実の data で作ったシートは緑（34 件）・行の欠け・重複・中身のずれ・--final で無いは赤
+    exd = json.load(open(EXTRACT_DATA, encoding="utf-8"))
+    all_x = set(C.IDS)
+
+    def ex_wb(edit=None, sheet=True):
+        w2 = openpyxl.load_workbook(base_copy)
+        if sheet:
+            ws = w2.create_sheet(EXTRACT_SHEET)
+            for c, h in enumerate(exd["header"], 1):
+                ws.cell(4, c, h)
+            for rr, row in enumerate(exd["rows"], 5):
+                for c, v in enumerate(row, 1):
+                    ws.cell(rr, c, v)
+            if edit:
+                edit(ws)
+        return w2
+    if check_extract_sheet(ex_wb(), all_x, True, EXTRACT_DATA):
+        print("FAIL 対照: 実の全文抽出のシートで赤", check_extract_sheet(ex_wb(), all_x, True, EXTRACT_DATA)[:2])
+        bad += 1
+    # ★ check() からの呼び出しも見る（関数を直接呼ぶ変異だけだと、check() から外しても緑のまま・メタ変異で実測）
+    mutate_named("extract-via-check", "判定者1_全文抽出: ID が抽出を確定した件と違う",
+                 fn_wb=lambda w: (lambda ws: (ws.cell(4, 1, "ID"), ws.cell(5, 1, "AF002")))(w.create_sheet(EXTRACT_SHEET)))
+    for nm, wb_, must in (("行が欠ける", ex_wb(lambda ws: ws.delete_rows(10)), "ID が抽出を確定した件と違う"),
+                          ("ID が重複", ex_wb(lambda ws: ws.cell(10, 1, ws.cell(11, 1).value)), "ID が重複"),
+                          ("中身がずれる", ex_wb(lambda ws: ws.cell(10, 3, "別の集団")), "中身が data/extract-rows.json と違う"),
+                          ("--final で無い", ex_wb(sheet=False), "が無い")):
+        es = check_extract_sheet(wb_, all_x, True, EXTRACT_DATA)
+        if not any(must in e for e in es):
+            print("FAIL 全文抽出の変異が赤にならない:", nm, es[:2])
+            bad += 1
+    for nm, wb_, must in (("指定した data が無い", ex_wb(), "中身を比べる data が無い"),):
+        es = check_extract_sheet(wb_, all_x, True, os.path.join(tmpd, "no-such.json"))
+        if not any(must in e for e in es):
+            print("FAIL 全文抽出の変異が赤にならない:", nm, es[:2])
+            bad += 1
+    # (13) 理由の問いの復元: 実のログと復元で作ったシートは緑・答えのずれ・行の欠け・シートのずれ・--final で無いは赤
+    real_log = read_log(C.LOG)
+    rq = read_log(REASONS)
+
+    def rq_wb(recs, edit=None, sheet=True):
+        w2 = openpyxl.load_workbook(base_copy)
+        if sheet:
+            ws = w2.create_sheet(REASON_SHEET)
+            for c, h in enumerate(REASON_HEADER, 1):
+                ws.cell(4, c, h)
+            for rr, x in enumerate(recs, 5):
+                for c, v in enumerate([x["log_seq"], x["item"], x["question"], " ／ ".join(x["options"]),
+                                       "可" if x["multiSelect"] else "不可", x["answer"], x.get("user_note", ""),
+                                       (x.get("answered_at") or "")[:16].replace("T", " ") + "（UTC）"], 1):
+                    ws.cell(rr, c, v)
+            if edit:
+                edit(ws)
+        return w2
+
+    def rq_file(recs, name):
+        pth = os.path.join(tmpd, name + ".jsonl")
+        with open(pth, "w", encoding="utf-8") as f:
+            f.writelines(json.dumps(x, ensure_ascii=False) + "\n" for x in recs)
+        return pth
+    if len(rq) != 18 or check_reasons(rq_wb(rq), real_log, REASONS, True):
+        print("FAIL 対照: 実の復元（18 件）とシートで赤", check_reasons(rq_wb(rq), real_log, REASONS, True)[:2])
+        bad += 1
+    if check_reasons(rq_wb(rq), real_log, None, True):
+        print("FAIL 復元のパスが無いとき（selftest の既定）に赤")
+        bad += 1
+    # ★ check() からの呼び出しも見る: 基準のログに無い seq を指す復元は赤（check() から外すと緑になる）
+    if not any("理由の問い" in e for e in check(base_copy, base_log, reasons_path=rq_file(rq[:1], "rq-via-check"))):
+        print("FAIL check() に復元を渡しても理由の問いの検査が走らない")
+        bad += 1
+    bad_ans = [dict(x, answer="迷っていたので AI に寄せた") if k == 0 else x for k, x in enumerate(rq)]
+    k21 = next(k for k, x in enumerate(rq) if x["item"] == "AF021")
+    cut = [dict(x, answer=x["answer"].split(", ")[0]) if k == k21 else x for k, x in enumerate(rq)]  # 多選択の答えを 1 つ目だけに
+    k13, k16 = (next(k for k, x in enumerate(rq) if x["item"] == i) for i in ("AF013", "AF016"))
+    swap = [dict(x, question=rq[k16]["question"]) if k == k13 else (dict(x, question=rq[k13]["question"]) if k == k16 else x)
+            for k, x in enumerate(rq)]
+    unote = [dict(x, user_note="私的なメモ") if k == 0 else x for k, x in enumerate(rq)]
+    badopt = [dict(x, options=x["options"][1:]) if k == k21 else x for k, x in enumerate(rq)]
+    dup = rq + [rq[0]]
+    for nm, args, must in (("答えが note とずれる", (rq_wb(bad_ans), real_log, rq_file(bad_ans, "rq-ans"), True), "note と合わない"),
+                           ("復元の行が欠ける", (rq_wb(rq[1:]), real_log, rq_file(rq[1:], "rq-miss"), True), "復元が無い"),
+                           ("seq が別の件", (rq_wb(rq), real_log, rq_file([dict(rq[0], log_seq=rq[1]["log_seq"])] + rq[1:], "rq-seq"), True),
+                            "同じ件の 2 回目でない"),
+                           ("シートの選択肢がずれる", (rq_wb(rq, lambda ws: ws.cell(6, 4, "別の選択肢")), real_log, REASONS, True), "1 行ずつ一致しない"),
+                           ("--final でシートが無い", (rq_wb(rq, sheet=False), real_log, REASONS, True), "が無い"),
+                           ("多選択の答えを 1 つ目だけに切る", (rq_wb(cut), real_log, rq_file(cut, "rq-cut"), True), "note と合わない"),
+                           ("問いの文を 2 件で入れ替える（答え・選択肢は同じ）", (rq_wb(swap), real_log, rq_file(swap, "rq-swap"), True),
+                            "問いの文の形・件が違う"),
+                           ("補足がログに無い", (rq_wb(unote), real_log, rq_file(unote, "rq-unote"), True), "補足（user_note）がログの note に無い"),
+                           ("答えが選択肢に無い", (rq_wb(badopt), real_log, rq_file(badopt, "rq-opt"), True), "答えが選択肢に無い"),
+                           ("seq が重複", (rq_wb(dup), real_log, rq_file(dup, "rq-dup"), True), "が重複"),
+                           ("シートの時刻がずれる", (rq_wb(rq, lambda ws: ws.cell(5, 8, "2026-10-01 00:00（UTC）")), real_log, REASONS, True),
+                            "1 行ずつ一致しない"),
+                           ("シートの見出しが違う", (rq_wb(rq, lambda ws: ws.cell(4, 8, "問うた時刻")), real_log, REASONS, True), "見出しが違う")):
+        es = check_reasons(*args)
+        if not any(must in e for e in es):
+            print("FAIL 理由の問いの変異が赤にならない:", nm, es[:2])
+            bad += 1
+    for nm, note, want in (("末尾まで", "理由の問い（複数選択）の答え: 材料が足りない", "材料が足りない"),
+                           ("「。」まで", "理由の問い（複数選択）の答え: A, B。抄録で判定", "A, B"),
+                           ("前に「。」を含む文がある", "訂正を示した。理由の問い（複数選択）の答え: A", "A"),
+                           ("問いの文に「。」があっても、答えの前の「理由の問い」から読む", "理由の問い「…書きます。…」の答え: A", "A"),
+                           ("問うていない（AF002 の形）", "保留の理由は理由の問いを重ねず、この発言を理由とした", None),
+                           ("前方一致の誤り", "理由の問いの答え: 判断できない", "判断できない")):
+        if note_reason_answer(note) != want:
+            print("FAIL note の理由の答えの取り出し:", nm, note_reason_answer(note))
+            bad += 1
     print("selftest", "PASS" if bad == 0 else f"FAIL {bad}")
     return bad == 0
 
@@ -617,7 +1022,7 @@ def selftest():
 def main(argv):
     if "--selftest" in argv:
         sys.exit(0 if selftest() else 1)
-    errs = check(C.COPY_ARCHIVE, C.LOG, final="--final" in argv)
+    errs = check(C.COPY_ARCHIVE, C.LOG, final="--final" in argv, reasons_path=REASONS, extract_path=EXTRACT_DATA)
     if C.sha256(C.ORIGINAL) != C.ORIGINAL_SHA256 or C.sha256(C.ORIGINAL_DOWNLOADS) != C.ORIGINAL_SHA256:
         errs.append("元のファイルの SHA-256 が変わった")
     if C.sha256(C.COPY_ARCHIVE) != C.sha256(C.COPY_DOWNLOADS):
