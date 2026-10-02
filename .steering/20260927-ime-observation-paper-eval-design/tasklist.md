@@ -174,7 +174,8 @@
     - [x] G-GEAR で Mac の作業を取り込んで確かめた（2026-10-02・29 本緑・バイト一致・定数と文の一致・§3.1 の数の整合・本文 14,369 語）→ ⚠️ 判断 121 の焦点の規則が送った打鍵も数えていた（run の約 78% の時間が当たる）→ 研究者に問い判断 123（送った打鍵を差し引く）・実装は判断 124（作業用エージェント E・`OBS_SEND_DELAY_MS = 100`）→ 29 本緑・バイト一致・違反 0・違反なし・exit 3・本文 14,665 語
     - [x] attack-me round 5（§3.4・§3.1・§6.7・`delivery.py`・`closed_set.py` に絞る・G-GEAR・判断 117）。★ 判断 121〜124 の焦点の規則（喪失の区間の観測の行と送った打鍵の差し引き・余裕 500 ms・遅れ 100 ms）と `pilot-macos.md` の Raw logs も対象に・引き継ぎ `next-session-ime-paper-m3-round5.md`
       → 2026-10-02（G-GEAR）: 判定 minor revision（R1・R2・R3 とも minor・fatal 0・major 0・捏造 0・注入 0・有効な査読 3 / 3）。研究者の採否は判断 125（Y1 焦点の規則をコードで閉じる・Y2 計画の SHA-256 を解析で照合・Y3 感度は §7 に開示・直す一覧を全部承認・round 6 なし）
-    - [ ] round 5 の直し: Y1〔コード: `delivery.py`・`pipeline.py`〕・Y2〔コード: `pipeline.py`〕・Y3（§7）・minor 7 件（1 content-free を中止した run にも〔コード〕・5 78% を `plan_figures` に〔コード〕）・nit 14 件 → 確認（`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・節の参照・語数・定数と文の目視の照合）
+    - [x] round 5 の直し: Y1〔コード: `delivery.py`・`pipeline.py`〕・Y2〔コード: `pipeline.py`〕・Y3（§7）・minor 7 件（1 content-free を中止した run にも〔コード〕・5 78% を `plan_figures` に〔コード〕）・nit 14 件 → 確認（`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・節の参照・語数・定数と文の目視の照合）
+      → 2026-10-02: 判断 126。29 本緑・バイト一致・exit 3・違反 0・違反なし・節の参照・本文 15,265 語・変異はすべて赤
     - [ ] 完了時レビュー（code-reviewer ∥ security-checker ∥ Codex 2 巡・`git merge-base origin/main HEAD`..HEAD）→ PR → CI 緑なら merge → main の CI
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
