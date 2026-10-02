@@ -17,7 +17,15 @@ import common34 as C
 PROJ = os.path.join(os.path.expanduser("~"), ".claude", "projects", "C--GSE-prototype")
 OUT = os.path.join(C.TASK, "reason-questions-restored.jsonl")
 MARK = "理由はどれに近いですか"
-ANSWERED = re.compile(r"理由の問い[^。]*の答え: ")
+
+
+def note_answer(note):
+    """note の「理由の問い … の答え: X」の X（「。」か末尾まで・完全一致で比べる）。問うていない note は None。
+    ★ 検査器（check_workbook.note_reason_answer）とは別に持つ。前方一致にすると多選択の欠けが通る（判断 15）。"""
+    note = note or ""
+    m = re.search(r"理由の問い", note)
+    m2 = re.compile(r"の答え: ([^。]*)").search(note, m.end()) if m else None
+    return m2.group(1).strip() if m2 else None
 
 
 def from_session(sid):
@@ -57,7 +65,7 @@ def main(sids):
     # ★ AF002・AF003 の note は「理由の問いを重ねず」（問うていない）なので当たらない
     by_item = {}
     for r in log:
-        if r["stage"] in ("2", "2e") and ANSWERED.search(r.get("note") or ""):
+        if r["stage"] in ("2", "2e") and note_answer(r.get("note")) is not None:
             if r["item"] in by_item:
                 sys.exit(f"理由の問いの答えを持つログの行が 2 つある: {r['item']}")
             by_item[r["item"]] = r
@@ -70,8 +78,13 @@ def main(sids):
         i = ids[0]
         if i in seen or i not in by_item:
             sys.exit(f"件の対応が 1 対 1 でない: {i}")
-        if not x["answer"] or ("の答え: " + x["answer"]) not in by_item[i]["note"]:
+        if not x["answer"] or note_answer(by_item[i]["note"]) != x["answer"]:
             sys.exit(f"答えがログの note と合わない: {i} {x['answer']!r}")
+        if any(part not in x["options"] for part in x["answer"].split(", ")):
+            sys.exit(f"答えが選択肢に無い（Other の自由記入）: {i} {x['answer']!r}")
+        if x["user_note"] and x["user_note"] not in by_item[i]["note"]:
+            # ★ 判定者 1 の補足は、ログに残したものだけ外に出す（確かめる段なしで repo・写しに出さない・security-checker）
+            sys.exit(f"補足（annotations）がログの note に無い: {i}")
         seen.add(i)
         out.append({"item": i, "log_seq": by_item[i]["seq"], **x})
     if seen != set(by_item):

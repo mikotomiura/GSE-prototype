@@ -34,6 +34,6 @@
 - [x] 元のファイルの SHA-256 が変わっていない・ステージに本文が無い（2026-10-02）
 - [x] code-reviewer ＋ security-checker（並列・判断 12 で全件対応）
 - [x] /cross-review の Codex 1 巡目（道具・記録・2026-10-02・計 99,882 tokens）→ 指摘 9 件に対応（判断 14）・写しを作り直し（`3499b70f…`）・`--final` 違反 0・`--selftest` PASS・検査器のメタ変異 9/9
-- [ ] /cross-review の Codex 2 巡目（判断 14 で足した規則の境界条件）
+- [x] /cross-review の 2 巡目（判断 14 で足した規則の境界条件・Codex ＋ code-reviewer ＋ security-checker）→ 判断 15 で対応・メタ変異 21/21
 - [x] 引き継ぎ（次のタスク: C の決定・提案のドキュメント・D）→ `_handoff/next-session-ai-fatigue-after-34.md`
 - [ ] 出荷（git-workflow ルール 6）

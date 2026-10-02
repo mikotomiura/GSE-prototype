@@ -48,6 +48,6 @@
 - **AskUserQuestion の問いを `\uXXXX` のエスケープで手打ちすると誤字が入る**（「抽録」「批判的吁味」が実際に出た）→ 問いの文は日本語のまま書く。ログには問いの逐語を残し、誤字は note と decisions に書く。
 - 1 回目の問いに文献の中身として「推奨」「勧める」が入ると、検査の禁止語に当たる → 規則は件と逐語の句の対で除外する（`STAGE1_EXEMPT`・判断 9・12）。
 - openpyxl: `ws.cell(r, c, None)` は値を書き換えない（空にするのは `.value = None`）。保存すると数式の計算済みの値が消える。
-- Chrome: Tilburg・RGU の Cloudflare の待機は人手なしで通った。RGU・出版社のリンクを開くと Downloads に落ちる（本文置き場へ移す）。curl もページ内の取得も止まる PDF（INFORMS の補足資料）は、タブに表示してユーザーに Ctrl+S で保存してもらう。`javascript_tool` の返り値に URL を入れるときは、`[BLOCKED: Cookie/query string data]` になったら、**query を返さない**（`new URL(u).origin + new URL(u).pathname` だけを返す）。⚠️ 区切り文字（`?&=`）の置き換えで遮断をくぐらない —— 値（トークン・署名）はそのまま残る（2026-10-02 の Codex の指摘で訂正・`20261001-ai-fatigue-34-screening/decisions.md` 判断 14）。
+- Chrome: Tilburg・RGU の Cloudflare の待機は人手なしで通った。RGU・出版社のリンクを開くと Downloads に落ちる（本文置き場へ移す）。curl もページ内の取得も止まる PDF（INFORMS の補足資料）は、タブに表示してユーザーに Ctrl+S で保存してもらう。`javascript_tool` の返り値に URL を入れるときは、`[BLOCKED: Cookie/query string data]` になったら、**query を返さない**（`new URL(u).origin + new URL(u).pathname` だけを返し、pathname の `;` から後も落とす（`;jsessionid=` などが残る）。それでも BLOCKED なら URL は返さず、DOI・題名・ページの題名で記録する）。⚠️ 区切り文字（`?&=`）の置き換えで遮断をくぐらない —— 値（トークン・署名）はそのまま残る（2026-10-02 の Codex の指摘で訂正・`20261001-ai-fatigue-34-screening/decisions.md` 判断 14）。
 - サブエージェントの下書きは「メインが原文で」を付け過ぎる → 行ごとに経路を付け直す（判断 11）。
 - Codex の台帳はブランチごと（記憶 project_codex_ledger_branch_split）。予算ガードの hook は `C:\GSE-prototype` の台帳を読む。
