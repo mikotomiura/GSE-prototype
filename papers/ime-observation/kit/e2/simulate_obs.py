@@ -211,8 +211,8 @@ def selftest():
 
     t1 = trial("S1")
     ev = simulate(t1, KEYCAT)
-    check("S1 categories are six alphabetic keys (g a k k o u), space and enter",
-          [c for _, c in ev] == ["alphabetic"] * 6 + ["space", "enter"], repr([c for _, c in ev]))
+    check("S1 categories are six alphabetic keys (g a k k o u), space and two enters (candidate pick, commit)",
+          [c for _, c in ev] == ["alphabetic"] * 6 + ["space", "enter", "enter"], repr([c for _, c in ev]))
     downs = [s["at_ms"] for s in t1["steps"] if s["down"]]
     check("times are the step times of the presses (exact)", [t for t, _ in ev] == downs)
     check("t0 shifts every time", [t for t, _ in simulate(t1, KEYCAT, t0=5000)] == [d + 5000 for d in downs])
@@ -229,11 +229,12 @@ def selftest():
           [c for _, c in simulate(s14, KEYCAT)] == ["alphabetic"] * 6 + ["space"])
     s15 = trial("S15")
     check("S15: focus switches are absent and enter is present",
-          [c for _, c in simulate(s15, KEYCAT)] == ["alphabetic"] * 6 + ["space", "enter"])
+          [c for _, c in simulate(s15, KEYCAT)] == ["alphabetic"] * 6 + ["space", "enter", "enter"])
     s6 = trial("S6")
     check("S6: one backspace per reading character", [c for _, c in simulate(s6, KEYCAT)][-4:] == ["backspace"] * 4)
     s8 = trial("S8")
-    check("S8: the candidate digit key is numeric", simulate(s8, KEYCAT)[-1][1] == "numeric")
+    check("S8: the candidate digit key is numeric and the commit that follows it is enter",
+          [c for _, c in simulate(s8, KEYCAT)][-2:] == ["numeric", "enter"])
 
     # runs="count" groups by delimiter (a row of a different category), not by a 1-second window:
     # a run of alphabetic rows that spans a window boundary is kept as one token.

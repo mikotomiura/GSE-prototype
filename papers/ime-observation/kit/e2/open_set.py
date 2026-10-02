@@ -529,8 +529,8 @@ def load_trials(obs_paths, plan_paths, recipes, phrase_ids=None, markers_in_obs=
     """Trials from obs/1 + plan/1 pairs. Returns (trials, n_excluded_kana, n_other_phrases, n_no_typed_reading).
 
     phrase_ids: if given, only trials of these phrases are kept (the others count in n_other_phrases).
-    markers_in_obs / ime_toggle_in_obs: whether the block marker keys (function keys used only to mark block
-    boundaries) and the mid-conversion IME toggle keys are expected to appear as key rows in the observation.
+    markers_in_obs / ime_toggle_in_obs: whether the block marker keys (keys pressed only to mark block boundaries,
+    arrow keys on macOS) and the mid-conversion IME toggle keys are expected to appear as key rows in the observation.
     Both default to False (neither is a typing key, and by default no row is consumed for them); passing a
     flag expects an observation that does record the matching keys, and the assignment is refused when the
     observation and this expectation disagree."""

@@ -156,7 +156,15 @@ set of key names of the generator. A change in either therefore turns the selfte
 The last row is the one place this assumption about the logger is stated: the IME toggles and F13 to F19 (the
 block-start markers) are assumed to lie outside the observed key set of the Windows logger (`is_observed_key`), and the
 last three names are pseudo keys of the runner that produce no key event on either OS. This has not been verified
-against a logger run; it is to be confirmed in the calibration pilot. The virtual-key codes of the IME toggles and of
+against a logger run; it is to be confirmed in the calibration pilot. The first macOS calibration pilot confirmed it
+on macOS: the IME toggles and F13 and F14, the markers sent, produced no row (the macOS logger observes F1 to F12
+only, so F15 to F19 cannot produce one either), and of the 4,000 presses inside trials, the 18 without a row were
+all IME toggles. Because an unobserved marker cannot
+align the observation's clock, the block-start markers are now arrow keys (`left`, `right`, `left` in the pilot),
+which are observed as `navigation`; runs that use them need `--markers-in-obs`. Such a marker must be longer than
+every run of arrow presses inside a trial (see `../pilot/README.md`), so the three-key marker of the pilot serves
+only while no trial presses three arrows in a row; the measurement uses the four-key marker `left`, `right`, `left`,
+`right` (to be frozen with the protocol), which `--markers-in-obs` handles in the same way. The virtual-key codes of the IME toggles and of
 F13 map to `other` in `from_vk`, which is the category `read_obs`/`segment_by_plan` expect from them when a log is found
 to include them after all (see `--ime-toggle-in-obs` and `--markers-in-obs` below). If a listed key does produce a row
 and neither switch is used, the prediction misses that row for every candidate alike, so the effect on the ranking of
@@ -179,6 +187,16 @@ never shifts later trials silently. If the block-start marker presses appear in 
 `--markers-in-obs`; if the IME toggle presses (`ime_on`, `ime_off`, as category `other`) appear in the observation, add
 `--ime-toggle-in-obs`. Both default to off (see the key table above). `--out` is only ever created, never overwritten;
 an existing path is a usage error. Exit codes: 0 success, 2 usage error or unreadable input.
+
+`--recipes` and `--config` must be the files the plans were built from (the plan header's `recipes_sha256` and
+`config_sha256` are the SHA-256 of those files): for a macOS cell with live conversion off, pass
+`../gen/recipes.macos-live-off.json`. `closed_set.py` predicts each candidate's key presses from these procedures and
+this configuration (the attacker knowledge K2), so it compares the SHA-256 of both files with every plan's header and
+stops with exit code 2 when either differs, rather than building the predictions from the wrong ones. The
+comparison is on bytes, so the files must keep their line endings (the repository checks the recipes files out with
+LF line endings). The corpus is not compared: the candidates are drawn from the corpus passed, which may
+deliberately differ from the one the plans were built from. (`open_set.py` reads only the kana layout and which
+scenarios type through it from the recipes, which are the same in both files, and does not make this comparison.)
 
 The output is one JSON file with `assumptions`, `params` (including `phase_step_ms`), the hashes of the inputs, and
 `results[K][feature set]` with `acc`, `acc_ci`, `acc_source`, `acc_raw`, `acc_ci_raw`, `chance`, `n`, `n_skipped`,

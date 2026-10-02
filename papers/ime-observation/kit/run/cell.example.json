@@ -3,12 +3,14 @@
   "os": "macos",
   "ime": "macOS Japanese (Hiragana) - version to be filled in from the machine",
   "ime_settings": {
-    "layout": "US keyboard, Romaji input",
+    "layout": "JIS keyboard, Romaji input",
     "predictive_candidates": "off",
-    "learning": "reset by reset_cmd before each block"
+    "learning": "reset by reset_cmd before each block",
+    "live_conversion": "on",
+    "initial_state": "Japanese, switched on by the kana key in focus_cmd before each block"
   },
   "refinput_cmd": [
-    "papers/ime-observation/kit/refinput-macos/.build/refinput-macos",
+    "papers/ime-observation/kit/refinput-macos/.build/RefInput.app/Contents/MacOS/refinput-macos",
     "--out",
     "{out}"
   ],
@@ -21,15 +23,32 @@
     "false"
   ],
   "focus_cmd": [
-    "osascript",
+    "/usr/bin/osascript",
     "-e",
-    "tell application \"System Events\" to set frontmost of first process whose name is \"refinput-macos\" to true"
+    "tell application id \"local.ime-observation.refinput\" to activate",
+    "-e",
+    "delay 0.7",
+    "-e",
+    "repeat 5 times",
+    "-e",
+    "if id of application (path to frontmost application as text) is \"local.ime-observation.refinput\" then exit repeat",
+    "-e",
+    "delay 0.2",
+    "-e",
+    "end repeat",
+    "-e",
+    "if id of application (path to frontmost application as text) is not \"local.ime-observation.refinput\" then error \"the reference input field is not in front\"",
+    "-e",
+    "tell application \"System Events\" to key code 104",
+    "-e",
+    "delay 0.3"
   ],
   "ready_wait_ms": 3000,
   "settle_ms": 1000,
   "backend": "macos",
   "backend_opts": {
-    "focus_app": "placeholder.bundle.id.of.the.reference.input.field"
+    "focus_app": "local.ime-observation.refinput",
+    "away_app": "com.apple.finder"
   },
   "clock_sync_disabled": false,
   "auto_update_disabled": false

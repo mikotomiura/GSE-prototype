@@ -10,12 +10,12 @@
   "os": {
     "macos": {
       "S1": {
-        "steps": [{"type_reading": true}, {"key": "space"}, {"pause": "think"}, {"key": "enter"}],
+        "steps": [{"type_reading": true}, {"key": "space"}, {"pause": "think"}, {"key": "enter"}, {"key": "enter"}],
         "intent": {"commit": "enter", "cand_index": 0, "nav_count": 0, "abandon": false, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S2": {
         "params": {"cand_index": {"min": 1, "max": "cand_index_max"}},
-        "steps": [{"type_reading": true}, {"repeat": "space", "times": "cand_index+1"}, {"pause": "think"}, {"key": "enter"}],
+        "steps": [{"type_reading": true}, {"repeat": "space", "times": "cand_index+1"}, {"pause": "think"}, {"key": "enter"}, {"key": "enter"}],
         "intent": {"commit": "enter", "cand_index": {"$param": "cand_index"}, "nav_count": 0, "abandon": false, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S3": {
@@ -27,7 +27,7 @@
         "intent": {"commit": "none", "cand_index": null, "nav_count": 0, "abandon": true, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S5": {
-        "steps": [{"type_reading": true}, {"key": "esc"}],
+        "steps": [{"type_reading": true}, {"repeat": "esc", "times": 4}],
         "intent": {"commit": "none", "cand_index": null, "nav_count": 0, "abandon": true, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S6": {
@@ -36,12 +36,12 @@
       },
       "S7": {
         "params": {"nav_count": {"min": 1, "max": "nav_count_max"}},
-        "steps": [{"type_reading": true}, {"key": "space"}, {"repeat": "right", "times": "nav_count"}, {"pause": "think"}, {"key": "enter"}],
+        "steps": [{"type_reading": true}, {"key": "space"}, {"repeat": "right", "times": "nav_count"}, {"pause": "think"}, {"key": "enter"}, {"key": "enter"}],
         "intent": {"commit": "enter", "cand_index": 0, "nav_count": {"$param": "nav_count"}, "abandon": false, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S8": {
         "params": {"cand_index": {"min": 0, "max": "cand_index_max", "cap": 8}},
-        "steps": [{"type_reading": true}, {"key": "space"}, {"key": "space"}, {"pause": "think"}, {"digit": "cand_index+1"}],
+        "steps": [{"type_reading": true}, {"key": "space"}, {"key": "space"}, {"pause": "think"}, {"digit": "cand_index+1"}, {"key": "enter"}],
         "intent": {"commit": "digit", "cand_index": {"$param": "cand_index"}, "nav_count": 0, "abandon": false, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S9": {
@@ -59,11 +59,11 @@
         "intent": {"commit": "enter", "cand_index": null, "nav_count": 0, "abandon": false, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S12": {
-        "steps": [{"type_reading": true, "input": "kana"}, {"key": "space"}, {"key": "enter"}],
+        "steps": [{"type_reading": true, "input": "kana"}, {"key": "space"}, {"key": "enter"}, {"key": "enter"}],
         "intent": {"commit": "enter", "cand_index": 0, "nav_count": 0, "abandon": false, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S13": {
-        "steps": [{"type_reading": true}, {"key": "space"}, {"pause_ms": 21000}, {"key": "enter"}],
+        "steps": [{"type_reading": true}, {"key": "space"}, {"pause_ms": 21000}, {"key": "enter"}, {"key": "enter"}],
         "intent": {"commit": "enter", "cand_index": 0, "nav_count": 0, "abandon": false, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": false, "expect_session": true}
       },
       "S14": {
@@ -71,7 +71,7 @@
         "intent": {"commit": "none", "cand_index": null, "nav_count": 0, "abandon": false, "predictive": false, "ime_toggle_mid": true, "focus_switch_mid": false, "expect_session": true}
       },
       "S15": {
-        "steps": [{"type_reading": true}, {"key": "space"}, {"key": "focus_away"}, {"pause_ms": 1000}, {"key": "focus_back"}, {"key": "enter"}],
+        "steps": [{"type_reading": true}, {"key": "space"}, {"key": "focus_away"}, {"pause_ms": 1000}, {"key": "focus_back"}, {"key": "enter"}, {"key": "enter"}],
         "intent": {"commit": "enter", "cand_index": 0, "nav_count": 0, "abandon": false, "predictive": false, "ime_toggle_mid": false, "focus_switch_mid": true, "expect_session": true}
       }
     },

@@ -107,3 +107,4 @@
 - 測った原因: `_acceptance-lib.sh` の `_base` はローカルの `feature/ime-eval-kit` を先に見る。この Mac のローカル枝は `b2e284e2`（origin より 137 commit 古い・別の worktree が checkout したまま）→ merge-base からの差分 266 件。★ 最新の `origin/feature/ime-eval-kit`（`57210663`）を base にしても、main には #277 などの別トラックの 34 件が入っているので赤のまま（`papers/` の差分は 0 件）。
 - 判定: 測定器の適用範囲の外。`_acceptance-lib.sh` 自身が「issue ブランチの上で回すと意味を持つ。merge 後の枝では差分が空になり素通りする」と書く検査で、main の上では base が定まらない。→ 失敗は SCOPE を除いて数える（Mac の確認の結果は tasklist）。道具は変えない（worker は `_acceptance-lib.sh` を変えない・判断の対象外）。
 - ★ 教訓: main へ merge した後は、「枝の上の検査」と「中身の検査」を分けて読む。赤を見たら、まず何と比べた差分かを測る（B13 と同じく、測定器の検算が先）。
+- 追記（2026-10-01・G-GEAR・M1 の枝 `5a9cc805`）: main が #279（`scripts/run-codex-consult.sh` を変えた）を含むようになり、同じ原因で **GUARD**（「GSE 本体を変えている」）も 22 本すべてで ❌ になった（028 は SCOPE を持たないので GUARD の 1 件だけ）。`_base` は `feature/ime-eval-kit`（`57210663`）の merge-base を返し、#279 の差分を拾う。この枝だけの差分（`97381a7b..5a9cc805`）に `src-tauri/` `src/` `scripts/` `.github/` は 0 件。→ main の上では SCOPE と GUARD を除いて数える。

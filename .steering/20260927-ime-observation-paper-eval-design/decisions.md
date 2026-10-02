@@ -606,3 +606,179 @@ HIGH は 009・017・021（2 件）・022・013（引き継ぎの穴）。securi
 - **結果**: 1,800 句（各作品 150・候補は最少の『堕落論』で 241）・読みの長さ 6〜30（中央値 16）・SHA-256 `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620`・`SudachiPy==0.7.0`・`sudachidict-core==20260723.1`。2 回の書き出しでバイト一致・`--validate` exit 0・`kit/check.sh` 緑・`_style_check.py` 違反 0 件・書き出し器が通る（91 ファイル）。仮の config（selftest の値・n = 75）で両 OS の計画を作ると、どのシナリオでも 225 試行がすべて別の句（`--validate` exit 0）。
 - **トレードオフ**: ⚠️ 読みの誤りが残る（無作為 40 句の目視で `絞罪→しぼりざい`・`この室→むろ`・`女学校→おんながっこう`）。E1 は打鍵列として妥当なかなで足り、E2 の正解は打った読み（判断 19）なので直さない。同じ読みの句が 9 組（README の既知の限界）。
 - **影響範囲**: `kit/corpus/data/phrases.jsonl`・`kit/corpus/requirements.txt`・`experiment/data.md`（「Phrase corpus」節に 6 項目と出典の作品表）。生の `.txt` / zip は repo に入れない（archive の SHA-256 だけを記録）。
+
+## 判断 80: M1 の所見を受けた macOS の手順とマーカーの直し（2026-10-01・研究者の選択と実測）
+
+- **背景**: M1 の 1 回目（`pilot-macos-1-notes.md`）で、変換後の Enter が確定せず試行が持ち越される・マーカー F13 / F14 が観測側に届かない、が見つかった。
+- **採用**: (1) macOS の recipes をライブ変換 ON の IME の実際の挙動に合わせる（候補の窓の Enter は選ぶだけ → Enter 2 回・数字の後に Enter・Esc 4 回）。★ 研究者の手打ちでも同じ挙動を確認したので、合成キーの人工物ではない。(2) マーカーは**矢印キー（← → ←）**（研究者が AskUserQuestion で推奨を選択。他の案: F13 のまま時計を試行の打鍵で合わせる / F1〜F12 を語彙に足す）。
+- **理由**: (1) README（`kit/gen/README.md`）の想定どおり、パイロットの後に直すのは recipes のデータ。(2) 矢印キーは既に語彙にあり観測され、変換中でなければ IME の状態も文字も変えない。E2 は既存の `--markers-in-obs` で扱える（コードの変更なし）。
+- **トレードオフ**: ⚠️ ライブ変換 OFF では余分な Enter が改行になりうる → OFF のセルは別の recipes ファイル（パイロットしてから）。⚠️ E2 を本番のログに回すときは `--markers-in-obs` を付ける。
+- **影響範囲**: `kit/gen/recipes.json`（macOS のみ）・`generate_plan.py` / `simulate_obs.py` の selftest・`refinput-macos/build.sh`・pilot / run / e2 / gen / refinput-macos の README・`run/cell.example.json`。
+
+## 判断 81: M1 の枝の PR の前の整え —— 生成器の版を上げ、OFF 用の手順書も selftest で照合する（2026-10-01・G-GEAR・メインの実装上の選択・研究者が覆せる）
+
+- **背景**: 引き継ぎ（`next-session-ime-paper-m2.md` §2）の 1〜4。M1 で macOS の手順を変え、OFF 用の手順書 `recipes.macos-live-off.json` を足したが、生成器の版は `1.1.0` のままで、OFF 用の手順書は selftest の外にあった。
+- **採用**:
+  1. `GENERATOR_VERSION` を `1.1.0` → `1.2.0`。`kit/gen/README.md` の規則（「recipes の手順の意味が変わったら上げる」）に当たる。`plan/1` の書式は変わらないので minor。この値を固定している検査は無い（`grep -rn "GENERATOR_VERSION\|generator_version\|1\.1\.0"`。selftest の架空の計画は `"0"` / `"0.1"` を使う）。
+  2. OFF 用の手順書も selftest で照合する。`_scenario_checks` の終わりのキーを、手順の型ごとの表 `_PROFILES`（`windows` / `macos-live-on` / `macos-live-off`）から引く形にした。足した検査: OFF の 13 シナリオの照合・S11 が既定で外れる・Windows の節と `kana_layout` が `recipes.json` と同一・2 つの macOS の型が互いの計画を拒む（陰性対照）・`--validate`・`typed_reading`。README の「selftest は `recipes.json` だけを見る」を直し、ファイルの表と `scenarios` の行に OFF 用の手順書を足した。
+  3. `_scenario_checks(..., os_name="macos")` の既定を無くし、型を必須の引数にした（呼び出しは selftest の 5 か所だけ・どれも型を渡す）。
+  4. `run/cell.example.json` の `layout` を `US keyboard` → `JIS keyboard` に直した。`focus_cmd` の key code 104 は JIS のかなキー、S12 の `kana_layout` は JIS のかな配列、両パイロットとも JIS で、例のほうが食い違っていた。⚠️ `learning`（「毎ブロックでリセット」）は直さない。例は設計（design.md「ブロックの先頭で辞書・学習状態をリセット」）を示していて、`reset_cmd` は仮（`run/README.md` の前提 6「`cell.example.json` gives placeholders only」）。パイロットでリセットしなかったことは、M2 で `pilot-macos.md` の条件に書く（引き継ぎ §3.5）。本番でリセットするかどうかは M3 の事前登録で決める。
+- **確認（G-GEAR・Windows 11・Python 3.11.9）**: `generate_plan.py --selftest` 103 件が緑（直す前は 96 件）。OFF 用の手順書に変異を 7 本入れると、7 本とも selftest が赤になった（S1 の Enter を 2 回・S5 の Esc を 2 回・S2 の Enter を 1 回・S8 の数字の後の Enter を削る・S11 を既定で有効・Windows の節を変える・`kana_layout` を変える）。`kit/check.sh` の 27 本と `--compile` が緑、`_style_check.py papers/ime-observation` の違反は 0 件。
+- **経緯**: 1〜3 の差分は、worktree `C:/wt/ime-m1-pilot` に未コミットで残っていた（`generate_plan.py` の mtime は 2026-10-01 04:11 で、引き継ぎの commit `0da36bcc` の 6 分後。書いた記録は無く、前のセッションの書きかけと見られる）。メインが全行を読んで採用し、README を合わせ、4 を足した。
+
+## 判断 82: M1 の枝の完了時レビュー 1 巡目（Claude の 2 系統）の指摘への対応（2026-10-01・G-GEAR・メインの実装上の選択・研究者が覆せる）
+
+- **背景**: `97381a7b..5a9cc805`（この枝だけの差分・17 ファイル）に code-reviewer ∥ security-checker を回した。どちらも CRITICAL / HIGH は 0。指摘はすべて一次（コード・`pilot-macos-1-notes.md`・`clock_sync.py`・`run_cell.py`）で裏を取った。
+- **直したもの**（papers/ の 7 ファイル）:
+  1. 〔MEDIUM・コード〕矢印だけのマーカーが観測側で一意でない: 観測は種類しか持たないので、← → ← は `navigation` × 3 として探される。S7 は → を `nav_count` 回続けて押すので、`nav_count_max` ≥ 3 なら試行の中にも同じ並びが現れる。本物のマーカーが欠けたブロックでは、それが割り当てられて `missing` に出ない（`clock_sync.py` の README の約束に反する）。→ `normalize_config` が「矢印だけのマーカーは `nav_count_max` より長い」を検査して、破る config を拒む（exit 2）。gen / pilot の README に規則を書いた。⚠️ パイロットの config（← → ←）は `nav_count_max` によっては拒まれる → M2 で研究者が「4 打鍵のマーカー（← → ← →）」か「`nav_count_max` ≤ 2」かを決める（引き継ぎ §3）。
+  2. 〔MEDIUM・文書〕ライブ変換 ON で残った食い違いが gen/README に無かった → 「126 試行のうち、かな入力の 9 試行中 2 件は 1 回目の Return で確定・数字選択と予測候補の各 1 件が持ち越し」を Limitations に足した。OFF の確認には n = 39 を添えた。
+  3. 〔MEDIUM・文書〕e2/README が証拠より強かった（送ったのは F13 / F14 だけ・4,000 は試行の中の押下だけ）→ 書き分けた。
+  4. 〔MEDIUM・文書〕OFF のセルの計画を ON 用の手順書で攻撃しても `closed_set.py` は止まらない → e2/README の Usage に「`--recipes` は計画を作ったファイル（OFF なら `recipes.macos-live-off.json`）」と、照合がまだ無いこと・出力の `recipes_sha256` で後から比べられることを書いた。⚠️ コードの照合は今回入れない: selftest の計画は `recipes_sha256` が `"0" * 64` で、照合を入れると closed_set / open_set の selftest と 021 / 022 の fixture を直す範囲になる → E2 を本番のログに回す前の項目として引き継ぎ §5 に書いた。`open_set.py` は手順書から `kana_layout` と `typed_reading` しか使わず、2 つのファイルで同一なので実害は無い。
+  5. 〔LOW〕gen/README: 手順の終わりのキーを変えたら `_PROFILES` も直す・S11 の行の条件を前に出す・「仮説」は Windows の手順だけ（macOS は 1 台・1 版の実測）。`generate_plan.py`: 型の表のコメントの不正確さ（Windows の数字選択は 0 キー・Space の無い確定は全型で Return 1 回）・失敗の文言に型の名前・Windows の照合でも全シナリオが現れたかを確かめる。
+  6. 〔LOW〕run/README: `4a.` は CommonMark でリストの印にならない → 4 の 2 段落目にした（番号 5〜8 は変えない）。前提 6 の「placeholders only」を、仮の値（`reset_cmd`・`ime_settings.learning`・`ime` の版）の名指しに直した。`focus_cmd` は送出フラグの有無によらず、前面の確認より前に実行される（`run_cell.py:579-587` で確認）ことを表に書いた。前提 4 に System Events の Automation の許可と、計測の後に外せることを書いた。
+  7. 〔LOW〕pilot/README: 「空の欄のキャレットを動かす」は不正確（確定のたびに欄は空になり、矢印は命令として届く）・「変換の外で押す」は持ち越しのブロックでは成り立たない → 事実として書き直した。`open_set.py` の docstring の「function keys」を直した。
+  8. 〔LOW・security〕`build.sh` の bundle id の検査を送出側（`backend_macos.py:39` の `[A-Za-z0-9][A-Za-z0-9.-]{0,127}`）と同じ形にし、`LC_ALL=C` で範囲を ASCII に固定した。検査の部分だけを git-bash 5.2 で 11 通り試した（128 文字は通し 129 文字・先頭の `.` / `-`・空・空白・`"`・`<`・非 ASCII は拒む）。⚠️ macOS の bash 3.2 と `build.sh` 全体（`swiftc`）は Mac で確かめる。
+- **直さないもの（理由）**:
+  - 〔MEDIUM・security〕パイロットの生ログを公開物に含めるときの除外の基準が無い → M2 の §3-4 の作業そのもの。基準（計画どおりで aborted でない run だけ・oracle に対応しない観測の key 行が 0 件・手打ちの探査と手打ちの対照は除く）を引き継ぎに書いた。
+  - 〔LOW・security〕`focus_cmd` のかなキーが前面の確認より前に押される → 例の osascript に前面の bundle id の確認を足すのは、Windows では試せない。引き継ぎの Mac の項目にした。`run_cell.py` で `focus_cmd` を送出フラグの対象にする案は、既存の acceptance の挙動を変えるので採らず、README に書くだけにした。
+  - 〔範囲外〕`cell.example.json` の `predictive_candidates: "off"` と、既定で有効な S10（予測候補）の食い違い → パイロットの実際の設定を `pilot-macos.md` の条件に書くときに確かめる（引き継ぎ）。
+- **確認**: `generate_plan.py --selftest` 108 件が緑。新しい検査への変異 4 本（検査を外す・`<=` を `<` にする・Windows の照合に OFF の型を渡す・Windows の計画から S2 を抜く）がすべて赤。`kit/check.sh` の 27 本・`--compile` が緑、`_style_check.py` の違反 0 件。
+
+## 判断 83: M1 の枝の完了時レビュー（Codex）—— 上限の一時的な引き上げと、指摘 4 件への対応（2026-10-01・G-GEAR・上限は研究者の選択・対応はメインの実装上の選択で研究者が覆せる）
+
+- **予算**: 同日の Codex の実消費は、並行セッション（`docs/ai-fatigue-protocol-cont`）の台帳で 291,174 / 7 回だった。こちらで 1 回回すと上限 300,000 を超える。予算ガードの hook は `C:\GSE-prototype` の台帳（66,418）を読むので止まらない。研究者に AskUserQuestion で 3 案を出した（推奨は「今日は PR まで・Codex は 10-02」、ほかに「今日だけ 350,000 に上げる」「Codex を省く」）。研究者は「今日だけ上限を 350,000 に上げる」を選んだ。台帳に `_comment_2026_10_01_m1_pr_raise` を足した。並行セッションには、今日はこれ以上回さないよう SendMessage で知らせた。
+- **実行**: `scripts/run-codex-review.sh 97381a7b..6fa44a6a -- papers/ime-observation`（12 ファイル・772 行）。機密フィルタは素通りした。消費は 33,557（本ブランチの台帳 199,404 → 232,961・5 → 6 回）。同日の合計の見込みは 291,174 + 33,557 = 324,731。
+- **指摘と対応**（4 件とも一次で確かめた）:
+  1. 〔P1〕`closed_set.py` が計画と違う手順書を黙って使う。code-reviewer の MEDIUM と一致したので、判断 82 の「README だけ」を改め、コードで止める。`run()` で、各計画のヘッダーの `recipes_sha256` と `--recipes` のファイルの SHA-256 を比べ、違えば exit 2 にした。selftest の計画は `recipes.json` の実際の SHA-256 で作るように直し、OFF 用の手順書を渡すと exit 2 になるケースを足した（83 件緑・照合を外す変異で赤）。021 の acceptance は selftest とケース名の grep だけなので、影響しない。`open_set.py` は、2 つのファイルで同一の `kana_layout` / `typed_reading` しか使わないので照合しない（README に書いた）。
+  2. 〔P1〕例の `focus_cmd` が、前面の確認の前にキーを送る。`dryrun` では同意なしで送る。security-checker の LOW と同じ。
+     - (i) 同意: `run_cell.py` で、`focus_cmd` を `reset_cmd` と同じく送出フラグの対象にした。フラグが無ければ実行せず、manifest に skipped と理由を書く。README の「フラグは機械の状態を変える操作すべてへの同意」に合わせた。既存の「focus の失敗で abort」のケースはフラグありに直した。フラグなしでは走らない・フラグありでは走る、の 2 ケースを足した（53 件緑・ゲートを外す変異で赤）。manifest の `focus` を読む処理は `run_cell.py` の外に無い（grep）。
+     - (ii) 順序: 例の osascript に、かなキーを押す前の前面の確認を 1 行足した。式は送出側 `backend_macos.py` の `FRONT_QUERY`（`id of application (path to frontmost application as text)`）で、パイロットの実機で動いたもの。違えば `error` で非 0 になり、`run_cell.py` がブロックの前に abort する。⚠️ この 1 行は実機で試していない → Mac で確かめる（引き継ぎ）。README の前提 6 に「パイロットの後に足した 1 行」と書いた。
+  3. 〔P2〕持ち越しは、キー列の照合（`_scenario_checks`）では見つからない。`gt_sessions.py` の `oracle_agreement` は不一致を型ごとに数えるが、除外はしない。→ 持ち越した試行（と次の試行）をどう扱うかは、正解の定義と事前登録で決める（M2 / M3・引き継ぎ §3）。今回はコードを変えない。
+  4. 〔P2〕OFF 用の手順書でも、S11 を `scenarios` で名指しすれば生成できる。→ OFF 用の手順書の S11 を S9 と同じ形（`steps` が空・既定で無効）にし、名指しすると生成が止まるようにした。selftest に 1 ケース足した（109 件緑・直す前の手順書で赤）。⚠️ これで OFF 用の手順書の SHA-256 が変わる。パイロットの `verify-off` の計画は、`19c537c0` の版を指す（生ログを預けるときは、その版を添える）。
+- **2 巡目**: Codex の 2 巡目は回さない。同日の合計の見込み（324,731）に 1 回（3〜4 万）を足すと、研究者が選んだ 350,000 を超えるため。2 巡目の観点（今回足した規則の境界条件）は、Claude の code-reviewer で見る。
+
+## 判断 84: M1 の枝の完了時レビュー 2 巡目（code-reviewer・足した規則の境界条件）への対応（2026-10-01・G-GEAR・メインの実装上の選択・研究者が覆せる）
+
+- **背景**: 判断 82・83 で足した 5 つの規則（マーカーの長さ・E2 の手順書の照合・`focus_cmd` の同意・前面の確認・OFF の S11）の境界条件を、`5a9cc805..8ae9ccd1` で code-reviewer に攻めさせた。CRITICAL 0・HIGH 1・MEDIUM 5・LOW 5。すべて一次で確かめた。
+- **直したもの**:
+  1. 〔HIGH〕E2 の照合はファイルのバイト列で SHA-256 を比べる。ところが `recipes*.json` に `eol` の指定が無く、`core.autocrlf=true`（Git for Windows の既定）で clone すると CRLF になる。そうなると、正しい手順書を渡しても止まる。⚠️ この機械（`autocrlf=input`）では LF だった。od と Python でバイトを数えて確かめた（`git ls-files --eol` も `i/lf w/lf`）。なお、`grep -c $'\r'` は行数を返していて、測定器のほうが誤っていた。→ 先例（判断 32・63）に倣い、repo 直下の `.gitattributes` に `kit/gen/recipes*.json` と `kit/corpus/data/*.jsonl` の `eol=lf` を足した。コーパスの SHA-256 は `experiment/data.md` にも書いてある。index はもとから LF なので、中身は変わらない。⚠️ 書き出し器は公開 repo 用の `.gitattributes` を作らない（既存の先例のファイルも同じ）→ M12 の項目として引き継ぎに書いた。
+  2. 〔MEDIUM〕マーカーの検査は、書かれたマーカーを見ていて、観測に残る並びを見ていなかった（`["left","f13","right","left"]` が通る）。また、上限は config の `nav_count_max` ではなく手順書の `params` で決まる（整数も書ける）。さらに、検査が `normalize_config` の中にあったため、E2 もこれを呼んでいた。E2 はマーカーを個数で読み飛ばすだけなので、パイロットの config で E2 が誤って止まる。→ 検査を `plan_rows`（生成のときだけ）に移した。観測されないキーの集合 `UNOBSERVED_KEYS`（e2/README のキーの表と同じ前提）を除いたマーカーが矢印だけなら、作った計画の試行の中の矢印の最長の連続（観測されないキーは飛ばして数える）より長いことを求める。S7 の無い計画では検査しない。selftest: 前提（nav 3 で連続 3 が実際にある）・拒否 3 通り（`["left","f13"]` を拒否側へ移した）・受理 6 通り・手順書で上限 5 にした S7・`normalize_config` が判定しないこと。
+  3. 〔MEDIUM〕E2 は `config_sha256` を照合していなかった。K2（`ASSUMPTIONS`）は config も攻撃者の知識に挙げている → 手順書と同じく照合する。selftest は、計画を作った config を実際にファイルに書き、それを `--config` に渡す形に直した（もとは「計画は部分集合の config・`--config` は別のファイル」だった）。⚠️ コーパスは照合しない。設計（design.md §2）に「E2 だけ現代文のコーパスを足す」という任意の案があり、計画と違うコーパスを渡す正当な使い方がありうる。README に書いた。
+  4. 〔MEDIUM〕例の前面の確認が 1 回だけで、送出側（0.2 秒おきに 5 回）より誤って中断しやすい → `repeat 5 times … exit repeat … delay 0.2 … end repeat` の後で確かめる形にした。⚠️ 実機では試していない（引き継ぎ）。
+  5. 〔LOW〕run/README: manifest の `focus` に `skipped` を書いた（`focus_cmd` が空でなく、フラグが無いとき）。フラグの節の「skipped と記録」を、「計画が求めた reset と、空でない `focus_cmd`」に正した。前提 4 に「手順書はライブ変換の設定に合わせる・runner は確かめられない」を足した。前提 6 に「bundle id は例の 3 か所」を足した。
+  6. 〔LOW〕e2 / pilot の README: ← → ← は、どの試行も矢印を 3 回続けて押さない間だけ使える、と注記した。本番のマーカーは事前登録で決める。
+  7. 〔LOW〕`open_set.py` は、手順のうち「どのシナリオがかなで打つか」も読む → 2 つの手順書でこれが一致することを selftest で確かめる。
+- **確認**: `generate_plan.py --selftest` 113 件・`closed_set.py --selftest` 84 件が緑。変異 5 本がすべて赤: 検査の呼び出しを外す・射影をやめる・上限を 3 に固定する・OFF の S12 のかな入力を外す・照合から config を外す。S12 の変異は、最初の文字列の置き換えが Windows の節にも当たって不発だったので、JSON として macOS の S12 だけを変えてやり直した。`kit/check.sh` の 27 本と `--compile` が緑、`_style_check.py` の違反 0 件。
+- **直さないもの**: なし（引き継ぎに回したのは、M12 の公開 repo の `.gitattributes` と、実機での前面の確認の 2 つ）。
+
+## 判断 85: 本番の n・think の上限・マーカーの長さ（2026-10-01・Mac・研究者の選択）
+
+- **材料**（一次で取り直した）: 再パイロットの ON は 126 試行で 23.2 分（1 試行 11.05 秒・待ちとマーカー込み）。`generate_plan.py --estimate` は 1 試行 11.19 秒と見積もり、実測とほぼ一致した。think（対数一様 0.2〜20 秒）の寄与は、126 試行のうち think を使う 54 試行で計 202 秒（全体の約 15%・平均 1 試行 1.6 秒）。
+  - 1 セル（14 シナリオ × 3 速さ × n）の見積もり（macOS・ON / OFF）: n = 75 で 9.79 h / 9.25 h、n = 60 で 7.86 h / 7.40 h、n = 50 で 6.63 h / 6.15 h。
+  - think の上限を下げた場合（n = 75・ON）: 10 秒で 9.15 h、5 秒で 8.79 h。下げても 1 時間ほどしか縮まず、20 秒打ち切りの境界を見るという think の目的（design.md §1.5）を失う。
+  - 再現率 0.95 付近の Wilson 95% 半幅: n = 75 で ±5.3pt、n = 60 で ±6.0pt、n = 50 で ±6.6pt。
+- **研究者の選択**（AskUserQuestion・推奨どおり）: **n = 75・think 0.2〜20 秒**（1 セル約 10 時間を受け入れる）。**マーカーは 4 打鍵 ← → ← →**（`nav_count_max` = 3 を残す）。
+  - ← → ← → で `nav_count_max` = 3 なら、生成器が計画を作ることを ON / OFF の両方の手順書で確かめた（exit 0）。← → ← のままでは exit 2 になる（判断 84 の検査）。
+- **反映**: `kit/pilot/README.md` の `clock_sync.py` の例の JSON を 4 打鍵にし、`kit/e2/README.md` の記述も合わせた。`segment_by_plan`（`pos += len(r["marker"])`）と `clock_sync.py`（`len(spec["oracle_keys"])`）は、マーカーの長さによらないことをコードで確かめた。本番の生成の config は、M3 の事前登録で凍結する（今回はファイルを作らない）。
+
+## 判断 86: macOS の正解の定義 —— 打鍵の途中の自動確定を 1 つのセッションに含める（2026-10-01・Mac・メインの実装上の選択・研究者が覆せる）
+
+- **所見**: `gt_rules.example.json` のままでは、ライブ変換 ON の再パイロット（`pilot2-on`）で 126 試行中 40 試行が `multiple_sessions` になった（oracle 一致率 85 / 126）。ライブ変換は、読みを打っている途中で先頭を確定し、残りを marked にする（`insert_text` → `set_marked`）。既定の規則は、この確定ごとにセッションを閉じる。
+- **測定**（参照側の gt ログ・oracle・plan だけ。ImeShadow の封印は開けていない）:
+  - 試行の中で `insert_text` の後に `set_marked`（len > 0）が続いた 85 件の間隔は、0.50〜7.85 ms（中央値 1.0 ms）。どの 1 件も、間に `key_down` が無かった。つまり同じ 1 打鍵への IME の応答がひと続きに出ている。
+  - 試行の最後の確定から次の `set_marked` までは、最小 958 ms（試行の間の待ち 1,000 ms による）。ライブ変換 OFF（`pilot2-off`・`verify-off`）では、試行の中の続きは 0 件。
+  - 旧手順の `verify-1`（`b38b9904`）でも、続きは 29 件・最大 4.5 ms だった。
+- **決定**: `experiment/gt_rules.json` を新しく作り、`experiment/config.json` の `gt_rules` をこれに向けた。`mac_nstic` の commit は「`insert_text`（len > 0）または `unmark` で、その後 50 ms 以内に `set_marked`（len > 0）が来ないもの」とする。Windows の 2 つの規則は example のまま（M5 で直す）。example は selftest と pipeline が参照する仮説として残す。
+  - 50 ms は、既存の cancel の `within_ms` と同じ値。観測された最大の 7.85 ms と最小の 958 ms のあいだにある。
+  - 10・20・50・200・500・900 ms のどれでも、3 つの run（`pilot2-on`・`pilot2-off`・`verify-off`）のセッションと除外がバイト単位で同じだった。1 ms では 95 / 126、5 ms では 122 / 126、1,500 ms では 17 / 126 に崩れる。
+  - 1 試行が意図する変換は 1 つ（oracle の照合が 1 試行 1 セッションを期待する）。試行の間は 1,000 ms 空く。このため 50 ms の窓が、意図の違う 2 つの変換をつなぐことは、計画の作りの上で起きない。
+  - `unmark` はパイロットで一度も観測されていない。整合のために同じ条件を付けた。
+- **結果**: oracle 一致率は ON 124 / 126（残る 2 件は持ち越し）、OFF 117 / 117、`verify-off` 39 / 39。
+- **確認**: `gt_sessions.py` の selftest に `_case_experiment_rules` を足した。`experiment/gt_rules.json` を読み、自動確定を 1 セッションに含め、続きの無い確定では閉じること、また example では同じ入力が 2 つに割れること（対照）を確かめる。変異: 規則から続きの条件を外す・ファイルを消す → どちらもこのケースだけが赤。
+
+## 判断 87: 持ち越しは、持ち越した試行と受けた試行の両方を除外し、件数は別に報告する（2026-10-01・Mac・研究者の選択）
+
+- **所見**: ON の再パイロットでは 2 件（t00098 S10 → t00099、t00119 S8 → t00120）。セッションが前の試行の中で始まり、次の試行の区間まで続く。重なりの大きい次の試行に割り当てられるので、前の試行は `no_session`、次の試行は前の文字列を含んだセッションになる。
+- **研究者の選択**（AskUserQuestion・推奨どおり）: 2 試行とも除外し、持ち越しの件数は記述の量として別に報告する。
+- **実装**: `gt_sessions.py` で、セッションの区間（閉じていなければログの最後の事象まで）が 2 つ以上の試行の trial_begin..trial_end と重なるとき（両端を含む）、`excluded` に `{"type": "carry_over", "log": "gt", "trial_ids": [重なった試行すべて]}` を足す。下流の `match.py` は除外を試行の単位で扱うので（`trial_ids` に入った試行の観測も落とす）、変更は要らない。`l2.py` は型によらず除外を数える。
+  - `oracle_agreement` は変えない（持ち越した試行は `no_session` の不一致として残る）。一致率は「手順が意図どおりに IME を動かしたか」の量で、持ち越しはその失敗だから。
+  - 判定は壁時計で行う。試行の割り当て（`_assign_trial`）と同じ時計に揃えた。gt 側の壁時計の飛びがセッションの中にあると、区間が伸びて carry_over にも当たる。どちらにしても除外なので、結果は変わらない。既存の陰性対照（clock_jump_ms を変えると excluded が変わる）は、clock_jump の項目だけを比べる形に直した。
+- **確認**: 実データで、2 組（`t00098`/`t00099`・`t00119`/`t00120`）だけが carry_over になった。OFF の 2 run は 0 件。selftest に `_case_carry_over` を足した。持ち越しの検出、試行の後・次の試行の前に落ちる確定は対象外（陰性対照）、一致率は変わらない、閉じないセッションは log_truncated と carry_over の両方、を確かめる。変異 3 本（追加を外す・2 を 3 にする・重なりの判定を包含に変える）はどれもこのケースだけが赤。⚠️ 〔判断 88 で訂正〕この 3 本では、3 試行にまたがる場合と端ちょうどの場合が試されていなかった（code-reviewer が、両端だけを見る変異と端を含まない変異が通ることを示した）。`gt_sessions.py --selftest` 14 件・`kit/check.sh` 27 本・`run.sh --synthetic` が緑。
+
+## 判断 88: M2 の完了時レビュー（Claude の 2 系統）への対応（2026-10-01・Mac・メインの実装上の選択・研究者が覆せる）
+
+- **結果**: security-checker は CRITICAL / HIGH 0・MEDIUM 1・LOW 2。code-reviewer は CRITICAL / HIGH 0・MEDIUM 2・LOW 4。すべて一次で確かめた。
+- **直したもの**:
+  1. 〔MEDIUM・security〕`pilot-macos.md` の生ログの預け方の基準が、観測側の key 行しか押さえていなかった。参照入力欄も `keyDown` ごとに物理キーの `vk` を記録する（`RefInput.swift:176`、ソースの冒頭に「人が打ったログは打鍵内容として扱う」とある）。→ 基準に次の 3 点を足した。観測の key 行と gt の `key_down` の両方が、送出の記録に対応すること。今の `reach.py` は逆向きしか数えないこと。手打ちの対照と Enter・Esc の探査は runner の run ではなく、預けないこと。手打ちの記録（`manual-*.jsonl`・`enter-probe*`・`esc-probe*`）が `~/ime-pilot/runs/` の外にあることも確かめた。
+  2. 〔MEDIUM・code〕`_case_carry_over` が、両端だけを見る変異と端を含まない変異を見逃した（元の場所で再現した）。→ 3 試行にまたがるケース（真ん中の試行に事象が無い）と、終端が次の trial_begin とちょうど同じ ms のケースを足した。2 本の変異はどちらも赤になった。
+  3. 〔MEDIUM・code〕ライブ変換 ON では、先頭が自動確定した後に残りを取り消しても、セッションの outcome は `cancel` になる。数えると、`pilot2-on` の取り消しの 27 試行のうち 11 試行（S4: 3・S5: 3・S6: 5）がこれに当たった。→ `gt_rules.json` の `_note` と `pilot-macos.md` に、「outcome は最後に閉じた理由で、途中の自動確定は数えない」と件数を書いた。観測側の放棄とどう照合するか（診断用のフィールドを足すかを含む）は、M3 の事前登録で決める（引き継ぎ）。
+  4. 〔LOW〕50 ms の窓の端ちょうどのケースを足した（50 ms は続き、51 ms は別のセッション）。`> limit` を `>= limit` にする変異で赤になる。
+  5. 〔LOW〕docstring に 2 点書いた。壁時計の飛びで、次のブロックの最初の試行まで carry_over になりうること（除外が増える向き）。窓の中でログが終わると、log_truncated ではなく確定として閉じること。
+  6. 〔LOW〕`_note` の最大値を 7.85 ms に揃えた。README の「frozen with the protocol」を「will be / to be frozen」にした（生成の config はまだ無い・判断 85）。
+- **直さないもの**: 〔LOW・security〕carry_over の判定は、試行数とセッション数の総当たりになっている。1 セル約 3,150 試行では実害が無いので、そのままにする。
+- **確認**: `gt_sessions.py --selftest` 14 件・`kit/check.sh` 27 本・`run.sh --synthetic`・`_style_check.py` 違反 0 件。実データの組み立ては変わらなかった（ON 124 セッション・除外 2、OFF 117・0、`verify-off` 39・0）。
+- **Codex**: 今日（10-01）の実消費は 324,731 で、上限 300,000 を超えている → 研究者に確かめる。
+
+## 判断 89: M2 の完了時レビュー（Codex）—— 上限の一時的な引き上げと、指摘 3 件への対応（2026-10-01・Mac・上限は研究者の選択・対応はメインの実装上の選択で研究者が覆せる）
+
+- **予算**: 回す時点で、当日の実消費は 324,731 / 8 回（上限 300,000 を超えていた）。研究者に AskUserQuestion で 3 案を出した（推奨は「明日回してから PR」）。研究者は「今日だけ上限を上げて回す」を選んだ。台帳の上限を 360,000 にし（`_comment_2026_10_01_m2_raise`）、`scripts/run-codex-review.sh eb8409b3..HEAD -- papers/ime-observation` を 1 回回した（29,449・→ 354,180 / 9 回）。回した後、上限を 300,000 に戻した。
+- **指摘と対応**（3 件とも一次で確かめた）:
+  1. 〔P2〕50 ms 以内に始まった独立の入力も、続きとしてつないでしまう。→ 両方の手順書の全シナリオ（macOS・Windows）を走査した。確定・取り消しのキー（enter・esc・digit）の後に打鍵（`type_reading` を含む手順）が続くものは 0 件。手順の書き方 8 種をすべて数えて、走査の漏れが無いことも確かめた。試行の間は 1,000 ms 空く。よって計画の作りの上では起きない。`pilot-macos.md` にこの前提を書いた。コードは変えない。
+  2. 〔P2〕ログが窓の中で終わると、確定を未確認のまま採用する。→ 3 つの run とも、gt ログは最後の確定の 0〜23 ms 後で終わっていた。ただし runner は、最後のブロックの後 `settle_ms`（既定 1,000 ms）待ってから参照入力欄を止める（`run_cell.py:596`）。実測では、最後の確定から run の終わりまで約 1,065〜1,084 ms あった。窓のあいだ参照入力欄は動いていて、何も来なかったことになる。`pilot-macos.md` に「`settle_ms` を窓より短くしない」と書いた。事前登録（M3）で `settle_ms` を固定する（引き継ぎ）。
+  3. 〔P3〕取り消しの経路のテストが足りない。→ `_case_experiment_rules` に 2 つ足した。自動確定の後に残りを取り消すと 1 つの cancel になること。`unmark` も続きの有無で開く・閉じること。`unmark` の窓を外す変異で赤になる。
+- **確認**: `gt_sessions.py --selftest` 14 件・`kit/check.sh`・`_style_check.py` 違反 0 件。
+
+---
+
+★ 以下 2026-10-01（G-GEAR・M3 の事前登録の下書きに入る前）。研究者に AskUserQuestion で 8 問を問い、8 問とも推奨どおりに決まった。
+材料はこのセッションで一次から取った: `pipeline.py:320-352`（解析の設定・凍結のハッシュ）・`l1.py:44-51`・`l2.py:30-35`（`dwell_ms == 0` は「凍結で決める」）・`match.py:28-42`（ずれと IoU の性質）・`gt_rules.json` の `_note`・`e2/README.md:88-98, 229-241`・`ime_compose.rs` の冒頭（観測側の放棄の定義）・Dhakal ら（2018）の本文（Aalto の PDF を pypdf で全文抽出）・OSF ヘルプ。解析コードと E2 / E3・生成器・実行器の目録は Sonnet の作業用エージェント 2 本に作らせ、ここに書いた事実はメインが一次で開き直した。
+
+## 判断 90: 本番の打鍵の速さは 480 / 240 / 120 ms（2026-10-01・G-GEAR・研究者の選択）
+
+- **一次**: Dhakal ら（2018・CHI・doi:10.1145/3173574.3174220・`[P269]`）の Table 1 と本文。参加者ごとの平均 IKI は、全体 238.66 ms（SD 111.60）・速い群（速さが 90% の参加者を上回る・約 78 WPM 超）121.70 ms（SD 11.96）・遅い群（遅い 10%・約 26 WPM 未満）481.03 ms（SD 123.36）。押下の長さは 116.25 ms（SD 23.88）。IKI の計算では前の打鍵から 5,000 ms を超えた打鍵を除いている。
+- **選択肢と見積もり**（n = 75・`generate_plan.py --estimate`・コーパス `c8f890cb…`・ライブ変換 ON / OFF の 1 セル）: A = 480 / 240 / 120 → 11.9 h / 11.2 h ／ B = 300 / 200 / 120（パイロット）→ 9.8 h / 9.3 h ／ C = 400 / 240 / 120 → 11.1 h / 10.5 h。
+- **研究者の選択**: **A**（推奨）。3 水準が一次の値（遅い群・全体・速い群の平均）にそのまま対応し、根拠を 1 文で書ける。1 セルは約 2 時間長くなる。
+- ⚠️ **書き方の注意**（事前登録で明記する）: 生成器の `iki_median_ms` は対数正規分布の**中央値**で、一次の値は**参加者ごとの平均 IKI の平均**。σ = 0.3 では分布の平均は中央値の約 1.046 倍（502 / 251 / 126 ms）。一次は英語の書き写し（物理キーボード・オンラインの課題）で、日本語のローマ字入力ではない → 「打鍵の速さの範囲を一般の打鍵研究の値で張る設計上の要因」と書き、日本語の打鍵の推定値とは書かない。
+- **メインの実装上の選択**（研究者が覆せる・事前登録に書く）: `iki_sigma` = 0.3（間隔にばらつきを持たせる設計上の値で、データから推定したものではない）／ `key_hold_ms` = 60（生成器は押下を重ねない〔`at_ms` は押下と離しを順に置き、間隔の下限は `key_hold_ms + 1`〕。一次の 116 ms を使うと、速い水準〔中央値 120 ms〕の間隔の多くが下限に張り付く。IME は押下で動くので、離しの時刻は観測の対象に入らない）／ `inter_trial_ms` = 1,000 ／ `marker_gap_ms` = 150 ／ `cand_index_max` = 4 ／ `block_size` = 25 ／ `kana_len` 4〜8。n = 75・think 0.2〜20 s・マーカー ← → ← →・`nav_count_max` = 3 は判断 85。⚠️ パイロットの config の全体は Mac にだけあり、repo の記録は速さ・think・n・マーカーだけ（`pilot-macos-1-notes.md:10`）→ Mac で `cand_index_max` などの値を確かめる（引き継ぎ）。
+
+## 判断 91: IME の学習はリセットしない。条件と限界に書く（2026-10-01・G-GEAR・研究者の選択）
+
+- **背景**: design.md §1.1b は「ブロックの先頭で辞書・学習状態をリセット」と書くが、パイロットはリセットしておらず、macOS の標準 IME でリセットする手段も見つかっていない（`pilot-macos.md` の Setup・`run/README.md` の前提 6）。
+- **選択肢**: A = リセットしない・条件と限界に書く ／ B = 凍結の前に手段を探して入れる（10 月中旬の凍結が遅れうる・パイロットの一部のやり直し）。
+- **研究者の選択**: **A**（推奨）。`reset_ime_every_block` = false。学習の影響は候補の並びや自動確定の位置に出うる。区間はブロック単位のクラスタ・ブートストラップで出すが、ブロックをまたぐ依存は扱えない → 限界に書く。
+- **影響**: design.md §1.1b からの逸脱として事前登録に書く（設計の段階の意図 → 実際の条件）。`cell.example.json` の `learning` の記述をパイロットと本番の実際に合わせる（引き継ぎ §M3 (4)）。
+
+## 判断 92: 段階凍結は、Windows の追補で凍結の印を更新する（2026-10-01・G-GEAR・研究者の選択）
+
+- **背景**: 凍結の印 `sha256` は `config.json`・`SEED`・`gt_rules.json`（全体）を束ねる（`pipeline.py:343-352`）。`gt_rules.json` は Windows の 2 つの規則も持ち、それは Windows の較正パイロットの後に直す予定（`gt_rules.json` の `_note`）。macOS 版を凍結した後に Windows の規則を直すと、印が合わなくなる。
+- **選択肢**: A = 追補の凍結で `preregistration.md` の `frozen_at` と `sha256` を書き換え、macOS の節・`config.json`・`SEED`・`mac_nstic` の規則は変えない ／ B = 規則ファイルと凍結のハッシュを OS ごとに分ける（凍結の門・selftest・acceptance の改修）。
+- **研究者の選択**: **A**（推奨）。コードの変更なし。OSF には macOS 版の登録がそのまま残る。⚠️ 追補では、変えてよいのは `gt_rules.json` の `win_imm` / `win_tsf` と、追補の節の本文だけ。変えていないことは 2 つの凍結のタグの差分で示し、追補にも書く（事前登録の本文に、この手順を先に書いておく）。
+
+## 判断 93: OSF Registries の登録はすぐ公開する（2026-10-01・G-GEAR・研究者の選択・判断 73 の未決 (1)）
+
+- **一次**（OSF ヘルプ「Addressing Fear of Scooping on OSF Preregistrations」）: エンバーゴは逐語 "you can hide the details of your study from public view for a certain period" ／ "An embargo on the OSF can last for up to four years from the first submission" ／ 外部からは "it will appear as a 'page not found' notification"。⚠️ エンバーゴ中の view-only link は検索結果の要約にあるだけで、逐語では確かめていない。
+- **研究者の選択**: **すぐ公開**（推奨）。中身は手順と解析計画だけで機微な情報が無い。BRM の Open Practices Statement に URL を載せ、凍結の日時を誰でも確かめられる。登録は研究者が行う（判断 73）。
+
+## 判断 94: 時計のずれは補正しない。マーカーで測ったずれは診断として報告する（2026-10-01・G-GEAR・研究者の選択）
+
+- **背景**: 解析は `clock_offsets_ms` を照合器に渡していない（`pipeline.py:325-328`・`notes.md` の Unresolved）。一方 `pilot-macos.md` の Clocks は「Analyses that align the observation with the reference use the per-block offsets.」と書いていて、食い違っている。
+- **一次**: パイロットの観測 − 参照は、ブロック 1〜5 で −5〜−1 ms、ブロック 0 で −10 / −22 ms（`pilot-macos.md`）。`dwell_ms` の誤差は長さの差なので、ずれに依らない。照合（IoU ≥ 0.5）は、長さ L のセッションならずれが L/3 以下で対になる（`match.py:38-41`）。
+- **研究者の選択**: **補正しない**（推奨）。コードは変えない。`pilot-macos.md` の一文を直す。本番でも各 run で `clock_sync.py` を回し、ブロックごとのずれを結果と一緒に報告する（事前登録に書く）。
+
+## 判断 95: `dwell_ms == 0` の観測の行は今の扱いのまま、件数を出す（2026-10-01・G-GEAR・研究者の選択・判断 45 の未決）
+
+- **今の扱い**（一次）: 照合では長さ 0 の区間で、正の長さのセッションと重ならないので必ず偽検出に入る（`l1.py:44-51`）。L1 の dwell の誤差からは外して `n_zero_excluded` に数え、`zero_dwell_rows` をすべてのバケットで数える。L2 では変換の数と放棄率に数え、平均変換時間と時間の割合からは外し、`n_dwell_zero` を出す（`l2.py:30-35`）。
+- **研究者の選択**: **今のまま**（推奨）。コードの変更なし。適合率を下げる側（観測に不利な側）に倒れる。時刻の同期を止めるので稀なはず。⚠️ コードの docstring 4 か所（`l1.py:50-51, 456-457`・`l2.py:34-35, 547-548`）の「事前登録で決める」は、事前登録の後に「事前登録で決めた」に直す（凍結の前に）。
+
+## 判断 96: 自動確定の後の取り消しは、照合はそのままにして、層別の診断を足す（2026-10-01・G-GEAR・研究者の選択・判断 88 の引き継ぎ）
+
+- **一次**: 正解側のセッションの outcome は最後に閉じた理由で、途中の自動確定は数えない（`gt_rules.json` の `_note`・`pilot-macos.md`）。`pilot2-on` の取り消し 27 試行中 11（S4: 3・S5: 3・S6: 5）が「先頭が自動確定した後に残りを取り消した」形。観測側（macOS）は、未確定の文字列を捨てる Esc で放棄の印を立てる（`kit/logger/src/input/ime_compose.rs` 冒頭の表「`abandon` に入るもの」）→ 向きはそろうはず。
+- **研究者の選択**: **照合はそのまま・層別の診断を足す**（推奨）。主の指標は変えない。正解のセッションに「途中で自動確定があった」印（数）を付け、放棄の一致をその層でも報告する。
+- **実装**（メインが段取り・凍結の前）: `gt_sessions.py` のセッションに、続きのあった確定の数を出す欄を足す。`l1.py` の `abandon` に、その欄で分けた表を足す。selftest と変異で確かめる。
+
+## 判断 97: E2 の「偶然に近い」は、各 K で正解率の 95% 区間の上端が 2/K 以下（2026-10-01・G-GEAR・研究者の選択）
+
+- **背景**: `e2/README.md:229-241` は、公開の粒度の推奨を「許容幅に入る特徴集合」で決め、幅は解析計画が凍結の前に決めるとする（キットは決めない）。⚠️ 同じ節の「The recommended granularity is the **coarsest** feature set whose `acc` is still within the margin」は誤り: `acc` は粗い集合へ向かって増えない（自分とそこから作れる粗い集合の最大）ので、幅に入る集合は粗い側へ閉じており、「最も粗い」は常に `counts_only` になる。意図は「幅に入る**最も細かい**（順序で極大の）集合」。
+- **選択肢**: A = 上端 ≤ 2/K ／ B = 上端 ≤ 1/K + 5 ポイント（K = 1000 では偶然の 51 倍まで許す）／ C = 幅を決めず記述だけ。
+- **研究者の選択**: **A**（推奨）。K によらない尺度で、K = 1000 でも意味を持つ。Wilson 区間はブロック内の相関を無視する（`e2/README.md:93-98`）→ 上端で判定することで一部を吸収し、残りは限界に書く。
+- **影響**: 事前登録に定義を書く。`e2/README.md` の「coarsest」を直す（凍結の前）。

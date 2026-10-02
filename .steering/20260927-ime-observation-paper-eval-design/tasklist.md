@@ -89,6 +89,37 @@
 - [ ] M0〜M13（`_issue-plan.md` §5）。
   - [x] M0 コーパスの確定（2026-09-30・Mac・判断 79）: 研究者の承認で新字新仮名の 12 作品を青空文庫から取得 → `--seed 1 --per-work 150`（読み 6〜30・既定）で 1,800 句・SHA-256 `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620`・`SudachiPy==0.7.0` / `sudachidict-core==20260723.1` を `kit/corpus/requirements.txt` に pin・`--validate` exit 0・2 回の書き出しでバイト一致・`experiment/data.md` に 6 項目と出典の作品表（`fece8020`）。`kit/check.sh` 緑・書き出し器が通る（91 ファイル）・仮の config で両 OS の計画の各シナリオ 225 試行がすべて別の句
     → PR #278。⚠️ /cross-review は**研究者の判断でスキップ**（コードの変更 0 行・差分はコーパスのデータと data.md と steering）。CI: Mac の check の 1 回目は runner の通信切れ（"lost communication with the server"・手順は未実行）→ 失敗ジョブだけ再実行して緑
+  - [x] M1 macOS の較正パイロット（2026-10-01・Mac・`pilot-macos-1-notes.md`）: 1 回目で所見 6 件（変換後の Enter が確定しない・マーカー F13 が観測されない・bundle id・最初の IME の状態・自動確定・所要時間）→ 原因を実機で切り分け（IME 本来の挙動・研究者の手打ちでも同じ）→ recipes とマーカーを直して（判断 80・`b38b9904`・`3e729f99`）ON / OFF の再パイロットで確認（持ち越し ON 2 / 126・OFF 0 / 39）。ImeShadow は封印して読んでいない
+  - [x] M1 の枝 `feature/ime-m1-pilot` の PR（2026-10-01・G-GEAR・引き継ぎ `next-session-ime-paper-m2.md` §2）→ **PR #283・merge `0081efe7`**
+    - [x] PR の前の整え: `GENERATOR_VERSION` 1.2.0・OFF 用の手順書も selftest で照合・`_scenario_checks` の既定を無くす・`cell.example.json` の layout を JIS に（判断 81・`5e9f873a`）
+    - [x] origin/main（`97381a7b`）を取り込む（衝突 1 件: after-merge の handoff の §6 → Mac の方を §7 に・`5a9cc805`）
+    - [x] clean な checkout（`5a9cc805`）で Windows で回る全 acceptance 22 本: 失敗は SCOPE と GUARD だけ（どちらも main の上で比較の基準が `feature/ime-eval-kit` の merge-base になるため・B15 の型）。GUARD は #279 の `scripts/run-codex-consult.sh` を拾った。この枝だけの差分（`97381a7b..5a9cc805`）に `src-tauri/` `src/` `scripts/` `.github/` は 0 件。macOS 専用の 004 / 007 / 012 は exit 2。024 の一覧の SHA-256 `4f7c7bea9f35ef489f501ad1f1dbbc97402d02d8af08f9a6365ae89f3603dbb5`（92 ファイル・直す前の値）
+    - [x] 完了時レビュー 1 巡目（Claude）: code-reviewer ∥ security-checker → CRITICAL / HIGH 0 → 指摘を判断 82 のとおり直した（マーカーの長さの検査ほか）
+    - [x] 完了時レビュー（Codex）: 研究者の選択で上限を一時的に 350,000 に上げて 1 回（33,557）→ P1 2 件（`closed_set.py` の手順書の照合・`focus_cmd` の同意と順序）・P2 2 件（持ち越し → M2 へ・OFF の S11 を空に）→ 判断 83 のとおり直し、上限を 300,000 に戻した。2 巡目（今回足した規則の境界条件）は予算の都合で Claude の code-reviewer で見る
+    - [x] 完了時レビュー 2 巡目（code-reviewer・`5a9cc805..8ae9ccd1`）: HIGH 1（手順書の改行で SHA-256 が変わる → `.gitattributes`）・MEDIUM 5（マーカーの検査を `plan_rows` へ移して観測に残る並びと計画の実際の連続で判定・E2 は config も照合・前面の確認を 5 回まで読み直す ほか）→ 判断 84 のとおり直した
+    - [x] origin/main（#281）を 2 度目に取り込む（衝突は Codex の台帳の today だけ → 和 324,731 / 8 回・`f2c98d22`）。最後の commit の clean な checkout で Windows で回る全 acceptance 22 本: 失敗は SCOPE と GUARD だけ（B15）・macOS 専用の 004 / 007 / 012 は exit 2。024 の一覧の SHA-256 `f3271b3aa4700d7e515954736c8540a8ef11c7276c5a4389c6ca345a7f44a118`（92 ファイル・Windows）
+    - [x] push → PR #283 → CI → merge → main の CI（2026-10-01）: PR のイベントの run（36814196074）で Mac の check が **runner の通信切れ**（`Cargo test` の途中・"The self-hosted runner lost communication with the server"）で赤 → 研究者に AskUserQuestion で確かめ、失敗したジョブだけを再実行して緑（attempt 2・5 分 44 秒）。同じ commit の push のイベントの run（36814170682）は Mac も Windows も緑だった → merge（`0081efe7`）→ main の CI（36817877790）success（Mac / Windows の check・frontend-check）
+    - [x] ⚠️ Mac: 024-acceptance.sh を回し、一覧の SHA-256 が G-GEAR の `f3271b3a…a118`（92 ファイル）と一致するか（判断 68・`papers/` が `f2c98d22` と同じ内容の commit で）。あわせて `build.sh` と、例の `focus_cmd` の前面の確認（引き継ぎ §3-7）
+      → 2026-10-01（Mac・macOS 27.0・Python 3.14.4）: main（`eb8409b3`・`f2c98d22` からの `papers/` の差は 0）の clean な worktree で 024 は ✅ 139・❌ 2（SCOPE と GUARD だけ・B15）。★ 一覧の SHA-256 = `f3271b3aa4700d7e515954736c8540a8ef11c7276c5a4389c6ca345a7f44a118`（92 ファイル）で **G-GEAR と一致**
+      → `build.sh` を `/bin/bash` 3.2.57 で回して exit 0（bundle id `local.ime-observation.refinput` を PlistBuddy で読み戻した）。不正な `REFINPUT_BUNDLE_ID`（空白・先頭の `-`・`/`・非 ASCII・129 文字）はすべて exit 2、`ok-1.2` は exit 0
+      → 例の `focus_cmd`: 参照入力欄（`--out` 付きで起動）が前面のとき exit 0、Finder が前面から呼んでも前面にして exit 0、前面化の文を抜いて Finder を前面にしたままでは約 2 秒（5 回の読み直し）で exit 1（`the reference input field is not in front`）。`run_cell.py --selftest` の「前面の確認の失敗でブロックの前に abort」「focus の失敗で abort」も ok。⚠️ 最初の試行は `open RefInput.app`（`--out` なし → usage で即終了）で組んだため `activate` が返らなかった（測定器の誤り・`focus_cmd` の欠陥ではない）
+  - [ ] M2 の残り: 正解の定義（`gt_rules` の `mac_nstic`・ON の型は 2 形）・本番の n / think の上限（1 セル約 10 時間・研究者）・`experiment/pilot-macos.md`（公開用の英語）・パイロットの生ログの置き場（公開物に含める）
+    - [x] 本番の n / think / マーカー（判断 85・研究者）: n = 75・think 0.2〜20 秒・マーカー ← → ← →
+    - [x] 正解の定義（判断 86）: `experiment/gt_rules.json`（`mac_nstic` の commit に「50 ms 以内に `set_marked` が続かない」）・`config.json` をこれに向けた。一致率 ON 124 / 126・OFF 117 / 117・`verify-off` 39 / 39
+    - [x] 持ち越し（判断 87・研究者）: `gt_sessions.py` に除外の理由 `carry_over`（2 試行とも）
+    - [x] `experiment/pilot-macos.md`（公開用の英語）: 条件・run・1 回目の所見と直し・呼び出し列の型（途中の自動確定を畳むと各シナリオ 1 形・例外 3 種を一次で数え直した）・正解の定義・oracle 一致率（example の規則と本実験の規則）・時計（ブロック 1〜5 のドリフトは ±5 ms/時以内・−200 ms/時はブロック 0 の起動直後の約 100 ms による）・到達・1 試行の時間・本番の設定
+    - [x] 最後の commit（`6ecfa5b4`）の clean な worktree で 004・010・020・021・024: 失敗は SCOPE と GUARD だけ（B15）。024 の一覧の SHA-256 = `bc2e68162d118e3e1de25a77869dbc9a3c86980b057a93a707a3c9b3c7385f3c`（94 ファイル・Mac）
+    - [x] ⚠️ G-GEAR: 024 を回し、一覧の SHA-256 が Mac の `bc2e6816…5f3c`（94 ファイル）と一致するか（判断 68・`papers/` が `6ecfa5b4` と同じ内容の commit で）
+      → 2026-10-01（G-GEAR・Windows 11・Python 3.11.9）: PR #285 の merge 後の main（`500c5685`・`6ecfa5b4` からの `papers/` の差は 0）の clean な worktree（`C:/wt/clean-m2`）で 024 は ✅ 137・❌ 2（SCOPE と GUARD だけ・B15）。★ 一覧の SHA-256 = `bc2e68162d118e3e1de25a77869dbc9a3c86980b057a93a707a3c9b3c7385f3c`（94 ファイル）で **Mac と一致**
+      → あわせて Windows で回る残りの acceptance 21 本（001〜003 005 006 008〜011 013〜023 028）: **SCOPE と GUARD を除く失敗 0 件**（028 は SCOPE を持たないので GUARD の 1 件だけ）。`_style_check.py papers/ime-observation` 違反 0 件
+    - [ ] パイロットの生ログの置き場（除外の基準を先に書く・逆向きの到達を数える道具）
+    - [x] 完了時レビュー（Claude の 2 系統・判断 88）: MEDIUM 3 件・LOW 4 件を直した。Codex は判断 89（研究者の選択で今日だけ上限を 360,000 にして 1 回・P2 2 件・P3 1 件に対応・上限は 300,000 に戻した）
+  - [ ] M3 事前登録（macOS 版）の下書き → attack-me（stage `prereg`）→ 凍結 → OSF の登録（研究者）
+    - [x] 研究者に 8 問（2026-10-01・G-GEAR）→ 判断 90〜97（速さ 480 / 240 / 120 ms・学習はリセットしない・段階凍結は追補で印を更新・OSF はすぐ公開・時計のずれは補正しない・`dwell_ms == 0` は今のまま・自動確定の後の取り消しは層別の診断を足す・E2 は上端 ≤ 2/K）
+    - [ ] 凍結の前の直し: `gt_sessions.py` / `l1.py` に自動確定の層別の診断（判断 96）・`pilot-macos.md` の時計の一文（判断 94）・`e2/README.md` の「coarsest」（判断 97）・`notes.md` の主張の対応表と借りた手法の出典・`l1.py` / `l2.py` の「事前登録で決める」（判断 95）・`cell.example.json` の `learning` / `predictive_candidates`（判断 91）
+    - [ ] 本番の生成の config（判断 85・90）と、各 run の seed（計画・E2）を決めてファイルにする
+    - [ ] `experiment/preregistration.md` の下書き（学術的な英語・OSF Preregistration の節立て・凍結の前に計算した値をすべて開示）と、書誌の登録（`docs/references.md` に `[V184]` 以降）
+    - [ ] attack-me（stage `prereg`・`paper-reviewer`・起動の前に下書きを commit・封印物 `sealed/` がある時期なので研究者に知らせる）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
