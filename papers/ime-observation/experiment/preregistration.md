@@ -227,10 +227,11 @@ made on the pilot's logs before the freeze and reported here; neither reads a se
   marker (`pilot2-on`, `pilot2-off` and `verify-off`; the F13 and F14 presses of the first pilot's marker produce
   no row in the observation), with `--markers-in-obs` and the pilot's three-press marker, and the fraction of blocks
   it scores is reported. This is a diagnostic of the code: if it reveals a defect, the defect is corrected before
-  the freeze, and the fractions before and after the correction are reported. It scored every block of the three
-  runs (15 of 15 blocks, 282 trials) and left no press unassigned, so no defect was found and the code was not
-  changed. These logs had no missing or added press, so the check shows that the assignment scores clean logs
-  whole; it does not exercise the resynchronisation, which only the selftest's cases do.
+  the freeze, and the fractions before and after the correction are reported. Run with the assignment code of this
+  registration (the marker looked for at the right end of a run of arrow presses, section 6.8), it scored every
+  block of the three runs (15 of 15 blocks, 282 trials) and left no press unassigned, so no defect was found and the
+  code was not changed. These logs had no missing or added press, so the check shows that the assignment scores
+  clean logs whole; it does not exercise the resynchronisation, which only the selftest's cases do.
 - `kit/analysis/delivery.py` is run with the arguments of section 3.4 on the same three runs, and it is reported
   whether the runner's kana press before each block and the input-mode keys of S14 leave key-downs in the reference
   log, the largest count per segment of the reference's key-downs that the sent presses do not explain, the least
@@ -246,14 +247,19 @@ made on the pilot's logs before the freeze and reported here; neither reads a se
   no segment of the three runs exceeds its bound (the largest count beyond the marker presses is 0). The least time
   between the last key-down of a segment and the start of the next block was 1,582 ms. The reference lost the focus
   outside the planned switches once, in `pilot2-off`: for 31 ms, in the think time of an S1 trial, 2.7 seconds
-  after the last press sent; the observation holds no key row within 3 seconds of the loss. There was no such loss
-  in the other two runs, nor in the three other runs of the pilot to which the same report was applied (`pilot-1`,
-  `verify-1` and `verify-s5`; about 87 minutes in the six runs). A rule that aborts a run at any such loss could
-  therefore abort most runs of about 12 hours, so before the freeze the rule on the loss of focus was changed to
-  abort a run only when the observation records, within the loss, more key presses than the executor sent (section
-  3.4). A first version of the change counted every key row within the loss; in the oracles built from the
-  measurement plans (above), about 78% of the time of a run lies within 500 ms of a press sent, so that version
-  would have aborted a run at most losses during typing, since the executor goes on sending during a loss.
+  after the last press sent, with no press sent within 1 second after it; the observation holds no key row within
+  the loss widened by 500 ms on each side (the nearest is that of the last press sent). There was no such loss in
+  the other two runs, nor in the three other runs of the pilot to which the same report was applied (`pilot-1`,
+  `verify-1` and `verify-s5`; about 87 minutes in the six runs). One loss in about 87 minutes is a single
+  observation, so the rate is uncertain, but a rule that aborts a run at any such loss could abort most runs of
+  about 12 hours. Before the freeze the rule on the loss of focus was therefore changed to abort a run only when the
+  observation records, within a loss, key presses that the executor did not send (section 3.4). A first version of
+  the change counted every key row within the loss; in the oracles built from the measurement plans (below), about
+  78% of the time of a run lies within 500 ms of a press sent, so that version would have aborted a run at most
+  losses during typing, since the executor goes on sending during a loss. The rule as registered (section 3.4)
+  also covers the planned switches of S15 and matches the key rows to the presses sent one by one; this final form
+  was not applied to the pilot's logs before the freeze (they are on the measuring machine), only the earlier forms
+  were. It is applied to them when they are deposited (`experiment/pilot-macos.md`).
 
 Before the freeze, the prediction of section 4.5 was also computed on the two measurement plans, with an oracle
 built from the plans' own times (no sending delay; 2 s between blocks), by
@@ -269,8 +275,10 @@ of the other is cut off by a press outside the trials), 184 (109), 280 and 99 (6
 stratum that remain under the cut-off is given in section 3.3. The same command also writes the figures of the
 plans that sections 3.3 and 6.7 quote (`plan_figures`: per stratum, the number of trials and of blocks and the sum
 of m_j squared over the sum of m_j, for the planned trials and for those that are not long; per speed, the
-distribution of the number of trials of a text that are not long). The values of the analysis are computed from the
-oracles of the measurement, not from these.
+distribution of the number of trials of a text that are not long; and the fraction of the time of the oracle at
+which a loss of focus of 31 ms, widened by 500 ms or 100 ms on each side, would hold a press sent, which is 78.1%
+and 45.9% with live conversion on and 77.0% and 45.0% with it off). The values of the analysis are computed from
+the oracles of the measurement, not from these.
 
 ### 3.2 Data collection
 
@@ -365,8 +373,8 @@ ms.
   bound (`plan_figures`, section 3.1). D is therefore at most about 3.4 within a stratum, and near 1 only when rho
   is small. With D = 1 the half-width is about 0.23 x SD with 75 pairs (for example 2.3 ms when SD is 10 ms, 11 ms
   when it is 50 ms) and about 0.35 x SD with 31, the smallest stratum of the primary scope other than those of S6
-  and S13; with D = 3.4 it is about 1.8 times as wide. Over a speed level (about 1,050 pairs, m about 25) it is about
-  0.06 x SD x sqrt(D), with D between 1 and 25. Per speed there are 126 texts (on) and 117 (off) in 42 and 39 blocks
+  and S13; with D = 3.4 it is about 1.8 times as wide. Over a speed level (about 1,050 planned pairs and 553 to 940
+  in the primary scope, m about 25) it is about 0.06 to 0.08 x SD x sqrt(D), with D between 1 and 25. Per speed there are 126 texts (on) and 117 (off) in 42 and 39 blocks
   (three texts per block). The limits of agreement (the bias plus or minus 1.96 SD) are located to about 1.96 x SD x
   sqrt(3 x D / n) (Bland & Altman, 1986), about 0.39 x SD with 75 pairs and D = 1. No width is predicted for kappa
   and the ICC, because it depends on the values estimated; they are read through the intervals reported with them.
@@ -389,11 +397,12 @@ ms.
 
 Each cell is run once to completion. If a run is aborted (the runner stops it), the cell is run again from the start
 with the same plan, in a new run directory, up to three attempts. A completed run also counts as aborted for any of
-three reasons: its plan has another SHA-256 than the plan of section 2.4; its reference log holds a key press from
-outside the executor; or, while the reference input field had lost the focus other than in the planned switch of S15,
-the observation recorded a key press that the executor did not send. The last two are decided by closed rules from the
-delivery report of the run directory alone. Right after the run (section 3.2), and before any analysis of it, the
-report is made with
+four reasons: (1) its plan has another SHA-256 than the plans of section 2.4; (2) `kit/analysis/delivery.py` refuses
+its logs (exit status 2); (3) its reference log holds more key presses than the executor and the procedure explain
+(presses from outside, below); or (4) within a loss of focus of the reference input field, the observation log holds
+a key press that no press sent by the executor explains (loss of focus, below). Reasons 3 and 4 are decided by
+closed rules from the delivery report of the run directory alone. Right after the run (section 3.2), and before any
+analysis of it, the report is made with
 
     python3 kit/analysis/delivery.py --plan <run>/plan.jsonl --oracle <run>/oracle.jsonl --obs <run>/obs.jsonl \
       --gt <run>/gt.jsonl --pre-ms 20 --tail-ms 300 --out <report>
@@ -420,42 +429,51 @@ is therefore bounded by the marker presses of its block (0 for the segment befor
 `excluding_mode_keys` of the report applies. A kana press that does leave a key-down in a run of the measurement
 makes the run count as aborted wherever it falls; it cannot let a press from outside pass.
 
-**Loss of focus.** The run also counts as aborted when, within a loss of focus of the reference input field other
-than a planned switch of S15 (a loss that begins and ends inside the interval of an S15 trial), the observation log
-holds more key presses than the executor sent there. A loss runs from a focus-out of the reference to its next
-focus-in, or to the end of the logs when the focus does not come back. For this rule it is widened by 500 ms on each
-side, and losses whose widened spans meet are taken together: the margin covers the offset between the clocks of
-the two logs, the delay with which the observation collects a row, and a key that moves the focus, which is pressed
-just before the loss. Within each span the key rows of the observation are compared with the presses that the
-executor sent and that the observation records (the presses of the trials other than the input-mode keys, and the
-marker presses), counted from 100 ms before the span to its end, so that a press sent just before the span whose
-row falls inside it is matched. A person who types into another application takes the focus away from the
-reference, and the observation records every key press on the machine, so such presses appear as rows beyond the
-presses sent. The executor goes on sending during a loss, so neither a loss during typing nor a loss in which no
-key is pressed makes the run count as aborted by itself; the pilot had one loss, of 31 ms, with no key row within
-3 seconds (section 3.1).
+**Loss of focus.** A loss runs from a focus-out of the reference to its next focus-in, or to the end of the logs when
+the focus does not come back; the planned switches of S15 are losses too. Each loss is widened by 500 ms on each
+side, and losses whose widened spans meet are taken together; the margin covers the offset between the clocks of
+the two logs, the delay with which a key event reaches the observer, and a key that moves the focus, which is
+pressed just before the loss. Every key row of the observation log is matched, once for the whole log, to at most
+one press that the executor sent and that the observation records (the presses of the trials other than the
+input-mode keys, and the marker presses): in time order, each row takes the earliest press not yet taken that was
+sent from 300 ms before the row to 20 ms after it. The run counts as aborted when a widened span holds a row that
+takes no press. A person who types into another application takes the focus away from the reference, and the
+observation records the presses of the keys it observes (all but the input-mode keys and a few others, such as
+F13 to F19) whichever application has the focus, so such presses appear as rows without a press sent. The executor goes on sending during a loss, and a planned switch of S15 sends no key (the
+other application is brought to the front by a command), so neither a loss during typing, nor a planned switch,
+nor a loss in which no key is pressed makes the run count as aborted by itself. The margin of 500 ms and the window
+of 300 ms are design choices, not measured values; the window is well above the largest difference between the
+executor's and the observation's clocks that the pilot showed (86 to 95 ms in the first block of a run and 0 to 3
+ms in the others, `experiment/pilot-macos.md`).
 
-A run for which `delivery.py` refuses its input (exit status 2) also counts as aborted. No other reason and no
-explanation is admitted. The rules apply to the runs of the two cells and of the `working` condition of question 5;
-the `idle` condition sends no key and has no plan.
+No other reason and no explanation is admitted. The rules apply to the runs of the two cells and of the `working`
+condition of question 5. The `idle` condition sends no key and has no plan; its observation log is not deposited,
+because the observer is started before the command that begins the sampling is typed, so the log holds a person's
+key presses (only the samples of section 6.10 are deposited).
 
 The result of the check, its time, the SHA-256 of the plan, the largest count per segment beyond the marker presses
-and the number of spans of losses of focus outside the planned switches within which the observation holds more key
-presses than the executor sent are recorded in the table of run checks in `experiment/data.md` before any analysis of
-the run. `kit/analysis/pipeline.py` applies the same rules to the delivery report it computes and refuses to analyse a
-run that they catch. A completed run that counts as aborted for any of these reasons is not deposited, because its
-reference log records the key code of every key-down it received and its observation log records every key press on
-the machine, so either may hold a person's key presses. The same check is made on a run that the runner aborted: such
-a run is never analysed, and it is deposited only if the check passes or if it left neither a reference log nor an
-observation log. `pipeline.py --pack` and `--check-deposit` apply the rules to every run directory, completed or
-aborted, and refuse one that the rules catch or that cannot be checked (an observation log without a reference log, or
-logs that `delivery.py` refuses). The rule on presses counts the key-downs that remain beyond the presses that reached
-the reference, so a lost press and a press from outside cancel out: a marker press that does not reach the reference
-against a press from outside anywhere in the same segment, and a press of a trial that does not reach it against a
-press from outside in the interval of the same trial. Such a replacement is not detected (section 7). Outside a loss
-of focus, rows of the observation without a sent press are a result of the observer under test (section 6.3) and never
-make a run count as aborted. Aborted runs are reported with their reason and their delivery figures, and are not
-analysed. A cell that is not completed in three attempts is reported as not measured. The same rules apply to each
+and the number of widened spans that hold a row without a press sent are recorded in the table of run checks in
+`experiment/data.md` before any analysis of the run. `kit/analysis/pipeline.py` applies reasons 2 to 4 to the
+delivery report it computes and, on real data, reason 1 to the plan of each run (the two SHA-256 of section 2.4 are
+constants of the code); it refuses to analyse a run that they catch. A completed run that counts as aborted is not
+deposited: it is not analysed, and under reasons 2 to 4 its logs may hold a person's key presses (the reference log
+records the key code of every key-down it received, and the observation log records the presses of the keys it
+observes on the machine). The same check is made on a run that the runner aborted: such a run is never analysed,
+and it is deposited only if the check passes or if it left neither a reference log nor an observation log. A run
+that the runner aborts inside a trial does not pass: that trial has no end in the oracle, so its presses that reached
+the reference count as not explained (here the count does not mean a press from outside). `pipeline.py --pack` and
+`--check-deposit` apply reasons 2 to 4 and the content-free check of section 5 to every run directory, completed or
+aborted, and refuse one that they catch or that cannot be checked (an observation log without a reference log, or
+logs that `delivery.py` refuses); reason 1 is checked by hand before a run is deposited (`experiment/data.md`),
+because the runs of the pilot, which used other plans, are deposited with the same commands.
+
+The rule on presses counts the key-downs that remain beyond the presses that reached the reference, so a lost press
+and a press from outside cancel out: a marker press that does not reach the reference against a press from outside
+anywhere in the same segment, and a press of a trial that does not reach it against a press from outside in the
+interval of the same trial. Such a replacement is not detected (section 7). Outside the widened spans of the losses
+of focus, rows of the observation without a sent press are a result of the observer under test (section 6.3) and
+never make a run count as aborted. Aborted runs are reported with their reason and their delivery figures, and are
+not analysed. A cell that is not completed in three attempts is reported as not measured. The same rules apply to each
 condition of question 5: a condition that is aborted or insufficient (section 6.10) is run again on another night, up
 to three attempts in all, and every attempt is reported.
 
@@ -620,13 +638,13 @@ analysed (section 6.4).
 
 Other contingencies:
 
-- A loss of focus of the reference input field, other than the planned switch of S15, makes the run count as
-  aborted when the observation holds, within it, more key presses than the executor sent (section 3.4). An analysed
-  run can therefore have a loss, also during typing: the presses that the executor sends during it reach another
+- A loss of focus of the reference input field makes the run count as aborted when the observation holds, within
+  it, a key press that no press sent by the executor explains (section 3.4). An analysed run can therefore have a
+  loss, also during typing: the presses that the executor sends during it reach another
   application and not the reference, so their trials appear as disagreements between the plan and the ground truth
   (section 6.3). A loss lasts from a focus-out of the reference to its next focus-in (to the end of the log when
   none follows), so it can cover several trials, because the runner confirms the focus only before each block; an
-  S15 switch is planned only when it returns inside its own trial. These trials are not excluded: the delivery
+  S15 switch is planned only when it begins and ends inside its own trial. These trials are not excluded: the delivery
   report counts them per stratum, and the detection results report the observation rows assigned to them, and how
   many of these are false positives, in total and per speed, so that a failure of the reference is not read as one
   of the observer.
@@ -655,9 +673,10 @@ fraction of sent presses that arrived and the number of rows without a sent pres
 where the block markers and the runner's kana presses fall), and per segment of a block the rows that the sent
 presses do not explain (section 3.4); and, in the trials where every press arrived, the delay of each row after its
 press and the error of each interval between consecutive rows. Input-mode keys, which the observer does not record
-by design, are reported with and without. Rows of the observation without a sent press are a result of the observer
-and stay in the analysis; whether the rows of the reference make a run count as aborted is decided by the rules of
-section 3.4 alone. These figures concern events generated in software; no claim is made about the path from a
+by design, are reported with and without. Whether rows without a sent press make a run count as aborted is
+decided by the rules of section 3.4 alone (rows of the reference, and rows of the observation within a loss of
+focus); the other rows of the observation without a sent press are a result of the observer and stay in the
+analysis. These figures concern events generated in software; no claim is made about the path from a
 physical keyboard (section 7).
 
 ### 6.4 Scopes and comparisons
@@ -765,15 +784,15 @@ Shrout and Fleiss (1979). It is computed by `kit/analysis/stats.py` from the mea
 variance with the two methods as columns, with a 95% interval from resampling blocks. An interval is withheld, with
 the reason, when its statistic is undefined in the sample or in any resample. The per-speed values are primary;
 values pooled over speeds are reported for comparison, because a difference in level between speeds inflates a
-pooled ICC. Under `under_limit` a text keeps only its trials in the scope, and in this design their number k
-differs between speeds: computed from the measurement plans and the prediction (section 3.1), the mean k is 4.60,
+pooled ICC. Under `under_limit` a text keeps only its trials in the scope, and in this design their number r
+differs between speeds: computed from the measurement plans and the prediction (section 3.1), the mean r is 4.60,
 6.49 and 7.17 (slow, middle, fast) with live conversion on and 4.56, 6.43 and 7.21 with it off; at the slow speed
-30 of 126 and 27 of 117 texts have a k of three or less, 4 and 0 keep all eight trials, and no text has none. A
+30 of 126 and 27 of 117 texts have an r of three or less, 4 and 0 keep all eight trials, and no text has none. A
 value computed over fewer trials varies more, so the limits of agreement and the ICC of the primary scope hold for
-this design's distribution of k and are not compared between speeds. The bias is the mean of the per-text
-differences with every text weighted equally, whatever its k. The smaller k is, the more texts have a measure that
-cannot be computed on one side (for example no session, so no mean conversion time) and are left out of that
-measure (section 6.11). A text is not used if any of its trials was not run or was excluded; the numbers of such
+this design's distribution of r and are not compared between speeds, nor extrapolated to texts of another length
+(the per-trial differences below are the material for that). The bias is the mean of the per-text differences with
+every text weighted equally, whatever its r. The smaller r is, the more texts have a measure that cannot be computed
+on one side (for example no session, so no mean conversion time) and are left out of that measure (section 6.11). A text is not used if any of its trials was not run or was excluded; the numbers of such
 texts are reported by reason, block and speed. The number of a text's trials in the scope is reported per speed, and the
 texts with none are counted (section 6.11). The bias of each measure is also reported for three mixtures of speeds
 (slow, middle and fast in proportions 0.6/0.3/0.1, equal, and 0.1/0.3/0.6), with intervals that resample the blocks
@@ -922,7 +941,7 @@ the first eight hours). Reported for each condition: the mean, median, 95th perc
 observer's CPU (one core is 100%), its final resident memory and the least-squares slope of its resident memory in
 MB per hour. A condition with fewer than 480 usable samples or a window shorter than four hours is insufficient
 (section 3.4). The two conditions are always reported together and never reduced to one figure. Battery use is not
-measured.
+measured. The observation log of `idle` is not deposited (section 3.4); the samples of both conditions are.
 
 ### 6.11 Missing data
 
@@ -983,16 +1002,24 @@ between the two cells) is reported as exploratory.
   `under_limit` a text keeps fewer trials at the slow speed, so the per-text limits of agreement and ICC hold for
   this design's numbers of trials per text and are not compared between speeds (section 6.7). In a researcher's own
   log the sessions that are cut off cannot be confirmed from the key rows alone (section 6.4).
-- **The stopping rule counts presses, not keys.** The rule of section 3.4 counts the key-downs of the reference
-  that remain beyond the presses that reached it, so a press that does not reach the reference and a press from
-  outside cancel out (a marker press against a press anywhere in the same segment, a press of a trial against a
-  press in the same trial), and such a replacement is not detected. A person's key presses that reach neither the
-  reference nor another application, such as a shortcut that the system consumes without moving the focus, are
-  caught by neither rule of section 3.4. A person who moves the focus away and back without pressing a key is not
-  caught either, and puts no key press into the logs. Within a loss of focus the rule compares numbers of key rows
-  and of presses sent, so a key row that the observation misses there hides one press of a person, and so does a
-  press sent within the last 100 ms of the span whose row falls after it; a row that the observer duplicates there
-  makes the run count as aborted without a person.
+- **The stopping rule counts presses, not keys.** The rule on presses of section 3.4 counts the key-downs of the
+  reference that remain beyond the presses that reached it, so a press that does not reach the reference and a press
+  from outside cancel out (a marker press against a press anywhere in the same segment, a press of a trial against a
+  press in the same trial), and such a replacement is not detected. The rule on the loss of focus matches each key
+  row of the observation to a press sent: a press whose row the observation misses can take one press of a person
+  made from 20 ms before it to 300 ms after it, which is then not detected, while a row that arrives more than 300
+  ms after its press, or a row that the observer duplicates, makes the run count as aborted within a loss without a
+  person; there, unlike elsewhere (section 6.3), the behaviour of the observer under test decides an abort. A
+  person's key presses that reach neither the reference nor another application, such as a shortcut that the system
+  consumes without moving the focus, and presses of keys that the observation does not observe, are caught by
+  neither rule. A person who moves the focus away and back without pressing a key is not caught either, and puts no
+  key press into the logs. That the rules catch a person's key presses was checked only on cases constructed in the
+  selftests of the code, not by typing on the measuring machine; presses into an input field that takes keys without
+  taking the key window from the reference input field (such as a search field of the system) may not be caught.
+- **The reference input field can lose the focus by itself.** In the pilot it lost the focus once in about 87
+  minutes, for 31 ms (section 3.1; a single observation, so the rate is uncertain). The presses sent during such a
+  loss reach another application and not the reference, so their trials appear as disagreements between the plan
+  and the ground truth; they are reported with the delivery figures and not excluded (section 6.2).
 - **Intervals that treat trials as independent.** The Wilson intervals of pooled proportions ignore the clustering of
   trials in blocks and are read as lower bounds of the uncertainty (section 6.1). The near-chance rule of question 4
   uses the Wilson interval; with dependence within a block the rule is met more easily than it should be, and the

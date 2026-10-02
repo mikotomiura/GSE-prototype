@@ -139,8 +139,9 @@ interruption is raised again; a second Ctrl-C during the stop still ends the rem
 | `logger.stderr.txt`, `refinput.stderr.txt`, `reset.stderr.txt`, `focus.stderr.txt` | what each child and command wrote to standard error (created when used) |
 | `runner.error.txt` | the traceback of an unexpected error of the runner (only then) |
 
-Deposit `run.json` and the four logs only. The standard error files and `runner.error.txt` stay on the
-measuring machine: they may contain paths and user names.
+Deposit `run.json` and the four logs only, bundled and checked with `pipeline.py --pack` as
+`experiment/data.md` describes. The standard error files and `runner.error.txt` stay on the measuring machine: they
+may contain paths and user names.
 
 `run.json` holds: `cell` (as given, with the optional keys filled in), `plan_sha256`, `git_commit` (the
 commit of the checkout that holds the runner, taken at the start, or `null`), `git_dirty` (whether

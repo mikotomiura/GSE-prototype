@@ -81,6 +81,12 @@ exit status 3 when a mark is missing, malformed, duplicated or different. Only r
 rehearsals, not a defence against a person who edits a manifest. A synthetic result also carries
 "synthetic": true and is never written under experiment/results.
 
+Registered plans. In an analysis of real data, a run that is not aborted must have used one of the two plans of
+section 2.4 of the pre-registration (live conversion on, off): the SHA-256 of its plan log, which is checked
+against run.json, must be in REGISTERED_PLAN_SHA256. Otherwise the run counts as aborted under section 3.4 and the
+analysis stops with exit status 2; the message names the cell, never a value. Synthetic runs are not checked,
+and neither are --pack and --check-deposit (runs that used other plans are deposited with the same commands).
+
 Abort rule for the reference input field (pre-registration section 3.4). The delivery report divides the
 reference log into segments at the block_begin rows of the oracle (delivery.py, Definitions) and counts in
 each the key_down rows that no press of the measured trials explains (n_unexplained), in two versions that
@@ -91,14 +97,16 @@ puts at the head of the block, plus RUNNER_KANA_PRESSES_PER_BLOCK for every segm
 last block (the runner selects the input method with one key before each block; the segment of the last block
 has no such key after it, and the segment before the first block has the key of the first block; when the
 oracle has no block_begin the one segment counts as the segment before the first block). A run is also
-refused when the reference input field lost focus other than by the planned switch of scenario S15 and the
-observation log holds more key presses within that loss, widened by delivery.FOCUS_MARGIN_MS on both sides
-(merged where the widened losses overlap), than the executor sent
-(reference_focus_loss.n_unplanned_loss_spans_with_unexplained_presses is above 0; the keys sent are counted
-from delivery.OBS_SEND_DELAY_MS before the span): to type into another application a person must take the
-focus from the reference, and the observation records every key of the machine, but the executor goes on
-sending keys during a loss, so only the presses beyond the keys sent refuse the run. A loss in which the
-observation holds no press beyond the keys sent puts no press of a person into either log. Extra rows in the observation log never refuse a run. The message names the cell and the block,
+refused when the reference input field lost focus, for any reason (the planned switches of scenario S15 are
+losses too), and the observation log holds, within that loss widened by delivery.FOCUS_MARGIN_MS on both sides
+(merged where the widened losses overlap), a key row that no key sent by the executor explains
+(reference_focus_loss.n_loss_spans_with_unexplained_presses is above 0). The rows are matched one to one, in
+time order: each row takes the earliest key not yet taken that was sent from delivery.OBS_MATCH_BEFORE_MS before
+the row to delivery.OBS_MATCH_AFTER_MS after it; a row left without a key is unmatched. To type into another
+application a person must take the focus from the reference, and the observation records the keys it observes
+in every application, but the executor goes on sending keys during a loss, so only the rows beyond the keys sent refuse the
+run. A loss in which every row is matched puts no press of a person into either log. Outside a loss of focus,
+extra rows of the observation log never refuse a run. The message names the cell and the block,
 never a value of a log. The rule and its constants are recorded in e1_delivery.json ("abort_rule").
 
 Outputs (RESULTS_DIR): e1_l1.json, e1_l2.json, e1_detection.json and e1_delivery.json (the per-press delivery
@@ -121,7 +129,9 @@ paths that start with ~ or <repo>, and relative paths, are allowed); (b) the hom
 current user or of --also-home PATH (any number), in every separator spelling and in the MSYS spelling;
 (c) the absolute path of the repository; (d) the login name of the current user or a name given with
 --also-user NAME (any number), as a whole word; (e) content in the ground-truth or observation log (the
-content-free validator), for a run that was not aborted. For every run with a reference log, aborted by the
+content-free validator), for every run, aborted by the runner or not (a log that an aborted run recorded with a
+null hash and that is absent passes; a log that cannot be validated, for example because its last line is cut
+off, refuses the run). For every run with a reference log, aborted by the
 runner or not, it also applies the abort rule above (both parts) to the delivery report of the run: a run that
 the rule would refuse is not safe to deposit, since a person may have typed elsewhere in it, and a run whose
 delivery report cannot be computed (no plan or oracle log, or logs that do not fit) is reported as not
@@ -224,6 +234,10 @@ RUNNER_KANA_PRESSES_PER_BLOCK = 0
 REFERENCE_RECEIVES_MODE_KEYS = False
 DELIVERY_PRE_MS = 20
 DELIVERY_TAIL_MS = 300
+# SHA-256 of the plan logs of the two measurement plans of section 2.4 of the pre-registration (live conversion
+# on, live conversion off). An analysis of real data accepts a run that is not aborted only with one of them.
+REGISTERED_PLAN_SHA256 = ("c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba",
+                          "3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2")
 PRIMARY_NOTE = ("the primary estimates are the comparison and scope named here, per stratum; every other comparison "
                 "and scope is secondary. A cell without a prediction (the prediction models the macOS observer only) "
                 "has the comparison gt_obs and the scope all_trials only. Values under all_trials depend on this "
@@ -543,10 +557,12 @@ def read_runs_list(path):
 # ---------------------------------------------------------------- step 0
 
 def _content_free(run, name):
-    """Findings of the content-free validator for the gt and obs logs of a run."""
+    """Findings of the content-free validator for the gt and obs logs of a run (an absent log passes)."""
     vl = _tool("validate_logs", "formats", "validate_logs.py")
     out = []
     for kind in ("gt", "obs"):
+        if kind not in run["files"]:
+            continue
         try:
             for ln, code, msg in vl.validate(kind, run["files"][kind]):
                 out.append("%s/%s:%d: [%s] %s" % (name, LOG_FILES[kind], ln, code, msg))
@@ -833,9 +849,9 @@ def reference_abort_reasons(dlv):
     for bid in reference_abort_segments(dlv):
         out.append("the reference log holds key presses that the measured trials and the procedure do not explain, %s"
                    % ("before the first block" if bid is None else "in the segment of block %s" % bid))
-    if dlv["reference_focus_loss"]["n_unplanned_loss_spans_with_unexplained_presses"] > 0:
-        out.append("the observation log holds key presses that the executor did not send within a loss of focus of the"
-                   " reference input field other than the planned switch of S15")
+    if dlv["reference_focus_loss"]["n_loss_spans_with_unexplained_presses"] > 0:
+        out.append("the observation log holds key presses that no key sent by the executor explains within a loss of "
+                   "focus of the reference input field")
     return out
 
 
@@ -870,6 +886,11 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
         want = freeze_hash_of(cfg_bytes, _read_regular(seed_file, "seed file"), rules_bytes)
         check_prereg_text(match._decode(_read_regular(prereg, "pre-registration"), "pre-registration"), want)
     used = sorted((r for r in runs if not r["aborted"]), key=lambda r: r["label"])
+    if not synthetic:
+        for r in used:
+            if r["sha"]["plan"] not in REGISTERED_PLAN_SHA256:
+                raise InputError("run %s: under section 3.4 of the pre-registration the run counts as aborted and is "
+                                 "not analysed (its plan is not one of the two plans of section 2.4)" % r["label"])
     labels = [r["label"] for r in used]
     if len(set(labels)) != len(labels):
         raise InputError("two runs that were not aborted share a cell label (give each cell a distinct label)")
@@ -891,9 +912,11 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
     res["detection"]["same_sessions_as_all"] = {}
     res["delivery"] = dict(head, abort_rule={"runner_kana_presses_per_block": RUNNER_KANA_PRESSES_PER_BLOCK,
                                              "reference_receives_mode_keys": REFERENCE_RECEIVES_MODE_KEYS,
-                                             "unplanned_focus_loss_with_unexplained_presses_aborts": True,
+                                             "focus_loss_with_unexplained_presses_aborts": True,
                                              "focus_margin_ms": delivery.FOCUS_MARGIN_MS,
-                                             "obs_send_delay_ms": delivery.OBS_SEND_DELAY_MS,
+                                             "obs_match_before_ms": delivery.OBS_MATCH_BEFORE_MS,
+                                             "obs_match_after_ms": delivery.OBS_MATCH_AFTER_MS,
+                                             "registered_plan_sha256": list(REGISTERED_PLAN_SHA256),
                                              "pre_ms": DELIVERY_PRE_MS, "tail_ms": DELIVERY_TAIL_MS}, cells={})
     for r in used:
         f = r["files"]
@@ -1022,8 +1045,7 @@ def deposit_check_files(files, name, pats):
     when a hash does not match or a log whose hash is recorded is missing."""
     run = parse_run(files, name, verify_all=True)
     out = ["%s/%s:%d: contains %s" % (name, f, n, kind) for f, n, kind in scan_files(files, pats)]
-    if not run["aborted"]:
-        out += _content_free(run, name)
+    out += _content_free(run, name)
     out += _abort_rule_findings(run, name)
     return out
 
@@ -1695,7 +1717,21 @@ def _prereg_text(sha, extra=""):
     return "# Pre-registration\n\nfrozen_at: 2026-01-01\nsha256: %s\n%s" % (sha, extra)
 
 
+def _plan_sha_of(run_dir):
+    return json.loads(open(os.path.join(run_dir, MANIFEST), "rb").read().decode("utf-8"))["outputs"]["plan"]["sha256"]
+
+
 def _case_freeze_gate(d):
+    """The freeze gate, with the plan of the stand-in runs registered (the registered-plan check is tested after the
+    positive cases; the constant is restored on every path)."""
+    old = REGISTERED_PLAN_SHA256
+    try:
+        return _freeze_gate_body(d)
+    finally:
+        _set_constant("REGISTERED_PLAN_SHA256", old)
+
+
+def _freeze_gate_body(d):
     f = []
     cfg = _config_file(d)
     seedf = _seed_file(d)
@@ -1710,6 +1746,8 @@ def _case_freeze_gate(d):
     if want != good:
         f.append("the freeze hash is not defined as the hash of the three file hashes, each followed by a line feed")
     runs = _real_runs(d, "gate")[:1]
+    plan_sha = _plan_sha_of(runs[0])
+    _set_constant("REGISTERED_PLAN_SHA256", (plan_sha,))
     pr = os.path.join(d, "preregistration.md")
 
     def analyse_rc(name, with_prereg=True):
@@ -1766,6 +1804,26 @@ def _case_freeze_gate(d):
         rc = analyse_rc("g3") if i == 0 else 0
         if rc != 0 or (FULL and check_rc() != 0):
             f.append("the freeze gate refused: %s (rc %s)" % (name, rc))
+    # a run whose plan is not one of the registered plans counts as aborted: exit 2, no result, no value in the message
+    _write(pr, _prereg_text(good).encode("utf-8"))
+    for other in ((), ("0" * 64, "1" * 64), (plan_sha.upper(),)):
+        _set_constant("REGISTERED_PLAN_SHA256", other)
+        o = os.path.join(d, "g3x")
+        rc, _o, err = _quiet(["--runs"] + runs + ["--config", cfg, "--seed-file", seedf, "--out", o, "--prereg", pr])
+        if rc != 2 or plan_sha in err or os.path.exists(os.path.join(o, "e1_l1.json")):
+            f.append("a run whose plan is not registered was analysed, or the message holds a hash (rc %s)" % (rc,))
+        if rc == 2 and ("section 3.4" not in err or "section 2.4" not in err or runs and "synthetic-" not in err):
+            f.append("the message about an unregistered plan does not name the cell and the sections")
+    # the same runs, marked synthetic, are not subject to the check; neither are --check-deposit and --pack
+    _set_constant("REGISTERED_PLAN_SHA256", ())
+    syn = make_synthetic(os.path.join(d, "gate-syn"), 2)[:1]
+    if _quiet(["--runs"] + syn + ["--config", cfg, "--seed", "7", "--out", os.path.join(d, "g3y")])[0] != 0:
+        f.append("a synthetic run was refused for its plan")
+    if _quiet(["--check-deposit"] + runs)[0] != 0:
+        f.append("--check-deposit applied the registered-plan check")
+    if _quiet(["--pack", runs[0], "--out", os.path.join(d, "g3z.zip")])[0] != 0:
+        f.append("--pack applied the registered-plan check")
+    _set_constant("REGISTERED_PLAN_SHA256", (plan_sha,))
     # the analysis settings changed by one byte after the freeze
     _write(pr, _prereg_text(good).encode("utf-8"))
     with open(cfg, "ab") as fh:
@@ -1793,6 +1851,12 @@ def _case_run_sh(d):
     _write(os.path.join(exp, "config.json"), json.dumps({"bootstrap_B": 100, "gt_rules": "../kit/analysis/gt_rules.example.json"}).encode("utf-8"))
     _write(os.path.join(exp, "SEED"), b"7\n")
     runs = _real_runs(root, "runs")[:1]
+    # the copy of this file in the tree registers the plan of the stand-in run
+    cp = os.path.join(root, "kit", "analysis", "pipeline.py")
+    src = open(cp, "rb").read().decode("utf-8")
+    reg = src.index("REGISTERED_PLAN_SHA256 = (")
+    end = src.index(")" + chr(10), reg)
+    _write(cp, (src[:reg] + 'REGISTERED_PLAN_SHA256 = ("%s",' % _plan_sha_of(runs[0]) + src[end:]).encode("utf-8"))
     lines = "".join("- run_dir: ../runs/%s  manifest_sha256: %s\n" % (os.path.basename(r), _sha(open(os.path.join(r, MANIFEST), "rb").read()))
                     for r in runs)
     _write(os.path.join(exp, "data.md"), ("# Data\n\n" + lines).encode("utf-8"))
@@ -2223,9 +2287,12 @@ def _case_reference_abort_rule(d):
             rc = rc_of(run_with(tag + "i", []), "o" + tag + "i")[0]
             res = json.loads(open(os.path.join(d, "o" + tag + "i", "e1_delivery.json"), "rb").read().decode("utf-8")) if rc == 0 else {}
             if res.get("abort_rule") != {"runner_kana_presses_per_block": k, "reference_receives_mode_keys": REFERENCE_RECEIVES_MODE_KEYS,
-                                         "unplanned_focus_loss_with_unexplained_presses_aborts": True,
+                                         "focus_loss_with_unexplained_presses_aborts": True,
                                          "focus_margin_ms": delivery.FOCUS_MARGIN_MS,
-                                         "obs_send_delay_ms": delivery.OBS_SEND_DELAY_MS, "pre_ms": 20, "tail_ms": 300}:
+                                         "obs_match_before_ms": delivery.OBS_MATCH_BEFORE_MS,
+                                         "obs_match_after_ms": delivery.OBS_MATCH_AFTER_MS,
+                                         "registered_plan_sha256": list(REGISTERED_PLAN_SHA256),
+                                         "pre_ms": 20, "tail_ms": 300}:
                 f.append("[%d] the abort rule is not recorded in the delivery results" % k)
         finally:
             _set_constant("RUNNER_KANA_PRESSES_PER_BLOCK", old)
@@ -2234,10 +2301,10 @@ def _case_reference_abort_rule(d):
     def seg(bid, unexplained, marker):
         return {"block_id": bid, "n_unexplained": unexplained, "n_marker_presses": marker}
 
-    def report(by_segment, excluding=None, unplanned=0):
+    def report(by_segment, excluding=None, losses=0):
         return {"reference": {"segments": {"all_presses": {"by_segment": by_segment},
                                            "excluding_mode_keys": {"by_segment": excluding or by_segment}}},
-                "reference_focus_loss": {"n_unplanned_loss_spans_with_unexplained_presses": unplanned}}
+                "reference_focus_loss": {"n_loss_spans_with_unexplained_presses": losses}}
 
     for k in (0, 1):
         old = _set_constant("RUNNER_KANA_PRESSES_PER_BLOCK", k)
@@ -2251,7 +2318,7 @@ def _case_reference_abort_rule(d):
             one = [seg(None, k, 0)]
             if reference_abort_segments(report(one)) != [] or reference_abort_segments(report([seg(None, k + 1, 0)])) != [None]:
                 f.append("[%d] a log with no block_begin is not treated as the segment before the first block" % k)
-            if reference_abort_reasons(report([seg(None, 0, 0)], unplanned=0)) != []:
+            if reference_abort_reasons(report([seg(None, 0, 0)], losses=0)) != []:
                 f.append("[%d] a report with nothing to refuse has a reason" % k)
         finally:
             _set_constant("RUNNER_KANA_PRESSES_PER_BLOCK", old)
@@ -2264,10 +2331,10 @@ def _case_reference_abort_rule(d):
             if reference_abort_segments(report(quiet, excluding=noisy)) != want:
                 f.append("the version of the report does not follow REFERENCE_RECEIVES_MODE_KEYS (%r)" % receives)
         _set_constant("REFERENCE_RECEIVES_MODE_KEYS", old_mode)
-        why = reference_abort_reasons(report([seg(None, 0, 0)], unplanned=1))
-        if len(why) != 1 or "S15" not in why[0]:
-            f.append("an unplanned focus loss with an unexplained key press is not a reason to refuse")
-        if len(reference_abort_reasons(report([seg(None, 3, 0), seg(0, 0, 4)], unplanned=2))) != 2:
+        why = reference_abort_reasons(report([seg(None, 0, 0)], losses=1))
+        if len(why) != 1 or "loss of focus" not in why[0] or "S15" in why[0]:
+            f.append("a focus loss with an unexplained key press is not a reason to refuse")
+        if len(reference_abort_reasons(report([seg(None, 3, 0), seg(0, 0, 4)], losses=2))) != 2:
             f.append("the two parts of the rule are not reported separately")
     finally:
         _set_constant("RUNNER_KANA_PRESSES_PER_BLOCK", old)
@@ -2276,7 +2343,7 @@ def _case_reference_abort_rule(d):
 
 
 def _case_section34_enforcement(d):
-    """Section 3.4 before a deposit: a focus loss other than by S15 with an observation key press beyond the keys sent
+    """Section 3.4 before a deposit: a focus loss (the planned switches of S15 included) with an observation key row beyond the keys sent
     refuses the analysis (one with only the keys sent, or with none, does not), and the deposit check and
     the archive apply the abort rule to every run with a reference log, aborted by the runner or not."""
     f = []
@@ -2286,7 +2353,7 @@ def _case_section34_enforcement(d):
     t0 = min(x["t_wall_ms"] for x in ora if x.get("kind") == "trial_begin")
     last_end = max(x["t_wall_ms"] for x in ora if x.get("kind") == "trial_end")
 
-    def variant(name, rows=(), aborted=False, drop=(), extra_obs=()):
+    def variant(name, rows=(), aborted=False, drop=(), extra_obs=(), s15=False, obs_tail=b""):
         """A copy of the run with reference rows added, marked as aborted by the runner when asked; drop = logs left
         out (recorded with a null hash, as the runner does when it aborts); extra_obs = times of observation key
         rows that the executor did not send. The observation holds a key row 5 ms after every press sent."""
@@ -2305,7 +2372,15 @@ def _case_section34_enforcement(d):
         obs = obs[:1] + sorted([x for x in obs[1:] if x.get("type") != "key"]
                                + [{"type": "key", "t": t, "category": "alphabetic", "press": True} for t in keys],
                                key=lambda r: (r["t"], r["type"]))
-        _rewrite_log(dst, "obs", _jl(obs))
+        _rewrite_log(dst, "obs", _jl(obs) + obs_tail)
+        if s15:   # the first trial becomes a trial of scenario S15 (the plan, and the plan hash in the oracle header)
+            plan = [json.loads(x.decode("utf-8")) for x in open(os.path.join(dst, LOG_FILES["plan"]), "rb").read().splitlines() if x]
+            next(x for x in plan if x.get("kind") == "trial")["scenario"] = "S15"
+            plan_bytes = _jl(plan)
+            _rewrite_log(dst, "plan", plan_bytes)
+            orc = [json.loads(x.decode("utf-8")) for x in open(os.path.join(dst, LOG_FILES["oracle"]), "rb").read().splitlines() if x]
+            orc[0]["plan_sha256"] = _sha(plan_bytes)
+            _rewrite_log(dst, "oracle", _jl(orc))
         if aborted:
             m = json.loads(open(os.path.join(dst, MANIFEST), "rb").read().decode("utf-8"))
             for n in drop:
@@ -2326,21 +2401,35 @@ def _case_section34_enforcement(d):
     # the deposit check (exit 1), with no value in the message
     dst = variant("loss", loss, extra_obs=[t0 + 150])
     rc, _o, err = _quiet(["--runs", dst, "--config", cfg, "--seed", "1", "--out", os.path.join(d, "o1")])
-    if rc != 2 or "S15" not in err or str(t0 + 100) in err or os.path.exists(os.path.join(d, "o1", "e1_delivery.json")):
-        f.append("a run whose reference lost focus other than by S15 was analysed, or the message is wrong (rc %d)" % rc)
+    if rc != 2 or "loss of focus" not in err or str(t0 + 100) in err or os.path.exists(os.path.join(d, "o1", "e1_delivery.json")):
+        f.append("a run whose reference lost focus was analysed, or the message is wrong (rc %d)" % rc)
     rc, _o, err = _quiet(["--check-deposit", dst])
     if rc != 1 or "gt.jsonl" not in err or str(t0 + 100) in err:
-        f.append("a run whose reference lost focus other than by S15 passed the deposit check (rc %d)" % rc)
+        f.append("a run whose reference lost focus passed the deposit check (rc %d)" % rc)
     arch = os.path.join(d, "loss.zip")
     if _quiet(["--pack", dst, "--out", arch])[0] != 1 or os.path.exists(arch):
-        f.append("a run whose reference lost focus other than by S15 was packed")
-    # a loss other than by S15 with no key press of the observation within it (and its margins) refuses nothing
+        f.append("a run whose reference lost focus was packed")
+    # a loss with no key press of the observation within it (and its margins) refuses nothing
     quiet_loss = [(last_end + 1000, "focus_out", {}), (last_end + 1031, "focus_in", {})]
     dst = variant("qloss", quiet_loss)
     if _quiet(["--runs", dst, "--config", cfg, "--seed", "1", "--out", os.path.join(d, "oq")])[0] != 0:
         f.append("a run whose reference lost focus with no key press near the loss was not analysed")
     if _quiet(["--check-deposit", dst])[0] != 0:
         f.append("a run whose reference lost focus with no key press near the loss was refused by the deposit check")
+    # a planned switch of S15 (a loss that begins and ends inside an S15 trial) is a loss like any other: a key row
+    # of the observation that the executor did not send refuses the run; the same run without that row passes
+    dst = variant("s15ok", loss, s15=True)
+    if _quiet(["--runs", dst, "--config", cfg, "--seed", "1", "--out", os.path.join(d, "os0")])[0] != 0:
+        f.append("a run with a planned S15 switch and no key row beyond the keys sent was not analysed")
+    if _quiet(["--check-deposit", dst])[0] != 0:
+        f.append("a run with a planned S15 switch and no key row beyond the keys sent was refused by the deposit check")
+    dst = variant("s15bad", loss, s15=True, extra_obs=[t0 + 150])
+    rc, _o, err = _quiet(["--runs", dst, "--config", cfg, "--seed", "1", "--out", os.path.join(d, "os1")])
+    if rc != 2 or "loss of focus" not in err or os.path.exists(os.path.join(d, "os1", "e1_delivery.json")):
+        f.append("a key row beyond the keys sent inside a planned S15 switch did not refuse the analysis (rc %d)" % rc)
+    rc, _o, err = _quiet(["--check-deposit", dst])
+    if rc != 1 or "section 3.4" not in err or str(t0 + 150) in err:
+        f.append("a key row beyond the keys sent inside a planned S15 switch passed the deposit check (rc %d)" % rc)
     # a run aborted by the runner is checked in the same way
     dst = variant("a1", key, aborted=True)
     rc, _o, err = _quiet(["--check-deposit", dst])
@@ -2362,6 +2451,14 @@ def _case_section34_enforcement(d):
     dst = variant("a4", aborted=True, drop=("obs",))
     if _quiet(["--check-deposit", dst])[0] != 0:
         f.append("an aborted run without an observation log was refused by the deposit check")
+    # the content-free validator also applies to the logs of an aborted run; a log that cannot be validated refuses
+    dst = variant("a8", aborted=True, obs_tail=b'{"type":"key","t":1700000000001,"category":"alphabetic","press":true,"char":"a"}\n')
+    rc, _o, err = _quiet(["--check-deposit", dst])
+    if rc != 1 or "obs.jsonl" not in err or "section 3.4" in err:
+        f.append("an aborted run with content in the observation log passed the deposit check (rc %d)" % rc)
+    dst = variant("a9", aborted=True, obs_tail=b'{"type":"key","t":')
+    if _quiet(["--check-deposit", dst])[0] != 1:
+        f.append("an aborted run whose observation log ends in a cut-off line passed the deposit check")
     # no reference log: nothing to check; no oracle log but a reference log: not checkable
     dst = variant("a5", aborted=True, drop=("gt", "obs"))
     if _quiet(["--check-deposit", dst])[0] != 0:

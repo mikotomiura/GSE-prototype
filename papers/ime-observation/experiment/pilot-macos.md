@@ -177,27 +177,26 @@ key-down it receives.
 
 - Only runs of the runner are candidates: runs started by the runner from a plan, with a manifest (`run.json`). A
   run that the runner aborted is a candidate on the same terms as in the measurement.
-- The rules of section 3.4 of the pre-registration do not catch the run, with the settings fixed from this pilot
-  (k = 0, and the input-mode keys of S14 do not count among the presses sent) and the run's own marker, which its
-  plan states (three presses in these runs): in no segment of the reference log do the key-downs that the sent
-  presses do not explain exceed the marker presses of the block, and, within a loss of focus of the reference
-  other than a planned switch of S15, the observation holds no more key presses than the executor sent. The rules
-  rest on two facts: a person's typing into the reference input field leaves key-downs that no sent press explains,
-  and typing into any other application takes the focus away from the reference while the observation records
-  every key press. Their blind spots are those of the measurement (section 7 of the pre-registration): a press from
-  outside that replaces a press that was lost, and a shortcut that the system consumes without moving the focus.
+- The rules of section 3.4 of the pre-registration on the delivery report do not catch the run, with the settings
+  fixed from this pilot and the run's own marker, which its plan states (three presses in these runs). What the
+  rules rest on and what they do not catch are stated in section 3.4 and in the item "The stopping rule counts
+  presses, not keys" of section 7 of the pre-registration. The plans of these runs are not those of section 2.4,
+  so the rule on the plan's SHA-256 does not apply to them.
 - `kit/analysis/pipeline.py --check-deposit` passes on the run directory. It applies the same rules and also checks
-  the files for paths and names and the logs for the content-free form.
+  the files for paths and names and the logs, also those of an aborted run, for the content-free form.
 - Outside a loss of focus of the reference, rows of the observation without a sent press do not stop a run from
   being deposited; they are a result of the observer under test, as in the measurement.
 
 The observation logs were sealed (`kit/pilot/seal_obs.py`) and only their key rows were read. Their sealed session
 rows are unsealed after the freeze and the measurement only to be deposited; they are not analysed (section 3.1 of
 the pre-registration). `--check-deposit` is therefore run at deposit time, after the unsealing. Before the
-freeze, the rules of section 3.4 were applied to the key rows of the observation and to the reference logs of the
-six runs listed above and of a short run made before the first pilot, and caught none of them; the one loss of
-focus outside the planned switches (`pilot2-off`, 31 ms) had no key press within it (section 3.1 of the
-pre-registration). A dry run that was interrupted before the first pilot is subject to the same criteria.
+freeze, the rule on presses and earlier forms of the rule on the loss of focus (which left out the planned switches
+of S15 and compared numbers of rows and presses) were applied to the key rows of the observation and to the
+reference logs of the six runs listed above and of `short-1`, a run of nine trials made just before the first
+pilot, and caught none of them; the one loss of focus outside the planned switches (`pilot2-off`, 31 ms) had no key
+press within it (section 3.1 of the pre-registration). The rules in their registered form are applied by
+`--check-deposit` at deposit time. Any other run of the runner made before the first pilot, such as a dry run that
+was interrupted, is deposited only if it meets the same criteria then.
 
 The hand-typed checks described above (in the reference input field and in TextEdit) and the hand-run probes of the
 Enter and Escape behaviour were not runs of the runner and are not deposited.

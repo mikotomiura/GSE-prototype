@@ -571,6 +571,41 @@ def _range_figures(layers):
             "n_blocks_min": min(v["n_blocks"] for _k, v in have), "n_blocks_max": max(v["n_blocks"] for _k, v in have)}
 
 
+FIRST_RULE_LOSS_MS = 31
+FIRST_RULE_MARGINS_MS = (100, 500)
+_PSEUDO_KEYS = ("focus_away", "focus_back", "mouse_click")
+
+
+def _time_near_presses(oracle_bytes, loss_ms, margin_ms):
+    """The fraction of the time from the first row after the header to the last row of the oracle at which
+    a loss of focus of loss_ms, widened by margin_ms on each side, would hold a press: a loss that begins
+    at s spans [s - margin, s + loss + margin] and holds the press p when s lies in [p - loss - margin,
+    p + margin]. The presses are the sent rows with down true whose key is not focus_away, focus_back or
+    mouse_click (the input-mode keys are counted), and the marker rows. The length of the union of those
+    ranges of s, clipped to the first and the last row, is summed in whole milliseconds. 0.0 without a
+    press; null when the first and the last row share one time."""
+    rows = [json.loads(ln) for ln in oracle_bytes.decode("utf-8").splitlines() if ln.strip()]
+    if len(rows) < 2:
+        return None
+    t0, t1 = rows[1]["t_wall_ms"], rows[-1]["t_wall_ms"]
+    if t1 == t0:
+        return None
+    presses = [r["t_wall_ms"] for r in rows[1:]
+               if r.get("kind") == "marker"
+               or (r.get("kind") == "sent" and r.get("down") is True and r.get("key") not in _PSEUDO_KEYS)]
+    total, cur = 0, None
+    for a, b in sorted((max(t0, p - loss_ms - margin_ms), min(t1, p + margin_ms)) for p in presses):
+        if cur is None or a > cur[1]:
+            if cur is not None:
+                total += cur[1] - cur[0]
+            cur = [a, b]
+        elif b > cur[1]:
+            cur[1] = b
+    if cur is not None:
+        total += cur[1] - cur[0]
+    return _round6(total / (t1 - t0))
+
+
 def plan_figures(plan_bytes, long_by_trial, text_size=TEXT_SIZE_TRIALS):
     """The figures of the design that the pre-registration quotes from the measurement plans, from the
     plan alone and the prediction's per-trial "long" flag (long_by_trial: {trial_id: bool}).
@@ -581,8 +616,16 @@ def plan_figures(plan_bytes, long_by_trial, text_size=TEXT_SIZE_TRIALS):
     over the sum of m_j with m_j the number of the layer's trials in block j (null without a trial);
     n_blocks_by_speed counts the blocks of the plan per speed. The texts follow l2.py's text_layout:
     inside a block, in plan order, every consecutive run of text_size trials is a text and a shorter
-    remainder is not used; per speed, k is the number of under_limit trials of a text, and the output has
-    the number of texts, the mean of k (null without a text) and the histogram of k = 0 .. text_size."""
+    remainder is not used; per speed, r is the number of under_limit trials of a text, and the output has
+    the number of texts, the mean of r (null without a text) and the histogram of r = 0 .. text_size.
+
+    "focus_rule_first_version" is the figure of the first version of the rule for a loss of focus, which
+    counted every key row within a loss: {"loss_ms": 31, "fraction_of_time_by_margin_ms": {"100": f, "500": f}}.
+    f is the fraction of the time from the first to the last row of the oracle built from the plan
+    (oracle_from_plan, the default time between blocks) at which a loss of focus of 31 ms, widened by the
+    margin on each side, would hold a sent press. The presses counted are the sent presses (down true)
+    except focus_away, focus_back and mouse_click (the input-mode keys are counted), and the marker presses
+    (see _time_near_presses)."""
     if type(text_size) is not int or text_size < 1:
         raise InputError("text size: not a positive integer")
     rows = _plan_rows(plan_bytes)
@@ -625,7 +668,12 @@ def plan_figures(plan_bytes, long_by_trial, text_size=TEXT_SIZE_TRIALS):
     for sp, vals in ks.items():
         texts[sp] = {"n_texts": len(vals), "mean": _round6(sum(vals) / len(vals)) if vals else None,
                      "histogram": [sum(1 for v in vals if v == i) for i in range(text_size + 1)]}
+    oracle = oracle_from_plan(plan_bytes)
     return {"text_size_trials": text_size,
+            "focus_rule_first_version": {
+                "loss_ms": FIRST_RULE_LOSS_MS,
+                "fraction_of_time_by_margin_ms": dict(
+                    (str(m), _time_near_presses(oracle, FIRST_RULE_LOSS_MS, m)) for m in FIRST_RULE_MARGINS_MS)},
             "n_blocks_by_speed": dict((sp, sum(1 for b in block_speed.values() if b == sp)) for sp in match.SPEEDS),
             "layers": layers,
             "ranges": {w: _range_figures([((x["scenario"], x["speed"]), x[w]) for x in layers])
@@ -1063,7 +1111,8 @@ def _figures_fixture():
     """A plan of 4 blocks (the trials of block 1 are not contiguous in the file) and the trials whose
     presses enter a cut-off session (long)."""
     def trial(n, bid, sc, sp):
-        return {"kind": "trial", "trial_id": "t%d" % n, "block_id": bid, "scenario": sc, "speed": sp}
+        return {"kind": "trial", "trial_id": "t%d" % n, "block_id": bid, "scenario": sc, "speed": sp,
+                "gap_before_ms": 1000, "steps": [{"at_ms": 0, "key": "a", "down": True}]}
     rows = [{"kind": "header", "format": "plan/1", "os": "macos", "seed": 1},
             {"kind": "block", "block_id": 0, "speed": "slow"}, {"kind": "block", "block_id": 1, "speed": "slow"},
             {"kind": "block", "block_id": 2, "speed": "fast"}, {"kind": "block", "block_id": 3, "speed": "mid"}]
@@ -1100,6 +1149,37 @@ def _case_plan_figures():
         f.append("the ranges: %r" % (rg,))
     if pf["n_blocks_by_speed"] != {"slow": 2, "mid": 1, "fast": 1}:
         f.append("blocks per speed: %r" % (pf["n_blocks_by_speed"],))
+    # the first rule's figure: a hand-built oracle, first row after the header t0 = 0, last row t1 = 10000, L = 31.
+    # Presses: key a down 50, key a down 1000, marker 1100, ime_on down 5000, ime_off down 9990. Not presses: an up
+    # of b at 7000, focus_away down 1200, mouse_click down 8000. Each press p gives s in [p - 31 - M, p + M] clipped.
+    # M = 100: [0,150] (50 clipped at t0) + [869,1100] and [969,1200] -> [869,1200] (331) + [4869,5100] (231)
+    #   + [9859,10000] (9990 clipped at t1: 141) = 150 + 331 + 231 + 141 = 853 -> 0.0853
+    # M = 500: [0,550] (clipped), [469,1500], [569,1600] -> [0,1600] (1600) + [4469,5500] (1031) + [9459,10000]
+    #   (541) = 3172 -> 0.3172
+    ob = _jl([{"kind": "header", "format": "oracle/1"},
+              {"kind": "block_begin", "t_wall_ms": 0},
+              {"kind": "sent", "t_wall_ms": 50, "key": "a", "down": True},
+              {"kind": "sent", "t_wall_ms": 1000, "key": "a", "down": True},
+              {"kind": "marker", "t_wall_ms": 1100},
+              {"kind": "sent", "t_wall_ms": 1200, "key": "focus_away", "down": True},
+              {"kind": "sent", "t_wall_ms": 5000, "key": "ime_on", "down": True},
+              {"kind": "sent", "t_wall_ms": 7000, "key": "b", "down": False},
+              {"kind": "sent", "t_wall_ms": 8000, "key": "mouse_click", "down": True},
+              {"kind": "sent", "t_wall_ms": 9990, "key": "ime_off", "down": True},
+              {"kind": "block_end", "t_wall_ms": 10000}])
+    got = (_time_near_presses(ob, 31, 100), _time_near_presses(ob, 31, 500))
+    if got != (0.0853, 0.3172):
+        f.append("the time near presses: %r, want (0.0853, 0.3172)" % (got,))
+    if _time_near_presses(_jl([{"kind": "header"}, {"kind": "block_begin", "t_wall_ms": 0},
+                               {"kind": "block_end", "t_wall_ms": 10}]), 31, 100) != 0.0 or \
+            _time_near_presses(_jl([{"kind": "header"}, {"kind": "marker", "t_wall_ms": 5}]), 31, 100) is not None:
+        f.append("the time near presses: no press should give 0.0 and one time should give null")
+    ff = pf["focus_rule_first_version"]
+    if ff != {"loss_ms": 31, "fraction_of_time_by_margin_ms": {
+            "100": _time_near_presses(oracle_from_plan(plan), 31, 100),
+            "500": _time_near_presses(oracle_from_plan(plan), 31, 500)}} or \
+            not all(0 < v < 1 for v in ff["fraction_of_time_by_margin_ms"].values()):
+        f.append("focus_rule_first_version: %r" % (ff,))
     # texts of 4: block 0 -> t1..t4 (t2 long: k 3), t5..t8 (t6 long: k 3), remainder t9 t10; block 1 has 3 trials
     # (no text); block 2 -> t14..t17 (t15 long: k 3), remainder t18
     want_t = {"slow": {"n_texts": 2, "mean": 3.0, "histogram": [0, 0, 0, 2, 0]},
@@ -1155,8 +1235,8 @@ def _case_plan_figures():
         else:
             got = json.loads(open(o1, encoding="utf-8").read())
             if got["format"] != FORMAT or got["plan_figures"]["text_size_trials"] != 1 or \
-                    sorted(got["plan_figures"]) != ["layers", "n_blocks_by_speed", "ranges", "text_size_trials",
-                                                    "texts_by_speed"]:
+                    sorted(got["plan_figures"]) != ["focus_rule_first_version", "layers", "n_blocks_by_speed",
+                                                    "ranges", "text_size_trials", "texts_by_speed"]:
                 f.append("plan_figures in the --from-plan output: %r" % (sorted(got.get("plan_figures", {})),))
         with contextlib.redirect_stderr(io.StringIO()):
             rc = main(["--from-plan", "--plan", pp, "--keymap", kk, "--text-size", "0", "--out", o2])
