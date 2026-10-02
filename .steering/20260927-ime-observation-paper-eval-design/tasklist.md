@@ -190,6 +190,7 @@
     - [ ] ★ M6 への申し送り（判断 132）: 追補の節に「Status の日付は macOS の凍結の日で、印は追補で差し替えた」と 1 文
     - [x] 完了時レビュー（code-reviewer ∥ security-checker ∥ Codex 1 巡・`1086e3be..ce205e83`）→ 判断 132
     - [x] 出荷: ブランチ `docs/ime-m3-freeze` とタグ `ime-observation-prereg-macos` を push（`ls-remote` でタグが `ff122e32` を指すことを確かめた・タグの push でワークフローは起動しない）→ PR #293 → PR の CI（run 36977262693）は Mac・Windows の check と frontend-check が緑 → merge（merge commit 方式）。merge の前に main が 2 回進み、1 回目は `.codex/budget.json` の台帳だけが衝突 → 和で解いた（422,989 / 10 回・判断 132 の台帳のコメント）、2 回目（#294 の版上げ）は衝突なし → CI 緑（run 36984522344）→ **merge `2543f9fb`** → **main の CI（run 36988299913）success**（Mac / Windows の check・frontend-check）。凍結の commit `ff122e32` は main から辿れる
+  - [ ] M5 Windows の較正パイロット → ★ **別の Windows 実機で行う**（2026-10-03・研究者の選択・判断 133）。IME の学習はリセットしない・電源の設定はメインが一時的に切って戻す・実行の時間と M6 / M7 の機械は未決。G-GEAR では何もしていない。→ 引き継ぎ `next-session-ime-paper-m5-windows.md`
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
