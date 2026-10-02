@@ -86,3 +86,35 @@
 - ⚠️ 未確認（段階 B）: ログイン時の実起動・一覧での表示名（README は「gse-next」と書いた）・macOS の「バックグラウンドでの実行を許可」をオフにした状態が付け替え後も残るか。`.steering/20260928-o1-resilience-g1-g2-g5/g1-mac-autostart-experiment.md`。
 - ⚠️ O1 ゲートの「同意文書の状態表の『未了』」（6 択 ESM 追補の採否）は研究者判断待ちのまま（本タグとは無関係）。
 - Drive への差し替え・被験者への送付は研究者が行う（未実施）。
+
+## v0.1.39（2026-10-02）
+
+| 項目 | 値 |
+|---|---|
+| タグ | `v0.1.39`（軽量タグ・v0.1.38 と同じ形） |
+| コミット | `d7694240`（PR #294 の merge。版を 0.1.38 → 0.1.39 に上げただけ） |
+| タグ作成日 | 2026-10-02（研究者承認のうえ push） |
+| 切り直した理由 | PR #292（`f04b4995`）の **ADR-037** を配布バイナリに入れるため: O1 の作業種別の宣言に 5 つ目の値 **`other`（「その他・細切れの作業」）**。Writing fallback で採点し推論は不変（`HMM_VERSION` 据え置き）。記録: `.steering/20261002-o1-task-kind-other/` |
+| 版を分けた理由 | G1 は `meta.app_version = 0.1.36` で G1 のファイルを見分ける契約。同じ番号の別バイナリを作らない |
+| CI | run `36987050681`（head = `d7694240`・event = push）: `build-macos` / `build-windows` / `release` すべて success |
+| 使う配布物 | `O1_実施用_macOS.zip` ／ `O1_実施用_Windows.zip`（★ Drive に置くのはこの 2 つだけ）。⚠️ 作った場所は worktree `GSE-prototype-o1-other/experiments/20260801-controlled-friction-task/dist/_common/`（メインのチェックアウトの同名ファイルは v0.1.38 のまま・上書きしていない） |
+| O1_実施用_macOS.zip の SHA-256 | `decb2c4316d5a4f50d570a4577a91bf4780631125d9d491c3e487054af295ae8`（10,436,688 B） |
+| O1_実施用_Windows.zip の SHA-256 | `c17d296df9d74aa3790cce1939c45efcf3b3945b2750a6d61fafdcffa7d368d1`（5,982,909 B） |
+| Release の dmg の SHA-256 | `06dd39026f149f864345300f2b7003c9b39663700245f0fdd274571343a3204c`（`gse-next_0.1.39_aarch64.dmg`） |
+| ログでの見分け方 | `meta` 行の `app_version = 0.1.39` ＋ `o1_mode`。★ `session_meta` に `"task_kind":"other"` ＋ `"head_id":"writing_fallback"` が出うる |
+| 作ったコマンド | `bash make-common-app-zip.sh --mode o1 --tag v0.1.39 --config "$REPO/Form_O1/o1_submit.json"` |
+
+### 実体で確かめたこと（2026-10-02・Mac）
+- スクリプトの自己検査（自動送信・O1 実装・`--o1`・reconcile・初回セットアップ・余計なもの無し・署名・実行ビット・README 文言・UTF-8 フラグ）はすべて ✅。
+- 生成した zip を別の場所へ展開して、スクリプトとは別に再検算した:
+  - macOS: `CFBundleShortVersionString = 0.1.39`・`codesign --verify --strict` OK・`Contents/MacOS/` の 7 ファイルすべて実行ビットあり・`gse-next` は Release の dmg 内のものと byte 一致。
+  - Windows: `gse-next.exe` / `gse-submit.exe` が Release の資産と byte 一致（`cmp`）。
+  - 両 OS: `o1.mode` あり・`g1.mode` なし・`o1.autostart` なし。
+  - Release の資産の構成（名前）は v0.1.38 と同じ。
+- ★ **`other` が入っていることは来歴の連鎖で確かめた**: PR #292 の merge `f04b4995` はタグ `v0.1.39` の祖先（`git merge-base --is-ancestor`）／ Release の run の head はタグのコミット `d7694240` ／ そのコミットの `RecordingControls.tsx` に「その他・細切れの作業」がある ／ zip の中身は Release の資産と byte 一致。
+  - ⚠️ **バイナリの文字列検索では確かめられない**: 陽性対照「デザイン・映像・制作作業」が v0.1.38 / v0.1.39 の両方で **0 件**だった（Tauri が画面の資産を圧縮して埋め込むため）。→ この方法の 0 件を「入っていない」と読まないこと。
+
+### 注意
+- ⚠️★★★ **同意フォームの文面を変えた**（宣言の列挙を 5 択へ・PR #292）。被験者に届くのは、研究者が `Form_O1/GSE_O1_Form_Builder.gs` を O1 の Apps Script に貼り直し `migrateO1ConsentForm()` を実行してから（回答は保たれる）。⚠️ **再配備はこのタグの zip を Drive に置くのと同時かその後**に行う（逆順だと、同意は 5 択・画面は 4 択の旧 zip、という食い違いが起きる）。
+- ⚠️★ **v0.1.38 以前を O1 に使わない**（宣言が 4 択しか出ず、5 択の同意フォームと食い違う）。
+- Drive への差し替え・被験者への送付は研究者が行う（未実施）。

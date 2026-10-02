@@ -1085,3 +1085,62 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 1. **P1 延長した数える範囲が、喪失の外の入力を中止の理由にする**（真・文の食い違い）: 延長の範囲では、観測の余分な行（観測器の重複など）が連鎖を通じて中止の理由になりうるのに、§3.4・§6.3・`pilot-macos.md`・`pipeline.py` の説明は「喪失の外の余分な行は中止にしない」と書いていた。人の打鍵なら、焦点が戻った後なので参照に key-down が残り、理由 3 で中止になるのは同じ。→ 規則は保守側のまま変えず、4 か所を「広げた区間と、その後に数える範囲の外では」に揃え、§3.4 に「その中では原因を問わず数える（§7）」を足した。§7 は判断 128 で既に書いた。
 2. **P2 `FORMAT`（`delivery/1`）を上げていない**（真）: 凍結の前で外部の利用者はおらず、利用側（`pipeline.py`・`data.md`）は同時に直した。形式は凍結のタグで固定される。→ 上げない。
 3. **P2 本番の `REGISTERED_PLAN_SHA256` を登録の計画と照合するテストが無い**（真）: メインが今日、`generate_plan.py` で 2 計画を生成し直して SHA-256 の一致（ON `c7a5469d…`・OFF `3759ebf7…`）と on / off の対応（§2.4）を確かめた。定数と文の機械照合は判断 120 の 9 で採らないと決めている。→ テストは足さない。
+
+---
+
+★ 以下 2026-10-02（G-GEAR・M3 の凍結のセッション・引き継ぎ `next-session-ime-paper-m3-freeze.md`）。
+
+## 判断 130: 凍結の前の試しの書き出しが拒否した selftest の 2 行を直す（2026-10-02・G-GEAR・メインの選択・研究者が覆せる）
+
+- **発見**: 凍結の前に、main（`1086e3be`）の作業ツリーから `export.internal.py --allow-missing-license` を試しに回したら **exit 1**（`kit/analysis/pipeline.py:1996`・`:1997` が `user-path`）。判断 128 で足した deposit の selftest の 2 ケース（`file:///Users/x/y`・`FILE:/home/x`）が、書き出しの許可リスト（`alice`・`bob`・…・`name` の架空の名前だけ）に無い名前 `x` を使っていた。⚠️ 判断 128 の確認は `kit/check.sh` と `run.sh` だけで、書き出し（024）を回していなかった → **このまま凍結していたら、凍結の commit から書き出せず、M4 のロガーもビルドできなかった**。
+- **直し**（`eaaeea74`・凍結の前）: 名前を `gina`・`harry` に替えた。検査の意味（`file:` に続く `/` は名前によらず絶対パス・期待は `absolute path` だけ）は変わらない。`pipeline.py --selftest` 12 ケース緑。
+- **確認**（G-GEAR・Python 3.11.9・`eaaeea74`）: 試しの書き出し exit 0（98 ファイル）。一覧の SHA-256 を 024 の `LIST_PY` と、§9 の定義から書いた別の実装（scratchpad の `listsha.py`）の両方で計算して一致（`1ed564ec933f3950c01364363610cede01e7563765f562a71baec18034d64e05`・98 ファイル）。`kit/check.sh` 29 本緑。§9 の 5 ファイルの SHA-256 は表と一致。§2.4 のコマンドで 2 計画を生成し直して ON `c7a5469d…`・OFF `3759ebf7…`（§2.4・`REGISTERED_PLAN_SHA256` と一致）。凍結のハッシュ `64dfbb6e5f08222ade1fb96a8171d97c0fa1bc9ca9adb5cc987fc27bd9a8af2a`（作業ツリーと HEAD の blob で同じ・3 ファイルとも CR 0）。024-acceptance.sh は ✅ 137・❌ 2（SCOPE と GUARD だけ・B15）——書き出した側の `cargo test --locked`（ロガー）・全 `*.rs` の rustfmt 構文解析・陰性対照を含めて緑。
+- ★ 教訓: 公開物のコードを変えたら、凍結や merge の前に **024（書き出し）も回す**。
+
+## 判断 131: 凍結する・タグは `ime-observation-prereg-macos`・一覧を計算し直す道は M12 で公開 repo の最初の commit にする（2026-10-02・G-GEAR・研究者の選択）
+
+研究者に AskUserQuestion で 3 問（すべて推奨どおり）。
+- **凍結するか**: 既知の限界 3 つ（① 焦点の規則の最終形〔判断 125・127〕はパイロットの生ログにまだ当てていない — 預けるときに `--check-deposit` が当てる・§3.1 ② 規則の感度は selftest の合成の場合でしか確かめていない・§7 ③ 窓 300 ms・余裕 500 ms は設計の選択・§3.4）と判断 130 の直しを示して → **凍結する**（推奨）。採らなかった: 先に Mac で ① を当てる・保留。Status の文は問いのプレビューのとおり（凍結の日付・印は §9・印の 2 つ目が設定・seed・規則のファイルと合うときだけ実データを解析する・Windows は追補）。
+- **タグの名前**: 既存のタグは `v0.1.0`〜`v0.1.38` だけで、`ci.yml` は `v*` のタグの push でリリースのビルドを走らせる（`on.push.tags: ["v*"]`）ので `v` で始まる名前は使えない → **`ime-observation-prereg-macos`**（推奨・annotated・Windows の追補は `ime-observation-prereg-windows` と対）。作業ブランチと一緒に origin へ push する。採らなかった: 日付入り・スラッシュの名前空間。
+- **一覧を計算し直す道**（§9 の「公開物から計算し直せる」）: 凍結の commit にはライセンス全文が無いので、凍結の書き出しは `--allow-missing-license` の形（98 ファイル・`LICENSE-*` なし・`CITATION.cff` と `.zenodo.json` に TODO）→ **M12 で公開 repo（新しい履歴）の最初の commit を凍結の書き出しそのものにしてタグを付け、ライセンスと M12 の書き出しはその上に積む**（推奨）。今は何も公開しない。採らなかった: OSF の登録に zip を添付（登録と同時にロガーのコードが公開になる）・凍結の前にライセンスを置く。
+
+実体（G-GEAR・Python 3.11.9）:
+- 凍結の commit **`ff122e3246346da7869c4e990e4978acb1f191c6`**（`preregistration.md` の Status と 2 つの印だけ・8 行足して 3 行消した）。印は `frozen_at: 2026-10-02`・`sha256: 64dfbb6e5f08222ade1fb96a8171d97c0fa1bc9ca9adb5cc987fc27bd9a8af2a`。凍結したファイルの SHA-256 は `fa6fd586d580c47f13506cd36a87a94c08d6b9ab55b16a7b6df0b67670f87773`（タグの blob と書き出しの中で同じ）。
+- `--check-prereg` exit 0。陰性対照: `sha256` を 1 桁変えた写し・`frozen_at` の行を消した写しは exit 3。`run.sh`（実データ）は凍結の門を通り、`data.md` に run が無いので `no run directory was given` で exit 2（計測の前なので想定どおり・結果は書かない）。⚠️ 020-acceptance の AC3 は凍結の前の約束（「`preregistration.md` が無い」は下書きを置いた時点から赤・「本番は exit 3」は上の実測の exit 2 で満たさない）。020 は凍結の後には回さない（凍結の門そのものは `pipeline.py` の selftest が一時の木で確かめている）。020 自体は回していない。
+- タグ `ime-observation-prereg-macos`（annotated・メッセージに 2 つの印）→ `ff122e32`。
+- **書き出しの一覧の SHA-256 = `29b183ba245939ad82d9fa2d7db26e1a18520e2966f4aa9ec74478a4e51e6c49`（98 ファイル）**: タグのクリーンな worktree（`C:/wt/ime-m3-freeze-export`・detached）から `export.internal.py --out <scratchpad> --allow-missing-license` を 2 回（どちらも exit 0・同じ一覧）。§9 の定義（相対パスと SHA-256 を空白で・パスのバイト順・各行 LF）から書いた実装と 024 の `LIST_PY` で同じ値。凍結の前の試し（`eaaeea74`）との差は `experiment/preregistration.md` の 1 行だけ。一覧そのものは `freeze-export-list-macos.txt`（このディレクトリ・M12 で公開 repo の最初の commit と照合する）。
+- タグのクリーンな worktree で `kit/check.sh` 29 本緑・`run.sh --synthetic` 2 回で 4 ファイルともバイト一致。`_style_check.py papers/ime-observation` 0 件。
+- 凍結の後の commit（記録）: `experiment/notes.md` に凍結の commit・タグ・`sha256`・一覧の SHA-256 を書いた（登録の URL と日付は登録の後）。`notes.md` は凍結のハッシュの対象でも解析のコードでもなく、§9 が記録の場所に名指す。
+
+## 判断 132: 完了時レビューの扱いと Codex の上限（2026-10-02・G-GEAR・メインの選択・研究者が覆せる）
+
+範囲は `1086e3be..ce205e83`（9 ファイル）。code-reviewer（CRITICAL・HIGH 0・MEDIUM 2・LOW 3）∥ security-checker（CRITICAL・HIGH・MEDIUM 0・LOW 1）∥ Codex 1 巡（`run-codex-review.sh` を公開物の 3 ファイルに絞って・確定的な指摘 0・確認事項 3・20,874 tokens）。指摘はメインが一次で確かめた。凍結したファイル（`preregistration.md`）と解析のコードには触れず、記録と申し送りで応えた。
+- **Codex の上限**: 着手時に origin/main を取り込むと当日の台帳は 371,742 / 8 回（AI 疲労の #291 を合わせた和）で上限 300,000 を超えていた → 研究者の既定の指示（2026-10-01「codex は必要に応じて予算引き上げしていいよ」）で `daily_token_budget` だけを 420,000 に上げて 1 巡回した（392,616 / 9 回）。`tokens_used` は触っていない。回し終えて 300,000 に戻した（`_comment_budget_2026_10_02_ime_m3_freeze`）。
+- **Codex 2 巡目は回さない**: 2 巡目は「自分が足した規則の境界条件」を見るためのもの（memory の運用）だが、この範囲は規則を足していない（コードの変更は selftest の文字列 2 つだけ）。1 巡目の後の変更は `.steering/` の記録だけ。
+- **code-reviewer M1（公開の読者は private の commit とタグに辿り着けない・M12 の後の公開物からは別の一覧になる）**: 真（`gh repo view` で PRIVATE・`LICENSE-*` は一覧に 0 行）。→ OSF の登録の説明に添える案を引き継ぎ §2 に（研究者が決める）、M12 で `notes.md` に公開側のどの commit・タグが凍結の書き出しかを足すことを `_issue-plan.md` の M12・`tasklist.md` に。
+- **code-reviewer M2（引き継ぎの「§2 の 6 は済み」が事実と違う・タグの push が要る）**: 真（その時点で `ls-remote` は空）。→ 引き継ぎの文を直し、タグは `git push origin refs/tags/ime-observation-prereg-macos` で明示して送り、`ls-remote` で確かめる。PR は merge commit（`ff122e32` を main から辿れる）。
+- **code-reviewer L1（`run.sh` だけ `experiment/` からの相対）・L2（追補で印は差し替わるが Status の日付は §8 で書き換えられない）**: 真。凍結したので直さない → M6 の申し送り（追補の節に 1 文・`experiment/run.sh` と書く）。L3 は対応不要（検査の意味は変わらない）。
+- **security LOW（40 桁とタグ名を公開物に書くこと）**: 公開してよい（40 桁は §9 で OSF の登録に載る・SHA-1 から中身は逆算できない）。残るリスク = private repo が公開物と同じネットワークに入るか公開に切り替わると、その commit のツリーが取り出せる → M12 は `git init` の新しい履歴で作り、fork・公開への切り替え・private の履歴の push を使わない（判断 20 の「新しい履歴」に理由を足した）。⚠️ 報告の「前例: 公開物の `kit/logger/manifest.json` に private repo の 40 桁がある」は**書き出しの前の開発側のファイルについてで、公開の形には当たらない**（書き出した側の manifest に `upstream` の欄は 0 件・メインが確かめた）。結論は変わらない。
+- **Codex の確認事項**: (1) 値の整合 → 判断 131 で照合済み（`pipeline.py` の直し `eaaeea74` は凍結の commit の前にあり、タグに含まれる）。(2) 凍結の門の異常系 → `pipeline.py` の selftest（印なし・プレースホルダ・空・コメントやフェンスの中・2 行・ハッシュ違い・設定の 1 バイトの変更）と、メインの陰性対照 2 本。時系列の主張は OSF の登録が第三者の時刻を与える（判断 73）。(3) 1 文字の名前の境界 → 当たらない（`ABSOLUTE_PATH_RES` は名前によらず `file:` ＋ `/`・`/Users/`・`/home/` の根で当たる・`pipeline.py:967-975`）。
+
+## 判断 133: M5（Windows の較正パイロット）は G-GEAR ではなく別の Windows 実機で行う・IME の学習はリセットしない・電源の設定はメインが一時的に切って戻す（2026-10-03・G-GEAR・研究者の選択）
+
+- **背景**: OSF の登録（`https://osf.io/9nh7r`）が公開になり、Mac の M4 は Mac の夜を待つ。M5 は M4 にも OSF にも依存しない（`_issue-plan.md` §5 の前提は issue 群と M0 だけ）ので先に進める。`_issue-plan.md` は M5〜M7 の場所を G-GEAR としていた。
+- **研究者の選択**: M5 は**別の Windows 実機**で行う（G-GEAR でビルドを始める前に研究者が指示）。G-GEAR では何も送っていない（書き出し・ビルド・run は 0 回）。
+- **研究者に 3 問**（AskUserQuestion・推奨と理由つき）:
+  - IME の学習 → **リセットしない**（推奨）。Mac（M1・事前登録 §3.2・§7）と同じ扱い。MS-IME の入力履歴の消去は設定画面の操作でコマンドが無く、`reset_cmd` にできない。追補で開示する。
+  - 電源の設定 → **メインが一時的に切って戻す**（推奨）。`powercfg` で AC のスリープと画面オフを 0 にし、元の値を先に記録して run の後に戻す。スクリーンセーバーとロックも読んで、要れば同様に。
+  - 実行の時間（離席中に自動 ／ その場で 1 本ずつ ／ 準備だけ）→ **答えの前に中断**（別の実機にすると決まったため）。→ 別の実機のセッションの最初に聞く。
+- **未決（M6 の前に研究者が決める）**: M6（追補の凍結）と M7（Windows の本計測）をどの機械で行うか。⚠️ パイロットは計測する機械と IME の版で挙動を較正するものなので、**M7 は M5 と同じ機械**を推奨する。決まったら `_issue-plan.md` の M5〜M7 の「どこで」を直す。
+- **影響範囲**: 引き継ぎ `next-session-ime-paper-m5-windows.md`（新規）・`tasklist.md`（M5 の行）。
+
+## 判断 134: 判断 133 を改める —— 数時間以上の run だけを別の Windows 実機で行い、それ以外（M5 を含む）は G-GEAR で行う（2026-10-03・G-GEAR・研究者の選択）
+
+- **研究者の指示**（判断 133 の引き継ぎを書いた後）: 「数時間以上の run 以外まではこの G-GEAR で行う」。
+- **分け方**（メインが一次で当てはめた）:
+  - **別の Windows 実機**: 数時間以上の run だけ。M7 の本計測のセル（Mac の見積もりで 1 セル約 9.5〜10 時間・`pilot-macos-1-notes.md`）と、Windows の E3 の 2 条件（`idle` / `working` は各 8 時間・事前登録 §6.10 の macOS の形を Windows の追補でも採るなら）。
+  - **G-GEAR**: それ以外。M5 の較正パイロット（短い試しと本体・本体は Mac の M1 で 126 試行約 23 分）・書き出しとビルド・セルのファイル・M6 の追補の凍結・M8 の解析など。
+- **判断 133 から引き継ぐもの**: IME の学習はリセットしない・電源の設定はメインが一時的に切って戻す（どちらも研究者の答え）。実行の時間（離席中に自動か）は未決のまま。
+- ⚠️ **未決（M6 の前に研究者が決める）—— 較正した機械と計測する機械が違う**: パイロットは MS-IME の呼び出し列を**その機械と IME の版で**較正する。M5（G-GEAR）と M7（別の実機）で OS や MS-IME の版が違うと、パイロットで決めた正解の定義や手順書が計測する機械で同じに動く保証が無い。→ 推奨: (1) 追補に計測する機械の OS と MS-IME の版を書く、(2) M7 の前に計測する機械で**短い確認の run**（Mac の `verify-1` と同じ形・全シナリオ × 3 速さ × 1 で数分〜10 分程度）を回し、呼び出し列の型がパイロットと同じことを確かめる（違えば追補の凍結の前に戻る）。この確認は短い run だが計測する機械でしか意味が無いので、「短い run は G-GEAR」の例外になる。
+- ⚠️ G-GEAR は Windows の CI の self-hosted runner（memory）。パイロットの run の間に CI の job が走ると負荷で送出の時刻が遅れる（`emit/README.md`）→ run の間は push しない（または runner を止める・止めると hosted へ回る）。
+- **影響範囲**: `_issue-plan.md` の M7・M10 の「どこで」・引き継ぎ `next-session-ime-paper-m5-windows.md`（G-GEAR 用に書き直す）・`tasklist.md` の M5 の行。

@@ -2,9 +2,14 @@
 
 ## Status
 
-This is a draft. It is not frozen and no measurement has been made under it. The freeze adds two marks to this
-file (see section 9); until they are present, `run.sh` and `kit/analysis/pipeline.py` refuse to analyse real data.
-The cells on Windows are registered in an addendum that is frozen before the first Windows measurement (section 8).
+This registration covers the macOS cells and was frozen on 2026-10-02, before any measurement was made under it.
+The two lines below are the freeze marks of section 9; `run.sh` and `kit/analysis/pipeline.py` analyse real data
+only while both are present and the second matches the configuration, seed and rule files. The cells on Windows are
+registered in an addendum that is frozen before the first Windows measurement (section 8).
+
+frozen_at: 2026-10-02
+
+sha256: 64dfbb6e5f08222ade1fb96a8171d97c0fa1bc9ca9adb5cc987fc27bd9a8af2a
 
 ## 1. Study information
 

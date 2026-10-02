@@ -1993,8 +1993,8 @@ def _case_deposit_paths(d):
              ("a macOS home", "/Users/carol/x", [ap_]),
              ("a Linux home", "/home/dave/x", [ap_]),
              ("a mounted volume", "/Volumes/DISK/x", [ap_]),
-             ("a file URI", "file:///Users/x/y", [ap_]),
-             ("a file URI in capitals", "FILE:/home/x", [ap_]),
+             ("a file URI", "file:///Users/gina/y", [ap_]),
+             ("a file URI in capitals", "FILE:/home/harry/x", [ap_]),
              ("a file URI of another root", "see file:/tmp/x", [ap_]),
              ("an MSYS drive", "/d/work/x", [ap_]),
              ("a path after a colon", "PATH=/usr/bin:/home/erin/bin", [ap_]))
