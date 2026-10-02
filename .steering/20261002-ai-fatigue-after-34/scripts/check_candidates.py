@@ -10,6 +10,9 @@
 (6) 『AI判定比較』の行 = 判定済み ∩ 評価版の記録（順）・AI用途判定 = 評価版の値（独立に読む）・人間用途判定 = 期待。
 (7) 『問いと答え』がログと 1 行ずつ一致・『探索の一覧』『探索の検索式』が data と一致・『はじめに』に研究者への注意がある。
 (8) --final: 対象の記録（群 1〜3 と X の行）がすべて判定済み・含めた一次研究で全文ありは品質が確定・抽出の確定（x）がある。
+(9) 答えの逐語と判定（result）が合う（前のタスクの answer_mismatch: 既知の形への全体一致）。式のセルは『AI判定比較』の
+    一致の式（E 列）だけ。『全文抽出』の ID = 抽出を確定した件・中身は data/extract-rows.json と同じ。
+    『はじめに』の「判定者 2 に渡すとき」が戻す列を名指しする（判断 10）。
 --selftest: 自前のログで表を作り、陰性対照が緑・変異がそれぞれ赤になること。
 使い方: python check_candidates.py [--final] [--selftest]
 """
@@ -23,7 +26,7 @@ import tempfile
 import openpyxl
 
 import common as C
-from check_workbook import STAGE1_OPTIONS, stage1_banned  # 前のタスク（34 件）の固定の選択肢と禁止語の規則
+from check_workbook import STAGE1_OPTIONS, answer_mismatch, stage1_banned  # 前のタスク（34 件）の固定の選択肢・答えの読み方・禁止語の規則
 
 SHEETS = ["はじめに", "スクリーニング", "AI判定比較", "全文抽出", "探索の検索式", "探索の一覧", "問いと答え"]
 SCR_HEADER = ["ID", "論文タイトル", "暫定分類", "判定者1", "判定者2", "最終判定", "除外理由", "全文確認・抽出", "品質評価", "自由記入",
@@ -39,7 +42,8 @@ EXPECT_E4 = {"レビュー": "背景保持", "論考": "背景保持", "研究�
              "方法論": "方法論保持", "訂正通知": "訂正連結"}
 # 本タスクで判定する記録（design.md §2 の群 1〜3）。X の行は data から足す
 TARGET_IDS = ["S02-08", "S08-03", "S15-23", "S13-20", "S12-05", "S12-19", "S12-23"]
-INTRO_MUST = ["判定者 2 に渡さない", "Claude の関与", "Claude 版", "GPT 版は無い"]
+INTRO_MUST = ["判定者 2 に渡さない", "Claude の関与", "Claude 版", "GPT 版は無い",
+              "『スクリーニング』の D・G・H・I・J 列を初期値", "『AI判定比較』『全文抽出』『品質評価』『問いと答え』のシートを消して"]
 
 
 def read_log(path):
@@ -95,7 +99,7 @@ def check_sources():
     return errs
 
 
-def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_path=None):
+def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_path=None, extract_path=None):
     errs = []
     log = read_log(log_path)
     extra = load_json(extra_path or C.EXTRA_RECORDS, [])
@@ -133,9 +137,17 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
             errs.append(f"入力規則が無い・範囲が違う: {col}（{covered.get(col)}）")
     # ログから最終と段
     first, final_res, stages, quality, xconf = {}, {}, {}, {}, set()
+    first_ans, prev_res = {}, {}
     for rec in log:
         i, st = rec["item"], rec["stage"]
         stages.setdefault(i, []).append(st)
+        if st in ("1", "1e", "2", "2e"):  # (9) 答えの逐語と判定（result）
+            why = answer_mismatch(st, rec["answer"], rec["result"], first.get(i), prev_res.get(i), first_ans.get(i))
+            if why:
+                errs.append(f"{i}: 答えと判定が合わない（{why}）")
+            if st == "1":
+                first_ans[i] = rec["answer"]
+            prev_res[i] = rec["result"]
         if st in ("1", "1e"):
             first[i] = rec["result"]
             if st == "1":
@@ -223,6 +235,28 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
         r += 1
     if got != want:
         errs.append(f"AI判定比較の行が 判定済み ∩ 評価版 と違う: {got} / {want}")
+    # (9) 式のセル: 『AI判定比較』の一致の式（E 列）のほかに無い（外の文の先頭の = が式になるのを防ぐ）
+    for ws_ in w.worksheets:
+        for row in ws_.iter_rows():
+            for c in row:
+                if c.data_type == "f" and not (ws_.title == "AI判定比較" and c.column_letter == "E" and c.row >= 5):
+                    errs.append(f"式のセル: {ws_.title}!{c.coordinate}")
+    # (9) 『全文抽出』: ID = 抽出を確定した件（重複なし）・中身は data と同じ
+    we = w["全文抽出"]
+    ex = load_json(extract_path or C.EXTRACT_ROWS, None)
+    ex_rows = [[we.cell(r, c).value for c in range(1, we.max_column + 1)] for r in range(5, we.max_row + 1)]
+    ex_rows = [x for x in ex_rows if any(v not in (None, "") for v in x)]
+    ex_ids = [x[0] for x in ex_rows]
+    if len(ex_ids) != len(set(ex_ids)) or set(ex_ids) != xconf:
+        errs.append(f"全文抽出: ID が抽出を確定した件と違う（多い {sorted(set(ex_ids) - xconf)}・無い {sorted(xconf - set(ex_ids))}・重複を含む）")
+    if ex is None:
+        errs.append("全文抽出: 中身を比べる data が無い")
+    else:
+        def norm(row, n=we.max_column):
+            return [None if v in (None, "") else v for v in row] + [None] * (n - len(row))
+        if norm(ex["header"]) != norm([we.cell(4, c).value for c in range(1, we.max_column + 1)]) or \
+                [norm(x) for x in ex["rows"]] != [norm(x) for x in ex_rows]:
+            errs.append("全文抽出: 中身が data/extract-rows.json と違う")
     # 『問いと答え』
     wl = w["問いと答え"]
     for k, rec in enumerate(log):
@@ -306,6 +340,14 @@ def selftest():
         print(("PASS" if good else "FAIL"), name, "" if good else errs[:3])
         ok &= good
 
+    # ★ 自前のログの x（S15-23・X01）に合わせた全文抽出の data（実の data から 2 行だけ）
+    exd = json.load(open(C.EXTRACT_ROWS, encoding="utf-8"))
+    ex_small = {"header": exd["header"], "rows": [r for r in exd["rows"] if r[0] in ("S15-23", "X01")]}
+    ex_path = os.path.join(tmpd, "extract.json")
+    with open(ex_path, "w", encoding="utf-8") as f:
+        json.dump(ex_small, f, ensure_ascii=False)
+    old_ex = C.EXTRACT_ROWS
+    C.EXTRACT_ROWS = ex_path
     expect("negative-control（自前のログ）", base_log, red=False)
 
     def logm(fn):
@@ -341,6 +383,28 @@ def selftest():
     expect("intro-warning-removed", base_log,
            lambda wb: [wb["はじめに"].cell(r, 2).__setattr__("value", "") for r in range(5, 30) if "判定者 2 に渡さない" in str(wb["はじめに"].cell(r, 2).value or "")],
            must="判定者 2 に渡さない")
+    # (9) 答えと判定・式・全文抽出・『はじめに』の列の名指し（判断 10）
+    expect("answer-only-diff（答えだけをずらす）", logm(lambda lg: lg[0].__setitem__("answer", "保留")), must="答えと判定が合わない")
+    expect("result-only-diff（判定だけをずらす）",
+           logm(lambda lg: lg[1].__setitem__("result", {**lg[1]["result"], "ecode": "E2"})), must="答えと判定が合わない")
+    expect("answer-unreadable（Other の自由記入）", logm(lambda lg: lg[1].__setitem__("answer", "別の判定に変える")), must="読めない")
+    expect("formula-in-title", base_log, cell("探索の一覧", "B5", "=1+1"), must="式のセル: 探索の一覧!B5")
+    expect("formula-cmp-E-is-allowed（対照）", base_log, red=False)
+    expect("extract-row-removed", base_log, lambda wb: wb["全文抽出"].delete_rows(5), must="全文抽出: ID")
+    expect("extract-cell-changed", base_log, cell("全文抽出", "C5", "別の集団"), must="全文抽出: 中身")
+    expect("intro-columns-removed", base_log,
+           lambda wb: [wb["はじめに"].cell(r, 2).__setattr__("value", "このファイルは判定者 2 に渡さない。") for r in range(5, 30)
+                       if "判定者 2 に渡さない" in str(wb["はじめに"].cell(r, 2).value or "")],
+           must="D・G・H・I・J 列を初期値")
+    xp_put, _ = build_with(base_log)
+    wbp = openpyxl.load_workbook(xp_put)
+    B.put(wbp["探索の一覧"]["B5"], "=1+1")
+    wbp.save(xp_put)
+    wbr = openpyxl.load_workbook(xp_put)
+    good = wbr["探索の一覧"]["B5"].value == "=1+1" and wbr["探索の一覧"]["B5"].data_type == "s"
+    print(("PASS" if good else "FAIL"), "put-keeps-string（書き込み側の put で書いた = は文字列のまま）")
+    ok &= good
+    C.EXTRACT_ROWS = old_ex
     # --final: 対象が判定されていなければ赤（対照: 自前のログは未判定の対象を残すので必ず赤）
     xp, lp = build_with(base_log)
     errs = check(xp, lp, final=True)

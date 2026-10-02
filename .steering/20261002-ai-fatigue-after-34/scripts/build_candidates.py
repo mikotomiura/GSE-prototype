@@ -142,16 +142,23 @@ def cells_for(i, first, final, quality, xconf, has_ai):
             "reason": f1.get("reason_summary", ""), "next": f1.get("next", "")}
 
 
+def put(cell, v):
+    """セルに値を書く。★ 先頭が = の文字列は式にしない（探索の題名など外の文が式になるのを防ぐ・判断 10）。"""
+    cell.value = v
+    if isinstance(v, str) and v.startswith("="):
+        cell.data_type = "s"
+    return cell
+
+
 def add_sheet(wb, name, title, note, header, rows, widths=None):
     ws = wb.create_sheet(name)
-    ws["A1"] = title
-    ws["A1"].font = Font(bold=True, size=12)
-    ws["A2"] = note
+    put(ws["A1"], title).font = Font(bold=True, size=12)
+    put(ws["A2"], note)
     for c, hd in enumerate(header, 1):
-        ws.cell(4, c, hd).font = Font(bold=True)
+        put(ws.cell(4, c), hd).font = Font(bold=True)
     for r, row in enumerate(rows, 5):
         for c, v in enumerate(row, 1):
-            ws.cell(r, c, v).alignment = Alignment(wrap_text=True, vertical="top")
+            put(ws.cell(r, c), v).alignment = Alignment(wrap_text=True, vertical="top")
     for c in range(1, len(header) + 1):
         w = (widths or {}).get(c, 14 if c == 1 else 30)
         ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width = w
@@ -164,7 +171,9 @@ def intro_rows(n_rows, n_done, n_ai):
         ("このファイル", "研究者の DB（09-18）に無い追加候補（サーヴェイで見つかった 220 件と、判定者 1 が足した記録）を、研究者の『スクリーニング』と同じ列で並べた。"
                        "DB の記録ではなく提案で、DB に入れるかは研究者が決める。"),
         ("判定者 2 に渡すとき", "このファイルは判定者 2 に渡さない（判定者1 の欄と『AI判定比較』『問いと答え』があると、2 人の判定が独立でなくなる）。"
-                             "判定者 2 には、判定者1 の列（D・G〜J）と『AI判定比較』『全文抽出』『品質評価』『問いと答え』を除いた版を渡す。"),
+                             "判定者 2 に渡す版は、『スクリーニング』の D・G・H・I・J 列を初期値（判定者1 = 未判定・除外理由 = 空・全文確認 = 未完了・"
+                             "品質評価 = 未実施・自由記入 = 空）に戻し、『AI判定比較』『全文抽出』『品質評価』『問いと答え』のシートを消して作る"
+                             "（どれも判定者 1 の判定・理由・進み具合を含む）。"),
         ("基準の版", CRITERIA_VERSION + "（判定者用ファイルの『判定基準』と同じ）"),
         ("判定の段", "全文段の 1 回。各件を 2 段で記録: 1 回目は AI の判定を見ずに選び、2 回目に AI の判定を見て変えるかを選んだ。両方を自由記入に残した。"),
         ("AI の判定", "追加候補の AI の判定は Claude 版（2026-09-30 の評価版）だけで、GPT 版は無い。評価版に行が無い記録（判定者 1 が足した記録）は 2 回目を置かず、"

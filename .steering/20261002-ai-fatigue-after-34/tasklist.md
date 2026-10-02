@@ -26,10 +26,11 @@
 - [x] `proposal/proposal-v1.md`（§0〜§9）
 - [x] `build_proposal.py` → Downloads と archive の .docx・`check_proposal.py` 違反 0・`--selftest` PASS（陰性対照＋変異 6）
 - [x] LibreOffice で PDF にして 1・3 頁を目で見た（表の列幅を中身に合わせるよう直した）
-- [ ] 直した後の表の頁を目で見る（付録の表の列の折り返し）
+- [x] 直した後の表の頁を目で見る（付録の表の列の折り返し）→ 狭い列が折り返していたので列幅の決め方を直し、13 頁を見直した（判断 10・`2faae616…`）
 
 ## 完了（→ 次のセッション・引き継ぎ `_handoff/next-session-ai-fatigue-after-34-finish.md`）
-- [ ] PR #288 の Codex 2 巡（道具・記録）→ 指摘への対応 → #288 の merge
+- [x] PR #288 の Codex 2 巡（道具・記録）→ 指摘への対応 → #288 の merge（`8cf19570`・34 件のタスクの判断 14・15）
+- [x] 同じ型の穴を本タスクの道具にも当てる（答えと判定・式・全文抽出・判定者 2 に渡す版の列）→ 表を作り直し（`2d681d6f…`）・提案のドキュメントの直し（判断 10）
 - [ ] 元の資料の SHA-256 が変わっていない・前のタスクの `check_workbook.py --final` 違反 0・ステージに本文が無い
 - [ ] code-reviewer ＋ security-checker（並列）
 - [ ] /cross-review 2 巡（Codex の当日の実消費を先に確かめる）

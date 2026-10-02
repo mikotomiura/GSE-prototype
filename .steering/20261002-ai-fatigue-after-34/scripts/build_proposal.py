@@ -11,6 +11,7 @@ import re
 import shutil
 import sys
 import tempfile
+import unicodedata
 
 import openpyxl
 from docx import Document
@@ -109,6 +110,33 @@ def blocks(md):
     return out
 
 
+def disp_width(s):
+    """表示幅（全角・広い文字 = 2、ほか = 1）。**太字**の記号は数えない。"""
+    return sum(2 if unicodedata.east_asian_width(ch) in ("F", "W") else 1 for ch in s.replace("**", ""))
+
+
+TABLE_CM, UNIT_CM, PAD_CM, SHORT = 16.0, 0.2, 0.5, 10  # 表の幅・表示幅 1 あたり・セルの余白・短い列の上限（表示幅）
+
+
+def column_widths(x):
+    """表の列の幅。短い列（最も長いセルの表示幅が SHORT の 2 倍以下: 番号・ID・判定・用途・材料）は中身が 1〜2 行に収まる幅を cm で取り、
+    残りを長い列に、中身の平均の表示幅（8〜40 に丸める）で配る。
+    ★ 比率だけで配ると本文の列に押されて「S15-23」「Claude 版」「番号」が折り返した（2026-10-02 に PDF で確かめた・判断 10）。"""
+    ncol = len(x[0])
+    mean = [sum(disp_width(row[j]) for row in x) / len(x) for j in range(ncol)]
+    longest = [max(disp_width(row[j]) for row in x) for j in range(ncol)]
+    short = [lg <= 2 * SHORT for lg in longest]
+    # 表示幅が SHORT 以下は 1 行、2 倍以下は 2 行に収まる幅（「題名と書誌だけ」が 4 行に割れた）
+    fixed = [(lg if lg <= SHORT else -(-lg // 2)) * UNIT_CM + PAD_CM for lg in longest]
+    rest = TABLE_CM - sum(f for f, s in zip(fixed, short) if s)
+    weight = [min(max(m, 8.0), 40.0) for m in mean]
+    wsum = sum(w for w, s in zip(weight, short) if not s)
+    if not wsum or rest < 4.0:  # 長い列が無い・短い列だけで埋まる → 全部を中身の比で配る
+        weight = [min(max(m, 8.0), 40.0) if not s else f / UNIT_CM for m, s, f in zip(mean, short, fixed)]
+        return [int(Cm(TABLE_CM) * w / sum(weight)) for w in weight]
+    return [int(Cm(fixed[j] if short[j] else rest * weight[j] / wsum)) for j in range(ncol)]
+
+
 def build_docx(md, dst):
     doc = Document()
     set_font(doc)
@@ -126,13 +154,7 @@ def build_docx(md, dst):
             t = doc.add_table(rows=len(x), cols=len(x[0]))
             t.style = "Table Grid"
             t.autofit = False
-            # 列の幅は中身の平均の長さで配分する（短い列〈番号・ID〉を細く・本文の列を広く）
-            ncol = len(x[0])
-            mean = [sum(len(row[j]) for row in x) / len(x) for j in range(ncol)]
-            weight = [min(max(m, 6.0), 40.0) for m in mean]
-            total = Cm(16.0)
-            for j in range(ncol):
-                w = int(total * weight[j] / sum(weight))
+            for j, w in enumerate(column_widths(x)):
                 t.columns[j].width = w  # ★ 表の列の定義（gridCol）。LibreOffice などはこちらを見る
                 for i in range(len(x)):
                     t.cell(i, j).width = w
