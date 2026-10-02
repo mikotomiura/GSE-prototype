@@ -18,6 +18,8 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 
 ## §1 状態（2026-10-03 の終わり）
 
+- ★★★ **2026-10-03 の続き（Surface Pro 8）: M5 のパイロットを Surface で実施した**（判断 136・研究者の指示で判断 134 / 135 を改めた）。§2 の 1〜7 は済み。結果と所見は `.steering/20260927-ime-observation-paper-eval-design/pilot-windows-1-notes.md`。生ログと封印・作業ファイル（`cell-*.json`・`focus_front.py`・`away_window.py`・`run_fg.py`・`outcome.py`・`seq.py` など）は Surface の `~/ime-pilot/`。⚠️ **止まっている所**: S4 が凍結のコードの制約で MS-IME の取消にならない（ノートの所見 1）→ 研究者の判断待ち。以下の §1・§2 は当時の記述。
+
 - **macOS の事前登録は凍結済み・OSF で公開済み**: `https://osf.io/9nh7r`（DOI `10.17605/OSF.IO/9NH7R`・`date_registered` 2026-10-02・添えたファイルの SHA-256 は凍結したファイル `fa6fd586…7773` と一致・`notes.md` に記録・PR #298）。Mac の M4（本計測）は別の流れで、Mac の引き継ぎ `next-session-ime-paper-osf-m4.md` の §2 の 3 から。
 - **M5 はまだ何もしていない**: G-GEAR では書き出し・ビルド・run のどれも行っていない（判断 133・134）。
 - `papers/ime-observation/` の kit は凍結のタグから変わっていない（タグと main の差は `experiment/notes.md` の追記だけ・2026-10-03 に `git diff --stat` で確かめた）。

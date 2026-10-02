@@ -192,6 +192,9 @@
     - [x] 出荷: ブランチ `docs/ime-m3-freeze` とタグ `ime-observation-prereg-macos` を push（`ls-remote` でタグが `ff122e32` を指すことを確かめた・タグの push でワークフローは起動しない）→ PR #293 → PR の CI（run 36977262693）は Mac・Windows の check と frontend-check が緑 → merge（merge commit 方式）。merge の前に main が 2 回進み、1 回目は `.codex/budget.json` の台帳だけが衝突 → 和で解いた（422,989 / 10 回・判断 132 の台帳のコメント）、2 回目（#294 の版上げ）は衝突なし → CI 緑（run 36984522344）→ **merge `2543f9fb`** → **main の CI（run 36988299913）success**（Mac / Windows の check・frontend-check）。凍結の commit `ff122e32` は main から辿れる
   - [ ] M5 Windows の較正パイロット → ~~別の Windows 実機で行う（判断 133）~~ → ★ **G-GEAR で行う**（2026-10-03・研究者の選択・判断 134: 数時間以上の run〔M7 のセル・Windows の E3〕だけ別の Windows 実機）。IME の学習はリセットしない・電源の設定はメインが一時的に切って戻す・実行の時間は未決。⚠️ 較正（G-GEAR）と計測（別の実機）の機械が違う → M7 の前に計測する機械で短い確認の run（推奨・M6 の前に研究者が決める）。G-GEAR ではまだ何もしていない。→ 引き継ぎ `next-session-ime-paper-m5-windows.md`
     - [x] 2026-10-03: 引き継ぎを開いた機械が Surface Pro 8（判断 134 の「別の Windows 実機」・研究者の答え）だった → M5 は G-GEAR に残し、計測する機械の OS・MS-IME の版・キーボード・道具の有無を記録した（判断 135・25H2 / 26200・MS-IME 10.0.26100.8875・Rust と Python は未導入）
+    - [x] 2026-10-03: 研究者の指示で **M5 をこの Surface（計測する機械）で行う**（判断 136）。Python 3.11.9・Rust 1.98.1・MSVC を入れ、タグから書き出し（一覧 `29b183ba…` が一致）→ ビルド → selftest がすべて緑。短い試し（IMM / TSF 各 39 試行）と本体（各 117 試行・27.6 分）を打ち切りなしで回し、封印 → 集計した → `pilot-windows-1-notes.md`
+    - [ ] ★★★ 研究者の判断: **S4（Space → Esc 2 回）が MS-IME で取り消しにならない**（複数文節は Esc 3 回）—— 凍結の生成器が S4 を OS を問わず固定しており §8 の範囲で直せない（所見 1）。S8 の `after_digit`・正解の経路・起動の手順も（同じノートの「残り」）
+    - [ ] 直した手順で短い確認の run → 公開用の `experiment/pilot-windows.md`（英語）→ M5 を閉じる
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task

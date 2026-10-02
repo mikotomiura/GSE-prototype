@@ -1156,3 +1156,11 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 画面と電源: `ScreenSaveActive` 1（`ScreenSaveTimeOut` 空）・`ForegroundLockTimeout` 200000・電源の計画は「バランス」。⚠️ 8 時間の run の前に、判断 133 のとおり元の値を記録してから一時的に切る。
   - 道具: git 2.55.0.windows.3・bash 5.3.15・`gh` 認証済み。**Rust と Python が無い** → M7 / M10 の前に入れる（M5 と同じ版を推奨）。
 - **影響範囲**: `tasklist.md` の M5 の行・引き継ぎ `next-session-ime-paper-m5-windows.md` §1（計測する機械の値を足す）。
+
+## 判断 136: 判断 135 を改める —— M5 をこの Surface Pro 8（計測する機械）で行う（2026-10-03・Surface・研究者の選択）
+
+- **研究者の指示**（判断 135 の記録の後）: 「rust を CLI で入れてから実施するのは？ 特にハードウェアでの強い制約などがなければ同じ Windows だし実行していいんじゃ」。
+- **メインの判断**: 賛成。この Surface は M7 の本計測の機械（判断 134・135）なので、**較正と計測の機械が揃い、判断 134 の未決 2（較正と計測の機械が違う）が消える**。ハードウェアの制約は見当たらない（i5-1135G7・8 GB・JIS・AC 電源）。G-GEAR の値（26H2 / 26300）は比べる相手として残す。
+- **入れた道具**（2026-10-03・winget）: Python **3.11.9**（user・判断 52 の G-GEAR と同じ版）・rustup 1.29.1 → `rust-toolchain.toml` の **1.98.1**（既定にも 1.98.1 を指定）・Visual Studio 2022 Build Tools（VCTools・MSVC 14.44.35207）。`git` の作者名はこの機械に無い → 研究者の答えでコミットごとに `-c` で Mikoto Miura（設定は変えていない）。
+- **電源**: 読んだ値は AC・DC とも スリープ 0・画面オフ 0・スクリーンセーバーなし（`SCRNSAVE.EXE` 空）→ **変える必要がなかった**（判断 133 の「切って戻す」は不要・値は `~/ime-pilot/power-before.txt`）。着手時はバッテリーで、研究者が AC につないだ（`BatteryStatus.PowerOnline` を読み戻し）。
+- **影響範囲**: `tasklist.md` の M5・`pilot-windows-1-notes.md`（新規）・`_issue-plan.md` の M5 の「どこで」は M5 を閉じるときに直す。
