@@ -13,12 +13,16 @@
 (9) 答えの逐語と判定（result）が合う（前のタスクの answer_mismatch: 既知の形への全体一致）。式のセルは『AI判定比較』の
     一致の式（E 列）だけ。『全文抽出』の ID = 抽出を確定した件・中身は data/extract-rows.json と同じ。
     『はじめに』の「判定者 2 に渡すとき」が戻す列を名指しする（判断 10）。
+(10) 2 段の順序（2 回目の後に 1 回目を足さない）・入力規則の語彙・含めた件の研究の種類・--final の品質評価（完了と『品質評価』の
+    シート）・式を許すのは『AI判定比較』の比較の行の E 列だけ・『探索の検索式』『探索の一覧』の全列・全セルに手元のパスと
+    メールアドレスが無い（判断 11）。
 --selftest: 自前のログで表を作り、陰性対照が緑・変異がそれぞれ赤になること。
 使い方: python check_candidates.py [--final] [--selftest]
 """
 import copy
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -43,7 +47,16 @@ EXPECT_E4 = {"レビュー": "背景保持", "論考": "背景保持", "研究�
 # 本タスクで判定する記録（design.md §2 の群 1〜3）。X の行は data から足す
 TARGET_IDS = ["S02-08", "S08-03", "S15-23", "S13-20", "S12-05", "S12-19", "S12-23"]
 INTRO_MUST = ["判定者 2 に渡さない", "Claude の関与", "Claude 版", "GPT 版は無い",
-              "『スクリーニング』の D・G・H・I・J 列を初期値", "『AI判定比較』『全文抽出』『品質評価』『問いと答え』のシートを消して"]
+              "『スクリーニング』の D・G・H・I・J 列を初期値", "『探索の一覧』の「足した（ID）」列を空に",
+              "『AI判定比較』『全文抽出』『品質評価』『問いと答え』のシートを消し", "『はじめに』を判定者 2 用に書き直し"]
+# 入力規則の語彙（★ build_candidates.py とは別に持つ）
+DV_VOCAB = {"D": '"未判定,含める,除外,保留"', "E": '"未判定,含める,除外,保留"', "F": '"未判定,含める,除外,保留"',
+            "H": '"未完了,進行中,完了,入手不可,対象外"', "I": '"未実施,進行中,完了,対象外"'}
+CMP_DV_VOCAB = '"中心候補,背景保持,方法論保持,訂正連結,除外,保留"'
+KINDS = set(EXPECT_E4)  # 含めた件の研究の種類（kind_detail）の語彙
+# ★ 研究者に渡す表に、手元のパス・ユーザー名・メールアドレスを入れない（security-checker・判断 11）。
+#   ドライブ文字は前が英字でないときだけ（題名の「systems:/」や URL の「https://」に当てない）
+LOCAL = re.compile(r"(?<![A-Za-z])[A-Za-z]:[\\/]|Downloads[\\/]|/c/Users|\bjohnd\b|[\w.+-]+@[\w-]+\.[\w.]+", re.I)
 
 
 def read_log(path):
@@ -99,7 +112,17 @@ def check_sources():
     return errs
 
 
-def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_path=None, extract_path=None):
+def norm_row(row, n):
+    return [None if v in (None, "") else v for v in list(row)[:n]] + [None] * (n - len(list(row)[:n]))
+
+
+def sheet_body(ws, n):
+    """5 行目から、A 列が埋まっている行を n 列ずつ（空の行で止まらず、最後の行まで見る）。"""
+    rows = [[ws.cell(r, c).value for c in range(1, n + 1)] for r in range(5, ws.max_row + 1)]
+    return [norm_row(x, n) for x in rows if any(v not in (None, "") for v in x)]
+
+
+def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_path=None, extract_path=None, quality_path=None):
     errs = []
     log = read_log(log_path)
     extra = load_json(extra_path or C.EXTRA_RECORDS, [])
@@ -131,16 +154,20 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
     for dv in ws.data_validations.dataValidation:
         for rng in str(dv.sqref).split():
             col = "".join(ch for ch in rng.split(":")[0] if ch.isalpha())
-            covered[col] = rng
+            covered[col] = (rng, dv.formula1)
     for col in VALIDATED:
-        if covered.get(col) != f"{col}5:{col}{4 + len(expect_rows)}":
-            errs.append(f"入力規則が無い・範囲が違う: {col}（{covered.get(col)}）")
+        if covered.get(col) != (f"{col}5:{col}{4 + len(expect_rows)}", DV_VOCAB[col]):
+            errs.append(f"入力規則が無い・範囲や語彙が違う: {col}（{covered.get(col)}）")
     # ログから最終と段
     first, final_res, stages, quality, xconf = {}, {}, {}, {}, set()
-    first_ans, prev_res = {}, {}
+    first_ans, prev_res, seen2 = {}, {}, set()
     for rec in log:
         i, st = rec["item"], rec["stage"]
         stages.setdefault(i, []).append(st)
+        if st in ("1", "1e") and i in seen2:  # ★ AI の判定を見た後の答えを 1 回目に数えない（code-reviewer・判断 11）
+            errs.append(f"{i}: 1 回目（{st}）が 2 回目の後にある")
+        if st in ("2", "2e"):
+            seen2.add(i)
         if st in ("1", "1e", "2", "2e"):  # (9) 答えの逐語と判定（result）
             why = answer_mismatch(st, rec["answer"], rec["result"], first.get(i), prev_res.get(i), first_ans.get(i))
             if why:
@@ -194,6 +221,8 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
             continue
         f1, f0 = final_res[i], first[i]
         basis = f1.get("basis", "全文")
+        if f1["verdict"] == "含める" and f1.get("kind_detail") not in KINDS:
+            errs.append(f"{i}: 含めた件の研究の種類（kind_detail）が無い・語彙の外: {f1.get('kind_detail')!r}")
         exp_h = "入手不可" if basis in ("抄録", "なし") else ("完了" if i in xconf else "進行中")
         if f1["verdict"] == "含める" and f1.get("kind_detail") == "一次研究":
             q = quality.get(i)
@@ -215,8 +244,8 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
             errs.append(f"{i}: 自由記入の 1 回目と最終がログと違う")
         if ("AI の判定: Claude 版" in j) != (i in ai) or ("AI の判定: なし" in j) == (i in ai):
             errs.append(f"{i}: 自由記入の AI の判定の有無が違う")
-        if final and f1["verdict"] == "含める" and f1.get("kind_detail") == "一次研究" and basis == "全文" and i not in quality:
-            errs.append(f"{i}: 含めた一次研究（全文あり）で品質が確定していない")
+        if final and f1["verdict"] == "含める" and f1.get("kind_detail") == "一次研究" and basis == "全文" and exp_i != "完了":
+            errs.append(f"{i}: 含めた一次研究（全文あり）の品質評価が完了でない（q が無い・保留）（--final）")
     # 『AI判定比較』
     wc = w["AI判定比較"]
     want = [i for i in ids if i in final_res and i in ai]
@@ -235,11 +264,40 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
         r += 1
     if got != want:
         errs.append(f"AI判定比較の行が 判定済み ∩ 評価版 と違う: {got} / {want}")
+    cdv = [(str(dv.sqref), dv.formula1) for dv in wc.data_validations.dataValidation]
+    n_cmp = max(5, 4 + len(want))
+    if cdv != [("D5" if n_cmp == 5 else f"D5:D{n_cmp}", CMP_DV_VOCAB)]:  # ★ openpyxl は 1 セルの範囲を「D5」に縮めて保存する
+        errs.append(f"AI判定比較の入力規則が無い・範囲や語彙が違う: {cdv}")
+    # (10) 手元のパス・ユーザー名・メールアドレス（全シートの全セルと文書の属性）
+    for ws_ in w.worksheets:
+        for row in ws_.iter_rows():
+            for c in row:
+                if isinstance(c.value, str) and LOCAL.search(c.value):
+                    errs.append(f"手元のパス・メールアドレスの形: {ws_.title}!{c.coordinate}")
+    for k_ in ("creator", "lastModifiedBy", "title", "subject", "description", "keywords"):
+        v_ = getattr(w.properties, k_, None)
+        if isinstance(v_, str) and LOCAL.search(v_):
+            errs.append(f"手元のパス・メールアドレスの形: 文書の属性 {k_}")
+    # (10) 『品質評価』: 含めた一次研究で品質を確定した件と、data/quality-rows.json と一致（data に行があるときだけシートを置く）
+    qd = load_json(quality_path or C.QUALITY_ROWS, None)
+    want_q = sorted(i for i in final_res if final_res[i]["verdict"] == "含める"
+                    and final_res[i].get("kind_detail") == "一次研究" and i in quality)
+    if "品質評価" in w.sheetnames:
+        wq_ = w["品質評価"]
+        n_ = max(wq_.max_column, len((qd or {}).get("header") or []))
+        body = sheet_body(wq_, n_)
+        if sorted(x[0] for x in body) != want_q or len({x[0] for x in body}) != len(body):
+            errs.append(f"品質評価: ID が品質を確定した含める一次研究 {want_q} と違う")
+        if not qd or norm_row(qd["header"], n_) != norm_row([wq_.cell(4, c).value for c in range(1, n_ + 1)], n_) or \
+                [norm_row(x, n_) for x in qd["rows"]] != body:
+            errs.append("品質評価: 中身が data/quality-rows.json と違う")
+    elif (qd and qd.get("rows")) or want_q:
+        errs.append(f"品質評価のシートが無い（data の行・品質を確定した件 {want_q} があるのに）")
     # (9) 式のセル: 『AI判定比較』の一致の式（E 列）のほかに無い（外の文の先頭の = が式になるのを防ぐ）
     for ws_ in w.worksheets:
         for row in ws_.iter_rows():
             for c in row:
-                if c.data_type == "f" and not (ws_.title == "AI判定比較" and c.column_letter == "E" and c.row >= 5):
+                if c.data_type == "f" and not (ws_.title == "AI判定比較" and c.column_letter == "E" and 5 <= c.row < 5 + len(want)):
                     errs.append(f"式のセル: {ws_.title}!{c.coordinate}")
     # (9) 『全文抽出』: ID = 抽出を確定した件（重複なし）・中身は data と同じ
     we = w["全文抽出"]
@@ -272,12 +330,16 @@ def check(path, log_path, final=False, extra_path=None, runs_path=None, recs_pat
     runs = load_json(runs_path or C.SEARCH_RUNS, [])
     recs = load_json(recs_path or C.SEARCH_RECORDS, [])
     wr, wq = w["探索の検索式"], w["探索の一覧"]
-    if [wr.cell(5 + k, 2).value for k in range(len(runs))] != [x["query"] for x in runs] or wr.cell(5 + len(runs), 1).value is not None:
-        errs.append("探索の検索式が data と違う")
-    if [wq.cell(5 + k, 1).value for k in range(len(recs))] != [x["key"] for x in recs] or wq.cell(5 + len(recs), 1).value is not None:
-        errs.append("探索の一覧が data と違う")
-    elif [(wq.cell(5 + k, 10).value, wq.cell(5 + k, 11).value) for k in range(len(recs))] != [(x.get("layer"), x.get("reading")) for x in recs]:
-        errs.append("探索の一覧の層・読む一覧が data と違う")
+    # ★ 全列を data から独立に組んで比べる（検索式・層・読む一覧だけだと件数・日時・題名・重なり・足した ID の誤記が通る・Codex・判断 11）
+    want_r = [norm_row([x["api"], x["query"], x["executed_at"], x.get("total_hits"), x.get("fetched"), x.get("passed_filter"),
+                        "はい" if x.get("truncated") else "いいえ", x.get("error")], 8) for x in runs]
+    if sheet_body(wr, 8) != want_r:
+        errs.append("探索の検索式が data と違う（全列）")
+    want_l = [norm_row([x["key"], x["title"], x.get("year"), x.get("type"), x.get("venue"), x.get("language"), x.get("oa"),
+                        x.get("overlap"), x.get("sources"), x.get("layer"), x.get("reading"), x.get("added_as") or "いいえ"], 12)
+              for x in recs]
+    if sheet_body(wq, 12) != want_l:
+        errs.append("探索の一覧が data と違う（全列）")
     for x in recs:
         if x.get("added_as") and x["added_as"] not in ids:
             errs.append(f"探索で足したとする {x['added_as']} が表の行に無い")
@@ -378,7 +440,7 @@ def selftest():
            lambda wb: [wb["AI判定比較"].__setitem__(k, v) for k, v in (("A6", "S02-08"), ("C6", "中心候補"))], must="AI判定比較の行")
     expect("cmp-ai-value-changed", base_log, cell("AI判定比較", "C5", "中心候補"), must="AI用途判定")
     expect("logsheet-diff", base_log, cell("問いと答え", "F5", "別の答え"), must="問いと答え")
-    expect("search-layer-changed", base_log, cell("探索の一覧", "J5", "Z"), must="層・読む一覧")
+    expect("search-layer-changed", base_log, cell("探索の一覧", "J5", "Z"), must="探索の一覧が data と違う")
     expect("search-row-removed", base_log, lambda wb: wb["探索の一覧"].delete_rows(6), must="探索の一覧が data と違う")
     expect("intro-warning-removed", base_log,
            lambda wb: [wb["はじめに"].cell(r, 2).__setattr__("value", "") for r in range(5, 30) if "判定者 2 に渡さない" in str(wb["はじめに"].cell(r, 2).value or "")],
@@ -389,7 +451,6 @@ def selftest():
            logm(lambda lg: lg[1].__setitem__("result", {**lg[1]["result"], "ecode": "E2"})), must="答えと判定が合わない")
     expect("answer-unreadable（Other の自由記入）", logm(lambda lg: lg[1].__setitem__("answer", "別の判定に変える")), must="読めない")
     expect("formula-in-title", base_log, cell("探索の一覧", "B5", "=1+1"), must="式のセル: 探索の一覧!B5")
-    expect("formula-cmp-E-is-allowed（対照）", base_log, red=False)
     expect("extract-row-removed", base_log, lambda wb: wb["全文抽出"].delete_rows(5), must="全文抽出: ID")
     expect("extract-cell-changed", base_log, cell("全文抽出", "C5", "別の集団"), must="全文抽出: 中身")
     expect("intro-columns-removed", base_log,
@@ -404,7 +465,67 @@ def selftest():
     good = wbr["探索の一覧"]["B5"].value == "=1+1" and wbr["探索の一覧"]["B5"].data_type == "s"
     print(("PASS" if good else "FAIL"), "put-keeps-string（書き込み側の put で書いた = は文字列のまま）")
     ok &= good
+    # (10) 判断 11 の規則: 各規則の文言で赤になる変異
+    def J_of(wb, i, a, b):
+        ws_ = wb["スクリーニング"]
+        ws_[f"J{row_of(wb, i)}"] = ws_[f"J{row_of(wb, i)}"].value.replace(a, b)
+    expect("stage1-after-stage2（AI を見た後の答えを 1 回目に）",
+           logm(lambda lg: lg.append({**copy.deepcopy(lg[0]), "seq": 9, "answer": "保留", "result": {**lg[0]["result"], "verdict": "保留", "ecode": None}})),
+           must="1 回目（1）が 2 回目の後")
+    expect("J-first-changed", base_log, lambda wb: J_of(wb, "S15-23", "1回目: 除外 E4", "1回目: 保留"), must="自由記入の 1 回目と最終")
+    expect("J-ai-flag-changed", base_log, lambda wb: J_of(wb, "S15-23", "AI の判定: Claude 版", "AI の判定: なし"), must="AI の判定の有無")
+    expect("I-changed", base_log, lambda wb: wb["スクリーニング"].__setitem__(f"I{row_of(wb, 'S15-23')}", "完了"), must="品質評価が期待と違う")
+    expect("G-code-changed", base_log, lambda wb: wb["スクリーニング"].__setitem__(f"G{row_of(wb, 'S15-23')}", "E2 背景"), must="除外理由のコード")
+    expect("cmp-human-use-changed", base_log, cell("AI判定比較", "D5", "中心候補"), must="人間用途判定")
+    expect("cmp-formula-changed", base_log, cell("AI判定比較", "E5", '=IF(D5="","","一致")'), must="一致の式")
+    expect("formula-outside-cmp-rows", base_log, cell("AI判定比較", "E20", "=1+1"), must="式のセル: AI判定比較!E20")
+    expect("search-run-count-changed", base_log, cell("探索の検索式", "D5", 999999), must="探索の検索式")
+    expect("search-list-year-changed", base_log, cell("探索の一覧", "C5", 1999), must="探索の一覧が data と違う")
+    expect("search-list-added-changed", base_log, cell("探索の一覧", "L5", "S02-08"), must="探索の一覧が data と違う")
+    expect("dv-vocab-changed", base_log,
+           lambda wb: setattr(next(dv for dv in wb["スクリーニング"].data_validations.dataValidation if str(dv.sqref).startswith("D5")),
+                              "formula1", '"未判定,含める,除外,保留,中心候補"'), must="入力規則")
+    expect("local-path-in-cell", base_log, cell("問いと答え", "G5", "C:\\Users\\someone\\Downloads\\x.pdf"), must="手元のパス")
+    expect("email-in-cell", base_log, cell("探索の一覧", "B6", "contact a.b@example.org"), must="手元のパス")
+    # 対照: 題名の「systems:/」・URL の「https://」は手元のパスに当てない
+    expect("url-and-colon-slash-not-local（対照）", base_log,
+           lambda wb: wb["はじめに"].__setitem__("C40", "systems:/ https://example.org/x"), red=False)
+    prim = [{"seq": 5, "item": "S12-05", "stage": "1", "question": "S12-05 の事実と基準", "options": STAGE1_OPTIONS["primary"],
+             "answer": "含める（中心-A）", "note": "",
+             "result": {"verdict": "含める", "use": "中心-A", "kind": "一次研究", "kind_detail": "一次研究", "basis": "全文", "date": "2026-10-02"}},
+            {"seq": 6, "item": "S12-05", "stage": "2", "question": "AI の判定を見て", "options": ["1 回目のまま", "変える"], "answer": "1 回目のまま", "note": "",
+             "result": {"verdict": "含める", "use": "中心-A", "kind": "一次研究", "kind_detail": "一次研究", "basis": "全文", "date": "2026-10-02"}}]
+    expect("include-without-kind_detail", logm(lambda lg: lg.extend([{**x, "result": {k: v for k, v in x["result"].items() if k != "kind_detail"}}
+                                                                    for x in copy.deepcopy(prim)])), must="研究の種類（kind_detail）")
+    qhold = {"seq": 7, "item": "S12-05", "stage": "q", "question": "品質評価の確定", "options": ["確定", "保留（判定不能のまま）"],
+             "answer": "保留（判定不能のまま）", "note": "", "result": {"answer": "保留"}}
+    xp, lp = build_with(logm(lambda lg: lg.extend(copy.deepcopy(prim) + [qhold])))
+    good = any("品質評価が完了でない" in e for e in check(xp, lp, final=True))
+    print(("PASS" if good else "FAIL"), "final-quality-hold（q が保留なら --final で赤）")
+    ok &= good
     C.EXTRACT_ROWS = old_ex
+    # --final の緑の対照: 対象（群 1〜3 と X の行）をすべて判定し、抽出を確定した自前のログ（★ 常に赤の --final を見逃さない）
+    all_ids = TARGET_IDS + ["X01"]
+    full = []
+    for k_, i_ in enumerate(TARGET_IDS):
+        r1 = {"seq": 2 * k_ + 1, "item": i_, "stage": "1", "question": f"{i_} の事実と基準", "options": STAGE1_OPTIONS["other"],
+              "answer": "除外 E4（保持の区分は対応表で決まる）", "note": "",
+              "result": {"verdict": "除外", "ecode": "E4", "elabel": "レビュー（背景保持）", "kind": "一次研究でない", "kind_detail": "レビュー",
+                         "basis": "全文", "date": "2026-10-02"}}
+        full += [r1, {**copy.deepcopy(r1), "seq": 2 * k_ + 2, "stage": "2", "question": "AI の判定を見て",
+                      "options": ["1 回目のまま", "変える"], "answer": "1 回目のまま"}]
+    full += [copy.deepcopy(base_log[2]) | {"seq": 90}, {"seq": 91, "item": "S15-23", "stage": "x", "question": "抽出の確定", "options": ["確定"],
+                                                      "answer": "確定", "note": "", "result": {"items": all_ids}}]
+    ex_full = {"header": exd["header"], "rows": [[i_] + ["記載なし"] * (len(exd["header"]) - 1) for i_ in all_ids]}
+    with open(ex_path, "w", encoding="utf-8") as f:
+        json.dump(ex_full, f, ensure_ascii=False)
+    C.EXTRACT_ROWS = ex_path
+    xp, lp = build_with(full)
+    errs_full = check(xp, lp, final=True)
+    C.EXTRACT_ROWS = old_ex
+    good = not errs_full
+    print(("PASS" if good else "FAIL"), "final-green-control（対象をすべて判定した自前のログ）", "" if good else errs_full[:3])
+    ok &= good
     # --final: 対象が判定されていなければ赤（対照: 自前のログは未判定の対象を残すので必ず赤）
     xp, lp = build_with(base_log)
     errs = check(xp, lp, final=True)

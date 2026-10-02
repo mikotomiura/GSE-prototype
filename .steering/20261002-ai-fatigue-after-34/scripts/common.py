@@ -11,7 +11,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 TASK = os.path.dirname(HERE)
 STEER = os.path.dirname(TASK)
-DOWNLOADS = r"C:\Users\johnd\Downloads"
+DOWNLOADS = os.path.join(os.path.expanduser("~"), "Downloads")  # ★ ユーザー名を repo に書かない（security-checker・判断 11）
 
 # 前のタスク（34 件）の道具。stage1_banned などを import する
 PREV_SCRIPTS = os.path.join(STEER, "20261001-ai-fatigue-34-screening", "scripts")

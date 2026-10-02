@@ -398,6 +398,8 @@ def check(copy_path, log_path, final=False, original=C.ORIGINAL, reasons_path=No
         if i not in kind:
             errs.append(f"ログ {n}: 知らない件 {i}")
             continue
+        if st in ("1", "1e") and i in seen2:  # ★ AI の判定を見た後の答えを 1 回目に数えない（after-34 の code-reviewer・判断 16）
+            errs.append(f"ログ {n} {i}: 1 回目（{st}）が 2 回目の後にある")
         if st in ("1", "1e", "2", "2e"):  # (10) 答えの逐語と判定（result）
             why = answer_mismatch(st, rec.get("answer"), rec.get("result") or {}, first_res.get(i), prev_res.get(i), first_ans.get(i))
             if why:
@@ -824,6 +826,8 @@ def selftest():
             print("FAIL 『はじめに』の変異が --final で赤にならない:", nm)
             bad += 1
     mutate("stage2-first", fn_log=lambda L: list(reversed(L)))
+    mutate_named("stage1-after-stage2", "1 回目（1）が 2 回目の後",
+                 fn_log=lambda L: L + [dict(L[0], answer="保留", result={"verdict": "保留", "basis": "全文"})])
     mutate("extra-sheet", fn_wb=lambda w: w.create_sheet("メモ"))
     mutate("human-use-wrong", fn_wb=lambda w: w["AI判定比較"].cell(r, 4, "背景保持"))
     mutate("unlogged-verdict", fn_wb=lambda w: w["スクリーニング"].cell(C.FIRST_ROW + 1, 4, "含める"))  # AF002（基準のログに無い件）
