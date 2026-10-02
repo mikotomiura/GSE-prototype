@@ -186,6 +186,7 @@
     - [ ] ★ M12 への申し送り（判断 131）: 公開 repo の最初の commit を、タグ `ime-observation-prereg-macos` から `--allow-missing-license` で書き出したものそのものにしてタグを付け、一覧の SHA-256 が `29b183ba…6c49` になることを確かめてから、ライセンスと M12 の書き出しを上に積む。公開 repo は `git init` の新しい履歴（fork・公開への切り替え・private の履歴の push は使わない）。`notes.md` に公開側のどの commit・タグが凍結の書き出しかを 1〜2 文（判断 132）
     - [ ] ★ M6 への申し送り（判断 132）: 追補の節に「Status の日付は macOS の凍結の日で、印は追補で差し替えた」と 1 文
     - [x] 完了時レビュー（code-reviewer ∥ security-checker ∥ Codex 1 巡・`1086e3be..ce205e83`）→ 判断 132
+    - [x] 出荷: ブランチ `docs/ime-m3-freeze` とタグ `ime-observation-prereg-macos` を push（`ls-remote` でタグが `ff122e32` を指すことを確かめた・タグの push でワークフローは起動しない）→ PR #293 → PR の CI（run 36977262693）は Mac・Windows の check と frontend-check が緑 → merge（merge commit 方式）。⚠️ merge コミットと main の CI の run は次のセッションの最初に記録する（引き継ぎ `next-session-ime-paper-osf-m4.md` §2 の 0）
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task

@@ -28,6 +28,7 @@ Skill: verify-before-claiming・git-workflow・reproducibility-discipline。
 
 ## §2 やること
 
+0. **出荷の記録を足す**: PR #293 の merge コミット（`gh pr view 293 --json mergeCommit`）と main の CI の run（`gh run list --branch main --limit 3`）を `tasklist.md` の M3 の「出荷」の行に書く（このメモを書いたセッションは merge の前に記録をコミットした）。
 1. **OSF の登録が済んだか研究者に確かめる**（済んでいなければ、登録に載せるものを渡して待つ）。登録に載せるもの（§9）:
    - 凍結したファイル: タグ `ime-observation-prereg-macos` の `papers/ime-observation/experiment/preregistration.md`（SHA-256 `fa6fd586…7773`）
    - 2 つの印・凍結の commit の 40 桁・書き出しの一覧の SHA-256（§1）
