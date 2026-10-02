@@ -3,13 +3,14 @@
 ## 準備
 - [x] grill（AskUserQuestion 3 回・11 問）→ requirement.md・decisions.md 判断 1
 - [x] worktree `C:\wt\ai-fatigue-v2`（`docs/ai-fatigue-v2`・origin/main `f04b4995` から）
-- [ ] design.md の承認
-- [ ] 抄録の取得（`fetch_abstracts.py`・無料の API・メールアドレスなし）→ 取れなかった件を Chrome で確かめる
+- [x] design.md の承認（2026-10-02）
+- [x] 抄録の取得（`fetch_abstracts.py`・無料の API・メールアドレスなし）→ 取れなかった件は Chrome でなく `fetch_landing.py`（判断 2 の逸脱）→ 250 / 259
 
 ## 抄録段
-- [ ] 道具: `common.py`・`build_ta_sheet.py`・`check_ta_sheet.py`（`--selftest`・メタ変異）
-- [ ] 記入表 1 を作り、検査違反 0 → 判定者 1 に渡す
-- [ ] 記入表 1 を読む（`read_ta_sheet.py`）→ ログ・X 番号
+- [x] 道具: `common.py`・`build_ta_sheet.py`・`check_ta_sheet.py`（selftest 37 PASS・メタ変異 15 規則 PASS）・`read_ta_sheet.py`（試作で通した）
+- [x] 記入表 1 を作り、検査違反 0 → 判定者 1 に渡す（`515c18e7…`・2026-10-02）
+- [x] 記入表 2 の道具: `build_ta2_sheet.py`・`check_ta2_sheet.py`（selftest 23 PASS・メタ変異 10 規則 PASS）・`read_ta2_sheet.py`（試作で通した）
+- [ ] 記入表 1 を読む（`check_ta_sheet.py --filled --final` → `read_ta_sheet.py`）→ ログ・X 番号
 - [ ] 記入表 2 を作る → 判定者 1 が記入 → 読む
 
 ## 全文段
