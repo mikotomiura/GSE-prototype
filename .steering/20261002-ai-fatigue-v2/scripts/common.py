@@ -147,7 +147,8 @@ def write_text_atomic(path, text):
             os.remove(tmp)
 
 
-STOPPED_HINT = "（手で記入・保存された可能性と、前の実行が SHA-256 の記録を書く前に止まった可能性がある・止まって聞く）"
+STOPPED_HINT = ("（手で記入・保存された可能性と、前の実行が SHA-256 の記録を書く前に止まった可能性がある・止まって聞く。"
+                "前の版はコミット済みの archive にあり、道具で作り直せる）")
 
 
 def is_cand_id(i):
