@@ -1,7 +1,7 @@
 # 次セッション — IME 論文: OSF の登録の記録 → M4（Mac での macOS 本計測）
 
 > 作成: 2026-10-02（G-GEAR・M3 の凍結を終えたセッションの最後に）。
-> 前の引き継ぎ `next-session-ime-paper-m3-freeze.md` の後継（その §2 の 1〜4 と 6 は済み・5 の登録は研究者）。
+> 前の引き継ぎ `next-session-ime-paper-m3-freeze.md` の後継（その §2 の 1〜4 は済み・5 の登録は研究者・6 の出荷はこのメモを書いたセッションで行う —— 結果は `tasklist.md` の M3 の末尾）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（**判断 130・131**）・`tasklist.md`（M3 の末尾・M4）・`_issue-plan.md`（M4・M12）と、凍結した事前登録 `papers/ime-observation/experiment/preregistration.md`（§2.2・§2.4・§3.2・§3.4・§5・§9）。状態は着手時に `git fetch` で測り直す。
 
 ## §0 打ち込む用
@@ -32,6 +32,7 @@ Skill: verify-before-claiming・git-workflow・reproducibility-discipline。
    - 凍結したファイル: タグ `ime-observation-prereg-macos` の `papers/ime-observation/experiment/preregistration.md`（SHA-256 `fa6fd586…7773`）
    - 2 つの印・凍結の commit の 40 桁・書き出しの一覧の SHA-256（§1）
    - 登録は**すぐ公開**（判断 93）。⚠️ 登録は外部への操作なので研究者が行う。
+   - ★ 登録の説明に添える案（判断 132・研究者が決める）: 「commit の識別子は公開していない開発履歴のもの。公開側での照合は、公開 repo の最初の commit（凍結の書き出しそのもの）から計算した一覧の SHA-256 で行う」。理由: 公開 repo は新しい履歴で作るので、読者は 40 桁の commit とタグ `ime-observation-prereg-macos` に辿り着けない。M12 でライセンスと `CITATION.cff` を足した後の公開物からは別の一覧になる。
 2. **登録の URL と日付を `experiment/notes.md` に記録する**（§9。凍結の段落の後に 1 文）。`_style_check.py` 0 件を確かめる。
 3. **M4（Mac）**: 事前登録 §3.2 の順（ON → OFF → E3 `idle` → E3 `working`）で、各 run の前に:
    - ロガーは**凍結のタグから書き出した側でビルドする**（§2.2・判断 68）。書き出しの一覧の SHA-256 が `29b183ba…6c49` になることを Mac でも確かめる（判断 68 で機械によらず一致することは確かめてある）。

@@ -183,7 +183,9 @@
       → 2026-10-02（G-GEAR）: 試しの書き出しが selftest の 2 行で拒否 → 直した（`eaaeea74`・判断 130）。024 は ✅ 137・❌ 2（SCOPE と GUARD だけ）。研究者に 3 問 → 判断 131（凍結する・タグ `ime-observation-prereg-macos`・一覧の道は M12 で公開 repo の最初の commit）
       → 凍結の commit `ff122e3246346da7869c4e990e4978acb1f191c6`・`frozen_at: 2026-10-02`・`sha256: 64dfbb6e…af2a`・`--check-prereg` exit 0。書き出しの一覧の SHA-256 `29b183ba245939ad82d9fa2d7db26e1a18520e2966f4aa9ec74478a4e51e6c49`（98 ファイル・`freeze-export-list-macos.txt`）。`experiment/notes.md` に凍結の commit・タグ・一覧の SHA-256 を書いた
     - [ ] OSF Registries の登録（研究者・公開・最初の本計測の run より前）→ 登録の URL と日付を `experiment/notes.md` に（§9）
-    - [ ] ★ M12 への申し送り（判断 131）: 公開 repo の最初の commit を、タグ `ime-observation-prereg-macos` から `--allow-missing-license` で書き出したものそのものにしてタグを付け、一覧の SHA-256 が `29b183ba…6c49` になることを確かめてから、ライセンスと M12 の書き出しを上に積む
+    - [ ] ★ M12 への申し送り（判断 131）: 公開 repo の最初の commit を、タグ `ime-observation-prereg-macos` から `--allow-missing-license` で書き出したものそのものにしてタグを付け、一覧の SHA-256 が `29b183ba…6c49` になることを確かめてから、ライセンスと M12 の書き出しを上に積む。公開 repo は `git init` の新しい履歴（fork・公開への切り替え・private の履歴の push は使わない）。`notes.md` に公開側のどの commit・タグが凍結の書き出しかを 1〜2 文（判断 132）
+    - [ ] ★ M6 への申し送り（判断 132）: 追補の節に「Status の日付は macOS の凍結の日で、印は追補で差し替えた」と 1 文
+    - [x] 完了時レビュー（code-reviewer ∥ security-checker ∥ Codex 1 巡・`1086e3be..ce205e83`）→ 判断 132
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
