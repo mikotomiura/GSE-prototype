@@ -39,6 +39,15 @@ DATA_FILES = {
     "quality": os.path.join(C.TASK, "data", "quality-rows.json"),
     "checks": os.path.join(C.TASK, "data", "checks-rows.json"),
 }
+REASONS = os.path.join(C.TASK, "reason-questions-restored.jsonl")  # ★ 理由の問いの逐語（セッションの記録から復元・判断 14）
+
+
+def put(cell, v):
+    """セルに値を書く。★ 先頭が = の文字列は式にしない（文字列として保存する。外の文が式になるのを防ぐ・判断 14）。"""
+    cell.value = v
+    if isinstance(v, str) and v.startswith("="):
+        cell.data_type = "s"
+    return cell
 
 
 def load_log():
@@ -89,6 +98,9 @@ def use_of(result, kind):
 
 def cells_for(i, kind, first, final, quality, xconf):
     f0, f1 = first[i], final[i]
+    if f1["verdict"] == "含める" and kind not in PRIMARY:
+        # ★ 「含める（一次研究として読む）」の用途・品質評価の規則は決めていない（design §3 の選択肢にはある・判断 14）
+        sys.exit(f"{i}: 一次研究でない件を含めた（『一次研究として読む』の規則は未実装・止まって決める）")
     basis = f1.get("basis", "全文")
     use = use_of(f1, kind)
     g = ""
@@ -135,18 +147,26 @@ def add_sheet(wb, name, title, note, header, rows):
     if name in wb.sheetnames:
         del wb[name]
     ws = wb.create_sheet(name)
-    ws["A1"] = title
-    ws["A1"].font = Font(bold=True, size=12)
-    ws["A2"] = note
+    put(ws["A1"], title).font = Font(bold=True, size=12)
+    put(ws["A2"], note)
     for c, h in enumerate(header, 1):
-        ws.cell(4, c, h).font = Font(bold=True)
+        put(ws.cell(4, c), h).font = Font(bold=True)
     for r, row in enumerate(rows, 5):
         for c, v in enumerate(row, 1):
-            ws.cell(r, c, v).alignment = Alignment(wrap_text=True, vertical="top")
+            put(ws.cell(r, c), v).alignment = Alignment(wrap_text=True, vertical="top")
     for c in range(1, len(header) + 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width = 14 if c == 1 else 36
     ws.freeze_panes = "B5"
     return ws
+
+
+REASON_HEADER = ["seq（答えのログ）", "ID", "問い（逐語）", "選択肢", "複数選択", "答え", "補足（note）", "答えた時刻"]
+
+
+def load_reasons():
+    if not os.path.exists(REASONS):
+        return []
+    return [json.loads(x) for x in open(REASONS, encoding="utf-8") if x.strip()]
 
 
 def load_rows(key):
@@ -163,7 +183,9 @@ def build(dst):
     kind = kinds(wb)
     scr, cmp_ = wb["スクリーニング"], wb["AI判定比較"]
     done = [i for i in C.IDS if i in final]
-    all_done = len(done) == len(C.IDS)
+    # ★ 『AI判定比較』は 34 件すべての 2 回目（stage 2/2e）の後（1 回目だけの件を最終と数えない・判断 14）
+    done2 = [i for i in C.IDS if any(r["item"] == i and r["stage"] in ("2", "2e") for r in log)]
+    all_done = len(done2) == len(C.IDS)
     for k, i in enumerate(C.IDS):
         r = C.FIRST_ROW + k
         assert scr.cell(r, 1).value == i and cmp_.cell(r, 1).value == i, (i, r)
@@ -172,11 +194,11 @@ def build(dst):
         v = cells_for(i, kind[i], first, final, quality, xconf)
         for col in ("D", "G", "H", "I", "J"):
             if v[col] != "":
-                scr[f"{col}{r}"] = v[col]
-        if all_done:  # 『AI判定比較』は 34 件の判定がすべて終わってから（シートの逐語）
-            cmp_[f"D{r}"] = v["human_use"]
-            cmp_[f"F{r}"] = f"{v['reason']} ／ 基準の版: {CRITERIA_VERSION}".strip(" ／")
-            cmp_[f"G{r}"] = f"次の作業: {v['next']}（最終合意は判定者 2 の後）" if v["next"] else "（最終合意は判定者 2 の後）"
+                put(scr[f"{col}{r}"], v[col])
+        if all_done:  # 『AI判定比較』は 34 件の判定（2 回目まで）がすべて終わってから（シートの逐語「人間の独立判定終了後に入力」）
+            put(cmp_[f"D{r}"], v["human_use"])
+            put(cmp_[f"F{r}"], f"{v['reason']} ／ 基準の版: {CRITERIA_VERSION}".strip(" ／"))
+            put(cmp_[f"G{r}"], f"次の作業: {v['next']}（最終合意は判定者 2 の後）" if v["next"] else "（最終合意は判定者 2 の後）")
     intro = [
         ("このシート群", "判定者 1 が記入した。元のシートで書いたのは『スクリーニング』の判定者1・除外理由・全文確認・抽出・品質評価・自由記入の欄と、"
                        "『AI判定比較』の人間用途判定・理由・次の作業の欄だけ。判定者2・最終判定は未判定のまま。"),
@@ -191,11 +213,17 @@ def build(dst):
                         "1 回目の問いには事実だけを載せ、2 回目に AI の判定（GPT 版・Claude 版）を見せた。このほか AF002・AF003 では 2 回目の前に Claude の見立てを、"
                         "AF004 では 2 回目の後の確認の前に Claude の再計算を、判定者 1 が見ている（各行の自由記入と『判定者1_問いと答え』の補足）。"),
         ("判定者 2 に渡すとき", "この写しは判定者 2 に渡さない（判定者1 の欄と 判定者1_ のシートがあると、2 人の判定が独立でなくなる）。"
-                             "判定者 2 には、元のファイル（09-18）か、判定者1 の列と 判定者1_ のシートを除いた版を渡す。"),
-        ("記録", "質問と答えの逐語は『判定者1_問いと答え』（作業記録 screening-log.jsonl の写し・1 行 1 問）。"),
+                             "判定者 2 には元のファイル（09-18）を渡す。この写しから作るなら、"
+                             + "と".join(f"『{s}』の {'・'.join(cols)} 列" for s, cols in C.INPUT_COLS.items())
+                             + "を元のファイルの値に戻し、名前が 判定者1_ で始まるシートをすべて消す"
+                             "（どれも判定者 1 の判定・理由・進み具合を含む）。"),
+        ("記録", "質問と答えの逐語は『判定者1_問いと答え』（作業記録 screening-log.jsonl の写し・1 行 1 問）。"
+                "2 回目の後に重ねた理由の問い（変えた理由・保留の理由）は、当時は答えだけを補足に入れたので、"
+                "問いの文と選択肢を対話の記録から復元して『判定者1_理由の問い』に載せた（答えは補足と一致する）。"),
         ("元の『はじめに』の数式", "openpyxl で保存したため、元の『はじめに』シートの数式は計算済みの値を持たない。Excel で開くと再計算される"
                                "（プレビューや他の閲覧ソフトでは空に見えることがある）。"),
-        ("進み具合", f"判定済み {len(done)} / 34 件" + ("" if all_done else "（『AI判定比較』は 34 件の後に記入する）")),
+        ("進み具合", f"判定済み {len(done)} / 34 件（2 回目まで {len(done2)} 件）"
+                     + ("" if all_done else "（『AI判定比較』は 34 件の 2 回目の後に記入する）")),
     ]
     add_sheet(wb, C.ADDED_PREFIX + "はじめに", "判定者 1 の記入｜何をしたか", "このシートは判定者 1 が足した。", ["項目", "説明"], intro)
     add_sheet(wb, C.ADDED_PREFIX + "問いと答え", "判定者 1 の問いと答え｜作業記録の写し（1 行 1 問）",
@@ -203,6 +231,14 @@ def build(dst):
               ["seq", "ID", "段", "問い（逐語）", "選択肢", "答え", "補足（note）"],
               [[r.get("seq"), r["item"], r["stage"], r["question"], " ／ ".join(r.get("options") or []), r["answer"], r.get("note", "")]
                for r in log])
+    reasons = load_reasons()
+    if reasons:
+        add_sheet(wb, C.ADDED_PREFIX + "理由の問い", "判定者 1 の理由の問い｜2 回目の後に重ねた問いの逐語（対話の記録から復元）",
+                  "答えは『判定者1_問いと答え』の同じ seq の補足（note）と一致する。問いと選択肢は当時の対話の記録から読み取った。",
+                  REASON_HEADER,
+                  [[x["log_seq"], x["item"], x["question"], " ／ ".join(x["options"]), "可" if x["multiSelect"] else "不可",
+                    x["answer"], x.get("user_note", ""), (x.get("answered_at") or "")[:16].replace("T", " ") + "（UTC）"]
+                   for x in reasons])
     ex = load_rows("extract")
     if ex:
         add_sheet(wb, C.ADDED_PREFIX + "全文抽出", "判定者 1 の全文抽出｜『研究情報』と同じ列の形",

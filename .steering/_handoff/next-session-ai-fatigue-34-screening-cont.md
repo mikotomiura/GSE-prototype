@@ -76,5 +76,5 @@
 - 問いの誤字はログに逐語で残し、decisions と次の問いで知らせた（AF012「判別妙当性」・AF020「皆に無い」）。
 - ScienceDirect: ユーザーが人間確認を通すと、同じセッションで他の論文のページも開けた。OA の本文（AF004・AF019・AF034）は Chrome の `get_page_text`／`javascript_tool` で読める。有料の論文は抄録・ハイライト・序論・節の冒頭（Article preview）が無料で読める（AF002・AF003）。
 - ページのテキストをローカルの受け口（127.0.0.1 の HTTP サーバ）に送って保存する方法は権限の判定で拒否された → 使わない。メモは Write で短い逐語だけ。
-- `javascript_tool` の返り値に URL の query string が入ると `[BLOCKED: Cookie/query string data]` になる → `replace(/[?&=]/g,' ')` してから返す。
+- `javascript_tool` の返り値に URL の query string が入ると `[BLOCKED: Cookie/query string data]` になる。そのときは **query を返さない**（`new URL(u).origin + new URL(u).pathname` だけを返す）。⚠️ 区切り文字（`?&=`）の置き換えで遮断をくぐらない —— 値（トークン・署名）はそのまま残る（2026-10-02 の Codex の指摘で訂正・`20261001-ai-fatigue-34-screening/decisions.md` 判断 14）。
 - Codex: 2026-10-01 は当日の上限にほぼ到達（origin/main の台帳 291,174）。ユーザーの指示（判断 3）で、足りなければ `.codex/budget.json` の `daily_token_budget` を上げてよい（`tokens_used` は触らない・理由と前後の値を `_comment_budget_<日付>` に残してコミット）。予算ガードの hook は `C:\GSE-prototype` の台帳を読むので、上げるのはそちらにも要るかを回す前に確かめる。
