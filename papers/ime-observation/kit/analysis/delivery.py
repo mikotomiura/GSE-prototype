@@ -83,11 +83,25 @@ Definitions.
     and of unplanned ones (n_loss_intervals_unplanned: all the others, including a loss between trials, before
     the first block, in a trial of another scenario, or one that is not regained; the two add up to
     n_loss_intervals), the number of unplanned loss intervals in which the observation log holds a key press
-    (n_loss_intervals_unplanned_with_presses) and the number of such presses (n_presses_in_unplanned_losses); a
-    press counts for a loss when its time lies from FOCUS_MARGIN_MS before the focus_out to FOCUS_MARGIN_MS after
-    the focus_in (to the end of the log when the loss is not regained), and a press that lies in two such spans is
-    counted once; the trials that overlap at least one loss interval (trials_with_focus_loss, sorted) and
-    per stratum (scenario, speed) the number of measured trials and of trials with a focus loss. A planned
+    (n_loss_intervals_unplanned_with_presses) and the number of such presses (n_presses_in_unplanned_losses; both
+    include the presses that the executor sent); a press counts for a loss when its time lies from
+    FOCUS_MARGIN_MS before the focus_out to FOCUS_MARGIN_MS after the focus_in (to the end of the log when the
+    loss is not regained), and a press that lies in two such spans is counted once. The executor keeps sending
+    keys during a loss, and the observation records every key of the machine, so the presses are also set against
+    the keys sent: the spans of the unplanned losses, each widened as above, are merged when they overlap or touch
+    (n_unplanned_loss_spans), and for each merged span [a, b] n_rows is the number of observation key rows
+    (press = true) with a time in [a, b], n_sent is the number of presses the observation is expected to record
+    with a sent wall time in [a - OBS_SEND_DELAY_MS, b], and n_unexplained = max(0, n_rows - n_sent). A key the
+    observation is expected to record is a sent row with down = true whose key is neither a pseudo-key nor a mode
+    key (of any trial, measured or not), or a marker row of the oracle (one row for each marker press). Reported
+    are the number of spans with n_unexplained above 0
+    (n_unplanned_loss_spans_with_unexplained_presses) and the sum of n_unexplained
+    (n_presses_unexplained_in_unplanned_losses). Blind spots of this count: when the observation misses a sent key
+    inside a span, that many presses of a person are hidden; when the row of a key sent within OBS_SEND_DELAY_MS
+    before the end of the span falls outside the span, that many are hidden as well; and when the observation
+    duplicates a row of its own inside a span, the count rises although no person is present. The trials that
+    overlap at least one loss interval (trials_with_focus_loss, sorted) and per stratum (scenario, speed) the
+    number of measured trials and of trials with a focus loss. A planned
     switch to another application (scenario S15) is not counted in the list of trials: an S15 trial is left out
     of the list when every loss interval it overlaps begins and ends inside
     its own interval (the focus came back within the trial); any other loss, including an S15 switch that does
@@ -128,6 +142,10 @@ CUT_KINDS = ("reset", "block_begin", "marker")
 # counted for the loss (pre-registration section 3.4): it covers the offset between the two logs' clocks and the
 # delay with which the observation collects a row, and a key that moves the focus is pressed just before the loss.
 FOCUS_MARGIN_MS = 500
+# The expected delay from the sending of a key by the executor to the row of the observation log. A span of an
+# unplanned loss is widened by this much before it to count the keys sent, so that a key sent just before the span
+# whose row falls inside it is set against that row.
+OBS_SEND_DELAY_MS = 100
 
 
 class InputError(Exception):
@@ -221,10 +239,11 @@ def read_plan(data):
 
 
 def read_oracle(data, plan, plan_sha256, blocks):
-    """Return (trials, cuts, begins). trials is a list, in file order, of {trial_id, begin_wall, begin_mono,
-    end_wall, sent: [{key, step, wall, mono, down}]}; cuts is the sorted list of wall times of the oracle rows that
+    """Return (trials, cuts, begins, marker_times). trials is a list, in file order, of {trial_id, begin_wall,
+    begin_mono, end_wall, sent: [{key, step, wall, mono, down}]}; cuts is the sorted list of wall times of the oracle rows that
     end a trial's interval (reset / block_begin / marker / trial_begin); begins is the list of (wall time,
-    block_id) of the block_begin rows, sorted by time. blocks is the set of the block_ids of the plan. The sent
+    block_id) of the block_begin rows, sorted by time; marker_times is the sorted list of wall times of the marker
+    rows (one row for each marker press). blocks is the set of the block_ids of the plan. The sent
     rows are checked against the plan, and a block_begin against the blocks."""
     lines = _lines(data, "oracle")
     if not lines:
@@ -238,6 +257,7 @@ def read_oracle(data, plan, plan_sha256, blocks):
     order = []
     cuts = []
     begins = []
+    marker_times = []
     for n, raw in lines[1:]:
         where = "oracle:%d" % n
         row = _loads(raw, where, True)
@@ -248,6 +268,8 @@ def read_oracle(data, plan, plan_sha256, blocks):
             if not _is_int(row.get("t_wall_ms")):
                 raise InputError("%s: t_wall_ms is missing or not an integer" % where)
             cuts.append(row["t_wall_ms"])
+            if kind == "marker":
+                marker_times.append(row["t_wall_ms"])
             if kind == "block_begin":
                 bid = row.get("block_id")
                 if not _is_int(bid) or bid not in blocks:
@@ -288,8 +310,9 @@ def read_oracle(data, plan, plan_sha256, blocks):
         t["sent"].append({"key": key, "step": step, "down": down, "wall": row["t_wall_ms"],
                           "mono": row["t_mono_ns"]})
     cuts.sort()
+    marker_times.sort()
     begins.sort(key=lambda b: b[0])
-    return [trials[k] for k in order], cuts, begins
+    return [trials[k] for k in order], cuts, begins, marker_times
 
 
 def read_obs_presses(data):
@@ -350,7 +373,7 @@ def _loss_intervals(outs, ins):
     return out
 
 
-def _focus_losses(done, plan, outs, ins, starts, ends, obs_times):
+def _focus_losses(done, plan, outs, ins, starts, ends, obs_times, trials, marker_times):
     losses = _loss_intervals(outs, ins)
     def overlap(loss, i):
         return loss[0] <= ends[i] and (loss[1] is None or loss[1] >= starts[i])
@@ -371,6 +394,21 @@ def _focus_losses(done, plan, outs, ins, starts, ends, obs_times):
         return t >= span[0] and (span[1] is None or t <= span[1])
     with_presses = sum(1 for span in spans if any(within(t, span) for t in obs_times))
     n_presses = sum(1 for t in obs_times if any(within(t, span) for span in spans))
+    # the keys sent that the observation is expected to record, set against its rows in the merged spans
+    sent_times = sorted([s["wall"] for t in trials for s in _presses(t) if s["key"] not in MODE_KEYS]
+                        + list(marker_times))
+    merged = []
+    for a, b in sorted(spans, key=lambda sp: sp[0]):
+        if merged and (merged[-1][1] is None or a <= merged[-1][1]):
+            if merged[-1][1] is not None:
+                merged[-1][1] = None if b is None else max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    unexplained = []
+    for a, b in merged:
+        n_rows = sum(1 for t in obs_times if within(t, (a, b)))
+        n_sent = sum(1 for t in sent_times if within(t, (a - OBS_SEND_DELAY_MS, b)))
+        unexplained.append(max(0, n_rows - n_sent))
     per = {}
     for t, got in zip(done, hit):
         info = plan[t["trial_id"]]
@@ -384,6 +422,9 @@ def _focus_losses(done, plan, outs, ins, starts, ends, obs_times):
             "n_loss_intervals_outside_trials": outside, "n_loss_intervals_planned": planned_losses,
             "n_loss_intervals_unplanned": len(losses) - planned_losses,
             "n_loss_intervals_unplanned_with_presses": with_presses, "n_presses_in_unplanned_losses": n_presses,
+            "n_unplanned_loss_spans": len(merged),
+            "n_unplanned_loss_spans_with_unexplained_presses": sum(1 for u in unexplained if u > 0),
+            "n_presses_unexplained_in_unplanned_losses": sum(unexplained),
             "n_trials_with_focus_loss": sum(1 for g in hit if g),
             "trials_with_focus_loss": sorted(t["trial_id"] for t, got in zip(done, hit) if got),
             "by_stratum": [{"scenario": k[0], "speed": k[1], "n_trials": per[k][0], "n_trials_with_focus_loss": per[k][1]}
@@ -530,7 +571,7 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
     sha = {"plan": hashlib.sha256(plan_bytes).hexdigest(), "oracle": hashlib.sha256(oracle_bytes).hexdigest(),
            "obs": hashlib.sha256(obs_bytes).hexdigest(), "gt": hashlib.sha256(gt_bytes).hexdigest()}
     plan, markers = read_plan(plan_bytes)
-    trials, cuts, begins = read_oracle(oracle_bytes, plan, sha["plan"], markers)
+    trials, cuts, begins, marker_times = read_oracle(oracle_bytes, plan, sha["plan"], markers)
     obs_times = read_obs_presses(obs_bytes)
     gt_times = read_gt_key_downs(gt_bytes)
 
@@ -549,7 +590,8 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
     return {
         "format": FORMAT,
         "params": {"pre_ms": pre_ms, "tail_ms": tail_ms, "pseudo_keys": sorted(PSEUDO_KEYS),
-                   "mode_keys": sorted(MODE_KEYS), "focus_margin_ms": FOCUS_MARGIN_MS},
+                   "mode_keys": sorted(MODE_KEYS), "focus_margin_ms": FOCUS_MARGIN_MS,
+                   "obs_send_delay_ms": OBS_SEND_DELAY_MS},
         "inputs_sha256": sha,
         "trials": {"planned": len(plan), "begun": len(trials), "measured": len(done),
                    "incomplete": len(trials) - len(done)},
@@ -558,7 +600,8 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
         "observation": _side(done, speeds, obs_times, starts, ends, begins, markers),
         "reference": _side(done, speeds, gt_times, starts, ends, begins, markers),
         "reference_focus_loss": _focus_losses(done, plan, read_gt_events(gt_bytes, "focus_out"),
-                                              read_gt_events(gt_bytes, "focus_in"), starts, ends, obs_times),
+                                              read_gt_events(gt_bytes, "focus_in"), starts, ends, obs_times,
+                                              trials, marker_times),
     }
 
 
@@ -681,10 +724,11 @@ def _seg_fixture(gt_extra=(), gt_drop=(), plan_edit=None, oracle_edit=None):
 MINI_NS = 1_000_000
 
 
-def _mini(blocks, trials, gt, obs=()):
+def _mini(blocks, trials, gt, obs=(), marks=()):
     """A small fixture. blocks = [(block_id, begin ms)]; trials = [(trial_id, block_id, scenario, begin ms, end ms,
-    keys)]; gt = [(time ms, ev)]; obs = key press times. The i-th key of a trial is pressed at begin + 10 + 30 * i
-    and released 10 ms later (the oracle holds both). Times are ms from W0; the markers are empty."""
+    keys)]; gt = [(time ms, ev)]; obs = key press times; marks = times of marker rows of the oracle. The i-th key
+    of a trial is pressed at begin + 10 + 30 * i and released 10 ms later (the oracle holds both). Times are ms
+    from W0; the block rows of the plan have no marker."""
     plan_rows = [{"kind": "header", "format": "plan/1", "os": "macos"}]
     plan_rows += [{"kind": "block", "block_id": b} for b, _bg in blocks]
     for tid, b, scen, _bg, _en, keys in trials:
@@ -705,6 +749,8 @@ def _mini(blocks, trials, gt, obs=()):
                 ora.append({"kind": "sent", "trial_id": tid, "step": 2 * i + j, "key": k, "down": down,
                             "t_wall_ms": W0 + t, "t_mono_ns": (W0 + t) * MINI_NS})
         ora.append({"kind": "trial_end", "trial_id": tid, "t_wall_ms": W0 + en, "t_mono_ns": (W0 + en) * MINI_NS})
+    ora += [{"kind": "marker", "block_id": 0, "seq": i, "t_wall_ms": W0 + t, "t_mono_ns": (W0 + t) * MINI_NS}
+            for i, t in enumerate(marks)]
     gt_rows = [{"kind": "header", "format": "gt/1", "src": "x"}]
     gt_rows += [{"kind": "ev", "t_wall_ms": W0 + t, "t_mono_ns": 1, "ev": ev, "vk": 65} for t, ev in gt]
     obs_rows = [{"type": "meta", "format": "obs/1"}]
@@ -1065,6 +1111,58 @@ def _selftest():
           "focus loss: a press within the margins of two losses counts for both losses and once among the presses")
     check(evaluate(*_mini([(0, 0)], [("y", 0, "S1", 4000, 4500, ["a"])], _kd(4015)))["params"]["focus_margin_ms"] == m,
           "focus loss: the margin is recorded in the parameters")
+    check(evaluate(*_mini([(0, 0)], [("y", 0, "S1", 4000, 4500, ["a"])], _kd(4015)))["params"]["obs_send_delay_ms"]
+          == OBS_SEND_DELAY_MS, "focus loss: the delay is recorded in the parameters")
+
+    # focus losses: observation rows set against the keys sent. Trials x (S15) and y (S1) always send one key each,
+    # at 1010 and 4010; `extra` adds trials (id, begin, end, keys); every observation row is given explicitly.
+    def unexplained(events, obs, extra=(), marks=()):
+        trials = [("x", 0, "S15", 1000, 2000, ["a"]), ("y", 0, "S1", 4000, 4500, ["a"])]
+        trials += [(i, 0, "S1", b, e, k) for i, b, e, k in extra]
+        got = evaluate(*_mini([(0, 0)], trials, sorted(events), obs, marks))["reference_focus_loss"]
+        return (got["n_unplanned_loss_spans"], got["n_unplanned_loss_spans_with_unexplained_presses"],
+                got["n_presses_unexplained_in_unplanned_losses"])
+    z2 = [("z", 3000, 3400, ["a", "b"])]
+    loss = [(3005, "focus_out"), (3100, "focus_in")]
+    check(unexplained(loss, [3010, 3040], z2) == (1, 0, 0),
+          "unexplained: rows equal to the keys sent in a loss while typing are explained")
+    check(unexplained(loss, [3010, 3040, 3050], z2) == (1, 1, 1),
+          "unexplained: a row more than the keys sent is not explained")
+    check(unexplained(loss, [3010], z2) == (1, 0, 0),
+          "unexplained: rows fewer than the keys sent never count below 0")
+    check(unexplained(loss, [], z2) == (1, 0, 0) and unexplained([], [3010], z2) == (0, 0, 0),
+          "unexplained: no row, or no loss, nothing to explain")
+    check(unexplained(loss, [2515], [("w", 2445, 2490, ["a"])]) == (1, 0, 0),
+          "unexplained: a key sent just before the span whose row falls inside it is set against that row")
+    d = OBS_SEND_DELAY_MS
+    a0 = 3005 - m
+    check(unexplained(loss, [a0 + 10], [("w", a0 - d - 10, a0 - d + 40, ["a"])]) == (1, 0, 0),
+          "unexplained: a key sent exactly OBS_SEND_DELAY_MS before the span is explained")
+    check(unexplained(loss, [a0 + 10], [("w", a0 - d - 11, a0 - d + 39, ["a"])]) == (1, 1, 1),
+          "unexplained: a key sent one millisecond earlier than that is not")
+    check(unexplained(loss, [3010, 3040, 3070], [("m", 3000, 3400, ["ime_on", "focus_away", "a"])]) == (1, 1, 2)
+          and unexplained(loss, [3070], [("m", 3000, 3400, ["ime_on", "focus_away", "a"])]) == (1, 0, 0)
+          and unexplained(loss, [3070], [("m", 3000, 3400, ["ime_off", "mouse_click", "a"])]) == (1, 0, 0),
+          "unexplained: mode keys and pseudo-keys are not keys the observation is expected to record")
+    check(unexplained(loss, [3020], marks=[3020]) == (1, 0, 0) and unexplained(loss, [3020]) == (1, 1, 1),
+          "unexplained: a marker press counts as a key sent")
+    check(unexplained(loss, [3010], [("u", 3000, 3040, ["a"])], marks=[3020]) == (1, 0, 0)
+          and unexplained(loss, [3010, 3020, 3030], [("u", 3000, 3040, ["a"])], marks=[3020]) == (1, 1, 1),
+          "unexplained: a marker press and a key of a trial are counted together")
+    two = [(2900, "focus_out"), (2950, "focus_in"), (3100, "focus_out"), (3150, "focus_in")]
+    check(unexplained(two, [3010, 3040], z2) == (1, 0, 0) and unexplained(two, [3010, 3040, 3050], z2) == (1, 1, 1),
+          "unexplained: two losses within each other's margins make one span, with rows and keys counted once")
+    check(unexplained([(3000, "focus_out"), (3100, "focus_in"), (4100, "focus_out"), (4200, "focus_in")], [])[0] == 1
+          and unexplained([(3000, "focus_out"), (3100, "focus_in"), (4101, "focus_out"), (4200, "focus_in")], [])[0] == 2,
+          "unexplained: spans that touch are merged and spans that are one millisecond apart are not")
+    check(unexplained([(3005, "focus_out")], [4010, 9000]) == (1, 1, 1) and unexplained([(3005, "focus_out")], [2000]) == (1, 0, 0),
+          "unexplained: a loss that is not regained runs to the end of the log")
+    check(unexplained([(1200, "focus_out"), (1500, "focus_in")], [1300]) == (0, 0, 0),
+          "unexplained: a planned switch of S15 is not a span")
+    check(unexplained([(3005, "focus_out"), (3100, "focus_in"), (1200, "focus_out"), (1500, "focus_in")], [1300, 3010]) == (1, 1, 1),
+          "unexplained: a planned switch beside an unplanned loss adds no span")
+    check(unexplained(loss, [3010]) == (1, 1, 1) and unexplained(loss, [3010], [("z", 3000, 3040, ["a"])]) == (1, 0, 0),
+          "unexplained: a row with no key sent near it is unexplained")
 
     # block ids must be integers (a string and a boolean are refused, no value is echoed).
     def with_block_id(value):

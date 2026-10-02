@@ -27,7 +27,7 @@ from the pilot (section 3.1 of the pre-registration): k = 0, and the input-mode 
 presses sent, so the figures are read from the version `excluding_mode_keys` of `reference.segments`, and both
 bounds are 0.
 
-| Cell label | Attempt | Aborted by the runner | Checked at | SHA-256 of the plan | `delivery.py` exit status | `max_beyond_markers_before_last_block` | `beyond_markers_last_block` | `n_loss_intervals_unplanned_with_presses` | Counts as aborted | Deposited |
+| Cell label | Attempt | Aborted by the runner | Checked at | SHA-256 of the plan | `delivery.py` exit status | `max_beyond_markers_before_last_block` | `beyond_markers_last_block` | `n_unplanned_loss_spans_with_unexplained_presses` | Counts as aborted | Deposited |
 |---|---|---|---|---|---|---|---|---|---|---|
 | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
 
@@ -46,12 +46,15 @@ bounds are 0.
    attempt when the plan's SHA-256 differs, when the command exits with status 2, when, in the version of
    `reference.segments` that section 3.1 selects (`excluding_mode_keys`), `max_beyond_markers_before_last_block` or
    `beyond_markers_last_block` exceeds 0 (k = 0), or when
-   `reference_focus_loss.n_loss_intervals_unplanned_with_presses` is greater than 0. Such a run is neither analysed nor deposited, since its logs may hold a person's key presses (section 3.4 of
-   the pre-registration). A run that the runner aborted is never analysed; it is deposited only when the same check
-   passes, or when it left neither a reference log nor an observation log. No other reason and no explanation is admitted. Record the result
-   of this check and its time in the table of run checks above before any analysis. Rows of the observation without
-   a sent press are a result of the observer under test: they are reported (section 6.3) and do not stop the run
-   from being analysed or deposited.
+   `reference_focus_loss.n_unplanned_loss_spans_with_unexplained_presses` is greater than 0 (within a loss of focus
+   of the reference other than a planned switch of S15, the observation holds more key presses than the executor
+   sent). Such a run is neither analysed nor deposited, since its logs may hold a person's key presses (section 3.4
+   of the pre-registration). A run that the runner aborted is never analysed; it is deposited only when the same
+   check passes, or when it left neither a reference log nor an observation log. No other reason and no
+   explanation is admitted. Record the result of this check and its time in the table of run checks above before
+   any analysis. Outside a loss of focus of the reference, rows of the observation without a sent press are a
+   result of the observer under test: they are reported (section 6.3) and do not stop the run from being analysed
+   or deposited.
 2. Deposit only `run.json` and the four logs of a run directory: `plan.jsonl`, `oracle.jsonl`,
    `gt.jsonl` and `obs.jsonl`. A log that an aborted run recorded with a null hash need not exist.
 3. Do not deposit the `*.stderr.txt` files or `runner.error.txt`. They stay on the measuring machine.

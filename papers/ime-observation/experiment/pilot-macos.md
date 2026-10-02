@@ -180,16 +180,16 @@ key-down it receives.
 - The rules of section 3.4 of the pre-registration do not catch the run, with the settings fixed from this pilot
   (k = 0, and the input-mode keys of S14 do not count among the presses sent) and the run's own marker, which its
   plan states (three presses in these runs): in no segment of the reference log do the key-downs that the sent
-  presses do not explain exceed the marker presses of the block, and the observation holds no key press within a
-  loss of focus of the reference other than a planned switch of S15. The rules rest on two facts: a person's typing
-  into the reference input field leaves key-downs that no sent press explains, and typing into any other
-  application takes the focus away from the reference. Their blind spots are those of the measurement (section 7 of
-  the pre-registration): a press from outside that replaces a press that was lost, and a shortcut that the system
-  consumes without moving the focus.
+  presses do not explain exceed the marker presses of the block, and, within a loss of focus of the reference
+  other than a planned switch of S15, the observation holds no more key presses than the executor sent. The rules
+  rest on two facts: a person's typing into the reference input field leaves key-downs that no sent press explains,
+  and typing into any other application takes the focus away from the reference while the observation records
+  every key press. Their blind spots are those of the measurement (section 7 of the pre-registration): a press from
+  outside that replaces a press that was lost, and a shortcut that the system consumes without moving the focus.
 - `kit/analysis/pipeline.py --check-deposit` passes on the run directory. It applies the same rules and also checks
   the files for paths and names and the logs for the content-free form.
-- Rows of the observation without a sent press do not stop a run from being deposited; they are a result of the
-  observer under test, as in the measurement.
+- Outside a loss of focus of the reference, rows of the observation without a sent press do not stop a run from
+  being deposited; they are a result of the observer under test, as in the measurement.
 
 The observation logs were sealed (`kit/pilot/seal_obs.py`) and only their key rows were read. Their sealed session
 rows are unsealed after the freeze and the measurement only to be deposited; they are not analysed (section 3.1 of
