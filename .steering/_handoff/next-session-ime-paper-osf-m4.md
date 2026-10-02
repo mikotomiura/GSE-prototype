@@ -24,17 +24,22 @@ Skill: verify-before-claiming・git-workflow・reproducibility-discipline。
   - 書き出しの一覧の SHA-256: **`29b183ba245939ad82d9fa2d7db26e1a18520e2966f4aa9ec74478a4e51e6c49`（98 ファイル）**。一覧そのものは `.steering/20260927-ime-observation-paper-eval-design/freeze-export-list-macos.txt`。
 - 凍結の直前に、試しの書き出しが `pipeline.py` の selftest の 2 行で拒否されていたのを直した（`eaaeea74`・判断 130）。⚠️ 公開物のコードを変えたら 024（書き出し）も回す。
 - `experiment/notes.md` に凍結の commit・タグ・一覧の SHA-256 を書いた。**登録の URL と日付はまだ無い**。
-- 出荷の結果（PR 番号・merge・main の CI）は `tasklist.md` の M3 の末尾を見る。
+- 出荷: PR #293 → merge `2543f9fb` → main の CI（run 36988299913）success。
+- ★ **OSF の登録は送信済み・承認待ち**: **`https://osf.io/mbgxz`**（研究者が 2026-10-02 に送信・状態は pending approval）。同日 23:17 JST に公開の API（`https://api.osf.io/v2/registrations/mbgxz/`）は 404（承認待ちは外から見えない）。承認は 48 時間で自動。研究者が実際に選んだ様式・分野・ライセンス・Summary の文は聞いていない（渡した手順と推奨は `tasklist.md` の M3）。
 
 ## §2 やること
 
-0. **出荷の記録を足す**: PR #293 の merge コミット（`gh pr view 293 --json mergeCommit`）と main の CI の run（`gh run list --branch main --limit 3`）を `tasklist.md` の M3 の「出荷」の行に書く（このメモを書いたセッションは merge の前に記録をコミットした）。
-1. **OSF の登録が済んだか研究者に確かめる**（済んでいなければ、登録に載せるものを渡して待つ）。登録に載せるもの（§9）:
+0. **登録が公開になったか確かめる**: `curl -s https://api.osf.io/v2/registrations/mbgxz/` が 200 で `public: true`。まだ 404 なら研究者に状態を聞く（承認のメール）。⚠️ 公開になるまで M4 の run を始めない。
+   公開になったら:
+   - API の `date_registered` を読む（これを登録日にする）。
+   - 登録に添えたファイルをダウンロードし（API の `files` の関係から辿る）、SHA-256 が `fa6fd586d580c47f13506cd36a87a94c08d6b9ab55b16a7b6df0b67670f87773` か確かめる。違えば研究者に戻す（ファイルは差し替えられない）。
+   - 頁で様式・Summary の文（印・commit・一覧の SHA-256 が正しいか）を確かめる。
+1. （済み）OSF の登録。登録に載せたもの（§9）:
    - 凍結したファイル: タグ `ime-observation-prereg-macos` の `papers/ime-observation/experiment/preregistration.md`（SHA-256 `fa6fd586…7773`）
    - 2 つの印・凍結の commit の 40 桁・書き出しの一覧の SHA-256（§1）
    - 登録は**すぐ公開**（判断 93）。⚠️ 登録は外部への操作なので研究者が行う。
    - ★ 登録の説明に添える案（判断 132・研究者が決める）: 「commit の識別子は公開していない開発履歴のもの。公開側での照合は、公開 repo の最初の commit（凍結の書き出しそのもの）から計算した一覧の SHA-256 で行う」。理由: 公開 repo は新しい履歴で作るので、読者は 40 桁の commit とタグ `ime-observation-prereg-macos` に辿り着けない。M12 でライセンスと `CITATION.cff` を足した後の公開物からは別の一覧になる。
-2. **登録の URL と日付を `experiment/notes.md` に記録する**（§9。凍結の段落の後に 1 文）。`_style_check.py` 0 件を確かめる。
+2. **登録の URL と日付を `experiment/notes.md` に記録する**（§9。凍結の段落の後に 1 文: `https://osf.io/mbgxz` と 0 の `date_registered`）。`_style_check.py` 0 件を確かめる。
 3. **M4（Mac）**: 事前登録 §3.2 の順（ON → OFF → E3 `idle` → E3 `working`）で、各 run の前に:
    - ロガーは**凍結のタグから書き出した側でビルドする**（§2.2・判断 68）。書き出しの一覧の SHA-256 が `29b183ba…6c49` になることを Mac でも確かめる（判断 68 で機械によらず一致することは確かめてある）。
    - 計画は**凍結のタグから**生成し、SHA-256 が §2.4（ON `c7a5469d…`・OFF `3759ebf7…`）と一致すること。
