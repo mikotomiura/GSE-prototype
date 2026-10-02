@@ -13,6 +13,10 @@
 - [x] 事前登録ドラフト（未凍結）に other の扱いと見直し閾値「過半」
 - [x] cargo test --workspace / clippy --all-targets / tsc / gse-replay --snapshot（byte-equal）/ Form テスト
 - [x] 宣言 UI の目視確認（5 つ目が出て選べる）
-- [ ] code-reviewer ∥ security-checker・指摘対応
+- [x] code-reviewer ∥ security-checker・指摘対応（HIGH 1: consent-draft §2 を上流として先に直す → 対応。MEDIUM 2 / LOW 6 は対応、G1 backend ガードは ADR に注記のみ）
 - [ ] gse-dataset の schema 対 PR・check_schema_parity.py 一致
 - [ ] /finish-task（/cross-review 必須）→ PR → CI 緑 → merge
+
+## ⚠️ 配布直前の別タスクへの申し送り（security-checker MEDIUM）
+- [ ] 同意フォームの再配備は **本変更を含む新しい O1 タグと同時かその後**に行う（旧タグ v0.1.38 以前は 4 択しか出さない）
+- [ ] `docs/o1-distribution-tag.md` の新しい節に「同意フォームは 5 択版」「v0.1.38 以前を O1 に使わない」と書く

@@ -52,7 +52,8 @@ interface RecordingStatusDto {
  * ⚠️★★★ O1 の宣言 5 択 (ADR-016 **判断 4b-2** の 4 値 ＋ **ADR-037** の `other`)。
  *
  * ★ ラベルと補足は **同意文書 §2 の表と逐語で一致させる**
- * (`Form_O1/GSE_O1_Form_Builder.gs` / `o1_form_builder_test.cjs` が検査する)。
+ * (雛形 `consent-draft-o1.md` §2。⚠️ 機械検査 `o1_form_builder_test.cjs` は正本の
+ * `Form_O1/GSE_O1_Form_Builder.gs` に**ラベル**が載っているかだけを見る。補足は見ていない)。
  * ⚠️ 値を足すときは ADR を起こす —— `task_kind` は `schema/current.json` の enum に
  * 制約されており、足すと gse-dataset の parity 更新と同意文書の改訂が要る (ADR-037 D4 / D5)。
  *
@@ -133,7 +134,7 @@ const RecordingControls: React.FC = () => {
   const [outcome, setOutcome] = useState<RedactionOutcomeDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  // ⚠️★★★ O1: 宣言 4 択を開いているか。★ 既定は閉じている (1 行だけ出す)。
+  // ⚠️★★★ O1: 宣言 5 択を開いているか。★ 既定は閉じている (1 行だけ出す)。
   const [pickingTaskKind, setPickingTaskKind] = useState(false);
   // ★ O1: 研究者が割り当てた参加者 ID。⚠️ **これが無いと自動提出が動かない**
   //   (`run_reconcile_blocking` が「ID 未登録なので何もしない」で帰る)。

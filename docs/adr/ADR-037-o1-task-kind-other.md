@@ -18,7 +18,7 @@
 
 | # | ★ 本 ADR が **する**こと | ⚠️ 本 ADR が **しない**こと |
 |---|---|---|
-| 1 | ★ `task_kind` に 5 つ目の値 `other` を足す（O1 の宣言 UI にだけ出す） | ⚠️ G1 の開始画面（argumentative lock）に出す |
+| 1 | ★ `task_kind` に 5 つ目の値 `other` を足す（O1 の宣言 UI にだけ出す） | ⚠️ G1 の開始画面（argumentative lock）に出す（⚠️ ただし **backend では閉じていない** —— `record_session_meta` は G1 / 通常運用でも `TaskKind::parse` の 5 値を受け付ける。G1 を論述に固定しているのは frontend の lock だけで、`creative` などでも以前から同じ状態である） |
 | 2 | ★ `other` を **Writing fallback** で採点する | ⚠️ 新しい head を作る ／ 推論・特徴量・HMM の数値を変える ／ `HMM_VERSION` を上げる |
 | 3 | ★ 同意フォームの宣言の列挙を 5 択に直す | ⚠️ ADR-031（6 択 ESM）の同意改訂を承認・実装する |
 | 4 | ★ 「未設定」（`session_meta` の不在）は**そのまま残す** | ⚠️ `unknown` を足す（★ ADR-016 判断 4b-3 は維持） |
@@ -68,8 +68,12 @@ O1 は自然な作業を常時記録する（ADR-014・ADR-016 判断 4b-0）。
 ### D1. ★ `task_kind` に `other` を足す。画面の語は「その他・細切れの作業」
 
 - 値名: **`other`**（`TaskKind::Other` / `TaskKindDto::Other`・snake_case で `"other"`）
-- 画面の語と補足 1 行（★ UI と同意フォームで**逐語一致**させる）:
-  > **その他・細切れの作業** —— メールを読む・調べものなど、どれとも決めづらいとき（メールを書くのは「通信文」）
+- 画面の語と補足 1 行:
+  > **その他・細切れの作業** —— メールを読む・調べものなど、どれとも決めづらいとき。メールを書くのは「通信文」
+- ★ **逐語一致の範囲**: UI の補足（`O1_TASK_KINDS` の `note`）は、同意文書の雛形
+  `consent-draft-o1.md` §2 の表の右列と**逐語一致**させる（既存 4 値と同じ規則）。
+  ★ 同意フォームの正本（`Form_O1/GSE_O1_Form_Builder.gs`）は**語（ラベル）を逐語**にし、補足は**同じ意味の別文**で書く
+  （⚠️ 機械検査 `o1_form_builder_test.cjs` が見ているのはラベルだけである）。
 - ★ 補足の括弧は **「通信文」との境界**を閉じるためにある（メールを *読む* = other、*書く* = 通信文）。
 - ★ 出すのは **O1 の宣言 UI だけ**。G1 の開始画面は argumentative に固定したまま（交絡統制・`research-positioning §9`）。
 - ★ 「未設定」は残す。→ **ログ上の 3 状態が分かれる**: 4 つの領域のどれか ／ `other`（本人が「どれでもない」と言った）／
@@ -108,7 +112,8 @@ O1 は自然な作業を常時記録する（ADR-014・ADR-016 判断 4b-0）。
 
 ### D5. ★ 同意フォームの改訂は `other` の 1 点だけ
 
-- `Form_O1/GSE_O1_Form_Builder.gs` の「4 つの選択肢」の 2 か所を 5 択に直す。
+- ★ 文面の上流 `consent-draft-o1.md` §2 を先に 5 択へ直し、それを正本 `Form_O1/GSE_O1_Form_Builder.gs` の「4 つの選択肢」の 2 か所へ写す
+  （★ `.gs` 冒頭の規則「先にあちらを直してからここへ写す」）。
   ★ 既存の約束「何を選んでも、記録する内容は 1 つも変わりません」は **`other` でも真のまま**である（D2）。
 - ⚠️ ADR-031 の同意改訂（6 択 ESM）とは束ねない（ADR-031 は Proposed で承認待ち）。
   ⚠️ その結果、**同意フォームの再配備が将来もう 1 回要る可能性**を受け入れる。
@@ -140,6 +145,7 @@ O1 は自然な作業を常時記録する（ADR-014・ADR-016 判断 4b-0）。
   ★ **見直しの条件**: パイロットで宣言時間のうち `other` が過半を占めたら、語と補足を見直す
   （⚠️ 閾値はパイロット前に事前登録ドラフトに書く）。
 - ★ 旧バイナリで `other` を含むログを replay すると、`bin/replay.rs` が警告して Writing に倒す（落ちない）。
+  ⚠️ そのとき刻まれる `head_id` は `writing_fallback` ではなく `writing` になる（数値は同一）。新旧の replay を突き合わせるときは `task_kind` で揃える。
   ★ O1 の配布は本 ADR を含む新しいタグから行う（`docs/o1-distribution-tag.md` に新しい節を足す・別タスク）。
 
 ## Migration
@@ -147,7 +153,7 @@ O1 は自然な作業を常時記録する（ADR-014・ADR-016 判断 4b-0）。
 1. `logger.rs` / `schema_dto.rs` に `Other` を足し、振り分けを D2 のとおりにする。`schema/current.json` を再生成する。
 2. `HeadId::WritingFallback` / `HeadIdDto::WritingFallback` / `heads/writing.rs` の説明を「Creative と Other」に直す（★ 型と数値は不変）。
 3. O1 の宣言 UI（`RecordingControls.tsx`）と `probeTypes.ts` に `other` を足す。
-4. `Form_O1/*.gs` の 2 か所と `o1_form_builder_test.cjs` を 5 択に直す。
+4. `consent-draft-o1.md` §2 を 5 択に直し、`Form_O1/*.gs` の 2 か所と `o1_form_builder_test.cjs` へ写す。
 5. 現行仕様を述べる docs（`glossary.md`・`workspace-behavior-observation.md`・`task-adaptation-and-scope-gating.md` §3.2・
    `functional-design.md`）を追随させる。⚠️ ADR 本文は直さない。
 6. O1 の事前登録ドラフト（未凍結）に、`other` の扱い（D2・D3）と見直しの閾値を書く。

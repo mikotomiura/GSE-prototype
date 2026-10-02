@@ -4576,6 +4576,15 @@ mod tests {
                 "Creative は Writing head へ流すので数値は一致するはず (ime_open={ime_open})"
             );
         }
+        // ★ ADR-037 D2: Other も同じ経路。宣言から通して数値が Writing と一致する。
+        let other = head_for(TaskDomain::from(TaskKind::Other));
+        for ime_open in [true, false] {
+            assert_eq!(
+                writing.latent_axes(&f, ime_open),
+                other.latent_axes(&f, ime_open),
+                "Other は Writing head へ流すので数値は一致するはず (ime_open={ime_open})"
+            );
+        }
     }
 
     /// `task_kind` が未知の文字列なら `TaskKind::parse` が None を返し、
