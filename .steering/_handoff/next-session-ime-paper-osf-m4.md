@@ -2,6 +2,7 @@
 
 > 作成: 2026-10-02（G-GEAR・M3 の凍結を終えたセッションの最後に）。
 > 前の引き継ぎ `next-session-ime-paper-m3-freeze.md` の後継（その §2 の 1〜4 は済み・5 の登録は研究者・6 の出荷はこのメモを書いたセッションで行う —— 結果は `tasklist.md` の M3 の末尾）。
+> ★★★ **2026-10-03 追記（G-GEAR）: §2 の 0 と 2 は済んだ。登録は `https://osf.io/9nh7r`（DOI `10.17605/OSF.IO/9NH7R`・公開・`date_registered` 2026-10-02）で、下に書いた `mbgxz` は登録の元のプロジェクト（非公開・API は 404 のまま）。添えたファイルの SHA-256 は `fa6fd586…7773` と一致し、`notes.md` に記録した（`tasklist.md` の M3 の OSF の行）。→ Mac では §2 の 3（M4）から始める。** あわせて G-GEAR で M5（Windows の較正パイロット）を先に進める（研究者の選択・M5 は M4 にも OSF にも依存しない）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（**判断 130・131**）・`tasklist.md`（M3 の末尾・M4）・`_issue-plan.md`（M4・M12）と、凍結した事前登録 `papers/ime-observation/experiment/preregistration.md`（§2.2・§2.4・§3.2・§3.4・§5・§9）。状態は着手時に `git fetch` で測り直す。
 
 ## §0 打ち込む用
