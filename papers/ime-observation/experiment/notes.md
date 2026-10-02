@@ -52,6 +52,8 @@ tagged `ime-observation-prereg-macos`; the recorded `sha256` is
 `64dfbb6e5f08222ade1fb96a8171d97c0fa1bc9ca9adb5cc987fc27bd9a8af2a`. The list of the files exported from that commit
 (section 9 of the pre-registration) holds 98 files and has the SHA-256
 `29b183ba245939ad82d9fa2d7db26e1a18520e2966f4aa9ec74478a4e51e6c49`.
+The frozen file was registered on OSF Registries at https://osf.io/9nh7r on 2026-10-02 (13:40 UTC), with the two
+marks, the freezing commit and the SHA-256 of the list.
 
 ## Step 0 replaced
 
