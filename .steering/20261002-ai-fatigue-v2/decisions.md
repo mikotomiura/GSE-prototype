@@ -77,3 +77,69 @@
 - **記憶との関係**: 記憶 `feedback_no_ai_filtering_of_judge_candidates`（判定者用の候補を AI の見立てで絞らない）は「判定者に見せる候補を AI が絞る」ことを禁じる。本件は判定者 1 自身が、自分が判定しない残りの扱いを Claude に委ねたもので、AI の判定であることを明記する条件で受けた。
 - **記入表 1**（`Downloads\AI_fatigue_TA_sheet1_judge1.xlsx`・未記入のまま）は使わない。消すかは退避ファイルの整理（設計 §13）で判定者 1 に聞く。`read_ta_sheet.py`・`check_ta_sheet.py`・記入表 2 の道具は使わずに残す（作った経緯の記録として）。
 - **トレードオフ**: 213 件のうち 142 件（医療者 93 件の全件を含む）は人が抄録を読んでいない。研究者に渡す提案のドキュメント v2 で、群ごとの判定者（判定者 1／AI）を表で示し、研究者が残りをどう扱うか（判定者 2 だけで判定する・判定者 1 に再依頼する・AI のまま背景に置く等）を決められるようにする。
+
+## 判断 6: 判定者 1 の「除外 E4 背景」6 件の読み方（2026-10-03・判定者 1 の答え・3 つ目のセッション `114858cc-76a4-4d2f-92d3-4da26a97e57a`）
+
+- **経緯**: 判定者 1 は抄録段で 6 件（S04-85・S12-09・S14-34・S13-19・S04-55・S02-04）に `除外 E4 背景（レビュー・尺度の原著・理論）` を選んだ。問いの選択肢の説明は「一次研究でない。DB から消さず背景として残す」（セッション `08bafb9f…` の問いの逐語で確かめた）。6 件の抄録の欄の種類は、対照つきの教育の実験・ChatGPT の能力の評価・質的研究・道具の提案・無作為化試験・横断調査で、判定基準の E4（一次研究でない）と合わない読みがありうる。→ 判定のやり直しではなく、答えの読み方を 1 回の AskUserQuestion（2 問）で聞いた。1 問目は判定者 1 の意図についての問いなので推奨を付けず（問いの文にそう書いた）、2 問目は推奨と理由を添えた。
+- **問いと答え**（逐語の要点・全文はセッションの記録）:
+  - 1 問目「どちらの意味でしたか」（`範囲の外・背景として残す`／`一次研究でない（E4）`／`件によって違う`）→ **`範囲の外・背景として残す`**（6 件とも）。
+  - 2 問目「ログと表にはどう写しますか」（`注記して残す (Recommended)`／`E コードを今選び直す`／`1 問目は E4 の意味`）→ **`注記して残す (Recommended)`**。
+- **決定**: 6 件の判定者 1 の値は `除外`・除外理由 **`E4 背景（判定者 1 の選択のまま）`** とし、注記「判定者 1 の意図: 範囲の外・背景として残す（一次研究でないの意味ではない・判断 6）」を付ける。E1〜E3 などへの付け直しはしない（判定者 1 にこれ以上の判定を求めない・研究者と判定者 2 との照合の段で付け直せる）。
+- **写し方**: ログの `ta1` は答えの逐語（`answer`）をそのまま持ち、`result` に `{"decision":"除外","code":"E4 背景（判定者 1 の選択のまま）","intent":"範囲の外・背景として残す"}` を置く。追加候補の表・提案のドキュメント v2 では、E4（一次研究でない）の件と数えず、「E4 背景（判定者 1 の選択のまま・意図は範囲の外）」として別に数える。一致の表で評価版の E コードと比べるときも、E4 と同じとはしない。
+
+## 判断 7: Downloads の退避ファイルなどを消した（2026-10-03・判定者 1 の確認・design §13）
+
+- **一覧を示した事実**（消す前に機械で確かめた）: 退避ファイル（`.bak-*`）33 個 = 34 件の写し 13・判定者用ファイル 13・評価版 3・追加候補の表 3・提案 v1 の .docx 1。5 つの本体（Downloads）と作業記録の archive は、どれも記録した SHA-256 どおりにあった（34 件の写し `3499b70f…`・判定者用ファイル `10107fcf…`・評価版 `ed788f53…`・追加候補の表 `0d830c1f…`（本タスクで作り直した v2）・提案 v1 `前のタスクの archive/proposal-sha256.txt`）。記入表 1（未記入）は Downloads と原本（`_abstracts/ta_sheet1_original.xlsx`）が同じ SHA（`515c18e7…`）。記入表 2 は作っていない（無い）。`shsconf_sdmc2022_03022.pdf` は `ai-fatigue-fulltext/R47/` に同じ SHA の PDF がある。`ai-fatigue-fulltext/c2.py`・`cnt.py` は前のタスクで読んだレビューの本文の語を数えた使い捨ての道具で、`.steering/` のどこからも参照されていない（grep）。
+- **問いと答え**（1 回の AskUserQuestion・4 問・推奨と理由を添えた・4 問とも推奨どおり）: 退避 33 個 → `33 個とも消す`／提案 v1（Downloads）→ `消す`／記入表 1 → `Downloads の分だけ消す`（原本は残す: 抄録の原文を持つ問いの原文の置き場で、`check_log.py` が行の順を確かめるのに使う）／PDF と c2.py・cnt.py → `3 つとも消す`。
+- **消したもの**（38 個・名前は Downloads からの相対・バイト数・SHA-256）:
+
+| 名前 | バイト | SHA-256 |
+|---|---|---|
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-10262965119c` | 147528 | `10262965119cc93a4bf34396d3bb41ff01613a07e95c82e45bc8ef3a74502dfd` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-1bb5f8876dc9` | 137081 | `1bb5f8876dc9c7f08d0c533b3aa8d69a003aba7e7c4659b049e6b6bc4ef16e08` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-30d30b5cf0cc` | 123653 | `30d30b5cf0cc74055ae489f2c60688014971d243c0e00ae78bc0efcd50bac746` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-38124cd3a35d` | 194753 | `38124cd3a35d78f716eb62f2377cf45cc50b55779ee5ed8367634b31d05c9acf` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-48ba8b908413` | 113226 | `48ba8b908413fc8112ec35852d4317389500f577092e7be47384628b5f7ce8b0` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-50fbc2064e7d` | 162045 | `50fbc2064e7df1f9c5d6a22aadcec30d331a40d9d2b601d7bc4f4f990f5f9eda` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-69b4d69673d5` | 125037 | `69b4d69673d558fd8e428a08a72c87b86babf6d77bb6d5a83987ede1e1a5420f` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-9d296951b95e` | 194753 | `9d296951b95e0d8fea5c597fe31a003e26c5c4f94d7b61cf4adefa2f1743ba02` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-a4c1cd527bf4` | 197421 | `a4c1cd527bf4af00d5612121d2598eb065104691a5780377adfa81ccbf0457b8` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-d4eb993891ff` | 139113 | `d4eb993891ffd33490cc51ce4503c1ea0117a422411ca7b3ef055e2ad0c8fe07` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-df7bc579a936` | 127419 | `df7bc579a93642ae46103e47eae53332a5dd99adf8400e855cf675669f2c102c` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-e5830d5fab03` | 141798 | `e5830d5fab0380b26461f04c3bdd17251046837f3eb2b704675e635cd2f67564` |
+| `AI_fatigue_database_2026-09-18_judge1.xlsx.bak-eccb2325a618` | 134541 | `eccb2325a618493c86394ba3f5b029ff70d929127d92d8b2cb946111f0a9e738` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20260930074819` | 67539 | `41c28a99df54ca9061db8b36c8999e85c117a3a29dacf3efdaea66adba6e0835` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20260930110339` | 74246 | `b35e0d3d6964825b77fd363bbebc55e3d08a53d1af34a1eb4b8cf3d14908a5f8` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20260930112855` | 76704 | `ea20d6286d20431a212c18c72ea55f20a1087510bc2023e835da4b62f14df109` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20260930123842` | 89186 | `0b16d779fb588647673d8a1fa64f54a822eac4e90967ce1b3e05bbbcdb1baf48` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20260930123901` | 93769 | `019fd35ff7f03aacef0bc70d3911f3859cd9676404db907aa069fa1ba973d872` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20260930150752` | 93784 | `4adc4dd9a57337ae1792aad92b21602e071de9e3abe64a3be2ee485177b72bb1` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20260930160509` | 100411 | `f85870f3cbe69767f8b3ccd374c458607f38317d8bc56d2636687856aa64ff53` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20261001000920` | 100512 | `6984472edeef3794a9ed075076568aaca8373c4fb675afba608cdba280e6c883` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20261001005650` | 109000 | `ca79597b1dabfdaf04d3c076e40ded6a55f4c760abc2e691fb3e01af75181210` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20261001040403` | 109008 | `48af51d3603fbbc5b19ffdebc45810328e0aa137aac92423d933d11da80ca2b6` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20261001042240` | 109428 | `3d9d978db9781158fe68d046ae6193cf2550a20262b43405fc79e070c5afa6e4` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20261001101545` | 109578 | `097434dddac8a9a4884b05cc1f23c9a42adc1bfee2c1c661555491915eab1dfd` |
+| `AI_fatigue_judge-sheet_2026-09-30_judge1.xlsx.bak-20261001102124` | 109646 | `3ff467e235dea801db01d816325ad64460e92b1855e6a39932adfe4bac7e21d6` |
+| `AI_fatigue_candidates_AI_appraisal_2026-09-30_claude.xlsx.bak-20260930160446` | 121056 | `e219fbb65c9df450591e30fc9525bab25c868e387f2c63307de79ed0deb397c4` |
+| `AI_fatigue_candidates_AI_appraisal_2026-09-30_claude.xlsx.bak-20260930161204` | 121468 | `ae05523840d4a746415ce7866e4974045844a77a4595c61f6d9c23d8e850644f` |
+| `AI_fatigue_candidates_AI_appraisal_2026-09-30_claude.xlsx.bak-20260930161504` | 121726 | `97a37da1efe977576178c6f6e4de3119635aa9fdb06ddebbe6b20963f1f0df84` |
+| `AI_fatigue_additional_candidates_judge1.xlsx.bak-0b9363b7cc4c` | 788312 | `0b9363b7cc4cbccc2c4b8d3ad1be11d8477b6cd2227a6ac5ef6208a2a2f655d8` |
+| `AI_fatigue_additional_candidates_judge1.xlsx.bak-2d681d6f3b9e` | 788403 | `2d681d6f3b9e1ffd6ce901484fd7c9b59be7c1ea712189a7e87c1dc78fbaec7e` |
+| `AI_fatigue_additional_candidates_judge1.xlsx.bak-9bf219882af7` | 788309 | `9bf219882af7286f641875ce868f5e55464b4ed090bc1fbaccbb9079e97ed39b` |
+| `AI疲労DB_判定者1からの提案_v1.docx.bak-2faae6162ec8` | 47927 | `2faae6162ec8c8df3cbd46434a2e53f4bd5f6c10563a18d78cf16f3dff043555` |
+| `AI疲労DB_判定者1からの提案_v1.docx` | 48167 | `abc5d9a36439821a3aa4e843f8c6565e663b8ae5872e8d37dc2a274000afcf9e` |
+| `AI_fatigue_TA_sheet1_judge1.xlsx` | 250169 | `515c18e70a1c10fcd8e92443b4eb62da5549fde786ec3f59705393be423cab58` |
+| `shsconf_sdmc2022_03022.pdf` | 305362 | `d7235db7440878ab70940ade227d6e100c587aa00b94798126723dc801e0e67d` |
+| `ai-fatigue-fulltext/c2.py` | 1078 | `15b46b4b9dc78007dc95bc6d2ecac7515a2552b43beb8c96ab2b7405f13e30a1` |
+| `ai-fatigue-fulltext/cnt.py` | 743 | `593023d9cbcd19557efa3cba80d30855a3c270776736ca338571b8ca8faef144` |
+
+- **残したもの**: 5 つの本体のうち 4 つ（34 件の写し・判定者用ファイル・評価版・追加候補の表 v2）と、記入表 1 の原本・R47 の PDF。提案 v1 は前のタスクの archive にだけ残る。
+- **影響**: 前のタスクの `check_proposal.py`（v1）は Downloads の v1 の .docx が無いので赤になる（追加候補の表と同じく、v1 の時点の記録として残す・判断 1 の grill の決定と同じ扱い）。
+
+## 判断 8: 追加候補の表と提案のドキュメント v2 の形 — 設計 §9・§11 からの逸脱（2026-10-03・Claude が決めた・判断 5・6 に合わせた）
+
+- **ログ**（`screening-log.jsonl`・214 行）: 段は `ta1`（判定者 1・71 行）・`ta1e`（理由・1 行）・`ai_ta`（評価版の予備判定・142 行）の 3 つ。判定者 1 の行は答えのファイル（`data/ta-answers.json`）の聞いた順のまま（S12-04 の理由の問いは判定の 3 件後に聞いたので、その位置）。問いの逐語は抄録の訳を含むので載せず、`question_sha256` だけ。AI の行は評価版『Claudeスクリーニング案』の行番号・列（C・F）・値をそのまま持ち、`result` は題名・抄録段の判定だけ（★ 評価版の「除外理由」の列は、題名・抄録段で含めるの件では全文段の理由〈E6 など〉なので、AI の題名・抄録段の判定に付けない）。`check_log.py`（12 規則・selftest・メタ変異 PASS）・`--session` でセッションの記録とも一致。
+- **追加候補の表**（設計 §9 の「R 判定の段・S Q1/Q2」から変えた）: 列を R 判定者・S 判定の段・T AI の予備判定・U AI の除外理由（評価版の逐語）・V AI の値の出どころ（評価版の行）・W 研究者の読みに依存（Q1／Q2・全行で空）の 6 つにした。理由: 判断 5 で AI の行を判定者 1 の欄（D・G・J）に書けないので、AI の値の置き場が要る。シートに『一致の表』（71 件・判定者 1 と AI の題名・抄録段の予備判定）と『群ごとの一覧』（213 件・内容の群 × 判定者）を足した。『問いと答え』に「作業」の列を足し、題名・抄録段の行は問いの逐語の代わりに SHA-256 の先頭を載せた。『全文抽出』は前のタスクの data（全文段の 6 件）のまま。『品質評価』のシートは確定した件が無いので置かない。題名・抄録段で含めるの件の用途は「未定（全文段で決まる）」。`check_candidates.py` は前のタスクの一枚岩の検査器を規則ごとの関数に書き直した（20 規則・メタ変異 PASS）。
+- **提案のドキュメント v2**（設計 §11 から変えた）: §3 に Q11（判定者 1 が判定していない記録の扱い）・Q12（題名・抄録段で含める・保留にした記録の全文段）・Q13（探索の 43 件）・Q14（判定者 1 の「除外 E4 背景」の E コード）を足した。Q1・Q2 の「答えしだいで変わる件の一覧」は、全文段が無いので「追加候補ではまだ分からない」と書いた。§5 は 34 件の答えのまま、追加候補まで広げた見直しはしていないと書いた。§6.3 は構想の材料の数え直しをしていないと書いた。§9 は 9.1 34 件・9.2 判定者 1 が判定した追加候補（全文段 8 ＋ 題名・抄録段 71）・9.3 判定者 1 が判定していない記録（AI の予備判定・「人の判定ではありません」）。数と表は原稿の自動の区画 5 つ（counts・pop・agree・search43・appendix）に道具が書き、検査器はログと評価版から独立に数えて照らす。題名に版を入れない（ファイル名だけ `_v2`）。研究者に渡す文に作業の語・内部の参照（判断の番号・段の名前）・前の版への言及を置かない（`check_proposal.py` の禁止の語）。
+- **トレードオフ**: 表の列が 23 になり横に長い（R〜W は判定者 1 が足した列と『はじめに』に書いた）。提案は 35 頁（付録 9.2・9.3 が 221 行）。
