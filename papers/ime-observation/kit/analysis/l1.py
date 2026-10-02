@@ -13,19 +13,28 @@ Inputs: M.json is match.py's output (its definition, cell, and input hashes are 
 S.json is gt_sessions.py's output (the sessions of that definition, and the oracle agreement), PLAN
 and ORACLE are the files those two were built from. The hashes recorded in M.json and the plan hash
 recorded in the oracle header must agree with the files given; otherwise the run stops (unrelated
-inputs are never combined).
+inputs are never combined). The measures cover the matching of M.json, so they cover the trials of its
+scope (match.py --scope; the output repeats the scope's name). S.json may also be the prediction in
+the form of the ground truth (spec_predict.py's as_sessions_bytes), which carries no oracle agreement.
 
-Measures (each is computed per stratum -- (cell, scenario, speed) -- and pooled over all pairs):
+Measures (each is computed per stratum -- (cell, scenario, speed) --, per speed -- (cell, speed), pooled
+over the scenarios -- and pooled over all pairs):
   dwell_ms     the error is  observed - ground truth  (a positive bias means the observation is longer);
                ground-truth dwell = end_wall_ms - start_wall_ms. Reported: the median absolute error with
-               a cluster-bootstrap interval, and Bland-Altman bias, limits of agreement, and a
-               cluster-bootstrap interval for the bias. The resampling unit is the block, because trials
+               a cluster-bootstrap interval, and Bland-Altman bias, limits of agreement, and
+               cluster-bootstrap intervals for the bias and for each limit. The resampling unit is the block, because trials
                in one block share the state of the input method and are not independent. A pair whose
                observed dwell_ms is 0 is not a measurement (a clock that moved backwards yields 0), so it
                is left out of every error figure and counted separately (n_zero_excluded).
   abandon      ground truth = the session ended in a cancel; observation = the row's abandon flag.
                Reported: the 2 x 2 table (rows = ground truth, columns = observation, index 1 = abandon),
-               Cohen's kappa, and the raw agreement with a Wilson interval.
+               Cohen's kappa with a cluster-bootstrap interval (blocks; withheld, with the reason, when
+               kappa is undefined in the sample or in any resample -- inside one (scenario, speed)
+               stratum the ground truth has mostly one outcome, so kappa is read per speed), and the raw
+               agreement with a Wilson interval. The same figures are also
+               reported, as a diagnostic, separately for sessions with and without a commit that did
+               not close the session because the composition continued (n_continued_commits > 0);
+               pairs whose session lacks that field are counted as n_unknown.
   nav          exact-match rate with a Wilson interval, and the distribution of the difference
                (observed - true). The true count is the session's nav_true_cand when it is not null
                (sources with a candidate window: presses while the window was open), otherwise nav_true.
@@ -45,10 +54,10 @@ Measures (each is computed per stratum -- (cell, scenario, speed) -- and pooled 
   zero_dwell_rows
                the observed rows whose dwell_ms is 0, counted in every bucket (pairs, split, merge,
                false positives), overall and per stratum for the buckets that carry a session. In the
-               present matching such a row has zero length, cannot overlap a session of positive
-               length, and therefore falls into the false positives and never into a pair; how these
-               rows enter the matching is to be fixed in the pre-registration. The matching is not
-               changed here.
+               matching such a row has zero length, cannot overlap a session of positive length, and
+               therefore falls into the false positives and never into a pair. The pre-registration
+               keeps this treatment: such a row stays in the matching as a zero-length interval, so it
+               counts against precision, and the number of such rows is reported.
 
 Configuration CFG (JSON): {"B": 2000, "seed": 1, "limit_ms": 20000}; B is at most 100000. Keys starting with "_" are
 annotations and are not read.
@@ -110,15 +119,39 @@ def _flat_median_abs(cs):
     return statistics.median(abs(v) for c in cs for v in c)
 
 
+def _flat_loa(sign):
+    def stat(cs):
+        vals = [v for c in cs for v in c]
+        return statistics.fmean(vals) + sign * stats.BA_Z * statistics.stdev(vals)
+    return stat
+
+
+class _Undefined(Exception):
+    """Raised inside a resample whose statistic is undefined (so no other error is hidden)."""
+
+
+def _kappa_of(cs):
+    t = [[0, 0], [0, 0]]
+    for c in cs:
+        for g, o in c:
+            t[g][o] += 1
+    k = stats.cohen_kappa(t)
+    if k is None:
+        raise _Undefined()
+    return k
+
+
 def dwell_error(pairs, block_of, B, seed):
     """The error of the observed dwell_ms against the ground-truth duration, over 1:1 pairs
     ({"gt", "obs", "iou"}). The difference is observed - ground truth.
 
     block_of: a function taking a ground-truth session and returning its block, or a dict from
     trial_id to block. Pairs are resampled block by block.
-    Returns {"n", "n_zero_excluded", "n_blocks", "mae", "mae_ci", "bland_altman", "bias_ci"}. A pair
-    whose observed dwell_ms is 0 is excluded from n and from every figure, and counted in
-    n_zero_excluded.
+    Returns {"n", "n_zero_excluded", "n_blocks", "mae", "mae_ci", "bland_altman", "bias_ci",
+    "loa_lo_ci", "loa_hi_ci"}: the last two are block-bootstrap intervals for the lower and the upper
+    limit of agreement ([null, null] with fewer than two blocks; every resample of two or more blocks
+    holds two or more pairs, so the standard deviation is always defined). A pair whose
+    observed dwell_ms is 0 is excluded from n and from every figure, and counted in n_zero_excluded.
     """
     obs, gt, by_block, n_zero = [], [], {}, 0
     for p in pairs:
@@ -139,23 +172,68 @@ def dwell_error(pairs, block_of, B, seed):
         "mae_ci": _ci(stats.cluster_bootstrap(clusters, _flat_median_abs, B, seed)),
         "bland_altman": stats.bland_altman(obs, gt),
         "bias_ci": _ci(stats.cluster_bootstrap(clusters, _flat_mean, B, seed)),
+        "loa_lo_ci": _ci(stats.cluster_bootstrap(clusters, _flat_loa(-1), B, seed)),
+        "loa_hi_ci": _ci(stats.cluster_bootstrap(clusters, _flat_loa(1), B, seed)),
     }
 
 
-def abandon_agreement(pairs):
+def abandon_agreement(pairs, block_of=None, B=DEFAULT_B, seed=DEFAULT_SEED):
     """Agreement on abandonment over 1:1 pairs. Ground truth is positive when the session's outcome is
     "cancel"; the observation is positive when the row's abandon flag is true.
-    Returns {"table", "n", "kappa", "agree", "agree_ci"}; table = [[tn, fp], [fn, tp]] with rows the
-    ground truth and columns the observation."""
+    Returns {"table", "n", "kappa", "kappa_ci", "kappa_ci_status", "agree", "agree_ci"}; table =
+    [[tn, fp], [fn, tp]] with rows the ground truth and columns the observation. kappa_ci is a
+    block-bootstrap interval when block_of is given (as for dwell_error); it is [null, null] and
+    kappa_ci_status says why when kappa is undefined ("no_kappa": only one outcome on both sides),
+    with fewer than two blocks ("fewer_than_two_blocks"), when any resample has an undefined kappa
+    ("undefined_resample"; the interval is then withheld rather than computed from the other
+    resamples) or without block_of ("not_requested")."""
     table = [[0, 0], [0, 0]]
+    by_block = {}
     for p in pairs:
         g = 1 if p["gt"].get("outcome") == "cancel" else 0
         o = 1 if p["obs"].get("abandon") is True else 0
         table[g][o] += 1
+        if block_of is not None:
+            by_block.setdefault(_block_key(block_of, p["gt"]), []).append((g, o))
     n = sum(sum(r) for r in table)
     x = table[0][0] + table[1][1]
-    return {"table": table, "n": n, "kappa": stats.cohen_kappa(table),
+    kappa = stats.cohen_kappa(table)
+    ci, status = (None, None), "ok"
+    if kappa is None:
+        status = "no_kappa"
+    elif block_of is None:
+        status = "not_requested"
+    elif len(by_block) < 2:
+        status = "fewer_than_two_blocks"
+    else:
+        try:
+            ci = stats.cluster_bootstrap(_clusters(by_block), _kappa_of, B, seed)
+        except _Undefined:
+            status = "undefined_resample"
+    return {"table": table, "n": n, "kappa": kappa, "kappa_ci": _ci(ci), "kappa_ci_status": status,
             "agree": (x / n if n else None), "agree_ci": _ci(stats.wilson(x, n))}
+
+
+def abandon_by_continued_commit(pairs):
+    """Agreement on abandonment over 1:1 pairs, split by whether the ground-truth session held a
+    commit that did not close it because the composition continued within the rule's window
+    (gt_sessions.py's n_continued_commits > 0). With live conversion the input method commits the
+    head of a reading while the rest is still being typed; when the rest is then cancelled, the
+    session is a cancel on the ground-truth side. This is a diagnostic split of the abandon measure,
+    which it does not replace.
+    Returns {"with", "without", "n_unknown"}: "with" and "without" have the form of
+    abandon_agreement; n_unknown counts the pairs whose session carries no n_continued_commits (a
+    non-negative integer), which enter neither stratum."""
+    with_c, without_c, unknown = [], [], 0
+    for p in pairs:
+        k = p["gt"].get("n_continued_commits")
+        if not (match._is_int(k) and k >= 0):
+            unknown += 1
+        elif k > 0:
+            with_c.append(p)
+        else:
+            without_c.append(p)
+    return {"with": abandon_agreement(with_c), "without": abandon_agreement(without_c), "n_unknown": unknown}
 
 
 def _nav_true(gt):
@@ -354,8 +432,13 @@ def oracle_report(oracle_agreement, plan_trials=None, cell=None):
 
 
 def _measures(pairs, block_of, B, seed):
-    return {"dwell": dwell_error(pairs, block_of, B, seed), "abandon": abandon_agreement(pairs),
-            "nav": nav_agreement(pairs)}
+    return {"dwell": dwell_error(pairs, block_of, B, seed), "abandon": abandon_agreement(pairs, block_of, B, seed),
+            "abandon_by_continued_commit": abandon_by_continued_commit(pairs), "nav": nav_agreement(pairs)}
+
+
+def _speed_key(lab):
+    sp = lab[1]
+    return (lab[0] is None, str(lab[0]), match.SPEEDS.index(sp) if sp in match.SPEEDS else len(match.SPEEDS))
 
 
 def l1_report(match_result, gt_sessions, oracle_agreement, plan_trials, cell, B, seed, limit_ms=DEFAULT_LIMIT_MS):
@@ -372,16 +455,24 @@ def l1_report(match_result, gt_sessions, oracle_agreement, plan_trials, cell, B,
     def label(gt):
         return _label(plan_trials, cell, gt.get("trial_id"))
 
-    groups = {}
+    groups, speeds = {}, {}
     for p in match_result["pairs"]:
-        groups.setdefault(label(p["gt"]), []).append(p)
+        lab = label(p["gt"])
+        groups.setdefault(lab, []).append(p)
+        speeds.setdefault((lab[0], lab[2]), []).append(p)
     by_stratum = []
     for lab in sorted(groups, key=_label_key):
         row = {"stratum": _stratum(lab)}
         row.update(_measures(groups[lab], block_of, B, seed))
         by_stratum.append(row)
+    by_speed = []
+    for lab in sorted(speeds, key=_speed_key):
+        row = {"stratum": {"cell": lab[0], "speed": lab[1]}}
+        row.update(_measures(speeds[lab], block_of, B, seed))
+        by_speed.append(row)
     return {
-        "metrics": {"by_stratum": by_stratum, "pooled": _measures(match_result["pairs"], block_of, B, seed)},
+        "metrics": {"by_stratum": by_stratum, "by_speed": by_speed,
+                    "pooled": _measures(match_result["pairs"], block_of, B, seed)},
         "truncation": truncation_check(gt_sessions, match_result, limit_ms, label),
         "oracle": oracle_report(oracle_agreement, plan_trials, cell),
         "zero_dwell_rows": zero_dwell_rows(match_result, label),
@@ -445,16 +536,20 @@ def evaluate(match_bytes, sessions_bytes, plan_bytes, oracle_bytes, config_bytes
         raise InputError("match: config.cell is missing or has the wrong shape")
     rep = l1_report(m["matching"], sess, sobj.get("oracle_agreement"), plan["trials"], cell,
                     cfg["B"], cfg["seed"], cfg["limit_ms"])
+    scope = m.get("scope").get("name") if isinstance(m.get("scope"), dict) else "all_trials"
+    if scope not in match.SCOPES:
+        raise InputError("match: scope.name must be one of %s" % ", ".join(match.SCOPES))
     rep.update({
         "definition": definition,
+        "scope": scope,
         "config": {"B": cfg["B"], "seed": cfg["seed"], "limit_ms": cfg["limit_ms"], "cell": cell},
         "inputs_sha256": {"match": _sha(match_bytes), "sessions": have["sessions"], "plan": have["plan"],
                           "oracle": have["oracle"], "config": None if config_bytes is None else _sha(config_bytes)},
         "used": {"n_pairs": len(m["matching"]["pairs"])},
         "note": "Pairs whose observed dwell_ms is 0 are left out of the dwell figures and counted in "
-                "n_zero_excluded; in the present matching a row of dwell_ms 0 never enters a pair and is "
-                "counted in zero_dwell_rows (its place in the matching is to be fixed in the "
-                "pre-registration). Intervals are cluster-bootstrap (blocks) for dwell_ms and Wilson for "
+                "n_zero_excluded; in the matching a row of dwell_ms 0 is a zero-length interval that never "
+                "enters a pair, so it counts as a false positive (as pre-registered), and it is counted in "
+                "zero_dwell_rows. Intervals are cluster-bootstrap (blocks) for dwell_ms and Wilson for "
                 "proportions; read them as the width visible from this sample. The oracle report is built "
                 "from every trial of the oracle and for every session definition, not only the definition "
                 "matched here.",
@@ -562,6 +657,15 @@ def _case_dwell_bias():
     mlo, mhi = r["mae_ci"]
     if mlo is None or not (mlo <= r["mae"] <= mhi) or not (mlo <= 36.5 <= mhi) or mhi - mlo > 15:
         f.append("mae_ci does not contain the point estimate %r and 36.5 (or is too wide): %r" % (r["mae"], r["mae_ci"]))
+    # the limits of agreement (20 -/+ 1.96 * 50 = -78 / 118) carry their own block-bootstrap intervals
+    ba = r["bland_altman"]
+    for key, point, true in (("loa_lo_ci", ba["loa_lo"], -78.0), ("loa_hi_ci", ba["loa_hi"], 118.0)):
+        a, b = r[key]
+        if a is None or not (a <= point <= b) or not (a <= true <= b) or b - a > 25:
+            f.append("%s does not contain the point %r and %r (or is too wide): %r" % (key, point, true, r[key]))
+    one = dwell_error(pairs[:1], blk, 50, 7)
+    if one["loa_lo_ci"] != [None, None] or one["loa_hi_ci"] != [None, None]:
+        f.append("one pair gives no interval for the limits of agreement: %r" % (one,))
     # control on an independent draw (another seed): with no injected bias the interval must not contain 20
     # (the interval can tell the two apart)
     pairs0, blk0 = _synth(1000, 101, bias=0, sigma=50)
@@ -596,6 +700,59 @@ def _case_abandon_flip():
     a0 = abandon_agreement(p0)
     if a0["agree"] != 1.0 or a0["kappa"] != 1.0 or a0["table"][0][1] != 0 or a0["table"][1][0] != 0:
         f.append("with no flip agreement and kappa should be exactly 1: %r" % (a0,))
+    # kappa's block-bootstrap interval, and the reasons it is withheld
+    ab = abandon_agreement(pairs, _blk, 300, 3)
+    klo, khi = ab["kappa_ci"]
+    if ab["kappa_ci_status"] != "ok" or klo is None or not (klo <= ab["kappa"] <= khi) or khi - klo > 0.2 or klo == khi:
+        f.append("kappa_ci should bracket kappa (status ok): %r / %r" % (ab["kappa_ci"], ab["kappa_ci_status"]))
+    if a["kappa_ci_status"] != "not_requested" or a["kappa_ci"] != [None, None]:
+        f.append("without blocks the kappa interval is not requested: %r" % (a["kappa_ci_status"],))
+    commits = [p for p in p0 if p["gt"]["outcome"] != "cancel"]
+    if abandon_agreement(commits, _b0, 50, 1)["kappa_ci_status"] != "no_kappa":
+        f.append("one outcome on both sides gives no kappa and says so")
+    if abandon_agreement(p0[:40], lambda _g: 0, 50, 1)["kappa_ci_status"] != "fewer_than_two_blocks":
+        f.append("one block gives no kappa interval and says so")
+    # block 1 holds only commits that agree, so a resample of it alone has no kappa
+    mixed = [dict(p, gt=dict(p["gt"], trial_id="a")) for p in commits[:20]] + \
+            [dict(p, gt=dict(p["gt"], trial_id="b")) for p in p0[:20]]
+    two = abandon_agreement(mixed, lambda g: g["trial_id"], 200, 1)
+    if two["kappa"] is None or two["kappa_ci_status"] != "undefined_resample" or two["kappa_ci"] != [None, None]:
+        f.append("an undefined resample withholds the kappa interval and says so: %r" % (two,))
+    return f
+
+
+def _case_abandon_by_continued_commit():
+    """The diagnostic split puts each pair in the stratum its session's n_continued_commits selects,
+    counts a missing or malformed field as unknown, and leaves the pooled abandon measure unchanged."""
+    f = []
+    pairs, _blk = _synth(300, 4, flip=0.0)
+    marked = []
+    for i, p in enumerate(pairs):
+        k = None if i % 30 == 0 else (2 if i % 3 == 0 else 0)  # 10 unknown, 90 with, 200 without
+        gt = dict(p["gt"])
+        if k is not None:
+            gt["n_continued_commits"] = k
+        obs = dict(p["obs"])
+        if k == 2:  # disagree on every pair of the "with" stratum, and nowhere else
+            obs["abandon"] = not obs["abandon"]
+        marked.append(dict(p, gt=gt, obs=obs))
+    marked[1]["gt"]["n_continued_commits"] = -1  # malformed: unknown, not "without"
+    r = abandon_by_continued_commit(marked)
+    if (r["with"]["n"], r["without"]["n"], r["n_unknown"]) != (90, 199, 11):
+        f.append("the strata do not hold (with, without, unknown) = (90, 199, 11): %r"
+                 % ((r["with"]["n"], r["without"]["n"], r["n_unknown"]),))
+    if r["with"]["agree"] != 0.0 or r["without"]["agree"] != 1.0:
+        f.append("the disagreement is not confined to the stratum it was put in: with %r, without %r"
+                 % (r["with"]["agree"], r["without"]["agree"]))
+    whole = abandon_agreement(marked)
+    if whole["n"] != 300 or whole["agree"] != 210 / 300:
+        f.append("the pooled abandon measure changed or lost pairs: %r" % ((whole["n"], whole["agree"]),))
+    e = abandon_by_continued_commit([])
+    if e["with"]["n"] != 0 or e["with"]["agree"] is not None or e["n_unknown"] != 0:
+        f.append("with no pairs the strata should be empty and null: %r" % (e,))
+    m = _measures(marked, _blk, 50, 1)
+    if not _same(m.get("abandon_by_continued_commit"), r) or not _same(m.get("abandon"), abandon_agreement(marked, _blk, 50, 1)):
+        f.append("the per-stratum and pooled measures do not carry the split next to the abandon measure")
     return f
 
 
@@ -861,6 +1018,12 @@ def _case_cli():
             f.append("nav agreement or truncation is wrong: %r %r" % (pooled["nav"], out["truncation"]))
         if len(out["metrics"]["by_stratum"]) != 9 or out["oracle"]["n_disagree"] != 2:
             f.append("expected 9 strata and 2 oracle disagreements: %r" % (len(out["metrics"]["by_stratum"]),))
+        bs = out["metrics"]["by_speed"]
+        per = {}
+        for r in out["metrics"]["by_stratum"]:
+            per[r["stratum"]["speed"]] = per.get(r["stratum"]["speed"], 0) + r["dwell"]["n"]
+        if [r["stratum"]["speed"] for r in bs] != ["slow", "mid", "fast"] or any(r["dwell"]["n"] != per[r["stratum"]["speed"]] for r in bs):
+            f.append("by_speed should pool each speed's strata, in the order slow, mid, fast: %r" % ([(r["stratum"], r["dwell"]["n"]) for r in bs],))
         if sum(s["dwell"]["n"] for s in out["metrics"]["by_stratum"]) != 84:
             f.append("the strata do not add up to the pooled pairs")
         # a row of dwell_ms 0 that went through match.py lands in the false positives and is counted, not lost
@@ -935,6 +1098,7 @@ def _case_cli():
 CASES = [
     ("recovers a dwell bias (+20 ms, sigma 50 ms; the interval and the SD)", _case_dwell_bias),
     ("recovers an abandon flip (10% flipped; the agreement interval and kappa)", _case_abandon_flip),
+    ("abandon agreement split by continued commits (strata, unknown, pooled unchanged)", _case_abandon_by_continued_commit),
     ("excludes a dwell_ms of zero (and counts it)", _case_dwell_zero),
     ("shuffling widens the limits of agreement (negative control; the bias stays near 0)", _case_shuffle),
     ("navigation agreement (the true count, the difference distribution)", _case_nav),

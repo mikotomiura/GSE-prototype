@@ -19,8 +19,9 @@ line (`src: "mac_nstic"`). The contract for the log format is specified in
   used to answer the protocol and to draw the view. It is not logged.
 - **Committed text is not retained.** Unlike an ordinary text field, the view empties its in-memory text and
   selection as soon as no marked text remains (after `insertText` or `unmarkText`). The input method is
-  therefore given no left context, so that trials are independent of one another. The recorded lines (for
-  example the `len` of an `insert_text`) are unaffected.
+  therefore given no left context from the text of an earlier trial. Trials are not independent in every
+  respect: the input method keeps its own state, including what it has learned, across trials. The recorded
+  lines (for example the `len` of an `insert_text`) are unaffected.
 - **No interpretation is performed.** Calls are written in the order received. The protocol documentation
   does not state the order in which the input method calls `unmarkText()` and `insertText`, and it does not
   define what counts as the ground truth of a conversion; that definition is fixed by a calibration pilot with

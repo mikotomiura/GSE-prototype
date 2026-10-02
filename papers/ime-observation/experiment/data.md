@@ -20,33 +20,67 @@ used are printed when the analysis ends.
 |---|---|---|---|
 | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
 
+## Run checks (section 3.4 of the pre-registration)
+
+One line per attempt, also for an attempt that the runner aborted. The rules are those of section 3.4 of the
+pre-registration; with the settings fixed there, the figures of the rule on presses are read from the version
+`excluding_mode_keys` of `reference.segments`, and the bounds of the three counts are 0.
+
+| Cell label | Attempt | Aborted by the runner | Checked at | SHA-256 of the plan | `delivery.py` exit status | `max_beyond_markers_before_last_block` | `beyond_markers_last_block` | `n_loss_spans_with_unexplained_presses` | Counts as aborted | Deposited |
+|---|---|---|---|---|---|---|---|---|---|---|
+| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
+
 ## Deposit procedure
 
-1. Deposit only `run.json` and the four logs of a run directory: `plan.jsonl`, `oracle.jsonl`,
+1. Right after every attempt, also one that the runner aborted, before the next run of the order (section 3.2 of
+   the pre-registration), and before any analysis of the run, run on the run directory alone (it reads the key
+   rows of the logs and the focus changes of the reference, not the session rows)
+
+   ```
+   python3 kit/analysis/delivery.py --plan <run>/plan.jsonl --oracle <run>/oracle.jsonl --obs <run>/obs.jsonl \
+     --gt <run>/gt.jsonl --pre-ms 20 --tail-ms 300 --out <report>
+   ```
+
+   and check by hand that the plan's SHA-256 is the one that section 2.4 of the pre-registration gives the cell (live
+   conversion on or off). Under section 3.4 of the pre-registration a completed run counts as an aborted attempt when
+   it is not, when the command exits with status 2, when `max_beyond_markers_before_last_block` or
+   `beyond_markers_last_block` of `reference.segments.excluding_mode_keys` exceeds 0, or when
+   `reference_focus_loss.n_loss_spans_with_unexplained_presses` exceeds 0; such a run is neither analysed nor
+   deposited. A run that the runner aborted is never analysed and is deposited only under the conditions of section
+   3.4; one aborted inside a trial does not pass the check. No other reason and no explanation is admitted. Record
+   the result of this check and its time in the table of run checks above before any analysis. The `idle` condition
+   of question 5 has no line in the table: it sends no key, and only its samples are deposited (its observation log
+   is not).
+2. Deposit only `run.json` and the four logs of a run directory: `plan.jsonl`, `oracle.jsonl`,
    `gt.jsonl` and `obs.jsonl`. A log that an aborted run recorded with a null hash need not exist.
-2. Do not deposit the `*.stderr.txt` files or `runner.error.txt`. They stay on the measuring machine.
-3. On the measuring machine, bundle the files with
+3. Do not deposit the `*.stderr.txt` files or `runner.error.txt`. They stay on the measuring machine.
+4. On the measuring machine, bundle the files with
    `python3 kit/analysis/pipeline.py --pack <run-dir> --out <archive.zip> [--also-user NAME ...] [--also-home PATH ...]`.
    Pass the login name and the home directory of the measuring machine with `--also-user` and `--also-home`
    (each may be given more than once). The command refuses, with exit status 1 and without writing the
    archive, a run in which any of the five files contains an absolute path (a drive letter, a UNC path,
    `/Users/`, `/home/`, `/Volumes/`, an MSYS drive path such as `/c/`), the home directory, the repository
-   path, a login name, or content in the ground-truth or observation log; it exits with status 2 when a log
+   path, a login name, or content in the ground-truth or observation log, and a run, completed or aborted by the
+   runner, that the rules of section 3.4 of the pre-registration on the delivery report catch or that cannot be
+   checked (an observation log without a reference log, or logs that `delivery.py` refuses); it does not check the
+   plan's SHA-256 (step 1 does, by hand), because the pilot's runs used other plans; it exits with status 2 when a log
    no longer matches the hash recorded in `run.json`. Only paths that begin with `~` or `<repo>`, and
    relative paths, are allowed. It never overwrites an existing archive, writes the files in a fixed order
    with fixed times so that packing twice gives the same bytes, checks the contents of the archive again,
    and prints the archive's SHA-256.
-4. Record the printed SHA-256 in the table above, together with the hash of `run.json`
+5. Record the printed SHA-256 in the table above, together with the hash of `run.json`
    (`manifest_sha256` in the line of the list above).
-5. Deposit that archive, unchanged. `python3 kit/analysis/pipeline.py --check-deposit <run-dir> ...` runs the
+6. Deposit that archive, unchanged. `python3 kit/analysis/pipeline.py --check-deposit <run-dir> ...` runs the
    same check on unpacked directories without writing an archive.
 
 ## Machine that ran the deposit check
 
-Record, for every archive, the machine on which `--pack` was run and the values that were passed. The check
-finds only the values it is given (see the docstring of `pipeline.py` for what it cannot find).
+Record, for every archive, the machine on which `--pack` was run and whether `--also-user` and `--also-home` were
+passed. The check finds only the values it is given (see the docstring of `pipeline.py` for what it cannot find).
+Do not write the values themselves here: they are login names and home directories, which this document must not
+carry.
 
-| Cell label | Machine (operating system, host role) | `--also-user` values | `--also-home` values | Date checked |
+| Cell label | Machine (operating system, host role) | `--also-user` passed (number of values) | `--also-home` passed (number of values) | Date checked |
 |---|---|---|---|---|
 | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
 

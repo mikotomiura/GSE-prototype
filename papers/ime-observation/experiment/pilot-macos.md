@@ -17,11 +17,11 @@ reference to the system under test.
 | Input method | macOS Japanese, Romaji input (`com.apple.inputmethod.Kotoeri.RomajiTyping`), ABC layout as the other input source |
 | Live conversion | On in the first pilot and in one cell of the second; off in the other cell. Set through the input menu and read back from it |
 | Predictive candidates | Not changed from the input method's default (no override is stored in its preferences). Scenario S10 selects a predictive candidate |
-| Learning | Not reset between blocks or runs (a method of resetting it is still being examined). The example cell file (`kit/run/cell.example.json`) describes a reset at every block, which the pilot did not do |
+| Learning | Not reset between blocks or runs. No method of resetting the learning of this input method was found, and the measurement does not reset it either (see the pre-registration) |
 | Initial state | Before each block, `focus_cmd` brings the reference input field to the front, confirms it is in front, and presses the kana key (key code 104) so that the block starts in Japanese input |
 | Observation | The stand-alone logger built from an export of this repository |
 | Reference input field | `kit/refinput-macos`, wrapped in an application bundle by `build.sh` so that the front-window check can name it |
-| Plan | Corpus `c8f890cb…` (see `data.md`), seed 1, provisional settings: n = 3 per scenario and speed, key intervals with medians of 300, 200 and 120 ms, think time 0.2 to 20 s, 25 trials per block |
+| Plan | Corpus `c8f890cb…` (see `data.md`), seed 1 for `pilot-1` and `pilot2-on`, 5 for `pilot2-off` and 2 to 6 for the shorter runs, provisional settings: n = 3 per scenario and speed (1 in `verify-1` and `verify-off`), key intervals with medians of 300, 200 and 120 ms, think time 0.2 to 20 s, 25 trials per block. The other generator settings are those of the measurement (`experiment/plan_config.macos.json`) except the marker (see the findings) and the reset request, which the plans made but no reset command carried out (see Learning) |
 
 Scenario S9 is disabled by default in both procedure files, and S11 (which needs live conversion) is not run
 with live conversion off, so a cell has 14 or 13 scenarios.
@@ -89,7 +89,7 @@ exclusions in all three runs analysed (`pilot2-on`, `pilot2-off`, `verify-off`).
 A session's outcome is the reason it finally closed. Text committed automatically earlier in the same session is
 not counted, so when the head of a reading was committed and the rest was then cancelled, the session is a
 cancellation. With live conversion on this happened in 11 of the 27 cancelled trials (S4: 3, S5: 3, S6: 5 of 9
-each). How the observation's abandonment is compared with such sessions is fixed in the pre-registration.
+each). How the observation's abandonment is compared with such sessions is set out in the pre-registration.
 
 The 50 ms window needs the reference log to keep running after a commit. Within a trial no procedure types
 again after its committing or cancelling key, and trials are 1,000 ms apart. After the last trial the runner
@@ -127,7 +127,13 @@ In both runs the first block, at the start of the run, differed by about
 100 ms from the executor on both the observation and the reference side; the observation and the reference
 agreed with each other there to within 22 ms. A line fitted to all six blocks gives a drift of about −200 ms per
 hour, but this comes from block 0 alone: over blocks 1 to 5 (15 minutes) the fitted drift is within ±5 ms per
-hour. Analyses that align the observation with the reference use the per-block offsets.
+hour. The analysis does not correct for these offsets. The dwell error is a difference of durations and does
+not depend on them. Two intervals of the same length still pair under the overlap criterion of the matching as long
+as the offset stays at or below a third of that length (intervals of different lengths tolerate less), so the
+largest difference seen here (22 ms) could on its own affect only sessions shorter than about 66 ms; the delay with
+which an observation row is collected (up to about 100 ms; section 4.4 of the pre-registration) adds to it and
+raises this length to about 370 ms. The per-block offsets are measured in the same way in every run of the
+measurement and reported with the results.
 
 ### Reaching the observation
 
@@ -141,32 +147,57 @@ the number of marker presses (six blocks of three).
 
 Including the waits and markers, 126 trials took 23.2 minutes with live conversion on (11.0 s per trial) and 117
 trials took 23.2 minutes with it off (11.9 s per trial). The median trial lasted 7.9 s (on) and 9.5 s (off); the 95th percentile was
-26.3 s and 26.7 s, set by S13, which waits more than 20 s. For the measurement settings (below), the generator's estimate (`generate_plan.py --estimate`) is 11.2 s per trial
-with live conversion on and 11.4 s with it off.
+26.3 s and 26.7 s, set by S13, which waits more than 20 s. For the pilot's key intervals the generator's estimate
+(`generate_plan.py --estimate`) is 11.2 s per trial with live conversion on and 11.4 s with it off, close to the
+measured times.
 
 ## Consequences for the measurement
 
-- n = 75 per scenario and speed, with think time from 0.2 to 20 s. One macOS cell then takes about 9.8 hours
-  with live conversion on and 9.3 hours with it off. Lowering the upper limit of think time to 5 s would save
-  about one hour per cell and would remove the range in which the 20-second cut-off is examined.
+- n = 75 per scenario and speed, with think time from 0.2 to 20 s. With the pilot's key intervals one macOS cell
+  would take about 9.8 hours with live conversion on and 9.3 hours with it off; lowering the upper limit of think
+  time to 5 s would save about one hour per cell and would remove the range in which the 20-second cut-off is
+  examined. The key intervals of the measurement were set afterwards (medians of 480, 240 and 120 ms; see the
+  pre-registration), for which the generator estimates 13.6 and 13.8 s per trial and 11.9 and 11.2 hours per
+  cell.
 - The block-start marker is `left`, `right`, `left`, `right`. The three-key marker of the pilot cannot be told
   apart from the three arrow presses in a row that scenario S7 may make.
 - Cells with live conversion off use `kit/gen/recipes.macos-live-off.json` throughout: for the plan, and for the
   closed-set attack, which checks that the plan and the procedure file match.
 
-These settings are frozen with the pre-registration.
+The settings of the measurement are in `experiment/plan_config.macos.json` and are frozen with the
+pre-registration.
 
 ## Raw logs
 
-The raw logs of the pilot runs are kept on the measuring machine and are not yet deposited. Before they are, the
-criteria for which runs are deposited, and the tool that checks them, will be written here. Both logs can carry
-a person's typing: the observation records every key press on the machine, and the reference input field records
-the key code of every key-down it receives. The criteria will therefore require at least the following.
+The raw logs of the pilot runs are kept on the measuring machine and are not yet deposited. They are deposited with
+the measurement data under the following criteria, which were written before the freeze of the pre-registration and
+are those of the measurement (section 3.4 of the pre-registration). Both logs can carry a person's typing: the
+observation records every key press on the machine, and the reference input field records the key code of every
+key-down it receives.
 
-- Only planned runs are candidates: runs started by the runner from a plan, with a manifest, that were not
-  aborted.
-- In each run, every key row of the observation and every `key_down` of the reference log is matched, within a
-  stated tolerance, by a press the executor recorded as sent. The present reach count (`kit/pilot/reach.py`)
-  checks only the opposite direction, from the executor to the observation.
-- The hand-typed checks described above (in the reference input field and in TextEdit) and the hand-run probes
-  of the Enter and Escape behaviour were not runs of the runner and are not deposited.
+- Only runs of the runner are candidates: runs started by the runner from a plan, with a manifest (`run.json`). A
+  run that the runner aborted is a candidate on the same terms as in the measurement.
+- The rules of section 3.4 of the pre-registration on the delivery report do not catch the run, with the settings
+  fixed from this pilot and the run's own marker, which its plan states (three presses in these runs). What the
+  rules rest on and what they do not catch are stated in section 3.4 and in the item "The stopping rule counts
+  presses, not keys" of section 7 of the pre-registration. The plans of these runs are not those of section 2.4,
+  so the rule on the plan's SHA-256 does not apply to them.
+- `kit/analysis/pipeline.py --check-deposit` passes on the run directory. It applies the same rules and also checks
+  the files for paths and names and the logs, also those of an aborted run, for the content-free form.
+- Outside the losses of focus of the reference and the stretches that section 3.4 of the pre-registration counts with
+  them, rows of the observation without a sent press do not stop a run from being deposited; they are a result of the
+  observer under test, as in the measurement.
+
+The observation logs were sealed (`kit/pilot/seal_obs.py`) and only their key rows were read. Their sealed session
+rows are unsealed after the freeze and the measurement only to be deposited; they are not analysed (section 3.1 of
+the pre-registration). `--check-deposit` is therefore run at deposit time, after the unsealing. Before the
+freeze, the rule on presses and earlier forms of the rule on the loss of focus (which left out the planned switches
+of S15 and compared numbers of rows and presses) were applied to the key rows of the observation and to the
+reference logs of the six runs listed above and of `short-1`, a run of nine trials made just before the first
+pilot, and caught none of them; the one loss of focus outside the planned switches (`pilot2-off`, 31 ms) had no key
+press within it (section 3.1 of the pre-registration). The rules in their registered form are applied by
+`--check-deposit` at deposit time. Any other run of the runner made before the first pilot, such as a dry run that
+was interrupted, is deposited only if it meets the same criteria then.
+
+The hand-typed checks described above (in the reference input field and in TextEdit) and the hand-run probes of the
+Enter and Escape behaviour were not runs of the runner and are not deposited.

@@ -2,7 +2,8 @@
 # kit: selftest
 """Closed-set identification (attacker knowledge K2): which of K candidate phrases was typed (standard library only).
 
-  closed_set.py --obs OBS... --plan PLAN... --corpus F --recipes F --config F [--K 10,100,1000] [--seed N] --out F
+  closed_set.py --obs OBS... --plan PLAN... --corpus F --recipes F --config F [--K 10,100,1000] [--seed N]
+                [--bootstrap B] [--markers-in-obs] [--ime-toggle-in-obs] --out F
   closed_set.py --selftest        positive and negative controls on synthetic observations (fast)
 
 Simulation attack. For every candidate phrase the attacker runs the same scenario generator as the experiment
@@ -39,6 +40,25 @@ detail (see the coarsening order of FEATURE_SETS, COARSER_OR_EQUAL). Each featur
 maximum, over itself and every feature set derivable from it, of the measured accuracy (acc_raw holds the value
 measured for that feature set alone). The publication-granularity recommendation is to be read from the reported
 (maximum) value, not from acc_raw.
+
+Assignment of presses and blocks that do not match the plan. The observed presses are assigned to the plan in plan
+order (the evaluator supplies the trial boundaries). With --markers-in-obs the block-start markers appear in the
+observation and serve as anchors: a block whose presses (its marker and its trials, compared by category) equal the
+plan is scored; a block with a missing, extra or different press is left unscored and counted, and the next block is
+found again by its own marker, so one dropped press loses one block and never shifts the others (align_blocks). A
+marker is recognised at the right end of a run of its category (the press after it is not of its last category), so
+arrow presses just before it do not hide it, and a run of arrow presses inside a trial, at most three, cannot be
+mistaken for it when the marker is longer; a block is placed only where its whole sequence matches. Presses that no
+scored block covers are counted as unassigned. The output holds an `alignment` object (blocks, unscored blocks and
+trials by scenario and by speed, unassigned presses); n, the accuracies and the intervals are
+computed over the scored trials only. Without --markers-in-obs there is no anchor to resynchronise to, so any mismatch
+stops the run (exit 2).
+
+Descriptive block-bootstrap interval. Next to the Wilson intervals, each feature set reports a 95% percentile interval
+of acc and of acc_raw from a bootstrap that resamples blocks (the cluster of a trial is its block; blocks of different
+sessions are different clusters; the maximum behind acc is recomputed inside each resample), B resamples (--bootstrap),
+the seed of --seed. These intervals are descriptive; the decision rule reads the Wilson interval. With fewer than two
+blocks the interval is [null, null] and ci_block_status says so. by_speed gives the raw accuracy per speed level.
 
 Scope. The results hold for this attack only. No upper bound on identifiability is claimed: a stronger language model,
 boundary estimation or the combination of several trials is not included. Results (acc_raw) are reported as measured,
@@ -93,6 +113,7 @@ def coarser_or_equal(features):
     return [g for g, (gt, gr) in FEATURE_SETS.items() if _TIMING_RANK[gt] <= tr and _RUNS_RANK[gr] <= rr]
 
 
+DEFAULT_BOOTSTRAP = 2000   # resamples of the block bootstrap (descriptive intervals)
 PAUSE_MS = 600      # intervals shorter than this are treated as typing jitter and ignored (their law does not depend on the phrase)
 TAU_MS = 1000       # a difference of this size in the length of a pause gives the largest penalty
 W_TIME = 0.5        # weight of the pause penalty (one category mismatch costs 1)
@@ -333,19 +354,27 @@ def _pool_by_reading(corpus):
     return pool
 
 
-def evaluate(trials, corpus, K, features_list, seed, recipes, config):
+def evaluate(trials, corpus, K, features_list, seed, recipes, config, B=DEFAULT_BOOTSTRAP):
     """For every trial, attack with the typed phrase and K-1 decoys drawn from phrases the scenario could actually
     produce (see _scenario_pool), and return, for each feature set, the accuracy the removal experiment recommends
     a publication decision be based on next to the accuracy measured for that feature set alone.
 
-    trials: [{"trial_id", "scenario", "speed", "os", "phrase_id", "observed": [(t, category)]}].
+    trials: [{"trial_id", "cluster", "scenario", "speed", "os", "phrase_id", "observed": [(t, category)]}];
+    "cluster" names the block of the trial (the unit that the block bootstrap resamples; blocks of different
+    sessions are different clusters).
     Returns {feature set: {
       "acc": the maximum, over the feature set and every feature set derivable from it (coarser_or_equal), of the
              measured accuracy -- the value the publication-granularity recommendation is read from,
       "acc_ci": its Wilson 95% interval, "acc_source": the feature set the maximum came from,
       "acc_raw": the accuracy measured for this feature set alone, "acc_ci_raw": its Wilson 95% interval,
       "chance": 1/K, "n", "n_skipped", "mean_rank" (of the typed phrase, from this feature set alone),
-      "by_scenario": {scenario: {"acc", "n"}} (raw, per scenario)}}.
+      "by_scenario": {scenario: {"acc", "n"}} (raw, per scenario),
+      "by_speed": {speed: {"acc", "n"}} (raw, per speed),
+      "acc_ci_block", "acc_ci_raw_block": descriptive 95% percentile intervals of acc and acc_raw from a bootstrap
+             of B resamples of the blocks (stats.cluster_bootstrap; the maximum behind acc is recomputed inside
+             every resample); [None, None] when there are fewer than two blocks,
+      "ci_block_status": "ok" or "fewer_than_two_blocks", "n_blocks"}}.
+    The intervals of the block bootstrap are descriptive; the decision rule reads the Wilson interval.
     Correctness is judged on the typed reading (see _typed_reading), not on phrase identity, so that a scenario
     which only types part of the reading (S10) or a synthetic reading (S12) is judged the way the attacker's
     evidence actually constrains it. Trials whose phrase is not in the corpus (synthetic kana
@@ -361,7 +390,7 @@ def evaluate(trials, corpus, K, features_list, seed, recipes, config):
     preds = {}
     pools = {}    # (scenario, os) -> scenario-eligible pool (_scenario_pool)
     typed = {}    # (scenario, os) -> {phrase_id: typed reading} of that pool (_typed_map)
-    res = dict((f, {"correct": 0, "ranks": [], "by_scenario": {}}) for f in features_list)
+    res = dict((f, {"correct": 0, "ranks": [], "by_scenario": {}, "by_speed": {}, "hits": []}) for f in features_list)
     for tr in used:
         sk = (tr["scenario"], tr["os"])
         if sk not in pools:
@@ -384,9 +413,23 @@ def evaluate(trials, corpus, K, features_list, seed, recipes, config):
             bysc = res[f]["by_scenario"].setdefault(tr["scenario"], {"correct": 0, "n": 0})
             bysc["n"] += 1
             bysc["correct"] += correct
+            bysp = res[f]["by_speed"].setdefault(tr["speed"], {"correct": 0, "n": 0})
+            bysp["n"] += 1
+            bysp["correct"] += correct
+            res[f]["hits"].append(correct)
     out = {}
     n = len(used)
     all_x = dict((f, res[f]["correct"]) for f in features_list)
+    # one cluster per block: a 1-tuple holding (number of trials, correct trials of every feature set), so that a
+    # resample can be summed without visiting the trials
+    cluster_of = {}
+    for i, tr in enumerate(used):
+        c = cluster_of.setdefault(tr["cluster"], [0] + [0] * len(features_list))
+        c[0] += 1
+        for j, f in enumerate(features_list):
+            c[1 + j] += res[f]["hits"][i]
+    boot_clusters = [(tuple(c),) for c in cluster_of.values()]
+    index = dict((f, j + 1) for j, f in enumerate(features_list))
     for f in features_list:
         closure = [g for g in coarser_or_equal(f) if g in features_list]
         best_g = min(closure, key=lambda g: (-all_x[g], g))
@@ -395,7 +438,27 @@ def evaluate(trials, corpus, K, features_list, seed, recipes, config):
         lo_r, hi_r = stats.wilson(x_raw, n)
         by_sc = dict((s, {"acc": (v["correct"] / v["n"]) if v["n"] else None, "n": v["n"]})
                     for s, v in res[f]["by_scenario"].items())
+        by_sp = dict((s, {"acc": (v["correct"] / v["n"]) if v["n"] else None, "n": v["n"]})
+                     for s, v in res[f]["by_speed"].items())
+        if n and len(boot_clusters) >= 2:
+            members = [index[g] for g in closure]
+            col = index[f]
+            bseed = _sub_seed(seed, "block_bootstrap", K)
+
+            def stat_rep(sample, members=members):
+                tot = sum(c[0][0] for c in sample)
+                return max(sum(c[0][m] for c in sample) for m in members) / tot
+
+            def stat_raw(sample, col=col):
+                return sum(c[0][col] for c in sample) / sum(c[0][0] for c in sample)
+            ci_b = list(stats.cluster_bootstrap(boot_clusters, stat_rep, B, bseed))
+            ci_rb = list(stats.cluster_bootstrap(boot_clusters, stat_raw, B, bseed))
+            status = "ok"
+        else:
+            ci_b, ci_rb, status = [None, None], [None, None], "fewer_than_two_blocks"
         out[f] = {"acc": (x_rep / n) if n else None, "acc_ci": [lo, hi], "acc_source": best_g,
+                  "acc_ci_block": ci_b, "acc_ci_raw_block": ci_rb, "ci_block_status": status,
+                  "n_blocks": len(boot_clusters), "by_speed": by_sp,
                   "acc_raw": (x_raw / n) if n else None, "acc_ci_raw": [lo_r, hi_r],
                   "chance": 1.0 / K, "n": n, "n_skipped": len(trials) - n,
                   "mean_rank": (sum(res[f]["ranks"]) / n) if n else None, "by_scenario": by_sc}
@@ -508,37 +571,186 @@ def expected_categories(trial_row, keycat=KEYCAT, ime_toggle_in_obs=False):
     return out
 
 
-def segment_by_plan(events, rows, obs_os, markers_in_obs=False, ime_toggle_in_obs=False, tag=""):
-    """Cut the sequence of observed presses into trials in plan order (the evaluator supplies the boundaries).
+def marker_categories(marker, keycat=KEYCAT):
+    """The category sequence of a block-start marker, for an observation in which the marker presses appear
+    (--markers-in-obs). A marker key without a table entry (F13 to F19) is expected as "other", the category
+    from_vk gives its virtual-key code, in the same way as the IME toggle keys (see expected_categories)."""
+    return [keycat.get(k) or "other" for k in marker]
+
+
+def _is_anchor(cats, i, marker):
+    """True when cats[i:i+len(marker)] is the marker and the press after it, if there is one, is not of the
+    marker's last category. The test is anchored on the right: within a run of presses of the marker's category
+    that is longer than the marker, only the last len(marker) presses of the run stand as the marker, so a press
+    added in front of a marker, or the arrow presses that end the last trial of the block before it, do not hide
+    the marker. A run of fewer presses than the marker is not the marker."""
+    n = len(marker)
+    if n == 0 or cats[i:i + n] != marker:
+        return False
+    if i + n < len(cats) and cats[i + n] == marker[-1]:
+        return False
+    return True
+
+
+def _next_anchor(cats, marker, start):
+    """The first index at or after `start` at which the marker stands as an anchor (see _is_anchor), or None."""
+    for i in range(max(start, 0), len(cats) - len(marker) + 1):
+        if _is_anchor(cats, i, marker):
+            return i
+    return None
+
+
+def align_blocks(cats, blocks):
+    """Resynchronise the observed category sequence to the plan at the block markers.
+
+    cats: the observed categories. blocks: [(marker categories, [expected category list of each trial])], in plan
+    order. The expected sequence of a block is its marker followed by its trials. Returns (starts, n_unassigned);
+    starts[i] is the index in cats at which the expected sequence of block i begins, or None when block i is left
+    unscored (its observed presses do not match the plan).
+
+    A cursor walks the observation. When the expected sequence of a block equals cats at the cursor, the block is
+    placed there. Otherwise the anchors at or after the cursor are scanned in order, an anchor being a position at
+    which the marker of the block or the marker of the following block stands at the right end of a run (see
+    _is_anchor); the markers may differ between blocks. At each anchor: when the whole expected sequence of the block
+    matches there, the block is placed there (the presses before it stay unassigned); otherwise, when the whole
+    expected sequence of the following block matches there, the block is left unscored and the cursor moves to that
+    anchor. An anchor at which neither matches (a run of the marker's length that arises inside a trial, for
+    instance three arrow presses and one added) is passed over. When no anchor qualifies, the block is left
+    unscored and the cursor stays, so the next block scans from the same place. Hence one difference (a missing,
+    added or changed press, a damaged marker) loses only the block whose presses contain it, also when a missing
+    press at the end of a block leaves arrow presses next to the marker of the next block; a press added between two
+    blocks loses no block and is counted as unassigned. These properties are checked by the selftest's cases; they
+    are not proved in general.
+    n_unassigned is the number of presses that no placed block covers (stray presses, the presses of unscored
+    blocks, presses after the last block).
+    """
+    seqs = [list(m) + [c for t in ts for c in t] for m, ts in blocks]
+    starts = [None] * len(blocks)
+    cursor = 0
+    for i, (marker, _) in enumerate(blocks):
+        exp = seqs[i]
+        if cats[cursor:cursor + len(exp)] == exp:
+            starts[i] = cursor
+            cursor += len(exp)
+            continue
+        nxt = blocks[i + 1][0] if i + 1 < len(blocks) else None
+        for p in range(cursor, len(cats)):
+            if not (_is_anchor(cats, p, marker) or (nxt is not None and _is_anchor(cats, p, nxt))):
+                continue
+            if cats[p:p + len(exp)] == exp:
+                starts[i] = p
+                cursor = p + len(exp)
+                break
+            if nxt is not None and cats[p:p + len(seqs[i + 1])] == seqs[i + 1]:
+                cursor = p
+                break
+    covered = sum(len(seqs[i]) for i, s in enumerate(starts) if s is not None)
+    return starts, len(cats) - covered
+
+
+def align_plan(cats, rows, obs_os, markers_in_obs=False, ime_toggle_in_obs=False, tag=""):
+    """Assign the observed categories to the trials of a plan. Returns (scored, alignment).
+
+    scored: [{"row", "start", "n"}] for every trial of a block that matches the plan (cats[start:start+n] is its
+    presses). alignment: {"n_blocks", "n_blocks_unscored", "unscored_block_ids", "n_trials", "n_trials_unscored",
+    "unscored_by_scenario", "unscored_by_speed", "unscored_reason", "n_presses", "n_presses_unassigned"} (see
+    merge_alignments for the meaning of the counts).
 
     obs_os is the os the observation's own header declared (read_obs); it must agree with the plan's header os, so a
-    mismatched pair of files is rejected instead of silently scored under the wrong OS's rules. The number of
-    presses and the category sequence of every trial must agree with the plan; otherwise ValueError is raised, so
-    that a dropped key never shifts later trials silently. When markers_in_obs is true, the presses of the
-    block-start markers are skipped; ime_toggle_in_obs is passed to expected_categories. Returns
-    [{"trial_id", "block_id", "scenario", "speed", "phrase_id", "os", "observed"}].
+    mismatched pair of files is rejected instead of silently scored under the wrong OS's rules.
+
+    With markers_in_obs, the blocks are resynchronised at their markers (align_blocks): a block whose presses do
+    not match the plan (a missing, extra or different press) is left unscored and counted, and the other blocks are
+    scored. Without markers_in_obs the observation holds no marker to resynchronise to, so the presses are assigned
+    in plan order and any mismatch of a trial's category sequence, or any press left over, raises ValueError (a
+    dropped key must not shift the later trials silently). ime_toggle_in_obs is passed to expected_categories.
     """
     header = rows[0]
     if obs_os != header["os"]:
         raise ValueError("the observation's os (%s) does not match the plan's os (%s)" % (obs_os, header["os"]))
-    pos = 0
-    out = []
-    for r in rows[1:]:
-        if r["kind"] == "block":
-            if markers_in_obs:
-                pos += len(r["marker"])
-            continue
-        exp = expected_categories(r, ime_toggle_in_obs=ime_toggle_in_obs)
-        seg = events[pos:pos + len(exp)]
-        if [c for _, c in seg] != exp:
-            raise ValueError("trial %s%s: the presses do not match the plan (missing, extra or different keys)" % (
-                tag, r["trial_id"]))
-        pos += len(exp)
-        out.append({"trial_id": tag + r["trial_id"], "block_id": r["block_id"], "scenario": r["scenario"],
-                    "speed": r["speed"], "phrase_id": r["phrase_id"], "os": header["os"], "observed": seg})
-    if pos != len(events):
-        raise ValueError("the observation has %d more presses than the plan" % (len(events) - pos))
+    scored = []
+    unscored = []     # (block id, [trial rows])
+    n_blocks = sum(1 for r in rows[1:] if r["kind"] == "block")
+    n_trials = sum(1 for r in rows[1:] if r["kind"] != "block")
+    if not markers_in_obs:
+        pos = 0
+        for r in rows[1:]:
+            if r["kind"] == "block":
+                continue
+            exp = expected_categories(r, ime_toggle_in_obs=ime_toggle_in_obs)
+            if cats[pos:pos + len(exp)] != exp:
+                raise ValueError("trial %s%s: the presses do not match the plan (missing, extra or different keys)"
+                                 % (tag, r["trial_id"]))
+            scored.append({"row": r, "start": pos, "n": len(exp)})
+            pos += len(exp)
+        if pos != len(cats):
+            raise ValueError("the observation has %d more presses than the plan" % (len(cats) - pos))
+        n_unassigned = 0
+    else:
+        blocks = []   # (block id, marker categories, [trial rows], [expected categories])
+        for r in rows[1:]:
+            if r["kind"] == "block":
+                blocks.append((r["block_id"], marker_categories(r["marker"]), [], []))
+            elif not blocks:
+                raise ValueError("the plan has a trial (%s) before its first block" % r["trial_id"])
+            else:
+                blocks[-1][2].append(r)
+                blocks[-1][3].append(expected_categories(r, ime_toggle_in_obs=ime_toggle_in_obs))
+        starts, n_unassigned = align_blocks(cats, [(m, exps) for _, m, _, exps in blocks])
+        for (bid, m, trs, exps), s in zip(blocks, starts):
+            if s is None:
+                unscored.append((bid, trs))
+                continue
+            p = s + len(m)
+            for r, e in zip(trs, exps):
+                scored.append({"row": r, "start": p, "n": len(e)})
+                p += len(e)
+    by_sc, by_sp = {}, {}
+    for _, trs in unscored:
+        for r in trs:
+            by_sc[r["scenario"]] = by_sc.get(r["scenario"], 0) + 1
+            by_sp[r["speed"]] = by_sp.get(r["speed"], 0) + 1
+    alignment = {"n_blocks": n_blocks, "n_blocks_unscored": len(unscored),
+                 "unscored_block_ids": [tag + str(bid) for bid, _ in unscored], "n_trials": n_trials,
+                 "n_trials_unscored": sum(len(trs) for _, trs in unscored), "unscored_by_scenario": by_sc,
+                 "unscored_by_speed": by_sp, "unscored_reason": "block_mismatch", "n_presses": len(cats),
+                 "n_presses_unassigned": n_unassigned}
+    return scored, alignment
+
+
+def merge_alignments(alignments):
+    """Sum the alignment objects of several sessions (align_plan). n_presses_unassigned counts the presses that no
+    scored block covers, which includes the presses of the unscored blocks themselves."""
+    out = {"n_blocks": 0, "n_blocks_unscored": 0, "unscored_block_ids": [], "n_trials": 0, "n_trials_unscored": 0,
+           "unscored_by_scenario": {}, "unscored_by_speed": {}, "unscored_reason": "block_mismatch", "n_presses": 0,
+           "n_presses_unassigned": 0}
+    for al in alignments:
+        for k in ("n_blocks", "n_blocks_unscored", "n_trials", "n_trials_unscored", "n_presses",
+                  "n_presses_unassigned"):
+            out[k] += al[k]
+        out["unscored_block_ids"].extend(al["unscored_block_ids"])
+        for k in ("unscored_by_scenario", "unscored_by_speed"):
+            for name, v in al[k].items():
+                out[k][name] = out[k].get(name, 0) + v
     return out
+
+
+def segment_by_plan(events, rows, obs_os, markers_in_obs=False, ime_toggle_in_obs=False, tag=""):
+    """Cut the sequence of observed presses into trials in plan order (the evaluator supplies the boundaries).
+
+    The assignment, the resynchronisation at block markers and the stop on a mismatch without markers are those of
+    align_plan. Returns ([{"trial_id", "block_id", "cluster", "scenario", "speed", "phrase_id", "os", "observed"}]
+    for the scored trials, the alignment object); "cluster" is the block, qualified by tag, that the block
+    bootstrap of evaluate resamples.
+    """
+    scored, alignment = align_plan([c for _, c in events], rows, obs_os, markers_in_obs, ime_toggle_in_obs, tag)
+    out = []
+    for s in scored:
+        r = s["row"]
+        out.append({"trial_id": tag + r["trial_id"], "block_id": r["block_id"], "cluster": tag + str(r["block_id"]),
+                    "scenario": r["scenario"], "speed": r["speed"], "phrase_id": r["phrase_id"], "os": rows[0]["os"],
+                    "observed": events[s["start"]:s["start"] + s["n"]]})
+    return out, alignment
 
 
 # ---------------------------------------------------------------- CLI
@@ -558,7 +770,7 @@ def _sha_file(path):
 
 
 def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, Ks, features_list, seed, markers_in_obs,
-        ime_toggle_in_obs=False):
+        ime_toggle_in_obs=False, bootstrap=DEFAULT_BOOTSTRAP):
     if len(obs_paths) != len(plan_paths):
         raise ValueError("--obs and --plan differ in count (%d and %d)" % (len(obs_paths), len(plan_paths)))
     recipes = generate_plan.load_recipes(recipes_path)
@@ -573,6 +785,7 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, Ks, featu
     corpus = generate_plan.load_corpus(corpus_path)
     trials = []
     n_shadow = 0
+    alignments = []
     for i, (op, pp) in enumerate(zip(obs_paths, plan_paths)):
         plan = read_plan(pp)
         # The candidates' key presses are predicted from these procedures and this configuration (K2), so they must
@@ -584,12 +797,14 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, Ks, featu
                                  "the file the plan was built from" % (i + 1, what, what, what))
         events, sh, obs_os = read_obs(op)
         n_shadow += sh
-        trials.extend(segment_by_plan(events, plan, obs_os, markers_in_obs, ime_toggle_in_obs, tag="s%d-" % i))
+        seg, al = segment_by_plan(events, plan, obs_os, markers_in_obs, ime_toggle_in_obs, tag="s%d-" % i)
+        trials.extend(seg)
+        alignments.append(al)
     results = {}
     for K in Ks:
-        results[str(K)] = evaluate(trials, corpus, K, features_list, seed, recipes, config)
-    return {"format": FORMAT, "assumptions": ASSUMPTIONS, "seed": seed, "n_sessions": len(obs_paths),
-            "n_trials": len(trials), "n_ime_shadow_rows_unused": n_shadow, "features": dict(
+        results[str(K)] = evaluate(trials, corpus, K, features_list, seed, recipes, config, B=bootstrap)
+    return {"format": FORMAT, "assumptions": ASSUMPTIONS, "seed": seed, "bootstrap": bootstrap,
+            "n_sessions": len(obs_paths), "n_trials": len(trials), "alignment": merge_alignments(alignments), "n_ime_shadow_rows_unused": n_shadow, "features": dict(
                 (f, {"timing": FEATURE_SETS[f][0], "runs": FEATURE_SETS[f][1]}) for f in features_list),
             "params": {"pause_ms": PAUSE_MS, "tau_ms": TAU_MS, "w_time": W_TIME, "phase_step_ms": PHASE_STEP_MS},
             "corpus_sha256": _sha_file(corpus_path), "recipes_sha256": recipes_sha256,
@@ -646,7 +861,7 @@ def _selftest_world(tmp, n_trials, seed, scenarios):
         for t, c in obs:
             t = int(round(t + 30.0 * _normal(rng)))
             jit.append((max(t, jit[-1][0]) if jit else t, c))
-        trials.append({"trial_id": tid, "scenario": sc, "speed": sp, "os": "macos", "phrase_id": ph["phrase_id"],
+        trials.append({"trial_id": tid, "cluster": "b%d" % (i // 12), "scenario": sc, "speed": sp, "os": "macos", "phrase_id": ph["phrase_id"],
                        "observed": jit})
     return recipes, cfg, cfg_path, corpus, corpus_path, trials
 
@@ -843,7 +1058,7 @@ def selftest():
         mixed_corpus = mixed + list(corpus[:30])
         s12_row = generate_plan.build_trial(mixed[0], "S12", "mid", "macos", recipes, cfg,
                                             generate_plan.trial_rng(1, "s12t"), "s12t", 0)
-        s12_trials = [{"trial_id": "s12t", "scenario": "S12", "speed": "mid", "os": "macos",
+        s12_trials = [{"trial_id": "s12t", "cluster": "b0", "scenario": "S12", "speed": "mid", "os": "macos",
                       "phrase_id": mixed[0]["phrase_id"], "observed": simulate(s12_row, KEYCAT, t0=0)}]
         try:
             evaluate(s12_trials, mixed_corpus, 10, ["all"], 1, recipes, cfg)
@@ -923,7 +1138,7 @@ def selftest():
             if r["kind"] == "block":
                 clock += 5000
                 for _ in r["marker"]:
-                    mk_lines.append('{"type":"key","t":%d,"category":"function","press":true}' % clock)
+                    mk_lines.append('{"type":"key","t":%d,"category":"other","press":true}' % clock)
                     clock += r["marker_gap_ms"]
                 continue
             clock += r["gap_before_ms"]
@@ -1031,13 +1246,273 @@ def selftest():
         s14_rows = [s14_header, s14row]
         obs14 = simulate(s14row, KEYCAT, t0=0)
         check("positive: segment_by_plan accepts an observation without the IME toggle presses by default",
-              len(segment_by_plan(obs14, s14_rows, "macos")) == 1)
+              len(segment_by_plan(obs14, s14_rows, "macos")[0]) == 1)
         obs14_toggle = obs14 + [(obs14[-1][0] + 10, "other"), (obs14[-1][0] + 20, "other")]
         raises("negative: segment_by_plan rejects the same observation with the two extra IME-toggle rows when "
               "the switch is off",
                lambda: segment_by_plan(obs14_toggle, s14_rows, "macos"))
         check("positive: segment_by_plan accepts the IME-toggle rows once --ime-toggle-in-obs is set",
-              len(segment_by_plan(obs14_toggle, s14_rows, "macos", ime_toggle_in_obs=True)) == 1)
+              len(segment_by_plan(obs14_toggle, s14_rows, "macos", ime_toggle_in_obs=True)[0]) == 1)
+
+        # ---- block resynchronisation (--markers-in-obs): a block that does not match the plan is left unscored
+        rows_p = read_plan(plan_path)
+        evs_mk, _, os_mk = read_obs(mk_p)
+        layout = []    # [marker presses, trial presses, trials, block_id] of every block
+        for r in rows_p[1:]:
+            if r["kind"] == "block":
+                layout.append([len(r["marker"]), 0, 0, r["block_id"]])
+            else:
+                layout[-1][1] += len(expected_categories(r))
+                layout[-1][2] += 1
+        blen = [m + k for m, k, _, _ in layout]
+        bstart = [sum(blen[:i]) for i in range(len(blen))]
+        n_all = sum(t for _, _, t, _ in layout)
+
+        def seg(evs):
+            return segment_by_plan(evs, rows_p, os_mk, True)
+
+        def lost(evs, i):
+            """segment_by_plan on evs; True when exactly block i is unscored and its counts are right."""
+            tr, al = seg(evs)
+            ids = set(t["trial_id"] for t in tr)
+            return (al["unscored_block_ids"] == [str(layout[i][3])] and al["n_blocks_unscored"] == 1
+                    and al["n_trials_unscored"] == layout[i][2] and len(tr) == n_all - layout[i][2]
+                    and sum(al["unscored_by_scenario"].values()) == layout[i][2]
+                    and sum(al["unscored_by_speed"].values()) == layout[i][2]
+                    and not any(t["block_id"] == layout[i][3] for t in tr) and len(ids) == len(tr)), al
+
+        check("alignment setup: the plan has several blocks and an intact observation scores every trial",
+              len(layout) >= 3 and len(seg(evs_mk)[0]) == n_all and seg(evs_mk)[1]["n_blocks"] == len(layout)
+              and seg(evs_mk)[1]["n_blocks_unscored"] == 0 and seg(evs_mk)[1]["n_presses_unassigned"] == 0
+              and len(evs_mk) == sum(blen) and seg(evs_mk)[1]["n_presses"] == len(evs_mk))
+        check("alignment: the observed presses of a scored trial are its own presses",
+              [c for _, c in seg(evs_mk)[0][0]["observed"]]
+              == expected_categories(next(r for r in rows_p[1:] if r["kind"] == "trial")))
+        for i in (0, 1, len(layout) - 1):
+            ok, al = lost(evs_mk[:bstart[i] + layout[i][0] + 2] + evs_mk[bstart[i] + layout[i][0] + 3:], i)
+            check("alignment: one missing press inside block %d leaves only that block unscored" % i, ok, repr(al))
+            check("alignment: that block's presses are counted as unassigned (block %d)" % i,
+                  al["n_presses_unassigned"] == blen[i] - 1 and al["n_presses"] == len(evs_mk) - 1, repr(al))
+        i = 1
+        ext = evs_mk[:bstart[i] + layout[i][0] + 2] + [(0, "enter")] + evs_mk[bstart[i] + layout[i][0] + 2:]
+        ok, al = lost(ext, i)
+        check("alignment: one extra press inside a block leaves only that block unscored", ok, repr(al))
+        check("alignment: the extra press and the block's presses are counted as unassigned",
+              al["n_presses_unassigned"] == blen[i] + 1, repr(al))
+        stray = evs_mk[:bstart[1]] + [(0, "escape")] + evs_mk[bstart[1]:]
+        tr_s, al_s = seg(stray)
+        check("alignment: a stray press between two blocks loses no block and is counted as one unassigned press",
+              len(tr_s) == n_all and al_s["n_blocks_unscored"] == 0 and al_s["n_presses_unassigned"] == 1, repr(al_s))
+        stray2 = evs_mk[:bstart[1]] + [(0, "escape"), (0, "escape"), (0, "enter")] + evs_mk[bstart[1]:]
+        tr_s2, al_s2 = seg(stray2)
+        check("alignment: several stray presses before a block are all counted as unassigned",
+              len(tr_s2) == n_all and al_s2["n_presses_unassigned"] == 3, repr(al_s2))
+        tail = evs_mk + [(0, "escape")] * 5
+        tr_t, al_t = seg(tail)
+        check("alignment: presses left after the last block are counted as unassigned, without an error",
+              len(tr_t) == n_all and al_t["n_blocks_unscored"] == 0 and al_t["n_presses_unassigned"] == 5, repr(al_t))
+        for i in (0, 1, len(layout) - 1):
+            ok, al = lost(evs_mk[:bstart[i]] + evs_mk[bstart[i] + 1:], i)
+            check("alignment: a press missing from the marker of block %d leaves that block unscored and no other"
+                  % i, ok, repr(al))
+        bad_two = evs_mk[:bstart[1]] + evs_mk[bstart[1] + 1:bstart[2] + layout[2][0] + 1] \
+            + evs_mk[bstart[2] + layout[2][0] + 2:]
+        tr_b, al_b = seg(bad_two)
+        check("alignment: a damaged marker in one block and a missing press in the next leave both unscored and "
+              "the others scored (no crash, no shift)",
+              al_b["unscored_block_ids"] == [str(layout[1][3]), str(layout[2][3])]
+              and len(tr_b) == n_all - layout[1][2] - layout[2][2]
+              and al_b["n_trials_unscored"] == layout[1][2] + layout[2][2], repr(al_b))
+        check("alignment: a trial of a scored block is the same with and without damage elsewhere (the cut is by plan)",
+              [t["observed"] for t in tr_b if t["block_id"] == layout[0][3]]
+              == [t["observed"] for t in seg(evs_mk)[0] if t["block_id"] == layout[0][3]])
+        gone = [e for e in evs_mk if e[1] not in ("other",)]
+        tr_g, al_g = seg(gone)
+        check("alignment: with every marker press missing no block can be found again: all unscored, no error",
+              tr_g == [] and al_g["n_blocks_unscored"] == len(layout) and al_g["n_trials_unscored"] == n_all
+              and al_g["n_presses_unassigned"] == len(gone), repr(al_g))
+        # navigation marker (macOS): anchored at the right end of a run, never a run of arrows inside a trial
+        nav = "navigation"
+        mk4 = [nav] * 4
+        t1 = ["alphabetic", "space", nav, nav, nav, "enter"]
+        t2 = ["alphabetic", "enter"]
+        nb = [(mk4, [t1, t2]), (mk4, [t2, t1]), (mk4, [t1])]
+        sq = [mk4 + t1 + t2, mk4 + t2 + t1, mk4 + t1]
+        full = sq[0] + sq[1] + sq[2]
+        check("align_blocks: an intact sequence with a four-press navigation marker is placed block by block",
+              align_blocks(full, nb) == ([0, len(sq[0]), len(sq[0]) + len(sq[1])], 0))
+        cut = len(sq[0])
+        check("align_blocks: a press missing from a navigation marker (a run of three) leaves that block unscored; "
+              "the next block is found by its own marker",
+              align_blocks(full[:cut] + full[cut + 1:], nb) == ([0, None, len(sq[0]) + len(sq[1]) - 1], len(sq[1]) - 1))
+        check("align_blocks: an extra navigation press in front of a marker (a run of five) hides nothing: the "
+              "block is placed after the added press, which is unassigned",
+              align_blocks(full[:cut] + [nav] + full[cut:], nb) == ([0, cut + 1, len(sq[0]) + len(sq[1]) + 1], 1))
+        check("_is_anchor: the marker is an anchor at the right end of a run; in a longer run only the last "
+              "len(marker) presses are; a shorter run is not",
+              _is_anchor([nav] * 4, 0, mk4) and not _is_anchor([nav] * 5, 0, mk4) and _is_anchor([nav] * 5, 1, mk4)
+              and _is_anchor([nav] * 7, 3, mk4) and not _is_anchor([nav] * 7, 2, mk4)
+              and _is_anchor(["space"] + [nav] * 4 + ["enter"], 1, mk4) and not _is_anchor([nav] * 3, 0, mk4))
+        mid = cut + 4 + len(t2) + 3
+        check("align_blocks: a missing press among the arrows of a trial leaves only that block unscored",
+              align_blocks(full[:mid] + full[mid + 1:], nb)[0] == [0, None, len(sq[0]) + len(sq[1]) - 1])
+        check("align_blocks: a run of three arrows inside a trial is never taken for a marker (nothing placed when "
+              "only trial presses are present)",
+              align_blocks(t1 + t1, nb)[0] == [None, None, None])
+        # a run of exactly four navigation presses inside a trial that is not a marker (an added press) loses that block only
+        rm = ["nav"] * 4
+
+        def rblk(k):
+            return (rm, [["L"] * (3 + k) + ["sp", "ret"], ["L"] * (2 + k % 3) + ["sp", "nav", "nav", "nav", "ret"],
+                         ["L"] * (1 + (k * 2) % 5) + ["bs", "ret"]])
+        rbl = [rblk(k) for k in range(8)]
+        rsq = [list(m) + [c for t in ts for c in t] for m, ts in rbl]
+        roff = [sum(len(x) for x in rsq[:j]) for j in range(len(rsq))]
+        rcats = [c for x in rsq for c in x]
+        rb = 1
+        rpos = roff[rb] + 4 + len(rbl[rb][1][0]) + (2 + rb % 3) + 2     # after the third arrow of trial 2 of block 1
+        rst, rn = align_blocks(rcats[:rpos] + ["nav"] + rcats[rpos:], rbl)
+        check("align_blocks: an added arrow that makes a run of four inside a trial loses that block only; the blocks "
+              "after it are placed one press later, and the lost block's presses and the added one are unassigned",
+              rst == [roff[0], None] + [roff[j] + 1 for j in range(2, 8)] and rn == len(rsq[rb]) + 1, repr((rst, rn)))
+        rpos = roff[rb] + len(rsq[rb]) - 1                  # an added arrow before the last press of block 1
+        rst, rn = align_blocks(rcats[:rpos] + ["nav"] + rcats[rpos:], rbl)
+        check("align_blocks: an added arrow before the last press of a block loses that block only",
+              rst == [roff[0], None] + [roff[j] + 1 for j in range(2, 8)], repr(rst))
+        rpos = roff[rb + 1]                                 # an added arrow right before the marker of block 2
+        rst, rn = align_blocks(rcats[:rpos] + ["nav"] + rcats[rpos:], rbl)
+        check("align_blocks: an added arrow right before a marker (a run of five) loses no block; the added press "
+              "is unassigned and the blocks after it are placed one press later",
+              rst == [roff[0], roff[1], roff[2] + 1] + [roff[j] + 1 for j in range(3, 8)] and rn == 1, repr((rst, rn)))
+        # a block whose last trial ends in arrow presses (as the macOS live-conversion-off recipe does) and whose
+        # closing Enter is missing: the arrows join the marker of the next block into a run of five to seven
+        for na in (1, 2, 3):
+            ends = [("L", "sp") + ("nav",) * na + ("ret",)]
+            eb = [(rm, [["L"] * (1 + k) + ["ret"], list(ends[0])]) for k in range(4)]
+            esq = [list(m) + [c for t in ts for c in t] for m, ts in eb]
+            eoff = [sum(len(x) for x in esq[:j]) for j in range(len(esq))]
+            ecats = [c for x in esq for c in x]
+            for lost_b in (0, 1, 2):
+                cutat = eoff[lost_b] + len(esq[lost_b]) - 1          # the last Enter of block lost_b
+                est, en = align_blocks(ecats[:cutat] + ecats[cutat + 1:], eb)
+                want = [None if j == lost_b else (eoff[j] if j < lost_b else eoff[j] - 1) for j in range(4)]
+                check("align_blocks: the closing Enter of block %d missing after %d arrows loses that block only"
+                      % (lost_b, na), est == want and en == len(esq[lost_b]) - 1, repr((est, en)))
+        # a press added after the last trial of a block (between two blocks) loses no block
+        epos = eoff[2]
+        est, en = align_blocks(ecats[:epos] + ["nav"] + ecats[epos:], eb)
+        check("align_blocks: an arrow added between two blocks loses no block and is counted as unassigned",
+              est == [eoff[0], eoff[1], eoff[2] + 1, eoff[3] + 1] and en == 1, repr((est, en)))
+        # an arrow added in front of the marker of the first block: the block is scored
+        est, en = align_blocks(["nav"] + ecats, eb)
+        check("align_blocks: an arrow added in front of the first marker leaves every block scored",
+              est == [eoff[j] + 1 for j in range(4)] and en == 1, repr((est, en)))
+        rst, rn = align_blocks(rcats[:roff[3]] + rcats[roff[3] + 1:], rbl)
+        check("align_blocks: with an unscored block the next block scans from the same place (a damaged marker in "
+              "block 3 loses block 3 only)",
+              rst == [roff[0], roff[1], roff[2], None] + [roff[j] - 1 for j in range(4, 8)], repr(rst))
+        # the following block, found whole at an anchor, takes the cursor even when block i would match further on
+        sw = align_blocks(sq[1] + sq[0], nb[:2])
+        check("align_blocks: when the following block matches at an anchor, the block before it is left unscored "
+              "even if its own sequence stands later in the observation",
+              sw == ([None, 0], len(sq[0])), repr(sw))
+        mk3 = [nav] * 3
+        s3 = mk3 + t2 + t1
+        sw2 = align_blocks(s3 + sq[0], [(mk4, [t1, t2]), (mk3, [t2, t1])])
+        check("align_blocks: the marker of the following block is an anchor too, when the markers differ",
+              sw2 == ([None, 0], len(sq[0])), repr(sw2))
+        nb4 = nb + [(mk4, [t2])]
+        sq4 = sq + [mk4 + t2]
+        full4 = sq4[0] + sq4[1][:4] + sq4[1][5:] + sq4[2][:4] + sq4[2][5:] + sq4[3]
+        al4 = align_blocks(full4, nb4)
+        check("align_blocks: two blocks lost in a row leave the blocks after them scored (no anchor qualifies for "
+              "the first one; the cursor stays)",
+              al4[0] == [0, None, None, len(sq4[0]) + len(sq4[1]) + len(sq4[2]) - 2], repr(al4))
+        check("align_blocks: an empty observation places nothing and does not fail",
+              align_blocks([], nb) == ([None, None, None], 0))
+        last = bstart[1] + blen[1] - 1
+        ok, al = lost(evs_mk[:last] + [(evs_mk[last][0], "escape")] + evs_mk[last + 1:], 1)
+        check("alignment: a different category in the last press of a block leaves that block unscored", ok, repr(al))
+        # without markers there is no anchor: any mismatch stops the run
+        ev_nm, _, os_nm = read_obs(obs_p)
+        raises("without --markers-in-obs a missing press raises (no anchor to resynchronise to)",
+               lambda: segment_by_plan(ev_nm[:7] + ev_nm[8:], rows_p, os_nm))
+        raises("without --markers-in-obs an extra press raises",
+               lambda: segment_by_plan(ev_nm[:7] + [(0, "enter")] + ev_nm[7:], rows_p, os_nm))
+        raises("without --markers-in-obs presses left after the last trial raise",
+               lambda: segment_by_plan(ev_nm + [(0, "enter")], rows_p, os_nm))
+        miss_p = obs_file(fix_order(mk_lines[:bstart[1] + layout[1][0] + 4] + mk_lines[bstart[1] + layout[1][0] + 5:]),
+                          "mk_missing.ndjson")
+        out_ms = new_out()
+        rc_ms = main(["--obs", miss_p] + base + ["--out", out_ms, "--markers-in-obs", "--bootstrap", "50"])
+        check("command line: with --markers-in-obs one missing press does not stop the run (exit 0)", rc_ms == 0, str(rc_ms))
+        if rc_ms == 0:
+            with open(out_ms, "rb") as fh:
+                jm = json.loads(fh.read().decode("utf-8"))
+            ali = jm["alignment"]
+            check("command line: the output reports the alignment (one unscored block, its trials by scenario and "
+                  "speed, the unassigned presses) and n counts the scored trials only",
+                  ali["n_blocks"] == len(layout) and ali["n_blocks_unscored"] == 1
+                  and ali["unscored_block_ids"] == ["s0-" + str(layout[1][3])]
+                  and ali["n_trials_unscored"] == layout[1][2] and jm["n_trials"] == n_all - layout[1][2]
+                  and jm["results"]["10"]["all"]["n"] == n_all - layout[1][2]
+                  and sum(ali["unscored_by_scenario"].values()) == layout[1][2]
+                  and sum(ali["unscored_by_speed"].values()) == layout[1][2]
+                  and ali["n_presses_unassigned"] == blen[1] - 1 and jm["bootstrap"] == 50
+                  and jm["results"]["10"]["all"]["n_blocks"] == len(layout) - 1, repr(ali))
+            check("command line: the output holds the block-bootstrap fields and by_speed",
+                  all(k in jm["results"]["10"]["all"] for k in ("acc_ci_block", "acc_ci_raw_block", "ci_block_status",
+                                                                  "by_speed", "n_blocks")))
+        check("command line: --bootstrap must be at least 1 (exit 2)",
+              main(["--obs", mk_p] + base + ["--out", new_out(), "--markers-in-obs", "--bootstrap", "0"]) == 2)
+
+        # ---- descriptive block-bootstrap interval and by_speed
+        fb = ["all", "counts_only"]
+        e1 = evaluate(trials, corpus, 10, fb, 7, recipes, cfg, B=200)
+        e2 = evaluate(trials, corpus, 10, fb, 7, recipes, cfg, B=200)
+        e3 = evaluate(trials, corpus, 10, fb, 8, recipes, cfg, B=200)
+        for f in fb:
+            r1 = e1[f]
+            check("block bootstrap %s: status ok, 13 blocks, ordered intervals inside [0, 1]" % f,
+                  r1["ci_block_status"] == "ok" and r1["n_blocks"] == 13
+                  and 0.0 <= r1["acc_ci_block"][0] <= r1["acc_ci_block"][1] <= 1.0
+                  and 0.0 <= r1["acc_ci_raw_block"][0] <= r1["acc_ci_raw_block"][1] <= 1.0, repr(r1))
+            check("block bootstrap %s: deterministic for a fixed seed" % f,
+                  (r1["acc_ci_block"], r1["acc_ci_raw_block"]) == (e2[f]["acc_ci_block"], e2[f]["acc_ci_raw_block"]))
+            check("block bootstrap %s: the interval of the maximum is not below that of the raw accuracy "
+                  "(the maximum is taken inside each resample)" % f,
+                  r1["acc_ci_block"][0] >= r1["acc_ci_raw_block"][0] - 1e-12
+                  and r1["acc_ci_block"][1] >= r1["acc_ci_raw_block"][1] - 1e-12)
+        check("block bootstrap: a different seed gives different intervals",
+              (e1["all"]["acc_ci_raw_block"], e1["counts_only"]["acc_ci_raw_block"])
+              != (e3["all"]["acc_ci_raw_block"], e3["counts_only"]["acc_ci_raw_block"]))
+        # the interval of acc_raw reproduced from per-block evaluations (a trial's result does not depend on the
+        # other trials) and stats.cluster_bootstrap
+        per_block = {}
+        for t in trials:
+            per_block.setdefault(t["cluster"], []).append(t)
+        pb = dict((c, evaluate(ts, corpus, 10, fb, 7, recipes, cfg, B=10)) for c, ts in per_block.items())
+        for f in fb:
+            cl = [((pb[c][f]["n"], int(round(pb[c][f]["acc_raw"] * pb[c][f]["n"]))),) for c in per_block]
+            ref = stats.cluster_bootstrap(cl, lambda smp: sum(c[0][1] for c in smp) / sum(c[0][0] for c in smp), 200,
+                                          _sub_seed(7, "block_bootstrap", 10))
+            check("block bootstrap %s: acc_ci_raw_block equals stats.cluster_bootstrap over the blocks' own counts" % f,
+                  all(abs(a - b) < 1e-12 for a, b in zip(e1[f]["acc_ci_raw_block"], ref)),
+                  repr((e1[f]["acc_ci_raw_block"], ref)))
+        one = evaluate([dict(t, cluster="only") for t in trials], corpus, 10, fb, 7, recipes, cfg, B=50)
+        check("block bootstrap: with one block the intervals are [None, None] and the status says so",
+              all(one[f]["acc_ci_block"] == [None, None] and one[f]["acc_ci_raw_block"] == [None, None]
+                  and one[f]["ci_block_status"] == "fewer_than_two_blocks" and one[f]["n_blocks"] == 1 for f in fb))
+        check("block bootstrap: the point values and the Wilson intervals do not depend on the clustering",
+              all(one[f]["acc"] == e1[f]["acc"] and one[f]["acc_ci"] == e1[f]["acc_ci"] for f in fb))
+        for f in fb:
+            bs = e1[f]["by_speed"]
+            check("by_speed %s: one entry per speed with the number of trials of that speed" % f,
+                  set(bs) == {"slow", "mid", "fast"}
+                  and all(bs[sp]["n"] == sum(1 for t in trials if t["speed"] == sp) for sp in bs)
+                  and sum(v["n"] for v in bs.values()) == e1[f]["n"], repr(bs))
+            check("by_speed %s: the accuracies add up to the raw accuracy" % f,
+                  abs(sum(v["acc"] * v["n"] for v in bs.values()) - e1[f]["acc_raw"] * e1[f]["n"]) < 1e-9)
     finally:
         for name in os.listdir(tmp):
             os.remove(os.path.join(tmp, name))
@@ -1067,9 +1542,15 @@ def main(argv):
     ap.add_argument("--config")
     ap.add_argument("--K", default="10,100,1000", help="numbers of candidates (comma separated)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--bootstrap", type=int, default=DEFAULT_BOOTSTRAP,
+                    help="resamples of the block bootstrap behind the descriptive intervals acc_ci_block and "
+                         "acc_ci_raw_block (default %d); the decision rule does not use them" % DEFAULT_BOOTSTRAP)
     ap.add_argument("--features", default=",".join(FEATURE_SETS), help="feature sets (default: all of them)")
     ap.add_argument("--markers-in-obs", action="store_true",
-                    help="the presses of the block-start markers appear in the observation (default: they do not)")
+                    help="the presses of the block-start markers appear in the observation (default: they do not). With "
+                         "this flag a block whose presses do not match the plan is left unscored and counted "
+                         "(alignment in the output), and the blocks after it are found again by their markers; "
+                         "without it any mismatch stops the run (exit 2)")
     ap.add_argument("--ime-toggle-in-obs", action="store_true",
                     help="the presses of the IME toggle keys (ime_on, ime_off) appear in the observation, as "
                          "category other (default: they do not)")
@@ -1084,12 +1565,14 @@ def main(argv):
         Ks = [int(x) for x in args.K.split(",") if x]
         if not Ks or any(k < 2 for k in Ks):
             raise ValueError("--K must be comma-separated integers of at least 2")
+        if args.bootstrap < 1:
+            raise ValueError("--bootstrap must be an integer of at least 1")
         feats = [x for x in args.features.split(",") if x]
         bad = [x for x in feats if x not in FEATURE_SETS]
         if not feats or bad:
             raise ValueError("--features must be among %s" % "/".join(FEATURE_SETS))
         result = run(args.obs, args.plan, args.corpus, args.recipes, args.config, Ks, feats, args.seed,
-                     args.markers_in_obs, args.ime_toggle_in_obs)
+                     args.markers_in_obs, args.ime_toggle_in_obs, args.bootstrap)
         # --out is created fresh (never overwritten), and inside the try, so that an existing file or another
         # OSError is reported the same way as any other usage error instead of an uncaught Traceback.
         with open(args.out, "xb") as f:
@@ -1097,8 +1580,9 @@ def main(argv):
     except (ValueError, OSError) as e:
         print("closed_set.py: %s" % e, file=sys.stderr)
         return 2
-    print("closed-set identification: %d trials, K = %s, written to %s" % (
-        result["n_trials"], ",".join(str(k) for k in Ks), args.out))
+    al = result["alignment"]
+    print("closed-set identification: %d trials scored (%d unscored in %d blocks), K = %s, written to %s" % (
+        result["n_trials"], al["n_trials_unscored"], al["n_blocks_unscored"], ",".join(str(k) for k in Ks), args.out))
     return 0
 
 

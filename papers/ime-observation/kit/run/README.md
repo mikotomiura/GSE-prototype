@@ -53,11 +53,14 @@ Check these by hand; the runner records the statements in the cell file and cann
    `recipes.macos-live-off.json` with it off); the runner cannot check that the plan and the machine agree.
 5. The marker keys can trigger the global hotkeys of other applications; close or reconfigure any application that
    registers them. Markers must be keys the observer records (see `../pilot/README.md`); arrow keys are used.
-6. `reset_cmd` really clears the input method's dictionary and learning, and `focus_cmd` really brings the
-   reference input field to the front. Both differ by system and input method and are checked in a calibration
-   pilot. In `cell.example.json`, `reset_cmd` (`false`), the `learning` entry of `ime_settings` (which states the
-   intended reset), and the version in `ime` are placeholders; the other commands and options are the ones used in
-   the macOS calibration pilot, where the input method's learning was not reset, except lines added to `focus_cmd`
+6. `reset_cmd`, when a plan requests a reset, really clears the input method's dictionary and learning, and
+   `focus_cmd` really brings the reference input field to the front. Both differ by system and input method and are
+   checked in a calibration pilot. In `cell.example.json`, the version in `ime` is a placeholder. `reset_cmd` is
+   empty and the `learning` entry of `ime_settings` records that the learning is not reset: no method of resetting
+   it was found for the macOS input method, and the measurement plans request no reset (an empty `reset_cmd` with a
+   plan that does request one is recorded as `skipped`). The `predictive_candidates` entry records the input
+   method's default, which the pilot did not change. The other commands and options are the ones used in the macOS
+   calibration pilot, where the input method's learning was not reset either, except lines added to `focus_cmd`
    after the pilot: they check, with the query the emitter uses to read the front application (up to five reads 0.2
    seconds apart, as the emitter does), that the reference input field is in front before the input-method key is
    pressed, and fail otherwise (which aborts the run before the block). The bundle identifier of the reference input
@@ -136,8 +139,9 @@ interruption is raised again; a second Ctrl-C during the stop still ends the rem
 | `logger.stderr.txt`, `refinput.stderr.txt`, `reset.stderr.txt`, `focus.stderr.txt` | what each child and command wrote to standard error (created when used) |
 | `runner.error.txt` | the traceback of an unexpected error of the runner (only then) |
 
-Deposit `run.json` and the four logs only. The standard error files and `runner.error.txt` stay on the
-measuring machine: they may contain paths and user names.
+Deposit `run.json` and the four logs only, bundled and checked with `pipeline.py --pack` as
+`experiment/data.md` describes. The standard error files and `runner.error.txt` stay on the measuring machine: they
+may contain paths and user names.
 
 `run.json` holds: `cell` (as given, with the optional keys filled in), `plan_sha256`, `git_commit` (the
 commit of the checkout that holds the runner, taken at the start, or `null`), `git_dirty` (whether
@@ -154,5 +158,6 @@ Before it is written, every string of the manifest is scanned: the home director
 are replaced by `~` and `<repo>` (both spellings of the path separator, the longer path first), so that no user
 name or directory layout is deposited.
 
-The `gt` and `obs` logs use the clocks of their own processes, so their times are aligned to the oracle in
-the analysis, not by the runner.
+The `gt` and `obs` logs use the clocks of their own processes. The runner does not align them, and the analysis
+does not correct them either: the differences between the logs are measured at the block-start markers
+(`kit/pilot/clock_sync.py`) and reported.

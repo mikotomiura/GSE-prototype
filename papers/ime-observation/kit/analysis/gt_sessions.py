@@ -39,7 +39,11 @@ Rule file (one block per source; keys starting with `_` are annotations and are 
   While a session is open, commit conditions are checked before cancel conditions, and the session
   closes on whichever matches first (the closing event's timestamp is the session end). A start
   event that matches while a session is already open has no effect on the session itself; its count
-  is reported separately, for diagnostic purposes, as n_start_while_open.
+  is reported separately, for diagnostic purposes, as n_start_while_open. Likewise, an event that
+  matches a commit condition's event and result requirement but does not close the session, because
+  the condition's not_followed_by event arrives within its window, is counted as
+  n_continued_commits (with live conversion on macOS, the input method commits the head of a reading
+  while the rest is still being typed).
   A session is treated as having shown a candidate window if any event matching candidate occurs
   within the session interval (inclusive of both ends). When candidate is null, no candidate window
   can be detected, so candidate_shown is null and windows_def cannot be constructed either (null).
@@ -55,7 +59,8 @@ Rule file (one block per source; keys starting with `_` are annotations and are 
 Output (SESSIONS, JSON):
   {"src", "rules_sha256", "definitions": {"all", "macos_def", "windows_def"}, "oracle_agreement", "excluded"}
   - A session is {"trial_id", "start_wall_ms", "end_wall_ms", "start_mono_ns", "end_mono_ns",
-    "outcome", "candidate_shown", "nav_true", "nav_true_cand", "excluded_by", "n_start_while_open"}.
+    "outcome", "candidate_shown", "nav_true", "nav_true_cand", "excluded_by", "n_start_while_open",
+    "n_continued_commits"}.
     outcome is commit, cancel, or open_at_end (the log ended before the session closed; end_* is
     null in that case). trial_id is assigned by the greatest overlap, in wall-clock time, with an
     oracle trial_begin..trial_end interval (ties go to the earlier trial); it is null when no trial
@@ -80,6 +85,11 @@ Output (SESSIONS, JSON):
     clock jump.
     n_start_while_open is a diagnostic integer: the number of start events that arrived while this
     session was already open.
+    n_continued_commits is a diagnostic integer: the number of commit events inside this session
+    that were followed within the window by the condition's not_followed_by event and therefore did
+    not close it (0 for rules without not_followed_by). The outcome is still the reason the session
+    finally closed, so a session whose head was committed this way and whose rest was cancelled is a
+    cancel; this count lets the analysis report agreement on abandonment separately for such sessions.
   - all is every composition. macos_def is every kana-input segment (identical to all on the
     reference side; the two definitions differ only in how the observation side counts them).
     windows_def contains only sessions during which a candidate window appeared (null when candidate
@@ -512,7 +522,8 @@ def _run_machine(b, events):
                 cur = {"start_wall_ms": e["t_wall_ms"], "start_mono_ns": e["t_mono_ns"],
                        "result_seen": _has_result(e),
                        "candidate_shown": None if b.candidate is None else (cand_open is not None),
-                       "n_start_while_open": 0, "cand_open": cand_open, "cand_windows": []}
+                       "n_start_while_open": 0, "n_continued_commits": 0,
+                       "cand_open": cand_open, "cand_windows": []}
             continue
         if _ev_match(b.start, e):
             cur["n_start_while_open"] += 1
@@ -535,6 +546,13 @@ def _run_machine(b, events):
             for c in b.cancel:
                 if _close_match(c, events, i, cur["result_seen"]):
                     outcome = "cancel"
+                    break
+        if outcome is None:
+            # A commit event that did not close the session can only have failed its not_followed_by test.
+            for c in b.commit:
+                if (c.nfb is not None and _ev_match(c, e)
+                        and (c.after_result is None or cur["result_seen"] == c.after_result)):
+                    cur["n_continued_commits"] += 1
                     break
         if outcome is not None:
             cur["end_wall_ms"], cur["end_mono_ns"], cur["outcome"] = e["t_wall_ms"], e["t_mono_ns"], outcome
@@ -744,7 +762,8 @@ def assemble(gt_bytes, oracle_bytes, rules_bytes, plan_bytes=None):
     pub = [{"trial_id": s["trial_id"], "start_wall_ms": s["start_wall_ms"], "end_wall_ms": s["end_wall_ms"],
             "start_mono_ns": s["start_mono_ns"], "end_mono_ns": s["end_mono_ns"], "outcome": s["outcome"],
             "candidate_shown": s["candidate_shown"], "nav_true": s["nav_true"], "nav_true_cand": s["nav_true_cand"],
-            "excluded_by": s["excluded_by"], "n_start_while_open": s["n_start_while_open"]} for s in sessions]
+            "excluded_by": s["excluded_by"], "n_start_while_open": s["n_start_while_open"],
+            "n_continued_commits": s["n_continued_commits"]} for s in sessions]
     return {
         "src": src,
         "rules_sha256": hashlib.sha256(rules_bytes).hexdigest(),
@@ -1185,8 +1204,9 @@ def _experiment_rules():
 def _case_experiment_rules():
     """The experiment's rule file (experiment/gt_rules.json) keeps one session across an automatic
     commit in the middle of typing (insert_text followed by set_marked within 50 ms, as live
-    conversion does on macOS), and still closes a session at a commit with no continuation; the
-    example rule set splits the same input in two (control)."""
+    conversion does on macOS), counts it in n_continued_commits, and still closes a session at a
+    commit with no continuation; the example rule set splits the same input in two and counts no
+    continued commit (control)."""
     f = []
     trials = [("t00001", 0, 1900), ("t00002", 2000, 3900)]
     evs = [_sm(100, 1), _sm(300, 4), _ins(500, 2), _sm(501, 2), _sm(700, 4), _ins(900, 4),   # one composition, auto-commit at 500
@@ -1200,19 +1220,24 @@ def _case_experiment_rules():
     want = [("t00001", "commit", 100, 900), ("t00002", "commit", 2100, 2500), ("t00002", "commit", 2600, 2900)]
     if got != want:
         f.append("the experiment rules do not keep the auto-commit inside one session: %r" % (got,))
+    n_cont = [s["n_continued_commits"] for s in r["definitions"]["all"]]
+    if n_cont != [1, 0, 0]:
+        f.append("n_continued_commits does not count the automatic commit kept inside the session: %r" % (n_cont,))
     # The head committed automatically and the rest cancelled: one session, a cancellation (11 of the 27
     # cancelled trials of the pilot with live conversion on took this path).
     rc = assemble(_gt_bytes("mac_nstic", [_sm(100, 1), _sm(300, 4), _ins(500, 2), _sm(501, 2), _sm(700, 0)]),
                   _oracle_bytes([("t00001", 0, 1900)]), rules)
-    got_c = [(s["outcome"], s["start_wall_ms"] - WALL0, s["end_wall_ms"] - WALL0) for s in rc["definitions"]["all"]]
-    if got_c != [("cancel", 100, 700)]:
-        f.append("an automatic commit followed by a cancellation is not one cancelled session: %r" % (got_c,))
+    got_c = [(s["outcome"], s["start_wall_ms"] - WALL0, s["end_wall_ms"] - WALL0, s["n_continued_commits"])
+             for s in rc["definitions"]["all"]]
+    if got_c != [("cancel", 100, 700, 1)]:
+        f.append("an automatic commit followed by a cancellation is not one cancelled session with one continued commit: %r" % (got_c,))
     # unmark follows the same rule: with a continuation the session stays open, without one it closes.
-    for evs_u, want_u in (([_sm(100, 1), (500, "unmark", {}), _sm(510, 1), _ins(900, 1)], [("commit", 100, 900)]),
+    for evs_u, want_u in (([_sm(100, 1), (500, "unmark", {}), _sm(510, 1), _ins(900, 1)], [("commit", 100, 900, 1)]),
                           ([_sm(100, 1), (500, "unmark", {}), _sm(700, 1), _ins(900, 1)],
-                           [("commit", 100, 500), ("commit", 700, 900)])):
+                           [("commit", 100, 500, 0), ("commit", 700, 900, 0)])):
         ru = assemble(_gt_bytes("mac_nstic", evs_u), _oracle_bytes([("t00001", 0, 1900)]), rules)
-        got_u = [(s["outcome"], s["start_wall_ms"] - WALL0, s["end_wall_ms"] - WALL0) for s in ru["definitions"]["all"]]
+        got_u = [(s["outcome"], s["start_wall_ms"] - WALL0, s["end_wall_ms"] - WALL0, s["n_continued_commits"])
+                 for s in ru["definitions"]["all"]]
         if got_u != want_u:
             f.append("unmark does not follow the continuation rule: %r, not %r" % (got_u, want_u))
     # The window includes its end: a continuation exactly 50 ms after the commit keeps the session open,
@@ -1225,6 +1250,9 @@ def _case_experiment_rules():
     r0 = assemble(_gt_bytes("mac_nstic", evs), _oracle_bytes(trials), _example_rules())
     if len(_wins(("t00001",), r0["definitions"]["all"])) != 2:
         f.append("control: the example rules no longer split at the auto-commit, so this case tests nothing")
+    if any(s["n_continued_commits"] != 0 for s in r0["definitions"]["all"]):
+        f.append("rules without not_followed_by count continued commits: %r"
+                 % ([s["n_continued_commits"] for s in r0["definitions"]["all"]],))
     return f
 
 
