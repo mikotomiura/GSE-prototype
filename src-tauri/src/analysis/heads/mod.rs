@@ -94,7 +94,10 @@ impl TaskDomain {
 pub enum HeadId {
     /// `argumentative` / `correspondence` を Writing head で採点した。
     Writing,
-    /// **Creative を Writing head で採点した。**
+    /// **Creative / Other を Writing head で採点した。**
+    ///
+    /// ★ Other (ADR-037 D2) は「4 つの領域のどれとも決めづらい」と本人が宣言した区間で、
+    /// 適合する head が無い点で Creative と同じ。⚠️ 両者は `session_meta` の `task_kind` で分ける。
     ///
     /// ⚠️ ADR-006 下位決定 #3 は「Creative には打鍵 β を持たせない」と決めているが、
     /// 代替 head がまだ存在しないため Writing head へ流している (#3 からの意図的な逸脱・

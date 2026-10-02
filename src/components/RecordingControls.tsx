@@ -49,11 +49,12 @@ interface RecordingStatusDto {
 }
 
 /**
- * ⚠️★★★ O1 の宣言 4 択 (ADR-016 **判断 4b-2**: 既存 4 値をそのまま出す)。
+ * ⚠️★★★ O1 の宣言 5 択 (ADR-016 **判断 4b-2** の 4 値 ＋ **ADR-037** の `other`)。
  *
- * ★ ラベルと補足は **同意文書 §2 の表と逐語で一致させる**。
- * ⚠️ **新しい値を足さない** —— `task_kind` は `schema/current.json` で 4 値の enum に
- * 制約されており、足すと gse-dataset の parity 更新が要る (判断 4b-3)。
+ * ★ ラベルと補足は **同意文書 §2 の表と逐語で一致させる**
+ * (`Form_O1/GSE_O1_Form_Builder.gs` / `o1_form_builder_test.cjs` が検査する)。
+ * ⚠️ 値を足すときは ADR を起こす —— `task_kind` は `schema/current.json` の enum に
+ * 制約されており、足すと gse-dataset の parity 更新と同意文書の改訂が要る (ADR-037 D4 / D5)。
  *
  * ⚠️★ `creative` の語は **「創作」を捨てて「デザイン・映像・制作作業」**にした
  * (判断 O1-3)。★ 「制作」も執筆と読めうるので、**補足を 1 行必ず添える**。
@@ -67,6 +68,11 @@ const O1_TASK_KINDS: { value: string; label: string; note: string }[] = [
     note: "図面・動画編集・3D など、文字をあまり打たない作業",
   },
   { value: "vibe_coding", label: "vibe coding", note: "AI と対話しながらのコーディング" },
+  {
+    value: "other",
+    label: "その他・細切れの作業",
+    note: "メールを読む・調べものなど、どれとも決めづらいとき。メールを書くのは「通信文」",
+  },
 ];
 
 /** 宣言値 → 画面に出す語。⚠️ 未宣言 (`null`) は「未設定」。 */

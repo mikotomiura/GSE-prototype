@@ -72,6 +72,9 @@ pub enum TaskKind {
     Correspondence,
     Creative,
     VibeCoding,
+    /// ★ O1 の「その他・細切れの作業」(ADR-037)。4 つの領域のどれとも決めづらいと本人が宣言した。
+    /// ⚠️ 未宣言 (`session_meta` の不在・ADR-016 判断 4b-3) とは別の状態である。
+    Other,
 }
 
 impl TaskKind {
@@ -81,6 +84,7 @@ impl TaskKind {
             Self::Correspondence => "correspondence",
             Self::Creative => "creative",
             Self::VibeCoding => "vibe_coding",
+            Self::Other => "other",
         }
     }
 
@@ -90,6 +94,7 @@ impl TaskKind {
             "correspondence" => Some(Self::Correspondence),
             "creative" => Some(Self::Creative),
             "vibe_coding" => Some(Self::VibeCoding),
+            "other" => Some(Self::Other),
             _ => None,
         }
     }
@@ -114,7 +119,8 @@ impl From<TaskKind> for TaskDomain {
             // Creative は打鍵 β が原理的に不適 (ADR-006 #3) だが代替 head がまだ無い。
             // 数値挙動は Writing と同一のまま、head_id だけ分けて事後に分離可能にする
             // (.steering/20260818-adr006-head-extraction-wiring/decisions.md D-6)
-            TaskKind::Creative => TaskDomain::WritingFallback,
+            // Other (ADR-037 D2) も同じ: 適合する head が無いと本人が言った区間。推論は Writing と同一。
+            TaskKind::Creative | TaskKind::Other => TaskDomain::WritingFallback,
             // ここが 2b で実際に挙動が変わる唯一の分岐
             TaskKind::VibeCoding => TaskDomain::Coding,
         }
@@ -3740,11 +3746,16 @@ mod tests {
         // ③ ⚠️★★★ どちらのファイルにも `task_kind` は高々 1 種類
         //    (★ 2 種類あると `gse-replay` が Err で落ちる = ローテートが要る理由)
         for (name, c) in [("file1", &c1), ("file2", &c2)] {
-            let kinds: std::collections::BTreeSet<&str> =
-                ["argumentative", "correspondence", "creative", "vibe_coding"]
-                    .into_iter()
-                    .filter(|k| c.contains(&format!(r#""task_kind":"{k}""#)))
-                    .collect();
+            let kinds: std::collections::BTreeSet<&str> = [
+                "argumentative",
+                "correspondence",
+                "creative",
+                "vibe_coding",
+                "other",
+            ]
+            .into_iter()
+            .filter(|k| c.contains(&format!(r#""task_kind":"{k}""#)))
+            .collect();
             assert!(
                 kinds.len() <= 1,
                 "⚠️ {name} に相異なる task_kind が {} 種類ある: {kinds:?}",
@@ -4447,6 +4458,7 @@ mod tests {
             TaskKind::Correspondence,
             TaskKind::Creative,
             TaskKind::VibeCoding,
+            TaskKind::Other,
         ] {
             assert_eq!(TaskKind::parse(k.as_str()), Some(k));
         }
@@ -4474,6 +4486,9 @@ mod tests {
     fn new_enums_parse_rejects_unknown() {
         assert_eq!(Track::parse("Main"), None); // case-sensitive
         assert_eq!(TaskKind::parse("coding"), None);
+        // ★ ADR-037 D1: 値名は `other`。画面の語や却下した `free_task` は通さない。
+        assert_eq!(TaskKind::parse("free_task"), None);
+        assert_eq!(TaskKind::parse("Other"), None);
         assert_eq!(ProbeSource::parse(""), None);
         assert_eq!(SkipReason::parse("skip"), None);
         assert_eq!(ExpectedQuadrant::parse("focused"), None);
@@ -4485,6 +4500,8 @@ mod tests {
     ///
     /// この表が変わるということは「同じ task_kind が別の推論器で採点される」という
     /// **挙動変更**であり、`HMM_VERSION` の bump とゴールデン再生成を伴う。
+    /// ⚠️ ただし `Other` の行 (ADR-037) は **既存の行を変えず、既存の fallback 経路に新しい値を
+    /// 載せただけ**で分岐は増えていない → bump しない (ADR-037 D4)。
     #[test]
     fn task_kind_routes_to_expected_domain() {
         assert_eq!(
@@ -4500,6 +4517,10 @@ mod tests {
             TaskDomain::WritingFallback
         );
         assert_eq!(TaskDomain::from(TaskKind::VibeCoding), TaskDomain::Coding);
+        assert_eq!(
+            TaskDomain::from(TaskKind::Other),
+            TaskDomain::WritingFallback
+        );
     }
 
     /// Creative / Correspondence は Writing head で走る (ADR-006 #3 からの逸脱・D-6)。
@@ -4516,6 +4537,13 @@ mod tests {
         );
         assert_eq!(
             head_for(TaskDomain::from(TaskKind::Creative))
+                .head_id()
+                .as_str(),
+            "writing_fallback"
+        );
+        // ★ ADR-037 D2: Other も Writing head の fallback 識別子で走る。
+        assert_eq!(
+            head_for(TaskDomain::from(TaskKind::Other))
                 .head_id()
                 .as_str(),
             "writing_fallback"
@@ -4600,6 +4628,26 @@ mod tests {
         assert_eq!(
             line,
             r#"{"type":"session_meta","track":"exploratory","task_kind":"argumentative","intervention_enabled":false,"condition":null,"label_pool":null,"head_id":"writing","ts":42}"#
+        );
+    }
+
+    /// ★ ADR-037: O1 で `other` を宣言したときの `session_meta` 行。
+    /// `task_kind` が `other`、`head_id` が `writing_fallback` で刻まれる。
+    #[test]
+    fn session_meta_line_other_uses_writing_fallback() {
+        let kind = TaskKind::Other;
+        let line = format_session_meta_line(
+            9,
+            Track::Main,
+            kind,
+            false,
+            None,
+            None,
+            crate::analysis::heads::head_for(TaskDomain::from(kind)).head_id(),
+        );
+        assert_eq!(
+            line,
+            r#"{"type":"session_meta","track":"main","task_kind":"other","intervention_enabled":false,"condition":null,"label_pool":null,"head_id":"writing_fallback","ts":9}"#
         );
     }
 
@@ -4992,6 +5040,7 @@ mod tests {
         assert_eq!(TaskKind::Correspondence.as_str(), "correspondence");
         assert_eq!(TaskKind::Creative.as_str(), "creative");
         assert_eq!(TaskKind::VibeCoding.as_str(), "vibe_coding");
+        assert_eq!(TaskKind::Other.as_str(), "other");
         assert_eq!(ProbeSource::RandomProbe.as_str(), "random_probe");
         assert_eq!(ProbeSource::SelfMarker.as_str(), "self_marker");
         assert_eq!(SkipReason::None.as_str(), "none");

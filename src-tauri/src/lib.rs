@@ -1344,7 +1344,7 @@ fn o1_rotate(
     Ok(())
 }
 
-/// ⚠️★★★ O1: **作業の種類を宣言する / 宣言し直す** (ADR-016 判断 4 / 4b-1 / 4b-2 / 4b-3)。
+/// ⚠️★★★ O1: **作業の種類を宣言する / 宣言し直す** (ADR-016 判断 4 / 4b-1 / 4b-2 / 4b-3・ADR-037)。
 ///
 /// ★ 同意文書 §2 の逐語「作業が変わったら、そのつど選び直してください」に対応する唯一の経路。
 ///
@@ -1357,7 +1357,7 @@ fn declare_task_kind(
     engine: State<'_, CognitiveStateEngine>,
     reset_signal: State<'_, ResetSignal>,
 ) -> Result<(), String> {
-    // ⚠️ 新 enum 値は足さない (判断 4b-2)。未知値は**黙って捨てず**エラーにする。
+    // ★ 受け付ける値は `TaskKind::parse` が SSOT (ADR-037 で `other` を足して 5 値)。未知値は**黙って捨てず**エラーにする。
     let kind = logger::TaskKind::parse(&task_kind)
         .ok_or_else(|| format!("invalid task_kind: {:?}", task_kind))?;
 

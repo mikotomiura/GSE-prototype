@@ -41,7 +41,7 @@ const BETA_WRITING_LATIN_F6: f64 = 0.08; // Pause-after-delete rate
 /// Phase1 (task_kind = argumentative 固定) で走っていたのはこの head の挙動そのものである。
 ///
 /// ⚠️ `id` は **識別子だけ**を切り替える。`writing` と `writing_fallback` で
-/// **数値挙動は完全に同一**である (Creative を Writing head で採点している事実を
+/// **数値挙動は完全に同一**である (Creative / Other を Writing head で採点している事実を
 /// ログ上で分離できるようにするためだけのもの・D-6)。
 #[derive(Debug, Clone, Copy)]
 pub struct WritingHead {
