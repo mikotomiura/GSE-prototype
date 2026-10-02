@@ -7,12 +7,14 @@
 ★ 単独の版（前の版に触れない）・研究者は repo と作業の語を知らない。
 使い方: check_proposal.py | --selftest
 """
+import atexit
 import json
 import os
 import re
 import shutil
 import sys
 import tempfile
+import zipfile
 
 import openpyxl
 from docx import Document
@@ -28,7 +30,17 @@ LOG34 = os.path.join(C.STEER, "20261001-ai-fatigue-34-screening", "screening-log
 WARN = "判定者 2 に渡さない"
 # ★ 作業の語・内部の参照・前の版への言及（研究者は repo を読めない・単独の版）
 BANNED = re.compile(r"GSE|\.steering|scratchpad|screening-log|cross-review|Codex|worktree|\.jsonl|check_\w+\.py|build_\w+\.py|"
-                    r"判断 ?\d|設計 ?§|\bv1\b|v2|前の版|ta1e?\b|ai_ta|評価版（ed78|記入表", re.I)
+                    r"判断 ?\d|設計 ?§|\bv1\b|v2|前の版|ta1e?\b|ai_ta|評価版（ed78|記入表|"
+                    r"AI の判定を見ず|AI の判定を見ない", re.I)  # ★ 盲検と読める書き方（判定者 1 は判定の前に評価版を読んでいる・判断 9 の 1）
+# 判定者 1 の題名・抄録段の判定 → 付録 9.2 の用途（★ 書き込み側と別に持つ・除外は E コードで分ける・判断 9 の 2）
+J1_USE = {"含める": "未定", "保留": "保留"}
+J1_USE_EX = {"E1": "除外", "E2": "背景保持", "E3": "除外", "E4 背景": "背景保持"}
+# .docx に許す部品（★ 雛形の縮小画像〈docProps/thumbnail.*〉は許さない・判断 9 の 11）と、app.xml に許す要素（雛形の名前・アプリを持たない）
+DOCX_PARTS = {"[Content_Types].xml", "_rels/.rels", "docProps/core.xml", "docProps/app.xml", "word/document.xml",
+              "word/_rels/document.xml.rels", "word/styles.xml", "word/stylesWithEffects.xml", "word/settings.xml",
+              "word/webSettings.xml", "word/fontTable.xml", "word/theme/theme1.xml", "word/numbering.xml",
+              "customXml/item1.xml", "customXml/_rels/item1.xml.rels", "customXml/itemProps1.xml"}
+APP_ELEMENTS = {"DocSecurity", "LinksUpToDate", "SharedDoc", "HyperlinksChanged"}
 BLOCKS = {"counts": "## 1 ", "pop": "## 7 ", "agree": "## 7 ", "search43": "## 7 ", "appendix": "## 8 "}
 USE34_E4 = {"既存レビュー": "背景保持", "尺度・理論": "背景保持", "方法論": "方法論保持", "訂正通知": "訂正連結",
             "直接研究": "背景保持", "隣接研究": "背景保持"}
@@ -74,7 +86,8 @@ def short_ok(md_title, full):
     return t == md_title or (md_title.endswith("…") and t.startswith(m) and len(m) >= 20)
 
 
-def sources():
+def sources(log_path=None):
+    """log_path は selftest の緑の対照（ログの写し）用。既定は本タスクのログ。"""
     s = {"md": open(MD, encoding="utf-8").read()}
     jw = openpyxl.load_workbook(C.JUDGE_FILE, read_only=True, data_only=True)
     rows = list(jw[C.JUDGE_SHEET].iter_rows(values_only=True))
@@ -86,7 +99,7 @@ def sources():
         s["title"][x["id"]] = x["title"]
     s["prev"] = finals(read_log(C.PREV_LOG))
     j1, ai = {}, {}
-    for r in read_log(C.LOG):
+    for r in read_log(log_path or C.LOG):
         if r["stage"] in ("ta1", "ta1e"):
             j1[r["item"]] = r["result"]
         elif r["stage"] == "ai_ta":
@@ -277,11 +290,12 @@ def r_search43(ctx):
 
 
 def r_app91(ctx):
+    """付録 9.1。★ 判定者1 の値も 34 件のログの最終の判定から組む（写しの xlsx は書き込み側と同じ出どころ・判断 9 の 7）。"""
     s = ctx["src"]
     want = []
     for r in s["copy34"]:
         x = s["log34"].get(r[0])
-        want.append((r[0], r[3], use_label(x, USE34_E4.get(r[2])) if x else "（ログに無い）",
+        want.append((r[0], x["verdict"] if x else "（ログに無い）", use_label(x, USE34_E4.get(r[2])) if x else "（ログに無い）",
                      BASIS34.get(x.get("basis", "全文"), "（語彙の外）") if x else "（ログに無い）"))
     got = [(c[0], c[2], c[3], c[4]) for c in table_after(ctx["md"], "### 9.1")]
     titles = all(short_ok(c[1], r[1]) for c, r in zip(table_after(ctx["md"], "### 9.1"), s["copy34"]))
@@ -296,7 +310,7 @@ def r_app92(ctx):
                      use_label(r, USEC_E4.get(r.get("kind_detail"))), BASIS_C.get(r.get("basis", "全文"), "（語彙の外）")))
     for i, r in s["j1"].items():
         g = "—" if r["verdict"] != "除外" else ("E4 背景" if str(r.get("ecode") or "").startswith("E4 背景") else r["ecode"])
-        want.append((i, r["verdict"], g, "題名・抄録段", {"含める": "未定", "保留": "保留", "除外": "背景保持"}[r["verdict"]], "抄録"))
+        want.append((i, r["verdict"], g, "題名・抄録段", J1_USE[r["verdict"]] if g == "—" else J1_USE_EX[g], "抄録"))
     rows = table_after(ctx["md"], "### 9.2")
     got = [(c[0], c[2], c[3], c[4], c[5], c[6]) for c in rows]
     titles = all(short_ok(c[1], s["title"].get(c[0])) for c in rows)
@@ -343,6 +357,28 @@ def r_docx_scan(ctx):
     return [f"r_docx_scan: .docx に手元のパス・メールアドレスの形・外へのリンク: {x}" for x in C.scan_package(ctx["docx"])]
 
 
+def r_docx_parts(ctx):
+    """.docx の部品は許した名前だけ・縮小画像の関係と型の宣言が無い・app.xml に雛形の名前やアプリの要素が無い（判断 9 の 11）。"""
+    import xml.etree.ElementTree as ET
+    with zipfile.ZipFile(ctx["docx"]) as z:
+        names = set(z.namelist())
+        rels = z.read("_rels/.rels").decode("utf-8")
+        types = z.read("[Content_Types].xml").decode("utf-8")
+        app = z.read("docProps/app.xml") if "docProps/app.xml" in names else None
+    v = []
+    if names - DOCX_PARTS:
+        v.append(f"r_docx_parts: 許していない部品: {sorted(names - DOCX_PARTS)}")
+    if "thumbnail" in rels or "thumbnail" in types:
+        v.append("r_docx_parts: 縮小画像の関係・型の宣言が残る")
+    if app is None:
+        v.append("r_docx_parts: app.xml が無い")
+    else:
+        tags = {el.tag.split("}")[-1] for el in ET.fromstring(app)}
+        if tags - APP_ELEMENTS or b"Normal.dot" in app or b"Macintosh" in app:
+            v.append(f"r_docx_parts: app.xml に雛形の値・許していない要素: {sorted(tags - APP_ELEMENTS)}")
+    return v
+
+
 RULES_PROPOSAL = [
     r_heads,
     r_warn,
@@ -358,6 +394,7 @@ RULES_PROPOSAL = [
     r_docx_text,
     r_docx_props,
     r_docx_scan,
+    r_docx_parts,
 ]
 
 
@@ -378,8 +415,9 @@ def selftest():
     src = sources()
     _, md = B.compose_md()  # ★ 自動の区画を作り直した原稿（書き戻さない）
     tmpd = tempfile.mkdtemp(prefix="propchk-")
+    atexit.register(shutil.rmtree, tmpd, True)  # ★ 途中で例外で落ちても判定入りの写しを残さない（判断 9 の 13 と同じ型）
 
-    def run(name, md2, must=None, mutate_docx=None):
+    def run(name, md2, must=None, mutate_docx=None, s=None, mutate_zip=None):
         nonlocal ok
         p = os.path.join(tmpd, "t.docx")
         B.build_docx(md2, p)
@@ -387,10 +425,22 @@ def selftest():
             d = Document(p)
             mutate_docx(d)
             d.save(p)
-        v = check(md2, p, {**src, "md": md2})
-        good = (not v) if must is None else any(x.startswith(must) for x in v)
+        if mutate_zip:
+            zip_edit(p, mutate_zip)
+        v = check(md2, p, {**(s or src), "md": md2})
+        # ★ 当てたい規則の「例外」は検出に数えない（判断 9 の 5）
+        good = (not v) if must is None else any(x.startswith(must + ":") and not x.startswith(must + ": 例外") for x in v)
         ok &= good
         print(("PASS" if good else "FAIL"), name, "" if good else v[:3])
+
+    def zip_edit(p, fn):
+        """zip の部品を fn(部品の dict) で書き換えた写しで置き換える（.docx の部品の変異用）。"""
+        with zipfile.ZipFile(p) as z:
+            parts = {n: z.read(n) for n in z.namelist()}
+        fn(parts)
+        with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED) as z:
+            for n, b in parts.items():
+                z.writestr(n, b)
 
     def sub(old, new, count=1):
         assert old in md, old
@@ -442,6 +492,65 @@ def selftest():
     run(".docx の段落を変える", md, "r_docx_text", para)
     run(".docx の属性が雛形", md, "r_docx_props", lambda d: setattr(d.core_properties, "comments", "generated by python-docx"))
     run(".docx の属性に手元のパス", md, "r_docx_scan", lambda d: setattr(d.core_properties, "category", "C:/wt/x"))
+
+    # ---- 判断 9 の直し（1・2・6・7・11）
+    run("盲検と読める書き方（AI の判定を見ず）", md + "\n1 回目は AI の判定を見ずに選んだ\n", "r_banned")
+    # 7: 写しの判定者1 と原稿を揃えてずらしても、34 件のログの最終の判定と比べて落ちる
+    k91 = next(k for k, r in enumerate(src["copy34"]) if r[0] == "AF001")
+    v91 = src["copy34"][k91][3]
+    w91 = "保留" if v91 != "保留" else "除外"
+    copy2 = [list(r) for r in src["copy34"]]
+    copy2[k91][3] = w91
+    run("付録 9.1 の判定者1 を写しと揃えてずらす", row("| AF001 |", 2, w91), "r_app91", s={**src, "copy34": copy2})
+
+    # 11: .docx の部品（雛形の縮小画像・app.xml の雛形の値）
+    def add_thumb(parts):
+        parts["docProps/thumbnail.jpeg"] = b"\xff\xd8\xff\xd9"
+    run(".docx に雛形の縮小画像の部品", md, "r_docx_parts", mutate_zip=add_thumb)
+
+    def thumb_rel(parts):
+        parts["_rels/.rels"] = parts["_rels/.rels"].replace(
+            b"</Relationships>", b'<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/package/2006/relationships/'
+                                 b'metadata/thumbnail" Target="docProps/thumbnail.jpeg"/></Relationships>')
+    run(".docx に縮小画像の関係だけ残る", md, "r_docx_parts", mutate_zip=thumb_rel)
+
+    def app_template(parts):
+        parts["docProps/app.xml"] = parts["docProps/app.xml"].replace(
+            b"<DocSecurity>", b"<Template>Normal.dotm</Template><Application>Microsoft Macintosh Word</Application><DocSecurity>")
+    run(".docx の app.xml に雛形の名前とアプリ", md, "r_docx_parts", mutate_zip=app_template)
+
+    # 2: 題名・抄録段の除外 E1 の件（実のログには無い）。理由の行を E1 にしたログの写し → 表 → 原稿で緑の対照と変異
+    import build_candidates as BC
+    lg = read_log(C.LOG)
+    e = next(r for r in lg if r["stage"] == "ta1e" and r["item"] == "S12-04")
+    e["answer"], e["result"] = "E1", {"verdict": "除外", "ecode": "E1"}
+    log_e1 = os.path.join(tmpd, "log-e1.jsonl")
+    with open(log_e1, "w", encoding="utf-8", newline="\n") as f:
+        f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in lg)
+    t_e1 = os.path.join(tmpd, "e1.xlsx")
+    BC.build(t_e1, log_path=log_e1)
+    _, md_e1 = B.compose_md(t_e1)
+    src_e1 = sources(log_path=log_e1)
+    run("緑の対照: 題名・抄録段に除外 E1 の件があるログの写しで作った原稿", md_e1, s=src_e1)
+    ls = md_e1.splitlines()
+    k = next(i for i, x in enumerate(ls) if x.startswith("| S12-04 |") and "題名・抄録段" in x)
+    cells = ls[k].strip().strip("|").split("|")
+    assert cells[5].strip() == "除外", cells
+    cells[5] = " 背景保持 "
+    ls[k] = "|" + "|".join(cells) + "|"
+    run("付録 9.2 の E1 の件の用途を背景保持と書く", "\n".join(ls), "r_app92", s=src_e1)
+
+    # 6: 表の U 列に、AI が含めるの件の理由（全文段の E6 など）があっても、9.3 の E コードは —（書き込み側の直しの緑の対照）
+    wb = openpyxl.load_workbook(C.CAND_ARCHIVE)
+    ws = wb["スクリーニング"]
+    h = [c.value for c in ws[4]]
+    iu, it = h.index("AI の除外理由（評価版の逐語）") + 1, h.index("AI の予備判定（題名・抄録段・評価版）") + 1
+    rr = next(r for r in range(5, ws.max_row + 1) if ws.cell(r, it).value == "含める")
+    ws.cell(rr, iu).value = "E6（本文が入手できない）"
+    t_u = os.path.join(tmpd, "u.xlsx")
+    wb.save(t_u)
+    _, md_u = B.compose_md(t_u)
+    run("緑の対照: 表の U 列に AI の含めるの件の理由があっても 9.3 の E コードは —", md_u)
     shutil.rmtree(tmpd, ignore_errors=True)
     print("selftest", "PASS" if ok else "FAIL")
     return ok

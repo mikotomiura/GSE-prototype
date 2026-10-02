@@ -7,6 +7,7 @@
 ★ 判断 6: 判定者 1 の「除外 E4 背景」は E4（一次研究でない）と書かず、意図（範囲の外・背景として残す）を書く。
 使い方: check_candidates.py [--final] | --selftest
 """
+import atexit
 import copy
 import datetime
 import json
@@ -37,14 +38,23 @@ EXPECT_HUMAN = {("含める", "中心-A"): "中心候補", ("含める", "中心
                 ("除外", "E3"): "除外", ("除外", "E5"): "除外", ("除外", "E7"): "除外", ("除外", "E6"): "保留"}
 EXPECT_E4 = {"レビュー": "背景保持", "論考": "背景保持", "研究計画": "背景保持", "一次研究": "背景保持",
              "方法論": "方法論保持", "訂正通知": "訂正連結"}
-# 判定者 1 の題名・抄録段の判定 → 用途の書き出し（★ 別に持つ）
-JUDGE1_USE = {"含める": "用途: 未定", "保留": "用途: 保留", "除外": "用途: 背景保持"}
+# 判定者 1 の題名・抄録段の判定 → 用途の書き出し（★ 別に持つ・除外は E コードで分ける・判断 9 の 2）
+JUDGE1_USE = {"含める": "用途: 未定（", "保留": "用途: 保留（"}
+JUDGE1_USE_EX = {"E1": "用途: 除外 ／", "E2": "用途: 背景保持 ／", "E3": "用途: 除外 ／", "E4 背景": "用途: 背景保持 ／"}
 N_PREV, N_J1, N_AI = 8, 71, 142
 FULL_TRANSLATION = 8
 INTRO_MUST = ["判定者 2 に渡さない", "Claude の関与", "Claude 版", "GPT 版は無い",
               "『スクリーニング』の D・G・H・I・J 列を初期値", "R〜W 列", "『探索の一覧』の「足した（ID）」列を空に",
-              "『AI判定比較』『一致の表』『群ごとの一覧』『全文抽出』『品質評価』『問いと答え』のシートを消し",
-              "『はじめに』を判定者 2 用に書き直し", "人の判定ではない", "範囲の外・背景として残す", "43 件"]
+              "『AI判定比較』『一致の表』『群ごとの一覧』『全文抽出』『問いと答え』のシートを消し",
+              "『はじめに』を判定者 2 用に書き直し", "人の判定ではない", "範囲の外・背景として残す"]
+# 『群ごとの一覧』の行の順（★ 書き込み側の並べ替えの規則を import せず、別に持つ・判断 9 の 17）
+GROUP_ORDER = (["学生・学習者", "教員・研究者", "働く人（医療・教育の外）", "医療者", "消費者・一般の利用者", "不明"],
+               ["生成 AI・対話", "AI 一般・導入", "意思決定支援・警報・予測", "記録支援・下書き", "不明"],
+               ["横断調査", "縦断", "比較（非無作為化・前後）", "無作為化", "実験・模擬", "質的", "不明"])
+# ★ 研究者に渡す表に置かない語: 作業記録の内部の参照・作業の語（判断 9 の 8）。外の文（題名・DOI の v1 など）に当てないよう、
+#   大文字と小文字を分け、版の語（v1・v2）は入れない
+BANNED = re.compile(r"判断 ?\d|設計 ?§|\.steering|scratchpad|screening-log|cross-review|Codex|worktree|\.jsonl|(?:check|build)_\w+\.py|"
+                    r"記入表|引き継ぎ|AI の判定を見ず|AI の判定を見ない|AI の値を見ていない")
 RUN_HEADER = ["API", "検索式（逐語）", "実行日時", "総数", "取得", "条件を通った", "打ち切り", "エラー"]
 LIST_HEADER = ["key", "題名", "年", "種別（API）", "掲載", "言語", "無料の版", "重なり", "見つかった API", "層", "読む一覧", "足した（ID）"]
 AGREE_HEADER = ["順", "ID", "論文タイトル", "判定者 1（題名・抄録段）", "判定者 1 の除外理由", "AI の予備判定（題名・抄録段・評価版）",
@@ -70,7 +80,8 @@ def nz(v):
     return None if blank(v) else v
 
 
-def sources(log_path=None):
+def sources(log_path=None, prev_log_path=None):
+    """log_path・prev_log_path は selftest の緑の対照（ログの写し）用。既定は本タスクと前のタスクのログ。"""
     s = {}
     jw = openpyxl.load_workbook(C.JUDGE_FILE, read_only=True, data_only=True)
     rows = list(jw[C.JUDGE_SHEET].iter_rows(values_only=True))
@@ -80,7 +91,7 @@ def sources(log_path=None):
     s["judge"] = [(r[ix["候補番号"]], r[ix["題名（書誌の記録）"]], r[ix["DOI"]], r[ic]) for r in rows[C.JUDGE_HEADER_ROW:] if r and r[0]]
     s["extra"] = load_json(C.PREV_EXTRA_RECORDS, [])
     # 前のタスクのログ（全文段）
-    s["prev_log"] = read_log(C.PREV_LOG)
+    s["prev_log"] = read_log(prev_log_path or C.PREV_LOG)
     first, final, quality, xconf, has2 = {}, {}, {}, set(), set()
     for r in s["prev_log"]:
         i, st = r["item"], r["stage"]
@@ -155,8 +166,25 @@ def prev_use(res):
     return EXPECT_HUMAN[(v, e)]
 
 
+def prev_j_use(res):
+    """全文段の自由記入の「用途: 」。含めるは答えの用途（中心-A／中心-B）のまま（判断 9 の 3）。ほかは用途の対応。"""
+    return res["use"] if res["verdict"] == "含める" else prev_use(res)
+
+
 def is_e4bg(res):
     return str(res.get("ecode") or "").startswith("E4 背景")
+
+
+def judge1_use(res):
+    """題名・抄録段の判定者 1 の自由記入の「用途: 」（★ 語彙の外の E コードは KeyError → 規則の例外 = 違反）。"""
+    if res["verdict"] != "除外":
+        return JUDGE1_USE[res["verdict"]]
+    return JUDGE1_USE_EX["E4 背景" if is_e4bg(res) else res["ecode"]]
+
+
+def search_reading(s):
+    """『探索の一覧』の「読む一覧」の期待: data の値から「・判断 N」（作業記録の内部の参照）を落とす（判断 9 の 8・書き込み側と別に持つ）。"""
+    return re.sub(r"・判断 ?\d+", "", s) if isinstance(s, str) else s
 
 
 # ---------------------------------------------------------------- 規則
@@ -250,7 +278,7 @@ def r_prev_rows(ctx):
             bad.append("除外理由")
         if x[7] != exp_h or x[8] != exp_i:
             bad.append("全文確認・品質評価")
-        if f"1回目: {prev_label(f0)} → 最終: {prev_label(f1)}" not in j or f"用途: {prev_use(f1)} " not in j or "段: 全文段" not in j:
+        if f"1回目: {prev_label(f0)} → 最終: {prev_label(f1)}" not in j or f"用途: {prev_j_use(f1)} ／" not in j or "段: 全文段" not in j:
             bad.append("自由記入の 1 回目・最終・用途・段")
         if ("AI の判定: Claude 版" in j) != (i in p["has2"]):
             bad.append("自由記入の AI の判定の有無")
@@ -283,7 +311,7 @@ def r_judge1_rows(ctx):
             bad.append("除外理由のコード")
         if (x[7], x[8]) != (("対象外", "対象外") if ex else ("未完了", "未実施")):
             bad.append("全文確認・品質評価")
-        must = ["段: 題名・抄録段", "判定者: 判定者 1", f"判定: {res['verdict']}", JUDGE1_USE[res["verdict"]], "材料: 抄録",
+        must = ["段: 題名・抄録段", "判定者: 判定者 1", f"判定: {res['verdict']}", judge1_use(res), "材料: 抄録",
                 "全訳" if d["order"] <= FULL_TRANSLATION else "固定の欄", jst(d["at"]), "『一致の表』"]
         if any(m not in j for m in must) or "AI の判定: Claude 版" in j:
             bad.append("自由記入（段・判定者・判定・用途・材料・問いの形・日付・AI の判定）")
@@ -390,19 +418,24 @@ def r_groups(ctx):
     w, v = ctx["wb"]["群ごとの一覧"], []
     if [w.cell(4, c).value for c in range(1, 12)] != GROUP_HEADER:
         v.append("r_groups: 見出しが違う")
-    cg = {x[0]: x[3] for x in ctx["src"]["judge"]}
+    cg = {x[0]: x[3] or "不明｜不明｜不明" for x in ctx["src"]["judge"]}
     cnt = {}
     for i, d in list(ctx["src"]["j1"].items()) + list(ctx["src"]["ai_items"].items()):
         who = "j" if i in ctx["src"]["j1"] else "a"
         c = cnt.setdefault(cg[i], {"j": {"含める": 0, "保留": 0, "除外": 0}, "a": {"含める": 0, "保留": 0, "除外": 0}})
         c[who][d["res"]["verdict"]] += 1
-    want = sorted([g.split("｜")[0], g, sum(c["j"].values()) + sum(c["a"].values()), sum(c["j"].values()), c["j"]["含める"],
-                   c["j"]["保留"], c["j"]["除外"], sum(c["a"].values()), c["a"]["含める"], c["a"]["保留"], c["a"]["除外"]]
-                  for g, c in cnt.items())
+    outside = [g for g in cnt if len(g.split("｜")) != 3 or any(p not in lst for lst, p in zip(GROUP_ORDER, g.split("｜")))]
+    if outside:
+        v.append(f"r_groups: 内容の群が順の表の語彙の外（行の順を決められない）: {outside[:3]}")
+    # ★ 行の順も見る（対象者 → AI の種類 → デザインの順の表で並べた順・判断 9 の 17）
+    want = sorted(([g.split("｜")[0], g, sum(c["j"].values()) + sum(c["a"].values()), sum(c["j"].values()), c["j"]["含める"],
+                    c["j"]["保留"], c["j"]["除外"], sum(c["a"].values()), c["a"]["含める"], c["a"]["保留"], c["a"]["除外"]]
+                   for g, c in cnt.items()),
+                  key=lambda x: tuple(lst.index(p) if p in lst else len(lst) for lst, p in zip(GROUP_ORDER, x[1].split("｜"))))
     rows = [x for _, x in body(w, 11)]
     got, tot = rows[:-1], rows[-1] if rows else None
-    if sorted(got) != want:
-        v.append(f"r_groups: 群の行が独立に数えた値と違う（{len(got)} 行 / {len(want)}）")
+    if got != want:
+        v.append(f"r_groups: 群の行（値と順）が独立に数え・並べた値と違う（{len(got)} 行 / {len(want)}）")
     if tot is None or tot[0] != "計" or tot[2:] != [sum(x[k] for x in want) for k in range(2, 11)]:
         v.append("r_groups: 計の行が違う")
     if want and (sum(x[2] for x in want) != N_J1 + N_AI):
@@ -464,7 +497,8 @@ def r_search(ctx):
     if rows(wr, 8) != want_r or [wr.cell(4, c).value for c in range(1, 9)] != RUN_HEADER or wr.max_column > 8:
         v.append("r_search: 探索の検索式が data と違う")
     want_l = [[nz(y) for y in (x["key"], x["title"], x.get("year"), x.get("type"), x.get("venue"), x.get("language"), x.get("oa"),
-                               x.get("overlap"), x.get("sources"), x.get("layer"), x.get("reading"), x.get("added_as") or "いいえ")]
+                               x.get("overlap"), x.get("sources"), x.get("layer"), search_reading(x.get("reading")),
+                               x.get("added_as") or "いいえ")]
               for x in ctx["src"]["recs"]]
     if rows(wq, 12) != want_l or [wq.cell(4, c).value for c in range(1, 13)] != LIST_HEADER or wq.max_column > 12:
         v.append("r_search: 探索の一覧が data と違う")
@@ -479,7 +513,46 @@ def r_intro(ctx):
     want = f"判定者 1 の判定 {len(ctx['src']['prev']['final']) + n_j1} 件（全文段 8・題名・抄録段 {n_j1}）／AI の予備判定だけ {n_ai} 件"
     if want not in text:
         v.append(f"r_intro: 進み具合の数がログと違う（期待「{want}」）")
+    # ★ 探索の読む一覧の数は data から数え、「判定者 1 の作業量の都合」の文で当てる（どこかの「43 件」では足りない・判断 9 の 17）
+    n43 = sum(1 for r in ctx["src"]["recs"] if re.fullmatch(r"R\d\d", str(r.get("reading") or "")) and not r.get("overlap"))
+    if f"{n43} 件は、判定者 1 の作業量の都合" not in text:
+        v.append(f"r_intro: 探索の {n43} 件を足していない理由の文が無い")
+    # ★ 判定者 2 用の版の作り方で名前を挙げたシートが、すべて実在する（無いシート〈前の『品質評価』〉を消せと書かない・判断 9 の 10）
+    how = next((str(wi.cell(r, 2).value or "") for r in range(1, wi.max_row + 1) if wi.cell(r, 1).value == "判定者 2 に渡すとき"), "")
+    named = re.findall(r"『([^』]+)』", how)
+    if not named or any(n not in ctx["wb"].sheetnames for n in named):
+        v.append(f"r_intro: 判定者 2 用の版の作り方に、無いシートの名前: {[n for n in named if n not in ctx['wb'].sheetnames]}")
     return v
+
+
+def r_trailing(ctx):
+    """表のある各シートで、本体（A 列が続く行）の後の行がすべて空（★ 空行を挟んだ下の行を見落とさない・判断 9 の 4）。"""
+    v = []
+    for name in SHEETS:
+        if name not in ctx["wb"].sheetnames:
+            continue
+        ws = ctx["wb"][name]
+        for r in range(5 + len(body(ws, 1)), ws.max_row + 1):
+            if any(not blank(c.value) for c in ws[r]):
+                v.append(f"r_trailing: {name}: 本体の後の {r} 行目に値がある")
+                break
+    return v
+
+
+def r_banned(ctx):
+    """研究者に渡す表のセル・属性に、作業記録の内部の参照・作業の語が無い（判断 9 の 8）。"""
+    v = []
+    for ws in ctx["wb"].worksheets:
+        for row in ws.iter_rows():
+            for c in row:
+                m = BANNED.search(c.value) if isinstance(c.value, str) else None
+                if m:
+                    v.append(f"r_banned: 禁止の語「{m.group(0)}」: {ws.title}!{c.coordinate}")
+    p = ctx["wb"].properties
+    for x in (p.title, p.subject, p.keywords, p.description, p.category, p.creator, p.lastModifiedBy):
+        if isinstance(x, str) and BANNED.search(x):
+            v.append(f"r_banned: 表の属性に禁止の語: {x!r}")
+    return v[:10]
 
 
 def r_local(ctx):
@@ -539,6 +612,8 @@ RULES_COMMON = [
     r_extract,
     r_search,
     r_intro,
+    r_trailing,
+    r_banned,
     r_local,
     r_formula,
 ]
@@ -562,6 +637,7 @@ def selftest():
     import build_candidates as B
     ok = True
     tmpd = tempfile.mkdtemp(prefix="candchk-")
+    atexit.register(shutil.rmtree, tmpd, True)  # ★ 途中で例外で落ちても判定入りの写しを残さない（判断 9 の 13 と同じ型）
     base = os.path.join(tmpd, "base.xlsx")
     B.build(base)
     src = sources()
@@ -569,7 +645,8 @@ def selftest():
     def expect(name, path, must=None, s=None, final=True):
         nonlocal ok
         v = check(path, s or src, final=final)
-        good = (not v) if must is None else any(x.startswith(must) for x in v)
+        # ★ 当てたい規則の「例外」は検出に数えない（判断 9 の 5）
+        good = (not v) if must is None else any(x.startswith(must + ":") and not x.startswith(must + ": 例外") for x in v)
         ok &= good
         print(("PASS" if good else "FAIL"), name, "" if good else v[:3])
 
@@ -668,6 +745,75 @@ def selftest():
     print(("PASS" if good else "FAIL"), "put は = を文字列のまま書く（対照）")
     ok &= good
     expect("--final なしでも陰性対照は緑", base, final=False)
+
+    # ---- 判断 9 の直し（2・3・4・8・10・17）
+    def log_copy(path_in, name, fn):
+        lg = read_log(path_in)
+        fn(lg)
+        p = os.path.join(tmpd, name)
+        with open(p, "w", encoding="utf-8", newline="\n") as f:
+            for r in lg:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        return p
+
+    def mut_at(name, path, i, col, old, new, must, s2):
+        """path の表の『スクリーニング』の i の行の col のセルで old を new に置き換えた写しを、s2 で検査する。"""
+        wb = openpyxl.load_workbook(path)
+        r = {x[0]: k for k, x in body(wb["スクリーニング"], 1)}[i]
+        c = wb["スクリーニング"][f"{col}{r}"]
+        assert old in str(c.value), (name, c.value)
+        c.value = str(c.value).replace(old, new)
+        p = os.path.join(tmpd, f"m{abs(hash(name))}.xlsx")
+        wb.save(p)
+        expect(name, p, must, s=s2)
+
+    # 2: 題名・抄録段の除外の用途は E コードで分ける。実のログに無い E1 は、理由の行を E1 にしたログの写しで緑の対照と変異
+    def to_e1(lg):
+        r = next(r for r in lg if r["stage"] == "ta1e" and r["item"] == "S12-04")
+        r["answer"], r["result"] = "E1", {"verdict": "除外", "ecode": "E1"}
+    log_e1 = log_copy(C.LOG, "log-e1.jsonl", to_e1)
+    t_e1 = os.path.join(tmpd, "e1.xlsx")
+    B.build(t_e1, log_path=log_e1)
+    src_e1 = sources(log_path=log_e1)
+    expect("緑の対照: 題名・抄録段に除外 E1 の件があるログの写しで作った表", t_e1, s=src_e1)
+    mut_at("E1 の件の用途を背景保持と書く", t_e1, "S12-04", "J", "用途: 除外 ／", "用途: 背景保持 ／", "r_judge1_rows", src_e1)
+    mut_at("E2 の件の用途を除外と書く", base, "S12-04", "J", "用途: 背景保持 ／", "用途: 除外 ／", "r_judge1_rows", src)
+    # 3: 全文段で含めるの件の自由記入の用途は答えの用途（中心-A）。2 回目を含める（中心-A）にした前のログの写しで緑の対照と変異
+    def s1205_include(lg):
+        r = next(r for r in lg if r["item"] == "S12-05" and r["stage"] == "2")
+        r["result"] = {k: x for k, x in r["result"].items() if k != "ecode"} | {"verdict": "含める", "use": "中心-A"}
+    prev_inc = log_copy(C.PREV_LOG, "prev-include.jsonl", s1205_include)
+    t_inc = os.path.join(tmpd, "include.xlsx")
+    B.build(t_inc, prev_log_path=prev_inc)
+    src_inc = sources(prev_log_path=prev_inc)
+    expect("緑の対照: 全文段に含めるの件がある前のログの写しで作った表", t_inc, s=src_inc)
+    mut_at("全文段の含めるの用途を中心候補と書く", t_inc, "S12-05", "J", "用途: 中心-A ／", "用途: 中心候補 ／", "r_prev_rows", src_inc)
+    # 4: 空行を挟んだ下の行
+    n_scr = len(rows)
+    mut("スクリーニングの本体の後に空行を挟んで行を足す", cell(s, f"A{4 + n_scr + 2}", "S99-99"), "r_trailing")
+    mut("一致の表の本体の後に空行を挟んで値を足す", cell("一致の表", f"C{4 + N_J1 + 2}", "x"), "r_trailing")
+    # 8: 研究者に渡す表に内部の参照・作業の語
+    k42 = next(r for r, x in body(openpyxl.load_workbook(base)["探索の一覧"], 11) if str(x[10] or "").startswith("R42"))
+    mut("探索の一覧の読む一覧に「・判断 6」を戻す", lambda wb: wb["探索の一覧"].__setitem__(
+        f"K{k42}", str(wb["探索の一覧"][f"K{k42}"].value).replace("）", "・判断 6）")), "r_banned")
+    mut("盲検と読める書き方（AI の判定を見ずに）", lambda wb: [wb["はじめに"].cell(r, 2).__setattr__(
+        "value", str(wb["はじめに"].cell(r, 2).value).replace("問いに AI の判定を載せずに", "AI の判定を見ずに"))
+        for r in range(5, 40) if "問いに AI の判定を載せずに" in str(wb["はじめに"].cell(r, 2).value or "")], "r_banned")
+    mut("表の属性に内部の参照", lambda wb: setattr(wb.properties, "title", "判断 9 の表"), "r_banned")
+    # 10・17: 判定者 2 用の版の作り方に無いシート・探索の 43 件の理由の文・群の行の順
+    mut("判定者 2 用の版の作り方に無いシート（品質評価）", lambda wb: [wb["はじめに"].cell(r, 2).__setattr__(
+        "value", str(wb["はじめに"].cell(r, 2).value).replace("『全文抽出』『問いと答え』", "『全文抽出』『品質評価』『問いと答え』"))
+        for r in range(5, 40) if wb["はじめに"].cell(r, 1).value == "判定者 2 に渡すとき"], "r_intro")
+    mut("探索の 43 件の理由の文を変える（「43 件」は残る）", lambda wb: [wb["はじめに"].cell(r, 2).__setattr__(
+        "value", str(wb["はじめに"].cell(r, 2).value).replace("43 件は、判定者 1 の作業量の都合で", "43 件は、別の理由で"))
+        for r in range(5, 40) if "43 件は、判定者 1 の作業量の都合" in str(wb["はじめに"].cell(r, 2).value or "")], "r_intro")
+
+    def swap_groups(wb):
+        w = wb["群ごとの一覧"]
+        for c in range(1, 12):
+            a, b = w.cell(5, c).value, w.cell(6, c).value
+            w.cell(5, c).value, w.cell(6, c).value = b, a
+    mut("群ごとの一覧の 2 行の順を入れ替える（値はそのまま）", swap_groups, "r_groups")
     shutil.rmtree(tmpd, ignore_errors=True)
     print("selftest", "PASS" if ok else "FAIL")
     return ok

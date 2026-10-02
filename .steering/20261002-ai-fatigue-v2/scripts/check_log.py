@@ -54,17 +54,15 @@ def sources():
                       "col_ta": openpyxl.utils.get_column_letter(h.index("Claude予備判定（題名・抄録段）") + 1),
                       "col_reason": openpyxl.utils.get_column_letter(h.index("除外理由") + 1)}
                for k, r in enumerate(rr) if k > hr and r and r[0]}
-    # 行の順: 記入表 1 の原本（git の外）の『追加候補』の B 列。無ければ判定者用ファイルの順の並べ替えの規則
+    # 行の順: 記入表 1 の原本（git の外）の『追加候補』の B 列。★ 無ければ違反（書き込み側と同じ並べ替えの規則では照らさない・判断 9 の 15）
     if os.path.exists(C.TA_SHEET1_ORIG):
         w1 = openpyxl.load_workbook(C.TA_SHEET1_ORIG, read_only=True)["追加候補"]
         s["order"] = [r[1] for r in list(w1.iter_rows(values_only=True))[4:] if r and r[1]]
         s["order_from"] = "記入表 1 の原本"
     else:
-        from build_ta_sheet import order_cands
-        data = [r for r in rows[C.JUDGE_HEADER_ROW:] if r and r[0] and r[0] not in s["prev"]]
-        s["order"] = [r[0] for r in order_cands(data)]
-        s["order_from"] = "並べ替えの規則（原本なし）"
-    s["verbatim"] = [json.loads(x)["question"] for x in open(VERBATIM, encoding="utf-8") if x.strip()] if os.path.exists(VERBATIM) else []
+        s["order"], s["order_from"] = None, "記入表 1 の原本（無い）"
+    # ★ 無ければ None（r_no_verbatim が違反にする。照らす相手が無いまま緑にしない・判断 9 の 15 と同じ型）
+    s["verbatim"] = [json.loads(x)["question"] for x in open(VERBATIM, encoding="utf-8") if x.strip()] if os.path.exists(VERBATIM) else None
     s["sha"] = {"judge": C.JUDGE_FILE_SHA256, "appraisal": C.APPRAISAL_SHA256}
     return s
 
@@ -127,6 +125,8 @@ def r_cover(ctx):
 
 def r_order(ctx):
     v = []
+    if ctx["src"]["order"] is None:
+        return ["r_order: 行の順を照らす記入表 1 の原本が無い（判断 7 で残したもの）"]
     pos = {i: k for k, i in enumerate(ctx["src"]["order"], 1)}
     lines = [r for r in ctx["log"] if r.get("stage") in ("ta1", "ai_ta")]
     if [r.get("order") for r in lines] != list(range(1, len(lines) + 1)):
@@ -224,15 +224,40 @@ def r_counts(ctx):
     return [] if got == JUDGE1_COUNTS else [f"r_counts: 判定者 1 の内訳 {got} が判断 5 の記録 {JUDGE1_COUNTS} と違う"]
 
 
+def strings(x):
+    """ログの値の文字列をすべて（dict のキーも・入れ子も）。"""
+    if isinstance(x, str):
+        yield x
+    elif isinstance(x, dict):
+        for k, y in x.items():
+            yield str(k)
+            yield from strings(y)
+    elif isinstance(x, list):
+        for y in x:
+            yield from strings(y)
+
+
+def windows(body, n=40, step=20):
+    """本文の 40 字の窓を 20 字おきに（末尾の窓も）。60 字以上続けて写すと、どこを写しても 1 つは丸ごと入る。"""
+    if len(body) < n:
+        return []
+    return [body[k:k + n] for k in range(0, len(body) - n + 1, step)] + [body[-n:]]
+
+
 def r_no_verbatim(ctx):
-    """問いの逐語（抄録の訳・要約を含む）をログに載せない。"""
+    """問いの逐語（抄録の訳・要約を含む）をログに載せない。
+
+    ★ ログの文字列の値を 1 つずつ（JSON に直さず・改行や " をそのまま）、問いの本文の複数の窓で照らす（判断 9 の 14）。
+    """
     v = []
-    text = json.dumps(ctx["log"], ensure_ascii=False)
     if any("question" in r for r in ctx["log"]):
         v.append("r_no_verbatim: ログに question の欄がある（逐語は git の外・SHA-256 だけ）")
+    if not ctx["src"]["verbatim"]:
+        return v + ["r_no_verbatim: 照らす問いの逐語（git の外）が無い"]
+    text = "\0".join(strings(ctx["log"]))  # ★ 値の境を跨いで当たらないように区切る
     for q in ctx["src"]["verbatim"]:
         body = q.split("\n", 1)[1] if "\n" in q else ""
-        if len(body) >= 40 and body[:40] in text:
+        if any(w in text for w in windows(body)):
             v.append("r_no_verbatim: ログに問いの逐語の文がある")
             break
     return v
@@ -284,7 +309,8 @@ def selftest():
     def expect(name, log, must=None, s=None):
         nonlocal ok
         v = check(log, s or src)
-        good = (not v) if must is None else any(x.startswith(must) for x in v)
+        # ★ 当てたい規則の「例外」は検出に数えない（判断 9 の 5）
+        good = (not v) if must is None else any(x.startswith(must + ":") and not x.startswith(must + ": 例外") for x in v)
         ok &= good
         print(("PASS" if good else "FAIL"), name, "" if good else v[:3])
 
@@ -324,6 +350,7 @@ def selftest():
         a, b = at(lg, "ai_ta", 10), at(lg, "ai_ta", 11)
         a["order"], b["order"] = b["order"], a["order"]
     expect("AI の 2 件の順を入れ替える", m(swap), "r_order")
+    expect("記入表 1 の原本が無い（判断 9 の 15）", base, "r_order", s={**src, "order": None, "order_from": "無い"})
     expect("答えだけを変える（判定はそのまま）", m(lambda lg: item(lg, "S02-06").__setitem__("note", "メモ")), "r_answers")
     expect("問いの SHA を変える", m(lambda lg: item(lg, "S02-06").__setitem__("question_sha256", "0" * 64)), "r_answers")
     expect("判定だけを変える（答えはそのまま）",
@@ -356,9 +383,16 @@ def selftest():
         r["answer"], r["result"] = "保留", {"verdict": "保留"}
     expect("判定者 1 の内訳が判断 5 の記録と違う", m(flip), "r_counts")
     expect("ログに問いの逐語", m(lambda lg: item(lg, "S02-06").__setitem__("question", "【S02-06・抄録段 1 回目】…")), "r_no_verbatim")
+    expect("照らす問いの逐語が無い", base, "r_no_verbatim", s={**src, "verbatim": None})
     if src["verbatim"]:
         q = src["verbatim"][0]
         expect("ログの notes に問いの文", m(lambda lg: item(lg, "S02-06").__setitem__("note", q.split("\n", 1)[1][:60])), "r_no_verbatim")
+        # ★ 判断 9 の 14: 先頭でなく途中の、改行を跨ぐ 60 字（JSON に直すと改行が \n になり、前の照らし方では逃した）
+        body = next(b for b in (x.split("\n", 1)[1] for x in src["verbatim"] if "\n" in x) if "\n" in b[60:-40])
+        k = body.index("\n", 60)
+        mid = body[k - 30:k + 30]
+        expect("ログの別の欄に、問いの途中の改行を跨ぐ文", m(lambda lg: at(lg, "ta1", 3).__setitem__("answered_at", mid)), "r_no_verbatim")
+        expect("ログの入れ子の値に、問いの途中の文", m(lambda lg: at(lg, "ta1", 4)["result"].__setitem__("intent", mid)), "r_no_verbatim")
     print("selftest", "PASS" if ok else "FAIL")
     return ok
 

@@ -49,17 +49,20 @@ def cell(s):
     return str(s if s is not None else "").replace("|", "／")
 
 
-def cand_rows():
-    """追加候補の表（archive）の『スクリーニング』: ID → 列の名前 → 値。"""
-    ws = openpyxl.load_workbook(C.CAND_ARCHIVE, read_only=True)["スクリーニング"]
-    rows = list(ws.iter_rows(values_only=True))
+def load_cand(path):
+    """追加候補の表（既定は archive）を読み切って閉じる（★ read_only はファイルを開いたままにするので使わない）。"""
+    return openpyxl.load_workbook(path or C.CAND_ARCHIVE)
+
+
+def cand_rows(wb):
+    """『スクリーニング』: ID → 列の名前 → 値。"""
+    rows = list(wb["スクリーニング"].iter_rows(values_only=True))
     h = list(rows[3])
     return [dict(zip(h, r)) for r in rows[4:] if r and r[0]]
 
 
-def sheet_rows(name, ncol):
-    ws = openpyxl.load_workbook(C.CAND_ARCHIVE, read_only=True)[name]
-    return [list(r[:ncol]) for r in list(ws.iter_rows(values_only=True))[4:] if r and r[0] is not None]
+def sheet_rows(wb, name, ncol):
+    return [list(r[:ncol]) for r in list(wb[name].iter_rows(values_only=True))[4:] if r and r[0] is not None]
 
 
 def kinds(rows):
@@ -96,8 +99,8 @@ def block_counts(rows):
     ])
 
 
-def block_pop(rows):
-    g = sheet_rows("群ごとの一覧", 11)
+def block_pop(wb):
+    g = sheet_rows(wb, "群ごとの一覧", 11)
     body, total = g[:-1], g[-1]
     pops = []
     for r in body:
@@ -112,8 +115,8 @@ def block_pop(rows):
     return "\n".join(out)
 
 
-def block_agree():
-    a = sheet_rows("一致の表", 9)
+def block_agree(wb):
+    a = sheet_rows(wb, "一致の表", 9)
     vs = ("含める", "保留", "除外")
     out = ["| 判定者 1 ＼ AI の予備判定 | 含める | 保留 | 除外 | 計 |", "|---|---|---|---|---|"]
     for j in vs:
@@ -150,8 +153,9 @@ def block_appendix(rows):
         a.append(f"| {r[0]} | {cell(short(r[1]))} | {r[3]} | {field(r[9], '用途')} | {field(r[9], '材料')} |")
     ft, ta, ai = kinds(rows)
     a += ["", "### 9.2 追加候補で判定者 1 が判定した記録", "",
-          "段: 全文段 = 全文段の 2 段（1 回目は AI の判定を見ず、2 回目に AI の判定を見た）／題名・抄録段 = 判定者 1 の題名・抄録段の判定"
-          "（全文段は未実施）。除外理由の「E4 背景」は判定者 1 の選択のままで、意図は範囲の外・背景として残す（一次研究でないの意味ではない）。",
+          "段: 全文段 = 全文段の 2 段（1 回目は問いに AI の判定を載せず、2 回目に AI の判定を見た）／題名・抄録段 = 判定者 1 の題名・抄録段の判定"
+          "（問いに AI の判定を載せていない・全文段は未実施）。どちらの段でも、判定者 1 は判定の前に AI の評価版を読んでいる。"
+          "除外理由の「E4 背景」は判定者 1 の選択のままで、意図は範囲の外・背景として残す（一次研究でないの意味ではない）。",
           "", "| ID | 題名（短縮） | 判定者1 | 除外理由 | 段 | 用途 | 材料 |", "|---|---|---|---|---|---|---|"]
     for r in ft + sorted(ta, key=lambda r: r["ID"]):
         g = r["除外理由"] or ""
@@ -166,16 +170,19 @@ def block_appendix(rows):
           "★ 人の判定ではありません。AI（Claude）の評価版の題名・抄録段の予備判定を、そのまま写したものです。",
           "", "| ID | 題名（短縮） | AI の予備判定 | AI の除外理由 |", "|---|---|---|---|"]
     for r in sorted(ai, key=lambda r: r["ID"]):
-        code = re.match(r"(E\d)", r["AI の除外理由（評価版の逐語）"] or "")
-        a.append(f"| {r['ID']} | {cell(short(r['論文タイトル']))} | {r['AI の予備判定（題名・抄録段・評価版）']} | {code.group(1) if code else '—'} |")
+        ta = r["AI の予備判定（題名・抄録段・評価版）"]
+        # ★ E コードは AI の予備判定が除外のときだけ（含めるの件の除外理由の列は全文段の理由・判断 9 の 6）
+        code = re.match(r"(E\d)", r["AI の除外理由（評価版の逐語）"] or "") if ta == "除外" else None
+        a.append(f"| {r['ID']} | {cell(short(r['論文タイトル']))} | {ta} | {code.group(1) if code else '—'} |")
     return "\n".join(a)
 
 
-def compose_md():
-    """原稿の自動の区画を作り直した文字列（★ ここでは書き戻さない）。"""
+def compose_md(cand_path=None):
+    """原稿の自動の区画を作り直した文字列（★ ここでは書き戻さない）。cand_path は検査器の selftest の対照（表の写し）用。"""
     s = open(MD, encoding="utf-8").read()
-    rows = cand_rows()
-    gen = {"counts": block_counts(rows), "pop": block_pop(rows), "agree": block_agree(), "search43": block_search43(),
+    wb = load_cand(cand_path)
+    rows = cand_rows(wb)
+    gen = {"counts": block_counts(rows), "pop": block_pop(wb), "agree": block_agree(wb), "search43": block_search43(),
            "appendix": block_appendix(rows)}
     new = s
     for name in BLOCKS:
@@ -187,8 +194,7 @@ def compose_md():
 
 def write_md(old, new):
     if new != old:
-        with open(MD, "w", encoding="utf-8", newline="\n") as f:
-            f.write(new)
+        C.write_text_atomic(MD, new)
 
 
 def add_runs(p, text):
@@ -296,22 +302,92 @@ def build_docx(md, dst):
     cp.created = cp.modified = now
     cp.revision = 1
     doc.save(dst)
+    neutralize_package(dst)
+
+
+# ★ python-docx の雛形が持つ属性（判断 9 の 11）: 雛形の縮小画像（thumbnail）と、app.xml の Template・Application・AppVersion。
+#   部品を消し、app.xml を中立の最小の形に置き換える。検査器（check_proposal.r_docx_parts）は部品の名前と app.xml を独立に確かめる。
+APP_XML = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+           '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
+           'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><DocSecurity>0</DocSecurity>'
+           '<LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged></Properties>')
+
+
+def neutralize_package(path):
+    """保存した .docx の zip から thumbnail の部品・関係・型の宣言を消し、app.xml を中立の値にする（同じフォルダで置き換える）。"""
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        parts = [(i, z.read(i.filename)) for i in z.infolist()]
+    thumbs = {i.filename for i, _ in parts if i.filename.startswith("docProps/thumbnail")}
+    fd, tmp = tempfile.mkstemp(suffix=".part", dir=os.path.dirname(os.path.abspath(path)), prefix=".tmp-")
+    os.close(fd)
+    try:
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as out:
+            for info, data in parts:
+                name = info.filename
+                if name in thumbs:
+                    continue
+                if name == "docProps/app.xml":
+                    data = APP_XML.encode("utf-8")
+                elif name == "_rels/.rels":
+                    t = data.decode("utf-8")
+                    t = re.sub(r'<Relationship [^>]*Target="/?docProps/thumbnail[^"]*"[^>]*/>', "", t)
+                    data = t.encode("utf-8")
+                elif name == "[Content_Types].xml":
+                    t = data.decode("utf-8")
+                    t = re.sub(r'<Override [^>]*PartName="/docProps/thumbnail[^"]*"[^>]*/>', "", t)
+                    exts = {n.rsplit(".", 1)[-1].lower() for n in (i.filename for i, _ in parts) if n not in thumbs and "." in n}
+                    for ext in ("jpeg", "jpg", "png", "emf", "wmf"):
+                        if ext not in exts:  # ★ ほかに使う部品が無い画像の型の宣言だけ消す
+                            t = re.sub(rf'<Default Extension="{ext}" [^>]*/>', "", t, flags=re.I)
+                    data = t.encode("utf-8")
+                out.writestr(info, data)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
+def check_candidates_sha():
+    """元にする追加候補の表（archive と Downloads）が記録の SHA-256 と同じ（★ 違う表から提案を作らない・判断 9 の 12）。"""
+    if not os.path.exists(C.CAND_SHA_RECORD):
+        sys.exit(f"追加候補の表の SHA-256 の記録が無い（止まって聞く）: {C.CAND_SHA_RECORD}")
+    rec = open(C.CAND_SHA_RECORD, encoding="utf-8").read().strip()
+    for p in (C.CAND_ARCHIVE, C.CAND_DOWNLOADS):
+        if not os.path.exists(p) or C.sha256(p) != rec:
+            sys.exit(f"追加候補の表が SHA-256 の記録と違う・無い{C.STOPPED_HINT}: {p}")
+
+
+def dry_run(md):
+    """作って検査し、消す（★ 判定入りの写しを %TEMP% に残さない・原稿は書き戻さない・判断 9 の 13）。"""
+    import check_proposal as K
+    fd, tmp = tempfile.mkstemp(suffix=".docx", prefix="proposal-dry-")
+    os.close(fd)
+    try:
+        build_docx(md, tmp)
+        src = K.sources()
+        v = K.check(md, tmp, {**src, "md": md})
+        sha = C.sha256(tmp)
+    finally:
+        os.remove(tmp)
+    for x in v:
+        print("違反:", x)
+    print(f"dry-run: 違反 {len(v)}（作った .docx は検査の後に消した・原稿は書き戻していない・SHA-256 {sha}）")
+    sys.exit(1 if v else 0)
 
 
 def main(dry):
+    check_candidates_sha()
     old_md, md = compose_md()
     if dry:
-        fd, tmp = tempfile.mkstemp(suffix=".docx", prefix="proposal-dry-")
-        os.close(fd)
-        build_docx(md, tmp)
-        print("dry-run ok（repo の外・原稿は書き戻していない）", tmp)
+        dry_run(md)
         return
     last = open(SHA_RECORD, encoding="utf-8").read().strip() if os.path.exists(SHA_RECORD) else None
     for p in (DOCX_ARCHIVE, DOCX_DOWNLOADS):
         if os.path.exists(p) and C.sha256(p) != last:
-            sys.exit(f".docx が最後に書いたものと違う（手で直された可能性・止まって聞く）: {p}")
+            sys.exit(f".docx が SHA-256 の記録と違う{C.STOPPED_HINT}: {p}")
         if not os.path.exists(p) and last is not None:
-            sys.exit(f"記録があるのに .docx が無い（止まって聞く）: {p}")
+            sys.exit(f"記録があるのに .docx が無い{C.STOPPED_HINT}: {p}")
     tmps, bak = [], None
     try:
         fd, tmp_a = tempfile.mkstemp(suffix=".part", dir=os.path.dirname(DOCX_ARCHIVE), prefix=".tmp-")
@@ -322,9 +398,9 @@ def main(dry):
         os.close(fd)
         tmps.append(tmp_d)
         shutil.copyfile(tmp_a, tmp_d)
-        for p in (DOCX_ARCHIVE, DOCX_DOWNLOADS):
+        for p in (DOCX_ARCHIVE, DOCX_DOWNLOADS):  # ★ 置き換えの直前にもう一度
             if (os.path.exists(p) and C.sha256(p) != last) or (not os.path.exists(p) and last is not None):
-                sys.exit(f".docx が最後に書いたものと違う・無い（止まって聞く）: {p}")
+                sys.exit(f".docx が SHA-256 の記録と違う・無い{C.STOPPED_HINT}: {p}")
         if os.path.exists(DOCX_DOWNLOADS):
             fd, bak = tempfile.mkstemp(suffix=".part", prefix="proposal-bak-")
             os.close(fd)
@@ -339,17 +415,15 @@ def main(dry):
                 os.remove(DOCX_DOWNLOADS)
             raise
         write_md(old_md, md)
+        new = C.sha256(DOCX_ARCHIVE)
+        if C.sha256(DOCX_DOWNLOADS) != new:
+            sys.exit("archive と Downloads の .docx が合わない（SHA-256 の記録は書いていない）")
+        C.write_text_atomic(SHA_RECORD, new + "\n")
     finally:
-        for t in tmps:
+        # ★ 失敗の経路でも、一時ファイルと退避（判定入り）を残さない（判断 9 の 13）
+        for t in tmps + ([bak] if bak else []):
             if os.path.exists(t):
                 os.remove(t)
-    new = C.sha256(DOCX_ARCHIVE)
-    if C.sha256(DOCX_DOWNLOADS) != new:
-        sys.exit("archive と Downloads の .docx が合わない")
-    with open(SHA_RECORD, "w", encoding="utf-8", newline="\n") as f:
-        f.write(new + "\n")
-    if bak and os.path.exists(bak):
-        os.remove(bak)
     print("ok", new)
 
 

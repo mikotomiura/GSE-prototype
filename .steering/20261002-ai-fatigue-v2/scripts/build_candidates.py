@@ -14,6 +14,7 @@
 import datetime
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -154,7 +155,7 @@ def label(r):
 
 
 def prev_cells(i, first, final, quality, xconf, has_ai):
-    """前のタスクで全文段まで判定した記録（S02-08 ほか 7 件と X01）の欄（前のタスクの書き方のまま）。"""
+    """前のタスクで全文段まで判定した記録（S02-08 など追加候補の 7 件と X01）の欄（前のタスクの書き方のまま）。"""
     f0, f1 = first[i], final[i]
     basis = f1.get("basis", "全文")
     use = use_of(f1)
@@ -199,7 +200,12 @@ def judge1_use(res):
         return "未定（全文段で決まる・全文段は未実施）"
     if res["verdict"] == "保留":
         return "保留（全文段は未実施）"
-    return "背景保持"  # E2・E4 背景（範囲の外・背景として残す）
+    e = str(res.get("ecode") or "")
+    if e == "E2" or e.startswith("E4 背景"):  # E4 背景 = 範囲の外・背景として残す（判断 6）
+        return "背景保持"
+    if e in ("E1", "E3"):
+        return "除外"
+    raise ValueError(f"題名・抄録段の除外理由が語彙の外: {e!r}")  # ★ 黙って背景保持にしない（判断 9 の 2）
 
 
 def judge1_cells(d):
@@ -257,6 +263,11 @@ def pop_rows(groups):
     return out
 
 
+def reading_label(s):
+    """『探索の一覧』の「読む一覧」の欄。★ 作業記録の内部の参照（「・判断 6」）を研究者に渡す表に載せない（判断 9 の 8）。"""
+    return re.sub(r"・判断 ?\d+", "", s) if isinstance(s, str) else s
+
+
 def put(cell, v):
     """セルに値を書く。★ 先頭が = の文字列は式にしない（探索の題名など外の文が式になるのを防ぐ）。"""
     cell.value = v
@@ -289,13 +300,14 @@ def intro_rows(n):
                              "2 人の判定が独立でなくなる）。判定者 2 に渡す版は、『スクリーニング』の D・G・H・I・J 列を初期値（判定者1 = 未判定・"
                              "除外理由 = 空・全文確認 = 未完了・品質評価 = 未実施・自由記入 = 空）に戻し、R〜W 列（判定者・判定の段・AI の予備判定・"
                              "AI の除外理由・AI の値の出どころ・研究者の読みに依存）を消し、『探索の一覧』の「足した（ID）」列を空にし、"
-                             "『AI判定比較』『一致の表』『群ごとの一覧』『全文抽出』『品質評価』『問いと答え』のシートを消し、"
+                             "『AI判定比較』『一致の表』『群ごとの一覧』『全文抽出』『問いと答え』のシートを消し、"
                              "『はじめに』を判定者 2 用に書き直して作る（どれも判定者 1 の判定・理由・進み具合・AI の判定を含む）。"),
         ("基準の版", CRITERIA_VERSION + "（判定者用ファイルの『判定基準』と同じ）"),
-        ("判定者と段（R・S 列）", f"220 件と足した 1 件は、次の 3 つに分かれる。(1) 判定者 1 が全文段で判定した 8 件（S02-08 ほか 7 件と X01）／"
+        ("判定者と段（R・S 列）", f"220 件と足した 1 件は、次の 3 つに分かれる。(1) 判定者 1 が全文段で判定した 8 件（S02-08 など追加候補の 7 件と X01）／"
                               f"(2) 判定者 1 が題名・抄録段で判定した {n['j1']} 件／(3) 判定者 1 が判定していない {n['ai']} 件"
                               "（AI〈評価版〉の題名・抄録段の予備判定だけがある）。R 列に判定者、S 列に段を書いた。"),
-        ("全文段の 8 件", "各件を 2 段で記録した: 1 回目は AI の判定を見ずに選び、2 回目に AI の判定（評価版）を見て変えるかを選んだ。"
+        ("全文段の 8 件", "各件を 2 段で記録した: 1 回目は問いに AI の判定を載せずに選び（判定者 1 は判定の前に評価版を読んでいる）、"
+                         "2 回目に AI の判定（評価版）を見て変えるかを選んだ。"
                          "評価版に行が無い X01 は 2 回目を置かず、新しい AI の判定も作っていない。"),
         ("題名・抄録段の判定者 1", f"判定者 1 は {n['j1']} 件を、問い（1 回に 4 件まで）で判定した。問いには題名・年・掲載誌と、"
                                 f"順 1〜{FULL_TRANSLATION} は抄録の日本語の全訳、順 {FULL_TRANSLATION + 1} からは抄録の事実を固定の欄"
@@ -319,7 +331,8 @@ def intro_rows(n):
                              "全文段を行っていないこのファイルでは空。"),
         ("答えと用途の対応", "含める（中心-A／中心-B）→ 中心候補／除外 E2 → 背景保持／除外 E4 → レビュー・論考・研究計画は背景保持、方法論は方法論保持、"
                          "訂正通知は訂正連結／除外 E1・E3・E5・E7 → 除外／保留（E6 を含む）→ 保留。"
-                         "題名・抄録段の含めるは用途が未定（全文段で決まる）。判定者 1 の「除外 E4 背景」は背景保持。"),
+                         "題名・抄録段の含めるは用途が未定（全文段で決まる）。題名・抄録段の除外は、E2 と判定者 1 の「除外 E4 背景」が背景保持、"
+                         "E1・E3 が除外。"),
         ("品質評価", "判定で含めた一次研究だけ全文段で確定する（JBI・尺度開発は COSMIN・6 領域・合計点なし）。このファイルの時点で確定した件は無い。"),
         ("無料の本文", "有料の本文・有料のデータベースは使っていない。抄録は無料の学術 API（メールアドレス・鍵は送っていない）と、"
                      "DOI の行き先のページの抄録の欄から取った。"),
@@ -334,8 +347,9 @@ def intro_rows(n):
     ]
 
 
-def build(dst, log_path=None):
-    prev_log = read_log(C.PREV_LOG)
+def build(dst, log_path=None, prev_log_path=None):
+    """log_path・prev_log_path は検査器の selftest の対照（ログの写し）用。既定は本タスクと前のタスクのログ。"""
+    prev_log = read_log(prev_log_path or C.PREV_LOG)
     first, final, quality, xconf = prev_decisions(prev_log)
     this_log = read_log(log_path or C.LOG)
     dec = this_decisions(this_log)
@@ -408,7 +422,8 @@ def build(dst, log_path=None):
         agree.append([d["order"], i, title[i], d["result"]["verdict"], judge1_g(d["result"]), a["ta"],
                       a["reason"] if a["ta"] == "除外" else None, same, code])
     add_sheet(wb, "一致の表", "一致の表｜題名・抄録段で判定者 1 が判定した記録と、評価版の題名・抄録段の予備判定",
-              "判定者 1 の判定の後に機械で突き合わせた（判定者 1 は判定の時の問いで AI の値を見ていない）。判定の一致は 含める／保留／除外 の一致、"
+              "判定者 1 の判定の後に機械で突き合わせた（問いに AI の判定を載せていない。判定者 1 は判定の前に評価版を読んでいる）。"
+              "判定の一致は 含める／保留／除外 の一致、"
               "除外理由の一致は両方が除外のときの E コードの一致。一致の率は品質評価やκではない。", AGREE_HEADER, agree, {3: 50, 7: 40})
     groups = group_rows(cands, dec)
     add_sheet(wb, "群ごとの一覧", "群ごとの一覧｜未判定だった 213 件を内容の群で数えた（誰が判定したか・判定の内訳）",
@@ -433,7 +448,8 @@ def build(dst, log_path=None):
               "か読まない理由（題名の語の規則）。足した = 判定者 1 が候補に足したか（読む一覧の 43 件は、判定者 1 の作業量の都合でこのファイルでは足していない）。",
               ["key", "題名", "年", "種別（API）", "掲載", "言語", "無料の版", "重なり", "見つかった API", "層", "読む一覧", "足した（ID）"],
               [[x["key"], x["title"], x.get("year"), x.get("type"), x.get("venue"), x.get("language"), x.get("oa"),
-                x.get("overlap"), x.get("sources"), x.get("layer"), x.get("reading"), x.get("added_as") or "いいえ"] for x in recs])
+                x.get("overlap"), x.get("sources"), x.get("layer"), reading_label(x.get("reading")), x.get("added_as") or "いいえ"]
+               for x in recs])
     qa = [[PREV_WORK, r.get("seq"), r["item"], r["stage"], r["question"], " ／ ".join(r.get("options") or []), r["answer"], r.get("note", "")]
           for r in prev_log]
     qa += [[THIS_WORK, r["seq"], r["item"], r["stage"],
@@ -441,8 +457,9 @@ def build(dst, log_path=None):
             f"判定者 1 の手元の記録と SHA-256 {r['question_sha256'][:16]}… で結ぶ）",
             " ／ ".join(r["options"]), r["answer"], r["note"]] for r in this_log if r["stage"] in ("ta1", "ta1e")]
     add_sheet(wb, "問いと答え", "判定者 1 の問いと答え｜作業記録の写し（1 行 1 問）",
-              "段: 1 = 全文段の 1 回目（AI の判定を見ない）・1e = 除外の理由・2 = 2 回目（AI の判定を見た）・q = 品質評価の確定・x = 抽出の確定／"
-              "ta1 = 題名・抄録段（判定者 1・AI の判定を見ない）・ta1e = その除外理由。AI の予備判定は問いではないのでここに載せない（『スクリーニング』の T〜V 列）。",
+              "段: 1 = 全文段の 1 回目（問いに AI の判定を載せていない）・1e = 除外の理由・2 = 2 回目（問いに AI の判定を載せた）・"
+              "q = 品質評価の確定・x = 抽出の確定／ta1 = 題名・抄録段（判定者 1・問いに AI の判定を載せていない）・ta1e = その除外理由。"
+              "判定者 1 は判定の前に評価版を読んでいる。AI の予備判定は問いではないのでここに載せない（『スクリーニング』の T〜V 列）。",
               LOG_HEADER, qa, {5: 60})
     wb.save(dst)
 
@@ -455,24 +472,38 @@ def last_record():
     return None, False
 
 
+def dry_run():
+    """作って検査し、消す（★ 判定入りの写しを %TEMP% に残さない・判断 9 の 13）。"""
+    import check_candidates as K
+    fd, tmp = tempfile.mkstemp(suffix=".xlsx", prefix="cand-dry-")
+    os.close(fd)
+    try:
+        build(tmp)
+        v = K.check(tmp, K.sources(), final=True)
+        sha = C.sha256(tmp)
+    finally:
+        os.remove(tmp)
+    for x in v:
+        print("違反:", x)
+    print(f"dry-run: 違反 {len(v)}（作った表は検査の後に消した・SHA-256 {sha}）")
+    sys.exit(1 if v else 0)
+
+
 def main(dry):
     for p, s in ((C.JUDGE_FILE, C.JUDGE_FILE_SHA256), (C.APPRAISAL, C.APPRAISAL_SHA256)):
         if C.sha256(p) != s:
             sys.exit(f"元の資料の SHA-256 が違う: {p}")
     if dry:
-        fd, tmp = tempfile.mkstemp(suffix=".xlsx", prefix="cand-dry-")
-        os.close(fd)
-        build(tmp)
-        print("dry-run ok（repo の外）", tmp)
+        dry_run()
         return
     last, own = last_record()
     # ★ archive は本タスクの記録とだけ比べる（初回は無いはず）。Downloads は初回だけ前のタスクの記録と比べる
     checks = ((C.CAND_ARCHIVE, last if own else None), (C.CAND_DOWNLOADS, last))
     for p, want in checks:
         if os.path.exists(p) and C.sha256(p) != want:
-            sys.exit(f"表が最後に書いたものと違う（手で記入された可能性・止まって聞く）: {p}")
+            sys.exit(f"表が SHA-256 の記録と違う{C.STOPPED_HINT}: {p}")
         if not os.path.exists(p) and want is not None:
-            sys.exit(f"記録があるのに表が無い（止まって聞く）: {p}")
+            sys.exit(f"記録があるのに表が無い{C.STOPPED_HINT}: {p}")
     os.makedirs(os.path.dirname(C.CAND_ARCHIVE), exist_ok=True)
     tmps, bak = [], None
     try:
@@ -486,7 +517,7 @@ def main(dry):
         shutil.copyfile(tmp_a, tmp_d)
         for p, want in checks:  # ★ 置き換えの直前にもう一度
             if (os.path.exists(p) and C.sha256(p) != want) or (not os.path.exists(p) and want is not None):
-                sys.exit(f"表が最後に書いたものと違う・無い（止まって聞く）: {p}")
+                sys.exit(f"表が SHA-256 の記録と違う・無い{C.STOPPED_HINT}: {p}")
         if os.path.exists(C.CAND_DOWNLOADS):
             fd, bak = tempfile.mkstemp(suffix=".part", prefix="cand-bak-")
             os.close(fd)
@@ -500,17 +531,15 @@ def main(dry):
             else:
                 os.remove(C.CAND_DOWNLOADS)
             raise
+        new = C.sha256(C.CAND_ARCHIVE)
+        if C.sha256(C.CAND_DOWNLOADS) != new:
+            sys.exit("archive と Downloads の表が合わない（SHA-256 の記録は書いていない）")
+        C.write_text_atomic(C.CAND_SHA_RECORD, new + "\n")
     finally:
-        for t in tmps:
+        # ★ 失敗の経路でも、一時ファイルと退避（判定入り）を残さない（判断 9 の 13）
+        for t in tmps + ([bak] if bak else []):
             if os.path.exists(t):
                 os.remove(t)
-    new = C.sha256(C.CAND_ARCHIVE)
-    if C.sha256(C.CAND_DOWNLOADS) != new:
-        sys.exit("archive と Downloads の表が合わない")
-    with open(C.CAND_SHA_RECORD, "w", encoding="utf-8", newline="\n") as f:
-        f.write(new + "\n")
-    if bak and os.path.exists(bak):
-        os.remove(bak)
     print("ok", new)
 
 

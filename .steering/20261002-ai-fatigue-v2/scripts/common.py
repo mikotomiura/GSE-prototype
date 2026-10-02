@@ -39,7 +39,7 @@ COPY34_SHA_RECORD = os.path.join(STEER, "20261001-ai-fatigue-34-screening", "arc
 
 # 前のタスク（追加候補 8 件・探索）。★ 読むだけ
 PREV_TASK = os.path.join(STEER, "20261002-ai-fatigue-after-34")
-PREV_LOG = os.path.join(PREV_TASK, "screening-log.jsonl")            # 17 行（S02-08 ほか 7 件と X01）
+PREV_LOG = os.path.join(PREV_TASK, "screening-log.jsonl")            # 17 行（S02-08 など追加候補の 7 件と X01）
 PREV_DATA = os.path.join(PREV_TASK, "data")
 PREV_EXTRA_RECORDS = os.path.join(PREV_DATA, "extra-records.json")   # X01
 PREV_EXTRACT_ROWS = os.path.join(PREV_DATA, "extract-rows.json")
@@ -132,6 +132,22 @@ def sha256(path):
         for b in iter(lambda: f.read(1 << 20), b""):
             h.update(b)
     return h.hexdigest()
+
+
+def write_text_atomic(path, text):
+    """同じフォルダの一時ファイルに書いてから置き換える（途中で止まっても、前の中身か新しい中身のどちらかが残る・判断 9 の 13）。"""
+    import tempfile
+    fd, tmp = tempfile.mkstemp(suffix=".part", dir=os.path.dirname(path), prefix=".tmp-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
+STOPPED_HINT = "（手で記入・保存された可能性と、前の実行が SHA-256 の記録を書く前に止まった可能性がある・止まって聞く）"
 
 
 def is_cand_id(i):
