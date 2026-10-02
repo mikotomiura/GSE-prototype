@@ -21,3 +21,8 @@
 ## ⚠️ 配布直前の別タスクへの申し送り（security-checker MEDIUM）
 - [ ] 同意フォームの再配備は **本変更を含む新しい O1 タグと同時かその後**に行う（旧タグ v0.1.38 以前は 4 択しか出さない）
 - [ ] `docs/o1-distribution-tag.md` の新しい節に「同意フォームは 5 択版」「v0.1.38 以前を O1 に使わない」と書く
+
+## 出荷の記録（2026-10-02）
+- [x] PR #292 merge（`f04b4995`）・main の run 発火 1 件・gse-dataset PR #1 merge（`c657c56`）・main どうしの schema parity OK
+- ⚠️ merge 中に `.codex/budget.json` の競合マーカーを作業ブランチへ push してしまった（Python の置換失敗の後も `git add` が走った）→ `64b6cf7b` で解消・main には入っていない
+- [ ] O1 v0.1.39: 版上げ PR → merge → タグ push → release → zip 作り直し・検算 → `docs/o1-distribution-tag.md` に節 → O1 ゲート再実行
