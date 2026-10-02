@@ -29,5 +29,7 @@
 
 ## 完了
 - [ ] 元の資料 4 つの SHA・前の 2 タスクのディレクトリに差分なし・ステージに抄録と本文なし
-- [ ] code-reviewer ＋ security-checker（並列）→ /cross-review 2 巡
+- [x] code-reviewer ＋ security-checker（並列）・Codex 1 巡目（2 回）→ 判断 9（指摘 18 件を一次で確かめた・CRITICAL/HIGH 0）
+- [ ] 判断 9 の 1〜17 を直す → 表と提案を作り直す → 3 本の selftest・メタ変異・`--final` 違反 0 → コミット
+- [ ] Codex 2 巡目（直しの差分・足した規則の境界条件）
 - [ ] 出荷（git-workflow ルール 6）
