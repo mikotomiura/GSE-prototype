@@ -179,7 +179,11 @@
     - [x] 完了時レビュー（code-reviewer ∥ security-checker は `965486554..f02cb49a` の公開物 24 ファイル・Codex は研究者の選択で直近の `kit/` に絞って 2 巡）
       → code-reviewer MEDIUM 1・LOW 6、security MEDIUM 1・LOW 4・範囲外 1、Codex 1 巡目 P1 1・P2 2（すべて真）→ 研究者に 4 問 → 判断 127（起動の前と止めた後も喪失・数える終わりの延長・計画をセルと対応・残り 12 件）・実装は判断 128。Codex 2 巡目 P1 1・P2 2 → 判断 129（文を揃える・FORMAT とテストは足さない）。29 本緑・バイト一致・exit 3・違反 0・違反なし・節の参照・本文 15,469 語
     - [x] PR → CI 緑なら merge → main の CI → PR #289（merge `c613bdf5`・PR の CI は Mac / Windows の self-hosted と frontend が緑）。attack-me の `tmp/`（round 1〜5）を消した（閉じたため）
-    - [ ] 凍結（研究者の最終の確認 → 印 → タグ → 書き出しの一覧の SHA-256）→ OSF の登録（研究者）・引き継ぎ `next-session-ime-paper-m3-freeze.md`
+    - [x] 凍結（研究者の最終の確認 → 印 → タグ → 書き出しの一覧の SHA-256）・引き継ぎ `next-session-ime-paper-m3-freeze.md`
+      → 2026-10-02（G-GEAR）: 試しの書き出しが selftest の 2 行で拒否 → 直した（`eaaeea74`・判断 130）。024 は ✅ 137・❌ 2（SCOPE と GUARD だけ）。研究者に 3 問 → 判断 131（凍結する・タグ `ime-observation-prereg-macos`・一覧の道は M12 で公開 repo の最初の commit）
+      → 凍結の commit `ff122e3246346da7869c4e990e4978acb1f191c6`・`frozen_at: 2026-10-02`・`sha256: 64dfbb6e…af2a`・`--check-prereg` exit 0。書き出しの一覧の SHA-256 `29b183ba245939ad82d9fa2d7db26e1a18520e2966f4aa9ec74478a4e51e6c49`（98 ファイル・`freeze-export-list-macos.txt`）。`experiment/notes.md` に凍結の commit・タグ・一覧の SHA-256 を書いた
+    - [ ] OSF Registries の登録（研究者・公開・最初の本計測の run より前）→ 登録の URL と日付を `experiment/notes.md` に（§9）
+    - [ ] ★ M12 への申し送り（判断 131）: 公開 repo の最初の commit を、タグ `ime-observation-prereg-macos` から `--allow-missing-license` で書き出したものそのものにしてタグを付け、一覧の SHA-256 が `29b183ba…6c49` になることを確かめてから、ライセンスと M12 の書き出しを上に積む
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
