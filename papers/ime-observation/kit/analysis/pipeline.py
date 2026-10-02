@@ -81,10 +81,14 @@ exit status 3 when a mark is missing, malformed, duplicated or different. Only r
 rehearsals, not a defence against a person who edits a manifest. A synthetic result also carries
 "synthetic": true and is never written under experiment/results.
 
-Registered plans. In an analysis of real data, a run that is not aborted must have used one of the two plans of
-section 2.4 of the pre-registration (live conversion on, off): the SHA-256 of its plan log, which is checked
-against run.json, must be in REGISTERED_PLAN_SHA256. Otherwise the run counts as aborted under section 3.4 and the
-analysis stops with exit status 2; the message names the cell, never a value. Synthetic runs are not checked,
+Registered plans and cells. Section 2.4 of the pre-registration gives each cell its plan: one for live conversion
+on, one for live conversion off. In an analysis of real data, a run that is not aborted is analysed only when the
+cell recorded in its run.json says ime_settings.live_conversion is "on" or "off" and the SHA-256 of its plan log
+(checked against run.json) equals the value REGISTERED_PLAN_SHA256 holds for that setting (a dictionary keyed by
+"on" and "off"). A run whose cell has no such setting, or whose plan is the plan of the other setting or any other
+plan, counts as aborted under section 3.4 and the analysis stops with exit status 2; the message names the cell
+and says that its plan is not the plan that section 2.4 gives its cell, and holds no value and no hash. The
+dictionary is recorded in e1_delivery.json ("abort_rule", registered_plan_sha256). Synthetic runs are not checked,
 and neither are --pack and --check-deposit (runs that used other plans are deposited with the same commands).
 
 Abort rule for the reference input field (pre-registration section 3.4). The delivery report divides the
@@ -100,14 +104,23 @@ oracle has no block_begin the one segment counts as the segment before the first
 refused when the reference input field lost focus, for any reason (the planned switches of scenario S15 are
 losses too), and the observation log holds, within that loss widened by delivery.FOCUS_MARGIN_MS on both sides
 (merged where the widened losses overlap), a key row that no key sent by the executor explains
-(reference_focus_loss.n_loss_spans_with_unexplained_presses is above 0). The rows are matched one to one, in
-time order: each row takes the earliest key not yet taken that was sent from delivery.OBS_MATCH_BEFORE_MS before
-the row to delivery.OBS_MATCH_AFTER_MS after it; a row left without a key is unmatched. To type into another
-application a person must take the focus from the reference, and the observation records the keys it observes
-in every application, but the executor goes on sending keys during a loss, so only the rows beyond the keys sent refuse the
-run. A loss in which every row is matched puts no press of a person into either log. Outside a loss of focus,
-extra rows of the observation log never refuse a run. The message names the cell and the block,
-never a value of a log. The rule and its constants are recorded in e1_delivery.json ("abort_rule").
+(reference_focus_loss.n_loss_spans_with_unexplained_presses is above 0). Two spans count as losses besides the
+losses of the log: the time from the start of the logs to the first focus_in of the reference log (the whole
+log when the reference log has no focus row at all), and the time after the last key_down or focus row of the
+reference log; so a reference log of a faithful run starts with a focus_in, as the real reference input field
+writes one when the runner brings it to the front, and the synthetic runs write one. The focus rows are read in
+the order of the log. The rows are matched one to one, in time order: each row takes the earliest key not yet
+taken that was sent from delivery.OBS_MATCH_AFTER_MS before the row to delivery.OBS_MATCH_BEFORE_MS after it (the
+row comes after its key, by at most OBS_MATCH_AFTER_MS); a row left without a key is unmatched. The unmatched
+rows of a span are counted in a window that extends forward past its end while keys sent follow each other
+closely (delivery._extended_end), because the matching is global and a shortage can move to a later row. To
+type into another application a person must take the focus from the reference, and the observation records the
+keys it observes in every application, but the executor goes on sending keys during a loss, so only the rows
+beyond the keys sent refuse the run. The count has blind spots (a key whose row the observation misses can take
+one press of a person, a row stamped far from its key stays unmatched, a duplicated row counts); they are
+listed in the docstring of delivery.py. Outside a loss of focus, extra rows of the observation log never refuse
+a run. The message names the cell and the block, never a value of a log. The rule and its constants are
+recorded in e1_delivery.json ("abort_rule").
 
 Outputs (RESULTS_DIR): e1_l1.json, e1_l2.json, e1_detection.json and e1_delivery.json (the per-press delivery
 report of delivery.py, per cell: cells[label]). Each one carries the seed, the
@@ -124,7 +137,7 @@ a line without it, or with a different one, stops the analysis. The labels that 
 Deposit check. Only run.json and the four logs are meant to be deposited. --check-deposit exits 1 when a
 run directory is not safe to deposit and reports the file and line (never the value). It refuses a file
 that contains (a) any absolute path: a drive letter, a UNC path, /Users/, /home/, /Volumes/, /root/,
-/mnt/, an MSYS drive path such as /c/, in the plain spelling and in the spelling of a JSON string (only
+/mnt/, an MSYS drive path such as /c/, a file: URI (any case, file: followed by a slash), in the plain spelling and in the spelling of a JSON string (only
 paths that start with ~ or <repo>, and relative paths, are allowed); (b) the home directory of the
 current user or of --also-home PATH (any number), in every separator spelling and in the MSYS spelling;
 (c) the absolute path of the repository; (d) the login name of the current user or a name given with
@@ -234,10 +247,12 @@ RUNNER_KANA_PRESSES_PER_BLOCK = 0
 REFERENCE_RECEIVES_MODE_KEYS = False
 DELIVERY_PRE_MS = 20
 DELIVERY_TAIL_MS = 300
-# SHA-256 of the plan logs of the two measurement plans of section 2.4 of the pre-registration (live conversion
-# on, live conversion off). An analysis of real data accepts a run that is not aborted only with one of them.
-REGISTERED_PLAN_SHA256 = ("c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba",
-                          "3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2")
+# SHA-256 of the plan logs of the two measurement plans of section 2.4 of the pre-registration, by the setting of live
+# conversion of the cell ("on", "off") that section 2.4 gives each plan to. An analysis of real data accepts a run that
+# is not aborted only when its cell records one of the two settings and its plan log is the plan of that setting.
+REGISTERED_PLAN_SHA256 = {"on": "c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba",
+                          "off": "3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2"}
+LIVE_CONVERSION_KEY = "live_conversion"
 PRIMARY_NOTE = ("the primary estimates are the comparison and scope named here, per stratum; every other comparison "
                 "and scope is secondary. A cell without a prediction (the prediction models the macOS observer only) "
                 "has the comparison gt_obs and the scope all_trials only. Values under all_trials depend on this "
@@ -855,6 +870,15 @@ def reference_abort_reasons(dlv):
     return out
 
 
+def _plan_matches_cell(run):
+    """True when the cell of the run records live conversion "on" or "off" and the SHA-256 of its plan log is the
+    registered plan of that setting (section 2.4)."""
+    settings = run["manifest"]["cell"].get("ime_settings")
+    setting = settings.get(LIVE_CONVERSION_KEY) if isinstance(settings, dict) else None
+    return (isinstance(setting, str) and setting in REGISTERED_PLAN_SHA256
+            and run["sha"]["plan"] == REGISTERED_PLAN_SHA256[setting])
+
+
 def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, manifest_shas=None):
     """The whole pipeline. Writes the three result files; raises CheckFailed / NotFrozen / InputError."""
     if not _is_int(seed):
@@ -888,9 +912,9 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
     used = sorted((r for r in runs if not r["aborted"]), key=lambda r: r["label"])
     if not synthetic:
         for r in used:
-            if r["sha"]["plan"] not in REGISTERED_PLAN_SHA256:
+            if not _plan_matches_cell(r):
                 raise InputError("run %s: under section 3.4 of the pre-registration the run counts as aborted and is "
-                                 "not analysed (its plan is not one of the two plans of section 2.4)" % r["label"])
+                                 "not analysed (its plan is not the plan that section 2.4 gives its cell)" % r["label"])
     labels = [r["label"] for r in used]
     if len(set(labels)) != len(labels):
         raise InputError("two runs that were not aborted share a cell label (give each cell a distinct label)")
@@ -916,7 +940,7 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
                                              "focus_margin_ms": delivery.FOCUS_MARGIN_MS,
                                              "obs_match_before_ms": delivery.OBS_MATCH_BEFORE_MS,
                                              "obs_match_after_ms": delivery.OBS_MATCH_AFTER_MS,
-                                             "registered_plan_sha256": list(REGISTERED_PLAN_SHA256),
+                                             "registered_plan_sha256": dict(REGISTERED_PLAN_SHA256),
                                              "pre_ms": DELIVERY_PRE_MS, "tail_ms": DELIVERY_TAIL_MS}, cells={})
     for r in used:
         f = r["files"]
@@ -947,6 +971,7 @@ ABSOLUTE_PATH_RES = (
     r"(?<![\w~>.:\-/\\])//[\w$.-]+/",                                 # a UNC path with slashes
     r"(?<!%s)/(?:Users|home|Volumes|root|mnt)/" % _NAME_EDGE,         # a home-like root
     r"(?<!%s)/[A-Za-z](?=/)" % _NAME_EDGE,                            # an MSYS drive path such as /c/
+    r"(?<![A-Za-z0-9_])file:\\?/",                                    # a file: URI (plain, or with the slash escaped as a JSON string does)
 )
 _ESC_RE = re.compile(r"\\(u[0-9a-fA-F]{4}|.)", re.DOTALL)
 _SIMPLE_ESC = {"b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
@@ -1193,7 +1218,8 @@ def make_synthetic_run(run_dir, seed, label, speeds):
 
     orows = [{"kind": "header", "format": "oracle/1", "plan_sha256": _sha(plan_bytes), "os": "macos",
               "emitter_version": "0.1", "backend": "dryrun"}]
-    grows = [{"kind": "header", "format": "gt/1", "src": "mac_nstic", "app_version": "0.1.0", "os": "macos"}]
+    grows = [{"kind": "header", "format": "gt/1", "src": "mac_nstic", "app_version": "0.1.0", "os": "macos"},
+             orow("ev", 100, ev="focus_in")]     # the reference field has the focus before the first block, as the runner brings it
     for b in range(len(speeds)):
         mine = [x for x in trials if x[1] == b]
         orows.append(orow("block_begin", mine[0][2] - 100, block_id=b))
@@ -1209,6 +1235,11 @@ def make_synthetic_run(run_dir, seed, label, speeds):
                 grows.append(orow("ev", lo + length, ev="insert_text", len=3))
         orows.append(orow("block_end", mine[-1][3] + 100, block_id=b))
     oracle_bytes, gt_bytes = _jl(orows), _jl(grows)
+    # the keys sent: the reference field sees each of them as a key_down row 3 ms later, the observation as a key row
+    # 5 ms later (a run without a person has no other row, and the rows of the delivery report are all explained).
+    # The key_down rows are added after the sessions are assembled, so that they are not part of the ground truth rules.
+    sent = sorted(WALL0 + at for x in trials for at, up, _key in x[8] if not up)
+    gt_down = [orow("ev", s - WALL0 + 3, ev="key_down", vk=0) for s in sent]
 
     rules = _read_regular(os.path.join(_HERE, "gt_rules.example.json"), "rules")
     sess = gt_sessions.assemble(gt_bytes, oracle_bytes, rules, plan_bytes)["definitions"]["macos_def"]
@@ -1218,10 +1249,11 @@ def make_synthetic_run(run_dir, seed, label, speeds):
     obs_rows = [{"type": "meta", "format": "obs/1", "os": "macos", "logger_version": "0.1.0",
                  "manifest_sha256": "0" * 64,
                  "capabilities": {"unconditional": ["key"], "threshold_gated": [], "config_gated": ["ime_shadow"]}}]
-    keys = [{"type": "key", "t": WALL0 + t[2], "category": "alphabetic", "press": True} for t in trials]
+    keys = [{"type": "key", "t": s + 5, "category": "alphabetic", "press": True} for s in sent]
     obs_rows += sorted(keys + obs_ime, key=lambda r: (r["t"], r["type"]))
     obs_bytes = _jl(obs_rows)
 
+    gt_bytes = _jl(grows[:1] + sorted(grows[1:] + gt_down, key=lambda r: r["t_wall_ms"]))
     logs = {"plan": plan_bytes, "oracle": oracle_bytes, "gt": gt_bytes, "obs": obs_bytes}
     outputs = {}
     for name in LOG_NAMES:
@@ -1422,10 +1454,11 @@ _DROP = object()
 
 
 def _real_runs(d, name, seed=2):
-    """Synthetic runs without the synthetic mark (they stand in for real runs)."""
+    """Synthetic runs without the synthetic mark (they stand in for real runs); the cell records live conversion on."""
     runs = make_synthetic(os.path.join(d, name), seed)
     for r in runs:
-        _set_manifest(r, synthetic=_DROP)
+        m = json.loads(open(os.path.join(r, MANIFEST), "rb").read().decode("utf-8"))
+        _set_manifest(r, synthetic=_DROP, cell=dict(m["cell"], ime_settings={LIVE_CONVERSION_KEY: "on"}))
     return runs
 
 
@@ -1495,9 +1528,11 @@ def _case_reproduces(d):
     if sorted(dlv["cells"]) != ["synthetic-a", "synthetic-b"] or any(
             c.get("format") != delivery.FORMAT or c["trials"]["measured"] != 2 * SYN_TRIALS_PER_BLOCK for c in dlv["cells"].values()):
         f.append("e1_delivery.json does not hold the delivery report of both cells")
-    # the synthetic observation holds one key row per trial and the synthetic reference log no key-down
-    elif any(c["observation"]["reach"]["all_presses"]["reached"] != 2 * SYN_TRIALS_PER_BLOCK
-             or c["reference"]["reach"]["all_presses"]["reached"] != 0 for c in dlv["cells"].values()):
+    # the synthetic observation holds a key row, and the synthetic reference log a key_down row, for every press sent
+    elif any(c["observation"]["reach"]["all_presses"]["sent_presses"] == 0
+             or c["observation"]["reach"]["all_presses"]["reached"] != c["observation"]["reach"]["all_presses"]["sent_presses"]
+             or c["reference"]["reach"]["all_presses"]["reached"] != c["reference"]["reach"]["all_presses"]["sent_presses"]
+             for c in dlv["cells"].values()):
         f.append("the delivery report does not read the observation and the reference from their own logs")
     # the synthetic oracle sends every press at its planned time (the plan's steps are the oracle's presses)
     elif any((c["send_lateness_ms"]["overall"]["min"], c["send_lateness_ms"]["overall"]["max"]) != (0, 0)
@@ -1747,7 +1782,7 @@ def _freeze_gate_body(d):
         f.append("the freeze hash is not defined as the hash of the three file hashes, each followed by a line feed")
     runs = _real_runs(d, "gate")[:1]
     plan_sha = _plan_sha_of(runs[0])
-    _set_constant("REGISTERED_PLAN_SHA256", (plan_sha,))
+    _set_constant("REGISTERED_PLAN_SHA256", {"on": plan_sha, "off": "1" * 64})
     pr = os.path.join(d, "preregistration.md")
 
     def analyse_rc(name, with_prereg=True):
@@ -1806,7 +1841,8 @@ def _freeze_gate_body(d):
             f.append("the freeze gate refused: %s (rc %s)" % (name, rc))
     # a run whose plan is not one of the registered plans counts as aborted: exit 2, no result, no value in the message
     _write(pr, _prereg_text(good).encode("utf-8"))
-    for other in ((), ("0" * 64, "1" * 64), (plan_sha.upper(),)):
+    for other in ({}, {"on": "0" * 64, "off": "1" * 64}, {"on": plan_sha.upper(), "off": "1" * 64},
+                  {"on": "0" * 64, "off": plan_sha}):    # the last: the right plan, registered for the other setting
         _set_constant("REGISTERED_PLAN_SHA256", other)
         o = os.path.join(d, "g3x")
         rc, _o, err = _quiet(["--runs"] + runs + ["--config", cfg, "--seed-file", seedf, "--out", o, "--prereg", pr])
@@ -1814,8 +1850,34 @@ def _freeze_gate_body(d):
             f.append("a run whose plan is not registered was analysed, or the message holds a hash (rc %s)" % (rc,))
         if rc == 2 and ("section 3.4" not in err or "section 2.4" not in err or runs and "synthetic-" not in err):
             f.append("the message about an unregistered plan does not name the cell and the sections")
+    # a cell without the live-conversion setting, or with another value, is refused even with its plan registered
+    _set_constant("REGISTERED_PLAN_SHA256", {"on": plan_sha, "off": plan_sha})
+    for tag, settings in (("none", {}), ("other", {LIVE_CONVERSION_KEY: "auto"}), ("upper", {LIVE_CONVERSION_KEY: "ON"}),
+                          ("listed", {LIVE_CONVERSION_KEY: ["on"]}), ("wrongkey", {"live": "on"})):
+        v = os.path.join(d, "g3s" + tag)
+        shutil.copytree(runs[0], v)
+        _set_manifest(v, cell=dict(json.loads(open(os.path.join(v, MANIFEST), "rb").read().decode("utf-8"))["cell"],
+                                   ime_settings=settings))
+        o = os.path.join(d, "g3so" + tag)
+        rc, _o, err = _quiet(["--runs", v, "--config", cfg, "--seed-file", seedf, "--out", o, "--prereg", pr])
+        if rc != 2 or plan_sha in err or os.path.exists(os.path.join(o, "e1_l1.json")) or "section 2.4" not in err:
+            f.append("a run whose cell has no valid live-conversion setting (%s) was analysed (rc %s)" % (tag, rc))
+    # both settings, each with its own plan, pass; the plans swapped between the settings are refused
+    both = _real_runs(d, "gate-both")
+    sha_a, sha_b = _plan_sha_of(both[0]), _plan_sha_of(both[1])
+    if sha_a == sha_b:
+        f.append("the two synthetic runs have the same plan")
+    for k, (i, setting) in enumerate(((0, "on"), (1, "off"))):
+        m = json.loads(open(os.path.join(both[i], MANIFEST), "rb").read().decode("utf-8"))
+        _set_manifest(both[i], cell=dict(m["cell"], ime_settings={LIVE_CONVERSION_KEY: setting}))
+    for reg, want in (({"on": sha_a, "off": sha_b}, 0), ({"on": sha_b, "off": sha_a}, 2)):
+        _set_constant("REGISTERED_PLAN_SHA256", reg)
+        o = os.path.join(d, "g3b%d" % want)
+        rc = _quiet(["--runs"] + both + ["--config", cfg, "--seed-file", seedf, "--out", o, "--prereg", pr])[0]
+        if rc != want:
+            f.append("live conversion on and off with their own plans: expected exit %d, got %s" % (want, rc))
     # the same runs, marked synthetic, are not subject to the check; neither are --check-deposit and --pack
-    _set_constant("REGISTERED_PLAN_SHA256", ())
+    _set_constant("REGISTERED_PLAN_SHA256", {})
     syn = make_synthetic(os.path.join(d, "gate-syn"), 2)[:1]
     if _quiet(["--runs"] + syn + ["--config", cfg, "--seed", "7", "--out", os.path.join(d, "g3y")])[0] != 0:
         f.append("a synthetic run was refused for its plan")
@@ -1823,7 +1885,7 @@ def _freeze_gate_body(d):
         f.append("--check-deposit applied the registered-plan check")
     if _quiet(["--pack", runs[0], "--out", os.path.join(d, "g3z.zip")])[0] != 0:
         f.append("--pack applied the registered-plan check")
-    _set_constant("REGISTERED_PLAN_SHA256", (plan_sha,))
+    _set_constant("REGISTERED_PLAN_SHA256", {"on": plan_sha, "off": "1" * 64})
     # the analysis settings changed by one byte after the freeze
     _write(pr, _prereg_text(good).encode("utf-8"))
     with open(cfg, "ab") as fh:
@@ -1854,9 +1916,10 @@ def _case_run_sh(d):
     # the copy of this file in the tree registers the plan of the stand-in run
     cp = os.path.join(root, "kit", "analysis", "pipeline.py")
     src = open(cp, "rb").read().decode("utf-8")
-    reg = src.index("REGISTERED_PLAN_SHA256 = (")
-    end = src.index(")" + chr(10), reg)
-    _write(cp, (src[:reg] + 'REGISTERED_PLAN_SHA256 = ("%s",' % _plan_sha_of(runs[0]) + src[end:]).encode("utf-8"))
+    reg = src.index("REGISTERED_PLAN_SHA256 = {")
+    end = src.index("}" + chr(10), reg)
+    _write(cp, (src[:reg] + 'REGISTERED_PLAN_SHA256 = {"on": "%s", "off": "%s"' % (_plan_sha_of(runs[0]), "1" * 64)
+                + src[end:]).encode("utf-8"))
     lines = "".join("- run_dir: ../runs/%s  manifest_sha256: %s\n" % (os.path.basename(r), _sha(open(os.path.join(r, MANIFEST), "rb").read()))
                     for r in runs)
     _write(os.path.join(exp, "data.md"), ("# Data\n\n" + lines).encode("utf-8"))
@@ -1930,6 +1993,9 @@ def _case_deposit_paths(d):
              ("a macOS home", "/Users/carol/x", [ap_]),
              ("a Linux home", "/home/dave/x", [ap_]),
              ("a mounted volume", "/Volumes/DISK/x", [ap_]),
+             ("a file URI", "file:///Users/x/y", [ap_]),
+             ("a file URI in capitals", "FILE:/home/x", [ap_]),
+             ("a file URI of another root", "see file:/tmp/x", [ap_]),
              ("an MSYS drive", "/d/work/x", [ap_]),
              ("a path after a colon", "PATH=/usr/bin:/home/erin/bin", [ap_]))
     for name, text, want in cases:
@@ -1939,14 +2005,18 @@ def _case_deposit_paths(d):
     # an escape that a JSON string uses for a separator is decoded before the search
     mm = dict(files)
     for name, spelling in (("unicode escapes", b"\\u002fhome\\u002fharry"), ("escaped slashes", b"\\/home\\/harry"),
-                           ("a drive with a unicode escape", b"C:\\u005cx")):
+                           ("a drive with a unicode escape", b"C:\\u005cx"),
+                           ("a file URI with escaped slashes", b"file:\\/\\/\\/tmp\\/x"),
+                           ("a file URI with a unicode escape", b"file:\\u002f\\u002ftmp")):
         mm[MANIFEST] = files[MANIFEST].replace(b'"format"', b'"note":"' + spelling + b'","format"', 1)
         if [k for _f, _n, k in scan_files(mm, pats)] != [ap_]:
             f.append("a path spelled with %s was not found" % name)
     for name, text in (("replaced paths", "started at ~/work in <repo>/papers"), ("replaced paths with backslashes", "~\\\\work <repo>\\\\kit"),
                        ("a name inside a longer word", "alicesprings"), ("a relative path", "kit/analysis/x kit\\\\analysis"),
                        ("an address", "see http://example.org/a/b"), ("a fraction", "and/or a/b 1/2/3"),
-                       ("a relative path that contains a root name", "kit/home/x ./Users/y ../mnt/z")):
+                       ("a relative path that contains a root name", "kit/home/x ./Users/y ../mnt/z"),
+                       ("the word profile:", "profile:/x and a profile: x/y"), ("file: without a slash", "file: x or file:kit/y"),
+                       ("a name that ends in file", "tmpfile:/x")):
         if kinds_of(text):
             f.append("%s was reported: %r" % (name, kinds_of(text)))
     if kinds_of("alice", build_patterns(home, "al", repo)):
@@ -2230,11 +2300,8 @@ def _case_reference_abort_rule(d):
         dst = os.path.join(d, name)
         shutil.copytree(base_run, dst)
         gt = open(os.path.join(dst, LOG_FILES["gt"]), "rb").read()
-        sent = [json.loads(x.decode("utf-8")) for x in open(os.path.join(dst, LOG_FILES["oracle"]), "rb").read().splitlines() if x]
         rows = [json.loads(x.decode("utf-8")) for x in gt.splitlines() if x]
-        # every press the executor sent arrives 5 ms later, as in a run that delivers faithfully
-        rows += [{"kind": "ev", "t_wall_ms": x["t_wall_ms"] + 5, "t_mono_ns": x["t_mono_ns"] + 5000000, "ev": "key_down", "vk": 65}
-                 for x in sent if x.get("kind") == "sent" and x["down"] and x["key"] not in delivery.PSEUDO_KEYS]
+        # the reference log of a synthetic run already holds a key_down row for every press the executor sent
         rows += [{"kind": "ev", "t_wall_ms": WALL0 + t, "t_mono_ns": (MONO0 + t) * 1000000, "ev": "key_down", "vk": 65}
                  for t in rel_times]
         rows = rows[:1] + sorted(rows[1:], key=lambda r: r["t_wall_ms"])
@@ -2291,7 +2358,7 @@ def _case_reference_abort_rule(d):
                                          "focus_margin_ms": delivery.FOCUS_MARGIN_MS,
                                          "obs_match_before_ms": delivery.OBS_MATCH_BEFORE_MS,
                                          "obs_match_after_ms": delivery.OBS_MATCH_AFTER_MS,
-                                         "registered_plan_sha256": list(REGISTERED_PLAN_SHA256),
+                                         "registered_plan_sha256": dict(REGISTERED_PLAN_SHA256),
                                          "pre_ms": 20, "tail_ms": 300}:
                 f.append("[%d] the abort rule is not recorded in the delivery results" % k)
         finally:
@@ -2359,10 +2426,8 @@ def _case_section34_enforcement(d):
         rows that the executor did not send. The observation holds a key row 5 ms after every press sent."""
         dst = os.path.join(d, name)
         shutil.copytree(base_run, dst)
-        # every press the executor sent arrives 5 ms later, as in a run that delivers faithfully
+        # the reference log of a synthetic run already holds a key_down row for every press the executor sent
         gt = [json.loads(x.decode("utf-8")) for x in open(os.path.join(dst, LOG_FILES["gt"]), "rb").read().splitlines() if x]
-        gt += [{"kind": "ev", "t_wall_ms": x["t_wall_ms"] + 5, "t_mono_ns": x["t_mono_ns"] + 5000000, "ev": "key_down", "vk": 65}
-               for x in ora if x.get("kind") == "sent" and x["down"] and x["key"] not in delivery.PSEUDO_KEYS]
         gt += [{"kind": "ev", "t_wall_ms": t, "t_mono_ns": (t - WALL0 + MONO0) * 1000000, "ev": ev, **kw} for t, ev, kw in rows]
         gt = gt[:1] + sorted(gt[1:], key=lambda r: r["t_wall_ms"])
         _rewrite_log(dst, "gt", _jl(gt))
@@ -2452,7 +2517,7 @@ def _case_section34_enforcement(d):
     if _quiet(["--check-deposit", dst])[0] != 0:
         f.append("an aborted run without an observation log was refused by the deposit check")
     # the content-free validator also applies to the logs of an aborted run; a log that cannot be validated refuses
-    dst = variant("a8", aborted=True, obs_tail=b'{"type":"key","t":1700000000001,"category":"alphabetic","press":true,"char":"a"}\n')
+    dst = variant("a8", aborted=True, obs_tail=b'{"type":"key","t":1700000005000,"category":"alphabetic","press":true,"char":"a"}\n')
     rc, _o, err = _quiet(["--check-deposit", dst])
     if rc != 1 or "obs.jsonl" not in err or "section 3.4" in err:
         f.append("an aborted run with content in the observation log passed the deposit check (rc %d)" % rc)

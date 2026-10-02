@@ -41,16 +41,16 @@ pre-registration; with the settings fixed there, the figures of the rule on pres
      --gt <run>/gt.jsonl --pre-ms 20 --tail-ms 300 --out <report>
    ```
 
-   and check the plan's SHA-256 against section 2.4 of the pre-registration by hand. Under section 3.4 of the
-   pre-registration a completed run counts as an aborted attempt when the plan's SHA-256 differs, when the command
-   exits with status 2, when `max_beyond_markers_before_last_block` or `beyond_markers_last_block` of
-   `reference.segments.excluding_mode_keys` exceeds 0, or when
+   and check by hand that the plan's SHA-256 is the one that section 2.4 of the pre-registration gives the cell (live
+   conversion on or off). Under section 3.4 of the pre-registration a completed run counts as an aborted attempt when
+   it is not, when the command exits with status 2, when `max_beyond_markers_before_last_block` or
+   `beyond_markers_last_block` of `reference.segments.excluding_mode_keys` exceeds 0, or when
    `reference_focus_loss.n_loss_spans_with_unexplained_presses` exceeds 0; such a run is neither analysed nor
    deposited. A run that the runner aborted is never analysed and is deposited only under the conditions of section
    3.4; one aborted inside a trial does not pass the check. No other reason and no explanation is admitted. Record
-   the result of this check and its time in the table of run checks above before any analysis. The `idle`
-   condition of question 5 has no line in the table: it sends no key, and only its samples are deposited (its
-   observation log is not).
+   the result of this check and its time in the table of run checks above before any analysis. The `idle` condition
+   of question 5 has no line in the table: it sends no key, and only its samples are deposited (its observation log
+   is not).
 2. Deposit only `run.json` and the four logs of a run directory: `plan.jsonl`, `oracle.jsonl`,
    `gt.jsonl` and `obs.jsonl`. A log that an aborted run recorded with a null hash need not exist.
 3. Do not deposit the `*.stderr.txt` files or `runner.error.txt`. They stay on the measuring machine.
@@ -75,10 +75,12 @@ pre-registration; with the settings fixed there, the figures of the rule on pres
 
 ## Machine that ran the deposit check
 
-Record, for every archive, the machine on which `--pack` was run and the values that were passed. The check
-finds only the values it is given (see the docstring of `pipeline.py` for what it cannot find).
+Record, for every archive, the machine on which `--pack` was run and whether `--also-user` and `--also-home` were
+passed. The check finds only the values it is given (see the docstring of `pipeline.py` for what it cannot find).
+Do not write the values themselves here: they are login names and home directories, which this document must not
+carry.
 
-| Cell label | Machine (operating system, host role) | `--also-user` values | `--also-home` values | Date checked |
+| Cell label | Machine (operating system, host role) | `--also-user` passed (number of values) | `--also-home` passed (number of values) | Date checked |
 |---|---|---|---|---|
 | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
 

@@ -1628,7 +1628,8 @@ def _case_prediction_scope():
         # uncontaminated: neither carried_out (t00016) nor received_carry (t00017); the closing-key trial
         # t00021 stays in, so the list is the 88 trials that are in no carry layer
         unc = under["scope"]["uncontaminated_trials"]
-        if not isinstance(unc, list) or len(unc) != 88 or unc != sorted(unc) or "t00016" in unc or                 "t00017" in unc or "t00021" not in unc or set(none_ids) - set(unc):
+        if not isinstance(unc, list) or len(unc) != 88 or unc != sorted(unc) or "t00016" in unc or \
+                "t00017" in unc or "t00021" not in unc or set(none_ids) - set(unc):
             f.append("scope.uncontaminated_trials should list the 88 trials in no carry layer: %r" % (unc,))
         if plain["scope"]["uncontaminated_trials"] is not None:
             f.append("scope.uncontaminated_trials should be null without a prediction")

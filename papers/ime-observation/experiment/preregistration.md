@@ -361,23 +361,23 @@ ms.
   and the trial that received it is set aside with it. Outside S6 and S13, six strata of each cell (all slow) hold
   fewer than 50 trials. Strata are reported with their numbers and intervals, or as null when they are empty
   (section 6.11).
-- **Precision of continuous measures and the design effect**: for a mean difference (the bias of `dwell_ms`, a
-  per-text bias), the half-width of the 95% interval is about 1.96 x SD x sqrt(D / n), where SD is the standard
-  deviation of the differences, n the number of pairs or texts, and D the design effect of the blocks. With m_j
-  items in block j, D = 1 + (sum of m_j squared / sum of m_j - 1) x rho, where rho is the correlation within a block
-  (for blocks of equal size m, 1 + (m - 1) x rho). The plan shuffles the trials of a speed before cutting them into
-  blocks, so the 75 trials of a planned stratum fall unevenly into 33 to 39 of the 42 blocks of their speed with
-  live conversion on and into 30 to 37 of the 39 blocks with it off; computed from the two measurement plans, sum
-  of m_j squared over sum of m_j is 2.4 to 3.1 (on) and 2.5 to 3.4 (off) across the strata. Over the trials of the
-  primary scope (section 6.4) it is at most 3.05 (on, S14 middle) and 3.22 (off, S15 middle), within the same
-  bound (`plan_figures`, section 3.1). D is therefore at most about 3.4 within a stratum, and near 1 only when rho
-  is small. With D = 1 the half-width is about 0.23 x SD with 75 pairs (for example 2.3 ms when SD is 10 ms, 11 ms
-  when it is 50 ms) and about 0.35 x SD with 31, the smallest stratum of the primary scope other than those of S6
-  and S13; with D = 3.4 it is about 1.8 times as wide. Over a speed level (about 1,050 planned pairs and 553 to 940
-  in the primary scope, m about 25) it is about 0.06 to 0.08 x SD x sqrt(D), with D between 1 and 25. Per speed there are 126 texts (on) and 117 (off) in 42 and 39 blocks
-  (three texts per block). The limits of agreement (the bias plus or minus 1.96 SD) are located to about 1.96 x SD x
-  sqrt(3 x D / n) (Bland & Altman, 1986), about 0.39 x SD with 75 pairs and D = 1. No width is predicted for kappa
-  and the ICC, because it depends on the values estimated; they are read through the intervals reported with them.
+- **Precision of continuous measures and the design effect**: for a mean difference (the bias of `dwell_ms`, a per-text
+  bias), the half-width of the 95% interval is about 1.96 x SD x sqrt(D / n), where SD is the standard deviation of the
+  differences, n the number of pairs or texts, and D the design effect of the blocks. With m_j items in block j, D = 1
+  + (sum of m_j squared / sum of m_j - 1) x rho, where rho is the correlation within a block (for blocks of equal size
+  m, 1 + (m - 1) x rho). The plan shuffles the trials of a speed before cutting them into blocks, so the 75 trials of a
+  planned stratum fall unevenly into 33 to 39 of the 42 blocks of their speed with live conversion on and into 30 to 37
+  of the 39 blocks with it off; computed from the two measurement plans, sum of m_j squared over sum of m_j is 2.4 to
+  3.1 (on) and 2.5 to 3.4 (off) across the strata. Over the trials of the primary scope (section 6.4) it is at most
+  3.05 (on, S14 middle) and 3.22 (off, S15 middle), within the same bound (`plan_figures`, section 3.1). D is therefore
+  at most about 3.4 within a stratum, and near 1 only when rho is small. With D = 1 the half-width is about 0.23 x SD
+  with 75 pairs (for example 2.3 ms when SD is 10 ms, 11 ms when it is 50 ms) and about 0.35 x SD with 31, the smallest
+  stratum of the primary scope other than those of S6 and S13; with D = 3.4 it is about 1.8 times as wide. Over a speed
+  level (about 1,050 planned pairs and 553 to 940 in the primary scope, m about 25) it is about 0.06 to 0.08 x SD x
+  sqrt(D), with D between 1 and 25. Per speed there are 126 texts (on) and 117 (off) in 42 and 39 blocks (three texts
+  per block). The limits of agreement (the bias plus or minus 1.96 SD) are located to about 1.96 x SD x sqrt(3 x D / n)
+  (Bland & Altman, 1986), about 0.39 x SD with 75 pairs and D = 1. No width is predicted for kappa and the ICC, because
+  it depends on the values estimated; they are read through the intervals reported with them.
 - **Key intervals**: log-normal, with medians of 480 ms (slow), 240 ms (middle) and 120 ms (fast) and a log-scale
   standard deviation of 0.3. The medians follow the per-participant mean inter-key intervals that Dhakal, Feit,
   Kristensson and Oulasvirta (2018) report for the slowest tenth of their participants (481 ms), for all
@@ -397,12 +397,12 @@ ms.
 
 Each cell is run once to completion. If a run is aborted (the runner stops it), the cell is run again from the start
 with the same plan, in a new run directory, up to three attempts. A completed run also counts as aborted for any of
-four reasons: (1) its plan has another SHA-256 than the plans of section 2.4; (2) `kit/analysis/delivery.py` refuses
-its logs (exit status 2); (3) its reference log holds more key presses than the executor and the procedure explain
-(presses from outside, below); or (4) within a loss of focus of the reference input field, the observation log holds
-a key press that no press sent by the executor explains (loss of focus, below). Reasons 3 and 4 are decided by
-closed rules from the delivery report of the run directory alone. Right after the run (section 3.2), and before any
-analysis of it, the report is made with
+four reasons: (1) its plan is not the plan that section 2.4 gives its cell (live conversion on or off); (2)
+`kit/analysis/delivery.py` refuses its logs (exit status 2); (3) its reference log holds more key presses than the
+executor and the procedure explain (presses from outside, below); or (4) within a loss of focus of the reference input
+field, the observation log holds a key press that no press sent by the executor explains (loss of focus, below).
+Reasons 3 and 4 are decided by closed rules from the delivery report of the run directory alone. Right after the run
+(section 3.2), and before any analysis of it, the report is made with
 
     python3 kit/analysis/delivery.py --plan <run>/plan.jsonl --oracle <run>/oracle.jsonl --obs <run>/obs.jsonl \
       --gt <run>/gt.jsonl --pre-ms 20 --tail-ms 300 --out <report>
@@ -430,42 +430,50 @@ is therefore bounded by the marker presses of its block (0 for the segment befor
 makes the run count as aborted wherever it falls; it cannot let a press from outside pass.
 
 **Loss of focus.** A loss runs from a focus-out of the reference to its next focus-in, or to the end of the logs when
-the focus does not come back; the planned switches of S15 are losses too. Each loss is widened by 500 ms on each
-side, and losses whose widened spans meet are taken together; the margin covers the offset between the clocks of
-the two logs, the delay with which a key event reaches the observer, and a key that moves the focus, which is
-pressed just before the loss. Every key row of the observation log is matched, once for the whole log, to at most
-one press that the executor sent and that the observation records (the presses of the trials other than the
-input-mode keys, and the marker presses): in time order, each row takes the earliest press not yet taken that was
-sent from 300 ms before the row to 20 ms after it. The run counts as aborted when a widened span holds a row that
-takes no press. A person who types into another application takes the focus away from the reference, and the
-observation records the presses of the keys it observes (all but the input-mode keys and a few others, such as
-F13 to F19) whichever application has the focus, so such presses appear as rows without a press sent. The executor goes on sending during a loss, and a planned switch of S15 sends no key (the
-other application is brought to the front by a command), so neither a loss during typing, nor a planned switch,
-nor a loss in which no key is pressed makes the run count as aborted by itself. The margin of 500 ms and the window
-of 300 ms are design choices, not measured values; the window is well above the largest difference between the
-executor's and the observation's clocks that the pilot showed (86 to 95 ms in the first block of a run and 0 to 3
-ms in the others, `experiment/pilot-macos.md`).
+the focus does not come back, in the order of the reference log; the planned switches of S15 are losses too. The
+observer is started before the reference input field and stopped after it, so the time before the reference first has
+the focus (the whole run when it never has it) and the time after the last row of its log count as losses as well. Each
+loss is widened by 500 ms on each side, and losses whose widened spans meet are taken together; the margin covers the
+offset between the clocks of the two logs, the delay with which a key event reaches the observer, and a key that moves
+the focus, which is pressed just before the loss. Every key row of the observation log is matched, once for the whole
+log, to at most one press that the executor sent and that the observation records (the presses of the trials other than
+the input-mode keys, and the marker presses): in time order, each row takes the earliest press not yet taken that was
+sent from 300 ms before the row to 20 ms after it. The run counts as aborted when a row that takes no press lies in a
+widened span or in the stretch counted after it (below). Because the matching runs in time order, a person's press that
+falls between a press sent and that press's own row takes the press and leaves the later row without one; while the
+presses sent follow each other within 320 ms, that shortage can move on from row to row. The rows are therefore also
+counted in a stretch after the end of the span: up to 320 ms after it, and further up to 300 ms after the last of the
+presses sent that follow the end of the span at intervals of at most 320 ms. A person who types into another
+application takes the focus away from the reference, and the observation records the presses of the keys it observes
+(all but the input-mode keys and a few others, such as F13 to F19) whichever application has the focus, so such presses
+appear as rows without a press sent. The executor goes on sending during a loss, a planned switch of S15 sends no key
+(the other application is brought to the front by a command), and before the first block the executor sends no key that
+the observation records, so neither a loss during typing, nor a planned switch, nor the start or the end of a run, nor
+a loss in which no key is pressed makes the run count as aborted by itself. The margin of 500 ms and the window of 300
+ms are design choices, not measured values; the window is well above the largest difference between the executor's and
+the observation's clocks that the pilot showed (86 to 95 ms in the first block of a run and 0 to 3 ms in the others,
+`experiment/pilot-macos.md`).
 
 No other reason and no explanation is admitted. The rules apply to the runs of the two cells and of the `working`
 condition of question 5. The `idle` condition sends no key and has no plan; its observation log is not deposited,
 because the observer is started before the command that begins the sampling is typed, so the log holds a person's
 key presses (only the samples of section 6.10 are deposited).
 
-The result of the check, its time, the SHA-256 of the plan, the largest count per segment beyond the marker presses
-and the number of widened spans that hold a row without a press sent are recorded in the table of run checks in
-`experiment/data.md` before any analysis of the run. `kit/analysis/pipeline.py` applies reasons 2 to 4 to the
-delivery report it computes and, on real data, reason 1 to the plan of each run (the two SHA-256 of section 2.4 are
-constants of the code); it refuses to analyse a run that they catch. A completed run that counts as aborted is not
-deposited: it is not analysed, and under reasons 2 to 4 its logs may hold a person's key presses (the reference log
-records the key code of every key-down it received, and the observation log records the presses of the keys it
-observes on the machine). The same check is made on a run that the runner aborted: such a run is never analysed,
-and it is deposited only if the check passes or if it left neither a reference log nor an observation log. A run
-that the runner aborts inside a trial does not pass: that trial has no end in the oracle, so its presses that reached
-the reference count as not explained (here the count does not mean a press from outside). `pipeline.py --pack` and
-`--check-deposit` apply reasons 2 to 4 and the content-free check of section 5 to every run directory, completed or
-aborted, and refuse one that they catch or that cannot be checked (an observation log without a reference log, or
-logs that `delivery.py` refuses); reason 1 is checked by hand before a run is deposited (`experiment/data.md`),
-because the runs of the pilot, which used other plans, are deposited with the same commands.
+The result of the check, its time, the SHA-256 of the plan, the largest count per segment beyond the marker presses and
+the number of widened spans that hold a row without a press sent are recorded in the table of run checks in
+`experiment/data.md` before any analysis of the run. `kit/analysis/pipeline.py` applies reasons 2 to 4 to the delivery
+report it computes and, on real data, reason 1 to the plan of each run (the two SHA-256 of section 2.4 are constants of
+the code, read against the live-conversion setting of the run's cell); it refuses to analyse a run that they catch. A
+completed run that counts as aborted is not deposited: it is not analysed, and under reasons 2 to 4 its logs may hold a
+person's key presses (the reference log records the key code of every key-down it received, and the observation log
+records the presses of the keys it observes on the machine). The same check is made on a run that the runner aborted:
+such a run is never analysed, and it is deposited only if the check passes or if it left neither a reference log nor an
+observation log. A run that the runner aborts inside a trial does not pass: that trial has no end in the oracle, so its
+presses that reached the reference count as not explained (here the count does not mean a press from outside).
+`pipeline.py --pack` and `--check-deposit` apply reasons 2 to 4 and the content-free check of section 5 to every run
+directory, completed or aborted, and refuse one that they catch or that cannot be checked (an observation log without a
+reference log, or logs that `delivery.py` refuses); reason 1 is checked by hand before a run is deposited
+(`experiment/data.md`), because the runs of the pilot, which used other plans, are deposited with the same commands.
 
 The rule on presses counts the key-downs that remain beyond the presses that reached the reference, so a lost press
 and a press from outside cancel out: a marker press that does not reach the reference against a press from outside
@@ -776,28 +784,28 @@ Over the one-to-one pairs of each stratum, per speed and per cell, for each comp
 ### 6.7 Question 3: per-text agreement
 
 Under `under_limit` (primary) and `all_trials` (section 6.4), for each of the four measures of section 4.6 and each
-speed: the Bland-Altman bias and limits of agreement of the per-text difference (observation minus ground truth),
-each with a 95% interval from resampling blocks (the texts of a block form one cluster), and the intraclass
-correlation for absolute agreement of a single measurement, with the two methods as the only raters of interest
-(a two-way mixed model): ICC(A,1) in the notation of McGraw and Wong (1996), which has the value of ICC(2,1) of
-Shrout and Fleiss (1979). It is computed by `kit/analysis/stats.py` from the mean squares of a two-way analysis of
-variance with the two methods as columns, with a 95% interval from resampling blocks. An interval is withheld, with
-the reason, when its statistic is undefined in the sample or in any resample. The per-speed values are primary;
-values pooled over speeds are reported for comparison, because a difference in level between speeds inflates a
-pooled ICC. Under `under_limit` a text keeps only its trials in the scope, and in this design their number r
-differs between speeds: computed from the measurement plans and the prediction (section 3.1), the mean r is 4.60,
-6.49 and 7.17 (slow, middle, fast) with live conversion on and 4.56, 6.43 and 7.21 with it off; at the slow speed
-30 of 126 and 27 of 117 texts have an r of three or less, 4 and 0 keep all eight trials, and no text has none. A
-value computed over fewer trials varies more, so the limits of agreement and the ICC of the primary scope hold for
-this design's distribution of r and are not compared between speeds, nor extrapolated to texts of another length
-(the per-trial differences below are the material for that). The bias is the mean of the per-text differences with
-every text weighted equally, whatever its r. The smaller r is, the more texts have a measure that cannot be computed
-on one side (for example no session, so no mean conversion time) and are left out of that measure (section 6.11). A text is not used if any of its trials was not run or was excluded; the numbers of such
-texts are reported by reason, block and speed. The number of a text's trials in the scope is reported per speed, and the
-texts with none are counted (section 6.11). The bias of each measure is also reported for three mixtures of speeds
-(slow, middle and fast in proportions 0.6/0.3/0.1, equal, and 0.1/0.3/0.6), with intervals that resample the blocks
-of each speed separately, to show whether the aggregate's bias moves with the mix; the interval of a single speed's
-bias is the one reported with that speed's agreement.
+speed: the Bland-Altman bias and limits of agreement of the per-text difference (observation minus ground truth), each
+with a 95% interval from resampling blocks (the texts of a block form one cluster), and the intraclass correlation for
+absolute agreement of a single measurement, with the two methods as the only raters of interest (a two-way mixed
+model): ICC(A,1) in the notation of McGraw and Wong (1996), which has the value of ICC(2,1) of Shrout and Fleiss
+(1979). It is computed by `kit/analysis/stats.py` from the mean squares of a two-way analysis of variance with the two
+methods as columns, with a 95% interval from resampling blocks. An interval is withheld, with the reason, when its
+statistic is undefined in the sample or in any resample. The per-speed values are primary; values pooled over speeds
+are reported for comparison, because a difference in level between speeds inflates a pooled ICC. Under `under_limit` a
+text keeps only its trials in the scope, and in this design their number r differs between speeds: computed from the
+measurement plans and the prediction (section 3.1), the mean r is 4.60, 6.49 and 7.17 (slow, middle, fast) with live
+conversion on and 4.56, 6.43 and 7.21 with it off; at the slow speed 30 of 126 and 27 of 117 texts have an r of three
+or less, 4 and 0 keep all eight trials, and no text has none. A value computed over fewer trials varies more, so the
+limits of agreement and the ICC of the primary scope hold for this design's distribution of r and are not compared
+between speeds, nor extrapolated to texts of another length (the per-trial differences below are the material for
+that). The bias is the mean of the per-text differences with every text weighted equally, whatever its r. The smaller r
+is, the more texts have a measure that cannot be computed on one side (for example no session, so no mean conversion
+time) and are left out of that measure (section 6.11). A text is not used if any of its trials was not run or was
+excluded; the numbers of such texts are reported by reason, block and speed. The number of a text's trials in the scope
+is reported per speed, and the texts with none are counted (section 6.11). The bias of each measure is also reported
+for three mixtures of speeds (slow, middle and fast in proportions 0.6/0.3/0.1, equal, and 0.1/0.3/0.6), with intervals
+that resample the blocks of each speed separately, to show whether the aggregate's bias moves with the mix; the
+interval of a single speed's bias is the one reported with that speed's agreement.
 
 The plan orders the trials of a block by the seed and does not balance the scenarios within a text, so a text mixes
 the scenarios about equally only in expectation, and every per-text value and ICC holds for this design's mix of
@@ -844,14 +852,14 @@ observed one. K is 10, 100 and 1,000; the seed is the one in `experiment/SEED`.
       --recipes kit/gen/<procedure file of the cell> --config experiment/plan_config.macos.json \
       --K 10,100,1000 --seed 20260929 --bootstrap 2000 --markers-in-obs --out results/e2_closed_set_<cell>.json
 
-The attack is repeated for six feature sets that remove information from the log: exact times and run lengths
-(`all`), no times (`no_time`), no lengths of letter runs (`no_runs`), times in 1-second bins (`bin1s`), 1-second
-bins without run lengths (`bin1s_count`), and neither (`counts_only`). An attacker given a detailed log can always
-discard information, so the accuracy reported for a feature set is the maximum over that set and every coarser set
-derivable from it. Reported: the accuracy with its Wilson interval and, descriptively, a 95% percentile interval
-that resamples blocks; the chance level 1/K; the mean rank of the true phrase; and, descriptively and without an
-interval, the accuracy of the feature set alone per scenario and per speed. A trial whose phrase is a generated kana string (S12) is not counted, which leaves 2,925 trials with live
-conversion on and 2,700 with it off when every block is scored.
+The attack is repeated for six feature sets that remove information from the log: exact times and run lengths (`all`),
+no times (`no_time`), no lengths of letter runs (`no_runs`), times in 1-second bins (`bin1s`), 1-second bins without
+run lengths (`bin1s_count`), and neither (`counts_only`). An attacker given a detailed log can always discard
+information, so the accuracy reported for a feature set is the maximum over that set and every coarser set derivable
+from it. Reported: the accuracy with its Wilson interval and, descriptively, a 95% percentile interval that resamples
+blocks; the chance level 1/K; the mean rank of the true phrase; and, descriptively and without an interval, the
+accuracy of the feature set alone per scenario and per speed. A trial whose phrase is a generated kana string (S12) is
+not counted, which leaves 2,925 trials with live conversion on and 2,700 with it off when every block is scored.
 
 The synthetic key intervals are drawn independently of the keys and the pauses follow the procedures (section 3.3),
 so the logs carry none of the timing structure of human typing: neither the timing of particular key pairs nor the
@@ -1005,14 +1013,14 @@ between the two cells) is reported as exploratory.
 - **The stopping rule counts presses, not keys.** The rule on presses of section 3.4 counts the key-downs of the
   reference that remain beyond the presses that reached it, so a press that does not reach the reference and a press
   from outside cancel out (a marker press against a press anywhere in the same segment, a press of a trial against a
-  press in the same trial), and such a replacement is not detected. The rule on the loss of focus matches each key
-  row of the observation to a press sent: a press whose row the observation misses can take one press of a person
-  made from 20 ms before it to 300 ms after it, which is then not detected, while a row that arrives more than 300
-  ms after its press, or a row that the observer duplicates, makes the run count as aborted within a loss without a
-  person; there, unlike elsewhere (section 6.3), the behaviour of the observer under test decides an abort. A
-  person's key presses that reach neither the reference nor another application, such as a shortcut that the system
-  consumes without moving the focus, and presses of keys that the observation does not observe, are caught by
-  neither rule. A person who moves the focus away and back without pressing a key is not caught either, and puts no
+  press in the same trial), and such a replacement is not detected. The rule on the loss of focus matches each key row
+  of the observation to a press sent: a press whose row the observation misses can take one press of a person made from
+  20 ms before it to 300 ms after it, which is then not detected, while a row that arrives more than 300 ms after its
+  press, or a row that the observer duplicates, makes the run count as aborted within a loss, or among the rows counted
+  after it, without a person; there, unlike elsewhere (section 6.3), the behaviour of the observer under test decides
+  an abort. A person's key presses that reach neither the reference nor another application, such as a shortcut that
+  the system consumes without moving the focus, and presses of keys that the observation does not observe, are caught
+  by neither rule. A person who moves the focus away and back without pressing a key is not caught either, and puts no
   key press into the logs. That the rules catch a person's key presses was checked only on cases constructed in the
   selftests of the code, not by typing on the measuring machine; presses into an input field that takes keys without
   taking the key window from the reference input field (such as a search field of the system) may not be caught.

@@ -253,7 +253,7 @@ def load_keymap(path):
         with open(path, "rb") as f:
             km = json.loads(f.read().decode("utf-8"))
     except (OSError, ValueError, UnicodeDecodeError) as e:
-        raise InputError("keymap: cannot read %s (%s)" % (path, e))
+        raise InputError("keymap: cannot read %s (%s)" % (os.path.basename(str(path)), type(e).__name__))
     if not isinstance(km, dict):
         raise InputError("keymap: not an object")
     out = {}
@@ -634,6 +634,9 @@ def plan_figures(plan_bytes, long_by_trial, text_size=TEXT_SIZE_TRIALS):
         if not isinstance(r, dict):
             continue
         if r.get("kind") == "block":
+            if r.get("speed") not in match.SPEEDS:
+                raise InputError("plan: block %r has no speed or a speed that is not one of %s"
+                                 % (r.get("block_id"), "/".join(match.SPEEDS)))
             block_speed[r.get("block_id")] = r.get("speed")
         elif r.get("kind") == "trial":
             tid = r.get("trial_id")
@@ -1104,6 +1107,16 @@ def _case_cli():
             rc = main(["--from-plan", "--oracle", o, "--plan", p, "--keymap", k, "--out", out + "4"])
         if rc != 2:
             f.append("--from-plan with --oracle should exit 2")
+        # error messages hold no directory part: an unreadable keymap, an unreadable plan, an unwritable --out
+        for label, args in (("keymap", ["--from-plan", "--plan", p, "--keymap", os.path.join(d, "nodir", "nokm.json"), "--out", out + "5"]),
+                            ("plan", ["--from-plan", "--plan", os.path.join(d, "nodir", "noplan.jsonl"), "--keymap", k, "--out", out + "6"]),
+                            ("out", ["--from-plan", "--plan", p, "--keymap", k, "--out", os.path.join(d, "nodir", "o.json")])):
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                rc = main(args)
+            msg = err.getvalue()
+            if rc != 2 or not msg or d in msg or "nodir" in msg:
+                f.append("an unreadable/unwritable %s should exit 2 with no directory in the message: %r" % (label, msg))
     return f
 
 
@@ -1211,6 +1224,13 @@ def _case_plan_figures():
             pa["ranges"]["under_limit"] != {"min": None, "max": None, "max_layer": None, "n_blocks_min": None,
                                             "n_blocks_max": None} or pa["texts_by_speed"]["slow"]["mean"] != 0.0:
         f.append("with every trial long: %r" % (pa["ranges"]["under_limit"],))
+    for label, bad_row in (("a block without a speed", {"kind": "block", "block_id": 9}),
+                           ("a block with a speed that is not one of the speeds", {"kind": "block", "block_id": 9, "speed": "warp"})):
+        try:
+            plan_figures(plan + _jl([bad_row]), longs, 4)
+            f.append("%s was not refused" % label)
+        except InputError:
+            pass
     for label, call in (("a text size of 0", lambda: plan_figures(plan, longs, 0)),
                         ("a text size that is not an int", lambda: plan_figures(plan, longs, 2.5)),
                         ("a trial without a flag", lambda: plan_figures(plan, {}, 4))):
@@ -1298,14 +1318,22 @@ def main(argv):
             out["oracle_from_plan"] = {"block_gap_ms": a.block_gap_ms}
             out["plan_figures"] = plan_figures(pb, dict((t, d["long"]) for t, d in out["trials"]["by_trial"].items()),
                                                a.text_size)
-    except (OSError, InputError) as e:
+    except OSError as e:
+        sys.stderr.write("spec_predict.py: cannot read %s (%s)\n"
+                         % (os.path.basename(str(e.filename or "an input")), type(e).__name__))
+        return 2
+    except InputError as e:
         sys.stderr.write("spec_predict.py: %s\n" % e)
         return 2
     if os.path.exists(a.out):
-        sys.stderr.write("spec_predict.py: %s exists (not overwritten)\n" % a.out)
+        sys.stderr.write("spec_predict.py: %s exists (not overwritten)\n" % os.path.basename(a.out))
         return 2
-    with open(a.out, "wb") as fh:
-        fh.write(render(out))
+    try:
+        with open(a.out, "wb") as fh:
+            fh.write(render(out))
+    except OSError as e:
+        sys.stderr.write("spec_predict.py: cannot write %s (%s)\n" % (os.path.basename(a.out), type(e).__name__))
+        return 2
     return 0
 
 

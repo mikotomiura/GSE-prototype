@@ -602,7 +602,8 @@ def mixture_bias(texts_by_stratum, mixtures, B=None, seed=None):
                 cis[m], statuses[m] = [None, None], "not_requested"
                 continue
             needed = [s for s in SPEEDS if w[s] != 0]
-            thin = min((len(blocks.get(s, ())) for s in needed), default=0)
+            # only the blocks that hold a value of this measure count (as in _ba_interval)
+            thin = min((sum(1 for b in blocks.get(s, ()) if b[m]) for s in needed), default=0)
             values = [_mix_total(w, lambda s: r[s][m] if s in r else None) for r in reps]
             cis[m], statuses[m] = _ci_status(bias[m], thin, values)
         out[name] = {"weights": w, "bias": bias, "bias_ci": cis, "bias_ci_status": statuses}
@@ -702,7 +703,8 @@ def per_trial(plan, oracle, gt, obs, excluded_trials, out_of_scope, B, seed, onl
                       "obs_mean": statistics.fmean(a["obs"][i] for _b, a in items),
                       "diff_mean": statistics.fmean(diffs),
                       "diff_sd": statistics.stdev(diffs) if len(diffs) >= 2 else None,
-                      "diff_ci": [lo, hi]}
+                      "diff_ci": [lo, hi],
+                      "diff_ci_status": "ok" if len(blocks) >= 2 else "fewer_than_two_blocks"}
         out.append(row)
     return {"n_trials": len(acc), "trials_not_used": not_used, "n_outside": outside, "by_stratum": out}
 
@@ -1516,9 +1518,13 @@ def _case_per_trial():
         lo, hi = ds["diff_ci"]
         if lo is None or not lo <= ds["diff_mean"] <= hi:
             f.append("the interval should bracket the mean: %r" % ds)
+    if any(x[q]["diff_ci_status"] != "ok" for x in r["by_stratum"] if x["status"] == "ok" for q in PER_TRIAL):
+        f.append("two blocks should give diff_ci_status ok")
     one = per_trial({"trials": {"t00003": w["plan"]["trials"]["t00003"]}}, w["oracle"], gt, obs, set(), set(), 50, 1)
     if one["by_stratum"][0]["dwell_sum_ms"]["diff_ci"] != [None, None] or one["by_stratum"][0]["dwell_sum_ms"]["diff_sd"] is not None:
         f.append("one trial in one block gives no interval and no standard deviation")
+    if any(one["by_stratum"][0][q]["diff_ci_status"] != "fewer_than_two_blocks" for q in PER_TRIAL):
+        f.append("one block should give diff_ci_status fewer_than_two_blocks: %r" % (one["by_stratum"][0],))
     return f
 
 
@@ -1759,11 +1765,17 @@ def _case_mixture_intervals():
             nd["mixtures"]["f"]["bias_ci_status"]["conversions_per_trial"] != "no_data":
         f.append("a null bias must give the status no_data: %r" % (nd,))
     # a replicate in which a needed stratum has no text with the measure is undefined: withheld, not dropped
-    und = _syn_texts({"slow": [(0, 1, None), (1, 1, 3)]})
+    und = _syn_texts({"slow": [(0, 1, None), (1, 1, 3), (2, 1, 5)]})
     ub = mixture_bias(und, {"s": {"slow": 1}}, 200, 1)
     if ub["mixtures"]["s"]["bias_ci_status"]["conversions_per_trial"] != "undefined_resample" or \
             ub["mixtures"]["s"]["bias_ci"]["conversions_per_trial"] != [None, None]:
         f.append("an undefined replicate must withhold the interval with undefined_resample: %r" % (ub,))
+    # a stratum with values in one block only (the other block holds none of the measure) is "fewer_than_two_blocks",
+    # not "undefined_resample": only the blocks that hold a value of the measure are counted
+    ob1 = mixture_bias(_syn_texts({"slow": [(0, 1, None), (1, 1, 3)]}), {"s": {"slow": 1}}, 200, 1)
+    if ob1["mixtures"]["s"]["bias_ci_status"]["conversions_per_trial"] != "fewer_than_two_blocks" or \
+            ob1["mixtures"]["s"]["bias_ci"]["conversions_per_trial"] != [None, None]:
+        f.append("values in one block only must give fewer_than_two_blocks: %r" % (ob1,))
     # the global random state is not touched
     state = random.getstate()
     mixture_bias(sx, mixes, 20, 1)

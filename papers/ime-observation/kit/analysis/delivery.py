@@ -11,7 +11,8 @@ Inputs: the plan (plan/1), the oracle (oracle/1; one row per press as sent by th
 (obs/1) and the reference log (gt/1). From the observation log only the rows whose type is "key" are read (fields
 t and press); every other row is skipped without its other fields being inspected, so this tool does not depend on
 the session rows. From the reference log only the rows whose ev is "key_down", "focus_out" or "focus_in" are read
-(field t_wall_ms); the key code a key_down carries is not interpreted. A row that does not parse as JSON, or a row that is not an object, is refused.
+(field t_wall_ms, and, for the focus rows, the position in the log); the key code a key_down carries is not
+interpreted. A row that does not parse as JSON, or a row that is not an object, is refused.
 
 Definitions.
   * A press is an oracle "sent" row with down = true whose key is not a pseudo-key (PSEUDO_KEYS: focus_away,
@@ -75,6 +76,9 @@ Definitions.
     Values are rounded to six decimals.
   * Focus losses of the reference input field: a loss interval runs from a focus_out row to the next focus_in row
     (to the end of the log when none follows); a focus_out inside a loss interval already open starts no new one.
+    The focus rows are taken in the order of the log (by time, and rows of equal time by line number): at an equal
+    time, a focus_in then a focus_out closes one loss and opens another, and a focus_out then a focus_in gives a
+    loss of length zero.
     A loss that is not regained therefore covers every later trial, although the reference field no longer
     receives their keys. A loss interval overlaps a trial when it shares at least one millisecond with the
     trial's interval (as defined for reach). Reported: the numbers of focus_out and of focus_in rows, the number
@@ -89,23 +93,43 @@ Definitions.
     loss is not regained), and a press that lies in two such spans is counted once. The executor keeps sending
     keys during a loss, and the observation records every key of the machine, so the rows are also set against
     the keys sent. The span of every loss, planned or not, is widened by FOCUS_MARGIN_MS on both sides (to the
-    end of the log when the loss is not regained), and spans that overlap or touch are merged
-    (n_loss_spans). A planned switch of S15 is a span too: the switch sends no key, so only the rows beyond the
-    keys sent count there. A key the observation is expected to record is a sent row with down = true whose key
-    is neither a pseudo-key nor a mode key (of any trial, measured or not), or a marker row of the oracle (one
-    for each marker press). The rows (observation key rows with press = true) are matched to these keys once for
-    the whole log, one to one, greedily and in time order: a row at time r may take a key sent at s when
-    r - OBS_MATCH_AFTER_MS <= s <= r + OBS_MATCH_BEFORE_MS; each row, in ascending order, takes the earliest
-    key not yet taken that fits, and a key sent earlier than that window can no longer be taken. A row that
-    takes none is unmatched. For each merged span [a, b], n_unexplained is the number of unmatched rows with a
-    time in [a, b]. Reported are the number of spans with n_unexplained above 0
-    (n_loss_spans_with_unexplained_presses) and the sum of n_unexplained (n_presses_unexplained_in_losses).
-    Blind spots of this count: (i) when the observation misses the row of a key sent, that key can be matched to
-    one press of a person made from OBS_MATCH_BEFORE_MS before it to OBS_MATCH_AFTER_MS after it, and that
-    press then goes uncounted; (ii) a row stamped more than OBS_MATCH_BEFORE_MS before its key, or arriving more
-    than OBS_MATCH_AFTER_MS after it, stays unmatched and, inside a span, is counted although no person is
-    present; (iii) a row that the observation duplicates inside a span is counted although no person is
-    present. The trials that
+    end of the log when the loss is not regained), and spans that overlap or touch are merged. Two losses are
+    added before the widening and the merging; they are not losses in the sense above: they are not counted in
+    n_loss_intervals or in any other interval count, are not planned, are not in the trial list, and enter only
+    these spans. The observer is started before the reference input field and stopped after it, so (a) the time
+    from the start of the logs up to the first focus_in is a loss when the first focus row of the reference log
+    (in the order of the log) is a focus_in, and the whole log is one when the log has no focus row at all (a log
+    whose first focus row is a focus_out already has a loss from there, and adds nothing); (b) the time from the
+    last row of the reference log that this tool reads (the last key_down, focus_out or focus_in; when there is
+    none, (a) already covers the whole log) to the end of the logs is a loss. The start of (a) is open
+    (minus infinity; None in the code) and is not widened. The executor sends no key before the first block
+    that the observation records, so these spans hold no row in a run without a person. n_loss_spans is the
+    number of merged spans, these included. A planned switch of S15 is a span too: the switch sends no key, so
+    only the rows beyond the keys sent count there. A key the observation is expected to record is a sent row
+    with down = true whose key is neither a pseudo-key nor a mode key (of any trial, measured or not), or a
+    marker row of the oracle (one for each marker press). The rows (observation key rows with press = true) are
+    matched to these keys once for the whole log, one to one, greedily and in time order: a row at time r may
+    take a key sent at s when r - OBS_MATCH_AFTER_MS <= s <= r + OBS_MATCH_BEFORE_MS; each row, in ascending
+    order, takes the earliest key not yet taken that fits, and a key sent earlier than that window can no longer
+    be taken. A row that takes none is unmatched. Unmatched rows are counted in a window [a, e] of each merged
+    span [a, b]. When b is open, e is open. Otherwise e starts as b + OBS_MATCH_BEFORE_MS + OBS_MATCH_AFTER_MS
+    and is extended: take, in ascending order, the keys sent after b + OBS_MATCH_BEFORE_MS; while the next one is
+    at most OBS_MATCH_BEFORE_MS + OBS_MATCH_AFTER_MS after the previous one (the first one counted from
+    b + OBS_MATCH_BEFORE_MS), e becomes the larger of e and its time + OBS_MATCH_AFTER_MS; the extension stops at
+    the first larger gap. The reason is that the matching is global: when a person's press falls between a key
+    sent and that key's own row, the press takes the key and the unmatched row moves to the executor's later row,
+    and this shortage can be carried from key to key past the end of the span only while consecutive keys are at
+    most that far apart, the displaced row arriving at most OBS_MATCH_AFTER_MS after its key. For each merged
+    span, n_unexplained is the number of unmatched rows with a time in its window. Reported are the number of
+    spans with n_unexplained above 0 (n_loss_spans_with_unexplained_presses) and the number of distinct
+    unmatched rows that lie in at least one window (n_presses_unexplained_in_losses; a row in two overlapping
+    windows is counted once). Blind spots of this count: (i) when the observation misses the row of a key sent,
+    that key can be matched to one press of a person made from OBS_MATCH_BEFORE_MS before it to
+    OBS_MATCH_AFTER_MS after it, and that press then goes uncounted; (ii) a row stamped more than
+    OBS_MATCH_BEFORE_MS before its key, or arriving more than OBS_MATCH_AFTER_MS after it, stays unmatched and,
+    inside a counting window, is counted although no person is present; (iii) a row that the observation
+    duplicates inside a counting window is counted although no person is present.
+    The trials that
     overlap at least one loss interval (trials_with_focus_loss, sorted) and per stratum (scenario, speed) the
     number of measured trials and of trials with a focus loss. A planned
     switch to another application (scenario S15) is not counted in the list of trials: an S15 trial is left out
@@ -116,8 +140,13 @@ Definitions.
 Refused (exit 2): a block row of the plan whose block_id is repeated or is not an integer (a boolean is not one)
 or whose marker is not an array of strings; a block_begin whose block_id is not an integer, is not in the plan or
 appears twice for one block; a plan whose SHA-256 differs from the oracle header's plan_sha256; a sent row whose
-trial or step is absent from the plan, or whose key or down flag disagrees with the plan step; a sent row of a
-trial with no trial_begin; a duplicated trial_begin or trial_end; and malformed input. Error messages carry only
+trial or step is absent from the plan, or whose key or down flag disagrees with the plan step; a marker
+row of the oracle whose block_id is missing, not an integer (a boolean is not one) or not a block of the plan,
+whose seq is missing or not an integer or lies outside 0 .. (the length of the block's marker array) - 1 (so a
+block with an empty or missing marker array can have no marker row), or whose (block_id, seq) appears twice; a
+sent row of a trial with no trial_begin; a duplicated trial_begin or trial_end; and malformed input, a line
+nested too deeply to be read included. Any other unexpected error also exits 2, and only its type name is
+printed. Error messages carry only
 row numbers and field names, never a value read from a log.
 
 The output holds no path and identical input yields identical output bytes (sorted keys, LF, UTF-8, no BOM). The
@@ -126,7 +155,9 @@ Exit status: 0 written / 1 selftest failure / 2 usage error or invalid input.
 """
 import argparse
 import bisect
+import contextlib
 import hashlib
+import io
 import json
 import os
 import subprocess
@@ -251,8 +282,10 @@ def read_oracle(data, plan, plan_sha256, blocks):
     begin_mono, end_wall, sent: [{key, step, wall, mono, down}]}; cuts is the sorted list of wall times of the oracle rows that
     end a trial's interval (reset / block_begin / marker / trial_begin); begins is the list of (wall time,
     block_id) of the block_begin rows, sorted by time; marker_times is the sorted list of wall times of the marker
-    rows (one row for each marker press). blocks is the set of the block_ids of the plan. The sent
-    rows are checked against the plan, and a block_begin against the blocks."""
+    marker rows (one row for each marker press). blocks is {block_id: the number of marker presses of the block}
+    as read_plan returns it. The sent rows are checked against the plan, a block_begin against the blocks, and a
+    marker row against the marker list of its block (block_id in the plan, integer seq in 0 .. length - 1, no
+    (block_id, seq) twice)."""
     lines = _lines(data, "oracle")
     if not lines:
         raise InputError("oracle: empty file")
@@ -266,6 +299,7 @@ def read_oracle(data, plan, plan_sha256, blocks):
     cuts = []
     begins = []
     marker_times = []
+    marker_seen = set()
     for n, raw in lines[1:]:
         where = "oracle:%d" % n
         row = _loads(raw, where, True)
@@ -277,6 +311,16 @@ def read_oracle(data, plan, plan_sha256, blocks):
                 raise InputError("%s: t_wall_ms is missing or not an integer" % where)
             cuts.append(row["t_wall_ms"])
             if kind == "marker":
+                bid, seq = row.get("block_id"), row.get("seq")
+                if not _is_int(bid) or bid not in blocks:
+                    raise InputError("%s: block_id of a marker is missing, not an integer or not in the plan" % where)
+                if not _is_int(seq):
+                    raise InputError("%s: seq of a marker is missing or not an integer" % where)
+                if (bid, seq) in marker_seen:
+                    raise InputError("%s: a marker (block_id, seq) appears twice" % where)
+                if seq < 0 or seq >= blocks[bid]:
+                    raise InputError("%s: seq of a marker is outside the marker list of its block in the plan" % where)
+                marker_seen.add((bid, seq))
                 marker_times.append(row["t_wall_ms"])
             if kind == "block_begin":
                 bid = row.get("block_id")
@@ -364,16 +408,41 @@ def read_gt_key_downs(data):
     return read_gt_events(data, "key_down")
 
 
-def _loss_intervals(outs, ins):
+def read_gt_focus(data):
+    """Return (focus, last): focus is the list of (t_wall_ms, line number, ev) of the reference rows whose ev is
+    "focus_out" or "focus_in", in the order of the log (sorted by time, equal times by line number); last is the
+    greatest t_wall_ms of the rows this tool reads (key_down, focus_out, focus_in), None when there is none."""
+    out = []
+    last = None
+    for n, raw in _lines(data, "gt"):
+        where = "gt:%d" % n
+        row = _loads(raw, where, False)
+        if not isinstance(row, dict):
+            raise InputError("%s: the row is not an object" % where)
+        ev = row.get("ev")
+        if row.get("kind") != "ev" or ev not in ("key_down", "focus_out", "focus_in"):
+            continue
+        if not _is_int(row.get("t_wall_ms")):
+            raise InputError("%s: a %s row lacks an integer t_wall_ms" % (where, ev))
+        t = row["t_wall_ms"]
+        if last is None or t > last:
+            last = t
+        if ev != "key_down":
+            out.append((t, n, ev))
+    out.sort(key=lambda e: (e[0], e[1]))
+    return out, last
+
+
+def _loss_intervals(focus):
     """Return [(begin, end)] of the focus loss intervals: from a focus_out to the next focus_in, or to None (the
-    end of the log) when none follows. A focus_out while a loss is open and a focus_in while none is open add
-    nothing. On equal times a focus_out is taken before a focus_in."""
-    events = sorted([(t, 0) for t in outs] + [(t, 1) for t in ins])
+    end of the log) when none follows. focus = [(t, line number, ev)]; the rows are taken in the order of the log
+    (by time, equal times by line number). A focus_out while a loss is open and a focus_in while none is open add
+    nothing."""
     out, begin = [], None
-    for t, kind in events:
-        if kind == 0 and begin is None:
+    for t, _n, ev in sorted(focus, key=lambda e: (e[0], e[1])):
+        if ev == "focus_out" and begin is None:
             begin = t
-        elif kind == 1 and begin is not None:
+        elif ev == "focus_in" and begin is not None:
             out.append((begin, t))
             begin = None
     if begin is not None:
@@ -381,8 +450,24 @@ def _loss_intervals(outs, ins):
     return out
 
 
-def _focus_losses(done, plan, outs, ins, starts, ends, obs_times, trials, marker_times):
-    losses = _loss_intervals(outs, ins)
+def _extended_end(b, sent_times):
+    """The end of the window in which the unmatched rows of a merged span ending at b are counted: a row that is
+    displaced by a person's press can only take the next key sent when that key is at most OBS_MATCH_BEFORE_MS +
+    OBS_MATCH_AFTER_MS after the previous one, and it arrives at most OBS_MATCH_AFTER_MS after its key."""
+    gap = OBS_MATCH_BEFORE_MS + OBS_MATCH_AFTER_MS
+    e = b + gap
+    last = b + OBS_MATCH_BEFORE_MS
+    i = bisect.bisect_right(sent_times, last)
+    while i < len(sent_times) and sent_times[i] - last <= gap:
+        last = sent_times[i]
+        e = max(e, last + OBS_MATCH_AFTER_MS)
+        i += 1
+    return e
+
+
+def _focus_losses(done, plan, focus, last_row, starts, ends, obs_times, trials, marker_times):
+    losses = _loss_intervals(focus)
+    n_out = sum(1 for e in focus if e[2] == "focus_out")
     def overlap(loss, i):
         return loss[0] <= ends[i] and (loss[1] is None or loss[1] >= starts[i])
     def inside(loss, i):
@@ -399,7 +484,7 @@ def _focus_losses(done, plan, outs, ins, starts, ends, obs_times, trials, marker
     spans = [(loss[0] - FOCUS_MARGIN_MS, None if loss[1] is None else loss[1] + FOCUS_MARGIN_MS)
              for loss, p in zip(losses, planned) if not p]
     def within(t, span):
-        return t >= span[0] and (span[1] is None or t <= span[1])
+        return (span[0] is None or t >= span[0]) and (span[1] is None or t <= span[1])
     with_presses = sum(1 for span in spans if any(within(t, span) for t in obs_times))
     n_presses = sum(1 for t in obs_times if any(within(t, span) for span in spans))
     # the keys sent that the observation is expected to record, set against its rows in the merged spans
@@ -416,17 +501,30 @@ def _focus_losses(done, plan, outs, ins, starts, ends, obs_times, trials, marker
             ptr += 1
         else:
             unmatched.append(r)
-    # the spans of all losses (planned ones too), each widened by the margin, merged when they overlap or touch
-    all_spans = [(loss[0] - FOCUS_MARGIN_MS, None if loss[1] is None else loss[1] + FOCUS_MARGIN_MS)
-                 for loss in losses]
+    # the losses of all kinds (planned ones too) and the two added ones: from the start of the logs (None) up to
+    # the first focus_in when the first focus row is a focus_in, or over the whole log when it has no focus row;
+    # and from the last row of the reference log to the end of the logs. Each is widened by the margin (None stays
+    # open) and spans that overlap or touch are merged.
+    added = []
+    if not focus:
+        added.append((None, None))
+    elif focus[0][2] == "focus_in":
+        added.append((None, focus[0][0]))
+    if last_row is not None:
+        added.append((last_row, None))
+    all_spans = [(None if loss[0] is None else loss[0] - FOCUS_MARGIN_MS,
+                  None if loss[1] is None else loss[1] + FOCUS_MARGIN_MS) for loss in list(losses) + added]
     merged = []
-    for a, b in sorted(all_spans, key=lambda sp: sp[0]):
-        if merged and (merged[-1][1] is None or a <= merged[-1][1]):
+    for a, b in sorted(all_spans, key=lambda sp: (sp[0] is not None, sp[0] or 0)):
+        if merged and (merged[-1][1] is None or a is None or a <= merged[-1][1]):
             if merged[-1][1] is not None:
                 merged[-1][1] = None if b is None else max(merged[-1][1], b)
         else:
             merged.append([a, b])
-    unexplained = [sum(1 for r in unmatched if within(r, (a, b))) for a, b in merged]
+    # the window in which a merged span counts its unmatched rows: a closed span is extended (see _extended_end)
+    windows = [(a, None if b is None else _extended_end(b, sent_times)) for a, b in merged]
+    unexplained = [sum(1 for r in unmatched if within(r, w)) for w in windows]
+    n_unexplained_rows = sum(1 for r in unmatched if any(within(r, w) for w in windows))
     per = {}
     for t, got in zip(done, hit):
         info = plan[t["trial_id"]]
@@ -436,13 +534,13 @@ def _focus_losses(done, plan, outs, ins, starts, ends, obs_times, trials, marker
     def order(k):
         sc = k[0][1:]
         return (int(sc) if sc.isdigit() else 0, k[0], SPEEDS.index(k[1]))
-    return {"n_focus_out": len(outs), "n_focus_in": len(ins), "n_loss_intervals": len(losses),
+    return {"n_focus_out": n_out, "n_focus_in": len(focus) - n_out, "n_loss_intervals": len(losses),
             "n_loss_intervals_outside_trials": outside, "n_loss_intervals_planned": planned_losses,
             "n_loss_intervals_unplanned": len(losses) - planned_losses,
             "n_loss_intervals_unplanned_with_presses": with_presses, "n_presses_in_unplanned_losses": n_presses,
             "n_loss_spans": len(merged),
             "n_loss_spans_with_unexplained_presses": sum(1 for u in unexplained if u > 0),
-            "n_presses_unexplained_in_losses": sum(unexplained),
+            "n_presses_unexplained_in_losses": n_unexplained_rows,
             "n_trials_with_focus_loss": sum(1 for g in hit if g),
             "trials_with_focus_loss": sorted(t["trial_id"] for t, got in zip(done, hit) if got),
             "by_stratum": [{"scenario": k[0], "speed": k[1], "n_trials": per[k][0], "n_trials_with_focus_loss": per[k][1]}
@@ -592,6 +690,7 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
     trials, cuts, begins, marker_times = read_oracle(oracle_bytes, plan, sha["plan"], markers)
     obs_times = read_obs_presses(obs_bytes)
     gt_times = read_gt_key_downs(gt_bytes)
+    focus, last_row = read_gt_focus(gt_bytes)
 
     lateness = []
     for t in trials:
@@ -617,8 +716,7 @@ def evaluate(plan_bytes, oracle_bytes, obs_bytes, gt_bytes, pre_ms=20, tail_ms=3
         "send_lateness_ms": _by_speed(lateness),
         "observation": _side(done, speeds, obs_times, starts, ends, begins, markers),
         "reference": _side(done, speeds, gt_times, starts, ends, begins, markers),
-        "reference_focus_loss": _focus_losses(done, plan, read_gt_events(gt_bytes, "focus_out"),
-                                              read_gt_events(gt_bytes, "focus_in"), starts, ends, obs_times,
+        "reference_focus_loss": _focus_losses(done, plan, focus, last_row, starts, ends, obs_times,
                                               trials, marker_times),
     }
 
@@ -646,11 +744,16 @@ END = {"t1": 500, "t2": 2200, "t3": 4300}
 LATE_NS = {("t1", 0): 2_000_000, ("t1", 2): 1_000_000, ("t1", 4): 3_500_000, ("t2", 2): 4_000_000}
 
 
-def _fixture(plan_edit=None, oracle_edit=None, extra_obs=(), obs_drop=None):
+FOCUS0 = -100_000  # ms from W0: the reference field has the focus from before every row the fixtures use
+
+
+def _fixture(plan_edit=None, oracle_edit=None, extra_obs=(), obs_drop=None, focus0=True):
     """Plan, oracle, observation and reference bytes. Hand-computed truth of the default fixture:
     lateness a 2, ime_on 1, b 3.5, c 0, d 4, e 0 ms; observation rows lose the mode-key press of t1 and gain a
-    duplicate in t3; reference rows also see the mode key. A marker follows t2 at +2210 ms."""
-    plan_rows = [{"kind": "header", "format": "plan/1", "os": "windows"}, {"kind": "block", "block_id": 0}]
+    duplicate in t3; reference rows also see the mode key. A marker follows t2 at +2210 ms. The reference log starts
+    with a focus_in at FOCUS0 unless focus0 is False."""
+    plan_rows = [{"kind": "header", "format": "plan/1", "os": "windows"},
+                 {"kind": "block", "block_id": 0, "marker": ["m1", "m2"]}]
     for tid, (speed, steps) in PLAN_STEPS.items():
         plan_rows.append({"kind": "trial", "trial_id": tid, "block_id": 0, "scenario": "S1", "speed": speed,
                           "steps": [{"key": k, "at_ms": at, "down": d} for k, at, d in steps]})
@@ -683,6 +786,8 @@ def _fixture(plan_edit=None, oracle_edit=None, extra_obs=(), obs_drop=None):
     obs += [{"type": "key", "t": t + 20, "category": "alphabetic", "press": False} for t in obs_t]
     obs += list(extra_obs)
     gt = [{"kind": "header", "format": "gt/1", "src": "x"}]
+    if focus0:
+        gt.append({"kind": "ev", "t_wall_ms": W0 + FOCUS0, "t_mono_ns": 1, "ev": "focus_in"})
     gt += [{"kind": "ev", "t_wall_ms": W0 + t, "t_mono_ns": 1, "ev": "key_down", "vk": 65}
            for t in (-97, 3, 202, 405, 2001, 2105, 2211, 4101)]
     gt += [{"kind": "ev", "t_wall_ms": W0 + 5, "t_mono_ns": 1, "ev": "set_marked", "len": "bad"},
@@ -696,7 +801,7 @@ SEG_TRIALS = (("a0", 0, 1000, 1200), ("a1", 0, 2000, 2200), ("b0", 1, 4500, 4700
 SEG_BEGIN = {0: 0, 1: 3500}
 
 
-def _seg_fixture(gt_extra=(), gt_drop=(), plan_edit=None, oracle_edit=None):
+def _seg_fixture(gt_extra=(), gt_drop=(), plan_edit=None, oracle_edit=None, focus0=True):
     """Two blocks of four marker presses each (an oracle marker row per press, a reference key_down 2 ms after it)
     and three one-press trials (a0, a1 in block 0; b0 in block 1; the key_down is 5 ms after the send). Times are
     ms from W0. The reference rows of the default fixture: 4 + 2 of block 0, 4 + 1 of block 1. gt_extra adds
@@ -734,21 +839,24 @@ def _seg_fixture(gt_extra=(), gt_drop=(), plan_edit=None, oracle_edit=None):
     gt_t = [t for t in gt_t if t not in gt_drop] + list(gt_extra)
     obs = [{"type": "meta", "format": "obs/1"}] + [{"type": "key", "t": W0 + t, "category": "alphabetic", "press": True}
                                                     for t in obs_t]
-    gt = [{"kind": "header", "format": "gt/1", "src": "x"}] + [
-        {"kind": "ev", "t_wall_ms": W0 + t, "t_mono_ns": 1, "ev": "key_down", "vk": 65} for t in gt_t]
+    gt = [{"kind": "header", "format": "gt/1", "src": "x"}]
+    if focus0:
+        gt.append({"kind": "ev", "t_wall_ms": W0 + FOCUS0, "t_mono_ns": 1, "ev": "focus_in"})
+    gt += [{"kind": "ev", "t_wall_ms": W0 + t, "t_mono_ns": 1, "ev": "key_down", "vk": 65} for t in gt_t]
     return plan, _jl(ora), _jl(obs), _jl(gt)
 
 
 MINI_NS = 1_000_000
 
 
-def _mini(blocks, trials, gt, obs=(), marks=()):
+def _mini(blocks, trials, gt, obs=(), marks=(), focus0=True):
     """A small fixture. blocks = [(block_id, begin ms)]; trials = [(trial_id, block_id, scenario, begin ms, end ms,
     keys)]; gt = [(time ms, ev)]; obs = key press times; marks = times of marker rows of the oracle. The i-th key
     of a trial is pressed at begin + 10 + 30 * i and released 10 ms later (the oracle holds both). Times are ms
-    from W0; the block rows of the plan have no marker."""
+    from W0; block 0 of the plan has one marker key for each time in marks, the other blocks have none. The reference
+    log starts with a focus_in at FOCUS0 unless focus0 is False."""
     plan_rows = [{"kind": "header", "format": "plan/1", "os": "macos"}]
-    plan_rows += [{"kind": "block", "block_id": b} for b, _bg in blocks]
+    plan_rows += [{"kind": "block", "block_id": b, "marker": ["m"] * len(marks) if b == 0 else []} for b, _bg in blocks]
     for tid, b, scen, _bg, _en, keys in trials:
         steps = []
         for i, k in enumerate(keys):
@@ -770,6 +878,8 @@ def _mini(blocks, trials, gt, obs=(), marks=()):
     ora += [{"kind": "marker", "block_id": 0, "seq": i, "t_wall_ms": W0 + t, "t_mono_ns": (W0 + t) * MINI_NS}
             for i, t in enumerate(marks)]
     gt_rows = [{"kind": "header", "format": "gt/1", "src": "x"}]
+    if focus0:
+        gt_rows.append({"kind": "ev", "t_wall_ms": W0 + FOCUS0, "t_mono_ns": 1, "ev": "focus_in"})
     gt_rows += [{"kind": "ev", "t_wall_ms": W0 + t, "t_mono_ns": 1, "ev": ev, "vk": 65} for t, ev in gt]
     obs_rows = [{"type": "meta", "format": "obs/1"}]
     obs_rows += [{"type": "key", "t": W0 + t, "category": "alphabetic", "press": True} for t in obs]
@@ -850,7 +960,7 @@ def _selftest():
                {"scenario": "S1", "speed": "mid", "n_trials": 1, "n_trials_with_focus_loss": 1},
                {"scenario": "S1", "speed": "fast", "n_trials": 1, "n_trials_with_focus_loss": 0}]
     check(fo["trials_with_focus_loss"] == ["t3"], "the trials with a focus loss are listed: %r" % (fo["trials_with_focus_loss"],))
-    check(fo["n_focus_out"] == 2 and fo["n_focus_in"] == 0 and fo["n_loss_intervals"] == 1
+    check(fo["n_focus_out"] == 2 and fo["n_focus_in"] == 1 and fo["n_loss_intervals"] == 1
           and fo["n_loss_intervals_outside_trials"] == 0 and fo["n_trials_with_focus_loss"] == 1
           and fo["by_stratum"] == want_fo, "focus losses of the reference are counted per trial and stratum")
 
@@ -865,10 +975,10 @@ def _selftest():
         keep += [{"kind": "ev", "t_wall_ms": W0 + t, "t_mono_ns": 1, "ev": ev} for t, ev in events]
         return evaluate(f[0], f[1], f[2], _jl(keep))["reference_focus_loss"]
     r = loss([(2100, "focus_out")])
-    check(r["trials_with_focus_loss"] == ["t2", "t3"] and r["n_loss_intervals"] == 1 and r["n_focus_in"] == 0,
+    check(r["trials_with_focus_loss"] == ["t2", "t3"] and r["n_loss_intervals"] == 1 and r["n_focus_in"] == 1,
           "a loss that is not regained covers the following trials up to the end of the log")
     r = loss([(700, "focus_out"), (2100, "focus_in")])
-    check(r["trials_with_focus_loss"] == ["t1", "t2"] and r["n_focus_in"] == 1,
+    check(r["trials_with_focus_loss"] == ["t1", "t2"] and r["n_focus_in"] == 2,
           "a loss regained in the next trial covers both trials and not the one after")
     r = loss([(2050, "focus_out"), (2150, "focus_in")], s15=True)
     check(r["trials_with_focus_loss"] == [] and r["n_loss_intervals"] == 1 and r["n_loss_intervals_outside_trials"] == 0,
@@ -887,7 +997,7 @@ def _selftest():
     check(r["trials_with_focus_loss"] == [] and r["n_loss_intervals"] == 1 and r["n_loss_intervals_outside_trials"] == 1,
           "a loss between two trials that is regained before the next trial overlaps no trial")
     r = loss([(3500, "focus_in"), (2050, "focus_out"), (2060, "focus_out"), (2100, "focus_in")])
-    check(r["n_loss_intervals"] == 1 and r["n_focus_out"] == 2 and r["n_focus_in"] == 2
+    check(r["n_loss_intervals"] == 1 and r["n_focus_out"] == 2 and r["n_focus_in"] == 3
           and r["trials_with_focus_loss"] == ["t2"]
           and [(b["speed"], b["n_trials_with_focus_loss"]) for b in r["by_stratum"]]
           == [("slow", 0), ("mid", 0), ("fast", 1)],
@@ -1137,11 +1247,16 @@ def _selftest():
 
     # focus losses: observation rows set against the keys sent. Trials x (S15) and y (S1) always send one key each,
     # at 1010 and 4010; `extra` adds trials (id, begin, end, keys); every observation row is given explicitly.
-    def unexplained(events, obs, extra=(), marks=()):
+    def unexplained(events, obs, extra=(), marks=(), open_end=False):
+        """(n_loss_spans of the losses given, spans with unexplained rows, unexplained rows). The reference log
+        holds a focus_in at FOCUS0 and a last key_down far after every row, so that the span of the start and the
+        span after the last row (see _focus_losses) hold no row; they are left out of the span count, the span
+        after the last row being merged into the losses when open_end (a loss that is not regained)."""
         trials = [("x", 0, "S15", 1000, 2000, ["a"]), ("y", 0, "S1", 4000, 4500, ["a"])]
         trials += [(i, 0, "S1", b, e, k) for i, b, e, k in extra]
-        got = evaluate(*_mini([(0, 0)], trials, sorted(events), obs, marks))["reference_focus_loss"]
-        return (got["n_loss_spans"], got["n_loss_spans_with_unexplained_presses"],
+        got = evaluate(*_mini([(0, 0)], trials, sorted(list(events) + [(1_000_000, "key_down")]), obs,
+                              marks))["reference_focus_loss"]
+        return (got["n_loss_spans"] - (1 if open_end else 2), got["n_loss_spans_with_unexplained_presses"],
                 got["n_presses_unexplained_in_losses"])
     z2 = [("z", 3000, 3400, ["a", "b"])]
     loss = [(3005, "focus_out"), (3100, "focus_in")]
@@ -1195,7 +1310,8 @@ def _selftest():
     check(unexplained([(3000, "focus_out"), (3100, "focus_in"), (4100, "focus_out"), (4200, "focus_in")], [])[0] == 1
           and unexplained([(3000, "focus_out"), (3100, "focus_in"), (4101, "focus_out"), (4200, "focus_in")], [])[0] == 2,
           "unexplained: spans that touch are merged and spans that are one millisecond apart are not")
-    check(unexplained([(3005, "focus_out")], [4010, 9000]) == (1, 1, 1) and unexplained([(3005, "focus_out")], [2000]) == (1, 0, 0),
+    check(unexplained([(3005, "focus_out")], [4010, 9000], open_end=True) == (1, 1, 1)
+          and unexplained([(3005, "focus_out")], [2000], open_end=True) == (1, 0, 0),
           "unexplained: a loss that is not regained runs to the end of the log")
     sw = [(1200, "focus_out"), (1500, "focus_in")]
     check(unexplained(sw, [1013, 1300]) == (1, 1, 1) and unexplained(sw, [1013]) == (1, 0, 0),
@@ -1206,6 +1322,115 @@ def _selftest():
           "unexplained: a planned switch beside an unplanned loss is a span of its own")
     check(unexplained(loss, [3010]) == (1, 1, 1) and unexplained(loss, [3010], [("z", 3000, 3040, ["a"])]) == (1, 0, 0),
           "unexplained: a row with no key sent near it is unexplained")
+
+    # focus losses: the order of the focus rows in the log (equal times are taken in the order of the log).
+    fo_, fi_ = "focus_out", "focus_in"
+    check(_loss_intervals([(100, 1, fo_), (200, 2, fi_), (200, 3, fo_)]) == [(100, 200), (200, None)],
+          "focus order: in then out at an equal time closes a loss and opens another that is not regained")
+    check(_loss_intervals([(100, 1, fo_), (200, 2, fo_), (200, 3, fi_)]) == [(100, 200)]
+          and _loss_intervals([(200, 3, fo_), (200, 2, fi_)]) == [(200, None)]
+          and _loss_intervals([(200, 2, fo_), (200, 3, fi_)]) == [(200, 200)],
+          "focus order: out then in at an equal time gives a loss of length zero; the line number decides, not the list")
+    ordr = evaluate(*_mini([(0, 0)], [("y", 0, "S1", 4000, 4500, ["a"])],
+                           [(100, fo_), (200, fi_), (200, fo_), (4015, "key_down")], [4012]))["reference_focus_loss"]
+    check(ordr["n_loss_intervals"] == 2 and ordr["n_focus_out"] == 2 and ordr["n_focus_in"] == 2,
+          "focus order: the log order is kept through the evaluation (a loss that starts at the time of a regain)")
+
+    # focus losses: before the first focus_in and after the last row of the reference log (spans added to the losses,
+    # outside every count of losses). Trial y sends one key at 4010; its row is at 4012.
+    def edge(gt, obs, marks=()):
+        got = evaluate(*_mini([(0, 0)], [("y", 0, "S1", 4000, 4500, ["a"])], gt, obs, marks, focus0=False)
+                       )["reference_focus_loss"]
+        return (got["n_loss_spans"], got["n_loss_spans_with_unexplained_presses"],
+                got["n_presses_unexplained_in_losses"], got["n_loss_intervals"])
+    tail_row = [(1_000_000, "key_down")]
+    check(edge([(1000, fi_), (4015, "key_down")] + tail_row, [500, 4012]) == (2, 1, 1, 0),
+          "edge: an unsent row before the first focus_in is counted (the span from the start, without a loss counted)")
+    check(edge([(-2000, fi_), (4015, "key_down")] + tail_row, [500, 4012]) == (2, 0, 0, 0),
+          "edge: a row after the first focus_in plus the margin is not in the span from the start")
+    check(edge([(4015, "key_down")] + tail_row, [4012, 700]) == (1, 1, 1, 0)
+          and edge([(4015, "key_down")] + tail_row, [4012]) == (1, 0, 0, 0),
+          "edge: a log with no focus row is one loss: an unsent row aborts, the executor's own row does not")
+    check(edge([(5000, fi_), (6000, "key_down")], [4012]) == (1, 0, 0, 0)
+          and edge([(5000, fi_), (6000, "key_down")], [4012, 4300]) == (1, 1, 1, 0),
+          "edge: the executor's own matched rows before the first focus_in do not abort, an unsent one does")
+    check(edge([(-5000, fi_), (4015, "key_down")], [4012, 4600]) == (2, 1, 1, 0)
+          and edge([(-5000, fi_), (4015, "key_down")], [4012]) == (2, 0, 0, 0),
+          "edge: an unsent row after the last row of the reference log aborts, a matched one does not")
+    check(edge([(-5000, fi_), (100, "key_down")], [4012]) == (2, 0, 0, 0),
+          "edge: a reference log that ends early but whose rows are all matched does not abort")
+    check(edge([(100, fo_), (200, "key_down")] + tail_row, [4012, 150]) == (1, 1, 1, 1),
+          "edge: a log whose first focus row is a focus_out adds no span at the start of the logs")
+    check(edge([(-5000, fi_)], [4012])[:3] == (1, 0, 0) and edge([(-5000, fi_)], [4012, 4300])[:3] == (1, 1, 1),
+          "edge: with a focus_in as the only reference row, everything after it falls in the span after the last row")
+    check(edge([], [4012])[:3] == (1, 0, 0) and edge([], [4012, 100])[:3] == (1, 1, 1) and edge([], [])[:3] == (1, 0, 0),
+          "edge: an empty reference log is one loss over the whole log")
+    check(unexplained([(2000, fo_), (2100, fi_), (2200, fo_)], [2300], open_end=True) == (1, 1, 1)
+          and unexplained([(2000, fo_), (2100, fi_), (2200, fo_)], [], open_end=True) == (1, 0, 0),
+          "unexplained: a closed span merged with a later span that is not regained becomes one open span")
+    check(unexplained([(3000, fo_)], [3500, 4500], open_end=True) == (1, 1, 2),
+          "unexplained: the span after the last row merges into an open loss and nothing is counted twice")
+
+    # focus losses: the shortage carried past the end of a span (security review: keys 100 ms apart, every row 90 ms
+    # after its key, one press of a person inside the loss). Keys at 3500, 3600, ... one trial each.
+    def chain(key_times, obs, events=((3000, fo_), (3100, fi_))):
+        trials = [("k%d" % i, 0, "S1", t - 10, t + 40, ["a"]) for i, t in enumerate(key_times)]
+        got = evaluate(*_mini([(0, 0)], trials, sorted(list(events) + [(1_000_000, "key_down")]), obs)
+                       )["reference_focus_loss"]
+        return (got["n_loss_spans"] - 2, got["n_loss_spans_with_unexplained_presses"],
+                got["n_presses_unexplained_in_losses"])
+    keys9 = [3500 + 100 * i for i in range(9)]
+    rows9 = [t + 90 for t in keys9]
+    check(chain(keys9, rows9) == (1, 0, 0), "chain: every row 90 ms after its key and no person is present gives 0")
+    check(chain(keys9, sorted(rows9 + [3520])) == (1, 1, 1),
+          "chain: a press of a person inside the loss takes a key and the shortage lands past the end of the span: counted")
+    keys7 = [3500, 3600, 3700, 4100, 4200]
+    rows7 = [t + 90 for t in keys7]
+    check(chain(keys7, sorted(rows7 + [3520])) == (1, 1, 1) and chain(keys7, sorted(rows7 + [3520, 4300])) == (1, 1, 1),
+          "chain: a gap of more than OBS_MATCH_BEFORE_MS + OBS_MATCH_AFTER_MS stops the extension (a row beyond is not counted)")
+    check(chain([3500, 3600, 3700, 3900], sorted([3590, 3690, 3790, 3990, 3520, 4150])) == (1, 1, 2),
+          "chain: within the gap the extension goes on, up to the last key plus OBS_MATCH_AFTER_MS")
+    two_spans = [(3000, fo_), (3100, fi_), (4101, fo_), (4150, fi_)]
+    check(unexplained(two_spans, [3700]) == (2, 2, 1),
+          "unexplained: a row in the windows of two spans counts for both spans and once among the rows")
+    check(_extended_end(3600, [3500, 4000]) == 3920 and _extended_end(3600, [3700]) == 4000
+          and _extended_end(3600, [3700, 4020]) == 4320 and _extended_end(3600, [3700, 4021]) == 4000
+          and _extended_end(3600, []) == 3920,
+          "chain: the window end (hand computed, the gap condition is inclusive)")
+
+    # marker rows of the oracle: block_id and seq are checked against the plan.
+    seg = _seg_fixture()
+
+    def first_marker(edit):
+        def go(ora):
+            edit(next(r for r in ora if r.get("kind") == "marker"), ora)
+        return go
+    def del_field(name):
+        return first_marker(lambda r, ora: r.pop(name))
+    def set_field(name, value):
+        return first_marker(lambda r, ora: r.__setitem__(name, value))
+    def dup_marker(r, ora):
+        ora.append(dict(r))
+    check(refused(_oracle_with(seg, del_field("block_id")))
+          and refused(_oracle_with(seg, set_field("block_id", "zzmarkerid")), "zzmarkerid")
+          and refused(_oracle_with(seg, set_field("block_id", True)))
+          and refused(_oracle_with(seg, set_field("block_id", 7))),
+          "a marker row whose block_id is missing, a string, a boolean or not in the plan is refused, value not echoed")
+    check(refused(_oracle_with(seg, del_field("seq"))) and refused(_oracle_with(seg, set_field("seq", "zzseq")), "zzseq")
+          and refused(_oracle_with(seg, set_field("seq", True))) and refused(_oracle_with(seg, set_field("seq", 1.0))),
+          "a marker row whose seq is missing, a string, a boolean or a float is refused, value not echoed")
+    check(refused(_oracle_with(seg, set_field("seq", 4))) and refused(_oracle_with(seg, set_field("seq", -1))),
+          "a marker row whose seq is outside 0 .. length - 1 of its block's marker array is refused")
+    check(refused(_oracle_with(seg, first_marker(dup_marker))),
+          "a marker row whose (block_id, seq) appears twice is refused")
+    empty_marker = _mini([(0, 0)], [("y", 0, "S1", 4000, 4500, ["a"])], [(4015, "key_down")], [4012])
+    check(not refused(empty_marker)
+          and refused(_oracle_with(empty_marker, lambda ora: ora.append(
+              {"kind": "marker", "block_id": 0, "seq": 0, "t_wall_ms": W0 + 10, "t_mono_ns": 1}))),
+          "a block with no marker array can have no marker row")
+    check(not refused(_fixture()) and not refused(seg)
+          and not refused(_mini([(0, 0)], [("y", 0, "S1", 4000, 4500, ["a"])], [(4015, "key_down")], [4012], [3000, 3010])),
+          "the marker rows of the fixtures (as the emitter and oracle_from_plan write them) pass")
 
     # block ids must be integers (a string and a boolean are refused, no value is echoed).
     def with_block_id(value):
@@ -1242,6 +1467,32 @@ def _selftest():
         check(p.returncode == 2, "CLI: an existing --out is not overwritten (exit 2)")
         with open(outp, "rb") as f:
             check(f.read() == written, "CLI: the existing --out is left untouched")
+        deep = b"[" * 200000 + b"\n"
+        for i, name in enumerate(("plan", "oracle", "obs", "gt")):
+            alt = dict(paths)
+            alt[name] = os.path.join(tmp, "deep_" + name + ".jsonl")
+            with open(alt[name], "wb") as f:
+                f.write(fx[("plan", "oracle", "obs", "gt").index(name)].split(b"\n")[0] + b"\n" + deep)
+            args_ = [sys.executable, me, "--plan", alt["plan"], "--oracle", alt["oracle"], "--obs", alt["obs"],
+                     "--gt", alt["gt"], "--out", os.path.join(tmp, "deep%d.json" % i)]
+            p = subprocess.run(args_, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            check(p.returncode == 2 and b"Traceback" not in p.stdout
+                  and not os.path.exists(os.path.join(tmp, "deep%d.json" % i)),
+                  "CLI: a deeply nested JSON line in the %s file exits 2 without a traceback" % name)
+        def boom(*_a, **_k):
+            raise ValueError("zzsecretvalue")
+        real_evaluate = globals()["evaluate"]
+        globals()["evaluate"] = boom
+        errbuf = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(errbuf):
+                rc_boom = main(["--plan", paths["plan"], "--oracle", paths["oracle"], "--obs", paths["obs"],
+                                "--gt", paths["gt"], "--out", os.path.join(tmp, "boom.json")])
+        finally:
+            globals()["evaluate"] = real_evaluate
+        check(rc_boom == 2 and "ValueError" in errbuf.getvalue() and "zzsecretvalue" not in errbuf.getvalue()
+              and not os.path.exists(os.path.join(tmp, "boom.json")),
+              "CLI: any other unexpected error exits 2 and prints only its type name")
         with open(paths["plan"], "ab") as f:
             f.write(b'{"kind":"block","block_id":1}\n')
         p = subprocess.run(base[:-1] + [outp + "2"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -1302,6 +1553,12 @@ def main(argv=None):
         body = render(evaluate(data[0], data[1], data[2], data[3], args.pre_ms, args.tail_ms))
     except InputError as e:
         print("delivery: %s" % e, file=sys.stderr)
+        return 2
+    except RecursionError:
+        print("delivery: the input is nested too deeply (RecursionError)", file=sys.stderr)
+        return 2
+    except Exception as e:
+        print("delivery: unexpected error (%s)" % e.__class__.__name__, file=sys.stderr)
         return 2
     try:
         with open(args.out, "xb") as f:

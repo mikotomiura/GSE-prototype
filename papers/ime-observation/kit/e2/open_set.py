@@ -558,8 +558,10 @@ def load_trials(obs_paths, plan_paths, recipes, phrase_ids=None, markers_in_obs=
         obs = _read_obs(obs_path)
         cats = [r.get("category") for r in obs[1:] if isinstance(r, dict) and r.get("type") == "key" and r.get("press") is True]
         plan = _read_plan(plan_path)
+        # the os the observation's own header declares (validated above), so that the check against the plan's os can fail
+        obs_os = obs[0].get("os") if obs and isinstance(obs[0], dict) else None
         try:
-            scored, alignment = closed_set.align_plan(cats, plan, plan[0]["os"], markers_in_obs, ime_toggle_in_obs,
+            scored, alignment = closed_set.align_plan(cats, plan, obs_os, markers_in_obs, ime_toggle_in_obs,
                                                       tag="s%d-" % idx)
         except ValueError as e:
             raise InputError("the observation does not line up with the plan: %s" % e)
@@ -1040,6 +1042,20 @@ def selftest():
         check("alignment: an intact observation scores every trial outside the kana layout and loses no block",
               al_ok["n_blocks"] == len(layout) and al_ok["n_blocks_unscored"] == 0 and al_ok["n_presses_unassigned"] == 0
               and al_ok["n_trials_unscored"] == 0 and len(ids_ok) > 0 and k_ok > 0)
+
+        # the observation's header os must agree with the plan's os (the same refusal the closed set gives)
+        os_other = "windows" if rows[0]["os"] != "windows" else "macos"
+        obs_os_path = os.path.join(tmp, "obs_other_os.jsonl")
+        with open(obs_os_path, "wb") as fh:
+            fh.write(("\n".join([mk_header.replace('"os":"%s"' % rows[0]["os"], '"os":"%s"' % os_other)]
+                                + [generate_plan.dumps({"type": "key", "t": i + 1, "category": c, "press": True})
+                                   for i, c in enumerate(mk_cats)]) + "\n").encode("utf-8"))
+        try:
+            load_trials([obs_os_path], [plan_path], recipes, None, markers_in_obs=True)
+            check("an observation header with another os than the plan is refused", False, "no exception")
+        except InputError as e:
+            check("an observation header with another os than the plan is refused",
+                  "does not match the plan's os" in str(e) and os_other in str(e), repr(str(e)))
 
         def lost_ids(i):
             return set(layout[i][2])
