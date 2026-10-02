@@ -1,0 +1,2 @@
+# 抄録段の問いを聞いたセッション（ta_from_session.py が読む・判断 3）
+08bafb9f-337b-47a6-8e1f-a7d1d38edae5
