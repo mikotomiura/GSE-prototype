@@ -20,15 +20,11 @@
   "manual_approval_threshold_lines": 2000,
   "_comment_diag_2026_09_25": "⚠️ 2026-09-25: モデルを gpt-5.5（Legacy）→ gpt-6-astra / gpt-6-sol へ切り替えた際（chore(codex) d3b6da2）、gpt-6-astra がこのアカウントで応答するかを wrapper を経由せず codex exec 直接呼び出しで 1 回確認した（scratchpad・プロンプト「Reply with exactly: OK」・effort low）。★ 実測 5747 tokens。→ 本記帳で +5747 / invocations +1 を自己申告として加算した（★ 2026-09-12 の診断コールと同じ作法）。直後の /cross-review 3 回（P1 前タスク・パス限定）は wrapper 経由で自動計上済み（0 → 146699）。",
   "_comment_merge_2026_09_29": "2026-09-29: docs/p321-paper-submission-prep に origin/main を merge した際、today が衝突した（両側とも同じ日付を共通の起点 109931 / 2 回から別々に記帳）。_comment_merge_2026_09_11 の規則どおり和を採った: 起点 109931 / 2 ＋ 本ブランチ +96583 / +4（2 本目の論文の /cross-review 2 巡・原稿と文書を別の呼び出しで 4 回） ＋ origin/main +165944 / +4（AI 疲労文献 DB の Codex・コミット 1a28e350 / 521986c5 / d5182aa3 / 71bfd1de の系列） = 372458 / 10 回。⚠️ PR #257（O1 管理シート）の Codex 1 巡目 +81661 / +1 回（G-GEAR で 2026-09-29 に実行・控え C:/wt/pr257-codex-r1/README.md）はこの和に入っていない: 研究者の指示で記帳を Mac 側に渡したが、PR #257 の merge（7ae41eba）には記帳されていない。Mac 側で記帳しない場合は、どちらか一方のブランチで 1 回だけ加算すること（二重に足さない）。",
+  "_comment_merge_2026_10_02": "2026-10-02: feature/o1-task-kind-other に origin/main を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり和を採った: 起点 108230 / 2 回 ＋ 本ブランチ +30373 / +1（ADR-037 の /cross-review） ＋ origin/main +263512 / +6（AI 疲労 文献 DB の Codex） = 402115 / 9 回。",
   "today": {
     "date": "2026-10-02",
-<<<<<<< HEAD
-    "tokens_used": 138603,
-    "invocations": 3
-=======
-    "tokens_used": 371742,
-    "invocations": 8
->>>>>>> origin/main
+    "tokens_used": 402115,
+    "invocations": 9
   },
   "history": [
     {
