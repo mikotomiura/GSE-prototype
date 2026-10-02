@@ -6,9 +6,10 @@
 ## §0 打ち込む用（★ `/clear` してから。モデルは Opus）
 
 ```
-.steering/_handoff/next-session-ai-fatigue-after-34.md を読んで、AI 疲労 文献 DB の 34 件の後のタスクを始めてください。まず /start-task。前のタスクは .steering/20261001-ai-fatigue-34-screening/（decisions.md 判断 1〜12・novelty-check.md・measurement-issues.md を先に読む）。最初に、測定論の論文（C）に進むかを AskUserQuestion で聞く（推奨と理由を添える・材料は novelty-check.md §5）。次に、研究者への提案のドキュメントの中身と、D（追加候補の絞り込み）の範囲を決める。
+.steering/_handoff/next-session-ai-fatigue-after-34.md を読んで、AI 疲労 文献 DB の 34 件の後のタスクを始めてください。worktree C:\wt\ai-fatigue-judge-file のブランチ docs/ai-fatigue-after-34（作成済み・PR #288 の head 5107b009 の上に積んだ）で作業する。まず /start-task（grill）。§1.5 の「grill で決める論点」を AskUserQuestion で推奨と理由を添えて聞く。前のタスクは .steering/20261001-ai-fatigue-34-screening/（decisions.md 判断 1〜13・novelty-check.md・measurement-issues.md を先に読む）と、構想の一次 .steering/20261001-ai-fatigue-protocol-cont/decisions.md 判断 8。
 
-⚠️ git add -A / git add <dir> は使わない。作業ツリーに別ブランチの未コミット作業がある（C:\GSE-prototype は feature/ime-m3-prereg）。新しいブランチは worktree で切る。
+⚠️ Codex（/cross-review の Codex 系統）は最後にまとめて回す（2026-10-02 のユーザーの指示）。PR #288 の Codex 2 巡もそこで一緒に回し、#288 の merge はその後。それまで PR #288 は open のまま（CI は 2026-10-02 02 時台に走った）。
+⚠️ git add -A / git add <dir> は使わない。C:\GSE-prototype は別のトラック（feature/ime-m3-prereg）の作業ツリー。
 ⚠️ 研究者の元のファイル（09-18・48ba8b90…）は変えない。判定者 1 の写し（Downloads\AI_fatigue_database_2026-09-18_judge1.xlsx・SHA は archive/copy-sha256.txt）は前のタスクの scripts/write_workbook.py だけで書く。
 ⚠️ 外部に出る操作（研究者・著者への送信・フォーム・OSF）はしない。学術 API にメールアドレスを送らない。本文・PDF・抄録の全文はコミットしない（本文は git の外の C:\Users\johnd\Downloads\ai-fatigue-fulltext\）。有料の本文は使わない。
 ⚠️ 抄録だけの件・ボット検査で止まった件は、問いを組む前に Chrome で無料の版（機関リポジトリ・OA・出版社の無料の補足資料）を開き直す（記憶 feedback_captcha_user_passes・2026-10-02 に再指摘）。Chrome の前に browser-verification Skill、サブエージェントの前に subagent-delegation Skill を読む。
@@ -24,9 +25,22 @@
 | 新規性の確認（B） | 「AI 疲労の尺度は未検証・作るべき」「概念の境界」は既存（AF014・Nobles）。本文を読めた 6 本に無いもの = 研究を AI への帰属の段階で分けた表・言い換え尺度・依存症型尺度・標本の独立・報告の不整合・自動化の人間工学との橋渡し（数えた語と読んだ行の範囲・AF015 は未確認・系統的な探索の前の暫定） | `novelty-check.md` §5 |
 | 確認の結果 | 確認事項 12・次の確認・作業 34・ユーザーのメモ 8（一次で確認 15・一部確認 26・入手不可 9・研究者の確認待ち 3・未着手 1） | `data/checks-rows.json`・判断 11 |
 
+## §1.5 前のセッションの最後（2026-10-02 02 時台）にしたこと・決まっていないこと
+
+- PR #288（`docs/ai-fatigue-34-screening`・34 件のタスク）は open。Codex は提供元の利用上限で回らず（判断 13）、その後ユーザーが「**Codex は最後にまとめて**。先にタスクを進めたい」と指示した。→ 次のタスクの完了時に、#288 の分（`9f5796d5..5107b009`）と新しいタスクの分の Codex 2 巡をまとめて回し、#288 → 新しいタスクの PR の順に merge する。
+- 新しいブランチ `docs/ai-fatigue-after-34` を worktree `C:\wt\ai-fatigue-judge-file` で切った（5107b009 の上・コミットはこの引き継ぎの更新だけ）。`.steering/` のタスクのディレクトリはまだ作っていない。
+- `/start-task` を起動し、構想の一次（protocol-cont 判断 8）を読んだところでコンテキスト 64% のため区切った。**grill の問いはまだ 1 つも出していない。**
+- **grill で決める論点**（推奨と理由を添えて聞く・記憶 feedback_ask_with_recommendation）:
+  1. タスク名（案 `ai-fatigue-after-34`・決めるのはユーザー）。
+  2. **C（測定論の論文）に進むか**。材料は novelty-check.md §5。推奨の案: 「D の中の既存レビューを先に当たってから C を決める」（novelty-check の前提 (a)・既存レビュー 7 本のうち読めたのは 6 本・系統的に探していない）。ほかの選択肢: C に進む（外枠と attack-me まで）／C に進まない／研究者に提案のドキュメントで聞いてから。
+  3. **D の範囲**（このタスクで 220 件をどこまで）。判断 8 の決定: 研究者の DB の『項目定義・採択基準』に揃えて先に文で固定し、落とした候補も理由つきで付録に全部載せ、最後に残すものはユーザーが決める。AI の見立てで黙って落とさない（記憶 feedback_no_ai_filtering_of_judge_candidates）。決めること: 全件を判定者 1 が 2 段で判定するか／題名・抄録の段だけか／既存レビューだけ先か。
+  4. **提案のドキュメントの形と置き場**（判断 8 は「ドキュメント」までしか決めていない）。研究者に渡すもの。中身の候補: 34 件の写しの渡し方（判定者 2 に渡さない）・研究者の決定待ちの一覧・Claude の関与の開示・ユーザーのメモの issue と答え・追加候補の絞り込みの表と付録・新規性の確認と論文のアイディア（C の外枠）・登録型にするならの選択肢（N-05）・元の『はじめに』の数式の注記。ユーザーの要望（判断 8 の (a)〜(d)）も入れる。
+  5. /reimagine を使うか（前のタスクは使わなかった）。
+- 判断 8 の N-05（英語の登録版に進まない）は、34 件のタスクの判断 1 でユーザーが明示で決めた（再確認は不要）。
+
 ## §2 次にやること（順）
 
-0. ⚠️★ **PR #288（`docs/ai-fatigue-34-screening`）がまだ merge されていなければ、これが先**（判断 13）。Codex は 2026-10-02 02:04 に提供元の利用上限で回らず、ユーザーの決定で「PR まで・merge は Codex 2 巡の後」。worktree `C:\wt\ai-fatigue-judge-file` で:
+0. ⚠️★ **PR #288（`docs/ai-fatigue-34-screening`）の Codex 2 巡と merge は、このタスクの完了時にまとめて行う**（ユーザーの指示・2026-10-02）。手順の控え（判断 13）。worktree `C:\wt\ai-fatigue-judge-file` で:
    - 1 巡目（道具）: `bash scripts/run-codex-review.sh 9f5796d5..<HEAD> -- <scripts 7 本・requirement.md・design.md>`（出力は scratchpad）。2 回目（記録）: `decisions.md・novelty-check.md・tasklist.md・measurement-issues.md・requirement.md・_handoff の 2 ファイル`。⚠️ `.xlsx`・`wave1/`・`screening-log.jsonl`・`data/*.json` は渡さない。
    - 2 巡目: 1 巡目の直しで足した規則の境界条件だけ（パスを絞る）。Claude 側の 2 巡は判断 12・13 で済んでいる。
    - 「codex exec error」なら、最小のプロンプトで `codex exec --json` を 1 回試して JSON の `error` を読む（ラッパーは標準エラーを捨てる）。上限なら止まって聞く。
