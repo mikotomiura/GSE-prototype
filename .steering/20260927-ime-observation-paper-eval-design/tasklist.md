@@ -176,7 +176,9 @@
       → 2026-10-02（G-GEAR）: 判定 minor revision（R1・R2・R3 とも minor・fatal 0・major 0・捏造 0・注入 0・有効な査読 3 / 3）。研究者の採否は判断 125（Y1 焦点の規則をコードで閉じる・Y2 計画の SHA-256 を解析で照合・Y3 感度は §7 に開示・直す一覧を全部承認・round 6 なし）
     - [x] round 5 の直し: Y1〔コード: `delivery.py`・`pipeline.py`〕・Y2〔コード: `pipeline.py`〕・Y3（§7）・minor 7 件（1 content-free を中止した run にも〔コード〕・5 78% を `plan_figures` に〔コード〕）・nit 14 件 → 確認（`kit/check.sh`・`run.sh --synthetic` 2 回でバイト一致・`_style_check.py`・`check_citations.py`・`--check-prereg` exit 3・節の参照・語数・定数と文の目視の照合）
       → 2026-10-02: 判断 126。29 本緑・バイト一致・exit 3・違反 0・違反なし・節の参照・本文 15,265 語・変異はすべて赤
-    - [ ] 完了時レビュー（code-reviewer ∥ security-checker ∥ Codex 2 巡・`git merge-base origin/main HEAD`..HEAD）→ PR → CI 緑なら merge → main の CI
+    - [x] 完了時レビュー（code-reviewer ∥ security-checker は `965486554..f02cb49a` の公開物 24 ファイル・Codex は研究者の選択で直近の `kit/` に絞って 2 巡）
+      → code-reviewer MEDIUM 1・LOW 6、security MEDIUM 1・LOW 4・範囲外 1、Codex 1 巡目 P1 1・P2 2（すべて真）→ 研究者に 4 問 → 判断 127（起動の前と止めた後も喪失・数える終わりの延長・計画をセルと対応・残り 12 件）・実装は判断 128。Codex 2 巡目 P1 1・P2 2 → 判断 129（文を揃える・FORMAT とテストは足さない）。29 本緑・バイト一致・exit 3・違反 0・違反なし・節の参照・本文 15,469 語
+    - [ ] PR → CI 緑なら merge → main の CI
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task

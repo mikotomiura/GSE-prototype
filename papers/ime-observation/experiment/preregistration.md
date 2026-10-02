@@ -479,8 +479,9 @@ The rule on presses counts the key-downs that remain beyond the presses that rea
 and a press from outside cancel out: a marker press that does not reach the reference against a press from outside
 anywhere in the same segment, and a press of a trial that does not reach it against a press from outside in the
 interval of the same trial. Such a replacement is not detected (section 7). Outside the widened spans of the losses
-of focus, rows of the observation without a sent press are a result of the observer under test (section 6.3) and
-never make a run count as aborted. Aborted runs are reported with their reason and their delivery figures, and are
+of focus and the stretches counted after them, rows of the observation without a sent press are a result of the
+observer under test (section 6.3) and never make a run count as aborted; inside them, the rule counts such a row
+whatever its cause (section 7). Aborted runs are reported with their reason and their delivery figures, and are
 not analysed. A cell that is not completed in three attempts is reported as not measured. The same rules apply to each
 condition of question 5: a condition that is aborted or insufficient (section 6.10) is run again on another night, up
 to three attempts in all, and every attempt is reported.
@@ -678,14 +679,14 @@ the trials in which the input method behaved as planned.
 The delivery of the presses is reported descriptively, per cell and speed (`kit/analysis/delivery.py`): the delay of
 each press against the plan's schedule; for the observation's key rows and for the reference log's key-downs, the
 fraction of sent presses that arrived and the number of rows without a sent press (inside trials, and outside them,
-where the block markers and the runner's kana presses fall), and per segment of a block the rows that the sent
-presses do not explain (section 3.4); and, in the trials where every press arrived, the delay of each row after its
-press and the error of each interval between consecutive rows. Input-mode keys, which the observer does not record
-by design, are reported with and without. Whether rows without a sent press make a run count as aborted is
-decided by the rules of section 3.4 alone (rows of the reference, and rows of the observation within a loss of
-focus); the other rows of the observation without a sent press are a result of the observer and stay in the
-analysis. These figures concern events generated in software; no claim is made about the path from a
-physical keyboard (section 7).
+where the block markers and the runner's kana presses fall), and per segment of a block the rows that the sent presses
+do not explain (section 3.4); and, in the trials where every press arrived, the delay of each row after its press and
+the error of each interval between consecutive rows. Input-mode keys, which the observer does not record by design, are
+reported with and without. Whether rows without a sent press make a run count as aborted is decided by the rules of
+section 3.4 alone (rows of the reference, and rows of the observation within a loss of focus or the stretch counted
+after it); the other rows of the observation without a sent press are a result of the observer and stay in the
+analysis. These figures concern events generated in software; no claim is made about the path from a physical keyboard
+(section 7).
 
 ### 6.4 Scopes and comparisons
 

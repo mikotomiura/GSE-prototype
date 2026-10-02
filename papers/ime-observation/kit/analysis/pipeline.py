@@ -118,8 +118,8 @@ type into another application a person must take the focus from the reference, a
 keys it observes in every application, but the executor goes on sending keys during a loss, so only the rows
 beyond the keys sent refuse the run. The count has blind spots (a key whose row the observation misses can take
 one press of a person, a row stamped far from its key stays unmatched, a duplicated row counts); they are
-listed in the docstring of delivery.py. Outside a loss of focus, extra rows of the observation log never refuse
-a run. The message names the cell and the block, never a value of a log. The rule and its constants are
+listed in the docstring of delivery.py. Outside a loss of focus (widened, with the stretch counted after it), extra rows of
+the observation log never refuse a run. The message names the cell and the block, never a value of a log. The rule and its constants are
 recorded in e1_delivery.json ("abort_rule").
 
 Outputs (RESULTS_DIR): e1_l1.json, e1_l2.json, e1_detection.json and e1_delivery.json (the per-press delivery

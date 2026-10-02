@@ -184,8 +184,9 @@ key-down it receives.
   so the rule on the plan's SHA-256 does not apply to them.
 - `kit/analysis/pipeline.py --check-deposit` passes on the run directory. It applies the same rules and also checks
   the files for paths and names and the logs, also those of an aborted run, for the content-free form.
-- Outside a loss of focus of the reference, rows of the observation without a sent press do not stop a run from
-  being deposited; they are a result of the observer under test, as in the measurement.
+- Outside the losses of focus of the reference and the stretches that section 3.4 of the pre-registration counts with
+  them, rows of the observation without a sent press do not stop a run from being deposited; they are a result of the
+  observer under test, as in the measurement.
 
 The observation logs were sealed (`kit/pilot/seal_obs.py`) and only their key rows were read. Their sealed session
 rows are unsealed after the freeze and the measurement only to be deposited; they are not analysed (section 3.1 of
