@@ -1,14 +1,14 @@
-# 次セッション（別の Windows 実機）— IME 論文: M5 Windows の較正パイロット
+# 次セッション（G-GEAR）— IME 論文: M5 Windows の較正パイロット
 
-> 作成: 2026-10-03（G-GEAR・OSF の登録を記録したセッションの最後に）。研究者の選択で、M5 は G-GEAR ではなく**別の Windows 実機**で行う（判断 133）。
-> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（**判断 68・133**、Mac の前例は `pilot-macos-1-notes.md`）・`_issue-plan.md` §5（M5・M6）・`design.md` §1.1・§1.1a・§1.1b と、`papers/ime-observation/kit/pilot/README.md`・`kit/refinput-windows/README.md`・`kit/run/README.md`、凍結した事前登録 `papers/ime-observation/experiment/preregistration.md` の **§8**（追補が変えてよい範囲）。状態は着手時に `git fetch` で測り直す。
+> 作成: 2026-10-03（G-GEAR・OSF の登録を記録したセッションの最後に）。★ **研究者の選択で M5 は G-GEAR で行う**（判断 134）。別の Windows 実機で行うのは**数時間以上の run だけ**（M7 の本計測のセル・Windows の E3 の 8 時間の 2 条件）。⚠️ 判断 133（M5 を別の実機で）は判断 134 で改めた。
+> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（**判断 68・133・134**、Mac の前例は `pilot-macos-1-notes.md`）・`_issue-plan.md` §5（M5・M6）・`design.md` §1.1・§1.1a・§1.1b と、`papers/ime-observation/kit/pilot/README.md`・`kit/refinput-windows/README.md`・`kit/run/README.md`、凍結した事前登録 `papers/ime-observation/experiment/preregistration.md` の **§8**（追補が変えてよい範囲）。状態は着手時に `git fetch` で測り直す。
 
 ## §0 打ち込む用
 
 ```
 git fetch → origin/main から作業ブランチを切る（例: feature/ime-m5-windows-pilot）。
 .steering/_handoff/next-session-ime-paper-m5-windows.md を読んで §2 から始めてください。
-一次は decisions.md の判断 68・133、design.md §1.1a、kit/pilot/README.md、kit/refinput-windows/README.md、kit/run/README.md、事前登録 §8。
+一次は decisions.md の判断 68・133・134、design.md §1.1a、kit/pilot/README.md、kit/refinput-windows/README.md、kit/run/README.md、事前登録 §8。
 ⚠️ 凍結のタグ ime-observation-prereg-macos のコードは変えない。追補（M6）が変えてよいのは §8 に列挙した Windows の部分と、Windows だけが使う新しいファイルだけ。
 ⚠️ パイロットは ImeShadow を読まない（obs は seal_obs.py で封印してからキーの行だけで集計する）。生ログはコミットしない。
 ⚠️ 合成キーを送る run の前に、研究者が PC から離れていることを確かめる（§1 の未決 1）。
@@ -19,22 +19,22 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 ## §1 状態（2026-10-03 の終わり）
 
 - **macOS の事前登録は凍結済み・OSF で公開済み**: `https://osf.io/9nh7r`（DOI `10.17605/OSF.IO/9NH7R`・`date_registered` 2026-10-02・添えたファイルの SHA-256 は凍結したファイル `fa6fd586…7773` と一致・`notes.md` に記録・PR #298）。Mac の M4（本計測）は別の流れで、Mac の引き継ぎ `next-session-ime-paper-osf-m4.md` の §2 の 3 から。
-- **M5 はまだ何もしていない**: G-GEAR では書き出し・ビルド・run のどれも行っていない（判断 133）。
+- **M5 はまだ何もしていない**: G-GEAR では書き出し・ビルド・run のどれも行っていない（判断 133・134）。
 - `papers/ime-observation/` の kit は凍結のタグから変わっていない（タグと main の差は `experiment/notes.md` の追記だけ・2026-10-03 に `git diff --stat` で確かめた）。
-- **研究者の選択（判断 133）**:
+- **研究者の選択（判断 133 の答えを判断 134 が引き継ぐ）**:
   - IME の学習は**リセットしない**（Mac と同じ。MS-IME の入力履歴の消去は設定画面の操作でコマンドが無い）。セルのファイルの `ime_settings.learning` にそう書き、`reset_cmd` は空。
   - 電源の設定は**メインが一時的に切って戻す**: `powercfg` で AC のスリープと画面オフを 0 にする。**元の値を先に記録し**、run の後に戻して読み戻しで確かめる。スクリーンセーバーとロック（`HKCU:\Control Panel\Desktop` の `ScreenSaveActive` など）も読み、要れば同様に。
 - **未決**:
   1. **実行の時間**（研究者に聞く前に中断した）: 選択肢は「離席中に自動（推奨・手順書の Windows の部分だけを直して走らせ直すところまで任せる・凍結済みのコードに欠陥が見つかれば止めて報告）」／「その場で 1 本ずつ」／「準備だけ」。→ このセッションの最初に AskUserQuestion で聞く（推奨と理由を添える）。
-  2. **M6・M7 をどの機械で行うか**（M6 の前に研究者が決める）。推奨は M7 を M5 と同じ機械にすること（パイロットは機械と IME の版で挙動を較正するため）。決まったら `_issue-plan.md` の M5〜M7 の「どこで」を直す。
-- 参考: G-GEAR の MS-IME は `{03B5835F-F03C-411B-9CE2-AA23E1171E36}`（Microsoft IME・日本語）だけで、Google 日本語入力は入っていなかった。この実機の入力方式も `Get-WinUserLanguageList` で確かめて記録する。
+  2. ⚠️ **較正する機械（G-GEAR）と計測する機械（別の実機）が違う**（判断 134・M6 の前に研究者が決める）。パイロットは MS-IME の呼び出し列をその機械と版で較正する。推奨: 追補に計測する機械の OS と MS-IME の版を書き、M7 の前に計測する機械で短い確認の run（Mac の `verify-1` の形・全シナリオ × 3 速さ × 1）を回して、呼び出し列の型がパイロットと同じことを確かめる。→ M5 の記録に G-GEAR の OS と MS-IME の版を必ず残す（比べる相手になる）。
+- 参考（2026-10-03 に G-GEAR で読んだ値）: Windows 11 `26H2`・build `26300`。入力方式は `{03B5835F-F03C-411B-9CE2-AA23E1171E36}`（Microsoft IME・日本語）だけで、Google 日本語入力は入っていない。MS-IME の版とキーボードの配列はまだ読んでいない。Python は 3.11.9（判断 52）—— 着手時に測り直す。
 
 ## §2 やること
 
 1. **機械の前提を確かめて記録する**（`tasklist.md` の M5 の下に。公開用の版は M6 で `experiment/env.md` の Windows の節にする想定）:
    - git・git-bash（hook は bash 前提）・Python 3（版を記録）・Rust（`cargo` と MSVC のビルド道具）・`gh` の認証。
    - Windows の版（`DisplayVersion`・`CurrentBuild`）・MS-IME の版・キーボード（JIS か）・入力方式（ローマ字入力）・予測入力の設定（既定のまま変えない）。
-   - その機械が CI の self-hosted runner なら、run と CI が重ならないようにする（負荷で送出の時刻が遅れる・`emit/README.md` の `--selftest --full` の注意）。
+   - ⚠️ **G-GEAR は Windows の CI の self-hosted runner**（memory）。run と CI の job が重ならないようにする（負荷で送出の時刻が遅れる・`emit/README.md` の `--selftest --full` の注意）→ run の間は push しない。
 2. **書き出しとビルド（判断 68: パイロットのロガーは書き出しからビルドする）**:
    - タグのクリーンな worktree: `git worktree add --detach <dir> ime-observation-prereg-macos`。
    - その `papers/ime-observation` で `python kit/export/export.internal.py --out <out> --allow-missing-license`。
