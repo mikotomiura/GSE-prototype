@@ -1144,3 +1144,15 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - ⚠️ **未決（M6 の前に研究者が決める）—— 較正した機械と計測する機械が違う**: パイロットは MS-IME の呼び出し列を**その機械と IME の版で**較正する。M5（G-GEAR）と M7（別の実機）で OS や MS-IME の版が違うと、パイロットで決めた正解の定義や手順書が計測する機械で同じに動く保証が無い。→ 推奨: (1) 追補に計測する機械の OS と MS-IME の版を書く、(2) M7 の前に計測する機械で**短い確認の run**（Mac の `verify-1` と同じ形・全シナリオ × 3 速さ × 1 で数分〜10 分程度）を回し、呼び出し列の型がパイロットと同じことを確かめる（違えば追補の凍結の前に戻る）。この確認は短い run だが計測する機械でしか意味が無いので、「短い run は G-GEAR」の例外になる。
 - ⚠️ G-GEAR は Windows の CI の self-hosted runner（memory）。パイロットの run の間に CI の job が走ると負荷で送出の時刻が遅れる（`emit/README.md`）→ run の間は push しない（または runner を止める・止めると hosted へ回る）。
 - **影響範囲**: `_issue-plan.md` の M7・M10 の「どこで」・引き継ぎ `next-session-ime-paper-m5-windows.md`（G-GEAR 用に書き直す）・`tasklist.md` の M5 の行。
+
+## 判断 135: 引き継ぎを開いた機械は G-GEAR ではなく、判断 134 の「別の Windows 実機」（Surface Pro 8）だった —— M5 は G-GEAR に残し、ここでは機械の前提だけを記録する（2026-10-03・Surface・研究者の選択）
+
+- **所見**（メインが着手時に測った）: `hostname` は `TABLET-J870RJQA`、`Win32_ComputerSystem` は Microsoft Corporation・**Surface Pro 8**。引き継ぎ §1 の参考値（G-GEAR: 26H2・build 26300）と OS が違う。Rust（`cargo` / `rustup`）は入っておらず、`python` は Microsoft Store の入口だけ（`AppData/Local/Programs/Python/Python311・312・314` の中に `python.exe` は無い）。
+- **研究者に 1 問**（AskUserQuestion）: G-GEAR で行う（ここでは止める）／この Surface で行う（判断 134 を改める）／**この機械が「別の Windows 実機」** → **研究者の答え: この機械が判断 134 の「別の Windows 実機」**。→ M5 は判断 134 のとおり G-GEAR に残す。この機械では何もビルド・送出していない（ブランチを切っただけ）。
+- **計測する機械の前提**（判断 134 の未決 2 で「M5 の記録と比べる相手」になる・2026-10-03 に読んだ値）:
+  - OS: Windows 11 Home（`EditionID` Core）・`DisplayVersion` **25H2**・`CurrentBuild` **26200**・UBR 8875（⚠️ G-GEAR の 26H2 / 26300 と違う）。
+  - MS-IME: 入力方式は `0411:{03B5835F-F03C-411B-9CE2-AA23E1171E36}{A76C93D9-5523-4E90-AAFA-4DB112F9AC76}`（Microsoft IME）だけ。DLL の版は `IMJPTIP.DLL`・`IMJPAPI.DLL`・`IMJPPRED.DLL` が **10.0.26100.8875**、`IMJPCD` など辞書・変換の DLL が 10.0.26100.8737 / 8328。`HKCU\Software\Microsoft\IME\15.0\IMEJP\MSIME`: `romastyle` MS-IME・`PredictionUseInputHistory` 1・`UseCloudSuggestion` 0（既定から変えていない・読んだだけ）。ローマ字／かな入力の別はまだ読んでいない。
+  - キーボード: 配列 `00000411`（日本語）・`OverrideKeyboardIdentifier` PCAT_106KEY・`OverrideKeyboardType` 7（JIS）。
+  - 画面と電源: `ScreenSaveActive` 1（`ScreenSaveTimeOut` 空）・`ForegroundLockTimeout` 200000・電源の計画は「バランス」。⚠️ 8 時間の run の前に、判断 133 のとおり元の値を記録してから一時的に切る。
+  - 道具: git 2.55.0.windows.3・bash 5.3.15・`gh` 認証済み。**Rust と Python が無い** → M7 / M10 の前に入れる（M5 と同じ版を推奨）。
+- **影響範囲**: `tasklist.md` の M5 の行・引き継ぎ `next-session-ime-paper-m5-windows.md` §1（計測する機械の値を足す）。

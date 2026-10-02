@@ -11,7 +11,7 @@ git fetch → origin/main から作業ブランチを切る（例: feature/ime-m
 一次は decisions.md の判断 68・133・134、design.md §1.1a、kit/pilot/README.md、kit/refinput-windows/README.md、kit/run/README.md、事前登録 §8。
 ⚠️ 凍結のタグ ime-observation-prereg-macos のコードは変えない。追補（M6）が変えてよいのは §8 に列挙した Windows の部分と、Windows だけが使う新しいファイルだけ。
 ⚠️ パイロットは ImeShadow を読まない（obs は seal_obs.py で封印してからキーの行だけで集計する）。生ログはコミットしない。
-⚠️ 合成キーを送る run の前に、研究者が PC から離れていることを確かめる（§1 の未決 1）。
+⚠️ 合成キーを送る run は研究者の答えで「離席中に自動」（2026-10-03・§1 の ★）。研究者は常に離席している扱いで、始めたいときに始めてよい。
 Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data-privacy。
 応答は日本語。公開物（papers/）は学術的な英語・GSE への言及なし。コミットは git add パス指定（-A 禁止）。
 ```
@@ -24,8 +24,9 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 - **研究者の選択（判断 133 の答えを判断 134 が引き継ぐ）**:
   - IME の学習は**リセットしない**（Mac と同じ。MS-IME の入力履歴の消去は設定画面の操作でコマンドが無い）。セルのファイルの `ime_settings.learning` にそう書き、`reset_cmd` は空。
   - 電源の設定は**メインが一時的に切って戻す**: `powercfg` で AC のスリープと画面オフを 0 にする。**元の値を先に記録し**、run の後に戻して読み戻しで確かめる。スクリーンセーバーとロック（`HKCU:\Control Panel\Desktop` の `ScreenSaveActive` など）も読み、要れば同様に。
+- ★ **2026-10-03（Surface Pro 8）**: このメモを Surface で開いたが、研究者の答えで **Surface が判断 134 の「別の Windows 実機」**（判断 135）→ M5 はこのまま G-GEAR で行う。計測する機械の値（Windows 11 25H2 / build 26200・MS-IME の DLL 10.0.26100.8875・JIS・Rust と Python は未導入）は判断 135 に記録した → 比べる相手になる。★ **実行の時間は答えが出た: 離席中に自動**（研究者「常に離席しているようなもの・始めたいときに始めてよい」）→ 未決 1 は聞き直さず、run の前の確認も要らない。
 - **未決**:
-  1. **実行の時間**（研究者に聞く前に中断した）: 選択肢は「離席中に自動（推奨・手順書の Windows の部分だけを直して走らせ直すところまで任せる・凍結済みのコードに欠陥が見つかれば止めて報告）」／「その場で 1 本ずつ」／「準備だけ」。→ このセッションの最初に AskUserQuestion で聞く（推奨と理由を添える）。
+  1. ~~**実行の時間**~~ → 2026-10-03 に答え「離席中に自動」（上の ★）。以下は当時の記述: **実行の時間**（研究者に聞く前に中断した）: 選択肢は「離席中に自動（推奨・手順書の Windows の部分だけを直して走らせ直すところまで任せる・凍結済みのコードに欠陥が見つかれば止めて報告）」／「その場で 1 本ずつ」／「準備だけ」。→ このセッションの最初に AskUserQuestion で聞く（推奨と理由を添える）。
   2. ⚠️ **較正する機械（G-GEAR）と計測する機械（別の実機）が違う**（判断 134・M6 の前に研究者が決める）。パイロットは MS-IME の呼び出し列をその機械と版で較正する。推奨: 追補に計測する機械の OS と MS-IME の版を書き、M7 の前に計測する機械で短い確認の run（Mac の `verify-1` の形・全シナリオ × 3 速さ × 1）を回して、呼び出し列の型がパイロットと同じことを確かめる。→ M5 の記録に G-GEAR の OS と MS-IME の版を必ず残す（比べる相手になる）。
 - 参考（2026-10-03 に G-GEAR で読んだ値）: Windows 11 `26H2`・build `26300`。入力方式は `{03B5835F-F03C-411B-9CE2-AA23E1171E36}`（Microsoft IME・日本語）だけで、Google 日本語入力は入っていない。MS-IME の版とキーボードの配列はまだ読んでいない。Python は 3.11.9（判断 52）—— 着手時に測り直す。
 
