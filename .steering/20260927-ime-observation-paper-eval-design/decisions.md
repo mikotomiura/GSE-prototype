@@ -1164,3 +1164,12 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **入れた道具**（2026-10-03・winget）: Python **3.11.9**（user・判断 52 の G-GEAR と同じ版）・rustup 1.29.1 → `rust-toolchain.toml` の **1.98.1**（既定にも 1.98.1 を指定）・Visual Studio 2022 Build Tools（VCTools・MSVC 14.44.35207）。`git` の作者名はこの機械に無い → 研究者の答えでコミットごとに `-c` で Mikoto Miura（設定は変えていない）。
 - **電源**: 読んだ値は AC・DC とも スリープ 0・画面オフ 0・スクリーンセーバーなし（`SCRNSAVE.EXE` 空）→ **変える必要がなかった**（判断 133 の「切って戻す」は不要・値は `~/ime-pilot/power-before.txt`）。着手時はバッテリーで、研究者が AC につないだ（`BatteryStatus.PowerOnline` を読み戻し）。
 - **影響範囲**: `tasklist.md` の M5・`pilot-windows-1-notes.md`（新規）・`_issue-plan.md` の M5 の「どこで」は M5 を閉じるときに直す。
+
+## 判断 137: S4 は逸脱 D1 として Windows だけ Esc 3 回にし、S8 は数字の後に Enter を足す —— 直した手順で確認の run まで回す（2026-10-03・Surface・研究者の選択）
+
+- **問い**（`pilot-windows-1-notes.md` の所見 1・2）: S4（Space → Esc 2 回）は MS-IME で複数文節に変換した後は取り消しにならない（3 回目で取り消し）。凍結の生成器の `_scenario_checks` と事前登録 §2.3 の表が S4 を OS を問わず Esc 2 回に固定しており、§8 の追補の範囲で直せない。S8 は数字の後に Enter が要る（§8 の範囲）。
+- **研究者の答え**（AskUserQuestion）: S4 は「逸脱として Win だけ Esc 3 回（推奨）」、S8 は「直して確認の run まで回す（推奨）」。
+- **変えたもの**: `kit/gen/generate_plan.py` の `_PROFILES` に `cancel_converted` を足し（windows は Esc 3 回・macOS の 2 つは Esc 2 回で値は変わらない）、S4 の照合をそれで読む。windows の `after_digit` を `["enter"]`。2 つの手順書の `os.windows` の S4 に Esc を 1 つ、S8 に Enter を 1 つ足した（2 つの手順書の `os.windows` は selftest が一致を求める → 同じに直した）。逸脱の記録は新しい `experiment/deviations.md` の D1（英語・日付・理由・影響）。
+- ★ **macOS への影響が無いことを確かめた**: 本番の `plan_config.macos.json`・seed 11 で、タグの書き出しと直した作業ツリーから 2 つの手順書それぞれで macOS の計画を作り、記録される手順書の SHA-256 を伏せると**バイト一致**した（3,150 / 2,925 試行）。⚠️ 手順書の SHA-256 は変わるので、計画そのものはバイト一致しない（§8 のとおり macOS の計画はタグから作る）→ D1 にはこの形で書いた。
+- **selftest**: 生成器 113 件緑。`kit/check.sh` は作業ツリー（`core.autocrlf=true` で CRLF）では 3 本が赤だが、**変更を stash した状態でも同じく赤**（`.rs` を `"\n"` で照合する selftest が CRLF で外れる・変更と無関係）→ LF のクリーンな worktree で全体を確かめる。
+- **影響範囲**: M6 の追補（§8）では D1 を「逸脱」として追補の本文から参照する。正解の経路の選択・起動の手順（`run_fg.py` など）・`gt_rules` の Windows のブロックは M6 で決める。
