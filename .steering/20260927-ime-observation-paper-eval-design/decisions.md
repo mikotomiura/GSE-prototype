@@ -1177,3 +1177,54 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **影響範囲**: M6 の追補（§8）では D1 を「逸脱」として追補の本文から参照する。正解の経路の選択・起動の手順（`run_fg.py` など）・`gt_rules` の Windows のブロックは M6 で決める。
 - **完了時レビュー**（2026-10-03・`5c37c8ed..HEAD`）: `security-checker` は指摘なし（生ログ・キーコード・読みの転記なし・`papers/` に機械の情報なし・照合は緩んでいない）。`code-reviewer` は中 2・低 3 → 中 2（D1 がマーカーの欠けを S4 だけのせいにしていた・タグの差分に macOS のプロファイルの行が出ることを書いていなかった）と低 2（コメントに 1 文節の場合・3 回目の Esc の記述を "expected to" に）を直した。低 1（Windows の負の対照の selftest）は、凍結に関わる変更を広げないため見送った。
 - ⚠️ **`/cross-review` は省いた（安全ゲート: codex 不在）**: この Surface には Codex CLI が入っていない（npm のグローバルは `claude` だけ）。加えて、この機械の `python3` は Microsoft Store のスタブなので、`secrets-pre-filter.sh`・`codex-budget-guard.sh` が「hook 入力 JSON を parse できない」で fail-closed になり、「codex」の語を含む Bash 呼び出しはすべて止まる（hook は `python3` を `python` より先に選ぶ）→ この機械で Codex を使うなら、導入と、Store のエイリアスを切るか hook の側の対応が要る。
+
+## 判断 138: M6（Windows の追補）の中身 —— TSF の 1 セル・`gt_rules` は変えない・起動の道具を `kit/run/` に足す・n = 75（2026-10-03・Surface・研究者の選択）
+
+- **材料**（2026-10-03・gt と oracle と plan だけを読み、obs は読んでいない）: タグのままの `gt_rules.json` でパイロットの gt を `gt_sessions.py` に通した。計画との一致は、直した手順の確認の run で **IMM 39 / 39・TSF 39 / 39**（確定 30・取消 9）。直す前の run の不一致（short: 33 / 39・30 / 39、本体: 102 / 117・93 / 117）は、すべて S4 と S8 の持ち越しとその次の試行による。S15（前面を外れた時点の確定）と TSF の S7（→ が文節の数を超えたときのその場の確定）も、今の規則で確定として数えられる。
+- **研究者の答え**（AskUserQuestion・4 問とも推奨どおり）:
+  1. 正解の経路は **TSF の 1 セル**（`refinput_tsf`・規則の `win_tsf`）。理由: MS-IME は TSF の入力方式（TIP）で、TSF の入力欄は composition を直接受け取る（IMM の窓は互換の層を通す）。いまのアプリの多くは TSF。IMM はパイロットの比較の相手として記録に残す。
+  2. `gt_rules.json` の Windows のブロックは**変えない** → 凍結の `sha256:` は macOS と同じ値のまま、`frozen_at:` だけが追補の日付になる。根拠はパイロットの一致率として追補に書く。
+  3. `focus_front.py`・`away_window.py`・`run_fg.py` を **Windows のセルだけが使う新しいファイルとして `kit/run/` に足す**（§8 の範囲・凍結の既存コードは変えない・selftest を付ける）。
+  4. 試行数は **macOS と同じ 75**（13 シナリオ × 3 速さ × 75 = 2,925 試行・Surface の実測で約 11.5 時間）。
+- **影響範囲**: `experiment/plan_config.windows.json`（新規）・`kit/run/` の 3 ファイル（新規）・Windows のセルのファイル（新規）・`preregistration.md` の追補の節と凍結の印・`experiment/pilot-windows.md`（M5 を閉じる）・`experiment/notes.md`（OSF の登録・M6 の最後に研究者が行う）。
+
+## 判断 139: 凍結の解析コードは Windows の run を拒み、Windows の主要な範囲も作れない —— 逸脱 D2（計画の照合を広げる）と D3（Windows の範囲を正解の長さで定める）（2026-10-03・Surface・研究者の選択）
+
+- **見つけたこと**（impact-analyzer の調査をメインが一次で確かめた）:
+  1. `kit/analysis/pipeline.py:253` の `REGISTERED_PLAN_SHA256` と `:873` の `_plan_matches_cell` は、セルの `ime_settings.live_conversion` が "on" / "off" で、計画の SHA-256 が macOS の 2 つの計画と一致する run だけを解析する → Windows の run は必ず拒まれる。§8 の追補の範囲では直せない。
+  2. `pipeline.py:787` は `plan["os"] == "macos"` のときだけ予測（`spec_predict`）を作り、無ければ範囲は `all_trials` だけ（`_prediction_summary` の理由は「the prediction models the macOS observer only」）。→ Windows では問い 1〜3 の主要な範囲 `under_limit` が無い。Windows のロガーは IME の WinEvent で観測するので（`driver_windows/ime_winevent.rs`）、キーからの予測はそもそも当てはまらない。20 秒の打ち切りは OS 共通（`kit/logger/src/input/ime_cloak.rs:167` `MAX_SESSION_MS: u64 = 20_000`）。
+  3. TSF の参照入力欄は IME が消費したキーを受け取らない（`delivery.py` で参照への到達 6 / 1,470・パイロット本体 16 / 3,900）→ 中断の理由 3（外からの押下）は 0 で通るが、人の打鍵を見つける力は弱い（理由 4 は観測ログで働く）。IMM の参照なら各ブロックの前の `VK_IME_ON` がキーの行を 1 つ残し、凍結の k = 0 で毎回中断扱いになっていた（`verify-imm` の区間 0 に 1 行）→ TSF を選んだこと（判断 138）と整合。追補の限界に書く。
+- **研究者の答え**（AskUserQuestion・2 問とも推奨どおり）: (1) **逸脱 D2**: `pipeline.py` の計画の照合に Windows のセルの計画を足す（セルの os が windows なら Windows の計画と照らす・macOS の照合は不変）。(2) **逸脱 D3**: Windows だけ、正解のセッションが 20 秒以上続いた試行を「長い」として `under_limit` / `over_limit` を作る（§4.3 の印を使う）。
+- **進め方**: macOS の解析は macOS のタグから走る（§8）ので、D2・D3 は macOS の結果を変えない。それでも変更後のコードで macOS の入力の結果が変わらないことを selftest と合成データで確かめる。D2・D3 は `experiment/deviations.md` に記録し、追補の節から参照する。
+- **実装と確かめたこと**（2026-10-03・判断 139 の続き）: D2 は `REGISTERED_PLAN_SHA256_WINDOWS`（Windows の計測の計画 `b7bdf8fc…36b0`）を足し、セルの os が windows なら照らす。D3 は新しい `kit/analysis/gt_scope.py`（正解のセッションが `limit_ms` 以上の試行を「長い」とし、予測と同じ形式で `match.py` に渡す）。Windows のセルを解析したときだけ `note_windows`・`registered_plan_sha256_windows`・`long_trials_from` を結果に記録する。selftest に Windows の合成 run の場合を足し、D2 の前の照合・D3 を外した状態の 2 つの対照で赤になることを確かめた。**macOS の合成 run の結果 4 ファイルは、タグのコードと変更後のコード（LF の worktree）でバイト一致**。LF の worktree で `kit/check.sh` 33 本緑。
+- **計測の計画**: `plan_config.windows.json`（n = 75・macOS と同じ値）・`recipes.json`・seed 20260929 → 2,925 試行・117 ブロック・SHA-256 `b7bdf8fc…36b0`。Python 3.11.9 と 3.13.15（`uv`）でバイト一致。⚠️ この機械は `core.autocrlf=true` → 作業コピーから作ると設定ファイルの SHA-256 が変わり計画も変わる → 書き出し（LF）から作る（`README.windows.md` に書いた）。
+- **D3 の見積もり**: 計画の打鍵の時刻の幅が 20 秒以上の試行 = 617 / 2,925（slow 401・mid 123・fast 93）。直した手順の確認の run 2 本では、この見積もりと正解の「長い試行」が 10 / 10 で一致。S13 は全試行が長い。S13 以外の層の最小は S6 slow の 30。
+- **パイロットの診断**（§3.1 に相当・追補 §10.9）: E2 の割り当て（攻撃なし・`--markers-in-obs`）は 7 本・27 ブロック・429 試行すべてを採点し、割り当てられない押下 0。`delivery.py`（登録の形）は TSF の run を捕まえない（k = 0・計画外のフォーカス喪失 0）。IMM の run は k = 1・モードのキーを数える版で捕まえない。
+- **書いたもの**: `experiment/deviations.md` の D2・D3、`experiment/pilot-windows.md`（公開・英語）、`kit/run/README.windows.md`、`preregistration.md` の §10（Windows の追補）。文体の検査は違反 0。⚠️ 凍結の印はまだ替えていない。
+
+## 判断 140: Windows の追補は、凍結の前に attack-me を 1 回回す（2026-10-03・Surface・研究者の選択）
+
+- **問い**: §10・D1〜D3・`pilot-windows.md` を書き終えた。macOS の登録は凍結の前に attack-me を 5 回回した。追補をどうするか。
+- **研究者の答え**（AskUserQuestion）: 「attack-me を 1 回回してから凍結（推奨）」。理由（メインの推奨）: D2・D3 は解析のコードに触れるので、第三者の目で攻める価値が高い。
+- **やり方**: `attack-me/prereg-ime-windows/round-1/`。macOS と同じ立場・同じ接地の文献（研究者の指示）。macOS の `tmp\` は G-GEAR にあるので、この機械で取り直した（8 本のうち 7 本は round 1 の原本と SHA-256 が一致・Koo の HTML は動的なページで違う〔題・著者は一致〕）。投稿規程も取り直し、J1〜J10 は逐語で在る。見る範囲はタグ `ime-observation-prereg-macos` から変わった箇所（§10 と、持ち込んだ公開物・コード）に絞り、§1〜§9 は文脈として渡した。
+- ⚠️ この機械の `~/ime-pilot/runs/` に封印物と生ログがある（査読者役は Read しか持たないが、読むことは構造で縛れない）→ 起動の前に研究者に知らせ、応答の保存の検査（一覧の外の絶対パス）で確かめる。
+
+## 判断 141: attack-me round 1（Windows の追補）の採否 —— 長い試行は oracle の送出の幅・D4 で人の打鍵を中止に・問 4 は macOS で決める・Windows の解析は別の一覧・直す一覧を全部承認（2026-10-03・Surface・研究者の選択）
+
+- **round 1 の判定**: major revision（R1・R2・R3 とも major・fatal 0・接地の引用 12 / 12 在る・注入 0）。記録は `attack-me/prereg-ime-windows/round-1/verdict.md`。3 人が一致した最重要: Windows のロガーの規則が §10 に無く、メインが書いた「composition events を読む」は実装（IME の窓の表示・非表示・cloak）と違う。20 秒の打ち切りは cloak の経路にしか無く（窓の表示から）、WinEvent の経路には無い（25 秒の安全弁だけ）→ D3 の「両 OS で同じ」は成り立たない。⚠️ メインが一次を確かめずに書いた誤り（「composition events」と `cell.windows.json` のパス）。
+- **研究者の答え**（AskUserQuestion・4 問とも推奨どおり＋直す一覧を全部承認・round 2 まで）:
+  1. 長い試行の主の定義は **oracle の送出の幅**（試行の最初と最後の送った押下が 20 秒以上）。正解の長さの版は感度（`under_limit_gt_duration`）、19〜21 秒の境界の帯と、2 つの定義で分類の違う試行を層ごとに数える。
+  2. **逸脱 D4**: Windows の run は、観測の key 行のうち送った押下で説明されないものが区間の印を超えたら中止（解析も寄託もしない）。パイロット 7 本は全区間で印ちょうど。
+  3. 問 4 の推奨は **macOS の 2 セルで決める**（凍結のまま）。Windows のセルは同じ判定を別に報告し、成り立たなければ Windows のログへの但し書きとして報告する（推奨は変えない）。
+  4. Windows の run は **`experiment/data.windows.md`**（新規）に並べ、`pipeline.py --runs-from experiment/data.windows.md --out experiment/results/windows` を §10.7 に逐語で。Windows のタグで出た macOS の結果は報告しない。IMM のパイロットの run は寄託しない（`--check-deposit` が k = 0 で拒む）。
+- **実装**（`9fb61af2`・`b41c00b3`）: `kit/analysis/scope_windows.py`（`gt_scope.py` を置き換え）・`pipeline.py`（D4 の `observation_abort_segments`・`reference_abort_reasons(dlv, os_name)`・Windows の run の gt の `src` が `win_tsf` でなければ拒む〔D2 に含めた〕・感度の範囲・診断〔result_len の無い `tsf_end`・S4 の何回目の Esc〕・`note_windows` の書き直し・説明文）・selftest（D4 を外す・経路の検査を外す の 2 つの対照で赤）。§10 を書き直した（10.1〜10.11・Windows のロガーの小節・層ごとの表・Windows のタグの SHA の表・問 4・解析の入口・問 5 の量と `cpu_all_zero`）。`deviations.md` を D1〜D4 と「macOS は変わらない」の節（命令とハッシュ: macOS の計画はタグから登録の SHA と一致し、変更後は手順書の SHA を伏せてバイト一致／合成の macOS の run の結果 4 ファイルがバイト一致〔bootstrap 2000〕）で書き直した。`pilot-windows.md`・`README.windows.md` を直した。LF の worktree で `kit/check.sh` 33 本緑・書き出し 108 ファイル・文体の検査 0。
+- **次**: round 2（同じ立場・同じ文献・役ごとの引き継ぎを渡し、再掲を求めない）。⚠️ round 2 の直しでコードを変えたら、`deviations.md` の「macOS は変わらない」の比較を取り直す。
+
+## 判断 142: attack-me round 2（Windows の追補）の採否 —— minor・直して凍結へ（2026-10-03・Surface・研究者の選択）
+
+- **round 2 の判定**: minor revision（R1・R2・R3 とも minor・fatal 0・接地の引用 6 / 6 在る・注入 0）。記録は `attack-me/prereg-ime-windows/round-2/verdict.md`。一致した指摘: §10.3 がロガーの実装と食い違う（WinEvent の経路の 25 秒の安全弁は dwell ≈ 25 秒の行を書く・経路は時点ごと〔WinEvent が一度も来ていなければ cloak〕・行に経路が残らない・セッション中の SHOW はやり直し・回収前の要約の喪失）。`cpu_all_zero` の食い違い。節番号の直し漏れ（メインの誤り）。
+- **研究者の答え**（AskUserQuestion・4 問とも推奨どおり）: (1) `cpu_all_zero` は `working` だけ不十分として測り直し、`idle` は印つきで報告（§10.9 が README に優先）。(2) 経路は判定せず、20〜25 秒と 25 秒以上の観測の行を数えて記述で報告（混在は限界）。(3) 計測の守りを両方足す: IME の版がパイロットと違えば 39 試行の点検で 39 / 39 のときだけ測る／各 run の直後に点検の行（manifest の SHA）を commit して push。(4) 残りの直しを全部行って凍結まで。
+- **実装**（`d40e090a`）: §10.1（OSF に登録するもの・push の時刻）・§10.3 の書き直し・§10.6（凍結の前に変われば表を直す・比の分母 13.3 / 13.0）・§10.7（D3 の読み方・S15・経路の記述・Σm²/Σm 1.56〜3.19・`scope_windows.py --from-plan`・診断・問 4 は修飾キーと離鍵の行を評価しない）・§10.8（`working` にも・D4 の盲点と報告・版の規則・push）・§10.9・§10.11（持ち出し・観測区間の時刻・参照の時刻・選別）。`scope_windows.py`（`--from-plan`・観測の行の診断）・`pipeline.py`（寄託でも参照の経路を検査・節番号）。selftest に寄託の経路の場合。`data.windows.md`・`pilot-windows.md`（IMM の k = 1 は登録の設定ではない・`windows_def` の数・比の分母）・`README.windows.md`（Windows 11 Home の更新の一時停止と時刻・LF の取り出し・版の確認）・`deviations.md`（D4 の盲点・「10 trials of one plan, run twice」・証拠の commit を `d40e090a` に）。
+- **確かめたこと**: `d40e090a` の LF の worktree で `kit/check.sh` 33 本緑。macOS の計画（両手順書）と合成の run の結果 4 ファイルは、`9fb61af2` のときと同じハッシュでタグとバイト一致。文体の検査 0。
+- **補足**: 道具の名前は判断 138 の作業名（`focus_front.py`・`away_window.py`・`run_fg.py`）から、公開物では `focus_windows.py`・`away_windows.py`・`start_windows.py` にした（OS ごとの命名にそろえた・メインの選択）。
+- **次**: 完了時レビュー（code-reviewer ∥ security-checker・Codex は不在）→ 凍結の印を替える → タグ `ime-observation-prereg-windows` → 書き出しの一覧の SHA → OSF への登録（研究者）→ `notes.md`。
