@@ -259,7 +259,7 @@ LIVE_CONVERSION_KEY = "live_conversion"
 # plan is given in the Windows addendum, section 10 of the pre-registration). A run whose cell records the operating
 # system "windows" is accepted only when its plan log is this plan; the check of the macOS cells is unchanged.
 REGISTERED_PLAN_SHA256_WINDOWS = "b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0"
-# The reference input field of the Windows cell (section 10.3): a run of a Windows cell whose reference log comes from
+# The reference input field of the Windows cell (section 10.4): a run of a Windows cell whose reference log comes from
 # another field counts as aborted, like a run with another plan.
 WINDOWS_GT_SRC = "win_tsf"
 PRIMARY_NOTE = ("the primary estimates are the comparison and scope named here, per stratum; every other comparison "
@@ -824,7 +824,8 @@ def run_stages(run, cfg, rules_bytes, seed, keymap, focus_trials=()):
     if windows_scope:
         out["long_trials_from"] = dict(scope_windows.scope_summary(f["oracle"], f["plan"], sessions, cfg["limit_ms"]),
                                        sha256=_sha(scope_bytes), sha256_sensitivity=_sha(scope_gt_bytes))
-        out["windows_diagnostics"] = scope_windows.windows_diagnostics(f["gt"], f["oracle"], f["plan"], sessions)
+        out["windows_diagnostics"] = scope_windows.windows_diagnostics(f["gt"], f["oracle"], f["plan"], sessions,
+                                                                         f["obs"])
 
     def no_layers(m_out):
         # the long trials of a Windows cell come from the oracle or the ground truth, which have no layers
@@ -985,8 +986,8 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
     if not synthetic:
         for r in used:
             if not _plan_matches_cell(r):
-                why = ("its plan is not the plan that section 10.5 gives the Windows cell, or its reference log does "
-                       "not come from the reference input field of section 10.3"
+                why = ("its plan is not the plan that section 10.6 gives the Windows cell, or its reference log does "
+                       "not come from the reference input field of section 10.4"
                        if r["manifest"]["cell"].get("os") == "windows"
                        else "its plan is not the plan that section 2.4 gives its cell")
                 raise InputError("run %s: under section 3.4 of the pre-registration the run counts as aborted and is "
@@ -1152,8 +1153,12 @@ def _abort_rule_findings(run, name):
         os_name = match.parse_plan_strata(files["plan"])["os"]
     except InputError as e:
         return ["%s: section 3.4 cannot be checked (plan: %s)" % (where, e)]
-    return ["%s: not safe to deposit under section 3.4: %s" % (where, why)
-            for why in reference_abort_reasons(dlv, os_name)]
+    out = ["%s: not safe to deposit under section 3.4: %s" % (where, why)
+           for why in reference_abort_reasons(dlv, os_name)]
+    if os_name == "windows" and _gt_src(run) != WINDOWS_GT_SRC:
+        out.append("%s: not safe to deposit under section 10.8: the reference log does not come from the reference "
+                   "input field of the Windows cell (deviation D2)" % where)
+    return out
 
 
 def deposit_check_files(files, name, pats):
@@ -2717,6 +2722,14 @@ def _case_windows_cell(d):
                                        os_name)
         if none != [] or (os_name == "windows") != any("D4" in w for w in why):
             f.append("the rule of D4 does not apply exactly to the %s run with one key row that was not sent" % os_name)
+    # D2 at deposit: a Windows run whose reference log is not from the TSF field is not safe to deposit
+    wr = load_run(runs[0])
+    if _abort_rule_findings(wr, "w") != []:
+        f.append("a clean Windows run is not safe to deposit: %r" % (_abort_rule_findings(wr, "w")[:1],))
+    head, rest = wr["files"]["gt"].split(b"\n", 1)
+    wr["files"]["gt"] = head.replace(b'"win_tsf"', b'"win_imm"') + b"\n" + rest
+    if not any("10.8" in x for x in _abort_rule_findings(wr, "w")):
+        f.append("a Windows run whose reference is not the TSF field is not refused at deposit")
     om = os.path.join(d, "out-mac")
     rc, _o, err = _quiet(["--runs"] + mac + ["--config", cfg, "--seed", "7", "--out", om])
     mo = dict((n, json.loads(b.decode("utf-8"))) for n, b in _read_results(om).items()) if rc == 0 else {}

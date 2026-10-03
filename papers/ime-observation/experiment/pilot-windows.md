@@ -79,7 +79,7 @@ call written once with `+`), the TSF sequences reduce to one per scenario in the
 The IMM sequences cannot be folded this way, because a `comp` call and a notification alternate at every key.
 
 The candidate element of the TSF field opens while the reading is typed, before any Space: the input method shows
-its prediction window there. Every session of the corrected TSF runs but one (S10) showed it, so the Windows
+its prediction window there. Every session of each corrected TSF run but one (an S10 session) showed it, so the Windows
 definition of a session with a candidate window (`windows_def`) holds nearly the same sessions as the common
 definition (`all`).
 
@@ -157,9 +157,10 @@ sent inside the trials, 3 to 16 per TSF run reached the field as a key-down, aga
 (`reference.reach` of the delivery report; the marker presses are counted separately and reached the field when no
 composition was open). Its log therefore shows a person's
 key press only when the input method does not consume it; the rule on the loss of focus reads the observation and is
-not affected. In the IMM runs the rule on presses allowed one key-down beyond the markers per segment (the
-`VK_IME_ON` press; none in the segment of the last block), with the input-mode keys of S14 counted among the presses
-sent, and there was no loss of focus outside the planned switches either.
+not affected. In the IMM runs each segment but the last held one key-down beyond the markers (the `VK_IME_ON` press),
+which the registered setting k = 0 counts as a press from outside; with k = 1 and the input-mode keys of S14
+counted among the presses sent (not the registered settings) no segment exceeded its bound, and there was no loss
+of focus outside the planned switches either.
 
 The assignment of observed presses to trials that both attacks of question 4 use, run without any attack on the key
 rows of all seven runs with the four-press marker in the observation (`--markers-in-obs`), scored every block (27
@@ -169,7 +170,8 @@ blocks, 429 trials) and left no press unassigned.
 
 Including the waits and markers, 117 trials took 27.5 minutes in `pilot-*` (14.1 s per trial; median trial 11.8 s,
 95th percentile 28.6 s, set by S13), and 39 trials took 9.9 minutes in the corrected runs (15.2 s per trial; S4 and S8
-now end with a key more). The generator's estimate for the pilot plans is 13.3 s per trial.
+now end with a key more). The generator's estimate is 13.3 s per trial for the plans of `pilot-*` and 13.0 s for
+the plan of the corrected runs.
 
 ## Consequences for the measurement
 

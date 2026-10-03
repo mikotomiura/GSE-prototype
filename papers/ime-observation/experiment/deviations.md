@@ -74,7 +74,7 @@ counts and the sensitivity analysis report how much this matters.
 
 **Effect.** On a Windows cell the long trials are defined by what was sent. With the corrected Windows procedure, the
 trials whose presses span at least 20 seconds were exactly the long trials of the ground truth in two check runs of
-the pilot with the TSF field (10 of 10 in each; the two runs used the same plan).
+the pilot with the TSF field: 10 trials of one plan, run twice.
 
 ## D4. A key row of the observation that no sent press explains counts a Windows run as aborted (2026-10-03)
 
@@ -91,8 +91,11 @@ the rule on the loss of focus. On macOS the reference field received every key-d
 2.1 states that no person's typing is part of the data; without the rule this could not be supported on Windows.
 
 **Effect.** In every segment of the seven runs of the Windows pilot the key rows of the observation that no sent press
-explains were exactly the marker presses. The rule also aborts a run in which the observer writes a key row twice, and
-it cannot catch a press of a key that the observer does not record (section 10.3). It does not apply to macOS plans.
+explains were exactly the marker presses. The rule also aborts a run in which the observer writes a key row twice,
+which is an error of the observer under test; the figures of such a run are reported (section 10.8). It cannot catch
+a press of a key that the observer does not record (section 10.3), a person's press that cancels a sent press that the
+observation lost, or input with the pointer, touch or pen. It applies to the runs of the Windows cell and of the
+`working` condition on Windows, and not to macOS plans.
 
 ## The macOS cells are unchanged
 

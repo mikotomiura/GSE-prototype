@@ -24,7 +24,8 @@ to it), in a terminal that is not elevated.
    ```
 
 2. Generate the plan from the published files as they are (with LF line ends; a checkout that converts line ends
-   changes the SHA-256 of the settings and procedure files that the plan records, and with them the plan's):
+   changes the SHA-256 of the settings and procedure files that the plan records, and with them the plan's; with
+   git, check out with `git -c core.autocrlf=false clone` or use the published export):
 
    ```
    python kit/gen/generate_plan.py --config experiment/plan_config.windows.json \
@@ -32,11 +33,15 @@ to it), in a terminal that is not elevated.
      --os windows --seed 20260929 --out <plan>
    ```
 
-   The SHA-256 of the plan must be the one the pre-registration gives the Windows cell (section 10).
+   The SHA-256 of the plan must be the one the pre-registration gives the Windows cell (section 10.6).
 
 3. Copy `cell.windows.json`, write the Windows version and build and the input method's version into `ime`, and set
    `clock_sync_disabled` and `auto_update_disabled` to `true` once time synchronisation and automatic updates are
-   off (`README.md`, before a measurement). `focus_cmd` starts `python`; it must be the same Python as the runner's.
+   off (`README.md`, before a measurement). On Windows 11 Home automatic updates cannot be turned off; pause them
+   (Settings, Windows Update, Pause updates) for a period that covers the run of 12 to 13 hours, and turn off
+   "Set time automatically" (Settings, Time & language, Date & time). Read the version of the input method
+   (`IMJPTIP.DLL`) and compare it with the pilot's (section 10.8 of the pre-registration). `focus_cmd` starts
+   `python`; it must be the same Python as the runner's.
 
 4. Turn off sleep, the screen lock and the screen saver, close every application that could come to the front, and
    start the run:

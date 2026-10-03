@@ -1105,18 +1105,22 @@ is not changed. When the addendum is frozen it replaces the two freeze marks the
 of the addendum's freeze, and `sha256:` keeps its value, because the addendum does not revise the Windows blocks of
 `experiment/gt_rules.json`, and `experiment/config.json` and `experiment/SEED` are unchanged. The freeze marks
 therefore do not tell the two freezes apart, and the analysis code accepts the Windows plan in every version that
-holds deviation D2; that the Windows measurement follows the addendum is shown by the date of its registration and
-the dates in the manifests of the runs. The freezing commit of the addendum is tagged
-`ime-observation-prereg-windows`.
+holds deviation D2. That the Windows measurement follows the addendum is shown by the date of its registration and
+by commits pushed to the repository right after each run (section 10.8), whose times are kept by the hosting service,
+not by the measuring machine. The freezing commit of the addendum is tagged `ime-observation-prereg-windows`. The
+addendum is registered on OSF Registries as the macOS freeze was (section 9): the frozen file with its two marks, the
+40-digit identifier of the freezing commit and the SHA-256 of the list of files exported from it; the URL and date of
+the registration are recorded in `experiment/notes.md`, and the registration date precedes the first Windows
+measurement.
 
 The difference between that tag and `ime-observation-prereg-macos` holds:
 
 - the Windows sections (`os.windows`) of the two procedure files and the Windows profile of the generator (S8 ends
   with a Return; section 10.5);
 - new files that only the Windows cell uses: `experiment/plan_config.windows.json`, `experiment/pilot-windows.md`,
-  `experiment/data.windows.md`, `experiment/deviations.md`, `kit/analysis/scope_windows.py`,
-  `kit/run/cell.windows.json`, `kit/run/focus_windows.py`, `kit/run/away_windows.py`, `kit/run/start_windows.py` and
-  `kit/run/README.windows.md`;
+  `experiment/data.windows.md`, `kit/analysis/scope_windows.py`, `kit/run/cell.windows.json`,
+  `kit/run/focus_windows.py`, `kit/run/away_windows.py`, `kit/run/start_windows.py` and `kit/run/README.windows.md`;
+- `experiment/deviations.md`, the record of deviations that section 8 names, created for the deviations below;
 - this section and the freeze marks;
 - a record in `experiment/notes.md` of the registration of the macOS freeze, which is unrelated to the addendum;
 - the changes of four deviations, recorded in `experiment/deviations.md` before any Windows measurement, to parts of
@@ -1130,7 +1134,7 @@ The difference between that tag and `ime-observation-prereg-macos` holds:
 On the macOS cells the four deviations change nothing that is reported: the macOS plans generated with the changed
 generator differ from those of the macOS tag only in the recorded SHA-256 of the procedure file, and on synthetic
 macOS runs the result files of the changed analysis code are byte-identical to those of the macOS tag; the commands
-and hashes are given in `experiment/deviations.md`. The macOS plans are generated, and the macOS analysis is run, from
+and hashes, taken on the freezing commit of the addendum, are given in `experiment/deviations.md`. The macOS plans are generated, and the macOS analysis is run, from
 the macOS tag (section 8).
 
 ### 10.2 Scope
@@ -1144,34 +1148,43 @@ stopping rule and question 5.
 ### 10.3 The observer on Windows
 
 On Windows the observer does not infer sessions from key presses. A session is a period during which a window of the
-input method is shown, observed system-wide (the window's application is not identified):
+input method is shown, observed system-wide (the window's application is not identified). The observer has two
+paths, chosen from moment to moment:
 
 - **Window events.** The operating system reports the display, change and dismissal of an input-method window
   (`EVENT_OBJECT_IME_SHOW`, `EVENT_OBJECT_IME_CHANGE`, `EVENT_OBJECT_IME_HIDE`), received by an out-of-context event
-  hook. A display (or a change while no session is open) opens a session and a dismissal closes it; `dwell_ms` is the
-  time between them on the wall clock. This path has no cut-off at 20 seconds; a window that is still shown after
-  25 seconds is cleared by a safety valve of the monitoring loop.
+  hook. A display, or a change while no session is open, opens a session, and a dismissal closes it; `dwell_ms` is the
+  time between them on the wall clock. A display while a session is open starts the session again without a row (for
+  example when the prediction window and the candidate window are shown one after the other). This path has no cut-off
+  at 20 seconds: a window that is still shown 25 seconds after the session opened is ended by a safety valve of the
+  monitoring loop, which writes a row with a `dwell_ms` of about 25 seconds, and the next change of the window opens a
+  new session.
 - **Window cloaking.** On systems that show and hide the candidate window by cloaking it in the desktop compositor,
-  the events above do not arrive. When none of them has arrived for 60 seconds, the observer follows the cloak and
-  uncloak notifications of windows of the input method's class instead: a session opens when such a window becomes
-  visible and closes when none is visible, a gap of less than 150 ms being folded into the session, and a session is
-  cut off, without a row, 20 seconds after it opened, whether or not the window is still shown.
+  the events above do not arrive. Until the first of them arrives in a run, and whenever none has arrived for 60
+  seconds, the observer follows the cloak and uncloak notifications of windows of the class `IME` instead: a session
+  opens when such a window becomes visible and closes when none is visible, a gap of less than 150 ms being folded into
+  the session (its `dwell_ms` ends when the window became invisible, and its row is written after the gap has passed),
+  and a session is cut off, without a row, 20 seconds after it opened, whether or not the window is still shown.
 
-On both paths `nav` counts the arrow-key presses and `abandon` records an Escape press made while a session is open,
-in any application, so both are upper bounds for the session's window. A session's row is written when the monitoring
-loop, which runs every 100 ms, collects it; the row's time is the time of that collection. Which path drives the
-Microsoft input method on the measuring machine was not determined before the freeze, because that would have meant
-reading the observation's session rows; a row of 20 seconds or more shows the first path (section 10.7).
+Both paths can therefore act within one run, and a row does not record which path wrote it. On both paths `nav` counts
+the arrow-key presses and `abandon` records an Escape press made while a session is open, in any application, so both
+are upper bounds for the session's window. A session's row is written when the monitoring loop, which runs every 100
+ms, collects it, and the row's time is the time of that collection; a session that closes and is followed by another
+before the loop collects it is lost. Which path drives the Microsoft input method on the measuring machine was not
+determined before the freeze, because that would have meant reading the observation's session rows; rows of 20 to 25
+seconds can come only from the first path, and rows of about 25 seconds from its safety valve (section 10.7).
 
-For each key press, the observer writes a key row for letters, digits, the numeric keypad, punctuation keys,
-Backspace, Return, Space, Tab, Delete, the modifier keys (Shift, Control, Alt and the Windows keys, which macOS does
-not record), Page Up, Page Down, Home, End, the arrow keys, Escape and F1 to F12; it writes no row for the input-mode
-keys (`VK_IME_ON`, `VK_IME_OFF`) or for F13 and above. Key presses sent by a program are recorded like physical ones.
+For each key press and release, the observer writes a key row for letters, digits, the numeric keypad, punctuation
+keys, Backspace, Return, Space, Tab, Delete, the modifier keys (Shift, Control, Alt and the Windows keys, which macOS
+does not record), Page Up, Page Down, Home, End, the arrow keys, Escape and F1 to F12; it writes no row for the
+input-mode keys (`VK_IME_ON`, `VK_IME_OFF`) or for F13 and above. Key presses sent by a program are recorded like
+physical ones.
 
 A session of the observer is therefore a different construct from a session of the reference input field (a
 composition, section 10.7): the window may open after the composition (for example when the prediction window
-appears) and close before or after it. These differences are part of what the agreement measures; they enter the
-dwell error, and they are not corrected.
+appears) and close before or after it, and on the second path the observed interval ends at least 150 ms before the
+row's time. These differences are part of what the agreement measures; they enter the dwell error and the matching,
+and they are not corrected (the settings of section 5 are unchanged).
 
 ### 10.4 Instruments and machine
 
@@ -1229,15 +1242,16 @@ the files that the plan records). At the Windows tag these files have the SHA-25
 | `kit/corpus/data/phrases.jsonl` | `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620` |
 | `kit/emit/keymap_windows.json` | `171bfb30ebf4989b4a083a07161b9838b8366bf74493853de7a41340bf69790e` |
 
-The table of section 9 gives these files at the macOS tag. The settings equal those of
+The table of section 9 gives these files at the macOS tag; if any of the files above changes before the addendum is
+frozen, this table and the plan's SHA-256 below are updated in the freezing commit. The settings equal those of
 `experiment/plan_config.macos.json` (n = 75 per scenario and speed, key-interval medians of 480, 240 and 120 ms,
 think time from 0.2 to 20 s, 25 trials per block). The plan holds 2,925 trials in 117 blocks; generated before the
 freeze on the measuring machine (Windows 11) with Python 3.11.9 and 3.13.15 it was byte-identical, SHA-256
 `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0`. This is the plan that the analysis accepts for the
 Windows cell (deviation D2, reason 1 of section 3.4). The generator estimates 13.75 seconds per trial (11.2 hours).
-In the pilot the measured time per trial was 6% (117 trials, frozen procedures) to 17% (39 trials, corrected
-procedures, with relatively more time spent between blocks) above the generator's estimate, so the run is expected to
-take 12 to 13 hours.
+In the pilot the measured time per trial was 6% (117 trials, frozen procedures: 14.1 s against an estimate of
+13.3 s) to 17% (39 trials, corrected procedures: 15.2 s against 13.0 s, with relatively more time spent between blocks)
+above the generator's estimate for the pilot's plans, so the run is expected to take 12 to 13 hours.
 
 ### 10.7 Ground truth, scopes and analysis
 
@@ -1251,7 +1265,7 @@ each).
 **Definitions.** As in section 5, the definition of the cell's system (`windows_def`, the sessions that showed a
 candidate window) is the definition of the analysis. The Microsoft input method opens its prediction window, which the
 field reports as a candidate element, while the reading is typed, so `windows_def` holds nearly all sessions (all but
-one in each check run of the pilot), and "with a candidate window" does not mean on Windows that the reading was
+one, an S10 session, in each of the two check runs of the pilot, which used the same plan), and "with a candidate window" does not mean on Windows that the reading was
 converted. Whether the two definitions hold the same sessions is reported per cell, as on macOS.
 
 **Scopes.** The prediction of section 4.5 models the macOS observer; no prediction applies to the Windows observer
@@ -1261,21 +1275,26 @@ those layers, is null for it. For the Windows cell a trial is long when the pres
 ms on the wall clock, from the first to the last (deviation D3); like the macOS scopes, this is decided from the oracle
 and the plan alone. `under_limit` and `over_limit` are formed from these trials, and the primary estimates of the cell
 are those of `gt_obs` under `under_limit`, per stratum, as for the macOS cells. The observer's own cut-off does not
-follow this rule (section 10.3: on one path it counts from the opening of the window, and on the other there is
-none), so the trials near the boundary may disagree for that reason; they are reported (below). The specified
+follow this rule (section 10.3: on one path a session is cut off without a row 20 seconds after the window opened, on
+the other a row of about 25 seconds is written), so the trials near the boundary may disagree for that reason; they
+are reported (below). In S15 the presses span the switch to the other window and the Return after it, while the
+composition ends at the loss of focus, so the two definitions can differ there more than elsewhere; the trials they
+classify differently are read per stratum. The specified
 behaviour that section 6.4 states for `over_limit` (no row, and a fresh session at the next letter or digit) is the
 macOS observer's; for the Windows cell the results under `over_limit` and the count of observed rows of 20 seconds or
-more (section 6.6) are reported descriptively and read with section 10.3.
+more (section 6.6) are reported descriptively and read with section 10.3. The path that wrote a row is not
+recorded and is not inferred: the rows of 20 to 25 seconds and of 25 seconds or more are counted (below) and reported
+descriptively, as indications of the first path and of its safety valve.
 
 As a sensitivity analysis, detection under `under_limit` is also computed with the long trials taken from the ground
 truth (a trial is long when a session of the reference assigned to it lasts at least 20,000 ms; result key
 `under_limit_gt_duration`). Per stratum, the numbers of long trials under both definitions, of the trials they classify
 differently, and of the trials whose reference session lasts from 19 to 21 seconds are reported (`long_trials_from`).
 
-From the plan's own times, 617 of the 2,925 trials are long (401 slow, 123 mid, 93 fast); in the pilot's check runs
-with the corrected procedures, these were exactly the long trials of the ground truth (10 of 10 in each of two runs of
-the same plan). The trials that remain under the cut-off before the exclusions of section 6.2 are, per scenario and
-speed (slow / mid / fast):
+From the plan's own times (`python kit/analysis/scope_windows.py --from-plan <plan>`), 617 of the 2,925 trials are
+long (401 slow, 123 mid, 93 fast). In the pilot's check runs with the corrected procedures, the long trials of the plan
+were exactly those of the ground truth: 10 trials of one plan, run twice. The trials that remain under the cut-off
+before the exclusions of section 6.2 are, per scenario and speed (slow / mid / fast):
 
 | Scenario | slow / mid / fast |
 |---|---|
@@ -1294,12 +1313,14 @@ speed (slow / mid / fast):
 | S15 | 46 / 75 / 75 |
 
 S13 has no trial under the cut-off, as on macOS; eight other strata have fewer than 50 trials, the smallest 30 (S6,
-slow). A speed level holds 574 (slow), 852 (mid) and 882 (fast) of them. The precision that section 3.3 gives for n = 31
-is close to that of the smallest strata.
+slow). A speed level holds 574 (slow), 852 (mid) and 882 (fast) of them, in 39 blocks each. The precision that section
+3.3 gives for n = 31 is close to that of the smallest strata. Over the trials under the cut-off, the sum of m_j
+squared over the sum of m_j (section 3.3) ranges from 1.56 to 3.19 per stratum (largest S15, mid), within the range
+that section 3.3 gives for the macOS plans.
 
 **Diagnostics.** Reported for the Windows cell: the ends of a reference composition that carry no committed
 length, per scenario; for S4, the Escape press after which the reference session ended (the second or the third); and the
-observed rows of 20 seconds or more. If the observation log of the Windows cell holds no session row at all, the
+observed session rows of 20 to 25 seconds and of 25 seconds or more. If the observation log of the Windows cell holds no session row at all, the
 analysis code refuses the run (step 0 of `kit/analysis/pipeline.py`), and the cell is reported as not measured.
 
 **Question 4.** The two attacks are run on the observation log of the Windows cell with the commands of section 6.8,
@@ -1308,7 +1329,10 @@ without a switch for the input-mode keys, which leave no row on Windows. Without
 section 6.8 for 2,700 apply. The recommendation of section 6.8 is decided from the two macOS cells, as registered; the
 same judgement (near chance at both K = 10 and K = 100) is reported for the Windows cell separately, and when it does
 not hold there, this is reported as a qualification of the recommendation for logs recorded on Windows; it does not
-change the recommendation.
+change the recommendation. The plans send no modifier key and the attacks read key presses only, so the judgement on
+Windows concerns the key rows of presses other than modifier keys; the modifier rows and the release rows that the
+Windows observer writes (section 10.3) are not evaluated, and publishing them is outside the recommendation, as the
+session rows are (section 6.8).
 
 **Running the analysis.** The analysis of the Windows cell is run from the Windows tag, on the runs listed in
 `experiment/data.windows.md`, by
@@ -1321,16 +1345,32 @@ The macOS cells are not analysed from the Windows tag; results of the macOS cell
 
 ### 10.8 Stopping rule and data collection
 
-Section 3.4 applies with its settings, with three additions for the Windows cell. In the pilot, `VK_IME_ON` before each
-block and the input-mode keys of S14 left no key-down in the log of the TSF field, so k = 0 and the version
-`excluding_mode_keys` of the delivery report hold. A run of the Windows cell whose plan is not the plan of section 10.6,
-or whose reference log does not come from `refinput_tsf` (`src` `win_tsf`), counts as aborted (deviation D2). The TSF
-field records a key-down only for a key that the input method does not consume, so a person typing into the field
-while it has the focus would pass the rule on presses from outside and, since the focus is not lost, the rule on the
-loss of focus as well; therefore a run of the Windows cell also counts as aborted when, in any segment of the
-observation log (as section 3.4 divides the reference log), the key rows that no sent press explains exceed the marker
-presses of the segment (deviation D4; in the pilot they never did). The rule cannot catch a person's press of a key
-that the observer does not record (section 10.3), and it also aborts a run in which the observer writes a key row twice.
+Section 3.4 applies with its settings, with these additions; like section 3.4, they apply to the runs of the Windows
+cell and of the `working` condition of question 5 on Windows, which plays the plan of the Windows cell with the same
+cell file.
+
+- In the pilot, `VK_IME_ON` before each block and the input-mode keys of S14 left no key-down in the log of the TSF
+  field, so k = 0 and the version `excluding_mode_keys` of the delivery report hold.
+- A run whose plan is not the plan of section 10.6, or whose reference log does not come from `refinput_tsf` (`src`
+  `win_tsf`), counts as aborted (deviation D2).
+- The TSF field records a key-down only for a key that the input method does not consume, so a person typing into the
+  field while it has the focus would pass the rule on presses from outside and, since the focus is not lost, the rule
+  on the loss of focus as well. A run therefore also counts as aborted when, in any segment of the observation log (as
+  section 3.4 divides the reference log), the key rows that no sent press explains exceed the marker presses of the
+  segment (deviation D4; in the pilot they never did). The rule cannot catch a press of a key that the observer does
+  not record (section 10.3), a person's press that cancels a sent press that the observation lost (as section 7 states
+  for the reference), or input with the pointer, touch or pen; it also aborts a run in which the observer writes a key
+  row twice. Since such a row is an error of the observer under test, the figures of a run aborted by this rule (the
+  segment and the number of rows) are reported with the results.
+- Before the first run, the versions of the system and of the input method are read. If the input method's version
+  differs from the pilot's (section 10.4), the check plan of the pilot (`verify` in `experiment/pilot-windows.md`: 39
+  trials, one per scenario and speed) is run first with the measurement's cell file, and the Windows cell is measured
+  only if every trial produces the session its plan intends (39 of 39); otherwise the cell is not measured and this is
+  reported.
+- Right after each attempt, its line in the table of run checks of `experiment/data.windows.md`, with the SHA-256 of
+  its manifest, is committed and pushed to the repository, so that the time of each run is kept outside the measuring
+  machine.
+
 The checks are recorded in `experiment/data.windows.md`, where the plan's SHA-256 is checked by hand against section
 10.6. The runs are made on separate nights in this order: the Windows cell, then the two conditions of question 5 on
 Windows, `idle` and then `working`.
@@ -1341,8 +1381,11 @@ As section 6.10, with the Windows sampler of `kit/e3` and, for the `working` con
 played by the runner (12 to 13 hours; the samples are those of the first eight hours). On Windows the CPU value of a
 sample is the processor time of the observer over about one second at the moment of reading, not an average over the
 interval, and the memory is the working set, so the values are compared within each system and not between systems. A
-counter that cannot be read gives zero; a condition in which every CPU sample is zero (`cpu_all_zero`) is insufficient
-and is run again under section 3.4.
+counter that cannot be read gives zero. In the `working` condition the observer processes the key presses of the plan,
+so a condition in which every CPU sample is zero (`cpu_all_zero`) is taken as a counter that could not be read: it is
+insufficient and is run again under section 3.4. In the `idle` condition a true zero is possible, so the condition is
+reported with the flag. For the Windows cell this rule takes precedence over the description of the flag in
+`kit/e3/README.md`.
 
 ### 10.10 Data that exist before the freeze of the addendum
 
@@ -1364,18 +1407,33 @@ observation of it exists.
 ### 10.11 Limitations specific to the Windows cell
 
 - **Synthetic input, one input method, one kind of field, one machine.** As on macOS (section 7), the input is
-  synthetic. The cell is measured with one version of the system and of the Microsoft input method, on one machine. The
-  observer follows the input method's window and does not depend on the kind of field, but the reference does: in the
-  pilot the TSF field committed when the right arrow was pressed beyond the last segment (S7), where an IMM window kept
-  the composition open, and the last call of a trial differed by more than 200 ms between the two fields in 8 of 117
-  trials. Before carrying the agreement to other applications, the pilot procedure (`kit/pilot/README.md`) can be
-  repeated with the field of interest.
+  synthetic. The cell is measured with one version of the system and of the Microsoft input method, with its default
+  settings (predictive candidates shown), on one machine. The observer sees a session only while the input method
+  shows its window; a field decides whether the input method may show its user-interface elements, and the reference
+  input field lets it show them, so in applications that draw the candidates themselves the observer may see nothing.
+  This was not tested. With predictive candidates turned off, the window would open at the conversion rather than while
+  the reading is typed. The reference depends on the kind of field as well: in the pilot the TSF field committed when
+  the right arrow was pressed beyond the last segment (S7), where an IMM window kept the composition open, and the last
+  call of a trial differed by more than 200 ms between the two fields in 8 of 117 trials. The agreement measured here
+  therefore cannot be carried to an application whose field does not record a reference, and no procedure of this kit
+  measures it there.
 - **Two constructs.** The observer's session is a period of a visible input-method window, the reference's a
   composition (section 10.3); the agreement measures both the observer's errors and the difference of the constructs.
 - **Commit at a loss of focus.** In S15 the input method commits when the other window comes to the front; the session
   ends there, and the Return pressed afterwards reaches the field as a plain key.
-- **Long trials.** On Windows the scope is decided from the span of the presses sent, which is not the rule of the
-  observer's cut-off (section 10.7); the trials near the boundary and the sensitivity analysis are reported.
+- **Long trials and the observer's paths.** On Windows the scope is decided from the span of the presses sent, which
+  is not the rule of the observer's cut-off (section 10.7); the trials near the boundary and the sensitivity analysis
+  are reported. The two paths of the observer can both act in a run, and a row does not record its path.
+- **Timing of the observed interval.** On the cloaking path the observed interval ends at least 150 ms before the
+  row's time (section 10.3), and on both paths the row's time is that of the collection, up to 100 ms after the
+  session closed. The matching places the observed interval by the row's time (section 4.4) and is not adjusted, so
+  short sessions can fail to pair for this reason; the differences are reported as part of the observer's agreement.
+- **The reference is software on the same machine.** The times of the reference's compositions come from the TSF
+  notifications that the field receives after each edit; they were not checked against an external clock. In the
+  pilot the first call of a trial differed by a median of 5 ms between the TSF and the IMM field.
+- **Selection by the stopping rule.** Deviation D4 aborts a run when the observer writes a key row that no sent press
+  explains, which can also be an error of the observer; if every attempt is aborted, the cell is not measured, and the
+  figures of the aborted runs are reported (section 10.8).
 - **The reference sees few of the presses.** The TSF field receives only the keys that the input method does not
   consume, so the reference side of the delivery report counts few presses, and the stopping rule relies on the
   observation for presses from outside (section 10.8).
