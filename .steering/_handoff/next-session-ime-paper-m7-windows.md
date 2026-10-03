@@ -39,6 +39,15 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 6. 問 5 の Windows（`idle` → `working`・別の夜・`kit/e3`）。`working` も §10.8 の規則と点検の行。`cpu_all_zero` は `working` だけ不十分（§10.9）。
 7. 解析は §10.7 の命令（`pipeline.py --runs-from experiment/data.windows.md … --out experiment/results/windows`）で、Windows のタグから。macOS のセルは Windows のタグから解析しない。
 
+## §2.5 進み具合（2026-10-03 23:50〜 JST のセッション）
+
+- PR #302 は merge 済み（`6c6aefe0`）・タグは origin にある。登録日 2026-10-03 → **計測は 2026-10-04 0:00 JST 以降に始める**（§10.1「登録日が計測より前」）。
+- ✅ §2-2: LF の worktree `~/ime-m7/wt`（タグ `a57c4fd7`）から書き出し `~/ime-m7/export` → 108 ファイル・一覧 `~/ime-m7/export-list.txt` の SHA-256 `f61af353…87b7`（コミット済みの一覧とバイト一致）。ロガーと `refinput-windows` を `--locked` でビルド済み。
+- ✅ §2-3 の計画: `~/ime-m7/plan/plan-windows.jsonl` の SHA-256 `b7bdf8fc…36b0`（§10.6 と一致）。
+- ⚠️ **版が変わった**: `IMJPTIP.DLL` **10.0.26100.8972**（パイロット 8875）・OS build **26200.9168**（パイロット 8875）→ §10.8 の 39 試行の点検が要る（計画は `~/ime-pilot/plan-verify.jsonl`・SHA `f02e046b…0154`・パイロットと同じ。セルは本計測のセルのファイル。合否は `gt_sessions.py --rules experiment/gt_rules.json`〔`win_tsf`〕の `oracle_agreement` で 39 / 39）。
+- ⚠️ **再起動待ちの更新** KB5129195（2026-10-03 22:02 に「reboot is necessary」・`RebootPending` あり）→ 計測中の自動再起動を避けるため、**再起動して更新を終えてから**版を読み直し、その版でセルのファイルを作り、点検 → 本計測。
+- 未了の手作業（研究者）: AC 電源（23:55 時点で放電中 52%）・更新の一時停止・「時刻を自動的に設定」を切る（今は `Type NTP`）。スリープ / 画面オフ 0・スクリーンセーバーなしは確認済み。self-hosted runner のサービスは無い（確認済み）。
+
 ## §3 気をつけること
 
 - ⚠️ 凍結のコードを変えない。欠陥が見つかれば直さずに止めて研究者に戻す（逸脱の記録は研究者が決める）。

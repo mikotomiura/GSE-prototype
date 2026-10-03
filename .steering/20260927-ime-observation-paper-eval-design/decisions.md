@@ -1228,3 +1228,9 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **確かめたこと**: `d40e090a` の LF の worktree で `kit/check.sh` 33 本緑。macOS の計画（両手順書）と合成の run の結果 4 ファイルは、`9fb61af2` のときと同じハッシュでタグとバイト一致。文体の検査 0。
 - **補足**: 道具の名前は判断 138 の作業名（`focus_front.py`・`away_window.py`・`run_fg.py`）から、公開物では `focus_windows.py`・`away_windows.py`・`start_windows.py` にした（OS ごとの命名にそろえた・メインの選択）。
 - **次**: 完了時レビュー（code-reviewer ∥ security-checker・Codex は不在）→ 凍結の印を替える → タグ `ime-observation-prereg-windows` → 書き出しの一覧の SHA → OSF への登録（研究者）→ `notes.md`。
+
+## 判断 143: 凍結のセルのテンプレートの相対パスが Windows で起動できない —— 逸脱 D5 を計測の前に記録する（2026-10-04・Surface・研究者の選択）
+
+- **起きたこと**: 再起動の後の版は OS build 26200.9457・`IMJPTIP.DLL` 10.0.26100.9278（パイロット 8875）→ §10.8 の 39 試行の点検が要る。`cell.windows.json` を写して `ime` と 2 つの旗だけ埋めたセルで、書き出しの最上位から `start_windows.py` を起動 → runner が `FileNotFoundError`（WinError 2）で中止（00:24 JST・キーは 1 つも送っていない・`~/ime-m7/runs/verify-m7`）。
+- **原因（実測）**: `subprocess` が `kit/logger/target/release/...`（スラッシュ・`./` なしの相対）を見つけられない。同じ cwd で `kit\...`・`.\kit\...`・`./kit/...` は起動する。`python`（`focus_cmd`）は起動する。パイロットのセル（`~/ime-pilot/make_cells.py`）は絶対パスだったので見つからなかった。
+- **研究者の答え**（AskUserQuestion）: 「逸脱 D5 を先に記録（推奨）」。セルのコピーで 2 つの exe のパスを `kit\...`（最上位からの相対のまま）にし、`deviations.md` に D5 を書いて commit → push してから、点検 → 本計測。テンプレート・runner・タグのファイルは変えない。
