@@ -10,19 +10,19 @@
     "reference_path": "TSF (refinput_tsf, ground-truth rules win_tsf)"
   },
   "refinput_cmd": [
-    "papers/ime-observation/kit/refinput-windows/target/release/refinput_tsf.exe",
+    "kit/refinput-windows/target/release/refinput_tsf.exe",
     "--out",
     "{out}"
   ],
   "logger_cmd": [
-    "papers/ime-observation/kit/logger/target/release/ime-observation-logger.exe",
+    "kit/logger/target/release/ime-observation-logger.exe",
     "--out",
     "{out}"
   ],
   "reset_cmd": [],
   "focus_cmd": [
     "python",
-    "papers/ime-observation/kit/run/focus_windows.py",
+    "kit/run/focus_windows.py",
     "--title",
     "refinput_tsf (gt/1 win_tsf)",
     "--ime-on"
