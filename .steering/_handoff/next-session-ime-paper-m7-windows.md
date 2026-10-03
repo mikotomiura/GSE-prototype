@@ -1,5 +1,6 @@
 # 次セッション — IME 論文: Windows の追補の OSF 登録と M7（Windows の本計測）
 
+> ★ **2026-10-03 追記: 追補は OSF に登録済み — https://osf.io/4jwzn（DOI 10.17605/OSF.IO/4JWZN・2026-10-03T13:56 UTC・添えたファイルの SHA が一致・`notes.md` に記録）。§1 の未了 1 は済み。**
 > 作成: 2026-10-03（Surface Pro 8・M5 と M6 を終えたセッションの最後）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（**判断 137〜142**）・`tasklist.md`・`pilot-windows-1-notes.md`・`attack-me/prereg-ime-windows/round-1・2/verdict.md` と、凍結した `papers/ime-observation/experiment/preregistration.md` の **§10**・`deviations.md`・`data.windows.md`・`kit/run/README.windows.md`。状態は着手時に `git fetch` で測り直す。
 

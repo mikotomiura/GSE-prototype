@@ -197,7 +197,7 @@
     - [x] 2026-10-03: 直した手順で短い確認の run（IMM / TSF 各 39 試行）→ 持ち越し 0・S4 / S8 とも 3 / 3 で意図どおり・gt のマーカーが全ブロックで一致（`pilot-windows-1-notes.md` の「確認の run」）
     - [x] 公開用の `experiment/pilot-windows.md`（英語）→ M5 を閉じる（2026-10-03・M6 と一緒に書いた・attack-me round 1・2 で直した）
   - [x] M6 Windows の追補（2026-10-03・Surface・判断 138〜142）: §10・逸脱 D1〜D4・`pilot-windows.md`・`data.windows.md`・`kit/run/` の Windows の道具・`scope_windows.py`。attack-me round 1（major）→ round 2（minor）→ 直して完了時レビュー（code-reviewer ∥ security-checker・Codex は不在で省略）→ **凍結 `a57c4fd7`・タグ `ime-observation-prereg-windows`**（`sha256` は macOS と同じ・書き出し 108 ファイル・一覧の SHA-256 `f61af353…87b7`・`freeze-export-list-windows.txt`）
-    - [ ] ★ 研究者: OSF Registries に追補を登録する（凍結したファイル `f8620963…2b1d`・commit の 40 桁・一覧の SHA）→ URL と日付を `experiment/notes.md` に → 登録の日付は Windows の最初の計測より前
+    - [x] 2026-10-03: 研究者が OSF Registries に追補を登録した → **https://osf.io/4jwzn**（DOI 10.17605/OSF.IO/4JWZN・公開・`date_registered` 2026-10-03T13:56:27 UTC・Open-Ended・添えたファイルの SHA-256 が凍結したファイル `f8620963…` と一致）→ `notes.md` に記録。元の項目: 研究者: OSF Registries に追補を登録する（凍結したファイル `f8620963…2b1d`・commit の 40 桁・一覧の SHA）→ URL と日付を `experiment/notes.md` に → 登録の日付は Windows の最初の計測より前
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
