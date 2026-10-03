@@ -1187,3 +1187,12 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   3. `focus_front.py`・`away_window.py`・`run_fg.py` を **Windows のセルだけが使う新しいファイルとして `kit/run/` に足す**（§8 の範囲・凍結の既存コードは変えない・selftest を付ける）。
   4. 試行数は **macOS と同じ 75**（13 シナリオ × 3 速さ × 75 = 2,925 試行・Surface の実測で約 11.5 時間）。
 - **影響範囲**: `experiment/plan_config.windows.json`（新規）・`kit/run/` の 3 ファイル（新規）・Windows のセルのファイル（新規）・`preregistration.md` の追補の節と凍結の印・`experiment/pilot-windows.md`（M5 を閉じる）・`experiment/notes.md`（OSF の登録・M6 の最後に研究者が行う）。
+
+## 判断 139: 凍結の解析コードは Windows の run を拒み、Windows の主要な範囲も作れない —— 逸脱 D2（計画の照合を広げる）と D3（Windows の範囲を正解の長さで定める）（2026-10-03・Surface・研究者の選択）
+
+- **見つけたこと**（impact-analyzer の調査をメインが一次で確かめた）:
+  1. `kit/analysis/pipeline.py:253` の `REGISTERED_PLAN_SHA256` と `:873` の `_plan_matches_cell` は、セルの `ime_settings.live_conversion` が "on" / "off" で、計画の SHA-256 が macOS の 2 つの計画と一致する run だけを解析する → Windows の run は必ず拒まれる。§8 の追補の範囲では直せない。
+  2. `pipeline.py:787` は `plan["os"] == "macos"` のときだけ予測（`spec_predict`）を作り、無ければ範囲は `all_trials` だけ（`_prediction_summary` の理由は「the prediction models the macOS observer only」）。→ Windows では問い 1〜3 の主要な範囲 `under_limit` が無い。Windows のロガーは IME の WinEvent で観測するので（`driver_windows/ime_winevent.rs`）、キーからの予測はそもそも当てはまらない。20 秒の打ち切りは OS 共通（`kit/logger/src/input/ime_cloak.rs:167` `MAX_SESSION_MS: u64 = 20_000`）。
+  3. TSF の参照入力欄は IME が消費したキーを受け取らない（`delivery.py` で参照への到達 6 / 1,470・パイロット本体 16 / 3,900）→ 中断の理由 3（外からの押下）は 0 で通るが、人の打鍵を見つける力は弱い（理由 4 は観測ログで働く）。IMM の参照なら各ブロックの前の `VK_IME_ON` がキーの行を 1 つ残し、凍結の k = 0 で毎回中断扱いになっていた（`verify-imm` の区間 0 に 1 行）→ TSF を選んだこと（判断 138）と整合。追補の限界に書く。
+- **研究者の答え**（AskUserQuestion・2 問とも推奨どおり）: (1) **逸脱 D2**: `pipeline.py` の計画の照合に Windows のセルの計画を足す（セルの os が windows なら Windows の計画と照らす・macOS の照合は不変）。(2) **逸脱 D3**: Windows だけ、正解のセッションが 20 秒以上続いた試行を「長い」として `under_limit` / `over_limit` を作る（§4.3 の印を使う）。
+- **進め方**: macOS の解析は macOS のタグから走る（§8）ので、D2・D3 は macOS の結果を変えない。それでも変更後のコードで macOS の入力の結果が変わらないことを selftest と合成データで確かめる。D2・D3 は `experiment/deviations.md` に記録し、追補の節から参照する。

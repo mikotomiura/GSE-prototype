@@ -201,6 +201,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import delivery  # noqa: E402  per-press delivery of the scripted input
+import gt_scope  # noqa: E402  the long trials of a Windows cell, from the ground truth (deviation D3)
 import gt_sessions  # noqa: E402  ground-truth sessions
 import inject  # noqa: E402  synthetic observation rows with known errors
 import l1  # noqa: E402  level 1
@@ -253,10 +254,18 @@ DELIVERY_TAIL_MS = 300
 REGISTERED_PLAN_SHA256 = {"on": "c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba",
                           "off": "3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2"}
 LIVE_CONVERSION_KEY = "live_conversion"
+# SHA-256 of the plan log of the measurement plan of the Windows cell (deviation D2, experiment/deviations.md; the
+# plan is given in the Windows addendum, section 10 of the pre-registration). A run whose cell records the operating
+# system "windows" is accepted only when its plan log is this plan; the check of the macOS cells is unchanged.
+REGISTERED_PLAN_SHA256_WINDOWS = "b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0"
 PRIMARY_NOTE = ("the primary estimates are the comparison and scope named here, per stratum; every other comparison "
                 "and scope is secondary. A cell without a prediction (the prediction models the macOS observer only) "
                 "has the comparison gt_obs and the scope all_trials only. Values under all_trials depend on this "
                 "design's fraction of long trials (see predictions)")
+PRIMARY_NOTE_WINDOWS = ("a cell on Windows has no prediction and so only the comparison gt_obs; its scopes take the long "
+                        "trials from the ground truth, a trial being long when a ground-truth session assigned to it lasts "
+                        "at least limit_ms (deviation D3; see long_trials_from of the cell), so its primary estimates "
+                        "are gt_obs under under_limit")
 DETECTION_KEYS = ("definition", "config", "inputs_sha256", "input", "excluded", "used", "diagnostics", "metrics")
 
 
@@ -789,11 +798,20 @@ def run_stages(run, cfg, rules_bytes, seed, keymap, focus_trials=()):
         pred_bytes = spec_predict.render(pred)
         comps["gt_pred"] = (sess_bytes, spec_predict.as_obs_bytes(pred))
         comps["pred_obs"] = (spec_predict.as_sessions_bytes(pred, sess_bytes, f["oracle"]), f["obs"])
-    scopes = match.SCOPES if pred is not None else ("all_trials",)
+    # The long trials that the scopes set aside: from the prediction on macOS; on Windows, where the observer reads
+    # the input method's events and no prediction applies, from the ground-truth durations (deviation D3, gt_scope.py).
+    scope_bytes = pred_bytes
+    if plan["os"] == "windows":
+        scope_bytes = gt_scope.as_prediction_bytes(sessions, f["oracle"], f["plan"], cfg["limit_ms"])
+    scopes = match.SCOPES if scope_bytes is not None else ("all_trials",)
     def_os = DEFINITION_OF_OS[plan["os"]]
     out = {"prediction": _prediction_summary(pred, pred_bytes, plan, f["plan"]),
            "same_sessions_as_all": sessions["definitions"][def_os] == sessions["definitions"]["all"],
            "definitions": {}}
+    if pred is None and scope_bytes is not None:
+        longs = sorted(gt_scope.long_trials(sessions, cfg["limit_ms"]) & set(plan["trials"]))
+        out["long_trials_from"] = {"source": gt_scope.SOURCE, "limit_ms": cfg["limit_ms"], "n_long": len(longs),
+                                   "sha256": _sha(scope_bytes)}
     for definition in (def_os, "all"):
         det, l1o, l2o = {}, {}, {}
         for comp in COMPARISONS:
@@ -803,7 +821,11 @@ def run_stages(run, cfg, rules_bytes, seed, keymap, focus_trials=()):
             sb, ob = comps[comp]
             det[comp], l1o[comp] = {}, {}
             for scope in scopes:
-                m_out = match.evaluate(sb, definition, ob, f["plan"], f["oracle"], sc["match"], pred_bytes, scope)
+                m_out = match.evaluate(sb, definition, ob, f["plan"], f["oracle"], sc["match"], scope_bytes, scope)
+                if pred is None and scope_bytes is not None:
+                    # the long trials came from the ground truth, which has no layers of a prediction
+                    m_out["scope"]["layer_none_trials"] = m_out["scope"]["uncontaminated_trials"] = None
+                    m_out["diagnostics"]["prediction_layers"] = None
                 det[comp][scope] = _detection_view(m_out, _focus_loss(m_out, oracle, focus_trials, plan["trials"]))
                 if scope in L1_SCOPES:
                     m_bytes = match.render(m_out)
@@ -872,7 +894,10 @@ def reference_abort_reasons(dlv):
 
 def _plan_matches_cell(run):
     """True when the cell of the run records live conversion "on" or "off" and the SHA-256 of its plan log is the
-    registered plan of that setting (section 2.4)."""
+    registered plan of that setting (section 2.4). A cell on Windows has no such setting: its plan log must be the
+    registered plan of the Windows cell (deviation D2)."""
+    if run["manifest"]["cell"].get("os") == "windows":
+        return run["sha"]["plan"] == REGISTERED_PLAN_SHA256_WINDOWS
     settings = run["manifest"]["cell"].get("ime_settings")
     setting = settings.get(LIVE_CONVERSION_KEY) if isinstance(settings, dict) else None
     return (isinstance(setting, str) and setting in REGISTERED_PLAN_SHA256
@@ -942,6 +967,11 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
                                              "obs_match_after_ms": delivery.OBS_MATCH_AFTER_MS,
                                              "registered_plan_sha256": dict(REGISTERED_PLAN_SHA256),
                                              "pre_ms": DELIVERY_PRE_MS, "tail_ms": DELIVERY_TAIL_MS}, cells={})
+    if any(r["manifest"]["cell"].get("os") == "windows" for r in used):
+        # recorded only when a Windows cell is analysed, so that the result files of the macOS cells are unchanged
+        res["delivery"]["abort_rule"]["registered_plan_sha256_windows"] = REGISTERED_PLAN_SHA256_WINDOWS
+        for key in PRIMARY:
+            res[key]["primary"]["note_windows"] = PRIMARY_NOTE_WINDOWS
     for r in used:
         f = r["files"]
         try:
@@ -956,6 +986,8 @@ def analyse(run_dirs, config_path, seed, out_dir, prereg=None, seed_file=None, m
         st = run_stages(r, cfg, rules_bytes, seed, keymap, dlv["reference_focus_loss"]["trials_with_focus_loss"])
         res["detection"]["predictions"][r["label"]] = st["prediction"]
         res["detection"]["same_sessions_as_all"][r["label"]] = st["same_sessions_as_all"]
+        if "long_trials_from" in st:
+            res["detection"].setdefault("long_trials_from", {})[r["label"]] = st["long_trials_from"]
         for key in PRIMARY:
             res[key]["cells"][r["label"]] = dict((definition, d[key]) for definition, d in st["definitions"].items())
     _write_results(out_dir, [(fname, match.render(res[key])) for key, fname in RESULT_FILES])
@@ -1166,7 +1198,7 @@ def _syn_presses(kind, lo, length, cancel, arrow):
     return sorted(presses)
 
 
-def make_synthetic_run(run_dir, seed, label, speeds):
+def make_synthetic_run(run_dir, seed, label, speeds, os_name="macos"):
     """A complete synthetic run directory in the form the run-cell tool writes: two blocks of
     SYN_TRIALS_PER_BLOCK trials, one composition per trial (a quarter of them cancelled), a few arrow
     presses, and an observation log made by inject.py from the assembled ground truth. The oracle records
@@ -1175,10 +1207,12 @@ def make_synthetic_run(run_dir, seed, label, speeds):
     observer's 20-second cut-off) and one is cancelled with Backspace. The observation is made from the
     sessions shorter than 20 s (the observer reports no longer session); it does not depend on the
     prediction. The ground truth is generated from the seed and the observation errors from the seed xor
-    INJECT_XOR."""
+    INJECT_XOR. With os_name "windows" the run is a Windows cell: the reference log holds the calls of the TSF
+    reference field (src win_tsf) and the headers and the cell name Windows; everything else is the same."""
+    win = os_name == "windows"
     rng = random.Random(seed)
     os.mkdir(run_dir)
-    plan_rows = [{"kind": "header", "format": "plan/1", "os": "macos", "seed": seed, "generator_version": "0.1",
+    plan_rows = [{"kind": "header", "format": "plan/1", "os": os_name, "seed": seed, "generator_version": "0.1",
                   "config_sha256": "0" * 64, "recipes_sha256": "0" * 64, "corpus_sha256": "0" * 64}]
     trials = []                                   # (trial_id, block, begin_rel, end_rel, lo_rel, length, cancel, arrow, events)
     idx, t = 0, 0
@@ -1216,9 +1250,10 @@ def make_synthetic_run(run_dir, seed, label, speeds):
     def orow(kind, t, **kw):
         return dict(kw, kind=kind, t_wall_ms=WALL0 + t, t_mono_ns=(MONO0 + t) * 1000000)
 
-    orows = [{"kind": "header", "format": "oracle/1", "plan_sha256": _sha(plan_bytes), "os": "macos",
+    orows = [{"kind": "header", "format": "oracle/1", "plan_sha256": _sha(plan_bytes), "os": os_name,
               "emitter_version": "0.1", "backend": "dryrun"}]
-    grows = [{"kind": "header", "format": "gt/1", "src": "mac_nstic", "app_version": "0.1.0", "os": "macos"},
+    grows = [{"kind": "header", "format": "gt/1", "src": "win_tsf" if win else "mac_nstic", "app_version": "0.1.0",
+              "os": os_name},
              orow("ev", 100, ev="focus_in")]     # the reference field has the focus before the first block, as the runner brings it
     for b in range(len(speeds)):
         mine = [x for x in trials if x[1] == b]
@@ -1228,6 +1263,10 @@ def make_synthetic_run(run_dir, seed, label, speeds):
             for step, (at, up, key) in enumerate(events):
                 orows.append(orow("sent", at, trial_id=tid, step=step, key=key, down=not up))
             orows.append(orow("trial_end", end, trial_id=tid))
+            if win:
+                grows.append(orow("ev", lo, ev="tsf_start"))
+                grows.append(orow("ev", lo + length, ev="tsf_end", result_len=0 if cancel else 3))
+                continue
             grows.append(orow("ev", lo, ev="set_marked", len=3, sel_loc=3, sel_len=0))
             if cancel:
                 grows.append(orow("ev", lo + length, ev="set_marked", len=0, sel_loc=0, sel_len=0))
@@ -1242,11 +1281,11 @@ def make_synthetic_run(run_dir, seed, label, speeds):
     gt_down = [orow("ev", s - WALL0 + 3, ev="key_down", vk=0) for s in sent]
 
     rules = _read_regular(os.path.join(_HERE, "gt_rules.example.json"), "rules")
-    sess = gt_sessions.assemble(gt_bytes, oracle_bytes, rules, plan_bytes)["definitions"]["macos_def"]
+    sess = gt_sessions.assemble(gt_bytes, oracle_bytes, rules, plan_bytes)["definitions"]["all" if win else "macos_def"]
     reported = [s for s in sess if s["end_wall_ms"] is not None and s["end_wall_ms"] - s["start_wall_ms"] < spec_predict.LIMIT_MS]
     obs_ime, _truth = inject.inject(reported, {"miss": 0.05, "split": 0.04, "merge": 0.04, "false_pos": 0.05},
                                     {"bias_ms": 20, "sd_ms": 10, "end_lag_ms_max": 30}, seed ^ INJECT_XOR)
-    obs_rows = [{"type": "meta", "format": "obs/1", "os": "macos", "logger_version": "0.1.0",
+    obs_rows = [{"type": "meta", "format": "obs/1", "os": os_name, "logger_version": "0.1.0",
                  "manifest_sha256": "0" * 64,
                  "capabilities": {"unconditional": ["key"], "threshold_gated": [], "config_gated": ["ime_shadow"]}}]
     keys = [{"type": "key", "t": s + 5, "category": "alphabetic", "press": True} for s in sent]
@@ -1259,7 +1298,7 @@ def make_synthetic_run(run_dir, seed, label, speeds):
     for name in LOG_NAMES:
         _write_new(os.path.join(run_dir, LOG_FILES[name]), logs[name])
         outputs[name] = {"file": LOG_FILES[name], "sha256": _sha(logs[name]), "lines": logs[name].count(b"\n")}
-    cell = {"os": "macos", "label": label, "ime": "synthetic", "ime_settings": {}, "refinput_cmd": ["synthetic-input", "{out}"],
+    cell = {"os": os_name, "label": label, "ime": "synthetic", "ime_settings": {}, "refinput_cmd": ["synthetic-input", "{out}"],
             "logger_cmd": ["synthetic-logger", "{out}"], "reset_cmd": [], "focus_cmd": [], "ready_wait_ms": 0,
             "backend": "dryrun", "clock_sync_disabled": False, "auto_update_disabled": False}
     manifest = {"format": RUN_FORMAT, "runner_version": "synthetic", "emitter_version": "synthetic", "synthetic": True,
@@ -1274,7 +1313,7 @@ def _write_new(path, data):
         fh.write(data)
 
 
-def make_synthetic(out_dir, seed):
+def make_synthetic(out_dir, seed, os_name="macos"):
     """Two synthetic run directories (run-a, run-b) under out_dir; returns their paths. An existing directory
     of the same name is never overwritten, and nothing is written under the results directory of the experiment."""
     if _is_under(out_dir, EXPERIMENT_RESULTS):
@@ -1285,7 +1324,7 @@ def make_synthetic(out_dir, seed):
             raise InputError("a run directory of that name already exists and is not overwritten")
     os.makedirs(out_dir, exist_ok=True)
     for i, ((label, speeds), p) in enumerate(zip(SYN_SPECS, paths)):
-        make_synthetic_run(p, seed * 1000 + i, label, speeds)
+        make_synthetic_run(p, seed * 1000 + i, label, speeds, os_name)
     return paths
 
 
@@ -2540,8 +2579,67 @@ def _case_section34_enforcement(d):
     return f
 
 
+def _case_windows_cell(d):
+    """Deviations D2 and D3: the plan of a Windows cell is checked against its own registered plan, and its scopes take
+    the long trials from the ground truth; an analysis of macOS cells alone records nothing of either."""
+    f = []
+    cell_of = lambda os_name, setting=None: {"os": os_name, "ime_settings": {} if setting is None else {"live_conversion": setting}}
+    cases = [(cell_of("windows"), REGISTERED_PLAN_SHA256_WINDOWS, True), (cell_of("windows"), "0" * 64, False),
+             (cell_of("windows", "on"), REGISTERED_PLAN_SHA256["on"], False),
+             (cell_of("macos", "on"), REGISTERED_PLAN_SHA256_WINDOWS, False),
+             (cell_of("macos", "on"), REGISTERED_PLAN_SHA256["on"], True), (cell_of("macos"), REGISTERED_PLAN_SHA256["on"], False)]
+    for cell, sha, want in cases:
+        if _plan_matches_cell({"manifest": {"cell": cell}, "sha": {"plan": sha}}) is not want:
+            f.append("the plan check of a %s cell with %s plan should be %s" % (cell["os"], sha[:8], want))
+    runs = make_synthetic(os.path.join(d, "win"), 3, "windows")
+    cfg = _config_file(d)
+    o = os.path.join(d, "out-win")
+    rc, _o, err = _quiet(["--runs"] + runs + ["--config", cfg, "--seed", "7", "--out", o])
+    if rc != 0:
+        return f + ["the pipeline did not exit 0 on Windows cells (%d): %s" % (rc, err[-300:])]
+    out = dict((n, json.loads(b.decode("utf-8"))) for n, b in _read_results(o).items())
+    deto = out["e1_detection.json"]
+    n_long = 2 * len(SYN_SPECS[0][1])   # one trial in 16 lasts SYN_LONG_MS: two per block of 32
+    for label in ("synthetic-a", "synthetic-b"):
+        cell = deto["cells"][label]
+        if sorted(cell) != ["all", "windows_def"]:
+            f.append("a Windows cell does not hold windows_def and all: %r" % sorted(cell))
+            continue
+        if deto["predictions"][label].get("available") is not False:
+            f.append("a Windows cell reports a prediction")
+        ltf = deto.get("long_trials_from", {}).get(label, {})
+        if ltf.get("source") != gt_scope.SOURCE or ltf.get("n_long") != n_long or ltf.get("limit_ms") != 20000:
+            f.append("long_trials_from of a Windows cell is wrong: %r" % (ltf,))
+        det = cell["all"]
+        if det["gt_pred"] is not None or det["pred_obs"] is not None or sorted(det["gt_obs"]) != sorted(match.SCOPES):
+            f.append("a Windows cell should have gt_obs under the three scopes and no comparison with a prediction")
+            continue
+        used = dict((s, det["gt_obs"][s]["used"]["n_gt"]) for s in match.SCOPES)
+        if used["under_limit"] + used["over_limit"] != used["all_trials"] or used["over_limit"] != n_long:
+            f.append("the scopes of a Windows cell do not split the ground truth at its long sessions: %r" % used)
+        if any(det["gt_obs"][s]["diagnostics"]["prediction_layers"] is not None for s in match.SCOPES):
+            f.append("a Windows cell reports layers of a prediction")
+        if sorted(out["e1_l1.json"]["cells"][label]["all"]["gt_obs"]) != ["all_trials", "under_limit"]:
+            f.append("level 1 of a Windows cell is not computed under under_limit and all_trials")
+    for name in ("e1_detection.json", "e1_l1.json", "e1_l2.json"):
+        if out[name]["primary"].get("note_windows") != PRIMARY_NOTE_WINDOWS:
+            f.append("%s does not state how the primary estimates of a Windows cell are scoped" % name)
+    if out["e1_delivery.json"]["abort_rule"].get("registered_plan_sha256_windows") != REGISTERED_PLAN_SHA256_WINDOWS:
+        f.append("the delivery results do not record the registered plan of the Windows cell")
+    mac = make_synthetic(os.path.join(d, "mac"), 3)
+    om = os.path.join(d, "out-mac")
+    rc, _o, err = _quiet(["--runs"] + mac + ["--config", cfg, "--seed", "7", "--out", om])
+    mo = dict((n, json.loads(b.decode("utf-8"))) for n, b in _read_results(om).items()) if rc == 0 else {}
+    if rc != 0 or "registered_plan_sha256_windows" in mo["e1_delivery.json"]["abort_rule"] \
+            or any("note_windows" in mo[n]["primary"] for n in ("e1_detection.json", "e1_l1.json", "e1_l2.json")) \
+            or "long_trials_from" in mo["e1_detection.json"]:
+        f.append("an analysis of macOS cells alone records something of the Windows cell (rc %s)" % rc)
+    return f
+
+
 CASES = [
     ("the abort rule of the reference input field (unexplained key presses per block)", _case_reference_abort_rule),
+    ("a Windows cell: its registered plan and its scopes from the ground truth (deviations D2, D3)", _case_windows_cell),
     ("section 3.4 before a deposit: focus loss, and the abort rule for aborted runs in the deposit check and the archive",
      _case_section34_enforcement),
     ("the rows of the trials that lost focus, and the composition of the scopes", _case_focus_and_composition),
