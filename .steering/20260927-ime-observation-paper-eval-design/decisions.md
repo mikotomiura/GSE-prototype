@@ -1208,3 +1208,14 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **研究者の答え**（AskUserQuestion）: 「attack-me を 1 回回してから凍結（推奨）」。理由（メインの推奨）: D2・D3 は解析のコードに触れるので、第三者の目で攻める価値が高い。
 - **やり方**: `attack-me/prereg-ime-windows/round-1/`。macOS と同じ立場・同じ接地の文献（研究者の指示）。macOS の `tmp\` は G-GEAR にあるので、この機械で取り直した（8 本のうち 7 本は round 1 の原本と SHA-256 が一致・Koo の HTML は動的なページで違う〔題・著者は一致〕）。投稿規程も取り直し、J1〜J10 は逐語で在る。見る範囲はタグ `ime-observation-prereg-macos` から変わった箇所（§10 と、持ち込んだ公開物・コード）に絞り、§1〜§9 は文脈として渡した。
 - ⚠️ この機械の `~/ime-pilot/runs/` に封印物と生ログがある（査読者役は Read しか持たないが、読むことは構造で縛れない）→ 起動の前に研究者に知らせ、応答の保存の検査（一覧の外の絶対パス）で確かめる。
+
+## 判断 141: attack-me round 1（Windows の追補）の採否 —— 長い試行は oracle の送出の幅・D4 で人の打鍵を中止に・問 4 は macOS で決める・Windows の解析は別の一覧・直す一覧を全部承認（2026-10-03・Surface・研究者の選択）
+
+- **round 1 の判定**: major revision（R1・R2・R3 とも major・fatal 0・接地の引用 12 / 12 在る・注入 0）。記録は `attack-me/prereg-ime-windows/round-1/verdict.md`。3 人が一致した最重要: Windows のロガーの規則が §10 に無く、メインが書いた「composition events を読む」は実装（IME の窓の表示・非表示・cloak）と違う。20 秒の打ち切りは cloak の経路にしか無く（窓の表示から）、WinEvent の経路には無い（25 秒の安全弁だけ）→ D3 の「両 OS で同じ」は成り立たない。⚠️ メインが一次を確かめずに書いた誤り（「composition events」と `cell.windows.json` のパス）。
+- **研究者の答え**（AskUserQuestion・4 問とも推奨どおり＋直す一覧を全部承認・round 2 まで）:
+  1. 長い試行の主の定義は **oracle の送出の幅**（試行の最初と最後の送った押下が 20 秒以上）。正解の長さの版は感度（`under_limit_gt_duration`）、19〜21 秒の境界の帯と、2 つの定義で分類の違う試行を層ごとに数える。
+  2. **逸脱 D4**: Windows の run は、観測の key 行のうち送った押下で説明されないものが区間の印を超えたら中止（解析も寄託もしない）。パイロット 7 本は全区間で印ちょうど。
+  3. 問 4 の推奨は **macOS の 2 セルで決める**（凍結のまま）。Windows のセルは同じ判定を別に報告し、成り立たなければ Windows のログへの但し書きとして報告する（推奨は変えない）。
+  4. Windows の run は **`experiment/data.windows.md`**（新規）に並べ、`pipeline.py --runs-from experiment/data.windows.md --out experiment/results/windows` を §10.7 に逐語で。Windows のタグで出た macOS の結果は報告しない。IMM のパイロットの run は寄託しない（`--check-deposit` が k = 0 で拒む）。
+- **実装**（`9fb61af2`・`b41c00b3`）: `kit/analysis/scope_windows.py`（`gt_scope.py` を置き換え）・`pipeline.py`（D4 の `observation_abort_segments`・`reference_abort_reasons(dlv, os_name)`・Windows の run の gt の `src` が `win_tsf` でなければ拒む〔D2 に含めた〕・感度の範囲・診断〔result_len の無い `tsf_end`・S4 の何回目の Esc〕・`note_windows` の書き直し・説明文）・selftest（D4 を外す・経路の検査を外す の 2 つの対照で赤）。§10 を書き直した（10.1〜10.11・Windows のロガーの小節・層ごとの表・Windows のタグの SHA の表・問 4・解析の入口・問 5 の量と `cpu_all_zero`）。`deviations.md` を D1〜D4 と「macOS は変わらない」の節（命令とハッシュ: macOS の計画はタグから登録の SHA と一致し、変更後は手順書の SHA を伏せてバイト一致／合成の macOS の run の結果 4 ファイルがバイト一致〔bootstrap 2000〕）で書き直した。`pilot-windows.md`・`README.windows.md` を直した。LF の worktree で `kit/check.sh` 33 本緑・書き出し 108 ファイル・文体の検査 0。
+- **次**: round 2（同じ立場・同じ文献・役ごとの引き継ぎを渡し、再掲を求めない）。⚠️ round 2 の直しでコードを変えたら、`deviations.md` の「macOS は変わらない」の比較を取り直す。
