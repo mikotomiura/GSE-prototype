@@ -65,3 +65,26 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 - 片付け: npm / pip のキャッシュ・`src-tauri/target`・パイロットの `target`・前セッションの worktree 2 つを消した（C: の空き 4.8 → 8.8 GB）。
 - **試み 2**: 研究者が VS Code を閉じ、単独の PowerShell から `start_windows.py … --run-dir C:/Users/johnd/ime-m7/runs/cell-2` を起動する（Claude Code の外）。
 - **次のセッション**: `cell-2` の `run.json` の有無を確かめる → `delivery.py`（`data.md` の Deposit procedure 1・`--pre-ms 20 --tail-ms 300`）→ `data.windows.md` の Run checks に試み 2 の行（manifest の SHA-256・D4 は `observation.segments.excluding_mode_keys.max_unexplained_beyond_markers`）→ すぐ commit・push → PR #303 を CI 緑で merge。⚠️ git の identity が無い機械なので `git -c user.name="Mikoto Miura" -c user.email="164107357+mikotomiura@users.noreply.github.com"`。
+
+## §2.7 次のセッションの起動と打ち込む用（試み 2・2026-10-04 1:50 JST）
+
+研究者の手順: Slack・Edge を通知領域から終了 → VS Code を閉じる → Win+R「powershell」（管理者でない）→
+
+```
+$env:CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP = "1"
+cd C:\GSE-prototype
+claude
+```
+
+打ち込む用:
+
+```
+.steering/_handoff/next-session-ime-paper-m7-windows.md の §2.6・§2.7 を読んで、M7 の試み 2 を起動してください。
+1. 状態を測る: git fetch・枝 docs/ime-m7-windows-d5（PR #303）・版（IMJPTIP.DLL 10.0.26100.9278・build 26200.9457 から変わっていないか）・AC・NoSync・RebootRequired なし・空きメモリ。変わっていたら起動せずに戻す。
+2. 計画 ~/ime-m7/plan/plan-windows.jsonl の SHA-256 が b7bdf8fc…36b0、セル ~/ime-m7/cell-windows.json が 0e4c17ed…4fb6 であることを確かめる。
+3. run は Claude Code のバックグラウンドのタスクにしない。PowerShell の Start-Process で独立したプロセスとして起動する（作業ディレクトリ ~/ime-m7/export・python kit/run/start_windows.py --cell C:/Users/johnd/ime-m7/cell-windows.json --plan C:/Users/johnd/ime-m7/plan/plan-windows.jsonl --run-dir C:/Users/johnd/ime-m7/runs/cell-2 --i-understand-this-sends-keys・標準出力と標準エラーは ~/ime-m7/runs/cell-2.out / cell-2.err へ）。起動後 1 分で前面の確認（cell-2.out の "brought to the front: yes"）と子の生存を確かめる。
+4. 終了の見張りは run.json の出現 または start_windows.py のプロセスの消失を until ループで（両方の終わり方を拾う）。
+5. 終わったら §2.6 の「次のセッション」の点検 → data.windows.md に試み 2 の行 → すぐ commit・push（§10.8）。
+⚠️ 凍結のタグのコードは変えない。観測のセッション行は読まない。生ログを git に入れない。run 中は誰も PC に触れない。git は -c user.name/-c user.email（§2.6）。
+Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data-privacy。応答は日本語。
+```
