@@ -7,7 +7,7 @@ The two lines below are the freeze marks of section 9; `run.sh` and `kit/analysi
 only while both are present and the second matches the configuration, seed and rule files. The cells on Windows are
 registered in an addendum that is frozen before the first Windows measurement (section 8).
 
-frozen_at: 2026-10-02
+frozen_at: 2026-10-03
 
 sha256: 64dfbb6e5f08222ade1fb96a8171d97c0fa1bc9ca9adb5cc987fc27bd9a8af2a
 
