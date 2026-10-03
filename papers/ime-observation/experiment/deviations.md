@@ -101,7 +101,8 @@ observation lost, or input with the pointer, touch or pen. It applies to the run
 
 The macOS plans and analysis are generated and run from the macOS tag (section 8). That the changed files would give
 the same results was checked on 2026-10-03, on Windows 11 with Python 3.11.9, in checkouts with LF line ends of the
-macOS tag and of the commit of these changes (`9fb61af2`):
+macOS tag and of the commit that holds the code of the addendum (`d40e090a`; the commits after it up to the
+freezing commit of the addendum change documents only):
 
 - Plans: in each checkout,
   `python kit/gen/generate_plan.py --config experiment/plan_config.macos.json --recipes kit/gen/<file> --corpus
