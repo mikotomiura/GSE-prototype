@@ -3,6 +3,8 @@
 > 作成: 2026-10-03（G-GEAR・OSF の登録を記録したセッションの最後に）。★ **研究者の選択で M5 は G-GEAR で行う**（判断 134）。別の Windows 実機で行うのは**数時間以上の run だけ**（M7 の本計測のセル・Windows の E3 の 8 時間の 2 条件）。⚠️ 判断 133（M5 を別の実機で）は判断 134 で改めた。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（**判断 68・133・134**、Mac の前例は `pilot-macos-1-notes.md`）・`_issue-plan.md` §5（M5・M6）・`design.md` §1.1・§1.1a・§1.1b と、`papers/ime-observation/kit/pilot/README.md`・`kit/refinput-windows/README.md`・`kit/run/README.md`、凍結した事前登録 `papers/ime-observation/experiment/preregistration.md` の **§8**（追補が変えてよい範囲）。状態は着手時に `git fetch` で測り直す。
 
+> ★★★★★ **2026-10-03 の終わり: M5 と M6 は済んだ**（凍結 `a57c4fd7`・タグ `ime-observation-prereg-windows`）。次は `next-session-ime-paper-m7-windows.md`。このメモは履歴。
+
 ## §0 打ち込む用
 
 ```
