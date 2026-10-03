@@ -59,3 +59,14 @@
 3. **正解の経路の選択**（M6）: (a) IMM と (b) TSF はどちらも確定と取消を分けられる。違いは S7 の確定の時点（入力欄の種類による）と、持ち越しの記録のしかた。
 4. **起動の手順**（所見 5）: 前面ロックのため、M7 でも `run_fg.py` の形の起動か、研究者が前面の端末から起動するかを決める。`focus_front.py`・`away_window.py`・`run_fg.py` を Windows だけの新しいファイルとして `kit/run/` に足すかも（M6）。
 5. 公開用の `experiment/pilot-windows.md`（英語）は、上が決まってから書く（Mac の `pilot-macos.md` も正解の定義の後に書いた）。→ M5 はまだ閉じない。
+
+## 確認の run（2026-10-03・判断 137 で直した手順・`verify-imm`・`verify-tsf`）
+
+- 手順の変更: S4 は Esc 3 回（逸脱 D1・`experiment/deviations.md`）、S8 は数字の後に Enter 1 回（`_PROFILES["windows"]["after_digit"]`・§8 の範囲）。コミット `f657509c`。
+- 計画 `plan-verify`（n = 1・39 試行・3 ブロック・seed 8・SHA-256 `f02e046b…0154`）は直した生成器（LF の worktree `~/ime-pilot/wt-lf`）で作り、`--validate` exit 0。runner・送出器・ロガー・参照入力欄はタグの書き出しのまま（runner は計画を生成器で検証しない —— 検証は selftest の中だけ・確かめた）。起動は前回と同じ `run_fg.py`。2 本とも打ち切りなし・3 ブロックとも前面の確認が取れた・各 9.9 分。
+- ★ **結果（2 経路とも同じ）**: 持ち越しは **0 件**（前回の本体は 19 件）。S4 は 3 / 3 で取消（IMM は 3 回目の Esc で `comp`〔結果なし〕→ `end_comp`、TSF は 3 回目で `tsf_end` の `result_len` 0 —— 1 回目・2 回目は composition が残る・所見 1 の機序どおり）。S8 は 3 / 3 で確定。S1・S2・S3・S7・S10・S12・S13・S14・S15 は確定、S5・S6 は取消（意図どおり）。
+- 到達: 1,470 押下のうち 1,464（99.6%）。欠けは S14 の 3 試行の IME キー 2 押下ずつだけ（設計どおり）。
+- 時計: **gt のマーカーが 3 ブロックすべてで見つかった**（前回の本体はブロック 1・3・5 で欠けた —— 持ち越しが消えたため）。IMM は obs − oracle 1 ms・gt − oracle 4 ms、TSF は obs − oracle 0 ms・gt − oracle 3 ms（中央値）。ドリフトの値（gt 側 約 40 ms/h）は 3 点・10 分からの外挿で当てにならない（範囲は 2〜9 ms）→ 本体の値（IMM ≈ 0・TSF 10.7 ms/h）を参照する。
+- 残る既知の差: S7 の 1 試行で TSF だけ IME を通らない Enter が入った（所見の「S7 の経路差」と同じ）。S15 の戻りの Enter は両経路で IME を通らない（所見 3）。
+- 封印: `verify-imm` `9e20cc4c…`（04:10:03Z）・`verify-tsf` `7c78eb1a…`（04:20:16Z）。生ログは `~/ime-pilot/runs/`。
+- → 直した Windows の手順は**意図どおりに動く**。M5 に残るのは公開用の `experiment/pilot-windows.md`（正解の経路の選択・起動の手順・`gt_rules` の Windows のブロックが決まってから・M6 と一緒に）。

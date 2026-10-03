@@ -18,6 +18,7 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 
 ## §1 状態（2026-10-03 の終わり）
 
+- ★★★★ **2026-10-03 の続きの続き（Surface）: 止まっていた所を研究者が決めた（判断 137）**。S4 は**逸脱 D1 として Windows だけ Esc 3 回**（`experiment/deviations.md`・`_PROFILES` に `cancel_converted`）、S8 は数字の後に Enter（§8 の範囲）。直した手順で確認の run（IMM / TSF 各 39 試行）を回し、**持ち越し 0・S4 / S8 とも 3 / 3 で意図どおり・gt のマーカーが全ブロックで一致**（`pilot-windows-1-notes.md` の「確認の run」）。CHI Posters の記録の直し（§3 の末尾）も済み。→ **次は M6**（追補）: 正解の経路（IMM / TSF）の選択・起動の手順（`run_fg.py`・`focus_front.py`・`away_window.py` を `kit/run/` に足すか）・`gt_rules` の Windows のブロック（S15 の確定は `focus_out` の時点）・追補の節で D1 を参照 → その後に公開用の `experiment/pilot-windows.md` で M5 を閉じる。⚠️ この機械の作業コピーは CRLF で `kit/check.sh` の 3 本が赤になる（変更と無関係）→ selftest は LF の worktree（`git -c core.autocrlf=false worktree add`）で回す。`python3` は `~/ime-pilot/bin` を PATH の先頭に。
 - ★★★ **2026-10-03 の続き（Surface Pro 8）: M5 のパイロットを Surface で実施した**（判断 136・研究者の指示で判断 134 / 135 を改めた）。§2 の 1〜7 は済み。結果と所見は `.steering/20260927-ime-observation-paper-eval-design/pilot-windows-1-notes.md`。生ログと封印・作業ファイル（`cell-*.json`・`focus_front.py`・`away_window.py`・`run_fg.py`・`outcome.py`・`seq.py` など）は Surface の `~/ime-pilot/`。⚠️ **止まっている所**: S4 が凍結のコードの制約で MS-IME の取消にならない（ノートの所見 1）→ 研究者の判断待ち。以下の §1・§2 は当時の記述。
 
 - **macOS の事前登録は凍結済み・OSF で公開済み**: `https://osf.io/9nh7r`（DOI `10.17605/OSF.IO/9NH7R`・`date_registered` 2026-10-02・添えたファイルの SHA-256 は凍結したファイル `fa6fd586…7773` と一致・`notes.md` に記録・PR #298）。Mac の M4（本計測）は別の流れで、Mac の引き継ぎ `next-session-ime-paper-osf-m4.md` の §2 の 3 から。
