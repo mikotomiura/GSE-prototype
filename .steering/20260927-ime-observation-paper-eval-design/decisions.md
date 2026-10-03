@@ -1177,3 +1177,13 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **影響範囲**: M6 の追補（§8）では D1 を「逸脱」として追補の本文から参照する。正解の経路の選択・起動の手順（`run_fg.py` など）・`gt_rules` の Windows のブロックは M6 で決める。
 - **完了時レビュー**（2026-10-03・`5c37c8ed..HEAD`）: `security-checker` は指摘なし（生ログ・キーコード・読みの転記なし・`papers/` に機械の情報なし・照合は緩んでいない）。`code-reviewer` は中 2・低 3 → 中 2（D1 がマーカーの欠けを S4 だけのせいにしていた・タグの差分に macOS のプロファイルの行が出ることを書いていなかった）と低 2（コメントに 1 文節の場合・3 回目の Esc の記述を "expected to" に）を直した。低 1（Windows の負の対照の selftest）は、凍結に関わる変更を広げないため見送った。
 - ⚠️ **`/cross-review` は省いた（安全ゲート: codex 不在）**: この Surface には Codex CLI が入っていない（npm のグローバルは `claude` だけ）。加えて、この機械の `python3` は Microsoft Store のスタブなので、`secrets-pre-filter.sh`・`codex-budget-guard.sh` が「hook 入力 JSON を parse できない」で fail-closed になり、「codex」の語を含む Bash 呼び出しはすべて止まる（hook は `python3` を `python` より先に選ぶ）→ この機械で Codex を使うなら、導入と、Store のエイリアスを切るか hook の側の対応が要る。
+
+## 判断 138: M6（Windows の追補）の中身 —— TSF の 1 セル・`gt_rules` は変えない・起動の道具を `kit/run/` に足す・n = 75（2026-10-03・Surface・研究者の選択）
+
+- **材料**（2026-10-03・gt と oracle と plan だけを読み、obs は読んでいない）: タグのままの `gt_rules.json` でパイロットの gt を `gt_sessions.py` に通した。計画との一致は、直した手順の確認の run で **IMM 39 / 39・TSF 39 / 39**（確定 30・取消 9）。直す前の run の不一致（short: 33 / 39・30 / 39、本体: 102 / 117・93 / 117）は、すべて S4 と S8 の持ち越しとその次の試行による。S15（前面を外れた時点の確定）と TSF の S7（→ が文節の数を超えたときのその場の確定）も、今の規則で確定として数えられる。
+- **研究者の答え**（AskUserQuestion・4 問とも推奨どおり）:
+  1. 正解の経路は **TSF の 1 セル**（`refinput_tsf`・規則の `win_tsf`）。理由: MS-IME は TSF の入力方式（TIP）で、TSF の入力欄は composition を直接受け取る（IMM の窓は互換の層を通す）。いまのアプリの多くは TSF。IMM はパイロットの比較の相手として記録に残す。
+  2. `gt_rules.json` の Windows のブロックは**変えない** → 凍結の `sha256:` は macOS と同じ値のまま、`frozen_at:` だけが追補の日付になる。根拠はパイロットの一致率として追補に書く。
+  3. `focus_front.py`・`away_window.py`・`run_fg.py` を **Windows のセルだけが使う新しいファイルとして `kit/run/` に足す**（§8 の範囲・凍結の既存コードは変えない・selftest を付ける）。
+  4. 試行数は **macOS と同じ 75**（13 シナリオ × 3 速さ × 75 = 2,925 試行・Surface の実測で約 11.5 時間）。
+- **影響範囲**: `experiment/plan_config.windows.json`（新規）・`kit/run/` の 3 ファイル（新規）・Windows のセルのファイル（新規）・`preregistration.md` の追補の節と凍結の印・`experiment/pilot-windows.md`（M5 を閉じる）・`experiment/notes.md`（OSF の登録・M6 の最後に研究者が行う）。
