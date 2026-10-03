@@ -47,17 +47,19 @@ to it), in a terminal that is not elevated.
 
    Nobody touches the keyboard or the pointer until the runner has ended: synthetic keys go to the window in front.
 
+## After the run
+
+Record the checks of the run in `experiment/data.windows.md` (not `data.md`), and list the run there once it has been
+deposited. The analysis of the Windows cell is run from the Windows freezing tag with the command of section 10.7 of
+the pre-registration; `experiment/run.sh` reads `data.md` and serves the macOS cells.
+
 ## Notes from the calibration pilot
 
-- The Microsoft input method switches on with `VK_IME_ON` (0x16) and leaves no key-down in the TSF reference log, so
-  the setting k = 0 of the rule on presses from outside (pre-registration, section 3.4) holds for the Windows cell.
-- The TSF reference input field receives only the keys that the input method does not consume (in the pilot, the
-  arrow keys of the block-start markers and a few keys outside a composition). Its log therefore shows few of the
-  presses sent, and the rule on presses from outside sees a person's key only when the input method does not consume
-  it; the rule on the loss of focus reads the observation log and is not affected.
+- The stopping rule of the Windows cell and the reasons for its additions are in section 10.8 of the pre-registration
+  (the TSF reference input field receives only the keys that the input method does not consume).
 - `SetForegroundWindow` was refused when the runner was started from a shell that was not in the foreground; the
-  emitter's read-back then stops the run before any key is sent. `start_windows.py` avoided this in the pilot
-  run that used it, and an earlier version of it in the four runs before. Starting `run_cell.py` directly from a terminal in the foreground may avoid it as well; this was not
-  tried in the pilot.
+  emitter's read-back then stops the run before any key is sent. `start_windows.py` avoided this in the pilot run
+  that used it, and an earlier version of it in the four runs before. Starting `run_cell.py` directly from a terminal
+  in the foreground may avoid it as well; this was not tried in the pilot.
 - An application window used as the S15 target was closed during one pilot run, which stopped the run; the
   `ime-away` window avoids this.

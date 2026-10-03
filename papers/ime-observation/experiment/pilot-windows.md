@@ -16,7 +16,7 @@ analysis and were not read.
 | Item | Value |
 |---|---|
 | Machine | x86-64 tablet computer (Intel Core i5-1135G7, 8 GB memory), Windows 11 Home 25H2, build 26200.8875, JIS keyboard (106 keys), on mains power; sleep, screen-off and screen saver were already off |
-| Input method | Microsoft IME (Japanese), `IMJPTIP.DLL` 10.0.26100.8875, Romaji input |
+| Input method | Microsoft IME (Japanese), `IMJPTIP.DLL` 10.0.26100.8875, default settings: Romaji input (no other input method or typing mode is set in its settings) |
 | Predictive candidates | Not changed from the input method's default. Scenario S10 selects a predictive candidate |
 | Learning | Not reset between blocks or runs. The input method offers no command that clears its input history, and the measurement does not reset it either |
 | Initial state | Before each block the focus command brings the reference input field to the front, reads the foreground window back, and presses `VK_IME_ON` (0x16) |
@@ -57,7 +57,8 @@ reference input fields can be compared trial by trial.
    count the session as committed at that point; no change was made.
 4. **The emitter's first `SetForegroundWindow` can be refused** by the foreground lock when the runner is started
    from a shell that is not in the foreground. `kit/run/start_windows.py` brings the field to the front while the
-   runner waits for its children; with it (and with an earlier version of it in the pilot runs) no run was refused.
+   runner waits for its children; with it (and with an earlier version of it in the four runs `pilot-*` and
+   `verify-*`) no run was refused.
 5. **The S15 target must not be a window that can close.** The window `ime-away` of `kit/run/away_windows.py`
    replaced the application window.
 6. **Escape once cancels a reading that was not converted** (S5), and `VK_IME_ON` switches the input method on.
@@ -119,8 +120,9 @@ a new one in the TSF field).
 ### Choice of the reference input field
 
 The measurement uses the TSF field (`kit/run/cell.windows.json`). The Microsoft input method is a text service of
-the TSF; a TSF client receives its composition directly, while an IMM window receives it through the compatibility
-layer, and most current applications are TSF clients. A second reason follows from the rule on presses from outside
+the TSF; a TSF client receives its composition directly, while an IMM window receives it through a compatibility
+layer of the system. The choice was made from the reference side alone, before any session row of the observer was
+read. A second reason follows from the rule on presses from outside
 (section 3.4 of the pre-registration): the IMM field receives the `VK_IME_ON` press of the focus command as a
 key-down before every block (one in each segment but the last, in all three IMM runs), which the setting k = 0 of the
 registration does not allow, while the TSF field received none (below).
@@ -143,15 +145,17 @@ ten minutes and give no useful drift.
 
 ### Reaching the observation and the reference
 
-Of the presses sent inside trials, 3,882 of 3,900 (`pilot-*`) and 1,464 of 1,470 (corrected runs) produced a key row
-in the observation (`kit/pilot/reach.py`); the missing presses are the two input-mode keys of each S14 trial, which
+Of the presses sent inside trials, 3,882 of 3,900 in each `pilot-*` run and 1,464 of 1,470 in each corrected run
+produced a key row in the observation (`kit/pilot/reach.py`); the missing presses are the two input-mode keys of each S14 trial, which
 the observation does not record by design. No trial had more rows than presses.
 
 `kit/analysis/delivery.py`, run with the arguments of section 3.4 of the pre-registration on the key rows of the
 observation, found in the TSF runs no key-down in the reference log beyond the marker presses in any segment (with
 and without the input-mode keys of S14 counted), none in the segment before the first block, and no loss of focus of
-the reference outside the planned switches of S15, so no widened span held a row without a press sent. The TSF field
-received 3 to 16 key-downs per run in all, against 1,174 to 3,900 presses sent. Its log therefore shows a person's
+the reference outside the planned switches of S15, so no widened span held a row without a press sent. Of the presses
+sent inside the trials, 3 to 16 per TSF run reached the field as a key-down, against 1,174 to 3,900 sent
+(`reference.reach` of the delivery report; the marker presses are counted separately and reached the field when no
+composition was open). Its log therefore shows a person's
 key press only when the input method does not consume it; the rule on the loss of focus reads the observation and is
 not affected. In the IMM runs the rule on presses allowed one key-down beyond the markers per segment (the
 `VK_IME_ON` press; none in the segment of the last block), with the input-mode keys of S14 counted among the presses
@@ -171,27 +175,31 @@ now end with a key more). The generator's estimate for the pilot plans is 13.3 s
 
 - One cell: the Microsoft input method with the TSF reference input field, the corrected procedures and n = 75 per
   scenario and speed (2,925 trials in 117 blocks; `experiment/plan_config.windows.json`). The generator estimates
-  13.75 s per trial (11.2 hours); scaled by the pilot's ratio of measured to estimated time, the run takes about
-  12 hours.
+  13.75 s per trial (11.2 hours); scaled by the pilot's ratios of measured to estimated time (1.06 for the runs of 117
+  trials with the frozen procedures, 1.17 for the runs of 39 trials with the corrected ones, in which the time between
+  blocks weighs more), the run takes 12 to 13 hours.
 - The run is started with `kit/run/start_windows.py`, and S15 uses the `ime-away` window.
 - The settings of the rule on presses from outside fixed on macOS (k = 0, the input-mode keys of S14 not counted
-  among the presses sent) hold for the TSF field.
-- The scopes of questions 1 to 3 take the long trials from the ground truth (deviation D3). With the corrected
-  procedures, the trials whose planned presses span at least 20 seconds were exactly the long trials of the ground
-  truth in `verify-tsf` and `toolcheck-tsf` (10 of 10 each).
+  among the presses sent) hold for the TSF field. Because that field sees few of the presses, a run also counts as
+  aborted when the observation holds key rows that no sent press explains (deviation D4).
+- The scopes of questions 1 to 3 take the long trials from the span of the presses sent (deviation D3). With the
+  corrected procedures, the trials whose presses span at least 20 seconds were exactly the long trials of the ground
+  truth in `verify-tsf` and `toolcheck-tsf` (10 of 10 each; the two runs used the same plan).
 
 ## Raw logs
 
-The raw logs of the pilot runs are kept on the measuring machine and are not yet deposited. They are deposited with
-the measurement data under the criteria of the macOS pilot (`pilot-macos.md`, Raw logs), which are those of the
-measurement, with the settings that this pilot found for each reference: for the TSF runs those of the measurement;
-for the IMM runs one key-down of the focus command per segment except the last (k = 1) and the input-mode keys of S14
-counted among the presses sent. The plans of these runs are not the plan of the Windows cell, so the rule on the
-plan's SHA-256 does not apply to them. Before the freeze of the addendum, the rules of section 3.4 in their
-registered form (`kit/analysis/delivery.py` of the macOS freezing tag) were applied to the key rows of the
-observation and the reference logs of the seven runs and caught none of them under these settings; the three aborted
-attempts are deposited only if they meet the same criteria at deposit time. `--check-deposit` is run at deposit time,
-after the observation logs are unsealed.
+The raw logs of the pilot runs are kept on the measuring machine and are not yet deposited. The runs with the TSF
+field are deposited with the measurement data under the criteria of the macOS pilot (`pilot-macos.md`, Raw logs),
+which are those of the measurement, with the rules that the Windows addendum adds (section 10.8 of the
+pre-registration: the reference log comes from the TSF field, and no key row of the observation goes beyond the
+marker presses). The plans of these runs are not the plan of the Windows cell, so the rule on the plan's SHA-256 does
+not apply to them. Before the freeze of the addendum, `kit/analysis/delivery.py` of the macOS freezing tag was applied
+to the key rows of the observation and the reference logs of all seven runs: it caught none of the four TSF runs, and
+no run had a key row of the observation beyond the marker presses. The three runs with the IMM field are not
+deposited: that field receives the focus command's `VK_IME_ON` as a key-down in every segment but the last, which the
+setting k = 0 counts as a press from outside, so `--check-deposit` refuses them. The three aborted attempts are
+deposited only if they meet the same criteria at deposit time. `--check-deposit` is run at deposit time, after the
+observation logs are unsealed.
 
-The probes of the Escape and digit behaviour (finding 1 and 2) typed into the reference input field alone, without
+The probes of the Escape and digit behaviour (findings 1 and 2) typed into the reference input field alone, without
 the observer, and are not deposited.
