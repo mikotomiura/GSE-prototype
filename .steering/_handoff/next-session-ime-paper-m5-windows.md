@@ -11,12 +11,15 @@ git fetch → origin/main から作業ブランチを切る（例: feature/ime-m
 一次は decisions.md の判断 68・133・134、design.md §1.1a、kit/pilot/README.md、kit/refinput-windows/README.md、kit/run/README.md、事前登録 §8。
 ⚠️ 凍結のタグ ime-observation-prereg-macos のコードは変えない。追補（M6）が変えてよいのは §8 に列挙した Windows の部分と、Windows だけが使う新しいファイルだけ。
 ⚠️ パイロットは ImeShadow を読まない（obs は seal_obs.py で封印してからキーの行だけで集計する）。生ログはコミットしない。
-⚠️ 合成キーを送る run の前に、研究者が PC から離れていることを確かめる（§1 の未決 1）。
+⚠️ 合成キーを送る run は研究者の答えで「離席中に自動」（2026-10-03・§1 の ★）。研究者は常に離席している扱いで、始めたいときに始めてよい。
 Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data-privacy。
 応答は日本語。公開物（papers/）は学術的な英語・GSE への言及なし。コミットは git add パス指定（-A 禁止）。
 ```
 
 ## §1 状態（2026-10-03 の終わり）
+
+- ★★★★ **2026-10-03 の続きの続き（Surface）: 止まっていた所を研究者が決めた（判断 137）**。S4 は**逸脱 D1 として Windows だけ Esc 3 回**（`experiment/deviations.md`・`_PROFILES` に `cancel_converted`）、S8 は数字の後に Enter（§8 の範囲）。直した手順で確認の run（IMM / TSF 各 39 試行）を回し、**持ち越し 0・S4 / S8 とも 3 / 3 で意図どおり・gt のマーカーが全ブロックで一致**（`pilot-windows-1-notes.md` の「確認の run」）。CHI Posters の記録の直し（§3 の末尾）も済み。→ **次は M6**（追補）: 正解の経路（IMM / TSF）の選択・起動の手順（`run_fg.py`・`focus_front.py`・`away_window.py` を `kit/run/` に足すか）・`gt_rules` の Windows のブロック（S15 の確定は `focus_out` の時点）・追補の節で D1 を参照 → その後に公開用の `experiment/pilot-windows.md` で M5 を閉じる。⚠️ この機械の作業コピーは CRLF で `kit/check.sh` の 3 本が赤になる（変更と無関係）→ selftest は LF の worktree（`git -c core.autocrlf=false worktree add`）で回す。`python3` は `~/ime-pilot/bin` を PATH の先頭に。
+- ★★★ **2026-10-03 の続き（Surface Pro 8）: M5 のパイロットを Surface で実施した**（判断 136・研究者の指示で判断 134 / 135 を改めた）。§2 の 1〜7 は済み。結果と所見は `.steering/20260927-ime-observation-paper-eval-design/pilot-windows-1-notes.md`。生ログと封印・作業ファイル（`cell-*.json`・`focus_front.py`・`away_window.py`・`run_fg.py`・`outcome.py`・`seq.py` など）は Surface の `~/ime-pilot/`。⚠️ **止まっている所**: S4 が凍結のコードの制約で MS-IME の取消にならない（ノートの所見 1）→ 研究者の判断待ち。以下の §1・§2 は当時の記述。
 
 - **macOS の事前登録は凍結済み・OSF で公開済み**: `https://osf.io/9nh7r`（DOI `10.17605/OSF.IO/9NH7R`・`date_registered` 2026-10-02・添えたファイルの SHA-256 は凍結したファイル `fa6fd586…7773` と一致・`notes.md` に記録・PR #298）。Mac の M4（本計測）は別の流れで、Mac の引き継ぎ `next-session-ime-paper-osf-m4.md` の §2 の 3 から。
 - **M5 はまだ何もしていない**: G-GEAR では書き出し・ビルド・run のどれも行っていない（判断 133・134）。
@@ -24,8 +27,9 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 - **研究者の選択（判断 133 の答えを判断 134 が引き継ぐ）**:
   - IME の学習は**リセットしない**（Mac と同じ。MS-IME の入力履歴の消去は設定画面の操作でコマンドが無い）。セルのファイルの `ime_settings.learning` にそう書き、`reset_cmd` は空。
   - 電源の設定は**メインが一時的に切って戻す**: `powercfg` で AC のスリープと画面オフを 0 にする。**元の値を先に記録し**、run の後に戻して読み戻しで確かめる。スクリーンセーバーとロック（`HKCU:\Control Panel\Desktop` の `ScreenSaveActive` など）も読み、要れば同様に。
+- ★ **2026-10-03（Surface Pro 8）**: このメモを Surface で開いたが、研究者の答えで **Surface が判断 134 の「別の Windows 実機」**（判断 135）→ M5 はこのまま G-GEAR で行う。計測する機械の値（Windows 11 25H2 / build 26200・MS-IME の DLL 10.0.26100.8875・JIS・Rust と Python は未導入）は判断 135 に記録した → 比べる相手になる。★ **実行の時間は答えが出た: 離席中に自動**（研究者「常に離席しているようなもの・始めたいときに始めてよい」）→ 未決 1 は聞き直さず、run の前の確認も要らない。
 - **未決**:
-  1. **実行の時間**（研究者に聞く前に中断した）: 選択肢は「離席中に自動（推奨・手順書の Windows の部分だけを直して走らせ直すところまで任せる・凍結済みのコードに欠陥が見つかれば止めて報告）」／「その場で 1 本ずつ」／「準備だけ」。→ このセッションの最初に AskUserQuestion で聞く（推奨と理由を添える）。
+  1. ~~**実行の時間**~~ → 2026-10-03 に答え「離席中に自動」（上の ★）。以下は当時の記述: **実行の時間**（研究者に聞く前に中断した）: 選択肢は「離席中に自動（推奨・手順書の Windows の部分だけを直して走らせ直すところまで任せる・凍結済みのコードに欠陥が見つかれば止めて報告）」／「その場で 1 本ずつ」／「準備だけ」。→ このセッションの最初に AskUserQuestion で聞く（推奨と理由を添える）。
   2. ⚠️ **較正する機械（G-GEAR）と計測する機械（別の実機）が違う**（判断 134・M6 の前に研究者が決める）。パイロットは MS-IME の呼び出し列をその機械と版で較正する。推奨: 追補に計測する機械の OS と MS-IME の版を書き、M7 の前に計測する機械で短い確認の run（Mac の `verify-1` の形・全シナリオ × 3 速さ × 1）を回して、呼び出し列の型がパイロットと同じことを確かめる。→ M5 の記録に G-GEAR の OS と MS-IME の版を必ず残す（比べる相手になる）。
 - 参考（2026-10-03 に G-GEAR で読んだ値）: Windows 11 `26H2`・build `26300`。入力方式は `{03B5835F-F03C-411B-9CE2-AA23E1171E36}`（Microsoft IME・日本語）だけで、Google 日本語入力は入っていない。MS-IME の版とキーボードの配列はまだ読んでいない。Python は 3.11.9（判断 52）—— 着手時に測り直す。
 

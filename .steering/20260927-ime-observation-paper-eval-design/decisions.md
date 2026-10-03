@@ -66,6 +66,7 @@
 - **理由**: 非アーカイブなので二重出版にならない。締切の順序（BRM 12 月 → CHI 1 月）とも整合する。
 - **⚠️ 未確認**: BRM が「査読中の論文と同じ内容の非アーカイブ発表」をどう扱うか（Springer の規程ページは取得できなかった）。→ 投稿前に BRM の規程を確認し、カバーレターで開示する。
 - **見直しタイミング**: BRM の規程が非アーカイブ発表も制限していた場合は CHI を見送る。
+- ⚠️ **追記（2026-10-03）**: 2026-09-28 に **取り下げ済み**（`.steering/20260928-p321-reanalysis-paper/decisions.md` の判断 15・研究者の選択）→ IME 論文は **BRM だけ**。
 
 ## 判断 9: 2 本目は「今は書かない」（2026-09-27）
 
@@ -126,6 +127,7 @@ Apple の `NSTextInputClient` 文書（JSON 経由で取得）／BRM の投稿�
 - **採用**: A
 - **理由**: 規程に禁止の記述が無く、非アーカイブ発表なので、開示して判断を編集者に委ねるのが透明。
 - **見直しタイミング**: BRM の編集者から指摘があった場合は CHI への投稿を取り下げる（CHI の締切 2027-01-21 は BRM 投稿より後）。
+- ⚠️ **追記（2026-10-03）**: CHI 2027 Posters への併願そのものを 2026-09-28 に取り下げた（p321 のタスクの判断 15）→ カバーレターでの開示は**不要**。
 
 ## 判断 14: /reimagine の結果、ハイブリッド（v1 ＋ v2 の 8 点）を採用する（2026-09-28）
 
@@ -1144,3 +1146,34 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - ⚠️ **未決（M6 の前に研究者が決める）—— 較正した機械と計測する機械が違う**: パイロットは MS-IME の呼び出し列を**その機械と IME の版で**較正する。M5（G-GEAR）と M7（別の実機）で OS や MS-IME の版が違うと、パイロットで決めた正解の定義や手順書が計測する機械で同じに動く保証が無い。→ 推奨: (1) 追補に計測する機械の OS と MS-IME の版を書く、(2) M7 の前に計測する機械で**短い確認の run**（Mac の `verify-1` と同じ形・全シナリオ × 3 速さ × 1 で数分〜10 分程度）を回し、呼び出し列の型がパイロットと同じことを確かめる（違えば追補の凍結の前に戻る）。この確認は短い run だが計測する機械でしか意味が無いので、「短い run は G-GEAR」の例外になる。
 - ⚠️ G-GEAR は Windows の CI の self-hosted runner（memory）。パイロットの run の間に CI の job が走ると負荷で送出の時刻が遅れる（`emit/README.md`）→ run の間は push しない（または runner を止める・止めると hosted へ回る）。
 - **影響範囲**: `_issue-plan.md` の M7・M10 の「どこで」・引き継ぎ `next-session-ime-paper-m5-windows.md`（G-GEAR 用に書き直す）・`tasklist.md` の M5 の行。
+
+## 判断 135: 引き継ぎを開いた機械は G-GEAR ではなく、判断 134 の「別の Windows 実機」（Surface Pro 8）だった —— M5 は G-GEAR に残し、ここでは機械の前提だけを記録する（2026-10-03・Surface・研究者の選択）
+
+- **所見**（メインが着手時に測った）: `hostname` は `TABLET-J870RJQA`、`Win32_ComputerSystem` は Microsoft Corporation・**Surface Pro 8**。引き継ぎ §1 の参考値（G-GEAR: 26H2・build 26300）と OS が違う。Rust（`cargo` / `rustup`）は入っておらず、`python` は Microsoft Store の入口だけ（`AppData/Local/Programs/Python/Python311・312・314` の中に `python.exe` は無い）。
+- **研究者に 1 問**（AskUserQuestion）: G-GEAR で行う（ここでは止める）／この Surface で行う（判断 134 を改める）／**この機械が「別の Windows 実機」** → **研究者の答え: この機械が判断 134 の「別の Windows 実機」**。→ M5 は判断 134 のとおり G-GEAR に残す。この機械では何もビルド・送出していない（ブランチを切っただけ）。
+- **計測する機械の前提**（判断 134 の未決 2 で「M5 の記録と比べる相手」になる・2026-10-03 に読んだ値）:
+  - OS: Windows 11 Home（`EditionID` Core）・`DisplayVersion` **25H2**・`CurrentBuild` **26200**・UBR 8875（⚠️ G-GEAR の 26H2 / 26300 と違う）。
+  - MS-IME: 入力方式は `0411:{03B5835F-F03C-411B-9CE2-AA23E1171E36}{A76C93D9-5523-4E90-AAFA-4DB112F9AC76}`（Microsoft IME）だけ。DLL の版は `IMJPTIP.DLL`・`IMJPAPI.DLL`・`IMJPPRED.DLL` が **10.0.26100.8875**、`IMJPCD` など辞書・変換の DLL が 10.0.26100.8737 / 8328。`HKCU\Software\Microsoft\IME\15.0\IMEJP\MSIME`: `romastyle` MS-IME・`PredictionUseInputHistory` 1・`UseCloudSuggestion` 0（既定から変えていない・読んだだけ）。ローマ字／かな入力の別はまだ読んでいない。
+  - キーボード: 配列 `00000411`（日本語）・`OverrideKeyboardIdentifier` PCAT_106KEY・`OverrideKeyboardType` 7（JIS）。
+  - 画面と電源: `ScreenSaveActive` 1（`ScreenSaveTimeOut` 空）・`ForegroundLockTimeout` 200000・電源の計画は「バランス」。⚠️ 8 時間の run の前に、判断 133 のとおり元の値を記録してから一時的に切る。
+  - 道具: git 2.55.0.windows.3・bash 5.3.15・`gh` 認証済み。**Rust と Python が無い** → M7 / M10 の前に入れる（M5 と同じ版を推奨）。
+- **影響範囲**: `tasklist.md` の M5 の行・引き継ぎ `next-session-ime-paper-m5-windows.md` §1（計測する機械の値を足す）。
+
+## 判断 136: 判断 135 を改める —— M5 をこの Surface Pro 8（計測する機械）で行う（2026-10-03・Surface・研究者の選択）
+
+- **研究者の指示**（判断 135 の記録の後）: 「rust を CLI で入れてから実施するのは？ 特にハードウェアでの強い制約などがなければ同じ Windows だし実行していいんじゃ」。
+- **メインの判断**: 賛成。この Surface は M7 の本計測の機械（判断 134・135）なので、**較正と計測の機械が揃い、判断 134 の未決 2（較正と計測の機械が違う）が消える**。ハードウェアの制約は見当たらない（i5-1135G7・8 GB・JIS・AC 電源）。G-GEAR の値（26H2 / 26300）は比べる相手として残す。
+- **入れた道具**（2026-10-03・winget）: Python **3.11.9**（user・判断 52 の G-GEAR と同じ版）・rustup 1.29.1 → `rust-toolchain.toml` の **1.98.1**（既定にも 1.98.1 を指定）・Visual Studio 2022 Build Tools（VCTools・MSVC 14.44.35207）。`git` の作者名はこの機械に無い → 研究者の答えでコミットごとに `-c` で Mikoto Miura（設定は変えていない）。
+- **電源**: 読んだ値は AC・DC とも スリープ 0・画面オフ 0・スクリーンセーバーなし（`SCRNSAVE.EXE` 空）→ **変える必要がなかった**（判断 133 の「切って戻す」は不要・値は `~/ime-pilot/power-before.txt`）。着手時はバッテリーで、研究者が AC につないだ（`BatteryStatus.PowerOnline` を読み戻し）。
+- **影響範囲**: `tasklist.md` の M5・`pilot-windows-1-notes.md`（新規）・`_issue-plan.md` の M5 の「どこで」は M5 を閉じるときに直す。
+
+## 判断 137: S4 は逸脱 D1 として Windows だけ Esc 3 回にし、S8 は数字の後に Enter を足す —— 直した手順で確認の run まで回す（2026-10-03・Surface・研究者の選択）
+
+- **問い**（`pilot-windows-1-notes.md` の所見 1・2）: S4（Space → Esc 2 回）は MS-IME で複数文節に変換した後は取り消しにならない（3 回目で取り消し）。凍結の生成器の `_scenario_checks` と事前登録 §2.3 の表が S4 を OS を問わず Esc 2 回に固定しており、§8 の追補の範囲で直せない。S8 は数字の後に Enter が要る（§8 の範囲）。
+- **研究者の答え**（AskUserQuestion）: S4 は「逸脱として Win だけ Esc 3 回（推奨）」、S8 は「直して確認の run まで回す（推奨）」。
+- **変えたもの**: `kit/gen/generate_plan.py` の `_PROFILES` に `cancel_converted` を足し（windows は Esc 3 回・macOS の 2 つは Esc 2 回で値は変わらない）、S4 の照合をそれで読む。windows の `after_digit` を `["enter"]`。2 つの手順書の `os.windows` の S4 に Esc を 1 つ、S8 に Enter を 1 つ足した（2 つの手順書の `os.windows` は selftest が一致を求める → 同じに直した）。逸脱の記録は新しい `experiment/deviations.md` の D1（英語・日付・理由・影響）。
+- ★ **macOS への影響が無いことを確かめた**: 本番の `plan_config.macos.json`・seed 11 で、タグの書き出しと直した作業ツリーから 2 つの手順書それぞれで macOS の計画を作り、記録される手順書の SHA-256 を伏せると**バイト一致**した（3,150 / 2,925 試行）。⚠️ 手順書の SHA-256 は変わるので、計画そのものはバイト一致しない（§8 のとおり macOS の計画はタグから作る）→ D1 にはこの形で書いた。
+- **selftest**: 生成器 113 件緑。`kit/check.sh` は作業ツリー（`core.autocrlf=true` で CRLF）では 3 本が赤だが、**変更を stash した状態でも同じく赤**（`.rs` を `"\n"` で照合する selftest が CRLF で外れる・変更と無関係）→ LF のクリーンな worktree で全体を確かめる。
+- **影響範囲**: M6 の追補（§8）では D1 を「逸脱」として追補の本文から参照する。正解の経路の選択・起動の手順（`run_fg.py` など）・`gt_rules` の Windows のブロックは M6 で決める。
+- **完了時レビュー**（2026-10-03・`5c37c8ed..HEAD`）: `security-checker` は指摘なし（生ログ・キーコード・読みの転記なし・`papers/` に機械の情報なし・照合は緩んでいない）。`code-reviewer` は中 2・低 3 → 中 2（D1 がマーカーの欠けを S4 だけのせいにしていた・タグの差分に macOS のプロファイルの行が出ることを書いていなかった）と低 2（コメントに 1 文節の場合・3 回目の Esc の記述を "expected to" に）を直した。低 1（Windows の負の対照の selftest）は、凍結に関わる変更を広げないため見送った。
+- ⚠️ **`/cross-review` は省いた（安全ゲート: codex 不在）**: この Surface には Codex CLI が入っていない（npm のグローバルは `claude` だけ）。加えて、この機械の `python3` は Microsoft Store のスタブなので、`secrets-pre-filter.sh`・`codex-budget-guard.sh` が「hook 入力 JSON を parse できない」で fail-closed になり、「codex」の語を含む Bash 呼び出しはすべて止まる（hook は `python3` を `python` より先に選ぶ）→ この機械で Codex を使うなら、導入と、Store のエイリアスを切るか hook の側の対応が要る。
