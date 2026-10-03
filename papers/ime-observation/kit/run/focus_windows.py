@@ -16,7 +16,8 @@ five times, 0.2 seconds apart, as the emitter does; when the window is not in fr
 releases ``VK_IME_ON`` (0x16) through ``SendInput``, the key that switched the Microsoft input method on in the
 Windows calibration pilot (``experiment/pilot-windows.md``).
 
-No output on success. Exit status: 0 done; 1 the window was not found exactly once, was not in front, or the key
+Started by hand with ``--ime-on``, it presses that one key without the runner's consent flag; the runner runs it only
+with the flag. No output on success. Exit status: 0 done; 1 the window was not found exactly once, was not in front, or the key
 was refused; 2 usage error. The libraries are loaded lazily, so the self-test runs on every operating system.
 """
 import argparse

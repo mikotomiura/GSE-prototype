@@ -1319,8 +1319,10 @@ squared over the sum of m_j (section 3.3) ranges from 1.56 to 3.19 per stratum (
 that section 3.3 gives for the macOS plans.
 
 **Diagnostics.** Reported for the Windows cell: the ends of a reference composition that carry no committed
-length, per scenario; for S4, the Escape press after which the reference session ended (the second or the third); and the
-observed session rows of 20 to 25 seconds and of 25 seconds or more. If the observation log of the Windows cell holds no session row at all, the
+length, per scenario (an end belongs to the trial whose interval, extended by 300 ms as in `kit/pilot/reach.py`,
+holds it); for S4, the Escape press after which the reference session ended (the number of Escapes the trial sent up
+to the end, when the last of them came at most 2 seconds before it); and the observed session rows of 20 to 25
+seconds and of 25 seconds or more. If the observation log of the Windows cell holds no session row at all, the
 analysis code refuses the run (step 0 of `kit/analysis/pipeline.py`), and the cell is reported as not measured.
 
 **Question 4.** The two attacks are run on the observation log of the Windows cell with the commands of section 6.8,

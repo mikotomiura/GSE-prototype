@@ -80,16 +80,23 @@ def bring_when_shown(api, title, child, limit_s, sleep=time.sleep, clock=time.mo
 
 def start_away(api, title, spawn, sleep=time.sleep, clock=time.monotonic):
     """Start the away window when none is shown; return the child (or None when one was already shown)."""
-    if api.find_windows(title):
+    shown = api.find_windows(title)
+    if len(shown) > 1:
+        raise RuntimeError("%d visible windows carry the away title %r (exactly one is required)" % (len(shown), title))
+    if shown:
         return None
     child = spawn([sys.executable, os.path.join(HERE, "away_windows.py"), "--title", title])
-    t0 = clock()
-    while clock() - t0 < AWAY_WAIT_S:
-        if len(api.find_windows(title)) == 1:
-            return child
-        if child.poll() is not None:
-            break
-        sleep(POLL_S)
+    try:
+        t0 = clock()
+        while clock() - t0 < AWAY_WAIT_S:
+            if len(api.find_windows(title)) == 1:
+                return child
+            if child.poll() is not None:
+                break
+            sleep(POLL_S)
+    except BaseException:
+        stop(child)
+        raise
     stop(child)
     raise RuntimeError("the away window %r did not appear" % title)
 
@@ -126,11 +133,17 @@ def launch(argv, api_factory, spawn, sleep=time.sleep, clock=time.monotonic, err
     except RuntimeError as e:
         err.write("start_windows.py: %s\n" % e)
         return 2
+    child = None
     try:
         child = spawn(runner)
         shown = bring_when_shown(api, title, child, ready_s + WATCH_EXTRA_S, sleep, clock)
         err.write("start_windows.py: reference input field brought to the front: %s\n" % ("yes" if shown else "no"))
         return child.wait()
+    except BaseException:
+        # the runner is stopped before the away window, so that no block runs without its S15 target; the runner
+        # then records the run as aborted
+        stop(child)
+        raise
     finally:
         stop(away_child)
 
@@ -214,6 +227,29 @@ def selftest():
     api, ch = _Api(appear_after={"away": 10**6}), []
     check("an away window that does not appear stops before the runner",
           run(base + [CONSENT], api, ch) == 2 and len(ch) == 1 and ch[0].terminated)
+
+    class _Failing(_Api):
+        def find_windows(self, title):
+            if title == "field":
+                raise RuntimeError("EnumWindows failed")
+            return _Api.find_windows(self, title)
+
+    api, ch = _Failing(appear_after={"away": 1}), []
+    try:
+        run(base + [CONSENT], api, ch)
+        raised = False
+    except RuntimeError:
+        raised = True
+    check("an error while watching for the field stops the runner and then the away window",
+          raised and len(ch) == 2 and ch[0].terminated and ch[1].terminated)
+
+    class _Two(_Api):
+        def find_windows(self, title):
+            return [1, 2] if title == "away" else _Api.find_windows(self, title)
+
+    api, ch = _Two(), []
+    check("two windows with the away title are refused before anything starts",
+          run(base + [CONSENT], api, ch) == 2 and not ch)
     api, ch = _Api(appear_after={"field": 10**6}), []
     tick[0] = 0.0
     child = _Child(["run_cell.py"])

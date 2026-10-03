@@ -914,8 +914,8 @@ def reference_abort_reasons(dlv, os_name=None):
     """The reasons, as strings that hold no value of a log, why section 3.4 of the pre-registration counts the run
     as aborted; empty when it does not (see the abort rule in the module description). For a plan on Windows the
     rule of deviation D4 applies as well: the reference input field of the Windows cell receives only the keys that
-    the input method does not consume, so a key row of the observation that no sent press explains counts the run
-    as aborted wherever it falls."""
+    the input method does not consume, so the run counts as aborted when, in any segment of the observation log,
+    the key rows that no sent press explains exceed the marker presses of the segment."""
     out = []
     if os_name == "windows":
         for bid in observation_abort_segments(dlv):
@@ -936,11 +936,20 @@ def _plan_matches_cell(run):
     registered plan of that setting (section 2.4). A cell on Windows has no such setting: its plan log must be the
     registered plan of the Windows cell (deviation D2)."""
     if run["manifest"]["cell"].get("os") == "windows":
-        return run["sha"]["plan"] == REGISTERED_PLAN_SHA256_WINDOWS and _gt_src(run) == WINDOWS_GT_SRC
+        return run["sha"]["plan"] == REGISTERED_PLAN_SHA256_WINDOWS and _gt_src(run) == WINDOWS_GT_SRC \
+            and _plan_os(run) == "windows"
     settings = run["manifest"]["cell"].get("ime_settings")
     setting = settings.get(LIVE_CONVERSION_KEY) if isinstance(settings, dict) else None
     return (isinstance(setting, str) and setting in REGISTERED_PLAN_SHA256
             and run["sha"]["plan"] == REGISTERED_PLAN_SHA256[setting])
+
+
+def _plan_os(run):
+    """The operating system of the run's plan, or None when it cannot be read."""
+    try:
+        return match.parse_plan_strata(run["files"]["plan"])["os"]
+    except (InputError, KeyError):
+        return None
 
 
 def _gt_src(run):
@@ -1153,6 +1162,9 @@ def _abort_rule_findings(run, name):
         os_name = match.parse_plan_strata(files["plan"])["os"]
     except InputError as e:
         return ["%s: section 3.4 cannot be checked (plan: %s)" % (where, e)]
+    cell = (run.get("manifest") or {}).get("cell") or {}
+    if "windows" in (os_name, cell.get("os")):
+        os_name = "windows"   # the rules of the Windows cell apply when either the plan or the cell names Windows
     out = ["%s: not safe to deposit under section 3.4: %s" % (where, why)
            for why in reference_abort_reasons(dlv, os_name)]
     if os_name == "windows" and _gt_src(run) != WINDOWS_GT_SRC:
@@ -2651,6 +2663,9 @@ def _case_windows_cell(d):
     f = []
     cell_of = lambda os_name, setting=None: {"os": os_name, "ime_settings": {} if setting is None else {"live_conversion": setting}}
     gt_of = lambda src: (json.dumps({"kind": "header", "format": "gt/1", "src": src}) + "\n").encode("utf-8")
+    plan_of = lambda os_name: b"\n".join(json.dumps(x).encode("utf-8") for x in [
+        {"kind": "header", "format": "plan/1", "os": os_name}, {"kind": "block", "block_id": 0, "speed": "slow"},
+        {"kind": "trial", "trial_id": "t00001", "block_id": 0, "scenario": "S1", "speed": "slow"}]) + b"\n"
     cases = [(cell_of("windows"), REGISTERED_PLAN_SHA256_WINDOWS, "win_tsf", True),
              (cell_of("windows"), REGISTERED_PLAN_SHA256_WINDOWS, "win_imm", False),
              (cell_of("windows"), "0" * 64, "win_tsf", False),
@@ -2659,7 +2674,8 @@ def _case_windows_cell(d):
              (cell_of("macos", "on"), REGISTERED_PLAN_SHA256["on"], "mac_nstic", True),
              (cell_of("macos"), REGISTERED_PLAN_SHA256["on"], "mac_nstic", False)]
     for cell, sha, src, want in cases:
-        if _plan_matches_cell({"manifest": {"cell": cell}, "sha": {"plan": sha}, "files": {"gt": gt_of(src)}}) is not want:
+        files = {"gt": gt_of(src), "plan": plan_of(cell["os"])}
+        if _plan_matches_cell({"manifest": {"cell": cell}, "sha": {"plan": sha}, "files": files}) is not want:
             f.append("the plan check of a %s cell with %s plan and %s should be %s" % (cell["os"], sha[:8], src, want))
     runs = make_synthetic(os.path.join(d, "win"), 3, "windows")
     cfg = _config_file(d)
@@ -2722,6 +2738,43 @@ def _case_windows_cell(d):
                                        os_name)
         if none != [] or (os_name == "windows") != any("D4" in w for w in why):
             f.append("the rule of D4 does not apply exactly to the %s run with one key row that was not sent" % os_name)
+    # the null views of question 3 that use the layers of a prediction
+    for label in ("synthetic-a", "synthetic-b"):
+        v = out["e1_l2.json"]["cells"][label]["all"]["gt_obs"]["under_limit"]
+        if v.get("per_trial_uncontaminated") is not None:
+            f.append("level 2 of a Windows cell reports the view restricted to uncontaminated trials")
+    # the sensitivity scope uses the ground truth: shorten the reference session of one long trial to 5 s, so that the
+    # two definitions classify it differently
+    alt = make_synthetic(os.path.join(d, "win-alt"), 3, "windows")
+    gt_lines = open(os.path.join(alt[0], LOG_FILES["gt"]), "rb").read().split(b"\n")
+    starts = {}
+    changed = False
+    for i, line in enumerate(gt_lines[1:], 1):
+        if not line:
+            continue
+        r = json.loads(line)
+        if r.get("ev") == "tsf_start":
+            starts["open"] = (r["t_wall_ms"], r["t_mono_ns"])
+        elif r.get("ev") == "tsf_end" and "open" in starts and not changed:
+            w0, m0 = starts["open"]
+            if r["t_wall_ms"] - w0 >= SYN_LONG_MS:
+                r["t_wall_ms"], r["t_mono_ns"] = w0 + 5000, m0 + 5000 * 1000000
+                gt_lines[i] = json.dumps(r, separators=(",", ":")).encode("utf-8")
+                changed = True
+    rows = [gt_lines[0]] + sorted((x for x in gt_lines[1:] if x), key=lambda x: json.loads(x)["t_wall_ms"])
+    _rewrite_log(alt[0], "gt", b"\n".join(rows) + b"\n")
+    oa = os.path.join(d, "out-win-alt")
+    rc, _o, err = _quiet(["--runs"] + alt + ["--config", cfg, "--seed", "7", "--out", oa])
+    if not changed or rc != 0:
+        f.append("the case with one shortened reference session did not run (%s, rc %s): %s" % (changed, rc, err[-200:]))
+    else:
+        da = json.loads(_read_results(oa)["e1_detection.json"].decode("utf-8"))
+        ltf = da["long_trials_from"]["synthetic-a"]["total"]
+        g = da["cells"]["synthetic-a"]["all"]["gt_obs"]
+        if ltf["n_long"] != n_long or ltf["n_long_gt"] != n_long - 1 or ltf["n_differ"] != 1 \
+                or g["under_limit_gt_duration"]["used"]["n_gt"] != g["under_limit"]["used"]["n_gt"] + 1:
+            f.append("the sensitivity scope does not follow the ground truth: %r, %r / %r"
+                     % (ltf, g["under_limit_gt_duration"]["used"]["n_gt"], g["under_limit"]["used"]["n_gt"]))
     # D2 at deposit: a Windows run whose reference log is not from the TSF field is not safe to deposit
     wr = load_run(runs[0])
     if _abort_rule_findings(wr, "w") != []:

@@ -41,7 +41,8 @@ to it), in a terminal that is not elevated.
    (Settings, Windows Update, Pause updates) for a period that covers the run of 12 to 13 hours, and turn off
    "Set time automatically" (Settings, Time & language, Date & time). Read the version of the input method
    (`IMJPTIP.DLL`) and compare it with the pilot's (section 10.8 of the pre-registration). `focus_cmd` starts
-   `python`; it must be the same Python as the runner's.
+   `python`, which Windows looks up in the working directory and then on the PATH; it must be the same Python as the
+   runner's, so run from a directory that holds no other `python.exe`.
 
 4. Turn off sleep, the screen lock and the screen saver, close every application that could come to the front, and
    start the run:

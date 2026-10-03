@@ -46,6 +46,8 @@ SOURCE_GT = "ground_truth_duration"
 PSEUDO_KEYS = ("focus_away", "focus_back", "mouse_click")
 BAND_MS = 1000
 END_AFTER_PRESS_MS = 2000   # a session end is credited to the last Escape sent at most this long before it
+TRIAL_TAIL_MS = 300         # an end of a reference composition belongs to a trial up to this long after trial_end
+                            # (the tail of kit/pilot/reach.py and of the delivery report)
 
 
 def _sent_presses(oracle_bytes):
@@ -112,7 +114,11 @@ def scope_summary(oracle_bytes, plan_bytes, sessions, limit_ms):
 
 def windows_diagnostics(gt_bytes, oracle_bytes, plan_bytes, sessions, obs_bytes=b""):
     """The diagnostics of section 10.7: ends without a result length per scenario, the Escape after which each
-    S4 session ended, and the observed session rows of 20 to 25 seconds and of 25 seconds or more."""
+    S4 session ended, and the observed session rows of 20 to 25 seconds and of 25 seconds or more.
+
+    For a session of an S4 trial the count is the number of Escapes the trial sent up to the session's end (so a
+    second session of the same trial counts the Escapes before the first as well), and "none" when no Escape was
+    sent within END_AFTER_PRESS_MS before the end."""
     plan = match.parse_plan_strata(plan_bytes)["trials"]
     wins = []
     for line in oracle_bytes.decode("utf-8").split("\n")[1:]:
@@ -129,7 +135,8 @@ def windows_diagnostics(gt_bytes, oracle_bytes, plan_bytes, sessions, obs_bytes=
             continue
         r = json.loads(line)
         if r.get("ev") == "tsf_end" and "result_len" not in r:
-            tid = next((w[0] for w in wins if w[2] is not None and w[1] <= r["t_wall_ms"] <= w[2] + 300), None)
+            tid = next((w[0] for w in wins if w[2] is not None and w[1] <= r["t_wall_ms"] <= w[2] + TRIAL_TAIL_MS),
+                       None)
             sc = plan[tid]["scenario"] if tid in plan else "outside_trials"
             ends[sc] = ends.get(sc, 0) + 1
     sent = _sent_presses(oracle_bytes)
@@ -198,7 +205,7 @@ def selftest():
                         orow("trial_begin", 0, trial_id="t00001"), orow("sent", 100, trial_id="t00001", key="a", down=True),
                         orow("sent", 20100, trial_id="t00001", key="enter", down=True), orow("trial_end", 21000, trial_id="t00001"),
                         orow("trial_begin", 30000, trial_id="t00002"), orow("sent", 30100, trial_id="t00002", key="a", down=True),
-                        orow("sent", 49000, trial_id="t00002", key="focus_away", down=True),
+                        orow("sent", 50150, trial_id="t00002", key="focus_away", down=True),
                         orow("sent", 50099, trial_id="t00002", key="enter", down=True),
                         orow("sent", 50200, trial_id="t00002", key="enter", down=False), orow("trial_end", 51000, trial_id="t00002"),
                         orow("trial_begin", 60000, trial_id="t00003"), orow("sent", 60100, trial_id="t00003", key="a", down=True),
