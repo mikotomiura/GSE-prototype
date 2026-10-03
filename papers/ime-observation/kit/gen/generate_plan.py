@@ -925,8 +925,9 @@ def _sha_file(path):
 # - both macOS profiles cancel a converted reading with two Escapes.
 # - windows (either file): one Return for each commit and one Escape for the cancel; a digit pick only selects the
 #   candidate and takes one Return to commit; after a conversion into several segments the first Escape reverts the
-#   focused segment and the second returns to kana, so the cancel of a converted reading presses three (a deviation
-#   from the macOS freeze, recorded in experiment/deviations.md).
+#   focused segment and the second returns to kana, so the cancel of a converted reading presses three (a reading in
+#   one segment is cancelled by the second, and the third then falls outside the composition); this is a deviation
+#   from the macOS freeze, recorded in experiment/deviations.md (D1).
 _PROFILES = {
     "windows": {"commit": ["enter"], "commit_cands": ["enter"], "after_digit": ["enter"], "cancel": ["esc"],
                 "cancel_converted": ["esc"] * 3},
