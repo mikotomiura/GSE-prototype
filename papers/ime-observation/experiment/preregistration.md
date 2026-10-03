@@ -1094,6 +1094,159 @@ given in section 2.4. At the time of writing these files have the SHA-256:
 If any of them changes before the freeze, the table and the plan hashes of section 2.4 are updated in the freezing
 commit.
 
+## 10. Windows addendum
+
+### 10.1 Status of the addendum
+
+This section is the Windows addendum of section 8. It was written and frozen before any Windows measurement, after
+the Windows calibration pilot (`experiment/pilot-windows.md`). The date in the Status at the top of this file is
+that of the macOS freeze; under section 8 that text is not changed, and the two freeze marks there were replaced by
+those of the addendum: `frozen_at:` gives the date of the addendum's freeze, and `sha256:` is unchanged, because the
+addendum did not revise the Windows blocks of `experiment/gt_rules.json`, and `experiment/config.json` and
+`experiment/SEED` are unchanged. The freezing commit of the addendum is tagged `ime-observation-prereg-windows`. The
+difference between that tag and `ime-observation-prereg-macos` shows what the addendum changed: the Windows sections
+of the two procedure files and the Windows profile of the generator; the new files that only the Windows cell uses
+(`experiment/plan_config.windows.json`, `experiment/pilot-windows.md`, `kit/run/cell.windows.json`,
+`kit/run/focus_windows.py`, `kit/run/away_windows.py`, `kit/run/start_windows.py`, `kit/run/README.windows.md`,
+`kit/analysis/gt_scope.py`); this section and the freeze marks; `experiment/deviations.md`; and the changes of three
+deviations, recorded there before any Windows measurement, to parts of existing files that section 8 does not open to
+the addendum: D1 (scenario S4 presses three Escapes on Windows; the generator's check of S4 now reads the Escapes from
+each profile, with the two Escapes of the frozen check for both macOS profiles), D2 (the plan check of
+`kit/analysis/pipeline.py` accepts the registered plan of the Windows cell) and D3 (the scopes of the Windows cell take
+the long trials from the ground truth). A macOS plan generated after these changes differs from one generated from the
+macOS tag only in the recorded SHA-256 of the procedure file, and the analysis of synthetic macOS runs gives
+byte-identical result files under both tags (`experiment/deviations.md`). The macOS plans are generated, and the
+macOS analysis is run, from the macOS tag (section 8). The analysis of the Windows cell is run from the Windows tag
+with `experiment/run.sh`.
+
+### 10.2 Scope
+
+The addendum adds one cell: the Microsoft input method (Japanese, Romaji input) on Windows 11, measured with the TSF
+reference input field. It covers questions 1 to 3 for this cell, question 4 on its observation log and question 5 on
+Windows. Everything not stated in this section is as registered for the macOS cells.
+
+### 10.3 Instruments and machine
+
+- **Reference input field** (`kit/refinput-windows`, program `refinput_tsf`). A window with a rich-edit control
+  that is a client of the Text Services Framework. It records, with wall-clock and monotonic times, the start of a
+  composition (`tsf_start`), every change of it with its length (`tsf_update`), its end with the length of the text
+  committed (`tsf_end`; zero when nothing was committed), the begin and end of the input method's user-interface
+  elements with their kind (`ui_begin`, `ui_end`), each change of focus, and a key-down (key code only) for each key
+  that the input method does not consume. No text is recorded. The other field of the kit, `refinput_imm`, was used
+  only in the pilot; the reasons for the choice are given in `experiment/pilot-windows.md`.
+- **Runner.** `kit/run/run_cell.py` with a cell file made from `kit/run/cell.windows.json`, started through
+  `kit/run/start_windows.py`, which brings the reference input field to the front while the runner waits for its
+  children (the foreground lock of Windows can otherwise refuse the emitter's first activation, which stops the run
+  before any key is sent). Before every block the focus command (`kit/run/focus_windows.py`) brings the field to the
+  front, confirms that it is in front, and presses `VK_IME_ON`; the window that S15 brings to the front is a window
+  of its own (`kit/run/away_windows.py`). How a Windows cell is run is described in `kit/run/README.windows.md`.
+- **Executor.** `kit/emit/backend_windows.py` sends the presses through `SendInput`, with the checks of the front
+  window described in that file.
+- **Measuring machine.** The machine of the Windows pilot: an x86-64 tablet computer (Intel Core i5-1135G7, 8 GB
+  memory), Windows 11 Home 25H2 (build 26200 in the pilot), JIS keyboard, Microsoft IME `IMJPTIP.DLL` 10.0.26100.8875
+  in the pilot. The versions at the time of the run are recorded in `experiment/env.md` and in the run manifest. The
+  machine runs on mains power, with automatic updates, network time synchronisation, sleep, screen lock and the screen
+  saver turned off, and the runner's terminal is not elevated. The input method's predictive candidates are left at
+  their default, and its learning is not reset: it offers no command that clears its input history, and the plan
+  requests no reset.
+
+### 10.4 Procedures
+
+The Windows sections of `kit/gen/recipes.json` give the procedures. They differ from the table of section 2.3 as
+follows: a single Return commits wherever the table shows two (S1, S2, S7, S12, S13 and S15); S4 types the reading,
+presses Space, pauses and presses Escape three times (deviation D1); S5 presses Escape once; S8 presses Return after
+the digit; S11, which needs live conversion, is not run; and S14 switches the input mode with `VK_IME_OFF` and
+`VK_IME_ON`. The cell therefore has 13 scenarios. Before each block the input method is switched on with
+`VK_IME_ON` rather than the kana key. The marker, the gaps between trials and the other settings of section 3.2 are
+those of the macOS cells.
+
+### 10.5 Plan
+
+The plan is generated by
+
+    python3 kit/gen/generate_plan.py --config experiment/plan_config.windows.json \
+      --recipes kit/gen/recipes.json --corpus kit/corpus/data/phrases.jsonl \
+      --os windows --seed 20260929 --out <plan>
+
+from files with LF line ends (the plan records the SHA-256 of its settings, procedure and corpus files). The settings
+equal those of `experiment/plan_config.macos.json` (n = 75 per scenario and speed, key-interval medians of 480, 240
+and 120 ms, think time from 0.2 to 20 s, 25 trials per block). The plan holds 2,925 trials in 117 blocks; generated
+before the freeze with Python 3.11.9 and 3.13.15 it was byte-identical, SHA-256
+`b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0`. This is the plan that the analysis accepts for the
+Windows cell (deviation D2, reason 1 of section 3.4). The generator estimates 13.75 seconds per trial (11.2 hours);
+in the pilot the measured time per trial was 6% above the generator's estimate, so the run is expected to take about
+12 hours.
+
+### 10.6 Ground truth and scopes
+
+Sessions are assembled from the reference log by `kit/analysis/gt_sessions.py` with the `win_tsf` rules of
+`experiment/gt_rules.json`, which the pilot left unchanged: a session opens at `tsf_start` and closes at `tsf_end`, as
+committed when the length of the committed text is positive and as cancelled otherwise; a session shows a candidate
+window when a `ui_begin` of kind `candidate` falls within it. The Microsoft input method opens this element while the
+reading is typed (its prediction window), so the Windows definition of a session with a candidate window
+(`windows_def`) holds nearly all sessions; both it and the common definition are reported, as on macOS. With the
+corrected procedures every trial of the pilot's check runs produced the session its plan intends (39 of 39 in each of
+three runs).
+
+The prediction of section 4.5 models the macOS observer, which infers sessions from key presses; the Windows observer
+reads the input method's composition events, and no prediction applies to it. For the Windows cell a trial is long
+when a ground-truth session assigned to it lasts at least 20,000 ms (deviation D3), and `under_limit` and
+`over_limit` are formed from these trials. The comparisons with the prediction (`gt_pred`, `pred_obs`) and the
+prediction's layers are not computed for this cell. The primary estimates of the cell are those of `gt_obs` under
+`under_limit`, per stratum, as for the macOS cells.
+
+From the plan's own times, the trials whose presses span at least 20 seconds, which in the pilot's check runs were
+exactly the long trials of the ground truth, are 617 of the 2,925 (401 slow, 123 mid and 93 fast). Every S13 trial is
+long, so S13 has no trial under the cut-off, as on macOS. In the other strata between 30 (S6, slow) and 75 trials
+remain under the cut-off before the exclusions of section 6.2; a speed level holds about 574 (slow), 852 (mid) and
+882 (fast) of them. These figures are estimates from the plan; the scopes of the analysis are formed from the ground
+truth of the measurement.
+
+### 10.7 Stopping rule and data collection
+
+Section 3.4 applies with its settings. In the pilot, `VK_IME_ON` before each block and the input-mode keys of S14 left
+no key-down in the log of the TSF field, so k = 0 and the version `excluding_mode_keys` of the delivery report hold
+for the Windows cell. The TSF field records a key-down only for a key that the input method does not consume, so the
+rule on presses from outside sees a person's press only when the input method leaves it to the field; the rule on the
+loss of focus, which reads the observation, is not affected (section 10.10). The runs are made on separate nights in
+this order: the Windows cell, then the two conditions of question 5 on Windows, `idle` and then `working`.
+
+### 10.8 Question 5 on Windows
+
+As section 6.10, with the Windows sampler of `kit/e3` and, for the `working` condition, the plan of the Windows cell
+played by the runner (about 12 hours; the samples are those of the first eight hours).
+
+### 10.9 Data that exist before the freeze of the addendum
+
+The Windows calibration pilot is reported in `experiment/pilot-windows.md`, which also states the criteria under which
+its raw logs are deposited. As on macOS, only the reference side and the key rows of the observation were analysed;
+the session rows of the observation were sealed before any analysis and were not read, no agreement between the
+observation and the ground truth was computed, and no text-recoverability or runtime analysis was run on pilot data.
+On Windows the key rows are not the input from which the observer forms its sessions. Two checks of the code were
+made on the pilot's logs before the freeze, as on macOS: the assignment of observed presses to trials that both
+attacks of question 4 use scored every block of the seven runs of the pilot (27 blocks) and left no press
+unassigned, and `kit/analysis/delivery.py`, in its registered form, caught none of these runs (with the settings
+stated in `experiment/pilot-windows.md`). The plan of the Windows cell was generated (section 10.5), and the long
+trials were estimated from it (section 10.6); no observation of it exists.
+
+### 10.10 Limitations specific to the Windows cell
+
+- **One input method, one kind of field.** The point at which the Microsoft input method commits can depend on the
+  field: in the pilot the TSF field committed when the right arrow was pressed beyond the last segment (S7), where the
+  IMM field did not. The ground truth records what the TSF field received; agreement with other kinds of fields is not
+  measured.
+- **Commit at a loss of focus.** In S15 the input method commits when the other window comes to the front; the
+  session ends there, and the Return pressed afterwards reaches the field as a plain key.
+- **Long trials defined by the ground truth.** On Windows a trial is long when the reference's session lasts 20
+  seconds or more; on macOS when the predicted session does. A session that the input method closes earlier or later
+  than the presses suggest is classified by what the reference recorded, so the scopes of the two systems are not
+  defined by the same rule (deviation D3).
+- **The reference sees few of the presses.** Because the TSF field receives only the keys that the input method does
+  not consume, its log cannot show a press from outside that the input method consumed (section 10.7), and the
+  reference side of the delivery report counts few presses.
+- **The learning of the input method is not reset**, as on macOS (section 7).
+- **One machine.** The cell is measured on one machine with one version of the system and of the input method.
+
 ## References
 
 Bland, J. M., & Altman, D. G. (1986). Statistical methods for assessing agreement between two methods of clinical

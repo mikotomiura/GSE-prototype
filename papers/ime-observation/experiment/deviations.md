@@ -34,3 +34,45 @@ composition. Because the generator reads the Escapes of S4 from the profiles, th
 freezing tags shows lines that touch the macOS profiles (the new `cancel_converted` entry, with the two Escapes of
 the frozen check) and the check of S4, which is shared by all profiles; that these lines leave the macOS plans
 unchanged is shown by the comparison above. The Windows addendum refers to this entry for them.
+
+## D2. The analysis accepts the registered plan of the Windows cell (2026-10-03)
+
+**What changes.** Before analysing real data, `kit/analysis/pipeline.py` checks that each run used the plan that
+section 2.4 gives its cell (reason 1 of section 3.4). The frozen check accepted a run only when its cell records live
+conversion `on` or `off` and its plan log is one of the two macOS measurement plans, so every run of a Windows cell
+would have counted as aborted. The check now accepts a run whose cell records the operating system `windows` when its
+plan log is the measurement plan of the Windows cell (SHA-256
+`b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0`, given in the Windows addendum); the check of the
+macOS cells is unchanged. When a Windows cell is analysed, the delivery results also record this value
+(`registered_plan_sha256_windows`).
+
+**Reason.** Section 8 lets the Windows addendum change only the Windows parts of the rule file, of the procedure files
+and of the generator's profiles, and add new files; the plan check is in none of them. Without the change the
+registered analysis could not be run on any Windows run.
+
+**Effect.** None on the macOS cells: on two synthetic macOS runs the four result files of the changed code are
+byte-identical to those of the code at the macOS freezing tag (checked on 2026-10-03), and the macOS analysis is run
+from that tag (section 8).
+
+## D3. The scopes of the Windows cell take the long trials from the ground truth (2026-10-03)
+
+**What changes.** Questions 1 to 3 are answered primarily over the trials that are not long (scope `under_limit`,
+section 6.4), and the long trials come from the prediction of section 4.5. The prediction models the macOS observer,
+which infers sessions from key presses; the Windows observer reads the input method's own composition events, so no
+prediction from the key presses applies to it, and the frozen pipeline computed a Windows cell under `all_trials`
+only. For a Windows cell a trial is now long when a ground-truth session assigned to it lasts at least `limit_ms`
+(20,000 ms, end minus start on the wall clock, the duration that the cut-off check of section 6.6 uses), and
+`under_limit` and `over_limit` are built from these trials by the same code as on macOS (`kit/analysis/gt_scope.py`,
+which hands them to `kit/analysis/match.py` in the form of a prediction). The comparisons with the prediction
+(`gt_pred`, `pred_obs`) and the prediction's layers are not computed for a Windows cell. The result files state this
+(`note_windows` beside the primary estimates, and `long_trials_from` per Windows cell).
+
+**Reason.** The cut-off at 20 seconds is the same on both systems, so without a scope the primary agreement of a
+Windows cell would mix the sessions that the observer is specified not to report with its errors, and could not be
+compared with the macOS cells. The ground truth already records each session's start and end, which the cut-off check of section 6.6 uses.
+
+**Effect.** None on the macOS cells (the comparison of D2). On a Windows cell the long trials are defined by what the
+input method did rather than by what was sent; with the corrected Windows procedure, the trials whose planned presses
+span at least 20 seconds were exactly the long trials of the ground truth in two check runs of the pilot (10 of 10
+each, `experiment/pilot-windows.md`). A trial whose session is shortened or lengthened by the input method (for
+example a commit at a loss of focus) is classified by the session the reference recorded.
