@@ -32,4 +32,4 @@ four counts are 0.
 
 | Cell label | Attempt | Aborted by the runner | Checked at | SHA-256 of the plan | `src` of the reference log | `delivery.py` exit status | `max_beyond_markers_before_last_block` | `beyond_markers_last_block` | `n_loss_spans_with_unexplained_presses` | Observation rows beyond the markers (D4) | Counts as aborted | Deposited |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
+| windows-msime-tsf | 1 | No: the runner was stopped from outside at about 00:59 JST, 21 minutes in (the shell that ran it was ended by the coding assistant's session under low memory); no manifest was written, so no manifest SHA-256 | 2026-10-04T01:00+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | 0 | 0 | 14 (last segment, cut off) | Yes (incomplete) | No |
