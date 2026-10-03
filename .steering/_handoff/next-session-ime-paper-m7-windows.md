@@ -55,3 +55,13 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 - ⚠️ 生ログを git に入れない・外部の LLM に渡さない。参照のログのキーコードを転記しない。
 - ⚠️ 合成キーは前面の窓に入る。run の間は誰も PC に触れない（タブレットなのでタッチ・ペンも）。
 - ⚠️ G-GEAR は Windows の CI の self-hosted runner。この Surface はそうではない（確かめてから）。
+
+## §2.6 進み具合（2026-10-04 0:20〜1:50 JST のセッション・枝 `docs/ime-m7-windows-d5`・PR #303）
+
+- 再起動後の版: OS build 26200.9457・`IMJPTIP.DLL` 10.0.26100.9278（パイロット 8875）。AC・NoSync・更新の一時停止（10-29 まで）は確認済み。
+- ★ **逸脱 D5**（判断 143）: 凍結の `cell.windows.json` の相対パス（`kit/logger/...`）では Windows で子が起動しない → セルのコピー `~/ime-m7/cell-windows.json`（SHA-256 `0e4c17ed…4fb6`）で 2 つの exe を `kit\...` に。計測の前に push 済み（`563c08a4`）。
+- ✅ §10.8 の 39 試行の点検: **39 / 39**（`~/ime-m7/runs/verify-m7`・観測は封印済み）。
+- ❌ **試み 1**（`~/ime-m7/runs/aborted/cell-1`）: 00:38 起動 → 00:59 に Claude Code がメモリ不足でバックグラウンドの shell を止めた。`run.json` なし。`data.windows.md` に行を記録・push 済み（`2cab630c`）。残りは最大 2 回。
+- 片付け: npm / pip のキャッシュ・`src-tauri/target`・パイロットの `target`・前セッションの worktree 2 つを消した（C: の空き 4.8 → 8.8 GB）。
+- **試み 2**: 研究者が VS Code を閉じ、単独の PowerShell から `start_windows.py … --run-dir C:/Users/johnd/ime-m7/runs/cell-2` を起動する（Claude Code の外）。
+- **次のセッション**: `cell-2` の `run.json` の有無を確かめる → `delivery.py`（`data.md` の Deposit procedure 1・`--pre-ms 20 --tail-ms 300`）→ `data.windows.md` の Run checks に試み 2 の行（manifest の SHA-256・D4 は `observation.segments.excluding_mode_keys.max_unexplained_beyond_markers`）→ すぐ commit・push → PR #303 を CI 緑で merge。⚠️ git の identity が無い機械なので `git -c user.name="Mikoto Miura" -c user.email="164107357+mikotomiura@users.noreply.github.com"`。
