@@ -1237,3 +1237,31 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **点検の結果（§10.8・2026-10-04 00:27〜00:37 JST）**: D5 のセル（SHA-256 `0e4c17ed…4fb6`）・計画 `plan-verify`（`f02e046b…0154`）で `start_windows.py` → 中止なし・前面の確認 3 / 3。観測は `seal_obs.py` で封印（`cd4a5fcc…`・key 行 2,952 を残した）。`gt_sessions.py --rules experiment/gt_rules.json`（`b9a48375…`）→ `src` `win_tsf`・39 セッション（確定 30・取消 9）・**`oracle_agreement` 39 / 39** → 本計測へ。生ログは `~/ime-m7/runs/verify-m7`（中止の 1 回目は `~/ime-m7/runs/aborted/verify-m7-1`）。
 - **本計測の 1 回目**: 2026-10-04 00:38 JST に起動（`~/ime-m7/runs/cell-1`・計画 `b7bdf8fc…36b0`）。
 - ⚠️ **本計測の 1 回目は中止**: 2026-10-04 00:59 JST ごろ、Claude Code が「メモリ不足・セッションが idle」を理由にバックグラウンドの shell（`start_windows.py`）を止めた（run の失敗ではない）。runner・観測器・参照入力欄とも終了・`run.json` なし・oracle 6,133 行。空きメモリ 1.4 / 8 GB（VS Code・Chrome・Defender・メモリ圧縮）。`delivery.py` exit 0・参照側 0 / 0 / 0・観測の D4 の数 14（最後の区間・途中で切れた）→ 中止の試み 1 として `data.windows.md` に 1 行を書き、すぐ push（§10.8）。再起動は研究者の指示を待つ。
+
+## 判断 144: G-GEAR の Windows パイロットの最初の試しを記録として残す（2026-10-04・G-GEAR・メインの選択・研究者が覆せる）
+
+- **経緯**: 2026-10-03 未明、判断 134（M5 は G-GEAR）に従って G-GEAR で Windows の較正パイロットを回した（MS-IME `IMJPTIP.DLL` 10.0.26100.9278・Windows 11 26H2 / build 26300）。記録は枝 `docs/ime-m5-pilot-ggear`（`433d13ff`）に push したが、**main には入れていない**。その間に Surface のセッションが判断 135〜143 で M5（Surface）→ M6（追補の凍結・`https://osf.io/4jwzn`）→ M7 の Windows のセルまで進めた。⚠️ その枝の「判断 135」は main の判断 135 と**別の中身**（番号が衝突した）。
+- **採用**: 枝の `pilot-windows-1-notes.md` を **`pilot-windows-ggear-notes.md`** に名前を変えて main に残す（冒頭に「M5 の記録ではない」と出どころを追記）。枝の判断 135・`pilot-windows-tools/`・書き直した引き継ぎは main に入れない（Surface の M5 と M6 が置き換えた）。
+- **残す理由**: 別の版の MS-IME でも S4（変換の後の Esc 2 回で取り消されない）と S8（数字の後に Enter が要る）が同じに出た（Surface の判断 137 と一致）。ほかに、開始の前面化が `SetForegroundWindow` に拒まれうること（研究者の入力の直後に起動した run だけが通った）、`refinput_imm` の窓に文字が出ないこと（研究者が誤動作と受け取った）が記録にある。生ログは G-GEAR の `C:/ime-pilot-win/runs/` にある（コミットしない・預けない）。
+- **後始末（研究者に聞く）**: 枝 `docs/ime-m5-pilot-ggear` は不要になった。消すかは研究者が決める（消しても中身はこの記録と `433d13ff` に残る）。
+
+## 判断 145: 投稿計画を前倒しする —— BRM に 10 月末に投稿・原稿は今から並行で書く（2026-10-04・G-GEAR・研究者の選択）
+
+- **背景**: M4（Mac）は最後の run が 2026-10-05 10 時ごろに終わる（研究者）。M7 は Windows のセルが 10-04 13:03 に完了（2925 / 2925）、残りは Windows の E3（`idle` → `working`）で、明日・明後日に終わる見込み（研究者）。→ 結果は 10-05〜06 にそろう。Windows の追補は 10-03 に凍結済みなので、macOS の解析を Windows の結果より先に始めても追補に影響しない。
+- **研究者の選択**: 投稿の目標は **2026 年 10 月末**（推奨どおり）。原稿は**今から並行で**書く（推奨どおり）。コンテキストの都合で、執筆は**次のセッション**から始める。
+- **日程**（遅れても 11 月上旬に収める）:
+
+  | 時期 | 内容 |
+  |---|---|
+  | 〜10-05 | 原稿の外枠（節構成・主張 ↔ 根拠の対応表・判断 21 の `manuscript/outline.md`）・手法の節（凍結した事前登録と追補 §10 から書ける・結果を待たない） |
+  | 10-05〜07 | M4 の §3.4 の点検 → macOS の解析（macOS のタグから）。Windows の E3 の後に Windows の解析（Windows のタグから）・E3 のまとめ（M8・M10） |
+  | 10-08〜17 | 結果・考察・序論・要旨 → 原稿の全体 |
+  | 10-18〜22 | attack-me（原稿のプレ査読）1〜2 巡 → 直す |
+  | 10-23〜27 | M12: 公開 repo・リリース・Zenodo の DOI・Open Practices Statement（OSF の 2 つの登録と DOI）・カバーレター |
+  | 10-28〜31 | BRM に投稿 |
+
+- **投稿先は BRM のまま**（判断 1）。★ **費用 0 を一次で確かめた**（2026-10-04・Chrome で `https://link.springer.com/journal/13428/how-to-publish-with-us`）: 逐語 "Authors can also choose to publish under the subscription publishing model (no APC charges apply); both options will be offered after the paper has been accepted."（OA を選ぶと APC は $4,090）。投稿規程（`/submission-guidelines`）の本文に投稿料・掲載料・カラー図の費用の語は無かった。雑誌なので登壇も無い → 研究者の条件（memory「登壇なし・費用ゼロ」・2026-09-28）を満たす。⚠️ 採択後に購読モデルを選ぶこと（OA を選ばない）。
+- **CHI 2027 Posters**: 2026-09-28 に取り下げ済み（p321 のタスクの判断 15・判断 13 の追記）。→ 判断 8・9 の CHI の記述は無効。`design.md` §6・`requirement.md`・`paper-suggest.md` の残りを直した。
+- ⚠️ **M12 の申し送り**: 凍結のタグが 2 つ（`ime-observation-prereg-macos` の一覧 `29b183ba…`・98 ファイル／`ime-observation-prereg-windows` の一覧 `f61af353…`・108 ファイル）。判断 131 は「公開 repo の最初の commit を macOS の凍結の書き出しにする」だけを決めている → **Windows の凍結の書き出しの一覧も公開物から計算し直せる形**（2 つ目の commit にするなど）を M12 の前に決める。
+- **arXiv**: 任意。endorsement が要る（memory）ので、投稿をそれ待ちにしない。
+- **影響範囲**: `design.md` §6・`paper-suggest.md` §6・`requirement.md` のゴール・`_issue-plan.md` の M13・`tasklist.md`・引き継ぎ `next-session-ime-paper-writing.md`（新規）。
