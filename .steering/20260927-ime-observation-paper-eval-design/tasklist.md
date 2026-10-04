@@ -203,4 +203,8 @@
 - [x] 合成入力の記録一式を 5 つ目の貢献「データセット」として加える（2026-10-04・研究者の選択・判断 146）→ 説明書・Zenodo の DOI・パイロットの生ログの判断は M12 の枠で
 - [x] G-GEAR の Windows パイロットの最初の試し（2026-10-03 未明）を `pilot-windows-ggear-notes.md` として残した（判断 144・M5 の記録ではない）。枝 `docs/ime-m5-pilot-ggear` は研究者の了承で消した（2026-10-04）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
+  - [x] 外枠の初稿（2026-10-04・G-GEAR・枝 `docs/ime-manuscript-outline`）: 13 節 ＋ Open Practices ＋ Declarations・貢献 5 つ・主張 ↔ 根拠の表 23 行（OB / LG / AG / RC / RT / DS）・図 5・表 10。内部の対応（判断・`[Pn]`/`[Vn]`・未登録の引用）は `manuscript-map.md`。`_style_check.py` 違反 0（変異で赤になることも確認）
+  - [x] 研究者の確定（判断 147）: データセットは専用の短い節・パイロットの生ログは別の区分で数える・原稿は LaTeX（Springer の雛形）
+  - [ ] attack-me（外枠）→ 採否 → 直す
+  - [ ] 手法の節（凍結した事前登録と追補 §10・逸脱 D1〜D5 から・LaTeX）
 - [ ] /finish-task
