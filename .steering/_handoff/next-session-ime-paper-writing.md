@@ -43,5 +43,4 @@ Skill: citation-ssot・verify-before-claiming・attack-me（外枠を書いた�
 - ⚠️ **判断の番号の衝突**: Mac・Surface・G-GEAR のセッションが並行で `decisions.md` に追記している。2026-10-03 に「判断 135」が 2 つの枝で別の中身になった（判断 144）。→ 追記の前に `git fetch` して main の最後の番号を見る。merge の前にもう一度突き合わせ、ぶつかったら番号を付け直す。
 - ⚠️ M12 の申し送り（判断 145）: 凍結のタグが 2 つ（macOS の一覧 `29b183ba…`・98 ファイル／Windows の一覧 `f61af353…`・108 ファイル）。公開 repo で両方の一覧を計算し直せる形を M12 の前に決める。
 - ⚠️ 原稿で結果の数を書くときは `experiment/results/` の JSON から写し、手で丸めない（再現性・reproducibility-discipline）。
-- ⚠️ 枝 `docs/ime-m5-pilot-ggear`（G-GEAR の最初の試し・main に入れない）を消すかは研究者に聞く（判断 144）。
 - ⚠️ `.codex/budget.json` は台帳。`git checkout --` で戻さない。

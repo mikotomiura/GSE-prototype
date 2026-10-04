@@ -1243,7 +1243,7 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **経緯**: 2026-10-03 未明、判断 134（M5 は G-GEAR）に従って G-GEAR で Windows の較正パイロットを回した（MS-IME `IMJPTIP.DLL` 10.0.26100.9278・Windows 11 26H2 / build 26300）。記録は枝 `docs/ime-m5-pilot-ggear`（`433d13ff`）に push したが、**main には入れていない**。その間に Surface のセッションが判断 135〜143 で M5（Surface）→ M6（追補の凍結・`https://osf.io/4jwzn`）→ M7 の Windows のセルまで進めた。⚠️ その枝の「判断 135」は main の判断 135 と**別の中身**（番号が衝突した）。
 - **採用**: 枝の `pilot-windows-1-notes.md` を **`pilot-windows-ggear-notes.md`** に名前を変えて main に残す（冒頭に「M5 の記録ではない」と出どころを追記）。枝の判断 135・`pilot-windows-tools/`・書き直した引き継ぎは main に入れない（Surface の M5 と M6 が置き換えた）。
 - **残す理由**: 別の版の MS-IME でも S4（変換の後の Esc 2 回で取り消されない）と S8（数字の後に Enter が要る）が同じに出た（Surface の判断 137 と一致）。ほかに、開始の前面化が `SetForegroundWindow` に拒まれうること（研究者の入力の直後に起動した run だけが通った）、`refinput_imm` の窓に文字が出ないこと（研究者が誤動作と受け取った）が記録にある。生ログは G-GEAR の `C:/ime-pilot-win/runs/` にある（コミットしない・預けない）。
-- **後始末（研究者に聞く）**: 枝 `docs/ime-m5-pilot-ggear` は不要になった。消すかは研究者が決める（消しても中身はこの記録と `433d13ff` に残る）。
+- **後始末**: 枝 `docs/ime-m5-pilot-ggear` は不要になった → 2026-10-04 に研究者の了承で origin とローカルから消した（`433d13ff`・PR なし・worktree なし）。中身の記録はこの判断と `pilot-windows-ggear-notes.md`。⚠️ `pilot-windows-tools/` と書き直した引き継ぎは残していない（Surface の `kit/run/` と M5 の記録が置き換えた）。
 
 ## 判断 145: 投稿計画を前倒しする —— BRM に 10 月末に投稿・原稿は今から並行で書く（2026-10-04・G-GEAR・研究者の選択）
 
