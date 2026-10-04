@@ -51,11 +51,14 @@ runtime cost added no learning to the input method before the agreement cells we
 
 A reference input field is a minimal application that records what the input method tells it, and only that. Both
 fields record times on the wall clock and on a monotonic clock, and neither records any text. The reference was placed
-at this software layer because an application sees a conversion only through the calls it receives; an external
-timing device, the usual standard for validating timing instruments, would time the path of the keys, not the
-conversion. The comparison is therefore between two software records on the same machine, not against an external
-standard: the physical path of the keys is not exercised, no external clock is used, and the reference is the sessions
-that one kind of field received, not the input method's internal state (Section~\ref{sec:limitations}).
+at this software layer because the question of the study is agreement with the calls that an application receives
+from the input method, and no external device observes these calls. An external device, the usual standard for
+validating timing instruments, could time the keys, the candidate window or the marked text on the screen; none of
+these was done.\footnote{The registration gives the reason more broadly: that an external timing device would time
+the path of the keys, not the conversion.} The comparison is therefore between two software records on the same
+machine, not against an external standard: the physical path of the keys and the display are not exercised, no
+external clock is used, and the reference is the sessions that one kind of field received, not the input method's
+internal state (Section~\ref{sec:limitations}).
 
 \paragraph{macOS.} The field implements the text-input client protocol of the macOS text system and records every call
 that the input method makes to it: marked text set (with its length and the selected range), text inserted (with its
@@ -239,10 +242,16 @@ read them (for example, the observation rows of trials in which the reference lo
 so that a failure of the reference is not read as one of the logger); no check is used to exclude trials or to adjust
 values.
 
-\paragraph{Delivery.} A delivery report compared, press by press, the oracle with the plan, with the key rows of the
-observation and with the key-downs of the reference log: the delay of each press against the schedule, the fraction of
-sent presses that reached each log, the rows without a sent press, and, in the trials where every press arrived, the
-delay of each row after its press.
+\paragraph{Delivery.} A delivery report compared, press by press, the oracle with the plan, with the key rows of
+presses in the observation and with the key-downs of the reference log: the delay of each press against the schedule,
+the fraction of sent presses that reached each log, the rows without a sent press, and the timing of the rows. For
+the timing, a trial was used when the rows of presses within its window (from 20~ms before its start to 300~ms after
+its end) equalled its presses other than the input-mode keys; the $i$-th row was paired with the $i$-th press, the
+delay of a row was its wall-clock time minus the executor's wall-clock time of dispatch, and the interval error was
+the difference between consecutive rows minus that between the corresponding presses. Each was summarised per speed by
+its number, mean, minimum, 5th percentile, median, 95th percentile and maximum, and the trials that could not be
+paired were counted. The logger also writes a row for each key release, on both systems; no analysis uses these rows,
+and the times of releases enter no measure.
 
 \paragraph{Stopping rule.} Each cell was run once to completion, and a run that was aborted was repeated from the
 start with the same plan, up to three attempts. A completed run also counted as aborted when its plan was not the
@@ -259,8 +268,10 @@ from outside the runner and was counted as aborted, and one start from a termina
 addendum excludes, was refused by the runner before its first trial and was not counted; this is recorded as deviation
 D6.
 
-\paragraph{Clocks.} The differences between the clocks of the observation, the reference field and the executor were
-measured at the block markers of every run and are reported. They were not used to correct the matching: the duration
+\paragraph{Marker times.} The times at which the executor, the observation and the reference field recorded the
+same block-marker presses were compared in every run and are reported. Their differences combine the offsets of the
+processes' clocks with the delays of the paths by which each record receives a press, and the two cannot be separated
+without an external clock. They were not used to correct the matching: the duration
 error is a difference of durations, and a pair needs an overlap that tolerates a shift of up to a third of the length
 of two intervals of equal length.
 

@@ -124,7 +124,8 @@ separator in the two paths differs. No key was sent in the aborted attempt, and 
 **What changes.** Section 3.4 counts every run that the runner aborts as an attempt, up to three, and admits no other
 reason or explanation; it does not name two events that occurred on 2026-10-04 before the completed run of the
 Windows cell. (1) The first attempt was started at 00:38 JST and was stopped at about 00:59 JST from outside the
-runner: the shell that ran it was ended by another program on the machine under low memory. The runner wrote no
+runner: the shell that ran it was ended by the coding assistant's session on the same machine under low memory (the
+wording of the table of run checks). The runner wrote no
 manifest. This attempt is counted as aborted (attempt 1). (2) A start at about 01:51 JST was made from a terminal with
 administrator rights, which section 10.4 excludes. The runner refused to go on before the first trial, and no key was
 sent (the oracle log holds its header only). This start is not counted among the attempts. The completed run is

@@ -1315,3 +1315,20 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **実装（メイン）**: 外枠を全面的に書き直した（6,984 語・主張 31 行: OB 4・LG 5・RF 1・AG 8・KT 1・RC 3・RT 1・RE 5・DS 3。AG7・AG8 は RF1・KT1 に寄せた）。手法の節に D6・§10.8・精度の計画・基準をソフトウェアの層に置く理由・診断は読むためだけ・carry-over の割合・2 回の凍結の表。`_style_check.py` 違反 0。
 - ★ **メインの反省**: context-B の「持ち帰ってほしいこと」に「入力方式自身のセッション」「どの測度を信頼してよいか」「結果に基づいて」と書いたのはメインで、事前登録と食い違っていた（監査役 3-A-1・3-A-2）。round 2 の context-B は事前登録の言い方にする。
 - **次**: round 2（同じ立場・同じ接地・引き継ぎを渡し再掲を求めない）は次のセッション（コンテキストが半分を超えたため・memory「半分で区切る」）。
+
+## 判断 150: 外枠の attack-me round 2（major）の採否 —— 直す一覧を全部承認・要旨は登録 §6.1 に従い層を絞る・推奨 (d) は 2 段に狭める・round 3 は原稿の attack-me で確かめる・macOS のセルが欠けたら推奨しない（2026-10-05・G-GEAR・研究者の選択）
+
+- **round 2**: `attack-me/outline-ime-manuscript/round-2/`。有効な査読 3 / 3（R1 major・R2 minor・R3 major）＋ 監査役。接地の引用 57 件を本文で照合して捏造 0、注入 0、偽陽性 0（R2 の「macOS は押下だけ」の前提は偽で、指摘の残りは真）。round 1 の指摘の大半は解消。新しい穴は round 1 の直しで足した仕組みにあった（verdict.md の Y1〜Y44）。
+- ★ **メインの見落とし（2 件）**:
+  1. 判断 149-5 の要旨の規則を推奨したとき、凍結した事前登録 §6.1（623〜626 行 "In the abstract and the conclusions … An estimate in the primary scope is given together with the fraction of trials that the scope sets aside and the estimate under `all_trials`"）と照合していなかった。→ 規則が登録に反していた（Y1）。
+  2. round 2 の context-B にも、事前登録と食い違う文が 2 つあった。「打ち切りが集計を動かす向きは規則から言える」は 4 つの集計のうち 2 つだけに当たり、Windows の窓の経路には 20 秒の打ち切りが無い。「時刻つきの記録は評価しない」は誤りで、時刻を持つ特徴の集合は攻撃に渡して推定だけを報告した。
+- ★ **ソースで確かめたこと**: macOS のロガーも押下と解放の両方でキー行を書く（`kit/logger/src/driver_macos.rs` の `handle_key` と `queue_row`）。届き方（`delivery.py`）と攻撃（`closed_set.py` の `read_obs`）が使うのは押下の行だけ。事前登録 §1.1 は macOS を押下だけで書いている → 原稿では両 OS とも解放の行を書くと書き、登録の書き方との違いを注にする。KT1 の定義は凍結の `delivery.py`（62〜76 行）に在る。安全弁の実装とテストは `kit/logger/src/main.rs`（273 行・777 行）。
+- **研究者の選択（6 問とも推奨どおり。1 問は事実の確認）**:
+  1. 直す一覧（Y1〜Y44 の ★ 以外）を**全部承認**。既定は 3 つ: KT1 で最初のブロックを分けない（凍結の出力に無い）。文書の写しはアーカイブの URL で残す。`FORMATS.md` をデータの寄託に含める。
+  2. **要旨は登録 §6.1 に従う**。セルごとに、主の範囲の値に、範囲が外した割合と carry-over の割合、`all_trials` の値を添える（逸脱 D7 は作らない）。範囲に入れるのは、主の範囲で **30 試行以上の層だけ**にし、外した層の数を添える（null の層は入れない）。Windows は「別の構成概念との一致」と添える。CPU は系ごとに書いて比べない。推奨は 1 つで、Windows は但し書きにする。§13 の結論にも同じ規則をかける。
+  3. **推奨 (d) / RE4 は 2 段に狭める**（新しいコードは足さない）。(i) 39 試行の点検で確かめられるのは、自分の機械と版で手順が入力方式を計画どおり動かすか（基準の側・Windows・D5 の手当てつき）。(ii) ロガーの一致を推定し直すには、登録の計画の全体と凍結の解析が要る。この一式は登録外の計画では一致を計算しない。macOS には登録の短い点検が無い。
+  4. **外枠の round 3 は回さない**。直した外枠は、原稿の attack-me（stage `manuscript`・判断 145 の 10-18〜22）に round 1・2 の引き継ぎを渡して確かめる。
+  5. **macOS のセルが 1 つでも測れなければ、粒度は推奨しない**と報告する（登録の条件「両セル」を確かめられないため）。
+  6. 試行 2 の間に Surface で何が動いていたか（Y12）は**分からない → Surface のセッションで調べる**。それまで外枠には報告の項目だけを置き、Open items に載せる。
+- **実装（メイン）**: 外枠を直す（Y1〜Y44）。`method.tex` の基準を置く理由（Y7）を狭める。`deviations.md` D6 と `data.windows.md` の試行 1 の言い方を揃える（Y12）。⚠️ `README.md` の題（Y25）は引き継ぎ §2 の 4 で書き出しの前に直す。
+- **影響範囲**: `papers/ime-observation/manuscript/outline.md`・`sections/method.tex`・`experiment/deviations.md`・`experiment/data.windows.md`・`manuscript-map.md`・引き継ぎ。

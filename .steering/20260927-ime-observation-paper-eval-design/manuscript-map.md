@@ -7,7 +7,9 @@
 
 | 外枠の部分 | 判断（一次） | メモ |
 |---|---|---|
-| 題（Working title） | 判断 15（T1・E2 が強ければ T4） | 公開物には「問いの形に変えうる」とだけ書いた |
+| 題（Working title） | 判断 15（T1）→ ★ 判断 149 で "Logging …" に固定（T4 の分岐は取り下げ） | 2026-10-05: `README.md`・`CITATION.cff`・`.zenodo.json`・`main.tex` の題も揃えた（判断 150 の実装）。凍結のタグは変えていない |
+| 要旨の規則 | 判断 149-5 → ★ 判断 150-2 で事前登録 §6.1 に合わせて直した | 主の範囲 ＋ 外した割合（範囲・carry-over）＋ `all_trials`・層は 30 試行以上・Windows は別の構成概念・CPU は系ごと |
+| attack-me（外枠） | round 1（判断 149）・round 2（判断 150） | round 3 は回さない。原稿の attack-me（stage `manuscript`）に round 1・2 の引き継ぎを渡す |
 | Journal requirements | 判断 1・design.md §5 の 12（2026-09-28 の確認）・判断 145（10-04 の費用の確認） | ★ 2026-10-04 23:39 に `curl -sL`（cookie つき）で原文を取得して逐語で照合した（判断 147 の追記）。投稿は **ScholarOne**。Open Practices は References の直前（外枠の初稿の順を直した）。分量の上限・LaTeX の雛形は規定なし。投稿の直前にもう一度読む |
 | Scope of the claims | 判断 6（精度評価が主・漏れても報告）・事前登録 §6.1（区間の幅で書く・評価語を使わない）・§6.8・§7・design.md §0 の「書かないこと」・`docs/research-positioning.md` の差分（設計上の排他性） | |
 | Contributions 1〜4 | 判断 6 の (3)(1)(2)(4) | ★ **メインの選択（研究者が覆せる）**: ロガーを独立の貢献にせず、貢献 2「ロガーとその検証（主）」にまとめた。判断 6 の 4 つ ＋ 判断 146 の 1 つ ＝ 5 つに合わせるため。design.md §0 の C2（ロガー）は貢献 2 の前半に入る |
@@ -27,9 +29,10 @@
 | OB1〜OB3 | `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §3.2・§7.1〜7.5（MS / Apple の一次文書の逐語） | ⚠️ **一次の文書を `docs/references.md` に未登録**（design.md §0 C1 の「論文用に一次の MS / Apple 文書へ引き直し、`[Pn]` で接地する」）。§3 を書くときに登録する。⚠️ macOS の Accessibility の定数 135 個の全数確認は 2026-08-22 の SDK の値 → 計測の版で数え直してから書く |
 | OB4 | 事前登録 §1.1・§10.3・§10.11（Two constructs） | |
 | LG1 | `kit/formats/FORMATS.md`（`obs/1`）・`validate_logs.py`・`notes.md` の Step 0 | ★ 10-04 にソースで確かめた: macOS も押下と解放の両方で key 行を書く（`driver_macos.rs` の `handle_key`・`queue_row` は repeat と観測しないキーだけを落とす） |
-| LG2 | `kit/logger/src/`・`spec_predict.py` の selftest | |
-| AG1〜AG10 | 事前登録の問い 1〜3・`notes.md` の結果ファイルの表 | ⚠️ 時計のずれ（AG8）の結果の置き場は `notes.md` の表に無い（`clock_sync.py` の出力）→ 解析のときに決める |
-| AG9 | `data.md`・`data.windows.md` の run checks | ★ Windows の試行 1 は外から止められた（低メモリでコーディング支援のセッションがシェルを終えた）・管理者権限の開始は数えない（研究者の判断）→ 原稿の試行の表にそのまま載せる |
+| LG2 | `kit/logger/src/`・`spec_predict.py` の selftest・★ Windows の安全弁は `main.rs` 273 行（実装）・777 行（テスト） | 判断 150 で LG2b に名指した |
+| AG1〜AG8 | 事前登録の問い 1〜3・`notes.md` の結果ファイルの表 | ★ 判断 150 で番号を振り直した（旧 AG9 → AG7・旧 AG10 → AG8・round 1 の AG7/AG8 は RF1・KT1 に寄せた）。マーカーの時刻（`clock_sync.py` の出力）は外枠の「Claims and evidence」の冒頭で「タグから run ごとに作り結果と一緒に置く」と決めた |
+| AG7 | `data.md`・`data.windows.md` の run checks | ★ Windows の試行 1 は外から止められた（低メモリでコーディング支援のセッションがシェルを終えた）・管理者権限の開始は数えない（研究者の判断）→ 原稿の試行の表にそのまま載せる。★ 起動ごとに寄託したか・理由も載せる（判断 150・Y28）。⚠️ 試行 2 の間に Surface で何が動いていたかは未確認（Surface で調べる・判断 150-6） |
+| KT1 | 凍結の `delivery.py` 62〜76 行（対のつくり方・要約） | 判断 150 で外枠と `method.tex` に定義を写した |
 | RC1〜RC3 | 事前登録 §6.8・§10.7 | |
 | RT1 | 事前登録 §6.10・§10.9 | |
 | DS1 | 事前登録 §3.1（**基準を満たすパイロットの生ログは本計測のデータと預ける** ＝ 凍結物が既に約束している・判断 110）・`pilot-macos.md` / `pilot-windows.md` の Raw logs | ★ 判断 146 の増える仕事 4「較正パイロットの生ログを含めるか」は、**預けることは凍結物で決まっている**。残るのは「データセットの一部として数えるか」だけ → 研究者に確認（§4） |
