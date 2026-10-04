@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use these artifacts, please cite them as below."
 type: software
-title: "Observing Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation"
+title: "Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation"
 # The author list is a placeholder. The authors confirm names and affiliations before publication.
 authors:
   - family-names: "TODO"
