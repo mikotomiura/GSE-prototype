@@ -2,7 +2,7 @@
 
 Departures from the frozen registration (`preregistration.md`, tag `ime-observation-prereg-macos`), recorded
 under section 8 before the analysis they affect is run. Each entry gives its date, the reason and the effect. The
-four entries below were made for the Windows cell before any Windows measurement; the evidence that they leave the
+entries below were made for the Windows cell before any Windows measurement; the evidence that they leave the
 macOS cells unchanged is given at the end.
 
 ## D1. Scenario S4 presses three Escapes on Windows (2026-10-03)
@@ -96,6 +96,27 @@ which is an error of the observer under test; the figures of such a run are repo
 a press of a key that the observer does not record (section 10.3), a person's press that cancels a sent press that the
 observation lost, or input with the pointer, touch or pen. It applies to the runs of the Windows cell and of the
 `working` condition on Windows, and not to macOS plans.
+
+## D5. The cell file of the Windows measurement names the two programs with backslashes (2026-10-04)
+
+**What changes.** `kit/run/README.windows.md` (step 3) makes the cell file of the measurement by copying
+`kit/run/cell.windows.json` and filling in `ime`, `clock_sync_disabled` and `auto_update_disabled`. In the cell file of
+the measurement the first entries of `refinput_cmd` and `logger_cmd` are also written with backslashes, as
+`kit\refinput-windows\target\release\refinput_tsf.exe` and `kit\logger\target\release\ime-observation-logger.exe`,
+still relative to the top directory of the published materials. Nothing else in the cell file differs from the
+template, and the template, the runner and every other file of the tag are unchanged. The same cell file is used for
+the check of section 10.8 (the input method's version differs from the pilot's) and for the runs of the Windows cell and
+of the `working` condition; the run manifest records it.
+
+**Reason.** Started from the top directory as the README describes, the runner could not start the observer or the
+reference input field: `subprocess.Popen` on Windows refused the relative program paths with forward slashes (`FileNotFoundError`,
+WinError 2), and the first attempt of the check of section 10.8 was aborted by the runner on 2026-10-04 before any key
+was sent. The same programs started from the same directory when the paths were written with backslashes or began with
+`./`. The pilot did not find this because its cell files named the programs by absolute paths. The
+template could not be corrected without changing a file of the tag.
+
+**Effect.** The programs, their arguments and the directory they run from are those of the template; only the
+separator in the two paths differs. No key was sent in the aborted attempt, and it is not a run of the Windows cell.
 
 ## The macOS cells are unchanged
 
