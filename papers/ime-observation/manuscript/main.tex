@@ -1,0 +1,28 @@
+% Manuscript for Behavior Research Methods, built with the Springer Nature LaTeX template (class sn-jnl with the
+% APA reference style). The template files are not part of this directory; they are obtained from the publisher.
+% The sections are kept in separate files while the manuscript is written and are combined into one file for
+% submission. The structure and the evidence for each claim are fixed in outline.md.
+\documentclass[pdflatex,sn-apa]{sn-jnl}
+
+\usepackage{booktabs}
+
+% A value that is filled in from the result files or the run manifests after the measurement.
+\newcommand{\tbd}[1]{\textbf{[#1]}}
+
+\begin{document}
+
+\title{Observing Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a
+synthetic-input validation}
+
+\abstract{\tbd{Abstract of no more than 250 words, written after the results.}}
+
+\keywords{Japanese input method, keystroke logging, privacy-preserving logging, observability, method validation,
+reproducibility}
+
+\maketitle
+
+\input{sections/method}
+
+\bibliography{references}
+
+\end{document}

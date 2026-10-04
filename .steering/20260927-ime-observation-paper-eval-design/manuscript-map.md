@@ -53,8 +53,10 @@
 | §3 Apple の NSTextInputClient・Accessibility・IMK・CGWindowList・TIS | Apple Developer | — | ⚠️ 未登録 |
 | §5 打鍵の速さ | Dhakal et al. (2018) | [P269] | 登録済み |
 | §5 / §6 統計 | Wilson / Efron / Cameron ら / Bland & Altman / Cohen / Shrout & Fleiss / McGraw & Wong / Witten & Bell | [V179] [V188] [V181] [V184] [V185] [V186] [V187] [V189] | 登録済み（判断 98 の 7） |
-| §5 読みの付与 | SudachiPy（Takaoka et al., 2018 か） | — | ⚠️ 未登録 |
-| §5 / §10 コーパスの出所 | 青空文庫 | — | ⚠️ 未登録 |
+| §5 読みの付与 | Takaoka et al. (2018) Sudachi | [V190] | ★ 登録済み（2026-10-05・判断 148）・`references.bib` の `takaoka2018`・`method.tex` が引く |
+| §5 / §10 コーパスの出所 | 青空文庫 | [V191] | ★ 登録済み（同上）・`references.bib` の `aozora` |
+| §2 計時の道具の検証（attack-me round 1 の X8） | Plant (2016)・Pinet et al. (2017)・Bridges et al. (2020) | — | ⚠️ 未登録（attack-me の接地で OpenAlex を確認済み・論文で引くときに登録） |
+| §2・§12 打鍵の記録の漏れと書き手の特定（X13） | Monaco (2018) | — | ⚠️ 未登録（同上） |
 | §10 データの説明書 | Gebru et al. (2021) Datasheets for Datasets | — | ⚠️ 未登録 |
 
 ★ 未登録のものは、その節を書くときに一次（Crossref・出版社・公式文書）で書誌を確かめて `docs/references.md` に append する（citation-ssot ルール 5: 未確認は provisional）。
