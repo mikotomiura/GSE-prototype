@@ -32,5 +32,6 @@
 - [x] 設計案を具体化する（§8: 面・時・造形・本人の操作・プライバシー・評価の段・棄却線・研究者が決めること）
 
 ## 閉じる
-- [ ] 単独でコミット・push（PR は出さない）
-- [ ] /cross-review 1 巡目・2 巡目と対応を decisions.md に
+- [x] 単独でコミット・push（PR は出さない）（`cac7327c`）
+- [x] /cross-review 1 巡目（Claude 19 件・Codex 5 件・すべて採用 → 判断 4）。Codex は 44,395 トークン（worktree の台帳に記帳・コミットに含める）
+- [ ] /cross-review 2 巡目（足した主張・留保の境界条件）と対応を decisions.md に
