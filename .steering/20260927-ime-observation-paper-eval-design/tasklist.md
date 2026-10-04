@@ -200,6 +200,7 @@
     - [x] 2026-10-03: 研究者が OSF Registries に追補を登録した → **https://osf.io/4jwzn**（DOI 10.17605/OSF.IO/4JWZN・公開・`date_registered` 2026-10-03T13:56:27 UTC・Open-Ended・添えたファイルの SHA-256 が凍結したファイル `f8620963…` と一致）→ `notes.md` に記録。元の項目: 研究者: OSF Registries に追補を登録する（凍結したファイル `f8620963…2b1d`・commit の 40 桁・一覧の SHA）→ URL と日付を `experiment/notes.md` に → 登録の日付は Windows の最初の計測より前
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
 - [x] 投稿計画の見直し（2026-10-04・G-GEAR・判断 145）: BRM に **10 月末**に投稿・原稿は計測と並行で書く（次のセッションから・引き継ぎ `next-session-ime-paper-writing.md`）。BRM の購読モデルの費用 0 を一次で確認（Chrome）。CHI の残りの記述（`design.md` §6・`requirement.md`・`paper-suggest.md`）を直した
+- [x] 合成入力の記録一式を 5 つ目の貢献「データセット」として加える（2026-10-04・研究者の選択・判断 146）→ 説明書・Zenodo の DOI・パイロットの生ログの判断は M12 の枠で
 - [x] G-GEAR の Windows パイロットの最初の試し（2026-10-03 未明）を `pilot-windows-ggear-notes.md` として残した（判断 144・M5 の記録ではない）。⚠️ 枝 `docs/ime-m5-pilot-ggear` を消すかは研究者
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
 - [ ] /finish-task
