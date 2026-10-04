@@ -94,3 +94,11 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 - 01:51 の `cell-2`（`runs/aborted/cell-2`）は管理者権限でランナーが最初の試行の前に拒否・鍵は送っていない → `delivery.py` は exit 0・数はすべて 0（`runs/aborted/cell-2-admin.delivery.json`）。研究者の判断で**行は残し、最大 3 回には数えない**（`618892d1`）。⚠️ この判断を `decisions.md` に逸脱として書くかは研究者が決める。
 - ✅ **試み 2**（`~/ime-m7/runs/cell-2`）: 01:57:31 に `Start-Process` で起動 → 13:03 に完了。2925 / 2925 試行・中止なし・manifest SHA-256 `5c74a1fa…3d82`。`delivery.py` exit 0・`src` `win_tsf`・4 つの数と D4 はすべて 0・計画外のフォーカスの喪失 0。行を記録して push 済み（`1c4a60b0`）。ロガーの stderr に `candidate window stale — auto-resetting` の WARN が 2 回（18:12Z・23:50Z）。
 - 次: PR #303 を CI 緑で merge → §2 の 6（問 5 の Windows: `idle` → `working`・別の夜）→ §2 の 7（解析）。
+
+## §2.9 進み具合（2026-10-04 13:10〜21:25 JST）
+
+- ✅ PR #303 を CI 緑で merge（`93b4cdbd`）。
+- ✅ **問 5 の `idle`**（`~/ime-m7/runs/e3-idle`）: 研究者の指示で 13:16 JST に開始（昼・本計測の終わった日の続き）→ 21:16 に完了。ロガーは単独で `Start-Process`（観測ログ `runs/e3-idle-obs.jsonl` は寄託しない・§3.4）、サンプラーは Git の bash で `run_e3.sh idle 28800 30`（PATH の `bash` は WSL なので使わない）。`summarize_e3.py`: 879 行・status `measured`・`cpu_all_zero: false`・CPU 平均 5.56 %・中央値 4.68・p95 10.82・最大 20.21・ワーキングセット最終 15.1 MB・傾き 0.01 MB/h・7.99 h・間隔の中央値 33 s。`samples.tsv` SHA-256 `43ab3b39…5f59`・`conditions.txt` `13bf360f…8122`・ロガーの SHA-256 `5f8a0567…06bd`。終了後にロガーを止めた。
+- ⚠️ 研究者が決めること: (1) `idle` を昼に、本計測と同じ日に行ったことを「一夜ずつ・別の夜」（§6.10・§10.8）からの逸脱として記録するか。(2) 01:51 の拒否された開始を数えない判断の記録（§2.8）。
+- `data.md` の手順 1 のとおり `idle` は Run checks に行を持たない。`data.windows.md` に問 5 の表は無い（寄託の時に追記する）。
+- 次: 問 5 の `working`（`idle` と別の夜・`run_e3.sh working 28800 30 …` を先に起動 → 別のプロセスで本計測と同じセルと計画の `start_windows.py`・12〜13 時間・直後に `delivery.py` の点検と Run checks の行・`cpu_all_zero` なら不十分）→ §2 の 7（解析）。⚠️ 見張りの shell はメモリ不足で Claude Code に止められることがある（run 本体は外のプロセスなので無事）。
