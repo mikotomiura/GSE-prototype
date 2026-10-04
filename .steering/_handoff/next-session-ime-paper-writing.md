@@ -1,5 +1,7 @@
 # 次セッション — IME 論文: 原稿を書き始める（BRM・10 月末投稿）
 
+> ★ **2026-10-05: このメモの §2 の 1〜4 は済んだ**（外枠・attack-me round 1・手法の節の草稿・形式 = LaTeX・判断 147〜149）。続きは **`next-session-ime-paper-outline-round2.md`**。
+
 > 作成: 2026-10-04（G-GEAR・投稿計画を見直したセッションの最後に）。研究者の選択で、**BRM に 10 月末に投稿**し、原稿は**計測と並行で今から書く**（判断 145）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/` の `decisions.md`（**判断 1・6・15・21・145・146**）・`design.md` §5（論文の節構成）・`paper-suggest.md`（題の候補）と、凍結した事前登録 `papers/ime-observation/experiment/preregistration.md`（macOS の節と Windows の追補 §10）・`experiment/deviations.md`（D1〜D5）・`experiment/notes.md`。状態は着手時に `git fetch` で測り直す。
 
