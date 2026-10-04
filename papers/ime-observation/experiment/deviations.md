@@ -2,8 +2,9 @@
 
 Departures from the frozen registration (`preregistration.md`, tag `ime-observation-prereg-macos`), recorded
 under section 8 before the analysis they affect is run. Each entry gives its date, the reason and the effect. The
-entries below were made for the Windows cell before any Windows measurement; the evidence that they leave the
-macOS cells unchanged is given at the end.
+entries D1 to D5 were made for the Windows cell before any Windows measurement, and D6 after the measurement of the
+Windows cell and before any analysis of it; the evidence that D1 to D5 leave the macOS cells unchanged is given at
+the end (D6 concerns the Windows cell only).
 
 ## D1. Scenario S4 presses three Escapes on Windows (2026-10-03)
 
@@ -117,6 +118,27 @@ template could not be corrected without changing a file of the tag.
 
 **Effect.** The programs, their arguments and the directory they run from are those of the template; only the
 separator in the two paths differs. No key was sent in the aborted attempt, and it is not a run of the Windows cell.
+
+## D6. How the attempts of the Windows cell were counted (2026-10-05)
+
+**What changes.** Section 3.4 counts every run that the runner aborts as an attempt, up to three, and admits no other
+reason or explanation; it does not name two events that occurred on 2026-10-04 before the completed run of the
+Windows cell. (1) The first attempt was started at 00:38 JST and was stopped at about 00:59 JST from outside the
+runner: the shell that ran it was ended by another program on the machine under low memory. The runner wrote no
+manifest. This attempt is counted as aborted (attempt 1). (2) A start at about 01:51 JST was made from a terminal with
+administrator rights, which section 10.4 excludes. The runner refused to go on before the first trial, and no key was
+sent (the oracle log holds its header only). This start is not counted among the attempts. The completed run is
+attempt 2 (01:57 to 13:03 JST, all 2,925 planned trials). All three are listed in the table of run checks of
+`experiment/data.windows.md`.
+
+**Reason.** The stopped attempt is counted because a run that ends before its plan is complete is an aborted run,
+whatever stopped it. The refused start is not counted because it was a start that the registration itself forbids
+(section 10.4), and the runner's check stopped it before any trial was played, so no input reached the input method
+or the logs.
+
+**Effect.** No key was sent in the refused start, and the stopped attempt is not analysed or deposited. Counting the
+refused start would make the completed run the third attempt instead of the second; it would not change which run is
+analysed. The analysis of the Windows cell reads only the completed run listed in `experiment/data.windows.md`.
 
 ## The macOS cells are unchanged
 

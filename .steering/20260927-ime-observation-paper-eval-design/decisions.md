@@ -1293,3 +1293,25 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - ⚠️ **未決（後で決める）**: (a) この G-GEAR には LaTeX も pandoc も無い（`command -v` で確認）→ コンパイルは LaTeX のある機械か Overleaf。(b) Springer の雛形のファイル（`sn-jnl.cls` など）は雛形側のライセンスなので、CC BY 4.0 の公開物に入れるかは雛形を取得するときに確かめる（入れないなら取得の手順を書く）。(c) BRM の投稿規程は WebFetch では Springer の認証に転送されて読めなかった → 投稿の前に Chrome で読み直す。
 - **影響範囲**: `papers/ime-observation/manuscript/outline.md`（§10・DS1・Table 10）・`manuscript-map.md`・`tasklist.md`。
 - ⚠️★ **追記（同日・attack-me の準備で BRM の投稿規程を一次で照合した結果・メインの記録）**: `curl -sL`（cookie つき）で `https://link.springer.com/journal/13428/submission-guidelines` の原文を取得し（2026-10-04 23:39 JST・HTTP 200）、文を逐語で確かめた。(1) ★ **投稿は ScholarOne**（逐語 "Manuscripts are to be submitted electronically via ScholarOne" ・`http://mc.manuscriptcentral.com/brmic`）であって Editorial Manager ではない → 上の 3 の「EMSE の実測どおり `.tex` は 1 本・タイトル頁は別添」の **`.tex` 1 本の根拠は BRM には当たらない可能性がある**（EMSE は Editorial Manager の実測）。タイトル頁は規程に逐語 "The title page must include the authors' names and affiliations and the corresponding author's address, telephone number, and e-mail address" があるが、別添かどうかは書かれていない。→ ScholarOne の挙動は投稿の段で確かめる。LaTeX の選択そのものは変えない。(2) ★ **外枠の誤りを直した**: Open Practices Statement は逐語 "immediately prior to the References section" なので、Declarations（逐語 "placed in a 'Declarations' section before the reference list"）→ Open Practices Statement → References の順にした（外枠の初稿は Open Practices を Declarations の前に置いていた）。Declarations の見出しは原文の一覧どおり（"Conflicts of interest/Competing interests"・"Authors' contributions (optional …)" を足した）。(3) 本文の分量・LaTeX の雛形の語は取得した範囲の原文に無い（規定なし）。
+
+## 判断 148: 原稿を LaTeX で書くので公開物の文体検査を `.tex` / `.bib` に広げ、手法の節の草稿を書く（2026-10-04〜05・G-GEAR・メインの選択・研究者が覆せる）
+
+1. **文体検査の穴**: `issues/_style_check.py` はディレクトリを歩くとき `TEXT_SUFFIX` にある拡張子だけを見ていて、`.tex` と `.bib` を飛ばしていた（明示したファイルなら禁止語だけは見る・日本語の地の文は見ない）。→ 公開の書き出し（`kit/export/export.internal.py` がこの道具を全体に回す）を原稿が素通りする。★ `TEXT_SUFFIX` に `.tex`・`.bib` を足し、2 つは**コメントも含めて全行**の日本語を赤にした（公開する全文なので）。selftest に 6 件（tex の本文・コメント・英語だけ・GSE・bib・走査で `.tex` を拾う）。変異 2 本（拡張子を戻す・分岐を外す）でどちらも selftest が赤。`papers/ime-observation` の全体で違反 0。
+2. **手法の節** `papers/ime-observation/manuscript/sections/method.tex`（英語・LaTeX・約 5,200 語）: 凍結した事前登録（§2〜§6・§10）・`deviations.md`・`pilot-*.md` から書いた。数（パイロットの run 数 6 と 7・試行 468 と 429・一致 124/126・117/117・39/39・層の最小 31 と 32・S6 の 3 と 30・コーパス 1,800 句・読み 6〜30・SudachiPy 0.7.0）はすべて一次の記録から写した。測った後に分かる値（macOS の版）は `\tbd{}`。表は Table 3（シナリオ）・逸脱・2 回の凍結。
+3. **書誌**: `manuscript/references.bib`（公開物・著者と年で引く・判断 76）。登録済みの [P269]・[V179]・[V181]・[V184]〜[V189] は事前登録の参考文献の行のとおり（名はイニシャル。⚠️ 最初に記憶で名を展開して書き、一次で確かめていないので戻した）。★ 新しく `docs/references.md` に **[V190] Takaoka ら（2018）Sudachi**（ACL Anthology の bib で確認）と **[V191] 青空文庫**（サイトが 200 を返すことを確認）を append した。OSF の 2 つの登録は API で題と登録日を確かめて `@misc` に（著者は TODO）。
+4. `manuscript/main.tex` は Springer の雛形（`sn-jnl`・`sn-apa`）の骨組みだけ。雛形のファイルは置かない（判断 147 の未決 (b)）。⚠️ この機械には LaTeX が無く、**コンパイルしていない**（後の節のラベル〔`sec:logger`・`sec:dataset` など〕はまだ無い）。
+
+## 判断 149: 外枠の attack-me round 1（major）の採否 —— 直す一覧を全部承認・§11 は閾値の無い 5 種・D6 と §10.8 を公開の記録に・題は Logging に固定・要旨の規則・利用者の道具は足さない・キー行の時刻は登録済みの値だけ（2026-10-05・G-GEAR・研究者の選択）
+
+- **round 1**: `attack-me/outline-ime-manuscript/round-1/`。有効な査読 3 / 3（R1 計時の道具の検証・R2 書字研究の利用者・R3 メタサイエンスとデータ管理・いずれも Opus の `paper-reviewer`）＋ 監査役。3 人とも **major**。接地の引用 34 件を本文で照合して捏造 0、注入 0、偽陽性 0、確かめられない 1（テキスト入力研究の文献）。★ LG2 は「Windows の経路の単体テスト〔41 本〕は在るが外枠が名指ししていない」形の真。★ §10.8 の点検（39 / 39）は内部の記録にだけあり公開物に無かった（真）。
+- **研究者の選択（7 問とも推奨どおり）**:
+  1. 直す一覧（verdict.md の ★ 以外）を**全部承認**。
+  2. **§11 の推奨は閾値の無い 5 種に限る**: (a) 定義が OS で違う測度は OS 間で比べない (b) 20 秒の打ち切りは規則から向きだけ (c) 漏洩は登録の判定の言い方（プライバシーの基準ではない）(d) 自分の機械で 39 試行の点検から再検証する手順 (e) 自分のアプリでの一致はこの一式では測れない。推奨ごとに根拠（結果・規則・構成概念）の行 RE1〜RE5。
+  3. **D6 として記録し §10.8 の点検も公開**: `deviations.md` に D6（外から止められた試行は中止に数え、管理者権限で拒まれた開始は数えない）・`data.windows.md` に「Check of section 10.8」の節（build 26200.9457・IME 10.0.26100.9278・39 / 39・30 確定 9 取消）。⚠️ 点検の計画の SHA-256 の全桁はこの機械に無い（Surface の点検の run の manifest にある）→ 公開物には先頭 8 桁と末尾 4 桁だけを書き、全桁を写すことを外枠の Open items に置いた。
+  4. **題は "Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation" に今固定**し、結果の後に変えない（判断 15 の「E2 が強ければ T4」は取り下げ）。⚠️ `README.md`・`CITATION.cff`・`.zenodo.json`・`kit/` の題の文字列は T1 のまま → 公開の書き出しの前（M12）に揃える。
+  5. **要旨の規則**: セルごとに (i) 検出の recall と precision の層ごとの Wilson 区間の最小の下端〜最大の上端 ＋ 主の範囲が外した割合 (ii) `dwell_ms` の偏りの速さごとの区間の範囲 (iii) 漏洩の判定と推奨（または推奨なし）(iv) 実行コストの条件ごとの CPU の平均（区間なし）。`all_trials` は本文の表だけ。
+  6. **利用者向けのスクリプトは足さない**。代わりに Table 4（書字研究の測度 × OS: obs から計算できるか・この検証が裏づけたか）と LG3。
+  7. **キー行の時刻は登録済みの値（§6.3 の行の遅れ・連続する行の間隔の誤差）を本文に上げるだけ**（KT1）。OS の刻みの分解能の探索は足さない。
+- **実装（メイン）**: 外枠を全面的に書き直した（6,984 語・主張 31 行: OB 4・LG 5・RF 1・AG 8・KT 1・RC 3・RT 1・RE 5・DS 3。AG7・AG8 は RF1・KT1 に寄せた）。手法の節に D6・§10.8・精度の計画・基準をソフトウェアの層に置く理由・診断は読むためだけ・carry-over の割合・2 回の凍結の表。`_style_check.py` 違反 0。
+- ★ **メインの反省**: context-B の「持ち帰ってほしいこと」に「入力方式自身のセッション」「どの測度を信頼してよいか」「結果に基づいて」と書いたのはメインで、事前登録と食い違っていた（監査役 3-A-1・3-A-2）。round 2 の context-B は事前登録の言い方にする。
+- **次**: round 2（同じ立場・同じ接地・引き継ぎを渡し再掲を求めない）は次のセッション（コンテキストが半分を超えたため・memory「半分で区切る」）。

@@ -205,6 +205,11 @@
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
   - [x] 外枠の初稿（2026-10-04・G-GEAR・枝 `docs/ime-manuscript-outline`）: 13 節 ＋ Open Practices ＋ Declarations・貢献 5 つ・主張 ↔ 根拠の表 23 行（OB / LG / AG / RC / RT / DS）・図 5・表 10。内部の対応（判断・`[Pn]`/`[Vn]`・未登録の引用）は `manuscript-map.md`。`_style_check.py` 違反 0（変異で赤になることも確認）
   - [x] 研究者の確定（判断 147）: データセットは専用の短い節・パイロットの生ログは別の区分で数える・原稿は LaTeX（Springer の雛形）
-  - [ ] attack-me（外枠）→ 採否 → 直す
-  - [ ] 手法の節（凍結した事前登録と追補 §10・逸脱 D1〜D5 から・LaTeX）
+  - [x] attack-me（外枠）round 1 → **major**（有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 149・7 問とも推奨）→ 外枠を全面的に直した（31 行）・D6 と §10.8 の点検を公開の記録に（`deviations.md`・`data.windows.md`）
+  - [ ] attack-me（外枠）round 2（同じ立場・同じ接地・引き継ぎ `carryover-*` を渡す・context-B を事前登録の言い方に）→ 次のセッション
+  - [x] 手法の節の草稿 `manuscript/sections/method.tex`（LaTeX・約 5,200 語・判断 148）・`references.bib`・`main.tex` の骨組み。⚠️ 未コンパイル（この機械に LaTeX が無い）
+  - [x] 公開物の文体検査を `.tex` / `.bib` に広げた（判断 148・selftest ＋ 変異 2 本）
+  - [ ] 題を Logging に揃える（`README.md`・`CITATION.cff`・`.zenodo.json`・`kit/` の題の文字列・M12 の前・判断 149 の 4）
+  - [ ] `data.windows.md` の §10.8 の点検の計画の SHA-256 を全桁にする（Surface の点検の run の manifest から）
+  - [ ] 後の節（§2 比較表・§3 観測可能性〔方法・一次の文書の登録〕・§4 ロガー・Table 4・§10 データセット）・未登録の引用の登録（Plant・Pinet・Bridges・Monaco・Gebru・MS / Apple の文書・Inputlog の版・Translog-II・ScriptLog）
 - [ ] /finish-task
