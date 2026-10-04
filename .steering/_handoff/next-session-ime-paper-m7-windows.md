@@ -88,3 +88,9 @@ claude
 ⚠️ 凍結のタグのコードは変えない。観測のセッション行は読まない。生ログを git に入れない。run 中は誰も PC に触れない。git は -c user.name/-c user.email（§2.6）。
 Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data-privacy。応答は日本語。
 ```
+
+## §2.8 進み具合（2026-10-04 1:55〜13:05 JST のセッション）
+
+- 01:51 の `cell-2`（`runs/aborted/cell-2`）は管理者権限でランナーが最初の試行の前に拒否・鍵は送っていない → `delivery.py` は exit 0・数はすべて 0（`runs/aborted/cell-2-admin.delivery.json`）。研究者の判断で**行は残し、最大 3 回には数えない**（`618892d1`）。⚠️ この判断を `decisions.md` に逸脱として書くかは研究者が決める。
+- ✅ **試み 2**（`~/ime-m7/runs/cell-2`）: 01:57:31 に `Start-Process` で起動 → 13:03 に完了。2925 / 2925 試行・中止なし・manifest SHA-256 `5c74a1fa…3d82`。`delivery.py` exit 0・`src` `win_tsf`・4 つの数と D4 はすべて 0・計画外のフォーカスの喪失 0。行を記録して push 済み（`1c4a60b0`）。ロガーの stderr に `candidate window stale — auto-resetting` の WARN が 2 回（18:12Z・23:50Z）。
+- 次: PR #303 を CI 緑で merge → §2 の 6（問 5 の Windows: `idle` → `working`・別の夜）→ §2 の 7（解析）。
