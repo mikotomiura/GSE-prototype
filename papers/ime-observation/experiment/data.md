@@ -14,11 +14,15 @@ used are printed when the analysis ends.
 
 <!-- - run_dir: /path/to/an/unpacked/run-directory  manifest_sha256: 0000000000000000000000000000000000000000000000000000000000000000 -->
 
+- run_dir: runs/macos-standard-live-on-1  manifest_sha256: 0257755cb0a9d5001fc6ce3097a03df446129840d19342e3d8bf81aed1e7c268
+- run_dir: runs/macos-standard-live-off-1  manifest_sha256: 4ac581cb8fcf89aa48e3311e51c0de1a965bdc42592305a9878ca0504ac2f519
+
 ## Deposits
 
 | Cell label | Deposit location | SHA-256 of the archive | Date deposited |
 |---|---|---|---|
-| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
+| macos-standard-live-on (attempt 1; packed on the measuring machine) | not yet deposited | `77bd8a8e64563921a9d3e49fc5fa552a67d4633a66669354852dea651fed49b8` | not yet deposited |
+| macos-standard-live-off (attempt 1; packed on the measuring machine) | not yet deposited | `e1cdf2e8b63ab402a950e37b8841ce302ccb280f396fefc148c8891971d73d10` | not yet deposited |
 
 ## Run checks (section 3.4 of the pre-registration)
 
@@ -36,6 +40,27 @@ for 2.7 s (2026-10-03, 04:20:33.68 to 04:20:36.35 UTC, in trial `t00004`). By th
 pointer click on another window; the logs cannot confirm the cause. No key was pressed, so no row of the
 observation lacks a sent press within the loss, and 11 presses that the executor sent did not reach the reference
 input field. The run does not count as aborted (section 3.4), and the trial is analysed (section 6.2).
+
+## Analysis of the macOS cells
+
+Run on 2026-10-05 on the measuring machine (macOS 27.0.1, Python 3.14.4), in an export of the macOS freezing tag
+(the list of its files has the SHA-256 that `notes.md` gives), on the run directories listed above, unpacked from the
+two archives. Every command exited with status 0. Paths are relative to the export, except `<data>`, which is this file, and
+`<results>`, which is `experiment/results` of this directory.
+
+| Question | Command | Output (SHA-256) |
+|---|---|---|
+| 1 to 3, registered (deviation D10, change 1: `kit/analysis/match.py` of commit `115cd5ff`) | `python3 kit/analysis/pipeline.py --runs-from <data> --config experiment/config.json --seed 20260929 --seed-file experiment/SEED --prereg experiment/preregistration.md --out <results>` | `e1_delivery.json` `7b7e6ba085f7c7e16e2807bb46bff9ff4e0c8483fe9357b96b1feec4ff4d4c61`, `e1_detection.json` `ce595253043bddf460aba173420c994f256341fba8119afe573d7a7bc8fefd1b`, `e1_l1.json` `1e22b6fb82435c926c6251bb62e392a03d048923eda5610d9204f6b738d8ca49`, `e1_l2.json` `5642725b04988dabe198bcf78039b911f20fc58b7bff5652b11e2b2e9dd165c8` |
+| 1 to 3, corrected (deviation D10, change 2) | the same command with `IME_MATCH_MERGE_RECOUNT=obs` and `--out <results>/d10/macos` | `e1_delivery.json` `7b7e6ba085f7c7e16e2807bb46bff9ff4e0c8483fe9357b96b1feec4ff4d4c61`, `e1_detection.json` `c6295552ba6a8d82c0ce4e1ae925a4913761247525cffc6220520f157951a16b`, `e1_l1.json` `9b8889d5905bb64fa7f234c81fb7d932bfca69276ea9a8783d70fd82c73d168b`, `e1_l2.json` `4a832d156da0b60d17271153cea1c36460a1c64493e1800af3794ecf80d087a4` |
+| 4, open set (section 6.8) | `python3 kit/e2/open_set.py --obs <run>/obs.jsonl --plan <run>/plan.jsonl --corpus kit/corpus/data/phrases.jsonl --recipes kit/gen/<procedure file> --split-seed 20260929 --seed 20260929 --eval-fraction 0.2 --split both --n 3 --smoothing wb --beam 8 --length-info both --bootstrap 2000 --markers-in-obs --out <results>/e2_open_set_<cell>.json` | on: `963886dae2f6fa676df20a21ed9bbfb1fbfb986dfd67f35722be641b0aba45cc`, off: `77bba3a3830a03e50bbfc0bf0c71ea711618aaac73cbcdeb5ae20c8286f9c89d` |
+| 4, closed set (section 6.8; deviation D8: `kit/e2/closed_set.py` of commit `14c85e6e`) | `python3 kit/e2/closed_set.py --obs <run>/obs.jsonl --plan <run>/plan.jsonl --corpus kit/corpus/data/phrases.jsonl --recipes kit/gen/<procedure file> --config experiment/plan_config.macos.json --K 10,100,1000 --seed 20260929 --bootstrap 2000 --markers-in-obs --skip-scenario S12 --out <results>/e2_closed_set_<cell>.json` | on: `e2697df0c8ba1712bdd17142d3efa3989bf16e0942422987eca818fc0a385f88`, off: `e8ca561962d9440752b2967723e6bb5486282a9254b814e4ef626b912f92453e` |
+| 5 (section 6.10) | `python3 kit/e3/summarize_e3.py idle=<idle>/samples.tsv working=<working>/samples.tsv > <results>/e3_macos.txt` | `0ada2e3e9c266814858bb7d11c9811498083bce3101f94790c69a0e79c6217ff` |
+
+The procedure file is `kit/gen/recipes.json` for the cell with live conversion on and
+`kit/gen/recipes.macos-live-off.json` for the cell with it off. Both runs of the closed set left out the 225 trials
+of S12 and scored every block. The two samples of question 5 have the SHA-256
+`f2fc37ef12d520d0e757a9e1232c99975475017c75cc824815a79e236d261222` (`idle`) and
+`32fb07829de7a4ac0dca0e128089dfe2eed977e26b044841884ef4c3b96921ec` (`working`).
 
 ## Deposit procedure
 
@@ -89,7 +114,8 @@ carry.
 
 | Cell label | Machine (operating system, host role) | `--also-user` passed (number of values) | `--also-home` passed (number of values) | Date checked |
 |---|---|---|---|---|
-| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
+| macos-standard-live-on | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-05 |
+| macos-standard-live-off | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-05 |
 
 ## Phrase corpus
 
