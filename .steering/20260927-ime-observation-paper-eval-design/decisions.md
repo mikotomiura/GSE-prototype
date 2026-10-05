@@ -1446,3 +1446,26 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - ★ **`build.sh` の欠陥（判断 154 の記録の訂正）**: Windows の git-bash では `BIBINPUTS` に MSYS 形式のパス（`/c/…`）が入り、BibTeX が原稿の `references.bib` を見つけられず（別の同名のファイルを読み）、引用がすべて未定義になっていた。完了表示は `LaTeX Warning: Reference` だけを数えていて、natbib の「Citation … undefined」を数えていなかった → 見逃した。⚠️ 判断 154 の「未定義の参照は 4 つだけ」は手で組んだ版（`pwd -W` を使った）の事実で、`build.sh` の版には当たらなかった。→ Windows では `pwd -W` で渡し、完了表示に「undefined citations」を足した。直した後: 書誌 68 件・引用の未定義 0・参照の未定義は 4 つのラベルだけ。
 - **公開物の文体**: Surface が `data.windows.md` に書いた内部の番号（「the record of M7」）を `_style_check.py` が赤にした → 「as when the runs ended」に直した（違反 0）。
 - **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`・`build.sh`・`sections/observability.tex`・`references.bib`・`supplement/observability-documents.tex`・`outline.md`・`experiment/data.windows.md`・`docs/references.md`。
+
+## 判断 166: Windows のセルの直した解析（逸脱 D10）を G-GEAR で回した —— 登録の解析は 2 台目の機械でもバイト一致、直した解析は併合の率とその分子だけが変わる（2026-10-05・G-GEAR・メインの実行・研究者が覆せる）
+
+- **背景**: 判断 157 の (2)（Windows のセルも ② で回し直す）と判断 165 の残り。研究者の提案で Surface の代わりに G-GEAR で回した（引き継ぎ `next-session-ime-paper-ggear-d10.md`）。新しい計測はしない・凍結のタグのコードと事前登録は変えない・封印は開けない。
+- **入力**（このセッションで測り直した）: 書庫 `Downloads\windows-msime-tsf-2.zip` `f2287a74…cd06`（`data.windows.md` の Deposits と一致）。展開済みの `experiment/runs/windows-msime-tsf-2`（gitignore を `check-ignore` で確認）の `run.json` `5c74a1fa…3d82`・`plan.jsonl` `b7bdf8fc…36b0`・`obs.jsonl` `58f0bda6…2562` が記録と一致。G-GEAR は Python 3.11.9（Ryzen 7 9700X・Windows 11 Home 26300）。
+- **手順 1（書き出し）**: `git -c core.autocrlf=false worktree add --detach <scratch>/wt-win ime-observation-prereg-windows`（`a57c4fd7`）→ `export.internal.py --out <scratch>/export-win --allow-missing-license` exit 0・108 ファイル。一覧（§9 の形を Python で作り直した）の SHA-256 `f61af353…87b7` で、`freeze-export-list-windows.txt` と**バイト一致**。
+- **手順 2（D10 の `match.py`）**: `export-d10` に写して `115cd5ff` の `match.py`（`6f817228…`・CR 0）に差し替え。タグとの差は D10 の 3 点（`_prop` の防御・`merge_recount_mode()` と `obs` の分岐・`config` の `merge_recount`・selftest `_case_d10`）だけを diff で確認。⚠️ `115cd5ff` は `deviations.md` も変えている（文書・コードは `match.py` だけ）。書き出しは `match.py` を変えない（書き出しの `match.py` がタグの git のバイトと同じ `66881f86…`）ので、差し替えは「`115cd5ff` の書き出し」と同じ。selftest は match 18 件・pipeline 13 件 OK。
+- **手順 3（登録の解析の再現）**: 環境変数なし・`--out <scratch>/check-registered` → exit 0（約 2 分）・「1 run(s), 0 aborted, 1 analysed」・標準エラー空・**4 ファイルとも `results/windows/e1_*.json` とバイト一致**（Surface と G-GEAR・同じ Python 3.11.9）。→ D10 の変更 1 は Windows の登録の結果を変えない。`data.windows.md` に節を足した後にもう一度回して、4 ファイルがバイト一致（追記が `--runs-from` の読みを変えないこと）。
+- **手順 4（直した解析）**: `IME_MATCH_MERGE_RECOUNT=obs`・`--out experiment/results/d10/windows`（無い場所・スクリプトで存在を確かめてから）→ exit 0・1 run・中止 0・標準エラー空。SHA-256: delivery `1c4e5cf2…f321`（登録と同じ）・detection `1ae79137…13ab`・l1 `ea8d22ea…878e`・l2 `b29a159e…a261`。
+- **手順 5（突き合わせ・値は出さずに形と数だけ）**: delivery はバイト一致。detection は全範囲で層の数と並び・合算（pooled）が同じ。層ごとの precision・recall・F1・split_rate・miss_rate・false_pos_rate と `n_merge_obs_recount` 以外の数はすべて同じ。違うのは `merge_rate` と `n_merge_obs_recount` だけで、`windows_def` の `all_trials`・`under_limit`（主の範囲・37 層のうち 2 層）・`under_limit_gt_duration` で各 2 層、`all` で各 8 層、`over_limit` で 0 層。直した側は全層で分子 ≤ 分母。登録の側に D10 の注（値なし）は 0。`config.merge_recount: obs` が 8 か所（評価 8 本）。l1・l2 は `inputs_sha256.match` だけが違う。→ macOS の `results/d10/macos/` と**同じ形**（macOS は予測の層もあるので、加えて `prediction_layers` の併合の率と登録の側の注 32 か所）。出力にパス・ホスト名・ログイン名なし・CR 0。
+- **記録**: `data.windows.md` に「Analysis under deviation D10」の節（機械は製品名でなく仕様で・内部の番号なし・`_style_check.py` 違反 0）。
+- **読んでいないもの**: 率の値は出していない（変わった層の数だけ）。併合の率を登録と直した解析で並べる表は `results_tables.py` の仕事（引き継ぎ `next-session-ime-paper-results-2.md` §2 の 2）。
+- **影響範囲**: `experiment/results/d10/windows/e1_*.json`（新規 4）・`experiment/data.windows.md`・本ファイル・引き継ぎ 2 本（surface-d10 の冒頭・results-2 の §5）。書庫 `Downloads\windows-msime-tsf-2.zip` は消さずに置いた（寄託は研究者）。
+
+## 判断 167: データの寄託先は Zenodo（データセットの記録・データ単独の DOI）、コードと材料は GitHub の公開 repo にする（2026-10-05・G-GEAR・研究者の選択）
+
+- **背景**: 研究者の問い「OSF へ up はいつ頃する？」。記録の食い違いを見つけた: 判断 146 は「Zenodo の記録をデータセットとして DOI 付きで作る（ソフトウェアの記録と分けるかは M12 で決める）」、判断 159 と引き継ぎ `next-session-ime-paper-results-2.md` は「OSF への寄託は研究者」。`data.md`・`data.windows.md` の Deposits はどれも「not yet deposited」で、日付は決まっていない。OSF Registries の 2 つの登録（`9nh7r`・`4jwzn`）は済んでいる（別物）。
+- **メインの推奨**: Zenodo にデータセット用の記録として作る（判断 146 の形・外枠の Open Practices「the data with their own DOI」・下書きと DOI の予約は Claude が進められ、公開は都度確かめる〔memory「Zenodo token」〕・予約した DOI を先に原稿に書ける・Editorial Manager の欄は GitHub〔memory「Springer Editorial Manager」〕）。採らなかった: OSF のプロジェクトに上げて OSF で DOI を作る。
+- **研究者の答え（逐語）**: 「ok. zenodo, githubにしよう」→ **データ = Zenodo（データセットの記録・データ単独の DOI）／コードと材料 = GitHub の公開 repo（M12 の計画どおり・リリースは Zenodo で DOI）**。投稿の欄のリンクは GitHub。
+- **日程**: M12 の枠（判断 145 の 10-23〜27・足りなければ 11 月上旬）。投稿（10-28〜31）の前に DOI が要る（Data availability・Open Practices Statement）。DOI の予約は先にしてよい。
+- **まだ決まっていないこと**（M12 で研究者に聞く）: E3 の標本（`samples.tsv`）の置き方・`working` の観測ログを含めるか（外枠の Open items）・較正パイロットの生ログを含めるか（判断 146 の 4）・ソフトウェアの記録は GitHub のリリースを Zenodo に連携させるか。
+- **書庫の場所**（git の外）: macOS ON / OFF は Mac の `~/ime-m4/deposit/`、Windows は Surface の `~/ime-m7/deposit/`（G-GEAR の `Downloads` に同じ SHA の写し）。
+- **影響範囲**: 判断 159 と引き継ぎの「OSF への寄託」はこの判断で読み替える（本文は書き換えない）。`next-session-ime-paper-results-2.md` §5 に書いた。

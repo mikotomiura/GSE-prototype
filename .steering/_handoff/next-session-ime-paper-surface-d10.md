@@ -1,6 +1,7 @@
 # 次セッション（Surface Pro 8・Windows の計測機）— IME 論文: Windows のセルの直した解析（逸脱 D10）
 
 > ⚠️★ **2026-10-05 午後: 研究者の提案で G-GEAR で回すことにした → このメモは使わない。** 手順は `next-session-ime-paper-ggear-d10.md`（書庫は G-GEAR に写して照合・展開済み）。
+> ✅ **G-GEAR で実施済み（2026-10-05・判断 166）**: 結果は `experiment/results/d10/windows/`・記録は `data.windows.md` の「Analysis under deviation D10」。
 
 > 作成: 2026-10-05（G-GEAR）。**新しい計測はしない。** Windows の問 1〜3 を、D10 の直した数え方でもう一度回すだけ。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 157・165**、

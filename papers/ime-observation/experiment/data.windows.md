@@ -88,3 +88,43 @@ nothing else ran.
   `cpu_all_zero` is false (as when the runs ended). Summary `results/windows/e3_windows.txt` (SHA-256
   `dd12cc822693dd022c6ad711797ef1abd6c7b99c2a8363edcbbd2ef09967cc18`), made with `kit/e3/summarize_e3.py idle=... working=...`
   of the export.
+
+## Analysis under deviation D10 (run on 2026-10-05 on a second Windows machine)
+
+Questions 1 to 3 of the Windows cell were analysed again, as deviation D10 requires, on an x86-64 desktop computer
+(AMD Ryzen 7 9700X, Windows 11 Home build 26300, Python 3.11.9), not the measuring machine. Paths are relative to the
+export, except `<data>`, which is this file, and `<results>`, which is `experiment/results` of this directory.
+
+- **Inputs.** A copy of the archive of attempt 2 was brought to this machine; its SHA-256 is the one in the table of
+  deposits (`f2287a7494b108a7b827f96da48f523e84e1a9478121d03fa82dca2c8749cd06`). It was unpacked into the run directory
+  listed above, where `run.json` has the SHA-256 of that line
+  (`5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82`), `plan.jsonl` the SHA-256 of section 10.6
+  (`b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0`) and `obs.jsonl`
+  `58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562`, as in the registered results.
+- **Code.** An export of the Windows freezing tag, made from a checkout with LF line ends; the list of its 108 files
+  has the SHA-256 that `notes.md` gives. In a copy of that export, `kit/analysis/match.py` was replaced by the file of
+  commit `115cd5ff`; the difference from the tagged file is the two changes of deviation D10 and their self-test. The
+  self-tests of `kit/analysis/match.py` (18 cases) and `kit/analysis/pipeline.py` (13 cases) passed in the copy.
+- **Registered analysis, repeated.** The command of section 10.7, run in the copy without the environment variable of
+  D10 and with `--runs-from <data>` and an output directory outside the repository, exited with status 0 ("1 run(s),
+  0 aborted, 1 analysed", standard error empty). Its four files are byte-identical to `<results>/windows/e1_*.json`,
+  so the first change of D10 leaves the registered results of the Windows cell as they were, and they are reproduced on
+  a second machine with the same version of Python.
+- **Corrected analysis** (D10, second change). Command:
+  `IME_MATCH_MERGE_RECOUNT=obs python kit/analysis/pipeline.py --runs-from <data> --config experiment/config.json
+  --seed 20260929 --seed-file experiment/SEED --prereg experiment/preregistration.md --out <results>/d10/windows`.
+  Exit status 0 ("1 run(s), 0 aborted, 1 analysed", standard error empty). Output SHA-256: `e1_delivery.json`
+  `1c4e5cf207eed94a6826bd74d84d864d8ea5577a7251bccf26a01f76bcecf321`, `e1_detection.json`
+  `1ae7913760195e931bf3fd69185c032fedae0717e16f70da889556a6dfd113ab`, `e1_l1.json`
+  `ea8d22eafc903865eca8993b85f458c2101aeef075e77590f301995f66f1878e`, `e1_l2.json`
+  `b29a159e3d1f3343bf8e0da30a6aef5ab1331935754e46b97bc587f5af00a261`. Each of the eight detection results records
+  `merge_recount` `obs` in its `config`.
+- **What differs from the registered results.** `e1_delivery.json` is byte-identical. In `e1_detection.json` every
+  scope has the same strata in the same order and the same pooled rates; in every stratum precision, recall, F1, the
+  split rate, the miss rate, the false-positive rate and every count other than `n_merge_obs_recount` are the same.
+  The merge rate and `n_merge_obs_recount` differ in 2 strata of `all_trials`, `under_limit` and
+  `under_limit_gt_duration` under `windows_def` (2 of the 37 strata of the primary scope), in 8 strata of each of
+  these scopes under the definition `all`, and in no stratum of `over_limit`. In the corrected results no merge rate
+  has a numerator above its denominator; the registered results of the Windows cell hold no rate without a value. In
+  `e1_l1.json` and `e1_l2.json` only the SHA-256 of the detection result that they record (`inputs_sha256.match`)
+  differs.

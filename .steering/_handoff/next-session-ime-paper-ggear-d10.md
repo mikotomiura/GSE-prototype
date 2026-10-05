@@ -1,5 +1,7 @@
 # 次セッション（G-GEAR）— IME 論文: Windows のセルの直した解析（逸脱 D10）を G-GEAR で回す → 結果の節へ
 
+> ✅ **2026-10-05 午後に実施済み（判断 166）**。寄託先は判断 167（データ = Zenodo・コード = GitHub）。続きは `next-session-ime-paper-results-2.md` §5。
+
 > 作成: 2026-10-05 午後（G-GEAR）。研究者の提案で、Surface の代わりに **G-GEAR で** Windows の D10 を回す
 > （`next-session-ime-paper-surface-d10.md` は使わない・手順はそれを G-GEAR 向けに直したもの）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 157・165**、
