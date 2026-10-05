@@ -45,8 +45,8 @@ Datasheet & Motivation, composition, collection, preprocessing, uses, distributi
 \end{table*}
 
 In the dimensions on which keystroke datasets differ, the dataset holds fixed phrases typed without errors or
-corrections by a program; keys as fourteen categories in the logger's log, without key names, and as key codes in the
-reference log and the record of presses; times of presses and releases on both systems; events injected through the
+corrections by a program; keys as fourteen categories in the logger's log, without key names, as key codes in the
+reference log and as key names in the record of presses; times of presses and releases on both systems; events injected through the
 interfaces of the operating system, not typed on a physical keyboard; and a JIS keyboard layout on both systems.
 
 \subsection{How the records were produced and checked}
@@ -55,8 +55,8 @@ interfaces of the operating system, not typed on a physical keyboard; and a JIS 
 The records were produced by the procedure of Section~\ref{sec:method}. Right after each attempt, and before any
 analysis, the stopping rule was applied to the run's logs and the plan of every measurement run was checked by hand
 against the registration (Section~\ref{sec:method-checks}). At deposit, a packing command bundles only the manifest and
-the four logs of a run, refuses a run whose files hold an absolute path, a login name or home directory given to it,
-or content in the reference or observation log, applies the stopping rule and the check of the content-free
+the four logs of a run, refuses a run whose files hold an absolute path, the path of the repository, a login name or home
+directory given to it, or content in the reference or observation log, applies the stopping rule and the check of the content-free
 format again, and refuses a run that fails or cannot be checked; it writes the files in a fixed order with fixed times,
 so that packing twice gives the same archive, and prints the SHA-256 of the archive, which is recorded with the run.
 The stopping rule exists so that no person's typing enters the data, and its blind spots are stated in the

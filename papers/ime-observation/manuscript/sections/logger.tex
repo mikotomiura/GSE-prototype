@@ -25,9 +25,12 @@ produce no row. On macOS rows are written for the letters, the digits and the sy
 Tab, Space, Backspace, Forward Delete, Escape, the arrow keys and F1 to F12; the modifier keys, the numeric keypad,
 Page Up, Page Down, Home, End, the yen and underscore keys of the JIS layout and the function keys above F12 produce
 none, and auto-repeated presses are not written.\footnote{The registration describes the macOS logger as writing a row
-for every press other than the input-mode keys, F13 to F19 and the modifier keys, and as writing rows of presses only.
-The logger's source observes the narrower set given here and writes a row for each release as well. No key outside
-the observed set was sent in the measurement, and every analysis uses the rows of presses only.} On Windows rows are
+for every press other than the input-mode keys, F13 to F19 and the modifier keys, and does not mention rows of
+releases.
+The logger's source observes the narrower set given here and writes a row for each release as well. Apart from the
+input-mode keys (the key that the runner pressed before each block to switch the input method on, and the mode keys
+of scenario S14), no key outside the observed set was sent in the measurement, and every analysis uses the rows of
+presses only.} On Windows rows are
 also written for the modifier keys, the numeric keypad, Page Up, Page Down, Home and End; the function keys above F12
 produce none, and the driver does not distinguish auto-repeated key-down events. Each synthetic key of the measurement
 was held for 60~ms, and the times of releases enter no measure.
@@ -125,7 +128,7 @@ Keys observed & Letters, digits, symbol keys of the main block, Return, Tab, Spa
 Keys without a row & Input-mode keys, modifier keys, numeric keypad, Page Up, Page Down, Home, End, JIS yen and underscore keys, keys above F12; auto-repeated presses & Input-mode keys, keys above F12, and keys outside the observed set \\
 Session & A segment of kana input inferred from key presses while Japanese input is selected & A period during which a window of the input method is visible (window events, or cloaking) \\
 Opens & First letter or digit key & Display of the window (or a change while no session is open); uncloaking of a window of the input method's class \\
-Closes & Return or another closing key (committed); Escape (abandoned); first press after a change to non-Japanese input & Dismissal of the window; no visible window of the class after a gap of 150~ms \\
+Closes & Return or another closing key (committed); Escape (abandoned); a change to non-Japanese input, at the mode key or at the next press after another means of switching & Dismissal of the window; no visible window of the class after a gap of 150~ms \\
 Cut-off & At the first press 20~s or more after opening; no row & Window events: none, safety valve at about 25~s with a row; cloaking: 20~s after opening, no row \\
 \texttt{dwell\_ms} & From the opening press to the closing press & From the display to the dismissal (window events) or from the uncloaking to the last cloaking (cloaking); to the time of collection when the session is closed by the safety valve or after a missed dismissal \\
 \texttt{nav} & Arrow presses during the session & Arrow presses in any application while a session is open (upper bound) \\

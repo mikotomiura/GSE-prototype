@@ -547,8 +547,8 @@ figures of the records (the tables of run checks and of attempts, the check of s
 ## Open items before the manuscript is complete
 
 - The counts of the accessibility constants examined on macOS (in the documentation retrieved on 5 October 2026: C
-  interface 101 attributes, 9 parameterized attributes and 25 notifications; AppKit 132, 19 and 43) are to be checked
-  against the SDK headers of the system version of the measurement, and the header of the text input sources is to be
+  interface 101 attributes, 9 parameterized attributes and 25 notifications; AppKit 131, 18 and 42) are to be checked
+  against the SDK headers of the system version of the measurement (macOS 27.0.1), and the header of the text input sources is to be
   read in that SDK (it was read in a copy of the macOS 11.3 SDK).
 - Whether literature on evaluating text entry through input methods should be placed in section 2 is to be checked
   against primary sources.
