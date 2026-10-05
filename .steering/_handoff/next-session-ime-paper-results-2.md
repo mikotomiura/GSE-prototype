@@ -66,3 +66,4 @@ LaTeX: G-GEAR は MiKTeX 25.12（ユーザー領域）と雛形 C:\Users\johnd\t
 - ✅ **Windows の直した解析（D10）を G-GEAR で回した**（判断 166）: `experiment/results/d10/windows/e1_*.json`。登録の解析は G-GEAR でも 4 ファイルがバイト一致。直した解析で違うのは `merge_rate` と `n_merge_obs_recount` だけ（主の範囲で 37 層のうち 2 層・`all` で 8 層・合算は同じ）。delivery は同じバイト。→ 3 セルの登録と直した解析がそろった。§2 の 2 の「D10 の併合の率の登録と直した解析の並べ」に進める（`results/d10/macos/` と `results/d10/windows/` を読む）。
 - ★ **寄託先が決まった**（判断 167・研究者）: データ = **Zenodo**（データセットの記録・データ単独の DOI）、コードと材料 = **GitHub** の公開 repo。§1 の「寄託（OSF）」はこれで読み替える。日程は M12（10-23〜27）・DOI の予約は先にしてよい。E3 の標本・`working` の観測ログ・パイロットの生ログを含めるかは M12 で研究者に聞く。
 - 番号: 次の判断は 168、逸脱は D12。
+- ✅ **同日夕**: §2 の 2 の前半を済ませた（判断 168〜170: 表 10・11・12・開いた集合・補遺・D10 の列）。**続きは `next-session-ime-paper-results-3.md`**（表 7・KT1・表 8 の macOS → 結果の節）。
