@@ -1646,3 +1646,15 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **指摘と直し（2 件とも一次で確かめて妥当）**: (1) 図 5 で区間の上端も軸の下端より下だと、下端だけを切り上げて上下が逆転する（上端 0 は対数軸に描けない）→ 両端とも下端で描く・断りの判定に上端も入れる。(2) `SCENARIO_RE`（`^S[0-9]{1,2}$`）がコメントの「S1〜S15」より広く、S0・S01・S16〜S99 を通す → `^S(?:[1-9]|1[0-5])$`。実データ（S1〜S15）は通る（`--check` 一致）。
 - **検証**: selftest 133 → 135 件（区間全体が下端より下・S1〜S15 だけを通し S0／S01／S16／小文字／末尾の空白を止める）。変異 2 本を足して 24 本すべて狙った確認で赤、無変異は緑。生成物は変わらない。
 - **影響範囲**: `manuscript/tools/results_tables.py`・`.codex/budget.json`（台帳）・本ファイル。
+
+## 判断 185: 研究者が答えられる `\tbd`（表紙・Funding・利益相反・貢献）を埋め、Springer Nature の規程に従って AI Declaration と図の題の断りを入れる・投稿の前に研究者が結果と考察を読んで直す段を置く（2026-10-05・G-GEAR・研究者の選択）
+
+- **研究者の指示（逐語）**: 「TDDのかしょはasskusequestionで聞いて.名前: Mikoto Miura; mail: mmiura.network@gmail.com; orcid: https://orcid.org/0009-0000-4196-0508」「Hiroshima, Japanにして」。
+- **AskUserQuestion の答え（すべて推奨どおり、または研究者の記入）**: 所属 = Independent researcher（Hiroshima, Japan）／単著（貢献は CRediT の役割をすべて Mikoto Miura）／Funding なし／利益相反なし／表紙の住所と電話は書かず、投稿システム（ScholarOne）にだけ入れる（原稿は公開の repo とプレプリントにも載るため）。
+- **表紙**: sn-jnl の `\author*`・`\affil*`・`\email`。⚠️ 雛形の `\orcid` は `Orcidlogo.eps` を読むが、雛形にその画像は無く、`-no-shell-escape` では eps を変換できない → `\orcidlogo` を文字（「(ORCID 0009-…)」・リンク）に置き換えた。上付きにすると所属の印「1*」とくっつくので、名前の後ろに括弧で出した。
+- **見つけた欠け（`\tbd` ではない）**: Springer Nature の「AI use in manuscript preparation」（2026-10-05 に curl で原文を取得）。逐語: Green と Amber の Declaration の欄は「Clearly describe use and confirm author accountability」、Amber の例に「drafting sections based on author input」、Red（不可）に「Writing results or discussion independently; generating scientific claims or interpretations」、図は「information about the AI system used, the purpose of its use, and the extent of its contribution should be provided in an AI Declaration in your manuscript. Specific disclosure should be provided within the caption or legend of the visual content.」。
+- **研究者の選択**: (1) AI Declaration は使った範囲をすべて書く（推奨どおり）。(2) 投稿の前に、結果・推奨・限界・結論を研究者が読み、主張と解釈を自分のものとして直す段を置く（推奨どおり・規程の「the argument, interpretation, and conclusions must be author-led」）。読みやすいように、節ごとに主張と根拠の対応を日本語で添える。
+- **書いたもの**: `declarations.tex` に見出し「AI declaration」（Claude〔Opus・Sonnet・Haiku・Claude Code〕と Codex〔コードのレビュー〕の使い道、研究の問い・設計・登録・計測・解釈は著者、AI はデータを作っていない、著者が確かめて責任を負う）。⚠️ モデルは一次で確かめた: ループの設定 `_loop-config.json` の `headless.model` が sonnet・`watchdog_model` が haiku、`.claude/agents/loop-worker.md` が sonnet。図 1〜5 の題に「code written with the assistance of an AI tool and reviewed by the author (AI declaration)」—— 図 2〜5 は道具の `FIG_AI_NOTE`（selftest 136 件・変異 1 本を足して 25 本すべて赤）、図 1 は手で。
+- ⚠️ **宣言の「The author reviewed … and is accountable」は、投稿の前に研究者が読んで直す段（上の (2)）を済ませて初めて事実になる**。引き継ぎの段に入れた。
+- **検証**: `build.sh` main エラー 0・未定義の参照 0・生成されていない値 0・overfull 0・BibTeX の警告 0。表紙を画像で確かめた。文体の検査 違反 0。残る `\tbd` は M12 のもの（データと release の DOI・repo の URL・外枠の公開 commit・表 1 の版・寄託の欄）だけ。
+- **影響範囲**: `manuscript/main.tex`（表紙）・`sections/declarations.tex`・`figures/components.tex`・`manuscript/tools/results_tables.py`・`manuscript/generated/fig-*.tex`・本ファイル・引き継ぎ `next-session-ime-paper-manuscript-2.md`。

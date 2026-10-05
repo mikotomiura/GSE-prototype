@@ -1868,6 +1868,10 @@ FIG_SPEEDS = (("slow", -0.25), ("mid", 0.0), ("fast", 0.25))
 # The six feature sets are set apart along the axis of K by these shifts, in decades.
 FIG_SET_SHIFTS = (-0.1, -0.06, -0.02, 0.02, 0.06, 0.1)
 FIG_NO_CELL = "No cell was measured when the figure was generated."
+# The disclosure that the publisher asks for in the caption of a figure made with the help of an AI tool; the AI
+# declaration of the manuscript gives the tools and the extent of their use.
+FIG_AI_NOTE = (". The figure is drawn from the result files by code written with the assistance of an AI tool and "
+               "reviewed by the author (AI declaration)")
 # The lower edge of the logarithmic axis of Figure 5: an accuracy or a lower end of an interval below it (zero among
 # them, which a logarithmic axis cannot show) is drawn at the edge, and the caption says so.
 FIG_LOG_FLOOR = 0.0005
@@ -1913,7 +1917,7 @@ def fig_wrap(label, caption, legend, body, env="figure", placement="[p]"):
             FIG_NO_CELL, caption, label)
     return (GENERATED_NOTE + "\\begin{%s}%s\n\\centering\n\\pgfplotslegendfromname{%s}\\par\\medskip\n"
             "\\begin{tikzpicture}\n%s\\end{tikzpicture}\n\\caption{%s}\n\\label{%s}\n\\end{%s}\n" % (
-                env, placement, legend, body, caption, label, env))
+                env, placement, legend, body, caption + FIG_AI_NOTE, label, env))
 
 
 def fig_scenario_axis(keys):
@@ -2895,6 +2899,9 @@ def _selftest_figures(check):
         xs = [float(x) for x in re.findall(r"\\\\(-?[0-9.e+-]+) (?:-?[0-9.e+-]+|nan)(?=\\\\)", f2)]
         check("fig 2: every scenario of the design is a tick, and a scenario without a stratum in the scope has no mark",
               "xtick={1,2}, xticklabels={S1,S2}" in f2 and xs and all(0.7 < x < 1.3 for x in xs), str(xs[:12]))
+        check("figures: every drawn figure says in its caption that its code was written with an AI tool",
+              all(("\\caption{" in files[n].decode("utf-8")) and (FIG_AI_NOTE + "}") in files[n].decode("utf-8")
+                  for n in ("fig-detection.tex", "fig-dwell.tex", "fig-text-agreement.tex")))
         check("fig 2: one panel per cell and measure, with the legend of the speeds and the open marks",
               f2.count("\\nextgroupplot[") == 2 and "\\addlegendentry{fewer than %d trials}" % MIN_TRIALS in f2
               and "\\pgfplotslegendfromname{fig:detection:legend}" in f2 and "\\label{fig:detection}" in f2)
