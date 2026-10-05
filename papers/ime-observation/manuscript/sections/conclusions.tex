@@ -1,0 +1,57 @@
+% Section 13 of the manuscript: conclusions. Estimates are quoted under the rule for the abstract (outline.md, section
+% 6.1 of the registration): items (i) to (iv) for each cell and system, as the ranges of their intervals, with the
+% fractions that the scope sets aside and the estimates over all trials. Every value is read with \rv{}.
+
+\section{Conclusions}
+\label{sec:conclusions}
+
+Among the documented interfaces examined that do not depend on the application, Windows offers events of the input
+method's windows that carry no text, which the logger follows, whereas on macOS none reports a conversion, so the logger
+infers it from key presses (Section~\ref{sec:observability}); that the Windows route works was established only for
+the input method measured. On both systems an application can report a conversion without text through its own
+accessibility implementation, but whether it does depends on the application.
+
+The logger's rows were compared with the sessions that a reference input field received from the input method, under
+synthetic input. On macOS with live conversion off, in the strata that keep at least 30 trials in the primary scope, the
+Wilson intervals of recall spanned \rv{macos-standard-live-off.primary.recall.range} and those of precision
+\rv{macos-standard-live-off.primary.precision.range} (\rv{macos-standard-live-off.primary.recall.strata.left} and
+\rv{macos-standard-live-off.primary.precision.strata.left} strata left out); the scope set aside
+\rv{macos-standard-live-off.scope.setaside}, and carry-over excluded \rv{macos-standard-live-off.carryover}; over all
+trials the two spanned \rv{macos-standard-live-off.all.recall.range} and
+\rv{macos-standard-live-off.all.precision.range} (\rv{macos-standard-live-off.all.recall.strata.left} and
+\rv{macos-standard-live-off.all.precision.strata.left} strata left out). With live conversion on, recall spanned
+\rv{macos-standard-live-on.primary.recall.range} and precision \rv{macos-standard-live-on.primary.precision.range}
+(\rv{macos-standard-live-on.primary.recall.strata.left} and \rv{macos-standard-live-on.primary.precision.strata.left}
+strata left out); the scope set aside \rv{macos-standard-live-on.scope.setaside}, and carry-over excluded
+\rv{macos-standard-live-on.carryover}; over all trials the two spanned \rv{macos-standard-live-on.all.recall.range} and
+\rv{macos-standard-live-on.all.precision.range} (\rv{macos-standard-live-on.all.recall.strata.left} and
+\rv{macos-standard-live-on.all.precision.strata.left} strata left out). The per-speed intervals of the bias of
+\texttt{dwell\_ms} spanned \rv{macos-standard-live-off.primary.dwellbias.range} with live conversion off and
+\rv{macos-standard-live-on.primary.dwellbias.range} with it on, and over all trials
+\rv{macos-standard-live-off.all.dwellbias.range} and \rv{macos-standard-live-on.all.dwellbias.range}.
+
+On Windows the logger's sessions are windows of the input method and the reference's are compositions, so these values
+estimate the agreement with a different construct and are not set against those of macOS. Recall spanned
+\rv{windows-msime-tsf.primary.recall.range} and precision \rv{windows-msime-tsf.primary.precision.range}
+(\rv{windows-msime-tsf.primary.recall.strata.left} and \rv{windows-msime-tsf.primary.precision.strata.left} strata left
+out); the scope set aside \rv{windows-msime-tsf.scope.setaside}, and carry-over excluded
+\rv{windows-msime-tsf.carryover}; over all trials the two spanned \rv{windows-msime-tsf.all.recall.range} and
+\rv{windows-msime-tsf.all.precision.range} (\rv{windows-msime-tsf.all.recall.strata.left} and
+\rv{windows-msime-tsf.all.precision.strata.left} strata left out). The per-speed intervals of the bias of
+\texttt{dwell\_ms} spanned \rv{windows-msime-tsf.primary.dwellbias.range}, and over all trials
+\rv{windows-msime-tsf.all.dwellbias.range}.
+
+For identifying the typed phrase among $K$ candidates, neither granularity of the key rows that keeps no time met the
+registered near-chance rule in either macOS cell, so the recommended granularity is \rv{q4.recommendation}; on Windows
+the same judgement gives: \rv{q4.windows.qualification}. The rule is not a criterion of privacy, and records that keep
+time were not judged.
+
+The mean CPU of the logger, with one core as 100, was \rv{macos.e3.idle.cpu.mean} with the machine idle and
+\rv{macos.e3.working.cpu.mean} with scripted typing on macOS, and \rv{windows.e3.idle.cpu.mean} and
+\rv{windows.e3.working.cpu.mean} on Windows; the samplers of the two systems measure differently, and the values are not
+compared.
+
+These estimates hold for one input method per system, the reference input fields and synthetic input. Whether the
+agreement holds for other input methods, for the applications in which people write, and for human typing is left to
+other studies; the dataset allows other rules that infer sessions from key presses to be evaluated against the same
+ground truth without new measurement.

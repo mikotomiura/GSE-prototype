@@ -1598,3 +1598,81 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **表 7 の凡例（判断 177 の LOW (3)）**: 「not computed: …」の凡例は、印の時刻の無いセルがあるときだけ出す（`table_reference`）。selftest 110 件（全セルに印の時刻があるとき凡例が無いこと）・変異 1 本（常に出す）が狙った確認で赤。値と規則には関わらない。
 - **Codex**（`run-codex-review.sh 45adce11..0f1b0246 -- results_tables.py`・20,775 トークン・台帳は今日 258,825 / 6 回）: 不具合・セキュリティの懸念なし。確認事項 2 つ —— (1) 凡例を残す側の確認 → 既存の「rf1: a cell without marker times says so」が見ている（印の時刻の無いセルがあると「not computed」が出る）、(2) 凡例と表の本体の判定の一致 → 本体も同じ `clocks.get(label)` の `None`（`reference_rows` の `cs is None`）で一致。直さない。
 - **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/table-reference.tex`・本ファイル。
+
+## 判断 181: 図 1〜5 を pgfplots（TeX）で描き、図 2〜5 の座標は結果の表の道具が生成する（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **背景**: 引き継ぎ `next-session-ime-paper-manuscript-1.md` §2 の 2（「道具は標準ライブラリだけ。作図を別のスクリプト〔matplotlib など〕にするか、TeX で描くかを決める」）。G-GEAR の Python に matplotlib は無い。MiKTeX には pgfplots 1.18.1 がある。
+- **選んだもの**: pgfplots。`results_tables.py`（標準ライブラリのまま）が図 2〜5 を `generated/fig-*.tex`（pgfplots のコードと座標をその場に書いたもの）として生成し、スタイル（速さ・特徴の集合の色と印・区間・白抜き・パネル）は `main.tex` の前文に置く。図 1（構成）は結果の値を持たないので手書きの TikZ（`figures/components.tex`）。理由: (1) Python に新しい依存を足さない（再現の記録が増えない）、(2) 図の座標も `--check` に入り、結果のファイルとずれない、(3) 字体が本文と同じ。採らなかった: matplotlib の別スクリプト（依存と版の固定が増え、PNG/PDF が結果のファイルとずれても `--check` が捕まえない）。
+- **図の規則（値を見る前に決めた・既存の表の規則は変えていない）**: 区間は結果のファイルの両端をそのまま縦の線で描く（推定が百分位の区間の外にあってもそのまま）。主の範囲で 30 試行未満の層は白抜き（要旨と本文の範囲から外れる層）。値の無い層は描かず、題で言う。図 2 = セル × 再現率・適合率（層ごと・主の比較と範囲）、図 3 = セルごとの `dwell_ms` の差（偏りと一致の限界の上下、それぞれの区間）、図 4 = 4 つの文ごとの測度（偏りと一致の限界・セル × 速さ）、図 5 = 閉じた集合の正答率と K（両対数・6 つの集合・1/K と 2/K の線・`acc`〔集合とそこから導ける集合の最大〕を描き `acc_raw` は描かない）。色は dataviz の categorical の 1〜6 番（`validate_palette.js` で CVD の分離は PASS・面との対比は WARN → どの系列にも固有の印があり、値は表にもある）。
+- ⚠️ **組版で見つけたこと**: sn-jnl の `\scriptsize` は 9pt で `\footnotesize`（7pt）より大きい（`\f@size` で確かめた）。図の小さい字はすべて `\footnotesize` にした。本文の幅は 372pt（13.1 cm）・高さ 552.7pt（19.4 cm）→ 図 2（6 パネル）は `sidewaysfigure`、ほかは軸の寸法を cm で固定（`scale only axis`）。
+- **検証**: selftest 110 → 125 件（`_selftest_figures`: 30 試行ちょうどは塗り・29 は白抜き・速さのずらし・区間の両端・区間の外の推定・一致の限界がそれぞれ自分の区間・文ごとは主の範囲・速さに値の無い測度は描かない・閉じた集合は `acc` と集合のずらし・1/K と 2/K・セルが無いと何も描かない）。★ 変異 12 本（scratchpad の使い捨て `mutate_figs.py`）はすべて狙った確認で赤、無変異は緑。実物で生成（20 ファイル）→ `--check` 一致。`build.sh` で main エラー 0・生成されていない値 0・BibTeX の警告 0。図の頁を画像にして目で確かめた（重なりを 2 回直した）。文体の検査 違反 0。
+- **組版の数の変化**: main の overfull は一度 2 になった（図 1 の TikZ が 10.6pt はみ出した）→ 箱の幅と間を詰めて 1（以前と同じ vbox）に戻した。未定義の参照は `sec:limitations`・`sec:availability`（§12 と Data availability を書けば消える）。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/fig-*.tex`（新規 4）・`manuscript/figures/components.tex`（新規）・`manuscript/main.tex`（前文）・`sections/method.tex`・`results-agreement.tex`・`results-text.tex`・`recoverability.tex`・`manuscript/BUILD.md`・本ファイル・`tasklist.md`。
+
+## 判断 182: 要旨・序論・推奨・限界・結論・Declarations・Open Practices Statement を書き、手法の節に逸脱 D10 を足す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **要旨（外枠の Rule for the abstract・登録 §6.1）**: (i)〜(iv) を全部入れると 280 語 → 規則どおり (iv) CPU、次に (ii) `dwell_ms` の偏りを本文（`sec:cost`・`sec:results-session`）に回した。残りは (i) セルごとの再現率・適合率の範囲（30 試行以上の層・外した層の数を再現率と適合率で別に・範囲が外した割合・carry-over の割合・全試行の範囲）と (iii) 推奨（Windows は但し書き）。**248 語**（scratchpad の使い捨て `count_abstract.py` が `\rv` を生成値で展開して空白で数える・"0.280–1.000" は 1 語）。Windows は「別の構成概念」と書いて macOS とは別の文にした。値はすべて `\rv`。
+- **道具の追加（書式だけ）**: 要旨の語数のため、範囲が外した割合と carry-over の割合を百分率だけで出す鍵 `<cell>.scope.setaside.pct`・`<cell>.carryover.pct`（値と出どころは既存の鍵と同じ）。規則は変えていない。selftest 125 → 126 件。変異 2 本（別の分母・もう一方の割合から）が狙った確認で赤（1 本目の作りは鍵を消して例外で落ちていた → 確認を `get` にして、変異を作り直した）。
+- **新しい節**: `sections/introduction.tex`（§1: 外枠の Section plan と貢献 5 つ・優先権の主張なし）・`recommendations.tex`（§11: (a)〜(e)＝RE1〜RE5・閾値なし・根拠を名指す）・`limitations.tex`（§12: 外枠 §12 と登録 §7・§10.11。理想化した入力は影響する測度と向きを書き、向きは期待として書く・向きの言えないものは「分からない」と書いた）・`conclusions.tex`（§13: 要旨の規則で (i)〜(iv) をすべて・残る問い）・`declarations.tex`（`\backmatter`・雑誌の見出し・Ethics は Not applicable〔外枠どおり〕・Open Practices Statement）。`main.tex` の並びに入れた。
+- **手法の節の D10**: 「Nine deviations」→「Ten」・表 `tab:deviations` に D10 の行・「macOS の解析は macOS のタグから D10 の 1 つ目の変更〔値なし〕と D8 のスイッチで回した・1 つ目の変更は合成の run で凍結のコードとバイト一致・2 つ目の直した解析は全セルで登録の解析の隣に報告」（`deviations.md` D10 で確かめた）。`\tbd{Deviations recorded after this draft}` を消した。外枠 §5.9 の「D1 to D9」を「D1 to D10」に。
+- **参照**: `method.tex` の `sec:availability`（番号の無い Declarations の中を節番号で指していた）→「(Declarations, Code availability)」の文に。未定義の参照 0。
+- ⚠️ **値から書いた定性的な語**（結果のファイルが変われば手で直す・`--check` は捕まえない）: 要旨の「neither … nor … none is recommended」、§11 (c) と §13 の「neither granularity … in either macOS cell」。推奨そのものは `\rv{q4.recommendation}`、Windows の判定は `\rv{q4.windows.qualification}`。
+- ⚠️ **研究者が書くもの（`\tbd` のまま）**: 著者と所属（表紙）・Funding・Conflicts of interest・Authors' contributions。M12 で埋まるもの: データの DOI・コードの repo の URL とリリースの DOI・外枠を固定した公開 commit・表 1 の「This logger」の版・`dataset.tex` の working の観測ログ。⚠️ BRM はデータの引用を書誌に求める（外枠の Journal requirements）→ DOI を予約したら `references.bib` にデータセットの項目を足して Data availability から引く。
+- **検証**: `build.sh` main エラー 0・未定義の参照 0・生成されていない値 0・overfull 1（以前と同じ vbox）・BibTeX の警告 0（65 頁）。評価の語の grep（`only` は限定、`closely`・`accurately` は問いの言い回し）。文体の検査 違反 0。新しい節の行は 120 字以内。
+- **影響範囲**: `manuscript/main.tex`・`sections/{introduction,recommendations,limitations,conclusions,declarations}.tex`（新規）・`sections/method.tex`・`manuscript/outline.md`・`manuscript/tools/results_tables.py`・`manuscript/generated/values.*`・本ファイル・`tasklist.md`。
+
+## 判断 183: 完了時レビュー（code-reviewer ∥ security-checker ＋ Codex 1 巡目）の指摘を一次で確かめて直す・M12 の寄託の 4 点を研究者が決めた（2026-10-05・G-GEAR・メインの選択〔直し〕と研究者の選択〔M12〕・研究者が覆せる）
+
+- **範囲**: `94a1ddb3..2b13cbf2`（判断 181・182 の 2 commit・22 ファイル）。Codex はコードだけ（`run-codex-review.sh 94a1ddb3..2b13cbf2 -- manuscript/tools/results_tables.py`・差分 416 行・27,948 トークン・台帳は今日 286,773 / 7 回）。散文の LaTeX は Claude 側で見た。
+- **結果**: security-checker = LOW 1（約 3.5 分）。code-reviewer = HIGH 0・MEDIUM 3・LOW 4（約 4 分）。Codex = P2 3・P3 1。重なり: 対数軸の 0（code-reviewer LOW 6 と Codex P2-1）。
+- **直したもの**:
+  1. （security LOW）結果の JSON のシナリオ名と速さが TeX にそのまま入る経路 → `load()` で全文書を歩き、層の `scenario` が `^S[0-9]{1,2}$`、`speed` が `SPEEDS`、`by_scenario`・`tsf_end_without_result_len` の鍵がシナリオ名でなければ止める（`CELL_RE` と同じ作法・範囲外の既存の表の経路もまとめて塞がる）。実データは通る（`--check` 一致）。
+  2. （Codex P2-1・code-reviewer LOW 6）図 5 の対数軸で正答率 0 や区間の下端 0 が黙って消える → 軸の下端 `FIG_LOG_FLOOR`（0.0005）で描き、そうした値があるときだけ題に断りを足す。実データの最小は 0.064 で生成物は変わらない。
+  3. （Codex P2-2）層が空のとき `fig_scenario_axis` が `IndexError` → 目盛りの無い軸にする（空のオプションは落とす）。
+  4. （code-reviewer MEDIUM 2）図 4 は 1 枚の軸に Windows と macOS を並べる → 題に「Windows のセルの値は別の構成概念との一致で、macOS とは比べない」を足した。
+  5. （code-reviewer MEDIUM 1）全試行の範囲に外した層の数が無い → 結論（語数の制限なし）と結果の節に足した。⚠️ 要旨は 249 語で入らないので足さない。読み: 規則 (i) の「with the number of strata left out」は主の範囲に付き、「the same range over all trials」は同じ作り方の範囲を指す（判断 175 の読み (B)）。全試行の外した数は本文と結論にある。研究者が要旨にも要ると決めれば、ほかを削って足す。
+  6. （code-reviewer MEDIUM 3）限界の節に「止める規則が Windows では run を選びうる」（外枠 §12・登録 §10.11）の帰結が欠けていた → 「分析した run はそうした誤りの無い run に選ばれうる・全試行が止まればセルは測られなかった」を足した。
+  7. （code-reviewer LOW 4）selftest の `"70.0\%"` は不正なエスケープ → バックスラッシュを 2 つにした（`-W error::SyntaxWarning` で構文を確かめた）。
+  8. （code-reviewer LOW 5）限界の印（`mark=-`）に白抜きが効かない → `fig open` を `mark options={fill=white, line width=0.4pt}` にして細い線で区別し、図 3 の題を「Open marks and thin dashes」に。
+  9. （code-reviewer LOW 7）要旨の「carry-over between trials 0.0% and 5.8%」の動詞の省略 → 「excluded」を足した（249 語）。
+- **直さなかったもの（理由）**: Codex P2-3（`nan` の区切りに `unbounded coords=jump` が要る）→ `main.tex` の `fig interval` に指定済みで、組んだ図で区間が分かれていることを目で確かめた（Codex は `main.tex` を見ていない）。Codex P3（描画のテストが無い）→ 道具は標準ライブラリだけにする方針（判断 181）。組版は `build.sh` と目視で確かめる。code-reviewer の「打ち消し合う」の出典が見つからない → 登録 §7（1021 行）に逐語であった（偽陽性）。
+- **検証**: selftest 126 → 133 件。★ 変異（scratchpad の `mutate_figs.py`）22 本すべて狙った確認で赤（2 本は作り直した: 前の直しで行が変わって当たらなかった 1 本、確認が例外で落ちて FAIL に数えられていなかった 1 本 → 確認を例外で落ちない形にした）。実物で生成 → 図 3・4 の題だけ変化・`--check` 一致。`build.sh`: main エラー 0・未定義の参照 0・生成されていない値 0・overfull 1（以前と同じ）・BibTeX の警告 0。文体の検査 違反 0。
+- **M12 の研究者の答え（4 問とも推奨どおり）**: (1) E3 の標本 `samples.tsv` は Zenodo のデータに入れる（GitHub には入れない）。(2) E3 の working 条件の観測ログも寄託する（計測の run と同じ停止規則で点検済み・寄託の前に `--pack` と `--check-deposit`）→ `dataset.tex` の `\tbd{confirmed at deposit}` は寄託のときに外す。(3) 較正パイロットの生ログを別の区分として含める（外枠 DS1 どおり・封印したセッション行は寄託のためだけに開け、解析しない）。(4) コードのリリースの DOI は GitHub と Zenodo の連携で取る（研究者の GitHub アカウントでの操作）。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/main.tex`・`sections/{conclusions,limitations,results-agreement}.tex`・`manuscript/generated/fig-{dwell,text-agreement}.tex`・`.codex/budget.json`（台帳）・本ファイル。
+
+## 判断 184: Codex 2 巡目（判断 183 の直しの境界）の指摘 2 件を直す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **範囲**: `run-codex-review.sh 2b13cbf2..a315a3ea -- manuscript/tools/results_tables.py`（差分 228 行）・24,183 トークン。⚠️ 台帳の残り 13,227 が 1 回の上限 30,000 を下回りガードで止まるので、研究者の 2026-10-01 の指示（上限は必要に応じて上げてよい・`tokens_used` は触らず理由をコメントに）により `daily_token_budget` を一時的に 330,000 にし、回した後に 300,000 に戻した（`_comment_2026_10_05_raise`）。今日の記帳は 310,956 / 8 回。3 巡目は回さない（記録どおり 2 巡）。
+- **指摘と直し（2 件とも一次で確かめて妥当）**: (1) 図 5 で区間の上端も軸の下端より下だと、下端だけを切り上げて上下が逆転する（上端 0 は対数軸に描けない）→ 両端とも下端で描く・断りの判定に上端も入れる。(2) `SCENARIO_RE`（`^S[0-9]{1,2}$`）がコメントの「S1〜S15」より広く、S0・S01・S16〜S99 を通す → `^S(?:[1-9]|1[0-5])$`。実データ（S1〜S15）は通る（`--check` 一致）。
+- **検証**: selftest 133 → 135 件（区間全体が下端より下・S1〜S15 だけを通し S0／S01／S16／小文字／末尾の空白を止める）。変異 2 本を足して 24 本すべて狙った確認で赤、無変異は緑。生成物は変わらない。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`.codex/budget.json`（台帳）・本ファイル。
+
+## 判断 185: 研究者が答えられる `\tbd`（表紙・Funding・利益相反・貢献）を埋め、Springer Nature の規程に従って AI Declaration と図の題の断りを入れる・投稿の前に研究者が結果と考察を読んで直す段を置く（2026-10-05・G-GEAR・研究者の選択）
+
+- **研究者の指示（逐語）**: 「TDDのかしょはasskusequestionで聞いて.名前: Mikoto Miura; mail: mmiura.network@gmail.com; orcid: https://orcid.org/0009-0000-4196-0508」「Hiroshima, Japanにして」。
+- **AskUserQuestion の答え（すべて推奨どおり、または研究者の記入）**: 所属 = Independent researcher（Hiroshima, Japan）／単著（貢献は CRediT の役割をすべて Mikoto Miura）／Funding なし／利益相反なし／表紙の住所と電話は書かず、投稿システム（ScholarOne）にだけ入れる（原稿は公開の repo とプレプリントにも載るため）。
+- **表紙**: sn-jnl の `\author*`・`\affil*`・`\email`。⚠️ 雛形の `\orcid` は `Orcidlogo.eps` を読むが、雛形にその画像は無く、`-no-shell-escape` では eps を変換できない → `\orcidlogo` を文字（「(ORCID 0009-…)」・リンク）に置き換えた。上付きにすると所属の印「1*」とくっつくので、名前の後ろに括弧で出した。
+- **見つけた欠け（`\tbd` ではない）**: Springer Nature の「AI use in manuscript preparation」（2026-10-05 に curl で原文を取得）。逐語: Green と Amber の Declaration の欄は「Clearly describe use and confirm author accountability」、Amber の例に「drafting sections based on author input」、Red（不可）に「Writing results or discussion independently; generating scientific claims or interpretations」、図は「information about the AI system used, the purpose of its use, and the extent of its contribution should be provided in an AI Declaration in your manuscript. Specific disclosure should be provided within the caption or legend of the visual content.」。
+- **研究者の選択**: (1) AI Declaration は使った範囲をすべて書く（推奨どおり）。(2) 投稿の前に、結果・推奨・限界・結論を研究者が読み、主張と解釈を自分のものとして直す段を置く（推奨どおり・規程の「the argument, interpretation, and conclusions must be author-led」）。読みやすいように、節ごとに主張と根拠の対応を日本語で添える。
+- **書いたもの**: `declarations.tex` に見出し「AI declaration」（Claude〔Opus・Sonnet・Haiku・Claude Code〕と Codex〔コードのレビュー〕の使い道、研究の問い・設計・登録・計測・解釈は著者、AI はデータを作っていない、著者が確かめて責任を負う）。⚠️ モデルは一次で確かめた: ループの設定 `_loop-config.json` の `headless.model` が sonnet・`watchdog_model` が haiku、`.claude/agents/loop-worker.md` が sonnet。図 1〜5 の題に「code written with the assistance of an AI tool and reviewed by the author (AI declaration)」—— 図 2〜5 は道具の `FIG_AI_NOTE`（selftest 136 件・変異 1 本を足して 25 本すべて赤）、図 1 は手で。
+- ⚠️ **宣言の「The author reviewed … and is accountable」は、投稿の前に研究者が読んで直す段（上の (2)）を済ませて初めて事実になる**。引き継ぎの段に入れた。
+- **検証**: `build.sh` main エラー 0・未定義の参照 0・生成されていない値 0・overfull 0・BibTeX の警告 0。表紙を画像で確かめた。文体の検査 違反 0。残る `\tbd` は M12 のもの（データと release の DOI・repo の URL・外枠の公開 commit・表 1 の版・寄託の欄）だけ。
+- **影響範囲**: `manuscript/main.tex`（表紙）・`sections/declarations.tex`・`figures/components.tex`・`manuscript/tools/results_tables.py`・`manuscript/generated/fig-*.tex`・本ファイル・引き継ぎ `next-session-ime-paper-manuscript-2.md`。
+
+## 判断 186: AI Declaration を記録どおりの文に直す —— コードの確認は道具とテスト、設計と設定は提案と承認で書く（2026-10-05・G-GEAR・研究者の選択〔2 問〕とメインの選択〔残り〕・研究者が覆せる）
+
+- **背景**: 判断 185 の追加分を code-reviewer に見せた（`1133af38..95351748`・10 ファイル・約 4 分・HIGH 2・MEDIUM 3・LOW 4）。Codex は今日の台帳が上限を超えている（310,956 / 300,000）ので回さず、Claude 単独に縮退した。
+- **一次で確かめたこと**: (1) 研究者がコードを読んだ記録は無い（コードの確認は selftest・変異・code-reviewer・security-checker・Codex だけ）。(2) 判断 98 は「研究者に問わずに決めたもの」（seed・止める規則など）、判断 86 は「メインの実装上の選択」（macOS の正解の定義）。(3) Co-Authored-By はロガーの履歴（`src-tauri/src`・`kit/`・最初の commit 2026-02-19）で Opus 4.6・4.8・5・5.5、Sonnet 4.6・5・5.5。ループの設定は worker = sonnet・watchdog = haiku。(4) 本文の「2.7 s」は `data.md` の記録から写した値（外枠の「the figures of the records … from data.md」）。
+- **研究者の選択（2 問とも推奨どおり）**: (H1) 「reviewed by the author」は記録どおりの文に直す → 宣言は「The code was checked by its tests and by the reviews named above」、図の題は「code written and reviewed with an AI tool (Claude) and checked by its tests; see the AI declaration」（図 1 は「code written with an AI tool (Claude)」）。(H2) 「decided by the author」は提案と承認で書く → 「The research questions are the author's. Parts of the design, of the analysis settings and of the text were proposed by Claude; the author chose among the options presented, checked and approved them, and froze the registrations.」。
+- **メインが直したもの（研究者の「すべて書く」の選択に沿う）**: 使い道に、2 つの登録・逸脱の記録・手順・外枠と節の下書き、登録と外枠の模擬査読、run の点検・寄託の梱包・解析の実行（著者の指示の下）を足した。値の出どころを「解析のコード（登録の解析・表の逸脱・exploratory と書いた解析）から生成され、記録の数（run の点検など）は run の記録から写した」に正した。外枠は「著者の外枠」ではなく Claude の下書きに含めた。kit の部品は「all the code」に。モデルの版と期間（Opus 4.6〜5.5・Sonnet 4.6〜5.5・Haiku 4.5・2026 年 2 月〜10 月）。CRediT に Validation・Resources・Project administration を足した。selftest に描いた図 5 の題の確認を足した（137 件・変異 25 本すべて赤）。⚠️ datasheet はまだ書いていないので宣言から外した —— 書いたら足す。
+- ⚠️ **後で事実になる文**: 「The interpretation of the results is the author's, and the author is accountable」は、投稿の前に研究者が結果・推奨・限界・結論を読んで直す段（判断 185 の (2)）を済ませて初めて事実になる。引き継ぎに書いた。
+- **検証**: `build.sh` main エラー 0・未定義の参照 0・生成されていない値 0・overfull 0・BibTeX の警告 0。文体の検査 違反 0。
+- **影響範囲**: `sections/declarations.tex`・`figures/components.tex`・`tools/results_tables.py`・`generated/fig-*.tex`・本ファイル・引き継ぎ `next-session-ime-paper-manuscript-2.md`。
+
+## 判断 187: 研究者の指示で判断 185・186 の追加分を Codex に見せ、「No AI tool produced data」を意図どおりに狭める（2026-10-05 夜・G-GEAR・研究者の指示とメインの選択・研究者が覆せる）
+
+- **背景**: 研究者「codexは制限が解除されたはず」。止めていたのは OpenAI 側ではなく repo の台帳の 1 日の上限（今日 310,956 / 300,000）。2026-10-01 の指示（上限は必要に応じて上げてよい）により一時的に 350,000 にし、`run-codex-review.sh 1133af38..f9d7fc5b -- declarations.tex main.tex components.tex results_tables.py`（差分 119 行）を回した（22,716 トークン）。回した後に 300,000 に戻した（`_comment_2026_10_05_raise_2`・今日の記帳は 333,672 / 9 回）。判断 186 で「Claude 単独に縮退」と書いた分は、これで 2 系統になった。
+- **指摘と扱い**: (1) P2「`\orcidlogo` の置き換えが組めるか」→ `build.sh` でエラー 0・表紙を画像で確かめ済み（誤検知）。(2) P2「selftest は文言の挿入しか見ない」→ 組版は `build.sh` が原稿全体を組み（図を含めてエラー 0）、図は目で確かめている。道具は標準ライブラリだけの方針（判断 181）なので LaTeX の組版の試験は道具に入れない。(3) P3「No AI tool produced data が広く読める」→ 妥当（合成入力の計画は Claude が書いた生成器が作る）。「No language model produced or altered any value of the data: the plans were generated by the plan generator from the seed, the logs were written by the programs during the runs, …」に直した。
+- **検証**: `build.sh` main エラー 0・overfull 0・未定義の参照 0。文体の検査 違反 0。
+- **Mac の runner**: 12:18 の run は空きがちょうど下限 8 GiB で通ったが、12:41 の run（`f9d7fc5b`）の「Disk guard」がまた落ちた → 研究者に伝えた（解消していない）。
+- **影響範囲**: `sections/declarations.tex`・`.codex/budget.json`（台帳）・本ファイル。

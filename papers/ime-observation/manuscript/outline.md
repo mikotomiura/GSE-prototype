@@ -339,7 +339,7 @@ continuous measures, kappa and the ICC); missing values reported as null.
 
 5.9 Pre-registration and deviations: a table of the two freezes (dates, tags, the SHA-256 of the lists of exported
 files, the OSF registrations), with the reason that the freeze marks of the file carry the date of the second freeze;
-the deviations D1 to D9 (Table 6); the public commit that fixed this outline, and with it the rules for reporting,
+the deviations D1 to D10 (Table 6); the public commit that fixed this outline, and with it the rules for reporting,
 before the results were analysed.
 
 ### 6. Results: what the reference establishes, detection and per-session agreement

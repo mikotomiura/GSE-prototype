@@ -25,6 +25,8 @@ the oracle and the plan alone: the rows that the logger's rules specify for the 
 (Section~\ref{sec:method-prediction}). Ground-truth sessions were assembled from the ground-truth log by fixed rules
 (Section~\ref{sec:method-reference}) and matched to the logger's session rows (Section~\ref{sec:method-analysis}).
 
+\input{figures/components}
+
 \subsection{Cells, machines and settings}
 \label{sec:method-cells}
 
@@ -332,7 +334,8 @@ described without evaluative words. Analyses not described in the registration a
 tag. Before any statistic, the analysis checked the freeze marks, the SHA-256 of every log against its run manifest,
 the content-free format of every log, and the plan of every run, and it refused a run that the stopping rule catches.
 The result files record the SHA-256 of the configuration, the rules, every manifest and every log. Every result value
-in this article is copied from the result files by a script (Section~\ref{sec:availability}).
+in this article is copied from the result files by a script that is released with the code (Declarations, Code
+availability).
 
 \subsection{Registration and deviations}
 \label{sec:deviations}
@@ -362,16 +365,18 @@ Registration & \url{https://osf.io/9nh7r} & \url{https://osf.io/4jwzn} \\
 \end{tabular}
 \end{table}
 
-Nine deviations were recorded (Table~\ref{tab:deviations}): five for the Windows cell before the Windows
+Ten deviations were recorded (Table~\ref{tab:deviations}): five for the Windows cell before the Windows
 measurement, one for the macOS runs after their measurement and before their analysis (D6), two for the Windows runs
-after their measurement (D7, before the analysis of the cell, and D9), and one for the closed-set attack of all three
-cells before that attack was run on any of them (D8). The registration allowed the addendum to change only the
-Windows parts of existing files; deviations D1 to D4 touched other parts. On the macOS cells they change nothing that
-is reported: the
-macOS plans generated with the changed generator differ only in the recorded SHA-256 of a procedure file, the result
-files of the changed analysis code on synthetic macOS runs are byte-identical to those of the macOS tag, and the macOS
-analysis was run from the macOS tag, the closed-set attack with the switch that D8 adds. \tbd{Deviations recorded
-after this draft, if any.}
+after their measurement (D7, before the analysis of the cell, and D9), one for the closed-set attack of all three
+cells before that attack was run on any of them (D8), and one for the analysis of questions 1 to 3 (D10), made when
+the frozen analysis stopped on the macOS cells and before any of their results of these questions was seen. The
+registration allowed the addendum to change only the Windows parts of existing files; deviations D1 to D4 touched
+other parts. On the macOS cells they change nothing that is reported: the macOS plans generated with the changed
+generator differ only in the recorded SHA-256 of a procedure file, the result files of the changed analysis code on
+synthetic macOS runs are byte-identical to those of the macOS tag, and the macOS analysis was run from the macOS tag,
+with the first change of D10 for questions 1 to 3 and the switch that D8 adds for the closed-set attack. The first
+change of D10 left the result files of synthetic runs byte-identical to those of the frozen code; the corrected
+analysis of its second change is reported next to the registered one for every cell.
 
 \begin{table}[t]
 \caption{Deviations from the registration}
@@ -408,6 +413,11 @@ is in the corpus, and stopped because too few decoys remained. \\
 D9 & The Windows runs were made in the registered order, each started as soon as the check of the one before it was
 done, not on separate nights. &
 As for D6; the order was kept, and no two runs overlapped. \\
+D10 & A rate whose numerator exceeds its denominator is reported without a value instead of stopping the analysis;
+a corrected analysis, reported next to the registered one, counts a recounted merge in the stratum in which its
+session row is counted. &
+The frozen code counted a recounted merge in the stratum of the missed session, so the numerator of a stratum's
+merge rate could exceed its denominator, and the analysis of the macOS cells stopped before it wrote any result. \\
 \bottomrule
 \end{tabular}
 \end{table}
