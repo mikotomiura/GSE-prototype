@@ -255,7 +255,7 @@ of the result files and requires them to cover the same texts as the ICC.
 
 **Reason.** In the two-way model of the ICC, a column that is the same in every row makes the mean square between the
 subjects equal to the residual mean square, so ICC(A,1) is zero whatever the other column holds (or undefined, if the
-other column is constant too). Section 6.11 of the
+other column holds the same value in every row as well). Section 6.11 of the
 registration reports a measure that cannot be computed because of zero variance as missing, with the reason, never as
 zero; the frozen code (`kit/analysis/stats.py`) returns no value only when every value of both columns is the same. The
 design gives every trial of the primary scope one session in most strata, so the conversions per trial of the

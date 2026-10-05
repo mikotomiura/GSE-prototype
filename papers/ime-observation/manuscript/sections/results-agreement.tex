@@ -227,9 +227,10 @@ agreed with the specified rows, which hold the sessions opened after a cut-off, 
 \rv{macos-standard-live-off.pooled.predobs.overlimit.precision} and
 \rv{macos-standard-live-on.pooled.predobs.overlimit.precision}. On Windows no row lasted from 20 to 25~s
 (\rv{windows-msime-tsf.win.rows.20000to24999}) or 25~s or more (\rv{windows-msime-tsf.win.rows.25000ormore}), so the
-rows give no indication of the window-event path or of its safety valve. That path has no cut-off at 20~s and would
-have written rows of more than 20~s for the sessions of S13, which outlast it; their absence is consistent with the
-cloaking path, which writes no row of 20~s or more, but does not show which path drove the input method. The plan made \rv{windows-msime-tsf.win.long.long}
+rows give no indication of the window-event path or of its safety valve. That path has no cut-off at 20~s and can write
+rows of 20~s or more, although a window shown again within a session starts it again without a row and the window need
+not stay visible for the whole composition; the absence of such rows is consistent with the cloaking path, which writes
+none, but does not show which path drove the input method. The plan made \rv{windows-msime-tsf.win.long.long}
 of the \rv{windows-msime-tsf.win.long.trials} Windows trials long and the reference
 \rv{windows-msime-tsf.win.long.longgt}; the two classified \rv{windows-msime-tsf.win.long.differ} trials differently,
 and the reference session of \rv{windows-msime-tsf.win.long.band} trials lasted from 19 to 21~s. With the long trials
