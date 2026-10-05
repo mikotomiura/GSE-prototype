@@ -1228,3 +1228,12 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **確かめたこと**: `d40e090a` の LF の worktree で `kit/check.sh` 33 本緑。macOS の計画（両手順書）と合成の run の結果 4 ファイルは、`9fb61af2` のときと同じハッシュでタグとバイト一致。文体の検査 0。
 - **補足**: 道具の名前は判断 138 の作業名（`focus_front.py`・`away_window.py`・`run_fg.py`）から、公開物では `focus_windows.py`・`away_windows.py`・`start_windows.py` にした（OS ごとの命名にそろえた・メインの選択）。
 - **次**: 完了時レビュー（code-reviewer ∥ security-checker・Codex は不在）→ 凍結の印を替える → タグ `ime-observation-prereg-windows` → 書き出しの一覧の SHA → OSF への登録（研究者）→ `notes.md`。
+
+## 判断 143: 凍結のセルのテンプレートの相対パスが Windows で起動できない —— 逸脱 D5 を計測の前に記録する（2026-10-04・Surface・研究者の選択）
+
+- **起きたこと**: 再起動の後の版は OS build 26200.9457・`IMJPTIP.DLL` 10.0.26100.9278（パイロット 8875）→ §10.8 の 39 試行の点検が要る。`cell.windows.json` を写して `ime` と 2 つの旗だけ埋めたセルで、書き出しの最上位から `start_windows.py` を起動 → runner が `FileNotFoundError`（WinError 2）で中止（00:24 JST・キーは 1 つも送っていない・`~/ime-m7/runs/verify-m7`）。
+- **原因（実測）**: `subprocess` が `kit/logger/target/release/...`（スラッシュ・`./` なしの相対）を見つけられない。同じ cwd で `kit\...`・`.\kit\...`・`./kit/...` は起動する。`python`（`focus_cmd`）は起動する。パイロットのセル（`~/ime-pilot/make_cells.py`）は絶対パスだったので見つからなかった。
+- **研究者の答え**（AskUserQuestion）: 「逸脱 D5 を先に記録（推奨）」。セルのコピーで 2 つの exe のパスを `kit\...`（最上位からの相対のまま）にし、`deviations.md` に D5 を書いて commit → push してから、点検 → 本計測。テンプレート・runner・タグのファイルは変えない。
+- **点検の結果（§10.8・2026-10-04 00:27〜00:37 JST）**: D5 のセル（SHA-256 `0e4c17ed…4fb6`）・計画 `plan-verify`（`f02e046b…0154`）で `start_windows.py` → 中止なし・前面の確認 3 / 3。観測は `seal_obs.py` で封印（`cd4a5fcc…`・key 行 2,952 を残した）。`gt_sessions.py --rules experiment/gt_rules.json`（`b9a48375…`）→ `src` `win_tsf`・39 セッション（確定 30・取消 9）・**`oracle_agreement` 39 / 39** → 本計測へ。生ログは `~/ime-m7/runs/verify-m7`（中止の 1 回目は `~/ime-m7/runs/aborted/verify-m7-1`）。
+- **本計測の 1 回目**: 2026-10-04 00:38 JST に起動（`~/ime-m7/runs/cell-1`・計画 `b7bdf8fc…36b0`）。
+- ⚠️ **本計測の 1 回目は中止**: 2026-10-04 00:59 JST ごろ、Claude Code が「メモリ不足・セッションが idle」を理由にバックグラウンドの shell（`start_windows.py`）を止めた（run の失敗ではない）。runner・観測器・参照入力欄とも終了・`run.json` なし・oracle 6,133 行。空きメモリ 1.4 / 8 GB（VS Code・Chrome・Defender・メモリ圧縮）。`delivery.py` exit 0・参照側 0 / 0 / 0・観測の D4 の数 14（最後の区間・途中で切れた）→ 中止の試み 1 として `data.windows.md` に 1 行を書き、すぐ push（§10.8）。再起動は研究者の指示を待つ。
