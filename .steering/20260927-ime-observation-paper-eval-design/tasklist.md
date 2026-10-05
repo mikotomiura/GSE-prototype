@@ -238,8 +238,11 @@
     - [x] 登録が報告を求めていた残り（層ごとの問 2・全スコープの層ごとの検出・スコープの構成・除外・打ち切り・Windows の診断）と表 9 の区間（判断 172・selftest 91 件・変異 20 本）
     - [x] Windows の印の時刻（§6.9・判断 171・`results/windows/clock_sync_windows-msime-tsf.json`）
     - [ ] Mac で: macOS の 2 セルの印の時刻（§6.9・判断 171 の手順・`gt_vks` は 123・124）→ `results/clock_sync_<cell>.json`・`data.md`
-    - [ ] 表 11 の「規則の性質」（§6.8 の確率の表）の置き方
-    - [ ] `sections/results-*.tex`（RF1 → 問 1・2 → 問 3 → 問 4 → 問 5）
+    - [x] 表 11 の「規則の性質」（§6.8 の確率の表）の置き方 → 手法の節の静的な表 `tab:nearchance` のまま（判断 174）
+    - [x] `sections/results-*.tex`（RF1 → 問 1・2 → 問 3 → 問 4 → 問 5）の草稿（判断 174）
+    - [x] Windows の開いた集合が macOS OFF とバイト一致する理由を確かめた（判断 173）
+    - [ ] 図 2〜5（作図の道具を決める）
+    - [ ] 要旨と結論（外枠の Rule for the abstract）・§1・§11〜13
     - [ ] 完了時レビュー（code-reviewer ∥ security-checker ＋ /cross-review）→ PR
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task

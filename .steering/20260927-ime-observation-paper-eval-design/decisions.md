@@ -1536,3 +1536,15 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **記録**: `data.windows.md` に節「The open set of question 4, repeated」（命令・SHA・計画の比較）。⚠️ それまで `data.windows.md` には Windows の開いた集合の命令と SHA が無かった（Surface のコミットの記録だけ）—— この節で埋めた。
 - **原稿への影響**: 問 4 の結果の節で、Windows の判定が macOS OFF と同じ値になる理由（計画が句・文字キー・時刻を共有）を書く。問 1〜3 の Windows と macOS を並べないという規則は変えない。
 - **影響範囲**: `experiment/data.windows.md`・本ファイル。
+
+## 判断 174: 結果の節の草稿（§6・§7・問 4・問 5）を書き、表 11 の「規則の性質」は手法の節の既存の静的な表のままにする（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **規則（道具）を先にコミットしてから値を読んだ**: 表の道具は `ffd61b1a`（判断 171）・`7c599224`（判断 172）で固めた後、このセッションで初めて結果の値を読んだ。値を読んだ後に道具の規則は変えていない（判断 173 は記録の追加だけ）。
+- **ファイル**: 新規 `sections/results-agreement.tex`（§6: 試行と attempts の表〔`sec:results-attempts`・記録 `data.md`・`data.windows.md` から写した〕・参照が確かめること〔表 7・KT1 の表〕・検出〔除外とスコープ・主の比較・予測との比較・2 つの定義・D10・打ち切り・診断・表 8〕・1 対 1 の一致〔表 9〕）・新規 `sections/results-text.tex`（§7・表 10）・`recoverability.tex` の結果（閉じた集合・推奨・Windows の但し書き・開いた集合・表 11 と開いた集合の表）・`cost.tex` の結果（表 12）。`main.tex` に 2 つを読み込んだ。
+- **値の書き方**: 結果の値はすべて `\rv{}` か生成した表（本文の `\rv` は 175 個・生成した値に無いのは macOS の印の時刻の 4 つだけ＝未計算で太字の [鍵] が出る・意図どおり）。⚠️ 値でない**定性的な記述**（「OFF は除外なし」「ON の『セッションなし』は S10 の遅い・中の速さに多い」「文ごとの abandonment rate と fraction of time converting の偏りは全セルの全速さで負〔区間が 0 未満〕」「conversions per trial の偏りは macOS で速さにより符号が違い、Windows は全速さで正」「行の 20 秒以上は無い」）は生成した表を読んで書いた —— 結果のファイルが変われば手で直す必要がある（`--check` は捕まえない）。
+- **一次で確かめてから書いたこと**: (1) D10 の直した解析が macOS でも変えたのは `merge_rate` と `n_merge_obs_recount`（と設定・注）だけ（登録と直したファイルを葉まで比べた・1,904 と 476 か所）。(2) macOS の `start_while_open` は正解の規則の開始の事象が `set_marked`（文字のたびに呼ばれる）なので、OFF は全セッション・ON はほぼ全セッション（`gt_rules.json`・`gt_sessions.py` の docstring）。(3) 試行の外の行の数が印のキーの数（4 × ブロック数）と一致。(4) 評価の語の grep（`only` は限定の用法だけ）・文体違反 0。
+- **表 11 の「規則の性質」（引き継ぎ §2 の 3）**: `recoverability.tex` に登録 §6.8 の確率の表 `tab:nearchance`（静的・登録の値）が既にあった → そのまま置き、注の「判定は結果のファイルから足す」を「判定は表 `tab:closed-set`」に直した。外枠の表の一覧に KT1 の表を足した。
+- **結果の要点（研究者への報告用）**: 問 4 は macOS の 2 セルとも `no_time`・`counts_only` が K = 10・100 で near chance にならず、**推奨は none**。Windows も同じ判定（値は macOS OFF と同じ —— 判断 173）。macOS ON は計画と正解の食い違いが他より多く、ほとんどが「セッションなし」（S10 の遅い・中）。Windows の参照は IME が消費しないキーしか受け取らない（設計どおり）ので、参照の側の KT1 は Windows で対にできない。
+- **組版**: `build.sh` で main エラー 0・未定義の参照は 3 ラベル（`fig:components`・`sec:availability`・`sec:limitations`・`sec:results-attempts` は埋まった）・overfull は HEAD と同じ 1 件（試行の表の見出しの幅を 1 回直した）。
+- **まだ**: 図 2〜5（外枠の Figures・道具は標準ライブラリだけなので作図は別に決める）・macOS の印の時刻（Mac）・要旨と結論（外枠の Rule for the abstract）・§1・§11〜13・完了時レビュー・attack-me。
+- **影響範囲**: `manuscript/sections/results-agreement.tex`・`results-text.tex`（新規）・`recoverability.tex`・`cost.tex`・`main.tex`・`outline.md`（表の一覧）・本ファイル・`tasklist.md`。

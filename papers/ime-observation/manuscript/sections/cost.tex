@@ -38,4 +38,11 @@ key presses.
 \subsection{Results}
 \label{sec:cost-results}
 
-\tbd{Table 11 per system and condition, written from the result files.}
+Every condition of each system had enough samples to be reported (Table~\ref{tab:cost}). On macOS the mean CPU of the
+logger was \rv{macos.e3.idle.cpu.mean} in the idle condition and \rv{macos.e3.working.cpu.mean} in the working
+condition; on Windows it was \rv{windows.e3.idle.cpu.mean} idle and \rv{windows.e3.working.cpu.mean} working (one core
+is 100). The values of each system are read within that system, because the two samplers measure differently
+(Section~\ref{sec:cost-method}); the table gives the median, the 95th percentile and the maximum of the CPU, the final
+memory and its slope for each condition.
+
+\input{generated/table-cost}

@@ -533,6 +533,8 @@ figures of the records (the tables of run checks and of attempts, the check of s
 - Table 6: deviations from the registrations.
 - Table 7: what the reference establishes (plan against ground truth by type, delivery, losses of focus, marker
   times), with the estimates each check is used to read.
+- Table of the timing of the key rows of presses (KT1), per cell and speed, next to Table 7; the same figures for the
+  key-downs of the reference in the supplement.
 - Table 8: detection per speed and cell (three comparisons on macOS, the primary comparison on Windows).
 - Table 9: per-session agreement.
 - Table 10: per-text agreement.
