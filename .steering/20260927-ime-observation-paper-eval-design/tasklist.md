@@ -237,7 +237,8 @@
     - [x] 結果の表の道具（判断 156・165・168〜172）: 表 7〜12・KT1・補遺の層ごとの表・予測の層・D10 の直した併合の率・selftest 78 件・変異 29 本（判断 171）
     - [x] 登録が報告を求めていた残り（層ごとの問 2・全スコープの層ごとの検出・スコープの構成・除外・打ち切り・Windows の診断）と表 9 の区間（判断 172・selftest 91 件・変異 20 本）
     - [x] Windows の印の時刻（§6.9・判断 171・`results/windows/clock_sync_windows-msime-tsf.json`）
-    - [ ] Mac で: macOS の 2 セルの印の時刻（§6.9・判断 171 の手順・`gt_vks` は 123・124）→ `results/clock_sync_<cell>.json`・`data.md`
+    - [x] Mac で: macOS の 2 セルの印の時刻（§6.9・判断 171 の手順・`gt_vks` は 123・124）→ `results/clock_sync_<cell>.json`・`data.md`
+      → 2026-10-05（Mac・Python 3.14.4・判断 177）: on 126・off 117 ブロックすべてで印が見つかった（欠け 0）・2 回目とバイト一致・`--check` 一致・未生成の値 0・文体違反 0（組版は G-GEAR）
     - [x] 表 11 の「規則の性質」（§6.8 の確率の表）の置き方 → 手法の節の静的な表 `tab:nearchance` のまま（判断 174）
     - [x] `sections/results-*.tex`（RF1 → 問 1・2 → 問 3 → 問 4 → 問 5）の草稿（判断 174）
     - [x] Windows の開いた集合が macOS OFF とバイト一致する理由を確かめた（判断 173）

@@ -62,6 +62,37 @@ of S12 and scored every block. The two samples of question 5 have the SHA-256
 `f2fc37ef12d520d0e757a9e1232c99975475017c75cc824815a79e236d261222` (`idle`) and
 `32fb07829de7a4ac0dca0e128089dfe2eed977e26b044841884ef4c3b96921ec` (`working`).
 
+## Marker times of section 6.9 (run on 2026-10-05 on the measuring machine)
+
+The per-block differences at the block-start markers (section 6.9 of the pre-registration) were measured for both
+macOS cells on the machine of the previous section (Python 3.14.4), after the analyses above, in the same way as for
+the Windows cell (`data.windows.md`, "Marker times of section 6.9"). `<run>` is the run directory of the cell listed
+above and `<results>` is `experiment/results` of this directory.
+
+- **Code.** `kit/pilot/clock_sync.py` and `kit/pilot/seal_obs.py` of the macOS freezing tag, taken with `git archive`
+  with LF line ends together with `kit/formats`, whose validator the self-test of `seal_obs.py` calls (the two files
+  are unchanged in the current commit). Both self-tests passed.
+- **Inputs.** `run.json` of each `<run>` has the SHA-256 given above, and `oracle.jsonl`, `gt.jsonl` and `obs.jsonl`
+  have the SHA-256 that this manifest records. The observation with key rows only was made from a copy of `obs.jsonl`
+  outside the repository, by `python3 kit/pilot/seal_obs.py --obs <copy>/obs.jsonl --keys-out <copy>/obs.keys.jsonl
+  --sealed-dir <copy>/sealed` (exit status 0; SHA-256 of `obs.keys.jsonl`: on
+  `a3d7685c2383a4f937069b407a7778f2df376b169f7096b6e5db369faa6d7322`, off
+  `8b8889b66f1a3c33cae780139ae0ebe14625e00485c16cea01a23a28689a39a9`); `<run>` was not changed.
+- **Marker specification.** As for the Windows cell, it is the marker of `plan_config.macos.json` (left, right, left,
+  right), the macOS key codes of these keys for the reference log (the example in `kit/pilot/README.md`), the category
+  `navigation` for the observation, and the largest gap of that example, which is above the 150 ms of the plan's
+  `marker_gap_ms`: `{"oracle_keys": ["left", "right", "left", "right"], "gt_vks": [123, 124, 123, 124],
+  "obs_categories": ["navigation", "navigation", "navigation", "navigation"], "max_gap_ms": 300}` (one line in the
+  file, SHA-256 `cd87248d8eace83dfe68e75b4f97af2452c9f97f8c285a17d5afb58f110c9045`). The window is the default of
+  3,000 ms. The settings were fixed before the output was read; the differences correct no estimate (section 6.9).
+- **Command.** `python3 kit/pilot/clock_sync.py --oracle <run>/oracle.jsonl --gt <run>/gt.jsonl --obs-keys
+  <copy>/obs.keys.jsonl --marker marker.json --out <results>/clock_sync_<cell>.json`. Exit status 0 for both cells; a
+  second run gave a byte-identical file. Output SHA-256: on
+  `8daab9da3c1c2487d9dcf5786cb27e89405797b70a88a24e65a74a60d15ceb6d`, off
+  `e289c5830a6d1d94f823ddebe3d872a968d882304485490c23e5f8b3ad6de7ca`. All 126 blocks of the cell with live conversion
+  on and all 117 blocks of the cell with it off have a complete marker in the oracle, and the marker was found in
+  every one of these blocks in the reference log and in the observation (none missing).
+
 ## Deposit procedure
 
 1. Right after every attempt, also one that the runner aborted, before the next run of the order (section 3.2 of
