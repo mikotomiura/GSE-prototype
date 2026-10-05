@@ -153,7 +153,7 @@ def load(path):
 # The scenario names of the plans (S1 to S15). A scenario name and a speed are printed into the generated TeX (table
 # rows, figure ticks, the diagnostics in the text), so a result file that holds any other name or speed stops the
 # script, as a cell label outside CELL_RE does.
-SCENARIO_RE = re.compile(r"^S[0-9]{1,2}$")
+SCENARIO_RE = re.compile(r"^S(?:[1-9]|1[0-5])$")
 # The keys under which a result file names scenarios by the keys of a mapping.
 SCENARIO_KEYED = ("by_scenario", "tsf_end_without_result_len")
 
@@ -2112,10 +2112,11 @@ def figure_closed_set(cells, docs):
                 if r.get("acc") is None:
                     continue
                 x = K * 10 ** shift
-                lo, hi = r["acc_ci"]
-                clamped = clamped or r["acc"] < FIG_LOG_FLOOR or (lo is not None and lo < FIG_LOG_FLOOR)
+                # Both ends are drawn at the edge when they lie below it, so an interval below the edge stays in order.
+                ends = [None if e is None else max(e, FIG_LOG_FLOOR) for e in r["acc_ci"]]
+                clamped = clamped or any(v is not None and v < FIG_LOG_FLOOR for v in [r["acc"]] + list(r["acc_ci"]))
                 points.append((x, max(r["acc"], FIG_LOG_FLOOR)))
-                intervals.append((x, None if lo is None else max(lo, FIG_LOG_FLOOR), hi))
+                intervals.append((x, ends[0], ends[1]))
             body += [fig_intervals("fig set%d" % (j + 1), intervals), fig_points("fig set%d, fig point" % (j + 1),
                                                                                   points)]
     body.append("\\end{groupplot}\n")
@@ -2953,6 +2954,16 @@ def _selftest_figures(check):
               "nan\\\\1258.93 0.0005\\\\1258.93 0.004\\\\1258.93 nan\\\\}" in f5z
               and "\\\\1258.93 0.0005\\\\};" in f5z
               and "below 0.0005 is drawn at the lower edge of the axis" in f5z, f5z[-2500:])
+        zero["results"]["1000"]["counts_only"].update({"acc": 0.0, "acc_ci": [0.0, 0.0002]})
+        with open(os.path.join(tmp, "windows", closed_set_name("windows-test")), "wb") as f:
+            f.write(json.dumps(zero).encode("utf-8"))
+        f5b = build(tmp)["fig-closed-set.tex"].decode("utf-8")
+        check("fig 5: an interval that lies wholly below the lower edge is drawn at the edge, its ends in order",
+              "nan\\\\1258.93 0.0005\\\\1258.93 0.0005\\\\1258.93 nan\\\\}" in f5b
+              and "below 0.0005 is drawn at the lower edge of the axis" in f5b, f5b[-2500:])
+        check("names: the scenario names of the plans are S1 to S15, without leading zeros",
+              all(SCENARIO_RE.fullmatch("S%d" % i) for i in range(1, 16))
+              and not any(SCENARIO_RE.fullmatch(n) for n in ("S0", "S00", "S01", "S16", "S99", "s1", "S1 ")))
         try:
             empty_axis = fig_scenario_axis([])
         except IndexError as e:

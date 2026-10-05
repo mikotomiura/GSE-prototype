@@ -1639,3 +1639,10 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **検証**: selftest 126 → 133 件。★ 変異（scratchpad の `mutate_figs.py`）22 本すべて狙った確認で赤（2 本は作り直した: 前の直しで行が変わって当たらなかった 1 本、確認が例外で落ちて FAIL に数えられていなかった 1 本 → 確認を例外で落ちない形にした）。実物で生成 → 図 3・4 の題だけ変化・`--check` 一致。`build.sh`: main エラー 0・未定義の参照 0・生成されていない値 0・overfull 1（以前と同じ）・BibTeX の警告 0。文体の検査 違反 0。
 - **M12 の研究者の答え（4 問とも推奨どおり）**: (1) E3 の標本 `samples.tsv` は Zenodo のデータに入れる（GitHub には入れない）。(2) E3 の working 条件の観測ログも寄託する（計測の run と同じ停止規則で点検済み・寄託の前に `--pack` と `--check-deposit`）→ `dataset.tex` の `\tbd{confirmed at deposit}` は寄託のときに外す。(3) 較正パイロットの生ログを別の区分として含める（外枠 DS1 どおり・封印したセッション行は寄託のためだけに開け、解析しない）。(4) コードのリリースの DOI は GitHub と Zenodo の連携で取る（研究者の GitHub アカウントでの操作）。
 - **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/main.tex`・`sections/{conclusions,limitations,results-agreement}.tex`・`manuscript/generated/fig-{dwell,text-agreement}.tex`・`.codex/budget.json`（台帳）・本ファイル。
+
+## 判断 184: Codex 2 巡目（判断 183 の直しの境界）の指摘 2 件を直す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **範囲**: `run-codex-review.sh 2b13cbf2..a315a3ea -- manuscript/tools/results_tables.py`（差分 228 行）・24,183 トークン。⚠️ 台帳の残り 13,227 が 1 回の上限 30,000 を下回りガードで止まるので、研究者の 2026-10-01 の指示（上限は必要に応じて上げてよい・`tokens_used` は触らず理由をコメントに）により `daily_token_budget` を一時的に 330,000 にし、回した後に 300,000 に戻した（`_comment_2026_10_05_raise`）。今日の記帳は 310,956 / 8 回。3 巡目は回さない（記録どおり 2 巡）。
+- **指摘と直し（2 件とも一次で確かめて妥当）**: (1) 図 5 で区間の上端も軸の下端より下だと、下端だけを切り上げて上下が逆転する（上端 0 は対数軸に描けない）→ 両端とも下端で描く・断りの判定に上端も入れる。(2) `SCENARIO_RE`（`^S[0-9]{1,2}$`）がコメントの「S1〜S15」より広く、S0・S01・S16〜S99 を通す → `^S(?:[1-9]|1[0-5])$`。実データ（S1〜S15）は通る（`--check` 一致）。
+- **検証**: selftest 133 → 135 件（区間全体が下端より下・S1〜S15 だけを通し S0／S01／S16／小文字／末尾の空白を止める）。変異 2 本を足して 24 本すべて狙った確認で赤、無変異は緑。生成物は変わらない。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`.codex/budget.json`（台帳）・本ファイル。
