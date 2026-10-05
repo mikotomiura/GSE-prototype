@@ -56,7 +56,7 @@ LaTeX: G-GEAR は MiKTeX 25.12（ユーザー領域）と雛形 C:\Users\johnd\t
 ## §4 追記（2026-10-05 午後・判断 165）
 
 - ✅ Mac（判断 157〜159）と Surface（判断 161）の解析を取り込んだ。3 セルの問 1〜5 の結果・閉じた集合（D8）・E3 の要約がそろった。
-- ★ **逸脱 D10**（Mac・研究者の選択）: 凍結の `match.py` の数え直しの併合の欠陥。登録の解析（分子 > 分母は値なし）と直した解析（`IME_MATCH_MERGE_RECOUNT=obs`・`results/d10/`）を横に並べる。⚠️ **Windows の直した解析はまだ** → Surface で `next-session-ime-paper-surface-d10.md`。
+- ★ **逸脱 D10**（Mac・研究者の選択）: 凍結の `match.py` の数え直しの併合の欠陥。登録の解析（分子 > 分母は値なし）と直した解析（`IME_MATCH_MERGE_RECOUNT=obs`・`results/d10/`）を横に並べる。⚠️ **Windows の直した解析はまだ** → **G-GEAR で** `next-session-ime-paper-ggear-d10.md`（研究者の提案・書庫は写して照合・展開済み。Surface 用のメモは使わない）。
 - 結果の表の道具は値なしと測度ごとの層に対応した（判断 165）。`results/d10/` を読む表（併合の率の登録と直した解析の並べ）はまだ無い → §2 の 2 に足す。
 - `build.sh` の書誌の欠陥を直した（Windows で引用がすべて未定義になっていた・判断 165）。
 - 番号: 判断は G-GEAR 165〜（166 から）、Surface 162〜164。逸脱は G-GEAR D12〜・Surface D11。
