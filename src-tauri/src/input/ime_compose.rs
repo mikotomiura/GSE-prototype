@@ -13,8 +13,10 @@
 //!
 //! # ⚠️★★★ これは「打鍵からの推論」であって、IME の内部状態ではない
 //!
-//! ★ macOS には**他プロセスの変換状態を観測する公開 API が無い**
-//! (`.steering/20260821-workspace-behavior-triage/survey-input-channels.md §7`)。
+//! ★ macOS には**他プロセスの変換状態をアプリを問わず観測する公開の経路が見つかっていない**
+//! (`.steering/20260821-workspace-behavior-triage/survey-input-channels.md §7.5`)。
+//! ⚠️ アプリが Accessibility で出す経路 (変換中の範囲・開始 / 終了の通知) はあるが、アプリしだいなので頼らない
+//! (2026-10-05 訂正: 旧文は「公開 API が無い」)。
 //! ⚠️ ただし **Windows 側の `nav` / `abandon` も同じく打鍵推論**である
 //! (`hook_windows.rs::classify_ime_nav_key` —— `0x1B`→放棄 / `0x25..0x28`→ナビ)。
 //! → ★ 手法としては**同型**であり、macOS だけが特別に弱いわけではない。
