@@ -214,5 +214,8 @@
   - [x] 公開物の文体検査を `.tex` / `.bib` に広げた（判断 148・selftest ＋ 変異 2 本）
   - [x] 題を Logging に揃える（`README.md`・`CITATION.cff`・`.zenodo.json`・`main.tex`・`kit/logger/README.md` の古い一文も・2026-10-05・判断 150）。`kit/` に題の文字列は無かった
   - [ ] `data.windows.md` の §10.8 の点検の計画の SHA-256 を全桁にする（Surface の点検の run の manifest から）
-  - [ ] 後の節（§2 比較表・§3 観測可能性〔方法・一次の文書の登録〕・§4 ロガー・Table 4・§10 データセット）・未登録の引用の登録（Plant・Pinet・Bridges・Monaco・Gebru・MS / Apple の文書・Inputlog の版・Translog-II・ScriptLog）
+  - [x] 後の節（§2 比較表・§3 観測可能性〔方法・一次の文書の登録〕・§4 ロガー・Table 4・§10 データセット）・未登録の引用の登録（Plant・Pinet・Bridges・Monaco・Gebru・MS / Apple の文書・Inputlog の版・Translog-II・ScriptLog）
+    → 2026-10-05（G-GEAR）: `sections/related.tex`（§2・Table 1）・`observability.tex`（§3・Table 2）・`logger.tex`（§4・Table 3・Table 4）・`dataset.tex`（§10・Table 13）。MS 16・Apple 13・WebKit のソースを取得して逐語を確かめ、Wayback に写しを作った（`docs/references.md` [V192]〜[V235]）。★★★ macOS の Accessibility にも変換の範囲の属性と開始・終了の通知があった → 判断 151（§3 と貢献 1 を対称の形に・研究者の選択）。macOS の観測するキーが登録の書き方より狭いこと・ヘッダの SHA-256 が共通部分だけを覆うこと・Windows の補助の信号を原稿の注にした。ScriptLog は scriptlog.net で 1.1 が有償で売られていた（サブエージェントの「入手できない」は不正確だった）
+  - [ ] Mac で: AppKit と C の Accessibility の定数の数と `TextInputSources.h` を計測の版の SDK のヘッダで確かめる（外枠の Open items・判断 151）
+  - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task
