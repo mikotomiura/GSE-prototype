@@ -206,6 +206,40 @@ for the next night, as for the macOS runs (D6).
 Windows cell was measured (the reason that section 3.2 gives for the order), and no two items overlapped. Nothing else
 of the registration depends on the hour of a run.
 
+## D10. A recounted merge is counted with its paired observation; a rate above one has no value (2026-10-05)
+
+**What changes.** `kit/analysis/match.py` takes a second pass over the missed sessions (section 6.5): a missed
+session that lies, by at least `theta` of its length, inside an observation row that is already paired counts as
+evidence that the row merged it (`n_merge_obs_recount`, which enters the numerator of the merge rate). The frozen code
+counts that row in the stratum of the missed session, while the denominator (`n_obs`) counts it in the stratum of the
+session it is paired with. When the two lie in different strata, the numerator of a stratum can exceed its
+denominator. The analysis of the macOS cells from the freezing tag stopped on the first such stratum, in the layers of
+the prediction per speed (section 4.5), with `x and n must be integers with 0 <= x <= n` and exit status 2, before any
+result file was written; the Windows cell has no layers (D3) and was not stopped. Two changes were made, before any
+result of questions 1 to 3 of the macOS cells was seen:
+
+1. A rate whose numerator exceeds its denominator is reported with no value and no interval and with the note
+   `no value: the numerator exceeds the denominator (deviation D10)`, instead of stopping the analysis. Nothing else
+   changes: on two synthetic runs (`pipeline.py --synthetic <dir> --seed 4`, analysed with `--seed 7`, `bootstrap_B`
+   2000 and `kit/analysis/gt_rules.example.json`), the four result files were byte-identical to those of the freezing
+   tag. The analysis of the macOS cells with this change alone is reported as the registered analysis.
+2. With the environment variable `IME_MATCH_MERGE_RECOUNT=obs`, a recounted merge is counted in the stratum in which
+   `n_obs` counts its observation row, that is, the stratum of the session the row is paired with, as the recounted
+   split already is on the side of the ground truth; the missed session keeps its count in `n_miss_as_merge`. The
+   numerator then never exceeds the denominator. The detection results record the setting (`merge_recount`: `obs`).
+   This corrected analysis is reported next to the registered one (section 8), for the macOS cells and for the Windows
+   cell, whose registered results were computed without it.
+
+**Reason.** The merge rate is a share of observation rows, so each row it counts must be one of the rows of its
+denominator. The frozen rule breaks this where a missed session and the row that absorbed it fall in different
+strata, for example in different trials.
+
+**Effect.** Precision, recall, F1, the split rate and every count of `match()` are unchanged by both changes. Under
+the first change a stratum may report its merge rate without a value; under the second the merge rate of a stratum may
+change wherever a recounted merge crosses strata, including the primary strata of section 6.4. The pooled rates
+over all trials are the same under both rules. The code of both changes is in commit `115cd5ff`, and the selftest
+of `match.py` checks both rules on a constructed case.
+
 ## The macOS cells are unchanged
 
 The macOS plans and analysis are generated and run from the macOS tag (section 8). That the changed files would give
