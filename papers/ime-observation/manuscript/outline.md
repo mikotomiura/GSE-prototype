@@ -330,7 +330,7 @@ observation and to the reference, with the timing of the key rows of presses as 
 the stopping rule (presses from outside, losses of focus, and on Windows the key rows that no sent press explains);
 the times at which the executor, the observation and the reference recorded the same block-marker presses, whose
 differences combine the offsets of the clocks with the delays of the paths and cannot be separated without an
-external clock; every attempt and how attempts were counted (deviation D6), with whether each start was deposited and
+external clock; every attempt and how attempts were counted (deviation D7), with whether each start was deposited and
 why.
 
 5.8 Analysis: exclusions; scopes (`under_limit` primary, `over_limit`, `all_trials`); matching by interval overlap;
@@ -339,7 +339,7 @@ continuous measures, kappa and the ICC); missing values reported as null.
 
 5.9 Pre-registration and deviations: a table of the two freezes (dates, tags, the SHA-256 of the lists of exported
 files, the OSF registrations), with the reason that the freeze marks of the file carry the date of the second freeze;
-the deviations D1 to D6 (Table 6); the public commit that fixed this outline, and with it the rules for reporting,
+the deviations D1 to D7 (Table 6); the public commit that fixed this outline, and with it the rules for reporting,
 before the results were analysed.
 
 ### 6. Results: what the reference establishes, detection and per-session agreement
@@ -499,7 +499,7 @@ figures of the records (the tables of run checks and of attempts, the check of s
 | AG4 | Agreement of `nav` with the arrow presses that the executor sent during the session (the reference for this measure is the executor, not the reference input field). | Question 2; section 6.6 | `e1_l1.json` | Section 6; Table 9 |
 | AG5 | Behaviour at the 20-second cut-off: rows of 20 seconds or more, and rows of the long trials against the specified rows (macOS); rows of 20 to 25 seconds and of 25 seconds or more, and the sensitivity analysis of the long trials (Windows), reported descriptively. | Questions 1 and 2; sections 6.6, 10.7 | `e1_l1.json`; `e1_detection.json` (`over_limit`, `under_limit_gt_duration`, `long_trials_from`) | Section 6 |
 | AG6 | Separation of the disagreement into the validity of the rules (ground truth against prediction) and their execution (prediction against observation), macOS only. | Section 6.4 | `e1_detection.json`; `e1_l1.json` (`gt_pred`, `pred_obs`, layers) | Section 6; Table 8 |
-| AG7 | Every attempt of every run, including attempts aborted, stopped or refused, with its reason and figures, how attempts were counted, whether it was deposited and why, and the check of section 10.8; exclusions by reason, stratum and number. | Sections 3.4, 6.2, 10.8; deviation D6 | `experiment/data.md`, `experiment/data.windows.md` (run checks; check of section 10.8); `experiment/deviations.md`; `e1_delivery.json`; `e1_detection.json` | Section 5.7; table of attempts |
+| AG7 | Every attempt of every run, including attempts aborted, stopped or refused, with its reason and figures, how attempts were counted, whether it was deposited and why, and the check of section 10.8; exclusions by reason, stratum and number. | Sections 3.4, 6.2, 10.8; deviation D7 | `experiment/data.md`, `experiment/data.windows.md` (run checks; check of section 10.8); `experiment/deviations.md`; `e1_delivery.json`; `e1_detection.json` | Section 5.7; table of attempts |
 | AG8 | Per-text agreement of four measures per speed (Bland-Altman bias and limits; ICC(A,1)), the biases under three mixtures of speeds, and per-trial differences by scenario and speed. | Question 3; section 6.7 | `e1_l2.json` | Section 7; Figure 4; Table 10 |
 | KT1 | Timing of the key rows of presses on the software path, per system and speed, descriptive, as the frozen delivery report defines it: in the trials whose rows of presses equal the presses sent other than the input-mode keys (within the trial's window, from 20 ms before its start to 300 ms after its end), the i-th row is paired with the i-th press; the delay is the row's wall-clock time minus the executor's wall-clock time of dispatch, and the interval error is the difference between consecutive rows minus that between consecutive presses; each is summarised by n, mean, minimum, 5th percentile, median, 95th percentile and maximum, with the number of trials not paired. Times are whole milliseconds. No claim is made about the path from a physical keyboard. | Section 6.3 | `e1_delivery.json` (`kit/analysis/delivery.py`) | Section 6 |
 | RC1 | Closed-set identification accuracy against the chance level 1/K for six feature sets, K of 10, 100 and 1,000, per cell, with the number of unscored blocks and trials. | Question 4; section 6.8 | `e2_closed_set_<cell>.json` | Section 8; Figure 5 |

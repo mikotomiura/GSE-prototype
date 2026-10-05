@@ -42,9 +42,11 @@ was not reset at any point: no method of resetting it was found on macOS, and th
 command that clears its input history. The run manifest of every run records the versions of the system, the input
 method and the programs, and the outcome of every check of the front window.
 
-On each machine the cells were measured on separate nights in a fixed order (on macOS, live conversion on, then off),
-followed by the two conditions of the runtime-cost study (Section~\ref{sec:cost}), so that the replay used for the
-runtime cost added no learning to the input method before the agreement cells were measured.
+On each machine the cells were measured in a fixed order (on macOS, live conversion on, then off), followed by the two
+conditions of the runtime-cost study (Section~\ref{sec:cost}), so that the replay used for the runtime cost added no
+learning to the input method before the agreement cells were measured. The registration asks for the runs to be made
+on separate nights; on macOS each run was started as soon as the check of the one before it was done, so the runs
+followed one another without overlapping (deviation D6). \tbd{The timing of the Windows runs, as recorded.}
 
 \subsection{Reference input fields and ground truth}
 \label{sec:method-reference}
@@ -266,7 +268,7 @@ exist so that no person's typing enters the data; they were applied right after 
 every attempt is reported with its figures (Section~\ref{sec:results-attempts}). On Windows one attempt was stopped
 from outside the runner and was counted as aborted, and one start from a terminal with administrator rights, which the
 addendum excludes, was refused by the runner before its first trial and was not counted; this is recorded as deviation
-D6.
+D7.
 
 \paragraph{Marker times.} The times at which the executor, the observation and the reference field recorded the
 same block-marker presses were compared in every run and are reported. Their differences combine the offsets of the
@@ -357,9 +359,11 @@ Registration & \url{https://osf.io/9nh7r} & \url{https://osf.io/4jwzn} \\
 \end{tabular}
 \end{table}
 
-Six deviations were recorded (Table~\ref{tab:deviations}): five before the Windows measurement and one after it,
-before any analysis of the Windows cell. The registration allowed the addendum to change only the Windows parts of
-existing files; deviations D1 to D4 touched other parts. On the macOS cells they change nothing that is reported: the
+Seven deviations were recorded (Table~\ref{tab:deviations}): five for the Windows cell before the Windows
+measurement, one for the macOS runs after their measurement and before their analysis (D6), and one for the Windows
+cell after its measurement and before its analysis (D7). The registration allowed the addendum to change only the
+Windows parts of existing files; deviations D1 to D4 touched other parts. On the macOS cells they change nothing that
+is reported: the
 macOS plans generated with the changed generator differ only in the recorded SHA-256 of a procedure file, the result
 files of the changed analysis code on synthetic macOS runs are byte-identical to those of the macOS tag, and the macOS
 analysis was run from the macOS tag. \tbd{Deviations recorded after this draft, if any.}
@@ -385,7 +389,11 @@ The Windows reference field receives only the keys that the input method does no
 would otherwise pass the stopping rule. \\
 D5 & The cell file of the Windows measurement names the two programs with backslashes. &
 The runner could not start the programs from the relative paths of the template, which use forward slashes. \\
-D6 & On Windows an attempt stopped from outside the runner is counted as aborted, and a start refused by the runner
+D6 & The macOS runs were made in the registered order, each started as soon as the check of the one before it was
+done, not on separate nights. &
+The operator did not wait for the next night; the order, which keeps the replay of the runtime-cost study after the
+two cells, was kept, and no two runs overlapped. \\
+D7 & On Windows an attempt stopped from outside the runner is counted as aborted, and a start refused by the runner
 before its first trial, made with administrator rights, is not counted. &
 The registration names neither event; the refused start was forbidden by the addendum and sent no key. \\
 \bottomrule

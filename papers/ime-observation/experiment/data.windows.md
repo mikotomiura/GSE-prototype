@@ -14,11 +14,13 @@ listed here; the runs of question 5 appear only in the tables below.
 
 <!-- - run_dir: /path/to/an/unpacked/run-directory  manifest_sha256: 0000000000000000000000000000000000000000000000000000000000000000 -->
 
+- run_dir: runs/windows-msime-tsf-2  manifest_sha256: 5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82
+
 ## Deposits
 
 | Cell label | Deposit location | SHA-256 of the archive | Date deposited |
 |---|---|---|---|
-| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
+| windows-msime-tsf (attempt 2; packed on the measuring machine, Windows 11 Home, with `--also-user` and `--also-home` each given once) | not yet deposited | `f2287a7494b108a7b827f96da48f523e84e1a9478121d03fa82dca2c8749cd06` | not yet deposited |
 
 ## Run checks (sections 3.4 and 10.8 of the pre-registration)
 
@@ -35,9 +37,10 @@ four counts are 0.
 | windows-msime-tsf | 1 | No: the runner was stopped from outside at about 00:59 JST, 21 minutes in (the shell that ran it was ended by the coding assistant's session under low memory); no manifest was written, so no manifest SHA-256 | 2026-10-04T01:00+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | 0 | 0 | 14 (last segment, cut off) | Yes (incomplete) | No |
 | windows-msime-tsf | Not numbered (refused before the first trial) | Yes: started at about 01:51 JST with administrator rights, the runner refused to go on (`refusing to run with administrator rights`) before the first trial; no key was sent (the oracle log holds its header only); manifest SHA-256 `0027d0a428b554181ae3aa36f08f6e564fe7c207bb30d8718942be6c99ced1b9` | 2026-10-04T01:56+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | none (no trial) | 0 | 0 | No: by the researcher's decision this start, which sent no key, is not counted among the at most three attempts | No |
 | windows-msime-tsf | 2 | No: ran from 01:57 to 13:03 JST, all 2925 planned trials measured, none incomplete; manifest SHA-256 `5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82` | 2026-10-04T13:04+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | 0 | 0 | 0 | No | No |
+| windows-msime-tsf, question 5 `working` | 1 | No: ran from 21:29 JST on 2026-10-04 to 08:35 JST on 2026-10-05, all 2925 planned trials measured, none incomplete; manifest SHA-256 `1e5f40ac835978ad2adc722b3e17b23bb4b6b4424706c87b7de377ec552e217a` | 2026-10-05T10:03+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | 0 | 0 | 0 | No | No |
 
 How the attempts above were counted (the start refused before the first trial, and attempt 1, which was stopped from
-outside the runner) is recorded as deviation D6 in `experiment/deviations.md`.
+outside the runner) is recorded as deviation D7 in `experiment/deviations.md`.
 
 ## Check of section 10.8 (versions differ from the pilot)
 
