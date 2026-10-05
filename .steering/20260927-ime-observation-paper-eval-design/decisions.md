@@ -1741,3 +1741,15 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **検証**: selftest 162 → 163 件（0.1 を 10 文 → SD がちょうど 0 で一定）。使い捨ての変異（`fsum` を `sum` に戻す）は 3.11 で赤（⚠️ 3.12 以降では補正つきの `sum()` が同じ答えを出すので、この変異は 3.11 の機械でしか赤にならない）。`build.sh --submission`: main・main-submission・補遺ともエラー 0・未定義の参照 0・**生成されていない値 0**・bibtex の警告 0・overfull は main 1（以前と同じ）・補遺 167（`session-strata` 50・`detection-strata` 41 など既存の層ごとの表から・探索的な dwell の表からは 0）。補遺 136 頁の表 50〜52 を画像で確かめた。文体の検査 違反 0。
 - **判断 190 の独立の確かめ**: 探索的な出力 2 つの SHA-256 が `data.md` と一致・CR 0。出力に記録したスクリプトの SHA-256（`453bfc02…`）がコミットのスクリプトと一致。`run_manifest`（on `0257755c…`・off `4ac581cb…`）は `data.md` の run の manifest と、`obs` は登録の `e1_delivery.json` の記録と一致。`e1_l1_registered` は登録の `e1_l1.json` の SHA-256（`1e22b6fb…`）と一致。
 - **影響範囲**: `manuscript/tools/results_tables.py`（`reference_spread()` と selftest）・本ファイル・`tasklist.md`。
+
+## 判断 192: Z40（Windows の 2 つの定義の差）を逸脱 D12 として報告する —— 登録 §5 は共通の定義の結果を「報告しない」と書いていた（2026-10-06・G-GEAR・研究者の選択〔推奨どおり〕・実装はメイン）
+
+- **見つけたこと（一次で確かめた）**: 判断 188 は Z40 を「1 文と補遺の参照」で承認したが、登録 §5（`preregistration.md` 594〜598 行）は「The analysis is also run under the definition common to both systems (`all`) … and the results under `all` are not otherwise reported」、§10.7 は Windows を「as on macOS」とする。→ 共通の定義の recall・precision を出すのは登録の約束から外れる。§6.12（書かれていない解析は探索的に）には「報告しない」と明記された結果は当たりにくい。判断 188 の時点ではこの約束に気づいていなかった（問いの前提を一次で確かめ直した）。
+- **研究者への問い（AskUserQuestion・推奨つき）**: 「数＋探索的な値・D12（推奨）」「数だけ（登録の範囲内）」「探索的な値・逸脱なし」。⚠️ 問いの中で、私（Claude）がすでに値を見たこと（主の範囲で共通の定義 2,306 会話・recall 0.880・precision 0.760、解析の定義 2,280・0.889・0.759）を開示した。→ **研究者は「数＋探索的な値・D12」を選んだ。**
+- **実装**:
+  - 表の道具: `Cell` が共通の定義（`all`）の主の比較の検出を読む（無ければ止まる）。`definition_pooled()` が「解析の定義の会話が共通の定義より多い」「同じ会話と報告されたのに数が違う」で止まる。`definition_values()`（2 つの定義が同じでないセルだけ: 範囲ごとに共通の定義の会話・行・recall・precision・分割・統合の率と、外れた会話の数）。補遺 `generated/detection-definitions.tex`（行＝量・列＝範囲×定義・推定値の下に区間）。横向きにすると表が次の頁に送られて頁が空いたので縦の表にした（補遺の overfull は 167 のまま）。
+  - D10 の直した解析でも Windows のプールした統合の数は登録と同じ（主の範囲 3・23）を確かめた。
+  - 値（主の範囲）: 外れた参照の会話 26 / 2,306（全試行 28 / 2,923）。共通の定義で recall 0.880・precision 0.760・統合の率 0.009（解析の定義 0.889・0.759・0.001）。⚠️ 統合の率は約 8 倍（3 → 23 件）—— 本文は研究者の承認どおり recall・precision だけ、分割・統合は補遺。研究者の読み直し（§2 の 3）で事実として渡す。
+  - `deviations.md`: 冒頭（D11 と D12 は結果を見た後）と D12 の本文（値は書かず補遺を指す）。`method.tex`: 定義の段落に D12・「Twelve deviations」・逸脱の表に D12 の行。`results-agreement.tex`「The two definitions」に数と値。`declarations.tex`「Deviations D11 and D12 were made after the results had been seen」。`supplement.tex` に新しい節。外枠（`outline.md` の「D1 to D10」）は結果の前に報告の規則を固めた版として commit で引く文書なので書き換えない（D11 の先例と同じ）。
+- **検証**: selftest 163 → 170 件。使い捨ての変異 11 本すべて赤（scratchpad の `mutate_defs.py`: 共通の定義でなく解析の定義の値・外れた数の符号・2 つの止まる確かめ・補遺の順・範囲の取り違え・共通の定義が無いときの確かめ・同じセルにも値・全セルに表・読む定義の取り違え・区間の改行）。前の `mutate_d11.py` 17 本もすべて赤のまま。`build.sh --submission`: エラー 0・未定義の参照 0・生成されていない値 0・bibtex の警告 0・overfull は main 1・補遺 167。補遺 67 頁を画像で確かめた。文体の検査 違反 0。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（`values.*`・新規 `detection-definitions.tex`）・`manuscript/supplement/supplement.tex`・`manuscript/sections/{method,results-agreement,declarations}.tex`・`experiment/deviations.md`・`verdict.md` §8・本ファイル・`tasklist.md`。

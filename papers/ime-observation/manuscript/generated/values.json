@@ -5511,6 +5511,108 @@
     36
    ]
   },
+  "windows-msime-tsf.defs.all.common.mergerate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/merge_rate",
+   "text": "0.007 [0.005, 0.011]",
+   "value": [
+    0.007203257124960852,
+    0.004804762547000922,
+    0.010786082186062727
+   ]
+  },
+  "windows-msime-tsf.defs.all.common.precision": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/precision",
+   "text": "0.675 [0.658, 0.691]",
+   "value": [
+    0.6746006890072033,
+    0.6581482840543142,
+    0.6906334789334945
+   ]
+  },
+  "windows-msime-tsf.defs.all.common.recall": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/recall",
+   "text": "0.737 [0.721, 0.753]",
+   "value": [
+    0.7369141293191926,
+    0.7206484977183647,
+    0.752557864664535
+   ]
+  },
+  "windows-msime-tsf.defs.all.common.rows": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/n_obs",
+   "text": "3{,}193",
+   "value": 3193
+  },
+  "windows-msime-tsf.defs.all.common.sessions": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/n_gt",
+   "text": "2{,}923",
+   "value": 2923
+  },
+  "windows-msime-tsf.defs.all.common.splitrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/split_rate",
+   "text": "0.097 [0.087, 0.108]",
+   "value": [
+    0.09681833732466644,
+    0.08662135655830049,
+    0.10807366428177574
+   ]
+  },
+  "windows-msime-tsf.defs.all.leftout": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/n_gt minus windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/n_gt",
+   "text": "28",
+   "value": 28
+  },
+  "windows-msime-tsf.defs.primary.common.mergerate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/merge_rate",
+   "text": "0.009 [0.006, 0.013]",
+   "value": [
+    0.008614232209737827,
+    0.005747007156466102,
+    0.012893387043523913
+   ]
+  },
+  "windows-msime-tsf.defs.primary.common.precision": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/precision",
+   "text": "0.760 [0.744, 0.776]",
+   "value": [
+    0.7602996254681648,
+    0.7437402753732217,
+    0.7761110401991921
+   ]
+  },
+  "windows-msime-tsf.defs.primary.common.recall": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/recall",
+   "text": "0.880 [0.866, 0.893]",
+   "value": [
+    0.8803122289679098,
+    0.8664273102489249,
+    0.8929321658319648
+   ]
+  },
+  "windows-msime-tsf.defs.primary.common.rows": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/n_obs",
+   "text": "2{,}670",
+   "value": 2670
+  },
+  "windows-msime-tsf.defs.primary.common.sessions": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/n_gt",
+   "text": "2{,}306",
+   "value": 2306
+  },
+  "windows-msime-tsf.defs.primary.common.splitrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/split_rate",
+   "text": "0.096 [0.084, 0.109]",
+   "value": [
+    0.095836947094536,
+    0.08448572385908786,
+    0.10853248400021763
+   ]
+  },
+  "windows-msime-tsf.defs.primary.leftout": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/n_gt minus windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/n_gt",
+   "text": "26",
+   "value": 26
+  },
   "windows-msime-tsf.delivery.lateness": {
    "source": "windows/e1_delivery.json:cells/windows-msime-tsf/send_lateness_ms/overall",
    "text": "0.05~ms (median), 0.09~ms (95th percentile) and 140.83~ms (maximum)",

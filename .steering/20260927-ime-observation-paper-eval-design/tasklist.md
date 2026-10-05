@@ -249,7 +249,7 @@
     - [x] 原稿の attack-me（stage manuscript）round 1 → **major**（R1・R2・R3 とも・有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 188・8 問とも推奨＋dwell の分位点の問い直し）→ 直した（`verdict.md` §8）→ 作業中の点検と /cross-review 2 巡の指摘を直した（判断 189）（2026-10-06・G-GEAR）
     - [x] Mac で: macOS の 2 セルの探索的な dwell の分位点（`kit/analysis/explore_dwell_quantiles.py`・判断 188-4）→ `experiment/results/exploratory/dwell_quantiles_<cell>.json`（原稿の `\rv` 8 個が埋まる）
       → 2026-10-06（Mac・判断 190）。G-GEAR で通しのビルド（生成されていない値 0）と、Python の版で `values.json` の最後の桁が変わる問題の直し（`math.fsum`・判断 191）
-    - [ ] 表の道具に Windows の 2 つの定義の差の大きさ（Z40）
+    - [x] 表の道具に Windows の 2 つの定義の差の大きさ（Z40）→ 2026-10-06（G-GEAR・判断 192）: 登録 §5 が「報告しない」としていたので研究者の選択で逸脱 D12・§6 に数と値・補遺に両定義の表
     - [ ] 原稿の attack-me round 2 を回すか（研究者に問う・研究者の読み直しの後が推奨）
     - [x] 著者・所属・Funding・利益相反・貢献（研究者・判断 185）と AI Declaration（判断 185〜187）→ PR #309 で main に
     - [ ] 研究者が結果・推奨・限界・結論を読んで直す（判断 185・186・投稿の前・AI Declaration の前提）＋ Discussion を研究者の解釈から書く（判断 188-6）＋ 断りの重複を削る（Z10）
