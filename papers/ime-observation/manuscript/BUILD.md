@@ -53,3 +53,11 @@ sources.
 
 For submission the sections are combined into one file, and the template files are not uploaded unless the
 submission system asks for them.
+
+    bash build.sh <template-dir> <out-dir> --submission
+
+also builds `main-submission.pdf` in the layout that the journal asks for (double spaced, 1-inch margins, the page
+number in the upper right corner); the public `main.pdf` keeps the layout of the template. The title page with the
+corresponding author's postal address and telephone number is `submission/title-page.tex`: copy it outside the
+repository, fill in the two marked fields, build the copy with `pdflatex`, and upload it to the submission system
+only, so that the address and the telephone number are never published with the sources.

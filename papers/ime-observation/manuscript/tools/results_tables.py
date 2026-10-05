@@ -780,6 +780,20 @@ def dwell_explore_values(cell, doc):
             vals["%s.dwellx.%s.within%s" % (cell.label, sp, ms)] = {
                 "text": fmt_pct(e["within"][key]), "value": e["within"][key],
                 "source": "%s:cells/%s/%s/%s/within/%s" % (doc["src"], cell.label, PRIMARY_SCOPE, sp, key)}
+    # The same figures as ranges over the speeds, for the text.
+    present = [sp for sp in SPEEDS if doc["cells"][PRIMARY_SCOPE].get(sp) is not None]
+    if present:
+        src = "%s:cells/%s/%s/*" % (doc["src"], cell.label, PRIMARY_SCOPE)
+        for key, _ in DWELL_EXPLORE_PCTS:
+            xs = [doc["cells"][PRIMARY_SCOPE][sp]["percentiles"][key] for sp in present]
+            lo, hi = fmt_signed(min(xs), True), fmt_signed(max(xs), True)
+            vals["%s.dwellx.%s.range" % (cell.label, key.replace(".", ""))] = {
+                "text": lo if lo == hi else "%s to %s~ms" % (lo, hi), "value": [min(xs), max(xs)], "source": src}
+        for key, ms in DWELL_EXPLORE_WITHIN:
+            xs = [doc["cells"][PRIMARY_SCOPE][sp]["within"][key] for sp in present]
+            lo, hi = fmt_pct(min(xs)), fmt_pct(max(xs))
+            vals["%s.dwellx.within%s.range" % (cell.label, ms)] = {
+                "text": lo if lo == hi else "%s--%s" % (lo, hi), "value": [min(xs), max(xs)], "source": src}
     return vals
 
 
@@ -1471,9 +1485,9 @@ def session_supplement(cells):
                 m = cell.l1_by[comp][scope]["metrics"]
                 lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
                           "\\begin{longtable}{L{0.08}L{0.06}L{0.07}L{0.12}L{0.12}L{0.12}L{0.11}L{0.11}L{0.11}L{0.10}}\n",
-                          "\\caption{Per-session agreement per stratum, cell %s, comparison \\texttt{%s}, %s: %s}"
+                          "\\caption{Per-session agreement per stratum, cell %s, comparison %s, %s: %s}"
                           "\\label{tab:session-%s-%s-%s}\\\\\n" % (
-                              cell_name(cell.label), tex_escape(comp), scope_name(scope), SESSION_CAPTION, cell.label,
+                              cell_name(cell.label), dict(COMPARISONS)[comp], scope_name(scope), SESSION_CAPTION, cell.label,
                               comp.replace("_", ""), scope.replace("_", "")),
                           "\\toprule\n",
                           "Scenario & Speed & " + SESSION_HEAD,
@@ -1639,13 +1653,13 @@ def table_strata(cell, d10=None):
         for scope in [s for s in STRATA_SCOPES if s in cell.det_by[comp]]:
             lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
                       "\\begin{longtable}{L{0.08}L{0.06}L{0.07}L{0.08}L{0.06}L{0.17}L{0.17}L{0.10}L{0.10}L{0.10}}\n",
-                      "\\caption{Detection per stratum in %s, cell %s (definition \\texttt{%s}, comparison \\texttt{%s}), "
+                      "\\caption{Detection per stratum in %s, cell %s (definition \\texttt{%s}, comparison %s), "
                       "with Wilson intervals. Trials: trials kept in the scope (%s); Sessions and Rows: the reference "
                       "sessions (or predicted rows) and the session rows of the stratum that entered the matching; Merge "
                       "rate: as registered; Corrected: the merge rate of the corrected analysis of deviation D10%s; %s: "
                       "no value (no denominator, or a numerator above the denominator, deviation D10)}"
                       "\\label{tab:strata-%s-%s-%s}\\\\\n" % (
-                          scope_name(scope), cell_name(cell.label), tex_escape(cell.definition), tex_escape(comp),
+                          scope_name(scope), cell_name(cell.label), tex_escape(cell.definition), dict(COMPARISONS)[comp],
                           "from the per-trial records of question 3" if scope in SCOPES else
                           "not given for this scope", "" if d10 is not None else " (not computed for this cell)",
                           NO_VALUE, cell.label, comp.replace("_", ""), scope.replace("_", "")),
@@ -1938,7 +1952,7 @@ def table_text_agreement(cells):
              "withheld (the reason is in the result file); %s: no value; %s. The values hold for this design's numbers "
              "of trials per text and are not compared between speeds}\n" % (NO_VALUE, REFERENCE_CONSTANT_NOTE),
              "\\label{tab:text-agreement}\n",
-             "\\begin{tabular}{L{0.13}L{0.13}L{0.05}L{0.05}L{0.08}L{0.14}L{0.14}L{0.14}L{0.14}}\n",
+             "\\begin{tabular}{L{0.13}L{0.13}L{0.06}L{0.06}L{0.09}L{0.13}L{0.13}L{0.13}L{0.13}}\n",
              "\\toprule\n",
              "Cell & Measure & " + AGREEMENT_HEAD,
              "\\midrule\n"]
@@ -3259,9 +3273,10 @@ def _selftest_dwell_explore(check):
         cell = _FakeCell("cell-x", [], [], speeds)
         check("dwellx: a cell without the file has no exploratory values",
               read_dwell_explore(tmp, cell) is None and dwell_explore_values(cell, None) == {})
-        entry = lambda n, p=-1500.4: {"n": n, "percentiles": {"p2.5": p, "p97.5": 40.0},
-                                      "within": {"abs_le_100_ms": 0.375, "abs_le_1000_ms": 0.8}}
-        doc = {"exploratory": True, "cells": {"cell-x": {"under_limit": {"slow": entry(10), "fast": entry(4)},
+        entry = lambda n, p=-1500.4, w=0.375: {"n": n, "percentiles": {"p2.5": p, "p97.5": 40.0},
+                                               "within": {"abs_le_100_ms": w, "abs_le_1000_ms": 0.8}}
+        doc = {"exploratory": True, "cells": {"cell-x": {"under_limit": {"slow": entry(10), "fast": entry(4, -900.0,
+                                                                                                         0.25)},
                                                          "all_trials": {"slow": entry(12, -2600.0),
                                                                         "fast": entry(4, -2600.0)}}}}
         os.makedirs(os.path.join(tmp, DWELL_EXPLORE_DIR))
@@ -3274,9 +3289,14 @@ def _selftest_dwell_explore(check):
         write(doc)
         got = read_dwell_explore(tmp, cell)
         vals = dwell_explore_values(cell, got)
+        check("dwellx: the ranges over the speeds run from the smallest to the largest, and one value stands alone",
+              vals.get("cell-x.dwellx.p25.range", {}).get("text") == "$-$1,500 to $-$900~ms"
+              and vals.get("cell-x.dwellx.within100.range", {}).get("text") == "25.0\\%--37.5\\%"
+              and vals.get("cell-x.dwellx.within1000.range", {}).get("text") == "80.0\\%"
+              and vals.get("cell-x.dwellx.p975.range", {}).get("text") == "40", sorted(vals))
         check("dwellx: the values of the primary scope, signed whole milliseconds and percentages",
               vals.get("cell-x.dwellx.slow.p25", {}).get("text") == "$-$1,500"
-              and vals.get("cell-x.dwellx.fast.within100", {}).get("text") == "37.5\\%"
+              and vals.get("cell-x.dwellx.fast.within100", {}).get("text") == "25.0\\%"
               and "cell-x.dwellx.mid.p25" not in vals
               and vals["cell-x.dwellx.slow.within1000"]["source"].endswith("under_limit/slow/within/abs_le_1000_ms"),
               sorted(vals))

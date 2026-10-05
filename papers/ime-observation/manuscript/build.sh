@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 # Build the manuscript and the supplement with pdfLaTeX and BibTeX.
 #
-#   bash build.sh <template-dir> <out-dir>
+#   bash build.sh <template-dir> <out-dir> [--submission]
 #
 # <template-dir> is the directory sn-article-template of the Springer Nature LaTeX template (it holds sn-jnl.cls and
 # the directory bst); see BUILD.md for where to obtain it. The template is not part of this directory. <out-dir>
 # receives main.pdf, supplement.pdf and the logs, so that no build output is written next to the sources; it must lie
-# outside this directory. Both may be given as relative paths.
+# outside this directory. Both may be given as relative paths. With --submission the manuscript is also built in the
+# layout that the journal asks for a submission (double spaced, 1-inch margins, page numbers in the upper right
+# corner) as main-submission.pdf.
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "usage: bash build.sh <template-dir> <out-dir>" >&2
+submission=0
+if [ "$#" -eq 3 ] && [ "$3" = "--submission" ]; then
+  submission=1
+elif [ "$#" -ne 2 ]; then
+  echo "usage: bash build.sh <template-dir> <out-dir> [--submission]" >&2
   exit 2
 fi
 template=$1
@@ -87,12 +92,32 @@ latex main.tex
 latex main.tex
 latex main.tex
 
+# The layout for submission: the same sources under another job name, with the switch that main.tex reads.
+names="main supplement"
+if [ "$submission" = 1 ]; then
+  sub() {
+    if ! pdflatex -no-shell-escape -interaction=nonstopmode -halt-on-error -output-directory="$out" \
+        -jobname=main-submission '\def\imsubmission{1}\input{main.tex}' > "$out/main-submission.run.log"; then
+      echo "build.sh: pdflatex failed on the submission layout; see $out/main-submission.run.log" >&2
+      exit 1
+    fi
+  }
+  sub
+  (cd "$out" && bibtex main-submission > main-submission.bibtex.log) || [ $? -eq 1 ] || {
+    echo "build.sh: bibtex failed; see $out/main-submission.blg" >&2
+    exit 1
+  }
+  sub
+  sub
+  names="main main-submission supplement"
+fi
+
 # The supplement has no citations.
 cd "$here/supplement"
 latex supplement.tex
 latex supplement.tex
 
-for name in main supplement; do
+for name in $names; do
   log="$out/$name.log"
   echo "$name: $(grep -c '^!' "$log" || true) errors, $(grep -c 'LaTeX Warning: Reference' "$log" || true) undefined references, $(grep -c 'Warning: Citation' "$log" || true) undefined citations, $(grep -c 'Package results Warning: Result value' "$log" || true) result values not generated, $(grep -c '^Overfull' "$log" || true) overfull boxes"
 done

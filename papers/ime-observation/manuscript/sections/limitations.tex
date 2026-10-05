@@ -11,7 +11,9 @@ assemble sessions from the calls; with live conversion on, the rule folds the au
 typed into one session, and a rule that did not fold them would define a conversion differently. The reference is
 software on the measured machine: no external clock was used, and no external device timed the keys, the candidate
 window or the marked text on the screen, so the agreement is between two software records. The kind of field affects
-the reference, as the two Windows fields of the pilot showed (Section~\ref{sec:method-reference}).
+the reference, as the two Windows fields of the pilot showed (Section~\ref{sec:method-reference}). The field can lose
+the focus by itself, as it did once in the pilot; the presses sent during such a loss reach another application, and
+their trials stay in the evaluation as disagreements between the plan and the ground truth.
 
 \paragraph{Windows.} The logger and the reference record different constructs, so the Windows estimates include the
 difference between a visible window of the input method and a composition. They hold for an unknown mixture of the
@@ -19,7 +21,12 @@ logger's two paths, because a row does not record its path (Section~\ref{sec:log
 with its default settings, with predictive candidates shown; with them turned off, the window would open at the
 conversion rather than while the reading is typed. Applications that draw their own candidates were not tested, and in
 them the logger may see no session. The counts \texttt{nav} and \texttt{abandon} are counted system-wide while a
-session is open and are upper bounds; this design does not exercise their excess, because only the executor typed.
+session is open and are upper bounds; this design does not exercise their excess, because only the executor typed. In
+S15 the input method commits when another window comes to the front, so the session ends there. On the cloaking path
+the observed interval ends at least 150~ms before the row's time, and on both paths the row's time is that of its
+collection; the matching is not adjusted for either, so short sessions can fail to pair for this reason. The input mode
+was switched with keys that a program sends, and the response of the input method was not compared with that to keys
+pressed by hand.
 
 \paragraph{Synthetic and idealised input.} The procedures were calibrated so that each conversion ends within its trial,
 and trials were separated by a pause of 1~s; a conversion that ran from one trial into the next was excluded as
@@ -27,20 +34,27 @@ carry-over, so the agreement for conversions that continue into the input that f
 held for 60~ms and no two presses overlapped; the session rules of the macOS logger act on the order of the presses,
 which overlapping presses do not change, and the release rows, whose times overlapping would change, were not validated.
 Key intervals were drawn independently of the keys, with no pauses at the boundaries of words and phrases; this affects
-the measures of timing and the feature sets of question~4 that keep time, and because the timing of human typing carries
-information about the keys \citep{monaco2018}, those sets are expected to identify phrases at least as accurately in
-human typing as here, which is one reason they are reported as estimates only. The input had no typing errors, and
+the measures of timing and the feature sets of question~4 that keep time. The timing of human typing carries information
+about the keys \citep{monaco2018} that these logs lack, while the attacker's knowledge of the generator and the absence
+of typing errors favour identification here, so how those sets would fare on human typing is not known, which is one
+reason they are reported as estimates only. The input had no typing errors, and
 corrections occurred only where a scenario prescribed them; errors would add presses that the attacks of question~4 do
 not expect, so the identification is expected to be lower with them than here, and the effect of errors on detection is
 not known. The events were injected through the interfaces of the operating system, so the timing of the key rows
-(Table~\ref{tab:key-timing}) covers the software path only; the path from a physical key, which earlier validations
-measured from the key to the record \citep{pinet2017}, adds its own delay, so the delay from a physical key to a row is
-expected to be longer than the delays reported here. The input mode was switched only by the mode keys; on macOS a
-switch made otherwise is followed by polling the input source every 100~ms, which was not exercised.
+(Table~\ref{tab:key-timing}) covers the path from the injection to the row; the path from a physical key, which earlier
+validations measured from the key to the record \citep{pinet2017}, adds its own delay, so the delay from a physical key
+to a row is expected to be longer than the delays reported here. The rows take their times from the wall clock when an
+event reaches the logger; the registration asks for network time synchronisation to be off during the runs, and an
+adjustment of the clock while the logger runs, which in ordinary use can happen, moves the times of the rows and was
+not exercised. The drift between the clocks of the records was measured only at the block markers
+(Section~\ref{sec:results-reference}). The input mode was switched only by the mode keys; on macOS a switch made
+otherwise is followed by polling the input source every 100~ms, which was not exercised.
 
 \paragraph{The rules of the macOS logger.} The minus, comma and period keys close a session, so a reading that contains
 a long-vowel mark or punctuation is split into several sessions, which can raise the number of conversions that a
-researcher counts from the log. The cut-off leaves out
+researcher counts from the log. With the kana layout every kana typed with a symbol key, among them the voiced-sound
+mark, closes a session in the same way; S12 used only kana typed with letter, digit, minus, comma and period keys, so
+its agreement does not represent kana input in general. The cut-off leaves out
 the sessions that reach 20~s; how it moves each aggregate is stated in Section~\ref{sec:recommendations}.
 
 \paragraph{One machine and one version per system.} One input method was measured per system, on one machine, with the
@@ -69,7 +83,9 @@ the absence of such errors; had every attempt been stopped, the cell would not h
 that keeps times (the sets that keep time are estimates only), does not evaluate granularities between milliseconds and
 one-second bins, and evaluates neither the rows of key releases, the session rows nor, on Windows, the rows of modifier
 keys. Identifying a writer from the timing of a log was not evaluated. The attacks are not claimed to be the strongest
-possible.
+possible: the accuracy of an attack on a feature set alone was not monotone in the information the set keeps. The
+decoys were not matched to the true phrase in length, so the numbers of keys of each category are expected to
+distinguish the candidates more than they would among phrases of equal length.
 
 \paragraph{Runtime cost.} The samplers of the two systems measure differently, so their values are not compared, and
 battery use was not measured.

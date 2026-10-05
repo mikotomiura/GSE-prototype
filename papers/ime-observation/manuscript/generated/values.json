@@ -5492,6 +5492,22 @@
    "text": "75.0\\%",
    "value": 0.7496790757381258
   },
+  "windows-msime-tsf.dwellx.p25.range": {
+   "source": "exploratory/dwell_quantiles_windows-msime-tsf.json:cells/windows-msime-tsf/under_limit/*",
+   "text": "$-$6,363 to $-$4,047~ms",
+   "value": [
+    -6362.95,
+    -4046.85
+   ]
+  },
+  "windows-msime-tsf.dwellx.p975.range": {
+   "source": "exploratory/dwell_quantiles_windows-msime-tsf.json:cells/windows-msime-tsf/under_limit/*",
+   "text": "$-$43 to $-$33~ms",
+   "value": [
+    -43.0,
+    -33.02499999999998
+   ]
+  },
   "windows-msime-tsf.dwellx.slow.p25": {
    "source": "exploratory/dwell_quantiles_windows-msime-tsf.json:cells/windows-msime-tsf/under_limit/slow/percentiles/p2.5",
    "text": "$-$4,988",
@@ -5511,6 +5527,22 @@
    "source": "exploratory/dwell_quantiles_windows-msime-tsf.json:cells/windows-msime-tsf/under_limit/slow/within/abs_le_1000_ms",
    "text": "73.5\\%",
    "value": 0.734982332155477
+  },
+  "windows-msime-tsf.dwellx.within100.range": {
+   "source": "exploratory/dwell_quantiles_windows-msime-tsf.json:cells/windows-msime-tsf/under_limit/*",
+   "text": "37.1\\%--37.5\\%",
+   "value": [
+    0.37098844672657255,
+    0.375366568914956
+   ]
+  },
+  "windows-msime-tsf.dwellx.within1000.range": {
+   "source": "exploratory/dwell_quantiles_windows-msime-tsf.json:cells/windows-msime-tsf/under_limit/*",
+   "text": "73.5\\%--81.2\\%",
+   "value": [
+    0.734982332155477,
+    0.8123167155425219
+   ]
   },
   "windows-msime-tsf.excluded.gt.carryover": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/excluded/gt/by_reason/carry_over",

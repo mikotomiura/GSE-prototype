@@ -5,7 +5,7 @@
 \label{sec:introduction}
 
 Keystroke logging records each key press of a writer with its time, so that the process of writing can be studied
-alongside the text it produces \citep{leijten2013,wengelin2023}. From such logs researchers compute inter-key intervals
+alongside the text it produces \citep{wengelin2023}. From such logs researchers compute inter-key intervals
 and pauses, revisions, bursts of production between pauses, and the amount of text produced and the time taken
 \citep{conijn2019}.
 
@@ -27,11 +27,13 @@ reveals.
 The article makes five contributions.
 \begin{enumerate}
 \item An analysis of observability (Section~\ref{sec:observability}): what the documented public interfaces of
-Windows and macOS let a program that reads no text learn about the conversion in another application. On both systems
-an application's own accessibility implementation can report a conversion without text, but whether it does depends on
-the application. Among the routes that do not depend on the application, Windows offers the window events of the input
-method, and on macOS none of the documented interfaces examined reports a conversion, so the logger infers it from key
-presses.
+Windows and macOS let a program that reads no text learn about the conversion in another application. Such a program
+may receive key codes, which spell the reading when it is typed in Roman letters, but uses no interface that delivers
+the composition, the candidates or other text; the logger writes only the category of each key. On both systems an
+application's own accessibility implementation can report a conversion without text, but whether it does depends on the
+application. Among the routes that do not depend on the application, Windows reports the display and the cloaking of
+the input method's windows without text, and on macOS none of the documented interfaces examined reports a conversion,
+so the logger infers it from key presses.
 \item A logger for both systems and its validation (Sections~\ref{sec:logger} to \ref{sec:results-text}). The logger
 writes a category and a time for every press and release of the keys it observes and one summary row for every
 conversion session, and it declares in its log which rows the log can contain. Its rows were compared with the
@@ -52,6 +54,6 @@ measurement.
 \end{enumerate}
 
 The analyses of agreement and of recoverability come from the same measurement runs; the runtime cost was measured in
-runs of its own, and the dataset holds the runs of the calibration pilots as a separate part. All input was produced by
-a program, and no claim is made about natural typing, about other input methods or about applications other than the
-reference input fields (Section~\ref{sec:limitations}).
+runs of its own, and the dataset holds the runs of the calibration pilots as a separate part. All key input of the
+measurement runs was produced by a program, and no claim is made about natural typing, about other input methods or
+about applications other than the reference input fields (Section~\ref{sec:limitations}).

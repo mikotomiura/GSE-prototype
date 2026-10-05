@@ -106,7 +106,11 @@ under the registered rule (\texttt{no\_time}: \rv{macos-standard-live-off.q4.no_
 \rv{macos-standard-live-on.q4.no_time.near}; \texttt{counts\_only}: \rv{macos-standard-live-off.q4.counts_only.near}
 and \rv{macos-standard-live-on.q4.counts_only.near}), and the recommended granularity is \rv{q4.recommendation}: no
 granularity of the key rows is recommended. The rule judges the identification of one phrase among $K$ candidates in
-one trial; this result is not a judgement of the privacy of a log.
+one trial; this result is not a judgement of the privacy of a log. In both macOS cells, at $K = 10$ and $K = 100$, the
+maximum that gives the accuracy of \texttt{no\_time} came from the attack on \texttt{counts\_only}: the numbers of key
+presses of each category in a trial, without their order or times, identified the phrase as often as the more detailed
+set did (supplement). The decoys were drawn from the phrases of the trial's scenario, whose readings have 6 to 30 kana,
+and were not matched to the true phrase in length.
 
 On Windows the same judgement gives: \rv{q4.windows.qualification}. The Windows accuracies of the two sets equal those of
 the macOS cell with live conversion off to the reported precision. The two plans were generated from the same seed and
@@ -118,7 +122,10 @@ independent replication of the macOS one for these sets.
 Figure~\ref{fig:closed-set} shows every feature set at every $K$, and the supplement gives their values, with the
 accuracy per speed and scenario. The sets that keep time
 are estimates only: the synthetic intervals carry none of the timing structure of human typing, and these sets enter
-neither the judgement nor the recommendation.
+neither the judgement nor the recommendation. The accuracy of an attack on a set alone was not monotone in the
+information the set keeps: at $K = 10$ the attack on \texttt{all} alone identified fewer phrases than the attack on
+\texttt{counts\_only} in both macOS cells (supplement), so the attacks are not the strongest possible, and the maximum
+over the coarser sets is what the figure shows.
 
 \paragraph{Open set.} Table~\ref{tab:open-set} gives the character error rate of the attack and of the prior-only
 baseline, their difference (gain), and the gain over the shuffled control, in which each trial is decoded from another

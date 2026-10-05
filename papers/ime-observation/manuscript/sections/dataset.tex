@@ -6,9 +6,11 @@
 \section{The dataset}
 \label{sec:dataset}
 
-The records of the measurement are released as a dataset for evaluating loggers of input-method conversion against
-the calls that a reference input field received from the input method. The dataset is synthetic input in one kind of
-reference input field per system. It is not a record of human writing and not a benchmark of natural typing.
+The records of the measurement are released as a dataset of the calls that a reference input field received from the
+input method under scripted input, with the presses sent and the logger's rows: a ground truth against which rules
+that infer conversions from key presses can be evaluated, and a set of key logs whose typed phrases are known
+(Section~\ref{sec:dataset-uses}). The dataset is synthetic input in one kind of reference input field per system. It is
+not a record of human writing and not a benchmark of natural typing.
 
 \subsection{Contents}
 \label{sec:dataset-contents}
@@ -74,7 +76,8 @@ the rules of the measurement runs \tbd{confirmed at deposit}. The Windows pilot 
 not deposited, because that field received the key press that switches the input method on as a key-down, which the
 stopping rule counts as a press from outside. The error output of the programs stays on the measuring machines, and
 checks typed by hand were not runs of the runner and are not deposited. The table of attempts states for every start
-of every run whether it was deposited and why (Section~\ref{sec:results-attempts}).
+of every run of a plan whether it was deposited, with the reason where these rules decide it
+(Section~\ref{sec:results-attempts}).
 
 \subsection{Uses}
 \label{sec:dataset-uses}
@@ -94,9 +97,10 @@ about writers.
 \label{sec:dataset-distribution}
 
 The dataset is deposited in Zenodo under the persistent identifier \tbd{DOI of the dataset}, with the data and
-documents under the Creative Commons Attribution 4.0 licence and the code under the Apache License 2.0. A datasheet in
-the form proposed by \citet{gebru2021}, which organises the description by the stages of a dataset's life (motivation,
-composition, collection process, preprocessing, uses, distribution and maintenance), is released with it. The datasheet
+documents under the Creative Commons Attribution 4.0 licence and the code under the Apache License 2.0
+\citep{dataset}. A datasheet in the form proposed by \citet{gebru2021}, which organises the description by the stages
+of a dataset's life (motivation, composition, collection process, preprocessing, uses, distribution and maintenance), is
+released with it \tbd{written at deposit}. The datasheet
 states the terms of the corpus source: the phrases come from works whose copyright has expired, which the source
 library allows to be copied and redistributed freely, asking that the information recorded in its files be kept
 \citep{aozora,aozora-terms}; the corpus records the identifier of each source work, and the source works are listed

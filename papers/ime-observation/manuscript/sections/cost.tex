@@ -38,7 +38,8 @@ key presses.
 \subsection{Results}
 \label{sec:cost-results}
 
-Every condition of each system had enough samples to be reported (Table~\ref{tab:cost}). On macOS the mean CPU of the
+The records of the runs hold one attempt of each condition on each system (the working conditions are in
+Table~\ref{tab:attempts}), and every one had enough samples to be reported (Table~\ref{tab:cost}). On macOS the mean CPU of the
 logger was \rv{macos.e3.idle.cpu.mean} in the idle condition and \rv{macos.e3.working.cpu.mean} in the working
 condition; on Windows it was \rv{windows.e3.idle.cpu.mean} idle and \rv{windows.e3.working.cpu.mean} working (one core
 is 100). The values of each system are read within that system, because the two samplers measure differently
