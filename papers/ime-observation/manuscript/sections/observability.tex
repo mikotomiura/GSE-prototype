@@ -123,11 +123,11 @@ and on macOS a segment of kana input inferred from the keys. Their measures are 
 are validated separately against references of their own system (Section~\ref{sec:method-reference}), and they are not
 compared as equal. Table~\ref{tab:interfaces} summarises the interfaces examined.
 
-\begin{table*}[t]
+\begin{sidewaystable}[p]
 \caption{Interfaces examined for logging the conversion of another application. ``Text'' is whether the interface
 delivers the composition, the candidates or other text to the program that uses it}
 \label{tab:interfaces}
-\begin{tabular}{p{0.24\linewidth}p{0.33\linewidth}p{0.07\linewidth}p{0.17\linewidth}p{0.10\linewidth}}
+\begin{tabular}{L{0.26}L{0.35}L{0.08}L{0.18}L{0.11}}
 \toprule
 Interface & What it exposes to a program outside the application & Text & Used by the logger & Source \\
 \midrule
@@ -154,4 +154,4 @@ Text input sources & The selected input source and input mode & No & Whether a J
 Event tap & The key code and time of every key event & No & Key rows; sessions by inference & \citet{apple-cgevent-tapcreate} \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{sidewaystable}
