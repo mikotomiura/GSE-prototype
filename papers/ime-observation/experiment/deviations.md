@@ -282,15 +282,17 @@ the analysis. Sections 5 and 10.7 of the registration report under the common de
 definitions hold the same sessions; section 5 states that the results under `all` are not otherwise reported. The
 analysis code and the result files do not change: the result files hold the detection under both definitions, and the
 values are taken from them by the script that turns the result files into the tables and the values of the article
-(`manuscript/tools/results_tables.py`), which also requires the definition of the analysis to hold no more sessions
-than the common one in every scope, and as many where the two are reported to hold the same sessions.
+(`manuscript/tools/results_tables.py`), which also requires the analysis to have reported for every cell whether the
+two definitions hold the same sessions, and the definition of the analysis to hold no more sessions than the common
+one in the primary scope and over all trials, and as many where the two are reported to hold the same sessions.
 
 **Reason.** On Windows the definition of the analysis keeps only the sessions in which the reference field reported a
 candidate element. That the two definitions do not hold the same sessions does not show how many sessions differ or
 how far the estimates of question 1 depend on the choice of definition.
 
 **Effect.** No registered value changes; values are added to the text of question 1 and a table to the supplement. In
-the macOS cells the two definitions held the same sessions, and nothing is added for them. This deviation was made
+the macOS cells the two definitions held the same sessions, and no value or table is added for them; the supplement
+says that they held the same sessions. This deviation was made
 after all results had been seen, including the detection under the common definition, when a simulated review of the
 article before its submission asked for the size of the difference between the two definitions.
 

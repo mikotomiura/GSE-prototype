@@ -901,6 +901,11 @@ def definition_pooled(cell, scope):
     where = "%s:cells/%s/{%s,%s}/%s/%s/metrics/pooled/n_gt" % (cell.src["e1_detection.json"], cell.label,
                                                                cell.definition, COMMON_DEFINITION, PRIMARY_COMPARISON,
                                                                scope)
+    # Without the report of whether the two definitions hold the same sessions, the supplement could not say which
+    # cells it leaves out (the registration asks for the report per cell).
+    if not isinstance(cell.det_top.get("same_sessions_as_all"), bool):
+        raise ValueError("%s:same_sessions_as_all/%s: no report of whether the two definitions hold the same sessions"
+                         % (cell.src["e1_detection.json"], cell.label))
     if own["n_gt"] > common["n_gt"]:
         raise ValueError("%s: the definition of the analysis holds more sessions than the common one" % where)
     if cell.det_top.get("same_sessions_as_all") and own["n_gt"] != common["n_gt"]:
@@ -3561,6 +3566,12 @@ def _selftest_definitions(check):
             f.write(original)
         _rewrite(detp, lambda d: d["cells"]["windows-test"].pop(COMMON_DEFINITION))
         _expect_stop(check, "definitions: negative: no result under the common definition stops", tmp)
+        with open(detp, "wb") as f:
+            f.write(original)
+        # Without the report of whether the definitions hold the same sessions, the supplement cannot place the cell.
+        _rewrite(detp, lambda d: d.pop("same_sessions_as_all"))
+        _expect_stop(check, "definitions: negative: no report of whether the definitions hold the same sessions stops",
+                     tmp)
         with open(detp, "wb") as f:
             f.write(original)
     finally:
