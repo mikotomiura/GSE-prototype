@@ -1632,7 +1632,7 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   4. （code-reviewer MEDIUM 2）図 4 は 1 枚の軸に Windows と macOS を並べる → 題に「Windows のセルの値は別の構成概念との一致で、macOS とは比べない」を足した。
   5. （code-reviewer MEDIUM 1）全試行の範囲に外した層の数が無い → 結論（語数の制限なし）と結果の節に足した。⚠️ 要旨は 249 語で入らないので足さない。読み: 規則 (i) の「with the number of strata left out」は主の範囲に付き、「the same range over all trials」は同じ作り方の範囲を指す（判断 175 の読み (B)）。全試行の外した数は本文と結論にある。研究者が要旨にも要ると決めれば、ほかを削って足す。
   6. （code-reviewer MEDIUM 3）限界の節に「止める規則が Windows では run を選びうる」（外枠 §12・登録 §10.11）の帰結が欠けていた → 「分析した run はそうした誤りの無い run に選ばれうる・全試行が止まればセルは測られなかった」を足した。
-  7. （code-reviewer LOW 4）selftest の `"70.0\%"` は不正なエスケープ → `"70.0\%"`（`-W error::SyntaxWarning` で構文を確かめた）。
+  7. （code-reviewer LOW 4）selftest の `"70.0\%"` は不正なエスケープ → バックスラッシュを 2 つにした（`-W error::SyntaxWarning` で構文を確かめた）。
   8. （code-reviewer LOW 5）限界の印（`mark=-`）に白抜きが効かない → `fig open` を `mark options={fill=white, line width=0.4pt}` にして細い線で区別し、図 3 の題を「Open marks and thin dashes」に。
   9. （code-reviewer LOW 7）要旨の「carry-over between trials 0.0% and 5.8%」の動詞の省略 → 「excluded」を足した（249 語）。
 - **直さなかったもの（理由）**: Codex P2-3（`nan` の区切りに `unbounded coords=jump` が要る）→ `main.tex` の `fig interval` に指定済みで、組んだ図で区間が分かれていることを目で確かめた（Codex は `main.tex` を見ていない）。Codex P3（描画のテストが無い）→ 道具は標準ライブラリだけにする方針（判断 181）。組版は `build.sh` と目視で確かめる。code-reviewer の「打ち消し合う」の出典が見つからない → 登録 §7（1021 行）に逐語であった（偽陽性）。
