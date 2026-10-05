@@ -146,7 +146,7 @@ Apple TN2150 逐語「**Event taps (CoreGraphics/CGEvent.h)**」がブロック�
 
 | | Windows | macOS |
 |---|---|---|
-| 変換中か | ★ **観測できる**（WinEvent ＋ `ImmGetOpenStatus` ＋ UIA の 3 段） | ⚠️★★★ **公開 API が存在しない。** composition は `NSTextInputClient` 上に閉じている |
+| 変換中か | ★ **観測できる**（WinEvent ＋ `ImmGetOpenStatus` ＋ UIA の 3 段） | ⚠️★★★ **アプリを問わずに変換を知らせる公開の通知は見つかっていない。** composition は対象アプリの `NSTextInputClient` 上で処理され、外へ知らせるかはアプリの Accessibility の実装しだい（WebKit のソースは出す・§7.5）。⚠️ 2026-10-05 訂正: 旧文は「公開 API が存在しない。composition は `NSTextInputClient` 上に閉じている」 |
 | 現行実装 | `ime_windows.rs` | ⚠️ `hook_macos.rs::update_compose_state` ＝ **keycode 列からのヒューリスティック推定** |
 
 → ⚠️★★★ **同じ `IME_ACTIVE` フィールドでも Win=観測値 / mac=推定値であり、両 OS のデータを混ぜて学習・評価してはならない。**
@@ -428,17 +428,34 @@ user-initiated conversions.**」
 逐語「**Data is the finalized string of the completed composition**」＝ **確定文字列が流れ込む**。
 ★ `ConversionTargetChanged` だけ使うなら WinEvent 版と等価で、**WinEvent の方が軽い**。
 
-### 7.5 ★★★ macOS — **公開 API が存在しない**（★ 全数確認）
+### 7.5 ★★★ macOS — **アプリを問わずに変換を知らせる公開の通知は見つかっていない**（⚠️ 2026-10-05 訂正）
+
+> ⚠️★★★ **2026-10-05 訂正**（IME 論文のタスク `.steering/20260927-ime-observation-paper-eval-design/decisions.md` 判断 151・153
+> 〔枝 `docs/ime-manuscript-outline`・この訂正の時点で main に未 merge・番号は merge の前に確かめ直す〕・
+> 本訂正は `.steering/20261005-macos-ax-marked-text-correction/`）: 旧見出しは「**公開 API が存在しない**（★ 全数確認）」、
+> 旧版の表の 1 行目は「Accessibility の全定数 … 135 個を全数確認し … *ゼロ*」だった。
+> ⚠️ **数えたのは C（Carbon）の定数だけで、AppKit の定数を見ていなかった。** AppKit には変換中の範囲の属性と、
+> 変換の開始・終了の通知がある（下の表の 2 行目）。→ ★ **言えるのは「アプリを問わずに変換を知らせる公開の通知は見つかっていない」まで**
+> （候補窓はウィンドウ一覧のポーリングで一部見えるが、通知ではなく、変換前は出ない —— 下の表の「候補ウィンドウの検知」）。
+> アプリが用意する経路はある（WebKit のソースは出す）。⚠️ **設計の結論（GSE は macOS では打鍵から推す）は変えていない**（変えるかは研究者）。
 
 | 調査対象 | ★ 結果 |
 |---|---|
-| **Accessibility の全定数** | ⚠️★★★ **Attributes 101 個 ＋ Parameterized 9 個 ＋ Notifications 25 個 = 135 個を全数確認し、marked text / composition / 入力方式状態を表すものは *ゼロ*** |
-| **`NSTextInputClient`** | ★ **対象アプリのビューが実装する in-process なプロトコル**。外部プロセスが問い合わせる公開 API は無い |
+| **Accessibility の C（Carbon）の定数** | ★ **属性 101 個 ＋ パラメータ付き 9 個 ＋ 通知 25 個 = 135 個に、marked text / composition / 入力方式の状態を表すものは無い**（2026-10-05 に Apple の文書の JSON で数え直して同じ数・該当なし） |
+| ⚠️★★★ **Accessibility の AppKit の定数**（2026-10-05 に追加） | ★ **属性 131 個・パラメータ付き 18 個・通知 42 個**（各一覧の `init(rawValue:)` を除く）。★ **`NSAccessibility.Attribute` に `textInputMarkedRangeAttribute`（変換中の範囲）、`NSAccessibility.Notification` に `NSAccessibilityTextInputMarkingSessionBegan` / `…Ended`（変換の開始・終了）がある**（Objective-C の名は `NSAccessibilityTextInputMarkedRangeAttribute`・`NSAccessibilityTextInputMarkingSessionBeganNotification` / `…EndedNotification`。3 つとも各頁の JSON の `introducedAt` が macOS 10.6・説明の文は無い）。⚠️ 外から受ける側は C の `AXObserver`（対象のプロセスごとに作る・Accessibility の権限が要る）で、C の定数一覧に無いことは C から受けられないことを意味しない。出典: <https://developer.apple.com/documentation/appkit/nsaccessibility-swift.struct/attribute> と <https://developer.apple.com/documentation/appkit/nsaccessibility-swift.struct/notification>（IME 論文の枝で `docs/references.md` [V224]・[V225] に登録） |
+| ★ **WebKit**（2026-10-05 に追加） | ★ **ソースは出す**（commit `1a5a134d14845e9bf54a67049a36a2585e62897c`・同 [V206]）。`Source/WebCore/accessibility/AXObjectCache.cpp` 3692〜3719 行の `onTextCompositionChange` が変換の開始・終了で `AXNotification::TextCompositionBegan` / `…Ended` を投げ（`HAVE(INLINE_PREDICTIONS)` の条件つき。`Source/WTF/wtf/PlatformHave.h` 1326〜1331 行が `PLATFORM(MAC)` で 1 にする・呼ぶのは `Source/WebCore/editing/Editor.cpp`）、`accessibility/mac/AXObjectCacheMac.mm` 361〜366 行がそれを上の 2 つの通知に写し、375 行が **userInfo なし（`nil`）** で投げる。`WebAccessibilityObjectWrapperMac.mm` 2290〜2295 行が変換中の範囲を `NSRange`（位置と長さ）で返す。⚠️ **実機で別のプロセスが受け取れるかは確かめていない**。⚠️ **終了の通知が確定・取消・フォーカスの喪失を区別するか、通知の遅れは未確認**。⚠️ **アプリの Accessibility の実装が出すものなので、出すかはアプリしだい**（AppKit の `NSTextView`・Chromium 系〔Chrome・Electron〕は未確認）。⚠️ **content-free は 3 つに分けて評価する**（2 巡目のレビューで直した）—— (i) **通知の中身**: 文字列を運ばない（WebKit は userInfo なし）。開始・終了の時刻だけなら通知で足りる。(ii) **範囲の属性**: 位置と長さで、文字数の量になる（`data-privacy` は文字数を原則持たない）。(iii) **受ける側の実装**: 通知は要素を渡すので、同じ要素から文字列を返す属性（`kAXValueAttribute`・`kAXStringForRangeParameterizedAttribute`・`kAXAttributedStringForRangeParameterizedAttribute`）も呼べてしまう。→ 採るなら（研究者の判断・新しいチャネルは別 ADR が先）、通知だけか範囲まで読むかを決め、文字列を返す属性を**呼ばない**と能力で書く必要がある |
+| **`NSTextInputClient`** | ★ **対象アプリのビューが実装する in-process なプロトコル**。外部プロセスが問い合わせる公開 API は無い（★ 外へ知らせる経路は上の AppKit の Accessibility） |
 | **Input Method Kit** | ⚠️ **Windows の TIP と構造が逆** —— macOS の input method は**独立プロセス**で `NSConnection` 経由。逐語「**The only client in OS X v10.5 is the Text Services Manager.**」→ ★ **「対象プロセスに入り込む」という迂回路すら存在しない** |
 | **候補ウィンドウの検知** | ★ `kCGWindowLayer` / `kCGWindowOwnerPID` は **Screen Recording 権限なしで取れる**（⚠️ `kCGWindowName` だけが gated）。⚠️ **しかし (i) 通知が無くポーリング専用、(ii) 変換前（ローマ字入力中・下線のみ）は候補窓が出ない**＝ ★ **GSE が最も欲しい「かな入力中」を取り逃す** |
 | `TISCopyCurrentKeyboardInputSource` | ★ 返るのは**入力ソース識別子（IME on/off）**まで。⚠️ composition ではない（★ 前提は正しかった）。⚠️ **Apple 公式ドキュメントは削除済みでヘッダのみ** |
 
 ### 7.6 ⚠️★★★ 非対称は **解消できない**。★ ただし「下に合わせる」のは誤り
+
+> ⚠️ **2026-10-05 訂正（§7.5）**: ここで言う非対称は ★ **アプリを問わない通知**の非対称である
+> （Windows は入力方式の窓のイベント 0x8027〜0x8029〔と cloak〕がある・macOS は調べた範囲に無い）。
+> ⚠️ **アプリが用意する経路は両 OS にある** —— Windows は UIA の TextEdit パターンの変換対象の変化（§7.4 の 0x8030）、
+> macOS は AppKit の Accessibility の変換中の範囲と開始・終了の通知（§7.5）。どちらもアプリしだいなので、下の結論は変わらない
+> （⚠️ 下の本文の「0x8027-0x8030」のうち 0x8030 はアプリしだいの側で、結論を支えるのは 0x8027〜0x8029 と cloak）。
 
 ★ **理由**: Windows の 0x8027-0x8030 を捨てて macOS のヒューリスティックに揃えると、
 ⚠️ **取得可能な客観信号を自ら破棄して推定精度の上限を下げる**。
