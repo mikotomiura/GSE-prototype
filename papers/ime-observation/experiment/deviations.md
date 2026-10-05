@@ -1,9 +1,9 @@
 # Deviations
 
 Departures from the frozen registration (`preregistration.md`, tag `ime-observation-prereg-macos`), recorded
-under section 8 before the analysis they affect is run. Each entry gives its date, the reason and the effect. The
-entries below were made for the Windows cell before any Windows measurement; the evidence that they leave the
-macOS cells unchanged is given at the end.
+under section 8 before the analysis they affect is run. Each entry gives its date, the reason and the effect. D1
+to D5 were made for the Windows cell before any Windows measurement; the evidence that they leave the macOS
+cells unchanged is given at the end. D6 concerns the macOS measurement.
 
 ## D1. Scenario S4 presses three Escapes on Windows (2026-10-03)
 
@@ -117,6 +117,23 @@ template could not be corrected without changing a file of the tag.
 
 **Effect.** The programs, their arguments and the directory they run from are those of the template; only the
 separator in the two paths differs. No key was sent in the aborted attempt, and it is not a run of the Windows cell.
+
+## D6. The macOS runs were not made on separate nights (2026-10-05)
+
+**What changes.** Section 3.2 states that the runs are made on separate nights, in the order live conversion on,
+live conversion off, `idle` and `working`, and section 6.10 measures each condition of question 5 on one night. The
+runs were made in this order, each after the check of the one before it, but each was started as soon as that check
+was done (times in UTC; local time is UTC+9): the cell with live conversion on from 2026-10-02 16:03 to 2026-10-03
+04:04, the cell with it off from 04:19 to 15:27 on 2026-10-03, `idle` from 2026-10-03 15:37 to 23:37, and `working`
+from 2026-10-04 13:03 to 2026-10-05 01:04. The run with live conversion off began in the local afternoon, and it and
+`idle` both fell in the night from 2026-10-03 to 2026-10-04.
+
+**Reason.** The operator chose to start each item when the one before it had been completed and checked, rather than
+wait for the next night.
+
+**Effect.** The order of section 3.2, which keeps the learning added by the replay of section 6.10 from preceding the
+two cells, is kept, and no two items overlapped. Nothing else of the registration depends on the hour of a run.
+The background load on the machine during each run is reported in `env.md`.
 
 ## The macOS cells are unchanged
 

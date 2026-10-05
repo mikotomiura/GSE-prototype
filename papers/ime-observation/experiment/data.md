@@ -31,6 +31,11 @@ pre-registration; with the settings fixed there, the figures of the rule on pres
 | macos-standard-live-on | 1 | no | 2026-10-03 04:15 UTC | `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba` | 0 | 0 | 0 | 0 | no | not yet |
 | macos-standard-live-off | 1 | no | 2026-10-03 15:34 UTC | `3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2` | 0 | 0 | 0 | 0 | no | not yet |
 | macos-e3-working | 1 | no | 2026-10-05 01:17 UTC | `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba` | 0 | 0 | 0 | 0 | no | not yet |
+In the run of the cell with live conversion off, the reference input field lost the focus once outside the plan,
+for 2.7 s (2026-10-03, 04:20:33.68 to 04:20:36.35 UTC, in trial `t00004`). By the operator's report this was a
+pointer click on another window; the logs cannot confirm the cause. No key was pressed, so no row of the
+observation lacks a sent press within the loss, and 11 presses that the executor sent did not reach the reference
+input field. The run does not count as aborted (section 3.4), and the trial is analysed (section 6.2).
 
 ## Deposit procedure
 
