@@ -118,6 +118,14 @@
     2925
    ]
   },
+  "macos-standard-live-off.carryover.pct": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/excluded/trials/by_type/carry_over",
+   "text": "0.0\\%",
+   "value": [
+    0,
+    2925
+   ]
+  },
   "macos-standard-live-off.cutoff.all.long": {
    "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/truncation/n_long",
    "text": "614",
@@ -2440,6 +2448,14 @@
     2925
    ]
   },
+  "macos-standard-live-off.scope.setaside.pct": {
+   "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
+   "text": "24.4\\%",
+   "value": [
+    714,
+    2925
+   ]
+  },
   "macos-standard-live-off.startwhileopen.all": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/diagnostics/start_while_open/n",
    "text": "2{,}925",
@@ -2584,6 +2600,14 @@
   "macos-standard-live-on.carryover": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/excluded/trials/by_type/carry_over",
    "text": "182 of 3{,}150 trials (5.8\\%)",
+   "value": [
+    182,
+    3150
+   ]
+  },
+  "macos-standard-live-on.carryover.pct": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/excluded/trials/by_type/carry_over",
+   "text": "5.8\\%",
    "value": [
     182,
     3150
@@ -4926,6 +4950,14 @@
     3150
    ]
   },
+  "macos-standard-live-on.scope.setaside.pct": {
+   "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
+   "text": "22.9\\%",
+   "value": [
+    720,
+    3150
+   ]
+  },
   "macos-standard-live-on.startwhileopen.all": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/diagnostics/start_while_open/n",
    "text": "2{,}968",
@@ -5096,6 +5128,14 @@
   "windows-msime-tsf.carryover": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/excluded/trials/by_type/carry_over",
    "text": "2 of 2{,}925 trials (0.1\\%)",
+   "value": [
+    2,
+    2925
+   ]
+  },
+  "windows-msime-tsf.carryover.pct": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/excluded/trials/by_type/carry_over",
+   "text": "0.1\\%",
    "value": [
     2,
     2925
@@ -6929,6 +6969,14 @@
   "windows-msime-tsf.scope.setaside": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
    "text": "617 of 2{,}925 trials (21.1\\%)",
+   "value": [
+    617,
+    2925
+   ]
+  },
+  "windows-msime-tsf.scope.setaside.pct": {
+   "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
+   "text": "21.1\\%",
    "value": [
     617,
     2925

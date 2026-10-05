@@ -243,7 +243,7 @@
     - [x] `sections/results-*.tex`（RF1 → 問 1・2 → 問 3 → 問 4 → 問 5）の草稿（判断 174）
     - [x] Windows の開いた集合が macOS OFF とバイト一致する理由を確かめた（判断 173）
     - [x] 図 1〜5（判断 181: pgfplots・図 2〜5 の座標は表の道具が生成・selftest 125 件・変異 12 本）
-    - [ ] 要旨と結論（外枠の Rule for the abstract）・§1・§11〜13
+    - [x] 要旨と結論（外枠の Rule for the abstract・248 語）・§1・§11〜13・Declarations・Open Practices・D10 を手法の節に（判断 182）
     - [ ] 完了時レビュー（code-reviewer ∥ security-checker ＋ /cross-review）→ PR
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task

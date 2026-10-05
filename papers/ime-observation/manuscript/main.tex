@@ -83,13 +83,42 @@
 \title{Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a
 synthetic-input validation}
 
-\abstract{\tbd{Abstract of no more than 250 words, written after the results.}}
+% The abstract follows the rule fixed in outline.md before the results (section 6.1 of the registration): item (i)
+% for each cell and item (iii), the recommendation. Items (iv), the CPU of the logger, and (ii), the bias of the
+% session duration, are left to the text (Sections sec:cost and sec:results-session), in this order, because the
+% abstract does not fit 250 words with them. Every value is read with \rv{} from the generated values; the words that
+% state the judgement of question 4 ("neither", "none", "nor") follow from the values and are corrected by hand if the
+% result files change.
+\abstract{Keystroke loggers documented for writing research record the conversion of a Japanese input method either not
+at all or with the text: key names spelling the reading, or the composition or screen text. We examined which documented
+Windows and macOS interfaces let a program log the conversion without reading text, built a logger writing key
+categories, times and one row per conversion session, and estimated, in a pre-registered study with synthetic input, its
+agreement with the sessions a reference input field received from the input method. On macOS, with live conversion off
+and on, over the strata keeping at least 30 trials in the primary scope, the Wilson intervals of recall spanned
+\rv{macos-standard-live-off.primary.recall.range} and \rv{macos-standard-live-on.primary.recall.range} and those of
+precision \rv{macos-standard-live-off.primary.precision.range} and \rv{macos-standard-live-on.primary.precision.range}
+(strata left out: \rv{macos-standard-live-off.primary.recall.strata.left} and
+\rv{macos-standard-live-on.primary.recall.strata.left} for recall,
+\rv{macos-standard-live-off.primary.precision.strata.left} and \rv{macos-standard-live-on.primary.precision.strata.left}
+for precision); the scope set aside \rv{macos-standard-live-off.scope.setaside.pct} and
+\rv{macos-standard-live-on.scope.setaside.pct} of trials, and carry-over between trials
+\rv{macos-standard-live-off.carryover.pct} and \rv{macos-standard-live-on.carryover.pct}; over all trials recall spanned
+\rv{macos-standard-live-off.all.recall.range} and \rv{macos-standard-live-on.all.recall.range} and precision
+\rv{macos-standard-live-off.all.precision.range} and \rv{macos-standard-live-on.all.precision.range}. On Windows, where
+the logger's sessions (windows of the input method) are a different construct from the reference's compositions, recall
+spanned \rv{windows-msime-tsf.primary.recall.range} and precision \rv{windows-msime-tsf.primary.precision.range}
+(\rv{windows-msime-tsf.primary.recall.strata.left} and \rv{windows-msime-tsf.primary.precision.strata.left} strata left
+out; \rv{windows-msime-tsf.scope.setaside.pct} set aside; \rv{windows-msime-tsf.carryover.pct} carried over; over all
+trials \rv{windows-msime-tsf.all.recall.range} and \rv{windows-msime-tsf.all.precision.range}). For identifying the
+typed phrase among $K$ candidates, neither granularity of the key rows without times met the registered near-chance rule
+in either macOS cell, so none is recommended; nor did either on Windows. The registrations, code and data are public.}
 
 \keywords{Japanese input method, keystroke logging, privacy-preserving logging, observability, method validation,
 reproducibility}
 
 \maketitle
 
+\input{sections/introduction}
 \input{sections/related}
 \input{sections/observability}
 \input{sections/logger}
@@ -99,6 +128,10 @@ reproducibility}
 \input{sections/recoverability}
 \input{sections/cost}
 \input{sections/dataset}
+\input{sections/recommendations}
+\input{sections/limitations}
+\input{sections/conclusions}
+\input{sections/declarations}
 
 \bibliography{references}
 

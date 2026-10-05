@@ -372,6 +372,12 @@ def abstract_values(cell):
                 "text": "%s of %s trials (%s)" % (fmt_int(carry), fmt_int(total), fmt_pct(float(carry) / total)),
                 "value": [carry, total],
                 "source": cell.path("e1_detection.json", scope, "excluded/trials/by_type/carry_over")}
+            # The same two fractions as percentages alone, for the abstract.
+            for key in ("scope.setaside", "carryover"):
+                full = vals["%s.%s" % (cell.label, key)]
+                vals["%s.%s.pct" % (cell.label, key)] = {
+                    "text": fmt_pct(float(full["value"][0]) / full["value"][1]), "value": full["value"],
+                    "source": full["source"]}
         sp = cell.speed_sessions(scope)
         cis = [sp[s]["dwell"]["bias_ci"] for s in SPEEDS if s in sp and sp[s]["dwell"]["bias_ci"][0] is not None
                and sp[s]["dwell"]["bias_ci"][1] is not None]
@@ -3073,6 +3079,11 @@ def selftest():
               vals["windows-test.scope.setaside"]["value"] == [315, 450]
               and vals["windows-test.scope.setaside"]["text"] == "315 of 450 trials (70.0\\%)"
               and vals["windows-test.carryover"]["value"] == [1, 450], str(vals["windows-test.scope.setaside"]))
+        check("the same fractions as percentages alone, for the abstract",
+              vals.get("windows-test.scope.setaside.pct", {}).get("text") == "70.0\%"
+              and vals.get("windows-test.carryover.pct", {}).get("text") == "0.2\%"
+              and vals.get("windows-test.carryover.pct", {}).get("source") == vals["windows-test.carryover"]["source"],
+              str((vals.get("windows-test.scope.setaside.pct"), vals.get("windows-test.carryover.pct"))))
         check("the dwell-bias range spans the per-speed intervals, in whole milliseconds with a minus sign",
               vals["windows-test.primary.dwellbias.range"]["value"] == [-1050.6, -49.5]
               and vals["windows-test.primary.dwellbias.range"]["text"] == "$-$1,051 to $-$50~ms",
