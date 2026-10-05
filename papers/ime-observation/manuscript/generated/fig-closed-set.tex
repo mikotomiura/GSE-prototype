@@ -4,7 +4,7 @@
 \pgfplotslegendfromname{fig:closed-set:legend}\par\medskip
 \begin{tikzpicture}
 \begin{groupplot}[group style={group size=3 by 1, horizontal sep=0.45cm, yticklabels at=edge left, ylabels at=edge left}, fig panel, xmode=log, ymode=log, xtick={10,100,1000}, xmin=6, xmax=1700, ymin=0.0005, ymax=1.5, scale only axis, width=3.3cm, height=4.5cm, xlabel={$K$}, ylabel={Accuracy}]
-\nextgroupplot[title={\texttt{macos-standard-live-off}}, legend to name=fig:closed-set:legend, legend columns=4]
+\nextgroupplot[title={macOS, live conversion off}, legend to name=fig:closed-set:legend, legend columns=4]
 \addlegendimage{fig set1, fig point}
 \addlegendentry{\texttt{all}}
 \addlegendimage{fig set2, fig point}
@@ -35,7 +35,7 @@
 \addplot[forget plot, fig set5, fig point] table[row sep=\\] {x y\\11.4815 0.901852\\114.815 0.421481\\1148.15 0.0807407\\};
 \addplot[forget plot, fig interval, fig set6] table[row sep=\\] {x y\\12.5893 0.890052\\12.5893 0.91251\\12.5893 nan\\125.893 0.40298\\125.893 0.440206\\125.893 nan\\1258.93 0.064095\\1258.93 0.083784\\1258.93 nan\\};
 \addplot[forget plot, fig set6, fig point] table[row sep=\\] {x y\\12.5893 0.901852\\125.893 0.421481\\1258.93 0.0733333\\};
-\nextgroupplot[title={\texttt{macos-standard-live-on}}]
+\nextgroupplot[title={macOS, live conversion on}]
 \addplot[forget plot, fig chance, domain=7:1500] {1/x};
 \addplot[forget plot, fig margin, domain=7:1500] {2/x};
 \addplot[forget plot, fig interval, fig set1] table[row sep=\\] {x y\\7.94328 0.895585\\7.94328 0.916682\\7.94328 nan\\79.4328 0.421082\\79.4328 0.457027\\79.4328 nan\\794.328 0.0742589\\794.328 0.0943543\\794.328 nan\\};
@@ -50,7 +50,7 @@
 \addplot[forget plot, fig set5, fig point] table[row sep=\\] {x y\\11.4815 0.906667\\114.815 0.435214\\1148.15 0.0806838\\};
 \addplot[forget plot, fig interval, fig set6] table[row sep=\\] {x y\\12.5893 0.895585\\12.5893 0.916682\\12.5893 nan\\125.893 0.417343\\125.893 0.453254\\125.893 nan\\1258.93 0.067168\\1258.93 0.0864222\\1258.93 nan\\};
 \addplot[forget plot, fig set6, fig point] table[row sep=\\] {x y\\12.5893 0.906667\\125.893 0.435214\\1258.93 0.0762393\\};
-\nextgroupplot[title={\texttt{windows-msime-tsf}}]
+\nextgroupplot[title={Windows}]
 \addplot[forget plot, fig chance, domain=7:1500] {1/x};
 \addplot[forget plot, fig margin, domain=7:1500] {2/x};
 \addplot[forget plot, fig interval, fig set1] table[row sep=\\] {x y\\7.94328 0.897056\\7.94328 0.91882\\7.94328 nan\\79.4328 0.414382\\79.4328 0.451735\\79.4328 nan\\794.328 0.0752358\\794.328 0.0963132\\794.328 nan\\};

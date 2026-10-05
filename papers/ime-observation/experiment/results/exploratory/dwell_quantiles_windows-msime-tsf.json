@@ -1,0 +1,86 @@
+{
+ "cells": {
+  "windows-msime-tsf": {
+   "all_trials": {
+    "fast": {
+     "n": 695,
+     "percentiles": {
+      "p2.5": -4797.25,
+      "p97.5": -33.35000000000002
+     },
+     "within": {
+      "abs_le_1000_ms": 0.7985611510791367,
+      "abs_le_100_ms": 0.3683453237410072
+     }
+    },
+    "mid": {
+     "n": 802,
+     "percentiles": {
+      "p2.5": -7912.525,
+      "p97.5": -42.0
+     },
+     "within": {
+      "abs_le_1000_ms": 0.7281795511221946,
+      "abs_le_100_ms": 0.36034912718204487
+     }
+    },
+    "slow": {
+     "n": 654,
+     "percentiles": {
+      "p2.5": -10059.425,
+      "p97.5": -43.325000000000045
+     },
+     "within": {
+      "abs_le_1000_ms": 0.654434250764526,
+      "abs_le_100_ms": 0.3241590214067278
+     }
+    }
+   },
+   "under_limit": {
+    "fast": {
+     "n": 682,
+     "percentiles": {
+      "p2.5": -4046.85,
+      "p97.5": -33.02499999999998
+     },
+     "within": {
+      "abs_le_1000_ms": 0.8123167155425219,
+      "abs_le_100_ms": 0.375366568914956
+     }
+    },
+    "mid": {
+     "n": 779,
+     "percentiles": {
+      "p2.5": -6362.95,
+      "p97.5": -42.0
+     },
+     "within": {
+      "abs_le_1000_ms": 0.7496790757381258,
+      "abs_le_100_ms": 0.37098844672657255
+     }
+    },
+    "slow": {
+     "n": 566,
+     "percentiles": {
+      "p2.5": -4988.125,
+      "p97.5": -43.0
+     },
+     "within": {
+      "abs_le_1000_ms": 0.734982332155477,
+      "abs_le_100_ms": 0.3745583038869258
+     }
+    }
+   }
+  }
+ },
+ "exploratory": true,
+ "inputs_sha256": {
+  "config": "25733be6e52dbe0274f5d763cb06be9cd089d3de5cb4255f7a2a9abc338b6cf4",
+  "e1_l1": "4fd11b1d3c5eba4df88f9a859629764bdfcd889e1c3a58281bdda6c35b69530e",
+  "obs": "58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562",
+  "run_manifest": "5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82",
+  "script": "fb18e4184910b553a822f70687802d62eb78488816aec07ae592bfeef9aba3c7"
+ },
+ "note": "not registered; percentiles of the dwell error (observed minus ground truth, ms) of the one-to-one pairs of the primary comparison, and the fractions of pairs within 100 ms and 1,000 ms; no interval",
+ "percentile_method": "linear interpolation between order statistics, h = (n - 1) p"
+}

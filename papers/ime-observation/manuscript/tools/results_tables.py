@@ -61,6 +61,7 @@ Standard library only.
 """
 import argparse
 import json
+import math
 import os
 import re
 import shutil
@@ -76,6 +77,9 @@ FILES = ("e1_detection.json", "e1_l1.json", "e1_l2.json")
 # The labels of the three cells of the measurement (experiment/data.md and experiment/data.windows.md).
 EXPECTED_CELLS = ("macos-standard-live-on", "macos-standard-live-off", "windows-msime-tsf")
 MACOS_CELLS = EXPECTED_CELLS[:2]
+# The names under which the tables and figures show the cells (the labels stay the keys of the values).
+CELL_NAMES = {"macos-standard-live-on": "macOS, live conversion on",
+              "macos-standard-live-off": "macOS, live conversion off", "windows-msime-tsf": "Windows"}
 WINDOWS_CELL = EXPECTED_CELLS[2]
 # Question 4 (section 6.8 of the pre-registration). The feature sets of the closed set, from the most detailed; the
 # rule considers only the two sets that keep no time, the most detailed first (counts_only is a coarsening of
@@ -113,8 +117,8 @@ EXCLUSION_TYPES = ("clock_jump", "log_truncated", "carry_over")
 D10_DIRS = {"macos": os.path.join("d10", "macos"), "windows": os.path.join("d10", "windows")}
 # Section 6.4: the three comparisons (the two with the prediction exist on macOS only, section 10.7) and the four
 # layers of the prediction, in the order of the registration.
-COMPARISONS = (("gt_obs", "\\texttt{gt\\_obs} (primary)"), ("gt_pred", "\\texttt{gt\\_pred}"),
-               ("pred_obs", "\\texttt{pred\\_obs}"))
+COMPARISONS = (("gt_obs", "Reference vs. logger (primary)"), ("gt_pred", "Reference vs. specified rows"),
+               ("pred_obs", "Specified rows vs. logger"))
 COMPARISONS_OF = {"macos": ("gt_obs", "gt_pred", "pred_obs"), "windows": ("gt_obs",)}
 LAYERS = (("carried_out", "carried out"), ("received_carry", "received carry"),
           ("closing_key_in_reading", "closing key in reading"), ("none", "none of the three"))
@@ -712,11 +716,107 @@ def l2_values(cell):
                 "text": est_ci(ba["bias"], e["bias_ci"][0], e["bias_ci"][1], lambda x: fmt_signed(x, ms)),
                 "value": [ba["bias"]] + list(e["bias_ci"]),
                 "source": cell.path("e1_l2.json", PRIMARY_SCOPE, "agreement_by_stratum", s, m, "bias_ci")}
+            spread = checked_spread(cell, PRIMARY_SCOPE, m, s, e)
+            constant = spread["constant"]
             vals["%s.l2.%s.%s.icc" % (cell.label, m, s)] = {
-                "text": est_ci(e["icc21"], e["icc21_ci"][0], e["icc21_ci"][1], lambda x: fmt_signed(x)),
-                "value": [e["icc21"]] + list(e["icc21_ci"]),
+                "text": REFERENCE_CONSTANT_TEXT if constant else est_ci(
+                    e["icc21"], e["icc21_ci"][0], e["icc21_ci"][1], lambda x: fmt_signed(x)),
+                "value": [None, None, None] if constant else [e["icc21"]] + list(e["icc21_ci"]),
                 "source": cell.path("e1_l2.json", PRIMARY_SCOPE, "agreement_by_stratum", s, m, "icc21_ci")}
+            vals["%s.l2.%s.%s.refsd" % (cell.label, m, s)] = {
+                "text": fmt_sd(spread["sd"], ms), "value": spread["sd"],
+                "source": cell.path("e1_l2.json", PRIMARY_SCOPE, "aggregate", "gt")}
     return vals
+
+
+# ---------------------------------------------------------------- exploratory: the distribution of the dwell error
+
+DWELL_EXPLORE_DIR = "exploratory"
+DWELL_EXPLORE_PCTS = (("p2.5", "2.5th percentile"), ("p97.5", "97.5th percentile"))
+DWELL_EXPLORE_WITHIN = (("abs_le_100_ms", "100"), ("abs_le_1000_ms", "1000"))
+
+
+def read_dwell_explore(results_dir, cell):
+    """The exploratory percentiles of the dwell error of a cell (kit/analysis/explore_dwell_quantiles.py), or None when
+    the file has not been made. The file must hold this cell, both scopes and the speeds of the registered results."""
+    name = "dwell_quantiles_%s.json" % cell.label
+    p = os.path.join(results_dir, DWELL_EXPLORE_DIR, name)
+    if not os.path.isfile(p):
+        return None
+    doc = load(p)
+    src = "%s/%s" % (DWELL_EXPLORE_DIR, name)
+    if doc.get("exploratory") is not True:
+        raise ValueError("%s: not marked as exploratory" % src)
+    block = (doc.get("cells") or {}).get(cell.label)
+    if not block or sorted(block) != sorted(SCOPES):
+        raise ValueError("%s: cell %s with both scopes is missing" % (src, cell.label))
+    for scope in SCOPES:
+        speeds = cell.speed_sessions(scope)
+        for sp in SPEEDS:
+            e = block[scope].get(sp)
+            reg = (speeds.get(sp) or {}).get("dwell")
+            if (e is None) != (reg is None):
+                raise ValueError("%s: %s, %s does not match the registered results" % (src, scope, sp))
+            if e is not None and e["n"] != reg["n"]:
+                raise ValueError("%s: %s, %s has %d pairs, the registered results %d" % (src, scope, sp, e["n"],
+                                                                                          reg["n"]))
+    return {"src": src, "cells": block}
+
+
+def dwell_explore_values(cell, doc):
+    """Values for the text: per speed, the percentiles and the fractions within 100 ms and 1 s, primary scope."""
+    vals = {}
+    if doc is None:
+        return vals
+    for sp in SPEEDS:
+        e = doc["cells"][PRIMARY_SCOPE].get(sp)
+        if e is None:
+            continue
+        for key, _ in DWELL_EXPLORE_PCTS:
+            vals["%s.dwellx.%s.%s" % (cell.label, sp, key.replace(".", ""))] = {
+                "text": fmt_signed(e["percentiles"][key], True), "value": e["percentiles"][key],
+                "source": "%s:cells/%s/%s/%s/percentiles/%s" % (doc["src"], cell.label, PRIMARY_SCOPE, sp, key)}
+        for key, ms in DWELL_EXPLORE_WITHIN:
+            vals["%s.dwellx.%s.within%s" % (cell.label, sp, ms)] = {
+                "text": fmt_pct(e["within"][key]), "value": e["within"][key],
+                "source": "%s:cells/%s/%s/%s/within/%s" % (doc["src"], cell.label, PRIMARY_SCOPE, sp, key)}
+    return vals
+
+
+def dwell_explore_supplement(cells, docs):
+    """Supplement: the exploratory distribution of the dwell error per cell, scope and speed."""
+    lines = [GENERATED_NOTE, "\\section*{Exploratory: the distribution of the dwell error}\n\\label{sec:supp-dwell}\n\n",
+             "Not registered. For the one-to-one pairs of the primary comparison, the 2.5th and 97.5th percentiles of "
+             "the difference of \\texttt{dwell\\_ms} from the duration of the reference session (observation minus "
+             "reference, ms; linear interpolation between order statistics) and the fractions of pairs whose absolute "
+             "difference is at most 100~ms and at most 1~s, without intervals. The pairs are those of the registered "
+             "analysis: the script runs the frozen analysis and reproduces its number of pairs, bias and median "
+             "absolute difference at every speed before it writes these figures.\n\n"]
+    for cell in cells:
+        doc = docs.get(cell.label)
+        name = cell_name(cell.label)
+        if doc is None:
+            lines.append("Cell %s: not computed when this file was generated.\n\n" % name)
+            continue
+        lines += ["{\\footnotesize\n", "\\begin{longtable}{L{0.16}L{0.10}L{0.08}L{0.15}L{0.15}L{0.15}L{0.15}}\n",
+                  "\\caption{Exploratory distribution of the dwell error, cell %s}\\label{tab:dwell-explore-%s}\\\\\n"
+                  % (name, cell.label),
+                  "\\toprule\n",
+                  "Scope & Speed & Pairs & 2.5th percentile (ms) & 97.5th percentile (ms) & Within 100~ms & "
+                  "Within 1~s \\\\\n",
+                  "\\midrule\n\\endhead\n"]
+        for scope in SCOPES:
+            for i, sp in enumerate(SPEEDS):
+                e = doc["cells"][scope].get(sp)
+                head = ["\\texttt{%s}" % tex_escape(scope) if i == 0 else "", sp]
+                if e is None:
+                    lines.append(" & ".join(head) + " & \\multicolumn{5}{l}{no pair} \\\\\n")
+                    continue
+                lines.append(" & ".join(head + [fmt_int(e["n"])]
+                                        + [fmt_signed(e["percentiles"][k], True) for k, _ in DWELL_EXPLORE_PCTS]
+                                        + [fmt_pct(e["within"][k]) for k, _ in DWELL_EXPLORE_WITHIN]) + " \\\\\n")
+        lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n\n"]
+    return "".join(lines)
 
 
 # ---------------------------------------------------------------- deviation D10: the corrected merge rate
@@ -974,7 +1074,7 @@ def table_reference(cells, clocks):
              "\\label{tab:reference}\n",
              "\\begin{tabular}{L{0.34}" + ("L{%.3f}" % width) * len(cells) + "}\n",
              "\\toprule\n",
-             "Figure & " + " & ".join(tex_escape(c.label) for c in cells) + " \\\\\n"]
+             "Figure & " + " & ".join(cell_name(c.label) for c in cells) + " \\\\\n"]
     for key, title, read in REFERENCE_GROUPS:
         lines += ["\\midrule\n",
                   "\\multicolumn{%d}{L{%.3f}}{\\textit{%s}; read with %s} \\\\\n" % (
@@ -1102,7 +1202,7 @@ def table_key_timing(cells, side, label, long_table=False):
         for sp in SPEEDS + (None,):
             for j, (measure, mlabel) in enumerate(TIMING_MEASURES):
                 e = timing_entry(t, measure, sp)
-                head = [tex_escape(cell.label) if first else "", (sp or "all speeds") if j == 0 else "", mlabel]
+                head = [cell_name(cell.label) if first else "", (sp or "all speeds") if j == 0 else "", mlabel]
                 first = False
                 if e is None:
                     lines.append(" & ".join(head) + " & \\multicolumn{7}{l}{not in the result file} \\\\\n")
@@ -1135,7 +1235,7 @@ def reference_supplement(cells, clocks):
                   "\\begin{longtable}{L{0.08}L{0.06}L{0.06}L{0.16}" + "L{0.08}" * len(PLAN_TYPES) + "L{0.08}}\n",
                   "\\caption{Plan against ground truth per stratum, cell %s: trials of the plan, disagreeing trials "
                   "(count, and rate with its Wilson interval), the count of each type, and the trials that overlap a "
-                  "loss of focus of the reference}\\label{tab:plan-strata-%s}\\\\\n" % (tex_escape(cell.label),
+                  "loss of focus of the reference}\\label{tab:plan-strata-%s}\\\\\n" % (cell_name(cell.label),
                                                                                        cell.label),
                   "\\toprule\n",
                   "Scenario & Speed & Trials & Disagreeing & " + " & ".join(short) + " & Loss of focus \\\\\n",
@@ -1154,7 +1254,7 @@ def reference_supplement(cells, clocks):
     for cell in cells:
         cs = clocks.get(cell.label)
         if cs is None:
-            lines.append("Cell %s: the marker times were not computed.\n\n" % tex_escape(cell.label))
+            lines.append("Cell %s: the marker times were not computed.\n\n" % cell_name(cell.label))
             continue
         per = [dict((b["block_id"], b["diff_ms"]) for b in cs["differences"][k]["per_block"]) for k, _ in CLOCK_DIFFS]
         blocks = sorted(set(b for p in per for b in p))
@@ -1162,7 +1262,7 @@ def reference_supplement(cells, clocks):
                   "\\begin{longtable}{L{0.10}" + "L{0.22}" * len(CLOCK_DIFFS) + "}\n",
                   "\\caption{Differences at the block-start markers per block, cell %s, in milliseconds (the first key "
                   "of the marker on each side; wall clocks unless stated); %s: the marker was not found on a side}"
-                  "\\label{tab:markers-%s}\\\\\n" % (tex_escape(cell.label), NO_VALUE, cell.label),
+                  "\\label{tab:markers-%s}\\\\\n" % (cell_name(cell.label), NO_VALUE, cell.label),
                   "\\toprule\n",
                   "Block & " + " & ".join(label for _, label in CLOCK_DIFFS) + " \\\\\n",
                   "\\midrule\n\\endhead\n"]
@@ -1183,6 +1283,11 @@ TEX_SPECIAL = {"\\": "\\textbackslash{}", "{": "\\{", "}": "\\}", "_": "\\_", "%
 def tex_escape(s):
     """A string of the result files as text: every character that TeX treats specially is escaped."""
     return "".join(TEX_SPECIAL.get(c, c) for c in s)
+
+
+def cell_name(label):
+    """The name under which tables and figures show a cell; the escaped label for a cell not in CELL_NAMES."""
+    return CELL_NAMES.get(label) or tex_escape(label)
 
 
 def ci_text(e):
@@ -1220,7 +1325,7 @@ def table_detection(cells):
         for i, (comp, comp_label) in enumerate((c, l) for c, l in COMPARISONS if c in cell.comparisons):
             strata = dict((scope, cell.detection_strata(scope, comp)) for scope in SCOPES)
             for j, sp in enumerate(SPEEDS):
-                row = [tex_escape(cell.label) if i == 0 and j == 0 else "", comp_label if j == 0 else "", sp]
+                row = [cell_name(cell.label) if i == 0 and j == 0 else "", comp_label if j == 0 else "", sp]
                 for scope in SCOPES:
                     for m in ("recall", "precision"):
                         row.append(speed_range(kept[scope], strata[scope], sp, m)[0])
@@ -1272,7 +1377,7 @@ def table_layers(cells, d10s):
                   "\\begin{longtable}{L{0.10}L{0.10}L{0.11}L{0.07}L{0.08}L{0.07}L{0.12}L{0.12}L{0.07}L{0.07}L{0.09}}\n",
                   "\\caption{Detection per layer of the prediction, cell %s (definition \\texttt{%s}), with Wilson "
                   "intervals%s}\\label{tab:layers-%s}\\\\\n" % (
-                      tex_escape(cell.label), tex_escape(cell.definition),
+                      cell_name(cell.label), tex_escape(cell.definition),
                       "" if d10 is not None else "; the corrected analysis was not computed for this cell", cell.label),
                   "\\toprule\n",
                   "Comparison & Scope & Layer (trials) & Speed & Sessions & Rows & Recall & Precision & Split rate & "
@@ -1349,7 +1454,7 @@ def table_session(cells):
         for i, s in enumerate(SPEEDS):
             if s not in sp:
                 continue
-            lines.append(" & ".join([tex_escape(cell.label) if i == 0 else "", s] + session_cells(sp[s])) + " \\\\\n")
+            lines.append(" & ".join([cell_name(cell.label) if i == 0 else "", s] + session_cells(sp[s])) + " \\\\\n")
     lines += ["\\bottomrule\n", "\\end{tabular}\n", "}\n", "\\end{sidewaystable}\n"]
     return "".join(lines)
 
@@ -1368,7 +1473,7 @@ def session_supplement(cells):
                           "\\begin{longtable}{L{0.08}L{0.06}L{0.07}L{0.12}L{0.12}L{0.12}L{0.11}L{0.11}L{0.11}L{0.10}}\n",
                           "\\caption{Per-session agreement per stratum, cell %s, comparison \\texttt{%s}, %s: %s}"
                           "\\label{tab:session-%s-%s-%s}\\\\\n" % (
-                              tex_escape(cell.label), tex_escape(comp), scope_name(scope), SESSION_CAPTION, cell.label,
+                              cell_name(cell.label), tex_escape(comp), scope_name(scope), SESSION_CAPTION, cell.label,
                               comp.replace("_", ""), scope.replace("_", "")),
                           "\\toprule\n",
                           "Scenario & Speed & " + SESSION_HEAD,
@@ -1406,12 +1511,12 @@ def table_composition(cell):
     pred = cell.det_top.get("predictions") or {}
     if not pred.get("available"):
         return ("The number of letter keys and the think time per stratum and scope are computed with the prediction, "
-                "which the analysis of cell %s does not compute.\n\n" % tex_escape(cell.label))
+                "which the analysis of cell %s does not compute.\n\n" % cell_name(cell.label))
     lines = ["\\begin{landscape}\n", "{\\footnotesize\n",
              "\\begin{longtable}{L{0.08}L{0.06}L{0.14}L{0.07}L{0.22}L{0.22}}\n",
              "\\caption{Composition of the scopes per stratum, cell %s, from the plan: trials, letter keys and think "
              "time of the trials, as median (minimum to maximum)}\\label{tab:composition-%s}\\\\\n" % (
-                 tex_escape(cell.label), cell.label),
+                 cell_name(cell.label), cell.label),
              "\\toprule\n",
              "Scenario & Speed & Scope & Trials & Letter keys & Think time (ms) \\\\\n",
              "\\midrule\n\\endhead\n"]
@@ -1540,7 +1645,7 @@ def table_strata(cell, d10=None):
                       "rate: as registered; Corrected: the merge rate of the corrected analysis of deviation D10%s; %s: "
                       "no value (no denominator, or a numerator above the denominator, deviation D10)}"
                       "\\label{tab:strata-%s-%s-%s}\\\\\n" % (
-                          scope_name(scope), tex_escape(cell.label), tex_escape(cell.definition), tex_escape(comp),
+                          scope_name(scope), cell_name(cell.label), tex_escape(cell.definition), tex_escape(comp),
                           "from the per-trial records of question 3" if scope in SCOPES else
                           "not given for this scope", "" if d10 is not None else " (not computed for this cell)",
                           NO_VALUE, cell.label, comp.replace("_", ""), scope.replace("_", "")),
@@ -1586,7 +1691,7 @@ def table_closed_set(cells, docs):
     for cell in cells:
         doc = docs.get(cell.label)
         if doc is None:
-            lines.append("%s & \\multicolumn{7}{l}{not measured} \\\\\n" % tex_escape(cell.label))
+            lines.append("%s & \\multicolumn{7}{l}{not measured} \\\\\n" % cell_name(cell.label))
             continue
         first = True
         for f in RULE_SETS:
@@ -1594,7 +1699,7 @@ def table_closed_set(cells, docs):
                 r = doc["results"][str(K)][f]
                 blk = r.get("acc_ci_block") or [None, None]
                 lines.append(" & ".join([
-                    tex_escape(cell.label) if first else "", "\\texttt{%s}" % tex_escape(f), fmt_int(K), fmt_int(r["n"]),
+                    cell_name(cell.label) if first else "", "\\texttt{%s}" % tex_escape(f), fmt_int(K), fmt_int(r["n"]),
                     est_ci(r["acc"], r["acc_ci"][0], r["acc_ci"][1]),
                     "%s, %s" % (fmt_p(blk[0]), fmt_p(blk[1])) if blk[0] is not None else NO_VALUE,
                     fmt_p(2.0 / K), yes_no(near_chance_at(r, K))]) + " \\\\\n")
@@ -1618,12 +1723,12 @@ def table_closed_set_all(cells, docs):
     for cell in cells:
         doc = docs.get(cell.label)
         if doc is None:
-            lines.append("Cell %s: not measured.\n\n" % tex_escape(cell.label))
+            lines.append("Cell %s: not measured.\n\n" % cell_name(cell.label))
             continue
         lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
                   "\\begin{longtable}{L{0.13}L{0.06}L{0.06}L{0.20}L{0.12}L{0.18}L{0.07}L{0.06}L{0.06}L{0.06}}\n",
                   "\\caption{Closed set, cell %s: accuracy per feature set and K}\\label{tab:closed-set-%s}\\\\\n" % (
-                      tex_escape(cell.label), cell.label),
+                      cell_name(cell.label), cell.label),
                   "\\toprule\n",
                   "Feature set & K & Trials & Accuracy & Source & Raw & Mean rank & Slow & Mid & Fast \\\\\n",
                   "\\midrule\n\\endhead\n"]
@@ -1643,7 +1748,7 @@ def table_closed_set_all(cells, docs):
         lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
                   "\\begin{longtable}{L{0.08}L{0.06}" + "L{0.14}" * len(CLOSED_SET_SETS) + "}\n",
                   "\\caption{Closed set, cell %s: raw accuracy per scenario}\\label{tab:closed-set-scenario-%s}\\\\\n" % (
-                      tex_escape(cell.label), cell.label),
+                      cell_name(cell.label), cell.label),
                   "\\toprule\n",
                   "Scenario & K & " + " & ".join("\\texttt{%s}" % tex_escape(f) for f in CLOSED_SET_SETS) + " \\\\\n",
                   "\\midrule\n\\endhead\n"]
@@ -1677,7 +1782,7 @@ def table_open_set(cells, docs):
     for cell in cells:
         doc = docs.get(cell.label)
         if doc is None:
-            lines.append("%s & \\multicolumn{8}{l}{not measured} \\\\\n" % tex_escape(cell.label))
+            lines.append("%s & \\multicolumn{8}{l}{not measured} \\\\\n" % cell_name(cell.label))
             continue
         first = True
         for split, model, label in OPEN_SET_ATTACKERS:
@@ -1685,7 +1790,7 @@ def table_open_set(cells, docs):
                 r = doc["splits"][split][li]
                 a, b, g, sh = r[model], r["baseline"][model], r["gain"][model], r["shuffled"][model]
                 lines.append(" & ".join([
-                    tex_escape(cell.label) if first else "", label if j == 0 else "", li_label, fmt_int(r["n"]),
+                    cell_name(cell.label) if first else "", label if j == 0 else "", li_label, fmt_int(r["n"]),
                     est_ci(a["cer"], a["cer_ci"][0], a["cer_ci"][1]), est_ci(b["cer"], b["cer_ci"][0], b["cer_ci"][1]),
                     est_ci(g["gain"], g["gain_ci"][0], g["gain_ci"][1], fmt_signed),
                     est_ci(sh["gain_vs_shuffled"], sh["gain_vs_shuffled_ci"][0], sh["gain_vs_shuffled_ci"][1],
@@ -1732,14 +1837,73 @@ def table_cost(e3):
     return "".join(lines)
 
 
-def _agreement_row(e, ms):
-    """Texts, bias, limits of agreement and ICC(A,1) of one per-text measure, each with its interval."""
+REFERENCE_CONSTANT = "%s (reference constant)" % NO_VALUE
+REFERENCE_CONSTANT_TEXT = "no value: the reference's value is the same in every text (deviation D11)"
+REFERENCE_CONSTANT_NOTE = ("%s: no ICC(A,1), because the reference's value is the same in every text, so the ICC is zero "
+                           "whatever the logger writes (section 6.11 of the registration; deviation D11)"
+                           % REFERENCE_CONSTANT)
+
+
+def reference_spread(cell, scope, m, speed=None):
+    """The reference's values of a per-text measure over the texts on which agreement() was computed (both sides have
+    the measure), at one speed or (speed None) over all: {"n", "sd", "constant"}. sd is the sample standard deviation
+    (None with fewer than two texts). constant: two or more texts and every value the same; then ICC(A,1) is zero
+    whatever the observation (the subjects' and the residual mean squares are equal), which section 6.11 of the
+    registration reports as no value (zero variance), and the article does so under deviation D11."""
+    agg = cell.l2[scope]["aggregate"]
+    gts, obs = agg["gt"], agg["obs"]
+    if len(gts) != len(obs):
+        raise ValueError("%s: the two sides of the per-text aggregate differ in length" % cell.path(
+            "e1_l2.json", scope, "aggregate"))
+    vals = []
+    for g, o in zip(gts, obs):
+        if g["text_id"] != o["text_id"] or g["speed"] != o["speed"]:
+            raise ValueError("%s: the two sides of the per-text aggregate are not aligned" % cell.path(
+                "e1_l2.json", scope, "aggregate"))
+        if speed is not None and g["speed"] != speed:
+            continue
+        if g[m] is None or o[m] is None:
+            continue
+        vals.append(g[m])
+    n = len(vals)
+    if n >= 2:
+        mean = sum(vals) / float(n)
+        sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / (n - 1))
+    else:
+        sd = None
+    return {"n": n, "sd": sd, "constant": n >= 2 and max(vals) == min(vals)}
+
+
+def checked_spread(cell, scope, m, speed, e):
+    """reference_spread(), required to cover the same texts as the agreement entry e."""
+    sp = reference_spread(cell, scope, m, speed)
+    if sp["n"] != e["n"]:
+        raise ValueError("%s: the reference's texts (%d) differ from the agreement's (%d)" % (
+            cell.path("e1_l2.json", scope, "aggregate"), sp["n"], e["n"]))
+    return sp
+
+
+def icc_text(e, spread):
+    if spread["constant"]:
+        return REFERENCE_CONSTANT
+    return est_ci(e["icc21"], e["icc21_ci"][0], e["icc21_ci"][1], fmt_signed)
+
+
+def fmt_sd(x, ms):
+    if x is None:
+        return NO_VALUE
+    return fmt_ms(x) if ms else "%.3f" % x
+
+
+def _agreement_row(e, ms, spread):
+    """Texts, the reference's standard deviation between texts, bias, limits of agreement and ICC(A,1) of one per-text
+    measure, each estimate with its interval."""
     sg = lambda x: fmt_signed(x, ms)
     ba = e["bland_altman"]
-    return [fmt_int(e["n"]), est_ci(ba["bias"], e["bias_ci"][0], e["bias_ci"][1], sg),
+    return [fmt_int(e["n"]), fmt_sd(spread["sd"], ms), est_ci(ba["bias"], e["bias_ci"][0], e["bias_ci"][1], sg),
             est_ci(ba["loa_lo"], e["loa_lo_ci"][0], e["loa_lo_ci"][1], sg),
             est_ci(ba["loa_hi"], e["loa_hi_ci"][0], e["loa_hi_ci"][1], sg),
-            est_ci(e["icc21"], e["icc21_ci"][0], e["icc21_ci"][1], fmt_signed)]
+            icc_text(e, spread)]
 
 
 def _agreement_rows(cell, scope, first_col=None):
@@ -1753,13 +1917,13 @@ def _agreement_rows(cell, scope, first_col=None):
             head = ([first_col if first else ""] if first_col is not None else []) + [label if i == 0 else "", s]
             first = False
             if e is None:
-                lines.append(" & ".join(head) + " & \\multicolumn{5}{l}{no text in the scope} \\\\\n")
+                lines.append(" & ".join(head) + " & \\multicolumn{6}{l}{no text in the scope} \\\\\n")
                 continue
-            lines.append(" & ".join(head + _agreement_row(e, ms)) + " \\\\\n")
+            lines.append(" & ".join(head + _agreement_row(e, ms, checked_spread(cell, scope, m, s, e))) + " \\\\\n")
     return lines
 
 
-AGREEMENT_HEAD = ("Speed & Texts & Bias & Lower limit & Upper limit & ICC(A,1) \\\\\n")
+AGREEMENT_HEAD = ("Speed & Texts & Reference SD & Bias & Lower limit & Upper limit & ICC(A,1) \\\\\n")
 
 
 def table_text_agreement(cells):
@@ -1769,16 +1933,17 @@ def table_text_agreement(cells):
              "{\\footnotesize\n",
              "\\caption{Per-text agreement per cell, measure and speed, primary scope: bias and limits of agreement of the "
              "per-text difference (observation minus reference) and ICC(A,1), each with a 95\\%% interval that resamples "
-             "blocks; Texts is the number of texts with a value on both sides. An estimate printed without an interval "
-             "has its interval withheld (the reason is in the result file); %s: no value. The values hold for this "
-             "design's numbers of trials per text and are not compared between speeds}\n" % NO_VALUE,
+             "blocks; Texts is the number of texts with a value on both sides, and Reference SD the standard deviation "
+             "of the reference's values between those texts. An estimate printed without an interval has its interval "
+             "withheld (the reason is in the result file); %s: no value; %s. The values hold for this design's numbers "
+             "of trials per text and are not compared between speeds}\n" % (NO_VALUE, REFERENCE_CONSTANT_NOTE),
              "\\label{tab:text-agreement}\n",
-             "\\begin{tabular}{L{0.15}L{0.15}L{0.06}L{0.06}L{0.15}L{0.15}L{0.15}L{0.13}}\n",
+             "\\begin{tabular}{L{0.13}L{0.13}L{0.05}L{0.05}L{0.08}L{0.14}L{0.14}L{0.14}L{0.14}}\n",
              "\\toprule\n",
              "Cell & Measure & " + AGREEMENT_HEAD,
              "\\midrule\n"]
     for cell in cells:
-        lines += _agreement_rows(cell, PRIMARY_SCOPE, tex_escape(cell.label))
+        lines += _agreement_rows(cell, PRIMARY_SCOPE, cell_name(cell.label))
     lines += ["\\bottomrule\n", "\\end{tabular}\n", "}\n", "\\end{sidewaystable}\n"]
     return "".join(lines)
 
@@ -1794,7 +1959,7 @@ def text_agreement_supplement(cells):
              "views that leave out the trials of the carry layers need the layers of the prediction and are not "
              "computed for the Windows cell.\n\n"]
     for cell in cells:
-        name = tex_escape(cell.label)
+        name = cell_name(cell.label)
         lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
                   "\\begin{longtable}{L{0.14}L{0.11}L{0.06}L{0.12}L{0.14}L{0.14}L{0.14}L{0.14}}\n",
                   "\\caption{Per-text agreement pooled over speeds and the bias in three mixtures of speeds (weights "
@@ -1811,14 +1976,15 @@ def text_agreement_supplement(cells):
                 mix = [est_ci(mixes[key]["bias"][m], mixes[key]["bias_ci"][m][0], mixes[key]["bias_ci"][m][1], sg)
                        for key, _, _ in L2_MIXTURES]
                 lines.append(" & ".join([label if j == 0 else "", "\\texttt{%s}" % tex_escape(scope), fmt_int(e["n"]),
-                                         est_ci(e["icc21"], e["icc21_ci"][0], e["icc21_ci"][1], fmt_signed),
+                                         icc_text(e, checked_spread(cell, scope, m, None, e)),
                                          est_ci(e["bland_altman"]["bias"], e["bias_ci"][0], e["bias_ci"][1], sg)]
                                         + mix) + " \\\\\n")
         lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n\n"]
         lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
-                  "\\begin{longtable}{L{0.20}L{0.06}L{0.07}L{0.17}L{0.17}L{0.17}L{0.15}}\n",
+                  "\\begin{longtable}{L{0.18}L{0.06}L{0.06}L{0.08}L{0.15}L{0.15}L{0.15}L{0.15}}\n",
                   "\\caption{Per-text agreement per measure and speed over all trials (\\texttt{all\\_trials}), cell "
-                  "%s}\\label{tab:text-all-%s}\\\\\n" % (name, cell.label),
+                  "%s; Reference SD: the standard deviation of the reference's values between the texts; %s}"
+                  "\\label{tab:text-all-%s}\\\\\n" % (name, REFERENCE_CONSTANT_NOTE, cell.label),
                   "\\toprule\n",
                   "Measure & " + AGREEMENT_HEAD,
                   "\\midrule\n\\endhead\n"]
@@ -1958,7 +2124,7 @@ def figure_detection(cells):
     """Figure 2: recall and precision per scenario and speed with their Wilson intervals, per cell, in the primary
     comparison and scope."""
     caption = ("Recall and precision of the session rows against the reference per scenario and speed, with 95\\%% "
-               "Wilson intervals, per cell, in the primary comparison (\\texttt{gt\\_obs}) and scope "
+               "Wilson intervals, per cell, in the primary comparison (reference vs. logger) and scope "
                "(\\texttt{under\\_limit}). Open marks: strata that keep fewer than %d trials in the scope, which the "
                "ranges given in the text leave out. A stratum with no trial or no value in the scope is not drawn; "
                "Table~\\ref{tab:detection} and the supplement give every stratum" % MIN_TRIALS)
@@ -1972,7 +2138,7 @@ def figure_detection(cells):
         kept = cell.kept_trials(PRIMARY_SCOPE)[0]
         strata = cell.detection_strata(PRIMARY_SCOPE)
         for m in ("recall", "precision"):
-            opts = [fig_scenario_axis(kept), "title={\\texttt{%s}: %s}" % (tex_escape(cell.label), m)]
+            opts = [fig_scenario_axis(kept), "title={%s: %s}" % (cell_name(cell.label), m)]
             if first:
                 opts.append(legend_opts)
             body.append("\\nextgroupplot[%s]\n" % ", ".join(o for o in opts if o))
@@ -2015,7 +2181,7 @@ def figure_dwell(cells):
         kept = cell.kept_trials(PRIMARY_SCOPE)[0]
         entries = dict((stratum_key(st["stratum"]), st) for st in cell.l1[PRIMARY_SCOPE]["metrics"]["by_stratum"]
                        if st["stratum"].get("scenario") is not None)
-        opts = [fig_scenario_axis(kept), "title={\\texttt{%s}}" % tex_escape(cell.label)]
+        opts = [fig_scenario_axis(kept), "title={%s}" % cell_name(cell.label)]
         if first:
             opts.append(legend_opts)
         body.append("\\nextgroupplot[%s]\n" % ", ".join(o for o in opts if o))
@@ -2042,7 +2208,7 @@ def figure_text(cells):
         return fig_wrap("fig:text-agreement", caption, None, None)
     ticks = "xtick={%s}, xticklabels={%s}, xmin=0.5, xmax=%s" % (
         ",".join(str(i) for i in range(1, len(cells) + 1)),
-        ",".join("\\texttt{%s}" % tex_escape(c.label) for c in cells), fig_num(len(cells) + 0.5))
+        ",".join("{%s}" % cell_name(c.label) for c in cells), fig_num(len(cells) + 0.5))
     body = ["\\begin{groupplot}[group style={group size=1 by %d, vertical sep=1.4cm}, fig panel, fig zero, "
             "scale only axis, width=11cm, height=2.5cm, %s]\n" % (len(L2_MEASURES), ticks)]
     legend_opts, legend_body = fig_legend("fig:text-agreement:legend",
@@ -2101,7 +2267,7 @@ def figure_closed_set(cells, docs):
     clamped = False
     for i, cell in enumerate(measured):
         doc = docs[cell.label]
-        opts = ["title={\\texttt{%s}}" % tex_escape(cell.label)]
+        opts = ["title={%s}" % cell_name(cell.label)]
         if i == 0:
             opts.append(legend_opts)
         body.append("\\nextgroupplot[%s]\n" % ", ".join(o for o in opts if o))
@@ -2146,6 +2312,7 @@ def build(results_dir):
     e3 = read_e3_all(results_dir)
     d10 = dict((c.label, read_d10(results_dir, c)) for c in cells)
     clocks = dict((c.label, read_clock_sync(c)) for c in cells)
+    dwellx = dict((c.label, read_dwell_explore(results_dir, c)) for c in cells)
     values = {}
     for cell in cells:
         values.update(abstract_values(cell))
@@ -2155,6 +2322,7 @@ def build(results_dir):
         values.update(diagnostic_values(cell))
         values.update(d10_values(cell, d10[cell.label]))
         values.update(l2_values(cell))
+        values.update(dwell_explore_values(cell, dwellx[cell.label]))
         values.update(open_set_values(cell, open_docs[cell.label]))
     values.update(closed_set_values(cells, docs))
     values.update(e3_values(e3))
@@ -2175,6 +2343,7 @@ def build(results_dir):
         "reference-strata.tex": reference_supplement(cells, clocks).encode("utf-8"),
         "detection-layers.tex": table_layers(cells, d10).encode("utf-8"),
         "session-strata.tex": session_supplement(cells).encode("utf-8"),
+        "dwell-explore.tex": dwell_explore_supplement(cells, dwellx).encode("utf-8"),
         "fig-detection.tex": figure_detection(cells).encode("utf-8"),
         "fig-dwell.tex": figure_dwell(cells).encode("utf-8"),
         "fig-text-agreement.tex": figure_text(cells).encode("utf-8"),
@@ -2183,7 +2352,7 @@ def build(results_dir):
     strata = [GENERATED_NOTE, "\\section*{Detection per stratum}\n\\label{sec:supp-strata}\n\n",
               "The tables below are generated from the result files of the analysis. The cells whose result files were "
               "not available when the tables were generated are: %s.\n\n" % (
-                  ", ".join(tex_escape(c) for c in EXPECTED_CELLS if c not in [x.label for x in cells]) or "none")]
+                  ", ".join(cell_name(c) for c in EXPECTED_CELLS if c not in [x.label for x in cells]) or "none")]
     for cell in cells:
         strata.append(table_composition(cell))
         strata.append(table_strata(cell, d10[cell.label]).replace(GENERATED_NOTE, ""))
@@ -2398,11 +2567,27 @@ def _fixture(tmp, label="windows-test", sub="windows"):
                                              icc21_ci_status="undefined in a resample")
         del slow["abandon_rate"]
         by_speed["slow"] = slow
+        # The texts behind the agreement entries: 40 per speed. The reference's conversions per trial are the same in
+        # every text at the mid speed (so its ICC has no value), and the slow texts have no abandonment rate.
+        agg = {"gt": [], "obs": []}
+        for s in SPEEDS:
+            for k in range(40):
+                t = {"text_id": "b%d.%s" % (k, s), "block_id": k, "speed": s}
+                g = dict(t, conversions_per_trial=1.0 if s == "mid" else 1.0 + 0.01 * k,
+                         mean_dwell_ms=1000.0 + 10.0 * k, abandon_rate=None if s == "slow" else 0.1 + 0.001 * k,
+                         dwell_fraction=0.2 + 0.001 * k)
+                o = dict(t, conversions_per_trial=1.0 + 0.02 * (k % 3), mean_dwell_ms=990.0 + 10.0 * k,
+                         abandon_rate=0.1, dwell_fraction=0.19 + 0.001 * k)
+                agg["gt"].append(g)
+                agg["obs"].append(o)
+        pooled_n = dict((m, sum(1 for g, o in zip(agg["gt"], agg["obs"]) if g[m] is not None and o[m] is not None))
+                        for m, _, _ in L2_MEASURES)
+        pooled = dict((m, dict(agr[m], n=pooled_n[m])) for m, _, _ in L2_MEASURES)
         return {"per_trial": {"by_stratum": bs, "n_trials": sum(kept.values()),
                               "trials_not_used": {"excluded": sum(excl.values()), "not_run": 0,
                                                   "out_of_scope": sum(oos.values())}},
                 "per_trial_uncontaminated": None, "per_trial_layer_none": None,
-                "agreement": agr, "agreement_by_stratum": by_speed,
+                "agreement": pooled, "agreement_by_stratum": by_speed, "aggregate": agg,
                 "mixture_bias": {"mixtures": mixes, "by_stratum": {}}}
 
     keys = [("S1", "fast"), ("S1", "mid"), ("S1", "slow"), ("S2", "fast"), ("S2", "mid"), ("S2", "slow")]
@@ -3021,6 +3206,104 @@ def _selftest_figures(check):
         shutil.rmtree(empty, ignore_errors=True)
 
 
+class _FakeCell(object):
+    """Enough of a Cell for reference_spread() and read_dwell_explore()."""
+
+    def __init__(self, label, gt, obs, speeds=None):
+        self.label = label
+        self.l2 = {PRIMARY_SCOPE: {"aggregate": {"gt": gt, "obs": obs}}}
+        self._speeds = speeds or {}
+
+    def path(self, f, *keys):
+        return "%s:%s" % (f, "/".join(str(k) for k in keys))
+
+    def speed_sessions(self, scope):
+        return self._speeds.get(scope, {})
+
+
+def _selftest_spread(check):
+    t = lambda k, s: {"text_id": "b%d" % k, "block_id": k, "speed": s}
+    gt = [dict(t(0, "slow"), m=1.0), dict(t(1, "slow"), m=1.0), dict(t(2, "mid"), m=2.0), dict(t(3, "mid"), m=None)]
+    obs = [dict(t(0, "slow"), m=1.5), dict(t(1, "slow"), m=0.5), dict(t(2, "mid"), m=2.5), dict(t(3, "mid"), m=3.0)]
+    sp = reference_spread(_FakeCell("x", gt, obs), PRIMARY_SCOPE, "m", "slow")
+    check("spread: a reference that is the same in every text is constant, with SD 0",
+          sp == {"n": 2, "sd": 0.0, "constant": True}, sp)
+    sp = reference_spread(_FakeCell("x", gt, obs), PRIMARY_SCOPE, "m", None)
+    check("spread: over all speeds the texts without a value on a side are left out",
+          sp["n"] == 3 and not sp["constant"] and abs(sp["sd"] - math.sqrt(1.0 / 3.0)) < 1e-12, sp)
+    sp = reference_spread(_FakeCell("x", gt, obs), PRIMARY_SCOPE, "m", "mid")
+    check("spread: one text has no SD and is not constant", sp == {"n": 1, "sd": None, "constant": False}, sp)
+    for name, bad in (("in length", obs[:3]), ("in alignment", [obs[1], obs[0]] + obs[2:])):
+        try:
+            reference_spread(_FakeCell("x", gt, bad), PRIMARY_SCOPE, "m", "slow")
+            check("spread: sides that differ %s are refused" % name, False)
+        except ValueError:
+            check("spread: sides that differ %s are refused" % name, True)
+        except Exception as ex:  # a crash is a failure of this check, not of the run
+            check("spread: sides that differ %s are refused" % name, False, repr(ex))
+    e = {"n": 3}
+    try:
+        checked_spread(_FakeCell("x", gt, obs), PRIMARY_SCOPE, "m", "slow", e)
+        check("spread: texts that differ from the agreement's are refused", False)
+    except ValueError:
+        check("spread: texts that differ from the agreement's are refused", True)
+    except Exception as ex:
+        check("spread: texts that differ from the agreement's are refused", False, repr(ex))
+
+
+def _selftest_dwell_explore(check):
+    tmp = tempfile.mkdtemp(prefix="results_tables_dwellx_")
+    try:
+        speeds = {"under_limit": {"slow": {"dwell": {"n": 10}}, "fast": {"dwell": {"n": 4}}},
+                  "all_trials": {"slow": {"dwell": {"n": 12}}, "fast": {"dwell": {"n": 4}}}}
+        cell = _FakeCell("cell-x", [], [], speeds)
+        check("dwellx: a cell without the file has no exploratory values",
+              read_dwell_explore(tmp, cell) is None and dwell_explore_values(cell, None) == {})
+        entry = lambda n, p=-1500.4: {"n": n, "percentiles": {"p2.5": p, "p97.5": 40.0},
+                                      "within": {"abs_le_100_ms": 0.375, "abs_le_1000_ms": 0.8}}
+        doc = {"exploratory": True, "cells": {"cell-x": {"under_limit": {"slow": entry(10), "fast": entry(4)},
+                                                         "all_trials": {"slow": entry(12, -2600.0),
+                                                                        "fast": entry(4, -2600.0)}}}}
+        os.makedirs(os.path.join(tmp, DWELL_EXPLORE_DIR))
+        p = os.path.join(tmp, DWELL_EXPLORE_DIR, "dwell_quantiles_cell-x.json")
+
+        def write(d):
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(d, f)
+
+        write(doc)
+        got = read_dwell_explore(tmp, cell)
+        vals = dwell_explore_values(cell, got)
+        check("dwellx: the values of the primary scope, signed whole milliseconds and percentages",
+              vals.get("cell-x.dwellx.slow.p25", {}).get("text") == "$-$1,500"
+              and vals.get("cell-x.dwellx.fast.within100", {}).get("text") == "37.5\\%"
+              and "cell-x.dwellx.mid.p25" not in vals
+              and vals["cell-x.dwellx.slow.within1000"]["source"].endswith("under_limit/slow/within/abs_le_1000_ms"),
+              sorted(vals))
+        sup = dwell_explore_supplement([cell], {"cell-x": got})
+        check("dwellx: the supplement table is labelled as not registered and holds both scopes",
+              "Not registered" in sup and sup.count("\\texttt{all\\_trials}") == 1 and "& 12 &" in sup, sup[-600:])
+        for name, bad in (("not marked as exploratory", dict(doc, exploratory=False)),
+                          ("with a number of pairs that differs from the registered results",
+                           {"exploratory": True, "cells": {"cell-x": dict(doc["cells"]["cell-x"], all_trials={
+                               "slow": entry(11), "fast": entry(4)})}}),
+                          ("without a scope", {"exploratory": True, "cells": {"cell-x": {
+                              "under_limit": doc["cells"]["cell-x"]["under_limit"]}}}),
+                          ("with a speed the registered results lack", {"exploratory": True, "cells": {"cell-x": dict(
+                              doc["cells"]["cell-x"], under_limit={"slow": entry(10), "fast": entry(4),
+                                                                   "mid": entry(3)})}})):
+            write(bad)
+            try:
+                read_dwell_explore(tmp, cell)
+                check("dwellx: a file %s is refused" % name, False)
+            except ValueError:
+                check("dwellx: a file %s is refused" % name, True)
+            except Exception as ex:
+                check("dwellx: a file %s is refused" % name, False, repr(ex))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _selftest_macos(check):
     """Table 8 with the three comparisons, the layers of the prediction and the corrected merge rate of D10 on a
     synthetic macOS cell."""
@@ -3031,8 +3314,9 @@ def _selftest_macos(check):
         t8 = files["table-detection.tex"].decode("utf-8")
         vals = json.loads(files["values.json"].decode("utf-8"))["values"]
         check("table 8: a macOS cell has the three comparisons in order, each from its own results",
-              t8.find("\\texttt{gt\\_obs} (primary)") < t8.find("\\texttt{gt\\_pred}") < t8.find("\\texttt{pred\\_obs}")
-              and "& \\texttt{gt\\_pred} & slow & " in t8
+              t8.find("Reference vs. logger (primary)") < t8.find("Reference vs. specified rows")
+              < t8.find("Specified rows vs. logger")
+              and "& Reference vs. specified rows & slow & " in t8
               and " & mid & 0.810--0.990 (1/2) & 0.810--0.990 (1/2) & " in t8
               and " & mid & 0.500--0.950 (1/2) & 0.500--0.950 (1/2) & " in t8, t8[-2500:])
         check("table 8: the values of the comparisons with the prediction follow the rule of the abstract",
@@ -3157,6 +3441,8 @@ def selftest():
     _selftest_reference(check)
     _selftest_macos(check)
     _selftest_figures(check)
+    _selftest_spread(check)
+    _selftest_dwell_explore(check)
 
     tmp = tempfile.mkdtemp(prefix="results_tables_selftest_")
     try:
@@ -3203,8 +3489,9 @@ def selftest():
                   if k.startswith("windows-test.") and ".q4." not in k and ".d10." not in k)
               and all(v["source"] for v in vals.values()))
         strata_tex = files["detection-strata.tex"].decode("utf-8")
-        check("the supplement names the expected cells that were not available",
-              all(c in strata_tex for c in EXPECTED_CELLS), strata_tex[:300])
+        check("the supplement names the expected cells that were not available, by their names",
+              all(cell_name(c) in strata_tex for c in EXPECTED_CELLS) and "macos-standard" not in strata_tex,
+              strata_tex[:300])
         check("the per-stratum table states a stratum without sessions instead of leaving it out",
               "no trial in the scope" in strata_tex and "S2 & fast" in strata_tex)
         check("the generated files say that they are generated", all(
@@ -3212,15 +3499,27 @@ def selftest():
         t10 = files["table-text-agreement.tex"].decode("utf-8")
         check("q3: a duration is in whole milliseconds with a minus sign, and the bias, the lower and the upper limit "
               "and the ICC each come with their own interval",
-              "Mean conversion time (ms) & slow & 40 & $-$1,234 [$-$1,235, $-$1,233] & $-$2,134 [$-$2,135, $-$2,133] "
+              "Mean conversion time (ms) & slow & 40 & 117 & $-$1,234 [$-$1,235, $-$1,233] & $-$2,134 [$-$2,135, $-$2,133] "
               "& $-$534 [$-$535, $-$533] & 0.750 [0.500, 0.875] \\\\" in t10, t10[-1500:])
         row = [l for l in t10.splitlines() if "Conversions per trial & slow" in l]
         check("q3: an estimate whose interval is withheld is printed alone, not dropped",
               len(row) == 1 and row[0].endswith("& 0.750 \\\\"), str(row))
         check("q3: a measure with no text in the scope is stated",
-              "Abandonment rate & slow & \\multicolumn{5}{l}{no text in the scope}" in t10)
-        check("q3: proportions keep three decimals with a minus sign",
-              "Fraction of time converting & slow & 40 & $-$0.01" in t10)
+              "Abandonment rate & slow & \\multicolumn{6}{l}{no text in the scope}" in t10)
+        check("q3: proportions keep three decimals with a minus sign, after the reference's SD",
+              "Fraction of time converting & slow & 40 & 0.012 & $-$0.01" in t10)
+        mid = [l for l in t10.splitlines() if " & mid & " in l]
+        check("q3: an ICC whose reference is the same in every text has no value, with the reason, and its SD is zero",
+              len(mid) >= 1 and mid[0].startswith(" &  & mid & 40 & 0.000 & ") and mid[0].endswith(
+                  "& %s \\\\" % REFERENCE_CONSTANT) and REFERENCE_CONSTANT_NOTE in t10
+              and sum(1 for l in t10.splitlines() if REFERENCE_CONSTANT + " \\\\" in l) == len(row), str(mid[:2]))
+        icc_mid = [v for k, v in vals.items() if k.endswith(".l2.conversions_per_trial.mid.icc")]
+        check("q3: the value of such an ICC for the text says why it has none, and holds no number",
+              icc_mid and all(v["text"] == REFERENCE_CONSTANT_TEXT and v["value"] == [None, None, None]
+                              for v in icc_mid), str(icc_mid[:1]))
+        icc_slow = [v for k, v in vals.items() if k.endswith(".l2.conversions_per_trial.slow.icc")]
+        check("q3: an ICC whose reference varies keeps its value",
+              icc_slow and all(v["value"][0] == 0.75 for v in icc_slow), str(icc_slow[:1]))
         sup = files["text-agreement.tex"].decode("utf-8")
         check("q3: the views that need the layers are stated as not computed for a Windows cell",
               sup.count("not computed for this cell (no layers of the prediction)") == 2, sup[:400])
