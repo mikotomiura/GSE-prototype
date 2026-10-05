@@ -14,7 +14,7 @@ git fetch → 枝 origin/docs/ime-manuscript-outline から続ける（main に�
 ⚠️ 公開物（papers/）は学術的な英語・GSE への言及なし・記号や口語なし・内部の番号（判断・M・issue・Y）を書かない（D の番号は公開の逸脱なので書いてよい）。_style_check.py を必ず回す（.tex / .bib も対象）。
 ⚠️ 結果の値は tools/results_tables.py で generated/ に生成し、本文は \rv{<key>} で読む（手で写さない）。要旨と結論は外枠の「Rule for the abstract」。結果を見てから規則を変えない。
 ⚠️ 理論・手法・先行研究に依拠する文は citation-ssot（docs/references.md の [Pn]/[Vn]・append-only・次は [V236]）。公開物は著者と年で引く。
-⚠️ 判断の次の番号は 157、逸脱の次は D10。他の枝が足していないか着手時に必ず見る（MSYS_NO_PATHCONV=1 git show <ref>:<path>）。
+⚠️ 番号の割り当て（2026-10-05）: 判断は Mac 157〜160・Surface 161〜164・G-GEAR 165〜、逸脱は Mac D10・Surface D11・G-GEAR D12〜。他の枝が足していないか着手時に必ず見る（MSYS_NO_PATHCONV=1 git show <ref>:<path>）。
 ⚠️ 凍結のタグのコードと事前登録は変えない（D8 の closed_set.py の --skip-scenario だけが例外で、既定の出力は凍結と同じ）。封印（sealed/）は開けない。生ログ・キーコードを原稿や外部の LLM に出さない。
 Skill: citation-ssot・verify-before-claiming・subagent-delegation・reproducibility-discipline・git-workflow（attack-me は原稿の段で）。
 LaTeX: G-GEAR は MiKTeX 25.12（ユーザー領域）と雛形 C:\Users\johnd\tools\sn-template\sn-article-template（公開物の外）。組むのは manuscript/build.sh（BUILD.md）。
@@ -32,7 +32,7 @@ LaTeX: G-GEAR は MiKTeX 25.12（ユーザー領域）と雛形 C:\Users\johnd\t
 
 ## §2 やること
 
-1. **計測の機械で回す（このメモを持って Surface と Mac で）**:
+1. **計測の機械で回す** —— ★ 機械ごとの打ち込む用は別の引き継ぎ: Surface は `next-session-ime-paper-surface-d8.md`（枝 `docs/ime-m8-windows-closed-set`）、Mac は `next-session-ime-paper-mac-analysis.md`（枝 `docs/ime-m8-macos-analysis`）。どちらも push だけで、G-GEAR がこの枝に取り込む。下はその要約:
    - **Windows（Surface）**: `experiment/runs/windows-msime-tsf-2`（gitignore・書庫 `f2287a74…cd06` を展開済み）で、§10.7 の閉じた集合の命令に `--skip-scenario S12` を足して回す。`kit/e2/closed_set.py` だけ commit `14c85e6e` 以降のもの、他は Windows のタグ `ime-observation-prereg-windows` の書き出し。出力 `experiment/results/windows/e2_closed_set_windows-msime-tsf.json` の `skipped_scenarios` が `{"S12": 225}`・各 K の `n` が 2,700（全ブロックが採点されたとき）であることを確かめる。
    - **Windows の E3**: `summarize_e3.py` の標準出力（idle と working の両方）を `experiment/results/windows/e3_windows.txt` に置く（notes.md の表の名前）。
    - **macOS（Mac）**: macOS のタグから `run.sh`（問 1〜3）と §6.8 の開いた集合・閉じた集合（閉じた集合は `--skip-scenario S12` と commit `14c85e6e` 以降の `closed_set.py`）。`e3_macos.txt` も置く。⚠️ ON の閉じた集合の `n` は 2,925、OFF は 2,700。
