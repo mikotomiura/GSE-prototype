@@ -322,6 +322,98 @@
    "text": "1",
    "value": 1
   },
+  "macos-standard-live-off.dwellx.fast.p25": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/fast/percentiles/p2.5",
+   "text": "$-$814",
+   "value": -813.6999999999999
+  },
+  "macos-standard-live-off.dwellx.fast.p975": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/fast/percentiles/p97.5",
+   "text": "3,657",
+   "value": 3657.3249999999975
+  },
+  "macos-standard-live-off.dwellx.fast.within100": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/fast/within/abs_le_100_ms",
+   "text": "72.0\\%",
+   "value": 0.7202702702702702
+  },
+  "macos-standard-live-off.dwellx.fast.within1000": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/fast/within/abs_le_1000_ms",
+   "text": "92.3\\%",
+   "value": 0.922972972972973
+  },
+  "macos-standard-live-off.dwellx.mid.p25": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/mid/percentiles/p2.5",
+   "text": "$-$1,041",
+   "value": -1040.9249999999997
+  },
+  "macos-standard-live-off.dwellx.mid.p975": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/mid/percentiles/p97.5",
+   "text": "3,032",
+   "value": 3031.749999999971
+  },
+  "macos-standard-live-off.dwellx.mid.within100": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/mid/within/abs_le_100_ms",
+   "text": "71.2\\%",
+   "value": 0.711864406779661
+  },
+  "macos-standard-live-off.dwellx.mid.within1000": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/mid/within/abs_le_1000_ms",
+   "text": "94.2\\%",
+   "value": 0.942090395480226
+  },
+  "macos-standard-live-off.dwellx.p25.range": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/*",
+   "text": "$-$5,365 to $-$814~ms",
+   "value": [
+    -5365.3,
+    -813.6999999999999
+   ]
+  },
+  "macos-standard-live-off.dwellx.p975.range": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/*",
+   "text": "6 to 3,657~ms",
+   "value": [
+    6.0,
+    3657.3249999999975
+   ]
+  },
+  "macos-standard-live-off.dwellx.slow.p25": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/slow/percentiles/p2.5",
+   "text": "$-$5,365",
+   "value": -5365.3
+  },
+  "macos-standard-live-off.dwellx.slow.p975": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/slow/percentiles/p97.5",
+   "text": "6",
+   "value": 6.0
+  },
+  "macos-standard-live-off.dwellx.slow.within100": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/slow/within/abs_le_100_ms",
+   "text": "69.8\\%",
+   "value": 0.6979362101313321
+  },
+  "macos-standard-live-off.dwellx.slow.within1000": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/slow/within/abs_le_1000_ms",
+   "text": "88.9\\%",
+   "value": 0.8893058161350844
+  },
+  "macos-standard-live-off.dwellx.within100.range": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/*",
+   "text": "69.8\\%--72.0\\%",
+   "value": [
+    0.6979362101313321,
+    0.7202702702702702
+   ]
+  },
+  "macos-standard-live-off.dwellx.within1000.range": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-off.json:cells/macos-standard-live-off/under_limit/*",
+   "text": "88.9\\%--94.2\\%",
+   "value": [
+    0.8893058161350844,
+    0.942090395480226
+   ]
+  },
   "macos-standard-live-off.excluded.gt.n": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/excluded/gt/n",
    "text": "0",
@@ -1049,7 +1141,7 @@
   "macos-standard-live-off.l2.abandon_rate.mid.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.149",
-   "value": 0.14949477817579152
+   "value": 0.14949477817579146
   },
   "macos-standard-live-off.l2.abandon_rate.slow.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/agreement_by_stratum/slow/abandon_rate/bias_ci",
@@ -1072,7 +1164,7 @@
   "macos-standard-live-off.l2.abandon_rate.slow.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.203",
-   "value": 0.2032800894403101
+   "value": 0.20328008944031
   },
   "macos-standard-live-off.l2.conversions_per_trial.fast.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/agreement_by_stratum/fast/conversions_per_trial/bias_ci",
@@ -1164,7 +1256,7 @@
   "macos-standard-live-off.l2.dwell_fraction.fast.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.012",
-   "value": 0.01188796576003134
+   "value": 0.011887965760031342
   },
   "macos-standard-live-off.l2.dwell_fraction.mid.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/agreement_by_stratum/mid/dwell_fraction/bias_ci",
@@ -2869,6 +2961,98 @@
    "text": "0",
    "value": 0
   },
+  "macos-standard-live-on.dwellx.fast.p25": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/fast/percentiles/p2.5",
+   "text": "$-$901",
+   "value": -900.5999999999999
+  },
+  "macos-standard-live-on.dwellx.fast.p975": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/fast/percentiles/p97.5",
+   "text": "4,387",
+   "value": 4387.400000000001
+  },
+  "macos-standard-live-on.dwellx.fast.within100": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/fast/within/abs_le_100_ms",
+   "text": "51.2\\%",
+   "value": 0.5119196988707654
+  },
+  "macos-standard-live-on.dwellx.fast.within1000": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/fast/within/abs_le_1000_ms",
+   "text": "93.5\\%",
+   "value": 0.9347553324968633
+  },
+  "macos-standard-live-on.dwellx.mid.p25": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/mid/percentiles/p2.5",
+   "text": "$-$1,238",
+   "value": -1237.5
+  },
+  "macos-standard-live-on.dwellx.mid.p975": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/mid/percentiles/p97.5",
+   "text": "52",
+   "value": 51.75
+  },
+  "macos-standard-live-on.dwellx.mid.within100": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/mid/within/abs_le_100_ms",
+   "text": "43.6\\%",
+   "value": 0.435656836461126
+  },
+  "macos-standard-live-on.dwellx.mid.within1000": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/mid/within/abs_le_1000_ms",
+   "text": "94.4\\%",
+   "value": 0.9436997319034852
+  },
+  "macos-standard-live-on.dwellx.p25.range": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/*",
+   "text": "$-$3,316 to $-$901~ms",
+   "value": [
+    -3315.6499999999996,
+    -900.5999999999999
+   ]
+  },
+  "macos-standard-live-on.dwellx.p975.range": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/*",
+   "text": "41 to 4,387~ms",
+   "value": [
+    41.299999999999955,
+    4387.400000000001
+   ]
+  },
+  "macos-standard-live-on.dwellx.slow.p25": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/slow/percentiles/p2.5",
+   "text": "$-$3,316",
+   "value": -3315.6499999999996
+  },
+  "macos-standard-live-on.dwellx.slow.p975": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/slow/percentiles/p97.5",
+   "text": "41",
+   "value": 41.299999999999955
+  },
+  "macos-standard-live-on.dwellx.slow.within100": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/slow/within/abs_le_100_ms",
+   "text": "37.1\\%",
+   "value": 0.37087378640776697
+  },
+  "macos-standard-live-on.dwellx.slow.within1000": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/slow/within/abs_le_1000_ms",
+   "text": "88.9\\%",
+   "value": 0.8893203883495145
+  },
+  "macos-standard-live-on.dwellx.within100.range": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/*",
+   "text": "37.1\\%--51.2\\%",
+   "value": [
+    0.37087378640776697,
+    0.5119196988707654
+   ]
+  },
+  "macos-standard-live-on.dwellx.within1000.range": {
+   "source": "exploratory/dwell_quantiles_macos-standard-live-on.json:cells/macos-standard-live-on/under_limit/*",
+   "text": "88.9\\%--94.4\\%",
+   "value": [
+    0.8893203883495145,
+    0.9436997319034852
+   ]
+  },
   "macos-standard-live-on.excluded.gt.carryover": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/excluded/gt/by_reason/carry_over",
    "text": "88",
@@ -3611,7 +3795,7 @@
   "macos-standard-live-on.l2.abandon_rate.mid.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.167",
-   "value": 0.16738796683014093
+   "value": 0.16738796683014084
   },
   "macos-standard-live-on.l2.abandon_rate.slow.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/slow/abandon_rate/bias_ci",
@@ -3634,7 +3818,7 @@
   "macos-standard-live-on.l2.abandon_rate.slow.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.204",
-   "value": 0.2043044017084764
+   "value": 0.20430440170847644
   },
   "macos-standard-live-on.l2.conversions_per_trial.fast.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/fast/conversions_per_trial/bias_ci",
@@ -3657,7 +3841,7 @@
   "macos-standard-live-on.l2.conversions_per_trial.fast.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.012",
-   "value": 0.011707322644771187
+   "value": 0.011707322644771175
   },
   "macos-standard-live-on.l2.conversions_per_trial.mid.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/mid/conversions_per_trial/bias_ci",
@@ -3680,7 +3864,7 @@
   "macos-standard-live-on.l2.conversions_per_trial.mid.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.017",
-   "value": 0.016750630254320227
+   "value": 0.01675063025432021
   },
   "macos-standard-live-on.l2.conversions_per_trial.slow.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/slow/conversions_per_trial/bias_ci",
@@ -3726,7 +3910,7 @@
   "macos-standard-live-on.l2.dwell_fraction.fast.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.013",
-   "value": 0.01315872689524475
+   "value": 0.013158726895244754
   },
   "macos-standard-live-on.l2.dwell_fraction.mid.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/mid/dwell_fraction/bias_ci",
@@ -3772,7 +3956,7 @@
   "macos-standard-live-on.l2.dwell_fraction.slow.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.009",
-   "value": 0.008913841224639512
+   "value": 0.008913841224639514
   },
   "macos-standard-live-on.l2.mean_dwell_ms.fast.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/fast/mean_dwell_ms/bias_ci",
@@ -3818,7 +4002,7 @@
   "macos-standard-live-on.l2.mean_dwell_ms.mid.refsd": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/aggregate/gt",
    "text": "1,899",
-   "value": 1899.2384652224273
+   "value": 1899.238465222427
   },
   "macos-standard-live-on.l2.mean_dwell_ms.slow.bias": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/slow/mean_dwell_ms/bias_ci",
@@ -6211,7 +6395,7 @@
   "windows-msime-tsf.l2.abandon_rate.fast.refsd": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.166",
-   "value": 0.16563863576731966
+   "value": 0.16563863576731971
   },
   "windows-msime-tsf.l2.abandon_rate.mid.bias": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/agreement_by_stratum/mid/abandon_rate/bias_ci",
@@ -6234,7 +6418,7 @@
   "windows-msime-tsf.l2.abandon_rate.mid.refsd": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.156",
-   "value": 0.15588022475696475
+   "value": 0.1558802247569648
   },
   "windows-msime-tsf.l2.abandon_rate.slow.bias": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/agreement_by_stratum/slow/abandon_rate/bias_ci",
@@ -6257,7 +6441,7 @@
   "windows-msime-tsf.l2.abandon_rate.slow.refsd": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.212",
-   "value": 0.21161452804910966
+   "value": 0.2116145280491096
   },
   "windows-msime-tsf.l2.conversions_per_trial.fast.bias": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/agreement_by_stratum/fast/conversions_per_trial/bias_ci",
@@ -6280,7 +6464,7 @@
   "windows-msime-tsf.l2.conversions_per_trial.fast.refsd": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.061",
-   "value": 0.061455794360136186
+   "value": 0.06145579436013622
   },
   "windows-msime-tsf.l2.conversions_per_trial.mid.bias": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/agreement_by_stratum/mid/conversions_per_trial/bias_ci",
@@ -6372,7 +6556,7 @@
   "windows-msime-tsf.l2.dwell_fraction.mid.refsd": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/aggregate/gt",
    "text": "0.039",
-   "value": 0.03908831630210587
+   "value": 0.03908831630210588
   },
   "windows-msime-tsf.l2.dwell_fraction.slow.bias": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/agreement_by_stratum/slow/dwell_fraction/bias_ci",
@@ -6418,7 +6602,7 @@
   "windows-msime-tsf.l2.mean_dwell_ms.fast.refsd": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/aggregate/gt",
    "text": "1,410",
-   "value": 1410.3274600557743
+   "value": 1410.3274600557745
   },
   "windows-msime-tsf.l2.mean_dwell_ms.mid.bias": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/agreement_by_stratum/mid/mean_dwell_ms/bias_ci",
@@ -6441,7 +6625,7 @@
   "windows-msime-tsf.l2.mean_dwell_ms.mid.refsd": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/aggregate/gt",
    "text": "1,963",
-   "value": 1963.000468389724
+   "value": 1963.0004683897237
   },
   "windows-msime-tsf.l2.mean_dwell_ms.slow.bias": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/agreement_by_stratum/slow/mean_dwell_ms/bias_ci",
@@ -6464,7 +6648,7 @@
   "windows-msime-tsf.l2.mean_dwell_ms.slow.refsd": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/aggregate/gt",
    "text": "2,460",
-   "value": 2460.371566386943
+   "value": 2460.3715663869425
   },
   "windows-msime-tsf.markers.blocks": {
    "source": "windows/clock_sync_windows-msime-tsf.json:oracle|gt/matched|obs/matched",
