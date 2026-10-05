@@ -1893,8 +1893,8 @@ def table_cost(e3):
 REFERENCE_CONSTANT = "%s (reference constant)" % NO_VALUE
 REFERENCE_CONSTANT_TEXT = "no value: the reference's value is the same in every text (deviation D11)"
 REFERENCE_CONSTANT_NOTE = ("%s: no ICC(A,1), because the reference's value is the same in every text, so the ICC is zero "
-                           "whatever the logger writes, or undefined if the logger writes the same value in every text "
-                           "(section 6.11 of the registration; deviation D11)" % REFERENCE_CONSTANT)
+                           "whatever the logger writes, or undefined if the logger writes that same value in every text "
+                           "too (section 6.11 of the registration; deviation D11)" % REFERENCE_CONSTANT)
 
 
 def reference_spread(cell, scope, m, speed=None):

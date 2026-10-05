@@ -116,6 +116,16 @@ def reproduces(stats, pairs, entry):
             and stats.median_abs_error(obs, gt) == dw["mae"])
 
 
+def primary_call(stats, calls, obs_sha, definition, scope, want, reg_by, where):
+    """The recorded call of the primary comparison for one scope: it read the run's observation log under the cell's
+    definition, its matching output has the SHA-256 that the registered result file records (want), and its pairs
+    reproduce the registered figures of every speed."""
+    candidates = [c for c in calls
+                  if c["obs_sha256"] == obs_sha and c["definition"] == definition and c["scope"] == scope
+                  and c["match_sha256"] == want]
+    return select_primary(stats, candidates, reg_by, where)
+
+
 def select_primary(stats, candidates, reg_by, where):
     """Among the recorded calls that read the run's observation log for one definition and scope (on macOS the
     comparison of the prediction with the logger reads it too), the one whose pairs reproduce the registered values of
@@ -224,10 +234,8 @@ def run(args):
         # an output with that SHA-256, so they are the registered pairs themselves, not pairs with equal summaries.
         want = committed["cells"][cell][definition][PRIMARY][scope]["inputs_sha256"]["match"]
         reg_by = dict((e["stratum"]["speed"], e) for e in reg if e["stratum"].get("speed") in SPEEDS)
-        candidates = [c for c in listener.calls
-                      if c["obs_sha256"] == obs_sha and c["definition"] == definition and c["scope"] == scope
-                      and c["match_sha256"] == want]
-        call = select_primary(stats, candidates, reg_by, "cell %s, %s" % (cell, scope))
+        call = primary_call(stats, listener.calls, obs_sha, definition, scope, want, reg_by,
+                            "cell %s, %s" % (cell, scope))
         block = dict((sp, summarise([o - g for o, g in call["by_speed"].get(sp, [])])) for sp in SPEEDS if sp in reg_by)
         block["match_sha256"] = want
         out["cells"].setdefault(cell, {})[scope] = block
@@ -289,8 +297,14 @@ def selftest():
         check("no reproducing call is refused", True)
     check("a registered entry without a duration value is not reproduced",
           reproduces(Stub, [(1, 0)], {"dwell": None}) is False and reproduces(Stub, [(1, 0)], {}) is False)
+    def safe_reproduces(pairs, entry):
+        try:
+            return reproduces(Stub, pairs, entry)
+        except Exception:  # a crash is a failure of the check below, not of the self-test
+            return None
+
     check("a speed without pairs is reproduced by no pairs, and only by them",
-          reproduces(Stub, [], {"dwell": {"n": 0}}) is True and reproduces(Stub, [(1, 0)], {"dwell": {"n": 0}}) is False)
+          safe_reproduces([], {"dwell": {"n": 0}}) is True and safe_reproduces([(1, 0)], {"dwell": {"n": 0}}) is False)
     import tempfile
 
     class A(object):
@@ -338,6 +352,28 @@ def selftest():
             check("registered: %s is refused" % name, False)
         except SystemExit:
             check("registered: %s is refused" % name, True)
+    # Two matching outputs whose pairs have the same number, bias and median absolute difference but different tails:
+    # only the one with the registered SHA-256 may be taken.
+    reg2 = {"slow": {"dwell": {"n": 3, "bland_altman": {"bias": 0.0}, "mae": 10.0}}}
+    narrow = {"obs_sha256": "o", "definition": "d", "scope": "s", "match_sha256": "m1",
+              "by_speed": {"slow": [(90, 100), (100, 100), (110, 100)]}}
+    wide = {"obs_sha256": "o", "definition": "d", "scope": "s", "match_sha256": "m2",
+            "by_speed": {"slow": [(990, 1000), (1000, 1000), (1010, 1000)]}}
+    check("pairs with equal summaries: both reproduce the registered figures",
+          select_primary(Stub, [narrow], reg2, "t") is narrow and select_primary(Stub, [wide], reg2, "t") is wide)
+    def chosen(want):
+        try:
+            return primary_call(Stub, [narrow, wide], "o", "d", "s", want, reg2, "t")
+        except SystemExit:
+            return None
+
+    check("the call is chosen by the SHA-256 of its matching output",
+          chosen("m2") is wide and chosen("m1") is narrow)
+    try:
+        primary_call(Stub, [narrow, wide], "o", "d", "s", "m3", reg2, "t")
+        check("no matching output with the registered SHA-256 is refused", False)
+    except SystemExit:
+        check("no matching output with the registered SHA-256 is refused", True)
     extra = {"by_speed": {"slow": [(110, 100), (90, 100)], "mid": [(205, 200)], "fast": [(1, 0)]}}
     try:
         select_primary(Stub, [extra], reg, "t")

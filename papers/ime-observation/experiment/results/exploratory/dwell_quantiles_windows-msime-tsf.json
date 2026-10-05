@@ -94,7 +94,7 @@
   "e1_l1_registered": "4fd11b1d3c5eba4df88f9a859629764bdfcd889e1c3a58281bdda6c35b69530e",
   "obs": "58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562",
   "run_manifest": "5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82",
-  "script": "878e22026378b0235472e3f8aad273b12a34ca53fbb80608d119ac68f5815c6c"
+  "script": "453bfc02f961a4c2b8436d542f0e3d1ecf44aca2b4b9c18d22d56ca599a91439"
  },
  "note": "not registered; percentiles of the dwell error (observed minus ground truth, ms) of the one-to-one pairs of the primary comparison, and the fractions of pairs within 100 ms and 1,000 ms; no interval",
  "percentile_method": "linear interpolation between order statistics, h = (n - 1) p"
