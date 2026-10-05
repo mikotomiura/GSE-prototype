@@ -25,6 +25,7 @@
       "abs_le_100_ms": 0.3683453237410072
      }
     },
+    "match_sha256": "f3ce99f8ccee17cbf882896519b81d905e12991649baa523bf416e89a7dd6960",
     "mid": {
      "n": 802,
      "percentiles": {
@@ -60,6 +61,7 @@
       "abs_le_100_ms": 0.375366568914956
      }
     },
+    "match_sha256": "42507c87b7587a59afaa68065d848fb3488c1a3aadc43fafca090c1b46e0d16b",
     "mid": {
      "n": 779,
      "percentiles": {
@@ -92,7 +94,7 @@
   "e1_l1_registered": "4fd11b1d3c5eba4df88f9a859629764bdfcd889e1c3a58281bdda6c35b69530e",
   "obs": "58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562",
   "run_manifest": "5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82",
-  "script": "396dd8ab5abb77c8e40d33eeafa5565717ef463f586475bc22e6dfb7a4ce9f57"
+  "script": "878e22026378b0235472e3f8aad273b12a34ca53fbb80608d119ac68f5815c6c"
  },
  "note": "not registered; percentiles of the dwell error (observed minus ground truth, ms) of the one-to-one pairs of the primary comparison, and the fractions of pairs within 100 ms and 1,000 ms; no interval",
  "percentile_method": "linear interpolation between order statistics, h = (n - 1) p"

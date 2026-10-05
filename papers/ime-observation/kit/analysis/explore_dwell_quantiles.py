@@ -11,9 +11,10 @@ every call of `l1.evaluate` is recorded. The pairs of the primary comparison (gr
 are those whose observation input has the SHA-256 of the run's `obs.jsonl`; the speed of a pair comes from the plan,
 as in `l1.py`. Before anything is written, the script recomputes, per speed, the number of pairs, the bias and the
 median absolute difference with the frozen `stats.py` and requires them to equal the values of the frozen `e1_l1.json`
-written in the scratch directory, and it requires the per-speed duration figures of that file to equal those of the
-registered result file of the article (`--registered`), so the pairs are those of the registered analysis. The output
-records the SHA-256 of every analysis module of the export it ran.
+written in the scratch directory, it requires the per-speed duration figures of that file to equal those of the
+registered result file of the article (`--registered`), and it takes the pairs only from the matching output whose
+SHA-256 the registered result file records, so the pairs are those of the registered analysis. The output records that
+SHA-256 per scope and the SHA-256 of every analysis module of the export it ran.
 
 Percentiles use linear interpolation between order statistics: for sorted values x[0..n-1] and probability p, the
 position is h = (n - 1) p, and the value is x[floor(h)] + (h - floor(h)) (x[floor(h) + 1] - x[floor(h)]). No interval
@@ -97,7 +98,8 @@ class Listener(object):
             by_speed.setdefault(lab[2], []).append((obs, gt))
         self.calls.append({"cell": cell, "definition": m.get("definition"),
                            "scope": (m.get("scope") or {}).get("name", "all_trials"),
-                           "obs_sha256": m["inputs_sha256"]["obs"], "by_speed": by_speed})
+                           "obs_sha256": m["inputs_sha256"]["obs"],
+                           "match_sha256": hashlib.sha256(match_bytes).hexdigest(), "by_speed": by_speed})
         return result
 
 
@@ -106,8 +108,10 @@ def reproduces(stats, pairs, entry):
     obs = [o for o, _g in pairs]
     gt = [g for _o, g in pairs]
     dw = entry.get("dwell")
-    if not dw or len(obs) != dw["n"] or not obs:
+    if not dw or len(obs) != dw["n"]:
         return False
+    if not obs:  # a speed whose every pair was left out: nothing more to compare
+        return True
     return (stats.bland_altman(obs, gt)["bias"] == dw["bland_altman"]["bias"]
             and stats.median_abs_error(obs, gt) == dw["mae"])
 
@@ -216,12 +220,17 @@ def run(args):
         except (KeyError, TypeError):
             raise SystemExit("--registered: no cell %s under %s, %s, %s" % (cell, definition, PRIMARY, scope))
         same_dwell(reg, com, "cell %s, %s" % (cell, scope))
+        # The registered result records the SHA-256 of the matching output it read; the pairs taken here must come from
+        # an output with that SHA-256, so they are the registered pairs themselves, not pairs with equal summaries.
+        want = committed["cells"][cell][definition][PRIMARY][scope]["inputs_sha256"]["match"]
         reg_by = dict((e["stratum"]["speed"], e) for e in reg if e["stratum"].get("speed") in SPEEDS)
         candidates = [c for c in listener.calls
-                      if c["obs_sha256"] == obs_sha and c["definition"] == definition and c["scope"] == scope]
+                      if c["obs_sha256"] == obs_sha and c["definition"] == definition and c["scope"] == scope
+                      and c["match_sha256"] == want]
         call = select_primary(stats, candidates, reg_by, "cell %s, %s" % (cell, scope))
-        out["cells"].setdefault(cell, {})[scope] = dict(
-            (sp, summarise([o - g for o, g in call["by_speed"][sp]])) for sp in SPEEDS if sp in reg_by)
+        block = dict((sp, summarise([o - g for o, g in call["by_speed"].get(sp, [])])) for sp in SPEEDS if sp in reg_by)
+        block["match_sha256"] = want
+        out["cells"].setdefault(cell, {})[scope] = block
     try:
         f = open(args.out, "x", encoding="utf-8", newline="\n")
     except FileExistsError:
@@ -280,6 +289,8 @@ def selftest():
         check("no reproducing call is refused", True)
     check("a registered entry without a duration value is not reproduced",
           reproduces(Stub, [(1, 0)], {"dwell": None}) is False and reproduces(Stub, [(1, 0)], {}) is False)
+    check("a speed without pairs is reproduced by no pairs, and only by them",
+          reproduces(Stub, [], {"dwell": {"n": 0}}) is True and reproduces(Stub, [(1, 0)], {"dwell": {"n": 0}}) is False)
     import tempfile
 
     class A(object):

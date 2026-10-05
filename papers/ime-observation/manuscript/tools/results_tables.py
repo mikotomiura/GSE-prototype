@@ -60,6 +60,7 @@ the script exits 1 when any differs, so that a table cannot drift from the resul
 Standard library only.
 """
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -749,20 +750,55 @@ def read_dwell_explore(results_dir, cell):
     src = "%s/%s" % (DWELL_EXPLORE_DIR, name)
     if doc.get("exploratory") is not True:
         raise ValueError("%s: not marked as exploratory" % src)
+    # The file was made against the registered result file that this script reads, and from the matching outputs that
+    # the registered result file records.
+    l1_path = os.path.join(cell.directory, "e1_l1.json")
+    if (doc.get("inputs_sha256") or {}).get("e1_l1_registered") != sha256_of(l1_path):
+        raise ValueError("%s: made against another e1_l1.json than %s" % (src, cell.src["e1_l1.json"]))
     block = (doc.get("cells") or {}).get(cell.label)
     if not block or sorted(block) != sorted(SCOPES):
         raise ValueError("%s: cell %s with both scopes is missing" % (src, cell.label))
     for scope in SCOPES:
+        if block[scope].get("match_sha256") != cell.l1[scope]["inputs_sha256"]["match"]:
+            raise ValueError("%s: %s was not taken from the registered matching output" % (src, scope))
         speeds = cell.speed_sessions(scope)
         for sp in SPEEDS:
             e = block[scope].get(sp)
             reg = (speeds.get(sp) or {}).get("dwell")
             if (e is None) != (reg is None):
                 raise ValueError("%s: %s, %s does not match the registered results" % (src, scope, sp))
-            if e is not None and e["n"] != reg["n"]:
+            if e is None:
+                continue
+            if e["n"] != reg["n"]:
                 raise ValueError("%s: %s, %s has %d pairs, the registered results %d" % (src, scope, sp, e["n"],
                                                                                           reg["n"]))
+            check_dwell_entry(e, "%s: %s, %s" % (src, scope, sp))
     return {"src": src, "cells": block}
+
+
+def sha256_of(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def check_dwell_entry(e, where):
+    """The figures of one speed: none for a speed without pairs; otherwise finite percentiles in order and fractions with
+    0 <= within 100 ms <= within 1 s <= 1."""
+    pc = [e["percentiles"].get(k) for k, _ in DWELL_EXPLORE_PCTS]
+    wi = [e["within"].get(k) for k, _ in DWELL_EXPLORE_WITHIN]
+    if e["n"] == 0:
+        if any(x is not None for x in pc + wi):
+            raise ValueError("%s: figures for a speed without pairs" % where)
+        return
+    if any(not isinstance(x, (int, float)) or isinstance(x, bool) or not math.isfinite(x) for x in pc + wi):
+        raise ValueError("%s: a figure is missing or not a finite number" % where)
+    if not pc[0] <= pc[1]:
+        raise ValueError("%s: the percentiles are out of order" % where)
+    if not 0.0 <= wi[0] <= wi[1] <= 1.0:
+        raise ValueError("%s: the fractions are not 0 <= within 100 ms <= within 1 s <= 1" % where)
 
 
 def dwell_explore_values(cell, doc):
@@ -772,7 +808,7 @@ def dwell_explore_values(cell, doc):
         return vals
     for sp in SPEEDS:
         e = doc["cells"][PRIMARY_SCOPE].get(sp)
-        if e is None:
+        if e is None or e["n"] == 0:
             continue
         for key, _ in DWELL_EXPLORE_PCTS:
             vals["%s.dwellx.%s.%s" % (cell.label, sp, key.replace(".", ""))] = {
@@ -783,7 +819,7 @@ def dwell_explore_values(cell, doc):
                 "text": fmt_pct(e["within"][key]), "value": e["within"][key],
                 "source": "%s:cells/%s/%s/%s/within/%s" % (doc["src"], cell.label, PRIMARY_SCOPE, sp, key)}
     # The same figures as ranges over the speeds, for the text.
-    present = [sp for sp in SPEEDS if doc["cells"][PRIMARY_SCOPE].get(sp) is not None]
+    present = [sp for sp in SPEEDS if (doc["cells"][PRIMARY_SCOPE].get(sp) or {}).get("n")]
     if present:
         src = "%s:cells/%s/%s/*" % (doc["src"], cell.label, PRIMARY_SCOPE)
         for key, _ in DWELL_EXPLORE_PCTS:
@@ -826,7 +862,7 @@ def dwell_explore_supplement(cells, docs):
             for i, sp in enumerate(SPEEDS):
                 e = doc["cells"][scope].get(sp)
                 head = ["\\texttt{%s}" % tex_escape(scope) if i == 0 else "", sp]
-                if e is None:
+                if e is None or e["n"] == 0:
                     lines.append(" & ".join(head) + " & \\multicolumn{5}{l}{no pair} \\\\\n")
                     continue
                 lines.append(" & ".join(head + [fmt_int(e["n"])]
@@ -3227,10 +3263,13 @@ def _selftest_figures(check):
 class _FakeCell(object):
     """Enough of a Cell for reference_spread() and read_dwell_explore()."""
 
-    def __init__(self, label, gt, obs, speeds=None):
+    def __init__(self, label, gt, obs, speeds=None, directory=None, match=None):
         self.label = label
         self.l2 = {PRIMARY_SCOPE: {"aggregate": {"gt": gt, "obs": obs}}}
         self._speeds = speeds or {}
+        self.directory = directory
+        self.src = {"e1_l1.json": "e1_l1.json"}
+        self.l1 = dict((s, {"inputs_sha256": {"match": (match or {}).get(s)}}) for s in SCOPES)
 
     def path(self, f, *keys):
         return "%s:%s" % (f, "/".join(str(k) for k in keys))
@@ -3272,17 +3311,26 @@ def _selftest_spread(check):
 def _selftest_dwell_explore(check):
     tmp = tempfile.mkdtemp(prefix="results_tables_dwellx_")
     try:
-        speeds = {"under_limit": {"slow": {"dwell": {"n": 10}}, "fast": {"dwell": {"n": 4}}},
+        speeds = {"under_limit": {"slow": {"dwell": {"n": 10}}, "mid": {"dwell": {"n": 0}}, "fast": {"dwell": {"n": 4}}},
                   "all_trials": {"slow": {"dwell": {"n": 12}}, "fast": {"dwell": {"n": 4}}}}
-        cell = _FakeCell("cell-x", [], [], speeds)
+        cell_dir = os.path.join(tmp, "cell")
+        os.makedirs(cell_dir)
+        with open(os.path.join(cell_dir, "e1_l1.json"), "wb") as f:
+            f.write(b"{}\n")
+        l1_sha = sha256_of(os.path.join(cell_dir, "e1_l1.json"))
+        match = {"under_limit": "a" * 64, "all_trials": "b" * 64}
+        cell = _FakeCell("cell-x", [], [], speeds, cell_dir, match)
         check("dwellx: a cell without the file has no exploratory values",
               read_dwell_explore(tmp, cell) is None and dwell_explore_values(cell, None) == {})
         entry = lambda n, p=-1500.4, w=0.375: {"n": n, "percentiles": {"p2.5": p, "p97.5": 40.0},
                                                "within": {"abs_le_100_ms": w, "abs_le_1000_ms": 0.8}}
-        doc = {"exploratory": True, "cells": {"cell-x": {"under_limit": {"slow": entry(10), "fast": entry(4, -900.0,
-                                                                                                         0.25)},
-                                                         "all_trials": {"slow": entry(12, -2600.0),
-                                                                        "fast": entry(4, -2600.0)}}}}
+        empty = {"n": 0, "percentiles": {"p2.5": None, "p97.5": None},
+                 "within": {"abs_le_100_ms": None, "abs_le_1000_ms": None}}
+        doc = {"exploratory": True, "inputs_sha256": {"e1_l1_registered": l1_sha},
+               "cells": {"cell-x": {"under_limit": {"slow": entry(10), "mid": empty, "fast": entry(4, -900.0, 0.25),
+                                                    "match_sha256": match["under_limit"]},
+                                    "all_trials": {"slow": entry(12, -2600.0), "fast": entry(4, -2600.0),
+                                                   "match_sha256": match["all_trials"]}}}}
         os.makedirs(os.path.join(tmp, DWELL_EXPLORE_DIR))
         p = os.path.join(tmp, DWELL_EXPLORE_DIR, "dwell_quantiles_cell-x.json")
 
@@ -3306,16 +3354,36 @@ def _selftest_dwell_explore(check):
               sorted(vals))
         sup = dwell_explore_supplement([cell], {"cell-x": got})
         check("dwellx: the supplement table is labelled as not registered and holds both scopes",
-              "Not registered" in sup and sup.count("\\texttt{all\\_trials}") == 1 and "& 12 &" in sup, sup[-600:])
+              "Not registered" in sup and sup.count("\\texttt{all\\_trials}") == 1 and "& 12 &" in sup
+              and "mid & \\multicolumn{5}{l}{no pair}" in sup, sup[-600:])
+
+        def with_cell(cells_x, **top):
+            d = {"exploratory": True, "inputs_sha256": {"e1_l1_registered": l1_sha}, "cells": {"cell-x": cells_x}}
+            d.update(top)
+            return d
+
+        ul = doc["cells"]["cell-x"]["under_limit"]
+        at = doc["cells"]["cell-x"]["all_trials"]
         for name, bad in (("not marked as exploratory", dict(doc, exploratory=False)),
-                          ("with a number of pairs that differs from the registered results",
-                           {"exploratory": True, "cells": {"cell-x": dict(doc["cells"]["cell-x"], all_trials={
-                               "slow": entry(11), "fast": entry(4)})}}),
-                          ("without a scope", {"exploratory": True, "cells": {"cell-x": {
-                              "under_limit": doc["cells"]["cell-x"]["under_limit"]}}}),
-                          ("with a speed the registered results lack", {"exploratory": True, "cells": {"cell-x": dict(
-                              doc["cells"]["cell-x"], under_limit={"slow": entry(10), "fast": entry(4),
-                                                                   "mid": entry(3)})}})):
+                          ("made against another registered result file",
+                           with_cell(doc["cells"]["cell-x"], inputs_sha256={"e1_l1_registered": "0" * 64})),
+                          ("taken from another matching output", with_cell({"under_limit": dict(
+                              ul, match_sha256="c" * 64), "all_trials": at})),
+                          ("with a number of pairs that differs from the registered results", with_cell(
+                              {"under_limit": ul, "all_trials": dict(at, slow=entry(11))})),
+                          ("without a scope", with_cell({"under_limit": ul})),
+                          ("with a speed the registered results lack", with_cell(
+                              {"under_limit": ul, "all_trials": dict(at, mid=entry(3))})),
+                          ("with percentiles out of order", with_cell(
+                              {"under_limit": dict(ul, slow=entry(10, 50.0)), "all_trials": at})),
+                          ("with fractions out of order", with_cell(
+                              {"under_limit": dict(ul, slow=entry(10, -1500.4, 0.9)), "all_trials": at})),
+                          ("with a figure that is not a number", with_cell(
+                              {"under_limit": dict(ul, slow=dict(entry(10), within={"abs_le_100_ms": None,
+                                                                                    "abs_le_1000_ms": 0.8})),
+                               "all_trials": at})),
+                          ("with figures for a speed without pairs", with_cell(
+                              {"under_limit": dict(ul, mid=dict(entry(0))), "all_trials": at}))):
             write(bad)
             try:
                 read_dwell_explore(tmp, cell)
