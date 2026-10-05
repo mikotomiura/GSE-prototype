@@ -1719,3 +1719,8 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **検証**: 表の道具の selftest 156 件・変異 13 本すべて赤。探索的なスクリプトの selftest 24 件。`build.sh --submission`: main・main-submission・補遺ともエラー 0・未定義の参照 0・生成されていない値は macOS の探索的な 8 個だけ・bibtex の警告 0・overfull は main 1（§4 の頁の 2.1 pt）。`build.sh` は `papers/ime-observation/experiment/` を出力先にすると拒む（試した）。文体の検査 違反 0・要旨 248 語。
 - ⚠️ **開示**: code-reviewer は「6 to 30 kana」の出典を探す grep で、`experiment/runs/windows-msime-tsf-2/plan.jsonl`（合成入力の計画・git の外）の数行を目にした（根拠には使っていない）。生ログ・封印物は開いていない。
 - **影響範囲**: `kit/analysis/explore_dwell_quantiles.py`・`experiment/results/exploratory/`・`manuscript/tools/results_tables.py`・`manuscript/generated/`・`manuscript/build.sh`・`papers/ime-observation/.gitignore`・`manuscript/sections/`（§5〜§8・§10〜§14 のコメント）・`experiment/deviations.md`・`verdict.md`。
+- **追記（同日・/cross-review 2 巡・`run-codex-review.sh` をパス限定で 3 回・111,404 tokens）**:
+  - 1 巡目（コード `f30a6e6c..b2555d7b`・1,265 行）: P1「古い探索結果が混入しうる」→ 表の道具が探索的なファイルの `e1_l1_registered` の SHA-256 と、範囲ごとの照合の出力の SHA-256 を確かめる。P2「集計値の一致は対の同一性を保証しない」→ ★ 登録の結果ファイルが `inputs_sha256.match`（照合の出力の SHA-256）を記録していたので、その出力からだけ対を取る形にした（集計値の一致より強い）。P2「対の無い速さで落ちる」→ 扱う。P2「数値の検査が無い」→ 有限・分位点の順序・0 ≤ 100 ms ≤ 1 s ≤ 1。
+  - 1 巡目（本文・1,205 行）: P2「両列が定数なら未定義、は誤り」→ 真（参照 1・ロガー 2 なら 0）。P2「窓のイベントの経路なら 20 秒超の行を書いたはず、は言えない」→ 真（会話の始め直し・窓と合成は別の構成概念）→ 書き直した。P2「道具とビルドの接続が見えない」→ 偽陽性（コードは別の回に渡した・そちらで確かめた）。
+  - 2 巡目（直しの境界・326 行）: P2「未定義の条件がまだ曖昧」→「参照と同じ値をロガーも全文に書くとき」に。P2「照合の出力で選ぶ処理の退行のテストが無い」→ `primary_call()` を切り出し、件数・偏り・中央絶対差が同じで裾の違う 2 つの出力から登録の SHA-256 の方を取ることを selftest で確かめた（確かめは例外で落ちない形・変異 4 本すべて赤）。
+  - 最終: 表の道具の selftest 162 件・変異 17 本すべて赤。探索的なスクリプトの selftest 0 failed。Windows の探索的な出力は最終の版で回し直した（記録したスクリプトの SHA-256 がコミットのファイルと一致・値は最初から同じ）。`build.sh --submission` エラー 0・文体 違反 0。
