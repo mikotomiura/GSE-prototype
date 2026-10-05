@@ -1397,3 +1397,12 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **検証**: selftest 18 件（合成の結果ファイル: 30 試行ちょうどの層は入り 29 は外れる・範囲・割合・ms の符号・出どころ・層の表の「試行なし」・決定的・`--check` の陽性と陰性 2 つ・主の範囲が違うと止まる・結果ファイルが無いとき）。★ 変異 5 本（`>=` を `>` に・範囲を区間でなく値から・`--check` が常に通る・主の検査を外す・総試行から範囲外を落とす）はどれも狙った検査で赤、無変異の写しは緑。生成した表を雛形で組んで画像で確かめた（`build.sh` で `main.pdf`・`supplement.pdf` ともエラー 0）。
 - **配線**: `main.tex` に `\rv` と `\input{generated/values}`、補遺に `pdflscape` と層ごとの表。`BUILD.md` に生成と `--check` の手順。
 - **影響範囲**: 新規 `manuscript/tools/results_tables.py`・`manuscript/generated/`（5 ファイル）・`main.tex`・`supplement/supplement.tex`・`build.sh`・`BUILD.md`。
+
+## 判断 161: Windows の閉じた集合（D8 のスイッチ付き）と E3 の要約を Surface で回し、結果の JSON と記録を枝 `docs/ime-m8-windows-closed-set` に置く（2026-10-05・Surface・メインの選択・研究者が覆せる）
+
+- **背景**: `next-session-ime-paper-surface-d8.md` §2。新しい計測はしない・凍結のコードと事前登録は変えない（D8 の `closed_set.py` だけ commit `14c85e6e` のものに差し替え）。
+- **実行**: 入力の SHA-256 は計画・観測とも引き継ぎの値と一致。`export-d8`（書き出しの写し）で selftest OK（157 checks）・LF のまま。閉じた集合は `Start-Process` の独立プロセスで約 2 時間 40 分・exit 0・標準エラー空。`skipped_scenarios` `{"S12": 225}`・`n_trials` 2,925・全 K・全特徴量で `n` 2,700・`n_skipped` 0。出力 SHA-256 `93b5eb2b…38b7`。E3 は両方 measured・working の `cpu_all_zero` false。
+- **前の引き継ぎの残り**: (a) 試み 2 の間の計測機の記録を `data.windows.md` に 1 段落（Defender の定義更新 1 件・電源サービスのイベント 11 件・再起動なし。タスクスケジューラのログは無効で、Claude Code のセッションは読んでいない → 「何も動かなかった」とは言わない）。(b) §10.8 の点検の計画の SHA-256 を全桁に（点検の run の manifest の `plan_sha256`）。
+- **結果は読んでいない**: チャンスとの比較（§6.8）は結果の節で G-GEAR が書く。
+- ⚠️ **手順の注意**: Windows の PowerShell に渡す `-File` のパスは `cygpath -w`。`git -C` に MSYS パス（`/c/...`）は渡せない（`C:/...`）。`grep -c $'\r'` はこのシェルで当てにならず、Python で数えた（CR 0）。
+- **影響範囲**: `results/windows/e2_closed_set_windows-msime-tsf.json`・`results/windows/e3_windows.txt`・`data.windows.md`・本ファイル。
