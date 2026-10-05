@@ -3574,6 +3574,11 @@ def _selftest_definitions(check):
                      tmp)
         with open(detp, "wb") as f:
             f.write(original)
+        # 0 is false but not a report of the analysis, which writes true or false.
+        _rewrite(detp, lambda d: d["same_sessions_as_all"].update({"windows-test": 0}))
+        _expect_stop(check, "definitions: negative: a report that is not true or false (0) stops", tmp)
+        with open(detp, "wb") as f:
+            f.write(original)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     tmp = tempfile.mkdtemp(prefix="results_tables_defs_macos_")
@@ -3588,6 +3593,13 @@ def _selftest_definitions(check):
               and "held the same sessions in the cell macos-test." in sup
               and "No cell had sessions that only one of the two definitions held." in sup, sup[-800:])
         detp = os.path.join(tmp, "e1_detection.json")
+        with open(detp, "rb") as f:
+            original = f.read()
+        # A cell that gets no table is checked too.
+        _rewrite(detp, lambda d: d.pop("same_sessions_as_all"))
+        _expect_stop(check, "definitions: negative: a cell without a table and without the report stops", tmp)
+        with open(detp, "wb") as f:
+            f.write(original)
         _rewrite(detp, lambda d: d["cells"]["macos-test"][COMMON_DEFINITION][PRIMARY_COMPARISON]["under_limit"][
             "metrics"]["pooled"].update({"n_gt": 201}))
         _expect_stop(check, "definitions: negative: the same sessions reported with different numbers stops", tmp)
