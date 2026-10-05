@@ -94,6 +94,28 @@ the Windows cell (`data.windows.md`, "Marker times of section 6.9"). `<cell>` is
   on and all 117 blocks of the cell with it off have a complete marker in the oracle, and the marker was found in
   every one of these blocks in the reference log and in the observation (none missing).
 
+## Exploratory dwell quantiles of the macOS cells (run on 2026-10-06 on the measuring machine)
+
+Not registered. The 2.5th and 97.5th percentiles of the dwell error and the fractions of pairs within 100 ms and 1 s
+were computed for both macOS cells with `kit/analysis/explore_dwell_quantiles.py` on the machine of the previous
+sections (macOS 27.0.1, Python 3.14.4). `<cell>` is `macos-standard-live-on` or `macos-standard-live-off`, `<run>` is
+the run directory of that cell listed above (`run.json` has the SHA-256 given above), `<export>` is the export of the
+macOS freezing tag whose `kit/analysis/match.py` is the one of commit `115cd5ff` (SHA-256
+`6f817228e2e7d5f17f65895c7a00a721c28c00df24c46df0c8bd4b237ad72cff`; deviation D10, change 1), the same export as for
+the registered analysis above, and `<scratch>` is an empty directory outside this directory.
+
+- **Command.** `python3 kit/analysis/explore_dwell_quantiles.py --code <export> --run <run> --config
+  <export>/experiment/config.json --seed 20260929 --seed-file <export>/experiment/SEED --prereg
+  <export>/experiment/preregistration.md --registered experiment/results/e1_l1.json --scratch <scratch> --out
+  experiment/results/exploratory/dwell_quantiles_<cell>.json`. Exit status 0 for both cells; the frozen analysis
+  reproduced the number of pairs, bias and median absolute difference of every speed before anything was written. A
+  second run gave a byte-identical file.
+- **Script.** SHA-256 `453bfc02f961a4c2b8436d542f0e3d1ecf44aca2b4b9c18d22d56ca599a91439` (also recorded in the output).
+- **Output SHA-256.** on `eda7cae41160436af7f06c4c3e6fb14125e545793561405cca2d07dfd0a501b8`, off
+  `4dc993a2d15ef95cc57b42481fcb630898cbcd877247831956da3476ee57aff8`.
+
+The tables and values of the manuscript were then regenerated with `manuscript/tools/results_tables.py`.
+
 ## Deposit procedure
 
 1. Right after every attempt, also one that the runner aborted, before the next run of the order (section 3.2 of

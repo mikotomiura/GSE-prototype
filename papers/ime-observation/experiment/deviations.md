@@ -1,15 +1,16 @@
 # Deviations
 
 Departures from the frozen registration (`preregistration.md`, tag `ime-observation-prereg-macos`), recorded
-under section 8 before the analysis they affect is run, except D11, which changes how a result is reported and was
-made after every result had been seen. Each entry gives its date, the reason and the effect. D1
+under section 8 before the analysis they affect is run, except D11 and D12, which change how results are reported and
+were made after every result had been seen. Each entry gives its date, the reason and the effect. D1
 to D5 were made for the Windows cell before any Windows measurement; the evidence that they leave the macOS
 cells unchanged is given at the end. D6 concerns the macOS
 measurement. D7 was made after the measurement of the Windows cell and before any analysis of it, and concerns
 the Windows cell only. D8 was made before the closed-set attack of question 4 was run on any cell, and concerns all
 three cells. D9 concerns the Windows measurement. D10 was made when the analysis of the macOS cells stopped, before
 any of their results of questions 1 to 3 was seen; the registered results of the Windows cell had been computed by
-then. D11 concerns the report of question 3 in all three cells.
+then. D11 concerns the report of question 3 in all three cells. D12 concerns the report of question 1 in the Windows
+cell.
 
 ## D1. Scenario S4 presses three Escapes on Windows (2026-10-03)
 
@@ -269,6 +270,31 @@ strata as in the primary scope. Every other value of question 3 is unchanged. In
 speed with live conversion on) the reference differs from 1 in a single text; their ICCs keep their values and are
 described in the text as near zero for the same reason. This deviation was made after all results had been seen, when
 a simulated review of the article before its submission pointed out these values.
+
+## D12. On Windows the detection under the definition common to both systems is also reported (2026-10-06)
+
+**What changes.** For a cell in which the definition of the analysis and the definition common to both systems
+(`all`, every session) do not hold the same sessions, which in this study is the Windows cell only, the article
+reports for the primary comparison, in the primary scope and over all trials, how many reference sessions the
+definition of the analysis leaves out and the detection pooled over the strata under the common definition (recall,
+precision, split rate and merge rate with their Wilson intervals), next to the same measures under the definition of
+the analysis. Sections 5 and 10.7 of the registration report under the common definition only whether the two
+definitions hold the same sessions; section 5 states that the results under `all` are not otherwise reported. The
+analysis code and the result files do not change: the result files hold the detection under both definitions, and the
+values are taken from them by the script that turns the result files into the tables and the values of the article
+(`manuscript/tools/results_tables.py`), which also requires the analysis to have reported for every cell whether the
+two definitions hold the same sessions, and the definition of the analysis to hold no more sessions than the common
+one in the primary scope and over all trials, and as many where the two are reported to hold the same sessions.
+
+**Reason.** On Windows the definition of the analysis keeps only the sessions in which the reference field reported a
+candidate element. That the two definitions do not hold the same sessions does not show how many sessions differ or
+how far the estimates of question 1 depend on the choice of definition.
+
+**Effect.** No registered value changes; values are added to the text of question 1 and a table to the supplement. In
+the macOS cells the two definitions held the same sessions, and no value or table is added for them; the supplement
+says that they held the same sessions. This deviation was made
+after all results had been seen, including the detection under the common definition, when a simulated review of the
+article before its submission asked for the size of the difference between the two definitions.
 
 ## The macOS cells are unchanged
 

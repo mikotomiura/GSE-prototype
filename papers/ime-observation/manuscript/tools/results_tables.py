@@ -220,6 +220,10 @@ def definition_of(system):
     return "windows_def" if system == "windows" else "macos_def"
 
 
+# The definition common to both systems (every session).
+COMMON_DEFINITION = "all"
+
+
 def stratum_key(st):
     return (st["scenario"], st["speed"])
 
@@ -257,6 +261,14 @@ class Cell(object):
             raise ValueError("%s: cell %s holds the comparisons %s, not those of %s" % (
                 self.src["e1_detection.json"], label, ", ".join(self.comparisons), system))
         self.det_by = dict((c, definition_block[c]) for c in self.comparisons)
+        # The detection of the primary comparison under the definition common to both systems, which the analysis
+        # also runs (sections 5 and 10.7 of the registration); deviation D12 reports it where the two differ.
+        common = (docs["e1_detection.json"]["cells"][label].get(COMMON_DEFINITION) or {}).get(PRIMARY_COMPARISON) or {}
+        for scope in SCOPES:
+            if not common.get(scope):
+                raise ValueError("%s: no %s under %s for cell %s" % (self.src["e1_detection.json"], scope,
+                                                                      COMMON_DEFINITION, label))
+        self.det_common = common
         l1_block = docs["e1_l1.json"]["cells"][label][self.definition]
         if tuple(c for c, _ in COMPARISONS if l1_block.get(c)) != self.comparisons:
             raise ValueError("%s: cell %s does not hold the comparisons of the detection results" % (
@@ -868,6 +880,106 @@ def dwell_explore_supplement(cells, docs):
                 lines.append(" & ".join(head + [fmt_int(e["n"])]
                                         + [fmt_signed(e["percentiles"][k], True) for k, _ in DWELL_EXPLORE_PCTS]
                                         + [fmt_pct(e["within"][k]) for k, _ in DWELL_EXPLORE_WITHIN]) + " \\\\\n")
+        lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n\n"]
+    return "".join(lines)
+
+
+# ---------------------------------------------------------------- deviation D12: the definition common to both systems
+
+# The registration reports, under the common definition, only whether it holds the same sessions as the definition of
+# the cell's system (sections 5 and 10.7). Deviation D12 also reports the pooled detection of the primary comparison
+# under both definitions for a cell in which they do not.
+DEFINITION_MEASURES = (("recall", "Recall"), ("precision", "Precision"), ("split_rate", "Split rate"),
+                       ("merge_rate", "Merge rate"))
+
+
+def definition_pooled(cell, scope):
+    """The pooled detection of the primary comparison in a scope under the definition of the analysis and under the
+    common one. The definition of the analysis keeps some of the sessions of the common one, so it cannot hold more;
+    and where the analysis reports that the two hold the same sessions, they must hold as many in every scope."""
+    own, common = cell.det[scope]["metrics"]["pooled"], cell.det_common[scope]["metrics"]["pooled"]
+    where = "%s:cells/%s/{%s,%s}/%s/%s/metrics/pooled/n_gt" % (cell.src["e1_detection.json"], cell.label,
+                                                               cell.definition, COMMON_DEFINITION, PRIMARY_COMPARISON,
+                                                               scope)
+    # Without the report of whether the two definitions hold the same sessions, the supplement could not say which
+    # cells it leaves out (the registration asks for the report per cell).
+    if not isinstance(cell.det_top.get("same_sessions_as_all"), bool):
+        raise ValueError("%s:same_sessions_as_all/%s: no report of whether the two definitions hold the same sessions"
+                         % (cell.src["e1_detection.json"], cell.label))
+    if own["n_gt"] > common["n_gt"]:
+        raise ValueError("%s: the definition of the analysis holds more sessions than the common one" % where)
+    if cell.det_top.get("same_sessions_as_all") and own["n_gt"] != common["n_gt"]:
+        raise ValueError("%s: the two definitions are reported to hold the same sessions but differ in number" % where)
+    return own, common
+
+
+def definition_values(cell):
+    """Deviation D12, for the text: per scope, the sessions of the common definition, how many of them the definition
+    of the analysis leaves out, and the pooled measures under the common definition, for a cell in which the two
+    definitions do not hold the same sessions."""
+    vals = {}
+    for scope in SCOPES:
+        own, common = definition_pooled(cell, scope)
+        if cell.det_top.get("same_sessions_as_all") is not False:
+            continue
+        base = "%s.defs.%s" % (cell.label, "primary" if scope == PRIMARY_SCOPE else "all")
+        src = "%s:cells/%s/%s/%s/%s/metrics/pooled" % (cell.src["e1_detection.json"], cell.label, COMMON_DEFINITION,
+                                                       PRIMARY_COMPARISON, scope)
+        vals[base + ".common.sessions"] = {"text": fmt_int(common["n_gt"]), "value": common["n_gt"],
+                                           "source": src + "/n_gt"}
+        vals[base + ".common.rows"] = {"text": fmt_int(common["n_obs"]), "value": common["n_obs"],
+                                       "source": src + "/n_obs"}
+        for m, _ in DEFINITION_MEASURES:
+            vals["%s.common.%s" % (base, m.replace("_", ""))] = {
+                "text": ci_text(common[m]), "value": [common[m]["value"], common[m]["lo"], common[m]["hi"]],
+                "source": src + "/" + m}
+        vals[base + ".leftout"] = {"text": fmt_int(common["n_gt"] - own["n_gt"]), "value": common["n_gt"] - own["n_gt"],
+                                   "source": "%s/n_gt minus %s" % (src, cell.path("e1_detection.json", scope,
+                                                                                    "metrics/pooled/n_gt"))}
+    return vals
+
+
+def definitions_supplement(cells):
+    """Supplement: the pooled detection of the primary comparison under both definitions, for the cells in which they
+    do not hold the same sessions (deviation D12)."""
+    lines = [GENERATED_NOTE, "\\section*{Detection under the definition common to both systems}\n"
+             "\\label{sec:supp-definitions}\n\n",
+             "Reported under deviation D12. The registration reports under the definition of a session common to both "
+             "systems (\\texttt{all}, every session) only whether it holds the same sessions as the definition of the "
+             "cell's system. For a cell in which it did not, the detection of the primary comparison pooled over the "
+             "strata is given under both definitions, with Wilson intervals, which for pooled proportions are lower "
+             "bounds of the uncertainty. A pooled value is not an estimate for natural typing.\n\n"]
+    shown = [c for c in cells if c.det_top.get("same_sessions_as_all") is False]
+    same = [c.label for c in cells if c.det_top.get("same_sessions_as_all")]
+    if same:
+        lines.append("The two definitions held the same sessions in %s.\n\n" % " and in ".join(
+            "the cell %s" % cell_name(c) for c in same))
+    if not shown:
+        lines.append("No cell had sessions that only one of the two definitions held.\n\n")
+    for cell in shown:
+        name = cell_name(cell.label)
+        # One column per scope and definition, the definition of the analysis first; an estimate above its interval.
+        cols = []
+        for scope in SCOPES:
+            own, common = definition_pooled(cell, scope)
+            cols += [own, common]
+        defs = [tex_escape(cell.definition), COMMON_DEFINITION] * len(SCOPES)
+        lines += ["{\\footnotesize\n",
+                  "\\begin{longtable}{L{0.20}%s}\n" % ("L{%.2f}" % (0.80 / len(cols)) * len(cols)),
+                  "\\caption{Detection of the primary comparison pooled over the strata under the definition of the "
+                  "analysis (\\texttt{%s}) and the common definition (\\texttt{%s}), cell %s}"
+                  "\\label{tab:definitions-%s}\\\\\n" % (tex_escape(cell.definition), COMMON_DEFINITION, name,
+                                                         cell.label),
+                  "\\toprule\n",
+                  " & %s \\\\\n" % " & ".join("\\multicolumn{2}{l}{\\texttt{%s}}" % tex_escape(s) for s in SCOPES),
+                  "".join("\\cmidrule(lr){%d-%d}" % (2 + 2 * i, 3 + 2 * i) for i in range(len(SCOPES))) + "\n",
+                  "Measure & %s \\\\\n" % " & ".join("\\texttt{%s}" % d for d in defs),
+                  "\\midrule\n\\endhead\n",
+                  "Reference sessions & %s \\\\\n" % " & ".join(fmt_int(p["n_gt"]) for p in cols),
+                  "Session rows & %s \\\\\n" % " & ".join(fmt_int(p["n_obs"]) for p in cols)]
+        for m, label in DEFINITION_MEASURES:
+            lines.append("%s & %s \\\\\n" % (label, " & ".join(ci_text(p[m]).replace(" [", "\\newline [", 1)
+                                                               for p in cols)))
         lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n\n"]
     return "".join(lines)
 
@@ -1920,8 +2032,10 @@ def reference_spread(cell, scope, m, speed=None):
         vals.append(g[m])
     n = len(vals)
     if n >= 2:
-        mean = sum(vals) / float(n)
-        sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / (n - 1))
+        # math.fsum, not sum: sum() adds floats with compensation from Python 3.12 on, so the last digits written to
+        # values.json would depend on the version of Python that made them.
+        mean = math.fsum(vals) / float(n)
+        sd = math.sqrt(math.fsum((v - mean) ** 2 for v in vals) / (n - 1))
     else:
         sd = None
     return {"n": n, "sd": sd, "constant": n >= 2 and max(vals) == min(vals)}
@@ -2374,6 +2488,7 @@ def build(results_dir):
         values.update(reference_values(cell, clocks[cell.label]))
         values.update(timing_values(cell))
         values.update(diagnostic_values(cell))
+        values.update(definition_values(cell))
         values.update(d10_values(cell, d10[cell.label]))
         values.update(l2_values(cell))
         values.update(dwell_explore_values(cell, dwellx[cell.label]))
@@ -2398,6 +2513,7 @@ def build(results_dir):
         "detection-layers.tex": table_layers(cells, d10).encode("utf-8"),
         "session-strata.tex": session_supplement(cells).encode("utf-8"),
         "dwell-explore.tex": dwell_explore_supplement(cells, dwellx).encode("utf-8"),
+        "detection-definitions.tex": definitions_supplement(cells).encode("utf-8"),
         "fig-detection.tex": figure_detection(cells).encode("utf-8"),
         "fig-dwell.tex": figure_dwell(cells).encode("utf-8"),
         "fig-text-agreement.tex": figure_text(cells).encode("utf-8"),
@@ -2728,6 +2844,15 @@ def _fixture(tmp, label="windows-test", sub="windows"):
         top["long_trials_from"] = {label: {"band_ms": 1000, "limit_ms": 20000, "by_stratum": {},
                                            "total": {"n_band": 6, "n_differ": 2, "n_long": 617, "n_long_gt": 615,
                                                      "n_trials": 2925}}}
+    # The definition common to both systems: on macOS the same sessions (a copy); on Windows 10 more reference sessions
+    # in the primary scope and 12 more over all trials, with other measures, so that a mix-up of the two shows.
+    if sub:
+        cells_det[COMMON_DEFINITION] = {PRIMARY_COMPARISON: {"under_limit": det_scope(det_u, 1, r=0.86),
+                                                             "all_trials": det_scope(det_a, 1, focus_a, r=0.76)}}
+        for scope, n in (("under_limit", 210), ("all_trials", 212)):
+            cells_det[COMMON_DEFINITION][PRIMARY_COMPARISON][scope]["metrics"]["pooled"]["n_gt"] = n
+    else:
+        cells_det[COMMON_DEFINITION] = json.loads(json.dumps(cells_det[defn]))
     cells_l2 = {defn: {PRIMARY_COMPARISON: {"under_limit": l2_scope(kept_u, oos_u, excl),
                                             "all_trials": l2_scope(kept_a, {}, excl)}}}
     # over all trials another value, so that reading the wrong scope shows
@@ -3290,6 +3415,12 @@ def _selftest_spread(check):
           sp["n"] == 3 and not sp["constant"] and abs(sp["sd"] - math.sqrt(1.0 / 3.0)) < 1e-12, sp)
     sp = reference_spread(_FakeCell("x", gt, obs), PRIMARY_SCOPE, "m", "mid")
     check("spread: one text has no SD and is not constant", sp == {"n": 1, "sd": None, "constant": False}, sp)
+    # Ten texts of 0.1 (not exact in binary): a sum from left to right gives a mean below 0.1 and an SD above zero, so
+    # the value would differ between versions of Python; the correctly rounded sum gives exactly zero.
+    tens = [dict(t(k, "slow"), m=0.1) for k in range(10)]
+    sp = reference_spread(_FakeCell("x", tens, tens), PRIMARY_SCOPE, "m", "slow")
+    check("spread: the sums are correctly rounded, so the SD does not depend on the version of Python",
+          sp == {"n": 10, "sd": 0.0, "constant": True}, sp)
     for name, bad in (("in length", obs[:3]), ("in alignment", [obs[1], obs[0]] + obs[2:])):
         try:
             reference_spread(_FakeCell("x", gt, bad), PRIMARY_SCOPE, "m", "slow")
@@ -3392,6 +3523,86 @@ def _selftest_dwell_explore(check):
                 check("dwellx: a file %s is refused" % name, True)
             except Exception as ex:
                 check("dwellx: a file %s is refused" % name, False, repr(ex))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _selftest_definitions(check):
+    """Deviation D12: the detection under the common definition, for a cell whose two definitions differ, on a synthetic
+    Windows cell (they differ) and a synthetic macOS cell (they hold the same sessions)."""
+    close = lambda a, b: a is not None and len(a) == len(b) and all(abs(x - y) < 1e-9 for x, y in zip(a, b))
+    tmp = tempfile.mkdtemp(prefix="results_tables_defs_")
+    try:
+        _fixture(tmp)
+        files = build(tmp)
+        vals = json.loads(files["values.json"].decode("utf-8"))["values"]
+        sup = files["detection-definitions.tex"].decode("utf-8")
+        g = lambda k: (vals.get("windows-test.defs." + k) or {}).get("value")
+        check("definitions: the sessions of the common definition and those that the definition of the analysis "
+              "leaves out, per scope",
+              (g("primary.common.sessions"), g("primary.leftout"), g("all.common.sessions"), g("all.leftout"))
+              == (210, 10, 212, 12), str([g(k) for k in ("primary.common.sessions", "primary.leftout")]))
+        check("definitions: the measures are those of the common definition in each scope, not of the analysis",
+              close(g("primary.common.recall"), [0.86, 0.81, 0.91]) and close(g("all.common.precision"),
+                                                                              [0.76, 0.71, 0.81])
+              and close(g("primary.common.mergerate"), [0.0, 0.0, 0.1])
+              and close(vals["windows-test.pooled.gtobs.underlimit.recall"]["value"], [0.9, 0.85, 0.95]),
+              str((g("primary.common.recall"), g("all.common.precision"))))
+        check("definitions: the supplement gives both definitions in both scopes, the analysis's first",
+              "Measure & \\texttt{windows\\_def} & \\texttt{all} & \\texttt{windows\\_def} & \\texttt{all} \\\\" in sup
+              and sup.find("\\multicolumn{2}{l}{\\texttt{under\\_limit}}")
+              < sup.find("\\multicolumn{2}{l}{\\texttt{all\\_trials}}")
+              and "Reference sessions & 200 & 210 & 200 & 212 \\\\" in sup
+              and "Recall & 0.900\\newline [0.850, 0.950] & 0.860\\newline [0.810, 0.910] & 0.800\\newline "
+                  "[0.750, 0.850] & 0.760\\newline [0.710, 0.810] \\\\" in sup, sup[-1500:])
+        # The common definition cannot hold fewer sessions than the definition of the analysis.
+        detp = os.path.join(tmp, "windows", "e1_detection.json")
+        with open(detp, "rb") as f:
+            original = f.read()
+        _rewrite(detp, lambda d: d["cells"]["windows-test"][COMMON_DEFINITION][PRIMARY_COMPARISON]["all_trials"][
+            "metrics"]["pooled"].update({"n_gt": 199}))
+        _expect_stop(check, "definitions: negative: fewer sessions under the common definition stops", tmp)
+        with open(detp, "wb") as f:
+            f.write(original)
+        _rewrite(detp, lambda d: d["cells"]["windows-test"].pop(COMMON_DEFINITION))
+        _expect_stop(check, "definitions: negative: no result under the common definition stops", tmp)
+        with open(detp, "wb") as f:
+            f.write(original)
+        # Without the report of whether the definitions hold the same sessions, the supplement cannot place the cell.
+        _rewrite(detp, lambda d: d.pop("same_sessions_as_all"))
+        _expect_stop(check, "definitions: negative: no report of whether the definitions hold the same sessions stops",
+                     tmp)
+        with open(detp, "wb") as f:
+            f.write(original)
+        # 0 is false but not a report of the analysis, which writes true or false.
+        _rewrite(detp, lambda d: d["same_sessions_as_all"].update({"windows-test": 0}))
+        _expect_stop(check, "definitions: negative: a report that is not true or false (0) stops", tmp)
+        with open(detp, "wb") as f:
+            f.write(original)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    tmp = tempfile.mkdtemp(prefix="results_tables_defs_macos_")
+    try:
+        _fixture(tmp, "macos-test", "")
+        files = build(tmp)
+        vals = json.loads(files["values.json"].decode("utf-8"))["values"]
+        sup = files["detection-definitions.tex"].decode("utf-8")
+        check("definitions: a cell whose two definitions hold the same sessions has no value and no table, and the "
+              "supplement says so",
+              not any(".defs." in k for k in vals) and "longtable" not in sup
+              and "held the same sessions in the cell macos-test." in sup
+              and "No cell had sessions that only one of the two definitions held." in sup, sup[-800:])
+        detp = os.path.join(tmp, "e1_detection.json")
+        with open(detp, "rb") as f:
+            original = f.read()
+        # A cell that gets no table is checked too.
+        _rewrite(detp, lambda d: d.pop("same_sessions_as_all"))
+        _expect_stop(check, "definitions: negative: a cell without a table and without the report stops", tmp)
+        with open(detp, "wb") as f:
+            f.write(original)
+        _rewrite(detp, lambda d: d["cells"]["macos-test"][COMMON_DEFINITION][PRIMARY_COMPARISON]["under_limit"][
+            "metrics"]["pooled"].update({"n_gt": 201}))
+        _expect_stop(check, "definitions: negative: the same sessions reported with different numbers stops", tmp)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -3535,6 +3746,7 @@ def selftest():
     _selftest_figures(check)
     _selftest_spread(check)
     _selftest_dwell_explore(check)
+    _selftest_definitions(check)
 
     tmp = tempfile.mkdtemp(prefix="results_tables_selftest_")
     try:

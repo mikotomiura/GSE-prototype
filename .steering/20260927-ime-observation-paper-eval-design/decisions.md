@@ -1724,3 +1724,53 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 1 巡目（本文・1,205 行）: P2「両列が定数なら未定義、は誤り」→ 真（参照 1・ロガー 2 なら 0）。P2「窓のイベントの経路なら 20 秒超の行を書いたはず、は言えない」→ 真（会話の始め直し・窓と合成は別の構成概念）→ 書き直した。P2「道具とビルドの接続が見えない」→ 偽陽性（コードは別の回に渡した・そちらで確かめた）。
   - 2 巡目（直しの境界・326 行）: P2「未定義の条件がまだ曖昧」→「参照と同じ値をロガーも全文に書くとき」に。P2「照合の出力で選ぶ処理の退行のテストが無い」→ `primary_call()` を切り出し、件数・偏り・中央絶対差が同じで裾の違う 2 つの出力から登録の SHA-256 の方を取ることを selftest で確かめた（確かめは例外で落ちない形・変異 4 本すべて赤）。
   - 最終: 表の道具の selftest 162 件・変異 17 本すべて赤。探索的なスクリプトの selftest 0 failed。Windows の探索的な出力は最終の版で回し直した（記録したスクリプトの SHA-256 がコミットのファイルと一致・値は最初から同じ）。`build.sh --submission` エラー 0・文体 違反 0。
+
+## 判断 190: macOS 2 セルの探索的な dwell の分位点を Mac で回し、原稿の `\rv` の 8 個を埋める（2026-10-06・Mac・引き継ぎ manuscript-3 §2 の 1・メインの実行）
+
+- **実行**: macOS の凍結タグの書き出し（`~/ime-m4/export-d10`・`match.py` は commit `115cd5ff` のものと SHA-256 一致＝逸脱 D10 の第 1 の変更）を `--code` に、run は `experiment/runs/macos-standard-live-{on,off}-1`（`run.json` の SHA-256 は `data.md` と一致）。2 セルとも exit 0。凍結の解析が登録の速さごとの n・偏り・中央絶対差を再現し、登録の `e1_l1.json`（`1e22b6fb…`）と一致した。止まらず・値を合わせに行っていない。
+- **再現**: 2 回目の実行は 2 セルとも 1 回目とバイト一致。出力 SHA-256 は on `eda7cae4…`・off `4dc993a2…`（全桁は `data.md`）。スクリプトの SHA-256 は `453bfc02…`（出力の記録と一致）。
+- **反映**: `results_tables.py` で表を再生成（`dwell-explore.tex`・`values.tex`・`values.json`）。原稿の `\rv` の未定義は 0（手元の突き合わせ）。`data.md` に実行の記録を足した。文体の検査 違反 0。
+- ⚠️ **フルビルドは未実施**: Mac に SN テンプレート（`~/tools/sn-template`）が無い。「生成されていない値 0」は `\rv` のキーと `values.tex` の定義の突き合わせで確かめた。LaTeX の通しは G-GEAR で。
+- **残り**（引き継ぎ §2 の 2〜7）: 表の道具に Windows の 2 つの定義の差（Z40）・研究者の読み直しと Discussion・round 2 を回すか・M12 は未着手。
+
+## 判断 191: 判断 190 を G-GEAR で通しで確かめ、表の道具の参照の SD の和を `math.fsum` にする —— `values.json` の最後の桁が Python の版で変わり、`build.sh` の最新性の検査が別の機械で止まった（2026-10-06・G-GEAR・メインの選択・研究者が覆せる）
+
+- **見つけたこと**: Mac の枝（`f4962768`）を G-GEAR で `build.sh --submission` すると「`results_tables.py: out of date with the result files: values.json`」で止まった。G-GEAR（Python 3.11.9）で作り直した `values.json` と Mac（3.14.4）の版の差は、参照の文間の SD（`*.l2.*.refsd`）の 5 個の値の**最後の 1〜2 桁だけ**（丸めた文字列・`values.tex`・表はバイト一致）。
+- **原因（一次で確かめた）**: `reference_spread()` が浮動小数の和を組み込みの `sum()` で取っていた。Python 3.12 から `sum()` は浮動小数を補正つきで足すので、3.11 と 3.12 以降で最後の桁が変わる。表の道具のほかの `sum()` は整数の数え上げだけ（grep で確かめた）。探索的なスクリプトの `sum()` は selftest の仮の関数（整数）だけ。
+- **直し**: `reference_spread()` の平均と平方和を `math.fsum`（正しく丸めた和・版に依らない）に。**値の定義（標本の SD）は変えていない**（登録の規則でも表の規則でもない・数値の足し方だけ）。G-GEAR で作り直した生成物は Mac の版と**バイト一致**（`git diff` 0）→ コミット済みの生成物はそのまま。
+- **検証**: selftest 162 → 163 件（0.1 を 10 文 → SD がちょうど 0 で一定）。使い捨ての変異（`fsum` を `sum` に戻す）は 3.11 で赤（⚠️ 3.12 以降では補正つきの `sum()` が同じ答えを出すので、この変異は 3.11 の機械でしか赤にならない）。`build.sh --submission`: main・main-submission・補遺ともエラー 0・未定義の参照 0・**生成されていない値 0**・bibtex の警告 0・overfull は main 1（以前と同じ）・補遺 167（`session-strata` 50・`detection-strata` 41 など既存の層ごとの表から・探索的な dwell の表からは 0）。補遺 136 頁の表 50〜52 を画像で確かめた。文体の検査 違反 0。
+- **判断 190 の独立の確かめ**: 探索的な出力 2 つの SHA-256 が `data.md` と一致・CR 0。出力に記録したスクリプトの SHA-256（`453bfc02…`）がコミットのスクリプトと一致。`run_manifest`（on `0257755c…`・off `4ac581cb…`）は `data.md` の run の manifest と、`obs` は登録の `e1_delivery.json` の記録と一致。`e1_l1_registered` は登録の `e1_l1.json` の SHA-256（`1e22b6fb…`）と一致。
+- **影響範囲**: `manuscript/tools/results_tables.py`（`reference_spread()` と selftest）・本ファイル・`tasklist.md`。
+
+## 判断 192: Z40（Windows の 2 つの定義の差）を逸脱 D12 として報告する —— 登録 §5 は共通の定義の結果を「報告しない」と書いていた（2026-10-06・G-GEAR・研究者の選択〔推奨どおり〕・実装はメイン）
+
+- **見つけたこと（一次で確かめた）**: 判断 188 は Z40 を「1 文と補遺の参照」で承認したが、登録 §5（`preregistration.md` 594〜598 行）は「The analysis is also run under the definition common to both systems (`all`) … and the results under `all` are not otherwise reported」、§10.7 は Windows を「as on macOS」とする。→ 共通の定義の recall・precision を出すのは登録の約束から外れる。§6.12（書かれていない解析は探索的に）には「報告しない」と明記された結果は当たりにくい。判断 188 の時点ではこの約束に気づいていなかった（問いの前提を一次で確かめ直した）。
+- **研究者への問い（AskUserQuestion・推奨つき）**: 「数＋探索的な値・D12（推奨）」「数だけ（登録の範囲内）」「探索的な値・逸脱なし」。⚠️ 問いの中で、私（Claude）がすでに値を見たこと（主の範囲で共通の定義 2,306 会話・recall 0.880・precision 0.760、解析の定義 2,280・0.889・0.759）を開示した。→ **研究者は「数＋探索的な値・D12」を選んだ。**
+- **実装**:
+  - 表の道具: `Cell` が共通の定義（`all`）の主の比較の検出を読む（無ければ止まる）。`definition_pooled()` が「解析の定義の会話が共通の定義より多い」「同じ会話と報告されたのに数が違う」で止まる。`definition_values()`（2 つの定義が同じでないセルだけ: 範囲ごとに共通の定義の会話・行・recall・precision・分割・統合の率と、外れた会話の数）。補遺 `generated/detection-definitions.tex`（行＝量・列＝範囲×定義・推定値の下に区間）。横向きにすると表が次の頁に送られて頁が空いたので縦の表にした（補遺の overfull は 167 のまま）。
+  - D10 の直した解析でも Windows のプールした統合の数は登録と同じ（主の範囲 3・23）を確かめた。
+  - 値（主の範囲）: 外れた参照の会話 26 / 2,306（全試行 28 / 2,923）。共通の定義で recall 0.880・precision 0.760・統合の率 0.009（解析の定義 0.889・0.759・0.001）。⚠️ 統合の率は約 8 倍（3 → 23 件）—— 本文は研究者の承認どおり recall・precision だけ、分割・統合は補遺。研究者の読み直し（§2 の 3）で事実として渡す。
+  - `deviations.md`: 冒頭（D11 と D12 は結果を見た後）と D12 の本文（値は書かず補遺を指す）。`method.tex`: 定義の段落に D12・「Twelve deviations」・逸脱の表に D12 の行。`results-agreement.tex`「The two definitions」に数と値。`declarations.tex`「Deviations D11 and D12 were made after the results had been seen」。`supplement.tex` に新しい節。外枠（`outline.md` の「D1 to D10」）は結果の前に報告の規則を固めた版として commit で引く文書なので書き換えない（D11 の先例と同じ）。
+- **検証**: selftest 163 → 170 件。使い捨ての変異 11 本すべて赤（scratchpad の `mutate_defs.py`: 共通の定義でなく解析の定義の値・外れた数の符号・2 つの止まる確かめ・補遺の順・範囲の取り違え・共通の定義が無いときの確かめ・同じセルにも値・全セルに表・読む定義の取り違え・区間の改行）。前の `mutate_d11.py` 17 本もすべて赤のまま。`build.sh --submission`: エラー 0・未定義の参照 0・生成されていない値 0・bibtex の警告 0・overfull は main 1・補遺 167。補遺 67 頁を画像で確かめた。文体の検査 違反 0。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（`values.*`・新規 `detection-definitions.tex`）・`manuscript/supplement/supplement.tex`・`manuscript/sections/{method,results-agreement,declarations}.tex`・`experiment/deviations.md`・`verdict.md` §8・本ファイル・`tasklist.md`。
+
+## 判断 193: 研究者の読み直しの資料を渡す —— 主張 ↔ 根拠・Discussion の事実・断りの重複を日本語で、Mac の下書きの取り違え 2 点を事実と突き合わせて（2026-10-06・G-GEAR・引き継ぎ manuscript-3 §2 の 3・メインの選択）
+
+- **資料**: `reading-results-discussion.md`（公開しない）。§A は §6〜9・§12〜14 の段落ごとの主張と根拠（登録の節・結果ファイル・表）と見てほしい点（★）。§B は Discussion の事実 F1〜F8 と問い 7 つ。§C は断りの重複 7 種の場所と置き場所の案。PDF は `~/ime-paper-build/`（repo の外）。値は `values.json`（`49bb761d`）から読むための写し。
+- **事実として新しく拾ったもの（一次で確かめた）**: (1) 予測の層の表で、どの層にも入らない試行は参照とロガーも参照と予測も recall = precision = 0.960（off）・0.973（on）。(2) Windows は S2・S8 の遅い速さで分割の率 0.95・0.97 が速さとともに下がり、**分割の無い S1 でも recall が 0.976 → 0.571 と速さで下がる**。(3) 書字研究のポーズの尺度の文献は `references.bib` に無い（Discussion で並べるなら新しく引く）。
+- **Mac の下書き（`a0a374c9`・Claude の提案）を突き合わせた点**: 「記号キーによる分割（S6・S10）」は取り違え（S6 は Backspace、S10 は Tab。記号キーは別の層）。「Windows の分割（S2・S8）」だけでは S1 の速さによる低下を覆わない。どちらも資料の §B.3 に書いた。下書きの筋（予測可能性で分ける）を採るかは研究者。
+- **次**: 研究者が §A の各行・§B.4 の問い・§C の置き場所に答える → Claude が英語にする（Discussion は研究者の解釈から）→ round 2 を回すかを問う。
+
+## 判断 194: この枝の作業中の点検（code-reviewer ∥ security-checker）の指摘を一次で確かめて直す（2026-10-06・G-GEAR・M1 は研究者の選択・残りはメインの選択）
+
+- **対象**: `cc12c571..2749d6e7` の `papers/`（副次で読み直しの資料の §B.2）。security-checker: CRITICAL / HIGH / MEDIUM 0・LOW 1。code-reviewer: MEDIUM 1・LOW 3・資料 2。
+- **一次で確かめて真だったもの（直した）**:
+  - M1: D12 の段落が定義でほぼ変わらない recall・precision だけを本文に出し、区間の重ならない統合の率（0.001 → 0.009）は補遺だけ → 選んで出したように読める。**研究者に問い（推奨: 統合の率も本文に）、研究者が推奨を選んだ** → 本文に統合の率の対比を足した。
+  - L1: 「同じ会話か」の報告（`same_sessions_as_all`）が無いセルを黙って飛ばし、補遺が「どのセルにも片方だけの会話は無い」と書きうる → `definition_pooled()` で bool でなければ止まる。selftest 171 件・変異 12 本すべて赤。
+  - L2: D12 の「in every scope」は確かめる範囲（主の範囲と全試行）より広い → 書き直した（報告の有無の確かめも書いた）。L3: 「nothing is added」→「no value or table is added; the supplement says that they held the same sessions」。
+  - 資料 S1: F5 の「97.5% 点は macOS で正の数秒」「2.5% 点は全セルで負の数秒」「on は 4〜5 割」は誤り（遅い速さは 6・41 ms など）→ 速さごとの値に書き直した。資料 S2: 持ち出しの層の統合の率は登録どおりの値だけを書いていた → D10 で直した値（0.901・0.859）を並べた。
+- **確かめて直さなかったもの**: security LOW（非公開の作業 repo の commit `115cd5ff` の参照）は範囲より前から 5 か所にある（`git grep` で確かめた）→ M12 で公開の repo を**履歴なしで**作るときに、参照を公開側のタグか SHA-256 に揃えるかを決める（M12 の注意に入れる）。
+- **検証**: `build.sh --submission` エラー 0・未定義の参照 0・生成されていない値 0・overfull main 1・補遺 167。`--check` 一致。文体の検査 違反 0。
+- **追記（同日・/cross-review 2 巡・`run-codex-review.sh` をパス限定で 2 回・48,136 tokens・今日の台帳 111,404 → 159,540 / 3 → 5 回）**:
+  - 1 巡目（`cc12c571..f2728eb8`・papers/ の 8 ファイル・491 行・29,090）: P1「新しい `\rv` の生成物が差分に無い」→ 偽陽性（生成物は git で追跡され `build.sh` が最新性を検査する・差分から外したのはこちら・ビルドで生成されていない値 0）。P2「同じ会話かの確かめが件数だけ」→ 偽陽性（上流の `pipeline.py` 821 行が会話の記録の列そのものを `==` で比べて旗を作る・道具の件数の確かめは整合の確かめ）。
+  - 2 巡目（点検の直しの境界 `2749d6e7..f2728eb8`・19,046）: 1「全セルが `definition_pooled()` を通るか」→ 偽陽性（`definition_values()` が `continue` の前に全セル・両範囲で呼ぶ）。2 → 1 巡目の P2 と同じ。3「型の確かめのテストが欠落だけ」→ 真（安い）→ 0 を拒むテストと、表を出さない macOS のセルで報告が欠けたら止まるテストを足した。selftest 173 件・変異 14 本（`isinstance` を `is None` に緩める・表の無いセルで確かめを飛ばす、を含む）と前の 17 本すべて赤。`--check` 一致。

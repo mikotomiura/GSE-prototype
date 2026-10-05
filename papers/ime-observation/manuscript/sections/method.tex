@@ -108,7 +108,8 @@ cell's system: on macOS every session, and on Windows the sessions that showed a
 method opens its prediction window, which the field reports as a candidate element, while the reading is typed, so on
 Windows this definition holds nearly all sessions and does not mean that the reading was converted. The analysis was
 also run under the definition common to both systems (every session); whether the two definitions hold the same
-sessions is reported per cell.
+sessions is reported per cell, and where they do not, how many sessions the definition of the analysis leaves out and
+the detection pooled under the common definition are also reported (deviation D12).
 
 \subsection{Scenarios, speeds and plans}
 \label{sec:method-plans}
@@ -388,12 +389,13 @@ Registration & \url{https://osf.io/9nh7r} & \url{https://osf.io/4jwzn} \\
 \end{tabular}
 \end{table}
 
-Eleven deviations were recorded (Table~\ref{tab:deviations}): five for the Windows cell before the Windows
+Twelve deviations were recorded (Table~\ref{tab:deviations}): five for the Windows cell before the Windows
 measurement, one for the macOS runs after their measurement and before their analysis (D6), two for the Windows runs
 after their measurement (D7, before the analysis of the cell, and D9), one for the closed-set attack of all three
 cells before that attack was run on any of them (D8), one for the analysis of questions 1 to 3 (D10), made when the
-frozen analysis stopped on the macOS cells and before any of their results of these questions was seen, and one for the
-reporting of the per-text ICC (D11), made after all results had been seen. The registered results of questions 1 to 3
+frozen analysis stopped on the macOS cells and before any of their results of these questions was seen, and two for
+reporting, made after all results had been seen: of the per-text ICC (D11) and of the detection under the definition
+common to both systems on Windows (D12). The registered results of questions 1 to 3
 of the Windows cell, on which the frozen code did not stop, had been computed and committed before D10, and the
 corrected analysis of D10 was applied to them as well. The
 registration allowed the addendum to change only the Windows parts of existing files; deviations D1 to D4 touched
@@ -449,6 +451,10 @@ the reason, and the reference's standard deviation between texts is reported nex
 Such an ICC is zero whatever the logger writes (or undefined if the logger writes that same value in every text too); the
 registration reports a measure with zero variance as missing, never as zero, but the frozen code returns no value only
 when every value of both sides is the same. \\
+D12 & On Windows, where the two definitions of a session do not hold the same sessions, how many sessions the
+definition of the analysis leaves out and the detection pooled under the common definition are reported. &
+The registration reports under the common definition only whether the two definitions hold the same sessions, which
+does not show how far the estimates depend on the choice of definition. \\
 \bottomrule
 \end{tabular}
 \end{table}

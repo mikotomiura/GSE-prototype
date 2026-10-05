@@ -203,7 +203,7 @@
 | Z34・Z36・Z37・Z46 | 要旨の語数の都合で実行コストとデータセットの列挙は足さない・問 3 の全試行は補遺・凍結の SHA-256 は M12 の Open item・"data are public" は寄託の後に真 | 残す（記録） |
 | Z38 | 表と図のセルと比較を読める名前に（`cell_name`・COMPARISONS・層の表の題） | 済 |
 | Z39 | 推奨 (f)「Before the logger is used with people」（全アプリのキー行・アプリを記録しない・macOS は入力監視の権限・行の公開は判定していない） | 済 |
-| Z40 | Windows の 2 つの定義の差の大きさ: 結果のファイルは両方の定義を持つが、表の道具は真偽しか読まない | **未（道具に足す）** |
+| Z40 | Windows の 2 つの定義の差の大きさ: 結果のファイルは両方の定義を持つが、表の道具は真偽しか読まない | 済（2026-10-06・判断 192）: 登録 §5 は共通の定義の結果を「報告しない」と書いていた → 研究者の選択で**逸脱 D12** として、外れた参照の会話の数とプールした recall・precision を §6 に・補遺に両定義の表（分割・統合の率も） |
 
 - 検証: selftest 154 件 OK・使い捨ての変異 13 本すべて赤（scratchpad の `mutate_d11.py`）。`build.sh --submission`: main・main-submission・補遺ともエラー 0・未定義の参照 0・生成されていない値は macOS の探索的な値 8 個だけ・overfull は main 1（§4 の頁の 2.1 pt）。文体の検査 違反 0。要旨 248 語。
 - ⚠️ 見つけたこと: OSF の 2 つの登録の貢献者のプロフィール名が「Mikto Miura」（研究者に伝える）。`experiment/env.md` の「Analysis machine」と Windows の lock file の行が「(to be filled in)」のまま（M12 の前に埋める）。
