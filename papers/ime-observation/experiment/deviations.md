@@ -237,7 +237,7 @@ strata, for example in different trials.
 **Effect.** Precision, recall, F1, the split rate and every count of `match()` are unchanged by both changes. Under
 the first change a stratum may report its merge rate without a value; under the second the merge rate of a stratum may
 change wherever a recounted merge crosses strata, including the primary strata of section 6.4. The pooled rates
-over all trials are the same under both rules. The code of both changes is in commit `<D10 commit>`, and the selftest
+over all trials are the same under both rules. The code of both changes is in commit `115cd5ff`, and the selftest
 of `match.py` checks both rules on a constructed case.
 
 ## The macOS cells are unchanged
