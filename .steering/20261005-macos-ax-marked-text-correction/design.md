@@ -14,8 +14,10 @@
 2. C の定数（`…/applicationservices/carbon_accessibility/{attributes,notifications,parameterized_attributes}.json`）:
    101・25・9。変換を表すものは無い（語 mark に当たるのは `kAXMenuItemMarkCharAttribute` だけ）。
    パラメータ付きに `kAXStringForRangeParameterizedAttribute` がある（範囲から文字列を読める）。
-3. WebKit（commit `1a5a134d14845e9bf54a67049a36a2585e62897c`・raw で取得・SHA-256 は IME 論文の枝の [V206] の記録と一致）:
-   `AXObjectCacheMac.mm` 361〜366 行・`WebAccessibilityObjectWrapperMac.mm` 2290〜2295 行。
+3. WebKit（commit `1a5a134d14845e9bf54a67049a36a2585e62897c`・raw で取得・2 本の SHA-256 は IME 論文の枝の [V206] の記録と一致）:
+   `AXObjectCacheMac.mm` 361〜366 行・375 行（userInfo `nil`）・`WebAccessibilityObjectWrapperMac.mm` 2290〜2295 行。
+   レビューの後に追加で取得（同じ commit）: `Source/WebCore/accessibility/AXObjectCache.cpp` 3692〜3719 行（SHA-256 `fd156683…9968`）・
+   `Source/WebCore/editing/Editor.cpp`（`onTextCompositionChange` を呼ぶ・`ff0a6826…7fb7`）・`Source/WTF/wtf/PlatformHave.h` 1326〜1331 行（`ac6d7a7c…bf65`）。
 
 [Vn] の扱い: [V206]・[V224]・[V225] は IME 論文の枝（未 merge）で登録されている。`check_citations.py` は `docs/` を走査するので、
 `docs/` の文書には番号を書かず URL と文書名で引く（制約 7 の既存の書き方と同じ）。番号は `.steering/` の調査メモにだけ「IME 論文の枝で登録」と添える。
@@ -26,14 +28,15 @@
 - `docs/agent-shared.md` — 技術的制約 7 の末尾（括弧の中の言い方 ＋ 訂正の 2 行）
 - `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` — §3.2 の表の macOS のセル・§7.5（見出し・訂正の注・C と AppKit の行を分け、WebKit の行を足す）・§7.6（非対称はアプリを問わない経路のことだと注）
 - `docs/architecture.md` — macOS 固有の設計判断の「IME 状態機械」の理由の文
-- `src-tauri/src/input/ime_compose.rs` — モジュールの doc コメントの 1 文（振る舞いは変えない）
+- `docs/architecture/workspace-behavior-observation.md` — 83 行の「他プロセスの IME composition」に注（2 巡目・decisions 判断 4）
+- ⚠️ `src-tauri/src/input/ime_compose.rs` は初版で直したが戻した（IME 論文の kit の逐語コピー・decisions 判断 1・4）
 
 ### 新規作成するファイル
 - `.steering/20261005-macos-ax-marked-text-correction/` の requirement / design / tasklist / decisions
 
 ## 影響範囲
 
-コメントと文書だけ。コードの振る舞い・スキーマ・`capabilities` は変えない。
+文書だけ。コード（コメントを含む）・スキーマ・`capabilities` は変えない。
 
 ## 既存パターンとの整合性
 
@@ -42,7 +45,7 @@
 ## テスト戦略
 
 - `python scripts/check_citations.py`（違反なし）
-- `cargo fmt --check`（`ime_compose.rs` のコメントの変更）
+- `ime_compose.rs` が `cf320319` と同じバイトであること（`git diff cf320319 -- src-tauri/src/input/ime_compose.rs` が空）
 - grep で、直した文書に「公開 API が存在しない」が訂正の印つきの旧文としてだけ残ることを確かめる
 
 ## ロールバック計画

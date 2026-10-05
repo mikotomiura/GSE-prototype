@@ -89,10 +89,12 @@ Claude / Codex 固有の動作プロトコルはここに書きません
      **別途禁止** —— ★ こちらは **UIPI 第 5 項（DLL injection）に直撃**する（旧文が部分的に指していたのはこれ）。
    - ★ **採る手段は WinEvent (`WINEVENT_OUTOFCONTEXT`)**: DLL 注入不要・プロセス跨ぎ可・
      **コールバック引数に文字列が 1 つも無く content-free が構造的に保証される**。
-     詳細と macOS 側（**アプリを問わない公開の経路は見つかっていない**）は
+     詳細と macOS 側（**アプリを問わずに変換を知らせる公開の通知は見つかっていない**）は
      `.steering/20260821-workspace-behavior-triage/survey-input-channels.md §7`。
      ⚠️ 2026-10-05 訂正: 旧文「公開 API が存在しない」は言い過ぎ。AppKit の Accessibility に変換中の範囲の属性と
-     開始・終了の通知があり、WebKit は出す。ただしアプリしだいなので GSE は頼らず、macOS は打鍵から推す（§7.5）。
+     開始・終了の通知があり、WebKit のソースはそれを出す（`NSTextView`・Chromium 系は未確認）。ただしアプリしだいで、
+     範囲（位置と長さ）は文字数の量であり、同じ権限で文字列を返す属性にも届く（content-free は構造で保証されない）。
+     現行の macOS は打鍵から推す（この経路を使うかは未決・研究者が決める・§7.5）。
 8. **Rust ログ**: `tracing` のみ。`println!` / `eprintln!` 禁止
 9. **エラーハンドリング**: `anyhow::Result` を使用
 10. **Tauri 2.0**: capabilities で権限管理。v1 allowlist は使わない
