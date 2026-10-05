@@ -1753,3 +1753,10 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - `deviations.md`: 冒頭（D11 と D12 は結果を見た後）と D12 の本文（値は書かず補遺を指す）。`method.tex`: 定義の段落に D12・「Twelve deviations」・逸脱の表に D12 の行。`results-agreement.tex`「The two definitions」に数と値。`declarations.tex`「Deviations D11 and D12 were made after the results had been seen」。`supplement.tex` に新しい節。外枠（`outline.md` の「D1 to D10」）は結果の前に報告の規則を固めた版として commit で引く文書なので書き換えない（D11 の先例と同じ）。
 - **検証**: selftest 163 → 170 件。使い捨ての変異 11 本すべて赤（scratchpad の `mutate_defs.py`: 共通の定義でなく解析の定義の値・外れた数の符号・2 つの止まる確かめ・補遺の順・範囲の取り違え・共通の定義が無いときの確かめ・同じセルにも値・全セルに表・読む定義の取り違え・区間の改行）。前の `mutate_d11.py` 17 本もすべて赤のまま。`build.sh --submission`: エラー 0・未定義の参照 0・生成されていない値 0・bibtex の警告 0・overfull は main 1・補遺 167。補遺 67 頁を画像で確かめた。文体の検査 違反 0。
 - **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（`values.*`・新規 `detection-definitions.tex`）・`manuscript/supplement/supplement.tex`・`manuscript/sections/{method,results-agreement,declarations}.tex`・`experiment/deviations.md`・`verdict.md` §8・本ファイル・`tasklist.md`。
+
+## 判断 193: 研究者の読み直しの資料を渡す —— 主張 ↔ 根拠・Discussion の事実・断りの重複を日本語で、Mac の下書きの取り違え 2 点を事実と突き合わせて（2026-10-06・G-GEAR・引き継ぎ manuscript-3 §2 の 3・メインの選択）
+
+- **資料**: `reading-results-discussion.md`（公開しない）。§A は §6〜9・§12〜14 の段落ごとの主張と根拠（登録の節・結果ファイル・表）と見てほしい点（★）。§B は Discussion の事実 F1〜F8 と問い 7 つ。§C は断りの重複 7 種の場所と置き場所の案。PDF は `~/ime-paper-build/`（repo の外）。値は `values.json`（`49bb761d`）から読むための写し。
+- **事実として新しく拾ったもの（一次で確かめた）**: (1) 予測の層の表で、どの層にも入らない試行は参照とロガーも参照と予測も recall = precision = 0.960（off）・0.973（on）。(2) Windows は S2・S8 の遅い速さで分割の率 0.95・0.97 が速さとともに下がり、**分割の無い S1 でも recall が 0.976 → 0.571 と速さで下がる**。(3) 書字研究のポーズの尺度の文献は `references.bib` に無い（Discussion で並べるなら新しく引く）。
+- **Mac の下書き（`a0a374c9`・Claude の提案）を突き合わせた点**: 「記号キーによる分割（S6・S10）」は取り違え（S6 は Backspace、S10 は Tab。記号キーは別の層）。「Windows の分割（S2・S8）」だけでは S1 の速さによる低下を覆わない。どちらも資料の §B.3 に書いた。下書きの筋（予測可能性で分ける）を採るかは研究者。
+- **次**: 研究者が §A の各行・§B.4 の問い・§C の置き場所に答える → Claude が英語にする（Discussion は研究者の解釈から）→ round 2 を回すかを問う。
