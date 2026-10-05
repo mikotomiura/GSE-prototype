@@ -102,3 +102,10 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 - ⚠️ 研究者が決めること: (1) `idle` を昼に、本計測と同じ日に行ったことを「一夜ずつ・別の夜」（§6.10・§10.8）からの逸脱として記録するか。(2) 01:51 の拒否された開始を数えない判断の記録（§2.8）。
 - `data.md` の手順 1 のとおり `idle` は Run checks に行を持たない。`data.windows.md` に問 5 の表は無い（寄託の時に追記する）。
 - 次: 問 5 の `working`（`idle` と別の夜・`run_e3.sh working 28800 30 …` を先に起動 → 別のプロセスで本計測と同じセルと計画の `start_windows.py`・12〜13 時間・直後に `delivery.py` の点検と Run checks の行・`cpu_all_zero` なら不十分）→ §2 の 7（解析）。⚠️ 見張りの shell はメモリ不足で Claude Code に止められることがある（run 本体は外のプロセスなので無事）。
+
+## §2.10 進み具合（2026-10-04 21:25〜2026-10-05 10:10 JST）
+
+- ✅ **問 5 の `working` 試み 1**: 研究者の指示で `idle` の終了直後に開始（⚠️ `idle` と同じ夜にかかる・「別の夜」からの逸脱として記録するかは研究者が決める）。21:29:23 にサンプラー `run_e3.sh working 28800 30 runs/e3-working`（Git の bash・`E3_EXE` にロガー）→ 21:29:36 に `start_windows.py`（本計測と同じセル・計画・`runs/q5-working-1`）。ランナーは 08:35 に完了: 2925 / 2925・中止なし・manifest SHA-256 `1e5f40ac…217a`。`delivery.py` exit 0・`src` `win_tsf`・4 つの数と D4 はすべて 0。Run checks に行（`3007fb2d`）。
+- `summarize_e3.py`（idle と working を並べて）: working は 880 行（不在 1 行 = 起動直後）・status `measured`・`cpu_all_zero: false`・CPU 平均 5.37 %・中央値 4.66・p95 10.84・最大 15.51・ワーキングセット最終 16.3 MB・傾き 0.09 MB/h・7.99 h。`samples.tsv` SHA-256 `638da0ea…f88f`・`conditions.txt` `9b6ae939…8345`。
+- ロガーの stderr に `candidate window stale — auto-resetting` が本計測と working で各 2 回。
+- 次: 問 5 の寄託（`samples.tsv`・`conditions.txt` の両条件）・本計測の寄託・§2 の 7（解析: §10.7 の命令を Windows のタグから）。研究者の判断待ち: `idle` / `working` の日時の逸脱の扱い・01:51 の開始の扱い。
