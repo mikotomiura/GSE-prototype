@@ -48,9 +48,43 @@ Before the first attempt, the versions of the system and of the input method wer
 after a restart that completed a pending update: Windows 11 build 26200.9457 and `IMJPTIP.DLL` 10.0.26100.9278, which
 differ from those of the pilot (build 26200.8875, `IMJPTIP.DLL` 10.0.26100.8875; section 10.4). As section 10.8
 requires, the check plan of the pilot (`verify` in `experiment/pilot-windows.md`: 39 trials, one per scenario and
-speed, seed 8; SHA-256 beginning `f02e046b` and ending `0154`) was run first, with the cell file of the measurement
+speed, seed 8; SHA-256 `f02e046b1efd91d36f3c2785d91d098a670b905dcfce923f64f9cc7041440154`, read from the `plan_sha256` of the
+manifest of the check run) was run first, with the cell file of the measurement
 (deviation D5), on 2026-10-04 from 00:27 to 00:37 JST. A first start of the check was aborted by the runner before
 any key was sent (deviation D5). In the check the runner aborted nothing and every front-window check passed. The
 observation log was sealed before the reference side was read. The ground-truth sessions, assembled with the `win_tsf`
 rules of `experiment/gt_rules.json`, were 39 (30 committed, 9 cancelled), and every trial produced the session its
 plan intends (39 of 39), so the Windows cell was measured with these versions.
+
+## What else ran on the measuring machine during attempt 2
+
+Attempt 2 of the cell (question 1 to 4) ran from 01:57 to 13:03 JST on 2026-10-04. What the event logs of the machine
+show for that window (read on 2026-10-05 with `Get-WinEvent`): one Windows Update install, at 04:52, of a Microsoft
+Defender Antivirus security-intelligence update (events 43, 44, 19 of `Microsoft-Windows-WindowsUpdateClient`; no
+other update was downloaded or installed); no Defender scan event (ids 1000 to 1002 of the Defender operational log);
+and 11 events of id 12 of `Microsoft-Windows-UserModePowerService` (01:57:06, 02:07:05 and :07, 04:46:46 and :48,
+10:46:25 to 10:48:14), which are power-state changes of the user-mode power service and were not read further. There was
+no restart or unexpected shutdown (ids 41, 42, 1074 absent). The task-scheduler operational log has no event in the
+window (the log is not enabled on this machine), so what the task scheduler started cannot be told from the records,
+and the Claude Code sessions that ran on the machine were not read. This is what the records show, not a claim that
+nothing else ran.
+
+## Closed set of question 4 and the summary of experiment 3 (analysis run on 2026-10-05, Surface Pro 8)
+
+- **Closed set** (sections 6.8 and 10.7 of the pre-registration, with deviation D8). The code was `kit/e2/closed_set.py` of
+  commit `14c85e6e` (the frozen export with that one file replaced; the difference from the tagged file is the switch
+  `--skip-scenario`, its self-test and its docstring; self-test OK, 157 checks). Inputs were checked before the run:
+  `plan.jsonl` `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0`, `obs.jsonl`
+  `58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562`. Command (from the replaced export):
+  `python kit/e2/closed_set.py --obs <run>/obs.jsonl --plan <run>/plan.jsonl --corpus kit/corpus/data/phrases.jsonl
+  --recipes kit/gen/recipes.json --config experiment/plan_config.windows.json --K 10,100,1000 --seed 20260929
+  --bootstrap 2000 --markers-in-obs --skip-scenario S12 --out results/windows/e2_closed_set_windows-msime-tsf.json`.
+  Exit 0 after about 2 h 40 min on this machine (standard error empty). Output SHA-256
+  `93b5eb2bb7e43056899b78b6bcf486505ec91bced94844d065dcdd74a8d238b7`. `n_trials` 2,925 (all scored; 0 unscored blocks),
+  `skipped_scenarios` `{"S12": 225}`, and for every K (10, 100, 1000) and every feature set `n` 2,700 and `n_skipped` 0.
+  The comparison with chance (rule of section 6.8) is not made here.
+- **Experiment 3** (section 10.9). `samples.tsv` SHA-256: idle `43ab3b395635e0d5c78abc008db31368b48bcc6595c74f74f59e8e21debc5f59`,
+  working `638da0eaafcf156a441068e91a36578199736c435f08e140391617e43fcca88f`. Both are `status: measured`; in `working`
+  `cpu_all_zero` is false (as in the record of M7). Summary `results/windows/e3_windows.txt` (SHA-256
+  `dd12cc822693dd022c6ad711797ef1abd6c7b99c2a8363edcbbd2ef09967cc18`), made with `kit/e3/summarize_e3.py idle=... working=...`
+  of the export.

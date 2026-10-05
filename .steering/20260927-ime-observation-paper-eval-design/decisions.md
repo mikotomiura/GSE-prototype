@@ -1426,3 +1426,12 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - ⚠️ **結果の表（§2 の 9）は生成できなかった**: `manuscript/tools/results_tables.py` が `fmt_p(None)` で `TypeError`（`table_strata`・主の層の表の split / merge rate）。該当は**分母が 0 の層**（OFF の `all_trials` の S13 の fast / slow は観測の行 0 → `merge_rate` と `precision` の値が None。どちらのセルも `(None, None)` の層は `recall` / `split_rate` が n = 0）—— 凍結のコードの元からの振る舞いで **D10 とは無関係**。表の道具は G-GEAR の持ち物（判断 156）で空欄の書き方は原稿の選択なので**直していない**。`manuscript/generated/` は書き換わっていない。⚠️ 予測の層の表を道具が読むなら、D10 の注（値なし）も同じく None で来る。
 - ⚠️ 表示した値: 問 4 の開いた集合のログの末尾（数行の CER）が一度画面に出た（判断 157）。問 1〜3 の率・問 4 の推奨は見ていない。
 - **出荷の記録（前のセッションの残り）**: PR #297（M4 の記録・D6）→ merge `9cedba6c` → main の CI は #304 の merge に取り消され、`cf320319` の main の CI（run 37253171494）が success。
+
+## 判断 161: Windows の閉じた集合（D8 のスイッチ付き）と E3 の要約を Surface で回し、結果の JSON と記録を枝 `docs/ime-m8-windows-closed-set` に置く（2026-10-05・Surface・メインの選択・研究者が覆せる）
+
+- **背景**: `next-session-ime-paper-surface-d8.md` §2。新しい計測はしない・凍結のコードと事前登録は変えない（D8 の `closed_set.py` だけ commit `14c85e6e` のものに差し替え）。
+- **実行**: 入力の SHA-256 は計画・観測とも引き継ぎの値と一致。`export-d8`（書き出しの写し）で selftest OK（157 checks）・LF のまま。閉じた集合は `Start-Process` の独立プロセスで約 2 時間 40 分・exit 0・標準エラー空。`skipped_scenarios` `{"S12": 225}`・`n_trials` 2,925・全 K・全特徴量で `n` 2,700・`n_skipped` 0。出力 SHA-256 `93b5eb2b…38b7`。E3 は両方 measured・working の `cpu_all_zero` false。
+- **前の引き継ぎの残り**: (a) 試み 2 の間の計測機の記録を `data.windows.md` に 1 段落（Defender の定義更新 1 件・電源サービスのイベント 11 件・再起動なし。タスクスケジューラのログは無効で、Claude Code のセッションは読んでいない → 「何も動かなかった」とは言わない）。(b) §10.8 の点検の計画の SHA-256 を全桁に（点検の run の manifest の `plan_sha256`）。
+- **結果は読んでいない**: チャンスとの比較（§6.8）は結果の節で G-GEAR が書く。
+- ⚠️ **手順の注意**: Windows の PowerShell に渡す `-File` のパスは `cygpath -w`。`git -C` に MSYS パス（`/c/...`）は渡せない（`C:/...`）。`grep -c $'\r'` はこのシェルで当てにならず、Python で数えた（CR 0）。
+- **影響範囲**: `results/windows/e2_closed_set_windows-msime-tsf.json`・`results/windows/e3_windows.txt`・`data.windows.md`・本ファイル。
