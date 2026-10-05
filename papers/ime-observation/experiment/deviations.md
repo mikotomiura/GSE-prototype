@@ -3,7 +3,10 @@
 Departures from the frozen registration (`preregistration.md`, tag `ime-observation-prereg-macos`), recorded
 under section 8 before the analysis they affect is run. Each entry gives its date, the reason and the effect. D1
 to D5 were made for the Windows cell before any Windows measurement; the evidence that they leave the macOS
-cells unchanged is given at the end. D6 concerns the macOS measurement.
+cells unchanged is given at the end. D6 concerns the macOS
+measurement. D7 was made after the measurement of the Windows cell and before any analysis of it, and concerns
+the Windows cell only. D8 was made before the closed-set attack of question 4 was run on any cell, and concerns all
+three cells. D9 concerns the Windows measurement.
 
 ## D1. Scenario S4 presses three Escapes on Windows (2026-10-03)
 
@@ -134,6 +137,108 @@ wait for the next night.
 **Effect.** The order of section 3.2, which keeps the learning added by the replay of section 6.10 from preceding the
 two cells, is kept, and no two items overlapped. Nothing else of the registration depends on the hour of a run.
 The background load on the machine during each run is reported in `env.md`.
+
+## D7. How the attempts of the Windows cell were counted (2026-10-05)
+
+**What changes.** Section 3.4 counts every run that the runner aborts as an attempt, up to three, and admits no other
+reason or explanation; it does not name two events that occurred on 2026-10-04 before the completed run of the
+Windows cell. (1) The first attempt was started at 00:38 JST and was stopped at about 00:59 JST from outside the
+runner: the shell that ran it was ended by the coding assistant's session on the same machine under low memory (the
+wording of the table of run checks). The runner wrote no
+manifest. This attempt is counted as aborted (attempt 1). (2) A start at about 01:51 JST was made from a terminal with
+administrator rights, which section 10.4 excludes. The runner refused to go on before the first trial, and no key was
+sent (the oracle log holds its header only). This start is not counted among the attempts. The completed run is
+attempt 2 (01:57 to 13:03 JST, all 2,925 planned trials). All three are listed in the table of run checks of
+`experiment/data.windows.md`.
+
+**Reason.** The stopped attempt is counted because a run that ends before its plan is complete is an aborted run,
+whatever stopped it. The refused start is not counted because it was a start that the registration itself forbids
+(section 10.4), and the runner's check stopped it before any trial was played, so no input reached the input method
+or the logs.
+
+**Effect.** No key was sent in the refused start, and the stopped attempt is not analysed or deposited. Counting the
+refused start would make the completed run the third attempt instead of the second; it would not change which run is
+analysed. The analysis of the Windows cell reads only the completed run listed in `experiment/data.windows.md`.
+
+## D8. The closed-set attack leaves out every trial of scenario S12 (2026-10-05)
+
+**What changes.** Section 6.8 states that a trial whose phrase is a generated kana string (S12) is not counted, which
+leaves 2,925 trials with live conversion on and 2,700 with it off, and section 10.7 states that 2,700 trials remain on
+Windows without the S12 trials. The frozen `kit/e2/closed_set.py` leaves out only the trials whose phrase is not in
+the corpus. The plan generator gives an S12 trial a phrase of the corpus whose reading can be typed with the kana
+layout, as long as such phrases remain, and a generated kana string after that, so the frozen code keeps the S12
+trials with a phrase of the corpus. A switch `--skip-scenario` is added to `kit/e2/closed_set.py`: it leaves every
+trial of the named scenario out of the attack, after the trials have been aligned with the plan, and states their
+number in the output (`skipped_scenarios`). Without the switch the output is that of the frozen code; every trial
+draws its candidates from its own seed, so leaving out trials does not change the draws of the others. The
+closed-set attack of every cell is run with the command of section 6.8 (and of section 10.7 on Windows) and
+`--skip-scenario S12`, with `kit/e2/closed_set.py` of the commit that adds the switch and every other file from the
+freezing tag of the cell's system. Nothing else changes: the open-set attack already leaves out the kana-input
+trials by their scenario, and the decision rule, the values of K and the seed are those of section 6.8.
+
+**Reason.** On Windows the frozen code stopped with "the corpus has too few phrases with a distinct typed reading
+(K = 100)": the decoys of an S12 trial are drawn from the phrases that S12 could have produced, and fewer than 99 of
+them have a typed reading different from that of the true phrase. The three plans, generated again from the freezing
+tags with the seed in `experiment/SEED`, have the SHA-256 registered in sections 2.4 and 10.6 (`c7a5469d…`,
+`3759ebf7…` and `b7bdf8fc…`), and each
+holds 225 S12 trials, 74 of them with a phrase of the corpus (74 distinct phrases); the macOS cells would therefore
+stop in the same way. The counts that the registration gives (3,150 − 225 = 2,925 with live conversion on, and
+2,925 − 225 = 2,700 with it off and on Windows) are those of leaving out every S12 trial.
+
+**Effect.** The closed-set accuracy is estimated on the trials that sections 6.8 and 10.7 count: 2,925 with live
+conversion on and 2,700 with it off and on Windows when every block is scored. No attack had been run on any cell
+when this entry was made, and the probabilities of the table in section 6.8 for those numbers apply.
+
+## D9. The Windows runs were not made on separate nights (2026-10-05)
+
+**What changes.** Section 10.8 states that the runs are made on separate nights, in the order the Windows cell,
+`idle` and `working`, and section 6.10 measures each condition of question 5 on one night. The runs were made in this
+order, each after the check of the one before it, and no two overlapped (times in JST): the Windows cell from 01:57
+to 13:03 on 2026-10-04, `idle` from 13:16 to 21:16 on 2026-10-04, and `working` from 21:29 on 2026-10-04 (the sampler
+started at 21:29 and the runner just after it) to 08:35 on 2026-10-05, the runner having played the whole plan. The
+Windows cell ran through the night and the morning, `idle` in the afternoon and evening of the same day, and
+`working` in the following night.
+
+**Reason.** The operator started each item when the one before it had been completed and checked, rather than wait
+for the next night, as for the macOS runs (D6).
+
+**Effect.** The order of section 10.8 is kept, so the replay of the `working` condition added no learning before the
+Windows cell was measured (the reason that section 3.2 gives for the order), and no two items overlapped. Nothing else
+of the registration depends on the hour of a run.
+
+## D10. A recounted merge is counted with its paired observation; a rate above one has no value (2026-10-05)
+
+**What changes.** `kit/analysis/match.py` takes a second pass over the missed sessions (section 6.5): a missed
+session that lies, by at least `theta` of its length, inside an observation row that is already paired counts as
+evidence that the row merged it (`n_merge_obs_recount`, which enters the numerator of the merge rate). The frozen code
+counts that row in the stratum of the missed session, while the denominator (`n_obs`) counts it in the stratum of the
+session it is paired with. When the two lie in different strata, the numerator of a stratum can exceed its
+denominator. The analysis of the macOS cells from the freezing tag stopped on the first such stratum, in the layers of
+the prediction per speed (section 4.5), with `x and n must be integers with 0 <= x <= n` and exit status 2, before any
+result file was written; the Windows cell has no layers (D3) and was not stopped. Two changes were made, before any
+result of questions 1 to 3 of the macOS cells was seen:
+
+1. A rate whose numerator exceeds its denominator is reported with no value and no interval and with the note
+   `no value: the numerator exceeds the denominator (deviation D10)`, instead of stopping the analysis. Nothing else
+   changes: on two synthetic runs (`pipeline.py --synthetic <dir> --seed 4`, analysed with `--seed 7`, `bootstrap_B`
+   2000 and `kit/analysis/gt_rules.example.json`), the four result files were byte-identical to those of the freezing
+   tag. The analysis of the macOS cells with this change alone is reported as the registered analysis.
+2. With the environment variable `IME_MATCH_MERGE_RECOUNT=obs`, a recounted merge is counted in the stratum in which
+   `n_obs` counts its observation row, that is, the stratum of the session the row is paired with, as the recounted
+   split already is on the side of the ground truth; the missed session keeps its count in `n_miss_as_merge`. The
+   numerator then never exceeds the denominator. The detection results record the setting (`merge_recount`: `obs`).
+   This corrected analysis is reported next to the registered one (section 8), for the macOS cells and for the Windows
+   cell, whose registered results were computed without it.
+
+**Reason.** The merge rate is a share of observation rows, so each row it counts must be one of the rows of its
+denominator. The frozen rule breaks this where a missed session and the row that absorbed it fall in different
+strata, for example in different trials.
+
+**Effect.** Precision, recall, F1, the split rate and every count of `match()` are unchanged by both changes. Under
+the first change a stratum may report its merge rate without a value; under the second the merge rate of a stratum may
+change wherever a recounted merge crosses strata, including the primary strata of section 6.4. The pooled rates
+over all trials are the same under both rules. The code of both changes is in commit `115cd5ff`, and the selftest
+of `match.py` checks both rules on a constructed case.
 
 ## The macOS cells are unchanged
 

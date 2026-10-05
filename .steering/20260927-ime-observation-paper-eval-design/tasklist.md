@@ -213,5 +213,36 @@
   - [x] M6 Windows の追補（2026-10-03・Surface・判断 138〜142）: §10・逸脱 D1〜D4・`pilot-windows.md`・`data.windows.md`・`kit/run/` の Windows の道具・`scope_windows.py`。attack-me round 1（major）→ round 2（minor）→ 直して完了時レビュー（code-reviewer ∥ security-checker・Codex は不在で省略）→ **凍結 `a57c4fd7`・タグ `ime-observation-prereg-windows`**（`sha256` は macOS と同じ・書き出し 108 ファイル・一覧の SHA-256 `f61af353…87b7`・`freeze-export-list-windows.txt`）
     - [x] 2026-10-03: 研究者が OSF Registries に追補を登録した → **https://osf.io/4jwzn**（DOI 10.17605/OSF.IO/4JWZN・公開・`date_registered` 2026-10-03T13:56:27 UTC・Open-Ended・添えたファイルの SHA-256 が凍結したファイル `f8620963…` と一致）→ `notes.md` に記録。元の項目: 研究者: OSF Registries に追補を登録する（凍結したファイル `f8620963…2b1d`・commit の 40 桁・一覧の SHA）→ URL と日付を `experiment/notes.md` に → 登録の日付は Windows の最初の計測より前
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
+- [x] 投稿計画の見直し（2026-10-04・G-GEAR・判断 145）: BRM に **10 月末**に投稿・原稿は計測と並行で書く（次のセッションから・引き継ぎ `next-session-ime-paper-writing.md`）。BRM の購読モデルの費用 0 を一次で確認（Chrome）。CHI の残りの記述（`design.md` §6・`requirement.md`・`paper-suggest.md`）を直した
+- [x] 合成入力の記録一式を 5 つ目の貢献「データセット」として加える（2026-10-04・研究者の選択・判断 146）→ 説明書・Zenodo の DOI・パイロットの生ログの判断は M12 の枠で
+- [x] G-GEAR の Windows パイロットの最初の試し（2026-10-03 未明）を `pilot-windows-ggear-notes.md` として残した（判断 144・M5 の記録ではない）。枝 `docs/ime-m5-pilot-ggear` は研究者の了承で消した（2026-10-04）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
+  - [x] 外枠の初稿（2026-10-04・G-GEAR・枝 `docs/ime-manuscript-outline`）: 13 節 ＋ Open Practices ＋ Declarations・貢献 5 つ・主張 ↔ 根拠の表 23 行（OB / LG / AG / RC / RT / DS）・図 5・表 10。内部の対応（判断・`[Pn]`/`[Vn]`・未登録の引用）は `manuscript-map.md`。`_style_check.py` 違反 0（変異で赤になることも確認）
+  - [x] 研究者の確定（判断 147）: データセットは専用の短い節・パイロットの生ログは別の区分で数える・原稿は LaTeX（Springer の雛形）
+  - [x] attack-me（外枠）round 1 → **major**（有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 149・7 問とも推奨）→ 外枠を全面的に直した（31 行）・D6 と §10.8 の点検を公開の記録に（`deviations.md`・`data.windows.md`）
+  - [x] attack-me（外枠）round 2 → **major**（R1 major・R2 minor・R3 major・有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 150・6 問とも推奨＋事実 1 問）→ 外枠を直した（Y1〜Y44・要旨の規則を事前登録 §6.1 に合わせた・推奨 (d) を 2 段に・表を 13 に）・`method.tex`・D6 の言い方
+  - [ ] ★ round 3 は回さない → 原稿の attack-me（stage `manuscript`・10-18〜22）に外枠の round 1・2 の引き継ぎを渡す（判断 150-4）
+  - [ ] 試行 2 の間に Surface で何が動いていたか（Y12・判断 150-6）→ Surface のセッションで調べて `data.windows.md`・外枠 §5.2 に
+  - [x] 手法の節の残り: 問 4（`sections/recoverability.tex`）と問 5（`sections/cost.tex`）の手法（2026-10-05・`730edd64`）
+  - [x] 手法の節の草稿 `manuscript/sections/method.tex`（LaTeX・約 5,200 語・判断 148）・`references.bib`・`main.tex` の骨組み。⚠️ 未コンパイル（この機械に LaTeX が無い）
+  - [x] 公開物の文体検査を `.tex` / `.bib` に広げた（判断 148・selftest ＋ 変異 2 本）
+  - [x] 題を Logging に揃える（`README.md`・`CITATION.cff`・`.zenodo.json`・`main.tex`・`kit/logger/README.md` の古い一文も・2026-10-05・判断 150）。`kit/` に題の文字列は無かった
+  - [ ] `data.windows.md` の §10.8 の点検の計画の SHA-256 を全桁にする（Surface の点検の run の manifest から）
+  - [x] 後の節（§2 比較表・§3 観測可能性〔方法・一次の文書の登録〕・§4 ロガー・Table 4・§10 データセット）・未登録の引用の登録（Plant・Pinet・Bridges・Monaco・Gebru・MS / Apple の文書・Inputlog の版・Translog-II・ScriptLog）
+    → 2026-10-05（G-GEAR）: `sections/related.tex`（§2・Table 1）・`observability.tex`（§3・Table 2）・`logger.tex`（§4・Table 3・Table 4）・`dataset.tex`（§10・Table 13）。MS 16・Apple 13・WebKit のソースを取得して逐語を確かめ、Wayback に写しを作った（`docs/references.md` [V192]〜[V235]）。★★★ macOS の Accessibility にも変換の範囲の属性と開始・終了の通知があった → 判断 151（§3 と貢献 1 を対称の形に・研究者の選択）。macOS の観測するキーが登録の書き方より狭いこと・ヘッダの SHA-256 が共通部分だけを覆うこと・Windows の補助の信号を原稿の注にした。ScriptLog は scriptlog.net で 1.1 が有償で売られていた（サブエージェントの「入手できない」は不正確だった）
+    → 同日: 独立の照合（Opus）の指摘 17 件をすべて一次で裏取りして直した（判断 153）・書誌 [V192]〜[V235] を登録（`4e5e5184`）・補遺の文書一覧 `manuscript/supplement/observability-documents.tex`（31 件・Wayback の写しつき）
+  - [x] main に入った M4（PR #297）と Windows の解析（PR #304）を取り込んだ（`745a551f`）。逸脱の番号の衝突は研究者の選択で main の D6（macOS の晩）を保ち、この枝の Windows の試行の数え方を **D7** に（判断 152）。macOS の版（27.0.1・26A434）を原稿に記入
+  - [ ] Mac で: AppKit と C の Accessibility の定数の数と `TextInputSources.h` を計測の版（macOS 27.0.1）の SDK のヘッダで確かめる（外枠の Open items・判断 151・153）
+  - [ ] 結果の節（引き継ぎ `next-session-ime-paper-results-3.md`）
+    - [x] 結果の表の道具（判断 156・165・168〜172）: 表 7〜12・KT1・補遺の層ごとの表・予測の層・D10 の直した併合の率・selftest 78 件・変異 29 本（判断 171）
+    - [x] 登録が報告を求めていた残り（層ごとの問 2・全スコープの層ごとの検出・スコープの構成・除外・打ち切り・Windows の診断）と表 9 の区間（判断 172・selftest 91 件・変異 20 本）
+    - [x] Windows の印の時刻（§6.9・判断 171・`results/windows/clock_sync_windows-msime-tsf.json`）
+    - [ ] Mac で: macOS の 2 セルの印の時刻（§6.9・判断 171 の手順・`gt_vks` は 123・124）→ `results/clock_sync_<cell>.json`・`data.md`
+    - [x] 表 11 の「規則の性質」（§6.8 の確率の表）の置き方 → 手法の節の静的な表 `tab:nearchance` のまま（判断 174）
+    - [x] `sections/results-*.tex`（RF1 → 問 1・2 → 問 3 → 問 4 → 問 5）の草稿（判断 174）
+    - [x] Windows の開いた集合が macOS OFF とバイト一致する理由を確かめた（判断 173）
+    - [ ] 図 2〜5（作図の道具を決める）
+    - [ ] 要旨と結論（外枠の Rule for the abstract）・§1・§11〜13
+    - [ ] 完了時レビュー（code-reviewer ∥ security-checker ＋ /cross-review）→ PR
+  - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task

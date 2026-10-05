@@ -1,16 +1,17 @@
-# Observing Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation
+# Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation
 
 This directory holds the artifacts of a single paper on observing Japanese IME conversion without
 recording its text: the limits of observability, a cross-platform standalone logger, and a
 synthetic-input validation. Raw logs are not committed to the repository; they are deposited
-separately, and their locations and SHA-256 digests are recorded in `experiment/data.md`.
+separately, and their locations and SHA-256 digests are recorded in `experiment/data.md` (macOS) and
+`experiment/data.windows.md` (Windows).
 
 ## Layout
 
 | Directory | Role |
 |---|---|
 | `kit/` | The reproducible toolset (log formats, generator, emitter, reference input field, standalone logger, analysis). |
-| `experiment/` | Experiment records (SEED / env.md / data.md / run.sh / notes.md). Raw logs are not stored here (`experiment/raw/` is ignored); the deposit location and its SHA-256 are recorded in `data.md`. |
+| `experiment/` | Experiment records (SEED / env.md / data.md / data.windows.md / run.sh / notes.md). Raw logs are not stored here (`experiment/raw/` is ignored); the deposit location and its SHA-256 are recorded in `data.md` (macOS) and `data.windows.md` (Windows). |
 | `manuscript/` | The manuscript. |
 
 ## License

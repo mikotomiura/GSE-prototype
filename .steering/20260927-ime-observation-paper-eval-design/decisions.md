@@ -1237,3 +1237,342 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **点検の結果（§10.8・2026-10-04 00:27〜00:37 JST）**: D5 のセル（SHA-256 `0e4c17ed…4fb6`）・計画 `plan-verify`（`f02e046b…0154`）で `start_windows.py` → 中止なし・前面の確認 3 / 3。観測は `seal_obs.py` で封印（`cd4a5fcc…`・key 行 2,952 を残した）。`gt_sessions.py --rules experiment/gt_rules.json`（`b9a48375…`）→ `src` `win_tsf`・39 セッション（確定 30・取消 9）・**`oracle_agreement` 39 / 39** → 本計測へ。生ログは `~/ime-m7/runs/verify-m7`（中止の 1 回目は `~/ime-m7/runs/aborted/verify-m7-1`）。
 - **本計測の 1 回目**: 2026-10-04 00:38 JST に起動（`~/ime-m7/runs/cell-1`・計画 `b7bdf8fc…36b0`）。
 - ⚠️ **本計測の 1 回目は中止**: 2026-10-04 00:59 JST ごろ、Claude Code が「メモリ不足・セッションが idle」を理由にバックグラウンドの shell（`start_windows.py`）を止めた（run の失敗ではない）。runner・観測器・参照入力欄とも終了・`run.json` なし・oracle 6,133 行。空きメモリ 1.4 / 8 GB（VS Code・Chrome・Defender・メモリ圧縮）。`delivery.py` exit 0・参照側 0 / 0 / 0・観測の D4 の数 14（最後の区間・途中で切れた）→ 中止の試み 1 として `data.windows.md` に 1 行を書き、すぐ push（§10.8）。再起動は研究者の指示を待つ。
+
+## 判断 144: G-GEAR の Windows パイロットの最初の試しを記録として残す（2026-10-04・G-GEAR・メインの選択・研究者が覆せる）
+
+- **経緯**: 2026-10-03 未明、判断 134（M5 は G-GEAR）に従って G-GEAR で Windows の較正パイロットを回した（MS-IME `IMJPTIP.DLL` 10.0.26100.9278・Windows 11 26H2 / build 26300）。記録は枝 `docs/ime-m5-pilot-ggear`（`433d13ff`）に push したが、**main には入れていない**。その間に Surface のセッションが判断 135〜143 で M5（Surface）→ M6（追補の凍結・`https://osf.io/4jwzn`）→ M7 の Windows のセルまで進めた。⚠️ その枝の「判断 135」は main の判断 135 と**別の中身**（番号が衝突した）。
+- **採用**: 枝の `pilot-windows-1-notes.md` を **`pilot-windows-ggear-notes.md`** に名前を変えて main に残す（冒頭に「M5 の記録ではない」と出どころを追記）。枝の判断 135・`pilot-windows-tools/`・書き直した引き継ぎは main に入れない（Surface の M5 と M6 が置き換えた）。
+- **残す理由**: 別の版の MS-IME でも S4（変換の後の Esc 2 回で取り消されない）と S8（数字の後に Enter が要る）が同じに出た（Surface の判断 137 と一致）。ほかに、開始の前面化が `SetForegroundWindow` に拒まれうること（研究者の入力の直後に起動した run だけが通った）、`refinput_imm` の窓に文字が出ないこと（研究者が誤動作と受け取った）が記録にある。生ログは G-GEAR の `C:/ime-pilot-win/runs/` にある（コミットしない・預けない）。
+- **後始末**: 枝 `docs/ime-m5-pilot-ggear` は不要になった → 2026-10-04 に研究者の了承で origin とローカルから消した（`433d13ff`・PR なし・worktree なし）。中身の記録はこの判断と `pilot-windows-ggear-notes.md`。⚠️ `pilot-windows-tools/` と書き直した引き継ぎは残していない（Surface の `kit/run/` と M5 の記録が置き換えた）。
+
+## 判断 145: 投稿計画を前倒しする —— BRM に 10 月末に投稿・原稿は今から並行で書く（2026-10-04・G-GEAR・研究者の選択）
+
+- **背景**: M4（Mac）は最後の run が 2026-10-05 10 時ごろに終わる（研究者）。M7 は Windows のセルが 10-04 13:03 に完了（2925 / 2925）、残りは Windows の E3（`idle` → `working`）で、明日・明後日に終わる見込み（研究者）。→ 結果は 10-05〜06 にそろう。Windows の追補は 10-03 に凍結済みなので、macOS の解析を Windows の結果より先に始めても追補に影響しない。
+- **研究者の選択**: 投稿の目標は **2026 年 10 月末**（推奨どおり）。原稿は**今から並行で**書く（推奨どおり）。コンテキストの都合で、執筆は**次のセッション**から始める。
+- **日程**（遅れても 11 月上旬に収める）:
+
+  | 時期 | 内容 |
+  |---|---|
+  | 〜10-05 | 原稿の外枠（節構成・主張 ↔ 根拠の対応表・判断 21 の `manuscript/outline.md`）・手法の節（凍結した事前登録と追補 §10 から書ける・結果を待たない） |
+  | 10-05〜07 | M4 の §3.4 の点検 → macOS の解析（macOS のタグから）。Windows の E3 の後に Windows の解析（Windows のタグから）・E3 のまとめ（M8・M10） |
+  | 10-08〜17 | 結果・考察・序論・要旨 → 原稿の全体 |
+  | 10-18〜22 | attack-me（原稿のプレ査読）1〜2 巡 → 直す |
+  | 10-23〜27 | M12: 公開 repo・リリース・Zenodo の DOI・Open Practices Statement（OSF の 2 つの登録と DOI）・カバーレター |
+  | 10-28〜31 | BRM に投稿 |
+
+- **投稿先は BRM のまま**（判断 1）。★ **費用 0 を一次で確かめた**（2026-10-04・Chrome で `https://link.springer.com/journal/13428/how-to-publish-with-us`）: 逐語 "Authors can also choose to publish under the subscription publishing model (no APC charges apply); both options will be offered after the paper has been accepted."（OA を選ぶと APC は $4,090）。投稿規程（`/submission-guidelines`）の本文に投稿料・掲載料・カラー図の費用の語は無かった。雑誌なので登壇も無い → 研究者の条件（memory「登壇なし・費用ゼロ」・2026-09-28）を満たす。⚠️ 採択後に購読モデルを選ぶこと（OA を選ばない）。
+- **CHI 2027 Posters**: 2026-09-28 に取り下げ済み（p321 のタスクの判断 15・判断 13 の追記）。→ 判断 8・9 の CHI の記述は無効。`design.md` §6・`requirement.md`・`paper-suggest.md` の残りを直した。
+- ⚠️ **M12 の申し送り**: 凍結のタグが 2 つ（`ime-observation-prereg-macos` の一覧 `29b183ba…`・98 ファイル／`ime-observation-prereg-windows` の一覧 `f61af353…`・108 ファイル）。判断 131 は「公開 repo の最初の commit を macOS の凍結の書き出しにする」だけを決めている → **Windows の凍結の書き出しの一覧も公開物から計算し直せる形**（2 つ目の commit にするなど）を M12 の前に決める。
+- **arXiv**: 任意。endorsement が要る（memory）ので、投稿をそれ待ちにしない。
+- **影響範囲**: `design.md` §6・`paper-suggest.md` §6・`requirement.md` のゴール・`_issue-plan.md` の M13・`tasklist.md`・引き継ぎ `next-session-ime-paper-writing.md`（新規）。
+
+## 判断 146: 合成入力の記録一式を「データセット」として論文の貢献の 1 つに加える（2026-10-04・G-GEAR・研究者の選択）
+
+- **背景**: 研究者の問い「人のタイプではない機械型の IME データセットも公開するのか」。→ 公開することは既に決まっていた（`data.md` の寄託の手順・`design.md` §4・BRM の Level 2 TOP）が、論文では「再現性のための材料」の扱いだった（判断 6 の 4 つの貢献に入っていない）。メインが「content-free な IME 観測器を検証するためのデータセット（正解の参照ログ付き）として貢献に数えることもできる」と示した。
+- **研究者の選択**: 「データセットとして出すのも今回の論文での貢献のプラスになりそう」→ **貢献に加える**。
+- **範囲（メインの案・外枠で研究者が確定する）**:
+  - ★ **主張の芯は判断 6 のまま**（精度評価が主）。データセットは 5 つ目の貢献として足す。⚠️ 「人の書字のデータ」「自然な入力のベンチマーク」とは書かない（合成入力・参照入力欄は 1 つ・IME の版は記録した版だけ）。
+  - 中身: run ごとの `plan`・`oracle`・`gt`（参照入力欄が受けた IME のイベント＝正解）・`obs`（観測器の出力）・`run.json`、E3 の標本、語句のコーパス（青空文庫のパブリックドメイン）、計画の設定と seed。macOS 2 セル（ライブ変換 ON / OFF）＋ Windows 1 セル（MS-IME・TSF の参照）。
+  - 使い道として書けるもの（過大にしない）: (a) IME が入力欄へ送る呼び出し列の、OS と設定ごとの実測（正解の定義の根拠の再検討）、(b) 自分の観測器の定義を同じ計画で再実行して比べる（計画・実行器・参照入力欄は公開物にある）、(c) 本文を伏せた打鍵ログから本文をどこまで復元できるかの研究（E2 と同じ形・送った語句が既知なので答え合わせができる）。
+- **増える仕事**（判断 145 の日程の 10-23〜27 の M12 の枠に入れる・⚠️ 足りなければ 11 月上旬へ）:
+  1. データの説明書（Datasheets for Datasets の形〔Gebru ら・引用は citation-ssot で登録〕: 動機・構成・収集の過程・前処理・用途・配布・保守）を公開物に置く。`kit/formats/FORMATS.md` を形式の仕様として参照する。
+  2. Zenodo の記録を**データセットとして** DOI 付きで作る（ソフトウェアの記録と分けるか 1 つにするかは M12 で決める）。⚠️ memory: Springer の Editorial Manager は Zenodo のリンクを Invalid にした（EMSE の実測）→ 原稿の本文と参考文献に DOI を書き、投稿の欄は GitHub にする。
+  3. 原稿にデータセットの節（または Availability の節を厚く）と、貢献の箇条に 1 行。限界（合成・1 つの参照入力欄・IME の版・中止した run の扱い）を明記する。
+  4. 較正パイロットの生ログを含めるか（M2 の残り「生ログの置き場」）をこの機会に決める。
+- **変えないもの**: 凍結した事前登録・解析のコード・寄託の手順（`data.md`）。データセットとしての打ち出しは論文の書き方の変更で、解析を足さない。
+- **影響範囲**: 引き継ぎ `next-session-ime-paper-writing.md`（外枠に貢献 5 を入れる・増える仕事）・`tasklist.md`。
+
+## 判断 147: 原稿の外枠 —— データセットは専用の短い節・パイロットの生ログは別の区分で数える・原稿は LaTeX（Springer の雛形）（2026-10-04・G-GEAR・研究者の選択）
+
+- **背景**: 引き継ぎ `next-session-ime-paper-writing.md` §2 の 1（外枠）と 4（形式）。判断 146 は「範囲はメインの案・外枠で研究者が確定する」としていた。外枠は `papers/ime-observation/manuscript/outline.md`（公開物・英語）、内部の対応は `manuscript-map.md`。
+- **研究者の選択（3 問とも推奨どおり）**:
+  1. **データセットは専用の短い節**（§10 The dataset）にする。内容の表・用途 (a)〜(c)・限界を書き、説明書（Datasheets for Datasets の形）は公開物に別に置く。Availability の節を厚くする案は採らない。
+  2. **較正パイロットの生ログ（基準を満たす run）をデータセットの一部として数える。ただし別の区分**（計画が本計測と違う較正の run）にする。★ 預けること自体は凍結した事前登録 §3.1 が既に約束している（判断 110）ので、判断 146 の増える仕事 4 の「含めるか」は、**データセットとして数えるか**だけが残っていた。
+  3. **原稿は LaTeX（Springer Nature の雛形）**。表は結果の JSON から生成して本文に埋め込む。EMSE の実測（memory）どおり、提出する `.tex` は 1 本にまとめ、タイトル頁は別添にする。
+- **メインの選択（研究者が覆せる）**: 貢献は判断 6 の 4 つ ＋ 判断 146 の 1 つの 5 つにし、ロガーは独立の貢献にせず貢献 2「ロガーとその検証（主）」にまとめた（design.md §0 の C2 は貢献 2 の前半に入る）。
+- ⚠️ **未決（後で決める）**: (a) この G-GEAR には LaTeX も pandoc も無い（`command -v` で確認）→ コンパイルは LaTeX のある機械か Overleaf。(b) Springer の雛形のファイル（`sn-jnl.cls` など）は雛形側のライセンスなので、CC BY 4.0 の公開物に入れるかは雛形を取得するときに確かめる（入れないなら取得の手順を書く）。(c) BRM の投稿規程は WebFetch では Springer の認証に転送されて読めなかった → 投稿の前に Chrome で読み直す。
+- **影響範囲**: `papers/ime-observation/manuscript/outline.md`（§10・DS1・Table 10）・`manuscript-map.md`・`tasklist.md`。
+- ⚠️★ **追記（同日・attack-me の準備で BRM の投稿規程を一次で照合した結果・メインの記録）**: `curl -sL`（cookie つき）で `https://link.springer.com/journal/13428/submission-guidelines` の原文を取得し（2026-10-04 23:39 JST・HTTP 200）、文を逐語で確かめた。(1) ★ **投稿は ScholarOne**（逐語 "Manuscripts are to be submitted electronically via ScholarOne" ・`http://mc.manuscriptcentral.com/brmic`）であって Editorial Manager ではない → 上の 3 の「EMSE の実測どおり `.tex` は 1 本・タイトル頁は別添」の **`.tex` 1 本の根拠は BRM には当たらない可能性がある**（EMSE は Editorial Manager の実測）。タイトル頁は規程に逐語 "The title page must include the authors' names and affiliations and the corresponding author's address, telephone number, and e-mail address" があるが、別添かどうかは書かれていない。→ ScholarOne の挙動は投稿の段で確かめる。LaTeX の選択そのものは変えない。(2) ★ **外枠の誤りを直した**: Open Practices Statement は逐語 "immediately prior to the References section" なので、Declarations（逐語 "placed in a 'Declarations' section before the reference list"）→ Open Practices Statement → References の順にした（外枠の初稿は Open Practices を Declarations の前に置いていた）。Declarations の見出しは原文の一覧どおり（"Conflicts of interest/Competing interests"・"Authors' contributions (optional …)" を足した）。(3) 本文の分量・LaTeX の雛形の語は取得した範囲の原文に無い（規定なし）。
+
+## 判断 148: 原稿を LaTeX で書くので公開物の文体検査を `.tex` / `.bib` に広げ、手法の節の草稿を書く（2026-10-04〜05・G-GEAR・メインの選択・研究者が覆せる）
+
+1. **文体検査の穴**: `issues/_style_check.py` はディレクトリを歩くとき `TEXT_SUFFIX` にある拡張子だけを見ていて、`.tex` と `.bib` を飛ばしていた（明示したファイルなら禁止語だけは見る・日本語の地の文は見ない）。→ 公開の書き出し（`kit/export/export.internal.py` がこの道具を全体に回す）を原稿が素通りする。★ `TEXT_SUFFIX` に `.tex`・`.bib` を足し、2 つは**コメントも含めて全行**の日本語を赤にした（公開する全文なので）。selftest に 6 件（tex の本文・コメント・英語だけ・GSE・bib・走査で `.tex` を拾う）。変異 2 本（拡張子を戻す・分岐を外す）でどちらも selftest が赤。`papers/ime-observation` の全体で違反 0。
+2. **手法の節** `papers/ime-observation/manuscript/sections/method.tex`（英語・LaTeX・約 5,200 語）: 凍結した事前登録（§2〜§6・§10）・`deviations.md`・`pilot-*.md` から書いた。数（パイロットの run 数 6 と 7・試行 468 と 429・一致 124/126・117/117・39/39・層の最小 31 と 32・S6 の 3 と 30・コーパス 1,800 句・読み 6〜30・SudachiPy 0.7.0）はすべて一次の記録から写した。測った後に分かる値（macOS の版）は `\tbd{}`。表は Table 3（シナリオ）・逸脱・2 回の凍結。
+3. **書誌**: `manuscript/references.bib`（公開物・著者と年で引く・判断 76）。登録済みの [P269]・[V179]・[V181]・[V184]〜[V189] は事前登録の参考文献の行のとおり（名はイニシャル。⚠️ 最初に記憶で名を展開して書き、一次で確かめていないので戻した）。★ 新しく `docs/references.md` に **[V190] Takaoka ら（2018）Sudachi**（ACL Anthology の bib で確認）と **[V191] 青空文庫**（サイトが 200 を返すことを確認）を append した。OSF の 2 つの登録は API で題と登録日を確かめて `@misc` に（著者は TODO）。
+4. `manuscript/main.tex` は Springer の雛形（`sn-jnl`・`sn-apa`）の骨組みだけ。雛形のファイルは置かない（判断 147 の未決 (b)）。⚠️ この機械には LaTeX が無く、**コンパイルしていない**（後の節のラベル〔`sec:logger`・`sec:dataset` など〕はまだ無い）。
+
+## 判断 149: 外枠の attack-me round 1（major）の採否 —— 直す一覧を全部承認・§11 は閾値の無い 5 種・D6 と §10.8 を公開の記録に・題は Logging に固定・要旨の規則・利用者の道具は足さない・キー行の時刻は登録済みの値だけ（2026-10-05・G-GEAR・研究者の選択）
+
+- **round 1**: `attack-me/outline-ime-manuscript/round-1/`。有効な査読 3 / 3（R1 計時の道具の検証・R2 書字研究の利用者・R3 メタサイエンスとデータ管理・いずれも Opus の `paper-reviewer`）＋ 監査役。3 人とも **major**。接地の引用 34 件を本文で照合して捏造 0、注入 0、偽陽性 0、確かめられない 1（テキスト入力研究の文献）。★ LG2 は「Windows の経路の単体テスト〔41 本〕は在るが外枠が名指ししていない」形の真。★ §10.8 の点検（39 / 39）は内部の記録にだけあり公開物に無かった（真）。
+- **研究者の選択（7 問とも推奨どおり）**:
+  1. 直す一覧（verdict.md の ★ 以外）を**全部承認**。
+  2. **§11 の推奨は閾値の無い 5 種に限る**: (a) 定義が OS で違う測度は OS 間で比べない (b) 20 秒の打ち切りは規則から向きだけ (c) 漏洩は登録の判定の言い方（プライバシーの基準ではない）(d) 自分の機械で 39 試行の点検から再検証する手順 (e) 自分のアプリでの一致はこの一式では測れない。推奨ごとに根拠（結果・規則・構成概念）の行 RE1〜RE5。
+  3. **D6 として記録し §10.8 の点検も公開**: `deviations.md` に D6（外から止められた試行は中止に数え、管理者権限で拒まれた開始は数えない）・`data.windows.md` に「Check of section 10.8」の節（build 26200.9457・IME 10.0.26100.9278・39 / 39・30 確定 9 取消）。⚠️ 点検の計画の SHA-256 の全桁はこの機械に無い（Surface の点検の run の manifest にある）→ 公開物には先頭 8 桁と末尾 4 桁だけを書き、全桁を写すことを外枠の Open items に置いた。
+  4. **題は "Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation" に今固定**し、結果の後に変えない（判断 15 の「E2 が強ければ T4」は取り下げ）。⚠️ `README.md`・`CITATION.cff`・`.zenodo.json`・`kit/` の題の文字列は T1 のまま → 公開の書き出しの前（M12）に揃える。
+  5. **要旨の規則**: セルごとに (i) 検出の recall と precision の層ごとの Wilson 区間の最小の下端〜最大の上端 ＋ 主の範囲が外した割合 (ii) `dwell_ms` の偏りの速さごとの区間の範囲 (iii) 漏洩の判定と推奨（または推奨なし）(iv) 実行コストの条件ごとの CPU の平均（区間なし）。`all_trials` は本文の表だけ。
+  6. **利用者向けのスクリプトは足さない**。代わりに Table 4（書字研究の測度 × OS: obs から計算できるか・この検証が裏づけたか）と LG3。
+  7. **キー行の時刻は登録済みの値（§6.3 の行の遅れ・連続する行の間隔の誤差）を本文に上げるだけ**（KT1）。OS の刻みの分解能の探索は足さない。
+- **実装（メイン）**: 外枠を全面的に書き直した（6,984 語・主張 31 行: OB 4・LG 5・RF 1・AG 8・KT 1・RC 3・RT 1・RE 5・DS 3。AG7・AG8 は RF1・KT1 に寄せた）。手法の節に D6・§10.8・精度の計画・基準をソフトウェアの層に置く理由・診断は読むためだけ・carry-over の割合・2 回の凍結の表。`_style_check.py` 違反 0。
+- ★ **メインの反省**: context-B の「持ち帰ってほしいこと」に「入力方式自身のセッション」「どの測度を信頼してよいか」「結果に基づいて」と書いたのはメインで、事前登録と食い違っていた（監査役 3-A-1・3-A-2）。round 2 の context-B は事前登録の言い方にする。
+- **次**: round 2（同じ立場・同じ接地・引き継ぎを渡し再掲を求めない）は次のセッション（コンテキストが半分を超えたため・memory「半分で区切る」）。
+
+## 判断 150: 外枠の attack-me round 2（major）の採否 —— 直す一覧を全部承認・要旨は登録 §6.1 に従い層を絞る・推奨 (d) は 2 段に狭める・round 3 は原稿の attack-me で確かめる・macOS のセルが欠けたら推奨しない（2026-10-05・G-GEAR・研究者の選択）
+
+- **round 2**: `attack-me/outline-ime-manuscript/round-2/`。有効な査読 3 / 3（R1 major・R2 minor・R3 major）＋ 監査役。接地の引用 57 件を本文で照合して捏造 0、注入 0、偽陽性 0（R2 の「macOS は押下だけ」の前提は偽で、指摘の残りは真）。round 1 の指摘の大半は解消。新しい穴は round 1 の直しで足した仕組みにあった（verdict.md の Y1〜Y44）。
+- ★ **メインの見落とし（2 件）**:
+  1. 判断 149-5 の要旨の規則を推奨したとき、凍結した事前登録 §6.1（623〜626 行 "In the abstract and the conclusions … An estimate in the primary scope is given together with the fraction of trials that the scope sets aside and the estimate under `all_trials`"）と照合していなかった。→ 規則が登録に反していた（Y1）。
+  2. round 2 の context-B にも、事前登録と食い違う文が 2 つあった。「打ち切りが集計を動かす向きは規則から言える」は 4 つの集計のうち 2 つだけに当たり、Windows の窓の経路には 20 秒の打ち切りが無い。「時刻つきの記録は評価しない」は誤りで、時刻を持つ特徴の集合は攻撃に渡して推定だけを報告した。
+- ★ **ソースで確かめたこと**: macOS のロガーも押下と解放の両方でキー行を書く（`kit/logger/src/driver_macos.rs` の `handle_key` と `queue_row`）。届き方（`delivery.py`）と攻撃（`closed_set.py` の `read_obs`）が使うのは押下の行だけ。事前登録 §1.1 は macOS を押下だけで書いている → 原稿では両 OS とも解放の行を書くと書き、登録の書き方との違いを注にする。KT1 の定義は凍結の `delivery.py`（62〜76 行）に在る。安全弁の実装とテストは `kit/logger/src/main.rs`（273 行・777 行）。
+- **研究者の選択（6 問とも推奨どおり。1 問は事実の確認）**:
+  1. 直す一覧（Y1〜Y44 の ★ 以外）を**全部承認**。既定は 3 つ: KT1 で最初のブロックを分けない（凍結の出力に無い）。文書の写しはアーカイブの URL で残す。`FORMATS.md` をデータの寄託に含める。
+  2. **要旨は登録 §6.1 に従う**。セルごとに、主の範囲の値に、範囲が外した割合と carry-over の割合、`all_trials` の値を添える（逸脱 D7 は作らない）。範囲に入れるのは、主の範囲で **30 試行以上の層だけ**にし、外した層の数を添える（null の層は入れない）。Windows は「別の構成概念との一致」と添える。CPU は系ごとに書いて比べない。推奨は 1 つで、Windows は但し書きにする。§13 の結論にも同じ規則をかける。
+  3. **推奨 (d) / RE4 は 2 段に狭める**（新しいコードは足さない）。(i) 39 試行の点検で確かめられるのは、自分の機械と版で手順が入力方式を計画どおり動かすか（基準の側・Windows・D5 の手当てつき）。(ii) ロガーの一致を推定し直すには、登録の計画の全体と凍結の解析が要る。この一式は登録外の計画では一致を計算しない。macOS には登録の短い点検が無い。
+  4. **外枠の round 3 は回さない**。直した外枠は、原稿の attack-me（stage `manuscript`・判断 145 の 10-18〜22）に round 1・2 の引き継ぎを渡して確かめる。
+  5. **macOS のセルが 1 つでも測れなければ、粒度は推奨しない**と報告する（登録の条件「両セル」を確かめられないため）。
+  6. 試行 2 の間に Surface で何が動いていたか（Y12）は**分からない → Surface のセッションで調べる**。それまで外枠には報告の項目だけを置き、Open items に載せる。
+- **実装（メイン）**: 外枠を直す（Y1〜Y44）。`method.tex` の基準を置く理由（Y7）を狭める。`deviations.md` D6 と `data.windows.md` の試行 1 の言い方を揃える（Y12）。⚠️ `README.md` の題（Y25）は引き継ぎ §2 の 4 で書き出しの前に直す。
+- **影響範囲**: `papers/ime-observation/manuscript/outline.md`・`sections/method.tex`・`experiment/deviations.md`・`experiment/data.windows.md`・`manuscript-map.md`・引き継ぎ。
+
+## 判断 151: macOS の Accessibility にも変換の範囲の属性と開始・終了の通知がある —— §3 と貢献 1 は「アプリが用意する経路は両 OS にある・ロガーはアプリを問わない経路だけを使う」の対称の形に書き直す・GSE 本体の文書は別のタスクで直す（2026-10-05・G-GEAR・研究者の選択）
+
+- **背景**: 結果を待たない節（§3）を書くために Apple の一次文書を取得したところ（2026-10-05・`https://developer.apple.com/tutorials/data/documentation/…json` を `curl` で取得）、AppKit の `NSAccessibility.Attribute` に **`textInputMarkedRangeAttribute`**、`NSAccessibility.Notification` に **`NSAccessibilityTextInputMarkingSessionBegan` / `…Ended`** が載っていた（3 つとも macOS 10.6 から・説明の文は無い）。★ **WebKit のソースで実際に使われていることを確かめた**: `Source/WebCore/accessibility/mac/AXObjectCacheMac.mm` 361〜366 行（`AXNotification::TextCompositionBegan` / `…Ended` を 2 つの通知に写す）・`WebAccessibilityObjectWrapperMac.mm` 2290〜2295 行（変換中の範囲を `NSRange`＝位置と長さで返す）・コミット `1a5a134d14845e9bf54a67049a36a2585e62897c`（2026-10-05 00:59 UTC の main）。Chromium の `ax_platform_node_cocoa.mm` には同じ語が無かった（それ以上は調べていない）。
+- ★ **数え直し**: 内部の調査メモ（`.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5）の「135 個を全数確認してゼロ」は **Carbon（C）の定数**（属性 101・通知 25・パラメータ付き 9）だけだった（今回も同じ数・該当なし）。AppKit の定数（属性 132・通知 43・パラメータ付き 19）を見ていなかった。→ ⚠️ 外枠の OB3「Accessibility の属性・通知に変換中の文字列を報告するものは無い」と、凍結した事前登録 §1.1「macOS には他のアプリの変換状態を報告する公開のインタフェースが無い」は**言い過ぎ**。
+- **研究者の選択（2 問とも推奨どおり）**:
+  1. **§3 と貢献 1 は対称の形で書き直す**: 両 OS とも、アプリのアクセシビリティの実装が用意すれば文字列なしで変換を知らせる経路がある（Windows は UI Automation の TextEdit パターンの変換対象の変化〔0x8030〕、macOS は変換中の範囲の属性と開始・終了の通知）。これはアプリしだいなので、アプリを問わない記録には頼れず、ロガーは使わず評価もしていない。アプリを問わない経路は Windows では入力方式の窓のイベント（と cloak）、macOS では調べた範囲に無い → 打鍵から推す。事前登録 §1.1 の文は文書が支えるより広いと注に書く。新しい計測は足さない。
+  2. **GSE 本体の文書**（`docs/agent-shared.md` の技術的制約 7 の「macOS 側（公開 API が存在しない）」と調査メモ §7.5）は、この枝に混ぜず、**別の小さなタスクで一次（WebKit のソースと Apple の定数の一覧）に戻して直す**。
+- **メインの見つけたこと（ソースで確かめた・研究者が覆せる）**: macOS のロガーが行を書くキーは、事前登録 §1.1 の書き方（「入力モードのキーのほか F13〜F19 と修飾キーが行を書かない」）より狭い。`kit/logger/src/driver_macos/keymap.rs` の `is_observed_key` は、英字・数字・主キー群の記号・Return・Tab・Space・Backspace・Forward Delete・Escape・矢印・F1〜F12 だけを通し、テンキー・Page Up / Down・Home / End・JIS の ¥ と _ のキー・ISO の § キーも行を書かない。→ 原稿の Table 3 はソースどおりの集合を書き、登録の書き方との違いを注にする（解放の行と同じ扱い・判断 150）。計測の計画が送るキー（`FORMATS.md` の `keyname`）は英字・数字・記号 3 つ・Space・Return・Escape・Backspace・Tab・矢印・入力モード・F13〜F19・Shift だけなので、計測の行には影響しない。
+- **メインの見つけたこと（2）**: ログのヘッダの `manifest_sha256` はロガーの**共通部分の manifest**（`kit/logger/manifest.json`・状態機械・キーの分類・`main.rs`）だけを覆い、各 OS のドライバは別の manifest（`manifest.macos.json`・`manifest.windows.json`）にある（`main.rs` 56 行の doc 逐語 "Covers only the core manifest, not a driver's own manifest."）。→ 原稿の §4 と LG1b は「ヘッダの SHA-256 は共通部分を識別し、ドライバを含む全体は凍結のタグが固定する」と書く。
+- **影響範囲**: `papers/ime-observation/manuscript/outline.md`（貢献 1・OB3・§3・§4・Open items）・新しい節 `sections/observability.tex`・`sections/logger.tex`・`manuscript-map.md`・`docs/references.md`（Apple / Microsoft / WebKit の文書）・引き継ぎ（GSE 本体の文書を直す別タスク）。
+
+## 判断 152: main に入った Mac の記録（PR #297）と Windows の解析（PR #304）をこの枝に取り込む —— 逸脱の番号は main の D6（macOS の晩）を保ち、この枝の Windows の試行の数え方を D7 に付け直す（2026-10-05・G-GEAR・研究者の選択）
+
+- **背景**: 研究者の知らせ「Mac の計測結果が git に merge された」「PR304 も merge された」。`git fetch` で確かめた: PR #297（`9cedba6c`・M4 の記録）は `data.md` の点検の表（ON・OFF・E3 working とも打ち切りに数えない）・`env.md`（macOS 27.0.1 26A434・JapaneseIM-RomajiTyping 6.3・rustc 1.99.0・Swift 6.4・背景の CI の負荷）・**逸脱 D6「macOS の run が別々の晩ではなかった」**。PR #304（`cf320319`）は Windows のセルの解析の結果（`experiment/results/windows/e1_*.json`・`e2_open_set_windows-msime-tsf.json`）と `data.windows.md`（run の行・書庫の SHA・問 5 の working の点検の行）。⚠️ macOS の解析（問 1〜4）はまだ回っていない。⚠️ Windows の問 4 の閉じた集合は凍結のコードの欠陥で止まっている（`next-session-ime-paper-m7-windows.md` §2.11・研究者が逸脱として決める待ち。macOS も S12 の候補が 72 で同じ欠陥に当たるおそれ）。
+- ⚠️ **衝突**: この枝は判断 149 で D6 を「Windows の試行の数え方」に使っていた（未 merge）。main は D6 を macOS の晩に使った（先に merge）。
+- **研究者の選択（推奨どおり）**: main の D6 を保ち、この枝の項を **D7** に付け直す。`deviations.md`（冒頭の文に D7 を足し、D6 の後に D7）・`data.windows.md`（「deviation D7」）・`method.tex`（本文・逸脱の表に D6 を足し D7 に・「七つの逸脱」）・`outline.md`（§5.7・§5.9・AG7）を直した。Windows の次の逸脱は **D8 から**（引き継ぎに書く）。
+- **あわせて直したこと（メイン）**: `method.tex` の「各機械で別々の晩に測った」は macOS で D6 により事実と違う → 「決まった順で測った・登録は別々の晩を求める・macOS は D6」に直し、Windows の晩の扱いは \tbd（Windows 側で研究者の判断待ち）。
+- **台帳**: `.codex/budget.json` は自動で混ざったが、この枝は台帳を触っておらず、取り込んだ結果は main と同じ（差分 0）。二重計上なし。
+
+## 判断 153: 結果を待たない 4 節の事実の照合（指摘 17 件はすべて真）を反映し、macOS の版を記録から埋め、書誌 44 件を登録する（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **照合**: `ee54bcbe` の 4 節（`related.tex`・`observability.tex`・`logger.tex`・`dataset.tex`）を、独立のサブエージェント（Opus・読み取りだけ・取得した一次の文書のテキスト・ロガーのソース・凍結物だけを読む）に照合させた（約 9 分）。指摘 17 件を一次で裏取りし、**すべて真**（偽陽性 0）。主なもの: (1) AppKit の定数の数は各一覧の `init(rawValue:)` を除くと **属性 131・パラメータ付き 18・通知 42**（判断 151 の 132 / 19 / 43 は誤り・C の 101 / 9 / 25 は正しい）。(2) 押下の記録（oracle）はキー名でありキーコードではない。(3) 「計測では観測するキーの外のキーを送っていない」は誤り（ランナーがブロックの前に押すかなキーと S14 の入力モードのキーがある）・事前登録 §1.1 は解放に触れていないのであって「押下だけ」と書いてはいない。(4) Accessible Event Watcher の勧めはイベント定数の頁の全イベントに掛かる → アプリしだいの根拠は TextEdit パターンの頁だけにした。(5) TSF の頁は「in-proc server」としか言わない → 「入力方式を置き換える」を削った。(6)〜(17) IMM の「自分の窓」・XP 時代の MSAA の記述・コールバックの引数（フックの handle）・ウィンドウ一覧の情報・Table 2 の 2 行・宇都ら（2020）の執筆言語は明記なし・Monaco の主張の範囲（英単語）・CyWrite の「タグ付きのリリースなし」・ScriptLog の頁は 2003 年更新で現行版は開発者から入手（Wengelin & Johansson 2023）・Table 3 の閉じの条件・Tappy の空白キーの印・梱包が拒むリポジトリのパス。→ すべて直した（25 か所）。
+- **照合で読んでいない範囲**（報告どおり）: 不在の主張（「文書に無い」）は全文の一覧が無いので確かめられない → 原稿は「調べた文書には無い」と書いた。Whiskerd らは注釈まで。`carl2012.txt` は読まれていない。
+- **macOS の版**: main に入った `env.md`（PR #297）の記録から、`method.tex` と `observability.tex` の \tbd を「macOS 27.0.1（build 26A434）・ローマ字入力の版 6.3」で埋めた。外枠の Open items の SDK の確認も「27.0.1」と名指した。
+- **書誌**: `docs/references.md` に **[V192]〜[V235]**（文献 8・道具の頁 6・WebKit のソース 1・Microsoft の文書 16・Apple の文書 12・SDK のヘッダ 1）を append。`references.bib` に 30 件（文書 29 ＋ WebKit）を足した（文献と道具は `ee54bcbe` で 25 件）。各文書は Wayback の写し（2026-10-05 01:22〜02:01 UTC）・最終更新日・取得日を注に持つ。生成は scratchpad の台帳から（手で写していない）。`check_citations.py` 違反なし・原稿の引用キー 67 / 67 が書誌にある。
+- **影響範囲**: 4 節・`method.tex`・`outline.md`・`manuscript-map.md`・`docs/references.md`・`references.bib`。
+
+## 判断 154: GSE 本体の訂正は別の枝で出し（PR #305）、LaTeX を入れて原稿と補遺を組めるようにする —— 雛形は公開物に入れず取得の手順と組む道具を置く（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **GSE 本体の訂正（引き継ぎ §2 の 0・判断 151-2）**: `main` から枝 `docs/macos-ax-marked-text-correction`（worktree `C:/wt/macos-ax-correction`）を切り、`.steering/20261005-macos-ax-marked-text-correction/` に記録した。`docs/agent-shared.md` 制約 7・`docs/architecture.md`・`docs/architecture/workspace-behavior-observation.md`・調査メモ §3.2・§7.5・§7.6 を「アプリを問わずに変換を知らせる公開の通知は見つかっていない・アプリが用意する経路はある」に直した（PR #305）。完了時レビュー（code-reviewer ∥ security-checker ＋ Codex 2 巡）の指摘はすべて一次で裏取りして直した。★ この論文に効く見つけたこと 2 つ:
+  1. ⚠️ **`kit/logger/src/input/ime_compose.rs` は GSE の `src-tauri/src/input/ime_compose.rs` の逐語コピー**（`PROVENANCE.internal.md`「1 バイトも変えない」・`manifest.json` の SHA-256・`check_manifest_upstream.internal.py --against-upstream` が作業ツリーの上流と照合）。上流のコメント（16 行「公開 API が無い」）を直すと照合が赤になるので、**上流は直さなかった**。照合を凍結の commit に固定すれば上流を直せる（Codex の指摘）→ 研究者の判断待ち。kit の写しのコメントは公開物に残る（凍結物なので変えない）。
+  2. WebKit は同じ commit で `AXObjectCache.cpp` 3692〜3719 行（`onTextCompositionChange`・`HAVE(INLINE_PREDICTIONS)` の条件つきで、`PlatformHave.h` 1326〜1331 行が Mac で 1）から 2 つの通知を投げ、`AXObjectCacheMac.mm` 375 行が userInfo `nil` で出す。→ 原稿の §3 の「WebKit が出す」は、発火の経路までソースで言える（実機で別のプロセスが受け取れるかは確かめていない）。§3 の文と [V206] の注に足すかは原稿の段で決める。
+- **LaTeX の導入（引き継ぎ §2 の 1・研究者の許可 2026-10-05）**: `winget` で MiKTeX 25.12 をユーザーの領域に入れ（管理者権限なし）、パッケージの自動取得を有効にした。Springer Nature の雛形は 2024 年 12 月版の ZIP（901,814 バイト・SHA-256 `812e76dc…ecae`）を `https://cms-resources.apps.public.k8s.springernature.io/springer-cms/rest/v1/content/18782940/data/v12`（LaTeX author support の頁のリンク）から取得し、**公開物の外**（`C:\Users\johnd\tools\sn-template\`）に置いた。
+  - ★ **判断 147 (b) の答え**: `sn-jnl.cls` の頭は LPPL 1.3c と「This file may only be distributed together with a copy of the LaTeX base system」（LaTeX の基本の `classes.dtx` から生成した旨）を書く → CC BY 4.0 の公開物には**入れない**。取得の手順を `manuscript/BUILD.md` に、組む道具を `manuscript/build.sh`（雛形の場所と出力の場所を引数に取り、ソースの横に何も書かない）に置いた。
+  - **直したこと**: (1) `main.tex` に `amsmath`（クラスが文書の始めで `\allowdisplaybreaks` を呼ぶ・雛形の見本も読む）・`graphicx`・`array`・`[T1]{fontenc}`・`lmodern`。(2) 雛形の APA の書式は `url` の欄を素の文字で出すので、URL の下線でコンパイルが止まった → `APACrefURL` の環境を `\url` に渡すよう定義し直した（試しの文書で確かめた）。(3) 表の列を「列の間の余白を含む比率」の列型 `L{}` にし、各表の比率の和を 1 以下にした（はみ出し 4 件 → 0）。Table 1・2 は高さがページを 516 pt・354 pt 超えていた → 雛形の勧めどおり `sidewaystable`。他の `table*` は 1 段組なので `table`（雛形の表の字の大きさになる）。(4) 書誌: APA の文の頭だけ大文字にする規則で固有名詞が小文字になっていた（"Aozora bunko"・"2018 ieee symposium on security and privacy (sp)" など 10 か所）→ 括弧で守った。会議録の論文に雛形の書式は DOI を出さない（`fin.entry` の DOI がコメントアウトされている）→ 2 件は DOI を note にも書いた。Dhakal らの "p. Paper 646" を note の "Paper 646" にした。(5) 栞は小節までにした（段落の見出しで出ていた警告 6 件）。(6) 補遺の文書一覧を組む `supplement/supplement.tex` を足し、一覧の冒頭の閉じ引用符の欠けを直した。
+  - **結果**: `main.pdf` 38 頁・エラー 0・未定義の参照は引き継ぎの 4 つ（`fig:components`・`sec:availability`・`sec:limitations`・`sec:results-attempts`）だけ・横のはみ出し 0・縦のはみ出し 2（9・10 頁・4 pt・脚注の頁）。`supplement.pdf` 5 頁・エラー 0（URL の列に数 pt のはみ出し）。表 1・参考文献の頁は画像にして目で確かめた。`_style_check.py` 違反 0。
+  - ⚠️ **残したこと**: 雛形の APA の書式は 3 人以上の著者で最後の著者の前に "&" を出さない・会議録の DOI を出さない（出版社の書式なので `.bst` は変えない）。OSF の 2 つの登録の著者は `TODO` のまま（研究者の名の書き方を確かめてから）。BRM の投稿は ScholarOne なので、`.tex` を 1 本にまとめるか・雛形のファイルを上げるかは投稿の段で確かめる（判断 147 の追記）。
+- **影響範囲**: `manuscript/main.tex`・`sections/related.tex`・`observability.tex`・`logger.tex`・`method.tex`・`dataset.tex`・`references.bib`・`supplement/observability-documents.tex`・新規 `supplement/supplement.tex`・`BUILD.md`・`build.sh`。
+
+## 判断 155: 問 4 の閉じた集合は S12 の試行をすべて外す（逸脱 D8）・Windows の run の日時を逸脱 D9 にする・この枝の PR は結果の節の後に出す（2026-10-05・G-GEAR・研究者の選択）
+
+- **背景**: 引き継ぎ §2 の 3（研究者の判断待ち）。Windows の閉じた集合は凍結のコードで止まっていた（`next-session-ime-paper-m7-windows.md` §2.11）。
+- ★ **メインが一次で確かめたこと**: (1) 事前登録 §6.8（864〜868 行）は「S12 の試行は数えない・ライブ変換 ON 2,925・OFF 2,700」、§10.7（1326〜1331 行）は「S12 を除いて 2,700」。凍結の `closed_set.py` の `evaluate()` は「コーパスに無い句」の試行だけを外す（`used = [t for t in trials if t["phrase_id"] in by_id]`）。(2) 計画の生成器はかなのシナリオに、かなで打てるコーパスの句を先に使い切ってから生成したかな文字列を当てる（`generate_plan.py` 580〜592 行）。(3) ★ **3 つの計画を凍結のタグから再生成**（`git archive` → `generate_plan.py --seed 20260929`）し、登録の SHA-256（`c7a5469d…`・`3759ebf7…`・`b7bdf8fc…`）と一致した。どの計画も S12 は 225 試行で、そのうち 74 がコーパスの句（74 句すべて別）→ **macOS の 2 セルも同じ欠陥で止まる**。登録の数（3,150 − 225 = 2,925・2,925 − 225 = 2,700）は S12 をすべて外した数。(4) 開いた集合はシナリオで S12 を外していて（`open_set.py` 82 行）欠陥は無い。(5) Windows の E3 は `idle` が 10-04 13:16〜21:16（本計測の終わった日の昼）、`working` が 21:29〜10-05 08:35。登録 §10.8（1376〜1377 行）は「別々の夜に、この順で」。(6) 01:51 の拒否された開始は D7 が既に扱っている（照合済み・引き継ぎ §2 の 3）。
+- **研究者の選択（3 問とも推奨どおり）**:
+  1. **閉じた集合は S12 の試行をすべて外す**（逸脱 **D8**・3 セルとも）。
+  2. **Windows の run の日時を逸脱として記録**（**D9**・macOS の D6 と同じ形）。
+  3. **この枝の PR は結果の節の後に出す**（いまは push だけ・完了時レビューは結果の節と D8・D9 を足してから 1 回）。
+- **実装（メインの選択・研究者が覆せる）**:
+  - `kit/e2/closed_set.py` に **`--skip-scenario S`**（繰り返し可・既定なし）を足した。試行を計画に合わせた**後**で外すので、`alignment` と `n_trials` は計画の全体のまま、出力に `skipped_scenarios`（シナリオごとの数）を足す。⚠️ 既定（スイッチなし）の出力は凍結のコードと同じ（出力の辞書に鍵を足すのはスイッチがあるときだけ・候補は試行ごとの種から引くので他の試行の引きは変わらない〔`_sub_seed(tseed, "cand")`〕）。`evaluate()` は変えていない（selftest の S12 を含む検査がそのまま通る）。名前の検査（`S[1-9][0-9]*`・二重の指定を拒む）。selftest に 6 件（スイッチなしで鍵が無い・S2 を外す・計画に無い S12 は 0・名前の拒否・二重の拒否）→ **157 / 157**。★ 変異 3 本（外さない・鍵を常に書く・名前の検査を外す）はどれも selftest を赤にし、無変異の写しは緑（対照）。`kit/e2/README.md` に使い方。
+  - `experiment/deviations.md` に **D8**（理由・3 計画の再生成と 74 / 225・効果）と **D9**（時刻・順と重なりなし）。冒頭の文に D8・D9。
+  - `manuscript/sections/method.tex`: Windows の日時の `\tbd` を D9 の文で埋め、逸脱の表に D8・D9、「Nine deviations」。`outline.md` の §5.9 を「D1 to D9」に。
+- ⚠️ **残り（次の作業）**: 閉じた集合を回すのは計測の機械（Windows = Surface の `experiment/runs/windows-msime-tsf-2`・macOS = Mac）。命令は §6.8・§10.7 のものに `--skip-scenario S12` を足し、`kit/e2/closed_set.py` だけこの commit のもの、他は各 OS の凍結のタグの書き出し。macOS の問 1〜4 もまだ回っていない。
+- **影響範囲**: `kit/e2/closed_set.py`・`kit/e2/README.md`・`experiment/deviations.md`・`manuscript/sections/method.tex`・`manuscript/outline.md`。
+
+## 判断 156: 結果の表と本文の値は `manuscript/tools/results_tables.py` が結果の JSON から生成し、原稿は `\rv{<key>}` で読む（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **背景**: 引き継ぎ §2 の 2（「結果の値は結果の JSON からスクリプトで写す・手で写さない」・要旨は外枠の「Rule for the abstract」）。まず Windows の結果で作る。
+- **道具**: `manuscript/tools/results_tables.py`（標準ライブラリだけ）。`experiment/results/`（macOS の 2 セル・まだ無い）と `results/windows/` の `e1_detection.json`・`e1_l1.json`・`e1_l2.json` を読み、`manuscript/generated/` に 5 つを書く: `values.json`（全桁の値と出どころ〔ファイルと JSON の中の道筋〕）・`values.tex`（整形した値・原稿は `\rv{<key>}` で読み、無い鍵は `\tbd` で出る）・`table-detection.tex`（表 8: セル × 速さ、30 試行以上の層の Wilson 区間の最小の下端〜最大の上端、主の範囲と全試行）・`table-session.tex`（表 9: セル × 速さの滞在の偏り〔区間〕・一致の限界・中央値の絶対差・`abandon` の一致と κ・`nav` の完全一致・横向き）・`detection-strata.tex`（補遺: 層ごとの検出・範囲ごとに横向きの長い表・測っていないセルを名指す）。`--check` は書かずに比べて違えば exit 1（`build.sh` が最初に回す）。
+- ★ **要旨の規則の写し方**: (i) 主の範囲の層ごとの「残った試行」は `e1_l2.json` の `per_trial.by_stratum[].n_trials`（検出の JSON は層の試行数を持たない）。層の数は計画の層（13 シナリオ × 3 速さ = 39）。範囲は 30 試行以上かつ再現率・適合率の区間がある層だけ。外した割合は `trials_not_used.out_of_scope` と検出の `excluded.trials.by_type.carry_over` を総試行（層の試行・除外・未実施・範囲外の和）で割る。(ii) `dwell_ms` の偏りは `e1_l1.json` の `metrics.by_speed[].dwell.bias_ci` の範囲。(iii) 推奨と (iv) CPU は閉じた集合と E3 の結果ファイルが来てから足す。
+- **書式**: 割合は小数 3 桁・ms は整数（Python の丸め）・`values.json` は丸めない値を持つ。⚠️ 引き継ぎの「丸めない」は「手で丸めない」と読んだ（本文に 16 桁を出さない）—— 研究者が覆せる。
+- **Windows の値（生成物から・主 = `windows_def`・`gt_obs`・`under_limit`）**: 再現率の範囲 0.412–1.000・適合率 0.321–1.000（36 層・外した層 3 = S13 の 3 速さ〔主の範囲で試行 0〕）、範囲が外した試行 617 / 2,925（21.1%）・carry-over 2 / 2,925（0.1%）、全試行では 39 層で再現率・適合率とも 0.000–1.000、滞在の偏りの区間の範囲 −1,121〜−456 ms（全試行 −1,916〜−535 ms）。⚠️ 解釈はまだ書かない（結果の節の段・macOS の後）。
+- **検証**: selftest 18 件（合成の結果ファイル: 30 試行ちょうどの層は入り 29 は外れる・範囲・割合・ms の符号・出どころ・層の表の「試行なし」・決定的・`--check` の陽性と陰性 2 つ・主の範囲が違うと止まる・結果ファイルが無いとき）。★ 変異 5 本（`>=` を `>` に・範囲を区間でなく値から・`--check` が常に通る・主の検査を外す・総試行から範囲外を落とす）はどれも狙った検査で赤、無変異の写しは緑。生成した表を雛形で組んで画像で確かめた（`build.sh` で `main.pdf`・`supplement.pdf` ともエラー 0）。
+- **配線**: `main.tex` に `\rv` と `\input{generated/values}`、補遺に `pdflscape` と層ごとの表。`BUILD.md` に生成と `--check` の手順。
+- **影響範囲**: 新規 `manuscript/tools/results_tables.py`・`manuscript/generated/`（5 ファイル）・`main.tex`・`supplement/supplement.tex`・`build.sh`・`BUILD.md`。
+
+## 判断 157: macOS の問 1〜3 が凍結のコードの欠陥で止まった —— 逸脱 D10 で「登録の解析（分子 > 分母は値なし）」と「直した解析（数え直した併合を対の観測の層に）」の両方を回す（2026-10-05・Mac・研究者の選択）
+
+- **起きたこと**: 引き継ぎ `next-session-ime-paper-mac-analysis.md` §2 の 4 の命令（macOS のタグの書き出し `~/ime-m4/export-ff122e32`）が **exit 2**（`pipeline: x and n must be integers with 0 <= x <= n`）・結果のファイルは 1 つも書かれていない。原因を 1 回だけ見た（凍結のコードは変えずに `stats` の関数を外から包んでスタックを出した）: `match.evaluate` → `_layer_metrics`（`diagnostics.prediction_layers`・予測の層 × 速さ）→ `_metrics_row` の `merge_rate` = `_prop(merge_obs + merge_obs_recount, n_obs)` で **27 / 18**。
+- **原因（コードで確かめた・`match.py` の `detection_metrics`）**: θ の数え直しの併合（`rc["merge"]` の `{"gt": 取り残された正解, "obs": 既に対になっている観測}`）を `st = gl(e["gt"])`（**取り残された正解の層**）に数えるが、分母 `n_obs` は観測を**その対の正解の層**で数える（`pairs` は `gl(p["gt"])`）。層が違うと分子だけが別の層に入る。分割の数え直しは対の正解の層（`gl(e["gt"])` の `e["gt"]` は対の正解）で分母と同じ側 → 非対称。予測の層は層の外の観測を `None` に落とすので分母が小さく、超えた。Windows は予測の層を計算しない（D3）ので止まらなかった。主の層（シナリオ × 速さ）でも試行をまたぐ併合があれば分子がずれうる（止まらないだけ）。
+- **研究者の選択（2 問）**: (1) 欠陥の扱い → **ここで D10 の方針を立てる**（推奨）。採らなかった: G-GEAR に戻す・すべて止める。(2) 直し方 → **両方回す**（推奨）: ① 分子 > 分母の割合は値と区間なし＋注、それ以外は凍結のコードと同じ → **登録の解析**として報告 ② `IME_MATCH_MERGE_RECOUNT=obs` で数え直した併合を対の観測の層に数える → **直した解析**として横に並べる（§8）。Windows のセルも ② で回し直す（Surface / G-GEAR）。採らなかった: ① だけ・② だけ。⚠️ 選んだ時点で問 1〜3 の結果は誰も見ていない。⚠️ ただし直す途中で、問 4 の開いた集合のログの末尾（CER の数値の数行）がメインの画面に出た —— D10 の選択（問 1〜3 の数え方）より後で、選択には関わらない。
+- **実装（commit `115cd5ff`・`kit/analysis/match.py` だけ・pipeline・設定・規則のファイルは変えない）**: `_prop` の防御・`merge_recount_mode()`（環境変数・`gt` / `obs`・ほかは InputError）・`obs` のとき `paired_gt[id(e["obs"])]` の層へ（`n_miss_as_merge` は正解の層のまま）・`evaluate` の `config` に `merge_recount` を `obs` のときだけ足す（凍結の形を保つ）。⚠️ スイッチを環境変数にしたのは、pipeline が match に渡す設定のキーが固定（`config.json` は凍結のハッシュの対象）で、pipeline を変えると macOS のタグと今の枝で中身が違う（D2〜D4）から。`match.py` はタグと枝でバイト一致。
+- **検証**: match の selftest 18 件（新しい `_case_d10`: 層をまたぐ併合で ① は 1 / 0 を値なし＋注・② は対の層に 1 / 1・単一の層は両方で同じ・不正な値は拒否・`_prop(1, 2)` は区間を保つ）。★ 変異 3 本（防御を外す・`obs` の分岐を外す・防御を `<=` に）→ すべて赤。pipeline の selftest 13 件。★ **合成の run**（`--synthetic --seed 4`・`--seed 7`・`bootstrap_B` 2000・`gt_rules.example.json`）で **スイッチなしの 4 ファイルがタグとバイト一致**・スイッチありは delivery 以外の 3 ファイルが変わり `merge_recount` 36 か所。
+- **影響範囲**: `kit/analysis/match.py`・`experiment/deviations.md`（D10）・結果は `experiment/results/`（登録）と `experiment/results/d10/macos/`（直した）。⚠️ Windows の ② は未実施（Surface / G-GEAR へ）。`results_tables.py` が `results/d10/` を読むかは G-GEAR が決める。
+
+## 判断 158: macOS 27 の SDK のヘッダを数え直した —— AppKit は文書と一致、C の Accessibility は文書より多いが marked text の定数は無い、入力ソースのヘッダは入力ソースと入力モードだけ（2026-10-05・Mac・メインの確認）
+
+- **SDK**: `xcrun --show-sdk-path` = Command Line Tools の `MacOSX.sdk`・`--show-sdk-version` **27.0**・build **26A425**（`CLTools_Executables` 27.0.0.0.1788430756）。⚠️ 機械の OS は 27.0.1（26A434）で、SDK の版とは別。
+- **(a) AppKit `NSAccessibilityConstants.h`**（SHA-256 先頭 `bef307f721603f6b`）: 1 行 1 宣言を確かめたうえで `grep -c "NSAccessibilityAttributeName const"` **131**・`"NSAccessibilityParameterizedAttributeName const"` **18**・`"NSAccessibilityNotificationName const"` **42** → **判断 153 の数（文書の一覧から `init(rawValue:)` を除いた数）と一致**。`NSAccessibilityTextInputMarkedRangeAttribute`（96 行・macos(10.6)）・`NSAccessibilityTextInputMarkingSessionBeganNotification` / `…EndedNotification`（466・467 行・macos(10.6)）が**ある**。
+- **(b) C `AXAttributeConstants.h`（`5734d01bc751983b`）・`AXNotificationConstants.h`（`204847bb5e78d75a`）**（HIServices）: python で `#define kAX…` を名前の末尾で分類 → `…Attribute` **138**（値の文字列で 137 種）・`…ParameterizedAttribute` **14**・`…Notification` **37**（ほか 1 と 4）。⚠️ **判断 153 の 101 / 9 / 25 と一致しない**（文書の一覧はヘッダの部分集合で、数え方の差は未調査）。marked text・text input・composition を表す定数は**無い**（`marked` に当たるのはコメントの "marked as focused" の 1 か所だけ・名前に text / input / select / range を含む定数は選択・可視範囲・行・セルの類）。→ 原稿の「C の定数に marked text は無い」は数の差に関わらず保たれる。数を書くなら「SDK 27.0 のヘッダで 138 / 14 / 37」と出どころを添える。
+- **(c) `TextInputSources.h`（HIToolbox・`e3c1a70e0cb8e214`・© 2006-2008）**: ⚠️ **ISO-8859 で書かれていて grep が黙って空を返した**（memory「ugrep は非 UTF-8 で黙って空」と同じ型）→ latin-1 で読み直した。関数 16（`TISCopyCurrentKeyboardInputSource` ほか・入力ソースの選択・有効化・プロパティ）・定数 27（`kTISProperty…` 15・`kTISNotify…` 2・`kTISCategory…` 3・`kTISType…` 7）。`marked` / `composition` / `convers` / `candidate` / `inline` は 0 件 → **入力ソースと入力モードだけで、11.3 の写しで読んだことと変わらない**。
+- **影響範囲**: 原稿の文（`observability.tex`）は G-GEAR が直す。この判断は数と数え方の記録だけ。
+
+## 判断 159: macOS の 2 セルを書庫にして解析した（問 1〜5）—— 結果の表の道具は分母 0 の層で落ちたので直さず G-GEAR に戻す（2026-10-05・Mac・メインの実行・研究者が覆せる）
+
+- **書庫**（`data.md` の手順 4〜5・書き出し `~/ime-m4/export-ff122e32`・一覧 `29b183ba…6c49` を再確認）: `pipeline.py --pack` を ON / OFF に（`--also-user` / `--also-home` を 1 つずつ・値は書かない）→ ON `77bd8a8e…49b8`（74,044,861 B）・OFF `e1cdf2e8…3d10`（66,091,676 B）。⚠️ zsh で `PIPESTATUS` が空だったので、同じ命令を一時の場所へもう一度 → **どちらも exit 0・バイト一致**。書庫は `~/ime-m4/deposit/`（git に入れない・OSF への寄託は研究者）。`e3-working-run` は書庫にしない（外枠の Open items）。
+- **展開**: `experiment/runs/macos-standard-live-{on,off}-1`（gitignore）・`run.json` の SHA-256 が元の run と一致 → `data.md` に `run_dir` の 2 行・Deposits・Machine の表。
+- **問 1〜3**: 判断 157（D10）のとおり 2 本 → どちらも exit 0・「2 run(s), 0 aborted, 2 analysed」。登録の側で D10 の注（値なし）は **32 か所・すべて `diagnostics.prediction_layers` の `received_carry` 層の速さごとの merge_rate**（主の `by_stratum` には 0）。直した側は注 0・`merge_recount: obs` 36 か所。`e1_delivery.json` は両方で同じバイト。
+- **問 4**: 開いた集合 ON / OFF exit 0。閉じた集合（D8・`export-d8`・`14c85e6e` の `closed_set.py`・selftest 157 OK）ON / OFF exit 0・`skipped_scenarios` `{"S12": 225}`・`n_trials` ON 3,150 / OFF 2,925・各 K と特徴量の `n` ON 2,925 / OFF 2,700・`n_skipped` 0・採点されないブロック 0。推奨（§6.8 の判定）は読んでいない・書かない。
+- **問 5**: `samples.tsv` の SHA が M4 の記録と一致 → `results/e3_macos.txt`（両方 `measured`・パスなし）。
+- **出力の SHA-256 と命令**は `data.md` の新しい節「Analysis of the macOS cells」。結果のファイルにホームのパスが無いことを確かめた。
+- ⚠️ **結果の表（§2 の 9）は生成できなかった**: `manuscript/tools/results_tables.py` が `fmt_p(None)` で `TypeError`（`table_strata`・主の層の表の split / merge rate）。該当は**分母が 0 の層**（OFF の `all_trials` の S13 の fast / slow は観測の行 0 → `merge_rate` と `precision` の値が None。どちらのセルも `(None, None)` の層は `recall` / `split_rate` が n = 0）—— 凍結のコードの元からの振る舞いで **D10 とは無関係**。表の道具は G-GEAR の持ち物（判断 156）で空欄の書き方は原稿の選択なので**直していない**。`manuscript/generated/` は書き換わっていない。⚠️ 予測の層の表を道具が読むなら、D10 の注（値なし）も同じく None で来る。
+- ⚠️ 表示した値: 問 4 の開いた集合のログの末尾（数行の CER）が一度画面に出た（判断 157）。問 1〜3 の率・問 4 の推奨は見ていない。
+- **出荷の記録（前のセッションの残り）**: PR #297（M4 の記録・D6）→ merge `9cedba6c` → main の CI は #304 の merge に取り消され、`cf320319` の main の CI（run 37253171494）が success。
+
+## 判断 161: Windows の閉じた集合（D8 のスイッチ付き）と E3 の要約を Surface で回し、結果の JSON と記録を枝 `docs/ime-m8-windows-closed-set` に置く（2026-10-05・Surface・メインの選択・研究者が覆せる）
+
+- **背景**: `next-session-ime-paper-surface-d8.md` §2。新しい計測はしない・凍結のコードと事前登録は変えない（D8 の `closed_set.py` だけ commit `14c85e6e` のものに差し替え）。
+- **実行**: 入力の SHA-256 は計画・観測とも引き継ぎの値と一致。`export-d8`（書き出しの写し）で selftest OK（157 checks）・LF のまま。閉じた集合は `Start-Process` の独立プロセスで約 2 時間 40 分・exit 0・標準エラー空。`skipped_scenarios` `{"S12": 225}`・`n_trials` 2,925・全 K・全特徴量で `n` 2,700・`n_skipped` 0。出力 SHA-256 `93b5eb2b…38b7`。E3 は両方 measured・working の `cpu_all_zero` false。
+- **前の引き継ぎの残り**: (a) 試み 2 の間の計測機の記録を `data.windows.md` に 1 段落（Defender の定義更新 1 件・電源サービスのイベント 11 件・再起動なし。タスクスケジューラのログは無効で、Claude Code のセッションは読んでいない → 「何も動かなかった」とは言わない）。(b) §10.8 の点検の計画の SHA-256 を全桁に（点検の run の manifest の `plan_sha256`）。
+- **結果は読んでいない**: チャンスとの比較（§6.8）は結果の節で G-GEAR が書く。
+- ⚠️ **手順の注意**: Windows の PowerShell に渡す `-File` のパスは `cygpath -w`。`git -C` に MSYS パス（`/c/...`）は渡せない（`C:/...`）。`grep -c $'\r'` はこのシェルで当てにならず、Python で数えた（CR 0）。
+- **影響範囲**: `results/windows/e2_closed_set_windows-msime-tsf.json`・`results/windows/e3_windows.txt`・`data.windows.md`・本ファイル。
+
+## 判断 165: Mac と Surface の解析を論文の枝に取り込み、結果の表の道具を値なしと測度ごとの層に対応させ、§3 に SDK 27.0 のヘッダの数を書き、`build.sh` の書誌の欠陥を直す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **取り込み**: `origin/docs/ime-m8-macos-analysis`（判断 157〜159・逸脱 D10・`match.py`・macOS の問 1〜5 の結果）と `origin/docs/ime-m8-windows-closed-set`（判断 161・Windows の閉じた集合・E3 の要約）を merge（`a56b17e1`・`d889f45f`）。衝突は `decisions.md` の末尾の追記だけ（157〜159 の後に 161 を並べた）。番号の割り当て（Mac 157〜160・Surface 161〜164・G-GEAR 165〜）のとおりで、160・162〜164 は欠番。
+- ★ **D10 の Windows の直した解析はまだ**（判断 157 の (2)・`deviations.md` D10 は「macOS と Windows の両方で横に並べる」）。Windows の run のデータは Surface にしか無い。`match.py` は 2 つのタグでバイト一致（`git diff ime-observation-prereg-macos ime-observation-prereg-windows -- …/match.py` が空）で、`115cd5ff` が変えたのは `match.py` だけ → Surface で Windows のタグの書き出しの写しに差し替えて回せる（引き継ぎ `next-session-ime-paper-surface-d10.md`）。
+- **結果の表の道具**（判断 156 の直し・Mac の判断 159 で落ちた）: (1) 値の無い割合（分母 0・D10 の値なし）を `--` で出す（`fmt_p`・`est_ci`）。(2) ★ **要旨の規則の層は測度ごとに数える**: 規則の文「strata with fewer trials or no value」は測度ごとに読むのが文どおり。以前は再現率と適合率の両方に値がある層だけを入れていたので、観測の行が 0 で適合率が値なしの層（macOS OFF の全試行の S13）が、再現率 0 でも再現率の範囲から落ちていた。→ `strata_in_range(kept, strata, keys, measure)`・鍵は `<cell>.<scope>.<measure>.strata.used|left`・表 8 は測度ごとに「範囲（層の数/全層）」。⚠️ この直しは Mac の報告（値なしの層の形）を読んで決め、結果の値を出す前に入れた（値を見てから規則を変えていない）。selftest 19 件・★ 変異 7 本（`>` に・測度をまとめる・値なしで落ちる・値から範囲・`--check` が常に通る・主の検査を外す・総試行から範囲外を落とす）はどれも赤、無変異は緑。
+- **3 セルの生成**: `values.json` の `cells` は 3 つ（`macos-standard-live-on`・`-off`・`windows-msime-tsf`）。⚠️ 生成のときに要旨の (i)(ii) の値が画面に出た（区間の範囲・外した割合）。結果の解釈は書いていない。macOS ON の層は 14 シナリオ × 3 速さ。
+- **§3 と SDK**（判断 158）: `observability.tex` に「C の定数は文書の一覧で 101・9・25、macOS 27.0 の SDK のヘッダでは名前の末尾で数えて 138・14・37、どちらも marked text の定数なし」「AppKit は文書とヘッダで同じ 131・18・42」「入力ソースのヘッダは 27.0 でも composition を表すものなし」を足した。出典は新しく **[V236]**（`docs/references.md`・`references.bib` の `apple-sdk-27`・公開の URL は無い・ヘッダの SHA-256 の先頭を記録）。補遺の文書一覧の前書きと外枠の Open items（済み）も直した。`check_citations.py` 違反なし。
+- ★ **`build.sh` の欠陥（判断 154 の記録の訂正）**: Windows の git-bash では `BIBINPUTS` に MSYS 形式のパス（`/c/…`）が入り、BibTeX が原稿の `references.bib` を見つけられず（別の同名のファイルを読み）、引用がすべて未定義になっていた。完了表示は `LaTeX Warning: Reference` だけを数えていて、natbib の「Citation … undefined」を数えていなかった → 見逃した。⚠️ 判断 154 の「未定義の参照は 4 つだけ」は手で組んだ版（`pwd -W` を使った）の事実で、`build.sh` の版には当たらなかった。→ Windows では `pwd -W` で渡し、完了表示に「undefined citations」を足した。直した後: 書誌 68 件・引用の未定義 0・参照の未定義は 4 つのラベルだけ。
+- **公開物の文体**: Surface が `data.windows.md` に書いた内部の番号（「the record of M7」）を `_style_check.py` が赤にした → 「as when the runs ended」に直した（違反 0）。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`・`build.sh`・`sections/observability.tex`・`references.bib`・`supplement/observability-documents.tex`・`outline.md`・`experiment/data.windows.md`・`docs/references.md`。
+
+## 判断 166: Windows のセルの直した解析（逸脱 D10）を G-GEAR で回した —— 登録の解析は 2 台目の機械でもバイト一致、直した解析は併合の率とその分子だけが変わる（2026-10-05・G-GEAR・メインの実行・研究者が覆せる）
+
+- **背景**: 判断 157 の (2)（Windows のセルも ② で回し直す）と判断 165 の残り。研究者の提案で Surface の代わりに G-GEAR で回した（引き継ぎ `next-session-ime-paper-ggear-d10.md`）。新しい計測はしない・凍結のタグのコードと事前登録は変えない・封印は開けない。
+- **入力**（このセッションで測り直した）: 書庫 `Downloads\windows-msime-tsf-2.zip` `f2287a74…cd06`（`data.windows.md` の Deposits と一致）。展開済みの `experiment/runs/windows-msime-tsf-2`（gitignore を `check-ignore` で確認）の `run.json` `5c74a1fa…3d82`・`plan.jsonl` `b7bdf8fc…36b0`・`obs.jsonl` `58f0bda6…2562` が記録と一致。G-GEAR は Python 3.11.9（Ryzen 7 9700X・Windows 11 Home 26300）。
+- **手順 1（書き出し）**: `git -c core.autocrlf=false worktree add --detach <scratch>/wt-win ime-observation-prereg-windows`（`a57c4fd7`）→ `export.internal.py --out <scratch>/export-win --allow-missing-license` exit 0・108 ファイル。一覧（§9 の形を Python で作り直した）の SHA-256 `f61af353…87b7` で、`freeze-export-list-windows.txt` と**バイト一致**。
+- **手順 2（D10 の `match.py`）**: `export-d10` に写して `115cd5ff` の `match.py`（`6f817228…`・CR 0）に差し替え。タグとの差は D10 の 3 点（`_prop` の防御・`merge_recount_mode()` と `obs` の分岐・`config` の `merge_recount`・selftest `_case_d10`）だけを diff で確認。⚠️ `115cd5ff` は `deviations.md` も変えている（文書・コードは `match.py` だけ）。書き出しは `match.py` を変えない（書き出しの `match.py` がタグの git のバイトと同じ `66881f86…`）ので、差し替えは「`115cd5ff` の書き出し」と同じ。selftest は match 18 件・pipeline 13 件 OK。
+- **手順 3（登録の解析の再現）**: 環境変数なし・`--out <scratch>/check-registered` → exit 0（約 2 分）・「1 run(s), 0 aborted, 1 analysed」・標準エラー空・**4 ファイルとも `results/windows/e1_*.json` とバイト一致**（Surface と G-GEAR・同じ Python 3.11.9）。→ D10 の変更 1 は Windows の登録の結果を変えない。`data.windows.md` に節を足した後にもう一度回して、4 ファイルがバイト一致（追記が `--runs-from` の読みを変えないこと）。
+- **手順 4（直した解析）**: `IME_MATCH_MERGE_RECOUNT=obs`・`--out experiment/results/d10/windows`（無い場所・スクリプトで存在を確かめてから）→ exit 0・1 run・中止 0・標準エラー空。SHA-256: delivery `1c4e5cf2…f321`（登録と同じ）・detection `1ae79137…13ab`・l1 `ea8d22ea…878e`・l2 `b29a159e…a261`。
+- **手順 5（突き合わせ・値は出さずに形と数だけ）**: delivery はバイト一致。detection は全範囲で層の数と並び・合算（pooled）が同じ。層ごとの precision・recall・F1・split_rate・miss_rate・false_pos_rate と `n_merge_obs_recount` 以外の数はすべて同じ。違うのは `merge_rate` と `n_merge_obs_recount` だけで、`windows_def` の `all_trials`・`under_limit`（主の範囲・37 層のうち 2 層）・`under_limit_gt_duration` で各 2 層、`all` で各 8 層、`over_limit` で 0 層。直した側は全層で分子 ≤ 分母。登録の側に D10 の注（値なし）は 0。`config.merge_recount: obs` が 8 か所（評価 8 本）。l1・l2 は `inputs_sha256.match` だけが違う。→ macOS の `results/d10/macos/` と**同じ形**（macOS は予測の層もあるので、加えて `prediction_layers` の併合の率と登録の側の注 32 か所）。出力にパス・ホスト名・ログイン名なし・CR 0。
+- **記録**: `data.windows.md` に「Analysis under deviation D10」の節（機械は製品名でなく仕様で・内部の番号なし・`_style_check.py` 違反 0）。
+- **読んでいないもの**: 率の値は出していない（変わった層の数だけ）。併合の率を登録と直した解析で並べる表は `results_tables.py` の仕事（引き継ぎ `next-session-ime-paper-results-2.md` §2 の 2）。
+- **影響範囲**: `experiment/results/d10/windows/e1_*.json`（新規 4）・`experiment/data.windows.md`・本ファイル・引き継ぎ 2 本（surface-d10 の冒頭・results-2 の §5）。書庫 `Downloads\windows-msime-tsf-2.zip` は消さずに置いた（寄託は研究者）。
+
+## 判断 167: データの寄託先は Zenodo（データセットの記録・データ単独の DOI）、コードと材料は GitHub の公開 repo にする（2026-10-05・G-GEAR・研究者の選択）
+
+- **背景**: 研究者の問い「OSF へ up はいつ頃する？」。記録の食い違いを見つけた: 判断 146 は「Zenodo の記録をデータセットとして DOI 付きで作る（ソフトウェアの記録と分けるかは M12 で決める）」、判断 159 と引き継ぎ `next-session-ime-paper-results-2.md` は「OSF への寄託は研究者」。`data.md`・`data.windows.md` の Deposits はどれも「not yet deposited」で、日付は決まっていない。OSF Registries の 2 つの登録（`9nh7r`・`4jwzn`）は済んでいる（別物）。
+- **メインの推奨**: Zenodo にデータセット用の記録として作る（判断 146 の形・外枠の Open Practices「the data with their own DOI」・下書きと DOI の予約は Claude が進められ、公開は都度確かめる〔memory「Zenodo token」〕・予約した DOI を先に原稿に書ける・Editorial Manager の欄は GitHub〔memory「Springer Editorial Manager」〕）。採らなかった: OSF のプロジェクトに上げて OSF で DOI を作る。
+- **研究者の答え（逐語）**: 「ok. zenodo, githubにしよう」→ **データ = Zenodo（データセットの記録・データ単独の DOI）／コードと材料 = GitHub の公開 repo（M12 の計画どおり・リリースは Zenodo で DOI）**。投稿の欄のリンクは GitHub。
+- **日程**: M12 の枠（判断 145 の 10-23〜27・足りなければ 11 月上旬）。投稿（10-28〜31）の前に DOI が要る（Data availability・Open Practices Statement）。DOI の予約は先にしてよい。
+- **まだ決まっていないこと**（M12 で研究者に聞く）: E3 の標本（`samples.tsv`）の置き方・`working` の観測ログを含めるか（外枠の Open items）・較正パイロットの生ログを含めるか（判断 146 の 4）・ソフトウェアの記録は GitHub のリリースを Zenodo に連携させるか。
+- **書庫の場所**（git の外）: macOS ON / OFF は Mac の `~/ime-m4/deposit/`、Windows は Surface の `~/ime-m7/deposit/`（G-GEAR の `Downloads` に同じ SHA の写し）。
+- **影響範囲**: 判断 159 と引き継ぎの「OSF への寄託」はこの判断で読み替える（本文は書き換えない）。`next-session-ime-paper-results-2.md` §5 に書いた。
+
+## 判断 168: 結果の表の道具に問 4（表 11・推奨）・問 5（表 12）・D10 の直した併合の率を足す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **背景**: 引き継ぎ `next-session-ime-paper-results-2.md` §2 の 2（道具を広げる）の前半。3 セルの問 1〜5 と D10 の直した解析がそろった（判断 166）。
+- **問 4 の規則（§6.8・§10.7 をコードに写した）**: 集合が K で near chance ＝ 報告の正解率（自身と粗い集合の最大＝`acc`）の Wilson 区間の上端（`acc_ci[1]`）≤ 2/K。規則の near chance ＝ K = 10 と K = 100 の両方。推奨 ＝ `no_time`・`counts_only` の順に、**macOS の 2 セルの両方**で near chance の最も細かい集合、無ければ none。macOS のセルが欠けたら not decided（外枠 §8）。Windows の同じ判定は但し書きで、推奨を変えない。K = 1,000 は規則に入れない。値の無い（採点された試行 0）集合は near chance としない。⚠️ `acc` と `acc_ci` の意味は `kit/e2/closed_set.py` の docstring（371〜381 行）で確かめた。閉じた集合のファイルは D8（S12 を外した）であることを検査する（`skipped_scenarios`）。
+- **問 5（§6.10・§10.9）**: `summarize_e3.py` の出力を読み、`measured` の条件だけを引く（`insufficient` は値なし）。Windows の `working` で CPU が全部 0 は insufficient（§10.9）、`idle` は印つきで報告。要旨の (iv) は系ごと・条件ごとの CPU の平均（区間なし）。
+- **D10**: 補遺の層の表に「Corrected」（直した解析の併合の率）の列を登録の列の隣に足した。登録の側が `merge_recount` を持っていたら止まる・直した側が `obs` でなければ止まる。値 `<cell>.d10.<primary|all>.merge.differ`（併合の率が変わった層の数）。
+- **表の形（メインの選択）**: 表 11 は 2 つの規則の集合 × K = 10・100 をセルごとに（正解率〔Wilson〕・ブロックの区間・2/K・near chance）＋推奨の行。全集合・全 K と速さ・シナリオごとの素の正解率は補遺 `closed-set-all.tex`（`supplement.tex` に読み込んだ）。表 11・12 は表 8 と同じ `sidewaystable`。⚠️ 外枠の表 11 の「規則の性質」（§6.8 の確率の表）は登録の値で結果ではないので生成しない（結果の節で §6.8 を引く）。
+- **検証**: selftest 19 → 40 件。★ 変異 16 本（`<=` を `<` に・素の区間を読む・K = 1,000 を規則に・片方の macOS で足りる・粗い集合を先に・Windows も決める・欠けたセルの検査を外す・欠けたら none・値なしを near chance に・Windows の全 0 を引く・insufficient を引く・直した列に登録の値・D8 の検査を外す・D10 の印を要求しない・登録の印を拒まない・変わった層を全部数える）→ すべて赤（欠けたセルの変異は例外でなく狙った確認で赤になるよう selftest を直した）。実物で生成 → `--check` 一致・文体違反 0。`build.sh`: main はエラー 0・未定義の参照は判断 165 と同じ 4 ラベル・overfull 1（HEAD と同じ）。補遺は overfull が 29 → 35（増えた 6 件は既存の層の表と同じ「横向きのページの出力時」の型）。表 11・12 は一時の写しの main に入れて組み、overfull が増えないことを確かめた（結果の節は §2 の 3）。
+- ⚠️ **表示した値**: 規則のコードと selftest・変異を済ませてから実物で生成した。生成の後、表の幅の確認で LaTeX のログの overfull の行に表 12 の数が 4 つ出た（以降は数字を伏せた）。推奨と問 4 の値は見ていない。規則は生成の後に変えていない（変えたのは表の列の幅だけ）。
+- **まだ**: 表 7（届き方・RF1・KT1）・表 10（L2）・開いた集合・表 8 の macOS の 3 つの比較と予測の層。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 3 ファイル）・`manuscript/supplement/supplement.tex`・本ファイル。
+
+## 判断 169: 結果の表の道具に問 3（表 10・文ごとの一致）と補遺の試行の差を足す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **規則（§4.6・§6.7）**: 4 つの測度を §4.6 の順（変換の数・平均変換時間・取り消し率・変換に費やした時間の割合）。主は速さごと（`agreement_by_stratum`）。速さをまとめた値（`agreement`）と 3 つの混合（`mixture_bias`）は補遺で「比べるため」と明記。混合の重みは §6.7 の 0.6/0.3/0.1・等しい・0.1/0.3/0.6 と**照合して違えば止まる**。試行の差は主の範囲で 3 つの見方（全試行・運ばれた層を除く・層 none〔診断〕）。後の 2 つは予測の層が要るので Windows では「計算しない」と書く（§10.7）。
+- **表の形（メインの選択）**: 表 10 はセル × 測度 × 速さで、文の数・偏り・下限・上限・ICC(A,1)（それぞれ区間つき）。区間が出せない推定は推定だけを出し、表の注で「理由は結果のファイル」。ミリ秒は整数、割合は小数 3 桁、負の符号は `$-$`。補遺 `text-agreement.tex`（`supplement.tex` に読み込んだ）は合算と混合・全試行の速さごと・試行の差（観測と参照の平均つき）。
+- **検証**: selftest 40 → 49 件（作り物の全試行の値を主の範囲と変えて、範囲の取り違えが見えるようにした）。★ 変異 10 本を足して計 26 本（下限に上限の区間・ミリ秒でない・混合の重みを照合しない・文の無い行を落とす・区間なしを値なしに・層の無い見方を書かない・観測と参照の平均を入れ替え・表 10 と値が全試行を読む ほか）→ すべて赤。実物で生成 → `--check` 一致・文体違反 0・CR 0。一時の写しの main に表 10 を入れて組み、main の overfull は HEAD と同じ。補遺で増えたのは横向きのページの出力時の型だけ。
+- **表示した値**: なし（ログの overfull は数字を伏せて見た）。
+- **まだ**: 表 7（届き方・RF1・KT1）・開いた集合・表 8 の macOS の 3 つの比較と予測の層。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 2 ファイル）・`manuscript/supplement/supplement.tex`・本ファイル。
+
+## 判断 170: 結果の表の道具に開いた集合（RC3）の表を足す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **規則（§6.8）とコードの確認**: `kit/e2/open_set.py` の docstring（14〜64 行）で、K1 = 作品ごとに分ける（`--split work`・既定）、K1+ = 文ごとに分ける（`--split phrase`）、`gain` = 基準線の CER − 攻撃の CER、`gain_vs_shuffled` = 他の試行の復号の CER − 攻撃の CER を確かめた。
+- **表の形（メインの選択）**: `table-open-set.tex`（`sidewaystable`）。セル × 攻撃者（K0・K1・K1+・文ごとに分けた K0）× 長さの知識（区切りの数・本当の長さ）で、試行の数・攻撃の CER・基準線の CER・gain・shuffled との差（それぞれ区間つき）・復号できない試行の数。外枠の表の一覧には開いた集合の番号が無い（RC3 は §8 の本文）ので、本文に置くか補遺に回すかは §2 の 3 で決める。値 `<cell>.q4.open.<K0|K1|K1plus|K0.phrase>.<count|true>.<cer|gain|gainvsshuffled>`。2 つの分け方 × 2 つの長さ × K0・K1 がそろわなければ止まる。
+- **検証**: selftest 49 → 52 件（攻撃者ごとに値を変えた作り物で、K1+ の取り違えと gain の取り違えが見える）。★ 変異 3 本を足して計 29 本 → すべて赤。実物で生成 → `--check` 一致・文体違反 0・CR 0。一時の写しの main に入れて組み、overfull は HEAD と同じ（見出しの「Undecodable」は分綴の位置を指定）。
+- **表示した値**: なし。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 1 ファイル）・本ファイル。
+
+## 判断 171: 印の時刻（§6.9）を Windows のセルで計算し、結果の表の道具に表 7（RF1）・KT1・表 8 の macOS の 3 つの比較・予測の層（D10 の直した併合の率つき）を足す（2026-10-05・G-GEAR・研究者の選択〔印の時刻〕とメインの選択〔表の形〕・研究者が覆せる）
+
+- **見つけたこと（一次で確かめた）**: §6.9 の印の時刻（`kit/pilot/clock_sync.py` の出力）は、本計測のどの run でも計算されていなかった。`e1_detection.json` の `config.clock_offsets_ms` は空（`notes.md` の「clock_offsets_ms is not passed to the matcher」＝補正しない設定）で、`uncorrected_blocks` は補正しなかったブロックの一覧にすぎず、印の時刻ではない。外枠の Claims and evidence は「its output is kept with the result files of the system」と書くが、`results/` にも `data.md`・`data.windows.md` にも無い。
+- **研究者の選択（推奨どおり）**: **Windows を今回回す**（G-GEAR に run がある）。macOS は Mac への引き継ぎ。表 7 は、ファイルのあるセルは読み、無いセルは「not computed」と出す。採らなかった: 今回は回さない・逸脱にして報告しない。
+- **Windows の印の時刻（実行）**: Windows のタグの `kit/pilot/clock_sync.py`・`seal_obs.py`（`git archive`・LF・HEAD と差なし）・selftest 緑。入力 3 ファイルは run の manifest の SHA-256 と一致。`obs.jsonl` の**写し**（repo の外）を `seal_obs.py` でキーの行だけに（`6b866cf5…`・run のディレクトリは触っていない）。印の仕様は登録に無いので、Windows のパイロットと同じ形（README の例の `gt_vks` を Windows の仮想キーに〔37・39〕・`obs_categories` は `navigation`・`max_gap_ms` 300・窓は既定 3,000 ms）を**出力を読む前に**決めた（`8e382eed…`）。exit 0・2 回目とバイト一致・`results/windows/clock_sync_windows-msime-tsf.json`（`5341c3d6…`・パスなし・CR 0）。117 ブロックすべてで実行器・参照・観測の印が見つかった（欠け 0）。記録は `data.windows.md` の新しい節。
+- **道具（`results_tables.py`・メインの選択）**:
+  - 読み込み: `Cell` が `e1_delivery.json` と全比較を読む。系ごとの比較の組（macOS は 3 つ・Windows は `gt_obs` だけ）と違えば止まる。計画と正解の一致（`e1_l1.json` の `oracle`）は l1.py の docstring のとおり全試行・全定義で同じものなので、2 つのスコープで違えば止まる（実物で、正解を使う 8 つの塊は同一・`pred_obs` は `plan_available: false` を確かめた）。検出の `focus_loss.n_trials` が届き方の `n_trials_with_focus_loss` と違えば止まる。`clock_sync_<cell>.json` があれば読み、4 つの差がそろわなければ止まる。
+  - **表 7** `table-reference.tex`（`sidewaystable`・セルが列）: 計画と正解（試行・食い違いの数と率〔Wilson〕・§6.3 の順の 7 つの型・どの試行にも入らないセッション）／届き方（測った試行・送ったキー・予定に対する送出の遅れの中央値・95 %・最大・観測と参照の到達・少ない試行・多い行・試行の外の行を「全キー / 入力モードのキーを除く」の 2 版で）／フォーカスの喪失（計画どおりの S15 とその他・観測にキーの行のある喪失・重なる試行・その試行のセッションの行と偽陽性を主の範囲と全試行で）／印の時刻（見つかったブロック・4 つの差の中央値〔範囲〕と 1 時間あたりのずれ）。群ごとに「何を読むのに使うか」（RF1 の Reported in）を見出しの行に書いた。
+  - **KT1** `table-key-timing.tex`（本文・観測のキーの行）と補遺の参照のキーダウン: 系 × 速さ（＋全速さ）× 遅れ・間隔の誤差の n・平均・最小・5 %・中央・95 %・最大。対にできた試行・できなかった試行は結果のファイルに**全体の数しか無い**ので、セルごとに全体で出す（KT1 の「per system and speed」の速さごとの対にできなかった数は出せない —— 結果の節で書く）。最小・最大は整数（時刻が整数の ms）、ほかは小数 1 桁（メインの選択）。⚠️ 外枠の表の一覧に KT1 の表は無い（Section 6 の本文）→ 表を足したのはメインの選択。
+  - **表 8** `table-detection.tex` を `sidewaystable` にして比較の列を足した（macOS は `gt_obs`・`gt_pred`・`pred_obs`、Windows は `gt_obs`）。シナリオごとの試行数は主の比較のものを使う（§6.4「all three comparisons cover the same trials」）。値 `<cell>.<gtpred|predobs>.<primary|all>.<recall|precision>.range|strata.left`。
+  - **予測の層**（補遺 `detection-layers.tex`）: macOS のセル × 3 比較 × 3 スコープ（`over_limit` も・§6.4「each comparison and scope」）× 4 層（§6.4 の順）× 速さと併合。併合の率の隣に D10 の直した値。D10 の値なし（分子 > 分母）は `--`。値 `<cell>.d10.layers.novalue`（`macos_def` の層の併合の率で値なしの数）。
+  - 補遺 `reference-strata.tex`: 層ごとの計画と正解（型ごとの数・フォーカスの喪失のある試行）・ブロックごとの印の時刻（Windows）・参照の KT1。`supplement.tex` に読み込んだ。
+- **検証**: selftest 52 → 78 件（Windows 形の合成に届き方・計画と正解・フォーカス・印の時刻、別の一時ディレクトリに macOS 形の合成〔3 比較・層・D10〕）。`_expect_stop` は他の例外を「狙った確認の赤」として数えるようにした。★ 変異 29 本（scratchpad の使い捨て）→ **すべて狙った確認で赤**（例外で落ちたものなし）・無変異は緑。実物で生成 → `--check` 一致・15 ファイル・CR 0・既存の `detection-strata.tex` はバイトが変わらない・文体違反 0。一時の写しの main に結果の表 8 つを入れて組み、**main の overfull は HEAD と同じ 1 件**・補遺は 55 → 81（増えた 26 件はすべて「横向きのページの出力時」の型）・未定義の参照は HEAD と同じ 4 ラベル。列の幅は 2 回直した（KT1 の見出し・桁区切りの数・層の表の見出し）。
+- **表示した値**: 規則のコードと selftest・変異を済ませてから実物で生成した。生成のとき値は画面に出していない（overfull は数字を伏せた）。ただし形を確かめる途中で、macOS OFF のセルにフォーカスの喪失が `mid` の速さにある（速さの名前だけ）ことと、印が 117 ブロックすべてで見つかったことは見た。
+- **まだ**: macOS の 2 セルの印の時刻（Mac で・同じ手順で `obs_categories` は `navigation`・`gt_vks` は macOS のキーコード 123・124）。表 11 の「規則の性質」・結果の節。
+- **影響範囲**: `experiment/results/windows/clock_sync_windows-msime-tsf.json`（新規）・`experiment/data.windows.md`・`manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 4・変更 3）・`manuscript/supplement/supplement.tex`・`manuscript/outline.md`（Open items）・本ファイル・`tasklist.md`。
+
+## 判断 172: 登録が報告を求めていて結果の表に無かったもの（層ごとの 1 対 1 の一致・`over_limit` と感度分析の層ごとの検出・スコープの構成・除外の理由・打ち切りなど）を道具に足し、表 9 の一致の限界と中央値の絶対差に区間を付ける（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **見つけたこと（登録と外枠を一次で読み直した）**: 結果の節を書く前に、§6.1〜6.7・§10.7 が「報告する」と書くものを道具の出力と突き合わせた。足りなかったもの: (1) 問 2 は「per stratum, per speed and per cell」で 3 つの比較（§6.4・§6.6）→ 表 9 は主の比較・速さごとだけだった。(2) 問 1 は 3 つのスコープ（§6.4「computed under all three scopes」）と Windows の感度分析（§10.7 `under_limit_gt_duration`）→ 補遺の層の表は主の比較の 2 スコープだけだった。(3) §6.1「The number of letter keys and the think time of the trials in each scope are reported per stratum, from the plan」→ 無かった。(4) §6.2 の除外の理由・`start_while_open`・長さ 0 の行、§6.6 の打ち切りの数と「continued commit」で分けた `abandon`、§10.7 の診断（20〜25 秒・25 秒以上の行・S4 の Esc・長さの無い終わり・長い試行の 2 つの出どころ）、2 つの定義が同じセッションを持つか → 値に無かった。(5) ★ **表 9 の一致の限界と中央値の絶対差に区間が無かった**（判断 156 の表）—— §6.1「the bias and the limits of agreement ... carry 95% percentile bootstrap intervals」・結果のファイルに `loa_lo_ci`・`loa_hi_ci`・`mae_ci` がある → 外枠の「Estimates are reported with their intervals where the registration gives them」に照らして欠け。
+- **道具（メインの選択）**:
+  - 表 9: 偏り・下限・上限・中央値の絶対差それぞれに区間（列を 10 に・`footnotesize`）。行の部品 `session_cells` を補遺と共有。
+  - 補遺 `session-strata.tex`（新規）: 比較 × 2 スコープ（問 2 のスコープ）× 層ごと・速さごと・併合。
+  - 補遺 `detection-strata.tex`: 比較 × 検出のすべてのスコープ（`over_limit`・Windows の `under_limit_gt_duration` も）。試行の数は問 3 の試行の記録がある 2 スコープだけ（ほかは `--` と表の注）。各セルの頭にスコープの構成の表（macOS・予測の要約 `composition` から・中央値〔最小〜最大〕）。Windows は「予測を計算しないので無い」と書く（★ 凍結のコードが Windows では作らない —— 登録 §6.1 の欠け・結果の節で書く）。ラベルを `tab:strata-<cell>-<comp>-<scope>` に変えた（本文からの参照は無い）。
+  - 値 `diagnostic_values`: 除外（理由ごと・`<cell>.excluded.<trials|gt|obs>.<reason|n>`）・`samesessions`・`startwhileopen`・`zerodwell`・`cutoff`（`n_long` ほか 5 つ）・`abandon.continued`・比較 × スコープの併合の検出の値（`pooled.<comp>.<scope>.<measure>`・F1 も）・予測の要約（macOS）・Windows の診断（`win.*`）。
+  - ★ 除外の確認: 実物で「`pred_obs` の `gt` の側の除外が違う」で止まった —— `pred_obs` の最初の側は予測なので当然違う（値を見る前の形の確認で分かった・規則の直しは道具の検査の範囲）。→ 各比較の中でスコープ間は同じ・試行の除外は全比較で同じ・正解の側は `gt_obs` と `gt_pred`、観測の側は `gt_obs` と `pred_obs` で同じ、に直した。
+- **検証**: selftest 78 → 91 件（合成に除外の理由・長さ 0・打ち切り・併合の値・層ごとの問 2・予測の要約・Windows の診断を足し、比較・スコープごとに値を変えた）。`l1` の比較の組が検出と違えば止まる確認を足したら、既存の「系の比較の組」の否定の確認が先に l1 の確認に捕まって変異で緑になった → 否定の確認を両方のファイルから外す形に直した。★ 変異は 2 回目 20 本（scratchpad の使い捨て）がすべて狙った確認で赤、判断 171 の 29 本も回し直して 28 本が赤（1 本は書き直した関数の型で、2 回目の変異が同じ規則を確かめる）。実物で生成 → 16 ファイル・`--check` 一致・CR 0・文体違反 0。一時の写しの main に結果の表 8 つを入れて組み、**main の overfull は HEAD と同じ 1 件**・補遺は 160（HEAD の 55 のうち出力時以外の 17 件は同じ、増えたのはすべて横向きのページの出力時の型）。
+- **表示した値**: なし（形の確認で、除外がある／ないセル〔macOS OFF は除外 0〕と、Windows では 2 つの定義が別のセッションを持つことを見た —— どちらも登録が予想していた形）。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 1・変更 4）・`manuscript/supplement/supplement.tex`・本ファイル。
+
+## 判断 173: Windows の開いた集合の結果が macOS OFF とバイト一致する —— 取り違えではなく、2 つのセルの計画が句・文字キー・時刻を共有するため（G-GEAR で回し直して確かめた）（2026-10-05・G-GEAR・メインの確認）
+
+- **見つけたこと**: 結果の表を読むと、Windows の閉じた集合（`no_time`・`counts_only`）と開いた集合の値が macOS OFF とすべての桁（区間まで）で一致していた。ファイルを比べると、開いた集合は**バイトが同一**（`77bba3a3…`・Windows は Surface が 10-05 10:30 に `44fbda3b` で入れた、macOS OFF は後で Mac が作った）。閉じた集合は別のファイル（`config_sha256`・`recipes_sha256`・`n_ime_shadow_rows_unused`・`all` などの 52 か所が違う）で、規則の 2 つの集合だけが同じ。
+- **確かめたこと**: (1) G-GEAR の Windows の run から Windows のタグ（`git archive`・LF・selftest 134 件 OK）の `open_set.py` を §6.8・§10.7 の命令で回し直した → exit 0・約 80 秒・**`77bba3a3…` とバイト一致**（Windows の run がこのファイルを出す＝写し間違いではない）。(2) macOS OFF の計画を macOS のタグから §2.4 の命令で再生成 → 登録の `3759ebf7…` と一致。Windows の計画（`b7bdf8fc…`）と試行ごとに比べると、2,925 試行の block・シナリオ・速さ・gap・考える時間・句・読みの長さ・意図が**すべて同じ**。キーが違うのは S2（macOS が Return を 1 つ多く押す）と S4（Windows が Esc を 1 つ多く押す・D1）の各 225 試行だけ（後ろの時刻もそれに応じて違う）で、文字・数字・記号のキーは全試行で同じ・総数も同じ（93,861）。→ 開いた集合が読む文字キーと記号は 2 つのセルで同じで、両方とも入力モードのキー以外はすべて届いた → 同じファイルになる。
+- **記録**: `data.windows.md` に節「The open set of question 4, repeated」（命令・SHA・計画の比較）。⚠️ それまで `data.windows.md` には Windows の開いた集合の命令と SHA が無かった（Surface のコミットの記録だけ）—— この節で埋めた。
+- **原稿への影響**: 問 4 の結果の節で、Windows の判定が macOS OFF と同じ値になる理由（計画が句・文字キー・時刻を共有）を書く。問 1〜3 の Windows と macOS を並べないという規則は変えない。
+- **影響範囲**: `experiment/data.windows.md`・本ファイル。
+
+## 判断 174: 結果の節の草稿（§6・§7・問 4・問 5）を書き、表 11 の「規則の性質」は手法の節の既存の静的な表のままにする（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **規則（道具）を先にコミットしてから値を読んだ**: 表の道具は `ffd61b1a`（判断 171）・`7c599224`（判断 172）で固めた後、このセッションで初めて結果の値を読んだ。値を読んだ後に道具の規則は変えていない（判断 173 は記録の追加だけ）。
+- **ファイル**: 新規 `sections/results-agreement.tex`（§6: 試行と attempts の表〔`sec:results-attempts`・記録 `data.md`・`data.windows.md` から写した〕・参照が確かめること〔表 7・KT1 の表〕・検出〔除外とスコープ・主の比較・予測との比較・2 つの定義・D10・打ち切り・診断・表 8〕・1 対 1 の一致〔表 9〕）・新規 `sections/results-text.tex`（§7・表 10）・`recoverability.tex` の結果（閉じた集合・推奨・Windows の但し書き・開いた集合・表 11 と開いた集合の表）・`cost.tex` の結果（表 12）。`main.tex` に 2 つを読み込んだ。
+- **値の書き方**: 結果の値はすべて `\rv{}` か生成した表（本文の `\rv` は 175 個・生成した値に無いのは macOS の印の時刻の 4 つだけ＝未計算で太字の [鍵] が出る・意図どおり）。⚠️ 値でない**定性的な記述**（「OFF は除外なし」「ON の『セッションなし』は S10 の遅い・中の速さに多い」「文ごとの abandonment rate と fraction of time converting の偏りは全セルの全速さで負〔区間が 0 未満〕」「conversions per trial の偏りは macOS で速さにより符号が違い、Windows は全速さで正」「行の 20 秒以上は無い」）は生成した表を読んで書いた —— 結果のファイルが変われば手で直す必要がある（`--check` は捕まえない）。
+- **一次で確かめてから書いたこと**: (1) D10 の直した解析が macOS でも変えたのは `merge_rate` と `n_merge_obs_recount`（と設定・注）だけ（登録と直したファイルを葉まで比べた・1,904 と 476 か所）。(2) macOS の `start_while_open` は正解の規則の開始の事象が `set_marked`（文字のたびに呼ばれる）なので、OFF は全セッション・ON はほぼ全セッション（`gt_rules.json`・`gt_sessions.py` の docstring）。(3) 試行の外の行の数が印のキーの数（4 × ブロック数）と一致。(4) 評価の語の grep（`only` は限定の用法だけ）・文体違反 0。
+- **表 11 の「規則の性質」（引き継ぎ §2 の 3）**: `recoverability.tex` に登録 §6.8 の確率の表 `tab:nearchance`（静的・登録の値）が既にあった → そのまま置き、注の「判定は結果のファイルから足す」を「判定は表 `tab:closed-set`」に直した。外枠の表の一覧に KT1 の表を足した。
+- **結果の要点（研究者への報告用）**: 問 4 は macOS の 2 セルとも `no_time`・`counts_only` が K = 10・100 で near chance にならず、**推奨は none**。Windows も同じ判定（値は macOS OFF と同じ —— 判断 173）。macOS ON は計画と正解の食い違いが他より多く、ほとんどが「セッションなし」（S10 の遅い・中）。Windows の参照は IME が消費しないキーしか受け取らない（設計どおり）ので、参照の側の KT1 は Windows で対にできない。
+- **組版**: `build.sh` で main エラー 0・未定義の参照は 3 ラベル（`fig:components`・`sec:availability`・`sec:limitations`・`sec:results-attempts` は埋まった）・overfull は HEAD と同じ 1 件（試行の表の見出しの幅を 1 回直した）。
+- **まだ**: 図 2〜5（外枠の Figures・道具は標準ライブラリだけなので作図は別に決める）・macOS の印の時刻（Mac）・要旨と結論（外枠の Rule for the abstract）・§1・§11〜13・完了時レビュー・attack-me。
+- **影響範囲**: `manuscript/sections/results-agreement.tex`・`results-text.tex`（新規）・`recoverability.tex`・`cost.tex`・`main.tex`・`outline.md`（表の一覧）・本ファイル・`tasklist.md`。
+
+## 判断 175: この枝の完了時レビュー（code-reviewer ∥ security-checker ＋ Codex 1 巡目）の指摘を一次で確かめて直す・「全試行の範囲」の読みを記録する（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **範囲**: `origin/main...HEAD`（`cf320319..4e0c36dd`・111 ファイル）。コードは 5 ファイル（`results_tables.py`・`match.py`〔D10〕・`closed_set.py`〔D8〕・`build.sh`・`_style_check.py`）。Codex は研究者の承認（手動承認の閾値 2,000 行を超えた・推奨どおり 5 ファイル）でパス限定（`run-codex-review.sh cf320319..4e0c36dd -- <5 paths>`）・1 回 77,499 トークン（この枝の台帳で今日 98,711・origin/main の 132,139 と合わせて約 23 万 / 30 万）。
+- **結果**: code-reviewer = HIGH 0・MEDIUM 5・LOW 7（約 4 分）。security-checker = CRITICAL・HIGH・MEDIUM 0・LOW 4（約 6 分・生ログ・打鍵の中身・個人情報は公開物に無い）。Codex 1 巡目 = P1 1・P2 4。重なり: `build.sh` の相対パス（3 者）・D10 の入力の照合（code-reviewer と Codex）・D8 の検査の緩さ（同）・セル名と TeX のエスケープ（security と Codex）。
+- **直したもの（`results_tables.py`・`build.sh`・`main.tex`・`BUILD.md`）**:
+  1. `build.sh`: 雛形と出力先を最初に絶対パスに（Windows は `pwd -W`・TEXINPUTS も同じ形）・出力先が原稿のディレクトリの中なら拒否（自分で作ったディレクトリは消す）・`-no-shell-escape`・BibTeX の警告（exit 1）で止まらない・pdflatex が落ちたらログの場所を出す・「生成されていない結果の値」と BibTeX の警告の数を表示。⚠️ このセッションで雛形を `/c/...` の形で渡して `sn-jnl.cls` が見つからなかったのも同じ根（TEXINPUTS は MSYS が変換しない）。相対パスでの組版（scratchpad から雛形と出力先を相対で）と拒否を実際に回して確かめた。
+  2. `main.tex` の `\rv`: 鍵が無いとき `\PackageWarningNoLine{results}{Result value <key> not generated}` を出し、`build.sh` が数える（今は macOS の印の時刻の 4 つ）。
+  3. 範囲の鍵（要旨の規則・予測との比較）は層が 1 つも入らなくても `--` の値として出す。偏りの範囲に使った速さと除いた速さの数 `<cell>.<primary|all>.dwellbias.speeds.used|left`。
+  4. D10: 登録の側に「分子 > 分母で値なし」が併合の率以外にあれば止める（Codex 5 への対応 —— `match.py` の `_prop` の防御はすべての割合に効くが、実データで値が消えたのは 32 か所すべて併合の率と確かめた・`match.py` は解析を回し終えた凍結の直しなので変えない）。直した側は、`merge_rate`・`n_merge_obs_recount`・`merge_recount` を除いて登録と完全に同じでなければ止める（入力の SHA・設定・ほかの率すべて）。
+  5. D8: `skipped_scenarios` が `{"S12": >0}` だけ・どの結果の `by_scenario` にも S12 が無い・未採点のブロックと試行の数がある、を確かめる。
+  6. 除外の試行の型は §6.2 の 3 つだけ・各型の数は総数以下・総数 0 は型が無いときだけ（⚠️ 1 つの試行が 2 つの型で数えられうるので「和 = 総数」は使わない —— `match.py` の `_count_types` を一次で確かめた）。
+  7. セル名を `match.py` と同じ `CELL_RE` で検証・`tex_escape` を TeX の特殊文字すべてに。
+  8. E3 の measured の条件に `cpu_all_zero` の行が無ければ止める。`--check` は、もう生成しないファイルが出力先に残っていれば赤。
+- **直さなかったもの（理由）**:
+  - ★ **code-reviewer MEDIUM「全試行の範囲」に入る層の選び方**: 外枠の「the same range over all trials」は (A) 主の範囲で選んだ層の全試行の区間、(B) 全試行の側で同じ作り方（30 試行以上の層）をやり直す、の 2 通りに読める。道具は (B)（判断 156 で、値を見る前に実装・ただし読みは記録していなかった）。(B) を保つ理由: 登録 §6.1 は「the estimate under `all_trials`」と書き、全試行の推定は主の範囲で 0 試行の層（S13）も含むべきで、(A) では全試行の値にならない。⚠️ 値を見た後でこの読みを変えると規則の後付けになるので変えない。研究者が (A) を選ぶなら、道具の 1 か所（`abstract_values` の `kept`）の直しで済む。
+  - code-reviewer LOW「macOS のセルの集合に値が無いと none ではなく not decided に」: 値の無い集合を near chance としない扱いは判断 168 で値を見る前に selftest で固めた。実データは全集合に値がある → 変えない。
+  - Codex 5 の `match.py` 自体の直し: 上の 4 のとおり（凍結の解析を回し直すことになる・新しい逸脱になる）。
+  - security LOW「`.steering/` にユーザー名を含む絶対パス」: repo は private・`.steering/` は公開物の外・merge-base で既に 150 か所。新しい引き継ぎは `~` で書く。security LOW「ビルドの生成物を `.gitignore` に」: 出力先を原稿の外に限る拒否で代えた。
+- **検証**: selftest 91 → 105 件。★ 変異 3 回目 14 本（scratchpad）→ すべて狙った確認で赤（除外の型の確認が、別の確認〔スコープ間の除外の一致〕に先に捕まって緑になったので、全スコープを変える形に直した）。1 回目の「D10 の数え方」の変異は、新しい共有の確認に例外で捕まるようになったので、数える箇所だけを変える変異に差し替えた。1・2 回目も回し直して計 62 本が狙った確認で赤。実物で生成 → 16 ファイル・`--check` 一致（値は鍵が増えただけ）・文体違反 0・CR 0。`build.sh` で main エラー 0・overfull は HEAD と同じ 1 件・生成されていない値 4（macOS の印の時刻）・BibTeX の警告 0。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/build.sh`・`manuscript/BUILD.md`・`manuscript/main.tex`・`manuscript/generated/values.*`・`.codex/budget.json`（台帳）・本ファイル。
+
+## 判断 176: Codex 2 巡目（判断 175 の直しの境界）の指摘 4 件を直す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **範囲**: `run-codex-review.sh 4e0c36dd..9f730d2e -- results_tables.py build.sh main.tex`（約 235 行）・28,412 トークン（この枝の台帳で今日 127,123・origin/main の 132,139 と合わせて約 26 万 / 30 万）。3 巡目は回さない（記録どおり 2 巡・予算）。
+- **指摘と直し（4 件とも一次で確かめて妥当）**: (1) 出力先の判定をシンボリックリンクで回避できる → `pwd -P`（物理パス）で比べ、Windows は `cygpath -m` で C:/ の形・大文字小文字を無視して比べる（大文字に変えた原稿のパスが拒否され、作ったディレクトリが残らないことを回して確かめた・リンクそのものの試しは Windows で作れないので未実施）。(2) 除外の数の整合 → 非負の整数・型ごとの最大 ≤ 総数 ≤ 型ごとの和（`match.py` は除外した試行にすべて型を付ける）。(3) `CELL_RE.match` は末尾の改行を許す（Python の `$`）→ `fullmatch`（⚠️ 上流の `match.py` も同じ `$` だが凍結のコードなので変えない）。(4) 未採点の数の確認が真偽値と負数を通す → `is_count`（`type(v) is int and v >= 0`）。
+- **検証**: selftest 105 → 109 件。変異 3 回目に 4 本を足して 18 本・2 回目 20 本・1 回目 28 本の計 66 本が狙った確認で赤（末尾の改行の確認が、前の確認で書き換えたファイルを戻す前に読んでいて緑になったので、元のデータから作る形に直した）。実物の `--check` 一致（値の変化なし）・`build.sh` を相対パスで回して main エラー 0・overfull 1（HEAD と同じ）・生成されていない値 4。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/build.sh`・`.codex/budget.json`（台帳）・本ファイル。

@@ -1,0 +1,66 @@
+% Manuscript for Behavior Research Methods, built with the Springer Nature LaTeX template (class sn-jnl with the
+% APA reference style). The template files are not part of this directory; they are obtained from the publisher.
+% The sections are kept in separate files while the manuscript is written and are combined into one file for
+% submission. The structure and the evidence for each claim are fixed in outline.md.
+\documentclass[pdflatex,sn-apa]{sn-jnl}
+
+% T1 encoding gives the underscore of URLs and the accented letters of names their own glyphs.
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+% The class expects amsmath (it calls \allowdisplaybreaks at the start of the document), as in the sample article of
+% the template.
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+
+% A ragged-right paragraph column whose width, given as a fraction of the line, includes the space between columns, so
+% that columns whose fractions sum to at most one fit the line.
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{\dimexpr#1\linewidth-2\tabcolsep\relax}}
+
+% The APA style of the template prints the url field of a reference as plain text, so an underscore in a URL stops the
+% compilation; the environment that holds the field is redefined to pass the URL to \url.
+\makeatletter
+\AtBeginDocument{%
+  \renewenvironment{APACrefURL}[1][]{%
+    \ifx\@empty#1\@empty\BRetrievedFrom\else\BRetrieved{#1}\fi\url}{}}
+\makeatother
+
+% Bookmarks go down to subsections; the run-in paragraph headings are not bookmarked.
+\hypersetup{bookmarksdepth=2}
+
+% A value that is filled in from the result files or the run manifests after the measurement.
+\newcommand{\tbd}[1]{\textbf{[#1]}}
+
+% A value of the results, generated from the result files by tools/results_tables.py into generated/values.tex; a key
+% without a generated value prints as a value still to be filled in and is reported in the log, where build.sh counts
+% it.
+\newcommand{\rv}[1]{\ifcsname rv@#1\endcsname\csname rv@#1\endcsname\else\tbd{#1}%
+  \PackageWarningNoLine{results}{Result value #1 not generated}\fi}
+\input{generated/values}
+
+\begin{document}
+
+\title{Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a
+synthetic-input validation}
+
+\abstract{\tbd{Abstract of no more than 250 words, written after the results.}}
+
+\keywords{Japanese input method, keystroke logging, privacy-preserving logging, observability, method validation,
+reproducibility}
+
+\maketitle
+
+\input{sections/related}
+\input{sections/observability}
+\input{sections/logger}
+\input{sections/method}
+\input{sections/results-agreement}
+\input{sections/results-text}
+\input{sections/recoverability}
+\input{sections/cost}
+\input{sections/dataset}
+
+\bibliography{references}
+
+\end{document}

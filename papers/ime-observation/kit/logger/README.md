@@ -38,8 +38,8 @@ python3 papers/ime-observation/kit/logger/check_manifest.py --self              
 python3 papers/ime-observation/kit/logger/check_manifest.py --selftest           # negative controls for the verifier itself
 ```
 
-Run as: `ime-observation-logger --out <path> [--duration-s <n>]` (until a driver is present for the
-current platform, this ends with "not implemented"). The output path is opened with
+Run as: `ime-observation-logger --out <path> [--duration-s <n>]` (drivers exist for macOS and
+Windows; on any other system it ends with an error saying that no driver exists). The output path is opened with
 `OpenOptions::new().write(true).create_new(true)` (**an existing observation log is never overwritten**;
 the path is opened only after the driver has started successfully). Passing `--out` twice, or a negative
 or non-integer `--duration-s`, is a usage error (exit 2). `--selftest` removes its default output path

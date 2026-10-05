@@ -46,7 +46,7 @@ CJK = re.compile("[　-〿぀-ヿ㐀-䶿一-鿿！-｠]")
 BACKTICK = re.compile(r"`[^`\n]*`")
 SKIP_DIRS = {"target", ".build", "__pycache__", ".venv", "venv", "runs", "sealed"}
 SKIP_SUFFIX = (".jsonl", ".ndjson", ".lock", ".pyc", ".png", ".pdf", ".zip")
-TEXT_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff")
+TEXT_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib")
 UPSTREAM_KEYS = re.compile(r"^(gse_|upstream_)|^(start_anchor|end_anchor)$")
 
 
@@ -292,6 +292,9 @@ def check_text(rel, text, verbatim):
         prose = md_prose(text)
     elif ext == ".json":
         prose = json_prose(text)
+    elif ext in (".tex", ".bib"):
+        # 判断 148: 原稿（LaTeX）と書誌は全文が公開の文なので、コメントも含めて全行を見る
+        prose = list(enumerate(lines, 1))
     else:
         prose = []
     for no, ln in prose:
@@ -376,6 +379,11 @@ def selftest():
     expect("md コードブロックの日本語は通る", "a.md", "```\n" + J + "\n```\n", [])
     expect("md .steering は赤", "a.md", "see .steering/x\n", ["forbidden:.steering"])
     expect("sh 日本語のコメントは赤", "a.sh", "echo ok # " + J + "\n", ["japanese-prose"])
+    expect("tex 本文の日本語は赤", "a.tex", "\\section{Method}\n" + J + "\n", ["japanese-prose"])
+    expect("tex コメントの日本語も赤", "a.tex", "% " + J + "\nText.\n", ["japanese-prose"])
+    expect("tex 英語だけは通る", "a.tex", "\\section{Method}\nThe logger writes rows.\n", [])
+    expect("tex 禁止語 GSE は赤", "a.tex", "The GSE logger.\n", ["forbidden:gse"])
+    expect("bib 日本語の書誌は赤", "r.bib", "@article{k, title={" + J + "}}\n", ["japanese-prose"])
     expect("json reason の日本語は赤", "m.json", '{"entries":[{"reason":"' + J + '"}]}', ["japanese-prose"])
     expect("json 出どころの欄は見ない", "m.json",
            '{"entries":[{"gse_path":"src-tauri/x.rs","start_anchor":"// ' + J + '","reason":"ok"}]}', [])
@@ -413,6 +421,13 @@ def selftest():
             f.write(J + "\n")
         if len(run(tmp, ["papers/ime-observation"])) != 1:
             fails.append("走査: 対象の中の違反を 1 件拾うはず")
+        os.makedirs(os.path.join(tmp, "papers", "ime-observation", "manuscript"))
+        with io.open(os.path.join(tmp, "papers", "ime-observation", "manuscript", "m.tex"), "w",
+                     encoding="utf-8") as f:
+            f.write("The GSE logger.\n")
+        if len(run(tmp, ["papers/ime-observation"])) != 2:
+            fails.append("走査: .tex も走査の対象のはず（判断 148）")
+        os.remove(os.path.join(tmp, "papers", "ime-observation", "manuscript", "m.tex"))
         if len(run(tmp, ["papers/ime-observation/kit/x/bad.md", "papers/ime-observation/kit/x/NOTES.internal.md"])) != 1:
             fails.append("走査: 明示したファイルの違反は拾い、明示した *.internal.* は拾わないはず")
     finally:
