@@ -1,7 +1,7 @@
 # 次セッション — IME 論文: 原稿の attack-me（stage `manuscript`）→ M12（Zenodo・GitHub の公開 repo）
 
 > 作成: 2026-10-05 夜（G-GEAR・図 1〜5〔判断 181〕、要旨と残りの節〔判断 182〕、完了時レビュー〔判断 183・184〕、PR を出したセッションの最後）。
-> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 145・146・150・167・175・181〜186**、
+> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 145・146・150・167・175・181〜187**、
 > 外枠 `papers/ime-observation/manuscript/outline.md`（Rule for the abstract・Claims and evidence・Open items）、凍結した事前登録（§6.1・§7・§10.11）・`deviations.md`（D1〜D10）・`data.md`・`data.windows.md`。状態は着手時に `git fetch` で測り直す。
 
 ## §0 打ち込む用
@@ -9,11 +9,11 @@
 ```
 git fetch → この枝（docs/ime-manuscript-outline）の PR の状態を gh pr view で確かめる（merge 済みなら main から新しい枝を切る）。
 .steering/_handoff/next-session-ime-paper-manuscript-2.md を読んで §2 を上から実行してください。
-一次は decisions.md の判断 145・146・150・167・175・181〜186、outline.md、凍結した事前登録、deviations.md（D1〜D10）、manuscript/tools/results_tables.py。
+一次は decisions.md の判断 145・146・150・167・175・181〜187、outline.md、凍結した事前登録、deviations.md（D1〜D10）、manuscript/tools/results_tables.py。
 ⚠️ 新しい計測はしない。凍結のタグのコードと事前登録は変えない。封印（sealed/）は寄託のためだけに開ける（解析しない）。生ログ・キーコードを原稿や外部の LLM に出さない。experiment/runs/ は git に入れない。
 ⚠️ 結果の値は \rv{<key>} と生成した表で読み、手で写さない。値を見た後で表の道具の規則を変えない（変えるなら研究者に聞く）。評価の語を使わない（登録 §6.1）。
 ⚠️ 公開物（papers/）は学術的な英語・GSE への言及なし・記号や口語なし・内部の番号（判断・M・issue）を書かない（D の番号は書いてよい）。_style_check.py を repo 直下から papers/ime-observation で回す。
-⚠️ 判断の番号は 187〜、逸脱は D11（他の枝が足していないか着手時に MSYS_NO_PATHCONV=1 git show で見る）。
+⚠️ 判断の番号は 188〜、逸脱は D11（他の枝が足していないか着手時に MSYS_NO_PATHCONV=1 git show で見る）。
 ⚠️ Zenodo: 下書きと DOI の予約は Claude が進めてよい・公開は都度研究者に確かめる・token は表示も委譲もしない（memory「Zenodo token」）。
 Skill: attack-me・verify-before-claiming・citation-ssot・reproducibility-discipline・subagent-delegation・git-workflow。応答は日本語。コミットは git add パス指定（-A 禁止）。
 ⚠️ heredoc・python -c・sed にバックスラッシュを含めない（このセッションで 6 回以上壊れた）→ 置換は Edit か、Write で書いたスクリプトで。git show <ref>:<path> は MSYS_NO_PATHCONV=1。
