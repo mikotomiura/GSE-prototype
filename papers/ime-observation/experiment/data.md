@@ -66,14 +66,15 @@ of S12 and scored every block. The two samples of question 5 have the SHA-256
 
 The per-block differences at the block-start markers (section 6.9 of the pre-registration) were measured for both
 macOS cells on the machine of the previous section (Python 3.14.4), after the analyses above, in the same way as for
-the Windows cell (`data.windows.md`, "Marker times of section 6.9"). `<run>` is the run directory of the cell listed
-above and `<results>` is `experiment/results` of this directory.
+the Windows cell (`data.windows.md`, "Marker times of section 6.9"). `<cell>` is `macos-standard-live-on` or
+`macos-standard-live-off`, `<run>` is the run directory of that cell listed above and `<results>` is
+`experiment/results` of this directory.
 
 - **Code.** `kit/pilot/clock_sync.py` and `kit/pilot/seal_obs.py` of the macOS freezing tag, taken with `git archive`
   with LF line ends together with `kit/formats`, whose validator the self-test of `seal_obs.py` calls (the two files
   are unchanged in the current commit). Both self-tests passed.
 - **Inputs.** `run.json` of each `<run>` has the SHA-256 given above, and `oracle.jsonl`, `gt.jsonl` and `obs.jsonl`
-  have the SHA-256 that this manifest records. The observation with key rows only was made from a copy of `obs.jsonl`
+  have the SHA-256 that the run manifest (`run.json`) records. The observation with key rows only was made from a copy of `obs.jsonl`
   outside the repository, by `python3 kit/pilot/seal_obs.py --obs <copy>/obs.jsonl --keys-out <copy>/obs.keys.jsonl
   --sealed-dir <copy>/sealed` (exit status 0; SHA-256 of `obs.keys.jsonl`: on
   `a3d7685c2383a4f937069b407a7778f2df376b169f7096b6e5db369faa6d7322`, off

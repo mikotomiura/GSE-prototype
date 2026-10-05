@@ -1588,4 +1588,5 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **表示した値**: ⚠️ 生成の後に `values.tex` の印のキーを確かめる `grep` で、macOS OFF の印の時刻の値（`markers.*` の 10 行）を画面に出してしまった。仕様・道具・生成はすべてその前に終わっていて、値を見た後で変えたものは無い。
 - **記録**: `experiment/data.md` に節「Marker times of section 6.9」（Windows の節の形）。`manuscript/outline.md` の Open items の該当行を「Done on 5 October 2026」に直した。
 - **引き継ぎへの注**: 引き継ぎ（`next-session-ime-paper-mac-markers.md` §2 の 2）の取り出しの命令は `kit/formats` を足すのが正しい（同じ手順を別の機械で回すときのため）。
+- **完了時レビュー**: code-reviewer（HIGH 0・MEDIUM 0・LOW 3）∥ security-checker（指摘 0・パス / ホスト名 / 秘密 / 打鍵の中身 / 生ログの混入なし）。LOW の (1)「this manifest」があいまい →「the run manifest (`run.json`)」、(2) `<cell>` が未定義 → 節の冒頭で定義、を直した（文体違反 0）。(3) 表 7 の caption に、使うセルの無い凡例「not computed: …」が残る —— 生成物は手で直さず、道具で使われない凡例を出さないかは G-GEAR の次のセッションで決める（値と規則には関わらない）。`/cross-review` は送るコードが無い（記録・結果の JSON・生成物だけ）ので省略。
 - **影響範囲**: `experiment/results/clock_sync_macos-standard-live-{on,off}.json`（新規）・`experiment/data.md`・`manuscript/generated/`（変更 4）・`manuscript/outline.md`・本ファイル・`tasklist.md`。
