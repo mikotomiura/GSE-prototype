@@ -1732,3 +1732,12 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **反映**: `results_tables.py` で表を再生成（`dwell-explore.tex`・`values.tex`・`values.json`）。原稿の `\rv` の未定義は 0（手元の突き合わせ）。`data.md` に実行の記録を足した。文体の検査 違反 0。
 - ⚠️ **フルビルドは未実施**: Mac に SN テンプレート（`~/tools/sn-template`）が無い。「生成されていない値 0」は `\rv` のキーと `values.tex` の定義の突き合わせで確かめた。LaTeX の通しは G-GEAR で。
 - **残り**（引き継ぎ §2 の 2〜7）: 表の道具に Windows の 2 つの定義の差（Z40）・研究者の読み直しと Discussion・round 2 を回すか・M12 は未着手。
+
+## 判断 191: 判断 190 を G-GEAR で通しで確かめ、表の道具の参照の SD の和を `math.fsum` にする —— `values.json` の最後の桁が Python の版で変わり、`build.sh` の最新性の検査が別の機械で止まった（2026-10-06・G-GEAR・メインの選択・研究者が覆せる）
+
+- **見つけたこと**: Mac の枝（`f4962768`）を G-GEAR で `build.sh --submission` すると「`results_tables.py: out of date with the result files: values.json`」で止まった。G-GEAR（Python 3.11.9）で作り直した `values.json` と Mac（3.14.4）の版の差は、参照の文間の SD（`*.l2.*.refsd`）の 5 個の値の**最後の 1〜2 桁だけ**（丸めた文字列・`values.tex`・表はバイト一致）。
+- **原因（一次で確かめた）**: `reference_spread()` が浮動小数の和を組み込みの `sum()` で取っていた。Python 3.12 から `sum()` は浮動小数を補正つきで足すので、3.11 と 3.12 以降で最後の桁が変わる。表の道具のほかの `sum()` は整数の数え上げだけ（grep で確かめた）。探索的なスクリプトの `sum()` は selftest の仮の関数（整数）だけ。
+- **直し**: `reference_spread()` の平均と平方和を `math.fsum`（正しく丸めた和・版に依らない）に。**値の定義（標本の SD）は変えていない**（登録の規則でも表の規則でもない・数値の足し方だけ）。G-GEAR で作り直した生成物は Mac の版と**バイト一致**（`git diff` 0）→ コミット済みの生成物はそのまま。
+- **検証**: selftest 162 → 163 件（0.1 を 10 文 → SD がちょうど 0 で一定）。使い捨ての変異（`fsum` を `sum` に戻す）は 3.11 で赤（⚠️ 3.12 以降では補正つきの `sum()` が同じ答えを出すので、この変異は 3.11 の機械でしか赤にならない）。`build.sh --submission`: main・main-submission・補遺ともエラー 0・未定義の参照 0・**生成されていない値 0**・bibtex の警告 0・overfull は main 1（以前と同じ）・補遺 167（`session-strata` 50・`detection-strata` 41 など既存の層ごとの表から・探索的な dwell の表からは 0）。補遺 136 頁の表 50〜52 を画像で確かめた。文体の検査 違反 0。
+- **判断 190 の独立の確かめ**: 探索的な出力 2 つの SHA-256 が `data.md` と一致・CR 0。出力に記録したスクリプトの SHA-256（`453bfc02…`）がコミットのスクリプトと一致。`run_manifest`（on `0257755c…`・off `4ac581cb…`）は `data.md` の run の manifest と、`obs` は登録の `e1_delivery.json` の記録と一致。`e1_l1_registered` は登録の `e1_l1.json` の SHA-256（`1e22b6fb…`）と一致。
+- **影響範囲**: `manuscript/tools/results_tables.py`（`reference_spread()` と selftest）・本ファイル・`tasklist.md`。

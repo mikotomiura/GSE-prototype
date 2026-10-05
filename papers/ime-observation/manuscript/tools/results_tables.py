@@ -1920,8 +1920,10 @@ def reference_spread(cell, scope, m, speed=None):
         vals.append(g[m])
     n = len(vals)
     if n >= 2:
-        mean = sum(vals) / float(n)
-        sd = math.sqrt(sum((v - mean) ** 2 for v in vals) / (n - 1))
+        # math.fsum, not sum: sum() adds floats with compensation from Python 3.12 on, so the last digits written to
+        # values.json would depend on the version of Python that made them.
+        mean = math.fsum(vals) / float(n)
+        sd = math.sqrt(math.fsum((v - mean) ** 2 for v in vals) / (n - 1))
     else:
         sd = None
     return {"n": n, "sd": sd, "constant": n >= 2 and max(vals) == min(vals)}
@@ -3290,6 +3292,12 @@ def _selftest_spread(check):
           sp["n"] == 3 and not sp["constant"] and abs(sp["sd"] - math.sqrt(1.0 / 3.0)) < 1e-12, sp)
     sp = reference_spread(_FakeCell("x", gt, obs), PRIMARY_SCOPE, "m", "mid")
     check("spread: one text has no SD and is not constant", sp == {"n": 1, "sd": None, "constant": False}, sp)
+    # Ten texts of 0.1 (not exact in binary): a sum from left to right gives a mean below 0.1 and an SD above zero, so
+    # the value would differ between versions of Python; the correctly rounded sum gives exactly zero.
+    tens = [dict(t(k, "slow"), m=0.1) for k in range(10)]
+    sp = reference_spread(_FakeCell("x", tens, tens), PRIMARY_SCOPE, "m", "slow")
+    check("spread: the sums are correctly rounded, so the SD does not depend on the version of Python",
+          sp == {"n": 10, "sd": 0.0, "constant": True}, sp)
     for name, bad in (("in length", obs[:3]), ("in alignment", [obs[1], obs[0]] + obs[2:])):
         try:
             reference_spread(_FakeCell("x", gt, bad), PRIMARY_SCOPE, "m", "slow")
