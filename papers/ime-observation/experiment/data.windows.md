@@ -155,3 +155,31 @@ on the machine of the previous section, after the analyses above. `<run>` is the
   second run gave a byte-identical file. Output SHA-256
   `5341c3d6e938858ce4ddca4002cb1743e7abd5f4e17317b81c0af49842d622e8`. All 117 blocks have a complete marker in the
   oracle, and the marker was found in all 117 blocks of the reference log and of the observation (none missing).
+
+## The open set of question 4, repeated (2026-10-05, on the second Windows machine)
+
+The open-set result of the Windows cell, `results/windows/e2_open_set_windows-msime-tsf.json` (SHA-256
+`77bba3a3830a03e50bbfc0bf0c71ea711618aaac73cbcdeb5ae20c8286f9c89d`), is byte-identical to that of the macOS cell
+with live conversion off, which was computed later on the macOS machine (`data.md`). It was therefore computed again
+from the Windows run on the machine of the two previous sections, to tell a copied file from a result that the two
+cells share.
+
+- **Command.** From `git archive` of the Windows freezing tag (LF line ends; self-test of `kit/e2/open_set.py` OK):
+  `python kit/e2/open_set.py --obs <run>/obs.jsonl --plan <run>/plan.jsonl --corpus kit/corpus/data/phrases.jsonl
+  --recipes kit/gen/recipes.json --split-seed 20260929 --seed 20260929 --eval-fraction 0.2 --split both --n 3
+  --smoothing wb --beam 8 --length-info both --bootstrap 2000 --markers-in-obs --out <outside the repository>`. Exit
+  status 0. The output has the SHA-256 above: the Windows run gives this file.
+- **Why the two cells give the same file.** The plan of the macOS cell with live conversion off was generated again
+  from the macOS freezing tag with the command of section 2.4 of the pre-registration (procedure file
+  `kit/gen/recipes.macos-live-off.json`); it has the registered SHA-256
+  (`3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2`). Compared trial by trial with the plan of the
+  Windows cell (`b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0`), the two plans have the same 2,925
+  trials with the same block, scenario, speed, gap, think time, phrase, reading length and intent. Their key presses
+  differ only in S2, where the macOS procedure presses one Return more, and in S4, where the Windows procedure presses
+  one Escape more (deviation D1), in all 225 trials of each (the times of the later steps of these trials differ
+  accordingly); the presses of letters, digits and punctuation are the same in every trial, and the two plans hold the
+  same number of presses. The open-set attack decodes the letter keys and the punctuation, which the two cells share,
+  and in both cells every press other than the input-mode keys reached the log (`e1_delivery.json`); the two output
+  files are byte-identical. The
+  closed-set results of the two cells are different files; their accuracies for the two feature sets that keep no time
+  are the same to the reported precision.
