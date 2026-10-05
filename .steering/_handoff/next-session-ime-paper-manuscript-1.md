@@ -14,7 +14,7 @@ git fetch → 枝 docs/ime-manuscript-outline（origin と一致・PR の状態�
 ⚠️ 新しい計測はしない。凍結のタグのコードと事前登録は変えない。封印（sealed/）は開けない。生ログ・キーコードを原稿や外部の LLM に出さない。experiment/runs/ は git に入れない。
 ⚠️ 結果の値は \rv{<key>} と生成した表で読み、手で写さない。値を見た後で表の道具の規則を変えない（変えるなら研究者に聞く）。評価の語を使わない（登録 §6.1）。
 ⚠️ 公開物（papers/）は学術的な英語・GSE への言及なし・記号や口語なし・内部の番号（判断・M・issue）を書かない（D の番号は書いてよい）。_style_check.py を回す。
-⚠️ 判断の次の番号は 177、逸脱は D11（他の枝が足していないか着手時に MSYS_NO_PATHCONV=1 git show で見る）。
+⚠️ 判断の番号は G-GEAR が 180〜（Mac が印の時刻で 177〜179 を使う）、逸脱は D11（他の枝が足していないか着手時に MSYS_NO_PATHCONV=1 git show で見る）。
 Skill: verify-before-claiming・citation-ssot・reproducibility-discipline・subagent-delegation・git-workflow・attack-me（原稿の段）。応答は日本語。コミットは git add パス指定（-A 禁止）。heredoc にバックスラッシュを含めない（Write / Edit）。git show <ref>:<path> は MSYS_NO_PATHCONV=1。
 LaTeX（G-GEAR）: MiKTeX 25.12 は PATH に無いので PATH="~/AppData/Local/Programs/MiKTeX/miktex/bin/x64:$PATH"。雛形は ~/tools/sn-template/sn-article-template。組むのは manuscript/build.sh（PYTHON=python・相対パス可・出力先は原稿の外）。
 ```
@@ -42,7 +42,7 @@ LaTeX（G-GEAR）: MiKTeX 25.12 は PATH に無いので PATH="~/AppData/Local/P
 ## §2 やること
 
 0. **PR の状態**: CI が緑なら merge・main の CI を確かめる（git-workflow ルール 6）。赤なら 1 回だけ原因を見て報告。
-1. **macOS の印の時刻**（Mac で・判断 171 の手順）: macOS のタグの `kit/pilot/clock_sync.py`・`seal_obs.py`（`git archive`・LF）・`obs.jsonl` の**写し**から `seal_obs.py` でキーの行だけに → 印の仕様 `{"oracle_keys": ["left","right","left","right"], "gt_vks": [123,124,123,124], "obs_categories": ["navigation","navigation","navigation","navigation"], "max_gap_ms": 300}`・窓は既定 → `results/clock_sync_<cell>.json`（2 セル）→ `data.md` に節（`data.windows.md` の「Marker times of section 6.9」の形）→ 道具で生成し直す（生成されていない値 0 になる）→ 外枠の Open items を「済み」に。
+1. **macOS の印の時刻**（★ Mac で・専用の引き継ぎ `next-session-ime-paper-mac-markers.md`。G-GEAR では Mac の枝を取り込むだけ）: macOS のタグの `kit/pilot/clock_sync.py`・`seal_obs.py`（`git archive`・LF）・`obs.jsonl` の**写し**から `seal_obs.py` でキーの行だけに → 印の仕様 `{"oracle_keys": ["left","right","left","right"], "gt_vks": [123,124,123,124], "obs_categories": ["navigation","navigation","navigation","navigation"], "max_gap_ms": 300}`・窓は既定 → `results/clock_sync_<cell>.json`（2 セル）→ `data.md` に節（`data.windows.md` の「Marker times of section 6.9」の形）→ 道具で生成し直す（生成されていない値 0 になる）→ 外枠の Open items を「済み」に。
 2. **図 2〜5**（外枠の Figures）: 道具は標準ライブラリだけ。作図を別のスクリプト（matplotlib など）にするか、TeX で描くかを決める（依存を足すなら reproducibility の記録）。図 1（構成）・`fig:components` も。
 3. **要旨と結論**（外枠の Rule for the abstract・§13）: (i)〜(iv) を `\rv` で。250 語に収まらなければ (iv)、次に (ii) を本文に回す。Windows は「別の構成概念との一致」として macOS と並べない・CPU は系どうしを比べない。
 4. **残りの節**: §1（序論）・§11（推奨・`sec:...`）・§12（限界・`sec:limitations`）・§13（結論）・Declarations・Open Practices・Data availability（`sec:availability`）。外枠の Section plan と Claims and evidence（RE1〜RE5）に沿う。
