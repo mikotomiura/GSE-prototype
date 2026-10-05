@@ -1620,3 +1620,22 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - ⚠️ **研究者が書くもの（`\tbd` のまま）**: 著者と所属（表紙）・Funding・Conflicts of interest・Authors' contributions。M12 で埋まるもの: データの DOI・コードの repo の URL とリリースの DOI・外枠を固定した公開 commit・表 1 の「This logger」の版・`dataset.tex` の working の観測ログ。⚠️ BRM はデータの引用を書誌に求める（外枠の Journal requirements）→ DOI を予約したら `references.bib` にデータセットの項目を足して Data availability から引く。
 - **検証**: `build.sh` main エラー 0・未定義の参照 0・生成されていない値 0・overfull 1（以前と同じ vbox）・BibTeX の警告 0（65 頁）。評価の語の grep（`only` は限定、`closely`・`accurately` は問いの言い回し）。文体の検査 違反 0。新しい節の行は 120 字以内。
 - **影響範囲**: `manuscript/main.tex`・`sections/{introduction,recommendations,limitations,conclusions,declarations}.tex`（新規）・`sections/method.tex`・`manuscript/outline.md`・`manuscript/tools/results_tables.py`・`manuscript/generated/values.*`・本ファイル・`tasklist.md`。
+
+## 判断 183: 完了時レビュー（code-reviewer ∥ security-checker ＋ Codex 1 巡目）の指摘を一次で確かめて直す・M12 の寄託の 4 点を研究者が決めた（2026-10-05・G-GEAR・メインの選択〔直し〕と研究者の選択〔M12〕・研究者が覆せる）
+
+- **範囲**: `94a1ddb3..2b13cbf2`（判断 181・182 の 2 commit・22 ファイル）。Codex はコードだけ（`run-codex-review.sh 94a1ddb3..2b13cbf2 -- manuscript/tools/results_tables.py`・差分 416 行・27,948 トークン・台帳は今日 286,773 / 7 回）。散文の LaTeX は Claude 側で見た。
+- **結果**: security-checker = LOW 1（約 3.5 分）。code-reviewer = HIGH 0・MEDIUM 3・LOW 4（約 4 分）。Codex = P2 3・P3 1。重なり: 対数軸の 0（code-reviewer LOW 6 と Codex P2-1）。
+- **直したもの**:
+  1. （security LOW）結果の JSON のシナリオ名と速さが TeX にそのまま入る経路 → `load()` で全文書を歩き、層の `scenario` が `^S[0-9]{1,2}$`、`speed` が `SPEEDS`、`by_scenario`・`tsf_end_without_result_len` の鍵がシナリオ名でなければ止める（`CELL_RE` と同じ作法・範囲外の既存の表の経路もまとめて塞がる）。実データは通る（`--check` 一致）。
+  2. （Codex P2-1・code-reviewer LOW 6）図 5 の対数軸で正答率 0 や区間の下端 0 が黙って消える → 軸の下端 `FIG_LOG_FLOOR`（0.0005）で描き、そうした値があるときだけ題に断りを足す。実データの最小は 0.064 で生成物は変わらない。
+  3. （Codex P2-2）層が空のとき `fig_scenario_axis` が `IndexError` → 目盛りの無い軸にする（空のオプションは落とす）。
+  4. （code-reviewer MEDIUM 2）図 4 は 1 枚の軸に Windows と macOS を並べる → 題に「Windows のセルの値は別の構成概念との一致で、macOS とは比べない」を足した。
+  5. （code-reviewer MEDIUM 1）全試行の範囲に外した層の数が無い → 結論（語数の制限なし）と結果の節に足した。⚠️ 要旨は 249 語で入らないので足さない。読み: 規則 (i) の「with the number of strata left out」は主の範囲に付き、「the same range over all trials」は同じ作り方の範囲を指す（判断 175 の読み (B)）。全試行の外した数は本文と結論にある。研究者が要旨にも要ると決めれば、ほかを削って足す。
+  6. （code-reviewer MEDIUM 3）限界の節に「止める規則が Windows では run を選びうる」（外枠 §12・登録 §10.11）の帰結が欠けていた → 「分析した run はそうした誤りの無い run に選ばれうる・全試行が止まればセルは測られなかった」を足した。
+  7. （code-reviewer LOW 4）selftest の `"70.0\%"` は不正なエスケープ → `"70.0\%"`（`-W error::SyntaxWarning` で構文を確かめた）。
+  8. （code-reviewer LOW 5）限界の印（`mark=-`）に白抜きが効かない → `fig open` を `mark options={fill=white, line width=0.4pt}` にして細い線で区別し、図 3 の題を「Open marks and thin dashes」に。
+  9. （code-reviewer LOW 7）要旨の「carry-over between trials 0.0% and 5.8%」の動詞の省略 → 「excluded」を足した（249 語）。
+- **直さなかったもの（理由）**: Codex P2-3（`nan` の区切りに `unbounded coords=jump` が要る）→ `main.tex` の `fig interval` に指定済みで、組んだ図で区間が分かれていることを目で確かめた（Codex は `main.tex` を見ていない）。Codex P3（描画のテストが無い）→ 道具は標準ライブラリだけにする方針（判断 181）。組版は `build.sh` と目視で確かめる。code-reviewer の「打ち消し合う」の出典が見つからない → 登録 §7（1021 行）に逐語であった（偽陽性）。
+- **検証**: selftest 126 → 133 件。★ 変異（scratchpad の `mutate_figs.py`）22 本すべて狙った確認で赤（2 本は作り直した: 前の直しで行が変わって当たらなかった 1 本、確認が例外で落ちて FAIL に数えられていなかった 1 本 → 確認を例外で落ちない形にした）。実物で生成 → 図 3・4 の題だけ変化・`--check` 一致。`build.sh`: main エラー 0・未定義の参照 0・生成されていない値 0・overfull 1（以前と同じ）・BibTeX の警告 0。文体の検査 違反 0。
+- **M12 の研究者の答え（4 問とも推奨どおり）**: (1) E3 の標本 `samples.tsv` は Zenodo のデータに入れる（GitHub には入れない）。(2) E3 の working 条件の観測ログも寄託する（計測の run と同じ停止規則で点検済み・寄託の前に `--pack` と `--check-deposit`）→ `dataset.tex` の `\tbd{confirmed at deposit}` は寄託のときに外す。(3) 較正パイロットの生ログを別の区分として含める（外枠 DS1 どおり・封印したセッション行は寄託のためだけに開け、解析しない）。(4) コードのリリースの DOI は GitHub と Zenodo の連携で取る（研究者の GitHub アカウントでの操作）。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/main.tex`・`sections/{conclusions,limitations,results-agreement}.tex`・`manuscript/generated/fig-{dwell,text-agreement}.tex`・`.codex/budget.json`（台帳）・本ファイル。

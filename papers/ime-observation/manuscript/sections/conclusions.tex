@@ -12,19 +12,21 @@ the input method measured. On both systems an application can report a conversio
 accessibility implementation, but whether it does depends on the application.
 
 The logger's rows were compared with the sessions that a reference input field received from the input method, under
-synthetic input. On macOS with live conversion off, in the strata that keep at least 30 trials in the primary scope,
-the Wilson intervals of recall spanned \rv{macos-standard-live-off.primary.recall.range} and those of precision
-\rv{macos-standard-live-off.primary.precision.range}
-(\rv{macos-standard-live-off.primary.recall.strata.left} and \rv{macos-standard-live-off.primary.precision.strata.left}
-strata left out); the scope set aside \rv{macos-standard-live-off.scope.setaside}, and carry-over excluded
-\rv{macos-standard-live-off.carryover}; over all trials the two spanned \rv{macos-standard-live-off.all.recall.range}
-and \rv{macos-standard-live-off.all.precision.range}. With live conversion on, recall spanned
+synthetic input. On macOS with live conversion off, in the strata that keep at least 30 trials in the primary scope, the
+Wilson intervals of recall spanned \rv{macos-standard-live-off.primary.recall.range} and those of precision
+\rv{macos-standard-live-off.primary.precision.range} (\rv{macos-standard-live-off.primary.recall.strata.left} and
+\rv{macos-standard-live-off.primary.precision.strata.left} strata left out); the scope set aside
+\rv{macos-standard-live-off.scope.setaside}, and carry-over excluded \rv{macos-standard-live-off.carryover}; over all
+trials the two spanned \rv{macos-standard-live-off.all.recall.range} and
+\rv{macos-standard-live-off.all.precision.range} (\rv{macos-standard-live-off.all.recall.strata.left} and
+\rv{macos-standard-live-off.all.precision.strata.left} strata left out). With live conversion on, recall spanned
 \rv{macos-standard-live-on.primary.recall.range} and precision \rv{macos-standard-live-on.primary.precision.range}
 (\rv{macos-standard-live-on.primary.recall.strata.left} and \rv{macos-standard-live-on.primary.precision.strata.left}
 strata left out); the scope set aside \rv{macos-standard-live-on.scope.setaside}, and carry-over excluded
-\rv{macos-standard-live-on.carryover}; over all trials the two spanned \rv{macos-standard-live-on.all.recall.range}
-and \rv{macos-standard-live-on.all.precision.range}. The per-speed intervals of the bias of \texttt{dwell\_ms} spanned
-\rv{macos-standard-live-off.primary.dwellbias.range} with live conversion off and
+\rv{macos-standard-live-on.carryover}; over all trials the two spanned \rv{macos-standard-live-on.all.recall.range} and
+\rv{macos-standard-live-on.all.precision.range} (\rv{macos-standard-live-on.all.recall.strata.left} and
+\rv{macos-standard-live-on.all.precision.strata.left} strata left out). The per-speed intervals of the bias of
+\texttt{dwell\_ms} spanned \rv{macos-standard-live-off.primary.dwellbias.range} with live conversion off and
 \rv{macos-standard-live-on.primary.dwellbias.range} with it on, and over all trials
 \rv{macos-standard-live-off.all.dwellbias.range} and \rv{macos-standard-live-on.all.dwellbias.range}.
 
@@ -34,8 +36,10 @@ estimate the agreement with a different construct and are not set against those 
 (\rv{windows-msime-tsf.primary.recall.strata.left} and \rv{windows-msime-tsf.primary.precision.strata.left} strata left
 out); the scope set aside \rv{windows-msime-tsf.scope.setaside}, and carry-over excluded
 \rv{windows-msime-tsf.carryover}; over all trials the two spanned \rv{windows-msime-tsf.all.recall.range} and
-\rv{windows-msime-tsf.all.precision.range}. The per-speed intervals of the bias of \texttt{dwell\_ms} spanned
-\rv{windows-msime-tsf.primary.dwellbias.range}, and over all trials \rv{windows-msime-tsf.all.dwellbias.range}.
+\rv{windows-msime-tsf.all.precision.range} (\rv{windows-msime-tsf.all.recall.strata.left} and
+\rv{windows-msime-tsf.all.precision.strata.left} strata left out). The per-speed intervals of the bias of
+\texttt{dwell\_ms} spanned \rv{windows-msime-tsf.primary.dwellbias.range}, and over all trials
+\rv{windows-msime-tsf.all.dwellbias.range}.
 
 For identifying the typed phrase among $K$ candidates, neither granularity of the key rows that keeps no time met the
 registered near-chance rule in either macOS cell, so the recommended granularity is \rv{q4.recommendation}; on Windows
