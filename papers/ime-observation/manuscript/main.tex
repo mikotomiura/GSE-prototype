@@ -32,6 +32,11 @@
 % A value that is filled in from the result files or the run manifests after the measurement.
 \newcommand{\tbd}[1]{\textbf{[#1]}}
 
+% A value of the results, generated from the result files by tools/results_tables.py into generated/values.tex; a key
+% without a generated value prints as a value still to be filled in.
+\newcommand{\rv}[1]{\ifcsname rv@#1\endcsname\csname rv@#1\endcsname\else\tbd{#1}\fi}
+\input{generated/values}
+
 \begin{document}
 
 \title{Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a

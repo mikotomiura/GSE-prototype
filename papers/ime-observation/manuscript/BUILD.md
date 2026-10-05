@@ -26,6 +26,19 @@ The script writes `main.pdf`, `supplement.pdf` and the logs to the output direct
 untouched. It ends by printing, for each document, the number of errors, of undefined references and of overfull
 boxes. References to sections and figures that are not written yet are reported as undefined.
 
+## Results tables and values
+
+The tables of the results and every value of the results quoted in the text are generated from the result files of
+the analysis by `tools/results_tables.py` (standard library only) into `generated/`; the text reads a value with
+`\rv{<key>}`, and `generated/values.json` gives the source of each value inside the result files. After the result
+files change:
+
+    python3 tools/results_tables.py --results ../experiment/results --out generated
+
+`build.sh` first runs the same command with `--check` and stops when a generated file no longer matches the result
+files (set `PYTHON` when the interpreter is not `python3`). `python3 tools/results_tables.py --selftest` checks the
+script on synthetic result files.
+
 ## Submission
 
 For submission the sections are combined into one file, and the template files are not uploaded unless the

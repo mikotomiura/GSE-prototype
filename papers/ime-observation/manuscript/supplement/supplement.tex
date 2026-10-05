@@ -1,6 +1,5 @@
 % Supplementary material of the manuscript, built as a separate document with the same template as the manuscript
-% (see BUILD.md in the parent directory). The per-stratum tables are added here when they are generated from the
-% result files.
+% (see BUILD.md in the parent directory). The per-stratum tables are generated from the result files.
 \documentclass[pdflatex,sn-apa]{sn-jnl}
 
 \usepackage[T1]{fontenc}
@@ -10,6 +9,7 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{longtable}
+\usepackage{pdflscape}
 % Long URLs in narrow columns may break after any character.
 \usepackage{xurl}
 
@@ -25,5 +25,9 @@
 \maketitle
 
 \input{observability-documents}
+
+\clearpage
+% Generated from the result files by ../tools/results_tables.py.
+\input{../generated/detection-strata}
 
 \end{document}

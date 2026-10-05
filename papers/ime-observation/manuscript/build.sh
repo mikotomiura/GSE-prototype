@@ -31,6 +31,9 @@ export TEXINPUTS="${template}${sep}"
 export BSTINPUTS="${template}/bst${sep}"
 export BIBINPUTS="${here}${sep}"
 
+# The tables and values of the results must match the result files (set PYTHON when python3 is not the interpreter).
+"${PYTHON:-python3}" "$here/tools/results_tables.py" --results "$here/../experiment/results" --out "$here/generated" --check
+
 latex() {
   pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$out" "$1" > "$out/$(basename "$1" .tex).run.log"
 }

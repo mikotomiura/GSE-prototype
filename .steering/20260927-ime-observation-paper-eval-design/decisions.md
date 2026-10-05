@@ -1386,3 +1386,14 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - `manuscript/sections/method.tex`: Windows の日時の `\tbd` を D9 の文で埋め、逸脱の表に D8・D9、「Nine deviations」。`outline.md` の §5.9 を「D1 to D9」に。
 - ⚠️ **残り（次の作業）**: 閉じた集合を回すのは計測の機械（Windows = Surface の `experiment/runs/windows-msime-tsf-2`・macOS = Mac）。命令は §6.8・§10.7 のものに `--skip-scenario S12` を足し、`kit/e2/closed_set.py` だけこの commit のもの、他は各 OS の凍結のタグの書き出し。macOS の問 1〜4 もまだ回っていない。
 - **影響範囲**: `kit/e2/closed_set.py`・`kit/e2/README.md`・`experiment/deviations.md`・`manuscript/sections/method.tex`・`manuscript/outline.md`。
+
+## 判断 156: 結果の表と本文の値は `manuscript/tools/results_tables.py` が結果の JSON から生成し、原稿は `\rv{<key>}` で読む（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **背景**: 引き継ぎ §2 の 2（「結果の値は結果の JSON からスクリプトで写す・手で写さない」・要旨は外枠の「Rule for the abstract」）。まず Windows の結果で作る。
+- **道具**: `manuscript/tools/results_tables.py`（標準ライブラリだけ）。`experiment/results/`（macOS の 2 セル・まだ無い）と `results/windows/` の `e1_detection.json`・`e1_l1.json`・`e1_l2.json` を読み、`manuscript/generated/` に 5 つを書く: `values.json`（全桁の値と出どころ〔ファイルと JSON の中の道筋〕）・`values.tex`（整形した値・原稿は `\rv{<key>}` で読み、無い鍵は `\tbd` で出る）・`table-detection.tex`（表 8: セル × 速さ、30 試行以上の層の Wilson 区間の最小の下端〜最大の上端、主の範囲と全試行）・`table-session.tex`（表 9: セル × 速さの滞在の偏り〔区間〕・一致の限界・中央値の絶対差・`abandon` の一致と κ・`nav` の完全一致・横向き）・`detection-strata.tex`（補遺: 層ごとの検出・範囲ごとに横向きの長い表・測っていないセルを名指す）。`--check` は書かずに比べて違えば exit 1（`build.sh` が最初に回す）。
+- ★ **要旨の規則の写し方**: (i) 主の範囲の層ごとの「残った試行」は `e1_l2.json` の `per_trial.by_stratum[].n_trials`（検出の JSON は層の試行数を持たない）。層の数は計画の層（13 シナリオ × 3 速さ = 39）。範囲は 30 試行以上かつ再現率・適合率の区間がある層だけ。外した割合は `trials_not_used.out_of_scope` と検出の `excluded.trials.by_type.carry_over` を総試行（層の試行・除外・未実施・範囲外の和）で割る。(ii) `dwell_ms` の偏りは `e1_l1.json` の `metrics.by_speed[].dwell.bias_ci` の範囲。(iii) 推奨と (iv) CPU は閉じた集合と E3 の結果ファイルが来てから足す。
+- **書式**: 割合は小数 3 桁・ms は整数（Python の丸め）・`values.json` は丸めない値を持つ。⚠️ 引き継ぎの「丸めない」は「手で丸めない」と読んだ（本文に 16 桁を出さない）—— 研究者が覆せる。
+- **Windows の値（生成物から・主 = `windows_def`・`gt_obs`・`under_limit`）**: 再現率の範囲 0.412–1.000・適合率 0.321–1.000（36 層・外した層 3 = S13 の 3 速さ〔主の範囲で試行 0〕）、範囲が外した試行 617 / 2,925（21.1%）・carry-over 2 / 2,925（0.1%）、全試行では 39 層で再現率・適合率とも 0.000–1.000、滞在の偏りの区間の範囲 −1,121〜−456 ms（全試行 −1,916〜−535 ms）。⚠️ 解釈はまだ書かない（結果の節の段・macOS の後）。
+- **検証**: selftest 18 件（合成の結果ファイル: 30 試行ちょうどの層は入り 29 は外れる・範囲・割合・ms の符号・出どころ・層の表の「試行なし」・決定的・`--check` の陽性と陰性 2 つ・主の範囲が違うと止まる・結果ファイルが無いとき）。★ 変異 5 本（`>=` を `>` に・範囲を区間でなく値から・`--check` が常に通る・主の検査を外す・総試行から範囲外を落とす）はどれも狙った検査で赤、無変異の写しは緑。生成した表を雛形で組んで画像で確かめた（`build.sh` で `main.pdf`・`supplement.pdf` ともエラー 0）。
+- **配線**: `main.tex` に `\rv` と `\input{generated/values}`、補遺に `pdflscape` と層ごとの表。`BUILD.md` に生成と `--check` の手順。
+- **影響範囲**: 新規 `manuscript/tools/results_tables.py`・`manuscript/generated/`（5 ファイル）・`main.tex`・`supplement/supplement.tex`・`build.sh`・`BUILD.md`。
