@@ -145,6 +145,11 @@ def load(path):
         return json.loads(f.read().decode("utf-8"))
 
 
+def is_count(v):
+    """A non-negative integer (a JSON true or false is not one)."""
+    return type(v) is int and v >= 0
+
+
 # The cell labels that the analysis accepts (kit/analysis/match.py, CELL_RE); a label is also used in file names, TeX
 # labels and macro names, so any other label stops the script.
 CELL_RE = re.compile(r"^[A-Za-z0-9_.+-]{1,64}$")
@@ -159,7 +164,7 @@ def find_cells(results_dir):
             continue
         det = load(os.path.join(d, "e1_detection.json"))
         for label in sorted(det["cells"]):
-            if not CELL_RE.match(label):
+            if not CELL_RE.fullmatch(label):
                 raise ValueError("%se1_detection.json: the cell label %r is not one the analysis accepts" % (
                     (sub + "/") if sub else "", label))
             found.append((d, (sub + "/") if sub else "", label, system))
@@ -345,9 +350,11 @@ def abstract_values(cell):
         if scope == PRIMARY_SCOPE:
             out_of_scope = not_used["out_of_scope"]
             ex = cell.det[scope]["excluded"]["trials"]
-            # A trial can be excluded for two types (kit/analysis/match.py counts distinct trials per type).
-            if set(ex["by_type"]) - set(EXCLUSION_TYPES) or any(v > ex["n"] for v in ex["by_type"].values()) \
-                    or (ex["n"] == 0) != (not ex["by_type"]):
+            # A trial can be excluded for two types (kit/analysis/match.py counts distinct trials per type), and every
+            # excluded trial has a type: the largest count is at most the total and the sum at least the total.
+            counts = list(ex["by_type"].values())
+            if set(ex["by_type"]) - set(EXCLUSION_TYPES) or not is_count(ex["n"]) \
+                    or not all(is_count(v) for v in counts) or max(counts + [0]) > ex["n"] or sum(counts) < ex["n"]:
                 raise ValueError("%s: the excluded trials are not counted by the types of section 6.2" % cell.path(
                     "e1_detection.json", scope, "excluded/trials"))
             carry = ex["by_type"].get("carry_over", 0)
@@ -408,7 +415,7 @@ def read_closed_set(cell):
                 raise ValueError("%s: %s still has trials at K = %d, feature set %s (deviation D8)" % (
                     src, CLOSED_SET_SKIPPED, K, f))
     al = doc.get("alignment") or {}
-    if not all(isinstance(al.get(k), int) for k in ("n_blocks_unscored", "n_trials_unscored")):
+    if not all(is_count(al.get(k)) for k in ("n_blocks_unscored", "n_trials_unscored")):
         raise ValueError("%s: the unscored blocks and trials are not counted" % src)
     return doc
 
@@ -2497,6 +2504,11 @@ def _selftest_reference(check):
         _expect_stop(check, "review: negative: an excluded trial of a type outside section 6.2 stops", tmp)
         with open(detp0, "wb") as f:
             f.write(json.dumps(det0).encode("utf-8"))
+        _rewrite(detp0, lambda doc: [b["excluded"]["trials"].update({"n": 10}) for b in
+                                     doc["cells"]["windows-test"]["windows_def"][PRIMARY_COMPARISON].values()])
+        _expect_stop(check, "review: negative: more excluded trials than the types account for stop", tmp)
+        with open(detp0, "wb") as f:
+            f.write(json.dumps(det0).encode("utf-8"))
         _rewrite(detp0, lambda doc: blk(doc)["metrics"]["by_stratum"][0].update(
             {"recall": {"value": None, "lo": None, "hi": None, "n": 2, "x": 3, "note": "above"}}))
         _expect_stop(check, "review: negative: a rate other than the merge rate without a value (D10's defence) stops",
@@ -2508,6 +2520,11 @@ def _selftest_reference(check):
         with open(detp0, "wb") as f:
             f.write(json.dumps(bad_label).encode("utf-8"))
         _expect_stop(check, "review: negative: a cell label that the analysis does not accept stops", tmp)
+        bad_label = json.loads(json.dumps(det0))
+        bad_label["cells"]["windows-test\n"] = bad_label["cells"]["windows-test"]
+        with open(detp0, "wb") as f:
+            f.write(json.dumps(bad_label).encode("utf-8"))
+        _expect_stop(check, "review: negative: a cell label with a trailing line break stops", tmp)
         with open(detp0, "wb") as f:
             f.write(json.dumps(det0).encode("utf-8"))
         check("review: every character that TeX treats specially is escaped",
@@ -2790,7 +2807,11 @@ def selftest():
                            ("a closed-set file with trials of S12 in a result",
                             lambda d: d["results"]["100"]["no_time"]["by_scenario"].update({"S12": {"acc": 0.5, "n": 3}})),
                            ("a closed-set file without the count of unscored blocks",
-                            lambda d: d["alignment"].pop("n_blocks_unscored"))):
+                            lambda d: d["alignment"].pop("n_blocks_unscored")),
+                           ("a closed-set file whose count of unscored blocks is true",
+                            lambda d: d["alignment"].update({"n_blocks_unscored": True})),
+                           ("a closed-set file whose count of unscored trials is negative",
+                            lambda d: d["alignment"].update({"n_trials_unscored": -1}))):
             doc = _cs_doc(_near(RULE_SETS))
             edit(doc)
             with open(cs, "wb") as f:

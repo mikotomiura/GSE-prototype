@@ -22,8 +22,11 @@ windows=0
 case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) windows=1 ;;
 esac
+# The physical path (symbolic links resolved), so that an output directory cannot reach the sources through a link.
 absolute() {
-  if [ "$windows" = 1 ]; then (cd "$1" && pwd -W); else (cd "$1" && pwd); fi
+  local p
+  p=$(cd "$1" && pwd -P)
+  if [ "$windows" = 1 ]; then cygpath -m "$p"; else echo "$p"; fi
 }
 here=$(absolute "$(dirname "$0")")
 
@@ -40,8 +43,15 @@ fi
 # throughout.
 template=$(absolute "$template")
 out=$(absolute "$out")
-case "$out/" in
-  "$here"/*)
+# Windows compares paths without regard to case.
+out_cmp=$out
+here_cmp=$here
+if [ "$windows" = 1 ]; then
+  out_cmp=$(printf '%s' "$out" | tr '[:upper:]' '[:lower:]')
+  here_cmp=$(printf '%s' "$here" | tr '[:upper:]' '[:lower:]')
+fi
+case "$out_cmp/" in
+  "$here_cmp"/*)
     if [ "$created" = 1 ]; then rmdir "$out"; fi
     echo "build.sh: $out lies inside the manuscript directory; give an output directory outside it" >&2
     exit 2 ;;

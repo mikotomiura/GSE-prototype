@@ -1569,3 +1569,10 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - security LOW「`.steering/` にユーザー名を含む絶対パス」: repo は private・`.steering/` は公開物の外・merge-base で既に 150 か所。新しい引き継ぎは `~` で書く。security LOW「ビルドの生成物を `.gitignore` に」: 出力先を原稿の外に限る拒否で代えた。
 - **検証**: selftest 91 → 105 件。★ 変異 3 回目 14 本（scratchpad）→ すべて狙った確認で赤（除外の型の確認が、別の確認〔スコープ間の除外の一致〕に先に捕まって緑になったので、全スコープを変える形に直した）。1 回目の「D10 の数え方」の変異は、新しい共有の確認に例外で捕まるようになったので、数える箇所だけを変える変異に差し替えた。1・2 回目も回し直して計 62 本が狙った確認で赤。実物で生成 → 16 ファイル・`--check` 一致（値は鍵が増えただけ）・文体違反 0・CR 0。`build.sh` で main エラー 0・overfull は HEAD と同じ 1 件・生成されていない値 4（macOS の印の時刻）・BibTeX の警告 0。
 - **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/build.sh`・`manuscript/BUILD.md`・`manuscript/main.tex`・`manuscript/generated/values.*`・`.codex/budget.json`（台帳）・本ファイル。
+
+## 判断 176: Codex 2 巡目（判断 175 の直しの境界）の指摘 4 件を直す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **範囲**: `run-codex-review.sh 4e0c36dd..9f730d2e -- results_tables.py build.sh main.tex`（約 235 行）・28,412 トークン（この枝の台帳で今日 127,123・origin/main の 132,139 と合わせて約 26 万 / 30 万）。3 巡目は回さない（記録どおり 2 巡・予算）。
+- **指摘と直し（4 件とも一次で確かめて妥当）**: (1) 出力先の判定をシンボリックリンクで回避できる → `pwd -P`（物理パス）で比べ、Windows は `cygpath -m` で C:/ の形・大文字小文字を無視して比べる（大文字に変えた原稿のパスが拒否され、作ったディレクトリが残らないことを回して確かめた・リンクそのものの試しは Windows で作れないので未実施）。(2) 除外の数の整合 → 非負の整数・型ごとの最大 ≤ 総数 ≤ 型ごとの和（`match.py` は除外した試行にすべて型を付ける）。(3) `CELL_RE.match` は末尾の改行を許す（Python の `$`）→ `fullmatch`（⚠️ 上流の `match.py` も同じ `$` だが凍結のコードなので変えない）。(4) 未採点の数の確認が真偽値と負数を通す → `is_count`（`type(v) is int and v >= 0`）。
+- **検証**: selftest 105 → 109 件。変異 3 回目に 4 本を足して 18 本・2 回目 20 本・1 回目 28 本の計 66 本が狙った確認で赤（末尾の改行の確認が、前の確認で書き換えたファイルを戻す前に読んでいて緑になったので、元のデータから作る形に直した）。実物の `--check` 一致（値の変化なし）・`build.sh` を相対パスで回して main エラー 0・overfull 1（HEAD と同じ）・生成されていない値 4。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/build.sh`・`.codex/budget.json`（台帳）・本ファイル。
