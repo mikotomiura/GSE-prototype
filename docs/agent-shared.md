@@ -93,7 +93,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
      `.steering/20260821-workspace-behavior-triage/survey-input-channels.md §7`。
      ⚠️ 2026-10-05 訂正: 旧文「公開 API が存在しない」は言い過ぎ。AppKit の Accessibility に変換中の範囲の属性と
      開始・終了の通知があり、WebKit のソースはそれを出す（`NSTextView`・Chromium 系は未確認）。ただしアプリしだいで、
-     範囲（位置と長さ）は文字数の量であり、同じ権限で文字列を返す属性にも届く（content-free は構造で保証されない）。
+     通知そのものは文字列を運ばない（WebKit は userInfo なし）が、範囲（位置と長さ）を読めば文字数の量になる。
      現行の macOS は打鍵から推す（この経路を使うかは未決・研究者が決める・§7.5）。
 8. **Rust ログ**: `tracing` のみ。`println!` / `eprintln!` 禁止
 9. **エラーハンドリング**: `anyhow::Result` を使用

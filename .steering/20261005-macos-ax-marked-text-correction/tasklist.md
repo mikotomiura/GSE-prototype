@@ -23,5 +23,5 @@
 - [x] 指摘への対応（decisions 判断 4）
 
 ## 完了処理
-- [ ] git commit（パス指定）
+- [x] git commit（パス指定）
 - [ ] 出荷フロー（git-workflow ルール 6）
