@@ -1590,3 +1590,10 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **引き継ぎへの注**: 引き継ぎ（`next-session-ime-paper-mac-markers.md` §2 の 2）の取り出しの命令は `kit/formats` を足すのが正しい（同じ手順を別の機械で回すときのため）。
 - **完了時レビュー**: code-reviewer（HIGH 0・MEDIUM 0・LOW 3）∥ security-checker（指摘 0・パス / ホスト名 / 秘密 / 打鍵の中身 / 生ログの混入なし）。LOW の (1)「this manifest」があいまい →「the run manifest (`run.json`)」、(2) `<cell>` が未定義 → 節の冒頭で定義、を直した（文体違反 0）。(3) 表 7 の caption に、使うセルの無い凡例「not computed: …」が残る —— 生成物は手で直さず、道具で使われない凡例を出さないかは G-GEAR の次のセッションで決める（値と規則には関わらない）。`/cross-review` は送るコードが無い（記録・結果の JSON・生成物だけ）ので省略。
 - **影響範囲**: `experiment/results/clock_sync_macos-standard-live-{on,off}.json`（新規）・`experiment/data.md`・`manuscript/generated/`（変更 4）・`manuscript/outline.md`・本ファイル・`tasklist.md`。
+
+## 判断 180: Mac の印の時刻（判断 177）を G-GEAR で確かめ、PR #307 が main でなく枝に入ったので main への PR を出し直す・表 7 の使われない凡例を出さない（2026-10-05・G-GEAR・メインの確認と選択・研究者が覆せる）
+
+- **見つけたこと**: PR #307 は 07:54Z に作られ、base が `docs/ime-manuscript-outline`（そのとき PR #306 は merge 前）だった。08:04Z の merge は**その枝に入っただけ**で、main（`8848eabe`・PR #306 の merge）には Mac の 2 commit が入っていない（`gh api .../branches/main`・`git branch -r --contains 45adce11` で確かめた）。→ この枝から main への PR を出し直す。
+- **G-GEAR で独立に確かめたこと**: (1) `clock_sync_macos-standard-live-{on,off}.json` の SHA-256（`8daab9da…`・`e289c583…`）・印の仕様の SHA-256（`cd87248d…`）が `data.md` と一致・CR 0・LF・パスなし。形は ON 126・OFF 117 ブロックすべてで実行器・参照・観測の印が見つかり、`missing` はどれも 0（判断 177 と同じ）。(2) `results_tables.py --selftest`（109 件）・`--check` 一致（Mac の生成物が G-GEAR でもバイト一致）。(3) `build.sh`: main・補遺ともエラー 0・**生成されていない結果の値 0**・main の overfull 1（以前と同じ）・BibTeX の警告 0。(4) 文体の検査は repo 直下から `papers/ime-observation` で違反 0（⚠️ papers の中から `.` で回すと、ロガーの写し `kit/logger/src` に別の規則が当たって 1,274 件と出る —— 検査の呼び方の問題で、公開物の違反ではない）。
+- **表 7 の凡例（判断 177 の LOW (3)）**: 「not computed: …」の凡例は、印の時刻の無いセルがあるときだけ出す（`table_reference`）。selftest 110 件（全セルに印の時刻があるとき凡例が無いこと）・変異 1 本（常に出す）が狙った確認で赤。値と規則には関わらない。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/table-reference.tex`・本ファイル。

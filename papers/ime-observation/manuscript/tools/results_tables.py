@@ -911,6 +911,9 @@ def table_reference(cells, clocks):
     if any([(g, f) for g, f, _ in p] != [(g, f) for g, f, _ in per[0]] for p in per):
         raise ValueError("the rows of the checks differ between cells")
     width = (0.66 / len(cells)) if cells else 0.66
+    # The legend of the marker times is given only when a cell has none.
+    not_computed = ("not computed: the marker times of the cell were not computed; "
+                    if any(clocks.get(c.label) is None for c in cells) else "")
     lines = [GENERATED_NOTE,
              "\\begin{sidewaystable}[p]\n",
              "{\\footnotesize\n",
@@ -922,8 +925,7 @@ def table_reference(cells, clocks):
              "differences between the times at which the executor, the reference and the observation recorded the "
              "block-start markers, which combine the offsets of the clocks with the delays of the paths. Each group "
              "names the estimates it is used to read; no check excludes a trial or changes a value. Figures without an "
-             "interval are descriptive; not computed: the marker times of the cell were not computed; %s: no value}\n"
-             % NO_VALUE,
+             "interval are descriptive; %s%s: no value}\n" % (not_computed, NO_VALUE),
              "\\label{tab:reference}\n",
              "\\begin{tabular}{L{0.34}" + ("L{%.3f}" % width) * len(cells) + "}\n",
              "\\toprule\n",
@@ -2462,6 +2464,8 @@ def _selftest_reference(check):
               "Observation minus executor (ms): median (range); drift per hour & 1 (0 to 1); 10.2 \\\\" in t7
               and "Reference minus executor, monotonic clocks (ms): median (range); drift per hour & 3.5 (2.5 to 4.5); "
               "30.2 \\\\" in t7 and "& 3 of 3, 3, 2 \\\\" in t7, t7[-1800:])
+        check("markers: with marker times for every cell, the legend of cells without them is not given",
+              "not computed" not in t7, t7[:900])
         check("markers: the supplement gives every block and marks a block not found on a side",
               "2 & %s & 3 & 4.5 & %s \\\\" % (NO_VALUE, NO_VALUE) in sup and "0 & 0 & 1 & 2.5 & 3 \\\\" in sup, sup[-3000:])
         check("markers: the values for the text",
