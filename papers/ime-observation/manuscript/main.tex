@@ -14,6 +14,45 @@
 \usepackage{booktabs}
 \usepackage{array}
 
+% The figures are drawn by pgfplots: Figure 1 from figures/components.tex, Figures 2 to 5 from the coordinates that
+% tools/results_tables.py writes into generated/fig-*.tex with the styles below. The six colours are the first six
+% slots of a categorical palette checked for separation under colour-vision deficiencies; every series also has a mark
+% of its own, so that the figures can be read in grey.
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{groupplots}
+\usetikzlibrary{positioning,arrows.meta,calc}
+\definecolor{figc1}{HTML}{2A78D6}
+\definecolor{figc2}{HTML}{EB6834}
+\definecolor{figc3}{HTML}{1BAF7A}
+\definecolor{figc4}{HTML}{EDA100}
+\definecolor{figc5}{HTML}{E87BA4}
+\definecolor{figc6}{HTML}{008300}
+\pgfplotsset{
+  fig panel/.style={tick label style={font=\footnotesize}, title style={font=\footnotesize},
+    label style={font=\footnotesize}, legend style={font=\footnotesize, draw=none}, legend cell align=left,
+    ymajorgrids, major grid style={black!12}, scaled y ticks=false,
+    y tick label style={/pgf/number format/fixed, /pgf/number format/1000 sep={{,}}}},
+  fig proportion/.style={ymin=-0.03, ymax=1.03, ytick={0,0.25,0.5,0.75,1}},
+  fig zero/.style={extra y ticks={0}, extra y tick labels={}, extra y tick style={grid=major,
+    major grid style={black!60, dashed}}},
+  fig slow/.style={color=figc1, mark=*},
+  fig mid/.style={color=figc2, mark=square*},
+  fig fast/.style={color=figc3, mark=triangle*},
+  fig set1/.style={color=figc1, mark=*},
+  fig set2/.style={color=figc2, mark=square*},
+  fig set3/.style={color=figc3, mark=triangle*},
+  fig set4/.style={color=figc4, mark=diamond*},
+  fig set5/.style={color=figc5, mark=pentagon*},
+  fig set6/.style={color=figc6, mark=star, mark options={line width=0.8pt}},
+  fig point/.style={only marks, mark size=1.5pt},
+  fig open/.style={mark options={fill=white}},
+  fig limit/.style={only marks, mark=-, mark size=3pt, mark options={line width=1pt}},
+  fig interval/.style={no markers, line width=0.6pt, unbounded coords=jump},
+  fig chance/.style={no markers, black!70, samples=2},
+  fig margin/.style={no markers, black!70, dashed, samples=2},
+}
+
 % A ragged-right paragraph column whose width, given as a fraction of the line, includes the space between columns, so
 % that columns whose fractions sum to at most one fit the line.
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{\dimexpr#1\linewidth-2\tabcolsep\relax}}

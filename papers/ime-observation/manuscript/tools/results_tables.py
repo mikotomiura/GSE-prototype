@@ -34,7 +34,10 @@ without marker times as not computed. It writes:
 - detection-strata.tex: the per-stratum detection of every cell, with the merge rate of the corrected analysis of
   deviation D10 next to the registered one, for the supplement (a cell that was not measured is stated as such);
 - closed-set-all.tex: every feature set at every K per cell, with the raw accuracy per speed and scenario, for the
-  supplement.
+  supplement;
+- fig-detection.tex, fig-dwell.tex, fig-text-agreement.tex and fig-closed-set.tex: Figures 2 to 5 (recall and
+  precision per stratum; the difference of dwell_ms per stratum; the per-text agreement; the closed-set accuracy
+  against K), as pgfplots code with the coordinates inline, drawn with the styles defined in main.tex.
 
 Question 4 (section 6.8, and section 10.7 for Windows): a feature set is near chance at K when the upper end of the
 Wilson interval of its reported accuracy (the maximum over the set and the sets derivable from it) is at most 2/K; it
@@ -1811,6 +1814,261 @@ def text_agreement_supplement(cells):
     return "".join(lines)
 
 
+# ---------------------------------------------------------------- figures
+
+# Figures 2 to 5 are drawn by pgfplots from the coordinates written here; the styles that they name (the marks and
+# colours of the speeds and of the feature sets, the intervals, the open marks, the panels) are defined in the preamble
+# of main.tex. An interval is drawn from its two ends as the result file gives them, so an estimate that lies outside
+# its percentile interval is drawn as such, and an interval without both ends is not drawn. A stratum that keeps fewer
+# than MIN_TRIALS trials in the primary scope is drawn with an open mark, and a stratum without a value is not drawn.
+
+FIG_SPEEDS = (("slow", -0.25), ("mid", 0.0), ("fast", 0.25))
+# The six feature sets are set apart along the axis of K by these shifts, in decades.
+FIG_SET_SHIFTS = (-0.1, -0.06, -0.02, 0.02, 0.06, 0.1)
+FIG_NO_CELL = "No cell was measured when the figure was generated."
+
+
+def fig_num(x):
+    """A coordinate; six significant digits are enough to draw."""
+    return "%.6g" % x
+
+
+def fig_points(style, points):
+    """An \\addplot of marks at the points (x, y); nothing without a point, because pgfplots cannot plot an empty
+    table."""
+    if not points:
+        return ""
+    rows = "".join("%s %s\\\\" % (fig_num(x), fig_num(y)) for x, y in points)
+    return "\\addplot[forget plot, %s] table[row sep=\\\\] {x y\\\\%s};\n" % (style, rows)
+
+
+def fig_intervals(style, intervals):
+    """An \\addplot of vertical segments from (x, lo) to (x, hi), separated by an undefined coordinate."""
+    rows = "".join("%s %s\\\\%s %s\\\\%s nan\\\\" % (fig_num(x), fig_num(lo), fig_num(x), fig_num(hi), fig_num(x))
+                   for x, lo, hi in intervals if lo is not None and hi is not None)
+    if not rows:
+        return ""
+    return "\\addplot[forget plot, fig interval, %s] table[row sep=\\\\] {x y\\\\%s};\n" % (style, rows)
+
+
+def fig_legend(name, entries, columns=None):
+    """The options that send the legend of the first panel to a name, and its images and entries (in one row unless
+    the number of columns is given)."""
+    opts = "legend to name=%s, legend columns=%d" % (name, columns or len(entries))
+    body = "".join("\\addlegendimage{%s}\n\\addlegendentry{%s}\n" % (style, text) for style, text in entries)
+    return opts, body
+
+
+def fig_wrap(label, caption, legend, body, env="figure", placement="[p]"):
+    """A figure whose legend stands above its panels; without panels, a figure that says that no cell was measured.
+    The sizes of the panels are given in centimetres, because the text width of a sideways figure is the text
+    height."""
+    if body is None:
+        return GENERATED_NOTE + "\\begin{figure}[t]\n\\centering\n%s\n\\caption{%s}\n\\label{%s}\n\\end{figure}\n" % (
+            FIG_NO_CELL, caption, label)
+    return (GENERATED_NOTE + "\\begin{%s}%s\n\\centering\n\\pgfplotslegendfromname{%s}\\par\\medskip\n"
+            "\\begin{tikzpicture}\n%s\\end{tikzpicture}\n\\caption{%s}\n\\label{%s}\n\\end{%s}\n" % (
+                env, placement, legend, body, caption, label, env))
+
+
+def fig_scenario_axis(keys):
+    """The options of an axis of scenarios: a tick at the number of every scenario of the design, and the limits."""
+    names = sorted(set(k[0] for k in keys), key=scenario_order)
+    nums = [scenario_order(n) for n in names]
+    return "xtick={%s}, xticklabels={%s}, xmin=%s, xmax=%s" % (
+        ",".join(str(n) for n in nums), ",".join(names), fig_num(nums[0] - 0.6), fig_num(nums[-1] + 0.6))
+
+
+def fig_speed_marks(kept, entries, value_of, point="fig point"):
+    """Per speed, the intervals and the marks of the strata of entries {(scenario, speed): entry}, at the number of
+    the scenario shifted by the speed; value_of(entry) gives (value, lo, hi), with a value of None when there is none.
+    A stratum that keeps fewer than MIN_TRIALS trials in the primary scope gets an open mark."""
+    out = []
+    for sp, shift in FIG_SPEEDS:
+        full, hollow, intervals = [], [], []
+        for k in sorted((k for k in entries if k[1] == sp), key=lambda k: scenario_order(k[0])):
+            v, lo, hi = value_of(entries[k])
+            if v is None:
+                continue
+            x = scenario_order(k[0]) + shift
+            (full if kept.get(k, 0) >= MIN_TRIALS else hollow).append((x, v))
+            intervals.append((x, lo, hi))
+        out += [fig_intervals("fig %s" % sp, intervals), fig_points("fig %s, %s" % (sp, point), full),
+                fig_points("fig %s, %s, fig open" % (sp, point), hollow)]
+    return "".join(out)
+
+
+FIG_SPEED_LEGEND = [("fig %s, fig point" % sp, sp) for sp, _ in FIG_SPEEDS] + [
+    ("black, mark=*, fig point, fig open", "fewer than %d trials" % MIN_TRIALS)]
+
+
+def figure_detection(cells):
+    """Figure 2: recall and precision per scenario and speed with their Wilson intervals, per cell, in the primary
+    comparison and scope."""
+    caption = ("Recall and precision of the session rows against the reference per scenario and speed, with 95\\%% "
+               "Wilson intervals, per cell, in the primary comparison (\\texttt{gt\\_obs}) and scope "
+               "(\\texttt{under\\_limit}). Open marks: strata that keep fewer than %d trials in the scope, which the "
+               "ranges given in the text leave out. A stratum with no trial or no value in the scope is not drawn; "
+               "Table~\\ref{tab:detection} and the supplement give every stratum" % MIN_TRIALS)
+    if not cells:
+        return fig_wrap("fig:detection", caption, None, None)
+    body = ["\\begin{groupplot}[group style={group size=2 by %d, horizontal sep=1.1cm, vertical sep=1.2cm}, "
+            "fig panel, fig proportion, scale only axis, width=8.2cm, height=2.2cm]\n" % len(cells)]
+    legend_opts, legend_body = fig_legend("fig:detection:legend", FIG_SPEED_LEGEND)
+    first = True
+    for cell in cells:
+        kept = cell.kept_trials(PRIMARY_SCOPE)[0]
+        strata = cell.detection_strata(PRIMARY_SCOPE)
+        for m in ("recall", "precision"):
+            opts = [fig_scenario_axis(kept), "title={\\texttt{%s}: %s}" % (tex_escape(cell.label), m)]
+            if first:
+                opts.append(legend_opts)
+            body.append("\\nextgroupplot[%s]\n" % ", ".join(opts))
+            if first:
+                body.append(legend_body)
+                first = False
+            body.append(fig_speed_marks(kept, strata, lambda e, m=m: (e[m].get("value"), e[m].get("lo"),
+                                                                       e[m].get("hi"))))
+    body.append("\\end{groupplot}\n")
+    return fig_wrap("fig:detection", caption, "fig:detection:legend", "".join(body), env="sidewaysfigure",
+                    placement="")
+
+
+def figure_dwell(cells):
+    """Figure 3: the difference of dwell_ms from the duration of the reference session per scenario and speed (the
+    bias and both limits of agreement, each with its interval), per cell, in the primary comparison and scope."""
+    caption = ("Difference of \\texttt{dwell\\_ms} from the duration of the reference session per scenario and speed, "
+               "per cell, in the primary comparison and scope: the bias (marks) and the lower and upper limits of "
+               "agreement (dashes), each with a 95\\%% interval that resamples blocks; a negative difference means that "
+               "the logger's duration was shorter. Open marks: strata that keep fewer than %d trials in the scope. A "
+               "stratum without a matched session is not drawn, and an estimate whose interval is withheld is drawn "
+               "without it; the supplement gives every stratum" % MIN_TRIALS)
+    if not cells:
+        return fig_wrap("fig:dwell", caption, None, None)
+    body = ["\\begin{groupplot}[group style={group size=1 by %d, vertical sep=1.4cm}, fig panel, fig zero, "
+            "scale only axis, width=11cm, height=3.6cm, ylabel={Difference (ms)}]\n" % len(cells)]
+    legend_opts, legend_body = fig_legend("fig:dwell:legend", FIG_SPEED_LEGEND + [("black, fig limit",
+                                                                                    "limit of agreement")])
+
+    def part(key, ci_key):
+        def value_of(e):
+            dw = e["dwell"]
+            ci = dw.get(ci_key) or [None, None]
+            return dw["bland_altman"].get(key), ci[0], ci[1]
+        return value_of
+
+    first = True
+    for cell in cells:
+        kept = cell.kept_trials(PRIMARY_SCOPE)[0]
+        entries = dict((stratum_key(st["stratum"]), st) for st in cell.l1[PRIMARY_SCOPE]["metrics"]["by_stratum"]
+                       if st["stratum"].get("scenario") is not None)
+        opts = [fig_scenario_axis(kept), "title={\\texttt{%s}}" % tex_escape(cell.label)]
+        if first:
+            opts.append(legend_opts)
+        body.append("\\nextgroupplot[%s]\n" % ", ".join(opts))
+        if first:
+            body.append(legend_body)
+            first = False
+        body.append(fig_speed_marks(kept, entries, part("loa_lo", "loa_lo_ci"), "fig limit"))
+        body.append(fig_speed_marks(kept, entries, part("loa_hi", "loa_hi_ci"), "fig limit"))
+        body.append(fig_speed_marks(kept, entries, part("bias", "bias_ci")))
+    body.append("\\end{groupplot}\n")
+    return fig_wrap("fig:dwell", caption, "fig:dwell:legend", "".join(body))
+
+
+def figure_text(cells):
+    """Figure 4: the per-text bias and limits of agreement of the four measures per cell and speed, each with its
+    interval, in the primary scope."""
+    caption = ("Per-text agreement of the four measures per cell and speed in the primary scope: the bias (marks) and "
+               "the lower and upper limits of agreement (dashes) of the per-text difference (observation minus "
+               "reference), each with a 95\\% interval that resamples blocks. The values hold for this design's numbers "
+               "of trials per text and are not compared between speeds; a measure with no text in the scope is not "
+               "drawn. Table~\\ref{tab:text-agreement} gives the values with ICC(A,1)")
+    if not cells:
+        return fig_wrap("fig:text-agreement", caption, None, None)
+    ticks = "xtick={%s}, xticklabels={%s}, xmin=0.5, xmax=%s" % (
+        ",".join(str(i) for i in range(1, len(cells) + 1)),
+        ",".join("\\texttt{%s}" % tex_escape(c.label) for c in cells), fig_num(len(cells) + 0.5))
+    body = ["\\begin{groupplot}[group style={group size=1 by %d, vertical sep=1.4cm}, fig panel, fig zero, "
+            "scale only axis, width=11cm, height=2.5cm, %s]\n" % (len(L2_MEASURES), ticks)]
+    legend_opts, legend_body = fig_legend("fig:text-agreement:legend",
+                                          [("fig %s, fig point" % sp, sp) for sp, _ in FIG_SPEEDS]
+                                          + [("black, fig limit", "limit of agreement")])
+    for j, (m, label, _) in enumerate(L2_MEASURES):
+        opts = ["title={%s}" % label]
+        if j == 0:
+            opts.append(legend_opts)
+        body.append("\\nextgroupplot[%s]\n" % ", ".join(opts))
+        if j == 0:
+            body.append(legend_body)
+        for sp, shift in FIG_SPEEDS:
+            marks = {"bias": [], "loa_lo": [], "loa_hi": []}
+            intervals = []
+            for i, cell in enumerate(cells, 1):
+                e = (cell.l2[PRIMARY_SCOPE]["agreement_by_stratum"].get(sp) or {}).get(m)
+                if e is None:
+                    continue
+                x = i + shift
+                for key in marks:
+                    v = e["bland_altman"].get(key)
+                    if v is None:
+                        continue
+                    ci = e.get(key + "_ci") or [None, None]
+                    marks[key].append((x, v))
+                    intervals.append((x, ci[0], ci[1]))
+            body += [fig_intervals("fig %s" % sp, intervals),
+                     fig_points("fig %s, fig limit" % sp, marks["loa_lo"] + marks["loa_hi"]),
+                     fig_points("fig %s, fig point" % sp, marks["bias"])]
+    body.append("\\end{groupplot}\n")
+    return fig_wrap("fig:text-agreement", caption, "fig:text-agreement:legend", "".join(body))
+
+
+def figure_closed_set(cells, docs):
+    """Figure 5: the closed-set accuracy against K for the six feature sets, with the chance level and the margin of
+    the near-chance rule, per cell."""
+    caption = ("Closed-set identification accuracy against the number of candidates $K$ for the six feature sets, per "
+               "cell, with 95\\% Wilson intervals; the accuracy of a set is the maximum over the set and the sets "
+               "derivable from it. Solid line: the chance level $1/K$; dashed line: the margin $2/K$ of the near-chance "
+               "rule, which judges \\texttt{no\\_time} and \\texttt{counts\\_only} at $K = 10$ and $100$; the sets that "
+               "keep time are estimates only. The sets are set apart along $K$ for legibility; every point lies at "
+               "$K = 10$, $100$ or $1{,}000$. Both axes are logarithmic. Table~\\ref{tab:closed-set} gives the "
+               "judgement")
+    measured = [c for c in cells if docs.get(c.label) is not None]
+    if not measured:
+        return fig_wrap("fig:closed-set", caption, None, None)
+    body = ["\\begin{groupplot}[group style={group size=%d by 1, horizontal sep=0.45cm, yticklabels at=edge left, "
+            "ylabels at=edge left}, fig panel, xmode=log, ymode=log, "
+            "xtick={10,100,1000}, xmin=6, xmax=1700, ymin=0.0005, ymax=1.5, scale only axis, width=3.3cm, height=4.5cm, "
+            "xlabel={$K$}, ylabel={Accuracy}]\n" % len(measured)]
+    legend_opts, legend_body = fig_legend(
+        "fig:closed-set:legend", [("fig set%d, fig point" % (j + 1), "\\texttt{%s}" % tex_escape(f))
+                                  for j, f in enumerate(CLOSED_SET_SETS)]
+        + [("fig chance", "$1/K$"), ("fig margin", "$2/K$")], columns=4)
+    for i, cell in enumerate(measured):
+        doc = docs[cell.label]
+        opts = ["title={\\texttt{%s}}" % tex_escape(cell.label)]
+        if i == 0:
+            opts.append(legend_opts)
+        body.append("\\nextgroupplot[%s]\n" % ", ".join(opts))
+        if i == 0:
+            body.append(legend_body)
+        body.append("\\addplot[forget plot, fig chance, domain=7:1500] {1/x};\n")
+        body.append("\\addplot[forget plot, fig margin, domain=7:1500] {2/x};\n")
+        for j, (f, shift) in enumerate(zip(CLOSED_SET_SETS, FIG_SET_SHIFTS)):
+            points, intervals = [], []
+            for K in CLOSED_SET_KS:
+                r = doc["results"][str(K)][f]
+                if r.get("acc") is None:
+                    continue
+                x = K * 10 ** shift
+                points.append((x, r["acc"]))
+                intervals.append((x, r["acc_ci"][0], r["acc_ci"][1]))
+            body += [fig_intervals("fig set%d" % (j + 1), intervals), fig_points("fig set%d, fig point" % (j + 1),
+                                                                                  points)]
+    body.append("\\end{groupplot}\n")
+    return fig_wrap("fig:closed-set", caption, "fig:closed-set:legend", "".join(body), placement="[t]")
+
+
 def values_tex(values):
     lines = [GENERATED_NOTE, "% Read with \\rv{<key>}; the source of each value is in values.json.\n"]
     for k in sorted(values):
@@ -1856,6 +2114,10 @@ def build(results_dir):
         "reference-strata.tex": reference_supplement(cells, clocks).encode("utf-8"),
         "detection-layers.tex": table_layers(cells, d10).encode("utf-8"),
         "session-strata.tex": session_supplement(cells).encode("utf-8"),
+        "fig-detection.tex": figure_detection(cells).encode("utf-8"),
+        "fig-dwell.tex": figure_dwell(cells).encode("utf-8"),
+        "fig-text-agreement.tex": figure_text(cells).encode("utf-8"),
+        "fig-closed-set.tex": figure_closed_set(cells, docs).encode("utf-8"),
     }
     strata = [GENERATED_NOTE, "\\section*{Detection per stratum}\n\\label{sec:supp-strata}\n\n",
               "The tables below are generated from the result files of the analysis. The cells whose result files were "
@@ -2556,6 +2818,93 @@ def _selftest_reference(check):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _selftest_figures(check):
+    """Figures 2 to 5 on the synthetic Windows cell: S1 keeps 75, 30 and 29 trials (fast, mid, slow) in the primary
+    scope and S2 none."""
+    tmp = tempfile.mkdtemp(prefix="results_tables_figures_")
+    try:
+        _fixture(tmp)
+        files = build(tmp)
+        f2 = files["fig-detection.tex"].decode("utf-8")
+        check("fig 2: a stratum at the minimum of trials (30) gets a filled mark and one under it (29) an open mark, "
+              "at the number of the scenario shifted by the speed",
+              "\\addplot[forget plot, fig mid, fig point] table[row sep=\\\\] {x y\\\\1 0.733333\\\\};" in f2
+              and "\\addplot[forget plot, fig slow, fig point, fig open] table[row sep=\\\\] {x y\\\\0.75 0.689655\\\\};"
+              in f2 and "\\addplot[forget plot, fig fast, fig point] table[row sep=\\\\] {x y\\\\1.25 0.933333\\\\};"
+              in f2, f2[:1500])
+        check("fig 2: an interval is drawn from its two ends as the result file gives them",
+              "\\addplot[forget plot, fig interval, fig mid] table[row sep=\\\\] {x y\\\\1 0.6\\\\1 0.86\\\\1 nan\\\\};"
+              in f2, f2[:1500])
+        xs = [float(x) for x in re.findall(r"\\\\(-?[0-9.e+-]+) (?:-?[0-9.e+-]+|nan)(?=\\\\)", f2)]
+        check("fig 2: every scenario of the design is a tick, and a scenario without a stratum in the scope has no mark",
+              "xtick={1,2}, xticklabels={S1,S2}" in f2 and xs and all(0.7 < x < 1.3 for x in xs), str(xs[:12]))
+        check("fig 2: one panel per cell and measure, with the legend of the speeds and the open marks",
+              f2.count("\\nextgroupplot[") == 2 and "\\addlegendentry{fewer than %d trials}" % MIN_TRIALS in f2
+              and "\\pgfplotslegendfromname{fig:detection:legend}" in f2 and "\\label{fig:detection}" in f2)
+        f3 = files["fig-dwell.tex"].decode("utf-8")
+        check("fig 3: the bias of a stratum and each limit of agreement, each with its own interval",
+              "\\addplot[forget plot, fig mid, fig point] table[row sep=\\\\] {x y\\\\1 -499\\\\};" in f3
+              and "\\addplot[forget plot, fig mid, fig limit] table[row sep=\\\\] {x y\\\\1 -1399\\\\};" in f3
+              and "\\addplot[forget plot, fig mid, fig limit] table[row sep=\\\\] {x y\\\\1 401\\\\};" in f3
+              and "{x y\\\\1 -600\\\\1 -400\\\\1 nan\\\\}" in f3 and "{x y\\\\1 -1449\\\\1 -1349\\\\1 nan\\\\}" in f3
+              and "{x y\\\\1 351\\\\1 451\\\\1 nan\\\\}" in f3, f3[:2500])
+        check("fig 3: the marks of a stratum under the minimum of trials are open, the limits too",
+              "\\addplot[forget plot, fig slow, fig limit, fig open] table[row sep=\\\\] {x y\\\\0.75 -1799.4\\\\};" in f3
+              and "\\addplot[forget plot, fig slow, fig point, fig open] table[row sep=\\\\] {x y\\\\0.75 -899.4\\\\};"
+              in f3, f3[:2500])
+        f4 = files["fig-text-agreement.tex"].decode("utf-8")
+        panels = f4.split("\\nextgroupplot[")[1:]
+        check("fig 4: one panel per measure, in the order of the table",
+              len(panels) == len(L2_MEASURES) and all(p.startswith("title={%s}" % label)
+                                                      for p, (_, label, _) in zip(panels, L2_MEASURES)),
+              str([p[:40] for p in panels]))
+        check("fig 4: the bias and both limits at the position of the cell shifted by the speed, each with its interval",
+              len(panels) == 4
+              and "\\addplot[forget plot, fig mid, fig point] table[row sep=\\\\] {x y\\\\1 -1234.4\\\\};" in panels[1]
+              and "\\addplot[forget plot, fig mid, fig limit] table[row sep=\\\\] {x y\\\\1 -2134.4\\\\1 -534.4\\\\};"
+              in panels[1] and "1 -1235.4\\\\1 -1233.4\\\\1 nan\\\\1 -2135.4\\\\1 -2133.4\\\\1 nan\\\\1 -535.4\\\\1 "
+              "-533.4\\\\1 nan\\\\}" in panels[1] and "{x y\\\\0.75 -1234.4\\\\}" in panels[1], f4[:2500])
+        check("fig 4: a measure with no text at a speed is not drawn",
+              len(panels) == 4 and "fig slow" not in panels[2] and "fig mid" in panels[2] and "fig slow" in panels[0],
+              panels[2][:600] if len(panels) > 2 else f4[:600])
+        check("fig 4: the per-text values are those of the primary scope", "-4321" not in f4)
+        check("fig 5: a cell without a closed-set file is not drawn", FIG_NO_CELL in files["fig-closed-set.tex"].decode(
+            "utf-8") and "tikzpicture" not in files["fig-closed-set.tex"].decode("utf-8"))
+        with open(os.path.join(tmp, "windows", closed_set_name("windows-test")), "wb") as f:
+            f.write(json.dumps(_cs_doc(None, {(10, "no_time"): 0.5})).encode("utf-8"))
+        f5 = build(tmp)["fig-closed-set.tex"].decode("utf-8")
+        check("fig 5: every set at every K, set apart by its shift in decades, with the accuracy of the rule (not the "
+              "raw accuracy) and its Wilson interval",
+              "\\addplot[forget plot, fig set5, fig point] table[row sep=\\\\] {x y\\\\11.4815 0.89\\\\114.815 0.89\\\\"
+              "1148.15 0.89\\\\};" in f5 and "{x y\\\\11.4815 0.89\\\\11.4815 0.9\\\\11.4815 nan\\\\" in f5
+              and "\\addplot[forget plot, fig set1, fig point] table[row sep=\\\\] {x y\\\\7.94328 0.89\\\\" in f5
+              and "0.49" not in f5, f5[:2500])
+        check("fig 5: the chance level 1/K and the margin 2/K are drawn",
+              "\\addplot[forget plot, fig chance, domain=7:1500] {1/x};" in f5
+              and "\\addplot[forget plot, fig margin, domain=7:1500] {2/x};" in f5)
+        # An estimate outside its percentile interval keeps the interval as the result file gives it.
+        p = os.path.join(tmp, "windows", "e1_l1.json")
+        doc = load(p)
+        for st in doc["cells"]["windows-test"]["windows_def"][PRIMARY_COMPARISON]["under_limit"]["metrics"]["by_stratum"]:
+            if st["stratum"]["speed"] == "fast":
+                st["dwell"]["bias_ci"] = [-90.0, -10.0]
+        with open(p, "wb") as f:
+            f.write(json.dumps(doc).encode("utf-8"))
+        f3b = build(tmp)["fig-dwell.tex"].decode("utf-8")
+        check("fig 3: an estimate outside its interval is drawn with the interval of the result file",
+              "{x y\\\\1.25 -90\\\\1.25 -10\\\\1.25 nan\\\\}" in f3b and "{x y\\\\1.25 -99\\\\}" in f3b, f3b[:2500])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    empty = tempfile.mkdtemp(prefix="results_tables_figures_empty_")
+    try:
+        files = build(empty)
+        check("figures: without a measured cell every figure says so and draws nothing",
+              all(FIG_NO_CELL in files[n].decode("utf-8") and "tikzpicture" not in files[n].decode("utf-8")
+                  for n in ("fig-detection.tex", "fig-dwell.tex", "fig-text-agreement.tex", "fig-closed-set.tex")))
+    finally:
+        shutil.rmtree(empty, ignore_errors=True)
+
+
 def _selftest_macos(check):
     """Table 8 with the three comparisons, the layers of the prediction and the corrected merge rate of D10 on a
     synthetic macOS cell."""
@@ -2691,6 +3040,7 @@ def selftest():
     _selftest_rules(check)
     _selftest_reference(check)
     _selftest_macos(check)
+    _selftest_figures(check)
 
     tmp = tempfile.mkdtemp(prefix="results_tables_selftest_")
     try:

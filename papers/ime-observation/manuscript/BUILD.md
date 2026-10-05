@@ -17,8 +17,8 @@ they are obtained from the publisher.
 ## Building
 
 A TeX distribution with pdfLaTeX and BibTeX is needed; the packages that the class and the preamble load (among
-them `apacite`, `rotating`, `threeparttable`, `longtable`, `xurl` and `lmodern`) are part of the usual distributions.
-The build was checked with MiKTeX 25.12 (pdfTeX 4.23) on Windows.
+them `apacite`, `rotating`, `threeparttable`, `longtable`, `xurl`, `lmodern` and `pgfplots`) are part of the usual
+distributions. The build was checked with MiKTeX 25.12 (pdfTeX 4.23, pgfplots 1.18.1) on Windows.
 
     bash build.sh <path to sn-article-template> <output directory>
 
@@ -41,6 +41,13 @@ files change:
 `build.sh` first runs the same command with `--check` and stops when a generated file no longer matches the result
 files (set `PYTHON` when the interpreter is not `python3`). `python3 tools/results_tables.py --selftest` checks the
 script on synthetic result files.
+
+Figures 2 to 5 are generated in the same way, as `generated/fig-*.tex`: pgfplots code that holds the coordinates and
+names the styles defined in the preamble of `main.tex`, so the figures are drawn by TeX and no plotting library is
+needed. Figure 1 (`figures/components.tex`) holds no result and is written by hand. In the class of the template
+`\scriptsize` is larger than `\footnotesize`, so the figures use `\footnotesize` for their smallest text. A submission
+system that asks for the figures as separate files can be given each figure compiled on its own page from the same
+sources.
 
 ## Submission
 
