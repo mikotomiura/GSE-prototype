@@ -1515,3 +1515,16 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **表示した値**: 規則のコードと selftest・変異を済ませてから実物で生成した。生成のとき値は画面に出していない（overfull は数字を伏せた）。ただし形を確かめる途中で、macOS OFF のセルにフォーカスの喪失が `mid` の速さにある（速さの名前だけ）ことと、印が 117 ブロックすべてで見つかったことは見た。
 - **まだ**: macOS の 2 セルの印の時刻（Mac で・同じ手順で `obs_categories` は `navigation`・`gt_vks` は macOS のキーコード 123・124）。表 11 の「規則の性質」・結果の節。
 - **影響範囲**: `experiment/results/windows/clock_sync_windows-msime-tsf.json`（新規）・`experiment/data.windows.md`・`manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 4・変更 3）・`manuscript/supplement/supplement.tex`・`manuscript/outline.md`（Open items）・本ファイル・`tasklist.md`。
+
+## 判断 172: 登録が報告を求めていて結果の表に無かったもの（層ごとの 1 対 1 の一致・`over_limit` と感度分析の層ごとの検出・スコープの構成・除外の理由・打ち切りなど）を道具に足し、表 9 の一致の限界と中央値の絶対差に区間を付ける（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **見つけたこと（登録と外枠を一次で読み直した）**: 結果の節を書く前に、§6.1〜6.7・§10.7 が「報告する」と書くものを道具の出力と突き合わせた。足りなかったもの: (1) 問 2 は「per stratum, per speed and per cell」で 3 つの比較（§6.4・§6.6）→ 表 9 は主の比較・速さごとだけだった。(2) 問 1 は 3 つのスコープ（§6.4「computed under all three scopes」）と Windows の感度分析（§10.7 `under_limit_gt_duration`）→ 補遺の層の表は主の比較の 2 スコープだけだった。(3) §6.1「The number of letter keys and the think time of the trials in each scope are reported per stratum, from the plan」→ 無かった。(4) §6.2 の除外の理由・`start_while_open`・長さ 0 の行、§6.6 の打ち切りの数と「continued commit」で分けた `abandon`、§10.7 の診断（20〜25 秒・25 秒以上の行・S4 の Esc・長さの無い終わり・長い試行の 2 つの出どころ）、2 つの定義が同じセッションを持つか → 値に無かった。(5) ★ **表 9 の一致の限界と中央値の絶対差に区間が無かった**（判断 156 の表）—— §6.1「the bias and the limits of agreement ... carry 95% percentile bootstrap intervals」・結果のファイルに `loa_lo_ci`・`loa_hi_ci`・`mae_ci` がある → 外枠の「Estimates are reported with their intervals where the registration gives them」に照らして欠け。
+- **道具（メインの選択）**:
+  - 表 9: 偏り・下限・上限・中央値の絶対差それぞれに区間（列を 10 に・`footnotesize`）。行の部品 `session_cells` を補遺と共有。
+  - 補遺 `session-strata.tex`（新規）: 比較 × 2 スコープ（問 2 のスコープ）× 層ごと・速さごと・併合。
+  - 補遺 `detection-strata.tex`: 比較 × 検出のすべてのスコープ（`over_limit`・Windows の `under_limit_gt_duration` も）。試行の数は問 3 の試行の記録がある 2 スコープだけ（ほかは `--` と表の注）。各セルの頭にスコープの構成の表（macOS・予測の要約 `composition` から・中央値〔最小〜最大〕）。Windows は「予測を計算しないので無い」と書く（★ 凍結のコードが Windows では作らない —— 登録 §6.1 の欠け・結果の節で書く）。ラベルを `tab:strata-<cell>-<comp>-<scope>` に変えた（本文からの参照は無い）。
+  - 値 `diagnostic_values`: 除外（理由ごと・`<cell>.excluded.<trials|gt|obs>.<reason|n>`）・`samesessions`・`startwhileopen`・`zerodwell`・`cutoff`（`n_long` ほか 5 つ）・`abandon.continued`・比較 × スコープの併合の検出の値（`pooled.<comp>.<scope>.<measure>`・F1 も）・予測の要約（macOS）・Windows の診断（`win.*`）。
+  - ★ 除外の確認: 実物で「`pred_obs` の `gt` の側の除外が違う」で止まった —— `pred_obs` の最初の側は予測なので当然違う（値を見る前の形の確認で分かった・規則の直しは道具の検査の範囲）。→ 各比較の中でスコープ間は同じ・試行の除外は全比較で同じ・正解の側は `gt_obs` と `gt_pred`、観測の側は `gt_obs` と `pred_obs` で同じ、に直した。
+- **検証**: selftest 78 → 91 件（合成に除外の理由・長さ 0・打ち切り・併合の値・層ごとの問 2・予測の要約・Windows の診断を足し、比較・スコープごとに値を変えた）。`l1` の比較の組が検出と違えば止まる確認を足したら、既存の「系の比較の組」の否定の確認が先に l1 の確認に捕まって変異で緑になった → 否定の確認を両方のファイルから外す形に直した。★ 変異は 2 回目 20 本（scratchpad の使い捨て）がすべて狙った確認で赤、判断 171 の 29 本も回し直して 28 本が赤（1 本は書き直した関数の型で、2 回目の変異が同じ規則を確かめる）。実物で生成 → 16 ファイル・`--check` 一致・CR 0・文体違反 0。一時の写しの main に結果の表 8 つを入れて組み、**main の overfull は HEAD と同じ 1 件**・補遺は 160（HEAD の 55 のうち出力時以外の 17 件は同じ、増えたのはすべて横向きのページの出力時の型）。
+- **表示した値**: なし（形の確認で、除外がある／ないセル〔macOS OFF は除外 0〕と、Windows では 2 つの定義が別のセッションを持つことを見た —— どちらも登録が予想していた形）。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 1・変更 4）・`manuscript/supplement/supplement.tex`・本ファイル。

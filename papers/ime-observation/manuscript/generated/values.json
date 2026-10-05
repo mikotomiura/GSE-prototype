@@ -6,6 +6,56 @@
  ],
  "min_trials": 30,
  "values": {
+  "macos-standard-live-off.abandon.continued.unknown.all": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/abandon_by_continued_commit/n_unknown",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.abandon.continued.unknown.primary": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/abandon_by_continued_commit/n_unknown",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.abandon.continued.with.all": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/abandon_by_continued_commit/with",
+   "text": "-- (0 pairs)",
+   "value": [
+    null,
+    null,
+    null,
+    0
+   ]
+  },
+  "macos-standard-live-off.abandon.continued.with.primary": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/abandon_by_continued_commit/with",
+   "text": "-- (0 pairs)",
+   "value": [
+    null,
+    null,
+    null,
+    0
+   ]
+  },
+  "macos-standard-live-off.abandon.continued.without.all": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/abandon_by_continued_commit/without",
+   "text": "0.979 [0.972, 0.985] (2{,}016 pairs)",
+   "value": [
+    0.9791666666666666,
+    0.971960348989656,
+    0.9845503670187274,
+    2016
+   ]
+  },
+  "macos-standard-live-off.abandon.continued.without.primary": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/abandon_by_continued_commit/without",
+   "text": "0.979 [0.971, 0.984] (1{,}981 pairs)",
+   "value": [
+    0.9787985865724381,
+    0.9714670842714597,
+    0.9842767569152888,
+    1981
+   ]
+  },
   "macos-standard-live-off.all.dwellbias.range": {
    "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
    "text": "$-$739 to 201~ms",
@@ -57,6 +107,56 @@
     0,
     2925
    ]
+  },
+  "macos-standard-live-off.cutoff.all.long": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/truncation/n_long",
+   "text": "614",
+   "value": 614
+  },
+  "macos-standard-live-off.cutoff.all.longexcluded": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/truncation/n_long_excluded",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.cutoff.all.longwithrow": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/truncation/n_long_with_row",
+   "text": "20",
+   "value": 20
+  },
+  "macos-standard-live-off.cutoff.all.obsoverlimit": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/truncation/n_obs_over_limit",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.cutoff.all.obsoverlimitfalsepos": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/truncation/n_obs_over_limit_false_pos",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.cutoff.primary.long": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/truncation/n_long",
+   "text": "22",
+   "value": 22
+  },
+  "macos-standard-live-off.cutoff.primary.longexcluded": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/truncation/n_long_excluded",
+   "text": "592",
+   "value": 592
+  },
+  "macos-standard-live-off.cutoff.primary.longwithrow": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/truncation/n_long_with_row",
+   "text": "13",
+   "value": 13
+  },
+  "macos-standard-live-off.cutoff.primary.obsoverlimit": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/truncation/n_obs_over_limit",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.cutoff.primary.obsoverlimitfalsepos": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/truncation/n_obs_over_limit_false_pos",
+   "text": "0",
+   "value": 0
   },
   "macos-standard-live-off.d10.all.merge.differ": {
    "source": "e1_detection.json and d10/macos/e1_detection.json:all_trials/metrics/by_stratum/*/merge_rate",
@@ -203,6 +303,21 @@
    "source": "e1_delivery.json:cells/macos-standard-live-off/reference/reach/excluding_mode_keys/trials_with_loss",
    "text": "1",
    "value": 1
+  },
+  "macos-standard-live-off.excluded.gt.n": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/excluded/gt/n",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.excluded.obs.n": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/excluded/obs/n",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.excluded.trials.n": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/excluded/trials/n",
+   "text": "0",
+   "value": 0
   },
   "macos-standard-live-off.focus.lossintervalsplanned": {
    "source": "e1_delivery.json:cells/macos-standard-live-off/reference_focus_loss/n_loss_intervals_planned",
@@ -1173,6 +1288,677 @@
     0.0013115967097245668
    ]
   },
+  "macos-standard-live-off.pooled.gtobs.alltrials.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/f1",
+   "text": "0.755",
+   "value": 0.7549148099606815
+  },
+  "macos-standard-live-off.pooled.gtobs.alltrials.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/false_pos_rate",
+   "text": "0.135 [0.122, 0.150]",
+   "value": [
+    0.1353476821192053,
+    0.1222841194101458,
+    0.14956900403426868
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.alltrials.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/merge_rate",
+   "text": "0.039 [0.032, 0.047]",
+   "value": [
+    0.03890728476821192,
+    0.03189992254175049,
+    0.04737860131418334
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.alltrials.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/miss_rate",
+   "text": "0.282 [0.266, 0.298]",
+   "value": [
+    0.28170940170940173,
+    0.26570207607259194,
+    0.298289345807175
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.alltrials.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/precision",
+   "text": "0.834 [0.819, 0.849]",
+   "value": [
+    0.8344370860927153,
+    0.8190874125063881,
+    0.8487249328476565
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.alltrials.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/recall",
+   "text": "0.689 [0.672, 0.706]",
+   "value": [
+    0.6892307692307692,
+    0.6722196767450422,
+    0.7057454728078928
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.alltrials.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/n_obs",
+   "text": "2{,}416",
+   "value": 2416
+  },
+  "macos-standard-live-off.pooled.gtobs.alltrials.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/n_gt",
+   "text": "2{,}925",
+   "value": 2925
+  },
+  "macos-standard-live-off.pooled.gtobs.alltrials.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/pooled/split_rate",
+   "text": "0.022 [0.017, 0.028]",
+   "value": [
+    0.02188034188034188,
+    0.017172321344066724,
+    0.027842562757505795
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.overlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/over_limit/metrics/pooled/f1",
+   "text": "0.074",
+   "value": 0.0737618545837724
+  },
+  "macos-standard-live-off.pooled.gtobs.overlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/over_limit/metrics/pooled/false_pos_rate",
+   "text": "0.851 [0.800, 0.891]",
+   "value": [
+    0.851063829787234,
+    0.7999140042938513,
+    0.8909208315621411
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.overlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/over_limit/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.016]",
+   "value": [
+    0.0,
+    0.0,
+    0.01608371862934411
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.overlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/over_limit/metrics/pooled/miss_rate",
+   "text": "0.951 [0.933, 0.965]",
+   "value": [
+    0.9509803921568627,
+    0.9325892468088645,
+    0.9645447820030063
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.overlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/over_limit/metrics/pooled/precision",
+   "text": "0.149 [0.109, 0.200]",
+   "value": [
+    0.14893617021276595,
+    0.10907916843785889,
+    0.20008599570614863
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.overlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/over_limit/metrics/pooled/recall",
+   "text": "0.049 [0.035, 0.067]",
+   "value": [
+    0.049019607843137254,
+    0.035455217996993665,
+    0.06741075319113549
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.overlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/over_limit/metrics/pooled/n_obs",
+   "text": "235",
+   "value": 235
+  },
+  "macos-standard-live-off.pooled.gtobs.overlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/over_limit/metrics/pooled/n_gt",
+   "text": "714",
+   "value": 714
+  },
+  "macos-standard-live-off.pooled.gtobs.overlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/over_limit/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.005]",
+   "value": [
+    0.0,
+    0.0,
+    0.005351402839012759
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.underlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/f1",
+   "text": "0.902",
+   "value": 0.9020947176684881
+  },
+  "macos-standard-live-off.pooled.gtobs.underlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/false_pos_rate",
+   "text": "0.058 [0.049, 0.069]",
+   "value": [
+    0.05823016964695094,
+    0.04915684018572155,
+    0.06885696707692006
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.underlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/merge_rate",
+   "text": "0.043 [0.035, 0.052]",
+   "value": [
+    0.04309949564419991,
+    0.0353495736918891,
+    0.052456092044719474
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.underlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/miss_rate",
+   "text": "0.066 [0.056, 0.077]",
+   "value": [
+    0.06558118498417007,
+    0.05599766172744953,
+    0.07667163505244362
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.underlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/precision",
+   "text": "0.908 [0.895, 0.920]",
+   "value": [
+    0.9082989454378725,
+    0.895458272919661,
+    0.9197038491692
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.underlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/recall",
+   "text": "0.896 [0.883, 0.908]",
+   "value": [
+    0.8959746720940751,
+    0.8825550009228232,
+    0.9080207728087787
+   ]
+  },
+  "macos-standard-live-off.pooled.gtobs.underlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/n_obs",
+   "text": "2{,}181",
+   "value": 2181
+  },
+  "macos-standard-live-off.pooled.gtobs.underlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/n_gt",
+   "text": "2{,}211",
+   "value": 2211
+  },
+  "macos-standard-live-off.pooled.gtobs.underlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/pooled/split_rate",
+   "text": "0.029 [0.023, 0.037]",
+   "value": [
+    0.028946178199909543,
+    0.022733316760738573,
+    0.03679304721246152
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.alltrials.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/pooled/f1",
+   "text": "0.755",
+   "value": 0.7552892716719716
+  },
+  "macos-standard-live-off.pooled.gtpred.alltrials.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/pooled/false_pos_rate",
+   "text": "0.136 [0.123, 0.150]",
+   "value": [
+    0.1361754966887417,
+    0.12307563422704043,
+    0.1504304900722107
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.alltrials.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/pooled/merge_rate",
+   "text": "0.038 [0.032, 0.047]",
+   "value": [
+    0.03849337748344371,
+    0.03152587384764215,
+    0.04692614958087332
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.alltrials.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/pooled/miss_rate",
+   "text": "0.281 [0.265, 0.298]",
+   "value": [
+    0.28136752136752136,
+    0.26536664953383293,
+    0.29794190848043633
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.alltrials.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/pooled/precision",
+   "text": "0.835 [0.820, 0.849]",
+   "value": [
+    0.8348509933774835,
+    0.8195154848573896,
+    0.8491233609240734
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.alltrials.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/pooled/recall",
+   "text": "0.690 [0.673, 0.706]",
+   "value": [
+    0.6895726495726495,
+    0.672566169310366,
+    0.7060818441080665
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.alltrials.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/pooled/n_obs",
+   "text": "2{,}416",
+   "value": 2416
+  },
+  "macos-standard-live-off.pooled.gtpred.alltrials.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/pooled/n_gt",
+   "text": "2{,}925",
+   "value": 2925
+  },
+  "macos-standard-live-off.pooled.gtpred.alltrials.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/pooled/split_rate",
+   "text": "0.022 [0.017, 0.028]",
+   "value": [
+    0.02188034188034188,
+    0.017172321344066724,
+    0.027842562757505795
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.overlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/over_limit/metrics/pooled/f1",
+   "text": "0.074",
+   "value": 0.07360672975814932
+  },
+  "macos-standard-live-off.pooled.gtpred.overlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/over_limit/metrics/pooled/false_pos_rate",
+   "text": "0.852 [0.802, 0.892]",
+   "value": [
+    0.8523206751054853,
+    0.8015432937556657,
+    0.8918589170502864
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.overlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/over_limit/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.016]",
+   "value": [
+    0.0,
+    0.0,
+    0.0159501559220918
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.overlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/over_limit/metrics/pooled/miss_rate",
+   "text": "0.951 [0.933, 0.965]",
+   "value": [
+    0.9509803921568627,
+    0.9325892468088645,
+    0.9645447820030063
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.overlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/over_limit/metrics/pooled/precision",
+   "text": "0.148 [0.108, 0.198]",
+   "value": [
+    0.14767932489451477,
+    0.10814108294971354,
+    0.19845670624433426
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.overlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/over_limit/metrics/pooled/recall",
+   "text": "0.049 [0.035, 0.067]",
+   "value": [
+    0.049019607843137254,
+    0.035455217996993665,
+    0.06741075319113549
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.overlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/over_limit/metrics/pooled/n_obs",
+   "text": "237",
+   "value": 237
+  },
+  "macos-standard-live-off.pooled.gtpred.overlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/over_limit/metrics/pooled/n_gt",
+   "text": "714",
+   "value": 714
+  },
+  "macos-standard-live-off.pooled.gtpred.overlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/over_limit/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.005]",
+   "value": [
+    0.0,
+    0.0,
+    0.005351402839012759
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.underlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/pooled/f1",
+   "text": "0.903",
+   "value": 0.9029612756264237
+  },
+  "macos-standard-live-off.pooled.gtpred.underlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/pooled/false_pos_rate",
+   "text": "0.058 [0.049, 0.069]",
+   "value": [
+    0.05828361633776962,
+    0.04920215703271016,
+    0.0689197788407252
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.underlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/pooled/merge_rate",
+   "text": "0.043 [0.035, 0.052]",
+   "value": [
+    0.04268012849931161,
+    0.034967173726940914,
+    0.05200270585527034
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.underlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/pooled/miss_rate",
+   "text": "0.065 [0.056, 0.076]",
+   "value": [
+    0.06512890094979647,
+    0.05557914170787691,
+    0.07618715590156323
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.underlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/pooled/precision",
+   "text": "0.910 [0.897, 0.921]",
+   "value": [
+    0.9095915557595227,
+    0.8968191886986696,
+    0.920922288945963
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.underlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/pooled/recall",
+   "text": "0.896 [0.883, 0.908]",
+   "value": [
+    0.8964269561284487,
+    0.8830308907191556,
+    0.9084478821828993
+   ]
+  },
+  "macos-standard-live-off.pooled.gtpred.underlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/pooled/n_obs",
+   "text": "2{,}179",
+   "value": 2179
+  },
+  "macos-standard-live-off.pooled.gtpred.underlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/pooled/n_gt",
+   "text": "2{,}211",
+   "value": 2211
+  },
+  "macos-standard-live-off.pooled.gtpred.underlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/pooled/split_rate",
+   "text": "0.029 [0.023, 0.037]",
+   "value": [
+    0.028946178199909543,
+    0.022733316760738573,
+    0.03679304721246152
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.alltrials.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/pooled/f1",
+   "text": "0.989",
+   "value": 0.9888245033112583
+  },
+  "macos-standard-live-off.pooled.predobs.alltrials.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/pooled/false_pos_rate",
+   "text": "0.011 [0.008, 0.016]",
+   "value": [
+    0.011175496688741722,
+    0.007691822452160009,
+    0.016211172766742915
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.alltrials.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.002]",
+   "value": [
+    0.0,
+    0.0,
+    0.0015874836786068834
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.alltrials.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/pooled/miss_rate",
+   "text": "0.011 [0.008, 0.016]",
+   "value": [
+    0.011175496688741722,
+    0.007691822452160009,
+    0.016211172766742915
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.alltrials.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/pooled/precision",
+   "text": "0.989 [0.984, 0.992]",
+   "value": [
+    0.9888245033112583,
+    0.9837888272332571,
+    0.99230817754784
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.alltrials.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/pooled/recall",
+   "text": "0.989 [0.984, 0.992]",
+   "value": [
+    0.9888245033112583,
+    0.9837888272332571,
+    0.99230817754784
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.alltrials.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/pooled/n_obs",
+   "text": "2{,}416",
+   "value": 2416
+  },
+  "macos-standard-live-off.pooled.predobs.alltrials.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/pooled/n_gt",
+   "text": "2{,}416",
+   "value": 2416
+  },
+  "macos-standard-live-off.pooled.predobs.alltrials.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.002]",
+   "value": [
+    0.0,
+    0.0,
+    0.0015874836786068834
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.overlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/over_limit/metrics/pooled/f1",
+   "text": "0.924",
+   "value": 0.923728813559322
+  },
+  "macos-standard-live-off.pooled.predobs.overlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/over_limit/metrics/pooled/false_pos_rate",
+   "text": "0.072 [0.046, 0.113]",
+   "value": [
+    0.07234042553191489,
+    0.04565322610409854,
+    0.11278433748951068
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.overlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/over_limit/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.016]",
+   "value": [
+    0.0,
+    0.0,
+    0.01608371862934411
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.overlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/over_limit/metrics/pooled/miss_rate",
+   "text": "0.080 [0.052, 0.122]",
+   "value": [
+    0.08016877637130802,
+    0.051921856827435345,
+    0.12180844287086114
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.overlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/over_limit/metrics/pooled/precision",
+   "text": "0.928 [0.887, 0.954]",
+   "value": [
+    0.9276595744680851,
+    0.8872156625104893,
+    0.9543467738959014
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.overlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/over_limit/metrics/pooled/recall",
+   "text": "0.920 [0.878, 0.948]",
+   "value": [
+    0.919831223628692,
+    0.8781915571291388,
+    0.9480781431725647
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.overlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/over_limit/metrics/pooled/n_obs",
+   "text": "235",
+   "value": 235
+  },
+  "macos-standard-live-off.pooled.predobs.overlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/over_limit/metrics/pooled/n_gt",
+   "text": "237",
+   "value": 237
+  },
+  "macos-standard-live-off.pooled.predobs.overlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/over_limit/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.016]",
+   "value": [
+    0.0,
+    0.0,
+    0.0159501559220918
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.underlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/pooled/f1",
+   "text": "0.996",
+   "value": 0.9958715596330275
+  },
+  "macos-standard-live-off.pooled.predobs.underlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/pooled/false_pos_rate",
+   "text": "0.005 [0.002, 0.008]",
+   "value": [
+    0.004585052728106373,
+    0.0024924337175242224,
+    0.008419780861909362
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.underlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.002]",
+   "value": [
+    0.0,
+    0.0,
+    0.001758232298817515
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.underlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/pooled/miss_rate",
+   "text": "0.004 [0.002, 0.007]",
+   "value": [
+    0.0036714089031665903,
+    0.0018615289473012026,
+    0.007228209906849803
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.underlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/pooled/precision",
+   "text": "0.995 [0.992, 0.998]",
+   "value": [
+    0.9954149472718936,
+    0.9915802191380906,
+    0.9975075662824758
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.underlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/pooled/recall",
+   "text": "0.996 [0.993, 0.998]",
+   "value": [
+    0.9963285910968334,
+    0.9927717900931501,
+    0.9981384710526988
+   ]
+  },
+  "macos-standard-live-off.pooled.predobs.underlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/pooled/n_obs",
+   "text": "2{,}181",
+   "value": 2181
+  },
+  "macos-standard-live-off.pooled.predobs.underlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/pooled/n_gt",
+   "text": "2{,}179",
+   "value": 2179
+  },
+  "macos-standard-live-off.pooled.predobs.underlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.002]",
+   "value": [
+    0.0,
+    0.0,
+    0.0017598432562159214
+   ]
+  },
+  "macos-standard-live-off.pred.rows.open": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/counts/open",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.pred.rows.row": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/counts/row",
+   "text": "2{,}416",
+   "value": 2416
+  },
+  "macos-standard-live-off.pred.rows.truncated": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/counts/truncated",
+   "text": "683",
+   "value": 683
+  },
+  "macos-standard-live-off.pred.trials.carriedout": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/trials/n_carried_out",
+   "text": "186",
+   "value": 186
+  },
+  "macos-standard-live-off.pred.trials.closingkeyinreading": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/trials/n_closing_key_in_reading",
+   "text": "99",
+   "value": 99
+  },
+  "macos-standard-live-off.pred.trials.long": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/trials/n_long",
+   "text": "714",
+   "value": 714
+  },
+  "macos-standard-live-off.pred.trials.n": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/trials/n",
+   "text": "2{,}925",
+   "value": 2925
+  },
+  "macos-standard-live-off.pred.trials.none": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/trials/n_none",
+   "text": "109",
+   "value": 109
+  },
+  "macos-standard-live-off.pred.trials.receivedcarry": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/trials/n_received_carry",
+   "text": "184",
+   "value": 184
+  },
+  "macos-standard-live-off.pred.trials.split": {
+   "source": "e1_detection.json:predictions/macos-standard-live-off/trials/n_split",
+   "text": "280",
+   "value": 280
+  },
   "macos-standard-live-off.predobs.all.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/all_trials/metrics/by_stratum/*/precision",
    "text": "0.301--1.000",
@@ -1539,6 +2325,11 @@
     0
    ]
   },
+  "macos-standard-live-off.samesessions": {
+   "source": "e1_detection.json:same_sessions_as_all/macos-standard-live-off",
+   "text": "yes",
+   "value": true
+  },
   "macos-standard-live-off.scope.setaside": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
    "text": "714 of 2{,}925 trials (24.4\\%)",
@@ -1547,10 +2338,92 @@
     2925
    ]
   },
+  "macos-standard-live-off.startwhileopen.all": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/diagnostics/start_while_open/n",
+   "text": "2{,}925",
+   "value": 2925
+  },
+  "macos-standard-live-off.startwhileopen.primary": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/start_while_open/n",
+   "text": "2{,}211",
+   "value": 2211
+  },
   "macos-standard-live-off.trials.total": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/per_trial",
    "text": "2{,}925",
    "value": 2925
+  },
+  "macos-standard-live-off.zerodwell.all": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/zero_dwell_rows",
+   "text": "0 (0 of them false positives)",
+   "value": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  "macos-standard-live-off.zerodwell.primary": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/zero_dwell_rows",
+   "text": "0 (0 of them false positives)",
+   "value": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  "macos-standard-live-on.abandon.continued.unknown.all": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/abandon_by_continued_commit/n_unknown",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-on.abandon.continued.unknown.primary": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/abandon_by_continued_commit/n_unknown",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-on.abandon.continued.with.all": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/abandon_by_continued_commit/with",
+   "text": "0.976 [0.960, 0.985] (613 pairs)",
+   "value": [
+    0.9755301794453507,
+    0.9600216420479725,
+    0.9851158672151147,
+    613
+   ]
+  },
+  "macos-standard-live-on.abandon.continued.with.primary": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/abandon_by_continued_commit/with",
+   "text": "0.975 [0.959, 0.985] (600 pairs)",
+   "value": [
+    0.975,
+    0.959164223636837,
+    0.9847921604001473,
+    600
+   ]
+  },
+  "macos-standard-live-on.abandon.continued.without.all": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/abandon_by_continued_commit/without",
+   "text": "0.986 [0.978, 0.991] (1{,}474 pairs)",
+   "value": [
+    0.985753052917232,
+    0.9783178976203362,
+    0.9906629030284186,
+    1474
+   ]
+  },
+  "macos-standard-live-on.abandon.continued.without.primary": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/abandon_by_continued_commit/without",
+   "text": "0.986 [0.978, 0.991] (1{,}458 pairs)",
+   "value": [
+    0.98559670781893,
+    0.9780810577856144,
+    0.9905602346444994,
+    1458
+   ]
   },
   "macos-standard-live-on.all.dwellbias.range": {
    "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
@@ -1603,6 +2476,56 @@
     182,
     3150
    ]
+  },
+  "macos-standard-live-on.cutoff.all.long": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/truncation/n_long",
+   "text": "605",
+   "value": 605
+  },
+  "macos-standard-live-on.cutoff.all.longexcluded": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/truncation/n_long_excluded",
+   "text": "67",
+   "value": 67
+  },
+  "macos-standard-live-on.cutoff.all.longwithrow": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/truncation/n_long_with_row",
+   "text": "26",
+   "value": 26
+  },
+  "macos-standard-live-on.cutoff.all.obsoverlimit": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/truncation/n_obs_over_limit",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-on.cutoff.all.obsoverlimitfalsepos": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/truncation/n_obs_over_limit_false_pos",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-on.cutoff.primary.long": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/truncation/n_long",
+   "text": "26",
+   "value": 26
+  },
+  "macos-standard-live-on.cutoff.primary.longexcluded": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/truncation/n_long_excluded",
+   "text": "646",
+   "value": 646
+  },
+  "macos-standard-live-on.cutoff.primary.longwithrow": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/truncation/n_long_with_row",
+   "text": "21",
+   "value": 21
+  },
+  "macos-standard-live-on.cutoff.primary.obsoverlimit": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/truncation/n_obs_over_limit",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-on.cutoff.primary.obsoverlimitfalsepos": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/truncation/n_obs_over_limit_false_pos",
+   "text": "0",
+   "value": 0
   },
   "macos-standard-live-on.d10.all.merge.differ": {
    "source": "e1_detection.json and d10/macos/e1_detection.json:all_trials/metrics/by_stratum/*/merge_rate",
@@ -1749,6 +2672,36 @@
    "source": "e1_delivery.json:cells/macos-standard-live-on/reference/reach/excluding_mode_keys/trials_with_loss",
    "text": "0",
    "value": 0
+  },
+  "macos-standard-live-on.excluded.gt.carryover": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/excluded/gt/by_reason/carry_over",
+   "text": "88",
+   "value": 88
+  },
+  "macos-standard-live-on.excluded.gt.n": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/excluded/gt/n",
+   "text": "88",
+   "value": 88
+  },
+  "macos-standard-live-on.excluded.obs.carryover": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/excluded/obs/by_reason/carry_over",
+   "text": "164",
+   "value": 164
+  },
+  "macos-standard-live-on.excluded.obs.n": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/excluded/obs/n",
+   "text": "164",
+   "value": 164
+  },
+  "macos-standard-live-on.excluded.trials.carryover": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/excluded/trials/by_type/carry_over",
+   "text": "182",
+   "value": 182
+  },
+  "macos-standard-live-on.excluded.trials.n": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/excluded/trials/n",
+   "text": "182",
+   "value": 182
   },
   "macos-standard-live-on.focus.lossintervalsplanned": {
    "source": "e1_delivery.json:cells/macos-standard-live-on/reference_focus_loss/n_loss_intervals_planned",
@@ -2719,6 +3672,677 @@
     0.001218025341746426
    ]
   },
+  "macos-standard-live-on.pooled.gtobs.alltrials.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/f1",
+   "text": "0.767",
+   "value": 0.766574839302112
+  },
+  "macos-standard-live-on.pooled.gtobs.alltrials.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/false_pos_rate",
+   "text": "0.125 [0.113, 0.139]",
+   "value": [
+    0.12530315278900567,
+    0.11283581493093746,
+    0.13893229420289133
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.alltrials.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/merge_rate",
+   "text": "0.030 [0.024, 0.037]",
+   "value": [
+    0.02950687146321746,
+    0.023533491974760037,
+    0.03693908519004767
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.alltrials.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/miss_rate",
+   "text": "0.272 [0.256, 0.288]",
+   "value": [
+    0.27196230225513296,
+    0.25626409636251496,
+    0.28824944536513136
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.alltrials.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/precision",
+   "text": "0.844 [0.829, 0.857]",
+   "value": [
+    0.84357316087308,
+    0.8287275565848312,
+    0.8573534652449911
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.alltrials.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/recall",
+   "text": "0.702 [0.686, 0.719]",
+   "value": [
+    0.702457085156513,
+    0.6857649567410148,
+    0.7186263416365805
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.alltrials.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/n_obs",
+   "text": "2{,}474",
+   "value": 2474
+  },
+  "macos-standard-live-on.pooled.gtobs.alltrials.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/n_gt",
+   "text": "2{,}971",
+   "value": 2971
+  },
+  "macos-standard-live-on.pooled.gtobs.alltrials.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/pooled/split_rate",
+   "text": "0.026 [0.020, 0.032]",
+   "value": [
+    0.02558061258835409,
+    0.02048684168772393,
+    0.031899633685143106
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.overlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/over_limit/metrics/pooled/f1",
+   "text": "0.061",
+   "value": 0.061375661375661375
+  },
+  "macos-standard-live-on.pooled.gtobs.overlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/over_limit/metrics/pooled/false_pos_rate",
+   "text": "0.871 [0.821, 0.909]",
+   "value": [
+    0.8711111111111111,
+    0.8210232005152787,
+    0.9087396705161053
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.overlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/over_limit/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.017]",
+   "value": [
+    0.0,
+    0.0,
+    0.016786551005620227
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.overlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/over_limit/metrics/pooled/miss_rate",
+   "text": "0.960 [0.943, 0.972]",
+   "value": [
+    0.9597222222222223,
+    0.9427532163554655,
+    0.9718116955225469
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.overlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/over_limit/metrics/pooled/precision",
+   "text": "0.129 [0.091, 0.179]",
+   "value": [
+    0.1288888888888889,
+    0.09126032948389468,
+    0.17897679948472123
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.overlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/over_limit/metrics/pooled/recall",
+   "text": "0.040 [0.028, 0.057]",
+   "value": [
+    0.04027777777777778,
+    0.028188304477453102,
+    0.05724678364453459
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.overlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/over_limit/metrics/pooled/n_obs",
+   "text": "225",
+   "value": 225
+  },
+  "macos-standard-live-on.pooled.gtobs.overlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/over_limit/metrics/pooled/n_gt",
+   "text": "720",
+   "value": 720
+  },
+  "macos-standard-live-on.pooled.gtobs.overlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/over_limit/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.005]",
+   "value": [
+    0.0,
+    0.0,
+    0.005307044483128601
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.underlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/f1",
+   "text": "0.915",
+   "value": 0.9146666666666666
+  },
+  "macos-standard-live-on.pooled.gtobs.underlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/false_pos_rate",
+   "text": "0.051 [0.042, 0.061]",
+   "value": [
+    0.050689195197865716,
+    0.04236474210436103,
+    0.060545943382604966
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.underlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/merge_rate",
+   "text": "0.032 [0.026, 0.041]",
+   "value": [
+    0.032458870609159626,
+    0.025894943548628466,
+    0.040617264061015027
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.underlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/miss_rate",
+   "text": "0.052 [0.044, 0.062]",
+   "value": [
+    0.0519768991559307,
+    0.04354613102569029,
+    0.06193421567020899
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.underlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/precision",
+   "text": "0.915 [0.903, 0.926]",
+   "value": [
+    0.915073365940418,
+    0.9028323408722623,
+    0.925898856651654
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.underlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/recall",
+   "text": "0.914 [0.902, 0.925]",
+   "value": [
+    0.914260328742781,
+    0.9019768204093126,
+    0.9251323285307704
+   ]
+  },
+  "macos-standard-live-on.pooled.gtobs.underlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/n_obs",
+   "text": "2{,}249",
+   "value": 2249
+  },
+  "macos-standard-live-on.pooled.gtobs.underlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/n_gt",
+   "text": "2{,}251",
+   "value": 2251
+  },
+  "macos-standard-live-on.pooled.gtobs.underlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/pooled/split_rate",
+   "text": "0.034 [0.027, 0.042]",
+   "value": [
+    0.033762772101288314,
+    0.027059823461026155,
+    0.04205433009112685
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.alltrials.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/pooled/f1",
+   "text": "0.768",
+   "value": 0.7680440771349862
+  },
+  "macos-standard-live-on.pooled.gtpred.alltrials.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/pooled/false_pos_rate",
+   "text": "0.126 [0.114, 0.140]",
+   "value": [
+    0.12611156022635409,
+    0.11360712293590569,
+    0.13977529448458154
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.alltrials.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/pooled/merge_rate",
+   "text": "0.030 [0.024, 0.037]",
+   "value": [
+    0.02950687146321746,
+    0.023533491974760037,
+    0.03693908519004767
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.alltrials.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/pooled/miss_rate",
+   "text": "0.274 [0.258, 0.290]",
+   "value": [
+    0.27364523729384044,
+    0.2579140546694867,
+    0.28996101073544633
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.alltrials.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/pooled/precision",
+   "text": "0.845 [0.830, 0.859]",
+   "value": [
+    0.8451899757477769,
+    0.8304022091680918,
+    0.8589074292350476
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.alltrials.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/pooled/recall",
+   "text": "0.704 [0.687, 0.720]",
+   "value": [
+    0.703803433187479,
+    0.6871310460621237,
+    0.719949471257301
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.alltrials.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/pooled/n_obs",
+   "text": "2{,}474",
+   "value": 2474
+  },
+  "macos-standard-live-on.pooled.gtpred.alltrials.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/pooled/n_gt",
+   "text": "2{,}971",
+   "value": 2971
+  },
+  "macos-standard-live-on.pooled.gtpred.alltrials.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/pooled/split_rate",
+   "text": "0.025 [0.020, 0.032]",
+   "value": [
+    0.02524402558061259,
+    0.020186905565441234,
+    0.03152726507196845
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.overlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/over_limit/metrics/pooled/f1",
+   "text": "0.061",
+   "value": 0.0613107822410148
+  },
+  "macos-standard-live-on.pooled.gtpred.overlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/over_limit/metrics/pooled/false_pos_rate",
+   "text": "0.872 [0.822, 0.909]",
+   "value": [
+    0.8716814159292036,
+    0.8217881287156561,
+    0.9091504968134378
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.overlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/over_limit/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.017]",
+   "value": [
+    0.0,
+    0.0,
+    0.016713515657290335
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.overlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/over_limit/metrics/pooled/miss_rate",
+   "text": "0.960 [0.943, 0.972]",
+   "value": [
+    0.9597222222222223,
+    0.9427532163554655,
+    0.9718116955225469
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.overlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/over_limit/metrics/pooled/precision",
+   "text": "0.128 [0.091, 0.178]",
+   "value": [
+    0.12831858407079647,
+    0.09084950318656221,
+    0.17821187128434385
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.overlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/over_limit/metrics/pooled/recall",
+   "text": "0.040 [0.028, 0.057]",
+   "value": [
+    0.04027777777777778,
+    0.028188304477453102,
+    0.05724678364453459
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.overlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/over_limit/metrics/pooled/n_obs",
+   "text": "226",
+   "value": 226
+  },
+  "macos-standard-live-on.pooled.gtpred.overlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/over_limit/metrics/pooled/n_gt",
+   "text": "720",
+   "value": 720
+  },
+  "macos-standard-live-on.pooled.gtpred.overlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/over_limit/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.005]",
+   "value": [
+    0.0,
+    0.0,
+    0.005307044483128601
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.underlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/pooled/f1",
+   "text": "0.917",
+   "value": 0.9166481440320071
+  },
+  "macos-standard-live-on.pooled.gtpred.underlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/pooled/false_pos_rate",
+   "text": "0.051 [0.043, 0.061]",
+   "value": [
+    0.05115658362989324,
+    0.042790413376488215,
+    0.06105413478417965
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.underlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/pooled/merge_rate",
+   "text": "0.032 [0.026, 0.041]",
+   "value": [
+    0.032473309608540925,
+    0.025906497215172453,
+    0.040635247201935495
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.underlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/pooled/miss_rate",
+   "text": "0.054 [0.046, 0.064]",
+   "value": [
+    0.054198134162594405,
+    0.04558174718389503,
+    0.06433350111490015
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.underlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/pooled/precision",
+   "text": "0.917 [0.905, 0.928]",
+   "value": [
+    0.9172597864768683,
+    0.9051472671249399,
+    0.9279486831478982
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.underlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/pooled/recall",
+   "text": "0.916 [0.904, 0.927]",
+   "value": [
+    0.916037316748112,
+    0.9038596616677663,
+    0.9267974085546336
+   ]
+  },
+  "macos-standard-live-on.pooled.gtpred.underlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/pooled/n_obs",
+   "text": "2{,}248",
+   "value": 2248
+  },
+  "macos-standard-live-on.pooled.gtpred.underlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/pooled/n_gt",
+   "text": "2{,}251",
+   "value": 2251
+  },
+  "macos-standard-live-on.pooled.gtpred.underlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/pooled/split_rate",
+   "text": "0.033 [0.027, 0.042]",
+   "value": [
+    0.03331852509995557,
+    0.02666349003900371,
+    0.0415636831925701
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.alltrials.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/pooled/f1",
+   "text": "0.989",
+   "value": 0.9890864995957963
+  },
+  "macos-standard-live-on.pooled.predobs.alltrials.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/pooled/false_pos_rate",
+   "text": "0.011 [0.008, 0.016]",
+   "value": [
+    0.010913500404203719,
+    0.007511244410406766,
+    0.0158322421612576
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.alltrials.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.002]",
+   "value": [
+    0.0,
+    0.0,
+    0.0015503247017758875
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.alltrials.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/pooled/miss_rate",
+   "text": "0.011 [0.008, 0.016]",
+   "value": [
+    0.010913500404203719,
+    0.007511244410406766,
+    0.0158322421612576
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.alltrials.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/pooled/precision",
+   "text": "0.989 [0.984, 0.992]",
+   "value": [
+    0.9890864995957963,
+    0.9841677578387423,
+    0.9924887555895933
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.alltrials.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/pooled/recall",
+   "text": "0.989 [0.984, 0.992]",
+   "value": [
+    0.9890864995957963,
+    0.9841677578387423,
+    0.9924887555895933
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.alltrials.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/pooled/n_obs",
+   "text": "2{,}474",
+   "value": 2474
+  },
+  "macos-standard-live-on.pooled.predobs.alltrials.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/pooled/n_gt",
+   "text": "2{,}474",
+   "value": 2474
+  },
+  "macos-standard-live-on.pooled.predobs.alltrials.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.002]",
+   "value": [
+    0.0,
+    0.0,
+    0.0015503247017758875
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.overlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/over_limit/metrics/pooled/f1",
+   "text": "0.949",
+   "value": 0.9490022172949002
+  },
+  "macos-standard-live-on.pooled.predobs.overlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/over_limit/metrics/pooled/false_pos_rate",
+   "text": "0.049 [0.028, 0.085]",
+   "value": [
+    0.04888888888888889,
+    0.02751501790812548,
+    0.08540795922138968
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.overlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/over_limit/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.017]",
+   "value": [
+    0.0,
+    0.0,
+    0.016786551005620227
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.overlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/over_limit/metrics/pooled/miss_rate",
+   "text": "0.053 [0.031, 0.091]",
+   "value": [
+    0.05309734513274336,
+    0.030631511666043318,
+    0.09050180763826043
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.overlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/over_limit/metrics/pooled/precision",
+   "text": "0.951 [0.915, 0.972]",
+   "value": [
+    0.9511111111111111,
+    0.9145920407786103,
+    0.9724849820918746
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.overlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/over_limit/metrics/pooled/recall",
+   "text": "0.947 [0.909, 0.969]",
+   "value": [
+    0.9469026548672567,
+    0.9094981923617396,
+    0.9693684883339566
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.overlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/over_limit/metrics/pooled/n_obs",
+   "text": "225",
+   "value": 225
+  },
+  "macos-standard-live-on.pooled.predobs.overlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/over_limit/metrics/pooled/n_gt",
+   "text": "226",
+   "value": 226
+  },
+  "macos-standard-live-on.pooled.predobs.overlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/over_limit/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.017]",
+   "value": [
+    0.0,
+    0.0,
+    0.016713515657290335
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.underlimit.f1": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/pooled/f1",
+   "text": "0.993",
+   "value": 0.9931065154547476
+  },
+  "macos-standard-live-on.pooled.predobs.underlimit.falseposrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/pooled/false_pos_rate",
+   "text": "0.007 [0.004, 0.012]",
+   "value": [
+    0.007114273010226767,
+    0.004383863258523204,
+    0.01152558242411095
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.underlimit.mergerate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.002]",
+   "value": [
+    0.0,
+    0.0,
+    0.0017051616329473226
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.underlimit.missrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/pooled/miss_rate",
+   "text": "0.007 [0.004, 0.011]",
+   "value": [
+    0.0066725978647686835,
+    0.004047878377299598,
+    0.010980470393939894
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.underlimit.precision": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/pooled/precision",
+   "text": "0.993 [0.988, 0.996]",
+   "value": [
+    0.9928857269897733,
+    0.988474417575889,
+    0.9956161367414769
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.underlimit.recall": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/pooled/recall",
+   "text": "0.993 [0.989, 0.996]",
+   "value": [
+    0.9933274021352313,
+    0.9890195296060601,
+    0.9959521216227004
+   ]
+  },
+  "macos-standard-live-on.pooled.predobs.underlimit.rows": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/pooled/n_obs",
+   "text": "2{,}249",
+   "value": 2249
+  },
+  "macos-standard-live-on.pooled.predobs.underlimit.sessions": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/pooled/n_gt",
+   "text": "2{,}248",
+   "value": 2248
+  },
+  "macos-standard-live-on.pooled.predobs.underlimit.splitrate": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/pooled/split_rate",
+   "text": "0.000 [0.000, 0.002]",
+   "value": [
+    0.0,
+    0.0,
+    0.0017059188628252375
+   ]
+  },
+  "macos-standard-live-on.pred.rows.open": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/counts/open",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-on.pred.rows.row": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/counts/row",
+   "text": "2{,}638",
+   "value": 2638
+  },
+  "macos-standard-live-on.pred.rows.truncated": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/counts/truncated",
+   "text": "719",
+   "value": 719
+  },
+  "macos-standard-live-on.pred.trials.carriedout": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/trials/n_carried_out",
+   "text": "188",
+   "value": 188
+  },
+  "macos-standard-live-on.pred.trials.closingkeyinreading": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/trials/n_closing_key_in_reading",
+   "text": "113",
+   "value": 113
+  },
+  "macos-standard-live-on.pred.trials.long": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/trials/n_long",
+   "text": "755",
+   "value": 755
+  },
+  "macos-standard-live-on.pred.trials.n": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/trials/n",
+   "text": "3{,}150",
+   "value": 3150
+  },
+  "macos-standard-live-on.pred.trials.none": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/trials/n_none",
+   "text": "113",
+   "value": 113
+  },
+  "macos-standard-live-on.pred.trials.receivedcarry": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/trials/n_received_carry",
+   "text": "184",
+   "value": 184
+  },
+  "macos-standard-live-on.pred.trials.split": {
+   "source": "e1_detection.json:predictions/macos-standard-live-on/trials/n_split",
+   "text": "314",
+   "value": 314
+  },
   "macos-standard-live-on.predobs.all.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/all_trials/metrics/by_stratum/*/precision",
    "text": "0.207--1.000",
@@ -3085,6 +4709,11 @@
     0
    ]
   },
+  "macos-standard-live-on.samesessions": {
+   "source": "e1_detection.json:same_sessions_as_all/macos-standard-live-on",
+   "text": "yes",
+   "value": true
+  },
   "macos-standard-live-on.scope.setaside": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
    "text": "720 of 3{,}150 trials (22.9\\%)",
@@ -3093,10 +4722,42 @@
     3150
    ]
   },
+  "macos-standard-live-on.startwhileopen.all": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/diagnostics/start_while_open/n",
+   "text": "2{,}968",
+   "value": 2968
+  },
+  "macos-standard-live-on.startwhileopen.primary": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/start_while_open/n",
+   "text": "2{,}248",
+   "value": 2248
+  },
   "macos-standard-live-on.trials.total": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/per_trial",
    "text": "3{,}150",
    "value": 3150
+  },
+  "macos-standard-live-on.zerodwell.all": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/zero_dwell_rows",
+   "text": "0 (0 of them false positives)",
+   "value": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  "macos-standard-live-on.zerodwell.primary": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/zero_dwell_rows",
+   "text": "0 (0 of them false positives)",
+   "value": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
   },
   "macos.e3.idle.cpu.mean": {
    "source": "e3_macos.txt:idle/cpu mean",
@@ -3123,6 +4784,56 @@
     "counts_only": false,
     "no_time": false
    }
+  },
+  "windows-msime-tsf.abandon.continued.unknown.all": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/abandon_by_continued_commit/n_unknown",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.abandon.continued.unknown.primary": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/abandon_by_continued_commit/n_unknown",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.abandon.continued.with.all": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/abandon_by_continued_commit/with",
+   "text": "-- (0 pairs)",
+   "value": [
+    null,
+    null,
+    null,
+    0
+   ]
+  },
+  "windows-msime-tsf.abandon.continued.with.primary": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/abandon_by_continued_commit/with",
+   "text": "-- (0 pairs)",
+   "value": [
+    null,
+    null,
+    null,
+    0
+   ]
+  },
+  "windows-msime-tsf.abandon.continued.without.all": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/abandon_by_continued_commit/without",
+   "text": "0.848 [0.833, 0.863] (2{,}151 pairs)",
+   "value": [
+    0.8484425848442585,
+    0.8326681741549551,
+    0.8629746509187632,
+    2151
+   ]
+  },
+  "windows-msime-tsf.abandon.continued.without.primary": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/abandon_by_continued_commit/without",
+   "text": "0.849 [0.832, 0.863] (2{,}027 pairs)",
+   "value": [
+    0.8485446472619635,
+    0.8322798549238443,
+    0.8634908532537043,
+    2027
+   ]
   },
   "windows-msime-tsf.all.dwellbias.range": {
    "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
@@ -3175,6 +4886,56 @@
     2,
     2925
    ]
+  },
+  "windows-msime-tsf.cutoff.all.long": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/truncation/n_long",
+   "text": "605",
+   "value": 605
+  },
+  "windows-msime-tsf.cutoff.all.longexcluded": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/truncation/n_long_excluded",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.cutoff.all.longwithrow": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/truncation/n_long_with_row",
+   "text": "118",
+   "value": 118
+  },
+  "windows-msime-tsf.cutoff.all.obsoverlimit": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/truncation/n_obs_over_limit",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.cutoff.all.obsoverlimitfalsepos": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/truncation/n_obs_over_limit_false_pos",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.cutoff.primary.long": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/truncation/n_long",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.cutoff.primary.longexcluded": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/truncation/n_long_excluded",
+   "text": "605",
+   "value": 605
+  },
+  "windows-msime-tsf.cutoff.primary.longwithrow": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/truncation/n_long_with_row",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.cutoff.primary.obsoverlimit": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/truncation/n_obs_over_limit",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.cutoff.primary.obsoverlimitfalsepos": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/truncation/n_obs_over_limit_false_pos",
+   "text": "0",
+   "value": 0
   },
   "windows-msime-tsf.d10.all.merge.differ": {
    "source": "windows/e1_detection.json and d10/windows/e1_detection.json:all_trials/metrics/by_stratum/*/merge_rate",
@@ -3316,6 +5077,36 @@
    "source": "windows/e1_delivery.json:cells/windows-msime-tsf/reference/reach/excluding_mode_keys/trials_with_loss",
    "text": "2{,}925",
    "value": 2925
+  },
+  "windows-msime-tsf.excluded.gt.carryover": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/excluded/gt/by_reason/carry_over",
+   "text": "2",
+   "value": 2
+  },
+  "windows-msime-tsf.excluded.gt.n": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/excluded/gt/n",
+   "text": "2",
+   "value": 2
+  },
+  "windows-msime-tsf.excluded.obs.carryover": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/excluded/obs/by_reason/carry_over",
+   "text": "3",
+   "value": 3
+  },
+  "windows-msime-tsf.excluded.obs.n": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/excluded/obs/n",
+   "text": "3",
+   "value": 3
+  },
+  "windows-msime-tsf.excluded.trials.carryover": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/excluded/trials/by_type/carry_over",
+   "text": "2",
+   "value": 2
+  },
+  "windows-msime-tsf.excluded.trials.n": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/excluded/trials/n",
+   "text": "2",
+   "value": 2
   },
   "windows-msime-tsf.focus.lossintervalsplanned": {
    "source": "windows/e1_delivery.json:cells/windows-msime-tsf/reference_focus_loss/n_loss_intervals_planned",
@@ -4316,6 +6107,282 @@
     0.0013115967097245673
    ]
   },
+  "windows-msime-tsf.pooled.gtobs.alltrials.f1": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/f1",
+   "text": "0.707",
+   "value": 0.7066360052562418
+  },
+  "windows-msime-tsf.pooled.gtobs.alltrials.falseposrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/false_pos_rate",
+   "text": "0.317 [0.301, 0.333]",
+   "value": [
+    0.3169433134982775,
+    0.30103280928887943,
+    0.3332937548969964
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.alltrials.mergerate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/merge_rate",
+   "text": "0.001 [0.000, 0.003]",
+   "value": [
+    0.0009395552771688068,
+    0.00031958387782979065,
+    0.002758910613518745
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.alltrials.missrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/miss_rate",
+   "text": "0.251 [0.236, 0.267]",
+   "value": [
+    0.25112262521588946,
+    0.23566254789855512,
+    0.2672423123809624
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.alltrials.precision": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/precision",
+   "text": "0.674 [0.657, 0.690]",
+   "value": [
+    0.6736611337300344,
+    0.6571977731354887,
+    0.6897071373160627
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.alltrials.recall": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/recall",
+   "text": "0.743 [0.727, 0.759]",
+   "value": [
+    0.7430051813471502,
+    0.7267726907672188,
+    0.7585936253928912
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.alltrials.rows": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/n_obs",
+   "text": "3{,}193",
+   "value": 3193
+  },
+  "windows-msime-tsf.pooled.gtobs.alltrials.sessions": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/n_gt",
+   "text": "2{,}895",
+   "value": 2895
+  },
+  "windows-msime-tsf.pooled.gtobs.alltrials.splitrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/split_rate",
+   "text": "0.098 [0.087, 0.109]",
+   "value": [
+    0.09775474956822107,
+    0.08746362947883991,
+    0.10911195663566144
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.overlimit.f1": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/over_limit/metrics/pooled/f1",
+   "text": "0.218",
+   "value": 0.2179261862917399
+  },
+  "windows-msime-tsf.pooled.gtobs.overlimit.falseposrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/over_limit/metrics/pooled/false_pos_rate",
+   "text": "0.748 [0.709, 0.783]",
+   "value": [
+    0.7476099426386233,
+    0.7086684536065635,
+    0.7829405412127839
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.overlimit.mergerate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/over_limit/metrics/pooled/merge_rate",
+   "text": "0.000 [0.000, 0.007]",
+   "value": [
+    0.0,
+    0.0,
+    0.007291489225796732
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.overlimit.missrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/over_limit/metrics/pooled/miss_rate",
+   "text": "0.792 [0.758, 0.822]",
+   "value": [
+    0.791869918699187,
+    0.7580213935588718,
+    0.8220948783601663
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.overlimit.precision": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/over_limit/metrics/pooled/precision",
+   "text": "0.237 [0.203, 0.275]",
+   "value": [
+    0.23709369024856597,
+    0.20264363200602428,
+    0.2753777055410008
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.overlimit.recall": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/over_limit/metrics/pooled/recall",
+   "text": "0.202 [0.172, 0.235]",
+   "value": [
+    0.2016260162601626,
+    0.1718132035286404,
+    0.23514314244827614
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.overlimit.rows": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/over_limit/metrics/pooled/n_obs",
+   "text": "523",
+   "value": 523
+  },
+  "windows-msime-tsf.pooled.gtobs.overlimit.sessions": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/over_limit/metrics/pooled/n_gt",
+   "text": "615",
+   "value": 615
+  },
+  "windows-msime-tsf.pooled.gtobs.overlimit.splitrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/over_limit/metrics/pooled/split_rate",
+   "text": "0.101 [0.079, 0.127]",
+   "value": [
+    0.1008130081300813,
+    0.07944041415679964,
+    0.1271415092074129
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimit.f1": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/f1",
+   "text": "0.819",
+   "value": 0.8189898989898989
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimit.falseposrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/false_pos_rate",
+   "text": "0.233 [0.217, 0.249]",
+   "value": [
+    0.23258426966292134,
+    0.21695037063548084,
+    0.24898655120811125
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimit.mergerate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/merge_rate",
+   "text": "0.001 [0.000, 0.003]",
+   "value": [
+    0.0011235955056179776,
+    0.0003821958021044743,
+    0.0032984483094707605
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimit.missrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/miss_rate",
+   "text": "0.105 [0.093, 0.119]",
+   "value": [
+    0.10526315789473684,
+    0.0933232276944464,
+    0.1185309957902849
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimit.precision": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/precision",
+   "text": "0.759 [0.743, 0.775]",
+   "value": [
+    0.7591760299625468,
+    0.7425924470217024,
+    0.7750149060374493
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimit.recall": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/recall",
+   "text": "0.889 [0.875, 0.901]",
+   "value": [
+    0.8890350877192983,
+    0.8754825860391665,
+    0.901278862593104
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimit.rows": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/n_obs",
+   "text": "2{,}670",
+   "value": 2670
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimit.sessions": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/n_gt",
+   "text": "2{,}280",
+   "value": 2280
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimit.splitrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/pooled/split_rate",
+   "text": "0.097 [0.085, 0.110]",
+   "value": [
+    0.0969298245614035,
+    0.08545485324646268,
+    0.10976073717850182
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimitgtduration.f1": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit_gt_duration/metrics/pooled/f1",
+   "text": "0.820",
+   "value": 0.819718309859155
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimitgtduration.falseposrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit_gt_duration/metrics/pooled/false_pos_rate",
+   "text": "0.232 [0.216, 0.248]",
+   "value": [
+    0.23171641791044775,
+    0.21613301021097972,
+    0.24806782949440617
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimitgtduration.mergerate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit_gt_duration/metrics/pooled/merge_rate",
+   "text": "0.001 [0.000, 0.003]",
+   "value": [
+    0.001119402985074627,
+    0.00038076943085020814,
+    0.003286160591543348
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimitgtduration.missrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit_gt_duration/metrics/pooled/miss_rate",
+   "text": "0.105 [0.093, 0.118]",
+   "value": [
+    0.10480349344978165,
+    0.09291317645847995,
+    0.11801746870888304
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimitgtduration.precision": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit_gt_duration/metrics/pooled/precision",
+   "text": "0.760 [0.744, 0.776]",
+   "value": [
+    0.7600746268656716,
+    0.7435420113490149,
+    0.7758627379212856
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimitgtduration.recall": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit_gt_duration/metrics/pooled/recall",
+   "text": "0.890 [0.876, 0.902]",
+   "value": [
+    0.8895196506550218,
+    0.8760219352567968,
+    0.9017127216611172
+   ]
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimitgtduration.rows": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit_gt_duration/metrics/pooled/n_obs",
+   "text": "2{,}680",
+   "value": 2680
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimitgtduration.sessions": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit_gt_duration/metrics/pooled/n_gt",
+   "text": "2{,}290",
+   "value": 2290
+  },
+  "windows-msime-tsf.pooled.gtobs.underlimitgtduration.splitrate": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit_gt_duration/metrics/pooled/split_rate",
+   "text": "0.097 [0.085, 0.109]",
+   "value": [
+    0.0965065502183406,
+    0.08507949112928495,
+    0.10928505708579064
+   ]
+  },
   "windows-msime-tsf.primary.dwellbias.range": {
    "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
    "text": "$-$1,121 to $-$456~ms",
@@ -4630,6 +6697,11 @@
     0
    ]
   },
+  "windows-msime-tsf.samesessions": {
+   "source": "windows/e1_detection.json:same_sessions_as_all/windows-msime-tsf",
+   "text": "no",
+   "value": false
+  },
   "windows-msime-tsf.scope.setaside": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
    "text": "617 of 2{,}925 trials (21.1\\%)",
@@ -4638,10 +6710,99 @@
     2925
    ]
   },
+  "windows-msime-tsf.startwhileopen.all": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/diagnostics/start_while_open/n",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.startwhileopen.primary": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/diagnostics/start_while_open/n",
+   "text": "0",
+   "value": 0
+  },
   "windows-msime-tsf.trials.total": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/per_trial",
    "text": "2{,}925",
    "value": 2925
+  },
+  "windows-msime-tsf.win.endsnolength": {
+   "source": "windows/e1_detection.json:windows_diagnostics/windows-msime-tsf/tsf_end_without_result_len",
+   "text": "1 in S2",
+   "value": {
+    "S2": 1
+   }
+  },
+  "windows-msime-tsf.win.long.band": {
+   "source": "windows/e1_detection.json:long_trials_from/windows-msime-tsf/total/n_band",
+   "text": "112",
+   "value": 112
+  },
+  "windows-msime-tsf.win.long.bandms": {
+   "source": "windows/e1_detection.json:long_trials_from/windows-msime-tsf/band_ms",
+   "text": "1{,}000",
+   "value": 1000
+  },
+  "windows-msime-tsf.win.long.differ": {
+   "source": "windows/e1_detection.json:long_trials_from/windows-msime-tsf/total/n_differ",
+   "text": "10",
+   "value": 10
+  },
+  "windows-msime-tsf.win.long.long": {
+   "source": "windows/e1_detection.json:long_trials_from/windows-msime-tsf/total/n_long",
+   "text": "617",
+   "value": 617
+  },
+  "windows-msime-tsf.win.long.longgt": {
+   "source": "windows/e1_detection.json:long_trials_from/windows-msime-tsf/total/n_long_gt",
+   "text": "607",
+   "value": 607
+  },
+  "windows-msime-tsf.win.long.trials": {
+   "source": "windows/e1_detection.json:long_trials_from/windows-msime-tsf/total/n_trials",
+   "text": "2{,}925",
+   "value": 2925
+  },
+  "windows-msime-tsf.win.rows.20000to24999": {
+   "source": "windows/e1_detection.json:windows_diagnostics/windows-msime-tsf/observed_rows_dwell_ms/20000_to_24999",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.win.rows.25000ormore": {
+   "source": "windows/e1_detection.json:windows_diagnostics/windows-msime-tsf/observed_rows_dwell_ms/25000_or_more",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.win.s4.escape2": {
+   "source": "windows/e1_detection.json:windows_diagnostics/windows-msime-tsf/s4_session_end_after_escape/2",
+   "text": "8",
+   "value": 8
+  },
+  "windows-msime-tsf.win.s4.escape3": {
+   "source": "windows/e1_detection.json:windows_diagnostics/windows-msime-tsf/s4_session_end_after_escape/3",
+   "text": "217",
+   "value": 217
+  },
+  "windows-msime-tsf.zerodwell.all": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/zero_dwell_rows",
+   "text": "0 (0 of them false positives)",
+   "value": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  "windows-msime-tsf.zerodwell.primary": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/zero_dwell_rows",
+   "text": "0 (0 of them false positives)",
+   "value": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
   },
   "windows.e3.idle.cpu.mean": {
    "source": "windows/e3_windows.txt:idle/cpu mean",

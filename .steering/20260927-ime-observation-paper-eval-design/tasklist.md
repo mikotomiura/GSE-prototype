@@ -234,7 +234,8 @@
   - [x] main に入った M4（PR #297）と Windows の解析（PR #304）を取り込んだ（`745a551f`）。逸脱の番号の衝突は研究者の選択で main の D6（macOS の晩）を保ち、この枝の Windows の試行の数え方を **D7** に（判断 152）。macOS の版（27.0.1・26A434）を原稿に記入
   - [ ] Mac で: AppKit と C の Accessibility の定数の数と `TextInputSources.h` を計測の版（macOS 27.0.1）の SDK のヘッダで確かめる（外枠の Open items・判断 151・153）
   - [ ] 結果の節（引き継ぎ `next-session-ime-paper-results-3.md`）
-    - [x] 結果の表の道具（判断 156・165・168〜171）: 表 7〜12・KT1・補遺の層ごとの表・予測の層・D10 の直した併合の率・selftest 78 件・変異 29 本（判断 171）
+    - [x] 結果の表の道具（判断 156・165・168〜172）: 表 7〜12・KT1・補遺の層ごとの表・予測の層・D10 の直した併合の率・selftest 78 件・変異 29 本（判断 171）
+    - [x] 登録が報告を求めていた残り（層ごとの問 2・全スコープの層ごとの検出・スコープの構成・除外・打ち切り・Windows の診断）と表 9 の区間（判断 172・selftest 91 件・変異 20 本）
     - [x] Windows の印の時刻（§6.9・判断 171・`results/windows/clock_sync_windows-msime-tsf.json`）
     - [ ] Mac で: macOS の 2 セルの印の時刻（§6.9・判断 171 の手順・`gt_vks` は 123・124）→ `results/clock_sync_<cell>.json`・`data.md`
     - [ ] 表 11 の「規則の性質」（§6.8 の確率の表）の置き方

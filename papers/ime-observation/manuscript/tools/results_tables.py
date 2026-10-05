@@ -197,6 +197,15 @@ class Cell(object):
             raise ValueError("%s: cell %s holds the comparisons %s, not those of %s" % (
                 self.src["e1_detection.json"], label, ", ".join(self.comparisons), system))
         self.det_by = dict((c, definition_block[c]) for c in self.comparisons)
+        l1_block = docs["e1_l1.json"]["cells"][label][self.definition]
+        if tuple(c for c, _ in COMPARISONS if l1_block.get(c)) != self.comparisons:
+            raise ValueError("%s: cell %s does not hold the comparisons of the detection results" % (
+                self.src["e1_l1.json"], label))
+        self.l1_by = dict((c, l1_block[c]) for c in self.comparisons)
+        # The summaries of the detection file outside the cells (the prediction, the two definitions, and on Windows
+        # the diagnostics and the long trials of both sources).
+        self.det_top = dict((k, (v or {}).get(label)) for k, v in docs["e1_detection.json"].items()
+                            if k in ("predictions", "same_sessions_as_all", "windows_diagnostics", "long_trials_from"))
         # The delivery report of the same analysis (it has no primary comparison or scope).
         p = os.path.join(directory, DELIVERY_FILE)
         self.src[DELIVERY_FILE] = prefix + DELIVERY_FILE
@@ -1168,76 +1177,262 @@ def table_layers(cells, d10s):
     return "".join(lines)
 
 
+def session_cells(e):
+    """Pairs, bias, lower and upper limit of agreement and median absolute difference of dwell_ms (each with its
+    interval), and the agreement of abandon (raw and kappa) and of nav (exact), each with its interval."""
+    dw, ba, ab, nav = e["dwell"], e["dwell"]["bland_altman"], e["abandon"], e["nav"]
+    ci = lambda key: dw.get(key) or [None, None]
+    return [fmt_int(dw["n"]),
+            est_ci(ba["bias"], ci("bias_ci")[0], ci("bias_ci")[1], fmt_ms),
+            est_ci(ba["loa_lo"], ci("loa_lo_ci")[0], ci("loa_lo_ci")[1], fmt_ms),
+            est_ci(ba["loa_hi"], ci("loa_hi_ci")[0], ci("loa_hi_ci")[1], fmt_ms),
+            est_ci(dw["mae"], ci("mae_ci")[0], ci("mae_ci")[1], fmt_ms),
+            est_ci(ab["agree"], ab["agree_ci"][0], ab["agree_ci"][1]),
+            est_ci(ab["kappa"], ab["kappa_ci"][0], ab["kappa_ci"][1]),
+            est_ci(nav["exact"], nav["exact_ci"][0], nav["exact_ci"][1])]
+
+
+SESSION_HEAD = ("Pairs & Bias (ms) & Lower limit (ms) & Upper limit (ms) & Median absolute difference (ms) & "
+                "\\texttt{abandon} agreement & \\texttt{abandon} kappa & \\texttt{nav} exact \\\\\n")
+SESSION_CAPTION = ("the difference of \\texttt{dwell\\_ms} from the duration of the reference session (bias, limits of "
+                   "agreement and median absolute difference, each with a 95\\% interval that resamples blocks), the "
+                   "agreement of \\texttt{abandon} with the outcome of the session (raw agreement with its Wilson "
+                   "interval and kappa with its block interval), and the exact agreement of \\texttt{nav} with the "
+                   "arrow presses sent (Wilson interval); Pairs is the number of matched sessions with a duration on "
+                   "both sides. An estimate printed without an interval has its interval withheld (the reason is in "
+                   "the result file); " + NO_VALUE + ": no value")
+
+
 def table_session(cells):
     lines = [GENERATED_NOTE,
              "\\begin{sidewaystable}[p]\n",
-             "\\caption{Per-session agreement per cell and speed, primary scope: the difference of \\texttt{dwell\\_ms} "
-             "from the duration of the reference session (bias with its interval, limits of agreement, median absolute "
-             "difference), the agreement of \\texttt{abandon} with the outcome of the session (raw agreement and kappa), "
-             "and the exact agreement of \\texttt{nav} with the arrow presses sent; Pairs is the number of matched "
-             "sessions; " + NO_VALUE + ": no value in the result file}\n",
+             "{\\footnotesize\n",
+             "\\caption{Per-session agreement per cell and speed, primary comparison and scope: " + SESSION_CAPTION + "}\n",
              "\\label{tab:session}\n",
-             "\\begin{tabular}{L{0.14}L{0.07}L{0.07}L{0.17}L{0.15}L{0.08}L{0.11}L{0.12}L{0.09}}\n",
+             "\\begin{tabular}{L{0.12}L{0.06}L{0.06}L{0.11}L{0.11}L{0.11}L{0.11}L{0.11}L{0.11}L{0.10}}\n",
              "\\toprule\n",
-             "Cell & Speed & Pairs & Bias (ms) & Limits (ms) & Median absolute difference (ms) & "
-             "\\texttt{abandon} agreement & "
-             "\\texttt{abandon} kappa & \\texttt{nav} exact \\\\\n",
+             "Cell & Speed & " + SESSION_HEAD,
              "\\midrule\n"]
     for cell in cells:
         sp = cell.speed_sessions(PRIMARY_SCOPE)
         for i, s in enumerate(SPEEDS):
             if s not in sp:
                 continue
-            e = sp[s]
-            dw, ba = e["dwell"], e["dwell"]["bland_altman"]
-            ab, nav = e["abandon"], e["nav"]
-            row = [tex_escape(cell.label) if i == 0 else "", s, fmt_int(dw["n"]),
-                   est_ci(ba["bias"], dw["bias_ci"][0], dw["bias_ci"][1], fmt_ms),
-                   "%s, %s" % (fmt_ms(ba["loa_lo"]), fmt_ms(ba["loa_hi"])),
-                   fmt_ms(dw["mae"]),
-                   est_ci(ab["agree"], ab["agree_ci"][0], ab["agree_ci"][1]),
-                   est_ci(ab["kappa"], ab["kappa_ci"][0], ab["kappa_ci"][1]),
-                   est_ci(nav["exact"], nav["exact_ci"][0], nav["exact_ci"][1])]
-            lines.append(" & ".join(row) + " \\\\\n")
-    lines += ["\\bottomrule\n", "\\end{tabular}\n", "\\end{sidewaystable}\n"]
+            lines.append(" & ".join([tex_escape(cell.label) if i == 0 else "", s] + session_cells(sp[s])) + " \\\\\n")
+    lines += ["\\bottomrule\n", "\\end{tabular}\n", "}\n", "\\end{sidewaystable}\n"]
     return "".join(lines)
 
 
-def table_strata(cell, d10=None):
-    """One landscape long table per scope (the supplement loads pdflscape and longtable). The last column is the merge
-    rate of the corrected analysis of deviation D10, next to the registered one."""
-    lines = [GENERATED_NOTE]
+def session_supplement(cells):
+    """Supplement: per-session agreement per stratum, per speed and pooled, for every comparison and both scopes."""
+    lines = [GENERATED_NOTE, "\\section*{Per-session agreement per stratum}\n\\label{sec:supp-session}\n\n",
+             "Generated from the result files of question 2, for every comparison (three on macOS, the primary one on "
+             "Windows) and both scopes of question 2. The rows of a speed and the pooled row collect the pairs of their "
+             "strata; a pooled value is not an estimate for natural typing.\n\n"]
+    for cell in cells:
+        for comp in cell.comparisons:
+            for scope in SCOPES:
+                m = cell.l1_by[comp][scope]["metrics"]
+                lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
+                          "\\begin{longtable}{L{0.08}L{0.06}L{0.07}L{0.12}L{0.12}L{0.12}L{0.11}L{0.11}L{0.11}L{0.10}}\n",
+                          "\\caption{Per-session agreement per stratum, cell %s, comparison \\texttt{%s}, %s: %s}"
+                          "\\label{tab:session-%s-%s-%s}\\\\\n" % (
+                              tex_escape(cell.label), tex_escape(comp), scope_name(scope), SESSION_CAPTION, cell.label,
+                              comp.replace("_", ""), scope.replace("_", "")),
+                          "\\toprule\n",
+                          "Scenario & Speed & " + SESSION_HEAD,
+                          "\\midrule\n\\endhead\n"]
+                for st in sorted(m["by_stratum"], key=lambda st: (scenario_order(st["stratum"].get("scenario") or ""),
+                                                                  SPEEDS.index(st["stratum"]["speed"]))):
+                    lines.append(" & ".join([st["stratum"].get("scenario") or "", st["stratum"]["speed"]]
+                                            + session_cells(st)) + " \\\\\n")
+                lines.append("\\midrule\n")
+                by = dict((st["stratum"]["speed"], st) for st in m["by_speed"])
+                for s in SPEEDS:
+                    if s in by:
+                        lines.append(" & ".join(["all", s] + session_cells(by[s])) + " \\\\\n")
+                lines.append(" & ".join(["pooled", ""] + session_cells(m["pooled"])) + " \\\\\n")
+                lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n\n"]
+    return "".join(lines)
+
+
+SCOPE_NAMES = {
+    "under_limit": "the primary scope (\\texttt{under\\_limit})",
+    "over_limit": "the long trials (\\texttt{over\\_limit})",
+    "all_trials": "all trials (\\texttt{all\\_trials})",
+    "under_limit_gt_duration": "the primary scope with the long trials taken from the reference (\\texttt{under\\_limit"
+                               "\\_gt\\_duration}, sensitivity analysis)"}
+STRATA_SCOPES = ("under_limit", "over_limit", "all_trials", "under_limit_gt_duration")
+
+
+def scope_name(scope):
+    return SCOPE_NAMES.get(scope, "\\texttt{%s}" % tex_escape(scope))
+
+
+def table_composition(cell):
+    """Section 6.1: the number of letter keys and the think time of the trials of each scope, per stratum, from the plan
+    (the summary of the prediction; the Windows analysis computes no prediction)."""
+    pred = cell.det_top.get("predictions") or {}
+    if not pred.get("available"):
+        return ("The number of letter keys and the think time per stratum and scope are computed with the prediction, "
+                "which the analysis of cell %s does not compute.\n\n" % tex_escape(cell.label))
+    lines = ["\\begin{landscape}\n", "{\\footnotesize\n",
+             "\\begin{longtable}{L{0.08}L{0.06}L{0.14}L{0.07}L{0.22}L{0.22}}\n",
+             "\\caption{Composition of the scopes per stratum, cell %s, from the plan: trials, letter keys and think "
+             "time of the trials, as median (minimum to maximum)}\\label{tab:composition-%s}\\\\\n" % (
+                 tex_escape(cell.label), cell.label),
+             "\\toprule\n",
+             "Scenario & Speed & Scope & Trials & Letter keys & Think time (ms) \\\\\n",
+             "\\midrule\n\\endhead\n"]
+    order = dict((s, i) for i, s in enumerate(STRATA_SCOPES))
+    for e in sorted(pred["composition"], key=lambda e: (scenario_order(e["scenario"]), SPEEDS.index(e["speed"]),
+                                                        order.get(e["scope"], len(order)))):
+        mm = lambda s: NO_VALUE if s["n"] == 0 else "%s (%s to %s)" % (fmt_int(s["median"]), fmt_int(s["min"]),
+                                                                      fmt_int(s["max"]))
+        lines.append(" & ".join([e["scenario"], e["speed"], "\\texttt{%s}" % tex_escape(e["scope"]),
+                                 fmt_int(e["n_trials"]), mm(e["letter_keys"]), mm(e["think_ms"])]) + " \\\\\n")
+    lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n\n"]
+    return "".join(lines)
+
+
+def diagnostic_values(cell):
+    """Descriptive values of sections 6.2, 6.4, 6.6 and 10.7 for the text: exclusions by reason, whether the two
+    definitions hold the same sessions, starts while a session was open, rows of zero duration, the cut-off, the
+    agreement of abandon split by continued commits, the pooled detection measures, and the Windows diagnostics."""
+    lab, vals = cell.label, {}
+    src_det = lambda *k: cell.path("e1_detection.json", *k)
+    ex = cell.det[PRIMARY_SCOPE]["excluded"]
+    # The exclusions are made before the scopes, and the comparisons cover the same trials (section 6.4); the first
+    # side of pred_obs and the second side of gt_pred are the prediction, so only the sides that are the same records
+    # are compared.
+    same_side = {"gt_obs": ("trials", "gt", "obs"), "gt_pred": ("trials", "gt"), "pred_obs": ("trials", "obs")}
+    for comp in cell.comparisons:
+        first = cell.det_by[comp][PRIMARY_SCOPE]["excluded"]
+        for scope in cell.det_by[comp]:
+            if cell.det_by[comp][scope]["excluded"] != first:
+                raise ValueError("%s: the exclusions of %s differ between scopes" % (cell.src["e1_detection.json"], comp))
+        if any(first[k] != ex[k] for k in same_side[comp]):
+            raise ValueError("%s: the exclusions of %s differ from those of the primary comparison" % (
+                cell.src["e1_detection.json"], comp))
+    for kind, field in (("trials", "by_type"), ("gt", "by_reason"), ("obs", "by_reason")):
+        vals["%s.excluded.%s.n" % (lab, kind)] = {"text": fmt_int(ex[kind]["n"]), "value": ex[kind]["n"],
+                                                 "source": src_det(PRIMARY_SCOPE, "excluded", kind, "n")}
+        for reason, n in sorted(ex[kind][field].items()):
+            vals["%s.excluded.%s.%s" % (lab, kind, reason.replace("_", ""))] = {
+                "text": fmt_int(n), "value": n, "source": src_det(PRIMARY_SCOPE, "excluded", kind, field, reason)}
+    same = cell.det_top.get("same_sessions_as_all")
+    vals[lab + ".samesessions"] = {"text": NO_VALUE if same is None else ("yes" if same else "no"), "value": same,
+                                   "source": "%s:same_sessions_as_all/%s" % (cell.src["e1_detection.json"], lab)}
     for scope in SCOPES:
-        name = "the primary scope (\\texttt{%s})" % tex_escape(scope) if scope == PRIMARY_SCOPE else \
-            "all trials (\\texttt{%s})" % tex_escape(scope)
-        lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
-                  "\\begin{longtable}{L{0.08}L{0.06}L{0.07}L{0.08}L{0.06}L{0.17}L{0.17}L{0.10}L{0.10}L{0.10}}\n",
-                  "\\caption{Detection per stratum in %s, cell %s (definition \\texttt{%s}, comparison \\texttt{%s}), "
-                  "with Wilson intervals. Trials: trials kept in the scope; Sessions and Rows: the reference sessions "
-                  "and the session rows of the stratum that entered the matching; Merge rate: as registered; "
-                  "Corrected: the merge rate of the corrected analysis of deviation D10%s; %s: no value (no "
-                  "denominator, or a numerator above the denominator, deviation D10)}\\label{tab:strata-%s-%s}\\\\\n" % (
-                      name, tex_escape(cell.label), tex_escape(cell.definition), tex_escape(PRIMARY_COMPARISON),
-                      "" if d10 is not None else " (not computed for this cell)", NO_VALUE, cell.label, scope),
-                  "\\toprule\n",
-                  "Scenario & Speed & Trials & Sessions & Rows & Recall & Precision & Split rate & Merge rate & "
-                  "Corrected \\\\\n",
-                  "\\midrule\n\\endhead\n"]
-        kept, _, _ = cell.kept_trials(scope)
-        strata = cell.detection_strata(scope)
-        corrected = d10_strata(d10[PRIMARY_COMPARISON], scope) if d10 is not None else {}
-        for k in sorted(kept, key=lambda k: (scenario_order(k[0]), SPEEDS.index(k[1]))):
-            if k not in strata:
-                why = "no trial in the scope" if kept[k] == 0 else "no session in the scope"
-                lines.append("%s & %s & %s & \\multicolumn{7}{l}{%s} \\\\\n" % (k[0], k[1], fmt_int(kept[k]), why))
-                continue
-            st = strata[k]
-            cor = fmt_p(corrected[k]["merge_rate"]["value"]) if k in corrected else NO_VALUE
-            lines.append(" & ".join([k[0], k[1], fmt_int(kept[k]), fmt_int(st["n_gt"]), fmt_int(st["n_obs"]),
-                                     ci_text(st["recall"]), ci_text(st["precision"]),
-                                     fmt_p(st["split_rate"]["value"]), fmt_p(st["merge_rate"]["value"]), cor])
-                         + " \\\\\n")
-        lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n"]
+        tag = "primary" if scope == PRIMARY_SCOPE else "all"
+        sw = cell.det[scope]["diagnostics"]["start_while_open"]
+        vals["%s.startwhileopen.%s" % (lab, tag)] = {"text": fmt_int(sw["n"]), "value": sw["n"],
+                                                     "source": src_det(scope, "diagnostics/start_while_open/n")}
+        z = cell.l1[scope]["zero_dwell_rows"]
+        vals["%s.zerodwell.%s" % (lab, tag)] = {
+            "text": "%s (%s of them false positives)" % (fmt_int(z["n"]), fmt_int(z["in_false_pos"])),
+            "value": [z["n"], z["in_pairs"], z["in_split"], z["in_merge"], z["in_false_pos"]],
+            "source": cell.path("e1_l1.json", scope, "zero_dwell_rows")}
+        tr = cell.l1[scope]["truncation"]
+        for k in ("n_long", "n_long_with_row", "n_long_excluded", "n_obs_over_limit", "n_obs_over_limit_false_pos"):
+            vals["%s.cutoff.%s.%s" % (lab, tag, k[2:].replace("_", ""))] = {
+                "text": fmt_int(tr[k]), "value": tr[k], "source": cell.path("e1_l1.json", scope, "truncation", k)}
+        cc = cell.l1[scope]["metrics"]["pooled"]["abandon_by_continued_commit"]
+        for side in ("with", "without"):
+            e = cc[side]
+            vals["%s.abandon.continued.%s.%s" % (lab, side, tag)] = {
+                "text": "%s (%s pairs)" % (est_ci(e["agree"], e["agree_ci"][0], e["agree_ci"][1]), fmt_int(e["n"])),
+                "value": [e["agree"]] + list(e["agree_ci"]) + [e["n"]],
+                "source": cell.path("e1_l1.json", scope, "metrics/pooled/abandon_by_continued_commit", side)}
+        vals["%s.abandon.continued.unknown.%s" % (lab, tag)] = {
+            "text": fmt_int(cc["n_unknown"]), "value": cc["n_unknown"],
+            "source": cell.path("e1_l1.json", scope, "metrics/pooled/abandon_by_continued_commit/n_unknown")}
+    for comp in cell.comparisons:
+        for scope in [s for s in STRATA_SCOPES if s in cell.det_by[comp]]:
+            p = cell.det_by[comp][scope]["metrics"]["pooled"]
+            base = "%s.pooled.%s.%s" % (lab, comp.replace("_", ""), scope.replace("_", ""))
+            src = "%s:cells/%s/%s/%s/%s/metrics/pooled" % (cell.src["e1_detection.json"], lab, cell.definition, comp,
+                                                           scope)
+            for m in ("recall", "precision", "split_rate", "merge_rate", "miss_rate", "false_pos_rate"):
+                vals["%s.%s" % (base, m.replace("_", ""))] = {"text": ci_text(p[m]),
+                                                              "value": [p[m]["value"], p[m]["lo"], p[m]["hi"]],
+                                                              "source": src + "/" + m}
+            vals[base + ".f1"] = {"text": fmt_p(p["f1"]["value"]), "value": p["f1"]["value"], "source": src + "/f1"}
+            vals[base + ".sessions"] = {"text": fmt_int(p["n_gt"]), "value": p["n_gt"], "source": src + "/n_gt"}
+            vals[base + ".rows"] = {"text": fmt_int(p["n_obs"]), "value": p["n_obs"], "source": src + "/n_obs"}
+    pred = cell.det_top.get("predictions") or {}
+    if pred.get("available"):
+        psrc = "%s:predictions/%s" % (cell.src["e1_detection.json"], lab)
+        for k, v in sorted(pred["counts"].items()):
+            vals["%s.pred.rows.%s" % (lab, k)] = {"text": fmt_int(v), "value": v, "source": psrc + "/counts/" + k}
+        for k, v in sorted(pred["trials"].items()):
+            if k != "by_stratum":
+                vals["%s.pred.trials.%s" % (lab, k.replace("n_", "", 1).replace("_", ""))] = {
+                    "text": fmt_int(v), "value": v, "source": psrc + "/trials/" + k}
+    wd = cell.det_top.get("windows_diagnostics")
+    if wd is not None:
+        wsrc = "%s:windows_diagnostics/%s" % (cell.src["e1_detection.json"], lab)
+        for k, v in sorted(wd["observed_rows_dwell_ms"].items()):
+            vals["%s.win.rows.%s" % (lab, k.replace("_", ""))] = {"text": fmt_int(v), "value": v,
+                                                                 "source": wsrc + "/observed_rows_dwell_ms/" + k}
+        for k, v in sorted(wd["s4_session_end_after_escape"].items()):
+            vals["%s.win.s4.escape%s" % (lab, k)] = {"text": fmt_int(v), "value": v,
+                                                    "source": wsrc + "/s4_session_end_after_escape/" + k}
+        nolen = wd["tsf_end_without_result_len"]
+        vals[lab + ".win.endsnolength"] = {
+            "text": ", ".join("%s in %s" % (fmt_int(nolen[s]), s) for s in sorted(nolen, key=scenario_order)) or "none",
+            "value": nolen, "source": wsrc + "/tsf_end_without_result_len"}
+    lt = cell.det_top.get("long_trials_from")
+    if lt is not None:
+        lsrc = "%s:long_trials_from/%s" % (cell.src["e1_detection.json"], lab)
+        for k, v in sorted(lt["total"].items()):
+            vals["%s.win.long.%s" % (lab, k.replace("n_", "", 1).replace("_", ""))] = {
+                "text": fmt_int(v), "value": v, "source": lsrc + "/total/" + k}
+        vals[lab + ".win.long.bandms"] = {"text": fmt_int(lt["band_ms"]), "value": lt["band_ms"],
+                                          "source": lsrc + "/band_ms"}
+    return vals
+
+
+def table_strata(cell, d10=None):
+    """One landscape long table per comparison and scope of the detection results (the supplement loads pdflscape and
+    longtable). The last column is the merge rate of the corrected analysis of deviation D10, next to the registered
+    one. The trials kept per stratum are known for the two scopes of question 3 (from its per-trial records); in the
+    other scopes the strata are those of the detection results."""
+    lines = [GENERATED_NOTE]
+    for comp in cell.comparisons:
+        for scope in [s for s in STRATA_SCOPES if s in cell.det_by[comp]]:
+            lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
+                      "\\begin{longtable}{L{0.08}L{0.06}L{0.07}L{0.08}L{0.06}L{0.17}L{0.17}L{0.10}L{0.10}L{0.10}}\n",
+                      "\\caption{Detection per stratum in %s, cell %s (definition \\texttt{%s}, comparison \\texttt{%s}), "
+                      "with Wilson intervals. Trials: trials kept in the scope (%s); Sessions and Rows: the reference "
+                      "sessions (or predicted rows) and the session rows of the stratum that entered the matching; Merge "
+                      "rate: as registered; Corrected: the merge rate of the corrected analysis of deviation D10%s; %s: "
+                      "no value (no denominator, or a numerator above the denominator, deviation D10)}"
+                      "\\label{tab:strata-%s-%s-%s}\\\\\n" % (
+                          scope_name(scope), tex_escape(cell.label), tex_escape(cell.definition), tex_escape(comp),
+                          "from the per-trial records of question 3" if scope in SCOPES else
+                          "not given for this scope", "" if d10 is not None else " (not computed for this cell)",
+                          NO_VALUE, cell.label, comp.replace("_", ""), scope.replace("_", "")),
+                      "\\toprule\n",
+                      "Scenario & Speed & Trials & Sessions & Rows & Recall & Precision & Split rate & Merge rate & "
+                      "Corrected \\\\\n",
+                      "\\midrule\n\\endhead\n"]
+            strata = cell.detection_strata(scope, comp)
+            kept = cell.kept_trials(scope)[0] if scope in SCOPES else dict((k, None) for k in strata)
+            corrected = d10_strata(d10[comp], scope) if d10 is not None else {}
+            for k in sorted(kept, key=lambda k: (scenario_order(k[0]), SPEEDS.index(k[1]))):
+                trials = NO_VALUE if kept[k] is None else fmt_int(kept[k])
+                if k not in strata:
+                    why = "no trial in the scope" if kept[k] == 0 else "no session in the scope"
+                    lines.append("%s & %s & %s & \\multicolumn{7}{l}{%s} \\\\\n" % (k[0], k[1], trials, why))
+                    continue
+                st = strata[k]
+                cor = fmt_p(corrected[k]["merge_rate"]["value"]) if k in corrected else NO_VALUE
+                lines.append(" & ".join([k[0], k[1], trials, fmt_int(st["n_gt"]), fmt_int(st["n_obs"]),
+                                         ci_text(st["recall"]), ci_text(st["precision"]),
+                                         fmt_p(st["split_rate"]["value"]), fmt_p(st["merge_rate"]["value"]), cor])
+                             + " \\\\\n")
+            lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n"]
     return "".join(lines)
 
 
@@ -1552,6 +1747,7 @@ def build(results_dir):
         values.update(comparison_values(cell))
         values.update(reference_values(cell, clocks[cell.label]))
         values.update(timing_values(cell))
+        values.update(diagnostic_values(cell))
         values.update(d10_values(cell, d10[cell.label]))
         values.update(l2_values(cell))
         values.update(open_set_values(cell, open_docs[cell.label]))
@@ -1573,12 +1769,14 @@ def build(results_dir):
         "table-key-timing.tex": table_key_timing(cells, "observation", "tab:key-timing").encode("utf-8"),
         "reference-strata.tex": reference_supplement(cells, clocks).encode("utf-8"),
         "detection-layers.tex": table_layers(cells, d10).encode("utf-8"),
+        "session-strata.tex": session_supplement(cells).encode("utf-8"),
     }
     strata = [GENERATED_NOTE, "\\section*{Detection per stratum}\n\\label{sec:supp-strata}\n\n",
               "The tables below are generated from the result files of the analysis. The cells whose result files were "
               "not available when the tables were generated are: %s.\n\n" % (
                   ", ".join(tex_escape(c) for c in EXPECTED_CELLS if c not in [x.label for x in cells]) or "none")]
     for cell in cells:
+        strata.append(table_composition(cell))
         strata.append(table_strata(cell, d10[cell.label]).replace(GENERATED_NOTE, ""))
     files["detection-strata.tex"] = "".join(strata).encode("utf-8")
     return files
@@ -1734,11 +1932,23 @@ def _fixture(tmp, label="windows-test", sub="windows"):
     focus_a = {"n_trials": 2, "n_rows": 5, "n_false_pos": 2, "by_speed": {"mid": {"n_trials": 2, "n_rows": 5,
                                                                                     "n_false_pos": 2}}}
 
-    def det_scope(strata, carry, focus=None, layers=None):
+    def pooled(r):
+        """Pooled detection measures around r, distinct per comparison and scope."""
+        e = _stratum("S1", "fast", 200, int(200 * r), r - 0.05, r + 0.05)
+        e["stratum"] = "all"
+        for m in ("miss_rate", "false_pos_rate"):
+            e[m] = {"value": 1 - r, "lo": 1 - r - 0.05, "hi": 1 - r + 0.05, "n": 200, "x": 200 - int(200 * r)}
+        e["f1"] = {"value": r, "lo": None, "hi": None, "n": 200, "x": int(200 * r), "note": "no interval"}
+        return e
+
+    def det_scope(strata, carry, focus=None, layers=None, r=0.9):
         return {"metrics": {"by_stratum": strata + [{"stratum": {"cell": "c", "scenario": None, "speed": None},
-                                                      "n_gt": 0, "n_obs": 3}]},
-                "excluded": {"trials": {"by_type": {"carry_over": carry}, "n": carry}},
-                "config": {"theta": 0.5}, "focus_loss": focus or focus_u, "diagnostics": {"prediction_layers": layers}}
+                                                      "n_gt": 0, "n_obs": 3}], "pooled": pooled(r)},
+                "excluded": {"trials": {"by_type": {"carry_over": 1}, "n": 1},
+                             "gt": {"by_reason": {"carry_over": 2}, "n": 2},
+                             "obs": {"by_reason": {"carry_over": 1}, "n": 1}},
+                "config": {"theta": 0.5}, "focus_loss": focus or focus_u,
+                "diagnostics": {"prediction_layers": layers, "start_while_open": {"n": 3 + carry, "by_stratum": []}}}
 
     det_u = [_stratum("S1", "fast", 75, 70, 0.85, 0.97), _stratum("S1", "mid", 30, 22, 0.60, 0.86),
              _stratum("S1", "slow", 29, 20, 0.10, 0.99)]
@@ -1789,19 +1999,40 @@ def _fixture(tmp, label="windows-test", sub="windows"):
     kept_a = dict((k, 75) for k in keys)
     kept_a[("S1", "mid")] = 74
 
-    def l1_scope(biases):
-        out = []
-        for sp, (b, lo, hi) in biases.items():
-            out.append({"stratum": {"cell": "c", "speed": sp},
-                        "dwell": {"bias_ci": [lo, hi], "bland_altman": {"bias": b, "loa_lo": b - 900, "loa_hi": b + 900,
-                                                                          "n": 50, "sd": 450},
-                                  "mae": 300.0, "n": 50},
-                        "abandon": {"agree": 0.9, "agree_ci": [0.8, 0.95], "kappa": None, "kappa_ci": [None, None]},
-                        "nav": {"exact": 1.0, "exact_ci": [0.93, 1.0], "n": 50}})
-        return {"metrics": {"by_speed": out}, "oracle": _oracle_report()}
+    def l1_entry(stratum, b, lo, hi):
+        """One entry of question 2, with intervals on the bias, both limits and the median absolute difference."""
+        return {"stratum": stratum,
+                "dwell": {"bias_ci": [lo, hi], "bland_altman": {"bias": b, "loa_lo": b - 900, "loa_hi": b + 900,
+                                                                  "n": 50, "sd": 450},
+                          "loa_lo_ci": [b - 950, b - 850], "loa_hi_ci": [b + 850, b + 950], "mae": 300.0,
+                          "mae_ci": [250.0, 350.0], "n": 50},
+                "abandon": {"agree": 0.9, "agree_ci": [0.8, 0.95], "kappa": None, "kappa_ci": [None, None]},
+                "nav": {"exact": 1.0, "exact_ci": [0.93, 1.0], "n": 50},
+                "abandon_by_continued_commit": {
+                    "with": {"agree": 0.75, "agree_ci": [0.6, 0.85], "kappa": None, "kappa_ci": [None, None], "n": 20},
+                    "without": {"agree": 0.95, "agree_ci": [0.9, 0.98], "kappa": None, "kappa_ci": [None, None],
+                                "n": 30},
+                    "n_unknown": 1}}
+
+    def l1_scope(biases, zero=0):
+        by_speed = [l1_entry({"cell": "c", "speed": sp}, b, lo, hi) for sp, (b, lo, hi) in biases.items()]
+        strata = [l1_entry({"cell": "c", "scenario": "S1", "speed": sp}, b + 1.0, lo, hi)
+                  for sp, (b, lo, hi) in biases.items()]
+        return {"metrics": {"by_speed": by_speed, "by_stratum": strata,
+                            "pooled": l1_entry("all", -400.0 - zero, -450.0, -350.0)},
+                "oracle": _oracle_report(),
+                "zero_dwell_rows": {"n": 2 + zero, "in_pairs": 0, "in_split": 0, "in_merge": 0, "in_false_pos": 2 + zero,
+                                    "by_stratum": []},
+                "truncation": {"limit_ms": 20000, "n_long": 4 + zero, "n_long_with_row": 1, "n_long_excluded": 0,
+                               "n_obs_over_limit": 2 + zero, "n_obs_over_limit_false_pos": 1, "by_stratum": [],
+                               "with_row_gt_dwell_ms": []}}
 
     cells_det = {defn: {PRIMARY_COMPARISON: {"under_limit": det_scope(det_u, 1),
-                                             "all_trials": det_scope(det_a, 1, focus_a)}}}
+                                             "all_trials": det_scope(det_a, 1, focus_a, r=0.8)}}}
+    l1_u = {"slow": (-900.4, -1050.6, -800.2), "mid": (-500.0, -600.0, -400.0), "fast": (-100.0, -150.0, -49.5)}
+    l1_a = {"slow": (-2000.0, -2500.0, -1500.0), "mid": (-500.0, -600.0, -400.0), "fast": (-100.0, -150.0, -50.0)}
+    cells_l1 = {defn: {PRIMARY_COMPARISON: {"under_limit": l1_scope(l1_u), "all_trials": l1_scope(l1_a, 5)}}}
+    top = {"same_sessions_as_all": {label: not sub}}
     if not sub:
         # macOS: the primary comparison also under over_limit, the comparisons with the prediction with other
         # intervals, and the layers of the prediction in every comparison and scope.
@@ -1813,27 +2044,48 @@ def _fixture(tmp, label="windows-test", sub="windows"):
         prim_blk = cells_det[defn][PRIMARY_COMPARISON]
         prim_blk["under_limit"]["diagnostics"]["prediction_layers"] = _layers(0.0, novalue=True)
         prim_blk["all_trials"]["diagnostics"]["prediction_layers"] = _layers(0.01)
-        prim_blk["over_limit"] = det_scope(over, 0, None, _layers(0.02))
+        prim_blk["over_limit"] = det_scope(over, 0, None, _layers(0.02), r=0.3)
         for comp, (strata_u, shift) in pred.items():
             cells_det[defn][comp] = {
-                "under_limit": det_scope(strata_u, 1, None, _layers(shift)),
+                "under_limit": det_scope(strata_u, 1, None, _layers(shift), r=0.7 + shift),
                 "all_trials": det_scope([dict(s, stratum=dict(s["stratum"])) for s in det_a], 1, focus_a,
-                                        _layers(shift + 0.01)),
+                                        _layers(shift + 0.01), r=0.6 + shift),
                 "over_limit": det_scope(over, 0, None, _layers(shift + 0.02, drop=("none", "fast")
-                                                               if comp == "pred_obs" else None))}
-    cells_l1 = {defn: {PRIMARY_COMPARISON: {
-        "under_limit": l1_scope({"slow": (-900.4, -1050.6, -800.2), "mid": (-500.0, -600.0, -400.0),
-                                 "fast": (-100.0, -150.0, -49.5)}),
-        "all_trials": l1_scope({"slow": (-2000.0, -2500.0, -1500.0), "mid": (-500.0, -600.0, -400.0),
-                                "fast": (-100.0, -150.0, -50.0)})}}}
+                                                               if comp == "pred_obs" else None), r=0.2 + shift)}
+            cells_l1[defn][comp] = {"under_limit": l1_scope(dict((s, (b + 10 * shift, lo, hi))
+                                                                  for s, (b, lo, hi) in l1_u.items())),
+                                    "all_trials": l1_scope(l1_a, 7)}
+        top["predictions"] = {label: {
+            "available": True, "counts": {"open": 1, "row": 300, "truncated": 4},
+            "trials": {"n": 450, "n_long": 6, "n_carried_out": 3, "n_received_carry": 3, "n_closing_key_in_reading": 9,
+                       "n_none": 430, "n_split": 2, "by_stratum": []},
+            "composition": [{"scenario": sc, "speed": sp, "scope": scope, "n_trials": 75,
+                             "letter_keys": {"n": 75, "min": 4, "median": 10 + i, "max": 20},
+                             "think_ms": {"n": 75, "min": 200, "median": 1500 + 100 * i, "max": 19000}}
+                            for sc in ("S1", "S2") for sp in SPEEDS
+                            for i, scope in enumerate(("all_trials", "over_limit", "under_limit"))]}}
+    else:
+        cells_det[defn][PRIMARY_COMPARISON]["over_limit"] = det_scope([_stratum("S1", "slow", 46, 10, 0.1, 0.4)], 0,
+                                                                      r=0.3)
+        cells_det[defn][PRIMARY_COMPARISON]["under_limit_gt_duration"] = det_scope(det_u, 1, r=0.85)
+        top["predictions"] = {label: {"available": False, "reason": "no prediction for this system"}}
+        top["windows_diagnostics"] = {label: {"observed_rows_dwell_ms": {"20000_to_24999": 3, "25000_or_more": 1},
+                                              "s4_session_end_after_escape": {"2": 5, "3": 70},
+                                              "tsf_end_without_result_len": {"S10": 4, "S2": 1}}}
+        top["long_trials_from"] = {label: {"band_ms": 1000, "limit_ms": 20000, "by_stratum": {},
+                                           "total": {"n_band": 6, "n_differ": 2, "n_long": 617, "n_long_gt": 615,
+                                                     "n_trials": 2925}}}
     cells_l2 = {defn: {PRIMARY_COMPARISON: {"under_limit": l2_scope(kept_u, oos_u, excl),
                                             "all_trials": l2_scope(kept_a, {}, excl)}}}
     # over all trials another value, so that reading the wrong scope shows
     cells_l2[defn][PRIMARY_COMPARISON]["all_trials"]["agreement_by_stratum"]["slow"]["mean_dwell_ms"] = \
         _agreement(-4321.0, True)
     for name, cells in (("e1_detection.json", cells_det), ("e1_l1.json", cells_l1), ("e1_l2.json", cells_l2)):
+        doc = {"primary": prim, "cells": {label: cells}}
+        if name == "e1_detection.json":
+            doc.update(top)
         with open(os.path.join(d, name), "wb") as f:
-            f.write(json.dumps({"primary": prim, "cells": {label: cells}}).encode("utf-8"))
+            f.write(json.dumps(doc).encode("utf-8"))
     with open(os.path.join(d, DELIVERY_FILE), "wb") as f:
         f.write(json.dumps({"cells": {label: _delivery()}}).encode("utf-8"))
     return tmp
@@ -2069,6 +2321,39 @@ def _selftest_reference(check):
               "loss of focus",
               "S1 & fast & 75 & 3 (0.040 [0.000, 0.090]) & 2 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\\\" in sup
               and "S1 & mid & 75 & 0 (0.000 [0.000, 0.050]) & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 2 \\\\" in sup, sup[:2500])
+        t9 = files["table-session.tex"].decode("utf-8")
+        check("table 9: the bias, both limits and the median absolute difference each carry their own interval",
+              "windows-test & slow & 50 & $-$900 [$-$1,051, $-$800] & $-$1,800 [$-$1,850, $-$1,750] & 0 [$-$50, 50] & "
+              "300 [250, 350] & 0.900 [0.800, 0.950] & %s & 1.000 [0.930, 1.000] \\\\" % NO_VALUE in t9, t9[-1200:])
+        st = files["detection-strata.tex"].decode("utf-8")
+        check("strata: every scope of the detection results has its table, and the trials are not given where question "
+              "3 does not count them",
+              "\\label{tab:strata-windows-test-gtobs-underlimitgtduration}" in st
+              and "\\label{tab:strata-windows-test-gtobs-overlimit}" in st
+              and "S1 & slow & %s & 46 & 46 & " % NO_VALUE in st
+              and "which the analysis of cell windows-test does not compute" in st, st[:1500])
+        check("diagnostics: exclusions by reason, the two definitions, rows of zero duration and the cut-off per scope",
+              vals["windows-test.excluded.gt.carryover"]["value"] == 2 and vals["windows-test.excluded.obs.n"]["value"] == 1
+              and vals["windows-test.samesessions"]["text"] == "no"
+              and vals["windows-test.zerodwell.all"]["value"][0] == 7 and vals["windows-test.zerodwell.primary"]["value"][0] == 2
+              and vals["windows-test.cutoff.all.obsoverlimit"]["value"] == 7
+              and vals["windows-test.cutoff.primary.longwithrow"]["value"] == 1,
+              str([k for k in vals if ".excluded." in k or ".cutoff." in k][:8]))
+        check("diagnostics: the agreement of abandon split by continued commits, and the pooled measures per scope",
+              vals["windows-test.abandon.continued.with.primary"]["text"] == "0.750 [0.600, 0.850] (20 pairs)"
+              and vals["windows-test.abandon.continued.unknown.all"]["value"] == 1
+              and vals["windows-test.pooled.gtobs.underlimit.recall"]["value"][0] == 0.9
+              and vals["windows-test.pooled.gtobs.alltrials.recall"]["value"][0] == 0.8
+              and vals["windows-test.pooled.gtobs.underlimitgtduration.f1"]["text"] == "0.850",
+              str(vals.get("windows-test.pooled.gtobs.underlimit.recall")))
+        check("diagnostics: the Windows rows of 20 to 25 and of 25 seconds or more, the Escapes of S4, the ends without a "
+              "length by scenario, and the long trials of the two sources",
+              vals["windows-test.win.rows.20000to24999"]["value"] == 3 and vals["windows-test.win.rows.25000ormore"]["value"] == 1
+              and vals["windows-test.win.s4.escape3"]["value"] == 70
+              and vals["windows-test.win.endsnolength"]["text"] == "1 in S2, 4 in S10"
+              and vals["windows-test.win.long.long"]["value"] == 617 and vals["windows-test.win.long.longgt"]["value"] == 615
+              and vals["windows-test.win.long.differ"]["value"] == 2,
+              str([k for k in vals if ".win." in k]))
         cs = os.path.join(tmp, "windows", clock_sync_name("windows-test"))
         with open(cs, "wb") as f:
             f.write(json.dumps(_clock_doc()).encode("utf-8"))
@@ -2130,6 +2415,28 @@ def _selftest_macos(check):
               and vals["macos-test.predobs.primary.precision.range"]["value"] == [0.81, 0.99]
               and "macos-test.gtobs.primary.recall.range" not in vals,
               str(vals.get("macos-test.gtpred.primary.recall.range")))
+        ss = files["session-strata.tex"].decode("utf-8")
+        check("session strata: every comparison and both scopes, each from its own results, with the rows per speed "
+              "and the pooled row",
+              ss.count("\\begin{longtable}") == 6 and "\\label{tab:session-macos-test-gtpred-underlimit}" in ss
+              and ss.find("tab:session-macos-test-gtobs-underlimit") < ss.find("S1 & slow & 50 & $-$899 [")
+              < ss.find("tab:session-macos-test-gtpred-underlimit") < ss.find("S1 & slow & 50 & $-$898 [")
+              and "all & slow & 50 & $-$900 [" in ss and "pooled &  & 50 & $-$400 [" in ss
+              and "pooled &  & 50 & $-$405 [" in ss, ss[:2000])
+        st = files["detection-strata.tex"].decode("utf-8")
+        check("strata: the composition of the scopes from the plan, in the order of the scopes, and the comparisons "
+              "with the prediction in every scope",
+              st.find("S1 & slow & \\texttt{under\\_limit} & 75 & 12 (4 to 20) & 1{,}700 (200 to 19{,}000)")
+              < st.find("S1 & slow & \\texttt{over\\_limit} & 75 & 11 (4 to 20)") and "tab:composition-macos-test" in st
+              and "\\label{tab:strata-macos-test-predobs-overlimit}" in st
+              and st.find("tab:strata-macos-test-gtpred-underlimit") < st.find("S1 & fast & 75 & 75 & 75 & 0.800 [0.700, "
+                                                                               "0.800]"), st[:1500])
+        check("diagnostics: the summary of the prediction and the pooled measures of every comparison and scope",
+              vals["macos-test.pred.trials.long"]["value"] == 6 and vals["macos-test.pred.rows.truncated"]["value"] == 4
+              and vals["macos-test.samesessions"]["text"] == "yes"
+              and abs(vals["macos-test.pooled.gtpred.overlimit.recall"]["value"][0] - 0.3) < 1e-9
+              and "macos-test.win.rows.25000ormore" not in vals,
+              str(vals.get("macos-test.pooled.gtpred.overlimit.recall")))
         lay = files["detection-layers.tex"].decode("utf-8")
         check("layers: every comparison and scope, the four layers in the order of the registration with their "
               "trials, per speed and pooled, and the corrected column says that it was not computed",
@@ -2150,11 +2457,18 @@ def _selftest_macos(check):
                 blocks[comp][scope]["config"]["merge_recount"] = "obs"
         blocks[PRIMARY_COMPARISON]["under_limit"]["diagnostics"]["prediction_layers"]["received_carry"]["by_speed"][0][
             "merge_rate"] = {"value": 0.5, "lo": 0.1, "hi": 0.9, "n": 4, "x": 2}
+        blocks["gt_pred"]["under_limit"]["metrics"]["by_stratum"][0]["merge_rate"] = {"value": 0.75, "lo": 0.3, "hi": 0.9,
+                                                                                       "n": 4, "x": 3}
         with open(os.path.join(d10d, "e1_detection.json"), "wb") as f:
             f.write(json.dumps(cor).encode("utf-8"))
         files = build(tmp)
         lay = files["detection-layers.tex"].decode("utf-8")
         vals = json.loads(files["values.json"].decode("utf-8"))["values"]
+        st = files["detection-strata.tex"].decode("utf-8")
+        i_pred = st.find("tab:strata-macos-test-gtpred-underlimit")
+        check("strata: the corrected merge rate is that of the same comparison",
+              st.count("& 0.000 & 0.750 \\\\") == 1 and i_pred < st.find("& 0.000 & 0.750 \\\\")
+              < st.find("tab:strata-macos-test-gtpred-alltrials"), st[i_pred:i_pred + 1200])
         check("layers: the corrected merge rate stands next to the registered one, from the same comparison, scope, "
               "layer and speed",
               "received carry (11) & slow & 40 & 40 & 0.525 [0.310, 0.700] & 0.525 [0.310, 0.700] & 0.000 & %s & "
@@ -2167,6 +2481,37 @@ def _selftest_macos(check):
         _expect_stop(check, "d10: negative: a corrected comparison or scope without the switch stops", tmp)
         shutil.rmtree(d10d)
         detp = os.path.join(tmp, "e1_detection.json")
+        good_det = load(detp)
+        _rewrite(detp, lambda doc: doc["cells"]["macos-test"]["macos_def"]["gt_pred"]["over_limit"]["excluded"][
+            "obs"].update({"n": 9}))
+        _expect_stop(check, "diagnostics: negative: exclusions that differ between comparisons or scopes stop", tmp)
+
+        def side(kind, n):
+            def edit(doc):
+                for blk in doc["cells"]["macos-test"]["macos_def"]["pred_obs"].values():
+                    blk["excluded"][kind]["n"] = n
+            return edit
+        with open(detp, "wb") as f:
+            f.write(json.dumps(good_det).encode("utf-8"))
+        _rewrite(detp, side("gt", 5))
+        try:
+            ok = "macos-test.excluded.gt.n" in json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+        except ValueError as e:
+            ok = repr(e)
+        check("diagnostics: the first side of pred_obs (the prediction) may exclude other rows than the reference",
+              ok is True, str(ok))
+        with open(detp, "wb") as f:
+            f.write(json.dumps(good_det).encode("utf-8"))
+        _rewrite(detp, side("trials", 9))
+        _expect_stop(check, "diagnostics: negative: trials excluded differently in another comparison stop", tmp)
+        with open(detp, "wb") as f:
+            f.write(json.dumps(good_det).encode("utf-8"))
+        l1p = os.path.join(tmp, "e1_l1.json")
+        good_l1 = load(l1p)
+        _rewrite(l1p, lambda doc: doc["cells"]["macos-test"]["macos_def"].pop("pred_obs"))
+        _expect_stop(check, "session strata: negative: per-session results without a comparison of the detection "
+                            "results stop", tmp)
+        # Both files without pred_obs: only the check of the comparisons of the system can stop it.
         _rewrite(detp, lambda doc: doc["cells"]["macos-test"]["macos_def"].pop("pred_obs"))
         _expect_stop(check, "table 8: negative: a macOS cell without a comparison of the registration stops", tmp)
     finally:
@@ -2327,7 +2672,7 @@ def selftest():
         reg = load(os.path.join(tmp, "windows", "e1_detection.json"))
         cor = json.loads(json.dumps(reg))
         blk = cor["cells"]["windows-test"]["windows_def"][PRIMARY_COMPARISON]
-        for scope in SCOPES:
+        for scope in blk:
             blk[scope]["config"]["merge_recount"] = "obs"
         blk["under_limit"]["metrics"]["by_stratum"][0]["merge_rate"] = {"value": 0.25, "lo": 0.1, "hi": 0.5, "n": 4,
                                                                          "x": 1}
