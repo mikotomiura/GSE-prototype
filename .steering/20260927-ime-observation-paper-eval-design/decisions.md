@@ -1658,3 +1658,13 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - ⚠️ **宣言の「The author reviewed … and is accountable」は、投稿の前に研究者が読んで直す段（上の (2)）を済ませて初めて事実になる**。引き継ぎの段に入れた。
 - **検証**: `build.sh` main エラー 0・未定義の参照 0・生成されていない値 0・overfull 0・BibTeX の警告 0。表紙を画像で確かめた。文体の検査 違反 0。残る `\tbd` は M12 のもの（データと release の DOI・repo の URL・外枠の公開 commit・表 1 の版・寄託の欄）だけ。
 - **影響範囲**: `manuscript/main.tex`（表紙）・`sections/declarations.tex`・`figures/components.tex`・`manuscript/tools/results_tables.py`・`manuscript/generated/fig-*.tex`・本ファイル・引き継ぎ `next-session-ime-paper-manuscript-2.md`。
+
+## 判断 186: AI Declaration を記録どおりの文に直す —— コードの確認は道具とテスト、設計と設定は提案と承認で書く（2026-10-05・G-GEAR・研究者の選択〔2 問〕とメインの選択〔残り〕・研究者が覆せる）
+
+- **背景**: 判断 185 の追加分を code-reviewer に見せた（`1133af38..95351748`・10 ファイル・約 4 分・HIGH 2・MEDIUM 3・LOW 4）。Codex は今日の台帳が上限を超えている（310,956 / 300,000）ので回さず、Claude 単独に縮退した。
+- **一次で確かめたこと**: (1) 研究者がコードを読んだ記録は無い（コードの確認は selftest・変異・code-reviewer・security-checker・Codex だけ）。(2) 判断 98 は「研究者に問わずに決めたもの」（seed・止める規則など）、判断 86 は「メインの実装上の選択」（macOS の正解の定義）。(3) Co-Authored-By はロガーの履歴（`src-tauri/src`・`kit/`・最初の commit 2026-02-19）で Opus 4.6・4.8・5・5.5、Sonnet 4.6・5・5.5。ループの設定は worker = sonnet・watchdog = haiku。(4) 本文の「2.7 s」は `data.md` の記録から写した値（外枠の「the figures of the records … from data.md」）。
+- **研究者の選択（2 問とも推奨どおり）**: (H1) 「reviewed by the author」は記録どおりの文に直す → 宣言は「The code was checked by its tests and by the reviews named above」、図の題は「code written and reviewed with an AI tool (Claude) and checked by its tests; see the AI declaration」（図 1 は「code written with an AI tool (Claude)」）。(H2) 「decided by the author」は提案と承認で書く → 「The research questions are the author's. Parts of the design, of the analysis settings and of the text were proposed by Claude; the author chose among the options presented, checked and approved them, and froze the registrations.」。
+- **メインが直したもの（研究者の「すべて書く」の選択に沿う）**: 使い道に、2 つの登録・逸脱の記録・手順・外枠と節の下書き、登録と外枠の模擬査読、run の点検・寄託の梱包・解析の実行（著者の指示の下）を足した。値の出どころを「解析のコード（登録の解析・表の逸脱・exploratory と書いた解析）から生成され、記録の数（run の点検など）は run の記録から写した」に正した。外枠は「著者の外枠」ではなく Claude の下書きに含めた。kit の部品は「all the code」に。モデルの版と期間（Opus 4.6〜5.5・Sonnet 4.6〜5.5・Haiku 4.5・2026 年 2 月〜10 月）。CRediT に Validation・Resources・Project administration を足した。selftest に描いた図 5 の題の確認を足した（137 件・変異 25 本すべて赤）。⚠️ datasheet はまだ書いていないので宣言から外した —— 書いたら足す。
+- ⚠️ **後で事実になる文**: 「The interpretation of the results is the author's, and the author is accountable」は、投稿の前に研究者が結果・推奨・限界・結論を読んで直す段（判断 185 の (2)）を済ませて初めて事実になる。引き継ぎに書いた。
+- **検証**: `build.sh` main エラー 0・未定義の参照 0・生成されていない値 0・overfull 0・BibTeX の警告 0。文体の検査 違反 0。
+- **影響範囲**: `sections/declarations.tex`・`figures/components.tex`・`tools/results_tables.py`・`generated/fig-*.tex`・本ファイル・引き継ぎ `next-session-ime-paper-manuscript-2.md`。

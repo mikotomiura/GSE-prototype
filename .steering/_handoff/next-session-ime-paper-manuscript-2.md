@@ -1,7 +1,7 @@
 # 次セッション — IME 論文: 原稿の attack-me（stage `manuscript`）→ M12（Zenodo・GitHub の公開 repo）
 
 > 作成: 2026-10-05 夜（G-GEAR・図 1〜5〔判断 181〕、要旨と残りの節〔判断 182〕、完了時レビュー〔判断 183・184〕、PR を出したセッションの最後）。
-> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 145・146・150・167・175・181〜185**、
+> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 145・146・150・167・175・181〜186**、
 > 外枠 `papers/ime-observation/manuscript/outline.md`（Rule for the abstract・Claims and evidence・Open items）、凍結した事前登録（§6.1・§7・§10.11）・`deviations.md`（D1〜D10）・`data.md`・`data.windows.md`。状態は着手時に `git fetch` で測り直す。
 
 ## §0 打ち込む用
@@ -9,11 +9,11 @@
 ```
 git fetch → この枝（docs/ime-manuscript-outline）の PR の状態を gh pr view で確かめる（merge 済みなら main から新しい枝を切る）。
 .steering/_handoff/next-session-ime-paper-manuscript-2.md を読んで §2 を上から実行してください。
-一次は decisions.md の判断 145・146・150・167・175・181〜185、outline.md、凍結した事前登録、deviations.md（D1〜D10）、manuscript/tools/results_tables.py。
+一次は decisions.md の判断 145・146・150・167・175・181〜186、outline.md、凍結した事前登録、deviations.md（D1〜D10）、manuscript/tools/results_tables.py。
 ⚠️ 新しい計測はしない。凍結のタグのコードと事前登録は変えない。封印（sealed/）は寄託のためだけに開ける（解析しない）。生ログ・キーコードを原稿や外部の LLM に出さない。experiment/runs/ は git に入れない。
 ⚠️ 結果の値は \rv{<key>} と生成した表で読み、手で写さない。値を見た後で表の道具の規則を変えない（変えるなら研究者に聞く）。評価の語を使わない（登録 §6.1）。
 ⚠️ 公開物（papers/）は学術的な英語・GSE への言及なし・記号や口語なし・内部の番号（判断・M・issue）を書かない（D の番号は書いてよい）。_style_check.py を repo 直下から papers/ime-observation で回す。
-⚠️ 判断の番号は 186〜、逸脱は D11（他の枝が足していないか着手時に MSYS_NO_PATHCONV=1 git show で見る）。
+⚠️ 判断の番号は 187〜、逸脱は D11（他の枝が足していないか着手時に MSYS_NO_PATHCONV=1 git show で見る）。
 ⚠️ Zenodo: 下書きと DOI の予約は Claude が進めてよい・公開は都度研究者に確かめる・token は表示も委譲もしない（memory「Zenodo token」）。
 Skill: attack-me・verify-before-claiming・citation-ssot・reproducibility-discipline・subagent-delegation・git-workflow。応答は日本語。コミットは git add パス指定（-A 禁止）。
 ⚠️ heredoc・python -c・sed にバックスラッシュを含めない（このセッションで 6 回以上壊れた）→ 置換は Edit か、Write で書いたスクリプトで。git show <ref>:<path> は MSYS_NO_PATHCONV=1。
@@ -39,7 +39,7 @@ LaTeX（G-GEAR）: PATH="$HOME/AppData/Local/Programs/MiKTeX/miktex/bin/x64:$PAT
 0. **PR の状態**: CI が緑なら merge・main の CI を確かめる（git-workflow ルール 6）。赤なら 1 回だけ原因を見て報告。
 1. **原稿の attack-me**（stage `manuscript`・判断 145 の 10-18〜22 の枠を前倒し）: Skill `attack-me` の手順で、査読者 3 人＋意図の監査役（`paper-reviewer`・Opus）。外枠の round 1・2 の引き継ぎ（`.steering/.../attack-me/outline-ime-manuscript/round-1/`・`round-2/` の verdict と指摘の一覧）を渡す（判断 150-4）。⚠️ 渡すのは組んだ PDF ではなく `.tex` と生成物（値は `generated/values.tex`）。指摘は一次で裏取りしてから研究者に採否を聞く（査読の結果は研究の証拠ではない）。
 2. ✅ **表紙・Funding・利益相反・貢献**は判断 185 で埋めた（単著・Independent researcher, Hiroshima, Japan・資金なし・利益相反なし・住所と電話は投稿システムだけ）。AI Declaration と図の題の断りも入れた。
-   ★ **研究者が結果と考察を読んで直す段**（判断 185・Springer Nature の規程「the argument, interpretation, and conclusions must be author-led」）: attack-me の直しの後、投稿の前に、結果（§6〜9）・推奨・限界・結論を研究者が読み、主張と解釈を自分のものとして直す。Claude は節ごとに「主張 ↔ 根拠（登録の節・結果のファイル・表）」の対応を日本語で添えて渡す。⚠️ AI Declaration の「The author reviewed … and is accountable」はこの段を済ませて初めて事実になる。
+   ★ **研究者が結果と考察を読んで直す段**（判断 185・Springer Nature の規程「the argument, interpretation, and conclusions must be author-led」）: attack-me の直しの後、投稿の前に、結果（§6〜9）・推奨・限界・結論を研究者が読み、主張と解釈を自分のものとして直す。Claude は節ごとに「主張 ↔ 根拠（登録の節・結果のファイル・表）」の対応を日本語で添えて渡す。⚠️ AI Declaration の「The interpretation of the results is the author's, and the author is accountable」はこの段を済ませて初めて事実になる（判断 186 で、コードの確認は「テストと道具のレビュー」、設計と設定は「Claude の提案を著者が選び・確かめ・承認」と記録どおりに直した）。datasheet を Claude が書いたら、宣言の使い道に足す。
 3. **M12**（判断 145・146・167・183）:
    - Zenodo のデータセットの記録を**下書き**で作り DOI を予約（公開は研究者に確かめる）。中身は外枠 DS1・`dataset.tex` の表 13＋判断 183 の 4 点。寄託の前に各 run を `kit/analysis/pipeline.py --pack` と `--check-deposit` に通す（`data.md` の寄託の手順）。書庫は Mac の `~/ime-m4/deposit/`・Surface の `~/ime-m7/deposit/`（G-GEAR の `Downloads` に同じ SHA の写し）。
    - GitHub の公開 repo: 最初の commit は macOS の凍結の書き出し（判断 131・一覧の SHA-256 `29b183ba…`）、Windows の凍結の書き出しの一覧（`f61af353…`）も公開物から計算し直せる形にする（判断 145 の申し送り・外枠 Open items）。リリースと Zenodo の連携は研究者の GitHub アカウントで。

@@ -1870,8 +1870,8 @@ FIG_SET_SHIFTS = (-0.1, -0.06, -0.02, 0.02, 0.06, 0.1)
 FIG_NO_CELL = "No cell was measured when the figure was generated."
 # The disclosure that the publisher asks for in the caption of a figure made with the help of an AI tool; the AI
 # declaration of the manuscript gives the tools and the extent of their use.
-FIG_AI_NOTE = (". The figure is drawn from the result files by code written with the assistance of an AI tool and "
-               "reviewed by the author (AI declaration)")
+FIG_AI_NOTE = (". The figure is drawn from the result files by code written and reviewed with an AI tool (Claude) and "
+               "checked by its tests; see the AI declaration")
 # The lower edge of the logarithmic axis of Figure 5: an accuracy or a lower end of an interval below it (zero among
 # them, which a logarithmic axis cannot show) is drawn at the edge, and the caption says so.
 FIG_LOG_FLOOR = 0.0005
@@ -2946,6 +2946,8 @@ def _selftest_figures(check):
               "1148.15 0.89\\\\};" in f5 and "{x y\\\\11.4815 0.89\\\\11.4815 0.9\\\\11.4815 nan\\\\" in f5
               and "\\addplot[forget plot, fig set1, fig point] table[row sep=\\\\] {x y\\\\7.94328 0.89\\\\" in f5
               and "0.49" not in f5, f5[:2500])
+        check("figures: the drawn figure 5 also says in its caption that its code was written with an AI tool",
+              (FIG_AI_NOTE + "}") in f5)
         check("fig 5: the chance level 1/K and the margin 2/K are drawn",
               "\\addplot[forget plot, fig chance, domain=7:1500] {1/x};" in f5
               and "\\addplot[forget plot, fig margin, domain=7:1500] {2/x};" in f5)
