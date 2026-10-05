@@ -15,6 +15,7 @@ git fetch → 枝 origin/docs/ime-manuscript-outline から続ける（main に�
 ⚠️ 逸脱の次の番号は D8（D6 = macOS の晩・D7 = Windows の試行の数え方・判断 152）。他の枝が足していないか着手時に必ず見る。
 ⚠️ 凍結のタグのコードと事前登録は変えない。封印（sealed/）は開けない。生ログ・キーコードを原稿や外部の LLM に出さない。
 Skill: citation-ssot・verify-before-claiming・subagent-delegation・reproducibility-discipline・git-workflow（attack-me は原稿の段で）。
+§2 の 0（GSE 本体の訂正）は main から別の枝で行う（論文の枝に混ぜない・判断 151-2）。
 応答は日本語。コミットは git add パス指定（-A 禁止）。heredoc にバックスラッシュを含めない（Write / Edit を使う）。
 ```
 
@@ -29,11 +30,15 @@ Skill: citation-ssot・verify-before-claiming・subagent-delegation・reproducib
 
 ## §2 やること
 
-1. **結果の節の道具**: `manuscript/` に、結果の JSON（`experiment/results/` と `results/windows/`・`notes.md` が名指すファイル）から表と本文の値を生成する道具を作る（手で写さない）。まず Windows の結果で作り、macOS の結果が来たら同じ道具で足す。要旨と結論は外枠の「Rule for the abstract」（層は 30 試行以上・外した層の数・範囲と carry-over の割合・`all_trials`・Windows は別の構成概念・CPU は系ごと）。
-2. **研究者の判断待ち（他の枝で起票済み）を確かめてから書く**: 問 4 の閉じた集合の欠陥の直し方（逸脱 D8〜）、Windows の run の晩の扱い（`method.tex` の \tbd「The timing of the Windows runs, as recorded.」）、01:51 の開始の扱い（D7 で済んでいるか照合）、寄託。
-3. **Mac で**: AppKit と C の Accessibility の定数の数と `TextInputSources.h` を macOS 27.0.1 の SDK のヘッダで確かめる（外枠の Open items）。
-4. **Surface で**（研究者か Surface のセッション）: (a) Windows の試行 2 の間に計測機で何が動いていたか → `data.windows.md` と外枠 §5.2（macOS は `env.md` に CI の負荷が書かれた）。(b) `data.windows.md` の §10.8 の点検の計画の SHA-256 を全桁に。
-5. **別の小さなタスク**: GSE 本体の「macOS は公開 API が存在しない」を一次に戻す → `next-session-gse-macos-ax-correction.md`（判断 151-2）。
+0. **最初に片づける小さな別作業 —— GSE 本体の「macOS は公開 API が存在しない」を一次に戻す**（判断 151-2）。⚠️ **論文の枝には混ぜない**: `main` から別の枝（例 `docs/macos-ax-marked-text-correction`）を切り、`/start-task` で `.steering/` を作る（並行セッションがあれば `git worktree`）。
+   - 一次: (1) Apple の AppKit の Accessibility の定数に `textInputMarkedRangeAttribute`（変換中の範囲）と `NSAccessibilityTextInputMarkingSessionBegan` / `…Ended`（変換の開始・終了）がある（macOS 10.6 から・説明なし・`docs/references.md` [V224]・[V225]）。(2) WebKit のソース（[V206]・commit `1a5a134d`）が変換の開始・終了を 2 つの通知に写し、変換中の範囲を位置と長さで返す。(3) 内部の調査メモ `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 の「135 個でゼロ」は C の定数だけを数えていた（AppKit は属性 131・パラメータ付き 18・通知 42）。
+   - 手順: 消費者を grep で洗う（`公開 API が存在しない`・`公開 API が無い`・`no public interface` などを `docs/`・`.claude/`・`.steering/`・`src-tauri/src/` で。⚠️ 凍結物の事前登録は変えない）→ `docs/agent-shared.md` の技術的制約 7 の末尾（★ Codex も読む共通文書なので最小の変更）と調査メモ §3.2・§7.5・§7.6 を「アプリを問わない公開の経路は見つかっていない。アプリが用意する Accessibility の経路はあり、WebKit は出す（AppKit の NSTextView が出すかは未確認）」に直す。⚠️ 設計の結論（打鍵から推す）は変えない —— 変えるかは研究者。
+   - 完了時: `python scripts/check_citations.py`・code-reviewer ∥ security-checker ＋ /cross-review（パス限定）→ 出荷フロー（git-workflow ルール 6）。
+1. **LaTeX を入れてコンパイルする**（研究者の許可 2026-10-05）: G-GEAR に TeX の配布（例: `winget` で MiKTeX か TeX Live）を入れ、Springer Nature の雛形（`sn-jnl.cls`・`sn-apa.bst` ほか）を**公開物の外**に取得する（⚠️ 雛形のライセンスが CC BY 4.0 の公開物に入れられるかは未決〔判断 147 (b)〕→ 取得の手順だけを `manuscript/` に書く）。`main.tex` をコンパイルし、未定義のラベル（`fig:components`・`sec:availability`・`sec:limitations`・`sec:results-attempts`）以外の警告と、表の幅・`longtable`（補遺）・書誌の出力（APA）を直す。
+2. **結果の節の道具**: `manuscript/` に、結果の JSON（`experiment/results/` と `results/windows/`・`notes.md` が名指すファイル）から表と本文の値を生成する道具を作る（手で写さない）。まず Windows の結果で作り、macOS の結果が来たら同じ道具で足す。要旨と結論は外枠の「Rule for the abstract」（層は 30 試行以上・外した層の数・範囲と carry-over の割合・`all_trials`・Windows は別の構成概念・CPU は系ごと）。
+3. **研究者の判断待ち（他の枝で起票済み）を確かめてから書く**: 問 4 の閉じた集合の欠陥の直し方（逸脱 D8〜）、Windows の run の晩の扱い（`method.tex` の \tbd「The timing of the Windows runs, as recorded.」）、01:51 の開始の扱い（D7 で済んでいるか照合）、寄託。
+4. **Mac で**: AppKit と C の Accessibility の定数の数と `TextInputSources.h` を macOS 27.0.1 の SDK のヘッダで確かめる（外枠の Open items）。
+5. **Surface で**（研究者か Surface のセッション）: (a) Windows の試行 2 の間に計測機で何が動いていたか → `data.windows.md` と外枠 §5.2（macOS は `env.md` に CI の負荷が書かれた）。(b) `data.windows.md` の §10.8 の点検の計画の SHA-256 を全桁に。
 6. **出荷の判断**: Mac と Windows の計測は終わったので、この枝の PR を出せる状態か研究者に確かめる。出すなら完了時レビュー（code-reviewer ∥ security-checker ＋ /cross-review〔パス限定・`run-codex-review.sh -- <paths>`〕）→ git-workflow ルール 6。⚠️ Codex の前に origin/main の `.codex/budget.json` も見る（memory「台帳はブランチごと」）。
 7. 結果の節の後: 原稿の attack-me（stage `manuscript`・判断 145 の 10-18〜22）。外枠の round 1・2 の引き継ぎ（`verdict.md` の Y1〜Y44 と採否）と、このセッションの判断 151〜153 を渡す。
 
