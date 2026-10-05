@@ -1701,3 +1701,21 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 外枠の Open item「試行 2 の間に Surface で何が動いていたか」は `data.windows.md` の「What else ran on the measuring machine during attempt 2」に既に書かれていたのに、引き継ぎで未解決として渡した（Surface のセッションが書いた節を、外枠と引き継ぎに反映していなかった）。
 - **次**: 直す（表の道具〔Z2・Z6・Z38〕は selftest と変異で確かめる）→ 研究者が結果と考察を読んで直す段（Discussion を含む）→ round 2 を回すかは直した後に問う。
 - **影響範囲**: `papers/ime-observation/manuscript/`（節・表の道具・生成物・`references.bib`・`main.tex`）・`experiment/deviations.md`（D11）・投稿用のタイトル頁と組版（公開物の外）・本ファイル・`attack-me/manuscript-ime-observation/round-1/verdict.md` §7。
+- **実装（2026-10-06・G-GEAR・`08865d82`・`7629be4d`）**: 直した中身は `verdict.md` §8。表の道具（selftest 154 件・使い捨ての変異 13 本すべて赤）・探索的なスクリプト（Windows を G-GEAR で回した）・本文・D11・補遺の来歴の表・投稿用の組版とタイトル頁のひな形。
+
+## 判断 189: 判断 188 の直しの作業中の点検（code-reviewer ∥ security-checker）の指摘を一次で確かめて直す（2026-10-06・G-GEAR・メインの選択・研究者が覆せる）
+
+- **対象**: `f30a6e6c..7629be4d` の `papers/`。code-reviewer: HIGH 3・MEDIUM 4・LOW 9。security-checker: CRITICAL / HIGH / MEDIUM 0・LOW 4。
+- **一次で確かめて真だったもの（直した）**:
+  - H1: 「macOS の中央絶対差は数十 ms」は live off だけ（live on は 384・171・97 ms）→「どのセルと速さでも中央絶対差は一致の限界の幅の 1/10 未満」に（表 8 で確かめた）。
+  - H2: 「macOS のロガーと Windows の隠蔽の経路は S13 に行を書かない」は誤り（Windows の S13 には 58・80・77 本の行があり、対にならないだけ）→「どの行も S13 の会話と対にならなかった（macOS は打ち切りで行を書かない・Windows は 20 秒以上の行が無い）」に。§6 の打ち切りの段落も「20 秒以上の行を書かない」に。
+  - H3: D11 の影響の範囲の書き漏れ（補遺でさらに 8 つ）→ `deviations.md` に列挙。
+  - M1: live on の mid・fast は参照が 1 文だけ 1 と違い、ICC がほぼ 0（`e1_l2.json` で数えた）→ 基準は広げず §7 と D11 に開示。
+  - M2: 探索的な値の文に「主の範囲」を足した。macOS の値は Mac で回すまで `\tbd`（8 個）。
+  - M3: Windows の下端は recall と precision で場面が違う → 分けて書いた。
+  - M4・L5・security 1・2: 探索的なスクリプトに `--registered`（コミット済みの `e1_l1.json` と速さごとの dwell の n・n_zero_excluded・mae・bland_altman が一致することを要求）・書き出しの解析モジュールの SHA-256 の記録・`--out` と `--scratch`（このディレクトリの外・空）の確認を解析の前に・`open(..., "x")`・登録側の値が無いときに落ちない形。Windows を回し直した（値は同じ・記録の欄だけ増えた）。selftest 24 件。
+  - L1: 「ICC は 0」→「0（ロガーも一定なら定義されない）」。L2: 丸めて 0 の値に負号を付けない。L3: 補遺の速さをまとめた表にも注。L4: 範囲が 1 値でも単位。L6: 投稿用の bibtex の警告も数える。L7: 節の番号のコメント。L8: 「no_time 単独の攻撃と少なくとも同じだけ」。L9: §5 に表の比較の名前の対応。
+  - security 3: `build.sh` の出力先の検査を `papers/ime-observation` 全体に広げ、`.gitignore` に LaTeX の副産物。security 4: タイトル頁のひな形の空欄の印が消えたら `build.sh` が止まる。
+- **検証**: 表の道具の selftest 156 件・変異 13 本すべて赤。探索的なスクリプトの selftest 24 件。`build.sh --submission`: main・main-submission・補遺ともエラー 0・未定義の参照 0・生成されていない値は macOS の探索的な 8 個だけ・bibtex の警告 0・overfull は main 1（§4 の頁の 2.1 pt）。`build.sh` は `papers/ime-observation/experiment/` を出力先にすると拒む（試した）。文体の検査 違反 0・要旨 248 語。
+- ⚠️ **開示**: code-reviewer は「6 to 30 kana」の出典を探す grep で、`experiment/runs/windows-msime-tsf-2/plan.jsonl`（合成入力の計画・git の外）の数行を目にした（根拠には使っていない）。生ログ・封印物は開いていない。
+- **影響範囲**: `kit/analysis/explore_dwell_quantiles.py`・`experiment/results/exploratory/`・`manuscript/tools/results_tables.py`・`manuscript/generated/`・`manuscript/build.sh`・`papers/ime-observation/.gitignore`・`manuscript/sections/`（§5〜§8・§10〜§14 のコメント）・`experiment/deviations.md`・`verdict.md`。

@@ -171,11 +171,12 @@ and \rv{windows-msime-tsf.pooled.gtobs.alltrials.recall}.
 \paragraph{What sets the ends of the ranges.} In both macOS cells the lowest intervals of the primary scope belong to
 S6 and S10 at the fast speed, the two scenarios whose disagreement the registration expects from the logger's rules: in
 S6 the logger keeps the session open while Backspace deletes the reading, and in S10 it closes the session at Tab,
-which chooses a predictive candidate. On Windows the lowest belong to S8 at the fast speed, which chooses a candidate
-with a digit, and to S2 at the fast and the middle speed, which cycles the candidates. Over all trials
-the intervals of every cell start at zero because of S13, whose sessions were built to outlast the 20-s cut-off: the
-macOS logger and the cloaking path of the Windows logger write no row for them, and no stratum other than S13 has an
-interval that starts at zero. The strata left out of the ranges have fewer than 30 trials in the primary scope or no
+which chooses a predictive candidate. On Windows the lowest recall belongs to S8 at the fast speed, which chooses a
+candidate with a digit, with S2 and S1 at the fast speed close to it, and the lowest precision to S8 at the fast speed
+and to S2, which cycles the candidates, at the middle and the fast speed. Over all trials the intervals of every cell
+start at zero because of S13, whose sessions were built to outlast the 20-s cut-off: no row of the logger paired with
+one of them (the macOS logger cuts such a session off without a row, and on Windows no row lasted 20~s or more), and
+no stratum other than S13 has an interval that starts at zero. The strata left out of the ranges have fewer than 30 trials in the primary scope or no
 value there: the three strata of S13, which the scope sets aside entirely, in every cell; S6 at the slow speed with
 live conversion off; and S6 at the slow and the middle speed and S10 at the slow speed with it on. A miss can come from
 the timing of a row or from a difference between the lengths of the two constructs as well as from a session that the
@@ -228,7 +229,7 @@ agreed with the specified rows, which hold the sessions opened after a cut-off, 
 (\rv{windows-msime-tsf.win.rows.20000to24999}) or 25~s or more (\rv{windows-msime-tsf.win.rows.25000ormore}), so the
 rows give no indication of the window-event path or of its safety valve. That path has no cut-off at 20~s and would
 have written rows of more than 20~s for the sessions of S13, which outlast it; their absence is consistent with the
-cloaking path, which writes none, but does not show which path drove the input method. The plan made \rv{windows-msime-tsf.win.long.long}
+cloaking path, which writes no row of 20~s or more, but does not show which path drove the input method. The plan made \rv{windows-msime-tsf.win.long.long}
 of the \rv{windows-msime-tsf.win.long.trials} Windows trials long and the reference
 \rv{windows-msime-tsf.win.long.longgt}; the two classified \rv{windows-msime-tsf.win.long.differ} trials differently,
 and the reference session of \rv{windows-msime-tsf.win.long.band} trials lasted from 19 to 21~s. With the long trials
@@ -260,10 +261,11 @@ on Windows; over all trials, \rv{macos-standard-live-off.all.dwellbias.range},
 that the logger's duration was shorter than the reference's. Table~\ref{tab:session} gives the bias, the limits of
 agreement and the median absolute difference per speed, with the agreement of \texttt{abandon} and \texttt{nav};
 Figure~\ref{fig:dwell} shows the bias and the limits of agreement per stratum, and the supplement gives every stratum
-and the comparisons with the prediction. The differences have long tails: on macOS the median absolute difference was
-tens of milliseconds while the limits of agreement lay seconds apart, so the limits, which assume normally distributed
-differences, describe neither the typical pair nor the largest differences. In the exploratory analysis of their
-distribution (not registered; ranges over the speeds, every speed in the supplement), the fraction of pairs within
+and the comparisons with the prediction. The differences have long tails: in every cell and at every speed the median
+absolute difference was less than a tenth of the distance between the limits of agreement (Table~\ref{tab:session}), so
+the limits, which assume normally distributed differences, describe neither the typical pair nor the largest
+differences. In the exploratory analysis of their distribution in the primary scope (not registered; ranges over the
+speeds, every speed and scope in the supplement), the fraction of pairs within
 100~ms was \rv{macos-standard-live-off.dwellx.within100.range} with live conversion off,
 \rv{macos-standard-live-on.dwellx.within100.range} with it on and \rv{windows-msime-tsf.dwellx.within100.range} on
 Windows, and within 1~s \rv{macos-standard-live-off.dwellx.within1000.range},

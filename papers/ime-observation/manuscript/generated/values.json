@@ -3647,7 +3647,7 @@
   },
   "macos-standard-live-on.l2.conversions_per_trial.fast.icc": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/fast/conversions_per_trial/icc21_ci",
-   "text": "0.004 [$-$0.000, 0.015]",
+   "text": "0.004 [0.000, 0.015]",
    "value": [
     0.003707244811908469,
     -1.2787136144510675e-16,
@@ -3670,7 +3670,7 @@
   },
   "macos-standard-live-on.l2.conversions_per_trial.mid.icc": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/mid/conversions_per_trial/icc21_ci",
-   "text": "0.050 [$-$0.000, 0.169]",
+   "text": "0.050 [0.000, 0.169]",
    "value": [
     0.050218888895705,
     -1.595160419869822e-16,

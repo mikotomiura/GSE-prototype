@@ -11,7 +11,9 @@ every call of `l1.evaluate` is recorded. The pairs of the primary comparison (gr
 are those whose observation input has the SHA-256 of the run's `obs.jsonl`; the speed of a pair comes from the plan,
 as in `l1.py`. Before anything is written, the script recomputes, per speed, the number of pairs, the bias and the
 median absolute difference with the frozen `stats.py` and requires them to equal the values of the frozen `e1_l1.json`
-written in the scratch directory, so the pairs are those of the registered analysis.
+written in the scratch directory, and it requires the per-speed duration figures of that file to equal those of the
+registered result file of the article (`--registered`), so the pairs are those of the registered analysis. The output
+records the SHA-256 of every analysis module of the export it ran.
 
 Percentiles use linear interpolation between order statistics: for sorted values x[0..n-1] and probability p, the
 position is h = (n - 1) p, and the value is x[floor(h)] + (h - floor(h)) (x[floor(h) + 1] - x[floor(h)]). No interval
@@ -20,7 +22,8 @@ is computed. A pair whose observed `dwell_ms` is 0 is left out, as in the regist
 usage:
   python explore_dwell_quantiles.py --code <export of the freezing tag> --run <run directory> \\
       --config <experiment/config.json> --seed <n> --seed-file <experiment/SEED> --prereg <preregistration.md> \\
-      --scratch <directory outside the repository> --out <result file>
+      --registered <experiment/results/.../e1_l1.json> --scratch <empty directory outside this directory> \\
+      --out <result file>
   python explore_dwell_quantiles.py --selftest
 """
 
@@ -102,8 +105,8 @@ def reproduces(stats, pairs, entry):
     """Whether the pairs reproduce the registered n, bias and median absolute difference of a speed exactly."""
     obs = [o for o, _g in pairs]
     gt = [g for _o, g in pairs]
-    dw = entry["dwell"]
-    if len(obs) != dw["n"] or not obs:
+    dw = entry.get("dwell")
+    if not dw or len(obs) != dw["n"] or not obs:
         return False
     return (stats.bland_altman(obs, gt)["bias"] == dw["bland_altman"]["bias"]
             and stats.median_abs_error(obs, gt) == dw["mae"])
@@ -130,7 +133,41 @@ def select_primary(stats, candidates, reg_by, where):
     return good[0]
 
 
+HERE = os.path.dirname(os.path.realpath(__file__))
+ROOT = os.path.dirname(os.path.dirname(HERE))  # the directory that holds kit/ and experiment/
+DWELL_KEYS = ("n", "n_zero_excluded", "mae", "bland_altman")
+
+
+def inside(path, root):
+    p, r = os.path.normcase(os.path.realpath(path)), os.path.normcase(os.path.realpath(root))
+    return p == r or p.startswith(r.rstrip(os.sep) + os.sep)
+
+
+def check_paths(args):
+    """Refuse before any work: an existing --out (never overwritten) and a scratch directory inside this directory
+    (the frozen analysis writes its result files there, which must not be mistaken for the article's)."""
+    if os.path.exists(args.out):
+        raise SystemExit("--out exists; it is not overwritten")
+    if inside(args.scratch, ROOT):
+        raise SystemExit("--scratch must lie outside %s" % ROOT)
+    if os.path.isdir(args.scratch) and os.listdir(args.scratch):
+        raise SystemExit("--scratch must be empty")
+
+
+def same_dwell(scratch_block, registered_block, where):
+    """The per-speed duration figures of the frozen run must equal those of the registered result file."""
+    a = dict((e["stratum"].get("speed"), e.get("dwell")) for e in scratch_block)
+    b = dict((e["stratum"].get("speed"), e.get("dwell")) for e in registered_block)
+    for sp in SPEEDS:
+        x, y = a.get(sp), b.get(sp)
+        if (x is None) != (y is None):
+            raise SystemExit("%s, %s: the run and the registered result file differ in having a value" % (where, sp))
+        if x is not None and any(x.get(k) != y.get(k) for k in DWELL_KEYS):
+            raise SystemExit("%s, %s: the duration figures differ from the registered result file" % (where, sp))
+
+
 def run(args):
+    check_paths(args)
     code = os.path.abspath(os.path.join(args.code, "kit", "analysis"))
     if not os.path.isfile(os.path.join(code, "pipeline.py")):
         raise SystemExit("--code: no kit/analysis/pipeline.py under %s" % args.code)
@@ -154,30 +191,42 @@ def run(args):
     definition = DEFINITION_OF_OS[system]
     obs_sha = sha256_file(os.path.join(args.run, "obs.jsonl"))
     with open(os.path.join(args.scratch, "e1_l1.json"), "rb") as f:
-        registered = json.loads(f.read().decode("utf-8"))
+        frozen = json.loads(f.read().decode("utf-8"))
+    with open(args.registered, "rb") as f:
+        committed = json.loads(f.read().decode("utf-8"))
     out = {"exploratory": True,
            "note": "not registered; percentiles of the dwell error (observed minus ground truth, ms) of the one-to-one "
                    "pairs of the primary comparison, and the fractions of pairs within 100 ms and 1,000 ms; no interval",
            "percentile_method": "linear interpolation between order statistics, h = (n - 1) p",
            "inputs_sha256": {"run_manifest": sha256_file(os.path.join(args.run, "run.json")), "obs": obs_sha,
                              "config": sha256_file(args.config), "script": sha256_file(os.path.abspath(__file__)),
-                             "e1_l1": sha256_file(os.path.join(args.scratch, "e1_l1.json"))},
+                             "e1_l1_of_this_run": sha256_file(os.path.join(args.scratch, "e1_l1.json")),
+                             "e1_l1_registered": sha256_file(args.registered)},
+           "analysis_modules_sha256": dict((n, sha256_file(os.path.join(code, n)))
+                                           for n in sorted(os.listdir(code)) if n.endswith(".py")),
            "cells": {}}
     cells = sorted(set(c["cell"] for c in listener.calls))
     if len(cells) != 1:
         raise SystemExit("one run gives one cell; the calls name %s" % cells)
     cell = cells[0]
     for scope in SCOPES:
-        reg = registered["cells"][cell][definition][PRIMARY][scope]["metrics"]["by_speed"]
+        reg = frozen["cells"][cell][definition][PRIMARY][scope]["metrics"]["by_speed"]
+        try:
+            com = committed["cells"][cell][definition][PRIMARY][scope]["metrics"]["by_speed"]
+        except (KeyError, TypeError):
+            raise SystemExit("--registered: no cell %s under %s, %s, %s" % (cell, definition, PRIMARY, scope))
+        same_dwell(reg, com, "cell %s, %s" % (cell, scope))
         reg_by = dict((e["stratum"]["speed"], e) for e in reg if e["stratum"].get("speed") in SPEEDS)
         candidates = [c for c in listener.calls
                       if c["obs_sha256"] == obs_sha and c["definition"] == definition and c["scope"] == scope]
         call = select_primary(stats, candidates, reg_by, "cell %s, %s" % (cell, scope))
         out["cells"].setdefault(cell, {})[scope] = dict(
             (sp, summarise([o - g for o, g in call["by_speed"][sp]])) for sp in SPEEDS if sp in reg_by)
-    if os.path.exists(args.out):
+    try:
+        f = open(args.out, "x", encoding="utf-8", newline="\n")
+    except FileExistsError:
         raise SystemExit("--out exists; it is not overwritten")
-    with open(args.out, "w", encoding="utf-8", newline="\n") as f:
+    with f:
         json.dump(out, f, indent=1, sort_keys=True)
         f.write("\n")
     print("wrote %s (cells: %s)" % (args.out, ", ".join(sorted(out["cells"]))))
@@ -229,6 +278,55 @@ def selftest():
         check("no reproducing call is refused", False)
     except SystemExit:
         check("no reproducing call is refused", True)
+    check("a registered entry without a duration value is not reproduced",
+          reproduces(Stub, [(1, 0)], {"dwell": None}) is False and reproduces(Stub, [(1, 0)], {}) is False)
+    import tempfile
+
+    class A(object):
+        pass
+
+    tmp = tempfile.mkdtemp(prefix="explore_selftest_")
+    try:
+        a = A()
+        a.out, a.scratch = os.path.join(tmp, "out.json"), os.path.join(tmp, "scratch")
+        check_paths(a)
+        check("paths: a new output and a scratch directory outside this directory pass", True)
+        for name, change in (("an existing output", lambda: open(a.out, "w").close()),
+                             ("a scratch directory inside this directory",
+                              lambda: setattr(a, "scratch", os.path.join(ROOT, "experiment", "scratch-test"))),
+                             ("a scratch directory that is not empty", None)):
+            b = A()
+            b.out, b.scratch = os.path.join(tmp, "out2.json"), os.path.join(tmp, "scratch2")
+            if name == "an existing output":
+                b.out = a.out
+                change()
+            elif name == "a scratch directory inside this directory":
+                b.scratch = os.path.join(ROOT, "experiment", "scratch-test")
+            else:
+                os.makedirs(b.scratch)
+                open(os.path.join(b.scratch, "x"), "w").close()
+            try:
+                check_paths(b)
+                check("paths: %s is refused" % name, False)
+            except SystemExit:
+                check("paths: %s is refused" % name, True)
+        check("paths: the check made no directory", not os.path.exists(os.path.join(ROOT, "experiment", "scratch-test")))
+    finally:
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
+    blk = lambda sp, n, mae: {"stratum": {"speed": sp}, "dwell": {"n": n, "n_zero_excluded": 0, "mae": mae,
+                                                                   "bland_altman": {"bias": 1.0}}}
+    same_dwell([blk("slow", 3, 2.0)], [blk("slow", 3, 2.0)], "t")
+    check("registered: equal duration figures pass", True)
+    for name, other in (("a different number of pairs", [blk("slow", 4, 2.0)]),
+                        ("a different median absolute difference", [blk("slow", 3, 2.5)]),
+                        ("a speed missing on one side", []),
+                        ("a speed present on one side only", [blk("slow", 3, 2.0), blk("fast", 1, 0.0)])):
+        try:
+            same_dwell([blk("slow", 3, 2.0)], other, "t")
+            check("registered: %s is refused" % name, False)
+        except SystemExit:
+            check("registered: %s is refused" % name, True)
     extra = {"by_speed": {"slow": [(110, 100), (90, 100)], "mid": [(205, 200)], "fast": [(1, 0)]}}
     try:
         select_primary(Stub, [extra], reg, "t")
@@ -243,7 +341,7 @@ def main(argv):
     if argv == ["--selftest"]:
         return selftest()
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    for name in ("--code", "--run", "--config", "--seed-file", "--prereg", "--scratch", "--out"):
+    for name in ("--code", "--run", "--config", "--seed-file", "--prereg", "--registered", "--scratch", "--out"):
         ap.add_argument(name, required=True)
     ap.add_argument("--seed", required=True, type=int)
     run(ap.parse_args(argv))

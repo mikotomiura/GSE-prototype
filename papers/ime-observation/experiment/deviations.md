@@ -254,16 +254,21 @@ made by the script that turns the result files into the tables and the values of
 of the result files and requires them to cover the same texts as the ICC.
 
 **Reason.** In the two-way model of the ICC, a column that is the same in every row makes the mean square between the
-subjects equal to the residual mean square, so ICC(A,1) is zero whatever the other column holds. Section 6.11 of the
+subjects equal to the residual mean square, so ICC(A,1) is zero whatever the other column holds (or undefined, if the
+other column is constant too). Section 6.11 of the
 registration reports a measure that cannot be computed because of zero variance as missing, with the reason, never as
 zero; the frozen code (`kit/analysis/stats.py`) returns no value only when every value of both columns is the same. The
 design gives every trial of the primary scope one session in most strata, so the conversions per trial of the
 reference are 1 in every text there.
 
-**Effect.** Six of the per-speed ICCs of the conversions per trial lose their value of 0.000: the three speeds of the
-macOS cell with live conversion off, the slow speed of the macOS cell with it on, and the slow and middle speeds of the
-Windows cell. Every other value of question 3 is unchanged. This deviation was made after all results had been seen,
-when a simulated review of the article before its submission pointed out these values.
+**Effect.** In the primary scope, six of the per-speed ICCs of the conversions per trial lose their value of 0.000:
+the three speeds of the macOS cell with live conversion off, the slow speed of the macOS cell with it on, and the slow
+and middle speeds of the Windows cell. In the supplement, eight more lose theirs: the ICCs pooled over the speeds of
+the macOS cell with live conversion off in the primary scope and over all trials, and, over all trials, the same six
+strata as in the primary scope. Every other value of question 3 is unchanged. In two strata (the middle and the fast
+speed with live conversion on) the reference differs from 1 in a single text; their ICCs keep their values and are
+described in the text as near zero for the same reason. This deviation was made after all results had been seen, when
+a simulated review of the article before its submission pointed out these values.
 
 ## The macOS cells are unchanged
 

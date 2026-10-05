@@ -240,8 +240,10 @@ under the logger's rules, such as the minus, comma or period key).
 The prediction separates two sources of disagreement. Three comparisons were computed with the same matching and the
 same measures: ground truth against observation (the primary comparison), ground truth against prediction (how well
 the rules, carried out exactly, describe the sessions of the reference field) and prediction against observation
-(whether the logger carries out its rules). The Windows logger follows the input method's windows, which the presses do
-not determine, so no prediction applies to it, and only the primary comparison was computed for the Windows cell.
+(whether the logger carries out its rules). The tables call them reference vs.\ logger, reference vs.\ specified rows
+and specified rows vs.\ logger, the specified rows being the rows of the prediction. The Windows logger follows the
+input method's windows, which the presses do not determine, so no prediction applies to it, and only the primary
+comparison was computed for the Windows cell.
 
 \subsection{Checks of the instruments and the stopping rule}
 \label{sec:method-checks}
@@ -342,7 +344,7 @@ percentile bootstrap intervals \citep{efron1979} from 2{,}000 resamples of whole
 the trials of a block share the state of the input method. Pooled proportions carry Wilson intervals that ignore this
 clustering and are read as lower bounds of the uncertainty. A value that cannot be computed is reported as missing with
 its reason, never as zero; this includes an ICC whose reference has the same value in every text, which is zero
-whatever the logger writes (deviation D11). Synthetic input has no natural mix of scenarios, so a pooled value is
+whatever the logger writes, or undefined if the logger's values are constant too (deviation D11). Synthetic input has no natural mix of scenarios, so a pooled value is
 labelled as pooled and is not an estimate of accuracy in natural typing. No threshold of adequate agreement was set,
 and the estimates are described without evaluative words. The one analysis not described in the registration is the
 exploratory analysis above, and it is labelled as such.
@@ -444,8 +446,9 @@ The frozen code counted a recounted merge in the stratum of the missed session, 
 merge rate could exceed its denominator, and the analysis of the macOS cells stopped before it wrote any result. \\
 D11 & The per-text ICC of a stratum whose reference has the same value in every text is reported without a value, with
 the reason, and the reference's standard deviation between texts is reported next to every ICC. &
-Such an ICC is zero whatever the logger writes; the registration reports a measure with zero variance as missing,
-never as zero, but the frozen code returns no value only when every value of both sides is the same. \\
+Such an ICC is zero whatever the logger writes (or undefined if the logger's values are constant too); the
+registration reports a measure with zero variance as missing, never as zero, but the frozen code returns no value only
+when every value of both sides is the same. \\
 \bottomrule
 \end{tabular}
 \end{table}

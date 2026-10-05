@@ -34,6 +34,17 @@ absolute() {
   if [ "$windows" = 1 ]; then cygpath -m "$p"; else echo "$p"; fi
 }
 here=$(absolute "$(dirname "$0")")
+# The directory of the article's public files (manuscript, experiment, kit); no output may be written inside it.
+root=$(absolute "$here/..")
+
+# The title page in this directory is a template whose address and telephone fields stay empty: the filled copy is kept
+# outside the repository (BUILD.md). Stop if the template has been filled in.
+for field in '[postal address]' '[telephone number]'; do
+  if ! grep -qF "$field" "$here/submission/title-page.tex"; then
+    echo "build.sh: submission/title-page.tex no longer holds the empty field $field; fill in a copy outside the repository instead" >&2
+    exit 2
+  fi
+done
 
 if [ ! -f "$template/sn-jnl.cls" ] || [ ! -f "$template/bst/sn-apacite.bst" ]; then
   echo "build.sh: $template does not hold sn-jnl.cls and bst/sn-apacite.bst" >&2
@@ -48,17 +59,18 @@ fi
 # throughout.
 template=$(absolute "$template")
 out=$(absolute "$out")
-# Windows compares paths without regard to case.
+# Windows compares paths without regard to case. The logs of the build name the template's location, so they are kept
+# out of every directory of the article's public files, not only out of the manuscript's.
 out_cmp=$out
-here_cmp=$here
+root_cmp=$root
 if [ "$windows" = 1 ]; then
   out_cmp=$(printf '%s' "$out" | tr '[:upper:]' '[:lower:]')
-  here_cmp=$(printf '%s' "$here" | tr '[:upper:]' '[:lower:]')
+  root_cmp=$(printf '%s' "$root" | tr '[:upper:]' '[:lower:]')
 fi
 case "$out_cmp/" in
-  "$here_cmp"/*)
+  "$root_cmp"/*)
     if [ "$created" = 1 ]; then rmdir "$out"; fi
-    echo "build.sh: $out lies inside the manuscript directory; give an output directory outside it" >&2
+    echo "build.sh: $out lies inside $root; give an output directory outside it" >&2
     exit 2 ;;
 esac
 
@@ -121,4 +133,6 @@ for name in $names; do
   log="$out/$name.log"
   echo "$name: $(grep -c '^!' "$log" || true) errors, $(grep -c 'LaTeX Warning: Reference' "$log" || true) undefined references, $(grep -c 'Warning: Citation' "$log" || true) undefined citations, $(grep -c 'Package results Warning: Result value' "$log" || true) result values not generated, $(grep -c '^Overfull' "$log" || true) overfull boxes"
 done
-echo "bibtex: $(grep -c '^Warning--' "$out/main.blg" || true) warnings"
+for blg in main $( [ "$submission" = 1 ] && echo main-submission ); do
+  echo "bibtex ($blg): $(grep -c '^Warning--' "$out/$blg.blg" || true) warnings"
+done

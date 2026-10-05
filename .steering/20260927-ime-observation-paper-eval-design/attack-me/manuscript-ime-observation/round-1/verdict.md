@@ -181,3 +181,29 @@
 - 8 問とも推奨どおり（1 問は事実の確認: 計測の run はすべて Claude Code が研究者の指示で起動した）。
 - 直す一覧は全部承認。要旨は登録 §6.1 の規則を保ち、端を決めたものを添える。ICC の恒等的な 0 は値なし（逸脱 D11）。dwell の分位点の限界だけ探索的に足す。キーワードを外し、問 4 の大きさを結論と §8 に書く。Discussion は研究者の解釈を元に書く。公開しないタイトル頁と投稿用の組版を作る。
 - 対応はこのあと（直した版で round 2 を回すかは、直した後に問う）。
+
+## 8. 対応（2026-10-06・G-GEAR・commit `08865d82`・`7629be4d`）
+
+| # | 対応 | 状態 |
+|---|---|---|
+| Z1 | 要旨に「lowest where the logger's rules predict disagreement」「lowest in a scenario built to outlast the 20-s cut-off」（248 語）。§6 に「What sets the ends of the ranges」（S6・S10／Windows は S8・S2／全試行は S13 だけ）と外した層の内訳。§6 と結論にプールした値 | 済 |
+| Z2 | 表の道具: 参照の文間の SD を表 10 と補遺に、参照が一定の層（6 つ）の ICC を値なし（理由つき）。D11 を `deviations.md` と表 6 に。§7 に読み方 | 済 |
+| Z3 | 序論・結論: 2 つの経路（窓のイベントと隠蔽）・どちらが働いたかは不明・隠蔽は窓のクラスに依る。§6: 20〜25 秒の行が無いことは隠蔽の経路と矛盾しない | 済 |
+| Z4 | §5.2 の設定を記録が示す範囲に。§6.1 に「What else ran on the machines」（macOS の CI の runner の重なり 23・20・13・2 %、Windows の Defender の更新・電源の事象・AI のセッション）。試行 1 を止めた主体と数。AI 宣言に run の起動と監視 | 済 |
+| Z5 | §5.8 と Declarations・OPS を「凍結タグの書き出し＋D8・D10 で差し替えたファイル」に。補遺に来歴の表 | 済 |
+| Z6 | `kit/analysis/explore_dwell_quantiles.py`（凍結の解析を回し、登録の対の数・偏り・中央絶対差を再現した候補だけから分位点）。Windows を G-GEAR で回した（凍結の出力は登録の結果とバイト一致）。§6.4 に裾の重さと範囲、補遺に表 | Windows 済・**macOS は Mac で回す**（値は `\tbd` の 8 個） |
+| Z7 | 表 4: 押している時間は「重ならない押下だけ」、バーストは「休止で区切るだけ」、Windows の変換は「窓の出現（1 つが複数の行になりうる）」、「1 つの文書・アプリのキー」の行 | 済 |
+| Z8 | キーワードを外す。§8 に counts_only から来たこと・囮の長さ。推奨 (c) と結論に K=10・100 の正答率と「a log that records no text can still reveal which of a few known texts was typed」 | 済 |
+| Z9 | `sections/discussion.tex` に枠だけ（`\tbd`）。研究者の解釈を受けて書く | **研究者の読み直しの段で** |
+| Z10 | §6 の冒頭の断りを参照に。ほかの節の重複は研究者の読み直しの段で一緒に削る | 一部 |
+| Z11 | `build.sh --submission`（`referee` の二重行送り・1 インチ・右上の頁番号を画像で確かめた）・`submission/title-page.tex`（住所と電話は空欄・記入は repo の外） | 済 |
+| Z12・Z13 | `references.bib` に `dataset`・`release`（DOI は `\tbd`）・OSF の 2 件の著者を Miura, M.（OSF の API で確かめた） | 済 |
+| Z14〜Z22・Z24〜Z33・Z35・Z41〜Z45・Z47〜Z49 | 本文の該当箇所を直した（定義・No key・Ethics・写し元・試行の表の理由の列・安全弁のテスト・ICC のモデル・効果量・検定しない・探索的・datasheet の `\tbd`・observer・登録済みの限界・かな配列・限界の向き・焦点の喪失・データセットの目的・表 1・テキストの線引き・推奨 (c)(d)(f)・キー行の時刻を取る点と NTP・注入の経路・マーカーと KT1・許容の限界・"evaluated"・Pinet の 8 ms・[V31] を引かない） | 済 |
+| Z23 | D10 の時点で Windows の問 1〜3 の登録の結果は main に入っていた（判断 152 の PR #304）→ §5.9 と `deviations.md` の冒頭に書いた | 済 |
+| Z34・Z36・Z37・Z46 | 要旨の語数の都合で実行コストとデータセットの列挙は足さない・問 3 の全試行は補遺・凍結の SHA-256 は M12 の Open item・"data are public" は寄託の後に真 | 残す（記録） |
+| Z38 | 表と図のセルと比較を読める名前に（`cell_name`・COMPARISONS・層の表の題） | 済 |
+| Z39 | 推奨 (f)「Before the logger is used with people」（全アプリのキー行・アプリを記録しない・macOS は入力監視の権限・行の公開は判定していない） | 済 |
+| Z40 | Windows の 2 つの定義の差の大きさ: 結果のファイルは両方の定義を持つが、表の道具は真偽しか読まない | **未（道具に足す）** |
+
+- 検証: selftest 154 件 OK・使い捨ての変異 13 本すべて赤（scratchpad の `mutate_d11.py`）。`build.sh --submission`: main・main-submission・補遺ともエラー 0・未定義の参照 0・生成されていない値は macOS の探索的な値 8 個だけ・overfull は main 1（§4 の頁の 2.1 pt）。文体の検査 違反 0。要旨 248 語。
+- ⚠️ 見つけたこと: OSF の 2 つの登録の貢献者のプロフィール名が「Mikto Miura」（研究者に伝える）。`experiment/env.md` の「Analysis machine」と Windows の lock file の行が「(to be filled in)」のまま（M12 の前に埋める）。

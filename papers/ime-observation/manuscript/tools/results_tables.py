@@ -688,6 +688,8 @@ def fmt_signed(x, ms=False):
     if ms:
         return fmt_ms(x)
     s = "%.3f" % x
+    if s == "-0.000":  # a value that rounds to zero carries no sign
+        return "0.000"
     return "$-$" + s[1:] if s.startswith("-") else s
 
 
@@ -788,7 +790,8 @@ def dwell_explore_values(cell, doc):
             xs = [doc["cells"][PRIMARY_SCOPE][sp]["percentiles"][key] for sp in present]
             lo, hi = fmt_signed(min(xs), True), fmt_signed(max(xs), True)
             vals["%s.dwellx.%s.range" % (cell.label, key.replace(".", ""))] = {
-                "text": lo if lo == hi else "%s to %s~ms" % (lo, hi), "value": [min(xs), max(xs)], "source": src}
+                "text": "%s~ms" % lo if lo == hi else "%s to %s~ms" % (lo, hi), "value": [min(xs), max(xs)],
+                "source": src}
         for key, ms in DWELL_EXPLORE_WITHIN:
             xs = [doc["cells"][PRIMARY_SCOPE][sp]["within"][key] for sp in present]
             lo, hi = fmt_pct(min(xs)), fmt_pct(max(xs))
@@ -1854,8 +1857,8 @@ def table_cost(e3):
 REFERENCE_CONSTANT = "%s (reference constant)" % NO_VALUE
 REFERENCE_CONSTANT_TEXT = "no value: the reference's value is the same in every text (deviation D11)"
 REFERENCE_CONSTANT_NOTE = ("%s: no ICC(A,1), because the reference's value is the same in every text, so the ICC is zero "
-                           "whatever the logger writes (section 6.11 of the registration; deviation D11)"
-                           % REFERENCE_CONSTANT)
+                           "whatever the logger writes, or undefined if the logger's values are constant too (section 6.11 "
+                           "of the registration; deviation D11)" % REFERENCE_CONSTANT)
 
 
 def reference_spread(cell, scope, m, speed=None):
@@ -1977,7 +1980,8 @@ def text_agreement_supplement(cells):
         lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
                   "\\begin{longtable}{L{0.14}L{0.11}L{0.06}L{0.12}L{0.14}L{0.14}L{0.14}L{0.14}}\n",
                   "\\caption{Per-text agreement pooled over speeds and the bias in three mixtures of speeds (weights "
-                  "of slow, mid and fast), cell %s}\\label{tab:text-pooled-%s}\\\\\n" % (name, cell.label),
+                  "of slow, mid and fast), cell %s; %s}\\label{tab:text-pooled-%s}\\\\\n" % (
+                      name, REFERENCE_CONSTANT_NOTE, cell.label),
                   "\\toprule\n",
                   "Measure & Scope & Texts & ICC(A,1), pooled & Bias, pooled & "
                   + " & ".join("Bias, %s" % w for _, w, _ in L2_MIXTURES) + " \\\\\n",
@@ -3293,7 +3297,7 @@ def _selftest_dwell_explore(check):
               vals.get("cell-x.dwellx.p25.range", {}).get("text") == "$-$1,500 to $-$900~ms"
               and vals.get("cell-x.dwellx.within100.range", {}).get("text") == "25.0\\%--37.5\\%"
               and vals.get("cell-x.dwellx.within1000.range", {}).get("text") == "80.0\\%"
-              and vals.get("cell-x.dwellx.p975.range", {}).get("text") == "40", sorted(vals))
+              and vals.get("cell-x.dwellx.p975.range", {}).get("text") == "40~ms", sorted(vals))
         check("dwellx: the values of the primary scope, signed whole milliseconds and percentages",
               vals.get("cell-x.dwellx.slow.p25", {}).get("text") == "$-$1,500"
               and vals.get("cell-x.dwellx.fast.within100", {}).get("text") == "25.0\\%"
@@ -3537,6 +3541,12 @@ def selftest():
         check("q3: the value of such an ICC for the text says why it has none, and holds no number",
               icc_mid and all(v["text"] == REFERENCE_CONSTANT_TEXT and v["value"] == [None, None, None]
                               for v in icc_mid), str(icc_mid[:1]))
+        sup_q3 = files["text-agreement.tex"].decode("utf-8")
+        check("q3: every supplementary table of per-text agreement explains a reference-constant ICC",
+              sup_q3.count(REFERENCE_CONSTANT_NOTE) == 2 * len(row), sup_q3.count(REFERENCE_CONSTANT_NOTE))
+        check("q3: a value that rounds to zero is printed without a sign",
+              fmt_signed(-1.6e-16) == "0.000" and fmt_signed(-0.0004) == "0.000" and fmt_signed(-0.0006) == "$-$0.001"
+              and fmt_signed(-0.4, True) == "0", (fmt_signed(-1.6e-16), fmt_signed(-0.0006), fmt_signed(-0.4, True)))
         icc_slow = [v for k, v in vals.items() if k.endswith(".l2.conversions_per_trial.slow.icc")]
         check("q3: an ICC whose reference varies keeps its value",
               icc_slow and all(v["value"][0] == 0.75 for v in icc_slow), str(icc_slow[:1]))
