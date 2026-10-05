@@ -6,14 +6,24 @@
   python3 manuscript/tools/results_tables.py --selftest
 
 Every number of the results that the manuscript states is copied by this script from the result files of
-`kit/analysis/pipeline.py` (questions 1 to 3), `kit/e2/closed_set.py` (question 4) and `kit/e3/summarize_e3.py`
-(question 5); none is typed by hand. The script reads the cells of the macOS analysis from the top of the results
-directory and the Windows cell from its subdirectory `windows`, and the corrected analysis of deviation D10 from
-`d10/macos` and `d10/windows`; a cell whose files are absent is reported as not measured. It writes:
+`kit/analysis/pipeline.py` (questions 1 to 3 and the delivery report), `kit/e2/closed_set.py` (question 4),
+`kit/e3/summarize_e3.py` (question 5) and `kit/pilot/clock_sync.py` (the marker times of section 6.9, one file
+`clock_sync_<cell>.json` per cell); none is typed by hand. The script reads the cells of the macOS analysis from the
+top of the results directory and the Windows cell from its subdirectory `windows`, and the corrected analysis of
+deviation D10 from `d10/macos` and `d10/windows`; a cell whose files are absent is reported as not measured, and a cell
+without marker times as not computed. It writes:
 
 - values.json: every value with its full precision and its source (file and path inside the file);
 - values.tex: the formatted values, read in the text with the macro \\rv{<key>} that main.tex defines;
-- table-detection.tex: detection per cell and speed (the range of the per-scenario intervals);
+- table-reference.tex: what the reference establishes (Table 7: plan against ground truth by type, delivery of the
+  presses, losses of focus with the session rows of the trials concerned, marker times), one column per cell;
+- table-key-timing.tex: the timing of the key rows of presses (KT1) per cell and speed;
+- reference-strata.tex: for the supplement, the plan against the ground truth per stratum, the marker times per
+  block and the timing of the key-downs of the reference;
+- table-detection.tex: detection per cell, comparison (three on macOS, the primary one on Windows) and speed (the
+  range of the per-scenario intervals);
+- detection-layers.tex: for the supplement, detection per layer of the prediction (macOS) for every comparison and
+  scope, with the corrected merge rate of deviation D10;
 - table-session.tex: per-session agreement per cell and speed;
 - table-text-agreement.tex: per-text agreement of the four measures of section 4.6 per cell and speed (primary scope);
 - text-agreement.tex: for the supplement, per-text agreement over all trials, pooled over speeds and in the three
@@ -95,6 +105,32 @@ L2_TRIAL_MEASURES = (("n_conversions", "Conversions", False), ("dwell_sum_ms", "
                      ("n_cancelled", "Cancelled conversions", False))
 # Deviation D10: the corrected analysis of questions 1 to 3, per system.
 D10_DIRS = {"macos": os.path.join("d10", "macos"), "windows": os.path.join("d10", "windows")}
+# Section 6.4: the three comparisons (the two with the prediction exist on macOS only, section 10.7) and the four
+# layers of the prediction, in the order of the registration.
+COMPARISONS = (("gt_obs", "\\texttt{gt\\_obs} (primary)"), ("gt_pred", "\\texttt{gt\\_pred}"),
+               ("pred_obs", "\\texttt{pred\\_obs}"))
+COMPARISONS_OF = {"macos": ("gt_obs", "gt_pred", "pred_obs"), "windows": ("gt_obs",)}
+LAYERS = (("carried_out", "carried out"), ("received_carry", "received carry"),
+          ("closing_key_in_reading", "closing key in reading"), ("none", "none of the three"))
+LAYER_SCOPES = ("under_limit", "over_limit", "all_trials")
+# Section 6.3: the types of disagreement between the plan and the ground truth, in the order of the registration
+# (kit/analysis/gt_sessions.py, MISMATCH_TYPES).
+PLAN_TYPES = (("no_session", "No session"), ("unexpected_session", "An unexpected session"),
+              ("multiple_sessions", "Several sessions"),
+              ("expected_cancel_got_commit", "A commit where a cancellation was planned"),
+              ("expected_commit_got_cancel", "A cancellation where a commit was planned"),
+              ("open_at_end", "A session open at the end"), ("unknown_trial", "A trial not in the plan"))
+# The delivery report (section 6.3, kit/analysis/delivery.py) and the timing of the key rows (KT1).
+DELIVERY_FILE = "e1_delivery.json"
+DELIVERY_SIDES = (("observation", "Observation"), ("reference", "Reference"))
+REACH_VERSIONS = (("all_presses", "all presses"), ("excluding_mode_keys", "input-mode keys left out"))
+TIMING_MEASURES = (("delay_ms", "Delay"), ("interval_error_ms", "Interval error"))
+TIMING_STATS = ("n", "mean", "min", "p05", "median", "p95", "max")
+# Section 6.9: the differences at the block-start markers (kit/pilot/clock_sync.py), one file per cell.
+CLOCK_DIFFS = (("obs_minus_oracle_wall", "Observation minus executor"),
+               ("gt_minus_oracle_wall", "Reference minus executor"),
+               ("gt_minus_oracle_mono", "Reference minus executor, monotonic clocks"),
+               ("obs_minus_gt_wall", "Observation minus reference"))
 GENERATED_NOTE = "% Generated by manuscript/tools/results_tables.py from the result files; do not edit by hand.\n"
 
 
@@ -154,10 +190,41 @@ class Cell(object):
             for scope in SCOPES:
                 if not block.get(scope):
                     raise ValueError("%s: no %s under %s for cell %s" % (self.src[name], scope, self.definition, label))
+        # Every comparison of the detection results; the system decides which exist (section 10.7).
+        definition_block = docs["e1_detection.json"]["cells"][label][self.definition]
+        self.comparisons = tuple(c for c, _ in COMPARISONS if definition_block.get(c))
+        if self.comparisons != COMPARISONS_OF[system]:
+            raise ValueError("%s: cell %s holds the comparisons %s, not those of %s" % (
+                self.src["e1_detection.json"], label, ", ".join(self.comparisons), system))
+        self.det_by = dict((c, definition_block[c]) for c in self.comparisons)
+        # The delivery report of the same analysis (it has no primary comparison or scope).
+        p = os.path.join(directory, DELIVERY_FILE)
+        self.src[DELIVERY_FILE] = prefix + DELIVERY_FILE
+        if not os.path.isfile(p):
+            raise ValueError("%s: missing" % self.src[DELIVERY_FILE])
+        dl = load(p)
+        if label not in (dl.get("cells") or {}):
+            raise ValueError("%s: no cell %s" % (self.src[DELIVERY_FILE], label))
+        self.dlv = dl["cells"][label]
 
     def path(self, f, *keys):
         return "%s:cells/%s/%s/%s/%s" % (self.src[f], self.label, self.definition, PRIMARY_COMPARISON,
                                          "/".join(str(k) for k in keys))
+
+    def dpath(self, *keys):
+        return "%s:cells/%s/%s" % (self.src[DELIVERY_FILE], self.label, "/".join(str(k) for k in keys))
+
+    def plan_agreement(self):
+        """The plan-versus-ground-truth report (section 6.3). It covers every trial of the oracle whatever the scope
+        (kit/analysis/l1.py, oracle_report), so it must be the same in both scopes."""
+        o = self.l1[PRIMARY_SCOPE]["oracle"]
+        if any(self.l1[s]["oracle"] != o for s in SCOPES):
+            raise ValueError("%s: the plan-versus-ground-truth report differs between scopes" % self.path(
+                "e1_l1.json", "*", "oracle"))
+        if not o.get("plan_available"):
+            raise ValueError("%s: the plan-versus-ground-truth report has no plan" % self.path(
+                "e1_l1.json", PRIMARY_SCOPE, "oracle"))
+        return o
 
     def kept_trials(self, scope):
         """{(scenario, speed): trials kept in the scope}, from the per-trial records of level 2, and the totals."""
@@ -172,10 +239,10 @@ class Cell(object):
             raise ValueError("%s: the per-stratum trials do not add up to n_trials" % self.path("e1_l2.json", scope))
         return kept, total, pt["trials_not_used"]
 
-    def detection_strata(self, scope):
+    def detection_strata(self, scope, comparison=PRIMARY_COMPARISON):
         """{(scenario, speed): stratum entry of e1_detection.json} (the row of presses outside the trials is left out)."""
         out = {}
-        for st in self.det[scope]["metrics"]["by_stratum"]:
+        for st in self.det_by[comparison][scope]["metrics"]["by_stratum"]:
             if st["stratum"] in (None, "all") or st["stratum"].get("scenario") is None:
                 continue
             out[stratum_key(st["stratum"])] = st
@@ -562,19 +629,40 @@ def l2_values(cell):
 
 
 def read_d10(results_dir, cell):
-    """The detection block of the corrected analysis (deviation D10) for the cell, or None when it was not run. The
-    registered block must not carry the switch and the corrected one must carry it."""
+    """The detection results of the corrected analysis (deviation D10) for the cell, {comparison: {scope: block}},
+    or None when it was not run. No registered block may carry the switch, and every corrected block must carry it."""
     p = os.path.join(results_dir, D10_DIRS[cell.system], "e1_detection.json")
-    for scope in SCOPES:
-        if "merge_recount" in cell.det[scope]["config"]:
-            raise ValueError("%s: the registered results carry the switch of deviation D10" % cell.src["e1_detection.json"])
+    for comp in cell.comparisons:
+        for scope in cell.det_by[comp]:
+            if "merge_recount" in cell.det_by[comp][scope]["config"]:
+                raise ValueError("%s: the registered results carry the switch of deviation D10" %
+                                 cell.src["e1_detection.json"])
     if not os.path.isfile(p):
         return None
-    block = load(p)["cells"][cell.label][cell.definition][PRIMARY_COMPARISON]
-    for scope in SCOPES:
-        if block[scope]["config"].get("merge_recount") != "obs":
-            raise ValueError("%s: the corrected results do not record merge_recount obs" % p)
-    return block
+    blocks = load(p)["cells"][cell.label][cell.definition]
+    out = {}
+    for comp in cell.comparisons:
+        if not blocks.get(comp) or sorted(blocks[comp]) != sorted(cell.det_by[comp]):
+            raise ValueError("%s: the corrected results do not hold the comparison %s in the scopes of the registered "
+                             "ones" % (p, comp))
+        for scope in blocks[comp]:
+            if blocks[comp][scope]["config"].get("merge_recount") != "obs":
+                raise ValueError("%s: the corrected results do not record merge_recount obs" % p)
+        out[comp] = blocks[comp]
+    return out
+
+
+def d10_no_value(e):
+    """A rate without a value because its numerator exceeds its denominator (the defence of deviation D10)."""
+    return e.get("value") is None and e.get("n") is not None and e.get("x") is not None and e["x"] > e["n"]
+
+
+def layer_entries(block):
+    """Every metrics entry of the layers of the prediction in a detection block (pooled and per speed), or none."""
+    layers = (block.get("diagnostics") or {}).get("prediction_layers")
+    if not layers:
+        return []
+    return [e for name, _ in LAYERS for e in [layers[name]["pooled"]] + list(layers[name]["by_speed"])]
 
 
 def d10_strata(block, scope):
@@ -586,11 +674,21 @@ def d10_strata(block, scope):
     return out
 
 
-def d10_values(cell, block):
-    """The number of strata whose merge rate the corrected analysis changes, per scope."""
+def d10_values(cell, d10):
+    """The number of strata whose merge rate the corrected analysis changes, per scope (primary comparison), and the
+    number of merge rates of the layers of the prediction that have no value in the registered analysis because the
+    numerator exceeds the denominator."""
     vals = {}
-    if block is None:
+    if d10 is None:
         return vals
+    block = d10[PRIMARY_COMPARISON]
+    if "gt_pred" in cell.comparisons:
+        reg = [e for comp in cell.comparisons for scope in cell.det_by[comp]
+               for e in layer_entries(cell.det_by[comp][scope])]
+        n = sum(1 for e in reg if d10_no_value(e["merge_rate"]))
+        vals["%s.d10.layers.novalue" % cell.label] = {
+            "text": str(n), "value": n,
+            "source": "%s:*/*/diagnostics/prediction_layers/*/merge_rate" % cell.src["e1_detection.json"]}
     for scope in SCOPES:
         reg, cor = cell.detection_strata(scope), d10_strata(block, scope)
         if sorted(reg) != sorted(cor):
@@ -604,6 +702,342 @@ def d10_values(cell, block):
     return vals
 
 
+# ---------------------------------------------------------------- what the reference establishes (RF1) and KT1
+
+
+def fmt_num1(x):
+    """Milliseconds: an integer of the result file as it is, any other number with one decimal; a typeset minus."""
+    if x is None:
+        return NO_VALUE
+    s = "{:,}".format(x) if isinstance(x, int) and not isinstance(x, bool) else "{:,.1f}".format(x)
+    return "$-$" + s[1:] if s.startswith("-") else s
+
+
+def fmt_ms2(x):
+    """Milliseconds with two decimals, for the lateness of the executor's presses (a fraction of a millisecond)."""
+    if x is None:
+        return NO_VALUE
+    s = "{:,.2f}".format(x)
+    return "$-$" + s[1:] if s.startswith("-") else s
+
+
+def count_ci(n, rate, ci):
+    """A count with its rate and the Wilson interval of the rate."""
+    return "%s (%s)" % (fmt_int(n), est_ci(rate, ci[0], ci[1]))
+
+
+def clock_sync_name(label):
+    return "clock_sync_%s.json" % label
+
+
+def read_clock_sync(cell):
+    """The differences at the block-start markers of the cell (section 6.9), or None when they were not computed. The
+    file must hold the four differences."""
+    p = os.path.join(cell.directory, clock_sync_name(cell.label))
+    if not os.path.isfile(p):
+        return None
+    doc = load(p)
+    for k, _ in CLOCK_DIFFS:
+        if k not in (doc.get("differences") or {}):
+            raise ValueError("%s: no difference %s" % (cell.prefix + clock_sync_name(cell.label), k))
+    return doc
+
+
+def reach_versions(r, f):
+    """One figure of the reach of a side in the two versions, all presses / the input-mode keys left out."""
+    return " / ".join(f(r[v]) for v, _ in REACH_VERSIONS)
+
+
+def reference_rows(cell, cs):
+    """[(group, figure, text)] of Table 7 for one cell; the groups and figures are the same for every cell."""
+    o = cell.plan_agreement()
+    d = cell.dlv
+    rows = [("plan", "Trials compared", fmt_int(o["n_trials"])),
+            ("plan", "Trials that disagree with the plan's intent",
+             count_ci(o["n_disagree"], o["disagree_rate"], o["disagree_ci"]))]
+    for t, label in PLAN_TYPES:
+        e = o["by_type"].get(t)
+        if e is None:
+            raise ValueError("%s: no count of the type %s" % (cell.path("e1_l1.json", PRIMARY_SCOPE, "oracle"), t))
+        rows.append(("plan", "\\quad " + label, count_ci(e["n"], e["rate"], e["ci"])))
+    ua = o.get("unassigned_sessions")
+    rows.append(("plan", "Sessions assigned to no trial", NO_VALUE if ua is None else fmt_int(ua)))
+    tr, la = d["trials"], d["send_lateness_ms"]["overall"]
+    rows += [("delivery", "Trials measured of those planned (incomplete)", "%s of %s (%s)" % (
+                 fmt_int(tr["measured"]), fmt_int(tr["planned"]), fmt_int(tr["incomplete"]))),
+             ("delivery", "Presses sent", "%s / %s" % (fmt_int(d["presses"]["all"]),
+                                                     fmt_int(d["presses"]["excluding_mode_keys"]))),
+             ("delivery", "Lateness of the presses against the schedule (ms): median, 95th percentile, maximum",
+              "%s, %s, %s" % (fmt_ms2(la["median"]), fmt_ms2(la["p95"]), fmt_ms2(la["max"])))]
+    for side, name in DELIVERY_SIDES:
+        r = d[side]["reach"]
+        rows += [("delivery", "%s: presses that arrived (rate)" % name,
+                  reach_versions(r, lambda e: "%s (%s)" % (fmt_int(e["reached"]), fmt_p(e["reach_rate"])))),
+                 ("delivery", "%s: trials with fewer rows than presses" % name,
+                  reach_versions(r, lambda e: fmt_int(e["trials_with_loss"]))),
+                 ("delivery", "%s: rows beyond the presses sent in a trial (trials)" % name,
+                  reach_versions(r, lambda e: "%s (%s)" % (fmt_int(e["excess_rows"]), fmt_int(e["trials_with_excess"])))),
+                 ("delivery", "%s: rows outside every trial" % name,
+                  reach_versions(r, lambda e: fmt_int(e["rows_outside_trials"])))]
+    f = d["reference_focus_loss"]
+    rows += [("focus", "Losses: planned switches of S15, others", "%s, %s" % (
+                 fmt_int(f["n_loss_intervals_planned"]), fmt_int(f["n_loss_intervals_unplanned"]))),
+             ("focus", "Other losses with key rows in the observation",
+              fmt_int(f["n_loss_intervals_unplanned_with_presses"])),
+             ("focus", "Trials that overlap a loss", fmt_int(f["n_trials_with_focus_loss"]))]
+    for scope in SCOPES:
+        fl = cell.det[scope]["focus_loss"]
+        if fl["n_trials"] != f["n_trials_with_focus_loss"]:
+            raise ValueError("%s: the trials with a loss of focus differ from the delivery report" % cell.path(
+                "e1_detection.json", scope, "focus_loss"))
+        rows.append(("focus", "Session rows of these trials (false positives), %s" % (
+            "primary scope" if scope == PRIMARY_SCOPE else "all trials"),
+            "%s (%s)" % (fmt_int(fl["n_rows"]), fmt_int(fl["n_false_pos"]))))
+    if cs is None:
+        rows.append(("markers", "Blocks with the marker found: executor, reference, observation", "not computed"))
+    else:
+        rows.append(("markers", "Blocks with the marker found: executor, reference, observation", "%s of %s, %s, %s" % (
+            fmt_int(len(cs["oracle"]["with_marker"])), fmt_int(cs["oracle"]["blocks"]),
+            fmt_int(len(cs["gt"]["matched"])), fmt_int(len(cs["obs"]["matched"])))))
+    for k, label in CLOCK_DIFFS:
+        e = None if cs is None else cs["differences"][k]
+        rows.append(("markers", "%s (ms): median (range); drift per hour" % label, "not computed" if e is None else
+                     "%s (%s to %s); %s" % (fmt_num1(e["median_ms"]), fmt_num1(e["min_ms"]), fmt_num1(e["max_ms"]),
+                                            fmt_num1(e["drift_ms_per_hour"]))))
+    return rows
+
+
+REFERENCE_GROUPS = (
+    ("plan", "Plan against ground truth, every trial of the plan",
+     "misses in detection (Table~\\ref{tab:detection}) and per-text agreement (Table~\\ref{tab:text-agreement})"),
+    ("delivery", "Delivery of the presses",
+     "the timing of the key rows (Table~\\ref{tab:key-timing}) and misses in detection"),
+    ("focus", "Losses of focus of the reference input field", "false positives in detection"),
+    ("markers", "Times at which the block-start markers were recorded",
+     "misses of short sessions in detection and the difference of \\texttt{dwell\\_ms} (Table~\\ref{tab:session})"))
+
+
+def table_reference(cells, clocks):
+    """Table 7: what the reference establishes, one column per cell, with the estimates each check is used to read."""
+    per = [reference_rows(c, clocks.get(c.label)) for c in cells]
+    if any([(g, f) for g, f, _ in p] != [(g, f) for g, f, _ in per[0]] for p in per):
+        raise ValueError("the rows of the checks differ between cells")
+    width = (0.66 / len(cells)) if cells else 0.66
+    lines = [GENERATED_NOTE,
+             "\\begin{sidewaystable}[p]\n",
+             "{\\footnotesize\n",
+             "\\caption{What the reference establishes, per cell: the agreement of the ground truth with the intent of "
+             "the plan (count, and rate with its Wilson interval), the delivery of the presses that the executor sent "
+             "(a / b: all presses / the input-mode keys left out, which the logger does not record by design), the "
+             "losses of focus of the reference input field (a planned switch of S15 that returns within its trial is "
+             "not counted as a trial with a loss) with the session rows assigned to the trials concerned, and the "
+             "differences between the times at which the executor, the reference and the observation recorded the "
+             "block-start markers, which combine the offsets of the clocks with the delays of the paths. Each group "
+             "names the estimates it is used to read; no check excludes a trial or changes a value. Figures without an "
+             "interval are descriptive; not computed: the marker times of the cell were not computed; %s: no value}\n"
+             % NO_VALUE,
+             "\\label{tab:reference}\n",
+             "\\begin{tabular}{L{0.34}" + ("L{%.3f}" % width) * len(cells) + "}\n",
+             "\\toprule\n",
+             "Figure & " + " & ".join(tex_escape(c.label) for c in cells) + " \\\\\n"]
+    for key, title, read in REFERENCE_GROUPS:
+        lines += ["\\midrule\n",
+                  "\\multicolumn{%d}{L{%.3f}}{\\textit{%s}; read with %s} \\\\\n" % (
+                      1 + len(cells), 0.34 + width * len(cells), title, read)]
+        for i, (g, fig, _) in enumerate(per[0] if per else []):
+            if g != key:
+                continue
+            lines.append(" & ".join([fig] + [p[i][2] for p in per]) + " \\\\\n")
+    lines += ["\\bottomrule\n", "\\end{tabular}\n", "}\n", "\\end{sidewaystable}\n"]
+    return "".join(lines)
+
+
+def reference_values(cell, cs):
+    """Values of the checks of the instruments for the text, with their sources."""
+    lab, vals = cell.label, {}
+    o = cell.plan_agreement()
+    src = cell.path("e1_l1.json", PRIMARY_SCOPE, "oracle")
+    vals[lab + ".plan.trials"] = {"text": fmt_int(o["n_trials"]), "value": o["n_trials"], "source": src + "/n_trials"}
+    vals[lab + ".plan.disagree"] = {"text": count_ci(o["n_disagree"], o["disagree_rate"], o["disagree_ci"]),
+                                    "value": [o["n_disagree"], o["disagree_rate"]] + list(o["disagree_ci"]),
+                                    "source": src + "/n_disagree|disagree_rate|disagree_ci"}
+    for t, _ in PLAN_TYPES:
+        e = o["by_type"][t]
+        vals["%s.plan.%s" % (lab, t)] = {"text": count_ci(e["n"], e["rate"], e["ci"]),
+                                         "value": [e["n"], e["rate"]] + list(e["ci"]), "source": src + "/by_type/" + t}
+    d = cell.dlv
+    la = d["send_lateness_ms"]["overall"]
+    vals[lab + ".delivery.lateness"] = {
+        "text": "%s~ms (median), %s~ms (95th percentile) and %s~ms (maximum)" % (
+            fmt_ms2(la["median"]), fmt_ms2(la["p95"]), fmt_ms2(la["max"])),
+        "value": [la["median"], la["p95"], la["max"]], "source": cell.dpath("send_lateness_ms/overall")}
+    for side, _ in DELIVERY_SIDES:
+        tag = "obs" if side == "observation" else "ref"
+        for v, _ in REACH_VERSIONS:
+            e = d[side]["reach"][v]
+            vk = "%s.delivery.%s.%s" % (lab, tag, "all" if v == "all_presses" else "nomode")
+            vals[vk + ".reach"] = {"text": "%s of %s (%s)" % (fmt_int(e["reached"]), fmt_int(e["sent_presses"]),
+                                                              fmt_p(e["reach_rate"])),
+                                   "value": [e["reached"], e["sent_presses"], e["reach_rate"]],
+                                   "source": cell.dpath(side, "reach", v)}
+            for k in ("excess_rows", "trials_with_excess", "trials_with_loss", "rows_outside_trials"):
+                vals["%s.%s" % (vk, k.replace("_", ""))] = {"text": fmt_int(e[k]), "value": e[k],
+                                                           "source": cell.dpath(side, "reach", v, k)}
+    f = d["reference_focus_loss"]
+    for k in ("n_loss_intervals_planned", "n_loss_intervals_unplanned", "n_loss_intervals_unplanned_with_presses",
+              "n_trials_with_focus_loss"):
+        vals["%s.focus.%s" % (lab, k[2:].replace("_", ""))] = {"text": fmt_int(f[k]), "value": f[k],
+                                                              "source": cell.dpath("reference_focus_loss", k)}
+    for scope in SCOPES:
+        fl = cell.det[scope]["focus_loss"]
+        vals["%s.focus.rows.%s" % (lab, "primary" if scope == PRIMARY_SCOPE else "all")] = {
+            "text": "%s session rows, %s of them false positives" % (fmt_int(fl["n_rows"]), fmt_int(fl["n_false_pos"])),
+            "value": [fl["n_rows"], fl["n_false_pos"]], "source": cell.path("e1_detection.json", scope, "focus_loss")}
+    if cs is not None:
+        src = cell.prefix + clock_sync_name(lab)
+        vals[lab + ".markers.blocks"] = {
+            "text": "%s of %s blocks" % (fmt_int(len(cs["oracle"]["with_marker"])), fmt_int(cs["oracle"]["blocks"])),
+            "value": [len(cs["oracle"]["with_marker"]), cs["oracle"]["blocks"], len(cs["gt"]["matched"]),
+                      len(cs["obs"]["matched"])], "source": src + ":oracle|gt/matched|obs/matched"}
+        for k, _ in CLOCK_DIFFS:
+            e = cs["differences"][k]
+            short = k.replace("_minus_", "").replace("_wall", "").replace("_", "")
+            vals["%s.markers.%s.median" % (lab, short)] = {"text": fmt_num1(e["median_ms"]) + "~ms",
+                                                          "value": e["median_ms"], "source": src + ":differences/" + k}
+            vals["%s.markers.%s.range" % (lab, short)] = {
+                "text": "%s to %s~ms" % (fmt_num1(e["min_ms"]), fmt_num1(e["max_ms"])),
+                "value": [e["min_ms"], e["max_ms"]], "source": src + ":differences/" + k}
+            vals["%s.markers.%s.drift" % (lab, short)] = {"text": fmt_num1(e["drift_ms_per_hour"]) + "~ms per hour",
+                                                         "value": e["drift_ms_per_hour"],
+                                                         "source": src + ":differences/" + k + "/drift_ms_per_hour"}
+    return vals
+
+
+def timing_entry(t, measure, speed):
+    """The summary of one measure of KT1 for a speed, or for every speed (speed None); None when absent."""
+    m = t[measure]
+    return m["overall"] if speed is None else (m.get("by_speed") or {}).get(speed)
+
+
+def timing_values(cell):
+    """KT1: every summary of the delay and the interval error per side and speed, and the trials paired."""
+    vals = {}
+    for side, _ in DELIVERY_SIDES:
+        tag = "obs" if side == "observation" else "ref"
+        t = cell.dlv[side]["timing"]
+        for k in ("n_trials_paired", "n_trials_not_paired"):
+            vals["%s.kt.%s.%s" % (cell.label, tag, k.replace("n_trials_", "").replace("_", ""))] = {
+                "text": fmt_int(t[k]), "value": t[k], "source": cell.dpath(side, "timing", k)}
+        for measure, _ in TIMING_MEASURES:
+            for sp in SPEEDS + (None,):
+                e = timing_entry(t, measure, sp)
+                if e is None:
+                    continue
+                for stat in TIMING_STATS:
+                    vals["%s.kt.%s.%s.%s.%s" % (cell.label, tag, measure.split("_")[0], sp or "all", stat)] = {
+                        "text": fmt_int(e[stat]) if stat == "n" else fmt_num1(e[stat]) + "~ms", "value": e[stat],
+                        "source": cell.dpath(side, "timing", measure, "overall" if sp is None else "by_speed/" + sp,
+                                             stat)}
+    return vals
+
+
+def table_key_timing(cells, side, label, long_table=False):
+    """KT1 for one side: the delay and the interval error per cell and speed (n, mean, minimum, 5th percentile,
+    median, 95th percentile, maximum), with the trials paired and not paired per cell. The main text takes a
+    sideways table, the supplement (which does not load rotating) a landscape long table."""
+    who = "key rows of presses in the log" if side == "observation" else "key-downs of the reference log"
+    caption = ("\\caption{Timing of the %s on the software path, per cell and speed, in milliseconds, as the delivery "
+               "report defines it: in the trials whose rows equal the presses sent other than the input-mode keys, "
+               "the i-th row is paired with the i-th press; the delay is the time of the row minus the executor's "
+               "time of dispatch, and the interval error is the difference between consecutive rows minus that "
+               "between the consecutive presses. The times are whole milliseconds, so the minimum and the maximum are "
+               "whole. The trials paired and not paired are given per cell, over all speeds, as the report gives "
+               "them; %s: no value}" % (who, NO_VALUE))
+    spec = "{L{0.14}L{0.08}L{0.11}L{0.07}" + "L{0.09}" * 6 + "}\n"
+    head = "Cell & Speed & Measure & n & Mean & Minimum & 5th percentile & Median & 95th percentile & Maximum \\\\\n"
+    if long_table:
+        lines = [GENERATED_NOTE, "\\begin{landscape}\n", "{\\footnotesize\n", "\\begin{longtable}" + spec,
+                 caption + "\\label{%s}\\\\\n" % label, "\\toprule\n", head, "\\midrule\n\\endhead\n"]
+    else:
+        lines = [GENERATED_NOTE, "\\begin{sidewaystable}[p]\n", "{\\footnotesize\n", caption + "\n",
+                 "\\label{%s}\n" % label, "\\begin{tabular}" + spec, "\\toprule\n", head, "\\midrule\n"]
+    for cell in cells:
+        t = cell.dlv[side]["timing"]
+        first = True
+        for sp in SPEEDS + (None,):
+            for j, (measure, mlabel) in enumerate(TIMING_MEASURES):
+                e = timing_entry(t, measure, sp)
+                head = [tex_escape(cell.label) if first else "", (sp or "all speeds") if j == 0 else "", mlabel]
+                first = False
+                if e is None:
+                    lines.append(" & ".join(head) + " & \\multicolumn{7}{l}{not in the result file} \\\\\n")
+                    continue
+                lines.append(" & ".join(head + [fmt_int(e["n"])] + [fmt_num1(e[s]) for s in TIMING_STATS[1:]])
+                             + " \\\\\n")
+        lines.append(" & \\multicolumn{9}{l}{Trials paired: %s; not paired: %s} \\\\\n" % (
+            fmt_int(t["n_trials_paired"]), fmt_int(t["n_trials_not_paired"])))
+    if long_table:
+        lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n"]
+    else:
+        lines += ["\\bottomrule\n", "\\end{tabular}\n", "}\n", "\\end{sidewaystable}\n"]
+    return "".join(lines)
+
+
+def reference_supplement(cells, clocks):
+    """Supplement: the plan against the ground truth per stratum (with the trials that overlap a loss of focus), the
+    differences at the markers per block, and the timing of the key-downs of the reference."""
+    lines = [GENERATED_NOTE, "\\section*{What the reference establishes, per stratum and per block}\n"
+             "\\label{sec:supp-reference}\n\n",
+             "Generated from the result files of questions 1 to 3 and of the marker times. Disagreeing trials stay in "
+             "the evaluation. The trials with a loss of focus leave out a planned switch of S15 that returns within its "
+             "trial.\n\n"]
+    short = ("No session", "Unex\\-pected", "Several", "Commit for cancel", "Cancel for commit", "Open at end",
+             "Not in plan")
+    for cell in cells:
+        o = cell.plan_agreement()
+        focus = dict(((st["scenario"], st["speed"]), st) for st in cell.dlv["reference_focus_loss"]["by_stratum"])
+        lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
+                  "\\begin{longtable}{L{0.08}L{0.06}L{0.06}L{0.16}" + "L{0.08}" * len(PLAN_TYPES) + "L{0.08}}\n",
+                  "\\caption{Plan against ground truth per stratum, cell %s: trials of the plan, disagreeing trials "
+                  "(count, and rate with its Wilson interval), the count of each type, and the trials that overlap a "
+                  "loss of focus of the reference}\\label{tab:plan-strata-%s}\\\\\n" % (tex_escape(cell.label),
+                                                                                       cell.label),
+                  "\\toprule\n",
+                  "Scenario & Speed & Trials & Disagreeing & " + " & ".join(short) + " & Loss of focus \\\\\n",
+                  "\\midrule\n\\endhead\n"]
+        for st in sorted(o["by_stratum"], key=lambda st: (scenario_order(st["stratum"].get("scenario") or ""),
+                                                          SPEEDS.index(st["stratum"]["speed"])
+                                                          if st["stratum"].get("speed") in SPEEDS else len(SPEEDS))):
+            sc, sp = st["stratum"].get("scenario"), st["stratum"].get("speed")
+            fo = focus.get((sc, sp))
+            lines.append(" & ".join(
+                [sc or "not in the plan", sp or "", fmt_int(st["n_trials"]),
+                 count_ci(st["n_disagree"], st["disagree_rate"], st["disagree_ci"])]
+                + [fmt_int((st["by_type"].get(t) or {}).get("n", 0)) for t, _ in PLAN_TYPES]
+                + [NO_VALUE if fo is None else fmt_int(fo["n_trials_with_focus_loss"])]) + " \\\\\n")
+        lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n\n"]
+    for cell in cells:
+        cs = clocks.get(cell.label)
+        if cs is None:
+            lines.append("Cell %s: the marker times were not computed.\n\n" % tex_escape(cell.label))
+            continue
+        per = [dict((b["block_id"], b["diff_ms"]) for b in cs["differences"][k]["per_block"]) for k, _ in CLOCK_DIFFS]
+        blocks = sorted(set(b for p in per for b in p))
+        lines += ["{\\footnotesize\n",
+                  "\\begin{longtable}{L{0.10}" + "L{0.22}" * len(CLOCK_DIFFS) + "}\n",
+                  "\\caption{Differences at the block-start markers per block, cell %s, in milliseconds (the first key "
+                  "of the marker on each side; wall clocks unless stated); %s: the marker was not found on a side}"
+                  "\\label{tab:markers-%s}\\\\\n" % (tex_escape(cell.label), NO_VALUE, cell.label),
+                  "\\toprule\n",
+                  "Block & " + " & ".join(label for _, label in CLOCK_DIFFS) + " \\\\\n",
+                  "\\midrule\n\\endhead\n"]
+        for b in blocks:
+            lines.append(" & ".join([fmt_int(b)] + [fmt_num1(p.get(b)) for p in per]) + " \\\\\n")
+        lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n\n"]
+    lines.append(table_key_timing(cells, "reference", "tab:key-timing-reference", True).replace(GENERATED_NOTE, ""))
+    return "".join(lines)
+
+
 # ---------------------------------------------------------------- tables
 
 
@@ -615,37 +1049,122 @@ def ci_text(e):
     return est_ci(e.get("value"), e.get("lo"), e.get("hi"))
 
 
+def speed_range(kept, strata, sp, m):
+    """The range of the Wilson intervals of measure m over the scenarios of speed sp that enter it, as text, and
+    (lo, hi, used, scenarios); lo and hi are None when no scenario enters."""
+    keys = [k for k in kept if k[1] == sp]
+    used = strata_in_range(kept, strata, keys, m)
+    if not used:
+        return "%s (0/%d)" % (NO_VALUE, len(keys)), (None, None, 0, len(keys))
+    lo, hi = interval_range([strata[k][m] for k in used])
+    return "%s--%s (%d/%d)" % (fmt_p(lo), fmt_p(hi), len(used), len(keys)), (lo, hi, len(used), len(keys))
+
+
 def table_detection(cells):
+    """Table 8: detection per cell, comparison and speed. The trials kept per scenario are those of the primary
+    comparison: the three comparisons cover the same trials (section 6.4)."""
     lines = [GENERATED_NOTE,
-             "\\begin{table}[t]\n",
-             "\\caption{Detection per cell and speed: the range from the lowest lower end to the highest upper end of the "
-             "Wilson intervals of the scenarios that keep at least %d trials and have a value of the measure, with the "
-             "number of such scenarios and of all scenarios in parentheses, in the primary scope and over all trials; "
-             "%s: no scenario in the range}\n" % (MIN_TRIALS, NO_VALUE),
+             "\\begin{sidewaystable}[p]\n",
+             "\\caption{Detection per cell, comparison and speed: the range from the lowest lower end to the highest "
+             "upper end of the Wilson intervals of the scenarios that keep at least %d trials and have a value of the "
+             "measure, with the number of such scenarios and of all scenarios in parentheses, in the primary scope and "
+             "over all trials. The comparisons with the prediction exist for the macOS cells only; %s: no scenario in "
+             "the range}\n" % (MIN_TRIALS, NO_VALUE),
              "\\label{tab:detection}\n",
-             "\\begin{tabular}{L{0.18}L{0.08}L{0.185}L{0.185}L{0.185}L{0.185}}\n",
+             "\\begin{tabular}{L{0.17}L{0.12}L{0.07}L{0.16}L{0.16}L{0.16}L{0.16}}\n",
              "\\toprule\n",
-             "Cell & Speed & Recall & Precision & Recall, all trials & Precision, all trials \\\\\n",
+             "Cell & Comparison & Speed & Recall & Precision & Recall, all trials & Precision, all trials \\\\\n",
              "\\midrule\n"]
     for cell in cells:
-        per_scope = {}
+        kept = dict((scope, cell.kept_trials(scope)[0]) for scope in SCOPES)
+        for i, (comp, comp_label) in enumerate((c, l) for c, l in COMPARISONS if c in cell.comparisons):
+            strata = dict((scope, cell.detection_strata(scope, comp)) for scope in SCOPES)
+            for j, sp in enumerate(SPEEDS):
+                row = [tex_escape(cell.label) if i == 0 and j == 0 else "", comp_label if j == 0 else "", sp]
+                for scope in SCOPES:
+                    for m in ("recall", "precision"):
+                        row.append(speed_range(kept[scope], strata[scope], sp, m)[0])
+                lines.append(" & ".join(row) + " \\\\\n")
+    lines += ["\\bottomrule\n", "\\end{tabular}\n", "\\end{sidewaystable}\n"]
+    return "".join(lines)
+
+
+def comparison_values(cell):
+    """The ranges of recall and precision over the scenarios (both scopes) for the comparisons with the prediction,
+    per speed, and over all speeds by the rule of the abstract, for the text."""
+    vals = {}
+    for comp in cell.comparisons:
+        if comp == PRIMARY_COMPARISON:
+            continue
         for scope in SCOPES:
-            kept, _, _ = cell.kept_trials(scope)
-            per_scope[scope] = (kept, cell.detection_strata(scope))
-        for sp in SPEEDS:
-            row = [tex_escape(cell.label) if sp == SPEEDS[0] else "", sp]
-            for scope in SCOPES:
-                kept, strata = per_scope[scope]
-                keys = [k for k in kept if k[1] == sp]
-                for m in ("recall", "precision"):
-                    used = strata_in_range(kept, strata, keys, m)
-                    if used:
-                        lo, hi = interval_range([strata[k][m] for k in used])
-                        row.append("%s--%s (%d/%d)" % (fmt_p(lo), fmt_p(hi), len(used), len(keys)))
-                    else:
-                        row.append("%s (0/%d)" % (NO_VALUE, len(keys)))
-            lines.append(" & ".join(row) + " \\\\\n")
-    lines += ["\\bottomrule\n", "\\end{tabular}\n", "\\end{table}\n"]
+            kept = cell.kept_trials(scope)[0]
+            strata = cell.detection_strata(scope, comp)
+            tag = "primary" if scope == PRIMARY_SCOPE else "all"
+            design = sorted(kept, key=lambda k: (scenario_order(k[0]), SPEEDS.index(k[1])))
+            for m in ("recall", "precision"):
+                src = "%s:cells/%s/%s/%s/%s/metrics/by_stratum/*/%s" % (
+                    cell.src["e1_detection.json"], cell.label, cell.definition, comp, scope, m)
+                used = strata_in_range(kept, strata, design, m)
+                if used:
+                    lo, hi = interval_range([strata[k][m] for k in used])
+                    vals["%s.%s.%s.%s.range" % (cell.label, comp.replace("_", ""), tag, m)] = {
+                        "text": "%s--%s" % (fmt_p(lo), fmt_p(hi)), "value": [lo, hi], "source": src}
+                vals["%s.%s.%s.%s.strata.left" % (cell.label, comp.replace("_", ""), tag, m)] = {
+                    "text": str(len(design) - len(used)), "value": len(design) - len(used), "source": src}
+    return vals
+
+
+def table_layers(cells, d10s):
+    """Supplement: detection per layer of the prediction (macOS), for every comparison and scope, pooled and per
+    speed, with the merge rate of the corrected analysis of deviation D10 next to the registered one."""
+    lines = [GENERATED_NOTE, "\\section*{Detection per layer of the prediction}\n\\label{sec:supp-layers}\n\n",
+             "A diagnostic of the macOS cells (section 6.4 of the registration): the detection measures for the trials "
+             "of four layers marked by the prediction, carried out, received carry, closing key in reading, and the "
+             "trials in none of the three. A trial with several marks is counted in each of its layers. Merge rate: as "
+             "registered; Corrected: the merge rate of the corrected analysis of deviation D10; %s: no value (no "
+             "denominator, or a numerator above the denominator, deviation D10). The Windows cell has no "
+             "prediction.\n\n" % NO_VALUE]
+    for cell in cells:
+        if "gt_pred" not in cell.comparisons:
+            continue
+        d10 = d10s.get(cell.label)
+        lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
+                  "\\begin{longtable}{L{0.10}L{0.10}L{0.11}L{0.07}L{0.08}L{0.07}L{0.12}L{0.12}L{0.07}L{0.07}L{0.09}}\n",
+                  "\\caption{Detection per layer of the prediction, cell %s (definition \\texttt{%s}), with Wilson "
+                  "intervals%s}\\label{tab:layers-%s}\\\\\n" % (
+                      tex_escape(cell.label), tex_escape(cell.definition),
+                      "" if d10 is not None else "; the corrected analysis was not computed for this cell", cell.label),
+                  "\\toprule\n",
+                  "Comparison & Scope & Layer (trials) & Speed & Sessions & Rows & Recall & Precision & Split rate & "
+                  "Merge rate & Corrected \\\\\n",
+                  "\\midrule\n\\endhead\n"]
+        for comp in cell.comparisons:
+            for scope in LAYER_SCOPES:
+                block = cell.det_by[comp].get(scope)
+                layers = ((block or {}).get("diagnostics") or {}).get("prediction_layers")
+                if not layers:
+                    raise ValueError("%s: no layers of the prediction in %s under %s" % (
+                        cell.src["e1_detection.json"], comp, scope))
+                cor_layers = None if d10 is None else d10[comp][scope]["diagnostics"]["prediction_layers"]
+                for li, (name, label) in enumerate(LAYERS):
+                    by = dict((e["stratum"]["speed"], e) for e in layers[name]["by_speed"])
+                    cor_by = {} if cor_layers is None else dict(
+                        (e["stratum"]["speed"], e) for e in cor_layers[name]["by_speed"])
+                    for si, sp in enumerate(SPEEDS + (None,)):
+                        e = layers[name]["pooled"] if sp is None else by.get(sp)
+                        ce = (None if cor_layers is None else cor_layers[name]["pooled"]) if sp is None else cor_by.get(sp)
+                        head = [COMPARISONS[[c for c, _ in COMPARISONS].index(comp)][1] if li == 0 and si == 0 else "",
+                                "\\texttt{%s}" % tex_escape(scope) if li == 0 and si == 0 else "",
+                                "%s (%s)" % (label, fmt_int(layers[name]["n_trials"])) if si == 0 else "",
+                                sp or "pooled"]
+                        if e is None:
+                            lines.append(" & ".join(head) + " & \\multicolumn{7}{l}{not in the result file} \\\\\n")
+                            continue
+                        lines.append(" & ".join(head + [
+                            fmt_int(e["n_gt"]), fmt_int(e["n_obs"]), ci_text(e["recall"]), ci_text(e["precision"]),
+                            fmt_p(e["split_rate"]["value"]), fmt_p(e["merge_rate"]["value"]),
+                            NO_VALUE if ce is None else fmt_p(ce["merge_rate"]["value"])]) + " \\\\\n")
+        lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n\n"]
     return "".join(lines)
 
 
@@ -706,7 +1225,7 @@ def table_strata(cell, d10=None):
                   "\\midrule\n\\endhead\n"]
         kept, _, _ = cell.kept_trials(scope)
         strata = cell.detection_strata(scope)
-        corrected = d10_strata(d10, scope) if d10 is not None else {}
+        corrected = d10_strata(d10[PRIMARY_COMPARISON], scope) if d10 is not None else {}
         for k in sorted(kept, key=lambda k: (scenario_order(k[0]), SPEEDS.index(k[1]))):
             if k not in strata:
                 why = "no trial in the scope" if kept[k] == 0 else "no session in the scope"
@@ -1026,9 +1545,13 @@ def build(results_dir):
     open_docs = dict((c.label, read_open_set(c)) for c in cells)
     e3 = read_e3_all(results_dir)
     d10 = dict((c.label, read_d10(results_dir, c)) for c in cells)
+    clocks = dict((c.label, read_clock_sync(c)) for c in cells)
     values = {}
     for cell in cells:
         values.update(abstract_values(cell))
+        values.update(comparison_values(cell))
+        values.update(reference_values(cell, clocks[cell.label]))
+        values.update(timing_values(cell))
         values.update(d10_values(cell, d10[cell.label]))
         values.update(l2_values(cell))
         values.update(open_set_values(cell, open_docs[cell.label]))
@@ -1046,6 +1569,10 @@ def build(results_dir):
         "closed-set-all.tex": table_closed_set_all(cells, docs).encode("utf-8"),
         "table-text-agreement.tex": table_text_agreement(cells).encode("utf-8"),
         "text-agreement.tex": text_agreement_supplement(cells).encode("utf-8"),
+        "table-reference.tex": table_reference(cells, clocks).encode("utf-8"),
+        "table-key-timing.tex": table_key_timing(cells, "observation", "tab:key-timing").encode("utf-8"),
+        "reference-strata.tex": reference_supplement(cells, clocks).encode("utf-8"),
+        "detection-layers.tex": table_layers(cells, d10).encode("utf-8"),
     }
     strata = [GENERATED_NOTE, "\\section*{Detection per stratum}\n\\label{sec:supp-strata}\n\n",
               "The tables below are generated from the result files of the analysis. The cells whose result files were "
@@ -1101,17 +1628,117 @@ def _agreement(bias, ms):
             "icc21": 0.75, "icc21_ci": [0.5, 0.875], "icc21_ci_status": "ok"}
 
 
-def _fixture(tmp, label="windows-test", sub="windows"):
-    """A synthetic Windows cell: S1 keeps 75, 30 and 29 trials (mid is at the minimum, slow under it), S2 keeps 0."""
-    d = os.path.join(tmp, sub)
-    os.makedirs(d)
-    prim = {"comparison": PRIMARY_COMPARISON, "scope": PRIMARY_SCOPE}
+def _oracle_report():
+    """A plan-versus-ground-truth report whose types have distinct counts, so that a mix-up of types shows."""
+    counts = {"no_session": 4, "unexpected_session": 1, "multiple_sessions": 2, "expected_cancel_got_commit": 0,
+              "expected_commit_got_cancel": 3, "open_at_end": 0, "unknown_trial": 0}
 
-    def det_scope(strata, carry):
+    def rate(x, n):
+        return {"n": x, "rate": float(x) / n, "ci": [max(0.0, float(x) / n - 0.004), float(x) / n + 0.02]}
+    strata = []
+    for sc in ("S1", "S2"):
+        for sp in SPEEDS:
+            by = {"no_session": rate(2, 75), "expected_commit_got_cancel": rate(1, 75)} if (sc, sp) == ("S1", "fast") \
+                else {}
+            n_dis = sum(e["n"] for e in by.values())
+            strata.append({"stratum": {"cell": "c", "scenario": sc, "speed": sp}, "n_trials": 75, "n_disagree": n_dis,
+                           "disagree_rate": n_dis / 75.0, "disagree_ci": [0.0, n_dis / 75.0 + 0.05], "by_type": by})
+    return {"plan_available": True, "n_agree": 440, "unassigned_sessions": 2, "removed_from_evaluation": False,
+            "n_trials": 450, "n_disagree": 10, "disagree_rate": 10 / 450.0, "disagree_ci": [0.012, 0.04],
+            "by_type": dict((t, rate(x, 450)) for t, x in counts.items()), "by_stratum": strata}
+
+
+def _summary(base):
+    """A KT1 summary: integer minimum and maximum, the other figures with decimals (distinct per base)."""
+    return {"n": 100, "mean": base + 0.3, "min": int(base) - 1, "p05": base - 0.5, "median": base, "p95": base + 2.0,
+            "max": int(base) + 7}
+
+
+def _delivery():
+    """A delivery report whose two sides, two versions and speeds differ, so that a mix-up shows."""
+    def reach(reached, sent, outside, loss, excess_rows, excess_trials):
+        return {"reached": reached, "sent_presses": sent, "reach_rate": float(reached) / sent,
+                "excess_rows": excess_rows, "trials_with_excess": excess_trials, "rows_outside_trials": outside,
+                "trials_with_loss": loss}
+
+    def timing(d0, i0):
+        return {"delay_ms": {"overall": _summary(d0), "by_speed": dict(
+                    (sp, _summary(d0 + 10 * (k + 1))) for k, sp in enumerate(SPEEDS))},
+                "interval_error_ms": {"overall": _summary(i0), "by_speed": dict(
+                    (sp, _summary(i0 - 10 * (k + 1))) for k, sp in enumerate(SPEEDS))},
+                "n_trials_paired": 440, "n_trials_not_paired": 10}
+    late = {"n": 1000, "mean": 0.012, "min": 0.001, "p05": 0.002, "median": 0.011, "p95": 0.034, "max": 0.567}
+    focus = {"n_focus_in": 4, "n_focus_out": 4, "n_loss_intervals": 4, "n_loss_intervals_outside_trials": 0,
+             "n_loss_intervals_planned": 3, "n_loss_intervals_unplanned": 1, "n_loss_intervals_unplanned_with_presses": 1,
+             "n_loss_spans": 6, "n_loss_spans_with_unexplained_presses": 0, "n_presses_in_unplanned_losses": 2,
+             "n_presses_unexplained_in_losses": 0, "n_trials_with_focus_loss": 2, "trials_with_focus_loss": ["t7", "t8"],
+             "by_stratum": [{"scenario": sc, "speed": sp, "n_trials": 75,
+                             "n_trials_with_focus_loss": 2 if (sc, sp) == ("S1", "mid") else 0}
+                            for sc in ("S1", "S2") for sp in SPEEDS]}
+    return {"presses": {"all": 1000, "excluding_mode_keys": 990},
+            "trials": {"planned": 450, "begun": 450, "measured": 450, "incomplete": 0},
+            "send_lateness_ms": {"overall": late, "by_speed": dict((sp, late) for sp in SPEEDS)},
+            "observation": {"reach": {"all_presses": reach(990, 1000, 8, 10, 0, 0),
+                                      "excluding_mode_keys": reach(990, 990, 8, 0, 0, 0)},
+                            "timing": timing(3.0, -0.5)},
+            "reference": {"reach": {"all_presses": reach(1000, 1000, 9, 0, 1, 1),
+                                    "excluding_mode_keys": reach(990, 990, 9, 0, 11, 6)},
+                          "timing": timing(5.0, 1.5)},
+            "reference_focus_loss": focus}
+
+
+def _clock_doc():
+    """Marker times: three blocks, the observation's marker missing in block 2."""
+    diffs = {}
+    for i, (k, _) in enumerate(CLOCK_DIFFS):
+        mono = k.endswith("mono")
+        blocks = (0, 1) if k.startswith("obs") else (0, 1, 2)
+        pb = [{"block_id": b, "diff_ms": (i + b + 0.5) if mono else (i + b)} for b in blocks]
+        vs = [p["diff_ms"] for p in pb]
+        diffs[k] = {"n": len(vs), "median_ms": sorted(vs)[len(vs) // 2], "min_ms": min(vs), "max_ms": max(vs),
+                    "offset_at_start_ms": float(i), "drift_ms_per_hour": 10.0 * (i + 1) + 0.25, "residual_max_ms": 0.5,
+                    "per_block": pb}
+    return {"params": {"window_ms": 3000}, "oracle": {"blocks": 3, "with_marker": [0, 1, 2], "missing": []},
+            "differences": diffs, "gt": {"occurrences": 3, "matched": [0, 1, 2], "missing": [], "unmatched_occurrences": 0},
+            "obs": {"occurrences": 2, "matched": [0, 1], "missing": [2], "unmatched_occurrences": 0}}
+
+
+def _layers(shift, novalue=False, drop=None):
+    """Layers of the prediction with distinct values per layer; novalue puts a rate of deviation D10 (numerator above
+    the denominator) into received carry; drop removes one speed of one layer."""
+    out = {}
+    for i, (name, _) in enumerate(LAYERS):
+        def ent(stratum, n, x):
+            e = _stratum("S1", "fast", n, x, 0.30 + 0.01 * i + shift, 0.70 + shift)
+            e["stratum"] = stratum
+            return e
+        by = [ent({"speed": sp}, 40, 20 + i) for sp in SPEEDS if (name, sp) != drop]
+        if novalue and name == "received_carry":
+            by[0]["merge_rate"] = {"value": None, "lo": None, "hi": None, "n": 2, "x": 3,
+                                   "note": "numerator above the denominator"}
+        if novalue and name == "closing_key_in_reading":  # no value because there is no denominator: not D10
+            by[1]["merge_rate"] = {"value": None, "lo": None, "hi": None, "n": 0, "x": 0}
+        out[name] = {"n_trials": 10 + i, "pooled": ent("layer", 120, 60 + i), "by_speed": by}
+    return out
+
+
+def _fixture(tmp, label="windows-test", sub="windows"):
+    """A synthetic cell (Windows under windows/, macOS at the top with the comparisons with the prediction and its
+    layers): S1 keeps 75, 30 and 29 trials (mid is at the minimum, slow under it), S2 keeps 0."""
+    d = os.path.join(tmp, sub) if sub else tmp
+    os.makedirs(d, exist_ok=True)
+    prim = {"comparison": PRIMARY_COMPARISON, "scope": PRIMARY_SCOPE}
+    defn = "windows_def" if sub else "macos_def"
+    focus_u = {"n_trials": 2, "n_rows": 3, "n_false_pos": 1, "by_speed": {"mid": {"n_trials": 2, "n_rows": 3,
+                                                                                    "n_false_pos": 1}}}
+    focus_a = {"n_trials": 2, "n_rows": 5, "n_false_pos": 2, "by_speed": {"mid": {"n_trials": 2, "n_rows": 5,
+                                                                                    "n_false_pos": 2}}}
+
+    def det_scope(strata, carry, focus=None, layers=None):
         return {"metrics": {"by_stratum": strata + [{"stratum": {"cell": "c", "scenario": None, "speed": None},
                                                       "n_gt": 0, "n_obs": 3}]},
                 "excluded": {"trials": {"by_type": {"carry_over": carry}, "n": carry}},
-                "config": {"theta": 0.5}}
+                "config": {"theta": 0.5}, "focus_loss": focus or focus_u, "diagnostics": {"prediction_layers": layers}}
 
     det_u = [_stratum("S1", "fast", 75, 70, 0.85, 0.97), _stratum("S1", "mid", 30, 22, 0.60, 0.86),
              _stratum("S1", "slow", 29, 20, 0.10, 0.99)]
@@ -1171,22 +1798,44 @@ def _fixture(tmp, label="windows-test", sub="windows"):
                                   "mae": 300.0, "n": 50},
                         "abandon": {"agree": 0.9, "agree_ci": [0.8, 0.95], "kappa": None, "kappa_ci": [None, None]},
                         "nav": {"exact": 1.0, "exact_ci": [0.93, 1.0], "n": 50}})
-        return {"metrics": {"by_speed": out}}
+        return {"metrics": {"by_speed": out}, "oracle": _oracle_report()}
 
-    cells_det = {"windows_def": {PRIMARY_COMPARISON: {"under_limit": det_scope(det_u, 1), "all_trials": det_scope(det_a, 1)}}}
-    cells_l1 = {"windows_def": {PRIMARY_COMPARISON: {
+    cells_det = {defn: {PRIMARY_COMPARISON: {"under_limit": det_scope(det_u, 1),
+                                             "all_trials": det_scope(det_a, 1, focus_a)}}}
+    if not sub:
+        # macOS: the primary comparison also under over_limit, the comparisons with the prediction with other
+        # intervals, and the layers of the prediction in every comparison and scope.
+        over = [_stratum("S1", "slow", 46, 10, 0.1, 0.4)]
+        pred = {"gt_pred": ([_stratum("S1", "fast", 75, 60, 0.70, 0.80), _stratum("S1", "mid", 30, 25, 0.50, 0.95),
+                             _stratum("S1", "slow", 29, 20, 0.20, 0.30)], 0.1),
+                "pred_obs": ([_stratum("S1", "fast", 75, 74, 0.88, 0.99), _stratum("S1", "mid", 30, 29, 0.81, 0.99),
+                              _stratum("S1", "slow", 29, 28, 0.80, 0.99)], 0.2)}
+        prim_blk = cells_det[defn][PRIMARY_COMPARISON]
+        prim_blk["under_limit"]["diagnostics"]["prediction_layers"] = _layers(0.0, novalue=True)
+        prim_blk["all_trials"]["diagnostics"]["prediction_layers"] = _layers(0.01)
+        prim_blk["over_limit"] = det_scope(over, 0, None, _layers(0.02))
+        for comp, (strata_u, shift) in pred.items():
+            cells_det[defn][comp] = {
+                "under_limit": det_scope(strata_u, 1, None, _layers(shift)),
+                "all_trials": det_scope([dict(s, stratum=dict(s["stratum"])) for s in det_a], 1, focus_a,
+                                        _layers(shift + 0.01)),
+                "over_limit": det_scope(over, 0, None, _layers(shift + 0.02, drop=("none", "fast")
+                                                               if comp == "pred_obs" else None))}
+    cells_l1 = {defn: {PRIMARY_COMPARISON: {
         "under_limit": l1_scope({"slow": (-900.4, -1050.6, -800.2), "mid": (-500.0, -600.0, -400.0),
                                  "fast": (-100.0, -150.0, -49.5)}),
         "all_trials": l1_scope({"slow": (-2000.0, -2500.0, -1500.0), "mid": (-500.0, -600.0, -400.0),
                                 "fast": (-100.0, -150.0, -50.0)})}}}
-    cells_l2 = {"windows_def": {PRIMARY_COMPARISON: {"under_limit": l2_scope(kept_u, oos_u, excl),
-                                                     "all_trials": l2_scope(kept_a, {}, excl)}}}
+    cells_l2 = {defn: {PRIMARY_COMPARISON: {"under_limit": l2_scope(kept_u, oos_u, excl),
+                                            "all_trials": l2_scope(kept_a, {}, excl)}}}
     # over all trials another value, so that reading the wrong scope shows
-    cells_l2["windows_def"][PRIMARY_COMPARISON]["all_trials"]["agreement_by_stratum"]["slow"]["mean_dwell_ms"] = \
+    cells_l2[defn][PRIMARY_COMPARISON]["all_trials"]["agreement_by_stratum"]["slow"]["mean_dwell_ms"] = \
         _agreement(-4321.0, True)
     for name, cells in (("e1_detection.json", cells_det), ("e1_l1.json", cells_l1), ("e1_l2.json", cells_l2)):
         with open(os.path.join(d, name), "wb") as f:
             f.write(json.dumps({"primary": prim, "cells": {label: cells}}).encode("utf-8"))
+    with open(os.path.join(d, DELIVERY_FILE), "wb") as f:
+        f.write(json.dumps({"cells": {label: _delivery()}}).encode("utf-8"))
     return tmp
 
 
@@ -1351,6 +2000,179 @@ def _selftest_rules(check):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _expect_stop(check, name, tmp):
+    """The script must stop with its own message (ValueError), not run through and not fail elsewhere."""
+    try:
+        build(tmp)
+        check(name, False, "(ran through)")
+    except ValueError:
+        check(name, True)
+    except Exception as e:  # noqa: BLE001 - another error is a failure of this check, not of the selftest
+        check(name, False, repr(e))
+
+
+def _rewrite(path, edit):
+    doc = load(path)
+    edit(doc)
+    with open(path, "wb") as f:
+        f.write(json.dumps(doc).encode("utf-8"))
+
+
+def _selftest_reference(check):
+    """Table 7 (RF1), KT1 and the marker times on a synthetic Windows cell."""
+    tmp = tempfile.mkdtemp(prefix="results_tables_rf1_")
+    try:
+        _fixture(tmp)
+        files = build(tmp)
+        t7 = files["table-reference.tex"].decode("utf-8")
+        vals = json.loads(files["values.json"].decode("utf-8"))["values"]
+        check("rf1: the disagreements with the plan are a count with the rate and its Wilson interval",
+              "Trials that disagree with the plan's intent & 10 (0.022 [0.012, 0.040]) \\\\" in t7, t7[:1500])
+        order = [t7.find("\\quad " + label + " & ") for _, label in PLAN_TYPES]
+        check("rf1: the types of disagreement keep the order of the registration and their own counts",
+              all(o > 0 for o in order) and order == sorted(order)
+              and "\\quad An unexpected session & 1 (" in t7 and "\\quad Several sessions & 2 (" in t7
+              and "\\quad A cancellation where a commit was planned & 3 (" in t7, str(order))
+        check("rf1: the delivery gives both versions in the stated order (all presses / input-mode keys left out) and "
+              "the two sides apart",
+              "Observation: presses that arrived (rate) & 990 (0.990) / 990 (1.000) \\\\" in t7
+              and "Reference: rows beyond the presses sent in a trial (trials) & 1 (1) / 11 (6) \\\\" in t7
+              and "Presses sent & 1{,}000 / 990 \\\\" in t7, t7[1500:4000])
+        check("rf1: the lateness of the executor is the median, the 95th percentile and the maximum",
+              "(ms): median, 95th percentile, maximum & 0.01, 0.03, 0.57 \\\\" in t7)
+        check("rf1: the session rows of the trials with a loss of focus are given per scope",
+              "false positives), primary scope & 3 (1) \\\\" in t7 and "false positives), all trials & 5 (2) \\\\" in t7)
+        check("rf1: a cell without marker times says so", "not computed" in t7 and "windows-test.markers.blocks" not in vals)
+        check("rf1: the values for the text name their sources",
+              vals["windows-test.plan.expected_commit_got_cancel"]["text"].startswith("3 (")
+              and vals["windows-test.delivery.ref.nomode.excessrows"]["value"] == 11
+              and vals["windows-test.focus.trialswithfocusloss"]["value"] == 2
+              and vals["windows-test.focus.rows.all"]["value"] == [5, 2]
+              and vals["windows-test.plan.trials"]["source"].endswith("under_limit/oracle/n_trials"),
+              str(vals.get("windows-test.plan.expected_commit_got_cancel")))
+        kt = files["table-key-timing.tex"].decode("utf-8")
+        check("kt1: the main table is the observation's key rows, per speed, with the seven figures in order",
+              "& slow & Delay & 100 & 13.3 & 12 & 12.5 & 13.0 & 15.0 & 20 \\\\" in kt
+              and "&  & Interval error & 100 & $-$10.2 & $-$11 & $-$11.0 & $-$10.5 & $-$8.5 & $-$3 \\\\" in kt
+              and "& all speeds & Delay & 100 & 3.3 & 2 & 2.5 & 3.0 & 5.0 & 10 \\\\" in kt
+              and "Trials paired: 440; not paired: 10" in kt and "key rows of presses in the log" in kt, kt[-2500:])
+        sup = files["reference-strata.tex"].decode("utf-8")
+        check("kt1: the supplement gives the reference's key-downs in a landscape long table",
+              "& slow & Delay & 100 & 15.3 & 14 & 14.5 & 15.0 & 17.0 & 22 \\\\" in sup
+              and "key-downs of the reference log" in sup and "\\begin{longtable}" in sup
+              and "sidewaystable" not in sup, sup[-1500:])
+        check("kt1: the values give every figure per side, measure and speed",
+              vals["windows-test.kt.obs.delay.mid.p95"]["text"] == "25.0~ms"
+              and vals["windows-test.kt.ref.interval.all.min"]["value"] == 0
+              and vals["windows-test.kt.obs.notpaired"]["value"] == 10, str(vals.get("windows-test.kt.obs.delay.mid.p95")))
+        check("rf1: the supplement gives the types per stratum in the order of the registration and the trials with a "
+              "loss of focus",
+              "S1 & fast & 75 & 3 (0.040 [0.000, 0.090]) & 2 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\\\" in sup
+              and "S1 & mid & 75 & 0 (0.000 [0.000, 0.050]) & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 2 \\\\" in sup, sup[:2500])
+        cs = os.path.join(tmp, "windows", clock_sync_name("windows-test"))
+        with open(cs, "wb") as f:
+            f.write(json.dumps(_clock_doc()).encode("utf-8"))
+        files = build(tmp)
+        t7 = files["table-reference.tex"].decode("utf-8")
+        sup = files["reference-strata.tex"].decode("utf-8")
+        vals = json.loads(files["values.json"].decode("utf-8"))["values"]
+        check("markers: the median, range and drift of each difference, whole milliseconds kept whole",
+              "Observation minus executor (ms): median (range); drift per hour & 1 (0 to 1); 10.2 \\\\" in t7
+              and "Reference minus executor, monotonic clocks (ms): median (range); drift per hour & 3.5 (2.5 to 4.5); "
+              "30.2 \\\\" in t7 and "& 3 of 3, 3, 2 \\\\" in t7, t7[-1800:])
+        check("markers: the supplement gives every block and marks a block not found on a side",
+              "2 & %s & 3 & 4.5 & %s \\\\" % (NO_VALUE, NO_VALUE) in sup and "0 & 0 & 1 & 2.5 & 3 \\\\" in sup, sup[-3000:])
+        check("markers: the values for the text",
+              vals["windows-test.markers.obsoracle.median"]["text"] == "1~ms"
+              and vals["windows-test.markers.gtoraclemono.range"]["text"] == "2.5 to 4.5~ms"
+              and vals["windows-test.markers.obsgt.drift"]["value"] == 40.25,
+              str(sorted(k for k in vals if ".markers." in k)))
+        l1p = os.path.join(tmp, "windows", "e1_l1.json")
+        good = load(l1p)
+        _rewrite(l1p, lambda doc: doc["cells"]["windows-test"]["windows_def"][PRIMARY_COMPARISON]["all_trials"][
+            "oracle"].update({"n_agree": 439}))
+        _expect_stop(check, "rf1: negative: a plan-versus-ground-truth report that differs between scopes stops", tmp)
+        with open(l1p, "wb") as f:
+            f.write(json.dumps(good).encode("utf-8"))
+        detp = os.path.join(tmp, "windows", "e1_detection.json")
+        good_det = load(detp)
+        _rewrite(detp, lambda doc: doc["cells"]["windows-test"]["windows_def"][PRIMARY_COMPARISON]["under_limit"][
+            "focus_loss"].update({"n_trials": 3}))
+        _expect_stop(check, "rf1: negative: trials with a loss of focus that differ from the delivery report stop", tmp)
+        with open(detp, "wb") as f:
+            f.write(json.dumps(good_det).encode("utf-8"))
+        _rewrite(cs, lambda doc: doc["differences"].pop("obs_minus_gt_wall"))
+        _expect_stop(check, "markers: negative: a file without one of the four differences stops", tmp)
+        os.remove(cs)
+        os.remove(os.path.join(tmp, "windows", DELIVERY_FILE))
+        _expect_stop(check, "rf1: negative: a cell without its delivery report stops", tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _selftest_macos(check):
+    """Table 8 with the three comparisons, the layers of the prediction and the corrected merge rate of D10 on a
+    synthetic macOS cell."""
+    tmp = tempfile.mkdtemp(prefix="results_tables_macos_")
+    try:
+        _fixture(tmp, "macos-test", "")
+        files = build(tmp)
+        t8 = files["table-detection.tex"].decode("utf-8")
+        vals = json.loads(files["values.json"].decode("utf-8"))["values"]
+        check("table 8: a macOS cell has the three comparisons in order, each from its own results",
+              t8.find("\\texttt{gt\\_obs} (primary)") < t8.find("\\texttt{gt\\_pred}") < t8.find("\\texttt{pred\\_obs}")
+              and "& \\texttt{gt\\_pred} & slow & " in t8
+              and " & mid & 0.810--0.990 (1/2) & 0.810--0.990 (1/2) & " in t8
+              and " & mid & 0.500--0.950 (1/2) & 0.500--0.950 (1/2) & " in t8, t8[-2500:])
+        check("table 8: the values of the comparisons with the prediction follow the rule of the abstract",
+              vals["macos-test.gtpred.primary.recall.range"]["value"] == [0.5, 0.95]
+              and vals["macos-test.gtpred.primary.recall.strata.left"]["value"] == 4
+              and vals["macos-test.predobs.primary.precision.range"]["value"] == [0.81, 0.99]
+              and "macos-test.gtobs.primary.recall.range" not in vals,
+              str(vals.get("macos-test.gtpred.primary.recall.range")))
+        lay = files["detection-layers.tex"].decode("utf-8")
+        check("layers: every comparison and scope, the four layers in the order of the registration with their "
+              "trials, per speed and pooled, and the corrected column says that it was not computed",
+              lay.count("\\texttt{over\\_limit}") == 3 and lay.count("received carry (11)") == 9
+              and lay.find("carried out (10)") < lay.find("received carry (11)") < lay.find("closing key in reading (12)")
+              < lay.find("none of the three (13)")
+              and "& fast & \\multicolumn{7}{l}{not in the result file}" in lay
+              and "the corrected analysis was not computed for this cell" in lay, lay[:1500])
+        check("layers: a merge rate of deviation D10 is printed as no value",
+              "received carry (11) & slow & 40 & 40 & 0.525 [0.310, 0.700] & 0.525 [0.310, 0.700] & 0.000 & %s & %s" % (
+                  NO_VALUE, NO_VALUE) in lay, lay[:3000])
+        d10d = os.path.join(tmp, "d10", "macos")
+        os.makedirs(d10d)
+        cor = load(os.path.join(tmp, "e1_detection.json"))
+        blocks = cor["cells"]["macos-test"]["macos_def"]
+        for comp in blocks:
+            for scope in blocks[comp]:
+                blocks[comp][scope]["config"]["merge_recount"] = "obs"
+        blocks[PRIMARY_COMPARISON]["under_limit"]["diagnostics"]["prediction_layers"]["received_carry"]["by_speed"][0][
+            "merge_rate"] = {"value": 0.5, "lo": 0.1, "hi": 0.9, "n": 4, "x": 2}
+        with open(os.path.join(d10d, "e1_detection.json"), "wb") as f:
+            f.write(json.dumps(cor).encode("utf-8"))
+        files = build(tmp)
+        lay = files["detection-layers.tex"].decode("utf-8")
+        vals = json.loads(files["values.json"].decode("utf-8"))["values"]
+        check("layers: the corrected merge rate stands next to the registered one, from the same comparison, scope, "
+              "layer and speed",
+              "received carry (11) & slow & 40 & 40 & 0.525 [0.310, 0.700] & 0.525 [0.310, 0.700] & 0.000 & %s & "
+              "0.500 \\\\" % NO_VALUE in lay and lay.count("& 0.500 \\\\") == 1, lay[:3000])
+        check("d10: the merge rates of the layers without a value in the registered analysis are counted",
+              vals["macos-test.d10.layers.novalue"]["value"] == 1, str(vals.get("macos-test.d10.layers.novalue")))
+        del blocks["pred_obs"]["over_limit"]["config"]["merge_recount"]
+        with open(os.path.join(d10d, "e1_detection.json"), "wb") as f:
+            f.write(json.dumps(cor).encode("utf-8"))
+        _expect_stop(check, "d10: negative: a corrected comparison or scope without the switch stops", tmp)
+        shutil.rmtree(d10d)
+        detp = os.path.join(tmp, "e1_detection.json")
+        _rewrite(detp, lambda doc: doc["cells"]["macos-test"]["macos_def"].pop("pred_obs"))
+        _expect_stop(check, "table 8: negative: a macOS cell without a comparison of the registration stops", tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def selftest():
     fails, ran = [], []
 
@@ -1361,6 +2183,8 @@ def selftest():
             print("FAIL: %s %s" % (name, detail))
 
     _selftest_rules(check)
+    _selftest_reference(check)
+    _selftest_macos(check)
 
     tmp = tempfile.mkdtemp(prefix="results_tables_selftest_")
     try:

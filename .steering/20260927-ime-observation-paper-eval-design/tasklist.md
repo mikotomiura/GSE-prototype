@@ -233,5 +233,12 @@
     → 同日: 独立の照合（Opus）の指摘 17 件をすべて一次で裏取りして直した（判断 153）・書誌 [V192]〜[V235] を登録（`4e5e5184`）・補遺の文書一覧 `manuscript/supplement/observability-documents.tex`（31 件・Wayback の写しつき）
   - [x] main に入った M4（PR #297）と Windows の解析（PR #304）を取り込んだ（`745a551f`）。逸脱の番号の衝突は研究者の選択で main の D6（macOS の晩）を保ち、この枝の Windows の試行の数え方を **D7** に（判断 152）。macOS の版（27.0.1・26A434）を原稿に記入
   - [ ] Mac で: AppKit と C の Accessibility の定数の数と `TextInputSources.h` を計測の版（macOS 27.0.1）の SDK のヘッダで確かめる（外枠の Open items・判断 151・153）
+  - [ ] 結果の節（引き継ぎ `next-session-ime-paper-results-3.md`）
+    - [x] 結果の表の道具（判断 156・165・168〜171）: 表 7〜12・KT1・補遺の層ごとの表・予測の層・D10 の直した併合の率・selftest 78 件・変異 29 本（判断 171）
+    - [x] Windows の印の時刻（§6.9・判断 171・`results/windows/clock_sync_windows-msime-tsf.json`）
+    - [ ] Mac で: macOS の 2 セルの印の時刻（§6.9・判断 171 の手順・`gt_vks` は 123・124）→ `results/clock_sync_<cell>.json`・`data.md`
+    - [ ] 表 11 の「規則の性質」（§6.8 の確率の表）の置き方
+    - [ ] `sections/results-*.tex`（RF1 → 問 1・2 → 問 3 → 問 4 → 問 5）
+    - [ ] 完了時レビュー（code-reviewer ∥ security-checker ＋ /cross-review）→ PR
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task

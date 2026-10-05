@@ -558,6 +558,9 @@ figures of the records (the tables of run checks and of attempts, the check of s
   the datasheet.
 - The full SHA-256 of the check plan of section 10.8 is to be copied into `experiment/data.windows.md` from the run
   manifest of the check.
+- The marker times of section 6.9 are to be computed for the two macOS cells, as they were for the Windows cell on 5
+  October 2026 (`experiment/data.windows.md`, "Marker times of section 6.9"), on the machine that holds the macOS runs,
+  and recorded in `experiment/data.md`; until then Table 7 states them as not computed for these cells.
 - What else was running on the Windows measuring machine during the completed run is to be established from the
   records of that machine and stated in section 5.2 and in the table of attempts.
 - The list of documents of the observability analysis (`supplement/observability-documents.tex`, with the URL, the

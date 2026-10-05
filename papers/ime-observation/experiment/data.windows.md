@@ -128,3 +128,30 @@ export, except `<data>`, which is this file, and `<results>`, which is `experime
   has a numerator above its denominator; the registered results of the Windows cell hold no rate without a value. In
   `e1_l1.json` and `e1_l2.json` only the SHA-256 of the detection result that they record (`inputs_sha256.match`)
   differs.
+
+## Marker times of section 6.9 (run on 2026-10-05 on the second Windows machine)
+
+The per-block differences at the block-start markers (section 6.9 of the pre-registration) were measured for attempt 2
+on the machine of the previous section, after the analyses above. `<run>` is the run directory listed above and
+`<results>` is `experiment/results` of this directory.
+
+- **Code.** `kit/pilot/clock_sync.py` and `kit/pilot/seal_obs.py` of the Windows freezing tag, taken with `git archive`
+  with LF line ends (the two files are unchanged in the current commit). Both self-tests passed.
+- **Inputs.** `oracle.jsonl`, `gt.jsonl` and `obs.jsonl` of `<run>` have the SHA-256 that the run manifest records. The
+  observation with key rows only was made from a copy of `obs.jsonl` outside the repository, by
+  `python kit/pilot/seal_obs.py --obs <copy>/obs.jsonl --keys-out obs.keys.jsonl --sealed-dir <copy>/sealed` (exit
+  status 0; SHA-256 of `obs.keys.jsonl` `6b866cf55073b0e5450e779d96321f9d93cfc0dd8dd5892d2c7184bafba36131`); `<run>`
+  was not changed.
+- **Marker specification.** The registration names the tool but not its marker specification. As in the Windows pilot,
+  it is the marker of `plan_config.windows.json` (left, right, left, right), the virtual-key codes of these keys for
+  the reference log, the category `navigation` for the observation, and the largest gap of the example in
+  `kit/pilot/README.md`, which is above the 150 ms of the plan's `marker_gap_ms`:
+  `{"oracle_keys": ["left", "right", "left", "right"], "gt_vks": [37, 39, 37, 39], "obs_categories": ["navigation",
+  "navigation", "navigation", "navigation"], "max_gap_ms": 300}` (one line in the file, SHA-256
+  `8e382eed13bb6e71601c73682690c44bff00050c1161814b92229f8600dc5e9a`). The window is the default of 3,000 ms. The
+  settings were fixed before the output was read; the differences correct no estimate (section 6.9).
+- **Command.** `python kit/pilot/clock_sync.py --oracle <run>/oracle.jsonl --gt <run>/gt.jsonl --obs-keys
+  obs.keys.jsonl --marker marker.json --out <results>/windows/clock_sync_windows-msime-tsf.json`. Exit status 0; a
+  second run gave a byte-identical file. Output SHA-256
+  `5341c3d6e938858ce4ddca4002cb1743e7abd5f4e17317b81c0af49842d622e8`. All 117 blocks have a complete marker in the
+  oracle, and the marker was found in all 117 blocks of the reference log and of the observation (none missing).
