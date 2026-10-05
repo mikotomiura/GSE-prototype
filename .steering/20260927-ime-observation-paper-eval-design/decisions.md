@@ -1371,3 +1371,18 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - **結果**: `main.pdf` 38 頁・エラー 0・未定義の参照は引き継ぎの 4 つ（`fig:components`・`sec:availability`・`sec:limitations`・`sec:results-attempts`）だけ・横のはみ出し 0・縦のはみ出し 2（9・10 頁・4 pt・脚注の頁）。`supplement.pdf` 5 頁・エラー 0（URL の列に数 pt のはみ出し）。表 1・参考文献の頁は画像にして目で確かめた。`_style_check.py` 違反 0。
   - ⚠️ **残したこと**: 雛形の APA の書式は 3 人以上の著者で最後の著者の前に "&" を出さない・会議録の DOI を出さない（出版社の書式なので `.bst` は変えない）。OSF の 2 つの登録の著者は `TODO` のまま（研究者の名の書き方を確かめてから）。BRM の投稿は ScholarOne なので、`.tex` を 1 本にまとめるか・雛形のファイルを上げるかは投稿の段で確かめる（判断 147 の追記）。
 - **影響範囲**: `manuscript/main.tex`・`sections/related.tex`・`observability.tex`・`logger.tex`・`method.tex`・`dataset.tex`・`references.bib`・`supplement/observability-documents.tex`・新規 `supplement/supplement.tex`・`BUILD.md`・`build.sh`。
+
+## 判断 155: 問 4 の閉じた集合は S12 の試行をすべて外す（逸脱 D8）・Windows の run の日時を逸脱 D9 にする・この枝の PR は結果の節の後に出す（2026-10-05・G-GEAR・研究者の選択）
+
+- **背景**: 引き継ぎ §2 の 3（研究者の判断待ち）。Windows の閉じた集合は凍結のコードで止まっていた（`next-session-ime-paper-m7-windows.md` §2.11）。
+- ★ **メインが一次で確かめたこと**: (1) 事前登録 §6.8（864〜868 行）は「S12 の試行は数えない・ライブ変換 ON 2,925・OFF 2,700」、§10.7（1326〜1331 行）は「S12 を除いて 2,700」。凍結の `closed_set.py` の `evaluate()` は「コーパスに無い句」の試行だけを外す（`used = [t for t in trials if t["phrase_id"] in by_id]`）。(2) 計画の生成器はかなのシナリオに、かなで打てるコーパスの句を先に使い切ってから生成したかな文字列を当てる（`generate_plan.py` 580〜592 行）。(3) ★ **3 つの計画を凍結のタグから再生成**（`git archive` → `generate_plan.py --seed 20260929`）し、登録の SHA-256（`c7a5469d…`・`3759ebf7…`・`b7bdf8fc…`）と一致した。どの計画も S12 は 225 試行で、そのうち 74 がコーパスの句（74 句すべて別）→ **macOS の 2 セルも同じ欠陥で止まる**。登録の数（3,150 − 225 = 2,925・2,925 − 225 = 2,700）は S12 をすべて外した数。(4) 開いた集合はシナリオで S12 を外していて（`open_set.py` 82 行）欠陥は無い。(5) Windows の E3 は `idle` が 10-04 13:16〜21:16（本計測の終わった日の昼）、`working` が 21:29〜10-05 08:35。登録 §10.8（1376〜1377 行）は「別々の夜に、この順で」。(6) 01:51 の拒否された開始は D7 が既に扱っている（照合済み・引き継ぎ §2 の 3）。
+- **研究者の選択（3 問とも推奨どおり）**:
+  1. **閉じた集合は S12 の試行をすべて外す**（逸脱 **D8**・3 セルとも）。
+  2. **Windows の run の日時を逸脱として記録**（**D9**・macOS の D6 と同じ形）。
+  3. **この枝の PR は結果の節の後に出す**（いまは push だけ・完了時レビューは結果の節と D8・D9 を足してから 1 回）。
+- **実装（メインの選択・研究者が覆せる）**:
+  - `kit/e2/closed_set.py` に **`--skip-scenario S`**（繰り返し可・既定なし）を足した。試行を計画に合わせた**後**で外すので、`alignment` と `n_trials` は計画の全体のまま、出力に `skipped_scenarios`（シナリオごとの数）を足す。⚠️ 既定（スイッチなし）の出力は凍結のコードと同じ（出力の辞書に鍵を足すのはスイッチがあるときだけ・候補は試行ごとの種から引くので他の試行の引きは変わらない〔`_sub_seed(tseed, "cand")`〕）。`evaluate()` は変えていない（selftest の S12 を含む検査がそのまま通る）。名前の検査（`S[1-9][0-9]*`・二重の指定を拒む）。selftest に 6 件（スイッチなしで鍵が無い・S2 を外す・計画に無い S12 は 0・名前の拒否・二重の拒否）→ **157 / 157**。★ 変異 3 本（外さない・鍵を常に書く・名前の検査を外す）はどれも selftest を赤にし、無変異の写しは緑（対照）。`kit/e2/README.md` に使い方。
+  - `experiment/deviations.md` に **D8**（理由・3 計画の再生成と 74 / 225・効果）と **D9**（時刻・順と重なりなし）。冒頭の文に D8・D9。
+  - `manuscript/sections/method.tex`: Windows の日時の `\tbd` を D9 の文で埋め、逸脱の表に D8・D9、「Nine deviations」。`outline.md` の §5.9 を「D1 to D9」に。
+- ⚠️ **残り（次の作業）**: 閉じた集合を回すのは計測の機械（Windows = Surface の `experiment/runs/windows-msime-tsf-2`・macOS = Mac）。命令は §6.8・§10.7 のものに `--skip-scenario S12` を足し、`kit/e2/closed_set.py` だけこの commit のもの、他は各 OS の凍結のタグの書き出し。macOS の問 1〜4 もまだ回っていない。
+- **影響範囲**: `kit/e2/closed_set.py`・`kit/e2/README.md`・`experiment/deviations.md`・`manuscript/sections/method.tex`・`manuscript/outline.md`。

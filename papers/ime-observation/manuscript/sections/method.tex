@@ -47,7 +47,9 @@ On each machine the cells were measured in a fixed order (on macOS, live convers
 conditions of the runtime-cost study (Section~\ref{sec:cost}), so that the replay used for the runtime cost added no
 learning to the input method before the agreement cells were measured. The registration asks for the runs to be made
 on separate nights; on macOS each run was started as soon as the check of the one before it was done, so the runs
-followed one another without overlapping (deviation D6). \tbd{The timing of the Windows runs, as recorded.}
+followed one another without overlapping (deviation D6). On Windows the cell was measured through the night and the
+morning, the idle condition in the afternoon and evening of the same day and the working condition in the following
+night, again in the registered order and without overlapping (deviation D9).
 
 \subsection{Reference input fields and ground truth}
 \label{sec:method-reference}
@@ -360,14 +362,16 @@ Registration & \url{https://osf.io/9nh7r} & \url{https://osf.io/4jwzn} \\
 \end{tabular}
 \end{table}
 
-Seven deviations were recorded (Table~\ref{tab:deviations}): five for the Windows cell before the Windows
-measurement, one for the macOS runs after their measurement and before their analysis (D6), and one for the Windows
-cell after its measurement and before its analysis (D7). The registration allowed the addendum to change only the
+Nine deviations were recorded (Table~\ref{tab:deviations}): five for the Windows cell before the Windows
+measurement, one for the macOS runs after their measurement and before their analysis (D6), two for the Windows runs
+after their measurement (D7, before the analysis of the cell, and D9), and one for the closed-set attack of all three
+cells before that attack was run on any of them (D8). The registration allowed the addendum to change only the
 Windows parts of existing files; deviations D1 to D4 touched other parts. On the macOS cells they change nothing that
 is reported: the
 macOS plans generated with the changed generator differ only in the recorded SHA-256 of a procedure file, the result
 files of the changed analysis code on synthetic macOS runs are byte-identical to those of the macOS tag, and the macOS
-analysis was run from the macOS tag. \tbd{Deviations recorded after this draft, if any.}
+analysis was run from the macOS tag, the closed-set attack with the switch that D8 adds. \tbd{Deviations recorded
+after this draft, if any.}
 
 \begin{table}[t]
 \caption{Deviations from the registration}
@@ -397,6 +401,13 @@ two cells, was kept, and no two runs overlapped. \\
 D7 & On Windows an attempt stopped from outside the runner is counted as aborted, and a start refused by the runner
 before its first trial, made with administrator rights, is not counted. &
 The registration names neither event; the refused start was forbidden by the addendum and sent no key. \\
+D8 & The closed-set attack leaves out every trial of scenario S12, through a switch added to the attack; without the
+switch its output is that of the frozen code. &
+The registration does not count the S12 trials, but the frozen code kept the 74 S12 trials of each plan whose phrase
+is in the corpus, and stopped because too few decoys remained. \\
+D9 & The Windows runs were made in the registered order, each started as soon as the check of the one before it was
+done, not on separate nights. &
+As for D6; the order was kept, and no two runs overlapped. \\
 \bottomrule
 \end{tabular}
 \end{table}
