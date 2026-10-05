@@ -222,7 +222,7 @@
   - [x] attack-me（外枠）round 1 → **major**（有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 149・7 問とも推奨）→ 外枠を全面的に直した（31 行）・D6 と §10.8 の点検を公開の記録に（`deviations.md`・`data.windows.md`）
   - [x] attack-me（外枠）round 2 → **major**（R1 major・R2 minor・R3 major・有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 150・6 問とも推奨＋事実 1 問）→ 外枠を直した（Y1〜Y44・要旨の規則を事前登録 §6.1 に合わせた・推奨 (d) を 2 段に・表を 13 に）・`method.tex`・D6 の言い方
   - [ ] ★ round 3 は回さない → 原稿の attack-me（stage `manuscript`・10-18〜22）に外枠の round 1・2 の引き継ぎを渡す（判断 150-4）
-  - [ ] 試行 2 の間に Surface で何が動いていたか（Y12・判断 150-6）→ Surface のセッションで調べて `data.windows.md`・外枠 §5.2 に
+  - [x] 試行 2 の間に Surface で何が動いていたか（Y12・判断 150-6）→ `data.windows.md` に書かれていた。原稿 §6.1 に写した（判断 188・Z4）
   - [x] 手法の節の残り: 問 4（`sections/recoverability.tex`）と問 5（`sections/cost.tex`）の手法（2026-10-05・`730edd64`）
   - [x] 手法の節の草稿 `manuscript/sections/method.tex`（LaTeX・約 5,200 語・判断 148）・`references.bib`・`main.tex` の骨組み。⚠️ 未コンパイル（この機械に LaTeX が無い）
   - [x] 公開物の文体検査を `.tex` / `.bib` に広げた（判断 148・selftest ＋ 変異 2 本）
@@ -246,9 +246,13 @@
     - [x] 要旨と結論（外枠の Rule for the abstract・248 語）・§1・§11〜13・Declarations・Open Practices・D10 を手法の節に（判断 182）
     - [x] 完了時レビュー（code-reviewer ∥ security-checker ＋ /cross-review 2 巡・判断 183・184）→ PR
     - [x] M12 の寄託の 4 点（E3 の標本・working の観測ログ・パイロットの生ログ・コードの DOI）を研究者が決めた（判断 183）
-    - [ ] 原稿の attack-me（stage manuscript）→ 引き継ぎ `next-session-ime-paper-manuscript-2.md`
+    - [x] 原稿の attack-me（stage manuscript）round 1 → **major**（R1・R2・R3 とも・有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 188・8 問とも推奨＋dwell の分位点の問い直し）→ 直した（`verdict.md` §8）→ 作業中の点検と /cross-review 2 巡の指摘を直した（判断 189）（2026-10-06・G-GEAR）
+    - [ ] Mac で: macOS の 2 セルの探索的な dwell の分位点（`kit/analysis/explore_dwell_quantiles.py`・判断 188-4）→ `experiment/results/exploratory/dwell_quantiles_<cell>.json`（原稿の `\rv` 8 個が埋まる）
+    - [ ] 表の道具に Windows の 2 つの定義の差の大きさ（Z40）
+    - [ ] 原稿の attack-me round 2 を回すか（研究者に問う・研究者の読み直しの後が推奨）
     - [x] 著者・所属・Funding・利益相反・貢献（研究者・判断 185）と AI Declaration（判断 185〜187）→ PR #309 で main に
-    - [ ] 研究者が結果・推奨・限界・結論を読んで直す（判断 185・186・投稿の前・AI Declaration の前提）
+    - [ ] 研究者が結果・推奨・限界・結論を読んで直す（判断 185・186・投稿の前・AI Declaration の前提）＋ Discussion を研究者の解釈から書く（判断 188-6）＋ 断りの重複を削る（Z10）
+    - [ ] OSF のプロフィール名が「Mikto Miura」→ 研究者に確かめてもらう（判断 189 の記録）
     - [ ] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task

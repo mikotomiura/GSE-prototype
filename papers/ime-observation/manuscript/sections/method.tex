@@ -6,12 +6,14 @@
 \section{Validation method}
 \label{sec:method}
 
-The logger was validated by comparing its rows with sessions assembled from the calls that a reference input field
+The logger was evaluated by comparing its rows with sessions assembled from the calls that a reference input field
 received from the input method, while a program typed according to a plan whose intent was known. The protocol, the
 analysis code and its settings were registered and frozen before any measurement: first for the two macOS cells
 \citep{prereg-macos}, then, in an addendum frozen before the first Windows measurement, for the Windows cell
-\citep{prereg-windows}. This section describes the protocol as registered; Section~\ref{sec:deviations} lists every
-departure from it.
+\citep{prereg-windows}. The registrations call the logger the observer. The study estimates and tests no hypothesis;
+the only rule that turns an estimate into a decision is the near-chance rule of the recoverability study
+(Section~\ref{sec:recoverability}). This section describes the protocol as registered; Section~\ref{sec:deviations}
+lists every departure from it.
 
 \subsection{Overview}
 \label{sec:method-overview}
@@ -38,9 +40,13 @@ input method (Japanese, Romaji input) with its default settings, measured on an 
 i5-1135G7, 8 GB of memory) with a JIS keyboard under Windows 11 Home 25H2 (build 26200.9457, input method
 10.0.26100.9278). These versions differed from those of the Windows pilot (build 26200.8875, input method
 10.0.26100.8875), so, as the addendum requires, the 39-trial check plan of the pilot was run first on the measuring
-machine; every trial produced the session its plan intends (39 of 39), and the cell was measured. On both systems the predictive candidates were left at their default (shown). Each machine ran on
-mains power, with automatic updates, network time synchronisation, sleep, the screen lock and the screen saver turned
-off; on Windows the runs were started from a terminal without administrator rights. The learning of the input method
+machine; every trial produced the session its plan intends (39 of 39), and the cell was measured. On both systems the
+predictive candidates were left at their default (shown). The registration asks for each machine to run on mains power,
+with automatic updates, network time synchronisation, sleep, the screen lock and the screen saver turned off; the run
+manifests do not record these settings. What else ran on each machine is reported with the runs
+(Section~\ref{sec:results-attempts}); on Windows the records show one automatic update during the completed run. On
+Windows the runs were started from a terminal without administrator rights. The runs on both systems were started and
+monitored by an AI coding assistant under the author's instructions (Declarations). The learning of the input method
 was not reset at any point: no method of resetting it was found on macOS, and the Microsoft input method offers no
 command that clears its input history. The run manifest of every run records the versions of the system, the input
 method and the programs, and the outcome of every check of the front window.
@@ -234,8 +240,10 @@ under the logger's rules, such as the minus, comma or period key).
 The prediction separates two sources of disagreement. Three comparisons were computed with the same matching and the
 same measures: ground truth against observation (the primary comparison), ground truth against prediction (how well
 the rules, carried out exactly, describe the sessions of the reference field) and prediction against observation
-(whether the logger carries out its rules). The Windows logger follows the input method's windows, which the presses do
-not determine, so no prediction applies to it, and only the primary comparison was computed for the Windows cell.
+(whether the logger carries out its rules). The tables call them reference vs.\ logger, reference vs.\ specified rows
+and specified rows vs.\ logger, the specified rows being the rows of the prediction. The Windows logger follows the
+input method's windows, which the presses do not determine, so no prediction applies to it, and only the primary
+comparison was computed for the Windows cell.
 
 \subsection{Checks of the instruments and the stopping rule}
 \label{sec:method-checks}
@@ -316,26 +324,41 @@ per speed; and by the exact agreement of the navigation count with the arrow pre
 20~s or more and the rows of the long trials are counted. Question~3 (per-text agreement) groups the trials of each
 block, in plan order, into texts of eight trials and computes four aggregates on both sides: the conversions per
 trial, the mean conversion time, the abandonment rate and the fraction of time spent converting. Agreement is reported
-per speed by the Bland--Altman bias and limits of the per-text difference and by the intraclass correlation for
-absolute agreement of a single measurement, ICC(A,1) in the notation of \citet{mcgrawwong1996}, which equals
-ICC(2,1) of \citet{shroutfleiss1979}. The bias is also reported for three mixtures of the speeds, and three
-per-trial differences are reported per scenario and speed so that a reader can weight the scenarios differently.
+per speed by the Bland--Altman bias and limits of the per-text difference and by the intraclass correlation of a
+two-way mixed model with the two methods as the only raters of interest, for absolute agreement of a single
+measurement: ICC(A,1) in the notation of \citet{mcgrawwong1996}, which has the same value as ICC(2,1) of
+\citet{shroutfleiss1979}, computed by the analysis code of the kit (\texttt{kit/analysis/stats.py}). The bias is also
+reported for three mixtures of the speeds, and three per-trial differences are reported per scenario and speed so that
+a reader can weight the scenarios differently. The bias, the limits of agreement, kappa and the ICC are the effect sizes
+of this study; it tests no hypothesis, so no statistical power is computed, and the numbers of trials were set by the
+precision plan above.
+
+\paragraph{Exploratory analysis.} Not registered: because the errors of the duration have long tails, the 2.5th and
+97.5th percentiles of the error and the fractions of pairs within 100~ms and within 1~s are reported for the pairs of
+the primary comparison, without intervals. A script runs the frozen analysis unchanged, takes its pairs and requires
+them to reproduce its number of pairs, bias and median absolute error at every speed before it computes these figures.
 
 \paragraph{Intervals and wording.} The primary estimates are given per cell, scenario and speed. Proportions carry
 95\% Wilson intervals \citep{wilson1927}. Continuous measures, the limits of agreement, kappa and the ICC carry 95\%
 percentile bootstrap intervals \citep{efron1979} from 2{,}000 resamples of whole blocks \citep{cameron2008}, because
 the trials of a block share the state of the input method. Pooled proportions carry Wilson intervals that ignore this
 clustering and are read as lower bounds of the uncertainty. A value that cannot be computed is reported as missing with
-its reason, never as zero. Synthetic input has no natural mix of scenarios, so a pooled value is labelled as pooled and
-is not an estimate of accuracy in natural typing. No threshold of adequate agreement was set, and the estimates are
-described without evaluative words. Analyses not described in the registration are labelled as exploratory.
+its reason, never as zero; this includes an ICC whose reference has the same value in every text, which is zero
+whatever the logger writes, or undefined if the logger writes that same value in every text too (deviation D11). Synthetic input has no natural mix of scenarios, so a pooled value is
+labelled as pooled and is not an estimate of accuracy in natural typing. No threshold of adequate agreement was set,
+and the estimates are described without evaluative words. The one analysis not described in the registration is the
+exploratory analysis above, and it is labelled as such.
 
-\paragraph{Reproducibility.} The analysis of each system was run by one command from a clean checkout of its freezing
-tag. Before any statistic, the analysis checked the freeze marks, the SHA-256 of every log against its run manifest,
-the content-free format of every log, and the plan of every run, and it refused a run that the stopping rule catches.
-The result files record the SHA-256 of the configuration, the rules, every manifest and every log. Every result value
-in this article is copied from the result files by a script that is released with the code (Declarations, Code
-availability).
+\paragraph{Reproducibility.} The analyses were run from exports of the freezing tags: the registered analysis of
+questions 1 to 3 with the matching code of the first change of deviation D10, which leaves the results of the frozen
+code unchanged, the corrected analysis with its second change, and the closed-set attack with the switch of deviation
+D8; each of these replaces one file of the export. Before any statistic, the analysis checked the freeze marks, the
+SHA-256 of every log against its run manifest, the content-free format of every log, and the plan of every run, and it
+refused a run that the stopping rule catches. The result files record the SHA-256 of the configuration, the rules,
+every manifest and every log. The supplement lists, for every result file, the code it was made with, and the records
+of the runs give the commands and the SHA-256 of every output. The result values of this article are copied from the
+result files by a script that is released with the code, and the figures of the records (the attempts, the checks of
+the runs, the deviations) from the records of the runs (Declarations, Code availability).
 
 \subsection{Registration and deviations}
 \label{sec:deviations}
@@ -365,11 +388,14 @@ Registration & \url{https://osf.io/9nh7r} & \url{https://osf.io/4jwzn} \\
 \end{tabular}
 \end{table}
 
-Ten deviations were recorded (Table~\ref{tab:deviations}): five for the Windows cell before the Windows
+Eleven deviations were recorded (Table~\ref{tab:deviations}): five for the Windows cell before the Windows
 measurement, one for the macOS runs after their measurement and before their analysis (D6), two for the Windows runs
 after their measurement (D7, before the analysis of the cell, and D9), one for the closed-set attack of all three
-cells before that attack was run on any of them (D8), and one for the analysis of questions 1 to 3 (D10), made when
-the frozen analysis stopped on the macOS cells and before any of their results of these questions was seen. The
+cells before that attack was run on any of them (D8), one for the analysis of questions 1 to 3 (D10), made when the
+frozen analysis stopped on the macOS cells and before any of their results of these questions was seen, and one for the
+reporting of the per-text ICC (D11), made after all results had been seen. The registered results of questions 1 to 3
+of the Windows cell, on which the frozen code did not stop, had been computed and committed before D10, and the
+corrected analysis of D10 was applied to them as well. The
 registration allowed the addendum to change only the Windows parts of existing files; deviations D1 to D4 touched
 other parts. On the macOS cells they change nothing that is reported: the macOS plans generated with the changed
 generator differ only in the recorded SHA-256 of a procedure file, the result files of the changed analysis code on
@@ -418,6 +444,11 @@ a corrected analysis, reported next to the registered one, counts a recounted me
 session row is counted. &
 The frozen code counted a recounted merge in the stratum of the missed session, so the numerator of a stratum's
 merge rate could exceed its denominator, and the analysis of the macOS cells stopped before it wrote any result. \\
+D11 & The per-text ICC of a stratum whose reference has the same value in every text is reported without a value, with
+the reason, and the reference's standard deviation between texts is reported next to every ICC. &
+Such an ICC is zero whatever the logger writes (or undefined if the logger writes that same value in every text too); the
+registration reports a measure with zero variance as missing, never as zero, but the frozen code returns no value only
+when every value of both sides is the same. \\
 \bottomrule
 \end{tabular}
 \end{table}

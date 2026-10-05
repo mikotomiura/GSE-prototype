@@ -1,12 +1,15 @@
 # Deviations
 
 Departures from the frozen registration (`preregistration.md`, tag `ime-observation-prereg-macos`), recorded
-under section 8 before the analysis they affect is run. Each entry gives its date, the reason and the effect. D1
+under section 8 before the analysis they affect is run, except D11, which changes how a result is reported and was
+made after every result had been seen. Each entry gives its date, the reason and the effect. D1
 to D5 were made for the Windows cell before any Windows measurement; the evidence that they leave the macOS
 cells unchanged is given at the end. D6 concerns the macOS
 measurement. D7 was made after the measurement of the Windows cell and before any analysis of it, and concerns
 the Windows cell only. D8 was made before the closed-set attack of question 4 was run on any cell, and concerns all
-three cells. D9 concerns the Windows measurement.
+three cells. D9 concerns the Windows measurement. D10 was made when the analysis of the macOS cells stopped, before
+any of their results of questions 1 to 3 was seen; the registered results of the Windows cell had been computed by
+then. D11 concerns the report of question 3 in all three cells.
 
 ## D1. Scenario S4 presses three Escapes on Windows (2026-10-03)
 
@@ -239,6 +242,33 @@ the first change a stratum may report its merge rate without a value; under the 
 change wherever a recounted merge crosses strata, including the primary strata of section 6.4. The pooled rates
 over all trials are the same under both rules. The code of both changes is in commit `115cd5ff`, and the selftest
 of `match.py` checks both rules on a constructed case.
+
+## D11. A per-text ICC whose reference is the same in every text is reported without a value (2026-10-06)
+
+**What changes.** In the report of question 3 (section 6.7), the ICC(A,1) of a measure and speed whose ground-truth
+values are the same in every text is given as no value, with the reason that the reference's value is the same in
+every text, instead of the number that the frozen code returns; and the standard deviation of the ground-truth values
+between the texts is reported next to every ICC. The analysis code and the result files do not change: the change is
+made by the script that turns the result files into the tables and the values of the article
+(`manuscript/tools/results_tables.py`), which reads the ground-truth values of each text from the per-text aggregates
+of the result files and requires them to cover the same texts as the ICC.
+
+**Reason.** In the two-way model of the ICC, a column that is the same in every row makes the mean square between the
+subjects equal to the residual mean square, so ICC(A,1) is zero whatever the other column holds (or undefined, if the
+other column holds that same value in every row too). Section 6.11 of the
+registration reports a measure that cannot be computed because of zero variance as missing, with the reason, never as
+zero; the frozen code (`kit/analysis/stats.py`) returns no value only when every value of both columns is the same. The
+design gives every trial of the primary scope one session in most strata, so the conversions per trial of the
+reference are 1 in every text there.
+
+**Effect.** In the primary scope, six of the per-speed ICCs of the conversions per trial lose their value of 0.000:
+the three speeds of the macOS cell with live conversion off, the slow speed of the macOS cell with it on, and the slow
+and middle speeds of the Windows cell. In the supplement, eight more lose theirs: the ICCs pooled over the speeds of
+the macOS cell with live conversion off in the primary scope and over all trials, and, over all trials, the same six
+strata as in the primary scope. Every other value of question 3 is unchanged. In two strata (the middle and the fast
+speed with live conversion on) the reference differs from 1 in a single text; their ICCs keep their values and are
+described in the text as near zero for the same reason. This deviation was made after all results had been seen, when
+a simulated review of the article before its submission pointed out these values.
 
 ## The macOS cells are unchanged
 

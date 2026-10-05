@@ -3,7 +3,7 @@
 \centering
 \pgfplotslegendfromname{fig:text-agreement:legend}\par\medskip
 \begin{tikzpicture}
-\begin{groupplot}[group style={group size=1 by 4, vertical sep=1.4cm}, fig panel, fig zero, scale only axis, width=11cm, height=2.5cm, xtick={1,2,3}, xticklabels={\texttt{macos-standard-live-off},\texttt{macos-standard-live-on},\texttt{windows-msime-tsf}}, xmin=0.5, xmax=3.5]
+\begin{groupplot}[group style={group size=1 by 4, vertical sep=1.4cm}, fig panel, fig zero, scale only axis, width=11cm, height=2.5cm, xtick={1,2,3}, xticklabels={{macOS, live conversion off},{macOS, live conversion on},{Windows}}, xmin=0.5, xmax=3.5]
 \nextgroupplot[title={Conversions per trial}, legend to name=fig:text-agreement:legend, legend columns=4]
 \addlegendimage{fig slow, fig point}
 \addlegendentry{slow}

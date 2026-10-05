@@ -16,7 +16,10 @@ gives the rows and the definitions on each system.
 \label{sec:logger-rows}
 
 \paragraph{Key rows.} For each press and each release of an observed key the logger writes a row with the time on
-the wall clock in whole milliseconds, one of fourteen categories and whether the event was a press. The categories
+the wall clock in whole milliseconds, one of fourteen categories and whether the event was a press. The time is read
+from the wall clock when the event reaches the logger's keyboard hook (Windows) or event tap (macOS), not taken from the
+event's own time stamp, so an adjustment of the system clock moves it. The rows are written for the presses of every
+application: the log does not record which application received a key. The categories
 keep the kind of a key and discard which key it was: letters, digits, punctuation and symbol keys, the comma and
 period keys, Tab, Backspace, Delete, Space, Return, navigation keys, modifier keys, function keys, Escape and other
 keys. The comma and period keys form a category of their own because they can mark the boundaries of clauses and
@@ -72,7 +75,10 @@ committed by Return, by any key other than a letter, digit, Space, Backspace, ar
 to non-Japanese input, at the mode key or at the next press; it is closed as abandoned by Escape. Space, Backspace and the arrow keys keep a session open,
 and a press with the Command or Control modifier is a shortcut that leaves the session unchanged. The minus, comma
 and period keys, which in Romaji input type a long-vowel mark, a comma and a full stop inside a reading, close a
-session, so a reading that contains them is split into several sessions. A digit that chooses a candidate continues
+session, so a reading that contains them is split into several sessions. With the kana layout the same holds for every
+kana typed with a symbol key, among them the voiced-sound mark, which the JIS layout places on the @ key; the kana
+strings of S12 used only the 39 kana typed with letter, digit, minus, comma and period keys, and the last three of these
+close a session as above. A digit that chooses a candidate continues
 the session, as does the next letter after a candidate chosen with the mouse, so one row can cover several
 conversions. A session is cut off, without a row, at the first press that comes 20~s or more after it opened; that
 press starts afresh. \texttt{nav} counts the arrow presses of the session and \texttt{abandon} records that Escape
@@ -88,7 +94,8 @@ event reports that a window of the input method has become visible, changed or h
 session is open, opens a session, and a dismissal closes it. A display while a session is open starts the session
 again without a row. This path has no cut-off at 20~s; a window still shown 25~s after the session opened is ended by a
 safety valve of the monitoring loop, which writes a row with a duration of about 25~s, and the next change of the
-window opens a new session. On the second path, used until the first window event of a run arrives and whenever none
+window opens a new session; the valve is part of the logger's main loop (\texttt{kit/logger/src/main.rs}), where a
+unit test exercises it, and it wrote no row in the measurement (Section~\ref{sec:results-detection}). On the second path, used until the first window event of a run arrives and whenever none
 has arrived for 60~s, the logger follows the cloaking and uncloaking of windows of the input method's class: a session
 opens when such a window becomes visible and closes when none is visible, a gap shorter than 150~ms is folded into the
 session, and a session is cut off, without a row, 20~s after it opened, whether or not the window is still shown. The monitoring loop
@@ -138,23 +145,24 @@ Cut-off & At the first press 20~s or more after opening; no row & Window events:
 \end{tabular}
 \end{table}
 
-\begin{table}[t]
+\begin{table}[tp]
 \caption{Measures of keystroke studies of writing: whether each can be computed from the logger's rows alone, and
 whether this study estimates its agreement with a reference}
 \label{tab:measures}
-\begin{tabular}{L{0.18}L{0.18}L{0.18}L{0.20}L{0.26}}
+\begin{tabular}{L{0.18}L{0.17}L{0.17}L{0.18}L{0.30}}
 \toprule
 Measure & macOS & Windows & Agreement estimated & Reason when not computable or not estimated \\
 \midrule
 Inter-key intervals and pauses between presses & Yes & Yes & Timing of the rows of presses on the software path only (Section~\ref{sec:method-checks}) & Physical keyboard and keys outside the observed set not covered \\
 Pauses at word and sentence boundaries & Partly & Partly & No & No text; only the comma and period keys are marked, and Space converts rather than separating words \\
-Pauses before and after a conversion is committed & Approximately & Approximately & No & The row gives the collection time and the duration, not the time of the commit \\
-Key hold times & Yes & Yes & No & Releases are paired by category only; release times were not evaluated \\
+Pauses before and after a conversion is committed & Approximate & Approximate & No & The row gives the collection time and the duration, not the time of the commit \\
+Key hold times & Without overlap only & Without overlap only & No & Releases pair with presses by category, so overlapping presses of one category cannot be paired; release times not evaluated \\
 Revisions (Backspace and Delete) & Counts & Counts & No & No text; whether a deletion edits a reading or committed text is not recorded \\
-Bursts of typing & Yes & Yes & No & Not evaluated \\
+Bursts of typing & Bounded by pauses only & Bounded by pauses only & No & The conditions on revisions and on the place of insertion need the text and the cursor \\
+Keys of one document or application & No & No & No & The application that received a key is not recorded, so key rows of every application are mixed \\
 Word counts, production and efficiency ratios & No & No & No & No text and no final product \\
 Input mode & No & No & No & The input-mode keys produce no row and the mode is not written \\
-Conversions and their duration & Yes & Yes & Detection and duration (Section~\ref{sec:method-analysis}) & Different constructs on the two systems \\
+Conversions and their duration & Yes, as inferred sessions & As window appearances; one conversion can give several rows & Detection and duration (Section~\ref{sec:method-analysis}) & Different constructs on the two systems \\
 Candidate navigation & Yes & Upper bound & Agreement with the arrow presses sent & Counted in any application on Windows \\
 Abandonment & Yes & Upper bound & Agreement with the session's outcome & Counted in any application on Windows \\
 Four per-text aggregates of this study & Yes & Yes & Per-text agreement & Defined by this study \\
