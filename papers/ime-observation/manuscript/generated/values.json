@@ -1213,6 +1213,88 @@
     0.8876248419138355
    ]
   },
+  "macos-standard-live-off.markers.blocks": {
+   "source": "clock_sync_macos-standard-live-off.json:oracle|gt/matched|obs/matched",
+   "text": "117 of 117 blocks",
+   "value": [
+    117,
+    117,
+    117,
+    117
+   ]
+  },
+  "macos-standard-live-off.markers.gtoracle.drift": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/gt_minus_oracle_wall/drift_ms_per_hour",
+   "text": "$-$0.5~ms per hour",
+   "value": -0.53
+  },
+  "macos-standard-live-off.markers.gtoracle.median": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/gt_minus_oracle_wall",
+   "text": "3~ms",
+   "value": 3
+  },
+  "macos-standard-live-off.markers.gtoracle.range": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/gt_minus_oracle_wall",
+   "text": "2 to 117~ms",
+   "value": [
+    2,
+    117
+   ]
+  },
+  "macos-standard-live-off.markers.gtoraclemono.drift": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/gt_minus_oracle_mono/drift_ms_per_hour",
+   "text": "$-$0.5~ms per hour",
+   "value": -0.53
+  },
+  "macos-standard-live-off.markers.gtoraclemono.median": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/gt_minus_oracle_mono",
+   "text": "2.5~ms",
+   "value": 2.537
+  },
+  "macos-standard-live-off.markers.gtoraclemono.range": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/gt_minus_oracle_mono",
+   "text": "2.0 to 116.8~ms",
+   "value": [
+    1.966,
+    116.776
+   ]
+  },
+  "macos-standard-live-off.markers.obsgt.drift": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/obs_minus_gt_wall/drift_ms_per_hour",
+   "text": "0.1~ms per hour",
+   "value": 0.097
+  },
+  "macos-standard-live-off.markers.obsgt.median": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/obs_minus_gt_wall",
+   "text": "$-$2~ms",
+   "value": -2
+  },
+  "macos-standard-live-off.markers.obsgt.range": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/obs_minus_gt_wall",
+   "text": "$-$20 to $-$1~ms",
+   "value": [
+    -20,
+    -1
+   ]
+  },
+  "macos-standard-live-off.markers.obsoracle.drift": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/obs_minus_oracle_wall/drift_ms_per_hour",
+   "text": "$-$0.4~ms per hour",
+   "value": -0.434
+  },
+  "macos-standard-live-off.markers.obsoracle.median": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/obs_minus_oracle_wall",
+   "text": "1~ms",
+   "value": 1
+  },
+  "macos-standard-live-off.markers.obsoracle.range": {
+   "source": "clock_sync_macos-standard-live-off.json:differences/obs_minus_oracle_wall",
+   "text": "0 to 97~ms",
+   "value": [
+    0,
+    97
+   ]
+  },
   "macos-standard-live-off.plan.disagree": {
    "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/oracle/n_disagree|disagree_rate|disagree_ci",
    "text": "0 (0.000 [0.000, 0.001])",
@@ -3615,6 +3697,88 @@
     0.8201805059819325,
     0.6890395475327898,
     0.9042329252914831
+   ]
+  },
+  "macos-standard-live-on.markers.blocks": {
+   "source": "clock_sync_macos-standard-live-on.json:oracle|gt/matched|obs/matched",
+   "text": "126 of 126 blocks",
+   "value": [
+    126,
+    126,
+    126,
+    126
+   ]
+  },
+  "macos-standard-live-on.markers.gtoracle.drift": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/gt_minus_oracle_wall/drift_ms_per_hour",
+   "text": "$-$0.3~ms per hour",
+   "value": -0.343
+  },
+  "macos-standard-live-on.markers.gtoracle.median": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/gt_minus_oracle_wall",
+   "text": "3.0~ms",
+   "value": 3.0
+  },
+  "macos-standard-live-on.markers.gtoracle.range": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/gt_minus_oracle_wall",
+   "text": "2 to 113~ms",
+   "value": [
+    2,
+    113
+   ]
+  },
+  "macos-standard-live-on.markers.gtoraclemono.drift": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/gt_minus_oracle_mono/drift_ms_per_hour",
+   "text": "$-$0.3~ms per hour",
+   "value": -0.346
+  },
+  "macos-standard-live-on.markers.gtoraclemono.median": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/gt_minus_oracle_mono",
+   "text": "3.2~ms",
+   "value": 3.198
+  },
+  "macos-standard-live-on.markers.gtoraclemono.range": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/gt_minus_oracle_mono",
+   "text": "2.4 to 113.8~ms",
+   "value": [
+    2.39,
+    113.756
+   ]
+  },
+  "macos-standard-live-on.markers.obsgt.drift": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/obs_minus_gt_wall/drift_ms_per_hour",
+   "text": "0.0~ms per hour",
+   "value": 0.005
+  },
+  "macos-standard-live-on.markers.obsgt.median": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/obs_minus_gt_wall",
+   "text": "$-$2.0~ms",
+   "value": -2.0
+  },
+  "macos-standard-live-on.markers.obsgt.range": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/obs_minus_gt_wall",
+   "text": "$-$16 to $-$1~ms",
+   "value": [
+    -16,
+    -1
+   ]
+  },
+  "macos-standard-live-on.markers.obsoracle.drift": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/obs_minus_oracle_wall/drift_ms_per_hour",
+   "text": "$-$0.3~ms per hour",
+   "value": -0.339
+  },
+  "macos-standard-live-on.markers.obsoracle.median": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/obs_minus_oracle_wall",
+   "text": "1.0~ms",
+   "value": 1.0
+  },
+  "macos-standard-live-on.markers.obsoracle.range": {
+   "source": "clock_sync_macos-standard-live-on.json:differences/obs_minus_oracle_wall",
+   "text": "0 to 97~ms",
+   "value": [
+    0,
+    97
    ]
   },
   "macos-standard-live-on.plan.disagree": {
