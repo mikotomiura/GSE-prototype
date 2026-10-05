@@ -247,7 +247,8 @@
     - [x] 完了時レビュー（code-reviewer ∥ security-checker ＋ /cross-review 2 巡・判断 183・184）→ PR
     - [x] M12 の寄託の 4 点（E3 の標本・working の観測ログ・パイロットの生ログ・コードの DOI）を研究者が決めた（判断 183）
     - [ ] 原稿の attack-me（stage manuscript）→ 引き継ぎ `next-session-ime-paper-manuscript-2.md`
-    - [ ] 著者・所属・Funding・利益相反・貢献（研究者）
+    - [x] 著者・所属・Funding・利益相反・貢献（研究者・判断 185）と AI Declaration（判断 185〜187）→ PR #309 で main に
+    - [ ] 研究者が結果・推奨・限界・結論を読んで直す（判断 185・186・投稿の前・AI Declaration の前提）
     - [ ] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task
