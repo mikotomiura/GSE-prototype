@@ -22,14 +22,16 @@ if [ ! -f "$template/sn-jnl.cls" ] || [ ! -f "$template/bst/sn-apacite.bst" ]; t
 fi
 mkdir -p "$out"
 
-# TeX reads the search paths with the separator of the system: a semicolon on Windows, a colon elsewhere.
+# TeX reads the search paths with the separator of the system: a semicolon on Windows, a colon elsewhere. On Windows
+# the directory of this script is passed in the form of the system (C:/...), which a Windows TeX can open.
 sep=":"
+here_tex=$here
 case "$(uname -s)" in
-  MINGW* | MSYS* | CYGWIN*) sep=";" ;;
+  MINGW* | MSYS* | CYGWIN*) sep=";"; here_tex=$(cd "$here" && pwd -W) ;;
 esac
 export TEXINPUTS="${template}${sep}"
 export BSTINPUTS="${template}/bst${sep}"
-export BIBINPUTS="${here}${sep}"
+export BIBINPUTS="${here_tex}${sep}"
 
 # The tables and values of the results must match the result files (set PYTHON when python3 is not the interpreter).
 "${PYTHON:-python3}" "$here/tools/results_tables.py" --results "$here/../experiment/results" --out "$here/generated" --check
@@ -52,5 +54,5 @@ latex supplement.tex
 
 for name in main supplement; do
   log="$out/$name.log"
-  echo "$name: $(grep -c '^!' "$log" || true) errors, $(grep -c 'LaTeX Warning: Reference' "$log" || true) undefined references, $(grep -c '^Overfull' "$log" || true) overfull boxes"
+  echo "$name: $(grep -c '^!' "$log" || true) errors, $(grep -c 'LaTeX Warning: Reference' "$log" || true) undefined references, $(grep -c 'Warning: Citation' "$log" || true) undefined citations, $(grep -c '^Overfull' "$log" || true) overfull boxes"
 done

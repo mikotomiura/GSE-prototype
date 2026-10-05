@@ -85,6 +85,6 @@ nothing else ran.
   The comparison with chance (rule of section 6.8) is not made here.
 - **Experiment 3** (section 10.9). `samples.tsv` SHA-256: idle `43ab3b395635e0d5c78abc008db31368b48bcc6595c74f74f59e8e21debc5f59`,
   working `638da0eaafcf156a441068e91a36578199736c435f08e140391617e43fcca88f`. Both are `status: measured`; in `working`
-  `cpu_all_zero` is false (as in the record of M7). Summary `results/windows/e3_windows.txt` (SHA-256
+  `cpu_all_zero` is false (as when the runs ended). Summary `results/windows/e3_windows.txt` (SHA-256
   `dd12cc822693dd022c6ad711797ef1abd6c7b99c2a8363edcbbd2ef09967cc18`), made with `kit/e3/summarize_e3.py idle=... working=...`
   of the export.

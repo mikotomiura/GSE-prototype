@@ -52,3 +52,11 @@ LaTeX: G-GEAR は MiKTeX 25.12（ユーザー領域）と雛形 C:\Users\johnd\t
 - ⚠️ git-bash の heredoc と sed の置換文字列でバックスラッシュが壊れた（このセッションで 3 回）。LaTeX の文字列を含む置換は Edit か、Write で書いた Python で行う。
 - ⚠️ サブエージェントの記録ファイル（`tasks/*.output`）は読まない。報告は届いた本文から使い、一次で裏取りする（このセッションのレビュー 3 本の指摘は全部真だった）。
 - ⚠️ `.codex/budget.json` は台帳。`git checkout --` で戻さない。
+
+## §4 追記（2026-10-05 午後・判断 165）
+
+- ✅ Mac（判断 157〜159）と Surface（判断 161）の解析を取り込んだ。3 セルの問 1〜5 の結果・閉じた集合（D8）・E3 の要約がそろった。
+- ★ **逸脱 D10**（Mac・研究者の選択）: 凍結の `match.py` の数え直しの併合の欠陥。登録の解析（分子 > 分母は値なし）と直した解析（`IME_MATCH_MERGE_RECOUNT=obs`・`results/d10/`）を横に並べる。⚠️ **Windows の直した解析はまだ** → Surface で `next-session-ime-paper-surface-d10.md`。
+- 結果の表の道具は値なしと測度ごとの層に対応した（判断 165）。`results/d10/` を読む表（併合の率の登録と直した解析の並べ）はまだ無い → §2 の 2 に足す。
+- `build.sh` の書誌の欠陥を直した（Windows で引用がすべて未定義になっていた・判断 165）。
+- 番号: 判断は G-GEAR 165〜（166 から）、Surface 162〜164。逸脱は G-GEAR D12〜・Surface D11。

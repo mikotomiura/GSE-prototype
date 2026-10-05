@@ -546,10 +546,10 @@ figures of the records (the tables of run checks and of attempts, the check of s
 
 ## Open items before the manuscript is complete
 
-- The counts of the accessibility constants examined on macOS (in the documentation retrieved on 5 October 2026: C
-  interface 101 attributes, 9 parameterized attributes and 25 notifications; AppKit 131, 18 and 42) are to be checked
-  against the SDK headers of the system version of the measurement (macOS 27.0.1), and the header of the text input sources is to be
-  read in that SDK (it was read in a copy of the macOS 11.3 SDK).
+- Done on 5 October 2026: the counts of the accessibility constants were checked against the header files of the SDK
+  of macOS 27.0 on the machine of the measurement (AppKit 131, 18 and 42, as in the documentation; C interface 138,
+  14 and 37 by the ending of the names, more than the 101, 9 and 25 of the documentation, none on marked text), and
+  the header of the text input sources was read in that SDK (input source and input mode only); section 3 states both.
 - Whether literature on evaluating text entry through input methods should be placed in section 2 is to be checked
   against primary sources.
 - The form in which the list of exported files of each freezing tag can be recomputed from the public repository is

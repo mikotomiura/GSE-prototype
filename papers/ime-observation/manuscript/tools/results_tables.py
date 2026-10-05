@@ -136,11 +136,27 @@ class Cell(object):
 # ---------------------------------------------------------------- values
 
 
+NO_VALUE = "--"
+
+
 def fmt_p(x):
-    return "%.3f" % x
+    """A proportion; NO_VALUE when the result file holds no value (no denominator, or deviation D10)."""
+    return NO_VALUE if x is None else "%.3f" % x
+
+
+def est_ci(value, lo, hi, fmt=None):
+    """An estimate with its interval; the estimate alone when the interval has no value, NO_VALUE without estimate."""
+    fmt = fmt or fmt_p
+    if value is None:
+        return NO_VALUE
+    if lo is None or hi is None:
+        return fmt(value)
+    return "%s [%s, %s]" % (fmt(value), fmt(lo), fmt(hi))
 
 
 def fmt_ms(x):
+    if x is None:
+        return NO_VALUE
     s = "{:,}".format(int(round(x)))
     return "$-$" + s[1:] if s.startswith("-") else s
 
@@ -158,6 +174,14 @@ def interval_range(entries):
     return min(e["lo"] for e in entries), max(e["hi"] for e in entries)
 
 
+def strata_in_range(kept, strata, keys, measure):
+    """The strata of keys that enter the range of a measure: at least MIN_TRIALS trials kept in the scope and an
+    interval of the measure in the result file. The rule leaves out, per measure, the strata with fewer trials or with
+    no value, so a stratum without a value of precision (no session row) still enters the range of recall."""
+    return [k for k in keys if kept[k] >= MIN_TRIALS and k in strata and strata[k][measure]["lo"] is not None
+            and strata[k][measure]["hi"] is not None]
+
+
 def abstract_values(cell):
     """The values of items (i) and (ii) of the rule for the abstract, with their sources."""
     vals = {}
@@ -165,20 +189,20 @@ def abstract_values(cell):
         kept, total, not_used = cell.kept_trials(scope)
         strata = cell.detection_strata(scope)
         design = sorted(kept, key=lambda k: (scenario_order(k[0]), SPEEDS.index(k[1])))
-        used = [k for k in design if kept[k] >= MIN_TRIALS and k in strata
-                and strata[k]["recall"]["lo"] is not None and strata[k]["precision"]["lo"] is not None]
         tag = "primary" if scope == PRIMARY_SCOPE else "all"
-        if used:
-            for m in ("recall", "precision"):
+        for m in ("recall", "precision"):
+            used = strata_in_range(kept, strata, design, m)
+            if used:
                 lo, hi = interval_range([strata[k][m] for k in used])
                 vals["%s.%s.%s.range" % (cell.label, tag, m)] = {
                     "text": "%s--%s" % (fmt_p(lo), fmt_p(hi)), "value": [lo, hi],
                     "source": cell.path("e1_detection.json", scope, "metrics/by_stratum/*", m, "lo|hi")}
-        vals["%s.%s.strata.used" % (cell.label, tag)] = {
-            "text": str(len(used)), "value": len(used), "source": cell.path("e1_l2.json", scope, "per_trial/by_stratum")}
-        vals["%s.%s.strata.left" % (cell.label, tag)] = {
-            "text": str(len(design) - len(used)), "value": len(design) - len(used),
-            "source": cell.path("e1_l2.json", scope, "per_trial/by_stratum")}
+            vals["%s.%s.%s.strata.used" % (cell.label, tag, m)] = {
+                "text": str(len(used)), "value": len(used),
+                "source": cell.path("e1_l2.json", scope, "per_trial/by_stratum")}
+            vals["%s.%s.%s.strata.left" % (cell.label, tag, m)] = {
+                "text": str(len(design) - len(used)), "value": len(design) - len(used),
+                "source": cell.path("e1_l2.json", scope, "per_trial/by_stratum")}
         if scope == PRIMARY_SCOPE:
             out_of_scope = not_used["out_of_scope"]
             carry = cell.det[scope]["excluded"]["trials"]["by_type"].get("carry_over", 0)
@@ -211,21 +235,20 @@ def tex_escape(s):
 
 
 def ci_text(e):
-    if e["lo"] is None:
-        return fmt_p(e["value"]) if e.get("value") is not None else "--"
-    return "%s [%s, %s]" % (fmt_p(e["value"]), fmt_p(e["lo"]), fmt_p(e["hi"]))
+    return est_ci(e.get("value"), e.get("lo"), e.get("hi"))
 
 
 def table_detection(cells):
     lines = [GENERATED_NOTE,
              "\\begin{table}[t]\n",
              "\\caption{Detection per cell and speed: the range from the lowest lower end to the highest upper end of the "
-             "Wilson intervals of the scenarios that keep at least %d trials (Strata: scenarios in the range, of all "
-             "scenarios), in the primary scope and over all trials}\n" % MIN_TRIALS,
+             "Wilson intervals of the scenarios that keep at least %d trials and have a value of the measure, with the "
+             "number of such scenarios and of all scenarios in parentheses, in the primary scope and over all trials; "
+             "%s: no scenario in the range}\n" % (MIN_TRIALS, NO_VALUE),
              "\\label{tab:detection}\n",
-             "\\begin{tabular}{L{0.16}L{0.08}L{0.10}L{0.165}L{0.165}L{0.165}L{0.165}}\n",
+             "\\begin{tabular}{L{0.18}L{0.08}L{0.185}L{0.185}L{0.185}L{0.185}}\n",
              "\\toprule\n",
-             "Cell & Speed & Strata & Recall & Precision & Recall, all trials & Precision, all trials \\\\\n",
+             "Cell & Speed & Recall & Precision & Recall, all trials & Precision, all trials \\\\\n",
              "\\midrule\n"]
     for cell in cells:
         per_scope = {}
@@ -234,21 +257,17 @@ def table_detection(cells):
             per_scope[scope] = (kept, cell.detection_strata(scope))
         for sp in SPEEDS:
             row = [tex_escape(cell.label) if sp == SPEEDS[0] else "", sp]
-            texts = []
             for scope in SCOPES:
                 kept, strata = per_scope[scope]
                 keys = [k for k in kept if k[1] == sp]
-                used = [k for k in keys if kept[k] >= MIN_TRIALS and k in strata and strata[k]["recall"]["lo"] is not None
-                        and strata[k]["precision"]["lo"] is not None]
-                if scope == PRIMARY_SCOPE:
-                    row.append("%d of %d" % (len(used), len(keys)))
                 for m in ("recall", "precision"):
+                    used = strata_in_range(kept, strata, keys, m)
                     if used:
                         lo, hi = interval_range([strata[k][m] for k in used])
-                        texts.append("%s--%s" % (fmt_p(lo), fmt_p(hi)))
+                        row.append("%s--%s (%d/%d)" % (fmt_p(lo), fmt_p(hi), len(used), len(keys)))
                     else:
-                        texts.append("--")
-            lines.append(" & ".join(row + texts) + " \\\\\n")
+                        row.append("%s (0/%d)" % (NO_VALUE, len(keys)))
+            lines.append(" & ".join(row) + " \\\\\n")
     lines += ["\\bottomrule\n", "\\end{tabular}\n", "\\end{table}\n"]
     return "".join(lines)
 
@@ -260,7 +279,7 @@ def table_session(cells):
              "from the duration of the reference session (bias with its interval, limits of agreement, median absolute "
              "difference), the agreement of \\texttt{abandon} with the outcome of the session (raw agreement and kappa), "
              "and the exact agreement of \\texttt{nav} with the arrow presses sent; Pairs is the number of matched "
-             "sessions}\n",
+             "sessions; " + NO_VALUE + ": no value in the result file}\n",
              "\\label{tab:session}\n",
              "\\begin{tabular}{L{0.14}L{0.07}L{0.07}L{0.17}L{0.15}L{0.08}L{0.11}L{0.12}L{0.09}}\n",
              "\\toprule\n",
@@ -275,16 +294,14 @@ def table_session(cells):
                 continue
             e = sp[s]
             dw, ba = e["dwell"], e["dwell"]["bland_altman"]
-            kappa = "--" if e["abandon"]["kappa"] is None else "%s [%s, %s]" % (
-                fmt_p(e["abandon"]["kappa"]), fmt_p(e["abandon"]["kappa_ci"][0]), fmt_p(e["abandon"]["kappa_ci"][1]))
+            ab, nav = e["abandon"], e["nav"]
             row = [tex_escape(cell.label) if i == 0 else "", s, fmt_int(dw["n"]),
-                   "%s [%s, %s]" % (fmt_ms(ba["bias"]), fmt_ms(dw["bias_ci"][0]), fmt_ms(dw["bias_ci"][1])),
+                   est_ci(ba["bias"], dw["bias_ci"][0], dw["bias_ci"][1], fmt_ms),
                    "%s, %s" % (fmt_ms(ba["loa_lo"]), fmt_ms(ba["loa_hi"])),
                    fmt_ms(dw["mae"]),
-                   "%s [%s, %s]" % (fmt_p(e["abandon"]["agree"]), fmt_p(e["abandon"]["agree_ci"][0]),
-                                    fmt_p(e["abandon"]["agree_ci"][1])),
-                   kappa,
-                   "%s [%s, %s]" % (fmt_p(e["nav"]["exact"]), fmt_p(e["nav"]["exact_ci"][0]), fmt_p(e["nav"]["exact_ci"][1]))]
+                   est_ci(ab["agree"], ab["agree_ci"][0], ab["agree_ci"][1]),
+                   est_ci(ab["kappa"], ab["kappa_ci"][0], ab["kappa_ci"][1]),
+                   est_ci(nav["exact"], nav["exact_ci"][0], nav["exact_ci"][1])]
             lines.append(" & ".join(row) + " \\\\\n")
     lines += ["\\bottomrule\n", "\\end{tabular}\n", "\\end{sidewaystable}\n"]
     return "".join(lines)
@@ -300,9 +317,10 @@ def table_strata(cell):
                   "\\begin{longtable}{L{0.08}L{0.07}L{0.08}L{0.08}L{0.07}L{0.20}L{0.20}L{0.11}L{0.11}}\n",
                   "\\caption{Detection per stratum in %s, cell %s (definition \\texttt{%s}, comparison \\texttt{%s}), "
                   "with Wilson intervals. Trials: trials kept in the scope; Sessions and Rows: the reference sessions "
-                  "and the session rows of the stratum that entered the matching}\\label{tab:strata-%s-%s}\\\\\n" % (
+                  "and the session rows of the stratum that entered the matching; %s: no value (no denominator, or a "
+                  "numerator above the denominator, deviation D10)}\\label{tab:strata-%s-%s}\\\\\n" % (
                       name, tex_escape(cell.label), tex_escape(cell.definition), tex_escape(PRIMARY_COMPARISON),
-                      cell.label, scope),
+                      NO_VALUE, cell.label, scope),
                   "\\toprule\n",
                   "Scenario & Speed & Trials & Sessions & Rows & Recall & Precision & Split rate & Merge rate \\\\\n",
                   "\\midrule\n\\endhead\n"]
@@ -403,7 +421,10 @@ def _fixture(tmp, label="windows-test", sub="windows"):
              _stratum("S1", "slow", 29, 20, 0.10, 0.99)]
     det_a = [_stratum("S1", "fast", 75, 70, 0.84, 0.96), _stratum("S1", "mid", 75, 60, 0.70, 0.88),
              _stratum("S1", "slow", 75, 50, 0.55, 0.77), _stratum("S2", "fast", 75, 75, 0.95, 1.0),
-             _stratum("S2", "mid", 75, 75, 0.95, 1.0), _stratum("S2", "slow", 75, 75, 0.95, 1.0)]
+             _stratum("S2", "mid", 75, 75, 0.95, 1.0), _stratum("S2", "slow", 75, 0, 0.0, 0.049)]
+    # S2 slow over all trials: no session row, so precision and the merge rate have no value; recall is 0.
+    none = {"value": None, "lo": None, "hi": None, "n": 0, "x": 0}
+    det_a[-1]["precision"], det_a[-1]["merge_rate"], det_a[-1]["n_obs"] = dict(none), dict(none), 0
 
     def l2_scope(kept, oos, excl):
         bs = []
@@ -468,14 +489,22 @@ def selftest():
               vals["windows-test.trials.total"]["value"] == 75 * 6, str(vals["windows-test.trials.total"]))
         check("a stratum at the minimum of trials (30) is in the range; one under it (29) and strata without trials "
               "are left out",
-              vals["windows-test.primary.strata.used"]["value"] == 2 and vals["windows-test.primary.strata.left"]["value"] == 4,
-              str((vals["windows-test.primary.strata.used"], vals["windows-test.primary.strata.left"])))
+              vals["windows-test.primary.recall.strata.used"]["value"] == 2
+              and vals["windows-test.primary.recall.strata.left"]["value"] == 4,
+              str((vals["windows-test.primary.recall.strata.used"], vals["windows-test.primary.recall.strata.left"])))
         check("the primary range is the lowest lower end to the highest upper end of the strata used",
               vals["windows-test.primary.recall.range"]["value"] == [0.60, 0.97]
               and vals["windows-test.primary.recall.range"]["text"] == "0.600--0.970",
               str(vals["windows-test.primary.recall.range"]))
-        check("the range over all trials uses the strata of all trials",
-              vals["windows-test.all.recall.range"]["value"] == [0.55, 1.0], str(vals["windows-test.all.recall.range"]))
+        check("the range over all trials uses the strata of all trials, per measure: a stratum without a value of "
+              "precision (no session row) stays in the range of recall (its recall of 0) and is left out of precision",
+              vals["windows-test.all.recall.range"]["value"] == [0.0, 1.0]
+              and vals["windows-test.all.precision.range"]["value"] == [0.55, 1.0]
+              and vals["windows-test.all.recall.strata.left"]["value"] == 0
+              and vals["windows-test.all.precision.strata.left"]["value"] == 1,
+              str((vals["windows-test.all.recall.range"], vals["windows-test.all.precision.range"])))
+        check("a stratum whose rates have no value is printed with the mark of no value, not dropped",
+              "S2 & slow & 75 & 75 & 0 & 0.000 [0.000, 0.049] & %s" % NO_VALUE in files["detection-strata.tex"].decode("utf-8"))
         check("the fractions set aside by the scope and by carry-over are counts over the total",
               vals["windows-test.scope.setaside"]["value"] == [315, 450]
               and vals["windows-test.scope.setaside"]["text"] == "315 of 450 trials (70.0\\%)"

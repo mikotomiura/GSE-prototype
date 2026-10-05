@@ -76,8 +76,11 @@ is integrated with the system's text services \citep{apple-imk}; the documentati
 input method that runs inside the client application. Assistive applications reach other applications through the accessibility interface
 \citep{apple-axuielement}. Of its C constants listed in the documentation (101 attributes, 9 parameterized attributes
 and 25 notifications), none concerns marked text or a composition
-\citep{apple-ax-attributes,apple-ax-parameterized,apple-ax-notifications}. The constants of the AppKit framework (131
-attributes, 18 parameterized attributes and 42 notifications) include three that do: an attribute for the marked
+\citep{apple-ax-attributes,apple-ax-parameterized,apple-ax-notifications}; the header files of the software
+development kit of macOS 27.0 define more of them (138 attributes, 14 parameterized attributes and 37 notifications,
+counted by the ending of their names), and none of these concerns marked text either \citep{apple-sdk-27}. The
+constants of the AppKit framework (131 attributes, 18 parameterized attributes and 42 notifications, the same counts
+in the documentation and in the header file of the kit) include three that do: an attribute for the marked
 range of a text input and two notifications for the beginning and end of a marking session, available since macOS
 10.6 and listed without a description
 \citep{apple-nsaccessibility-attribute,apple-nsaccessibility-parameterized,apple-nsaccessibility-notification}. They
@@ -87,7 +90,8 @@ The list of windows is returned as it stands when it is requested, with informat
 bounds and its identifier \citep{apple-cgwindowlist}, so a program can follow it only by polling. It lists windows, not marked text: the reading
 that is typed before conversion is shown by the application's text view, and a window of the input method exists only
 when the input method shows one. The current keyboard input source \citep{apple-textinputsources} identifies the
-selected input source and input mode, and none of its properties describes a composition. An event tap receives the
+selected input source and input mode, and none of its properties describes a composition; in the header file of
+the kit of macOS 27.0 none of its functions or constants concerns a composition either \citep{apple-sdk-27}. An event tap receives the
 key-down and key-up events of the session \citep{apple-cgevent-tapcreate}. The logger therefore infers sessions from
 the key presses and the input source (Section~\ref{sec:logger}).
 
