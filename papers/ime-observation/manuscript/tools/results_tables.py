@@ -59,6 +59,7 @@ Standard library only.
 import argparse
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -103,6 +104,8 @@ L2_VIEWS = (("per_trial", "every trial of the scope"),
             ("per_trial_layer_none", "trials of the layer none (diagnostic)"))
 L2_TRIAL_MEASURES = (("n_conversions", "Conversions", False), ("dwell_sum_ms", "Summed conversion time (ms)", True),
                      ("n_cancelled", "Cancelled conversions", False))
+# Section 6.2: the only types of excluded trials (kit/analysis/match.py).
+EXCLUSION_TYPES = ("clock_jump", "log_truncated", "carry_over")
 # Deviation D10: the corrected analysis of questions 1 to 3, per system.
 D10_DIRS = {"macos": os.path.join("d10", "macos"), "windows": os.path.join("d10", "windows")}
 # Section 6.4: the three comparisons (the two with the prediction exist on macOS only, section 10.7) and the four
@@ -142,6 +145,11 @@ def load(path):
         return json.loads(f.read().decode("utf-8"))
 
 
+# The cell labels that the analysis accepts (kit/analysis/match.py, CELL_RE); a label is also used in file names, TeX
+# labels and macro names, so any other label stops the script.
+CELL_RE = re.compile(r"^[A-Za-z0-9_.+-]{1,64}$")
+
+
 def find_cells(results_dir):
     """[(directory, file prefix for the source, cell label, system)] for every cell whose three files exist."""
     found = []
@@ -151,6 +159,9 @@ def find_cells(results_dir):
             continue
         det = load(os.path.join(d, "e1_detection.json"))
         for label in sorted(det["cells"]):
+            if not CELL_RE.match(label):
+                raise ValueError("%se1_detection.json: the cell label %r is not one the analysis accepts" % (
+                    (sub + "/") if sub else "", label))
             found.append((d, (sub + "/") if sub else "", label, system))
     return found
 
@@ -320,11 +331,11 @@ def abstract_values(cell):
         tag = "primary" if scope == PRIMARY_SCOPE else "all"
         for m in ("recall", "precision"):
             used = strata_in_range(kept, strata, design, m)
-            if used:
-                lo, hi = interval_range([strata[k][m] for k in used])
-                vals["%s.%s.%s.range" % (cell.label, tag, m)] = {
-                    "text": "%s--%s" % (fmt_p(lo), fmt_p(hi)), "value": [lo, hi],
-                    "source": cell.path("e1_detection.json", scope, "metrics/by_stratum/*", m, "lo|hi")}
+            # The key exists also when no stratum enters the range, so that the text never loses it silently.
+            lo, hi = interval_range([strata[k][m] for k in used]) if used else (None, None)
+            vals["%s.%s.%s.range" % (cell.label, tag, m)] = {
+                "text": "%s--%s" % (fmt_p(lo), fmt_p(hi)) if used else NO_VALUE, "value": [lo, hi],
+                "source": cell.path("e1_detection.json", scope, "metrics/by_stratum/*", m, "lo|hi")}
             vals["%s.%s.%s.strata.used" % (cell.label, tag, m)] = {
                 "text": str(len(used)), "value": len(used),
                 "source": cell.path("e1_l2.json", scope, "per_trial/by_stratum")}
@@ -333,7 +344,13 @@ def abstract_values(cell):
                 "source": cell.path("e1_l2.json", scope, "per_trial/by_stratum")}
         if scope == PRIMARY_SCOPE:
             out_of_scope = not_used["out_of_scope"]
-            carry = cell.det[scope]["excluded"]["trials"]["by_type"].get("carry_over", 0)
+            ex = cell.det[scope]["excluded"]["trials"]
+            # A trial can be excluded for two types (kit/analysis/match.py counts distinct trials per type).
+            if set(ex["by_type"]) - set(EXCLUSION_TYPES) or any(v > ex["n"] for v in ex["by_type"].values()) \
+                    or (ex["n"] == 0) != (not ex["by_type"]):
+                raise ValueError("%s: the excluded trials are not counted by the types of section 6.2" % cell.path(
+                    "e1_detection.json", scope, "excluded/trials"))
+            carry = ex["by_type"].get("carry_over", 0)
             vals["%s.trials.total" % cell.label] = {
                 "text": fmt_int(total), "value": total, "source": cell.path("e1_l2.json", scope, "per_trial")}
             vals["%s.scope.setaside" % cell.label] = {
@@ -346,12 +363,17 @@ def abstract_values(cell):
                 "value": [carry, total],
                 "source": cell.path("e1_detection.json", scope, "excluded/trials/by_type/carry_over")}
         sp = cell.speed_sessions(scope)
-        cis = [sp[s]["dwell"]["bias_ci"] for s in SPEEDS if s in sp and sp[s]["dwell"]["bias_ci"][0] is not None]
-        if cis:
-            lo, hi = min(c[0] for c in cis), max(c[1] for c in cis)
-            vals["%s.%s.dwellbias.range" % (cell.label, tag)] = {
-                "text": "%s to %s~ms" % (fmt_ms(lo), fmt_ms(hi)), "value": [lo, hi],
-                "source": cell.path("e1_l1.json", scope, "metrics/by_speed/*/dwell/bias_ci")}
+        cis = [sp[s]["dwell"]["bias_ci"] for s in SPEEDS if s in sp and sp[s]["dwell"]["bias_ci"][0] is not None
+               and sp[s]["dwell"]["bias_ci"][1] is not None]
+        lo, hi = (min(c[0] for c in cis), max(c[1] for c in cis)) if cis else (None, None)
+        src = cell.path("e1_l1.json", scope, "metrics/by_speed/*/dwell/bias_ci")
+        vals["%s.%s.dwellbias.range" % (cell.label, tag)] = {
+            "text": "%s to %s~ms" % (fmt_ms(lo), fmt_ms(hi)) if cis else NO_VALUE, "value": [lo, hi], "source": src}
+        # The speeds whose interval enters the range, and those left out (no pair, or the interval withheld).
+        vals["%s.%s.dwellbias.speeds.used" % (cell.label, tag)] = {"text": str(len(cis)), "value": len(cis),
+                                                                   "source": src}
+        vals["%s.%s.dwellbias.speeds.left" % (cell.label, tag)] = {"text": str(len(SPEEDS) - len(cis)),
+                                                                   "value": len(SPEEDS) - len(cis), "source": src}
     return vals
 
 
@@ -370,8 +392,11 @@ def read_closed_set(cell):
         return None
     doc = load(p)
     src = cell.prefix + closed_set_name(cell.label)
-    if CLOSED_SET_SKIPPED not in (doc.get("skipped_scenarios") or {}):
-        raise ValueError("%s: %s is not left out (deviation D8)" % (src, CLOSED_SET_SKIPPED))
+    skipped = doc.get("skipped_scenarios") or {}
+    # Deviation D8 leaves out every trial of S12 and nothing else.
+    if sorted(skipped) != [CLOSED_SET_SKIPPED] or not skipped[CLOSED_SET_SKIPPED] > 0:
+        raise ValueError("%s: the trials left out are not those of %s alone (deviation D8): %r" % (
+            src, CLOSED_SET_SKIPPED, skipped))
     for K in CLOSED_SET_KS:
         for f in CLOSED_SET_SETS:
             r = (doc.get("results") or {}).get(str(K), {}).get(f)
@@ -379,6 +404,12 @@ def read_closed_set(cell):
                 raise ValueError("%s: no result for K = %d and the feature set %s" % (src, K, f))
             if abs(r["chance"] - 1.0 / K) > 1e-12:
                 raise ValueError("%s: the chance level of K = %d is not 1/K" % (src, K))
+            if CLOSED_SET_SKIPPED in (r.get("by_scenario") or {}):
+                raise ValueError("%s: %s still has trials at K = %d, feature set %s (deviation D8)" % (
+                    src, CLOSED_SET_SKIPPED, K, f))
+    al = doc.get("alignment") or {}
+    if not all(isinstance(al.get(k), int) for k in ("n_blocks_unscored", "n_trials_unscored")):
+        raise ValueError("%s: the unscored blocks and trials are not counted" % src)
     return doc
 
 
@@ -443,7 +474,7 @@ def closed_set_values(cells, docs):
         src = cell.prefix + closed_set_name(cell.label)
         al = doc.get("alignment") or {}
         vals["%s.q4.unscored" % cell.label] = {
-            "text": "%s blocks, %s trials" % (fmt_int(al.get("n_blocks_unscored", 0)), fmt_int(al.get("n_trials_unscored", 0))),
+            "text": "%s blocks, %s trials" % (fmt_int(al["n_blocks_unscored"]), fmt_int(al["n_trials_unscored"])),
             "value": [al.get("n_blocks_unscored"), al.get("n_trials_unscored")], "source": src + ":alignment"}
         for f in RULE_SETS:
             for K in RULE_KS:
@@ -547,6 +578,8 @@ def read_e3(path):
             raise ValueError("%s: the condition %s has no status" % (path, name))
         if s["status"] != "not measured" and (s["cpu"] is None or set(s["cpu"]) != {"mean", "median", "p95", "max"}):
             raise ValueError("%s: the CPU line of the condition %s cannot be read" % (path, name))
+        if s["status"] == "measured" and s["cpu_all_zero"] is None:
+            raise ValueError("%s: the condition %s has no cpu_all_zero line (section 10.9)" % (path, name))
     return out
 
 
@@ -637,15 +670,51 @@ def l2_values(cell):
 # ---------------------------------------------------------------- deviation D10: the corrected merge rate
 
 
+# Deviation D10 changes, by its definition, only the merge rate and its recounted numerator, and adds the switch to
+# the configuration; everything else of a corrected detection block must equal the registered one.
+D10_CHANGES = ("merge_rate", "n_merge_obs_recount", "merge_recount")
+
+
+def _without(x, keys):
+    """A copy of a JSON value without the members named in keys, at any depth."""
+    if isinstance(x, dict):
+        return dict((k, _without(v, keys)) for k, v in x.items() if k not in keys)
+    if isinstance(x, list):
+        return [_without(v, keys) for v in x]
+    return x
+
+
+def _no_value_outside_merge(x, key=None):
+    """The members that hold a rate without a value because of the defence of D10, other than merge rates."""
+    found = []
+    if isinstance(x, dict):
+        if key != "merge_rate" and d10_no_value(x):
+            found.append(key)
+        for k, v in x.items():
+            found += _no_value_outside_merge(v, k)
+    elif isinstance(x, list):
+        for v in x:
+            found += _no_value_outside_merge(v, key)
+    return found
+
+
 def read_d10(results_dir, cell):
     """The detection results of the corrected analysis (deviation D10) for the cell, {comparison: {scope: block}},
-    or None when it was not run. No registered block may carry the switch, and every corrected block must carry it."""
+    or None when it was not run. No registered block may carry the switch, and the defence of D10 (a rate whose
+    numerator exceeds its denominator has no value) may have acted on merge rates only, the one rate that D10 concerns;
+    every corrected block must carry the switch and equal the registered one apart from D10_CHANGES, so that it comes
+    from the same inputs and settings."""
     p = os.path.join(results_dir, D10_DIRS[cell.system], "e1_detection.json")
     for comp in cell.comparisons:
         for scope in cell.det_by[comp]:
             if "merge_recount" in cell.det_by[comp][scope]["config"]:
                 raise ValueError("%s: the registered results carry the switch of deviation D10" %
                                  cell.src["e1_detection.json"])
+            other = _no_value_outside_merge(cell.det_by[comp][scope])
+            if other:
+                raise ValueError("%s: a rate other than the merge rate has a numerator above its denominator (%s, %s "
+                                 "under %s)" % (cell.src["e1_detection.json"], ", ".join(sorted(set(other))), comp,
+                                               scope))
     if not os.path.isfile(p):
         return None
     blocks = load(p)["cells"][cell.label][cell.definition]
@@ -657,6 +726,9 @@ def read_d10(results_dir, cell):
         for scope in blocks[comp]:
             if blocks[comp][scope]["config"].get("merge_recount") != "obs":
                 raise ValueError("%s: the corrected results do not record merge_recount obs" % p)
+            if _without(blocks[comp][scope], D10_CHANGES) != _without(cell.det_by[comp][scope], D10_CHANGES):
+                raise ValueError("%s: the corrected results of %s under %s differ from the registered ones in more than "
+                                 "the merge rate (other inputs or settings)" % (p, comp, scope))
         out[comp] = blocks[comp]
     return out
 
@@ -1050,8 +1122,13 @@ def reference_supplement(cells, clocks):
 # ---------------------------------------------------------------- tables
 
 
+TEX_SPECIAL = {"\\": "\\textbackslash{}", "{": "\\{", "}": "\\}", "_": "\\_", "%": "\\%", "&": "\\&", "#": "\\#",
+               "$": "\\$", "^": "\\^{}", "~": "\\~{}"}
+
+
 def tex_escape(s):
-    return s.replace("_", "\\_").replace("%", "\\%").replace("&", "\\&")
+    """A string of the result files as text: every character that TeX treats specially is escaped."""
+    return "".join(TEX_SPECIAL.get(c, c) for c in s)
 
 
 def ci_text(e):
@@ -1114,10 +1191,10 @@ def comparison_values(cell):
                 src = "%s:cells/%s/%s/%s/%s/metrics/by_stratum/*/%s" % (
                     cell.src["e1_detection.json"], cell.label, cell.definition, comp, scope, m)
                 used = strata_in_range(kept, strata, design, m)
-                if used:
-                    lo, hi = interval_range([strata[k][m] for k in used])
-                    vals["%s.%s.%s.%s.range" % (cell.label, comp.replace("_", ""), tag, m)] = {
-                        "text": "%s--%s" % (fmt_p(lo), fmt_p(hi)), "value": [lo, hi], "source": src}
+                lo, hi = interval_range([strata[k][m] for k in used]) if used else (None, None)
+                vals["%s.%s.%s.%s.range" % (cell.label, comp.replace("_", ""), tag, m)] = {
+                    "text": "%s--%s" % (fmt_p(lo), fmt_p(hi)) if used else NO_VALUE, "value": [lo, hi],
+                    "source": src}
                 vals["%s.%s.%s.%s.strata.left" % (cell.label, comp.replace("_", ""), tag, m)] = {
                     "text": str(len(design) - len(used)), "value": len(design) - len(used), "source": src}
     return vals
@@ -1785,6 +1862,11 @@ def build(results_dir):
 def write_or_check(files, out_dir, check):
     if check:
         differ = []
+        # A file that the script no longer writes but that is still in the output directory could still be read by
+        # the manuscript.
+        if os.path.isdir(out_dir):
+            differ += ["%s (no longer generated)" % n for n in sorted(os.listdir(out_dir))
+                       if n not in files and os.path.isfile(os.path.join(out_dir, n))]
         for name, data in sorted(files.items()):
             p = os.path.join(out_dir, name)
             if not os.path.isfile(p):
@@ -2241,6 +2323,14 @@ def _selftest_rules(check):
               and "insufficient (every CPU sample is zero)" in cost_w
               and "measured (every CPU sample is zero)" in cost_w, cost_w[-700:])
         with open(p, "wb") as f:
+            f.write(E3_FIXTURE.replace("cpu_all_zero: {idle_zero}\n", "").format(
+                working_zero="false", working_status="measured").encode("utf-8"))
+        try:
+            read_e3(p)
+            check("q5: negative: a measured condition without its cpu_all_zero line stops the script", False)
+        except ValueError:
+            check("q5: negative: a measured condition without its cpu_all_zero line stops the script", True)
+        with open(p, "wb") as f:
             f.write(E3_FIXTURE.replace("== working", "== busy").format(
                 idle_zero="false", working_zero="false", working_status="measured").encode("utf-8"))
         try:
@@ -2372,6 +2462,56 @@ def _selftest_reference(check):
               and vals["windows-test.markers.gtoraclemono.range"]["text"] == "2.5 to 4.5~ms"
               and vals["windows-test.markers.obsgt.drift"]["value"] == 40.25,
               str(sorted(k for k in vals if ".markers." in k)))
+        detp0 = os.path.join(tmp, "windows", "e1_detection.json")
+        l1p0 = os.path.join(tmp, "windows", "e1_l1.json")
+        det0, l10 = load(detp0), load(l1p0)
+
+        def blk(doc, scope=PRIMARY_SCOPE):
+            return doc["cells"]["windows-test"]["windows_def"][PRIMARY_COMPARISON][scope]
+
+        def no_recall_interval(doc):
+            for st in blk(doc)["metrics"]["by_stratum"]:
+                if "recall" in st:
+                    st["recall"]["lo"] = st["recall"]["hi"] = None
+        _rewrite(detp0, no_recall_interval)
+        v = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+        check("review: a range without any stratum is still a value (no value), so the text cannot lose it",
+              (v.get("windows-test.primary.recall.range") or {}).get("text") == NO_VALUE
+              and (v.get("windows-test.primary.recall.strata.left") or {}).get("value") == 6,
+              str(v.get("windows-test.primary.recall.range")))
+        with open(detp0, "wb") as f:
+            f.write(json.dumps(det0).encode("utf-8"))
+        _rewrite(l1p0, lambda doc: [e["dwell"].update({"bias_ci": [None, None]}) for e in blk(doc)["metrics"]["by_speed"]
+                                    if e["stratum"]["speed"] == "slow"])
+        v = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+        check("review: the dwell-bias range names the speeds it uses and leaves out",
+              v["windows-test.primary.dwellbias.range"]["value"] == [-600.0, -49.5]
+              and v["windows-test.primary.dwellbias.speeds.used"]["value"] == 2
+              and v["windows-test.primary.dwellbias.speeds.left"]["value"] == 1,
+              str(v.get("windows-test.primary.dwellbias.range")))
+        with open(l1p0, "wb") as f:
+            f.write(json.dumps(l10).encode("utf-8"))
+        # In every scope, so that only the check of the types (not that of the scopes) can stop it.
+        _rewrite(detp0, lambda doc: [b["excluded"]["trials"]["by_type"].update({"carryover": 1}) for b in
+                                     doc["cells"]["windows-test"]["windows_def"][PRIMARY_COMPARISON].values()])
+        _expect_stop(check, "review: negative: an excluded trial of a type outside section 6.2 stops", tmp)
+        with open(detp0, "wb") as f:
+            f.write(json.dumps(det0).encode("utf-8"))
+        _rewrite(detp0, lambda doc: blk(doc)["metrics"]["by_stratum"][0].update(
+            {"recall": {"value": None, "lo": None, "hi": None, "n": 2, "x": 3, "note": "above"}}))
+        _expect_stop(check, "review: negative: a rate other than the merge rate without a value (D10's defence) stops",
+                     tmp)
+        with open(detp0, "wb") as f:
+            f.write(json.dumps(det0).encode("utf-8"))
+        bad_label = load(detp0)
+        bad_label["cells"]["windows-test}\\input{x"] = bad_label["cells"]["windows-test"]
+        with open(detp0, "wb") as f:
+            f.write(json.dumps(bad_label).encode("utf-8"))
+        _expect_stop(check, "review: negative: a cell label that the analysis does not accept stops", tmp)
+        with open(detp0, "wb") as f:
+            f.write(json.dumps(det0).encode("utf-8"))
+        check("review: every character that TeX treats specially is escaped",
+              tex_escape("a\\b{c}_%&#$^~") == "a\\textbackslash{}b\\{c\\}\\_\\%\\&\\#\\$\\^{}\\~{}")
         l1p = os.path.join(tmp, "windows", "e1_l1.json")
         good = load(l1p)
         _rewrite(l1p, lambda doc: doc["cells"]["windows-test"]["windows_def"][PRIMARY_COMPARISON]["all_trials"][
@@ -2625,6 +2765,13 @@ def selftest():
         check("negative: --check fails when a table was edited by hand", write_or_check(files, out, True) == 1)
         os.remove(os.path.join(out, "values.tex"))
         check("negative: --check fails when a file is missing", write_or_check(files, out, True) == 1)
+        write_or_check(files, out, False)
+        with open(os.path.join(out, "table-old.tex"), "wb") as f:
+            f.write(b"% a table that is no longer generated\n")
+        check("negative: --check fails when a file that is no longer generated is still there",
+              write_or_check(files, out, True) == 1)
+        os.remove(os.path.join(out, "table-old.tex"))
+        check("--check passes again once that file is gone", write_or_check(files, out, True) == 0)
         check("q4: a cell without a closed-set file is reported as not measured",
               "windows-test & \\multicolumn{7}{l}{not measured}" in files["table-closed-set.tex"].decode("utf-8"))
         check("d10: without the corrected analysis the column says so",
@@ -2637,6 +2784,18 @@ def selftest():
             check("q4: negative: a closed-set file that keeps S12 (not deviation D8) stops the script", False)
         except ValueError:
             check("q4: negative: a closed-set file that keeps S12 (not deviation D8) stops the script", True)
+        for name, edit in (("a closed-set file that also leaves out another scenario",
+                            lambda d: d["skipped_scenarios"].update({"S2": 10})),
+                           ("a closed-set file whose S12 count is zero", lambda d: d["skipped_scenarios"].update({"S12": 0})),
+                           ("a closed-set file with trials of S12 in a result",
+                            lambda d: d["results"]["100"]["no_time"]["by_scenario"].update({"S12": {"acc": 0.5, "n": 3}})),
+                           ("a closed-set file without the count of unscored blocks",
+                            lambda d: d["alignment"].pop("n_blocks_unscored"))):
+            doc = _cs_doc(_near(RULE_SETS))
+            edit(doc)
+            with open(cs, "wb") as f:
+                f.write(json.dumps(doc).encode("utf-8"))
+            _expect_stop(check, "q4: negative: %s stops" % name, tmp)
         with open(cs, "wb") as f:
             f.write(json.dumps(_cs_doc(_near(RULE_SETS))).encode("utf-8"))
         files_cs = build(tmp)
@@ -2686,6 +2845,13 @@ def selftest():
               and vd["windows-test.d10.all.merge.differ"]["value"] == [0, 6]
               and "& 0.000 & 0.250 \\\\" in files_d["detection-strata.tex"].decode("utf-8"),
               str((vd.get("windows-test.d10.primary.merge.differ"), vd.get("windows-test.d10.all.merge.differ"))))
+        saved = json.loads(json.dumps(blk["under_limit"]["metrics"]["by_stratum"][1]))
+        blk["under_limit"]["metrics"]["by_stratum"][1]["recall"]["lo"] = 0.01
+        with open(os.path.join(d10d, "e1_detection.json"), "wb") as f:
+            f.write(json.dumps(cor).encode("utf-8"))
+        _expect_stop(check, "d10: negative: corrected results that differ from the registered ones in more than the "
+                            "merge rate stop", tmp)
+        blk["under_limit"]["metrics"]["by_stratum"][1] = saved
         del blk["all_trials"]["config"]["merge_recount"]
         with open(os.path.join(d10d, "e1_detection.json"), "wb") as f:
             f.write(json.dumps(cor).encode("utf-8"))

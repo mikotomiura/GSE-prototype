@@ -64,6 +64,16 @@
     200.62936054676095
    ]
   },
+  "macos-standard-live-off.all.dwellbias.speeds.left": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.all.dwellbias.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
+   "text": "3",
+   "value": 3
+  },
   "macos-standard-live-off.all.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/all_trials/metrics/by_stratum/*/precision/lo|hi",
    "text": "0.000--1.000",
@@ -2019,6 +2029,16 @@
     200.62936054676095
    ]
   },
+  "macos-standard-live-off.primary.dwellbias.speeds.left": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-off.primary.dwellbias.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
+   "text": "3",
+   "value": 3
+  },
   "macos-standard-live-off.primary.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/by_stratum/*/precision/lo|hi",
    "text": "0.379--1.000",
@@ -2432,6 +2452,16 @@
     -747.1745025839792,
     151.08837719298236
    ]
+  },
+  "macos-standard-live-on.all.dwellbias.speeds.left": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-on.all.dwellbias.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
+   "text": "3",
+   "value": 3
   },
   "macos-standard-live-on.all.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/all_trials/metrics/by_stratum/*/precision/lo|hi",
@@ -4403,6 +4433,16 @@
     156.13453521760854
    ]
   },
+  "macos-standard-live-on.primary.dwellbias.speeds.left": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
+   "text": "0",
+   "value": 0
+  },
+  "macos-standard-live-on.primary.dwellbias.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
+   "text": "3",
+   "value": 3
+  },
   "macos-standard-live-on.primary.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/by_stratum/*/precision/lo|hi",
    "text": "0.359--1.000",
@@ -4842,6 +4882,16 @@
     -1915.6178647338982,
     -535.3400257518672
    ]
+  },
+  "windows-msime-tsf.all.dwellbias.speeds.left": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.all.dwellbias.speeds.used": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
+   "text": "3",
+   "value": 3
   },
   "windows-msime-tsf.all.precision.range": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/by_stratum/*/precision/lo|hi",
@@ -6390,6 +6440,16 @@
     -1121.488608636693,
     -456.3306170707334
    ]
+  },
+  "windows-msime-tsf.primary.dwellbias.speeds.left": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
+   "text": "0",
+   "value": 0
+  },
+  "windows-msime-tsf.primary.dwellbias.speeds.used": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
+   "text": "3",
+   "value": 3
   },
   "windows-msime-tsf.primary.precision.range": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/by_stratum/*/precision/lo|hi",

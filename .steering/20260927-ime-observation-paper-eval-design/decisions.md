@@ -1548,3 +1548,24 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **組版**: `build.sh` で main エラー 0・未定義の参照は 3 ラベル（`fig:components`・`sec:availability`・`sec:limitations`・`sec:results-attempts` は埋まった）・overfull は HEAD と同じ 1 件（試行の表の見出しの幅を 1 回直した）。
 - **まだ**: 図 2〜5（外枠の Figures・道具は標準ライブラリだけなので作図は別に決める）・macOS の印の時刻（Mac）・要旨と結論（外枠の Rule for the abstract）・§1・§11〜13・完了時レビュー・attack-me。
 - **影響範囲**: `manuscript/sections/results-agreement.tex`・`results-text.tex`（新規）・`recoverability.tex`・`cost.tex`・`main.tex`・`outline.md`（表の一覧）・本ファイル・`tasklist.md`。
+
+## 判断 175: この枝の完了時レビュー（code-reviewer ∥ security-checker ＋ Codex 1 巡目）の指摘を一次で確かめて直す・「全試行の範囲」の読みを記録する（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **範囲**: `origin/main...HEAD`（`cf320319..4e0c36dd`・111 ファイル）。コードは 5 ファイル（`results_tables.py`・`match.py`〔D10〕・`closed_set.py`〔D8〕・`build.sh`・`_style_check.py`）。Codex は研究者の承認（手動承認の閾値 2,000 行を超えた・推奨どおり 5 ファイル）でパス限定（`run-codex-review.sh cf320319..4e0c36dd -- <5 paths>`）・1 回 77,499 トークン（この枝の台帳で今日 98,711・origin/main の 132,139 と合わせて約 23 万 / 30 万）。
+- **結果**: code-reviewer = HIGH 0・MEDIUM 5・LOW 7（約 4 分）。security-checker = CRITICAL・HIGH・MEDIUM 0・LOW 4（約 6 分・生ログ・打鍵の中身・個人情報は公開物に無い）。Codex 1 巡目 = P1 1・P2 4。重なり: `build.sh` の相対パス（3 者）・D10 の入力の照合（code-reviewer と Codex）・D8 の検査の緩さ（同）・セル名と TeX のエスケープ（security と Codex）。
+- **直したもの（`results_tables.py`・`build.sh`・`main.tex`・`BUILD.md`）**:
+  1. `build.sh`: 雛形と出力先を最初に絶対パスに（Windows は `pwd -W`・TEXINPUTS も同じ形）・出力先が原稿のディレクトリの中なら拒否（自分で作ったディレクトリは消す）・`-no-shell-escape`・BibTeX の警告（exit 1）で止まらない・pdflatex が落ちたらログの場所を出す・「生成されていない結果の値」と BibTeX の警告の数を表示。⚠️ このセッションで雛形を `/c/...` の形で渡して `sn-jnl.cls` が見つからなかったのも同じ根（TEXINPUTS は MSYS が変換しない）。相対パスでの組版（scratchpad から雛形と出力先を相対で）と拒否を実際に回して確かめた。
+  2. `main.tex` の `\rv`: 鍵が無いとき `\PackageWarningNoLine{results}{Result value <key> not generated}` を出し、`build.sh` が数える（今は macOS の印の時刻の 4 つ）。
+  3. 範囲の鍵（要旨の規則・予測との比較）は層が 1 つも入らなくても `--` の値として出す。偏りの範囲に使った速さと除いた速さの数 `<cell>.<primary|all>.dwellbias.speeds.used|left`。
+  4. D10: 登録の側に「分子 > 分母で値なし」が併合の率以外にあれば止める（Codex 5 への対応 —— `match.py` の `_prop` の防御はすべての割合に効くが、実データで値が消えたのは 32 か所すべて併合の率と確かめた・`match.py` は解析を回し終えた凍結の直しなので変えない）。直した側は、`merge_rate`・`n_merge_obs_recount`・`merge_recount` を除いて登録と完全に同じでなければ止める（入力の SHA・設定・ほかの率すべて）。
+  5. D8: `skipped_scenarios` が `{"S12": >0}` だけ・どの結果の `by_scenario` にも S12 が無い・未採点のブロックと試行の数がある、を確かめる。
+  6. 除外の試行の型は §6.2 の 3 つだけ・各型の数は総数以下・総数 0 は型が無いときだけ（⚠️ 1 つの試行が 2 つの型で数えられうるので「和 = 総数」は使わない —— `match.py` の `_count_types` を一次で確かめた）。
+  7. セル名を `match.py` と同じ `CELL_RE` で検証・`tex_escape` を TeX の特殊文字すべてに。
+  8. E3 の measured の条件に `cpu_all_zero` の行が無ければ止める。`--check` は、もう生成しないファイルが出力先に残っていれば赤。
+- **直さなかったもの（理由）**:
+  - ★ **code-reviewer MEDIUM「全試行の範囲」に入る層の選び方**: 外枠の「the same range over all trials」は (A) 主の範囲で選んだ層の全試行の区間、(B) 全試行の側で同じ作り方（30 試行以上の層）をやり直す、の 2 通りに読める。道具は (B)（判断 156 で、値を見る前に実装・ただし読みは記録していなかった）。(B) を保つ理由: 登録 §6.1 は「the estimate under `all_trials`」と書き、全試行の推定は主の範囲で 0 試行の層（S13）も含むべきで、(A) では全試行の値にならない。⚠️ 値を見た後でこの読みを変えると規則の後付けになるので変えない。研究者が (A) を選ぶなら、道具の 1 か所（`abstract_values` の `kept`）の直しで済む。
+  - code-reviewer LOW「macOS のセルの集合に値が無いと none ではなく not decided に」: 値の無い集合を near chance としない扱いは判断 168 で値を見る前に selftest で固めた。実データは全集合に値がある → 変えない。
+  - Codex 5 の `match.py` 自体の直し: 上の 4 のとおり（凍結の解析を回し直すことになる・新しい逸脱になる）。
+  - security LOW「`.steering/` にユーザー名を含む絶対パス」: repo は private・`.steering/` は公開物の外・merge-base で既に 150 か所。新しい引き継ぎは `~` で書く。security LOW「ビルドの生成物を `.gitignore` に」: 出力先を原稿の外に限る拒否で代えた。
+- **検証**: selftest 91 → 105 件。★ 変異 3 回目 14 本（scratchpad）→ すべて狙った確認で赤（除外の型の確認が、別の確認〔スコープ間の除外の一致〕に先に捕まって緑になったので、全スコープを変える形に直した）。1 回目の「D10 の数え方」の変異は、新しい共有の確認に例外で捕まるようになったので、数える箇所だけを変える変異に差し替えた。1・2 回目も回し直して計 62 本が狙った確認で赤。実物で生成 → 16 ファイル・`--check` 一致（値は鍵が増えただけ）・文体違反 0・CR 0。`build.sh` で main エラー 0・overfull は HEAD と同じ 1 件・生成されていない値 4（macOS の印の時刻）・BibTeX の警告 0。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/build.sh`・`manuscript/BUILD.md`・`manuscript/main.tex`・`manuscript/generated/values.*`・`.codex/budget.json`（台帳）・本ファイル。

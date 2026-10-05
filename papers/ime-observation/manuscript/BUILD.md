@@ -23,8 +23,11 @@ The build was checked with MiKTeX 25.12 (pdfTeX 4.23) on Windows.
     bash build.sh <path to sn-article-template> <output directory>
 
 The script writes `main.pdf`, `supplement.pdf` and the logs to the output directory and leaves the sources
-untouched. It ends by printing, for each document, the number of errors, of undefined references and of overfull
-boxes. References to sections and figures that are not written yet are reported as undefined.
+untouched; both directories may be given as relative paths, and the output directory must lie outside this directory.
+LaTeX runs without shell escape. The script ends by printing, for each document, the number of errors, of undefined
+references and citations, of result values that the text reads but that were not generated (`\rv{<key>}` with no
+value, printed in bold as a value still to be filled in), and of overfull boxes, and the number of BibTeX warnings.
+References to sections and figures that are not written yet are reported as undefined.
 
 ## Results tables and values
 
