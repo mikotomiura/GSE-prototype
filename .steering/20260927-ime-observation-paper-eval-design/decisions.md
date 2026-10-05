@@ -1490,3 +1490,11 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **表示した値**: なし（ログの overfull は数字を伏せて見た）。
 - **まだ**: 表 7（届き方・RF1・KT1）・開いた集合・表 8 の macOS の 3 つの比較と予測の層。
 - **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 2 ファイル）・`manuscript/supplement/supplement.tex`・本ファイル。
+
+## 判断 170: 結果の表の道具に開いた集合（RC3）の表を足す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **規則（§6.8）とコードの確認**: `kit/e2/open_set.py` の docstring（14〜64 行）で、K1 = 作品ごとに分ける（`--split work`・既定）、K1+ = 文ごとに分ける（`--split phrase`）、`gain` = 基準線の CER − 攻撃の CER、`gain_vs_shuffled` = 他の試行の復号の CER − 攻撃の CER を確かめた。
+- **表の形（メインの選択）**: `table-open-set.tex`（`sidewaystable`）。セル × 攻撃者（K0・K1・K1+・文ごとに分けた K0）× 長さの知識（区切りの数・本当の長さ）で、試行の数・攻撃の CER・基準線の CER・gain・shuffled との差（それぞれ区間つき）・復号できない試行の数。外枠の表の一覧には開いた集合の番号が無い（RC3 は §8 の本文）ので、本文に置くか補遺に回すかは §2 の 3 で決める。値 `<cell>.q4.open.<K0|K1|K1plus|K0.phrase>.<count|true>.<cer|gain|gainvsshuffled>`。2 つの分け方 × 2 つの長さ × K0・K1 がそろわなければ止まる。
+- **検証**: selftest 49 → 52 件（攻撃者ごとに値を変えた作り物で、K1+ の取り違えと gain の取り違えが見える）。★ 変異 3 本を足して計 29 本 → すべて赤。実物で生成 → `--check` 一致・文体違反 0・CR 0。一時の写しの main に入れて組み、overfull は HEAD と同じ（見出しの「Undecodable」は分綴の位置を指定）。
+- **表示した値**: なし。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 1 ファイル）・本ファイル。

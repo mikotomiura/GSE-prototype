@@ -19,6 +19,7 @@ directory and the Windows cell from its subdirectory `windows`, and the correcte
 - text-agreement.tex: for the supplement, per-text agreement over all trials, pooled over speeds and in the three
   mixtures of section 6.7 (whose weights are checked), and the per-trial differences per scenario and speed;
 - table-closed-set.tex: the near-chance judgement of section 6.8 per cell, set and K, and the recommendation;
+- table-open-set.tex: the open-set reconstruction per cell, attacker (K0, K1, K1+) and knowledge of the length;
 - table-cost.tex: runtime cost per system and condition (sections 6.10 and 10.9);
 - detection-strata.tex: the per-stratum detection of every cell, with the merge rate of the corrected analysis of
   deviation D10 next to the registered one, for the supplement (a cell that was not measured is stated as such);
@@ -71,6 +72,10 @@ RULE_KS = (10, 100)
 CLOSED_SET_KS = (10, 100, 1000)
 # Deviation D8: the closed set leaves out every trial of this scenario in every cell.
 CLOSED_SET_SKIPPED = "S12"
+# The open set (section 6.8): the attackers as (split, model, label); K1+ is K1 with the corpus split by phrase.
+OPEN_SET_ATTACKERS = (("work", "K0", "K0"), ("work", "K1", "K1"), ("phrase", "K1", "K1+"),
+                      ("phrase", "K0", "K0 (split by phrase)"))
+OPEN_SET_LENGTHS = (("count", "number of segments"), ("true", "true length"))
 # Question 5 (sections 6.10 and 10.9): one summary file per system, one block per condition.
 E3_CONDITIONS = ("idle", "working")
 E3_FILES = (("", "macos", "e3_macos.txt"), ("windows", "windows", "e3_windows.txt"))
@@ -373,6 +378,54 @@ def closed_set_values(cells, docs):
             vals["%s.q4.%s.near" % (cell.label, f)] = {
                 "text": yes_no(near_chance(doc, f)), "value": near_chance(doc, f),
                 "source": "%s:results/10|100/%s/acc_ci" % (src, f)}
+    return vals
+
+
+def open_set_name(label):
+    return "e2_open_set_%s.json" % label
+
+
+def read_open_set(cell):
+    """The open-set result of a cell, or None when its file is absent; both splits and both length levels must be
+    present with K0 and K1."""
+    p = os.path.join(cell.directory, open_set_name(cell.label))
+    if not os.path.isfile(p):
+        return None
+    doc = load(p)
+    for split, model, _ in OPEN_SET_ATTACKERS:
+        for li, _ in OPEN_SET_LENGTHS:
+            r = (doc.get("splits") or {}).get(split, {}).get(li)
+            if r is None or model not in r or model not in (r.get("shuffled") or {}):
+                raise ValueError("%s: no result for the split %s, length %s and model %s" % (
+                    cell.prefix + open_set_name(cell.label), split, li, model))
+    return doc
+
+
+def open_set_values(cell, doc):
+    """Values of the open set for the text: per attacker and length level, the attack's CER, the gain over the
+    baseline and the gain over the shuffled control, each with its interval."""
+    vals = {}
+    if doc is None:
+        return vals
+    src = cell.prefix + open_set_name(cell.label)
+    for split, model, label in OPEN_SET_ATTACKERS:
+        key = label.split(" ")[0].replace("+", "plus") + ("" if split == "work" or model == "K1" else ".phrase")
+        for li, _ in OPEN_SET_LENGTHS:
+            r = doc["splits"][split][li]
+            sh = r["shuffled"][model]
+            base = "%s.q4.open.%s.%s" % (cell.label, key, li)
+            vals[base + ".cer"] = {"text": est_ci(r[model]["cer"], r[model]["cer_ci"][0], r[model]["cer_ci"][1]),
+                                   "value": [r[model]["cer"]] + list(r[model]["cer_ci"]),
+                                   "source": "%s:splits/%s/%s/%s/cer" % (src, split, li, model)}
+            vals[base + ".gain"] = {"text": est_ci(r["gain"][model]["gain"], r["gain"][model]["gain_ci"][0],
+                                                   r["gain"][model]["gain_ci"][1], fmt_signed),
+                                    "value": [r["gain"][model]["gain"]] + list(r["gain"][model]["gain_ci"]),
+                                    "source": "%s:splits/%s/%s/gain/%s" % (src, split, li, model)}
+            vals[base + ".gainvsshuffled"] = {
+                "text": est_ci(sh["gain_vs_shuffled"], sh["gain_vs_shuffled_ci"][0], sh["gain_vs_shuffled_ci"][1],
+                               fmt_signed),
+                "value": [sh["gain_vs_shuffled"]] + list(sh["gain_vs_shuffled_ci"]),
+                "source": "%s:splits/%s/%s/shuffled/%s/gain_vs_shuffled" % (src, split, li, model)}
     return vals
 
 
@@ -760,6 +813,44 @@ def table_closed_set_all(cells, docs):
     return "".join(lines)
 
 
+def table_open_set(cells, docs):
+    """The open set (section 6.8) per cell, attacker and knowledge of the length."""
+    lines = [GENERATED_NOTE,
+             "\\begin{sidewaystable}[p]\n",
+             "{\\footnotesize\n",
+             "\\caption{Open-set reconstruction per cell and attacker: character error rate (CER) of the attack and of "
+             "the prior-only baseline, the gain (baseline CER minus attack CER) and the gain over the shuffled control "
+             "(the CER of another trial's decoding minus the attack's), each with a block-clustered 95\\%% percentile "
+             "interval. K1 holds out whole works, K1+ splits the corpus by phrase; the baseline knows the number of "
+             "segments or the true length. Undecodable: trials for which no string fits; %s: no value}\n" % NO_VALUE,
+             "\\label{tab:open-set}\n",
+             "\\begin{tabular}{L{0.14}L{0.11}L{0.10}L{0.06}L{0.13}L{0.13}L{0.12}L{0.11}L{0.10}}\n",
+             "\\toprule\n",
+             "Cell & Attacker & Length known & Trials & CER & Baseline CER & Gain & Gain over shuffled & "
+             "Undecod\\-able \\\\\n",
+             "\\midrule\n"]
+    for cell in cells:
+        doc = docs.get(cell.label)
+        if doc is None:
+            lines.append("%s & \\multicolumn{8}{l}{not measured} \\\\\n" % tex_escape(cell.label))
+            continue
+        first = True
+        for split, model, label in OPEN_SET_ATTACKERS:
+            for j, (li, li_label) in enumerate(OPEN_SET_LENGTHS):
+                r = doc["splits"][split][li]
+                a, b, g, sh = r[model], r["baseline"][model], r["gain"][model], r["shuffled"][model]
+                lines.append(" & ".join([
+                    tex_escape(cell.label) if first else "", label if j == 0 else "", li_label, fmt_int(r["n"]),
+                    est_ci(a["cer"], a["cer_ci"][0], a["cer_ci"][1]), est_ci(b["cer"], b["cer_ci"][0], b["cer_ci"][1]),
+                    est_ci(g["gain"], g["gain_ci"][0], g["gain_ci"][1], fmt_signed),
+                    est_ci(sh["gain_vs_shuffled"], sh["gain_vs_shuffled_ci"][0], sh["gain_vs_shuffled_ci"][1],
+                           fmt_signed),
+                    fmt_int(a["n_undecodable"])]) + " \\\\\n")
+                first = False
+    lines += ["\\bottomrule\n", "\\end{tabular}\n", "}\n", "\\end{sidewaystable}\n"]
+    return "".join(lines)
+
+
 def table_cost(e3):
     """Table 12: runtime cost per system and condition, never reduced to one figure; the systems are not compared."""
     lines = [GENERATED_NOTE,
@@ -932,6 +1023,7 @@ def build(results_dir):
     found = find_cells(results_dir)
     cells = [Cell(*f) for f in found]
     docs = dict((c.label, read_closed_set(c)) for c in cells)
+    open_docs = dict((c.label, read_open_set(c)) for c in cells)
     e3 = read_e3_all(results_dir)
     d10 = dict((c.label, read_d10(results_dir, c)) for c in cells)
     values = {}
@@ -939,6 +1031,7 @@ def build(results_dir):
         values.update(abstract_values(cell))
         values.update(d10_values(cell, d10[cell.label]))
         values.update(l2_values(cell))
+        values.update(open_set_values(cell, open_docs[cell.label]))
     values.update(closed_set_values(cells, docs))
     values.update(e3_values(e3))
     files = {
@@ -948,6 +1041,7 @@ def build(results_dir):
         "table-detection.tex": table_detection(cells).encode("utf-8"),
         "table-session.tex": table_session(cells).encode("utf-8"),
         "table-closed-set.tex": table_closed_set(cells, docs).encode("utf-8"),
+        "table-open-set.tex": table_open_set(cells, open_docs).encode("utf-8"),
         "table-cost.tex": table_cost(e3).encode("utf-8"),
         "closed-set-all.tex": table_closed_set_all(cells, docs).encode("utf-8"),
         "table-text-agreement.tex": table_text_agreement(cells).encode("utf-8"),
@@ -1119,6 +1213,28 @@ def _cs_doc(his=None, raw_his=None, n=100, skipped=True):
     if skipped:
         doc["skipped_scenarios"] = {CLOSED_SET_SKIPPED: 225}
     return doc
+
+
+def _os_doc(drop=None):
+    """An open-set result whose values differ per split and model, so that a mix-up of attackers shows."""
+    cer = {("work", "K0"): 0.9, ("work", "K1"): 0.8, ("phrase", "K1"): 0.6, ("phrase", "K0"): 0.95}
+    splits = {}
+    for split in ("work", "phrase"):
+        splits[split] = {}
+        for li, _ in OPEN_SET_LENGTHS:
+            r = {"n": 50, "baseline": {}, "gain": {}, "shuffled": {}}
+            for model in ("K0", "K1"):
+                c = cer[(split, model)]
+                g = 1.0 - c
+                r[model] = {"cer": c, "cer_ci": [c - 0.05, c + 0.05], "n_undecodable": 2}
+                r["baseline"][model] = {"cer": 1.0, "cer_ci": [0.95, 1.05]}
+                r["gain"][model] = {"gain": g, "gain_ci": [g - 0.05, g + 0.05]}
+                r["shuffled"][model] = {"cer": 1.0, "cer_ci": [0.95, 1.05], "gain": 0.0, "gain_ci": [-0.05, 0.05],
+                                        "gain_vs_shuffled": g + 0.01, "gain_vs_shuffled_ci": [g - 0.04, g + 0.06]}
+            splits[split][li] = r
+    if drop:
+        del splits[drop[0]][drop[1]]
+    return {"splits": splits, "alignment": {"n_blocks_unscored": 0, "n_trials_unscored": 0}}
 
 
 def _near(sets, k10=0.2, k100=0.02):
@@ -1359,6 +1475,29 @@ def selftest():
         check("q4: the table gives the judgement per set and K, and the recommendation is not decided without the "
               "macOS cells", "\\texttt{no\\_time} & 10 & 100 & " in t11 and t11.count("& yes \\\\") == 4
               and "not decided (a macOS cell was not measured)" in t11, t11[-900:])
+        check("open set: a cell without a file is reported as not measured",
+              "windows-test & \\multicolumn{8}{l}{not measured}" in files["table-open-set.tex"].decode("utf-8"))
+        osp = os.path.join(tmp, "windows", open_set_name("windows-test"))
+        with open(osp, "wb") as f:
+            f.write(json.dumps(_os_doc(drop=("phrase", "true"))).encode("utf-8"))
+        try:
+            build(tmp)
+            check("open set: negative: a missing split or length level stops the script", False)
+        except ValueError:
+            check("open set: negative: a missing split or length level stops the script", True)
+        with open(osp, "wb") as f:
+            f.write(json.dumps(_os_doc()).encode("utf-8"))
+        files_os = build(tmp)
+        tos = files_os["table-open-set.tex"].decode("utf-8")
+        vos = json.loads(files_os["values.json"].decode("utf-8"))["values"]
+        check("open set: K1+ is K1 with the corpus split by phrase, and the gain and the gain over the shuffled "
+              "control are not interchanged",
+              "& K1+ & number of segments & 50 & 0.600 [0.550, 0.650] & 1.000 [0.950, 1.050] & 0.400 [0.350, 0.450] "
+              "& 0.410 [0.360, 0.460] & 2 \\\\" in tos
+              and vos["windows-test.q4.open.K1plus.count.cer"]["text"] == "0.600 [0.550, 0.650]"
+              and vos["windows-test.q4.open.K1.true.gainvsshuffled"]["text"] == "0.210 [0.160, 0.260]"
+              and vos["windows-test.q4.open.K0.phrase.count.cer"]["text"] == "0.950 [0.900, 1.000]", tos[-1200:])
+        os.remove(osp)
         d10d = os.path.join(tmp, "d10", "windows")
         os.makedirs(d10d)
         reg = load(os.path.join(tmp, "windows", "e1_detection.json"))
