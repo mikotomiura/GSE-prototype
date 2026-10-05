@@ -230,6 +230,8 @@
   - [ ] `data.windows.md` の §10.8 の点検の計画の SHA-256 を全桁にする（Surface の点検の run の manifest から）
   - [x] 後の節（§2 比較表・§3 観測可能性〔方法・一次の文書の登録〕・§4 ロガー・Table 4・§10 データセット）・未登録の引用の登録（Plant・Pinet・Bridges・Monaco・Gebru・MS / Apple の文書・Inputlog の版・Translog-II・ScriptLog）
     → 2026-10-05（G-GEAR）: `sections/related.tex`（§2・Table 1）・`observability.tex`（§3・Table 2）・`logger.tex`（§4・Table 3・Table 4）・`dataset.tex`（§10・Table 13）。MS 16・Apple 13・WebKit のソースを取得して逐語を確かめ、Wayback に写しを作った（`docs/references.md` [V192]〜[V235]）。★★★ macOS の Accessibility にも変換の範囲の属性と開始・終了の通知があった → 判断 151（§3 と貢献 1 を対称の形に・研究者の選択）。macOS の観測するキーが登録の書き方より狭いこと・ヘッダの SHA-256 が共通部分だけを覆うこと・Windows の補助の信号を原稿の注にした。ScriptLog は scriptlog.net で 1.1 が有償で売られていた（サブエージェントの「入手できない」は不正確だった）
-  - [ ] Mac で: AppKit と C の Accessibility の定数の数と `TextInputSources.h` を計測の版の SDK のヘッダで確かめる（外枠の Open items・判断 151）
+    → 同日: 独立の照合（Opus）の指摘 17 件をすべて一次で裏取りして直した（判断 153）・書誌 [V192]〜[V235] を登録（`4e5e5184`）・補遺の文書一覧 `manuscript/supplement/observability-documents.tex`（31 件・Wayback の写しつき）
+  - [x] main に入った M4（PR #297）と Windows の解析（PR #304）を取り込んだ（`745a551f`）。逸脱の番号の衝突は研究者の選択で main の D6（macOS の晩）を保ち、この枝の Windows の試行の数え方を **D7** に（判断 152）。macOS の版（27.0.1・26A434）を原稿に記入
+  - [ ] Mac で: AppKit と C の Accessibility の定数の数と `TextInputSources.h` を計測の版（macOS 27.0.1）の SDK のヘッダで確かめる（外枠の Open items・判断 151・153）
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task

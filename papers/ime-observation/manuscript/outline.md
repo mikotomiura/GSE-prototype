@@ -560,5 +560,6 @@ figures of the records (the tables of run checks and of attempts, the check of s
   manifest of the check.
 - What else was running on the Windows measuring machine during the completed run is to be established from the
   records of that machine and stated in section 5.2 and in the table of attempts.
-- The list of documents of the observability analysis (URL, archived copy, date of last update, date of retrieval) is
-  to be placed in the supplement.
+- The list of documents of the observability analysis (`supplement/observability-documents.tex`, with the URL, the
+  archived copy and the date of last update of each) is to be assembled into the supplement with the per-stratum
+  tables.
