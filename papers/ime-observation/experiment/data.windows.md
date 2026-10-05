@@ -14,11 +14,13 @@ listed here; the runs of question 5 appear only in the tables below.
 
 <!-- - run_dir: /path/to/an/unpacked/run-directory  manifest_sha256: 0000000000000000000000000000000000000000000000000000000000000000 -->
 
+- run_dir: runs/windows-msime-tsf-2  manifest_sha256: 5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82
+
 ## Deposits
 
 | Cell label | Deposit location | SHA-256 of the archive | Date deposited |
 |---|---|---|---|
-| (to be filled in) | (to be filled in) | (to be filled in) | (to be filled in) |
+| windows-msime-tsf (attempt 2; packed on the measuring machine, Windows 11 Home, with `--also-user` and `--also-home` each given once) | not yet deposited | `f2287a7494b108a7b827f96da48f523e84e1a9478121d03fa82dca2c8749cd06` | not yet deposited |
 
 ## Run checks (sections 3.4 and 10.8 of the pre-registration)
 

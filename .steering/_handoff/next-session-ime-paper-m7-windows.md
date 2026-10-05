@@ -109,3 +109,12 @@ Skill: verify-before-claiming・reproducibility-discipline・git-workflow・data
 - `summarize_e3.py`（idle と working を並べて）: working は 880 行（不在 1 行 = 起動直後）・status `measured`・`cpu_all_zero: false`・CPU 平均 5.37 %・中央値 4.66・p95 10.84・最大 15.51・ワーキングセット最終 16.3 MB・傾き 0.09 MB/h・7.99 h。`samples.tsv` SHA-256 `638da0ea…f88f`・`conditions.txt` `9b6ae939…8345`。
 - ロガーの stderr に `candidate window stale — auto-resetting` が本計測と working で各 2 回。
 - 次: 問 5 の寄託（`samples.tsv`・`conditions.txt` の両条件）・本計測の寄託・§2 の 7（解析: §10.7 の命令を Windows のタグから）。研究者の判断待ち: `idle` / `working` の日時の逸脱の扱い・01:51 の開始の扱い。
+
+## §2.11 進み具合（2026-10-05 10:05〜 JST・解析）
+
+- 書庫: `pipeline.py --pack ~/ime-m7/runs/cell-2 --also-user <login> --also-home <home>` → `~/ime-m7/deposit/windows-msime-tsf-2.zip`・SHA-256 `f2287a74…cd06`（5 ファイル）。`data.windows.md` の Deposits に記録（場所と日付は未寄託）。⚠️ **OSF への寄託は研究者の作業**。
+- 書庫を `papers/ime-observation/experiment/runs/windows-msime-tsf-2`（gitignore）に展開し、`run.json` の SHA 一致を確かめ、`data.windows.md` に `- run_dir: runs/windows-msime-tsf-2  manifest_sha256: 5c74…` を足した。
+- ✅ 問 1〜3: 書き出し（タグ `a57c4fd7`）から §10.7 の命令（`--runs-from` は作業コピーの `data.windows.md`）→ exit 0・1 run・中止 0。`experiment/results/windows/e1_*.json`。主要（`windows_def`・`gt_obs`・`under_limit`）: 再現率 0.889・適合率 0.759・偽陽性率 0.233・分割率 0.097、放棄 κ 0.496、ナビの完全一致 0.962、滞在の MAE 251 ms。
+- ✅ 問 4 の開いた集合（§6.8 の命令・`--recipes kit/gen/recipes.json`）: exit 0 → `e2_open_set_windows-msime-tsf.json`。
+- ❌ **問 4 の閉じた集合が凍結のコードの欠陥で止まる**: `closed_set.py: the corpus has too few phrases with a distinct typed reading (K = 100)`。Windows の計画の S12 225 試行のうち 74 はコーパスの句（かなで打てる句）で、`closed_set.py` はコーパスに無い句（151 試行）しか外さない。S12 の候補はコーパスに 72 句しかなく、K = 100 の 99 個のおとりが足りない。事前登録 §6.8・§10.7 は「S12 は数えない・2,700 試行」。コードは変えていない。⚠️ macOS も S12 の候補は 72（macOS の計画の S12 の句は未確認）。→ **研究者が逸脱として直し方を決める**（例: S12 の試行をコーパスの句でも外す）。その後に閉じた集合を回す。
+- 研究者の判断待ち（まとめ）: 上の閉じた集合・`idle` / `working` の日時・01:51 の開始の扱い・寄託。
