@@ -30,6 +30,7 @@ pre-registration; with the settings fixed there, the figures of the rule on pres
 |---|---|---|---|---|---|---|---|---|---|---|
 | macos-standard-live-on | 1 | no | 2026-10-03 04:15 UTC | `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba` | 0 | 0 | 0 | 0 | no | not yet |
 | macos-standard-live-off | 1 | no | 2026-10-03 15:34 UTC | `3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2` | 0 | 0 | 0 | 0 | no | not yet |
+| macos-e3-working | 1 | no | 2026-10-05 01:17 UTC | `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba` | 0 | 0 | 0 | 0 | no | not yet |
 
 ## Deposit procedure
 
