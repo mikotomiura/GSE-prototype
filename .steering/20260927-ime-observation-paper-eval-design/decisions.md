@@ -1469,3 +1469,15 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **まだ決まっていないこと**（M12 で研究者に聞く）: E3 の標本（`samples.tsv`）の置き方・`working` の観測ログを含めるか（外枠の Open items）・較正パイロットの生ログを含めるか（判断 146 の 4）・ソフトウェアの記録は GitHub のリリースを Zenodo に連携させるか。
 - **書庫の場所**（git の外）: macOS ON / OFF は Mac の `~/ime-m4/deposit/`、Windows は Surface の `~/ime-m7/deposit/`（G-GEAR の `Downloads` に同じ SHA の写し）。
 - **影響範囲**: 判断 159 と引き継ぎの「OSF への寄託」はこの判断で読み替える（本文は書き換えない）。`next-session-ime-paper-results-2.md` §5 に書いた。
+
+## 判断 168: 結果の表の道具に問 4（表 11・推奨）・問 5（表 12）・D10 の直した併合の率を足す（2026-10-05・G-GEAR・メインの選択・研究者が覆せる）
+
+- **背景**: 引き継ぎ `next-session-ime-paper-results-2.md` §2 の 2（道具を広げる）の前半。3 セルの問 1〜5 と D10 の直した解析がそろった（判断 166）。
+- **問 4 の規則（§6.8・§10.7 をコードに写した）**: 集合が K で near chance ＝ 報告の正解率（自身と粗い集合の最大＝`acc`）の Wilson 区間の上端（`acc_ci[1]`）≤ 2/K。規則の near chance ＝ K = 10 と K = 100 の両方。推奨 ＝ `no_time`・`counts_only` の順に、**macOS の 2 セルの両方**で near chance の最も細かい集合、無ければ none。macOS のセルが欠けたら not decided（外枠 §8）。Windows の同じ判定は但し書きで、推奨を変えない。K = 1,000 は規則に入れない。値の無い（採点された試行 0）集合は near chance としない。⚠️ `acc` と `acc_ci` の意味は `kit/e2/closed_set.py` の docstring（371〜381 行）で確かめた。閉じた集合のファイルは D8（S12 を外した）であることを検査する（`skipped_scenarios`）。
+- **問 5（§6.10・§10.9）**: `summarize_e3.py` の出力を読み、`measured` の条件だけを引く（`insufficient` は値なし）。Windows の `working` で CPU が全部 0 は insufficient（§10.9）、`idle` は印つきで報告。要旨の (iv) は系ごと・条件ごとの CPU の平均（区間なし）。
+- **D10**: 補遺の層の表に「Corrected」（直した解析の併合の率）の列を登録の列の隣に足した。登録の側が `merge_recount` を持っていたら止まる・直した側が `obs` でなければ止まる。値 `<cell>.d10.<primary|all>.merge.differ`（併合の率が変わった層の数）。
+- **表の形（メインの選択）**: 表 11 は 2 つの規則の集合 × K = 10・100 をセルごとに（正解率〔Wilson〕・ブロックの区間・2/K・near chance）＋推奨の行。全集合・全 K と速さ・シナリオごとの素の正解率は補遺 `closed-set-all.tex`（`supplement.tex` に読み込んだ）。表 11・12 は表 8 と同じ `sidewaystable`。⚠️ 外枠の表 11 の「規則の性質」（§6.8 の確率の表）は登録の値で結果ではないので生成しない（結果の節で §6.8 を引く）。
+- **検証**: selftest 19 → 40 件。★ 変異 16 本（`<=` を `<` に・素の区間を読む・K = 1,000 を規則に・片方の macOS で足りる・粗い集合を先に・Windows も決める・欠けたセルの検査を外す・欠けたら none・値なしを near chance に・Windows の全 0 を引く・insufficient を引く・直した列に登録の値・D8 の検査を外す・D10 の印を要求しない・登録の印を拒まない・変わった層を全部数える）→ すべて赤（欠けたセルの変異は例外でなく狙った確認で赤になるよう selftest を直した）。実物で生成 → `--check` 一致・文体違反 0。`build.sh`: main はエラー 0・未定義の参照は判断 165 と同じ 4 ラベル・overfull 1（HEAD と同じ）。補遺は overfull が 29 → 35（増えた 6 件は既存の層の表と同じ「横向きのページの出力時」の型）。表 11・12 は一時の写しの main に入れて組み、overfull が増えないことを確かめた（結果の節は §2 の 3）。
+- ⚠️ **表示した値**: 規則のコードと selftest・変異を済ませてから実物で生成した。生成の後、表の幅の確認で LaTeX のログの overfull の行に表 12 の数が 4 つ出た（以降は数字を伏せた）。推奨と問 4 の値は見ていない。規則は生成の後に変えていない（変えたのは表の列の幅だけ）。
+- **まだ**: 表 7（届き方・RF1・KT1）・表 10（L2）・開いた集合・表 8 の macOS の 3 つの比較と予測の層。
+- **影響範囲**: `manuscript/tools/results_tables.py`・`manuscript/generated/`（新規 3 ファイル）・`manuscript/supplement/supplement.tex`・本ファイル。

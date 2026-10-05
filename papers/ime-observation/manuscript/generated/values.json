@@ -58,6 +58,22 @@
     2925
    ]
   },
+  "macos-standard-live-off.d10.all.merge.differ": {
+   "source": "e1_detection.json and d10/macos/e1_detection.json:all_trials/metrics/by_stratum/*/merge_rate",
+   "text": "21 of 39",
+   "value": [
+    21,
+    39
+   ]
+  },
+  "macos-standard-live-off.d10.primary.merge.differ": {
+   "source": "e1_detection.json and d10/macos/e1_detection.json:under_limit/metrics/by_stratum/*/merge_rate",
+   "text": "21 of 36",
+   "value": [
+    21,
+    36
+   ]
+  },
   "macos-standard-live-off.primary.dwellbias.range": {
    "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
    "text": "$-$561 to 201~ms",
@@ -101,6 +117,60 @@
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/per_trial/by_stratum",
    "text": "35",
    "value": 35
+  },
+  "macos-standard-live-off.q4.counts_only.k10.acc": {
+   "source": "e2_closed_set_macos-standard-live-off.json:results/10/counts_only/acc|acc_ci",
+   "text": "0.902 [0.890, 0.913]",
+   "value": [
+    0.9018518518518519,
+    0.8900522562749811,
+    0.9125095925053339
+   ]
+  },
+  "macos-standard-live-off.q4.counts_only.k100.acc": {
+   "source": "e2_closed_set_macos-standard-live-off.json:results/100/counts_only/acc|acc_ci",
+   "text": "0.421 [0.403, 0.440]",
+   "value": [
+    0.42148148148148146,
+    0.4029801737971629,
+    0.44020589814622246
+   ]
+  },
+  "macos-standard-live-off.q4.counts_only.near": {
+   "source": "e2_closed_set_macos-standard-live-off.json:results/10|100/counts_only/acc_ci",
+   "text": "no",
+   "value": false
+  },
+  "macos-standard-live-off.q4.no_time.k10.acc": {
+   "source": "e2_closed_set_macos-standard-live-off.json:results/10/no_time/acc|acc_ci",
+   "text": "0.902 [0.890, 0.913]",
+   "value": [
+    0.9018518518518519,
+    0.8900522562749811,
+    0.9125095925053339
+   ]
+  },
+  "macos-standard-live-off.q4.no_time.k100.acc": {
+   "source": "e2_closed_set_macos-standard-live-off.json:results/100/no_time/acc|acc_ci",
+   "text": "0.421 [0.403, 0.440]",
+   "value": [
+    0.42148148148148146,
+    0.4029801737971629,
+    0.44020589814622246
+   ]
+  },
+  "macos-standard-live-off.q4.no_time.near": {
+   "source": "e2_closed_set_macos-standard-live-off.json:results/10|100/no_time/acc_ci",
+   "text": "no",
+   "value": false
+  },
+  "macos-standard-live-off.q4.unscored": {
+   "source": "e2_closed_set_macos-standard-live-off.json:alignment",
+   "text": "0 blocks, 0 trials",
+   "value": [
+    0,
+    0
+   ]
   },
   "macos-standard-live-off.scope.setaside": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
@@ -167,6 +237,22 @@
     3150
    ]
   },
+  "macos-standard-live-on.d10.all.merge.differ": {
+   "source": "e1_detection.json and d10/macos/e1_detection.json:all_trials/metrics/by_stratum/*/merge_rate",
+   "text": "21 of 42",
+   "value": [
+    21,
+    42
+   ]
+  },
+  "macos-standard-live-on.d10.primary.merge.differ": {
+   "source": "e1_detection.json and d10/macos/e1_detection.json:under_limit/metrics/by_stratum/*/merge_rate",
+   "text": "21 of 39",
+   "value": [
+    21,
+    39
+   ]
+  },
   "macos-standard-live-on.primary.dwellbias.range": {
    "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
    "text": "$-$656 to 156~ms",
@@ -211,6 +297,60 @@
    "text": "36",
    "value": 36
   },
+  "macos-standard-live-on.q4.counts_only.k10.acc": {
+   "source": "e2_closed_set_macos-standard-live-on.json:results/10/counts_only/acc|acc_ci",
+   "text": "0.907 [0.896, 0.917]",
+   "value": [
+    0.9066666666666666,
+    0.8955846004233203,
+    0.9166819675861035
+   ]
+  },
+  "macos-standard-live-on.q4.counts_only.k100.acc": {
+   "source": "e2_closed_set_macos-standard-live-on.json:results/100/counts_only/acc|acc_ci",
+   "text": "0.435 [0.417, 0.453]",
+   "value": [
+    0.4352136752136752,
+    0.4173431126843868,
+    0.45325418480381346
+   ]
+  },
+  "macos-standard-live-on.q4.counts_only.near": {
+   "source": "e2_closed_set_macos-standard-live-on.json:results/10|100/counts_only/acc_ci",
+   "text": "no",
+   "value": false
+  },
+  "macos-standard-live-on.q4.no_time.k10.acc": {
+   "source": "e2_closed_set_macos-standard-live-on.json:results/10/no_time/acc|acc_ci",
+   "text": "0.907 [0.896, 0.917]",
+   "value": [
+    0.9066666666666666,
+    0.8955846004233203,
+    0.9166819675861035
+   ]
+  },
+  "macos-standard-live-on.q4.no_time.k100.acc": {
+   "source": "e2_closed_set_macos-standard-live-on.json:results/100/no_time/acc|acc_ci",
+   "text": "0.435 [0.417, 0.453]",
+   "value": [
+    0.4352136752136752,
+    0.4173431126843868,
+    0.45325418480381346
+   ]
+  },
+  "macos-standard-live-on.q4.no_time.near": {
+   "source": "e2_closed_set_macos-standard-live-on.json:results/10|100/no_time/acc_ci",
+   "text": "no",
+   "value": false
+  },
+  "macos-standard-live-on.q4.unscored": {
+   "source": "e2_closed_set_macos-standard-live-on.json:alignment",
+   "text": "0 blocks, 0 trials",
+   "value": [
+    0,
+    0
+   ]
+  },
   "macos-standard-live-on.scope.setaside": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
    "text": "720 of 3{,}150 trials (22.9\\%)",
@@ -223,6 +363,32 @@
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/per_trial",
    "text": "3{,}150",
    "value": 3150
+  },
+  "macos.e3.idle.cpu.mean": {
+   "source": "e3_macos.txt:idle/cpu mean",
+   "text": "0.32",
+   "value": 0.32
+  },
+  "macos.e3.working.cpu.mean": {
+   "source": "e3_macos.txt:working/cpu mean",
+   "text": "0.36",
+   "value": 0.36
+  },
+  "q4.recommendation": {
+   "source": "e2_closed_set_macos-standard-live-on.json, e2_closed_set_macos-standard-live-off.json:results/10|100/*/acc_ci",
+   "text": "none",
+   "value": {
+    "set": null,
+    "status": "none"
+   }
+  },
+  "q4.windows.qualification": {
+   "source": "windows/e2_closed_set_windows-msime-tsf.json:results/10|100/*/acc_ci",
+   "text": "\\texttt{no\\_time} near chance on Windows: no; \\texttt{counts\\_only} near chance on Windows: no",
+   "value": {
+    "counts_only": false,
+    "no_time": false
+   }
   },
   "windows-msime-tsf.all.dwellbias.range": {
    "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/by_speed/*/dwell/bias_ci",
@@ -276,6 +442,22 @@
     2925
    ]
   },
+  "windows-msime-tsf.d10.all.merge.differ": {
+   "source": "windows/e1_detection.json and d10/windows/e1_detection.json:all_trials/metrics/by_stratum/*/merge_rate",
+   "text": "2 of 39",
+   "value": [
+    2,
+    39
+   ]
+  },
+  "windows-msime-tsf.d10.primary.merge.differ": {
+   "source": "windows/e1_detection.json and d10/windows/e1_detection.json:under_limit/metrics/by_stratum/*/merge_rate",
+   "text": "2 of 36",
+   "value": [
+    2,
+    36
+   ]
+  },
   "windows-msime-tsf.primary.dwellbias.range": {
    "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/by_speed/*/dwell/bias_ci",
    "text": "$-$1,121 to $-$456~ms",
@@ -320,6 +502,60 @@
    "text": "36",
    "value": 36
   },
+  "windows-msime-tsf.q4.counts_only.k10.acc": {
+   "source": "windows/e2_closed_set_windows-msime-tsf.json:results/10/counts_only/acc|acc_ci",
+   "text": "0.902 [0.890, 0.913]",
+   "value": [
+    0.9018518518518519,
+    0.8900522562749811,
+    0.9125095925053339
+   ]
+  },
+  "windows-msime-tsf.q4.counts_only.k100.acc": {
+   "source": "windows/e2_closed_set_windows-msime-tsf.json:results/100/counts_only/acc|acc_ci",
+   "text": "0.421 [0.403, 0.440]",
+   "value": [
+    0.42148148148148146,
+    0.4029801737971629,
+    0.44020589814622246
+   ]
+  },
+  "windows-msime-tsf.q4.counts_only.near": {
+   "source": "windows/e2_closed_set_windows-msime-tsf.json:results/10|100/counts_only/acc_ci",
+   "text": "no",
+   "value": false
+  },
+  "windows-msime-tsf.q4.no_time.k10.acc": {
+   "source": "windows/e2_closed_set_windows-msime-tsf.json:results/10/no_time/acc|acc_ci",
+   "text": "0.902 [0.890, 0.913]",
+   "value": [
+    0.9018518518518519,
+    0.8900522562749811,
+    0.9125095925053339
+   ]
+  },
+  "windows-msime-tsf.q4.no_time.k100.acc": {
+   "source": "windows/e2_closed_set_windows-msime-tsf.json:results/100/no_time/acc|acc_ci",
+   "text": "0.421 [0.403, 0.440]",
+   "value": [
+    0.42148148148148146,
+    0.4029801737971629,
+    0.44020589814622246
+   ]
+  },
+  "windows-msime-tsf.q4.no_time.near": {
+   "source": "windows/e2_closed_set_windows-msime-tsf.json:results/10|100/no_time/acc_ci",
+   "text": "no",
+   "value": false
+  },
+  "windows-msime-tsf.q4.unscored": {
+   "source": "windows/e2_closed_set_windows-msime-tsf.json:alignment",
+   "text": "0 blocks, 0 trials",
+   "value": [
+    0,
+    0
+   ]
+  },
   "windows-msime-tsf.scope.setaside": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/per_trial/trials_not_used/out_of_scope",
    "text": "617 of 2{,}925 trials (21.1\\%)",
@@ -332,6 +568,16 @@
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/per_trial",
    "text": "2{,}925",
    "value": 2925
+  },
+  "windows.e3.idle.cpu.mean": {
+   "source": "windows/e3_windows.txt:idle/cpu mean",
+   "text": "5.56",
+   "value": 5.56
+  },
+  "windows.e3.working.cpu.mean": {
+   "source": "windows/e3_windows.txt:working/cpu mean",
+   "text": "5.37",
+   "value": 5.37
   }
  }
 }
