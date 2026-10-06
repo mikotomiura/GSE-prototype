@@ -1,5 +1,7 @@
 # 次セッション（Mac）— IME 論文 M12: `conditions.txt` の SHA-256 を記録し、macOS の書庫と標本を G-GEAR へ移す
 
+> ✅ 済み（2026-10-07・判断 216・枝 `docs/ime-m12-mac-conditions`）: §2 の 1〜6。7 のうち 13 ファイルは Drive の `mac/` で移し済み。**残りは計測の書庫 2 つ**（`macos-standard-live-on-1.zip` `77bd8a8e…`・`-off-1.zip` `e1cdf2e8…`）を、測った機械の `~/ime-m4/deposit/` から Drive の `mac/` へ研究者が手で上げること。
+
 > 作成: 2026-10-06 夜（G-GEAR・判断 215 の後）。`next-session-ime-paper-manuscript-9.md` の §2.1 の残りを、機械ごとの引き継ぎに分けたもの（研究者の求め）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 214・215**、`papers/ime-observation/experiment/data.md`（Deposits・Deposit procedure・question 5 の段落・2026-10-06 の節）、`papers/ime-observation/kit/export/deposit.internal.{json,py}`（寄託の一覧と照合の道具・docstring が仕様）。状態は着手時に `git fetch` で測り直す。
 > 並行: Surface（`next-session-ime-paper-m12-surface.md`）と同時に進めてよい。G-GEAR（`next-session-ime-paper-m12-ggear.md`）は両方の後。
