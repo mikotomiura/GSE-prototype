@@ -423,7 +423,7 @@ def is_link(full, root):
 
 # The kinds of file that the checker of the writing rules reads (its TEXT_SUFFIX, its ignore-file name) and the
 # names of the other files of the source that are allowed. Anything else would be exported without being checked.
-CHECKED_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib")
+CHECKED_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib", ".svg")
 CHECKED_NAMES = (".gitignore", ".gitattributes", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA")
 
 
@@ -1684,7 +1684,7 @@ def selftest():
             rcx, text, o = run("type-" + nm.replace("/", "_"), {nm: "x\n"})
             ck(name + " (%s)" % nm, rcx == 2 and os.path.basename(nm) in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
         kinds_ok = dict(("kit/kinds/" + n, "x\n") for n in ("a.py", "a.rs", "a.sh", "a.md", "a.json", "a.toml", "a.swift", "a.txt", "a.cff",
-                                                           "a.tex", "a.bib", ".gitignore", ".gitattributes", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA"))
+                                                           "a.tex", "a.bib", "a.svg", ".gitignore", ".gitattributes", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA"))
         rcx, text, o = run("kinds-ok", kinds_ok)
         ck(name + " (the allowed kinds pass)", rcx == 0, text)
         ck(name + " (a .tex and a .bib file are exported)",

@@ -2006,3 +2006,17 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 8. **CITATION.cff と .zenodo.json**: TODO を消し、Zenodo のソフトウェアの記録とそろえた（題・版 1.0.0・DOI・著者と ORCID・repo の URL・データセットへの参照）。`.zenodo.json` は手で上げるので使わないが、説明の誤り（書き出しの道具は公開しない）を直して残した。
 - **検証**: 書き出しの selftest ok・変異 11 本すべて赤。文体の検査の selftest OK・違反 0 件。走査（`scan_counts.py`・書き出しの関数をそのまま呼ぶ）0 件。`build.sh --submission`: エラー 0・未定義 0・生成されていない値 0・overfull は main 0・main-submission 1・補遺 167（前と同じ）。組んだ PDF の文字で、DOI・URL・commit・表 1 の行を確かめた。新しい散文の行は 120 字以内（表の行と JSON の 1 行は元から長い形）。
 - **影響範囲**: `papers/ime-observation/` の `README.md`・`CITATION.cff`・`.zenodo.json`・`.gitattributes`（新）・`LICENSE-CODE`（新）・`LICENSE-DATA`（新）・`experiment/{data,data.windows,deviations,notes}.md`・`kit/{logger,refinput-macos,refinput-windows}/README.md`・`kit/run/cell.example.json`・`kit/export/*`・`manuscript/references.bib`・`manuscript/sections/{dataset,declarations,related}.tex`・`manuscript/supplement/provenance.tex`・`issues/_style_check.py`・本ファイル。
+
+## 判断 210: 公開 repo の README の先頭にロゴと動く図を置く —— GIF ではなく SVG（書き出しはバイナリを入れない）・図の行は実物の形式どおりで時刻は作り例と明記（2026-10-06・G-GEAR・研究者の求め〔「リポジトリの中で gif 画像などをトップに置きたい・ロゴっぽいものも作れたら最高」〕・形と中身はメインの選択・研究者が覆せる）
+
+- **形**: 書き出しの道具はバイナリ（GIF・PNG）を公開物に入れない（安全の規則・`not a UTF-8 text file` で止まる）→ **動く SVG**（CSS の `@keyframes`・GitHub の README の `<img>` で再生される）にした。テキストなので、書き出しの走査（個人の値・禁止語）がそのまま効く。ロゴは明るい版と暗い版の 2 枚を `<picture>` の `prefers-color-scheme` で切り替える。
+- **ロゴ**（`assets/logo-{light,dark}.svg`）: キーキャップの中に空の文字の枠 3 つと、変換中を示す点線の下線（円の並び）とキャレット。右に `ime-conversion-logging` と副題 "Logging Japanese IME conversion without recording text"。
+- **動く図**（`assets/demo.svg`・12 秒で繰り返す）: 左は入力欄（`n i h o n g o` → にほんご → Space で 日本語〔変換中の印〕→ Enter で確定）とキーの点灯、右はロガーが同じ時刻に書く `obs/1` の行（`key` 9 行と `ime_shadow` 1 行）。⚠️ **実物との整合を一次で確かめた**: 行の形は `kit/formats/FORMATS.md` の `obs/1`（`key` は 14 分類と `press`、`ime_shadow` は `dwell_ms`・`nav`・`abandon` で文字も長さも持たない）。`t` は壁時計のミリ秒（ロガーの README）。macOS の推定ではセッションは最初の英数字キーで始まり Enter で確定（`input/ime_compose.rs` の遷移表）、`nav` は矢印だけを数え Space は数えない → `dwell_ms` 4000（最初のキーから Enter まで）・`nav` 0・`abandon` false。`ime_shadow` は監視の巡回が要約を取り出した時刻に書かれる（`main.rs` の `emit_ime_shadow`）→ Enter の行の後に 16 ms 遅れで置いた。図の下に「時刻は作り例・解放の行（`press:false`）も書かれるが省いた・文字も読みも候補も記録しない」と明記。
+- **生成**: `assets/make_assets.py`（標準ライブラリだけ・`--frame T` で T 秒の静止画）。出力は README から参照する 3 枚。
+- **道具の直し**: 書き出しの `CHECKED_SUFFIX` と文体の検査の `TEXT_SUFFIX` に `.svg`。文体の検査では SVG の地の文を `<title>`・`<desc>`・コメントとし（日本語は赤）、`<text>`（図の中の入力の例）は見ない。禁止語は全行。selftest に 5 件（図の中の日本語は通る・title・複数行の desc・コメントは赤・図の中の禁止語は赤）と走査の 1 件。
+- **検証**:
+  - Chrome（`http://127.0.0.1` で配信）: タブが `hidden` で静止画が撮れなかった → 同じ SVG をページに直接入れ、`getAnimations()` の 30 本の時刻を 9 点に合わせて、見えている入力欄の文字・行の数・キーの点灯を数えた。すべて設計どおり（0.5 s は空・1.15 s は n と 1 行・2.65 s はにほんg と 6 行・3.0 s はにほんご と 7 行・4.2 s は 日本語 と 8 行・5.05 s は 9 行と Enter の点灯・6.0 s は 10 行・10.7 s は消えかけ・11.5 s は空）。⚠️ `<img>` に入れたときの再生と、GitHub での見え方（書体・ダークの切り替え）は**まだ見ていない**（repo に push した後に確かめる）。
+  - MuPDF で静止画を PNG にして配置を確かめた（キーの列のはみ出しと上の余白を直した）。⚠️ MuPDF は `stroke-dasharray` を描かない → ロゴの点線は円にした（入力欄の点線は破線のまま・ブラウザで描かれる）。
+  - 生成のスクリプトを 120 字以内に折り直した後も、3 枚と静止画 2 枚がブラウザで確かめたものとバイト一致。
+  - 文体の検査の selftest OK・違反 0 件、書き出しの selftest ok・走査 0 件。使い捨ての変異 4 本（SVG の地の文を見ない・`.svg` を走査しない・`<text>` も地の文にする・書き出しの種類から外す）すべて赤。
+- **影響範囲**: `papers/ime-observation/{README.md,assets/}`・`kit/export/{export.internal.py,README.internal.md}`・`issues/_style_check.py`・本ファイル。

@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo-light.svg" width="600" alt="ime-conversion-logging">
+  </picture>
+</p>
+
 # Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation
 
 This repository holds the artifacts of a single paper on observing Japanese IME conversion without
@@ -5,6 +12,13 @@ recording its text: the limits of observability, a cross-platform standalone log
 synthetic-input validation. Raw logs are not committed to the repository; they are deposited
 separately, and their locations and SHA-256 digests are recorded in `experiment/data.md` (macOS) and
 `experiment/data.windows.md` (Windows). Commands in the documents of this repository are run from its root.
+
+<p align="center">
+  <img src="assets/demo.svg" width="100%" alt="Left: the romaji n, i, h, o, n, g, o typed with the input
+    method on become a reading in an input field; Space converts it and Enter commits it. Right: the rows that the
+    logger writes at the same times: a key category and a time for every key press and, when the conversion ends,
+    its duration, its number of candidate moves and whether it was abandoned. No character is written.">
+</p>
 
 ## Identifiers
 
@@ -26,7 +40,8 @@ is, in order:
 4. the release, tagged `v1.0.0`.
 
 The first three commits carry the date of the working commit they come from, and their messages name it. The
-licence texts, this file's identifiers and the line-end rules of `.gitattributes` are added in the release.
+licence texts, this file's identifiers and figures and the line-end rules of `.gitattributes` are added in the
+release.
 
 ### Recomputing the lists of the freezing tags
 
@@ -60,6 +75,7 @@ does not match.
 | `kit/` | The reproducible toolset (log formats, generator, emitter, reference input field, standalone logger, analysis). |
 | `experiment/` | Experiment records (SEED / env.md / data.md / data.windows.md / run.sh / notes.md). Raw logs are not stored here (`experiment/raw/` is ignored); the deposit location and its SHA-256 are recorded in `data.md` (macOS) and `data.windows.md` (Windows). |
 | `manuscript/` | The manuscript. |
+| `assets/` | The figures of this file and the script that makes them (`make_assets.py`). |
 
 ## License
 

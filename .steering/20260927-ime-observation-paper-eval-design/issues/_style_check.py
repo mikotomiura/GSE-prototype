@@ -46,7 +46,7 @@ CJK = re.compile("[　-〿぀-ヿ㐀-䶿一-鿿！-｠]")
 BACKTICK = re.compile(r"`[^`\n]*`")
 SKIP_DIRS = {"target", ".build", "__pycache__", ".venv", "venv", "runs", "sealed"}
 SKIP_SUFFIX = (".jsonl", ".ndjson", ".lock", ".pyc", ".png", ".pdf", ".zip")
-TEXT_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib")
+TEXT_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib", ".svg")
 UPSTREAM_KEYS = re.compile(r"^(gse_|upstream_)|^(start_anchor|end_anchor)$")
 
 
@@ -214,6 +214,21 @@ def md_prose(text):
     return out
 
 
+SVG_PROSE = re.compile(r"<title[^>]*>(.*?)</title>|<desc[^>]*>(.*?)</desc>|<!--(.*?)-->", re.S)
+
+
+def svg_prose(text):
+    """判断 210: 公開 repo の図（SVG）。地の文は <title>・<desc>・コメントだけで、<text> は図の中の文字
+    （入力の例として日本語を描く）なので見ない。"""
+    out = []
+    for m in SVG_PROSE.finditer(text):
+        body = next(g for g in m.groups() if g is not None)
+        no = text.count("\n", 0, m.start()) + 1
+        for i, ln in enumerate(body.split("\n")):
+            out.append((no + i, ln))
+    return out
+
+
 def json_prose(text):
     out = []
     try:
@@ -292,6 +307,8 @@ def check_text(rel, text, verbatim):
         prose = md_prose(text)
     elif ext == ".json":
         prose = json_prose(text)
+    elif ext == ".svg":
+        prose = svg_prose(text)
     elif ext in (".tex", ".bib"):
         # 判断 148: 原稿（LaTeX）と書誌は全文が公開の文なので、コメントも含めて全行を見る
         prose = list(enumerate(lines, 1))
@@ -384,6 +401,12 @@ def selftest():
     expect("tex 英語だけは通る", "a.tex", "\\section{Method}\nThe logger writes rows.\n", [])
     expect("tex 禁止語 GSE は赤", "a.tex", "The GSE logger.\n", ["forbidden:gse"])
     expect("bib 日本語の書誌は赤", "r.bib", "@article{k, title={" + J + "}}\n", ["japanese-prose"])
+    # 判断 210: SVG は <title>・<desc>・コメントが地の文。<text> の日本語（図の中の入力の例）は通す
+    expect("svg 図の中の日本語は通る", "a.svg", "<svg>\n<title>Demo</title>\n<text>" + J + "</text>\n</svg>\n", [])
+    expect("svg title の日本語は赤", "a.svg", "<svg>\n<title>" + J + "</title>\n</svg>\n", ["japanese-prose"])
+    expect("svg 複数行の desc の日本語は赤", "a.svg", "<svg>\n<desc>English\n" + J + "</desc>\n</svg>\n", ["japanese-prose"])
+    expect("svg コメントの日本語は赤", "a.svg", "<svg>\n<!-- " + J + " -->\n</svg>\n", ["japanese-prose"])
+    expect("svg 禁止語は図の中でも赤", "a.svg", "<svg>\n<text>GSE</text>\n</svg>\n", ["forbidden:gse"])
     expect("json reason の日本語は赤", "m.json", '{"entries":[{"reason":"' + J + '"}]}', ["japanese-prose"])
     expect("json 出どころの欄は見ない", "m.json",
            '{"entries":[{"gse_path":"src-tauri/x.rs","start_anchor":"// ' + J + '","reason":"ok"}]}', [])
@@ -435,6 +458,14 @@ def selftest():
         if len(run(tmp, ["papers/ime-observation"])) != 2:
             fails.append("走査: .gitattributes のコメントも走査の対象のはず（判断 209）")
         os.remove(os.path.join(tmp, "papers", "ime-observation", ".gitattributes"))
+        # 判断 210: 公開 repo の図（SVG）も走査する
+        os.makedirs(os.path.join(tmp, "papers", "ime-observation", "assets"))
+        with io.open(os.path.join(tmp, "papers", "ime-observation", "assets", "a.svg"), "w",
+                     encoding="utf-8") as f:
+            f.write("<svg>\n<title>" + J + "</title>\n</svg>\n")
+        if len(run(tmp, ["papers/ime-observation"])) != 2:
+            fails.append("走査: .svg も走査の対象のはず（判断 210）")
+        os.remove(os.path.join(tmp, "papers", "ime-observation", "assets", "a.svg"))
         if len(run(tmp, ["papers/ime-observation/kit/x/bad.md", "papers/ime-observation/kit/x/NOTES.internal.md"])) != 1:
             fails.append("走査: 明示したファイルの違反は拾い、明示した *.internal.* は拾わないはず")
     finally:
