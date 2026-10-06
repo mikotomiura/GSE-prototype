@@ -78,7 +78,7 @@ not match.
 | Directory | Role |
 |---|---|
 | `kit/` | The reproducible toolset (log formats, generator, emitter, reference input field, standalone logger, analysis). |
-| `experiment/` | Experiment records (SEED / env.md / data.md / data.windows.md / run.sh / notes.md). Raw logs are not stored here (`experiment/raw/` is ignored); the deposit location and its SHA-256 are recorded in `data.md` (macOS) and `data.windows.md` (Windows). |
+| `experiment/` | Experiment records (SEED / env.md / data.md / data.windows.md / run.sh / notes.md). Raw logs are not stored here (`experiment/raw/` is ignored); the deposit location and its SHA-256 are recorded in `data.md` (macOS) and `data.windows.md` (Windows). The datasheet of the dataset is `datasheet.md`, which is also deposited with the data. |
 | `manuscript/` | The manuscript. |
 | `assets/` | The figures of this file and the script that makes them (`make_assets.py`). |
 

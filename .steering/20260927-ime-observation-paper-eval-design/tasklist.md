@@ -272,6 +272,9 @@
       - [x] PR #316 の /cross-review 2 巡（Codex・パス限定 3 回）の指摘を直した（SVG を XML として読む層・文字参照を戻した走査・凍結の一覧の手順・`xml:base` ほか・変異 21 本すべて赤・本番の形の書き出し exit 0・`kit/check.sh` 31 本が緑）（2026-10-06・G-GEAR・判断 212）→ CI → merge
       - [ ] GitHub での README（ロゴ・動く図）の見え方を確かめる（ロゴと図はリリース D の README に入る → D を push した後）
       - [ ] datasheet（Claude の下書き → AI 宣言に足す → 研究者が確かめる）
+        - [x] 下書き `experiment/datasheet.md`・点検（code ∥ security）の指摘で書き直し・研究者の 5 問（連絡先はメール・§10.8 の確かめの run はパイロットの部・青空文庫の出どころと作業履歴・方針の文）・書き出しの例外・`dataset.tex`・AI 宣言（2026-10-06・G-GEAR・判断 213・枝 `docs/ime-m12-datasheet`）
+        - [x] 研究者が全文を日本語で確かめ「このまま採る」（2026-10-06）→ /cross-review 2 巡（Codex・アドレスを伏せた写し・指摘 5 件を直した）（判断 213）→ PR → CI → merge
+        - [ ] 寄託のとき: 「(to be filled in at deposit)」を埋める（G-GEAR §2.4）
       - [ ] Mac / Surface: working・パイロット・標本の書庫（`--pack`・`--check-deposit`）→ SHA-256 を記録 → G-GEAR へ。A〜D を各機械で書き出し直して exit 0 と一覧の一致
       - [ ] G-GEAR: 書庫を照らして下書きに上げる → 「at deposit」の 6 か所と `confirmed at deposit` → D を作る → 研究者に公開を確かめる（repo を公開・Zenodo 2 つを公開）
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
