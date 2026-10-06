@@ -60,6 +60,7 @@ the script exits 1 when any differs, so that a table cannot drift from the resul
 Standard library only.
 """
 import argparse
+import collections
 import hashlib
 import json
 import math
@@ -382,6 +383,21 @@ def interval_range(entries):
     return min(e["lo"] for e in entries), max(e["hi"] for e in entries)
 
 
+SPEED_WORDS = {"slow": "slow", "mid": "middle", "fast": "fast"}
+
+
+def strata_names(keys):
+    """Strata (scenario, speed) in the given order, grouped by scenario, with the speeds named as the text names them:
+    "S6 (slow), S13 (slow, middle, fast)"; "none"."""
+    groups = []
+    for sc, sp in keys:
+        if groups and groups[-1][0] == sc:
+            groups[-1][1].append(SPEED_WORDS[sp])
+        else:
+            groups.append((sc, [SPEED_WORDS[sp]]))
+    return ", ".join("%s (%s)" % (sc, ", ".join(sps)) for sc, sps in groups) if groups else "none"
+
+
 def strata_in_range(kept, strata, keys, measure):
     """The strata of keys that enter the range of a measure: at least MIN_TRIALS trials kept in the scope and an
     interval of the measure in the result file. The rule leaves out, per measure, the strata with fewer trials or with
@@ -410,6 +426,10 @@ def abstract_values(cell):
                 "source": cell.path("e1_l2.json", scope, "per_trial/by_stratum")}
             vals["%s.%s.%s.strata.left" % (cell.label, tag, m)] = {
                 "text": str(len(design) - len(used)), "value": len(design) - len(used),
+                "source": cell.path("e1_l2.json", scope, "per_trial/by_stratum")}
+            left = [k for k in design if k not in used]
+            vals["%s.%s.%s.strata.leftnames" % (cell.label, tag, m)] = {
+                "text": strata_names(left), "value": [list(k) for k in left],
                 "source": cell.path("e1_l2.json", scope, "per_trial/by_stratum")}
         if scope == PRIMARY_SCOPE:
             out_of_scope = not_used["out_of_scope"]
@@ -523,6 +543,19 @@ def yes_no(j):
     return NO_VALUE if j is None else ("yes" if j else "no")
 
 
+def windows_sets_clause(judged):
+    """The judgement of each set of the rule on Windows as an English clause: "neither A nor B was near chance", "both
+    A and B were near chance", or the sets named one by one when they differ or have no value."""
+    names = dict((f, "\\texttt{%s}" % tex_escape(f)) for f in RULE_SETS)
+    vals = [judged[f] for f in RULE_SETS]
+    if len(RULE_SETS) == 2 and all(v is False for v in vals):
+        return "neither %s nor %s was near chance" % tuple(names[f] for f in RULE_SETS)
+    if len(RULE_SETS) == 2 and all(v is True for v in vals):
+        return "both %s and %s were near chance" % tuple(names[f] for f in RULE_SETS)
+    part = {True: "was near chance", False: "was not near chance", None: "has no value"}
+    return ", and ".join("%s %s" % (names[f], part[judged[f]]) for f in RULE_SETS)
+
+
 def closed_set_values(cells, docs):
     """Values of question 4: the recommendation (item iii of the rule for the abstract), the Windows judgement as its
     qualification, and per cell the accuracy and the judgement of the two sets of the rule."""
@@ -532,16 +565,18 @@ def closed_set_values(cells, docs):
     text = {"recommended": "\\texttt{%s}" % tex_escape(rec["set"] or ""), "none": "none",
             "not decided": "not decided (a macOS cell was not measured)"}[rec["status"]]
     vals["q4.recommendation"] = {"text": text, "value": rec, "source": macos_src + ":results/10|100/*/acc_ci"}
+    # The Windows judgement as a clause that the text places after "On Windows," (it names no system itself).
     win = docs.get(WINDOWS_CELL)
     if win is None:
-        q = "the Windows cell was not measured"
+        q = "the cell was not measured"
         qv = None
     elif rec["status"] == "recommended":
         qv = near_chance(win, rec["set"])
-        q = {True: "holds on Windows", False: "does not hold on Windows", None: "has no value on Windows"}[qv]
+        q = {True: "the recommended set was also near chance", False: "the recommended set was not near chance",
+             None: "the recommended set has no value"}[qv]
     else:
         qv = dict((f, near_chance(win, f)) for f in RULE_SETS)
-        q = "; ".join("\\texttt{%s} near chance on Windows: %s" % (tex_escape(f), yes_no(qv[f])) for f in RULE_SETS)
+        q = windows_sets_clause(qv)
     vals["q4.windows.qualification"] = {"text": q, "value": qv,
                                         "source": "windows/" + closed_set_name(WINDOWS_CELL) + ":results/10|100/*/acc_ci"}
     for cell in cells:
@@ -746,10 +781,47 @@ def l2_values(cell):
                     e["icc21"], e["icc21_ci"][0], e["icc21_ci"][1], lambda x: fmt_signed(x)),
                 "value": [None, None, None] if constant else [e["icc21"]] + list(e["icc21_ci"]),
                 "source": cell.path("e1_l2.json", PRIMARY_SCOPE, "agreement_by_stratum", s, m, "icc21_ci")}
+            if constant:
+                # Deviation D11 reports the registered result next to the corrected one (section 8 of the registration).
+                vals["%s.l2.%s.%s.icc" % (cell.label, m, s)]["registered"] = [e["icc21"]] + list(e["icc21_ci"])
             vals["%s.l2.%s.%s.refsd" % (cell.label, m, s)] = {
                 "text": fmt_sd(spread["sd"], ms), "value": spread["sd"],
                 "source": cell.path("e1_l2.json", PRIMARY_SCOPE, "aggregate", "gt")}
     return vals
+
+
+def l2_constant_values(cells):
+    """Per per-text measure, over the strata of speed and cell of the primary scope that have an agreement entry: in
+    how many the reference's value is the same in every text (deviation D11), out of how many, and in how many it
+    differs from the most frequent value in a single text, so that the text states these counts from the result files.
+    The texts are those of the ICC, with a value on both sides (reference_spread()); a stratum of one text is neither."""
+    vals = {}
+    for m, _, _ in L2_MEASURES:
+        n_of = n_const = n_one = 0
+        srcs = []
+        for cell in cells:
+            by = cell.l2[PRIMARY_SCOPE]["agreement_by_stratum"]
+            for s in SPEEDS:
+                e = (by.get(s) or {}).get(m)
+                if e is None:
+                    continue
+                spread = checked_spread(cell, PRIMARY_SCOPE, m, s, e)
+                n_of += 1
+                n_const += spread["constant"]
+                n_one += (not spread["constant"]) and spread["off_mode"] == 1
+            srcs.append(cell.path("e1_l2.json", PRIMARY_SCOPE, "aggregate", "gt"))
+        src = ", ".join(srcs)
+        for key, n in (("constant.strata", n_const), ("constant.of", n_of), ("onetext.strata", n_one)):
+            vals["q3.%s.%s" % (m, key)] = {"text": number_word(n), "value": n, "source": src}
+    return vals
+
+
+NUMBER_WORDS = ("none", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
+
+
+def number_word(n):
+    """A count as a word up to twelve, as the text writes small counts; larger counts as digits."""
+    return NUMBER_WORDS[n] if 0 <= n < len(NUMBER_WORDS) else fmt_int(n)
 
 
 # ---------------------------------------------------------------- exploratory: the distribution of the dwell error
@@ -1062,10 +1134,11 @@ def ms_span(lo, hi):
 def decomposition_values(cell):
     """Values that the discussion reads from the registered results, in the primary scope. For every comparison of the
     cell: the span over the speeds of the limits of agreement of dwell_ms (lowest lower limit to highest upper limit)
-    and of its median absolute difference (point estimates), with the number of speeds that enter them. For the
-    comparisons of the reference with the logger and with the specified rows (macOS): the pooled recall and precision
-    of each layer of the prediction in the primary scope, and the number of trials of the plan in the layer, which the
-    analysis counts over the whole plan whatever the scope."""
+    and of its median absolute difference (point estimates), with the number of speeds that enter them. For the three
+    comparisons with the prediction (macOS): the pooled recall and precision of each layer of the prediction in the
+    primary scope, and the number of trials of the plan in the layer, which the analysis counts over the whole plan
+    whatever the scope. The comparison of the specified rows with the logger shows, per layer, how far the logger's rows
+    were the specified ones there."""
     vals = {}
     for comp in cell.comparisons:
         tag = comp.replace("_", "")
@@ -1086,7 +1159,7 @@ def decomposition_values(cell):
         mae = {"text": ms_span(mlo, mhi) if with_mae else NO_VALUE, "value": [mlo, mhi]}
         vals["%s.%s.primary.dwell.loa.span" % (cell.label, tag)] = dict(loa, source=src + "/bland_altman/loa_lo|loa_hi")
         vals["%s.%s.primary.dwell.mae.span" % (cell.label, tag)] = dict(mae, source=src + "/mae")
-        if comp not in ("gt_obs", "gt_pred"):
+        if comp not in ("gt_obs", "gt_pred", "pred_obs"):
             continue
         layers = cell.det_by[comp][PRIMARY_SCOPE]["diagnostics"].get("prediction_layers")
         if not layers:
@@ -2123,11 +2196,13 @@ def table_cost(e3):
     return "".join(lines)
 
 
-REFERENCE_CONSTANT = "%s (reference constant)" % NO_VALUE
+REFERENCE_CONSTANT = "%s (reference constant" % NO_VALUE
 REFERENCE_CONSTANT_TEXT = "no value: the reference's value is the same in every text (deviation D11)"
-REFERENCE_CONSTANT_NOTE = ("%s: no ICC(A,1), because the reference's value is the same in every text, so the ICC is zero "
-                           "whatever the logger writes, or undefined if the logger writes that same value in every text "
-                           "too (section 6.11 of the registration; deviation D11)" % REFERENCE_CONSTANT)
+REFERENCE_CONSTANT_NOTE = ("%s; registered \\ldots): no ICC(A,1), because the reference's value is the same in every "
+                           "text, so the ICC is zero whatever the logger writes, or undefined if the logger writes that "
+                           "same value in every text too (section 6.11 of the registration; deviation D11); the value "
+                           "that the frozen code returns, the registered result, follows \\emph{registered}"
+                           % REFERENCE_CONSTANT)
 
 
 def reference_spread(cell, scope, m, speed=None):
@@ -2159,7 +2234,12 @@ def reference_spread(cell, scope, m, speed=None):
         sd = math.sqrt(math.fsum((v - mean) ** 2 for v in vals) / (n - 1))
     else:
         sd = None
-    return {"n": n, "sd": sd, "constant": n >= 2 and max(vals) == min(vals)}
+    # The number of texts whose value differs from the most frequent one (ties go to the smaller value), so that a
+    # reference that differs in a single text can be told from one that varies more.
+    counts = collections.Counter(vals)
+    mode = min(counts, key=lambda v: (-counts[v], v)) if vals else None
+    off_mode = sum(1 for v in vals if v != mode)
+    return {"n": n, "sd": sd, "constant": n >= 2 and max(vals) == min(vals), "off_mode": off_mode}
 
 
 def checked_spread(cell, scope, m, speed, e):
@@ -2172,9 +2252,13 @@ def checked_spread(cell, scope, m, speed, e):
 
 
 def icc_text(e, spread):
+    """ICC(A,1) with its interval; under deviation D11 no value, with the registered result (the frozen code's value)
+    next to it, as section 8 of the registration asks of a correction (next to the registered result, not in its
+    place)."""
+    value = est_ci(e["icc21"], e["icc21_ci"][0], e["icc21_ci"][1], fmt_signed)
     if spread["constant"]:
-        return REFERENCE_CONSTANT
-    return est_ci(e["icc21"], e["icc21_ci"][0], e["icc21_ci"][1], fmt_signed)
+        return "%s; registered %s)" % (REFERENCE_CONSTANT, value)
+    return value
 
 
 def fmt_sd(x, ms):
@@ -2413,8 +2497,8 @@ def figure_detection(cells):
     """Figure 2: recall and precision per scenario and speed with their Wilson intervals, per cell, in the primary
     comparison and scope."""
     caption = ("Recall and precision of the session rows against the reference per scenario and speed, with 95\\%% "
-               "Wilson intervals, per cell, in the primary comparison (reference vs. logger) and scope "
-               "(\\texttt{under\\_limit}). Open marks: strata that keep fewer than %d trials in the scope, which the "
+               "Wilson intervals, per cell, in the primary comparison (reference vs. logger) and the primary scope. "
+               "Open marks: strata that keep fewer than %d trials in the scope, which the "
                "ranges given in the text leave out. A stratum with no trial or no value in the scope is not drawn; "
                "Table~\\ref{tab:detection} and the supplement give every stratum" % MIN_TRIALS)
     if not cells:
@@ -2615,6 +2699,7 @@ def build(results_dir):
         values.update(l2_values(cell))
         values.update(dwell_explore_values(cell, dwellx[cell.label]))
         values.update(open_set_values(cell, open_docs[cell.label]))
+    values.update(l2_constant_values(cells))
     values.update(closed_set_values(cells, docs))
     values.update(e3_values(e3))
     files = {
@@ -3127,12 +3212,20 @@ def _selftest_rules(check):
           str(recommend(docs8)))
     v = closed_set_values([], docs)
     check("q4: the Windows judgement is the qualification of the recommended set",
-          v["q4.windows.qualification"]["text"] == "does not hold on Windows"
+          v["q4.windows.qualification"]["text"] == "the recommended set was not near chance"
           and v["q4.recommendation"]["text"] == "\\texttt{no\\_time}", str(v["q4.windows.qualification"]))
     v6 = closed_set_values([], docs6)
-    check("q4: with nothing recommended, the Windows judgement of each set is reported",
-          v6["q4.windows.qualification"]["text"].count("near chance on Windows: yes") == 2,
+    check("q4: with nothing recommended, the Windows judgement of each set is reported as a clause",
+          v6["q4.windows.qualification"]["text"]
+          == "both \\texttt{no\\_time} and \\texttt{counts\\_only} were near chance",
           v6["q4.windows.qualification"]["text"])
+    clauses = (windows_sets_clause({"no_time": False, "counts_only": False}),
+               windows_sets_clause({"no_time": True, "counts_only": False}),
+               windows_sets_clause({"no_time": None, "counts_only": False}))
+    check("q4: the Windows clause says neither, or names each set when they differ or one has no value",
+          clauses == ("neither \\texttt{no\\_time} nor \\texttt{counts\\_only} was near chance",
+                      "\\texttt{no\\_time} was near chance, and \\texttt{counts\\_only} was not near chance",
+                      "\\texttt{no\\_time} has no value, and \\texttt{counts\\_only} was not near chance"), str(clauses))
     tmp = tempfile.mkdtemp(prefix="results_tables_e3_")
     try:
         p = os.path.join(tmp, "e3.txt")
@@ -3548,18 +3641,52 @@ def _selftest_spread(check):
     obs = [dict(t(0, "slow"), m=1.5), dict(t(1, "slow"), m=0.5), dict(t(2, "mid"), m=2.5), dict(t(3, "mid"), m=3.0)]
     sp = reference_spread(_FakeCell("x", gt, obs), PRIMARY_SCOPE, "m", "slow")
     check("spread: a reference that is the same in every text is constant, with SD 0",
-          sp == {"n": 2, "sd": 0.0, "constant": True}, sp)
+          sp == {"n": 2, "sd": 0.0, "constant": True, "off_mode": 0}, sp)
     sp = reference_spread(_FakeCell("x", gt, obs), PRIMARY_SCOPE, "m", None)
     check("spread: over all speeds the texts without a value on a side are left out",
           sp["n"] == 3 and not sp["constant"] and abs(sp["sd"] - math.sqrt(1.0 / 3.0)) < 1e-12, sp)
     sp = reference_spread(_FakeCell("x", gt, obs), PRIMARY_SCOPE, "m", "mid")
-    check("spread: one text has no SD and is not constant", sp == {"n": 1, "sd": None, "constant": False}, sp)
+    check("spread: one text has no SD and is not constant", sp == {"n": 1, "sd": None, "constant": False, "off_mode": 0}, sp)
     # Ten texts of 0.1 (not exact in binary): a sum from left to right gives a mean below 0.1 and an SD above zero, so
     # the value would differ between versions of Python; the correctly rounded sum gives exactly zero.
     tens = [dict(t(k, "slow"), m=0.1) for k in range(10)]
     sp = reference_spread(_FakeCell("x", tens, tens), PRIMARY_SCOPE, "m", "slow")
     check("spread: the sums are correctly rounded, so the SD does not depend on the version of Python",
-          sp == {"n": 10, "sd": 0.0, "constant": True}, sp)
+          sp == {"n": 10, "sd": 0.0, "constant": True, "off_mode": 0}, sp)
+    one = [dict(t(k, "slow"), m=(2.0 if k == 3 else 1.0)) for k in range(6)]
+    two = [dict(t(k, "slow"), m=(2.0 if k in (3, 4) else 1.0)) for k in range(6)]
+    sp1 = reference_spread(_FakeCell("x", one, one), PRIMARY_SCOPE, "m", "slow")
+    sp2 = reference_spread(_FakeCell("x", two, two), PRIMARY_SCOPE, "m", "slow")
+    check("spread: a reference that differs from the most frequent value in a single text is counted as such",
+          sp1["off_mode"] == 1 and not sp1["constant"] and sp2["off_mode"] == 2, (sp1, sp2))
+    # The counts of the text over the strata of a cell: slow is constant, mid differs in a single text, fast in two.
+    cv = {"slow": (1.0, 1.0, 1.0, 1.0), "mid": (1.0, 1.0, 1.0, 2.0), "fast": (1.0, 1.0, 2.0, 2.0)}
+    gt3 = [dict(t(10 * i + k, s), conversions_per_trial=v) for i, s in enumerate(SPEEDS) for k, v in enumerate(cv[s])]
+    fake = _FakeCell("x", gt3, gt3)
+    fake.l2[PRIMARY_SCOPE]["agreement_by_stratum"] = dict((s, {"conversions_per_trial": {"n": 4}}) for s in SPEEDS)
+    cst = l2_constant_values([fake])
+    got = tuple(cst["q3.conversions_per_trial.%s" % k]["value"] for k in ("constant.strata", "constant.of",
+                                                                         "onetext.strata"))
+    check("q3: the counts of the text tell a constant reference, one that differs in a single text and one that "
+          "differs in more", got == (1, 3, 1), str(got))
+    # A second cell: slow constant, mid with a single text, no agreement at fast; and a text whose logger side is
+    # missing, which leaves the ICC and so the count (the reference differs only there).
+    gt4 = [dict(t(100 + k, "slow"), conversions_per_trial=1.0) for k in range(3)] + [
+        dict(t(110, "mid"), conversions_per_trial=1.0), dict(t(120, "slow"), conversions_per_trial=2.0)]
+    ob4 = [dict(g) for g in gt4]
+    ob4[-1]["conversions_per_trial"] = None
+    fake2 = _FakeCell("y", gt4, ob4)
+    fake2.l2[PRIMARY_SCOPE]["agreement_by_stratum"] = {"slow": {"conversions_per_trial": {"n": 3}},
+                                                       "mid": {"conversions_per_trial": {"n": 1}}}
+    cst2 = l2_constant_values([fake, fake2])
+    got2 = tuple(cst2["q3.conversions_per_trial.%s" % k]["value"] for k in ("constant.strata", "constant.of",
+                                                                           "onetext.strata"))
+    check("q3: over cells, a stratum without agreement is not counted, a stratum of one text is neither constant nor "
+          "single-text, and a text without the logger's value is not one of the ICC's texts", got2 == (2, 5, 1),
+          str(got2))
+    words = (number_word(0), number_word(2), number_word(6), number_word(9), number_word(12), number_word(13))
+    check("a small count is written as a word, a larger one as digits",
+          words == ("none", "two", "six", "nine", "twelve", "13"), str(words))
     for name, bad in (("in length", obs[:3]), ("in alignment", [obs[1], obs[0]] + obs[2:])):
         try:
             reference_spread(_FakeCell("x", gt, bad), PRIMARY_SCOPE, "m", "slow")
@@ -3856,8 +3983,9 @@ def _selftest_decomposition(check):
               and t("layer.none.gtpred.primary.recall") == "0.525 [0.430, 0.800]"
               and t("layer.carriedout.gtobs.primary.precision") == "0.500 [0.300, 0.700]"
               and t("layer.none.gtobs.plan.trials") == "13" and t("layer.none.gtobs.primary.trials") is None
-              and t("layer.none.predobs.primary.recall") is None,
-              str((t("layer.none.gtobs.primary.recall"), t("layer.none.gtpred.primary.recall"))))
+              and t("layer.none.predobs.primary.recall") == "0.525 [0.530, 0.900]",
+              str((t("layer.none.gtobs.primary.recall"), t("layer.none.gtpred.primary.recall"),
+                   t("layer.none.predobs.primary.recall"))))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     tmp = tempfile.mkdtemp(prefix="results_tables_decomp_win_")
@@ -4039,6 +4167,15 @@ def selftest():
               and vals["windows-test.all.recall.strata.left"]["value"] == 0
               and vals["windows-test.all.precision.strata.left"]["value"] == 1,
               str((vals["windows-test.all.recall.range"], vals["windows-test.all.precision.range"])))
+        names = dict((k, (vals.get("windows-test.%s.strata.leftnames" % k) or {}).get("text"))
+                     for k in ("primary.recall", "all.recall", "all.precision"))
+        check("the strata left out of a range are named in the order of the design, grouped by scenario, as many as "
+              "are counted",
+              names["primary.recall"] == "S1 (slow), S2 (slow, middle, fast)" and names["all.recall"] == "none"
+              and re.match(r"^S\d+ \((slow|middle|fast)\)$", names["all.precision"] or "") is not None, str(names))
+        order = strata_names([("S6", "slow"), ("S10", "fast"), ("S13", "slow"), ("S13", "mid")])
+        check("the names keep the order given (the order of the design, not of the strings)",
+              order == "S6 (slow), S10 (fast), S13 (slow, middle)", order)
         check("a stratum whose rates have no value is printed with the mark of no value, not dropped",
               "S2 & slow & 75 & 75 & 0 & 0.000 [0.000, 0.049] & %s" % NO_VALUE in files["detection-strata.tex"].decode("utf-8"))
         check("the fractions set aside by the scope and by carry-over are counts over the total",
@@ -4079,14 +4216,29 @@ def selftest():
         check("q3: proportions keep three decimals with a minus sign, after the reference's SD",
               "Fraction of time converting & slow & 40 & 0.012 & $-$0.01" in t10)
         mid = [l for l in t10.splitlines() if " & mid & " in l]
-        check("q3: an ICC whose reference is the same in every text has no value, with the reason, and its SD is zero",
-              len(mid) >= 1 and mid[0].startswith(" &  & mid & 40 & 0.000 & ") and mid[0].endswith(
-                  "& %s \\\\" % REFERENCE_CONSTANT) and REFERENCE_CONSTANT_NOTE in t10
-              and sum(1 for l in t10.splitlines() if REFERENCE_CONSTANT + " \\\\" in l) == len(row), str(mid[:2]))
+        d11_cell = "& %s; registered 0.750 [0.500, 0.875]) \\\\" % REFERENCE_CONSTANT
+        check("q3: an ICC whose reference is the same in every text has no value, with the reason, the registered "
+              "result next to it (deviation D11; section 8 of the registration), and its SD is zero",
+              len(mid) >= 1 and mid[0].startswith(" &  & mid & 40 & 0.000 & ") and mid[0].endswith(d11_cell)
+              and REFERENCE_CONSTANT_NOTE in t10
+              and sum(1 for l in t10.splitlines() if l.endswith(d11_cell)) == len(row), str(mid[:2]))
+        cst = dict((k, vals.get("q3.conversions_per_trial.%s" % k) or {}) for k in
+                   ("constant.strata", "constant.of", "onetext.strata"))
+        check("q3: the text's count of strata whose reference is the same in every text is the number of such ICCs "
+              "in the table, out of the strata of conversions per trial that have a value, as a word",
+              cst["constant.strata"].get("value") == len(row) and cst["constant.strata"].get("text") == number_word(
+                  len(row))
+              and cst["constant.of"].get("value") == sum(1 for k in vals if re.match(
+                  r"^[a-z-]+\.l2\.conversions_per_trial\.(slow|mid|fast)\.icc$", k))
+              and cst["onetext.strata"].get("value") == 0, str(cst))
+        check("figure 2 names the scope in words, not by the identifier of the result files",
+              "under\\_limit" not in files["fig-detection.tex"].decode("utf-8")
+              and "primary scope" in files["fig-detection.tex"].decode("utf-8"))
         icc_mid = [v for k, v in vals.items() if k.endswith(".l2.conversions_per_trial.mid.icc")]
-        check("q3: the value of such an ICC for the text says why it has none, and holds no number",
+        check("q3: the value of such an ICC for the text says why it has none, holds no number, and keeps the "
+              "registered result next to it",
               icc_mid and all(v["text"] == REFERENCE_CONSTANT_TEXT and v["value"] == [None, None, None]
-                              for v in icc_mid), str(icc_mid[:1]))
+                              and v.get("registered") == [0.75, 0.5, 0.875] for v in icc_mid), str(icc_mid[:1]))
         sup_q3 = files["text-agreement.tex"].decode("utf-8")
         check("q3: every supplementary table of per-text agreement explains a reference-constant ICC",
               sup_q3.count(REFERENCE_CONSTANT_NOTE) == 2 * len(row), sup_q3.count(REFERENCE_CONSTANT_NOTE))

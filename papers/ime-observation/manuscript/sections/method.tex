@@ -12,8 +12,8 @@ analysis code and its settings were registered and frozen before any measurement
 \citep{prereg-macos}, then, in an addendum frozen before the first Windows measurement, for the Windows cell
 \citep{prereg-windows}. The registrations call the logger the observer. The study estimates and tests no hypothesis;
 the only rule that turns an estimate into a decision is the near-chance rule of the recoverability study
-(Section~\ref{sec:recoverability}). This section describes the protocol as registered; Section~\ref{sec:deviations}
-lists every departure from it.
+(Section~\ref{sec:recoverability}). This section describes the protocol as registered and names a deviation where it
+applies; Section~\ref{sec:deviations} lists every departure from it.
 
 \subsection{Overview}
 \label{sec:method-overview}
@@ -112,7 +112,8 @@ method opens its prediction window, which the field reports as a candidate eleme
 Windows this definition holds nearly all sessions and does not mean that the reading was converted. The analysis was
 also run under the definition common to both systems (every session); whether the two definitions hold the same
 sessions is reported per cell, and where they do not, how many sessions the definition of the analysis leaves out and
-the detection under the common definition, per stratum as ranges and pooled, are also reported (deviation D12).
+the detection under the common definition, per stratum as ranges and pooled, are also reported (deviation D12, made
+after the results had been seen).
 
 \subsection{Scenarios, speeds and plans}
 \label{sec:method-plans}
@@ -310,7 +311,7 @@ off at 20~s; on Windows, where no prediction applies, a trial is long when the p
 over all trials and, for the cut-off, over the long trials alone. The scope is decided from what was sent, so it does
 not depend on the observation. An estimate in the primary scope is always given with the fraction of trials that the
 scope sets aside, the fraction excluded because a conversion ran from one trial into the next, and the estimate over
-all trials.
+all trials, in the text or in the supplement.
 
 \paragraph{Matching.} Sessions and observation rows were matched one to one in descending order of their intersection
 over union, among the pairs that reach 0.5. A row's interval is the span of its duration ending at the time the row
@@ -348,10 +349,12 @@ percentile bootstrap intervals \citep{efron1979} from 2{,}000 resamples of whole
 the trials of a block share the state of the input method. Pooled proportions carry Wilson intervals that ignore this
 clustering and are read as lower bounds of the uncertainty. A value that cannot be computed is reported as missing with
 its reason, never as zero; this includes an ICC whose reference has the same value in every text, which is zero
-whatever the logger writes, or undefined if the logger writes that same value in every text too (deviation D11). Synthetic input has no natural mix of scenarios, so a pooled value is
-labelled as pooled and is not an estimate of accuracy in natural typing. No threshold of adequate agreement was set,
-and the estimates are described without evaluative words. The one analysis not described in the registration is the
-exploratory analysis above, and it is labelled as such.
+whatever the logger writes, or undefined if the logger writes that same value in every text too (deviation D11, made
+after the results had been seen). Synthetic input has no natural mix of scenarios, so a pooled value is labelled as
+pooled and is not an estimate of accuracy in natural typing. No threshold of adequate agreement was set,
+and the estimates are described without evaluative words. Apart from the deviations (Section~\ref{sec:deviations}),
+the one analysis not described in the registration is the exploratory analysis above, and it is labelled as such; the
+comparisons between the cells or between speeds that the discussion reads are labelled as exploratory there.
 
 \paragraph{Reproducibility.} The analyses were run from exports of the freezing tags: the registered analysis of
 questions 1 to 3 with the matching code of the first change of deviation D10, which leaves the results of the frozen
@@ -361,8 +364,11 @@ SHA-256 of every log against its run manifest, the content-free format of every 
 refused a run that the stopping rule catches. The result files record the SHA-256 of the configuration, the rules,
 every manifest and every log. The supplement lists, for every result file, the code it was made with, and the records
 of the runs give the commands and the SHA-256 of every output. The result values of this article are copied from the
-result files by a script that is released with the code, and the figures of the records (the attempts, the checks of
-the runs, the deviations) from the records of the runs (Declarations, Code availability).
+result files, or computed from them (the ranges over the strata, the counts of strata and the reference's standard
+deviation between texts), by a script that is released with the code (\texttt{manuscript/tools/results\_tables.py}),
+and the figures of the records (the attempts, the checks of the runs, the deviations) are copied from the records of
+the runs (Declarations, Code availability). Statements that name strata or compare values, such as which strata set the
+ends of a range, are written by hand from the generated values and tables and were checked by hand against them.
 
 \subsection{Registration and deviations}
 \label{sec:deviations}
@@ -398,7 +404,11 @@ after their measurement (D7, before the analysis of the cell, and D9), one for t
 cells before that attack was run on any of them (D8), one for the analysis of questions 1 to 3 (D10), made when the
 frozen analysis stopped on the macOS cells and before any of their results of these questions was seen, and two for
 reporting, made after all results had been seen: of the per-text ICC (D11) and of the detection under the definition
-common to both systems on Windows (D12). The registered results of questions 1 to 3
+common to both systems on Windows (D12). Both were prompted by a simulated review of this article before its submission
+(Declarations). D12 grew in two steps: it was recorded that the ranges of its per-stratum intervals would be reported
+whatever their values before the ranges were computed, although the detection under the common definition had already
+been seen, and the counts of the strata whose estimates change were added after the ranges had been seen, when a review
+of the discussion found such changes. The registered results of questions 1 to 3
 of the Windows cell, on which the frozen code did not stop, had been computed and committed before D10, and the
 corrected analysis of D10 was applied to them as well. The
 registration allowed the addendum to change only the Windows parts of existing files; deviations D1 to D4 touched
@@ -450,13 +460,15 @@ session row is counted. &
 The frozen code counted a recounted merge in the stratum of the missed session, so the numerator of a stratum's
 merge rate could exceed its denominator, and the analysis of the macOS cells stopped before it wrote any result. \\
 D11 & The per-text ICC of a stratum whose reference has the same value in every text is reported without a value, with
-the reason, and the reference's standard deviation between texts is reported next to every ICC. &
+the reason and next to the registered value, and the reference's standard deviation between texts is reported next to
+every ICC. &
 Such an ICC is zero whatever the logger writes (or undefined if the logger writes that same value in every text too); the
 registration reports a measure with zero variance as missing, never as zero, but the frozen code returns no value only
 when every value of both sides is the same. \\
 D12 & On Windows, where the two definitions of a session do not hold the same sessions, how many sessions the
 definition of the analysis leaves out and the detection under the common definition, per stratum as ranges and pooled,
-are reported. &
+are reported, with the number of strata whose estimate changes within the ranges and the largest change (added after
+the ranges had been seen). &
 The registration reports under the common definition only whether the two definitions hold the same sessions, which
 does not show how far the estimates depend on the choice of definition. \\
 \bottomrule

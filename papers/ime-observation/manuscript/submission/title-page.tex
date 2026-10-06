@@ -8,8 +8,13 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{setspace}
 \usepackage{hyperref}
+\usepackage{fancyhdr}
 \doublespacing
-\pagestyle{empty}
+% The journal asks for the page number in the upper right corner of each page.
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
 
 \begin{document}
 
