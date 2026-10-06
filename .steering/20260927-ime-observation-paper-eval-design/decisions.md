@@ -1892,3 +1892,8 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **研究者の選択**: 原稿の attack-me round 2 は**次のセッションで回す**（推奨どおり・同じ 3 つの立場と同じ接地・round 1 の指摘と対応、判断 195〜203 の Discussion を渡す）。
 - **検証**: `build.sh --submission` main・main-submission・補遺ともエラー 0・未定義の参照 0・未定義の引用 0・生成されていない値 0・bibtex の警告 0・overfull main 0・main-submission 1（書誌の WebKit の項目）・補遺 167。文体の検査 違反 0。足した行は 120 字以内。PDF 42〜43 頁を画像で確かめた。
 - **影響範囲**: `manuscript/sections/` の method・limitations・results-agreement・discussion・conclusions・recoverability。
+- **追記（同日・/cross-review 1 巡目・`run-codex-review.sh` を `46262e59..4256317d` の `manuscript/sections` と `references.bib` に限定・452 行・29,656 tokens・今日の台帳 244,646 → 274,302 / 8 → 9 回）**: P2 2 件・P3 1 件を一次で確かめた。
+  - P2「尺度の段落はポーズの判定の精度と変換の長さの精度を混ぜて読ませうる・対になった会話だけの割合は対にならなかった会話を含まない」→ 真（段落は並べるだけだが、読み違えを防ぐ句が無い）→ 長さを「対になった会話の、変換に費やした時間を計算する元になる長さ」とし、最後に「並べただけで、行から計算したポーズを閾値で分けたときの判定は評価していない・対にならなかった会話は §6.3 で数える」の 1 文を足した（範囲の事実・解釈は足していない）。
+  - P2「『どのアプリでも動くロガーはキーから推す』は、調べた接点からアプリ横断のロガー一般の必然に広げている」→ 真（§3・§14 は「the logger infers」でこのロガーに限っている）→「the logger, which is meant to work in any application, infers」に。
+  - P3「新しい `\rv` のキーが生成物にあるか diff から確かめられない」→ 偽陽性（検証の項目の提示で、`build.sh --submission` の生成されていない値 0 で確かめ済み）。
+  - 検証: `build.sh --submission` エラー 0・未定義 0・生成されていない値 0・overfull main 0。文体 違反 0。足した行は 120 字以内。

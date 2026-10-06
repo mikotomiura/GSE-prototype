@@ -67,14 +67,14 @@ the sessions that paired, which differ between strata and speeds; and the delay 
 input method's calls to the reference field was not measured.
 
 \paragraph{What the interfaces allow.} Among the documented interfaces examined that do not depend on the application,
-none on macOS reports a conversion, so a logger meant to work in any application infers the sessions from the keys
-(Section~\ref{sec:observability}), and its sessions are those that its rules define. For the macOS logger the agreement
-with the reference was thus set mainly by its rules rather than by their implementation (first paragraph of this
-section). Rules that infer the sessions differently can be evaluated against the same reference on the dataset without
-new measurement (Section~\ref{sec:dataset-uses}). On Windows, of the same interfaces, those that carry no text report
-the windows of the input method, not the composition (Section~\ref{sec:observability-windows}), so the logger records a
-period during which a window is visible, and its agreement with the reference, which records compositions, includes
-the difference between the two constructs; the values of the two systems are therefore not compared
+none on macOS reports a conversion, so the logger, which is meant to work in any application, infers the sessions from
+the keys (Section~\ref{sec:observability}), and its sessions are those that its rules define. For the macOS logger the
+agreement with the reference was thus set mainly by its rules rather than by their implementation (first paragraph of
+this section). Rules that infer the sessions differently can be evaluated against the same reference on the dataset
+without new measurement (Section~\ref{sec:dataset-uses}). On Windows, of the same interfaces, those that carry no text
+report the windows of the input method, not the composition (Section~\ref{sec:observability-windows}), so the logger
+records a period during which a window is visible, and its agreement with the reference, which records compositions,
+includes the difference between the two constructs; the values of the two systems are therefore not compared
 (Section~\ref{sec:observability-consequence}).
 
 \paragraph{Windows.} The durations of the Windows logger were shorter than the reference's at every speed
@@ -108,9 +108,11 @@ between consecutive rows differed from those sent by a median of
 \rv{macos-standard-live-off.kt.obs.interval.all.median}, \rv{macos-standard-live-on.kt.obs.interval.all.median} and
 \rv{windows-msime-tsf.kt.obs.interval.all.median} (Table~\ref{tab:key-timing}), on the software path alone, to which
 the path from a physical key adds its own delay, such as the sampling of a USB keyboard every 8~ms \citep{pinet2017};
-and in the primary scope the durations of the paired sessions were within 100~ms of the reference's in
-\rv{macos-standard-live-off.dwellx.within100.range} of the pairs with live conversion off,
-\rv{macos-standard-live-on.dwellx.within100.range} with it on and \rv{windows-msime-tsf.dwellx.within100.range} on
-Windows, and within 1~s in \rv{macos-standard-live-off.dwellx.within1000.range},
-\rv{macos-standard-live-on.dwellx.within1000.range} and \rv{windows-msime-tsf.dwellx.within1000.range} (exploratory
-ranges over the speeds; Section~\ref{sec:results-session}).
+and in the primary scope the durations of the sessions that paired, from which a researcher would compute the time
+spent converting, were within 100~ms of the reference's in \rv{macos-standard-live-off.dwellx.within100.range} of the
+pairs with live conversion off, \rv{macos-standard-live-on.dwellx.within100.range} with it on and
+\rv{windows-msime-tsf.dwellx.within100.range} on Windows, and within 1~s in
+\rv{macos-standard-live-off.dwellx.within1000.range}, \rv{macos-standard-live-on.dwellx.within1000.range} and
+\rv{windows-msime-tsf.dwellx.within1000.range} (exploratory ranges over the speeds; Section~\ref{sec:results-session}).
+These figures are set beside the scales; how pauses computed from the rows would be classified against a threshold
+was not evaluated, and the sessions that did not pair are counted in Section~\ref{sec:results-detection}.
