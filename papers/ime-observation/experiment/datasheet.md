@@ -4,8 +4,7 @@ This datasheet describes the dataset "Logging Japanese IME conversion without re
 synthetic-input validation" (DOI 10.5281/zenodo.23183438). It follows the sections proposed by Gebru et al. (2021):
 motivation, composition, collection process, preprocessing, uses, distribution and maintenance. It is deposited with
 the data, and with `FORMATS.md` it describes every file of the deposit. The registrations, the article and the code
-repository give the details that are referred to here. Values that are known only when the files are deposited are
-marked "(to be filled in at deposit)".
+repository give the details that are referred to here.
 
 ## Motivation
 
@@ -51,9 +50,13 @@ lines of each log), `children` (for each program, its exit status, whether it wa
 error output, which is not deposited), `resets` (per block, whether a reset of the input method was run or skipped,
 and why), `focus` (per block, the outcome of the command that brought the reference input field to the front and of
 the check that it was in front), `aborted` and `abort_reason`. Before the manifest is written, the
-home directory and the root of the checkout are replaced by `~` and `<repo>` in every string. The `git_commit` of the
-Windows measurement run is `null`; for the other runs: (to be filled in at deposit). A commit recorded there belongs to
-the author's working repository, which is not public; the code of the freezing tags is in the code repository.
+home directory and the root of the checkout are replaced by `~` and `<repo>` in every string. Of the deposited runs,
+only the macOS runs of the calibration-pilot part and the Windows pilot run `toolcheck-tsf` record a commit (with
+`git_dirty` true in `verify-s5`, `verify-off` and `toolcheck-tsf` and false in the others); in the remaining runs both
+fields are `null`, because the runner ran from an export of the code. The values of every run are in
+`experiment/data.md` (macOS) and `experiment/data.windows.md` (Windows) of the code repository. A commit recorded in
+`git_commit` belongs to the author's working repository, which is not public; the code of the freezing tags is in the
+code repository.
 
 **Runtime samples.** Each condition of the runtime-cost study has `samples.tsv` and `conditions.txt`. `samples.tsv` is
 tab-separated, with a header line and one row per reading, in the columns `epoch_s` (Unix time in seconds), `cpu_pct`
@@ -69,8 +72,10 @@ read also gives zero. The interval was set to 30 seconds; a reading takes longer
 about 39 seconds in a trial run), so the times of the rows are not evenly spaced at 30 seconds. The values are compared
 within each system and not between systems; the battery level and the energy index are not summarised. `conditions.txt`
 holds lines of the form `name=value`: the condition, the operating system and its version, the number of logical
-processors, the name of the sampled process, the SHA-256 of the logger's executable, the number of such processes before
-the run, the set duration and interval in seconds, and the start and end times in UTC.
+processors, the name of the sampled process, the SHA-256 of the logger's executable (`unknown` when it could not be
+found at the start, as when the logger was not running yet; a line `executable_sha256_at_end` then gives it at the
+end), the number of such processes before the run, the set duration and interval in seconds, and the start and end
+times in UTC.
 
 **Parts.** The dataset has two parts, which are kept apart.
 
@@ -82,18 +87,24 @@ the run, the set duration and interval in seconds, and the start and end times i
      Text Services Framework; 2,925 trials in 117 blocks (attempt 2).
    - The `working` condition of the runtime-cost study on each system: the logger running while the runner plays the
      plan of `macos-standard-live-on` (macOS) or of `windows-msime-tsf` (Windows). Its logs are deposited under the
-     rules of the measurement runs (to be filled in at deposit).
+     rules of the measurement runs; the run of each system passed the checks.
+   - The start of `windows-msime-tsf` that the runner refused before the first trial (administrator rights; no key
+     sent). It passes the checks of the deposit and is not counted among the attempts.
    - The runtime samples of the `idle` and the `working` condition on each system.
 2. *Calibration-pilot runs*, made before the freezes from other plans, with provisional settings, that meet the
    registered criteria for deposit (`experiment/pilot-macos.md` and `experiment/pilot-windows.md` of the code
    repository, section "Raw logs"). The candidates are the macOS pilot runs `pilot-1`, `verify-1`, `verify-s5`,
    `pilot2-on`, `pilot2-off`, `verify-off` and `short-1` and any other run of the runner made before the first macOS
    pilot; the Windows pilot runs with the TSF reference field `short-tsf`, `pilot-tsf`, `verify-tsf` and
-   `toolcheck-tsf`, and the three Windows pilot attempts that the runner aborted. This part also holds, under the same
-   criteria, the check that preceded the Windows measurement (section 10.8 of the registration): the 39-trial plan
-   `verify` of the Windows pilot, run on the measuring machine with the versions of the measurement before the first
-   attempt, and its first start, which the runner aborted before any key was sent. Which candidates pass the check at
-   deposit: (to be filled in at deposit).
+   `toolcheck-tsf`, and the three Windows pilot attempts with that field that the runner aborted. This part also
+   holds, under the same criteria, the check that preceded the Windows measurement (section 10.8 of the registration):
+   the 39-trial plan `verify` of the Windows pilot, run on the measuring machine with the versions of the measurement
+   before the first attempt, and its first start, which the runner aborted before any key was sent. At deposit every
+   macOS candidate passed the check, among them `dryrun-1`, a run of the runner before the first pilot that sent no
+   key and was interrupted. Of the Windows candidates, all passed but one of the three aborted attempts: it was stopped
+   after four trials, when an application window used as the target of S15 had been closed, and its observation log
+   holds key presses that the measured trials and the procedure do not explain. The two attempts that passed were
+   stopped before any key was sent, when the system refused to bring the executor's window to the front.
 
 Shared by both parts are the phrase corpus (`phrases.jsonl`), the settings of the plan generator
 (`plan_config.macos.json`, `plan_config.windows.json`), the procedures of the scenarios (`recipes.json`,
@@ -103,28 +114,62 @@ datasheet.
 **What is not deposited.** A completed run that the stopping rule catches is not deposited, because its logs may hold a
 person's key presses. A run that the runner aborted is deposited only if it passes the same checks or left neither a
 reference log nor an observation log; one aborted inside a trial does not pass. Not deposited, therefore, are: the first
-Windows attempt, which was stopped from outside the runner inside a trial; the observation logs of the `idle` condition
-on both systems, which hold the key presses that started the sampling (only their samples are deposited); and the
-Windows pilot runs with the other reference field, which received the key press that switches the input method on as a
-key-down, which the stopping rule counts as a press from outside. Whether the start of the Windows measurement that the
-runner refused before the first trial is deposited: (to be filled in at deposit). The error output of the programs
+Windows attempt, which was stopped from outside the runner inside a trial; the Windows pilot attempt stopped after four
+trials (Part 2 above); the observation logs of the `idle` condition on both systems, which hold the key presses that
+started the sampling (only their samples are deposited); and the Windows pilot runs with the other reference field,
+which received the key press that switches the input method on as a key-down, which the stopping rule counts as a press
+from outside, together with an attempt with that field that the runner aborted before any key was sent, whose
+reference log does not come from the reference field of the measurement. The start of the Windows measurement that the
+runner refused before the first trial passes the same checks and is deposited. The error output of the programs
 stays on the measuring machines, and checks typed by hand into the reference input field were not runs of the runner
 and are not deposited. The table of attempts in the article states for every start of every run of a plan of the
 measurement whether it was deposited.
 
 **Files of the deposit.** The deposit holds one archive per run, made by the packing command (section "Preprocessing"),
-the runtime samples and the shared files. The SHA-256 of each archive is also recorded in `experiment/data.md` (macOS)
-and `experiment/data.windows.md` (Windows) of the code repository.
+the runtime samples and the shared files, each as a file of its own. The SHA-256 of each archive and of each runtime
+sample is also recorded in `experiment/data.md` (macOS) and `experiment/data.windows.md` (Windows) of the code
+repository. The SHA-256 of this datasheet cannot be given in the file itself; Zenodo gives a checksum of every file.
 
 | File | Part | Contents | SHA-256 |
 |---|---|---|---|
-| (to be filled in at deposit) | Measurement | `macos-standard-live-on`, attempt 1 | `77bd8a8e64563921a9d3e49fc5fa552a67d4633a66669354852dea651fed49b8` |
-| (to be filled in at deposit) | Measurement | `macos-standard-live-off`, attempt 1 | `e1cdf2e8b63ab402a950e37b8841ce302ccb280f396fefc148c8891971d73d10` |
-| (to be filled in at deposit) | Measurement | `windows-msime-tsf`, attempt 2 | `f2287a7494b108a7b827f96da48f523e84e1a9478121d03fa82dca2c8749cd06` |
-| (to be filled in at deposit) | Measurement | The `working` runs and the runtime samples | (to be filled in at deposit) |
-| (to be filled in at deposit) | Calibration pilot | The candidates that passed the check | (to be filled in at deposit) |
+| `macos-standard-live-on-1.zip` | Measurement | `macos-standard-live-on`, attempt 1 | `77bd8a8e64563921a9d3e49fc5fa552a67d4633a66669354852dea651fed49b8` |
+| `macos-standard-live-off-1.zip` | Measurement | `macos-standard-live-off`, attempt 1 | `e1cdf2e8b63ab402a950e37b8841ce302ccb280f396fefc148c8891971d73d10` |
+| `windows-msime-tsf-2.zip` | Measurement | `windows-msime-tsf`, attempt 2 | `f2287a7494b108a7b827f96da48f523e84e1a9478121d03fa82dca2c8749cd06` |
+| `windows-msime-tsf-refused-start.zip` | Measurement | The start of `windows-msime-tsf` that the runner refused before the first trial (administrator rights; no key sent) | `a5afe2dcbe57f37f92e115aa16be4b5dc5500894e4ce4cf13dab3615448a1447` |
+| `macos-e3-working-1.zip` | Measurement | The `working` run of the runtime-cost study, macOS | `77b51736e0fb713b181748153927b12e0ff6c7734b97f8c058891836aed5e3ea` |
+| `windows-e3-working-1.zip` | Measurement | The `working` run of the runtime-cost study, Windows | `39d40801197ce0e95f0271899c83d53b6bbd6dc977c6172e6e615385bddb1f45` |
+| `macos-e3-idle-samples.tsv` | Measurement | Runtime samples, `idle` condition, macOS | `f2fc37ef12d520d0e757a9e1232c99975475017c75cc824815a79e236d261222` |
+| `macos-e3-idle-conditions.txt` | Measurement | Conditions of the `idle` samples, macOS | `25a08f08c98ce4589ed34475b3dd803e178b8f52429ad66c2a71ec0c7fba680f` |
+| `macos-e3-working-samples.tsv` | Measurement | Runtime samples, `working` condition, macOS | `32fb07829de7a4ac0dca0e128089dfe2eed977e26b044841884ef4c3b96921ec` |
+| `macos-e3-working-conditions.txt` | Measurement | Conditions of the `working` samples, macOS | `95f29b15a7de9fc1b6334f804f1d8dd5f9377ec21002d12167d5d0f916dd7ae4` |
+| `windows-e3-idle-samples.tsv` | Measurement | Runtime samples, `idle` condition, Windows | `43ab3b395635e0d5c78abc008db31368b48bcc6595c74f74f59e8e21debc5f59` |
+| `windows-e3-idle-conditions.txt` | Measurement | Conditions of the `idle` samples, Windows | `13bf360fb1d0554b215db6896f522ea0efd4995b0c3c574bdf293c4d792f8122` |
+| `windows-e3-working-samples.tsv` | Measurement | Runtime samples, `working` condition, Windows | `638da0eaafcf156a441068e91a36578199736c435f08e140391617e43fcca88f` |
+| `windows-e3-working-conditions.txt` | Measurement | Conditions of the `working` samples, Windows | `9b6ae9391481a57cfee74654316203e7ef33152e72980af44bd022a5c8f68345` |
+| `macos-pilot-short-1.zip` | Calibration pilot | macOS pilot run `short-1` | `cde623bdab677a997e494fecf97a7d091baf4e542a703172f1997592fe6238be` |
+| `macos-pilot-pilot-1.zip` | Calibration pilot | macOS pilot run `pilot-1` | `6bd8583bfab9483d02b9b292697d2ac45ac836dad27e0f6946ef7569c663a749` |
+| `macos-pilot-verify-1.zip` | Calibration pilot | macOS pilot run `verify-1` | `31e60d7627e6ddd5a2c7a7601fd9ef1c794cb31235395a8df4403d6dde7a80ae` |
+| `macos-pilot-verify-s5.zip` | Calibration pilot | macOS pilot run `verify-s5` | `96c460291e65506b5b9187fefcd82bf0017290f2ec677cea6f055fb73807c5f4` |
+| `macos-pilot-pilot2-on.zip` | Calibration pilot | macOS pilot run `pilot2-on` | `3bdf963d8812f63af3a2e10ec72af2b7adf6693da74dd85a19a443a8fdb1e40b` |
+| `macos-pilot-pilot2-off.zip` | Calibration pilot | macOS pilot run `pilot2-off` | `1e4563d2b196f974407c911fe96be84a50e7916055623d91cf1af2f307c26187` |
+| `macos-pilot-verify-off.zip` | Calibration pilot | macOS pilot run `verify-off` | `28ac532edf171217b240ee7a75bb4118f584ce2b9581964b3d764c95dcb5fe11` |
+| `macos-pilot-dryrun-1.zip` | Calibration pilot | macOS run `dryrun-1` of the runner before the first pilot (no key sent; interrupted) | `fdbcd130d1f2b3209add450cd3fb03b9c10774f0cf96377a56454824ec43f78e` |
+| `windows-pilot-short-tsf.zip` | Calibration pilot | Windows pilot run `short-tsf` | `a31d48d1c797535ee92c9b03c48be8e83bc5705202e15859f69d1f41cd977ced` |
+| `windows-pilot-pilot-tsf.zip` | Calibration pilot | Windows pilot run `pilot-tsf` | `634ceff63ca0f43d65d49e506e877ae48bf238ec9c43330228d2cb4c915a1111` |
+| `windows-pilot-verify-tsf.zip` | Calibration pilot | Windows pilot run `verify-tsf` | `546ab6ed5b76bb79a40c679177167c26be6fa4461a45acdd17d656a0f840823c` |
+| `windows-pilot-toolcheck-tsf.zip` | Calibration pilot | Windows pilot run `toolcheck-tsf` | `c066d36bcb90562c30a11ee84decfd37ffa9c4d88b31b4fcad5873884b4adbf5` |
+| `windows-pilot-aborted-a.zip` | Calibration pilot | Windows pilot attempt with plan `short` that the runner aborted (the foreground window was refused) | `1f8ae344c9ea8f95fafa85e26b20c8b782974df05204fe1df79fb6d1ce2e10f9` |
+| `windows-pilot-aborted-b.zip` | Calibration pilot | Windows pilot attempt with plan `pilot` that the runner aborted (the foreground window was refused) | `7565058faf6f8cf794586d836d59167901540960ac7321ad7b9d4cef91e76432` |
+| `windows-check-verify.zip` | Calibration pilot | The check before the Windows measurement (plan `verify` of the pilot, 39 trials) | `e980074f56032f3c264f82df2d0b4f4f8a10eeddd3b2f8e4cc5d607323f1a217` |
+| `windows-check-verify-start-1.zip` | Calibration pilot | The first start of that check (aborted by the runner before any key was sent) | `6a910ea2ad4b2d27b4ef86c971edfa2090f8e2e2c3ddadd021748bb4e40f07ba` |
 | `phrases.jsonl` | Shared | The phrase corpus | `c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620` |
-| (to be filled in at deposit) | Shared | Generator settings, procedures and seed; `FORMATS.md`; this datasheet | (to be filled in at deposit) |
+| `plan_config.macos.json` | Shared | Settings of the plan generator, macOS | `eb0ff955834d135a99d1dff3ae4cb1d58a8734c819835b3afbc5db08edf02209` |
+| `plan_config.windows.json` | Shared | Settings of the plan generator, Windows | `400fe5314d0f660f2e776a7f86deb471ae1235a3bea4c1be457b26ebe0a9181f` |
+| `recipes.json` | Shared | Procedures of the scenarios | `430ec52c67f0592bc1c9d038a972876a2608ed7c39eb2aabcf68efc4ff908411` |
+| `recipes.macos-live-off.json` | Shared | Procedures of the scenarios, macOS with live conversion off | `8560f7bd59d04b0a2629af2beabdfd6fabc0aef92d35a2a9ad73a89bfd74d19a` |
+| `SEED` | Shared | The seed | `e36ada0b3705d3a26adb9de6c05e0cacf29e47b2cb77685a779bfccd33ff1bfc` |
+| `FORMATS.md` | Shared | Specification of the formats | `2b06ef8d5b28278850b6dfe40d942b5b1557d3b5aca86a45e224ba4a495be6f8` |
+| `datasheet.md` | Shared | This datasheet | not given (this file) |
 
 **Labels.** The reference log is the ground truth: the conversion sessions of the reference are assembled from its
 calls by the registered rules, which differ by system (`experiment/gt_rules.json` of the code repository). The plan
@@ -271,8 +316,8 @@ inferences about writers.
 
 The dataset is distributed through Zenodo under DOI 10.5281/zenodo.23183438, under the Creative Commons Attribution
 4.0 International licence. The code that made the records and reads them is distributed separately under the Apache
-License 2.0 (DOI 10.5281/zenodo.23183441; https://github.com/mikotomiura/ime-conversion-logging). Date of release: (to
-be filled in at deposit).
+License 2.0 (DOI 10.5281/zenodo.23183441; https://github.com/mikotomiura/ime-conversion-logging). Date of release:
+7 October 2026.
 
 The phrases come from works whose copyright has expired, obtained from Aozora Bunko (https://www.aozora.gr.jp/). Its
 terms for such works allow the files to be copied, redistributed and adapted freely; they ask that the information

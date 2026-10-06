@@ -23,6 +23,15 @@ used are printed when the analysis ends.
 |---|---|---|---|
 | macos-standard-live-on (attempt 1; packed on the measuring machine) | not yet deposited | `77bd8a8e64563921a9d3e49fc5fa552a67d4633a66669354852dea651fed49b8` | not yet deposited |
 | macos-standard-live-off (attempt 1; packed on the measuring machine) | not yet deposited | `e1cdf2e8b63ab402a950e37b8841ce302ccb280f396fefc148c8891971d73d10` | not yet deposited |
+| macos-e3-working (the `working` run of question 5; packed on the measuring machine on 2026-10-06) | not yet deposited | `77b51736e0fb713b181748153927b12e0ff6c7734b97f8c058891836aed5e3ea` | not yet deposited |
+| macos-pilot-short-1 (calibration pilot; packed on the measuring machine on 2026-10-06) | not yet deposited | `cde623bdab677a997e494fecf97a7d091baf4e542a703172f1997592fe6238be` | not yet deposited |
+| macos-pilot-pilot-1 (calibration pilot) | not yet deposited | `6bd8583bfab9483d02b9b292697d2ac45ac836dad27e0f6946ef7569c663a749` | not yet deposited |
+| macos-pilot-verify-1 (calibration pilot) | not yet deposited | `31e60d7627e6ddd5a2c7a7601fd9ef1c794cb31235395a8df4403d6dde7a80ae` | not yet deposited |
+| macos-pilot-verify-s5 (calibration pilot) | not yet deposited | `96c460291e65506b5b9187fefcd82bf0017290f2ec677cea6f055fb73807c5f4` | not yet deposited |
+| macos-pilot-pilot2-on (calibration pilot) | not yet deposited | `3bdf963d8812f63af3a2e10ec72af2b7adf6693da74dd85a19a443a8fdb1e40b` | not yet deposited |
+| macos-pilot-pilot2-off (calibration pilot) | not yet deposited | `1e4563d2b196f974407c911fe96be84a50e7916055623d91cf1af2f307c26187` | not yet deposited |
+| macos-pilot-verify-off (calibration pilot) | not yet deposited | `28ac532edf171217b240ee7a75bb4118f584ce2b9581964b3d764c95dcb5fe11` | not yet deposited |
+| macos-pilot-dryrun-1 (the dry run before the first pilot; interrupted) | not yet deposited | `fdbcd130d1f2b3209add450cd3fb03b9c10774f0cf96377a56454824ec43f78e` | not yet deposited |
 
 ## Run checks (section 3.4 of the pre-registration)
 
@@ -174,6 +183,73 @@ carry.
 |---|---|---|---|---|
 | macos-standard-live-on | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-05 |
 | macos-standard-live-off | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-05 |
+| macos-e3-working | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| macos-pilot-short-1 | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| macos-pilot-pilot-1 | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| macos-pilot-verify-1 | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| macos-pilot-verify-s5 | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| macos-pilot-pilot2-on | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| macos-pilot-pilot2-off | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| macos-pilot-verify-off | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| macos-pilot-dryrun-1 | macOS 27.0.1, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+
+## Calibration-pilot runs and the `working` run, packed on the macOS machine (2026-10-06)
+
+The candidates of the datasheet (Part 2) and the `working` run of question 5 were packed from copies of the run
+directories, each with `--also-user` and `--also-home` given once. The sealed observation logs of the pilot runs were
+unsealed in the copies only to be deposited (`kit/pilot/seal_obs.py --unseal`); they were not read and are not
+analysed. Before packing, `pipeline.py --check-deposit` passed on every copy (exit status 0). For each run the table
+gives the two fields of its `run.json` that the datasheet asks for (`git_commit`: the commit of the working repository
+that the runner ran from, which is not a commit of the public repository; `git_dirty`: whether that tree had
+uncommitted changes) and the SHA-256 of `run.json`. The SHA-256 of each archive is in the table of deposits above.
+
+| Run | `git_commit` | `git_dirty` | Aborted by the runner | SHA-256 of `run.json` |
+|---|---|---|---|---|
+| macos-e3-working | `null` | `null` | no | `a2fa68e47d6f8d70c316a68cf458eff8344050dda4826348ca758bbfeafde0f9` |
+| short-1 | `9f1d28dcb2be473aeec7064128f620c60d189958` | false | no | `4a8a87d07207fd3aff7e92ac34b5055f1bf26f6c32e416de6f4322d7e83c8c6f` |
+| pilot-1 | `9f1d28dcb2be473aeec7064128f620c60d189958` | false | no | `e9ca6047eb5df3aa820119b08005ac15d282121a227dee68b93805d7626b70a4` |
+| verify-1 | `b38b99046f44e51ce44ed23cb8a61da56f99485c` | false | no | `5d1463b21060889dbd4897f900c100b8b3212ebe878938e3fc707690cf1aedff` |
+| verify-s5 | `b38b99046f44e51ce44ed23cb8a61da56f99485c` | true | no | `0f90d21285ded29ab3f51f390670aaa8099bb701c58975b6aac68f10848ffd3a` |
+| pilot2-on | `3e729f99edaef138ec0e64e21f0613821e8ff742` | false | no | `09b4e141b0eae1fb7a9aa90856047edefdadf1311700d9e1fc0e140ea0d99418` |
+| pilot2-off | `3e729f99edaef138ec0e64e21f0613821e8ff742` | false | no | `5f7a321a8d76a1040bfb86635801245839b27d748a051a8813bfb6c37101a58f` |
+| verify-off | `3e729f99edaef138ec0e64e21f0613821e8ff742` | true | no | `d05bb55c415d63eef48e43e2bf2b7092888365cc607bef3166daf51f12abde52` |
+| dryrun-1 | `9f1d28dcb2be473aeec7064128f620c60d189958` | false | yes (`interrupted (SystemExit)`) | `3ea7a2a3a520790c72cec11a1d6e03ae2e4e234c43e1935379800db18efdd97e` |
+
+The `working` run has the plan of the cell with live conversion on (`c7a5469d…`, the line `macos-e3-working` of the
+run checks above); the logger and runner of that run were started from an export, not from a git work tree, which is why
+its two fields are `null`, as for the two measurement runs. Every run of the runner that the measuring machine holds
+from before the first pilot is in the table: besides `short-1` (nine trials) it is `dryrun-1`, a run with the backend
+`dryrun` (no key sent) that was interrupted and is deposited because it passes the check. No candidate failed the check.
+The error output of the programs (`*.stderr.txt`, `*.runner.txt`) is not deposited.
+
+The runtime samples are the files of the `idle` and the `working` condition (`samples.tsv` and `conditions.txt`). They
+are not bundled by `--pack`. Before they were moved, they were checked by eye and by a search: none of the four files
+holds a path, the login name or the home directory. Their SHA-256 are those given above under question 5.
+
+The SHA-256 of the two `conditions.txt` were read on the measuring machine on 2026-10-07, from the files that were
+bundled and from the run directories they were copied from (the two values are equal for each condition).
+
+The `conditions.txt` of the `idle` condition has the SHA-256 `25a08f08c98ce4589ed34475b3dd803e178b8f52429ad66c2a71ec0c7fba680f`.
+
+The `conditions.txt` of the `working` condition has the SHA-256 `95f29b15a7de9fc1b6334f804f1d8dd5f9377ec21002d12167d5d0f916dd7ae4`.
+
+### Move of the macOS archives and samples to the deposit machine (2026-10-07)
+
+The nine archives of the table above and the four sample files were moved from the measuring machine to the
+deposit machine through a folder of the researcher's Google Drive (`mac/`, with the sub-folders `pilot/` and
+`e3-samples/{idle,working}/`), uploaded by hand. After the upload, the file names and sizes in the folder were
+compared with the local files through the Drive API: 13 files, every size equal (the archive of the `working` run
+74,028,949 bytes; the eight pilot archives; the two `samples.tsv` 31,631 and 32,047 bytes; the two `conditions.txt`
+299 and 335 bytes), and nothing else in the folder. Drive does not return a SHA-256, so the check is of the sizes
+only. The SHA-256 of each archive are to be compared with the table of deposits above on the deposit machine
+before anything is uploaded to Zenodo.
+
+The two archives of the measurement (`macos-standard-live-on`, 74,044,861 bytes, and `macos-standard-live-off`,
+66,091,676 bytes), packed earlier on the measuring machine, were moved later on the same day through the same
+folder. On the deposit machine, on 2026-10-07, `kit/export/deposit.internal.py --from` found all fifteen files of this
+record by their SHA-256: every archive in the table of deposits, the two `samples.tsv` and the two `conditions.txt`. The `run.json` of
+the two archives of the measurement, whose SHA-256 are those of the list of run directories above, has `null` in
+`git_commit` and in `git_dirty` (read on the deposit machine from the archives; the runner ran from an export).
 
 ## Phrase corpus
 

@@ -1,7 +1,7 @@
 % Section 11 of the manuscript: the dataset.
 % What is deposited, and under which rules, follows sections 3.1, 3.4, 6.10 and 10.10 of the registration,
 % experiment/data.md, experiment/data.windows.md and the sections on raw logs of experiment/pilot-macos.md and
-% experiment/pilot-windows.md. Values that are known only after the deposit are marked with \tbd.
+% experiment/pilot-windows.md. The values known only at deposit were filled in from those records on 2026-10-07.
 
 \section{The dataset}
 \label{sec:dataset}
@@ -18,7 +18,8 @@ The dataset has two parts that are kept apart (Table~\ref{tab:dataset}). The fir
 made from the registered plans. The second holds the runs of the calibration pilots that meet the registered criteria
 for deposit; they were made from other plans, with provisional settings (Section~\ref{sec:method-pilots}). It also
 holds, under the same criteria, the run of the pilot's check plan that preceded the Windows measurement
-(Section~\ref{sec:method-cells}). For each run the dataset holds the plan, the record of every press that the executor
+(Section~\ref{sec:method-cells}), with its first start, which the runner aborted before any key was sent. For each run
+the dataset holds the plan, the record of every press that the executor
 sent, the log of the reference input field, the logger's log and the run manifest, which records the versions of the
 system, the input method and the programs and the SHA-256 of every log. It further holds the samples of the
 runtime-cost study, the phrase corpus, the settings of the generator and the seed, the specification of the formats and
@@ -72,9 +73,12 @@ run that the runner aborted is deposited only if it passes the same checks or le
 observation log; one aborted inside a trial does not pass. The observation log of the idle condition of the runtime-cost
 study is not deposited, because the logger was started before the command that begins the sampling was typed, so the
 log holds a person's key presses; only its samples are deposited. The logs of the working condition are deposited under
-the rules of the measurement runs \tbd{confirmed at deposit}. The Windows pilot runs with the second reference field are
-not deposited, because that field received the key press that switches the input method on as a key-down, which the
-stopping rule counts as a press from outside. The error output of the programs stays on the measuring machines, and
+the rules of the measurement runs; the run of each system passed the checks. An attempt of the Windows pilot that
+was stopped after four trials, when a window used by S15 had been closed, does not pass the checks and is not
+deposited. The Windows pilot runs with the second reference field are not deposited, because that field received the
+key press that switches the input method on as a key-down, which the stopping rule counts as a press from outside;
+nor is an attempt with that field that the runner aborted before any key was sent, whose reference log does not come
+from the reference field of the measurement. The error output of the programs stays on the measuring machines, and
 checks typed by hand were not runs of the runner and are not deposited. The table of attempts states for every start
 of every run of a plan whether it was deposited, with the reason where these rules decide it
 (Section~\ref{sec:results-attempts}).
@@ -100,7 +104,7 @@ The dataset is deposited in Zenodo under DOI 10.5281/zenodo.23183438, under the 
 licence \citep{dataset}; the code that made the records and reads them is released separately under the Apache License
 2.0 (Declarations, Code availability). A datasheet in the form proposed by \citet{gebru2021}, which organises the
 description by the stages of a dataset's life (motivation, composition, collection process, preprocessing, uses,
-distribution and maintenance), is released with it \tbd{written at deposit}. The datasheet states the terms of the corpus source: the phrases come from works whose copyright has expired, which the source
+distribution and maintenance), is released with it. The datasheet states the terms of the corpus source: the phrases come from works whose copyright has expired, which the source
 library allows to be copied and redistributed freely, asking that the information recorded in its files be kept
 \citep{aozora,aozora-terms}; the corpus records the identifier of each source work, and the source works are listed
 with the SHA-256 of the archives downloaded. Corrections will be released as new versions under the same concept
