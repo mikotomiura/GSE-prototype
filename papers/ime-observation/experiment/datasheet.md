@@ -139,9 +139,9 @@ repository. The SHA-256 of this datasheet cannot be given in the file itself; Ze
 | `macos-e3-working-1.zip` | Measurement | The `working` run of the runtime-cost study, macOS | `77b51736e0fb713b181748153927b12e0ff6c7734b97f8c058891836aed5e3ea` |
 | `windows-e3-working-1.zip` | Measurement | The `working` run of the runtime-cost study, Windows | `39d40801197ce0e95f0271899c83d53b6bbd6dc977c6172e6e615385bddb1f45` |
 | `macos-e3-idle-samples.tsv` | Measurement | Runtime samples, `idle` condition, macOS | `f2fc37ef12d520d0e757a9e1232c99975475017c75cc824815a79e236d261222` |
-| `macos-e3-idle-conditions.txt` | Measurement | Conditions of the `idle` samples, macOS | (to be filled in at deposit) |
+| `macos-e3-idle-conditions.txt` | Measurement | Conditions of the `idle` samples, macOS | `25a08f08c98ce4589ed34475b3dd803e178b8f52429ad66c2a71ec0c7fba680f` |
 | `macos-e3-working-samples.tsv` | Measurement | Runtime samples, `working` condition, macOS | `32fb07829de7a4ac0dca0e128089dfe2eed977e26b044841884ef4c3b96921ec` |
-| `macos-e3-working-conditions.txt` | Measurement | Conditions of the `working` samples, macOS | (to be filled in at deposit) |
+| `macos-e3-working-conditions.txt` | Measurement | Conditions of the `working` samples, macOS | `95f29b15a7de9fc1b6334f804f1d8dd5f9377ec21002d12167d5d0f916dd7ae4` |
 | `windows-e3-idle-samples.tsv` | Measurement | Runtime samples, `idle` condition, Windows | `43ab3b395635e0d5c78abc008db31368b48bcc6595c74f74f59e8e21debc5f59` |
 | `windows-e3-idle-conditions.txt` | Measurement | Conditions of the `idle` samples, Windows | `13bf360fb1d0554b215db6896f522ea0efd4995b0c3c574bdf293c4d792f8122` |
 | `windows-e3-working-samples.tsv` | Measurement | Runtime samples, `working` condition, Windows | `638da0eaafcf156a441068e91a36578199736c435f08e140391617e43fcca88f` |
@@ -153,7 +153,7 @@ repository. The SHA-256 of this datasheet cannot be given in the file itself; Ze
 | `macos-pilot-pilot2-on.zip` | Calibration pilot | macOS pilot run `pilot2-on` | `3bdf963d8812f63af3a2e10ec72af2b7adf6693da74dd85a19a443a8fdb1e40b` |
 | `macos-pilot-pilot2-off.zip` | Calibration pilot | macOS pilot run `pilot2-off` | `1e4563d2b196f974407c911fe96be84a50e7916055623d91cf1af2f307c26187` |
 | `macos-pilot-verify-off.zip` | Calibration pilot | macOS pilot run `verify-off` | `28ac532edf171217b240ee7a75bb4118f584ce2b9581964b3d764c95dcb5fe11` |
-| `macos-pilot-dryrun-1.zip` | Calibration pilot | macOS run `dryrun-1` of the runner before the first pilot (no key sent; aborted by the runner) | `fdbcd130d1f2b3209add450cd3fb03b9c10774f0cf96377a56454824ec43f78e` |
+| `macos-pilot-dryrun-1.zip` | Calibration pilot | macOS run `dryrun-1` of the runner before the first pilot (no key sent; interrupted) | `fdbcd130d1f2b3209add450cd3fb03b9c10774f0cf96377a56454824ec43f78e` |
 | `windows-pilot-short-tsf.zip` | Calibration pilot | Windows pilot run `short-tsf` | `a31d48d1c797535ee92c9b03c48be8e83bc5705202e15859f69d1f41cd977ced` |
 | `windows-pilot-pilot-tsf.zip` | Calibration pilot | Windows pilot run `pilot-tsf` | `634ceff63ca0f43d65d49e506e877ae48bf238ec9c43330228d2cb4c915a1111` |
 | `windows-pilot-verify-tsf.zip` | Calibration pilot | Windows pilot run `verify-tsf` | `546ab6ed5b76bb79a40c679177167c26be6fa4461a45acdd17d656a0f840823c` |

@@ -31,7 +31,7 @@ used are printed when the analysis ends.
 | macos-pilot-pilot2-on (calibration pilot) | not yet deposited | `3bdf963d8812f63af3a2e10ec72af2b7adf6693da74dd85a19a443a8fdb1e40b` | not yet deposited |
 | macos-pilot-pilot2-off (calibration pilot) | not yet deposited | `1e4563d2b196f974407c911fe96be84a50e7916055623d91cf1af2f307c26187` | not yet deposited |
 | macos-pilot-verify-off (calibration pilot) | not yet deposited | `28ac532edf171217b240ee7a75bb4118f584ce2b9581964b3d764c95dcb5fe11` | not yet deposited |
-| macos-pilot-dryrun-1 (the dry run before the first pilot; aborted by the runner) | not yet deposited | `fdbcd130d1f2b3209add450cd3fb03b9c10774f0cf96377a56454824ec43f78e` | not yet deposited |
+| macos-pilot-dryrun-1 (the dry run before the first pilot; interrupted) | not yet deposited | `fdbcd130d1f2b3209add450cd3fb03b9c10774f0cf96377a56454824ec43f78e` | not yet deposited |
 
 ## Run checks (section 3.4 of the pre-registration)
 
@@ -238,11 +238,18 @@ The `conditions.txt` of the `working` condition has the SHA-256 `95f29b15a7de9fc
 The nine archives of the table above and the four sample files were moved from the measuring machine to the
 deposit machine through a folder of the researcher's Google Drive (`mac/`, with the sub-folders `pilot/` and
 `e3-samples/{idle,working}/`), uploaded by hand. After the upload, the file names and sizes in the folder were
-compared with the local files through the Drive API: 14 files, every size equal (the archive of the `working` run
+compared with the local files through the Drive API: 13 files, every size equal (the archive of the `working` run
 74,028,949 bytes; the eight pilot archives; the two `samples.tsv` 31,631 and 32,047 bytes; the two `conditions.txt`
 299 and 335 bytes), and nothing else in the folder. Drive does not return a SHA-256, so the check is of the sizes
 only. The SHA-256 of each archive are to be compared with the table of deposits above on the deposit machine
 before anything is uploaded to Zenodo.
+
+The two archives of the measurement (`macos-standard-live-on`, 74,044,861 bytes, and `macos-standard-live-off`,
+66,091,676 bytes), packed earlier on the measuring machine, were moved later on the same day through the same
+folder. On the deposit machine, on 2026-10-07, `kit/export/deposit.internal.py --from` found all fifteen files of this
+record by their SHA-256: every archive in the table of deposits, the two `samples.tsv` and the two `conditions.txt`. The `run.json` of
+the two archives of the measurement, whose SHA-256 are those of the list of run directories above, has `null` in
+`git_commit` and in `git_dirty` (read on the deposit machine from the archives; the runner ran from an export).
 
 ## Phrase corpus
 

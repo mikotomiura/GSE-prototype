@@ -2131,3 +2131,25 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - ⚠️ Windows では `python3` が Store の別名で失敗し、`kit/check.sh` が全部赤になる（`PATH` から WindowsApps を外して回した・道具の欠陥ではない）。
 - **コミット**: git の author が未設定だったので、この履歴の author（`-c user.name/user.email`・設定は変えていない）で commit した。
 - **影響範囲**: `papers/ime-observation/experiment/data.windows.md`（Deposits 表 +10 行・Machine 表・新しい節）・`kit/export/deposit.internal.json`（Windows の SHA-256・1 項目追加・1 項目削除）・本ファイル・`tasklist.md`・本引き継ぎ。Zenodo への上げと datasheet の表・Parts の文は G-GEAR。
+
+## 判断 218: Mac と Surface の枝を合わせ、G-GEAR に集めて照合し、寄託のときに決まる値（datasheet・原稿の `\tbd` 8 か所）を埋めた —— 記録の寄託先と日付は上げた後に埋める（2026-10-07・G-GEAR・引き継ぎ m12-ggear §2.1〜2.5・研究者の選択〔4 問とも推奨どおり〕・埋めた文はメイン・研究者が覆せる）
+
+- **着手時に測った状態**: Surface の枝（判断 217）は push 済み。Mac の判断 216 の枝は無く、Mac は古い引き継ぎ（-9 §2.1 の 4）で `docs/ime-m12-mac-deposit` に「Drive で移した」節（`349beb6c`）を push していた。Drive の書き出し（研究者の Downloads・27 ファイル）は Mac 13（working・パイロット 8・標本 4）と Surface 14。計測の macOS の書庫 2 つ（`macos-standard-live-{on,off}-1.zip`）は無かった（G-GEAR のどこにも無い）。
+- **研究者の選択（AskUserQuestion・推奨どおり）**: (1) Mac の判断 216 は Mac で回して push する（Mac の古い push は merge する）。(2) 計測の書庫 2 つは Mac から追加で送る。(3) Mac では m12-mac の §2 を回す（測った機械で `conditions.txt` の値を取り、届いた値と照らす）→ 判断 216（`f6b1f6f4`）。(4) datasheet の公開日と記録の日付は 2026-10-07（Zenodo の `publication_date` も同じ日に指定する）。(5) 別の job の tmp に残っていた token の写し 2 つ（判断 215）は消す → 中身を読まずに消した。
+- **合わせる**: 枝 `docs/ime-m12-deposit`（`origin/docs/ime-m12-deposit-prep` から）に Surface（`9f52c948`）・Mac の古い push（`349beb6c`）・判断 216 の枝を merge（衝突なし）。G-GEAR の `main` は別の worktree が使うので切り替えていない。
+- **集める**: `C:/ime-deposit/` に Drive の 27 ファイルと Downloads の `windows-msime-tsf-2.zip`（28）。G-GEAR で取った `conditions.txt` の SHA-256（idle `25a08f08…`・working `95f29b15…`）は Mac が測った機械で取った値（判断 216）と一致した。計測の書庫 2 つは研究者が同じ Drive の `mac/` に上げ直した書き出し（29 ファイル・`…T154247Z…`）から 2 つだけを空の dir に取り出して足した（30）。大きさは判断 216 と、SHA-256 は `data.md` の Deposits（`77bd8a8e…`・`e1cdf2e8…`）と一致。`run.json` の `git_commit`・`git_dirty` だけを読み、両方 `null`（`run.json` の SHA-256 は `data.md` の run の一覧の `manifest_sha256` と一致）→ `data.md` の移した節に書いた（datasheet の「値はすべて記録にある」の裏づけ・code M2）。
+- **埋めた値**（一次は `data.md`・`data.windows.md`・`pilot-windows.md`・判断 214・217）:
+  - datasheet: 「Files of the deposit」の表を `deposit.internal.py --table` の 38 行に（スクリプトで差し込み・datasheet の行は `not given (this file)`）。`git_commit`（macOS のパイロット部と `toolcheck-tsf` だけが commit を持つ・ほかは `null`）・working の run は両系とも通った・拒んだ開始は寄託する（Parts の 1 に足した）・通った候補（macOS は全部・Windows は中止 3 つのうち S15 の窓が閉じて 4 試行で止まった 1 つが通らない）・寄託しないものに通らなかった試みと IMM の中止の試み（D2）・`conditions.txt` の `executable_sha256_at_end`（`run_e3.sh:182-184`）・公開日 7 October 2026。冒頭の「(to be filled in at deposit) で印を付ける」の文を消した（道具は datasheet にこの印が残ると上げない）。
+  - 原稿: `dataset.tex` の `\tbd` 2 か所（working は通った・datasheet は一緒に出す）・試行の表の 6 か所（すべて Yes・拒んだ開始は「refused before any key was sent, it passes the checks of the deposit」）。除外の節と宣言に、通らなかったパイロットの試みと IMM の中止の試みを 1 句ずつ。§10.8 の確かめの最初の開始を寄託の部に。
+- **点検（code-reviewer ∥ security-checker・`28b16b8f..20bc5277`・11 ファイル）**: security = CRITICAL・HIGH 0・MEDIUM 1・LOW 4（約 4.1 分）。code = HIGH 2・MEDIUM 2・LOW 7（約 5.7 分）。表 38 行は `--table` とバイト一致、共有 7 ファイルの SHA-256 は HEAD の blob と一致（code が確かめた）。重なり: 上げる前に `data.windows.md` に寄託先と日付・Deposited を書いた（両方）・拒んだ開始の「aborted by the runner」が同じ行の Aborted 列と食い違う（両方）・IMM の中止の試みの理由（両方）。すべて一次で確かめて真と判断し、直した（`948203f6`）:
+  - 記録の寄託先・日付・Deposited は「not yet」に戻した → **上げた後に両系をそろえて埋める**（`--upload` は記録が HEAD と同じことを求めるので、上げる前の PR と上げた後の小さな PR の 2 本にする）。原稿の試行の表の Yes は公開のときの状態として残す。
+  - datasheet の公開日は残す。⚠️ **公開の直前に Zenodo の `publication_date` が 2026-10-07 かを確かめる**（ずれるなら datasheet を直して上げ直す・security の提案）。
+  - code H2 の「Mac の移した節の期待値は 15」は、その節が移したのが 13（計測の 2 つは別に送る）なので 13 に直した。計測の 2 つは届いてから記録する。
+  - `git_commit` の文（M1・L4）・「値はすべて記録にある」（M2）→ 試み 2 の値を G-GEAR で `run.json` の 2 つの欄だけ読んで `data.windows.md` に足した（`null`・`run.json` の SHA-256 は試行の表の `5c74a1fa…` と一致。拒んだ開始と macOS の working も記録と一致）。
+  - `dryrun-1` は「aborted by the runner」ではなく interrupted（`run_cell.py` の SIGTERM → `sys.exit` → `interrupted (SystemExit)`・`pilot-macos.md:200`）→ 一覧の contents と `data.md` の Deposits の行を直した。
+  - 原稿の「with no key pressed by a person」は記録で確かめられる言い方「with no key press in the logs other than those sent」に（security LOW 4・研究者が採った文からの差）。
+  - `data.windows.md` の `--check-deposit` の 12 件の中身・読んだ欄（L5・L6）・G-GEAR へ移して照らした節。
+  - 参考（security）: macOS の標本 4 ファイルにホスト名・ログイン名・パス・`@` の形は 0 件（G-GEAR で数だけ数えた）。
+- **検証**: `deposit.internal.py --selftest` ok・`kit/check.sh` 34 本緑（merge した作業ツリー）・文体の検査 違反 0・`build.sh --submission` はエラー 0・未定義 0・生成されていない値 0・overfull は main 0・main-submission 1・補遺 167（前と同じ）。MiKTeX が `PATH` に無いので `~/AppData/Local/Programs/MiKTeX/miktex/bin/x64` を足して回した。
+- ⚠️ **研究者が採った datasheet からの差**（伝える）: 表を 7 行から 1 ファイルずつの 38 行に（datasheet の行は自分の値を書けない・判断 215）・Parts の 1 に拒んだ開始・Parts の 2 に通った候補と通らなかった 1 つ・寄託しないものに 2 つ（通らなかった試み・IMM の中止の試み）・`git_commit` の値・`conditions.txt` の欄の 1 つ・公開日。原稿は試行の表の 1 行の言い方（人の打鍵）と、除外の節・宣言の句。
+- **影響範囲**: `papers/ime-observation/experiment/{datasheet,data,data.windows}.md`・`kit/export/deposit.internal.json`・`manuscript/sections/{dataset,declarations,results-agreement}.tex`・本ファイル・`tasklist.md`・引き継ぎ。
