@@ -1,7 +1,8 @@
 # 次セッション（G-GEAR）— IME 論文 M12: Mac と Surface の枝を合わせ、照合して Zenodo に上げ、datasheet を埋め、リリース D → 公開の確認
 
 > 作成: 2026-10-06 夜（G-GEAR・判断 215 の後）。`next-session-ime-paper-manuscript-9.md` の §2.3 を、機械ごとの引き継ぎに分けて具体にしたもの（研究者の求め）。**Mac（`next-session-ime-paper-m12-mac.md`）と Surface（`next-session-ime-paper-m12-surface.md`）の両方が済んでから**始める。
-> ✅ **§2.1〜2.5 は済み（2026-10-07・G-GEAR・判断 218・枝 `docs/ime-m12-deposit`）**: 3 台の枝を合わせ、`C:/ime-deposit/` の 30 ファイルで照合が通り（保留 0）、datasheet と `\tbd` 8 か所を埋め、点検と /cross-review（Codex 3 回）の指摘を直した。⚠️ 記録の寄託先と日付は**上げた後**に別の小さな PR で埋める（§2.6 の後）。残りは §2.6〜2.9。
+> ✅ **§2.1〜2.5 は済み（2026-10-07・G-GEAR・判断 218・PR #318 merge `62cacbe5`）**: 3 台の枝を合わせ、`C:/ime-deposit/` の 30 ファイルで照合が通り（保留 0）、datasheet と `\tbd` 8 か所を埋め、点検と /cross-review（Codex 3 回）の指摘を直した。
+> ⏳ **2026-10-07 未明の途中経過（判断 218・219）**: (1) データセットの下書きへの `--upload`（`62cacbe5` の新しいクローン・job の tmp の `clone-main`）は 33 ファイルまで済み、残り 5 つ（大きい書庫）を送り直し中（回線は毎秒 73 KB ほど・1 回目は 55 MB で HTTP 0）。途中で止まっても、同じ命令を回し直せば既にあるものは飛ばす。(2) 研究者の求めで README を仕上げ、日本語訳 `README.ja.md` を足した（枝 `docs/ime-m12-readme`・PR はまだ）。上げが済んだら同じ枝で記録（`data.md`・`data.windows.md`）の寄託先と日付を埋めて PR → merge。(3) リリース D は 1 回目（`12dc813f`・研究者が GitHub に push 済み・非公開）を、README の後の main から**作り直して置き換える**（force push は研究者）。(4) 研究者は「Zenodo は用意ができたら publish してよい」と許した → 説明と日付（文案は job の tmp の `dataset-description.html`・`software-description.html`・`zenodo_update.py`）→ ソフトウェアに D の zip → 2 つを publish。GitHub を public にする許可はまだ無い。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 207〜218**、`tasklist.md` の M12、`papers/ime-observation/kit/export/deposit.internal.{json,py}`（docstring が照合と上げの仕様）、`kit/export/README.internal.md`（公開の手順と履歴）、`experiment/data.md`・`data.windows.md`、`experiment/datasheet.md`。状態は着手時に `git fetch` で測り直す。
 
 ## §0 打ち込む用
