@@ -2084,3 +2084,11 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 2 巡目（直しの境界・2 ファイル・19,635）: P2「プロセスが無い行で全列が 0 は時刻と電池に当たらない・最初の行の CPU の空は」→ 真（macOS は `epoch_s`・`battery_pct` を読み `ref_energy_impact` は空・最初の行の空は macOS だけ。Windows は不在で 4 列が 0）→ 0 になる列を名指し、最初の行は macOS と限った。P2「`rss_alt_kb` を同じ量の再測定と読ませる」→ 真（Windows は private bytes）→ 系ごとに違う量で、Windows は常駐メモリではないと書いた。
   - 3 巡目は回さない（2 巡目の直しはサンプラのコードで確かめた・memory の「2 巡」）。研究者が採った後の直しは上の 3＋2 件で、意味は変えず正確にした（研究者が覆せる）。
 - **影響範囲**: `papers/ime-observation/{experiment/datasheet.md,README.md,manuscript/sections/{dataset,declarations}.tex,kit/export/{export.internal.py,README.internal.md}}`・本ファイル。
+
+## 判断 214: macOS の書庫 9 つと標本を束ね、3 種の書き出しを Mac で確かめた（2026-10-06・Mac・引き継ぎ -9 §2.1・研究者の選択なし・手順どおり）
+- **束ねたもの**（`~/ime-m4/deposit/`・`--also-user`・`--also-home` 各 1・`--check-deposit` は全 9 件 exit 0）: `macos-e3-working-1.zip` `77b51736…`・パイロット 8 件（`short-1`・`pilot-1`・`verify-1`・`verify-s5`・`pilot2-on`・`pilot2-off`・`verify-off`・`dryrun-1`・`pilot/`）・E3 の標本 4 ファイル（`e3-samples/`・パスなし・SHA-256 は `data.md` の既存値と一致）。封印したセッション行は scratchpad の写しでだけ戻し、読まず、元の run は触っていない。
+- **候補で落ちたものは無い**。`dryrun-1` は `short-1` より前の runner の run で、backend `dryrun`（鍵を送らない）・中断（`interrupted (SystemExit)`）・check を通るので寄託に入れた。これ以外に runner の run は Mac に無い。
+- **`git_commit`/`git_dirty`**（datasheet の求め）: `data.md` の新しい節に表で記録。`verify-s5`・`verify-off` は dirty=true、`macos-e3-working` は export から回したので null。
+- **書き出しの確かめ（Mac）**: タグ 2 つの worktree でタグ自身の exporter（`--allow-missing-license`）→ 一覧 `29b183ba…`（98）・`f61af353…`（108）が一致。origin/main（`3e383ccb`）の fresh clone で本番の形 exit 0・195 ファイル・`kit/check.sh` 31 本緑。3 つの木とも Mac のログイン名・ホーム・ホスト名は 0 件（pyc を除く。ヒットは検査コードの説明と架空名だけ）。
+- ⚠️ README の `git archive` の一覧の手順は**公開 repo のタグ**用で、作業 repo のタグ（全体 3028 件）では不一致になる（想定どおり）。
+- **影響範囲**: `papers/ime-observation/experiment/data.md`（Deposits 表 9 行・Machine 表 9 行・新しい節）。文体の検査 0 件。Zenodo への上げは G-GEAR。

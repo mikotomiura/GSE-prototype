@@ -270,6 +270,7 @@
       - [x] 作業中の点検（code-reviewer ∥ security-checker）の指摘 14 件を直した（判断 211）
       - [x] 研究者が公開 repo に A〜C を push した（2026-10-06・`git ls-remote` で main = `cb29a1a9…`・タグ 2 つが A・B を指す・非公開のまま）
       - [x] PR #316 の /cross-review 2 巡（Codex・パス限定 3 回）の指摘を直した（SVG を XML として読む層・文字参照を戻した走査・凍結の一覧の手順・`xml:base` ほか・変異 21 本すべて赤・本番の形の書き出し exit 0・`kit/check.sh` 31 本が緑）（2026-10-06・G-GEAR・判断 212）→ CI → merge
+      - [x] Mac: macOS の書庫 9 つ（E3 working・パイロット 8）と E3 の標本を束ね、タグ 2 つ・main の書き出しを Mac で確かめた（2026-10-06・判断 214）→ 書庫を G-GEAR へ移す（研究者）
       - [ ] GitHub での README（ロゴ・動く図）の見え方を確かめる（ロゴと図はリリース D の README に入る → D を push した後）
       - [ ] datasheet（Claude の下書き → AI 宣言に足す → 研究者が確かめる）
         - [x] 下書き `experiment/datasheet.md`・点検（code ∥ security）の指摘で書き直し・研究者の 5 問（連絡先はメール・§10.8 の確かめの run はパイロットの部・青空文庫の出どころと作業履歴・方針の文）・書き出しの例外・`dataset.tex`・AI 宣言（2026-10-06・G-GEAR・判断 213・枝 `docs/ime-m12-datasheet`）
