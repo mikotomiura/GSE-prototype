@@ -42,9 +42,9 @@ written.
 ## Build, run, self-test
 
 ```bash
-bash papers/ime-observation/kit/refinput-macos/build.sh        # produces .build/refinput-macos and .build/RefInput.app
+bash kit/refinput-macos/build.sh        # produces .build/refinput-macos and .build/RefInput.app
 .build/refinput-macos --selftest --out /tmp/gt.jsonl           # no window; see below
-python3 papers/ime-observation/kit/formats/validate_logs.py --kind gt /tmp/gt.jsonl
+python3 kit/formats/validate_logs.py --kind gt /tmp/gt.jsonl
 .build/refinput-macos --out gt_mac_nstic.jsonl                 # opens a window and records until it is closed
 ```
 

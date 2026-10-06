@@ -129,8 +129,8 @@ id (long-term or temporary), an Anthropic or OpenAI key head, the shape of a Goo
 token head; the check runs on the source and again on the converted output, and each line is also
 checked with its escapes decoded; the text is never printed), a file of a kind that the checker of
 the writing rules does not read (the file must have the extension `.py`, `.rs`, `.sh`, `.md`,
-`.json`, `.toml`, `.swift`, `.txt`, `.cff`, `.tex` or `.bib`, or be named `.gitignore`, `SEED`, `Cargo.lock`,
-`LICENSE-CODE` or `LICENSE-DATA`; under `kit/corpus/data/` only the `*.jsonl` files directly in it;
+`.json`, `.toml`, `.swift`, `.txt`, `.cff`, `.tex` or `.bib`, or be named `.gitignore`, `.gitattributes`, `SEED`,
+`Cargo.lock`, `LICENSE-CODE` or `LICENSE-DATA`; under `kit/corpus/data/` only the `*.jsonl` files directly in it;
 add the kind to the checker or leave the file out), a name that holds the word `internal` in
 another form than `.internal.` (a word that no letter touches, in any case, as in `notes_internal.md`,
 `internal2.md` or `notes(internal).md`, or `Internal` right after a lower-case letter, as in

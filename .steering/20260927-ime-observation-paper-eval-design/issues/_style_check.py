@@ -10,7 +10,7 @@
   2. 日本語（ひらがな・カタカナ・漢字・全角の句読点）が「地の文」にあること:
      - Python: コメントと docstring
      - Rust: コメント（// /// //! /* */）。文字列リテラルは見ない
-     - shell / .gitignore: # 以降のコメント
+     - shell / .gitignore / .gitattributes: # 以降のコメント
      - Markdown: 地の文（``` のコードブロックとバッククォートの中は除く）
      - JSON: manifest の "reason"、規則ファイルの "_note"
      ★ 地の文の中でもバッククォートで囲んだ部分（例: `がっこう`）は許す（読みの例を示すため）。
@@ -286,7 +286,7 @@ def check_text(rel, text, verbatim):
         prose = py_prose(text)
     elif ext in (".rs", ".swift"):
         prose = rs_prose(text)
-    elif ext == ".sh" or base == ".gitignore" or ext == ".toml":
+    elif ext == ".sh" or base in (".gitignore", ".gitattributes") or ext == ".toml":
         prose = hash_prose(text)
     elif ext == ".md":
         prose = md_prose(text)
@@ -320,7 +320,7 @@ def iter_files(root, paths):
             for f in sorted(files):
                 if f.endswith(SKIP_SUFFIX) or ".internal." in f:
                     continue
-                if not (f.endswith(TEXT_SUFFIX) or f == ".gitignore"):
+                if not (f.endswith(TEXT_SUFFIX) or f in (".gitignore", ".gitattributes")):
                     continue
                 yield (reld + "/" + f) if reld != "." else f
 
@@ -428,6 +428,13 @@ def selftest():
         if len(run(tmp, ["papers/ime-observation"])) != 2:
             fails.append("走査: .tex も走査の対象のはず（判断 148）")
         os.remove(os.path.join(tmp, "papers", "ime-observation", "manuscript", "m.tex"))
+        # 判断 209: 公開 repo の .gitattributes も書き出すので、コメントの日本語と禁止語を見る
+        with io.open(os.path.join(tmp, "papers", "ime-observation", ".gitattributes"), "w",
+                     encoding="utf-8") as f:
+            f.write("# " + J + "\n* text=auto eol=lf\n")
+        if len(run(tmp, ["papers/ime-observation"])) != 2:
+            fails.append("走査: .gitattributes のコメントも走査の対象のはず（判断 209）")
+        os.remove(os.path.join(tmp, "papers", "ime-observation", ".gitattributes"))
         if len(run(tmp, ["papers/ime-observation/kit/x/bad.md", "papers/ime-observation/kit/x/NOTES.internal.md"])) != 1:
             fails.append("走査: 明示したファイルの違反は拾い、明示した *.internal.* は拾わないはず")
     finally:

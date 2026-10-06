@@ -241,8 +241,9 @@ strata, for example in different trials.
 **Effect.** Precision, recall, F1, the split rate and every count of `match()` are unchanged by both changes. Under
 the first change a stratum may report its merge rate without a value; under the second the merge rate of a stratum may
 change wherever a recounted merge crosses strata, including the primary strata of section 6.4. The pooled rates
-over all trials are the same under both rules. The code of both changes is in commit `115cd5ff`, and the selftest
-of `match.py` checks both rules on a constructed case.
+over all trials are the same under both rules. The code of both changes is the `kit/analysis/match.py` of release
+`v1.0.0` (SHA-256 `6f817228e2e7d5f17f65895c7a00a721c28c00df24c46df0c8bd4b237ad72cff`), and its selftest checks both
+rules on a constructed case.
 
 ## D11. A per-text ICC whose reference is the same in every text is reported without a value (2026-10-06)
 
@@ -309,8 +310,9 @@ the discussion found that the per-stratum estimates within the ranges change.
 
 The macOS plans and analysis are generated and run from the macOS tag (section 8). That the changed files would give
 the same results was checked on 2026-10-03, on Windows 11 with Python 3.11.9, in checkouts with LF line ends of the
-macOS tag and of the commit that holds the code of the addendum (`3cc151c7`; the commits after it up to the
-freezing commit of the addendum change documents only):
+macOS tag and of the commit that holds the code of the addendum (a commit of the working repository, which is not
+public; the commits after it up to the freezing commit of the addendum change only `preregistration.md` and
+`deviations.md`, so its code is the code of the Windows freezing tag):
 
 - Plans: in each checkout,
   `python kit/gen/generate_plan.py --config experiment/plan_config.macos.json --recipes kit/gen/<file> --corpus

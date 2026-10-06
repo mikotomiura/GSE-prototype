@@ -1,0 +1,4 @@
+# Text files are checked out with LF line ends on every system. The checksums of the procedures, the corpus, the
+# configuration, the pinned sources and the lists of exported files are computed over LF bytes, so a checkout with
+# CRLF line ends would not match them.
+* text=auto eol=lf
