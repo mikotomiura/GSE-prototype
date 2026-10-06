@@ -1,5 +1,7 @@
 # 次セッション（Surface）— IME 論文 M12: Windows の書庫と標本を束ねて記録し、書き出しを確かめ、G-GEAR へ移す
 
+> ✅ **済み（2026-10-06・Surface・判断 217・枝 `docs/ime-m12-surface-deposit`）**: §2 の 1〜9 を実行。残りは §2.10（研究者が `C:/ime-deposit/` の Windows の書庫と標本 14 ファイルを G-GEAR の `C:/ime-deposit/` へ移す）。結果と見つけたことは判断 217。
+
 > 作成: 2026-10-06 夜（G-GEAR・判断 215 の後）。`next-session-ime-paper-manuscript-9.md` の §2.2 を、機械ごとの引き継ぎに分けて具体にしたもの（研究者の求め）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 207・213・214・215**、`papers/ime-observation/experiment/data.windows.md`（Deposits・Run checks・Check of section 10.8）と `data.md` の **Deposit procedure**（手順 1〜5）と 2026-10-06 の節（Mac が同じことをした形）、`experiment/pilot-windows.md`（Raw logs）、`experiment/datasheet.md`（Parts 2）、`manuscript/sections/dataset.tex` §11.3（What was not deposited）、`kit/export/deposit.internal.{json,py}`（docstring が照合の仕様）。状態は着手時に `git fetch` で測り直す。
 > 並行: Mac（`next-session-ime-paper-m12-mac.md`）と同時に進めてよい。G-GEAR（`next-session-ime-paper-m12-ggear.md`）は両方の後。

@@ -2110,3 +2110,15 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - ⚠️ **見つけたこと（研究者に伝える）**: 別の job の一時ディレクトリ（`~/.claude/jobs/` の下）に Zenodo の token の写しが 2 つ残っている（中身は読んでいない）。消すかは研究者が決める。
 - **研究者の求め**: Mac と Surface で詰めることが残るので、引き継ぎを機械ごとに分ける → `next-session-ime-paper-m12-{mac,surface,ggear}.md`（-9 はその分け元として残す）。判断の番号は Mac 216・Surface 217・G-GEAR 218〜と先に割り当てた（並行で番号が衝突しないように）。枝は Mac `docs/ime-m12-mac-conditions`・Surface `docs/ime-m12-surface-deposit`（どちらも `docs/ime-m12-deposit-prep` から・PR は G-GEAR で 1 本）。
 - **影響範囲**: `papers/ime-observation/kit/export/deposit.internal.{py,json}`（新）・本ファイル・`tasklist.md`・`.steering/_handoff/next-session-ime-paper-{manuscript-9,m12-mac,m12-surface,m12-ggear}.md`。
+
+## 判断 217: Windows の書庫 10 と標本を Surface で束ね、記録と一覧を埋め、3 種の書き出しを確かめた（2026-10-06・Surface・引き継ぎ m12-surface §2・研究者の選択なし・手順どおり）
+- **束ねたもの**（`C:/ime-deposit/`・`--also-user`・`--also-home` 各 1・値は書かない・封印した行は写しで `--unseal` のみ・ログは開いていない）: `windows-e3-working-1.zip` `39d40801…1b45`・パイロット `windows-pilot-{short,pilot,verify,toolcheck}-tsf.zip`・中止した試み 2（`windows-pilot-aborted-{a,b}.zip`）・§10.8 の確かめ `windows-check-verify.zip` と最初の開始 `windows-check-verify-start-1.zip`・管理者権限で拒まれた開始 `windows-msime-tsf-refused-start.zip`・標本 4 ファイル。SHA-256 は `data.windows.md` の Deposits（11 行）と一覧に入れ、書庫の実ファイルのハッシュと 1 件ずつ突き合わせた。`conditions.txt` は idle `13bf360f…`・working `9b6ae939…`。`samples.tsv` は記録の値と一致。
+- **`--check-deposit`**: 手元の run 12 件の写し。通ったのは 10 件。**落ちたのは 2 件**: S15 の窓が閉じて止まった試み（`short-tsf-aborted2`・試行の中で止まった → D4 の判定・規則どおり寄託しない）と、IMM の入力欄の `pilot-imm-1`（D2・IMM の run は寄託しない）。
+- ⚠️ **見つけたこと**: Surface には前面の窓を拒まれた中止が 3 つある（`short-tsf-aborted1`・`pilot-tsf-1` と IMM の `pilot-imm-1`）。`pilot-windows.md` の「2 回」は TSF の 2 つを数えたもの（本文は変えず `data.windows.md` に書いた）。datasheet の「3 つの中止」は S15 の 1 つを含めて TSF の 3 つ → 寄託するのは 2 つになる（`datasheet.md` の文は G-GEAR が直す）。
+- **`abort_reason`**: 先に `run_cell.py` と `backend_windows.py` のメッセージを一次で読み、窓の題・アプリ名が入らない（キー名・オプション名・個数だけ）ことを確かめてから、該当欄だけを読んだ。入っていなかった（確かめの最初の開始は OS のメッセージで、パスなし）。
+- **管理者権限で拒まれた開始は寄託する**: §11.3 の規則（同じ確かめを通る）を `--check-deposit` が通し、鍵は送られていない。回数に数えない研究者の決め（2026-10-04）は変わらない。一覧に `windows-msime-tsf-refused-start.zip` を足し、`aborted-c` を消した。
+- **一覧の照合**: `deposit.internal.py --selftest` ok。`--from C:/ime-deposit --allow-pending`（`--export` あり）→ Windows の項目はすべて ok、FAIL は macOS の MISSING 13 件のみ（保留は macOS の `conditions.txt` 2 件）。
+- **書き出しの確かめ（Surface）**: タグ 2 つのきれいな worktree（`core.autocrlf=false`）でタグ自身の exporter（`--allow-missing-license`）→ 一覧 `29b183ba…`（98）・`f61af353…`（108）が一致。この枝（`24ebc05a`）の新しいクローンで本番の形 exit 0・195 ファイル。3 つの木とも Surface のログイン名・ホーム・ホスト名は 0 件。`kit/check.sh`: 34 本緑（引き継ぎの「31 本」は古い数。判断 215 の作業ツリーも 34 本）。
+- ⚠️ Windows では `python3` が Store の別名で失敗し、`kit/check.sh` が全部赤になる（`PATH` から WindowsApps を外して回した・道具の欠陥ではない）。
+- **コミット**: git の author が未設定だったので、この履歴の author（`-c user.name/user.email`・設定は変えていない）で commit した。
+- **影響範囲**: `papers/ime-observation/experiment/data.windows.md`（Deposits 表 +10 行・Machine 表・新しい節）・`kit/export/deposit.internal.json`（Windows の SHA-256・1 項目追加・1 項目削除）・本ファイル・`tasklist.md`・本引き継ぎ。Zenodo への上げと datasheet の表・Parts の文は G-GEAR。
