@@ -318,7 +318,10 @@ if __name__ == "__main__":
     ap.add_argument("--out", required=True)
     ap.add_argument("--frame", type=float)
     a = ap.parse_args()
-    if formats_categories() != CATEGORIES:
+    found = formats_categories()  # compared in order, so that the figure keeps the order of the specification
+    if not found:
+        sys.exit("make_assets: the list of key categories was not found in kit/formats/FORMATS.md; nothing was written")
+    if found != CATEGORIES:
         sys.exit("make_assets: the key categories differ from those of kit/formats/FORMATS.md; nothing was written")
     os.makedirs(a.out, exist_ok=True)
 
