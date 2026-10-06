@@ -1,5 +1,6 @@
 # 次セッション — IME 論文 M12 の続き: 公開 repo の push → Mac・Surface で書庫と書き出しの確かめ → G-GEAR で Zenodo に上げてリリース D → 公開の確認
 
+> ⚠️★ **2026-10-06 夜に `next-session-ime-paper-manuscript-9.md` で置き換えた**（PR #316・#317 の merge と datasheet の後）。次のセッションは -9 を読む。以下は記録。
 > 作成: 2026-10-06 夜（G-GEAR）。判断 206〜211 の後。枝 `docs/ime-m12-release`。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 207〜212**、`tasklist.md` の M12 の小項目、`papers/ime-observation/kit/export/README.internal.md`（公開の履歴と手順）、`experiment/data.md` の寄託の手順。状態は着手時に `git fetch` で測り直す。
 
