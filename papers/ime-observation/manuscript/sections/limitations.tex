@@ -21,7 +21,9 @@ logger's two paths, because a row does not record its path (Section~\ref{sec:log
 with its default settings, with predictive candidates shown; with them turned off, the window would open at the
 conversion rather than while the reading is typed. Applications that draw their own candidates were not tested, and in
 them the logger may see no session. The counts \texttt{nav} and \texttt{abandon} are counted system-wide while a
-session is open and are upper bounds; this design does not exercise their excess, because only the executor typed. In
+session is open and are upper bounds; this design does not exercise their excess, because only the executor typed, and
+the per-text abandonment rate of the Windows logger was lower than the reference's (Section~\ref{sec:results-session}).
+In
 S15 the input method commits when another window comes to the front, so the session ends there. On the cloaking path
 the observed interval ends at least 150~ms before the row's time, and on both paths the row's time is that of its
 collection; the matching is not adjusted for either, so short sessions can fail to pair for this reason. The input mode
@@ -33,8 +35,11 @@ and trials were separated by a pause of 1~s; a conversion that ran from one tria
 carry-over, so the agreement for conversions that continue into the input that follows is not estimated. Each key was
 held for 60~ms and no two presses overlapped; the session rules of the macOS logger act on the order of the presses,
 which overlapping presses do not change, and the release rows, whose times overlapping would change, were not validated.
-Key intervals were drawn independently of the keys, with no pauses at the boundaries of words and phrases; this affects
-the measures of timing and the feature sets of question~4 that keep time. The timing of human typing carries information
+The think time before the decisive key was drawn between 0.2 and 20~s (Section~\ref{sec:method-plans}); a difference
+in where the rules and the reference end a session can include such a pause, so the long tails of the duration
+differences may depend on this distribution, and the limits of agreement are not carried over to other distributions
+of pauses. Key intervals were drawn independently of the keys, with no pauses at the boundaries of words and phrases;
+this affects the measures of timing and the feature sets of question~4 that keep time. The timing of human typing carries information
 about the keys \citep{monaco2018} that these logs lack, while the attacker's knowledge of the generator and the absence
 of typing errors favour identification here, so how those sets would fare on human typing is not known. The input had
 no typing errors, and
@@ -44,9 +49,9 @@ not known. The events were injected through the interfaces of the operating syst
 (Table~\ref{tab:key-timing}) covers the path from the injection to the row; the path from a physical key, which earlier
 validations measured from the key to the record \citep{pinet2017}, adds its own delay, so the delay from a physical key
 to a row is expected to be longer than the delays reported here. The rows take their times from the wall clock when an
-event reaches the logger; the registration asks for network time synchronisation to be off during the runs, and an
-adjustment of the clock while the logger runs, which in ordinary use can happen, moves the times of the rows and was
-not exercised. The drift between the clocks of the records was measured only at the block markers
+event reaches the logger; the registration asks for network time synchronisation to be off during the runs, whether it
+was off was not recorded (Section~\ref{sec:method-cells}), and an adjustment of the clock while the logger runs, which
+in ordinary use can happen, moves the times of the rows and was not exercised. The drift between the clocks of the records was measured only at the block markers
 (Section~\ref{sec:results-reference}). The input mode was switched only by the mode keys; on macOS a switch made
 otherwise is followed by polling the input source every 100~ms, which was not exercised.
 
@@ -60,12 +65,19 @@ the sessions that reach 20~s; how it moves each aggregate is stated in Section~\
 \paragraph{One machine and one version per system.} One input method was measured per system, on one machine, with the
 versions recorded in the run manifests; the Windows versions of the measurement differed from those of the pilot, and
 the registered check passed (Section~\ref{sec:method-cells}). The learning of the input method was not reset, so the
-candidates and the automatic commits may have changed over the runs. Scenario S9 (choosing a candidate with the mouse)
-was not evaluated.
+candidates and the automatic commits may have changed over the runs. Other programs ran on the measuring machines
+(Section~\ref{sec:results-attempts}), and their load was not controlled. Scenario S9 (choosing a candidate with the
+mouse) was not evaluated.
 
 \paragraph{The prediction.} The prediction models the macOS logger's rules and the runner's presses, but not the
 modifier keys, the collection of rows or the delay from dispatch to the logger, so a difference between the prediction
-and the observation is reported as such and is not attributed to a cause.
+and the observation is reported as such and is not attributed to a cause. On macOS as on Windows the time of a session
+row is that of its collection, up to about 100~ms after the session closed, and the matching is not adjusted for it, so
+short sessions can fail to pair for this reason; the strata in which the logger's rows departed most from the specified
+rows (Section~\ref{sec:results-detection}) may owe their departures to this, which was not tested.
+
+\paragraph{Deviations.} A defect of the frozen code was corrected next to the registered analysis (deviation D10), and
+two changes of reporting were made after the results had been seen (D11 and D12; Section~\ref{sec:deviations}).
 
 \paragraph{Scopes and intervals.} The primary scope sets aside the trials whose presses went into a session that is cut
 off; how often that happens is a property of this design, and the trials that remain differ between speeds in reading
@@ -81,7 +93,9 @@ the absence of such errors; had every attempt been stopped, the cell would not h
 
 \paragraph{Recoverability.} The study judges one phrase at a time, not a whole log, and no record that keeps times;
 what else it does not evaluate, and that its attacks are not claimed to be the strongest possible, is stated in
-Section~\ref{sec:recoverability-method}. The decoys were not matched to the true phrase in length, so the numbers of
+Section~\ref{sec:recoverability-method}. The Wilson interval of the near-chance rule treats trials as independent, so
+with dependence within a block the rule is met more easily than it should be (Section~\ref{sec:recoverability-method}).
+The decoys were not matched to the true phrase in length, so the numbers of
 keys of each category are expected to distinguish the candidates more than they would among phrases of equal length.
 
 \paragraph{Runtime cost.} The values of each system are read within that system (Section~\ref{sec:cost-method}), and

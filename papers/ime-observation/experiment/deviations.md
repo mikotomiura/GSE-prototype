@@ -248,8 +248,10 @@ of `match.py` checks both rules on a constructed case.
 
 **What changes.** In the report of question 3 (section 6.7), the ICC(A,1) of a measure and speed whose ground-truth
 values are the same in every text is given as no value, with the reason that the reference's value is the same in
-every text, instead of the number that the frozen code returns; and the standard deviation of the ground-truth values
-between the texts is reported next to every ICC. The analysis code and the result files do not change: the change is
+every text, next to the number that the frozen code returns, which remains the registered result (section 8); and the
+standard deviation of the ground-truth values between the texts is reported next to every ICC. The article first gave
+the corrected report in place of the registered number; it has given both since a second simulated review pointed out
+section 8 of the registration. The analysis code and the result files do not change: the change is
 made by the script that turns the result files into the tables and the values of the article
 (`manuscript/tools/results_tables.py`), which reads the ground-truth values of each text from the per-text aggregates
 of the result files and requires them to cover the same texts as the ICC.

@@ -22,9 +22,10 @@ Split by kind, not by directory.
 - Data (including the phrases and readings in `kit/corpus/data/`) and documents (`*.md`, the
   records under `experiment/`, `manuscript/`): CC BY 4.0
 
-## Component staging areas
+## Components
 
-Subsequent components are built at the following locations.
+The kit is made of the following components; the logger's own README (`kit/logger/README.md`) is the entry point for
+using the logger.
 
 | Directory | Contents |
 |---|---|
