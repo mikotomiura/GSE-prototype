@@ -72,8 +72,9 @@ nothing else ran.
 ## Closed set of question 4 and the summary of experiment 3 (analysis run on 2026-10-05, Surface Pro 8)
 
 - **Closed set** (sections 6.8 and 10.7 of the pre-registration, with deviation D8). The code was `kit/e2/closed_set.py` of
-  commit `14c85e6e` (the frozen export with that one file replaced; the difference from the tagged file is the switch
-  `--skip-scenario`, its self-test and its docstring; self-test OK, 157 checks). Inputs were checked before the run:
+  release `v1.0.0` (SHA-256 `364cc833b48a73aeb15b9416bff203ec21a71296e26534f914e3a2bb9bd067c3`; the frozen export with
+  that one file replaced; the difference from the tagged file is the switch `--skip-scenario`, its self-test and its
+  docstring; self-test OK, 157 checks). Inputs were checked before the run:
   `plan.jsonl` `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0`, `obs.jsonl`
   `58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562`. Command (from the replaced export):
   `python kit/e2/closed_set.py --obs <run>/obs.jsonl --plan <run>/plan.jsonl --corpus kit/corpus/data/phrases.jsonl
@@ -103,8 +104,9 @@ export, except `<data>`, which is this file, and `<results>`, which is `experime
   `58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562`, as in the registered results.
 - **Code.** An export of the Windows freezing tag, made from a checkout with LF line ends; the list of its 108 files
   has the SHA-256 that `notes.md` gives. In a copy of that export, `kit/analysis/match.py` was replaced by the file of
-  commit `115cd5ff`; the difference from the tagged file is the two changes of deviation D10 and their self-test. The
-  self-tests of `kit/analysis/match.py` (18 cases) and `kit/analysis/pipeline.py` (13 cases) passed in the copy.
+  release `v1.0.0` (SHA-256 `6f817228e2e7d5f17f65895c7a00a721c28c00df24c46df0c8bd4b237ad72cff`); the difference from
+  the tagged file is the two changes of deviation D10 and their self-test. The self-tests of `kit/analysis/match.py`
+  (18 cases) and `kit/analysis/pipeline.py` (13 cases) passed in the copy.
 - **Registered analysis, repeated.** The command of section 10.7, run in the copy without the environment variable of
   D10 and with `--runs-from <data>` and an output directory outside the repository, exited with status 0 ("1 run(s),
   0 aborted, 1 analysed", standard error empty). Its four files are byte-identical to `<results>/windows/e1_*.json`,

@@ -1,6 +1,6 @@
 # 次セッション — IME 論文: round 3 を回すかを研究者に → M12（Zenodo・datasheet・公開 repo・`\tbd`）→ 投稿の前の確かめ
 
-> 作成: 2026-10-06 夕方（G-GEAR）。原稿の attack-me round 2（minor）の採否と直し（判断 204）の後。
+> 作成: 2026-10-06 夕方（G-GEAR）。原稿の attack-me round 2（minor）の採否と直し（判断 204）と、プレプリントの置き場所の決定（判断 205）の後。PR #315 は merge 済み（`96c4032e`）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 204**（と追記）、`attack-me/manuscript-ime-observation/round-2/verdict.md`（§3 の Y 番号・§7 の採否・§8 の対応）、外枠 `papers/ime-observation/manuscript/outline.md`、凍結した事前登録、`experiment/deviations.md`（D1〜D12）。状態は着手時に `git fetch` で測り直す。
 
 ## §0 打ち込む用
@@ -46,13 +46,14 @@ LaTeX（G-GEAR）: PATH="$HOME/AppData/Local/Programs/MiKTeX/miktex/bin/x64:$PAT
    - `references.bib` の `dataset`・`release`
 
    ⚠️ 書庫は Mac の `~/ime-m4/deposit/` と Surface の `~/ime-m7/deposit/`（G-GEAR の `Downloads` にあるのは Windows の 1 本だけ）→ macOS 側は Mac で。⚠️ 凍結の表の書き出しの一覧の SHA-256（round 1 の Z37・監査役の 1-7）は M12 で。
-3. **投稿の前**:
+3. **プレプリント**（判断 205）: M12 で `\tbd` を埋めた後、BRM に出す版と同じものを **PsyArXiv** に出す（ライセンスは推奨 CC BY 4.0 を研究者に確かめる・分野の選び方と OSF の事前登録の project とのつなぎ方もそのとき決める）。⚠️ PsyArXiv はほぼ撤回できない。⚠️ 事前の審査で止まったら Zenodo に切り替える（研究者に確かめる）。同じ原稿にプレプリントの DOI を 2 つ付けない。投稿のときにプレプリントの DOI とライセンスを申告し、掲載が決まったらプレプリントに掲載版の DOI と URL を足す（Springer の方針）。
+4. **投稿の前**:
    - 投稿規程（BRM・ScholarOne）の語数の上限を一次で確かめる。round 2 の取得（2026-10-06）では、規程のページに上限は無かった（"word limit" などの語なし）。ScholarOne の画面でも確かめる。
    - カバーレター。
    - タイトル頁（repo の外で記入・右上の頁番号は付けた）。
    - 要旨を変えたら `_count_abstract.py` で 250 語以内にする（今は 248 語）。
    - 図 1（AI が描画のコードを書いた図）の説明文に AI の開示が要るかを編集部に確かめる（出版社の方針の "visual content" の適用範囲は規程から読めない・round 2 の Y39）。
-4. 研究者に残っていること: OSF のプロフィール名「Mikto Miura」を直す（判断 200 の 8）。
+5. 研究者に残っていること: OSF のプロフィール名「Mikto Miura」を直す（判断 200 の 8・PsyArXiv の著者名にも出るので、プレプリントの前に）。
 
 ## §3 気をつけること
 

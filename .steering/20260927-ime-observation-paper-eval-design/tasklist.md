@@ -251,7 +251,7 @@
       → 2026-10-06（Mac・判断 190）。G-GEAR で通しのビルド（生成されていない値 0）と、Python の版で `values.json` の最後の桁が変わる問題の直し（`math.fsum`・判断 191）
     - [x] 表の道具に Windows の 2 つの定義の差の大きさ（Z40）→ 2026-10-06（G-GEAR・判断 192）: 登録 §5 が「報告しない」としていたので研究者の選択で逸脱 D12・§6 に数と値・補遺に両定義の表
     - [x] 原稿の attack-me round 2 → **minor**（R1・R2・R3 とも・有効 3/3・捏造 0・注入 0・偽陽性 1）→ 研究者の採否（判断 204・8 問とも推奨）→ 直した（`round-2/verdict.md` §8）→ 点検（security 0・code MEDIUM 5・LOW 10）と /cross-review 2 巡の直し → 研究者が直した Discussion と AI 宣言を改めて採った（2026-10-06・G-GEAR）→ PR → CI → merge
-    - [ ] round 3 を回すか（推奨: 回さない。minor の指摘は直した・同じ立場の 3 回目は効きが小さい）→ 投稿の前に研究者に問う
+    - [x] round 3 を回すか → 回さない（2026-10-06・研究者の選択・判断 206）。`round-1/tmp/`・`round-2/tmp/` を消した
     - [x] 著者・所属・Funding・利益相反・貢献（研究者・判断 185）と AI Declaration（判断 185〜187）→ PR #309 で main に
     - [ ] 研究者が結果・推奨・限界・結論を読んで直す（判断 185・186・投稿の前・AI Declaration の前提）＋ Discussion を研究者の解釈から書く（判断 188-6）＋ 断りの重複を削る（Z10）
       - [x] 読み直しの資料 `reading-results-discussion.md`（主張 ↔ 根拠・Discussion の事実 F1〜F8 と問い・断りの重複）を渡した（2026-10-06・判断 193）
@@ -260,6 +260,19 @@
       - [x] 判断 200 の方針で Discussion を仕上げ（数字を §6 に寄せる・観測可能性と書字研究の尺度の段落・研究者が採った）、断りを寄せた（−235 語）（2026-10-06・判断 201・202）
       - [x] 点検（code-reviewer ∥ security-checker）・/cross-review 2 巡の指摘を直した（2026-10-06・判断 203）→ PR → CI → merge
     - [ ] OSF のプロフィール名が「Mikto Miura」→ 研究者に確かめてもらう（判断 189 の記録）
-    - [ ] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用
+    - [ ] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用（進め方は判断 207）
+      - [x] 研究者の 4 点（リリースの DOI は手で予約・repo 名・履歴の 4 commit と非公開の参照の置き換え・書庫は G-GEAR に集める）（判断 207）
+      - [x] Zenodo の下書き 2 つと DOI の予約: データセット `10.5281/zenodo.23183438`・ソフトウェア `10.5281/zenodo.23183441`（判断 208）
+      - [ ] 非公開の repo `mikotomiura/ime-conversion-logging` を作り（済）、A・B・C を push（タグ 2 つ）→ ⚠️ push は自動モードで拒まれた・研究者が `C:/wt/ime-conversion-logging.git` から push する
+      - [x] 書き出しの道具を .tex・.bib と LaTeX の ignore に対応させ、`rv@` を `rv:` に、研究者のアドレスだけを通す（selftest・変異 10 本・判断 208）
+      - [x] 非公開の commit の参照 12 か所の置き換え・`\tbd`（DOI・URL・外枠の commit・表 1 の版）・`references.bib`・CITATION.cff・.zenodo.json・ライセンスの全文・.gitattributes・凍結の一覧を計算し直す手順（README）（判断 209）
+      - [x] README の先頭にロゴと動く SVG（研究者の求め・判断 210）
+      - [x] 作業中の点検（code-reviewer ∥ security-checker）の指摘 14 件を直した（判断 211）
+      - [x] 研究者が公開 repo に A〜C を push した（2026-10-06・`git ls-remote` で main = `cb29a1a9…`・タグ 2 つが A・B を指す・非公開のまま）
+      - [x] PR #316 の /cross-review 2 巡（Codex・パス限定 3 回）の指摘を直した（SVG を XML として読む層・文字参照を戻した走査・凍結の一覧の手順・`xml:base` ほか・変異 21 本すべて赤・本番の形の書き出し exit 0・`kit/check.sh` 31 本が緑）（2026-10-06・G-GEAR・判断 212）→ CI → merge
+      - [ ] GitHub での README（ロゴ・動く図）の見え方を確かめる（ロゴと図はリリース D の README に入る → D を push した後）
+      - [ ] datasheet（Claude の下書き → AI 宣言に足す → 研究者が確かめる）
+      - [ ] Mac / Surface: working・パイロット・標本の書庫（`--pack`・`--check-deposit`）→ SHA-256 を記録 → G-GEAR へ。A〜D を各機械で書き出し直して exit 0 と一覧の一致
+      - [ ] G-GEAR: 書庫を照らして下書きに上げる → 「at deposit」の 6 か所と `confirmed at deposit` → D を作る → 研究者に公開を確かめる（repo を公開・Zenodo 2 つを公開）
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task

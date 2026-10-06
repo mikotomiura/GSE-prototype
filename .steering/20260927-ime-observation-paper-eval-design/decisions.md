@@ -1928,3 +1928,135 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 2 巡目（直しの境界 `a7ee74cb..ad710425`・364 行）: P2「小さな調整やブロックの中で戻る調整は印の間のずれに出ないことがある」→ 真 → 「試行の中の時刻への影響は除けない」に。P2「§8 の方法の文にも正の依存の前提を」→ 真 → 揃えた。`cd22a8ab`。
   - 検証: `build.sh --submission` main・main-submission・補遺ともエラー 0・未定義 0・生成されていない値 0・overfull main 0・main-submission 1（以前から）・補遺 167。文体の検査 違反 0。
 - **研究者の確認（AskUserQuestion・推奨どおり）**: 直した Discussion の全文（日本語の訳・この round で変えた所に印）と AI 宣言の直しを示し、研究者は「**このまま採る**」を選んだ（判断 204-8 の実行。宣言の「レビューの後の直しを含めて確かめて採った」が事実になった）。
+
+## 判断 205: プレプリントは PsyArXiv に、M12 の後・BRM への投稿の直前に出す（2026-10-06・G-GEAR・研究者の選択〔2 問とも推奨どおり〕）
+
+- **研究者の問い**: プレプリントの置き場所を決めたい（Zenodo はすぐ出せるが、MetaArXiv・Authorea なども検討したい）。
+- **一次で確かめた事実（2026-10-06）**:
+  - 投稿先の条件（Springer の journal policies の "Preprint sharing" の節・`curl` で cookie つきで原文を取得）: 逐語 "Springer Nature journals encourage posting of preprints of primary research manuscripts on preprint servers of the authors’ choice" / "preprints may be posted at any time during the peer review process" / "Posting of preprints is not considered prior publication" / "Authors should disclose details of preprint posting, including DOI and licensing terms, upon submission of the manuscript" / "Once the preprint is published, it is the author’s responsibility to ensure that the preprint record is updated with a publication reference, including the DOI and a URL link to the published version" / "Authors may choose any license of their choice for the preprint including Creative Commons licenses"。
+  - BRM の投稿規程（round 2 で取り直した原文）にはプレプリント・In Review・Research Square の語が無い。タイトル頁に著者名を求める → 二重盲検ではない（プレプリントで著者が分かっても査読の匿名性を壊さない）。
+  - PsyArXiv: 2025-08-19 から事前の審査（24〜72 時間・improvingpsych.org の告知）。2026-03 から、レビュー・事例・意見などの形式と、査読者が経験の少ない話題（言語学・計算論など）は過去の業績で専門性を見る（PsyArXiv の blog の逐語）。撤回は法的な義務があるときだけ（FAQ）。費用は無料。OSF のヘルプ: 承認されると DOI と固定の URL、ライセンスは CC0 か CC BY 4.0 を推奨。AI の扱いの規定は見つからなかった（未照合）。
+  - MetaArXiv: 対象はメタサイエンス（DOAPR の記録・BITSS の運営）。事前の審査で対象かどうかを見る → この論文（計測の道具の検証）は対象の外と判断されやすい。
+  - OSF の汎用のプレプリントサーバーは 2025-08-25 から受付を停止（COS の blog）。PsyArXiv・MetaArXiv・SocArXiv など 14 のコミュニティのサーバーは続いている。
+  - Authorea: 2018 年から Wiley の所有。2026 年 5 月に Wiley の Research Exchange Preprints へ移り、直接の投稿を一時停止して Wiley の Under Review 経由だけ（Wikipedia と検索の要約が一致・Authorea 本体のページは 403 で未照合）→ BRM（Springer）からは使えない見込み。
+  - Zenodo: 全分野・事前の審査なし・取り下げても墓碑の頁が残る（Zenodo の方針）。プレプリント専用のサーバーではない。
+  - arXiv: 初めての投稿には endorsement が要る。所属のメールが無ければ、既存の著者から個人的に受ける（arXiv のヘルプの逐語・memory の記録と一致）。
+- **研究者の選択（AskUserQuestion・推奨どおり）**:
+  1. 置き場所は **PsyArXiv**（BRM の読者に届き、OSF の事前登録とつながる）。同じ原稿にプレプリントの DOI を 2 つ付けない。Zenodo にはデータセットとコードの release を置く（M12）。PsyArXiv の審査で止まったら Zenodo に切り替える（そのとき研究者に確かめる）。
+  2. 時期は **M12 の後・BRM への投稿の直前**。データとコードの DOI を取り、`\tbd` を埋めて、BRM に出す版と同じものを出す（PsyArXiv はほぼ撤回できない・要旨の "code and data are public" が真になってから）。投稿のときにプレプリントの DOI とライセンスを申告し、掲載が決まったらプレプリントに掲載版の DOI と URL を足す。
+- **未決（そのとき決める）**: プレプリントのライセンス（推奨は CC BY 4.0・公開の材料と同じ）、PsyArXiv の分野の選び方、OSF の事前登録の project とのつなぎ方。
+- **影響範囲**: 本ファイル・引き継ぎ `next-session-ime-paper-manuscript-7.md`（M12 の後の手順に足した）。
+
+## 判断 206: 原稿の attack-me は round 2 で閉じる —— round 3 は回さず、round 1・2 の `tmp/` を消す（2026-10-06・G-GEAR・研究者の選択〔推奨どおり〕）
+
+- **問い（AskUserQuestion）**: round 3 を回すか。推奨は「回さない」で、理由は 3 つ: (1) round 2 は有効な査読 3 人とも minor で、指摘は直した（判断 204・`round-2/verdict.md` §8）。(2) 同じ立場・同じ接地の 3 回目は効きが小さい。(3) 投稿先の査読が次の検証になる。
+- **研究者の選択**: 回さない。
+- **実行**: `round-1/tmp/`（24 MB）と `round-2/tmp/`（23 MB）を消した（git の外・`.gitignore` の `tmp/`）。消す前に、raw の応答 8 本（各 round の R1・R2・R3・audit）がコミット済みの `review-R*.md`・`audit.md` と CR を除いて 1 行も違わないことを `diff` で確かめた。接地の原本と本文は `panel.md` の URL と SHA-256 から取り直せる。
+- **影響範囲**: 本ファイルだけ（attack-me の記録は変えない）。
+
+## 判断 207: M12 の進め方 —— リリースの DOI は手で上げて予約する（判断 183-4 を覆す）・公開 repo は `ime-conversion-logging`（今は非公開）・履歴は 4 つの commit・非公開の commit の参照は公開物で確かめられる形に・データの書庫は G-GEAR に集めて上げる（2026-10-06・G-GEAR・研究者の選択〔4 問とも推奨どおり〕）
+
+- **一次で確かめた事実（2026-10-06）**:
+  - Zenodo の文書（`help.zenodo.org/docs/deposit/describe-records/reserve-doi/` を curl で取得）: 逐語 "By default, Zenodo registers DOIs for all uploads when they are published on Zenodo. In case you want to know the DOI in advance of publication, you can use the method described below to reserve a DOI. The reserved DOI can then be included in files (e.g. a text document) prior to uploading them on Zenodo." / "If you delete the draft upload, the reserved DOI is lost."。予約は下書きの欄の機能。
+  - GitHub との連携（`docs/github/enable-repository/`・`archive-software/github-upload/`）: 逐語 "Once connected, new releases from the repository will be automatically ingested and archived." / "Wait for the release to be processed … When the release is finished, click the record DOI to go to the record"。下書きの段も予約の手順も書かれていない。→ 連携では repo の中の原稿にリリースの DOI を先に書けない（書くならリリースが 2 回要る）。
+  - 公開物が名指す非公開の作業 repo の commit は 12 か所（`git grep`）: `115cd5ff` が 6（`data.md` 53・103、`data.windows.md` 106、`deviations.md` 244、`supplement/provenance.tex` 21・33）、`14c85e6e` が 4（`data.md` 56、`data.windows.md` 75、`provenance.tex` 27・38）、`3cc151c7` が 1（`deviations.md` 312）、凍結の commit `ff122e32…` が 1（`notes.md` 50・登録も名指す）。⚠️ 引き継ぎ（manuscript-4・-7）の「`115cd5ff` が 5 か所」は数え落とし（`data.md` 103 は判断 194 の後に足された）で、`14c85e6e` は挙がっていなかった。
+  - 今の HEAD の `kit/analysis/match.py` は `115cd5ff` のものと、`kit/e2/closed_set.py` は `14c85e6e` のものとバイト一致する（SHA-256 `6f817228…`・`364cc833…`）。
+  - 外枠の最後の commit で、結果の解析より前のものは `ffd315a4`（2026-10-05 01:17 JST・判断 150 の直し）。最初のセル（Windows）の解析は 10-05 10:05 JST 以降に始まった（引き継ぎ `next-session-ime-paper-m7-windows.md` §2.11 の見出し）。結果のファイルの最初の commit は `44fbda3b`（10:30）。その後の外枠の commit（`b836e9c0` 11:05 など）は解析の後。
+  - 試しの書き出し（`--allow-missing-license`・scratchpad）は exit 2 で止まった。理由は、ignore の LaTeX の 7 行（`*.aux` など）を書き出しの除外の規則が知らないこと。⚠️ 書き出しが読むファイルの種類（`CHECKED_SUFFIX`）に `.tex`・`.bib` が無い（文体の検査は読む）。→ 公開の書き出し（D）の前に道具を直す。
+- **研究者の選択（AskUserQuestion・4 問とも推奨どおり）**:
+  1. **リリースの DOI は手で上げて予約する**（判断 183-4 の「GitHub と Zenodo の連携」を覆す）。Zenodo の下書きで DOI を予約し、原稿と `CITATION.cff` に書く。その後、公開 repo のタグの zip を下書きに上げ、研究者が確かめて公開する。データセットと同じ手順。
+  2. **公開 repo は `mikotomiura/ime-conversion-logging`**（題の "Logging Japanese IME conversion" に合わせる）。今は非公開で作る。公開に切り替えるのは Zenodo を公開するときで、その場で研究者に確かめる。
+  3. **履歴は 4 つの commit**: A＝macOS の凍結の書き出し（一覧 `29b183ba…`・タグ `ime-observation-prereg-macos`）、B＝Windows の凍結の書き出し（一覧 `f61af353…`・タグ `ime-observation-prereg-windows`）、C＝B に `ffd315a4` の外枠を足したもの（`\tbd{commit of the outline}` はこの commit）、D＝リリース `v1.0.0`。**非公開の commit の参照は置き換える**: `115cd5ff`・`14c85e6e` は「リリースのファイル（SHA-256）」に、`3cc151c7` は「Windows の凍結のタグ」に置き換える。`ff122e32` は登録が名指しているので、「作業 repo の commit（非公開）」と断って残す。
+  4. **データの書庫は G-GEAR に集めて上げる**。Mac と Surface のセッションで `--pack` と `--check-deposit` を回し、SHA-256 を `data.md` / `data.windows.md` に記録する。研究者が書庫を G-GEAR に移す（Windows の書庫と同じ道）。G-GEAR で SHA-256 を照らしてから下書きに上げる。token は G-GEAR だけに置く。
+- **メインの段取り（研究者が覆せる）**: 書き出しが走査するのは、それを回す機械の値（ホーム・ログイン名・ホスト名）と、渡した値だけ。そこで、ほかの機械の値をこの機械に持ち込まない。代わりに Mac と Surface のセッションで、A・B・C・D の木を同じ道具で書き出し直し、exit 0 と一覧の一致を確かめる。3 台とも通るまで公開に切り替えない。
+- **影響範囲**: 本ファイル・判断 183-4（この判断で読み替える。本文は書き換えない）・M12 の作業全体。
+
+## 判断 208: M12 の最初の実行 —— Zenodo の下書き 2 つと DOI の予約・非公開の repo・公開の履歴 A〜C を手元で組む・書き出しの道具を原稿に対応させる（2026-10-06・G-GEAR・メインの実行〔判断 207 の段取り〕・研究者が覆せる）
+
+- **Zenodo**（memory「Zenodo token」の許可の範囲・旧来の deposit API・token はプロセスの中で読むだけ）: 既存の記録 4 件にこの論文の下書きが無いことを確かめてから、2 つ作った（どちらも `unsubmitted`・ファイルなし・公開していない）。
+  - データセット: deposition `23183438`・**DOI `10.5281/zenodo.23183438`**（`upload_type` dataset・CC BY 4.0・題は `references.bib` の `dataset`）
+  - ソフトウェア: deposition `23183441`・**DOI `10.5281/zenodo.23183441`**（`upload_type` software・Apache-2.0・版 1.0.0・題は `release`）
+  - 両方とも creators は Miura, Mikoto（Independent researcher・ORCID）、関連の識別子は OSF の 2 つの登録（`isSupplementTo`）。説明は仮（"Draft. …"）で、公開の前に datasheet と合わせて書き直す。⚠️ 下書きを消すと予約した DOI も失われる（Zenodo の文書）→ 消さない。
+- **GitHub**: `mikotomiura/ime-conversion-logging` を**非公開**で作った（空・判断 207-2）。⚠️ **push は自動モードの判定で拒まれた** → 回り道はせず、研究者に push してもらう（下の bare の写しから）。
+- **公開の履歴 A〜C を手元で組んだ**（scratchpad で組み、`C:/wt/ime-conversion-logging.git` に bare の写しで残した）:
+  - 2 つの凍結のタグのきれいな worktree（detached・LF）から、**タグ自身の道具**を `--allow-missing-license` で回した（どちらも exit 0）。一覧を計算し直すと、記録した `freeze-export-list-{macos,windows}.txt` とバイト一致した（`29b183ba…` 98 ファイル・`f61af353…` 108 ファイル）。
+  - C は B の木に `ffd315a4` の `manuscript/outline.md`（CR 0・文体の検査 0 件・個人の値の grep 0 件）を足したもの（一覧 `c244c159…` 109 ファイル）。
+  - commit: A `bf137ffec0549ddb699e02e1efd6c88202230764`（タグ `ime-observation-prereg-macos`）、B `32a5e18076884bb2e4aea59606726a3faeecac7b`（タグ `ime-observation-prereg-windows`）、**C `cb29a1a9086e77c89cb66c05e39ba4fc8091e074`**（= `\tbd{commit of the outline}`）。作者の日付は元の commit の日付、commit の日付は 2026-10-06。作者は Mikoto Miura（GitHub の noreply のアドレス）。メッセージは英語で、元の commit の 40 桁と登録の URL・一覧の SHA-256 を書いた。`#!` で始まる 38 ファイルに実行ビット（タグの時点の作業 repo はすべて 100644）。各 commit を `git archive` で取り出して一覧を計算し直し、3 つとも上の値と一致した。
+  - ⚠️ B と C の差は `outline.md` の 1 ファイルだけ（`git diff --stat`）。
+- **書き出しの道具**（`kit/export/export.internal.py`・internal で書き出されない）:
+  1. `CHECKED_SUFFIX` に `.tex`・`.bib` を足した。判断 148 は「公開の書き出しを原稿が素通りしないように」文体の検査を `.tex`・`.bib` に広げたが、書き出し側の種類は足していなかった（Code availability と Open Practices は原稿の道具と外枠が公開 repo にあると書く）。→ 024 の acceptance の陰性対照（d）の「`.tex` で exit 2」は契約が変わったので、読まない種類の例を `.csv` に替えた（CI からは呼ばれていない）。
+  2. ignore の LaTeX の 7 行を除外の規則に足した。6 種（`.aux` など）は黙って外す。`*.log` は外さず、今までどおり秘密の名前として止める（README の「黙って飛ばさない」を守る）。ignore のファイルの各パターンが「外す」か「秘密の名前で止まる」のどちらか一方に当たることを selftest で確かめる（今まで、ignore の行と規則の一致は本番の書き出しでしか確かめていなかった）。
+  3. 試しの書き出し（今の木）は内容で止まった（exit 1・1,325 件）。内訳: `generated/values.tex` 1,323 件（鍵 `rv@<セル>.<…>` がメールアドレスの形に当たる）と、研究者のアドレス 2 件（`main.tex` の `\email`・`submission/title-page.tex`）。→ (a) 鍵の印を `rv@` から `rv:` に替えた（`main.tex` の `\rv` と `results_tables.py` の 1 行。`values.tex` は 1,323 行が印だけ変わり、selftest 192 件・`--check` 一致・組版は前と同じ）。(b) 研究者は判断 185 で「原稿は公開 repo とプレプリントにも載るので住所と電話は書かない」と決め、メールを原稿に入れた → そのアドレス 1 つだけを固定の定数 `PUBLIC_EMAILS` で通す（アドレス全体と一致するときだけ。それを含む長いアドレス・同じ行の別のアドレスは止める）。走査の残り 0 件。
+  - 検証: selftest ok。使い捨ての変異 10 本（scratchpad の `mutate_export.py`・`.tex` / `.bib` を外す・生成物を外さない・`.log` を黙って外す・`.synctex.gz` を外す・規則の無い ignore の行・左右の境界を外す・通さない・全部通す）はすべて赤。1 本は最初、置換の文字列が当たらなかった（次の行の形を取り違えた）ので作り直した。`build.sh --submission`: main・main-submission・補遺ともエラー 0・未定義 0・生成されていない値 0・overfull は main 0・main-submission 1・補遺 167（前と同じ）。文体の検査 違反 0。
+- **影響範囲**: `kit/export/{export.internal.py,README.internal.md}`（README に公開の履歴の節と手で上げる手順）・`manuscript/main.tex`・`manuscript/tools/results_tables.py`・`manuscript/generated/values.tex`・`issues/024-acceptance.sh`・本ファイル・`tasklist.md`。
+
+## 判断 209: 非公開の commit の参照を置き換え、寄託の前に決まる `\tbd` 10 か所を埋め、公開 repo の README・ライセンス・`.gitattributes`・CITATION.cff を整える（2026-10-06・G-GEAR・判断 207 の実行〔置き換え・埋める値〕とメインの選択〔下の 4〜7〕・研究者が覆せる）
+
+1. **非公開の commit の参照 12 か所**（判断 207-3）:
+   - `115cd5ff`・`14c85e6e` は「release `v1.0.0` の `kit/analysis/match.py`（SHA-256 `6f817228…`）・`kit/e2/closed_set.py`（`364cc833…`）」に置き換えた（`data.md`・`data.windows.md`・`deviations.md`・`supplement/provenance.tex`）。補遺は SHA-256 を 2 行の箇条にした（1 行だと 142pt はみ出す）。`data.md` に、2 つのファイルの SHA-256 を全桁で書いた 1 文を足した。
+   - `3cc151c7` は「作業 repo の commit（非公開）。その後の commit は `preregistration.md` と `deviations.md` だけを変えるので、コードは Windows の凍結のタグのもの」にした（`git diff --stat 3cc151c7 a57c4fd7` で 2 文書だけと確かめた）。
+   - `notes.md` の凍結の commit は「作業 repo の」と断った。公開 repo の最初の 2 commit が 2 つの書き出しで、同じ名前のタグであることを足した。
+   - 残り 0 件（`git grep`）。
+2. **埋めた `\tbd`**（18 → 8）: データの DOI 4 か所（`dataset.tex`・`declarations.tex` の Availability と Open Practices・書誌）、リリースの DOI 3 か所（Code availability・Open Practices・書誌）、repo の URL（Code availability）、外枠の commit `cb29a1a9…`（Open Practices・40 桁）、表 1 の「This logger, release 1.0.0 \citep{release}」。書誌の `dataset`・`release` は `doi` と `url`（`https://doi.org/…`）。⚠️ この書誌の型（sn-apa）は `@misc` の `doi` を出さず、`url` を "Retrieved from" で出す（Tappy・登録の項目と同じ）。残る 8 か所は寄託の後に決まるもの（`dataset.tex` の `confirmed at deposit` と `written at deposit`〔datasheet〕・試行の表の `at deposit` 6 か所）。
+3. **`dataset.tex` のライセンスの文**: 「データと文書は CC BY 4.0、コードは Apache 2.0」は、表 13（データセットの中身）にコードが無いのと合わない → 「データセットは CC BY 4.0。記録を作り読むコードは別に Apache 2.0 で（Declarations の Code availability）」にした。⚠️ 文の意味を変えたので研究者が覆せる。
+4. **README**（公開 repo の入口）: 「This directory」を「This repository」に、命令は根から回すと断った。節 "Identifiers"（2 つの DOI・OSF の 2 登録）と "History of this repository"（4 つの commit）と "Recomputing the lists of the freezing tags" を足した。手順は `git -c core.autocrlf=false archive <tag> | tar -x` と Python の数行。組んだ repo で回し、2 つのタグとも記録の値（`29b183ba…`・`f61af353…`）を出した。⚠️ `core.autocrlf=true` では `git archive` が CRLF で書き、一覧は別の値（`ce8bfefe…`）になった（実測）→ README に書いた。
+5. **作業 repo のパス 15 か所**: README と kit の README 3 つと `kit/run/cell.example.json` の命令が `papers/ime-observation/…` で書かれていて、公開 repo（根がこの dir）では通らない → 接頭辞を外した。読むのは 006 の acceptance の「cell.example.json が JSON として読める」だけ（確かめて JSON は読める）。ロガーの manifest はこれらを固定していない（`check_manifest.py --self` 一致）。
+6. **ライセンスの全文**: `LICENSE-CODE` は apache.org の `LICENSE-2.0.txt`（SHA-256 `cfc7749b…`・公式の版の値）、`LICENSE-DATA` は creativecommons.org の CC BY 4.0 の `legalcode.txt`。どちらも CR 0。
+7. **`.gitattributes`**（判断 84 が M12 に送っていたもの）: `papers/ime-observation/.gitattributes` に `* text=auto eol=lf`（コメントは英語）。作業 repo の索引は 193 ファイルすべて LF で、置いても変わるファイルは無い。書き出しは `.gitattributes` を知らない種類として止めていた → 書き出しの `CHECKED_NAMES` と文体の検査（`#` のコメントを地の文として読む）に足し、両方の selftest に足した（書き出しの selftest の陰性の例は `.editorconfig` に替えた）。変異 2 本（書き出しの種類から外す・文体の検査の走査から外す）とも赤。
+8. **CITATION.cff と .zenodo.json**: TODO を消し、Zenodo のソフトウェアの記録とそろえた（題・版 1.0.0・DOI・著者と ORCID・repo の URL・データセットへの参照）。`.zenodo.json` は手で上げるので使わないが、説明の誤り（書き出しの道具は公開しない）を直して残した。
+- **検証**: 書き出しの selftest ok・変異 11 本すべて赤。文体の検査の selftest OK・違反 0 件。走査（`scan_counts.py`・書き出しの関数をそのまま呼ぶ）0 件。`build.sh --submission`: エラー 0・未定義 0・生成されていない値 0・overfull は main 0・main-submission 1・補遺 167（前と同じ）。組んだ PDF の文字で、DOI・URL・commit・表 1 の行を確かめた。新しい散文の行は 120 字以内（表の行と JSON の 1 行は元から長い形）。
+- **影響範囲**: `papers/ime-observation/` の `README.md`・`CITATION.cff`・`.zenodo.json`・`.gitattributes`（新）・`LICENSE-CODE`（新）・`LICENSE-DATA`（新）・`experiment/{data,data.windows,deviations,notes}.md`・`kit/{logger,refinput-macos,refinput-windows}/README.md`・`kit/run/cell.example.json`・`kit/export/*`・`manuscript/references.bib`・`manuscript/sections/{dataset,declarations,related}.tex`・`manuscript/supplement/provenance.tex`・`issues/_style_check.py`・本ファイル。
+
+## 判断 210: 公開 repo の README の先頭にロゴと動く図を置く —— GIF ではなく SVG（書き出しはバイナリを入れない）・図の行は実物の形式どおりで時刻は作り例と明記（2026-10-06・G-GEAR・研究者の求め〔「リポジトリの中で gif 画像などをトップに置きたい・ロゴっぽいものも作れたら最高」〕・形と中身はメインの選択・研究者が覆せる）
+
+- **形**: 書き出しの道具はバイナリ（GIF・PNG）を公開物に入れない（安全の規則・`not a UTF-8 text file` で止まる）→ **動く SVG**（CSS の `@keyframes`・GitHub の README の `<img>` で再生される）にした。テキストなので、書き出しの走査（個人の値・禁止語）がそのまま効く。ロゴは明るい版と暗い版の 2 枚を `<picture>` の `prefers-color-scheme` で切り替える。
+- **ロゴ**（`assets/logo-{light,dark}.svg`）: キーキャップの中に空の文字の枠 3 つと、変換中を示す点線の下線（円の並び）とキャレット。右に `ime-conversion-logging` と副題 "Logging Japanese IME conversion without recording text"。
+- **動く図**（`assets/demo.svg`・12 秒で繰り返す）: 左は入力欄（`n i h o n g o` → にほんご → Space で 日本語〔変換中の印〕→ Enter で確定）とキーの点灯、右はロガーが同じ時刻に書く `obs/1` の行（`key` 9 行と `ime_shadow` 1 行）。⚠️ **実物との整合を一次で確かめた**: 行の形は `kit/formats/FORMATS.md` の `obs/1`（`key` は 14 分類と `press`、`ime_shadow` は `dwell_ms`・`nav`・`abandon` で文字も長さも持たない）。`t` は壁時計のミリ秒（ロガーの README）。macOS の推定ではセッションは最初の英数字キーで始まり Enter で確定（`input/ime_compose.rs` の遷移表）、`nav` は矢印だけを数え Space は数えない → `dwell_ms` 4000（最初のキーから Enter まで）・`nav` 0・`abandon` false。`ime_shadow` は監視の巡回が要約を取り出した時刻に書かれる（`main.rs` の `emit_ime_shadow`）→ Enter の行の後に 16 ms 遅れで置いた。図の下に「時刻は作り例・解放の行（`press:false`）も書かれるが省いた・文字も読みも候補も記録しない」と明記。
+- **生成**: `assets/make_assets.py`（標準ライブラリだけ・`--frame T` で T 秒の静止画）。出力は README から参照する 3 枚。
+- **道具の直し**: 書き出しの `CHECKED_SUFFIX` と文体の検査の `TEXT_SUFFIX` に `.svg`。文体の検査では SVG の地の文を `<title>`・`<desc>`・コメントとし（日本語は赤）、`<text>`（図の中の入力の例）は見ない。禁止語は全行。selftest に 5 件（図の中の日本語は通る・title・複数行の desc・コメントは赤・図の中の禁止語は赤）と走査の 1 件。
+- **検証**:
+  - Chrome（`http://127.0.0.1` で配信）: タブが `hidden` で静止画が撮れなかった → 同じ SVG をページに直接入れ、`getAnimations()` の 30 本の時刻を 9 点に合わせて、見えている入力欄の文字・行の数・キーの点灯を数えた。すべて設計どおり（0.5 s は空・1.15 s は n と 1 行・2.65 s はにほんg と 6 行・3.0 s はにほんご と 7 行・4.2 s は 日本語 と 8 行・5.05 s は 9 行と Enter の点灯・6.0 s は 10 行・10.7 s は消えかけ・11.5 s は空）。⚠️ `<img>` に入れたときの再生と、GitHub での見え方（書体・ダークの切り替え）は**まだ見ていない**（repo に push した後に確かめる）。
+  - MuPDF で静止画を PNG にして配置を確かめた（キーの列のはみ出しと上の余白を直した）。⚠️ MuPDF は `stroke-dasharray` を描かない → ロゴの点線は円にした（入力欄の点線は破線のまま・ブラウザで描かれる）。
+  - 生成のスクリプトを 120 字以内に折り直した後も、3 枚と静止画 2 枚がブラウザで確かめたものとバイト一致。
+  - 文体の検査の selftest OK・違反 0 件、書き出しの selftest ok・走査 0 件。使い捨ての変異 4 本（SVG の地の文を見ない・`.svg` を走査しない・`<text>` も地の文にする・書き出しの種類から外す）すべて赤。
+- **影響範囲**: `papers/ime-observation/{README.md,assets/}`・`kit/export/{export.internal.py,README.internal.md}`・`issues/_style_check.py`・本ファイル。
+
+## 判断 211: 作業中の点検（code-reviewer ∥ security-checker・`96c4032e..00fca8cd`・33 ファイル）の指摘を一次で確かめて直す（2026-10-06・G-GEAR・メインの選択・研究者が覆せる）
+
+- **結果**: security-checker = CRITICAL・HIGH・MEDIUM 0・LOW 4（約 4.3 分）。code-reviewer = CRITICAL・HIGH 0・MEDIUM 5・LOW 5（約 5 分）。重なり: アドレスの境界の `@`（security LOW 1・code MEDIUM 1）。置き換えた事実（2 ファイルの SHA-256・`3cc151c7` の後は 2 文書だけ・タグの指す commit・DOI の一致）は、code-reviewer が一次の git で確かめて合っていた。
+- **直したもの**（すべて一次で再現してから）:
+  1. （両方）`_PUBLIC_EMAIL` の前後の判定に `@` が無く、`who@<公開のアドレス>`・`<公開のアドレス>@corp.example` が通った（モジュールを読み込んで `line_kinds` で再現）。→ 左右の集合に `@` を、右に `_`・`%`・`+` と「点の後のハイフン」を足した。selftest に 3 形。
+  2. （security LOW 2）例外が全ファイルに効いていた → `PUBLIC_EMAIL_DIR = "manuscript/"` の中のファイルの行だけ（ファイル名には効かない）。selftest に「原稿の外では止まる」。README.internal も直した。
+  3. （security LOW 3）`.svg` を書き出す種類にしたのに中身の検査が無く、`data:` の URI でバイナリの規則を迂回できた → `check_svg`（全文を検索・script・`on…=`・`#` 以外への `href`・`#` 以外の `url(`・`foreignObject`・`iframe`・`embed`・`object`・`@import`・`data:`・`<!DOCTYPE`・`<!ENTITY` で exit 1・中身は出さない）。selftest に陰性 11 形（行をまたぐ `href=` を含む）と陽性 1 形（`url(#g)`・`href="#g"`）。今の 3 枚は通る。
+  4. （security LOW 4）入れ子の `.gitattributes` の `* text=auto` が root の `text`（強制）を上書きしていた（`git check-attr` で `text: auto` を再現）→ root と同じ照合用の 7 つの型を `text eol=lf` で並べ直し、`*.bat text eol=crlf` も写した。直した後は `text: set`、200 ファイルとも `i/lf w/lf`。
+  5. （code MEDIUM 2）新しい散文の行 5 本が 120 字を超えていた（前の測り方が出力を 10 行で切っていて見落とした）→ 折り直した。折った語で次の行が長くなった 3 本も直した。枝の全体を `origin/main` と比べて切らずに測り直した（残るのは表の行・JSON の 1 行・生成した SVG・internal のコードだけ）。
+  6. （code MEDIUM 3）`kit/refinput-macos/README.md` の `.build/refinput-macos` は、`build.sh` が自分の dir に移ってから書くので、根からは見つからない（`build.sh:7` の `cd "$(dirname "$0")"` で確かめた）→ `kit/refinput-macos/.build/refinput-macos` に。
+  7. （code MEDIUM 4）図の説明の "its number of candidate moves" は `nav` の定義（原稿 `logger.tex` の "the number of arrow-key presses during it"）と合わない → 図の `<desc>` と README の `alt` を直した。`demo.svg` の差は `<desc>` の 1 行だけ（動きの確かめはそのまま有効）。
+  8. （code MEDIUM 5）文体の検査の SVG を「見る所を列挙する」から「`<text>` の文字データだけを除き、残り全部を見る」に逆転し、文字参照（`&#x…;`）を戻してから見る。禁止語も SVG は文字参照を戻して見る。selftest に 7 件（属性・style のコメント・metadata・文字参照の日本語と禁止語・tspan の中は通る・tspan の属性は赤）。
+  9. （code LOW 6）表 1 の「release 1.0.0」はロガーの名乗る版（`logger_version` 0.1.0・`kit/logger/Cargo.toml`）と違う → 「This logger 0.1.0, in release 1.0.0 of the code」。
+  10. （code LOW 7）ignore の行と規則の一致の selftest を、ディレクトリの型（`excluded(…, True)`）と `!` の型（除外しない）にも広げた。知らない型は赤にする。
+  11. （code LOW 8・9）README の一覧の手順に Windows のタグの 1 文、綴りを "license" に揃えた（README の見出しとファイル名に合わせる）。
+  12. （code LOW 10）internal の docstring と README.internal の私が足した行を折った（元からある長い行は範囲の外なので触らない）。
+- **直さなかったもの**: security の参考（外枠の「解析の前」の主張は作者の日付に頼る）→ 原稿は commit を名指すだけで、時刻の証明は主張していない。commit メッセージに元の commit を書き、README に「作者の日付は元の commit の日付」と書いてある。⚠️ 研究者が「解析の前」の裏づけを強めたいなら、OSF に外枠の写しを置くなどを別に考える（今回はしない）。
+- **検証**: 書き出しの selftest ok・文体の検査の selftest OK・違反 0 件・走査 0 件・今の 3 枚の SVG は `check_svg` を通る。使い捨ての変異 12 本（scratchpad の `mutate_review.py`・左右の `@`・点とハイフン・例外を全体に・SVG の検査を呼ばない・リンクを許す・断片のリンクを拒む・data を許す・ディレクトリの規則を外す・SVG の文字参照を戻さない 2 本・tspan の属性を消す）すべて赤。`build.sh --submission`: エラー 0・未定義 0・生成されていない値 0・overfull は main 0・main-submission 1・補遺 167。組んだ PDF の表 1 の行を文字で確かめた。
+- **影響範囲**: `kit/export/{export.internal.py,README.internal.md}`・`issues/_style_check.py`・`papers/ime-observation/{.gitattributes,README.md,assets/make_assets.py,assets/demo.svg,experiment/notes.md,kit/refinput-macos/README.md}`・`manuscript/sections/{dataset,declarations,related}.tex`・`manuscript/supplement/provenance.tex`・本ファイル。
+
+## 判断 212: PR #316 の /cross-review（Codex・パス限定で 3 回）の指摘を一次で確かめて直す —— SVG を XML として読む層・文字参照を戻した走査・`<text>` の中の `<title>`・凍結の一覧の手順が期待値と比べる・`xml:base`・入れ子の復号・引用符の中の `>`（2026-10-06・G-GEAR・メインの選択・研究者が覆せる）
+
+- **予算**: 今日の記帳は 390,628 / 13 回（origin/main と同じ）で上限 300,000 を超えていた → 研究者の 2026-10-01 の指示どおり `daily_token_budget` を 500,000 に一時的に上げ（`tokens_used` は触らず `_comment_2026_10_06_raise_3` に理由）、3 回（30,599・31,521・52,656 = 114,776）回した後に 300,000 に戻した（505,404 / 16 回・今日はもう回さない）。差分は `values.tex` だけで 2,600 行あるので、引き継ぎどおりパスで絞った。差分にメールアドレスは無く、機密フィルタは rc 0。
+- **1 巡目・コード**（`export.internal.py`・`_style_check.py`・`make_assets.py`・546 行）。3 件とも scratchpad の `repro_cr1.py` で再現してから直した。
+  1. P1「`check_svg` は文字列だけを見る。接頭辞つきの `<s:script>` と `u&#114;l(` が通る」→ **真**（加えて CSS のエスケープ `u\72 l(` も通った）→ 図を **XML として読む層**（`svg_tree_kinds`）を足した: 整形式・要素は SVG の名前空間（か無し）で `SVG_ELEMENTS`（図形・文字・グループ・グラデーション・スタイル。アニメーション・画像・リンクの要素は入れない）・属性は SVG / XLink / XML の名前空間・イベント属性・断片以外へのリンク・復号した値と文字の外への参照とバックスラッシュを止める。宣言（`<!DOCTYPE`・`<!ENTITY`）を見つけた図は構文解析に渡さない（実体を展開させない）。文字列の層の要素名と `on…=` も接頭辞を許す形に。
+  2. P1「走査が SVG の文字参照を戻さない（`P&#48;01`）」→ **真**（Markdown の `&#64;` も GitHub では `@` に見えるのに通った）→ 走査と秘密の検査が文字参照を戻した形でも見る（`decoded_forms`）。
+  3. P2「`svg_prose` が `<text>` の中の `<title>` を消す」→ **真** → 要素の入れ子をたどり、`<text>`・`<tspan>`・`<textPath>` の直下の文字データだけを消す（`svg_drawn_blank`）。
+- **1 巡目・文書**（公開の文書 14 ファイル・593 行）:
+  1. P2「README.internal の安全の記述に対応する実装が差分に無い」→ **偽陽性**（実装はコードの呼び出しに分けた側にある）。
+  2. P2「README の凍結の一覧の手順は、`mkdir /tmp/freeze &&` が再実行で失敗すると古い中身を測り、期待値とも比べない」→ **真** → `mktemp -d` の新しい空の dir に取り出し、期待値と件数を引数で渡して違えば exit 1。README の手順を抜き出して組んだ公開 repo（bare）で回した: 両タグとも `match`・rc 0、件数を違えると `MISMATCH`・rc 1、無いタグは rc 2、再実行も `match`。
+  3. P2「README が参照するファイルが差分に無い」→ **偽陽性**（差分を絞ったため）。本番の形の書き出しの出力に、README の相対の参照 4 つ（`assets/` の 3 枚・`kit/formats/FORMATS.md`）と 2 つのライセンスがあることを確かめた。
+- **直し** `c9b957e3`。きれいな clone（LF・`--depth 1`）で本番の形の書き出し（ライセンスあり）が exit 0・194 ファイル、その木で `kit/check.sh` 31 本が緑。
+- **2 巡目**（直しの境界 `0c29f4ff..c9b957e3`・159 行）。3 件とも `repro_cr2.py` で再現してから直した。
+  1. 高「`xml:base` で `#g` が外のファイルに対して解決され得る」→ **真**（実際に読み込むかは閲覧環境しだい）→ XML の名前空間の属性は `xml:space` と `xml:lang` だけを通す。
+  2. 中「エスケープを戻して生じた `&` を戻さない（`P&#48;01`）」→ **真** → 両方の順に戻す（逆向きの `P&#92;u0030…` も確かめに足した）。
+  3. 中「`SVG_TAG` が引用符の中の `>` でタグを切り、属性の日本語を消す」→ **真** → 引用符の中を読み飛ばす。あわせて、空の `<text/>` の後から次の `</text>` までを中身と取り違えていたのを直した（このとき見つけ、再現した）。
+- **変異**（scratchpad の `mutate_cr1.py`・使い捨て）: 1 巡目の直しの 14 本を回すと 2 本（名前空間の確かめ・木の中のリンク）が生き残った。文字列の層が先に止めるので、木の層の規則が単独で試されていなかった → `svg_tree_kinds` を直接呼ぶ確かめ（8 件）を足し、木の層の規則の変異 2 本を足して 4 本とも赤。2 巡目の直しの 5 本を足して、全部で 21 本を回し直した → 17 本が赤・1 本が生き残り・3 本は 2 巡目の直しで元の文字列が変わって当たらなかった（変異を今の文字列に合わせ直した）。生き残りは「空の `<text/>` は中身を持たない」で、確かめ（空の `<text/>` の後の `<title>`）が入れ子の追跡でも赤になっていた → 空の `<text/>` の後の地の文字を見る確かめを足した。合わせた 4 本も赤 → **21 本すべて赤**。
+- **3 巡目の Codex は回さない**: 2 巡目の直しは再現・selftest・変異で確かめた（memory の「2 巡」・今日の記帳）。
+- **影響範囲**: `kit/export/{export.internal.py,README.internal.md}`・`issues/_style_check.py`・`papers/ime-observation/README.md`・`.codex/budget.json`・本ファイル。

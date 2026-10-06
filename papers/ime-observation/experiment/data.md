@@ -50,17 +50,21 @@ two archives. Every command exited with status 0. Paths are relative to the expo
 
 | Question | Command | Output (SHA-256) |
 |---|---|---|
-| 1 to 3, registered (deviation D10, change 1: `kit/analysis/match.py` of commit `115cd5ff`) | `python3 kit/analysis/pipeline.py --runs-from <data> --config experiment/config.json --seed 20260929 --seed-file experiment/SEED --prereg experiment/preregistration.md --out <results>` | `e1_delivery.json` `7b7e6ba085f7c7e16e2807bb46bff9ff4e0c8483fe9357b96b1feec4ff4d4c61`, `e1_detection.json` `ce595253043bddf460aba173420c994f256341fba8119afe573d7a7bc8fefd1b`, `e1_l1.json` `1e22b6fb82435c926c6251bb62e392a03d048923eda5610d9204f6b738d8ca49`, `e1_l2.json` `5642725b04988dabe198bcf78039b911f20fc58b7bff5652b11e2b2e9dd165c8` |
+| 1 to 3, registered (deviation D10, change 1: `kit/analysis/match.py` of release `v1.0.0`) | `python3 kit/analysis/pipeline.py --runs-from <data> --config experiment/config.json --seed 20260929 --seed-file experiment/SEED --prereg experiment/preregistration.md --out <results>` | `e1_delivery.json` `7b7e6ba085f7c7e16e2807bb46bff9ff4e0c8483fe9357b96b1feec4ff4d4c61`, `e1_detection.json` `ce595253043bddf460aba173420c994f256341fba8119afe573d7a7bc8fefd1b`, `e1_l1.json` `1e22b6fb82435c926c6251bb62e392a03d048923eda5610d9204f6b738d8ca49`, `e1_l2.json` `5642725b04988dabe198bcf78039b911f20fc58b7bff5652b11e2b2e9dd165c8` |
 | 1 to 3, corrected (deviation D10, change 2) | the same command with `IME_MATCH_MERGE_RECOUNT=obs` and `--out <results>/d10/macos` | `e1_delivery.json` `7b7e6ba085f7c7e16e2807bb46bff9ff4e0c8483fe9357b96b1feec4ff4d4c61`, `e1_detection.json` `c6295552ba6a8d82c0ce4e1ae925a4913761247525cffc6220520f157951a16b`, `e1_l1.json` `9b8889d5905bb64fa7f234c81fb7d932bfca69276ea9a8783d70fd82c73d168b`, `e1_l2.json` `4a832d156da0b60d17271153cea1c36460a1c64493e1800af3794ecf80d087a4` |
 | 4, open set (section 6.8) | `python3 kit/e2/open_set.py --obs <run>/obs.jsonl --plan <run>/plan.jsonl --corpus kit/corpus/data/phrases.jsonl --recipes kit/gen/<procedure file> --split-seed 20260929 --seed 20260929 --eval-fraction 0.2 --split both --n 3 --smoothing wb --beam 8 --length-info both --bootstrap 2000 --markers-in-obs --out <results>/e2_open_set_<cell>.json` | on: `963886dae2f6fa676df20a21ed9bbfb1fbfb986dfd67f35722be641b0aba45cc`, off: `77bba3a3830a03e50bbfc0bf0c71ea711618aaac73cbcdeb5ae20c8286f9c89d` |
-| 4, closed set (section 6.8; deviation D8: `kit/e2/closed_set.py` of commit `14c85e6e`) | `python3 kit/e2/closed_set.py --obs <run>/obs.jsonl --plan <run>/plan.jsonl --corpus kit/corpus/data/phrases.jsonl --recipes kit/gen/<procedure file> --config experiment/plan_config.macos.json --K 10,100,1000 --seed 20260929 --bootstrap 2000 --markers-in-obs --skip-scenario S12 --out <results>/e2_closed_set_<cell>.json` | on: `e2697df0c8ba1712bdd17142d3efa3989bf16e0942422987eca818fc0a385f88`, off: `e8ca561962d9440752b2967723e6bb5486282a9254b814e4ef626b912f92453e` |
+| 4, closed set (section 6.8; deviation D8: `kit/e2/closed_set.py` of release `v1.0.0`) | `python3 kit/e2/closed_set.py --obs <run>/obs.jsonl --plan <run>/plan.jsonl --corpus kit/corpus/data/phrases.jsonl --recipes kit/gen/<procedure file> --config experiment/plan_config.macos.json --K 10,100,1000 --seed 20260929 --bootstrap 2000 --markers-in-obs --skip-scenario S12 --out <results>/e2_closed_set_<cell>.json` | on: `e2697df0c8ba1712bdd17142d3efa3989bf16e0942422987eca818fc0a385f88`, off: `e8ca561962d9440752b2967723e6bb5486282a9254b814e4ef626b912f92453e` |
 | 5 (section 6.10) | `python3 kit/e3/summarize_e3.py idle=<idle>/samples.tsv working=<working>/samples.tsv > <results>/e3_macos.txt` | `0ada2e3e9c266814858bb7d11c9811498083bce3101f94790c69a0e79c6217ff` |
 
 The procedure file is `kit/gen/recipes.json` for the cell with live conversion on and
 `kit/gen/recipes.macos-live-off.json` for the cell with it off. Both runs of the closed set left out the 225 trials
 of S12 and scored every block. The two samples of question 5 have the SHA-256
 `f2fc37ef12d520d0e757a9e1232c99975475017c75cc824815a79e236d261222` (`idle`) and
-`32fb07829de7a4ac0dca0e128089dfe2eed977e26b044841884ef4c3b96921ec` (`working`).
+`32fb07829de7a4ac0dca0e128089dfe2eed977e26b044841884ef4c3b96921ec` (`working`). The two files that deviations D10 and D8
+replace are those of release `v1.0.0` of the public repository: `kit/analysis/match.py` has the SHA-256
+`6f817228e2e7d5f17f65895c7a00a721c28c00df24c46df0c8bd4b237ad72cff` and `kit/e2/closed_set.py` the SHA-256
+`364cc833b48a73aeb15b9416bff203ec21a71296e26534f914e3a2bb9bd067c3`; each differs from the file of the freezing tag
+as `deviations.md` describes.
 
 ## Marker times of section 6.9 (run on 2026-10-05 on the measuring machine)
 
@@ -100,7 +104,7 @@ Not registered. The 2.5th and 97.5th percentiles of the dwell error and the frac
 were computed for both macOS cells with `kit/analysis/explore_dwell_quantiles.py` on the machine of the previous
 sections (macOS 27.0.1, Python 3.14.4). `<cell>` is `macos-standard-live-on` or `macos-standard-live-off`, `<run>` is
 the run directory of that cell listed above (`run.json` has the SHA-256 given above), `<export>` is the export of the
-macOS freezing tag whose `kit/analysis/match.py` is the one of commit `115cd5ff` (SHA-256
+macOS freezing tag whose `kit/analysis/match.py` is the one of release `v1.0.0` (SHA-256
 `6f817228e2e7d5f17f65895c7a00a721c28c00df24c46df0c8bd4b237ad72cff`; deviation D10, change 1), the same export as for
 the registered analysis above, and `<scratch>` is an empty directory outside this directory.
 
