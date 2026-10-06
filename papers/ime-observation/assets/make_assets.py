@@ -9,6 +9,8 @@ checking a moment of the animation. The rows of the illustration follow the form
 their times are made up."""
 import argparse
 import os
+import re
+import sys
 
 SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
@@ -125,6 +127,15 @@ def validation(theme):
 
 CATEGORIES = ["alphabetic", "numeric", "punctuation", "sentence_punctuation", "tab", "backspace", "delete", "space",
               "enter", "navigation", "modifier", "function", "escape", "other"]
+
+
+def formats_categories():
+    """The key categories that kit/formats/FORMATS.md lists for the key row of obs/1."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "kit", "formats", "FORMATS.md")
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    m = re.search(r"`category` is one of(.*?)\n- ", text, re.S)
+    return re.findall(r"`([a-z_]+)`", m.group(1)) if m else []
 
 
 def records(theme):
@@ -307,6 +318,8 @@ if __name__ == "__main__":
     ap.add_argument("--out", required=True)
     ap.add_argument("--frame", type=float)
     a = ap.parse_args()
+    if formats_categories() != CATEGORIES:
+        sys.exit("make_assets: the key categories differ from those of kit/formats/FORMATS.md; nothing was written")
     os.makedirs(a.out, exist_ok=True)
 
     def put(name, text):

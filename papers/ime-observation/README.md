@@ -9,8 +9,8 @@
 
 # Logging Japanese IME conversion without recording text
 
-**A logger that writes one row per conversion of a Japanese input method, with its duration, its arrow-key presses
-and whether it was abandoned, and never a character.**
+**A logger that writes, for every conversion session of a Japanese input method that it detects, the duration, the
+arrow-key presses and whether it was abandoned, and never a character.**
 
 *Observability limits, a cross-platform logger, and a synthetic-input validation*
 
@@ -87,9 +87,10 @@ limitations.
   candidate strings and window names.">
 </picture>
 
-The logger (`kit/logger/`) runs on Windows and macOS. It writes one row per key press, with one of fourteen key
-categories and the time, and one row per conversion session, with its duration, the number of arrow-key presses
-during it and whether it was abandoned. Which key was pressed is discarded, and no character, candidate string,
+The logger (`kit/logger/`) runs on Windows and macOS. It writes one row per key press and per key release, with one
+of fourteen key categories and the time, and one row per conversion session that it detects, with its duration, the
+number of arrow-key presses during it and whether it was abandoned. How a session is detected differs by system
+([How the logger was validated](#how-the-logger-was-validated)). Which key was pressed is discarded, and no character, candidate string,
 reading or window name is recorded. The format of its log, `obs/1`, is specified in
 [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md). The key rows are not anonymous by construction: the article
 measures how far they reveal the typed phrase.
