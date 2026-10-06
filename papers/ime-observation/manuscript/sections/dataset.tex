@@ -18,7 +18,8 @@ The dataset has two parts that are kept apart (Table~\ref{tab:dataset}). The fir
 made from the registered plans. The second holds the runs of the calibration pilots that meet the registered criteria
 for deposit; they were made from other plans, with provisional settings (Section~\ref{sec:method-pilots}). It also
 holds, under the same criteria, the run of the pilot's check plan that preceded the Windows measurement
-(Section~\ref{sec:method-cells}). For each run the dataset holds the plan, the record of every press that the executor
+(Section~\ref{sec:method-cells}), with its first start, which the runner aborted before any key was sent. For each run
+the dataset holds the plan, the record of every press that the executor
 sent, the log of the reference input field, the logger's log and the run manifest, which records the versions of the
 system, the input method and the programs and the SHA-256 of every log. It further holds the samples of the
 runtime-cost study, the phrase corpus, the settings of the generator and the seed, the specification of the formats and
@@ -74,9 +75,10 @@ study is not deposited, because the logger was started before the command that b
 log holds a person's key presses; only its samples are deposited. The logs of the working condition are deposited under
 the rules of the measurement runs; the run of each system passed the checks. An attempt of the Windows pilot that
 was stopped after four trials, when a window used by S15 had been closed, does not pass the checks and is not
-deposited. The Windows pilot runs with the second reference field are
-not deposited, because that field received the key press that switches the input method on as a key-down, which the
-stopping rule counts as a press from outside. The error output of the programs stays on the measuring machines, and
+deposited. The Windows pilot runs with the second reference field are not deposited, because that field received the
+key press that switches the input method on as a key-down, which the stopping rule counts as a press from outside;
+nor is an attempt with that field that the runner aborted before any key was sent, whose reference log does not come
+from the reference field of the measurement. The error output of the programs stays on the measuring machines, and
 checks typed by hand were not runs of the runner and are not deposited. The table of attempts states for every start
 of every run of a plan whether it was deposited, with the reason where these rules decide it
 (Section~\ref{sec:results-attempts}).

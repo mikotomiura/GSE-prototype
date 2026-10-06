@@ -51,11 +51,12 @@ error output, which is not deposited), `resets` (per block, whether a reset of t
 and why), `focus` (per block, the outcome of the command that brought the reference input field to the front and of
 the check that it was in front), `aborted` and `abort_reason`. Before the manifest is written, the
 home directory and the root of the checkout are replaced by `~` and `<repo>` in every string. Of the deposited runs,
-only the macOS runs of the calibration-pilot part and the Windows pilot run `toolcheck-tsf` record a commit, and `git_dirty` is true in
-`verify-s5`, `verify-off` and `toolcheck-tsf`; in every other run both fields are `null`, because the runner ran from an
-export of the code. The values of every run are in `experiment/data.md` (macOS) and `experiment/data.windows.md`
-(Windows) of the code repository. A commit recorded there belongs to the author's working repository, which is not
-public; the code of the freezing tags is in the code repository.
+only the macOS runs of the calibration-pilot part and the Windows pilot run `toolcheck-tsf` record a commit (with
+`git_dirty` true in `verify-s5`, `verify-off` and `toolcheck-tsf` and false in the others); in the remaining runs both
+fields are `null`, because the runner ran from an export of the code. The values of every run are in
+`experiment/data.md` (macOS) and `experiment/data.windows.md` (Windows) of the code repository. A commit recorded in
+`git_commit` belongs to the author's working repository, which is not public; the code of the freezing tags is in the
+code repository.
 
 **Runtime samples.** Each condition of the runtime-cost study has `samples.tsv` and `conditions.txt`. `samples.tsv` is
 tab-separated, with a header line and one row per reading, in the columns `epoch_s` (Unix time in seconds), `cpu_pct`
@@ -71,8 +72,10 @@ read also gives zero. The interval was set to 30 seconds; a reading takes longer
 about 39 seconds in a trial run), so the times of the rows are not evenly spaced at 30 seconds. The values are compared
 within each system and not between systems; the battery level and the energy index are not summarised. `conditions.txt`
 holds lines of the form `name=value`: the condition, the operating system and its version, the number of logical
-processors, the name of the sampled process, the SHA-256 of the logger's executable, the number of such processes before
-the run, the set duration and interval in seconds, and the start and end times in UTC.
+processors, the name of the sampled process, the SHA-256 of the logger's executable (`unknown` when it could not be
+found at the start, as when the logger was not running yet; a line `executable_sha256_at_end` then gives it at the
+end), the number of such processes before the run, the set duration and interval in seconds, and the start and end
+times in UTC.
 
 **Parts.** The dataset has two parts, which are kept apart.
 
@@ -100,8 +103,8 @@ the run, the set duration and interval in seconds, and the start and end times i
    macOS candidate passed the check, among them `dryrun-1`, a run of the runner before the first pilot that sent no
    key and was interrupted. Of the Windows candidates, all passed but one of the three aborted attempts: it was stopped
    after four trials, when an application window used as the target of S15 had been closed, and its observation log
-   holds key presses that the sent presses do not explain. The two attempts that passed were stopped before any key was
-   sent, when the system refused to bring the executor's window to the front.
+   holds key presses that the measured trials and the procedure do not explain. The two attempts that passed were
+   stopped before any key was sent, when the system refused to bring the executor's window to the front.
 
 Shared by both parts are the phrase corpus (`phrases.jsonl`), the settings of the plan generator
 (`plan_config.macos.json`, `plan_config.windows.json`), the procedures of the scenarios (`recipes.json`,
@@ -115,8 +118,9 @@ Windows attempt, which was stopped from outside the runner inside a trial; the W
 trials (Part 2 above); the observation logs of the `idle` condition on both systems, which hold the key presses that
 started the sampling (only their samples are deposited); and the Windows pilot runs with the other reference field,
 which received the key press that switches the input method on as a key-down, which the stopping rule counts as a press
-from outside. The start of the Windows measurement that the runner refused before the first trial passes the same
-checks and is deposited. The error output of the programs
+from outside, together with an attempt with that field that the runner aborted before any key was sent, whose
+reference log does not come from the reference field of the measurement. The start of the Windows measurement that the
+runner refused before the first trial passes the same checks and is deposited. The error output of the programs
 stays on the measuring machines, and checks typed by hand into the reference input field were not runs of the runner
 and are not deposited. The table of attempts in the article states for every start of every run of a plan of the
 measurement whether it was deposited.
