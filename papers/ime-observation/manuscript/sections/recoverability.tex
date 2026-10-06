@@ -48,18 +48,18 @@ interval, the accuracy of each feature set alone per scenario and per speed.
 none of the timing structure of human typing, neither the timing of particular key pairs nor the pauses between words
 and phrases. The accuracy on the four feature sets that keep any time is therefore reported as an estimate only and
 does not enter the recommendation, which considers the two sets that keep no time (\texttt{no\_time} and its
-coarsening \texttt{counts\_only}). The accuracy of a feature set is near chance at $K=10$ or $K=100$ when the upper end of its 95\%
-Wilson interval is at most $2/K$. A set is near chance for the recommendation when it is near chance at both values of
-$K$ in both macOS cells, and the recommended granularity is the more detailed of the two sets that is near chance in
-this sense; if neither is, no granularity is recommended, and this is reported. At $K=1{,}000$ an attack at the chance
-level would rarely be judged near chance at the planned numbers of trials, so $K=1{,}000$ is reported descriptively
-and is not part of the rule. The probability of the judgement at the planned numbers of trials was fixed in the
-registration and is given with the results (Table~\ref{tab:nearchance}). The margin of $2/K$ and the values of $K$
-are choices of the design, not derived from a criterion of privacy. The Wilson interval treats trials as independent;
-with dependence within a block the rule is met more easily than it should be, which is why the block-resampled
-interval is reported next to it. The recommendation was decided from the two macOS cells. The same judgement was made
-for the Windows cell and, where it does not hold, is reported as a qualification of the recommendation for logs
-recorded on Windows; it does not change the recommendation.
+coarsening \texttt{counts\_only}). The accuracy of a feature set is near chance at $K=10$ or $K=100$ when the upper
+end of its 95\% Wilson interval is at most $2/K$. A set is near chance for the recommendation when it is near chance at
+both values of $K$ in both macOS cells, and the recommended granularity is the more detailed of the two sets that is
+near chance in this sense; if neither is, no granularity is recommended, and this is reported. At $K=1{,}000$ an attack
+at the chance level would rarely be judged near chance at the planned numbers of trials, so $K=1{,}000$ is reported
+descriptively and is not part of the rule. The probability of the judgement at the planned numbers of trials was fixed
+in the registration and is given with the results (Table~\ref{tab:nearchance}). The margin of $2/K$ and the values of
+$K$ are choices of the design, not derived from a criterion of privacy. The Wilson interval treats trials as
+independent; with dependence within a block the rule is met more easily than it should be, which is why the
+block-resampled interval is reported next to it. The recommendation was decided from the two macOS cells. The same
+judgement was made for the Windows cell and, where it does not hold, is reported as a qualification of the
+recommendation for logs recorded on Windows; it does not change the recommendation.
 
 \paragraph{Open set.} A second attacker saw only the categories of the key presses and, with a character language
 model, searched for the kana string that Romaji input would spell with exactly the observed letter keys and the
@@ -112,12 +112,12 @@ and \rv{macos-standard-live-on.q4.counts_only.near}), and the recommended granul
 granularity of the key rows is recommended. In both macOS cells, at $K = 10$ and $K = 100$, the
 maximum that gives the accuracy of \texttt{no\_time} came from the attack on \texttt{counts\_only}: the numbers of key
 presses of each category in a trial, without their order or times, identified the phrase at least as often as the
-attack on \texttt{no\_time} alone did (supplement). The decoys were drawn from the phrases of the trial's scenario, whose
-readings have 6 to 30 kana (Section~\ref{sec:method-plans}), and were not matched to the true phrase in length.
+attack on \texttt{no\_time} alone did (supplement). The decoys were drawn from the phrases of the trial's scenario,
+whose readings have 6 to 30 kana (Section~\ref{sec:method-plans}), and were not matched to the true phrase in length.
 
-On Windows, under the same judgement, \rv{q4.windows.qualification}. The Windows accuracies of the two sets equal those of
-the macOS cell with live conversion off to the reported precision. The two plans were generated from the same seed and
-share every trial's block, scenario, speed, phrase and times; their presses differ only in S2, where the macOS
+On Windows, under the same judgement, \rv{q4.windows.qualification}. The Windows accuracies of the two sets equal those
+of the macOS cell with live conversion off to the reported precision. The two plans were generated from the same seed
+and share every trial's block, scenario, speed, phrase and times; their presses differ only in S2, where the macOS
 procedure presses one Return more, and in S4, where the Windows procedure presses one Escape more (deviation D1), and
 the presses of letters, digits and punctuation are the same in every trial. The Windows judgement is therefore not an
 independent replication of the macOS one for these sets.
@@ -134,15 +134,17 @@ baseline, their difference (gain), and the gain over the shuffled control, in wh
 trial's observation. With the number of segments known, the gain of K1 was
 \rv{macos-standard-live-off.q4.open.K1.count.gain} with live conversion off and
 \rv{macos-standard-live-on.q4.open.K1.count.gain} with it on, and its gain over the shuffled control
-\rv{macos-standard-live-off.q4.open.K1.count.gainvsshuffled} and \rv{macos-standard-live-on.q4.open.K1.count.gainvsshuffled};
-for K1+ the gain over the shuffled control was \rv{macos-standard-live-off.q4.open.K1plus.count.gainvsshuffled} and
+\rv{macos-standard-live-off.q4.open.K1.count.gainvsshuffled} and
+\rv{macos-standard-live-on.q4.open.K1.count.gainvsshuffled}; for K1+ the gain over the shuffled control was
+\rv{macos-standard-live-off.q4.open.K1plus.count.gainvsshuffled} and
 \rv{macos-standard-live-on.q4.open.K1plus.count.gainvsshuffled}, and for K0
-\rv{macos-standard-live-off.q4.open.K0.count.gainvsshuffled} and \rv{macos-standard-live-on.q4.open.K0.count.gainvsshuffled}.
-With the true length known, the gain of K1 over the baseline was \rv{macos-standard-live-off.q4.open.K1.true.gain} and
-\rv{macos-standard-live-on.q4.open.K1.true.gain}. The open-set file of the Windows cell is byte-identical to that of the
-macOS cell with live conversion off: the attack decodes the letter keys and the punctuation, which the two plans share,
-and every press other than the input-mode keys reached the log in both cells. The open set does not enter the rule;
-it is a second view of what the letter-run lengths kept by \texttt{no\_time} reveal, for these attacks.
+\rv{macos-standard-live-off.q4.open.K0.count.gainvsshuffled} and
+\rv{macos-standard-live-on.q4.open.K0.count.gainvsshuffled}. With the true length known, the gain of K1 over the
+baseline was \rv{macos-standard-live-off.q4.open.K1.true.gain} and \rv{macos-standard-live-on.q4.open.K1.true.gain}. The
+open-set file of the Windows cell is byte-identical to that of the macOS cell with live conversion off: the attack
+decodes the letter keys and the punctuation, which the two plans share, and every press other than the input-mode keys
+reached the log in both cells. The open set does not enter the rule; it is a second view of what the letter-run lengths
+kept by \texttt{no\_time} reveal, for these attacks.
 
 \input{generated/table-closed-set}
 \input{generated/fig-closed-set}

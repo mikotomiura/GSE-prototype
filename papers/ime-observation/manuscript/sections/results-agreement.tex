@@ -70,17 +70,17 @@ Windows, question~5, working & 1 & Completed & No & \tbd{at deposit} \\
 Table~\ref{tab:reference} gives the checks of the instruments, each with the estimates it is used to read; no check
 excluded a trial or changed a value.
 
-\paragraph{Plan against ground truth.} Of the trials of the plan, the sessions of the reference disagreed with the plan's
-intent in \rv{macos-standard-live-off.plan.disagree} with live conversion off and in
+\paragraph{Plan against ground truth.} Of the trials of the plan, the sessions of the reference disagreed with the
+plan's intent in \rv{macos-standard-live-off.plan.disagree} with live conversion off and in
 \rv{macos-standard-live-on.plan.disagree} with live conversion on, and on Windows in
 \rv{windows-msime-tsf.plan.disagree}. With live conversion on, most disagreements were trials without a session
 (\rv{macos-standard-live-on.plan.no_session}), most of them in S10 at the slow and the middle speed (supplementary
 table of the plan against the ground truth per stratum). Such trials stay in the evaluation; a trial without a
 reference session has no session to detect, and its observation rows, if any, count as false positives.
 
-\paragraph{Delivery.} Every planned trial was measured in each cell. The lateness of the presses against the schedule had a median,
-a 95th percentile and a maximum of \rv{macos-standard-live-off.delivery.lateness} with live conversion off,
-\rv{macos-standard-live-on.delivery.lateness} with it on, and \rv{windows-msime-tsf.delivery.lateness} on Windows.
+\paragraph{Delivery.} Every planned trial was measured in each cell. The lateness of the presses against the schedule
+had a median, a 95th percentile and a maximum of \rv{macos-standard-live-off.delivery.lateness} with live conversion
+off, \rv{macos-standard-live-on.delivery.lateness} with it on, and \rv{windows-msime-tsf.delivery.lateness} on Windows.
 The logger wrote a key row for every press other than the input-mode keys, which it does not record by design
 (\rv{macos-standard-live-off.delivery.obs.nomode.reach}, \rv{macos-standard-live-on.delivery.obs.nomode.reach} and
 \rv{windows-msime-tsf.delivery.obs.nomode.reach}), no trial held more key rows than presses sent, and the rows outside
@@ -92,10 +92,10 @@ input method does not consume (Section~\ref{sec:method-reference}), so it receiv
 
 \paragraph{Timing of the key rows.} Table~\ref{tab:key-timing} gives the delay of the logger's key rows of presses after
 the executor dispatched them, and the error of the intervals between consecutive rows, per system and speed. Every
-trial was paired (not paired: \rv{macos-standard-live-off.kt.obs.notpaired}, \rv{macos-standard-live-on.kt.obs.notpaired}
-and \rv{windows-msime-tsf.kt.obs.notpaired}). Over all speeds the median delay was
-\rv{macos-standard-live-off.kt.obs.delay.all.median} and \rv{macos-standard-live-on.kt.obs.delay.all.median} on macOS
-and \rv{windows-msime-tsf.kt.obs.delay.all.median} on Windows, with 95th percentiles of
+trial was paired (not paired: \rv{macos-standard-live-off.kt.obs.notpaired},
+\rv{macos-standard-live-on.kt.obs.notpaired} and \rv{windows-msime-tsf.kt.obs.notpaired}). Over all speeds the median
+delay was \rv{macos-standard-live-off.kt.obs.delay.all.median} and \rv{macos-standard-live-on.kt.obs.delay.all.median}
+on macOS and \rv{windows-msime-tsf.kt.obs.delay.all.median} on Windows, with 95th percentiles of
 \rv{macos-standard-live-off.kt.obs.delay.all.p95}, \rv{macos-standard-live-on.kt.obs.delay.all.p95} and
 \rv{windows-msime-tsf.kt.obs.delay.all.p95} and maxima of \rv{macos-standard-live-off.kt.obs.delay.all.max},
 \rv{macos-standard-live-on.kt.obs.delay.all.max} and \rv{windows-msime-tsf.kt.obs.delay.all.max}. The error of the
@@ -146,8 +146,8 @@ of the wall clock or a truncated log, and no session row had a duration of zero
 (\rv{macos-standard-live-off.zerodwell.all}, \rv{macos-standard-live-on.zerodwell.all} and
 \rv{windows-msime-tsf.zerodwell.all} over all trials). The primary scope set aside
 \rv{macos-standard-live-off.scope.setaside} with live conversion off, \rv{macos-standard-live-on.scope.setaside} with
-it on, and \rv{windows-msime-tsf.scope.setaside} on Windows. The supplement gives the number of letter keys and the think
-time of the trials of each scope per stratum for the macOS cells, from the summary of the prediction; the analysis
+it on, and \rv{windows-msime-tsf.scope.setaside} on Windows. The supplement gives the number of letter keys and the
+think time of the trials of each scope per stratum for the macOS cells, from the summary of the prediction; the analysis
 of the Windows cell computes no prediction and gives no such summary.
 
 \paragraph{Primary comparison and scope.} In the strata that keep at least 30 trials in the primary scope, the Wilson
@@ -167,8 +167,8 @@ and \rv{macos-standard-live-on.all.precision.range} (\rv{macos-standard-live-on.
 \rv{windows-msime-tsf.all.precision.range} (\rv{windows-msime-tsf.all.recall.strata.left} and
 \rv{windows-msime-tsf.all.precision.strata.left}). Figure~\ref{fig:detection} shows every stratum with its interval,
 Table~\ref{tab:detection} gives the ranges per speed, and the supplement gives every stratum with the split and merge
-rates. Pooled over the strata of the primary scope (pooled values, whose Wilson intervals are lower bounds of the
-uncertainty; Section~\ref{sec:method-analysis}), recall was
+rates. Pooled over the strata of the primary scope (pooled values, whose Wilson intervals ignore the clustering of
+trials in blocks and are read as lower bounds of the uncertainty; Section~\ref{sec:method-analysis}), recall was
 \rv{macos-standard-live-off.pooled.gtobs.underlimit.recall}, \rv{macos-standard-live-on.pooled.gtobs.underlimit.recall}
 and \rv{windows-msime-tsf.pooled.gtobs.underlimit.recall}, and precision
 \rv{macos-standard-live-off.pooled.gtobs.underlimit.precision},
@@ -185,11 +185,11 @@ candidate with a digit, with S2 and S1 at the fast speed close to it, and the lo
 and to S2, which cycles the candidates, at the middle and the fast speed. Over all trials the intervals of every cell
 start at zero because of S13, whose sessions were built to outlast the 20-s cut-off: no row of the logger paired with
 one of them (the macOS logger cuts such a session off without a row, and on Windows no row lasted 20~s or more), and
-no stratum other than S13 has an interval that starts at zero. The strata left out of the ranges have fewer than 30 trials in the primary scope or no
-value there: the three strata of S13, which the scope sets aside entirely, in every cell; S6 at the slow speed with
-live conversion off; and S6 at the slow and the middle speed and S10 at the slow speed with it on. Over all trials the
-strata left out, which have fewer than 30 trials in that scope or no value there, were, for recall,
-\rv{macos-standard-live-off.all.recall.strata.leftnames} with live conversion off,
+no stratum other than S13 has an interval that starts at zero. The strata left out of the ranges have fewer than 30
+trials in the primary scope or no value there: the three strata of S13, which the scope sets aside entirely, in every
+cell; S6 at the slow speed with live conversion off; and S6 at the slow and the middle speed and S10 at the slow speed
+with it on. Over all trials the strata left out, which have fewer than 30 trials in that scope or no value there, were,
+for recall, \rv{macos-standard-live-off.all.recall.strata.leftnames} with live conversion off,
 \rv{macos-standard-live-on.all.recall.strata.leftnames} with it on and
 \rv{windows-msime-tsf.all.recall.strata.leftnames} on Windows, and for precision
 \rv{macos-standard-live-off.all.precision.strata.leftnames}, \rv{macos-standard-live-on.all.precision.strata.leftnames}
@@ -243,7 +243,8 @@ supplement gives detection per layer of the prediction, for every comparison and
 both systems held the same sessions in both cells. On Windows they did not (the
 definition of the analysis keeps the sessions in which the field reported a candidate element, which the input method
 opens while the reading is typed); the estimates above are those of the definition of the analysis. Under deviation
-D12, made after the results had been seen, the definition of the analysis left out \rv{windows-msime-tsf.defs.primary.leftout} of the
+D12, made after the results had been seen, the definition of the analysis left out
+\rv{windows-msime-tsf.defs.primary.leftout} of the
 \rv{windows-msime-tsf.defs.primary.common.sessions} reference sessions of the primary scope under the common definition
 (\rv{windows-msime-tsf.defs.all.leftout} of \rv{windows-msime-tsf.defs.all.common.sessions} over all trials). Under
 the common definition, the per-stratum Wilson intervals of recall spanned
@@ -278,11 +279,11 @@ gives the registered and the corrected merge rate side by side, per stratum and 
 (\rv{macos-standard-live-off.cutoff.all.obsoverlimit}, \rv{macos-standard-live-on.cutoff.all.obsoverlimit} and
 \rv{windows-msime-tsf.cutoff.all.obsoverlimit} over all trials). Of the reference sessions of 20~s or more that entered
 the matching over all trials, \rv{macos-standard-live-off.cutoff.all.longwithrow} of
-\rv{macos-standard-live-off.cutoff.all.long} with live conversion off and \rv{macos-standard-live-on.cutoff.all.longwithrow}
-of \rv{macos-standard-live-on.cutoff.all.long} with it on appeared in a pair, a split or a merge with a row of the
-logger, every row being shorter than 20~s; on Windows \rv{windows-msime-tsf.cutoff.all.longwithrow} of
-\rv{windows-msime-tsf.cutoff.all.long} did. On the long trials alone, pooled, the logger's rows
-agreed with the specified rows, which hold the sessions opened after a cut-off, with recall
+\rv{macos-standard-live-off.cutoff.all.long} with live conversion off and
+\rv{macos-standard-live-on.cutoff.all.longwithrow} of \rv{macos-standard-live-on.cutoff.all.long} with it on appeared in
+a pair, a split or a merge with a row of the logger, every row being shorter than 20~s; on Windows
+\rv{windows-msime-tsf.cutoff.all.longwithrow} of \rv{windows-msime-tsf.cutoff.all.long} did. On the long trials alone,
+pooled, the logger's rows agreed with the specified rows, which hold the sessions opened after a cut-off, with recall
 \rv{macos-standard-live-off.pooled.predobs.overlimit.recall} and
 \rv{macos-standard-live-on.pooled.predobs.overlimit.recall} and precision
 \rv{macos-standard-live-off.pooled.predobs.overlimit.precision} and
@@ -301,10 +302,10 @@ taken from the reference, pooled recall and precision in the primary scope were
 supplement).
 
 \paragraph{Diagnostics.} On Windows the ends of a reference composition that carried no committed length were, per
-scenario, \rv{windows-msime-tsf.win.endsnolength}; in S4 the reference session ended after the second of the three Escapes in
-\rv{windows-msime-tsf.win.s4.escape2} trials and after the third in \rv{windows-msime-tsf.win.s4.escape3}. On macOS the
-reference field receives the marked text again at every key, so a start event arrived while a session was open in
-\rv{macos-standard-live-off.startwhileopen.all} of the \rv{macos-standard-live-off.pooled.gtobs.alltrials.sessions}
+scenario, \rv{windows-msime-tsf.win.endsnolength}; in S4 the reference session ended after the second of the three
+Escapes in \rv{windows-msime-tsf.win.s4.escape2} trials and after the third in \rv{windows-msime-tsf.win.s4.escape3}. On
+macOS the reference field receives the marked text again at every key, so a start event arrived while a session was open
+in \rv{macos-standard-live-off.startwhileopen.all} of the \rv{macos-standard-live-off.pooled.gtobs.alltrials.sessions}
 sessions with live conversion off and \rv{macos-standard-live-on.startwhileopen.all} of the
 \rv{macos-standard-live-on.pooled.gtobs.alltrials.sessions} with it on (over all trials); on Windows in none
 (\rv{windows-msime-tsf.startwhileopen.all}). Such an event opens no session.
@@ -327,16 +328,17 @@ and the comparisons with the prediction. On macOS, over the speeds of the primar
 durations of the logger's rows against the specified rows spanned
 \rv{macos-standard-live-off.predobs.primary.dwell.loa.span} with live conversion off and
 \rv{macos-standard-live-on.predobs.primary.dwell.loa.span} with it on, with median absolute differences of
-\rv{macos-standard-live-off.predobs.primary.dwell.mae.span} and \rv{macos-standard-live-on.predobs.primary.dwell.mae.span},
-and those of the specified rows against the reference spanned \rv{macos-standard-live-off.gtpred.primary.dwell.loa.span}
-and \rv{macos-standard-live-on.gtpred.primary.dwell.loa.span}, with median absolute differences of
-\rv{macos-standard-live-off.gtpred.primary.dwell.mae.span} and \rv{macos-standard-live-on.gtpred.primary.dwell.mae.span}.
-The differences have long tails: in every cell and at every speed the median
-absolute difference was less than a tenth of the distance between the limits of agreement (Table~\ref{tab:session}), so
-the limits, which assume normally distributed differences, describe neither the typical pair nor the largest
-differences. In the exploratory analysis of their distribution in the primary scope (not registered; ranges over the
-speeds, every speed and scope in the supplement), the fraction of pairs within
-100~ms was \rv{macos-standard-live-off.dwellx.within100.range} with live conversion off,
+\rv{macos-standard-live-off.predobs.primary.dwell.mae.span} and
+\rv{macos-standard-live-on.predobs.primary.dwell.mae.span}, and those of the specified rows against the reference
+spanned \rv{macos-standard-live-off.gtpred.primary.dwell.loa.span} and
+\rv{macos-standard-live-on.gtpred.primary.dwell.loa.span}, with median absolute differences of
+\rv{macos-standard-live-off.gtpred.primary.dwell.mae.span} and
+\rv{macos-standard-live-on.gtpred.primary.dwell.mae.span}. The differences have long tails: in every cell and at every
+speed the median absolute difference was less than a tenth of the distance between the limits of agreement
+(Table~\ref{tab:session}), so the limits, which assume normally distributed differences, describe neither the typical
+pair nor the largest differences. In the exploratory analysis of their distribution in the primary scope (not
+registered; ranges over the speeds, every speed and scope in the supplement), the fraction of pairs within 100~ms was
+\rv{macos-standard-live-off.dwellx.within100.range} with live conversion off,
 \rv{macos-standard-live-on.dwellx.within100.range} with it on and \rv{windows-msime-tsf.dwellx.within100.range} on
 Windows, and within 1~s \rv{macos-standard-live-off.dwellx.within1000.range},
 \rv{macos-standard-live-on.dwellx.within1000.range} and \rv{windows-msime-tsf.dwellx.within1000.range}; the 2.5th

@@ -793,7 +793,8 @@ def l2_values(cell):
 def l2_constant_values(cells):
     """Per per-text measure, over the strata of speed and cell of the primary scope that have an agreement entry: in
     how many the reference's value is the same in every text (deviation D11), out of how many, and in how many it
-    differs from the most frequent value in a single text, so that the text states these counts from the result files."""
+    differs from the most frequent value in a single text, so that the text states these counts from the result files.
+    The texts are those of the ICC, with a value on both sides (reference_spread()); a stratum of one text is neither."""
     vals = {}
     for m, _, _ in L2_MEASURES:
         n_of = n_const = n_one = 0
@@ -3668,6 +3669,21 @@ def _selftest_spread(check):
                                                                          "onetext.strata"))
     check("q3: the counts of the text tell a constant reference, one that differs in a single text and one that "
           "differs in more", got == (1, 3, 1), str(got))
+    # A second cell: slow constant, mid with a single text, no agreement at fast; and a text whose logger side is
+    # missing, which leaves the ICC and so the count (the reference differs only there).
+    gt4 = [dict(t(100 + k, "slow"), conversions_per_trial=1.0) for k in range(3)] + [
+        dict(t(110, "mid"), conversions_per_trial=1.0), dict(t(120, "slow"), conversions_per_trial=2.0)]
+    ob4 = [dict(g) for g in gt4]
+    ob4[-1]["conversions_per_trial"] = None
+    fake2 = _FakeCell("y", gt4, ob4)
+    fake2.l2[PRIMARY_SCOPE]["agreement_by_stratum"] = {"slow": {"conversions_per_trial": {"n": 3}},
+                                                       "mid": {"conversions_per_trial": {"n": 1}}}
+    cst2 = l2_constant_values([fake, fake2])
+    got2 = tuple(cst2["q3.conversions_per_trial.%s" % k]["value"] for k in ("constant.strata", "constant.of",
+                                                                           "onetext.strata"))
+    check("q3: over cells, a stratum without agreement is not counted, a stratum of one text is neither constant nor "
+          "single-text, and a text without the logger's value is not one of the ICC's texts", got2 == (2, 5, 1),
+          str(got2))
     words = (number_word(0), number_word(2), number_word(6), number_word(9), number_word(12), number_word(13))
     check("a small count is written as a word, a larger one as digits",
           words == ("none", "two", "six", "nine", "twelve", "13"), str(words))
