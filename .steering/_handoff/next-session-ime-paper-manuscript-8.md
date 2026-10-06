@@ -6,7 +6,7 @@
 ## §0 打ち込む用
 
 ```
-git fetch → 状態を測る（枝 docs/ime-m12-release の PR が main に merge 済みか・判断 211 が main にあるか）。⚠️ main は別の worktree（C:/wt/p321-submission）が使っているので git switch main はしない。新しい作業は origin/main から枝を切る。
+git fetch → 状態を測る（PR #316〔枝 docs/ime-m12-release〕が main に merge 済みか）。未 merge なら §2.0 から。⚠️ main は別の worktree（C:/wt/p321-submission）が使っているので git switch main はしない。新しい作業は origin/main から枝を切る。
 .steering/_handoff/next-session-ime-paper-manuscript-8.md を読んで §2 を、このセッションの機械（G-GEAR / Mac / Surface）の節から実行してください。
 一次は decisions.md の判断 207〜211、tasklist.md の M12、kit/export/README.internal.md、experiment/data.md と data.windows.md の寄託の手順。
 Skill: git-workflow・verify-before-claiming・data-privacy（書庫・--pack）・subagent-delegation・browser-verification（GitHub と Zenodo を Chrome で見るとき）。応答は日本語。コミットは git add パス指定。
@@ -34,6 +34,11 @@ Skill: git-workflow・verify-before-claiming・data-privacy（書庫・--pack）
 - 残る `\tbd` 8 か所: `dataset.tex` の `confirmed at deposit`（working の観測ログ）と `written at deposit`（datasheet）、試行の表（`results-agreement.tex`）の `at deposit` 6 か所。
 
 ## §2 やること
+
+### 2.0 PR #316 の /cross-review と merge（G-GEAR・最初に）
+
+- PR #316 は作業中の点検（判断 211）まで済み、/cross-review（Codex）は未実施。⚠️ 差分は `values.tex` だけで 2,600 行あり fail-closed になる → `run-codex-review.sh origin/main..HEAD -- <paths>` で、コードのパス（`kit/export/export.internal.py`・`issues/_style_check.py`・`assets/make_assets.py`）と公開の文書の主な変更（`README.md`・`.gitattributes`・`manuscript/sections/declarations.tex`）に絞る。1 巡目＝自文書・他文書の矛盾、2 巡目＝足した規則の境界条件（memory）。回す前に origin/main の台帳（`.codex/budget.json`）も見る。
+- 指摘を一次で確かめて直す（判断 212〜）→ CI 緑なら merge（git-workflow ルール 6）→ main の CI を確かめる。
 
 ### 2.1 研究者（どの機械でも・最初に）: 公開 repo に A〜C を push する
 
@@ -68,8 +73,8 @@ push の後、`git ls-remote https://github.com/mikotomiura/ime-conversion-loggi
 
 ### 2.5 この枝の残り
 
-- 作業中の点検の指摘は判断 211 で直した。
-- ⚠️ `/cross-review`（Codex）は M12 の完了時（D を作った後）に、M12 の全体に回す。
+- 作業中の点検の指摘は判断 211 で直した。/cross-review は §2.0。
+- ⚠️ M12 の完了時（D を作った後）にも、D までの変更に /cross-review を回す。
 
 ## §3 気をつけること
 
