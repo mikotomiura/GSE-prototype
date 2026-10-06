@@ -2077,4 +2077,6 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **検証**: 書き出しの selftest ok・変異 4 本赤・文体の検査 0 件・`build.sh --submission` はエラー 0・未定義 0・生成されていない値 0・overfull は main 0・main-submission 1・補遺 167（前と同じ）。
 - **寄託のときに確かめること（Mac・Surface・G-GEAR へ）**: macOS の run の `run.json` の `git_commit`（非公開の作業 repo の commit なら datasheet にそう書いてある）・runner が中止した Windows のパイロットの試みの `abort_reason` の文字列（前面の窓の確認の失敗でアプリ名や窓の題が入らないか）・§10.8 の確かめの run と最初の開始を `--pack` する・各条件の `conditions.txt` を標本と一緒に寄託する。
 - **次**: 研究者が datasheet の全文を日本語で確かめる（読み物 `datasheet-reading-ja.md`）→ 直し → /cross-review（Codex の今日の台帳は 505,404 で上限を超えている）→ PR。
+- **研究者の確認（2026-10-06 夜・逐語「読んだ、このまま採る」）**: 読み物の全文を読み、datasheet を**このまま採った**。読み物の【確かめてほしい点】（記録の「操作者」は著者・報酬を払った人はいない・不快な内容の断り・連絡先のメール・追加を入れない）も、この答えで研究者が確かめたものとして扱う。AI 宣言の「the datasheet of the dataset」も事実になった。
+- **/cross-review の送り方**: 差分に研究者のメールアドレス（datasheet の連絡先と、書き出しの道具の定数の前後の行）が入る。外部の LLM には送らないため、アドレスを伏せた写しの commit（push しない・worktree で作って捨てる）を作り、その範囲を `run-codex-review.sh` に渡す。
 - **影響範囲**: `papers/ime-observation/{experiment/datasheet.md,README.md,manuscript/sections/{dataset,declarations}.tex,kit/export/{export.internal.py,README.internal.md}}`・本ファイル。
