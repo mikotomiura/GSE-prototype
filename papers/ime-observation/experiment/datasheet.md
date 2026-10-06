@@ -57,18 +57,20 @@ the author's working repository, which is not public; the code of the freezing t
 
 **Runtime samples.** Each condition of the runtime-cost study has `samples.tsv` and `conditions.txt`. `samples.tsv` is
 tab-separated, with a header line and one row per reading, in the columns `epoch_s` (Unix time in seconds), `cpu_pct`
-(the logger's CPU, one core = 100 %), `rss_kb` (resident memory in KB), `threads`, `battery_pct`, `rss_alt_kb` (a
-second reading of memory in KB), `energy_impact` and `ref_energy_impact` (macOS only: an energy index of the logger and
-of the file manager as a reference; empty on Windows). On macOS `cpu_pct` is the mean over the interval, `rss_kb` the
-memory column of `top` and `rss_alt_kb` the resident set of `ps`; on Windows `cpu_pct` is a sample of about one second
-at the moment of reading, `rss_kb` the working set and `rss_alt_kb` the private bytes. The first row of a run has an
-empty `cpu_pct`; rows read while the process was absent carry zero in every column; on Windows a counter that cannot be
-read gives zero. The interval was set to 30 seconds; a reading takes longer than that (on macOS the period was about 39
-seconds in a trial run), so the times of the rows are not evenly spaced at 30 seconds. The values are compared within
-each system and not between systems; the battery level and the energy index are not summarised. `conditions.txt` holds
-lines of the form `name=value`: the condition, the operating system and its version, the number of logical processors,
-the name of the sampled process, the SHA-256 of the logger's executable, the number of such processes before the run,
-the set duration and interval in seconds, and the start and end times in UTC.
+(the logger's CPU, one core = 100 %), `rss_kb` (resident memory in KB), `threads`, `battery_pct`, `rss_alt_kb` (a second
+measure of memory in KB, which differs by system), `energy_impact` and `ref_energy_impact` (macOS only: an energy index
+of the logger and of the file manager as a reference; empty on Windows). On macOS `cpu_pct` is the mean over the
+interval, `rss_kb` the memory column of `top` and `rss_alt_kb` the resident set of `ps`; on Windows `cpu_pct` is a
+sample of about one second at the moment of reading, `rss_kb` the working set and `rss_alt_kb` the private bytes, which
+is not resident memory. On macOS the first row of a run has an empty `cpu_pct`. In a row read while the process was
+absent, the measured columns (`cpu_pct`, `rss_kb`, `threads`, `rss_alt_kb` and, on macOS, `energy_impact`) are zero,
+`ref_energy_impact` is empty, and `epoch_s` and `battery_pct` keep their values; on Windows a CPU counter that cannot be
+read also gives zero. The interval was set to 30 seconds; a reading takes longer than that (on macOS the period was
+about 39 seconds in a trial run), so the times of the rows are not evenly spaced at 30 seconds. The values are compared
+within each system and not between systems; the battery level and the energy index are not summarised. `conditions.txt`
+holds lines of the form `name=value`: the condition, the operating system and its version, the number of logical
+processors, the name of the sampled process, the SHA-256 of the logger's executable, the number of such processes before
+the run, the set duration and interval in seconds, and the start and end times in UTC.
 
 **Parts.** The dataset has two parts, which are kept apart.
 
