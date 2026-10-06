@@ -1,19 +1,19 @@
 # 次セッション — IME 論文 M12 の続き: 公開 repo の push → Mac・Surface で書庫と書き出しの確かめ → G-GEAR で Zenodo に上げてリリース D → 公開の確認
 
 > 作成: 2026-10-06 夜（G-GEAR）。判断 206〜211 の後。枝 `docs/ime-m12-release`。
-> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 207〜211**、`tasklist.md` の M12 の小項目、`papers/ime-observation/kit/export/README.internal.md`（公開の履歴と手順）、`experiment/data.md` の寄託の手順。状態は着手時に `git fetch` で測り直す。
+> ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 207〜212**、`tasklist.md` の M12 の小項目、`papers/ime-observation/kit/export/README.internal.md`（公開の履歴と手順）、`experiment/data.md` の寄託の手順。状態は着手時に `git fetch` で測り直す。
 
 ## §0 打ち込む用
 
 ```
 git fetch → 状態を測る（PR #316〔枝 docs/ime-m12-release〕が main に merge 済みか）。未 merge なら §2.0 から。⚠️ main は別の worktree（C:/wt/p321-submission）が使っているので git switch main はしない。新しい作業は origin/main から枝を切る。
 .steering/_handoff/next-session-ime-paper-manuscript-8.md を読んで §2 を、このセッションの機械（G-GEAR / Mac / Surface）の節から実行してください。
-一次は decisions.md の判断 207〜211、tasklist.md の M12、kit/export/README.internal.md、experiment/data.md と data.windows.md の寄託の手順。
+一次は decisions.md の判断 207〜212、tasklist.md の M12、kit/export/README.internal.md、experiment/data.md と data.windows.md の寄託の手順。
 Skill: git-workflow・verify-before-claiming・data-privacy（書庫・--pack）・subagent-delegation・browser-verification（GitHub と Zenodo を Chrome で見るとき）。応答は日本語。コミットは git add パス指定。
 ⚠️ 公開（GitHub の repo を public に・Zenodo の publish）は取り消せない → その場で研究者に確かめる。Zenodo の下書き 2 つ（23183438・23183441）を消さない（予約した DOI が失われる）。token（C:/zenodo/）は表示・委譲しない。
 ⚠️ 公開 repo の履歴 A〜C は組み直さない（C の hash cb29a1a9… が原稿に入っている）。正本は C:/wt/ime-conversion-logging.git（bare）と、push した後の GitHub。
 ⚠️ 新しい計測はしない。凍結のタグのコードと事前登録は変えない。生ログ・キーコードを原稿や外部の LLM に出さない。
-⚠️ 判断の番号は 212〜、逸脱は D13。heredoc でバックスラッシュを 2 本重ねない（python に渡ると壊れる）→ 置換は Edit か Write で書いたスクリプトで。
+⚠️ 判断の番号は 213〜、逸脱は D13。heredoc でバックスラッシュを 2 本重ねない（python に渡ると壊れる）→ 置換は Edit か Write で書いたスクリプトで。
 ```
 
 ## §1 状態（2026-10-06 夜）
@@ -35,9 +35,10 @@ Skill: git-workflow・verify-before-claiming・data-privacy（書庫・--pack）
 
 ## §2 やること
 
-### 2.0 PR #316 の /cross-review と merge（G-GEAR・最初に）
+### 2.0 ✅ 済み（2026-10-06・G-GEAR・判断 212）: PR #316 の /cross-review と merge
 
-- PR #316 は作業中の点検（判断 211）まで済み、/cross-review（Codex）は未実施。⚠️ 差分は `values.tex` だけで 2,600 行あり fail-closed になる → `run-codex-review.sh origin/main..HEAD -- <paths>` で、コードのパス（`kit/export/export.internal.py`・`issues/_style_check.py`・`assets/make_assets.py`）と公開の文書の主な変更（`README.md`・`.gitattributes`・`manuscript/sections/declarations.tex`）に絞る。1 巡目＝自文書・他文書の矛盾、2 巡目＝足した規則の境界条件（memory）。回す前に origin/main の台帳（`.codex/budget.json`）も見る。
+- /cross-review は Codex をパスで絞って 3 回（1 巡目はコードと公開の文書を分けて 2 回・2 巡目は直しの境界）。真の指摘 7 件を再現してから直した（SVG を XML として読む層・文字参照を戻した走査・`<text>` の中の `<title>`・凍結の一覧の手順が期待値と比べる・`xml:base`・入れ子の復号・引用符の中の `>`）。偽陽性 2 件。変異 21 本すべて赤。きれいな clone で本番の形の書き出し exit 0・194 ファイル・`kit/check.sh` 31 本が緑。⚠️ merge したかは `git fetch` の後に `gh pr view 316` で確かめる。
+- 以下は当時の手順（記録）。PR #316 は作業中の点検（判断 211）まで済み、/cross-review（Codex）は未実施。⚠️ 差分は `values.tex` だけで 2,600 行あり fail-closed になる → `run-codex-review.sh origin/main..HEAD -- <paths>` で、コードのパス（`kit/export/export.internal.py`・`issues/_style_check.py`・`assets/make_assets.py`）と公開の文書の主な変更（`README.md`・`.gitattributes`・`manuscript/sections/declarations.tex`）に絞る。1 巡目＝自文書・他文書の矛盾、2 巡目＝足した規則の境界条件（memory）。回す前に origin/main の台帳（`.codex/budget.json`）も見る。
 - 指摘を一次で確かめて直す（判断 212〜）→ CI 緑なら merge（git-workflow ルール 6）→ main の CI を確かめる。
 
 ### 2.1 ✅ 済み（2026-10-06）: 研究者が公開 repo に A〜C を push した
@@ -86,4 +87,4 @@ push の後、`git ls-remote https://github.com/mikotomiura/ime-conversion-loggi
 - ⚠️ Zenodo の旧来の API はライセンスが 1 つ（データセット CC BY 4.0・ソフトウェア Apache-2.0）。データ・文書の CC BY 4.0 は README と同梱の LICENSE-DATA に書いてある。
 - ⚠️ Windows の Python が標準出力に書く行には CR が付く（`while read` で使うなら `${f%$'\r'}`）。
 - ⚠️ `pkill` は Windows の git-bash で効かない → 立てたサーバは PowerShell でそのポートのプロセスだけを止める。
-- Codex の台帳: 2026-10-06 は 390,628 / 13 回（今日は回していない）。
+- Codex の台帳: 2026-10-06 は 505,404 / 16 回（PR #316 の /cross-review 3 回の後・上限は 300,000 に戻した）。

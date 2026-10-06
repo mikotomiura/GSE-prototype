@@ -269,6 +269,7 @@
       - [x] README の先頭にロゴと動く SVG（研究者の求め・判断 210）
       - [x] 作業中の点検（code-reviewer ∥ security-checker）の指摘 14 件を直した（判断 211）
       - [x] 研究者が公開 repo に A〜C を push した（2026-10-06・`git ls-remote` で main = `cb29a1a9…`・タグ 2 つが A・B を指す・非公開のまま）
+      - [x] PR #316 の /cross-review 2 巡（Codex・パス限定 3 回）の指摘を直した（SVG を XML として読む層・文字参照を戻した走査・凍結の一覧の手順・`xml:base` ほか・変異 21 本すべて赤・本番の形の書き出し exit 0・`kit/check.sh` 31 本が緑）（2026-10-06・G-GEAR・判断 212）→ CI → merge
       - [ ] GitHub での README（ロゴ・動く図）の見え方を確かめる（ロゴと図はリリース D の README に入る → D を push した後）
       - [ ] datasheet（Claude の下書き → AI 宣言に足す → 研究者が確かめる）
       - [ ] Mac / Surface: working・パイロット・標本の書庫（`--pack`・`--check-deposit`）→ SHA-256 を記録 → G-GEAR へ。A〜D を各機械で書き出し直して exit 0 と一覧の一致
