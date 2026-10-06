@@ -23,10 +23,11 @@ The export
   3. rewrites the manifests so that they keep only kind / id / path / symbol / sha256 / reason and
      recomputes every checksum from the exported bytes;
   4. rejects the export when any exported text or file name contains a participant identifier, an
-     e-mail address (other than the one in PUBLIC_EMAILS, in the manuscript only), an internal dataset or session
-     name, an internal marker word or symbol, a home or repository path of the machine that runs the export, the login name of that machine, or an
-     absolute path that names a user (the fictional names in FICTIONAL are the only names that
-     pass). Every line is also checked after its JSON / string escapes are decoded;
+     e-mail address (other than the one in PUBLIC_EMAILS, in the manuscript and the datasheet only), an internal
+     dataset or session name, an internal marker word or symbol, a home or repository path of the machine that
+     runs the export, the login name of that machine, or an absolute path that names a user (the fictional
+     names in FICTIONAL are the only names that pass). Every line is also checked after its JSON / string
+     escapes are decoded;
   5. verifies the exported logger manifests with check_manifest.py --self;
   6. runs the checker of the writing rules of published files (_style_check.py, located with
      --style-check or in the git work tree of the source; inside a git work tree it must be committed)
@@ -118,10 +119,19 @@ WORD_RULES = (
 )
 # The e-mail address of the corresponding author, which the article prints: the author chose to publish it with the
 # manuscript (the postal address and the telephone number stay out). It is a constant: nothing extends it at run
-# time. It passes only in the files under PUBLIC_EMAIL_DIR and only as a whole address; an address that contains it
-# (also joined by another "@"), or another address on the same line, does not.
+# time. It passes only in the files under PUBLIC_EMAIL_DIR and in the files named in PUBLIC_EMAIL_FILES (the datasheet,
+# which is also deposited with the data and names its contact), and only as a whole address; an address that contains
+# it (also joined by another "@"), or another address on the same line, does not.
 PUBLIC_EMAILS = ("mmiura.network" + AT + "gmail.com",)
 PUBLIC_EMAIL_DIR = "manuscript/"
+PUBLIC_EMAIL_FILES = ("experiment/datasheet.md",)
+
+
+def public_email_place(rel):
+    """True for a file in which the public address of the corresponding author passes."""
+    return rel.startswith(PUBLIC_EMAIL_DIR) or rel in PUBLIC_EMAIL_FILES
+
+
 _PUBLIC_EMAIL = re.compile("|".join(r"(?<![A-Za-z0-9._%+\-" + AT + r"])" + re.escape(a)
                                     + r"(?![A-Za-z0-9_%+\-" + AT + r"]|\.[A-Za-z0-9\-])" for a in PUBLIC_EMAILS), re.I)
 # An SVG figure is exported as text, so it must not carry what a browser would run or load: a script, an event
@@ -947,7 +957,7 @@ def scan(files, rules):
     hits = []
     for rel in sorted(files):
         word_check = not _CORPUS_JSONL.match(rel)
-        pub = rel.startswith(PUBLIC_EMAIL_DIR)
+        pub = public_email_place(rel)
         for no, ln in [(0, rel)] + list(enumerate(files[rel].split("\n"), 1)):
             kinds = set()
             for form in decoded_forms(ln):
@@ -1348,6 +1358,13 @@ def selftest():
                     {"manuscript/main.tex": "Write to %s.\n" % longer}, "manuscript/main.tex")
         refused("the public address stops the export outside the manuscript",
                 {"README.md": "# Fake\nWrite to %s.\n" % pub}, "README.md")
+        for other in ("experiment/data.md", "experiment/sub/datasheet.md", "kit/experiment/datasheet.md"):
+            refused("the public address stops the export in a file other than the datasheet",
+                    {other: "# Fake\nWrite to %s.\n" % pub}, other)
+        refused("an address that is not exactly the public one stops the export in the datasheet",
+                {"experiment/datasheet.md": "# Fake\nWrite to %s.\n" % ("x" + pub)}, "experiment/datasheet.md")
+        rcx, text, o = run("pubmail-datasheet", {"experiment/datasheet.md": "# Fake\nWrite to %s.\n" % pub})
+        ck("the public address of the corresponding author passes in the datasheet", rcx == 0, text)
         name = "the public address of the corresponding author passes in the manuscript"
         for form in (pub, "\\email{%s}" % pub, "mailto:%s" % pub, pub.upper()):
             rcx, text, o = run("pubmail-" + str(len(form)) + form[:2].encode("utf-8").hex(),

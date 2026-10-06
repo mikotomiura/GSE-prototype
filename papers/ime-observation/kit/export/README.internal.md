@@ -155,7 +155,8 @@ characters.
   that the identifier is found inside a longer name joined by an underscore; inside brackets too,
   as in `[P017]`, and in file names), an e-mail address (the one exception is the address of the corresponding
   author, which the article prints; it is fixed in the script as `PUBLIC_EMAILS` and passes only in the files under
-  `manuscript/` and only as a whole address, not joined to anything by another `@`), the name of the private
+  `manuscript/` and in `experiment/datasheet.md` (the datasheet, which is also deposited with the data and names its
+  contact), and only as a whole address, not joined to anything by another `@`), the name of the private
   dataset repository, a session name of the private recordings, and the private working directories.
 * In an SVG figure (searched over the whole file): a script, an event handler, a link or reference to anything but a
   fragment of the same file (`href="#…"`, `url(#…)`), an embedded object, an `@import`, a data URI or a document
