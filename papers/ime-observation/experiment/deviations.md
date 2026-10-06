@@ -276,9 +276,10 @@ a simulated review of the article before its submission pointed out these values
 **What changes.** For a cell in which the definition of the analysis and the definition common to both systems
 (`all`, every session) do not hold the same sessions, which in this study is the Windows cell only, the article
 reports for the primary comparison, in the primary scope and over all trials, how many reference sessions the
-definition of the analysis leaves out and the detection pooled over the strata under the common definition (recall,
-precision, split rate and merge rate with their Wilson intervals), next to the same measures under the definition of
-the analysis. Sections 5 and 10.7 of the registration report under the common definition only whether the two
+definition of the analysis leaves out, the ranges of the per-stratum Wilson intervals of recall and precision under the
+common definition by the rule of the primary estimates (the strata that keep at least 30 trials in the scope), and the
+detection pooled over the strata under the common definition (recall, precision, split rate and merge rate with their
+Wilson intervals), next to the same figures under the definition of the analysis. Sections 5 and 10.7 of the registration report under the common definition only whether the two
 definitions hold the same sessions; section 5 states that the results under `all` are not otherwise reported. The
 analysis code and the result files do not change: the result files hold the detection under both definitions, and the
 values are taken from them by the script that turns the result files into the tables and the values of the article
@@ -294,7 +295,9 @@ how far the estimates of question 1 depend on the choice of definition.
 the macOS cells the two definitions held the same sessions, and no value or table is added for them; the supplement
 says that they held the same sessions. This deviation was made
 after all results had been seen, including the detection under the common definition, when a simulated review of the
-article before its submission asked for the size of the difference between the two definitions.
+article before its submission asked for the size of the difference between the two definitions. The ranges of the
+per-stratum intervals were added afterwards: it was recorded that they would be reported whatever their values before
+they were computed.
 
 ## The macOS cells are unchanged
 

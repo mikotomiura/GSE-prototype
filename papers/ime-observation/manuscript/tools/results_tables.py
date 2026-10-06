@@ -228,6 +228,17 @@ def stratum_key(st):
     return (st["scenario"], st["speed"])
 
 
+def strata_of(block):
+    """{(scenario, speed): stratum entry} of a detection block of one comparison and scope (the row of presses outside
+    the trials is left out)."""
+    out = {}
+    for st in block["metrics"]["by_stratum"]:
+        if st["stratum"] in (None, "all") or st["stratum"].get("scenario") is None:
+            continue
+        out[stratum_key(st["stratum"])] = st
+    return out
+
+
 def scenario_order(name):
     return int(name[1:]) if name[1:].isdigit() else 10 ** 6
 
@@ -322,12 +333,7 @@ class Cell(object):
 
     def detection_strata(self, scope, comparison=PRIMARY_COMPARISON):
         """{(scenario, speed): stratum entry of e1_detection.json} (the row of presses outside the trials is left out)."""
-        out = {}
-        for st in self.det_by[comparison][scope]["metrics"]["by_stratum"]:
-            if st["stratum"] in (None, "all") or st["stratum"].get("scenario") is None:
-                continue
-            out[stratum_key(st["stratum"])] = st
-        return out
+        return strata_of(self.det_by[comparison][scope])
 
     def speed_sessions(self, scope):
         return dict((st["stratum"]["speed"], st) for st in self.l1[scope]["metrics"]["by_speed"])
@@ -936,7 +942,26 @@ def definition_values(cell):
         vals[base + ".leftout"] = {"text": fmt_int(common["n_gt"] - own["n_gt"]), "value": common["n_gt"] - own["n_gt"],
                                    "source": "%s/n_gt minus %s" % (src, cell.path("e1_detection.json", scope,
                                                                                     "metrics/pooled/n_gt"))}
+        for m in ("recall", "precision"):
+            text, value, left = definition_range(cell, scope, cell.det_common[scope], m)
+            ssrc = "%s:cells/%s/%s/%s/%s/metrics/by_stratum/*/%s" % (
+                cell.src["e1_detection.json"], cell.label, COMMON_DEFINITION, PRIMARY_COMPARISON, scope, m)
+            vals["%s.common.%s.range" % (base, m)] = {"text": text, "value": value, "source": ssrc}
+            vals["%s.common.%s.strata.left" % (base, m)] = {"text": str(left), "value": left, "source": ssrc}
     return vals
+
+
+def definition_range(cell, scope, block, m):
+    """The range of the Wilson intervals of measure m over the strata that enter it under the rule of the abstract
+    (abstract_values), for a detection block of the primary comparison in a scope: (text, [lo, hi], strata left out).
+    The trials kept per stratum are those of the cell's analysis; the two definitions differ in the reference's
+    sessions, not in the trials."""
+    kept = cell.kept_trials(scope)[0]
+    strata = strata_of(block)
+    design = sorted(kept, key=lambda k: (scenario_order(k[0]), SPEEDS.index(k[1])))
+    used = strata_in_range(kept, strata, design, m)
+    lo, hi = interval_range([strata[k][m] for k in used]) if used else (None, None)
+    return ("%s--%s" % (fmt_p(lo), fmt_p(hi)) if used else NO_VALUE), [lo, hi], len(design) - len(used)
 
 
 def definitions_supplement(cells):
@@ -948,7 +973,9 @@ def definitions_supplement(cells):
              "systems (\\texttt{all}, every session) only whether it holds the same sessions as the definition of the "
              "cell's system. For a cell in which it did not, the detection of the primary comparison pooled over the "
              "strata is given under both definitions, with Wilson intervals, which for pooled proportions are lower "
-             "bounds of the uncertainty. A pooled value is not an estimate for natural typing.\n\n"]
+             "bounds of the uncertainty, together with the range of the per-stratum Wilson intervals of recall and "
+             "precision over the strata that keep at least %d trials in the scope and have a value, as in the main text. "
+             "A pooled value is not an estimate for natural typing.\n\n" % MIN_TRIALS]
     shown = [c for c in cells if c.det_top.get("same_sessions_as_all") is False]
     same = [c.label for c in cells if c.det_top.get("same_sessions_as_all")]
     if same:
@@ -966,8 +993,9 @@ def definitions_supplement(cells):
         defs = [tex_escape(cell.definition), COMMON_DEFINITION] * len(SCOPES)
         lines += ["{\\footnotesize\n",
                   "\\begin{longtable}{L{0.20}%s}\n" % ("L{%.2f}" % (0.80 / len(cols)) * len(cols)),
-                  "\\caption{Detection of the primary comparison pooled over the strata under the definition of the "
-                  "analysis (\\texttt{%s}) and the common definition (\\texttt{%s}), cell %s}"
+                  "\\caption{Detection of the primary comparison under the definition of the analysis (\\texttt{%s}) "
+                  "and the common definition (\\texttt{%s}), pooled over the strata and as ranges over the strata, cell "
+                  "%s}"
                   "\\label{tab:definitions-%s}\\\\\n" % (tex_escape(cell.definition), COMMON_DEFINITION, name,
                                                          cell.label),
                   "\\toprule\n",
@@ -980,6 +1008,14 @@ def definitions_supplement(cells):
         for m, label in DEFINITION_MEASURES:
             lines.append("%s & %s \\\\\n" % (label, " & ".join(ci_text(p[m]).replace(" [", "\\newline [", 1)
                                                                for p in cols)))
+        # The ranges over the strata, under the rule of the main text, in the order of the columns.
+        for m, label in (("recall", "Recall, range over the strata"), ("precision", "Precision, range over the strata")):
+            texts = []
+            for scope in SCOPES:
+                for block in (cell.det[scope], cell.det_common[scope]):
+                    text, _, left = definition_range(cell, scope, block, m)
+                    texts.append("%s\\newline (%d left out)" % (text, left))
+            lines.append("%s & %s \\\\\n" % (label, " & ".join(texts)))
         lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n\n"]
     return "".join(lines)
 
@@ -2847,7 +2883,11 @@ def _fixture(tmp, label="windows-test", sub="windows"):
     # The definition common to both systems: on macOS the same sessions (a copy); on Windows 10 more reference sessions
     # in the primary scope and 12 more over all trials, with other measures, so that a mix-up of the two shows.
     if sub:
-        cells_det[COMMON_DEFINITION] = {PRIMARY_COMPARISON: {"under_limit": det_scope(det_u, 1, r=0.86),
+        # In the primary scope its strata have other intervals than those of the analysis (S1 slow stays under the
+        # minimum of trials), so that reading the wrong block shows in the ranges.
+        common_u = [_stratum("S1", "fast", 75, 68, 0.80, 0.95), _stratum("S1", "mid", 30, 21, 0.55, 0.85),
+                    _stratum("S1", "slow", 29, 20, 0.05, 0.99)]
+        cells_det[COMMON_DEFINITION] = {PRIMARY_COMPARISON: {"under_limit": det_scope(common_u, 1, r=0.86),
                                                              "all_trials": det_scope(det_a, 1, focus_a, r=0.76)}}
         for scope, n in (("under_limit", 210), ("all_trials", 212)):
             cells_det[COMMON_DEFINITION][PRIMARY_COMPARISON][scope]["metrics"]["pooled"]["n_gt"] = n
@@ -3548,6 +3588,17 @@ def _selftest_definitions(check):
               and close(g("primary.common.mergerate"), [0.0, 0.0, 0.1])
               and close(vals["windows-test.pooled.gtobs.underlimit.recall"]["value"], [0.9, 0.85, 0.95]),
               str((g("primary.common.recall"), g("all.common.precision"))))
+        check("definitions: the ranges over the strata under the common definition follow the rule of the abstract "
+              "(at least 30 trials) and are read from the common definition's strata",
+              g("primary.common.recall.range") is not None
+              and close(g("primary.common.recall.range"), [0.55, 0.95]) and g("primary.common.recall.strata.left") == 4
+              and close(vals["windows-test.primary.recall.range"]["value"], [0.60, 0.97])
+              and close(g("all.common.precision.range"), vals["windows-test.all.precision.range"]["value"]),
+              str((g("primary.common.recall.range"), g("primary.common.recall.strata.left"))))
+        check("definitions: the supplement gives the ranges over the strata of both definitions with the strata left "
+              "out, in the order of the columns",
+              "Recall, range over the strata & 0.600--0.970\\newline (4 left out) & 0.550--0.950\\newline (4 left out) & "
+              in sup, sup[-900:])
         check("definitions: the supplement gives both definitions in both scopes, the analysis's first",
               "Measure & \\texttt{windows\\_def} & \\texttt{all} & \\texttt{windows\\_def} & \\texttt{all} \\\\" in sup
               and sup.find("\\multicolumn{2}{l}{\\texttt{under\\_limit}}")

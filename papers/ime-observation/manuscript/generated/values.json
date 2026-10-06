@@ -5529,6 +5529,19 @@
     0.6906334789334945
    ]
   },
+  "windows-msime-tsf.defs.all.common.precision.range": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/precision",
+   "text": "0.000--1.000",
+   "value": [
+    0.0,
+    1.0
+   ]
+  },
+  "windows-msime-tsf.defs.all.common.precision.strata.left": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/precision",
+   "text": "0",
+   "value": 0
+  },
   "windows-msime-tsf.defs.all.common.recall": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/recall",
    "text": "0.737 [0.721, 0.753]",
@@ -5537,6 +5550,19 @@
     0.7206484977183647,
     0.752557864664535
    ]
+  },
+  "windows-msime-tsf.defs.all.common.recall.range": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/recall",
+   "text": "0.000--1.000",
+   "value": [
+    0.0,
+    1.0
+   ]
+  },
+  "windows-msime-tsf.defs.all.common.recall.strata.left": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/recall",
+   "text": "0",
+   "value": 0
   },
   "windows-msime-tsf.defs.all.common.rows": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/n_obs",
@@ -5580,6 +5606,19 @@
     0.7761110401991921
    ]
   },
+  "windows-msime-tsf.defs.primary.common.precision.range": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/precision",
+   "text": "0.321--1.000",
+   "value": [
+    0.3212301490182536,
+    1.0
+   ]
+  },
+  "windows-msime-tsf.defs.primary.common.precision.strata.left": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/precision",
+   "text": "3",
+   "value": 3
+  },
   "windows-msime-tsf.defs.primary.common.recall": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/recall",
    "text": "0.880 [0.866, 0.893]",
@@ -5588,6 +5627,19 @@
     0.8664273102489249,
     0.8929321658319648
    ]
+  },
+  "windows-msime-tsf.defs.primary.common.recall.range": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/recall",
+   "text": "0.412--1.000",
+   "value": [
+    0.41157685726598636,
+    1.0
+   ]
+  },
+  "windows-msime-tsf.defs.primary.common.recall.strata.left": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/recall",
+   "text": "3",
+   "value": 3
   },
   "windows-msime-tsf.defs.primary.common.rows": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/n_obs",
