@@ -49,7 +49,7 @@ same name with other content, or a file of the draft that the list does not name
 The token is read from --token-file (default C:/zenodo/zenodo_token.txt on Windows; required elsewhere) inside the
 process, sent only to the API host and never printed; a token file inside the git work tree is refused. The commit
 of the source is read once and printed, so that what was sent can be tied to it: every committed file is read at
-that commit, and the check fails if HEAD moves while it runs.
+that commit, and the check fails if HEAD names another commit at its end.
 
 Exit status: 0 the check passed (and the upload completed), 1 the check failed, 2 a usage or environment error.
 """
@@ -69,6 +69,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -541,7 +542,7 @@ def run_check(source: Path, staging: Path | None, *, allow_pending: bool, final:
         if final:
             problems.append(f"{rel} under --from is not a file of the list")
     if head_commit(source) != rev:
-        problems.append(f"HEAD moved away from {rev[:12]} during the check; run it again")
+        problems.append(f"HEAD no longer names {rev[:12]} at the end of the check; run it again")
     return problems, items, data
 
 
@@ -561,7 +562,7 @@ class _Capped:
         self.f, self.left, self.md5 = f, size, _md5()
 
     def read(self, n: int = -1) -> bytes:
-        if self.left <= 0:
+        if self.left <= 0 or n == 0:
             return b""
         block = self.f.read(self.left if n is None or n < 0 else min(n, self.left))
         if not block:
@@ -850,6 +851,7 @@ class _Mock:
                                  "checksum": "md5:" + ("0" * 32 if mock.corrupt else md5)})
 
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server.handle_error = lambda request, client_address: None  # a request broken off by the client
         self.base = f"http://127.0.0.1:{self.server.server_address[1]}/api"
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
@@ -1116,7 +1118,7 @@ def selftest() -> int:
             p = check(td, "moved")[0]
         finally:
             globals()["head_commit"] = real_head
-        expect(has(p, "HEAD moved"), "HEAD moving during the check stops it")
+        expect(has(p, "HEAD no longer names"), "HEAD naming another commit at the end stops the check")
 
         # 5. the export
         def export_of(content: bytes):
@@ -1237,6 +1239,17 @@ def selftest() -> int:
                 expect(False, "a file that ends before its checked size breaks off the request")
             except _Shortened:
                 pass
+            zero = _Capped(io.BytesIO(b"0123"), 4)
+            expect(zero.read(0) == b"" and zero.read(100) == b"0123", "reading nothing is not taken for an early end")
+            lone = _Mock(token)  # its own server: it handles the broken request after the client has gone
+            try:
+                began = time.monotonic()
+                status, js = api_call("PUT", f"{lone.base}/files/b1/short.bin", token, lone.base,
+                                      body=_Capped(io.BytesIO(b"01"), 4), length=4)
+                expect(status == 0 and "_Shortened" in str(js) and time.monotonic() - began < 60,
+                       "a file that ends early breaks the request off at once")
+            finally:
+                lone.close()
             mock.files = {}
 
             for attr, value, word in (("state", "done", "unsubmitted draft"), ("submitted", True, "unsubmitted draft"),
