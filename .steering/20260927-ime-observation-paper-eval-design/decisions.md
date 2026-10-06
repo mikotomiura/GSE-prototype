@@ -1946,3 +1946,46 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   2. 時期は **M12 の後・BRM への投稿の直前**。データとコードの DOI を取り、`\tbd` を埋めて、BRM に出す版と同じものを出す（PsyArXiv はほぼ撤回できない・要旨の "code and data are public" が真になってから）。投稿のときにプレプリントの DOI とライセンスを申告し、掲載が決まったらプレプリントに掲載版の DOI と URL を足す。
 - **未決（そのとき決める）**: プレプリントのライセンス（推奨は CC BY 4.0・公開の材料と同じ）、PsyArXiv の分野の選び方、OSF の事前登録の project とのつなぎ方。
 - **影響範囲**: 本ファイル・引き継ぎ `next-session-ime-paper-manuscript-7.md`（M12 の後の手順に足した）。
+
+## 判断 206: 原稿の attack-me は round 2 で閉じる —— round 3 は回さず、round 1・2 の `tmp/` を消す（2026-10-06・G-GEAR・研究者の選択〔推奨どおり〕）
+
+- **問い（AskUserQuestion）**: round 3 を回すか。推奨は「回さない」で、理由は 3 つ: (1) round 2 は有効な査読 3 人とも minor で、指摘は直した（判断 204・`round-2/verdict.md` §8）。(2) 同じ立場・同じ接地の 3 回目は効きが小さい。(3) 投稿先の査読が次の検証になる。
+- **研究者の選択**: 回さない。
+- **実行**: `round-1/tmp/`（24 MB）と `round-2/tmp/`（23 MB）を消した（git の外・`.gitignore` の `tmp/`）。消す前に、raw の応答 8 本（各 round の R1・R2・R3・audit）がコミット済みの `review-R*.md`・`audit.md` と CR を除いて 1 行も違わないことを `diff` で確かめた。接地の原本と本文は `panel.md` の URL と SHA-256 から取り直せる。
+- **影響範囲**: 本ファイルだけ（attack-me の記録は変えない）。
+
+## 判断 207: M12 の進め方 —— リリースの DOI は手で上げて予約する（判断 183-4 を覆す）・公開 repo は `ime-conversion-logging`（今は非公開）・履歴は 4 つの commit・非公開の commit の参照は公開物で確かめられる形に・データの書庫は G-GEAR に集めて上げる（2026-10-06・G-GEAR・研究者の選択〔4 問とも推奨どおり〕）
+
+- **一次で確かめた事実（2026-10-06）**:
+  - Zenodo の文書（`help.zenodo.org/docs/deposit/describe-records/reserve-doi/` を curl で取得）: 逐語 "By default, Zenodo registers DOIs for all uploads when they are published on Zenodo. In case you want to know the DOI in advance of publication, you can use the method described below to reserve a DOI. The reserved DOI can then be included in files (e.g. a text document) prior to uploading them on Zenodo." / "If you delete the draft upload, the reserved DOI is lost."。予約は下書きの欄の機能。
+  - GitHub との連携（`docs/github/enable-repository/`・`archive-software/github-upload/`）: 逐語 "Once connected, new releases from the repository will be automatically ingested and archived." / "Wait for the release to be processed … When the release is finished, click the record DOI to go to the record"。下書きの段も予約の手順も書かれていない。→ 連携では repo の中の原稿にリリースの DOI を先に書けない（書くならリリースが 2 回要る）。
+  - 公開物が名指す非公開の作業 repo の commit は 12 か所（`git grep`）: `115cd5ff` が 6（`data.md` 53・103、`data.windows.md` 106、`deviations.md` 244、`supplement/provenance.tex` 21・33）、`14c85e6e` が 4（`data.md` 56、`data.windows.md` 75、`provenance.tex` 27・38）、`3cc151c7` が 1（`deviations.md` 312）、凍結の commit `ff122e32…` が 1（`notes.md` 50・登録も名指す）。⚠️ 引き継ぎ（manuscript-4・-7）の「`115cd5ff` が 5 か所」は数え落とし（`data.md` 103 は判断 194 の後に足された）で、`14c85e6e` は挙がっていなかった。
+  - 今の HEAD の `kit/analysis/match.py` は `115cd5ff` のものと、`kit/e2/closed_set.py` は `14c85e6e` のものとバイト一致する（SHA-256 `6f817228…`・`364cc833…`）。
+  - 外枠の最後の commit で、結果の解析より前のものは `ffd315a4`（2026-10-05 01:17 JST・判断 150 の直し）。最初のセル（Windows）の解析は 10-05 10:05 JST 以降に始まった（引き継ぎ `next-session-ime-paper-m7-windows.md` §2.11 の見出し）。結果のファイルの最初の commit は `44fbda3b`（10:30）。その後の外枠の commit（`b836e9c0` 11:05 など）は解析の後。
+  - 試しの書き出し（`--allow-missing-license`・scratchpad）は exit 2 で止まった。理由は、ignore の LaTeX の 7 行（`*.aux` など）を書き出しの除外の規則が知らないこと。⚠️ 書き出しが読むファイルの種類（`CHECKED_SUFFIX`）に `.tex`・`.bib` が無い（文体の検査は読む）。→ 公開の書き出し（D）の前に道具を直す。
+- **研究者の選択（AskUserQuestion・4 問とも推奨どおり）**:
+  1. **リリースの DOI は手で上げて予約する**（判断 183-4 の「GitHub と Zenodo の連携」を覆す）。Zenodo の下書きで DOI を予約し、原稿と `CITATION.cff` に書く。その後、公開 repo のタグの zip を下書きに上げ、研究者が確かめて公開する。データセットと同じ手順。
+  2. **公開 repo は `mikotomiura/ime-conversion-logging`**（題の "Logging Japanese IME conversion" に合わせる）。今は非公開で作る。公開に切り替えるのは Zenodo を公開するときで、その場で研究者に確かめる。
+  3. **履歴は 4 つの commit**: A＝macOS の凍結の書き出し（一覧 `29b183ba…`・タグ `ime-observation-prereg-macos`）、B＝Windows の凍結の書き出し（一覧 `f61af353…`・タグ `ime-observation-prereg-windows`）、C＝B に `ffd315a4` の外枠を足したもの（`\tbd{commit of the outline}` はこの commit）、D＝リリース `v1.0.0`。**非公開の commit の参照は置き換える**: `115cd5ff`・`14c85e6e` は「リリースのファイル（SHA-256）」に、`3cc151c7` は「Windows の凍結のタグ」に置き換える。`ff122e32` は登録が名指しているので、「作業 repo の commit（非公開）」と断って残す。
+  4. **データの書庫は G-GEAR に集めて上げる**。Mac と Surface のセッションで `--pack` と `--check-deposit` を回し、SHA-256 を `data.md` / `data.windows.md` に記録する。研究者が書庫を G-GEAR に移す（Windows の書庫と同じ道）。G-GEAR で SHA-256 を照らしてから下書きに上げる。token は G-GEAR だけに置く。
+- **メインの段取り（研究者が覆せる）**: 書き出しが走査するのは、それを回す機械の値（ホーム・ログイン名・ホスト名）と、渡した値だけ。そこで、ほかの機械の値をこの機械に持ち込まない。代わりに Mac と Surface のセッションで、A・B・C・D の木を同じ道具で書き出し直し、exit 0 と一覧の一致を確かめる。3 台とも通るまで公開に切り替えない。
+- **影響範囲**: 本ファイル・判断 183-4（この判断で読み替える。本文は書き換えない）・M12 の作業全体。
+
+## 判断 208: M12 の最初の実行 —— Zenodo の下書き 2 つと DOI の予約・非公開の repo・公開の履歴 A〜C を手元で組む・書き出しの道具を原稿に対応させる（2026-10-06・G-GEAR・メインの実行〔判断 207 の段取り〕・研究者が覆せる）
+
+- **Zenodo**（memory「Zenodo token」の許可の範囲・旧来の deposit API・token はプロセスの中で読むだけ）: 既存の記録 4 件にこの論文の下書きが無いことを確かめてから、2 つ作った（どちらも `unsubmitted`・ファイルなし・公開していない）。
+  - データセット: deposition `23183438`・**DOI `10.5281/zenodo.23183438`**（`upload_type` dataset・CC BY 4.0・題は `references.bib` の `dataset`）
+  - ソフトウェア: deposition `23183441`・**DOI `10.5281/zenodo.23183441`**（`upload_type` software・Apache-2.0・版 1.0.0・題は `release`）
+  - 両方とも creators は Miura, Mikoto（Independent researcher・ORCID）、関連の識別子は OSF の 2 つの登録（`isSupplementTo`）。説明は仮（"Draft. …"）で、公開の前に datasheet と合わせて書き直す。⚠️ 下書きを消すと予約した DOI も失われる（Zenodo の文書）→ 消さない。
+- **GitHub**: `mikotomiura/ime-conversion-logging` を**非公開**で作った（空・判断 207-2）。⚠️ **push は自動モードの判定で拒まれた** → 回り道はせず、研究者に push してもらう（下の bare の写しから）。
+- **公開の履歴 A〜C を手元で組んだ**（scratchpad で組み、`C:/wt/ime-conversion-logging.git` に bare の写しで残した）:
+  - 2 つの凍結のタグのきれいな worktree（detached・LF）から、**タグ自身の道具**を `--allow-missing-license` で回した（どちらも exit 0）。一覧を計算し直すと、記録した `freeze-export-list-{macos,windows}.txt` とバイト一致した（`29b183ba…` 98 ファイル・`f61af353…` 108 ファイル）。
+  - C は B の木に `ffd315a4` の `manuscript/outline.md`（CR 0・文体の検査 0 件・個人の値の grep 0 件）を足したもの（一覧 `c244c159…` 109 ファイル）。
+  - commit: A `bf137ffec0549ddb699e02e1efd6c88202230764`（タグ `ime-observation-prereg-macos`）、B `32a5e18076884bb2e4aea59606726a3faeecac7b`（タグ `ime-observation-prereg-windows`）、**C `cb29a1a9086e77c89cb66c05e39ba4fc8091e074`**（= `\tbd{commit of the outline}`）。作者の日付は元の commit の日付、commit の日付は 2026-10-06。作者は Mikoto Miura（GitHub の noreply のアドレス）。メッセージは英語で、元の commit の 40 桁と登録の URL・一覧の SHA-256 を書いた。`#!` で始まる 38 ファイルに実行ビット（タグの時点の作業 repo はすべて 100644）。各 commit を `git archive` で取り出して一覧を計算し直し、3 つとも上の値と一致した。
+  - ⚠️ B と C の差は `outline.md` の 1 ファイルだけ（`git diff --stat`）。
+- **書き出しの道具**（`kit/export/export.internal.py`・internal で書き出されない）:
+  1. `CHECKED_SUFFIX` に `.tex`・`.bib` を足した。判断 148 は「公開の書き出しを原稿が素通りしないように」文体の検査を `.tex`・`.bib` に広げたが、書き出し側の種類は足していなかった（Code availability と Open Practices は原稿の道具と外枠が公開 repo にあると書く）。→ 024 の acceptance の陰性対照（d）の「`.tex` で exit 2」は契約が変わったので、読まない種類の例を `.csv` に替えた（CI からは呼ばれていない）。
+  2. ignore の LaTeX の 7 行を除外の規則に足した。6 種（`.aux` など）は黙って外す。`*.log` は外さず、今までどおり秘密の名前として止める（README の「黙って飛ばさない」を守る）。ignore のファイルの各パターンが「外す」か「秘密の名前で止まる」のどちらか一方に当たることを selftest で確かめる（今まで、ignore の行と規則の一致は本番の書き出しでしか確かめていなかった）。
+  3. 試しの書き出し（今の木）は内容で止まった（exit 1・1,325 件）。内訳: `generated/values.tex` 1,323 件（鍵 `rv@<セル>.<…>` がメールアドレスの形に当たる）と、研究者のアドレス 2 件（`main.tex` の `\email`・`submission/title-page.tex`）。→ (a) 鍵の印を `rv@` から `rv:` に替えた（`main.tex` の `\rv` と `results_tables.py` の 1 行。`values.tex` は 1,323 行が印だけ変わり、selftest 192 件・`--check` 一致・組版は前と同じ）。(b) 研究者は判断 185 で「原稿は公開 repo とプレプリントにも載るので住所と電話は書かない」と決め、メールを原稿に入れた → そのアドレス 1 つだけを固定の定数 `PUBLIC_EMAILS` で通す（アドレス全体と一致するときだけ。それを含む長いアドレス・同じ行の別のアドレスは止める）。走査の残り 0 件。
+  - 検証: selftest ok。使い捨ての変異 10 本（scratchpad の `mutate_export.py`・`.tex` / `.bib` を外す・生成物を外さない・`.log` を黙って外す・`.synctex.gz` を外す・規則の無い ignore の行・左右の境界を外す・通さない・全部通す）はすべて赤。1 本は最初、置換の文字列が当たらなかった（次の行の形を取り違えた）ので作り直した。`build.sh --submission`: main・main-submission・補遺ともエラー 0・未定義 0・生成されていない値 0・overfull は main 0・main-submission 1・補遺 167（前と同じ）。文体の検査 違反 0。
+- **影響範囲**: `kit/export/{export.internal.py,README.internal.md}`（README に公開の履歴の節と手で上げる手順）・`manuscript/main.tex`・`manuscript/tools/results_tables.py`・`manuscript/generated/values.tex`・`issues/024-acceptance.sh`・本ファイル・`tasklist.md`。
