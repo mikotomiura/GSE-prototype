@@ -255,7 +255,8 @@
     - [ ] 研究者が結果・推奨・限界・結論を読んで直す（判断 185・186・投稿の前・AI Declaration の前提）＋ Discussion を研究者の解釈から書く（判断 188-6）＋ 断りの重複を削る（Z10）
       - [x] 読み直しの資料 `reading-results-discussion.md`（主張 ↔ 根拠・Discussion の事実 F1〜F8 と問い・断りの重複）を渡した（2026-10-06・判断 193）
       - [x] Discussion: 研究者の方向性 → 事実と照らし Codex に第二意見 → D12 の層ごとの範囲 → 5 段落を英語に → 研究者が採った → 点検と /cross-review 2 巡の直し（2026-10-06・判断 195〜199）
-      - [ ] 研究者の答え → 英語にする（§A の各段落・§C の断りを寄せる・§B.4 の 5〜7）
+      - [x] 研究者の答え（§A は今のまま・§C は案どおり・§B.4 の 5〜7・Discussion の仕上げの方針）を受けた（2026-10-06・判断 200）
+      - [ ] 判断 200 の方針で Discussion を仕上げ、断りを寄せる（引き継ぎ manuscript-5）
     - [ ] OSF のプロフィール名が「Mikto Miura」→ 研究者に確かめてもらう（判断 189 の記録）
     - [ ] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
