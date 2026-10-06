@@ -32,7 +32,7 @@ Skill: git-workflow・verify-before-claiming・data-privacy（書庫・--pack・
 
 ### 2.1 Mac（macOS の書庫と書き出しの確かめ）
 
-> ✅ **済み（2026-10-06・Mac・判断 214）**: 書庫 9 つは `~/ime-m4/deposit/`（`macos-e3-working-1.zip`・`pilot/`）、標本は `~/ime-m4/deposit/e3-samples/`。SHA-256 と `git_commit` は `data.md`。書き出し 3 種も確かめ済み。残りは 4（G-GEAR へ移す）だけ。
+> ✅ **済み（2026-10-06・Mac・判断 214）**: 書庫 9 つは `~/ime-m4/deposit/`（`macos-e3-working-1.zip`・`pilot/`）、標本は `~/ime-m4/deposit/e3-samples/`。SHA-256 と `git_commit` は `data.md`。書き出し 3 種も確かめ済み。4（G-GEAR へ移す）も、2026-10-07 に研究者が Google Drive の `mac/` へ手で上げ、ファイル名とサイズ 14 件の一致を Drive API で確かめた（`data.md` 末尾の節）。⚠️ SHA-256 は G-GEAR で照らす（Drive は返さない）。
 
 1. `data.md` の寄託の手順 1〜5 で、まだ書庫にしていないものを束ねる: macOS の E3 の `working` の run（Run checks の行 `macos-e3-working` は点検済み）、較正パイロットの run のうち寄託の条件を満たすもの（候補は datasheet の Parts 2: `pilot-1`・`verify-1`・`verify-s5`・`pilot2-on`・`pilot2-off`・`verify-off`・`short-1` と最初のパイロットの前の runner の run。封印したセッション行は寄託のためだけに `seal_obs.py --unseal` で戻し、解析しない）、E3 の標本（`idle` と `working` の **`samples.tsv` と `conditions.txt`**）。`--pack` に `--also-user`・`--also-home` を渡す（値は書かない）。SHA-256 を `data.md` の Deposits と「Machine that ran the deposit check」に記録する。寄託したパイロットの run と、通らなかった候補とその理由も `data.md` に書く。
 2. ★ datasheet のために（判断 213）: 各 run の `run.json` の **`git_commit` と `git_dirty` だけ**を読んで `data.md` に記録する（値は commit の 40 桁か `null`。非公開の作業 repo の commit なら datasheet にすでにそう書いてある）。
