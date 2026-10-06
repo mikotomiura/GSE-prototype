@@ -226,6 +226,17 @@ The runtime samples are the files of the `idle` and the `working` condition (`sa
 are not bundled by `--pack`. Before they were moved, they were checked by eye and by a search: none of the four files
 holds a path, the login name or the home directory. Their SHA-256 are those given above under question 5.
 
+### Move of the macOS archives and samples to the deposit machine (2026-10-07)
+
+The nine archives of the table above and the four sample files were moved from the measuring machine to the
+deposit machine through a folder of the researcher's Google Drive (`mac/`, with the sub-folders `pilot/` and
+`e3-samples/{idle,working}/`), uploaded by hand. After the upload, the file names and sizes in the folder were
+compared with the local files through the Drive API: 14 files, every size equal (the archive of the `working` run
+74,028,949 bytes; the eight pilot archives; the two `samples.tsv` 31,631 and 32,047 bytes; the two `conditions.txt`
+299 and 335 bytes), and nothing else in the folder. Drive does not return a SHA-256, so the check is of the sizes
+only. The SHA-256 of each archive are to be compared with the table of deposits above on the deposit machine
+before anything is uploaded to Zenodo.
+
 ## Phrase corpus
 
 `kit/corpus/data/phrases.jsonl` is the phrase corpus read by the scenario generator. It was built once with
