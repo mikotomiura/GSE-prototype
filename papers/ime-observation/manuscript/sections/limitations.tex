@@ -52,9 +52,10 @@ to a row is expected to be longer than the delays reported here. The rows take t
 event reaches the logger; the registration asks for network time synchronisation to be off during the runs, whether it
 was off was not recorded (Section~\ref{sec:method-cells}), and an adjustment of the clock while the logger runs, which
 in ordinary use can happen, moves the times of the rows. Such an adjustment was not tested; during the runs no trial was
-excluded for a step of the wall clock (Section~\ref{sec:results-detection}), and a smaller adjustment would show only in
-the drift between the clocks of the records, which was measured only at the block markers
-(Section~\ref{sec:results-reference}). The input mode was switched only by the mode keys; on macOS a switch made
+excluded for a step of the wall clock (Section~\ref{sec:results-detection}), but a smaller adjustment, or one undone
+within a block, need not show in the drift between the clocks of the records, which was measured only at the block
+markers (Section~\ref{sec:results-reference}), so an effect of such adjustments on the times within a trial is not
+ruled out. The input mode was switched only by the mode keys; on macOS a switch made
 otherwise is followed by polling the input source every 100~ms, which was not exercised.
 
 \paragraph{The rules of the macOS logger.} The minus, comma and period keys close a session, so a reading that contains
@@ -96,7 +97,7 @@ the absence of such errors; had every attempt been stopped, the cell would not h
 \paragraph{Recoverability.} The study judges one phrase at a time, not a whole log, and no record that keeps times;
 what else it does not evaluate, and that its attacks are not claimed to be the strongest possible, is stated in
 Section~\ref{sec:recoverability-method}. The Wilson interval of the near-chance rule treats trials as independent, so
-with positive dependence within a block the rule is met more easily than it should be
+with positive dependence within a block the rule can be met more easily than it should be
 (Section~\ref{sec:recoverability-method}).
 The decoys were not matched to the true phrase in length, so the numbers of
 keys of each category are expected to distinguish the candidates more than they would among phrases of equal length.
