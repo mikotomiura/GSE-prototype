@@ -1928,3 +1928,21 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 2 巡目（直しの境界 `a7ee74cb..ad710425`・364 行）: P2「小さな調整やブロックの中で戻る調整は印の間のずれに出ないことがある」→ 真 → 「試行の中の時刻への影響は除けない」に。P2「§8 の方法の文にも正の依存の前提を」→ 真 → 揃えた。`cd22a8ab`。
   - 検証: `build.sh --submission` main・main-submission・補遺ともエラー 0・未定義 0・生成されていない値 0・overfull main 0・main-submission 1（以前から）・補遺 167。文体の検査 違反 0。
 - **研究者の確認（AskUserQuestion・推奨どおり）**: 直した Discussion の全文（日本語の訳・この round で変えた所に印）と AI 宣言の直しを示し、研究者は「**このまま採る**」を選んだ（判断 204-8 の実行。宣言の「レビューの後の直しを含めて確かめて採った」が事実になった）。
+
+## 判断 205: プレプリントは PsyArXiv に、M12 の後・BRM への投稿の直前に出す（2026-10-06・G-GEAR・研究者の選択〔2 問とも推奨どおり〕）
+
+- **研究者の問い**: プレプリントの置き場所を決めたい（Zenodo はすぐ出せるが、MetaArXiv・Authorea なども検討したい）。
+- **一次で確かめた事実（2026-10-06）**:
+  - 投稿先の条件（Springer の journal policies の "Preprint sharing" の節・`curl` で cookie つきで原文を取得）: 逐語 "Springer Nature journals encourage posting of preprints of primary research manuscripts on preprint servers of the authors’ choice" / "preprints may be posted at any time during the peer review process" / "Posting of preprints is not considered prior publication" / "Authors should disclose details of preprint posting, including DOI and licensing terms, upon submission of the manuscript" / "Once the preprint is published, it is the author’s responsibility to ensure that the preprint record is updated with a publication reference, including the DOI and a URL link to the published version" / "Authors may choose any license of their choice for the preprint including Creative Commons licenses"。
+  - BRM の投稿規程（round 2 で取り直した原文）にはプレプリント・In Review・Research Square の語が無い。タイトル頁に著者名を求める → 二重盲検ではない（プレプリントで著者が分かっても査読の匿名性を壊さない）。
+  - PsyArXiv: 2025-08-19 から事前の審査（24〜72 時間・improvingpsych.org の告知）。2026-03 から、レビュー・事例・意見などの形式と、査読者が経験の少ない話題（言語学・計算論など）は過去の業績で専門性を見る（PsyArXiv の blog の逐語）。撤回は法的な義務があるときだけ（FAQ）。費用は無料。OSF のヘルプ: 承認されると DOI と固定の URL、ライセンスは CC0 か CC BY 4.0 を推奨。AI の扱いの規定は見つからなかった（未照合）。
+  - MetaArXiv: 対象はメタサイエンス（DOAPR の記録・BITSS の運営）。事前の審査で対象かどうかを見る → この論文（計測の道具の検証）は対象の外と判断されやすい。
+  - OSF の汎用のプレプリントサーバーは 2025-08-25 から受付を停止（COS の blog）。PsyArXiv・MetaArXiv・SocArXiv など 14 のコミュニティのサーバーは続いている。
+  - Authorea: 2018 年から Wiley の所有。2026 年 5 月に Wiley の Research Exchange Preprints へ移り、直接の投稿を一時停止して Wiley の Under Review 経由だけ（Wikipedia と検索の要約が一致・Authorea 本体のページは 403 で未照合）→ BRM（Springer）からは使えない見込み。
+  - Zenodo: 全分野・事前の審査なし・取り下げても墓碑の頁が残る（Zenodo の方針）。プレプリント専用のサーバーではない。
+  - arXiv: 初めての投稿には endorsement が要る。所属のメールが無ければ、既存の著者から個人的に受ける（arXiv のヘルプの逐語・memory の記録と一致）。
+- **研究者の選択（AskUserQuestion・推奨どおり）**:
+  1. 置き場所は **PsyArXiv**（BRM の読者に届き、OSF の事前登録とつながる）。同じ原稿にプレプリントの DOI を 2 つ付けない。Zenodo にはデータセットとコードの release を置く（M12）。PsyArXiv の審査で止まったら Zenodo に切り替える（そのとき研究者に確かめる）。
+  2. 時期は **M12 の後・BRM への投稿の直前**。データとコードの DOI を取り、`\tbd` を埋めて、BRM に出す版と同じものを出す（PsyArXiv はほぼ撤回できない・要旨の "code and data are public" が真になってから）。投稿のときにプレプリントの DOI とライセンスを申告し、掲載が決まったらプレプリントに掲載版の DOI と URL を足す。
+- **未決（そのとき決める）**: プレプリントのライセンス（推奨は CC BY 4.0・公開の材料と同じ）、PsyArXiv の分野の選び方、OSF の事前登録の project とのつなぎ方。
+- **影響範囲**: 本ファイル・引き継ぎ `next-session-ime-paper-manuscript-7.md`（M12 の後の手順に足した）。
