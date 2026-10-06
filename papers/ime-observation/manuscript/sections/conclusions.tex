@@ -61,8 +61,7 @@ records that keep time were not judged.
 
 The mean CPU of the logger, with one core as 100, was \rv{macos.e3.idle.cpu.mean} with the machine idle and
 \rv{macos.e3.working.cpu.mean} with scripted typing on macOS, and \rv{windows.e3.idle.cpu.mean} and
-\rv{windows.e3.working.cpu.mean} on Windows; the samplers of the two systems measure differently, and the values are not
-compared.
+\rv{windows.e3.working.cpu.mean} on Windows, each read within its own system (Section~\ref{sec:cost}).
 
 These estimates hold for one input method per system, the reference input fields and synthetic input. Whether the
 agreement holds for other input methods, for the applications in which people write, and for human typing is left to

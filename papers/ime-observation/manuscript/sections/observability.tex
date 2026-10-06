@@ -40,8 +40,8 @@ The Text Services Framework is the interface through which the Microsoft input m
 an application. Its thread manager is activated for the calling thread \citep{ms-tsf-activate}, and its sinks are
 installed on a source obtained from the thread manager or from a context of the calling process
 \citep{ms-tsf-advisesink}; no parameter of these calls names another process. The documentation for assistive
-technology states that "to access the composition string managed in TSF, the assistive technology products must
-create the ITfThreadMgr in the process of creating the target TSF-enabled applications"
+technology states that ``to access the composition string managed in TSF, the assistive technology products must
+create the ITfThreadMgr in the process of creating the target TSF-enabled applications''
 \citep{ms-ime-tsf-accessibility}. The text services of the framework, which provide text to applications, are
 implemented as in-process servers registered with the framework \citep{ms-tsf-architecture}, so code that takes this
 route runs inside the application. The input-method manager assigns an input context to each thread by default, and

@@ -98,9 +98,9 @@ and \rv{windows-msime-tsf.kt.obs.delay.all.median} on Windows, with 95th percent
 \rv{windows-msime-tsf.kt.obs.delay.all.p95}; the median interval error was
 \rv{macos-standard-live-off.kt.obs.interval.all.median}, \rv{macos-standard-live-on.kt.obs.interval.all.median} and
 \rv{windows-msime-tsf.kt.obs.interval.all.median}. The report counts the trials that could not be paired over all
-speeds, not per speed. These figures cover the software path from the dispatch of a synthetic event to the row; they
-include neither the path from a physical key nor any external clock. The same figures for the key-downs of the macOS
-reference field are given in the supplement.
+speeds, not per speed. These figures cover the software path from the dispatch of a synthetic event to the row
+(Section~\ref{sec:method-reference}). The same figures for the key-downs of the macOS reference field are given in the
+supplement.
 
 \paragraph{Losses of focus.} Apart from the planned switches of S15, the reference field lost the focus once, in the
 macOS run with live conversion off (\rv{macos-standard-live-off.focus.trialswithfocusloss} trial). The trial had no
@@ -117,14 +117,13 @@ and the observation minus the reference \rv{windows-msime-tsf.markers.obsgt.medi
 observation minus the reference had a median of \rv{macos-standard-live-off.markers.obsgt.median} with live conversion
 off and \rv{macos-standard-live-on.markers.obsgt.median} with it on (ranges
 \rv{macos-standard-live-off.markers.obsgt.range} and \rv{macos-standard-live-on.markers.obsgt.range}). Each difference
-combines the offset between the clocks of two processes with the delay of the path by which each record receives a
-press, and no external clock separates the two. The observation minus the executor is the quantity that the delay of
-the key rows above measures, taken here at the marker presses only. The values per block are given in the supplement.
+combines a clock offset with a path delay (Section~\ref{sec:method-checks}). The observation minus the executor is the
+quantity that the delay of the key rows above measures, taken here at the marker presses only. The values per block
+are given in the supplement.
 
-\paragraph{What the reference does not establish.} The reference is software on the measured machine: its agreement with
-the logger is agreement between two software records, not accuracy against an external standard, and the kind of
-field affects it (in the Windows pilot, the two candidate fields committed at different points in one scenario;
-Section~\ref{sec:method-reference}).
+\paragraph{What the reference does not establish.} The agreement of the logger with the reference is agreement between
+two software records, not accuracy against an external standard, and the kind of field affects it
+(Section~\ref{sec:method-reference}).
 
 \input{generated/table-reference}
 \input{generated/table-key-timing}

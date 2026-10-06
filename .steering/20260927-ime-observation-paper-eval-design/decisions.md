@@ -1863,3 +1863,18 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **語数**（コメントを除いた粗い数・`\rv` と参照は 1 語）: Discussion 1,014 → 1,147（2 段落を足して +133）。
 - **検証**: `build.sh`（main・補遺）エラー 0・未定義の参照 0・未定義の引用 0・生成されていない値 0・bibtex の警告 0・overfull main 1・補遺 167（以前と同じ）。文体の検査 違反 0・新しい行は 120 字以内。
 - **影響範囲**: `manuscript/sections/discussion.tex`・`manuscript/references.bib`・`docs/references.md`（[V162] の備考）・本ファイル。
+
+## 判断 202: 断りの重複（資料 §C の 7 種）を方法の節に寄せる —— 結果・限界・関連研究は 1 句か節の参照に、要旨・結論・推奨 (a)(c) は残す（2026-10-06・G-GEAR・判断 200-5 の研究者の選択の実行・個々の置き方はメインの選択・研究者が覆せる）
+
+- **置き場所（定義と理由を 1 回）と直したところ**:
+  1. プライバシーの基準ではない → §8 の方法「What is not evaluated」に「it is not a criterion of privacy」を足して置き場所に。§8 の結果の一文（「this result is not a judgement of the privacy of a log」）を削った。§13 の Recoverability は「1 句ずつ・時刻のある記録は判定しない」と §8 の方法の参照に縮め、§13 にしか無い向きの予想（囮の長さ）だけ残した。推奨 (c)・(f)・結論は残す。
+  2. サンプラーが違う → §9 の方法のまま。§9 の結果・§13・結論は「each read within its own system」と §9 の参照に（理由の句を外した）。
+  3. 別の構成概念 → §3.6 のまま。§1 は「logger は窓・参照は composition → 一致は差を含む（§3.6）」に、§13 は 1 句と参照に。要旨・結論・推奨 (a)・§4 の表は残す。Discussion は観測可能性の段落の 1 句（判断 201）。
+  4. 外部の装置・時計なし → §5.3 の方法のまま。§6 の 3 か所（キー行の時刻・印の時刻・「What the reference does not establish」）と §13 と §2.4 を 1 句と参照に。§2.4 は理由（どの外部装置も呼び出しを観測しない）を残し、「外部装置なら何を測れたか」の一文を §5.3 に任せた。
+  5. プールの Wilson は下限 → §5 の方法（2 か所とも方法の中・意味に触れないので変えない）。§13 は 1 句と参照に（ブロックを越えた依存の句は §13 にしか無いので残す）。⚠️ 補遺の D12 の表の注（`results_tables.py` が生成）は表が単独で読まれるので変えない。
+  6. 自然なタイピングの推定ではない → §5 の方法のまま。結論は残す。§11 の冒頭の「not a record of human writing and not a benchmark of natural typing」は同じ節の §11.4 の一覧と重なるので冒頭を削った。§1 の最後の文は研究全体の範囲の宣言なので残した。
+  7. 時刻のある集合は推定のみ → §8 の方法（近偶然の規則）のまま。§8 の結果は 1 句と参照に、§13 の 2 か所（「one reason they are reported as estimates only」と Recoverability の括弧）を外した。
+- **ついでに直したもの**: §3.2 の Microsoft の逐語の引用符が直線の `"` で組まれていた → `` `` … '' `` に（PDF 7 頁で見つけた）。尺度の段落のキー行の遅れをセルの名前で並べた（「1.0 ms and 1.0 ms on macOS」と読めたため）。
+- **語数**（コメントを除いた粗い数・`\rv` と参照は 1 語・節の .tex の合計）: 断りの寄せで 25,602 → 25,367（−235）。セッションの始め（`46262e59`）から −102（Discussion の 2 段落 +133 を含む）。要旨は変えていない（`_count_abstract.py` は回していない）。
+- **検証**: `build.sh --submission` main・main-submission・補遺ともエラー 0・未定義の参照 0・未定義の引用 0・生成されていない値 0・bibtex の警告 0・overfull は main 0（以前は 1）・main-submission 1（書誌の WebKit の項目のパスの中・今回触れていない段落）・補遺 167。文体の検査 違反 0。足した行は 120 字以内。PDF 7・41〜43 頁を画像で確かめた。
+- **影響範囲**: `manuscript/sections/` の introduction・related・observability・results-agreement・recoverability・cost・dataset・limitations・conclusions・discussion。
