@@ -1,5 +1,7 @@
 # 次セッション — IME 論文 M12 の続き: Mac・Surface で書庫と書き出しの確かめ → G-GEAR で Zenodo に上げてリリース D → 公開の確認
 
+> ⚠️ **2026-10-06 夜（G-GEAR・判断 215）に、残りを機械ごとの引き継ぎに分けた（研究者の求め）。次はこちらを読む**: Mac → `next-session-ime-paper-m12-mac.md`（判断 216）・Surface → `next-session-ime-paper-m12-surface.md`（判断 217）・G-GEAR（両方の後）→ `next-session-ime-paper-m12-ggear.md`（判断 218〜）。どれも枝 `docs/ime-m12-deposit-prep` から切る。このファイルは分け元として残す。
+
 > 作成: 2026-10-06 夜（G-GEAR）。判断 212・213 の後（PR #316・#317 は main に merge 済み）。`next-session-ime-paper-manuscript-8.md` をこれで置き換える。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 207〜213**、`tasklist.md` の M12 の小項目、`papers/ime-observation/kit/export/README.internal.md`（公開の履歴と手順）、`experiment/data.md`・`data.windows.md` の寄託の手順、`experiment/datasheet.md`。状態は着手時に `git fetch` で測り直す。
 > ⚠️ このファイルは枝 `docs/ime-m12-handoff-9` にある（.steering だけの変更なので PR を出していない）。main にはまだ無い → `git fetch` の後、新しい作業はこの枝（＝ main ＋ この引き継ぎ）から切る。
