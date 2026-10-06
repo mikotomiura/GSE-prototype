@@ -31,6 +31,7 @@ Skill: git-workflow・verify-before-claiming・data-privacy（書庫・--pack）
 - ✅ README の先頭にロゴ（ライトとダーク）と動く SVG（判断 210・研究者の求め）。⚠️ GitHub での見え方は push の後に確かめる。
 - ✅ 作業中の点検（code-reviewer ∥ security-checker）の指摘 14 件を一次で確かめて直した（判断 211）: アドレスの例外の境界（`@`）と範囲（`manuscript/` だけ）・SVG の能動的な要素を止める `check_svg`・入れ子の `.gitattributes` が root の強制 `text` を上書きしていたのを戻す・長い行・図の説明（`nav` は矢印キーの押下の数）・表 1 は「This logger 0.1.0, in release 1.0.0 of the code」。
 - ✅ 本番の形の書き出し（ライセンスあり）が G-GEAR で exit 0・194 ファイル・その木で `kit/check.sh` 31 本が緑。
+- ✅ 2026-10-06 夜（G-GEAR）: PR #316 を /cross-review の直しの後に merge（`c77e324f`・判断 212）。続けて datasheet を下書きした（枝 `docs/ime-m12-datasheet`・判断 213・未 PR）。研究者の確認（`.steering/20260927-ime-observation-paper-eval-design/datasheet-reading-ja.md`）と /cross-review（その日の Codex は上限超え）が残る。書き出しは datasheet を含めて 195 ファイル。
 - 残る `\tbd` 8 か所: `dataset.tex` の `confirmed at deposit`（working の観測ログ）と `written at deposit`（datasheet）、試行の表（`results-agreement.tex`）の `at deposit` 6 か所。
 
 ## §2 やること
@@ -58,17 +59,19 @@ push の後、`git ls-remote https://github.com/mikotomiura/ime-conversion-loggi
 1. `data.md` の寄託の手順 1〜5 で、まだ書庫にしていないものを束ねる: macOS の E3 の `working` の run（Run checks の行 `macos-e3-working` は点検済み）、較正パイロットの run のうち寄託の条件を満たすもの（外枠 DS1・判断 183-3・封印したセッション行は寄託のためだけに開け、解析しない）、E3 の標本（`samples.tsv`・`idle` と `working`）。`--pack` に `--also-user`・`--also-home` を渡す（値は書かない）。SHA-256 を `data.md` の Deposits と「Machine that ran the deposit check」に記録する。
 2. 公開物の書き出しを Mac で回して、Mac の値（ホーム・ログイン名・ホスト名）が入っていないことを確かめる: 2 つの凍結のタグのきれいな worktree でタグ自身の `export.internal.py --allow-missing-license`（一覧が `29b183ba…`・`f61af353…` と一致）、`origin` から取った最新の枝で本番の形の書き出し（exit 0）と、その木で `bash kit/check.sh`。
 3. 書庫を G-GEAR に移す（研究者・Windows の書庫と同じ道）。
+4. ★ datasheet のために（判断 213）: 各 run の `run.json` の `git_commit` と `git_dirty` **だけ**を読んで記録する（ログは開かない・値は commit の 40 桁か `null`）。各条件の `conditions.txt` を `samples.tsv` と一緒に移す（寄託する）。寄託したパイロットの run の名前と、寄託しなかった候補とその理由を `data.md` に書く。
 
 ### 2.3 Surface（Windows の書庫と書き出しの確かめ）
 
 1. 2.2 の 1 と同じことを Windows で: E3 の `working` の run、較正パイロットの run（⚠️ 2 つ目の参照入力欄のものは寄託しない・`dataset.tex`）、標本。`data.windows.md` に記録。Windows のセルの書庫 `windows-msime-tsf-2.zip` は G-GEAR の `Downloads` にもある（SHA-256 `f2287a74…cd06` を照らす）。
 2. 2.2 の 2 と同じ確かめを Surface で。
 3. 書庫を G-GEAR に移す。
+4. ★ datasheet のために（判断 213）: 2.2 の 4 と同じ（`git_commit`・`git_dirty`・`conditions.txt`・寄託したパイロットの run）。加えて、**§10.8 の確かめの run（パイロットの `verify` 計画 39 試行・2026-10-04 00:27〜00:37 JST）と、その最初の開始（runner が鍵を送る前に中止）もパイロットの部の候補として `--pack`** する（研究者の選択・判断 213-3）。runner が中止した Windows のパイロットの 3 つの試みは、`--pack` の前に `run.json` の `abort_reason` の文字列にアプリ名や窓の題が入っていないかを確かめる（security-checker の残し・`run_cell.py` の前面の窓の確かめの失敗の文を一次で読む）。管理者権限で拒まれた計測の開始（oracle のヘッダだけ）は、寄託の規則（`dataset.tex` §11.3）で決めて `data.windows.md` に書く。
 
 ### 2.4 G-GEAR（すべての書庫がそろってから）
 
 1. 書庫の SHA-256 を `data.md`・`data.windows.md` と照らし、Zenodo のデータセットの下書き（23183438）の bucket に上げる（API・token はプロセスの中で読むだけ）。datasheet・`FORMATS.md`・コーパス・計画の設定と seed も（表 13 のとおり）。
-2. datasheet（Gebru らの形）を下書きする。⚠️ Claude が書いたら AI 宣言の使い道に足し、研究者が確かめる。
+2. ✅ datasheet は 2026-10-06 に下書きした（判断 213・`experiment/datasheet.md`・枝 `docs/ime-m12-datasheet`）。ここでは「(to be filled in at deposit)」の印（ファイル名・SHA-256・寄託したパイロットの run・working の観測ログ・macOS の `git_commit`・管理者権限で拒んだ開始・公開日）を埋める。⚠️ 研究者が全文を確かめたか（`datasheet-reading-ja.md`）と、その枝が merge 済みかを先に見る。
 3. `\tbd` の残り 8 か所（試行の表の `at deposit` は寄託の規則で決まる・`confirmed at deposit`・datasheet）を埋め、`data.md`・`data.windows.md` の Deposits の場所と日付を埋める。`build.sh --submission`・文体の検査。
 4. リリース D: 最新の枝の本番の形の書き出しを C の上に commit（`README.internal.md` の手順・`#!` に実行ビット）→ タグ `v1.0.0` → `git archive` の zip をソフトウェアの下書き（23183441）に上げる。Zenodo の説明を書き直す（"Draft." を消す）。
 5. **研究者に確かめる**: GitHub の repo を public に・Zenodo の 2 つを publish（取り消せない）。公開の後、README の図とロゴ（ライト・ダーク）と DOI のリンクを Chrome で確かめる。
