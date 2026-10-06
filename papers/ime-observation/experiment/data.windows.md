@@ -21,6 +21,16 @@ listed here; the runs of question 5 appear only in the tables below.
 | Cell label | Deposit location | SHA-256 of the archive | Date deposited |
 |---|---|---|---|
 | windows-msime-tsf (attempt 2; packed on the measuring machine, Windows 11 Home, with `--also-user` and `--also-home` each given once) | not yet deposited | `f2287a7494b108a7b827f96da48f523e84e1a9478121d03fa82dca2c8749cd06` | not yet deposited |
+| windows-msime-tsf-refused-start (the start of the measurement that the runner refused before the first trial; packed on the measuring machine on 2026-10-06) | not yet deposited | `a5afe2dcbe57f37f92e115aa16be4b5dc5500894e4ce4cf13dab3615448a1447` | not yet deposited |
+| windows-e3-working (the `working` run of question 5; packed on the measuring machine on 2026-10-06) | not yet deposited | `39d40801197ce0e95f0271899c83d53b6bbd6dc977c6172e6e615385bddb1f45` | not yet deposited |
+| windows-pilot-short-tsf (calibration pilot; packed on the measuring machine on 2026-10-06) | not yet deposited | `a31d48d1c797535ee92c9b03c48be8e83bc5705202e15859f69d1f41cd977ced` | not yet deposited |
+| windows-pilot-pilot-tsf (calibration pilot) | not yet deposited | `634ceff63ca0f43d65d49e506e877ae48bf238ec9c43330228d2cb4c915a1111` | not yet deposited |
+| windows-pilot-verify-tsf (calibration pilot) | not yet deposited | `546ab6ed5b76bb79a40c679177167c26be6fa4461a45acdd17d656a0f840823c` | not yet deposited |
+| windows-pilot-toolcheck-tsf (calibration pilot) | not yet deposited | `c066d36bcb90562c30a11ee84decfd37ffa9c4d88b31b4fcad5873884b4adbf5` | not yet deposited |
+| windows-pilot-aborted-a (calibration pilot; the attempt with plan `short` that the runner aborted because the foreground window was refused) | not yet deposited | `1f8ae344c9ea8f95fafa85e26b20c8b782974df05204fe1df79fb6d1ce2e10f9` | not yet deposited |
+| windows-pilot-aborted-b (calibration pilot; the attempt with plan `pilot` that the runner aborted because the foreground window was refused) | not yet deposited | `7565058faf6f8cf794586d836d59167901540960ac7321ad7b9d4cef91e76432` | not yet deposited |
+| windows-check-verify (the check of section 10.8 before the measurement) | not yet deposited | `e980074f56032f3c264f82df2d0b4f4f8a10eeddd3b2f8e4cc5d607323f1a217` | not yet deposited |
+| windows-check-verify-start-1 (the first start of that check; aborted by the runner before any key was sent) | not yet deposited | `6a910ea2ad4b2d27b4ef86c971edfa2090f8e2e2c3ddadd021748bb4e40f07ba` | not yet deposited |
 
 ## Run checks (sections 3.4 and 10.8 of the pre-registration)
 
@@ -185,3 +195,85 @@ cells share.
   files are byte-identical. The
   closed-set results of the two cells are different files; their accuracies for the two feature sets that keep no time
   are the same to the reported precision.
+
+## Machine that ran the deposit check
+
+Record, for every archive, the machine on which `--pack` was run and whether `--also-user` and `--also-home` were
+passed, as in `data.md`. The values themselves are not written here. `windows-msime-tsf-2.zip` was packed earlier on the
+same machine (table of deposits above); the other rows are those packed on 2026-10-06.
+
+| Cell label | Machine (operating system, host role) | `--also-user` passed (number of values) | `--also-home` passed (number of values) | Date checked |
+|---|---|---|---|---|
+| windows-msime-tsf | Windows 11 Home, the measuring machine | yes (1) | yes (1) | not recorded (before 2026-10-05) |
+| windows-msime-tsf-refused-start | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| windows-e3-working | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| windows-pilot-short-tsf | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| windows-pilot-pilot-tsf | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| windows-pilot-verify-tsf | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| windows-pilot-toolcheck-tsf | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| windows-pilot-aborted-a | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| windows-pilot-aborted-b | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| windows-check-verify | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+| windows-check-verify-start-1 | Windows 11 Home, the measuring machine | yes (1) | yes (1) | 2026-10-06 |
+
+## Calibration-pilot runs, the check of section 10.8, the refused start and the `working` run, packed on the Windows machine (2026-10-06)
+
+The candidates of the datasheet (Part 2), the `working` run of question 5 and the refused start were packed from copies
+of the run directories, each with `--also-user` and `--also-home` given once. The sealed observation logs (of the four
+pilot runs and of the check) were unsealed in the copies only to be deposited (`kit/pilot/seal_obs.py --unseal`); they
+were not read and are not analysed. No log (`plan`, `oracle`, `gt`, `obs`) was opened in this work. Before packing,
+`pipeline.py --check-deposit` was run on a copy of every run that the machine holds from the Windows pilot, from the
+check and from the measurement's refused start (twelve copies), with the code of this repository. For the attempts
+that the runner aborted, only the field `abort_reason` of `run.json` was read.
+
+The table gives the fields of each `run.json` that the datasheet asks for (`git_commit`: the commit of the working
+repository that the runner ran from, which is not a commit of the public repository; `git_dirty`: whether that tree had
+uncommitted changes) and its SHA-256. `null` means that the runner was started from an export, not from a git work
+tree.
+
+| Run | `git_commit` | `git_dirty` | Aborted by the runner | SHA-256 of `run.json` |
+|---|---|---|---|---|
+| windows-e3-working | `null` | `null` | no | `1e5f40ac835978ad2adc722b3e17b23bb4b6b4424706c87b7de377ec552e217a` |
+| short-tsf | `null` | `null` | no | `52720dd666ee1a5ad36d04671598b2ab0f6263f23080caaf814c528c7bba6efe` |
+| pilot-tsf | `null` | `null` | no | `a529c33cf79be2e323d73bf27552a3b3fcfebc2c44a357a8d09db02801d285ab` |
+| verify-tsf | `null` | `null` | no | `2268c9ce420bac326bda75cc878b5b497dc42112f9c09f9d7a8b239cfeacd3f8` |
+| toolcheck-tsf | `0ae8619361f814e9eea8185225eeb63fb90cd2ba` | true | no | `378191c55d2ec276d07e04cb9e7ef56870766f79ec697dd2c1f87b1add885578` |
+| aborted-a (plan `short`) | `null` | `null` | yes (foreground window refused) | `b627e7413bd69d36e7d5483c302273ffcc85cfdc0f484d076068798ec1ac80e6` |
+| aborted-b (plan `pilot`) | `null` | `null` | yes (foreground window refused) | `7c86fbbeefab975016d20f4d416c802a9a8751506e5a677530be4390b25984c6` |
+| check-verify | `null` | `null` | no | `d91221a2d13d9bbe5f5bfdfc3d32f2d6f7e148002a573fb4d7804c18d61ac3e3` |
+| check-verify-start-1 | `null` | `null` | yes (`FileNotFoundError`, before any key) | `0d72b4039208d00baf46bdfbdd841739118bcc7e3026895fdcea6554d11dc2f8` |
+| refused-start | `null` | `null` | yes (administrator rights) | `0027d0a428b554181ae3aa36f08f6e564fe7c207bb30d8718942be6c99ced1b9` |
+
+- **What the `abort_reason` strings hold.** Before they were read, the code that writes them was read: the messages of
+  `kit/emit/backend_windows.py` and `kit/run/run_cell.py` name the key or the backend option and a count, never a window
+  title or an application name. The strings read (that of the first start of the check, `FileNotFoundError`, carries the
+  operating system's message in the language of the system, without a path) held no application name, window title or
+  path. The `working` run and the refused start have the plan of the Windows cell (`b7bdf8fc…`); the plans of the pilot
+  runs are not the plan of the cell.
+- **Candidates that did not pass.** (1) The attempt with plan `short` that the runner aborted because the window used as
+  the target of S15 was closed (finding 5 of the pilot): `--check-deposit` refused it (exit status 1: the observation
+  log holds key presses that the measured trials and the procedure do not explain, in the segment of block 0;
+  deviation D4), so it is not deposited, as the rule for a run aborted inside a trial requires. (2) A fourth attempt
+  that the machine holds, with the IMM reference field and plan `pilot`, aborted for the same refusal of the
+  foreground window as aborted-b: `--check-deposit` refused it (exit status 1: the reference log does not come from
+  the reference input field of the Windows cell; deviation D2). It is a run with the IMM field, which is not
+  deposited; the sentence of `pilot-windows.md` that twice the foreground window was refused counts the two attempts
+  with the TSF field. The first attempt of the measurement, stopped from outside inside a trial, has no manifest and is
+  not packed (table of run checks above).
+- **The refused start.** The start of the measurement that the runner refused (administrator rights, before the first
+  trial; table of run checks above) is deposited. The rule of section 11.3 of the article admits a run aborted by the
+  runner that passes the same checks or left neither a reference log nor an observation log. The start passes
+  `--check-deposit` (exit status 0), and no key was sent. The researcher's decision of 2026-10-04 that it is not
+  counted among the attempts is unchanged by its being deposited.
+- **`toolcheck-tsf`.** It is the only run whose `run.json` records a commit: the runner ran from a git work tree that
+  had uncommitted changes (the tools under check).
+- The error output of the programs (`*.stderr.txt`, `runner.error.txt`) is not deposited and stays on the measuring
+  machine.
+
+The runtime samples are the files of the `idle` and the `working` condition (`samples.tsv` and `conditions.txt`; four
+files in all). They are not bundled by `--pack`. Before they were moved, they were checked by eye and by a search: none
+of the four files holds a path, the login name, the home directory or the host name. The SHA-256 of the two
+`samples.tsv` are those of the section on experiment 3 above. The `conditions.txt` of each condition:
+
+- `conditions.txt` of `idle`: `13bf360fb1d0554b215db6896f522ea0efd4995b0c3c574bdf293c4d792f8122`
+- `conditions.txt` of `working`: `9b6ae9391481a57cfee74654316203e7ef33152e72980af44bd022a5c8f68345`
