@@ -1831,3 +1831,7 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 2「`definition_changes()` は両定義で範囲に入る層の共通部分だけを比べ、片方だけで値を持つ層が数から消える・precision の分母を本文が示さない」→ 真（実データでは 0 で数値に影響なし）→ 片方だけの層の数 `*.change.<m>.onlyone`（実データ 0）を足し、本文は「of the N strata that enter both」と precision の分母も `\rv` で。
   - 3「`bland_altman` があって限界が None のとき道具が落ちる」→ 真（`stats.py` 144 行: n=1 で限界は None）→ 限界と中央絶対差を別々に、値のある速さだけから取り、`speeds.used` は限界のある速さを数える。
   - selftest 181 件（n=1 の速さ・片方だけの層）。変異 9 本（Discussion の値・n=1 の速さを含む）・20 本（D12・片方だけの層を数えない、を含む）・前の 17 本すべて赤（2 本は最初当たらず: 文字列の古さ 1・変異の甘さ 1 → 直して赤を確かめた）。`build.sh --submission` エラー 0・生成されていない値 0。文体 違反 0。
+- **追記（/cross-review 2 巡目・直しの境界 `83ed8637..192ec2c8`・3 ファイル・362 行・27,783 tokens・今日の台帳 244,646 / 8 回）**: 3 件とも真（安い）→ 直した。
+  - 1「片方の定義だけの層の数が本文に出ない」→ 道具が注記 `*.change.onlyone.note`（0 なら「no stratum entered a range under one definition only」、そうでなければ数）を作り、¶5 に括弧で入れた（実データは 0）。
+  - 2「¶1 の『almost every session で規則に従った』は検出の一致だけでは言えない」→「detected almost exactly the sessions that its own rules specify …, with almost the same durations」に（属性〔abandon・nav〕は言わない）。
+  - 3「欠けの境界のテストが無い」→ すべての速さで限界が無い場合（幅は値なし・中央絶対差は出る）と、共通の定義に層が無い場合（比べた数 0・最大は値なし・片方だけ 2）を selftest に足した。selftest 183 件・変異 9・21（注記を常に「なし」にする、を含む）・17 本すべて赤。`build.sh --submission` エラー 0・生成されていない値 0。文体 違反 0。

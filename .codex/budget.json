@@ -24,8 +24,8 @@
   "_comment_merge_2026_10_02": "2026-10-02: feature/o1-task-kind-other に origin/main を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり和を採った: 起点 108230 / 2 回 ＋ 本ブランチ +30373 / +1（ADR-037 の /cross-review） ＋ origin/main +263512 / +6（AI 疲労 文献 DB の Codex） = 402115 / 9 回。",
   "today": {
     "date": "2026-10-06",
-    "tokens_used": 216863,
-    "invocations": 7
+    "tokens_used": 244646,
+    "invocations": 8
   },
   "history": [
     {

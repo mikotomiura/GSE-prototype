@@ -955,6 +955,14 @@ def definition_values(cell):
             vals["%s.change.%s.of" % (base, m)] = {"text": str(compared), "value": compared, "source": ssrc}
             vals["%s.change.%s.max" % (base, m)] = {"text": fmt_p(largest), "value": largest, "source": ssrc}
             vals["%s.change.%s.onlyone" % (base, m)] = {"text": str(onlyone), "value": onlyone, "source": ssrc}
+        # For the text: the strata that enter a range under one definition only, which the counts above leave out.
+        only = [vals["%s.change.%s.onlyone" % (base, m)]["value"] for m in ("recall", "precision")]
+        vals[base + ".change.onlyone.note"] = {
+            "text": "no stratum entered a range under one definition only" if not any(only) else
+            "%d strata entered the range of recall and %d that of precision under one definition only" % tuple(only),
+            "value": only, "source": "%s:cells/%s/{%s,%s}/%s/%s/metrics/by_stratum" % (
+                cell.src["e1_detection.json"], cell.label, cell.definition, COMMON_DEFINITION, PRIMARY_COMPARISON,
+                scope)}
     return vals
 
 
@@ -3727,6 +3735,24 @@ def _selftest_definitions(check):
         _expect_stop(check, "definitions: negative: no result under the common definition stops", tmp)
         with open(detp, "wb") as f:
             f.write(original)
+        # No stratum of the common definition in the primary scope: nothing is compared, the largest change has no
+        # value, the strata of the analysis enter one range only, and nothing stops.
+        _rewrite(detp, lambda d: d["cells"]["windows-test"][COMMON_DEFINITION][PRIMARY_COMPARISON]["under_limit"][
+            "metrics"].update({"by_stratum": []}))
+        try:
+            v1 = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+            gv = lambda k: (v1.get("windows-test.defs." + k) or {}).get("text")
+            got = (gv("primary.change.recall.of"), gv("primary.change.recall.max"),
+                   gv("primary.change.recall.onlyone"), gv("primary.common.recall.range"),
+                   gv("primary.change.onlyone.note"))
+        except Exception as ex:  # a crash is a failure of this check, not of the selftest
+            got = repr(ex)
+        check("definitions: with no stratum to compare, the counts are zero and the largest change has no value",
+              got == ("0", NO_VALUE, "2", NO_VALUE,
+                      "2 strata entered the range of recall and 2 that of precision under one definition only"),
+              str(got))
+        with open(detp, "wb") as f:
+            f.write(original)
         # Without the report of whether the definitions hold the same sessions, the supplement cannot place the cell.
         _rewrite(detp, lambda d: d.pop("same_sessions_as_all"))
         _expect_stop(check, "definitions: negative: no report of whether the definitions hold the same sessions stops",
@@ -3805,6 +3831,23 @@ def _selftest_decomposition(check):
             got = repr(ex)
         check("decomposition: a speed without limits of agreement is left out of their span and counted",
               got == ("$-$1,398 to 802~ms", "2", "30 to 50~ms"), str(got))
+        with open(l1p, "wb") as f:
+            f.write(original)
+
+        def all_one_pair(doc):
+            for e in doc["cells"]["macos-test"]["macos_def"]["pred_obs"][PRIMARY_SCOPE]["metrics"]["by_speed"]:
+                e["dwell"]["n"] = 1
+                e["dwell"]["bland_altman"].update({"n": 1, "sd": None, "loa_lo": None, "loa_hi": None})
+        _rewrite(l1p, all_one_pair)
+        try:
+            v1 = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+            got = ((v1.get("macos-test.predobs.primary.dwell.loa.span") or {}).get("text"),
+                   (v1.get("macos-test.predobs.primary.dwell.speeds.used") or {}).get("text"),
+                   (v1.get("macos-test.predobs.primary.dwell.mae.span") or {}).get("text"))
+        except Exception as ex:  # a crash is a failure of this check, not of the selftest
+            got = repr(ex)
+        check("decomposition: with no speed that has limits of agreement, the span has no value and the median "
+              "absolute differences are still given", got == (NO_VALUE, "0", "30 to 50~ms"), str(got))
         with open(l1p, "wb") as f:
             f.write(original)
         check("decomposition: each layer is read from its own comparison, in the primary scope, with the trials of the "
