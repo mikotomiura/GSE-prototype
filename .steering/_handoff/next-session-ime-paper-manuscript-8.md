@@ -21,7 +21,7 @@ Skill: git-workflow・verify-before-claiming・data-privacy（書庫・--pack）
 - ✅ 原稿の attack-me は round 2 で閉じた（round 3 は回さない・判断 206）。`round-1/tmp/`・`round-2/tmp/` は消した。
 - ✅ M12 の進め方（判断 207）: リリースの DOI は手で上げて予約（判断 183-4 を覆した）・公開 repo は `mikotomiura/ime-conversion-logging`・履歴は A〜D・非公開の commit の参照は置き換え・書庫は G-GEAR に集める。
 - ✅ Zenodo の下書き（判断 208）: データセット deposition `23183438`（**DOI 10.5281/zenodo.23183438**）・ソフトウェア deposition `23183441`（**DOI 10.5281/zenodo.23183441**）。どちらもファイルなし・説明は仮（"Draft. …"）。
-- ✅ GitHub の repo を**非公開・空**で作った。⚠️ **push は自動モードの判定で拒まれた**（研究者が push する・§2.1）。
+- ✅ GitHub の repo を非公開で作った。push は自動モードの判定で拒まれたので、研究者が A〜C を push した（§2.1）。
 - ✅ 公開の履歴 A〜C を手元で組んだ（`C:/wt/ime-conversion-logging.git`・bare）:
   - A `bf137ffec0549ddb699e02e1efd6c88202230764`（タグ `ime-observation-prereg-macos`・一覧 `29b183ba…` 98 ファイル）
   - B `32a5e18076884bb2e4aea59606726a3faeecac7b`（タグ `ime-observation-prereg-windows`・一覧 `f61af353…` 108 ファイル）
@@ -40,7 +40,9 @@ Skill: git-workflow・verify-before-claiming・data-privacy（書庫・--pack）
 - PR #316 は作業中の点検（判断 211）まで済み、/cross-review（Codex）は未実施。⚠️ 差分は `values.tex` だけで 2,600 行あり fail-closed になる → `run-codex-review.sh origin/main..HEAD -- <paths>` で、コードのパス（`kit/export/export.internal.py`・`issues/_style_check.py`・`assets/make_assets.py`）と公開の文書の主な変更（`README.md`・`.gitattributes`・`manuscript/sections/declarations.tex`）に絞る。1 巡目＝自文書・他文書の矛盾、2 巡目＝足した規則の境界条件（memory）。回す前に origin/main の台帳（`.codex/budget.json`）も見る。
 - 指摘を一次で確かめて直す（判断 212〜）→ CI 緑なら merge（git-workflow ルール 6）→ main の CI を確かめる。
 
-### 2.1 研究者（どの機械でも・最初に）: 公開 repo に A〜C を push する
+### 2.1 ✅ 済み（2026-10-06）: 研究者が公開 repo に A〜C を push した
+
+`git ls-remote` で main = `cb29a1a9086e77c89cb66c05e39ba4fc8091e074`、タグ `ime-observation-prereg-macos` → `bf137ffe…`・`ime-observation-prereg-windows` → `32a5e180…`。repo は非公開のまま。⚠️ ロゴと動く図はリリース D の README に入るので、GitHub での見え方は D を push した後に確かめる。以下は当時の手順（記録）。
 
 G-GEAR で（`!` を付けるとこのセッションで実行される）:
 

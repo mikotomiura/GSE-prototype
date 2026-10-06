@@ -268,7 +268,8 @@
       - [x] 非公開の commit の参照 12 か所の置き換え・`\tbd`（DOI・URL・外枠の commit・表 1 の版）・`references.bib`・CITATION.cff・.zenodo.json・ライセンスの全文・.gitattributes・凍結の一覧を計算し直す手順（README）（判断 209）
       - [x] README の先頭にロゴと動く SVG（研究者の求め・判断 210）
       - [x] 作業中の点検（code-reviewer ∥ security-checker）の指摘 14 件を直した（判断 211）
-      - [ ] ⚠️ 研究者が公開 repo に A〜C を push（`next-session-ime-paper-manuscript-8.md` §2.1）→ GitHub での README の見え方を確かめる
+      - [x] 研究者が公開 repo に A〜C を push した（2026-10-06・`git ls-remote` で main = `cb29a1a9…`・タグ 2 つが A・B を指す・非公開のまま）
+      - [ ] GitHub での README（ロゴ・動く図）の見え方を確かめる（ロゴと図はリリース D の README に入る → D を push した後）
       - [ ] datasheet（Claude の下書き → AI 宣言に足す → 研究者が確かめる）
       - [ ] Mac / Surface: working・パイロット・標本の書庫（`--pack`・`--check-deposit`）→ SHA-256 を記録 → G-GEAR へ。A〜D を各機械で書き出し直して exit 0 と一覧の一致
       - [ ] G-GEAR: 書庫を照らして下書きに上げる → 「at deposit」の 6 か所と `confirmed at deposit` → D を作る → 研究者に公開を確かめる（repo を公開・Zenodo 2 つを公開）
