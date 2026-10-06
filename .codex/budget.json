@@ -24,8 +24,8 @@
   "_comment_merge_2026_10_02": "2026-10-02: feature/o1-task-kind-other に origin/main を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり和を採った: 起点 108230 / 2 回 ＋ 本ブランチ +30373 / +1（ADR-037 の /cross-review） ＋ origin/main +263512 / +6（AI 疲労 文献 DB の Codex） = 402115 / 9 回。",
   "today": {
     "date": "2026-10-06",
-    "tokens_used": 244646,
-    "invocations": 8
+    "tokens_used": 297836,
+    "invocations": 10
   },
   "history": [
     {
@@ -255,5 +255,6 @@
   "_comment_merge_2026_10_02_ime_m3_freeze": "2026-10-02: docs/ime-m3-freeze に origin/main（O1 の #292）を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり和を採った: 共通の祖先（88a793a6）371742 / 8 回 ＋ 本ブランチ +20874 / +1（IME 論文 M3 の凍結の /cross-review の Codex 1 回・_comment_budget_2026_10_02_ime_m3_freeze） ＋ origin/main +30373 / +1（feature/o1-task-kind-other の ADR-037 の /cross-review） = 422989 / 10 回。一次記録: .steering/20260927-ime-observation-paper-eval-design/decisions.md 判断 132。",
   "_comment_merge_2026_10_03_ai_fatigue_v2": "2026-10-03: docs/ai-fatigue-v2 に origin/main（#293〜#296・#298・#299）を merge した際、today が衝突した。2026-10-02 は共通の祖先で 402115 / 9 回。本ブランチは増やさずに history へ移しただけで、origin/main は +20874 / +1（docs/ime-m3-freeze の /cross-review）で 422989 / 10 回 → _comment_merge_2026_09_11 の規則どおりの和 = origin/main の値を history に置いた。2026-10-03 は本ブランチだけが記帳した 159810 / 3 回（AI 疲労 DB v2 の完了レビューの Codex 1 巡目 2 回と 2 巡目 1 回）を today に採った。一次記録: .steering/20261002-ai-fatigue-v2/decisions.md 判断 9・判断 11。",
   "_comment_2026_10_05_raise": "2026-10-05: daily_token_budget を 300000 から 330000 へ上げた。理由: IME 論文の原稿の完了時レビュー（判断 183）の Codex 2 巡目（直しの境界・差分 228 行）を回すため。1 巡目で 27948 を使い今日の記帳は 286773 / 7 回で、残り 13227 が 1 回の上限 30000 を下回りガードで止まる。研究者の 2026-10-01 の指示（上限は必要に応じて上げてよい・tokens_used は触らず理由をコメントに）による。today.tokens_used は変えていない。 2 巡目（24183）の後に 300000 に戻した（今日の記帳は 310956 / 8 回で、今日はもう回さない）。",
-  "_comment_2026_10_05_raise_2": "2026-10-05 夜: daily_token_budget を 300000 から 350000 へ一時的に上げた。理由: 研究者の指示（Codex の制限は解除されたはず）を受け、AI Declaration と表紙の追加分（判断 185・186）を Codex で見るため。今日の記帳は 310956 / 8 回で、残りが 1 回の上限 30000 を下回る。2026-10-01 の指示（上限は必要に応じて上げてよい・tokens_used は触らず理由をコメントに）による。today.tokens_used は変えていない。 回した後（22716）に 300000 に戻した（今日の記帳は 333672 / 9 回）。"
+  "_comment_2026_10_05_raise_2": "2026-10-05 夜: daily_token_budget を 300000 から 350000 へ一時的に上げた。理由: 研究者の指示（Codex の制限は解除されたはず）を受け、AI Declaration と表紙の追加分（判断 185・186）を Codex で見るため。今日の記帳は 310956 / 8 回で、残りが 1 回の上限 30000 を下回る。2026-10-01 の指示（上限は必要に応じて上げてよい・tokens_used は触らず理由をコメントに）による。today.tokens_used は変えていない。 回した後（22716）に 300000 に戻した（今日の記帳は 333672 / 9 回）。",
+  "_comment_2026_10_06_raise": "2026-10-06: daily_token_budget を 300000 から 340000 へ一時的に上げた。理由: IME 論文の Discussion の仕上げと断りの寄せ（判断 201〜203）の /cross-review 2 巡目（直しの境界）を回すため。1 巡目で 29656 を使い今日の記帳は 274302 / 9 回で、残り 25698 が 1 回の上限 30000 を下回りガードで止まる。研究者の 2026-10-01 の指示（上限は必要に応じて上げてよい・tokens_used は触らず理由をコメントに・回した後は戻す）による。today.tokens_used は変えていない。 2 巡目（23534）の後に 300000 に戻した（今日の記帳は 297836 / 10 回で、今日はもう回さない）。"
 }

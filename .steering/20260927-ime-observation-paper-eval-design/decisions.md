@@ -1835,3 +1835,69 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 1「片方の定義だけの層の数が本文に出ない」→ 道具が注記 `*.change.onlyone.note`（0 なら「no stratum entered a range under one definition only」、そうでなければ数）を作り、¶5 に括弧で入れた（実データは 0）。
   - 2「¶1 の『almost every session で規則に従った』は検出の一致だけでは言えない」→「detected almost exactly the sessions that its own rules specify …, with almost the same durations」に（属性〔abandon・nav〕は言わない）。
   - 3「欠けの境界のテストが無い」→ すべての速さで限界が無い場合（幅は値なし・中央絶対差は出る）と、共通の定義に層が無い場合（比べた数 0・最大は値なし・片方だけ 2）を selftest に足した。selftest 183 件・変異 9・21（注記を常に「なし」にする、を含む）・17 本すべて赤。`build.sh --submission` エラー 0・生成されていない値 0。文体 違反 0。
+
+## 判断 200: Discussion の客観的な見立てを研究者に示し、残りの問いの答えを受ける —— 観測可能性の段落を足す・書字研究の尺度を文献で並べる・プライバシーは結論に残す・数字は §6 に寄せる・断りは §C の案どおり・長さの目安は置かない・§A は今のまま・OSF の名前は研究者が直す（2026-10-06・G-GEAR・研究者の選択〔8 問とも推奨どおり〕）
+
+- **研究者の問い**: 「Discussion の方向性は客観的に分析していい感じか」。
+- **メインの見立て（研究者に示した）**:
+  - 強み: 中心の主張が予測との比較（予測とロガーの差は数 ms・参照との差は予測と参照の差とほぼ同じ）という強い事実に立つ → 「精度を決めているのは実装ではなく規則（観測の手段）」と言える。仮説と事実を分け、評価の語がない。点検 3 回で言い過ぎを削った。査読者の問い（タイマー・人の打ち方・定義）に先に答えている。
+  - 弱み: (1) 結果の言い直しが多く「意味」が少ない（¶1・¶5 の数字は §6 にある → Z10 の繰り返しを増やす）。(2) ⚠️ Mac の下書きにあった観測可能性（§3）とのつながり・書字研究への含意・プライバシーの含意を、メインが書くときに落とした（下書きの筋は研究者が採っていた）。(3) 先行研究との照合が Pinet 1 本。
+- **研究者の答え（AskUserQuestion・2 回・8 問）**:
+  1. 観測可能性（§3）とのつながりの段落 → **足す**（例: macOS は変換を知らせる公開の接点が無くキーから推すしかない → 一致の天井は実装でなく規則が決める。Windows は窓を見るので構成概念の差が残る）。下書きは日本語で研究者に確かめる。
+  2. 書字研究の尺度（ポーズの閾値など）とキー行の時刻・dwell の誤差 → **並べる・文献を探す**（無料で読める 1〜2 本・本文で尺度を確かめてから・判定せずに 1〜2 文・citation-ssot で登録）。
+  3. 問 4 のプライバシーの含意 → **結論に残す**（Discussion に重ねない）。
+  4. Discussion の数字の繰り返し → **§6 に寄せて短く**（§6 に無い値〔予測との比較の dwell・層の値・D12 の層ごとの変化〕だけ残し、他は §6 の参照。D12 の段落は含意だけに）。
+  5. 断りの重複 → **資料 §C の案どおり**（定義と理由は方法の節に 1 回・結果と推奨と限界は 1 句か節の参照・要旨と結論と推奨 (a)(c) は単独で読まれるので残す）。
+  6. 長さ → **目安は置かない**（削った語数を報告する・投稿規程の上限は投稿前に一次で確かめる）。
+  7. 資料 §A → **今のまま残す**（★ の行を含む）。
+  8. OSF の貢献者名「Mikto Miura」→ **研究者が自分で直す**（原稿の引用は Miura, M. のまま）。
+- **区切り**: 文脈が長くなったので、研究者の既定の指示（半分ほどで次の波に入らず引き継ぎで区切る）に従い、実装は次のセッションに回す（`next-session-ime-paper-manuscript-5.md`）。
+
+## 判断 201: 判断 200 の方針で Discussion を仕上げる —— 数字を §6 に寄せ、観測可能性の段落と書字研究の尺度の段落を足し、研究者が日本語の文を採った（2026-10-06・G-GEAR・研究者の選択〔3 問とも推奨どおり〕・実装はメイン）
+
+- **枝**: `docs/ime-discussion-finish`（`origin/docs/ime-manuscript-handoff-5` の判断 200 から切った）。
+- **数字を §6 に寄せた**（判断 200-4・解釈の向きは変えていない）: ¶1 の参照とロガーのプールの recall と、長さの一致の限界・中央絶対差を §6.3・§6.4（表 session）の参照に（予測との比較の値・取り逃しと誤検出の率は §6 に無いので残した）。¶3 のキー行の遅れを「数 ms（§6.2）」に、2 つの計画の試行数を §5 の Plans の参照に。Windows の段落の偏りの範囲と中央絶対差を §6.4 の参照に。D12 の段落は外れた会話の数・範囲・統合の率を §6.3 の参照にし、§6 に無い層ごとの変化（`*.defs.primary.change.*`）だけ残し、最後に「プールの統合の率も 2 つの定義で違う（§6.3）」を数字なしで（recall と precision の変化だけを書くと選んで出したように読める・判断 194 の M1 と同じ理由）。
+- **観測可能性の段落（新・macOS の 3 段落と Windows の段落の間）**: §3・§14 の限定「documented interfaces examined that do not depend on the application」を保ち、macOS はキーから推すしかない → 会話は規則が定める → 一致は実装でなく規則で決まっていた（¶1 の根拠を指す）→ 別の規則はデータセットで新しい計測なしに評価できる（§11 の用途 (b)）。Windows は窓を見る → 構成概念の差 → OS 間で比べない（Windows の段落の最後の一文をここへ移して 1 回に）。⚠️ 研究者の例の「天井」は「決まっていた（set by）」にした —— 上限と書くと、どの規則・アプリ側の経路でもそれ以上にならないことまで言うことになり、確かめていない（研究者に示して採った）。
+- **書字研究の尺度の段落（新・最後）**: 文献は**新しく探さなかった** —— 中央書誌に全文照合済みの [V162]（Torrance & Conijn 2024・*Reading and Writing* 37(2):239–251・CC BY・OpenAlex で OA を確かめた）が問い「書字研究が使う時間の尺度（ms〜s）」にそのまま答えていたので、無料の版を取り直して p.243 の逐語（"traditionally set at 2 s"・"the same could be argued for any threshold a researcher might care to choose between perhaps 250 ms and 10 s (Chenu et al., 2014)"）を pypdf で読み直した（対句ごと: 2 s の区別は興味深いが、同じことは 250 ms〜10 s のどの閾値にも言える、という主語）。Crossref で書誌を確かめ `references.bib` に `torrance2024` を足し、`docs/references.md` の [V162] の備考に原稿での使用箇所を書いた（ID は変えない）。本文はキー行の遅れ（中央・95% 点・3 セル）と、対になった会話の長さの差が 100 ms・1 s 以内の割合（探索的）を尺度に並べるだけ（判定の語なし）。物理のキーボードの一文（Pinet 2017・USB の 8 ms）は ¶3 からここへ移した。⚠️ キー行の遅れと長さの割合は §6 にもあるが、並べること自体が判断 200-2 の目的なのでここに残した（研究者に示して採った）。
+- **研究者への提示（AskUserQuestion・3 問・日本語の訳と値を添えて）**: 観測可能性の段落 →「このまま採る（推奨）」／尺度の段落 →「このまま採る（推奨）」／数字の寄せ方 →「これでよい（推奨）」。
+- **語数**（コメントを除いた粗い数・`\rv` と参照は 1 語）: Discussion 1,014 → 1,147（2 段落を足して +133）。
+- **検証**: `build.sh`（main・補遺）エラー 0・未定義の参照 0・未定義の引用 0・生成されていない値 0・bibtex の警告 0・overfull main 1・補遺 167（以前と同じ）。文体の検査 違反 0・新しい行は 120 字以内。
+- **影響範囲**: `manuscript/sections/discussion.tex`・`manuscript/references.bib`・`docs/references.md`（[V162] の備考）・本ファイル。
+
+## 判断 202: 断りの重複（資料 §C の 7 種）を方法の節に寄せる —— 結果・限界・関連研究は 1 句か節の参照に、要旨・結論・推奨 (a)(c) は残す（2026-10-06・G-GEAR・判断 200-5 の研究者の選択の実行・個々の置き方はメインの選択・研究者が覆せる）
+
+- **置き場所（定義と理由を 1 回）と直したところ**:
+  1. プライバシーの基準ではない → §8 の方法「What is not evaluated」に「it is not a criterion of privacy」を足して置き場所に。§8 の結果の一文（「this result is not a judgement of the privacy of a log」）を削った。§13 の Recoverability は「1 句ずつ・時刻のある記録は判定しない」と §8 の方法の参照に縮め、§13 にしか無い向きの予想（囮の長さ）だけ残した。推奨 (c)・(f)・結論は残す。
+  2. サンプラーが違う → §9 の方法のまま。§9 の結果・§13・結論は「each read within its own system」と §9 の参照に（理由の句を外した）。
+  3. 別の構成概念 → §3.6 のまま。§1 は「logger は窓・参照は composition → 一致は差を含む（§3.6）」に、§13 は 1 句と参照に。要旨・結論・推奨 (a)・§4 の表は残す。Discussion は観測可能性の段落の 1 句（判断 201）。
+  4. 外部の装置・時計なし → §5.3 の方法のまま。§6 の 3 か所（キー行の時刻・印の時刻・「What the reference does not establish」）と §13 と §2.4 を 1 句と参照に。§2.4 は理由（どの外部装置も呼び出しを観測しない）を残し、「外部装置なら何を測れたか」の一文を §5.3 に任せた。
+  5. プールの Wilson は下限 → §5 の方法（2 か所とも方法の中・意味に触れないので変えない）。§13 は 1 句と参照に（ブロックを越えた依存の句は §13 にしか無いので残す）。⚠️ 補遺の D12 の表の注（`results_tables.py` が生成）は表が単独で読まれるので変えない。
+  6. 自然なタイピングの推定ではない → §5 の方法のまま。結論は残す。§11 の冒頭の「not a record of human writing and not a benchmark of natural typing」は同じ節の §11.4 の一覧と重なるので冒頭を削った。§1 の最後の文は研究全体の範囲の宣言なので残した。
+  7. 時刻のある集合は推定のみ → §8 の方法（近偶然の規則）のまま。§8 の結果は 1 句と参照に、§13 の 2 か所（「one reason they are reported as estimates only」と Recoverability の括弧）を外した。
+- **ついでに直したもの**: §3.2 の Microsoft の逐語の引用符が直線の `"` で組まれていた → `` `` … '' `` に（PDF 7 頁で見つけた）。尺度の段落のキー行の遅れをセルの名前で並べた（「1.0 ms and 1.0 ms on macOS」と読めたため）。
+- **語数**（コメントを除いた粗い数・`\rv` と参照は 1 語・節の .tex の合計）: 断りの寄せで 25,602 → 25,367（−235）。セッションの始め（`46262e59`）から −102（Discussion の 2 段落 +133 を含む）。要旨は変えていない（`_count_abstract.py` は回していない）。
+- **検証**: `build.sh --submission` main・main-submission・補遺ともエラー 0・未定義の参照 0・未定義の引用 0・生成されていない値 0・bibtex の警告 0・overfull は main 0（以前は 1）・main-submission 1（書誌の WebKit の項目のパスの中・今回触れていない段落）・補遺 167。文体の検査 違反 0。足した行は 120 字以内。PDF 7・41〜43 頁を画像で確かめた。
+- **影響範囲**: `manuscript/sections/` の introduction・related・observability・results-agreement・recoverability・cost・dataset・limitations・conclusions・discussion。
+
+## 判断 203: 判断 201・202 の作業中の点検（code-reviewer ∥ security-checker）の指摘を一次で確かめて直す・attack-me round 2 は次のセッションで回す（2026-10-06・G-GEAR・round 2 は研究者の選択〔推奨どおり〕・直しはメインの選択・研究者が覆せる）
+
+- **対象**: `46262e59..d45f12fb` の 12 ファイル。security-checker: CRITICAL / HIGH / MEDIUM 0・LOW 1。code-reviewer: HIGH 1・MEDIUM 3・LOW 8。
+- **一次で確かめて真だったもの（直した）**:
+  - HIGH: 断りを寄せたときに §6 の「What the reference does not establish」から「Windows のパイロットで 2 つの欄が 1 つの場面で別の点で確定した」を削り、その事実が原稿のどこにも無くなった（§5.3 にも無かった・§13 の「as the two Windows fields of the pilot showed」の裏づけが消えた）→ 一次（`pilot-windows-1-notes.md` 49 行: S7 の 3 試行で、TSF の欄は文節を超えた → でその場で確定、IMM の窓は Enter まで未確定）で確かめ、§5.3 の Windows の段落に 1 文で戻して置き場所に。§13 の文の主語の取り違え（「it」が一致を指して読める・LOW）も「affects the reference」に。
+  - MEDIUM: Discussion ¶1 の「not combined arithmetically」の参照先 `sec:method-analysis` にその文は無い（以前からの参照）→ その文がある §6.3（`results-detection`・「No arithmetic relation between the three comparisons is claimed」）に。
+  - MEDIUM: 観測可能性の段落の「set by its rules」は ¶1 の「mainly」を落とした言い切り（予測とロガーの取り逃し 0.004・0.007、誤検出 0.005・0.007）→「set mainly by its rules」。⚠️ 研究者が採った日本語（「決まっていた」）より弱めた —— ¶1 の根拠に合わせた直しで、向きは変えていない（判断 199 の ¶1 と同じ扱い・完了報告で示す）。
+  - MEDIUM: 同じ段落の Windows の文に限定が無く、§3 の TSF・IMM・アクセシブルなオブジェクト・UIA（テキストを運ぶ、またはアプリに依る）も「調べた経路」なので誤り → 「of the same interfaces, those that carry no text」と §3.2 の参照に。
+  - LOW（直した）: 冒頭コメントの「§6 の値は繰り返さない」に尺度の段落の例外を書いた。引用の言い換えを原文の対句の主語に合わせた（「2 s について言えること＝その両側で処理の質が違うこと＝が…どの閾値にも言える」）・「a review」→「the introduction to a special issue」（文献は自らをそう書く）。長さの割合に「in the primary scope」を足した。ポーズの尺度に直接関わるのは間隔の誤差なので、キー行の間隔の誤差の中央値（3 セルとも 0.0 ms・表 key-timing）を足した（`\rv` の値・§6 にある値）。¶3 の「live on の方が中央絶対差が大きい」に表 session の参照。結論の CPU の文に「because the samplers differ」を戻した（単独で読まれるので理由の句を残す）。§8 の結果に「which is not a criterion of privacy」と §8 の方法の参照（security-checker の LOW と code-reviewer の LOW が一致）。
+- **確かめて直さなかったもの**: 「almost exactly … almost the same durations」は評価の語に読めるという LOW → 判断 199 で Codex の指摘から入れて研究者が採った既存の文で、この範囲の変更ではない（round 2 の査読者に見せる）。
+- **研究者の選択**: 原稿の attack-me round 2 は**次のセッションで回す**（推奨どおり・同じ 3 つの立場と同じ接地・round 1 の指摘と対応、判断 195〜203 の Discussion を渡す）。
+- **検証**: `build.sh --submission` main・main-submission・補遺ともエラー 0・未定義の参照 0・未定義の引用 0・生成されていない値 0・bibtex の警告 0・overfull main 0・main-submission 1（書誌の WebKit の項目）・補遺 167。文体の検査 違反 0。足した行は 120 字以内。PDF 42〜43 頁を画像で確かめた。
+- **影響範囲**: `manuscript/sections/` の method・limitations・results-agreement・discussion・conclusions・recoverability。
+- **追記（同日・/cross-review 1 巡目・`run-codex-review.sh` を `46262e59..4256317d` の `manuscript/sections` と `references.bib` に限定・452 行・29,656 tokens・今日の台帳 244,646 → 274,302 / 8 → 9 回）**: P2 2 件・P3 1 件を一次で確かめた。
+  - P2「尺度の段落はポーズの判定の精度と変換の長さの精度を混ぜて読ませうる・対になった会話だけの割合は対にならなかった会話を含まない」→ 真（段落は並べるだけだが、読み違えを防ぐ句が無い）→ 長さを「対になった会話の、変換に費やした時間を計算する元になる長さ」とし、最後に「並べただけで、行から計算したポーズを閾値で分けたときの判定は評価していない・対にならなかった会話は §6.3 で数える」の 1 文を足した（範囲の事実・解釈は足していない）。
+  - P2「『どのアプリでも動くロガーはキーから推す』は、調べた接点からアプリ横断のロガー一般の必然に広げている」→ 真（§3・§14 は「the logger infers」でこのロガーに限っている）→「the logger, which is meant to work in any application, infers」に。
+  - P3「新しい `\rv` のキーが生成物にあるか diff から確かめられない」→ 偽陽性（検証の項目の提示で、`build.sh --submission` の生成されていない値 0 で確かめ済み）。
+  - 検証: `build.sh --submission` エラー 0・未定義 0・生成されていない値 0・overfull main 0。文体 違反 0。足した行は 120 字以内。
+- **追記（/cross-review 2 巡目・直しの境界 `d45f12fb..0a66b99b` の `manuscript/sections`・165 行・23,534 tokens・今日の台帳 274,302 → 297,836 / 9 → 10 回）**: ⚠️ 1 巡目の後の残り 25,698 が 1 回の上限 30,000 を下回ったので、研究者の 2026-10-01 の指示どおり `daily_token_budget` を 300,000 → 340,000 に一時的に上げ（`tokens_used` は触らず `_comment_2026_10_06_raise` に理由）、回した後に 300,000 に戻した。P2 1 件・P3 1 件とも真（安い）→ 直した。
+  - P2「1 巡目で足した『変換に費やした時間を計算する元になる長さ』は、Windows（窓の見える期間）に当たらない」→ 真（メインが 1 巡目の直しで足した句の境界）→「each as its logger defines a session」に。
+  - P3「間隔の誤差の中央値が符号つきなら『differed … by a median』は絶対値に読める」→ 真（`results_tables.py` 1473 行: 行の間隔 − 送出の間隔・最小 −94〜最大 94 ms）→「the signed error … had a median of」と、分位点は表 key-timing の参照に。
+  - 検証: `build.sh --submission` エラー 0・未定義 0・生成されていない値 0・overfull main 0。文体 違反 0。足した行は 120 字以内。S7 の 3 試行はパイロットの記録 49 行で確かめ済み（上の HIGH）。
