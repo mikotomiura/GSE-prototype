@@ -1020,6 +1020,53 @@ def definitions_supplement(cells):
     return "".join(lines)
 
 
+# ---------------------------------------------------------------- the comparisons side by side, for the discussion
+
+
+def ms_span(lo, hi):
+    """A span of milliseconds for the text; one value when both ends are the same."""
+    return "%s~ms" % fmt_ms(lo) if fmt_ms(lo) == fmt_ms(hi) else "%s to %s~ms" % (fmt_ms(lo), fmt_ms(hi))
+
+
+def decomposition_values(cell):
+    """Values that the discussion reads from the registered results, in the primary scope. For every comparison of the
+    cell: the span over the speeds of the limits of agreement of dwell_ms (lowest lower limit to highest upper limit)
+    and of its median absolute difference (point estimates). For the comparisons of the reference with the logger and
+    with the specified rows (macOS): the pooled recall and precision of each layer of the prediction, and its trials."""
+    vals = {}
+    for comp in cell.comparisons:
+        tag = comp.replace("_", "")
+        src = "%s:cells/%s/%s/%s/%s/metrics/by_speed/*/dwell" % (cell.src["e1_l1.json"], cell.label, cell.definition,
+                                                                 comp, PRIMARY_SCOPE)
+        sp = [e["dwell"] for e in cell.l1_by[comp][PRIMARY_SCOPE]["metrics"]["by_speed"]
+              if e["dwell"]["n"] and e["dwell"].get("bland_altman") and e["dwell"].get("mae") is not None]
+        if sp:
+            lo = min(d["bland_altman"]["loa_lo"] for d in sp)
+            hi = max(d["bland_altman"]["loa_hi"] for d in sp)
+            mlo, mhi = min(d["mae"] for d in sp), max(d["mae"] for d in sp)
+            loa, mae = {"text": ms_span(lo, hi), "value": [lo, hi]}, {"text": ms_span(mlo, mhi), "value": [mlo, mhi]}
+        else:
+            loa = mae = {"text": NO_VALUE, "value": [None, None]}
+        vals["%s.%s.primary.dwell.loa.span" % (cell.label, tag)] = dict(loa, source=src + "/bland_altman/loa_lo|loa_hi")
+        vals["%s.%s.primary.dwell.mae.span" % (cell.label, tag)] = dict(mae, source=src + "/mae")
+        if comp not in ("gt_obs", "gt_pred"):
+            continue
+        layers = cell.det_by[comp][PRIMARY_SCOPE]["diagnostics"].get("prediction_layers")
+        if not layers:
+            continue
+        for name, _ in LAYERS:
+            lsrc = "%s:cells/%s/%s/%s/%s/diagnostics/prediction_layers/%s" % (
+                cell.src["e1_detection.json"], cell.label, cell.definition, comp, PRIMARY_SCOPE, name)
+            key = "%s.layer.%s.%s.primary" % (cell.label, name.replace("_", ""), tag)
+            p = layers[name]["pooled"]
+            for m in ("recall", "precision"):
+                vals["%s.%s" % (key, m)] = {"text": ci_text(p[m]), "value": [p[m]["value"], p[m]["lo"], p[m]["hi"]],
+                                            "source": "%s/pooled/%s" % (lsrc, m)}
+            vals[key + ".trials"] = {"text": fmt_int(layers[name]["n_trials"]), "value": layers[name]["n_trials"],
+                                     "source": lsrc + "/n_trials"}
+    return vals
+
+
 # ---------------------------------------------------------------- deviation D10: the corrected merge rate
 
 
@@ -2525,6 +2572,7 @@ def build(results_dir):
         values.update(timing_values(cell))
         values.update(diagnostic_values(cell))
         values.update(definition_values(cell))
+        values.update(decomposition_values(cell))
         values.update(d10_values(cell, d10[cell.label]))
         values.update(l2_values(cell))
         values.update(dwell_explore_values(cell, dwellx[cell.label]))
@@ -3658,6 +3706,40 @@ def _selftest_definitions(check):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _selftest_decomposition(check):
+    """The values of the comparisons side by side, on a synthetic macOS cell (three comparisons, layers) and a
+    synthetic Windows cell (the primary comparison only, no layers)."""
+    tmp = tempfile.mkdtemp(prefix="results_tables_decomp_")
+    try:
+        _fixture(tmp, "macos-test", "")
+        vals = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+        t = lambda k: (vals.get("macos-test." + k) or {}).get("text")
+        check("decomposition: the span of the limits of agreement over the speeds is read per comparison",
+              (t("gtobs.primary.dwell.loa.span"), t("gtpred.primary.dwell.loa.span"), t("predobs.primary.dwell.loa.span"))
+              == ("$-$1,800 to 800~ms", "$-$1,799 to 801~ms", "$-$1,798 to 802~ms"),
+              str((t("gtobs.primary.dwell.loa.span"), t("gtpred.primary.dwell.loa.span"))))
+        check("decomposition: a span whose two ends are the same is one value", t("predobs.primary.dwell.mae.span")
+              == "300~ms", str(t("predobs.primary.dwell.mae.span")))
+        check("decomposition: each layer is read from its own comparison, in the primary scope",
+              t("layer.none.gtobs.primary.recall") == "0.525 [0.330, 0.700]"
+              and t("layer.none.gtpred.primary.recall") == "0.525 [0.430, 0.800]"
+              and t("layer.carriedout.gtobs.primary.precision") == "0.500 [0.300, 0.700]"
+              and t("layer.none.gtobs.primary.trials") == "13" and t("layer.none.predobs.primary.recall") is None,
+              str((t("layer.none.gtobs.primary.recall"), t("layer.none.gtpred.primary.recall"))))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    tmp = tempfile.mkdtemp(prefix="results_tables_decomp_win_")
+    try:
+        _fixture(tmp)
+        vals = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+        check("decomposition: a cell without the prediction has the span of its primary comparison and no layer",
+              (vals.get("windows-test.gtobs.primary.dwell.loa.span") or {}).get("text") == "$-$1,800 to 800~ms"
+              and not any(".layer." in k or ".predobs." in k for k in vals if k.startswith("windows-test.")),
+              str((vals.get("windows-test.gtobs.primary.dwell.loa.span") or {}).get("text")))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _selftest_macos(check):
     """Table 8 with the three comparisons, the layers of the prediction and the corrected merge rate of D10 on a
     synthetic macOS cell."""
@@ -3798,6 +3880,7 @@ def selftest():
     _selftest_spread(check)
     _selftest_dwell_explore(check)
     _selftest_definitions(check)
+    _selftest_decomposition(check)
 
     tmp = tempfile.mkdtemp(prefix="results_tables_selftest_")
     try:
