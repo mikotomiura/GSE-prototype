@@ -94,8 +94,10 @@ kit/logger/target/release/ime-observation-logger --out obs.jsonl --duration-s 60
 python3 kit/formats/validate_logs.py --kind obs obs.jsonl
 ```
 
-The logger never overwrites an existing log. Its README ([`kit/logger/README.md`](kit/logger/README.md)) describes
-the drivers, the options and the limitations.
+On macOS the logger needs the Input Monitoring permission. When it is missing, the logger stops with an error and asks
+the system once to show the permission prompt; grant the permission and start it again. The logger never overwrites
+an existing log. Its README ([`kit/logger/README.md`](kit/logger/README.md)) describes the drivers, the options and
+the limitations.
 
 ## Reproducing the analyses
 

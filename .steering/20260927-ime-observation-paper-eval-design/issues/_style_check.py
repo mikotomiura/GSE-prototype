@@ -25,6 +25,7 @@ import html
 import io
 import json
 import os
+import posixpath
 import re
 import sys
 import tempfile
@@ -323,11 +324,11 @@ def check_text(rel, text, verbatim):
             # 判断 211: SVG は文字参照（G&#x53;E など）を戻しても見る
             if rx.search(ln) or (ext == ".svg" and rx.search(html.unescape(ln))):
                 vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある"))
-    if rel in TRANSLATIONS:
-        # 判断 219: README の日本語訳（研究者の選択）だけは地の文が日本語。禁止語は上で見ている
-        return vs
     base = os.path.basename(rel)
-    if ext == ".py":
+    if posixpath.normpath(rel.replace("\\", "/")) in TRANSLATIONS:
+        # 判断 219: README の日本語訳（研究者の選択）だけは地の文が日本語。ほかの検査（禁止語）は見る
+        prose = []
+    elif ext == ".py":
         prose = py_prose(text)
     elif ext in (".rs", ".swift"):
         prose = rs_prose(text)
@@ -428,6 +429,8 @@ def selftest():
     expect("ほかの dir の README.ja.md は赤", "kit/README.ja.md", J + "\n", ["japanese-prose"])
     expect("ほかの名前の訳は赤", "README.zh.md", J + "\n", ["japanese-prose"])
     expect("README の日本語訳でも禁止語は赤", "README.ja.md", J + " GSE\n", ["forbidden:gse"])
+    expect("./ の付いた README の日本語訳も通る", "./README.ja.md", J + "\n", [])
+    expect("\\ で区切った README の日本語訳も通る", "papers\\ime-observation\\README.ja.md", J + "\n", [])
     expect("md コードブロックの日本語は通る", "a.md", "```\n" + J + "\n```\n", [])
     expect("md .steering は赤", "a.md", "see .steering/x\n", ["forbidden:.steering"])
     expect("sh 日本語のコメントは赤", "a.sh", "echo ok # " + J + "\n", ["japanese-prose"])
@@ -509,6 +512,13 @@ def selftest():
             f.write(J + "\n")
         if len(run(tmp, ["papers/ime-observation"])) != 1:
             fails.append("走査: 対象の中の違反を 1 件拾うはず")
+        # 判断 219: README の日本語訳は、repo の走査でも書き出した木の走査（根を論文の dir にして "."）でも通る
+        with io.open(os.path.join(tmp, "papers", "ime-observation", "README.ja.md"), "w", encoding="utf-8") as f:
+            f.write("# " + J + "\n" + J + "\n")
+        paper = os.path.join(tmp, "papers", "ime-observation")
+        if len(run(tmp, ["papers/ime-observation"])) != 1 or len(run(paper, ["."])) != 1:
+            fails.append("走査: README の日本語訳は repo でも書き出した木でも通るはず（判断 219）")
+        os.remove(os.path.join(tmp, "papers", "ime-observation", "README.ja.md"))
         os.makedirs(os.path.join(tmp, "papers", "ime-observation", "manuscript"))
         with io.open(os.path.join(tmp, "papers", "ime-observation", "manuscript", "m.tex"), "w",
                      encoding="utf-8") as f:
