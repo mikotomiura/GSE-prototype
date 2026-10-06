@@ -18,7 +18,8 @@ assume-unchanged or skip-worktree mark is refused). A SHA-256 of null marks a fi
 
   1. refuses a list whose names are not unique or not flat ([A-Za-z0-9._-]), or whose SHA-256 repeat;
   2. reads the table "Deposits" of each record (experiment/data.md, experiment/data.windows.md) and refuses a row that
-     is not four cells with a SHA-256 in backticks in the third, and a SHA-256 of that section outside that column.
+     is not four cells with a SHA-256 in backticks in the third, a SHA-256 given in two rows, and a SHA-256 of that
+     section outside that column (also a second one on a row).
      Every archive (*.zip) of the list must have its row in its own record, and the first cell of that row must be
      its label, alone or followed by " (" (when the row says "(attempt N", the name must end in "-N.zip"); every
      row must belong to an archive of the list whose record is that file, so that an archive packed and recorded on
@@ -41,12 +42,14 @@ does not name, the list, the records and the datasheet equal to HEAD, every file
 itself) named in the datasheet table with its part, contents and SHA-256, and no "(to be filled in at deposit)" left
 in the datasheet. It then sends each file that the draft does not hold yet to the bucket of the draft, the smallest
 first: a file under --from is hashed again through the handle it is sent from, sent up to its checked size only, and
-the MD5 of the bytes sent and the MD5 and size that the service returns are compared with the check. A file of the
+the MD5 of the bytes sent and the MD5 and size that the service returns are compared with the check; a file that
+ends before its checked size breaks the request off. A file of the
 same name with other content, or a file of the draft that the list does not name, stops it before anything is sent
 (remove such a file in the web form). The tool never publishes: it has no call that submits or publishes a record.
 The token is read from --token-file (default C:/zenodo/zenodo_token.txt on Windows; required elsewhere) inside the
 process, sent only to the API host and never printed; a token file inside the git work tree is refused. The commit
-of the source is printed, so that what was sent can be tied to it.
+of the source is read once and printed, so that what was sent can be tied to it: every committed file is read at
+that commit, and the check fails if HEAD moves while it runs.
 
 Exit status: 0 the check passed (and the upload completed), 1 the check failed, 2 a usage or environment error.
 """
@@ -120,8 +123,8 @@ def _git(source: Path, *args: str) -> subprocess.CompletedProcess:
         raise Usage(f"cannot run git: {e.__class__.__name__}") from None
 
 
-def committed(source: Path, rel: str) -> tuple[bytes | None, str | None]:
-    """The committed bytes of one file of the source directory, or the reason why they cannot be used."""
+def committed(source: Path, rel: str, rev: str = "HEAD") -> tuple[bytes | None, str | None]:
+    """The bytes of one file of the source directory at commit rev, or the reason why they cannot be used."""
     r = _git(source, "ls-files", "-v", "--", rel)
     if r.returncode != 0:
         raise Usage(f"git ls-files failed in {source}")
@@ -130,18 +133,25 @@ def committed(source: Path, rel: str) -> tuple[bytes | None, str | None]:
         return None, "is not one file tracked by git"
     if not tags[0].startswith("H "):
         return None, "carries an assume-unchanged or skip-worktree mark"
-    if _git(source, "diff", "--quiet", "HEAD", "--", rel).returncode != 0:
+    if _git(source, "diff", "--quiet", rev, "--", rel).returncode != 0:
         return None, "differs from the committed version (HEAD)"
-    r = _git(source, "cat-file", "blob", f"HEAD:./{rel}")
+    r = _git(source, "cat-file", "blob", f"{rev}:./{rel}")
     if r.returncode != 0:
         return None, "cannot be read from HEAD"
     return r.stdout, None
 
 
-def read_text(source: Path, rel: str, require_committed: bool) -> tuple[str | None, str | None]:
+def head_commit(source: Path) -> str | None:
+    """The commit that HEAD names now, or None."""
+    r = _git(source, "rev-parse", "--verify", "HEAD^{commit}")
+    text = r.stdout.decode("ascii", "replace").strip()
+    return text if r.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", text) else None
+
+
+def read_text(source: Path, rel: str, require_committed: bool, rev: str = "HEAD") -> tuple[str | None, str | None]:
     """The text of a file of the source directory (the committed one when required), or the reason."""
     if require_committed:
-        raw, why = committed(source, rel)
+        raw, why = committed(source, rel, rev)
         if raw is None:
             return None, why
     else:
@@ -307,10 +317,19 @@ def deposits_table(text: str, rel: str) -> tuple[list[tuple[str, str]] | None, l
             problems.append(f"{rel}: a row of 'Deposits' is not four cells with a lower-case SHA-256 in backticks "
                             f"in the third: {line.strip()[:70]}")
             continue
+        if any(sha == m.group(1) for _, sha in rows):
+            problems.append(f"{rel}: the table 'Deposits' gives the SHA-256 {m.group(1)[:12]}... in two rows")
         rows.append((cells[0], m.group(1)))
-    found = {h for line in section for h in HEX_ANY.findall(line)}
-    if found - {sha for _, sha in rows}:
-        problems.append(f"{rel}: the section 'Deposits' holds a SHA-256 outside the third column of its rows")
+    # A SHA-256 may stand only in the third cell of a well-formed row, and only once on its line.
+    for line in section:
+        found = HEX_ANY.findall(line)
+        if not found:
+            continue
+        cells = _cells(line) if line.startswith("|") else []
+        m = CELL_SHA.fullmatch(cells[2]) if len(cells) == 4 else None
+        if m is None or found != [m.group(1)]:
+            problems.append(f"{rel}: the section 'Deposits' holds a SHA-256 outside the third column of its rows")
+            break
     return rows, problems
 
 
@@ -407,10 +426,11 @@ def check_datasheet(text: str, items: list[Item], final: bool) -> list[str]:
 def run_check(source: Path, staging: Path | None, *, allow_pending: bool, final: bool,
               export: Path | None, out) -> tuple[list[str], list[Item], dict]:
     """Checks the list against the records, the datasheet, the committed files and the files under --from."""
-    head = _git(source, "rev-parse", "HEAD")
-    print(f"  source   commit {head.stdout.decode('ascii', 'replace').strip() if head.returncode == 0 else '?'}",
-          file=out)
-    text, why = read_text(source, LIST_FILE, final)
+    rev = head_commit(source)  # every committed file is read at this commit, so that what is sent is tied to it
+    print(f"  source   commit {rev or '?'}", file=out)
+    if rev is None:
+        return ["the commit of the source (HEAD) cannot be read"], [], {}
+    text, why = read_text(source, LIST_FILE, final, rev)
     if text is None:
         return [f"{LIST_FILE} {why}"], [], {}
     data, problems = load_list(text)
@@ -421,7 +441,7 @@ def run_check(source: Path, staging: Path | None, *, allow_pending: bool, final:
 
     # 2. the records
     for rel in RECORDS:
-        rtext, why = read_text(source, rel, final)
+        rtext, why = read_text(source, rel, final, rev)
         if rtext is None:
             problems.append(f"{rel} {why}")
             continue
@@ -430,18 +450,18 @@ def run_check(source: Path, staging: Path | None, *, allow_pending: bool, final:
             problems.append(f"{rel} has no section 'Deposits'")
             continue
         problems += form
-        cell_of = {sha: cell for cell, sha in rows}
+        recorded = {sha for _, sha in rows}
         for it in items:
             if it.sha256 is None or it.entry.get("record") != rel:
                 continue
             if it.name.endswith(".zip"):
-                why = (check_archive_row(it, cell_of[it.sha256]) if it.sha256 in cell_of else
+                why = (None if it.sha256 in recorded else
                        f"{it.name}: its SHA-256 is not in the table 'Deposits' of {rel}")
             else:
                 why = check_sample_line(it, rtext, rel)
             if why:
                 problems.append(why)
-        for cell, sha in rows:
+        for cell, sha in rows:  # every row, so that a second row of the same archive is checked too
             owner = by_sha.get(sha)
             if owner is None:
                 problems.append(f"{rel} records the archive {sha[:12]}... in 'Deposits', but the list has no file "
@@ -449,13 +469,17 @@ def run_check(source: Path, staging: Path | None, *, allow_pending: bool, final:
             elif not owner.name.endswith(".zip") or owner.entry.get("record") != rel:
                 problems.append(f"{rel} records in 'Deposits' the SHA-256 of {owner.name}, which is not an archive "
                                 f"recorded there")
+            else:
+                why = check_archive_row(owner, cell)
+                if why:
+                    problems.append(why)
 
     # 1/5. the files of this directory
     for it in items:
         rel = it.entry.get("repo")
         if rel is None:
             continue
-        blob, why = committed(source, rel)
+        blob, why = committed(source, rel, rev)
         if blob is None:
             problems.append(f"{it.name}: {rel} {why}")
             continue
@@ -516,13 +540,22 @@ def run_check(source: Path, staging: Path | None, *, allow_pending: bool, final:
         print(f"  unlisted {rel} (the list names no file with its SHA-256)", file=out)
         if final:
             problems.append(f"{rel} under --from is not a file of the list")
+    if head_commit(source) != rev:
+        problems.append(f"HEAD moved away from {rev[:12]} during the check; run it again")
     return problems, items, data
 
 
 # ---------------------------------------------------------------- the draft
 
+class _Shortened(OSError):
+    """The file ended before its checked size while it was sent."""
+
+
 class _Capped:
-    """Reads at most size bytes of a binary file and keeps the MD5 of what was read."""
+    """Reads at most size bytes of a binary file and keeps the MD5 of what was read.
+
+    A file that ends before size bytes raises _Shortened, so that the request is broken off instead of leaving the
+    service waiting for the rest of the declared length."""
 
     def __init__(self, f, size: int):
         self.f, self.left, self.md5 = f, size, _md5()
@@ -531,6 +564,8 @@ class _Capped:
         if self.left <= 0:
             return b""
         block = self.f.read(self.left if n is None or n < 0 else min(n, self.left))
+        if not block:
+            raise _Shortened(f"the file ended {self.left} bytes before its checked size")
         self.left -= len(block)
         self.md5.update(block)
         return block
@@ -998,6 +1033,13 @@ def selftest() -> int:
         expect(has(p, "is not four cells"), "Deposits row with a pipe in its label")
         p = check(td, "outside", edit=tedit(RECORDS[1], "## Deposits\n", f"## Deposits\n\nSee {sha_x}.\n"))[0]
         expect(has(p, "outside the third column"), "SHA-256 in Deposits outside the table")
+        p = check(td, "again", edit=tedit(RECORDS[1], "## Deposits\n", f"## Deposits\n\nSee {sha_w}.\n"))[0]
+        expect(has(p, "outside the third column"), "SHA-256 of a row given again outside the table")
+        p = check(td, "rowtwo", edit=tedit(RECORDS[1], f"`{sha_w}` | no |\n", f"`{sha_w}` | {sha_x} |\n"))[0]
+        expect(has(p, "outside the third column"), "a second SHA-256 on a row of Deposits")
+        p = check(td, "duprow", edit=tedit(RECORDS[0], row_a,
+                                           f"| b-pilot-1 (pilot) | no | `{sha_a}` | no |\n{row_a}"))[0]
+        expect(has(p, "in two rows") and has(p, "labelled"), "an archive in two rows, the first with another label")
         p = check(td, "otherrec", edit=tedit(RECORDS[1], f"`{sha_w}` | no |\n", f"`{sha_w}` | no |\n{row_a}"))[0]
         expect(has(p, "which is not an archive recorded there"), "Deposits row of an archive of the other record")
         p = check(td, "tsvrow", edit=tedit(RECORDS[0], row_b, row_b + f"| s | no | `{sha_s}` | no |\n"))[0]
@@ -1055,6 +1097,26 @@ def selftest() -> int:
         expect(has(p, "is not one file tracked"), "a directory as a file of this directory")
         p = check(td, "skip", after=lambda s: _git(s, "update-index", "--skip-worktree", "kit/shared.txt"))[0]
         expect(has(p, "skip-worktree"), "file of this directory with skip-worktree")
+        pinned = check(td, "pin")[4]
+        rev0 = head_commit(pinned)
+        (pinned / "kit/shared.txt").write_bytes(b"next\n")
+        _git(pinned, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false",
+             "-c", f"core.hooksPath={(td / 'no-hooks').as_posix()}", "commit", "-q", "-am", "next")
+        (pinned / "kit/shared.txt").write_bytes(shared)
+        expect(rev0 is not None and head_commit(pinned) not in (None, rev0)
+               and committed(pinned, "kit/shared.txt", rev0)[0] == shared
+               and committed(pinned, "kit/shared.txt")[0] is None, "files are read at the commit of the start")
+        real_head, calls = head_commit, []
+
+        def moving(source: Path) -> str | None:
+            calls.append(source)
+            return real_head(source) if len(calls) == 1 else "0" * 40
+        globals()["head_commit"] = moving
+        try:
+            p = check(td, "moved")[0]
+        finally:
+            globals()["head_commit"] = real_head
+        expect(has(p, "HEAD moved"), "HEAD moving during the check stops it")
 
         # 5. the export
         def export_of(content: bytes):
@@ -1168,6 +1230,13 @@ def selftest() -> int:
             capped = _Capped(io.BytesIO(b"0123456789"), 4)
             expect(capped.read(100) + capped.read(100) == b"0123" and capped.md5.hexdigest() == _md5(b"0123").hexdigest(),
                    "the sent bytes stop at the checked size")
+            short = _Capped(io.BytesIO(b"01"), 4)
+            try:
+                short.read(100)
+                short.read(100)
+                expect(False, "a file that ends before its checked size breaks off the request")
+            except _Shortened:
+                pass
             mock.files = {}
 
             for attr, value, word in (("state", "done", "unsubmitted draft"), ("submitted", True, "unsubmitted draft"),
