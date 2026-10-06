@@ -136,6 +136,8 @@ _SVG_ACTIVE = re.compile(r"<\s*(?:[\w.-]+:)?(?:script|foreignobject|iframe|embed
                          r"|[\"'(\s]data:", re.I)
 SVG_NS = "http://www.w3.org/2000/svg"
 SVG_ATTR_NS = ("", "http://www.w3.org/1999/xlink", "http://www.w3.org/XML/1998/namespace")
+XML_NS = SVG_ATTR_NS[2]
+XML_ATTRS = ("space", "lang")  # not xml:base, which would resolve a fragment reference against another file
 # Shapes, text, groups, gradients and the style sheet; no animation element (one can set a link), no image, no link.
 SVG_ELEMENTS = frozenset(("svg", "g", "defs", "symbol", "use", "title", "desc", "style", "rect", "circle", "ellipse",
                           "line", "polyline", "polygon", "path", "text", "tspan", "lineargradient", "radialgradient",
@@ -748,7 +750,8 @@ def _split_name(name):
 def svg_tree_kinds(text):
     """The kinds of active content found when the figure is read as XML (a namespace prefix resolved, a character
     reference decoded): an element outside SVG_ELEMENTS or the SVG namespace, an attribute outside the SVG, XLink
-    and XML namespaces, an event handler, a link to anything but a fragment, and a decoded value or text that refers
+    and XML namespaces (of the XML namespace only xml:space and xml:lang, not xml:base), an event handler, a link to
+    anything but a fragment, and a decoded value or text that refers
     outside the file. A figure that is not well-formed XML is refused too. Comments are not read (they do nothing).
     The search for a document type declaration runs before this, so the parser never expands a declared entity."""
     try:
@@ -763,7 +766,7 @@ def svg_tree_kinds(text):
         for name, value in el.attrib.items():
             ans, alocal = _split_name(name)
             alocal = alocal.lower()
-            if ans not in SVG_ATTR_NS or alocal.startswith("on"):
+            if ans not in SVG_ATTR_NS or alocal.startswith("on") or (ans == XML_NS and alocal not in XML_ATTRS):
                 kinds.add("attribute")
             elif alocal == "href" and not value.strip().startswith("#"):
                 kinds.add("link")
@@ -922,13 +925,18 @@ def line_kinds(text, word_check, rules, public_email=False):
 
 
 def decoded_forms(line):
-    """The line as written, with its program escapes decoded (unescape), and with its character references decoded
-    (an SVG figure or a Markdown page shows &#64; as the character it stands for), and with both."""
-    forms = [line]
-    if "\\" in line:
-        forms.append(unescape(line))
-    if "&" in line:
-        forms += [html.unescape(f) for f in forms]
+    """The line as written, with its program escapes decoded (unescape), with its character references decoded
+    (an SVG figure or a Markdown page shows &#64; as the character it stands for), and with each decoded after the
+    other in both orders (an escape can spell the & of a reference, and a reference the backslash of an escape)."""
+    def esc(s):
+        return unescape(s) if "\\" in s else s
+
+    def ref(s):
+        return html.unescape(s) if "&" in s else s
+    forms = []
+    for form in (line, esc(line), ref(line), ref(esc(line)), esc(ref(line))):
+        if form not in forms:
+            forms.append(form)
     return forms
 
 
@@ -1367,6 +1375,7 @@ def selftest():
                           ('<svg><h:style xmlns:h="http://www.w3.org/1999/xhtml">x</h:style></svg>', {"element"}),
                           ('<svg xmlns:e="http://example.org/e"><rect e:fill="red"/></svg>', {"attribute"}),
                           ('<svg><rect onclick="x()"/></svg>', {"attribute"}),
+                          ('<svg xml:base="https://example.org/f.svg"><use href="#g"/></svg>', {"attribute"}),
                           ('<svg><rect style="fill:url(https://example.org/p)"/></svg>', {"value"}),
                           ('<svg><use href="#g"/><rect fill="url(#g)" xml:space="preserve"/></svg>', set())):
             got = svg_tree_kinds(svg)
@@ -1374,6 +1383,9 @@ def selftest():
         name = "a character reference does not hide a value from the scan"
         refused(name, {"assets/f.svg": "<svg><text>P&#48;01</text></svg>\n"}, "assets/f.svg", forbid=("P001",))
         refused(name, {"README.md": "# Fake\nWrite to someone&#64;example.org.\n"}, "README.md")
+        # an escape that spells the & of a reference, and a reference that spells the backslash of an escape
+        refused(name, {"README.md": "# Fake\nSee P" + "\\" + "u0026#48;01.\n"}, "README.md", forbid=("P001",))
+        refused(name, {"README.md": "# Fake\nSee P&#92;u0030" + "01.\n"}, "README.md", forbid=("P001",))
         rcx, text, o = run("svg-ok", {"assets/f.svg": '<svg><defs><linearGradient id="g"/></defs><rect fill="url(#g)"/>'
                                                       '<use href="#g"/><text>the input method on become a reading</text></svg>\n'})
         ck("an SVG figure with references to its own fragments only passes", rcx == 0, text)

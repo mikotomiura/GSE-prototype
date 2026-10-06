@@ -215,8 +215,10 @@ def md_prose(text):
     return out
 
 
-SVG_TEXT_BODY = re.compile(r"(<text\b[^>]*>)(.*?)(</text>)", re.S)
-SVG_TAG = re.compile(r"<!--.*?-->|<(/?)([A-Za-z_][\w:.-]*)[^>]*?(/?)>", re.S)
+# 判断 212: 属性の値の中の > でタグを切らない（引用符の中を読み飛ばす）。空の <text/> は中身を持たない
+SVG_ATTRS = r"""(?:[^>"']|"[^"]*"|'[^']*')*"""
+SVG_TEXT_BODY = re.compile(r"(<text\b" + SVG_ATTRS + r"(?<!/)>)(.*?)(</text>)", re.S)
+SVG_TAG = re.compile(r"<!--.*?-->|<(/?)([A-Za-z_][\w:.-]*)" + SVG_ATTRS + r"?(/?)>", re.S)
 SVG_DRAWN = ("tspan", "textpath")
 
 
@@ -446,6 +448,17 @@ def selftest():
     expect("svg text の中の空の title の後の文字は通る", "a.svg", "<svg>\n<text><title/>" + J + "</text>\n</svg>\n", [])
     expect("svg text の中のコメントの日本語は赤", "a.svg", "<svg>\n<text>x<!-- " + J + " --></text>\n</svg>\n",
            ["japanese-prose"])
+    # 判断 212（/cross-review 2 巡目）: 属性の値の中の > でタグを切らない・空の <text/> は中身を持たない
+    expect("svg 値に > のある tspan の属性の日本語は赤", "a.svg",
+           '<svg>\n<text><tspan data-note=">' + J + '">x</tspan></text>\n</svg>\n', ["japanese-prose"])
+    expect("svg 値に > のある text の属性の日本語は赤", "a.svg",
+           "<svg>\n<text data-note='>" + J + "'>x</text>\n</svg>\n", ["japanese-prose"])
+    expect("svg 値に / と > のある tspan の後の文字は通る", "a.svg",
+           '<svg>\n<text><tspan fill="a/>b">' + J + "</tspan></text>\n</svg>\n", [])
+    expect("svg 空の text の後の title の日本語は赤", "a.svg",
+           "<svg>\n<text/>\n<title>" + J + "</title>\n<text>x</text>\n</svg>\n", ["japanese-prose"])
+    expect("svg 空の text の後の地の文字の日本語は赤", "a.svg",
+           "<svg>\n<text/>" + J + "\n<text>x</text>\n</svg>\n", ["japanese-prose"])
     expect("svg tspan の属性の日本語は赤", "a.svg", '<svg>\n<text><tspan aria-label="' + J + '">x</tspan></text>\n</svg>\n',
            ["japanese-prose"])
     expect("json reason の日本語は赤", "m.json", '{"entries":[{"reason":"' + J + '"}]}', ["japanese-prose"])

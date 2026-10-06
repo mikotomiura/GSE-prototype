@@ -2040,3 +2040,23 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **直さなかったもの**: security の参考（外枠の「解析の前」の主張は作者の日付に頼る）→ 原稿は commit を名指すだけで、時刻の証明は主張していない。commit メッセージに元の commit を書き、README に「作者の日付は元の commit の日付」と書いてある。⚠️ 研究者が「解析の前」の裏づけを強めたいなら、OSF に外枠の写しを置くなどを別に考える（今回はしない）。
 - **検証**: 書き出しの selftest ok・文体の検査の selftest OK・違反 0 件・走査 0 件・今の 3 枚の SVG は `check_svg` を通る。使い捨ての変異 12 本（scratchpad の `mutate_review.py`・左右の `@`・点とハイフン・例外を全体に・SVG の検査を呼ばない・リンクを許す・断片のリンクを拒む・data を許す・ディレクトリの規則を外す・SVG の文字参照を戻さない 2 本・tspan の属性を消す）すべて赤。`build.sh --submission`: エラー 0・未定義 0・生成されていない値 0・overfull は main 0・main-submission 1・補遺 167。組んだ PDF の表 1 の行を文字で確かめた。
 - **影響範囲**: `kit/export/{export.internal.py,README.internal.md}`・`issues/_style_check.py`・`papers/ime-observation/{.gitattributes,README.md,assets/make_assets.py,assets/demo.svg,experiment/notes.md,kit/refinput-macos/README.md}`・`manuscript/sections/{dataset,declarations,related}.tex`・`manuscript/supplement/provenance.tex`・本ファイル。
+
+## 判断 212: PR #316 の /cross-review（Codex・パス限定で 3 回）の指摘を一次で確かめて直す —— SVG を XML として読む層・文字参照を戻した走査・`<text>` の中の `<title>`・凍結の一覧の手順が期待値と比べる・`xml:base`・入れ子の復号・引用符の中の `>`（2026-10-06・G-GEAR・メインの選択・研究者が覆せる）
+
+- **予算**: 今日の記帳は 390,628 / 13 回（origin/main と同じ）で上限 300,000 を超えていた → 研究者の 2026-10-01 の指示どおり `daily_token_budget` を 500,000 に一時的に上げ（`tokens_used` は触らず `_comment_2026_10_06_raise_3` に理由）、3 回（30,599・31,521・52,656 = 114,776）回した後に 300,000 に戻した（505,404 / 16 回・今日はもう回さない）。差分は `values.tex` だけで 2,600 行あるので、引き継ぎどおりパスで絞った。差分にメールアドレスは無く、機密フィルタは rc 0。
+- **1 巡目・コード**（`export.internal.py`・`_style_check.py`・`make_assets.py`・546 行）。3 件とも scratchpad の `repro_cr1.py` で再現してから直した。
+  1. P1「`check_svg` は文字列だけを見る。接頭辞つきの `<s:script>` と `u&#114;l(` が通る」→ **真**（加えて CSS のエスケープ `u\72 l(` も通った）→ 図を **XML として読む層**（`svg_tree_kinds`）を足した: 整形式・要素は SVG の名前空間（か無し）で `SVG_ELEMENTS`（図形・文字・グループ・グラデーション・スタイル。アニメーション・画像・リンクの要素は入れない）・属性は SVG / XLink / XML の名前空間・イベント属性・断片以外へのリンク・復号した値と文字の外への参照とバックスラッシュを止める。宣言（`<!DOCTYPE`・`<!ENTITY`）を見つけた図は構文解析に渡さない（実体を展開させない）。文字列の層の要素名と `on…=` も接頭辞を許す形に。
+  2. P1「走査が SVG の文字参照を戻さない（`P&#48;01`）」→ **真**（Markdown の `&#64;` も GitHub では `@` に見えるのに通った）→ 走査と秘密の検査が文字参照を戻した形でも見る（`decoded_forms`）。
+  3. P2「`svg_prose` が `<text>` の中の `<title>` を消す」→ **真** → 要素の入れ子をたどり、`<text>`・`<tspan>`・`<textPath>` の直下の文字データだけを消す（`svg_drawn_blank`）。
+- **1 巡目・文書**（公開の文書 14 ファイル・593 行）:
+  1. P2「README.internal の安全の記述に対応する実装が差分に無い」→ **偽陽性**（実装はコードの呼び出しに分けた側にある）。
+  2. P2「README の凍結の一覧の手順は、`mkdir /tmp/freeze &&` が再実行で失敗すると古い中身を測り、期待値とも比べない」→ **真** → `mktemp -d` の新しい空の dir に取り出し、期待値と件数を引数で渡して違えば exit 1。README の手順を抜き出して組んだ公開 repo（bare）で回した: 両タグとも `match`・rc 0、件数を違えると `MISMATCH`・rc 1、無いタグは rc 2、再実行も `match`。
+  3. P2「README が参照するファイルが差分に無い」→ **偽陽性**（差分を絞ったため）。本番の形の書き出しの出力に、README の相対の参照 4 つ（`assets/` の 3 枚・`kit/formats/FORMATS.md`）と 2 つのライセンスがあることを確かめた。
+- **直し** `c9b957e3`。きれいな clone（LF・`--depth 1`）で本番の形の書き出し（ライセンスあり）が exit 0・194 ファイル、その木で `kit/check.sh` 31 本が緑。
+- **2 巡目**（直しの境界 `0c29f4ff..c9b957e3`・159 行）。3 件とも `repro_cr2.py` で再現してから直した。
+  1. 高「`xml:base` で `#g` が外のファイルに対して解決され得る」→ **真**（実際に読み込むかは閲覧環境しだい）→ XML の名前空間の属性は `xml:space` と `xml:lang` だけを通す。
+  2. 中「エスケープを戻して生じた `&` を戻さない（`P&#48;01`）」→ **真** → 両方の順に戻す（逆向きの `P&#92;u0030…` も確かめに足した）。
+  3. 中「`SVG_TAG` が引用符の中の `>` でタグを切り、属性の日本語を消す」→ **真** → 引用符の中を読み飛ばす。あわせて、空の `<text/>` の後から次の `</text>` までを中身と取り違えていたのを直した（このとき見つけ、再現した）。
+- **変異**（scratchpad の `mutate_cr1.py`・使い捨て）: 1 巡目の直しの 14 本を回すと 2 本（名前空間の確かめ・木の中のリンク）が生き残った。文字列の層が先に止めるので、木の層の規則が単独で試されていなかった → `svg_tree_kinds` を直接呼ぶ確かめ（8 件）を足し、木の層の規則の変異 2 本を足して 4 本とも赤。2 巡目の直しの 5 本を足して、全部で 21 本を回し直した → 17 本が赤・1 本が生き残り・3 本は 2 巡目の直しで元の文字列が変わって当たらなかった（変異を今の文字列に合わせ直した）。生き残りは「空の `<text/>` は中身を持たない」で、確かめ（空の `<text/>` の後の `<title>`）が入れ子の追跡でも赤になっていた → 空の `<text/>` の後の地の文字を見る確かめを足した。合わせた 4 本も赤 → **21 本すべて赤**。
+- **3 巡目の Codex は回さない**: 2 巡目の直しは再現・selftest・変異で確かめた（memory の「2 巡」・今日の記帳）。
+- **影響範囲**: `kit/export/{export.internal.py,README.internal.md}`・`issues/_style_check.py`・`papers/ime-observation/README.md`・`.codex/budget.json`・本ファイル。
