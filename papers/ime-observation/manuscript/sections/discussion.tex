@@ -1,11 +1,85 @@
-% Section 10 of the manuscript: discussion. Its interpretation is the author's: the section is written from the author's own reading of the results,
-% as the journal's publisher asks of the argument, the interpretation and the conclusions. Until then it holds only its
-% heading and the points it is to address.
+% Section 10 of the manuscript: discussion. Its interpretation is the author's: the section is written from the
+% author's direction (where the disagreements arise, the effect of the Windows definition, the mechanisms behind the
+% spread of the durations as hypotheses), as the journal's publisher asks of the argument, the interpretation and the
+% conclusions. Every result value is read with \rv{} from generated/values.tex (tools/results_tables.py).
 
 \section{Discussion}
 \label{sec:discussion}
 
-\tbd{Written from the author's interpretation: where the disagreements come from (the rules of the logger, the
-difference of constructs, the timing of the rows), which of them the registration expected, and how the timing of the
-key rows and the errors of the durations compare with the known errors of the physical path and with the scales of
-writing research.}
+\paragraph{Where the disagreements arise on macOS.} The macOS logger carried out its own rules. In the primary scope its
+rows agreed with the rows that the rules specify for the presses sent with pooled recall
+\rv{macos-standard-live-off.pooled.predobs.underlimit.recall} with live conversion off and
+\rv{macos-standard-live-on.pooled.predobs.underlimit.recall} with it on, and the limits of agreement of their durations
+spanned \rv{macos-standard-live-off.predobs.primary.dwell.loa.span} and
+\rv{macos-standard-live-on.predobs.primary.dwell.loa.span} over the speeds, with median absolute differences of
+\rv{macos-standard-live-off.predobs.primary.dwell.mae.span} and
+\rv{macos-standard-live-on.predobs.primary.dwell.mae.span}.
+The comparison of the reference with the specified rows, which involves no observation, gave the same picture as the
+comparison with the logger: pooled recall \rv{macos-standard-live-off.pooled.gtpred.underlimit.recall} and
+\rv{macos-standard-live-on.pooled.gtpred.underlimit.recall}, against
+\rv{macos-standard-live-off.pooled.gtobs.underlimit.recall} and
+\rv{macos-standard-live-on.pooled.gtobs.underlimit.recall}, the same lowest strata, and durations whose limits of
+agreement spanned \rv{macos-standard-live-off.gtpred.primary.dwell.loa.span} and
+\rv{macos-standard-live-on.gtpred.primary.dwell.loa.span}, with median absolute differences of
+\rv{macos-standard-live-off.gtpred.primary.dwell.mae.span} and \rv{macos-standard-live-on.gtpred.primary.dwell.mae.span}
+(against \rv{macos-standard-live-off.gtobs.primary.dwell.loa.span} and
+\rv{macos-standard-live-on.gtobs.primary.dwell.loa.span}, and \rv{macos-standard-live-off.gtobs.primary.dwell.mae.span}
+and \rv{macos-standard-live-on.gtobs.primary.dwell.mae.span}, for the logger). The disagreements of the macOS logger,
+and the long tails of its duration differences, thus arise where the sessions that its rules define differ from the
+sessions of the reference, not where the logger departs from its rules. The three comparisons are read side by side and
+are not combined arithmetically (Section~\ref{sec:method-analysis}).
+
+\paragraph{Disagreements that the registration listed and those it did not.} The registration listed, as following from
+the rules, a session that Backspace keeps open and carries into the next trial (S6), a session closed by Tab when a
+predictive candidate is chosen (S10), a reading split by the minus, comma or period key, and, with live conversion on, a
+session closed at the first of two Returns or Escapes. These set the lowest strata of the primary scope
+(Section~\ref{sec:results-detection}) and the layers of the prediction with the lowest agreement (supplement). In the
+trials outside every layer that the prediction marks, recall was
+\rv{macos-standard-live-off.layer.none.gtobs.primary.recall} and precision
+\rv{macos-standard-live-off.layer.none.gtobs.primary.precision} with live conversion off, and
+\rv{macos-standard-live-on.layer.none.gtobs.primary.recall} and
+\rv{macos-standard-live-on.layer.none.gtobs.primary.precision} with it on, and the specified rows agreed with the
+reference there to the same extent (recall \rv{macos-standard-live-off.layer.none.gtpred.primary.recall} and
+\rv{macos-standard-live-on.layer.none.gtpred.primary.recall}). The disagreements that remain there were not listed in
+the registration, and this study did not separate their sources.
+
+\paragraph{The spread of the durations on macOS.} The spread does not come from the timing of the logger's records:
+its key rows followed the injected presses by a median of \rv{macos-standard-live-off.kt.obs.delay.all.median} (95th
+percentile \rv{macos-standard-live-off.kt.obs.delay.all.p95}) with live conversion off and
+\rv{macos-standard-live-on.kt.obs.delay.all.median} (\rv{macos-standard-live-on.kt.obs.delay.all.p95}) with it on, and
+its durations matched those of its rules to within the few milliseconds given above. Nor does it reflect how people
+type, because the input was produced by a program. The reference's sessions begin and end with the calls that the input
+method makes to the field, which the rules approximate from the keys. Differences in where the two place the beginning
+and the end of a session are consistent with the spread: for example a session that the rules close at a key while the
+input method keeps the reading, or, with live conversion on, the commits that the input method makes while the reading
+is typed, which would also be consistent with the larger median absolute differences with live conversion on than off.
+These mechanisms were not tested. The beginnings and the ends of the sessions were not compared separately; the two
+macOS cells used different plans (\rv{macos-standard-live-off.pred.trials.n} and
+\rv{macos-standard-live-on.pred.trials.n} trials), so the two settings are not compared trial by trial; durations are
+compared only for the sessions that paired, which differ between strata and speeds; and the delay between an injected
+press and the input method's calls to the reference field was not measured. The delays above cover the path from the
+injection to the row; with a physical keyboard, which a USB connection samples every 8~ms \citep{pinet2017}, the delay
+from a key to a row is expected to be longer (Section~\ref{sec:limitations}).
+
+\paragraph{Windows.} The Windows logger records the visibility of the input method's windows, not the composition, so
+its agreement includes the difference between the two constructs (Section~\ref{sec:observability-consequence}). Its
+durations were shorter than the reference's at every speed (intervals of the bias spanning
+\rv{windows-msime-tsf.primary.dwellbias.range}, median absolute differences
+\rv{windows-msime-tsf.gtobs.primary.dwell.mae.span}), and recall fell with speed also in S1, in which few sessions were
+split (supplement). A window that appears after the
+composition begins or disappears before it ends, a change of the window that the logger does not observe, and, on the
+cloaking path, an observed interval that ends at least 150~ms before the row's time are consistent with shorter rows
+and with sessions that fail to pair. Which of them acted cannot be told here, because a row does not record its path and
+nothing outside the software observed the windows. The values of the two systems describe different constructs and are
+not compared; each is read against the construct that its logger records.
+
+\paragraph{The definition of a Windows session.} The definition of the analysis, which keeps the sessions in which the
+field reported a candidate element, left out \rv{windows-msime-tsf.defs.primary.leftout} of the
+\rv{windows-msime-tsf.defs.primary.common.sessions} reference sessions of the primary scope (deviation D12). Under the
+definition common to both systems, the ranges of the per-stratum intervals that the conclusions quote were
+\rv{windows-msime-tsf.defs.primary.common.recall.range} for recall and
+\rv{windows-msime-tsf.defs.primary.common.precision.range} for precision, against
+\rv{windows-msime-tsf.primary.recall.range} and \rv{windows-msime-tsf.primary.precision.range} under the definition of
+the analysis. The pooled merge rate was \rv{windows-msime-tsf.defs.primary.common.mergerate} under the common definition
+and \rv{windows-msime-tsf.pooled.gtobs.underlimit.mergerate} under the definition of the analysis, so a researcher who
+counts merged sessions on Windows depends on the definition more than one who reads recall and precision.
