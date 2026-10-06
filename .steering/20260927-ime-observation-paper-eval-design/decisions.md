@@ -2020,3 +2020,23 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 生成のスクリプトを 120 字以内に折り直した後も、3 枚と静止画 2 枚がブラウザで確かめたものとバイト一致。
   - 文体の検査の selftest OK・違反 0 件、書き出しの selftest ok・走査 0 件。使い捨ての変異 4 本（SVG の地の文を見ない・`.svg` を走査しない・`<text>` も地の文にする・書き出しの種類から外す）すべて赤。
 - **影響範囲**: `papers/ime-observation/{README.md,assets/}`・`kit/export/{export.internal.py,README.internal.md}`・`issues/_style_check.py`・本ファイル。
+
+## 判断 211: 作業中の点検（code-reviewer ∥ security-checker・`96c4032e..00fca8cd`・33 ファイル）の指摘を一次で確かめて直す（2026-10-06・G-GEAR・メインの選択・研究者が覆せる）
+
+- **結果**: security-checker = CRITICAL・HIGH・MEDIUM 0・LOW 4（約 4.3 分）。code-reviewer = CRITICAL・HIGH 0・MEDIUM 5・LOW 5（約 5 分）。重なり: アドレスの境界の `@`（security LOW 1・code MEDIUM 1）。置き換えた事実（2 ファイルの SHA-256・`3cc151c7` の後は 2 文書だけ・タグの指す commit・DOI の一致）は、code-reviewer が一次の git で確かめて合っていた。
+- **直したもの**（すべて一次で再現してから）:
+  1. （両方）`_PUBLIC_EMAIL` の前後の判定に `@` が無く、`who@<公開のアドレス>`・`<公開のアドレス>@corp.example` が通った（モジュールを読み込んで `line_kinds` で再現）。→ 左右の集合に `@` を、右に `_`・`%`・`+` と「点の後のハイフン」を足した。selftest に 3 形。
+  2. （security LOW 2）例外が全ファイルに効いていた → `PUBLIC_EMAIL_DIR = "manuscript/"` の中のファイルの行だけ（ファイル名には効かない）。selftest に「原稿の外では止まる」。README.internal も直した。
+  3. （security LOW 3）`.svg` を書き出す種類にしたのに中身の検査が無く、`data:` の URI でバイナリの規則を迂回できた → `check_svg`（全文を検索・script・`on…=`・`#` 以外への `href`・`#` 以外の `url(`・`foreignObject`・`iframe`・`embed`・`object`・`@import`・`data:`・`<!DOCTYPE`・`<!ENTITY` で exit 1・中身は出さない）。selftest に陰性 11 形（行をまたぐ `href=` を含む）と陽性 1 形（`url(#g)`・`href="#g"`）。今の 3 枚は通る。
+  4. （security LOW 4）入れ子の `.gitattributes` の `* text=auto` が root の `text`（強制）を上書きしていた（`git check-attr` で `text: auto` を再現）→ root と同じ照合用の 7 つの型を `text eol=lf` で並べ直し、`*.bat text eol=crlf` も写した。直した後は `text: set`、200 ファイルとも `i/lf w/lf`。
+  5. （code MEDIUM 2）新しい散文の行 5 本が 120 字を超えていた（前の測り方が出力を 10 行で切っていて見落とした）→ 折り直した。折った語で次の行が長くなった 3 本も直した。枝の全体を `origin/main` と比べて切らずに測り直した（残るのは表の行・JSON の 1 行・生成した SVG・internal のコードだけ）。
+  6. （code MEDIUM 3）`kit/refinput-macos/README.md` の `.build/refinput-macos` は、`build.sh` が自分の dir に移ってから書くので、根からは見つからない（`build.sh:7` の `cd "$(dirname "$0")"` で確かめた）→ `kit/refinput-macos/.build/refinput-macos` に。
+  7. （code MEDIUM 4）図の説明の "its number of candidate moves" は `nav` の定義（原稿 `logger.tex` の "the number of arrow-key presses during it"）と合わない → 図の `<desc>` と README の `alt` を直した。`demo.svg` の差は `<desc>` の 1 行だけ（動きの確かめはそのまま有効）。
+  8. （code MEDIUM 5）文体の検査の SVG を「見る所を列挙する」から「`<text>` の文字データだけを除き、残り全部を見る」に逆転し、文字参照（`&#x…;`）を戻してから見る。禁止語も SVG は文字参照を戻して見る。selftest に 7 件（属性・style のコメント・metadata・文字参照の日本語と禁止語・tspan の中は通る・tspan の属性は赤）。
+  9. （code LOW 6）表 1 の「release 1.0.0」はロガーの名乗る版（`logger_version` 0.1.0・`kit/logger/Cargo.toml`）と違う → 「This logger 0.1.0, in release 1.0.0 of the code」。
+  10. （code LOW 7）ignore の行と規則の一致の selftest を、ディレクトリの型（`excluded(…, True)`）と `!` の型（除外しない）にも広げた。知らない型は赤にする。
+  11. （code LOW 8・9）README の一覧の手順に Windows のタグの 1 文、綴りを "license" に揃えた（README の見出しとファイル名に合わせる）。
+  12. （code LOW 10）internal の docstring と README.internal の私が足した行を折った（元からある長い行は範囲の外なので触らない）。
+- **直さなかったもの**: security の参考（外枠の「解析の前」の主張は作者の日付に頼る）→ 原稿は commit を名指すだけで、時刻の証明は主張していない。commit メッセージに元の commit を書き、README に「作者の日付は元の commit の日付」と書いてある。⚠️ 研究者が「解析の前」の裏づけを強めたいなら、OSF に外枠の写しを置くなどを別に考える（今回はしない）。
+- **検証**: 書き出しの selftest ok・文体の検査の selftest OK・違反 0 件・走査 0 件・今の 3 枚の SVG は `check_svg` を通る。使い捨ての変異 12 本（scratchpad の `mutate_review.py`・左右の `@`・点とハイフン・例外を全体に・SVG の検査を呼ばない・リンクを許す・断片のリンクを拒む・data を許す・ディレクトリの規則を外す・SVG の文字参照を戻さない 2 本・tspan の属性を消す）すべて赤。`build.sh --submission`: エラー 0・未定義 0・生成されていない値 0・overfull は main 0・main-submission 1・補遺 167。組んだ PDF の表 1 の行を文字で確かめた。
+- **影響範囲**: `kit/export/{export.internal.py,README.internal.md}`・`issues/_style_check.py`・`papers/ime-observation/{.gitattributes,README.md,assets/make_assets.py,assets/demo.svg,experiment/notes.md,kit/refinput-macos/README.md}`・`manuscript/sections/{dataset,declarations,related}.tex`・`manuscript/supplement/provenance.tex`・本ファイル。

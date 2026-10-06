@@ -17,7 +17,8 @@ separately, and their locations and SHA-256 digests are recorded in `experiment/
   <img src="assets/demo.svg" width="100%" alt="Left: the romaji n, i, h, o, n, g, o typed with the input
     method on become a reading in an input field; Space converts it and Enter commits it. Right: the rows that the
     logger writes at the same times: a key category and a time for every key press and, when the conversion ends,
-    its duration, its number of candidate moves and whether it was abandoned. No character is written.">
+    its duration, the number of arrow-key presses during it and whether it was abandoned. No character is
+    written.">
 </p>
 
 ## Identifiers
@@ -40,7 +41,7 @@ is, in order:
 4. the release, tagged `v1.0.0`.
 
 The first three commits carry the date of the working commit they come from, and their messages name it. The
-licence texts, this file's identifiers and figures and the line-end rules of `.gitattributes` are added in the
+license texts, this file's identifiers and figures and the line-end rules of `.gitattributes` are added in the
 release.
 
 ### Recomputing the lists of the freezing tags
@@ -65,8 +66,9 @@ print(hashlib.sha256(text).hexdigest(), len(rows))
 EOF
 ```
 
-With `core.autocrlf=true` (the default of Git for Windows) the archive is written with CRLF line ends and the list
-does not match.
+For the Windows tag, take its files into another empty directory and pass that directory to the same script. With
+`core.autocrlf=true` (the default of Git for Windows) the archive is written with CRLF line ends and the list does
+not match.
 
 ## Layout
 

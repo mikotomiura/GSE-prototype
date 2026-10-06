@@ -175,8 +175,8 @@ def demo(frame=None):
             '<title id="t">How the logger records a conversion</title>\n'
             '<desc id="d">Left: the romaji n, i, h, o, n, g, o typed with the input method on become the reading '
             'nihongo, Space converts it and Enter commits it. Right: the rows the logger writes at the same times, '
-            'a key category and a time for every key press and, when the conversion ends, its duration, its number '
-            'of candidate moves and whether it was abandoned; no character is written.</desc>\n'
+            'a key category and a time for every key press and, when the conversion ends, its duration, the number '
+            'of arrow-key presses during it and whether it was abandoned; no character is written.</desc>\n'
             + style + "\n"
             '<rect x="0.5" y="0.5" width="959" height="409" rx="12" fill="#0d1117" stroke="#30363d"/>\n'
             + "\n".join(body) + "\n</svg>\n")

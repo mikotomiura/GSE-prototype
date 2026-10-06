@@ -20,6 +20,7 @@ kit/corpus/data/、*.internal.md、Cargo.lock、target/・__pycache__/ などの
 """
 import argparse
 import ast
+import html
 import io
 import json
 import os
@@ -214,19 +215,18 @@ def md_prose(text):
     return out
 
 
-SVG_PROSE = re.compile(r"<title[^>]*>(.*?)</title>|<desc[^>]*>(.*?)</desc>|<!--(.*?)-->", re.S)
+SVG_TEXT_BODY = re.compile(r"(<text\b[^>]*>)(.*?)(</text>)", re.S)
+SVG_CHAR_DATA = re.compile(r"(^|>)([^<]*)")
 
 
 def svg_prose(text):
-    """判断 210: 公開 repo の図（SVG）。地の文は <title>・<desc>・コメントだけで、<text> は図の中の文字
-    （入力の例として日本語を描く）なので見ない。"""
-    out = []
-    for m in SVG_PROSE.finditer(text):
-        body = next(g for g in m.groups() if g is not None)
-        no = text.count("\n", 0, m.start()) + 1
-        for i, ln in enumerate(body.split("\n")):
-            out.append((no + i, ln))
-    return out
+    """判断 210・211: 公開 repo の図（SVG）。<text> の文字データ（図の中の入力の例として日本語を描く）だけを除き、
+    残り（属性・<title>・<desc>・<style>・<metadata>・コメント・<tspan> の属性）はすべて地の文として見る。
+    文字参照（&#x…; など）は戻してから見る。行の番号は保つ。"""
+    def blank(m):
+        body = SVG_CHAR_DATA.sub(lambda d: d.group(1) + re.sub(r"[^\n]", "", d.group(2)), m.group(2))
+        return m.group(1) + body + m.group(3)
+    return [(no, html.unescape(ln)) for no, ln in enumerate(SVG_TEXT_BODY.sub(blank, text).split("\n"), 1)]
 
 
 def json_prose(text):
@@ -294,7 +294,8 @@ def check_text(rel, text, verbatim):
                 vs.append(Violation(rel, 0, "forbidden:" + kind, "禁止語がある"))
             continue
         for no, ln in enumerate(lines, 1):
-            if rx.search(ln):
+            # 判断 211: SVG は文字参照（G&#x53;E など）を戻しても見る
+            if rx.search(ln) or (ext == ".svg" and rx.search(html.unescape(ln))):
                 vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある"))
     base = os.path.basename(rel)
     if ext == ".py":
@@ -407,6 +408,15 @@ def selftest():
     expect("svg 複数行の desc の日本語は赤", "a.svg", "<svg>\n<desc>English\n" + J + "</desc>\n</svg>\n", ["japanese-prose"])
     expect("svg コメントの日本語は赤", "a.svg", "<svg>\n<!-- " + J + " -->\n</svg>\n", ["japanese-prose"])
     expect("svg 禁止語は図の中でも赤", "a.svg", "<svg>\n<text>GSE</text>\n</svg>\n", ["forbidden:gse"])
+    # 判断 211: 地の文は <text> の文字データ以外のすべて。文字参照は戻して見る
+    expect("svg 属性の日本語は赤", "a.svg", '<svg aria-label="' + J + '">\n</svg>\n', ["japanese-prose"])
+    expect("svg style のコメントの日本語は赤", "a.svg", "<svg>\n<style>/* " + J + " */</style>\n</svg>\n", ["japanese-prose"])
+    expect("svg metadata の日本語は赤", "a.svg", "<svg>\n<metadata>" + J + "</metadata>\n</svg>\n", ["japanese-prose"])
+    expect("svg 文字参照の日本語は赤", "a.svg", "<svg>\n<title>&#x65E5;&#26412;</title>\n</svg>\n", ["japanese-prose"])
+    expect("svg 文字参照の禁止語は赤", "a.svg", "<svg>\n<text>G&#x53;E</text>\n</svg>\n", ["forbidden:gse"])
+    expect("svg tspan の中の日本語は通る", "a.svg", '<svg>\n<text x="1"><tspan fill="#fff">' + J + "</tspan></text>\n</svg>\n", [])
+    expect("svg tspan の属性の日本語は赤", "a.svg", '<svg>\n<text><tspan aria-label="' + J + '">x</tspan></text>\n</svg>\n',
+           ["japanese-prose"])
     expect("json reason の日本語は赤", "m.json", '{"entries":[{"reason":"' + J + '"}]}', ["japanese-prose"])
     expect("json 出どころの欄は見ない", "m.json",
            '{"entries":[{"gse_path":"src-tauri/x.rs","start_anchor":"// ' + J + '","reason":"ok"}]}', [])

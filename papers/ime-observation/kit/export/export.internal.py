@@ -23,8 +23,8 @@ The export
   3. rewrites the manifests so that they keep only kind / id / path / symbol / sha256 / reason and
      recomputes every checksum from the exported bytes;
   4. rejects the export when any exported text or file name contains a participant identifier, an
-     e-mail address (other than the one in PUBLIC_EMAILS), an internal dataset or session name, an internal marker word or symbol, a home
-     or repository path of the machine that runs the export, the login name of that machine, or an
+     e-mail address (other than the one in PUBLIC_EMAILS, in the manuscript only), an internal dataset or session
+     name, an internal marker word or symbol, a home or repository path of the machine that runs the export, the login name of that machine, or an
      absolute path that names a user (the fictional names in FICTIONAL are the only names that
      pass). Every line is also checked after its JSON / string escapes are decoded;
   5. verifies the exported logger manifests with check_manifest.py --self;
@@ -116,10 +116,20 @@ WORD_RULES = (
 )
 # The e-mail address of the corresponding author, which the article prints: the author chose to publish it with the
 # manuscript (the postal address and the telephone number stay out). It is a constant: nothing extends it at run
-# time. Only the whole address passes; an address that contains it, or another address on the same line, does not.
+# time. It passes only in the files under PUBLIC_EMAIL_DIR and only as a whole address; an address that contains it
+# (also joined by another "@"), or another address on the same line, does not.
 PUBLIC_EMAILS = ("mmiura.network" + AT + "gmail.com",)
-_PUBLIC_EMAIL = re.compile("|".join(r"(?<![A-Za-z0-9._%+\-])" + re.escape(a) + r"(?![A-Za-z0-9\-]|\.[A-Za-z0-9])"
-                                    for a in PUBLIC_EMAILS), re.I)
+PUBLIC_EMAIL_DIR = "manuscript/"
+_PUBLIC_EMAIL = re.compile("|".join(r"(?<![A-Za-z0-9._%+\-" + AT + r"])" + re.escape(a)
+                                    + r"(?![A-Za-z0-9_%+\-" + AT + r"]|\.[A-Za-z0-9\-])" for a in PUBLIC_EMAILS), re.I)
+# An SVG figure is exported as text, so it must not carry what a browser would run or load: a script, an event
+# handler, a link or reference to anything but a fragment of the same file, an embedded object, an import, a data
+# URI (which could also carry a binary past the rule that only text is exported) or a document type declaration.
+_SVG_ACTIVE = re.compile(r"<script|<foreignobject|<iframe|<embed|<object|@import|<!doctype|<!entity"
+                         r"|\son[a-z]+\s*="
+                         r"|href\s*=\s*[\"'](?!#)"
+                         r"|url\(\s*[\"']?(?!#)"
+                         r"|[\"'(\s]data:", re.I)
 ALWAYS_RULES = (
     ("participant-id", re.compile(r"(?<![A-Za-z0-9])P\d{3}(?![A-Za-z0-9])")),
     ("email-address", re.compile(r"[A-Za-z0-9._%+\-]+" + AT + r"[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")),
@@ -714,6 +724,21 @@ def check_secret_content(files):
                    " or reword it if it matched by chance):\n" + "\n".join(hits[:100]))
 
 
+def check_svg(files):
+    """An SVG figure that holds a script, an event handler, a link or reference outside the file, an embedded object,
+    an import, a data URI or a document type declaration stops the export (exit 1). The whole file is searched, so a
+    construct split over lines is found too; the matched text is never shown."""
+    hits = []
+    for rel in sorted(files):
+        if rel.lower().endswith(".svg"):
+            text = files[rel]
+            for m in _SVG_ACTIVE.finditer(text):
+                hits.append("  %s:%d: active-svg" % (rel, text.count("\n", 0, m.start()) + 1))
+    if hits:
+        raise Stop(1, "an SVG figure holds what a browser would run or load (the text is not shown):\n"
+                   + "\n".join(hits[:100]))
+
+
 def path_forms(p):
     p = p.strip()
     m = re.match(r"^/([A-Za-z])/(.*)$", p)
@@ -824,10 +849,10 @@ def names_a_user(text):
     return False
 
 
-def line_kinds(text, word_check, rules):
+def line_kinds(text, word_check, rules, public_email=False):
     kinds = set()
     for kind, rx in ALWAYS_RULES:
-        if rx.search(_PUBLIC_EMAIL.sub(" ", text) if kind == "email-address" else text):
+        if rx.search(_PUBLIC_EMAIL.sub(" ", text) if kind == "email-address" and public_email else text):
             kinds.add(kind)
     if word_check:
         for kind, rx in WORD_RULES:
@@ -847,10 +872,11 @@ def scan(files, rules):
     hits = []
     for rel in sorted(files):
         word_check = not _CORPUS_JSONL.match(rel)
+        pub = rel.startswith(PUBLIC_EMAIL_DIR)
         for no, ln in [(0, rel)] + list(enumerate(files[rel].split("\n"), 1)):
-            kinds = line_kinds(ln, word_check, rules)
+            kinds = line_kinds(ln, word_check, rules, pub and no > 0)
             if "\\" in ln:
-                kinds |= line_kinds(unescape(ln), word_check, rules)
+                kinds |= line_kinds(unescape(ln), word_check, rules, pub and no > 0)
             for kind in sorted(kinds):
                 hits.append((rel, no, kind))
     return hits
@@ -1000,6 +1026,7 @@ def export(root, out, allow_missing_license, also_users, also_homes, style_check
         check_tool_committed(style_tool)
     files = collect(root)
     check_secret_content(files)
+    check_svg(files)
     if top:
         check_committed(root, files, [TRANSLATIONS])
     r = _py_check_manifest(ldir)
@@ -1240,13 +1267,28 @@ def selftest():
         addr = "who" + AT + "example.org"
         refused("an email address stops the export", {"README.md": "# Fake\nWrite to %s.\n" % addr}, "README.md", forbid=(addr,))
         pub = PUBLIC_EMAILS[0]
-        for longer in ("x" + pub, pub + ".example.org", pub.replace(AT, "+tag" + AT, 1), pub + ", " + addr, addr + " " + pub):
+        for longer in ("x" + pub, pub + ".example.org", pub.replace(AT, "+tag" + AT, 1), pub + ", " + addr, addr + " " + pub,
+                       "who" + AT + pub, pub + AT + "example.org", pub + ".-x.org"):
             refused("an address that is not exactly the public one stops the export",
-                    {"README.md": "# Fake\nWrite to %s.\n" % longer}, "README.md")
-        name = "the public address of the corresponding author passes"
+                    {"manuscript/main.tex": "Write to %s.\n" % longer}, "manuscript/main.tex")
+        refused("the public address stops the export outside the manuscript",
+                {"README.md": "# Fake\nWrite to %s.\n" % pub}, "README.md")
+        name = "the public address of the corresponding author passes in the manuscript"
         for form in (pub, "\\email{%s}" % pub, "mailto:%s" % pub, pub.upper()):
-            rcx, text, o = run("pubmail-" + str(len(form)) + form[:2].encode("utf-8").hex(), {"README.md": "# Fake\nWrite to %s.\n" % form})
+            rcx, text, o = run("pubmail-" + str(len(form)) + form[:2].encode("utf-8").hex(),
+                               {"manuscript/main.tex": "Write to %s.\n" % form})
             ck(name + " (%s)" % form.replace(AT, " at "), rcx == 0, text)
+        # an SVG figure carries nothing that a browser would run or load
+        name = "an SVG figure with active content stops the export"
+        for svg in ('<svg><script>x()</script></svg>', '<svg onload="x()"></svg>', '<svg><a href="https://example.org/">x</a></svg>',
+                    '<svg><image xlink:href="pic.png"/></svg>', '<svg><rect style="fill:url(https://example.org/p)"/></svg>',
+                    '<svg><style>@import "x.css";</style></svg>', '<svg><style>@font-face{src:url(data:font/woff2;base64,AA)}</style></svg>',
+                    '<svg><foreignObject><p>x</p></foreignObject></svg>', '<!DOCTYPE svg [<!ENTITY a "b">]>\n<svg/>',
+                    '<svg><a href=\n"https://example.org/">x</a></svg>', '<svg><desc> data:text/plain,x</desc></svg>'):
+            refused(name, {"assets/f.svg": svg + "\n"}, "assets/f.svg")
+        rcx, text, o = run("svg-ok", {"assets/f.svg": '<svg><defs><linearGradient id="g"/></defs><rect fill="url(#g)"/>'
+                                                      '<use href="#g"/><text>the input method on become a reading</text></svg>\n'})
+        ck("an SVG figure with references to its own fragments only passes", rcx == 0, text)
         for word in (_ORG, _TAURI, _STAR, _WARN, _STEER + "/notes"):
             refused("an internal marker word stops the export", {"README.md": "# Fake\nSee %s here.\n" % word}, "README.md")
         # comments are stripped from manifest-listed sources
@@ -1703,11 +1745,18 @@ def selftest():
         # every file pattern of the ignore file is either left out or stops the export as the name of a secret
         name = "each file pattern of the ignore file is implemented"
         for pat in sorted(IGNORE_LINES):
-            if pat.startswith("!") or pat.endswith("/") or not pat.startswith("*."):
-                continue
-            nm = "kit/x" + pat[1:]
-            ck(name + " (%s)" % pat, excluded(nm, False) != is_secret_name(nm.rsplit("/", 1)[-1]),
-               "excluded %s, secret name %s" % (excluded(nm, False), is_secret_name(nm.rsplit("/", 1)[-1])))
+            if pat.startswith("!"):
+                nm = pat[1:].replace("*", "x")
+                ck(name + " (%s)" % pat, not excluded(nm, False), nm)
+            elif pat.endswith("/"):
+                nm = pat[:-1].replace("**/", "kit/")
+                ck(name + " (%s)" % pat, excluded(nm, True), nm)
+            elif pat.startswith("*."):
+                nm = "kit/x" + pat[1:]
+                ck(name + " (%s)" % pat, excluded(nm, False) != is_secret_name(nm.rsplit("/", 1)[-1]),
+                   "excluded %s, secret name %s" % (excluded(nm, False), is_secret_name(nm.rsplit("/", 1)[-1])))
+            else:
+                ck(name + " (%s has a form this check knows)" % pat, False, pat)
         # a secret-looking directory name
         name = "a secret-looking directory name stops the export"
         for nm in ("kit/.aws/config.md", "kit/.ssh/x.md", "kit/.gnupg/x.md", "kit/.docker/x.md", "kit/.kube/x.md", "kit/.pgpass/x.md", "kit/my-secret/x.md",

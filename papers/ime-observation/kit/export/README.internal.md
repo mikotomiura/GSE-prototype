@@ -129,8 +129,8 @@ id (long-term or temporary), an Anthropic or OpenAI key head, the shape of a Goo
 token head; the check runs on the source and again on the converted output, and each line is also
 checked with its escapes decoded; the text is never printed), a file of a kind that the checker of
 the writing rules does not read (the file must have the extension `.py`, `.rs`, `.sh`, `.md`,
-`.json`, `.toml`, `.swift`, `.txt`, `.cff`, `.tex`, `.bib` or `.svg`, or be named `.gitignore`, `.gitattributes`, `SEED`,
-`Cargo.lock`, `LICENSE-CODE` or `LICENSE-DATA`; under `kit/corpus/data/` only the `*.jsonl` files directly in it;
+`.json`, `.toml`, `.swift`, `.txt`, `.cff`, `.tex`, `.bib` or `.svg`, or be named `.gitignore`, `.gitattributes`,
+`SEED`, `Cargo.lock`, `LICENSE-CODE` or `LICENSE-DATA`; under `kit/corpus/data/` only the `*.jsonl` files directly in it;
 add the kind to the checker or leave the file out), a name that holds the word `internal` in
 another form than `.internal.` (a word that no letter touches, in any case, as in `notes_internal.md`,
 `internal2.md` or `notes(internal).md`, or `Internal` right after a lower-case letter, as in
@@ -152,9 +152,13 @@ characters.
 * A participant identifier (the letter P and three digits, not adjoining a letter or digit, so
   that the identifier is found inside a longer name joined by an underscore; inside brackets too,
   as in `[P017]`, and in file names), an e-mail address (the one exception is the address of the corresponding
-  author, which the article prints; it is fixed in the script as `PUBLIC_EMAILS` and passes only as a whole
-  address), the name of the private dataset repository, a session
-  name of the private recordings, and the private working directories.
+  author, which the article prints; it is fixed in the script as `PUBLIC_EMAILS` and passes only in the files under
+  `manuscript/` and only as a whole address, not joined to anything by another `@`), the name of the private
+  dataset repository, a session name of the private recordings, and the private working directories.
+* In an SVG figure (searched over the whole file): a script, an event handler, a link or reference to anything but a
+  fragment of the same file (`href="#…"`, `url(#…)`), an embedded object, an `@import`, a data URI or a document
+  type declaration. A figure is exported as text and shown on the repository's page, so it may hold none of what a
+  browser would run or load, and a data URI could carry a binary past the rule that only text is exported.
 * The words that name the private project, the name of its source directory, and two internal
   marker symbols (not applied to the `.jsonl` files directly in `kit/corpus/data/`; other files there are checked).
 * Values of the machine that runs the export: the home directory, the repository root, the
