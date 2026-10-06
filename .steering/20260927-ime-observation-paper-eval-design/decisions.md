@@ -1826,3 +1826,8 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - LOW: ¶4 の 150 ms は行をずらすが短くはしない → 「対にならない」側だけに結んだ。¶3 の「USB は 8 ms」→「such as a USB keyboard sampled every 8 ms \citep{pinet2017}」。`decomposition_values()` が速さを `SPEEDS` で絞り `.dwell.speeds.used` を出す。`_selftest_definitions()` の全試行の fixture を共通の定義で 2 層変え（precision の範囲が動く）、補遺の 2 行を行全体で照合。D12 の規則に「and have a value」。`fmt_ms` の偶数への丸めを docstring に明記（挙動は変えない）。
 - **検証**: selftest 180 件。変異 8 本（Discussion の値）・19 本（D12）・前の 17 本すべて赤。`--check` 一致。`build.sh --submission` エラー 0・未定義の参照 0・生成されていない値 0・overfull main 1・補遺 167。文体の検査 違反 0。41〜43 頁を画像で確かめた。
 - ⚠️ **研究者への報告**: ¶2（事実の誤り）と ¶1（言い過ぎ）はメインが直した（研究者が採った解釈の向きは変えていない）→ 完了報告で明示する。
+- **追記（同日・/cross-review 1 巡目・`78aeacdb..76f53fab`・papers/ の 6 ファイル・553 行・30,895 tokens・今日の台帳 216,863 / 7 回）**: Codex の P2 3 件をすべて一次で確かめた。
+  - 1「¶3 の『広がりはロガーの時刻から来ない』は、対になった会話についてしか言えない」→ 真（予測とロガーの比較も対だけ）→「For the sessions that paired, the spread is not explained by …」に限定した。
+  - 2「`definition_changes()` は両定義で範囲に入る層の共通部分だけを比べ、片方だけで値を持つ層が数から消える・precision の分母を本文が示さない」→ 真（実データでは 0 で数値に影響なし）→ 片方だけの層の数 `*.change.<m>.onlyone`（実データ 0）を足し、本文は「of the N strata that enter both」と precision の分母も `\rv` で。
+  - 3「`bland_altman` があって限界が None のとき道具が落ちる」→ 真（`stats.py` 144 行: n=1 で限界は None）→ 限界と中央絶対差を別々に、値のある速さだけから取り、`speeds.used` は限界のある速さを数える。
+  - selftest 181 件（n=1 の速さ・片方だけの層）。変異 9 本（Discussion の値・n=1 の速さを含む）・20 本（D12・片方だけの層を数えない、を含む）・前の 17 本すべて赤（2 本は最初当たらず: 文字列の古さ 1・変異の甘さ 1 → 直して赤を確かめた）。`build.sh --submission` エラー 0・生成されていない値 0。文体 違反 0。

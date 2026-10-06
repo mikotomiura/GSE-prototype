@@ -6015,6 +6015,11 @@
    "text": "39",
    "value": 39
   },
+  "windows-msime-tsf.defs.all.change.precision.onlyone": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/precision",
+   "text": "0",
+   "value": 0
+  },
   "windows-msime-tsf.defs.all.change.precision.strata": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/precision",
    "text": "5",
@@ -6029,6 +6034,11 @@
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/recall",
    "text": "39",
    "value": 39
+  },
+  "windows-msime-tsf.defs.all.change.recall.onlyone": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/recall",
+   "text": "0",
+   "value": 0
   },
   "windows-msime-tsf.defs.all.change.recall.strata": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/recall",
@@ -6122,6 +6132,11 @@
    "text": "36",
    "value": 36
   },
+  "windows-msime-tsf.defs.primary.change.precision.onlyone": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/precision",
+   "text": "0",
+   "value": 0
+  },
   "windows-msime-tsf.defs.primary.change.precision.strata": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/precision",
    "text": "5",
@@ -6136,6 +6151,11 @@
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/recall",
    "text": "36",
    "value": 36
+  },
+  "windows-msime-tsf.defs.primary.change.recall.onlyone": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/recall",
+   "text": "0",
+   "value": 0
   },
   "windows-msime-tsf.defs.primary.change.recall.strata": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/recall",

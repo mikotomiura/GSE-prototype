@@ -950,23 +950,28 @@ def definition_values(cell):
                 cell.src["e1_detection.json"], cell.label, COMMON_DEFINITION, PRIMARY_COMPARISON, scope, m)
             vals["%s.common.%s.range" % (base, m)] = {"text": text, "value": value, "source": ssrc}
             vals["%s.common.%s.strata.left" % (base, m)] = {"text": str(left), "value": left, "source": ssrc}
-            changed, compared, largest = definition_changes(cell, scope, m)
+            changed, compared, largest, onlyone = definition_changes(cell, scope, m)
             vals["%s.change.%s.strata" % (base, m)] = {"text": str(changed), "value": changed, "source": ssrc}
             vals["%s.change.%s.of" % (base, m)] = {"text": str(compared), "value": compared, "source": ssrc}
             vals["%s.change.%s.max" % (base, m)] = {"text": fmt_p(largest), "value": largest, "source": ssrc}
+            vals["%s.change.%s.onlyone" % (base, m)] = {"text": str(onlyone), "value": onlyone, "source": ssrc}
     return vals
 
 
 def definition_changes(cell, scope, m):
     """Within the ranges: over the strata that enter the range of measure m under both definitions, how many have a
-    different estimate under the common definition, how many were compared, and the largest absolute difference
-    (None when no stratum is compared)."""
+    different estimate under the common definition, how many were compared, the largest absolute difference (None
+    when no stratum is compared), and how many strata enter the range under one definition only (a stratum that gains
+    or loses a value with the definition, which the comparison cannot count as a change)."""
     kept = cell.kept_trials(scope)[0]
     own, common = strata_of(cell.det[scope]), strata_of(cell.det_common[scope])
-    keys = sorted(set(strata_in_range(kept, own, list(kept), m)) & set(strata_in_range(kept, common, list(kept), m)))
+    own_used = set(strata_in_range(kept, own, list(kept), m))
+    common_used = set(strata_in_range(kept, common, list(kept), m))
+    keys = sorted(own_used & common_used)
     diffs = [abs(own[k][m]["value"] - common[k][m]["value"]) for k in keys
              if own[k][m]["value"] is not None and common[k][m]["value"] is not None]
-    return sum(1 for x in diffs if x > 0), len(diffs), (max(diffs) if diffs else None)
+    changed = sum(1 for x in diffs if x > 0)
+    return changed, len(diffs), (max(diffs) if diffs else None), len(own_used ^ common_used)
 
 
 def definition_range(cell, scope, block, m):
@@ -1059,17 +1064,18 @@ def decomposition_values(cell):
         src = "%s:cells/%s/%s/%s/%s/metrics/by_speed/*/dwell" % (cell.src["e1_l1.json"], cell.label, cell.definition,
                                                                  comp, PRIMARY_SCOPE)
         sp = [e["dwell"] for e in cell.l1_by[comp][PRIMARY_SCOPE]["metrics"]["by_speed"]
-              if (e.get("stratum") or {}).get("speed") in SPEEDS and e["dwell"]["n"]
-              and e["dwell"].get("bland_altman") and e["dwell"].get("mae") is not None]
-        vals["%s.%s.primary.dwell.speeds.used" % (cell.label, tag)] = {"text": str(len(sp)), "value": len(sp),
-                                                                      "source": src}
-        if sp:
-            lo = min(d["bland_altman"]["loa_lo"] for d in sp)
-            hi = max(d["bland_altman"]["loa_hi"] for d in sp)
-            mlo, mhi = min(d["mae"] for d in sp), max(d["mae"] for d in sp)
-            loa, mae = {"text": ms_span(lo, hi), "value": [lo, hi]}, {"text": ms_span(mlo, mhi), "value": [mlo, mhi]}
-        else:
-            loa = mae = {"text": NO_VALUE, "value": [None, None]}
+              if (e.get("stratum") or {}).get("speed") in SPEEDS and e["dwell"]["n"]]
+        # One pair has a bias but no limits of agreement (kit/analysis/stats.py), so the limits and the median absolute
+        # difference are taken from the speeds that have them; speeds.used counts the speeds with limits.
+        with_loa = [d["bland_altman"] for d in sp if (d.get("bland_altman") or {}).get("loa_lo") is not None
+                    and d["bland_altman"].get("loa_hi") is not None]
+        with_mae = [d["mae"] for d in sp if d.get("mae") is not None]
+        vals["%s.%s.primary.dwell.speeds.used" % (cell.label, tag)] = {"text": str(len(with_loa)),
+                                                                      "value": len(with_loa), "source": src}
+        lo, hi = (min(b["loa_lo"] for b in with_loa), max(b["loa_hi"] for b in with_loa)) if with_loa else (None, None)
+        mlo, mhi = (min(with_mae), max(with_mae)) if with_mae else (None, None)
+        loa = {"text": ms_span(lo, hi) if with_loa else NO_VALUE, "value": [lo, hi]}
+        mae = {"text": ms_span(mlo, mhi) if with_mae else NO_VALUE, "value": [mlo, mhi]}
         vals["%s.%s.primary.dwell.loa.span" % (cell.label, tag)] = dict(loa, source=src + "/bland_altman/loa_lo|loa_hi")
         vals["%s.%s.primary.dwell.mae.span" % (cell.label, tag)] = dict(mae, source=src + "/mae")
         if comp not in ("gt_obs", "gt_pred"):
@@ -2969,6 +2975,9 @@ def _fixture(tmp, label="windows-test", sub="windows"):
         common_a = [dict(s, stratum=dict(s["stratum"])) for s in det_a]
         common_a[1] = _stratum("S1", "mid", 75, 54, 0.62, 0.82)
         common_a[2] = _stratum("S1", "slow", 75, 45, 0.50, 0.70)
+        # S2 slow has a value of precision under the common definition only (three rows, none paired), so it enters
+        # that range alone and moves its lower end to zero.
+        common_a[5] = dict(common_a[5], n_obs=3, precision={"value": 0.0, "lo": 0.0, "hi": 0.2, "n": 3, "x": 0})
         cells_det[COMMON_DEFINITION] = {PRIMARY_COMPARISON: {"under_limit": det_scope(common_u, 1, r=0.86),
                                                              "all_trials": det_scope(common_a, 1, focus_a, r=0.76)}}
         for scope, n in (("under_limit", 210), ("all_trials", 212)):
@@ -3675,16 +3684,16 @@ def _selftest_definitions(check):
               g("primary.common.recall.range") is not None
               and close(g("primary.common.recall.range"), [0.55, 0.95]) and g("primary.common.recall.strata.left") == 4
               and close(vals["windows-test.primary.recall.range"]["value"], [0.60, 0.97])
-              and close(g("all.common.precision.range"), [0.50, 1.0])
+              and close(g("all.common.precision.range"), [0.0, 1.0])
               and close(vals["windows-test.all.precision.range"]["value"], [0.55, 1.0])
-              and g("all.common.precision.strata.left") == 1,
+              and g("all.common.precision.strata.left") == 0,
               str((g("primary.common.recall.range"), g("all.common.precision.range"))))
         check("definitions: the supplement gives the ranges over the strata of both definitions with the strata left "
               "out, in the order of the columns, for both measures",
               "Recall, range over the strata & 0.600--0.970\\newline (4 left out) & 0.550--0.950\\newline (4 left out) & "
               "0.000--1.000\\newline (0 left out) & 0.000--1.000\\newline (0 left out) \\\\" in sup
               and "Precision, range over the strata & 0.600--0.970\\newline (4 left out) & 0.550--0.950\\newline "
-              "(4 left out) & 0.550--1.000\\newline (1 left out) & 0.500--1.000\\newline (1 left out) \\\\" in sup,
+              "(4 left out) & 0.550--1.000\\newline (1 left out) & 0.000--1.000\\newline (0 left out) \\\\" in sup,
               sup[-900:])
         # Within the ranges: S1 fast and mid differ in the primary scope (by 0.027 and 0.033), S1 mid and slow over all
         # trials (by 0.080 and 0.067); precision has no value in S2 slow, so one stratum fewer is compared.
@@ -3692,6 +3701,8 @@ def _selftest_definitions(check):
               (g("primary.change.recall.strata"), g("primary.change.recall.of")) == (2, 2)
               and abs(g("primary.change.recall.max") - (22 / 30.0 - 21 / 30.0)) < 1e-9
               and (g("all.change.precision.strata"), g("all.change.precision.of")) == (2, 5)
+              and (g("all.change.precision.onlyone"), g("all.change.recall.onlyone"),
+                   g("primary.change.recall.onlyone")) == (1, 0, 0)
               and abs(g("all.change.precision.max") - (60 / 75.0 - 54 / 75.0)) < 1e-9,
               str([g(k) for k in ("primary.change.recall.strata", "primary.change.recall.of",
                                   "primary.change.recall.max", "all.change.precision.strata",
@@ -3774,6 +3785,28 @@ def _selftest_decomposition(check):
               == ("300~ms", "20 to 40~ms", "30 to 50~ms", "3"),
               str((t("gtobs.primary.dwell.mae.span"), t("gtpred.primary.dwell.mae.span"),
                    t("predobs.primary.dwell.mae.span"))))
+        # A speed with one pair has a bias but no limits: the limits come from the other speeds, and nothing stops.
+        l1p = os.path.join(tmp, "e1_l1.json")
+        with open(l1p, "rb") as f:
+            original = f.read()
+
+        def one_pair(doc):
+            for e in doc["cells"]["macos-test"]["macos_def"]["pred_obs"][PRIMARY_SCOPE]["metrics"]["by_speed"]:
+                if e["stratum"]["speed"] == "slow":
+                    e["dwell"]["n"] = 1
+                    e["dwell"]["bland_altman"].update({"n": 1, "sd": None, "loa_lo": None, "loa_hi": None})
+        _rewrite(l1p, one_pair)
+        try:
+            v1 = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+            got = ((v1.get("macos-test.predobs.primary.dwell.loa.span") or {}).get("text"),
+                   (v1.get("macos-test.predobs.primary.dwell.speeds.used") or {}).get("text"),
+                   (v1.get("macos-test.predobs.primary.dwell.mae.span") or {}).get("text"))
+        except Exception as ex:  # a crash is a failure of this check, not of the selftest
+            got = repr(ex)
+        check("decomposition: a speed without limits of agreement is left out of their span and counted",
+              got == ("$-$1,398 to 802~ms", "2", "30 to 50~ms"), str(got))
+        with open(l1p, "wb") as f:
+            f.write(original)
         check("decomposition: each layer is read from its own comparison, in the primary scope, with the trials of the "
               "plan in the layer",
               t("layer.none.gtobs.primary.recall") == "0.525 [0.330, 0.700]"
