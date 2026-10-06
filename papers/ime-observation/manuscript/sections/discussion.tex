@@ -6,8 +6,8 @@
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{Where the disagreements arise on macOS.} The macOS logger carried out its own rules. In the primary scope its
-rows agreed with the rows that the rules specify for the presses sent with pooled recall
+\paragraph{Where the disagreements arise on macOS.} The rows of the macOS logger followed its own rules in almost every
+session. In the primary scope they agreed with the rows that the rules specify for the presses sent with pooled recall
 \rv{macos-standard-live-off.pooled.predobs.underlimit.recall} with live conversion off and
 \rv{macos-standard-live-on.pooled.predobs.underlimit.recall} with it on, and the limits of agreement of their durations
 spanned \rv{macos-standard-live-off.predobs.primary.dwell.loa.span} and
@@ -25,23 +25,30 @@ agreement spanned \rv{macos-standard-live-off.gtpred.primary.dwell.loa.span} and
 (against \rv{macos-standard-live-off.gtobs.primary.dwell.loa.span} and
 \rv{macos-standard-live-on.gtobs.primary.dwell.loa.span}, and \rv{macos-standard-live-off.gtobs.primary.dwell.mae.span}
 and \rv{macos-standard-live-on.gtobs.primary.dwell.mae.span}, for the logger). The disagreements of the macOS logger,
-and the long tails of its duration differences, thus arise where the sessions that its rules define differ from the
-sessions of the reference, not where the logger departs from its rules. The three comparisons are read side by side and
-are not combined arithmetically (Section~\ref{sec:method-analysis}).
+and the long tails of its duration differences, thus arise mainly where the sessions that its rules define differ from
+the sessions of the reference; against its own rules the logger's miss rate was
+\rv{macos-standard-live-off.pooled.predobs.underlimit.missrate} and
+\rv{macos-standard-live-on.pooled.predobs.underlimit.missrate}, and its false-positive rate
+\rv{macos-standard-live-off.pooled.predobs.underlimit.falseposrate} and
+\rv{macos-standard-live-on.pooled.predobs.underlimit.falseposrate}. The three comparisons are read side by side and are
+not combined arithmetically (Section~\ref{sec:method-analysis}).
 
 \paragraph{Disagreements that the registration listed and those it did not.} The registration listed, as following from
 the rules, a session that Backspace keeps open and carries into the next trial (S6), a session closed by Tab when a
 predictive candidate is chosen (S10), a reading split by the minus, comma or period key, and, with live conversion on, a
-session closed at the first of two Returns or Escapes. These set the lowest strata of the primary scope
-(Section~\ref{sec:results-detection}) and the layers of the prediction with the lowest agreement (supplement). In the
+session closed at the first of two Returns or Escapes. These set the lowest strata of the primary scope, S6 and S10 at
+the fast speed (Section~\ref{sec:results-detection}). The prediction marks the first and the third as layers (a session
+carried into the next trial, a closing key inside a reading), together with the trials that receive a carried session,
+and these layers hold its lowest agreement (supplement). In the
 trials outside every layer that the prediction marks, recall was
 \rv{macos-standard-live-off.layer.none.gtobs.primary.recall} and precision
 \rv{macos-standard-live-off.layer.none.gtobs.primary.precision} with live conversion off, and
 \rv{macos-standard-live-on.layer.none.gtobs.primary.recall} and
 \rv{macos-standard-live-on.layer.none.gtobs.primary.precision} with it on, and the specified rows agreed with the
 reference there to the same extent (recall \rv{macos-standard-live-off.layer.none.gtpred.primary.recall} and
-\rv{macos-standard-live-on.layer.none.gtpred.primary.recall}). The disagreements that remain there were not listed in
-the registration, and this study did not separate their sources.
+\rv{macos-standard-live-on.layer.none.gtpred.primary.recall}). The layers do not mark the sessions closed by Tab in S10
+or, with live conversion on, those closed at the first of two Returns or Escapes, so disagreements that the
+registration listed remain among these trials, and this study did not separate them from any that it did not list.
 
 \paragraph{The spread of the durations on macOS.} The spread does not come from the timing of the logger's records:
 its key rows followed the injected presses by a median of \rv{macos-standard-live-off.kt.obs.delay.all.median} (95th
@@ -58,7 +65,7 @@ macOS cells used different plans (\rv{macos-standard-live-off.pred.trials.n} and
 \rv{macos-standard-live-on.pred.trials.n} trials), so the two settings are not compared trial by trial; durations are
 compared only for the sessions that paired, which differ between strata and speeds; and the delay between an injected
 press and the input method's calls to the reference field was not measured. The delays above cover the path from the
-injection to the row; with a physical keyboard, which a USB connection samples every 8~ms \citep{pinet2017}, the delay
+injection to the row; with a physical keyboard, such as a USB keyboard sampled every 8~ms \citep{pinet2017}, the delay
 from a key to a row is expected to be longer (Section~\ref{sec:limitations}).
 
 \paragraph{Windows.} The Windows logger records the visibility of the input method's windows, not the composition, so
@@ -66,10 +73,10 @@ its agreement includes the difference between the two constructs (Section~\ref{s
 durations were shorter than the reference's at every speed (intervals of the bias spanning
 \rv{windows-msime-tsf.primary.dwellbias.range}, median absolute differences
 \rv{windows-msime-tsf.gtobs.primary.dwell.mae.span}), and recall fell with speed also in S1, in which few sessions were
-split (supplement). A window that appears after the
-composition begins or disappears before it ends, a change of the window that the logger does not observe, and, on the
-cloaking path, an observed interval that ends at least 150~ms before the row's time are consistent with shorter rows
-and with sessions that fail to pair. Which of them acted cannot be told here, because a row does not record its path and
+split (supplement). A window that appears after the composition begins or disappears before it ends is consistent with
+shorter rows; a change of the window that the logger does not observe, and, on the cloaking path, an observed interval
+that ends at least 150~ms before the row's time, for which the matching is not adjusted, are consistent with sessions
+that fail to pair. Which of them acted cannot be told here, because a row does not record its path and
 nothing outside the software observed the windows. The values of the two systems describe different constructs and are
 not compared; each is read against the construct that its logger records.
 
@@ -80,6 +87,10 @@ definition common to both systems, the ranges of the per-stratum intervals that 
 \rv{windows-msime-tsf.defs.primary.common.recall.range} for recall and
 \rv{windows-msime-tsf.defs.primary.common.precision.range} for precision, against
 \rv{windows-msime-tsf.primary.recall.range} and \rv{windows-msime-tsf.primary.precision.range} under the definition of
-the analysis. The pooled merge rate was \rv{windows-msime-tsf.defs.primary.common.mergerate} under the common definition
-and \rv{windows-msime-tsf.pooled.gtobs.underlimit.mergerate} under the definition of the analysis, so a researcher who
-counts merged sessions on Windows depends on the definition more than one who reads recall and precision.
+the analysis. Within these ranges, the recall of \rv{windows-msime-tsf.defs.primary.change.recall.strata} of the
+\rv{windows-msime-tsf.defs.primary.change.recall.of} strata changed with the definition, by at most
+\rv{windows-msime-tsf.defs.primary.change.recall.max}, and the precision of
+\rv{windows-msime-tsf.defs.primary.change.precision.strata}, by at most
+\rv{windows-msime-tsf.defs.primary.change.precision.max}; the pooled merge rate was
+\rv{windows-msime-tsf.defs.primary.common.mergerate} under the common definition and
+\rv{windows-msime-tsf.pooled.gtobs.underlimit.mergerate} under the definition of the analysis.

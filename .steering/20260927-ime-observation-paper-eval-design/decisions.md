@@ -1813,3 +1813,16 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **AI 宣言**: Codex を「コードと本文のレビュー、Discussion の計画への第二意見」に、「The discussion was drafted by Claude from the direction and the interpretation that the author gave, and the author checked and approved it.」を足した（研究者の選択）。
 - **検証**: `build.sh --submission` エラー 0・未定義の参照 0・生成されていない値 0・overfull main 1・補遺 167。文体の検査 違反 0。Discussion の 41〜42 頁を画像で確かめた。
 - **残り**: 読み直しの資料の §A（各段落の主張）と §C（断りの重複）・§B.4 の 5（書字研究の尺度・新しい文献が要る）と 6（結論の問 4 の一文の置き場所）・7（長さ）は未回答。
+
+## 判断 199: Discussion の点検（code-reviewer ∥ security-checker）の指摘を一次で確かめて直す —— ¶2 の事実の誤り・¶1 の言い過ぎ・¶5 の最後の一文は研究者の選択で事実に置き換える（2026-10-06・G-GEAR・¶5 は研究者の選択〔推奨どおり〕・残りはメインの選択）
+
+- **対象**: `78aeacdb..83ed8637` の `papers/`。security-checker: 指摘 0（履歴ごと公開しない注意は M12 に既にある）。code-reviewer: HIGH 1・MEDIUM 4・LOW 6。
+- **一次で確かめて真だったもの（直した）**:
+  - HIGH ¶2「どの層にも入らない試行に残る不一致は登録が列挙していない」→ **誤り**。予測の層は 4 つ（`match.py` 125〜129 行: 持ち出し・持ち込み・読みの中の閉じるキー・どれでもない）で、S10 の Tab と live on の 2 回目の Return/Escape には層が無い → それらは「どれでもない」に入る。live off で S10 の対にならない参照の会話 88、「どれでもない」全体で 77（live on 62・53）→ 大半が登録の列挙したもの。→「層は S10 の Tab と live on の 2 回目を印さない → 登録が列挙した不一致もそこに残り、この研究は列挙しなかったものと分けていない」に。前の文も「予測は 1 つ目と 3 つ目を層にする（持ち込みの試行も）」と正確に。⚠️ メインが判断 193 の資料（F2）で「出どころは結果ファイルからは分けていない」と書いたまま、Discussion で「列挙していない」と書いてしまった。
+  - MEDIUM ¶1「carried out its own rules」「not where the logger departs」→ 言い過ぎ（予測とロガーの取り逃し 0.004・0.007・誤検出 0.005・0.007）→「almost every session」「mainly」と、その率を `\rv` で添えた。
+  - MEDIUM ¶5 の最後の一文（研究者が判断 198 で採った解釈）→ 層ごとの recall は定義で最大 0.080 動く（S3 fast・主の範囲で 36 層中 8 層・precision は 5 層で最大 0.027）・プールの差も recall 0.009 と統合の率 0.008 で絶対値は同程度 → **研究者に問い、研究者は「事実に置き換える（推奨）」を選んだ** → 道具に `definition_changes()`（両定義で範囲に入る層のうち推定値が変わった数・比べた数・最大の変化）と値 `*.defs.<scope>.change.{recall,precision}.{strata,of,max}` を足し、¶5 を「範囲の内側では recall が 36 層中 8 層で最大 0.080、precision が 5 層で最大 0.027 動き、統合の率は 0.009 と 0.001」に。D12 の What changes と Effect（変化の数は範囲を見た後で、点検の指摘で足した）にも書いた。
+  - MEDIUM 層の試行の値の名前（`.primary.trials`）が中身（計画全体の試行）と違う → `*.layer.<layer>.<comp>.plan.trials` に改名・docstring に明記。
+  - MEDIUM `_selftest_decomposition()` が中央絶対差の取り違えを見分けない → fixture の中央絶対差を比較と速さごとに変え（gt_pred 20〜40・pred_obs 30〜50・gt_obs 300）、3 つの比較の値を確かめる。
+  - LOW: ¶4 の 150 ms は行をずらすが短くはしない → 「対にならない」側だけに結んだ。¶3 の「USB は 8 ms」→「such as a USB keyboard sampled every 8 ms \citep{pinet2017}」。`decomposition_values()` が速さを `SPEEDS` で絞り `.dwell.speeds.used` を出す。`_selftest_definitions()` の全試行の fixture を共通の定義で 2 層変え（precision の範囲が動く）、補遺の 2 行を行全体で照合。D12 の規則に「and have a value」。`fmt_ms` の偶数への丸めを docstring に明記（挙動は変えない）。
+- **検証**: selftest 180 件。変異 8 本（Discussion の値）・19 本（D12）・前の 17 本すべて赤。`--check` 一致。`build.sh --submission` エラー 0・未定義の参照 0・生成されていない値 0・overfull main 1・補遺 167。文体の検査 違反 0。41〜43 頁を画像で確かめた。
+- ⚠️ **研究者への報告**: ¶2（事実の誤り）と ¶1（言い過ぎ）はメインが直した（研究者が採った解釈の向きは変えていない）→ 完了報告で明示する。

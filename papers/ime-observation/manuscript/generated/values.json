@@ -481,6 +481,11 @@
     43.5
    ]
   },
+  "macos-standard-live-off.gtobs.primary.dwell.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/metrics/by_speed/*/dwell",
+   "text": "3",
+   "value": 3
+  },
   "macos-standard-live-off.gtpred.all.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/all_trials/metrics/by_stratum/*/precision",
    "text": "0.000--1.000",
@@ -522,6 +527,11 @@
     36,
     43.5
    ]
+  },
+  "macos-standard-live-off.gtpred.primary.dwell.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/by_speed/*/dwell",
+   "text": "3",
+   "value": 3
   },
   "macos-standard-live-off.gtpred.primary.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/metrics/by_stratum/*/precision",
@@ -1405,6 +1415,11 @@
    "text": "2,632",
    "value": 2631.6938158331805
   },
+  "macos-standard-live-off.layer.carriedout.gtobs.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/carried_out/n_trials",
+   "text": "186",
+   "value": 186
+  },
   "macos-standard-live-off.layer.carriedout.gtobs.primary.precision": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/carried_out/pooled/precision",
    "text": "0.605 [0.496, 0.704]",
@@ -1423,8 +1438,8 @@
     0.5762887274890347
    ]
   },
-  "macos-standard-live-off.layer.carriedout.gtobs.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/carried_out/n_trials",
+  "macos-standard-live-off.layer.carriedout.gtpred.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/carried_out/n_trials",
    "text": "186",
    "value": 186
   },
@@ -1446,10 +1461,10 @@
     0.5762887274890347
    ]
   },
-  "macos-standard-live-off.layer.carriedout.gtpred.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/carried_out/n_trials",
-   "text": "186",
-   "value": 186
+  "macos-standard-live-off.layer.closingkeyinreading.gtobs.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/closing_key_in_reading/n_trials",
+   "text": "99",
+   "value": 99
   },
   "macos-standard-live-off.layer.closingkeyinreading.gtobs.primary.precision": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/closing_key_in_reading/pooled/precision",
@@ -1469,8 +1484,8 @@
     0.8291778084644637
    ]
   },
-  "macos-standard-live-off.layer.closingkeyinreading.gtobs.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/closing_key_in_reading/n_trials",
+  "macos-standard-live-off.layer.closingkeyinreading.gtpred.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/closing_key_in_reading/n_trials",
    "text": "99",
    "value": 99
   },
@@ -1492,10 +1507,10 @@
     0.8472984568174416
    ]
   },
-  "macos-standard-live-off.layer.closingkeyinreading.gtpred.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/closing_key_in_reading/n_trials",
-   "text": "99",
-   "value": 99
+  "macos-standard-live-off.layer.none.gtobs.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/none/n_trials",
+   "text": "2{,}470",
+   "value": 2470
   },
   "macos-standard-live-off.layer.none.gtobs.primary.precision": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/none/pooled/precision",
@@ -1515,8 +1530,8 @@
     0.9677591721512453
    ]
   },
-  "macos-standard-live-off.layer.none.gtobs.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/none/n_trials",
+  "macos-standard-live-off.layer.none.gtpred.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/none/n_trials",
    "text": "2{,}470",
    "value": 2470
   },
@@ -1538,10 +1553,10 @@
     0.9677591721512453
    ]
   },
-  "macos-standard-live-off.layer.none.gtpred.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/none/n_trials",
-   "text": "2{,}470",
-   "value": 2470
+  "macos-standard-live-off.layer.receivedcarry.gtobs.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/received_carry/n_trials",
+   "text": "184",
+   "value": 184
   },
   "macos-standard-live-off.layer.receivedcarry.gtobs.primary.precision": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/received_carry/pooled/precision",
@@ -1561,8 +1576,8 @@
     0.33223720568793014
    ]
   },
-  "macos-standard-live-off.layer.receivedcarry.gtobs.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/received_carry/n_trials",
+  "macos-standard-live-off.layer.receivedcarry.gtpred.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/received_carry/n_trials",
    "text": "184",
    "value": 184
   },
@@ -1583,11 +1598,6 @@
     0.1635616599516156,
     0.3221903266565029
    ]
-  },
-  "macos-standard-live-off.layer.receivedcarry.gtpred.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/received_carry/n_trials",
-   "text": "184",
-   "value": 184
   },
   "macos-standard-live-off.markers.blocks": {
    "source": "clock_sync_macos-standard-live-off.json:oracle|gt/matched|obs/matched",
@@ -2468,6 +2478,11 @@
     0,
     1.0
    ]
+  },
+  "macos-standard-live-off.predobs.primary.dwell.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/by_speed/*/dwell",
+   "text": "3",
+   "value": 3
   },
   "macos-standard-live-off.predobs.primary.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-off/macos_def/pred_obs/under_limit/metrics/by_stratum/*/precision",
@@ -3367,6 +3382,11 @@
     384
    ]
   },
+  "macos-standard-live-on.gtobs.primary.dwell.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/metrics/by_speed/*/dwell",
+   "text": "3",
+   "value": 3
+  },
   "macos-standard-live-on.gtpred.all.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/all_trials/metrics/by_stratum/*/precision",
    "text": "0.000--1.000",
@@ -3408,6 +3428,11 @@
     98,
     383
    ]
+  },
+  "macos-standard-live-on.gtpred.primary.dwell.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/by_speed/*/dwell",
+   "text": "3",
+   "value": 3
   },
   "macos-standard-live-on.gtpred.primary.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/metrics/by_stratum/*/precision",
@@ -4291,6 +4316,11 @@
    "text": "2,481",
    "value": 2480.5436310019013
   },
+  "macos-standard-live-on.layer.carriedout.gtobs.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/carried_out/n_trials",
+   "text": "188",
+   "value": 188
+  },
   "macos-standard-live-on.layer.carriedout.gtobs.primary.precision": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/carried_out/pooled/precision",
    "text": "0.609 [0.487, 0.719]",
@@ -4309,8 +4339,8 @@
     0.5642366393003748
    ]
   },
-  "macos-standard-live-on.layer.carriedout.gtobs.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/carried_out/n_trials",
+  "macos-standard-live-on.layer.carriedout.gtpred.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/carried_out/n_trials",
    "text": "188",
    "value": 188
   },
@@ -4332,10 +4362,10 @@
     0.609591647987286
    ]
   },
-  "macos-standard-live-on.layer.carriedout.gtpred.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/carried_out/n_trials",
-   "text": "188",
-   "value": 188
+  "macos-standard-live-on.layer.closingkeyinreading.gtobs.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/closing_key_in_reading/n_trials",
+   "text": "113",
+   "value": 113
   },
   "macos-standard-live-on.layer.closingkeyinreading.gtobs.primary.precision": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/closing_key_in_reading/pooled/precision",
@@ -4355,8 +4385,8 @@
     0.7998797664326889
    ]
   },
-  "macos-standard-live-on.layer.closingkeyinreading.gtobs.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/closing_key_in_reading/n_trials",
+  "macos-standard-live-on.layer.closingkeyinreading.gtpred.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/closing_key_in_reading/n_trials",
    "text": "113",
    "value": 113
   },
@@ -4378,10 +4408,10 @@
     0.7998797664326889
    ]
   },
-  "macos-standard-live-on.layer.closingkeyinreading.gtpred.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/closing_key_in_reading/n_trials",
-   "text": "113",
-   "value": 113
+  "macos-standard-live-on.layer.none.gtobs.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/none/n_trials",
+   "text": "2{,}676",
+   "value": 2676
   },
   "macos-standard-live-on.layer.none.gtobs.primary.precision": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/none/pooled/precision",
@@ -4401,8 +4431,8 @@
     0.9794147361275167
    ]
   },
-  "macos-standard-live-on.layer.none.gtobs.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/none/n_trials",
+  "macos-standard-live-on.layer.none.gtpred.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/none/n_trials",
    "text": "2{,}676",
    "value": 2676
   },
@@ -4424,10 +4454,10 @@
     0.9794147361275167
    ]
   },
-  "macos-standard-live-on.layer.none.gtpred.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/none/n_trials",
-   "text": "2{,}676",
-   "value": 2676
+  "macos-standard-live-on.layer.receivedcarry.gtobs.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/received_carry/n_trials",
+   "text": "184",
+   "value": 184
   },
   "macos-standard-live-on.layer.receivedcarry.gtobs.primary.precision": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/received_carry/pooled/precision",
@@ -4447,8 +4477,8 @@
     0.35331573666898186
    ]
   },
-  "macos-standard-live-on.layer.receivedcarry.gtobs.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/diagnostics/prediction_layers/received_carry/n_trials",
+  "macos-standard-live-on.layer.receivedcarry.gtpred.plan.trials": {
+   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/received_carry/n_trials",
    "text": "184",
    "value": 184
   },
@@ -4469,11 +4499,6 @@
     0.17333211159075582,
     0.35331573666898186
    ]
-  },
-  "macos-standard-live-on.layer.receivedcarry.gtpred.primary.trials": {
-   "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/gt_pred/under_limit/diagnostics/prediction_layers/received_carry/n_trials",
-   "text": "184",
-   "value": 184
   },
   "macos-standard-live-on.markers.blocks": {
    "source": "clock_sync_macos-standard-live-on.json:oracle|gt/matched|obs/matched",
@@ -5355,6 +5380,11 @@
     1.0
    ]
   },
+  "macos-standard-live-on.predobs.primary.dwell.speeds.used": {
+   "source": "e1_l1.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/by_speed/*/dwell",
+   "text": "3",
+   "value": 3
+  },
   "macos-standard-live-on.predobs.primary.precision.range": {
    "source": "e1_detection.json:cells/macos-standard-live-on/macos_def/pred_obs/under_limit/metrics/by_stratum/*/precision",
    "text": "0.815--1.000",
@@ -5975,6 +6005,36 @@
     36
    ]
   },
+  "windows-msime-tsf.defs.all.change.precision.max": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/precision",
+   "text": "0.027",
+   "value": 0.0273972602739726
+  },
+  "windows-msime-tsf.defs.all.change.precision.of": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/precision",
+   "text": "39",
+   "value": 39
+  },
+  "windows-msime-tsf.defs.all.change.precision.strata": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/precision",
+   "text": "5",
+   "value": 5
+  },
+  "windows-msime-tsf.defs.all.change.recall.max": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/recall",
+   "text": "0.080",
+   "value": 0.07960784313725489
+  },
+  "windows-msime-tsf.defs.all.change.recall.of": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/recall",
+   "text": "39",
+   "value": 39
+  },
+  "windows-msime-tsf.defs.all.change.recall.strata": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/by_stratum/*/recall",
+   "text": "8",
+   "value": 8
+  },
   "windows-msime-tsf.defs.all.common.mergerate": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/merge_rate",
    "text": "0.007 [0.005, 0.011]",
@@ -6051,6 +6111,36 @@
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/all_trials/metrics/pooled/n_gt minus windows/e1_detection.json:cells/windows-msime-tsf/windows_def/gt_obs/all_trials/metrics/pooled/n_gt",
    "text": "28",
    "value": 28
+  },
+  "windows-msime-tsf.defs.primary.change.precision.max": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/precision",
+   "text": "0.027",
+   "value": 0.0273972602739726
+  },
+  "windows-msime-tsf.defs.primary.change.precision.of": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/precision",
+   "text": "36",
+   "value": 36
+  },
+  "windows-msime-tsf.defs.primary.change.precision.strata": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/precision",
+   "text": "5",
+   "value": 5
+  },
+  "windows-msime-tsf.defs.primary.change.recall.max": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/recall",
+   "text": "0.080",
+   "value": 0.07960784313725489
+  },
+  "windows-msime-tsf.defs.primary.change.recall.of": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/recall",
+   "text": "36",
+   "value": 36
+  },
+  "windows-msime-tsf.defs.primary.change.recall.strata": {
+   "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/by_stratum/*/recall",
+   "text": "8",
+   "value": 8
   },
   "windows-msime-tsf.defs.primary.common.mergerate": {
    "source": "windows/e1_detection.json:cells/windows-msime-tsf/all/gt_obs/under_limit/metrics/pooled/merge_rate",
@@ -6427,6 +6517,11 @@
     178.5,
     480.0
    ]
+  },
+  "windows-msime-tsf.gtobs.primary.dwell.speeds.used": {
+   "source": "windows/e1_l1.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/metrics/by_speed/*/dwell",
+   "text": "3",
+   "value": 3
   },
   "windows-msime-tsf.kt.obs.delay.all.max": {
    "source": "windows/e1_delivery.json:cells/windows-msime-tsf/observation/timing/delay_ms/overall/max",
