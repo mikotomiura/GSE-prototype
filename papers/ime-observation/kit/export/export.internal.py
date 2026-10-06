@@ -46,6 +46,7 @@ import argparse
 import contextlib
 import fnmatch
 import getpass
+import html
 import io
 import json
 import os
@@ -55,6 +56,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 
 for _s in (sys.stdout, sys.stderr):  # keeps non-ASCII output from crashing on a legacy console codepage
     if hasattr(_s, "reconfigure"):
@@ -125,11 +127,22 @@ _PUBLIC_EMAIL = re.compile("|".join(r"(?<![A-Za-z0-9._%+\-" + AT + r"])" + re.es
 # An SVG figure is exported as text, so it must not carry what a browser would run or load: a script, an event
 # handler, a link or reference to anything but a fragment of the same file, an embedded object, an import, a data
 # URI (which could also carry a binary past the rule that only text is exported) or a document type declaration.
-_SVG_ACTIVE = re.compile(r"<script|<foreignobject|<iframe|<embed|<object|@import|<!doctype|<!entity"
-                         r"|\son[a-z]+\s*="
+# The text is searched as written (a name may carry a namespace prefix), and the figure is then read as XML, where
+# every prefix is resolved and every character reference decoded: only the elements in SVG_ELEMENTS pass there.
+_SVG_ACTIVE = re.compile(r"<\s*(?:[\w.-]+:)?(?:script|foreignobject|iframe|embed|object)|@import|<!doctype|<!entity"
+                         r"|\s(?:[\w.-]+:)?on[a-z]+\s*="
                          r"|href\s*=\s*[\"'](?!#)"
                          r"|url\(\s*[\"']?(?!#)"
                          r"|[\"'(\s]data:", re.I)
+SVG_NS = "http://www.w3.org/2000/svg"
+SVG_ATTR_NS = ("", "http://www.w3.org/1999/xlink", "http://www.w3.org/XML/1998/namespace")
+# Shapes, text, groups, gradients and the style sheet; no animation element (one can set a link), no image, no link.
+SVG_ELEMENTS = frozenset(("svg", "g", "defs", "symbol", "use", "title", "desc", "style", "rect", "circle", "ellipse",
+                          "line", "polyline", "polygon", "path", "text", "tspan", "lineargradient", "radialgradient",
+                          "stop", "clippath"))
+# In a decoded value or text: a reference outside the file, an import, a data URI, a script URL, or a backslash (a
+# CSS escape could spell any of these).
+_SVG_ACTIVE_VALUE = re.compile(r"url\(\s*[\"']?(?!#)|@import|(?<![a-z0-9-])data:|javascript:|\\", re.I)
 ALWAYS_RULES = (
     ("participant-id", re.compile(r"(?<![A-Za-z0-9])P\d{3}(?![A-Za-z0-9])")),
     ("email-address", re.compile(r"[A-Za-z0-9._%+\-]+" + AT + r"[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")),
@@ -717,23 +730,65 @@ def check_secret_content(files):
     hits = []
     for rel in sorted(files):
         for no, ln in enumerate(files[rel].split("\n"), 1):
-            if any(rx.search(ln) for rx in SECRET_CONTENT) or ("\\" in ln and any(rx.search(unescape(ln)) for rx in SECRET_CONTENT)):
+            if any(rx.search(form) for form in decoded_forms(ln) for rx in SECRET_CONTENT):
                 hits.append("  %s:%d" % (rel, no))
     if hits:
         raise Stop(2, "content that looks like a secret is not exported (the text is not shown; remove it from the source,"
                    " or reword it if it matched by chance):\n" + "\n".join(hits[:100]))
 
 
+def _split_name(name):
+    """(namespace, local name) of an ElementTree name."""
+    if name.startswith("{"):
+        ns, _, local = name[1:].partition("}")
+        return ns, local
+    return "", name
+
+
+def svg_tree_kinds(text):
+    """The kinds of active content found when the figure is read as XML (a namespace prefix resolved, a character
+    reference decoded): an element outside SVG_ELEMENTS or the SVG namespace, an attribute outside the SVG, XLink
+    and XML namespaces, an event handler, a link to anything but a fragment, and a decoded value or text that refers
+    outside the file. A figure that is not well-formed XML is refused too. Comments are not read (they do nothing).
+    The search for a document type declaration runs before this, so the parser never expands a declared entity."""
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return {"not-well-formed"}
+    kinds = set()
+    for el in root.iter():
+        ns, local = _split_name(el.tag)
+        if ns not in ("", SVG_NS) or local.lower() not in SVG_ELEMENTS:
+            kinds.add("element")
+        for name, value in el.attrib.items():
+            ans, alocal = _split_name(name)
+            alocal = alocal.lower()
+            if ans not in SVG_ATTR_NS or alocal.startswith("on"):
+                kinds.add("attribute")
+            elif alocal == "href" and not value.strip().startswith("#"):
+                kinds.add("link")
+            elif _SVG_ACTIVE_VALUE.search(value):
+                kinds.add("value")
+        if any(t and _SVG_ACTIVE_VALUE.search(t) for t in (el.text, el.tail)):
+            kinds.add("value")
+    return kinds
+
+
 def check_svg(files):
     """An SVG figure that holds a script, an event handler, a link or reference outside the file, an embedded object,
-    an import, a data URI or a document type declaration stops the export (exit 1). The whole file is searched, so a
-    construct split over lines is found too; the matched text is never shown."""
+    an import, a data URI or a document type declaration stops the export (exit 1). The whole file is searched as
+    written, so a construct split over lines is found too, and then read as XML (svg_tree_kinds), so a namespace
+    prefix or a character reference does not hide one; the matched text is never shown."""
     hits = []
     for rel in sorted(files):
         if rel.lower().endswith(".svg"):
             text = files[rel]
-            for m in _SVG_ACTIVE.finditer(text):
-                hits.append("  %s:%d: active-svg" % (rel, text.count("\n", 0, m.start()) + 1))
+            found = [m.start() for m in _SVG_ACTIVE.finditer(text)]
+            for at in found:
+                hits.append("  %s:%d: active-svg" % (rel, text.count("\n", 0, at) + 1))
+            if not found:  # a declaration found above is never handed to the parser
+                for kind in sorted(svg_tree_kinds(text)):
+                    hits.append("  %s: active-svg (%s, read as XML)" % (rel, kind))
     if hits:
         raise Stop(1, "an SVG figure holds what a browser would run or load (the text is not shown):\n"
                    + "\n".join(hits[:100]))
@@ -866,17 +921,29 @@ def line_kinds(text, word_check, rules, public_email=False):
     return kinds
 
 
+def decoded_forms(line):
+    """The line as written, with its program escapes decoded (unescape), and with its character references decoded
+    (an SVG figure or a Markdown page shows &#64; as the character it stands for), and with both."""
+    forms = [line]
+    if "\\" in line:
+        forms.append(unescape(line))
+    if "&" in line:
+        forms += [html.unescape(f) for f in forms]
+    return forms
+
+
 def scan(files, rules):
     """Returns [(path, line, kind)] for every hit; line 0 is the file name itself. Every line is
-    checked as written and with its escapes decoded. Values that matched are never reported."""
+    checked as written and with its escapes and character references decoded (decoded_forms). Values that matched
+    are never reported."""
     hits = []
     for rel in sorted(files):
         word_check = not _CORPUS_JSONL.match(rel)
         pub = rel.startswith(PUBLIC_EMAIL_DIR)
         for no, ln in [(0, rel)] + list(enumerate(files[rel].split("\n"), 1)):
-            kinds = line_kinds(ln, word_check, rules, pub and no > 0)
-            if "\\" in ln:
-                kinds |= line_kinds(unescape(ln), word_check, rules, pub and no > 0)
+            kinds = set()
+            for form in decoded_forms(ln):
+                kinds |= line_kinds(form, word_check, rules, pub and no > 0)
             for kind in sorted(kinds):
                 hits.append((rel, no, kind))
     return hits
@@ -1284,11 +1351,36 @@ def selftest():
                     '<svg><image xlink:href="pic.png"/></svg>', '<svg><rect style="fill:url(https://example.org/p)"/></svg>',
                     '<svg><style>@import "x.css";</style></svg>', '<svg><style>@font-face{src:url(data:font/woff2;base64,AA)}</style></svg>',
                     '<svg><foreignObject><p>x</p></foreignObject></svg>', '<!DOCTYPE svg [<!ENTITY a "b">]>\n<svg/>',
-                    '<svg><a href=\n"https://example.org/">x</a></svg>', '<svg><desc> data:text/plain,x</desc></svg>'):
+                    '<svg><a href=\n"https://example.org/">x</a></svg>', '<svg><desc> data:text/plain,x</desc></svg>',
+                    # a namespace prefix, a character reference or a CSS escape does not hide it (read as XML)
+                    '<svg><s:script xmlns:s="http://www.w3.org/2000/svg">x()</s:script></svg>',
+                    '<svg xmlns:e="http://example.org/e"><rect e:onload="x()"/></svg>',
+                    '<svg><rect style="fill:u&#114;l(https://example.org/p)"/></svg>', '<svg o&#110;load="x()"/>',
+                    '<svg><style>rect{fill:u\\72 l(https://example.org/p)}</style></svg>',
+                    '<svg><a href="#g">x</a></svg>', '<svg><set attributeName="href" to="https://example.org/"/></svg>',
+                    '<svg><h:p xmlns:h="http://www.w3.org/1999/xhtml">x</h:p></svg>', '<svg><rect x="1"></svg>',
+                    '<svg><desc>&#100;ata:text/plain,x</desc></svg>'):
             refused(name, {"assets/f.svg": svg + "\n"}, "assets/f.svg")
+        # each rule of the XML reading on its own (the search of the text stops most of these first)
+        for svg, want in (('<svg><use href="https://example.org/"/></svg>', {"link"}),
+                          ('<svg xmlns:x="http://www.w3.org/1999/xlink"><use x:href="f.svg"/></svg>', {"link"}),
+                          ('<svg><h:style xmlns:h="http://www.w3.org/1999/xhtml">x</h:style></svg>', {"element"}),
+                          ('<svg xmlns:e="http://example.org/e"><rect e:fill="red"/></svg>', {"attribute"}),
+                          ('<svg><rect onclick="x()"/></svg>', {"attribute"}),
+                          ('<svg><rect style="fill:url(https://example.org/p)"/></svg>', {"value"}),
+                          ('<svg><use href="#g"/><rect fill="url(#g)" xml:space="preserve"/></svg>', set())):
+            got = svg_tree_kinds(svg)
+            ck("an SVG figure read as XML: %s" % (sorted(want) or "nothing"), got == want, "%s -> %s" % (svg, sorted(got)))
+        name = "a character reference does not hide a value from the scan"
+        refused(name, {"assets/f.svg": "<svg><text>P&#48;01</text></svg>\n"}, "assets/f.svg", forbid=("P001",))
+        refused(name, {"README.md": "# Fake\nWrite to someone&#64;example.org.\n"}, "README.md")
         rcx, text, o = run("svg-ok", {"assets/f.svg": '<svg><defs><linearGradient id="g"/></defs><rect fill="url(#g)"/>'
                                                       '<use href="#g"/><text>the input method on become a reading</text></svg>\n'})
         ck("an SVG figure with references to its own fragments only passes", rcx == 0, text)
+        svg_ok = ('<svg xmlns="http://www.w3.org/2000/svg"><title>A &quot;figure&quot;</title>'
+                  '<text xml:space="preserve">a  b</text></svg>\n')
+        rcx, text, o = run("svg-ns-ok", {"assets/f.svg": svg_ok})
+        ck("an SVG figure in the SVG namespace with a character reference and xml:space passes", rcx == 0, text)
         for word in (_ORG, _TAURI, _STAR, _WARN, _STEER + "/notes"):
             refused("an internal marker word stops the export", {"README.md": "# Fake\nSee %s here.\n" % word}, "README.md")
         # comments are stripped from manifest-listed sources
@@ -1727,6 +1819,7 @@ def selftest():
             ck(name + " (%s)" % nm, rcx == 2 and os.path.basename(nm) in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
         kinds_ok = dict(("kit/kinds/" + n, "x\n") for n in ("a.py", "a.rs", "a.sh", "a.md", "a.json", "a.toml", "a.swift", "a.txt", "a.cff",
                                                            "a.tex", "a.bib", "a.svg", ".gitignore", ".gitattributes", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA"))
+        kinds_ok["kit/kinds/a.svg"] = "<svg/>\n"  # a figure must be well-formed XML (check_svg)
         rcx, text, o = run("kinds-ok", kinds_ok)
         ck(name + " (the allowed kinds pass)", rcx == 0, text)
         ck(name + " (a .tex and a .bib file are exported)",

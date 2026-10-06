@@ -51,22 +51,25 @@ with the relative path, a space and the SHA-256 of the file, sorted by the bytes
 The registrations give the SHA-256 of these lists: `29b183ba245939ad82d9fa2d7db26e1a18520e2966f4aa9ec74478a4e51e6c49`
 (98 files, `ime-observation-prereg-macos`) and `f61af353301e1370ac27c4a7425e8c2eb32991df9f7a2a765a26948da87787b7`
 (108 files, `ime-observation-prereg-windows`). The two tagged commits hold no `.gitattributes`, so take their files
-without line-end conversion:
+without line-end conversion, into a new empty directory. The script prints the SHA-256 and the number of files,
+compares them with the values given to it, and exits with 1 when they differ:
 
 ```bash
-mkdir /tmp/freeze && git -c core.autocrlf=false archive ime-observation-prereg-macos | tar -x -C /tmp/freeze
-python3 - /tmp/freeze <<'EOF'
+d=$(mktemp -d) && git -c core.autocrlf=false archive ime-observation-prereg-macos | tar -x -C "$d" &&
+python3 - "$d" 29b183ba245939ad82d9fa2d7db26e1a18520e2966f4aa9ec74478a4e51e6c49 98 <<'EOF'
 import hashlib, os, sys
-root = sys.argv[1]
+root, want = sys.argv[1], (sys.argv[2], int(sys.argv[3]))
 rows = sorted((os.path.relpath(os.path.join(d, n), root).replace(os.sep, "/").encode("utf-8"),
                hashlib.sha256(open(os.path.join(d, n), "rb").read()).hexdigest())
               for d, _, names in os.walk(root) for n in names)
 text = b"".join(p + b" " + h.encode("ascii") + b"\n" for p, h in rows)
-print(hashlib.sha256(text).hexdigest(), len(rows))
+got = (hashlib.sha256(text).hexdigest(), len(rows))
+print(*got, "match" if got == want else "MISMATCH")
+sys.exit(0 if got == want else 1)
 EOF
 ```
 
-For the Windows tag, take its files into another empty directory and pass that directory to the same script. With
+For the Windows tag, run the same commands with `ime-observation-prereg-windows`, its SHA-256 and 108. With
 `core.autocrlf=true` (the default of Git for Windows) the archive is written with CRLF line ends and the list does
 not match.
 

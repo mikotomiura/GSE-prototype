@@ -145,7 +145,8 @@ commit (a deleted tracked table too) or is a link, when a file it would export (
 
 The scan runs on all exported text after the changes above, and on every relative file name
 (reported as line 0). Each line is checked as written and again with its JSON and string escapes
-decoded. A finding is reported as a file name, a line number and a kind; the matched text is never
+decoded, with its character references decoded (`&#64;`, which an SVG figure or a Markdown page shows as the
+character), and with both. A finding is reported as a file name, a line number and a kind; the matched text is never
 printed. The script also verifies that the copied ranges of the pinned sources contain only ASCII
 characters.
 
@@ -158,7 +159,12 @@ characters.
 * In an SVG figure (searched over the whole file): a script, an event handler, a link or reference to anything but a
   fragment of the same file (`href="#…"`, `url(#…)`), an embedded object, an `@import`, a data URI or a document
   type declaration. A figure is exported as text and shown on the repository's page, so it may hold none of what a
-  browser would run or load, and a data URI could carry a binary past the rule that only text is exported.
+  browser would run or load, and a data URI could carry a binary past the rule that only text is exported. The
+  figure is then read as XML (a namespace prefix resolved, a character reference decoded; never when a document
+  type declaration was found): it must be well-formed, every element must be in the SVG namespace (or in none) and
+  one of the shapes, text, groups, gradients and the style sheet listed in `SVG_ELEMENTS` (no animation element,
+  image or link), every attribute in the SVG, XLink or XML namespace, and no decoded value or text may refer
+  outside the file or hold a backslash (a CSS escape could spell any of the above).
 * The words that name the private project, the name of its source directory, and two internal
   marker symbols (not applied to the `.jsonl` files directly in `kit/corpus/data/`; other files there are checked).
 * Values of the machine that runs the export: the home directory, the repository root, the

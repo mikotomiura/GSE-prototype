@@ -216,16 +216,37 @@ def md_prose(text):
 
 
 SVG_TEXT_BODY = re.compile(r"(<text\b[^>]*>)(.*?)(</text>)", re.S)
-SVG_CHAR_DATA = re.compile(r"(^|>)([^<]*)")
+SVG_TAG = re.compile(r"<!--.*?-->|<(/?)([A-Za-z_][\w:.-]*)[^>]*?(/?)>", re.S)
+SVG_DRAWN = ("tspan", "textpath")
+
+
+def svg_drawn_blank(body):
+    """<text> の中身から、<text> 自身と <tspan>・<textPath> の直下の文字データ（図に描く文字）だけを消す。
+    その中の別の要素（<title>・<desc> など）の文字データ・属性・コメントは残す（判断 212）。改行は保つ。"""
+    out, stack, pos = [], [], 0
+
+    def data(s):
+        return re.sub(r"[^\n]", "", s) if not stack or stack[-1] in SVG_DRAWN else s
+    for t in SVG_TAG.finditer(body):
+        out.append(data(body[pos:t.start()]) + t.group(0))
+        pos = t.end()
+        if t.group(2) is None:  # コメント
+            continue
+        if t.group(1):
+            if stack:
+                stack.pop()
+        elif not t.group(3):
+            stack.append(t.group(2).split(":")[-1].lower())
+    out.append(data(body[pos:]))
+    return "".join(out)
 
 
 def svg_prose(text):
-    """判断 210・211: 公開 repo の図（SVG）。<text> の文字データ（図の中の入力の例として日本語を描く）だけを除き、
-    残り（属性・<title>・<desc>・<style>・<metadata>・コメント・<tspan> の属性）はすべて地の文として見る。
-    文字参照（&#x…; など）は戻してから見る。行の番号は保つ。"""
+    """判断 210・211・212: 公開 repo の図（SVG）。<text> の文字データ（図の中の入力の例として日本語を描く）だけを除き、
+    残り（属性・<title>・<desc>・<style>・<metadata>・コメント・<tspan> の属性・<text> の中の <title> など）は
+    すべて地の文として見る。文字参照（&#x…; など）は戻してから見る。行の番号は保つ。"""
     def blank(m):
-        body = SVG_CHAR_DATA.sub(lambda d: d.group(1) + re.sub(r"[^\n]", "", d.group(2)), m.group(2))
-        return m.group(1) + body + m.group(3)
+        return m.group(1) + svg_drawn_blank(m.group(2)) + m.group(3)
     return [(no, html.unescape(ln)) for no, ln in enumerate(SVG_TEXT_BODY.sub(blank, text).split("\n"), 1)]
 
 
@@ -415,6 +436,16 @@ def selftest():
     expect("svg 文字参照の日本語は赤", "a.svg", "<svg>\n<title>&#x65E5;&#26412;</title>\n</svg>\n", ["japanese-prose"])
     expect("svg 文字参照の禁止語は赤", "a.svg", "<svg>\n<text>G&#x53;E</text>\n</svg>\n", ["forbidden:gse"])
     expect("svg tspan の中の日本語は通る", "a.svg", '<svg>\n<text x="1"><tspan fill="#fff">' + J + "</tspan></text>\n</svg>\n", [])
+    # 判断 212: <text> の中の <title>・<desc> は地の文（図に描く文字は <text>・<tspan> の直下だけ）
+    expect("svg text の中の title の日本語は赤", "a.svg", "<svg>\n<text><title>" + J + "</title>x</text>\n</svg>\n",
+           ["japanese-prose"])
+    expect("svg text の中の複数行の desc の日本語は赤", "a.svg", "<svg>\n<text><desc>a\n" + J + "</desc></text>\n</svg>\n",
+           ["japanese-prose"])
+    expect("svg text の中の title の後の文字は通る", "a.svg",
+           "<svg>\n<text><title>Demo</title>" + J + "<tspan>" + J + "</tspan>" + J + "</text>\n</svg>\n", [])
+    expect("svg text の中の空の title の後の文字は通る", "a.svg", "<svg>\n<text><title/>" + J + "</text>\n</svg>\n", [])
+    expect("svg text の中のコメントの日本語は赤", "a.svg", "<svg>\n<text>x<!-- " + J + " --></text>\n</svg>\n",
+           ["japanese-prose"])
     expect("svg tspan の属性の日本語は赤", "a.svg", '<svg>\n<text><tspan aria-label="' + J + '">x</tspan></text>\n</svg>\n',
            ["japanese-prose"])
     expect("json reason の日本語は赤", "m.json", '{"entries":[{"reason":"' + J + '"}]}', ["japanese-prose"])
