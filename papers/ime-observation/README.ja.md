@@ -82,7 +82,7 @@ kit/logger/target/release/ime-observation-logger --out obs.jsonl --duration-s 60
 python3 kit/formats/validate_logs.py --kind obs obs.jsonl
 ```
 
-macOS では、ロガーに「入力監視」の許可が要ります。許可が無いとロガーはエラーで止まり、許可を求める画面を 1 度だけシステムに出させます。許可してから、もう一度起動してください。ロガーは既にあるログを上書きしません。ドライバ・オプション・制約は、ロガーの README（[`kit/logger/README.md`](kit/logger/README.md)、英語）に書いてあります。
+macOS では、ロガーに「入力監視」の許可が要ります。許可が無いと、ロガーは許可を求める画面をシステムに出させてから、エラーで止まります。許可してから、もう一度起動してください。ロガーは既にあるログを上書きしません。ドライバ・オプション・制約は、ロガーの README（[`kit/logger/README.md`](kit/logger/README.md)、英語）に書いてあります。
 
 ## 解析を再現する
 

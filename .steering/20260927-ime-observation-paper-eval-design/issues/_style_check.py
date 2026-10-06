@@ -516,8 +516,9 @@ def selftest():
         with io.open(os.path.join(tmp, "papers", "ime-observation", "README.ja.md"), "w", encoding="utf-8") as f:
             f.write("# " + J + "\n" + J + "\n")
         paper = os.path.join(tmp, "papers", "ime-observation")
-        if len(run(tmp, ["papers/ime-observation"])) != 1 or len(run(paper, ["."])) != 1:
-            fails.append("走査: README の日本語訳は repo でも書き出した木でも通るはず（判断 219）")
+        found = [v.path for v in run(tmp, ["papers/ime-observation"])] + [v.path for v in run(paper, ["."])]
+        if found != ["papers/ime-observation/kit/x/bad.md", "kit/x/bad.md"]:
+            fails.append("走査: README の日本語訳は repo でも書き出した木でも通るはず（判断 219）: %s" % found)
         os.remove(os.path.join(tmp, "papers", "ime-observation", "README.ja.md"))
         os.makedirs(os.path.join(tmp, "papers", "ime-observation", "manuscript"))
         with io.open(os.path.join(tmp, "papers", "ime-observation", "manuscript", "m.tex"), "w",
