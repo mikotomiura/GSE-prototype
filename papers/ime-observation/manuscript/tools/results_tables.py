@@ -228,6 +228,17 @@ def stratum_key(st):
     return (st["scenario"], st["speed"])
 
 
+def strata_of(block):
+    """{(scenario, speed): stratum entry} of a detection block of one comparison and scope (the row of presses outside
+    the trials is left out)."""
+    out = {}
+    for st in block["metrics"]["by_stratum"]:
+        if st["stratum"] in (None, "all") or st["stratum"].get("scenario") is None:
+            continue
+        out[stratum_key(st["stratum"])] = st
+    return out
+
+
 def scenario_order(name):
     return int(name[1:]) if name[1:].isdigit() else 10 ** 6
 
@@ -322,12 +333,7 @@ class Cell(object):
 
     def detection_strata(self, scope, comparison=PRIMARY_COMPARISON):
         """{(scenario, speed): stratum entry of e1_detection.json} (the row of presses outside the trials is left out)."""
-        out = {}
-        for st in self.det_by[comparison][scope]["metrics"]["by_stratum"]:
-            if st["stratum"] in (None, "all") or st["stratum"].get("scenario") is None:
-                continue
-            out[stratum_key(st["stratum"])] = st
-        return out
+        return strata_of(self.det_by[comparison][scope])
 
     def speed_sessions(self, scope):
         return dict((st["stratum"]["speed"], st) for st in self.l1[scope]["metrics"]["by_speed"])
@@ -355,6 +361,8 @@ def est_ci(value, lo, hi, fmt=None):
 
 
 def fmt_ms(x):
+    """Whole milliseconds with a typeset minus sign. A half is rounded to the even neighbour (Python's round), so 178.5
+    is written 178."""
     if x is None:
         return NO_VALUE
     s = "{:,}".format(int(round(x)))
@@ -936,7 +944,55 @@ def definition_values(cell):
         vals[base + ".leftout"] = {"text": fmt_int(common["n_gt"] - own["n_gt"]), "value": common["n_gt"] - own["n_gt"],
                                    "source": "%s/n_gt minus %s" % (src, cell.path("e1_detection.json", scope,
                                                                                     "metrics/pooled/n_gt"))}
+        for m in ("recall", "precision"):
+            text, value, left = definition_range(cell, scope, cell.det_common[scope], m)
+            ssrc = "%s:cells/%s/%s/%s/%s/metrics/by_stratum/*/%s" % (
+                cell.src["e1_detection.json"], cell.label, COMMON_DEFINITION, PRIMARY_COMPARISON, scope, m)
+            vals["%s.common.%s.range" % (base, m)] = {"text": text, "value": value, "source": ssrc}
+            vals["%s.common.%s.strata.left" % (base, m)] = {"text": str(left), "value": left, "source": ssrc}
+            changed, compared, largest, onlyone = definition_changes(cell, scope, m)
+            vals["%s.change.%s.strata" % (base, m)] = {"text": str(changed), "value": changed, "source": ssrc}
+            vals["%s.change.%s.of" % (base, m)] = {"text": str(compared), "value": compared, "source": ssrc}
+            vals["%s.change.%s.max" % (base, m)] = {"text": fmt_p(largest), "value": largest, "source": ssrc}
+            vals["%s.change.%s.onlyone" % (base, m)] = {"text": str(onlyone), "value": onlyone, "source": ssrc}
+        # For the text: the strata that enter a range under one definition only, which the counts above leave out.
+        only = [vals["%s.change.%s.onlyone" % (base, m)]["value"] for m in ("recall", "precision")]
+        vals[base + ".change.onlyone.note"] = {
+            "text": "no stratum entered a range under one definition only" if not any(only) else
+            "%d strata entered the range of recall and %d that of precision under one definition only" % tuple(only),
+            "value": only, "source": "%s:cells/%s/{%s,%s}/%s/%s/metrics/by_stratum" % (
+                cell.src["e1_detection.json"], cell.label, cell.definition, COMMON_DEFINITION, PRIMARY_COMPARISON,
+                scope)}
     return vals
+
+
+def definition_changes(cell, scope, m):
+    """Within the ranges: over the strata that enter the range of measure m under both definitions, how many have a
+    different estimate under the common definition, how many were compared, the largest absolute difference (None
+    when no stratum is compared), and how many strata enter the range under one definition only (a stratum that gains
+    or loses a value with the definition, which the comparison cannot count as a change)."""
+    kept = cell.kept_trials(scope)[0]
+    own, common = strata_of(cell.det[scope]), strata_of(cell.det_common[scope])
+    own_used = set(strata_in_range(kept, own, list(kept), m))
+    common_used = set(strata_in_range(kept, common, list(kept), m))
+    keys = sorted(own_used & common_used)
+    diffs = [abs(own[k][m]["value"] - common[k][m]["value"]) for k in keys
+             if own[k][m]["value"] is not None and common[k][m]["value"] is not None]
+    changed = sum(1 for x in diffs if x > 0)
+    return changed, len(diffs), (max(diffs) if diffs else None), len(own_used ^ common_used)
+
+
+def definition_range(cell, scope, block, m):
+    """The range of the Wilson intervals of measure m over the strata that enter it under the rule of the abstract
+    (abstract_values), for a detection block of the primary comparison in a scope: (text, [lo, hi], strata left out).
+    The trials kept per stratum are those of the cell's analysis; the two definitions differ in the reference's
+    sessions, not in the trials."""
+    kept = cell.kept_trials(scope)[0]
+    strata = strata_of(block)
+    design = sorted(kept, key=lambda k: (scenario_order(k[0]), SPEEDS.index(k[1])))
+    used = strata_in_range(kept, strata, design, m)
+    lo, hi = interval_range([strata[k][m] for k in used]) if used else (None, None)
+    return ("%s--%s" % (fmt_p(lo), fmt_p(hi)) if used else NO_VALUE), [lo, hi], len(design) - len(used)
 
 
 def definitions_supplement(cells):
@@ -948,7 +1004,9 @@ def definitions_supplement(cells):
              "systems (\\texttt{all}, every session) only whether it holds the same sessions as the definition of the "
              "cell's system. For a cell in which it did not, the detection of the primary comparison pooled over the "
              "strata is given under both definitions, with Wilson intervals, which for pooled proportions are lower "
-             "bounds of the uncertainty. A pooled value is not an estimate for natural typing.\n\n"]
+             "bounds of the uncertainty, together with the range of the per-stratum Wilson intervals of recall and "
+             "precision over the strata that keep at least %d trials in the scope and have a value, as in the main text. "
+             "A pooled value is not an estimate for natural typing.\n\n" % MIN_TRIALS]
     shown = [c for c in cells if c.det_top.get("same_sessions_as_all") is False]
     same = [c.label for c in cells if c.det_top.get("same_sessions_as_all")]
     if same:
@@ -966,8 +1024,9 @@ def definitions_supplement(cells):
         defs = [tex_escape(cell.definition), COMMON_DEFINITION] * len(SCOPES)
         lines += ["{\\footnotesize\n",
                   "\\begin{longtable}{L{0.20}%s}\n" % ("L{%.2f}" % (0.80 / len(cols)) * len(cols)),
-                  "\\caption{Detection of the primary comparison pooled over the strata under the definition of the "
-                  "analysis (\\texttt{%s}) and the common definition (\\texttt{%s}), cell %s}"
+                  "\\caption{Detection of the primary comparison under the definition of the analysis (\\texttt{%s}) "
+                  "and the common definition (\\texttt{%s}), pooled over the strata and as ranges over the strata, cell "
+                  "%s}"
                   "\\label{tab:definitions-%s}\\\\\n" % (tex_escape(cell.definition), COMMON_DEFINITION, name,
                                                          cell.label),
                   "\\toprule\n",
@@ -980,8 +1039,70 @@ def definitions_supplement(cells):
         for m, label in DEFINITION_MEASURES:
             lines.append("%s & %s \\\\\n" % (label, " & ".join(ci_text(p[m]).replace(" [", "\\newline [", 1)
                                                                for p in cols)))
+        # The ranges over the strata, under the rule of the main text, in the order of the columns.
+        for m, label in (("recall", "Recall, range over the strata"), ("precision", "Precision, range over the strata")):
+            texts = []
+            for scope in SCOPES:
+                for block in (cell.det[scope], cell.det_common[scope]):
+                    text, _, left = definition_range(cell, scope, block, m)
+                    texts.append("%s\\newline (%d left out)" % (text, left))
+            lines.append("%s & %s \\\\\n" % (label, " & ".join(texts)))
         lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n\n"]
     return "".join(lines)
+
+
+# ---------------------------------------------------------------- the comparisons side by side, for the discussion
+
+
+def ms_span(lo, hi):
+    """A span of milliseconds for the text; one value when both ends are the same."""
+    return "%s~ms" % fmt_ms(lo) if fmt_ms(lo) == fmt_ms(hi) else "%s to %s~ms" % (fmt_ms(lo), fmt_ms(hi))
+
+
+def decomposition_values(cell):
+    """Values that the discussion reads from the registered results, in the primary scope. For every comparison of the
+    cell: the span over the speeds of the limits of agreement of dwell_ms (lowest lower limit to highest upper limit)
+    and of its median absolute difference (point estimates), with the number of speeds that enter them. For the
+    comparisons of the reference with the logger and with the specified rows (macOS): the pooled recall and precision
+    of each layer of the prediction in the primary scope, and the number of trials of the plan in the layer, which the
+    analysis counts over the whole plan whatever the scope."""
+    vals = {}
+    for comp in cell.comparisons:
+        tag = comp.replace("_", "")
+        src = "%s:cells/%s/%s/%s/%s/metrics/by_speed/*/dwell" % (cell.src["e1_l1.json"], cell.label, cell.definition,
+                                                                 comp, PRIMARY_SCOPE)
+        sp = [e["dwell"] for e in cell.l1_by[comp][PRIMARY_SCOPE]["metrics"]["by_speed"]
+              if (e.get("stratum") or {}).get("speed") in SPEEDS and e["dwell"]["n"]]
+        # One pair has a bias but no limits of agreement (kit/analysis/stats.py), so the limits and the median absolute
+        # difference are taken from the speeds that have them; speeds.used counts the speeds with limits.
+        with_loa = [d["bland_altman"] for d in sp if (d.get("bland_altman") or {}).get("loa_lo") is not None
+                    and d["bland_altman"].get("loa_hi") is not None]
+        with_mae = [d["mae"] for d in sp if d.get("mae") is not None]
+        vals["%s.%s.primary.dwell.speeds.used" % (cell.label, tag)] = {"text": str(len(with_loa)),
+                                                                      "value": len(with_loa), "source": src}
+        lo, hi = (min(b["loa_lo"] for b in with_loa), max(b["loa_hi"] for b in with_loa)) if with_loa else (None, None)
+        mlo, mhi = (min(with_mae), max(with_mae)) if with_mae else (None, None)
+        loa = {"text": ms_span(lo, hi) if with_loa else NO_VALUE, "value": [lo, hi]}
+        mae = {"text": ms_span(mlo, mhi) if with_mae else NO_VALUE, "value": [mlo, mhi]}
+        vals["%s.%s.primary.dwell.loa.span" % (cell.label, tag)] = dict(loa, source=src + "/bland_altman/loa_lo|loa_hi")
+        vals["%s.%s.primary.dwell.mae.span" % (cell.label, tag)] = dict(mae, source=src + "/mae")
+        if comp not in ("gt_obs", "gt_pred"):
+            continue
+        layers = cell.det_by[comp][PRIMARY_SCOPE]["diagnostics"].get("prediction_layers")
+        if not layers:
+            continue
+        for name, _ in LAYERS:
+            lsrc = "%s:cells/%s/%s/%s/%s/diagnostics/prediction_layers/%s" % (
+                cell.src["e1_detection.json"], cell.label, cell.definition, comp, PRIMARY_SCOPE, name)
+            key = "%s.layer.%s.%s.primary" % (cell.label, name.replace("_", ""), tag)
+            p = layers[name]["pooled"]
+            for m in ("recall", "precision"):
+                vals["%s.%s" % (key, m)] = {"text": ci_text(p[m]), "value": [p[m]["value"], p[m]["lo"], p[m]["hi"]],
+                                            "source": "%s/pooled/%s" % (lsrc, m)}
+            vals["%s.layer.%s.%s.plan.trials" % (cell.label, name.replace("_", ""), tag)] = {
+                "text": fmt_int(layers[name]["n_trials"]), "value": layers[name]["n_trials"],
+                "source": lsrc + "/n_trials"}
+    return vals
 
 
 # ---------------------------------------------------------------- deviation D10: the corrected merge rate
@@ -2489,6 +2610,7 @@ def build(results_dir):
         values.update(timing_values(cell))
         values.update(diagnostic_values(cell))
         values.update(definition_values(cell))
+        values.update(decomposition_values(cell))
         values.update(d10_values(cell, d10[cell.label]))
         values.update(l2_values(cell))
         values.update(dwell_explore_values(cell, dwellx[cell.label]))
@@ -2768,12 +2890,12 @@ def _fixture(tmp, label="windows-test", sub="windows"):
     kept_a = dict((k, 75) for k in keys)
     kept_a[("S1", "mid")] = 74
 
-    def l1_entry(stratum, b, lo, hi):
+    def l1_entry(stratum, b, lo, hi, mae=300.0):
         """One entry of question 2, with intervals on the bias, both limits and the median absolute difference."""
         return {"stratum": stratum,
                 "dwell": {"bias_ci": [lo, hi], "bland_altman": {"bias": b, "loa_lo": b - 900, "loa_hi": b + 900,
                                                                   "n": 50, "sd": 450},
-                          "loa_lo_ci": [b - 950, b - 850], "loa_hi_ci": [b + 850, b + 950], "mae": 300.0,
+                          "loa_lo_ci": [b - 950, b - 850], "loa_hi_ci": [b + 850, b + 950], "mae": mae,
                           "mae_ci": [250.0, 350.0], "n": 50},
                 "abandon": {"agree": 0.9, "agree_ci": [0.8, 0.95], "kappa": None, "kappa_ci": [None, None]},
                 "nav": {"exact": 1.0, "exact_ci": [0.93, 1.0], "n": 50},
@@ -2783,8 +2905,10 @@ def _fixture(tmp, label="windows-test", sub="windows"):
                                 "n": 30},
                     "n_unknown": 1}}
 
-    def l1_scope(biases, zero=0):
-        by_speed = [l1_entry({"cell": "c", "speed": sp}, b, lo, hi) for sp, (b, lo, hi) in biases.items()]
+    def l1_scope(biases, zero=0, maes=None):
+        """maes: the median absolute difference per speed (300 at every speed when absent)."""
+        by_speed = [l1_entry({"cell": "c", "speed": sp}, b, lo, hi, (maes or {}).get(sp, 300.0))
+                    for sp, (b, lo, hi) in biases.items()]
         strata = [l1_entry({"cell": "c", "scenario": "S1", "speed": sp}, b + 1.0, lo, hi)
                   for sp, (b, lo, hi) in biases.items()]
         return {"metrics": {"by_speed": by_speed, "by_stratum": strata,
@@ -2821,8 +2945,11 @@ def _fixture(tmp, label="windows-test", sub="windows"):
                                         _layers(shift + 0.01), r=0.6 + shift),
                 "over_limit": det_scope(over, 0, None, _layers(shift + 0.02, drop=("none", "fast")
                                                                if comp == "pred_obs" else None), r=0.2 + shift)}
+            # Medians of the absolute differences that differ per comparison and speed (20 to 40 ms for gt_pred and
+            # 30 to 50 ms for pred_obs; 300 ms at every speed for gt_obs), so that a mix-up of either shows.
+            maes = dict((s, x + 100 * shift) for s, x in (("slow", 10.0), ("mid", 30.0), ("fast", 20.0)))
             cells_l1[defn][comp] = {"under_limit": l1_scope(dict((s, (b + 10 * shift, lo, hi))
-                                                                  for s, (b, lo, hi) in l1_u.items())),
+                                                                  for s, (b, lo, hi) in l1_u.items()), maes=maes),
                                     "all_trials": l1_scope(l1_a, 7)}
         top["predictions"] = {label: {
             "available": True, "counts": {"open": 1, "row": 300, "truncated": 4},
@@ -2847,8 +2974,20 @@ def _fixture(tmp, label="windows-test", sub="windows"):
     # The definition common to both systems: on macOS the same sessions (a copy); on Windows 10 more reference sessions
     # in the primary scope and 12 more over all trials, with other measures, so that a mix-up of the two shows.
     if sub:
-        cells_det[COMMON_DEFINITION] = {PRIMARY_COMPARISON: {"under_limit": det_scope(det_u, 1, r=0.86),
-                                                             "all_trials": det_scope(det_a, 1, focus_a, r=0.76)}}
+        # In the primary scope its strata have other intervals than those of the analysis (S1 slow stays under the
+        # minimum of trials), so that reading the wrong block shows in the ranges.
+        common_u = [_stratum("S1", "fast", 75, 68, 0.80, 0.95), _stratum("S1", "mid", 30, 21, 0.55, 0.85),
+                    _stratum("S1", "slow", 29, 20, 0.05, 0.99)]
+        # Over all trials two strata (S1 mid and slow) differ from the analysis's, in their estimates and intervals; the
+        # lower end of S1 slow moves the range of precision (recall starts at zero in S2 slow under both).
+        common_a = [dict(s, stratum=dict(s["stratum"])) for s in det_a]
+        common_a[1] = _stratum("S1", "mid", 75, 54, 0.62, 0.82)
+        common_a[2] = _stratum("S1", "slow", 75, 45, 0.50, 0.70)
+        # S2 slow has a value of precision under the common definition only (three rows, none paired), so it enters
+        # that range alone and moves its lower end to zero.
+        common_a[5] = dict(common_a[5], n_obs=3, precision={"value": 0.0, "lo": 0.0, "hi": 0.2, "n": 3, "x": 0})
+        cells_det[COMMON_DEFINITION] = {PRIMARY_COMPARISON: {"under_limit": det_scope(common_u, 1, r=0.86),
+                                                             "all_trials": det_scope(common_a, 1, focus_a, r=0.76)}}
         for scope, n in (("under_limit", 210), ("all_trials", 212)):
             cells_det[COMMON_DEFINITION][PRIMARY_COMPARISON][scope]["metrics"]["pooled"]["n_gt"] = n
     else:
@@ -3548,6 +3687,34 @@ def _selftest_definitions(check):
               and close(g("primary.common.mergerate"), [0.0, 0.0, 0.1])
               and close(vals["windows-test.pooled.gtobs.underlimit.recall"]["value"], [0.9, 0.85, 0.95]),
               str((g("primary.common.recall"), g("all.common.precision"))))
+        check("definitions: the ranges over the strata under the common definition follow the rule of the abstract "
+              "(at least 30 trials) and are read from the common definition's strata",
+              g("primary.common.recall.range") is not None
+              and close(g("primary.common.recall.range"), [0.55, 0.95]) and g("primary.common.recall.strata.left") == 4
+              and close(vals["windows-test.primary.recall.range"]["value"], [0.60, 0.97])
+              and close(g("all.common.precision.range"), [0.0, 1.0])
+              and close(vals["windows-test.all.precision.range"]["value"], [0.55, 1.0])
+              and g("all.common.precision.strata.left") == 0,
+              str((g("primary.common.recall.range"), g("all.common.precision.range"))))
+        check("definitions: the supplement gives the ranges over the strata of both definitions with the strata left "
+              "out, in the order of the columns, for both measures",
+              "Recall, range over the strata & 0.600--0.970\\newline (4 left out) & 0.550--0.950\\newline (4 left out) & "
+              "0.000--1.000\\newline (0 left out) & 0.000--1.000\\newline (0 left out) \\\\" in sup
+              and "Precision, range over the strata & 0.600--0.970\\newline (4 left out) & 0.550--0.950\\newline "
+              "(4 left out) & 0.550--1.000\\newline (1 left out) & 0.000--1.000\\newline (0 left out) \\\\" in sup,
+              sup[-900:])
+        # Within the ranges: S1 fast and mid differ in the primary scope (by 0.027 and 0.033), S1 mid and slow over all
+        # trials (by 0.080 and 0.067); precision has no value in S2 slow, so one stratum fewer is compared.
+        check("definitions: the strata whose estimate changes with the definition are counted, with the largest change",
+              (g("primary.change.recall.strata"), g("primary.change.recall.of")) == (2, 2)
+              and abs(g("primary.change.recall.max") - (22 / 30.0 - 21 / 30.0)) < 1e-9
+              and (g("all.change.precision.strata"), g("all.change.precision.of")) == (2, 5)
+              and (g("all.change.precision.onlyone"), g("all.change.recall.onlyone"),
+                   g("primary.change.recall.onlyone")) == (1, 0, 0)
+              and abs(g("all.change.precision.max") - (60 / 75.0 - 54 / 75.0)) < 1e-9,
+              str([g(k) for k in ("primary.change.recall.strata", "primary.change.recall.of",
+                                  "primary.change.recall.max", "all.change.precision.strata",
+                                  "all.change.precision.of", "all.change.precision.max")]))
         check("definitions: the supplement gives both definitions in both scopes, the analysis's first",
               "Measure & \\texttt{windows\\_def} & \\texttt{all} & \\texttt{windows\\_def} & \\texttt{all} \\\\" in sup
               and sup.find("\\multicolumn{2}{l}{\\texttt{under\\_limit}}")
@@ -3566,6 +3733,24 @@ def _selftest_definitions(check):
             f.write(original)
         _rewrite(detp, lambda d: d["cells"]["windows-test"].pop(COMMON_DEFINITION))
         _expect_stop(check, "definitions: negative: no result under the common definition stops", tmp)
+        with open(detp, "wb") as f:
+            f.write(original)
+        # No stratum of the common definition in the primary scope: nothing is compared, the largest change has no
+        # value, the strata of the analysis enter one range only, and nothing stops.
+        _rewrite(detp, lambda d: d["cells"]["windows-test"][COMMON_DEFINITION][PRIMARY_COMPARISON]["under_limit"][
+            "metrics"].update({"by_stratum": []}))
+        try:
+            v1 = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+            gv = lambda k: (v1.get("windows-test.defs." + k) or {}).get("text")
+            got = (gv("primary.change.recall.of"), gv("primary.change.recall.max"),
+                   gv("primary.change.recall.onlyone"), gv("primary.common.recall.range"),
+                   gv("primary.change.onlyone.note"))
+        except Exception as ex:  # a crash is a failure of this check, not of the selftest
+            got = repr(ex)
+        check("definitions: with no stratum to compare, the counts are zero and the largest change has no value",
+              got == ("0", NO_VALUE, "2", NO_VALUE,
+                      "2 strata entered the range of recall and 2 that of precision under one definition only"),
+              str(got))
         with open(detp, "wb") as f:
             f.write(original)
         # Without the report of whether the definitions hold the same sessions, the supplement cannot place the cell.
@@ -3603,6 +3788,86 @@ def _selftest_definitions(check):
         _rewrite(detp, lambda d: d["cells"]["macos-test"][COMMON_DEFINITION][PRIMARY_COMPARISON]["under_limit"][
             "metrics"]["pooled"].update({"n_gt": 201}))
         _expect_stop(check, "definitions: negative: the same sessions reported with different numbers stops", tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _selftest_decomposition(check):
+    """The values of the comparisons side by side, on a synthetic macOS cell (three comparisons, layers) and a
+    synthetic Windows cell (the primary comparison only, no layers)."""
+    tmp = tempfile.mkdtemp(prefix="results_tables_decomp_")
+    try:
+        _fixture(tmp, "macos-test", "")
+        vals = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+        t = lambda k: (vals.get("macos-test." + k) or {}).get("text")
+        check("decomposition: the span of the limits of agreement over the speeds is read per comparison",
+              (t("gtobs.primary.dwell.loa.span"), t("gtpred.primary.dwell.loa.span"), t("predobs.primary.dwell.loa.span"))
+              == ("$-$1,800 to 800~ms", "$-$1,799 to 801~ms", "$-$1,798 to 802~ms"),
+              str((t("gtobs.primary.dwell.loa.span"), t("gtpred.primary.dwell.loa.span"))))
+        check("decomposition: the span of the median absolute differences is read per comparison over every speed, "
+              "and a span whose two ends are the same is one value",
+              (t("gtobs.primary.dwell.mae.span"), t("gtpred.primary.dwell.mae.span"),
+               t("predobs.primary.dwell.mae.span"), t("predobs.primary.dwell.speeds.used"))
+              == ("300~ms", "20 to 40~ms", "30 to 50~ms", "3"),
+              str((t("gtobs.primary.dwell.mae.span"), t("gtpred.primary.dwell.mae.span"),
+                   t("predobs.primary.dwell.mae.span"))))
+        # A speed with one pair has a bias but no limits: the limits come from the other speeds, and nothing stops.
+        l1p = os.path.join(tmp, "e1_l1.json")
+        with open(l1p, "rb") as f:
+            original = f.read()
+
+        def one_pair(doc):
+            for e in doc["cells"]["macos-test"]["macos_def"]["pred_obs"][PRIMARY_SCOPE]["metrics"]["by_speed"]:
+                if e["stratum"]["speed"] == "slow":
+                    e["dwell"]["n"] = 1
+                    e["dwell"]["bland_altman"].update({"n": 1, "sd": None, "loa_lo": None, "loa_hi": None})
+        _rewrite(l1p, one_pair)
+        try:
+            v1 = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+            got = ((v1.get("macos-test.predobs.primary.dwell.loa.span") or {}).get("text"),
+                   (v1.get("macos-test.predobs.primary.dwell.speeds.used") or {}).get("text"),
+                   (v1.get("macos-test.predobs.primary.dwell.mae.span") or {}).get("text"))
+        except Exception as ex:  # a crash is a failure of this check, not of the selftest
+            got = repr(ex)
+        check("decomposition: a speed without limits of agreement is left out of their span and counted",
+              got == ("$-$1,398 to 802~ms", "2", "30 to 50~ms"), str(got))
+        with open(l1p, "wb") as f:
+            f.write(original)
+
+        def all_one_pair(doc):
+            for e in doc["cells"]["macos-test"]["macos_def"]["pred_obs"][PRIMARY_SCOPE]["metrics"]["by_speed"]:
+                e["dwell"]["n"] = 1
+                e["dwell"]["bland_altman"].update({"n": 1, "sd": None, "loa_lo": None, "loa_hi": None})
+        _rewrite(l1p, all_one_pair)
+        try:
+            v1 = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+            got = ((v1.get("macos-test.predobs.primary.dwell.loa.span") or {}).get("text"),
+                   (v1.get("macos-test.predobs.primary.dwell.speeds.used") or {}).get("text"),
+                   (v1.get("macos-test.predobs.primary.dwell.mae.span") or {}).get("text"))
+        except Exception as ex:  # a crash is a failure of this check, not of the selftest
+            got = repr(ex)
+        check("decomposition: with no speed that has limits of agreement, the span has no value and the median "
+              "absolute differences are still given", got == (NO_VALUE, "0", "30 to 50~ms"), str(got))
+        with open(l1p, "wb") as f:
+            f.write(original)
+        check("decomposition: each layer is read from its own comparison, in the primary scope, with the trials of the "
+              "plan in the layer",
+              t("layer.none.gtobs.primary.recall") == "0.525 [0.330, 0.700]"
+              and t("layer.none.gtpred.primary.recall") == "0.525 [0.430, 0.800]"
+              and t("layer.carriedout.gtobs.primary.precision") == "0.500 [0.300, 0.700]"
+              and t("layer.none.gtobs.plan.trials") == "13" and t("layer.none.gtobs.primary.trials") is None
+              and t("layer.none.predobs.primary.recall") is None,
+              str((t("layer.none.gtobs.primary.recall"), t("layer.none.gtpred.primary.recall"))))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    tmp = tempfile.mkdtemp(prefix="results_tables_decomp_win_")
+    try:
+        _fixture(tmp)
+        vals = json.loads(build(tmp)["values.json"].decode("utf-8"))["values"]
+        check("decomposition: a cell without the prediction has the span of its primary comparison and no layer",
+              (vals.get("windows-test.gtobs.primary.dwell.loa.span") or {}).get("text") == "$-$1,800 to 800~ms"
+              and not any(".layer." in k or ".predobs." in k for k in vals if k.startswith("windows-test.")),
+              str((vals.get("windows-test.gtobs.primary.dwell.loa.span") or {}).get("text")))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -3747,6 +4012,7 @@ def selftest():
     _selftest_spread(check)
     _selftest_dwell_explore(check)
     _selftest_definitions(check)
+    _selftest_decomposition(check)
 
     tmp = tempfile.mkdtemp(prefix="results_tables_selftest_")
     try:
