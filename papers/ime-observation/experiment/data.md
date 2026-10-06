@@ -226,6 +226,13 @@ The runtime samples are the files of the `idle` and the `working` condition (`sa
 are not bundled by `--pack`. Before they were moved, they were checked by eye and by a search: none of the four files
 holds a path, the login name or the home directory. Their SHA-256 are those given above under question 5.
 
+The SHA-256 of the two `conditions.txt` were read on the measuring machine on 2026-10-07, from the files that were
+bundled and from the run directories they were copied from (the two values are equal for each condition).
+
+The `conditions.txt` of the `idle` condition has the SHA-256 `25a08f08c98ce4589ed34475b3dd803e178b8f52429ad66c2a71ec0c7fba680f`.
+
+The `conditions.txt` of the `working` condition has the SHA-256 `95f29b15a7de9fc1b6334f804f1d8dd5f9377ec21002d12167d5d0f916dd7ae4`.
+
 ### Move of the macOS archives and samples to the deposit machine (2026-10-07)
 
 The nine archives of the table above and the four sample files were moved from the measuring machine to the

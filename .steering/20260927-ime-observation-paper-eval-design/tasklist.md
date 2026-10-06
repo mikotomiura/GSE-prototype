@@ -273,7 +273,8 @@
       - [x] PR #316 の /cross-review 2 巡（Codex・パス限定 3 回）の指摘を直した（SVG を XML として読む層・文字参照を戻した走査・凍結の一覧の手順・`xml:base` ほか・変異 21 本すべて赤・本番の形の書き出し exit 0・`kit/check.sh` 31 本が緑）（2026-10-06・G-GEAR・判断 212）→ CI → merge
       - [x] Mac: macOS の書庫 9 つ（E3 working・パイロット 8）と E3 の標本を束ね、タグ 2 つ・main の書き出しを Mac で確かめた（2026-10-06・判断 214）→ 書庫を G-GEAR へ移す（研究者）
       - [x] G-GEAR の準備: 寄託は 1 ファイルずつ（研究者の選択）・一覧 `kit/export/deposit.internal.json` と照合して上げる道具 `deposit.internal.py`・点検（code ∥ security）の指摘 17 件を直した・下書きを GET で確かめた・引き継ぎを機械ごとに分けた（2026-10-06・判断 215・枝 `docs/ime-m12-deposit-prep`）
-      - [ ] Mac: `conditions.txt` の SHA-256 2 つを `data.md` と一覧に・macOS の 15 ファイルを G-GEAR の `C:/ime-deposit/` へ（判断 216・`next-session-ime-paper-m12-mac.md`）
+      - [x] Mac: `conditions.txt` の SHA-256 2 つを `data.md` と一覧に記録し、道具で照合した（macOS の 15 ファイルすべて ok・FAIL は windows の MISSING だけ・2026-10-07・判断 216・枝 `docs/ime-m12-mac-conditions`）
+      - [ ] Mac: 計測の書庫 2 つ（`macos-standard-live-{on,off}-1.zip`）を Drive の `mac/` へ上げて G-GEAR へ（研究者が手で。ほかの 13 ファイルは移し済み）
       - [ ] Surface: Windows の書庫と標本・`data.windows.md` と一覧・書き出しの確かめ・`C:/ime-deposit/` へ（判断 217・`next-session-ime-paper-m12-surface.md`）
       - [ ] G-GEAR: 枝を合わせて照合 → datasheet と `\tbd` を埋める → PR → `--upload` → リリース D → 研究者に公開を確かめる（判断 218〜・`next-session-ime-paper-m12-ggear.md`）
       - [ ] GitHub での README（ロゴ・動く図）の見え方を確かめる（ロゴと図はリリース D の README に入る → D を push した後）
