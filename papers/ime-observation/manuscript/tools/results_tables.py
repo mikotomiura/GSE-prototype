@@ -383,14 +383,18 @@ def interval_range(entries):
     return min(e["lo"] for e in entries), max(e["hi"] for e in entries)
 
 
+SPEED_WORDS = {"slow": "slow", "mid": "middle", "fast": "fast"}
+
+
 def strata_names(keys):
-    """Strata (scenario, speed) in the given order, grouped by scenario: "S13 (slow, mid, fast), S6 (slow)"; "none"."""
+    """Strata (scenario, speed) in the given order, grouped by scenario, with the speeds named as the text names them:
+    "S6 (slow), S13 (slow, middle, fast)"; "none"."""
     groups = []
     for sc, sp in keys:
         if groups and groups[-1][0] == sc:
-            groups[-1][1].append(sp)
+            groups[-1][1].append(SPEED_WORDS[sp])
         else:
-            groups.append((sc, [sp]))
+            groups.append((sc, [SPEED_WORDS[sp]]))
     return ", ".join("%s (%s)" % (sc, ", ".join(sps)) for sc, sps in groups) if groups else "none"
 
 
@@ -777,6 +781,9 @@ def l2_values(cell):
                     e["icc21"], e["icc21_ci"][0], e["icc21_ci"][1], lambda x: fmt_signed(x)),
                 "value": [None, None, None] if constant else [e["icc21"]] + list(e["icc21_ci"]),
                 "source": cell.path("e1_l2.json", PRIMARY_SCOPE, "agreement_by_stratum", s, m, "icc21_ci")}
+            if constant:
+                # Deviation D11 reports the registered result next to the corrected one (section 8 of the registration).
+                vals["%s.l2.%s.%s.icc" % (cell.label, m, s)]["registered"] = [e["icc21"]] + list(e["icc21_ci"])
             vals["%s.l2.%s.%s.refsd" % (cell.label, m, s)] = {
                 "text": fmt_sd(spread["sd"], ms), "value": spread["sd"],
                 "source": cell.path("e1_l2.json", PRIMARY_SCOPE, "aggregate", "gt")}
@@ -3651,6 +3658,16 @@ def _selftest_spread(check):
     sp2 = reference_spread(_FakeCell("x", two, two), PRIMARY_SCOPE, "m", "slow")
     check("spread: a reference that differs from the most frequent value in a single text is counted as such",
           sp1["off_mode"] == 1 and not sp1["constant"] and sp2["off_mode"] == 2, (sp1, sp2))
+    # The counts of the text over the strata of a cell: slow is constant, mid differs in a single text, fast in two.
+    cv = {"slow": (1.0, 1.0, 1.0, 1.0), "mid": (1.0, 1.0, 1.0, 2.0), "fast": (1.0, 1.0, 2.0, 2.0)}
+    gt3 = [dict(t(10 * i + k, s), conversions_per_trial=v) for i, s in enumerate(SPEEDS) for k, v in enumerate(cv[s])]
+    fake = _FakeCell("x", gt3, gt3)
+    fake.l2[PRIMARY_SCOPE]["agreement_by_stratum"] = dict((s, {"conversions_per_trial": {"n": 4}}) for s in SPEEDS)
+    cst = l2_constant_values([fake])
+    got = tuple(cst["q3.conversions_per_trial.%s" % k]["value"] for k in ("constant.strata", "constant.of",
+                                                                         "onetext.strata"))
+    check("q3: the counts of the text tell a constant reference, one that differs in a single text and one that "
+          "differs in more", got == (1, 3, 1), str(got))
     words = (number_word(0), number_word(2), number_word(6), number_word(9), number_word(12), number_word(13))
     check("a small count is written as a word, a larger one as digits",
           words == ("none", "two", "six", "nine", "twelve", "13"), str(words))
@@ -4138,8 +4155,11 @@ def selftest():
                      for k in ("primary.recall", "all.recall", "all.precision"))
         check("the strata left out of a range are named in the order of the design, grouped by scenario, as many as "
               "are counted",
-              names["primary.recall"] == "S1 (slow), S2 (slow, mid, fast)" and names["all.recall"] == "none"
-              and re.match(r"^S\d+ \((slow|mid|fast)\)$", names["all.precision"] or "") is not None, str(names))
+              names["primary.recall"] == "S1 (slow), S2 (slow, middle, fast)" and names["all.recall"] == "none"
+              and re.match(r"^S\d+ \((slow|middle|fast)\)$", names["all.precision"] or "") is not None, str(names))
+        order = strata_names([("S6", "slow"), ("S10", "fast"), ("S13", "slow"), ("S13", "mid")])
+        check("the names keep the order given (the order of the design, not of the strings)",
+              order == "S6 (slow), S10 (fast), S13 (slow, middle)", order)
         check("a stratum whose rates have no value is printed with the mark of no value, not dropped",
               "S2 & slow & 75 & 75 & 0 & 0.000 [0.000, 0.049] & %s" % NO_VALUE in files["detection-strata.tex"].decode("utf-8"))
         check("the fractions set aside by the scope and by carry-over are counts over the total",
@@ -4199,9 +4219,10 @@ def selftest():
               "under\\_limit" not in files["fig-detection.tex"].decode("utf-8")
               and "primary scope" in files["fig-detection.tex"].decode("utf-8"))
         icc_mid = [v for k, v in vals.items() if k.endswith(".l2.conversions_per_trial.mid.icc")]
-        check("q3: the value of such an ICC for the text says why it has none, and holds no number",
+        check("q3: the value of such an ICC for the text says why it has none, holds no number, and keeps the "
+              "registered result next to it",
               icc_mid and all(v["text"] == REFERENCE_CONSTANT_TEXT and v["value"] == [None, None, None]
-                              for v in icc_mid), str(icc_mid[:1]))
+                              and v.get("registered") == [0.75, 0.5, 0.875] for v in icc_mid), str(icc_mid[:1]))
         sup_q3 = files["text-agreement.tex"].decode("utf-8")
         check("q3: every supplementary table of per-text agreement explains a reference-constant ICC",
               sup_q3.count(REFERENCE_CONSTANT_NOTE) == 2 * len(row), sup_q3.count(REFERENCE_CONSTANT_NOTE))

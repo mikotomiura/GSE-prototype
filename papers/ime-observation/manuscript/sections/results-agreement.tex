@@ -188,7 +188,8 @@ one of them (the macOS logger cuts such a session off without a row, and on Wind
 no stratum other than S13 has an interval that starts at zero. The strata left out of the ranges have fewer than 30 trials in the primary scope or no
 value there: the three strata of S13, which the scope sets aside entirely, in every cell; S6 at the slow speed with
 live conversion off; and S6 at the slow and the middle speed and S10 at the slow speed with it on. Over all trials the
-strata left out were, for recall, \rv{macos-standard-live-off.all.recall.strata.leftnames} with live conversion off,
+strata left out, which have fewer than 30 trials in that scope or no value there, were, for recall,
+\rv{macos-standard-live-off.all.recall.strata.leftnames} with live conversion off,
 \rv{macos-standard-live-on.all.recall.strata.leftnames} with it on and
 \rv{windows-msime-tsf.all.recall.strata.leftnames} on Windows, and for precision
 \rv{macos-standard-live-off.all.precision.strata.leftnames}, \rv{macos-standard-live-on.all.precision.strata.leftnames}
@@ -214,9 +215,11 @@ scope, the logger's rows agreed with the specified rows with recall
 \rv{macos-standard-live-off.pooled.predobs.underlimit.falseposrate} and
 \rv{macos-standard-live-on.pooled.predobs.underlimit.falseposrate}, and the specified rows agreed with the reference
 with recall \rv{macos-standard-live-off.pooled.gtpred.underlimit.recall} and
-\rv{macos-standard-live-on.pooled.gtpred.underlimit.recall}. Of the strata of the primary scope, the specified rows and
-the logger's rows departed most in S12 at the middle and the fast speed in both cells, and in the long trials in S8
-(supplement). No arithmetic relation between the three comparisons is claimed. The prediction marked, of the trials of the plan, \rv{macos-standard-live-off.pred.trials.long}
+\rv{macos-standard-live-on.pooled.gtpred.underlimit.recall}. In the primary scope, the specified rows and the logger's
+rows departed most in S12 at the middle and the fast speed in both cells; over the long trials, which the primary scope
+sets aside, they departed most in S8, whose strata there hold few sessions (supplement). No arithmetic relation
+between the three comparisons is claimed. The prediction marked, of the trials of the plan,
+\rv{macos-standard-live-off.pred.trials.long}
 and \rv{macos-standard-live-on.pred.trials.long} as long, \rv{macos-standard-live-off.pred.trials.carriedout} and
 \rv{macos-standard-live-on.pred.trials.carriedout} as carrying a session out into the next trial,
 \rv{macos-standard-live-off.pred.trials.receivedcarry} and \rv{macos-standard-live-on.pred.trials.receivedcarry} as

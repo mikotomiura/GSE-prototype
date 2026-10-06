@@ -1237,6 +1237,11 @@
    ]
   },
   "macos-standard-live-off.l2.conversions_per_trial.fast.icc": {
+   "registered": [
+    0.0,
+    -1.5884980539913834e-16,
+    1.6925924892098301e-16
+   ],
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/agreement_by_stratum/fast/conversions_per_trial/icc21_ci",
    "text": "no value: the reference's value is the same in every text (deviation D11)",
    "value": [
@@ -1260,6 +1265,11 @@
    ]
   },
   "macos-standard-live-off.l2.conversions_per_trial.mid.icc": {
+   "registered": [
+    1.0572282228637025e-16,
+    -1.889117074824676e-16,
+    1.7958123390194132e-16
+   ],
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/agreement_by_stratum/mid/conversions_per_trial/icc21_ci",
    "text": "no value: the reference's value is the same in every text (deviation D11)",
    "value": [
@@ -1283,6 +1293,11 @@
    ]
   },
   "macos-standard-live-off.l2.conversions_per_trial.slow.icc": {
+   "registered": [
+    0.0,
+    -1.7371383583377003e-16,
+    1.755641854728414e-16
+   ],
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/agreement_by_stratum/slow/conversions_per_trial/icc21_ci",
    "text": "no value: the reference's value is the same in every text (deviation D11)",
    "value": [
@@ -2654,7 +2669,7 @@
   },
   "macos-standard-live-off.primary.precision.strata.leftnames": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/per_trial/by_stratum",
-   "text": "S6 (slow), S13 (slow, mid, fast)",
+   "text": "S6 (slow), S13 (slow, middle, fast)",
    "value": [
     [
      "S6",
@@ -2694,7 +2709,7 @@
   },
   "macos-standard-live-off.primary.recall.strata.leftnames": {
    "source": "e1_l2.json:cells/macos-standard-live-off/macos_def/gt_obs/under_limit/per_trial/by_stratum",
-   "text": "S6 (slow), S13 (slow, mid, fast)",
+   "text": "S6 (slow), S13 (slow, middle, fast)",
    "value": [
     [
      "S6",
@@ -4340,6 +4355,11 @@
    ]
   },
   "macos-standard-live-on.l2.conversions_per_trial.slow.icc": {
+   "registered": [
+    1.70137621746958e-16,
+    -1.9728451266613122e-16,
+    1.8489952063030272e-16
+   ],
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/agreement_by_stratum/slow/conversions_per_trial/icc21_ci",
    "text": "no value: the reference's value is the same in every text (deviation D11)",
    "value": [
@@ -5711,7 +5731,7 @@
   },
   "macos-standard-live-on.primary.precision.strata.leftnames": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/per_trial/by_stratum",
-   "text": "S6 (slow, mid), S10 (slow), S13 (slow, mid, fast)",
+   "text": "S6 (slow, middle), S10 (slow), S13 (slow, middle, fast)",
    "value": [
     [
      "S6",
@@ -5759,7 +5779,7 @@
   },
   "macos-standard-live-on.primary.recall.strata.leftnames": {
    "source": "e1_l2.json:cells/macos-standard-live-on/macos_def/gt_obs/under_limit/per_trial/by_stratum",
-   "text": "S6 (slow, mid), S10 (slow), S13 (slow, mid, fast)",
+   "text": "S6 (slow, middle), S10 (slow), S13 (slow, middle, fast)",
    "value": [
     [
      "S6",
@@ -7638,6 +7658,11 @@
    ]
   },
   "windows-msime-tsf.l2.conversions_per_trial.mid.icc": {
+   "registered": [
+    9.267937384482318e-16,
+    -3.268773833623001e-15,
+    2.988677489983575e-15
+   ],
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/agreement_by_stratum/mid/conversions_per_trial/icc21_ci",
    "text": "no value: the reference's value is the same in every text (deviation D11)",
    "value": [
@@ -7661,6 +7686,11 @@
    ]
   },
   "windows-msime-tsf.l2.conversions_per_trial.slow.icc": {
+   "registered": [
+    3.1015510048510574e-15,
+    -4.076564929564351e-15,
+    4.1512457851064226e-15
+   ],
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/agreement_by_stratum/slow/conversions_per_trial/icc21_ci",
    "text": "no value: the reference's value is the same in every text (deviation D11)",
    "value": [
@@ -8288,7 +8318,7 @@
   },
   "windows-msime-tsf.primary.precision.strata.leftnames": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/per_trial/by_stratum",
-   "text": "S13 (slow, mid, fast)",
+   "text": "S13 (slow, middle, fast)",
    "value": [
     [
      "S13",
@@ -8324,7 +8354,7 @@
   },
   "windows-msime-tsf.primary.recall.strata.leftnames": {
    "source": "windows/e1_l2.json:cells/windows-msime-tsf/windows_def/gt_obs/under_limit/per_trial/by_stratum",
-   "text": "S13 (slow, mid, fast)",
+   "text": "S13 (slow, middle, fast)",
    "value": [
     [
      "S13",

@@ -264,9 +264,10 @@ zero; the frozen code (`kit/analysis/stats.py`) returns no value only when every
 design gives every trial of the primary scope one session in most strata, so the conversions per trial of the
 reference are 1 in every text there.
 
-**Effect.** In the primary scope, six of the per-speed ICCs of the conversions per trial lose their value of 0.000:
-the three speeds of the macOS cell with live conversion off, the slow speed of the macOS cell with it on, and the slow
-and middle speeds of the Windows cell. In the supplement, eight more lose theirs: the ICCs pooled over the speeds of
+**Effect.** In the primary scope, six of the per-speed ICCs of the conversions per trial are reported without a value,
+next to their registered value of 0.000: the three speeds of the macOS cell with live conversion off, the slow speed of
+the macOS cell with it on, and the slow and middle speeds of the Windows cell. In the supplement, eight more are
+reported in the same way: the ICCs pooled over the speeds of
 the macOS cell with live conversion off in the primary scope and over all trials, and, over all trials, the same six
 strata as in the primary scope. Every other value of question 3 is unchanged. In two strata (the middle and the fast
 speed with live conversion on) the reference differs from 1 in a single text; their ICCs keep their values and are

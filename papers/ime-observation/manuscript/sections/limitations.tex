@@ -21,9 +21,9 @@ logger's two paths, because a row does not record its path (Section~\ref{sec:log
 with its default settings, with predictive candidates shown; with them turned off, the window would open at the
 conversion rather than while the reading is typed. Applications that draw their own candidates were not tested, and in
 them the logger may see no session. The counts \texttt{nav} and \texttt{abandon} are counted system-wide while a
-session is open and are upper bounds; this design does not exercise their excess, because only the executor typed, and
-the per-text abandonment rate of the Windows logger was lower than the reference's (Section~\ref{sec:results-session}).
-In
+session is open and are upper bounds; this design does not exercise their excess, because only the executor typed. In
+this study the per-text abandonment rate of the Windows logger was lower than the reference's
+(Section~\ref{sec:results-session}). In
 S15 the input method commits when another window comes to the front, so the session ends there. On the cloaking path
 the observed interval ends at least 150~ms before the row's time, and on both paths the row's time is that of its
 collection; the matching is not adjusted for either, so short sessions can fail to pair for this reason. The input mode
