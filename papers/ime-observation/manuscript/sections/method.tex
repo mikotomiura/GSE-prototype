@@ -98,7 +98,10 @@ two reference fields built for Windows, this one was chosen in the calibration p
 read: the Microsoft input method is a text service of the framework, so its client receives the composition directly,
 whereas a field that receives the input method's messages does so through a compatibility layer of the system; and
 the latter field received the key press that switches the input method on before every block as a key-down, which
-the rule on presses from outside (Section~\ref{sec:method-checks}) does not allow.
+the rule on presses from outside (Section~\ref{sec:method-checks}) does not allow. The two fields also committed at
+different points in one scenario of the pilot: in three trials of S7 the chosen field committed when the right arrow
+was pressed past the last segment, whereas the other kept the composition until Return, so the kind of field affects
+the reference.
 
 \paragraph{Assignment and definitions.} A session is assigned to the trial that it overlaps most in wall-clock time.
 Its true navigation count is the number of arrow presses that the oracle records as sent for that trial within the

@@ -1878,3 +1878,17 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **語数**（コメントを除いた粗い数・`\rv` と参照は 1 語・節の .tex の合計）: 断りの寄せで 25,602 → 25,367（−235）。セッションの始め（`46262e59`）から −102（Discussion の 2 段落 +133 を含む）。要旨は変えていない（`_count_abstract.py` は回していない）。
 - **検証**: `build.sh --submission` main・main-submission・補遺ともエラー 0・未定義の参照 0・未定義の引用 0・生成されていない値 0・bibtex の警告 0・overfull は main 0（以前は 1）・main-submission 1（書誌の WebKit の項目のパスの中・今回触れていない段落）・補遺 167。文体の検査 違反 0。足した行は 120 字以内。PDF 7・41〜43 頁を画像で確かめた。
 - **影響範囲**: `manuscript/sections/` の introduction・related・observability・results-agreement・recoverability・cost・dataset・limitations・conclusions・discussion。
+
+## 判断 203: 判断 201・202 の作業中の点検（code-reviewer ∥ security-checker）の指摘を一次で確かめて直す・attack-me round 2 は次のセッションで回す（2026-10-06・G-GEAR・round 2 は研究者の選択〔推奨どおり〕・直しはメインの選択・研究者が覆せる）
+
+- **対象**: `46262e59..d45f12fb` の 12 ファイル。security-checker: CRITICAL / HIGH / MEDIUM 0・LOW 1。code-reviewer: HIGH 1・MEDIUM 3・LOW 8。
+- **一次で確かめて真だったもの（直した）**:
+  - HIGH: 断りを寄せたときに §6 の「What the reference does not establish」から「Windows のパイロットで 2 つの欄が 1 つの場面で別の点で確定した」を削り、その事実が原稿のどこにも無くなった（§5.3 にも無かった・§13 の「as the two Windows fields of the pilot showed」の裏づけが消えた）→ 一次（`pilot-windows-1-notes.md` 49 行: S7 の 3 試行で、TSF の欄は文節を超えた → でその場で確定、IMM の窓は Enter まで未確定）で確かめ、§5.3 の Windows の段落に 1 文で戻して置き場所に。§13 の文の主語の取り違え（「it」が一致を指して読める・LOW）も「affects the reference」に。
+  - MEDIUM: Discussion ¶1 の「not combined arithmetically」の参照先 `sec:method-analysis` にその文は無い（以前からの参照）→ その文がある §6.3（`results-detection`・「No arithmetic relation between the three comparisons is claimed」）に。
+  - MEDIUM: 観測可能性の段落の「set by its rules」は ¶1 の「mainly」を落とした言い切り（予測とロガーの取り逃し 0.004・0.007、誤検出 0.005・0.007）→「set mainly by its rules」。⚠️ 研究者が採った日本語（「決まっていた」）より弱めた —— ¶1 の根拠に合わせた直しで、向きは変えていない（判断 199 の ¶1 と同じ扱い・完了報告で示す）。
+  - MEDIUM: 同じ段落の Windows の文に限定が無く、§3 の TSF・IMM・アクセシブルなオブジェクト・UIA（テキストを運ぶ、またはアプリに依る）も「調べた経路」なので誤り → 「of the same interfaces, those that carry no text」と §3.2 の参照に。
+  - LOW（直した）: 冒頭コメントの「§6 の値は繰り返さない」に尺度の段落の例外を書いた。引用の言い換えを原文の対句の主語に合わせた（「2 s について言えること＝その両側で処理の質が違うこと＝が…どの閾値にも言える」）・「a review」→「the introduction to a special issue」（文献は自らをそう書く）。長さの割合に「in the primary scope」を足した。ポーズの尺度に直接関わるのは間隔の誤差なので、キー行の間隔の誤差の中央値（3 セルとも 0.0 ms・表 key-timing）を足した（`\rv` の値・§6 にある値）。¶3 の「live on の方が中央絶対差が大きい」に表 session の参照。結論の CPU の文に「because the samplers differ」を戻した（単独で読まれるので理由の句を残す）。§8 の結果に「which is not a criterion of privacy」と §8 の方法の参照（security-checker の LOW と code-reviewer の LOW が一致）。
+- **確かめて直さなかったもの**: 「almost exactly … almost the same durations」は評価の語に読めるという LOW → 判断 199 で Codex の指摘から入れて研究者が採った既存の文で、この範囲の変更ではない（round 2 の査読者に見せる）。
+- **研究者の選択**: 原稿の attack-me round 2 は**次のセッションで回す**（推奨どおり・同じ 3 つの立場と同じ接地・round 1 の指摘と対応、判断 195〜203 の Discussion を渡す）。
+- **検証**: `build.sh --submission` main・main-submission・補遺ともエラー 0・未定義の参照 0・未定義の引用 0・生成されていない値 0・bibtex の警告 0・overfull main 0・main-submission 1（書誌の WebKit の項目）・補遺 167。文体の検査 違反 0。足した行は 120 字以内。PDF 42〜43 頁を画像で確かめた。
+- **影響範囲**: `manuscript/sections/` の method・limitations・results-agreement・discussion・conclusions・recoverability。

@@ -2,7 +2,8 @@
 % author's direction (where the disagreements arise, what the interfaces allow, the effect of the Windows definition,
 % the mechanisms behind the spread of the durations as hypotheses, and the scales of writing research), as the
 % journal's publisher asks of the argument, the interpretation and the conclusions. A value that the results sections
-% already give is referred to there rather than repeated. Every result value is read with \rv{} from
+% already give is referred to there rather than repeated, except in the paragraph that sets the timing of the rows
+% beside the scales of writing research, whose purpose is that comparison. Every result value is read with \rv{} from
 % generated/values.tex (tools/results_tables.py).
 
 \section{Discussion}
@@ -30,7 +31,8 @@ agreement spanned \rv{macos-standard-live-off.gtpred.primary.dwell.loa.span} and
 \rv{macos-standard-live-off.gtpred.primary.dwell.mae.span} and
 \rv{macos-standard-live-on.gtpred.primary.dwell.mae.span}. The disagreements of the macOS logger, and the long tails of
 its duration differences, thus arise mainly where the sessions that its rules define differ from the sessions of the
-reference (the three comparisons are read side by side, not combined arithmetically; Section~\ref{sec:method-analysis}).
+reference (the three comparisons are read side by side, not combined arithmetically;
+Section~\ref{sec:results-detection}).
 
 \paragraph{Disagreements that the registration listed and those it did not.} The registration listed, as following from
 the rules, a session that Backspace keeps open and carries into the next trial (S6), a session closed by Tab when a
@@ -57,7 +59,8 @@ sessions begin and end with the calls that the input method makes to the field, 
 keys. Differences in where the two place the beginning and the end of a session are consistent with the spread: for
 example a session that the rules close at a key while the input method keeps the reading, or, with live conversion on,
 the commits that the input method makes while the reading is typed, which would also be consistent with the larger
-median absolute differences with live conversion on than off. These mechanisms were not tested. The beginnings and the
+median absolute differences with live conversion on than off (Table~\ref{tab:session}). These mechanisms were not
+tested. The beginnings and the
 ends of the sessions were not compared separately; the two macOS cells used different plans
 (Section~\ref{sec:method-plans}), so the two settings are not compared trial by trial; durations are compared only for
 the sessions that paired, which differ between strata and speeds; and the delay between an injected press and the
@@ -66,12 +69,13 @@ input method's calls to the reference field was not measured.
 \paragraph{What the interfaces allow.} Among the documented interfaces examined that do not depend on the application,
 none on macOS reports a conversion, so a logger meant to work in any application infers the sessions from the keys
 (Section~\ref{sec:observability}), and its sessions are those that its rules define. For the macOS logger the agreement
-with the reference was thus set by its rules rather than by their implementation (first paragraph of this section).
-Rules that infer the sessions differently can be evaluated against the same reference on the dataset without new
-measurement (Section~\ref{sec:dataset-uses}). On Windows the routes examined report the windows of the input method,
-not the composition, so the logger records a period during which a window is visible, and its agreement with the
-reference, which records compositions, includes the difference between the two constructs; the values of the two
-systems are therefore not compared (Section~\ref{sec:observability-consequence}).
+with the reference was thus set mainly by its rules rather than by their implementation (first paragraph of this
+section). Rules that infer the sessions differently can be evaluated against the same reference on the dataset without
+new measurement (Section~\ref{sec:dataset-uses}). On Windows, of the same interfaces, those that carry no text report
+the windows of the input method, not the composition (Section~\ref{sec:observability-windows}), so the logger records a
+period during which a window is visible, and its agreement with the reference, which records compositions, includes
+the difference between the two constructs; the values of the two systems are therefore not compared
+(Section~\ref{sec:observability-consequence}).
 
 \paragraph{Windows.} The durations of the Windows logger were shorter than the reference's at every speed
 (Section~\ref{sec:results-session}), and recall fell with speed also in S1, in which few sessions were split
@@ -92,14 +96,19 @@ strata that enter both, by at most \rv{windows-msime-tsf.defs.primary.change.rec
 definitions (Section~\ref{sec:results-detection}).
 
 \paragraph{The scales of writing research.} Writing research that counts pauses has traditionally set the threshold of
-a pause at 2~s, although, as a review of its methods notes, the same could be argued for any threshold ``between
-perhaps 250 ms and 10 s'' \citep{torrance2024}. On these scales, the key rows of the logger followed the injected
-presses by a median of \rv{macos-standard-live-off.kt.obs.delay.all.median} with live conversion off,
+a pause at 2~s; the introduction to a special issue on methods for the writing time-course notes that what holds for
+2~s, that processing on either side of it is likely to differ in kind, could be argued for ``any threshold a
+researcher might care to choose between perhaps 250 ms and 10 s'' \citep{torrance2024}. On these scales, the key rows
+of the logger followed the injected presses by a median of \rv{macos-standard-live-off.kt.obs.delay.all.median} with
+live conversion off,
 \rv{macos-standard-live-on.kt.obs.delay.all.median} with it on and \rv{windows-msime-tsf.kt.obs.delay.all.median} on
 Windows (95th percentiles \rv{macos-standard-live-off.kt.obs.delay.all.p95},
-\rv{macos-standard-live-on.kt.obs.delay.all.p95} and \rv{windows-msime-tsf.kt.obs.delay.all.p95}) on the software path
-alone, to which the path from a physical key adds its own delay, such as the sampling of a USB keyboard every 8~ms
-\citep{pinet2017}; and the durations of the paired sessions were within 100~ms of the reference's in
+\rv{macos-standard-live-on.kt.obs.delay.all.p95} and \rv{windows-msime-tsf.kt.obs.delay.all.p95}), and the intervals
+between consecutive rows differed from those sent by a median of
+\rv{macos-standard-live-off.kt.obs.interval.all.median}, \rv{macos-standard-live-on.kt.obs.interval.all.median} and
+\rv{windows-msime-tsf.kt.obs.interval.all.median} (Table~\ref{tab:key-timing}), on the software path alone, to which
+the path from a physical key adds its own delay, such as the sampling of a USB keyboard every 8~ms \citep{pinet2017};
+and in the primary scope the durations of the paired sessions were within 100~ms of the reference's in
 \rv{macos-standard-live-off.dwellx.within100.range} of the pairs with live conversion off,
 \rv{macos-standard-live-on.dwellx.within100.range} with it on and \rv{windows-msime-tsf.dwellx.within100.range} on
 Windows, and within 1~s in \rv{macos-standard-live-off.dwellx.within1000.range},
