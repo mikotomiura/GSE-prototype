@@ -263,6 +263,7 @@
     - [ ] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用（進め方は判断 207）
       - [x] 研究者の 4 点（リリースの DOI は手で予約・repo 名・履歴の 4 commit と非公開の参照の置き換え・書庫は G-GEAR に集める）（判断 207）
       - [x] Zenodo の下書き 2 つと DOI の予約: データセット `10.5281/zenodo.23183438`・ソフトウェア `10.5281/zenodo.23183441`（判断 208）
+      - [x] Surface: Windows の書庫 10 と標本を束ね（TSF の落ちた 2 件は寄託せず・管理者権限で拒まれた開始は寄託）、記録と一覧を埋め、3 種の書き出しを確かめた（2026-10-06・判断 217・枝 `docs/ime-m12-surface-deposit`）
       - [ ] 非公開の repo `mikotomiura/ime-conversion-logging` を作り（済）、A・B・C を push（タグ 2 つ）→ ⚠️ push は自動モードで拒まれた・研究者が `C:/wt/ime-conversion-logging.git` から push する
       - [x] 書き出しの道具を .tex・.bib と LaTeX の ignore に対応させ、`rv@` を `rv:` に、研究者のアドレスだけを通す（selftest・変異 10 本・判断 208）
       - [x] 非公開の commit の参照 12 か所の置き換え・`\tbd`（DOI・URL・外枠の commit・表 1 の版）・`references.bib`・CITATION.cff・.zenodo.json・ライセンスの全文・.gitattributes・凍結の一覧を計算し直す手順（README）（判断 209）
