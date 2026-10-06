@@ -1,67 +1,49 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-    <img src="assets/logo-light.svg" width="600" alt="ime-conversion-logging">
-  </picture>
-</p>
+<p align="center"><a href="README.md">English</a> | <b>日本語</b></p>
 
-<h1 align="center">文字を記録せずに日本語 IME の変換を記録する</h1>
+<div align="center">
 
-<p align="center">
-  観測できることの限界、両 OS で動くロガー、合成入力による検証
-</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+  <img src="assets/logo-light.svg" width="600" alt="ime-conversion-logging">
+</picture>
 
-<p align="center">
-  <a href="https://doi.org/10.5281/zenodo.23183441"><img src="https://img.shields.io/badge/code%20DOI-10.5281%2Fzenodo.23183441-1682D4" alt="コードのリリースの DOI"></a>
-  <a href="https://doi.org/10.5281/zenodo.23183438"><img src="https://img.shields.io/badge/data%20DOI-10.5281%2Fzenodo.23183438-1682D4" alt="データセットの DOI"></a>
-  <a href="#事前登録"><img src="https://img.shields.io/badge/pre--registered-OSF%20Registries-2C6EAB" alt="OSF Registries に事前登録"></a>
-  <br>
-  <a href="LICENSE-CODE"><img src="https://img.shields.io/badge/code-Apache--2.0-3C873A" alt="コードのライセンス: Apache-2.0"></a>
-  <a href="LICENSE-DATA"><img src="https://img.shields.io/badge/data%20and%20documents-CC%20BY%204.0-3C873A" alt="データと文書のライセンス: CC BY 4.0"></a>
-  <img src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-555555" alt="対応: Windows と macOS">
-</p>
+# 文字を記録せずに日本語 IME の変換を記録する
 
-<p align="center">
-  <a href="README.md">English</a> | <b>日本語</b>
-</p>
+**日本語入力の変換 1 回ごとに、その長さ・矢印キーの回数・取り消したかどうかを 1 行に書き、文字は 1 つも書かないロガー。**
 
-<p align="center">
-  <img src="assets/demo.svg" width="100%" alt="左: 入力方法をオンにして打ったローマ字 n, i, h, o, n, g, o が入力欄の読みになり、Space で変換され、Enter で確定する。右: 同じ時刻にロガーが書く行。キーを押すたびにキーの分類と時刻を、変換が終わると変換の長さ、その間の矢印キーの回数、取り消したかどうかを書く。文字は 1 つも書かない。">
-</p>
+*観測できることの限界、両 OS で動くロガー、合成入力による検証*
+
+<img src="assets/demo.svg" width="100%" alt="左: 入力方法をオンにして打ったローマ字 n, i, h, o, n, g, o が入力欄の読みになり、Space で変換され、Enter で確定する。右: 同じ時刻にロガーが書く行。キーを押すたびにキーの分類と時刻を、変換が終わると変換の長さ、その間の矢印キーの回数、取り消したかどうかを書く。文字は 1 つも書かない。">
+
+[![Code release](https://img.shields.io/badge/code%20release-v1.0.0-1682D4?style=for-the-badge)](https://doi.org/10.5281/zenodo.23183441)
+[![Dataset](https://img.shields.io/badge/dataset-Zenodo-1682D4?style=for-the-badge)](https://doi.org/10.5281/zenodo.23183438)
+[![Pre-registered](https://img.shields.io/badge/pre--registered-OSF-2C6EAB?style=for-the-badge)](#事前登録)
+
+[![コードの DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23183441.svg)](https://doi.org/10.5281/zenodo.23183441)
+[![データの DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23183438.svg)](https://doi.org/10.5281/zenodo.23183438)
+[![コードのライセンス: Apache-2.0](https://img.shields.io/badge/code-Apache--2.0-3C873A)](LICENSE-CODE)
+[![データと文書のライセンス: CC BY 4.0](https://img.shields.io/badge/data%20and%20documents-CC%20BY%204.0-3C873A)](LICENSE-DATA)
+![対応: Windows と macOS](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-555555)
+
+</div>
 
 > [!IMPORTANT]
 > この文書は英語版 [README.md](README.md) の訳です。内容が食い違うときは英語版を正とします。
 
-このリポジトリは、文字を記録せずに日本語 IME の変換を観測することを扱う 1 本の論文の成果物をまとめたものです。観測できることの限界、両 OS で動く単体のロガー、合成入力による検証を含みます。文書に書いたコマンドは、すべてこのリポジトリの根から実行します。
+書く研究で使われる打鍵のロガーは、日本語入力の変換を**記録しないか、文字ごと記録するか**のどちらかでした。読みを綴るキーの名前や、変換中の文字列・画面の文字を記録するということです。このリポジトリは、その変換を**文字を記録せずに**観測することを扱う 1 本の論文の成果物をまとめたものです。Windows と macOS のどの公開の口で観測できるか、両 OS で動く**単体のロガー**、参照の入力欄と比べた**事前登録の検証**（合成入力）を含みます。文書に書いたコマンドは、すべてこのリポジトリの根から実行します。
 
 > [!NOTE]
 > 生ログはこのリポジトリに入っていません。データセット（[10.5281/zenodo.23183438](https://doi.org/10.5281/zenodo.23183438)）として寄託してあり、各書庫の SHA-256 は `experiment/data.md`（macOS）と `experiment/data.windows.md`（Windows）に記録してあります。
 
-## 目次
-
-- [概要](#概要)
-- [すぐに試す](#すぐに試す)
-- [解析を再現する](#解析を再現する)
-- [リポジトリの構成](#リポジトリの構成)
-- [事前登録](#事前登録)
-- [このリポジトリの履歴](#このリポジトリの履歴)
-- [検証](#検証)
-- [引用](#引用)
-- [ライセンス](#ライセンス)
-
-## 概要
-
-**ロガー**（`kit/logger/`）は Windows と macOS で動きます。キーを押すたびに、14 のキーの分類のどれか 1 つと時刻を 1 行に書きます。変換のまとまり（セッション）ごとには、その長さ、その間に押された矢印キーの回数、取り消したかどうかを 1 行に書きます。どのキーが押されたかは捨て、文字・候補の文字列・読み・ウィンドウの名前は一切記録しません。ログの形式 `obs/1` は [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md) に定めています。
-
-**検証**では、ロガーの行を参照と比べました。参照は、入力方法から受け取った呼び出しを記録する入力欄です。計画（プラン）を生成してキーを送ったのはプログラムで、実行の間に人が打つことは想定していません。測定は次の 3 つの設定で行いました。
-
-| 設定 | 入力方法 | 試行の数 |
-|---|---|---:|
-| `macos-standard-live-on` | macOS の日本語入力、ローマ字入力、ライブ変換オン | 3,150 |
-| `macos-standard-live-off` | 同じ設定でライブ変換オフ | 2,925 |
-| `windows-msime-tsf` | Microsoft IME（日本語）、ローマ字入力、Text Services Framework のクライアントである参照の入力欄 | 2,925 |
-
-問い・解析・中止の規則は測定の前に事前登録してあり（[事前登録](#事前登録)）、そこからのずれはすべて `experiment/deviations.md` に記録しています。
+<p align="center">
+  <a href="#すぐに試す">すぐに試す</a> ·
+  <a href="#ロガーが記録するもの">ロガーが記録するもの</a> ·
+  <a href="#ロガーの検証">検証</a> ·
+  <a href="#解析を再現する">解析を再現する</a> ·
+  <a href="#論文と引用">論文と引用</a> ·
+  <a href="#リポジトリの構成">構成</a> ·
+  <a href="#ライセンス">ライセンス</a>
+</p>
 
 ## すぐに試す
 
@@ -74,7 +56,7 @@ bash kit/check.sh
 bash experiment/run.sh --synthetic
 ```
 
-ロガーをビルドして動かします（Rust と Cargo が必要です）。
+ロガーをビルドして動かし、そのログを形式と照らします（Rust と Cargo が必要です）。
 
 ```bash
 cargo build --release --manifest-path kit/logger/Cargo.toml
@@ -84,12 +66,77 @@ python3 kit/formats/validate_logs.py --kind obs obs.jsonl
 
 macOS では、ロガーに「入力監視」の許可が要ります。許可が無いと、ロガーは許可を求める画面をシステムに出させてから、エラーで止まります。許可してから、もう一度起動してください。ロガーは既にあるログを上書きしません。ドライバ・オプション・制約は、ロガーの README（[`kit/logger/README.md`](kit/logger/README.md)、英語）に書いてあります。
 
+## ロガーが記録するもの
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/records-dark.svg">
+  <img src="assets/records-light.svg" width="100%" alt="ログに書くもの: キーを押すたび・離すたびに、14 の分類のどれか 1 つ、時刻、押したか離したか。変換のまとまりごとに、その長さ、その間の矢印キーの回数、取り消したかどうか。書かないもの: どのキーを押したか、文字と読み、候補の文字列、ウィンドウの名前。">
+</picture>
+
+ロガー（`kit/logger/`）は Windows と macOS で動きます。キーを押すたびに、14 のキーの分類のどれか 1 つと時刻を 1 行に書きます。変換のまとまり（セッション）ごとには、その長さ、その間に押された矢印キーの回数、取り消したかどうかを 1 行に書きます。どのキーが押されたかは捨て、文字・候補の文字列・読み・ウィンドウの名前は一切記録しません。ログの形式 `obs/1` は [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md) に定めています。ただし、キーの行は作りの上で匿名なわけではありません。打った句をどこまで明かすかは、論文が測っています。
+
+## ロガーの検証
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/validation-dark.svg">
+  <img src="assets/validation-light.svg" width="100%" alt="句のコーパスと設定から作った計画で、実行器がキーを押して離し、送ったものを記録する。キーは入力方法と、受け取った呼び出しを文字なしで記録する参照の入力欄に届き、同時にロガーも記録する。2 つの記録を、登録した規則のもとで壁時計の時刻で突き合わせる。">
+</picture>
+
+検証では、ロガーの行を参照と比べました。参照は、入力方法から受け取った呼び出しを記録する入力欄です。計画（プラン）を生成してキーを送ったのはプログラムで、実行の間に人が打つことは想定していません。測定は次の 3 つの設定で行いました。
+
+| 設定 | 入力方法 | 試行の数 |
+|---|---|---:|
+| `macos-standard-live-on` | macOS の日本語入力、ローマ字入力、ライブ変換オン | 3,150 |
+| `macos-standard-live-off` | 同じ設定でライブ変換オフ | 2,925 |
+| `windows-msime-tsf` | Microsoft IME（日本語）、ローマ字入力、Text Services Framework のクライアントである参照の入力欄 | 2,925 |
+
+macOS では、ロガーはキーの打鍵から変換のまとまりを推します。Windows では、入力方法のウィンドウが見えている間を 1 つのまとまりとし、これは参照の変換（composition）とは構成概念が違います。問い・解析・中止の規則は測定の前に事前登録してあり（[事前登録](#事前登録)）、そこからのずれはすべて `experiment/deviations.md` に記録しています。
+
 ## 解析を再現する
 
 1. データセット（[10.5281/zenodo.23183438](https://doi.org/10.5281/zenodo.23183438)）から各実行の書庫を取得します。データシート（`datasheet.md`、`experiment/` にも同じものがあります）が、すべてのファイルを説明し、すべての書庫と標本の SHA-256 を挙げています。
 2. `experiment/data.md`（macOS）と `experiment/data.windows.md`（Windows）に従います。どちらも、結果のファイルごとに、作ったコード・コマンド・入力・出力の SHA-256 を記録しています。
 
 結果のファイルは `experiment/results/` にあります。論文の表・本文で引く値・図は、`manuscript/tools/results_tables.py` がそれらから生成します。原稿のビルドの方法は `manuscript/BUILD.md` にあります。
+
+## 論文と引用
+
+> **Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation**<br>
+> Mikoto Miura（独立研究者）
+>
+> 論文は準備中で、原稿のソースは [`manuscript/`](manuscript/) にあります。事前登録: [macOS のセル](https://osf.io/9nh7r)・[Windows の追補](https://osf.io/4jwzn)。コード: [10.5281/zenodo.23183441](https://doi.org/10.5281/zenodo.23183441)。データ: [10.5281/zenodo.23183438](https://doi.org/10.5281/zenodo.23183438)。
+
+コードの引用は `CITATION.cff` にあり、GitHub の "Cite this repository" に表示されます。BibTeX では次のとおりです。
+
+```bibtex
+@software{miura2026code,
+  author    = {Miura, Mikoto},
+  title     = {Logging {J}apanese {IME} conversion without recording text: Logger, validation kit and analysis code},
+  version   = {1.0.0},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.23183441},
+  url       = {https://doi.org/10.5281/zenodo.23183441}
+}
+
+@dataset{miura2026data,
+  author    = {Miura, Mikoto},
+  title     = {Logging {J}apanese {IME} conversion without recording text: Records of the synthetic-input validation},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.23183438},
+  url       = {https://doi.org/10.5281/zenodo.23183438}
+}
+```
+
+## 事前登録
+
+| 登録 | 凍結した日 | 記録 | タグ |
+|---|---|---|---|
+| macOS のセル | 2026 年 10 月 2 日 | [osf.io/9nh7r](https://osf.io/9nh7r)（DOI 10.17605/OSF.IO/9NH7R） | `ime-observation-prereg-macos` |
+| Windows の追補 | 2026 年 10 月 3 日 | [osf.io/4jwzn](https://osf.io/4jwzn)（DOI 10.17605/OSF.IO/4JWZN） | `ime-observation-prereg-windows` |
+
+登録の本文は `experiment/preregistration.md`、そこからのずれは `experiment/deviations.md` にあります（どちらも英語）。
 
 ## リポジトリの構成
 
@@ -108,15 +155,6 @@ macOS では、ロガーに「入力監視」の許可が要ります。許可�
 | `experiment/` | 事前登録、ずれの記録、実行の記録（`data.md`、`data.windows.md`）、環境、結果、データセットのデータシート（`datasheet.md`、データと一緒にも寄託） |
 | `manuscript/` | 原稿、補遺、それらをビルドする道具 |
 | `assets/` | この文書の図と、それを作るスクリプト（`make_assets.py`） |
-
-## 事前登録
-
-| 登録 | 凍結した日 | 記録 | タグ |
-|---|---|---|---|
-| macOS のセル | 2026 年 10 月 2 日 | [osf.io/9nh7r](https://osf.io/9nh7r)（DOI 10.17605/OSF.IO/9NH7R） | `ime-observation-prereg-macos` |
-| Windows の追補 | 2026 年 10 月 3 日 | [osf.io/4jwzn](https://osf.io/4jwzn)（DOI 10.17605/OSF.IO/4JWZN） | `ime-observation-prereg-windows` |
-
-登録の本文は `experiment/preregistration.md`、そこからのずれは `experiment/deviations.md` にあります（どちらも英語）。
 
 ## このリポジトリの履歴
 
@@ -164,31 +202,6 @@ bash kit/check.sh --self-test  # この入口自身の陰性対照
 - `--selftest` で回すのは、`kit/` の下の `.py` のうち、目印のコメント `# kit: selftest` を持つものだけです（目印の無い補助のモジュールはコンパイルだけします）。目印は、**行全体が `# kit: selftest` であるコメント**として書きます（文字列の中の目印は拾いません）。
 - この入口は検証と受け入れの確かめのたびに回るので、**selftest は既定で速く書きます**（1 本 30 秒未満。超えると警告が出ます）。重い確かめは `--selftest --full` のように分け、既定では回しません。
 - ログの形式の契約は [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md) です。`gt` と `obs` の行の**形**（文字列の値が列挙か正規表現に合い、知らないキーやエスケープが無いこと）は `kit/formats/validate_logs.py` が機械で確かめます。整数の値・版の文字列・`manifest_sha256` の意味は範囲の外で、ログに中身を入れないこと（種類・長さ・時刻だけを書くこと）は書く側の責任です。FORMATS.md の "Scope of guarantee" を参照してください。
-
-## 引用
-
-コードの引用は `CITATION.cff` にあり、GitHub の "Cite this repository" に表示されます。BibTeX では次のとおりです。
-
-```bibtex
-@software{miura2026code,
-  author    = {Miura, Mikoto},
-  title     = {Logging {J}apanese {IME} conversion without recording text: Logger, validation kit and analysis code},
-  version   = {1.0.0},
-  year      = {2026},
-  publisher = {Zenodo},
-  doi       = {10.5281/zenodo.23183441},
-  url       = {https://doi.org/10.5281/zenodo.23183441}
-}
-
-@dataset{miura2026data,
-  author    = {Miura, Mikoto},
-  title     = {Logging {J}apanese {IME} conversion without recording text: Records of the synthetic-input validation},
-  year      = {2026},
-  publisher = {Zenodo},
-  doi       = {10.5281/zenodo.23183438},
-  url       = {https://doi.org/10.5281/zenodo.23183438}
-}
-```
 
 ## ライセンス
 

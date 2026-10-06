@@ -1,5 +1,6 @@
-"""Generates the figures of README.md as SVG: the logo in a light and a dark version, and the animated illustration
-of what the logger writes while a phrase is typed and converted. Run from the root of the repository:
+"""Generates the figures of README.md as SVG: the logo, the diagram of the validation and the diagram of what the
+logger writes, each in a light and a dark version, and the animated illustration of what the logger writes while a
+phrase is typed and converted. Run from the root of the repository:
 
     python3 assets/make_assets.py --out assets
 
@@ -15,9 +16,11 @@ JP = ("'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Noto Sans CJK
       "sans-serif")
 THEMES = {
     "light": dict(text="#1f2328", muted="#59636e", accent="#0969da", cap="#ddf4ff", face="#ffffff",
-                  caret="#bf8700"),
+                  caret="#bf8700", panel="#f6f8fa", border="#d0d7de", ok="#1a7f37", okbg="#dafbe1",
+                  no="#cf222e", nobg="#ffebe9"),
     "dark": dict(text="#f0f6fc", muted="#9198a1", accent="#4493f8", cap="#0c2d6b", face="#0d1117",
-                 caret="#d29922"),
+                 caret="#d29922", panel="#161b22", border="#30363d", ok="#3fb950", okbg="#033a16",
+                 no="#f85149", nobg="#3c1618"),
 }
 
 
@@ -47,6 +50,123 @@ def logo(theme):
         '</svg>',
     ]
     return "\n".join(lines).format(**c) + "\n"
+
+
+def _frame(c, w, h, title, desc, body):
+    head = [
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="%d" height="%d" role="img" '
+        'aria-labelledby="t d">' % (w, h, w, h),
+        '  <title id="t">%s</title>' % title,
+        '  <desc id="d">%s</desc>' % desc,
+        '  <rect x="0.5" y="0.5" width="%d" height="%d" rx="12" fill="%s" stroke="%s"/>'
+        % (w - 1, h - 1, c["face"], c["border"]),
+    ]
+    return "\n".join(head + body + ["</svg>"]) + "\n"
+
+
+def _text(x, y, s, size, fill, weight=None, family=SANS, anchor=None):
+    return ('  <text x="%s" y="%s" font-family="%s" font-size="%s" fill="%s"%s%s>%s</text>'
+            % (x, y, family, size, fill, ' font-weight="%s"' % weight if weight else "",
+               ' text-anchor="%s"' % anchor if anchor else "", s))
+
+
+def _card(c, x, y, w, h, head, lines, bar=None):
+    """A rounded box with a coloured bar on top, a heading and lines of text."""
+    out = ['  <rect x="%d" y="%d" width="%d" height="%d" rx="10" fill="%s" stroke="%s"/>'
+           % (x, y, w, h, c["panel"], c["border"]),
+           '  <rect x="%d" y="%d" width="%d" height="4" rx="2" fill="%s"/>' % (x + 14, y + 10, 36, bar or c["accent"]),
+           _text(x + 14, y + 36, head, 14, c["text"], 600)]
+    out += [_text(x + 14, y + 60 + 18 * i, ln, 12.5, c["muted"]) for i, ln in enumerate(lines)]
+    return out
+
+
+def _arrow(c, pts, dashed=False):
+    """A line through the points, with a head at the last one; the last segment points to the right."""
+    x2, y2 = pts[-1]
+    line = list(pts[:-1]) + [(x2 - 8, y2)]
+    return ['  <polyline points="%s" fill="none" stroke="%s" stroke-width="2"%s/>'
+            % (" ".join("%d,%d" % p for p in line), c["muted"], ' stroke-dasharray="4 4"' if dashed else ""),
+            '  <polygon points="%d,%d %d,%d %d,%d" fill="%s"/>' % (x2, y2, x2 - 9, y2 - 5, x2 - 9, y2 + 5, c["muted"])]
+
+
+def validation(theme):
+    c = THEMES[theme]
+    body = [_text(24, 40, "How the logger was validated", 16, c["text"], 600),
+            _text(24, 62, "Synthetic input in a pre-registered study. The logger and a reference input field record "
+                  "the same runs.", 12.5, c["muted"])]
+    body += _card(c, 24, 140, 150, 116, "Plan", ["Generated from the", "phrase corpus and", "the settings with a seed"])
+    body += _card(c, 204, 140, 158, 116, "Executor",
+                  ["Sends every key press", "and release, and records", "what it sent"])
+    body += _card(c, 394, 80, 170, 100, "Input method", ["macOS Japanese input", "or Microsoft IME"])
+    body += _card(c, 596, 80, 170, 100, "Reference field", ["Records the calls it", "receives. No text."])
+    body += _card(c, 394, 206, 372, 110, "Logger", ["Key categories, times and one row per conversion session.",
+                                                    "macOS: sessions inferred from the key presses.",
+                                                    "Windows: while a window of the input method is visible."])
+    body += _card(c, 798, 124, 138, 150, "Matching", ["By wall-clock time,", "by registered rules:",
+                                                      "detection, duration,", "arrow-key presses,", "abandonment"],
+                  bar=c["ok"])
+    body += _arrow(c, [(174, 198), (204, 198)])
+    body += _arrow(c, [(362, 180), (378, 180), (378, 130), (394, 130)])
+    body += _arrow(c, [(362, 216), (378, 216), (378, 261), (394, 261)])
+    body += _arrow(c, [(564, 130), (596, 130)])
+    body += _arrow(c, [(766, 130), (782, 130), (782, 170), (798, 170)])
+    body += _arrow(c, [(766, 261), (782, 261), (782, 228), (798, 228)])
+    body.append('  <line x1="479" y1="180" x2="479" y2="206" stroke="%s" stroke-width="2" stroke-dasharray="4 4"/>'
+                % c["muted"])
+    body.append(_text(487, 198, "its windows (Windows)", 11, c["muted"]))
+    return _frame(c, 960, 340, "How the logger was validated",
+                  "A plan generated from the phrase corpus and the settings drives an executor that sends every key "
+                  "press and release and records what it sent. The presses reach the input method and a reference "
+                  "input field, which records the calls it receives without text, and the logger, which writes key "
+                  "categories, times and one row per conversion session (on macOS inferred from the key presses, on "
+                  "Windows while a window of the input method is visible). The two records are matched by wall-clock "
+                  "time under the registered rules: detection, duration, arrow-key presses and abandonment.", body)
+
+
+CATEGORIES = ["alphabetic", "numeric", "punctuation", "sentence_punctuation", "tab", "backspace", "delete", "space",
+              "enter", "navigation", "modifier", "function", "escape", "other"]
+
+
+def records(theme):
+    c = THEMES[theme]
+    body = [_text(24, 40, "What the logger writes, and what it never writes", 16, c["text"], 600)]
+    body.append('  <rect x="24" y="60" width="580" height="222" rx="10" fill="%s" stroke="%s"/>'
+                % (c["panel"], c["border"]))
+    body.append('  <rect x="38" y="70" width="36" height="4" rx="2" fill="%s"/>' % c["ok"])
+    body.append(_text(38, 96, "Written to the log (format obs/1)", 14, c["ok"], 600))
+    body.append(_text(38, 122, "Every key press and release", 13, c["text"], 600))
+    body.append(_text(220, 122, "one of 14 categories, the time, press or release", 12.5, c["muted"]))
+    x, y = 38, 136
+    for cat in CATEGORIES:
+        w = int(len(cat) * 7.2 + 14)
+        if x + w > 590:
+            x, y = 38, y + 28
+        body.append('  <rect x="%d" y="%d" width="%d" height="22" rx="11" fill="%s" stroke="%s"/>'
+                    % (x, y, w, c["okbg"], c["ok"]))
+        body.append(_text(x + w / 2, y + 15, cat, 11.5, c["text"], family=MONO, anchor="middle"))
+        x += w + 6
+    body.append(_text(38, 222, "Every conversion session", 13, c["text"], 600))
+    body.append(_text(38, 242, "its duration (dwell_ms), the arrow-key presses during it (nav)", 12.5, c["muted"]))
+    body.append(_text(38, 260, "and whether it was abandoned (abandon)", 12.5, c["muted"]))
+    body.append('  <rect x="624" y="60" width="312" height="222" rx="10" fill="%s" stroke="%s"/>'
+                % (c["panel"], c["border"]))
+    body.append('  <rect x="638" y="70" width="36" height="4" rx="2" fill="%s"/>' % c["no"])
+    body.append(_text(638, 96, "Never written", 14, c["no"], 600))
+    for i, item in enumerate(["Which key was pressed", "Characters and readings", "Candidate strings",
+                              "Window names"]):
+        yy = 130 + 34 * i
+        body.append('  <rect x="638" y="%d" width="296" height="26" rx="6" fill="%s"/>' % (yy - 18, c["nobg"]))
+        body.append('  <line x1="648" y1="%d" x2="660" y2="%d" stroke="%s" stroke-width="2"/>'
+                    % (yy - 5, yy - 5, c["no"]))
+        body.append(_text(670, yy, item, 13, c["text"]))
+    body.append(_text(24, 312, "The key rows are not anonymous by construction: the article measures how far they "
+                      "reveal the typed phrase.", 12.5, c["muted"]))
+    return _frame(c, 960, 330, "What the logger writes, and what it never writes",
+                  "Written to the log in the format obs/1: for every key press and release, one of fourteen "
+                  "categories, the time and whether it was a press; for every conversion session, its duration, "
+                  "the arrow-key presses during it and whether it was abandoned. Never written: which key was "
+                  "pressed, characters and readings, candidate strings and window names. The key rows are not "
+                  "anonymous by construction; the article measures how far they reveal the typed phrase.", body)
 
 
 CYCLE = 12.0
@@ -194,8 +314,10 @@ if __name__ == "__main__":
             f.write(text)
 
     if a.frame is None:
-        put("logo-light.svg", logo("light"))
-        put("logo-dark.svg", logo("dark"))
+        for theme in ("light", "dark"):
+            put("logo-%s.svg" % theme, logo(theme))
+            put("validation-%s.svg" % theme, validation(theme))
+            put("records-%s.svg" % theme, records(theme))
         put("demo.svg", demo())
     else:
         put("demo-frame-%04.1f.svg" % a.frame, demo(a.frame))
