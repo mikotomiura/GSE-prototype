@@ -250,14 +250,14 @@
     - [x] Mac で: macOS の 2 セルの探索的な dwell の分位点（`kit/analysis/explore_dwell_quantiles.py`・判断 188-4）→ `experiment/results/exploratory/dwell_quantiles_<cell>.json`（原稿の `\rv` 8 個が埋まる）
       → 2026-10-06（Mac・判断 190）。G-GEAR で通しのビルド（生成されていない値 0）と、Python の版で `values.json` の最後の桁が変わる問題の直し（`math.fsum`・判断 191）
     - [x] 表の道具に Windows の 2 つの定義の差の大きさ（Z40）→ 2026-10-06（G-GEAR・判断 192）: 登録 §5 が「報告しない」としていたので研究者の選択で逸脱 D12・§6 に数と値・補遺に両定義の表
-    - [ ] 原稿の attack-me round 2 を回すか（研究者に問う・研究者の読み直しの後が推奨）
+    - [ ] 原稿の attack-me round 2 → **研究者の選択: 次のセッションで回す**（同じ立場・同じ接地・2026-10-06・判断 203）
     - [x] 著者・所属・Funding・利益相反・貢献（研究者・判断 185）と AI Declaration（判断 185〜187）→ PR #309 で main に
     - [ ] 研究者が結果・推奨・限界・結論を読んで直す（判断 185・186・投稿の前・AI Declaration の前提）＋ Discussion を研究者の解釈から書く（判断 188-6）＋ 断りの重複を削る（Z10）
       - [x] 読み直しの資料 `reading-results-discussion.md`（主張 ↔ 根拠・Discussion の事実 F1〜F8 と問い・断りの重複）を渡した（2026-10-06・判断 193）
       - [x] Discussion: 研究者の方向性 → 事実と照らし Codex に第二意見 → D12 の層ごとの範囲 → 5 段落を英語に → 研究者が採った → 点検と /cross-review 2 巡の直し（2026-10-06・判断 195〜199）
       - [x] 研究者の答え（§A は今のまま・§C は案どおり・§B.4 の 5〜7・Discussion の仕上げの方針）を受けた（2026-10-06・判断 200）
       - [x] 判断 200 の方針で Discussion を仕上げ（数字を §6 に寄せる・観測可能性と書字研究の尺度の段落・研究者が採った）、断りを寄せた（−235 語）（2026-10-06・判断 201・202）
-      - [ ] 点検（code-reviewer ∥ security-checker）・/cross-review 2 巡 → PR → CI → merge（判断 201・202 の枝）
+      - [x] 点検（code-reviewer ∥ security-checker）・/cross-review 2 巡の指摘を直した（2026-10-06・判断 203）→ PR → CI → merge
     - [ ] OSF のプロフィール名が「Mikto Miura」→ 研究者に確かめてもらう（判断 189 の記録）
     - [ ] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す

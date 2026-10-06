@@ -1897,3 +1897,7 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - P2「『どのアプリでも動くロガーはキーから推す』は、調べた接点からアプリ横断のロガー一般の必然に広げている」→ 真（§3・§14 は「the logger infers」でこのロガーに限っている）→「the logger, which is meant to work in any application, infers」に。
   - P3「新しい `\rv` のキーが生成物にあるか diff から確かめられない」→ 偽陽性（検証の項目の提示で、`build.sh --submission` の生成されていない値 0 で確かめ済み）。
   - 検証: `build.sh --submission` エラー 0・未定義 0・生成されていない値 0・overfull main 0。文体 違反 0。足した行は 120 字以内。
+- **追記（/cross-review 2 巡目・直しの境界 `d45f12fb..0a66b99b` の `manuscript/sections`・165 行・23,534 tokens・今日の台帳 274,302 → 297,836 / 9 → 10 回）**: ⚠️ 1 巡目の後の残り 25,698 が 1 回の上限 30,000 を下回ったので、研究者の 2026-10-01 の指示どおり `daily_token_budget` を 300,000 → 340,000 に一時的に上げ（`tokens_used` は触らず `_comment_2026_10_06_raise` に理由）、回した後に 300,000 に戻した。P2 1 件・P3 1 件とも真（安い）→ 直した。
+  - P2「1 巡目で足した『変換に費やした時間を計算する元になる長さ』は、Windows（窓の見える期間）に当たらない」→ 真（メインが 1 巡目の直しで足した句の境界）→「each as its logger defines a session」に。
+  - P3「間隔の誤差の中央値が符号つきなら『differed … by a median』は絶対値に読める」→ 真（`results_tables.py` 1473 行: 行の間隔 − 送出の間隔・最小 −94〜最大 94 ms）→「the signed error … had a median of」と、分位点は表 key-timing の参照に。
+  - 検証: `build.sh --submission` エラー 0・未定義 0・生成されていない値 0・overfull main 0。文体 違反 0。足した行は 120 字以内。S7 の 3 試行はパイロットの記録 49 行で確かめ済み（上の HIGH）。
