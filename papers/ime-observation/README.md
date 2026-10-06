@@ -5,13 +5,25 @@
   </picture>
 </p>
 
-# Logging Japanese IME conversion without recording text: Observability limits, a cross-platform logger, and a synthetic-input validation
+<h1 align="center">Logging Japanese IME conversion without recording text</h1>
 
-This repository holds the artifacts of a single paper on observing Japanese IME conversion without
-recording its text: the limits of observability, a cross-platform standalone logger, and a
-synthetic-input validation. Raw logs are not committed to the repository; they are deposited
-separately, and their locations and SHA-256 digests are recorded in `experiment/data.md` (macOS) and
-`experiment/data.windows.md` (Windows). Commands in the documents of this repository are run from its root.
+<p align="center">
+  Observability limits, a cross-platform logger, and a synthetic-input validation
+</p>
+
+<p align="center">
+  <a href="https://doi.org/10.5281/zenodo.23183441"><img src="https://img.shields.io/badge/code%20DOI-10.5281%2Fzenodo.23183441-1682D4" alt="DOI of the code release"></a>
+  <a href="https://doi.org/10.5281/zenodo.23183438"><img src="https://img.shields.io/badge/data%20DOI-10.5281%2Fzenodo.23183438-1682D4" alt="DOI of the dataset"></a>
+  <a href="#pre-registration"><img src="https://img.shields.io/badge/pre--registered-OSF%20Registries-2C6EAB" alt="Pre-registered on OSF Registries"></a>
+  <br>
+  <a href="LICENSE-CODE"><img src="https://img.shields.io/badge/code-Apache--2.0-3C873A" alt="Code license: Apache-2.0"></a>
+  <a href="LICENSE-DATA"><img src="https://img.shields.io/badge/data%20and%20documents-CC%20BY%204.0-3C873A" alt="Data and documents license: CC BY 4.0"></a>
+  <img src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS-555555" alt="Platforms: Windows and macOS">
+</p>
+
+<p align="center">
+  <b>English</b> | <a href="README.ja.md">Japanese</a>
+</p>
 
 <p align="center">
   <img src="assets/demo.svg" width="100%" alt="Left: the romaji n, i, h, o, n, g, o typed with the input
@@ -21,14 +33,108 @@ separately, and their locations and SHA-256 digests are recorded in `experiment/
     written.">
 </p>
 
-## Identifiers
+This repository holds the artifacts of a single paper on observing Japanese IME conversion without recording its
+text: the limits of observability, a cross-platform standalone logger, and a synthetic-input validation. Commands in
+the documents of this repository are run from its root.
 
-- Code, materials and analysis scripts (this repository, release `v1.0.0`): DOI
-  [10.5281/zenodo.23183441](https://doi.org/10.5281/zenodo.23183441). `CITATION.cff` gives the citation.
-- Records of the validation (the dataset, with its datasheet): DOI
-  [10.5281/zenodo.23183438](https://doi.org/10.5281/zenodo.23183438).
-- Pre-registration on OSF Registries: macOS cells, https://osf.io/9nh7r (DOI 10.17605/OSF.IO/9NH7R); Windows
-  addendum, https://osf.io/4jwzn (DOI 10.17605/OSF.IO/4JWZN).
+> [!NOTE]
+> Raw logs are not committed to this repository. They are deposited as a dataset
+> ([10.5281/zenodo.23183438](https://doi.org/10.5281/zenodo.23183438)), and the SHA-256 of every archive is recorded
+> in `experiment/data.md` (macOS) and `experiment/data.windows.md` (Windows).
+
+## Contents
+
+- [Overview](#overview)
+- [Quick start](#quick-start)
+- [Reproducing the analyses](#reproducing-the-analyses)
+- [Repository layout](#repository-layout)
+- [Pre-registration](#pre-registration)
+- [History of this repository](#history-of-this-repository)
+- [Verification](#verification)
+- [Citation](#citation)
+- [License](#license)
+
+## Overview
+
+**The logger** (`kit/logger/`) runs on Windows and macOS. It writes one row per key press, with one of fourteen key
+categories and the time, and one row per conversion session, with its duration, the number of arrow-key presses
+during it and whether it was abandoned. Which key was pressed is discarded, and no character, candidate string,
+reading or window name is recorded. The format of its log, `obs/1`, is specified in
+[`kit/formats/FORMATS.md`](kit/formats/FORMATS.md).
+
+**The validation** compares the logger's rows with a reference: an input field that records the calls it receives
+from the input method. A program generated the plans and sent the key presses, and no person was meant to type
+during the runs. The measurement covered three settings:
+
+| Setting | Input method | Trials |
+|---|---|---:|
+| `macos-standard-live-on` | macOS Japanese input method, Romaji input, live conversion on | 3,150 |
+| `macos-standard-live-off` | The same, live conversion off | 2,925 |
+| `windows-msime-tsf` | Microsoft IME (Japanese), Romaji input, with a reference field that is a client of the Text Services Framework | 2,925 |
+
+The questions, the analyses and the stopping rules were registered before the measurement
+([Pre-registration](#pre-registration)), and every departure from them is reported in `experiment/deviations.md`.
+
+## Quick start
+
+Run the selftests of the kit, and every stage of the analysis on two synthetic runs (nothing real is read):
+
+```bash
+git clone https://github.com/mikotomiura/ime-conversion-logging.git
+cd ime-conversion-logging
+bash kit/check.sh
+bash experiment/run.sh --synthetic
+```
+
+Build and run the logger (Rust and Cargo are needed):
+
+```bash
+cargo build --release --manifest-path kit/logger/Cargo.toml
+kit/logger/target/release/ime-observation-logger --out obs.jsonl --duration-s 60
+python3 kit/formats/validate_logs.py --kind obs obs.jsonl
+```
+
+The logger never overwrites an existing log. Its README ([`kit/logger/README.md`](kit/logger/README.md)) describes
+the drivers, the options and the limitations.
+
+## Reproducing the analyses
+
+1. Download the archives of the runs from the dataset
+   ([10.5281/zenodo.23183438](https://doi.org/10.5281/zenodo.23183438)). Its datasheet (`datasheet.md`, also in
+   `experiment/`) describes every file and gives the SHA-256 of every archive and sample.
+2. Follow `experiment/data.md` (macOS) and `experiment/data.windows.md` (Windows). For every result file they give
+   the code it was made with, the command, its inputs and the SHA-256 of the output.
+
+The result files are in `experiment/results/`. The tables, the values quoted in the text and the figures of the
+article are generated from them by `manuscript/tools/results_tables.py`, and `manuscript/BUILD.md` describes how the
+manuscript is built.
+
+## Repository layout
+
+| Directory | Contents |
+|---|---|
+| `kit/formats/` | Log-format contracts and their validators |
+| `kit/corpus/` | Aozora Bunko phrases and their readings |
+| `kit/gen/` | Scenario generator |
+| `kit/emit/` | Emitter (synthetic key dispatch and the oracle) |
+| `kit/run/` | Single-cell orchestration |
+| `kit/refinput-macos/`, `kit/refinput-windows/` | Reference input fields |
+| `kit/logger/` | Standalone logger |
+| `kit/pilot/` | Calibration pilot tooling |
+| `kit/analysis/` | Ground-truth assembly, matching, L1, L2, pipeline |
+| `kit/e2/`, `kit/e3/` | Leakage evaluation, execution cost |
+| `experiment/` | Registration, deviations, run records (`data.md`, `data.windows.md`), environment, results and the datasheet of the dataset (`datasheet.md`, also deposited with the data) |
+| `manuscript/` | The manuscript, its supplement and the tools that build them |
+| `assets/` | The figures of this file and the script that makes them (`make_assets.py`) |
+
+## Pre-registration
+
+| Registration | Frozen | Record | Tag |
+|---|---|---|---|
+| macOS cells | 2 October 2026 | [osf.io/9nh7r](https://osf.io/9nh7r) (DOI 10.17605/OSF.IO/9NH7R) | `ime-observation-prereg-macos` |
+| Windows addendum | 3 October 2026 | [osf.io/4jwzn](https://osf.io/4jwzn) (DOI 10.17605/OSF.IO/4JWZN) | `ime-observation-prereg-windows` |
+
+The registration is `experiment/preregistration.md`, and the departures from it are in `experiment/deviations.md`.
 
 ## History of this repository
 
@@ -44,7 +150,8 @@ The first three commits carry the date of the working commit they come from, and
 license texts, this file's identifiers and figures and the line-end rules of `.gitattributes` are added in the
 release.
 
-### Recomputing the lists of the freezing tags
+<details>
+<summary>Recomputing the lists of the freezing tags</summary>
 
 Section 9 of the pre-registration defines the list of the files exported from a freezing commit: one line per file,
 with the relative path, a space and the SHA-256 of the file, sorted by the bytes of the path, each line ended by LF.
@@ -73,43 +180,7 @@ For the Windows tag, run the same commands with `ime-observation-prereg-windows`
 `core.autocrlf=true` (the default of Git for Windows) the archive is written with CRLF line ends and the list does
 not match.
 
-## Layout
-
-| Directory | Role |
-|---|---|
-| `kit/` | The reproducible toolset (log formats, generator, emitter, reference input field, standalone logger, analysis). |
-| `experiment/` | Experiment records (SEED / env.md / data.md / data.windows.md / run.sh / notes.md). Raw logs are not stored here (`experiment/raw/` is ignored); the deposit location and its SHA-256 are recorded in `data.md` (macOS) and `data.windows.md` (Windows). The datasheet of the dataset is `datasheet.md`, which is also deposited with the data. |
-| `manuscript/` | The manuscript. |
-| `assets/` | The figures of this file and the script that makes them (`make_assets.py`). |
-
-## License
-
-Split by kind, not by directory.
-
-- Code (source in `.py` / `.sh` / `.swift` / `.rs`, etc.): Apache-2.0
-- Data (including the phrases and readings in `kit/corpus/data/`) and documents (`*.md`, the
-  records under `experiment/`, `manuscript/`): CC BY 4.0
-
-The full texts are `LICENSE-CODE` (Apache License 2.0) and `LICENSE-DATA` (Creative Commons Attribution 4.0
-International).
-
-## Components
-
-The kit is made of the following components; the logger's own README (`kit/logger/README.md`) is the entry point for
-using the logger.
-
-| Directory | Contents |
-|---|---|
-| `kit/formats/` | Log-format contracts and their validators |
-| `kit/corpus/` | Aozora Bunko phrases and their readings |
-| `kit/gen/` | Scenario generator |
-| `kit/emit/` | Emitter (synthetic key dispatch and the oracle) |
-| `kit/run/` | Single-cell orchestration |
-| `kit/refinput-macos/` / `kit/refinput-windows/` | Reference input field |
-| `kit/logger/` | Standalone logger |
-| `kit/pilot/` | Calibration pilot tooling |
-| `kit/analysis/` | Ground-truth assembly, matching, L1, L2, pipeline |
-| `kit/e2/` / `kit/e3/` | Leakage evaluation / execution cost |
+</details>
 
 ## Verification
 
@@ -120,7 +191,8 @@ bash kit/check.sh --self-test  # this entry point's own negative controls
 ```
 
 - Only the `.py` files under `kit/` that carry the `# kit: selftest` marker comment are run with
-  `--selftest` (unmarked helper modules are only compiled).
+  `--selftest` (unmarked helper modules are only compiled). The marker is written as a comment where **the entire
+  line reads `# kit: selftest`** (a marker inside a string literal is not picked up).
 - The entry point runs on every verify and on every acceptance check, so **selftests are written to
   be fast by default** (under 30 seconds each; exceeding that triggers a warning). Heavy checks are
   split into something like `--selftest --full` and are not run by default.
@@ -130,5 +202,37 @@ bash kit/check.sh --self-test  # this entry point's own negative controls
   of integer values, version strings, and `manifest_sha256` is out of scope; keeping the log
   content-free is the producing side's responsibility (writing only kind, length, and time), as
   described in FORMATS.md's "Scope of guarantee".
-- The marker is written as a comment where **the entire line reads `# kit: selftest`** (a marker
-  inside a string literal is not picked up).
+
+## Citation
+
+`CITATION.cff` gives the citation of the code, and GitHub shows it under "Cite this repository". In BibTeX:
+
+```bibtex
+@software{miura2026code,
+  author    = {Miura, Mikoto},
+  title     = {Logging {J}apanese {IME} conversion without recording text: Logger, validation kit and analysis code},
+  version   = {1.0.0},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.23183441},
+  url       = {https://doi.org/10.5281/zenodo.23183441}
+}
+
+@dataset{miura2026data,
+  author    = {Miura, Mikoto},
+  title     = {Logging {J}apanese {IME} conversion without recording text: Records of the synthetic-input validation},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.23183438},
+  url       = {https://doi.org/10.5281/zenodo.23183438}
+}
+```
+
+## License
+
+Split by kind, not by directory.
+
+| Kind | License | Full text |
+|---|---|---|
+| Code (source in `.py`, `.sh`, `.swift`, `.rs` and so on) | Apache License 2.0 | `LICENSE-CODE` |
+| Data (including the phrases and readings in `kit/corpus/data/`) and documents (`*.md`, the records under `experiment/`, `manuscript/`) | Creative Commons Attribution 4.0 International | `LICENSE-DATA` |

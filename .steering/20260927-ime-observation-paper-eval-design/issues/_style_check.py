@@ -14,6 +14,7 @@
      - Markdown: 地の文（``` のコードブロックとバッククォートの中は除く）
      - JSON: manifest の "reason"、規則ファイルの "_note"
      ★ 地の文の中でもバッククォートで囲んだ部分（例: `がっこう`）は許す（読みの例を示すため）。
+     ★ README の日本語訳（論文の dir の根の README.ja.md・判断 219）は 2 を見ない（1 は見る）。
 
 対象外: 逐語コピー（kit/logger/manifest*.json の kind が file のファイル全体と、excerpt の目印の間）、
 kit/corpus/data/、*.internal.md、Cargo.lock、target/・__pycache__/ などの生成物、.jsonl / .ndjson。
@@ -49,6 +50,8 @@ SKIP_DIRS = {"target", ".build", "__pycache__", ".venv", "venv", "runs", "sealed
 SKIP_SUFFIX = (".jsonl", ".ndjson", ".lock", ".pyc", ".png", ".pdf", ".zip")
 TEXT_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib", ".svg")
 UPSTREAM_KEYS = re.compile(r"^(gse_|upstream_)|^(start_anchor|end_anchor)$")
+# 判断 219: 日本語の地の文を許すのは README の日本語訳だけ（論文の dir の根と、書き出した木の根）
+TRANSLATIONS = ("README.ja.md", "papers/ime-observation/README.ja.md")
 
 
 class Violation(object):
@@ -320,6 +323,9 @@ def check_text(rel, text, verbatim):
             # 判断 211: SVG は文字参照（G&#x53;E など）を戻しても見る
             if rx.search(ln) or (ext == ".svg" and rx.search(html.unescape(ln))):
                 vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある"))
+    if rel in TRANSLATIONS:
+        # 判断 219: README の日本語訳（研究者の選択）だけは地の文が日本語。禁止語は上で見ている
+        return vs
     base = os.path.basename(rel)
     if ext == ".py":
         prose = py_prose(text)
@@ -417,6 +423,11 @@ def selftest():
     expect("rs ブロックコメントの日本語は赤", "a.rs", "/* " + J + " */\nfn f() {}\n", ["japanese-prose"])
     expect("rs src-tauri は赤", "a.rs", "// see src-tauri/x.rs\n", ["forbidden:src-tauri"])
     expect("md 地の文の日本語は赤", "a.md", "# Title\n" + J + "\n", ["japanese-prose"])
+    expect("README の日本語訳は通る", "README.ja.md", "# Title\n" + J + "\n", [])
+    expect("repo の中の README の日本語訳も通る", "papers/ime-observation/README.ja.md", J + "\n", [])
+    expect("ほかの dir の README.ja.md は赤", "kit/README.ja.md", J + "\n", ["japanese-prose"])
+    expect("ほかの名前の訳は赤", "README.zh.md", J + "\n", ["japanese-prose"])
+    expect("README の日本語訳でも禁止語は赤", "README.ja.md", J + " GSE\n", ["forbidden:gse"])
     expect("md コードブロックの日本語は通る", "a.md", "```\n" + J + "\n```\n", [])
     expect("md .steering は赤", "a.md", "see .steering/x\n", ["forbidden:.steering"])
     expect("sh 日本語のコメントは赤", "a.sh", "echo ok # " + J + "\n", ["japanese-prose"])
