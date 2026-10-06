@@ -56,8 +56,19 @@ rules that is missing or fails), or an unexpected failure (only the type of the 
    inside a git work tree, the checker must itself be tracked in the git work tree that holds it, equal to
    HEAD and free of an `assume-unchanged` or `skip-worktree` mark (a checker outside git stops the
    export with exit code 2), so that one commit yields one verdict.
-5. Create the new repository from `DIR`, tag a release, and deposit the release with the archive
-   service to obtain a DOI. Then add the DOI to `CITATION.cff`.
+5. Commit `DIR` on top of the history of the public repository (next section) and tag the release. The
+   DOI of the release is reserved beforehand in a draft of the archive service and is already in
+   `CITATION.cff` and the manuscript; the archive of the tag is uploaded to that draft, which is then published.
+
+## History of the public repository
+
+The public repository does not carry the history of the working repository. Its history is, in order:
+the export of the macOS freezing tag (made with that tag's own exporter and `--allow-missing-license`, so that
+the list of its files has the SHA-256 that the registration gives), tagged `ime-observation-prereg-macos`; the
+export of the Windows freezing tag, made in the same way, tagged `ime-observation-prereg-windows`; a commit that
+adds only `manuscript/outline.md` as it stood before the results were analysed; and the release. The author date
+of each of the first three commits is the date of the working commit it comes from, and the message names that
+commit. Scripts that start with `#!` are given the executable bit in the index.
 
 `--allow-missing-license` is not for publication. It is for trial exports and for building the
 measurement logger (next section); the script says so at the top of its output.
@@ -80,9 +91,11 @@ machine that runs the export.
 
 Everything the ignore file of this directory excludes: build products (`target/`, `.build/`,
 `__pycache__/`), raw logs (`*.jsonl`, `*.ndjson`, `runs/`, `sealed/`, `experiment/raw/`), archives
-(`*.jsonl.*`, `*.ndjson.*`, `*.zip`, `*.tar`, `*.tar.gz`, `*.tgz`, `*.zst`) and virtual environments.
-Names are compared without regard to case, and the script stops (exit code 2) if the ignore file
-does not list exactly the rules it implements.
+(`*.jsonl.*`, `*.ndjson.*`, `*.zip`, `*.tar`, `*.tar.gz`, `*.tgz`, `*.zst`), virtual environments, and the
+outputs of a LaTeX build run by hand (`*.aux`, `*.blg`, `*.bbl`, `*.out`, `*.toc`, `*.synctex.gz`). The ignore
+file also lists `*.log`, which is not left out: a log has the name of a secret and stops the export (next
+section), so remove it from the source. Names are compared without regard to case, and the script stops (exit
+code 2) if the ignore file does not list exactly the rules it implements.
 Corpus files `kit/corpus/data/*.jsonl` are kept. In addition, every file with `.internal.` in its
 name (internal notes and the translation table) and `.DS_Store` are left out. The aggregate results
 under `experiment/results/` are kept because the results section of the paper rests on them.
@@ -116,7 +129,7 @@ id (long-term or temporary), an Anthropic or OpenAI key head, the shape of a Goo
 token head; the check runs on the source and again on the converted output, and each line is also
 checked with its escapes decoded; the text is never printed), a file of a kind that the checker of
 the writing rules does not read (the file must have the extension `.py`, `.rs`, `.sh`, `.md`,
-`.json`, `.toml`, `.swift`, `.txt` or `.cff`, or be named `.gitignore`, `SEED`, `Cargo.lock`,
+`.json`, `.toml`, `.swift`, `.txt`, `.cff`, `.tex` or `.bib`, or be named `.gitignore`, `SEED`, `Cargo.lock`,
 `LICENSE-CODE` or `LICENSE-DATA`; under `kit/corpus/data/` only the `*.jsonl` files directly in it;
 add the kind to the checker or leave the file out), a name that holds the word `internal` in
 another form than `.internal.` (a word that no letter touches, in any case, as in `notes_internal.md`,
@@ -138,7 +151,9 @@ characters.
 
 * A participant identifier (the letter P and three digits, not adjoining a letter or digit, so
   that the identifier is found inside a longer name joined by an underscore; inside brackets too,
-  as in `[P017]`, and in file names), an e-mail address, the name of the private dataset repository, a session
+  as in `[P017]`, and in file names), an e-mail address (the one exception is the address of the corresponding
+  author, which the article prints; it is fixed in the script as `PUBLIC_EMAILS` and passes only as a whole
+  address), the name of the private dataset repository, a session
   name of the private recordings, and the private working directories.
 * The words that name the private project, the name of its source directory, and two internal
   marker symbols (not applied to the `.jsonl` files directly in `kit/corpus/data/`; other files there are checked).

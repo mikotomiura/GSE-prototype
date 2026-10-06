@@ -381,11 +381,12 @@ mkdir -p "${TMP}/c-secdir/papers/ime-observation/kit/.aws"
 printf '%s\n' "[default]" > "${TMP}/c-secdir/papers/ime-observation/kit/.aws/config"
 cx secdir > "${TMP}/neg-secdir.out" 2>&1; rc=$?
 judge 2 secdir ".aws" "(i) 秘密の名前の型の dir（.aws）で exit 2" "${rc}"
+# 判断 208 で .tex・.bib は書き出す種類になった（原稿を公開する）→ 読まない種類の例を .csv に替えた
 mkcopy tex
 mkdir -p "${TMP}/c-tex/papers/ime-observation/manuscript"
-printf '%s\n' "Introduction." > "${TMP}/c-tex/papers/ime-observation/manuscript/draft.tex"
+printf '%s\n' "a,b" > "${TMP}/c-tex/papers/ime-observation/manuscript/draft.csv"
 cx tex > "${TMP}/neg-tex.out" 2>&1; rc=$?
-judge 2 tex "draft.tex" "(d) 検査の道具が読まない種類（.tex）で exit 2" "${rc}"
+judge 2 tex "draft.csv" "(d) 検査の道具が読まない種類（.csv）で exit 2" "${rc}"
 # (b) .git が壊れている（指す先が無い）と git は「not a git repository」を返す → exit 2
 mkcopy brokengit
 printf 'gitdir: %s\n' "${TMP}/no-such-gitdir" > "${TMP}/c-brokengit/.git"

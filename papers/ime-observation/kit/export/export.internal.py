@@ -23,7 +23,7 @@ The export
   3. rewrites the manifests so that they keep only kind / id / path / symbol / sha256 / reason and
      recomputes every checksum from the exported bytes;
   4. rejects the export when any exported text or file name contains a participant identifier, an
-     e-mail address, an internal dataset or session name, an internal marker word or symbol, a home
+     e-mail address (other than the one in PUBLIC_EMAILS), an internal dataset or session name, an internal marker word or symbol, a home
      or repository path of the machine that runs the export, the login name of that machine, or an
      absolute path that names a user (the fictional names in FICTIONAL are the only names that
      pass). Every line is also checked after its JSON / string escapes are decoded;
@@ -76,7 +76,8 @@ IGNORE_FILE = ".gitignore"
 IGNORE_LINES = frozenset((
     "**/target/", "**/.build/", "**/__pycache__/", "*.jsonl", "*.ndjson", "runs/", "sealed/",
     "experiment/raw/", "*.jsonl.*", "*.ndjson.*", "*.zip", "*.tar", "*.tar.gz", "*.tgz", "*.zst",
-    ".venv/", "venv/", "!kit/corpus/data/*.jsonl"))
+    ".venv/", "venv/", "!kit/corpus/data/*.jsonl",
+    "*.aux", "*.log", "*.blg", "*.bbl", "*.out", "*.toc", "*.synctex.gz"))
 # File names (case-insensitive) that look like secrets. They are never exported and never skipped.
 SECRET_NAMES = (".env", ".env.*", "*.pem", "*.key", "*age-identity*", "*.agekey", "*.age", "*token*.json",
                 "credentials*.json", "client_secret*", "g1-submit*.json", "o1_submit*.json", "*.log",
@@ -113,6 +114,12 @@ WORD_RULES = (
     ("internal-word", re.compile(re.escape(_TAURI))),
     ("internal-symbol", re.compile("[" + _STAR + _WARN + "]")),
 )
+# The e-mail address of the corresponding author, which the article prints: the author chose to publish it with the
+# manuscript (the postal address and the telephone number stay out). It is a constant: nothing extends it at run
+# time. Only the whole address passes; an address that contains it, or another address on the same line, does not.
+PUBLIC_EMAILS = ("mmiura.network" + AT + "gmail.com",)
+_PUBLIC_EMAIL = re.compile("|".join(r"(?<![A-Za-z0-9._%+\-])" + re.escape(a) + r"(?![A-Za-z0-9\-]|\.[A-Za-z0-9])"
+                                    for a in PUBLIC_EMAILS), re.I)
 ALWAYS_RULES = (
     ("participant-id", re.compile(r"(?<![A-Za-z0-9])P\d{3}(?![A-Za-z0-9])")),
     ("email-address", re.compile(r"[A-Za-z0-9._%+\-]+" + AT + r"[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")),
@@ -350,6 +357,9 @@ def sha256_hex(b):
 # ---------------------------------------------------------------------------
 _DIR_NAMES = frozenset(("target", ".build", "__pycache__", "runs", "sealed", ".venv", "venv", ".git"))
 _ARCHIVE = (".zip", ".tar", ".tar.gz", ".tgz", ".zst")
+# The outputs of a LaTeX build run by hand. "*.log" of the ignore file is not among them: a log has the name of a
+# secret, so it stops the export instead of being left out silently (remove it from the source).
+_LATEX_OUTPUT = (".aux", ".blg", ".bbl", ".out", ".toc", ".synctex.gz")
 _CORPUS_JSONL = re.compile(r"^kit/corpus/data/[^/]+\.jsonl$")
 _REPARSE_POINT = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT (symbolic links, junctions, mount points)
 # A name that holds the word "internal" but not in the internal form (".internal.") is neither exported
@@ -374,7 +384,7 @@ def excluded(rel, is_dir):
         return True
     if name.endswith(".jsonl"):
         return not _CORPUS_JSONL.match(low)
-    return name.endswith(_ARCHIVE)
+    return name.endswith(_ARCHIVE) or name.endswith(_LATEX_OUTPUT)
 
 
 def check_ignore_file(root):
@@ -413,7 +423,7 @@ def is_link(full, root):
 
 # The kinds of file that the checker of the writing rules reads (its TEXT_SUFFIX, its ignore-file name) and the
 # names of the other files of the source that are allowed. Anything else would be exported without being checked.
-CHECKED_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff")
+CHECKED_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib")
 CHECKED_NAMES = (".gitignore", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA")
 
 
@@ -817,7 +827,7 @@ def names_a_user(text):
 def line_kinds(text, word_check, rules):
     kinds = set()
     for kind, rx in ALWAYS_RULES:
-        if rx.search(text):
+        if rx.search(_PUBLIC_EMAIL.sub(" ", text) if kind == "email-address" else text):
             kinds.add(kind)
     if word_check:
         for kind, rx in WORD_RULES:
@@ -1229,6 +1239,14 @@ def selftest():
             refused("a participant identifier stops the export", {"README.md": "# Fake\nSee %s here.\n" % joined}, "README.md")
         addr = "who" + AT + "example.org"
         refused("an email address stops the export", {"README.md": "# Fake\nWrite to %s.\n" % addr}, "README.md", forbid=(addr,))
+        pub = PUBLIC_EMAILS[0]
+        for longer in ("x" + pub, pub + ".example.org", pub.replace(AT, "+tag" + AT, 1), pub + ", " + addr, addr + " " + pub):
+            refused("an address that is not exactly the public one stops the export",
+                    {"README.md": "# Fake\nWrite to %s.\n" % longer}, "README.md")
+        name = "the public address of the corresponding author passes"
+        for form in (pub, "\\email{%s}" % pub, "mailto:%s" % pub, pub.upper()):
+            rcx, text, o = run("pubmail-" + str(len(form)) + form[:2].encode("utf-8").hex(), {"README.md": "# Fake\nWrite to %s.\n" % form})
+            ck(name + " (%s)" % form.replace(AT, " at "), rcx == 0, text)
         for word in (_ORG, _TAURI, _STAR, _WARN, _STEER + "/notes"):
             refused("an internal marker word stops the export", {"README.md": "# Fake\nSee %s here.\n" % word}, "README.md")
         # comments are stripped from manifest-listed sources
@@ -1661,13 +1679,35 @@ def selftest():
             ck(name + " (a .git file that points nowhere)", rcx == 2 and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
         # a kind of file that the style checker does not read
         name = "a file type that the style checker does not read stops the export"
-        for nm in ("manuscript/draft.tex", "kit/ci.yml", "kit/noext", "kit/README.MD", "kit/.gitattributes", "kit/data.csv"):
+        for nm in ("manuscript/draft.docx", "manuscript/figure.pdf", "kit/ci.yml", "kit/noext", "kit/README.MD", "kit/.gitattributes",
+                   "kit/data.csv", "manuscript/main.TEX"):
             rcx, text, o = run("type-" + nm.replace("/", "_"), {nm: "x\n"})
             ck(name + " (%s)" % nm, rcx == 2 and os.path.basename(nm) in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
         kinds_ok = dict(("kit/kinds/" + n, "x\n") for n in ("a.py", "a.rs", "a.sh", "a.md", "a.json", "a.toml", "a.swift", "a.txt", "a.cff",
-                                                           ".gitignore", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA"))
+                                                           "a.tex", "a.bib", ".gitignore", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA"))
         rcx, text, o = run("kinds-ok", kinds_ok)
         ck(name + " (the allowed kinds pass)", rcx == 0, text)
+        ck(name + " (a .tex and a .bib file are exported)",
+           rcx == 0 and all(os.path.isfile(os.path.join(o, "kit", "kinds", n)) for n in ("a.tex", "a.bib")), text)
+        # the outputs of a LaTeX build run by hand
+        name = "the outputs of a LaTeX build are left out, except a log, which stops the export"
+        latex = dict(("manuscript/main" + s, "x\n") for s in _LATEX_OUTPUT)
+        latex["manuscript/main.tex"] = "\\section{Method}\n"
+        rcx, text, o = run("latex-out", latex)
+        ck(name + " (exit 0)", rcx == 0, text)
+        ck(name + " (the source is exported)", rcx == 0 and os.path.isfile(os.path.join(o, "manuscript", "main.tex")), text)
+        for s in _LATEX_OUTPUT:
+            ck(name + " (%s left out)" % s, rcx == 0 and not os.path.exists(os.path.join(o, "manuscript", "main" + s)), text)
+        rcx, text, o = run("latex-log", {"manuscript/main.tex": "\\section{Method}\n", "manuscript/main.log": "x\n"})
+        ck(name + " (a .log stops it)", rcx == 2 and "main.log" in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+        # every file pattern of the ignore file is either left out or stops the export as the name of a secret
+        name = "each file pattern of the ignore file is implemented"
+        for pat in sorted(IGNORE_LINES):
+            if pat.startswith("!") or pat.endswith("/") or not pat.startswith("*."):
+                continue
+            nm = "kit/x" + pat[1:]
+            ck(name + " (%s)" % pat, excluded(nm, False) != is_secret_name(nm.rsplit("/", 1)[-1]),
+               "excluded %s, secret name %s" % (excluded(nm, False), is_secret_name(nm.rsplit("/", 1)[-1])))
         # a secret-looking directory name
         name = "a secret-looking directory name stops the export"
         for nm in ("kit/.aws/config.md", "kit/.ssh/x.md", "kit/.gnupg/x.md", "kit/.docker/x.md", "kit/.kube/x.md", "kit/.pgpass/x.md", "kit/my-secret/x.md",

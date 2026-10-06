@@ -2672,7 +2672,7 @@ def figure_closed_set(cells, docs):
 def values_tex(values):
     lines = [GENERATED_NOTE, "% Read with \\rv{<key>}; the source of each value is in values.json.\n"]
     for k in sorted(values):
-        lines.append("\\expandafter\\def\\csname rv@%s\\endcsname{%s}\n" % (k, values[k]["text"]))
+        lines.append("\\expandafter\\def\\csname rv:%s\\endcsname{%s}\n" % (k, values[k]["text"]))
     return "".join(lines)
 
 
