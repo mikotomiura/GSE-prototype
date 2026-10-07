@@ -21,17 +21,17 @@ used are printed when the analysis ends.
 
 | Cell label | Deposit location | SHA-256 of the archive | Date deposited |
 |---|---|---|---|
-| macos-standard-live-on (attempt 1; packed on the measuring machine) | not yet deposited | `77bd8a8e64563921a9d3e49fc5fa552a67d4633a66669354852dea651fed49b8` | not yet deposited |
-| macos-standard-live-off (attempt 1; packed on the measuring machine) | not yet deposited | `e1cdf2e8b63ab402a950e37b8841ce302ccb280f396fefc148c8891971d73d10` | not yet deposited |
-| macos-e3-working (the `working` run of question 5; packed on the measuring machine on 2026-10-06) | not yet deposited | `77b51736e0fb713b181748153927b12e0ff6c7734b97f8c058891836aed5e3ea` | not yet deposited |
-| macos-pilot-short-1 (calibration pilot; packed on the measuring machine on 2026-10-06) | not yet deposited | `cde623bdab677a997e494fecf97a7d091baf4e542a703172f1997592fe6238be` | not yet deposited |
-| macos-pilot-pilot-1 (calibration pilot) | not yet deposited | `6bd8583bfab9483d02b9b292697d2ac45ac836dad27e0f6946ef7569c663a749` | not yet deposited |
-| macos-pilot-verify-1 (calibration pilot) | not yet deposited | `31e60d7627e6ddd5a2c7a7601fd9ef1c794cb31235395a8df4403d6dde7a80ae` | not yet deposited |
-| macos-pilot-verify-s5 (calibration pilot) | not yet deposited | `96c460291e65506b5b9187fefcd82bf0017290f2ec677cea6f055fb73807c5f4` | not yet deposited |
-| macos-pilot-pilot2-on (calibration pilot) | not yet deposited | `3bdf963d8812f63af3a2e10ec72af2b7adf6693da74dd85a19a443a8fdb1e40b` | not yet deposited |
-| macos-pilot-pilot2-off (calibration pilot) | not yet deposited | `1e4563d2b196f974407c911fe96be84a50e7916055623d91cf1af2f307c26187` | not yet deposited |
-| macos-pilot-verify-off (calibration pilot) | not yet deposited | `28ac532edf171217b240ee7a75bb4118f584ce2b9581964b3d764c95dcb5fe11` | not yet deposited |
-| macos-pilot-dryrun-1 (the dry run before the first pilot; interrupted) | not yet deposited | `fdbcd130d1f2b3209add450cd3fb03b9c10774f0cf96377a56454824ec43f78e` | not yet deposited |
+| macos-standard-live-on (attempt 1; packed on the measuring machine) | https://doi.org/10.5281/zenodo.23183438 | `77bd8a8e64563921a9d3e49fc5fa552a67d4633a66669354852dea651fed49b8` | 2026-10-07 |
+| macos-standard-live-off (attempt 1; packed on the measuring machine) | https://doi.org/10.5281/zenodo.23183438 | `e1cdf2e8b63ab402a950e37b8841ce302ccb280f396fefc148c8891971d73d10` | 2026-10-07 |
+| macos-e3-working (the `working` run of question 5; packed on the measuring machine on 2026-10-06) | https://doi.org/10.5281/zenodo.23183438 | `77b51736e0fb713b181748153927b12e0ff6c7734b97f8c058891836aed5e3ea` | 2026-10-07 |
+| macos-pilot-short-1 (calibration pilot; packed on the measuring machine on 2026-10-06) | https://doi.org/10.5281/zenodo.23183438 | `cde623bdab677a997e494fecf97a7d091baf4e542a703172f1997592fe6238be` | 2026-10-07 |
+| macos-pilot-pilot-1 (calibration pilot) | https://doi.org/10.5281/zenodo.23183438 | `6bd8583bfab9483d02b9b292697d2ac45ac836dad27e0f6946ef7569c663a749` | 2026-10-07 |
+| macos-pilot-verify-1 (calibration pilot) | https://doi.org/10.5281/zenodo.23183438 | `31e60d7627e6ddd5a2c7a7601fd9ef1c794cb31235395a8df4403d6dde7a80ae` | 2026-10-07 |
+| macos-pilot-verify-s5 (calibration pilot) | https://doi.org/10.5281/zenodo.23183438 | `96c460291e65506b5b9187fefcd82bf0017290f2ec677cea6f055fb73807c5f4` | 2026-10-07 |
+| macos-pilot-pilot2-on (calibration pilot) | https://doi.org/10.5281/zenodo.23183438 | `3bdf963d8812f63af3a2e10ec72af2b7adf6693da74dd85a19a443a8fdb1e40b` | 2026-10-07 |
+| macos-pilot-pilot2-off (calibration pilot) | https://doi.org/10.5281/zenodo.23183438 | `1e4563d2b196f974407c911fe96be84a50e7916055623d91cf1af2f307c26187` | 2026-10-07 |
+| macos-pilot-verify-off (calibration pilot) | https://doi.org/10.5281/zenodo.23183438 | `28ac532edf171217b240ee7a75bb4118f584ce2b9581964b3d764c95dcb5fe11` | 2026-10-07 |
+| macos-pilot-dryrun-1 (the dry run before the first pilot; interrupted) | https://doi.org/10.5281/zenodo.23183438 | `fdbcd130d1f2b3209add450cd3fb03b9c10774f0cf96377a56454824ec43f78e` | 2026-10-07 |
 
 ## Run checks (section 3.4 of the pre-registration)
 
@@ -41,9 +41,9 @@ pre-registration; with the settings fixed there, the figures of the rule on pres
 
 | Cell label | Attempt | Aborted by the runner | Checked at | SHA-256 of the plan | `delivery.py` exit status | `max_beyond_markers_before_last_block` | `beyond_markers_last_block` | `n_loss_spans_with_unexplained_presses` | Counts as aborted | Deposited |
 |---|---|---|---|---|---|---|---|---|---|---|
-| macos-standard-live-on | 1 | no | 2026-10-03 04:15 UTC | `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba` | 0 | 0 | 0 | 0 | no | not yet |
-| macos-standard-live-off | 1 | no | 2026-10-03 15:34 UTC | `3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2` | 0 | 0 | 0 | 0 | no | not yet |
-| macos-e3-working | 1 | no | 2026-10-05 01:17 UTC | `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba` | 0 | 0 | 0 | 0 | no | not yet |
+| macos-standard-live-on | 1 | no | 2026-10-03 04:15 UTC | `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba` | 0 | 0 | 0 | 0 | no | yes |
+| macos-standard-live-off | 1 | no | 2026-10-03 15:34 UTC | `3759ebf7832ba561820abab504929dbadd7e775a33e22ba0e89b92e4800009a2` | 0 | 0 | 0 | 0 | no | yes |
+| macos-e3-working | 1 | no | 2026-10-05 01:17 UTC | `c7a5469de0febbbc2e90259e477900ab0eb68c74b86f420b1e9491799a1210ba` | 0 | 0 | 0 | 0 | no | yes |
 In the run of the cell with live conversion off, the reference input field lost the focus once outside the plan,
 for 2.7 s (2026-10-03, 04:20:33.68 to 04:20:36.35 UTC, in trial `t00004`). By the operator's report this was a
 pointer click on another window; the logs cannot confirm the cause. No key was pressed, so no row of the
@@ -250,6 +250,12 @@ folder. On the deposit machine, on 2026-10-07, `kit/export/deposit.internal.py -
 record by their SHA-256: every archive in the table of deposits, the two `samples.tsv` and the two `conditions.txt`. The `run.json` of
 the two archives of the measurement, whose SHA-256 are those of the list of run directories above, has `null` in
 `git_commit` and in `git_dirty` (read on the deposit machine from the archives; the runner ran from an export).
+
+On 2026-10-07 the files of this record were uploaded to the draft of the dataset from the deposit machine with
+`kit/export/deposit.internal.py --upload`, except the archives of the two measurement runs and of the `working` run:
+their uploads from the deposit machine broke off repeatedly, so they were uploaded by hand through the web form of the
+archive service from the measuring machine. The tool then checked that every file of the draft has the MD5 and the size
+of the check and that the draft holds exactly the files of the deposit.
 
 ## Phrase corpus
 

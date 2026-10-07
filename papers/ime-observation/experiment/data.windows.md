@@ -20,17 +20,17 @@ listed here; the runs of question 5 appear only in the tables below.
 
 | Cell label | Deposit location | SHA-256 of the archive | Date deposited |
 |---|---|---|---|
-| windows-msime-tsf (attempt 2; packed on the measuring machine, Windows 11 Home, with `--also-user` and `--also-home` each given once) | not yet deposited | `f2287a7494b108a7b827f96da48f523e84e1a9478121d03fa82dca2c8749cd06` | not yet deposited |
-| windows-msime-tsf-refused-start (the start of the measurement that the runner refused before the first trial; packed on the measuring machine on 2026-10-06) | not yet deposited | `a5afe2dcbe57f37f92e115aa16be4b5dc5500894e4ce4cf13dab3615448a1447` | not yet deposited |
-| windows-e3-working (the `working` run of question 5; packed on the measuring machine on 2026-10-06) | not yet deposited | `39d40801197ce0e95f0271899c83d53b6bbd6dc977c6172e6e615385bddb1f45` | not yet deposited |
-| windows-pilot-short-tsf (calibration pilot; packed on the measuring machine on 2026-10-06) | not yet deposited | `a31d48d1c797535ee92c9b03c48be8e83bc5705202e15859f69d1f41cd977ced` | not yet deposited |
-| windows-pilot-pilot-tsf (calibration pilot) | not yet deposited | `634ceff63ca0f43d65d49e506e877ae48bf238ec9c43330228d2cb4c915a1111` | not yet deposited |
-| windows-pilot-verify-tsf (calibration pilot) | not yet deposited | `546ab6ed5b76bb79a40c679177167c26be6fa4461a45acdd17d656a0f840823c` | not yet deposited |
-| windows-pilot-toolcheck-tsf (calibration pilot) | not yet deposited | `c066d36bcb90562c30a11ee84decfd37ffa9c4d88b31b4fcad5873884b4adbf5` | not yet deposited |
-| windows-pilot-aborted-a (calibration pilot; the attempt with plan `short` that the runner aborted because the foreground window was refused) | not yet deposited | `1f8ae344c9ea8f95fafa85e26b20c8b782974df05204fe1df79fb6d1ce2e10f9` | not yet deposited |
-| windows-pilot-aborted-b (calibration pilot; the attempt with plan `pilot` that the runner aborted because the foreground window was refused) | not yet deposited | `7565058faf6f8cf794586d836d59167901540960ac7321ad7b9d4cef91e76432` | not yet deposited |
-| windows-check-verify (the check of section 10.8 before the measurement) | not yet deposited | `e980074f56032f3c264f82df2d0b4f4f8a10eeddd3b2f8e4cc5d607323f1a217` | not yet deposited |
-| windows-check-verify-start-1 (the first start of that check; aborted by the runner before any key was sent) | not yet deposited | `6a910ea2ad4b2d27b4ef86c971edfa2090f8e2e2c3ddadd021748bb4e40f07ba` | not yet deposited |
+| windows-msime-tsf (attempt 2; packed on the measuring machine, Windows 11 Home, with `--also-user` and `--also-home` each given once) | https://doi.org/10.5281/zenodo.23183438 | `f2287a7494b108a7b827f96da48f523e84e1a9478121d03fa82dca2c8749cd06` | 2026-10-07 |
+| windows-msime-tsf-refused-start (the start of the measurement that the runner refused before the first trial; packed on the measuring machine on 2026-10-06) | https://doi.org/10.5281/zenodo.23183438 | `a5afe2dcbe57f37f92e115aa16be4b5dc5500894e4ce4cf13dab3615448a1447` | 2026-10-07 |
+| windows-e3-working (the `working` run of question 5; packed on the measuring machine on 2026-10-06) | https://doi.org/10.5281/zenodo.23183438 | `39d40801197ce0e95f0271899c83d53b6bbd6dc977c6172e6e615385bddb1f45` | 2026-10-07 |
+| windows-pilot-short-tsf (calibration pilot; packed on the measuring machine on 2026-10-06) | https://doi.org/10.5281/zenodo.23183438 | `a31d48d1c797535ee92c9b03c48be8e83bc5705202e15859f69d1f41cd977ced` | 2026-10-07 |
+| windows-pilot-pilot-tsf (calibration pilot) | https://doi.org/10.5281/zenodo.23183438 | `634ceff63ca0f43d65d49e506e877ae48bf238ec9c43330228d2cb4c915a1111` | 2026-10-07 |
+| windows-pilot-verify-tsf (calibration pilot) | https://doi.org/10.5281/zenodo.23183438 | `546ab6ed5b76bb79a40c679177167c26be6fa4461a45acdd17d656a0f840823c` | 2026-10-07 |
+| windows-pilot-toolcheck-tsf (calibration pilot) | https://doi.org/10.5281/zenodo.23183438 | `c066d36bcb90562c30a11ee84decfd37ffa9c4d88b31b4fcad5873884b4adbf5` | 2026-10-07 |
+| windows-pilot-aborted-a (calibration pilot; the attempt with plan `short` that the runner aborted because the foreground window was refused) | https://doi.org/10.5281/zenodo.23183438 | `1f8ae344c9ea8f95fafa85e26b20c8b782974df05204fe1df79fb6d1ce2e10f9` | 2026-10-07 |
+| windows-pilot-aborted-b (calibration pilot; the attempt with plan `pilot` that the runner aborted because the foreground window was refused) | https://doi.org/10.5281/zenodo.23183438 | `7565058faf6f8cf794586d836d59167901540960ac7321ad7b9d4cef91e76432` | 2026-10-07 |
+| windows-check-verify (the check of section 10.8 before the measurement) | https://doi.org/10.5281/zenodo.23183438 | `e980074f56032f3c264f82df2d0b4f4f8a10eeddd3b2f8e4cc5d607323f1a217` | 2026-10-07 |
+| windows-check-verify-start-1 (the first start of that check; aborted by the runner before any key was sent) | https://doi.org/10.5281/zenodo.23183438 | `6a910ea2ad4b2d27b4ef86c971edfa2090f8e2e2c3ddadd021748bb4e40f07ba` | 2026-10-07 |
 
 ## Run checks (sections 3.4 and 10.8 of the pre-registration)
 
@@ -45,9 +45,9 @@ four counts are 0.
 | Cell label | Attempt | Aborted by the runner | Checked at | SHA-256 of the plan | `src` of the reference log | `delivery.py` exit status | `max_beyond_markers_before_last_block` | `beyond_markers_last_block` | `n_loss_spans_with_unexplained_presses` | Observation rows beyond the markers (D4) | Counts as aborted | Deposited |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | windows-msime-tsf | 1 | No: the runner was stopped from outside at about 00:59 JST, 21 minutes in (the shell that ran it was ended by the coding assistant's session under low memory); no manifest was written, so no manifest SHA-256 | 2026-10-04T01:00+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | 0 | 0 | 14 (last segment, cut off) | Yes (incomplete) | No |
-| windows-msime-tsf | Not numbered (refused before the first trial) | Yes: started at about 01:51 JST with administrator rights, the runner refused to go on (`refusing to run with administrator rights`) before the first trial; no key was sent (the oracle log holds its header only); manifest SHA-256 `0027d0a428b554181ae3aa36f08f6e564fe7c207bb30d8718942be6c99ced1b9` | 2026-10-04T01:56+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | none (no trial) | 0 | 0 | No: by the researcher's decision this start, which sent no key, is not counted among the at most three attempts | No |
-| windows-msime-tsf | 2 | No: ran from 01:57 to 13:03 JST, all 2925 planned trials measured, none incomplete; manifest SHA-256 `5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82` | 2026-10-04T13:04+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | 0 | 0 | 0 | No | No |
-| windows-msime-tsf, question 5 `working` | 1 | No: ran from 21:29 JST on 2026-10-04 to 08:35 JST on 2026-10-05, all 2925 planned trials measured, none incomplete; manifest SHA-256 `1e5f40ac835978ad2adc722b3e17b23bb4b6b4424706c87b7de377ec552e217a` | 2026-10-05T10:03+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | 0 | 0 | 0 | No | No |
+| windows-msime-tsf | Not numbered (refused before the first trial) | Yes: started at about 01:51 JST with administrator rights, the runner refused to go on (`refusing to run with administrator rights`) before the first trial; no key was sent (the oracle log holds its header only); manifest SHA-256 `0027d0a428b554181ae3aa36f08f6e564fe7c207bb30d8718942be6c99ced1b9` | 2026-10-04T01:56+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | none (no trial) | 0 | 0 | No: by the researcher's decision this start, which sent no key, is not counted among the at most three attempts | Yes |
+| windows-msime-tsf | 2 | No: ran from 01:57 to 13:03 JST, all 2925 planned trials measured, none incomplete; manifest SHA-256 `5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82` | 2026-10-04T13:04+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | 0 | 0 | 0 | No | Yes |
+| windows-msime-tsf, question 5 `working` | 1 | No: ran from 21:29 JST on 2026-10-04 to 08:35 JST on 2026-10-05, all 2925 planned trials measured, none incomplete; manifest SHA-256 `1e5f40ac835978ad2adc722b3e17b23bb4b6b4424706c87b7de377ec552e217a` | 2026-10-05T10:03+09:00 | `b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0` | `win_tsf` | 0 | 0 | 0 | 0 | 0 | No | Yes |
 
 How the attempts above were counted (the start refused before the first trial, and attempt 1, which was stopped from
 outside the runner) is recorded as deviation D7 in `experiment/deviations.md`.
@@ -289,4 +289,6 @@ The ten archives and the four sample files of the previous section were moved fr
 machine by hand, through a folder of the researcher's Google Drive; the archive of attempt 2 of the measurement had
 been on the deposit machine since 2026-10-05. On the deposit machine, on 2026-10-07, `kit/export/deposit.internal.py
 --from` found all fifteen files of this record by their SHA-256: every archive in the table of deposits, the two
-`samples.tsv` and the two `conditions.txt`.
+`samples.tsv` and the two `conditions.txt`. They were uploaded to the draft of the dataset on the same day from the
+deposit machine with `kit/export/deposit.internal.py --upload`, which checked that every file of the draft has the MD5
+and the size of the check and that the draft holds exactly the files of the deposit.
