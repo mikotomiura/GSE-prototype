@@ -1,5 +1,7 @@
 # 次セッション — IME 論文: PsyArXiv のプレプリント → BRM への投稿の前の確かめ（M12 の公開の後）
 
+> ✅ **済み（2026-10-07・判断 221）。続きは `next-session-ime-paper-manuscript-11.md`**（PsyArXiv の審査の後 → BRM への投稿）。
+
 > 作成: 2026-10-07 昼（G-GEAR）。M12 をすべて済ませた後（判断 218〜220）。`next-session-ime-paper-manuscript-7.md` の §2 の 3〜5 を、今の状態から始められるように書き直したもの（-7 は M12 より前に書いたので §0 が古い）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 205**（プレプリントの置き場所と時期）と**判断 218〜220**（寄託・README・リリース D・公開）、`tasklist.md`、原稿 `papers/ime-observation/manuscript/`、`BUILD.md`。状態は着手時に `git fetch` で測り直す。
 
