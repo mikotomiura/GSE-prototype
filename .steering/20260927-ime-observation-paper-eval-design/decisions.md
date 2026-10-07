@@ -2191,3 +2191,16 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - 直さなかったもの: 公開の順は「Zenodo を publish → GitHub を public」（security の確認事項・守る）。記録の寄託日は下書きに上げた日（10-07）で、publish も同じ日の予定。
 - **/cross-review（Codex）5 回目**（点検の直し・6 ファイル）: (1) 図の生成物が差分に無い → 偽陽性（範囲から外しただけ）。(2) 「検出したまとまりごとに 1 行」と「行を書かないまとまり」が並ぶと検出と書き出しが紛れる → 「検出したまとまりが終わったときに 1 行・打ち切りは行なし」に書き分けた（README・訳・図）。(3) 全角と日本語の形の組み合わせのテスト → `判断 ＃２１９` を足した。今日の記帳 233,740 / 8 回。
 - **影響範囲**: `papers/ime-observation/{README.md,README.ja.md}`・`assets/{make_assets.py,validation-light.svg,validation-dark.svg,records-light.svg,records-dark.svg}`・`experiment/{data,data.windows}.md`・`issues/_style_check.py`・本ファイル。
+
+## 判断 220: 寄託を済ませ、リリース D を作り直し、Zenodo の 2 つを publish して、公開 repo を public にした（2026-10-07・G-GEAR・研究者の許可〔「Zenodo は具体的な用意さえできたら publish してよい」〕と選択〔repo を今 public にする・推奨どおり〕・手順はメイン）
+
+- **データセットの上げの結末**（判断 218 の続き）: 38 ファイルが下書きにそろい、`62cacbe5` のクローンで `deposit.internal.py --upload` が `deposit: uploaded; the draft holds exactly the files of the list` を出した（macOS の大きい 3 つは Mac からウェブで上げ、空の `pending` の登録 2 つは新しい API で消して上げ直した）。
+- **リリース D の作り直し**: PR #319 を merge（`428a13bd`・CI 緑）した main の新しいクローンで本番の形の書き出し（exit 0・200 ファイル＝前の 195 ＋ `README.ja.md` ＋図 4 枚）→ 公開 repo の作業クローンで C（`cb29a1a9`）の上に D を組み直した（commit `48caf9efedb85b94d0fd3cfad3d4e9ec18aed81c`・103→108 ファイルの差・`#!` の 40 ファイルに実行ビット・注釈付きタグ `v1.0.0`＝`49862e61`）。`git -c core.autocrlf=false archive v1.0.0` の木は書き出しとバイト一致（`diff -r`）。データセットに入れた共有の 8 ファイルは、`62cacbe5` の書き出しと D の書き出しとでバイト一致（`cmp`）。zip（`--prefix=ime-conversion-logging-1.0.0/`）は 3,867,948 バイト・SHA-256 `4bbbfebc77f5ab24639d8c3e688fd64627c9176752b78a21bca950a883a8fd0d`・MD5 `dce2fd685efe13c1a9654704be026546`。研究者が bare の写しと GitHub に force push した（`git ls-remote` で `main` と `v1.0.0^{}` が `48caf9ef`）。1 回目の D（`12dc813f`）は非公開の間に置き換えた。
+- **Zenodo**（job の tmp のスクリプト・token はプロセスの中で読むだけ）:
+  - ソフトウェアの下書き 23183441 に zip を上げた（返った MD5 と大きさが手元と一致・下書きはそれまで空）。
+  - 2 つの下書きの説明を書き直し（"Draft." を消し、datasheet・README と合わせた）、`publication_date` を 2026-10-07 に、関連の識別子を足した（データセット `isCompiledBy` ソフトウェアの DOI・ソフトウェア `compiles` データセットの DOI と `isSupplementTo` GitHub の `tree/v1.0.0`）。GET したメタデータを往復させ、予約の DOI が変わらないことを PUT の後に GET で確かめた。
+  - 公開の直前に `deposit.internal.py --remote` で 38 ファイルが一覧と一致することを確かめ、publish の前に各下書きで「`unsubmitted`・予約の DOI・ファイルの数（38・1）・日付 2026-10-07」を確かめてから publish した（2 つとも `state done`・DOI は予約どおり）。外から（token なし）`/api/records/<id>` で 2 つとも open・日付 2026-10-07・ファイル 38 と 1、`https://doi.org/10.5281/zenodo.23183438`・`…23183441` はどちらも Zenodo に解決（302）。datasheet の「Date of release: 7 October 2026」と一致。
+- **公開 repo を public に**（研究者の選択）: `gh repo edit --visibility public`。Chrome で README を確かめた: 画像 12 個に壊れたもの 0（publish した Zenodo の DOI バッジ 2 つも表示）・ダーク用の 3 枚（ロゴ・2 つの図）が読み込める・錨がすべて実在・DOI のリンク 8 つ・ライセンス 2 つの検出・「Cite this repository」・タグ 3 つ。
+- ⚠️ **公開の順**: Zenodo を publish → GitHub を public（security の確認事項どおり）。
+- **残り**（引き継ぎ `next-session-ime-paper-manuscript-7.md` §2 の 3〜5）: PsyArXiv のプレプリント（ライセンス・分野・OSF とのつなぎ方を研究者に確かめる）・投稿の前の確かめ（語数の上限・カバーレター・タイトル頁・要旨 250 語・図 1 の AI 開示）・OSF のプロフィール名の直し（研究者）。
+- **影響範囲**: 本ファイル・`tasklist.md`・`.steering/_handoff/next-session-ime-paper-m12-ggear.md`。公開物: Zenodo 23183438・23183441、GitHub `mikotomiura/ime-conversion-logging`（public・`v1.0.0`＝`48caf9ef`）。
