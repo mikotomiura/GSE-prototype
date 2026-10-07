@@ -142,7 +142,12 @@
   - macOS: `CFBundleShortVersionString = 0.1.40`・`codesign --verify --strict` OK・`gse-next` は Release の dmg 内のものと byte 一致。
   - Windows: `gse-next.exe` / `gse-submit.exe` が Release の資産と byte 一致（`cmp`）。
   - 両 OS: `o1.mode` あり。
-- ⚠️ **未実施**: 実機で O1 を起動して NDJSON の 1 行目に `o1_install_id` が出ること／再起動で同値／`~/.gse/o1_install_id` を消すと別値／非 O1 で出ないこと（陰性対照）。**配布前に実機で確かめる**こと。
+- ✅ **実機確認（2026-10-07・macOS・配布 zip の `gse-next.app`）**: 一時 HOME に隔離して起動した（⚠️ 実際の `~/.gse` / `~/Documents` は触っていない）。
+  - O1 起動 → `~/.gse/o1_install_id` が権限 0600 で作られ、NDJSON `gse_o1_*.ndjson` の 1 行目が `"o1_mode":"marker","o1_install_id":"ad9855f52414b6a4","app_version":"0.1.40"`（ファイルの値と一致）。
+  - 同じ HOME で再起動 → 同じ値 `ad9855f52414b6a4`。
+  - `o1_install_id` を消して起動 → 別の値 `a2030da7896f4aa9`（ファイルも更新）。
+  - 陰性対照（`o1.mode` なし・環境変数なしの同じ app）→ `gse_*.ndjson` の `meta` に `o1_mode` / `o1_install_id` なし・`~/.gse/o1_install_id` は作られない。
+  - ⚠️ **未実施**: Windows 実機（CI のビルドは成功・`gse-next.exe` の byte 一致のみ）。
 - ⚠️ 単体テストでは、非 O1 の断片が空文字列であること・妥当でない値を刻まないこと・anonymize が保つことを固定済み（PR #320）。
 
 ### 注意
