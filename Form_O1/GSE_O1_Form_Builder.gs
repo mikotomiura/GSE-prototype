@@ -238,6 +238,8 @@ var Q_O1_OS = "記録に使うパソコンの種類";
 var O1_REGISTRATION_TITLES = [Q_O1_PID, Q_O1_NAME, Q_O1_EMAIL, Q_O1_OS];
 /** 登録用の設問の直前に置く見出し。 */
 var O1_REGISTRATION_HEADER = "ご記名";
+/** パソコンの種類の選択肢。どちらの配布物を送るかがこの文字列で決まる。 */
+var O1_OS_CHOICES = ["Windows", "Mac", "両方使う"];
 var Q_O1_SUBJECT_ID = "参加者ID";
 
 // ★ O1-S の設問タイトルのうち、後段の集計が語で探すもの。
@@ -762,7 +764,11 @@ function o1AddRegistrationItem_(form, title) {
     var os = form.addMultipleChoiceItem();
     os.setTitle(Q_O1_OS);
     os.setHelpText("★ お送りするアプリが違うためお聞きします。⚠️ 機種名やホスト名はお聞きしません。");
-    os.setChoices([os.createChoice("Windows"), os.createChoice("Mac"), os.createChoice("両方使う")]);
+    os.setChoices(
+      O1_OS_CHOICES.map(function (c) {
+        return os.createChoice(c);
+      })
+    );
     os.setRequired(true);
     return os;
   }
@@ -839,7 +845,12 @@ function o1ConsentFormShapeProblems_(form) {
   expected.push({ title: Q_O1_PID, type: FormApp.ItemType.TEXT, required: false });
   expected.push({ title: Q_O1_NAME, type: FormApp.ItemType.TEXT, required: true });
   expected.push({ title: Q_O1_EMAIL, type: FormApp.ItemType.TEXT, required: true });
-  expected.push({ title: Q_O1_OS, type: FormApp.ItemType.MULTIPLE_CHOICE, required: true });
+  expected.push({
+    title: Q_O1_OS,
+    type: FormApp.ItemType.MULTIPLE_CHOICE,
+    required: true,
+    choices: O1_OS_CHOICES,
+  });
 
   var items = form.getItems().filter(function (it) {
     return it.getType() !== FormApp.ItemType.SECTION_HEADER;
@@ -865,6 +876,20 @@ function o1ConsentFormShapeProblems_(form) {
       if (req !== e.required) {
         problems.push("必須の有無が違う: " + e.title + "（実物 " + req + " / 期待 " + e.required + "）");
       }
+      // どちらの配布物を送るかは選択肢の文字列で決まるので、選択肢も照合する。
+      if (e.choices) {
+        var got = it
+          .asMultipleChoiceItem()
+          .getChoices()
+          .map(function (c) {
+            return c.getValue();
+          });
+        if (got.join("\n") !== e.choices.join("\n")) {
+          problems.push(
+            "選択肢が違う: " + e.title + "（実物 " + got.join(" / ") + " / 期待 " + e.choices.join(" / ") + "）"
+          );
+        }
+      }
     }
     if (pos < lastPos) {
       problems.push("並びが違う: " + e.title + " が " + lastTitle + " より前にある");
@@ -877,8 +902,11 @@ function o1ConsentFormShapeProblems_(form) {
   expected.forEach(function (e) {
     known[e.title] = true;
   });
+  var seen = {};
   titles.forEach(function (t) {
     if (!known[t]) problems.push("コードに無い設問: " + t);
+    if (seen[t] === 1) problems.push("同じタイトルの設問が 2 つ以上ある: " + t);
+    seen[t] = (seen[t] || 0) + 1;
   });
   return problems;
 }
@@ -918,10 +946,10 @@ function checkO1ConsentFormShape() {
  * パソコンの種類）を、構築と同じ定義で末尾に足す。設問も回答も消さない。2 回目は何も足さない。
  *
  * 2026-10-08 に、実物が「参加者ID」で終わり、後ろの 3 つが無かったので足した。
- * Apps Script の追加は末尾にしか付かないので、末尾に足して正しい順になる形のときだけ足す:
- *   - 欠けているのが `O1_REGISTRATION_TITLES` の後ろ側にまとまっている
+ * Apps Script の追加は末尾にしか付かないので、足した後にコードと一致する形のときだけ足す:
  *   - 今のフォームの最後が、残っている登録用の最後の設問（1 つも無ければ「ご記名」の見出し）
- * そうでなければ足さずに止まる（並べ替えが要る形は人が見る）。
+ *   - 照合で、登録用の設問の欠け以外の問題が無い（並びの崩れはここで止まる）
+ * そうでなければ足さずに止まる（並べ替えや直しが要る形は人が見る）。
  * 戻り値: 足した数。
  */
 function repairO1ConsentRegistrationItems() {
@@ -940,17 +968,11 @@ function repairO1ConsentRegistrationItems() {
     return 0;
   }
 
-  var first = O1_REGISTRATION_TITLES.indexOf(missing[0]);
-  var kept = O1_REGISTRATION_TITLES.slice(0, first);
-  var suffix = O1_REGISTRATION_TITLES.slice(first);
-  if (suffix.join("\n") !== missing.join("\n")) {
-    throw new Error(
-      "⛔ 欠けている登録用の設問が並びの後ろ側にまとまっていません。末尾に足すと順序が壊れるので止めました。\n" +
-        "  欠けている: " +
-        missing.join(" / ") +
-        "\n  checkO1ConsentFormShape() で形を確かめ、編集画面で直してください。"
-    );
-  }
+  // 最初に欠けた設問の直前に来るべきもの（並びでそれより前の登録用の設問の最後。無ければ見出し）が、
+  // 今のフォームの最後であること。並びで後ろの設問が残っていれば、それはこれより前にあるはずなので
+  // 下の照合が「並びが違う」で止める。照合は見出しを見ないので、登録用の設問の後ろに見出しが付いた形は
+  // ここでしか止まらない。
+  var kept = O1_REGISTRATION_TITLES.slice(0, O1_REGISTRATION_TITLES.indexOf(missing[0]));
   var wantLast = kept.length ? kept[kept.length - 1] : O1_REGISTRATION_HEADER;
   var lastTitle = all.length ? all[all.length - 1].getTitle() : "";
   if (lastTitle !== wantLast) {
@@ -961,6 +983,23 @@ function repairO1ConsentRegistrationItems() {
         wantLast +
         "」ではありません。末尾に足すと順序が壊れるので止めました。\n" +
         "  checkO1ConsentFormShape() で形を確かめてください。"
+    );
+  }
+
+  // 欠け以外の問題（並び・種類・必須・選択肢・重複・同意項目の欠け）が足す前からあるなら、
+  // 足しても一致しないので足さずに人に返す。
+  var missingMsg = {};
+  missing.forEach(function (t) {
+    missingMsg["欠けている: " + t] = true;
+  });
+  var other = o1ConsentFormShapeProblems_(form).filter(function (p) {
+    return !missingMsg[p];
+  });
+  if (other.length) {
+    throw new Error(
+      "⛔ 登録用の設問の欠けのほかにも、コードと違うところがあります。足さずに止めました:\n  - " +
+        other.join("\n  - ") +
+        "\n  編集画面で直してから、もう一度実行してください。"
     );
   }
 

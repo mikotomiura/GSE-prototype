@@ -335,8 +335,9 @@ mutate "リンク集: O1-S の「いつ」から終了判定の後を消す" \
 # --- §19 O1-C の登録用の設問の照合と修復（2026-10-08） -------------------------
 mutate "修復: メールアドレスを足さない" \
   's/(  missing\.forEach\(function \(t\) \{\n)    o1AddRegistrationItem_\(form, t\);/$1    if (t !== Q_O1_EMAIL) o1AddRegistrationItem_(form, t);/'
-mutate "修復: 欠けが後ろ側にまとまっているかを見ない" \
-  's/  if \(suffix\.join\("\\n"\) !== missing\.join\("\\n"\)\) \{/  if (false) {/'
+# 2026-10-08 に私が実際に入れかけた誤り。残っている登録用の設問を全部から取ると、参加者ID だけ欠けた形を素通りさせる。
+mutate "修復: 最後に来るべき設問を、欠けより前でなく残っている全部から取る" \
+  's/  var kept = O1_REGISTRATION_TITLES\.slice\(0, O1_REGISTRATION_TITLES\.indexOf\(missing\[0\]\)\);/  var kept = O1_REGISTRATION_TITLES.filter(function (t) { return !!present[t]; });/'
 mutate "修復: フォームの最後の設問を見ない" \
   's/  if \(lastTitle !== wantLast\) \{/  if (false) {/'
 mutate "修復: 揃っていても足す（冪等でない）" \
@@ -355,6 +356,12 @@ mutate "照合: 一致しないのに true を返す" \
   's/      problems\.join\("\\n  - "\)\n  \);\n  return false;/      problems.join("\\n  - ")\n  );\n  return true;/'
 mutate "migrate: 照合せずに「一致しています」と言う（10/03 の誤報）" \
   's/  var problems = o1ConsentFormShapeProblems_\(form\);\n  if \(problems\.length\) \{\n    Logger\.log\(\n      \(added \? "" : "追加する同意項目はありません。"\)/  var problems = [];\n  if (problems.length) {\n    Logger.log(\n      (added ? "" : "追加する同意項目はありません。")/'
+mutate "照合: 選択肢を見ない" \
+  's/      if \(e\.choices\) \{/      if (false) {/'
+mutate "照合: 重複を見ない" \
+  's/    if \(seen\[t\] === 1\) problems\.push/    if (false) problems.push/'
+mutate "修復: 欠け以外の問題を見ずに足す" \
+  's/  if \(other\.length\) \{/  if (false) {/'
 mutate "構築: 登録用の設問を足す順を入れ替える" \
   's/var O1_REGISTRATION_TITLES = \[Q_O1_PID, Q_O1_NAME, Q_O1_EMAIL, Q_O1_OS\];/var O1_REGISTRATION_TITLES = [Q_O1_PID, Q_O1_EMAIL, Q_O1_NAME, Q_O1_OS];/'
 

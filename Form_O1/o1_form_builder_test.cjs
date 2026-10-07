@@ -76,7 +76,10 @@ function makeItem(type) {
       if (type !== "CHECKBOX") throw new Error("stub: asCheckboxItem on " + type);
       return it;
     },
-    asMultipleChoiceItem: () => it,
+    asMultipleChoiceItem: () => {
+      if (type !== "MULTIPLE_CHOICE") throw new Error("stub: asMultipleChoiceItem on " + type);
+      return it;
+    },
     asListItem: () => it,
     asPageBreakItem: () => it,
     setGoToPage: () => it,
@@ -3057,7 +3060,24 @@ const shapeProblems = (ctx, form) => {
   const n = form.__items.length;
   const r = attempt(() => ctx.repairO1ConsentRegistrationItems());
   push(
-    "§19 最後の設問が合っていても、欠けが後ろ側にまとまっていなければ止まる",
+    "§19 最後の設問が合っていても、並びが崩れていれば止まる",
+    r.threw && form.__items.length === n,
+    { threw: r.threw, message: r.message }
+  );
+}
+
+{
+  // 登録用の設問の後ろに見出しが付いている。照合は見出しを見ないので、最後の設問の検査だけが止める形。
+  const ctx = brokenConsentCtx(3);
+  const form = ctx.__forms[O1_C];
+  form.addSectionHeaderItem().setTitle("後から付いた見出し");
+  push("§19 前提: この形は照合では問題 0", shapeProblems(ctx, form).filter((p) => p.indexOf("欠けている") < 0).length === 0, {
+    problems: shapeProblems(ctx, form),
+  });
+  const n = form.__items.length;
+  const r = attempt(() => ctx.repairO1ConsentRegistrationItems());
+  push(
+    "§19 登録用の設問の後ろに見出しがあれば足さずに止まる",
     r.threw && form.__items.length === n,
     { threw: r.threw, message: r.message }
   );
@@ -3155,6 +3175,51 @@ const shapeProblems = (ctx, form) => {
 }
 
 {
+  // code-reviewer LOW（2026-10-08）: 選択肢・重複・既存の並びの崩れ
+  const mk = () => {
+    const c = makeReadyCtx();
+    c.buildO1ConsentForm();
+    return c;
+  };
+  const c1 = mk();
+  c1.__forms[O1_C].__items.find((i) => i.__title === c1.Q_O1_OS).__choices = ["Windows", "macOS", "両方使う"];
+  push(
+    "§19 照合: パソコンの種類の選択肢が違えば挙げる",
+    shapeProblems(c1, c1.__forms[O1_C]).some((p) => p.indexOf("選択肢") >= 0),
+    { problems: shapeProblems(c1, c1.__forms[O1_C]) }
+  );
+  const c2 = mk();
+  const f2 = c2.__forms[O1_C];
+  const dup = makeItem("TEXT");
+  dup.__title = c2.Q_O1_NAME;
+  dup.__required = true;
+  f2.__items.push(dup);
+  push(
+    "§19 照合: 同じタイトルの設問が 2 つあれば挙げる",
+    shapeProblems(c2, f2).some((p) => p.indexOf("2 つ以上") >= 0 && p.indexOf(c2.Q_O1_NAME) >= 0),
+    { problems: shapeProblems(c2, f2) }
+  );
+  // [..., 参加者ID, 同意X(後から付いた), お名前, メールアドレス] は最後の設問と後ろ側の検査を通るが、
+  // 足しても一致しない。足す前に止まる。
+  const c3 = mk();
+  const f3 = c3.__forms[O1_C];
+  f3.__responses = 1;
+  const pidIdx = f3.__items.findIndex((i) => i.__title === c3.Q_O1_PID);
+  const stray = makeItem("CHECKBOX");
+  stray.__title = "後から付いた同意項目";
+  stray.__required = true;
+  f3.__items.splice(pidIdx + 1, 0, stray);
+  f3.__items = f3.__items.filter((i) => i.__title !== c3.Q_O1_OS);
+  const n3 = f3.__items.length;
+  const r3 = attempt(() => c3.repairO1ConsentRegistrationItems());
+  push(
+    "§19 修復: 欠け以外の問題が足す前からあれば足さずに止まる",
+    r3.threw && f3.__items.length === n3 && (r3.message || "").indexOf("後から付いた同意項目") >= 0,
+    { threw: r3.threw, message: r3.message }
+  );
+}
+
+{
   // 10/03 の誤報の回帰: 同意項目が揃っていても、登録用が欠けていれば「一致しています」と言わない。
   const ctx = brokenConsentCtx(3);
   const r = attempt(() => ctx.migrateO1ConsentForm());
@@ -3187,10 +3252,10 @@ cases.forEach((c) => {
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
 // ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-// 2026-10-08: §19 を足して 269 件なので下限 265。
-if (cases.length < 265) {
+// 2026-10-08: §19 を足して 275 件なので下限 270。
+if (cases.length < 270) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（265 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（270 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }
