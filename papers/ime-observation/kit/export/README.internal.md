@@ -56,13 +56,18 @@ rules that is missing or fails), or an unexpected failure (only the type of the 
    inside a git work tree, the checker must itself be tracked in the git work tree that holds it, equal to
    HEAD and free of an `assume-unchanged` or `skip-worktree` mark (a checker outside git stops the
    export with exit code 2), so that one commit yields one verdict.
-5. Commit `DIR` on top of the history of the public repository (next section) and tag the release. The
-   DOI of the release is reserved beforehand in a draft of the archive service and is already in
+5. Commit `DIR` on top of the history of the public repository (next section) and tag the release. For the
+   first release, the DOI is reserved beforehand in a draft of the archive service and is already in
    `CITATION.cff` and the manuscript; the archive of the tag is uploaded to that draft, which is then published.
-   A later release is a new version of the same record: its draft is made from the published record with the
-   new-version action of the archive service, which reserves the DOI of that version for `CITATION.cff`; the files
-   that the draft copies from the version before are removed before the archive of the new tag is uploaded. The
-   manuscript keeps the DOI of the version that it cites.
+   A later release is a new version of the same record. Before step 2, its draft is made from the published record
+   with the new-version action of the archive service, which reserves the DOI of that version. The version and that
+   DOI are written in `CITATION.cff` and in the citation of the code in `README.md` and `README.ja.md`, the version
+   in `.zenodo.json` and in the badge of the code release of both READMEs (whose links point to the DOI of all
+   versions), and the release is added to the history in both READMEs. The draft copies the files and the metadata
+   of the version before, except the version, which is left empty: its files are removed before the archive of the
+   new tag is uploaded, and its version, publication date, description and link to the tree of the tag are set
+   before it is published (the service does not read `.zenodo.json` when files are uploaded by hand). The manuscript
+   is not changed: it keeps the DOI of release 1.0.0, which it cites.
 
 ## History of the public repository
 

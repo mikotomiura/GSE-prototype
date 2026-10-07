@@ -205,13 +205,14 @@ is, in order:
 2. the files exported from the freezing commit of the Windows addendum, tagged `ime-observation-prereg-windows`;
 3. a commit that adds only `manuscript/outline.md` as it stood before the results were analysed;
 4. release 1.0.0, tagged `v1.0.0`;
-5. release 1.0.1, tagged `v1.0.1`, which sets the five tables of the manuscript that did not fit on their page
-   (Tables 1, 2, 4, 7 and 13) as tables that continue over pages, and adds to the build a check that no text or line
-   lies outside the page or over the page number. The logger, the kit, the analysis code and the results
-   are those of release 1.0.0.
+5. release 1.0.1, tagged `v1.0.1`. Besides the version and the DOI, it changes only how the manuscript is typeset and
+   checked: the five tables that did not fit on their page (Tables 1, 2, 4, 7 and 13) are set so that they can
+   continue onto the next page, and the build also reports pages on which text or a line lies outside the page or
+   over the page number. The text and the values of the manuscript, the logger, the kit, the analysis code and the
+   results are those of release 1.0.0; the script that generates the tables changed only in the layout of Table 13.
 
 The first three commits carry the date of the working commit they come from, and their messages name it. The
-license texts, this file's identifiers and figures and the line-end rules of `.gitattributes` are added in
+license texts, this file's identifiers and figures and the line-end rules of `.gitattributes` were added in
 release 1.0.0.
 
 <details>
