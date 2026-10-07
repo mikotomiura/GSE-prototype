@@ -5,5 +5,6 @@
 - [x] O1 の配布前ゲート 24/24
 - [x] 運営ワークフローの docx に反映（版 2）
 - [x] レビュー（code-reviewer ＋ security-checker）→ 指摘を反映（decisions.md 判断 2）。⚠️ Codex は 2026-10-07 の予算超過で不可
+- [x] 各リンクに「いつ・誰が使うか」の列（判断 4）・テスト全 249・変異全 80 件が赤
 - [ ] PR・CI・マージ
 - [ ] 研究者: Apps Script に貼り直し → `refreshO1LinksTab()` を実行 → 「提出物の受取フォルダ」を手で貼る

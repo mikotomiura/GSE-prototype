@@ -236,6 +236,7 @@ function makeWideSheet(rows) {
         setFontColor: paint("fg"),
         setFontWeight: paint("weight"),
         setHorizontalAlignment: paint("halign"),
+        setWrap: paint("wrap"),
         // ★ リンク集（2026-10-07）が使う。
         setValues: (vals) => {
           vals.forEach((line, i) => {
@@ -2759,6 +2760,32 @@ function readyWithFormUrls(extra) {
     { grid: sh && sh.__grid.slice(4, 9) }
   );
   push("§18 アプリの入手先が載る", linksValue(ctx, "アプリの入手先（O1_APP_DOWNLOAD_URL）") === "https://drive.example/o1", {});
+  // ★ 研究者依頼（2026-10-07）: 各リンクに「いつ・誰が使うか」を載せる
+  const whenOf = (label) => {
+    const row = sh.__grid.find((r) => r[0] === label);
+    return row ? String(row[3]) : "";
+  };
+  push(
+    "§18★ 全行が 5 列（項目 / 値 / 種別 / いつ・誰が / 備考）で、見出しに「いつ・誰が使うか」がある",
+    sh.__grid.every((r) => r.length === 5) && sh.__grid.some((r) => r[3] === "いつ・誰が使うか"),
+    { lens: [...new Set(sh.__grid.map((r) => r.length))] }
+  );
+  push(
+    "§18★ O1-C は【募集時】・O1-S は【終了判定の後】・アプリは受付メールで届く、と書いてある",
+    /【募集時】/.test(whenOf("O1-C 説明・同意（参加登録）— 回答 URL")) &&
+      /終了判定の後/.test(whenOf("O1-S 終了後アンケート — 回答 URL")) &&
+      /受付メール/.test(whenOf("アプリの入手先（O1_APP_DOWNLOAD_URL）")),
+    {
+      c: whenOf("O1-C 説明・同意（参加登録）— 回答 URL"),
+      s: whenOf("O1-S 終了後アンケート — 回答 URL"),
+    }
+  );
+  push(
+    "§18 リンクと手で入れる欄のすべてに「いつ・誰が使うか」がある（空にしない）",
+    sh.__grid.filter((r) => ["自動", "手動", "参照"].includes(r[2]) && r[0] !== "更新").every((r) => String(r[3]).length > 0),
+    {}
+  );
+  push("§18 説明の列は折り返す", !!sh.__style["6,4"] && sh.__style["6,4"].wrap === true, { style: sh.__style["6,4"] });
   // ⚠️★★★ ロスターの ID（氏名・メールへのポインタ）を書かない
   push("§18★★★ 参加者ロスターの ID を書かない", sh && linksText(ctx).indexOf(ROSTER_ID) < 0, {});
   push("§18★★ ロスターのメール（PII）を書かない", sh && !/@/.test(linksText(ctx)), {});
@@ -2900,9 +2927,9 @@ cases.forEach((c) => {
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
 // ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-if (cases.length < 240) {
+if (cases.length < 245) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（240 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（245 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }

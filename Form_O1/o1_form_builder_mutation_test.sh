@@ -329,6 +329,8 @@ mutate "リンク集: build でリンク集の例外を捕まえない" \
   's/  try \{\n    o1BuildLinksTab_\(ss\);\n  \} catch \(e\) \{/  {\n    o1BuildLinksTab_(ss);\n  } if (false) { var e;/'
 mutate "リンク集: 同じ項目名は最後の値を採る" \
   's/    if \(out\[label\] === undefined \|\| out\[label\] === ""\) out\[label\] = v;/    out[label] = v;/'
+mutate "リンク集: O1-S の「いつ」から終了判定の後を消す" \
+  's/【期間の終わり・終了判定の後】研究者が/研究者が/'
 
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"
