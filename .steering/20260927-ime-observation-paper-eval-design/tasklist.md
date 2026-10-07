@@ -260,11 +260,11 @@
       - [x] 判断 200 の方針で Discussion を仕上げ（数字を §6 に寄せる・観測可能性と書字研究の尺度の段落・研究者が採った）、断りを寄せた（−235 語）（2026-10-06・判断 201・202）
       - [x] 点検（code-reviewer ∥ security-checker）・/cross-review 2 巡の指摘を直した（2026-10-06・判断 203）→ PR → CI → merge
     - [ ] OSF のプロフィール名が「Mikto Miura」→ 研究者に確かめてもらう（判断 189 の記録）
-    - [ ] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用（進め方は判断 207）
+    - [x] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用（進め方は判断 207・2026-10-07 に公開・判断 220）
       - [x] 研究者の 4 点（リリースの DOI は手で予約・repo 名・履歴の 4 commit と非公開の参照の置き換え・書庫は G-GEAR に集める）（判断 207）
       - [x] Zenodo の下書き 2 つと DOI の予約: データセット `10.5281/zenodo.23183438`・ソフトウェア `10.5281/zenodo.23183441`（判断 208）
       - [x] Surface: Windows の書庫 10 と標本を束ね（TSF の落ちた 2 件は寄託せず・管理者権限で拒まれた開始は寄託）、記録と一覧を埋め、3 種の書き出しを確かめた（2026-10-06・判断 217・枝 `docs/ime-m12-surface-deposit`）
-      - [ ] 非公開の repo `mikotomiura/ime-conversion-logging` を作り（済）、A・B・C を push（タグ 2 つ）→ ⚠️ push は自動モードで拒まれた・研究者が `C:/wt/ime-conversion-logging.git` から push する
+      - [x] 非公開の repo `mikotomiura/ime-conversion-logging` を作り（済）、A・B・C を push（タグ 2 つ）→ ⚠️ push は自動モードで拒まれた・研究者が `C:/wt/ime-conversion-logging.git` から push した
       - [x] 書き出しの道具を .tex・.bib と LaTeX の ignore に対応させ、`rv@` を `rv:` に、研究者のアドレスだけを通す（selftest・変異 10 本・判断 208）
       - [x] 非公開の commit の参照 12 か所の置き換え・`\tbd`（DOI・URL・外枠の commit・表 1 の版）・`references.bib`・CITATION.cff・.zenodo.json・ライセンスの全文・.gitattributes・凍結の一覧を計算し直す手順（README）（判断 209）
       - [x] README の先頭にロゴと動く SVG（研究者の求め・判断 210）
@@ -277,13 +277,23 @@
       - [x] Mac: 計測の書庫 2 つ（`macos-standard-live-{on,off}-1.zip`）を Drive の `mac/` へ上げて G-GEAR へ（研究者が手で・2026-10-07・SHA-256 一致・判断 218）
       - [x] Surface: Windows の書庫と標本・`data.windows.md` と一覧・書き出しの確かめ・`C:/ime-deposit/` へ（判断 217・Drive で G-GEAR へ・2026-10-07）
       - [x] G-GEAR: 枝を合わせて照合（30 ファイル・保留 0）→ datasheet と `\tbd` 8 か所を埋める → 点検（code ∥ security）の指摘を直す（判断 218・枝 `docs/ime-m12-deposit`）
-      - [ ] G-GEAR: /cross-review → PR → CI → merge → `--upload`（main と同じ commit）→ 記録の寄託先と日付を埋める小さな PR → リリース D → 研究者に公開を確かめる（⚠️ 公開の直前に Zenodo の `publication_date` が 2026-10-07 か）
-      - [ ] GitHub での README（ロゴ・動く図）の見え方を確かめる（ロゴと図はリリース D の README に入る → D を push した後）
-      - [ ] datasheet（Claude の下書き → AI 宣言に足す → 研究者が確かめる）
+      - [x] G-GEAR: /cross-review → PR #318 → merge → `--upload`（38 ファイル・大きい 3 つは Mac からウェブ）→ README の仕上げ・日本語訳・図と記録の寄託先と日付（PR #319）→ リリース D `48caf9ef`（研究者が force push）→ Zenodo の 2 つを publish（2026-10-07・`publication_date` 一致）→ repo を public（判断 218〜220）
+      - [x] GitHub での README（ロゴ・動く図・2 枚の図・バッジ・ダーク用の 3 枚・DOI のリンク）の見え方を、公開の後に Chrome で確かめた（判断 220）
+      - [x] datasheet（Claude の下書き → AI 宣言に足す → 研究者が確かめる）
         - [x] 下書き `experiment/datasheet.md`・点検（code ∥ security）の指摘で書き直し・研究者の 5 問（連絡先はメール・§10.8 の確かめの run はパイロットの部・青空文庫の出どころと作業履歴・方針の文）・書き出しの例外・`dataset.tex`・AI 宣言（2026-10-06・G-GEAR・判断 213・枝 `docs/ime-m12-datasheet`）
         - [x] 研究者が全文を日本語で確かめ「このまま採る」（2026-10-06）→ /cross-review 2 巡（Codex・アドレスを伏せた写し・指摘 5 件を直した）（判断 213）→ PR → CI → merge
         - [x] 寄託のとき: 「(to be filled in at deposit)」を埋めた（表は 1 ファイルずつ 38 行・判断 218）
-      - [ ] Mac / Surface: working・パイロット・標本の書庫（`--pack`・`--check-deposit`）→ SHA-256 を記録 → G-GEAR へ。A〜D を各機械で書き出し直して exit 0 と一覧の一致
-      - [ ] G-GEAR: 書庫を照らして下書きに上げる → 「at deposit」の 6 か所と `confirmed at deposit` → D を作る → 研究者に公開を確かめる（repo を公開・Zenodo 2 つを公開）
+      - [x] Mac / Surface: working・パイロット・標本の書庫（`--pack`・`--check-deposit`）→ SHA-256 を記録 → G-GEAR へ（判断 214・216・217）。⚠️ D の書き出し直しは両機では回さず、判断 219 の理由で門を満たしたと扱った（研究者が覆せる）
+      - [x] G-GEAR: 書庫を照らして下書きに上げる → 「at deposit」の 6 か所と `confirmed at deposit` → D を作る → 研究者に公開を確かめる（repo を公開・Zenodo 2 つを公開）（2026-10-07・判断 218〜220）
+    - [ ] プレプリント（PsyArXiv・判断 205・221）
+      - [x] 研究者の 4 問（CC BY 4.0・心理の 3 分野・申告欄のリンクだけ・本文と補遺を 1 つの PDF に）・OSF の名前は直っていた・PDF（241 頁・リンク 1,101 本を元どおりに）・入力欄の値の案（2026-10-07・判断 221）
+      - [x] 研究者が入力して送った（Claude は入力欄の値を照らした・`bkuds_v1`・pending・ファイルは SHA-256 一致）（2026-10-07・判断 221）
+      - [x] 研究者の指摘で表 13 ほかが頁の外に出ていると分かった → 頁をまたぐ表に直し、頁の外と頁番号への重なりを数える検査を足した・点検と /cross-review 2 巡（2026-10-08・判断 222・枝 `fix/ime-table-overflow`）
+      - [ ] bkuds_v1 を取り下げ（研究者）→ 直した 248 頁で出し直す（Claude が段ごとに照らす）→ ファイルの SHA-256 を API で照らす（判断 222）
+      - [ ] 審査（24〜72 時間）→ DOI を記録する。止められたら Zenodo への切り替えを研究者に確かめる（判断 205）
+      - [ ] 公開 repo の v1.0.1 と Zenodo のコードの記録の新しい版（判断 222・merge の後）
+    - [ ] BRM への投稿（判断 221）
+      - [x] 語数の上限（本文は無い・要旨 250 語以内＝248 語）・図 1 の AI 開示（宣言とカバーレターで足りる・Y39）・カバーレターの下書きを研究者が採った・投稿用の PDF とタイトル頁の写しを `C:/ime-submission/` に（2026-10-07・判断 221）
+      - [ ] カバーレターにプレプリントの DOI を入れる・タイトル頁に住所と電話（研究者）・ScholarOne の画面で語数などの欄を確かめる・投稿（研究者）
   - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task
