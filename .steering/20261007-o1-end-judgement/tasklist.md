@@ -5,6 +5,7 @@
 - [x] テスト §12・変異 14 件・既存の変異の当たる位置の確認
 - [ ] リンク集の文言（「判定の機械はまだ無い」）を直す（PR #324 のマージ後に重ねる）
 - [ ] 運営ワークフローの docx（版 3）
-- [ ] レビュー（code-reviewer ＋ security-checker）。⚠️ Codex は当日の予算超過で不可の可能性（日付が変わったので確かめる）
+- [x] レビュー 3 系統（code-reviewer ＋ security-checker ＋ Codex）→ 反映（decisions.md 判断 3）・テスト 285・変異 113 件すべて赤
+- [ ] 反映後の Codex 再レビュー
 - [ ] PR・CI・マージ
 - [ ] 研究者: 受領台帳の Apps Script に貼り直し → `o1LedgerRun()` を 1 回手で実行

@@ -317,7 +317,15 @@ mutate "終了判定: 21 日目の当日に終了にする（1 日早い）" \
 mutate "終了判定: 期間を 20 日にする" \
   's/var endKey = first \+ O1_LEDGER_END_DAYS - 1;/var endKey = first + O1_LEDGER_END_DAYS - 2;/'
 mutate "終了判定: 登録日より前の日付も起算日に使う" \
-  's/      if \(regKey !== null && k < regKey\) \{/      if (false) {/'
+  's/ \|\| k < regKey \|\| / || /'
+mutate "終了判定: 受領日より後（未来）の日付も使う" \
+  's/ \|\| k > recvKey \+ 1 \|\| / || /'
+mutate "終了判定: 受領日よりずっと前の日付も使う" \
+  's/ \|\| k < recvKey - O1_LEDGER_END_MAX_LAG_DAYS\) \{/) {/'
+mutate "終了判定: 登録の無い P-ID も判定する" \
+  's/    if \(regKey === null\) \{\n      return \{ pid: pid, status: O1_LEDGER_END_UNREG/    if (false) {\n      return { pid: pid, status: O1_LEDGER_END_UNREG/'
+mutate "終了判定: 2000 年より前の年も読む" \
+  's/  if \(y < 2000\) return null;/  /'
 mutate "終了判定: 届いた日の数に期間の後の日も数える" \
   's/      return k <= endKey;\n    \}\)\.length;/      return true;\n    }).length;/'
 mutate "終了判定: 21 日目の記録が無くてもすぐ片づけ可にする" \
@@ -329,9 +337,19 @@ mutate "終了判定: 終了が続くたびに通知する" \
 mutate "終了判定: 打ち切りの回にも終了を通知する" \
   's/var endedToSend = reliable \? endPlan\.added : \[\];/var endedToSend = endPlan.added;/'
 mutate "終了判定: 研究者の記入を引き継がない" \
-  's/      if \(pid && !manualByPid\[pid\]\) manualByPid\[pid\] = r;/      0;/'
+  's/      manualByPid\[pid\] = r;\n    \}\);/      0;\n    });/'
+mutate "終了判定: 書く前にタブを clear する（失敗で記入が消える）" \
+  's/  if \(!sheet\) sheet = ss\.insertSheet\(O1_LEDGER_END_TAB\);\n  o1LedgerEnsureRows_\(sheet, out\.length\);/  if (!sheet) sheet = ss.insertSheet(O1_LEDGER_END_TAB);\n  sheet.clear();\n  o1LedgerEnsureRows_(sheet, out.length);/'
+mutate "終了判定: 見出しを照合しない（記入がずれる）" \
+  's/      if \(String\(head\[hc\]\)\.trim\(\) !== O1_LEDGER_END_HEAD\[hc\]\) \{/      if (false) {/'
+mutate "終了判定: 貼られた日付を整形しない" \
+  's/    if \(v instanceof Date\) return/    if (false) return/'
+mutate "終了判定: メールに 21 日目の日付を載せる" \
+  's/" 日目が過ぎました（今日 " \+ e\.dayNo \+/" 日目（" + o1LedgerKeyToStr_(e.endKey) + "）が過ぎました（今日 " + e.dayNo +/'
+mutate "終了判定: タイムゾーンの警告を出さない" \
+  's/  if \(tz !== "Asia\/Tokyo"\) warn\.push/  if (false) warn.push/'
 mutate "終了判定: 終了判定のタブの例外を捕まえない（途絶の通知が止まる）" \
-  's/  try \{\n    o1LedgerWriteEnd_\(ss, endRows, nowMs\);\n  \} catch \(e\) \{/  { o1LedgerWriteEnd_(ss, endRows, nowMs); } if (false) { var e;/'
+  's/  try \{\n    o1LedgerWriteEnd_\(ss, endRows, nowMs, (\{[^\n]*\})\);\n  \} catch \(e\) \{/  { o1LedgerWriteEnd_(ss, endRows, nowMs, $1); } if (false) { var e;/'
 mutate "終了判定: タブをテキスト形式にしない" \
   's/  var all = sheet\.getRange\(1, 1, out\.length, width\);\n  all\.setNumberFormat\("@"\);/  var all = sheet.getRange(1, 1, out.length, width);/'
 mutate "終了判定: 記入欄を無害化しない" \
