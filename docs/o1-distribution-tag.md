@@ -118,3 +118,40 @@
 - ⚠️★★★ **同意フォームの文面を変えた**（宣言の列挙を 5 択へ・PR #292）。被験者に届くのは、研究者が `Form_O1/GSE_O1_Form_Builder.gs` を O1 の Apps Script に貼り直し `migrateO1ConsentForm()` を実行してから（回答は保たれる）。⚠️ **再配備はこのタグの zip を Drive に置くのと同時かその後**に行う（逆順だと、同意は 5 択・画面は 4 択の旧 zip、という食い違いが起きる）。
 - ⚠️★ **v0.1.38 以前を O1 に使わない**（宣言が 4 択しか出ず、5 択の同意フォームと食い違う）。
 - Drive への差し替え・被験者への送付は研究者が行う（未実施）。
+
+## v0.1.40（2026-10-07）
+
+| 項目 | 値 |
+|---|---|
+| タグ | `v0.1.40`（注釈付きタグ） |
+| コミット | `d3d1a914`（PR #320 の merge。`o1_install_id` ＋ 版 0.1.39 → 0.1.40） |
+| タグ作成日 | 2026-10-07（研究者承認のうえ push） |
+| 切り直した理由 | **ADR-038**: O1 の `meta`（session_start）行に、導入ごとの乱数 16 桁 hex **`o1_install_id`** を刻む。複数端末で走らせても解析で端末を分けるため。記録: `.steering/20261007-o1-install-id/` |
+| 版を分けた理由 | G1 は `meta.app_version = 0.1.36` で G1 のファイルを見分ける契約。同じ番号の別バイナリを作らない |
+| CI | run `37608888169`（event = push）: `build-macos` / `build-windows` / `release` すべて success |
+| 使う配布物 | `O1_実施用_macOS.zip` ／ `O1_実施用_Windows.zip`（★ Drive に置くのはこの 2 つだけ）。作った場所は worktree `GSE-prototype-o1-device-id/experiments/20260801-controlled-friction-task/dist/_common/` |
+| O1_実施用_macOS.zip の SHA-256 | `7451ae20a3a8346701650d44538001af557255805fe115ebdf8e0b2b4cb2f251`（10,439,503 B） |
+| O1_実施用_Windows.zip の SHA-256 | `44554576e42fe9a927258c31208741b7fde902c5f51da8347e89015722cddeba`（5,987,315 B） |
+| Release の dmg の SHA-256 | `79cbdf2fcbaf93f056392a7b0c262bb18dec7059caf89002d65514f5b9b4d782`（`gse-next_0.1.40_aarch64.dmg`） |
+| ログでの見分け方 | `meta` 行の `app_version = 0.1.40` ＋ `o1_mode` ＋ **`o1_install_id`（`^[0-9a-f]{16}$`）** |
+| 作ったコマンド | `bash make-common-app-zip.sh --mode o1 --tag v0.1.40 --config "$REPO/Form_O1/o1_submit.json"` |
+
+### 実体で確かめたこと（2026-10-07・Mac）
+- スクリプトの自己検査（自動送信・O1 実装・`--o1`・reconcile・初回セットアップ・余計なもの無し・署名・実行ビット・README 文言・UTF-8 フラグ）はすべて ✅。
+- 生成した zip を別の場所へ展開して、スクリプトとは別に再検算した:
+  - macOS: `CFBundleShortVersionString = 0.1.40`・`codesign --verify --strict` OK・`gse-next` は Release の dmg 内のものと byte 一致。
+  - Windows: `gse-next.exe` / `gse-submit.exe` が Release の資産と byte 一致（`cmp`）。
+  - 両 OS: `o1.mode` あり。
+- ✅ **実機確認（2026-10-07・macOS・配布 zip の `gse-next.app`）**: 一時 HOME に隔離して起動した（⚠️ 実際の `~/.gse` / `~/Documents` は触っていない）。
+  - O1 起動 → `~/.gse/o1_install_id` が権限 0600 で作られ、NDJSON `gse_o1_*.ndjson` の 1 行目が `"o1_mode":"marker","o1_install_id":"ad9855f52414b6a4","app_version":"0.1.40"`（ファイルの値と一致）。
+  - 同じ HOME で再起動 → 同じ値 `ad9855f52414b6a4`。
+  - `o1_install_id` を消して起動 → 別の値 `a2030da7896f4aa9`（ファイルも更新）。
+  - 陰性対照（`o1.mode` なし・環境変数なしの同じ app）→ `gse_*.ndjson` の `meta` に `o1_mode` / `o1_install_id` なし・`~/.gse/o1_install_id` は作られない。
+  - ⚠️ **未実施**: Windows 実機（CI のビルドは成功・`gse-next.exe` の byte 一致のみ）。
+- ⚠️ 単体テストでは、非 O1 の断片が空文字列であること・妥当でない値を刻まないこと・anonymize が保つことを固定済み（PR #320）。
+
+### 注意
+- ⚠️★★★ **同意文書の改訂が先行条件**: 「記録するもの」に乱数の識別子を足す（案: `.steering/20261007-o1-install-id/consent-revision-proposal.md`）。研究者が `Form_O1/GSE_O1_Form_Builder.gs` を O1 の Apps Script に貼り、`migrateO1ConsentForm()` を実行する。⚠️ **zip の差し替えと同時かその後**に行う。
+- ⚠️★ **v0.1.39 以前を O1 の開始に使わない**（識別子が無く、複数端末を分けられない）。
+- ⚠️ gse-dataset の `schema/current.json` 同期（additive）が未了。
+- Drive への差し替え・被験者への送付は研究者が行う（未実施）。
