@@ -51,7 +51,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
   `capabilities.rs` (収集能力の自己記述・ADR-013)、`overlay_panel.rs`
 - `src-tauri/src/bin/` — `gse-replay` (回帰/評価 CLI)、`gse-cohort` (被験者横断判定)、`emit_schema` (JSON Schema 生成)、
   `gse-package` / `gse-unpack` / `gse-submit` (`--features package`)
-- `docs/` — 永続ドキュメント (**21 md** + `architecture/` + `adr/` + `literature/` + `mitou_submission/` + ★ `theory/`)
+- `docs/` — 永続ドキュメント (**26 md**・2026-10-07 に数え直した + `architecture/` + `adr/` + `literature/` + `mitou_submission/` + ★ `theory/`)
   ★ `docs/theory/` は理論の文書（**theory candidate・`EH0`・SSOT の主張ではない**。2026-09-19 に `.idea/` から移した）
 - `.steering/` — タスク単位の作業記録 (`[YYYYMMDD]-[task-name]/`)
 - `.claude/` — Claude Code 用 (skills / agents / commands / hooks)
@@ -194,7 +194,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
-| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜038**) の根拠を確認したい時 |
+| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜039**) の根拠を確認したい時 |
 | `docs/theory/README.md` | 理論（生成的返権論ほか・theory candidate）を読む時。⚠️ **SSOT の主張ではない**（RP §1 は問いとして参照するだけ） |
 | `docs/architecture/gse-v2-overview.md` | v2 再設計 (ドメイン分離・介入決定エンジン) の全体像 |
 | `docs/architecture/workspace-behavior-observation.md` | R3 (自然作業の常時収集) の観測空間・ラベル・評価設計を確認する時 (形成的トラック) |
@@ -202,6 +202,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/o1-distribution-tag.md` | ★ **O1 の配布物を作る / 配る時**。`--mode o1` に使ってよいリリースタグ（最新節）・zip の SHA-256・実体検証の記録。⚠️ G1 の配布タグ（`experiments/20260801-controlled-friction-task/distribution-tag.md`）とは別 |
 | `docs/g1-deletion-ledger.md` | ⚠️★★★ **G1 の削除保証台帳**。G1 の被験者からの削除要求に対応する時（★ O1 版と対になる文書・前提条件 8） |
 | `docs/person-lifecycle-ledger-template.md` | 人単位のライフサイクル台帳（G1/O1 それぞれの進み具合・「やめた」「削除の求め」の記録）を構築・参照する時 |
+| `docs/g1-o1-operations-workflow.md` | ★ **G1 / O1 の運営の通し**（参加者 1 人を受け入れて終えるまで・どのフォームをいつ誰が記入するか・始める前のゲート・運営の穴）を確認する時。⚠️ **索引であり手順の本文は持たない**（本文は各行の正本） |
 | `docs/architecture/intervention-decision-engine.md` | 介入決定エンジン (Layer 5-7) の設計を確認する時 |
 | `docs/architecture/domain-adapter-boundary.md` | ドメインアダプタ境界 (Layer 0-3) の設計を確認する時 |
 | `docs/architecture/personalization-and-online-learning.md` | 個人化・オンライン学習 (ADR-008 / ADR-009) を確認する時 |
