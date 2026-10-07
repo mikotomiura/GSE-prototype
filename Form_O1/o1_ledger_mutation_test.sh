@@ -324,6 +324,8 @@ mutate "終了判定: 受領日よりずっと前の日付も使う" \
   's/      if \(k < recvKey - O1_LEDGER_END_MAX_LAG_DAYS\) \{/      if (false) {/'
 mutate "終了判定: 重複行の下の記入を捨てる" \
   's/            if \(!a\) cur\[c\] = r\[c\];\n            else if \(b && a !== b\) cur\[c\] = a \+ " ／ " \+ b;/            0;/'
+mutate "終了判定: 遅れて届いた記録があっても片づけを可にする" \
+  's/      if \(late > 0\) settle = O1_LEDGER_END_SETTLE_CHECK;\n      else if/      if/'
 mutate "終了判定: 遅れて届いた除外を表示しない" \
   's/        \(r\.late \? /        (false ? /'
 mutate "終了判定: 起算日が無いと除外数を出さない" \

@@ -1732,6 +1732,13 @@ const endJudge = (files, reg, today) =>
   check("§12★ 14 日より遅れて届いた日付を除外したら、起算日を確かめるよう出す", /14 日より遅れて届いた日付 1 件を除外・起算日を確かめる/.test(endRowOf(ss, "P053")[5]), true);
 }
 {
+  // Codex 3 度目（2026-10-08）: 遅れて届いた記録がある人は片づけを「要確認」・遅れだけの人も件数を出す
+  const lateEnded = endJudge([EF("P071", "2026-08-20", "2026-09-10"), EF("P071", "2026-09-01")], undefined, key("2026-09-25"))[0];
+  check("§12★ 遅れて届いた記録がある終了の人は、片づけを「要確認」にする", [lateEnded.status, lateEnded.late, lateEnded.settle], ["終了（連絡待ち）", 1, "要確認（遅れて届いた記録がある・起算日を確かめてから）"]);
+  const lateOnly = endJudge([EF("P072", "2026-09-01", "2026-09-20")], undefined, TODAY)[0];
+  check("§12★ 遅れて届いた記録しか無い人は記録待ちで、遅れの数を持つ", [lateOnly.status, lateOnly.late, lateOnly.firstKey], ["記録待ち", 1, null]);
+}
+{
   // 重複行で両方に違う記入 → 両方残す
   const ss = makeSpreadsheet(["O1 登録ログ"]);
   regTab(ss, [["2026-09-01 09:00:00", "register", "P061", "ok", "new-pid", ""]]);
@@ -1745,6 +1752,13 @@ const endJudge = (files, reg, today) =>
   T.rows.splice(i + 1, 0, dup);
   call(env, "o1LedgerRun");
   check("§12★ 重複行の記入が食い違えば、両方を「／」でつないで残す", endRowOf(ss, "P061")[11], "上 ／ 下");
+  const i2 = T.rows.findIndex((r) => r && r[0] === "P061");
+  T.rows[i2][8] = new env.ctx.Date(2026, 9, 1);
+  const dup2 = T.rows[i2].slice();
+  dup2[8] = new env.ctx.Date(2026, 9, 2);
+  T.rows.splice(i2 + 1, 0, dup2);
+  call(env, "o1LedgerRun");
+  check("§12 重複行の日付は整形してからつなぐ（英語の長い文字列にしない）", /GMT|Thu|Fri|Oct/.test(String(endRowOf(ss, "P061")[8])), false);
 }
 {
   // タイムゾーンが日本でなければ表題に出す

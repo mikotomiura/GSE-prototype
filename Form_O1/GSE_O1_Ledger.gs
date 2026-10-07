@@ -173,6 +173,8 @@ var O1_LEDGER_END_SETTLE_ELAPSED = "可（終了から " + O1_LEDGER_END_SETTLE_
 var O1_LEDGER_END_SETTLE_WAIT = "待つ（最後の記録が届く途中かもしれない）";
 /** ⚠️ 登録ログに無い P-ID（★ 判定しない・通知しない）。 */
 var O1_LEDGER_END_UNREG = "判定できない（登録が見つからない）";
+/** ⚠️ 遅れて届いた記録を除外した人の片づけの案内（★ 起算日を確かめるまで「可」にしない）。 */
+var O1_LEDGER_END_SETTLE_CHECK = "要確認（遅れて届いた記録がある・起算日を確かめてから）";
 /**
  * ★ 名前の日付を、サーバ側の**受領日**で挟む（2026-10-08 レビュー指摘・3 系統一致）。
  *   名前は端末由来 = 信用しない（時計の狂い・他人の P-ID を名乗る送信）。
@@ -310,7 +312,8 @@ function o1LedgerEndJudge_(files, registered, todayKey) {
     var ended = todayKey > endKey;
     var settle = "";
     if (ended) {
-      if (last >= endKey) settle = O1_LEDGER_END_SETTLE_ARRIVED;
+      if (late > 0) settle = O1_LEDGER_END_SETTLE_CHECK;
+      else if (last >= endKey) settle = O1_LEDGER_END_SETTLE_ARRIVED;
       else if (todayKey - (endKey + 1) >= O1_LEDGER_END_SETTLE_DAYS) settle = O1_LEDGER_END_SETTLE_ELAPSED;
       else settle = O1_LEDGER_END_SETTLE_WAIT;
     }
@@ -1062,6 +1065,12 @@ function o1LedgerWriteEnd_(ss, endRows, nowMs, info) {
       }
     }
   }
+  var manualText = function (v) {
+    if (v === undefined || v === null) return "";
+    // ★ 書式つきで貼られた日付は Date で返る → 長い英語の文字列にしない
+    if (v instanceof Date) return isFinite(v.getTime()) ? Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd") : "";
+    return v;
+  };
   var manualByPid = Object.create(null);
   if (sheet && oldLast > H) {
     var prev = sheet.getRange(H + 1, 1, oldLast - H, width).getValues();
@@ -1074,8 +1083,8 @@ function o1LedgerWriteEnd_(ss, endRows, nowMs, info) {
         var cur = manualByPid[pid];
         [O1_LEDGER_END_MANUAL.contacted, O1_LEDGER_END_MANUAL.surveySent, O1_LEDGER_END_MANUAL.cleaned, O1_LEDGER_END_MANUAL.memo].forEach(
           function (c) {
-            var a = String(cur[c] === undefined || cur[c] === null ? "" : cur[c]).trim();
-            var b = String(r[c] === undefined || r[c] === null ? "" : r[c]).trim();
+            var a = String(manualText(cur[c])).trim(); // ★ 日付は整形してから比べてつなぐ
+            var b = String(manualText(r[c])).trim();
             if (!a) cur[c] = r[c];
             else if (b && a !== b) cur[c] = a + " ／ " + b;
           }
@@ -1089,12 +1098,6 @@ function o1LedgerWriteEnd_(ss, endRows, nowMs, info) {
     var r = [];
     for (var i = 0; i < width; i++) r.push("");
     return r;
-  };
-  var manualText = function (v) {
-    if (v === undefined || v === null) return "";
-    // ★ 書式つきで貼られた日付は Date で返る → 長い英語の文字列にしない
-    if (v instanceof Date) return isFinite(v.getTime()) ? Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd") : "";
-    return v;
   };
   var warn = [];
   var tz = Session.getScriptTimeZone();
