@@ -822,7 +822,8 @@ function migrateO1ConsentForm() {
         problems.length +
         " 件）:\n  - " +
         problems.join("\n  - ") +
-        "\n登録用の設問が欠けているだけなら repairO1ConsentRegistrationItems() で足せます。"
+        "\n登録用の設問が欠けているだけなら repairO1ConsentRegistrationItems() で足せます。" +
+        "\n並びの崩れ（末尾に足した同意項目が登録用の設問より後ろにある等）は、編集画面で直してください。"
     );
   } else if (!added) {
     Logger.log("✅ 追加する同意項目はありません（フォームはコードと一致しています）");
@@ -898,11 +899,12 @@ function o1ConsentFormShapeProblems_(form) {
       lastTitle = e.title;
     }
   });
-  var known = {};
+  // タイトルが constructor などでも誤らないよう、プロトタイプの無い辞書を使う（Codex 指摘・2026-10-08）。
+  var known = Object.create(null);
   expected.forEach(function (e) {
     known[e.title] = true;
   });
-  var seen = {};
+  var seen = Object.create(null);
   titles.forEach(function (t) {
     if (!known[t]) problems.push("コードに無い設問: " + t);
     if (seen[t] === 1) problems.push("同じタイトルの設問が 2 つ以上ある: " + t);
@@ -955,7 +957,7 @@ function checkO1ConsentFormShape() {
 function repairO1ConsentRegistrationItems() {
   var form = o1OpenFixed_(o1Config_().consentFormId, "FORM_ID_O1_CONSENT");
   var all = form.getItems();
-  var present = {};
+  var present = Object.create(null);
   all.forEach(function (it) {
     present[it.getTitle()] = true;
   });
@@ -964,7 +966,10 @@ function repairO1ConsentRegistrationItems() {
     return !present[t];
   });
   if (!missing.length) {
-    Logger.log("✅ 登録用の設問は 4 つとも揃っています。何も足しませんでした。");
+    Logger.log(
+      "✅ 登録用の設問は 4 つとも揃っています。何も足しませんでした。" +
+        "フォーム全体の照合は checkO1ConsentFormShape() で行ってください。"
+    );
     return 0;
   }
 
@@ -974,8 +979,11 @@ function repairO1ConsentRegistrationItems() {
   // ここでしか止まらない。
   var kept = O1_REGISTRATION_TITLES.slice(0, O1_REGISTRATION_TITLES.indexOf(missing[0]));
   var wantLast = kept.length ? kept[kept.length - 1] : O1_REGISTRATION_HEADER;
-  var lastTitle = all.length ? all[all.length - 1].getTitle() : "";
-  if (lastTitle !== wantLast) {
+  var lastItem = all.length ? all[all.length - 1] : null;
+  var lastTitle = lastItem ? lastItem.getTitle() : "";
+  // タイトルだけでなく種類も見る（登録用の設問と同じ名前の見出しで通り抜けないように。Codex 指摘・2026-10-08）。
+  var lastIsHeader = !!lastItem && lastItem.getType() === FormApp.ItemType.SECTION_HEADER;
+  if (lastTitle !== wantLast || lastIsHeader !== !kept.length) {
     throw new Error(
       "⛔ フォームの最後の設問が「" +
         lastTitle +
@@ -988,7 +996,7 @@ function repairO1ConsentRegistrationItems() {
 
   // 欠け以外の問題（並び・種類・必須・選択肢・重複・同意項目の欠け）が足す前からあるなら、
   // 足しても一致しないので足さずに人に返す。
-  var missingMsg = {};
+  var missingMsg = Object.create(null);
   missing.forEach(function (t) {
     missingMsg["欠けている: " + t] = true;
   });

@@ -339,9 +339,9 @@ mutate "修復: メールアドレスを足さない" \
 mutate "修復: 最後に来るべき設問を、欠けより前でなく残っている全部から取る" \
   's/  var kept = O1_REGISTRATION_TITLES\.slice\(0, O1_REGISTRATION_TITLES\.indexOf\(missing\[0\]\)\);/  var kept = O1_REGISTRATION_TITLES.filter(function (t) { return !!present[t]; });/'
 mutate "修復: フォームの最後の設問を見ない" \
-  's/  if \(lastTitle !== wantLast\) \{/  if (false) {/'
+  's/  if \(lastTitle !== wantLast \|\| lastIsHeader !== !kept\.length\) \{/  if (false) {/'
 mutate "修復: 揃っていても足す（冪等でない）" \
-  's/  if \(!missing\.length\) \{\n    Logger\.log\("✅ 登録用の設問は 4 つとも揃っています。何も足しませんでした。"\);\n    return 0;\n  \}/  if (!missing.length) missing = [Q_O1_OS];/'
+  's/  if \(!missing\.length\) \{\n    Logger\.log\(\n.*?\n    \);\n    return 0;\n  \}/  if (!missing.length) missing = [Q_O1_OS];/s'
 mutate "照合: 欠けを挙げない" \
   's/      problems\.push\("欠けている: " \+ e\.title\);\n      return;/      return;/'
 mutate "照合: 必須の有無を見ない" \
@@ -362,6 +362,10 @@ mutate "照合: 重複を見ない" \
   's/    if \(seen\[t\] === 1\) problems\.push/    if (false) problems.push/'
 mutate "修復: 欠け以外の問題を見ずに足す" \
   's/  if \(other\.length\) \{/  if (false) {/'
+mutate "照合: 既知のタイトルの辞書にプロトタイプを持たせる" \
+  's/  var known = Object\.create\(null\);/  var known = {};/'
+mutate "修復: 最後の設問の種類を見ない" \
+  's/  if \(lastTitle !== wantLast \|\| lastIsHeader !== !kept\.length\) \{/  if (lastTitle !== wantLast) {/'
 mutate "構築: 登録用の設問を足す順を入れ替える" \
   's/var O1_REGISTRATION_TITLES = \[Q_O1_PID, Q_O1_NAME, Q_O1_EMAIL, Q_O1_OS\];/var O1_REGISTRATION_TITLES = [Q_O1_PID, Q_O1_EMAIL, Q_O1_NAME, Q_O1_OS];/'
 

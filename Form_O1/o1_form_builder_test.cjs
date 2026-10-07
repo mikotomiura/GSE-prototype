@@ -3220,6 +3220,35 @@ const shapeProblems = (ctx, form) => {
 }
 
 {
+  // cross-review（Codex・2026-10-08）: プロトタイプのキー名のタイトルと、登録用と同名の見出し
+  const c1 = makeReadyCtx();
+  c1.buildO1ConsentForm();
+  const f1 = c1.__forms[O1_C];
+  const odd = makeItem("TEXT");
+  odd.__title = "constructor";
+  f1.__items.push(odd);
+  push(
+    "§19 照合: タイトルが constructor の設問も「コードに無い設問」として挙げる",
+    shapeProblems(c1, f1).some((p) => p.indexOf("コードに無い設問: constructor") >= 0),
+    { problems: shapeProblems(c1, f1) }
+  );
+  // …参加者ID → パソコンの種類 → 見出し「参加者ID…」で、お名前とメールアドレスが欠けている形
+  const c2 = makeReadyCtx();
+  c2.buildO1ConsentForm();
+  const f2 = c2.__forms[O1_C];
+  f2.__responses = 1;
+  f2.__items = f2.__items.filter((i) => i.__title !== c2.Q_O1_NAME && i.__title !== c2.Q_O1_EMAIL);
+  f2.addSectionHeaderItem().setTitle(c2.Q_O1_PID);
+  const n2 = f2.__items.length;
+  const r2 = attempt(() => c2.repairO1ConsentRegistrationItems());
+  push(
+    "§19 修復: 最後が登録用と同名の見出しなら足さずに止まる",
+    r2.threw && f2.__items.length === n2,
+    { threw: r2.threw, message: r2.message }
+  );
+}
+
+{
   // 10/03 の誤報の回帰: 同意項目が揃っていても、登録用が欠けていれば「一致しています」と言わない。
   const ctx = brokenConsentCtx(3);
   const r = attempt(() => ctx.migrateO1ConsentForm());
@@ -3252,10 +3281,10 @@ cases.forEach((c) => {
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
 // ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-// 2026-10-08: §19 を足して 275 件なので下限 270。
-if (cases.length < 270) {
+// 2026-10-08: §19 を足して 277 件なので下限 272。
+if (cases.length < 272) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（270 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（272 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }
