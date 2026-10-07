@@ -16,20 +16,28 @@ Subject: Pre-submission inquiry: ethics approval for a keystroke-timing dataset 
 
 Dear Editor,
 
-I am an independent researcher affiliated with ZEN University (Japan) and plan to submit to
-Behavior Research Methods. Before designing the study, I would like to ask how the journal would
-treat the following situation.
+I am [a student / a faculty member] at ZEN University (Japan) and plan to submit to
+Behavior Research Methods. Before designing a follow-up study, I would like to ask how the journal
+would treat the following situation.
 
-1. The study records keystroke timing in participants' everyday computer work (key category such
-   as "letter / backspace / space / enter" and timestamps only; no characters, no screen content,
-   no application names). Participants are a small group (3–5) recruited directly by me, with
-   written (electronic) informed consent, an on-screen recording indicator, one-click pause, and
-   the right to delete any time range.
+1. An ongoing study records participants' everyday computer work over several weeks. It records:
+   the time and category of each key press (e.g., letter / backspace / space / enter / symbol);
+   the duration of Japanese input-method conversion; the number and length of paste operations
+   (not their content); the times of window-focus changes (not which application); per-second
+   counts of mouse movement and wheel use (and clicks on Windows); the keyboard layout type;
+   the app version and recording-health status; on macOS, intervals of secure (password) input
+   (not their content); a random per-installation identifier; and work-state estimates computed
+   from these. It does NOT record which characters were typed, screen content, application or
+   window names, URLs, file names, or mouse position. Because recording is continuous, the data
+   show when a participant was or was not working at the computer; the consent form states this.
+   Participants are a small group (3–5) recruited directly by me, with electronic informed
+   consent, an on-screen recording indicator, one-click pause, and the right to delete any
+   time range.
 2. My university does not appear to operate a research ethics committee for non-medical human
    research [I am confirming this with the university]. Data collection started on 8 October 2026
    without committee approval or exemption, based on my own assessment.
-3. I understand from the submission guidelines that retrospective approval usually cannot be
-   obtained and that proceeding to peer review is at the Editor's discretion.
+3. The submission guidelines state that "retrospective ethics approval usually cannot be obtained
+   and it may not be possible to consider the manuscript for peer review."
 
 My questions:
 (a) If an independent ethics committee reviews and approves (or exempts) the secondary analysis and
@@ -64,10 +72,16 @@ Thank you for your time.
 倫理審査の承認または免除の記載を求められるため、次の点をお尋ねします。
 
 研究の概要:
-・パソコン作業中のキー操作の「種類と時刻」だけを記録し、作業の状態の推定に使えるかを調べる研究です
- （打った文字・画面の内容・アプリ名は記録しません）。
+・ふだんのパソコン作業のあいだの操作を数週間記録し、作業の状態の推定に使えるかを調べる研究です。
+・記録するもの: キーを押した時刻と種類（文字キー / バックスペース / 空白 / 改行 / 記号 など）／
+ 日本語入力の変換にかかった時間／貼り付けの回数と文字数（中身は取りません）／画面の切り替えが起きた時刻
+ （どのアプリかは取りません）／マウスの動いた量・ホイールの回数（Windows では押した回数も）を 1 秒ごとに数えた値／
+ キーボードの配列の種類・アプリの版・記録の状態／（macOS のみ）パスワード入力中だった区間の印／
+ 導入ごとの乱数の識別子／これらから計算した作業の状態の推定値。
+・記録しないもの: 打った文字・画面の内容・アプリやウィンドウの名前・URL・ファイル名・マウスの位置。
+・常時記録するため「いつ作業していて、いつ離れていたか」の時間の並びが残ります（同意文書に明記しています）。
 ・対象は研究者が直接説明する 3〜5 名程度で、電子的な説明と同意を取っています。
-・医学系の研究ではありません。
+・健康や医療についての知識を得ることを目的とする研究ではありません。
 
 お尋ねしたいこと:
 1. 本学に、人を対象とする研究（医学系以外）の倫理審査を行う委員会や手続きはありますか。
@@ -96,8 +110,15 @@ Thank you for your time.
 申請の前に、次の点をお尋ねします。
 
 研究の概要:
-・パソコン作業中のキー操作の「種類と時刻」だけを記録し、作業の状態の推定に使えるかを調べる研究です
- （打った文字・画面の内容・アプリ名は記録しません）。対象は 3〜5 名程度、電子的な説明と同意を取ります。
+・ふだんのパソコン作業のあいだの操作を数週間記録し、作業の状態の推定に使えるかを調べる研究です。
+・記録するもの: キーを押した時刻と種類（文字キー / バックスペース / 空白 / 改行 / 記号 など）／
+ 日本語入力の変換にかかった時間／貼り付けの回数と文字数（中身は取りません）／画面の切り替えが起きた時刻
+ （どのアプリかは取りません）／マウスの動いた量・ホイールの回数（Windows では押した回数も）を 1 秒ごとに数えた値／
+ キーボードの配列の種類・アプリの版・記録の状態／（macOS のみ）パスワード入力中だった区間の印／
+ 導入ごとの乱数の識別子／これらから計算した作業の状態の推定値。
+・記録しないもの: 打った文字・画面の内容・アプリやウィンドウの名前・URL・ファイル名・マウスの位置。
+・常時記録するため「いつ作業していて、いつ離れていたか」の時間の並びが残ります。
+・対象は 3〜5 名程度、電子的な説明と同意を取ります。健康や医療についての知識を得ることを目的とする研究ではありません。
 ・成果は学術雑誌（Behavior Research Methods）への投稿と、加工した記録の公開（申請制を検討）を予定しています。
 
 お尋ねしたいこと:

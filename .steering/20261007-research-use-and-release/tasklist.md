@@ -24,5 +24,6 @@
 - [ ] ADR-039 の【決 5】【決 6】【決 9】
 
 ## 仕上げ
-- [ ] レビュー（code-reviewer ＋ /cross-review）
-- [ ] コミット・PR
+- [x] レビュー（code-reviewer ＋ Codex）→ 指摘を全部反映（decisions.md 判断 6）。⚠️ Codex の再レビューは予算超過で未実施
+- [x] コミット
+- [ ] PR（研究者の確認後）
