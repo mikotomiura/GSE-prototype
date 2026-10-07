@@ -38,36 +38,68 @@ def outside(page, fitz):
     return found
 
 
+def _segments(path, fitz):
+    """The straight pieces of a drawn path: lines as they are, rectangles and quads by their edges, a curve by the
+    chord and the two control legs."""
+    for item in path["items"]:
+        kind = item[0]
+        if kind == "l":
+            yield item[1], item[2]
+        elif kind == "c":
+            yield item[1], item[2]
+            yield item[3], item[4]
+            yield item[1], item[4]
+        elif kind in ("re", "qu"):
+            q = fitz.Rect(item[1]).quad if kind == "re" else item[1]
+            corners = [q.ul, q.ur, q.lr, q.ll]
+            for k in range(4):
+                yield corners[k], corners[(k + 1) % 4]
+
+
+def _crosses(a, b, rect):
+    """Whether the segment from a to b passes through rect (sampled at a tenth of a point)."""
+    steps = max(1, int(max(abs(b.x - a.x), abs(b.y - a.y)) * 10))
+    return any(rect.contains((a.x + (b.x - a.x) * k / steps, a.y + (b.y - a.y) * k / steps)) for k in range(steps + 1))
+
+
 def over_number(page, number, fitz):
-    """Text or rules that cover the page number: (kind, rectangle, text). The page number is a span whose text is the
-    number alone; something covers it when it overlaps at least a quarter of the span's area. A long table that runs
-    into the foot of the page prints over the number while staying on the paper."""
+    """Text or rules that cover the page number: (kind, rectangle, text), or None when no span holds the number. The
+    page number is a span whose text is the number alone; another span covers it when it overlaps at least a quarter
+    of the span's area, a filled path when its fill does, and a stroked path when one of its lines passes through it.
+    A long table that runs into the foot of the page prints over the number while staying on the paper."""
     spans = [(fitz.Rect(s["bbox"]), s["text"])
              for b in page.get_text("dict", clip=fitz.INFINITE_RECT())["blocks"] for l in b.get("lines", [])
              for s in l["spans"] if s["text"].strip()]
-    rules = [p["rect"] for p in page.get_drawings()]
+    paths = page.get_drawings()
+    numbers = [i for i, (rect, text) in enumerate(spans) if text.strip() == str(number) and not rect.is_empty]
+    if not numbers:
+        return None
     found = []
-    for rect, text in spans:
-        if text.strip() != str(number) or rect.is_empty:
-            continue
+    for i in numbers:
+        rect = spans[i][0]
         least = 0.25 * rect.get_area()
-        for other, t in spans:
-            if other != rect and (other & rect).get_area() >= least:
+        for j, (other, t) in enumerate(spans):
+            if j != i and (other & rect).get_area() >= least:
                 found.append(("text", other, t))
-        for other in rules:
-            # A rule has no area, so it is widened by half a point and found when it crosses the number at all.
-            if (fitz.Rect(other) + (-0.5, -0.5, 0.5, 0.5) & rect).get_area() > 0:
-                found.append(("rule", other, ""))
+        for path in paths:
+            if path.get("fill") is not None and (fitz.Rect(path["rect"]) & rect).get_area() >= least:
+                found.append(("fill", path["rect"], ""))
+            elif path.get("color") is not None and any(
+                    _crosses(a, b, rect + (-0.5, -0.5, 0.5, 0.5)) for a, b in _segments(path, fitz)):
+                found.append(("rule", path["rect"], ""))
     return found
 
 
 def check(path, fitz):
-    """Print one line per page with content outside it or over its number; return the numbers of such pages."""
-    bad = covered = 0
+    """Print one line per page with content outside it or over its number; return the numbers of such pages and of
+    pages whose number (taken to be the page's position in the file) was not found, which are not checked for it."""
+    bad = covered = unnumbered = 0
     with fitz.open(path) as doc:
         for number, page in enumerate(doc, 1):
-            for label, parts in (("outside the page", outside(page, fitz)),
-                                 ("over the page number", over_number(page, number, fitz))):
+            cover = over_number(page, number, fitz)
+            if cover is None:
+                unnumbered += 1
+            for label, parts in (("outside the page", outside(page, fitz)), ("over the page number", cover or [])):
                 if not parts:
                     continue
                 if label == "outside the page":
@@ -78,7 +110,7 @@ def check(path, fitz):
                 # ascii() keeps a dash or a ligature of the text from stopping the print on a narrow console encoding.
                 print("%s: page %d: %d parts %s, the first a %s at %s %s" % (
                     path, number, len(parts), label, kind, [round(v) for v in rect], ascii(text[:40])))
-    return bad, covered
+    return bad, covered, unnumbered
 
 
 def selftest(fitz):
@@ -122,7 +154,7 @@ def selftest(fitz):
     # The page number: alone it passes; text printed over it or a rule across it is found; the same digit inside a
     # line of text, next to other words, is not taken for a cover.
     numbered = fitz.open()
-    for _ in range(5):
+    for _ in range(8):
         numbered.new_page(width=300, height=400)
     numbered[0].insert_text((150, 380), "1")
     numbered[0].insert_text((40, 100), "a line of text above")
@@ -130,11 +162,23 @@ def selftest(fitz):
     numbered[1].insert_text((140, 381), "text printed over it")
     numbered[2].insert_text((150, 380), "3")
     numbered[2].draw_line((100, 377), (200, 377))
-    numbered[3].insert_text((40, 100), "in 4 of the cases")
+    numbered[3].insert_text((40, 100), "in 4 of the cases")  # the digit is a word of a line, not a span of its own
     numbered[4].insert_text((150, 380), "5")
     numbered[4].insert_text((152, 300), "text well above the number")
-    covers = [len(over_number(p, n, fitz)) for n, p in enumerate(numbered, 1)]
-    ok = ok and covers[0] == 0 and covers[1] >= 1 and covers[2] >= 1 and covers[3] == 0 and covers[4] == 0
+    # A frame drawn around the number touches none of it; a filled box over it covers it.
+    numbered[5].insert_text((150, 380), "6")
+    numbered[5].draw_rect(fitz.Rect(140, 366, 166, 388))
+    numbered[6].insert_text((150, 380), "7")
+    numbered[6].draw_rect(fitz.Rect(145, 368, 162, 386), color=None, fill=(0, 0, 0))
+    # Another span with the very rectangle of the number (a digit of the same width, in another colour so that it is
+    # a span of its own) covers it.
+    numbered[7].insert_text((150, 380), "8")
+    numbered[7].insert_text((150, 380), "9", color=(1, 0, 0))
+    covers = [over_number(p, n, fitz) for n, p in enumerate(numbered, 1)]
+    counts = [None if c is None else len(c) for c in covers]
+    ok = (ok and counts[0] == 0 and counts[1] >= 1 and counts[2] >= 1 and counts[3] is None and counts[4] == 0
+          and counts[5] == 0 and counts[6] >= 1 and counts[7] >= 1)
+    covers = counts
     print("selftest %s (%s; %s)" % ("OK" if ok else "FAILED", results, covers))
     return 0 if ok else 1
 
@@ -154,13 +198,13 @@ def main(argv):
     for path in argv:
         # Every PDF gets one summary line, also when it cannot be read.
         try:
-            n, covered = check(path, fitz)
+            n, covered, unnumbered = check(path, fitz)
         except Exception as e:  # a missing or unreadable PDF, or an older PyMuPDF
             print("%s: pages not checked: %s" % (path, type(e).__name__))
             unchecked = True
             continue
-        print("%s: %d pages with content outside the page, %d pages with content over the page number" % (
-            path, n, covered))
+        print("%s: %d pages with content outside the page, %d pages with content over the page number, %d pages "
+              "whose number was not found (not checked for it)" % (path, n, covered, unnumbered))
         total += n + covered
     return 3 if unchecked else (1 if total else 0)
 
