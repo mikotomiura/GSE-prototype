@@ -23,9 +23,9 @@
   "_comment_merge_2026_10_05_ime_manuscript": "2026-10-05: docs/ime-manuscript-outline に origin/main（PR #305）を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり和を採った: 起点 21212 / 1 回 ＋ 本ブランチ +105911 / +2（完了時レビューの Codex 2 巡） ＋ origin/main +110927 / +2（macOS の観測可能性の訂正の Codex 2 巡） = 238050 / 5 回。",
   "_comment_merge_2026_10_02": "2026-10-02: feature/o1-task-kind-other に origin/main を merge した際、today が衝突した。_comment_merge_2026_09_11 の規則どおり和を採った: 起点 108230 / 2 回 ＋ 本ブランチ +30373 / +1（ADR-037 の /cross-review） ＋ origin/main +263512 / +6（AI 疲労 文献 DB の Codex） = 402115 / 9 回。",
   "today": {
-    "date": "2026-10-07",
-    "tokens_used": 233740,
-    "invocations": 8
+    "date": "2026-10-08",
+    "tokens_used": 122567,
+    "invocations": 2
   },
   "history": [
     {
@@ -242,6 +242,11 @@
       "date": "2026-10-06",
       "tokens_used": 555564,
       "invocations": 18
+    },
+    {
+      "date": "2026-10-07",
+      "tokens_used": 233740,
+      "invocations": 8
     }
   ],
   "_comment_history_2026_09_11": "⚠️★★★ 2026-09-11: history から 7 件が消えていたので復元した (1970-01-01 / 2026-06-16 / 08-01 / 08-02 / 08-03 / 08-05 / 08-06)。★ 消えた 5 件は歴代最大級の消費日 (08-03 が 614107・08-01 が 363718) であり、⚠️ **上限を 200000→300000 へ上げた同じ commit で最大消費の記録が消える**のは、意図が正しくても改竄に見える。★ 実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)。→ ★ history は append-only とし、消さない。 ★★★ 2026-09-21 訂正（研究者判断・blockers.md 起票 22）: ⚠️ **上の『実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)』は誤りである。** ★ 回転させるコードは scripts/run-codex-review.sh の `d['history'] = sorted(...)[-30:]` に在った。★ 2026-09-21 に実測: 日付が 09-20 → 09-21 へ変わった最初の記帳で、歴代最古の 2026-08-12 (25290 / 1 回) が実際に消えた。→ ★ 切り捨てを外し、消えた 1 件を実測値で戻した。★ history の件数上限は【置かない】と裁定した（研究者判断 2026-09-21）。⚠️ 本文は当時の記録として残してあるので、この訂正と併せて読むこと。",
