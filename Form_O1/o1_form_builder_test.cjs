@@ -2771,9 +2771,9 @@ function readyWithFormUrls(extra) {
     { lens: [...new Set(sh.__grid.map((r) => r.length))] }
   );
   push(
-    "§18★ O1-C は【募集時】・O1-S は【終了判定の後】・アプリは受付メールで届く、と書いてある",
+    "§18★ O1-C は【募集時】・O1-S は「O1 終了判定」タブで終了になった後・アプリは受付メールで届く、と書いてある",
     /【募集時】/.test(whenOf("O1-C 説明・同意（参加登録）— 回答 URL")) &&
-      /終了判定の後/.test(whenOf("O1-S 終了後アンケート — 回答 URL")) &&
+      /「O1 終了判定」タブが終了（連絡待ち）になった後/.test(whenOf("O1-S 終了後アンケート — 回答 URL")) &&
       /受付メール/.test(whenOf("アプリの入手先（O1_APP_DOWNLOAD_URL）")),
     {
       c: whenOf("O1-C 説明・同意（参加登録）— 回答 URL"),

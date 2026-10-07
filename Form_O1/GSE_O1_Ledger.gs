@@ -55,6 +55,9 @@
  *      ときは本ファイルは走らないので、これだけが最後の砦である。併せて、**途絶タブのバナーの「更新」時刻を
  *      ときどき見る**（★ 「通知が来ない = 異常なし」ではない）。
  *   4. `o1LedgerRun()` を 1 回手で実行する（★ 台帳と途絶のタブが**足される**・初回は現在の異常を 1 通で通知）。
+ *      ★ 2026-10-07 から「O1 終了判定」タブも作る（最初に記録した日から暦日 21 日・`O1_LEDGER_END_*`）。
+ *        研究者は右の 4 列（終了連絡日・O1-S 送付日・片づけ確認日・メモ）に書く（★ P-ID ごとに残る）。
+ *        新しく終了になった人は研究者宛ての通知に入る（★ 参加者には送らない）。
  *   5. `installO1LedgerTrigger()` を実行する（6 時間ごと・★ 冪等）。
  *   6. ⚠️★★★ **関数セレクタは表示を信用しない**（押す直前に読み直す）。このプロジェクトには
  *      書き込む関数 (`o1LedgerRun` / `installO1LedgerTrigger`) と読み取りの関数が同居する。
@@ -148,8 +151,225 @@ var O1_LEDGER_PROP_FAIL = "O1_LEDGER_FAIL";
 var O1_LEDGER_OPS_RENOTIFY_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ============================================================
+// ★ O1 終了判定（研究者判断 2026-10-07・`.steering/20261007-o1-end-judgement/`）
+// ============================================================
+// ★ 基準: 起算日 = **最初に記録した日**（届いたファイル名のセッション開始の日付の最小）、
+//   その日を 1 日目として **暦日 21 日目が過ぎたら終了**（事前登録草案【決 3-a・3-b】と同じ）。
+//   届いた日の数は**条件にしない**（数を出すだけ）。
+// ⚠️ 台帳が見られるのは**ファイル名だけ**（中身は暗号化）→ 事前登録の「有効日」は判定できない。
+// ⚠️ 判定は人を動かさない: 「終了（連絡待ち）」でも**参加者には何も送らない**（連絡と O1-S は研究者が手で送る）。
+var O1_LEDGER_END_TAB = "O1 終了判定";
+/** ★ 期間（暦日）。起算日を 1 日目として、この日数目が過ぎたら終了。 */
+var O1_LEDGER_END_DAYS = 21;
+/** ★ 片づけを案内してよい目安: 終了から何日たったか（猶予 48 時間 ＋ 1 日ごとの区切り）。 */
+var O1_LEDGER_END_SETTLE_DAYS = 3;
+var O1_LEDGER_END_WAIT = "記録待ち";
+var O1_LEDGER_END_ACTIVE = "期間中";
+var O1_LEDGER_END_ENDED = "終了（連絡待ち）";
+var O1_LEDGER_END_CONTACTED = "終了（連絡済み）";
+var O1_LEDGER_END_DONE = "完了";
+var O1_LEDGER_END_SETTLE_ARRIVED = "可（21 日目以降の記録が届いた）";
+var O1_LEDGER_END_SETTLE_ELAPSED = "可（終了から " + O1_LEDGER_END_SETTLE_DAYS + " 日たった）";
+var O1_LEDGER_END_SETTLE_WAIT = "待つ（最後の記録が届く途中かもしれない）";
+/** ⚠️ 登録ログに無い P-ID（★ 判定しない・通知しない）。 */
+var O1_LEDGER_END_UNREG = "判定できない（登録が見つからない）";
+/** ⚠️ 遅れて届いた記録を除外した人の片づけの案内（★ 起算日を確かめるまで「可」にしない）。 */
+var O1_LEDGER_END_SETTLE_CHECK = "要確認（遅れて届いた記録がある・起算日を確かめてから）";
+/**
+ * ★ 名前の日付を、サーバ側の**受領日**で挟む（2026-10-08 レビュー指摘・3 系統一致）。
+ *   名前は端末由来 = 信用しない（時計の狂い・他人の P-ID を名乗る送信）。
+ *   受領日より後 → 使わない（未来の日付で「片づけ可」を早めない）／
+ *   受領日よりこの日数より前 → 使わない（古い日付で起算日を過去へ飛ばさない）。
+ *   ★ 48 時間の猶予 ＋ 送れなかった日の後送りを見込んだ幅。
+ */
+var O1_LEDGER_END_MAX_LAG_DAYS = 14;
+/** ⚠️★★★ **氏名・メールの列は無い**（★ 増やすときも足さないこと）。後ろの 4 列は研究者が書く。 */
+var O1_LEDGER_END_HEAD = [
+  "P-ID",
+  "判定",
+  "起算日（1 日目）",
+  "21 日目",
+  "今日は何日目",
+  "届いた日の数（21 日のうち）",
+  "最後の記録の日",
+  "片づけの案内",
+  "終了連絡日",
+  "O1-S 送付日",
+  "片づけ確認日",
+  "メモ"
+];
+/** ★ 研究者が書く列（0 始まり）。⚠️ `O1_LEDGER_END_HEAD` と同時に直す。 */
+var O1_LEDGER_END_MANUAL = { contacted: 8, surveySent: 9, cleaned: 10, memo: 11 };
+/** 見出しの行（★ 1 表題 / 2 注意 / 3 見出し / 4〜 データ）。 */
+var O1_LEDGER_END_HEAD_ROW = 3;
+/** ★ 通知済みの終了の P-ID（JSON 配列）。 */
+var O1_LEDGER_PROP_ENDED = "O1_LEDGER_ENDED";
+
+// ============================================================
 // 純関数（★ ローカルの guard test が同じ関数を呼ぶ）
 // ============================================================
+
+/** `YYYY-MM-DD…` の文字列か Date → 暦日の通し番号（UTC の日数）。読めなければ null。 */
+function o1LedgerDayKey_(v) {
+  var y, mo, d;
+  if (v instanceof Date) {
+    if (!isFinite(v.getTime())) return null;
+    y = v.getFullYear();
+    mo = v.getMonth() + 1;
+    d = v.getDate();
+  } else {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v === undefined || v === null ? "" : v).trim());
+    if (!m) return null;
+    y = +m[1];
+    mo = +m[2];
+    d = +m[3];
+  }
+  if (y < 2000) return null; // ⚠️ `Date.UTC` は年 0〜99 を 1900 年代と読む（security-checker L-5）
+  var t = Date.UTC(y, mo - 1, d);
+  if (!isFinite(t)) return null;
+  var back = new Date(t);
+  if (back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d) return null; // 2026-02-31 のような日付を弾く
+  return Math.round(t / O1_LEDGER_DAY_MS);
+}
+
+/** 暦日の通し番号 → `YYYY-MM-DD`。 */
+function o1LedgerKeyToStr_(key) {
+  var d = new Date(key * O1_LEDGER_DAY_MS);
+  var p = function (n) {
+    return (n < 10 ? "0" : "") + n;
+  };
+  return d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate());
+}
+
+/**
+ * P-ID ごとに期間の終わりを判定する。★ 純関数（今日は引数で受ける）。
+ *
+ * @param {Array<{pid:string, start:string, receivedMs:number}>} files
+ *   台帳の O1 の行（`start` = 名前のセッション開始・`receivedMs` = Drive の受領＝サーバ側の時刻）
+ * @param {Object<string, number>} registered  P-ID → 最古の登録 epoch ms
+ * @param {number} todayKey  今日（スクリプトのタイムゾーン）の暦日の通し番号
+ * @return {Array<Object>} P-ID の昇順
+ *
+ * ⚠️ 名前の日付は次のときだけ使う（使わなかった数は `ignored` に出す）:
+ *   登録日以降 ／ その記録の受領日以前（＋1 日は時差の分）／ 受領日から `O1_LEDGER_END_MAX_LAG_DAYS` 日以内。
+ * ⚠️ **登録ログに無い P-ID は判定しない**（`O1_LEDGER_END_UNREG`・通知もしない）。
+ *   ★ 登録日の下限が効かないので、古い日付や他人の名乗りで即「終了」にされうるため。
+ * ★ 届いた日の数 = 期間（起算日〜21 日目）に**セッション開始の日付がある日**の数。
+ */
+function o1LedgerEndJudge_(files, registered, todayKey) {
+  var byPidEnd = Object.create(null);
+  (files || []).forEach(function (f) {
+    if (!byPidEnd[f.pid]) byPidEnd[f.pid] = [];
+    byPidEnd[f.pid].push(f);
+  });
+  var seenEnd = Object.create(null);
+  var pids = [];
+  Object.keys(byPidEnd).forEach(function (p) {
+    seenEnd[p] = true;
+    pids.push(p);
+  });
+  Object.keys(registered || {}).forEach(function (p) {
+    if (!seenEnd[p]) pids.push(p);
+  });
+  pids.sort();
+
+  return pids.map(function (pid) {
+    var regMs = registered && registered[pid] !== undefined ? registered[pid] : null;
+    var regKey = regMs === null ? null : o1LedgerDayKey_(new Date(regMs));
+    if (regKey === null) {
+      return { pid: pid, status: O1_LEDGER_END_UNREG, firstKey: null, endKey: null, dayNo: null, daysIn: 0, lastKey: null, settle: "", ignored: 0, late: 0 };
+    }
+    var keys = Object.create(null);
+    var ignored = 0;
+    var late = 0; // ★ 受領日の 14 日より前（＝遅れて届いた）で除外した数。起算日がずれうるので別に出す（Codex 指摘）
+    (byPidEnd[pid] || []).forEach(function (f) {
+      var k = o1LedgerDayKey_(f.start);
+      var recvKey = isFinite(f.receivedMs) ? o1LedgerDayKey_(new Date(f.receivedMs)) : null;
+      if (k === null || recvKey === null || k < regKey || k > recvKey + 1) {
+        ignored++;
+        return;
+      }
+      if (k < recvKey - O1_LEDGER_END_MAX_LAG_DAYS) {
+        late++;
+        return;
+      }
+      keys[k] = true;
+    });
+    var list = Object.keys(keys)
+      .map(Number)
+      .sort(function (a, b) {
+        return a - b;
+      });
+    if (list.length === 0) {
+      return { pid: pid, status: O1_LEDGER_END_WAIT, firstKey: null, endKey: null, dayNo: null, daysIn: 0, lastKey: null, settle: "", ignored: ignored, late: late };
+    }
+    var first = list[0];
+    var endKey = first + O1_LEDGER_END_DAYS - 1;
+    var last = list[list.length - 1];
+    var daysIn = list.filter(function (k) {
+      return k <= endKey;
+    }).length;
+    var ended = todayKey > endKey;
+    var settle = "";
+    if (ended) {
+      if (late > 0) settle = O1_LEDGER_END_SETTLE_CHECK;
+      else if (last >= endKey) settle = O1_LEDGER_END_SETTLE_ARRIVED;
+      else if (todayKey - (endKey + 1) >= O1_LEDGER_END_SETTLE_DAYS) settle = O1_LEDGER_END_SETTLE_ELAPSED;
+      else settle = O1_LEDGER_END_SETTLE_WAIT;
+    }
+    return {
+      pid: pid,
+      status: ended ? O1_LEDGER_END_ENDED : O1_LEDGER_END_ACTIVE,
+      firstKey: first,
+      endKey: endKey,
+      dayNo: todayKey - first + 1,
+      daysIn: daysIn,
+      lastKey: last,
+      settle: settle,
+      ignored: ignored,
+      late: late
+    };
+  });
+}
+
+/**
+ * 研究者の記入を見て判定の表示を進める。★ 純関数。
+ * 終了 ＋ 片づけ確認日あり → 完了 / 終了 ＋ 終了連絡日あり → 終了（連絡済み）。
+ */
+function o1LedgerEndShown_(status, manual) {
+  if (status !== O1_LEDGER_END_ENDED) return status;
+  var filled = function (v) {
+    return String(v === undefined || v === null ? "" : v).trim() !== "";
+  };
+  if (manual && filled(manual[O1_LEDGER_END_MANUAL.cleaned])) return O1_LEDGER_END_DONE;
+  if (manual && filled(manual[O1_LEDGER_END_MANUAL.contacted])) return O1_LEDGER_END_CONTACTED;
+  return status;
+}
+
+/**
+ * 新しく終了になった P-ID を返す。★ 純関数。
+ * @param {Array<string>|null} prevEnded  通知済みの P-ID
+ * @param {Array<Object>} endRows  `o1LedgerEndJudge_` の戻り
+ * @return {{added: Array<Object>, next: Array<string>}}
+ *   ★ `next` は「今終了している P-ID」（★ 削除で消えた P-ID は落ちる）。
+ */
+function o1LedgerEndAlerts_(prevEnded, endRows) {
+  var before = Object.create(null);
+  (prevEnded || []).forEach(function (p) {
+    before[p] = true;
+  });
+  var ended = (endRows || []).filter(function (r) {
+    return r.status === O1_LEDGER_END_ENDED;
+  });
+  return {
+    added: ended.filter(function (r) {
+      return !before[r.pid];
+    }),
+    next: ended.map(function (r) {
+      return r.pid;
+    })
+  };
+}
 
 /**
  * 受領ファイル名を読む。★ 通すのは **O1 の提出物の形だけ**。読めなければ null。
@@ -428,7 +648,7 @@ function o1LedgerSafeCell_(v) {
  * 通知メールの本文。⚠️ **P-ID・判定・日数だけ**（★ シートの URL・Drive の ID・ファイル名は載せない）。
  * ⚠️ 「やめた」とは書かない（★ 判定は届いたかの話・ADR-034 D4 2b）。
  */
-function o1LedgerMailText_(alerts, rows, foreignCount, opsAdded, opsOnly) {
+function o1LedgerMailText_(alerts, rows, foreignCount, opsAdded, opsOnly, endedAdded) {
   var byPid = {};
   rows.forEach(function (r) {
     byPid[r.pid] = r;
@@ -457,15 +677,37 @@ function o1LedgerMailText_(alerts, rows, foreignCount, opsAdded, opsOnly) {
   (opsAdded || []).forEach(function (k) {
     lines.push("- （運用）" + (opsText[k] || k));
   });
-  var heading = opsOnly
+  var ended = endedAdded || [];
+  ended.forEach(function (e) {
+    // ⚠️ 日付を載せない（★ 本文は「P-ID・判定・日数だけ」の約束・security-checker L-1）。
+    lines.push(
+      "- " + e.pid + ": " + O1_LEDGER_END_ENDED + " — " + O1_LEDGER_END_DAYS + " 日目が過ぎました（今日 " + e.dayNo +
+        " 日目）。届いた日 " + e.daysIn + " / " + O1_LEDGER_END_DAYS + " 日。"
+    );
+  });
+  // ★ 終了だけの回は、見出しを終了の知らせにする（⚠️ 「要確認」「運用」と読ませない）。
+  var endedOnly = ended.length > 0 && alerts.length === 0 && (opsAdded || []).length === 0;
+  var heading = endedOnly
+    ? "O1 受領台帳: 期間（" + O1_LEDGER_END_DAYS + " 日）が終わった人がいます。"
+    : opsOnly
     ? "O1 受領台帳: 台帳の運用に要確認があります（★ P-ID の異常ではありません）。"
     : "O1 受領台帳: 新しく要確認になったものがあります。";
+  var endNote = ended.length
+    ? "\n※ 期間が終わった人へ、終了の連絡と O1-S の URL（「O1 リンク集」）を研究者が 1 人ずつ手で送ってください（★ 参加者には何も自動で送っていません）。" +
+      "\n※ アプリの片づけは「" + O1_LEDGER_END_TAB + "」タブの「片づけの案内」が「可」になってから案内してください（最後の記録が届く前に消すと届きません）。"
+    : "";
+  // ★ 終了だけの回は、途絶の注意を付けない（code-reviewer LOW・読み違いを誘わない）。
+  var stallNote = endedOnly
+    ? ""
+    : "\n\n※ 分かるのは「届いたか」だけです（アプリ未起動・回線断・32 MB 超は区別できません）。" +
+      "\n※ 「途絶」「未受領」は「やめた」ではありません。本人へ連絡して確かめてください。";
   return (
     heading + "\n\n" +
     lines.join("\n") +
-    "\n\n※ 分かるのは「届いたか」だけです（アプリ未起動・回線断・32 MB 超は区別できません）。" +
-    "\n※ 「途絶」「未受領」は「やめた」ではありません。本人へ連絡して確かめてください。" +
-    "\n※ 詳細は O1 管理シートの「" + O1_LEDGER_DASH_TAB + "」タブを見てください。\n"
+    (endedOnly ? "\n" : "") +
+    stallNote +
+    endNote +
+    "\n※ 詳細は O1 管理シートの「" + O1_LEDGER_DASH_TAB + "」「" + O1_LEDGER_END_TAB + "」タブを見てください。\n"
   );
 }
 
@@ -714,7 +956,14 @@ function o1LedgerDashboard_(cfg, ss, scan) {
         badRows++;
         return;
       }
-      files.push({ pid: pid, day: day, receivedMs: ms, bytes: bytes, dup: String(v[O1_LEDGER_COL.dup]) === "dup" });
+      files.push({
+        pid: pid,
+        day: day,
+        receivedMs: ms,
+        bytes: bytes,
+        dup: String(v[O1_LEDGER_COL.dup]) === "dup",
+        start: v[O1_LEDGER_COL.start] // ★ 終了判定が使う（名前のセッション開始・`YYYY-MM-DD HH:MM:SS`）
+      });
     });
   }
 
@@ -772,11 +1021,181 @@ function o1LedgerDashboard_(cfg, ss, scan) {
     regSkipped: regInfo.skipped
   });
   console.log("途絶: " + rows.length + " 人・判定あり " + rows.filter(function (r) { return r.flags.length; }).length + " 人");
+
+  // ★ 終了判定（2026-10-07）。⚠️ タブを書けなくても途絶の通知は止めない（判定そのものは通知に渡す）。
+  var todayKey = o1LedgerDayKey_(new Date(nowMs));
+  var endRows = o1LedgerEndJudge_(files, regInfo.registered, todayKey);
+  try {
+    o1LedgerWriteEnd_(ss, endRows, nowMs, { truncated: !!(scan && scan.truncated), regSkipped: regInfo.skipped });
+  } catch (e) {
+    console.log("⚠️★ 「" + O1_LEDGER_END_TAB + "」を**更新できていません**（★ 途絶の判定と通知は続けます）: " + e);
+  }
   return {
     rows: rows,
+    endRows: endRows,
     foreignCount: foreignCount,
     ops: { truncated: !!(scan && scan.truncated), regSkipped: regInfo.skipped, badRows: badRows }
   };
+}
+
+/**
+ * 「O1 終了判定」タブを**書き直す**（★ 派生表・研究者の記入欄だけ P-ID ごとに引き継ぐ）。
+ *
+ *   行 1 表題（更新時刻・警告）/ 行 2 注意 / 行 3 見出し / 行 4〜 P-ID ごと
+ * ⚠️ 研究者の記入は **P-ID で**引き継ぐ。★ 台帳と登録ログから消えた P-ID（削除の求め）の行は残さない。
+ * ⚠️ 全セルを**テキスト形式**にしてから書く（★ 研究者が日付を打っても日付に化けず、数式にもならない）。
+ * ⚠️★★ **`clear()` しない**（2026-10-08 レビュー指摘・3 系統一致）: 消してから書く途中で失敗すると、
+ *   研究者の記入（ほかに写しが無い）が戻らず消える。→ 上から**上書き**し、余った行だけ空で上書きする。
+ * ⚠️★ **見出しが想定と違えば書かない**（研究者が列を挿入すると、記入が別の列へずれて引き継がれるため）。
+ * ⚠️ 読んでから書くまでの間に研究者が書いた分は上書きされうる（★ 6 時間ごとの数秒・注意の行に書く）。
+ */
+function o1LedgerWriteEnd_(ss, endRows, nowMs, info) {
+  var width = O1_LEDGER_END_HEAD.length;
+  var H = O1_LEDGER_END_HEAD_ROW;
+  var sheet = ss.getSheetByName(O1_LEDGER_END_TAB);
+  var oldLast = sheet ? sheet.getLastRow() : 0;
+  if (sheet && oldLast >= H) {
+    var head = sheet.getRange(H, 1, 1, width).getValues()[0];
+    for (var hc = 0; hc < width; hc++) {
+      if (String(head[hc]).trim() !== O1_LEDGER_END_HEAD[hc]) {
+        throw new Error(
+          "「" + O1_LEDGER_END_TAB + "」の見出しの " + (hc + 1) + " 列目が想定と違います（★ 記入がずれないよう書いていません。" +
+            "列を元に戻すか、タブを消してから次の実行を待ってください）"
+        );
+      }
+    }
+  }
+  var manualText = function (v) {
+    if (v === undefined || v === null) return "";
+    // ★ 書式つきで貼られた日付は Date で返る → 長い英語の文字列にしない
+    if (v instanceof Date) return isFinite(v.getTime()) ? Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd") : "";
+    return v;
+  };
+  var manualByPid = Object.create(null);
+  if (sheet && oldLast > H) {
+    var prev = sheet.getRange(H + 1, 1, oldLast - H, width).getValues();
+    prev.forEach(function (r) {
+      var pid = String(r[0] === undefined || r[0] === null ? "" : r[0]).trim();
+      if (!pid) return;
+      if (manualByPid[pid]) {
+        // ⚠️★ 下の行の記入を捨てない（Codex 指摘）: 空なら下の値で埋め、食い違えば「／」でつないで両方残す。
+        console.log("⚠️ 「" + O1_LEDGER_END_TAB + "」に同じ P-ID の行が複数あります（★ 記入を合わせて 1 行にします）。");
+        var cur = manualByPid[pid];
+        [O1_LEDGER_END_MANUAL.contacted, O1_LEDGER_END_MANUAL.surveySent, O1_LEDGER_END_MANUAL.cleaned, O1_LEDGER_END_MANUAL.memo].forEach(
+          function (c) {
+            var a = String(manualText(cur[c])).trim(); // ★ 日付は整形してから比べてつなぐ
+            var b = String(manualText(r[c])).trim();
+            if (!a) cur[c] = r[c];
+            else if (b && a !== b) cur[c] = a + " ／ " + b;
+          }
+        );
+        return;
+      }
+      manualByPid[pid] = r.slice();
+    });
+  }
+  var blank = function () {
+    var r = [];
+    for (var i = 0; i < width; i++) r.push("");
+    return r;
+  };
+  var warn = [];
+  var tz = Session.getScriptTimeZone();
+  if (tz !== "Asia/Tokyo") warn.push("⚠️ スクリプトのタイムゾーンが " + tz + "（★ Asia/Tokyo でないと日付が 1 日ずれうる）");
+  if (info && info.truncated) warn.push("⚠️ 走査打ち切り（★ 最新の受領が反映されていないかもしれない）");
+  if (info && info.regSkipped) warn.push("⚠️ 登録ログの日時が読めない行 " + info.regSkipped + "（★ その人は「判定できない」）");
+  var title = blank();
+  title[0] =
+    "O1 終了判定（起算日 = 最初に記録した日・" + O1_LEDGER_END_DAYS + " 日目が過ぎたら終了）　更新 " + o1LedgerFmt_(nowMs) +
+    (warn.length ? "　／　" + warn.join("　／　") : "");
+  var note = blank();
+  note[0] =
+    "★ 終了しても参加者には何も自動で送りません。研究者が 1 人ずつ終了の連絡と O1-S（「O1 リンク集」）を送り、" +
+    "「終了連絡日」「O1-S 送付日」に書いてください。片づけ（自動起動オフ → フォルダを消す）は「片づけの案内」が「可」になってから案内し、" +
+    "確かめたら「片づけ確認日」に書きます。★ 右の 4 列だけは作り直しても残ります（P-ID ごと・6 時間ごとの更新の数秒間に書いた分は上書きされうる）。" +
+    "⚠️ 氏名・メールは書かない。⚠️ 先頭が = + - @ の記入は ⚠ が前に付きます。⚠️ 列を挿入しない（ずれを防ぐため、見出しが違うと更新を止めます）。" +
+    "⚠️ 届いた日の数は記録が届いた日の数で、計器が健全だったかは分かりません。⚠️ 日付は名前の日付を受領日で挟んで使います（範囲外は除外して数を出す）。";
+  var out = [title, note, O1_LEDGER_END_HEAD.slice()];
+  var order = {};
+  order[O1_LEDGER_END_ENDED] = 0;
+  order[O1_LEDGER_END_CONTACTED] = 1;
+  order[O1_LEDGER_END_ACTIVE] = 2;
+  order[O1_LEDGER_END_WAIT] = 3;
+  order[O1_LEDGER_END_UNREG] = 4;
+  order[O1_LEDGER_END_DONE] = 5;
+  var shown = endRows.map(function (r) {
+    var m = manualByPid[r.pid] || blank();
+    return { r: r, m: m, status: o1LedgerEndShown_(r.status, m) };
+  });
+  shown.sort(function (a, b) {
+    var d = order[a.status] - order[b.status];
+    if (d) return d;
+    return a.r.pid < b.r.pid ? -1 : a.r.pid > b.r.pid ? 1 : 0;
+  });
+  shown.forEach(function (x) {
+    var r = x.r;
+    var line = [
+      r.pid,
+      x.status,
+      r.firstKey === null ? "" : o1LedgerKeyToStr_(r.firstKey),
+      r.endKey === null ? "" : o1LedgerKeyToStr_(r.endKey),
+      r.dayNo === null ? "" : r.dayNo > O1_LEDGER_END_DAYS ? "終了（" + r.dayNo + " 日目）" : r.dayNo + " / " + O1_LEDGER_END_DAYS,
+      (r.status === O1_LEDGER_END_UNREG ? "" : String(r.daysIn)) +
+        (r.ignored ? "（範囲外の日付 " + r.ignored + " 件を除外）" : "") +
+        (r.late ? "（⚠️ " + O1_LEDGER_END_MAX_LAG_DAYS + " 日より遅れて届いた日付 " + r.late + " 件を除外・起算日を確かめる）" : ""),
+      r.lastKey === null ? "" : o1LedgerKeyToStr_(r.lastKey),
+      r.settle
+    ];
+    [O1_LEDGER_END_MANUAL.contacted, O1_LEDGER_END_MANUAL.surveySent, O1_LEDGER_END_MANUAL.cleaned, O1_LEDGER_END_MANUAL.memo].forEach(
+      function (c) {
+        line[c] = manualText(x.m[c]);
+      }
+    );
+    out.push(line);
+  });
+  if (shown.length === 0) {
+    var none = blank();
+    none[0] = "（まだ登録も受領もありません）";
+    out.push(none);
+  }
+  out = out.map(function (row) {
+    return row.map(function (cell) {
+      return o1LedgerSafeCell_(String(cell)); // ★ 研究者の記入欄も含めて無害化する
+    });
+  });
+  // ★ 前より短くなった分は空で上書きする（⚠️ `clear()` を使わない）。
+  var total = Math.max(out.length, oldLast);
+  for (var extra = out.length; extra < total; extra++) out.push(blank());
+
+  if (!sheet) sheet = ss.insertSheet(O1_LEDGER_END_TAB);
+  o1LedgerEnsureRows_(sheet, out.length);
+  var all = sheet.getRange(1, 1, out.length, width);
+  all.setNumberFormat("@");
+  all.setValues(out);
+  try {
+    var U = O1_UI;
+    all.setBackground(null).setFontColor(null).setFontWeight(null); // ★ 前回の色を残さない（値は消さない）
+    sheet.getRange(1, 1, 1, width).setBackground(U.navy).setFontColor(U.white).setFontWeight("bold");
+    sheet.getRange(2, 1, 1, width).setBackground(U.accent).setFontColor(U.ink).setWrap(true);
+    sheet.getRange(H, 1, 1, width).setBackground(U.navy).setFontColor(U.white).setFontWeight("bold");
+    sheet.getRange(H, O1_LEDGER_END_MANUAL.contacted + 1, 1, 4).setBackground(U.warnFg); // ★ 研究者が書く列
+    for (var i = 0; i < shown.length; i++) {
+      var st = shown[i].status;
+      var cell = sheet.getRange(H + 1 + i, 2);
+      if (st === O1_LEDGER_END_ENDED) cell.setBackground(U.dangerBg).setFontColor(U.dangerFg).setFontWeight("bold");
+      else if (st === O1_LEDGER_END_CONTACTED) cell.setBackground(U.warnBg).setFontColor(U.warnFg);
+      else if (st === O1_LEDGER_END_DONE || st === O1_LEDGER_END_UNREG) cell.setBackground(U.grayBg).setFontColor(U.muted);
+      else if (st === O1_LEDGER_END_ACTIVE) cell.setFontColor(U.okFg);
+    }
+    if (shown.length > 0) sheet.getRange(H + 1, O1_LEDGER_END_MANUAL.contacted + 1, shown.length, 4).setBackground(U.warnBg);
+    [70, 130, 110, 100, 110, 150, 110, 230, 100, 100, 100, 200].forEach(function (w, c) {
+      sheet.setColumnWidth(c + 1, w);
+    });
+    sheet.setFrozenRows(H);
+    sheet.setTabColor(U.okFg);
+  } catch (e2) {
+    console.log("⚠️ 終了判定タブの見た目を整えられませんでした（★ 値には影響しません）: " + e2);
+  }
 }
 
 // ============================================================
@@ -1064,17 +1483,22 @@ function o1LedgerNotify_(cfg, result) {
   var lastOpsMs = Number(props.getProperty(O1_LEDGER_PROP_OPS_LAST) || 0);
   var opsDue = opsPlan.added.length === 0 && opsStillActive && nowForOps - lastOpsMs >= O1_LEDGER_OPS_RENOTIFY_MS;
   var opsToSend = opsDue ? Object.keys(opsPlan.next) : opsPlan.added;
+  // ★ 終了判定（2026-10-07）: **新しく**終了になった人だけを 1 回知らせる。
+  //   ⚠️ 走査が打ち切られた回は保留する（★ 途絶と同じ規律・状態も更新しない）。
+  var endPlan = o1LedgerEndAlerts_(o1LedgerReadJson_(props, O1_LEDGER_PROP_ENDED), result.endRows || []);
+  var endedToSend = reliable ? endPlan.added : [];
 
   var persist = function () {
     if (reliable) props.setProperty(O1_LEDGER_PROP_STATE, JSON.stringify(plan.next));
+    if (reliable) props.setProperty(O1_LEDGER_PROP_ENDED, JSON.stringify(endPlan.next));
     props.setProperty(O1_LEDGER_PROP_OPS, JSON.stringify(opsPlan.next));
     if (opsToSend.length > 0) props.setProperty(O1_LEDGER_PROP_OPS_LAST, String(nowForOps));
   };
-  if (alerts.length === 0 && opsToSend.length === 0) {
+  if (alerts.length === 0 && opsToSend.length === 0 && endedToSend.length === 0) {
     persist();
     return;
   }
-  var body = o1LedgerMailText_(alerts, result.rows, result.foreignCount, opsToSend, alerts.length === 0);
+  var body = o1LedgerMailText_(alerts, result.rows, result.foreignCount, opsToSend, alerts.length === 0, endedToSend);
   if (!cfg.email) {
     console.log("⚠️ " + O1_LEDGER_PROP_EMAIL + " が未設定なので通知を送っていません（★ 設定後の次回に 1 通届きます）:\n" + body);
     return;
@@ -1082,7 +1506,15 @@ function o1LedgerNotify_(cfg, result) {
   try {
     MailApp.sendEmail(
       cfg.email,
-      "[GSE O1] 受領台帳: " + (alerts.length === 0 ? "運用アラート " + opsToSend.length : "要確認 " + (alerts.length + opsToSend.length)) + " 件",
+      "[GSE O1] 受領台帳: " +
+        [
+          alerts.length > 0 ? "要確認 " + (alerts.length + opsToSend.length) + " 件" : opsToSend.length > 0 ? "運用アラート " + opsToSend.length + " 件" : "",
+          endedToSend.length > 0 ? "期間終了 " + endedToSend.length + " 人" : ""
+        ]
+          .filter(function (s) {
+            return s;
+          })
+          .join("・"),
       body
     );
   } catch (err) {
@@ -1090,7 +1522,7 @@ function o1LedgerNotify_(cfg, result) {
     return;
   }
   persist();
-  console.log("✉️ 研究者宛てに通知しました（" + (alerts.length + opsToSend.length) + " 件）。");
+  console.log("✉️ 研究者宛てに通知しました（" + (alerts.length + opsToSend.length) + " 件・期間終了 " + endedToSend.length + " 人）。");
 }
 
 /**
