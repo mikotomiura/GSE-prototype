@@ -446,6 +446,7 @@ def selftest():
     expect("./ の付いた README の日本語訳も通る", "./README.ja.md", J + "\n", [])
     expect("README の日本語訳の全角の禁止語は赤", "README.ja.md", "ＧＳＥ\n", ["forbidden:gse"])
     expect("README の日本語訳の判断の番号は赤", "README.ja.md", "判断 219 による\n", ["forbidden:internal-ref"])
+    expect("README の日本語訳の全角の判断の番号も赤", "README.ja.md", "判断 ＃２１９\n", ["forbidden:internal-ref"])
     expect("README の日本語訳の上流は赤", "README.ja.md", "上流の実装\n", ["forbidden:relation"])
     expect("README の日本語訳の苦闘は赤", "README.ja.md", "生産的苦闘\n", ["forbidden:gse"])
     expect("ほかの日本語は訳では通る", "README.ja.md", "判断の材料と 2 つの設定\n", [])

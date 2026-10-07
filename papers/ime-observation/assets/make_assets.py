@@ -161,8 +161,8 @@ def records(theme):
                     % (x, y, w, c["okbg"], c["ok"]))
         body.append(_text(x + w / 2, y + 15, cat, 11.5, c["text"], family=MONO, anchor="middle"))
         x += w + 6
-    body.append(_text(38, 222, "Every conversion session it detects", 13, c["text"], 600))
-    body.append(_text(290, 222, "(some, such as one cut off at 20 s, write no row)", 12.5, c["muted"]))
+    body.append(_text(38, 222, "Each detected session, when it ends", 13, c["text"], 600))
+    body.append(_text(290, 222, "(a session cut off, as at 20 s, writes no row)", 12.5, c["muted"]))
     body.append(_text(38, 242, "its duration (dwell_ms), the arrow-key presses during it (nav)", 12.5, c["muted"]))
     body.append(_text(38, 260, "and whether it was abandoned (abandon)", 12.5, c["muted"]))
     body.append('  <rect x="624" y="60" width="312" height="222" rx="10" fill="%s" stroke="%s"/>'
@@ -181,9 +181,9 @@ def records(theme):
     body.append(_text(24, 328, "the article measures how far they reveal the typed phrase.", 12.5, c["muted"]))
     return _frame(c, 960, 346, "What the logger writes, and what it never writes",
                   "Written to the log in the format obs/1: for every press and release of an observed key, one of "
-                  "fourteen categories, the time and whether it was a press; for every conversion session that the "
-                  "logger detects, its duration, the arrow-key presses during it and whether it was abandoned (some "
-                  "sessions, such as one cut off at 20 s, write no row). Never written: key names and key codes, "
+                  "fourteen categories, the time and whether it was a press; when a conversion session that the logger "
+                  "detects ends, its duration, the arrow-key presses during it and whether it was abandoned (a session "
+                  "cut off, for example at 20 s, writes no row). Never written: key names and key codes, "
                   "characters and readings, candidate strings and window names. Some categories stand for a single "
                   "key, and the key rows are not anonymous by construction; the article measures how far they "
                   "reveal the typed phrase.", body)

@@ -82,16 +82,16 @@ limitations.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/records-dark.svg">
   <img src="assets/records-light.svg" width="100%" alt="Written to the log: for every press and release of an observed
-  key, one of fourteen categories, the time and whether it was a press; for every conversion session detected, its
-  duration, the arrow-key presses during it and whether it was abandoned. Never written: key names and key codes,
-  characters and readings, candidate strings and window names.">
+  key, one of fourteen categories, the time and whether it was a press; when a detected conversion session ends, its
+  duration, the arrow-key presses during it and whether it was abandoned (a session cut off writes no row). Never
+  written: key names and key codes, characters and readings, candidate strings and window names.">
 </picture>
 
 The logger (`kit/logger/`) runs on Windows and macOS. It writes a row for every press and release of the keys it
-observes, with one of fourteen key categories and the time, and a summary row for every conversion session that it
-detects, with its duration, the number of arrow-key presses during it and whether it was abandoned. Which keys are
-observed and how a session is detected differ by system, and some sessions write no row (one cut off at 20 s, for
-example); the article gives the rules of each system. The key name and the key code are discarded and only the
+observes, with one of fourteen key categories and the time, and, when a conversion session that it detects ends, a
+summary row with its duration, the number of arrow-key presses during it and whether it was abandoned; a session that
+is cut off instead, for example at 20 s, writes no row. Which keys are observed and how a session is detected differ
+by system; the article gives the rules of each system. The key name and the key code are discarded and only the
 category is written, though some categories, such as `backspace` or `enter`, stand for a single key. No character,
 candidate string, reading or window name is recorded. The format of the log, `obs/1`, is specified in
 [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md). The key rows are not anonymous by construction: the article
