@@ -2299,24 +2299,27 @@ AGREEMENT_HEAD = ("Speed & Texts & Reference SD & Bias & Lower limit & Upper lim
 
 
 def table_text_agreement(cells):
-    """Table 10: per-text agreement of the four measures per cell and speed, primary scope."""
+    """Table 10: per-text agreement of the four measures per cell and speed, primary scope. Its rows do not fit one
+    rotated page of the manuscript, so it is a landscape long table that continues on the next page with the heading
+    repeated (main.tex loads longtable and pdflscape and defines \\tablecontinued)."""
+    head = "Cell & Measure & " + AGREEMENT_HEAD
     lines = [GENERATED_NOTE,
-             "\\begin{sidewaystable}[p]\n",
+             "\\begin{landscape}\n",
              "{\\footnotesize\n",
+             "\\begin{longtable}{L{0.13}L{0.13}L{0.06}L{0.06}L{0.09}L{0.13}L{0.13}L{0.13}L{0.13}}\n",
              "\\caption{Per-text agreement per cell, measure and speed, primary scope: bias and limits of agreement of the "
              "per-text difference (observation minus reference) and ICC(A,1), each with a 95\\%% interval that resamples "
              "blocks; Texts is the number of texts with a value on both sides, and Reference SD the standard deviation "
              "of the reference's values between those texts. An estimate printed without an interval has its interval "
              "withheld (the reason is in the result file); %s: no value; %s. The values hold for this design's numbers "
-             "of trials per text and are not compared between speeds}\n" % (NO_VALUE, REFERENCE_CONSTANT_NOTE),
-             "\\label{tab:text-agreement}\n",
-             "\\begin{tabular}{L{0.13}L{0.13}L{0.06}L{0.06}L{0.09}L{0.13}L{0.13}L{0.13}L{0.13}}\n",
-             "\\toprule\n",
-             "Cell & Measure & " + AGREEMENT_HEAD,
-             "\\midrule\n"]
+             "of trials per text and are not compared between speeds}" % (NO_VALUE, REFERENCE_CONSTANT_NOTE),
+             "\\label{tab:text-agreement}\\\\\n",
+             "\\toprule\n", head, "\\midrule\n\\endfirsthead\n",
+             "\\tablecontinued{9}\\\\\n",
+             "\\toprule\n", head, "\\midrule\n\\endhead\n"]
     for cell in cells:
         lines += _agreement_rows(cell, PRIMARY_SCOPE, cell_name(cell.label))
-    lines += ["\\bottomrule\n", "\\end{tabular}\n", "}\n", "\\end{sidewaystable}\n"]
+    lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n"]
     return "".join(lines)
 
 
@@ -4204,6 +4207,16 @@ def selftest():
         check("the generated files say that they are generated", all(
             data.decode("utf-8").startswith("% Generated") for n, data in files.items() if n.endswith(".tex")))
         t10 = files["table-text-agreement.tex"].decode("utf-8")
+        heads = [l for l in t10.splitlines() if l.startswith("Cell & Measure & Speed & ")]
+        check("q3: the per-text table is a landscape long table that continues on the next page: the caption and the "
+              "label on the first page only, the heading repeated under a continuation line, one column per heading "
+              "entry, and no sideways float, which runs off the page",
+              t10.count("\\begin{landscape}") == 1 and t10.count("\\begin{longtable}") == 1
+              and "sidewaystable" not in t10 and t10.count("\\caption{") == 1 and len(heads) == 2
+              and heads[0].count("&") + 1 == 9 and t10.count("\\tablecontinued{9}") == 1
+              and t10.index("\\caption{") < t10.index("\\label{tab:text-agreement}") < t10.index("\\endfirsthead")
+              < t10.index("\\tablecontinued{9}") < t10.index("\\endhead") < t10.index("\\end{longtable}"),
+              t10[:800])
         check("q3: a duration is in whole milliseconds with a minus sign, and the bias, the lower and the upper limit "
               "and the ICC each come with their own interval",
               "Mean conversion time (ms) & slow & 40 & 117 & $-$1,234 [$-$1,235, $-$1,233] & $-$2,134 [$-$2,135, $-$2,133] "
