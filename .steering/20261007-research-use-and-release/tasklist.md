@@ -31,5 +31,5 @@
 ## 追加（研究者の依頼 2026-10-07）
 - [x] G1 / O1 のゲートを回す → G1 の schema parity を gse-dataset PR #2 で直す（判断 7）
 - [x] `docs/g1-o1-operations-workflow.md`（判断 8）＋ agent-shared のリンクハブ
-- [x] レビュー（code-reviewer）。⚠️ Codex は当日の予算超過で未実施
+- [x] レビュー（code-reviewer: HIGH 1・MEDIUM 4・LOW 5 → 全部反映）。⚠️ Codex は当日の予算超過で未実施
 - [ ] CI 緑で PR #322 をマージ
