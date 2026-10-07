@@ -332,6 +332,32 @@ mutate "リンク集: 同じ項目名は最後の値を採る" \
 mutate "リンク集: O1-S の「いつ」から終了判定の後を消す" \
   's/【期間の終わり・「O1 終了判定」タブが終了（連絡待ち）になった後】研究者が/研究者が/'
 
+# --- §19 O1-C の登録用の設問の照合と修復（2026-10-08） -------------------------
+mutate "修復: メールアドレスを足さない" \
+  's/(  missing\.forEach\(function \(t\) \{\n)    o1AddRegistrationItem_\(form, t\);/$1    if (t !== Q_O1_EMAIL) o1AddRegistrationItem_(form, t);/'
+mutate "修復: 欠けが後ろ側にまとまっているかを見ない" \
+  's/  if \(suffix\.join\("\\n"\) !== missing\.join\("\\n"\)\) \{/  if (false) {/'
+mutate "修復: フォームの最後の設問を見ない" \
+  's/  if \(lastTitle !== wantLast\) \{/  if (false) {/'
+mutate "修復: 揃っていても足す（冪等でない）" \
+  's/  if \(!missing\.length\) \{\n    Logger\.log\("✅ 登録用の設問は 4 つとも揃っています。何も足しませんでした。"\);\n    return 0;\n  \}/  if (!missing.length) missing = [Q_O1_OS];/'
+mutate "照合: 欠けを挙げない" \
+  's/      problems\.push\("欠けている: " \+ e\.title\);\n      return;/      return;/'
+mutate "照合: 必須の有無を見ない" \
+  's/      if \(req !== e\.required\) \{/      if (false) {/'
+mutate "照合: 並びを見ない" \
+  's/    if \(pos < lastPos\) \{/    if (false) {/'
+mutate "照合: 種類を見ない" \
+  's/    if \(type !== e\.type\) \{/    if (false) {/'
+mutate "照合: 同意項目を期待に入れない" \
+  's/(  o1ConsentItemTitles_\(\)\.forEach\(function \(t\) \{\n)    expected\.push\(\{ title: t, type: FormApp\.ItemType\.CHECKBOX, required: true \}\);/$1    0;/'
+mutate "照合: 一致しないのに true を返す" \
+  's/      problems\.join\("\\n  - "\)\n  \);\n  return false;/      problems.join("\\n  - ")\n  );\n  return true;/'
+mutate "migrate: 照合せずに「一致しています」と言う（10/03 の誤報）" \
+  's/  var problems = o1ConsentFormShapeProblems_\(form\);\n  if \(problems\.length\) \{\n    Logger\.log\(\n      \(added \? "" : "追加する同意項目はありません。"\)/  var problems = [];\n  if (problems.length) {\n    Logger.log(\n      (added ? "" : "追加する同意項目はありません。")/'
+mutate "構築: 登録用の設問を足す順を入れ替える" \
+  's/var O1_REGISTRATION_TITLES = \[Q_O1_PID, Q_O1_NAME, Q_O1_EMAIL, Q_O1_OS\];/var O1_REGISTRATION_TITLES = [Q_O1_PID, Q_O1_EMAIL, Q_O1_NAME, Q_O1_OS];/'
+
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"
 if [ "$FAIL" -eq 0 ]; then
