@@ -310,6 +310,20 @@ mutate "見た目: system の灰を先に置く（満杯の警告行が埋もれ
 mutate "見た目: 書式の例外を捕まえない" \
   's/  try \{\n    styled = o1StyleMgmtTab_/  { styled = o1StyleMgmtTab_/'
 
+# ★ 2026-10-07 O1 リンク集（`.steering/20261007-o1-links-tab/`）
+mutate "リンク集: ロスタータブを持つ表にも書く" \
+  's/(function o1BuildLinksTab_\(ss\) \{\n.*?\n)  if \(ss\.getSheetByName\("参加者ロスター"\)\) \{/$1  if (false) {/s'
+mutate "リンク集: 手で入れた欄を引き継がない" \
+  's/  var manual = o1ReadLinksManual_\(sheet\);/  var manual = {};/'
+mutate "リンク集: 数式を無害化しない" \
+  's/    return r\.map\(o1PlainText_\);/    return r;/'
+mutate "リンク集: 運営シートの ID の検査を外す" \
+  's/(function refreshO1LinksTab\(\) \{\n  var cfg = o1Config_\(\);\n  var problem = o1MgmtConfigProblem_\(cfg\);\n)  if \(problem\) throw new Error\("⛔ " \+ problem\);/$1/'
+mutate "リンク集: O1-S の回答 URL に編集 URL を載せる" \
+  's/s \? s\.publishedUrl : notYet/s ? s.editUrl : notYet/'
+mutate "リンク集: buildO1MgmtSheet から作らない" \
+  's/    o1BuildLinksTab_\(ss\);\n  \} catch \(e\) \{/    0;\n  } catch (e) {/'
+
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"
 if [ "$FAIL" -eq 0 ]; then
