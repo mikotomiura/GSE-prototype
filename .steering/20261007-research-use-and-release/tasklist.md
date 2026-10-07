@@ -26,4 +26,10 @@
 ## 仕上げ
 - [x] レビュー（code-reviewer ＋ Codex）→ 指摘を全部反映（decisions.md 判断 6）。⚠️ Codex の再レビューは予算超過で未実施
 - [x] コミット
-- [ ] PR（研究者の確認後）
+- [x] PR #322
+
+## 追加（研究者の依頼 2026-10-07）
+- [x] G1 / O1 のゲートを回す → G1 の schema parity を gse-dataset PR #2 で直す（判断 7）
+- [x] `docs/g1-o1-operations-workflow.md`（判断 8）＋ agent-shared のリンクハブ
+- [x] レビュー（code-reviewer）。⚠️ Codex は当日の予算超過で未実施
+- [ ] CI 緑で PR #322 をマージ
