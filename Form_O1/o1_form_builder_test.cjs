@@ -1306,6 +1306,43 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
 }
 
 {
+  // 2026-10-08: 識別子（v0.1.40 の o1_install_id）と、結果の公表・記録の公開の約束。
+  //   配っているアプリ（v0.1.40）が識別子を記録するので、本文に無いまま始めない。
+  //   約束を足したら同意項目も足す（o1ConsentItemTitles_ の注記）。上流の同意文書にも同じ約束がある。
+  const ctx = makeReadyCtx();
+  ctx.buildO1ConsentForm();
+  const desc = ctx.__forms[O1_C].__description;
+  const items = ctx.o1ConsentItemTitles_();
+  const doc = fs.readFileSync(CONSENT_DOC, "utf8");
+  push(
+    "§6 本文に識別子（乱数・16 桁・端末ごとに分けるためだけ）の行がある",
+    desc.indexOf("乱数の識別子（16 桁") >= 0 && desc.indexOf("記録を端末ごとに分けるためだけに使います") >= 0,
+    {}
+  );
+  push("§6 同意文書にも識別子の行がある", doc.indexOf("乱数の識別子（16 桁）") >= 0, {});
+  push(
+    "§6 本文に結果の公表と記録の公開の節がある（取り除けない限界・あらためて尋ねる）",
+    desc.indexOf("▼ 結果の公表と、記録の公開について") >= 0 &&
+      desc.indexOf("公表済みの数値からあなたの分だけを取り除くことはできません") >= 0 &&
+      desc.indexOf("同意をいただけた記録だけを公開します") >= 0,
+    {}
+  );
+  push(
+    "§6 同意文書にも公表と公開の節がある",
+    doc.indexOf("結果の公表と、記録の公開について") >= 0 && doc.indexOf("同意をいただけた記録だけを公開します") >= 0,
+    {}
+  );
+  const iPub = items.findIndex((x) => x.indexOf("公表され") >= 0 && x.indexOf("同意した記録だけが公開される") >= 0);
+  const iKeep = items.findIndex((x) => x.indexOf("保管の上限") >= 0);
+  const iQuit = items.findIndex((x) => x.indexOf("参加はいつでもやめられ") >= 0);
+  push(
+    "§6 公表の同意項目が、保管の上限の直後・やめられるの前にある",
+    iPub >= 0 && iPub === iKeep + 1 && iQuit === iPub + 1,
+    { iKeep, iPub, iQuit }
+  );
+}
+
+{
   // ⚠️★★ 連絡先が同意文書 §7 と一致していること（★ 片方だけ直す事故の検査）。
   const ctx = makeReadyCtx();
   const doc = fs.readFileSync(CONSENT_DOC, "utf8");
@@ -3281,10 +3318,10 @@ cases.forEach((c) => {
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
 // ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-// 2026-10-08: §19 を足して 277 件なので下限 272。
-if (cases.length < 272) {
+// 2026-10-08: §19 を足して 277 件、§6 に 5 件を足して 282 件なので下限 277。
+if (cases.length < 277) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（272 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（277 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }
