@@ -30,12 +30,14 @@ value, printed in bold as a value still to be filled in), of overfull boxes and 
 the number of BibTeX warnings. References to sections and figures that are not written yet are reported as undefined.
 
 LaTeX does not always warn when a table runs off the page: a sideways float taller than the rotated page was set past
-both edges of the paper with no overfull box. The script therefore also reads each PDF with
-`tools/check_page_bounds.py` and prints the number of pages with text or rules outside the page. That check needs
-PyMuPDF; without it the script prints that the pages were not checked. A table too long for one page is a long table
-that continues on the next page with its heading repeated (Tables 1, 2 and 13 rotated, Tables 4 and 7 upright). In the
-layout of the template the landscape pages add overfull boxes in the output routine: the class's running head is an
-empty box as wide as the line, which the rotated page sets in the other width, so nothing is printed outside the page.
+both edges of the paper with no overfull box, and a table taller than the page printed over the page number. The
+script therefore also reads each PDF with `tools/check_page_bounds.py` and prints the number of pages with text or
+rules outside the page and the number of pages whose number is covered by other text or crossed by a rule. That check
+needs PyMuPDF; without it the script prints that the pages were not checked. A table too long for one page is a long
+table (rotated with pdflscape when it is wide) that continues on the next page under the heading "Table N
+(continued)" and its column heads. In the layout of the template each landscape page adds an overfull box in the
+output routine: the class's running head is an empty box as wide as the line, which the rotated page sets in the
+other width, so nothing is printed outside the page.
 
 ## Results tables and values
 
