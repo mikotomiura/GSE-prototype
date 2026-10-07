@@ -287,8 +287,10 @@ of the four files holds a path, the login name, the home directory or the host n
 
 The ten archives and the four sample files of the previous section were moved from the measuring machine to the deposit
 machine by hand, through a folder of the researcher's Google Drive; the archive of attempt 2 of the measurement had
-been on the deposit machine since 2026-10-05. On the deposit machine, on 2026-10-07, `kit/export/deposit.internal.py
---from` found all fifteen files of this record by their SHA-256: every archive in the table of deposits, the two
-`samples.tsv` and the two `conditions.txt`. They were uploaded to the draft of the dataset on the same day from the
-deposit machine with `kit/export/deposit.internal.py --upload`, which checked that every file of the draft has the MD5
-and the size of the check and that the draft holds exactly the files of the deposit.
+been on the deposit machine since 2026-10-05. On the deposit machine, on 2026-10-07, the deposit tool of the working
+repository (which is not part of the code release) found all fifteen files of this record by their SHA-256: every
+archive in the table of deposits, the two `samples.tsv` and the two `conditions.txt`. They were uploaded to the draft
+of the dataset on the same day from the deposit machine with that tool. The connection broke off during some of the
+larger archives, and the upload was run again, going on with the files that the draft did not hold yet. The tool then
+checked that every file of the draft has the MD5 and the size of the file that it had found on the deposit machine by
+the SHA-256 recorded here, and that the draft holds exactly the files of the deposit.

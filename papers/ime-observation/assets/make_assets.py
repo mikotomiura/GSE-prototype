@@ -8,6 +8,7 @@ With --frame T the illustration is written as a still at T seconds (the opacity 
 checking a moment of the animation. The rows of the illustration follow the format obs/1 (kit/formats/FORMATS.md);
 their times are made up."""
 import argparse
+import html
 import os
 import re
 import sys
@@ -58,8 +59,8 @@ def _frame(c, w, h, title, desc, body):
     head = [
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="%d" height="%d" role="img" '
         'aria-labelledby="t d">' % (w, h, w, h),
-        '  <title id="t">%s</title>' % title,
-        '  <desc id="d">%s</desc>' % desc,
+        '  <title id="t">%s</title>' % html.escape(title, quote=False),
+        '  <desc id="d">%s</desc>' % html.escape(desc, quote=False),
         '  <rect x="0.5" y="0.5" width="%d" height="%d" rx="12" fill="%s" stroke="%s"/>'
         % (w - 1, h - 1, c["face"], c["border"]),
     ]
@@ -69,7 +70,7 @@ def _frame(c, w, h, title, desc, body):
 def _text(x, y, s, size, fill, weight=None, family=SANS, anchor=None):
     return ('  <text x="%s" y="%s" font-family="%s" font-size="%s" fill="%s"%s%s>%s</text>'
             % (x, y, family, size, fill, ' font-weight="%s"' % weight if weight else "",
-               ' text-anchor="%s"' % anchor if anchor else "", s))
+               ' text-anchor="%s"' % anchor if anchor else "", html.escape(s, quote=False)))
 
 
 def _card(c, x, y, w, h, head, lines, bar=None):
@@ -116,13 +117,17 @@ def validation(theme):
     body.append('  <line x1="479" y1="180" x2="479" y2="206" stroke="%s" stroke-width="2" stroke-dasharray="4 4"/>'
                 % c["muted"])
     body.append(_text(487, 198, "its windows (Windows)", 11, c["muted"]))
-    return _frame(c, 960, 340, "How the logger was validated",
+    body += _arrow(c, [(283, 256), (283, 340), (790, 340), (790, 256), (798, 256)], dashed=True)
+    body.append(_text(300, 334, "the executor's record: the trials and the presses sent", 11, c["muted"]))
+    return _frame(c, 960, 360, "How the logger was validated",
                   "A plan generated from the phrase corpus and the settings drives an executor that sends every key "
                   "press and release and records what it sent. The presses reach the input method and a reference "
                   "input field, which records the calls it receives without text, and the logger, which writes key "
-                  "categories, times and one row per conversion session (on macOS inferred from the key presses, on "
-                  "Windows while a window of the input method is visible). The two records are matched by wall-clock "
-                  "time under the registered rules: detection, duration, arrow-key presses and abandonment.", body)
+                  "categories, times and a row per conversion session that it detects (on macOS inferred from the key "
+                  "presses, on Windows while a window of the input method is visible). The sessions of the reference "
+                  "and the rows of the logger are matched by wall-clock time under the registered rules, with the "
+                  "trials and the presses sent taken from the executor's record: detection, duration, arrow-key "
+                  "presses and abandonment.", body)
 
 
 CATEGORIES = ["alphabetic", "numeric", "punctuation", "sentence_punctuation", "tab", "backspace", "delete", "space",
@@ -145,8 +150,8 @@ def records(theme):
                 % (c["panel"], c["border"]))
     body.append('  <rect x="38" y="70" width="36" height="4" rx="2" fill="%s"/>' % c["ok"])
     body.append(_text(38, 96, "Written to the log (format obs/1)", 14, c["ok"], 600))
-    body.append(_text(38, 122, "Every key press and release", 13, c["text"], 600))
-    body.append(_text(220, 122, "one of 14 categories, the time, press or release", 12.5, c["muted"]))
+    body.append(_text(38, 122, "Every press and release of an observed key", 13, c["text"], 600))
+    body.append(_text(330, 122, "one of 14 categories, the time", 12.5, c["muted"]))
     x, y = 38, 136
     for cat in CATEGORIES:
         w = int(len(cat) * 7.2 + 14)
@@ -156,28 +161,32 @@ def records(theme):
                     % (x, y, w, c["okbg"], c["ok"]))
         body.append(_text(x + w / 2, y + 15, cat, 11.5, c["text"], family=MONO, anchor="middle"))
         x += w + 6
-    body.append(_text(38, 222, "Every conversion session", 13, c["text"], 600))
+    body.append(_text(38, 222, "Every conversion session it detects", 13, c["text"], 600))
+    body.append(_text(290, 222, "(some, such as one cut off at 20 s, write no row)", 12.5, c["muted"]))
     body.append(_text(38, 242, "its duration (dwell_ms), the arrow-key presses during it (nav)", 12.5, c["muted"]))
     body.append(_text(38, 260, "and whether it was abandoned (abandon)", 12.5, c["muted"]))
     body.append('  <rect x="624" y="60" width="312" height="222" rx="10" fill="%s" stroke="%s"/>'
                 % (c["panel"], c["border"]))
     body.append('  <rect x="638" y="70" width="36" height="4" rx="2" fill="%s"/>' % c["no"])
     body.append(_text(638, 96, "Never written", 14, c["no"], 600))
-    for i, item in enumerate(["Which key was pressed", "Characters and readings", "Candidate strings",
+    for i, item in enumerate(["Key names and key codes", "Characters and readings", "Candidate strings",
                               "Window names"]):
         yy = 130 + 34 * i
         body.append('  <rect x="638" y="%d" width="296" height="26" rx="6" fill="%s"/>' % (yy - 18, c["nobg"]))
         body.append('  <line x1="648" y1="%d" x2="660" y2="%d" stroke="%s" stroke-width="2"/>'
                     % (yy - 5, yy - 5, c["no"]))
         body.append(_text(670, yy, item, 13, c["text"]))
-    body.append(_text(24, 312, "The key rows are not anonymous by construction: the article measures how far they "
-                      "reveal the typed phrase.", 12.5, c["muted"]))
-    return _frame(c, 960, 330, "What the logger writes, and what it never writes",
-                  "Written to the log in the format obs/1: for every key press and release, one of fourteen "
-                  "categories, the time and whether it was a press; for every conversion session, its duration, "
-                  "the arrow-key presses during it and whether it was abandoned. Never written: which key was "
-                  "pressed, characters and readings, candidate strings and window names. The key rows are not "
-                  "anonymous by construction; the article measures how far they reveal the typed phrase.", body)
+    body.append(_text(24, 310, "Some categories, such as backspace or enter, stand for a single key, and the key rows "
+                      "are not anonymous by construction:", 12.5, c["muted"]))
+    body.append(_text(24, 328, "the article measures how far they reveal the typed phrase.", 12.5, c["muted"]))
+    return _frame(c, 960, 346, "What the logger writes, and what it never writes",
+                  "Written to the log in the format obs/1: for every press and release of an observed key, one of "
+                  "fourteen categories, the time and whether it was a press; for every conversion session that the "
+                  "logger detects, its duration, the arrow-key presses during it and whether it was abandoned (some "
+                  "sessions, such as one cut off at 20 s, write no row). Never written: key names and key codes, "
+                  "characters and readings, candidate strings and window names. Some categories stand for a single "
+                  "key, and the key rows are not anonymous by construction; the article measures how far they "
+                  "reveal the typed phrase.", body)
 
 
 CYCLE = 12.0

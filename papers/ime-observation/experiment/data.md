@@ -246,16 +246,17 @@ before anything is uploaded to Zenodo.
 
 The two archives of the measurement (`macos-standard-live-on`, 74,044,861 bytes, and `macos-standard-live-off`,
 66,091,676 bytes), packed earlier on the measuring machine, were moved later on the same day through the same
-folder. On the deposit machine, on 2026-10-07, `kit/export/deposit.internal.py --from` found all fifteen files of this
-record by their SHA-256: every archive in the table of deposits, the two `samples.tsv` and the two `conditions.txt`. The `run.json` of
-the two archives of the measurement, whose SHA-256 are those of the list of run directories above, has `null` in
-`git_commit` and in `git_dirty` (read on the deposit machine from the archives; the runner ran from an export).
+folder. On the deposit machine, on 2026-10-07, the deposit tool of the working repository (which is not part of the
+code release) found all fifteen files of this record by their SHA-256: every archive in the table of deposits, the
+two `samples.tsv` and the two `conditions.txt`. The `run.json` of the two archives of the measurement, whose SHA-256
+are those of the list of run directories above, has `null` in `git_commit` and in `git_dirty` (read on the deposit
+machine from the archives; the runner ran from an export).
 
-On 2026-10-07 the files of this record were uploaded to the draft of the dataset from the deposit machine with
-`kit/export/deposit.internal.py --upload`, except the archives of the two measurement runs and of the `working` run:
-their uploads from the deposit machine broke off repeatedly, so they were uploaded by hand through the web form of the
-archive service from the measuring machine. The tool then checked that every file of the draft has the MD5 and the size
-of the check and that the draft holds exactly the files of the deposit.
+On 2026-10-07 the files of this record were uploaded to the draft of the dataset from the deposit machine with that
+tool, except the archives of the two measurement runs and of the `working` run: their uploads from the deposit machine
+broke off repeatedly, so they were uploaded by hand through the web form of the archive service from the measuring
+machine. The tool then checked that every file of the draft has the MD5 and the size of the file that it had found on
+the deposit machine by the SHA-256 recorded here, and that the draft holds exactly the files of the deposit.
 
 ## Phrase corpus
 

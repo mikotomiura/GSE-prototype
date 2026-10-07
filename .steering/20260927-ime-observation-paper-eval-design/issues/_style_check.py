@@ -30,6 +30,7 @@ import re
 import sys
 import tempfile
 import tokenize
+import unicodedata
 
 FORBIDDEN = [
     ("gse", re.compile(r"(?<![A-Za-z0-9])gse(?![A-Za-z0-9])", re.IGNORECASE)),
@@ -53,6 +54,12 @@ TEXT_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", "
 UPSTREAM_KEYS = re.compile(r"^(gse_|upstream_)|^(start_anchor|end_anchor)$")
 # 判断 219: 日本語の地の文を許すのは README の日本語訳だけ（論文の dir の根と、書き出した木の根）
 TRANSLATIONS = ("README.ja.md", "papers/ime-observation/README.ja.md")
+# 訳では日本語の検査が外れるので、内部の言葉の日本語の形も止める（全角は NFKC で半角に寄せてから見る）
+JA_FORBIDDEN = [
+    ("internal-ref", re.compile(r"(判断|課題|マイルストーン)\s*#?\d")),
+    ("relation", re.compile(r"上流|逐語|参照実装|写した元")),
+    ("gse", re.compile(r"苦闘")),
+]
 
 
 class Violation(object):
@@ -328,6 +335,13 @@ def check_text(rel, text, verbatim):
     if posixpath.normpath(rel.replace("\\", "/")) in TRANSLATIONS:
         # 判断 219: README の日本語訳（研究者の選択）だけは地の文が日本語。ほかの検査（禁止語）は見る
         prose = []
+        for no, ln in enumerate(lines, 1):
+            folded = unicodedata.normalize("NFKC", ln)
+            for kind, rx in FORBIDDEN + JA_FORBIDDEN:
+                if rx.search(folded) and not rx.search(ln):
+                    vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある（全角や日本語の形）"))
+                elif rx.search(ln) and (kind, rx) in JA_FORBIDDEN:
+                    vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある（日本語の形）"))
     elif ext == ".py":
         prose = py_prose(text)
     elif ext in (".rs", ".swift"):
@@ -430,6 +444,11 @@ def selftest():
     expect("ほかの名前の訳は赤", "README.zh.md", J + "\n", ["japanese-prose"])
     expect("README の日本語訳でも禁止語は赤", "README.ja.md", J + " GSE\n", ["forbidden:gse"])
     expect("./ の付いた README の日本語訳も通る", "./README.ja.md", J + "\n", [])
+    expect("README の日本語訳の全角の禁止語は赤", "README.ja.md", "ＧＳＥ\n", ["forbidden:gse"])
+    expect("README の日本語訳の判断の番号は赤", "README.ja.md", "判断 219 による\n", ["forbidden:internal-ref"])
+    expect("README の日本語訳の上流は赤", "README.ja.md", "上流の実装\n", ["forbidden:relation"])
+    expect("README の日本語訳の苦闘は赤", "README.ja.md", "生産的苦闘\n", ["forbidden:gse"])
+    expect("ほかの日本語は訳では通る", "README.ja.md", "判断の材料と 2 つの設定\n", [])
     expect("\\ で区切った README の日本語訳も通る", "papers\\ime-observation\\README.ja.md", J + "\n", [])
     expect("md コードブロックの日本語は通る", "a.md", "```\n" + J + "\n```\n", [])
     expect("md .steering は赤", "a.md", "see .steering/x\n", ["forbidden:.steering"])

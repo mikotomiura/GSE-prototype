@@ -9,8 +9,8 @@
 
 # Logging Japanese IME conversion without recording text
 
-**A logger that writes, for every conversion session of a Japanese input method that it detects, the duration, the
-arrow-key presses and whether it was abandoned, and never a character.**
+**A logger that records the conversion sessions of a Japanese input method, with their duration, their arrow-key
+presses and whether they were abandoned, without recording a single character.**
 
 *Observability limits, a cross-platform logger, and a synthetic-input validation*
 
@@ -81,17 +81,19 @@ limitations.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/records-dark.svg">
-  <img src="assets/records-light.svg" width="100%" alt="Written to the log: for every key press and release, one of
-  fourteen categories, the time and whether it was a press; for every conversion session, its duration, the arrow-key
-  presses during it and whether it was abandoned. Never written: which key was pressed, characters and readings,
-  candidate strings and window names.">
+  <img src="assets/records-light.svg" width="100%" alt="Written to the log: for every press and release of an observed
+  key, one of fourteen categories, the time and whether it was a press; for every conversion session detected, its
+  duration, the arrow-key presses during it and whether it was abandoned. Never written: key names and key codes,
+  characters and readings, candidate strings and window names.">
 </picture>
 
-The logger (`kit/logger/`) runs on Windows and macOS. It writes one row per key press and per key release, with one
-of fourteen key categories and the time, and one row per conversion session that it detects, with its duration, the
-number of arrow-key presses during it and whether it was abandoned. How a session is detected differs by system
-([How the logger was validated](#how-the-logger-was-validated)). Which key was pressed is discarded, and no character, candidate string,
-reading or window name is recorded. The format of its log, `obs/1`, is specified in
+The logger (`kit/logger/`) runs on Windows and macOS. It writes a row for every press and release of the keys it
+observes, with one of fourteen key categories and the time, and a summary row for every conversion session that it
+detects, with its duration, the number of arrow-key presses during it and whether it was abandoned. Which keys are
+observed and how a session is detected differ by system, and some sessions write no row (one cut off at 20 s, for
+example); the article gives the rules of each system. The key name and the key code are discarded and only the
+category is written, though some categories, such as `backspace` or `enter`, stand for a single key. No character,
+candidate string, reading or window name is recorded. The format of the log, `obs/1`, is specified in
 [`kit/formats/FORMATS.md`](kit/formats/FORMATS.md). The key rows are not anonymous by construction: the article
 measures how far they reveal the typed phrase.
 
@@ -101,8 +103,9 @@ measures how far they reveal the typed phrase.
   <source media="(prefers-color-scheme: dark)" srcset="assets/validation-dark.svg">
   <img src="assets/validation-light.svg" width="100%" alt="A plan generated from the phrase corpus and the settings
   drives an executor that sends every key press and release and records what it sent. The presses reach the input
-  method and a reference input field, which records the calls it receives without text, and the logger. The two
-  records are matched by wall-clock time under the registered rules.">
+  method and a reference input field, which records the calls it receives without text, and the logger. The sessions
+  of the reference and the rows of the logger are matched by wall-clock time under the registered rules, with the
+  trials and the presses sent taken from the executor's record.">
 </picture>
 
 The validation compares the logger's rows with a reference: an input field that records the calls it receives from
@@ -117,8 +120,8 @@ runs. The measurement covered three settings:
 
 On macOS the logger infers each session from the key presses; on Windows a session lasts while a window of the input
 method is visible, which differs in construct from the reference's compositions. The questions, the analyses and the
-stopping rules were registered before the measurement ([Pre-registration](#pre-registration)), and every departure
-from them is reported in `experiment/deviations.md`.
+stopping rules were registered before the measurement ([Pre-registration](#pre-registration)), and the departures
+from them are reported in `experiment/deviations.md`.
 
 ## Reproducing the analyses
 
