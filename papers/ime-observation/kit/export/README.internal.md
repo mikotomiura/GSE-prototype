@@ -60,14 +60,17 @@ rules that is missing or fails), or an unexpected failure (only the type of the 
    first release, the DOI is reserved beforehand in a draft of the archive service and is already in
    `CITATION.cff` and the manuscript; the archive of the tag is uploaded to that draft, which is then published.
    A later release is a new version of the same record. Before step 2, its draft is made from the published record
-   with the new-version action of the archive service, which reserves the DOI of that version. The version and that
-   DOI are written in `CITATION.cff` and in the citation of the code in `README.md` and `README.ja.md`, the version
-   in `.zenodo.json` and in the badge of the code release of both READMEs (whose links point to the DOI of all
-   versions), and the release is added to the history in both READMEs. The draft copies the files and the metadata
-   of the version before, except the version, which is left empty: its files are removed before the archive of the
-   new tag is uploaded, and its version, publication date, description and link to the tree of the tag are set
-   before it is published (the service does not read `.zenodo.json` when files are uploaded by hand). The manuscript
-   is not changed: it keeps the DOI of release 1.0.0, which it cites.
+   with the new-version action of the archive service, which reserves the DOI of that version. In step 2, the
+   version and that DOI are written in `CITATION.cff` and in the BibTeX entry `@software` of `README.md` and
+   `README.ja.md`, and the version in `.zenodo.json` and in the text of the badge of the code release in both
+   READMEs; the links of the badges of the code point to the DOI of all versions and are not changed. The release is
+   added to the history in both READMEs and in the history section of this note. The `Code:` of the article box in
+   both READMEs keeps the DOI of release 1.0.0, like the manuscript, whose DOI of the code
+   (`manuscript/references.bib`, `manuscript/sections/declarations.tex`) is not changed. The draft copies the files
+   and the metadata of the version before, except the version, which is left empty. The copied files are removed from
+   the draft before the archive of the new tag is uploaded, and the draft's version, publication date (copied from the
+   version before), description, link to the tree of the tag and any other field changed in `.zenodo.json` are set
+   before it is published (the service does not read `.zenodo.json` when files are uploaded by hand).
 
 ## History of the public repository
 
