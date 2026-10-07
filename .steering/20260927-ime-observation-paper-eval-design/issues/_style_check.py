@@ -14,6 +14,7 @@
      - Markdown: 地の文（``` のコードブロックとバッククォートの中は除く）
      - JSON: manifest の "reason"、規則ファイルの "_note"
      ★ 地の文の中でもバッククォートで囲んだ部分（例: `がっこう`）は許す（読みの例を示すため）。
+     ★ README の日本語訳（論文の dir の根の README.ja.md・判断 219）は 2 を見ない（1 は見る）。
 
 対象外: 逐語コピー（kit/logger/manifest*.json の kind が file のファイル全体と、excerpt の目印の間）、
 kit/corpus/data/、*.internal.md、Cargo.lock、target/・__pycache__/ などの生成物、.jsonl / .ndjson。
@@ -24,10 +25,12 @@ import html
 import io
 import json
 import os
+import posixpath
 import re
 import sys
 import tempfile
 import tokenize
+import unicodedata
 
 FORBIDDEN = [
     ("gse", re.compile(r"(?<![A-Za-z0-9])gse(?![A-Za-z0-9])", re.IGNORECASE)),
@@ -49,6 +52,14 @@ SKIP_DIRS = {"target", ".build", "__pycache__", ".venv", "venv", "runs", "sealed
 SKIP_SUFFIX = (".jsonl", ".ndjson", ".lock", ".pyc", ".png", ".pdf", ".zip")
 TEXT_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib", ".svg")
 UPSTREAM_KEYS = re.compile(r"^(gse_|upstream_)|^(start_anchor|end_anchor)$")
+# 判断 219: 日本語の地の文を許すのは README の日本語訳だけ（論文の dir の根と、書き出した木の根）
+TRANSLATIONS = ("README.ja.md", "papers/ime-observation/README.ja.md")
+# 訳では日本語の検査が外れるので、内部の言葉の日本語の形も止める（全角は NFKC で半角に寄せてから見る）
+JA_FORBIDDEN = [
+    ("internal-ref", re.compile(r"(判断|課題|マイルストーン)\s*#?\d")),
+    ("relation", re.compile(r"上流|逐語|参照実装|写した元")),
+    ("gse", re.compile(r"苦闘")),
+]
 
 
 class Violation(object):
@@ -321,7 +332,17 @@ def check_text(rel, text, verbatim):
             if rx.search(ln) or (ext == ".svg" and rx.search(html.unescape(ln))):
                 vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある"))
     base = os.path.basename(rel)
-    if ext == ".py":
+    if posixpath.normpath(rel.replace("\\", "/")) in TRANSLATIONS:
+        # 判断 219: README の日本語訳（研究者の選択）だけは地の文が日本語。ほかの検査（禁止語）は見る
+        prose = []
+        for no, ln in enumerate(lines, 1):
+            folded = unicodedata.normalize("NFKC", ln)
+            for kind, rx in FORBIDDEN + JA_FORBIDDEN:
+                if rx.search(folded) and not rx.search(ln):
+                    vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある（全角や日本語の形）"))
+                elif rx.search(ln) and (kind, rx) in JA_FORBIDDEN:
+                    vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある（日本語の形）"))
+    elif ext == ".py":
         prose = py_prose(text)
     elif ext in (".rs", ".swift"):
         prose = rs_prose(text)
@@ -417,6 +438,19 @@ def selftest():
     expect("rs ブロックコメントの日本語は赤", "a.rs", "/* " + J + " */\nfn f() {}\n", ["japanese-prose"])
     expect("rs src-tauri は赤", "a.rs", "// see src-tauri/x.rs\n", ["forbidden:src-tauri"])
     expect("md 地の文の日本語は赤", "a.md", "# Title\n" + J + "\n", ["japanese-prose"])
+    expect("README の日本語訳は通る", "README.ja.md", "# Title\n" + J + "\n", [])
+    expect("repo の中の README の日本語訳も通る", "papers/ime-observation/README.ja.md", J + "\n", [])
+    expect("ほかの dir の README.ja.md は赤", "kit/README.ja.md", J + "\n", ["japanese-prose"])
+    expect("ほかの名前の訳は赤", "README.zh.md", J + "\n", ["japanese-prose"])
+    expect("README の日本語訳でも禁止語は赤", "README.ja.md", J + " GSE\n", ["forbidden:gse"])
+    expect("./ の付いた README の日本語訳も通る", "./README.ja.md", J + "\n", [])
+    expect("README の日本語訳の全角の禁止語は赤", "README.ja.md", "ＧＳＥ\n", ["forbidden:gse"])
+    expect("README の日本語訳の判断の番号は赤", "README.ja.md", "判断 219 による\n", ["forbidden:internal-ref"])
+    expect("README の日本語訳の全角の判断の番号も赤", "README.ja.md", "判断 ＃２１９\n", ["forbidden:internal-ref"])
+    expect("README の日本語訳の上流は赤", "README.ja.md", "上流の実装\n", ["forbidden:relation"])
+    expect("README の日本語訳の苦闘は赤", "README.ja.md", "生産的苦闘\n", ["forbidden:gse"])
+    expect("ほかの日本語は訳では通る", "README.ja.md", "判断の材料と 2 つの設定\n", [])
+    expect("\\ で区切った README の日本語訳も通る", "papers\\ime-observation\\README.ja.md", J + "\n", [])
     expect("md コードブロックの日本語は通る", "a.md", "```\n" + J + "\n```\n", [])
     expect("md .steering は赤", "a.md", "see .steering/x\n", ["forbidden:.steering"])
     expect("sh 日本語のコメントは赤", "a.sh", "echo ok # " + J + "\n", ["japanese-prose"])
@@ -498,6 +532,14 @@ def selftest():
             f.write(J + "\n")
         if len(run(tmp, ["papers/ime-observation"])) != 1:
             fails.append("走査: 対象の中の違反を 1 件拾うはず")
+        # 判断 219: README の日本語訳は、repo の走査でも書き出した木の走査（根を論文の dir にして "."）でも通る
+        with io.open(os.path.join(tmp, "papers", "ime-observation", "README.ja.md"), "w", encoding="utf-8") as f:
+            f.write("# " + J + "\n" + J + "\n")
+        paper = os.path.join(tmp, "papers", "ime-observation")
+        found = [v.path for v in run(tmp, ["papers/ime-observation"])] + [v.path for v in run(paper, ["."])]
+        if found != ["papers/ime-observation/kit/x/bad.md", "kit/x/bad.md"]:
+            fails.append("走査: README の日本語訳は repo でも書き出した木でも通るはず（判断 219）: %s" % found)
+        os.remove(os.path.join(tmp, "papers", "ime-observation", "README.ja.md"))
         os.makedirs(os.path.join(tmp, "papers", "ime-observation", "manuscript"))
         with io.open(os.path.join(tmp, "papers", "ime-observation", "manuscript", "m.tex"), "w",
                      encoding="utf-8") as f:
