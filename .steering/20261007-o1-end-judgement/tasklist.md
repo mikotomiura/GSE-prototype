@@ -3,8 +3,8 @@
 - [x] 純関数（`o1LedgerDayKey_` / `o1LedgerKeyToStr_` / `o1LedgerEndJudge_` / `o1LedgerEndShown_` / `o1LedgerEndAlerts_`）
 - [x] タブ（`o1LedgerWriteEnd_`）・台帳の処理への組み込み・通知の本文と件名
 - [x] テスト §12・変異 14 件・既存の変異の当たる位置の確認
-- [ ] リンク集の文言（「判定の機械はまだ無い」）を直す（PR #324 のマージ後に重ねる）
-- [ ] 運営ワークフローの docx（版 3）
+- [x] リンク集の文言を直す（PR #324 のマージ後に重ねた・「O1 終了判定」の行を足した）
+- [x] 運営ワークフローの docx（版 3・~/Downloads）
 - [x] レビュー 3 系統（code-reviewer ＋ security-checker ＋ Codex）→ 反映（decisions.md 判断 3）・テスト 285・変異 113 件すべて赤
 - [x] 反映後の Codex 再レビュー → 3 件を反映（判断 4）・テスト 289・変異 116
 - [ ] PR・CI・マージ
