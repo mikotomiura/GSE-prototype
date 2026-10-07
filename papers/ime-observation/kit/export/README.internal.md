@@ -59,6 +59,10 @@ rules that is missing or fails), or an unexpected failure (only the type of the 
 5. Commit `DIR` on top of the history of the public repository (next section) and tag the release. The
    DOI of the release is reserved beforehand in a draft of the archive service and is already in
    `CITATION.cff` and the manuscript; the archive of the tag is uploaded to that draft, which is then published.
+   A later release is a new version of the same record: its draft is made from the published record with the
+   new-version action of the archive service, which reserves the DOI of that version for `CITATION.cff`; the files
+   that the draft copies from the version before are removed before the archive of the new tag is uploaded. The
+   manuscript keeps the DOI of the version that it cites.
 
 ## History of the public repository
 
@@ -66,7 +70,8 @@ The public repository does not carry the history of the working repository. Its 
 the export of the macOS freezing tag (made with that tag's own exporter and `--allow-missing-license`, so that
 the list of its files has the SHA-256 that the registration gives), tagged `ime-observation-prereg-macos`; the
 export of the Windows freezing tag, made in the same way, tagged `ime-observation-prereg-windows`; a commit that
-adds only `manuscript/outline.md` as it stood before the results were analysed; and the release. The author date
+adds only `manuscript/outline.md` as it stood before the results were analysed; and the releases, each committed on
+top of the one before (`v1.0.0`, then `v1.0.1`). The author date
 of each of the first three commits is the date of the working commit it comes from, and the message names that
 commit. Scripts that start with `#!` are given the executable bit in the index.
 
