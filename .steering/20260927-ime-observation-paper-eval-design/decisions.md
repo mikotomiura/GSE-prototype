@@ -2181,4 +2181,13 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
   - **図**（`assets/make_assets.py` に `validation`・`records`、ライトとダークの対・`<picture>` で切り替え）: 検証の流れ（計画 → 実行器 → 入力方法 → 参照の入力欄／ロガー → 壁時計の時刻での突き合わせ。ロガーのまとまりは macOS は打鍵から推し、Windows は入力方法のウィンドウが見える間 —— `logger.tex` §3）と、ロガーが書くもの（14 分類・時刻・押したか離したか、まとまりごとの長さ・矢印キー・取り消し）と書かないもの（どのキー・文字と読み・候補・ウィンドウの名前）。図の下に「キーの行は作りの上で匿名ではない。打った句をどこまで明かすかは論文が測る」。ロゴと動く図はバイト単位で変わらない。14 分類は生成のときに `FORMATS.md` の列挙と照らし、食い違えば書かずに止まる（変えた写しで止まることを確かめた）。書き出しの道具の SVG の検査（文字列の層・XML の層）を 4 枚とも通り、Chrome で各文字の外枠が箱からはみ出さないことを数で確かめた（0 件）。
   - **GitHub での見え方**（Chrome）: 英語版・日本語版とも中央の見出し・画像 12 個に壊れたもの 0・錨 20 個がすべて実在・囲み・表 4・折りたたみ 1。スクリーンショットは英語版の先頭と図の 2 枚。⚠️ 図の中の文字は英語だけ（日本語版も同じ図を使う）。
   - **/cross-review（Codex）**: 3 回目（書き直し・4 件）→ (1) 図のファイルが差分に無い → 偽陽性（SVG は commit 済みで、範囲から外しただけ）。(2) 一行の要約「変換 1 回ごとに 1 行」が 1 対 1 を約束して読める → 真 → 「検出した変換のまとまりごと」に、本文に「検出の仕方は OS で違う」。(3) 見出しを変えて古い錨が切れる → repo はまだ非公開で外からのリンクは無いので直さない。(4) 本文の「キーを押すたびに 1 行」は離した行（`press:false`）を落とす・14 分類の二重持ち → 真 → 「押すたび・離すたび」に、生成のときに照らす。4 回目（境界・P3 1）→ 抽出の失敗と食い違いを別のメッセージに。今日の記帳は 205,194 / 7 回。
-- **影響範囲**: `papers/ime-observation/{README.md,README.ja.md}`・`assets/{make_assets.py,validation-light.svg,validation-dark.svg,records-light.svg,records-dark.svg}`・`issues/_style_check.py`・本ファイル。
+- **点検（code-reviewer ∥ security-checker・`origin/main..7768c079`・13 ファイル）**: security は CRITICAL・HIGH・MEDIUM 0・LOW 5（約 6.4 分）、code は HIGH 1・MEDIUM 3・LOW 6（約 7.8 分）。数・TSF の欄・BibTeX は一次と一致（code が確かめた）。すべて一次（`logger.tex` §3・`method.tex`・`driver_macos.rs`・datasheet）で確かめて直した（`1459c430`）:
+  - HIGH「すべてのキー・すべての変換に 1 行」→ 行を書くのは観測するキーの押す・離すだけ（`logger.tex:9-10`）、20 秒で打ち切ったまとまりは行なし（同 §3.3）→ README・図・訳を限定した。
+  - 「Never written: Which key was pressed」は強すぎる（`backspace`・`enter` などは 1 キーで 1 分類・両方の点検が指摘）→「キーの名前とキーコード」にし、1 キーの分類があることを書いた。
+  - 検証の図の突き合わせから実行器の記録が抜けていた（矢印キーの正しい回数は oracle・`method.tex`）→ 点線の矢印「the executor's record: the trials and the presses sent」と alt。
+  - 訳の「許可を求める画面を出させてから」は保証に読める → 「出すよう求めてから（まだ聞かれていなければ出る）」。「すべてのずれ」→「ずれ」。「標本」→「実行負荷の標本」。現在形に。
+  - 記録の「the MD5 and the size of the check」の相手が曖昧・Windows の上げの経緯（送り直し）が抜け・公開の版に入らない道具の名前 → 「寄託の機械で SHA-256 によって見つけたファイルの MD5 と大きさ」・「接続が切れ、まだ下書きに無いファイルから送り直した」・「作業 repo の寄託の道具（コードのリリースには入らない）」。
+  - 訳の例外の抜け道（日本語の内部の言葉と全角の英字）→ 訳では NFKC で寄せてから禁止語を見て、`JA_FORBIDDEN`（判断・課題・マイルストーンの番号・上流・逐語・参照実装・写した元・苦闘）を止める。selftest に 6 件、変異 2 本とも赤。`_text`・`_frame` は XML の特殊文字を変換する。
+  - 直さなかったもの: 公開の順は「Zenodo を publish → GitHub を public」（security の確認事項・守る）。記録の寄託日は下書きに上げた日（10-07）で、publish も同じ日の予定。
+- **/cross-review（Codex）5 回目**（点検の直し・6 ファイル）: (1) 図の生成物が差分に無い → 偽陽性（範囲から外しただけ）。(2) 「検出したまとまりごとに 1 行」と「行を書かないまとまり」が並ぶと検出と書き出しが紛れる → 「検出したまとまりが終わったときに 1 行・打ち切りは行なし」に書き分けた（README・訳・図）。(3) 全角と日本語の形の組み合わせのテスト → `判断 ＃２１９` を足した。今日の記帳 233,740 / 8 回。
+- **影響範囲**: `papers/ime-observation/{README.md,README.ja.md}`・`assets/{make_assets.py,validation-light.svg,validation-dark.svg,records-light.svg,records-dark.svg}`・`experiment/{data,data.windows}.md`・`issues/_style_check.py`・本ファイル。
