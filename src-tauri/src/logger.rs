@@ -1582,8 +1582,23 @@ fn keyboard_layout_fragment() -> String {
 /// ★ 値域は `O1Source` で型に閉じているので、⚠️ 外部由来の文字列が JSON を壊す経路は無い
 /// (`g1_mode` が security review MEDIUM で採った作法と同じ)。
 fn o1_mode_fragment() -> String {
-    match crate::o1::mode() {
-        Some(src) => format!(r#","o1_mode":"{}""#, src.as_str()),
+    o1_meta_fragment(crate::o1::mode(), crate::o1::install_id().as_deref())
+}
+
+/// `o1_mode_fragment` の純関数部分 (テストから O1 / 非 O1 を切り替えられるよう分けた)。
+///
+/// ⚠️★★★ **非 O1 なら空文字列**（★ 通常運用 / G1 の `meta` 行は 1 バイトも変わらない）。
+/// ★ `o1_install_id` は **`o1_mode` の直後**・O1 でも**妥当な値のときだけ**出す
+/// （⚠️ `[0-9a-f]{16}` に閉じた値なので JSON を壊す経路が無い。妥当でなければ出さない）。
+fn o1_meta_fragment(mode: Option<crate::o1::O1Source>, install_id: Option<&str>) -> String {
+    match mode {
+        Some(src) => {
+            let id = install_id
+                .filter(|s| crate::o1::is_valid_install_id(s))
+                .map(|s| format!(r#","o1_install_id":"{s}""#))
+                .unwrap_or_default();
+            format!(r#","o1_mode":"{}"{}"#, src.as_str(), id)
+        }
         None => String::new(),
     }
 }
@@ -2878,6 +2893,37 @@ fn chrono_like_filename() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // --- O1 の meta 断片 (o1_mode / o1_install_id) ---
+
+    #[test]
+    fn o1_meta_fragment_is_empty_outside_o1() {
+        // ★ 通常運用 / G1 の meta 行は 1 バイトも変わらない（識別子があっても出さない）。
+        assert_eq!(o1_meta_fragment(None, None), "");
+        assert_eq!(o1_meta_fragment(None, Some("0123456789abcdef")), "");
+    }
+
+    #[test]
+    fn o1_meta_fragment_puts_install_id_right_after_o1_mode() {
+        let f = o1_meta_fragment(Some(crate::o1::O1Source::Marker), Some("0123456789abcdef"));
+        assert_eq!(
+            f,
+            r#","o1_mode":"marker","o1_install_id":"0123456789abcdef""#
+        );
+    }
+
+    #[test]
+    fn o1_meta_fragment_drops_an_invalid_install_id() {
+        // ⚠️ JSON を壊しうる値・桁違いは刻まない（o1_mode だけ残る）。
+        for bad in ["", "ZZ", "0123456789abcde\"\"", "0123456789ABCDEF"] {
+            let f = o1_meta_fragment(Some(crate::o1::O1Source::Env), Some(bad));
+            assert_eq!(f, r#","o1_mode":"env""#, "bad={bad}");
+        }
+        assert_eq!(
+            o1_meta_fragment(Some(crate::o1::O1Source::Env), None),
+            r#","o1_mode":"env""#
+        );
+    }
 
     // --- 診断ログ (gse-app.log) の置き場 ---
 

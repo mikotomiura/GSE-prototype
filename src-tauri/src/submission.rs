@@ -88,6 +88,12 @@ pub const O1_ID_FILE_NAME: &str = "o1_participant_id";
 /// 確認すればそのまま送られる（`.age.ok` と同じ「収束型のまま」の性質）。
 pub const O1_CONSENT_FILE_NAME: &str = "o1_consent_ack";
 
+/// ⚠️★★★ **O1 の導入識別子のファイル名**（`~/.gse/o1_install_id`・2026-10-07）。
+///
+/// ★ 1 人が複数端末で O1 を走らせても解析で端末を分けるための、**乱数由来**の識別子（`o1.rs` の doc）。
+/// ⚠️ **参加者 ID とは別ファイル**である —— ★ 参加者 ID は人を指し、これは導入を指す。
+pub const O1_INSTALL_ID_FILE_NAME: &str = "o1_install_id";
+
 /// home ディレクトリ。`USERPROFILE` → `HOME` の順で引く (logger.rs `fallback_log_dir` と一致。
 /// Windows git-bash で両方設定された場合に解決先が割れないよう順序を揃える)。
 pub fn home_dir() -> Option<PathBuf> {
@@ -177,6 +183,126 @@ pub fn write_o1_participant_id(id: &str) -> Result<(), String> {
         ),
     )
     .map_err(|e| format!("参加者 ID を保存できません: {e}"))
+}
+
+/// 導入識別子ファイルの読み取り結果（★ 「読めなかった」と「読めたが壊れていた」を分ける）。
+enum InstallIdRead {
+    Valid(String),
+    Missing,
+    /// 読めたが形式違反（空・桁違い・文字違い）。★ 復旧してよいのはこの場合だけ。
+    Invalid,
+    /// 権限・I/O エラー。⚠️ **既存ファイルに触らない**（正常な値を壊さない）。
+    Unreadable,
+}
+
+fn read_install_id(p: &std::path::Path) -> InstallIdRead {
+    match std::fs::read_to_string(p) {
+        Ok(s) => {
+            let t = s.trim();
+            if crate::o1::is_valid_install_id(t) {
+                InstallIdRead::Valid(t.to_string())
+            } else {
+                InstallIdRead::Invalid
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => InstallIdRead::Missing,
+        Err(_) => InstallIdRead::Unreadable,
+    }
+}
+
+/// 導入識別子を `path` から読む。無い・形式違反なら `gen()` で作って**新規公開**する。
+///
+/// ⚠️★★ **完成した中身を別名で書いてから `hard_link` で公開する**（★ 書きかけを他プロセスに見せない。
+/// `hard_link` は宛先があれば失敗するので**先に公開された値が勝つ**）。
+/// ★ 読み取りエラー（権限・I/O）では**既存ファイルに触らず `None`**（正常な値を置換しない）。
+/// ★ 形式違反は、**直前にもう一度読んで**まだ壊れていれば `rename` で**原子的に置換**する
+///   （削除の隙間を作らない）。⚠️ **残る窓**: 壊れたファイルがある状態で 2 プロセスが同時に起動し、
+///   再読と置換の間に相手が公開すると値が割れうる（発生はごくまれ・割れても導入が 2 つに見えるだけ）。
+/// ★ `hard_link` 非対応のファイルシステムでは、別名ではなく `create_new` で直接書く（フォールバック）。
+/// 書けない場合は `None`（★ 識別子なしで記録は続く）。
+pub fn read_or_create_install_id_at(
+    path: &std::path::Path,
+    gen: impl FnOnce() -> String,
+) -> Option<String> {
+    use std::io::Write;
+    match read_install_id(path) {
+        InstallIdRead::Valid(id) => return Some(id),
+        InstallIdRead::Unreadable => return None,
+        InstallIdRead::Missing | InstallIdRead::Invalid => {}
+    }
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).ok()?;
+    }
+    let id = gen();
+    if !crate::o1::is_valid_install_id(&id) {
+        return None;
+    }
+    // ★ 一時名は pid ＋ 呼び出しごとの連番（同じプロセス内の並行呼び出しでも衝突しない）。
+    static TMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = TMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = path.with_extension(format!("tmp{}-{seq}", std::process::id()));
+    let _ = std::fs::remove_file(&tmp);
+    let written = {
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        opts.open(&tmp)
+            .and_then(|mut f| f.write_all(format!("{id}\n").as_bytes()))
+    };
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+        return None;
+    }
+    let result = match std::fs::hard_link(&tmp, path) {
+        Ok(()) => Some(id.clone()),
+        Err(e) => match read_install_id(path) {
+            InstallIdRead::Valid(existing) => Some(existing),
+            InstallIdRead::Unreadable => None,
+            InstallIdRead::Invalid => {
+                // 直前にもう一度読む（読み直しで正常になっていたらそれを採る）。
+                match read_install_id(path) {
+                    InstallIdRead::Valid(existing) => Some(existing),
+                    InstallIdRead::Invalid => std::fs::rename(&tmp, path).ok().map(|_| id.clone()),
+                    _ => None,
+                }
+            }
+            InstallIdRead::Missing => {
+                // 宛先が無いのにリンクできない = hard_link 非対応。直接書く。
+                let _ = e;
+                let mut opts = std::fs::OpenOptions::new();
+                opts.write(true).create_new(true);
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::OpenOptionsExt;
+                    opts.mode(0o600);
+                }
+                match opts
+                    .open(path)
+                    .and_then(|mut f| f.write_all(format!("{id}\n").as_bytes()))
+                {
+                    Ok(()) => Some(id.clone()),
+                    Err(_) => match read_install_id(path) {
+                        InstallIdRead::Valid(existing) => Some(existing),
+                        _ => None,
+                    },
+                }
+            }
+        },
+    };
+    let _ = std::fs::remove_file(&tmp);
+    result
+}
+
+/// O1 の導入識別子を読む（無ければ乱数で作る）。★ 起動時に 1 回だけ呼ぶ（`lib.rs`）。
+pub fn read_or_create_o1_install_id() -> Option<String> {
+    let path = home_dir().map(|h| h.join(".gse").join(O1_INSTALL_ID_FILE_NAME))?;
+    read_or_create_install_id_at(&path, || {
+        crate::o1::install_id_from_bytes(rand::random::<[u8; 8]>())
+    })
 }
 
 /// ⚠️★★★ **O1 の同意確認が済んでいるか**（R-7）。
@@ -908,5 +1034,129 @@ mod tests {
             sent_marker_path(p),
             Path::new("/tmp/x/P012_block01_gse_a.age.sent")
         );
+    }
+
+    fn unique_tmp_dir(tag: &str) -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!(
+            "gse-install-id-{tag}-{}-{nanos}",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn install_id_is_created_once_and_stable() {
+        let dir = unique_tmp_dir("stable");
+        let path = dir.join(".gse").join(O1_INSTALL_ID_FILE_NAME);
+        let first = read_or_create_install_id_at(&path, || "0123456789abcdef".to_string());
+        assert_eq!(first.as_deref(), Some("0123456789abcdef"));
+        // 2 回目は生成関数を呼ばず、同じ値を返す（再起動しても変わらない）。
+        let second = read_or_create_install_id_at(&path, || "ffffffffffffffff".to_string());
+        assert_eq!(second.as_deref(), Some("0123456789abcdef"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn install_id_is_recreated_when_the_file_is_corrupt() {
+        let dir = unique_tmp_dir("corrupt");
+        let path = dir.join(O1_INSTALL_ID_FILE_NAME);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(&path, "not-a-valid-id\"\n").unwrap();
+        let id = read_or_create_install_id_at(&path, || "00112233445566ff".to_string());
+        assert_eq!(id.as_deref(), Some("00112233445566ff"));
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap().trim(),
+            "00112233445566ff"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn install_id_is_recreated_when_the_file_is_empty_and_leaves_no_tmp() {
+        let dir = unique_tmp_dir("empty");
+        let path = dir.join(O1_INSTALL_ID_FILE_NAME);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(&path, "").unwrap();
+        let id = read_or_create_install_id_at(&path, || "aabbccddeeff0011".to_string());
+        assert_eq!(id.as_deref(), Some("aabbccddeeff0011"));
+        let names: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+            .collect();
+        assert_eq!(
+            names,
+            vec![O1_INSTALL_ID_FILE_NAME.to_string()],
+            "一時ファイルが残った"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn install_id_keeps_an_unreadable_file_untouched() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = unique_tmp_dir("unreadable");
+        let path = dir.join(O1_INSTALL_ID_FILE_NAME);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(&path, "0123456789abcdef\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+        // root では読めてしまうので、読めないことを確認できたときだけ検査する。
+        if std::fs::read_to_string(&path).is_err() {
+            let id = read_or_create_install_id_at(&path, || "ffffffffffffffff".to_string());
+            assert_eq!(id, None, "読めないときは置換しない");
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            assert_eq!(
+                std::fs::read_to_string(&path).unwrap().trim(),
+                "0123456789abcdef",
+                "正常な値が壊された"
+            );
+        } else {
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn install_id_concurrent_callers_agree() {
+        let dir = unique_tmp_dir("concurrent");
+        let path = dir.join(O1_INSTALL_ID_FILE_NAME);
+        std::fs::create_dir_all(&dir).unwrap();
+        // 壊れたファイルがある状態から複数スレッドで同時に呼んでも、最終ファイルの値は妥当で、
+        // 返った値はすべて妥当（⚠️ 割れうる残る窓は doc に明記・ここでは妥当性と収束を見る）。
+        std::fs::write(&path, "").unwrap();
+        let handles: Vec<_> = (0..8)
+            .map(|i| {
+                let p = path.clone();
+                std::thread::spawn(move || {
+                    read_or_create_install_id_at(&p, || format!("{:016x}", i + 1))
+                })
+            })
+            .collect();
+        for h in handles {
+            let r = h.join().unwrap();
+            assert!(r.as_deref().is_some_and(crate::o1::is_valid_install_id));
+        }
+        let fin = std::fs::read_to_string(&path).unwrap();
+        assert!(crate::o1::is_valid_install_id(fin.trim()));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn install_id_refuses_an_invalid_generated_value() {
+        let dir = unique_tmp_dir("invalid-gen");
+        let path = dir.join(O1_INSTALL_ID_FILE_NAME);
+        let id = read_or_create_install_id_at(&path, || "ZZ".to_string());
+        assert_eq!(id, None, "妥当でない値は書かない");
+        assert!(!path.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn real_generator_produces_a_valid_id() {
+        let id = crate::o1::install_id_from_bytes(rand::random::<[u8; 8]>());
+        assert!(crate::o1::is_valid_install_id(&id), "{id}");
     }
 }

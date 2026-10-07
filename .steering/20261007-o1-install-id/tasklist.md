@@ -1,0 +1,18 @@
+# tasklist
+- [x] o1.rs: 純関数 + OnceLock
+- [x] submission.rs: 読み書き
+- [x] lib.rs: 起動時に確定
+- [x] logger.rs: meta 断片（テスト 3 本）
+- [x] schema_dto.rs + current.json（additive 7 行）
+- [x] anonymize テスト
+- [x] テスト（冪等・壊れた値・非 O1 は空文字列）
+- [x] fmt / clippy / test（800 + 68 + … 全 pass）
+- [x] ADR-038 起票（Proposed）・README・agent-shared
+- [x] 同意文面案（consent-revision-proposal.md）
+- [x] 版 0.1.40 bump
+- [x] code-reviewer / security-checker の指摘対応
+- [x] /cross-review（Codex 実行済み・指摘 #1 #2 #5 #6 対応）
+- [ ] 事前登録草案 §4/§12 の書き換え（主チェックアウト側・別ブランチ）
+- [ ] コミット → PR → CI → merge
+- [ ] タグ v0.1.40（研究者承認）・配布物・o1-distribution-tag.md
+- [ ] gse-dataset の schema 同期（別 repo・研究者）

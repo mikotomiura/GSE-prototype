@@ -773,6 +773,41 @@ pub fn is_o1() -> bool {
     mode().is_some()
 }
 
+/// ⚠️★★★ **導入ごとの識別子** (`meta` 行の `o1_install_id`・2026-10-07・研究者判断)。
+///
+/// ★ 目的: 1 人が複数端末で O1 を走らせても、**解析で端末を分けられる**ようにする
+/// (端末 A を離れて B で作業した時間を「離脱」と混ぜない・G2 の入力を汚さない)。
+///
+/// ⚠️★★★ **ハードウェア・MAC・ホスト名・ユーザー名・OS の機械 ID は一切使わない**
+/// (ADR-013 D6 は「マシン GUID はフィンガープリントになる」として禁じている)。
+/// ★ **導入時に乱数で作った 16 桁の hex** であり、`~/.gse` を消せば別の値になる。
+/// ⚠️ 値域を `[0-9a-f]{16}` に閉じるので、**手書き JSON を壊す経路が無い**
+/// (`g1_mode` が security review MEDIUM で採った作法と同じ)。
+pub const INSTALL_ID_LEN: usize = 16;
+
+/// `s` が導入識別子として妥当か (純関数)。16 桁の小文字 hex だけを通す。
+pub fn is_valid_install_id(s: &str) -> bool {
+    s.len() == INSTALL_ID_LEN && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// 8 バイトの乱数から導入識別子を作る (純関数。乱数の取得は呼び出し側)。
+pub fn install_id_from_bytes(bytes: [u8; 8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+static O1_INSTALL_ID: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+/// 起動時に 1 回だけ導入識別子を確定させる。★ 2 回目以降は黙って無視する (`set_mode` と同じ)。
+/// ⚠️ 妥当でない値は**保持しない** (`None` にする)。
+pub fn set_install_id(id: Option<String>) {
+    let _ = O1_INSTALL_ID.set(id.filter(|s| is_valid_install_id(s)));
+}
+
+/// 確定済みの導入識別子。O1 でなければ・未確定なら `None`。
+pub fn install_id() -> Option<String> {
+    O1_INSTALL_ID.get().cloned().flatten()
+}
+
 /// 実行環境から O1 モードを検出する (IO あり)。★ `run()` から**起動時に 1 回だけ**呼ぶ。
 ///
 /// マーカーの探索に失敗した場合 (`current_exe()` が取れない・階層が足りない) は
@@ -1694,5 +1729,26 @@ mod tests {
             periodic_reconcile_due(last, last - 1),
             "⚠️ 時計が巻き戻ったら基準を引き直させる"
         );
+    }
+
+    #[test]
+    fn install_id_accepts_only_16_lowercase_hex() {
+        assert!(is_valid_install_id("0123456789abcdef"));
+        assert!(!is_valid_install_id("0123456789ABCDEF"), "大文字は不可");
+        assert!(!is_valid_install_id("0123456789abcde"), "15 桁は不可");
+        assert!(!is_valid_install_id("0123456789abcdef0"), "17 桁は不可");
+        assert!(!is_valid_install_id("0123456789abcdeg"), "hex 以外は不可");
+        assert!(!is_valid_install_id(""));
+        assert!(
+            !is_valid_install_id("0123456789abcd\"\""),
+            "JSON を壊す文字は不可"
+        );
+    }
+
+    #[test]
+    fn install_id_from_bytes_is_valid_and_deterministic() {
+        let id = install_id_from_bytes([0, 1, 0xab, 0xcd, 0xef, 0x10, 0x20, 0xff]);
+        assert_eq!(id, "0001abcdef1020ff");
+        assert!(is_valid_install_id(&id));
     }
 }

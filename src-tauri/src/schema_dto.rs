@@ -85,6 +85,15 @@ pub enum LogEntryDto {
         /// `required` に入れると**旧ログが schema 検証に落ちる** (ADR-005 の additive-only 違反)。
         #[serde(skip_serializing_if = "Option::is_none")]
         o1_mode: Option<String>,
+        /// ⚠️★★★ O1 の**導入ごとの識別子** (16 桁の小文字 hex・導入時に乱数で生成)。**start 形状のみ**。
+        ///
+        /// ★ 目的: 1 人が複数端末で O1 を走らせても、**解析で端末を分けられる** (2026-10-07・研究者判断)。
+        /// ⚠️ **ハードウェア・MAC・ホスト名・ユーザー名・OS の機械 ID は使わない** (ADR-013 D6)。
+        /// ⚠️ **O1 実施時にしか出ない** (通常運用 / G1 の NDJSON は従来と byte 単位で同一)。
+        /// ⚠️ **`Option` である** —— 旧ログ (v0.1.39 以前の O1 を含む) には無いので `required` に入れない (ADR-005)。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[schemars(regex(pattern = r"^[0-9a-f]{16}$"))]
+        o1_install_id: Option<String>,
         /// ★ アプリの版 (**粗い semver のみ**)。**start 形状のみ** (ADR-013 D1)。
         ///
         /// ⚠️ git SHA / ビルドホスト名 / ビルド時刻 / マシン GUID は
