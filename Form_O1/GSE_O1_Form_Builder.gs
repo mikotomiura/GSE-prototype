@@ -1674,10 +1674,14 @@ function buildO1MgmtSheet() {
   o1EnsureMgmtTab_(ss, O1_MGMT_REJECT_TAB, O1_MGMT_REJECT_BANNER);
   // ⚠️★★ **入力規則を貼らない**（★ 上の `O1_MGMT_MAX_ROWS` のコメント参照）。
   // ★ リンク集は派生の表示なので、作れなくてもログのタブの用意は止めない。
+  //   ⚠️ 失敗は「警告が出ていない＝成功」と読まれないよう、**肯定形で**作れなかったと言う。
   try {
     o1BuildLinksTab_(ss);
   } catch (e) {
-    Logger.log("⚠️ 「" + O1_LINKS_TAB + "」を作れませんでした（★ ログのタブは用意済み）: " + e);
+    Logger.log(
+      "⚠️★ 「" + O1_LINKS_TAB + "」は**作れていません**（★ ログのタブは用意済み）。" +
+        "原因を直してから refreshO1LinksTab() を実行してください: " + e
+    );
   }
   Logger.log("🔗 " + ss.getUrl());
   return ss.getUrl();
@@ -1836,22 +1840,35 @@ var O1_LINKS_MANUAL = [
     "O1 終了判定の基準",
     "★ 研究者が決めた基準（起算点・日数・有効日の条件）を書く。⚠️ 判定の機械はまだ無い",
   ],
-  ["メモ", ""],
+  ["メモ", "⚠️ 氏名・メールを書かない（作り直しても残り続けるため）"],
 ];
 
-/** ★ 既にあるリンク集から、手で入れる欄の値を項目名で拾う（⚠️ 無ければ空）。 */
+/**
+ * ★ 既にあるリンク集から、手で入れる欄の値を項目名で拾う（⚠️ 無ければ空）。
+ *
+ * ★ **表示値**（`getDisplayValues`）で読む（code-reviewer / security-checker 2026-10-07）:
+ *   `getValues` だと日付が `String(Date)`（"Thu Oct 08 2026 00:00:00 GMT+0900 …"）に化ける。
+ *   ⚠️ 数式・挿入したリンクは**保たない**（数式は表示された文字、リンクは表示文字だけが残る）。
+ *   → ★ 手で入れる欄には **URL をそのまま貼る**（2 行目の注記に書く）。
+ * ★ 同じ項目名の行が複数あれば、**空でない最初の値**を採る（⚠️ 行をコピーした空の行で消さない）。
+ */
 function o1ReadLinksManual_(sheet) {
   var out = {};
   if (!sheet) return out;
   var last = sheet.getLastRow();
   if (last < 1) return out;
-  var vals = sheet.getRange(1, 1, last, 2).getValues();
+  var vals = sheet.getRange(1, 1, last, 2).getDisplayValues();
   var labels = O1_LINKS_MANUAL.map(function (m) {
     return m[0];
   });
   for (var r = 0; r < vals.length; r++) {
     var label = String(vals[r][0]);
-    if (labels.indexOf(label) >= 0) out[label] = vals[r][1];
+    if (labels.indexOf(label) < 0) continue;
+    var v = String(vals[r][1]);
+    if (out[label] !== undefined && v !== "") {
+      Logger.log("⚠️ リンク集に「" + label + "」の行が複数あります（★ 空でない最初の値を採ります）。");
+    }
+    if (out[label] === undefined || out[label] === "") out[label] = v;
   }
   return out;
 }
@@ -1872,7 +1889,14 @@ function o1LinksRows_(props, cfg, manual) {
   var s = form("O1_SURVEY");
   var rows = [
     ["GSE O1 リンク集（研究者のみ）", "", "", ""],
-    ["⚠️ フォームの編集 URL を含みます。この表は研究者だけで共有してください。★ 氏名・メールは書きません。", "", "", ""],
+    [
+      "⚠️ フォームの編集 URL を含みます。この表は研究者だけで共有してください。" +
+        "⚠️ どの欄にも氏名・メールを書かないでください。" +
+        "⚠️ 作り直すと「手動」の 3 欄以外は消えます。手動の欄には URL をそのまま貼ってください（数式・挿入したリンクは保たれません）。",
+      "",
+      "",
+      "",
+    ],
     ["", "", "", ""],
     ["項目", "値 / URL", "種別", "備考"],
     ["▼ フォーム", "", "", ""],
@@ -1924,8 +1948,9 @@ function o1BuildLinksTab_(ss) {
   }
   var sheet = ss.getSheetByName(O1_LINKS_TAB);
   var manual = o1ReadLinksManual_(sheet);
-  if (!sheet) sheet = ss.insertSheet(O1_LINKS_TAB, 0);
+  // ★ 行を先に組み立てる（⚠️ 失敗しても空のタブを残さない・既存の手入力を消さない）。
   var rows = o1LinksRows_(PropertiesService.getScriptProperties(), o1Config_(), manual);
+  if (!sheet) sheet = ss.insertSheet(O1_LINKS_TAB, 0);
   sheet.clear();
   sheet.getRange(1, 1, rows.length, O1_LINKS_WIDTH).setValues(rows);
   var U = O1_MGMT_UI;

