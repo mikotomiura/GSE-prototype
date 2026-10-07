@@ -1475,6 +1475,173 @@ const sharedProps = (extra) =>
 }
 
 // ---------------------------------------------------------------------------
+// §12 O1 終了判定（2026-10-07・`.steering/20261007-o1-end-judgement/`）
+//   ★ 起算日 = 最初に記録した日・その日を 1 日目として 21 日目が過ぎたら終了
+// ---------------------------------------------------------------------------
+const END = "O1 終了判定";
+const END_HEAD_ROW = 3;
+const endData = (ss) => ss.sheets[END].rows.slice(END_HEAD_ROW).filter((r) => r && r[0] && !/まだ登録も受領も/.test(r[0]));
+const endRowOf = (ss, pid) => endData(ss).find((r) => r[0] === pid);
+const key = (s) => call(E, "o1LedgerDayKey_", s);
+const TODAY = key("2026-09-30"); // NOW と同じ日
+const EF = (pid, ymd) => ({ pid, start: ymd + " 10:11:12" });
+const endJudge = (files, reg, today) => plain(call(E, "o1LedgerEndJudge_", files, reg || {}, today === undefined ? TODAY : today));
+{
+  check("§12 日付の通し番号: 1 日違いは 1", key("2026-09-21") - key("2026-09-20"), 1);
+  check("§12 月をまたいでも暦日で数える", key("2026-10-01") - key("2026-09-30"), 1);
+  check("§12★ ありえない日付（2026-02-31）は読まない", key("2026-02-31"), null);
+  check("§12 形の違う文字列は読まない", key("20260920"), null);
+  check("§12 番号 → 文字列が元に戻る", call(E, "o1LedgerKeyToStr_", key("2026-09-05")), "2026-09-05");
+
+  // 境界: 起算日 09-10 → 21 日目 = 09-30
+  const f = [EF("P001", "2026-09-10"), EF("P001", "2026-09-29")];
+  const d20 = endJudge(f, {}, key("2026-09-29"))[0];
+  const d21 = endJudge(f, {}, key("2026-09-30"))[0];
+  const d22 = endJudge(f, {}, key("2026-10-01"))[0];
+  check("§12★ 20 日目は期間中", [d20.status, d20.dayNo], ["期間中", 20]);
+  check("§12★ 21 日目（当日）はまだ期間中", [d21.status, d21.dayNo], ["期間中", 21]);
+  check("§12★ 22 日目に入ったら終了（連絡待ち）", [d22.status, d22.dayNo], ["終了（連絡待ち）", 22]);
+  check("§12 21 日目の日付", call(E, "o1LedgerKeyToStr_", d22.endKey), "2026-09-30");
+
+  // 片づけの案内
+  const arrived = endJudge([EF("P002", "2026-09-01"), EF("P002", "2026-09-21")], {}, key("2026-09-22"))[0];
+  check("§12★ 21 日目以降の記録が届いていれば片づけ可", arrived.settle, "可（21 日目以降の記録が届いた）");
+  const waiting = endJudge([EF("P003", "2026-09-01"), EF("P003", "2026-09-15")], {}, key("2026-09-23"))[0];
+  check("§12★ 21 日目の記録が無く、終了から 3 日たっていなければ待つ", waiting.settle, "待つ（最後の記録が届く途中かもしれない）");
+  const elapsed = endJudge([EF("P003", "2026-09-01"), EF("P003", "2026-09-15")], {}, key("2026-09-25"))[0];
+  check("§12★ 終了から 3 日たてば片づけ可", elapsed.settle, "可（終了から 3 日たった）");
+  check("§12 期間中は片づけの案内を出さない", d21.settle, "");
+
+  // 届いた日の数: 同じ日は 1・期間の後は数えない
+  const many = endJudge([EF("P004", "2026-09-01"), EF("P004", "2026-09-01"), EF("P004", "2026-09-05"), EF("P004", "2026-09-21"), EF("P004", "2026-09-25")], {}, TODAY)[0];
+  check("§12★ 届いた日の数は期間内の日付の種類（同じ日は 1・22 日目以降は数えない）", many.daysIn, 3);
+  check("§12 最後の記録の日は期間の後も含む", call(E, "o1LedgerKeyToStr_", many.lastKey), "2026-09-25");
+
+  // 登録日より前の日付は使わない（端末の時計が狂っていても即終了にしない）
+  const reg = { P005: new Date(2026, 8, 20, 9, 0, 0).getTime() };
+  const clock = endJudge([EF("P005", "2025-01-01"), EF("P005", "2026-09-21")], reg, TODAY)[0];
+  check("§12★ 登録日より前の日付は起算日にしない（除外数を出す）", [call(E, "o1LedgerKeyToStr_", clock.firstKey), clock.ignored, clock.status], ["2026-09-21", 1, "期間中"]);
+  check("§12 登録だけで記録が無ければ記録待ち", endJudge([], { P006: ago(3) }, TODAY)[0].status, "記録待ち");
+  check(
+    "§12★ P-ID が Object.prototype の名前（constructor）でも壊れない",
+    (() => {
+      try {
+        return endJudge([EF("constructor", "2026-09-20"), EF("toString", "2026-09-21")], {}, TODAY).map((r) => [r.pid, r.status]);
+      } catch (e) {
+        return "threw: " + e;
+      }
+    })(),
+    [["constructor", "期間中"], ["toString", "期間中"]]
+  );
+
+  // 研究者の記入で表示を進める
+  const blank12 = Array(12).fill("");
+  const withCol = (c, v) => blank12.map((x, i) => (i === c ? v : x));
+  check("§12 終了連絡日があれば「終了（連絡済み）」", call(E, "o1LedgerEndShown_", "終了（連絡待ち）", withCol(8, "2026-10-01")), "終了（連絡済み）");
+  check("§12 片づけ確認日があれば「完了」", call(E, "o1LedgerEndShown_", "終了（連絡待ち）", withCol(10, "2026-10-05")), "完了");
+  check("§12 期間中は記入があっても期間中のまま", call(E, "o1LedgerEndShown_", "期間中", withCol(8, "x")), "期間中");
+
+  // 通知の要否
+  const rowsE = [{ pid: "P001", status: "終了（連絡待ち）" }, { pid: "P002", status: "期間中" }];
+  const a1 = plain(call(E, "o1LedgerEndAlerts_", null, rowsE));
+  check("§12★ 新しく終了になった人だけを知らせる", [a1.added.map((r) => r.pid), a1.next], [["P001"], ["P001"]]);
+  const a2 = plain(call(E, "o1LedgerEndAlerts_", ["P001"], rowsE));
+  check("§12★ 終了が続いても再び知らせない", a2.added.length, 0);
+  const a3 = plain(call(E, "o1LedgerEndAlerts_", ["P001", "P009"], rowsE));
+  check("§12 消えた P-ID（削除）は状態から落ちる", a3.next, ["P001"]);
+}
+{
+  // 統合: 21 日目が過ぎた人がタブに出て、研究者宛てに 1 回だけ知らせる
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const files = [
+    makeFile("e1", goodName("P011", 1, stamp(5)), 100, ago(23)),
+    makeFile("e2", goodName("P011", 2, stamp(26)), 100, ago(2)),
+    makeFile("e3", goodName("P012", 1, stamp(20)), 100, ago(8)),
+    makeFile("e4", goodName("P012", 2, stamp(28)), 100, ago(1)),
+  ];
+  const env = makeEnv({ spreadsheet: ss, files });
+  call(env, "o1LedgerRun");
+  check("§12★ 「O1 終了判定」タブができ、見出しが 12 列", ss.sheets[END] && ss.sheets[END].rows[END_HEAD_ROW - 1].length, 12);
+  check("§12★ 起算 09-05 の人は終了（連絡待ち）・09-20 の人は期間中", [endRowOf(ss, "P011")[1], endRowOf(ss, "P012")[1]], ["終了（連絡待ち）", "期間中"]);
+  check("§12 終了の人が上に並ぶ", endData(ss).map((r) => r[0]), ["P011", "P012"]);
+  check("§12 起算日・21 日目・片づけの案内", endRowOf(ss, "P011").slice(2, 8), ["2026-09-05", "2026-09-25", "終了（26 日目）", "1", "2026-09-26", "可（21 日目以降の記録が届いた）"]);
+  check("§12★ 期間終了をメールで知らせる（件名と本文）", [env.mails.length, /期間終了 1 人/.test(env.mails[0] && env.mails[0].subject), /P011: 終了（連絡待ち）/.test(env.mails[0] && env.mails[0].body)], [1, true, true]);
+  check("§12 終了だけの回は見出しが終了の知らせ（要確認と読ませない）", /期間（21 日）が終わった人がいます/.test(env.mails[0].body), true);
+  check("§12★ 期間中の人は知らせない", /P012/.test(env.mails[0].body), false);
+  call(env, "o1LedgerRun");
+  check("§12★ 終了が続いても 2 通目は送らない", env.mails.length, 1);
+
+  // 研究者の記入は P-ID ごとに残り、判定の表示が進む
+  const rIdx = ss.sheets[END].rows.findIndex((r) => r && r[0] === "P011");
+  ss.sheets[END].rows[rIdx][8] = "2026-09-30";
+  ss.sheets[END].rows[rIdx][11] = "電話で連絡";
+  call(env, "o1LedgerRun");
+  check("§12★ 終了連絡日を書くと「終了（連絡済み）」になり、記入は残る", [endRowOf(ss, "P011")[1], endRowOf(ss, "P011")[8], endRowOf(ss, "P011")[11]], ["終了（連絡済み）", "2026-09-30", "電話で連絡"]);
+  const rIdx2 = ss.sheets[END].rows.findIndex((r) => r && r[0] === "P011");
+  ss.sheets[END].rows[rIdx2][10] = "2026-10-02";
+  ss.sheets[END].rows[rIdx2][11] = "=HYPERLINK(\"x\")";
+  call(env, "o1LedgerRun");
+  check("§12 片づけ確認日を書くと「完了」", endRowOf(ss, "P011")[1], "完了");
+  check("§12★ 記入欄の数式は文字列に倒す", String(endRowOf(ss, "P011")[11]).startsWith("⚠="), true);
+  check("§12★ タブ全体をテキスト形式で書く（記入した日付が日付に化けない）", ss.sheets[END].formats["4,9"], "@");
+  check("§12 タブに氏名・メールが無い", JSON.stringify(ss.sheets[END].rows).includes("@"), false);
+}
+{
+  // 削除で台帳から消えた P-ID の行（研究者の記入ごと）は残らない
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const files = [makeFile("k1", goodName("P013", 1, stamp(20)), 100, ago(8))];
+  const env = makeEnv({ spreadsheet: ss, files });
+  call(env, "o1LedgerRun");
+  const i = ss.sheets[END].rows.findIndex((r) => r && r[0] === "P013");
+  ss.sheets[END].rows[i][11] = "メモ";
+  // 削除の求め（A-14）: 台帳の行を tombstone にする
+  const L = ss.sheets[LEDGER].rows;
+  const li = L.findIndex((r) => r && r[0] === "k1");
+  L[li][2] = "";
+  L[li][3] = "";
+  L[li][4] = "";
+  L[li][1] = "";
+  L[li][9] = "削除済";
+  call(env, "o1LedgerRun");
+  check("§12★ 削除された P-ID の行は記入ごと残らない", endRowOf(ss, "P013"), undefined);
+}
+{
+  // 走査が打ち切られた回は、終了の通知を保留する（状態も保存しない）
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const files = [];
+  for (let i = 1; i <= 6; i++) files.push(makeFile("t" + i, goodName("P014", i, stamp(i)), 100, ago(20)));
+  const startNow = NOW;
+  const env = makeEnv({ spreadsheet: ss, files, tickPerFile: 100000 });
+  call(env, "o1LedgerRun");
+  check("§12★ 打ち切りの回は期間終了を知らせない・状態を保存しない", [env.mails.some((m) => /期間終了/.test(m.subject)), "O1_LEDGER_ENDED" in env.props], [false, false]);
+  NOW = startNow;
+}
+{
+  // 終了判定のタブが書けなくても、途絶の通知は止まらない
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, []);
+  const orig = ss.insertSheet.bind(ss);
+  ss.insertSheet = (n) => {
+    if (n === END) throw new Error("stub: cannot insert");
+    return orig(n);
+  };
+  const env = makeEnv({ spreadsheet: ss, files: [makeFile("s1", goodName("P015", 1, stamp(10)), 100, ago(8))] });
+  const r = (() => {
+    try {
+      call(env, "o1LedgerRun");
+      return "ok";
+    } catch (e) {
+      return String(e);
+    }
+  })();
+  check("§12★ 終了判定のタブが書けなくても実行は止まらず、途絶は通知される", [r, env.mails.length, /途絶/.test(env.mails[0] && env.mails[0].body)], ["ok", 1, true]);
+  check("§12 書けなかったことをログに肯定形で残す", env.logs.some((l) => /更新できていません/.test(l)), true);
+}
+
+// ---------------------------------------------------------------------------
 // §7 ソースの性質（★ 歯止め）
 // ---------------------------------------------------------------------------
 {

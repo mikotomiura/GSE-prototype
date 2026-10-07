@@ -311,6 +311,36 @@ mutate "見た目: 途絶タブの書式の例外を捕まえない（通知が�
 mutate "見た目: 受領台帳の書式の例外を捕まえない（走査が止まる）" \
   's/  try \{\n    o1LedgerStyleLedgerTab_\(sheet\);/  o1LedgerStyleLedgerTab_(sheet); if (false) try {/'
 
+# ★ 2026-10-07 O1 終了判定（`.steering/20261007-o1-end-judgement/`）
+mutate "終了判定: 21 日目の当日に終了にする（1 日早い）" \
+  's/var ended = todayKey > endKey;/var ended = todayKey >= endKey;/'
+mutate "終了判定: 期間を 20 日にする" \
+  's/var endKey = first \+ O1_LEDGER_END_DAYS - 1;/var endKey = first + O1_LEDGER_END_DAYS - 2;/'
+mutate "終了判定: 登録日より前の日付も起算日に使う" \
+  's/      if \(regKey !== null && k < regKey\) \{/      if (false) {/'
+mutate "終了判定: 届いた日の数に期間の後の日も数える" \
+  's/      return k <= endKey;\n    \}\)\.length;/      return true;\n    }).length;/'
+mutate "終了判定: 21 日目の記録が無くてもすぐ片づけ可にする" \
+  's/      else settle = O1_LEDGER_END_SETTLE_WAIT;/      else settle = O1_LEDGER_END_SETTLE_ELAPSED;/'
+mutate "終了判定: ありえない日付も読む" \
+  's/  if \(back\.getUTCMonth\(\) !== mo - 1 \|\| back\.getUTCDate\(\) !== d\) return null;/  /'
+mutate "終了判定: 終了が続くたびに通知する" \
+  's/      return !before\[r\.pid\];/      return true;/'
+mutate "終了判定: 打ち切りの回にも終了を通知する" \
+  's/var endedToSend = reliable \? endPlan\.added : \[\];/var endedToSend = endPlan.added;/'
+mutate "終了判定: 研究者の記入を引き継がない" \
+  's/      if \(pid && !manualByPid\[pid\]\) manualByPid\[pid\] = r;/      0;/'
+mutate "終了判定: 終了判定のタブの例外を捕まえない（途絶の通知が止まる）" \
+  's/  try \{\n    o1LedgerWriteEnd_\(ss, endRows, nowMs\);\n  \} catch \(e\) \{/  { o1LedgerWriteEnd_(ss, endRows, nowMs); } if (false) { var e;/'
+mutate "終了判定: タブをテキスト形式にしない" \
+  's/  var all = sheet\.getRange\(1, 1, out\.length, width\);\n  all\.setNumberFormat\("@"\);/  var all = sheet.getRange(1, 1, out.length, width);/'
+mutate "終了判定: 記入欄を無害化しない" \
+  's/      return o1LedgerSafeCell_\(String\(cell\)\); \/\/ ★ 研究者の記入欄も含めて無害化する/      return String(cell);/'
+mutate "終了判定: 連絡済みの表示にしない" \
+  's/  if \(manual && filled\(manual\[O1_LEDGER_END_MANUAL\.contacted\]\)\) return O1_LEDGER_END_CONTACTED;/  /'
+mutate "終了判定: byPidEnd を素のオブジェクトに戻す（constructor で例外）" \
+  's/var byPidEnd = Object\.create\(null\);/var byPidEnd = {};/'
+
 echo
 echo "壊すと赤: $PASS / 穴: $FAIL"
 if [ "$FAIL" -ne 0 ]; then
