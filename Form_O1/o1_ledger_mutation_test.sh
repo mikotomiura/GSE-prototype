@@ -319,9 +319,15 @@ mutate "終了判定: 期間を 20 日にする" \
 mutate "終了判定: 登録日より前の日付も起算日に使う" \
   's/ \|\| k < regKey \|\| / || /'
 mutate "終了判定: 受領日より後（未来）の日付も使う" \
-  's/ \|\| k > recvKey \+ 1 \|\| / || /'
+  's/ \|\| k > recvKey \+ 1\) \{/) {/'
 mutate "終了判定: 受領日よりずっと前の日付も使う" \
-  's/ \|\| k < recvKey - O1_LEDGER_END_MAX_LAG_DAYS\) \{/) {/'
+  's/      if \(k < recvKey - O1_LEDGER_END_MAX_LAG_DAYS\) \{/      if (false) {/'
+mutate "終了判定: 重複行の下の記入を捨てる" \
+  's/            if \(!a\) cur\[c\] = r\[c\];\n            else if \(b && a !== b\) cur\[c\] = a \+ " ／ " \+ b;/            0;/'
+mutate "終了判定: 遅れて届いた除外を表示しない" \
+  's/        \(r\.late \? /        (false ? /'
+mutate "終了判定: 起算日が無いと除外数を出さない" \
+  's/      \(r\.status === O1_LEDGER_END_UNREG \? "" : String\(r\.daysIn\)\) \+\n        \(r\.ignored \?/      (r.status === O1_LEDGER_END_UNREG ? "" : String(r.daysIn)) +\n        (r.firstKey !== null \&\& r.ignored ?/'
 mutate "終了判定: 登録の無い P-ID も判定する" \
   's/    if \(regKey === null\) \{\n      return \{ pid: pid, status: O1_LEDGER_END_UNREG/    if (false) {\n      return { pid: pid, status: O1_LEDGER_END_UNREG/'
 mutate "終了判定: 2000 年より前の年も読む" \
@@ -337,7 +343,7 @@ mutate "終了判定: 終了が続くたびに通知する" \
 mutate "終了判定: 打ち切りの回にも終了を通知する" \
   's/var endedToSend = reliable \? endPlan\.added : \[\];/var endedToSend = endPlan.added;/'
 mutate "終了判定: 研究者の記入を引き継がない" \
-  's/      manualByPid\[pid\] = r;\n    \}\);/      0;\n    });/'
+  's/      manualByPid\[pid\] = r\.slice\(\);\n    \}\);/      0;\n    });/'
 mutate "終了判定: 書く前にタブを clear する（失敗で記入が消える）" \
   's/  if \(!sheet\) sheet = ss\.insertSheet\(O1_LEDGER_END_TAB\);\n  o1LedgerEnsureRows_\(sheet, out\.length\);/  if (!sheet) sheet = ss.insertSheet(O1_LEDGER_END_TAB);\n  sheet.clear();\n  o1LedgerEnsureRows_(sheet, out.length);/'
 mutate "終了判定: 見出しを照合しない（記入がずれる）" \

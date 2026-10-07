@@ -275,15 +275,20 @@ function o1LedgerEndJudge_(files, registered, todayKey) {
     var regMs = registered && registered[pid] !== undefined ? registered[pid] : null;
     var regKey = regMs === null ? null : o1LedgerDayKey_(new Date(regMs));
     if (regKey === null) {
-      return { pid: pid, status: O1_LEDGER_END_UNREG, firstKey: null, endKey: null, dayNo: null, daysIn: 0, lastKey: null, settle: "", ignored: 0 };
+      return { pid: pid, status: O1_LEDGER_END_UNREG, firstKey: null, endKey: null, dayNo: null, daysIn: 0, lastKey: null, settle: "", ignored: 0, late: 0 };
     }
     var keys = Object.create(null);
     var ignored = 0;
+    var late = 0; // ★ 受領日の 14 日より前（＝遅れて届いた）で除外した数。起算日がずれうるので別に出す（Codex 指摘）
     (byPidEnd[pid] || []).forEach(function (f) {
       var k = o1LedgerDayKey_(f.start);
       var recvKey = isFinite(f.receivedMs) ? o1LedgerDayKey_(new Date(f.receivedMs)) : null;
-      if (k === null || recvKey === null || k < regKey || k > recvKey + 1 || k < recvKey - O1_LEDGER_END_MAX_LAG_DAYS) {
+      if (k === null || recvKey === null || k < regKey || k > recvKey + 1) {
         ignored++;
+        return;
+      }
+      if (k < recvKey - O1_LEDGER_END_MAX_LAG_DAYS) {
+        late++;
         return;
       }
       keys[k] = true;
@@ -294,7 +299,7 @@ function o1LedgerEndJudge_(files, registered, todayKey) {
         return a - b;
       });
     if (list.length === 0) {
-      return { pid: pid, status: O1_LEDGER_END_WAIT, firstKey: null, endKey: null, dayNo: null, daysIn: 0, lastKey: null, settle: "", ignored: ignored };
+      return { pid: pid, status: O1_LEDGER_END_WAIT, firstKey: null, endKey: null, dayNo: null, daysIn: 0, lastKey: null, settle: "", ignored: ignored, late: late };
     }
     var first = list[0];
     var endKey = first + O1_LEDGER_END_DAYS - 1;
@@ -318,7 +323,8 @@ function o1LedgerEndJudge_(files, registered, todayKey) {
       daysIn: daysIn,
       lastKey: last,
       settle: settle,
-      ignored: ignored
+      ignored: ignored,
+      late: late
     };
   });
 }
@@ -1063,10 +1069,20 @@ function o1LedgerWriteEnd_(ss, endRows, nowMs, info) {
       var pid = String(r[0] === undefined || r[0] === null ? "" : r[0]).trim();
       if (!pid) return;
       if (manualByPid[pid]) {
-        console.log("⚠️ 「" + O1_LEDGER_END_TAB + "」に同じ P-ID の行が複数あります（★ 上の行の記入を採ります）。");
+        // ⚠️★ 下の行の記入を捨てない（Codex 指摘）: 空なら下の値で埋め、食い違えば「／」でつないで両方残す。
+        console.log("⚠️ 「" + O1_LEDGER_END_TAB + "」に同じ P-ID の行が複数あります（★ 記入を合わせて 1 行にします）。");
+        var cur = manualByPid[pid];
+        [O1_LEDGER_END_MANUAL.contacted, O1_LEDGER_END_MANUAL.surveySent, O1_LEDGER_END_MANUAL.cleaned, O1_LEDGER_END_MANUAL.memo].forEach(
+          function (c) {
+            var a = String(cur[c] === undefined || cur[c] === null ? "" : cur[c]).trim();
+            var b = String(r[c] === undefined || r[c] === null ? "" : r[c]).trim();
+            if (!a) cur[c] = r[c];
+            else if (b && a !== b) cur[c] = a + " ／ " + b;
+          }
+        );
         return;
       }
-      manualByPid[pid] = r;
+      manualByPid[pid] = r.slice();
     });
   }
   var blank = function () {
@@ -1121,7 +1137,9 @@ function o1LedgerWriteEnd_(ss, endRows, nowMs, info) {
       r.firstKey === null ? "" : o1LedgerKeyToStr_(r.firstKey),
       r.endKey === null ? "" : o1LedgerKeyToStr_(r.endKey),
       r.dayNo === null ? "" : r.dayNo > O1_LEDGER_END_DAYS ? "終了（" + r.dayNo + " 日目）" : r.dayNo + " / " + O1_LEDGER_END_DAYS,
-      r.firstKey === null ? "" : r.daysIn + (r.ignored ? "（範囲外の日付 " + r.ignored + " 件を除外）" : ""),
+      (r.status === O1_LEDGER_END_UNREG ? "" : String(r.daysIn)) +
+        (r.ignored ? "（範囲外の日付 " + r.ignored + " 件を除外）" : "") +
+        (r.late ? "（⚠️ " + O1_LEDGER_END_MAX_LAG_DAYS + " 日より遅れて届いた日付 " + r.late + " 件を除外・起算日を確かめる）" : ""),
       r.lastKey === null ? "" : o1LedgerKeyToStr_(r.lastKey),
       r.settle
     ];

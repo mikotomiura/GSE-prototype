@@ -1662,7 +1662,7 @@ const endJudge = (files, reg, today) =>
   const fut = endJudge([EF("P021", "2026-09-01"), EF("P021", "2026-12-01", "2026-09-10")], undefined, key("2026-09-22"))[0];
   check("§12★ 受領日より後（未来）の日付は使わない（片づけ可を早めない）", [fut.settle, fut.ignored, call(E, "o1LedgerKeyToStr_", fut.lastKey)], ["待つ（最後の記録が届く途中かもしれない）", 1, "2026-09-01"]);
   const old = endJudge([EF("P022", "2026-08-02", "2026-09-25"), EF("P022", "2026-09-24", "2026-09-25")], undefined, TODAY)[0];
-  check("§12★ 受領日より 14 日以上前の日付は使わない（起算日を過去へ飛ばさない）", [call(E, "o1LedgerKeyToStr_", old.firstKey), old.ignored, old.status], ["2026-09-24", 1, "期間中"]);
+  check("§12★ 受領日より 14 日以上前の日付は使わない（起算日を過去へ飛ばさない・遅れの数を別に出す）", [call(E, "o1LedgerKeyToStr_", old.firstKey), old.ignored, old.late, old.status], ["2026-09-24", 0, 1, "期間中"]);
   const lag = endJudge([EF("P023", "2026-09-11", "2026-09-25")], undefined, TODAY)[0];
   check("§12 受領日の 14 日前ちょうどまでは使う（後送りを見込む）", call(E, "o1LedgerKeyToStr_", lag.firstKey), "2026-09-11");
   const unreg = endJudge([EF("P024", "2026-09-01")], {}, TODAY)[0];
@@ -1704,6 +1704,47 @@ const endJudge = (files, reg, today) =>
   call(env, "o1LedgerRun");
   check("§12★★ 見出しが違えば書かない（記入をずらさない）", JSON.stringify(T.rows), snap);
   check("§12 見出しが違うことをログに出す", env.logs.some((l) => /見出しの .* 列目が想定と違います/.test(l)), true);
+}
+{
+  // Codex 再レビュー（2026-10-08）: 重複行の記入を捨てない・全部除外でも件数を出す・遅れて届いた分を知らせる
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, [["2026-09-01 09:00:00", "register", "P051", "ok", "new-pid", ""], ["2026-09-01 09:00:00", "register", "P052", "ok", "new-pid", ""], ["2026-09-01 09:00:00", "register", "P053", "ok", "new-pid", ""]]);
+  const files = [
+    makeFile("d1", goodName("P051", 1, stamp(20)), 100, ago(9)),
+    // P052: 全部が登録日より前（2026-08-xx）→ 有効な日付なし
+    makeFile("d2", "P052_o1day01_gse_o1_20260810_101112.age", 100, ago(9)),
+    // P053: 初日の記録が 20 日遅れて届いた
+    makeFile("d3", goodName("P053", 1, stamp(2)), 100, ago(8)),
+    makeFile("d4", goodName("P053", 2, stamp(21)), 100, ago(8)),
+  ];
+  const env = makeEnv({ spreadsheet: ss, files });
+  call(env, "o1LedgerRun");
+  const T = ss.sheets[END];
+  const i1 = T.rows.findIndex((r) => r && r[0] === "P051");
+  T.rows[i1][11] = "";
+  const dup = T.rows[i1].slice();
+  dup[8] = "2026-10-01";
+  dup[11] = "下の行だけのメモ";
+  T.rows.splice(i1 + 1, 0, dup);
+  call(env, "o1LedgerRun");
+  check("§12★★ 同じ P-ID の行が重複しても、下の行だけの記入を捨てない", [endRowOf(ss, "P051")[8], endRowOf(ss, "P051")[11], endData(ss).filter((r) => r[0] === "P051").length], ["2026-10-01", "下の行だけのメモ", 1]);
+  check("§12★ 全部が範囲外でも除外の件数を出す（記録待ちと区別できる）", [endRowOf(ss, "P052")[1], /範囲外の日付 1 件を除外/.test(endRowOf(ss, "P052")[5])], ["記録待ち", true]);
+  check("§12★ 14 日より遅れて届いた日付を除外したら、起算日を確かめるよう出す", /14 日より遅れて届いた日付 1 件を除外・起算日を確かめる/.test(endRowOf(ss, "P053")[5]), true);
+}
+{
+  // 重複行で両方に違う記入 → 両方残す
+  const ss = makeSpreadsheet(["O1 登録ログ"]);
+  regTab(ss, [["2026-09-01 09:00:00", "register", "P061", "ok", "new-pid", ""]]);
+  const env = makeEnv({ spreadsheet: ss, files: [makeFile("q1", goodName("P061", 1, stamp(20)), 100, ago(9))] });
+  call(env, "o1LedgerRun");
+  const T = ss.sheets[END];
+  const i = T.rows.findIndex((r) => r && r[0] === "P061");
+  T.rows[i][11] = "上";
+  const dup = T.rows[i].slice();
+  dup[11] = "下";
+  T.rows.splice(i + 1, 0, dup);
+  call(env, "o1LedgerRun");
+  check("§12★ 重複行の記入が食い違えば、両方を「／」でつないで残す", endRowOf(ss, "P061")[11], "上 ／ 下");
 }
 {
   // タイムゾーンが日本でなければ表題に出す
