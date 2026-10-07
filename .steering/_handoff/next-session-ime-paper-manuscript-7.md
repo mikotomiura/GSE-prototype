@@ -1,5 +1,6 @@
 # 次セッション — IME 論文: round 3 を回すかを研究者に → M12（Zenodo・datasheet・公開 repo・`\tbd`）→ 投稿の前の確かめ
 
+> ⚠️★ **2026-10-07 に `next-session-ime-paper-manuscript-10.md` で置き換えた**（§2 の 1 は判断 206、2 は判断 207〜220 で済み。3〜5 は -10 へ移した）。次のセッションは -10 を読む。以下は記録。
 > 作成: 2026-10-06 夕方（G-GEAR）。原稿の attack-me round 2（minor）の採否と直し（判断 204）と、プレプリントの置き場所の決定（判断 205）の後。PR #315 は merge 済み（`96c4032e`）。
 > ⚠️ **このメモを一次資料にしない。** 一次は `.steering/20260927-ime-observation-paper-eval-design/decisions.md` の**判断 204**（と追記）、`attack-me/manuscript-ime-observation/round-2/verdict.md`（§3 の Y 番号・§7 の採否・§8 の対応）、外枠 `papers/ime-observation/manuscript/outline.md`、凍結した事前登録、`experiment/deviations.md`（D1〜D12）。状態は着手時に `git fetch` で測り直す。
 
