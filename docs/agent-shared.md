@@ -51,7 +51,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
   `capabilities.rs` (収集能力の自己記述・ADR-013)、`overlay_panel.rs`
 - `src-tauri/src/bin/` — `gse-replay` (回帰/評価 CLI)、`gse-cohort` (被験者横断判定)、`emit_schema` (JSON Schema 生成)、
   `gse-package` / `gse-unpack` / `gse-submit` (`--features package`)
-- `docs/` — 永続ドキュメント (**21 md** + `architecture/` + `adr/` + `literature/` + `mitou_submission/` + ★ `theory/`)
+- `docs/` — 永続ドキュメント (**25 md**・2026-10-07 に数え直した + `architecture/` + `adr/` + `literature/` + `mitou_submission/` + ★ `theory/`)
   ★ `docs/theory/` は理論の文書（**theory candidate・`EH0`・SSOT の主張ではない**。2026-09-19 に `.idea/` から移した）
 - `.steering/` — タスク単位の作業記録 (`[YYYYMMDD]-[task-name]/`)
 - `.claude/` — Claude Code 用 (skills / agents / commands / hooks)
@@ -194,7 +194,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
-| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜037**) の根拠を確認したい時 |
+| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜039**) の根拠を確認したい時 |
 | `docs/theory/README.md` | 理論（生成的返権論ほか・theory candidate）を読む時。⚠️ **SSOT の主張ではない**（RP §1 は問いとして参照するだけ） |
 | `docs/architecture/gse-v2-overview.md` | v2 再設計 (ドメイン分離・介入決定エンジン) の全体像 |
 | `docs/architecture/workspace-behavior-observation.md` | R3 (自然作業の常時収集) の観測空間・ラベル・評価設計を確認する時 (形成的トラック) |

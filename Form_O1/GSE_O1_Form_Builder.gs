@@ -59,6 +59,8 @@
  *   4. ⚠️★★★ **`checkO1FormConfig()` を必ず実行する** (読み取り専用)。
  *      ★ 未設定と打ち間違いは**同じ症状**になるので、機械に見分けさせる。
  *   5. `setupO1Forms()` を実行 → フォーム 2 本が構築される。
+ *   5b. ★ `refreshO1LinksTab()` を実行 → 運営シートの「O1 リンク集」にフォームの URL が載る
+ *      (2026-10-07)。★ URL やアプリの入手先を変えたときも実行する（手で入れた欄は保つ）。
  *   6. `previewO1RegisterAckEmail()` で受付メールの文面を目で確認する
  *      (⚠️ メール送信は取り消せない)。
  *   7. `installO1ConsentTrigger()` を **一度だけ**実行 (提出 → 採番 → 受付メール)。
@@ -1671,6 +1673,16 @@ function buildO1MgmtSheet() {
   o1EnsureMgmtTab_(ss, O1_MGMT_TAB, O1_MGMT_BANNER);
   o1EnsureMgmtTab_(ss, O1_MGMT_REJECT_TAB, O1_MGMT_REJECT_BANNER);
   // ⚠️★★ **入力規則を貼らない**（★ 上の `O1_MGMT_MAX_ROWS` のコメント参照）。
+  // ★ リンク集は派生の表示なので、作れなくてもログのタブの用意は止めない。
+  //   ⚠️ 失敗は「警告が出ていない＝成功」と読まれないよう、**肯定形で**作れなかったと言う。
+  try {
+    o1BuildLinksTab_(ss);
+  } catch (e) {
+    Logger.log(
+      "⚠️★ 「" + O1_LINKS_TAB + "」は**作れていません**（★ ログのタブは用意済み）。" +
+        "原因を直してから refreshO1LinksTab() を実行してください: " + e
+    );
+  }
   Logger.log("🔗 " + ss.getUrl());
   return ss.getUrl();
 }
@@ -1802,6 +1814,240 @@ function checkO1MgmtSheet() {
       );
     }
   }
+}
+
+// ============================================================
+// ★ O1 リンク集（研究者判断 2026-10-07「O1 にも各リンク一覧を載せる」）
+// ============================================================
+// ★ G1 の「リンク集」（`Form_G1/GSE_G1_Form_Builder.gs` `buildLinksTab_`）に倣う。
+//   ★ このタブは**派生の表示**であり、毎回作り直す（⚠️ ログのタブとは違い追記のみではない）。
+//   ★ 手で入れる欄（`O1_LINKS_MANUAL`）だけは、項目名で探して値を引き継ぐ。
+//
+// ⚠️★★★ **書かないもの**:
+//   - ⚠️ **参加者ロスターの ID・URL**（★ 氏名・メールへの直接ポインタ。上の `o1Config_` の注記）。
+//     → ★ G1 と同じく**名前で指すだけ**にする。
+//   - ⚠️ 氏名・メール（★ 運営シートは持たない約束・台帳 §5b）。
+//   - ⚠️ 提出の受け口の URL と共有シークレット（★ 別プロジェクトの設定・追跡ファイルにも置かない）。
+var O1_LINKS_TAB = "O1 リンク集";
+var O1_LINKS_WIDTH = 5; // 項目 / 値・URL / 種別 / いつ・誰が使うか / 備考
+/** ★ 手で入れる欄（項目名 → いつ・誰が / 備考）。⚠️ 項目名を変えると、入っていた値が引き継がれない。 */
+var O1_LINKS_MANUAL = [
+  [
+    "提出物の受取フォルダ（Drive）",
+    "研究者のみ（参加者は使わない）。期間中に記録が届いているかを見るとき",
+    "★ 受け口 GSE_O1_Submit.gs の FOLDER_ID のフォルダ。記録は 1 日ごとに、48 時間おいてからアプリが自動で送る。⚠️ 別プロジェクトの設定なのでここからは読めない → 手で貼る",
+  ],
+  [
+    "O1 終了判定の基準",
+    "研究者。基準を決めたとき",
+    "★ 起算点・日数・有効日の条件を書く。⚠️ 判定の機械はまだ無い（運営ワークフロー O-7a）",
+  ],
+  ["メモ", "研究者", "⚠️ 氏名・メールを書かない（作り直しても残り続けるため）"],
+];
+
+/**
+ * ★ 既にあるリンク集から、手で入れる欄の値を項目名で拾う（⚠️ 無ければ空）。
+ *
+ * ★ **表示値**（`getDisplayValues`）で読む（code-reviewer / security-checker 2026-10-07）:
+ *   `getValues` だと日付が `String(Date)`（"Thu Oct 08 2026 00:00:00 GMT+0900 …"）に化ける。
+ *   ⚠️ 数式・挿入したリンクは**保たない**（数式は表示された文字、リンクは表示文字だけが残る）。
+ *   → ★ 手で入れる欄には **URL をそのまま貼る**（2 行目の注記に書く）。
+ * ★ 同じ項目名の行が複数あれば、**空でない最初の値**を採る（⚠️ 行をコピーした空の行で消さない）。
+ */
+function o1ReadLinksManual_(sheet) {
+  var out = {};
+  if (!sheet) return out;
+  var last = sheet.getLastRow();
+  if (last < 1) return out;
+  var vals = sheet.getRange(1, 1, last, 2).getDisplayValues();
+  var labels = O1_LINKS_MANUAL.map(function (m) {
+    return m[0];
+  });
+  for (var r = 0; r < vals.length; r++) {
+    var label = String(vals[r][0]);
+    if (labels.indexOf(label) < 0) continue;
+    var v = String(vals[r][1]);
+    if (out[label] !== undefined && v !== "") {
+      Logger.log("⚠️ リンク集に「" + label + "」の行が複数あります（★ 空でない最初の値を採ります）。");
+    }
+    if (out[label] === undefined || out[label] === "") out[label] = v;
+  }
+  return out;
+}
+
+/** ★ リンク集の行を作る（⚠️ 表は触らない＝テストしやすくする）。 */
+function o1LinksRows_(props, cfg, manual) {
+  var form = function (key) {
+    var raw = props.getProperty("FORMURL_" + key);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  };
+  var notYet = "（未生成 — setupO1Forms() を実行）";
+  var c = form("O1_CONSENT");
+  var s = form("O1_SURVEY");
+  var blank = ["", "", "", "", ""];
+  var section = function (t) {
+    return [t, "", "", "", ""];
+  };
+  // ★ 「いつ・誰が使うか」の文言の出所（2026-10-07 研究者依頼「どのタイミングで回答してもらうかも載せる」）:
+  //   O1-C = 同意フォームの説明・受付メール（`o1RegisterAckBody_`）・`docs/o1-roster-operations.md` §5
+  //   O1-S = `buildO1PostSurveyForm` の説明文（5 分・解析に使わない・理由を聞かない）・研究者判断（終了判定の後に手で送る）
+  //   アプリ = 受付メール（最初の起動だけ macOS は研究者と一緒に）
+  var rows = [
+    ["GSE O1 リンク集（研究者のみ）", "", "", "", ""],
+    [
+      "⚠️ フォームの編集 URL を含みます。この表は研究者だけで共有してください。" +
+        "⚠️ どの欄にも氏名・メールを書かないでください。" +
+        "⚠️ 作り直すと「手動」の 3 欄以外は消えます。手動の欄には URL をそのまま貼ってください（数式・挿入したリンクは保たれません）。",
+      "",
+      "",
+      "",
+      "",
+    ],
+    blank,
+    ["項目", "値 / URL", "種別", "いつ・誰が使うか", "備考"],
+    section("▼ フォーム（参加者に記入していただくもの）"),
+    [
+      "O1-C 説明・同意（参加登録）— 回答 URL",
+      c ? c.publishedUrl : notYet,
+      "自動",
+      "【募集時】研究者が候補者に渡す → 参加者が 1 回だけ記入（説明を読み、同意の各項目にチェックし、連絡先などを記入）",
+      "★ 記入すると自動で参加者 ID が採番され、受付メール（参加者 ID・アプリの入手先・毎日の起動・止め方と消し方・連絡先）が届く。" +
+        "⚠️ G1 の案内と同じ日に出さない。⚠️ 配布物と入手先がそろってから渡す。⚠️ 回答が同意の正本",
+    ],
+    [
+      "O1-C — 編集 URL",
+      c ? c.editUrl : notYet,
+      "自動",
+      "研究者のみ。同意の文面を改訂するとき",
+      "⚠️ フォームの画面で文面を直接直さない（repo と食い違う）。consent-draft-o1.md → .gs → migrateO1ConsentForm() の順",
+    ],
+    [
+      "O1-S 終了後アンケート — 回答 URL",
+      s ? s.publishedUrl : notYet,
+      "自動",
+      "【期間の終わり・終了判定の後】研究者が終了の連絡と一緒に 1 人ずつ手で送る → 参加者が 1 回だけ記入（参加者 ID を書いて約 5 分）",
+      "★ 解析には使わない（進め方と道具の改善のため）。答えたくない設問は飛ばせる。一時停止・削除の理由は聞かない。" +
+        "⚠️ アプリの片づけ（自動起動をオフ → フォルダを消す）は、最終日の記録が届いたことを台帳で確かめてから案内する",
+    ],
+    ["O1-S — 編集 URL", s ? s.editUrl : notYet, "自動", "研究者のみ。設問を確かめる・直すとき", "⚠️ 途中で設問を変えると、それまでの回答と比べられなくなる"],
+    blank,
+    section("▼ 配布と受け取り"),
+    [
+      "アプリの入手先（O1_APP_DOWNLOAD_URL）",
+      cfg.appDownloadUrl || "（未設定）",
+      "自動",
+      "参加者には O1-C の記入後の受付メールで自動で届く（研究者が別に送らなくてよい）。最初の起動だけ、macOS は研究者と一緒に（約 5 分）",
+      "★ 配布物を差し替えたら、このフォルダの zip を置き換える。⚠️ 空のままだと受付メールが作られず登録が止まる",
+    ],
+  ];
+  var pushManual = function (i) {
+    var m = O1_LINKS_MANUAL[i];
+    rows.push([m[0], manual[m[0]] === undefined ? "" : manual[m[0]], "手動", m[1], m[2]]);
+  };
+  pushManual(0);
+  rows.push(blank);
+  rows.push(section("▼ この表の他のタブ"));
+  rows.push([
+    O1_MGMT_TAB + " / " + O1_MGMT_REJECT_TAB,
+    "この表",
+    "参照",
+    "研究者。登録がうまくいったか・弾かれた提出があるかを見るとき",
+    "★ 登録のたびに自動で追記（氏名・メールなし）",
+  ]);
+  rows.push([
+    "O1 受領台帳 / O1 途絶",
+    "この表",
+    "参照",
+    "研究者。期間中、記録が届いているかを見るとき",
+    "★ 受領台帳の Apps Script が 6 時間ごとに更新。⚠️ 通知が無いことは異常が無い証拠にならない（「更新」時刻を見る）。⚠️ 「途絶」を「やめた」と読まない",
+  ]);
+  rows.push(blank);
+  rows.push(section("▼ 他の表・文書"));
+  rows.push([
+    "P-ID の採番元",
+    "Phase1 運用管理シートの「参加者ロスター」",
+    "参照",
+    "研究者。O1-C の記入でロスターに行ができた後に氏名を埋めるとき",
+    "⚠️ 氏名・メールを持つ表なので、ここにリンクを置かない。⚠️ 氏名だけの行を先に作らない",
+  ]);
+  rows.push([
+    "削除の手順と記録",
+    "リポジトリの docs/o1-deletion-ledger.md",
+    "参照",
+    "研究者。参加者から削除の求め・やめるとの申し出があったとき",
+    "★ 理由は聞かない。A（研究者側）・B（端末側）のチェックリスト。やめたときは削除の希望を確かめ、自動起動を外してもらう",
+  ]);
+  rows.push(["運営ワークフロー", "研究者の手元の GSE_G1_O1_運営ワークフロー.docx", "参照", "研究者。全体の流れを確かめるとき", ""]);
+  rows.push(blank);
+  rows.push(section("▼ 手で入れる欄（作り直しても保つ）"));
+  pushManual(1);
+  pushManual(2);
+  rows.push(blank);
+  rows.push([
+    "更新",
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm"),
+    "自動",
+    "",
+    "★ refreshO1LinksTab() か buildO1MgmtSheet() で作り直す",
+  ]);
+  return rows.map(function (r) {
+    return r.map(o1PlainText_);
+  });
+}
+
+/** ★ リンク集を作り直す（★ 手で入れた欄は保つ・⚠️ 他のタブには触れない）。 */
+function o1BuildLinksTab_(ss) {
+  // ⚠️★★★ ロスターの形をした表には書かない（★ `o1OpenMgmtLog_` と同じ判定）。
+  if (ss.getSheetByName("参加者ロスター")) {
+    throw new Error(
+      "⛔⚠️★★★ この表には「参加者ロスター」タブがあります。★ リンク集は**運営シート**に置いてください。"
+    );
+  }
+  var sheet = ss.getSheetByName(O1_LINKS_TAB);
+  var manual = o1ReadLinksManual_(sheet);
+  // ★ 行を先に組み立てる（⚠️ 失敗しても空のタブを残さない・既存の手入力を消さない）。
+  var rows = o1LinksRows_(PropertiesService.getScriptProperties(), o1Config_(), manual);
+  if (!sheet) sheet = ss.insertSheet(O1_LINKS_TAB, 0);
+  sheet.clear();
+  sheet.getRange(1, 1, rows.length, O1_LINKS_WIDTH).setValues(rows);
+  var U = O1_MGMT_UI;
+  sheet.getRange(1, 1, 1, O1_LINKS_WIDTH).setFontWeight("bold").setFontColor(U.navy);
+  sheet.getRange(2, 1, 1, O1_LINKS_WIDTH).setBackground(U.warnBg).setFontColor(U.warnFg);
+  sheet.getRange(4, 1, 1, O1_LINKS_WIDTH).setBackground(U.navy).setFontColor(U.white).setFontWeight("bold");
+  for (var r = 0; r < rows.length; r++) {
+    if (String(rows[r][0]).indexOf("▼") === 0) {
+      sheet.getRange(r + 1, 1, 1, O1_LINKS_WIDTH).setBackground(U.accent).setFontWeight("bold");
+    }
+    if (rows[r][2] === "手動") {
+      sheet.getRange(r + 1, 2, 1, 1).setBackground(U.warnBg);
+    }
+  }
+  // ★ 説明の列（いつ・誰が / 備考）は長いので折り返す。
+  sheet.getRange(1, 4, rows.length, 2).setWrap(true);
+  [280, 360, 50, 380, 420].forEach(function (w, i) {
+    sheet.setColumnWidth(i + 1, w);
+  });
+  sheet.setTabColor(U.okFg);
+  Logger.log("✅ 「" + O1_LINKS_TAB + "」を作り直しました（★ 手で入れた欄は保っています）。");
+}
+
+/**
+ * ★ リンク集**だけ**を作り直す（★ setupO1Forms() の後・URL を変えた後に実行する）。
+ * ⚠️ 登録ログ・却下ログ・受領台帳には触れない。
+ */
+function refreshO1LinksTab() {
+  var cfg = o1Config_();
+  var problem = o1MgmtConfigProblem_(cfg);
+  if (problem) throw new Error("⛔ " + problem);
+  var ss = SpreadsheetApp.openById(cfg.mgmtSheetId);
+  o1BuildLinksTab_(ss);
+  Logger.log("🔗 " + ss.getUrl());
+  return ss.getUrl();
 }
 
 // ============================================================

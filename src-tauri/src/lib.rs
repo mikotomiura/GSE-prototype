@@ -3333,6 +3333,15 @@ pub fn run() {
     }
     let o1_source = crate::o1::resolve(g1_source, o1_detected);
     crate::o1::set_mode(o1_source);
+    // ★ 導入識別子は **O1 のときだけ**作る（⚠️ 通常運用 / G1 は `~/.gse` に何も増やさない）。
+    //   ⚠️ 作れなくても記録は続く（`meta` に刻まれないだけ・研究者は事後に気づける）。
+    if o1_source.is_some() {
+        let install_id = crate::submission::read_or_create_o1_install_id();
+        if install_id.is_none() {
+            tracing::warn!("O1 install id could not be created; meta will have no o1_install_id");
+        }
+        crate::o1::set_install_id(install_id);
+    }
     if let Some(src) = o1_source {
         tracing::warn!(
             "O1 MODE ENABLED (source={}): recording runs WITHOUT pressing start \
