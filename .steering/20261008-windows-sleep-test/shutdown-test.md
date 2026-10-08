@@ -52,6 +52,33 @@
 6. `GSE-submissions` に `P998_` が無いことを確かめる（48 時間の待ちがあるので、10/11 00:00 より前に片付ければ送られない）。
 7. 上の「試験前の状態」と同じになったことを確かめて、ここに書く。
 
-## 結果
+## 結果（2026-10-09 00:45 点検・`win_boot_check.py`）
 
-（電源を入れ直した後の新しいセッションで書く）
+研究者の申告: サインイン後に `gse-next` を手で開いていない（自動で立ち上がった）。シャットダウンは 00:11 ごろ。00:44 の作業の種類の選択とその後の打鍵も試験のつもりで行った。
+
+**6 項目中 5 項目を実測で確認、1 項目（#1）は書いた合格の形を満たさなかった（高速スタートアップのため。下の注）。**
+
+| # | 結果 | 実測 |
+|---|---|---|
+| 1 | 電源は切られたが、書いた合格の形は満たさない | 00:11:08 User32 1074（StartMenuExperienceHost・「その他 (計画外)」・「電源を切る」）→ 00:41:52 Kernel-Boot 27 = `0x1`（高速スタートアップ）→ explorer が新しい PID 19844 で 00:42:00 に起動。ただし `LastBootUpTime` は 2026-10-04 00:10:57 のままで、Kernel-General 13/12 は無い。00:11:13 Kernel-Power 42・00:11:15 107 も出ている（高速スタートアップの休止の記録と読める） |
+| 2 | 合格 | gse-next PID 25860・00:42:42 起動（explorer の 42 秒後。10/01 の 2 分 06 秒より短い）。親 explorer.exe・CommandLine は配布フォルダの exe（引用符つき）。研究者は手で開いていない |
+| 3 | 合格 | 新しいファイル `gse_o1_20261008_154242.ndjson` の meta: 0.1.40・`o1_mode=marker`・`o1_install_id=990828be74d2993d`。applog `O1 autostart: already handled for this folder (marker present)` |
+| 4 | 合格 | サインイン後の `key` は 154242 で 19・154405 で 110（00:45 時点）。`hook_health` の `dropped` は全行 0。00:43:30 にフック停止の ERROR（`starved_ms=30001`）が 1 回出て、00:43:41 に `delivering events again` |
+| 5 | 合格（掃除で付いた） | 基線のファイルの最後の行は 00:11:07（1074 の 1 秒前）。`session_end=1791474163414`（00:42:43）は次の起動の掃除 `O1 orphan sweep: closed ... closed=1 failed=0` で付いた。シャットダウンのときには付いていない。v0.1.38 のサインアウトと同じ |
+| 6 | 合格 | `Run\GSE-O1` は同じ exe のまま。`StartupApproved\Run\GSE-O1` は現れなかった（10/01 は初回の自動起動で現れた。違いの理由は確かめていない） |
+
+注（#1 の合格の形の訂正・元の文は上に残す）: 高速スタートアップ（`HiberbootEnabled=1`）のシャットダウンはカーネルのセッションを休止させるので、`LastBootUpTime` が変わらず Kernel-General 13/12 も出ない。試験前にこれを見落として合格の形を書いた。この形の起動の確かめは「1074 の『電源を切る』＋ Kernel-Boot 27 = `0x1` ＋ explorer の新しい起動」で行うのが正しい。この 3 つはすべて実測で確認した。参加者の PC の既定（高速スタートアップ有効）ではこの形になる。
+
+その他:
+
+- 00:44:05 に研究者が画面で作業の種類（`vibe_coding`）を選び、記録が `gse_o1_20261008_154405.ndjson` に切り替わった（`rotating session log (declaration -> vibe_coding)`）。154242 には `session_end` が付いた。プロセスは同じ（PID 25860）で、再起動ではない。
+- 00:42:44 の起動時の自動送信: `packaged 0・sent 0`（48 時間の待ちに届いていない）。
+- 確かめていないこと: 通常のシャットダウン（高速スタートアップ無効・Shift を押しながらのシャットダウン・再起動）。
+
+## 後片付け（2026-10-09 01:05・研究者の了承を得て）
+
+- アプリは `taskkill /PID 25860`（`/F` なし）で終わらせた。ログに `shutdown requested` → `SessionLogger: session closed` が出て、正常に閉じた。
+- 消したもの: `HKCU\...\Run\GSE-O1`（`StartupApproved\Run` には現れていなかった）。`.gse` の `o1_autostart_registered`・`o1_consent_ack`・`o1_install_id`・`o1_participant_id`（P998 であることを確かめてから）。配布フォルダの `o1.autostart`。
+- 退避したもの: `gse_o1_20261008_150341.ndjson`・`gse_o1_20261008_154242.ndjson`・`gse_o1_20261008_154405.ndjson`・`.o1_clock_hwm` を `Documents\GSE-sleeptest-20261008\shutdown\` へ移した（Claude Code からの移動は権限の確認で止められたので、研究者が `!` で実行した）。`gse-app.log` は残した（560 行）。
+- 片付けた後に確かめた: `.gse` は `g1_participant_id`・`participant_id` の 2 つだけ。Run と StartupApproved\Run は Edge の 1 件だけ。配布フォルダは zip の 7 ファイルだけ。`GSE-sessions` に O1 のファイルは無い。`GSE-submissions` に `P998_` は 0 件。`gse-next.exe` は動いていない。試験前の状態に戻った。電源設定（高速スタートアップ）は変えていない。
+- 送信: 最初のファイルが閉じたのは 00:42:43 で、48 時間の待ちに届く前に片付けたので、P998 の記録は送られていない。
