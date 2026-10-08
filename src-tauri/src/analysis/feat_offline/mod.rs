@@ -73,6 +73,7 @@
 pub mod activity;
 pub mod boundary;
 pub mod dispersion;
+pub mod idle_trim;
 pub mod quality;
 pub mod restart;
 pub mod revision;

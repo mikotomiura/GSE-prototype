@@ -1,4 +1,4 @@
-"""P1 の探索格子 (選択 27 + 感度 OFAT 4) の実行器と、規則 (d) の除外 (issue 004)。
+"""P1 の探索格子 (選択 27 + 感度 OFAT 5) の実行器と、規則 (d) の除外 (issue 004)。
 
 ## ★ 何をするか
 
@@ -11,7 +11,7 @@
 - 出力: `<out>/<config_id>/<P-ID>/<session>/{baseline,pointer_b,modifier_m_plus}.json` (`p1_features_io` のレイアウトと同じ形)
   と `<out>/grid_manifest.json`。
 - ★ 長いセッションは release で: `GSE_REPLAY_BIN=src-tauri/target/release/gse-replay python scripts/p1_run_grid.py ...`
-  (`cargo run` は 1 呼び出しごとに起動するので、31 一式 × 3 極 × セッション数だけ遅い)。
+  (`cargo run` は 1 呼び出しごとに起動するので、32 一式 × 3 極 × セッション数だけ遅い)。
 
 ## ★ 格子 (`build_grid`)
 
@@ -19,12 +19,12 @@
 
 - 選択 (`role == "selection"`): そのキーの直積 (凍結 JSON では `q` × `hole_gap_ms` × `t1a_window_ms` = 27)。
   ID 例: `sel__q=0.995__hole_gap_ms=3000__t1a_window_ms=15000`。
-- 感度 (`role == "sensitivity_only"`): キーを 1 つずつ、運用値以外の値へ振る (他は運用値。凍結 JSON では `w_ms` / `b_ms` で 4 実行)。
+- 感度 (`role == "sensitivity_only"`): キーを 1 つずつ、運用値以外の値へ振る (他は運用値。凍結 JSON 1.1.0 では `w_ms` / `b_ms` / `idle_trim_max_ms` で 5 実行・事前宣言 v1.2 §6.3)。
   **Cartesian に組まない。** ID 例: `ofat__w_ms=15000`。
 - ⚠️★★★ **`warmup_count` は `q` の従属変数**。全一式に `q` と `warmup_count` を**対で** `--set` する (v1.1 冒頭 (5)・判断 7:
   CLI は連動しない)。⚠️ 判定は浮動小数点の式ではなく**対応表** `WARMUP_BY_Q` で行う
   (倍精度では `⌈1/(1−q)⌉` が `q` によって 1 ずれうる)。表に無い `q` が `search_space` にあれば格子を作らない (exit 3)。
-- 全一式に 6 キー (`w_ms` / `q` / `b_ms` / `hole_gap_ms` / `warmup_count` / `t1a_window_ms`) を**明示的に** `--set` する
+- 全一式に 7 キー (`w_ms` / `q` / `b_ms` / `hole_gap_ms` / `warmup_count` / `t1a_window_ms` / `idle_trim_max_ms`) を**明示的に** `--set` する
   (⚠️ 凍結値と同じキーは封筒の `overrides` に載らないだけ。意図を `config` の値で照合するため、運用値も渡す)。
 
 ## ⚠️★★★ 規則 (d) (`is_valid_search_run`)
@@ -34,14 +34,14 @@
 次の 2 つを `excluded_rule_d` に載せる (⚠️ **ファイルは削除しない**。除外するかは manifest を読む側の責務):
 
 - `rule_d`: `config.q` / `config.warmup_count` が対応表と合わない。
-- `param_mismatch`: 意図して渡したパラメータ (6 キー) と `config` の値が違う (CLI が `--set` を無視した、など)。
+- `param_mismatch`: 意図して渡したパラメータ (7 キー) と `config` の値が違う (CLI が `--set` を無視した、など)。
 
 ## ⚠️★★★ PG-1 (事前宣言 §2.3)
 
 PG-1 の値 (一人あたり episode 数の下限) が宣言されるまで、探索を **1 度も回さない**。値は凍結 JSON の新版のキー
 `pg1.min_episodes_per_participant` (bool でない int・1 以上) を読む (判断 19)。⚠️ 無い・型や範囲が違えば **exit 6**
 (`gse-replay` を 1 度も呼ばない・出力先も作らない)。値を推測で埋めない。
-既定の読み先は `src-tauri/prereg/p1-episode.json` (★ 現行 1.0.0 には無いので、既定では必ず exit 6)。テストは `--prereg` で差し替える。
+既定の読み先は `src-tauri/prereg/p1-episode.json` (★ 現行 1.1.0 にも無いので、既定では必ず exit 6)。テストは `--prereg` で差し替える。
 manifest には、どちらを使ったか (`frozen` = 既定 / `file` = `--prereg`) と、その JSON の sha256 の先頭 16 桁を刻む。
 
 ## ★ manifest は最後に確定する
@@ -54,7 +54,7 @@ manifest には、どちらを使ったか (`frozen` = 既定 / `file` = `--prer
       "prereg_source": "frozen" | "file", "prereg_sha256_prefix": "...",
       "envelope_identity": {"prereg_version", "prereg_sha256_prefix", "hmm_version", "provenance_hmm_version", "config_source"},
       "n_participants": n, "n_sessions": n, "sessions": [{"participant", "session"}, ...],
-      "configs": [{"id", "kind": "selection" | "sensitivity", "params": {6 キー}}, ...],
+      "configs": [{"id", "kind": "selection" | "sensitivity", "params": {7 キー}}, ...],
       "excluded_rule_d": [{"config_id", "participant", "session", "pole", "reasons": [...], "mismatch": {key: {"observed", "intended"}}}, ...],
       "outputs": [{"path": "<config_id>/<P-ID>/<session>/<pole>.json", "sha256": "..."}, ...]
     }
@@ -102,8 +102,11 @@ MANIFEST_NAME = "grid_manifest.json"
 #   ⚠️ **コードに書き写してよい値はこれだけ** (探索空間の値は凍結 JSON から読む)。式を浮動小数点で評価しない。
 WARMUP_BY_Q = {Decimal("0.99"): 100, Decimal("0.995"): 200, Decimal("0.999"): 1000}
 
-# ★ `--set` で渡す 6 キー (`run-features-all-poles.sh` の白リストと同じ。凍結 JSON の並び順)
-TUNABLE_KEYS = ("w_ms", "q", "b_ms", "hole_gap_ms", "warmup_count", "t1a_window_ms")
+# ★ `--set` で渡す 7 キー (`run-features-all-poles.sh` の白リストと同じ。凍結 JSON の並び順)
+#   `idle_trim_min_gap_ms` は固定 (振らない) なので渡さない (事前宣言 v1.2 §6.3)。
+TUNABLE_KEYS = ("w_ms", "q", "b_ms", "hole_gap_ms", "warmup_count", "t1a_window_ms", "idle_trim_max_ms")
+# 0 を許すキー (`idle_trim_max_ms=0` は前処理なしの実行・事前宣言 v1.2 §6.4)
+_ZERO_ALLOWED_KEYS = ("idle_trim_max_ms",)
 # 探索の対象になれるキー (`warmup_count` は従属なので、単独では振らない)
 _SEARCHED_KEYS = tuple(key for key in TUNABLE_KEYS if key != "warmup_count")
 _ROLES = ("selection", "sensitivity_only", "derived", "fixed")
@@ -233,6 +236,9 @@ def _check_value(key, value, where):
     if key == "q":
         if _q_key(value) not in WARMUP_BY_Q:
             raise GridError(f"{where}: q={value!r} は対応表 {sorted(WARMUP_BY_Q)} に無い (探索空間の外)")
+    elif key in _ZERO_ALLOWED_KEYS:
+        if type(value) is not int or value < 0:
+            raise GridError(f"{where}: {key}={value!r} が 0 以上の整数でない")
     elif type(value) is not int or value < 1:
         raise GridError(f"{where}: {key}={value!r} が 1 以上の整数でない")
 
@@ -241,7 +247,7 @@ def build_grid(prereg):
     """凍結 JSON から探索格子を組む。`[{"id", "kind", "params"}]` (選択 → 感度の順・JSON の並び順)。
 
     ⚠️ `search_space` / `search_roles` / `operational` の形が想定と違えば `GridError` (JSON は直さない)。
-    `params` は 6 キー (`q` は `normalize` 済みの `Decimal`・残りは int)。
+    `params` は 7 キー (`q` は `normalize` 済みの `Decimal`・残りは int)。
     """
     sections = {}
     for name in ("operational", "search_space", "search_roles"):
@@ -318,7 +324,7 @@ def build_grid(prereg):
 
 
 def set_args(params):
-    """`run-features-all-poles.sh` に `--` の後ろで渡す引数 (6 キーすべて・`q` と `warmup_count` は対)。"""
+    """`run-features-all-poles.sh` に `--` の後ろで渡す引数 (7 キーすべて・`q` と `warmup_count` は対)。"""
     args = ["--"]
     for key in TUNABLE_KEYS:
         args += ["--set", f"{key}={_fmt_value(params[key])}"]
@@ -407,7 +413,7 @@ def run_poles(bash, ndjson, outdir, params):
 
 
 def _param_diffs(config, intended):
-    """意図して渡した 6 キーと封筒 `config` の値が違うキーを `{key: {"observed", "intended"}}` で返す。"""
+    """意図して渡した 7 キーと封筒 `config` の値が違うキーを `{key: {"observed", "intended"}}` で返す。"""
     diffs = {}
     for key in TUNABLE_KEYS:
         observed, want = config.get(key), intended[key]
@@ -546,7 +552,7 @@ def run_grid(configs, sessions, out_path, prereg_source, prereg_sha256_prefix, b
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="p1_run_grid.py",
-        description="P1 の探索格子 (選択 27 + 感度 OFAT 4) を q と warmup_count を対で渡して 3 極で回す。PG-1 未宣言なら 1 実行も回さない。",
+        description="P1 の探索格子 (選択 27 + 感度 OFAT 5) を q と warmup_count を対で渡して 3 極で回す。PG-1 未宣言なら 1 実行も回さない。",
     )
     parser.add_argument("--ndjson-root", required=True, help="<root>/<P-ID>/<session>.ndjson")
     parser.add_argument("--out", required=True, help="出力ディレクトリ (★ repo の外・空か未作成)")

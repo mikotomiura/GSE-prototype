@@ -52,8 +52,13 @@ EXIT_SELFTEST_FAILED = 5
 # Section anchors. The tables we read are the FIRST table after each anchor,
 # and we stop at the next "###" so the sub-tables inside the section
 # (e.g. "併せて出力に載せるもの") are never mistaken for the value table.
-OPERATIONAL_ANCHOR = "## 1. 凍結する運用値"
-SEARCH_ANCHOR = "### 2.1 探索空間"
+#
+# v1.2 (2026-10-08) appended §6 instead of editing the frozen §1 / §2.1, so
+# each kind of table now has one anchor per version. The tables under all
+# anchors of a kind are merged; a key that appears under two anchors is drift
+# (two rows could disagree, and silently taking either one would hide it).
+OPERATIONAL_ANCHORS = ("## 1. 凍結する運用値", "### 6.2 足した運用値")
+SEARCH_ANCHORS = ("### 2.1 探索空間", "### 6.3 足した探索空間")
 
 DERIVED_MARK_DOC = "従属"
 DERIVED_MARK_JSON = "derived:"
@@ -118,13 +123,32 @@ def parse_table(lines: list[str]) -> list[list[str]]:
     return rows
 
 
-def read_operational_from_doc(text: str) -> dict[str, object]:
-    lines = section_lines(text, OPERATIONAL_ANCHOR)
+def table_rows_under(text: str, anchor: str) -> list[list[str]]:
+    lines = section_lines(text, anchor)
     if not lines:
-        die(EXIT_DOC_MISSING, f"section not found in document: {OPERATIONAL_ANCHOR!r}")
+        die(EXIT_DOC_MISSING, f"section not found in document: {anchor!r}")
     rows = parse_table(lines)
     if not rows:
-        die(EXIT_DOC_MISSING, f"no table found under {OPERATIONAL_ANCHOR!r}")
+        die(EXIT_DOC_MISSING, f"no table found under {anchor!r}")
+    return rows
+
+
+def merge_tables(text: str, anchors, read_one, duplicates: list[str], kind: str) -> dict[str, object]:
+    merged: dict[str, object] = {}
+    seen_under: dict[str, str] = {}
+    for anchor in anchors:
+        for key, value in read_one(table_rows_under(text, anchor)).items():
+            if key in seen_under:
+                duplicates.append(
+                    f"{kind}: {key!r} appears under both {seen_under[key]!r} and {anchor!r}"
+                )
+                continue
+            seen_under[key] = anchor
+            merged[key] = value
+    return merged
+
+
+def operational_from_rows(rows: list[list[str]]) -> dict[str, object]:
     out: dict[str, object] = {}
     for cells in rows:
         if len(cells) < 2:
@@ -136,13 +160,15 @@ def read_operational_from_doc(text: str) -> dict[str, object]:
     return out
 
 
-def read_search_space_from_doc(text: str) -> dict[str, object]:
-    lines = section_lines(text, SEARCH_ANCHOR)
-    if not lines:
-        die(EXIT_DOC_MISSING, f"section not found in document: {SEARCH_ANCHOR!r}")
-    rows = parse_table(lines)
-    if not rows:
-        die(EXIT_DOC_MISSING, f"no table found under {SEARCH_ANCHOR!r}")
+def read_operational_from_doc(text: str, duplicates: list[str]) -> dict[str, object]:
+    return merge_tables(text, OPERATIONAL_ANCHORS, operational_from_rows, duplicates, "operational")
+
+
+def read_search_space_from_doc(text: str, duplicates: list[str]) -> dict[str, object]:
+    return merge_tables(text, SEARCH_ANCHORS, search_space_from_rows, duplicates, "search_space")
+
+
+def search_space_from_rows(rows: list[list[str]]) -> dict[str, object]:
     out: dict[str, object] = {}
     for cells in rows:
         if len(cells) < 2:
@@ -245,10 +271,11 @@ def run_check(doc_path: Path, json_path: Path) -> int:
     if not isinstance(json_space, dict):
         die(EXIT_JSON_MISSING, "frozen JSON has no object-valued 'search_space'")
 
-    doc_ops = read_operational_from_doc(text)
-    doc_space = read_search_space_from_doc(text)
+    duplicates: list[str] = []
+    doc_ops = read_operational_from_doc(text, duplicates)
+    doc_space = read_search_space_from_doc(text, duplicates)
 
-    problems = compare(doc_ops, json_ops, doc_space, json_space)
+    problems = duplicates + compare(doc_ops, json_ops, doc_space, json_space)
     if problems:
         print(f"{DRIFT_BANNER}: {len(problems)} problem(s)", file=sys.stderr)
         for p in problems:
@@ -284,8 +311,33 @@ MUTATIONS = [
     (
         "json: add a key the document does not have",
         "json",
-        '"net_diff_min": 1\n  },',
-        '"net_diff_min": 1,\n    "bogus_key": 7\n  },',
+        '"idle_trim_max_ms": 1800000\n  },',
+        '"idle_trim_max_ms": 1800000,\n    "bogus_key": 7\n  },',
+    ),
+    # v1.2: the §6 tables are read as well, and a key under two anchors is drift.
+    (
+        "json: change an operational value added in v1.2",
+        "json",
+        '"idle_trim_max_ms": 1800000\n  },',
+        '"idle_trim_max_ms": 1700000\n  },',
+    ),
+    (
+        "doc: change an operational value in the v1.2 table",
+        "doc",
+        "| `idle_trim_max_ms` | `1800000` |",
+        "| `idle_trim_max_ms` | `1700000` |",
+    ),
+    (
+        "doc: change a search space in the v1.2 table",
+        "doc",
+        "| `idle_trim_max_ms` | `{0, 1800000}` |",
+        "| `idle_trim_max_ms` | `{1800000}` |",
+    ),
+    (
+        "doc: repeat a v1.0 operational key in the v1.2 table (same value)",
+        "doc",
+        "| `idle_trim_max_ms` | `1800000` |",
+        "| `w_ms` | `30000` | dup | dup |\n| `idle_trim_max_ms` | `1800000` |",
     ),
     (
         "json: move the operational value outside its own search space",

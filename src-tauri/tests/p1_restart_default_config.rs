@@ -25,9 +25,17 @@
 //! 100_000 ..= 104_800   打鍵 25 回 → 再開 r_1 = 100_000（★ o より後）
 //! 104_800 + W = 134_800 s'_1: 再停止（条件 A が再び true へ立ち上がる）
 //!                       → restop_ms = s'_1 - o = 134_800 - 91_200 = 43_600
+//! 150_000               閉じの打鍵 1 回（★ 最後の入力 = 最後の feat 行。事前宣言 v1.2 の前処理で
+//!                       ファイルの最後が削られないようにする）
 //! ```
 //!
 //! ★ `s'_1 = 134_800 <= b = 150_000` なので右側打ち切りにならない。
+//!
+//! ⚠️ **閉じの打鍵が無いと**（2026-10-08・事前宣言 v1.2 §6.1）: ファイルの最後で、最後の入力
+//! （2 つ目の塊の最後の release `104_880`）を含む秒の `feat` 行（`105_000`）より後が落ち、観測区間は `[1_000, 105_000]` に縮む。
+//! → `s'_1 = 134_800 > b` で再停止は右側打ち切りになる。これを `frozen_defaults_trim_an_idle_tail` が固定する
+//! （前処理が既定で効いていることの、実バイナリでの確かめ）。
+//! ★ 閉じの打鍵は 1 つ目の onset の `θ`（`s` より前の対だけを使う）にも、再停止 `s'_1` にも触れない。
 //! ⚠️ `s'_1` 自身も onset（`o_2 = 165_000 > b` なので**その行の `restop_ms` は打ち切りの `null`**）になる。
 //! → 「onset 行がちょうど 1 本」を前提にしない。
 //!
@@ -56,10 +64,13 @@ const BURST2_FIRST_OFFSET_MS: u64 = 100_000;
 const BURST2_PRESSES: u64 = 25;
 /// 上の時刻表から導いた `restop_ms`（`s'_1 - o`）。
 const EXPECTED_RESTOP_MS: u64 = 43_600;
+/// 閉じの打鍵が無いとき、前処理の後に残る最後の `feat` 行（2 つ目の塊の最後の release `104_880` 以上で最初の `feat` 行）。
+const TRIMMED_LAST_FEAT_OFFSET_MS: u64 = 105_000;
 
 /// `--features` の入力を作る。`second_silence == false` なら 2 つ目の塊を観測区間の右端まで続ける
-/// （★ 陰性対照: 再停止の沈黙だけが無い）。
-fn build_session(second_silence: bool) -> String {
+/// （★ 陰性対照: 再停止の沈黙だけが無い）。`closing_press` なら `feat` 行の右端に打鍵を 1 回置く
+/// （`second_silence == false` では最後の打鍵が既に右端にあるので置かない）。
+fn build_session(second_silence: bool, closing_press: bool) -> String {
     let at = |offset_ms: u64| SESSION_START_MS + offset_ms;
 
     let mut events: Vec<(u64, String)> = Vec::new();
@@ -88,6 +99,9 @@ fn build_session(second_silence: bool) -> String {
     };
     for i in 0..burst2_presses {
         push_press(BURST2_FIRST_OFFSET_MS + i * KEY_STEP_MS, BURST1_PRESSES + i);
+    }
+    if second_silence && closing_press {
+        push_press(FEAT_LAST_OFFSET_MS, BURST1_PRESSES + burst2_presses);
     }
 
     for offset_ms in (FEAT_FIRST_OFFSET_MS..=FEAT_LAST_OFFSET_MS).step_by(FEAT_STEP_MS as usize) {
@@ -185,6 +199,15 @@ fn assert_frozen_defaults_and_input_shape(envelope: &Value) {
     assert_eq!(config["hole_gap_ms"], 2_000, "{config}");
     assert_eq!(config["warmup_count"], 100, "{config}");
     assert_eq!(config["net_diff_min"], 1, "{config}");
+    assert_eq!(config["idle_trim_min_gap_ms"], 60_000, "{config}");
+    assert_eq!(config["idle_trim_max_ms"], 1_800_000, "{config}");
+
+    // ★ 前処理で落ちた `feat` 行が無い（最後の入力が `feat` 行の右端にある）。
+    assert_eq!(
+        envelope["provenance"]["idle_trim"],
+        json!({"dropped_feat_rows": 0, "spans": []}),
+        "前処理で行が落ちている（閉じの打鍵が効いていない）"
+    );
 
     // ★ `feat` 行に穴が 1 つも無い（観測区間が 1 本）。穴があると条件 A の連続が切れ、
     //   restop が測れない理由が入力の側に移る。
@@ -211,7 +234,7 @@ fn onset_rows(envelope: &Value) -> Vec<&Value> {
 /// AC1 / AC3: 凍結既定のまま、`restop_ms` が非 null の onset 行が 1 本以上ある。
 #[test]
 fn restop_is_measurable_under_frozen_defaults() {
-    let session = TempSession::write("measurable", &build_session(true));
+    let session = TempSession::write("measurable", &build_session(true, true));
     let envelope = replay_features(&session);
     assert_frozen_defaults_and_input_shape(&envelope);
 
@@ -249,7 +272,7 @@ fn restop_is_measurable_under_frozen_defaults() {
 /// AC2: 陰性対照。再停止の沈黙を消した版では `restop_ms` 非 null が 0 本（★ 検査が空振りしていない）。
 #[test]
 fn restop_absent_without_second_silence() {
-    let session = TempSession::write("no-second-silence", &build_session(false));
+    let session = TempSession::write("no-second-silence", &build_session(false, true));
     let envelope = replay_features(&session);
     assert_frozen_defaults_and_input_shape(&envelope);
 
@@ -285,5 +308,87 @@ fn restop_absent_without_second_silence() {
     assert!(
         measured.is_empty(),
         "★ 再停止の沈黙が無いのに restop_ms が測れている（検査が空振りしている）: {measured:#?}"
+    );
+}
+
+/// `gse-replay <session> --features <extra...>` を回し、封筒を返す。
+fn replay_features_with(session: &TempSession, extra: &[&str]) -> Value {
+    let output = Command::new(env!("CARGO_BIN_EXE_gse-replay"))
+        .arg(&session.path)
+        .arg("--features")
+        .args(extra)
+        .output()
+        .expect("spawn gse-replay");
+    assert!(
+        output.status.success(),
+        "gse-replay --features {extra:?} が失敗した: {:?}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).expect("stdout is the feature envelope JSON")
+}
+
+/// 事前宣言 v1.2 §6.1: 閉じの打鍵が無いと、凍結既定のままファイルの最後の無入力の `feat` 行が落ち、
+/// 観測区間が最後の入力で終わる。★ 前処理が既定で効いていることを、実バイナリで確かめる。
+/// ★ 同じ入力に `--set idle_trim_max_ms=0` を渡すと、前処理なし（観測区間は `feat` 行の右端まで）に戻る（対照）。
+#[test]
+fn frozen_defaults_trim_an_idle_tail() {
+    let session = TempSession::write("idle-tail", &build_session(true, false));
+
+    let trimmed = replay_features(&session);
+    assert_eq!(trimmed["config"]["overrides"], json!([]));
+    assert_eq!(
+        trimmed["provenance"]["observed_intervals"],
+        json!([{
+            "a_ms": SESSION_START_MS + FEAT_FIRST_OFFSET_MS,
+            "b_ms": SESSION_START_MS + TRIMMED_LAST_FEAT_OFFSET_MS,
+        }]),
+        "ファイルの最後の無入力の feat 行が落ちていない"
+    );
+    let dropped = (FEAT_LAST_OFFSET_MS - TRIMMED_LAST_FEAT_OFFSET_MS) / FEAT_STEP_MS;
+    assert_eq!(
+        trimmed["provenance"]["idle_trim"],
+        json!({
+            "dropped_feat_rows": dropped,
+            "spans": [{
+                "a_ms": SESSION_START_MS + TRIMMED_LAST_FEAT_OFFSET_MS + FEAT_STEP_MS,
+                "b_ms": SESSION_START_MS + FEAT_LAST_OFFSET_MS,
+            }],
+        })
+    );
+    // ★ 再停止 `s'_1 = 134_800` は区間の右端より後なので、restop は全 onset 行で打ち切りの null になる。
+    for row in onset_rows(&trimmed) {
+        assert_eq!(
+            row.get("restart").and_then(|r| r.get("restop_ms")),
+            Some(&Value::Null),
+            "区間を縮めたのに restop_ms が測れている: {row}"
+        );
+    }
+
+    let untrimmed = replay_features_with(&session, &["--set", "idle_trim_max_ms=0"]);
+    assert_eq!(
+        untrimmed["config"]["overrides"],
+        json!([{"key": "idle_trim_max_ms", "frozen": 1_800_000, "value": 0}])
+    );
+    assert_eq!(
+        untrimmed["provenance"]["observed_intervals"],
+        json!([{
+            "a_ms": SESSION_START_MS + FEAT_FIRST_OFFSET_MS,
+            "b_ms": SESSION_START_MS + FEAT_LAST_OFFSET_MS,
+        }]),
+        "idle_trim_max_ms=0 で前処理なしに戻っていない"
+    );
+    assert_eq!(
+        untrimmed["provenance"]["idle_trim"],
+        json!({"dropped_feat_rows": 0, "spans": []})
+    );
+    let measured: Vec<&Value> = onset_rows(&untrimmed)
+        .into_iter()
+        .filter(|row| !row["restart"]["restop_ms"].is_null())
+        .collect();
+    assert_eq!(
+        measured.first().map(|row| &row["restart"]["restop_ms"]),
+        Some(&json!(EXPECTED_RESTOP_MS)),
+        "前処理なしでは時刻表どおりに restop が測れる"
     );
 }
