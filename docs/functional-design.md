@@ -228,7 +228,7 @@ O1 の自然作業のセッション NDJSON から、1 Hz の特徴行（stall o
 - **観測区間の前処理**（2026-10-08・事前宣言 v1.2 §6・issue #330）: 観測区間を作る前に、長い穴（`idle_trim_min_gap_ms` 以上）の直前と
   ファイルの最後で、最後の入力（`key` 行と `pointer_bin` 行）を含む秒の `feat` 行より後を、最大 `idle_trim_max_ms` さかのぼって落とす。
   Windows のモダンスタンバイで、寝た後も `feat` 行が続く（電源につないだ試験で 16 分）ことへの対処。
-  落とした量は `provenance.idle_trim`。前処理なしの実行（`--set idle_trim_max_ms=0`）を必ず並べて報告する（2 本で挟む）。
+  落とした量は `provenance.idle_trim`。前処理なしの実行（`--set idle_trim_max_ms=0`）を必ず並べて報告する（2 本は真の値を挟む上下界ではない）。
 - **振る舞い上の制約**: 出力は `gse-dataset` へ共有しない（`scripts/check_no_feature_output.sh`）。`features.rs` / `engine.rs` は変えない。
 
 ## 3. ユースケース

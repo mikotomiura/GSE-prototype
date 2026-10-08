@@ -23,7 +23,7 @@ idle_trim(feat_ts, input_ts, min_gap_ms, max_trim_ms) -> (kept_feat_ts, IdleTrim
 
 計算: `cut` は `h` について単調非減少（`L` も `h − max_trim_ms` も単調）。各 `feat` 行 `t` について、`t` 以上で最初の `h` を二分探索で引き、その `cut < t` なら落とす（その `h` の `cut` が `h ≥ t` の中で最小なので、これで十分）。
 
-`IdleTrimSummary`: 落とした `feat` 行の数と、落とした行のつながり（連続する落とした行の最初と最後の時刻）の列。
+`IdleTrimSummary`: 落とした `feat` 行の数と、落とした行のつながりの列（1 本 = 1 つの終わりの点で落とした行の最初と最後の時刻・判断 7 で終わりの点ごとに分けた）。
 
 入力 `input_ts` は `key` 行の時刻（押下・解放とも）と `pointer_bin` 行の時刻（ビンの終端）。`ime_*` / `focus_transition` / `clipboard` / `hook_health` などは入れない（判断 1）。
 
@@ -34,12 +34,13 @@ idle_trim(feat_ts, input_ts, min_gap_ms, max_trim_ms) -> (kept_feat_ts, IdleTrim
 | `idle_trim_min_gap_ms` | `60000` | `{60000}` | 固定 |
 | `idle_trim_max_ms` | `1800000` | `{0, 1800000}` | 感度のみ |
 
-検査（`validate`）: `idle_trim_min_gap_ms > hole_gap_ms`（穴にならない間隔で削らない）。`idle_trim_max_ms` は 24 時間以下（自己 DoS の門ではなく、桁の取り違えを止める）。
+検査（`validate`）: `idle_trim_min_gap_ms > hole_gap_ms`（穴にならない間隔で削らない）。`idle_trim_min_gap_ms` と `idle_trim_max_ms` は 24 時間以下（24 時間を超える明らかな桁の誤りだけを止める・判断 8）。
 
 ## 配線（`src-tauri/src/bin/replay.rs`）
 
 - `P1Operational` に 2 フィールド（必須・`deny_unknown_fields` のまま）。`P1_OPERATIONAL_KEYS` / `as_pairs` / `apply_set` / `validate` を 10 キーに。
 - `--features` 経路: `collect_all_feat_timestamps` の直後に、新しい収集関数で `key` 行（押下・解放とも・キーの種類を問わない）と `pointer_bin` 行の時刻を 1 回の走査で集め、`idle_trim` を呼ぶ。以後は削った列を使う。
+  - 収集関数は行の種類と時刻だけを読む（`press` などが欠けた `key` 行も数える）。種類が `key` / `pointer_bin` なのに時刻を読めない行があれば fail-closed（判断 8）。
   - `keys`（`collect_key_events`）は使わない。あちらは押下だけで、キーの種類を解決できない行を捨てるので、「最後の `key` 行」とずれる。
   - 極 B の `pointer_rows`（`collect_pointer_bin_timestamps`）は触らない（極の経路を変えない）。
   - tick の右端は「入力と `feat` 行の最大」のまま。ファイルの最後を削ると右端も縮むが、削った範囲には onset が立たないので、onset が格子の外に出ることはない（`mod.rs` の module doc の issue 008 の理由に反しない）。

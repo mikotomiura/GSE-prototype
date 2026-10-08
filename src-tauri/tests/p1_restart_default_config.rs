@@ -357,7 +357,13 @@ fn frozen_defaults_trim_an_idle_tail() {
         })
     );
     // ★ 再停止 `s'_1 = 134_800` は区間の右端より後なので、restop は全 onset 行で打ち切りの null になる。
-    for row in onset_rows(&trimmed) {
+    //   ⚠️ onset が 0 本だと下のループは空振りで通るので、先に 1 本以上あることを確かめる (Codex 指摘 2026-10-09)。
+    let trimmed_onsets = onset_rows(&trimmed);
+    assert!(
+        !trimmed_onsets.is_empty(),
+        "前処理ありで onset が 1 本も無い（1 つ目の沈黙の onset は区間の内側に残るはず）"
+    );
+    for row in trimmed_onsets {
         assert_eq!(
             row.get("restart").and_then(|r| r.get("restop_ms")),
             Some(&Value::Null),

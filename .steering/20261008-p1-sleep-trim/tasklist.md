@@ -16,6 +16,8 @@
 - [x] 実記録（P998・repo の外）で前処理あり・なし・`warmup_count=10` を比べ、`verification.md` に書く（その中で 1 秒のずれを見つけて直した・判断 6）
 - [x] アプリ側の別 issue（#331・研究者の確認で次の配布に回す）
 - [x] code-reviewer ∥ security-checker（HIGH 0）・指摘をすべて対応（判断 7）・判断 6 を研究者に確認
-- [ ] 指摘の対応の後の全テスト・実記録の比べ直し
-- [ ] /finish-task（/cross-review 必須）・コミット・PR・#330 に裁定を書く
-- [ ] O1 事前登録の草案に参照を足す（PR #329 の merge 後。#329 は Windows の CI が時間切れで止まっている → 引き継ぎに書く）
+- [x] 指摘の対応の後の全テスト・実記録の比べ直し（`spans` が終わりの点ごとになった）
+- [x] /cross-review: Codex 4 回（差分を分けて）∥ code-reviewer 2 巡目。指摘への対応は判断 8（研究者に 2 点を確認）
+- [x] 判断 8 の対応の後の全テスト・clippy・fmt（cargo 緑・replay 73・clippy 0・Python の P1（全体の実行では grid の 5 件が赤 = 偽の replay が新しい必須の `provenance.idle_trim` を出していなかった → 偽物を直し、grid を再実行して緑。ほかは全体の実行で緑）・`p1-repro-test.sh` 70 件通過・parity の自己検査 16 件赤）
+- [ ] コミット・push・PR・CI・#330 に裁定を書く
+- [ ] O1 事前登録の草案に参照を足す（PR #329 の merge 後）→ 引き継ぎ `.steering/_handoff/next-session-p1-sleep-trim-followups.md` に書いた

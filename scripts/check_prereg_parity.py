@@ -12,6 +12,13 @@ JSON-parsing each cell) and **structural** on the search space (same key set,
 same explicit candidate lists, and the derived key declared as derived on
 both sides).
 
+v1.2 (2026-10-08) added: the tables of the appended section 6 are read as
+well; a key that appears twice (inside one table or under two anchors) is
+drift; and the role column of the search tables must match `search_roles`.
+Role duplicates are not reported separately: the role reader and the search
+space reader select rows with the same `row_key`, so their duplicate sets
+are identical and the search space reader already reports them.
+
 Exit codes:
     0 = document and JSON agree
     1 = drift detected
@@ -340,8 +347,8 @@ def run_check(doc_path: Path, json_path: Path) -> int:
         return EXIT_DRIFT
 
     print(
-        f"[check_prereg_parity] OK: {len(doc_ops)} operational value(s) and "
-        f"{len(doc_space)} search-space entry(ies) agree"
+        f"[check_prereg_parity] OK: {len(doc_ops)} operational value(s), "
+        f"{len(doc_space)} search-space entry(ies) and {len(doc_roles)} search role(s) agree"
     )
     return EXIT_OK
 
@@ -392,10 +399,18 @@ MUTATIONS = [
         "| `w_ms` | `30000` | dup | dup |\n| `idle_trim_max_ms` | `1800000` |",
     ),
     (
+        # The first row is kept, so this goes red on the value as well. The next
+        # mutation (right row first) is red only through the duplicate report.
         "doc: repeat a key inside one table (a wrong row before the right one)",
         "doc",
         "| `idle_trim_max_ms` | `1800000` |",
         "| `idle_trim_max_ms` | `1700000` | dup | dup |\n| `idle_trim_max_ms` | `1800000` |",
+    ),
+    (
+        "doc: repeat a key inside one table (the right row before a wrong one)",
+        "doc",
+        "| `idle_trim_max_ms` | `1800000` |",
+        "| `idle_trim_max_ms` | `1800000` | ok | ok |\n| `idle_trim_max_ms` | `1700000` |",
     ),
     (
         "doc: repeat a v1.0 search key in the v1.2 search table (same space)",

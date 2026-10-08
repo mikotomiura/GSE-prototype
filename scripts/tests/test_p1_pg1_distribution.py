@@ -82,6 +82,8 @@ def make_envelope(pole, onsets, applicable=True, reason=None):
             "app_version": None,
             "capabilities": None,
             "observed_intervals": [{"a_ms": 1_700_000_001_000, "b_ms": 1_700_000_220_000}],
+            # ★ 今の binary の形 (事前宣言 v1.2 §6.1): 3 極とも同じ値を持つ
+            "idle_trim": {"dropped_feat_rows": 4, "spans": [{"a_ms": 1_700_000_221_000, "b_ms": 1_700_000_224_000}]},
         },
         "config": {
             "w_ms": 30000,
@@ -92,6 +94,8 @@ def make_envelope(pole, onsets, applicable=True, reason=None):
             "warmup_count": 100,
             "theta_estimator": "nearest_rank",
             "t1a_window_ms": 30000,
+            "idle_trim_min_gap_ms": 60000,
+            "idle_trim_max_ms": 1800000,
             "pole": pole,
             "pole_applicable": applicable,
             "pole_not_applicable_reason": None if applicable else reason,
@@ -493,6 +497,16 @@ class Pg1DistributionTest(LayoutCase):
             ("config", "overrides", [{"key": "q", "value": 0.995}]),
             ("provenance", "idle_trim", {"dropped_feat_rows": 3, "spans": [{"a_ms": 1, "b_ms": 3}]}),
         )
+        # ★ 1 極だけ `provenance.idle_trim` が欠ける / 形が壊れている封筒は拒否する (前処理の値を持つ封筒には必須)
+        for label, broken in (
+            ("欠ける", lambda env: env["provenance"].pop("idle_trim")),
+            ("行数が負", lambda env: env["provenance"]["idle_trim"].__setitem__("dropped_feat_rows", -1)),
+            ("spans の向きが逆", lambda env: env["provenance"]["idle_trim"].__setitem__("spans", [{"a_ms": 5, "b_ms": 4}])),
+        ):
+            with self.subTest(idle_trim=label):
+                root = self.base_layout()
+                edit_envelope(root / "P01" / "s1" / "pointer_b.json", broken)
+                self.assert_rejected(root, 3, f"idle_trim {label}")
         for section, key, value in mismatches:
             with self.subTest(mismatch=f"{section}.{key}"):
                 root = self.base_layout()

@@ -71,7 +71,16 @@ _CROSS_POLE_KEYS = (
     #   ⚠️ 旧い封筒 (1.0.0 の binary) には無いので、無いこと同士は一致とみなす (版の混在は prereg_version で止まる)。
     ("provenance", "idle_trim"),
 )
-_ABSENT = object()
+
+
+class _Absent:
+    """`provenance.idle_trim` が無いことを表す番兵 (エラー文で読めるように repr を持つ)。"""
+
+    def __repr__(self):
+        return "<無い>"
+
+
+_ABSENT = _Absent()
 
 
 class FeaturesIOError(ValueError):
@@ -217,6 +226,24 @@ def check_envelope(envelope, expected_pole=None, where="封筒"):
         bad(f"非適用 (pole_applicable=false) なのに理由が無い: {reason!r}")
     if pole == "baseline" and not applicable:
         bad("baseline が非適用 (★ baseline は常に適用可)")
+
+    # ★ 事前宣言 v1.2 §6.1: 前処理の値 (`config.idle_trim_max_ms`) を持つ封筒は、落とした量
+    #   (`provenance.idle_trim`) も必ず持つ (同じ binary が両方を出す)。⚠️ 旧い封筒 (値を持たない) には求めない。
+    if "idle_trim_max_ms" in config:
+        trim = provenance.get("idle_trim")
+        if not isinstance(trim, dict):
+            bad(f"config に idle_trim_max_ms があるのに provenance.idle_trim がオブジェクトでない: {trim!r}")
+        dropped = trim.get("dropped_feat_rows")
+        if type(dropped) is not int or dropped < 0:
+            bad(f"provenance.idle_trim.dropped_feat_rows が 0 以上の整数ではない: {dropped!r}")
+        spans = trim.get("spans")
+        if not isinstance(spans, list):
+            bad(f"provenance.idle_trim.spans が配列ではない: {spans!r}")
+        for j, span in enumerate(spans):
+            a = span.get("a_ms") if isinstance(span, dict) else None
+            b = span.get("b_ms") if isinstance(span, dict) else None
+            if type(a) is not int or type(b) is not int or a > b:
+                bad(f"provenance.idle_trim.spans[{j}] が {{a_ms <= b_ms}} の整数の組ではない: {span!r}")
 
     for i, row in enumerate(rows):
         if not isinstance(row, dict):

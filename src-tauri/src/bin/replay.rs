@@ -263,6 +263,8 @@ struct IdleTrimDto {
     /// 落とした `feat` 行の数。
     dropped_feat_rows: u64,
     /// 落とした行のつながり (`[a_ms, b_ms]`・両端は落とした最初と最後の `feat` 行の時刻)。
+    /// ★ 1 本 = 1 つの終わりの点 (長い穴の直前・ファイルの最後) で落とした行。本数 = 行を落とした終わりの点の数。
+    /// ⚠️ 短い穴をまたぐことがあるので、`b_ms − a_ms` を削った時間として読まない (それは `dropped_feat_rows`)。
     spans: Vec<ObservedIntervalDto>,
 }
 
@@ -408,9 +410,11 @@ const P1_OPERATIONAL_KEYS: [&str; 10] = [
     "idle_trim_max_ms",
 ];
 
-/// `idle_trim_max_ms` と `idle_trim_min_gap_ms` の上限 (24 時間)。⚠️ 自己 DoS の門ではなく、秒と ms の取り違えのような
-/// 桁の誤りを止めるための値 (事前宣言 v1.2 §6.1)。
-const IDLE_TRIM_MAX_MS_LIMIT: u64 = 24 * 60 * 60 * 1000;
+/// `idle_trim_max_ms` と `idle_trim_min_gap_ms` の上限 (24 時間・事前宣言 v1.2 §6.1)。
+/// ⚠️ 自己 DoS の門ではなく、**24 時間を超える値 (明らかな桁の誤り) だけ**を止める。凍結値 60000 の
+/// 1440 倍未満の誤り (例: 1000 倍の 60000000 = 16.7 時間) は止めない —— その値は封筒の `overrides` に残る
+/// (研究者裁定 2026-10-09・上限を締めない)。
+const IDLE_TRIM_LIMIT_MS: u64 = 24 * 60 * 60 * 1000;
 
 /// 凍結 JSON の `operational` (P1 事前宣言 §1 の 8 値 ＋ v1.2 §6.2 の 2 値)。
 ///
@@ -543,16 +547,17 @@ impl P1Operational {
                 self.idle_trim_min_gap_ms, self.hole_gap_ms
             ));
         }
-        if self.idle_trim_max_ms > IDLE_TRIM_MAX_MS_LIMIT {
+        if self.idle_trim_max_ms > IDLE_TRIM_LIMIT_MS {
             return Err(format!(
-                "idle_trim_max_ms は {IDLE_TRIM_MAX_MS_LIMIT} (24 時間) 以下でなければならない"
+                "idle_trim_max_ms は {IDLE_TRIM_LIMIT_MS} (24 時間) 以下でなければならない"
             ));
         }
-        // ⚠️ 下限だけだと、桁の誤り (例: 60000000) で長い穴の前の削りが**黙って効かなくなり**、
-        //   ファイルの最後だけが削られる (code-reviewer L-7 / security-checker L3)。`idle_trim_max_ms` と同じ上限を置く。
-        if self.idle_trim_min_gap_ms > IDLE_TRIM_MAX_MS_LIMIT {
+        // ⚠️ `idle_trim_min_gap_ms` が大きすぎると長い穴の前の削りが効かなくなり、ファイルの最後だけが削られる
+        //   (code-reviewer L-7 / security-checker L3)。`idle_trim_max_ms` と同じ上限で、24 時間を超える値だけを止める
+        //   (それ未満の誤りは `overrides` に残る・[`IDLE_TRIM_LIMIT_MS`])。
+        if self.idle_trim_min_gap_ms > IDLE_TRIM_LIMIT_MS {
             return Err(format!(
-                "idle_trim_min_gap_ms は {IDLE_TRIM_MAX_MS_LIMIT} (24 時間) 以下でなければならない"
+                "idle_trim_min_gap_ms は {IDLE_TRIM_LIMIT_MS} (24 時間) 以下でなければならない"
             ));
         }
         // ⚠️ 実装済みの推定法だけを通す。未実装の名前を封筒に刻むと、出力が嘘をつく。
@@ -3167,7 +3172,13 @@ fn collect_pointer_bin_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, St
 /// ⚠️ [`collect_key_events`] は使わない —— あちらは押下だけで、キーを解決できない行を捨てるので、
 /// 「最後の `key` 行」とずれる。⚠️ `ime_*` / `focus_transition` / `clipboard` などは入れない
 /// (システムが出しうる・研究者裁定 2026-10-08 判断 1)。
-/// ★ 読むのは時刻だけ (`vk` / `category` / ポインタの値は使わない)。
+/// ★ 読むのは**行の種類と時刻だけ** ([`RowKindTimestampDto`]・`vk` / `category` / `press` / ポインタの値は読まない)。
+/// → `press` などが欠けた `key` 行も入力に数える (行全体を [`ReplayEvent`] として読むと、読めない行が
+///   「入力が無い」に化け、観測できていた `feat` 行まで削られる・Codex 指摘 2026-10-09)。
+///
+/// ⚠️ **fail-closed**: 種類が `key` / `pointer_bin` なのに時刻 `t` を非負の整数として読めない行があれば `Err`
+/// (呼び出し側は exit 1)。入力の時刻が分からないまま削ると、削る範囲が黙って広がるため。
+/// JSON として読めない行 (種類が分からない) は数えて警告し、読み飛ばす (他の収集関数と同じ)。
 fn collect_idle_trim_input_timestamps(session_path: &PathBuf) -> Result<Vec<u64>, String> {
     let metadata = std::fs::metadata(session_path)
         .map_err(|e| format!("cannot stat {}: {}", session_path.display(), e))?;
@@ -3182,44 +3193,53 @@ fn collect_idle_trim_input_timestamps(session_path: &PathBuf) -> Result<Vec<u64>
         .map_err(|e| format!("cannot open {}: {}", session_path.display(), e))?;
     let mut out: Vec<u64> = Vec::new();
     let mut parse_failed_lines: u64 = 0;
-    let mut malformed_pointer_lines: u64 = 0;
     for (lineno, line) in BufReader::new(file).lines().enumerate() {
         let line = line.map_err(|e| format!("read error at line {}: {}", lineno + 1, e))?;
         if line.trim().is_empty() {
             continue;
         }
-        let ev: ReplayEvent = match serde_json::from_str(&line) {
+        let row: RowKindTimestampDto = match serde_json::from_str(&line) {
             Ok(v) => v,
             Err(_) => {
                 parse_failed_lines += 1;
                 continue;
             }
         };
-        match ev {
-            ReplayEvent::Key { t, .. } => out.push(t),
-            ReplayEvent::PointerBin(v) => match serde_json::from_value::<PointerBinTimestampDto>(v)
-            {
-                Ok(dto) => out.push(dto.t),
-                Err(_) => malformed_pointer_lines += 1,
-            },
-            _ => {}
+        let kind = row.kind.as_deref();
+        if kind != Some("key") && kind != Some("pointer_bin") {
+            continue;
+        }
+        match row.t.as_ref().and_then(serde_json::Value::as_u64) {
+            Some(t) => out.push(t),
+            // ⚠️ 値は出さない (行番号と種類だけ)。
+            None => {
+                return Err(format!(
+                    "line {}: a `{}` row has no readable timestamp `t`; refusing to trim feat rows \
+                     without knowing the input times (idle trim is fail-closed)",
+                    lineno + 1,
+                    kind.unwrap_or_default()
+                ))
+            }
         }
     }
     if parse_failed_lines > 0 {
         tracing::warn!(
             failed = parse_failed_lines,
-            "collect_idle_trim_input_timestamps: some lines failed to parse as ReplayEvent"
-        );
-    }
-    if malformed_pointer_lines > 0 {
-        tracing::warn!(
-            skipped = malformed_pointer_lines,
-            "collect_idle_trim_input_timestamps: pointer_bin lines whose t did not match the \
-             logger format were skipped (not counted as input)"
+            "collect_idle_trim_input_timestamps: some lines were not JSON objects and were skipped"
         );
     }
     out.sort_unstable();
     Ok(out)
+}
+
+/// [`collect_idle_trim_input_timestamps`] 用: 行の**種類と時刻だけ**を読む DTO (ほかのキーは読まない)。
+/// ★ `t` は `Value` で受け、非負の整数かを呼び出し側で確かめる (型の違いを「行が無い」に化けさせない)。
+#[derive(Debug, serde::Deserialize)]
+struct RowKindTimestampDto {
+    #[serde(rename = "type", default)]
+    kind: Option<String>,
+    #[serde(default)]
+    t: Option<serde_json::Value>,
 }
 
 /// 修飾キーの `key` 行から読んだ edge (`(時刻, press なら true)`) と、読み飛ばした行の件数。
@@ -5776,17 +5796,56 @@ not json\n";
 {\"type\":\"key\",\"t\":1000,\"vk\":65,\"press\":true}\n\
 {\"type\":\"key\",\"t\":1080,\"vk\":65,\"press\":false}\n\
 {\"type\":\"key\",\"t\":2000,\"category\":\"no_such_category\",\"press\":true}\n\
+{\"type\":\"key\",\"t\":2500}\n\
 {\"type\":\"pointer_bin\",\"t\":3000,\"moved\":3,\"buttons\":0,\"wheel\":0}\n\
-{\"type\":\"pointer_bin\",\"t\":\"oops\"}\n\
 {\"type\":\"ime_state\",\"t\":4000,\"open\":true}\n\
 {\"type\":\"focus_transition\",\"t\":5000}\n\
 {\"type\":\"hook_health\",\"t\":6000,\"alive\":false,\"starved_ms\":120000,\"rehook\":true,\"dropped\":0,\"dropped_delta\":0}\n\
 {\"type\":\"feat\",\"t\":7000}\n\
+{\"type\":\"meta\",\"session_start\":1}\n\
 not json\n";
         std::fs::write(&path, ndjson).expect("write temp session");
         let got = collect_idle_trim_input_timestamps(&path);
         let _ = std::fs::remove_file(&path);
-        assert_eq!(got, Ok(vec![1_000, 1_080, 2_000, 3_000]));
+        // ★ `press` の無い `key` 行 (2500) も数える (行の種類と時刻だけを読む)。
+        assert_eq!(got, Ok(vec![1_000, 1_080, 2_000, 2_500, 3_000]));
+    }
+
+    /// fail-closed: 種類が `key` / `pointer_bin` なのに時刻を読めない行があれば `Err`
+    /// (入力の時刻が分からないまま削らない・Codex 指摘 2026-10-09)。★ ほかの種類の行の壊れた時刻は無関係 (対照)。
+    #[test]
+    fn idle_trim_input_collector_refuses_rows_without_a_readable_time() {
+        for (tag, bad) in [
+            ("ptr-str", "{\"type\":\"pointer_bin\",\"t\":\"oops\"}"),
+            ("key-missing", "{\"type\":\"key\",\"press\":true}"),
+            ("key-negative", "{\"type\":\"key\",\"t\":-1,\"press\":true}"),
+            ("key-float", "{\"type\":\"key\",\"t\":1.5,\"press\":true}"),
+        ] {
+            let path = std::env::temp_dir().join(format!(
+                "gse-replay-idle-trim-input-bad-{}-{tag}.ndjson",
+                std::process::id()
+            ));
+            let ndjson = format!("{{\"type\":\"key\",\"t\":1000,\"press\":true}}\n{bad}\n");
+            std::fs::write(&path, ndjson).expect("write temp session");
+            let got = collect_idle_trim_input_timestamps(&path);
+            let _ = std::fs::remove_file(&path);
+            assert!(
+                got.is_err(),
+                "{tag}: 時刻を読めない入力行は Err でなければならない: {got:?}"
+            );
+        }
+        let path = std::env::temp_dir().join(format!(
+            "gse-replay-idle-trim-input-other-{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            "{\"type\":\"key\",\"t\":1000,\"press\":true}\n{\"type\":\"ime_state\",\"t\":\"oops\"}\n",
+        )
+        .expect("write temp session");
+        let got = collect_idle_trim_input_timestamps(&path);
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(got, Ok(vec![1_000]));
     }
 
     /// 事前宣言 v1.2 §6.4: `--set idle_trim_max_ms=0` (前処理なしの実行) は凍結値から外れたキーとして
@@ -5823,10 +5882,10 @@ not json\n";
             );
         }
         for bad in [
-            vec!["idle_trim_min_gap_ms=2000"], // = hole_gap_ms
-            vec!["idle_trim_min_gap_ms=0"],    // < hole_gap_ms
-            vec!["hole_gap_ms=60000"],         // 凍結の 60000 と等しくなる
-            vec!["idle_trim_max_ms=86400001"],
+            vec!["idle_trim_min_gap_ms=2000"],     // = hole_gap_ms
+            vec!["idle_trim_min_gap_ms=0"],        // < hole_gap_ms
+            vec!["hole_gap_ms=60000"],             // 凍結の 60000 と等しくなる
+            vec!["idle_trim_max_ms=86400001"],     // 24 時間超
             vec!["idle_trim_min_gap_ms=86400001"], // 24 時間超
             vec!["idle_trim_max_ms=-1"],           // 型の不一致
             vec!["idle_trim_min_gap_ms=60000.5"],  // 型の不一致

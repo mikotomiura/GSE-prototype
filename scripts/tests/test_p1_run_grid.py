@@ -86,7 +86,7 @@ add_ov() { if [ "$2" != "$3" ]; then ov="${ov:+$ov,}{\"key\":\"$1\",\"frozen\":$
 add_ov w_ms 30000 "$w_ms"; add_ov q 0.99 "$q"; add_ov b_ms 30000 "$b_ms"
 add_ov hole_gap_ms 2000 "$hole_gap_ms"; add_ov warmup_count 100 "$warmup_count"; add_ov t1a_window_ms 30000 "$t1a_window_ms"
 add_ov idle_trim_max_ms 1800000 "$idle_trim_max_ms"
-printf '{"provenance":{"hmm_version":"%s"},"config":{"w_ms":%s,"q":%s,"b_ms":%s,"hole_gap_ms":%s,"warmup_count":%s,"t1a_window_ms":%s,"idle_trim_max_ms":%s,"pole":"%s","pole_applicable":true,"pole_not_applicable_reason":null,"prereg_id":"p1-episode","prereg_version":"1.0.0","prereg_sha256_prefix":"0123456789abcdef","config_source":"frozen","overrides":[%s],"hmm_version":"%s"},"rows":[{"stall_onset":{"is_onset":false}}]}\n' \
+printf '{"provenance":{"hmm_version":"%s","idle_trim":{"dropped_feat_rows":0,"spans":[]}},"config":{"w_ms":%s,"q":%s,"b_ms":%s,"hole_gap_ms":%s,"warmup_count":%s,"t1a_window_ms":%s,"idle_trim_max_ms":%s,"pole":"%s","pole_applicable":true,"pole_not_applicable_reason":null,"prereg_id":"p1-episode","prereg_version":"1.0.0","prereg_sha256_prefix":"0123456789abcdef","config_source":"frozen","overrides":[%s],"hmm_version":"%s"},"rows":[{"stall_onset":{"is_onset":false}}]}\n' \
   "$hmm" "$w_ms" "$q" "$b_ms" "$hole_gap_ms" "$warmup_count" "$t1a_window_ms" "$idle_trim_max_ms" "$pole" "$ov" "$hmm"
 """
 
