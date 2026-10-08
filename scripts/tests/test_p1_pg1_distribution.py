@@ -491,6 +491,7 @@ class Pg1DistributionTest(LayoutCase):
             ("config", "prereg_sha256_prefix", "ffffffffffffffff"),
             ("config", "config_source", "file"),
             ("config", "overrides", [{"key": "q", "value": 0.995}]),
+            ("provenance", "idle_trim", {"dropped_feat_rows": 3, "spans": [{"a_ms": 1, "b_ms": 3}]}),
         )
         for section, key, value in mismatches:
             with self.subTest(mismatch=f"{section}.{key}"):

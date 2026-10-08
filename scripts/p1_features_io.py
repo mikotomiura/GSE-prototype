@@ -67,7 +67,11 @@ _CROSS_POLE_KEYS = (
     ("config", "prereg_sha256_prefix"),
     ("config", "config_source"),
     ("config", "overrides"),
+    # ★ 事前宣言 v1.2 §6.1: 無入力の末尾の前処理は極の前に 1 回だけ掛かるので、落とした量も極によらない。
+    #   ⚠️ 旧い封筒 (1.0.0 の binary) には無いので、無いこと同士は一致とみなす (版の混在は prereg_version で止まる)。
+    ("provenance", "idle_trim"),
 )
+_ABSENT = object()
 
 
 class FeaturesIOError(ValueError):
@@ -243,7 +247,7 @@ def load_envelope(path, expected_pole):
 def load_session(paths):
     """1 セッションの 3 極を読み、`{pole: 封筒}` を返す。
 
-    ⚠️ 極の間で `hmm_version` (収集時・解析時) / `prereg_version` / `prereg_sha256_prefix` / `config_source` /
+    ⚠️ 極の間で `hmm_version` (収集時・解析時) / `prereg_version` / `prereg_sha256_prefix` / `config_source` / `provenance.idle_trim` /
     `overrides` が一致しなければ `EnvelopeError` (★ 3 極は同じ入力への 1 回の実行の出力のはず)。
     """
     if set(paths) != set(POLES):
@@ -252,7 +256,8 @@ def load_session(paths):
     first = POLES[0]
     for pole in POLES[1:]:
         for section, key in _CROSS_POLE_KEYS:
-            mine, theirs = envelopes[first][section][key], envelopes[pole][section][key]
+            mine = envelopes[first][section].get(key, _ABSENT)
+            theirs = envelopes[pole][section].get(key, _ABSENT)
             if mine != theirs:
                 raise EnvelopeError(
                     f"極 {first!r} と {pole!r} で {section}.{key} が食い違う: {mine!r} != {theirs!r} "

@@ -134,29 +134,62 @@ def table_rows_under(text: str, anchor: str) -> list[list[str]]:
 
 
 def merge_tables(text: str, anchors, read_one, duplicates: list[str], kind: str) -> dict[str, object]:
+    """Merge the (key, value) rows of the first table under each anchor.
+
+    A key that appears twice -- inside one table or under two anchors -- is
+    reported in `duplicates` and only its first row is kept. Silently taking
+    either row would let one of them disagree with the JSON unseen."""
     merged: dict[str, object] = {}
     seen_under: dict[str, str] = {}
     for anchor in anchors:
-        for key, value in read_one(table_rows_under(text, anchor)).items():
+        for key, value in read_one(table_rows_under(text, anchor)):
             if key in seen_under:
-                duplicates.append(
-                    f"{kind}: {key!r} appears under both {seen_under[key]!r} and {anchor!r}"
-                )
+                if seen_under[key] == anchor:
+                    duplicates.append(f"{kind}: {key!r} appears twice under {anchor!r}")
+                else:
+                    duplicates.append(
+                        f"{kind}: {key!r} appears under both {seen_under[key]!r} and {anchor!r}"
+                    )
                 continue
             seen_under[key] = anchor
             merged[key] = value
     return merged
 
 
-def operational_from_rows(rows: list[list[str]]) -> dict[str, object]:
-    out: dict[str, object] = {}
+def row_key(cells: list[str]):
+    if len(cells) < 2:
+        return None
+    key = str(parse_cell(cells[0]))
+    return key if re.fullmatch(r"[a-z0-9_]+", key) else None
+
+
+def operational_from_rows(rows: list[list[str]]) -> list[tuple[str, object]]:
+    out: list[tuple[str, object]] = []
     for cells in rows:
-        if len(cells) < 2:
+        key = row_key(cells)
+        if key is not None:
+            out.append((key, parse_cell(cells[1])))
+    return out
+
+
+# The role column of the search tables, mapped to `search_roles` in the JSON.
+ROLE_DOC_TO_JSON = {
+    "選択": "selection",
+    "感度のみ": "sensitivity_only",
+    "従属": "derived",
+    "固定": "fixed",
+}
+
+
+def roles_from_rows(rows: list[list[str]]) -> list[tuple[str, object]]:
+    out: list[tuple[str, object]] = []
+    for cells in rows:
+        key = row_key(cells)
+        if key is None:
             continue
-        key = str(parse_cell(cells[0]))
-        if not re.fullmatch(r"[a-z0-9_]+", key):
-            continue
-        out[key] = parse_cell(cells[1])
+        raw = cells[2] if len(cells) >= 3 else ""
+        word = raw.strip().strip("*").strip().strip("`").strip()
+        out.append((key, ROLE_DOC_TO_JSON.get(word, f"<unknown role {word!r}>")))
     return out
 
 
@@ -168,13 +201,16 @@ def read_search_space_from_doc(text: str, duplicates: list[str]) -> dict[str, ob
     return merge_tables(text, SEARCH_ANCHORS, search_space_from_rows, duplicates, "search_space")
 
 
-def search_space_from_rows(rows: list[list[str]]) -> dict[str, object]:
-    out: dict[str, object] = {}
+def read_roles_from_doc(text: str) -> dict[str, object]:
+    # Duplicates are already reported by read_search_space_from_doc (same rows).
+    return merge_tables(text, SEARCH_ANCHORS, roles_from_rows, [], "search_roles")
+
+
+def search_space_from_rows(rows: list[list[str]]) -> list[tuple[str, object]]:
+    out: list[tuple[str, object]] = []
     for cells in rows:
-        if len(cells) < 2:
-            continue
-        key = str(parse_cell(cells[0]))
-        if not re.fullmatch(r"[a-z0-9_]+", key):
+        key = row_key(cells)
+        if key is None:
             continue
         raw = cells[1].strip()
         # An explicit candidate list wins over the derived marker. Matching on
@@ -186,20 +222,32 @@ def search_space_from_rows(rows: list[list[str]]) -> dict[str, object]:
         m = re.search(r"\{([^{}]*)\}", raw)
         if m is None:
             if DERIVED_MARK_DOC in raw:
-                out[key] = DERIVED_MARK_DOC
+                out.append((key, DERIVED_MARK_DOC))
                 continue
-            out[key] = raw.strip("*").strip().strip("`").strip()
+            out.append((key, raw.strip("*").strip().strip("`").strip()))
             continue
         inner = m.group(1).strip()
         if not inner:
-            out[key] = []
+            out.append((key, []))
             continue
-        out[key] = [parse_cell(part) for part in inner.split(",")]
+        out.append((key, [parse_cell(part) for part in inner.split(",")]))
     return out
 
 
-def compare(doc_ops, json_ops, doc_space, json_space) -> list[str]:
+def compare(doc_ops, json_ops, doc_space, json_space, doc_roles=None, json_roles=None) -> list[str]:
     problems: list[str] = []
+
+    # v1.2: the role of each search key (role column vs `search_roles`).
+    if doc_roles is not None and json_roles is not None:
+        for key in sorted(set(doc_roles) | set(json_roles)):
+            if key not in json_roles:
+                problems.append(f"search_roles: {key!r} is in the document but not in the JSON")
+            elif key not in doc_roles:
+                problems.append(f"search_roles: {key!r} is in the JSON but not in the document")
+            elif doc_roles[key] != json_roles[key]:
+                problems.append(
+                    f"search_roles: {key!r} differs -- document={doc_roles[key]!r} json={json_roles[key]!r}"
+                )
 
     for key in sorted(set(doc_ops) | set(json_ops)):
         if key not in json_ops:
@@ -266,16 +314,20 @@ def run_check(doc_path: Path, json_path: Path) -> int:
 
     json_ops = frozen.get("operational")
     json_space = frozen.get("search_space")
+    json_roles = frozen.get("search_roles")
     if not isinstance(json_ops, dict):
         die(EXIT_JSON_MISSING, "frozen JSON has no object-valued 'operational'")
     if not isinstance(json_space, dict):
         die(EXIT_JSON_MISSING, "frozen JSON has no object-valued 'search_space'")
+    if not isinstance(json_roles, dict):
+        die(EXIT_JSON_MISSING, "frozen JSON has no object-valued 'search_roles'")
 
     duplicates: list[str] = []
     doc_ops = read_operational_from_doc(text, duplicates)
     doc_space = read_search_space_from_doc(text, duplicates)
+    doc_roles = read_roles_from_doc(text)
 
-    problems = duplicates + compare(doc_ops, json_ops, doc_space, json_space)
+    problems = duplicates + compare(doc_ops, json_ops, doc_space, json_space, doc_roles, json_roles)
     if problems:
         print(f"{DRIFT_BANNER}: {len(problems)} problem(s)", file=sys.stderr)
         for p in problems:
@@ -338,6 +390,30 @@ MUTATIONS = [
         "doc",
         "| `idle_trim_max_ms` | `1800000` |",
         "| `w_ms` | `30000` | dup | dup |\n| `idle_trim_max_ms` | `1800000` |",
+    ),
+    (
+        "doc: repeat a key inside one table (a wrong row before the right one)",
+        "doc",
+        "| `idle_trim_max_ms` | `1800000` |",
+        "| `idle_trim_max_ms` | `1700000` | dup | dup |\n| `idle_trim_max_ms` | `1800000` |",
+    ),
+    (
+        "doc: repeat a v1.0 search key in the v1.2 search table (same space)",
+        "doc",
+        "| `idle_trim_max_ms` | `{0, 1800000}` |",
+        "| `q` | `{0.99, 0.995, 0.999}` | 選択 | dup |\n| `idle_trim_max_ms` | `{0, 1800000}` |",
+    ),
+    (
+        "doc: change a role in the v1.2 search table",
+        "doc",
+        "| `idle_trim_max_ms` | `{0, 1800000}` | 感度のみ |",
+        "| `idle_trim_max_ms` | `{0, 1800000}` | 選択 |",
+    ),
+    (
+        "json: change a search role",
+        "json",
+        '"idle_trim_max_ms": "sensitivity_only"',
+        '"idle_trim_max_ms": "selection"',
     ),
     (
         "json: move the operational value outside its own search space",

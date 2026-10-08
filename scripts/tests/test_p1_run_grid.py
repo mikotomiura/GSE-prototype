@@ -323,7 +323,21 @@ class GridBuildTest(unittest.TestCase):
         def bool_value(data):
             data["search_space"]["hole_gap_ms"] = [2000, True]
 
+        # ★ 0 を許すのは `idle_trim_max_ms` だけ (事前宣言 v1.2 §6.4)。負・bool は拒否し、
+        #   ほかのキーの 0 は従来どおり拒否する (code-reviewer L-8 の陰性対照)。
+        def idle_trim_negative(data):
+            data["search_space"]["idle_trim_max_ms"] = [-1, 1800000]
+
+        def idle_trim_bool(data):
+            data["search_space"]["idle_trim_max_ms"] = [True, 1800000]
+
+        def zero_elsewhere(data):
+            data["search_space"]["w_ms"] = [0, 30000]
+
         for mutate in (
+            idle_trim_negative,
+            idle_trim_bool,
+            zero_elsewhere,
             selection_untunable,
             warmup_not_derived,
             missing_role,

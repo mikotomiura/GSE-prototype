@@ -230,7 +230,9 @@ struct FeatureProvenance {
     /// ★ 削除 / 一時停止 / 計器欠損の**原因ラベルは 1 つも無い**まま (ADR-030 D8 (b-2))。
     ///
     /// ⚠️★★★ **極 B ではこの列自体の意味が変わる** (security-checker LOW・issue 006)。
-    /// baseline (極 A) では「`feat` 行の穴」だけを表すが、極 B では
+    /// baseline (極 A) では「`feat` 行の穴」(★ 2026-10-08 から: 無入力の末尾の前処理の後の穴。
+    /// 前処理は**全極で** `key` / `pointer_bin` 行の時刻を読むので、baseline でも長い穴とファイルの最後ごとに
+    /// 最後の入力の秒が 1 つ右端に出る・下の [`IdleTrimDto`]) を表すが、極 B では
     /// **「観測区間 − ポインタ活動区間」= 評価区間**を表す。★ そのため、極 B の
     /// `observed_intervals` から baseline の `observed_intervals` を差し引くと、
     /// **ポインタ活動があった秒の時系列** (1 秒ビン単位・活動の**存在のみ**、
@@ -246,10 +248,16 @@ struct FeatureProvenance {
 
 /// [`FeatureProvenance::idle_trim`]。
 ///
-/// 落とした範囲は `observed_intervals` の穴としても読める。範囲の左端は「最後の入力の直後」なので、
-/// 最後の入力が `key` 行なら `rows[]` の `activity` から既に読める時刻だが、⚠️ `pointer_bin` 行なら
-/// **長い穴の直前の最後のポインタ活動の時刻**が baseline の出力にも出る (存在だけ・`moved` などの値は出ない。
-/// 極 B の `observed_intervals` の差分と同じ種類の間接的な露出)。原因のラベルは無い (ADR-030 D8 (b-2))。
+/// 落とした範囲は `observed_intervals` の穴と `rows[].quality.observability_mask.feat` からも読める。
+/// 範囲の左端は「最後の入力を含む秒の直後」なので、長い穴とファイルの最後ごとに次が baseline の出力にも出る
+/// (security-checker LOW・2026-10-09 に訂正):
+/// - 最後の入力が、キーを解決できた**押下**なら `rows[]` の `activity` から既に読める秒である。
+///   ⚠️ **解放**の行・キーを解決できない行なら、`activity` には出ない秒 (押下から 1 tick 以内のずれ) が新しく出る。
+/// - ⚠️ `pointer_bin` 行なら、**長い穴の直前の最後のポインタ活動の秒**が出る (存在だけ・`moved` などの値は出ない。
+///   極 B の `observed_intervals` の差分と同じ種類の間接的な露出)。
+/// - 30 分の上限で切られたときは、逆に「その前の 30 分は `key` も `pointer_bin` も無かった」という不在が読める。
+///
+/// 原因のラベルは無い (ADR-030 D8 (b-2))。封筒は `gse-dataset` へ共有しない (`sharing`)。
 #[derive(Debug, serde::Serialize)]
 struct IdleTrimDto {
     /// 落とした `feat` 行の数。
@@ -301,7 +309,7 @@ struct FeatureConfigDto {
     /// 前処理で戻す幅の上限 (ms・P1 事前宣言 v1.2 §6.2)。`0` は前処理なしの実行 (§6.4)。
     idle_trim_max_ms: u64,
     /// この出力の**極** (ADR-030 D3・[`Pole::as_str`])。★ 1 実行 1 極で、極を持つのは**封筒だけ**
-    /// (行には載せない・判断 3)。⚠️ 上の設定 8 値とは別の軸で、`--set` では変えられない (`--pole` だけ)。
+    /// (行には載せない・判断 3)。⚠️ 上の設定 10 値とは別の軸で、`--set` では変えられない (`--pole` だけ)。
     pole: &'static str,
     /// この入力で、上の極が**計算できたか**。★ 常に出る (`baseline` は常に `true`)。
     /// ⚠️ 極 B / 極 M+ の判定は**入力に依存する** (`capabilities` の宣言 / 修飾キー行の有無)。
@@ -400,7 +408,7 @@ const P1_OPERATIONAL_KEYS: [&str; 10] = [
     "idle_trim_max_ms",
 ];
 
-/// `idle_trim_max_ms` の上限 (24 時間)。⚠️ 自己 DoS の門ではなく、秒と ms の取り違えのような
+/// `idle_trim_max_ms` と `idle_trim_min_gap_ms` の上限 (24 時間)。⚠️ 自己 DoS の門ではなく、秒と ms の取り違えのような
 /// 桁の誤りを止めるための値 (事前宣言 v1.2 §6.1)。
 const IDLE_TRIM_MAX_MS_LIMIT: u64 = 24 * 60 * 60 * 1000;
 
@@ -540,6 +548,13 @@ impl P1Operational {
                 "idle_trim_max_ms は {IDLE_TRIM_MAX_MS_LIMIT} (24 時間) 以下でなければならない"
             ));
         }
+        // ⚠️ 下限だけだと、桁の誤り (例: 60000000) で長い穴の前の削りが**黙って効かなくなり**、
+        //   ファイルの最後だけが削られる (code-reviewer L-7 / security-checker L3)。`idle_trim_max_ms` と同じ上限を置く。
+        if self.idle_trim_min_gap_ms > IDLE_TRIM_MAX_MS_LIMIT {
+            return Err(format!(
+                "idle_trim_min_gap_ms は {IDLE_TRIM_MAX_MS_LIMIT} (24 時間) 以下でなければならない"
+            ));
+        }
         // ⚠️ 実装済みの推定法だけを通す。未実装の名前を封筒に刻むと、出力が嘘をつく。
         if self.theta_estimator != "nearest_rank" {
             // ⚠️ 外部ファイル由来の文字列は端末へそのまま出さない（`echo_untrusted`: 80 字で切り詰め・`{:?}` でエスケープ）。
@@ -561,7 +576,7 @@ struct ResolvedFeatureConfig {
     prereg_sha256_prefix: String,
     config_source: &'static str,
     overrides: Vec<ConfigOverride>,
-    /// ★ 極 (ADR-030 D3)。⚠️ `operational` の 8 値とは**別の軸**で、`--set` / `--feature-config` では
+    /// ★ 極 (ADR-030 D3)。⚠️ `operational` の 10 値とは**別の軸**で、`--set` / `--feature-config` では
     /// 変えられない (凍結 JSON に極は無い)。`resolve_feature_config` は常に `Baseline` で返し、
     /// `--pole` の値は [`Self::with_pole`] で足す。
     pole: Pole,
@@ -2118,7 +2133,9 @@ fn main() -> ExitCode {
         } else {
             None
         };
-        // ⚠️★★★ `pointer_bin` の行を要るのは**極 B だけ**。他の極では走査しない (baseline の実行経路を変えない)。
+        // ⚠️★★★ 極 B の抑制区間に `pointer_bin` の行を要るのは**極 B だけ**。他の極ではここで走査しない。
+        //   ⚠️ ただし 2026-10-08 から、無入力の末尾の前処理 (`collect_idle_trim_input_timestamps`) が
+        //   **全極で** `pointer_bin` 行の時刻を読む (baseline の観測区間の右端にも効く・上の `idle_trim`)。
         let pointer_rows: Option<Vec<u64>> = if pole == Pole::PointerB {
             match collect_pointer_bin_timestamps(&args.session_path) {
                 Ok(v) => Some(v),
@@ -5442,7 +5459,7 @@ mod tests {
         assert!(dto["pole_not_applicable_reason"].is_null());
     }
 
-    /// issue 004: 極は `--set` の 8 値とは別の軸で、`--set` / `--feature-config` から変えられない。
+    /// issue 004: 極は `--set` の 10 値とは別の軸で、`--set` / `--feature-config` から変えられない。
     #[test]
     fn pole_is_not_settable_through_set() {
         assert!(!P1_OPERATIONAL_KEYS.contains(&"pole"));
@@ -5796,6 +5813,7 @@ not json\n";
         for ok in [
             vec!["idle_trim_min_gap_ms=2001"],
             vec!["idle_trim_max_ms=86400000"],
+            vec!["idle_trim_min_gap_ms=86400000"],
             vec!["hole_gap_ms=5000", "idle_trim_min_gap_ms=5001"],
         ] {
             let sets: Vec<String> = ok.iter().map(|s| s.to_string()).collect();
@@ -5805,12 +5823,13 @@ not json\n";
             );
         }
         for bad in [
-            vec!["idle_trim_min_gap_ms=2000"],    // = hole_gap_ms
-            vec!["idle_trim_min_gap_ms=0"],       // < hole_gap_ms
-            vec!["hole_gap_ms=60000"],            // 凍結の 60000 と等しくなる
-            vec!["idle_trim_max_ms=86400001"],    // 24 時間超
-            vec!["idle_trim_max_ms=-1"],          // 型の不一致
-            vec!["idle_trim_min_gap_ms=60000.5"], // 型の不一致
+            vec!["idle_trim_min_gap_ms=2000"], // = hole_gap_ms
+            vec!["idle_trim_min_gap_ms=0"],    // < hole_gap_ms
+            vec!["hole_gap_ms=60000"],         // 凍結の 60000 と等しくなる
+            vec!["idle_trim_max_ms=86400001"],
+            vec!["idle_trim_min_gap_ms=86400001"], // 24 時間超
+            vec!["idle_trim_max_ms=-1"],           // 型の不一致
+            vec!["idle_trim_min_gap_ms=60000.5"],  // 型の不一致
         ] {
             let sets: Vec<String> = bad.iter().map(|s| s.to_string()).collect();
             assert!(

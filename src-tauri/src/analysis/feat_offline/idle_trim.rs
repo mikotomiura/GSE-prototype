@@ -12,12 +12,14 @@
 //! # 規則 (研究者裁定 2026-10-08・`.steering/20261008-p1-sleep-trim/decisions.md` 判断 1)
 //!
 //! 1. 終わりの点 `h`: 次の `feat` 行との差が `min_gap_ms` **以上**ある `feat` 行 (長い穴の直前) と、
-//!    最後の `feat` 行 (ファイルの最後)。
+//!    時刻が最大の `feat` 行 (ファイルの最後。⚠️ 時刻で並べ替えた後の最後であり、ファイルの行順ではない)。
 //! 2. `L` = `h` 以下で最後の入力の時刻。入力は呼び出し側が渡す (`gse-replay` は `key` 行と
 //!    `pointer_bin` 行の時刻だけを渡す。`ime_*` / `focus_transition` はシステムが出しうるので入れない)。
 //! 3. `R` = `L` 以上で最初の `feat` 行 (最後の入力を含む秒の行。`h` 自身が候補なので必ずある)。
 //!    `cut = max(R, h − max_trim_ms)`。`L` が無く `h − max_trim_ms` も負なら下限なし。
-//!    ★ `R` まで残すので、最後の入力は観測区間の内側に入る (右端を「最後の入力まで」戻す)。
+//!    ★ `R` まで残すので、最後の入力は観測区間の内側に入る (右端を「最後の入力まで」戻す・判断 6)。
+//!    ⚠️ ただし最後の入力が `feat` 行の穴 (`hole_gap_ms` を超える間隔) の中にあるときは、`R` は穴の後ろの行になり、
+//!    入力そのものはどの観測区間にも入らない (穴の中の入力は前処理が無くても観測区間の外である)。
 //! 4. `cut < t ≤ h` の `feat` 行を落とす。`max_trim_ms == 0` なら `cut = h` で何も落ちない。
 //!
 //! 落とした行は「入力ファイルに無かった」のと同じに扱う (呼び出し側は以後この列だけを使う)。
@@ -40,8 +42,9 @@
 pub struct IdleTrimSummary {
     /// 落とした `feat` 行の数。
     pub dropped_feat_rows: u64,
-    /// 落とした行のつながり (昇順の `feat` 列で隣り合って落ちた行の、最初と最後の時刻)。
-    /// 短い穴をまたいで落ちた行は 1 本につながる (間に残した行が無いため)。
+    /// 落とした行のつながり (1 本 = 1 つの終わりの点で落とした行の、最初と最後の時刻)。
+    /// 短い穴 (`min_gap_ms` 未満) をまたいで落ちた行は 1 本につながり、長い穴をまたげば別の本になる
+    /// (本数 = 行を落とした終わりの点の数)。
     pub spans: Vec<(u64, u64)>,
 }
 
@@ -92,9 +95,12 @@ pub fn idle_trim(
     // `cut` は `h` について単調非減少 (`L` も `h − max_trim_ms` も単調・`None` を最小とみなす)。
     // → 各行は「その行以上で最初の終わりの点」の `cut` だけを見ればよい
     //   (それより後の点の `cut` は同じか大きく、それより前の点は行より前で終わる)。
+    // ★ `spans` は終わりの点ごとに分ける (1 本 = 1 つの終わりの点で落とした行)。→ 本数 = 削った回数。
+    //   短い穴をまたいでも同じ終わりの点なら 1 本、長い穴をまたげば別の本になる。
     let mut kept: Vec<u64> = Vec::with_capacity(feat.len());
     let mut summary = IdleTrimSummary::default();
-    let mut open_span: Option<(u64, u64)> = None;
+    // (終わりの点の添字, 最初の時刻, 最後の時刻)
+    let mut open_span: Option<(usize, u64, u64)> = None;
     let mut k = 0;
     for &t in &feat {
         while ends[k].0 < t {
@@ -103,19 +109,24 @@ pub fn idle_trim(
         let dropped = ends[k].1.is_none_or(|cut| t > cut);
         if dropped {
             summary.dropped_feat_rows += 1;
-            open_span = Some(match open_span {
-                Some((a, _)) => (a, t),
-                None => (t, t),
-            });
+            open_span = match open_span {
+                Some((end, a, _)) if end == k => Some((end, a, t)),
+                other => {
+                    if let Some((_, a, b)) = other {
+                        summary.spans.push((a, b));
+                    }
+                    Some((k, t, t))
+                }
+            };
         } else {
-            if let Some(span) = open_span.take() {
-                summary.spans.push(span);
+            if let Some((_, a, b)) = open_span.take() {
+                summary.spans.push((a, b));
             }
             kept.push(t);
         }
     }
-    if let Some(span) = open_span {
-        summary.spans.push(span);
+    if let Some((_, a, b)) = open_span {
+        summary.spans.push((a, b));
     }
     (kept, summary)
 }
@@ -272,6 +283,37 @@ mod tests {
         assert_eq!(kept, expected);
         assert_eq!(summary.spans, vec![(6_000, 50_000), (211_000, 260_000)]);
         assert_eq!(summary.dropped_feat_rows, 45 + 50);
+    }
+
+    /// 長い穴をまたいで隣り合って落ちた行は、終わりの点ごとに別の `spans` になる
+    /// (1 本 = 1 つの終わりの点で落とした行。`spans` の本数 = 削った回数・code-reviewer M-1)。
+    #[test]
+    fn drops_on_both_sides_of_a_long_gap_are_separate_spans() {
+        // 入力は 30 秒だけ。穴の前 (31..=100 秒) もファイルの最後 (200..=210 秒) も落ち、間に残す行は無い。
+        let mut feat = feat_secs(0, 100);
+        feat.extend(feat_secs(200, 210));
+        let (kept, summary) = idle_trim(&feat, &secs(&[30]), MIN_GAP, MAX_TRIM);
+        assert_eq!(kept, feat_secs(0, 30));
+        assert_eq!(summary.spans, vec![(31_000, 100_000), (200_000, 210_000)]);
+        assert_eq!(summary.dropped_feat_rows, 70 + 11);
+    }
+
+    /// 入力が 1 本も無く `max_trim_ms == 0` なら、何も落ちない (0 = 前処理なしの保証・code-reviewer L-1)。
+    #[test]
+    fn no_input_with_max_trim_zero_keeps_every_row() {
+        let feat = feat_secs(0, 100);
+        let (kept, summary) = idle_trim(&feat, &[], MIN_GAP, 0);
+        assert_eq!(kept, feat);
+        assert_eq!(summary, IdleTrimSummary::default());
+    }
+
+    /// 入力が 1 本も無く `h ≥ max_trim_ms` なら、`h − max_trim_ms` より後だけを落とす。
+    #[test]
+    fn no_input_trims_back_only_max_trim() {
+        let feat = feat_secs(0, 2400);
+        let (kept, summary) = idle_trim(&feat, &[], MIN_GAP, MAX_TRIM);
+        assert_eq!(kept, feat_secs(0, 600));
+        assert_eq!(summary.spans, vec![(601_000, 2_400_000)]);
     }
 
     #[test]
