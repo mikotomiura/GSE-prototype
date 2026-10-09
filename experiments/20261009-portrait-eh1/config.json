@@ -1,0 +1,58 @@
+{
+  "_comment": "EH1 of the portrait (synthetic traces only, no participants). Criteria are frozen in .steering/20261009-portrait-eh1-eh2/design.md section 3 (commit abfb2c45).",
+  "session": {
+    "duration_s": 10800,
+    "final_flow_s": 60,
+    "epoch_ms": 1700000000000,
+    "session_spacing_ms": 1000000000
+  },
+  "segments": {
+    "FLOW": {"dur_min_s": 180, "dur_max_s": 900, "burst_min": 6, "burst_max": 20, "flight_median_ms": 150, "flight_sigma": 0.25, "gap_median_ms": 800, "gap_sigma": 0.5, "gap_cap_ms": 1900, "p_backspace": 0.03},
+    "STRUGGLE": {"dur_min_s": 120, "dur_max_s": 600, "burst_min": 1, "burst_max": 5, "flight_median_ms": 320, "flight_sigma": 0.35, "gap_median_ms": 3500, "gap_sigma": 0.6, "gap_cap_ms": 20000, "p_backspace": 0.25, "p_pause_after_bs": 0.6, "pause_after_bs_min_ms": 2000, "pause_after_bs_extra_ms": 3000},
+    "THINK": {"dur_min_s": 10, "dur_max_s": 90},
+    "STALL_SILENT": {"dur_min_s": 30, "dur_max_s": 180},
+    "AWAY": {"bands_s": [[60, 300], [300, 1200], [1200, 5400]], "band_p": [0.4, 0.4, 0.2]}
+  },
+  "_comment_segments_v2": "Deviation after the freeze (design section 8, 2026-10-09): world v2 gives FLOW and STRUGGLE the same burst duration and pause distributions, and THINK and STALL_SILENT the same length, so that the stall regime shows only in corrections, key intervals and burst length, not in the presence pattern. Reason: in v1 the presence-only model reaches AUC 0.997, which leaves no room for the positive controls (E1-3 undecidable by construction).",
+  "segments_v2": {
+    "FLOW": {"dur_min_s": 180, "dur_max_s": 900, "burst_dur_min_s": 1.0, "burst_dur_max_s": 4.0, "flight_median_ms": 150, "flight_sigma": 0.25, "gap_median_ms": 1500, "gap_sigma": 0.6, "gap_cap_ms": 8000, "p_backspace": 0.03},
+    "STRUGGLE": {"dur_min_s": 120, "dur_max_s": 600, "burst_dur_min_s": 1.0, "burst_dur_max_s": 4.0, "flight_median_ms": 320, "flight_sigma": 0.35, "gap_median_ms": 1500, "gap_sigma": 0.6, "gap_cap_ms": 8000, "p_backspace": 0.25},
+    "THINK": {"dur_min_s": 10, "dur_max_s": 180},
+    "STALL_SILENT": {"dur_min_s": 10, "dur_max_s": 180},
+    "AWAY": {"bands_s": [[60, 300], [300, 1200], [1200, 5400]], "band_p": [0.4, 0.4, 0.2]}
+  },
+  "transitions": {
+    "START": {"FLOW": 0.6, "STRUGGLE": 0.4},
+    "FLOW": {"THINK": 0.5, "STRUGGLE": 0.3, "AWAY": 0.2},
+    "THINK": {"FLOW": 0.6, "STRUGGLE": 0.4},
+    "STRUGGLE": {"STALL_SILENT": 0.5, "FLOW": 0.3, "AWAY": 0.2},
+    "STALL_SILENT": {"STRUGGLE": 0.4, "FLOW": 0.3, "AWAY": 0.3},
+    "AWAY": {"FLOW": 0.6, "STRUGGLE": 0.4}
+  },
+  "keys": {"dwell_ms": 80, "dwell_jitter_ms": 20, "p_space": 0.2},
+  "sets": {
+    "P": {"n": 240},
+    "O": {"pairs": 40, "prefix_s": 3600, "shared_suffix_s": 1200},
+    "J": {"jitter_ms": 50},
+    "D_shuffled": {"pairs": 20, "duration_s": 5400},
+    "D_diffend": {"pairs": 20, "shared_prefix_s": 3600, "suffix_s": 1200},
+    "D_noobs": {"n": 5, "duration_s": 1800, "keys": 5},
+    "D_continuous": {"n": 5, "duration_s": 10800},
+    "D_sleep": {"n": 5, "duration_s": 12600, "sleep_start_s": 3600, "sleep_s": 7200}
+  },
+  "scheduler_default": {"interval_s": 300, "window_s": 5, "jitter": false, "cap1": false},
+  "scheduler_jitter_frac": 0.3,
+  "e12_grid": {"interval_s": [120, 300, 600], "window_s": [2, 5, 10], "cap1": [false, true], "jitter": [false, true]},
+  "pc1": {"stop_silence_s": 3, "min_gap_s": 60},
+  "pc2": {"shrink": 0.5, "dim": 0.3},
+  "canvas": {"w": 320, "h": 180, "ground": [0.92, 0.91, 0.88], "coverage_eps": 0.05},
+  "generator": {"neutral_active_s": 60, "active_per_mark": 10, "alpha": 0.35, "diffuse_sigma": 0.6, "diffuse_mix": 0.1,
+                "raw_ranges": {"f1": [50, 600], "f3": [0, 0.5], "f4": [0, 20], "f6": [0, 1]}},
+  "e13": {"window_s": 60, "folds": 5, "bootstrap": 2000, "null_perms": 20, "margin": 0.03, "pc_lower": 0.1,
+          "strata_edges": [0, 1, 16, 46, 61], "lags": 2},
+  "e16": {"absence_min_s": 60, "band_invite_s": [300, 1200], "band_other_s": [[60, 300], [1200, 5400]], "bootstrap": 2000, "ci": 0.90, "lo": 0.8, "hi": 1.25},
+  "e14": {"rel_drop": 0.01},
+  "order": {"ratio_min": 3.0, "proj_factor": 4, "proj_sigma": 1.0},
+  "mappings": ["raw", "ordinal", "keyed"],
+  "drifts": ["none", "diffuse"]
+}
