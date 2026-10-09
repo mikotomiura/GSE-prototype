@@ -15,7 +15,7 @@ from array import array
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kitload  # noqa: E402
-from distances import scenario_pools, used_trials  # noqa: E402
+from distances import provenance, scenario_pools, used_trials  # noqa: E402
 
 
 def load(cfg, kit, trials_path, prepare_path, dist_dir=None, dist_summary_path=None, variants=()):
@@ -47,6 +47,9 @@ def load(cfg, kit, trials_path, prepare_path, dist_dir=None, dist_summary_path=N
             raise kitload.CheckError("the distances were computed from another raw/trials.json")
         if summ["attacker_seed"] != cfg["attacker_seed"]:
             raise kitload.CheckError("the distances were computed with another attacker seed")
+        if summ.get("provenance") != provenance(cfg):
+            raise kitload.CheckError("the distances were computed with other variant definitions, another "
+                                     "distances.py or other kit files (run distances.py again)")
         for s, pool in pools.items():
             want = summ["pools"][s]
             got = kitload.sha256_bytes("\n".join(p["phrase_id"] for p in pool).encode("utf-8"))

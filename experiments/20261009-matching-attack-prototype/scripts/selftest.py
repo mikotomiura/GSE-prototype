@@ -298,6 +298,116 @@ def test_bootstrap():
     check("bootstrap: excess and ratio", abs(s["excess"] - 0.4) < 1e-12 and abs(s["ratio"] - 5.0) < 1e-12)
 
 
+# ---------------------------------------------------------------- 10. checks added after the first review
+def finishes(fn, seconds):
+    """(finished in time, exception raised or None): runs fn in a daemon thread so that a check of a hang fails
+    instead of hanging the self-test."""
+    import threading
+    box = {}
+
+    def run():
+        try:
+            fn()
+            box["exc"] = None
+        except BaseException as e:  # noqa: B036
+            box["exc"] = e
+    th = threading.Thread(target=run, daemon=True)
+    th.start()
+    th.join(seconds)
+    return (not th.is_alive()), box.get("exc")
+
+
+def _failing_init():
+    raise ValueError("planted failure")
+
+
+def _probe(x):
+    kitload.check_init()
+    return x
+
+
+def test_review_fixes(kit):
+    from multiprocessing import Pool
+    import copy
+    import summarize
+    for bad in ("..\\outside", "C:x", "a/b:c", "/abs", "a\\..\\..\\x", ""):
+        raises("repo_path refuses %r" % bad, lambda bad=bad: kitload.repo_path(bad), kitload.CheckError)
+    check("repo_path accepts a plain relative path",
+          kitload.repo_path("papers/ime-observation/kit/gen/romaji.py").endswith("romaji.py"))
+    # a failing worker initialisation must stop the run (an unguarded Pool initializer restarts workers forever)
+    pool = Pool(1, initializer=kitload.guarded_init, initargs=(_failing_init,))
+    try:
+        done, exc = finishes(lambda: list(pool.imap_unordered(_probe, [1, 2])), 60)
+        check("a failing worker initialisation reaches the parent as an error (within 60 s)",
+              done and isinstance(exc, kitload.CheckError), "finished=%s exc=%r" % (done, exc))
+    finally:
+        pool.terminate()
+    done, exc = finishes(lambda: matching.draw_decoys(random.Random(1), 5, [2, 2], [["a", "b"], ["a", "b"]],
+                                                      ["a", "a"]), 10)
+    check("decoys k=2: more decoys than tuples left stops instead of looping",
+          done and isinstance(exc, ValueError), "finished=%s exc=%r" % (done, exc))
+    d3, _ = matching.draw_decoys(random.Random(1), 4, [2, 2], [["a", "b"], ["a", "b"]], ["a", "a"])
+    check("decoys k=2: exactly the tuples left when they are just enough", sorted(d3) == [(0, 1), (1, 0), (1, 1)])
+    from array import array
+    dists = [array("i", [5, 1, 9]), array("i", [2, 8, 0])]
+    # truth (pool 0 for trial 0, pool 1 for trial 1) = 5 + 8; decoys (1, 0) = 1 + 2, (2, 2) = 9 + 0
+    check("s_scores sums the per-trial distances position by position",
+          matching.s_scores(dists, [0, 1], [[1, 2], [0, 2]], [0, 1]) == (13, [3, 9]))
+    check("s_scores follows the trial order", matching.s_scores(dists, [1, 0], [[1, 2], [0, 2]], [0, 1]) ==
+          (2 + 1, [8 + 5, 0 + 9]))
+    cfg = kitload.load_config()
+    ph = {"phrase_id": "x-1-1", "text": "彼は、行った", "reading": "かれはいった"}
+    check("classify: a reading-point in the text", crosscheck.classify({"scenario": "S1"}, ph, ["かれは", "いった"], True,
+                                                                      cfg) == ["comma"])
+    ph2 = {"phrase_id": "x-1-2", "text": "彼は行った", "reading": "かれはいった"}
+    check("classify: no flag", crosscheck.classify({"scenario": "S1"}, ph2, ["かれはいった"], True, cfg) == [])
+    check("classify: a procedure", crosscheck.classify({"scenario": "S4"}, ph2, ["かれはいった"], True, cfg) ==
+          ["procedure"])
+    check("classify: a reading that differs", crosscheck.classify({"scenario": "S3"}, ph2, ["かれはおこなった"], True,
+                                                                   cfg) == ["reading"])
+    check("classify: an invalid synthesis counts as a reading difference",
+          crosscheck.classify({"scenario": "S3"}, ph2, ["かれはいった"], False, cfg) == ["reading"])
+    check("classify: a synthetic kana string", crosscheck.classify({"scenario": "S12"}, None, None, False, cfg) ==
+          ["procedure", "synthetic"])
+    er = crosscheck.expected_record
+    rj = kit.romaji
+    check("procedure rule: S1 closes one segment of the key count", er("S1", "かきく", rj) == ([6], None))
+    check("procedure rule: S8 adds the digit", er("S8", "かきく", rj) == ([7], None))
+    check("procedure rule: S10 types the first half", er("S10", "かきくけ", rj) == ([4], None))
+    check("procedure rule: S6 leaves the key count minus the kana", er("S6", "かきく", rj) == ([], 3))
+    check("procedure rule: S4 leaves an open segment", er("S4", "かきく", rj) == ([], 6))
+    check("procedure rule: S12 is not modelled", er("S12", "かきく", rj) is None)
+    from distances import provenance
+    cfg2 = copy.deepcopy(cfg)
+    cfg2["variants"]["S_rle4"]["w"] = 5
+    check("distances provenance changes with a variant definition", provenance(cfg) != provenance(cfg2))
+    cfg3 = copy.deepcopy(cfg)
+    cfg3["variants"]["L_bin4"]["w"] = 5
+    check("distances provenance ignores the L variants", provenance(cfg) == provenance(cfg3))
+    # summary provenance: every result from the same trials, distances and config; no partial run
+    tsha, dsha, csha = "t" * 64, "d" * 64, kitload.sha256_file(kitload.CONFIG)
+    cells = [{"k": k, "N": N} for k in cfg["windows"]["k"] for N in cfg["N"]]
+    prep = {"trials_json_sha256": tsha}
+    good = dict(cc={"trials_json_sha256": tsha},
+                rep={"trials_json_sha256": tsha, "distances_json_sha256": dsha},
+                m={"trials_json_sha256": tsha, "distances_json_sha256": dsha, "config_sha256": csha, "cells": cells},
+                ex={"trials_json_sha256": tsha, "distances_json_sha256": dsha, "config_sha256": csha, "cells": cells})
+    try:
+        summarize.check_provenance(cfg, prep, good["cc"], good["rep"], good["m"], good["ex"], dsha)
+        check("summary provenance: consistent results pass", True)
+    except kitload.CheckError as e:
+        check("summary provenance: consistent results pass", False, str(e))
+    for what, mutate in (("partial", lambda g: g["m"].__setitem__("partial", True)),
+                         ("another trials file", lambda g: g["ex"].__setitem__("trials_json_sha256", "x" * 64)),
+                         ("other distances", lambda g: g["rep"].__setitem__("distances_json_sha256", "x" * 64)),
+                         ("another config", lambda g: g["m"].__setitem__("config_sha256", "x" * 64)),
+                         ("a missing cell", lambda g: g["m"].__setitem__("cells", cells[1:]))):
+        g = copy.deepcopy(good)
+        mutate(g)
+        raises("summary provenance refuses %s" % what, lambda g=g: summarize.check_provenance(
+            cfg, prep, g["cc"], g["rep"], g["m"], g["ex"], dsha), kitload.CheckError)
+
+
 # ---------------------------------------------------------------- 9. tables
 def test_tables(kit):
     cfg = kitload.load_config()
@@ -321,6 +431,7 @@ def main():
     test_swap()
     test_bootstrap()
     test_tables(kit)
+    test_review_fixes(kit)
     print("selftest: %d checks, %d failed" % (N_CHECKS[0], len(FAILS)))
     return 1 if FAILS else 0
 

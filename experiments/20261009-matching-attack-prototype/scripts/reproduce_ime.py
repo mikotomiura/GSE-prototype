@@ -8,7 +8,9 @@ The candidates are drawn as closed_set.evaluate draws them (_make_candidates wit
 scenario pool of phrases with distinct readings) and the tie is broken as closed_set.attack breaks it (one
 random key per candidate from the tie seed). The distances are looked up in raw/dist instead of being computed
 by attack. The number of correct trials and the mean rank of the true phrase must equal the published acc_raw
-and mean_rank for every K and both feature sets; otherwise the script exits with status 1.
+and mean_rank for every K and both feature sets; otherwise the script exits with status 1. The same candidates are
+also scored through matching.py's s_scores and credit, which must agree with the tie-broken choice wherever the
+credit is 0 or 1 (a check of matching.py's scoring path on real data).
 """
 import argparse
 import os
@@ -18,6 +20,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kitload  # noqa: E402
 import data as dataload  # noqa: E402
+import matching  # noqa: E402
 
 FEATURE_VARIANT = {"no_time": "S_no_time", "counts_only": "S_counts_only"}
 
@@ -38,6 +41,7 @@ def run(d, kit, rcfg, published):
             dist = d["dist"][FEATURE_VARIANT[f]]
             correct = 0
             rank_sum = 0
+            path_mismatch = 0
             for i, t in enumerate(d["trials"]):
                 s = t["scenario"]
                 pool = d["pools"][s]
@@ -54,18 +58,26 @@ def run(d, kit, rcfg, published):
                 order = sorted(range(len(cands)), key=lambda m: (dists[m], keys[m]))
                 chosen = cands[order[0]]
                 chosen_typed = t["typed"] if order[0] == ti else typed_of[chosen["phrase_id"]]
-                correct += 1 if chosen_typed == t["typed"] else 0
+                ok_trial = 1 if chosen_typed == t["typed"] else 0
+                correct += ok_trial
                 rank_sum += order.index(ti) + 1
+                # the scoring path of matching.py (s_scores and credit) on the same candidates must agree with
+                # the tie-broken choice: credit 1 -> correct, credit 0 -> not correct
+                decoys = [pos_of[c["phrase_id"]] for m, c in enumerate(cands) if m != ti]
+                cr = matching.credit(*matching.s_scores(dist, [i], [decoys], [d["true_j"][i]]))
+                if (cr == 1.0 and not ok_trial) or (cr == 0.0 and ok_trial):
+                    path_mismatch += 1
             n = len(d["trials"])
             pub = published["results"][str(K)][f]
             mine_acc = correct / n
             mine_rank = rank_sum / n
             match = (pub["n"] == n and abs(pub["acc_raw"] - mine_acc) < 1e-12
-                     and abs(pub["mean_rank"] - mine_rank) < 1e-9)
+                     and abs(pub["mean_rank"] - mine_rank) < 1e-9 and path_mismatch == 0)
             ok = ok and match
             out[str(K)][f] = {"n": n, "correct": correct, "acc_raw": mine_acc, "mean_rank": mine_rank,
                               "published_acc_raw": pub["acc_raw"], "published_mean_rank": pub["mean_rank"],
-                              "published_n": pub["n"], "match": match}
+                              "published_n": pub["n"], "match": match,
+                              "matching_path_disagreements": path_mismatch}
     return out, ok
 
 
@@ -92,7 +104,10 @@ def main(argv):
     if published["config_sha256"] != cfg["inputs"]["plan_config"]["sha256"]:
         raise kitload.CheckError("the published results used another plan configuration")
     res, ok = run(d, kit, rcfg, published)
+    prep, _ = kitload.read_json(a.prepare)
+    _, dsha = kitload.read_json(a.dist_summary)
     kitload.write_json(a.out, {"format": "matching-attack-reproduce-ime/1", "published_sha256": pub_sha,
+                               "trials_json_sha256": prep["trials_json_sha256"], "distances_json_sha256": dsha,
                                "all_match": ok, "results": res})
     for K, fs in sorted(res.items(), key=lambda kv: int(kv[0])):
         for f, r in sorted(fs.items()):

@@ -41,9 +41,14 @@ def crosscheck_tables(cc):
                    al["n_blocks"], al["n_blocks_unscored"], al["n_trials"], al["n_trials"] - al["n_trials_unscored"],
                    al["n_presses"], al["n_presses_unassigned"], cc["n_scored_trials_differing_from_plan"]))
     out.append("")
-    out.append("説明のつかない不一致（原因の印が無いのに並びが違う試行）: **%d**。前のタスクの手順の読みがコーパスの読みと違う試行: %d"
-               "（語句 %d 個の読みを合成）。" % (cc["n_unexplained"], cc["n_trials_reading_differs"],
-                                     cc["n_phrases_synthesised"]))
+    out.append("説明のつかない不一致（原因の印が無いのに並びが違う試行）: 比べた %d 試行中 **%d**（S12 の合成のかなは比べられない）。"
+               "前のタスクの手順の読みがコーパスの読みと違う試行: %d（語句 %d 個の読みを合成）。" % (
+                   cc["n_compared"], cc["n_unexplained"], cc["n_trials_reading_differs"],
+                   cc["n_phrases_synthesised"]))
+    out.append("")
+    out.append("記録が、手順の規則（コーパスの読みとシナリオから決まる区間）と違う試行: %d 試行中 **%d**（S12 を除く）。"
+               "記録のカテゴリ列は計画と全試行で一致しているので、これは区切りと数え方の解釈の確かめにあたる。" % (
+                   cc["n_rule_checked"], len(cc["rule_mismatch_trial_ids"])))
     out.append("")
     out.append("| シナリオ | 試行 | 比べた | 並びが一致 | 合計が一致 | 開いた区間 | 閉じた区間の数 | 差 Δ の平均 [最小, 最大] | 原因の印 |")
     out.append("|---|---|---|---|---|---|---|---|---|")
@@ -169,20 +174,55 @@ def by_scenario_table(m, names):
 SC_ORDER_K1 = [s for s in SC_ORDER if s != "S12"]
 
 
-def explore_table(ex):
+def explore_table(ex, variants):
     out = ["## 7. 事後の探索: 打鍵数を変える手順（%s）を含む窓の数で分けた正答率（%%・区間なし）" % "・".join(
         ex["count_changing_scenarios"]), "",
            "結果を見た後に足した分析で、事前の固定には無い（`scripts/explore_procedure_noise.py`）。窓と候補は本計算と同じ。", "",
-           "| k | N | 含まない窓（数） | L_none | S_no_time | 1 つ含む窓（数） | L_none | S_no_time | 2 つ以上（数） | L_none | S_no_time |",
-           "|---|---|---|---|---|---|---|---|---|---|---|"]
+           "| k | N | 含まない窓（数） | L_none | L_mergeall | S_no_time | 1 つ含む（数） | L_none | L_mergeall | S_no_time "
+           "| 2 つ以上（数） | L_none | L_mergeall | S_no_time |",
+           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for c in ex["cells"]:
         row = ["%d" % c["k"], "%d" % c["N"]]
         for key in ("0", "1", "2+"):
             v = c["by_n_count_changing"].get(key)
-            row += ["–", "–", "–"] if v is None else ["%d" % v["n_windows"], pct(v["L_none"]), pct(v["S_no_time"])]
+            row += ["–"] * 4 if v is None else ["%d" % v["n_windows"]] + [
+                pct(v["acc"][n]) for n in ("L_none", "L_mergeall", "S_no_time")]
         out.append("| " + " | ".join(row) + " |")
     out.append("")
+    ks = [c["k"] for c in ex["cells"] if c["N"] == 1000 and "0" in c["by_n_count_changing"]]
+    by = dict((c["k"], c) for c in ex["cells"] if c["N"] == 1000)
+    out.append("### 含まない窓だけの、加工ごとの正答率（N = 1000）")
+    out.append("")
+    out.append("| 加工 | " + " | ".join("k = %d（%d 窓）" % (k, by[k]["by_n_count_changing"]["0"]["n_windows"])
+                                     for k in ks) + " |")
+    out.append("|---|" + "---|" * len(ks))
+    for name in variants:
+        out.append("| %s | " % name + " | ".join(pct(by[k]["by_n_count_changing"]["0"]["acc"][name]) for k in ks)
+                   + " |")
+    out.append("")
     return out
+
+
+def check_provenance(cfg, prep, cc, rep, m, ex, dsha):
+    """Every result must come from the same raw/trials.json, the same distances and the current config, and the
+    matching must hold every cell (a partial run of --only is refused)."""
+    tsha = prep["trials_json_sha256"]
+    for name, obj in (("crosscheck", cc), ("reproduce_ime", rep), ("matching", m), ("explore", ex)):
+        if obj.get("trials_json_sha256") != tsha:
+            raise kitload.CheckError("%s.json was computed from another raw/trials.json" % name)
+    for name, obj in (("reproduce_ime", rep), ("matching", m), ("explore", ex)):
+        if obj.get("distances_json_sha256") != dsha:
+            raise kitload.CheckError("%s.json was computed from other distances" % name)
+    csha = kitload.sha256_file(kitload.CONFIG)
+    for name, obj in (("matching", m), ("explore", ex)):
+        if obj.get("config_sha256") != csha:
+            raise kitload.CheckError("%s.json was computed under another config.json" % name)
+    if m.get("partial"):
+        raise kitload.CheckError("matching.json is a partial run (--only)")
+    want = sorted((k, N) for k in cfg["windows"]["k"] for N in cfg["N"])
+    for name, obj in (("matching", m), ("explore", ex)):
+        if sorted((c["k"], c["N"]) for c in obj["cells"]) != want:
+            raise kitload.CheckError("%s.json does not hold exactly the cells of config.json" % name)
 
 
 def main(argv):
@@ -191,9 +231,13 @@ def main(argv):
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     cfg = kitload.load_config()
+    prep, _ = kitload.read_json(os.path.join(a.results, "prepare.json"))
     cc, _ = kitload.read_json(os.path.join(a.results, "crosscheck.json"))
     rep, _ = kitload.read_json(os.path.join(a.results, "reproduce_ime.json"))
     m, _ = kitload.read_json(os.path.join(a.results, "matching.json"))
+    ex, _ = kitload.read_json(os.path.join(a.results, "explore_procedure_noise.json"))
+    _, dsha = kitload.read_json(os.path.join(a.results, "distances.json"))
+    check_provenance(cfg, prep, cc, rep, m, ex, dsha)
     prior, _ = kitload.read_json(kitload.input_path(cfg, "prior_matching"))
     variants = list(cfg["variants"])
     lines = ["# 結果の表（自動生成・`scripts/summarize.py`）", "",
@@ -204,10 +248,7 @@ def main(argv):
     lines += variant_tables(m, variants)
     lines += diagnostics_table(m)
     lines += by_scenario_table(m, variants)
-    ex_path = os.path.join(a.results, "explore_procedure_noise.json")
-    if os.path.exists(ex_path):
-        ex, _ = kitload.read_json(ex_path)
-        lines += explore_table(ex)
+    lines += explore_table(ex, variants)
     data =("\n".join(lines).rstrip("\n") + "\n").encode("utf-8")
     with open(a.out, "wb") as f:
         f.write(data)
@@ -215,4 +256,8 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except kitload.CheckError as e:
+        print("!! %s" % e, file=sys.stderr)
+        sys.exit(1)

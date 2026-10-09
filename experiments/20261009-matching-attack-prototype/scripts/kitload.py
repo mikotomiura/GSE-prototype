@@ -34,9 +34,17 @@ def sha256_bytes(data):
 
 
 def repo_path(rel):
-    if os.path.isabs(rel) or ".." in rel.split("/"):
+    """A path of config.json, relative to the repository with '/' separators and staying inside it. A
+    backslash, a drive or a colon is refused (on Windows they would escape the '..' check), and the resolved
+    path must lie under the repository."""
+    if (not rel or os.path.isabs(rel) or "\\" in rel or ":" in rel or rel.startswith("/")
+            or ".." in rel.split("/")):
         raise CheckError("a path in config.json must be relative to the repository and stay inside it: %s" % rel)
-    return os.path.join(REPO, *rel.split("/"))
+    path = os.path.join(REPO, *rel.split("/"))
+    root = os.path.realpath(REPO)
+    if os.path.commonpath([os.path.realpath(path), root]) != root:
+        raise CheckError("a path in config.json resolves outside the repository: %s" % rel)
+    return path
 
 
 def load_config(path=CONFIG):
@@ -102,53 +110,101 @@ def check_run_manifest(cfg):
 
 
 class Kit(object):
-    """The imported modules: closed_set, simulate_obs, generate_plan, romaji, and (prior=True) romaji_table and
-    build_segments of the previous task."""
+    """The imported modules: closed_set, simulate_obs, generate_plan, romaji, stats, and (prior=True) romaji_table
+    and build_segments of the previous task."""
 
 
-def _load_module(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
+# Module name -> file, in dependency order: each module is executed from the bytes whose SHA-256 was checked and
+# registered in sys.modules before the modules that import it, so their `import` statements find the checked
+# module instead of searching the path (and no .pyc is read or written).
+KIT_MODULES = [
+    ("romaji", "papers/ime-observation/kit/gen/romaji.py"),
+    ("generate_plan", "papers/ime-observation/kit/gen/generate_plan.py"),
+    ("simulate_obs", "papers/ime-observation/kit/e2/simulate_obs.py"),
+    ("stats", "papers/ime-observation/kit/analysis/stats.py"),
+    ("closed_set", "papers/ime-observation/kit/e2/closed_set.py"),
+]
+PRIOR_MODULES = [
+    ("romaji_table", "experiments/20261009-length-sequence-uniqueness/scripts/romaji_table.py"),
+    ("prior_build_segments", "experiments/20261009-length-sequence-uniqueness/scripts/build_segments.py"),
+]
+
+
+def load_checked_module(name, rel, want):
+    """Read the file once, check the SHA-256 of those bytes, and execute the same bytes as module `name`."""
+    path = repo_path(rel)
+    if not os.path.isfile(path):
+        raise CheckError("missing file: %s" % rel)
+    with open(path, "rb") as f:
+        data = f.read()
+    got = sha256_bytes(data)
+    if got != want:
+        raise CheckError("SHA-256 of %s is %s, not the recorded %s" % (rel, got, want))
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(name, loader=None, origin=path))
+    mod.__file__ = path
     sys.modules[name] = mod
-    spec.loader.exec_module(mod)
+    try:
+        exec(compile(data, path, "exec"), mod.__dict__)
+    except BaseException:
+        del sys.modules[name]
+        raise
     return mod
 
 
 def import_kit(cfg, prior=False):
-    for rel, want in cfg["code"].items():
-        if rel.startswith("experiments/") and not prior:
-            continue
-        check_file(rel, want)
+    sys.dont_write_bytecode = True
+    wanted = list(KIT_MODULES) + (list(PRIOR_MODULES) if prior else [])
+    for _, rel in wanted:
+        if rel not in cfg["code"]:
+            raise CheckError("config.json records no SHA-256 for %s" % rel)
     kit = Kit()
     saved = list(sys.path)
     try:
-        e2 = repo_path("papers/ime-observation/kit/e2")
-        for sub in ("e2", "gen", "analysis"):
-            p = repo_path("papers/ime-observation/kit/" + sub)
-            if p not in sys.path:
-                sys.path.insert(0, p)
-        kit.closed_set = _load_module("closed_set", os.path.join(e2, "closed_set.py"))
-        kit.simulate_obs = sys.modules["simulate_obs"]
-        kit.generate_plan = sys.modules["generate_plan"]
-        kit.romaji = sys.modules["romaji"]
-        if prior:
-            pdir = repo_path("experiments/20261009-length-sequence-uniqueness/scripts")
-            sys.path.insert(0, pdir)
-            kit.romaji_table = _load_module("romaji_table", os.path.join(pdir, "romaji_table.py"))
-            kit.build_segments = _load_module("prior_build_segments", os.path.join(pdir, "build_segments.py"))
+        for name, rel in wanted:
+            if name in sys.modules and getattr(sys.modules[name], "__file__", None) is not None and \
+                    os.path.normcase(sys.modules[name].__file__) == os.path.normcase(repo_path(rel)) and \
+                    getattr(sys.modules[name], "_kitload_sha256", None) == cfg["code"][rel]:
+                mod = sys.modules[name]
+            else:
+                mod = load_checked_module(name, rel, cfg["code"][rel])
+                mod._kitload_sha256 = cfg["code"][rel]
+            setattr(kit, {"prior_build_segments": "build_segments"}.get(name, name), mod)
     finally:
-        # The previous task's directory holds scripts with the same names as ours (matching, selftest,
-        # summarize); it must not stay on the path.
+        # The kit and the previous task's modules insert their directories into sys.path when they run; the
+        # previous task's directory holds scripts with the same names as ours (matching, selftest, summarize), so
+        # the path is restored.
         sys.path[:] = saved
-    for mod_name, mod in (("closed_set", kit.closed_set), ("simulate_obs", kit.simulate_obs),
-                          ("generate_plan", kit.generate_plan), ("romaji", kit.romaji)):
-        rel = {"closed_set": "papers/ime-observation/kit/e2/closed_set.py",
-               "simulate_obs": "papers/ime-observation/kit/e2/simulate_obs.py",
-               "generate_plan": "papers/ime-observation/kit/gen/generate_plan.py",
-               "romaji": "papers/ime-observation/kit/gen/romaji.py"}[mod_name]
-        if os.path.normcase(os.path.abspath(mod.__file__)) != os.path.normcase(repo_path(rel)):
-            raise CheckError("module %s was imported from %s, not from the checked file" % (mod_name, mod.__file__))
+    # every module the kit imports by name must be the checked one
+    for name, rel in KIT_MODULES + (PRIOR_MODULES if prior else []):
+        mod = sys.modules.get(name)
+        if mod is None or getattr(mod, "_kitload_sha256", None) != cfg["code"][rel]:
+            raise CheckError("module %s is not the checked file" % name)
+    if kit.closed_set.generate_plan is not kit.generate_plan or kit.closed_set.stats is not kit.stats or \
+            kit.closed_set.simulate_obs is not kit.simulate_obs or kit.simulate_obs.generate_plan is not \
+            kit.generate_plan or kit.generate_plan.romaji is not kit.romaji:
+        raise CheckError("a kit module imported another copy of a checked module")
+    if prior and kit.build_segments.count_keys is not kit.romaji_table.count_keys:
+        raise CheckError("build_segments imported another copy of romaji_table")
     return kit
+
+
+# ---------------------------------------------------------------- worker initialisation of a multiprocessing Pool
+# An exception raised inside a Pool initializer kills the worker, and the Pool starts a new one forever: the run
+# hangs instead of stopping (seen with Python 3.11). The initializer is therefore wrapped: an error is kept and
+# raised by the first task, which the parent receives through imap.
+_INIT_ERROR = []
+
+
+def guarded_init(fn, *args):
+    try:
+        fn(*args)
+    except BaseException as e:  # noqa: B036 - kept and re-raised by the task
+        _INIT_ERROR.append("%s: %s" % (type(e).__name__, e))
+
+
+def check_init():
+    if _INIT_ERROR:
+        raise CheckError("the worker could not be initialised (%s)" % _INIT_ERROR[0])
 
 
 def load_inputs(cfg, kit):

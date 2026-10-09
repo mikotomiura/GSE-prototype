@@ -62,6 +62,14 @@ def draw_decoys(rng, N, pool_sizes, typed_pos, truth_typed):
     """N - 1 decoy tuples of pool indices (see the module docstring). Returns (tuples, number redrawn)."""
     k = len(pool_sizes)
     below = kitload.below
+    # tuples a decoy may take: all tuples minus those typing the truth at every position
+    same = 1
+    total = 1
+    for i in range(k):
+        same *= sum(1 for t in typed_pos[i] if t == truth_typed[i])
+        total *= pool_sizes[i]
+    if total - same < N - 1:
+        raise ValueError("too few tuples with a typed reading different from the truth (N = %d)" % N)
     if k == 1:
         tt = truth_typed[0]
         tp = typed_pos[0]
@@ -226,6 +234,7 @@ def _init(trials_path, prepare_path, dist_dir, dist_summary):
 
 
 def run_cell(task):
+    kitload.check_init()
     k, N = task
     cfg, d, seed = _D["cfg"], _D["d"], _D["seed"]
     trials, pools, typed, R, true_j = d["trials"], d["pools"], d["typed"], d["R"], d["true_j"]
@@ -305,7 +314,7 @@ def main(argv):
         want = set(tuple(int(v) for v in c.split(":")) for c in a.only.split(","))
         cells = [c for c in cells if c in want]
     order = sorted(cells, key=lambda c: -(c[0] * c[1]))   # the largest cells first
-    with Pool(a.processes, initializer=_init, initargs=args) as pool:
+    with Pool(a.processes, initializer=kitload.guarded_init, initargs=(_init,) + args) as pool:
         done = {}
         for r in pool.imap_unordered(run_cell, order):
             done[(r["k"], r["N"])] = r

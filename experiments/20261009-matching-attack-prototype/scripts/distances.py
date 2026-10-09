@@ -74,6 +74,15 @@ def scenario_pools(kit, recipes, os_name, corpus, scenarios):
     return base, dict((s, cs._scenario_pool(recipes, os_name, s, base)) for s in sorted(scenarios))
 
 
+def provenance(cfg):
+    """What the distances depend on besides the trials and the pools: the definitions of the S variants, this
+    file, and the kit files (data.load refuses distances computed under other values)."""
+    return {"variants": dict((n, v) for n, v in cfg["variants"].items() if v["attacker"] == "S"),
+            "distances_py_sha256": kitload.sha256_file(os.path.abspath(__file__)),
+            "kit_code": dict((rel, cfg["code"][rel]) for _, rel in kitload.KIT_MODULES),
+            "os": cfg["os"]}
+
+
 def used_trials(trials, cfg):
     return [t for t in trials if t["scenario"] not in cfg["skip_scenarios"]]
 
@@ -92,6 +101,7 @@ def _worker_init(trials_path, trials_sha):
 
 
 def compute_variant(name):
+    kitload.check_init()
     cfg, kit, trials, pools = _W["cfg"], _W["kit"], _W["trials"], _W["pools"]
     variant = cfg["variants"][name]
     cs = kit.closed_set
@@ -142,7 +152,8 @@ def main(argv):
     os.makedirs(a.out_dir, exist_ok=True)
     trials_path = os.path.abspath(a.trials)
     out = {}
-    with Pool(a.processes, initializer=_worker_init, initargs=(trials_path, prep["trials_json_sha256"])) as pool:
+    with Pool(a.processes, initializer=kitload.guarded_init,
+              initargs=(_worker_init, trials_path, prep["trials_json_sha256"])) as pool:
         for name, values, n_pairs in pool.imap_unordered(compute_variant, names):
             if sys.byteorder != "little":
                 values.byteswap()
@@ -160,7 +171,7 @@ def main(argv):
                "n_trials": len(_W["trials"]), "pools": dict(
                    (s, {"n": len(pools[s]), "phrase_ids_sha256": kitload.sha256_bytes(
                        "\n".join(p["phrase_id"] for p in pools[s]).encode("utf-8"))}) for s in sorted(pools)),
-               "attacker_seed": cfg["attacker_seed"]}
+               "attacker_seed": cfg["attacker_seed"], "provenance": provenance(cfg)}
     kitload.write_json(a.summary, summary)
     return 0
 

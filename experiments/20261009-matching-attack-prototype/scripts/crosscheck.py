@@ -12,7 +12,9 @@ Each trial gets every cause flag that applies, from the plan and the text alone 
 procedure (the scenario departs from "type the reading, commit with Enter"), comma (the text holds a
 reading-point the executor did not type), reading (the previous procedure's reading differs from the corpus
 reading the executor typed, or is invalid), synthetic (an S12 kana string that is not in the corpus).
-A trial with no flag whose sequences differ is unexplained and listed by its trial id.
+A trial with no flag whose sequences differ is unexplained and listed by its trial id. Separately, the record of
+every trial outside S12 is compared with what its scenario's procedure leaves from the corpus reading
+(expected_record); a trial that differs is listed (rule_mismatch_trial_ids).
 """
 import argparse
 import os
@@ -65,6 +67,25 @@ def classify(trial, phrase, syn_units, syn_valid, cfg):
     return flags
 
 
+# The record a scenario's procedure leaves, from the phrase's reading alone (recipes.json for Windows): R is the
+# standard key count of the reading, n its length, Rh that of the first half (generate_plan.build_trial types
+# reading[:max(1, n // 2)] in S10). (closed segments, open segment or None).
+def expected_record(scenario, reading, romaji):
+    R = len(romaji.to_keys(reading))
+    n = len(reading)
+    if scenario in ("S1", "S2", "S3", "S7", "S13", "S15"):
+        return [R], None
+    if scenario == "S8":
+        return [R + 1], None
+    if scenario == "S10":
+        return [len(romaji.to_keys(reading[:max(1, n // 2)]))], None
+    if scenario in ("S4", "S5", "S14"):
+        return [], R
+    if scenario == "S6":
+        return [], R - n
+    return None
+
+
 def summarise_deltas(deltas):
     hist = {}
     for d in deltas:
@@ -85,6 +106,8 @@ def run(trials, corpus, cfg, kit, tok):
     per_sc = {}
     per_cause = {}
     unexplained = []
+    rule_mismatch = []
+    n_rule_checked = 0
     table_mismatch = 0
     n_reading_differs = 0
     for t in trials:
@@ -101,6 +124,11 @@ def run(trials, corpus, cfg, kit, tok):
         else:
             syn, syn_units, syn_valid = None, None, False
         flags = classify(t, phrase, syn_units, syn_valid, cfg)
+        exp = expected_record(t["scenario"], phrase["reading"], romaji) if phrase is not None else None
+        if exp is not None:
+            n_rule_checked += 1
+            if (closed, open_) != exp:
+                rule_mismatch.append(t["trial_id"])
         if phrase is not None and "reading" in flags:
             n_reading_differs += 1
         if syn is not None and syn_valid:
@@ -139,6 +167,8 @@ def run(trials, corpus, cfg, kit, tok):
         d["delta"] = summarise_deltas(d.pop("deltas"))
     return {"by_scenario": per_sc, "by_cause": per_cause, "unexplained_trial_ids": unexplained,
             "n_unexplained": len(unexplained), "n_trials": len(trials),
+            "n_compared": sum(v["n_compared"] for v in per_sc.values()),
+            "n_rule_checked": n_rule_checked, "rule_mismatch_trial_ids": rule_mismatch,
             "n_phrases_synthesised": len(syn_cache),
             "n_trials_reading_differs": n_reading_differs,
             "n_phrases_table_mismatch": table_mismatch}
@@ -160,8 +190,11 @@ def main(argv):
     res["format"] = "matching-attack-crosscheck/1"
     res["alignment"] = prep["alignment"]
     res["n_scored_trials_differing_from_plan"] = prep["n_scored_trials_differing_from_plan"]
+    res["trials_json_sha256"] = prep["trials_json_sha256"]
     kitload.write_json(a.out, res)
-    print("unexplained mismatches: %d of %d trials" % (res["n_unexplained"], res["n_trials"]))
+    print("unexplained mismatches: %d of %d compared trials (%d trials in all); records differing from their "
+          "procedure: %d of %d" % (res["n_unexplained"], res["n_compared"], res["n_trials"],
+                                   len(res["rule_mismatch_trial_ids"]), res["n_rule_checked"]))
     return 0
 
 
