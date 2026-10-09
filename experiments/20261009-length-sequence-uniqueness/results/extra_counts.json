@@ -1,0 +1,11 @@
+{
+ "format": "extra-counts/1",
+ "corpus_works": 1500,
+ "ruby_markers": 399165,
+ "adjacent_implicit_ruby": 4433,
+ "adjacent_implicit_ruby_fraction": 0.01110568311349943,
+ "works_with_adjacent_implicit_ruby": 388,
+ "b2_valid_segments": 7539433,
+ "b2_writer_reading_differs": 137501,
+ "b2_one_side_empty": 1761
+}
