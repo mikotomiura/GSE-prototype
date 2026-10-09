@@ -16,8 +16,14 @@
 
 ## 作品
 
-- 選定: `scripts/select_works.py`（`results/selection.json` に、条件を満たす作品の全順序と参照の 12 作品）。
+- 選定: `scripts/select_works.py`（`results/selection.json` に、条件を満たす 9,068 作品を種つきで並べた順の先頭 1,600 件と、参照の 12 作品）。
 - 取得した zip: `results/corpus_manifest.json`（作品 ID・URL・SHA-256・バイト数）。zip は `raw/zips/`（git に入らない）。
 - 使った作品: `results/corpus_stats.json` の `corpus_work_ids`（1,500）と `reference_work_ids`（12）。落とした作品と理由は `dropped`。
-- 著作権の切れた作品で、複製・再配布・改変は自由（青空文庫「収録ファイルの取り扱い規準」・memory「青空文庫の取得元」に一次の確認の記録）。底本・入力者・校正者の情報は各 zip に残っている。
+- 著作権の切れた作品で、複製・再配布・改変は自由（青空文庫「収録ファイルの取り扱い規準」。IME 論文の `papers/ime-observation/experiment/datasheet.md` に同じ規準の要約がある）。本実験は本文を再配布しない（記録するのは作品 ID・URL・zip の SHA-256 と、無効にした語の例として `corpus_stats.json` に入る 4 字までの断片だけ）。底本・入力者・校正者の情報は各 zip に残っている。
 - 参照の 12 作品の zip が IME 論文の記録（`papers/ime-observation/experiment/data.md`）と同じかは、`corpus_manifest.json` の `matches_ime_paper` に書く。
+
+## 2026-10-09 の取得と前処理の結果
+
+- 選定の先頭 1,600 件と参照の 12 件、計 1,612 件を取得した（失敗 0・1 秒に 1 件）。参照の 12 件は 12 件とも IME 論文の記録と同じ zip（SHA-256 が一致）。
+- 前処理で落とした作品は 0 件（読めない・有効な区間が無い・内容の重複のどれも無し）。先頭の 1,500 件がそのままコーパスになった（`corpus_stats.json` の `corpus_work_ids`）。
+- 2 回目の実行で、1,612 件すべての zip が manifest の SHA-256 と一致した。
