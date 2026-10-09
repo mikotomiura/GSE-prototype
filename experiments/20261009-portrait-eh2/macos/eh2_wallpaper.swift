@@ -330,6 +330,33 @@ func setPicture(_ u: URL, _ s: NSScreen, _ o: [NSWorkspace.DesktopImageOptionKey
     try ws.setDesktopImageURL(u, for: s, options: o)
 }
 
+// On macOS 27 the getter catches up with a set only after a delay (about 0.2 s measured on 2026-10-09),
+// so a readback right after the set fails although the set worked. Poll instead; nil = not within timeout.
+func readbackLagMs(_ s: NSScreen, _ u: URL, timeout: Double = 5) -> Double? {
+    let t0 = nowMs()
+    while nowMs() - t0 < timeout * 1000 {
+        if samePath(ws.desktopImageURL(for: s), u) { return nowMs() - t0 }
+        Thread.sleep(forTimeInterval: 0.02)
+    }
+    return nil
+}
+
+// The getter was also seen to fall back to an earlier picture for about a second, several seconds after
+// the last set (WallpaperAgent appears to replay earlier requests). After a restore, the placeholder
+// images are deleted only when the getter has shown the original for `stable` seconds without a break.
+func settled(_ s: NSScreen, _ u: URL, stable: Double = 5, timeout: Double = 30) -> Bool {
+    let t0 = nowMs()
+    var since: Double? = nil
+    while nowMs() - t0 < timeout * 1000 {
+        if samePath(ws.desktopImageURL(for: s), u) {
+            if since == nil { since = nowMs() }
+            if nowMs() - since! >= stable * 1000 { return true }
+        } else { since = nil }
+        Thread.sleep(forTimeInterval: 0.1)
+    }
+    return false
+}
+
 // sendsAway: this prompt sends the operator to another Space (or may find them there). The flag is
 // raised in the same critical section that checks for an interruption, so an interruption that came
 // before the prompt was shown still restores normally.
@@ -364,17 +391,20 @@ func restore() {
         return
     }
     var restored: [Any] = []
+    var settledAll: [Bool] = []
     for o in orig {
         guard let u = o.url else { restored.append("original_missing"); continue }
         do {
             try ws.setDesktopImageURL(u, for: o.screen, options: o.options)
-            restored.append(samePath(ws.desktopImageURL(for: o.screen), u) && fileHash(u) == o.sha256)
+            restored.append(readbackLagMs(o.screen, u) != nil && fileHash(u) == o.sha256)
         } catch { restored.append(false) }
     }
+    for o in orig { if let u = o.url { settledAll.append(settled(o.screen, u)) } }
     res["restored"] = restored
+    res["restore_settled"] = settledAll
     res["restore_target_unconfirmed"] = restoreTargetUnconfirmed
-    let allOk = restored.allSatisfy { ($0 as? Bool) == true }
-    print("Restored: \(restored)")
+    let allOk = restored.allSatisfy { ($0 as? Bool) == true } && settledAll.allSatisfy { $0 }
+    print("Restored: \(restored) settled: \(settledAll)")
     if allOk && !restoreTargetUnconfirmed {
         try? FileManager.default.removeItem(at: restoreFile)
         try? FileManager.default.removeItem(at: work)
@@ -427,7 +457,9 @@ do {
 
     // 1. Per-screen set and read back
     var lat: [Double] = []
+    var lag: [Double] = []
     var okN = 0
+    var immediateN = 0
     var tot = 0
     for k in 0..<nUpdates {
         for (i, o) in orig.enumerated() {
@@ -436,17 +468,22 @@ do {
             try setPicture(u, o.screen, opts)
             lat.append(nowMs() - t0)
             tot += 1
-            if samePath(ws.desktopImageURL(for: o.screen), u) { okN += 1 }
+            if samePath(ws.desktopImageURL(for: o.screen), u) { immediateN += 1 }
+            if let l = readbackLagMs(o.screen, u) { okN += 1; lag.append(l) }
         }
         try nap(0.3)
     }
-    res["per_screen"] = ["calls": tot, "readback_ok": okN, "latency_ms_median": orNull(median(lat)),
-                         "latency_ms_p95": orNull(pct(lat, 95)), "latency_ms_max": orNull(lat.max())] as [String: Any]
+    // readback_ok: the getter showed the new picture within 5 s; readback_immediate_ok: right after the set
+    res["per_screen"] = ["calls": tot, "readback_ok": okN, "readback_immediate_ok": immediateN,
+                         "latency_ms_median": orNull(median(lat)),
+                         "latency_ms_p95": orNull(pct(lat, 95)), "latency_ms_max": orNull(lat.max()),
+                         "readback_lag_ms_median": orNull(median(lag)), "readback_lag_ms_p95": orNull(pct(lag, 95)),
+                         "readback_lag_ms_max": orNull(lag.max())] as [String: Any]
 
     // 2. Distinct pictures per screen
     if orig.count >= 2 {
         for (i, o) in orig.enumerated() { try setPicture(imgs[i][i % 2], o.screen, opts) }
-        res["distinct_per_screen_readback_ok"] = orig.enumerated().allSatisfy { i, o in samePath(ws.desktopImageURL(for: o.screen), imgs[i][i % 2]) }
+        res["distinct_per_screen_readback_ok"] = orig.enumerated().allSatisfy { i, o in readbackLagMs(o.screen, imgs[i][i % 2]) != nil }
     } else {
         res["distinct_per_screen_readback_ok"] = "single_screen"
     }
@@ -477,7 +514,7 @@ do {
         // (the readback alone cannot tell Spaces apart if the getter ignores them).
         func confirmFirstSpace(expect: URL) throws -> Bool {
             while true {
-                if samePath(ws.desktopImageURL(for: o0.screen), expect) {
+                if readbackLagMs(o0.screen, expect, timeout: 2) != nil {
                     let yes = try guarded { askYesNo("Are you on the first Space (the one you started on) now?") }
                     if yes == "yes" { return true }
                 }
@@ -500,7 +537,7 @@ do {
         stateLock.lock(); onOtherSpace = false; stateLock.unlock()
         try setPicture(imgs[0][0], o0.screen, opts)
         try guarded(sendsAway: true) { waitEnter("The striped image is now set on this Space. Switch to the second Space (Ctrl+Right) and press Enter.") }
-        let readbackOther = samePath(ws.desktopImageURL(for: o0.screen), imgs[0][0])
+        let readbackOther = readbackLagMs(o0.screen, imgs[0][0], timeout: 2) != nil
         let visibleOther = try guarded { askYesNo("Do you see the striped image on the second Space?") }
         res["manual_spaces"] = ["readback_matches_on_other_space": readbackOther,
                                 "striped_image_visible_on_other_space": visibleOther] as [String: Any]

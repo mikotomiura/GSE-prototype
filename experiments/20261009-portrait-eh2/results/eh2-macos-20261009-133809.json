@@ -1,0 +1,74 @@
+{
+  "cpu" : {
+    "busy" : {
+      "self" : {
+        "cpu_s" : 0.017999999999999999,
+        "pids_changed" : false,
+        "rss_mb_end" : 193.171875,
+        "rss_mb_start" : 193.171875
+      },
+      "WallpaperAgent" : {
+        "cpu_s" : 0.89000000000000001,
+        "pids_changed" : false,
+        "rss_mb_end" : 32.46875,
+        "rss_mb_start" : 31.96875
+      }
+    },
+    "busy_elapsed_s" : 12.226014207959174,
+    "busy_every_s" : 3,
+    "busy_s" : 10,
+    "busy_updates" : 4,
+    "idle" : {
+      "self" : {
+        "cpu_s" : 0.010999999999999999,
+        "pids_changed" : false,
+        "rss_mb_end" : 193.171875,
+        "rss_mb_start" : 201.234375
+      },
+      "WallpaperAgent" : {
+        "cpu_s" : 0.01,
+        "pids_changed" : false,
+        "rss_mb_end" : 31.96875,
+        "rss_mb_start" : 32.34375
+      }
+    },
+    "idle_elapsed_s" : 10.208195459008216,
+    "idle_s" : 10
+  },
+  "distinct_per_screen_readback_ok" : "single_screen",
+  "finished" : "2026-10-09T04:38:39Z",
+  "mode" : "quick",
+  "original_readable_file" : [
+    true
+  ],
+  "os" : "macos",
+  "os_version" : "Version 27.0.1 (Build 26A434)",
+  "per_screen" : {
+    "calls" : 3,
+    "latency_ms_max" : 5.2128748893737793,
+    "latency_ms_median" : 3.2862919569015503,
+    "latency_ms_p95" : 5.2128748893737793,
+    "readback_immediate_ok" : 0,
+    "readback_lag_ms_max" : 220.67091596126556,
+    "readback_lag_ms_median" : 205.9909999370575,
+    "readback_lag_ms_p95" : 220.67091596126556,
+    "readback_ok" : 3
+  },
+  "restore_settled" : [
+    true
+  ],
+  "restore_target_unconfirmed" : false,
+  "restored" : [
+    true
+  ],
+  "screens" : [
+    {
+      "height_px" : 1912,
+      "index" : 0,
+      "scale" : 2,
+      "width_px" : 2940
+    }
+  ],
+  "started" : "2026-10-09T04:38:09Z",
+  "wallpaper_process" : "WallpaperAgent"
+}
