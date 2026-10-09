@@ -17,6 +17,8 @@
 
 ### 2-1. O1 事前登録の草案に参照を足す（PR #329 の merge の後）
 
+> 済み（2026-10-09）: #329 と #332 が main に入った後、草案の §4 に 4-7 を足し、改訂履歴に 1 行足した。ブランチ `docs/o1-draft-idle-trim-ref` に push しただけで、PR は出していない（`.steering` だけの変更は push だけ・研究者の指示 2026-10-05）。main へは次の PR に含めて入れる。
+
 - 草案 `.steering/20261007-o1-preregistration-draft/preregistration-draft.md` は PR #329 にだけある（main には未着）。#329 は 2026-10-08 に Windows の CI が 2 回止まった（1 回目はループの検査 `11g` の時間の検査、2 回目は 30 分の時間切れ）。変更は docs だけで、止まった理由は G-GEAR の負荷。研究者の指示は「赤は必要になったら再開」。
 - #329 が main に入ったら、草案の §4（前処理の先頭に置く必須検査）に 1 行足す:
   - 4-7: P1 の stall onset と観測区間は、事前宣言 v1.2 §6 の無入力の末尾の前処理の後の値を使う。前処理なし（`--set idle_trim_max_ms=0`）を並べて報告する（2 本は真の値を挟む上下界ではない）。`provenance.idle_trim` の `dropped_feat_rows` と `spans` の本数を報告する。
