@@ -28,11 +28,12 @@
 - 書誌（巻号頁・DOI）は、[V244] [V246] [V247] [V250] [V251] を Crossref で、[V253] [V254] [V251] を PDF の柱で、[V252] を J-STAGE の書誌で確認した。[V243]（JEDM）は Crossref で DOI が見つからず、[V248]（USENIX Security 2001）は DOI を確かめていないので、どちらも URL を key にした。
 - **claim 抽出**: 32 件 → **検証 32 件**
 - **confirmed 23**（3-0 が 16 / 2-1 が 7）／ **PLAUSIBLE BUT UNPROVEN 1** ／ **判定不能 5**（該当ゼロ）／ **否決 3**
-- ⚠️ **本ラウンドで訂正した前提（3 件）**:
+- ⚠️ **本ラウンドで訂正した前提（4 件）**:
   1. [V240] の旧注記「時刻の丸めは攻撃側の前処理で効き目を失いうる」は**誤読**だった。原文 §2.6 は「**攻撃側が**時刻を離散化しても EER の改善はわずか／無視できる」であり、§3.2 は防御側の離散化（delay）と乱数のフレーム遅延（rdelay）が**どちらも保護を与える**と書く（カード 6）。→ ADR-039 D6 と issue #333 の同じ記述が誤り。
-  2. ADR-039 事実 1 の注「『編集者の裁量』という言葉は、私が確かめた逐語には無い」は**誤り**だった。BRM の投稿規定に逐語 *"The decision on whether to proceed to peer review in such cases is at the Editor's discretion."* がある（カード 8）。
-  3. ADR-039 D5 の「（プライバシーを理由とする）例外の逐語は自分で確かめていない」を**確かめた**（カード 8）。
-  - ⚠️ ADR の本文は書き換えない規約なので、3 件は ADR-039 に反映していない（研究者の判断・`.steering/20261009-release-deidentification-survey/decisions.md`）。
+  2. ADR-039 事実 1 の注「『編集者の裁量』という言葉は、私が確かめた逐語には無い」は**誤り**だった。BRM の投稿規定に逐語 *"The decision on whether to proceed to peer review in such cases is at the Editor's discretion."* がある（カード 8）。⚠️ この裁量は**開始前に承認の無い研究を査読に回すか**についてのもので、データの公開の条件についてではない。
+  3. ADR-039 D5 の「例外の逐語は自分で確かめていない [V237]」について、ADR が「例外」と呼んだ箇所に当たる文（プライバシーで公開できない場合は「アクセスの条件」を書く）を確かめた（カード 8）。⚠️ ただし原文は記載の指示であり、「例外」という語も、それで type 4 を満たすという文も無い。
+  4. ADR-039 D6 の「ランダムな遅延は識別率を下げるが限定的（25 ms で約 20%）[V239]」は [V239] の抄録と結論の逐語どおりだが、本文の Table 4 から再現できない（相対 8〜25%・カード 6）。→ 引くときは表の値を併記する。
+  - ⚠️ ADR の本文は書き換えない規約なので、4 件は ADR-039 に反映していない（研究者の判断・`.steering/20261009-release-deidentification-survey/decisions.md`）。
 
 ### claim 台帳
 
@@ -49,7 +50,7 @@
 | 9 | 自由記述の打鍵で大規模に個人を識別できる（背景 1,000 人で Rank-1 67.4%・国で事前に絞ると 84.0%） | [V250] | **2-1** | 確定（留保: キーコードを入力に含む・1 セッションは短い転写） |
 | 10 | キー識別子を持たない（カテゴリ化した）記録で、日をまたいで個人を識別できる | — | — | **判定不能（0 件）** |
 | 11 | 打鍵の保持時間だけから、早期の Parkinson 病を識別できる（AUC 0.81・n=42/43） | [V246] | **3-0** | 確定 |
-| 12 | 打鍵による神経・精神疾患の検出は、自然な環境のデータでも AUC 0.82（臨床では 0.89）。エビデンスの質は中程度 | [V251] | **3-0** | 確定（群の識別として） |
+| 12 | 打鍵による神経・精神疾患の検出は、自然な環境のデータでも AUC 0.82（臨床では 0.89）。エビデンスの質は中程度 | [V251] | **3-0** | 確定（群の識別として・⚠️ 統合した研究の特徴は保持時間に限らない＝飛鍵時間なども含む） |
 | 13 | 乱数の遅延は識別を下げるが、半分にするには多くの場合 500 ms 要る | [V239] | **3-0** | 確定（⚠️ 抄録と結論の「約 20%」は表から再現できない。自由文は 0.71→0.62 ＝相対 13%） |
 | 14 | 攻撃側が時刻を離散化しても EER の改善はわずか／無視できる。防御側の離散化と乱数のフレーム遅延はどちらも保護を与え、同じ遅延なら乱数が常に上 | [V240] | **3-0** | 確定（⚠️ 旧注記の訂正） |
 | 15 | 粗くしても一意性はほとんど下がらない（位置の軌跡: 4 点で 95%・一意性は解像度の約 1/10 乗でしか減らない） | [V253] | **2-1** | 確定（留保: 位置データからの類比） |
@@ -57,7 +58,7 @@
 | 17 | 合成データは推論攻撃を防がないか、有用性を保てない。外れ値は守られない。DP つきの生成は改善するが、小さなデータでは保証か有用性を大きく失いうる | [V255] | **2-1** | 確定（留保: 表形式・n=1000） |
 | 18 | 参加者 3〜5 人の差分プライバシーでは雑音が信号を上回る | — | — | **判定不能（一次 0 件）** |
 | 19 | 30 秒窓の特徴量だけを出す加工の効き目を測った研究 | — | — | **判定不能（0 件）** |
-| 20 | BRM の type 4 は「参加者の秘密を破らずに」生データを自由に入手できることを前提とし、プライバシーで公開できない場合は「アクセスの条件」を書けばよいと明記する。Open Practices Statement の文例にも「データは出せないがコードは公開し模擬データで示す」形がある | [V237] | **3-0** | 確定 |
+| 20 | BRM の type 4 は「参加者の秘密を破らずに」生データを自由に入手できることを前提とし、プライバシーで公開できない場合も、データの入手について「アクセスの条件」とともに記載するよう指示する（⚠️ それで type 4 を満たすとは書かれていない）。Open Practices Statement の文例にも「データは出せないがコードは公開し模擬データで示す」形がある | [V237] | **3-0** | 確定 |
 | 21 | BRM: 開始前に承認の無い研究は事後の承認が通常得られず査読に回せないことがあるが、その判断は**編集者の裁量** | [V237] | **3-0** | 確定（⚠️ ADR-039 事実 1 の注の訂正） |
 | 22 | Springer Nature は共有への同意（利用・収集への同意とは別）を収集前に取ることを求め、管理型アクセス（再識別しない合意）と TRE を手段に挙げる | [V256] [V257] | **3-0** | 確定 |
 | 23 | 安全は状態でなく程度であり、データそのものに加え、プロジェクト・人・環境・出力の 5 つで管理する（Five Safes） | [V258] | **3-0** | 確定（枠組みとして） |
@@ -80,12 +81,12 @@
 |---|---|---|
 | **S1** 先例 | **確定（慣行の実在）／判定不能（安全の実績）** | 打鍵の時刻を誰でも取れる形で出した先例はある（[P274] は Space の印と日付まで出している）。⚠️ ただし公開文書に再識別の評価は無い。評価を伴うのは集計プロファイルを丸めた [V244] だけ。事故・撤回の事例は 0 件 |
 | **S2-a** 本文の推定・照合 | **確定（一般命題）／PLAUSIBLE BUT UNPROVEN（当方の形式）** | 時刻から内容が漏れる [V248]、長さの並びから文を復元できる [V249]。⚠️ カテゴリ化・推敲・日本語 IME の記録での照合は直接の研究 0 件 → **自前で測るしかない** |
-| **S2-b** 再識別 | **確定** | 時刻だけで別の時期の標本と結び付く [V244]、大規模に識別できる [V250]。⚠️ ただしどちらもキー識別子つき。カテゴリ化した記録の識別は 0 件 |
-| **S2-c** 健康状態の推定 | **確定（群の識別）** | 保持時間だけで早期 PD [V246]。自然な環境でも AUC 0.82 [V251]。→ 加工しても消せない側 |
-| **S3** 防御 | **確定（悲観側）** | 遅延は数百 ms 要る [V239]。丸めも効くが [V240]、集計値に掛けた効き目 [V244] をイベントの公開には持ち込めない。粗くする・標本が小さい・合成データは単独で安全とみなせない [V253] [V254] [V255]。⚠️ 小 n の DP は判定不能 |
+| **S2-b** 再識別 | **確定（キー識別子つき）／判定不能（カテゴリ化した記録）** | キー識別子つきの記録では、遅延（ダイグラフの平均）だけで別の時期の標本と結び付き [V244]、大規模に識別できる [V250]。⚠️ カテゴリ化した記録での識別は 0 件（#10） |
+| **S2-c** 健康状態の推定 | **確定（群の識別）** | 保持時間だけで早期 PD [V246]。打鍵の特徴による検出は自然な環境でも AUC 0.82 [V251]。⚠️ 公開する表現（加工後）でどこまで推定できるかは未検証 → 関門でも測る |
+| **S3** 防御 | **確定（悲観側）** | 遅延は数百 ms 要る [V239]。丸めも効くが [V240]、集計値に掛けた効き目 [V244] はイベントの公開には持ち込めない見込み（★ 推論・未検証）。粗くする・標本が小さい・合成データは単独で安全とみなせない [V253] [V254] [V255]。⚠️ 小 n の DP は判定不能 |
 | **S4** 制度 | **確定** | BRM はプライバシーを理由に「アクセスの条件」を書く道を規定に持つ [V237]。管理型アクセスの型 [V257] [V258] [V259]。日本の個人識別符号の列挙に打鍵は無いが、個人情報かは別 [V260] [V238] |
 
-★ **判定: de-risk 先行。** issue #333 の第一候補（段 0 ＋ 段 1 を申請制で出す・段 2 は関門を通った場合だけ）を**否定する証拠は無く**、S4 は道があることを示した。⚠️ ただし (1) 照合（#8）と段 1 の効き目（#19）は文献で決まらず、**関門の実測が先**、(2) 健康状態の推定（#11 #12）は加工で消せないので**同意文で知らせる**側に回る。
+★ **判定: de-risk 先行。** issue #333 の第一候補（段 0 ＋ 段 1 を申請制で出す・段 2 は関門を通った場合だけ）を**否定する証拠は無く**、S4 は道があることを示した。⚠️ ただし (1) 照合（#8）と段 1 の効き目（#19）は文献で決まらず、**関門の実測が先**、(2) 健康状態の推定（#11 #12）は、加工後の表現でどこまで残るかを**関門でも測り**、残るリスクを**同意文で知らせる**（⚠️ 保持時間を壊す加工は分析も壊しうる・推論）。
 
 ---
 
@@ -105,7 +106,7 @@
 2. **何がすごい**: [V243] 要旨逐語 *"the challenges of deidentification that are peculiar to keystroke log data"*。§4 逐語 *"The creators and maintainers of the Blackbox dataset, in fact, have restricted access because of the technical challenges of deidentification"*。打鍵の時刻による識別を認めたうえで、逐語 *"However, all of these identification techniques require a labeled sample, which the regulatory definition of identifiability assumes is not available."* とし、結論で逐語 *"the data is deidentified only as long as there is no other labeled sample of a student's keystrokes."* と限界を書く。加工は逐語 *"mask the characters of identifying text with the @ character"*（時刻は加工していない）。利用者への注意は逐語 *"Ethical use of this dataset includes avoiding attempts at reconstructing identities."*。[V244] 要旨逐語 *"simply removing explicit identifiers such as names and student numbers is not sufficient to protect the privacy of the users"*。
 3. **肝**: [V244] は、500 ms の丸めで逐語 *"Approximately 7% of the students are correctly identified with a threshold of k = 10. This accuracy is very low when compared to the non-anonymized accuracy of around 98.5%. Purely random guessing would yield an identification accuracy of around 5% with our data set, which means that even with the 7% accuracy it is possible that there may still be some information on identity in the data, which might not be acceptable in all scenarios."* と書く ＝ **偶然の水準と並べて基準を書いた先例**。
 4. **どう検証した**: [V244] は 199 人 / 153 人。個人ごとにダイグラフの平均遅延のプロファイルを作り、top-k の最近傍で別の時期と照合した。
-5. **議論**: ⚠️★★★ **[V244] の丸めは、個人のプロファイル（ダイグラフごとの平均）に掛けたもの**（逐語 *"rounding the average latencies in typing profiles"*）。イベントの時刻を公開すれば、攻撃者は自分で平均を取り直せるので、**段 2（イベント）には同じ効き目を期待できない**（★ 私の推論・未検証）。⚠️ 丸めは単調に効かない（Table 1・2014 年: 100 ms で 81.7%・200 ms で 6.5%・300 ms で 72.5%・400 ms で 77.1%・500 ms で 6.5%。著者も 200 ms の値を *"unexpected"* と書く）。一方、等幅の区間化は 300 ms で 6.5% / 7.2% まで単調に下がる。★ 有用性は残る: 500 ms の丸めでもプログラミング経験の分類は 73.9%（ZeroR 58.8%・Table 2）。⚠️ どちらもキー識別子つき。⚠️ [V243] の「ラベル付きの別標本は無い」という前提は、**当方では崩れる**（同じ参加者の別のセッション・G1 と O1 の両方に参加した人がいる）。
+5. **議論**: ⚠️★★★ **[V244] の丸めは、個人のプロファイル（ダイグラフごとの平均）に掛けたもの**（逐語 *"rounding the average latencies in typing profiles"*）。イベントの時刻を公開すれば、攻撃者は自分で平均を取り直せるので、**段 2（イベント）には同じ効き目を期待できない**（★ 私の推論・未検証）。⚠️ 丸めは単調に効かない（Table 1・2014 年: 100 ms で 81.7%・200 ms で 6.5%・300 ms で 72.5%・400 ms で 77.1%・500 ms で 6.5%。著者も 200 ms の値を *"unexpected"* と書く）。一方、等幅の区間化は 300 ms で 6.5% / 7.2% まで単調に下がる。★ 有用性は残る: 500 ms の丸めでもプログラミング経験の分類は 73.9%（ZeroR 58.8%・Table 2）。⚠️ どちらもキー識別子つき。⚠️ [V243] の「ラベル付きの別標本は無い」という前提について: 公開物の中に同じ参加者の複数のセッションがあること自体は、**匿名のセッションどうしの結び付け**であって本人の特定ではない。本人の特定まで進むのは、攻撃者が**本人と分かっている打鍵**（ラベル付きの標本）を別に持つ場合である（例: 同じ参加者の記録が別の公開物にも載る・身近な人が本人の打鍵を記録できる）。→ 関門では 2 つを分けて測る（★ 当方でラベル付きの標本がどこまで手に入るかは未検討）。
 6. **次に読む**: Longi et al. 2015（Koli Calling・98.6% の原典）・Brown et al. 2018（Blackbox の制限の理由）。
 - **やり残し**: [V244] は「ラベル付きの別標本」を攻撃者が持つ前提の照合だけを測った。当方で測るなら同じ前提（同じ参加者の別の日）で測る。
 
@@ -113,8 +114,8 @@
 
 1. **どんなもの**: [V248] は SSH の打鍵の時刻からパスワードを推す攻撃（USENIX Security 2001）。[V249] は暗号化通信のトークン長の並びから、AI アシスタントの応答文を復元する攻撃（USENIX Security 2024）。[V194] は打鍵のサイドチャネルの SoK。
 2. **何がすごい**: [V248] 逐語 *"the timing information leaks about 1 bit of information about the content per keystroke pair"*・*"Herbivore can reduce the cost of password cracking by a factor of 50"*。[V249] 逐語 *"we were able to accurately reconstruct 29% of an AI assistant's responses and successfully infer the topic from 55% of them"*。手法は (1) LLM で長さの並びを文に翻訳 (2) 文と文の文脈 (3) *"performing a known-plaintext attack by fine-tuning the model on the target model's writing style"*。
-3. **肝**: ★ 当方の記録は Space・Enter・句読点の位置が分かるので、**長さの並び**（単語長・文長・段落長）が残る。[V249] はまさに長さの並びだけから文を当てる。
-4. **どう検証した**: [V248] は HMM と n-Viterbi。[V249] は 57 万件の質問で学習し、検証 1 万・テスト 1 万。
+3. **肝**: ★ 当方の記録は Space・Enter・句読点の位置が分かるので、**その間の打鍵の個数の並び**が残る。これは単語長・文長・段落長の**代理**になりうる。[V249] は長さの並びだけから文を当てる。⚠️ ただし打鍵の個数は本文の長さと同じではない（日本語 IME の変換・BackSpace・貼り付け・カーソル移動で崩れる）→ 照合の実測には変換・推敲・貼り付けを含める。
+4. **どう検証した**: [V248] は HMM と n-Viterbi。[V249] は対話データの一般の問い 57 万件への**最初の応答**で学習し、検証 1 万・テスト 1 万。
 5. **議論**: ⚠️ [V248] の前提は逐語 *"In this paper we only consider users who are familiar with keyboard typing and use touch typing."*。⚠️ [V249] の長さはトークンごとに**正確**で、標的は LLM の定型的な文体。人の文章・推敲（BackSpace・カーソル移動・貼り付け）・日本語 IME で崩れるかは**未検証**。⚠️ 逆に「書きぶりを学習すると強くなる」（既知平文）は、**本人の過去の文章を持つ攻撃者が強い**ことを示唆する。→ ★ **#8（当方の形式での照合）は PLAUSIBLE BUT UNPROVEN**。issue #333 の「照合は易しい」は**見込みのまま**で、関門で測る。
 6. **次に読む**: Wright et al. "Spot me if you can"（IEEE S&P 2008・パケット長で候補の語句を照合・本文未取得）／ Idaho 大の修論 "Keystroke Timing Attacks in a Free-Text Environment"（書誌のみ）。
 - **やり残し**: 語長の並びだけで文がどれだけ一意になるかの研究は見つからなかった（★ 自前で見積もる: 青空文庫など）。
@@ -129,13 +130,13 @@
 6. **次に読む**: キー識別子なし・カテゴリ化した打鍵での識別の研究（見つからなかった → #10）。
 - **やり残し**: #10（カテゴリ化した記録での日をまたぐ識別）は 0 件 → ★ 関門 (ii) の実測で埋める。
 
-### カード 5: 打鍵の時刻だけから健康状態が推定される —— 加工で消せない側 **[検証済 3-0]** [V246] [V251]
+### カード 5: 打鍵から健康状態が推定される —— 保持時間だけでも、公開物でどこまで残るかは未検証 **[検証済 3-0]** [V246] [V251]
 
 1. **どんなもの**: [V246] は日常のキーボード操作の保持時間から早期 Parkinson 病を検出した研究（Sci Rep 2016・neuroQWERTY）。[V251] は打鍵による神経・精神疾患の検出の系統的レビューとメタ分析（Sci Rep 2022・41 研究）。
-2. **何がすごい**: [V246] 逐語 *"measures the key hold times (the time required to press and release a key) during the normal use of a computer"*・*"AUC = 0.81 (n = 42/43; …)"*。[V251] は PD の統合感度 0.86・特異度 0.83。自然な環境のデータでも AUC 0.82（95% CI 0.79–0.84）で、臨床（0.89）より有意に低いが高い。
-3. **肝**: ★ 使う特徴は**保持時間**（押下と解放の差）であり、**キー識別子が無くても取れる**。当方の記録は押下と解放の時刻を持つ。
+2. **何がすごい**: [V246] 逐語 *"measures the key hold times (the time required to press and release a key) during the normal use of a computer"*・*"AUC = 0.81 (n = 42/43; …)"*。[V251] は PD の統合感度 0.86・特異度 0.83（AUC 0.85）。自然な環境のデータでも AUC 0.82（95% CI 0.79–0.84）で、臨床（0.89）より有意に低いが高い。⚠️ [V251] が統合した研究の特徴は保持時間に限らない（飛鍵時間・その歪度など）。
+3. **肝**: ★ [V246] が使う特徴は**保持時間**（押下と解放の差）だけであり、**キー識別子が無くても取れる**。当方の記録は押下と解放の時刻を持つ。
 4. **どう検証した**: [V246] は 85 人。[V251] は QUADAS-2 で偏りのリスクを評価し、逐語 *"we rated the quality of evidence to be moderate"*。
-5. **議論**: ⚠️ どれも**群の識別**（病気か対照か）で、ラベル付きの学習データを要する。個人の日ごとの気分・疲労の推定とは設問が違う。⚠️ 異質性が高い（I² 79–87%）。→ ★ それでも「公開した打鍵から健康状態が推定されうる」は根拠つきで言える。**加工（遅延・丸め）で保持時間を壊せば分析も壊れる**ので、関門ではなく**同意文 v2 の第 3 層で知らせる**側に回る（★ 推論）。
+5. **議論**: ⚠️ どれも**群の識別**（病気か対照か）で、ラベル付きの学習データを要する。個人の日ごとの気分・疲労の推定とは設問が違う。⚠️ 異質性は指標によって大きい（I² は 0〜94%・PD の AUC は 94.04%）。→ ★ それでも「打鍵の記録から健康状態が推定されうる」は根拠つきで言える。⚠️ ただし**公開する表現（加工後・段 1 の特徴量）でどこまで推定できるかは未検証**。→ 関門でも測り（加工の前後で推定の性能を比べる）、残るリスクを**同意文 v2 の第 3 層で知らせる**。⚠️ 保持時間を壊す加工（遅延・丸め）は分析も壊しうる（★ 推論）。
 6. **次に読む**: Adams 2018 JMIR（自宅の自然入力での neuroQWERTY の検証）・うつ・MCI の研究（agent 報告の AUC 0.98 などは小さい n で、本文未読）。
 - **やり残し**: 小 n の研究の過大評価の検討を読んでいない。
 
@@ -145,7 +146,7 @@
 2. **何がすごい**: [V239] 結論逐語 *"With a 25 ms delay, identification accuracy is reduced by approximately 20% on average, and in most cases a 500 ms delay is needed to halve the identification accuracy."*。Table 4（delay mix・識別精度）: 長い自由文で Δ=0 → 0.71、平均の遅れ 26 ms → 0.62、126 ms → 0.36、394 ms → 0.30。[V240] §2.6 逐語 *"Timestamps values have been discretized using 1,001 different resolutions (from 0 to 1 by step of 1/1,000). As shown in Figure 3, attacker might expect slight (J≃ 0.02 for GREYC W1) or negligible (J < 0.005) EER improvement by doing so."*。§3.2 逐語 *"As shown in Figure 5, both provide significant protection compared to the costless KDAS. However, for the same latency, rdelay seems always better than delay."*・*"any pre-processing done with public information cannot decrease the privacy"*。
 3. **肝**: ★ 遅延は効くが、識別を半分にするには数百 ms 要る。丸め（離散化）も防御として効くが、同じ遅れなら乱数の方が強い。
 4. **どう検証した**: [V239] は 110 / 101 / 127 人・RandomForest・層化 10 分割。[V240] は固定文の 4 データ（46〜104 人）・EER。
-5. **議論**: ⚠️★★★ **[V240] の旧注記（「丸めは攻撃側の前処理で効き目を失いうる」）は誤読**。原文の「攻撃側の前処理」の節は、**攻撃側が**離散化して EER を良くできるかの話であり、改善はわずか。「公開情報だけでできる前処理はプライバシーを下げない」は、**丸めで EER が下がる（攻撃が良くなる）場合**についての注である。⚠️ [V239] の「約 20%」は表から再現できない（短い固定文 25%・長い固定文 8%・自由文 13%）→ 引くときは表の値を併記する。⚠️ 属性（性別など）の推定は、逐語 *"Soft biometric trait classification accuracies, which are initially near chance accuracy, are relativity unaffected"* ＝ **もともと偶然の水準に近い**ので、加工の効果は測れていない。⚠️ どちらも**リアルタイムの経路**の加工で、公開後の記録の加工とは設計が違う。⚠️ 数百 ms の遅延は、段 2 の時刻を使う分析（保持時間・間隔）と**正面から衝突する**。
+5. **議論**: ⚠️★★★ **[V240] の旧注記（「丸めは攻撃側の前処理で効き目を失いうる」）は誤読**。原文の「攻撃側の前処理」の節は、**攻撃側が**離散化して EER を良くできるかの話であり、改善はわずか。「公開情報だけでできる前処理はプライバシーを下げない」は、**丸めで EER が下がる（攻撃が良くなる）場合**についての注である。⚠️ [V239] の「約 20%」は表から再現できない（短い固定文 25%・長い固定文 8%・自由文 13%）→ 引くときは表の値を併記する。⚠️ 属性（性別など）の推定について、著者は逐語 *"Soft biometric trait classification accuracies, which are initially near chance accuracy, are relativity unaffected"* と書く（⚠️ ただし Table 4 の年齢は 0.69〜0.76 で、合算した基準 0.51 を上回る。「偶然に近い」は著者の評価として引く）。⚠️ どちらも**リアルタイムの経路**の加工で、公開後の記録の加工とは設計が違う。⚠️ 数百 ms の遅延は、段 2 の時刻を使う分析（保持時間・間隔）と**正面から衝突する**。
 6. **次に読む**: KeyDrown（NDSS 2018・本文未取得）。
 - **やり残し**: 公開後の記録に加工を掛けた評価（オフラインの加工）は見つからなかった。
 
@@ -162,8 +163,8 @@
 ### カード 8: BRM と Springer Nature —— プライバシーを理由に「アクセスの条件」を書く道がある **[検証済 3-0]** [V237] [V256] [V257]
 
 1. **どんなもの**: BRM の投稿規定 [V237]、Springer Nature の研究データ方針 [V256] と機微なデータの手引き [V257]。2026-10-09 に curl で取得し、HTML から読んだ。
-2. **何がすごい**: [V237] 逐語 *"This journal operates a type 4 research data policy. A submission to the journal implies that materials described in the manuscript, including all relevant raw data, will be freely available to any researcher wishing to use them for non-commercial purposes, without breaching participant confidentiality."*。同じ見出しの下に逐語 *"When it is not possible to share research data publicly, for instance when individual privacy could be compromised, data availability should still be stated in the manuscript along with any conditions for access."*。Open Practices Statement の文例に逐語 *"Due to data protection rules, the data cannot be made available, but documented code for the analyses in this article is available at (url for the site where the code is located) and is illustrated with simulated data."*。倫理の見出し "Retrospective ethics approval" に逐語 *"The decision on whether to proceed to peer review in such cases is at the Editor's discretion."*。[V257] 逐語 *"Participant consent to share the data (in addition to use or collection of data) should also be obtained and documented prior to data collection."*・*"Use of a controlled access repository to manage who can access data and under what terms … apply additional restrictions such as an agreement not to reidentify participants."*。
-3. **肝**: ★ ADR-039 D5 の案 A（申請制）も案 C（集計値とコードだけ）も、**規定の文言の中に置き場所がある**。案 C は Open Practices の文例そのもの。
+2. **何がすごい**: [V237] 逐語 *"This journal operates a type 4 research data policy. A submission to the journal implies that materials described in the manuscript, including all relevant raw data, will be freely available to any researcher wishing to use them for non-commercial purposes, without breaching participant confidentiality."*。小見出し "Data availability" の下に逐語 *"When it is not possible to share research data publicly, for instance when individual privacy could be compromised, data availability should still be stated in the manuscript along with any conditions for access."*。Open Practices Statement の文例に逐語 *"Due to data protection rules, the data cannot be made available, but documented code for the analyses in this article is available at (url for the site where the code is located) and is illustrated with simulated data."*。倫理の見出し "Retrospective ethics approval" に逐語 *"The decision on whether to proceed to peer review in such cases is at the Editor's discretion."*。[V257] 逐語 *"Participant consent to share the data (in addition to use or collection of data) should also be obtained and documented prior to data collection."*・*"Use of a controlled access repository to manage who can access data and under what terms … apply additional restrictions such as an agreement not to reidentify participants."*。
+3. **肝**: ★ ADR-039 D5 の案 A（申請制）も案 C（集計値とコードだけ）も、**規定の文言の中に書き方の置き場所がある**。案 C は Open Practices の文例そのもの。⚠️ ただし原文は「アクセスの条件とともに記載する」という指示であり、それで type 4 を満たすとも、「例外」とも書いていない。
 4. **どう検証した**: 規程の逐語の照合（運用の実例ではない）。
 5. **議論**: ⚠️ 本則の「freely available」と申請制の緊張は残る。文例 3 は *"available from the corresponding author on reasonable request"* で、審査や利用許諾を伴う管理型は文例に無い。⚠️ **BRM が実際に申請制を認めた・拒んだ例は 0 件**（#28）→ 投稿前に編集部へ尋ねる（ADR-039 の問い合わせ A に足す候補）。⚠️ 規程は改訂されうるので、投稿時に読み直す。
 6. **次に読む**: Springer Nature の data availability statement の文例集（"restricted access datasets" の例）。
@@ -201,20 +202,20 @@
 
 ### issue #333 / ADR-039 の決めごとへの含意（★ 決めるのは研究者）
 
-1. **【決 5】公開の形式**: BRM の規定に、プライバシーを理由に「アクセスの条件」を書く道が逐語である（カード 8）。案 C（集計値＋コード＋模擬データ）は Open Practices の文例そのもの。⚠️ 申請制の運用の先例は 0 件なので、**問い合わせ A に「申請制（利用許諾つき）で Open Practices Statement を書いてよいか」を足す**のが安い確認。
+1. **【決 5】公開の形式**: BRM の規定に、プライバシーで公開できない場合は「アクセスの条件」とともに記載するという指示が逐語である（カード 8・⚠️ それで type 4 を満たすとは書かれていない）。案 C（集計値＋コード＋模擬データ）は Open Practices の文例そのもの。⚠️ 申請制の運用の先例は 0 件なので、**問い合わせ A に「申請制（利用許諾つき）で Open Practices Statement を書いてよいか」を足す**のが安い確認。
 2. **【決 6】公開前の関門**: 攻撃を 3 つに分け、それぞれ文献に型がある。
-   - 結び付け: [V244] の型（別の日のプロファイルを top-k で照合）を実データで。★ 基準は偶然の水準と並べて書く（[V244] の書き方が先例）。
-   - 照合: [V249] の型（長さの並び → 候補の文章）を正解のある入力で。★ 当方の形式での直接の研究は 0 件（#8）→ **自前の実測が要る**。
-   - 健康状態の推定: 保持時間が主役で、加工で消すと分析も壊れる（カード 5）→ **関門ではなく同意文で知らせる側**。
+   - 結び付け: [V244] の型（別の日のプロファイルを top-k で照合）を実データで。★ 基準は偶然の水準と並べて書く（[V244] の書き方が先例）。⚠️ 匿名のセッションどうしの結び付けと、本人と分かっている打鍵（ラベル付きの標本）を使った本人の特定は分けて測る（カード 2）。
+   - 照合: [V249] の型（長さの代理の並び → 候補の文章）を正解のある入力で。★ 当方の形式での直接の研究は 0 件（#8）→ **自前の実測が要る**。⚠️ 入力には IME の変換・推敲・貼り付けを含める（打鍵の個数は本文の長さと同じではない・カード 3）。
+   - 健康状態の推定: 公開する表現（加工後）でどこまで推定できるかを、加工の前後で比べて測る（カード 5）。残るリスクは同意文で知らせる。⚠️ 保持時間を壊す加工は分析も壊しうる（★ 推論）。
 3. **加工の選び方**: 遅延は数百 ms 要り（カード 6）、段 2 の時刻の有用性と衝突する。丸めは効くが、[V244] の効き目は**集計値**に掛けたもので、イベントを出す段 2 には持ち込めない（★ 推論）。粗くする・標本が小さい・合成データは単独では安全とみなせない（カード 7）。
 4. **段 1 も関門にかける**: 30 秒窓の特徴量だけを出す効き目を測った研究は 0 件（#19）。issue #333 の議論（`keys` の差から 1 秒ごとの打鍵数を逆算できる見込み）と合わせ、段 1 を無条件に安全とみなさない。
 5. **同意文 v2 の第 3 層**: 共有への同意を収集前に取る（[V257]）。[V243] の注意書き（脱識別したが見落としの可能性がある・再識別を試みないこと）は第 3 層と利用規約の文案の素材。健康状態の推定のおそれ（カード 5）と、別のセッションと結び付けられるおそれ（カード 2・4）は根拠つきで書ける。
 6. **先例を根拠にしない**: [P274] は Space の印と日付まで誰でも取れる形で出しているが、再識別の評価は無い（カード 1）。「先行例と同じ粒度」は公開の根拠にしない。
-7. **ADR-039 の訂正候補 3 件**（★ ADR は書き換えない規約なので研究者の判断）: 事実 1 の注（編集者の裁量は逐語にある）／ D5 の「例外の逐語は未確認」（確認した）／ D6 の「時刻の丸めは攻撃側の前処理で効き目を失いうる [V240]」（誤読）。issue #333 の同じ記述も同様。
+7. **ADR-039 の訂正候補 4 件**（★ ADR は書き換えない規約なので研究者の判断）: 事実 1 の注（編集者の裁量は逐語にある・ただし事後承認の場合の査読の可否について）／ D5 の「例外の逐語は自分で確かめていない」（当たる文を確かめた・ただし「例外」とは書かれていない）／ D6 の「時刻の丸めは、攻撃側の前処理で効き目を失いうる [V240]」（誤読）／ D6 の「25 ms で約 20%」（抄録の逐語どおりだが表から再現できない・表の値を併記する）。issue #333 の [V240] の記述も同様。
 
 ### `docs/research-positioning.md` への還元
 
-- **精緻化**: §4 の「本文非保存だから公開しやすい＝GSE の差分 = 否決 1-2」に、本ラウンドの結果を 1 行足した（本文非保存でも結び付け・健康状態の推定は残り、照合も否定できない ＝「公開しやすい」そのものが条件つき）。研究の主張範囲（§1〜§3）は動かない。
+- **精緻化**: §4 の「本文非保存だから公開しやすい＝GSE の差分 = 否決 1-2」に、本ラウンドの結果を 1 行足した（本文非保存でも健康状態の推定は残りうる。キー識別子つきの記録では遅延だけで結び付き、カテゴリ化した記録での結び付けと照合は未検証 ＝「公開しやすい」そのものが条件つき）。研究の主張範囲（§1〜§3）は動かない。
 
 ## やり残し
 

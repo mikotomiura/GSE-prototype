@@ -9,12 +9,12 @@
 - [x] references.md に append（[V243]〜[V263]）＋ [V237] [V239] [V240] [P274] の注記を更新 → check_citations.py「違反なし」
 - [x] _index.md に 1 行
 - [x] research-positioning.md への還元（§4 を 1 か所精緻化・decisions.md 判断 4）
-- [ ] コミット（1 ラウンド = 1 コミット）→ push（PR は出さない・判断 5）
+- [x] コミット（1 ラウンド = 1 コミット・cc2409e5）→ push（PR は出さない・判断 5）
 - [ ] issue #333 にコメント
-- [ ] レビュー（code-reviewer ∥ /cross-review の Codex 系統）→ 指摘を一次で確かめて反映
+- [x] レビュー（code-reviewer ∥ /cross-review の Codex 系統）→ 指摘を一次で確かめて反映（判断 6）
 
 ## 研究者が決めること（本タスクの外）
 
-- [ ] ADR-039 の訂正 3 件の扱い（decisions.md 判断 3）
+- [ ] ADR-039 の訂正 4 件の扱い（decisions.md 判断 3）
 - [ ] 【決 5】【決 6】【決 6-a】（カードの「GSE への還元」を材料に）
 - [ ] PR にする時期（計測の run が終わってから）
