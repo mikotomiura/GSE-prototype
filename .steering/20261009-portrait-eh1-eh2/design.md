@@ -221,6 +221,9 @@ render_e18.py ── E1-8 の候補を PNG に（基準なし）
 | 2026-10-09 13:10 | `run.sh` の `experiment_dir_dirty` を、`results/` を除いた計器だけで判定する。provenance に `platform`・`cpu_count` を足した | 本番では `results/<world>/` が未追跡のファイルで埋まるので、前の判定は必ず真になっていた（スモークは `.gitignore` で無視されるので偽になり、気づけなかった）。本番を別の機器で回すので、OS とコア数を結果に残す |
 | （固定の時点・a5867958 から） | `ordinal` の順序の型は、6 種に「同じ値を含む（tie）」を足した 7 種で数える | §1.4 は「6 種」と書いた。F 系列は同じ値が続く（例: 修正の無い区間の f3 = 0）ので、tie を 6 種のどれかに押し込むと、上りの型と区別できなくなる。§8 に書き漏れていた（`/cross-review` 1 巡目 Claude の指摘） |
 | 2026-10-09 13:00 | 結果の JSON の非有限の数を `"inf"`・`"-inf"`・`"nan"` の文字列にし、標準の JSON で書く。provenance に `src_tauri_dirty` を足した | `/cross-review` 1 巡目（Codex）の指摘。`Infinity` は標準の JSON ではない。`gse-replay` のソースの変更が記録に残らなかった |
+| 2026-10-09 （本番・Windows の機器） | **`run.sh` の最後で `gse-replay` を `.exe` なしで開いて落ちた**ので、計器を変えずに環境変数 `GSE_REPLAY` に `gse-replay.exe` を渡して回した（notes 判断 W1）。本番 v1・v2 はこの指定で実行し、provenance の `experiment_dir_dirty` は false | `run.sh` が Windows で `.exe` を補わない。結果は変わらない（同じバイナリ・`gse_replay_sha256` が両 world で同じ）。直すのは EH1 の第 2 回の準備（判断 9） |
+| 2026-10-09 13:30〜13:57（本番にしなかった） | Surface Pro 8（RAM 8 GB）で回し始めた v1 の本番が `checks.py` の `MemoryError` で落ち、研究者の判断で止めた。**結果は開かずに消した**（notes 判断 W2）。EH1 の結果は G-GEAR の 1 回だけ | `checks.py` の並列の既定 16 を `run.sh` が変えられない。`--jobs` を渡せるようにするのは第 2 回の準備（判断 9） |
+| 2026-10-09 （結果を読んだ**後**） | **探索（固定の外）として `scripts/explore_material_info.py` を足した**: モデル A に窓の `p_stuck` の平均・F の水準を足したときの上乗せ（1 回の当てはめ）。結果は `results/<world>/exploratory_material_info.json`。合否を付けない | v2 で PC2 が働かなかった理由が「材料に情報が無い」か「既定の scheduler を通る形が情報を運ばない（または検査器が拾えない）」かで、次の段の打ち手が変わるため。⚠️ 結果を見てから足した解析なので、判定には使わない（判断 9） |
 | 2026-10-09 12:45 | 順序の感度の終わりの画像を float16 から float32 にした。E1-2 の slot の数を `(長さ − 1) // I` にした。順位相関の空の場合の扱い | float16 の量子化（約 5e-4）が比 3 の付近を揺らしうる。slot の数が 1 多かった（記述だけの値） |
 
 ## 9. ロールバック計画
