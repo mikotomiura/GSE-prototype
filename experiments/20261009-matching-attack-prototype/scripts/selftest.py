@@ -241,9 +241,10 @@ def test_sampler():
         random.Random(1), 400, [300], [typed["a"]], ["r1"]), ValueError)
     # small pools, where a missing exclusion would show at once
     small = ["p0", "p1", "p2"]
-    d3, _ = matching.draw_decoys(random.Random(4), 9, [3, 3], [small, small], ["p1", "p1"])
-    check("decoys k=2, 3 x 3 tuples: the 8 tuples other than the truth's, each once",
-          sorted(d3) == sorted((a, b) for a in range(3) for b in range(3) if (a, b) != (1, 1)), str(sorted(d3)))
+    others = sorted((a, b) for a in range(3) for b in range(3) if (a, b) != (1, 1))
+    bad = [sd for sd in range(20)
+           if sorted(matching.draw_decoys(random.Random(sd), 9, [3, 3], [small, small], ["p1", "p1"])[0]) != others]
+    check("decoys k=2, 3 x 3 tuples: the 8 tuples other than the truth's, each once (20 seeds)", not bad, str(bad))
     halves = ["q0", "q0", "q1", "q1", "q2", "q2", "q3", "q3", "q4", "q4"]
     d4, _ = matching.draw_decoys(random.Random(4), 9, [10], [halves], ["q2"])
     check("decoys k=1, two phrases share the truth's typed reading: the other 8 phrases",
