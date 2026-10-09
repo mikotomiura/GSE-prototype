@@ -1,0 +1,91 @@
+﻿{
+    "os":  "windows",
+    "os_version":  "10.0.26200.0",
+    "powershell":  "5.1.26100.9444",
+    "mode":  "full",
+    "started":  "2026-10-09T14:07:10",
+    "background_type":  0,
+    "slideshow_status_raw":  1,
+    "slideshow_enabled":  false,
+    "inactive_monitor_entries":  0,
+    "monitors":  [
+                     {
+                         "index":  0,
+                         "width":  2880,
+                         "height":  1920
+                     }
+                 ],
+    "original_position":  4,
+    "original_exists":  [
+                            true
+                        ],
+    "original_in_themes_cache":  [
+                                     false
+                                 ],
+    "per_monitor":  {
+                        "calls":  30,
+                        "readback_ok":  30,
+                        "latency_ms_median":  15.859850000000002,
+                        "latency_ms_p95":  38.9348,
+                        "latency_ms_max":  46.090900000000005
+                    },
+    "distinct_per_monitor_readback_ok":  "single_monitor",
+    "all_monitors":  {
+                         "calls":  10,
+                         "latency_ms_median":  18.4402,
+                         "latency_ms_p95":  37.714400000000005
+                     },
+    "cpu":  {
+                "idle_s":  300,
+                "busy_s":  300,
+                "busy_every_s":  10,
+                "busy_updates":  30,
+                "idle_elapsed_s":  300.01,
+                "busy_elapsed_s":  300.33,
+                "idle":  {
+                             "dwm":  {
+                                         "pids_changed":  false,
+                                         "cpu_s":  null,
+                                         "ws_mb_end":  125.76953125,
+                                         "ws_mb_start":  126.27734375
+                                     },
+                             "explorer":  {
+                                              "pids_changed":  false,
+                                              "cpu_s":  0.234,
+                                              "ws_mb_end":  172.6171875,
+                                              "ws_mb_start":  329.3671875
+                                          },
+                             "self":  {
+                                          "pids_changed":  false,
+                                          "cpu_s":  0.031,
+                                          "ws_mb_end":  113.46875,
+                                          "ws_mb_start":  113.84765625
+                                      }
+                         },
+                "busy":  {
+                             "dwm":  {
+                                         "pids_changed":  false,
+                                         "cpu_s":  null,
+                                         "ws_mb_end":  125.8359375,
+                                         "ws_mb_start":  125.76953125
+                                     },
+                             "explorer":  {
+                                              "pids_changed":  false,
+                                              "cpu_s":  4.219,
+                                              "ws_mb_end":  173.5078125,
+                                              "ws_mb_start":  172.6171875
+                                          },
+                             "self":  {
+                                          "pids_changed":  false,
+                                          "cpu_s":  0.062,
+                                          "ws_mb_end":  113.72265625,
+                                          "ws_mb_start":  113.46875
+                                      }
+                         }
+            },
+    "restored":  [
+                     true
+                 ],
+    "restored_position_ok":  true,
+    "finished":  "2026-10-09T14:17:25"
+}
