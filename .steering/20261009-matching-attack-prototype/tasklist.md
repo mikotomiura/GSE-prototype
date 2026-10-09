@@ -7,29 +7,32 @@
 - [x] requirement.md・design.md・decisions.md を書く
 
 ## 結果の前の固定
-- [ ] `experiments/20261009-matching-attack-prototype/` に README・config.json・SEED・data.md・env.md・requirements.txt・preregistration.md・run.sh を書く
-- [ ] 固定をコミットする（本計算の前）
+- [x] `experiments/20261009-matching-attack-prototype/` に README・config.json・SEED・data.md・env.md・requirements.txt・preregistration.md を書く
+- [x] 固定をコミットする（本計算の前・`19f16862`）
 
 ## 実装
-- [ ] scripts/kitload.py（SHA-256 を照らして読み込む）
-- [ ] scripts/prepare.py（記録の割り当て・試行ごとの値）
-- [ ] scripts/crosscheck.py（照らし合わせ）
-- [ ] scripts/distances.py（S の試行ごとの距離）
-- [ ] scripts/reproduce_ime.py（k = 1 の再現の確認）
-- [ ] scripts/matching.py（441 セルと診断）
-- [ ] scripts/summarize.py（表）
-- [ ] scripts/selftest.py（自己検査）
+- [x] scripts/kitload.py（SHA-256 を照らして読み込む）・data.py（攻撃の入力の読み込み）
+- [x] scripts/prepare.py（記録の割り当て・試行ごとの値）
+- [x] scripts/crosscheck.py（照らし合わせ）
+- [x] scripts/distances.py（S の試行ごとの距離）
+- [x] scripts/reproduce_ime.py（k = 1 の再現の確認）
+- [x] scripts/matching.py（441 セルと診断）
+- [x] scripts/summarize.py（表）・run.sh
+- [x] scripts/selftest.py（自己検査 75 件・変異 13 種がすべて落ちることを確かめた）
+- [x] コードをコミットする（本計算の前・`52f9c0da`・`c73fc37e`）
 
 ## 計算
-- [ ] 自己検査が通る
-- [ ] 照らし合わせ → 再現の確認 → 本計算（研究者に一言伝えてから）
-- [ ] 2 回目の実行で出力がバイト単位で同じことを確かめる
+- [x] 自己検査が通る
+- [x] 照らし合わせ → 再現の確認（6 つとも公開値と一致）
+- [x] 本計算（研究者に一言伝えてから・2026-10-09 に会話で伝えた）
+- [x] 2 回目の実行で出力がバイト単位で同じことを確かめる（並列 4 と 2・19 ファイル）
+- [x] 事後の探索（判断 4）
 
 ## 記録
-- [ ] notes.md（結果・限界・逸脱）
-- [ ] ADR-039 D6 に日付つきの注
-- [ ] issue #333 にコメント
-- [ ] 引き継ぎに完了の印
+- [x] notes.md（結果・限界・逸脱）
+- [x] ADR-039 D6 に日付つきの注
+- [ ] issue #333 にコメント（レビューの後）
+- [x] 引き継ぎに完了の印
 
 ## 完了処理（/finish-task）
 - [ ] code-reviewer と /cross-review（1 巡目 = 全体）

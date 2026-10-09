@@ -1,5 +1,7 @@
 # 引き継ぎ: 合成入力での照合攻撃の試作（ADR-039 D6 の候補 1・【決 6-a】の試作）
 
+**状態（2026-10-10）: 実施済み。** 結果は `experiments/20261009-matching-attack-prototype/notes.md`、作業記録は `.steering/20261009-matching-attack-prototype/`。ADR-039 D6 に日付つきの注、issue #333 にコメントを返した。IME 論文の `counts_only` が連なりの長さを捨てていないことを見つけた（同 decisions.md 判断 2・扱いは研究者が決める）。
+
 作成 2026-10-09（Windows の機 G-GEAR・`C:\GSE-prototype`）。新しいセッションで `/clear` の後に始める。
 応答・完了報告・途中の進捗の 1 行まで日本語で書く。記号（★・⚠️）を多用しない（研究者の指摘）。
 
