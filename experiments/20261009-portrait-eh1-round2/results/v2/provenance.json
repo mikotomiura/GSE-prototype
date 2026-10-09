@@ -1,0 +1,20 @@
+{
+ "world": "v2",
+ "smoke": false,
+ "git_commit": "0429e3aaef40a4c259a37691d10ee23fb0111702",
+ "experiment_dir_dirty": false,
+ "src_tauri_dirty": false,
+ "gse_replay_sha256": "71d09dab44526f2322a05833ae1a0fb33ffcc4908bfba796258276f083d78986",
+ "hmm_version": "0.5.0",
+ "python": "3.11.9",
+ "platform": "Windows-10-10.0.26300-SP0",
+ "cpu_count": 16,
+ "jobs": 8,
+ "seed": 20261009,
+ "packages": {
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "scikit-learn": "1.9.1",
+  "pillow": "12.3.0"
+ }
+}
