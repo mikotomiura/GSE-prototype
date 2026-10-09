@@ -10,7 +10,7 @@
 - [x] _index.md に 1 行
 - [x] research-positioning.md への還元（§4 を 1 か所精緻化・decisions.md 判断 4）
 - [x] コミット（1 ラウンド = 1 コミット・cc2409e5）→ push（PR は出さない・判断 5）
-- [ ] issue #333 にコメント
+- [x] issue #333 にコメント（https://github.com/mikotomiura/GSE-prototype/issues/333#issuecomment-6074912901）
 - [x] レビュー（code-reviewer ∥ /cross-review の Codex 系統）→ 指摘を一次で確かめて反映（判断 6）
 
 ## 研究者が決めること（本タスクの外）
