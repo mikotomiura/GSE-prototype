@@ -15,7 +15,7 @@ EH1 と EH2 は同時に回さないでください（EH2 は CPU を測りま�
 ## §1 前提（この機械で回してよいか）
 
 1. **計測の run がこの機械で走っていないこと**を研究者に確かめる（G-GEAR は CI の self-hosted runner でもある）。走っていたら回さない。
-2. EH1 に要るもの: GSE をビルドできる Rust（`cargo`・MSVC。`gse-replay` は `src-tauri` のライブラリごとビルドするので、初回は 7〜10 分ほど）・Python 3.11 以上・git-bash（`run.sh` は bash）。
+2. EH1 に要るもの: GSE をビルドできる Rust（`cargo`・MSVC。`gse-replay` は `src-tauri` のライブラリごとビルドするので、初回は 7〜10 分ほど）・Python 3.11 以上（計器を作った機械は 3.11.9。違う版なら `provenance.json` に刻まれるので、notes にも書く）・git-bash（`run.sh` は bash）。
 3. EH2 に要るもの: 背景が「画像」であること（設定 → 個人用設定 → 背景）。スライドショー・単色・Windows スポットライト・元の画像のファイルが消えている・元の画像が Themes フォルダの写し、のどれかだとスクリプトは断って止まる（元に戻せないため）。⚠️ `-Force` は使わない。一時的に「画像」へ替えたなら、終わったあとに研究者が自分で元に戻す。
 
 ## §2 EH1（合成の記録・参加者なし・機械を触らなくてよい）
@@ -43,13 +43,13 @@ bash run.sh --world v2              # 本番（逸脱）
 
 ## §3 EH2（壁紙の機械の検証・約 15 分・本番の間は機械を触らない）
 
-**EH1 の本番が走っていないときに回す**（EH2 は CPU を測る）。
+**EH1 の本番が走っていないときに回す**（EH2 は CPU を測る）。下のコマンドは PowerShell でも git-bash でも打てる（パスはスラッシュで書く）。
 
 ```
 cd C:/wt/portrait-eh1-eh2-win
-powershell -NoProfile -ExecutionPolicy Bypass -File experiments\20261009-portrait-eh2\windows\eh2_wallpaper.ps1 -DryRun
-powershell -NoProfile -ExecutionPolicy Bypass -File experiments\20261009-portrait-eh2\windows\eh2_wallpaper.ps1 -Quick
-powershell -NoProfile -ExecutionPolicy Bypass -File experiments\20261009-portrait-eh2\windows\eh2_wallpaper.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File experiments/20261009-portrait-eh2/windows/eh2_wallpaper.ps1 -DryRun
+powershell -NoProfile -ExecutionPolicy Bypass -File experiments/20261009-portrait-eh2/windows/eh2_wallpaper.ps1 -Quick
+powershell -NoProfile -ExecutionPolicy Bypass -File experiments/20261009-portrait-eh2/windows/eh2_wallpaper.ps1
 ```
 
 1. `-DryRun` は壁紙を替えない。

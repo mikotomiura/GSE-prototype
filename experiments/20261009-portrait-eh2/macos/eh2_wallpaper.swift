@@ -9,7 +9,9 @@
 //   3. measures the CPU time and resident memory of this process and of WallpaperAgent (or Dock)
 //      while idle and while updating every few seconds
 //   4. optionally (--manual) asks the operator to check Spaces and a screen share
-//   5. always restores the saved pictures and reads them back
+//   5. always restores the saved pictures and reads them back (Ctrl+C included), except while the
+//      operator may be on the second Space of the manual check, where a restore would act on the wrong
+//      Space; then it leaves the restore file and the placeholder images for a manual restore
 //
 // NSWorkspace sets the picture of the current Space only. The script therefore changes and restores
 // the current Space of each screen; other Spaces are not touched (except during the manual check,
@@ -113,7 +115,7 @@ func parseCpuTime(_ s: String) -> Double? {
 
 func procSample(_ name: String) -> [String: Any] {
     let pids = run("/usr/bin/pgrep", ["-x", name]).split(separator: "\n").map(String.init)
-    if pids.isEmpty { return ["cpu_s": NSNull(), "rss_mb": NSNull(), "n": 0] }
+    if pids.isEmpty { return ["cpu_s": NSNull(), "rss_mb": NSNull(), "n": 0, "pids": ""] }
     var cpu = 0.0
     var rss = 0.0
     var ok = true
@@ -125,7 +127,8 @@ func procSample(_ name: String) -> [String: Any] {
             rss += r / 1024
         } else { ok = false }
     }
-    return ["cpu_s": ok ? (cpu as Any) : NSNull(), "rss_mb": rss, "n": pids.count]
+    // the pid set lets delta() reject a span in which a process was restarted
+    return ["cpu_s": ok ? (cpu as Any) : NSNull(), "rss_mb": rss, "n": pids.count, "pids": pids.sorted().joined(separator: ",")]
 }
 
 func selfSample() -> [String: Any] {
@@ -135,7 +138,7 @@ func selfSample() -> [String: Any] {
         + Double(ru.ru_stime.tv_sec) + Double(ru.ru_stime.tv_usec) / 1e6
     let rssLine = run("/bin/ps", ["-o", "rss=", "-p", String(ProcessInfo.processInfo.processIdentifier)])
     let rss = (Double(rssLine.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0) / 1024
-    return ["cpu_s": cpu, "rss_mb": rss, "n": 1]
+    return ["cpu_s": cpu, "rss_mb": rss, "n": 1, "pids": String(ProcessInfo.processInfo.processIdentifier)]
 }
 
 let agentName = run("/usr/bin/pgrep", ["-x", "WallpaperAgent"]).isEmpty ? "Dock" : "WallpaperAgent"
@@ -149,8 +152,11 @@ func delta(_ a: [String: [String: Any]], _ b: [String: [String: Any]]) -> [Strin
     for (k, va) in a {
         let vb = b[k] ?? [:]
         var d: Any = NSNull()
-        if let x = va["cpu_s"] as? Double, let y = vb["cpu_s"] as? Double { d = ((y - x) * 1000).rounded() / 1000 }
-        out[k] = ["cpu_s": d, "rss_mb_start": orNull(va["rss_mb"]), "rss_mb_end": orNull(vb["rss_mb"])] as [String: Any]
+        let changed = (va["pids"] as? String) != (vb["pids"] as? String)
+        if !changed, let x = va["cpu_s"] as? Double, let y = vb["cpu_s"] as? Double { d = ((y - x) * 1000).rounded() / 1000 }
+        // the pids themselves do not go to the results
+        out[k] = ["cpu_s": d, "pids_changed": changed, "rss_mb_start": orNull(va["rss_mb"]),
+                  "rss_mb_end": orNull(vb["rss_mb"])] as [String: Any]
     }
     return out
 }
@@ -234,11 +240,13 @@ res["original_readable_file"] = exists
 func writeResults(_ suffix: String) {
     res["finished"] = isoFmt.string(from: Date())
     let out = resultsDir.appendingPathComponent("eh2-macos-\(stamp)\(suffix).json")
-    if let data = try? JSONSerialization.data(withJSONObject: res, options: [.prettyPrinted, .sortedKeys]) {
-        try? data.write(to: out)
+    do {
+        let data = try JSONSerialization.data(withJSONObject: res, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: out)
+        print("Results: \(out.path)")
+    } catch {
+        print("Could not write the results: \(error)")
     }
-    try? FileManager.default.removeItem(at: work)
-    print("Results: \(out.path)")
 }
 
 if dryRun {
@@ -254,10 +262,13 @@ if dryRun {
     }
     res["dryrun_get_latency_ms_median"] = orNull(median(lat))
     let s0 = samples()
+    let t0 = nowMs()
     Thread.sleep(forTimeInterval: 3)
     res["dryrun_cpu"] = delta(s0, samples())
+    res["dryrun_elapsed_s"] = (nowMs() - t0) / 1000
     print("Dry run (the picture was not changed).")
     writeResults("-dryrun")
+    try? FileManager.default.removeItem(at: work)
     exit(0)
 }
 
@@ -268,17 +279,78 @@ if !force && exists.contains(false) {
 }
 
 // The restore file is the only place that holds the original paths. It stays in the temporary folder.
+// Nothing is changed unless it was written.
 let restoreJSON: [[String: Any]] = orig.enumerated().map { i, o in ["index": i, "url": orNull(o.url?.path)] as [String: Any] }
-if let data = try? JSONSerialization.data(withJSONObject: restoreJSON, options: [.prettyPrinted]) {
-    try? data.write(to: restoreFile)
+do {
+    let data = try JSONSerialization.data(withJSONObject: restoreJSON, options: [.prettyPrinted])
+    try data.write(to: restoreFile)
+} catch {
+    print("Could not save the original pictures (\(error)). Nothing was changed.")
+    exit(4)
 }
 print("Saved the original pictures to \(restoreFile.path)")
 
+// ---------------------------------------------------------------------------
+// Interruption: Ctrl+C or a termination request only raises a flag. The main flow stops at its next
+// step and restores in one place. While the main flow waits for the operator (readLine) it cannot
+// change the picture, so the handler restores itself in that case.
+// ---------------------------------------------------------------------------
+struct Interrupted: Error {}
+let stateLock = NSLock()
+var interrupted = false
+var inPrompt = false
+var onOtherSpace = false  // the operator was sent to the second Space and has not been confirmed back
+var restoreTargetUnconfirmed = false
 var restoredOnce = false
 
+func isInterrupted() -> Bool {
+    stateLock.lock()
+    defer { stateLock.unlock() }
+    return interrupted
+}
+
+func nap(_ seconds: Double) throws {
+    let end = nowMs() + seconds * 1000
+    while nowMs() < end {
+        if isInterrupted() { throw Interrupted() }
+        Thread.sleep(forTimeInterval: min(0.1, max(0, (end - nowMs()) / 1000)))
+    }
+    if isInterrupted() { throw Interrupted() }
+}
+
+func setPicture(_ u: URL, _ s: NSScreen, _ o: [NSWorkspace.DesktopImageOptionKey: Any]) throws {
+    if isInterrupted() { throw Interrupted() }
+    try ws.setDesktopImageURL(u, for: s, options: o)
+}
+
+func guarded<T>(_ f: () -> T) throws -> T {
+    stateLock.lock()
+    inPrompt = true
+    let before = interrupted
+    stateLock.unlock()
+    if before {
+        stateLock.lock(); inPrompt = false; stateLock.unlock()
+        throw Interrupted()
+    }
+    let v = f()
+    stateLock.lock(); inPrompt = false; stateLock.unlock()
+    if isInterrupted() { throw Interrupted() }
+    return v
+}
+
 func restore() {
-    if restoredOnce { return }
+    stateLock.lock()
+    if restoredOnce { stateLock.unlock(); return }
     restoredOnce = true
+    let other = onOtherSpace
+    stateLock.unlock()
+    if other {
+        // restoring now would act on the second Space and leave the first one with the placeholder
+        res["restored"] = "not_attempted_on_other_space"
+        print("Not restored: this may be the second Space. Go back to the first Space and pick your picture again")
+        print("(the original paths are in \(restoreFile.path), the placeholder images in \(work.path); see README).")
+        return
+    }
     var restored: [Any] = []
     for o in orig {
         guard let u = o.url else { restored.append("original_missing"); continue }
@@ -288,32 +360,43 @@ func restore() {
         } catch { restored.append(false) }
     }
     res["restored"] = restored
+    res["restore_target_unconfirmed"] = restoreTargetUnconfirmed
     let allOk = restored.allSatisfy { ($0 as? Bool) == true }
     print("Restored: \(restored)")
-    if allOk {
+    if allOk && !restoreTargetUnconfirmed {
         try? FileManager.default.removeItem(at: restoreFile)
+        try? FileManager.default.removeItem(at: work)
     } else {
-        print("Restore was not confirmed. The original paths are kept in \(restoreFile.path) (see README).")
+        // keep the placeholder images too: a picture may still point at them
+        print("Restore was not confirmed. The original paths are kept in \(restoreFile.path) and the placeholder images in \(work.path) (see README).")
     }
 }
 
-// Ctrl+C or a termination request still restores the pictures and writes the results.
+func finish(_ code: Int32) -> Never {
+    restore()
+    writeResults("")
+    exit(code)
+}
+
 signal(SIGINT, SIG_IGN)
 signal(SIGTERM, SIG_IGN)
 var signalSources: [DispatchSourceSignal] = []
 for sig in [SIGINT, SIGTERM] {
     let src = DispatchSource.makeSignalSource(signal: sig, queue: DispatchQueue.global())
     src.setEventHandler {
+        stateLock.lock()
+        interrupted = true
+        let waiting = inPrompt
+        stateLock.unlock()
         print("\nInterrupted: restoring the original pictures.")
         res["interrupted"] = true
-        restore()
-        writeResults("")
-        exit(130)
+        if waiting { finish(130) }
     }
     src.resume()
     signalSources.append(src)
 }
 
+var exitCode: Int32 = 0
 do {
     var imgs: [[URL]] = []
     for (i, o) in orig.enumerated() {
@@ -333,72 +416,88 @@ do {
         for (i, o) in orig.enumerated() {
             let u = imgs[i][k % 2]
             let t0 = nowMs()
-            try ws.setDesktopImageURL(u, for: o.screen, options: opts)
+            try setPicture(u, o.screen, opts)
             lat.append(nowMs() - t0)
             tot += 1
             if samePath(ws.desktopImageURL(for: o.screen), u) { okN += 1 }
         }
-        Thread.sleep(forTimeInterval: 0.3)
+        try nap(0.3)
     }
     res["per_screen"] = ["calls": tot, "readback_ok": okN, "latency_ms_median": orNull(median(lat)),
                          "latency_ms_p95": orNull(pct(lat, 95)), "latency_ms_max": orNull(lat.max())] as [String: Any]
 
     // 2. Distinct pictures per screen
     if orig.count >= 2 {
-        for (i, o) in orig.enumerated() { try ws.setDesktopImageURL(imgs[i][i % 2], for: o.screen, options: opts) }
+        for (i, o) in orig.enumerated() { try setPicture(imgs[i][i % 2], o.screen, opts) }
         res["distinct_per_screen_readback_ok"] = orig.enumerated().allSatisfy { i, o in samePath(ws.desktopImageURL(for: o.screen), imgs[i][i % 2]) }
     } else {
         res["distinct_per_screen_readback_ok"] = "single_screen"
     }
 
-    // 3. CPU and memory: idle, then updating
+    // 3. CPU and memory: idle, then updating (elapsed times are measured, not assumed)
     let s0 = samples()
-    Thread.sleep(forTimeInterval: TimeInterval(idleS))
+    let tIdle = nowMs()
+    try nap(Double(idleS))
     let s1 = samples()
+    let idleElapsed = (nowMs() - tIdle) / 1000
     var updates = 0
     let tStart = nowMs()
     while nowMs() - tStart < Double(busyS) * 1000 {
-        for (i, o) in orig.enumerated() { try ws.setDesktopImageURL(imgs[i][updates % 2], for: o.screen, options: opts) }
+        for (i, o) in orig.enumerated() { try setPicture(imgs[i][updates % 2], o.screen, opts) }
         updates += 1
-        Thread.sleep(forTimeInterval: TimeInterval(busyEvery))
+        try nap(Double(busyEvery))
     }
     let s2 = samples()
     res["cpu"] = ["idle_s": idleS, "busy_s": busyS, "busy_every_s": busyEvery, "busy_updates": updates,
+                  "idle_elapsed_s": idleElapsed, "busy_elapsed_s": (nowMs() - tStart) / 1000,
                   "idle": delta(s0, s1), "busy": delta(s1, s2)] as [String: Any]
 
     // 4. Optional manual checks
     if manual {
-        waitEnter("\nManual check A: Spaces. Open Mission Control, add a second Space, come back to the first one, then press Enter.")
+        try guarded { waitEnter("\nManual check A: Spaces. Open Mission Control, add a second Space, come back to the first one, then press Enter.") }
         let o0 = orig[0]
-        try ws.setDesktopImageURL(imgs[0][0], for: o0.screen, options: opts)
-        waitEnter("The striped image is now set on this Space. Switch to the second Space (Ctrl+Right) and press Enter.")
-        res["manual_spaces"] = [
-            "readback_matches_on_other_space": samePath(ws.desktopImageURL(for: o0.screen), imgs[0][0]),
-            "striped_image_visible_on_other_space": askYesNo("Do you see the striped image on the second Space?"),
-        ] as [String: Any]
-        waitEnter("Switch back to the first Space, then press Enter.")
+        try setPicture(imgs[0][0], o0.screen, opts)
+        stateLock.lock(); onOtherSpace = true; stateLock.unlock()
+        try guarded { waitEnter("The striped image is now set on this Space. Switch to the second Space (Ctrl+Right) and press Enter.") }
+        let readbackOther = samePath(ws.desktopImageURL(for: o0.screen), imgs[0][0])
+        let visibleOther = try guarded { askYesNo("Do you see the striped image on the second Space?") }
+        res["manual_spaces"] = ["readback_matches_on_other_space": readbackOther,
+                                "striped_image_visible_on_other_space": visibleOther] as [String: Any]
+        try guarded { waitEnter("Switch back to the first Space, then press Enter.") }
         // Everything after this (the share check and the restore) acts on the current Space.
         var back = true
         while !samePath(ws.desktopImageURL(for: o0.screen), imgs[0][0]) {
-            print("The picture here is not the striped image, so this may not be the first Space. Switch back and press Enter, or type skip: ", terminator: "")
-            if (readLine() ?? "").trimmingCharacters(in: .whitespaces).lowercased() == "skip" { back = false; break }
+            let ans = try guarded { () -> String in
+                print("The picture here is not the striped image, so this may not be the first Space. Switch back and press Enter, or type skip: ", terminator: "")
+                return (readLine() ?? "").trimmingCharacters(in: .whitespaces).lowercased()
+            }
+            if ans == "skip" { back = false; break }
         }
         res["manual_back_on_first_space_confirmed"] = back
-        waitEnter("\nManual check B: start a screen share or a screen recording that shows the desktop, then press Enter. Three updates follow, 5 s apart.")
-        for k in 0..<3 {
-            try ws.setDesktopImageURL(imgs[0][(k + 1) % 2], for: o0.screen, options: opts)
-            Thread.sleep(forTimeInterval: 5)
+        if back {
+            stateLock.lock(); onOtherSpace = false; stateLock.unlock()
+            try guarded { waitEnter("\nManual check B: start a screen share or a screen recording that shows the desktop, then press Enter. Three updates follow, 5 s apart.") }
+            for k in 0..<3 {
+                try setPicture(imgs[0][(k + 1) % 2], o0.screen, opts)
+                try nap(5)
+            }
+            let shareVisible = try guarded { askYesNo("Was the change of picture visible in the share or recording?") }
+            let flicker = try guarded { askYesNo("Was there a flicker or a flash on the screen when the picture changed?") }
+            res["manual_screen_share"] = ["change_visible_in_share": shareVisible, "flicker_or_flash": flicker] as [String: Any]
+        } else {
+            // not confirmed on the first Space: no further change, and the automatic restore is not trusted
+            res["manual_screen_share"] = "skipped_not_on_first_space"
+            restoreTargetUnconfirmed = true
         }
-        res["manual_screen_share"] = [
-            "change_visible_in_share": askYesNo("Was the change of picture visible in the share or recording?"),
-            "flicker_or_flash": askYesNo("Was there a flicker or a flash on the screen when the picture changed?"),
-        ] as [String: Any]
     }
+} catch is Interrupted {
+    res["interrupted"] = true
+    exitCode = 130
 } catch {
     // only the domain and code go to the results: the description can carry file paths
     let ns = error as NSError
     res["error"] = ["domain": ns.domain, "code": ns.code] as [String: Any]
     print("Error: \(error)")
+    exitCode = 1
 }
-restore()
-writeResults("")
+finish(exitCode)

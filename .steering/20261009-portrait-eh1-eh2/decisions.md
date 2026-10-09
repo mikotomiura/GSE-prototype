@@ -76,3 +76,30 @@
 | R12 | security | LOW | `-ExecutionPolicy Bypass` | その起動の間だけ効くので使ってよい範囲（指摘のとおり）。変えない |
 
 - **読んでいない範囲**（両系統の申告）: Windows / macOS の API が実際にどう振る舞うか（Themes のキャッシュ・Space ごとの設定）・`render_e18.py` の詳細・依存ライブラリの脆弱性の照合。
+
+## 判断 7（2026-10-09）: `/cross-review` 1 巡目の結果と対応
+
+- **範囲**: `82859a27..c24fdbc7`。焦点は自文書・他文書の矛盾（設計・引き継ぎ・README と実装）。
+- **回し方**: メインが Claude 系統（`code-reviewer`・約 5.7 分・全ファイル）と Codex 系統（`scripts/run-codex-review.sh` を 2 本: EH1 のコード 1,707 行・EH2 のコード 807 行。差分全体は 2,919 行で手動承認の閾値 2,000 行を超えるので、パスで分けた）を並列に起動した。Codex は 2 本で 77,456 トークン（このブランチの台帳 0 → 77,456 / 2 回。今日の全体は origin/main の 115,752 と合わせて約 193,000 / 300,000）。
+- **結果**: Codex 10 件・Claude 16 件（HIGH 1・MEDIUM 4・LOW 11）。一次で裏取りし、すべて妥当と判断した（偽陽性なし）。2 系統で重なったのは 2 件（Swift の中断の競合・戻らないときに仮の画像を消す）。
+
+| # | 系統 | 指摘 | 対応 |
+|---|---|---|---|
+| Z1 | Codex ＋ Claude | Swift: 中断のハンドラが別スレッドで戻し、メインの更新と競合する | 後半を組み直した: ハンドラはフラグを立てるだけ。メインは各段でフラグを見て 1 か所で戻す。操作者の入力を待っている間だけハンドラが戻す |
+| Z2 | Codex | 両 OS: 手の確認で `skip` したまま別のデスクトップ / Space で戻す。2 枚目にいる間の中断も同じ | 2 枚目にいる間（戻ったことを確かめるまで）は自動で戻さず、restore ファイルと仮の画像を残して手で戻す案内を出す。`skip` なら画面共有の確認もしない |
+| Z3 | Codex ＋ Claude | Swift: 戻らなかったときも仮の画像を消す | 戻ったと確かめたときだけ消す（Windows と同じ） |
+| Z4 | Codex | Swift: restore ファイルの書き込みの失敗を無視する／結果の書き込みの失敗を隠す | restore ファイルが書けなければ何も替えずに止まる（exit 4）。結果の書き込みの失敗は表示する |
+| Z5 | Codex | CPU: 測定中のプロセスの入れ替わりで値が壊れる。`busy_s` が設定値 | PID の組が変わったら CPU を null にし `pids_changed` を記録（PID は書かない）。実測の経過時間を足した |
+| Z6 | Codex | E1-4 が途中の縮みを見逃す・検査 0 件でも緑 | 途中のすべての表示で確かめ、0 件は判定不能（design §8） |
+| Z7 | Codex | 順序の感度が順序を分離していない（O の前半は中身も違う） | 固定した §3.3 は残し、探索として「順序だけの感度」（D_shuffled と揺らし Jsh）を足した（design §8） |
+| Z8 | Codex | v2 のまとまりの長さが打鍵の速さでずれる | 休止を引いた終わりから数える（design §8） |
+| Z9 | Codex | JSON に `Infinity` | 文字列にして標準の JSON で書く（design §8） |
+| Z10 | Codex | provenance に `src-tauri` の変更が残らない | `src_tauri_dirty` を足した |
+| Z11 | Claude | HIGH: `experiment_dir_dirty` が本番で必ず真（`results/` の未追跡） | `results/` を除いて判定する（design §8） |
+| Z12 | Claude | 引き継ぎの EH2 のパスがバックスラッシュで git-bash で通らない | スラッシュにし、両方のシェルで打てると書いた |
+| Z13 | Claude | requirement・design §7・判断 2 が「この機械で `-Quick`」のまま | 下の「判断 2-4 の条件」を記録し、requirement と design §7 に注記した |
+| Z14 | Claude | モデル B が見えた更新だけを数える（§1.5 は実際の更新時刻） | 実際の更新の特徴も足した（design §8） |
+| Z15 | Claude | LOW: 順序の型 7 種が §8 に無い／design の古い記述／EH2 の画像の説明／provenance の OS とコア数／data.md の行の種類／PS1 の COM の失敗の中身／3 つ目の変異の生成器の時点／Python の版 | すべて直した（design §1.1・§2・§4・§8・data.md・PS1 の `inner_type` と `hresult`・引き継ぎ） |
+
+- **判断 2-4 の条件は満たせなかった**: 判断 2 の 4 は「Windows 版はこの機械で短く試して元の壁紙に戻す（壊れたスクリプトを渡さないため）」だった。この機械の背景が Windows スポットライトで、替えると API では戻せないので、`-DryRun`（壁紙を替えない部分）だけを回した。→ **受け手の Windows の機器の `-Quick` を最初の検証にする**（引き継ぎ §3 に「Restored: True ... が出なければ止めて報告」と書いた）。macOS 版はコンパイルもしていない → 受け手で最初に `swiftc -typecheck`。
+- **Claude 系統の「読んでいない範囲」**: Swift が実際にコンパイルできるか・Windows / macOS の API の実際の振る舞い・`capabilities_gate.py` の本体・replay.rs の tick の扱い。

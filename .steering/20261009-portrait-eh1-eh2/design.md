@@ -18,12 +18,12 @@ gse-replay <ndjson>（GSE の計算そのもの・この worktree のコミッ�
 portrait.py ── 更新の時刻を決める（scheduler）→ 形を描く（generator）→ 表示中の画像の列
       │
       ▼
-checks.py ── E1-1〜E1-7・順序の感度 → results/*.json（緑・赤・判定不能）
+checks.py ── E1-1〜E1-7・順序の感度 → results/<world>/*.json（緑・赤・判定不能）
 render_e18.py ── E1-8 の候補を PNG に（基準なし）
 ```
 
 - F 系列は Python で計算し直さず、`gse-replay`（`src-tauri/src/bin/replay.rs` の `run_replay`）が出す `FeatSnapshot` を使う。肖像の材料が GSE の F 系列そのものであることを保つため。
-- 生成した NDJSON と `FeatSnapshot` は `experiments/20261009-portrait-eh1/work/`（`.gitignore`）に置き、コミットしない。コミットするのは集計 JSON と少数の PNG。
+- 生成した NDJSON と `FeatSnapshot` は `experiments/20261009-portrait-eh1/work-<world>[-smoke]/`（`.gitignore`）に置き、コミットしない。コミットするのは集計 JSON と少数の PNG。
 - 合成の記録には `meta.capabilities`（`key` を `unconditional`）を書く。`run.sh` の Step 0（`capabilities_gate.py --require key`）を消さずに通す。
 
 ### 1.2 合成の記録（`gen_sessions.py`）
@@ -88,9 +88,9 @@ render_e18.py ── E1-8 の候補を PNG に（基準なし）
 ## 2. 変更対象
 
 ### 新規作成するファイル
-- `experiments/20261009-portrait-eh1/`: `config.json`・`SEED`・`data.md`・`env.md`・`requirements.txt`・`run.sh`・`notes.md`・`scripts/`（`gen_sessions.py`・`portrait.py`・`checks.py`・`render_e18.py`・`selftest.py`）・`results/`・`.gitignore`（`work/`）
-- `experiments/20261009-portrait-eh2/`: `windows/eh2_wallpaper.ps1`・`macos/eh2_wallpaper.swift`・`README.md`・`notes.md`・`results/`
-- `.steering/_handoff/next-session-portrait-eh2-windows.md`・`next-session-portrait-eh2-macos.md`
+- `experiments/20261009-portrait-eh1/`: `config.json`・`SEED`・`data.md`・`env.md`・`requirements.txt`・`run.sh`・`notes.md`・`scripts/`（`gen_sessions.py`・`replay_all.py`・`portrait.py`・`checks.py`・`render_e18.py`・`selftest.py`）・`results/<world>/`・`.gitignore`（`.venv/`・`work-*/`・`results/*-smoke/`）
+- `experiments/20261009-portrait-eh2/`: `windows/eh2_wallpaper.ps1`・`macos/eh2_wallpaper.swift`・`README.md`・`notes-windows.md`・`notes-macos.md`（引き継ぎ先が作る）・`results/`
+- `.steering/_handoff/next-session-portrait-eh1-eh2-windows.md`（EH1 ＋ EH2）・`next-session-portrait-eh2-macos.md`（EH2）
 
 ### 修正するファイル
 - なし（`src-tauri/`・`src/` は変えない。`gse-replay` はビルドして使うだけ）
@@ -164,7 +164,7 @@ render_e18.py ── E1-8 の候補を PNG に（基準なし）
 
 ## 4. EH2（`experiments/20261009-portrait-eh2/`）
 
-仮の画像（単色と縞の 2 枚 ＋ 各モニタの解像度の画像）で回す。合否は置かず、記録するだけ。
+仮の画像（縞と点の 2 枚。各モニタの解像度で作る）で回す。合否は置かず、記録するだけ。
 
 | 項目 | Windows（`IDesktopWallpaper`） | macOS（`NSWorkspace`） | 自動 / 手 |
 |---|---|---|---|
@@ -195,7 +195,7 @@ render_e18.py ── E1-8 の候補を PNG に（基準なし）
 
 - `selftest.py`: §3.6・§3.8 ＋ scheduler の境界（打鍵中の slot は飛ばす・スリープで飛んだ slot は追いかけない・上限 1 回）＋ 合成の記録が `gse-replay` を通ること。
 - `run.sh --smoke`: P を 12 本に減らして全段を通す（数分）。本番の前に回す。
-- EH2: Windows 版をこの機械で `-Quick`（3 回だけ・手の手順なし）で回し、元の壁紙に戻ったことを読み戻しで確かめる。
+- EH2: Windows 版をこの機械で `-Quick`（3 回だけ・手の手順なし）で回し、元の壁紙に戻ったことを読み戻しで確かめる。⚠️ この機械の背景が Windows スポットライトで、替えて戻す経路は回せなかった（`-DryRun` だけ）。受け手の機器の `-Quick` を最初の検証にする（decisions 判断 7）。macOS 版はコンパイルもしていないので、受け手で最初に `swiftc -typecheck`。
 
 ## 8. 固定の後の逸脱
 
@@ -212,7 +212,14 @@ render_e18.py ── E1-8 の候補を PNG に（基準なし）
 | 2026-10-09 12:40 | **本番を止めて捨てた**: 計器 `a5867958` で v1 の本番を回し始め、`results/v1/e13.json` ができた段階で止めた。⚠️ **結果のファイルは開かずに消した**（v2 は始まった直後で、出力も開かずに消した） | code-reviewer の指摘（次の行）が結果を変えるため。研究者の指示で EH1 を Windows の機器に回すことにもなった（判断 5） |
 | 2026-10-09 12:45 | キーを離す時刻（dwell）を、押す打鍵と一緒に区間の中で引くようにした。J は Oa の dwell をそのまま持ち、押す時刻だけを ±50 ms 動かす。O の組の後半は離す時刻まで同じ列になる | 設計 §1.2 の文言（J は「各打鍵の時刻を揺らした」・O は「最後の 20 分の打鍵を同じ列で共有」）どおりにした。前の実装は dwell をセッション ID から引き直しており、J と O の後半で離す時刻が独立に変わっていた（F1 は押すと離すの組から作るので、d_J と d_O が水増しされる向き） |
 | 2026-10-09 12:45 | scheduler がスリープの判定にラベルの配列を読まないようにした（`Session.sleep` を別に持つ） | E1-1 の境界を書き方に頼らないため（scheduler が読むのはスリープの有無だけ） |
-| 2026-10-09 12:45 | design §3.8 の 3 つ目の変異（`raw` の水準をラベルと無関係な乱数に替えると、E1-3 の上乗せが 0.03 未満に落ちる）を `selftest.py` に実装した（P が 40 本未満のスモークでは飛ばす）。全数の記録の先頭 60 本で上乗せ hgb +0.000・lr −0.001 を確かめた | 設計にあったのに実装していなかった |
+| 2026-10-09 12:45 | design §3.8 の 3 つ目の変異（`raw` の水準をラベルと無関係な乱数に替えると、E1-3 の上乗せが 0.03 未満に落ちる）を `selftest.py` に実装した（P が 40 本未満のスモークでは飛ばす）。全数の記録の先頭 60 本で上乗せ hgb +0.000・lr −0.001 を確かめた（記録は dwell の修正の**後**の生成器で作った・確かめたあと消した） | 設計にあったのに実装していなかった |
+| 2026-10-09 13:00 | **E1-4 を、不在の中の最初の更新の直後から戻った時点までの、すべての表示で確かめる**ようにした（終点だけの数も `endpoint_only_violations` として残す）。検査した不在が 0 件なら判定不能にする | `/cross-review` 1 巡目（Codex）の指摘。終点だけだと、途中で縮んで最後に戻る形を見逃す。打鍵の無い 60 s 以上には、机の前で考えている時間も入るので、途中の表示も本人に見えうる。どちらも緑を出しにくくする向き |
+| 2026-10-09 13:00 | **探索（固定の外）として「順序だけの感度」を足した**: D_shuffled の組（同じ区間を別の順に並べた a・b）の距離 ÷ a の打鍵の時刻を ±50 ms 揺らした写し（新しい集合 `Jsh`・20 本）との距離。`order.json` の `exploratory_order_only` に出し、合否を付けない | `/cross-review` 1 巡目（Codex）の指摘。§3.3 の O の組は前半を別々に作るので、測っているのは順序ではなく「履歴（中身を含む）の違い」への感度である。固定した §3.3 はそのまま残し、notes では「経路（履歴）の感度」と呼ぶ |
+| 2026-10-09 13:00 | world v2 で、まとまりの後の休止を「引いたまとまりの終わり」から数えるようにした | `/cross-review` 1 巡目（Codex）の指摘。最後の打鍵の時刻から数えていたので、打鍵の遅い STRUGGLE ほど次のまとまりの始まりがずれ、打鍵の有無の型に差が残っていた（v2 の狙いを損なう向き） |
+| 2026-10-09 13:10 | モデル B に、**実際の更新**の時刻の特徴（窓の中の数・最後の更新からの秒数・直近 10 分の数）を足した（見えた更新の特徴は残す） | `/cross-review` 1 巡目（Claude）の指摘。§1.5 は「実際の更新時刻」と書いたが、実装は画像が変わった更新だけを数えていた。何も変えない更新も、壁紙を設定する操作として見えうる（EH2 で確かめる）。攻撃者に渡る情報を増やす向き |
+| 2026-10-09 13:10 | `run.sh` の `experiment_dir_dirty` を、`results/` を除いた計器だけで判定する。provenance に `platform`・`cpu_count` を足した | 本番では `results/<world>/` が未追跡のファイルで埋まるので、前の判定は必ず真になっていた（スモークは `.gitignore` で無視されるので偽になり、気づけなかった）。本番を別の機器で回すので、OS とコア数を結果に残す |
+| （固定の時点・a5867958 から） | `ordinal` の順序の型は、6 種に「同じ値を含む（tie）」を足した 7 種で数える | §1.4 は「6 種」と書いた。F 系列は同じ値が続く（例: 修正の無い区間の f3 = 0）ので、tie を 6 種のどれかに押し込むと、上りの型と区別できなくなる。§8 に書き漏れていた（`/cross-review` 1 巡目 Claude の指摘） |
+| 2026-10-09 13:00 | 結果の JSON の非有限の数を `"inf"`・`"-inf"`・`"nan"` の文字列にし、標準の JSON で書く。provenance に `src_tauri_dirty` を足した | `/cross-review` 1 巡目（Codex）の指摘。`Infinity` は標準の JSON ではない。`gse-replay` のソースの変更が記録に残らなかった |
 | 2026-10-09 12:45 | 順序の感度の終わりの画像を float16 から float32 にした。E1-2 の slot の数を `(長さ − 1) // I` にした。順位相関の空の場合の扱い | float16 の量子化（約 5e-4）が比 3 の付近を揺らしうる。slot の数が 1 多かった（記述だけの値） |
 
 ## 9. ロールバック計画

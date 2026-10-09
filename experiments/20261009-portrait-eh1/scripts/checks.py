@@ -130,6 +130,17 @@ def lagged(F: np.ndarray, sess_idx: np.ndarray, lags: int) -> np.ndarray:
     return np.hstack(parts)
 
 
+def clean(o):
+    """Standard JSON: non-finite floats become the strings "inf", "-inf" and "nan"."""
+    if isinstance(o, dict):
+        return {k: clean(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [clean(v) for v in o]
+    if isinstance(o, float) and not np.isfinite(o):
+        return "nan" if np.isnan(o) else ("inf" if o > 0 else "-inf")
+    return o
+
+
 def ratio_of_medians(a: np.ndarray, b: np.ndarray) -> float:
     ma, mb = np.median(a) if len(a) else np.nan, np.median(b) if len(b) else np.nan
     if ma == 0 and mb == 0:
@@ -178,8 +189,8 @@ def main() -> int:
         for m in by_set[s]:
             for c in C["grid"]:
                 tasks.append((m["sid"], c, False, c.name in base6_names))
-    for s in ("O", "J"):
-        for m in by_set[s]:
+    for s in ("O", "J", "Jsh"):
+        for m in by_set.get(s, []):
             for c in C["base6"]:
                 tasks.append((m["sid"], c, False, True))
     tasks.sort(key=lambda t: t[0])  # keeps a session's runs together for the per-worker cache
@@ -259,7 +270,7 @@ def main() -> int:
         else:
             rec["verdict"] = "green" if rec["upper_max"] < margin else "red"
     e13["positive_controls_ok"], e13["null_ok"] = pcs_ok, null_ok
-    (out / "e13.json").write_text(json.dumps(e13, indent=1), encoding="utf-8")
+    (out / "e13.json").write_text(json.dumps(clean(e13), indent=1, allow_nan=False), encoding="utf-8")
     print(f"E1-3 done at {time.time() - t0:.0f} s")
 
     # ---------------- E1-6 / E1-4 / E1-7 ----------------
@@ -274,13 +285,19 @@ def main() -> int:
         rows = []
         for i, sid in enumerate(p_sids):
             for ab in results[(sid, c.name)]["absences"]:
-                rows.append((i, ab["len"], ab["change"], ab["change_proj"], ab["e14_violation"]))
+                rows.append((i, ab["len"], ab["change"], ab["change_proj"], ab["e14_violation"],
+                             ab["e14_endpoint_violation"]))
         si = np.array([r[0] for r in rows])
         ln = np.array([r[1] for r in rows])
         ch = np.array([r[2] for r in rows])
         e14v = [r[4] for r in rows if r[4] is not None]
+        e14_end = [r[5] for r in rows if r[5] is not None]
+        if not e14v:
+            v14 = "undecidable"  # no absence held an update: nothing was checked (design section 8)
+        else:
+            v14 = "green" if sum(e14v) == 0 else "red"
         e14c[c.name] = {"n_checked": len(e14v), "violations": int(sum(e14v)),
-                        "verdict": "green" if sum(e14v) == 0 else "red"}
+                        "endpoint_only_violations": int(sum(e14_end)), "verdict": v14}
         if c.pc:
             continue
         inv = (ln >= band_i[0]) & (ln < band_i[1])
@@ -316,17 +333,18 @@ def main() -> int:
                 viol += results[(m["sid"], c.name)]["e17_violations"]
                 n_d += 1
         e17c[c.name] = {"sessions": len(p_sids) + n_d, "violations": int(viol), "verdict": "green" if viol == 0 else "red"}
-    (out / "e16.json").write_text(json.dumps({k: v for k, v in e16c.items() if k not in explo_names}, indent=1),
+    (out / "e16.json").write_text(json.dumps(clean({k: v for k, v in e16c.items() if k not in explo_names}), indent=1, allow_nan=False),
                                   encoding="utf-8")
-    (out / "e14.json").write_text(json.dumps({k: v for k, v in e14c.items() if k not in explo_names}, indent=1),
+    (out / "e14.json").write_text(json.dumps(clean({k: v for k, v in e14c.items() if k not in explo_names}), indent=1, allow_nan=False),
                                   encoding="utf-8")
-    (out / "exploratory_recent.json").write_text(json.dumps(
+    (out / "exploratory_recent.json").write_text(json.dumps(clean(
         {"_note": "Outside the frozen criteria (design section 8): a scheduler that never updates inside an absence "
                   "of 60 s or more.",
          "e16": {k: v for k, v in e16c.items() if k in explo_names},
          "e14": {k: v for k, v in e14c.items() if k in explo_names},
-         "spearman": {k: v for k, v in spear.items() if k in explo_names}}, indent=1), encoding="utf-8")
-    (out / "e17.json").write_text(json.dumps(e17c, indent=1), encoding="utf-8")
+         "spearman": {k: v for k, v in spear.items() if k in explo_names}}), indent=1, allow_nan=False),
+        encoding="utf-8")
+    (out / "e17.json").write_text(json.dumps(clean(e17c), indent=1, allow_nan=False), encoding="utf-8")
 
     # ---------------- order sensitivity ----------------
     oc = cfg["order"]
@@ -337,6 +355,12 @@ def main() -> int:
 
     def proj(img: np.ndarray) -> np.ndarray:
         return pt.project(img.astype(np.float32), oc["proj_factor"], oc["proj_sigma"])
+
+    def rat(o: list, j: list) -> float:
+        mo, mj = float(np.median(o)), float(np.median(j))
+        if mj == 0:
+            return float("inf") if mo > 0 else float("nan")
+        return mo / mj
 
     for c in C["base6"]:
         dO, dJ, dOp, dJp = [], [], [], []
@@ -349,18 +373,33 @@ def main() -> int:
             dOp.append(pt.mad(proj(fa), proj(fb)))
             dJp.append(pt.mad(proj(fa), proj(fj)))
 
-        def rat(o: list, j: list) -> float:
-            mo, mj = float(np.median(o)), float(np.median(j))
-            if mj == 0:
-                return float("inf") if mo > 0 else float("nan")
-            return mo / mj
-
         r_full, r_proj = rat(dO, dJ), rat(dOp, dJp)
         order[c.name] = {"median_dO": float(np.median(dO)), "median_dJ": float(np.median(dJ)),
                          "ratio_full": r_full, "median_dO_proj": float(np.median(dOp)),
                          "median_dJ_proj": float(np.median(dJp)), "ratio_proj": r_proj,
                          "verdict": "green" if (r_full >= oc["ratio_min"] and r_proj >= oc["ratio_min"]) else "red"}
-    (out / "order.json").write_text(json.dumps(order, indent=1), encoding="utf-8")
+    # exploratory (outside the frozen criteria, design section 8): order only. D_shuffled pairs hold the
+    # same segments in another order; Jsh holds the a-session with the press times jittered.
+    sh_pairs: dict = {}
+    for m in by_set.get("D_shuffled", []) + by_set.get("Jsh", []):
+        sh_pairs.setdefault(m["pair"], {})[m["role"]] = m["sid"]
+    for c in C["base6"]:
+        dS, dJs, dSp, dJsp = [], [], [], []
+        for roles in sh_pairs.values():
+            if not {"a", "b", "j"} <= set(roles):
+                continue
+            fa = results[(roles["a"], c.name)]["final"]
+            fb = results[(roles["b"], c.name)]["final"]
+            fj = results[(roles["j"], c.name)]["final"]
+            dS.append(pt.mad(fa, fb))
+            dJs.append(pt.mad(fa, fj))
+            dSp.append(pt.mad(proj(fa), proj(fb)))
+            dJsp.append(pt.mad(proj(fa), proj(fj)))
+        if dS:
+            order[c.name]["exploratory_order_only"] = {
+                "n_pairs": len(dS), "median_d_shuffled": float(np.median(dS)), "median_d_jitter": float(np.median(dJs)),
+                "ratio_full": rat(dS, dJs), "ratio_proj": rat(dSp, dJsp)}
+    (out / "order.json").write_text(json.dumps(clean(order), indent=1, allow_nan=False), encoding="utf-8")
 
     # ---------------- descriptive: D pairs, Spearman ----------------
     desc = {"spearman_absence_len_vs_change": spear, "pairs": {}}
@@ -373,7 +412,7 @@ def main() -> int:
             d = [pt.mad(results[(r["a"], c.name)]["final"].astype(np.float32),
                         results[(r["b"], c.name)]["final"].astype(np.float32)) for r in pairs.values()]
             desc["pairs"][s][c.name] = {"median": float(np.median(d)), "n": len(d)}
-    (out / "describe.json").write_text(json.dumps(desc, indent=1), encoding="utf-8")
+    (out / "describe.json").write_text(json.dumps(clean(desc), indent=1, allow_nan=False), encoding="utf-8")
 
     # ---------------- E1-2 (scheduler only) ----------------
     g = cfg["e12_grid"]
@@ -416,7 +455,7 @@ def main() -> int:
                         "continuous_max_gap_s": cont_gap,
                         "updates_during_sleep": sleep_ups,
                     }
-    (out / "e12.json").write_text(json.dumps(e12, indent=1), encoding="utf-8")
+    (out / "e12.json").write_text(json.dumps(clean(e12), indent=1, allow_nan=False), encoding="utf-8")
 
     # ---------------- summary ----------------
     summ = {}
@@ -428,7 +467,7 @@ def main() -> int:
                              "E1-7": e17c[c.name]["verdict"]})
     summ["PC1"] = {"E1-3": e13["configs"]["PC1"]["verdict"]}
     summ["PC2"] = {"E1-3": e13["configs"]["PC2"]["verdict"], "E1-4": e14c["PC2"]["verdict"]}
-    (out / "summary.json").write_text(json.dumps(summ, indent=1), encoding="utf-8")
+    (out / "summary.json").write_text(json.dumps(clean(summ), indent=1, allow_nan=False), encoding="utf-8")
     print(f"all done in {time.time() - t0:.0f} s")
     return 0
 

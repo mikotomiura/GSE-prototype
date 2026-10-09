@@ -441,14 +441,22 @@ def run(sess: Session, conf: Config, cfg: dict, seed: int, want_windows: bool, w
         change_proj = mad(project(images[j0], proj["proj_factor"], proj["proj_sigma"]),
                           project(images[jr], proj["proj_factor"], proj["proj_sigma"]))
         inside = ups[(ups > s) & (ups < r)]
-        e14 = None
+        e14 = e14_end = None
         if len(inside):
             j1 = disp_idx_le(float(inside[0]))
-            c1, cr = coverage(images[j1], ground, eps), coverage(images[jr], ground, eps)
-            l1, lr = luminance(images[j1]), luminance(images[jr])
+            c1, l1 = coverage(images[j1], ground, eps), luminance(images[j1])
             rd = cfg["e14"]["rel_drop"]
-            e14 = bool(cr < c1 * (1 - rd) or lr < l1 * (1 - rd))
-        absences.append({"len": r - s, "change": change, "change_proj": change_proj, "e14_violation": e14})
+
+            def drop(j: int) -> bool:
+                return coverage(images[j], ground, eps) < c1 * (1 - rd) or luminance(images[j]) < l1 * (1 - rd)
+
+            # design 3.4 compares the display just after the first update with the one at the return;
+            # every display in between is checked too (a shrink that recovers before the return is still
+            # a shrink while the person may be looking: design section 8)
+            e14_end = bool(drop(jr))
+            e14 = bool(any(drop(j) for j in range(j1, jr + 1)))
+        absences.append({"len": r - s, "change": change, "change_proj": change_proj, "e14_violation": e14,
+                         "e14_endpoint_violation": e14_end})
     res["absences"] = absences
 
     if want_final:
@@ -466,7 +474,7 @@ def window_shape_features(sess: Session, ups: np.ndarray, visible: np.ndarray, i
     n_w = sess.duration_s // ws
     stats = np.array([image_stats(img, ground, eps) for img in images])
     vis_times = ups[visible]
-    feats = np.zeros((n_w, 15 + 14 + 3))
+    feats = np.zeros((n_w, 15 + 14 + 3 + 3))
     for w in range(n_w):
         s, e = w * ws, (w + 1) * ws
         js = int(np.searchsorted(ups, s, side="left"))
@@ -478,11 +486,16 @@ def window_shape_features(sess: Session, ups: np.ndarray, visible: np.ndarray, i
         d[2] = math.hypot(st_e[5] - st_s[5], st_e[6] - st_s[6])
         d[3:6] = st_e[0:3] - st_s[0:3]
         d[6:14] = st_e[7:15] - st_s[7:15]
-        n_in = int(((vis_times >= s) & (vis_times < e)).sum())
-        before = vis_times[vis_times < e]
-        since = float(e - before[-1]) if len(before) else float(e)
-        last10 = int(((vis_times >= e - 600) & (vis_times < e)).sum())
-        feats[w] = np.concatenate([st_e, d, [n_in, since, last10]])
+        # update times: the visible ones, and every actual update (design 1.5; an update that changes
+        # nothing may still be observable, for example as a flash when the wallpaper is set)
+        timing = []
+        for times in (vis_times, ups):
+            n_in = int(((times >= s) & (times < e)).sum())
+            before = times[times < e]
+            since = float(e - before[-1]) if len(before) else float(e)
+            last10 = int(((times >= e - 600) & (times < e)).sum())
+            timing += [n_in, since, last10]
+        feats[w] = np.concatenate([st_e, d, timing])
     return feats
 
 

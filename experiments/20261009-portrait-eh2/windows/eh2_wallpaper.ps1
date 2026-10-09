@@ -131,20 +131,22 @@ function Get-Sha256([string]$path) {
 
 function Get-ProcSample([string]$name) {
     # Sum over all processes of that name. Returns $null fields when access is denied (dwm often is).
-    $cpu = 0.0; $ws = 0.0; $ok = $true; $n = 0
+    # The pid set lets Get-Delta reject a span in which a process was restarted; it is not written out.
+    $cpu = 0.0; $ws = 0.0; $ok = $true; $n = 0; $pids = @()
     foreach ($p in @(Get-Process -Name $name -ErrorAction SilentlyContinue)) {
         $n++
+        $pids += $p.Id
         try { $cpu += $p.TotalProcessorTime.TotalSeconds } catch { $ok = $false }
         try { $ws += $p.WorkingSet64 / 1MB } catch { }
     }
-    if ($n -eq 0) { return @{ cpu_s = $null; ws_mb = $null; n = 0 } }
-    return @{ cpu_s = $(if ($ok) { $cpu } else { $null }); ws_mb = $ws; n = $n }
+    if ($n -eq 0) { return @{ cpu_s = $null; ws_mb = $null; n = 0; pids = '' } }
+    return @{ cpu_s = $(if ($ok) { $cpu } else { $null }); ws_mb = $ws; n = $n; pids = (($pids | Sort-Object) -join ',') }
 }
 
 function Get-Samples {
     $self = Get-Process -Id $PID
     return @{
-        self = @{ cpu_s = $self.TotalProcessorTime.TotalSeconds; ws_mb = $self.WorkingSet64 / 1MB; n = 1 }
+        self = @{ cpu_s = $self.TotalProcessorTime.TotalSeconds; ws_mb = $self.WorkingSet64 / 1MB; n = 1; pids = "$PID" }
         explorer = Get-ProcSample 'explorer'
         dwm = Get-ProcSample 'dwm'
     }
@@ -154,8 +156,9 @@ function Get-Delta($a, $b) {
     $out = @{}
     foreach ($k in $a.Keys) {
         $d = $null
-        if ($a[$k].cpu_s -ne $null -and $b[$k].cpu_s -ne $null) { $d = [Math]::Round($b[$k].cpu_s - $a[$k].cpu_s, 3) }
-        $out[$k] = @{ cpu_s = $d; ws_mb_start = $a[$k].ws_mb; ws_mb_end = $b[$k].ws_mb }
+        $changed = ($a[$k].pids -ne $b[$k].pids)
+        if (-not $changed -and $a[$k].cpu_s -ne $null -and $b[$k].cpu_s -ne $null) { $d = [Math]::Round($b[$k].cpu_s - $a[$k].cpu_s, 3) }
+        $out[$k] = @{ cpu_s = $d; pids_changed = $changed; ws_mb_start = $a[$k].ws_mb; ws_mb_end = $b[$k].ws_mb }
     }
     return $out
 }
@@ -259,6 +262,7 @@ if (-not $Force -and ((@($res.original_exists) -contains $false) -or (@($res.ori
 (@{ position = $origPos; monitors = $orig } | ConvertTo-Json -Depth 4) | Set-Content -LiteralPath $restoreFile -Encoding UTF8
 Write-Host "Saved the original settings to $restoreFile"
 
+$onOtherDesktop = $false
 try {
     # Placeholder images per monitor
     $imgs = @()
@@ -314,8 +318,10 @@ try {
 
     # 4. CPU and memory: idle, then updating
     $s0 = Get-Samples
+    $tIdle = [Diagnostics.Stopwatch]::StartNew()
     Start-Sleep -Seconds $idleS
     $s1 = Get-Samples
+    $idleElapsed = $tIdle.Elapsed.TotalSeconds
     $updates = 0
     $t = [Diagnostics.Stopwatch]::StartNew()
     while ($t.Elapsed.TotalSeconds -lt $busyS) {
@@ -326,6 +332,7 @@ try {
     $s2 = Get-Samples
     $res.cpu = [ordered]@{
         idle_s = $idleS; busy_s = $busyS; busy_every_s = $busyEvery; busy_updates = $updates
+        idle_elapsed_s = [Math]::Round($idleElapsed, 2); busy_elapsed_s = [Math]::Round($t.Elapsed.TotalSeconds, 2)
         idle = (Get-Delta $s0 $s1); busy = (Get-Delta $s1 $s2)
     }
 
@@ -336,6 +343,7 @@ try {
         Write-Host 'Create a second virtual desktop (Win+Ctrl+D), come back to the first one (Win+Ctrl+Left), then press Enter.'
         Read-Host | Out-Null
         for ($i = 0; $i -lt $count; $i++) { $dw.Set($orig[$i].id, $imgs[$i][0]) }
+        $onOtherDesktop = $true
         Write-Host 'The striped image is now set on this desktop. Switch to the second desktop (Win+Ctrl+Right) and press Enter.'
         Read-Host | Out-Null
         $res.manual_virtual_desktop = [ordered]@{
@@ -351,6 +359,12 @@ try {
             if ($ans -eq 'skip') { $back = $false; break }
         }
         $res.manual_back_on_first_desktop_confirmed = $back
+        if (-not $back) {
+            # not confirmed on the first desktop: no further change, and the automatic restore is not trusted
+            $res.manual_screen_share = 'skipped_not_on_first_desktop'
+            throw 'not_on_first_desktop'
+        }
+        $onOtherDesktop = $false
         Write-Host ''
         Write-Host 'Manual check B: screen share or recording.'
         Write-Host 'Start a screen share or a screen recording that shows the desktop, then press Enter. Three updates follow, 5 s apart.'
@@ -367,13 +381,23 @@ try {
 }
 catch {
     # only the type of the error goes to the results: the message can carry file paths
-    $res.error = $_.Exception.GetType().FullName
+    if ($_.Exception.Message -eq 'not_on_first_desktop') { $res.error = 'not_on_first_desktop' }
+    else {
+        $inner = $_.Exception.InnerException
+        $res.error = [ordered]@{
+            type = $_.Exception.GetType().FullName
+            inner_type = $(if ($inner) { $inner.GetType().FullName } else { $null })
+            hresult = $(if ($inner) { '0x{0:X8}' -f $inner.HResult } else { '0x{0:X8}' -f $_.Exception.HResult })
+        }
+    }
     Write-Host "Error: $($_.Exception.Message)"
 }
 finally {
-    # Always restore
+    # Always restore, except while the operator may be on the second desktop of the manual check:
+    # a restore there would act on the wrong desktop and leave the first one with the placeholder.
     $restored = @()
-    try { $dw.SetPosition($origPos) } catch { }
+    if ($onOtherDesktop) { $count = 0; $restored = @('not_attempted_on_other_desktop') }
+    try { if (-not $onOtherDesktop) { $dw.SetPosition($origPos) } } catch { }
     for ($i = 0; $i -lt $count; $i++) {
         $o = $orig[$i]
         if ($o.wallpaper -and (Test-Path -LiteralPath $o.wallpaper)) {

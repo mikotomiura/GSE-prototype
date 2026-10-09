@@ -76,6 +76,7 @@ def gen_typing(rng: np.random.Generator, kind: str, dur_ms: int, cfg: dict) -> S
                 seg.presses.append((int(t), last_vk, draw_dwell(rng, cfg)))
                 nxt = t + float(rng.lognormal(np.log(p["flight_median_ms"]), p["flight_sigma"]))
                 if nxt >= burst_end:
+                    t = burst_end  # the pause is measured from the drawn end, so slow typing does not lengthen it
                     break
                 t = nxt
         else:
@@ -281,6 +282,11 @@ def main() -> int:
         ks = key_seed(seed, "Dsh", i)
         emit(f"Dsh{i:02d}a", "D_shuffled", body + [tail], ks, {"pair": i, "role": "a"})
         emit(f"Dsh{i:02d}b", "D_shuffled", [body[k] for k in perm] + [tail], ks, {"pair": i, "role": "b"})
+        # jitter copy of the a-session: the noise floor for the order-only ratio (design section 8)
+        times, vks, dwells, dur_ms = assemble(body + [tail])
+        jt, jv, jd = jitter(derive_rng(seed, "Jsh", i), times, vks, dwells, sets["J"]["jitter_ms"])
+        emit(f"Jsh{i:02d}", "Jsh", None, ks, {"pair": i, "role": "j", "_labels": seg_labels(body + [tail], dur_ms // 1000)},
+             (jt, jv, jd, dur_ms // 1000))
 
     d = sets["D_diffend"]
     for i in range(max(2, int(round(d["pairs"] * scale)))):

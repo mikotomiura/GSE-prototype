@@ -74,15 +74,20 @@ echo "Step 0 OK: capabilities gate passed"
 "$PY" render_e18.py "$EXP_DIR/config.json" "$EXP_DIR/SEED" "$WORK" "$OUT"
 
 # Step 4: provenance
-"$PY" - "$OUT/provenance.json" "$GSE_REPLAY" "$HMM_VERSION" "$WORLD" "$SMOKE" "$EXP_DIR" <<'PYEOF'
-import hashlib, json, platform, subprocess, sys
+"$PY" - "$OUT/provenance.json" "$GSE_REPLAY" "$HMM_VERSION" "$WORLD" "$SMOKE" "$EXP_DIR" "$REPO_ROOT" <<'PYEOF'
+import hashlib, json, os, platform, subprocess, sys
 from importlib.metadata import version
-out, binary, hmm, world, smoke, exp_dir = sys.argv[1:7]
+out, binary, hmm, world, smoke, exp_dir, repo = sys.argv[1:8]
 sha = hashlib.sha256(open(binary, "rb").read()).hexdigest()
 commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-dirty = bool(subprocess.run(["git", "-C", exp_dir, "status", "--porcelain", "--", "."], capture_output=True, text=True).stdout.strip())
+# the instruments only: results/ fills with untracked files while the run writes them
+dirty = bool(subprocess.run(["git", "-C", exp_dir, "status", "--porcelain", "--", ".", ":(exclude)results"],
+                            capture_output=True, text=True).stdout.strip())
+src_dirty = bool(subprocess.run(["git", "-C", repo, "status", "--porcelain", "--", "src-tauri"], capture_output=True, text=True).stdout.strip())
 json.dump({"world": world, "smoke": bool(smoke), "git_commit": commit, "experiment_dir_dirty": dirty,
+           "src_tauri_dirty": src_dirty,
            "gse_replay_sha256": sha, "hmm_version": hmm, "python": platform.python_version(),
+           "platform": platform.platform(), "cpu_count": os.cpu_count(),
            "packages": {p: version(p) for p in ("numpy", "scipy", "scikit-learn", "pillow")}},
           open(out, "w"), indent=1)
 PYEOF
