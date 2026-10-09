@@ -1524,7 +1524,8 @@
   "ruby_substituted": 392275,
   "x_tokens": 87121,
   "no_frame": 51,
-  "replacement_chars": 0
+  "replacement_chars": 0,
+  "works_without_long_lines": 1
  },
  "invalid_token_examples_top": [
   [

@@ -27,12 +27,12 @@
 ## 記録
 - [x] `notes.md`（結果と限界）・`data.md`・`env.md`
 - [x] ADR-039 D6 に日付つきの注（README の索引にも 1 文）・references.md の [P269] に使用箇所
-- [ ] issue #333 にコメント
-- [ ] 引き継ぎファイルに完了の印
+- [x] issue #333 にコメント
+- [x] 引き継ぎファイルに完了の印
 
 ## 完了時のレビュー
 - [x] 1 巡目（code-reviewer ∥ security-checker ∥ Codex 2 回）の指摘を一次で確かめ、実装の誤りを直して全体を回し直した（decisions.md 判断 5・design.md §14・notes.md の逸脱）
-- [ ] 2 巡目（直した規則の境界条件）
+- [x] 2 巡目（直した規則の境界条件）（判断 6・回し直して出力がバイト単位で同じ）
 
 ## 完了
 - [ ] `/finish-task`（code-reviewer ∥ `/cross-review`）

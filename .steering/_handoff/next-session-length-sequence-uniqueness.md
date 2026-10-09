@@ -1,5 +1,7 @@
 # 引き継ぎ: 公開テキストで「長さの並び」がどれだけ一意かを見積もる（ADR-039 D6 の関門の最初の実測）
 
+**状態（2026-10-09）: 実施済み。** 結果は `experiments/20261009-length-sequence-uniqueness/notes.md`、作業記録は `.steering/20261009-length-sequence-uniqueness/`。ADR-039 D6 に日付つきの注、issue #333 にコメントを返した。
+
 作成 2026-10-09（Windows の機・`C:\GSE-prototype`）。新しいセッションで `/clear` の後に始める。
 返答・記録では絵文字や記号（★・⚠️）を多用しない（研究者の指摘）。応答は日本語。
 
