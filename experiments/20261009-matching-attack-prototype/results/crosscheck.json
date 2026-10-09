@@ -543,6 +543,7 @@
    "total_equal": 0
   }
  },
+ "config_sha256": "9a64943b7ec2ac0f31c18d1ac2109aedfad74f82179900116e1e90b1dcab82e1",
  "format": "matching-attack-crosscheck/1",
  "n_compared": 2774,
  "n_phrases_synthesised": 1450,

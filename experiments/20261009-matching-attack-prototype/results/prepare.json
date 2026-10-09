@@ -11,6 +11,36 @@
   "unscored_by_speed": {},
   "unscored_reason": "block_mismatch"
  },
+ "config_values": {
+  "counted_categories": [
+   "alphabetic",
+   "numeric",
+   "punctuation"
+  ],
+  "inputs": {
+   "corpus": "c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620",
+   "obs": "58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562",
+   "plan": "b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0",
+   "plan_config": "400fe5314d0f660f2e776a7f86deb471ae1235a3bea4c1be457b26ebe0a9181f",
+   "recipes": "430ec52c67f0592bc1c9d038a972876a2608ed7c39eb2aabcf68efc4ff908411",
+   "run_manifest": "5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82"
+  },
+  "kit_code": {
+   "papers/ime-observation/kit/analysis/stats.py": "ead0ccaa50bb86b088b66899ef5b1e04fb9b995a582e520679e04d09cbbf5c07",
+   "papers/ime-observation/kit/e2/closed_set.py": "364cc833b48a73aeb15b9416bff203ec21a71296e26534f914e3a2bb9bd067c3",
+   "papers/ime-observation/kit/e2/simulate_obs.py": "ab989955e7273e9290595318a96087c384d40e19565f351be17bf3f8d4733123",
+   "papers/ime-observation/kit/gen/generate_plan.py": "822538a52fd40ddc04e7ef406373f8d6cf5b0e7e22763b695fe61cef5fd5cb15",
+   "papers/ime-observation/kit/gen/romaji.py": "79db4d4ef74fb3e354aff769f0fe5c350cf57410c0adb2e7543d5594afd9f4b1"
+  },
+  "markers_in_obs": true,
+  "minus_categories": [
+   "backspace"
+  ],
+  "os": "windows",
+  "skip_scenarios": [
+   "S12"
+  ]
+ },
  "format": "matching-attack-prepare/1",
  "inputs": {
   "corpus": "c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620",

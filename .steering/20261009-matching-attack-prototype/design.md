@@ -206,3 +206,14 @@ code-reviewer ∥ security-checker ∥ Codex 2 回（コードと文書）。指
 - 事後の探索を全加工に広げた（Codex P1・文書）。
 - 自己検査 75 → 107 件。変異 20 種（前の 13 種＋今回の 7 種）がすべて落ちることを確かめた。
 
+## 14. 完了時のレビュー 2 巡目（2026-10-10）を受けて直したこと
+
+code-reviewer ∥ Codex 1 回（範囲 `de8ef3e6..15e0ac91`・1 巡目の直しの境界条件）。結果の値は変わらない（回し直して確かめた）。
+
+- `prepare.json` に、`raw/trials.json` が依存する設定の値（OS・印・除くシナリオ・数えるカテゴリ・入力とキットの SHA-256）を `config_values` として記録し、`data.load` と `crosscheck.py` が今の設定と照らす（code-reviewer MEDIUM）。
+- `crosscheck.json` と `reproduce_ime.json` に `config_sha256` を出し、`summarize.py` が照らす。`matching.json` と探索の種も照らす（code-reviewer MEDIUM・LOW、Codex P2）。
+- 距離の生成条件に、コーパス・手順・計画の設定の SHA-256 と攻撃者の種を足した（code-reviewer MEDIUM）。
+- 手順の規則と違う記録があれば、`crosscheck.py` は結果を書いてから非ゼロで終わる（Codex P2）。規則の無いシナリオ（S12 以外）は例外にする（code-reviewer LOW）。
+- 初期化の失敗はトレースバックを残し、文言で入力の不一致と区別する。別のドライブを指すパスは CheckError で止める。§2 の表に採点経路の食い違いの列を足した（code-reviewer LOW）。
+- 自己検査 107 → 116 件。変異 24 種がすべて落ちることを確かめた（1 種は置き換える文字列が 2 か所にあり入れられなかったが、同じ照合を別の検査が見る）。
+

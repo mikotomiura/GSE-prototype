@@ -1,6 +1,7 @@
 {
  "all_match": true,
- "distances_json_sha256": "f4215fedd846d61cef6ce3a8fdc561695941a3d3f374b11f0549f10b31e4219d",
+ "config_sha256": "9a64943b7ec2ac0f31c18d1ac2109aedfad74f82179900116e1e90b1dcab82e1",
+ "distances_json_sha256": "6a3e3edeab16ba31f85fa6bdd4af8cbb38acf75e873e373812ce6fcbed2da53a",
  "format": "matching-attack-reproduce-ime/1",
  "published_sha256": "93b5eb2bb7e43056899b78b6bcf486505ec91bced94844d065dcdd74a8d238b7",
  "results": {

@@ -53,7 +53,13 @@
   }
  },
  "provenance": {
-  "distances_py_sha256": "fe4159fb37cefc8eb63ced27906a00e91d2a5c6c602c49e1ddecae75b63175fa",
+  "attacker_seed": 20260929,
+  "distances_py_sha256": "0fa095a93dd421a96a1119039b171947586e7bb7785593164182dff9a76015e0",
+  "inputs": {
+   "corpus": "c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620",
+   "plan_config": "400fe5314d0f660f2e776a7f86deb471ae1235a3bea4c1be457b26ebe0a9181f",
+   "recipes": "430ec52c67f0592bc1c9d038a972876a2608ed7c39eb2aabcf68efc4ff908411"
+  },
   "kit_code": {
    "papers/ime-observation/kit/analysis/stats.py": "ead0ccaa50bb86b088b66899ef5b1e04fb9b995a582e520679e04d09cbbf5c07",
    "papers/ime-observation/kit/e2/closed_set.py": "364cc833b48a73aeb15b9416bff203ec21a71296e26534f914e3a2bb9bd067c3",

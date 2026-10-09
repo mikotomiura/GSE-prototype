@@ -35,6 +35,6 @@
 - [x] 引き継ぎに完了の印
 
 ## 完了処理（/finish-task）
-- [ ] code-reviewer と /cross-review（1 巡目 = 全体）
-- [ ] 直した差分の 2 巡目
+- [x] code-reviewer ∥ security-checker ∥ Codex 2 回（1 巡目 = 全体・判断 6）→ 直して回し直した
+- [x] 直した差分の 2 巡目（code-reviewer ∥ Codex 1 回・判断 7）→ 直して回し直した
 - [ ] commit → push → PR → CI 緑なら merge → main の CI 確認

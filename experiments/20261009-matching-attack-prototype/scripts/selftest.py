@@ -378,8 +378,11 @@ def test_review_fixes(kit):
     check("procedure rule: S4 leaves an open segment", er("S4", "かきく", rj) == ([], 6))
     check("procedure rule: S12 is not modelled", er("S12", "かきく", rj) is None)
     raises("procedure rule: a scenario without a rule stops", lambda: er("S9", "かきく", rj), ValueError)
-    check("crosscheck stops on a record that differs from its procedure rule",
-          crosscheck.exit_status({"rule_mismatch_trial_ids": ["t00001"]}) == 1)
+    import contextlib
+    import io
+    with contextlib.redirect_stderr(io.StringIO()):   # the planted mismatch's message is not a result
+        status = crosscheck.exit_status({"rule_mismatch_trial_ids": ["t00001"]})
+    check("crosscheck stops on a record that differs from its procedure rule", status == 1)
     check("crosscheck passes when every record follows its rule",
           crosscheck.exit_status({"rule_mismatch_trial_ids": []}) == 0)
     import prepare as prep_mod
