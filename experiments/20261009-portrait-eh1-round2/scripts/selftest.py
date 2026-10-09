@@ -85,6 +85,24 @@ def main() -> int:
         cents.append((xs.mean(), ys.mean()))
     check("lattice: the first drawn update sits in the first cell whatever the material",
           all(abs(c[0] - cells[0][0]) < 4 and abs(c[1] - cells[0][1]) < 4 for c in cents), str(cents))
+    # later updates, with an update without presses in between: the cell follows the drawn-update ordinal
+    seqs = []
+    for lvl in (0.0, 1.0):
+        g2 = pt.Generator("lattice", "none", cfg, 7)
+        mk = {c: np.full(n, lvl * (cfg["generator"]["raw_ranges"].get(c, [0, 1])[1])) for c in ("f1", "f3", "f4", "f5", "f6")}
+        cs = []
+        for k, act in enumerate((True, True, False, True)):
+            mk["active"] = np.full(n, act)
+            prev = g2.base.copy()
+            g2.update(dict(mk), n * (k + 1))
+            dv = np.abs(g2.base - prev).max(axis=2)
+            ys, xs = np.nonzero(dv > 0.05)
+            cs.append((round(float(xs.mean())), round(float(ys.mean()))) if len(xs) else None)
+        seqs.append(cs)
+    want = [cells[0], cells[1], None, cells[2]]
+    ok = all(all((w is None and c is None) or (w is not None and c is not None and abs(c[0] - w[0]) < 4
+                                               and abs(c[1] - w[1]) < 4) for c, w in zip(cs, want)) for cs in seqs)
+    check("lattice: cells follow the drawn-update ordinal (k = 0, 1, skip, 2) whatever the material", ok, str(seqs))
 
     # --- PC2 (design 1.3): tint in the display only
     n = cfg["generator"]["neutral_active_s"]
@@ -117,6 +135,10 @@ def main() -> int:
     s = fake_session([10.0, 95.0, 290.0], 500)
     ups = pt.schedule(s, pt.Sched("recent", 100, 2, False, False), 0.3, 1).tolist()
     check("sched recent: no update inside an absence of 60 s or more", ups == [100, 300], str(ups))
+    pc1 = {"stop_silence_s": 3, "min_gap_s": 60}
+    s = fake_session([0.1, 3.2, 100.0], 200)
+    ups = pt.schedule(s, pt.Sched("stop"), 0.3, 1, pc1).tolist()
+    check("sched stop (PC1): no update after typing resumed (rounded time inside the silence)", ups == [7, 103], str(ups))
 
     # --- statistics
     rng = np.random.default_rng(0)

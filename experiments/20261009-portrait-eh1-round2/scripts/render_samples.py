@@ -1,5 +1,5 @@
 """Sample images of the round 2 grammars (no criterion): the final image of each main configuration and of
-the positive controls for two sessions, so that the researcher can see what was tested. E1-8 is not drawn in
+the positive controls and the oracles for two sessions, so that the researcher can see what was tested. E1-8 is not drawn in
 round 2 (design 3.7).
 
 Usage: render_samples.py <config.json> <SEED> <work dir> <out dir>
@@ -34,7 +34,7 @@ def main() -> int:
     C = checks.configs(cfg)
     for sid in ("P000", "P001"):
         sess = pt.load_session(work, manifest[sid])
-        for c in C["main"] + [C["pc1"], C["pc2"]]:
+        for c in C["main"] + [C["pc1"], C["pc2"]] + C["orc"]:
             r = pt.run(sess, c, cfg, seed, False, True)
             to_png(r["final"], out / "samples" / f"synth-{sid}-{c.name}.png")
     print("rendered samples")

@@ -1,7 +1,8 @@
 """EH1 round 2 checks of the portrait: E1-3 (L300 and L60), E1-6, path sensitivity, E1-4, E1-7, and the
 descriptions (E1-2, update incidence per absence band, material information, order only, pairs).
 
-Criteria are frozen in .steering/20261009-portrait-eh1-round2/design.md section 3 (commit ea02e557).
+Criteria are frozen in .steering/20261009-portrait-eh1-round2/design.md section 3 (commit ea02e557; section 3.11,
+the oracle, added before any real configuration was run: commit 6b8ef7de).
 Every verdict is per generator configuration; there is no overall pass.
 
 Usage: checks.py <config.json> <SEED> <work dir> <results dir> --world v1|v2 [--jobs N] [--smoke | --pilot]
@@ -14,6 +15,8 @@ import argparse
 import functools
 import json
 import os
+import shutil
+import tempfile
 import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -183,16 +186,28 @@ def ratio_of_medians(a: np.ndarray, b: np.ndarray) -> float:
 # E1-3 (design 3.1)
 # ---------------------------------------------------------------------------
 
+def _to_memmap(arr: np.ndarray, d: Path, name: str) -> np.ndarray:
+    """Write once, pass by file: joblib sends a memmap by reference instead of dumping it again per call."""
+    path = d / f"{name}.npy"
+    np.save(path, np.ascontiguousarray(arr))
+    return np.load(path, mmap_mode="r")
+
+
 def e13_target(tag: str, XA: np.ndarray, Y: np.ndarray, G: np.ndarray, strata: np.ndarray, XB: dict,
-               cfg: dict, seed: int, jobs: int, nboot: int, nperm: int, applicable: bool) -> dict:
-    """One label. XB: config name -> {"full": X, "small": X}. Verdicts per design 3.1."""
+               cfg: dict, seed: int, jobs: int, nboot: int, nperm: int, applicable: bool,
+               scratch: Path | None = None) -> dict:
+    """One label. XB: config name -> {"full": X, "small": X}. Verdicts per design 3.1 and 3.11.
+    scratch: a directory for the feature matrices (written once per label, read by every fit)."""
     from joblib import Parallel, delayed
 
     folds, margin, pc_lower = cfg["e13"]["folds"], cfg["e13"]["margin"], cfg["e13"]["pc_lower"]
     names = list(XB)
+    if scratch is not None:
+        scratch.mkdir(parents=True, exist_ok=True)
+        XA = _to_memmap(XA, scratch, f"{tag}-A")
+        XB = {n: {fs: _to_memmap(XB[n][fs], scratch, f"{tag}-{i}-{fs}") for fs in FSETS} for i, n in enumerate(names)}
 
     def fit_all(y: np.ndarray, t: str) -> dict:
-        # joblib (loky) memory-maps the large arrays instead of pickling them per job
         js = [((t, "A", None, k), XA, y, G, k, seed, folds) for k in KINDS]
         js += [((t, n, fs, k), XB[n][fs], y, G, k, seed, folds) for n in names for fs in FSETS for k in KINDS]
         return dict(Parallel(n_jobs=jobs, backend="loky")(delayed(_fit_job)(j) for j in js))
@@ -217,8 +232,12 @@ def e13_target(tag: str, XA: np.ndarray, Y: np.ndarray, G: np.ndarray, strata: n
                 b = boots[n][key]
                 rec[key] = {"auc_B": auc_a[k] + gain, "gain": gain,
                             "ci95": [float(np.percentile(b, 2.5)), float(np.percentile(b, 97.5))]}
-        rec["upper_max"] = max(rec[f"{fs}/{k}"]["ci95"][1] for fs in FSETS for k in KINDS)
-        rec["lower_max"] = max(rec[f"{fs}/{k}"]["ci95"][0] for fs in FSETS for k in KINDS)
+        # a NaN bound (a draw without positives) must not depend on the order of max(): it counts as the
+        # side that keeps a verdict from passing (upper +inf, lower -inf)
+        ups = [rec[f"{fs}/{k}"]["ci95"][1] for fs in FSETS for k in KINDS]
+        los = [rec[f"{fs}/{k}"]["ci95"][0] for fs in FSETS for k in KINDS]
+        rec["upper_max"] = float("inf") if any(np.isnan(ups)) else max(ups)
+        rec["lower_max"] = float("-inf") if any(np.isnan(los)) else max(los)
         res["configs"][n] = rec
     pcs = [n for n in names if n in ("PC1", "PC2")]
     pcs_ok = all(res["configs"][n]["lower_max"] > pc_lower for n in pcs)
@@ -360,8 +379,8 @@ def main() -> int:
     d_sets = [s for s in by_set if s.startswith("D_")] if not a.pilot else []
     for s in d_sets:
         for m in by_set[s]:
-            for c in C["grid"]:
-                tasks.append((m["sid"], c, False, c.name in main_names))
+            for c in C["grid"]:  # final images only where they are used (describe pairs, order only)
+                tasks.append((m["sid"], c, False, c.name in main_names and s in ("D_shuffled", "D_diffend")))
     for s in (() if a.pilot else ("O", "J", "Jsh")):
         for m in by_set.get(s, []):
             for c in C["main"]:
@@ -381,13 +400,17 @@ def main() -> int:
     inputs = e13_labels(p_sids, cfg)
     applicable = a.world != "v1"
     e13 = {}
-    for tag in ("L300", "L60"):
-        inp = inputs[tag]
-        XB = attacker_sets(inp, shape, cfg)  # built per label to bound memory
-        e13[tag] = e13_target(tag, inp["XA"], inp["Y"], inp["G"], inp["strata"], XB, cfg, seed, a.jobs,
-                              cfg["e13"]["bootstrap"], cfg["e13"]["null_perms"], applicable)
-        del XB
-        print(f"E1-3 {tag} done at {time.time() - t0:.0f} s", flush=True)
+    scratch = Path(tempfile.mkdtemp(prefix="e13-", dir=work))  # under the git-ignored work dir
+    try:
+        for tag in ("L300", "L60"):
+            inp = inputs[tag]
+            XB = attacker_sets(inp, shape, cfg)  # built per label to bound memory
+            e13[tag] = e13_target(tag, inp["XA"], inp["Y"], inp["G"], inp["strata"], XB, cfg, seed, a.jobs,
+                                  cfg["e13"]["bootstrap"], cfg["e13"]["null_perms"], applicable, scratch / tag)
+            del XB
+            print(f"E1-3 {tag} done at {time.time() - t0:.0f} s", flush=True)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
     del shape
     e13["primary"] = "L300"
     if a.pilot:

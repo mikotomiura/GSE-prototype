@@ -1,5 +1,5 @@
 {
-  "_comment": "EH1 round 2 of the portrait (synthetic traces only, no participants). Criteria are frozen in .steering/20261009-portrait-eh1-round2/design.md section 3 (commit ea02e557). The traces are generated exactly as in round 1.",
+  "_comment": "EH1 round 2 of the portrait (synthetic traces only, no participants). Criteria are frozen in .steering/20261009-portrait-eh1-round2/design.md section 3 (commit ea02e557; section 3.11, the oracle: commit 6b8ef7de). The traces are generated exactly as in round 1.",
   "session": {
     "duration_s": 10800,
     "final_flow_s": 60,

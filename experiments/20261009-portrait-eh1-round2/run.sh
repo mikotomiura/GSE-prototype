@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # EH1 round 2 of the portrait: synthetic traces only, no participants.
-# Criteria are frozen in .steering/20261009-portrait-eh1-round2/design.md section 3 (commit ea02e557).
+# Criteria are frozen in .steering/20261009-portrait-eh1-round2/design.md section 3 (commit ea02e557;
+# section 3.11, the oracle, added before any real configuration was run: commit 6b8ef7de).
 #
 # Usage: bash run.sh [--smoke | --pilot] [--world v1|v2] [--jobs N]
 #   v2 = the primary record of round 2; v1 = secondary (E1-3 declared not applicable before the results).
@@ -39,6 +40,7 @@ case "$WORLD" in v1|v2) ;; *) echo "--world must be v1 or v2" >&2; exit 2 ;; esa
 case "$JOBS" in ''|*[!0-9]*) echo "--jobs must be a positive integer" >&2; exit 2 ;; esac
 [ "$JOBS" -ge 1 ] || { echo "--jobs must be a positive integer" >&2; exit 2; }
 if [ -n "$SMOKE" ] && [ -n "$PILOT" ]; then echo "--smoke and --pilot are exclusive" >&2; exit 2; fi
+if [ -n "$PILOT" ] && [ "$WORLD" != "v2" ]; then echo "--pilot runs on world v2 only (design 3.10)" >&2; exit 2; fi
 
 if [ -n "${PYTHON:-}" ]; then
   PY="$PYTHON"
@@ -69,12 +71,16 @@ else
   SUFFIX="$WORLD${SMOKE:+-smoke}"
 fi
 WORK="$EXP_DIR/work-$SUFFIX"
-OUT="$EXP_DIR/results/$SUFFIX"
-rm -rf "$WORK"
+# results are written to a partial directory and replace results/$SUFFIX only when every step has passed,
+# so that a failed run never leaves files of two runs side by side (round 2 /cross-review)
+FINAL_OUT="$EXP_DIR/results/$SUFFIX"
+OUT="$EXP_DIR/results/.partial-$SUFFIX"
+rm -rf "$WORK" "$OUT"
 mkdir -p "$OUT" "$WORK"
 if [ -n "$PILOT" ]; then
   # design 3.10: another seed and 40 P sessions (the other sets at smoke size; the pilot does not use them)
-  read -r OFFSET PILOT_P < <("$PY" -c "import json,sys; p=json.load(open(sys.argv[1],encoding='utf-8'))['sets']['pilot']; print(p['seed_offset'], p['P'])" "$EXP_DIR/config.json")
+  read -r OFFSET PILOT_P < <("$PY" -c "import json,sys; p=json.load(open(sys.argv[1],encoding='utf-8'))['sets']['pilot']; print(int(p['seed_offset']), int(p['P']))" "$EXP_DIR/config.json")
+  case "$OFFSET$PILOT_P" in ''|*[!0-9]*) echo "sets.pilot in config.json must hold non-negative integers" >&2; exit 2 ;; esac
   SEED_FILE="$WORK/SEED.pilot"
   echo $(( $(tr -d '[:space:]' < "$EXP_DIR/SEED") + OFFSET )) > "$SEED_FILE"
   GEN_EXTRA="--smoke --p-n $PILOT_P"
@@ -97,7 +103,8 @@ echo "Step 0 OK: capabilities gate passed"
 # Step 3: self-tests of the instruments, then the checks
 if [ -n "$PILOT" ]; then
   "$PY" checks.py "$EXP_DIR/config.json" "$SEED_FILE" "$WORK" "$OUT" --world "$WORLD" --jobs "$JOBS" --pilot
-  echo "pilot done: $OUT/pilot_e13.json (not committed; copy the PC numbers to design section 8)"
+  rm -rf "$FINAL_OUT" && mv "$OUT" "$FINAL_OUT"
+  echo "pilot done: $FINAL_OUT/pilot_e13.json (not committed; copy the PC numbers to design section 8)"
   exit 0
 fi
 "$PY" selftest.py "$EXP_DIR/config.json" "$WORK"
@@ -105,10 +112,10 @@ fi
 "$PY" render_samples.py "$EXP_DIR/config.json" "$SEED_FILE" "$WORK" "$OUT"
 
 # Step 4: provenance
-"$PY" - "$OUT/provenance.json" "$GSE_REPLAY" "$HMM_VERSION" "$WORLD" "$SMOKE" "$EXP_DIR" "$REPO_ROOT" "$JOBS" <<'PYEOF'
+"$PY" - "$OUT/provenance.json" "$GSE_REPLAY" "$HMM_VERSION" "$WORLD" "$SMOKE" "$EXP_DIR" "$REPO_ROOT" "$JOBS" "$SEED_FILE" <<'PYEOF'
 import hashlib, json, os, platform, subprocess, sys
 from importlib.metadata import version
-out, binary, hmm, world, smoke, exp_dir, repo, jobs = sys.argv[1:9]
+out, binary, hmm, world, smoke, exp_dir, repo, jobs, seed_file = sys.argv[1:10]
 sha = hashlib.sha256(open(binary, "rb").read()).hexdigest()
 commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
 def git_dirty(args):
@@ -122,7 +129,9 @@ json.dump({"world": world, "smoke": bool(smoke), "git_commit": commit, "experime
            "src_tauri_dirty": src_dirty,
            "gse_replay_sha256": sha, "hmm_version": hmm, "python": platform.python_version(),
            "platform": platform.platform(), "cpu_count": os.cpu_count(), "jobs": int(jobs),
+           "seed": int(open(seed_file).read().strip()),
            "packages": {p: version(p) for p in ("numpy", "scipy", "scikit-learn", "pillow")}},
           open(out, "w"), indent=1)
 PYEOF
-echo "done: $OUT"
+rm -rf "$FINAL_OUT" && mv "$OUT" "$FINAL_OUT"
+echo "done: $FINAL_OUT"

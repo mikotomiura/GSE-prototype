@@ -98,7 +98,8 @@ def schedule(sess: Session, sc: Sched, jitter_frac: float, seed: int, pc1: dict 
         for t_press, t_next in zip(p, ends):
             if t_next - t_press >= pc1["stop_silence_s"]:
                 u = int(math.ceil(t_press + pc1["stop_silence_s"]))
-                if u < dur and u - last_u >= pc1["min_gap_s"] and not sleep[u]:
+                # u < t_next: the rounded update time must still fall in the silence (round 2 /cross-review)
+                if u < dur and u < t_next and u - last_u >= pc1["min_gap_s"] and not sleep[u]:
                     out.append(u)
                     last_u = u
         return np.asarray(out, dtype=np.int64)
