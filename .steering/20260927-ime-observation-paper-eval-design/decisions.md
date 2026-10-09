@@ -2273,3 +2273,49 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **外からの確かめ**（token なし）: `/api/records/23219322` は open・版 1.0.1・日付 2026-10-08・ファイル 1（MD5 一致）・concept `10.5281/zenodo.23183440`。全版の検索で 23219322（1.0.1）と 23183441（1.0.0）の 2 つ。`https://doi.org/10.5281/zenodo.23183440` は `zenodo.org/records/23219322` に解決、`…23219322`・`…23183441` も解決（302）。1.0.0 の記録は版 1.0.0・日付 2026-10-07・ファイル同じ。データセット 23183438 は 38 ファイル・`isCompiledBy` `…23183441` のまま。GitHub の `main` の `CITATION.cff` は 1.0.1・`…23219322`、README のバッジ（Zenodo の全版の DOI の SVG・shields の v1.0.1）は 200。
 - **残り**: PsyArXiv `j7k34_v1` は 02:29 UTC の時点で審査中（OSF の API は 403 "pending moderation"）。BRM への投稿（引き継ぎ -12）。⚠️ 公開 repo の作業クローン（job の tmp の `pub`）は job を消すと消える → 次に組むときは bare の写し（`main`＝E）から `core.autocrlf=false` でクローンする。
 - **影響範囲**: 本ファイル・`tasklist.md`・`.steering/_handoff/next-session-ime-paper-manuscript-12.md`。公開物: GitHub `mikotomiura/ime-conversion-logging`（`v1.0.1`＝`08583068`）・Zenodo 23219322（publish 済み）。
+
+## 判断 225: `counts_only` などの記述をコードどおりに直し（逸脱 D13）、連なりの長さを本当に捨てた 2 つの組を事後の解析で測る —— 設計を結果の前に固定（2026-10-10・G-GEAR・研究者の決定〔直す 2 つ〕と選択〔4 問とも推奨どおり〕・設計の細部はメイン・研究者が覆せる）
+
+- **経緯**: 照合攻撃の試作（`.steering/20261009-matching-attack-prototype/decisions.md` 判断 2）で、`runs = "count"` の組（`no_runs`・`bin1s_count`・`counts_only`）が英字の連なりの長さを捨てていないと分かった。研究者は (1) 説明をコードどおりに直して逸脱として記録し、(2) 長さを本当に捨てた組を事後の解析として 3 セルで測る、と決めた（引き継ぎ `next-session-ime-counts-only-fix.md` §2）。PsyArXiv `j7k34_v1` は対象範囲の外として却下された（最終・再投稿不可）。次の出し先は研究者が決める。
+- **着手時に測った状態**: IME 論文の判断は main で 223、枝 `origin/docs/ime-release-1.0.1`（main に入っていない）に 224 があった → 本タスクの枝 `fix/ime-counts-only` に取り込んでから 225 を使う。公開 repo の `main` と `v1.0.1^{}` は `08583068`。
+- **一次で確かめた事実**（2026-10-10・G-GEAR・`closed_set.py` `364cc833…`・`simulate_obs.py` `ab989955…`）:
+  - `apply_features(…, runs = "count")` は英字の連なりの行に最初の行の時刻を付けるだけで、行を消さない。`_tokens(…, "count")` は同じ時刻の英字の行を 1 トークンにまとめ、その個数に連なりの長さを入れる。`_distance` は同じ区分のトークンの個数の差を費用にし、列の順序も使う（編集距離）。
+  - `counts_only` のトークン列は、各トークンを個数ぶん展開すると `no_time` の打鍵ごとの区分の列に一致する（乱数で作った記録 2,000 本で不一致 0）。→ **`counts_only` は `no_time` と同じ情報（全打鍵の区分とその順序）を持ち、違うのは距離の数え方だけ**。同じく `no_runs`・`bin1s_count` が `all`・`bin1s` から捨てたのは、連なりの中の 2 打目以降の時刻だけ。
+  - 距離の例（引き継ぎ §1 の表を再現）: 英字 10 打と 20 打 → `no_time` 10.0・`counts_only` 10.0。8 打と 12 打 → 4.0・4.0。英字 5・記号・英字 3 と 英字 3・記号・英字 5 → `no_time` 2.0・`counts_only` 4.0。
+  - 原稿の結果の節「the numbers of key presses of each category in a trial, without their order or times」と結論の「using the numbers of keys of each category alone」も誤り（順序を使っている）。登録 §6.8 は順序について書いていない。
+- **研究者の選択（AskUserQuestion・4 問とも推奨どおり）**:
+  1. 組は **(a) と (b) の両方**。
+  2. **登録の推奨（「推奨できる粒度なし」）は変えず、事後の判定として並べる**。
+  3. 載せ方は **結果によらず、本文（方法・結果・要旨・結論・推奨 (c)）に 1 文ずつ＋値の表は補遺**。
+  4. 記録は **本ファイルに判断 225〜**。
+- **事後の 2 つの組（結果の前に固定）**: 時刻は使わない（打鍵ごとの区分の列から作る）。
+  - `letter_runs_unit`（(a)・登録の意図「no lengths of letter runs」に当たる）: 続く英字の打鍵を 1 トークン・個数 1 にまとめる。ほかの区分は 1 打 1 トークン（個数 1）のまま。順序は残す。
+  - `all_runs_unit`（(b)）: 同じ区分が続く打鍵を、区分を問わず 1 トークン・個数 1 にまとめる（BackSpace・矢印・Space などの数も捨てる）。順序は残す。
+  - (b) は (a) から作れる。→ 登録の「その組とそこから作れる組の最大」の規則で、`letter_runs_unit` の報告値は 2 つの `acc_raw` の大きい方、`all_runs_unit` は自分の `acc_raw`。登録の 6 組の値は変えない（事後の 2 組は `no_time`・`counts_only` からも作れるが、登録の値には混ぜない）。
+  - 攻撃は登録のまま: 予測の記録（`Predictor.raw`・種 20260929）・距離（`_distance`・時刻なし）・候補（K − 1 個のおとり・試行ごとの種）・同点の決め方（`_sub_seed(tseed, "tie", 組の名)` の乱数）・K = 10・100・1,000・S12 を除く（D8）・`--markers-in-obs`・ブロックを単位にした百分位の区間（B = 2,000・記述）。
+- **事後の判定（結果の前に固定）**: 登録の規則をそのまま当てる。K = 10 と 100 で報告値の Wilson の 95% 区間の上端が 2/K 以下なら、その K で偶然の水準の近く。macOS の 2 セルの両方・両方の K で近いとき「事後には近い」。事後の粒度は、近いもののうち細かい方（`letter_runs_unit` → `all_runs_unit` の順）。どちらも近くなければ「事後にも無い」。Windows は同じ判定を但し書きとして並べる。K = 1,000 は記述だけ。登録の推奨と判定は変えない。
+- **実装の方針**: `closed_set.py` と `simulate_obs.py` は 1 バイトも変えない（SHA-256 が補遺の出どころの表〔`supplement/provenance.tex`〕・`data.md`・`data.windows.md` と試作の `config.json`〔違えば止まる〕に固定されている）。→ 2 つのファイルの誤った注（`FEATURE_SETS` の「run length removed」・`simulate_obs.py` の「the length of a run … is removed」）は直さず、`kit/e2/README.md` と D13 で正す（引き継ぎ §3-2 は docstring も範囲に挙げていたが、この理由で外す）。新しいスクリプト `kit/e2/explore_run_lengths.py` が 2 つを import し、登録の評価の手順（候補・同点・区間）を写して、トークンの作り方だけを差し替える。
+  - **陽性の対照**: 同じ手順で登録の `no_time` と `counts_only` も計算し、セルの登録の結果ファイルと、K ごとの `n`・正答の数（`acc_raw`）・`mean_rank`・シナリオと速さごとの値・Wilson の区間・ブロックの区間が完全に一致しなければ、何も書かずに止まる。入力（corpus・recipes・config の SHA-256・種・B・整列の結果）も登録の結果ファイルと照らす。
+  - selftest は `closed_set._selftest_world` の合成の世界で、対照の 2 組が `closed_set.evaluate` と一致することと、トークンの作り方・距離の例を確かめる（30 秒以内・`kit/check.sh` が回す）。
+- **データと機**: 3 セルとも G-GEAR で回す。Windows は `experiment/runs/windows-msime-tsf-2/`。macOS の 2 セルは Zenodo のデータセット 23183438 の `macos-standard-live-{on,off}-1.zip`（公開・token なし）を job の tmp に取り、`data.md` の `run.json` などの SHA-256 と照らす。生ログは repo に入れず、外部の LLM に送らない。
+- **結果の前に見ていた値（開示）**: (i) 登録の 6 組のすべての値（2026-10-05〜06 から）。(ii) 照合攻撃の試作（`experiments/20261009-matching-attack-prototype/`）の Windows のセルの k = 1（試行 1 つ）で、(b) に近い加工 `S_rleinf`（同じ区分の連なりをすべて個数 1・時刻なし）の正答率 N = 10 で 11.2%・N = 100 で 1.68%・N = 1,000 で 0.27%（`no_time` は 90.6%・44.3%・7.64%）とシナリオごとの値。候補の引き方（位置ごとに一様・引き直し）と同点（1/m の期待値）が IME 論文と違う。(a) に当たる加工は、どのセルでも測っていない。macOS のセルでは (a)・(b) とも測っていない。→ D13 に書く。
+- **直す範囲**（一次で洗った・全文を grep: 「run length」「letter run」「without their order」「numbers of key(s)」「coarsening」「counts_only」「no_runs」「bin1s_count」ほか。PsyArXiv への言及は論文の木に無い〔repo の外の `C:/ime-submission/cover-letter.md` に `[PsyArXiv DOI]` の空欄がある・研究者に伝える〕）:
+
+  | 場所 | 今の記述 | 扱い |
+  |---|---|---|
+  | 登録 §6.8（OSF・凍結） | 「no lengths of letter runs」「1-second bins without run lengths」「neither」「`counts_only` is a coarsening of `no_time`」 | 書き換えない。D13 で扱う |
+  | `recoverability.tex` 方法（37〜41 行・50〜51 行） | 「no run lengths」「without run lengths」「neither times nor run lengths」「its coarsening `counts_only`」 | 登録の名と、実装が捨てたもの（連なりの中の時刻だけ）を書き、D13 を引く。事後の 2 組を足す |
+  | 同 結果（112〜116 行） | 「the numbers of key presses of each category in a trial, without their order or times」 | `no_time` と同じ情報を持ち距離の数え方だけが違う、に直す。事後の判定を 1 文 |
+  | `conclusions.tex` 55〜60 行 | 「using the numbers of keys of each category alone」 | 打鍵の区分とその順序だけ、に直す。事後の判定を 1 文 |
+  | `limitations.tex` 102〜103 行 | 「the numbers of keys of each category are expected to distinguish …」 | 主語を区分の列に直す（期待の文のまま） |
+  | `main.tex` 要旨・`recommendations.tex` (c) | 時刻なしの 2 つの粒度はどちらも届かない | 事後の判定を 1 文ずつ |
+  | `method.tex` 逸脱の段落と表 | Twelve deviations・D1〜D12 | D13 を足す |
+  | `kit/e2/README.md` 表と説明（118〜134・296〜297 行） | 「run length removed: one token per run」・粗さの順序 | コードどおりに直し、事後の組と新しいスクリプトを書く |
+  | `experiment/deviations.md` | D12 まで | D13 を足す・冒頭の段落も |
+  | `data.md` | 解析の記録 | 事後の解析の実行の記録（コマンド・入力と出力の SHA-256）を足す |
+  | `manuscript/tools/results_tables.py`・`generated/`・補遺 | 事後の値なし・注「counts_only is a coarsening」 | 事後の値と補遺の表を生成。注を直す |
+  | `supplement/provenance.tex` | 出どころの表 | 事後の結果ファイルの行を足す |
+  | `closed_set.py`・`simulate_obs.py` | 注が誤り | 変えない（上の理由） |
+
+- **/reimagine**: 使わない（分岐は上の 4 問で研究者が決めた。実装は既存の関数を写すだけ）。
+- **見直し**: 結果が出た後に本文の文を書くとき（載せ方は変えない）。研究者が組・判定・載せ方を覆したとき。
