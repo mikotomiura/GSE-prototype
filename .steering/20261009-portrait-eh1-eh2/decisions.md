@@ -42,3 +42,10 @@
 | 7 | 不在 ＝ 60 s 以上の無打鍵（ラベルによらない） | 系から見える定義にする。AWAY と STALL_SILENT は打鍵からは区別できない |
 
 - **限界（固定の時点で書いておく）**: E1-3 はセッションをまたいで学ぶ攻撃者を想定している。本人が 1 セッションの中で自分の写像を覚えることは検査しない（`keyed` の守りはこの想定に頼る）→ EH3 の M-4 で聞く。合成した「停滞」は打鍵の統計の型で、結果はこの生成の仮定に条件づけられる。
+
+## 判断 4（2026-10-09・Claude・事後の是正）: ブランチを `docs/portrait-eh1-eh2` に改名した
+
+- **起きたこと**: ブランチを git-workflow の型どおり `feature/portrait-eh1-eh2` で切り、固定のコミット `abfb2c45` を push した。`ci.yml` は `main` と `feature/*` の push で起動するので、CI が走った（run 37876435457: Mac の self-hosted `gse-mac` の check と build-macos は完了、G-GEAR の self-hosted `gse-win` の check が約 26 分実行中）。計測の run 中は CI を計測機で走らせない、という研究者の指示（2026-10-04・memory）に反した。
+- **対応**: 12:17 ごろ run を取り消した（`cancelled`）。ブランチを `docs/portrait-eh1-eh2` に改名して push した（`docs/*` の push では CI は起動しない・`gh run list` で 0 件を確かめた）。以後の push はこの名前だけにする。⚠️ リモートの `feature/portrait-eh1-eh2`（`abfb2c45` を指す）は残っている。消すかは研究者に聞く。
+- ⚠️ その時間に計測が走っていたかは確かめていない。走っていたなら、その時間帯（2026-10-09 11:50〜12:17 ごろ）の Mac と G-GEAR の測定は CI と重なった可能性がある。
+- **再発防止**: memory `feedback_no_pr_during_measurement` の How to apply に「ブランチを切る時点で `docs/` にする（`experiments/` のコードでも）」を足した。

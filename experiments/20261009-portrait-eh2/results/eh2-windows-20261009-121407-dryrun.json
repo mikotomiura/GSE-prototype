@@ -1,0 +1,42 @@
+﻿{
+    "os":  "windows",
+    "os_version":  "10.0.26300.0",
+    "powershell":  "5.1.26100.9549",
+    "mode":  "dryrun",
+    "started":  "2026-10-09T12:14:07",
+    "background_type":  3,
+    "slideshow_status_raw":  1,
+    "slideshow_enabled":  false,
+    "inactive_monitor_entries":  0,
+    "monitors":  [
+                     {
+                         "index":  0,
+                         "width":  1920,
+                         "height":  1080
+                     }
+                 ],
+    "original_position":  4,
+    "original_exists":  [
+                            true
+                        ],
+    "dryrun_image_bytes":  68371,
+    "dryrun_get_latency_ms_median":  1.609,
+    "dryrun_cpu":  {
+                       "dwm":  {
+                                   "ws_mb_start":  111.89453125,
+                                   "cpu_s":  null,
+                                   "ws_mb_end":  111.90625
+                               },
+                       "explorer":  {
+                                        "ws_mb_start":  280.16015625,
+                                        "cpu_s":  0,
+                                        "ws_mb_end":  280.16015625
+                                    },
+                       "self":  {
+                                    "ws_mb_start":  92.58203125,
+                                    "cpu_s":  0.047,
+                                    "ws_mb_end":  98.40234375
+                                }
+                   },
+    "finished":  "2026-10-09T12:14:10"
+}
