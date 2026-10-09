@@ -11284,8 +11284,8 @@
    }
   }
  ],
- "config_sha256": "5ddfc20792d1f5317d9d9d27fc714b26122d16dcd8fc8472dae9a6aa1e6d9cb9",
- "distances_json_sha256": "1c94d35f50c4c04ba31545be9ce89563c9fe74c76f497ea64b580f0e54992373",
+ "config_sha256": "9a64943b7ec2ac0f31c18d1ac2109aedfad74f82179900116e1e90b1dcab82e1",
+ "distances_json_sha256": "f4215fedd846d61cef6ce3a8fdc561695941a3d3f374b11f0549f10b31e4219d",
  "format": "matching-attack/1",
  "n_blocks_with_windows": 117,
  "seed": 20261009,

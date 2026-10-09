@@ -544,11 +544,15 @@
   }
  },
  "format": "matching-attack-crosscheck/1",
+ "n_compared": 2774,
  "n_phrases_synthesised": 1450,
  "n_phrases_table_mismatch": 0,
+ "n_rule_checked": 2700,
  "n_scored_trials_differing_from_plan": 0,
  "n_trials": 2925,
  "n_trials_reading_differs": 3,
  "n_unexplained": 0,
+ "rule_mismatch_trial_ids": [],
+ "trials_json_sha256": "031ddf4ecbdb36b7728152a29a1f49db9bcbdf3d20aad2af66d9367cd4b3d94c",
  "unexplained_trial_ids": []
 }

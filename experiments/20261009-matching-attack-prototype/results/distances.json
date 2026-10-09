@@ -52,6 +52,101 @@
    "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
   }
  },
+ "provenance": {
+  "distances_py_sha256": "fe4159fb37cefc8eb63ced27906a00e91d2a5c6c602c49e1ddecae75b63175fa",
+  "kit_code": {
+   "papers/ime-observation/kit/analysis/stats.py": "ead0ccaa50bb86b088b66899ef5b1e04fb9b995a582e520679e04d09cbbf5c07",
+   "papers/ime-observation/kit/e2/closed_set.py": "364cc833b48a73aeb15b9416bff203ec21a71296e26534f914e3a2bb9bd067c3",
+   "papers/ime-observation/kit/e2/simulate_obs.py": "ab989955e7273e9290595318a96087c384d40e19565f351be17bf3f8d4733123",
+   "papers/ime-observation/kit/gen/generate_plan.py": "822538a52fd40ddc04e7ef406373f8d6cf5b0e7e22763b695fe61cef5fd5cb15",
+   "papers/ime-observation/kit/gen/romaji.py": "79db4d4ef74fb3e354aff769f0fe5c350cf57410c0adb2e7543d5594afd9f4b1"
+  },
+  "os": "windows",
+  "variants": {
+   "S_counts_only": {
+    "attacker": "S",
+    "kind": "ime",
+    "runs": "count"
+   },
+   "S_mboth": {
+    "attacker": "S",
+    "groups": {
+     "bound": [
+      "enter",
+      "escape",
+      "tab",
+      "sentence_punctuation"
+     ],
+     "char": [
+      "alphabetic",
+      "numeric",
+      "punctuation",
+      "space"
+     ]
+    },
+    "kind": "merge_categories"
+   },
+   "S_mbound": {
+    "attacker": "S",
+    "groups": {
+     "bound": [
+      "enter",
+      "escape",
+      "tab",
+      "sentence_punctuation"
+     ]
+    },
+    "kind": "merge_categories"
+   },
+   "S_mchar": {
+    "attacker": "S",
+    "groups": {
+     "char": [
+      "alphabetic",
+      "numeric",
+      "punctuation",
+      "space"
+     ]
+    },
+    "kind": "merge_categories"
+   },
+   "S_no_time": {
+    "attacker": "S",
+    "kind": "ime",
+    "runs": "exact"
+   },
+   "S_rle1": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 1
+   },
+   "S_rle16": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 16
+   },
+   "S_rle2": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 2
+   },
+   "S_rle4": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 4
+   },
+   "S_rle8": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 8
+   },
+   "S_rleinf": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": null
+   }
+  }
+ },
  "trials_json_sha256": "031ddf4ecbdb36b7728152a29a1f49db9bcbdf3d20aad2af66d9367cd4b3d94c",
  "variants": {
   "S_counts_only": {

@@ -1,5 +1,6 @@
 {
  "all_match": true,
+ "distances_json_sha256": "f4215fedd846d61cef6ce3a8fdc561695941a3d3f374b11f0549f10b31e4219d",
  "format": "matching-attack-reproduce-ime/1",
  "published_sha256": "93b5eb2bb7e43056899b78b6bcf486505ec91bced94844d065dcdd74a8d238b7",
  "results": {
@@ -8,6 +9,7 @@
     "acc_raw": 0.9018518518518519,
     "correct": 2435,
     "match": true,
+    "matching_path_disagreements": 0,
     "mean_rank": 1.1062962962962963,
     "n": 2700,
     "published_acc_raw": 0.9018518518518519,
@@ -18,6 +20,7 @@
     "acc_raw": 0.8988888888888888,
     "correct": 2427,
     "match": true,
+    "matching_path_disagreements": 0,
     "mean_rank": 1.1125925925925926,
     "n": 2700,
     "published_acc_raw": 0.8988888888888888,
@@ -30,6 +33,7 @@
     "acc_raw": 0.42148148148148146,
     "correct": 1138,
     "match": true,
+    "matching_path_disagreements": 0,
     "mean_rank": 2.156296296296296,
     "n": 2700,
     "published_acc_raw": 0.42148148148148146,
@@ -40,6 +44,7 @@
     "acc_raw": 0.41814814814814816,
     "correct": 1129,
     "match": true,
+    "matching_path_disagreements": 0,
     "mean_rank": 2.3088888888888888,
     "n": 2700,
     "published_acc_raw": 0.41814814814814816,
@@ -52,6 +57,7 @@
     "acc_raw": 0.07333333333333333,
     "correct": 198,
     "match": true,
+    "matching_path_disagreements": 0,
     "mean_rank": 12.274444444444445,
     "n": 2700,
     "published_acc_raw": 0.07333333333333333,
@@ -62,6 +68,7 @@
     "acc_raw": 0.08074074074074074,
     "correct": 218,
     "match": true,
+    "matching_path_disagreements": 0,
     "mean_rank": 13.768888888888888,
     "n": 2700,
     "published_acc_raw": 0.08074074074074074,
@@ -69,5 +76,6 @@
     "published_n": 2700
    }
   }
- }
+ },
+ "trials_json_sha256": "031ddf4ecbdb36b7728152a29a1f49db9bcbdf3d20aad2af66d9367cd4b3d94c"
 }
