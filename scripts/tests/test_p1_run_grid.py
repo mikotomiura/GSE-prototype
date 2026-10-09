@@ -1,7 +1,7 @@
 """Tests for scripts/p1_run_grid.py + scripts/run-features-all-poles.sh の `--` パススルー (探索格子の実行器・issue 004).
 
 ⚠️★★★ **規則を 1 つずつ固定する。** 特に:
-- 格子は凍結 JSON から組む (27 + 4 = 31・ID は決定的)。全一式で `q` と `warmup_count` が対応表どおりに対になる。
+- 格子は凍結 JSON から組む (27 + 5 = 32・ID は決定的)。全一式で `q` と `warmup_count` が対応表どおりに対になる。
 - 規則 (d) は封筒 `config` の値で判定し、除外は「載せるだけ」(削除しない)。ほかの一式は載らない。
 - PG-1 が宣言されていなければ `gse-replay` を **1 度も呼ばない** (exit 6)。
 - manifest は最後に確定する (途中で失敗したら残らない)。
@@ -55,7 +55,7 @@ _ABSENT = object()
 FAKE_REPLAY = r"""#!/usr/bin/env bash
 set -u
 if [ -n "${FAKE_CALL_LOG:-}" ]; then printf '%s\n' "$*" >> "$FAKE_CALL_LOG"; fi
-w_ms=30000; q=0.99; b_ms=30000; hole_gap_ms=2000; warmup_count=100; t1a_window_ms=30000
+w_ms=30000; q=0.99; b_ms=30000; hole_gap_ms=2000; warmup_count=100; t1a_window_ms=30000; idle_trim_max_ms=1800000
 pole=""
 shift
 while [ "$#" -gt 0 ]; do
@@ -71,6 +71,7 @@ while [ "$#" -gt 0 ]; do
         hole_gap_ms) if [ "${FAKE_IGNORE_HOLE_GAP:-0}" != 1 ]; then hole_gap_ms="$val"; fi ;;
         warmup_count) warmup_count="$val" ;;
         t1a_window_ms) t1a_window_ms="$val" ;;
+        idle_trim_max_ms) idle_trim_max_ms="$val" ;;
         *) echo "fake: unknown key ${key}" >&2; exit 1 ;;
       esac ;;
     *) echo "fake: unexpected arg $1" >&2; exit 1 ;;
@@ -84,8 +85,9 @@ ov=""
 add_ov() { if [ "$2" != "$3" ]; then ov="${ov:+$ov,}{\"key\":\"$1\",\"frozen\":$2,\"value\":$3}"; fi; }
 add_ov w_ms 30000 "$w_ms"; add_ov q 0.99 "$q"; add_ov b_ms 30000 "$b_ms"
 add_ov hole_gap_ms 2000 "$hole_gap_ms"; add_ov warmup_count 100 "$warmup_count"; add_ov t1a_window_ms 30000 "$t1a_window_ms"
-printf '{"provenance":{"hmm_version":"%s"},"config":{"w_ms":%s,"q":%s,"b_ms":%s,"hole_gap_ms":%s,"warmup_count":%s,"t1a_window_ms":%s,"pole":"%s","pole_applicable":true,"pole_not_applicable_reason":null,"prereg_id":"p1-episode","prereg_version":"1.0.0","prereg_sha256_prefix":"0123456789abcdef","config_source":"frozen","overrides":[%s],"hmm_version":"%s"},"rows":[{"stall_onset":{"is_onset":false}}]}\n' \
-  "$hmm" "$w_ms" "$q" "$b_ms" "$hole_gap_ms" "$warmup_count" "$t1a_window_ms" "$pole" "$ov" "$hmm"
+add_ov idle_trim_max_ms 1800000 "$idle_trim_max_ms"
+printf '{"provenance":{"hmm_version":"%s","idle_trim":{"dropped_feat_rows":0,"spans":[]}},"config":{"w_ms":%s,"q":%s,"b_ms":%s,"hole_gap_ms":%s,"warmup_count":%s,"t1a_window_ms":%s,"idle_trim_max_ms":%s,"pole":"%s","pole_applicable":true,"pole_not_applicable_reason":null,"prereg_id":"p1-episode","prereg_version":"1.0.0","prereg_sha256_prefix":"0123456789abcdef","config_source":"frozen","overrides":[%s],"hmm_version":"%s"},"rows":[{"stall_onset":{"is_onset":false}}]}\n' \
+  "$hmm" "$w_ms" "$q" "$b_ms" "$hole_gap_ms" "$warmup_count" "$t1a_window_ms" "$idle_trim_max_ms" "$pole" "$ov" "$hmm"
 """
 
 
@@ -176,7 +178,7 @@ class GridCase(unittest.TestCase):
         return [config for config in grid.build_grid(prereg) if predicate(config)]
 
     def run_subset(self, configs, root, out, prereg_path, source="file", sha=None, **fake_env):
-        """格子の一部だけを `run_grid` で回す (★ CLI の全 31 一式を回すと遅い)。`(manifest or None, RunError or None)`。"""
+        """格子の一部だけを `run_grid` で回す (★ CLI の全 32 一式を回すと遅い)。`(manifest or None, RunError or None)`。"""
         if sha is None:
             _, sha = grid.load_prereg(prereg_path)
         sessions = grid.list_sessions(root)
@@ -232,13 +234,13 @@ class GridBuildTest(unittest.TestCase):
         prereg, _ = grid.load_prereg(_write_tmp_prereg(self))
         return prereg
 
-    def test_grid_has_31_configs(self):
+    def test_grid_has_32_configs(self):
         prereg = self.prereg_with_pg1()
         configs = grid.build_grid(prereg)
         ids = [config["id"] for config in configs]
-        self.assertEqual(len(configs), 31)
-        self.assertEqual(len(set(ids)), 31, "ID が重複している")
-        self.assertEqual([config["kind"] for config in configs], ["selection"] * 27 + ["sensitivity"] * 4)
+        self.assertEqual(len(configs), 32)
+        self.assertEqual(len(set(ids)), 32, "ID が重複している")
+        self.assertEqual([config["kind"] for config in configs], ["selection"] * 27 + ["sensitivity"] * 5)
         # ★ 決定的: 何度組んでも同じ順・同じ ID
         self.assertEqual(ids, [config["id"] for config in grid.build_grid(prereg)])
         # ★ 選択 27 = q × hole_gap_ms × t1a_window_ms の全探索 (JSON の並び順・q が最も遅く動く)
@@ -250,17 +252,18 @@ class GridBuildTest(unittest.TestCase):
         ]
         self.assertEqual(ids[:27], expected_selection)
         self.assertIn("sel__q=0.995__hole_gap_ms=3000__t1a_window_ms=15000", ids)
-        # ★ 感度 4 = w_ms / b_ms を運用値 (30000) のまわりで OFAT (⚠️ 運用値そのものは入れない・Cartesian に組まない)
+        # ★ 感度 5 = w_ms / b_ms を運用値 (30000) のまわりで OFAT ＋ idle_trim_max_ms=0 (前処理なし・事前宣言 v1.2 §6.3)
+        #   (⚠️ 運用値そのものは入れない・Cartesian に組まない)
         self.assertEqual(
             ids[27:],
-            ["ofat__w_ms=15000", "ofat__w_ms=60000", "ofat__b_ms=15000", "ofat__b_ms=60000"],
+            ["ofat__w_ms=15000", "ofat__w_ms=60000", "ofat__b_ms=15000", "ofat__b_ms=60000", "ofat__idle_trim_max_ms=0"],
         )
         # ★ 値をコードに書き写していない: 凍結 JSON を変えれば格子が変わる
         smaller = json.loads(json.dumps(load_frozen()))
         smaller["search_space"]["hole_gap_ms"] = [2000, 3000]
         smaller["pg1"] = {"min_episodes_per_participant": 3}
         smaller_prereg, _ = grid.load_prereg(_write_json_tmp(self, smaller))
-        self.assertEqual(len(grid.build_grid(smaller_prereg)), 18 + 4)
+        self.assertEqual(len(grid.build_grid(smaller_prereg)), 18 + 5)
 
     def test_warmup_paired_with_q(self):
         configs = grid.build_grid(self.prereg_with_pg1())
@@ -275,11 +278,11 @@ class GridBuildTest(unittest.TestCase):
                 # 選択でない 2 キーは運用値
                 self.assertEqual((params["w_ms"], params["b_ms"]), (30000, 30000), config["id"])
             else:
-                # ★ 感度 4 は運用値の 100 (q は運用値の 0.99)
+                # ★ 感度 5 は運用値の 100 (q は運用値の 0.99)
                 self.assertEqual(params["warmup_count"], 100, config["id"])
                 self.assertEqual(params["q"], Decimal("0.99"), config["id"])
                 self.assertEqual((params["hole_gap_ms"], params["t1a_window_ms"]), (2000, 30000), config["id"])
-            # ★ `--set` の引数: 6 キーすべて・`q` と `warmup_count` は同じ呼び出しで対になる
+            # ★ `--set` の引数: 7 キーすべて・`q` と `warmup_count` は同じ呼び出しで対になる
             args = grid.set_args(params)
             self.assertEqual(args[0], "--")
             pairs = [args[i + 1] for i in range(1, len(args), 2)]
@@ -320,7 +323,21 @@ class GridBuildTest(unittest.TestCase):
         def bool_value(data):
             data["search_space"]["hole_gap_ms"] = [2000, True]
 
+        # ★ 0 を許すのは `idle_trim_max_ms` だけ (事前宣言 v1.2 §6.4)。負・bool は拒否し、
+        #   ほかのキーの 0 は従来どおり拒否する (code-reviewer L-8 の陰性対照)。
+        def idle_trim_negative(data):
+            data["search_space"]["idle_trim_max_ms"] = [-1, 1800000]
+
+        def idle_trim_bool(data):
+            data["search_space"]["idle_trim_max_ms"] = [True, 1800000]
+
+        def zero_elsewhere(data):
+            data["search_space"]["w_ms"] = [0, 30000]
+
         for mutate in (
+            idle_trim_negative,
+            idle_trim_bool,
+            zero_elsewhere,
             selection_untunable,
             warmup_not_derived,
             missing_role,
@@ -385,7 +402,7 @@ def _load(case, mutate):
 
 
 class GridRunTest(GridCase):
-    """偽の gse-replay で実際に回す。⚠️ 全 31 一式の実行は 1 回だけ (`setUpClass`)・残りは一部の一式だけ回す。"""
+    """偽の gse-replay で実際に回す。⚠️ 全 32 一式の実行は 1 回だけ (`setUpClass`)・残りは一部の一式だけ回す。"""
 
     full = None
 
@@ -427,7 +444,7 @@ class GridRunTest(GridCase):
         )
         self.assertEqual((manifest["n_participants"], manifest["n_sessions"]), (2, 2))
         self.assertEqual(manifest["sessions"], [{"participant": "P01", "session": "s1"}, {"participant": "P02", "session": "a-1"}])
-        self.assertEqual(len(manifest["configs"]), 31)
+        self.assertEqual(len(manifest["configs"]), 32)
         self.assertEqual(
             manifest["envelope_identity"],
             {
@@ -440,8 +457,8 @@ class GridRunTest(GridCase):
         )
         # ★ 忠実な偽物なら、除外は 1 件も無い (⚠️ 規則 (d) が正しい実行を除外していないこと)
         self.assertEqual(manifest["excluded_rule_d"], [])
-        # ★ 31 一式 × 2 セッション × 3 極 = 186 ファイル・全部に sha256・実物と一致
-        self.assertEqual(len(manifest["outputs"]), 31 * 2 * 3)
+        # ★ 32 一式 × 2 セッション × 3 極 = 192 ファイル・全部に sha256・実物と一致
+        self.assertEqual(len(manifest["outputs"]), 32 * 2 * 3)
         on_disk = sorted(
             p.relative_to(full["out"]).as_posix() for p in full["out"].rglob("*.json") if p.name != grid.MANIFEST_NAME
         )
@@ -453,15 +470,15 @@ class GridRunTest(GridCase):
             sorted(p.name for p in full["out"].iterdir() if p.name != grid.MANIFEST_NAME),
             sorted(c["id"] for c in manifest["configs"]),
         )
-        # ★ 一時名の manifest が残っていない・パラメータは 6 キー (q は数のまま)
+        # ★ 一時名の manifest が残っていない・パラメータは 7 キー (q は数のまま)
         self.assertFalse((full["out"] / (grid.MANIFEST_NAME + ".tmp")).exists())
         by_id = {c["id"]: c["params"] for c in manifest["configs"]}
         self.assertEqual(
             by_id["sel__q=0.995__hole_gap_ms=3000__t1a_window_ms=15000"],
-            {"w_ms": 30000, "q": 0.995, "b_ms": 30000, "hole_gap_ms": 3000, "warmup_count": 200, "t1a_window_ms": 15000},
+            {"w_ms": 30000, "q": 0.995, "b_ms": 30000, "hole_gap_ms": 3000, "warmup_count": 200, "t1a_window_ms": 15000, "idle_trim_max_ms": 1800000},
         )
-        # ★ gse-replay は 31 一式 × 2 セッション × 3 極 = 186 回・全部に q と warmup_count が対で渡る
-        self.assertEqual(len(full["calls"]), 31 * 2 * 3)
+        # ★ gse-replay は 32 一式 × 2 セッション × 3 極 = 192 回・全部に q と warmup_count が対で渡る
+        self.assertEqual(len(full["calls"]), 32 * 2 * 3)
         for line in full["calls"]:
             self.assertRegex(line, r"--set q=(0\.99|0\.995|0\.999) .*--set warmup_count=(100|200|1000) ", line)
         self.assertEqual(sum("--set q=0.995 " in line and "--set warmup_count=200 " in line for line in full["calls"]), 9 * 2 * 3)
@@ -528,7 +545,7 @@ class GridRunTest(GridCase):
         self.assertEqual(manifest3["excluded_rule_d"], [])
 
     def test_manifest_complete_only_on_success(self):
-        # ★ 成功: 全 31 一式の run (setUpClass) で manifest が complete: true・sha256 が実物と一致 (別 test が全件検査)
+        # ★ 成功: 全 32 一式の run (setUpClass) で manifest が complete: true・sha256 が実物と一致 (別 test が全件検査)
         self.assertIs(self.full["manifest"]["complete"], True)
         # ⚠️ 途中 (q=0.995 の最初の一式) で 3 極スクリプトが失敗した実行: exit 1・complete の manifest を残さない
         prereg = write_prereg(self.tmp)
@@ -825,18 +842,19 @@ class GridRunTest(GridCase):
         for pole in POLES:
             config = json.loads((outdir / f"{pole}.json").read_text(encoding="utf-8"))["config"]
             self.assertEqual((config["pole"], config["q"], config["warmup_count"]), (pole, 0.995, 200))
-        # ★ 6 キーすべて通る (値は整数・小数)
+        # ★ 7 キーすべて通る (値は整数・小数・0)
         outdir = self.new_out()
         rc, err = self.run_script(
             ndjson, outdir, "--",
             "--set", "w_ms=15000", "--set", "q=0.999", "--set", "b_ms=60000",
             "--set", "hole_gap_ms=3000", "--set", "warmup_count=1000", "--set", "t1a_window_ms=60000",
+            "--set", "idle_trim_max_ms=0",
         )
         self.assertEqual(rc, 0, err)
         config = json.loads((outdir / "baseline.json").read_text(encoding="utf-8"))["config"]
         self.assertEqual(
             {k: config[k] for k in grid.TUNABLE_KEYS},
-            {"w_ms": 15000, "q": 0.999, "b_ms": 60000, "hole_gap_ms": 3000, "warmup_count": 1000, "t1a_window_ms": 60000},
+            {"w_ms": 15000, "q": 0.999, "b_ms": 60000, "hole_gap_ms": 3000, "warmup_count": 1000, "t1a_window_ms": 60000, "idle_trim_max_ms": 0},
         )
         # ★ 従来のガードは `--` の有無に依らず効く (使い回し拒否・失敗時は何も置かない)
         rc, _ = self.run_script(ndjson, outdir, "--", "--set", "q=0.99")

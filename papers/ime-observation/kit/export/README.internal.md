@@ -56,9 +56,21 @@ rules that is missing or fails), or an unexpected failure (only the type of the 
    inside a git work tree, the checker must itself be tracked in the git work tree that holds it, equal to
    HEAD and free of an `assume-unchanged` or `skip-worktree` mark (a checker outside git stops the
    export with exit code 2), so that one commit yields one verdict.
-5. Commit `DIR` on top of the history of the public repository (next section) and tag the release. The
-   DOI of the release is reserved beforehand in a draft of the archive service and is already in
+5. Commit `DIR` on top of the history of the public repository (next section) and tag the release. For the
+   first release, the DOI is reserved beforehand in a draft of the archive service and is already in
    `CITATION.cff` and the manuscript; the archive of the tag is uploaded to that draft, which is then published.
+   A later release is a new version of the same record. Before step 2, its draft is made from the published record
+   with the new-version action of the archive service, which reserves the DOI of that version. In step 2, the
+   version and that DOI are written in `CITATION.cff` and in the BibTeX entry `@software` of `README.md` and
+   `README.ja.md`, and the version in `.zenodo.json` and in the text of the badge of the code release in both
+   READMEs; the links of the badges of the code point to the DOI of all versions and are not changed. The release is
+   added to the history in both READMEs and in the history section of this note. The `Code:` of the article box in
+   both READMEs keeps the DOI of release 1.0.0, like the manuscript, whose DOI of the code
+   (`manuscript/references.bib`, `manuscript/sections/declarations.tex`) is not changed. The draft copies the files
+   and the metadata of the version before, except the version, which is left empty. The copied files are removed from
+   the draft before the archive of the new tag is uploaded, and the draft's version, publication date (copied from the
+   version before), description, link to the tree of the tag and any other field changed in `.zenodo.json` are set
+   before it is published (the service does not read `.zenodo.json` when files are uploaded by hand).
 
 ## History of the public repository
 
@@ -66,7 +78,8 @@ The public repository does not carry the history of the working repository. Its 
 the export of the macOS freezing tag (made with that tag's own exporter and `--allow-missing-license`, so that
 the list of its files has the SHA-256 that the registration gives), tagged `ime-observation-prereg-macos`; the
 export of the Windows freezing tag, made in the same way, tagged `ime-observation-prereg-windows`; a commit that
-adds only `manuscript/outline.md` as it stood before the results were analysed; and the release. The author date
+adds only `manuscript/outline.md` as it stood before the results were analysed; and the releases, each committed on
+top of the one before (`v1.0.0`, then `v1.0.1`). The author date
 of each of the first three commits is the date of the working commit it comes from, and the message names that
 commit. Scripts that start with `#!` are given the executable bit in the index.
 

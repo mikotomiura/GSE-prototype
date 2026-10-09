@@ -1,0 +1,23 @@
+# tasklist
+
+- [x] `analysis/feat_offline/idle_trim.rs` のテストを先に書き、赤を確かめる（14 件中 10 件が赤・残る 4 件は「落とさない」側の対照）
+- [x] `idle_trim` を実装し、テストを緑にする（`mod.rs` に `pub mod`）・変異 3 件（穴の境界 `>=`→`>`／上限を外す／入力の境界 `<=`→`<`）がすべて赤
+- [x] `replay.rs`: `P1Operational` を 10 キーに（`as_pairs` / `apply_set` / `validate`）・`--features` 経路に新しい収集関数と `idle_trim` を配線・封筒（`config` 2 値・`provenance.idle_trim`）
+- [x] 凍結 JSON を 1.1.0 に（`operational` / `search_space` / `search_roles`・感度の budget 5）
+- [x] `replay.rs` の既存テストを揃える（`prereg_version` 1.1.0）と、新しいテスト 4 件（入力の収集・overrides・範囲の検査・旧形式の設定ファイルの拒否）
+- [x] `src-tauri/tests/p1_restart_default_config.rs`: 閉じの打鍵を足して時刻表を導き直し、前処理が既定で効くことを実バイナリで確かめるテストを足す
+- [x] `docs/preregistration-p1-episode.md`: v1.2 改訂宣言と §6
+- [x] `scripts/check_prereg_parity.py`: §6 を読む・重複キーを止める・自己検査の変異を足す
+- [x] `scripts/p1_run_grid.py` / `scripts/run-features-all-poles.sh` / `scripts/tests/` を揃える（感度の実行 5・一式 32）
+- [x] ADR-030 補訂 4
+- [x] `docs/functional-design.md`（P1 の特徴行の節を新設）/ `docs/glossary.md`（観測区間に追記・「無入力の末尾の前処理」を新設）
+- [x] `cargo test --workspace` 緑・Python の P1 テスト緑・`check_prereg_parity.py` と `--self-test` 緑
+- [x] clippy・fmt（警告なし）
+- [x] 実記録（P998・repo の外）で前処理あり・なし・`warmup_count=10` を比べ、`verification.md` に書く（その中で 1 秒のずれを見つけて直した・判断 6）
+- [x] アプリ側の別 issue（#331・研究者の確認で次の配布に回す）
+- [x] code-reviewer ∥ security-checker（HIGH 0）・指摘をすべて対応（判断 7）・判断 6 を研究者に確認
+- [x] 指摘の対応の後の全テスト・実記録の比べ直し（`spans` が終わりの点ごとになった）
+- [x] /cross-review: Codex 4 回（差分を分けて）∥ code-reviewer 2 巡目。指摘への対応は判断 8（研究者に 2 点を確認）
+- [x] 判断 8 の対応の後の全テスト・clippy・fmt（cargo 緑・replay 73・clippy 0・Python の P1（全体の実行では grid の 5 件が赤 = 偽の replay が新しい必須の `provenance.idle_trim` を出していなかった → 偽物を直し、grid を再実行して緑。ほかは全体の実行で緑）・`p1-repro-test.sh` 70 件通過・parity の自己検査 16 件赤）
+- [ ] コミット・push・PR・CI・#330 に裁定を書く
+- [ ] O1 事前登録の草案に参照を足す（PR #329 の merge 後）→ 引き継ぎ `.steering/_handoff/next-session-p1-sleep-trim-followups.md` に書いた
