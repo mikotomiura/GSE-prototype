@@ -37,7 +37,8 @@ would treat the following situation.
    research [I am confirming this with the university]. Data collection started on 8 October 2026
    without committee approval or exemption, based on my own assessment.
 3. The submission guidelines state that "retrospective ethics approval usually cannot be obtained
-   and it may not be possible to consider the manuscript for peer review."
+   and it may not be possible to consider the manuscript for peer review. The decision on whether
+   to proceed to peer review in such cases is at the Editor's discretion."
 
 My questions:
 (a) If an independent ethics committee reviews and approves (or exempts) the secondary analysis and
@@ -45,9 +46,18 @@ My questions:
     for peer review? If so, what should the ethics statement contain?
 (b) If not, would the journal consider a manuscript whose data are newly collected after committee
     approval, while the earlier data are described only as a pilot (not analysed in the paper)?
-(c) Because keystroke timing may allow re-identification, I plan to share the processed data
-    under a controlled-access agreement rather than openly. Would this satisfy the journal's
-    research data policy if the conditions of access are stated in the Open Practices Statement?
+(c) Because keystroke timing may allow re-identification and the inference of health-related
+    information, I plan to share data in two steps:
+    (i) at publication, aggregate results and documented analysis code, illustrated with
+        simulated data (as in the journal's example Open Practices Statement);
+    (ii) later, only for data representations that pass pre-specified re-identification tests,
+        processed (not raw) records under a controlled-access agreement (application required;
+        research use only; no attempts at re-identification; no redistribution).
+    The guidelines state that "when individual privacy could be compromised, data availability
+    should still be stated in the manuscript along with any conditions for access." Would
+    arrangement (i) alone be acceptable under the journal's type 4 research data policy? And
+    would arrangement (ii) be acceptable if its conditions of access are stated in the Open
+    Practices Statement?
 
 Thank you for your time.
 
@@ -57,6 +67,11 @@ Thank you for your time.
 ```
 
 ⚠️ (b) の「pilot として記述するだけで解析しない」は ADR-039 D1 の書き方に合わせた。O1 を論文でどう扱うかは研究者が決める。
+
+⚠️ **2026-10-09 改訂**（`.steering/20261009-release-deidentification-survey/decisions.md` 判断 7）:
+- 3. の引用に、投稿規定の続きの 1 文（*"The decision on whether to proceed to peer review in such cases is at the Editor's discretion."*）を足した。この文は 2026-10-09 に投稿規定の字面で確かめた（[V237]）。
+- (c) を ADR-039【決 5】の裁定（集計値＋コード＋模擬データを既定とし、関門を通った段だけ申請制で足す）に合わせて 2 段の問いに改めた。投稿規定の「アクセスの条件」の文（[V237]）を引いた。旧 (c) は「Because keystroke timing may allow re-identification, I plan to share the processed data under a controlled-access agreement rather than openly. Would this satisfy the journal's research data policy if the conditions of access are stated in the Open Practices Statement?」。
+- ⚠️ 「申請制で Open Practices Statement を書いてよいか」は旧 (c) にすでにあった。新しい問いを足したのではなく、(c) を書き直した。
 
 ---
 
