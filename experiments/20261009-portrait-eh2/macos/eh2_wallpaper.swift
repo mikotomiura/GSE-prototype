@@ -342,13 +342,15 @@ func readbackLagMs(_ s: NSScreen, _ u: URL, timeout: Double = 5) -> Double? {
 }
 
 // The getter was also seen to fall back to an earlier picture for about a second, several seconds after
-// the last set (WallpaperAgent appears to replay earlier requests). After a restore, the placeholder
-// images are deleted only when the getter has shown the original for `stable` seconds without a break.
-func settled(_ s: NSScreen, _ u: URL, stable: Double = 5, timeout: Double = 30) -> Bool {
+// the last set (WallpaperAgent appears to replay earlier requests; the replays stopped within 30 s).
+// True only when every screen shows its picture at the same time for `stable` seconds without a break,
+// so a screen that falls back while another one is still being watched is not missed.
+func heldFor(_ pairs: [(NSScreen, URL)], stable: Double, timeout: Double) -> Bool {
+    if pairs.isEmpty { return false }
     let t0 = nowMs()
     var since: Double? = nil
     while nowMs() - t0 < timeout * 1000 {
-        if samePath(ws.desktopImageURL(for: s), u) {
+        if pairs.allSatisfy({ samePath(ws.desktopImageURL(for: $0.0), $0.1) }) {
             if since == nil { since = nowMs() }
             if nowMs() - since! >= stable * 1000 { return true }
         } else { since = nil }
@@ -391,7 +393,6 @@ func restore() {
         return
     }
     var restored: [Any] = []
-    var settledAll: [Bool] = []
     for o in orig {
         guard let u = o.url else { restored.append("original_missing"); continue }
         do {
@@ -399,12 +400,14 @@ func restore() {
             restored.append(readbackLagMs(o.screen, u) != nil && fileHash(u) == o.sha256)
         } catch { restored.append(false) }
     }
-    for o in orig { if let u = o.url { settledAll.append(settled(o.screen, u)) } }
+    let restoredOk = restored.allSatisfy { ($0 as? Bool) == true }
+    // wait only when every screen was restored (otherwise the result is already "not confirmed")
+    let settledAll = restoredOk && heldFor(orig.compactMap { o in o.url.map { (o.screen, $0) } }, stable: 30, timeout: 60)
     res["restored"] = restored
-    res["restore_settled"] = settledAll
+    res["restore_settled_all"] = settledAll  // all screens together for 30 s (before 2026-10-09 17:00: restore_settled, per screen, 5 s)
     res["restore_target_unconfirmed"] = restoreTargetUnconfirmed
-    let allOk = restored.allSatisfy { ($0 as? Bool) == true } && settledAll.allSatisfy { $0 }
-    print("Restored: \(restored) settled: \(settledAll)")
+    let allOk = restoredOk && settledAll
+    print("Restored: \(restored) settled (all screens, 30 s): \(settledAll)")
     if allOk && !restoreTargetUnconfirmed {
         try? FileManager.default.removeItem(at: restoreFile)
         try? FileManager.default.removeItem(at: work)
@@ -474,7 +477,8 @@ do {
         try nap(0.3)
     }
     // readback_ok: the getter showed the new picture within 5 s; readback_immediate_ok: right after the set
-    res["per_screen"] = ["calls": tot, "readback_ok": okN, "readback_immediate_ok": immediateN,
+    // readback_within_5s_ok: renamed from readback_ok (which meant "right after the set" before 2026-10-09 13:38)
+    res["per_screen"] = ["calls": tot, "readback_within_5s_ok": okN, "readback_immediate_ok": immediateN,
                          "latency_ms_median": orNull(median(lat)),
                          "latency_ms_p95": orNull(pct(lat, 95)), "latency_ms_max": orNull(lat.max()),
                          "readback_lag_ms_median": orNull(median(lag)), "readback_lag_ms_p95": orNull(pct(lag, 95)),
@@ -537,7 +541,8 @@ do {
         stateLock.lock(); onOtherSpace = false; stateLock.unlock()
         try setPicture(imgs[0][0], o0.screen, opts)
         try guarded(sendsAway: true) { waitEnter("The striped image is now set on this Space. Switch to the second Space (Ctrl+Right) and press Enter.") }
-        let readbackOther = readbackLagMs(o0.screen, imgs[0][0], timeout: 2) != nil
+        // held for 2 s, not matched once: a replayed earlier request must not count as a match
+        let readbackOther = heldFor([(o0.screen, imgs[0][0])], stable: 2, timeout: 6)
         let visibleOther = try guarded { askYesNo("Do you see the striped image on the second Space?") }
         res["manual_spaces"] = ["readback_matches_on_other_space": readbackOther,
                                 "striped_image_visible_on_other_space": visibleOther] as [String: Any]
