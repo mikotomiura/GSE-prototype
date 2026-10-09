@@ -236,6 +236,7 @@ def e13_target(tag: str, XA: np.ndarray, Y: np.ndarray, G: np.ndarray, strata: n
         # side that keeps a verdict from passing (upper +inf, lower -inf)
         ups = [rec[f"{fs}/{k}"]["ci95"][1] for fs in FSETS for k in KINDS]
         los = [rec[f"{fs}/{k}"]["ci95"][0] for fs in FSETS for k in KINDS]
+        rec["n_nan_bounds"] = int(np.isnan(ups).sum() + np.isnan(los).sum())
         rec["upper_max"] = float("inf") if any(np.isnan(ups)) else max(ups)
         rec["lower_max"] = float("-inf") if any(np.isnan(los)) else max(los)
         res["configs"][n] = rec
@@ -259,10 +260,14 @@ def e13_target(tag: str, XA: np.ndarray, Y: np.ndarray, G: np.ndarray, strata: n
             rec["null95"] = null95[n]
         if n in pcs:
             rec["verdict"] = "detector_ok" if rec["lower_max"] > pc_lower else "detector_failed"
+            if rec["n_nan_bounds"]:
+                rec["verdict_reason"] = "a bootstrap draw without positives (NaN bound)"
         elif not applicable:  # world v1, declared before the results (design 3.1, 3.11)
             rec["verdict"] = "not_applicable"
         elif n.startswith("ORC-"):  # design 3.11: the reach of the scheduler's channel, not a verdict on a config
-            if rec["upper_max"] < margin and null_ok:
+            if rec["n_nan_bounds"]:
+                rec["verdict"] = "undecidable"  # a bootstrap draw without positives: no reading of the channel
+            elif rec["upper_max"] < margin and null_ok:
                 rec["verdict"] = "channel_narrow"
             elif rec["lower_max"] > pc_lower:
                 rec["verdict"] = "channel_open"
@@ -408,11 +413,13 @@ def main() -> int:
             e13[tag] = e13_target(tag, inp["XA"], inp["Y"], inp["G"], inp["strata"], XB, cfg, seed, a.jobs,
                                   cfg["e13"]["bootstrap"], cfg["e13"]["null_perms"], applicable, scratch / tag)
             del XB
+            shutil.rmtree(scratch / tag, ignore_errors=True)  # free the disk before the next label
             print(f"E1-3 {tag} done at {time.time() - t0:.0f} s", flush=True)
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     del shape
     e13["primary"] = "L300"
+    e13["seed"] = seed
     if a.pilot:
         e13["_note"] = ("Pilot (design 3.10): SEED + offset, positive controls only; not a result of round 2. "
                         "The numbers go to design section 8; this file is not committed.")

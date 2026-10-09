@@ -77,12 +77,22 @@ FINAL_OUT="$EXP_DIR/results/$SUFFIX"
 OUT="$EXP_DIR/results/.partial-$SUFFIX"
 rm -rf "$WORK" "$OUT"
 mkdir -p "$OUT" "$WORK"
+# publish: the old results are moved aside (not deleted) before the new ones take their place, and removed
+# only after the move succeeded. ⚠️ Do not run two runs of the same world and mode at the same time.
+publish() {
+  local old="$EXP_DIR/results/.old-$SUFFIX"
+  rm -rf "$old"
+  if [ -e "$FINAL_OUT" ]; then mv "$FINAL_OUT" "$old"; fi
+  mv -T "$OUT" "$FINAL_OUT"
+  rm -rf "$old"
+}
 if [ -n "$PILOT" ]; then
   # design 3.10: another seed and 40 P sessions (the other sets at smoke size; the pilot does not use them)
-  read -r OFFSET PILOT_P < <("$PY" -c "import json,sys; p=json.load(open(sys.argv[1],encoding='utf-8'))['sets']['pilot']; print(int(p['seed_offset']), int(p['P']))" "$EXP_DIR/config.json")
+  read -r OFFSET PILOT_P < <("$PY" -c "import json,sys; p=json.load(open(sys.argv[1],encoding='utf-8'))['sets']['pilot']; v=(p['seed_offset'], p['P']); ok=all(type(x) is int and x >= 0 for x in v); print(*v) if ok else sys.exit('sets.pilot must hold non-negative integers')" "$EXP_DIR/config.json")
+  PILOT_P="${PILOT_P%$'\r'}"  # Python on Windows ends the line with CRLF
   case "$OFFSET$PILOT_P" in ''|*[!0-9]*) echo "sets.pilot in config.json must hold non-negative integers" >&2; exit 2 ;; esac
   SEED_FILE="$WORK/SEED.pilot"
-  echo $(( $(tr -d '[:space:]' < "$EXP_DIR/SEED") + OFFSET )) > "$SEED_FILE"
+  echo $(( 10#$(tr -d '[:space:]' < "$EXP_DIR/SEED") + 10#$OFFSET )) > "$SEED_FILE"  # 10#: never octal
   GEN_EXTRA="--smoke --p-n $PILOT_P"
 fi
 cd "$EXP_DIR/scripts"
@@ -103,7 +113,7 @@ echo "Step 0 OK: capabilities gate passed"
 # Step 3: self-tests of the instruments, then the checks
 if [ -n "$PILOT" ]; then
   "$PY" checks.py "$EXP_DIR/config.json" "$SEED_FILE" "$WORK" "$OUT" --world "$WORLD" --jobs "$JOBS" --pilot
-  rm -rf "$FINAL_OUT" && mv "$OUT" "$FINAL_OUT"
+  publish
   echo "pilot done: $FINAL_OUT/pilot_e13.json (not committed; copy the PC numbers to design section 8)"
   exit 0
 fi
@@ -133,5 +143,5 @@ json.dump({"world": world, "smoke": bool(smoke), "git_commit": commit, "experime
            "packages": {p: version(p) for p in ("numpy", "scipy", "scikit-learn", "pillow")}},
           open(out, "w"), indent=1)
 PYEOF
-rm -rf "$FINAL_OUT" && mv "$OUT" "$FINAL_OUT"
+publish
 echo "done: $FINAL_OUT"
