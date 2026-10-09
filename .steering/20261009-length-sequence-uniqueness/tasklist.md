@@ -30,6 +30,10 @@
 - [ ] issue #333 にコメント
 - [ ] 引き継ぎファイルに完了の印
 
+## 完了時のレビュー
+- [x] 1 巡目（code-reviewer ∥ security-checker ∥ Codex 2 回）の指摘を一次で確かめ、実装の誤りを直して全体を回し直した（decisions.md 判断 5・design.md §14・notes.md の逸脱）
+- [ ] 2 巡目（直した規則の境界条件）
+
 ## 完了
 - [ ] `/finish-task`（code-reviewer ∥ `/cross-review`）
 - [ ] commit → push → PR → CI 緑なら merge → main の CI 確認

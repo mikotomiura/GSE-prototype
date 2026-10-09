@@ -1522,7 +1522,7 @@
  "aggregate_corpus": {
   "ruby": 395159,
   "ruby_substituted": 392275,
-  "x_tokens": 82205,
+  "x_tokens": 87121,
   "no_frame": 51,
   "replacement_chars": 0
  },
@@ -1540,6 +1540,10 @@
    1737
   ],
   [
+   "ゝ",
+   1573
+  ],
+  [
    "×",
    900
   ],
@@ -1552,12 +1556,48 @@
    737
   ],
   [
+   "いゝ",
+   528
+  ],
+  [
+   "たゞ",
+   420
+  ],
+  [
+   "まゝ",
+   366
+  ],
+  [
    "″",
    341
   ],
   [
+   "あゝ",
+   304
+  ],
+  [
+   "こゝ",
+   237
+  ],
+  [
+   "えゝ",
+   194
+  ],
+  [
+   "かゝっ",
+   190
+  ],
+  [
+   "ゞ",
+   184
+  ],
+  [
    "□",
    161
+  ],
+  [
+   "つゝ",
+   151
   ],
   [
    "尖",
@@ -1568,8 +1608,20 @@
    126
   ],
   [
+   "るゝ",
+   124
+  ],
+  [
+   "かゝる",
+   118
+  ],
+  [
    "寄",
    115
+  ],
+  [
+   "かゝり",
+   103
   ],
   [
    "箇",
@@ -1634,177 +1686,125 @@
   [
    "阿",
    62
-  ],
-  [
-   "罎",
-   61
-  ],
-  [
-   "阿香",
-   60
-  ],
-  [
-   "添",
-   59
-  ],
-  [
-   "阿爺",
-   59
-  ],
-  [
-   "蹈",
-   58
-  ],
-  [
-   "做",
-   56
-  ],
-  [
-   "捨",
-   56
-  ],
-  [
-   "啣",
-   56
-  ],
-  [
-   "奉",
-   53
-  ],
-  [
-   "→",
-   53
-  ],
-  [
-   "噛",
-   52
-  ],
-  [
-   "蹴",
-   51
-  ],
-  [
-   "踏",
-   51
   ]
  ],
  "corpus_by_definition": {
   "B0": {
    "segments": 1865764,
-   "valid": 1818136,
+   "valid": 1813836,
    "zero_length_valid": 188924,
-   "keys_valid": 50771606,
-   "writer_reading_differs_valid": 102910,
-   "writer_units_valid": 26879653,
-   "writer_unit_keys_valid": 50715653,
-   "valid_fraction": 0.974472655705652,
-   "mean_keys_valid": 27.92508701219271,
-   "writer_reading_differs_fraction_valid": 0.05660192636854449,
-   "mean_keys_per_writer_unit": 1.8867673998618955
+   "keys_valid": 50594655,
+   "writer_reading_differs_valid": 100825,
+   "writer_units_valid": 26799352,
+   "writer_unit_keys_valid": 50565325,
+   "valid_fraction": 0.9721679697968232,
+   "mean_keys_valid": 27.89373184786276,
+   "writer_reading_differs_fraction_valid": 0.05558661312268584,
+   "mean_keys_per_writer_unit": 1.8868114796208506
   },
   "B1": {
    "segments": 2542302,
-   "valid": 2494674,
+   "valid": 2490374,
    "zero_length_valid": 859558,
-   "keys_valid": 50771677,
-   "writer_reading_differs_valid": 102910,
-   "writer_units_valid": 26879724,
-   "writer_unit_keys_valid": 50715724,
-   "valid_fraction": 0.9812657976904396,
-   "mean_keys_valid": 20.352028762074724,
-   "writer_reading_differs_fraction_valid": 0.04125188301156785,
-   "mean_keys_per_writer_unit": 1.8867650575578827
+   "keys_valid": 50594737,
+   "writer_reading_differs_valid": 100825,
+   "writer_units_valid": 26799434,
+   "writer_unit_keys_valid": 50565407,
+   "valid_fraction": 0.9795744172014182,
+   "mean_keys_valid": 20.316119988403347,
+   "writer_reading_differs_fraction_valid": 0.04048588685876097,
+   "mean_keys_per_writer_unit": 1.8868087661851365
   },
   "B2": {
-   "segments": 7727246,
-   "valid": 7676524,
-   "zero_length_valid": 1922950,
-   "keys_valid": 52135848,
-   "writer_reading_differs_valid": 140798,
-   "writer_units_valid": 27599042,
-   "writer_unit_keys_valid": 52078747,
-   "valid_fraction": 0.9934359537667107,
-   "mean_keys_valid": 6.791595779548139,
-   "writer_reading_differs_fraction_valid": 0.01834137429909683,
-   "mean_keys_per_writer_unit": 1.8869766204203755
+   "segments": 7594779,
+   "valid": 7539433,
+   "zero_length_valid": 1790483,
+   "keys_valid": 52090511,
+   "writer_reading_differs_valid": 137501,
+   "writer_units_valid": 27588770,
+   "writer_unit_keys_valid": 52061340,
+   "valid_fraction": 0.9927126253443319,
+   "mean_keys_valid": 6.909075390682562,
+   "writer_reading_differs_fraction_valid": 0.01823757834309291,
+   "mean_keys_per_writer_unit": 1.8870482446299708
   },
   "B3": {
    "segments": 1544620,
-   "valid": 1498033,
+   "valid": 1493842,
    "zero_length_valid": 31,
-   "keys_valid": 50372688,
-   "writer_reading_differs_valid": 100907,
-   "writer_units_valid": 26662655,
-   "writer_unit_keys_valid": 50317323,
-   "valid_fraction": 0.9698391837474589,
-   "mean_keys_valid": 33.62588674615312,
-   "writer_reading_differs_fraction_valid": 0.06735966430646054,
-   "mean_keys_per_writer_unit": 1.8871835156701386
+   "keys_valid": 50171611,
+   "writer_reading_differs_valid": 98758,
+   "writer_units_valid": 26569109,
+   "writer_unit_keys_valid": 50142738,
+   "valid_fraction": 0.9671258950421463,
+   "mean_keys_valid": 33.58562083540294,
+   "writer_reading_differs_fraction_valid": 0.06611007054293559,
+   "mean_keys_per_writer_unit": 1.8872570397449158
   }
  },
  "reference_by_definition": {
   "B0": {
    "segments": 59504,
-   "valid": 58516,
+   "valid": 58099,
    "zero_length_valid": 7595,
-   "keys_valid": 1670100,
-   "writer_reading_differs_valid": 2615,
-   "writer_units_valid": 880757,
-   "writer_unit_keys_valid": 1668878,
-   "valid_fraction": 0.9833960742134983,
-   "mean_keys_valid": 28.54091188734705,
-   "writer_reading_differs_fraction_valid": 0.04468863216897943,
-   "mean_keys_per_writer_unit": 1.8948222949122175
+   "keys_valid": 1656561,
+   "writer_reading_differs_valid": 2590,
+   "writer_units_valid": 873600,
+   "writer_unit_keys_valid": 1655781,
+   "valid_fraction": 0.9763881419736489,
+   "mean_keys_valid": 28.51272827415274,
+   "writer_reading_differs_fraction_valid": 0.04457908053494897,
+   "mean_keys_per_writer_unit": 1.895353708791209
   },
   "B1": {
    "segments": 82268,
-   "valid": 81280,
+   "valid": 80863,
    "zero_length_valid": 30171,
-   "keys_valid": 1670102,
-   "writer_reading_differs_valid": 2615,
-   "writer_units_valid": 880759,
-   "writer_unit_keys_valid": 1668880,
-   "valid_fraction": 0.9879904701706618,
-   "mean_keys_valid": 20.547514763779528,
-   "writer_reading_differs_fraction_valid": 0.03217273622047244,
-   "mean_keys_per_writer_unit": 1.894820262977727
+   "keys_valid": 1656563,
+   "writer_reading_differs_valid": 2590,
+   "writer_units_valid": 873602,
+   "writer_unit_keys_valid": 1655783,
+   "valid_fraction": 0.9829216706374289,
+   "mean_keys_valid": 20.486044297144552,
+   "writer_reading_differs_fraction_valid": 0.03202948196332068,
+   "mean_keys_per_writer_unit": 1.8953516589934547
   },
   "B2": {
-   "segments": 251524,
-   "valid": 250485,
-   "zero_length_valid": 62732,
-   "keys_valid": 1695570,
-   "writer_reading_differs_valid": 3364,
-   "writer_units_valid": 894040,
-   "writer_unit_keys_valid": 1694324,
-   "valid_fraction": 0.9958691814697603,
-   "mean_keys_valid": 6.76914785316486,
-   "writer_reading_differs_fraction_valid": 0.013429945904944408,
-   "mean_keys_per_writer_unit": 1.895132208849716
+   "segments": 245902,
+   "valid": 244413,
+   "zero_length_valid": 57110,
+   "keys_valid": 1691368,
+   "writer_reading_differs_valid": 3315,
+   "writer_units_valid": 891800,
+   "writer_unit_keys_valid": 1690570,
+   "valid_fraction": 0.9939447422143781,
+   "mean_keys_valid": 6.920122906719365,
+   "writer_reading_differs_fraction_valid": 0.013563108345300782,
+   "mean_keys_per_writer_unit": 1.8956828885400314
   },
   "B3": {
    "segments": 47997,
-   "valid": 47039,
+   "valid": 46640,
    "zero_length_valid": 0,
-   "keys_valid": 1654779,
-   "writer_reading_differs_valid": 2582,
-   "writer_units_valid": 872552,
-   "writer_unit_keys_valid": 1653561,
-   "valid_fraction": 0.9800404191928662,
-   "mean_keys_valid": 35.17887285018814,
-   "writer_reading_differs_fraction_valid": 0.05489062267480176,
-   "mean_keys_per_writer_unit": 1.8950859089200414
+   "keys_valid": 1639118,
+   "writer_reading_differs_valid": 2554,
+   "writer_units_valid": 864275,
+   "writer_unit_keys_valid": 1638349,
+   "valid_fraction": 0.9717273996291435,
+   "mean_keys_valid": 35.14403945111492,
+   "writer_reading_differs_fraction_valid": 0.054759862778730704,
+   "mean_keys_per_writer_unit": 1.8956339128171011
   }
  },
  "derived_files_sha256": {
-  "corpus_B0.pkl": "1a3792064a8afafacdfa2e071fd7b32d988a03d1ee74c376f4a045a491a9692c",
-  "corpus_B1.pkl": "44552ca229aa8a42f4f5fb3a68cd45e2e41ee734c90bb2b6ea87e69be2937dae",
-  "corpus_B2.pkl": "5a4287743bbfd094f0595bfbddd7ec29beb531ddd1a456293e8526724ba34578",
-  "corpus_B3.pkl": "8831b5649ca2177073717c608e1dddc9df2fe1fe24baaaf62416899b4454f823",
-  "reference_B0.pkl": "d9209f5ff81842647b71bfedb8ba6942c1d048a455866d09d4f4aeaf84a19bf5",
-  "reference_B1.pkl": "6cb979c8869f01b8774323c0e178f04c02b5a5422544d643a074a7c5dfe156ce",
-  "reference_B2.pkl": "5e2f026d31877a5e07d9ffd0c35ccc9778283b8011000ff2e4416d3dd1b98471",
-  "reference_B3.pkl": "96a75229c387786cd56ad4a3f08c88ca36080d0605b876de8088a9845fa0ceac"
+  "corpus_B0.pkl": "6bd59c67c997762915bfdaa3f82394eafb1414755e1ab6597df8a1818efce1cc",
+  "corpus_B1.pkl": "9cb6802a9abf7289f44b9acca33adfc7f7cfe48ff06c8ba6ecc9c38d1d5a043a",
+  "corpus_B2.pkl": "8c85a991c207675cf736dd74d6503e24d8ee8c2f7cf8d2f569e6859f2cd16b43",
+  "corpus_B3.pkl": "1f1a4fc0ac6e9484259a55763b85e04c6d1359a755b8bd801459cdbeec0759a8",
+  "reference_B0.pkl": "7be5a08ed1e7d839fabe48f5b95839caf5cb144be81190d4c98ff8d7d0e43cc9",
+  "reference_B1.pkl": "703301422fdc229e86a0d8fea90ed146abf445c9f881fa1e9cc805e49f39cff7",
+  "reference_B2.pkl": "e6a129bf82d0ec601c05ceb1eda5a59f40a9e25f4872cce8ff818cffa2ec9502",
+  "reference_B3.pkl": "2096025e09a16607af9ccfc0a6c9705625b0716792ebad5e626bb82dd9f77def"
  },
- "r_bar": 1.8867673998618955
+ "r_bar": 1.8868114796208506
 }
