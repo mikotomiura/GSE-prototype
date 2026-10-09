@@ -8,17 +8,18 @@
 - [x] design §3 をコミットして固定する（下見・スモークより前）
 
 ## 計器
-- [ ] `experiments/20261010-portrait-eh1-round3/` を第 2 回から写す
-- [ ] `portrait.py`: `clock60`・PC-cal・`ORCgap`・`ORCcum`・L1800 の特徴
-- [ ] `checks.py`: E1-3 だけ・3 ラベル・判定不能の条件の置き換え・神託 6 本・`--pilot` で λ の格子
-- [ ] `selftest.py`: §3.7
+- [x] `experiments/20261010-portrait-eh1-round3/` を第 2 回から写す
+- [x] `portrait.py`: `clock60`・PC-cal・`ORCgap`・`ORCcum`・L1800 の特徴
+- [x] `checks.py`: E1-3 だけ・3 ラベル・判定不能の条件の置き換え・神託 6 本・`--pilot` で λ の格子
+- [x] `selftest.py`: §3.7
 
 ## 下見とスモーク
-- [ ] 下見（SEED + 1・v2・P 40・PC だけ）→ λ を選ぶ → `config.json` に固定 → §8
-- [ ] スモーク → 所要を見積もる
+- [x] 下見（SEED + 1・v2・P 40・PC だけ）→ λ を選ぶ → `config.json` に固定 → §8
+- [x] スモーク → 所要を見積もる
 
 ## 本番と仕上げ
-- [ ] 本番 v2（G-GEAR）
-- [ ] 結果を読んで解釈する → notes・decisions・親の判断
+- [x] 本番 v2（G-GEAR）
+- [x] 結果を読んで解釈する → notes・decisions 判断 5（親の判断は研究者に確かめた後）
+- [ ] 研究者に判断 5 の 3 点を確かめる → 親の decisions に還元
 - [ ] まとめの `/cross-review` → decisions
 - [ ] 完了時の出荷（push → PR → CI → merge）
