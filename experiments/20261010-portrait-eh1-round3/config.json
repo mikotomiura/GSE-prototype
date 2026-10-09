@@ -320,10 +320,10 @@
       1801
     ]
   },
-  "_comment_pccal": "Round 3 design 1.4 and 3.9: PCcal on a 60 s clock that never looks at presses; lam is chosen by the pilot (checks.py --pilot) and written here before the smoke and the main run. PCcal works when the lower bound max > lower and the point estimate max <= upper (design 3.2).",
+  "_comment_pccal": "Round 3 design 1.4 and 3.9: PCcal on a 60 s clock that never looks at presses; lam is chosen by the pilot (checks.py --pilot) and written here before the smoke and the main run. PCcal works when the lower bound max > lower and the point estimate max <= upper (design 3.2). lam = 0.1 was chosen by the pilot on 2026-10-10 01:39 (design section 8): the fitted L300 point estimate 0.0567 was the closest to 0.05.",
   "pccal": {
     "interval_s": 60,
-    "lam": null,
+    "lam": 0.1,
     "pilot_grid": [
       0.05,
       0.1,
