@@ -1,0 +1,57 @@
+{
+  "_note": "Values fixed before any result was computed (2026-10-09). Chosen by the researcher from Claude's recommendations (.steering/20261009-length-sequence-uniqueness/decisions.md, decision 1). These are experiment values, not pass criteria (ADR-039 D6).",
+  "selection": {
+    "orthography": "新字新仮名",
+    "work_copyright": "なし",
+    "exclude_poetry": true,
+    "n_works": 1500,
+    "nested_sizes": [100, 1000, 1500],
+    "fetch_count": 1600,
+    "duplicate_window_k": 10,
+    "duplicate_overlap": 0.5,
+    "reference_works": [
+      {"work_id": "000069", "label": "akutagawa_kappa", "ime_sha256": "8daf7b994cebd17dff5a5447fd18d0408a153855ea821b9bec138ee3e68a49e9"},
+      {"work_id": "000301", "label": "dazai_ningen_shikkaku", "ime_sha256": "fb37d694f86687f9e84e26643804fa84b4346895f5f56a90dd8843a12e2bc9c8"},
+      {"work_id": "001565", "label": "dazai_shayo", "ime_sha256": "712a759c175c7341bb2916f747f95d0d900923b353d511001ad677b7411eabc8"},
+      {"work_id": "045649", "label": "hayashi_horoki", "ime_sha256": "179eaee1bd51bfc1987daf16f293d6819083759ba5db0ffc95307f060b988947"},
+      {"work_id": "000456", "label": "miyazawa_ginga_tetsudo", "ime_sha256": "8bc90c0c7f97e069d02c4783ce905fa7b959cf60a74df816aeccf94079555076"},
+      {"work_id": "052468", "label": "nakaya_yuki", "ime_sha256": "2d7b144a0f219e8b8e0e861745deba270a37246108fab6271854d4e7653db848"},
+      {"work_id": "000545", "label": "oda_meoto_zenzai", "ime_sha256": "4a88e427c77bcebe21b04bc49aa6cf57e381f618caf7c945a4cc98b42347b89d"},
+      {"work_id": "001293", "label": "okamoto_hanshichi_01", "ime_sha256": "f409f1374648dbb29d91d50960f95d35e6f94eee14c3a01aa3044f2190f3452e"},
+      {"work_id": "042620", "label": "sakaguchi_darakuron", "ime_sha256": "82db555d429391899b8110b2416739825689596b5196ff5fa3fe87f05abcec40"},
+      {"work_id": "000752", "label": "soseki_botchan", "ime_sha256": "53c4d86033d0e4590c0354df5fec2709820ef21c09fa402826ff33376ec21228"},
+      {"work_id": "000773", "label": "soseki_kokoro", "ime_sha256": "c55d7bf6c7cc5bd960ce291949f38cae9ba6a672a6142c3b9e1a9f5a159fa4c4"},
+      {"work_id": "001684", "label": "terada_kaki_no_tane", "ime_sha256": "ce6792f93e0b98a747b9dd452e4bdb8519b3439975bf68f06c9c605dae747c54"}
+    ]
+  },
+  "fetch": {
+    "interval_s": 1.0,
+    "retries": 3,
+    "user_agent": "GSE-research length-sequence-uniqueness (public-domain text study; 1 request per second)"
+  },
+  "segmentation": {
+    "definitions": ["B0", "B1", "B2", "B3"],
+    "max_line_bytes": 40000
+  },
+  "uniqueness": {
+    "k": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+  },
+  "matching": {
+    "k": [1, 2, 3, 5, 8, 12, 20],
+    "N": [10, 100, 1000],
+    "trials": 2000,
+    "bootstrap": 2000,
+    "ci": 0.95,
+    "conditions": {
+      "ideal":      {"reading": "plain",  "habit_prob": 0.0,  "bs_share": 0.0,   "shift_prob": 0.0},
+      "weak":       {"reading": "writer", "habit_prob": 0.25, "bs_share": 0.018, "shift_prob": 0.0},
+      "mid":        {"reading": "writer", "habit_prob": 0.5,  "bs_share": 0.063, "shift_prob": 0.05},
+      "strong":     {"reading": "writer", "habit_prob": 0.5,  "bs_share": 0.108, "shift_prob": 0.15},
+      "ruby_only":  {"reading": "writer", "habit_prob": 0.0,  "bs_share": 0.0,   "shift_prob": 0.0},
+      "habit_only": {"reading": "plain",  "habit_prob": 0.5,  "bs_share": 0.0,   "shift_prob": 0.0},
+      "bs_only":    {"reading": "plain",  "habit_prob": 0.0,  "bs_share": 0.063, "shift_prob": 0.0},
+      "shift_only": {"reading": "plain",  "habit_prob": 0.0,  "bs_share": 0.0,   "shift_prob": 0.05}
+    },
+    "bs_kana_level_fraction": 0.5
+  }
+}
