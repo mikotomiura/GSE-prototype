@@ -64,11 +64,11 @@ def measure(keys_list, ks):
         raise SystemExit("uniqueness: a key count reaches the hash base")
     runs = valid_runs(x)
     h = array("q", [0]) * len(x)
-    idx = [i for i in range(len(x)) if runs[i] >= 1]
+    idx = array("i", (i for i in range(len(x)) if runs[i] >= 1))
     out = []
     kmax = max(ks)
     for k in range(1, kmax + 1):
-        idx = [i for i in idx if runs[i] >= k]
+        idx = array("i", (i for i in idx if runs[i] >= k))
         for i in idx:
             h[i] = (h[i] * BASE + x[i + k - 1] + 1) % MOD
         if k in ks:
