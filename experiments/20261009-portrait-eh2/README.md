@@ -49,5 +49,5 @@ swift experiments/20261009-portrait-eh2/macos/eh2_wallpaper.swift [--manual]
 | 日時 | 機械 | モード | 結果 |
 |---|---|---|---|
 | 2026-10-09 13:14 | Windows 11（1920×1080・1 台・背景はスポットライト） | `-DryRun` | `results/eh2-windows-20261009-131410-dryrun.json`。壁紙を替えない部分は動いた。背景が画像でないので、替えて戻す部分はこの機械では回していない（`-Quick` は設計どおり断って止まった）。12:14〜13:05 の記録は、レビューの指摘を直すたびに回し直して置き換えた |
-| 2026-10-09 13:28〜13:49 | MacBook Air（M4・macOS 27.0.1・内蔵 1 台） | `--dry-run`・`--quick`・既定 | `results/eh2-macos-*.json`・`notes-macos.md`。最初の quick は読み戻しが早すぎて `restored: [false]` と記録された（設定は効いていた）。getter が約 0.2 s 遅れて追いつくので、読み戻しを待つようにスクリプトを直し（判断 M1）、quick と本番で `restored: [true]`・`restore_settled: [true]`。手の確認は未実施 |
+| 2026-10-09 13:28〜13:49 | MacBook Air（M4・macOS 27.0.1・内蔵 1 台） | `--dry-run`・`--quick`・既定 | `results/eh2-macos-*.json`・`notes-macos.md`。最初の quick は読み戻しが早すぎて `restored: [false]` と記録された（設定は効いていた）。getter が約 0.2 s 遅れて追いつくので、読み戻しを待つようにスクリプトを直し（判断 M1）、quick と本番で `restored: [true]`・`restore_settled: [true]`（直した後のスクリプトでは `restore_settled_all`・notes-macos の「レビューの後に直したこと」）。手の確認は未実施 |
 | 2026-10-09 13:58〜14:17 | Surface Pro 8（Windows 11・内蔵 1 台） | `-DryRun`・`-Quick`・既定 | `results/eh2-windows-20261009-135800-dryrun.json`・`…-140639.json`・`…-140710.json`・`notes-windows.md`。**替えて戻す経路が初めて実機で回った**。直後の読み戻しで 30 / 30 一致・`restored` true。手の確認は未実施。⚠️ PowerShell 5.1 が書いた JSON は先頭に BOM が付く（Python では `utf-8-sig` で読む） |

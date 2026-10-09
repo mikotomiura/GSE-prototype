@@ -402,6 +402,7 @@ func restore() {
     }
     let restoredOk = restored.allSatisfy { ($0 as? Bool) == true }
     // wait only when every screen was restored (otherwise the result is already "not confirmed")
+    if restoredOk { print("Checking that the picture stays restored (up to 60 s). Do not close this window.") }
     let settledAll = restoredOk && heldFor(orig.compactMap { o in o.url.map { (o.screen, $0) } }, stable: 30, timeout: 60)
     res["restored"] = restored
     res["restore_settled_all"] = settledAll  // all screens together for 30 s (before 2026-10-09 17:00: restore_settled, per screen, 5 s)
@@ -476,7 +477,7 @@ do {
         }
         try nap(0.3)
     }
-    // readback_ok: the getter showed the new picture within 5 s; readback_immediate_ok: right after the set
+    // readback_within_5s_ok: the getter showed the new picture within 5 s; readback_immediate_ok: right after the set
     // readback_within_5s_ok: renamed from readback_ok (which meant "right after the set" before 2026-10-09 13:38)
     res["per_screen"] = ["calls": tot, "readback_within_5s_ok": okN, "readback_immediate_ok": immediateN,
                          "latency_ms_median": orNull(median(lat)),

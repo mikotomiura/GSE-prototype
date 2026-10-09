@@ -30,7 +30,9 @@
 - [x] /cross-review 2 巡と対応を decisions.md に（判断 7: 26 件・判断 8: 10 件。すべて妥当で対応済み。Codex は 3 本で 108,882 トークン）
 - [x] 両機器の結果をまとめた（notes の検算・design §8・EH2 README・判断 9・親の判断 12・`.idea` §11.4・探索 `explore_material_info.py`）
 - [x] 研究者に U-4・E1-8・次の段・古いブランチを聞いた（判断 9・すべて推奨どおり）。`feature/portrait-eh1-eh2` を消した
-- [ ] まとめの `/cross-review` 2 巡（1 巡目 = 書き写しと基準の読み方・受け手の Swift の修正 ／ 2 巡目 = 足した解釈の境界）
+- [x] まとめの `/cross-review` 2 巡（判断 10: Codex 3・Claude 10 ／ 判断 11: Codex 3・Claude 7。すべて当てた）
+- [ ] 直した Swift を Mac で `swiftc -typecheck` → `--quick`（未コンパイル・notes-macos）
+- [ ] PR（計測の run の後。merge の順は S-MR → 親 `docs/portrait-invitation-constraints` → このブランチ）
 
 ## 次の段（判断 9 の 3・別タスクで）
 - [ ] EH1 の第 2 回: 新しい固定（既定の scheduler で働く陽性対照・`recent` を固定の組に・揺らしに強い文法・攻撃者の窓）＋ `run.sh` の `.exe` と `--jobs`
