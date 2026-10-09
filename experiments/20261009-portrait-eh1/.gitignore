@@ -1,0 +1,5 @@
+.venv/
+work-*/
+results/*-smoke/
+results/*/.capabilities.json.tmp
+__pycache__/

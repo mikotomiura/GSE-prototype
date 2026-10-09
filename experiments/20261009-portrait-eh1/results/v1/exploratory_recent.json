@@ -1,0 +1,123 @@
+{
+ "_note": "Outside the frozen criteria (design section 8): a scheduler that never updates inside an absence of 60 s or more.",
+ "e16": {
+  "raw-none-I300-W5-recent60": {
+   "n_invite": 419,
+   "n_other": 1361,
+   "median_invite": 0.0,
+   "median_other": 0.0,
+   "ratio": 1.0,
+   "ci90": [
+    1.0,
+    1.0
+   ],
+   "verdict": "green"
+  },
+  "raw-diffuse-I300-W5-recent60": {
+   "n_invite": 419,
+   "n_other": 1361,
+   "median_invite": 0.0,
+   "median_other": 0.0,
+   "ratio": 1.0,
+   "ci90": [
+    1.0,
+    1.0
+   ],
+   "verdict": "green"
+  },
+  "ordinal-none-I300-W5-recent60": {
+   "n_invite": 419,
+   "n_other": 1361,
+   "median_invite": 0.0,
+   "median_other": 0.0,
+   "ratio": 1.0,
+   "ci90": [
+    1.0,
+    1.0
+   ],
+   "verdict": "green"
+  },
+  "ordinal-diffuse-I300-W5-recent60": {
+   "n_invite": 419,
+   "n_other": 1361,
+   "median_invite": 0.0,
+   "median_other": 0.0,
+   "ratio": 1.0,
+   "ci90": [
+    1.0,
+    1.0
+   ],
+   "verdict": "green"
+  },
+  "keyed-none-I300-W5-recent60": {
+   "n_invite": 419,
+   "n_other": 1361,
+   "median_invite": 0.0,
+   "median_other": 0.0,
+   "ratio": 1.0,
+   "ci90": [
+    1.0,
+    1.0
+   ],
+   "verdict": "green"
+  },
+  "keyed-diffuse-I300-W5-recent60": {
+   "n_invite": 419,
+   "n_other": 1361,
+   "median_invite": 0.0,
+   "median_other": 0.0,
+   "ratio": 1.0,
+   "ci90": [
+    1.0,
+    1.0
+   ],
+   "verdict": "green"
+  }
+ },
+ "e14": {
+  "raw-none-I300-W5-recent60": {
+   "n_checked": 0,
+   "violations": 0,
+   "endpoint_only_violations": 0,
+   "verdict": "undecidable"
+  },
+  "raw-diffuse-I300-W5-recent60": {
+   "n_checked": 0,
+   "violations": 0,
+   "endpoint_only_violations": 0,
+   "verdict": "undecidable"
+  },
+  "ordinal-none-I300-W5-recent60": {
+   "n_checked": 0,
+   "violations": 0,
+   "endpoint_only_violations": 0,
+   "verdict": "undecidable"
+  },
+  "ordinal-diffuse-I300-W5-recent60": {
+   "n_checked": 0,
+   "violations": 0,
+   "endpoint_only_violations": 0,
+   "verdict": "undecidable"
+  },
+  "keyed-none-I300-W5-recent60": {
+   "n_checked": 0,
+   "violations": 0,
+   "endpoint_only_violations": 0,
+   "verdict": "undecidable"
+  },
+  "keyed-diffuse-I300-W5-recent60": {
+   "n_checked": 0,
+   "violations": 0,
+   "endpoint_only_violations": 0,
+   "verdict": "undecidable"
+  }
+ },
+ "spearman": {
+  "raw-none-I300-W5-recent60": -0.01355672155914777,
+  "raw-diffuse-I300-W5-recent60": -0.013530803291829529,
+  "ordinal-none-I300-W5-recent60": -0.017442163380493654,
+  "ordinal-diffuse-I300-W5-recent60": -0.01744741845580379,
+  "keyed-none-I300-W5-recent60": -0.01711913842237926,
+  "keyed-diffuse-I300-W5-recent60": -0.01712087810130051
+ }
+}
