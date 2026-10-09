@@ -26,8 +26,8 @@
   "_comment_merge_2026_10_08_ime_table_2": "2026-10-08: fix/ime-table-overflow に origin/main（PR #325 の後）をもう一度 merge した際、today が衝突した。共通の起点の today は 10-07（306004 / 10 回・両側とも履歴の 10-07 は同じ値）で、両側とも 10-08 に繰り越して 0 から別々に記帳した → 和を採った: 本ブランチ 122567 / 2 回（表の直しの /cross-review 2 巡） ＋ origin/main 94711 / 3 回（O1 の終了判定のレビュー・ad5adf4f の系列） = 217278 / 5 回。",
   "today": {
     "date": "2026-10-10",
-    "tokens_used": 65072,
-    "invocations": 2
+    "tokens_used": 92702,
+    "invocations": 3
   },
   "history": [
     {
