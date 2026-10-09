@@ -47,17 +47,23 @@ My questions:
 (b) If not, would the journal consider a manuscript whose data are newly collected after committee
     approval, while the earlier data are described only as a pilot (not analysed in the paper)?
 (c) Because keystroke timing may allow re-identification and the inference of health-related
-    information, I plan to share data in two steps:
-    (i) at publication, aggregate results and documented analysis code, illustrated with
-        simulated data (as in the journal's example Open Practices Statement);
-    (ii) later, only for data representations that pass pre-specified re-identification tests,
-        processed (not raw) records under a controlled-access agreement (application required;
-        research use only; no attempts at re-identification; no redistribution).
-    The guidelines state that "when individual privacy could be compromised, data availability
-    should still be stated in the manuscript along with any conditions for access." Would
-    arrangement (i) alone be acceptable under the journal's type 4 research data policy? And
-    would arrangement (ii) be acceptable if its conditions of access are stated in the Open
-    Practices Statement?
+    information, I am considering the following data sharing:
+    (i) At submission and publication: aggregate results (checked for disclosure risk before
+        release), and documented analysis code illustrated with simulated data, as in the
+        journal's example Open Practices Statement.
+    (ii) At publication or later, for each level of processed data (derived analysis features,
+        or processed but not raw event records), only if that level passes pre-specified privacy
+        tests (linking sessions of the same person, matching to candidate texts, and inference of
+        health-related information): access under a controlled-access agreement (application
+        required; research use only; no attempts at re-identification; no redistribution).
+        If no level passes, only (i) would be shared.
+    The guidelines state: "When it is not possible to share research data publicly, for
+    instance when individual privacy could be compromised, data availability should still be
+    stated in the manuscript along with any conditions for access."
+    (c-1) If no level of processed data passes our tests, would arrangement (i) alone be
+          acceptable under the journal's type 4 research data policy?
+    (c-2) Would arrangement (ii) be acceptable if its conditions of access are stated in both
+          the Data Availability Statement and the Open Practices Statement?
 
 Thank you for your time.
 
@@ -70,7 +76,7 @@ Thank you for your time.
 
 ⚠️ **2026-10-09 改訂**（`.steering/20261009-release-deidentification-survey/decisions.md` 判断 7）:
 - 3. の引用に、投稿規定の続きの 1 文（*"The decision on whether to proceed to peer review in such cases is at the Editor's discretion."*）を足した。この文は 2026-10-09 に投稿規定の字面で確かめた（[V237]）。
-- (c) を ADR-039【決 5】の裁定（集計値＋コード＋模擬データを既定とし、関門を通った段だけ申請制で足す）に合わせて 2 段の問いに改めた。投稿規定の「アクセスの条件」の文（[V237]）を引いた。旧 (c) は「Because keystroke timing may allow re-identification, I plan to share the processed data under a controlled-access agreement rather than openly. Would this satisfy the journal's research data policy if the conditions of access are stated in the Open Practices Statement?」。
+- (c) を ADR-039【決 5】の裁定（集計値＋コード＋模擬データを既定とし、関門を通った段だけ申請制で足す）と D6 の裁定（攻撃 3 つ・集計値も点検）に合わせて改め、問いを (c-1)（何も関門を通らなかったとき (i) だけで足りるか）と (c-2)（申請制を Data Availability Statement と Open Practices Statement に書けば足りるか）に分けた（判断 7・8）。「後で共有する」と約束しないよう、(ii) は「関門を通った段だけ」「何も通らなければ (i) まで」と書いた。投稿規定の「アクセスの条件」の文（[V237]）を 1 文まるごと引いた。旧 (c) は「Because keystroke timing may allow re-identification, I plan to share the processed data under a controlled-access agreement rather than openly. Would this satisfy the journal's research data policy if the conditions of access are stated in the Open Practices Statement?」。
 - ⚠️ 「申請制で Open Practices Statement を書いてよいか」は旧 (c) にすでにあった。新しい問いを足したのではなく、(c) を書き直した。
 
 ---
