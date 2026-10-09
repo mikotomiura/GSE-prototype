@@ -24,5 +24,6 @@
 - [x] push（PR は出さない）
 - [x] 本番 v2・v1（G-GEAR・`--jobs 8`・2026-10-09。実行の記録と逸脱は notes）
 - [x] 結果を読んで解釈する（まとめのセッション・JSON から基準の式で計算し直し、全組が計器の判定と一致）→ notes「結果」・design §8・decisions 判断 6・親の判断 13
-- [ ] まとめの `/cross-review` 2 巡 → decisions
-- [ ] push（PR は出さない・merge の順は S-MR → 親 → `docs/portrait-eh1-eh2` → このブランチ）
+- [x] まとめの `/cross-review` 2 巡 → decisions（判断 7・8）
+- [ ] 研究者に、U-4 を聞いた問いの前提の訂正を伝える（判断 6 の決定 1 の注記）
+- [x] push（PR は出さない・merge の順は S-MR → 親 → `docs/portrait-eh1-eh2` → このブランチ）
