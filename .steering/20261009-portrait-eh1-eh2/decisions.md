@@ -54,6 +54,11 @@
 
 - **決定**: 研究者の逐語「まぁ EH-1 は windows に回す感じにして、windows のみ EH-1, 2 両方回す感じで引継ぎに書くか」。この機械で回していた本番は止めた（design §8・結果は開いていない）。
 - **前提の確認**（研究者の問い「EH1, 2 両方とも各機器で回す必要があった感じじゃなかった？」への回答）: EH1 は合成の記録と `gse-replay`（`analysis/`）と Python だけで、OS の API に触れない。`analysis/` は CI のゴールデンの一致で両 OS の同一性が確かめられている。→ 1 台で足りる。OS ごとに別物なのは EH2（壁紙の API・仮想デスクトップ / Spaces）。
+- **補記（2026-10-09・研究者の問い「API などで win, mac ごとにロジックが変わるので、mac でも EH1 を回した方がよいことはないか」）**: 一次で確かめた。
+  - macOS の入力層は Mac のキーコードを Windows の仮想キーコードに変換して記録する（`input/hook_macos.rs` の `macos_vk_to_vk`）。→ 合成の記録に Windows のキーコードを入れたのは両 OS で正しい形。
+  - `analysis/` の中で OS で分かれるのは 1 か所だけ: キーリピートの判定（`analysis/loop_step.rs:238` の `#[cfg(target_os = "windows")]`）。Windows は「同じキーを離す前にもう一度押した」押下をリピートとして F1・F4 から除く。macOS は hook の段で autorepeat を捨てるので、解析は判定しない（`input/hook_macos.rs:525・622`）。→ 合成の記録では、この重なりは押下の **0.069%**（スモークの P の 506,227 押下中 351）。窓ごとの F1（中央値）・F4 への効きは小さく、判定を変えるとは見ていない（確かめてはいない）。
+  - EH1 は入力層（OS の API）を通らない（合成のキーの行を `gse-replay` に直接渡す）。→ OS ごとの入力の違い（IME・観測するキー）は、どちらの OS で EH1 を回しても検査できない。それを見るのは実際の入力を通す EH2・EH3。
+  - → **Mac で EH1 を回す必要はない**と判断した。EH1 は Windows の解析（リピート判定あり）で回した、と notes の限界に書く。
 - **引き継ぎ**: `next-session-portrait-eh2-windows.md` を EH1 ＋ EH2 に書き直し、`next-session-portrait-eh1-eh2-windows.md` に改名した（EH1 と EH2 は同時に回さない —— EH2 は CPU を測る）。Mac は EH2 だけ（最初に `swiftc -typecheck`）。
 
 ## 判断 6（2026-10-09）: code-reviewer ∥ security-checker の結果と対応
