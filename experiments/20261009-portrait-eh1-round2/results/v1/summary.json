@@ -1,0 +1,266 @@
+{
+ "raw-none-I300-W5": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "green",
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "raw-diffuse-I300-W5": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "green",
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "ordinal-none-I300-W5": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "red",
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "ordinal-diffuse-I300-W5": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "red",
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "keyed-none-I300-W5": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "red",
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "keyed-diffuse-I300-W5": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "red",
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "lattice-none-I300-W5": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "green",
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "lattice-diffuse-I300-W5": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "green",
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "raw-none-I300-W5-recent60": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "green",
+  "E1-6": "green",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "raw-diffuse-I300-W5-recent60": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "green",
+  "E1-6": "green",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "ordinal-none-I300-W5-recent60": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "red",
+  "E1-6": "green",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "ordinal-diffuse-I300-W5-recent60": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "red",
+  "E1-6": "green",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "keyed-none-I300-W5-recent60": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "red",
+  "E1-6": "green",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "keyed-diffuse-I300-W5-recent60": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "red",
+  "E1-6": "green",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "lattice-none-I300-W5-recent60": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "green",
+  "E1-6": "green",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "lattice-diffuse-I300-W5-recent60": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable",
+  "path": "green",
+  "E1-6": "green",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "raw-none-I300-W5-jit": {
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "raw-none-I300-W5-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "raw-none-I300-W5-jit-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "raw-diffuse-I300-W5-jit": {
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "raw-diffuse-I300-W5-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "raw-diffuse-I300-W5-jit-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "ordinal-none-I300-W5-jit": {
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "ordinal-none-I300-W5-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "ordinal-none-I300-W5-jit-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "ordinal-diffuse-I300-W5-jit": {
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "ordinal-diffuse-I300-W5-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "ordinal-diffuse-I300-W5-jit-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "keyed-none-I300-W5-jit": {
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "keyed-none-I300-W5-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "keyed-none-I300-W5-jit-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "keyed-diffuse-I300-W5-jit": {
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "keyed-diffuse-I300-W5-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "keyed-diffuse-I300-W5-jit-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "lattice-none-I300-W5-jit": {
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "lattice-none-I300-W5-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "lattice-none-I300-W5-jit-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "lattice-diffuse-I300-W5-jit": {
+  "E1-6": "red",
+  "E1-4": "green",
+  "E1-7": "green"
+ },
+ "lattice-diffuse-I300-W5-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "lattice-diffuse-I300-W5-jit-cap1": {
+  "E1-6": "red",
+  "E1-4": "undecidable",
+  "E1-7": "green"
+ },
+ "PC1": {
+  "E1-3 L300": "detector_failed",
+  "E1-3 L60": "detector_failed"
+ },
+ "PC2": {
+  "E1-3 L300": "detector_failed",
+  "E1-3 L60": "detector_failed"
+ },
+ "ORC-I300-W5": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable"
+ },
+ "ORC-I300-W5-recent60": {
+  "E1-3 L300": "not_applicable",
+  "E1-3 L60": "not_applicable"
+ }
+}

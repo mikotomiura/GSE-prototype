@@ -1,0 +1,88 @@
+{
+ "spearman_absence_len_vs_change": {
+  "raw-none-I300-W5": 0.570543282473818,
+  "raw-none-I300-W5-jit": 0.5338580733770518,
+  "raw-none-I300-W5-cap1": 0.570543282473818,
+  "raw-none-I300-W5-jit-cap1": 0.5338580733770518,
+  "raw-diffuse-I300-W5": 0.5815562298632092,
+  "raw-diffuse-I300-W5-jit": 0.5444624558927578,
+  "raw-diffuse-I300-W5-cap1": 0.5706940616875461,
+  "raw-diffuse-I300-W5-jit-cap1": 0.5338576290393249,
+  "ordinal-none-I300-W5": 0.5581307168379283,
+  "ordinal-none-I300-W5-jit": 0.5153336225973651,
+  "ordinal-none-I300-W5-cap1": 0.5581307168379283,
+  "ordinal-none-I300-W5-jit-cap1": 0.5153336225973651,
+  "ordinal-diffuse-I300-W5": 0.559118778819653,
+  "ordinal-diffuse-I300-W5-jit": 0.5163085586693402,
+  "ordinal-diffuse-I300-W5-cap1": 0.5581513544959749,
+  "ordinal-diffuse-I300-W5-jit-cap1": 0.5153283277551908,
+  "keyed-none-I300-W5": 0.5570853336509699,
+  "keyed-none-I300-W5-jit": 0.5214522242349043,
+  "keyed-none-I300-W5-cap1": 0.5570853336509699,
+  "keyed-none-I300-W5-jit-cap1": 0.5214522242349043,
+  "keyed-diffuse-I300-W5": 0.5581414526004485,
+  "keyed-diffuse-I300-W5-jit": 0.5224422327679018,
+  "keyed-diffuse-I300-W5-cap1": 0.5570795251843129,
+  "keyed-diffuse-I300-W5-jit-cap1": 0.5214406189214651,
+  "raw-none-I300-W5-recent60": -0.01355672155914777,
+  "raw-diffuse-I300-W5-recent60": -0.013530803291829529,
+  "ordinal-none-I300-W5-recent60": -0.017442163380493654,
+  "ordinal-diffuse-I300-W5-recent60": -0.01744741845580379,
+  "keyed-none-I300-W5-recent60": -0.01711913842237926,
+  "keyed-diffuse-I300-W5-recent60": -0.01712087810130051
+ },
+ "pairs": {
+  "D_shuffled": {
+   "raw-none-I300-W5": {
+    "median": 0.019801526330411434,
+    "n": 20
+   },
+   "raw-diffuse-I300-W5": {
+    "median": 0.01978648081421852,
+    "n": 20
+   },
+   "ordinal-none-I300-W5": {
+    "median": 0.07539687305688858,
+    "n": 20
+   },
+   "ordinal-diffuse-I300-W5": {
+    "median": 0.07534121349453926,
+    "n": 20
+   },
+   "keyed-none-I300-W5": {
+    "median": 0.08638078346848488,
+    "n": 20
+   },
+   "keyed-diffuse-I300-W5": {
+    "median": 0.08635255321860313,
+    "n": 20
+   }
+  },
+  "D_diffend": {
+   "raw-none-I300-W5": {
+    "median": 0.0009549094829708338,
+    "n": 20
+   },
+   "raw-diffuse-I300-W5": {
+    "median": 0.0009677994239609689,
+    "n": 20
+   },
+   "ordinal-none-I300-W5": {
+    "median": 0.015900053083896637,
+    "n": 20
+   },
+   "ordinal-diffuse-I300-W5": {
+    "median": 0.01591221196576953,
+    "n": 20
+   },
+   "keyed-none-I300-W5": {
+    "median": 0.024442048743367195,
+    "n": 20
+   },
+   "keyed-diffuse-I300-W5": {
+    "median": 0.024458540603518486,
+    "n": 20
+   }
+  }
+ }
+}

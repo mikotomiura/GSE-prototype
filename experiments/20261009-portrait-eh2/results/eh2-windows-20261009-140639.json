@@ -1,0 +1,91 @@
+﻿{
+    "os":  "windows",
+    "os_version":  "10.0.26200.0",
+    "powershell":  "5.1.26100.9444",
+    "mode":  "quick",
+    "started":  "2026-10-09T14:06:39",
+    "background_type":  0,
+    "slideshow_status_raw":  1,
+    "slideshow_enabled":  false,
+    "inactive_monitor_entries":  0,
+    "monitors":  [
+                     {
+                         "index":  0,
+                         "width":  2880,
+                         "height":  1920
+                     }
+                 ],
+    "original_position":  4,
+    "original_exists":  [
+                            true
+                        ],
+    "original_in_themes_cache":  [
+                                     false
+                                 ],
+    "per_monitor":  {
+                        "calls":  3,
+                        "readback_ok":  3,
+                        "latency_ms_median":  7.311,
+                        "latency_ms_p95":  45.283500000000004,
+                        "latency_ms_max":  45.283500000000004
+                    },
+    "distinct_per_monitor_readback_ok":  "single_monitor",
+    "all_monitors":  {
+                         "calls":  3,
+                         "latency_ms_median":  17.4923,
+                         "latency_ms_p95":  31.294800000000002
+                     },
+    "cpu":  {
+                "idle_s":  10,
+                "busy_s":  10,
+                "busy_every_s":  3,
+                "busy_updates":  4,
+                "idle_elapsed_s":  10.02,
+                "busy_elapsed_s":  12.1,
+                "idle":  {
+                             "dwm":  {
+                                         "pids_changed":  false,
+                                         "cpu_s":  null,
+                                         "ws_mb_end":  129.9375,
+                                         "ws_mb_start":  187.04296875
+                                     },
+                             "explorer":  {
+                                              "pids_changed":  false,
+                                              "cpu_s":  0.078,
+                                              "ws_mb_end":  167.58203125,
+                                              "ws_mb_start":  297.23828125
+                                          },
+                             "self":  {
+                                          "pids_changed":  false,
+                                          "cpu_s":  0.047,
+                                          "ws_mb_end":  114.87890625,
+                                          "ws_mb_start":  114.08984375
+                                      }
+                         },
+                "busy":  {
+                             "dwm":  {
+                                         "pids_changed":  false,
+                                         "cpu_s":  null,
+                                         "ws_mb_end":  126.25,
+                                         "ws_mb_start":  129.9375
+                                     },
+                             "explorer":  {
+                                              "pids_changed":  false,
+                                              "cpu_s":  0.594,
+                                              "ws_mb_end":  253.2890625,
+                                              "ws_mb_start":  167.58203125
+                                          },
+                             "self":  {
+                                          "pids_changed":  false,
+                                          "cpu_s":  0.047,
+                                          "ws_mb_end":  114.78515625,
+                                          "ws_mb_start":  114.87890625
+                                      }
+                         }
+            },
+    "restored":  [
+                     true
+                 ],
+    "restored_position_ok":  true,
+    "finished":  "2026-10-09T14:07:04"
+}

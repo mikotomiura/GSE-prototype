@@ -1,0 +1,36 @@
+{
+  "dryrun_cpu" : {
+    "self" : {
+      "cpu_s" : 0.0050000000000000001,
+      "pids_changed" : false,
+      "rss_mb_end" : 257.703125,
+      "rss_mb_start" : 257.65625
+    },
+    "WallpaperAgent" : {
+      "cpu_s" : 0,
+      "pids_changed" : false,
+      "rss_mb_end" : 13.359375,
+      "rss_mb_start" : 13.375
+    }
+  },
+  "dryrun_elapsed_s" : 3.2063792079687117,
+  "dryrun_get_latency_ms_median" : 1.8057500123977661,
+  "dryrun_image_bytes" : 104859,
+  "finished" : "2026-10-09T04:33:07Z",
+  "mode" : "dryrun",
+  "original_readable_file" : [
+    true
+  ],
+  "os" : "macos",
+  "os_version" : "Version 27.0.1 (Build 26A434)",
+  "screens" : [
+    {
+      "height_px" : 1912,
+      "index" : 0,
+      "scale" : 2,
+      "width_px" : 2940
+    }
+  ],
+  "started" : "2026-10-09T04:33:03Z",
+  "wallpaper_process" : "WallpaperAgent"
+}

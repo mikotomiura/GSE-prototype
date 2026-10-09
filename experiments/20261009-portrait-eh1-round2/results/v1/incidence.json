@@ -1,0 +1,90 @@
+{
+ "_note": "Descriptive (design 3.7): no verdict.",
+ "by_scheduler": {
+  "I300-W5": {
+   "60-300": {
+    "n_absences": 1190,
+    "share_with_update": 0.38487394957983195,
+    "median_updates": 0.0
+   },
+   "300-1200": {
+    "n_absences": 419,
+    "share_with_update": 1.0,
+    "median_updates": 2.0
+   },
+   "1200-5400": {
+    "n_absences": 171,
+    "share_with_update": 1.0,
+    "median_updates": 9.0
+   }
+  },
+  "I300-W5-jit": {
+   "60-300": {
+    "n_absences": 1190,
+    "share_with_update": 0.42016806722689076,
+    "median_updates": 0.0
+   },
+   "300-1200": {
+    "n_absences": 419,
+    "share_with_update": 0.9809069212410502,
+    "median_updates": 2.0
+   },
+   "1200-5400": {
+    "n_absences": 171,
+    "share_with_update": 1.0,
+    "median_updates": 9.0
+   }
+  },
+  "I300-W5-cap1": {
+   "60-300": {
+    "n_absences": 1190,
+    "share_with_update": 0.38487394957983195,
+    "median_updates": 0.0
+   },
+   "300-1200": {
+    "n_absences": 419,
+    "share_with_update": 1.0,
+    "median_updates": 1.0
+   },
+   "1200-5400": {
+    "n_absences": 171,
+    "share_with_update": 1.0,
+    "median_updates": 1.0
+   }
+  },
+  "I300-W5-jit-cap1": {
+   "60-300": {
+    "n_absences": 1190,
+    "share_with_update": 0.42016806722689076,
+    "median_updates": 0.0
+   },
+   "300-1200": {
+    "n_absences": 419,
+    "share_with_update": 0.9809069212410502,
+    "median_updates": 1.0
+   },
+   "1200-5400": {
+    "n_absences": 171,
+    "share_with_update": 1.0,
+    "median_updates": 1.0
+   }
+  },
+  "I300-W5-recent60": {
+   "60-300": {
+    "n_absences": 1190,
+    "share_with_update": 0.16554621848739495,
+    "median_updates": 0.0
+   },
+   "300-1200": {
+    "n_absences": 419,
+    "share_with_update": 0.16706443914081145,
+    "median_updates": 0.0
+   },
+   "1200-5400": {
+    "n_absences": 171,
+    "share_with_update": 0.16374269005847952,
+    "median_updates": 0.0
+   }
+  }
+ }
+}

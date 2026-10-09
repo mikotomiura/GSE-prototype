@@ -1,0 +1,202 @@
+{
+ "raw-none-I300-W5": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "raw-none-I300-W5-jit": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "raw-none-I300-W5-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "raw-none-I300-W5-jit-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "raw-none-I300-W5-recent60": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "raw-diffuse-I300-W5": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "raw-diffuse-I300-W5-jit": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "raw-diffuse-I300-W5-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "raw-diffuse-I300-W5-jit-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "raw-diffuse-I300-W5-recent60": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-none-I300-W5": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-none-I300-W5-jit": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-none-I300-W5-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-none-I300-W5-jit-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-none-I300-W5-recent60": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-diffuse-I300-W5": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-diffuse-I300-W5-jit": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-diffuse-I300-W5-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-diffuse-I300-W5-jit-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "ordinal-diffuse-I300-W5-recent60": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-none-I300-W5": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-none-I300-W5-jit": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-none-I300-W5-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-none-I300-W5-jit-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-none-I300-W5-recent60": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-diffuse-I300-W5": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-diffuse-I300-W5-jit": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-diffuse-I300-W5-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-diffuse-I300-W5-jit-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "keyed-diffuse-I300-W5-recent60": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-none-I300-W5": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-none-I300-W5-jit": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-none-I300-W5-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-none-I300-W5-jit-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-none-I300-W5-recent60": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-diffuse-I300-W5": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-diffuse-I300-W5-jit": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-diffuse-I300-W5-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-diffuse-I300-W5-jit-cap1": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ },
+ "lattice-diffuse-I300-W5-recent60": {
+  "sessions": 335,
+  "violations": 0,
+  "verdict": "green"
+ }
+}

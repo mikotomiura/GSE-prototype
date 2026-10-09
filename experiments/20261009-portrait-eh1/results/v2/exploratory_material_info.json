@@ -1,0 +1,21 @@
+{
+ "_note": "Outside the frozen criteria; added after the results were read (design section 8).",
+ "n_windows": 43200,
+ "n_sessions": 240,
+ "prevalence": 0.25548611111111114,
+ "auc_p_stuck_alone": 0.8830814605895908,
+ "hgb": {
+  "auc_A": 0.8248236519226746,
+  "auc_A_plus_p_stuck": 0.9947230548042731,
+  "gain_p_stuck": 0.16989940288159855,
+  "auc_A_plus_F_levels": 0.9979837092551052,
+  "gain_F_levels": 0.17316005733243056
+ },
+ "lr": {
+  "auc_A": 0.7543397954703925,
+  "auc_A_plus_p_stuck": 0.9342387721062644,
+  "gain_p_stuck": 0.17989897663587184,
+  "auc_A_plus_F_levels": 0.9973596794264794,
+  "gain_F_levels": 0.24301988395608687
+ }
+}
