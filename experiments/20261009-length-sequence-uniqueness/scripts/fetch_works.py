@@ -15,15 +15,19 @@ the manifest lists. Standard library only.
 """
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
+import zipfile
 
 WORK_ID_RE = re.compile(r"[0-9]{6}")
-URL_PREFIX = "https://www.aozora.gr.jp/cards/"
+SITE_PREFIX = "https://www.aozora.gr.jp/"
+URL_PREFIX = SITE_PREFIX + "cards/"
 MAX_ZIP_BYTES = 20 * 1024 * 1024  # the largest archive in the corpus is far below this
 
 
@@ -42,21 +46,49 @@ def check_entry(wid, url):
         raise SystemExit("fetch_works: URL %r is not an Aozora Bunko card archive" % url)
 
 
+class SameSiteRedirect(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only inside https://www.aozora.gr.jp/ (the checked URL must not lead elsewhere)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not newurl.startswith(SITE_PREFIX):
+            raise urllib.error.HTTPError(newurl, code, "redirect outside %s refused" % SITE_PREFIX, headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(SameSiteRedirect)
+
+
+def fetch_bytes(url, cfg):
+    """The body of url, or an exception. A body longer than MAX_ZIP_BYTES, shorter than its Content-Length
+    (read(amt) does not raise on a truncated response) or not a readable zip archive is refused."""
+    req = urllib.request.Request(url, headers={"User-Agent": cfg["user_agent"]})
+    with _OPENER.open(req, timeout=60) as r:
+        declared = r.headers.get("Content-Length")
+        if declared is not None and int(declared) > MAX_ZIP_BYTES:
+            raise ValueError("declared length %s is larger than %d bytes" % (declared, MAX_ZIP_BYTES))
+        data = r.read(MAX_ZIP_BYTES + 1)
+    if len(data) > MAX_ZIP_BYTES:
+        raise ValueError("larger than %d bytes" % MAX_ZIP_BYTES)
+    if declared is not None and len(data) != int(declared):
+        raise ValueError("truncated: %d of %s bytes" % (len(data), declared))
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        bad = z.testzip()
+    if bad is not None:
+        raise ValueError("damaged member %s" % bad)
+    return data
+
+
 def download(url, dest, cfg):
     last = None
     for attempt in range(cfg["retries"]):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": cfg["user_agent"]})
-            with urllib.request.urlopen(req, timeout=60) as r:
-                data = r.read(MAX_ZIP_BYTES + 1)
-            if len(data) > MAX_ZIP_BYTES:
-                return "larger than %d bytes" % MAX_ZIP_BYTES
+            data = fetch_bytes(url, cfg)
             tmp = dest + ".part"
             with open(tmp, "wb") as f:
                 f.write(data)
             os.replace(tmp, dest)
             return None
-        except Exception as e:  # network errors are retried, then reported
+        except Exception as e:  # network errors and refused bodies are retried, then reported
             last = "%s: %s" % (type(e).__name__, e)
             time.sleep(cfg["interval_s"] * (attempt + 2))
     return last
@@ -142,7 +174,9 @@ def main(argv):
         if len(entries) % 100 == 0:
             print("fetch_works: %d / %d" % (len(entries), len(todo)), flush=True)
     if mismatched:
-        print("fetch_works: SHA-256 differs from the committed manifest for %s" % ", ".join(mismatched), file=sys.stderr)
+        print("fetch_works: SHA-256 differs from the committed manifest for %s. If the file is damaged, delete it "
+              "and run again; if Aozora Bunko changed the text, the recorded selection cannot be reproduced "
+              "(data.md)." % ", ".join(mismatched), file=sys.stderr)
         return 1
     if known is not None:
         # a committed manifest is never rewritten: every work it fetched must be on disk again

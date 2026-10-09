@@ -224,3 +224,13 @@ GSE のコード（`src-tauri/`・`src/`）は変えない。`papers/ime-observa
 - 取得と入力の守り（security-checker LOW・Codex）: 作品 ID は 6 桁の数字、URL は `https://www.aozora.gr.jp/cards/` だけを受け付ける。`--verify-only` は manifest を必須にし、書き込まず、manifest の全作品を照らす。コミット済みの manifest と選定が違えば止まる。参照の 12 作品が IME 論文の zip と 1 つでも違えば止まる。zip の中の本文は 50 MB、ダウンロードは 20 MB を上限にする。派生データの pickle は `corpus_stats.json` の SHA-256 と照らしてから読む。`run.sh` の curl は失敗で止まり、https だけを使う。
 - B2 の書き手の読み（残す・Codex）: ルビの親字の中に落ちた文節の切れ目で、書き手の形態素が切れ目をまたぐと、その読みは前の区間に入る。1 回目のデータで、B2 の有効な区間 767 万のうち片側だけが空になった区間は 2,130（0.028%）、書き手と攻撃者の読みが違う区間は 1.83%。書き手の記録に雑音を足す向きにだけ働き（B2 の雑音ありの正答率を少し下げうる）、B0・B1・B3 には起きない（B0 で 0 件）。直さずに限界として書く。
 
+### 14.1 2 巡目（直した差分の境界条件）で直したこと
+
+結果の値には触れない（派生データと指標の出力がバイト単位で同じになることを、回し直して確かめる）。
+
+- 取得（code-reviewer HIGH・1 巡目の私の直しの後退）: `read(amt)` は途中で切れた応答でも例外を出さない（CPython 3.11 の `HTTPResponse.read` の注記どおり）ので、上限つきで読むと、切れた zip を成功として置いてしまう。→ Content-Length と読んだ長さを比べ、zip として開いて `testzip` が通ったものだけを置く。
+- リダイレクト（Codex）: 転送先も `https://www.aozora.gr.jp/` の中に限る。
+- 派生データの読み込み（Codex・code-reviewer LOW）: バイト列を 1 回だけ読み、そのハッシュを照らしてから unpickle する。`matching.py` の読み込みのキャッシュは、パス・いまの SHA-256・`corpus_stats.json` の記録の組で引く（別のコーパスや差し替えたファイルを、照合なしに使い回さない）。照合は破損と取り違えを見つけるためのもので、真正性の証明ではない（両方を差し替えられる人には効かない）→ 派生データは他人と受け渡さない（data.md）。
+- 確定の規則の計算（Codex・性能）: 打った位置の列を二分探索で引く（意味は同じ）。
+- 記録（code-reviewer LOW）: 20 字以上の行が無い作品の数を `corpus_stats.json` に残す（重複の判定の対象にならない）。notes.md が引く件数（隣り合うルビ・B2 の書き手の読み）は `scripts/extra_counts.py` が `results/extra_counts.json` に出す。
+

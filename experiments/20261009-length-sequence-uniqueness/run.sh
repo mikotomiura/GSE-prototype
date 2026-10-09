@@ -64,6 +64,9 @@ main() {
   echo "== 指標 2（候補 N 本からの照合）=="
   run scripts/matching.py --derived raw/derived --stats results/corpus_stats.json --config config.json \
     --seed-file SEED --out results/matching.json --processes "$PROCS"
+  echo "== notes.md が引く件数（ルビ・B2 の書き手の読み）=="
+  run scripts/extra_counts.py --manifest results/corpus_manifest.json --zips raw/zips --derived raw/derived \
+    --stats results/corpus_stats.json --out results/extra_counts.json
   echo "== 表 =="
   run scripts/summarize.py --results results --out results/summary.md
   $SHA256 results/*.json results/summary.md

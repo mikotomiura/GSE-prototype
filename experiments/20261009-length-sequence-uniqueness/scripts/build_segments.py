@@ -14,6 +14,7 @@ For each work and each segmentation (B0..B3) a list of segments is built; a segm
 Only SudachiPy is used besides the standard library. The tokenizer is created once per process.
 """
 import argparse
+import bisect
 import hashlib
 import json
 import os
@@ -294,7 +295,7 @@ def line_cuts(plain, att_items, starts, mode):
         typed = sorted(pos for pos, kind, _ in att_items)
         last = 0
         for q in sorted(cf | {len(plain)}):
-            if any(last <= p < q for p in typed):
+            if bisect.bisect_left(typed, q) > bisect.bisect_left(typed, last):  # something typed in [last, q)
                 kept.append(q)
                 last = q
     cuts += [(c, 0, "CF") for c in kept]
@@ -479,15 +480,22 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def expected_sha(stats_path, path):
+    return json.load(open(stats_path, encoding="utf-8"))["derived_files_sha256"].get(os.path.basename(path))
+
+
 def load_derived(derived, role, name, stats_path):
     """Load <derived>/<role>_<name>.pkl after checking its SHA-256 against the value this step recorded in
-    corpus_stats.json (a pickle runs code when loaded; only the files this step wrote are accepted)."""
+    corpus_stats.json. The bytes are read once, hashed and unpickled from the same buffer. This detects a
+    damaged or mixed-up file; it is not an authenticity check (whoever can replace both the pickle and
+    corpus_stats.json can run code here), so derived files are never taken from anyone else (data.md)."""
     path = os.path.join(derived, "%s_%s.pkl" % (role, name))
-    want = json.load(open(stats_path, encoding="utf-8"))["derived_files_sha256"].get(os.path.basename(path))
-    if want is None or sha256_file(path) != want:
-        raise SystemExit("load_derived: %s does not match corpus_stats.json; rebuild it" % path)
     with open(path, "rb") as f:
-        return pickle.load(f)
+        data = f.read()
+    want = expected_sha(stats_path, path)
+    if want is None or hashlib.sha256(data).hexdigest() != want:
+        raise SystemExit("load_derived: %s does not match corpus_stats.json; rebuild it" % path)
+    return pickle.loads(data)
 
 
 def main(argv):
@@ -508,7 +516,8 @@ def main(argv):
     tallies = {role: {n: Tally() for n in DEFINITIONS} for role in ("corpus", "reference")}
     dropped = []
     seen_lines = set()
-    agg = {"ruby": 0, "ruby_substituted": 0, "x_tokens": 0, "no_frame": 0, "replacement_chars": 0}
+    agg = {"ruby": 0, "ruby_substituted": 0, "x_tokens": 0, "no_frame": 0, "replacement_chars": 0,
+           "works_without_long_lines": 0}
     x_examples = {}
     for e in manifest["works"]:
         role = e["role"]
@@ -534,6 +543,8 @@ def main(argv):
         packed = {n: pack(segs[n]) for n in DEFINITIONS}
         if role == "corpus":
             wins = line_hashes(lines, scfg["duplicate_min_line_chars"])
+            if not wins:
+                agg["works_without_long_lines"] += 1  # such a work is never judged a duplicate
             if wins and len(wins & seen_lines) >= scfg["duplicate_overlap"] * len(wins):
                 dropped.append({"work_id": e["work_id"], "role": role, "reason": "content duplicate"})
                 continue
@@ -564,8 +575,9 @@ def main(argv):
     ref_entries = {e["work_id"]: e for e in manifest["works"] if e["role"] == "reference"}
     not_same = [w for w in want_ref if not ref_entries.get(w, {}).get("matches_ime_paper")]
     if store["reference"]["work_ids"] != want_ref or not_same:
-        print("build_segments: the reference works are not the IME paper's 12 archives (missing or different: %s)"
-              % (not_same or sorted(set(want_ref) - set(store["reference"]["work_ids"]))), file=sys.stderr)
+        print("build_segments: the reference works are not the IME paper's 12 archives in the configured order "
+              "(not the same archive: %s; loaded: %s; wanted: %s)" % (not_same, store["reference"]["work_ids"], want_ref),
+              file=sys.stderr)
         return 1
 
     os.makedirs(a.out_dir, exist_ok=True)

@@ -27,7 +27,7 @@ from multiprocessing import Pool
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from romaji_table import HABITS, unit_keys  # noqa: E402
-from build_segments import load_derived, unpack  # noqa: E402  (no SudachiPy import at module level)
+from build_segments import expected_sha, load_derived, sha256_file, unpack  # noqa: E402  (no SudachiPy import)
 
 
 def seed_int(*parts):
@@ -86,10 +86,15 @@ _DATA = {}
 
 
 def _load(derived, name, stats):
-    if _DATA.get("name") != name:
+    """The corpus of one segmentation, kept between cells of the same process. The cache key holds the
+    file's path, its current SHA-256 and the value recorded in corpus_stats.json, so another corpus, a
+    changed file or a changed record is loaded (and checked) again."""
+    path = os.path.abspath(os.path.join(derived, "corpus_%s.pkl" % name))
+    key = (path, sha256_file(path), expected_sha(stats, path))
+    if _DATA.get("key") != key:
         _DATA.clear()
         d = load_derived(derived, "corpus", name, stats)
-        _DATA.update({"name": name, "work_ids": d["work_ids"], "keys": d["keys"], "units": d["units"],
+        _DATA.update({"key": key, "work_ids": d["work_ids"], "keys": d["keys"], "units": d["units"],
                       "cache": OrderedDict()})
     return _DATA
 

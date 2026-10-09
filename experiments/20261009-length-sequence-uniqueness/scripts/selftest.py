@@ -6,10 +6,14 @@
 Exit 0 when every check passes, 1 otherwise.
 """
 import argparse
+import io
 import math
 import os
 import random
 import sys
+import urllib.error
+import urllib.request
+import zipfile
 from array import array
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -181,9 +185,9 @@ def test_run_cell():
         return (rt.count_keys(s), s, s, True)
     works = [[seg("".join(rng.choice(kana) for _ in range(rng.randint(0, 3)))) for _ in range(rng.randint(2, 9))]
              for _ in range(25)]
+    mt._DATA.clear()
     with tempfile.TemporaryDirectory() as tmp:
         stats = _write_derived(tmp, works)
-        mt._DATA.clear()
         cell = mt.run_cell((tmp, stats, "B0", 2, 6, mcfg, "s", 1.9))
         # recompute the ideal credits from the same draws with the plain scoring function
         keys = [bs.pack(w)[0] for w in works]
@@ -200,33 +204,29 @@ def test_run_cell():
               (cell["results"]["ideal"]["acc"], total / mcfg["trials"]))
         lo, hi = cell["results"]["ideal"]["ci"]
         check("bootstrap interval contains the estimate", lo <= cell["results"]["ideal"]["acc"] <= hi, (lo, hi))
-        check("noisy condition scored", 0.0 <= cell["results"]["mid"]["acc"] <= 1.0, cell["results"]["mid"])
-        mt._DATA.clear()
+        check("the noisy condition is not better than the ideal one",
+              cell["results"]["mid"]["acc"] <= cell["results"]["ideal"]["acc"] + 0.02, cell["results"])
         cell = mt.run_cell((tmp, stats, "B0", 2, 26, mcfg, "s", 1.9))
         check("a cell with fewer eligible works than N is not computed", cell["status"].startswith("not computable"),
               cell["status"])
     same = [[seg("かな"), seg("さた")] for _ in range(8)]  # one window of k = 2 per work, the same everywhere
     with tempfile.TemporaryDirectory() as tmp:
         stats = _write_derived(tmp, same)
-        mt._DATA.clear()
         cell = mt.run_cell((tmp, stats, "B0", 2, 4, mcfg, "s", 1.9))
         check("identical candidates score exactly 1/N", abs(cell["results"]["ideal"]["acc"] - 0.25) < 1e-12,
               cell["results"]["ideal"]["acc"])
     with tempfile.TemporaryDirectory() as tmp:
         stats = _write_derived(tmp, [[seg("かな"), seg("さた"), seg("な")]])
-        mt._DATA.clear()
         cell = mt.run_cell((tmp, stats, "B0", 2, 1, mcfg, "s", 1.9))
         check("one work and N = 1: score 1 and a point interval",
               cell["results"]["ideal"]["acc"] == 1.0 and cell["results"]["ideal"]["ci"] == [1.0, 1.0], cell["results"]["ideal"])
         with open(os.path.join(tmp, "corpus_B0.pkl"), "ab") as f:
             f.write(b"x")
-        mt._DATA.clear()
         try:
             mt.run_cell((tmp, stats, "B0", 2, 1, mcfg, "s", 1.9))
             check("a derived file that differs from corpus_stats.json is refused", False)
         except SystemExit:
             check("a derived file that differs from corpus_stats.json is refused", True)
-    mt._DATA.clear()
 
 
 # ---------------------------------------------------------------- 3c. fetching and the manifest (offline)
@@ -266,8 +266,67 @@ def test_fetch_offline():
         with open(cfgp, "w", encoding="utf-8") as f:
             json.dump({"fetch": {"interval_s": 1, "retries": 1, "user_agent": "t"},
                        "selection": {"fetch_count": 1, "reference_works": []}}, f)
-        rc = fw.main(["--selection", sel, "--config", cfgp, "--zips", zips, "--manifest", man])
-        check("a selection that differs from the committed manifest stops before any download", rc == 1, rc)
+        downloads = []
+        real_download = fw.download
+        fw.download = lambda *args: downloads.append(args) or "refused in the self-test"
+        try:
+            rc = fw.main(["--selection", sel, "--config", cfgp, "--zips", zips, "--manifest", man])
+            check("a selection that differs from the committed manifest stops before any download",
+                  rc == 1 and not downloads, (rc, downloads))
+            for role_url in (("reference", url), ("corpus", url.replace("1_ruby_1", "1_ruby_2"))):
+                with open(man, "w", encoding="utf-8") as f:
+                    json.dump({"works": [{"work_id": "000002", "role": role_url[0], "url": role_url[1],
+                                          "sha256": "0" * 64}]}, f)
+                rc = fw.main(["--selection", sel, "--config", cfgp, "--zips", zips, "--manifest", man])
+                check("a manifest that differs only in role or URL stops (%s)" % role_url[0], rc == 1 and not downloads,
+                      (rc, downloads))
+        finally:
+            fw.download = real_download
+        # a response shorter than its Content-Length, and a good one, from a local socket
+        good = io.BytesIO()
+        with zipfile.ZipFile(good, "w") as z:
+            z.writestr("a.txt", "text " * 50)
+        good = good.getvalue()
+        cfg = {"retries": 1, "interval_s": 0.01, "user_agent": "selftest"}
+        for label, body, declared, want_ok in (("truncated", good[:40], len(good), False),
+                                               ("not a zip", b"x" * 100, 100, False),
+                                               ("complete", good, len(good), True)):
+            url_local = _serve_once(body, declared)
+            dest = os.path.join(tmp, "dl_%s.zip" % label.replace(" ", "_"))
+            err = fw.download(url_local, dest, cfg)
+            ok = err is None and os.path.exists(dest) and open(dest, "rb").read() == good
+            refused = err is not None and not os.path.exists(dest) and not os.path.exists(dest + ".part")
+            check("download %s is %s" % (label, "kept" if want_ok else "refused"), ok if want_ok else refused, err)
+    handler = fw.SameSiteRedirect()
+    req = urllib.request.Request("https://www.aozora.gr.jp/cards/000001/files/1.zip")
+    for target, allowed in (("https://www.aozora.gr.jp/cards/000001/files/2.zip", True),
+                            ("http://www.aozora.gr.jp/cards/000001/files/2.zip", False),
+                            ("https://example.com/x.zip", False)):
+        try:
+            handler.redirect_request(req, None, 302, "Found", {}, target)
+            got = True
+        except urllib.error.HTTPError:
+            got = False
+        check("redirect to %s is %s" % (target, "followed" if allowed else "refused"), got == allowed)
+
+
+def _serve_once(body, declared):
+    """A one-shot HTTP server on 127.0.0.1 that sends `declared` as Content-Length and then `body`."""
+    import socket
+    import threading
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+
+    def run():
+        conn, _ = srv.accept()
+        conn.recv(65536)
+        conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % declared + body)
+        conn.close()
+        srv.close()
+    threading.Thread(target=run, daemon=True).start()
+    return "http://127.0.0.1:%d/x.zip" % port
 
 
 def test_dedupe_lines():
