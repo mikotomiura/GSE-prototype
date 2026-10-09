@@ -1,0 +1,45 @@
+{
+ "alignment": {
+  "n_blocks": 117,
+  "n_blocks_unscored": 0,
+  "n_presses": 93879,
+  "n_presses_unassigned": 0,
+  "n_trials": 2925,
+  "n_trials_unscored": 0,
+  "unscored_block_ids": [],
+  "unscored_by_scenario": {},
+  "unscored_by_speed": {},
+  "unscored_reason": "block_mismatch"
+ },
+ "format": "matching-attack-prepare/1",
+ "inputs": {
+  "corpus": "c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620",
+  "obs": "58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562",
+  "plan": "b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0",
+  "plan_config": "400fe5314d0f660f2e776a7f86deb471ae1235a3bea4c1be457b26ebe0a9181f",
+  "prior_matching": "0d97c6a0ec1bd576f01c44862bc94c3b63dfde760ad49eb5292704a1c30aae6a",
+  "published_closed_set": null,
+  "recipes": "430ec52c67f0592bc1c9d038a972876a2608ed7c39eb2aabcf68efc4ff908411",
+  "run_manifest": "5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82"
+ },
+ "n_ime_shadow_rows_unused": 3196,
+ "n_presses_scored": 93411,
+ "n_scored_by_scenario": {
+  "S1": 225,
+  "S10": 225,
+  "S12": 225,
+  "S13": 225,
+  "S14": 225,
+  "S15": 225,
+  "S2": 225,
+  "S3": 225,
+  "S4": 225,
+  "S5": 225,
+  "S6": 225,
+  "S7": 225,
+  "S8": 225
+ },
+ "n_scored_trials_differing_from_plan": 0,
+ "n_trials_scored": 2925,
+ "trials_json_sha256": "031ddf4ecbdb36b7728152a29a1f49db9bcbdf3d20aad2af66d9367cd4b3d94c"
+}

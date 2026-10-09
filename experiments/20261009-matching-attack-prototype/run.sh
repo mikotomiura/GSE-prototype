@@ -44,9 +44,12 @@ main() {
   echo "== 照合（441 セルと診断）=="
   run scripts/matching.py --trials raw/trials.json --prepare results/prepare.json --dist-dir raw/dist \
     --dist-summary results/distances.json --out results/matching.json --processes "$PROCS"
+  echo "== 事後の探索（事前の固定に無い・打鍵数を変える手順を含む窓とそれ以外）=="
+  run scripts/explore_procedure_noise.py --trials raw/trials.json --prepare results/prepare.json \
+    --dist-dir raw/dist --dist-summary results/distances.json --out results/explore_procedure_noise.json
   echo "== 表 =="
   run scripts/summarize.py --results results --out results/summary.md
-  $SHA256 results/*.json results/summary.md
+  $SHA256 results/*.json results/summary.md raw/trials.json raw/dist/*.bin
 }
 
 case "${1:-all}" in

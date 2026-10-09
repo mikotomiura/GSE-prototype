@@ -169,6 +169,22 @@ def by_scenario_table(m, names):
 SC_ORDER_K1 = [s for s in SC_ORDER if s != "S12"]
 
 
+def explore_table(ex):
+    out = ["## 7. 事後の探索: 打鍵数を変える手順（%s）を含む窓の数で分けた正答率（%%・区間なし）" % "・".join(
+        ex["count_changing_scenarios"]), "",
+           "結果を見た後に足した分析で、事前の固定には無い（`scripts/explore_procedure_noise.py`）。窓と候補は本計算と同じ。", "",
+           "| k | N | 含まない窓（数） | L_none | S_no_time | 1 つ含む窓（数） | L_none | S_no_time | 2 つ以上（数） | L_none | S_no_time |",
+           "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for c in ex["cells"]:
+        row = ["%d" % c["k"], "%d" % c["N"]]
+        for key in ("0", "1", "2+"):
+            v = c["by_n_count_changing"].get(key)
+            row += ["–", "–", "–"] if v is None else ["%d" % v["n_windows"], pct(v["L_none"]), pct(v["S_no_time"])]
+        out.append("| " + " | ".join(row) + " |")
+    out.append("")
+    return out
+
+
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--results", required=True)
@@ -188,7 +204,11 @@ def main(argv):
     lines += variant_tables(m, variants)
     lines += diagnostics_table(m)
     lines += by_scenario_table(m, variants)
-    data = ("\n".join(lines).rstrip("\n") + "\n").encode("utf-8")
+    ex_path = os.path.join(a.results, "explore_procedure_noise.json")
+    if os.path.exists(ex_path):
+        ex, _ = kitload.read_json(ex_path)
+        lines += explore_table(ex)
+    data =("\n".join(lines).rstrip("\n") + "\n").encode("utf-8")
     with open(a.out, "wb") as f:
         f.write(data)
     return 0

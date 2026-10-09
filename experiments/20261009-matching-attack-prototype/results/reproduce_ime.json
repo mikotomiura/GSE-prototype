@@ -1,0 +1,73 @@
+{
+ "all_match": true,
+ "format": "matching-attack-reproduce-ime/1",
+ "published_sha256": "93b5eb2bb7e43056899b78b6bcf486505ec91bced94844d065dcdd74a8d238b7",
+ "results": {
+  "10": {
+   "counts_only": {
+    "acc_raw": 0.9018518518518519,
+    "correct": 2435,
+    "match": true,
+    "mean_rank": 1.1062962962962963,
+    "n": 2700,
+    "published_acc_raw": 0.9018518518518519,
+    "published_mean_rank": 1.1062962962962963,
+    "published_n": 2700
+   },
+   "no_time": {
+    "acc_raw": 0.8988888888888888,
+    "correct": 2427,
+    "match": true,
+    "mean_rank": 1.1125925925925926,
+    "n": 2700,
+    "published_acc_raw": 0.8988888888888888,
+    "published_mean_rank": 1.1125925925925926,
+    "published_n": 2700
+   }
+  },
+  "100": {
+   "counts_only": {
+    "acc_raw": 0.42148148148148146,
+    "correct": 1138,
+    "match": true,
+    "mean_rank": 2.156296296296296,
+    "n": 2700,
+    "published_acc_raw": 0.42148148148148146,
+    "published_mean_rank": 2.156296296296296,
+    "published_n": 2700
+   },
+   "no_time": {
+    "acc_raw": 0.41814814814814816,
+    "correct": 1129,
+    "match": true,
+    "mean_rank": 2.3088888888888888,
+    "n": 2700,
+    "published_acc_raw": 0.41814814814814816,
+    "published_mean_rank": 2.3088888888888888,
+    "published_n": 2700
+   }
+  },
+  "1000": {
+   "counts_only": {
+    "acc_raw": 0.07333333333333333,
+    "correct": 198,
+    "match": true,
+    "mean_rank": 12.274444444444445,
+    "n": 2700,
+    "published_acc_raw": 0.07333333333333333,
+    "published_mean_rank": 12.274444444444445,
+    "published_n": 2700
+   },
+   "no_time": {
+    "acc_raw": 0.08074074074074074,
+    "correct": 218,
+    "match": true,
+    "mean_rank": 13.768888888888888,
+    "n": 2700,
+    "published_acc_raw": 0.08074074074074074,
+    "published_mean_rank": 13.768888888888888,
+    "published_n": 2700
+   }
+  }
+ }
+}
