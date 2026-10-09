@@ -22,6 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kitload  # noqa: E402
+from prepare import prepare_values  # noqa: E402
 
 COMMA_IN_TEXT = frozenset("、，,")
 
@@ -83,7 +84,9 @@ def expected_record(scenario, reading, romaji):
         return [], R
     if scenario == "S6":
         return [], R - n
-    return None
+    if scenario == "S12":
+        return None   # kana input: a different keyboard layout, reported but not modelled
+    raise ValueError("no procedure rule for scenario %s" % scenario)
 
 
 def summarise_deltas(deltas):
@@ -184,6 +187,8 @@ def main(argv):
     kit = kitload.import_kit(cfg, prior=True)
     corpus, _, _ = kitload.load_inputs(cfg, kit)
     prep, _ = kitload.read_json(a.prepare)
+    if prep.get("config_values") != prepare_values(cfg):
+        raise kitload.CheckError("raw/trials.json was made under other config values (run prepare.py again)")
     data, _ = kitload.read_json(a.trials, prep["trials_json_sha256"])
     tok = kit.build_segments.Tokenizer(40000)
     res = run(data["trials"], corpus, cfg, kit, tok)
@@ -191,10 +196,21 @@ def main(argv):
     res["alignment"] = prep["alignment"]
     res["n_scored_trials_differing_from_plan"] = prep["n_scored_trials_differing_from_plan"]
     res["trials_json_sha256"] = prep["trials_json_sha256"]
+    res["config_sha256"] = kitload.sha256_file(kitload.CONFIG)
     kitload.write_json(a.out, res)
     print("unexplained mismatches: %d of %d compared trials (%d trials in all); records differing from their "
           "procedure: %d of %d" % (res["n_unexplained"], res["n_compared"], res["n_trials"],
                                    len(res["rule_mismatch_trial_ids"]), res["n_rule_checked"]))
+    return exit_status(res)
+
+
+def exit_status(res):
+    """1 when a record differs from its scenario's procedure rule: the counting and the boundaries the attacks
+    rely on would then not mean what design.md says (the results are written first, for inspection)."""
+    if res["rule_mismatch_trial_ids"]:
+        print("!! %d records differ from their procedure rule; stop" % len(res["rule_mismatch_trial_ids"]),
+              file=sys.stderr)
+        return 1
     return 0
 
 

@@ -80,7 +80,8 @@ def provenance(cfg):
     return {"variants": dict((n, v) for n, v in cfg["variants"].items() if v["attacker"] == "S"),
             "distances_py_sha256": kitload.sha256_file(os.path.abspath(__file__)),
             "kit_code": dict((rel, cfg["code"][rel]) for _, rel in kitload.KIT_MODULES),
-            "os": cfg["os"]}
+            "inputs": dict((k, cfg["inputs"][k]["sha256"]) for k in ("corpus", "recipes", "plan_config")),
+            "os": cfg["os"], "attacker_seed": cfg["attacker_seed"]}
 
 
 def used_trials(trials, cfg):

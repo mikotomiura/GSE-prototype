@@ -20,6 +20,16 @@ import kitload  # noqa: E402
 FORMAT = "matching-attack-trials/1"
 
 
+def prepare_values(cfg):
+    """The config values and input files raw/trials.json depends on (data.load and crosscheck.py refuse a
+    raw/trials.json made under other values)."""
+    return {"os": cfg["os"], "markers_in_obs": cfg["markers_in_obs"], "skip_scenarios": cfg["skip_scenarios"],
+            "counted_categories": cfg["counted_categories"], "minus_categories": cfg["minus_categories"],
+            "inputs": dict((k, cfg["inputs"][k].get("sha256"))
+                           for k in ("obs", "plan", "run_manifest", "corpus", "recipes", "plan_config")),
+            "kit_code": dict((rel, cfg["code"][rel]) for _, rel in kitload.KIT_MODULES)}
+
+
 def key_count(cats, counted, minus):
     """Text keys minus BackSpace (design.md section 3)."""
     return sum(1 for c in cats if c in counted) - sum(1 for c in cats if c in minus)
@@ -80,7 +90,8 @@ def main(argv):
                "n_scored_trials_differing_from_plan": n_plan_mismatch,
                "n_presses_scored": sum(len(t["ev"]) for t in trials),
                "trials_json_sha256": sha,
-               "inputs": dict((k, v.get("sha256")) for k, v in cfg["inputs"].items())}
+               "inputs": dict((k, v.get("sha256")) for k, v in cfg["inputs"].items()),
+               "config_values": prepare_values(cfg)}
     kitload.write_json(a.summary, summary)
     print("trials scored: %d of %d (blocks unscored: %d)" % (len(trials), alignment["n_trials"],
                                                                alignment["n_blocks_unscored"]))

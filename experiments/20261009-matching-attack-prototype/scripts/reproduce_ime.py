@@ -108,6 +108,7 @@ def main(argv):
     _, dsha = kitload.read_json(a.dist_summary)
     kitload.write_json(a.out, {"format": "matching-attack-reproduce-ime/1", "published_sha256": pub_sha,
                                "trials_json_sha256": prep["trials_json_sha256"], "distances_json_sha256": dsha,
+                               "config_sha256": kitload.sha256_file(kitload.CONFIG),
                                "all_match": ok, "results": res})
     for K, fs in sorted(res.items(), key=lambda kv: int(kv[0])):
         for f, r in sorted(fs.items()):

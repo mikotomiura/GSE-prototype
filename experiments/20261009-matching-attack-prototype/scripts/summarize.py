@@ -80,14 +80,15 @@ def crosscheck_tables(cc):
 def reproduce_table(rep):
     out = ["## 2. k = 1 の再現の確認（IME 論文の候補と同点の決め方）", "",
            "すべて一致: **%s**" % ("はい" if rep["all_match"] else "いいえ"), "",
-           "| K | 組 | 正答 / 試行 | acc_raw（本タスク） | acc_raw（公開値） | 平均順位（本タスク / 公開値） |",
-           "|---|---|---|---|---|---|"]
+           "| K | 組 | 正答 / 試行 | acc_raw（本タスク） | acc_raw（公開値） | 平均順位（本タスク / 公開値） "
+           "| matching.py の採点経路との食い違い |",
+           "|---|---|---|---|---|---|---|"]
     for K in sorted(rep["results"], key=int):
         for f in sorted(rep["results"][K]):
             r = rep["results"][K][f]
-            out.append("| %s | %s | %d / %d | %.6f | %.6f | %.4f / %.4f |" % (
+            out.append("| %s | %s | %d / %d | %.6f | %.6f | %.4f / %.4f | %d |" % (
                 K, f, r["correct"], r["n"], r["acc_raw"], r["published_acc_raw"], r["mean_rank"],
-                r["published_mean_rank"]))
+                r["published_mean_rank"], r["matching_path_disagreements"]))
     out.append("")
     return out
 
@@ -214,9 +215,13 @@ def check_provenance(cfg, prep, cc, rep, m, ex, dsha):
         if obj.get("distances_json_sha256") != dsha:
             raise kitload.CheckError("%s.json was computed from other distances" % name)
     csha = kitload.sha256_file(kitload.CONFIG)
-    for name, obj in (("matching", m), ("explore", ex)):
+    for name, obj in (("crosscheck", cc), ("reproduce_ime", rep), ("matching", m), ("explore", ex)):
         if obj.get("config_sha256") != csha:
             raise kitload.CheckError("%s.json was computed under another config.json" % name)
+    seed = kitload.read_seed()
+    for name, obj in (("matching", m), ("explore", ex)):
+        if obj.get("seed") != seed:
+            raise kitload.CheckError("%s.json was computed with another seed" % name)
     if m.get("partial"):
         raise kitload.CheckError("matching.json is a partial run (--only)")
     want = sorted((k, N) for k in cfg["windows"]["k"] for N in cfg["N"])

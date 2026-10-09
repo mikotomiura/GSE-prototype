@@ -16,12 +16,15 @@ from array import array
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kitload  # noqa: E402
 from distances import provenance, scenario_pools, used_trials  # noqa: E402
+from prepare import prepare_values  # noqa: E402
 
 
 def load(cfg, kit, trials_path, prepare_path, dist_dir=None, dist_summary_path=None, variants=()):
     corpus, recipes, pcfg = kitload.load_inputs(cfg, kit)
     cs, romaji = kit.closed_set, kit.romaji
     prep, _ = kitload.read_json(prepare_path)
+    if prep.get("config_values") != prepare_values(cfg):
+        raise kitload.CheckError("raw/trials.json was made under other config values (run prepare.py again)")
     data, _ = kitload.read_json(trials_path, prep["trials_json_sha256"])
     trials = used_trials(data["trials"], cfg)
     _, pools = scenario_pools(kit, recipes, cfg["os"], corpus, set(t["scenario"] for t in trials))

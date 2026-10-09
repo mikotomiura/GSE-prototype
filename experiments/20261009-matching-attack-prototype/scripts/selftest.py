@@ -377,6 +377,20 @@ def test_review_fixes(kit):
     check("procedure rule: S6 leaves the key count minus the kana", er("S6", "かきく", rj) == ([], 3))
     check("procedure rule: S4 leaves an open segment", er("S4", "かきく", rj) == ([], 6))
     check("procedure rule: S12 is not modelled", er("S12", "かきく", rj) is None)
+    raises("procedure rule: a scenario without a rule stops", lambda: er("S9", "かきく", rj), ValueError)
+    check("crosscheck stops on a record that differs from its procedure rule",
+          crosscheck.exit_status({"rule_mismatch_trial_ids": ["t00001"]}) == 1)
+    check("crosscheck passes when every record follows its rule",
+          crosscheck.exit_status({"rule_mismatch_trial_ids": []}) == 0)
+    import prepare as prep_mod
+    cfg4 = copy.deepcopy(cfg)
+    cfg4["counted_categories"] = cfg4["counted_categories"][:2]
+    check("the values raw/trials.json depends on change with the counted categories",
+          prep_mod.prepare_values(cfg) != prep_mod.prepare_values(cfg4))
+    cfg5 = copy.deepcopy(cfg)
+    cfg5["variants"]["S_rle4"]["w"] = 5
+    check("the values raw/trials.json depends on ignore the attack variants",
+          prep_mod.prepare_values(cfg) == prep_mod.prepare_values(cfg5))
     from distances import provenance
     cfg2 = copy.deepcopy(cfg)
     cfg2["variants"]["S_rle4"]["w"] = 5
@@ -388,10 +402,13 @@ def test_review_fixes(kit):
     tsha, dsha, csha = "t" * 64, "d" * 64, kitload.sha256_file(kitload.CONFIG)
     cells = [{"k": k, "N": N} for k in cfg["windows"]["k"] for N in cfg["N"]]
     prep = {"trials_json_sha256": tsha}
-    good = dict(cc={"trials_json_sha256": tsha},
-                rep={"trials_json_sha256": tsha, "distances_json_sha256": dsha},
-                m={"trials_json_sha256": tsha, "distances_json_sha256": dsha, "config_sha256": csha, "cells": cells},
-                ex={"trials_json_sha256": tsha, "distances_json_sha256": dsha, "config_sha256": csha, "cells": cells})
+    seed = kitload.read_seed()
+    good = dict(cc={"trials_json_sha256": tsha, "config_sha256": csha},
+                rep={"trials_json_sha256": tsha, "distances_json_sha256": dsha, "config_sha256": csha},
+                m={"trials_json_sha256": tsha, "distances_json_sha256": dsha, "config_sha256": csha, "cells": cells,
+                   "seed": seed},
+                ex={"trials_json_sha256": tsha, "distances_json_sha256": dsha, "config_sha256": csha, "cells": cells,
+                    "seed": seed})
     try:
         summarize.check_provenance(cfg, prep, good["cc"], good["rep"], good["m"], good["ex"], dsha)
         check("summary provenance: consistent results pass", True)
@@ -401,6 +418,11 @@ def test_review_fixes(kit):
                          ("another trials file", lambda g: g["ex"].__setitem__("trials_json_sha256", "x" * 64)),
                          ("other distances", lambda g: g["rep"].__setitem__("distances_json_sha256", "x" * 64)),
                          ("another config", lambda g: g["m"].__setitem__("config_sha256", "x" * 64)),
+                         ("a crosscheck under another config", lambda g: g["cc"].__setitem__("config_sha256", "x" * 64)),
+                         ("a reproduction under another config",
+                          lambda g: g["rep"].__setitem__("config_sha256", "x" * 64)),
+                         ("an exploration with another seed", lambda g: g["ex"].__setitem__("seed", seed + 1)),
+                         ("a matching with another seed", lambda g: g["m"].__setitem__("seed", seed + 1)),
                          ("a missing cell", lambda g: g["m"].__setitem__("cells", cells[1:]))):
         g = copy.deepcopy(good)
         mutate(g)

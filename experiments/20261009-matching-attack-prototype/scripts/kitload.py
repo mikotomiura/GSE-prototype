@@ -42,7 +42,11 @@ def repo_path(rel):
         raise CheckError("a path in config.json must be relative to the repository and stay inside it: %s" % rel)
     path = os.path.join(REPO, *rel.split("/"))
     root = os.path.realpath(REPO)
-    if os.path.commonpath([os.path.realpath(path), root]) != root:
+    try:
+        inside = os.path.commonpath([os.path.realpath(path), root]) == root
+    except ValueError:   # another drive (a junction inside the repository pointing elsewhere)
+        inside = False
+    if not inside:
         raise CheckError("a path in config.json resolves outside the repository: %s" % rel)
     return path
 
@@ -198,13 +202,17 @@ _INIT_ERROR = []
 def guarded_init(fn, *args):
     try:
         fn(*args)
-    except BaseException as e:  # noqa: B036 - kept and re-raised by the task
-        _INIT_ERROR.append("%s: %s" % (type(e).__name__, e))
+    except BaseException:  # noqa: B036 - kept and re-raised by the task
+        import traceback
+        _INIT_ERROR.append(traceback.format_exc())
 
 
 def check_init():
+    """Raise in the task what the worker's initialisation raised (a failed check of an input or a code file, or
+    any other error; the traceback of the worker is kept in the message)."""
     if _INIT_ERROR:
-        raise CheckError("the worker could not be initialised (%s)" % _INIT_ERROR[0])
+        raise CheckError("the worker's initialisation failed (a changed input or code file, or another error); "
+                         "its traceback:\n%s" % _INIT_ERROR[0])
 
 
 def load_inputs(cfg, kit):
