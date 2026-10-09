@@ -4,8 +4,8 @@
 - [x] 4 本のブランチを merge する（PR #338・研究者の決定: 先端の PR 1 本）
 - [x] 研究者に第 3 回の中身を聞く（判断 1・9 問）
 - [x] requirement / design §3（基準）/ decisions を書く
-- [ ] 固定の前の `/cross-review`（基準の穴を探す）→ decisions
-- [ ] design §3 をコミットして固定する（下見・スモークより前）
+- [x] 固定の前の `/cross-review` 2 巡（基準の穴を探す）→ decisions 判断 3・4
+- [x] design §3 をコミットして固定する（下見・スモークより前）
 
 ## 計器
 - [ ] `experiments/20261010-portrait-eh1-round3/` を第 2 回から写す
