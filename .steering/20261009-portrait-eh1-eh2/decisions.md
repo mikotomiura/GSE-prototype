@@ -103,3 +103,22 @@
 
 - **判断 2-4 の条件は満たせなかった**: 判断 2 の 4 は「Windows 版はこの機械で短く試して元の壁紙に戻す（壊れたスクリプトを渡さないため）」だった。この機械の背景が Windows スポットライトで、替えると API では戻せないので、`-DryRun`（壁紙を替えない部分）だけを回した。→ **受け手の Windows の機器の `-Quick` を最初の検証にする**（引き継ぎ §3 に「Restored: True ... が出なければ止めて報告」と書いた）。macOS 版はコンパイルもしていない → 受け手で最初に `swiftc -typecheck`。
 - **Claude 系統の「読んでいない範囲」**: Swift が実際にコンパイルできるか・Windows / macOS の API の実際の振る舞い・`capabilities_gate.py` の本体・replay.rs の tick の扱い。
+
+## 判断 8（2026-10-09）: `/cross-review` 2 巡目の結果と対応
+
+- **範囲**: `c24fdbc7..f7a2b1b9`（1 巡目の対応）。焦点は 1 巡目で足した規則の境界条件。
+- **回し方**: Claude 系統（`code-reviewer`・約 5.4 分）と Codex 系統（`scripts/run-codex-review.sh c24fdbc7..f7a2b1b9 -- <コードのパス>`・276 行の追加・31,426 トークン。このブランチの台帳 77,456 → 108,882 / 3 回。今日の全体は origin/main と合わせて約 224,600 / 300,000）を並列に起動した。
+- **結果**: Codex 3 件・Claude 7 件（HIGH 1・MEDIUM 2・LOW 4）。一次で裏取りし、すべて妥当と判断した（Codex の 3 は「呼び出し元が組み込みの型だけなら誤検知」と条件つきだったが、安く塞げるので当てた）。重なりは 1 件（手の確認の最初の段で別のデスクトップで戻しうる ≒ Claude の MEDIUM 2 の前半）。
+
+| # | 系統 | 指摘 | 対応 |
+|---|---|---|---|
+| Y1 | Claude | HIGH: E1-4 は不在の中の更新が 1 回だと自分自身と比べて必ず通るのに件数に入る（cap1 では赤の経路が無い） | 比べる表示が 2 つ以上ある不在だけを数え、0 件は判定不能（design §8）。cap1 の組は構成上判定不能になる。PC2 はスモークで引き続き赤（20 件中 14） |
+| Y2 | Codex | Swift: ハンドラとメインの両方が後始末に入ると、片方が復元を打ち切りうる・`res` の並行書き込み | 後始末を `finishLock`（手放さない）で 1 本にした。`interrupted` の記録も後始末の中で書く |
+| Y3 | Codex ＋ Claude | 手の確認の最初の段（2 枚目を作って戻る間）の中断で、2 枚目で戻しうる | 最初のプロンプトから「2 枚目にいるかもしれない」扱いにし、1 枚目に戻ったと確かめてから外す（両 OS） |
+| Y4 | Claude | 「1 枚目に戻った」の確かめが、読み戻しで Space を見分けられる前提に乗っている | 読み戻しの一致に加えて、操作者の「はい」を要る形にした（両 OS・`confirmFirstSpace` / `Confirm-FirstDesktop`） |
+| Y5 | Claude | Swift: プロンプトを出す前の中断が「戻さない」に化ける | 「2 枚目へ送る」フラグを、中断の確かめと同じロックの中で、中断が無いときだけ立てる（`guarded(sendsAway:)`） |
+| Y6 | Codex | `clean()` が NumPy の型を網羅しない | NumPy のスカラーと配列も変換する（`np.float32`・`np.int64`・配列の inf で確かめた） |
+| Y7 | Claude | LOW: `restore_target_unconfirmed` が結果に出ない／戻していないときの `restored_position_ok = True`／exit 3・4 で結果を書かない・stdin の EOF で空回り／git が失敗すると clean と記録される | 戻さない分岐でも書く／`not_attempted`／`-aborted` の結果を書き、EOF は skip・unknown として扱う／git が失敗したら null |
+
+- **Claude 系統の「読んでいない範囲」**: `render_e18.py`・`selftest.py`・`replay_all.py`・`schedule()` の本体・画像の作り方・NSWorkspace をメイン以外のスレッドから呼べるか（ハンドラが戻すのは操作者の入力を待っている間だけ）・両 OS の API の実際の振る舞い。
+- **2 巡で閉じる**: 2 巡目の指摘は 1 巡目の対応の境界に留まり、新しい種類の問題は出なかった。3 巡目は回さない。残る不確かさは、両 OS の API の実際の振る舞いと Swift のコンパイルで、どちらも受け手の機器の最初の手順（`-Quick`・`swiftc -typecheck`）で確かめる。

@@ -80,10 +80,13 @@ from importlib.metadata import version
 out, binary, hmm, world, smoke, exp_dir, repo = sys.argv[1:8]
 sha = hashlib.sha256(open(binary, "rb").read()).hexdigest()
 commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+def git_dirty(args):
+    # None when git itself fails (not on PATH, dubious ownership): an empty output would read as clean
+    r = subprocess.run(["git"] + args, capture_output=True, text=True)
+    return bool(r.stdout.strip()) if r.returncode == 0 else None
 # the instruments only: results/ fills with untracked files while the run writes them
-dirty = bool(subprocess.run(["git", "-C", exp_dir, "status", "--porcelain", "--", ".", ":(exclude)results"],
-                            capture_output=True, text=True).stdout.strip())
-src_dirty = bool(subprocess.run(["git", "-C", repo, "status", "--porcelain", "--", "src-tauri"], capture_output=True, text=True).stdout.strip())
+dirty = git_dirty(["-C", exp_dir, "status", "--porcelain", "--", ".", ":(exclude)results"])
+src_dirty = git_dirty(["-C", repo, "status", "--porcelain", "--", "src-tauri"])
 json.dump({"world": world, "smoke": bool(smoke), "git_commit": commit, "experiment_dir_dirty": dirty,
            "src_tauri_dirty": src_dirty,
            "gse_replay_sha256": sha, "hmm_version": hmm, "python": platform.python_version(),

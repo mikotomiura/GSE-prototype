@@ -195,7 +195,8 @@ func makeImage(_ url: URL, _ w: Int, _ h: Int, _ variant: Int) throws {
 func askYesNo(_ prompt: String) -> String {
     while true {
         print("\(prompt) [y/n/u(unknown)] ", terminator: "")
-        let r = (readLine() ?? "").trimmingCharacters(in: .whitespaces).lowercased()
+        guard let line = readLine() else { return "unknown" }  // end of input
+        let r = line.trimmingCharacters(in: .whitespaces).lowercased()
         switch r {
         case "y": return "yes"
         case "n": return "no"
@@ -275,6 +276,9 @@ if dryRun {
 if !force && exists.contains(false) {
     print("A screen's picture is not a readable file (for example a moving aerial wallpaper).")
     print("It cannot be restored through this API. Switch to a picture first, or pass --force.")
+    res["aborted"] = "original_not_restorable"
+    writeResults("-aborted")
+    try? FileManager.default.removeItem(at: work)
     exit(3)
 }
 
@@ -286,6 +290,9 @@ do {
     try data.write(to: restoreFile)
 } catch {
     print("Could not save the original pictures (\(error)). Nothing was changed.")
+    res["aborted"] = "restore_file_not_written"
+    writeResults("-aborted")
+    try? FileManager.default.removeItem(at: work)
     exit(4)
 }
 print("Saved the original pictures to \(restoreFile.path)")
@@ -323,10 +330,14 @@ func setPicture(_ u: URL, _ s: NSScreen, _ o: [NSWorkspace.DesktopImageOptionKey
     try ws.setDesktopImageURL(u, for: s, options: o)
 }
 
-func guarded<T>(_ f: () -> T) throws -> T {
+// sendsAway: this prompt sends the operator to another Space (or may find them there). The flag is
+// raised in the same critical section that checks for an interruption, so an interruption that came
+// before the prompt was shown still restores normally.
+func guarded<T>(sendsAway: Bool = false, _ f: () -> T) throws -> T {
     stateLock.lock()
     inPrompt = true
     let before = interrupted
+    if !before && sendsAway { onOtherSpace = true }
     stateLock.unlock()
     if before {
         stateLock.lock(); inPrompt = false; stateLock.unlock()
@@ -347,6 +358,7 @@ func restore() {
     if other {
         // restoring now would act on the second Space and leave the first one with the placeholder
         res["restored"] = "not_attempted_on_other_space"
+        res["restore_target_unconfirmed"] = true
         print("Not restored: this may be the second Space. Go back to the first Space and pick your picture again")
         print("(the original paths are in \(restoreFile.path), the placeholder images in \(work.path); see README).")
         return
@@ -372,7 +384,13 @@ func restore() {
     }
 }
 
-func finish(_ code: Int32) -> Never {
+// One exit path: whoever comes second (the handler or the main flow) waits here until the first one
+// has restored, written the results and exited. The lock is never released on purpose.
+let finishLock = NSLock()
+
+func finish(_ code: Int32, interruptedRun: Bool = false) -> Never {
+    finishLock.lock()
+    if interruptedRun { res["interrupted"] = true }
     restore()
     writeResults("")
     exit(code)
@@ -389,8 +407,7 @@ for sig in [SIGINT, SIGTERM] {
         let waiting = inPrompt
         stateLock.unlock()
         print("\nInterrupted: restoring the original pictures.")
-        res["interrupted"] = true
-        if waiting { finish(130) }
+        if waiting { finish(130, interruptedRun: true) }
     }
     src.resume()
     signalSources.append(src)
@@ -448,31 +465,48 @@ do {
         try nap(Double(busyEvery))
     }
     let s2 = samples()
+    let lastSetFirst = imgs[0][(updates - 1) % 2]  // what the first screen of this Space shows now
     res["cpu"] = ["idle_s": idleS, "busy_s": busyS, "busy_every_s": busyEvery, "busy_updates": updates,
                   "idle_elapsed_s": idleElapsed, "busy_elapsed_s": (nowMs() - tStart) / 1000,
                   "idle": delta(s0, s1), "busy": delta(s1, s2)] as [String: Any]
 
     // 4. Optional manual checks
     if manual {
-        try guarded { waitEnter("\nManual check A: Spaces. Open Mission Control, add a second Space, come back to the first one, then press Enter.") }
         let o0 = orig[0]
+        // Back on the first Space = the readback shows what this script set there AND the operator says so
+        // (the readback alone cannot tell Spaces apart if the getter ignores them).
+        func confirmFirstSpace(expect: URL) throws -> Bool {
+            while true {
+                if samePath(ws.desktopImageURL(for: o0.screen), expect) {
+                    let yes = try guarded { askYesNo("Are you on the first Space (the one you started on) now?") }
+                    if yes == "yes" { return true }
+                }
+                let ans = try guarded { () -> String in
+                    print("Switch to the first Space and press Enter, or type skip: ", terminator: "")
+                    return (readLine() ?? "skip").trimmingCharacters(in: .whitespaces).lowercased()
+                }
+                if ans == "skip" { return false }
+            }
+        }
+        // From the first prompt on, the operator may be on another Space until confirmed back.
+        try guarded(sendsAway: true) { waitEnter("\nManual check A: Spaces. Open Mission Control, add a second Space, come back to the first one, then press Enter.") }
+        let startOk = try confirmFirstSpace(expect: lastSetFirst)
+        if !startOk {
+            res["manual_spaces"] = "skipped_not_on_first_space"
+            res["manual_screen_share"] = "skipped_not_on_first_space"
+            restoreTargetUnconfirmed = true
+            finish(0)
+        }
+        stateLock.lock(); onOtherSpace = false; stateLock.unlock()
         try setPicture(imgs[0][0], o0.screen, opts)
-        stateLock.lock(); onOtherSpace = true; stateLock.unlock()
-        try guarded { waitEnter("The striped image is now set on this Space. Switch to the second Space (Ctrl+Right) and press Enter.") }
+        try guarded(sendsAway: true) { waitEnter("The striped image is now set on this Space. Switch to the second Space (Ctrl+Right) and press Enter.") }
         let readbackOther = samePath(ws.desktopImageURL(for: o0.screen), imgs[0][0])
         let visibleOther = try guarded { askYesNo("Do you see the striped image on the second Space?") }
         res["manual_spaces"] = ["readback_matches_on_other_space": readbackOther,
                                 "striped_image_visible_on_other_space": visibleOther] as [String: Any]
         try guarded { waitEnter("Switch back to the first Space, then press Enter.") }
         // Everything after this (the share check and the restore) acts on the current Space.
-        var back = true
-        while !samePath(ws.desktopImageURL(for: o0.screen), imgs[0][0]) {
-            let ans = try guarded { () -> String in
-                print("The picture here is not the striped image, so this may not be the first Space. Switch back and press Enter, or type skip: ", terminator: "")
-                return (readLine() ?? "").trimmingCharacters(in: .whitespaces).lowercased()
-            }
-            if ans == "skip" { back = false; break }
-        }
+        let back = try confirmFirstSpace(expect: imgs[0][0])
         res["manual_back_on_first_space_confirmed"] = back
         if back {
             stateLock.lock(); onOtherSpace = false; stateLock.unlock()
@@ -491,8 +525,7 @@ do {
         }
     }
 } catch is Interrupted {
-    res["interrupted"] = true
-    exitCode = 130
+    finish(130, interruptedRun: true)
 } catch {
     // only the domain and code go to the results: the description can carry file paths
     let ns = error as NSError

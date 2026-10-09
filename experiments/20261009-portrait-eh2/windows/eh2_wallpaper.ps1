@@ -262,6 +262,18 @@ if (-not $Force -and ((@($res.original_exists) -contains $false) -or (@($res.ori
 (@{ position = $origPos; monitors = $orig } | ConvertTo-Json -Depth 4) | Set-Content -LiteralPath $restoreFile -Encoding UTF8
 Write-Host "Saved the original settings to $restoreFile"
 
+# Back on the first desktop = the readback shows what this script set there AND the operator says so
+# (the readback alone cannot tell desktops apart if the getter ignores them).
+function Confirm-FirstDesktop([string]$expect) {
+    while ($true) {
+        if ($dw.Get($orig[0].id) -eq $expect) {
+            if ((Read-YesNo 'Are you on the first desktop (the one you started on) now?') -eq 'yes') { return $true }
+        }
+        $ans = (Read-Host 'Switch to the first desktop and press Enter, or type skip').Trim().ToLower()
+        if ($ans -eq 'skip') { return $false }
+    }
+}
+
 $onOtherDesktop = $false
 try {
     # Placeholder images per monitor
@@ -330,6 +342,7 @@ try {
         Start-Sleep -Seconds $busyEvery
     }
     $s2 = Get-Samples
+    $lastSet0 = $imgs[0][($updates - 1) % 2]  # what monitor 0 of this desktop shows now
     $res.cpu = [ordered]@{
         idle_s = $idleS; busy_s = $busyS; busy_every_s = $busyEvery; busy_updates = $updates
         idle_elapsed_s = [Math]::Round($idleElapsed, 2); busy_elapsed_s = [Math]::Round($t.Elapsed.TotalSeconds, 2)
@@ -341,7 +354,17 @@ try {
         Write-Host ''
         Write-Host 'Manual check A: virtual desktops.'
         Write-Host 'Create a second virtual desktop (Win+Ctrl+D), come back to the first one (Win+Ctrl+Left), then press Enter.'
+        # From this prompt on, the operator may be on another desktop until the readback shows the
+        # placeholder this script set on the first desktop.
+        $onOtherDesktop = $true
         Read-Host | Out-Null
+        $startOk = Confirm-FirstDesktop $lastSet0
+        if (-not $startOk) {
+            $res.manual_virtual_desktop = 'skipped_not_on_first_desktop'
+            $res.manual_screen_share = 'skipped_not_on_first_desktop'
+            throw 'not_on_first_desktop'
+        }
+        $onOtherDesktop = $false
         for ($i = 0; $i -lt $count; $i++) { $dw.Set($orig[$i].id, $imgs[$i][0]) }
         $onOtherDesktop = $true
         Write-Host 'The striped image is now set on this desktop. Switch to the second desktop (Win+Ctrl+Right) and press Enter.'
@@ -353,11 +376,7 @@ try {
         Write-Host 'Switch back to the first desktop, then press Enter.'
         Read-Host | Out-Null
         # Everything after this (the share check and the restore) acts on the current desktop.
-        $back = $true
-        while ($dw.Get($orig[0].id) -ne $imgs[0][0]) {
-            $ans = (Read-Host 'The wallpaper here is not the striped image, so this may not be the first desktop. Switch back and press Enter, or type skip').Trim().ToLower()
-            if ($ans -eq 'skip') { $back = $false; break }
-        }
+        $back = Confirm-FirstDesktop $imgs[0][0]
         $res.manual_back_on_first_desktop_confirmed = $back
         if (-not $back) {
             # not confirmed on the first desktop: no further change, and the automatic restore is not trusted
@@ -411,13 +430,14 @@ finally {
         }
     }
     $res.restored = $restored
-    try { $res.restored_position_ok = ($dw.GetPosition() -eq $origPos) } catch { $res.restored_position_ok = $false }
+    if ($onOtherDesktop) { $res.restored_position_ok = 'not_attempted' }
+    else { try { $res.restored_position_ok = ($dw.GetPosition() -eq $origPos) } catch { $res.restored_position_ok = $false } }
     $res.finished = (Get-Date).ToString('s')
     $out = Join-Path $resultsDir "eh2-windows-$stamp.json"
     ($res | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $out -Encoding UTF8
     Write-Host "Results: $out"
     Write-Host "Restored: $($restored -join ', ')  position ok: $($res.restored_position_ok)"
-    if (@($restored | Where-Object { $_ -ne $true }).Count -eq 0 -and $res.restored_position_ok) {
+    if (@($restored | Where-Object { $_ -ne $true }).Count -eq 0 -and $res.restored_position_ok -eq $true) {
         Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $restoreFile -Force -ErrorAction SilentlyContinue
     } else {

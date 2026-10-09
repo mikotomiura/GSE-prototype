@@ -134,8 +134,12 @@ def clean(o):
     """Standard JSON: non-finite floats become the strings "inf", "-inf" and "nan"."""
     if isinstance(o, dict):
         return {k: clean(v) for k, v in o.items()}
+    if isinstance(o, np.ndarray):
+        return [clean(v) for v in o.tolist()]
     if isinstance(o, (list, tuple)):
         return [clean(v) for v in o]
+    if isinstance(o, np.generic):
+        o = o.item()
     if isinstance(o, float) and not np.isfinite(o):
         return "nan" if np.isnan(o) else ("inf" if o > 0 else "-inf")
     return o

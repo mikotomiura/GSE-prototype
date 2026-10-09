@@ -26,6 +26,6 @@
 
 ## 閉じる
 - [x] code-reviewer ∥ security-checker（判断 6・指摘はすべて対応か理由つきで据え置き）
-- [ ] /cross-review 2 巡と対応を decisions.md に
+- [x] /cross-review 2 巡と対応を decisions.md に（判断 7: 26 件・判断 8: 10 件。すべて妥当で対応済み。Codex は 3 本で 108,882 トークン）
 - [ ] 両機器の結果が来たら: design §8・README の実行の表・notes をまとめ、親タスクの decisions.md と `.idea` §11 に還元する（研究者の決定 U-4・E1-8 の材料として）
 - [ ] コミット・push（PR なし・計測の run の後）

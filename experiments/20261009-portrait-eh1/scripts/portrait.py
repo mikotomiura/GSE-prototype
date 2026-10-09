@@ -453,8 +453,11 @@ def run(sess: Session, conf: Config, cfg: dict, seed: int, want_windows: bool, w
             # design 3.4 compares the display just after the first update with the one at the return;
             # every display in between is checked too (a shrink that recovers before the return is still
             # a shrink while the person may be looking: design section 8)
-            e14_end = bool(drop(jr))
-            e14 = bool(any(drop(j) for j in range(j1, jr + 1)))
+            # with a single update inside the absence (j1 == jr) there is nothing to compare: the display
+            # is compared with itself and cannot fail, so it is not counted as checked (design section 8)
+            if jr > j1:
+                e14_end = bool(drop(jr))
+                e14 = bool(any(drop(j) for j in range(j1 + 1, jr + 1)))
         absences.append({"len": r - s, "change": change, "change_proj": change_proj, "e14_violation": e14,
                          "e14_endpoint_violation": e14_end})
     res["absences"] = absences
