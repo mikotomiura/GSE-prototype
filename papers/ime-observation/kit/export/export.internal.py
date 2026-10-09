@@ -23,10 +23,11 @@ The export
   3. rewrites the manifests so that they keep only kind / id / path / symbol / sha256 / reason and
      recomputes every checksum from the exported bytes;
   4. rejects the export when any exported text or file name contains a participant identifier, an
-     e-mail address, an internal dataset or session name, an internal marker word or symbol, a home
-     or repository path of the machine that runs the export, the login name of that machine, or an
-     absolute path that names a user (the fictional names in FICTIONAL are the only names that
-     pass). Every line is also checked after its JSON / string escapes are decoded;
+     e-mail address (other than the one in PUBLIC_EMAILS, in the manuscript and the datasheet only), an internal
+     dataset or session name, an internal marker word or symbol, a home or repository path of the machine that
+     runs the export, the login name of that machine, or an absolute path that names a user (the fictional
+     names in FICTIONAL are the only names that pass). Every line is also checked after its JSON / string
+     escapes are decoded;
   5. verifies the exported logger manifests with check_manifest.py --self;
   6. runs the checker of the writing rules of published files (_style_check.py, located with
      --style-check or in the git work tree of the source; inside a git work tree it must be committed)
@@ -46,6 +47,7 @@ import argparse
 import contextlib
 import fnmatch
 import getpass
+import html
 import io
 import json
 import os
@@ -55,6 +57,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 
 for _s in (sys.stdout, sys.stderr):  # keeps non-ASCII output from crashing on a legacy console codepage
     if hasattr(_s, "reconfigure"):
@@ -76,7 +79,8 @@ IGNORE_FILE = ".gitignore"
 IGNORE_LINES = frozenset((
     "**/target/", "**/.build/", "**/__pycache__/", "*.jsonl", "*.ndjson", "runs/", "sealed/",
     "experiment/raw/", "*.jsonl.*", "*.ndjson.*", "*.zip", "*.tar", "*.tar.gz", "*.tgz", "*.zst",
-    ".venv/", "venv/", "!kit/corpus/data/*.jsonl"))
+    ".venv/", "venv/", "!kit/corpus/data/*.jsonl",
+    "*.aux", "*.log", "*.blg", "*.bbl", "*.out", "*.toc", "*.synctex.gz"))
 # File names (case-insensitive) that look like secrets. They are never exported and never skipped.
 SECRET_NAMES = (".env", ".env.*", "*.pem", "*.key", "*age-identity*", "*.agekey", "*.age", "*token*.json",
                 "credentials*.json", "client_secret*", "g1-submit*.json", "o1_submit*.json", "*.log",
@@ -113,6 +117,44 @@ WORD_RULES = (
     ("internal-word", re.compile(re.escape(_TAURI))),
     ("internal-symbol", re.compile("[" + _STAR + _WARN + "]")),
 )
+# The e-mail address of the corresponding author, which the article prints: the author chose to publish it with the
+# manuscript (the postal address and the telephone number stay out). It is a constant: nothing extends it at run
+# time. It passes only in the files under PUBLIC_EMAIL_DIR and in the files named in PUBLIC_EMAIL_FILES (the datasheet,
+# which is also deposited with the data and names its contact), and only as a whole address; an address that contains
+# it (also joined by another "@"), or another address on the same line, does not.
+PUBLIC_EMAILS = ("mmiura.network" + AT + "gmail.com",)
+PUBLIC_EMAIL_DIR = "manuscript/"
+PUBLIC_EMAIL_FILES = ("experiment/datasheet.md",)
+
+
+def public_email_place(rel):
+    """True for a file in which the public address of the corresponding author passes."""
+    return rel.startswith(PUBLIC_EMAIL_DIR) or rel in PUBLIC_EMAIL_FILES
+
+
+_PUBLIC_EMAIL = re.compile("|".join(r"(?<![A-Za-z0-9._%+\-" + AT + r"])" + re.escape(a)
+                                    + r"(?![A-Za-z0-9_%+\-" + AT + r"]|\.[A-Za-z0-9\-])" for a in PUBLIC_EMAILS), re.I)
+# An SVG figure is exported as text, so it must not carry what a browser would run or load: a script, an event
+# handler, a link or reference to anything but a fragment of the same file, an embedded object, an import, a data
+# URI (which could also carry a binary past the rule that only text is exported) or a document type declaration.
+# The text is searched as written (a name may carry a namespace prefix), and the figure is then read as XML, where
+# every prefix is resolved and every character reference decoded: only the elements in SVG_ELEMENTS pass there.
+_SVG_ACTIVE = re.compile(r"<\s*(?:[\w.-]+:)?(?:script|foreignobject|iframe|embed|object)|@import|<!doctype|<!entity"
+                         r"|\s(?:[\w.-]+:)?on[a-z]+\s*="
+                         r"|href\s*=\s*[\"'](?!#)"
+                         r"|url\(\s*[\"']?(?!#)"
+                         r"|[\"'(\s]data:", re.I)
+SVG_NS = "http://www.w3.org/2000/svg"
+SVG_ATTR_NS = ("", "http://www.w3.org/1999/xlink", "http://www.w3.org/XML/1998/namespace")
+XML_NS = SVG_ATTR_NS[2]
+XML_ATTRS = ("space", "lang")  # not xml:base, which would resolve a fragment reference against another file
+# Shapes, text, groups, gradients and the style sheet; no animation element (one can set a link), no image, no link.
+SVG_ELEMENTS = frozenset(("svg", "g", "defs", "symbol", "use", "title", "desc", "style", "rect", "circle", "ellipse",
+                          "line", "polyline", "polygon", "path", "text", "tspan", "lineargradient", "radialgradient",
+                          "stop", "clippath"))
+# In a decoded value or text: a reference outside the file, an import, a data URI, a script URL, or a backslash (a
+# CSS escape could spell any of these).
+_SVG_ACTIVE_VALUE = re.compile(r"url\(\s*[\"']?(?!#)|@import|(?<![a-z0-9-])data:|javascript:|\\", re.I)
 ALWAYS_RULES = (
     ("participant-id", re.compile(r"(?<![A-Za-z0-9])P\d{3}(?![A-Za-z0-9])")),
     ("email-address", re.compile(r"[A-Za-z0-9._%+\-]+" + AT + r"[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")),
@@ -350,6 +392,9 @@ def sha256_hex(b):
 # ---------------------------------------------------------------------------
 _DIR_NAMES = frozenset(("target", ".build", "__pycache__", "runs", "sealed", ".venv", "venv", ".git"))
 _ARCHIVE = (".zip", ".tar", ".tar.gz", ".tgz", ".zst")
+# The outputs of a LaTeX build run by hand. "*.log" of the ignore file is not among them: a log has the name of a
+# secret, so it stops the export instead of being left out silently (remove it from the source).
+_LATEX_OUTPUT = (".aux", ".blg", ".bbl", ".out", ".toc", ".synctex.gz")
 _CORPUS_JSONL = re.compile(r"^kit/corpus/data/[^/]+\.jsonl$")
 _REPARSE_POINT = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT (symbolic links, junctions, mount points)
 # A name that holds the word "internal" but not in the internal form (".internal.") is neither exported
@@ -374,7 +419,7 @@ def excluded(rel, is_dir):
         return True
     if name.endswith(".jsonl"):
         return not _CORPUS_JSONL.match(low)
-    return name.endswith(_ARCHIVE)
+    return name.endswith(_ARCHIVE) or name.endswith(_LATEX_OUTPUT)
 
 
 def check_ignore_file(root):
@@ -413,8 +458,8 @@ def is_link(full, root):
 
 # The kinds of file that the checker of the writing rules reads (its TEXT_SUFFIX, its ignore-file name) and the
 # names of the other files of the source that are allowed. Anything else would be exported without being checked.
-CHECKED_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff")
-CHECKED_NAMES = (".gitignore", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA")
+CHECKED_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib", ".svg")
+CHECKED_NAMES = (".gitignore", ".gitattributes", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA")
 
 
 def check_file_type(rel):
@@ -697,11 +742,69 @@ def check_secret_content(files):
     hits = []
     for rel in sorted(files):
         for no, ln in enumerate(files[rel].split("\n"), 1):
-            if any(rx.search(ln) for rx in SECRET_CONTENT) or ("\\" in ln and any(rx.search(unescape(ln)) for rx in SECRET_CONTENT)):
+            if any(rx.search(form) for form in decoded_forms(ln) for rx in SECRET_CONTENT):
                 hits.append("  %s:%d" % (rel, no))
     if hits:
         raise Stop(2, "content that looks like a secret is not exported (the text is not shown; remove it from the source,"
                    " or reword it if it matched by chance):\n" + "\n".join(hits[:100]))
+
+
+def _split_name(name):
+    """(namespace, local name) of an ElementTree name."""
+    if name.startswith("{"):
+        ns, _, local = name[1:].partition("}")
+        return ns, local
+    return "", name
+
+
+def svg_tree_kinds(text):
+    """The kinds of active content found when the figure is read as XML (a namespace prefix resolved, a character
+    reference decoded): an element outside SVG_ELEMENTS or the SVG namespace, an attribute outside the SVG, XLink
+    and XML namespaces (of the XML namespace only xml:space and xml:lang, not xml:base), an event handler, a link to
+    anything but a fragment, and a decoded value or text that refers
+    outside the file. A figure that is not well-formed XML is refused too. Comments are not read (they do nothing).
+    The search for a document type declaration runs before this, so the parser never expands a declared entity."""
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return {"not-well-formed"}
+    kinds = set()
+    for el in root.iter():
+        ns, local = _split_name(el.tag)
+        if ns not in ("", SVG_NS) or local.lower() not in SVG_ELEMENTS:
+            kinds.add("element")
+        for name, value in el.attrib.items():
+            ans, alocal = _split_name(name)
+            alocal = alocal.lower()
+            if ans not in SVG_ATTR_NS or alocal.startswith("on") or (ans == XML_NS and alocal not in XML_ATTRS):
+                kinds.add("attribute")
+            elif alocal == "href" and not value.strip().startswith("#"):
+                kinds.add("link")
+            elif _SVG_ACTIVE_VALUE.search(value):
+                kinds.add("value")
+        if any(t and _SVG_ACTIVE_VALUE.search(t) for t in (el.text, el.tail)):
+            kinds.add("value")
+    return kinds
+
+
+def check_svg(files):
+    """An SVG figure that holds a script, an event handler, a link or reference outside the file, an embedded object,
+    an import, a data URI or a document type declaration stops the export (exit 1). The whole file is searched as
+    written, so a construct split over lines is found too, and then read as XML (svg_tree_kinds), so a namespace
+    prefix or a character reference does not hide one; the matched text is never shown."""
+    hits = []
+    for rel in sorted(files):
+        if rel.lower().endswith(".svg"):
+            text = files[rel]
+            found = [m.start() for m in _SVG_ACTIVE.finditer(text)]
+            for at in found:
+                hits.append("  %s:%d: active-svg" % (rel, text.count("\n", 0, at) + 1))
+            if not found:  # a declaration found above is never handed to the parser
+                for kind in sorted(svg_tree_kinds(text)):
+                    hits.append("  %s: active-svg (%s, read as XML)" % (rel, kind))
+    if hits:
+        raise Stop(1, "an SVG figure holds what a browser would run or load (the text is not shown):\n"
+                   + "\n".join(hits[:100]))
 
 
 def path_forms(p):
@@ -814,10 +917,10 @@ def names_a_user(text):
     return False
 
 
-def line_kinds(text, word_check, rules):
+def line_kinds(text, word_check, rules, public_email=False):
     kinds = set()
     for kind, rx in ALWAYS_RULES:
-        if rx.search(text):
+        if rx.search(_PUBLIC_EMAIL.sub(" ", text) if kind == "email-address" and public_email else text):
             kinds.add(kind)
     if word_check:
         for kind, rx in WORD_RULES:
@@ -831,16 +934,34 @@ def line_kinds(text, word_check, rules):
     return kinds
 
 
+def decoded_forms(line):
+    """The line as written, with its program escapes decoded (unescape), with its character references decoded
+    (an SVG figure or a Markdown page shows &#64; as the character it stands for), and with each decoded after the
+    other in both orders (an escape can spell the & of a reference, and a reference the backslash of an escape)."""
+    def esc(s):
+        return unescape(s) if "\\" in s else s
+
+    def ref(s):
+        return html.unescape(s) if "&" in s else s
+    forms = []
+    for form in (line, esc(line), ref(line), ref(esc(line)), esc(ref(line))):
+        if form not in forms:
+            forms.append(form)
+    return forms
+
+
 def scan(files, rules):
     """Returns [(path, line, kind)] for every hit; line 0 is the file name itself. Every line is
-    checked as written and with its escapes decoded. Values that matched are never reported."""
+    checked as written and with its escapes and character references decoded (decoded_forms). Values that matched
+    are never reported."""
     hits = []
     for rel in sorted(files):
         word_check = not _CORPUS_JSONL.match(rel)
+        pub = public_email_place(rel)
         for no, ln in [(0, rel)] + list(enumerate(files[rel].split("\n"), 1)):
-            kinds = line_kinds(ln, word_check, rules)
-            if "\\" in ln:
-                kinds |= line_kinds(unescape(ln), word_check, rules)
+            kinds = set()
+            for form in decoded_forms(ln):
+                kinds |= line_kinds(form, word_check, rules, pub and no > 0)
             for kind in sorted(kinds):
                 hits.append((rel, no, kind))
     return hits
@@ -990,6 +1111,7 @@ def export(root, out, allow_missing_license, also_users, also_homes, style_check
         check_tool_committed(style_tool)
     files = collect(root)
     check_secret_content(files)
+    check_svg(files)
     if top:
         check_committed(root, files, [TRANSLATIONS])
     r = _py_check_manifest(ldir)
@@ -1229,6 +1351,65 @@ def selftest():
             refused("a participant identifier stops the export", {"README.md": "# Fake\nSee %s here.\n" % joined}, "README.md")
         addr = "who" + AT + "example.org"
         refused("an email address stops the export", {"README.md": "# Fake\nWrite to %s.\n" % addr}, "README.md", forbid=(addr,))
+        pub = PUBLIC_EMAILS[0]
+        for longer in ("x" + pub, pub + ".example.org", pub.replace(AT, "+tag" + AT, 1), pub + ", " + addr, addr + " " + pub,
+                       "who" + AT + pub, pub + AT + "example.org", pub + ".-x.org"):
+            refused("an address that is not exactly the public one stops the export",
+                    {"manuscript/main.tex": "Write to %s.\n" % longer}, "manuscript/main.tex")
+        refused("the public address stops the export outside the manuscript",
+                {"README.md": "# Fake\nWrite to %s.\n" % pub}, "README.md")
+        for other in ("experiment/data.md", "experiment/sub/datasheet.md", "kit/experiment/datasheet.md"):
+            refused("the public address stops the export in a file other than the datasheet",
+                    {other: "# Fake\nWrite to %s.\n" % pub}, other)
+        refused("an address that is not exactly the public one stops the export in the datasheet",
+                {"experiment/datasheet.md": "# Fake\nWrite to %s.\n" % ("x" + pub)}, "experiment/datasheet.md")
+        rcx, text, o = run("pubmail-datasheet", {"experiment/datasheet.md": "# Fake\nWrite to %s.\n" % pub})
+        ck("the public address of the corresponding author passes in the datasheet", rcx == 0, text)
+        name = "the public address of the corresponding author passes in the manuscript"
+        for form in (pub, "\\email{%s}" % pub, "mailto:%s" % pub, pub.upper()):
+            rcx, text, o = run("pubmail-" + str(len(form)) + form[:2].encode("utf-8").hex(),
+                               {"manuscript/main.tex": "Write to %s.\n" % form})
+            ck(name + " (%s)" % form.replace(AT, " at "), rcx == 0, text)
+        # an SVG figure carries nothing that a browser would run or load
+        name = "an SVG figure with active content stops the export"
+        for svg in ('<svg><script>x()</script></svg>', '<svg onload="x()"></svg>', '<svg><a href="https://example.org/">x</a></svg>',
+                    '<svg><image xlink:href="pic.png"/></svg>', '<svg><rect style="fill:url(https://example.org/p)"/></svg>',
+                    '<svg><style>@import "x.css";</style></svg>', '<svg><style>@font-face{src:url(data:font/woff2;base64,AA)}</style></svg>',
+                    '<svg><foreignObject><p>x</p></foreignObject></svg>', '<!DOCTYPE svg [<!ENTITY a "b">]>\n<svg/>',
+                    '<svg><a href=\n"https://example.org/">x</a></svg>', '<svg><desc> data:text/plain,x</desc></svg>',
+                    # a namespace prefix, a character reference or a CSS escape does not hide it (read as XML)
+                    '<svg><s:script xmlns:s="http://www.w3.org/2000/svg">x()</s:script></svg>',
+                    '<svg xmlns:e="http://example.org/e"><rect e:onload="x()"/></svg>',
+                    '<svg><rect style="fill:u&#114;l(https://example.org/p)"/></svg>', '<svg o&#110;load="x()"/>',
+                    '<svg><style>rect{fill:u\\72 l(https://example.org/p)}</style></svg>',
+                    '<svg><a href="#g">x</a></svg>', '<svg><set attributeName="href" to="https://example.org/"/></svg>',
+                    '<svg><h:p xmlns:h="http://www.w3.org/1999/xhtml">x</h:p></svg>', '<svg><rect x="1"></svg>',
+                    '<svg><desc>&#100;ata:text/plain,x</desc></svg>'):
+            refused(name, {"assets/f.svg": svg + "\n"}, "assets/f.svg")
+        # each rule of the XML reading on its own (the search of the text stops most of these first)
+        for svg, want in (('<svg><use href="https://example.org/"/></svg>', {"link"}),
+                          ('<svg xmlns:x="http://www.w3.org/1999/xlink"><use x:href="f.svg"/></svg>', {"link"}),
+                          ('<svg><h:style xmlns:h="http://www.w3.org/1999/xhtml">x</h:style></svg>', {"element"}),
+                          ('<svg xmlns:e="http://example.org/e"><rect e:fill="red"/></svg>', {"attribute"}),
+                          ('<svg><rect onclick="x()"/></svg>', {"attribute"}),
+                          ('<svg xml:base="https://example.org/f.svg"><use href="#g"/></svg>', {"attribute"}),
+                          ('<svg><rect style="fill:url(https://example.org/p)"/></svg>', {"value"}),
+                          ('<svg><use href="#g"/><rect fill="url(#g)" xml:space="preserve"/></svg>', set())):
+            got = svg_tree_kinds(svg)
+            ck("an SVG figure read as XML: %s" % (sorted(want) or "nothing"), got == want, "%s -> %s" % (svg, sorted(got)))
+        name = "a character reference does not hide a value from the scan"
+        refused(name, {"assets/f.svg": "<svg><text>P&#48;01</text></svg>\n"}, "assets/f.svg", forbid=("P001",))
+        refused(name, {"README.md": "# Fake\nWrite to someone&#64;example.org.\n"}, "README.md")
+        # an escape that spells the & of a reference, and a reference that spells the backslash of an escape
+        refused(name, {"README.md": "# Fake\nSee P" + "\\" + "u0026#48;01.\n"}, "README.md", forbid=("P001",))
+        refused(name, {"README.md": "# Fake\nSee P&#92;u0030" + "01.\n"}, "README.md", forbid=("P001",))
+        rcx, text, o = run("svg-ok", {"assets/f.svg": '<svg><defs><linearGradient id="g"/></defs><rect fill="url(#g)"/>'
+                                                      '<use href="#g"/><text>the input method on become a reading</text></svg>\n'})
+        ck("an SVG figure with references to its own fragments only passes", rcx == 0, text)
+        svg_ok = ('<svg xmlns="http://www.w3.org/2000/svg"><title>A &quot;figure&quot;</title>'
+                  '<text xml:space="preserve">a  b</text></svg>\n')
+        rcx, text, o = run("svg-ns-ok", {"assets/f.svg": svg_ok})
+        ck("an SVG figure in the SVG namespace with a character reference and xml:space passes", rcx == 0, text)
         for word in (_ORG, _TAURI, _STAR, _WARN, _STEER + "/notes"):
             refused("an internal marker word stops the export", {"README.md": "# Fake\nSee %s here.\n" % word}, "README.md")
         # comments are stripped from manifest-listed sources
@@ -1661,13 +1842,43 @@ def selftest():
             ck(name + " (a .git file that points nowhere)", rcx == 2 and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
         # a kind of file that the style checker does not read
         name = "a file type that the style checker does not read stops the export"
-        for nm in ("manuscript/draft.tex", "kit/ci.yml", "kit/noext", "kit/README.MD", "kit/.gitattributes", "kit/data.csv"):
+        for nm in ("manuscript/draft.docx", "manuscript/figure.pdf", "kit/ci.yml", "kit/noext", "kit/README.MD", "kit/.editorconfig",
+                   "kit/data.csv", "manuscript/main.TEX"):
             rcx, text, o = run("type-" + nm.replace("/", "_"), {nm: "x\n"})
             ck(name + " (%s)" % nm, rcx == 2 and os.path.basename(nm) in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
         kinds_ok = dict(("kit/kinds/" + n, "x\n") for n in ("a.py", "a.rs", "a.sh", "a.md", "a.json", "a.toml", "a.swift", "a.txt", "a.cff",
-                                                           ".gitignore", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA"))
+                                                           "a.tex", "a.bib", "a.svg", ".gitignore", ".gitattributes", "SEED", "Cargo.lock", "LICENSE-CODE", "LICENSE-DATA"))
+        kinds_ok["kit/kinds/a.svg"] = "<svg/>\n"  # a figure must be well-formed XML (check_svg)
         rcx, text, o = run("kinds-ok", kinds_ok)
         ck(name + " (the allowed kinds pass)", rcx == 0, text)
+        ck(name + " (a .tex and a .bib file are exported)",
+           rcx == 0 and all(os.path.isfile(os.path.join(o, "kit", "kinds", n)) for n in ("a.tex", "a.bib")), text)
+        # the outputs of a LaTeX build run by hand
+        name = "the outputs of a LaTeX build are left out, except a log, which stops the export"
+        latex = dict(("manuscript/main" + s, "x\n") for s in _LATEX_OUTPUT)
+        latex["manuscript/main.tex"] = "\\section{Method}\n"
+        rcx, text, o = run("latex-out", latex)
+        ck(name + " (exit 0)", rcx == 0, text)
+        ck(name + " (the source is exported)", rcx == 0 and os.path.isfile(os.path.join(o, "manuscript", "main.tex")), text)
+        for s in _LATEX_OUTPUT:
+            ck(name + " (%s left out)" % s, rcx == 0 and not os.path.exists(os.path.join(o, "manuscript", "main" + s)), text)
+        rcx, text, o = run("latex-log", {"manuscript/main.tex": "\\section{Method}\n", "manuscript/main.log": "x\n"})
+        ck(name + " (a .log stops it)", rcx == 2 and "main.log" in text and not os.path.exists(o), "exit %d %s" % (rcx, text.strip()[-200:]))
+        # every file pattern of the ignore file is either left out or stops the export as the name of a secret
+        name = "each file pattern of the ignore file is implemented"
+        for pat in sorted(IGNORE_LINES):
+            if pat.startswith("!"):
+                nm = pat[1:].replace("*", "x")
+                ck(name + " (%s)" % pat, not excluded(nm, False), nm)
+            elif pat.endswith("/"):
+                nm = pat[:-1].replace("**/", "kit/")
+                ck(name + " (%s)" % pat, excluded(nm, True), nm)
+            elif pat.startswith("*."):
+                nm = "kit/x" + pat[1:]
+                ck(name + " (%s)" % pat, excluded(nm, False) != is_secret_name(nm.rsplit("/", 1)[-1]),
+                   "excluded %s, secret name %s" % (excluded(nm, False), is_secret_name(nm.rsplit("/", 1)[-1])))
+            else:
+                ck(name + " (%s has a form this check knows)" % pat, False, pat)
         # a secret-looking directory name
         name = "a secret-looking directory name stops the export"
         for nm in ("kit/.aws/config.md", "kit/.ssh/x.md", "kit/.gnupg/x.md", "kit/.docker/x.md", "kit/.kube/x.md", "kit/.pgpass/x.md", "kit/my-secret/x.md",

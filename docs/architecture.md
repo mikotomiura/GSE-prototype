@@ -631,7 +631,7 @@ CGPreflightListenEventAccess()
 
 - **CGKeyCode → VK マッピング**: hook_macos.rs 内に変換テーブルを持つ。analysis 層をプラットフォーム非依存に保つための意図的な設計。マッピング精度はキーボードレイアウト（JIS/ANSI/ISO）に依存
 - **GCD dispatch_sync_f**: TIS API と AXIsProcessTrustedWithOptions はメインスレッド必須（HIToolbox/AppKit 制約）。フックスレッドから dispatch_sync_f でメインキューへ同期 dispatch する。メインスレッドからの呼び出しはデッドロックするため禁止
-- **IME 状態機械**: macOS では WinEvent に相当する IME イベント通知がないため、CGEventTap コールバックが受け取るキーコード列の状態機械で IME_COMPOSING を追跡。シフトなし英字 → かな文字列の変換パターンを検出
+- **IME 状態機械**: macOS では WinEvent の IME 窓イベントに相当する、アプリを問わない IME イベント通知が見つかっていないため (⚠️ 2026-10-05 訂正: アプリが Accessibility で出す変換の通知はあるがアプリしだいで、使うかは未決・`survey-input-channels.md §7.5`)、CGEventTap コールバックが受け取るキーコード列の状態機械で IME_COMPOSING を追跡。シフトなし英字 → かな文字列の変換パターンを検出
   - ⚠️★★★ **2026-09-11 (issue 008): 判断の置き場所が変わった。** 状態機械の本体は `input/ime_compose.rs` (**OS 非依存**) にあり、`hook_macos.rs` は `ime_compose::drive` を呼ぶ 1 行だけになった。★ `hook_macos.rs` の `#[cfg(test)] mod tests` は **Windows では 1 行も走らない**ため、判断をあちらに置くと「確定 / 放棄を分ける規則」を**どちらの OS の CI も検証しない**状態になる (`ime_cloak.rs` と同じ理由で `#[cfg]` を付けない)
   - ★ この状態機械が **`ime_shadow` 行を macOS でも出す**ようになった。⚠️ **由来は Windows と違う** —— Windows の `dwell_ms` は窓イベントの観測値、macOS は打鍵からの推定値である (`nav` / `abandon` は両 OS とも打鍵由来)。★ 由来は `meta` 行の OS と `capabilities` 宣言で判別する。⚠️ 両 OS のデータを混ぜて学習・評価してはならない (`survey-input-channels.md §3.2`)
 - **macos-private-api**: Tauri の macos-private-api feature はオーバーレイウィンドウ動作に必要。この feature はプライベート API を使用するため、Mac App Store 配布には非対応

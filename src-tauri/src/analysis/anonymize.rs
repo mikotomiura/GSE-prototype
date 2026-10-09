@@ -461,5 +461,13 @@ mod tests {
             o3.contains("\"threshold_gated\""),
             "capabilities が落ちた: {o3}"
         );
+
+        // ④ O1 の導入識別子は**保たれる**（端末を分ける解析の鍵。乱数由来で個人を指さない）。
+        let meta_o1 = r#"{"type":"meta","session_start":1000000,"hmm_version":"0.4.0","o1_mode":"marker","o1_install_id":"0123456789abcdef","app_version":"0.1.40"}"#;
+        let o4 = anonymize_line(meta_o1, 1_000_000).unwrap();
+        assert!(
+            o4.contains("\"o1_install_id\":\"0123456789abcdef\""),
+            "o1_install_id が落ちた: {o4}"
+        );
     }
 }

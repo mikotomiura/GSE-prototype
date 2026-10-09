@@ -59,6 +59,8 @@
  *   4. ⚠️★★★ **`checkO1FormConfig()` を必ず実行する** (読み取り専用)。
  *      ★ 未設定と打ち間違いは**同じ症状**になるので、機械に見分けさせる。
  *   5. `setupO1Forms()` を実行 → フォーム 2 本が構築される。
+ *   5b. ★ `refreshO1LinksTab()` を実行 → 運営シートの「O1 リンク集」にフォームの URL が載る
+ *      (2026-10-07)。★ URL やアプリの入手先を変えたときも実行する（手で入れた欄は保つ）。
  *   6. `previewO1RegisterAckEmail()` で受付メールの文面を目で確認する
  *      (⚠️ メール送信は取り消せない)。
  *   7. `installO1ConsentTrigger()` を **一度だけ**実行 (提出 → 採番 → 受付メール)。
@@ -232,6 +234,12 @@ var Q_O1_PID = "参加者ID（お持ちの方のみ）";
 var Q_O1_NAME = "お名前";
 var Q_O1_EMAIL = "メールアドレス";
 var Q_O1_OS = "記録に使うパソコンの種類";
+/** O1-C の末尾に並ぶ登録用の設問。この順で並ぶ（照合と修復が使う）。 */
+var O1_REGISTRATION_TITLES = [Q_O1_PID, Q_O1_NAME, Q_O1_EMAIL, Q_O1_OS];
+/** 登録用の設問の直前に置く見出し。 */
+var O1_REGISTRATION_HEADER = "ご記名";
+/** パソコンの種類の選択肢。どちらの配布物を送るかがこの文字列で決まる。 */
+var O1_OS_CHOICES = ["Windows", "Mac", "両方使う"];
 var Q_O1_SUBJECT_ID = "参加者ID";
 
 // ★ O1-S の設問タイトルのうち、後段の集計が語で探すもの。
@@ -579,6 +587,8 @@ function o1ConsentFormDescription_() {
     "・画面の切り替えが起きた時刻（★ どのアプリへ切り替えたかは記録しません）\n" +
     "・マウスの「動いた量・ホイールの回数」（Windows ではさらに「押した回数」）を 1 秒ごとに数えた値\n" +
     "・キーボードの配列の種類（開始時に 1 回だけ）／アプリの版／記録がうまくいっていたかの状態\n" +
+    "・この端末の導入ごとに作った乱数の識別子（16 桁・開始時に 1 回だけ）。端末や個人を特定する情報ではありません。" +
+    "複数の端末で使うときに、記録を端末ごとに分けるためだけに使います（機体番号・ホスト名などは使いません）\n" +
     "・（macOS のみ）パスワード入力中だった区間の印（★ 中身は一切取得しません）\n" +
     "・上の記録から計算した「作業の状態」の推定値\n\n" +
     "▼ ⚠️ 記録しないもの\n" +
@@ -613,6 +623,16 @@ function o1ConsentFormDescription_() {
     "、個人が特定できない集計値は " +
     O1_RETENTION_METRICS +
     " で削除します。\n\n" +
+    "▼ 結果の公表と、記録の公開について\n" +
+    "・研究の結果は論文などで公表します。公表するのは、記録から計算した数値と、その計算のプログラムです。" +
+    "お名前・連絡先・記録した日付と時刻は入れません。\n" +
+    "  参加者が少ないため、1 人ずつの数値を P0xx のような記号で示すことがあります。\n" +
+    "  論文に載せた数値は、上の保管の上限が来ても消えません（削除するのは研究者の手元の記録と集計値です）。" +
+    "公表する前であれば、削除のお申し出で公表の対象から外します。" +
+    "公表した後は、公表済みの数値からあなたの分だけを取り除くことはできません。\n" +
+    "・将来、加工した記録を研究成果として公開する可能性があります。" +
+    "その場合は、あらためてお尋ねし、同意をいただけた記録だけを公開します。\n" +
+    "  お尋ねに答えなくても、断っても、不利益はありません。答えがない場合は公開しません。\n\n" +
     "▼ お問い合わせ・削除のお申し出\n" +
     "研究責任者: " +
     O1_CONTACT_NAME +
@@ -651,6 +671,9 @@ function o1ConsentItemTitles_() {
       "、集計値は " +
       O1_RETENTION_METRICS +
       "）の説明を受けました。",
+    // 2026-10-08 追加（研究者判断 2026-10-07 判断 1 と 2026-10-08）。本文の「結果の公表と、記録の公開について」に対応する。
+    "研究の結果が論文などで公表され（1 人ずつの数値を記号で示すことを含む）、公表した数値は後から取り除けないこと、" +
+      "加工した記録を公開する場合は、あらためて尋ねられ、同意した記録だけが公開されることの説明を受けました。",
     "★ 参加はいつでもやめられ、やめた時点でそれまでの記録の削除も求められることを理解しました。",
     "上記すべてに同意し、この記録と研究利用に同意します。",
   ];
@@ -704,41 +727,67 @@ function buildO1ConsentForm() {
 
   o1AddSectionHeader_(
     form,
-    "ご記名",
+    O1_REGISTRATION_HEADER,
     "★ 参加者ID をお送りするため、また削除のお申し出を受け付けるために必要です。\n" +
       "⚠️ 記録（打鍵のログ）とは別に保管し、P0xx とのみ結び付けます。"
   );
-  // ★ P-ID は Phase1 / G1 と共有する (同じ人＝同じ ID)。
-  //   ⚠️ 必須にしない — 初参加の方は持っていない (その場合はこちらで採番する)。
-  var pid = form.addTextItem();
-  pid.setTitle(Q_O1_PID);
-  pid.setHelpText(
-    "以前 GSE の検証（Phase1 / G1）にご参加いただいた方は、そのときお伝えした " +
-      "P から始まる記号（例: P015）をご記入ください。初めての方は空欄で構いません。"
-  );
-  // ⚠️★ 形式を**フォームでも**検証する（Codex 指摘・2026-08-28）。
-  //   ★ 打ち間違いは提出前に本人が直せるのがいちばん安い。
-  //   ⚠️ 必須ではないので**空欄は通る**（★ 初参加の人を止めない）。
-  //   ★ 後段（`onO1ConsentSubmit`）でも同じ規則で検証する（★ 二重に持つ）。
-  pid.setValidation(
-    FormApp.createTextValidation().requireTextMatchesPattern("^[PpＰｐ]?[0-9０-９]*$").build()
-  );
-  form.addTextItem().setTitle(Q_O1_NAME).setRequired(true);
-  var mail = form.addTextItem();
-  mail.setTitle(Q_O1_EMAIL);
-  mail.setRequired(true);
-  mail.setValidation(FormApp.createTextValidation().requireTextMatchesPattern(".+@.+").build());
-
-  // ★ どちらの配布物を送るかがこれで決まる (`O1_実施用_Windows.zip` / `O1_実施用_macOS.zip`)。
-  //   ⚠️ 端末を特定する情報ではない (機種名・ホスト名は聞かない)。
-  var os = form.addMultipleChoiceItem();
-  os.setTitle(Q_O1_OS);
-  os.setHelpText("★ お送りするアプリが違うためお聞きします。⚠️ 機種名やホスト名はお聞きしません。");
-  os.setChoices([os.createChoice("Windows"), os.createChoice("Mac"), os.createChoice("両方使う")]);
-  os.setRequired(true);
+  O1_REGISTRATION_TITLES.forEach(function (title) {
+    o1AddRegistrationItem_(form, title);
+  });
 
   o1RecordFormUrl_("O1_CONSENT", form, "O1-C 説明・同意（★ 同意の正本）");
   Logger.log("O1-C 説明・同意を構築した: " + form.getPublishedUrl());
+}
+
+/**
+ * O1-C の登録用の設問（参加者ID・お名前・メールアドレス・パソコンの種類）を 1 つ末尾に足す。
+ * 構築（`buildO1ConsentForm`）と修復（`repairO1ConsentRegistrationItems`）の両方がこれを使う。
+ * 定義を 1 か所に置くので、修復で足した設問は構築したものと同じになる。
+ */
+function o1AddRegistrationItem_(form, title) {
+  if (title === Q_O1_PID) {
+    // ★ P-ID は Phase1 / G1 と共有する (同じ人＝同じ ID)。
+    //   ⚠️ 必須にしない — 初参加の方は持っていない (その場合はこちらで採番する)。
+    var pid = form.addTextItem();
+    pid.setTitle(Q_O1_PID);
+    pid.setHelpText(
+      "以前 GSE の検証（Phase1 / G1）にご参加いただいた方は、そのときお伝えした " +
+        "P から始まる記号（例: P015）をご記入ください。初めての方は空欄で構いません。"
+    );
+    // ⚠️★ 形式を**フォームでも**検証する（Codex 指摘・2026-08-28）。
+    //   ★ 打ち間違いは提出前に本人が直せるのがいちばん安い。
+    //   ⚠️ 必須ではないので**空欄は通る**（★ 初参加の人を止めない）。
+    //   ★ 後段（`onO1ConsentSubmit`）でも同じ規則で検証する（★ 二重に持つ）。
+    pid.setValidation(
+      FormApp.createTextValidation().requireTextMatchesPattern("^[PpＰｐ]?[0-9０-９]*$").build()
+    );
+    return pid;
+  }
+  if (title === Q_O1_NAME) {
+    return form.addTextItem().setTitle(Q_O1_NAME).setRequired(true);
+  }
+  if (title === Q_O1_EMAIL) {
+    var mail = form.addTextItem();
+    mail.setTitle(Q_O1_EMAIL);
+    mail.setRequired(true);
+    mail.setValidation(FormApp.createTextValidation().requireTextMatchesPattern(".+@.+").build());
+    return mail;
+  }
+  if (title === Q_O1_OS) {
+    // ★ どちらの配布物を送るかがこれで決まる (`O1_実施用_Windows.zip` / `O1_実施用_macOS.zip`)。
+    //   ⚠️ 端末を特定する情報ではない (機種名・ホスト名は聞かない)。
+    var os = form.addMultipleChoiceItem();
+    os.setTitle(Q_O1_OS);
+    os.setHelpText("★ お送りするアプリが違うためお聞きします。⚠️ 機種名やホスト名はお聞きしません。");
+    os.setChoices(
+      O1_OS_CHOICES.map(function (c) {
+        return os.createChoice(c);
+      })
+    );
+    os.setRequired(true);
+    return os;
+  }
+  throw new Error("o1AddRegistrationItem_: 登録用の設問ではありません: " + title);
 }
 
 /**
@@ -777,10 +826,223 @@ function migrateO1ConsentForm() {
         "  ★ **既に回答した方は、この項目に同意していません。**\n" +
         "  ⚠️ 追加が実質的な内容変更なら、既存の参加者に**あらためて同意を取り直す**こと。"
     );
-  } else {
+  }
+  // 同意項目のタイトルだけを見て「一致しています」と言わない（2026-10-03 に、登録用の 3 設問が
+  // 無いフォームでこう出していた）。言う前に、登録用の設問も含めて実物を照合する。
+  var problems = o1ConsentFormShapeProblems_(form);
+  if (problems.length) {
+    Logger.log(
+      (added ? "" : "追加する同意項目はありません。") +
+        "ただし、フォームはコードと一致していません（" +
+        problems.length +
+        " 件）:\n  - " +
+        problems.join("\n  - ") +
+        "\n登録用の設問が欠けているだけなら repairO1ConsentRegistrationItems() で足せます。" +
+        "\n並びの崩れ（末尾に足した同意項目が登録用の設問より後ろにある等）は、編集画面で直してください。"
+    );
+  } else if (!added) {
     Logger.log("✅ 追加する同意項目はありません（フォームはコードと一致しています）");
   }
   return added;
+}
+
+/**
+ * O1-C の実物の設問を、コードの期待と照合する。フォームを変更しない。
+ * 期待: 見出しを除いて、同意項目（チェックボックス・必須）がすべて、続いて登録用の 4 設問
+ *   （`O1_REGISTRATION_TITLES` の順。参加者ID だけ必須でない）。
+ * 戻り値: 問題の文の配列（一致していれば空）。
+ * 入力欄の検査（メールの「@ を含む」など）は Apps Script から読めないので見ていない。
+ */
+function o1ConsentFormShapeProblems_(form) {
+  var expected = [];
+  o1ConsentItemTitles_().forEach(function (t) {
+    expected.push({ title: t, type: FormApp.ItemType.CHECKBOX, required: true });
+  });
+  expected.push({ title: Q_O1_PID, type: FormApp.ItemType.TEXT, required: false });
+  expected.push({ title: Q_O1_NAME, type: FormApp.ItemType.TEXT, required: true });
+  expected.push({ title: Q_O1_EMAIL, type: FormApp.ItemType.TEXT, required: true });
+  expected.push({
+    title: Q_O1_OS,
+    type: FormApp.ItemType.MULTIPLE_CHOICE,
+    required: true,
+    choices: O1_OS_CHOICES,
+  });
+
+  var items = form.getItems().filter(function (it) {
+    return it.getType() !== FormApp.ItemType.SECTION_HEADER;
+  });
+  var titles = items.map(function (it) {
+    return it.getTitle();
+  });
+  var problems = [];
+  var lastPos = -1;
+  var lastTitle = "";
+  expected.forEach(function (e) {
+    var pos = titles.indexOf(e.title);
+    if (pos < 0) {
+      problems.push("欠けている: " + e.title);
+      return;
+    }
+    var it = items[pos];
+    var type = it.getType();
+    if (type !== e.type) {
+      problems.push("種類が違う: " + e.title + "（実物 " + type + " / 期待 " + e.type + "）");
+    } else {
+      var req = o1ItemIsRequired_(it, type);
+      if (req !== e.required) {
+        problems.push("必須の有無が違う: " + e.title + "（実物 " + req + " / 期待 " + e.required + "）");
+      }
+      // どちらの配布物を送るかは選択肢の文字列で決まるので、選択肢も照合する。
+      if (e.choices) {
+        var got = it
+          .asMultipleChoiceItem()
+          .getChoices()
+          .map(function (c) {
+            return c.getValue();
+          });
+        if (got.join("\n") !== e.choices.join("\n")) {
+          problems.push(
+            "選択肢が違う: " + e.title + "（実物 " + got.join(" / ") + " / 期待 " + e.choices.join(" / ") + "）"
+          );
+        }
+      }
+    }
+    if (pos < lastPos) {
+      problems.push("並びが違う: " + e.title + " が " + lastTitle + " より前にある");
+    } else {
+      lastPos = pos;
+      lastTitle = e.title;
+    }
+  });
+  // タイトルが constructor などでも誤らないよう、プロトタイプの無い辞書を使う（Codex 指摘・2026-10-08）。
+  var known = Object.create(null);
+  expected.forEach(function (e) {
+    known[e.title] = true;
+  });
+  var seen = Object.create(null);
+  titles.forEach(function (t) {
+    if (!known[t]) problems.push("コードに無い設問: " + t);
+    if (seen[t] === 1) problems.push("同じタイトルの設問が 2 つ以上ある: " + t);
+    seen[t] = (seen[t] || 0) + 1;
+  });
+  return problems;
+}
+
+/** 設問が必須か。`Item` には isRequired が無いので、種類ごとの型に変えて読む。 */
+function o1ItemIsRequired_(item, type) {
+  if (type === FormApp.ItemType.TEXT) return item.asTextItem().isRequired();
+  if (type === FormApp.ItemType.CHECKBOX) return item.asCheckboxItem().isRequired();
+  if (type === FormApp.ItemType.MULTIPLE_CHOICE) return item.asMultipleChoiceItem().isRequired();
+  return null;
+}
+
+/**
+ * 読み取り専用。O1-C の実物がコードの期待と一致しているかをログに出す。フォームを変更しない。
+ * 一致していれば true。
+ */
+function checkO1ConsentFormShape() {
+  var form = o1OpenFixed_(o1Config_().consentFormId, "FORM_ID_O1_CONSENT");
+  var problems = o1ConsentFormShapeProblems_(form);
+  if (!problems.length) {
+    Logger.log("✅ O1-C の設問はコードと一致しています（回答 " + form.getResponses().length + " 件）");
+    return true;
+  }
+  Logger.log(
+    "❌ O1-C の設問がコードと一致していません（" +
+      problems.length +
+      " 件・回答 " +
+      form.getResponses().length +
+      " 件）:\n  - " +
+      problems.join("\n  - ")
+  );
+  return false;
+}
+
+/**
+ * 回答を残したまま、O1-C に欠けている登録用の設問（参加者ID・お名前・メールアドレス・
+ * パソコンの種類）を、構築と同じ定義で末尾に足す。設問も回答も消さない。2 回目は何も足さない。
+ *
+ * 2026-10-08 に、実物が「参加者ID」で終わり、後ろの 3 つが無かったので足した。
+ * Apps Script の追加は末尾にしか付かないので、足した後にコードと一致する形のときだけ足す:
+ *   - 今のフォームの最後が、残っている登録用の最後の設問（1 つも無ければ「ご記名」の見出し）
+ *   - 照合で、登録用の設問の欠け以外の問題が無い（並びの崩れはここで止まる）
+ * そうでなければ足さずに止まる（並べ替えや直しが要る形は人が見る）。
+ * 戻り値: 足した数。
+ */
+function repairO1ConsentRegistrationItems() {
+  var form = o1OpenFixed_(o1Config_().consentFormId, "FORM_ID_O1_CONSENT");
+  var all = form.getItems();
+  var present = Object.create(null);
+  all.forEach(function (it) {
+    present[it.getTitle()] = true;
+  });
+
+  var missing = O1_REGISTRATION_TITLES.filter(function (t) {
+    return !present[t];
+  });
+  if (!missing.length) {
+    Logger.log(
+      "✅ 登録用の設問は 4 つとも揃っています。何も足しませんでした。" +
+        "フォーム全体の照合は checkO1ConsentFormShape() で行ってください。"
+    );
+    return 0;
+  }
+
+  // 最初に欠けた設問の直前に来るべきもの（並びでそれより前の登録用の設問の最後。無ければ見出し）が、
+  // 今のフォームの最後であること。並びで後ろの設問が残っていれば、それはこれより前にあるはずなので
+  // 下の照合が「並びが違う」で止める。照合は見出しを見ないので、登録用の設問の後ろに見出しが付いた形は
+  // ここでしか止まらない。
+  var kept = O1_REGISTRATION_TITLES.slice(0, O1_REGISTRATION_TITLES.indexOf(missing[0]));
+  var wantLast = kept.length ? kept[kept.length - 1] : O1_REGISTRATION_HEADER;
+  var lastItem = all.length ? all[all.length - 1] : null;
+  var lastTitle = lastItem ? lastItem.getTitle() : "";
+  // タイトルだけでなく種類も見る（登録用の設問と同じ名前の見出しで通り抜けないように。Codex 指摘・2026-10-08）。
+  var lastIsHeader = !!lastItem && lastItem.getType() === FormApp.ItemType.SECTION_HEADER;
+  if (lastTitle !== wantLast || lastIsHeader !== !kept.length) {
+    throw new Error(
+      "⛔ フォームの最後の設問が「" +
+        lastTitle +
+        "」で、「" +
+        wantLast +
+        "」ではありません。末尾に足すと順序が壊れるので止めました。\n" +
+        "  checkO1ConsentFormShape() で形を確かめてください。"
+    );
+  }
+
+  // 欠け以外の問題（並び・種類・必須・選択肢・重複・同意項目の欠け）が足す前からあるなら、
+  // 足しても一致しないので足さずに人に返す。
+  var missingMsg = Object.create(null);
+  missing.forEach(function (t) {
+    missingMsg["欠けている: " + t] = true;
+  });
+  var other = o1ConsentFormShapeProblems_(form).filter(function (p) {
+    return !missingMsg[p];
+  });
+  if (other.length) {
+    throw new Error(
+      "⛔ 登録用の設問の欠けのほかにも、コードと違うところがあります。足さずに止めました:\n  - " +
+        other.join("\n  - ") +
+        "\n  編集画面で直してから、もう一度実行してください。"
+    );
+  }
+
+  missing.forEach(function (t) {
+    o1AddRegistrationItem_(form, t);
+    Logger.log("➕ 登録用の設問を追加: " + t);
+  });
+  var n = form.getResponses().length;
+  Logger.log(
+    missing.length +
+      " 件の登録用の設問を足しました。" +
+      (n ? "既にある回答 " + n + " 件には、足した設問の答えがありません。" : "")
+  );
+  var problems = o1ConsentFormShapeProblems_(form);
+  Logger.log(
+    problems.length
+      ? "❌ 足した後もコードと一致していません:\n  - " + problems.join("\n  - ")
+      : "✅ 足した後の O1-C はコードと一致しています。"
+  );
+  return missing.length;
 }
 
 // ============================================================
@@ -1671,6 +1933,16 @@ function buildO1MgmtSheet() {
   o1EnsureMgmtTab_(ss, O1_MGMT_TAB, O1_MGMT_BANNER);
   o1EnsureMgmtTab_(ss, O1_MGMT_REJECT_TAB, O1_MGMT_REJECT_BANNER);
   // ⚠️★★ **入力規則を貼らない**（★ 上の `O1_MGMT_MAX_ROWS` のコメント参照）。
+  // ★ リンク集は派生の表示なので、作れなくてもログのタブの用意は止めない。
+  //   ⚠️ 失敗は「警告が出ていない＝成功」と読まれないよう、**肯定形で**作れなかったと言う。
+  try {
+    o1BuildLinksTab_(ss);
+  } catch (e) {
+    Logger.log(
+      "⚠️★ 「" + O1_LINKS_TAB + "」は**作れていません**（★ ログのタブは用意済み）。" +
+        "原因を直してから refreshO1LinksTab() を実行してください: " + e
+    );
+  }
   Logger.log("🔗 " + ss.getUrl());
   return ss.getUrl();
 }
@@ -1802,6 +2074,248 @@ function checkO1MgmtSheet() {
       );
     }
   }
+}
+
+// ============================================================
+// ★ O1 リンク集（研究者判断 2026-10-07「O1 にも各リンク一覧を載せる」）
+// ============================================================
+// ★ G1 の「リンク集」（`Form_G1/GSE_G1_Form_Builder.gs` `buildLinksTab_`）に倣う。
+//   ★ このタブは**派生の表示**であり、毎回作り直す（⚠️ ログのタブとは違い追記のみではない）。
+//   ★ 手で入れる欄（`O1_LINKS_MANUAL`）だけは、項目名で探して値を引き継ぐ。
+//
+// ⚠️★★★ **書かないもの**:
+//   - ⚠️ **参加者ロスターの ID・URL**（★ 氏名・メールへの直接ポインタ。上の `o1Config_` の注記）。
+//     → ★ G1 と同じく**名前で指すだけ**にする。
+//   - ⚠️ 氏名・メール（★ 運営シートは持たない約束・台帳 §5b）。
+//   - ⚠️ 提出の受け口の URL と共有シークレット（★ 別プロジェクトの設定・追跡ファイルにも置かない）。
+var O1_LINKS_TAB = "O1 リンク集";
+var O1_LINKS_WIDTH = 5; // 項目 / 値・URL / 種別 / いつ・誰が使うか / 備考
+/** ★ 手で入れる欄（項目名 → いつ・誰が / 備考）。⚠️ 項目名を変えると、入っていた値が引き継がれない。 */
+var O1_LINKS_MANUAL = [
+  [
+    "提出物の受取フォルダ（Drive）",
+    "研究者のみ（参加者は使わない）。期間中に記録が届いているかを見るとき",
+    "★ 受け口 GSE_O1_Submit.gs の FOLDER_ID のフォルダ。記録は 1 日ごとに、48 時間おいてからアプリが自動で送る。⚠️ 別プロジェクトの設定なのでここからは読めない → 手で貼る",
+  ],
+  [
+    "O1 終了判定の基準",
+    "研究者。基準を見直すとき",
+    "★ 現行（2026-10-07 研究者判断）: 最初に記録した日を 1 日目として暦日 21 日目が過ぎたら終了・届いた日の数は条件にしない。" +
+      "判定は受領台帳の Apps Script が「O1 終了判定」タブに出す（`O1_LEDGER_END_*`）。基準を変えるならここに書いてからコードを直す",
+  ],
+  ["メモ", "研究者", "⚠️ 氏名・メールを書かない（作り直しても残り続けるため）"],
+];
+
+/**
+ * ★ 既にあるリンク集から、手で入れる欄の値を項目名で拾う（⚠️ 無ければ空）。
+ *
+ * ★ **表示値**（`getDisplayValues`）で読む（code-reviewer / security-checker 2026-10-07）:
+ *   `getValues` だと日付が `String(Date)`（"Thu Oct 08 2026 00:00:00 GMT+0900 …"）に化ける。
+ *   ⚠️ 数式・挿入したリンクは**保たない**（数式は表示された文字、リンクは表示文字だけが残る）。
+ *   → ★ 手で入れる欄には **URL をそのまま貼る**（2 行目の注記に書く）。
+ * ★ 同じ項目名の行が複数あれば、**空でない最初の値**を採る（⚠️ 行をコピーした空の行で消さない）。
+ */
+function o1ReadLinksManual_(sheet) {
+  var out = {};
+  if (!sheet) return out;
+  var last = sheet.getLastRow();
+  if (last < 1) return out;
+  var vals = sheet.getRange(1, 1, last, 2).getDisplayValues();
+  var labels = O1_LINKS_MANUAL.map(function (m) {
+    return m[0];
+  });
+  for (var r = 0; r < vals.length; r++) {
+    var label = String(vals[r][0]);
+    if (labels.indexOf(label) < 0) continue;
+    var v = String(vals[r][1]);
+    if (out[label] !== undefined && v !== "") {
+      Logger.log("⚠️ リンク集に「" + label + "」の行が複数あります（★ 空でない最初の値を採ります）。");
+    }
+    if (out[label] === undefined || out[label] === "") out[label] = v;
+  }
+  return out;
+}
+
+/** ★ リンク集の行を作る（⚠️ 表は触らない＝テストしやすくする）。 */
+function o1LinksRows_(props, cfg, manual) {
+  var form = function (key) {
+    var raw = props.getProperty("FORMURL_" + key);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  };
+  var notYet = "（未生成 — setupO1Forms() を実行）";
+  var c = form("O1_CONSENT");
+  var s = form("O1_SURVEY");
+  var blank = ["", "", "", "", ""];
+  var section = function (t) {
+    return [t, "", "", "", ""];
+  };
+  // ★ 「いつ・誰が使うか」の文言の出所（2026-10-07 研究者依頼「どのタイミングで回答してもらうかも載せる」）:
+  //   O1-C = 同意フォームの説明・受付メール（`o1RegisterAckBody_`）・`docs/o1-roster-operations.md` §5
+  //   O1-S = `buildO1PostSurveyForm` の説明文（5 分・解析に使わない・理由を聞かない）・研究者判断（終了判定の後に手で送る）
+  //   アプリ = 受付メール（最初の起動だけ macOS は研究者と一緒に）
+  var rows = [
+    ["GSE O1 リンク集（研究者のみ）", "", "", "", ""],
+    [
+      "⚠️ フォームの編集 URL を含みます。この表は研究者だけで共有してください。" +
+        "⚠️ どの欄にも氏名・メールを書かないでください。" +
+        "⚠️ 作り直すと「手動」の 3 欄以外は消えます。手動の欄には URL をそのまま貼ってください（数式・挿入したリンクは保たれません）。",
+      "",
+      "",
+      "",
+      "",
+    ],
+    blank,
+    ["項目", "値 / URL", "種別", "いつ・誰が使うか", "備考"],
+    section("▼ フォーム（参加者に記入していただくもの）"),
+    [
+      "O1-C 説明・同意（参加登録）— 回答 URL",
+      c ? c.publishedUrl : notYet,
+      "自動",
+      "【募集時】研究者が候補者に渡す → 参加者が 1 回だけ記入（説明を読み、同意の各項目にチェックし、連絡先などを記入）",
+      "★ 記入すると自動で参加者 ID が採番され、受付メール（参加者 ID・アプリの入手先・毎日の起動・止め方と消し方・連絡先）が届く。" +
+        "⚠️ G1 の案内と同じ日に出さない。⚠️ 配布物と入手先がそろってから渡す。⚠️ 回答が同意の正本",
+    ],
+    [
+      "O1-C — 編集 URL",
+      c ? c.editUrl : notYet,
+      "自動",
+      "研究者のみ。同意の文面を改訂するとき",
+      "⚠️ フォームの画面で文面を直接直さない（repo と食い違う）。consent-draft-o1.md → .gs → migrateO1ConsentForm() の順",
+    ],
+    [
+      "O1-S 終了後アンケート — 回答 URL",
+      s ? s.publishedUrl : notYet,
+      "自動",
+      "【期間の終わり・「O1 終了判定」タブが終了（連絡待ち）になった後】研究者が終了の連絡と一緒に 1 人ずつ手で送る → 参加者が 1 回だけ記入（参加者 ID を書いて約 5 分）",
+      "★ 解析には使わない（進め方と道具の改善のため）。答えたくない設問は飛ばせる。一時停止・削除の理由は聞かない。" +
+        "⚠️ アプリの片づけ（自動起動をオフ → フォルダを消す）は、「O1 終了判定」タブの「片づけの案内」が「可」になってから案内する。送ったら同じタブの「O1-S 送付日」に書く",
+    ],
+    ["O1-S — 編集 URL", s ? s.editUrl : notYet, "自動", "研究者のみ。設問を確かめる・直すとき", "⚠️ 途中で設問を変えると、それまでの回答と比べられなくなる"],
+    blank,
+    section("▼ 配布と受け取り"),
+    [
+      "アプリの入手先（O1_APP_DOWNLOAD_URL）",
+      cfg.appDownloadUrl || "（未設定）",
+      "自動",
+      "参加者には O1-C の記入後の受付メールで自動で届く（研究者が別に送らなくてよい）。最初の起動だけ、macOS は研究者と一緒に（約 5 分）",
+      "★ 配布物を差し替えたら、このフォルダの zip を置き換える。⚠️ 空のままだと受付メールが作られず登録が止まる",
+    ],
+  ];
+  var pushManual = function (i) {
+    var m = O1_LINKS_MANUAL[i];
+    rows.push([m[0], manual[m[0]] === undefined ? "" : manual[m[0]], "手動", m[1], m[2]]);
+  };
+  pushManual(0);
+  rows.push(blank);
+  rows.push(section("▼ この表の他のタブ"));
+  rows.push([
+    O1_MGMT_TAB + " / " + O1_MGMT_REJECT_TAB,
+    "この表",
+    "参照",
+    "研究者。登録がうまくいったか・弾かれた提出があるかを見るとき",
+    "★ 登録のたびに自動で追記（氏名・メールなし）",
+  ]);
+  rows.push([
+    "O1 終了判定",
+    "この表",
+    "参照",
+    "研究者。期間が終わった人を見つけ、終了の連絡・O1-S・片づけを進めるとき",
+    "★ 受領台帳の Apps Script が 6 時間ごとに更新（新しく終了した人は研究者宛ての通知にも入る）。右の 4 列（終了連絡日・O1-S 送付日・片づけ確認日・メモ）に書く。参加者には何も自動で送らない",
+  ]);
+  rows.push([
+    "O1 受領台帳 / O1 途絶",
+    "この表",
+    "参照",
+    "研究者。期間中、記録が届いているかを見るとき",
+    "★ 受領台帳の Apps Script が 6 時間ごとに更新。⚠️ 通知が無いことは異常が無い証拠にならない（「更新」時刻を見る）。⚠️ 「途絶」を「やめた」と読まない",
+  ]);
+  rows.push(blank);
+  rows.push(section("▼ 他の表・文書"));
+  rows.push([
+    "P-ID の採番元",
+    "Phase1 運用管理シートの「参加者ロスター」",
+    "参照",
+    "研究者。O1-C の記入でロスターに行ができた後に氏名を埋めるとき",
+    "⚠️ 氏名・メールを持つ表なので、ここにリンクを置かない。⚠️ 氏名だけの行を先に作らない",
+  ]);
+  rows.push([
+    "削除の手順と記録",
+    "リポジトリの docs/o1-deletion-ledger.md",
+    "参照",
+    "研究者。参加者から削除の求め・やめるとの申し出があったとき",
+    "★ 理由は聞かない。A（研究者側）・B（端末側）のチェックリスト。やめたときは削除の希望を確かめ、自動起動を外してもらう",
+  ]);
+  rows.push(["運営ワークフロー", "研究者の手元の GSE_G1_O1_運営ワークフロー.docx", "参照", "研究者。全体の流れを確かめるとき", ""]);
+  rows.push(blank);
+  rows.push(section("▼ 手で入れる欄（作り直しても保つ）"));
+  pushManual(1);
+  pushManual(2);
+  rows.push(blank);
+  rows.push([
+    "更新",
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm"),
+    "自動",
+    "",
+    "★ refreshO1LinksTab() か buildO1MgmtSheet() で作り直す",
+  ]);
+  return rows.map(function (r) {
+    return r.map(o1PlainText_);
+  });
+}
+
+/** ★ リンク集を作り直す（★ 手で入れた欄は保つ・⚠️ 他のタブには触れない）。 */
+function o1BuildLinksTab_(ss) {
+  // ⚠️★★★ ロスターの形をした表には書かない（★ `o1OpenMgmtLog_` と同じ判定）。
+  if (ss.getSheetByName("参加者ロスター")) {
+    throw new Error(
+      "⛔⚠️★★★ この表には「参加者ロスター」タブがあります。★ リンク集は**運営シート**に置いてください。"
+    );
+  }
+  var sheet = ss.getSheetByName(O1_LINKS_TAB);
+  var manual = o1ReadLinksManual_(sheet);
+  // ★ 行を先に組み立てる（⚠️ 失敗しても空のタブを残さない・既存の手入力を消さない）。
+  var rows = o1LinksRows_(PropertiesService.getScriptProperties(), o1Config_(), manual);
+  if (!sheet) sheet = ss.insertSheet(O1_LINKS_TAB, 0);
+  sheet.clear();
+  sheet.getRange(1, 1, rows.length, O1_LINKS_WIDTH).setValues(rows);
+  var U = O1_MGMT_UI;
+  sheet.getRange(1, 1, 1, O1_LINKS_WIDTH).setFontWeight("bold").setFontColor(U.navy);
+  sheet.getRange(2, 1, 1, O1_LINKS_WIDTH).setBackground(U.warnBg).setFontColor(U.warnFg);
+  sheet.getRange(4, 1, 1, O1_LINKS_WIDTH).setBackground(U.navy).setFontColor(U.white).setFontWeight("bold");
+  for (var r = 0; r < rows.length; r++) {
+    if (String(rows[r][0]).indexOf("▼") === 0) {
+      sheet.getRange(r + 1, 1, 1, O1_LINKS_WIDTH).setBackground(U.accent).setFontWeight("bold");
+    }
+    if (rows[r][2] === "手動") {
+      sheet.getRange(r + 1, 2, 1, 1).setBackground(U.warnBg);
+    }
+  }
+  // ★ 説明の列（いつ・誰が / 備考）は長いので折り返す。
+  sheet.getRange(1, 4, rows.length, 2).setWrap(true);
+  [280, 360, 50, 380, 420].forEach(function (w, i) {
+    sheet.setColumnWidth(i + 1, w);
+  });
+  sheet.setTabColor(U.okFg);
+  Logger.log("✅ 「" + O1_LINKS_TAB + "」を作り直しました（★ 手で入れた欄は保っています）。");
+}
+
+/**
+ * ★ リンク集**だけ**を作り直す（★ setupO1Forms() の後・URL を変えた後に実行する）。
+ * ⚠️ 登録ログ・却下ログ・受領台帳には触れない。
+ */
+function refreshO1LinksTab() {
+  var cfg = o1Config_();
+  var problem = o1MgmtConfigProblem_(cfg);
+  if (problem) throw new Error("⛔ " + problem);
+  var ss = SpreadsheetApp.openById(cfg.mgmtSheetId);
+  o1BuildLinksTab_(ss);
+  Logger.log("🔗 " + ss.getUrl());
+  return ss.getUrl();
 }
 
 // ============================================================

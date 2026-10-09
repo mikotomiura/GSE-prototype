@@ -10,23 +10,27 @@
   2. 日本語（ひらがな・カタカナ・漢字・全角の句読点）が「地の文」にあること:
      - Python: コメントと docstring
      - Rust: コメント（// /// //! /* */）。文字列リテラルは見ない
-     - shell / .gitignore: # 以降のコメント
+     - shell / .gitignore / .gitattributes: # 以降のコメント
      - Markdown: 地の文（``` のコードブロックとバッククォートの中は除く）
      - JSON: manifest の "reason"、規則ファイルの "_note"
      ★ 地の文の中でもバッククォートで囲んだ部分（例: `がっこう`）は許す（読みの例を示すため）。
+     ★ README の日本語訳（論文の dir の根の README.ja.md・判断 219）は 2 を見ない（1 は見る）。
 
 対象外: 逐語コピー（kit/logger/manifest*.json の kind が file のファイル全体と、excerpt の目印の間）、
 kit/corpus/data/、*.internal.md、Cargo.lock、target/・__pycache__/ などの生成物、.jsonl / .ndjson。
 """
 import argparse
 import ast
+import html
 import io
 import json
 import os
+import posixpath
 import re
 import sys
 import tempfile
 import tokenize
+import unicodedata
 
 FORBIDDEN = [
     ("gse", re.compile(r"(?<![A-Za-z0-9])gse(?![A-Za-z0-9])", re.IGNORECASE)),
@@ -46,8 +50,16 @@ CJK = re.compile("[　-〿぀-ヿ㐀-䶿一-鿿！-｠]")
 BACKTICK = re.compile(r"`[^`\n]*`")
 SKIP_DIRS = {"target", ".build", "__pycache__", ".venv", "venv", "runs", "sealed"}
 SKIP_SUFFIX = (".jsonl", ".ndjson", ".lock", ".pyc", ".png", ".pdf", ".zip")
-TEXT_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff")
+TEXT_SUFFIX = (".py", ".rs", ".sh", ".md", ".json", ".toml", ".swift", ".txt", ".cff", ".tex", ".bib", ".svg")
 UPSTREAM_KEYS = re.compile(r"^(gse_|upstream_)|^(start_anchor|end_anchor)$")
+# 判断 219: 日本語の地の文を許すのは README の日本語訳だけ（論文の dir の根と、書き出した木の根）
+TRANSLATIONS = ("README.ja.md", "papers/ime-observation/README.ja.md")
+# 訳では日本語の検査が外れるので、内部の言葉の日本語の形も止める（全角は NFKC で半角に寄せてから見る）
+JA_FORBIDDEN = [
+    ("internal-ref", re.compile(r"(判断|課題|マイルストーン)\s*#?\d")),
+    ("relation", re.compile(r"上流|逐語|参照実装|写した元")),
+    ("gse", re.compile(r"苦闘")),
+]
 
 
 class Violation(object):
@@ -214,6 +226,43 @@ def md_prose(text):
     return out
 
 
+# 判断 212: 属性の値の中の > でタグを切らない（引用符の中を読み飛ばす）。空の <text/> は中身を持たない
+SVG_ATTRS = r"""(?:[^>"']|"[^"]*"|'[^']*')*"""
+SVG_TEXT_BODY = re.compile(r"(<text\b" + SVG_ATTRS + r"(?<!/)>)(.*?)(</text>)", re.S)
+SVG_TAG = re.compile(r"<!--.*?-->|<(/?)([A-Za-z_][\w:.-]*)" + SVG_ATTRS + r"?(/?)>", re.S)
+SVG_DRAWN = ("tspan", "textpath")
+
+
+def svg_drawn_blank(body):
+    """<text> の中身から、<text> 自身と <tspan>・<textPath> の直下の文字データ（図に描く文字）だけを消す。
+    その中の別の要素（<title>・<desc> など）の文字データ・属性・コメントは残す（判断 212）。改行は保つ。"""
+    out, stack, pos = [], [], 0
+
+    def data(s):
+        return re.sub(r"[^\n]", "", s) if not stack or stack[-1] in SVG_DRAWN else s
+    for t in SVG_TAG.finditer(body):
+        out.append(data(body[pos:t.start()]) + t.group(0))
+        pos = t.end()
+        if t.group(2) is None:  # コメント
+            continue
+        if t.group(1):
+            if stack:
+                stack.pop()
+        elif not t.group(3):
+            stack.append(t.group(2).split(":")[-1].lower())
+    out.append(data(body[pos:]))
+    return "".join(out)
+
+
+def svg_prose(text):
+    """判断 210・211・212: 公開 repo の図（SVG）。<text> の文字データ（図の中の入力の例として日本語を描く）だけを除き、
+    残り（属性・<title>・<desc>・<style>・<metadata>・コメント・<tspan> の属性・<text> の中の <title> など）は
+    すべて地の文として見る。文字参照（&#x…; など）は戻してから見る。行の番号は保つ。"""
+    def blank(m):
+        return m.group(1) + svg_drawn_blank(m.group(2)) + m.group(3)
+    return [(no, html.unescape(ln)) for no, ln in enumerate(SVG_TEXT_BODY.sub(blank, text).split("\n"), 1)]
+
+
 def json_prose(text):
     out = []
     try:
@@ -279,19 +328,35 @@ def check_text(rel, text, verbatim):
                 vs.append(Violation(rel, 0, "forbidden:" + kind, "禁止語がある"))
             continue
         for no, ln in enumerate(lines, 1):
-            if rx.search(ln):
+            # 判断 211: SVG は文字参照（G&#x53;E など）を戻しても見る
+            if rx.search(ln) or (ext == ".svg" and rx.search(html.unescape(ln))):
                 vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある"))
     base = os.path.basename(rel)
-    if ext == ".py":
+    if posixpath.normpath(rel.replace("\\", "/")) in TRANSLATIONS:
+        # 判断 219: README の日本語訳（研究者の選択）だけは地の文が日本語。ほかの検査（禁止語）は見る
+        prose = []
+        for no, ln in enumerate(lines, 1):
+            folded = unicodedata.normalize("NFKC", ln)
+            for kind, rx in FORBIDDEN + JA_FORBIDDEN:
+                if rx.search(folded) and not rx.search(ln):
+                    vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある（全角や日本語の形）"))
+                elif rx.search(ln) and (kind, rx) in JA_FORBIDDEN:
+                    vs.append(Violation(rel, no, "forbidden:" + kind, "禁止語がある（日本語の形）"))
+    elif ext == ".py":
         prose = py_prose(text)
     elif ext in (".rs", ".swift"):
         prose = rs_prose(text)
-    elif ext == ".sh" or base == ".gitignore" or ext == ".toml":
+    elif ext == ".sh" or base in (".gitignore", ".gitattributes") or ext == ".toml":
         prose = hash_prose(text)
     elif ext == ".md":
         prose = md_prose(text)
     elif ext == ".json":
         prose = json_prose(text)
+    elif ext == ".svg":
+        prose = svg_prose(text)
+    elif ext in (".tex", ".bib"):
+        # 判断 148: 原稿（LaTeX）と書誌は全文が公開の文なので、コメントも含めて全行を見る
+        prose = list(enumerate(lines, 1))
     else:
         prose = []
     for no, ln in prose:
@@ -317,7 +382,7 @@ def iter_files(root, paths):
             for f in sorted(files):
                 if f.endswith(SKIP_SUFFIX) or ".internal." in f:
                     continue
-                if not (f.endswith(TEXT_SUFFIX) or f == ".gitignore"):
+                if not (f.endswith(TEXT_SUFFIX) or f in (".gitignore", ".gitattributes")):
                     continue
                 yield (reld + "/" + f) if reld != "." else f
 
@@ -373,9 +438,63 @@ def selftest():
     expect("rs ブロックコメントの日本語は赤", "a.rs", "/* " + J + " */\nfn f() {}\n", ["japanese-prose"])
     expect("rs src-tauri は赤", "a.rs", "// see src-tauri/x.rs\n", ["forbidden:src-tauri"])
     expect("md 地の文の日本語は赤", "a.md", "# Title\n" + J + "\n", ["japanese-prose"])
+    expect("README の日本語訳は通る", "README.ja.md", "# Title\n" + J + "\n", [])
+    expect("repo の中の README の日本語訳も通る", "papers/ime-observation/README.ja.md", J + "\n", [])
+    expect("ほかの dir の README.ja.md は赤", "kit/README.ja.md", J + "\n", ["japanese-prose"])
+    expect("ほかの名前の訳は赤", "README.zh.md", J + "\n", ["japanese-prose"])
+    expect("README の日本語訳でも禁止語は赤", "README.ja.md", J + " GSE\n", ["forbidden:gse"])
+    expect("./ の付いた README の日本語訳も通る", "./README.ja.md", J + "\n", [])
+    expect("README の日本語訳の全角の禁止語は赤", "README.ja.md", "ＧＳＥ\n", ["forbidden:gse"])
+    expect("README の日本語訳の判断の番号は赤", "README.ja.md", "判断 219 による\n", ["forbidden:internal-ref"])
+    expect("README の日本語訳の全角の判断の番号も赤", "README.ja.md", "判断 ＃２１９\n", ["forbidden:internal-ref"])
+    expect("README の日本語訳の上流は赤", "README.ja.md", "上流の実装\n", ["forbidden:relation"])
+    expect("README の日本語訳の苦闘は赤", "README.ja.md", "生産的苦闘\n", ["forbidden:gse"])
+    expect("ほかの日本語は訳では通る", "README.ja.md", "判断の材料と 2 つの設定\n", [])
+    expect("\\ で区切った README の日本語訳も通る", "papers\\ime-observation\\README.ja.md", J + "\n", [])
     expect("md コードブロックの日本語は通る", "a.md", "```\n" + J + "\n```\n", [])
     expect("md .steering は赤", "a.md", "see .steering/x\n", ["forbidden:.steering"])
     expect("sh 日本語のコメントは赤", "a.sh", "echo ok # " + J + "\n", ["japanese-prose"])
+    expect("tex 本文の日本語は赤", "a.tex", "\\section{Method}\n" + J + "\n", ["japanese-prose"])
+    expect("tex コメントの日本語も赤", "a.tex", "% " + J + "\nText.\n", ["japanese-prose"])
+    expect("tex 英語だけは通る", "a.tex", "\\section{Method}\nThe logger writes rows.\n", [])
+    expect("tex 禁止語 GSE は赤", "a.tex", "The GSE logger.\n", ["forbidden:gse"])
+    expect("bib 日本語の書誌は赤", "r.bib", "@article{k, title={" + J + "}}\n", ["japanese-prose"])
+    # 判断 210: SVG は <title>・<desc>・コメントが地の文。<text> の日本語（図の中の入力の例）は通す
+    expect("svg 図の中の日本語は通る", "a.svg", "<svg>\n<title>Demo</title>\n<text>" + J + "</text>\n</svg>\n", [])
+    expect("svg title の日本語は赤", "a.svg", "<svg>\n<title>" + J + "</title>\n</svg>\n", ["japanese-prose"])
+    expect("svg 複数行の desc の日本語は赤", "a.svg", "<svg>\n<desc>English\n" + J + "</desc>\n</svg>\n", ["japanese-prose"])
+    expect("svg コメントの日本語は赤", "a.svg", "<svg>\n<!-- " + J + " -->\n</svg>\n", ["japanese-prose"])
+    expect("svg 禁止語は図の中でも赤", "a.svg", "<svg>\n<text>GSE</text>\n</svg>\n", ["forbidden:gse"])
+    # 判断 211: 地の文は <text> の文字データ以外のすべて。文字参照は戻して見る
+    expect("svg 属性の日本語は赤", "a.svg", '<svg aria-label="' + J + '">\n</svg>\n', ["japanese-prose"])
+    expect("svg style のコメントの日本語は赤", "a.svg", "<svg>\n<style>/* " + J + " */</style>\n</svg>\n", ["japanese-prose"])
+    expect("svg metadata の日本語は赤", "a.svg", "<svg>\n<metadata>" + J + "</metadata>\n</svg>\n", ["japanese-prose"])
+    expect("svg 文字参照の日本語は赤", "a.svg", "<svg>\n<title>&#x65E5;&#26412;</title>\n</svg>\n", ["japanese-prose"])
+    expect("svg 文字参照の禁止語は赤", "a.svg", "<svg>\n<text>G&#x53;E</text>\n</svg>\n", ["forbidden:gse"])
+    expect("svg tspan の中の日本語は通る", "a.svg", '<svg>\n<text x="1"><tspan fill="#fff">' + J + "</tspan></text>\n</svg>\n", [])
+    # 判断 212: <text> の中の <title>・<desc> は地の文（図に描く文字は <text>・<tspan> の直下だけ）
+    expect("svg text の中の title の日本語は赤", "a.svg", "<svg>\n<text><title>" + J + "</title>x</text>\n</svg>\n",
+           ["japanese-prose"])
+    expect("svg text の中の複数行の desc の日本語は赤", "a.svg", "<svg>\n<text><desc>a\n" + J + "</desc></text>\n</svg>\n",
+           ["japanese-prose"])
+    expect("svg text の中の title の後の文字は通る", "a.svg",
+           "<svg>\n<text><title>Demo</title>" + J + "<tspan>" + J + "</tspan>" + J + "</text>\n</svg>\n", [])
+    expect("svg text の中の空の title の後の文字は通る", "a.svg", "<svg>\n<text><title/>" + J + "</text>\n</svg>\n", [])
+    expect("svg text の中のコメントの日本語は赤", "a.svg", "<svg>\n<text>x<!-- " + J + " --></text>\n</svg>\n",
+           ["japanese-prose"])
+    # 判断 212（/cross-review 2 巡目）: 属性の値の中の > でタグを切らない・空の <text/> は中身を持たない
+    expect("svg 値に > のある tspan の属性の日本語は赤", "a.svg",
+           '<svg>\n<text><tspan data-note=">' + J + '">x</tspan></text>\n</svg>\n', ["japanese-prose"])
+    expect("svg 値に > のある text の属性の日本語は赤", "a.svg",
+           "<svg>\n<text data-note='>" + J + "'>x</text>\n</svg>\n", ["japanese-prose"])
+    expect("svg 値に / と > のある tspan の後の文字は通る", "a.svg",
+           '<svg>\n<text><tspan fill="a/>b">' + J + "</tspan></text>\n</svg>\n", [])
+    expect("svg 空の text の後の title の日本語は赤", "a.svg",
+           "<svg>\n<text/>\n<title>" + J + "</title>\n<text>x</text>\n</svg>\n", ["japanese-prose"])
+    expect("svg 空の text の後の地の文字の日本語は赤", "a.svg",
+           "<svg>\n<text/>" + J + "\n<text>x</text>\n</svg>\n", ["japanese-prose"])
+    expect("svg tspan の属性の日本語は赤", "a.svg", '<svg>\n<text><tspan aria-label="' + J + '">x</tspan></text>\n</svg>\n',
+           ["japanese-prose"])
     expect("json reason の日本語は赤", "m.json", '{"entries":[{"reason":"' + J + '"}]}', ["japanese-prose"])
     expect("json 出どころの欄は見ない", "m.json",
            '{"entries":[{"gse_path":"src-tauri/x.rs","start_anchor":"// ' + J + '","reason":"ok"}]}', [])
@@ -413,6 +532,36 @@ def selftest():
             f.write(J + "\n")
         if len(run(tmp, ["papers/ime-observation"])) != 1:
             fails.append("走査: 対象の中の違反を 1 件拾うはず")
+        # 判断 219: README の日本語訳は、repo の走査でも書き出した木の走査（根を論文の dir にして "."）でも通る
+        with io.open(os.path.join(tmp, "papers", "ime-observation", "README.ja.md"), "w", encoding="utf-8") as f:
+            f.write("# " + J + "\n" + J + "\n")
+        paper = os.path.join(tmp, "papers", "ime-observation")
+        found = [v.path for v in run(tmp, ["papers/ime-observation"])] + [v.path for v in run(paper, ["."])]
+        if found != ["papers/ime-observation/kit/x/bad.md", "kit/x/bad.md"]:
+            fails.append("走査: README の日本語訳は repo でも書き出した木でも通るはず（判断 219）: %s" % found)
+        os.remove(os.path.join(tmp, "papers", "ime-observation", "README.ja.md"))
+        os.makedirs(os.path.join(tmp, "papers", "ime-observation", "manuscript"))
+        with io.open(os.path.join(tmp, "papers", "ime-observation", "manuscript", "m.tex"), "w",
+                     encoding="utf-8") as f:
+            f.write("The GSE logger.\n")
+        if len(run(tmp, ["papers/ime-observation"])) != 2:
+            fails.append("走査: .tex も走査の対象のはず（判断 148）")
+        os.remove(os.path.join(tmp, "papers", "ime-observation", "manuscript", "m.tex"))
+        # 判断 209: 公開 repo の .gitattributes も書き出すので、コメントの日本語と禁止語を見る
+        with io.open(os.path.join(tmp, "papers", "ime-observation", ".gitattributes"), "w",
+                     encoding="utf-8") as f:
+            f.write("# " + J + "\n* text=auto eol=lf\n")
+        if len(run(tmp, ["papers/ime-observation"])) != 2:
+            fails.append("走査: .gitattributes のコメントも走査の対象のはず（判断 209）")
+        os.remove(os.path.join(tmp, "papers", "ime-observation", ".gitattributes"))
+        # 判断 210: 公開 repo の図（SVG）も走査する
+        os.makedirs(os.path.join(tmp, "papers", "ime-observation", "assets"))
+        with io.open(os.path.join(tmp, "papers", "ime-observation", "assets", "a.svg"), "w",
+                     encoding="utf-8") as f:
+            f.write("<svg>\n<title>" + J + "</title>\n</svg>\n")
+        if len(run(tmp, ["papers/ime-observation"])) != 2:
+            fails.append("走査: .svg も走査の対象のはず（判断 210）")
+        os.remove(os.path.join(tmp, "papers", "ime-observation", "assets", "a.svg"))
         if len(run(tmp, ["papers/ime-observation/kit/x/bad.md", "papers/ime-observation/kit/x/NOTES.internal.md"])) != 1:
             fails.append("走査: 明示したファイルの違反は拾い、明示した *.internal.* は拾わないはず")
     finally:

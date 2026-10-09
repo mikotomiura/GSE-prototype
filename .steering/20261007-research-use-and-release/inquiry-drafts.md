@@ -1,0 +1,167 @@
+# 問い合わせ文の草案（BRM の編集者・ZEN大学・所属機関の外の審査委員会）
+
+> ⚠️ 草案。**送るのは研究者**（外部への送信は取り消せない）。宛先・氏名は送る前に一次で確かめる。
+> ★ 打鍵の記録・NDJSON・参加者の情報を**添付しない**（`data-privacy` Skill）。
+> 根拠: ADR-039 D2（条件 a・b）・D3。順序の推奨: **B（大学）→ C（外部の委員会）→ A（編集者）**。
+> 理由: A に「どの委員会が見るか」を書けたほうが答えが具体になる。ただし A の答えは D2 の条件 a なので、B・C が長引くなら並行して送る。
+
+---
+
+## A. BRM の編集者あて（英語）
+
+⚠️ 宛先: 投稿規定の「未解決の質問は編集者へ」の箇所にある連絡先（下位エージェントの報告では編集者 2 名の名とアドレスがあった。**私は確かめていない** → 送る前に <https://link.springer.com/journal/13428/submission-guidelines> で確認する）。
+
+```
+Subject: Pre-submission inquiry: ethics approval for a keystroke-timing dataset collected before committee review
+
+Dear Editor,
+
+I am [a student / a faculty member] at ZEN University (Japan) and plan to submit to
+Behavior Research Methods. Before designing a follow-up study, I would like to ask how the journal
+would treat the following situation.
+
+1. An ongoing study records participants' everyday computer work over several weeks. It records:
+   the time and category of each key press (e.g., letter / backspace / space / enter / symbol);
+   the duration of Japanese input-method conversion; the number and length of paste operations
+   (not their content); the times of window-focus changes (not which application); per-second
+   counts of mouse movement and wheel use (and clicks on Windows); the keyboard layout type;
+   the app version and recording-health status; on macOS, intervals of secure (password) input
+   (not their content); a random per-installation identifier; and work-state estimates computed
+   from these. It does NOT record which characters were typed, screen content, application or
+   window names, URLs, file names, or mouse position. Because recording is continuous, the data
+   show when a participant was or was not working at the computer; the consent form states this.
+   Participants are a small group (3–5) recruited directly by me, with electronic informed
+   consent, an on-screen recording indicator, one-click pause, and the right to delete any
+   time range.
+2. My university does not appear to operate a research ethics committee for non-medical human
+   research [I am confirming this with the university]. Data collection started on 8 October 2026
+   without committee approval or exemption, based on my own assessment.
+3. The submission guidelines state that "retrospective ethics approval usually cannot be obtained
+   and it may not be possible to consider the manuscript for peer review. The decision on whether
+   to proceed to peer review in such cases is at the Editor's discretion."
+
+My questions:
+(a) If an independent ethics committee reviews and approves (or exempts) the secondary analysis and
+    publication of the already-collected data, could a manuscript using these data be considered
+    for peer review? If so, what should the ethics statement contain?
+(b) If not, would the journal consider a manuscript whose data are newly collected after committee
+    approval, while the earlier data are described only as a pilot (not analysed in the paper)?
+(c) Because keystroke timing may allow re-identification and the inference of health-related
+    information, I am considering the following data sharing:
+    (i) At submission and publication: aggregate results (checked for disclosure risk before
+        release), and documented analysis code illustrated with simulated data, as in the
+        journal's example Open Practices Statement.
+    (ii) At publication or later, for each level of processed data (derived analysis features,
+        or processed but not raw event records), only if that level passes pre-specified privacy
+        tests (linking sessions of the same person, matching to candidate texts, and inference of
+        health-related information): access under a controlled-access agreement (application
+        required; research use only; no attempts at re-identification; no redistribution).
+        If no level passes, only (i) would be shared.
+    The guidelines state: "When it is not possible to share research data publicly, for
+    instance when individual privacy could be compromised, data availability should still be
+    stated in the manuscript along with any conditions for access."
+    (c-1) If no level of processed data passes our tests, would arrangement (i) alone be
+          acceptable under the journal's type 4 research data policy?
+    (c-2) Would arrangement (ii) be acceptable if its conditions of access are stated in both
+          the Data Availability Statement and the Open Practices Statement?
+
+Thank you for your time.
+
+[Name]
+[Affiliation]
+[Email]
+```
+
+⚠️ (b) の「pilot として記述するだけで解析しない」は ADR-039 D1 の書き方に合わせた。O1 を論文でどう扱うかは研究者が決める。
+
+⚠️ **2026-10-09 改訂**（`.steering/20261009-release-deidentification-survey/decisions.md` 判断 7）:
+- 3. の引用に、投稿規定の続きの 1 文（*"The decision on whether to proceed to peer review in such cases is at the Editor's discretion."*）を足した。この文は 2026-10-09 に投稿規定の字面で確かめた（[V237]）。
+- (c) を ADR-039【決 5】の裁定（集計値＋コード＋模擬データを既定とし、関門を通った段だけ申請制で足す）と D6 の裁定（攻撃 3 つ・集計値も点検）に合わせて改め、問いを (c-1)（何も関門を通らなかったとき (i) だけで足りるか）と (c-2)（申請制を Data Availability Statement と Open Practices Statement に書けば足りるか）に分けた（判断 7・8）。「後で共有する」と約束しないよう、(ii) は「関門を通った段だけ」「何も通らなければ (i) まで」と書いた。投稿規定の「アクセスの条件」の文（[V237]）を 1 文まるごと引いた。旧 (c) は「Because keystroke timing may allow re-identification, I plan to share the processed data under a controlled-access agreement rather than openly. Would this satisfy the journal's research data policy if the conditions of access are stated in the Open Practices Statement?」。
+- ⚠️ 「申請制で Open Practices Statement を書いてよいか」は旧 (c) にすでにあった。新しい問いを足したのではなく、(c) を書き直した。
+
+---
+
+## B. ZEN大学あて（研究推進・研究倫理の窓口）
+
+⚠️ 宛先: 公開資料に、人を対象とする研究の審査の窓口は見つからなかった（研究不正の告発窓口だけ）。【学生／教員の別に応じて、指導教員・事務局・研究倫理教育責任者のどれに送るかを研究者が決める】
+
+```
+件名: 人を対象とする研究の倫理審査の取り扱いについてのお問い合わせ
+
+【所属・氏名】です。
+個人として行っている研究について、学外の学術雑誌（Behavior Research Methods）へ投稿する際に、
+倫理審査の承認または免除の記載を求められるため、次の点をお尋ねします。
+
+研究の概要:
+・ふだんのパソコン作業のあいだの操作を数週間記録し、作業の状態の推定に使えるかを調べる研究です。
+・記録するもの: キーを押した時刻と種類（文字キー / バックスペース / 空白 / 改行 / 記号 など）／
+ 日本語入力の変換にかかった時間／貼り付けの回数と文字数（中身は取りません）／画面の切り替えが起きた時刻
+ （どのアプリかは取りません）／マウスの動いた量・ホイールの回数（Windows では押した回数も）を 1 秒ごとに数えた値／
+ キーボードの配列の種類・アプリの版・記録の状態／（macOS のみ）パスワード入力中だった区間の印／
+ 導入ごとの乱数の識別子／これらから計算した作業の状態の推定値。
+・記録しないもの: 打った文字・画面の内容・アプリやウィンドウの名前・URL・ファイル名・マウスの位置。
+・常時記録するため「いつ作業していて、いつ離れていたか」の時間の並びが残ります（同意文書に明記しています）。
+・対象は研究者が直接説明する 3〜5 名程度で、電子的な説明と同意を取っています。
+・健康や医療についての知識を得ることを目的とする研究ではありません。
+
+お尋ねしたいこと:
+1. 本学に、人を対象とする研究（医学系以外）の倫理審査を行う委員会や手続きはありますか。
+   あれば、申請の方法と、【学生／教員】が申請できるかを教えてください。
+2. 無い場合、「本学では人を対象とする研究の倫理審査を取り扱っていない」旨を、
+   書面（メール可）でいただくことはできますか（投稿先への説明に使います）。
+3. 委員会が無い場合に、所属機関の長などによる承認で代える仕組みはありますか。
+4. 学外の倫理審査委員会で審査を受けることについて、本学として定めや制約はありますか。
+
+お手数をおかけしますが、よろしくお願いいたします。
+【氏名・連絡先】
+```
+
+★ 3 は日本心理学会の方針（委員会が無ければ所属機関の長の承認で代えることを認める場合がある）[V241] に合わせた問い。⚠️ BRM が所属機関の長の承認を「委員会の承認」として受けるかは確かめていない → A で併せて聞くかは研究者が決める。
+
+---
+
+## C. 所属機関の外の審査委員会あて（例: 心理学調査・実験に関する研究倫理審査委員会 [V242]）
+
+⚠️ 宛先: 委員会のページの問い合わせ窓口（ページに記載のフォームまたはメール）。費用 20 万円（税別）・最長 5 週間（ページの逐語）。
+
+```
+件名: 申請資格と、既に始めている収集の扱いについての事前のお問い合わせ
+
+【氏名】と申します。【ZEN大学の学生／教員】で、個人として研究を行っています。
+申請の前に、次の点をお尋ねします。
+
+研究の概要:
+・ふだんのパソコン作業のあいだの操作を数週間記録し、作業の状態の推定に使えるかを調べる研究です。
+・記録するもの: キーを押した時刻と種類（文字キー / バックスペース / 空白 / 改行 / 記号 など）／
+ 日本語入力の変換にかかった時間／貼り付けの回数と文字数（中身は取りません）／画面の切り替えが起きた時刻
+ （どのアプリかは取りません）／マウスの動いた量・ホイールの回数（Windows では押した回数も）を 1 秒ごとに数えた値／
+ キーボードの配列の種類・アプリの版・記録の状態／（macOS のみ）パスワード入力中だった区間の印／
+ 導入ごとの乱数の識別子／これらから計算した作業の状態の推定値。
+・記録しないもの: 打った文字・画面の内容・アプリやウィンドウの名前・URL・ファイル名・マウスの位置。
+・常時記録するため「いつ作業していて、いつ離れていたか」の時間の並びが残ります。
+・対象は 3〜5 名程度、電子的な説明と同意を取ります。健康や医療についての知識を得ることを目的とする研究ではありません。
+・成果は学術雑誌（Behavior Research Methods）への投稿と、加工した記録の公開（申請制を検討）を予定しています。
+
+お尋ねしたいこと:
+1. 所属機関に倫理審査委員会が無い（または取り扱っていない）研究者の申請を受け付けていますか。
+   【学生の場合: 学生個人の申請は可能ですか】
+2. これから始める新しい収集の審査（研究計画・同意文書・データ公開の方法を含む）をお願いできますか。
+3. 既に別の目的で 2026 年 10 月 8 日から始めている収集（委員会の承認を受けていないもの）について、
+   その記録の解析と公表を新しい研究として審査していただくことはできますか。
+4. 審査の対象に、加工した打鍵の記録を公開することの適否（再識別のおそれへの対策）を含められますか。
+
+よろしくお願いいたします。
+【氏名・連絡先】
+```
+
+---
+
+## 答えが来たら
+
+| 答え | 次にすること |
+|---|---|
+| A の (a) が可 | ADR-039 D2 の条件 a を満たした、と記録する（書面を保管・repo には要旨のみ） |
+| A の (a) が否 | O1 のデータは 2 本目に使わない（D2 は不成立）。D1 の新しい収集だけで進める |
+| B で委員会あり | 大学の委員会に申請（C は不要） |
+| B で委員会なし・書面あり | 書面を保管し、C へ申請 |
+| C で申請不可 | 他の委員会を探す（未踏査: NPO・一般社団法人の委員会） |

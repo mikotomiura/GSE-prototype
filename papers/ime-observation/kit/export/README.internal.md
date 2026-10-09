@@ -56,8 +56,32 @@ rules that is missing or fails), or an unexpected failure (only the type of the 
    inside a git work tree, the checker must itself be tracked in the git work tree that holds it, equal to
    HEAD and free of an `assume-unchanged` or `skip-worktree` mark (a checker outside git stops the
    export with exit code 2), so that one commit yields one verdict.
-5. Create the new repository from `DIR`, tag a release, and deposit the release with the archive
-   service to obtain a DOI. Then add the DOI to `CITATION.cff`.
+5. Commit `DIR` on top of the history of the public repository (next section) and tag the release. For the
+   first release, the DOI is reserved beforehand in a draft of the archive service and is already in
+   `CITATION.cff` and the manuscript; the archive of the tag is uploaded to that draft, which is then published.
+   A later release is a new version of the same record. Before step 2, its draft is made from the published record
+   with the new-version action of the archive service, which reserves the DOI of that version. In step 2, the
+   version and that DOI are written in `CITATION.cff` and in the BibTeX entry `@software` of `README.md` and
+   `README.ja.md`, and the version in `.zenodo.json` and in the text of the badge of the code release in both
+   READMEs; the links of the badges of the code point to the DOI of all versions and are not changed. The release is
+   added to the history in both READMEs and in the history section of this note. The `Code:` of the article box in
+   both READMEs keeps the DOI of release 1.0.0, like the manuscript, whose DOI of the code
+   (`manuscript/references.bib`, `manuscript/sections/declarations.tex`) is not changed. The draft copies the files
+   and the metadata of the version before, except the version, which is left empty. The copied files are removed from
+   the draft before the archive of the new tag is uploaded, and the draft's version, publication date (copied from the
+   version before), description, link to the tree of the tag and any other field changed in `.zenodo.json` are set
+   before it is published (the service does not read `.zenodo.json` when files are uploaded by hand).
+
+## History of the public repository
+
+The public repository does not carry the history of the working repository. Its history is, in order:
+the export of the macOS freezing tag (made with that tag's own exporter and `--allow-missing-license`, so that
+the list of its files has the SHA-256 that the registration gives), tagged `ime-observation-prereg-macos`; the
+export of the Windows freezing tag, made in the same way, tagged `ime-observation-prereg-windows`; a commit that
+adds only `manuscript/outline.md` as it stood before the results were analysed; and the releases, each committed on
+top of the one before (`v1.0.0`, then `v1.0.1`). The author date
+of each of the first three commits is the date of the working commit it comes from, and the message names that
+commit. Scripts that start with `#!` are given the executable bit in the index.
 
 `--allow-missing-license` is not for publication. It is for trial exports and for building the
 measurement logger (next section); the script says so at the top of its output.
@@ -80,9 +104,11 @@ machine that runs the export.
 
 Everything the ignore file of this directory excludes: build products (`target/`, `.build/`,
 `__pycache__/`), raw logs (`*.jsonl`, `*.ndjson`, `runs/`, `sealed/`, `experiment/raw/`), archives
-(`*.jsonl.*`, `*.ndjson.*`, `*.zip`, `*.tar`, `*.tar.gz`, `*.tgz`, `*.zst`) and virtual environments.
-Names are compared without regard to case, and the script stops (exit code 2) if the ignore file
-does not list exactly the rules it implements.
+(`*.jsonl.*`, `*.ndjson.*`, `*.zip`, `*.tar`, `*.tar.gz`, `*.tgz`, `*.zst`), virtual environments, and the
+outputs of a LaTeX build run by hand (`*.aux`, `*.blg`, `*.bbl`, `*.out`, `*.toc`, `*.synctex.gz`). The ignore
+file also lists `*.log`, which is not left out: a log has the name of a secret and stops the export (next
+section), so remove it from the source. Names are compared without regard to case, and the script stops (exit
+code 2) if the ignore file does not list exactly the rules it implements.
 Corpus files `kit/corpus/data/*.jsonl` are kept. In addition, every file with `.internal.` in its
 name (internal notes and the translation table) and `.DS_Store` are left out. The aggregate results
 under `experiment/results/` are kept because the results section of the paper rests on them.
@@ -116,8 +142,8 @@ id (long-term or temporary), an Anthropic or OpenAI key head, the shape of a Goo
 token head; the check runs on the source and again on the converted output, and each line is also
 checked with its escapes decoded; the text is never printed), a file of a kind that the checker of
 the writing rules does not read (the file must have the extension `.py`, `.rs`, `.sh`, `.md`,
-`.json`, `.toml`, `.swift`, `.txt` or `.cff`, or be named `.gitignore`, `SEED`, `Cargo.lock`,
-`LICENSE-CODE` or `LICENSE-DATA`; under `kit/corpus/data/` only the `*.jsonl` files directly in it;
+`.json`, `.toml`, `.swift`, `.txt`, `.cff`, `.tex`, `.bib` or `.svg`, or be named `.gitignore`, `.gitattributes`,
+`SEED`, `Cargo.lock`, `LICENSE-CODE` or `LICENSE-DATA`; under `kit/corpus/data/` only the `*.jsonl` files directly in it;
 add the kind to the checker or leave the file out), a name that holds the word `internal` in
 another form than `.internal.` (a word that no letter touches, in any case, as in `notes_internal.md`,
 `internal2.md` or `notes(internal).md`, or `Internal` right after a lower-case letter, as in
@@ -132,14 +158,29 @@ commit (a deleted tracked table too) or is a link, when a file it would export (
 
 The scan runs on all exported text after the changes above, and on every relative file name
 (reported as line 0). Each line is checked as written and again with its JSON and string escapes
-decoded. A finding is reported as a file name, a line number and a kind; the matched text is never
+decoded, with its character references decoded (`&#64;`, which an SVG figure or a Markdown page shows as the
+character), and with each decoded after the other in both orders. A finding is reported as a file name, a line
+number and a kind; the matched text is never
 printed. The script also verifies that the copied ranges of the pinned sources contain only ASCII
 characters.
 
 * A participant identifier (the letter P and three digits, not adjoining a letter or digit, so
   that the identifier is found inside a longer name joined by an underscore; inside brackets too,
-  as in `[P017]`, and in file names), an e-mail address, the name of the private dataset repository, a session
-  name of the private recordings, and the private working directories.
+  as in `[P017]`, and in file names), an e-mail address (the one exception is the address of the corresponding
+  author, which the article prints; it is fixed in the script as `PUBLIC_EMAILS` and passes only in the files under
+  `manuscript/` and in `experiment/datasheet.md` (the datasheet, which is also deposited with the data and names its
+  contact), and only as a whole address, not joined to anything by another `@`), the name of the private
+  dataset repository, a session name of the private recordings, and the private working directories.
+* In an SVG figure (searched over the whole file): a script, an event handler, a link or reference to anything but a
+  fragment of the same file (`href="#…"`, `url(#…)`), an embedded object, an `@import`, a data URI or a document
+  type declaration. A figure is exported as text and shown on the repository's page, so it may hold none of what a
+  browser would run or load, and a data URI could carry a binary past the rule that only text is exported. The
+  figure is then read as XML (a namespace prefix resolved, a character reference decoded; never when a document
+  type declaration was found): it must be well-formed, every element must be in the SVG namespace (or in none) and
+  one of the shapes, text, groups, gradients and the style sheet listed in `SVG_ELEMENTS` (no animation element,
+  image or link), every attribute in the SVG or XLink namespace or `xml:space` or `xml:lang` (not `xml:base`, which
+  would resolve a fragment reference against another file), and no decoded value or text may refer
+  outside the file or hold a backslash (a CSS escape could spell any of the above).
 * The words that name the private project, the name of its source directory, and two internal
   marker symbols (not applied to the `.jsonl` files directly in `kit/corpus/data/`; other files there are checked).
 * Values of the machine that runs the export: the home directory, the repository root, the

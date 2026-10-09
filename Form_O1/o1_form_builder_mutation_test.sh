@@ -310,6 +310,72 @@ mutate "見た目: system の灰を先に置く（満杯の警告行が埋もれ
 mutate "見た目: 書式の例外を捕まえない" \
   's/  try \{\n    styled = o1StyleMgmtTab_/  { styled = o1StyleMgmtTab_/'
 
+# ★ 2026-10-07 O1 リンク集（`.steering/20261007-o1-links-tab/`）
+mutate "リンク集: ロスタータブを持つ表にも書く" \
+  's/(function o1BuildLinksTab_\(ss\) \{\n.*?\n)  if \(ss\.getSheetByName\("参加者ロスター"\)\) \{/$1  if (false) {/s'
+mutate "リンク集: 手で入れた欄を引き継がない" \
+  's/  var manual = o1ReadLinksManual_\(sheet\);/  var manual = {};/'
+mutate "リンク集: 数式を無害化しない" \
+  's/    return r\.map\(o1PlainText_\);/    return r;/'
+mutate "リンク集: 運営シートの ID の検査を外す" \
+  's/(function refreshO1LinksTab\(\) \{\n  var cfg = o1Config_\(\);\n  var problem = o1MgmtConfigProblem_\(cfg\);\n)  if \(problem\) throw new Error\("⛔ " \+ problem\);/$1/'
+mutate "リンク集: O1-S の回答 URL に編集 URL を載せる" \
+  's/s \? s\.publishedUrl : notYet/s ? s.editUrl : notYet/'
+mutate "リンク集: buildO1MgmtSheet から作らない" \
+  's/    o1BuildLinksTab_\(ss\);\n  \} catch \(e\) \{/    0;\n  } catch (e) {/'
+mutate "リンク集: 手で入れた欄を表示値でなく値で読む（日付が化ける）" \
+  's/var vals = sheet\.getRange\(1, 1, last, 2\)\.getDisplayValues\(\);/var vals = sheet.getRange(1, 1, last, 2).getValues();/'
+mutate "リンク集: build でリンク集の例外を捕まえない" \
+  's/  try \{\n    o1BuildLinksTab_\(ss\);\n  \} catch \(e\) \{/  {\n    o1BuildLinksTab_(ss);\n  } if (false) { var e;/'
+mutate "リンク集: 同じ項目名は最後の値を採る" \
+  's/    if \(out\[label\] === undefined \|\| out\[label\] === ""\) out\[label\] = v;/    out[label] = v;/'
+mutate "リンク集: O1-S の「いつ」から終了判定の後を消す" \
+  's/【期間の終わり・「O1 終了判定」タブが終了（連絡待ち）になった後】研究者が/研究者が/'
+
+# --- §19 O1-C の登録用の設問の照合と修復（2026-10-08） -------------------------
+mutate "修復: メールアドレスを足さない" \
+  's/(  missing\.forEach\(function \(t\) \{\n)    o1AddRegistrationItem_\(form, t\);/$1    if (t !== Q_O1_EMAIL) o1AddRegistrationItem_(form, t);/'
+# 2026-10-08 に私が実際に入れかけた誤り。残っている登録用の設問を全部から取ると、参加者ID だけ欠けた形を素通りさせる。
+mutate "修復: 最後に来るべき設問を、欠けより前でなく残っている全部から取る" \
+  's/  var kept = O1_REGISTRATION_TITLES\.slice\(0, O1_REGISTRATION_TITLES\.indexOf\(missing\[0\]\)\);/  var kept = O1_REGISTRATION_TITLES.filter(function (t) { return !!present[t]; });/'
+mutate "修復: フォームの最後の設問を見ない" \
+  's/  if \(lastTitle !== wantLast \|\| lastIsHeader !== !kept\.length\) \{/  if (false) {/'
+mutate "修復: 揃っていても足す（冪等でない）" \
+  's/  if \(!missing\.length\) \{\n    Logger\.log\(\n.*?\n    \);\n    return 0;\n  \}/  if (!missing.length) missing = [Q_O1_OS];/s'
+mutate "照合: 欠けを挙げない" \
+  's/      problems\.push\("欠けている: " \+ e\.title\);\n      return;/      return;/'
+mutate "照合: 必須の有無を見ない" \
+  's/      if \(req !== e\.required\) \{/      if (false) {/'
+mutate "照合: 並びを見ない" \
+  's/    if \(pos < lastPos\) \{/    if (false) {/'
+mutate "照合: 種類を見ない" \
+  's/    if \(type !== e\.type\) \{/    if (false) {/'
+mutate "照合: 同意項目を期待に入れない" \
+  's/(  o1ConsentItemTitles_\(\)\.forEach\(function \(t\) \{\n)    expected\.push\(\{ title: t, type: FormApp\.ItemType\.CHECKBOX, required: true \}\);/$1    0;/'
+mutate "照合: 一致しないのに true を返す" \
+  's/      problems\.join\("\\n  - "\)\n  \);\n  return false;/      problems.join("\\n  - ")\n  );\n  return true;/'
+mutate "migrate: 照合せずに「一致しています」と言う（10/03 の誤報）" \
+  's/  var problems = o1ConsentFormShapeProblems_\(form\);\n  if \(problems\.length\) \{\n    Logger\.log\(\n      \(added \? "" : "追加する同意項目はありません。"\)/  var problems = [];\n  if (problems.length) {\n    Logger.log(\n      (added ? "" : "追加する同意項目はありません。")/'
+mutate "照合: 選択肢を見ない" \
+  's/      if \(e\.choices\) \{/      if (false) {/'
+mutate "照合: 重複を見ない" \
+  's/    if \(seen\[t\] === 1\) problems\.push/    if (false) problems.push/'
+mutate "修復: 欠け以外の問題を見ずに足す" \
+  's/  if \(other\.length\) \{/  if (false) {/'
+mutate "照合: 既知のタイトルの辞書にプロトタイプを持たせる" \
+  's/  var known = Object\.create\(null\);/  var known = {};/'
+mutate "修復: 最後の設問の種類を見ない" \
+  's/  if \(lastTitle !== wantLast \|\| lastIsHeader !== !kept\.length\) \{/  if (lastTitle !== wantLast) {/'
+# --- 2026-10-08 識別子と公表の約束 ---------------------------------------------
+mutate "本文から識別子の行を消す" \
+  's/    "・この端末の導入ごとに作った乱数の識別子（16 桁・開始時に 1 回だけ）。端末や個人を特定する情報ではありません。" \+\n    "複数の端末で使うときに、記録を端末ごとに分けるためだけに使います（機体番号・ホスト名などは使いません）\\n" \+\n//'
+mutate "本文から公表と公開の節を消す" \
+  's/    "▼ 結果の公表と、記録の公開について\\n" \+\n/    "\\n" +\n/'
+mutate "公表の同意項目を消す" \
+  's/    "研究の結果が論文などで公表され（1 人ずつの数値を記号で示すことを含む）、公表した数値は後から取り除けないこと、" \+\n      "加工した記録を公開する場合は、あらためて尋ねられ、同意した記録だけが公開されることの説明を受けました。",\n//'
+mutate "構築: 登録用の設問を足す順を入れ替える" \
+  's/var O1_REGISTRATION_TITLES = \[Q_O1_PID, Q_O1_NAME, Q_O1_EMAIL, Q_O1_OS\];/var O1_REGISTRATION_TITLES = [Q_O1_PID, Q_O1_EMAIL, Q_O1_NAME, Q_O1_OS];/'
+
 echo "────────────────────────────────────────"
 echo "  変異: 赤になった $PASS 件 / 緑のままだった $FAIL 件"
 if [ "$FAIL" -eq 0 ]; then

@@ -190,6 +190,20 @@
     - [x] ★ M6 への申し送り（判断 132）: 追補の節に「Status の日付は macOS の凍結の日で、印は追補で差し替えた」と 1 文（2026-10-03: §10.1 に書いた）
     - [x] 完了時レビュー（code-reviewer ∥ security-checker ∥ Codex 1 巡・`1086e3be..ce205e83`）→ 判断 132
     - [x] 出荷: ブランチ `docs/ime-m3-freeze` とタグ `ime-observation-prereg-macos` を push（`ls-remote` でタグが `ff122e32` を指すことを確かめた・タグの push でワークフローは起動しない）→ PR #293 → PR の CI（run 36977262693）は Mac・Windows の check と frontend-check が緑 → merge（merge commit 方式）。merge の前に main が 2 回進み、1 回目は `.codex/budget.json` の台帳だけが衝突 → 和で解いた（422,989 / 10 回・判断 132 の台帳のコメント）、2 回目（#294 の版上げ）は衝突なし → CI 緑（run 36984522344）→ **merge `2543f9fb`** → **main の CI（run 36988299913）success**（Mac / Windows の check・frontend-check）。凍結の commit `ff122e32` は main から辿れる
+  - [x] M4 macOS 本計測（事前登録 §3.2 の順: ON → OFF → E3 `idle` → E3 `working`・各晩 1 項目）
+    - [x] 準備の照合（2026-10-03・Mac・Python 3.14.4）: タグ `ime-observation-prereg-macos` のクリーンな worktree（detached・`ff122e32`・porcelain 0 行）から `export.internal.py --allow-missing-license` → exit 0・98 ファイル → §9 の定義で計算した一覧が **`29b183ba…6c49`**・`freeze-export-list-macos.txt` とバイト一致（G-GEAR と Mac で同じ）。計画: タグと書き出しの両方から §2.4 のコマンドで生成 → ON **`c7a5469d…10ba`**（3,277 行）・OFF **`3759ebf7…09a2`**（3,043 行）で §2.4 と一致。書き出し側で `cargo build --release --locked`（logger）と `refinput-macos/build.sh`（bundle id `local.ime-observation.refinput`）→ どちらも成功・`check_manifest.py --self` match。⚠️ 書き出しは scratchpad（セッションごとに消える）なので本計測の晩に同じ手順で作り直す
+    - [x] ON の run `on-1`（2026-10-03・Mac）: 開始 2026-10-02T16:03:56Z（OSF の `date_registered` 13:40 UTC の後）→ 約 12.0 時間で完走・`aborted: false`・前面の確認 126 / 126・子は 2 つとも `terminated`。`~/ime-m4/`（書き出し `export-ff122e32/`・一覧 `29b183ba…` を照合・`cell-on.json`〔`live_conversion: "on"`・時刻同期と自動更新のオフは研究者の申告・スクリーンセーバーと時刻同期は権限がなく読めず〕・`caffeinate -di` で包み `nohup` で切り離して起動）。run の前に読めた設定: AC 電源・sleep 0・displaysleep 0・自動更新 4 項目 0・`JIMPrefLiveConversionKey = 1`・macOS 27.0.1（26A434）・JapaneseIM-RomajiTyping 6.3
+      → §3.4 の点検（04:15 UTC・凍結の書き出しの `delivery.py`）: exit 0・計画 `c7a5469d…`（§2.4 の ON）・`reference.segments.excluding_mode_keys` の 2 つの数 0 / 0・`n_loss_spans_with_unexplained_presses` 0（失われた焦点 225 はすべて計画どおり〔S15〕）・到達 102,732 / 102,732 → **打ち切りに数えない**。`data.md` の点検の表に 1 行。`run.json` の SHA-256 `0257755c…c268`。預け入れはまだ
+      → ⚠️ **背景の負荷（2026-10-03 に気づいた）**: この Mac は CI の macOS セルフホストランナー（`~/actions-runner`・`gse-mac-selfhosted`）を兼ねる。ON の run（16:03〜04:04 UTC）の間に `CI / Release` が **12 回**起動した（`gh run list`・各 7〜31 分・G-GEAR の別セッションのブランチと main のマージ・cargo のビルドとテスト）。§3.2 の条件（電源・自動更新・時刻同期・スリープ・ロック・スクリーンセーバー）には背景の負荷が無いので**逸脱ではない**が、時刻に効きうる妥当性の脅威として論文の §7 の限界・`env.md` に書く。所要が見込み 10 時間 → 12.0 時間に延びたのはこれかもしれない（推測・未検証）。点検の数（到達 100%・外からの押下 0）には出ていない。ON はやり直さない（§3.4: 完走して点検を通ったセルは 1 回）
+    - [x] OFF の run `off-1`（開始 2026-10-03T04:19:38Z・ライブ変換 OFF を入力メニューの ✓ と `JIMPrefLiveConversionKey = 0` で確かめた・計画 `3759ebf7…` を照合・AC 電源・`cell-off.json`）→ 点検 → `data.md`。★ 研究者の選択: CI ランナーは止めず ON と同じ条件で測る（開始直後に PR #297 の CI が並行していた）
+      → 2026-10-04: 約 11.1 時間で完走・`aborted: false`・前面の確認 117 / 117。run の間に `CI / Release` が 8 回起動（2026-10-05 に run の実の終わり 15:27:12Z で数え直した・前は 15:30 で切って 9 回）。§3.4 の点検（15:34 UTC）: exit 0・計画 `3759ebf7…`（§2.4 の OFF）・0 / 0・`n_loss_spans_with_unexplained_presses` 0 → **打ち切りに数えない**。`data.md` に 1 行。`run.json` の SHA-256 `4ac581cb…f519`。⚠️ ON に無かったもの: **計画に無い焦点の喪失が 1 回**（04:20:33.68〜04:20:36.35 UTC・開始から 55 秒・試行 `t00004`〔S10・mid〕の中）→ 参照に届かなかった押下 11（参照 93,400 / 93,411・観測は 93,411 / 93,411）。★ 原因（研究者の報告・2026-10-04）: **研究者がその約 2 秒にマウスで別の場所をクリックした** → 焦点が移り、送った押下 11 が別のアプリに入った（その秒の統合ログは 0 行で、機械の側からは裏づけられない）。キーは押していない。規則上は喪失の幅の中に説明のない観測の行が無いので数えない。解析では試行 `t00004` は焦点を失った試行として §6.2 の扱いに従う
+    - [x] E3 `idle`（2026-10-04・Mac）: 先に `calibrate-cpu.sh`（真値 98.9% に `top -l 3` 98.8%・`-l 2` 44.0%・不在は空）と `summarize_e3.py --selftest` OK。観測器を 1 つだけ起動（`ps -c` の名前 `ime-observation-logger`・ログは `~/ime-m4/e3-idle-obs.jsonl`・§3.4 で預けない）→ `run_e3.sh idle 28800 30`（`caffeinate -di`・`nohup`）開始 2026-10-03T15:37:21Z → 8 時間で終了 → 観測器を止めた。`summarize_e3.py`: 使える行 777・不在 0・間隔の中央値 37 s・窓 7.99 h → **`status: measured`**（§6.10 の下限 480 行・4 時間を満たす）。`samples.tsv` の SHA-256 `f2fc37ef…1261222`・`conditions.txt` `25a08f08…7fba680f`。その間に `CI / Release` が 5 回起動（ON / OFF と同じく止めない）
+    - [x] E3 `working`（ライブ変換を ON に戻す → `run_e3.sh working` を先に → ON の計画を通しで流す run〔約 12 時間・最初の 8 時間を使う〕→ §3.4 の点検）
+      → 2026-10-04 12:52 JST: ライブ変換を ON に戻した（✓ の読み戻しと `JIMPrefLiveConversionKey = 1`）。`cell-e3-working.json`（`cell-on.json` のラベルだけ `macos-e3-working`）。★ 研究者の選択: **23:00 JST に自動で開始** → `~/ime-m4/e3-working-at-2300.sh` を `nohup caffeinate -i` で待機。23:00 に fail-closed で点検（AC 電源・ライブ変換 ON・観測器 / runner / サンプラーが動いていない・計画 `c7a5469d…`・出力先が無い）→ サンプラーを先に起動して行が出るのを待つ → runner。結果は `e3-working.status.txt`。止まる側を試した（開始を過去・計画の値を偽にした写し → バッテリーで動いていたので「AC 電源でない」で開始せず・出力先は作られない）
+      → ★ 研究者の指示で 23:00 を待たず **22:03 JST に開始**（待機を止め、同じスクリプトを開始時刻だけ過去にして再起動）: 点検は通過 → サンプラー 13:03:31Z（観測器 0 個を確認）→ runner 13:03:31Z。前面の確認と 3 本のログの伸び・観測器 1 個を確かめた
+      → 2026-10-05: 約 12.0 時間で完走（終了 01:04:16Z）・`aborted: false`・前面の確認 126 / 126。§3.4 の点検（01:17 UTC）: exit 0・計画 `c7a5469d…`・0 / 0・`n_loss_spans_with_unexplained_presses` 0・計画に無い焦点の喪失 0・到達は参照・観測とも 102,732 / 102,732 → **打ち切りに数えない**。`data.md` に 1 行（ラベル `macos-e3-working`）。`run.json` `a2fa68e4…de0f9`。`summarize_e3.py idle=… working=…` → **両方 `measured`**（working: 使える行 768・不在 1〔最初の行・観測器の起動前〕・窓 7.99 h・遷移 0）。`samples.tsv` `32fb0782…921ec`・`conditions.txt` `95f29b15…dd7ae4`。その間の CI は 1 回
+    - [x] `env.md`: 3 つのセルの行（macOS 27.0.1 26A434・RomajiTyping 6.3・rustc 1.99.0・Swift 6.4）・`Cargo.lock` の SHA-256 `206d2ed8…`・背景の CI（ON 12 / OFF 8 / idle 5 / working 1 回・各 2〜35 分・`gh run list` の作成時刻が run の窓の中のもの）を限界として 1 段落。★ /cross-review（2026-10-05・Claude ∥ Codex）を受けて: 回数を「重なった workflow run の数と run の時間に占める割合」に直した（ON 13・23% / OFF 9・20% / idle 7・13% / working 1・2%・Windows のジョブも含むので上限）・idle は点検の表に行が無い理由を 1 文。`data.md` に OFF のクリックによる焦点の喪失を 1 段落（原因は研究者の報告で、ログでは確かめられないと明記）。⚠️ **§3.2「別々の晩」から外れた**（OFF は ON の 15 分後の昼に開始・OFF と idle が同じ夜）→ `deviations.md` に **D6**（§8: 解析の前に記録）。前にメインが「逸脱には当たらない」と言ったのは確かめないままの断定だった
+    - [x] M4 の受け入れ条件（`_issue-plan.md`）: 3 つの run（`on-1`・`off-1`・`e3-working-run`）の `gt` / `obs` が凍結の書き出しの `validate_logs.py --kind` を、`oracle` が `emit.py --validate` を通る（9 本とも exit 0・2026-10-05）。`run.json` の SHA-256 は上に記録。⚠️ `data.md` の `- run_dir: … manifest_sha256: …` の行は預け入れから取り出した後に足す（`data.md` の規約）→ 預け入れ（`pipeline.py --pack`）と一緒に。生の run は `~/ime-m4/runs/`（この Mac だけ・git の外）
   - [ ] M5 Windows の較正パイロット → ~~別の Windows 実機で行う（判断 133）~~ → ★ **G-GEAR で行う**（2026-10-03・研究者の選択・判断 134: 数時間以上の run〔M7 のセル・Windows の E3〕だけ別の Windows 実機）。IME の学習はリセットしない・電源の設定はメインが一時的に切って戻す・実行の時間は未決。⚠️ 較正（G-GEAR）と計測（別の実機）の機械が違う → M7 の前に計測する機械で短い確認の run（推奨・M6 の前に研究者が決める）。G-GEAR ではまだ何もしていない。→ 引き継ぎ `next-session-ime-paper-m5-windows.md`
     - [x] 2026-10-03: 引き継ぎを開いた機械が Surface Pro 8（判断 134 の「別の Windows 実機」・研究者の答え）だった → M5 は G-GEAR に残し、計測する機械の OS・MS-IME の版・キーボード・道具の有無を記録した（判断 135・25H2 / 26200・MS-IME 10.0.26100.8875・Rust と Python は未導入）
     - [x] 2026-10-03: 研究者の指示で **M5 をこの Surface（計測する機械）で行う**（判断 136）。Python 3.11.9・Rust 1.98.1・MSVC を入れ、タグから書き出し（一覧 `29b183ba…` が一致）→ ビルド → selftest がすべて緑。短い試し（IMM / TSF 各 39 試行）と本体（各 117 試行・27.6 分）を打ち切りなしで回し、封印 → 集計した → `pilot-windows-1-notes.md`
@@ -199,5 +213,89 @@
   - [x] M6 Windows の追補（2026-10-03・Surface・判断 138〜142）: §10・逸脱 D1〜D4・`pilot-windows.md`・`data.windows.md`・`kit/run/` の Windows の道具・`scope_windows.py`。attack-me round 1（major）→ round 2（minor）→ 直して完了時レビュー（code-reviewer ∥ security-checker・Codex は不在で省略）→ **凍結 `a57c4fd7`・タグ `ime-observation-prereg-windows`**（`sha256` は macOS と同じ・書き出し 108 ファイル・一覧の SHA-256 `f61af353…87b7`・`freeze-export-list-windows.txt`）
     - [x] 2026-10-03: 研究者が OSF Registries に追補を登録した → **https://osf.io/4jwzn**（DOI 10.17605/OSF.IO/4JWZN・公開・`date_registered` 2026-10-03T13:56:27 UTC・Open-Ended・添えたファイルの SHA-256 が凍結したファイル `f8620963…` と一致）→ `notes.md` に記録。元の項目: 研究者: OSF Registries に追補を登録する（凍結したファイル `f8620963…2b1d`・commit の 40 桁・一覧の SHA）→ URL と日付を `experiment/notes.md` に → 登録の日付は Windows の最初の計測より前
   - 全体: ★ 凍結物は **`papers/ime-observation/experiment/preregistration.md`**（判断 21 で `experiments/<date>-…/` から変更）
+- [x] 投稿計画の見直し（2026-10-04・G-GEAR・判断 145）: BRM に **10 月末**に投稿・原稿は計測と並行で書く（次のセッションから・引き継ぎ `next-session-ime-paper-writing.md`）。BRM の購読モデルの費用 0 を一次で確認（Chrome）。CHI の残りの記述（`design.md` §6・`requirement.md`・`paper-suggest.md`）を直した
+- [x] 合成入力の記録一式を 5 つ目の貢献「データセット」として加える（2026-10-04・研究者の選択・判断 146）→ 説明書・Zenodo の DOI・パイロットの生ログの判断は M12 の枠で
+- [x] G-GEAR の Windows パイロットの最初の試し（2026-10-03 未明）を `pilot-windows-ggear-notes.md` として残した（判断 144・M5 の記録ではない）。枝 `docs/ime-m5-pilot-ggear` は研究者の了承で消した（2026-10-04）
 - [ ] 論文の外枠（節構成・主張 ↔ 根拠の対応表）を `papers/ime-observation/manuscript/outline.md` に置く（★ 判断 21）
+  - [x] 外枠の初稿（2026-10-04・G-GEAR・枝 `docs/ime-manuscript-outline`）: 13 節 ＋ Open Practices ＋ Declarations・貢献 5 つ・主張 ↔ 根拠の表 23 行（OB / LG / AG / RC / RT / DS）・図 5・表 10。内部の対応（判断・`[Pn]`/`[Vn]`・未登録の引用）は `manuscript-map.md`。`_style_check.py` 違反 0（変異で赤になることも確認）
+  - [x] 研究者の確定（判断 147）: データセットは専用の短い節・パイロットの生ログは別の区分で数える・原稿は LaTeX（Springer の雛形）
+  - [x] attack-me（外枠）round 1 → **major**（有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 149・7 問とも推奨）→ 外枠を全面的に直した（31 行）・D6 と §10.8 の点検を公開の記録に（`deviations.md`・`data.windows.md`）
+  - [x] attack-me（外枠）round 2 → **major**（R1 major・R2 minor・R3 major・有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 150・6 問とも推奨＋事実 1 問）→ 外枠を直した（Y1〜Y44・要旨の規則を事前登録 §6.1 に合わせた・推奨 (d) を 2 段に・表を 13 に）・`method.tex`・D6 の言い方
+  - [ ] ★ round 3 は回さない → 原稿の attack-me（stage `manuscript`・10-18〜22）に外枠の round 1・2 の引き継ぎを渡す（判断 150-4）
+  - [x] 試行 2 の間に Surface で何が動いていたか（Y12・判断 150-6）→ `data.windows.md` に書かれていた。原稿 §6.1 に写した（判断 188・Z4）
+  - [x] 手法の節の残り: 問 4（`sections/recoverability.tex`）と問 5（`sections/cost.tex`）の手法（2026-10-05・`730edd64`）
+  - [x] 手法の節の草稿 `manuscript/sections/method.tex`（LaTeX・約 5,200 語・判断 148）・`references.bib`・`main.tex` の骨組み。⚠️ 未コンパイル（この機械に LaTeX が無い）
+  - [x] 公開物の文体検査を `.tex` / `.bib` に広げた（判断 148・selftest ＋ 変異 2 本）
+  - [x] 題を Logging に揃える（`README.md`・`CITATION.cff`・`.zenodo.json`・`main.tex`・`kit/logger/README.md` の古い一文も・2026-10-05・判断 150）。`kit/` に題の文字列は無かった
+  - [ ] `data.windows.md` の §10.8 の点検の計画の SHA-256 を全桁にする（Surface の点検の run の manifest から）
+  - [x] 後の節（§2 比較表・§3 観測可能性〔方法・一次の文書の登録〕・§4 ロガー・Table 4・§10 データセット）・未登録の引用の登録（Plant・Pinet・Bridges・Monaco・Gebru・MS / Apple の文書・Inputlog の版・Translog-II・ScriptLog）
+    → 2026-10-05（G-GEAR）: `sections/related.tex`（§2・Table 1）・`observability.tex`（§3・Table 2）・`logger.tex`（§4・Table 3・Table 4）・`dataset.tex`（§10・Table 13）。MS 16・Apple 13・WebKit のソースを取得して逐語を確かめ、Wayback に写しを作った（`docs/references.md` [V192]〜[V235]）。★★★ macOS の Accessibility にも変換の範囲の属性と開始・終了の通知があった → 判断 151（§3 と貢献 1 を対称の形に・研究者の選択）。macOS の観測するキーが登録の書き方より狭いこと・ヘッダの SHA-256 が共通部分だけを覆うこと・Windows の補助の信号を原稿の注にした。ScriptLog は scriptlog.net で 1.1 が有償で売られていた（サブエージェントの「入手できない」は不正確だった）
+    → 同日: 独立の照合（Opus）の指摘 17 件をすべて一次で裏取りして直した（判断 153）・書誌 [V192]〜[V235] を登録（`4e5e5184`）・補遺の文書一覧 `manuscript/supplement/observability-documents.tex`（31 件・Wayback の写しつき）
+  - [x] main に入った M4（PR #297）と Windows の解析（PR #304）を取り込んだ（`745a551f`）。逸脱の番号の衝突は研究者の選択で main の D6（macOS の晩）を保ち、この枝の Windows の試行の数え方を **D7** に（判断 152）。macOS の版（27.0.1・26A434）を原稿に記入
+  - [ ] Mac で: AppKit と C の Accessibility の定数の数と `TextInputSources.h` を計測の版（macOS 27.0.1）の SDK のヘッダで確かめる（外枠の Open items・判断 151・153）
+  - [ ] 結果の節（引き継ぎ `next-session-ime-paper-results-3.md`）
+    - [x] 結果の表の道具（判断 156・165・168〜172）: 表 7〜12・KT1・補遺の層ごとの表・予測の層・D10 の直した併合の率・selftest 78 件・変異 29 本（判断 171）
+    - [x] 登録が報告を求めていた残り（層ごとの問 2・全スコープの層ごとの検出・スコープの構成・除外・打ち切り・Windows の診断）と表 9 の区間（判断 172・selftest 91 件・変異 20 本）
+    - [x] Windows の印の時刻（§6.9・判断 171・`results/windows/clock_sync_windows-msime-tsf.json`）
+    - [x] Mac で: macOS の 2 セルの印の時刻（§6.9・判断 171 の手順・`gt_vks` は 123・124）→ `results/clock_sync_<cell>.json`・`data.md`
+      → 2026-10-05（Mac・Python 3.14.4・判断 177）: on 126・off 117 ブロックすべてで印が見つかった（欠け 0）・2 回目とバイト一致・`--check` 一致・未生成の値 0・文体違反 0（組版は G-GEAR）
+    - [x] 表 11 の「規則の性質」（§6.8 の確率の表）の置き方 → 手法の節の静的な表 `tab:nearchance` のまま（判断 174）
+    - [x] `sections/results-*.tex`（RF1 → 問 1・2 → 問 3 → 問 4 → 問 5）の草稿（判断 174）
+    - [x] Windows の開いた集合が macOS OFF とバイト一致する理由を確かめた（判断 173）
+    - [x] 図 1〜5（判断 181: pgfplots・図 2〜5 の座標は表の道具が生成・selftest 125 件・変異 12 本）
+    - [x] 要旨と結論（外枠の Rule for the abstract・248 語）・§1・§11〜13・Declarations・Open Practices・D10 を手法の節に（判断 182）
+    - [x] 完了時レビュー（code-reviewer ∥ security-checker ＋ /cross-review 2 巡・判断 183・184）→ PR
+    - [x] M12 の寄託の 4 点（E3 の標本・working の観測ログ・パイロットの生ログ・コードの DOI）を研究者が決めた（判断 183）
+    - [x] 原稿の attack-me（stage manuscript）round 1 → **major**（R1・R2・R3 とも・有効 3/3・捏造 0・注入 0・偽陽性 0）→ 研究者の採否（判断 188・8 問とも推奨＋dwell の分位点の問い直し）→ 直した（`verdict.md` §8）→ 作業中の点検と /cross-review 2 巡の指摘を直した（判断 189）（2026-10-06・G-GEAR）
+    - [x] Mac で: macOS の 2 セルの探索的な dwell の分位点（`kit/analysis/explore_dwell_quantiles.py`・判断 188-4）→ `experiment/results/exploratory/dwell_quantiles_<cell>.json`（原稿の `\rv` 8 個が埋まる）
+      → 2026-10-06（Mac・判断 190）。G-GEAR で通しのビルド（生成されていない値 0）と、Python の版で `values.json` の最後の桁が変わる問題の直し（`math.fsum`・判断 191）
+    - [x] 表の道具に Windows の 2 つの定義の差の大きさ（Z40）→ 2026-10-06（G-GEAR・判断 192）: 登録 §5 が「報告しない」としていたので研究者の選択で逸脱 D12・§6 に数と値・補遺に両定義の表
+    - [x] 原稿の attack-me round 2 → **minor**（R1・R2・R3 とも・有効 3/3・捏造 0・注入 0・偽陽性 1）→ 研究者の採否（判断 204・8 問とも推奨）→ 直した（`round-2/verdict.md` §8）→ 点検（security 0・code MEDIUM 5・LOW 10）と /cross-review 2 巡の直し → 研究者が直した Discussion と AI 宣言を改めて採った（2026-10-06・G-GEAR）→ PR → CI → merge
+    - [x] round 3 を回すか → 回さない（2026-10-06・研究者の選択・判断 206）。`round-1/tmp/`・`round-2/tmp/` を消した
+    - [x] 著者・所属・Funding・利益相反・貢献（研究者・判断 185）と AI Declaration（判断 185〜187）→ PR #309 で main に
+    - [ ] 研究者が結果・推奨・限界・結論を読んで直す（判断 185・186・投稿の前・AI Declaration の前提）＋ Discussion を研究者の解釈から書く（判断 188-6）＋ 断りの重複を削る（Z10）
+      - [x] 読み直しの資料 `reading-results-discussion.md`（主張 ↔ 根拠・Discussion の事実 F1〜F8 と問い・断りの重複）を渡した（2026-10-06・判断 193）
+      - [x] Discussion: 研究者の方向性 → 事実と照らし Codex に第二意見 → D12 の層ごとの範囲 → 5 段落を英語に → 研究者が採った → 点検と /cross-review 2 巡の直し（2026-10-06・判断 195〜199）
+      - [x] 研究者の答え（§A は今のまま・§C は案どおり・§B.4 の 5〜7・Discussion の仕上げの方針）を受けた（2026-10-06・判断 200）
+      - [x] 判断 200 の方針で Discussion を仕上げ（数字を §6 に寄せる・観測可能性と書字研究の尺度の段落・研究者が採った）、断りを寄せた（−235 語）（2026-10-06・判断 201・202）
+      - [x] 点検（code-reviewer ∥ security-checker）・/cross-review 2 巡の指摘を直した（2026-10-06・判断 203）→ PR → CI → merge
+    - [ ] OSF のプロフィール名が「Mikto Miura」→ 研究者に確かめてもらう（判断 189 の記録）
+    - [x] M12: Zenodo の下書きと DOI の予約・GitHub の公開 repo・原稿の `\tbd` の DOI と URL・データの引用（進め方は判断 207・2026-10-07 に公開・判断 220）
+      - [x] 研究者の 4 点（リリースの DOI は手で予約・repo 名・履歴の 4 commit と非公開の参照の置き換え・書庫は G-GEAR に集める）（判断 207）
+      - [x] Zenodo の下書き 2 つと DOI の予約: データセット `10.5281/zenodo.23183438`・ソフトウェア `10.5281/zenodo.23183441`（判断 208）
+      - [x] Surface: Windows の書庫 10 と標本を束ね（TSF の落ちた 2 件は寄託せず・管理者権限で拒まれた開始は寄託）、記録と一覧を埋め、3 種の書き出しを確かめた（2026-10-06・判断 217・枝 `docs/ime-m12-surface-deposit`）
+      - [x] 非公開の repo `mikotomiura/ime-conversion-logging` を作り（済）、A・B・C を push（タグ 2 つ）→ ⚠️ push は自動モードで拒まれた・研究者が `C:/wt/ime-conversion-logging.git` から push した
+      - [x] 書き出しの道具を .tex・.bib と LaTeX の ignore に対応させ、`rv@` を `rv:` に、研究者のアドレスだけを通す（selftest・変異 10 本・判断 208）
+      - [x] 非公開の commit の参照 12 か所の置き換え・`\tbd`（DOI・URL・外枠の commit・表 1 の版）・`references.bib`・CITATION.cff・.zenodo.json・ライセンスの全文・.gitattributes・凍結の一覧を計算し直す手順（README）（判断 209）
+      - [x] README の先頭にロゴと動く SVG（研究者の求め・判断 210）
+      - [x] 作業中の点検（code-reviewer ∥ security-checker）の指摘 14 件を直した（判断 211）
+      - [x] 研究者が公開 repo に A〜C を push した（2026-10-06・`git ls-remote` で main = `cb29a1a9…`・タグ 2 つが A・B を指す・非公開のまま）
+      - [x] PR #316 の /cross-review 2 巡（Codex・パス限定 3 回）の指摘を直した（SVG を XML として読む層・文字参照を戻した走査・凍結の一覧の手順・`xml:base` ほか・変異 21 本すべて赤・本番の形の書き出し exit 0・`kit/check.sh` 31 本が緑）（2026-10-06・G-GEAR・判断 212）→ CI → merge
+      - [x] Mac: macOS の書庫 9 つ（E3 working・パイロット 8）と E3 の標本を束ね、タグ 2 つ・main の書き出しを Mac で確かめた（2026-10-06・判断 214）→ 書庫を G-GEAR へ移す（研究者）
+      - [x] G-GEAR の準備: 寄託は 1 ファイルずつ（研究者の選択）・一覧 `kit/export/deposit.internal.json` と照合して上げる道具 `deposit.internal.py`・点検（code ∥ security）の指摘 17 件を直した・下書きを GET で確かめた・引き継ぎを機械ごとに分けた（2026-10-06・判断 215・枝 `docs/ime-m12-deposit-prep`）
+      - [x] Mac: `conditions.txt` の SHA-256 2 つを `data.md` と一覧に記録し、道具で照合した（macOS の 15 ファイルすべて ok・FAIL は windows の MISSING だけ・2026-10-07・判断 216・枝 `docs/ime-m12-mac-conditions`）
+      - [x] Mac: 計測の書庫 2 つ（`macos-standard-live-{on,off}-1.zip`）を Drive の `mac/` へ上げて G-GEAR へ（研究者が手で・2026-10-07・SHA-256 一致・判断 218）
+      - [x] Surface: Windows の書庫と標本・`data.windows.md` と一覧・書き出しの確かめ・`C:/ime-deposit/` へ（判断 217・Drive で G-GEAR へ・2026-10-07）
+      - [x] G-GEAR: 枝を合わせて照合（30 ファイル・保留 0）→ datasheet と `\tbd` 8 か所を埋める → 点検（code ∥ security）の指摘を直す（判断 218・枝 `docs/ime-m12-deposit`）
+      - [x] G-GEAR: /cross-review → PR #318 → merge → `--upload`（38 ファイル・大きい 3 つは Mac からウェブ）→ README の仕上げ・日本語訳・図と記録の寄託先と日付（PR #319）→ リリース D `48caf9ef`（研究者が force push）→ Zenodo の 2 つを publish（2026-10-07・`publication_date` 一致）→ repo を public（判断 218〜220）
+      - [x] GitHub での README（ロゴ・動く図・2 枚の図・バッジ・ダーク用の 3 枚・DOI のリンク）の見え方を、公開の後に Chrome で確かめた（判断 220）
+      - [x] datasheet（Claude の下書き → AI 宣言に足す → 研究者が確かめる）
+        - [x] 下書き `experiment/datasheet.md`・点検（code ∥ security）の指摘で書き直し・研究者の 5 問（連絡先はメール・§10.8 の確かめの run はパイロットの部・青空文庫の出どころと作業履歴・方針の文）・書き出しの例外・`dataset.tex`・AI 宣言（2026-10-06・G-GEAR・判断 213・枝 `docs/ime-m12-datasheet`）
+        - [x] 研究者が全文を日本語で確かめ「このまま採る」（2026-10-06）→ /cross-review 2 巡（Codex・アドレスを伏せた写し・指摘 5 件を直した）（判断 213）→ PR → CI → merge
+        - [x] 寄託のとき: 「(to be filled in at deposit)」を埋めた（表は 1 ファイルずつ 38 行・判断 218）
+      - [x] Mac / Surface: working・パイロット・標本の書庫（`--pack`・`--check-deposit`）→ SHA-256 を記録 → G-GEAR へ（判断 214・216・217）。⚠️ D の書き出し直しは両機では回さず、判断 219 の理由で門を満たしたと扱った（研究者が覆せる）
+      - [x] G-GEAR: 書庫を照らして下書きに上げる → 「at deposit」の 6 か所と `confirmed at deposit` → D を作る → 研究者に公開を確かめる（repo を公開・Zenodo 2 つを公開）（2026-10-07・判断 218〜220）
+    - [ ] プレプリント（PsyArXiv・判断 205・221）
+      - [x] 研究者の 4 問（CC BY 4.0・心理の 3 分野・申告欄のリンクだけ・本文と補遺を 1 つの PDF に）・OSF の名前は直っていた・PDF（241 頁・リンク 1,101 本を元どおりに）・入力欄の値の案（2026-10-07・判断 221）
+      - [x] 研究者が入力して送った（Claude は入力欄の値を照らした・`bkuds_v1`・pending・ファイルは SHA-256 一致）（2026-10-07・判断 221）
+      - [x] 研究者の指摘で表 13 ほかが頁の外に出ていると分かった → 頁をまたぐ表に直し、頁の外と頁番号への重なりを数える検査を足した・点検と /cross-review 2 巡 → PR #326 → CI 緑 → merge `c9372538`（2026-10-08・判断 222）
+      - [x] bkuds_v1 を取り下げ（研究者）→ 直した 248 頁で出し直した **`j7k34_v1`**（pending）→ ファイルの SHA-256・タイトル・要旨・メタデータ・申告を API で照らした（2026-10-08・判断 222）
+      - [ ] 審査（24〜72 時間）→ DOI を記録する。止められたら Zenodo への切り替えを研究者に確かめる（判断 205）
+      - [ ] 公開 repo の v1.0.1 と Zenodo のコードの記録の新しい版（判断 222・merge の後）
+        - [x] Zenodo の新しい版の下書き 23219322・DOI `10.5281/zenodo.23219322` を予約・CITATION.cff と README を 1.0.1 に（BibTeX は 1.0.1・論文の欄は 1.0.0）・試しの書き出し 201 ファイル（共有の 8 ファイルは 1.0.0 と同じ）・点検と /cross-review（2 回目は Codex の上限で Claude 単独）（2026-10-08・判断 223）
+        - [ ] PR → CI → merge → merge した main から E を組む → 研究者が GitHub へ push → zip を下書きに上げてメタデータ → publish（研究者に確かめる）
+    - [ ] BRM への投稿（判断 221）
+      - [x] 語数の上限（本文は無い・要旨 250 語以内＝248 語）・図 1 の AI 開示（宣言とカバーレターで足りる・Y39）・カバーレターの下書きを研究者が採った・投稿用の PDF とタイトル頁の写しを `C:/ime-submission/` に（2026-10-07・判断 221）
+      - [ ] カバーレターにプレプリントの DOI を入れる・タイトル頁に住所と電話（研究者）・ScholarOne の画面で語数などの欄を確かめる・投稿（研究者）
+  - [ ] ★ 別タスク（判断 151-2）: GSE 本体の `docs/agent-shared.md` 技術的制約 7 の「macOS 側（公開 API が存在しない）」と `.steering/20260821-workspace-behavior-triage/survey-input-channels.md` §7.5 を一次（WebKit のソース・Apple の定数の一覧）に戻して直す
 - [ ] /finish-task
