@@ -19,7 +19,6 @@ import json
 import math
 import operator
 import os
-import pickle
 import random
 import sys
 from array import array
@@ -28,7 +27,7 @@ from multiprocessing import Pool
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from romaji_table import HABITS, unit_keys  # noqa: E402
-from build_segments import unpack  # noqa: E402  (no SudachiPy import at module level)
+from build_segments import load_derived, unpack  # noqa: E402  (no SudachiPy import at module level)
 
 
 def seed_int(*parts):
@@ -86,11 +85,10 @@ def credit_l1(rec, cands, true):
 _DATA = {}
 
 
-def _load(derived, name):
+def _load(derived, name, stats):
     if _DATA.get("name") != name:
         _DATA.clear()
-        with open(os.path.join(derived, "corpus_%s.pkl" % name), "rb") as f:
-            d = pickle.load(f)
+        d = load_derived(derived, "corpus", name, stats)
         _DATA.update({"name": name, "work_ids": d["work_ids"], "keys": d["keys"], "units": d["units"],
                       "cache": OrderedDict()})
     return _DATA
@@ -130,8 +128,8 @@ def percentile(sorted_vals, q):
 
 
 def run_cell(task):
-    derived, name, k, N, mcfg, seed, r_bar = task
-    data = _load(derived, name)
+    derived, stats, name, k, N, mcfg, seed, r_bar = task
+    data = _load(derived, name, stats)
     keys = data["keys"]
     starts = [valid_starts(kk, k) for kk in keys]
     eligible = [w for w in range(len(keys)) if len(starts[w])]
@@ -219,7 +217,7 @@ def run_cell(task):
             "max_windows_predictor": out["diag_max_windows"],
             "true_index_chi2": chi2,
             "true_index_df": N - 1,
-            "true_index_z": (chi2 - (N - 1)) / math.sqrt(2 * (N - 1)),
+            "true_index_z": (chi2 - (N - 1)) / math.sqrt(2 * (N - 1)) if N > 1 else None,
         },
     })
     return cell
@@ -240,9 +238,9 @@ def main(argv):
     seed = open(a.seed_file, encoding="utf-8").read().strip()
     r_bar = json.load(open(a.stats, encoding="utf-8"))["r_bar"]
     defs = cfg["segmentation"]["definitions"] if not a.only else a.only.split(",")
-    tasks = [(a.derived, name, k, N, mcfg, seed, r_bar) for name in defs for k in mcfg["k"] for N in mcfg["N"]]
+    tasks = [(a.derived, a.stats, name, k, N, mcfg, seed, r_bar) for name in defs for k in mcfg["k"] for N in mcfg["N"]]
     # heavy cells first so that the pool stays busy; the output order does not depend on this
-    tasks.sort(key=lambda t: -(t[2] * t[3]))
+    tasks.sort(key=lambda t: -(t[3] * t[4]))
     if a.processes > 1:
         with Pool(a.processes) as pool:
             cells = []

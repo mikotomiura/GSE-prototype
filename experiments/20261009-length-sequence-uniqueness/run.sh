@@ -19,6 +19,8 @@ if [ -x .venv/Scripts/python ]; then PY=.venv/Scripts/python; else PY=.venv/bin/
 [ -x "$PY" ] || { echo "!! .venv が無い（上のコメントの手順で作る）" >&2; exit 1; }
 run() { "$PY" -I -X utf8 -W ignore "$@"; }
 PROCS="${PROCESSES:-4}"
+# sha256sum (Linux, git-bash) or shasum -a 256 (macOS)
+if command -v sha256sum >/dev/null 2>&1; then SHA256="sha256sum"; else SHA256="shasum -a 256"; fi
 
 mkdir -p results raw/index raw/zips raw/derived
 
@@ -31,12 +33,15 @@ index() {
   local zip=raw/index/list_person_all_extended_utf8.zip
   local want=a615fa6ddb6ef3e0ad598337f5d08f1570c3d2aa51cc5d43a62998ca904905be
   if [ ! -f "$zip" ]; then
-    curl -sS -o "$zip" https://www.aozora.gr.jp/index_pages/list_person_all_extended_utf8.zip
+    curl -fsS --proto =https --max-time 300 -o "$zip.part" \
+      https://www.aozora.gr.jp/index_pages/list_person_all_extended_utf8.zip
+    mv "$zip.part" "$zip"
   fi
   local got
-  got=$(sha256sum "$zip" | cut -d' ' -f1)
+  got=$($SHA256 "$zip" | cut -d' ' -f1)
   if [ "$got" != "$want" ]; then
-    echo "!! 作品の一覧の SHA-256 が記録と違う（$got）。一覧が更新されている。data.md を見る" >&2
+    echo "!! 作品の一覧の SHA-256 が記録と違う（$got）。一覧が更新されたか、取得が壊れた。" >&2
+    echo "   取り直すなら $zip を消してから再実行する（更新されていれば同じ選定は再現できない。data.md を見る）" >&2
     exit 1
   fi
 }
@@ -54,13 +59,14 @@ main() {
   run scripts/build_segments.py --manifest results/corpus_manifest.json --zips raw/zips --config config.json \
     --out-dir raw/derived --stats results/corpus_stats.json
   echo "== 指標 1（位置が一意に決まる割合）=="
-  run scripts/uniqueness.py --derived raw/derived --config config.json --out results/uniqueness.json
+  run scripts/uniqueness.py --derived raw/derived --stats results/corpus_stats.json --config config.json \
+    --out results/uniqueness.json
   echo "== 指標 2（候補 N 本からの照合）=="
   run scripts/matching.py --derived raw/derived --stats results/corpus_stats.json --config config.json \
     --seed-file SEED --out results/matching.json --processes "$PROCS"
   echo "== 表 =="
   run scripts/summarize.py --results results --out results/summary.md
-  sha256sum results/*.json results/summary.md
+  $SHA256 results/*.json results/summary.md
 }
 
 case "${1:-all}" in

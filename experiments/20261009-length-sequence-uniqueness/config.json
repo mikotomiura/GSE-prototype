@@ -7,7 +7,7 @@
     "n_works": 1500,
     "nested_sizes": [100, 1000, 1500],
     "fetch_count": 1600,
-    "duplicate_window_k": 10,
+    "duplicate_min_line_chars": 20,
     "duplicate_overlap": 0.5,
     "reference_works": [
       {"work_id": "000069", "label": "akutagawa_kappa", "ime_sha256": "8daf7b994cebd17dff5a5447fd18d0408a153855ea821b9bec138ee3e68a49e9"},

@@ -14,7 +14,7 @@ DEF_LABEL = {
     "B3": "B3 読点・句点だけ（Enter を捨てる）",
 }
 COND_ORDER = ["ideal", "weak", "mid", "strong", "ruby_only", "habit_only", "bs_only", "shift_only"]
-K1_SHOW = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30]
+K1_SHOW = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30]
 
 
 def pct(x, digits=1):
@@ -101,7 +101,7 @@ def main(argv):
             pct(d["random_predictor"]["acc"], 2), pct(d["random_predictor"]["ci"][0], 2),
             pct(d["random_predictor"]["ci"][1], 2),
             pct(d["max_windows_predictor"]["acc"], 2), pct(d["max_windows_predictor"]["ci"][0], 2),
-            pct(d["max_windows_predictor"]["ci"][1], 2), d["true_index_z"]))
+            pct(d["max_windows_predictor"]["ci"][1], 2), float("nan") if d["true_index_z"] is None else d["true_index_z"]))
     L.append("")
     with open(a.out, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(L))

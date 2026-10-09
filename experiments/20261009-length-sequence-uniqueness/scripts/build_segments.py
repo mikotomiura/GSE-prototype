@@ -120,6 +120,7 @@ def parse_ruby(line):
     p2w = []
     inner = []  # (start, end) of replaced bases in plain
     bar = None
+    floor = 0  # an implicit base never reaches back past the end of the previous ruby's base
     n_ruby = n_sub = 0
     i = 0
     while i < len(line):
@@ -141,9 +142,10 @@ def parse_ruby(line):
                 bs = bar
             else:
                 bs = be
-                while bs > 0 and is_kanji(plain[bs - 1]):
+                while bs > floor and is_kanji(plain[bs - 1]):
                     bs -= 1
             bar = None
+            floor = be
             if bs < be and is_kana_reading(reading):
                 ws = p2w[bs]
                 del writer[ws:]
@@ -197,10 +199,14 @@ class Tokenizer(object):
 
 
 # ---------------------------------------------------------------- units
+ITERATION_MARKS = frozenset("ゝゞヽヾ〃")
+
+
 def is_word_char(ch):
-    """A character that may be read through the dictionary: a letter (kanji, kana, the iteration marks,
-    the long-vowel mark) or the ideographic zero. Digits, Latin letters, symbols and anything else are not."""
-    if is_digit_or_latin(ch):
+    """A character that may be read through the dictionary: a letter (kanji, kana, the long-vowel mark,
+    々) or the ideographic zero. Digits, Latin letters, symbols, the kana iteration marks ゝゞヽヾ and 〃
+    (design.md section 4.3: their typing is not determined) and anything else are not."""
+    if is_digit_or_latin(ch) or ch in ITERATION_MARKS:
         return False
     return unicodedata.category(ch).startswith("L") or ch == "〇"
 
@@ -280,14 +286,18 @@ def line_cuts(plain, att_items, starts, mode):
                 cf.add(q)
     elif mode == "bunsetsu":
         # punctuation and closing brackets never start a bunsetsu, so they stay with the one before them
-        cf.update(s for s in starts if s > 0)
+        cf.update(starts)
+    kept = []
     if mode != "none":
+        # a confirm Enter is pressed only when something was typed since the previous confirm (or the line
+        # start); the end of the line always gets one then, because the newline needs an empty composition
         typed = sorted(pos for pos, kind, _ in att_items)
-        last_cf = max([c for c in cf if c <= len(plain)] or [0])
-        if any(p >= last_cf for p in typed):
-            cf.add(len(plain))
-        cf = {c for c in cf if c > 0}
-    cuts += [(c, 0, "CF") for c in cf]
+        last = 0
+        for q in sorted(cf | {len(plain)}):
+            if any(last <= p < q for p in typed):
+                kept.append(q)
+                last = q
+    cuts += [(c, 0, "CF") for c in kept]
     cuts.append((len(plain), 2, "NL"))
     cuts.sort()
     return cuts
@@ -381,29 +391,29 @@ def segments_of_work(lines, tok):
 
 # ---------------------------------------------------------------- corpus
 SEP = chr(0x1F)
+MAX_TXT_BYTES = 50 * 1024 * 1024  # the largest text in the corpus is far below this; a larger member is refused
 
 
 def read_zip_text(path):
     with zipfile.ZipFile(path) as z:
-        names = [n for n in z.namelist() if n.lower().endswith(".txt")]
-        if len(names) != 1:
-            raise ValueError("expected one .txt in %s, found %r" % (os.path.basename(path), names))
-        data = z.read(names[0])
+        infos = [i for i in z.infolist() if i.filename.lower().endswith(".txt")]
+        if len(infos) != 1:
+            raise ValueError("expected one .txt in %s, found %r" % (os.path.basename(path), [i.filename for i in infos]))
+        if infos[0].file_size > MAX_TXT_BYTES:
+            raise ValueError("the text in %s is larger than %d bytes" % (os.path.basename(path), MAX_TXT_BYTES))
+        data = z.read(infos[0])
     text = data.decode("cp932", errors="replace")
     return text, text.count(chr(0xFFFD))
 
 
-def window_hashes(keys, k):
-    """Hashes of the windows of k consecutive valid segments (keys < 0 marks an invalid segment)."""
+def line_hashes(lines, min_chars):
+    """Hashes of the body lines (ruby removed, whitespace removed) of at least min_chars characters; used to
+    find a work whose text repeats earlier works (design.md section 3). The text decides, not the key counts."""
     out = set()
-    run = 0
-    for i, v in enumerate(keys):
-        if v >= 0:
-            run += 1
-            if run >= k:
-                out.add(hash(tuple(keys[i - k + 1:i + 1])))
-        else:
-            run = 0
+    for ln in lines:
+        s = "".join(ch for ch in parse_ruby(ln)[0] if not ch.isspace())
+        if len(s) >= min_chars:
+            out.add(hashlib.blake2b(s.encode("utf-8"), digest_size=8).digest())
     return out
 
 
@@ -469,6 +479,17 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def load_derived(derived, role, name, stats_path):
+    """Load <derived>/<role>_<name>.pkl after checking its SHA-256 against the value this step recorded in
+    corpus_stats.json (a pickle runs code when loaded; only the files this step wrote are accepted)."""
+    path = os.path.join(derived, "%s_%s.pkl" % (role, name))
+    want = json.load(open(stats_path, encoding="utf-8"))["derived_files_sha256"].get(os.path.basename(path))
+    if want is None or sha256_file(path) != want:
+        raise SystemExit("load_derived: %s does not match corpus_stats.json; rebuild it" % path)
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest", required=True)
@@ -486,7 +507,7 @@ def main(argv):
                     "units": {n: [] for n in DEFINITIONS}} for role in ("corpus", "reference")}
     tallies = {role: {n: Tally() for n in DEFINITIONS} for role in ("corpus", "reference")}
     dropped = []
-    seen_windows = set()
+    seen_lines = set()
     agg = {"ruby": 0, "ruby_substituted": 0, "x_tokens": 0, "no_frame": 0, "replacement_chars": 0}
     x_examples = {}
     for e in manifest["works"]:
@@ -512,11 +533,11 @@ def main(argv):
             continue
         packed = {n: pack(segs[n]) for n in DEFINITIONS}
         if role == "corpus":
-            wins = window_hashes(packed["B0"][0], scfg["duplicate_window_k"])
-            if wins and len(wins & seen_windows) >= scfg["duplicate_overlap"] * len(wins):
+            wins = line_hashes(lines, scfg["duplicate_min_line_chars"])
+            if wins and len(wins & seen_lines) >= scfg["duplicate_overlap"] * len(wins):
                 dropped.append({"work_id": e["work_id"], "role": role, "reason": "content duplicate"})
                 continue
-            seen_windows |= wins
+            seen_lines |= wins
             agg["no_frame"] += int(no_dash)
             agg["replacement_chars"] += n_repl
             for k in ("ruby", "ruby_substituted", "x_tokens"):
@@ -537,6 +558,14 @@ def main(argv):
     if n_corpus < scfg["n_works"]:
         print("build_segments: only %d usable works (need %d); raise fetch_count" % (n_corpus, scfg["n_works"]),
               file=sys.stderr)
+        return 1
+    # the reference corpus is meant to be the IME paper's 12 works, byte for byte; anything less stops the run
+    want_ref = [r["work_id"] for r in scfg["reference_works"]]
+    ref_entries = {e["work_id"]: e for e in manifest["works"] if e["role"] == "reference"}
+    not_same = [w for w in want_ref if not ref_entries.get(w, {}).get("matches_ime_paper")]
+    if store["reference"]["work_ids"] != want_ref or not_same:
+        print("build_segments: the reference works are not the IME paper's 12 archives (missing or different: %s)"
+              % (not_same or sorted(set(want_ref) - set(store["reference"]["work_ids"]))), file=sys.stderr)
         return 1
 
     os.makedirs(a.out_dir, exist_ok=True)

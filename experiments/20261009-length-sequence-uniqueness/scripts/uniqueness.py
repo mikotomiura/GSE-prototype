@@ -1,7 +1,8 @@
 """Measure 1: the fraction of windows of k segment lengths whose sequence occurs once in the corpus
 (design.md section 6). Standard library only.
 
-  uniqueness.py --derived raw/derived --config config.json --out results/uniqueness.json
+  uniqueness.py --derived raw/derived --stats results/corpus_stats.json --config config.json
+                --out results/uniqueness.json
 
 A window is k consecutive valid segments inside one work. Its sequence is compared by a polynomial hash
 modulo 2^61-1 of the k key counts (base larger than any count, so two different sequences of the same k
@@ -11,19 +12,20 @@ in 16 buckets of the hash to keep memory low.
 import argparse
 import json
 import os
-import pickle
 import sys
 from array import array
 from collections import Counter
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from build_segments import load_derived  # noqa: E402  (checks the SHA-256 before unpickling)
 
 MOD = (1 << 61) - 1
 BASE = (1 << 20) + 7
 BUCKETS = 16
 
 
-def load(derived, role, name):
-    with open(os.path.join(derived, "%s_%s.pkl" % (role, name)), "rb") as f:
-        d = pickle.load(f)
+def load(derived, role, name, stats):
+    d = load_derived(derived, role, name, stats)
     return d["work_ids"], d["keys"]
 
 
@@ -83,6 +85,7 @@ def measure(keys_list, ks):
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--derived", required=True)
+    ap.add_argument("--stats", required=True)
     ap.add_argument("--config", required=True)
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
@@ -92,7 +95,7 @@ def main(argv):
     defs = cfg["segmentation"]["definitions"]
     res = {"format": "uniqueness/1", "k": sorted(ks), "results": []}
     for name in defs:
-        wids, keys = load(a.derived, "corpus", name)
+        wids, keys = load(a.derived, "corpus", name, a.stats)
         for size in sizes:
             sub = keys[:size]
             r = measure(sub, ks)
@@ -100,7 +103,7 @@ def main(argv):
                                    "valid_segments": sum(sum(1 for v in kk if v >= 0) for kk in sub),
                                    "by_k": r})
             print("uniqueness: %s first_%d done" % (name, size), flush=True)
-        rw, rkeys = load(a.derived, "reference", name)
+        rw, rkeys = load(a.derived, "reference", name, a.stats)
         res["results"].append({"definition": name, "corpus": "reference_ime12", "works": len(rkeys),
                                "valid_segments": sum(sum(1 for v in kk if v >= 0) for kk in rkeys),
                                "by_k": measure(rkeys, ks)})

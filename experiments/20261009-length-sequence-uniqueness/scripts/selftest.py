@@ -115,9 +115,7 @@ def test_sampler():
         top = max(sz)
         hits += 1.0 / sz.count(top) if sizes[true_w] == top else 0.0
     check("negative control: pooled windows bias the largest-work predictor", hits / 3000 > 0.5, hits / 3000)
-    # duplicates across candidates: identical sequences are a tie in the ideal condition
-    cands = [(3, 1), (3, 1), (2, 2)]
-    check("identical sequences of two candidates tie", abs(1.0 / cands.count(cands[0]) - 0.5) < 1e-12)
+    # identical sequences across candidates are checked end to end in test_run_cell
 
 
 # ---------------------------------------------------------------- 4. BackSpace model
@@ -146,8 +144,139 @@ def test_backspace():
     check("kana-level corrections add r-1 per unit", all_kana == sum(2 * len(x) - 1 for x in parts), all_kana)
     letter = mt.noisy_counts([s], cond, 1.0, 0.0, random.Random(1))[0]
     check("letter-level corrections cancel in the net count", letter == rt.count_keys(s), letter)
-    shifted = mt.noisy_counts([""], {"habit_prob": 0.0, "shift_prob": 1.0}, 0.0, 0.5, random.Random(5))[0]
-    check("a shift never goes below zero", shifted >= 0, shifted)
+    shifted = {mt.noisy_counts([""], {"habit_prob": 0.0, "shift_prob": 1.0}, 0.0, 0.5, random.Random(sd))[0]
+               for sd in range(60)}
+    check("a shift of -1 from zero is clamped to 0 and +1 gives 1", shifted == {0, 1}, shifted)
+
+
+# ---------------------------------------------------------------- 3b. run_cell end to end on a synthetic corpus
+def _write_derived(tmp, works_segs):
+    import hashlib
+    import json
+    import pickle
+    keys, units = [], []
+    for segs in works_segs:
+        k, u = bs.pack(segs)
+        keys.append(k)
+        units.append(u)
+    path = os.path.join(tmp, "corpus_B0.pkl")
+    with open(path, "wb") as f:
+        pickle.dump({"work_ids": ["w%d" % i for i in range(len(works_segs))], "sha256": [""] * len(works_segs),
+                     "keys": keys, "units": units}, f, protocol=4)
+    stats = os.path.join(tmp, "stats.json")
+    with open(stats, "w", encoding="utf-8") as f:
+        json.dump({"derived_files_sha256": {"corpus_B0.pkl": hashlib.sha256(open(path, "rb").read()).hexdigest()}}, f)
+    return stats
+
+
+def test_run_cell():
+    import tempfile
+    mcfg = {"trials": 300, "bootstrap": 60, "ci": 0.95, "bs_kana_level_fraction": 0.5,
+            "conditions": {"ideal": {"reading": "plain", "habit_prob": 0.0, "bs_share": 0.0, "shift_prob": 0.0},
+                           "mid": {"reading": "writer", "habit_prob": 0.5, "bs_share": 0.063, "shift_prob": 0.05}}}
+    rng = random.Random(21)
+    kana = "あかさたなはまやらわんしちつ"
+
+    def seg(s):
+        return (rt.count_keys(s), s, s, True)
+    works = [[seg("".join(rng.choice(kana) for _ in range(rng.randint(0, 3)))) for _ in range(rng.randint(2, 9))]
+             for _ in range(25)]
+    with tempfile.TemporaryDirectory() as tmp:
+        stats = _write_derived(tmp, works)
+        mt._DATA.clear()
+        cell = mt.run_cell((tmp, stats, "B0", 2, 6, mcfg, "s", 1.9))
+        # recompute the ideal credits from the same draws with the plain scoring function
+        keys = [bs.pack(w)[0] for w in works]
+        starts = [mt.valid_starts(kk, 2) for kk in keys]
+        eligible = [w for w in range(len(keys)) if len(starts[w])]
+        rs = random.Random(mt.seed_int("s", "struct", "B0", 2, 6))
+        total = 0.0
+        for _ in range(mcfg["trials"]):
+            ws, wins, true = mt.draw_trial(rs, eligible, starts, 6)
+            cands = [tuple(keys[w][i:i + 2]) for w, i in zip(ws, wins)]
+            total += mt.credit_l1(cands[true], cands, true)
+        check("run_cell ideal credit equals credit_l1 on the same draws",
+              abs(cell["results"]["ideal"]["acc"] - total / mcfg["trials"]) < 1e-12,
+              (cell["results"]["ideal"]["acc"], total / mcfg["trials"]))
+        lo, hi = cell["results"]["ideal"]["ci"]
+        check("bootstrap interval contains the estimate", lo <= cell["results"]["ideal"]["acc"] <= hi, (lo, hi))
+        check("noisy condition scored", 0.0 <= cell["results"]["mid"]["acc"] <= 1.0, cell["results"]["mid"])
+        mt._DATA.clear()
+        cell = mt.run_cell((tmp, stats, "B0", 2, 26, mcfg, "s", 1.9))
+        check("a cell with fewer eligible works than N is not computed", cell["status"].startswith("not computable"),
+              cell["status"])
+    same = [[seg("かな"), seg("さた")] for _ in range(8)]  # one window of k = 2 per work, the same everywhere
+    with tempfile.TemporaryDirectory() as tmp:
+        stats = _write_derived(tmp, same)
+        mt._DATA.clear()
+        cell = mt.run_cell((tmp, stats, "B0", 2, 4, mcfg, "s", 1.9))
+        check("identical candidates score exactly 1/N", abs(cell["results"]["ideal"]["acc"] - 0.25) < 1e-12,
+              cell["results"]["ideal"]["acc"])
+    with tempfile.TemporaryDirectory() as tmp:
+        stats = _write_derived(tmp, [[seg("かな"), seg("さた"), seg("な")]])
+        mt._DATA.clear()
+        cell = mt.run_cell((tmp, stats, "B0", 2, 1, mcfg, "s", 1.9))
+        check("one work and N = 1: score 1 and a point interval",
+              cell["results"]["ideal"]["acc"] == 1.0 and cell["results"]["ideal"]["ci"] == [1.0, 1.0], cell["results"]["ideal"])
+        with open(os.path.join(tmp, "corpus_B0.pkl"), "ab") as f:
+            f.write(b"x")
+        mt._DATA.clear()
+        try:
+            mt.run_cell((tmp, stats, "B0", 2, 1, mcfg, "s", 1.9))
+            check("a derived file that differs from corpus_stats.json is refused", False)
+        except SystemExit:
+            check("a derived file that differs from corpus_stats.json is refused", True)
+    mt._DATA.clear()
+
+
+# ---------------------------------------------------------------- 3c. fetching and the manifest (offline)
+def test_fetch_offline():
+    import json
+    import tempfile
+    import zipfile
+    import fetch_works as fw
+    for bad_id, bad_url in (("../x", "https://www.aozora.gr.jp/cards/000001/files/1.zip"),
+                            ("000001", "file:///etc/passwd"), ("000001", "https://example.com/cards/1.zip")):
+        try:
+            fw.check_entry(bad_id, bad_url)
+            check("rejects %s %s" % (bad_id, bad_url), False)
+        except SystemExit:
+            check("rejects %s %s" % (bad_id, bad_url), True)
+    with tempfile.TemporaryDirectory() as tmp:
+        zips = os.path.join(tmp, "zips")
+        os.makedirs(zips)
+        zpath = os.path.join(zips, "000001.zip")
+        with zipfile.ZipFile(zpath, "w") as z:
+            z.writestr("a.txt", "text")
+        url = "https://www.aozora.gr.jp/cards/000001/files/1_ruby_1.zip"
+        man = os.path.join(tmp, "manifest.json")
+        check("verify-only without a manifest fails", fw.verify_only(man, zips) == 1)
+        check("verify-only writes no manifest", not os.path.exists(man))
+        with open(man, "w", encoding="utf-8") as f:
+            json.dump({"works": [{"work_id": "000001", "role": "corpus", "url": url,
+                                  "sha256": fw.sha256_file(zpath)}]}, f)
+        check("verify-only passes on a matching zip", fw.verify_only(man, zips) == 0)
+        with open(zpath, "ab") as f:
+            f.write(b"x")
+        check("verify-only fails on a changed zip", fw.verify_only(man, zips) == 1)
+        sel = os.path.join(tmp, "sel.json")
+        cfgp = os.path.join(tmp, "cfg.json")
+        with open(sel, "w", encoding="utf-8") as f:
+            json.dump({"seed": "1", "ordered": [{"work_id": "000002", "text_url": url}], "reference": []}, f)
+        with open(cfgp, "w", encoding="utf-8") as f:
+            json.dump({"fetch": {"interval_s": 1, "retries": 1, "user_agent": "t"},
+                       "selection": {"fetch_count": 1, "reference_works": []}}, f)
+        rc = fw.main(["--selection", sel, "--config", cfgp, "--zips", zips, "--manifest", man])
+        check("a selection that differs from the committed manifest stops before any download", rc == 1, rc)
+
+
+def test_dedupe_lines():
+    a = bs.line_hashes(["　吾輩《わがはい》は猫である。名前はまだ無い。どこで生れたか見当がつかぬ。", "短い行"], 20)
+    b = bs.line_hashes(["吾輩は猫である。 名前はまだ無い。どこで生れたか見当がつかぬ。"], 20)
+    check("text dedupe ignores ruby and whitespace", a == b and len(a) == 1, (a, b))
+    check("lines shorter than the minimum are ignored", bs.line_hashes(["短い行"], 20) == set())
+    c = bs.line_hashes(["吾輩は犬である。名前はまだ無い。どこで生れたか見当がつかぬ。"], 20)
+    check("a different text of the same length is not a duplicate", c.isdisjoint(a))
 
 
 # ---------------------------------------------------------------- 5. measure 1
@@ -194,6 +323,18 @@ def test_preprocessing(use_sudachi):
     check("ruby plain", plain == "何でも薄暗い所で種", plain)
     check("ruby writer", writer == "なんでもうすぐらい所でたね", writer)
     check("ruby counts", (n_ruby, n_sub) == (2, 2), (n_ruby, n_sub))
+    check("adjacent implicit ruby keeps both readings",
+          bs.parse_ruby("漢字《かんじ》漢字《かんじ》")[:2] == ("漢字漢字", "かんじかんじ"), bs.parse_ruby("漢字《かんじ》漢字《かんじ》")[:2])
+    check("adjacent implicit ruby with following text",
+          bs.parse_ruby("吾輩《わがはい》猫《ねこ》である")[:2] == ("吾輩猫である", "わがはいねこである"))
+    check("kana iteration marks are invalid (design 4.3)", bs.token_units(0, "こゝろ", "ココロ")[0][1] == "X")
+    items = [(1, "U", "わがはい"), (3, "U", "は"), (4, "U", "ねこ"), (8, "B", "period")]
+    cf = [c[0] for c in bs.line_cuts("　吾輩は猫である。", items, [1, 4], "bunsetsu") if c[2] == "CF"]
+    check("no confirm before anything is typed (indented line start)", cf == [4, 9], cf)
+    cf = [c[0] for c in bs.line_cuts("一", [(0, "U", "いち")], [0], "bunsetsu") if c[2] == "CF"]
+    check("a line that was typed ends with one confirm", cf == [1], cf)
+    cf = [c[0] for c in bs.line_cuts("", [], [], "sentence") if c[2] == "CF"]
+    check("a blank line gets no confirm", cf == [], cf)
     check("cut map is monotonic and spans the writer line",
           all(cut_map[i] <= cut_map[i + 1] for i in range(len(cut_map) - 1)) and cut_map[-1] == len(writer)
           and cut_map[6] == 9, cut_map)
@@ -221,7 +362,9 @@ def test_preprocessing(use_sudachi):
     check("B3 key counts", keys("B3") == [22, 14, 16, None, 13, 6], keys("B3"))
     check("B1 key counts", keys("B1") == [4, 0, 18, 0, 14, 0, 0, 16, None, 0, 0, 0, 13, 6, 0, 0], keys("B1"))
     b2 = keys("B2")
-    joined = {name: "".join(s[1] for s in segs[name]) for name in segs}
+    check("B2 key counts (counted by hand)",
+          b2 == [4, 0, 9, 9, 0, 7, 7, 0, 0, 7, 9, 0, 6, None, 8, 0, 0, 0, 6, 7, 0, 6, 0, 0], b2)
+    joined ={name: "".join(s[1] for s in segs[name]) for name in segs}
     check("every segmentation keeps the same units in the same order", len(set(joined.values())) == 1, joined)
     joined_w = {name: "".join(s[2] for s in segs[name]) for name in segs}
     check("the same holds for the writer", len(set(joined_w.values())) == 1, joined_w)
@@ -242,6 +385,9 @@ def main(argv):
     test_scoring()
     test_sampler()
     test_backspace()
+    test_run_cell()
+    test_fetch_offline()
+    test_dedupe_lines()
     test_uniqueness()
     test_preprocessing(not a.no_sudachi)
     if FAILS:
