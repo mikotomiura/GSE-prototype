@@ -19,6 +19,7 @@
 - [x] スモーク v2・v1 → 所要を見積もる
 
 ## 仕上げ
-- [ ] /cross-review 2 巡 → decisions
-- [ ] G-GEAR の引き継ぎ
+- [x] /cross-review 2 巡 → decisions（判断 4・5）
+- [x] G-GEAR の引き継ぎ（`_handoff/next-session-portrait-eh1-round2-run.md`）
 - [ ] push（PR は出さない）
+- [ ] 本番 v2・v1（G-GEAR）
