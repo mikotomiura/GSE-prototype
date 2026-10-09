@@ -2,7 +2,7 @@
 
 > 作成: 2026-10-09（研究者の指示「引継ぎなどを書いてもらえれば win, mac ごと別の機器で実行できます」）。
 > ⚠️ **このメモを一次資料にしない。** 中身は `.steering/20261009-portrait-eh1-eh2/design.md` §4 と `experiments/20261009-portrait-eh2/README.md`。
-> Windows 版の引き継ぎは `next-session-portrait-eh2-windows.md`（別の機器で並行に回す）。
+> Windows の引き継ぎは `next-session-portrait-eh1-eh2-windows.md`（EH1 と EH2 の Windows 版・別の機器で並行に回す）。
 
 ## §0 次のセッションの最初に貼るプロンプト
 
@@ -15,7 +15,7 @@
 ## §1 前提（この機械で回してよいか）
 
 1. **計測の run がこの機械で走っていないこと**を研究者に確かめる（計測に使う Mac は CI の self-hosted runner `gse-mac` でもある）。走っていたら回さない。
-2. **壁紙が普通の画像であること**。動く壁紙（Sonoma 以降の空撮など）は、この API では元に戻せない。スクリプトは画像が読めるファイルでないと断って止まる。⚠️ `--force` は使わない。一時的に普通の画像へ替えたなら、終わったあとに研究者が自分で元に戻す。
+2. **壁紙が普通の画像であること**。動く壁紙（Sonoma 以降の空撮など）と、壁紙の自動切り替え（時間ごとに替える設定）は、この API では元に戻せない。スクリプトは画像が読めるファイルでないと断って止まる。⚠️ `--force` は使わない。一時的に普通の画像へ替えたなら、終わったあとに研究者が自分で元に戻す。
 3. Xcode のコマンドラインツール（`swift --version` が通ること）。権限の付与は要らないはず（壁紙の設定に TCC は要らない）。もし許可を求められたら、何の許可かを研究者に伝えてから進める。
 4. NSWorkspace が替えるのは**今の Space**の壁紙だけ。スクリプトは今の Space だけを替えて戻す。
 
@@ -27,10 +27,11 @@ git worktree add -b docs/portrait-eh2-mac-run ../wt-portrait-eh2-mac origin/docs
 cd ../wt-portrait-eh2-mac
 ```
 
+0. **型の検査**: `swiftc -typecheck experiments/20261009-portrait-eh2/macos/eh2_wallpaper.swift`（コードレビューで型の誤りを 4 か所直したが、コンパイルはしていない。誤りが出たら直す）
 1. **壁紙を替えない確認**: `swift experiments/20261009-portrait-eh2/macos/eh2_wallpaper.swift --dry-run`
    - ⚠️ **このスクリプトは作成した機械（Windows）では一度もコンパイルも実行もされていない**。コンパイルの誤りが出たら直す（直したら、直した点を `notes-macos.md` に書き、スクリプトの修正も一緒にコミットしてよい）。
    - 結果の `screens`（画面の数と画素数）・`wallpaper_process`（`WallpaperAgent` か `Dock`）・`dryrun_cpu` の `cpu_s` が数値か null かを見る。
-2. **短い試し**（約 1 分・壁紙が縞と点に数回変わって元に戻る）: `--quick`。最後に `Restored: [true, ...]` が出ることを確かめる。⚠️ 出なければ止めて、README の「戻らなかったとき」で戻し、研究者に報告する。
+2. **短い試し**（約 1 分・壁紙が縞と点に数回変わって元に戻る）: `--quick`。最後に `Restored: [true, ...]` が出ることを確かめる（戻したあと、元のファイルの SHA-256 が変わっていないことも確かめている）。途中で Ctrl+C を押しても元に戻す作りだが、その経路も未実行。⚠️ 出なければ止めて、README の「戻らなかったとき」で戻し、研究者に報告する。
 3. **本番**（約 12 分・その間は機械を触らない。CPU を測る）: 引数なし。
 4. **任意の手の確認**（研究者がその場にいれば）: `--manual`。Spaces（Mission Control で Space を足す）と、画面共有か録画（QuickTime の画面収録・Zoom など）の中での見え方を y/n で答える。⚠️ Space を移る操作は研究者に頼む。
 5. 結果は `experiments/20261009-portrait-eh2/results/eh2-macos-<日時>.json`。`restored` がすべて `true`、`per_screen.readback_ok` が `calls` と同じかを見る。

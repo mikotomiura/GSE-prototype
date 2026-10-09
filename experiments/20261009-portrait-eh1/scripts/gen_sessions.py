@@ -30,7 +30,9 @@ VK_SPACE = 32
 class Segment:
     kind: str
     dur_ms: int
-    presses: list[tuple[int, int]] = field(default_factory=list)  # (t_ms relative, vk)
+    # (t_ms relative, vk, dwell_ms). The dwell is drawn with the press, so a copied segment (O, D) or a
+    # jittered session (J) keeps the same press-release pairs (design 1.2).
+    presses: list[tuple[int, int, int]] = field(default_factory=list)
 
 
 def derive_rng(seed: int, *names: object) -> np.random.Generator:
@@ -43,6 +45,11 @@ def derive_rng(seed: int, *names: object) -> np.random.Generator:
 def key_seed(seed: int, *names: object) -> int:
     digest = hashlib.sha256(("key|" + "|".join(str(n) for n in names) + f"|{seed}").encode()).digest()
     return int.from_bytes(digest[:8], "little") & ((1 << 63) - 1)
+
+
+def draw_dwell(rng: np.random.Generator, cfg: dict) -> int:
+    d, j = cfg["keys"]["dwell_ms"], cfg["keys"]["dwell_jitter_ms"]
+    return int(rng.integers(d - j, d + j + 1))
 
 
 def pick_vk(rng: np.random.Generator, p_bs: float, p_space: float) -> int:
@@ -66,7 +73,7 @@ def gen_typing(rng: np.random.Generator, kind: str, dur_ms: int, cfg: dict) -> S
             burst_end = t + float(rng.uniform(p["burst_dur_min_s"], p["burst_dur_max_s"])) * 1000
             while t < dur_ms:
                 last_vk = pick_vk(rng, p["p_backspace"], p_space)
-                seg.presses.append((int(t), last_vk))
+                seg.presses.append((int(t), last_vk, draw_dwell(rng, cfg)))
                 nxt = t + float(rng.lognormal(np.log(p["flight_median_ms"]), p["flight_sigma"]))
                 if nxt >= burst_end:
                     break
@@ -77,7 +84,7 @@ def gen_typing(rng: np.random.Generator, kind: str, dur_ms: int, cfg: dict) -> S
                 if t >= dur_ms:
                     break
                 last_vk = pick_vk(rng, p["p_backspace"], p_space)
-                seg.presses.append((int(t), last_vk))
+                seg.presses.append((int(t), last_vk, draw_dwell(rng, cfg)))
                 if i < n - 1:
                     t += float(rng.lognormal(np.log(p["flight_median_ms"]), p["flight_sigma"]))
         gap = min(float(rng.lognormal(np.log(p["gap_median_ms"]), p["gap_sigma"])), p["gap_cap_ms"])
@@ -101,7 +108,7 @@ def gen_segment(rng: np.random.Generator, kind: str, cfg: dict) -> Segment:
 
 
 def truncate(seg: Segment, dur_ms: int) -> Segment:
-    return Segment(seg.kind, dur_ms, [(t, vk) for (t, vk) in seg.presses if t < dur_ms])
+    return Segment(seg.kind, dur_ms, [p for p in seg.presses if p[0] < dur_ms])
 
 
 def markov(rng: np.random.Generator, total_ms: int, cfg: dict, start: str | None = None) -> list[Segment]:
@@ -137,17 +144,20 @@ def continuous(rng: np.random.Generator, total_ms: int, cfg: dict) -> list[Segme
     return segs
 
 
-def assemble(segs: list[Segment]) -> tuple[np.ndarray, np.ndarray, int]:
-    """Absolute press times (ms from session start), vks and the duration."""
+def assemble(segs: list[Segment]) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+    """Absolute press times (ms from session start), vks, dwells and the duration."""
     times: list[int] = []
     vks: list[int] = []
+    dwells: list[int] = []
     t0 = 0
     for seg in segs:
-        for t, vk in seg.presses:
+        for t, vk, dw in seg.presses:
             times.append(t0 + t)
             vks.append(vk)
+            dwells.append(dw)
         t0 += seg.dur_ms
-    return np.asarray(times, dtype=np.int64), np.asarray(vks, dtype=np.int16), t0
+    return (np.asarray(times, dtype=np.int64), np.asarray(vks, dtype=np.int16),
+            np.asarray(dwells, dtype=np.int64), t0)
 
 
 def seg_labels(segs: list[Segment], duration_s: int) -> np.ndarray:
@@ -161,15 +171,12 @@ def seg_labels(segs: list[Segment], duration_s: int) -> np.ndarray:
     return lab
 
 
-def write_session(work: Path, sid: str, start_ms: int, times: np.ndarray, vks: np.ndarray,
-                  duration_s: int, labels: np.ndarray, rng: np.random.Generator, cfg: dict) -> None:
-    dwell = cfg["keys"]["dwell_ms"]
-    jit = cfg["keys"]["dwell_jitter_ms"]
+def write_session(work: Path, sid: str, start_ms: int, times: np.ndarray, vks: np.ndarray, dwells: np.ndarray,
+                  duration_s: int, labels: np.ndarray, cfg: dict) -> None:
     rows: list[tuple[int, int, int, bool]] = []
-    for i, (t, vk) in enumerate(zip(times.tolist(), vks.tolist())):
-        rel = t + int(rng.integers(dwell - jit, dwell + jit + 1))
+    for t, vk, dw in zip(times.tolist(), vks.tolist(), dwells.tolist()):
         rows.append((start_ms + t, 0, vk, True))
-        rows.append((start_ms + rel, 1, vk, False))
+        rows.append((start_ms + t + dw, 1, vk, False))
     rows.sort(key=lambda r: (r[0], r[1]))
     meta = {
         "type": "meta",
@@ -194,10 +201,12 @@ def write_session(work: Path, sid: str, start_ms: int, times: np.ndarray, vks: n
                         duration_s=np.int64(duration_s), start_ms=np.int64(start_ms))
 
 
-def jitter(rng: np.random.Generator, times: np.ndarray, vks: np.ndarray, j: int) -> tuple[np.ndarray, np.ndarray]:
+def jitter(rng: np.random.Generator, times: np.ndarray, vks: np.ndarray, dwells: np.ndarray,
+           j: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Move each press by a uniform +-j ms; its release moves with it (the dwell is kept)."""
     t = np.maximum(0, times + rng.integers(-j, j + 1, size=times.shape))
     order = np.argsort(t, kind="stable")
-    return t[order], vks[order]
+    return t[order], vks[order], dwells[order]
 
 
 def main() -> int:
@@ -225,18 +234,18 @@ def main() -> int:
     counter = [0]
 
     def emit(sid: str, set_name: str, segs: list[Segment] | None, ks: int, extra: dict,
-             times_vks: tuple[np.ndarray, np.ndarray, int] | None = None) -> None:
-        if times_vks is None:
+             presses: tuple[np.ndarray, np.ndarray, np.ndarray, int] | None = None) -> None:
+        if presses is None:
             assert segs is not None
-            times, vks, dur_ms = assemble(segs)
+            times, vks, dwells, dur_ms = assemble(segs)
             duration_s = dur_ms // 1000
             labels = seg_labels(segs, duration_s)
         else:
-            times, vks, duration_s = times_vks
+            times, vks, dwells, duration_s = presses
             labels = extra.pop("_labels")
         start_ms = sc["epoch_ms"] + counter[0] * sc["session_spacing_ms"]
         counter[0] += 1
-        write_session(work, sid, start_ms, times, vks, duration_s, labels, derive_rng(seed, "dwell", sid), cfg)
+        write_session(work, sid, start_ms, times, vks, dwells, duration_s, labels, cfg)
         manifest.append({"sid": sid, "set": set_name, "duration_s": int(duration_s), "key_seed": ks, **extra})
 
     dur = sc["duration_s"] * 1000
@@ -258,10 +267,10 @@ def main() -> int:
         ks = key_seed(seed, "O", i)
         emit(f"Oa{i:02d}", "O", a_segs, ks, {"pair": i, "role": "a"})
         emit(f"Ob{i:02d}", "O", b_segs, ks, {"pair": i, "role": "b"})
-        times, vks, dur_ms = assemble(a_segs)
-        jt, jv = jitter(derive_rng(seed, "J", i), times, vks, sets["J"]["jitter_ms"])
+        times, vks, dwells, dur_ms = assemble(a_segs)
+        jt, jv, jd = jitter(derive_rng(seed, "J", i), times, vks, dwells, sets["J"]["jitter_ms"])
         emit(f"J{i:02d}", "J", None, ks, {"pair": i, "role": "j", "_labels": seg_labels(a_segs, dur_ms // 1000)},
-             (jt, jv, dur_ms // 1000))
+             (jt, jv, jd, dur_ms // 1000))
 
     d = sets["D_shuffled"]
     for i in range(max(2, int(round(d["pairs"] * scale)))):
@@ -286,7 +295,7 @@ def main() -> int:
     d = sets["D_noobs"]
     for i in range(d["n"] if not a.smoke else 1):
         r = derive_rng(seed, "Dno", i)
-        presses = [(10_000 + 200 * k, int(r.integers(65, 91))) for k in range(d["keys"])]
+        presses = [(10_000 + 200 * k, int(r.integers(65, 91)), draw_dwell(r, cfg)) for k in range(d["keys"])]
         segs = [Segment("FLOW", 12_000, presses), Segment("AWAY", d["duration_s"] * 1000 - 12_000)]
         emit(f"Dno{i:02d}", "D_noobs", segs, key_seed(seed, "Dno", i), {})
 

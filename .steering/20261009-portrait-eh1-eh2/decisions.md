@@ -49,3 +49,30 @@
 - **対応**: 12:17 ごろ run を取り消した（`cancelled`）。ブランチを `docs/portrait-eh1-eh2` に改名して push した（`docs/*` の push では CI は起動しない・`gh run list` で 0 件を確かめた）。以後の push はこの名前だけにする。⚠️ リモートの `feature/portrait-eh1-eh2`（`abfb2c45` を指す）は残っている。消すかは研究者に聞く。
 - ⚠️ その時間に計測が走っていたかは確かめていない。走っていたなら、その時間帯（2026-10-09 11:50〜12:17 ごろ）の Mac と G-GEAR の測定は CI と重なった可能性がある。
 - **再発防止**: memory `feedback_no_pr_during_measurement` の How to apply に「ブランチを切る時点で `docs/` にする（`experiments/` のコードでも）」を足した。
+
+## 判断 5（2026-10-09・研究者）: EH1 は Windows の機器で回す。Windows は EH1・EH2 の両方、Mac は EH2 だけ
+
+- **決定**: 研究者の逐語「まぁ EH-1 は windows に回す感じにして、windows のみ EH-1, 2 両方回す感じで引継ぎに書くか」。この機械で回していた本番は止めた（design §8・結果は開いていない）。
+- **前提の確認**（研究者の問い「EH1, 2 両方とも各機器で回す必要があった感じじゃなかった？」への回答）: EH1 は合成の記録と `gse-replay`（`analysis/`）と Python だけで、OS の API に触れない。`analysis/` は CI のゴールデンの一致で両 OS の同一性が確かめられている。→ 1 台で足りる。OS ごとに別物なのは EH2（壁紙の API・仮想デスクトップ / Spaces）。
+- **引き継ぎ**: `next-session-portrait-eh2-windows.md` を EH1 ＋ EH2 に書き直し、`next-session-portrait-eh1-eh2-windows.md` に改名した（EH1 と EH2 は同時に回さない —— EH2 は CPU を測る）。Mac は EH2 だけ（最初に `swiftc -typecheck`）。
+
+## 判断 6（2026-10-09）: code-reviewer ∥ security-checker の結果と対応
+
+- **範囲**: `82859a27..3c61d3d8`。security-checker は約 4.8 分、code-reviewer は約 8.8 分。指摘は一次（コード）で裏取りした。偽陽性はなかった（推定のものは「推定」と書いた）。
+
+| # | 系統 | 重要度 | 指摘 | 対応 |
+|---|---|---|---|---|
+| R1 | 両方 | HIGH | Windows: 元の画像のファイルが無い・単色でも止まらず、仮の画像のまま残る | 断る条件に足した（`f7bacad7`）。Themes フォルダの写しのときも断る |
+| R2 | code | HIGH | Windows: `$dw.Set($null, …)` は PowerShell が空文字に変えるので、全モニタ一括が失敗しうる | C# に `SetAll` を足した。未接続のモニタがあるときは一括の手順を飛ばす。手の確認はモニタごとに設定する |
+| R3 | code | HIGH | Swift: `X ?? NSNull()`・型の混ざった辞書リテラルがコンパイルの誤りになる見込み | `orNull` を足し、辞書に `as [String: Any]` を付けた。三項演算 `ok ? cpu : NSNull()` も直した。⚠️ コンパイルはしていない → Mac の引き継ぎの最初に `swiftc -typecheck` |
+| R4 | 両方 | MEDIUM | 戻ったかを読み戻しのパスだけで判断している | 両 OS で元のファイルの SHA-256 も確かめる |
+| R5 | security | MEDIUM | Swift の結果 JSON のエラーの説明文にパスが載りうる | domain と code だけにした。Windows も catch で型の名前だけ |
+| R6 | code | MEDIUM | EH1: dwell がセッション ID から引き直され、J・O の後半が文言から外れる | 直した（design §8）。本番は回し直す |
+| R7 | code | MEDIUM | design §3.8 の 3 つ目の変異が未実装 | 実装した（design §8） |
+| R8 | 両方 | MEDIUM / LOW | Swift: Ctrl+C で戻らない／手の確認の後に元のデスクトップ・Space に戻らないと別の面を戻す | シグナルで戻す。戻ったことを読み戻しで確かめてから進む |
+| R9 | code | LOW | `/var` と `/private/var` で読み戻しが偽の不一致 | 解決したパスで比べる |
+| R10 | code | LOW | float16・slot の数・順位相関の空・replay_all のコメント・scheduler がラベルを読む | 直した（design §8） |
+| R11 | security | LOW | 標準出力のパスが notes に貼られうる／`run.sh` の dirty の判定／見本の画像の名前 `P000` | 引き継ぎに grep の確認を足した／`git -C "$EXP_DIR"`／`synth-` を付けた |
+| R12 | security | LOW | `-ExecutionPolicy Bypass` | その起動の間だけ効くので使ってよい範囲（指摘のとおり）。変えない |
+
+- **読んでいない範囲**（両系統の申告）: Windows / macOS の API が実際にどう振る舞うか（Themes のキャッシュ・Space ごとの設定）・`render_e18.py` の詳細・依存ライブラリの脆弱性の照合。

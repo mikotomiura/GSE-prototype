@@ -40,8 +40,6 @@ def _session(sid: str) -> pt.Session:
 def _task(args: tuple) -> dict:
     sid, conf, want_windows, want_final = args
     res = pt.run(_session(sid), conf, CFG, SEED, want_windows, want_final)
-    if want_final:
-        res["final"] = res["final"].astype(np.float16)
     return res
 
 
@@ -307,8 +305,7 @@ def main() -> int:
                         "median_invite": float(np.median(ch[inv])) if inv.any() else None,
                         "median_other": float(np.median(ch[oth])) if oth.any() else None,
                         "ratio": obs, "ci90": ci, "verdict": "green" if green else "red"}
-        ok = ch > -1
-        rho = spearmanr(ln[ok], ch[ok]).statistic if np.ptp(ch) > 0 else 0.0
+        rho = spearmanr(ln, ch).statistic if len(ch) > 2 and np.ptp(ch) > 0 else 0.0
         spear[c.name] = float(rho)
         if c.name in explo_names:
             continue  # exploratory: E1-6 and E1-4 only, on P
@@ -392,7 +389,7 @@ def main() -> int:
                     for sid in targets:
                         ss = _session(sid)
                         ups = pt.schedule(ss, sc, cfg["scheduler_jitter_frac"], seed)
-                        n_slots = int(ss.duration_s // I)
+                        n_slots = int((ss.duration_s - 1) // I)  # slots k*I with k >= 1 and k*I < duration
                         if ss.set == "P":
                             slots += n_slots
                             skipped += n_slots - len(ups)

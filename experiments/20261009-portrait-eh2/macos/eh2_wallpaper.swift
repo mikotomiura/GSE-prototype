@@ -60,6 +60,15 @@ var res: [String: Any] = [
     "started": isoFmt.string(from: Date()),
 ]
 
+// "x ?? NSNull()" does not type-check when x is Double? or String?; this does.
+func orNull(_ x: Any?) -> Any { x ?? NSNull() }
+
+// /var and /private/var name the same folder; compare resolved paths.
+func samePath(_ a: URL?, _ b: URL?) -> Bool {
+    guard let a = a, let b = b else { return false }
+    return a.resolvingSymlinksInPath().standardizedFileURL.path == b.resolvingSymlinksInPath().standardizedFileURL.path
+}
+
 func median(_ xs: [Double]) -> Double? {
     if xs.isEmpty { return nil }
     let s = xs.sorted()
@@ -116,7 +125,7 @@ func procSample(_ name: String) -> [String: Any] {
             rss += r / 1024
         } else { ok = false }
     }
-    return ["cpu_s": ok ? cpu : NSNull(), "rss_mb": rss, "n": pids.count]
+    return ["cpu_s": ok ? (cpu as Any) : NSNull(), "rss_mb": rss, "n": pids.count]
 }
 
 func selfSample() -> [String: Any] {
@@ -141,7 +150,7 @@ func delta(_ a: [String: [String: Any]], _ b: [String: [String: Any]]) -> [Strin
         let vb = b[k] ?? [:]
         var d: Any = NSNull()
         if let x = va["cpu_s"] as? Double, let y = vb["cpu_s"] as? Double { d = ((y - x) * 1000).rounded() / 1000 }
-        out[k] = ["cpu_s": d, "rss_mb_start": va["rss_mb"] ?? NSNull(), "rss_mb_end": vb["rss_mb"] ?? NSNull()]
+        out[k] = ["cpu_s": d, "rss_mb_start": orNull(va["rss_mb"]), "rss_mb_end": orNull(vb["rss_mb"])] as [String: Any]
     }
     return out
 }
@@ -214,7 +223,7 @@ for (i, s) in screens.enumerated() {
     orig.append(Orig(screen: s, url: u, options: ws.desktopImageOptions(for: s) ?? [:], w: w, h: h, sha256: fileHash(u)))
     screenInfo.append(["index": i, "width_px": w, "height_px": h, "scale": Double(scale)])
 }
-res["screens"] = screenInfo
+res["screens"] = screenInfo as [[String: Any]]
 res["wallpaper_process"] = agentName
 let exists = orig.map { o -> Bool in
     guard let u = o.url, u.isFileURL else { return false }
@@ -237,12 +246,13 @@ if dryRun {
     for (i, o) in orig.enumerated() {
         let u = work.appendingPathComponent("s\(i)-a.png")
         try makeImage(u, o.w, o.h, 0)
-        res["dryrun_image_bytes"] = (try? FileManager.default.attributesOfItem(atPath: u.path)[.size] as? Int) ?? NSNull()
+        let attrs = try? FileManager.default.attributesOfItem(atPath: u.path)
+        res["dryrun_image_bytes"] = orNull(attrs?[.size])
         let t0 = nowMs()
         _ = ws.desktopImageURL(for: o.screen)
         lat.append(nowMs() - t0)
     }
-    res["dryrun_get_latency_ms_median"] = median(lat) ?? NSNull()
+    res["dryrun_get_latency_ms_median"] = orNull(median(lat))
     let s0 = samples()
     Thread.sleep(forTimeInterval: 3)
     res["dryrun_cpu"] = delta(s0, samples())
@@ -258,7 +268,7 @@ if !force && exists.contains(false) {
 }
 
 // The restore file is the only place that holds the original paths. It stays in the temporary folder.
-let restoreJSON: [[String: Any]] = orig.enumerated().map { i, o in ["index": i, "url": o.url?.path ?? NSNull()] }
+let restoreJSON: [[String: Any]] = orig.enumerated().map { i, o in ["index": i, "url": orNull(o.url?.path)] as [String: Any] }
 if let data = try? JSONSerialization.data(withJSONObject: restoreJSON, options: [.prettyPrinted]) {
     try? data.write(to: restoreFile)
 }
@@ -274,7 +284,7 @@ func restore() {
         guard let u = o.url else { restored.append("original_missing"); continue }
         do {
             try ws.setDesktopImageURL(u, for: o.screen, options: o.options)
-            restored.append(ws.desktopImageURL(for: o.screen) == u && fileHash(u) == o.sha256)
+            restored.append(samePath(ws.desktopImageURL(for: o.screen), u) && fileHash(u) == o.sha256)
         } catch { restored.append(false) }
     }
     res["restored"] = restored
@@ -326,17 +336,17 @@ do {
             try ws.setDesktopImageURL(u, for: o.screen, options: opts)
             lat.append(nowMs() - t0)
             tot += 1
-            if ws.desktopImageURL(for: o.screen) == u { okN += 1 }
+            if samePath(ws.desktopImageURL(for: o.screen), u) { okN += 1 }
         }
         Thread.sleep(forTimeInterval: 0.3)
     }
-    res["per_screen"] = ["calls": tot, "readback_ok": okN, "latency_ms_median": median(lat) ?? NSNull(),
-                         "latency_ms_p95": pct(lat, 95) ?? NSNull(), "latency_ms_max": lat.max() ?? NSNull()]
+    res["per_screen"] = ["calls": tot, "readback_ok": okN, "latency_ms_median": orNull(median(lat)),
+                         "latency_ms_p95": orNull(pct(lat, 95)), "latency_ms_max": orNull(lat.max())] as [String: Any]
 
     // 2. Distinct pictures per screen
     if orig.count >= 2 {
         for (i, o) in orig.enumerated() { try ws.setDesktopImageURL(imgs[i][i % 2], for: o.screen, options: opts) }
-        res["distinct_per_screen_readback_ok"] = orig.enumerated().allSatisfy { i, o in ws.desktopImageURL(for: o.screen) == imgs[i][i % 2] }
+        res["distinct_per_screen_readback_ok"] = orig.enumerated().allSatisfy { i, o in samePath(ws.desktopImageURL(for: o.screen), imgs[i][i % 2]) }
     } else {
         res["distinct_per_screen_readback_ok"] = "single_screen"
     }
@@ -354,7 +364,7 @@ do {
     }
     let s2 = samples()
     res["cpu"] = ["idle_s": idleS, "busy_s": busyS, "busy_every_s": busyEvery, "busy_updates": updates,
-                  "idle": delta(s0, s1), "busy": delta(s1, s2)]
+                  "idle": delta(s0, s1), "busy": delta(s1, s2)] as [String: Any]
 
     // 4. Optional manual checks
     if manual {
@@ -363,13 +373,13 @@ do {
         try ws.setDesktopImageURL(imgs[0][0], for: o0.screen, options: opts)
         waitEnter("The striped image is now set on this Space. Switch to the second Space (Ctrl+Right) and press Enter.")
         res["manual_spaces"] = [
-            "readback_matches_on_other_space": ws.desktopImageURL(for: o0.screen) == imgs[0][0],
+            "readback_matches_on_other_space": samePath(ws.desktopImageURL(for: o0.screen), imgs[0][0]),
             "striped_image_visible_on_other_space": askYesNo("Do you see the striped image on the second Space?"),
-        ]
+        ] as [String: Any]
         waitEnter("Switch back to the first Space, then press Enter.")
         // Everything after this (the share check and the restore) acts on the current Space.
         var back = true
-        while ws.desktopImageURL(for: o0.screen) != imgs[0][0] {
+        while !samePath(ws.desktopImageURL(for: o0.screen), imgs[0][0]) {
             print("The picture here is not the striped image, so this may not be the first Space. Switch back and press Enter, or type skip: ", terminator: "")
             if (readLine() ?? "").trimmingCharacters(in: .whitespaces).lowercased() == "skip" { back = false; break }
         }
@@ -382,12 +392,12 @@ do {
         res["manual_screen_share"] = [
             "change_visible_in_share": askYesNo("Was the change of picture visible in the share or recording?"),
             "flicker_or_flash": askYesNo("Was there a flicker or a flash on the screen when the picture changed?"),
-        ]
+        ] as [String: Any]
     }
 } catch {
     // only the domain and code go to the results: the description can carry file paths
     let ns = error as NSError
-    res["error"] = ["domain": ns.domain, "code": ns.code]
+    res["error"] = ["domain": ns.domain, "code": ns.code] as [String: Any]
     print("Error: \(error)")
 }
 restore()

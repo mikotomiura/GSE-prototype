@@ -27,7 +27,7 @@ def replay_one(binary: str, work: Path, sid: str, start_ms: int, duration_s: int
     snaps = json.loads(out.stdout)
     arr = {c: np.full(duration_s, np.nan, dtype=np.float64) for c in COLS}
     for s in snaps:
-        k = (int(s["timestamp"]) - start_ms) // 1000 - 1  # the tick at t covers (t-1 s, t]
+        k = (int(s["timestamp"]) - start_ms) // 1000 - 1  # the tick at t covers [t-1 s, t) (run_replay steps before same-ms events)
         if 0 <= k < duration_s:
             for c in COLS:
                 arr[c][k] = float(s[c])

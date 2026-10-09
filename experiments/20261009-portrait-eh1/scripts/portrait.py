@@ -32,9 +32,10 @@ class Session:
     duration_s: int
     presses: np.ndarray  # press times in seconds (float, sorted)
     active: np.ndarray  # bool per second: at least one press in [k, k+1)
-    seg: np.ndarray  # segment code per second
+    seg: np.ndarray  # segment code per second (labels: read only by the checks, never by the scheduler)
     feat: dict  # column -> float array per second (NaN where no tick)
     key_seed: int
+    sleep: np.ndarray  # bool per second: the machine was asleep (the only thing the scheduler takes from the trace)
 
 
 def load_session(work: Path, m: dict) -> Session:
@@ -45,8 +46,10 @@ def load_session(work: Path, m: dict) -> Session:
     active = np.zeros(dur, dtype=bool)
     idx = presses.astype(np.int64)
     active[idx[idx < dur]] = True
-    return Session(m["sid"], m["set"], dur, presses, active, lab["seg"].astype(np.int8),
-                   {c: feat[c] for c in ("f1", "f3", "f4", "f5", "f6", "p_stuck", "keys")}, int(m["key_seed"]))
+    seg = lab["seg"].astype(np.int8)
+    return Session(m["sid"], m["set"], dur, presses, active, seg,
+                   {c: feat[c] for c in ("f1", "f3", "f4", "f5", "f6", "p_stuck", "keys")}, int(m["key_seed"]),
+                   seg == SLEEP_CODE)
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +83,7 @@ def _has_press(presses: np.ndarray, lo: float, hi: float) -> bool:
 def schedule(sess: Session, sc: Sched, jitter_frac: float, seed: int, pc1: dict | None = None) -> np.ndarray:
     """Actual update times (integer seconds; the new image is shown from that second on)."""
     dur = sess.duration_s
-    sleep = sess.seg == SLEEP_CODE
+    sleep = sess.sleep
     out: list[int] = []
     if sc.kind == "stop":
         assert pc1 is not None
@@ -192,6 +195,7 @@ class Generator:
         if mapping == "keyed":
             self.tables = {k: v[r.permutation(7)] for k, v in self.tables.items()}
         self.p_bar = 0.0
+        self.mut_rng = np.random.default_rng(np.random.SeedSequence([key_seed & 0xFFFFFFFF, 99]))
         yy, xx = np.mgrid[0 : self.H, 0 : self.W]
         self._yy, self._xx = yy.astype(np.float32), xx.astype(np.float32)
 
@@ -240,6 +244,8 @@ class Generator:
                 return float(np.clip((v.mean() - lo) / (hi - lo), 0, 1))
 
             n1, n3, n4, n6 = lvl("f1"), lvl("f3"), lvl("f4"), lvl("f6")
+            if self.mutation == "random_levels":  # self-test (design 3.8): levels unrelated to the trace
+                n1, n3, n4, n6 = (float(v) for v in self.mut_rng.random(4))
             for i in range(m):
                 hue = 0.55 - 0.5 * n3 + 0.03 * math.sin(i * 1.7)
                 sigma = 2 + 6 * n4

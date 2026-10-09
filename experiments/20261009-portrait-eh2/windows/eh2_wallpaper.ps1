@@ -80,6 +80,8 @@ namespace GseEh2 {
         public int[] Rect(string id) { RECT r = w.GetMonitorRECT(id); return new int[] { r.Left, r.Top, r.Right, r.Bottom }; }
         public string Get(string id) { return w.GetWallpaper(id); }
         public void Set(string id, string path) { w.SetWallpaper(id, path); }
+        // PowerShell turns $null into "" for a string parameter, so "all monitors" needs its own entry point.
+        public void SetAll(string path) { w.SetWallpaper(null, path); }
         public int GetPosition() { return (int)w.GetPosition(); }
         public void SetPosition(int p) { w.SetPosition((DESKTOP_WALLPAPER_POSITION)p); }
     }
@@ -294,16 +296,21 @@ try {
         $res.distinct_per_monitor_readback_ok = 'single_monitor'
     }
 
-    # 3. All monitors at once (monitorID = null)
-    $lat2 = @()
-    for ($k = 0; $k -lt [Math]::Min($nUpdates, 10); $k++) {
-        $sw = [Diagnostics.Stopwatch]::StartNew()
-        $dw.Set($null, $imgs[0][$k % 2])
-        $sw.Stop()
-        $lat2 += $sw.Elapsed.TotalMilliseconds
-        Start-Sleep -Milliseconds 300
+    # 3. All monitors at once (monitorID = null). Skipped when Windows lists monitors that are not attached
+    #    now: the call would also reach them, and their wallpaper was not saved, so it could not be restored.
+    if ($inactive -gt 0) {
+        $res.all_monitors = 'skipped_inactive_monitor_entries'
+    } else {
+        $lat2 = @()
+        for ($k = 0; $k -lt [Math]::Min($nUpdates, 10); $k++) {
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            $dw.SetAll($imgs[0][$k % 2])
+            $sw.Stop()
+            $lat2 += $sw.Elapsed.TotalMilliseconds
+            Start-Sleep -Milliseconds 300
+        }
+        $res.all_monitors = [ordered]@{ calls = $lat2.Count; latency_ms_median = (Get-Median $lat2); latency_ms_p95 = (Get-Pct $lat2 95) }
     }
-    $res.all_monitors = [ordered]@{ calls = $lat2.Count; latency_ms_median = (Get-Median $lat2); latency_ms_p95 = (Get-Pct $lat2 95) }
 
     # 4. CPU and memory: idle, then updating
     $s0 = Get-Samples
@@ -328,7 +335,7 @@ try {
         Write-Host 'Manual check A: virtual desktops.'
         Write-Host 'Create a second virtual desktop (Win+Ctrl+D), come back to the first one (Win+Ctrl+Left), then press Enter.'
         Read-Host | Out-Null
-        $dw.Set($null, $imgs[0][0])
+        for ($i = 0; $i -lt $count; $i++) { $dw.Set($orig[$i].id, $imgs[$i][0]) }
         Write-Host 'The striped image is now set on this desktop. Switch to the second desktop (Win+Ctrl+Right) and press Enter.'
         Read-Host | Out-Null
         $res.manual_virtual_desktop = [ordered]@{
@@ -348,12 +355,20 @@ try {
         Write-Host 'Manual check B: screen share or recording.'
         Write-Host 'Start a screen share or a screen recording that shows the desktop, then press Enter. Three updates follow, 5 s apart.'
         Read-Host | Out-Null
-        for ($k = 0; $k -lt 3; $k++) { $dw.Set($null, $imgs[0][($k + 1) % 2]); Start-Sleep -Seconds 5 }
+        for ($k = 0; $k -lt 3; $k++) {
+            for ($i = 0; $i -lt $count; $i++) { $dw.Set($orig[$i].id, $imgs[$i][($k + 1) % 2]) }
+            Start-Sleep -Seconds 5
+        }
         $res.manual_screen_share = [ordered]@{
             change_visible_in_share = (Read-YesNo 'Was the change of wallpaper visible in the share or recording?')
             flicker_or_flash = (Read-YesNo 'Was there a flicker or a flash on the screen when the wallpaper changed?')
         }
     }
+}
+catch {
+    # only the type of the error goes to the results: the message can carry file paths
+    $res.error = $_.Exception.GetType().FullName
+    Write-Host "Error: $($_.Exception.Message)"
 }
 finally {
     # Always restore
@@ -372,16 +387,17 @@ finally {
         }
     }
     $res.restored = $restored
-    $res.restored_position_ok = ($dw.GetPosition() -eq $origPos)
+    try { $res.restored_position_ok = ($dw.GetPosition() -eq $origPos) } catch { $res.restored_position_ok = $false }
     $res.finished = (Get-Date).ToString('s')
     $out = Join-Path $resultsDir "eh2-windows-$stamp.json"
     ($res | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $out -Encoding UTF8
-    Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
     Write-Host "Results: $out"
     Write-Host "Restored: $($restored -join ', ')  position ok: $($res.restored_position_ok)"
     if (@($restored | Where-Object { $_ -ne $true }).Count -eq 0 -and $res.restored_position_ok) {
+        Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $restoreFile -Force -ErrorAction SilentlyContinue
     } else {
-        Write-Host "Restore was not confirmed. The original settings are kept in $restoreFile (see README)."
+        # keep the placeholder images too: the wallpaper may still point at them
+        Write-Host "Restore was not confirmed. The original settings are kept in $restoreFile and the placeholder images in $work (see README)."
     }
 }

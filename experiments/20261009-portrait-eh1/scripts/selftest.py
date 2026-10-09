@@ -33,7 +33,7 @@ def fake_session(presses: list[float], dur: int, sleep: tuple[int, int] | None =
     act = np.zeros(dur, dtype=bool)
     act[p.astype(int)] = True
     feat = {c: np.zeros(dur) for c in ("f1", "f3", "f4", "f5", "f6", "p_stuck", "keys")}
-    return pt.Session("fake", "P", dur, p, act, seg, feat, 12345)
+    return pt.Session("fake", "P", dur, p, act, seg, feat, 12345, seg == pt.SLEEP_CODE)
 
 
 def main() -> int:
@@ -109,6 +109,33 @@ def main() -> int:
     check("mutation: fading in absence turns E1-4 red", v14 > 0, f"violations={v14}")
     check("mutation: neutral on low recent input turns E1-7 red", v17 > 0, f"violations={v17}")
     check("unmutated ordinal-none is clean on the same sessions", v14_ok == 0 and v17_ok == 0, f"{v14_ok}/{v17_ok}")
+
+    # design 3.8 (third): raw with levels unrelated to the trace must not show a gain in E1-3
+    p_all = [m for m in manifest if m["set"] == "P"]
+    if len(p_all) < 40:
+        print(f"SKIP  mutation: random levels keep the E1-3 gain below the margin  (only {len(p_all)} P sessions; "
+              "runs in the full run)")
+    else:
+        use = p_all[:60]
+        XA, Y, G, F = [], [], [], []
+        conf = pt.Config("raw", "none", default, mutation="random_levels")
+        for i, m in enumerate(use):
+            sess = pt.load_session(work, m)
+            fa, lab, _ = pt.presence_features(sess, cfg)
+            XA.append(fa)
+            Y.append(lab)
+            G.append(np.full(len(lab), i))
+            F.append(pt.run(sess, conf, cfg, 1, True, False)["windows"])
+        XA, Y, G, F = np.vstack(XA), np.concatenate(Y), np.concatenate(G), np.vstack(F)
+        XB = np.hstack([XA, checks.lagged(F, G, cfg["e13"]["lags"])])
+        ones = np.ones(len(Y))
+        gains = []
+        for kind in ("hgb", "lr"):
+            pa = checks.oof_predict(XA, Y, G, kind, 1, cfg["e13"]["folds"])
+            pb = checks.oof_predict(XB, Y, G, kind, 1, cfg["e13"]["folds"])
+            gains.append(checks.weighted_auc(pb, Y, ones) - checks.weighted_auc(pa, Y, ones))
+        check("mutation: random levels keep the E1-3 gain below the margin", max(gains) < cfg["e13"]["margin"],
+              f"gain hgb={gains[0]:+.3f} lr={gains[1]:+.3f} on {len(use)} sessions")
 
     print(f"\n{len(FAILED)} failed")
     return 1 if FAILED else 0

@@ -74,13 +74,13 @@ echo "Step 0 OK: capabilities gate passed"
 "$PY" render_e18.py "$EXP_DIR/config.json" "$EXP_DIR/SEED" "$WORK" "$OUT"
 
 # Step 4: provenance
-"$PY" - "$OUT/provenance.json" "$GSE_REPLAY" "$HMM_VERSION" "$WORLD" "$SMOKE" <<'PYEOF'
+"$PY" - "$OUT/provenance.json" "$GSE_REPLAY" "$HMM_VERSION" "$WORLD" "$SMOKE" "$EXP_DIR" <<'PYEOF'
 import hashlib, json, platform, subprocess, sys
 from importlib.metadata import version
-out, binary, hmm, world, smoke = sys.argv[1:6]
+out, binary, hmm, world, smoke, exp_dir = sys.argv[1:7]
 sha = hashlib.sha256(open(binary, "rb").read()).hexdigest()
 commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-dirty = bool(subprocess.run(["git", "status", "--porcelain", "--", "."], capture_output=True, text=True).stdout.strip())
+dirty = bool(subprocess.run(["git", "-C", exp_dir, "status", "--porcelain", "--", "."], capture_output=True, text=True).stdout.strip())
 json.dump({"world": world, "smoke": bool(smoke), "git_commit": commit, "experiment_dir_dirty": dirty,
            "gse_replay_sha256": sha, "hmm_version": hmm, "python": platform.python_version(),
            "packages": {p: version(p) for p in ("numpy", "scipy", "scikit-learn", "pillow")}},

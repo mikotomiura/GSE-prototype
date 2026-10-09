@@ -51,7 +51,7 @@ def main() -> int:
         sess = pt.load_session(work, manifest[sid])
         for c in C["base6"]:
             r = pt.run(sess, c, cfg, seed, False, True)
-            to_png(r["final"], out / "samples" / f"{sid}-{c.name}.png")
+            to_png(r["final"], out / "samples" / f"synth-{sid}-{c.name}.png")
         final = pt.run(sess, C["base6"][2], cfg, seed, False, True)["final"]  # ordinal-none
         g = np.empty_like(final)
         g[:] = ground
@@ -76,9 +76,9 @@ def main() -> int:
             gen._blob(cx, cy, 4.0, col.astype(np.float32), 0.8)
             seed_frames.append(gen.base.copy())
         none = [final, final, g]
-        to_png(strip(fade), out / "e18" / f"{sid}-fade.png", 1)
-        to_png(strip(seed_frames), out / "e18" / f"{sid}-seed.png", 1)
-        to_png(strip(none), out / "e18" / f"{sid}-none.png", 1)
+        to_png(strip(fade), out / "e18" / f"synth-{sid}-fade.png", 1)
+        to_png(strip(seed_frames), out / "e18" / f"synth-{sid}-seed.png", 1)
+        to_png(strip(none), out / "e18" / f"synth-{sid}-none.png", 1)
     print("rendered E1-8 candidates and samples")
     return 0
 
