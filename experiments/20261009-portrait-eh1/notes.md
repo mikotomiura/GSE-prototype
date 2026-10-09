@@ -60,6 +60,10 @@
 - **判断 W1（実行）**: Windows では `run.sh` の最後の provenance 書き出しが `…/release/gse-replay`（`.exe` なし）を開いて `FileNotFoundError` で落ちた（スモーク 1 回目。解析本体は終わっていた）。計器は変えず、`run.sh` の冒頭に書かれた環境変数 `GSE_REPLAY` に ビルド済みの `gse-replay.exe` を指定して回し直した。スモーク 2 回目と本番 v1・v2 はこの指定で実行（`provenance.json` の `experiment_dir_dirty` は false）。`run.sh` が Windows で `.exe` を補わない点は本体のセッションで直すか判断してほしい。
 - 結果は Mac 版（作った機械）のスモークで見えた傾向（design §8: v1 の E1-3 は全組判定不能、v2 は PC1 が働く）と同じ向きだった。
 - E1-3 は両 world で判定不能のため、「形に停滞の情報が残らない」とは言えない。見つからなかったのではなく検査器が基準に届いていない（v1: 構成上、v2: PC2 が働かない）。
+- **判断 W2（Surface Pro 8 での試み・止めた）**: 2026-10-09 13:30〜13:57、Surface Pro 8（Windows 11・8 論理コア・RAM 8 GB）でも EH1 を回し始めたが、止めて結果は残していない（本番の結果のファイルは開かずに消した）。計器は変えていない。
+  - スモーク（v1）は selftest `0 failed`。`.exe` の件は判断 W1 と同じ症状で、同じ回避（`GSE_REPLAY` に `.exe` を渡す）で通った。
+  - 本番（v1）は selftest `0 failed`（変異 `random levels` も PASS）の後、`checks.py` が **`MemoryError`** で落ちた（開始から約 3 分半・runs の段）。`checks.py` の並列は `--jobs` の既定値 16 で、`run.sh` は渡さない。RAM 8 GB の機械に 16 プロセスは載らない。並列 3 で回し直しかけたが、研究者の判断で止め、EH1 は G-GEAR の結果（判断 W1）を使う。Surface では EH2 だけを回した（`experiments/20261009-portrait-eh2/notes-windows.md`）。
+  - 本体のセッションへ: RAM の少ない機械でも回せるよう、`run.sh` から `checks.py` に `--jobs` を渡せるようにするか判断してほしい。乱数は `SEED` とセッションから派生させているので、並列数で結果は変わらないはず（コードを読んだ範囲・実測で比べてはいない）。
 
 ## 限界
 
