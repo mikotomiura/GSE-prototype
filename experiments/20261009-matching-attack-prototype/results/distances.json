@@ -1,0 +1,214 @@
+{
+ "attacker_seed": 20260929,
+ "format": "matching-attack-distances/1",
+ "n_trials": 2700,
+ "pools": {
+  "S1": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S10": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S13": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S14": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S15": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S2": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S3": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S4": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S5": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S6": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S7": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  },
+  "S8": {
+   "n": 1791,
+   "phrase_ids_sha256": "2a3158c33d9e311e6d17c855f03e24a225de4b0ac104c2923916e022f236c680"
+  }
+ },
+ "provenance": {
+  "attacker_seed": 20260929,
+  "distances_py_sha256": "0fa095a93dd421a96a1119039b171947586e7bb7785593164182dff9a76015e0",
+  "inputs": {
+   "corpus": "c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620",
+   "plan_config": "400fe5314d0f660f2e776a7f86deb471ae1235a3bea4c1be457b26ebe0a9181f",
+   "recipes": "430ec52c67f0592bc1c9d038a972876a2608ed7c39eb2aabcf68efc4ff908411"
+  },
+  "kit_code": {
+   "papers/ime-observation/kit/analysis/stats.py": "ead0ccaa50bb86b088b66899ef5b1e04fb9b995a582e520679e04d09cbbf5c07",
+   "papers/ime-observation/kit/e2/closed_set.py": "364cc833b48a73aeb15b9416bff203ec21a71296e26534f914e3a2bb9bd067c3",
+   "papers/ime-observation/kit/e2/simulate_obs.py": "ab989955e7273e9290595318a96087c384d40e19565f351be17bf3f8d4733123",
+   "papers/ime-observation/kit/gen/generate_plan.py": "822538a52fd40ddc04e7ef406373f8d6cf5b0e7e22763b695fe61cef5fd5cb15",
+   "papers/ime-observation/kit/gen/romaji.py": "79db4d4ef74fb3e354aff769f0fe5c350cf57410c0adb2e7543d5594afd9f4b1"
+  },
+  "os": "windows",
+  "variants": {
+   "S_counts_only": {
+    "attacker": "S",
+    "kind": "ime",
+    "runs": "count"
+   },
+   "S_mboth": {
+    "attacker": "S",
+    "groups": {
+     "bound": [
+      "enter",
+      "escape",
+      "tab",
+      "sentence_punctuation"
+     ],
+     "char": [
+      "alphabetic",
+      "numeric",
+      "punctuation",
+      "space"
+     ]
+    },
+    "kind": "merge_categories"
+   },
+   "S_mbound": {
+    "attacker": "S",
+    "groups": {
+     "bound": [
+      "enter",
+      "escape",
+      "tab",
+      "sentence_punctuation"
+     ]
+    },
+    "kind": "merge_categories"
+   },
+   "S_mchar": {
+    "attacker": "S",
+    "groups": {
+     "char": [
+      "alphabetic",
+      "numeric",
+      "punctuation",
+      "space"
+     ]
+    },
+    "kind": "merge_categories"
+   },
+   "S_no_time": {
+    "attacker": "S",
+    "kind": "ime",
+    "runs": "exact"
+   },
+   "S_rle1": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 1
+   },
+   "S_rle16": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 16
+   },
+   "S_rle2": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 2
+   },
+   "S_rle4": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 4
+   },
+   "S_rle8": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": 8
+   },
+   "S_rleinf": {
+    "attacker": "S",
+    "kind": "rle",
+    "w": null
+   }
+  }
+ },
+ "trials_json_sha256": "031ddf4ecbdb36b7728152a29a1f49db9bcbdf3d20aad2af66d9367cd4b3d94c",
+ "variants": {
+  "S_counts_only": {
+   "n_distinct_pairs": 80200,
+   "n_values": 4835700,
+   "sha256": "44245a0769db3a7e7af056d9832f3a0b13ee8847df3b88838d4f60eaa182f1e9"
+  },
+  "S_mboth": {
+   "n_distinct_pairs": 48167,
+   "n_values": 4835700,
+   "sha256": "4f055ca2063089e422883f50395c0f35e96d6556933828fd00219b539ce96ee7"
+  },
+  "S_mbound": {
+   "n_distinct_pairs": 76675,
+   "n_values": 4835700,
+   "sha256": "5480790840f3553994bf4a6aa554ccbe0134b2d73b0436a01f15fc2c5e45fd9f"
+  },
+  "S_mchar": {
+   "n_distinct_pairs": 50663,
+   "n_values": 4835700,
+   "sha256": "4f055ca2063089e422883f50395c0f35e96d6556933828fd00219b539ce96ee7"
+  },
+  "S_no_time": {
+   "n_distinct_pairs": 80200,
+   "n_values": 4835700,
+   "sha256": "5480790840f3553994bf4a6aa554ccbe0134b2d73b0436a01f15fc2c5e45fd9f"
+  },
+  "S_rle1": {
+   "n_distinct_pairs": 80200,
+   "n_values": 4835700,
+   "sha256": "8da0febce97eb84821bfd4ac0c2f3dee3bb6979234f125256c185f4c739aedf2"
+  },
+  "S_rle16": {
+   "n_distinct_pairs": 653,
+   "n_values": 4835700,
+   "sha256": "7d737acc681ffccd91e057d4547eaf4e834a73cd6adb28b6d35afb988c3f8837"
+  },
+  "S_rle2": {
+   "n_distinct_pairs": 21947,
+   "n_values": 4835700,
+   "sha256": "b0fd47fb72b632d708b058c30e1da492bcd7734acd012466d289a293e01bd9c7"
+  },
+  "S_rle4": {
+   "n_distinct_pairs": 6800,
+   "n_values": 4835700,
+   "sha256": "bda57d00928cf609e37776bdcbb2ba3820ddf0406902e9e2b3978d9d9d6db51a"
+  },
+  "S_rle8": {
+   "n_distinct_pairs": 1992,
+   "n_values": 4835700,
+   "sha256": "c720f6ba9465d12bfe5b20e3b3b12c5da3d255880358ffa5f7fe5f168a530e32"
+  },
+  "S_rleinf": {
+   "n_distinct_pairs": 41,
+   "n_values": 4835700,
+   "sha256": "ab0e1770c5940923659b386f6b75e909170c20bfbc9a06b53ae54f29076c1a2d"
+  }
+ }
+}
