@@ -2319,3 +2319,29 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 
 - **/reimagine**: 使わない（分岐は上の 4 問で研究者が決めた。実装は既存の関数を写すだけ）。
 - **見直し**: 結果が出た後に本文の文を書くとき（載せ方は変えない）。研究者が組・判定・載せ方を覆したとき。
+
+## 判断 226: 事後の解析の結果 —— 2 つの組とも K = 10 では偶然の水準の近く・K = 100 では届かず、事後にも推奨できる粒度なし。原稿・README・D13 を直した（2026-10-10・G-GEAR・設計は判断 225 で固定・直しはメイン・研究者が覆せる）
+
+- **スクリプト** `kit/e2/explore_run_lengths.py`（SHA-256 `753f9210…`）: `closed_set.py`・`simulate_obs.py` を import するだけで変えない。selftest 32 件（合成の世界で対照の 2 組が `closed_set.evaluate` と一致・トークンと距離の例・閉包）。変異 12 本のうち 10 本が赤、残る 2 本は意味が同じ変更（正誤を読みで判定 ↔ 語句で判定〔おとりは読みが同じものを除くので同値〕・時刻なしでは距離の `timing` が効かない）。`kit/check.sh` 35 本緑。
+- **実行**（G-GEAR・Python 3.11.9・各セル約 2 分）: Windows は手元の run（計画 `b7bdf8fc…`・観測 `58f0bda6…`・`data.windows.md` と一致）。macOS は Zenodo 23183438 の書庫（SHA-256 は `data.md` と、MD5 は Zenodo の一覧と一致）を job の tmp に展開（`run.json`・計画・観測の SHA-256 も一致）。⚠️ 1 回目は macOS の 2 セルとも「計画と手順ファイルの SHA-256 が違う」で止まった（何も書いていない）→ 計画は macOS のタグの手順ファイル（`158cac1b…`・`36aad15a…`）から作られていた（HEAD の同名ファイルは D1〜D4 で変わっている）→ `git show ime-observation-prereg-macos:…` で取り出して回し直した。3 セルとも陽性の対照（登録の `no_time`・`counts_only` の全項目が K = 10・100・1,000 で一致）を通って書いた。2 回目の実行は 3 ファイルともバイト単位で同じ（off `9c913570…`・on `121a0300…`・Windows `3bc23a2d…`）。
+- **結果**（報告値・Wilson の 95% 区間・2/K は 0.200 と 0.020）:
+
+  | セル | 組 | K = 10 | K = 100 | K = 1,000 |
+  |---|---|---|---|---|
+  | macOS off | `letter_runs_unit` | 0.168 [0.155, 0.183] | 0.037 [0.030, 0.044] | 0.005 |
+  | macOS off | `all_runs_unit` | 0.106 [0.095, 0.118] | 0.017 [0.012, 0.022] | 0.001 |
+  | macOS on | `letter_runs_unit` | 0.162 [0.149, 0.176] | 0.037 [0.031, 0.044] | 0.004 |
+  | macOS on | `all_runs_unit` | 0.111 [0.101, 0.123] | 0.019 [0.015, 0.025] | 0.002 |
+  | Windows | 両方 | macOS off と完全に同じ（登録の組と同じ構造: 2 つの計画は文字・数字・記号の打鍵が同じ） | | |
+
+  - 事後の判定: K = 10 では 2 組とも両セルで近い、K = 100 では 2 組とも両セルで届かない（上端が 2/K を超える）→ **どちらも「両セル・両方の K」を満たさず、事後にも推奨できる粒度なし**。Windows も同じ。登録の推奨（なし）は変えていない。`letter_runs_unit` の報告値はどの K・セルでも自分の値（`all_runs_unit` より高い）。
+  - 参考（判定ではない）: `no_time` の K = 10 は約 0.90。長さを捨てると大きく下がるが、K = 100 では偶然の水準の 2 倍の幅に入らない。
+- **直したもの**（判断 225 の表のとおり）:
+  - `recoverability.tex`: 方法の 6 組の書き方（`no_runs`・`bin1s_count`・`counts_only` は連なりを 1 トークンにして長さを持つ・D13）・規則の段落（「its coarsening」→「registered as its coarsening」）・事後の解析の方法の段落（見ていた値の開示を含む）・結果の誤り（「without their order or times」→ `no_time` と同じ情報で距離の数え方だけが違う）・結果の事後の段落（値と判定は `\rv` から。K ごとの要約の語は値から決まり、結果が変われば手で直すとコメント）。
+  - 要旨（`main.tex`）: 問 4 の文を「no granularity … met the registered near-chance rule in any cell, so none is recommended; nor did two that drop run lengths (exploratory).」に組み直した。⚠️ 研究者の元の文（macOS の 2 セルで届かず、Windows も届かない、と分けて書く）を「in any cell」にまとめた —— 250 語の上限に入れるため（数え方は判断 221 と同じ・`\rv` を生成値で展開して空白で区切る・今 250 語）。研究者が覆せる。
+  - `conclusions.tex`（「the numbers of keys of each category alone」→「only the category of every key press in order」・事後の 1 文）・`recommendations.tex` (c)（事後の 1 文）・`limitations.tex`（逸脱の段落に D13・「種類ごとの数」の文に D13）・`method.tex`（Thirteen deviations・D13 の行）・`declarations.tex`（登録していないものに D13・結果の後の逸脱に D13・AI 宣言に「Claude が別の研究のためにコードを読んで見つけた」）。
+  - `results_tables.py`: 事後の結果を読む（登録の結果ファイルの SHA-256・陽性の対照・整列・除いた試行・閉包・最大の規則を照らし、違えば止まる）・値（`q4x.*`）・補遺の表（`closed-set-posthoc.tex`・横置き・登録の表と同じ幅の作り）。`windows_sets_clause` を `sets_clause` に一般化（登録の出力は変わらない・selftest で確かめた）。selftest 216 件（足した 22 件）・変異 8 本すべて赤。生成物で変わったのは `values.json`・`values.tex`（鍵が増えただけ）と新しい補遺の表だけ。
+  - `supplement.tex`（補遺の表を入れた）・`provenance.tex`（事後の結果ファイルの行）・`kit/e2/README.md`（表と説明をコードどおりに・事後の節・検証）・`experiment/deviations.md`（D13・冒頭の段落）・`data.md`・`data.windows.md`（実行の記録）。
+- **検査**: `build.sh --submission` はエラー 0・未定義 0・生成されていない値 0・頁の外 0・頁番号への重なり 0。overfull は `origin/main` を同じ手順でビルドした基準と比べ、本文 9・提出用 1 は同じ、補遺は 167 → 172（横置きの頁の柱 4〔BUILD.md の既知の形〕と出どころの表の長いファイル名 1〔既存の行と同じ形〕）。要旨 250 語。文体の検査 違反 0。
+- **研究者に確かめること（完了時）**: (1) 公開 repo の v1.0.2 と Zenodo の新しい版を出すか。⚠️ 原稿は今もコードの DOI に 1.0.0（`…23183441`）を引くが、1.0.0 には `explore_run_lengths.py` が無い → 原稿が引くコードの DOI を 1.0.2 にするか。(2) `attack-me` を回すか（原稿の外枠に事後の解析が入った）。(3) D13 に試作の Windows の数値（k = 1 の `S_rleinf`）を開示として書いた（引き継ぎ §4 は「論文の結果として引かない」—— 結果ではなく「見ていた値」として書いた。原稿の本文には数値を書いていない）。(4) repo の外の `C:/ime-submission/cover-letter.md` の `[PsyArXiv DOI]` の空欄（出し先しだい）。
+- **影響範囲**: `papers/ime-observation/{kit/e2/explore_run_lengths.py,kit/e2/README.md,experiment/deviations.md,experiment/data.md,experiment/data.windows.md,experiment/results/exploratory/closed_set_run_lengths_*.json,manuscript/main.tex,manuscript/sections/{recoverability,conclusions,recommendations,limitations,method,declarations}.tex,manuscript/supplement/{supplement,provenance}.tex,manuscript/tools/results_tables.py,manuscript/generated/{values.json,values.tex,closed-set-posthoc.tex}}`・本ファイル・`tasklist.md`。
