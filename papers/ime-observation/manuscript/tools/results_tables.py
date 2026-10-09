@@ -44,7 +44,10 @@ Wilson interval of its reported accuracy (the maximum over the set and the sets 
 is near chance for the rule when it is so at K = 10 and K = 100. The recommendation is the most detailed of no_time and
 counts_only that is near chance in both macOS cells, else none; without both macOS cells it is not decided. The
 Windows judgement of the same set is its qualification and never changes it. The closed-set files must be those of
-deviation D8 (every trial of S12 left out). Question 5: a condition is quoted only when its status is measured, and on
+deviation D8 (every trial of S12 left out). Deviation D13 (exploratory, not registered): the same rule is applied, in the
+same way, to the two sets without times that drop the lengths of runs (experiment/results/exploratory/
+closed_set_run_lengths_<cell>.json, made by kit/e2/explore_run_lengths.py against the registered closed-set file);
+it never changes the recommendation. Question 5: a condition is quoted only when its status is measured, and on
 Windows a working condition whose every CPU sample is zero is insufficient (section 10.9).
 
 The values of the abstract follow the rule fixed in outline.md before the results ("Rule for the abstract"): for
@@ -84,8 +87,9 @@ CELL_NAMES = {"macos-standard-live-on": "macOS, live conversion on",
               "macos-standard-live-off": "macOS, live conversion off", "windows-msime-tsf": "Windows"}
 WINDOWS_CELL = EXPECTED_CELLS[2]
 # Question 4 (section 6.8 of the pre-registration). The feature sets of the closed set, from the most detailed; the
-# rule considers only the two sets that keep no time, the most detailed first (counts_only is a coarsening of
-# no_time), and only K = 10 and K = 100 (K = 1,000 is descriptive).
+# rule considers only the two sets that keep no time, the most detailed first (counts_only is registered as a
+# coarsening of no_time; as computed it holds the same information, deviation D13), and only K = 10 and K = 100
+# (K = 1,000 is descriptive).
 CLOSED_SET_SETS = ("all", "no_runs", "bin1s", "bin1s_count", "no_time", "counts_only")
 RULE_SETS = ("no_time", "counts_only")
 RULE_KS = (10, 100)
@@ -543,17 +547,22 @@ def yes_no(j):
     return NO_VALUE if j is None else ("yes" if j else "no")
 
 
-def windows_sets_clause(judged):
-    """The judgement of each set of the rule on Windows as an English clause: "neither A nor B was near chance", "both
-    A and B were near chance", or the sets named one by one when they differ or have no value."""
-    names = dict((f, "\\texttt{%s}" % tex_escape(f)) for f in RULE_SETS)
-    vals = [judged[f] for f in RULE_SETS]
-    if len(RULE_SETS) == 2 and all(v is False for v in vals):
-        return "neither %s nor %s was near chance" % tuple(names[f] for f in RULE_SETS)
-    if len(RULE_SETS) == 2 and all(v is True for v in vals):
-        return "both %s and %s were near chance" % tuple(names[f] for f in RULE_SETS)
+def sets_clause(judged, sets):
+    """The judgement of each of the sets as an English clause: "neither A nor B was near chance", "both A and B were
+    near chance", or the sets named one by one when they differ or have no value."""
+    names = dict((f, "\\texttt{%s}" % tex_escape(f)) for f in sets)
+    vals = [judged[f] for f in sets]
+    if len(sets) == 2 and all(v is False for v in vals):
+        return "neither %s nor %s was near chance" % tuple(names[f] for f in sets)
+    if len(sets) == 2 and all(v is True for v in vals):
+        return "both %s and %s were near chance" % tuple(names[f] for f in sets)
     part = {True: "was near chance", False: "was not near chance", None: "has no value"}
-    return ", and ".join("%s %s" % (names[f], part[judged[f]]) for f in RULE_SETS)
+    return ", and ".join("%s %s" % (names[f], part[judged[f]]) for f in sets)
+
+
+def windows_sets_clause(judged):
+    """The judgement of each set of the rule on Windows as an English clause (sets_clause over RULE_SETS)."""
+    return sets_clause(judged, RULE_SETS)
 
 
 def closed_set_values(cells, docs):
@@ -598,6 +607,219 @@ def closed_set_values(cells, docs):
                 "text": yes_no(near_chance(doc, f)), "value": near_chance(doc, f),
                 "source": "%s:results/10|100/%s/acc_ci" % (src, f)}
     return vals
+
+
+# ---------------------------------------------------------------- deviation D13: feature sets without run lengths
+
+# Exploratory, not registered (deviation D13): the closed-set attack on two feature sets without times that drop the
+# lengths of runs (kit/e2/explore_run_lengths.py). The registered values and recommendation do not change. The
+# registered near-chance rule is applied to the two sets as an exploratory judgement, in the same way as the registered
+# judgement: from the two macOS cells, with the Windows judgement as its qualification.
+POSTHOC_DIR = "exploratory"
+POSTHOC_FORMAT = "e2-closed-posthoc/1"
+POSTHOC_SETS = ("letter_runs_unit", "all_runs_unit")   # the more detailed first: all_runs_unit is derived from the other
+POSTHOC_CLOSURE = {"letter_runs_unit": ["letter_runs_unit", "all_runs_unit"], "all_runs_unit": ["all_runs_unit"]}
+POSTHOC_CONTROLS = ["no_time", "counts_only"]
+
+
+def posthoc_name(label):
+    return "closed_set_run_lengths_%s.json" % label
+
+
+def read_posthoc(results_dir, cell, closed_doc):
+    """The exploratory closed-set result of deviation D13 for a cell, or None when the file has not been made. The file
+    must have been made against the registered closed-set file of the cell (by its SHA-256), have reproduced its
+    no_time and counts_only at every K, hold the trials of the registered analysis, and hold both sets at every K with
+    the chance level 1/K and the accuracy the maximum over the set and the sets derived from it."""
+    name = posthoc_name(cell.label)
+    p = os.path.join(results_dir, POSTHOC_DIR, name)
+    if not os.path.isfile(p):
+        return None
+    doc = load(p)
+    src = "%s/%s" % (POSTHOC_DIR, name)
+    if doc.get("format") != POSTHOC_FORMAT:
+        raise ValueError("%s: not a result of the exploratory analysis of deviation D13 (%s)" % (src, POSTHOC_FORMAT))
+    if closed_doc is None:
+        raise ValueError("%s: the registered closed-set file of the cell is missing" % src)
+    chk = doc.get("registered_check") or {}
+    if (chk.get("result") != "identical" or chk.get("sets") != POSTHOC_CONTROLS
+            or chk.get("K") != [str(K) for K in CLOSED_SET_KS]):
+        raise ValueError("%s: no_time and counts_only were not reproduced at every K" % src)
+    if chk.get("registered_sha256") != sha256_of(os.path.join(cell.directory, closed_set_name(cell.label))):
+        raise ValueError("%s: made against another closed-set file than %s" % (src, cell.prefix
+                                                                               + closed_set_name(cell.label)))
+    for key in ("alignment", "skipped_scenarios", "n_trials", "seed", "bootstrap"):
+        if doc.get(key) != closed_doc.get(key):
+            raise ValueError("%s: %s differs from the registered closed-set file" % (src, key))
+    if doc.get("closure") != POSTHOC_CLOSURE:
+        raise ValueError("%s: the sets derived from each set are not %r" % (src, POSTHOC_CLOSURE))
+    for K in CLOSED_SET_KS:
+        res = (doc.get("results") or {}).get(str(K)) or {}
+        if sorted(res) != sorted(POSTHOC_SETS):
+            raise ValueError("%s: the sets at K = %d are not %s" % (src, K, ", ".join(POSTHOC_SETS)))
+        for f in POSTHOC_SETS:
+            r = res[f]
+            if abs(r["chance"] - 1.0 / K) > 1e-12:
+                raise ValueError("%s: the chance level of K = %d is not 1/K" % (src, K))
+            if r["n"] != closed_doc["results"][str(K)]["no_time"]["n"]:
+                raise ValueError("%s: K = %d, %s has another number of trials than the registered file" % (src, K, f))
+            if CLOSED_SET_SKIPPED in (r.get("by_scenario") or {}):
+                raise ValueError("%s: %s still has trials at K = %d, %s (deviation D8)" % (src, CLOSED_SET_SKIPPED, K, f))
+            if r["acc_source"] not in POSTHOC_CLOSURE[f] or r["acc"] != max(
+                    res[g]["acc_raw"] for g in POSTHOC_CLOSURE[f]):
+                raise ValueError("%s: K = %d, the accuracy of %s is not the maximum over the sets derived from it"
+                                 % (src, K, f))
+    doc["src"] = src
+    return doc
+
+
+def posthoc_judgement(pdocs):
+    """The exploratory judgement of deviation D13, from the two macOS cells only, as the registered recommendation is
+    made: the more detailed of POSTHOC_SETS that is near chance in both cells. {"status": "near" | "none" | "not
+    decided", "set": name or None}."""
+    if any(pdocs.get(c) is None for c in MACOS_CELLS):
+        return {"status": "not decided", "set": None}
+    for f in POSTHOC_SETS:
+        if all(near_chance(pdocs[c], f) is True for c in MACOS_CELLS):
+            return {"status": "near", "set": f}
+    return {"status": "none", "set": None}
+
+
+def posthoc_values(cells, pdocs):
+    """Values of the exploratory analysis of deviation D13: the judgement from the two macOS cells (q4x.judgement, a
+    clause, and q4x.granularity, the set or none), its Windows qualification (q4x.windows) and, per cell, the accuracy
+    and the judgement of each set."""
+    vals = {}
+    jd = posthoc_judgement(pdocs)
+    names = dict((f, "\\texttt{%s}" % tex_escape(f)) for f in POSTHOC_SETS)
+    macos_src = ", ".join("%s/%s" % (POSTHOC_DIR, posthoc_name(c)) for c in MACOS_CELLS)
+    if jd["status"] == "not decided":
+        clause = "the judgement is not decided (a macOS cell was not analysed)"
+    else:
+        both = dict((f, all(near_chance(pdocs[c], f) is True for c in MACOS_CELLS)) for f in POSTHOC_SETS)
+        clause = sets_clause(both, POSTHOC_SETS) + " in both macOS cells"
+    vals["q4x.judgement"] = {"text": clause, "value": jd, "source": macos_src + ":results/10|100/*/acc_ci"}
+    vals["q4x.granularity"] = {
+        "text": {"near": names.get(jd["set"], ""), "none": "none",
+                 "not decided": "not decided (a macOS cell was not analysed)"}[jd["status"]],
+        "value": jd, "source": macos_src + ":results/10|100/*/acc_ci"}
+    win = pdocs.get(WINDOWS_CELL)
+    if win is None:
+        q, qv = "the cell was not analysed", None
+    elif jd["status"] == "near":
+        qv = near_chance(win, jd["set"])
+        q = {True: "%s was also near chance" % names[jd["set"]], False: "%s was not near chance" % names[jd["set"]],
+             None: "%s has no value" % names[jd["set"]]}[qv]
+    else:
+        qv = dict((f, near_chance(win, f)) for f in POSTHOC_SETS)
+        q = sets_clause(qv, POSTHOC_SETS)
+    vals["q4x.windows"] = {"text": q, "value": qv,
+                           "source": "%s/%s:results/10|100/*/acc_ci" % (POSTHOC_DIR, posthoc_name(WINDOWS_CELL))}
+    for cell in cells:
+        doc = pdocs.get(cell.label)
+        if doc is None:
+            continue
+        for f in POSTHOC_SETS:
+            for K in RULE_KS:
+                r = doc["results"][str(K)][f]
+                vals["%s.q4x.%s.k%d.acc" % (cell.label, f, K)] = {
+                    "text": est_ci(r["acc"], r["acc_ci"][0], r["acc_ci"][1]), "value": [r["acc"]] + list(r["acc_ci"]),
+                    "source": "%s:results/%d/%s/acc|acc_ci" % (doc["src"], K, f)}
+                vals["%s.q4x.%s.k%d.near" % (cell.label, f, K)] = {
+                    "text": yes_no(near_chance_at(r, K)), "value": near_chance_at(r, K),
+                    "source": "%s:results/%d/%s/acc_ci" % (doc["src"], K, f)}
+            vals["%s.q4x.%s.near" % (cell.label, f)] = {
+                "text": yes_no(near_chance(doc, f)), "value": near_chance(doc, f),
+                "source": "%s:results/10|100/%s/acc_ci" % (doc["src"], f)}
+    return vals
+
+
+def posthoc_supplement(cells, pdocs):
+    """Supplement: the exploratory analysis of deviation D13, per cell: the judgement at K = 10 and 100, every K with the
+    raw accuracy per speed, and the raw accuracy per scenario."""
+    jd = posthoc_judgement(pdocs)
+    lines = [GENERATED_NOTE,
+             "\\section*{Exploratory: feature sets without run lengths (deviation D13)}\n\\label{sec:supp-posthoc}\n\n",
+             "Not registered. The closed-set attack of question 4 on two feature sets without times that drop the "
+             "lengths of runs: \\texttt{letter\\_runs\\_unit}, in which every run of letter keys is one token whatever "
+             "its length and every other press one token, and \\texttt{all\\_runs\\_unit}, in which every run of presses "
+             "of the same category is one token whatever its length; both keep the order. The predicted logs, the "
+             "distance, the candidates and the tie-breaking of each trial, the values of K and the intervals are those of "
+             "the registered attack, and every run reproduced the registered \\texttt{no\\_time} and "
+             "\\texttt{counts\\_only} at every K before it wrote these values. \\texttt{all\\_runs\\_unit} is derived "
+             "from \\texttt{letter\\_runs\\_unit}, so the accuracy of \\texttt{letter\\_runs\\_unit} is the larger of the "
+             "two; Raw is the accuracy of the set alone. The registered near-chance rule is applied as an exploratory "
+             "judgement, from the two macOS cells, with the Windows judgement as its qualification; the registered "
+             "judgement and recommendation do not change. %s: no value.\n\n" % NO_VALUE]
+    # The layout of the registered tables (table_closed_set, table_closed_set_all), on landscape pages, with a wider
+    # column for the longer names of the feature sets.
+    lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
+              "\\begin{longtable}{L{0.20}L{0.15}L{0.06}L{0.07}L{0.19}L{0.15}L{0.07}L{0.10}}\n",
+              "\\caption{Exploratory judgement of the feature sets without run lengths}\\label{tab:posthoc}\\\\\n",
+              "\\toprule\n",
+              "Cell & Feature set & K & Trials & Accuracy & Block interval & 2/K & Near chance \\\\\n",
+              "\\midrule\n\\endhead\n"]
+    for cell in cells:
+        doc = pdocs.get(cell.label)
+        if doc is None:
+            lines.append("%s & \\multicolumn{7}{l}{not analysed} \\\\\n" % cell_name(cell.label))
+            continue
+        first = True
+        for f in POSTHOC_SETS:
+            for K in RULE_KS:
+                r = doc["results"][str(K)][f]
+                blk = r.get("acc_ci_block") or [None, None]
+                lines.append(" & ".join([
+                    cell_name(cell.label) if first else "", "\\texttt{%s}" % tex_escape(f), fmt_int(K), fmt_int(r["n"]),
+                    est_ci(r["acc"], r["acc_ci"][0], r["acc_ci"][1]),
+                    "%s, %s" % (fmt_p(blk[0]), fmt_p(blk[1])) if blk[0] is not None else NO_VALUE,
+                    fmt_p(2.0 / K), yes_no(near_chance_at(r, K))]) + " \\\\\n")
+                first = False
+    lines += ["\\midrule\n",
+              "\\multicolumn{8}{l}{Exploratory judgement from the two macOS cells: %s} \\\\\n" % (
+                  {"near": "\\texttt{%s} near chance" % tex_escape(jd["set"] or ""), "none": "neither set near chance",
+                   "not decided": "not decided (a macOS cell was not analysed)"}[jd["status"]]),
+              "\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n\n"]
+    for cell in cells:
+        doc = pdocs.get(cell.label)
+        if doc is None:
+            continue
+        lines += ["\\begin{landscape}\n", "{\\footnotesize\n",
+                  "\\begin{longtable}{L{0.15}L{0.06}L{0.06}L{0.18}L{0.13}L{0.17}L{0.07}L{0.06}L{0.06}L{0.06}}\n",
+                  "\\caption{Exploratory closed set, cell %s: accuracy per feature set and K}"
+                  "\\label{tab:posthoc-%s}\\\\\n" % (cell_name(cell.label), cell.label),
+                  "\\toprule\n",
+                  "Feature set & K & Trials & Accuracy & Source & Raw & Mean rank & Slow & Mid & Fast \\\\\n",
+                  "\\midrule\n\\endhead\n"]
+        for f in POSTHOC_SETS:
+            for K in CLOSED_SET_KS:
+                r = doc["results"][str(K)][f]
+                sp = r.get("by_speed") or {}
+                lines.append(" & ".join(
+                    ["\\texttt{%s}" % tex_escape(f), fmt_int(K), fmt_int(r["n"]),
+                     est_ci(r["acc"], r["acc_ci"][0], r["acc_ci"][1]), "\\texttt{%s}" % tex_escape(r["acc_source"]),
+                     est_ci(r["acc_raw"], r["acc_ci_raw"][0], r["acc_ci_raw"][1]),
+                     NO_VALUE if r.get("mean_rank") is None else "%.2f" % r["mean_rank"]]
+                    + [fmt_p((sp.get(s) or {}).get("acc")) for s in SPEEDS]) + " \\\\\n")
+        lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n", "\\end{landscape}\n\n"]
+        scen = sorted(set(s for K in CLOSED_SET_KS for f in POSTHOC_SETS
+                          for s in (doc["results"][str(K)][f].get("by_scenario") or {})), key=scenario_order)
+        lines += ["{\\footnotesize\n",
+                  "\\begin{longtable}{L{0.16}L{0.12}" + "L{0.30}" * len(POSTHOC_SETS) + "}\n",
+                  "\\caption{Exploratory closed set, cell %s: raw accuracy per scenario}"
+                  "\\label{tab:posthoc-scenario-%s}\\\\\n" % (cell_name(cell.label), cell.label),
+                  "\\toprule\n",
+                  "Scenario & K & " + " & ".join("\\texttt{%s}" % tex_escape(f) for f in POSTHOC_SETS) + " \\\\\n",
+                  "\\midrule\n\\endhead\n"]
+        for K in CLOSED_SET_KS:
+            for s in scen:
+                row = [s, fmt_int(K)]
+                for f in POSTHOC_SETS:
+                    e = (doc["results"][str(K)][f].get("by_scenario") or {}).get(s) or {}
+                    row.append("%s (%s)" % (fmt_p(e.get("acc")), fmt_int(e.get("n", 0))))
+                lines.append(" & ".join(row) + " \\\\\n")
+        lines += ["\\bottomrule\n", "\\end{longtable}\n", "}\n\n"]
+    return "".join(lines)
 
 
 def open_set_name(label):
@@ -2702,6 +2924,7 @@ def build(results_dir):
     d10 = dict((c.label, read_d10(results_dir, c)) for c in cells)
     clocks = dict((c.label, read_clock_sync(c)) for c in cells)
     dwellx = dict((c.label, read_dwell_explore(results_dir, c)) for c in cells)
+    posthoc = dict((c.label, read_posthoc(results_dir, c, docs[c.label])) for c in cells)
     values = {}
     for cell in cells:
         values.update(abstract_values(cell))
@@ -2717,6 +2940,7 @@ def build(results_dir):
         values.update(open_set_values(cell, open_docs[cell.label]))
     values.update(l2_constant_values(cells))
     values.update(closed_set_values(cells, docs))
+    values.update(posthoc_values(cells, posthoc))
     values.update(e3_values(e3))
     files = {
         "values.json": (json.dumps({"min_trials": MIN_TRIALS, "cells": [c.label for c in cells], "values": values},
@@ -2728,6 +2952,7 @@ def build(results_dir):
         "table-open-set.tex": table_open_set(cells, open_docs).encode("utf-8"),
         "table-cost.tex": table_cost(e3).encode("utf-8"),
         "closed-set-all.tex": table_closed_set_all(cells, docs).encode("utf-8"),
+        "closed-set-posthoc.tex": posthoc_supplement(cells, posthoc).encode("utf-8"),
         "table-text-agreement.tex": table_text_agreement(cells).encode("utf-8"),
         "text-agreement.tex": text_agreement_supplement(cells).encode("utf-8"),
         "table-reference.tex": table_reference(cells, clocks).encode("utf-8"),
@@ -3721,6 +3946,125 @@ def _selftest_spread(check):
         check("spread: texts that differ from the agreement's are refused", False, repr(ex))
 
 
+def _selftest_posthoc(check):
+    """Deviation D13: reading the exploratory closed-set files, the judgement from the two macOS cells and its Windows
+    qualification, and the refusals."""
+    def res(acc_raw, hi, n=200, src=None):
+        return {"acc": acc_raw, "acc_raw": acc_raw, "acc_ci": [acc_raw / 2, hi], "acc_ci_raw": [acc_raw / 2, hi],
+                "acc_source": src, "acc_ci_block": [acc_raw / 2, hi], "acc_ci_raw_block": [acc_raw / 2, hi],
+                "chance": None, "n": n, "mean_rank": 2.5, "by_scenario": {"S1": {"acc": acc_raw, "n": n}},
+                "by_speed": {"slow": {"acc": acc_raw, "n": n}}}
+
+    def posthoc_doc(hi_a, hi_b):
+        """A result whose upper Wilson ends are hi_a (letter_runs_unit) and hi_b (all_runs_unit) times 2/K."""
+        out = {}
+        for K in CLOSED_SET_KS:
+            a = res(0.5 / K, hi_a * 2.0 / K, src="letter_runs_unit")
+            b = res(0.4 / K, hi_b * 2.0 / K, src="all_runs_unit")
+            for r in (a, b):
+                r["chance"] = 1.0 / K
+            out[str(K)] = {"letter_runs_unit": a, "all_runs_unit": b}
+        return {"results": out}
+
+    near_both = posthoc_doc(0.9, 0.8)
+    only_b = posthoc_doc(1.1, 0.8)
+    neither = posthoc_doc(1.1, 1.2)
+    a, b = MACOS_CELLS
+    jd = posthoc_judgement
+    check("posthoc: letter_runs_unit near chance in both macOS cells is the exploratory granularity",
+          jd({a: near_both, b: near_both}) == {"status": "near", "set": "letter_runs_unit"})
+    check("posthoc: only all_runs_unit near chance in both macOS cells gives all_runs_unit",
+          jd({a: only_b, b: near_both}) == {"status": "near", "set": "all_runs_unit"})
+    check("posthoc: a set near chance in one macOS cell only is not near chance for the judgement",
+          jd({a: neither, b: near_both}) == {"status": "none", "set": None})
+    check("posthoc: without both macOS cells the judgement is not decided",
+          jd({a: near_both}) == {"status": "not decided", "set": None})
+    v = posthoc_values([], {a: near_both, b: near_both, WINDOWS_CELL: neither})
+    check("posthoc: the clause and the Windows qualification name the set judged near chance",
+          v["q4x.judgement"]["text"] == "both \\texttt{letter\\_runs\\_unit} and \\texttt{all\\_runs\\_unit} were near "
+          "chance in both macOS cells" and v["q4x.granularity"]["text"] == "\\texttt{letter\\_runs\\_unit}"
+          and v["q4x.windows"]["text"] == "\\texttt{letter\\_runs\\_unit} was not near chance", str(v))
+    v = posthoc_values([], {a: near_both, b: near_both, WINDOWS_CELL: only_b})
+    check("posthoc: the Windows qualification judges the set that the macOS cells judged near chance",
+          v["q4x.windows"]["text"] == "\\texttt{letter\\_runs\\_unit} was not near chance"
+          and v["q4x.windows"]["value"] is False, str(v["q4x.windows"]))
+    v = posthoc_values([], {a: neither, b: neither, WINDOWS_CELL: only_b})
+    check("posthoc: with neither set near chance the clause says so and Windows names each set",
+          v["q4x.judgement"]["text"] == "neither \\texttt{letter\\_runs\\_unit} nor \\texttt{all\\_runs\\_unit} was near "
+          "chance in both macOS cells" and v["q4x.granularity"]["text"] == "none"
+          and v["q4x.windows"]["text"] == "\\texttt{letter\\_runs\\_unit} was not near chance, and "
+          "\\texttt{all\\_runs\\_unit} was near chance", str(v))
+    check("posthoc: the registered clause of the Windows judgement is unchanged",
+          windows_sets_clause({"no_time": False, "counts_only": False})
+          == "neither \\texttt{no\\_time} nor \\texttt{counts\\_only} was near chance")
+
+    tmp = tempfile.mkdtemp(prefix="results_tables_posthoc_")
+    try:
+        cell_dir = os.path.join(tmp, "cell")
+        os.makedirs(cell_dir)
+        cell = _FakeCell("cell-x", [], [], {}, cell_dir)
+        cell.prefix = ""
+        top = {"alignment": {"n_blocks_unscored": 0, "n_trials_unscored": 0}, "skipped_scenarios": {"S12": 9},
+               "n_trials": 209, "seed": 7, "bootstrap": 40}
+        closed = dict(top, results=dict((str(K), {"no_time": {"n": 200}}) for K in CLOSED_SET_KS))
+        with open(os.path.join(cell_dir, closed_set_name("cell-x")), "w", encoding="utf-8") as f:
+            json.dump(closed, f)
+        closed_sha = sha256_of(os.path.join(cell_dir, closed_set_name("cell-x")))
+        check("posthoc: a cell without the file has no exploratory result", read_posthoc(tmp, cell, closed) is None)
+        good = dict(top, format=POSTHOC_FORMAT, closure=POSTHOC_CLOSURE, results=near_both["results"],
+                    registered_check={"result": "identical", "sets": POSTHOC_CONTROLS,
+                                      "K": [str(K) for K in CLOSED_SET_KS], "registered_sha256": closed_sha})
+        os.makedirs(os.path.join(tmp, POSTHOC_DIR))
+        p = os.path.join(tmp, POSTHOC_DIR, posthoc_name("cell-x"))
+
+        def write(d):
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(d, f)
+
+        write(good)
+        got = read_posthoc(tmp, cell, closed)
+        check("posthoc: a good file is read, with its source", got is not None and got["src"].endswith(
+            posthoc_name("cell-x")))
+        sup = posthoc_supplement([cell], {"cell-x": got})
+        check("posthoc: the supplement is labelled as not registered and holds every K",
+              "Not registered" in sup and "tab:posthoc-cell-x" in sup and sup.count("\\texttt{all\\_runs\\_unit} & ")
+              >= len(CLOSED_SET_KS) and "not decided" in sup, sup[:300])
+
+        def changed(path, value):
+            d = json.loads(json.dumps(good))
+            x = d
+            for k in path[:-1]:
+                x = x[k]
+            x[path[-1]] = value
+            return d
+        acc_not_max = changed(("results", "10", "letter_runs_unit", "acc"), 0.01)
+        for name, bad in (("of another format", changed(("format",), "e2-closed/1")),
+                          ("that did not reproduce the registered sets", changed(("registered_check", "result"),
+                                                                                  "different")),
+                          ("made against another registered file", changed(("registered_check", "registered_sha256"),
+                                                                           "0" * 64)),
+                          ("checked at fewer K", changed(("registered_check", "K"), ["10", "100"])),
+                          ("with another alignment", changed(("alignment", "n_trials_unscored"), 3)),
+                          ("with other trials left out", changed(("skipped_scenarios",), {"S12": 8})),
+                          ("with another closure", changed(("closure", "letter_runs_unit"), ["letter_runs_unit"])),
+                          ("whose accuracy is not the maximum over the derived sets", acc_not_max),
+                          ("with another number of trials", changed(("results", "100", "all_runs_unit", "n"), 199)),
+                          ("with trials of S12", changed(("results", "10", "all_runs_unit", "by_scenario"),
+                                                         {"S12": {"acc": 0.1, "n": 3}})),
+                          ("without a set", changed(("results", "1000"), {"letter_runs_unit":
+                                                                          good["results"]["1000"]["letter_runs_unit"]}))):
+            write(bad)
+            try:
+                read_posthoc(tmp, cell, closed)
+                check("posthoc: a file %s is refused" % name, False)
+            except ValueError:
+                check("posthoc: a file %s is refused" % name, True)
+            except Exception as ex:
+                check("posthoc: a file %s is refused" % name, False, repr(ex))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _selftest_dwell_explore(check):
     tmp = tempfile.mkdtemp(prefix="results_tables_dwellx_")
     try:
@@ -4155,6 +4499,7 @@ def selftest():
     _selftest_figures(check)
     _selftest_spread(check)
     _selftest_dwell_explore(check)
+    _selftest_posthoc(check)
     _selftest_definitions(check)
     _selftest_decomposition(check)
 
