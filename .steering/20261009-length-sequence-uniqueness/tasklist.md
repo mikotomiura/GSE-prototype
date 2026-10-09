@@ -35,5 +35,6 @@
 - [x] 2 巡目（直した規則の境界条件）（判断 6・回し直して出力がバイト単位で同じ）
 
 ## 完了
-- [ ] `/finish-task`（code-reviewer ∥ `/cross-review`）
-- [ ] commit → push → PR → CI 緑なら merge → main の CI 確認
+- [x] `/finish-task`（code-reviewer ∥ `/cross-review`・2 巡）
+- [x] commit → push → PR #337
+- [ ] CI 緑なら merge → main の CI 確認（2026-10-09 20:22 時点: `frontend-check` は緑。`decide-win-runner` が self-hosted の Mac（`macbook-air-m-arm64`）で走るため、Mac が offline のあいだ `queued` のまま止まり、`check` が始まらない。merge は止めた。Mac が online になれば続きが流れる）
