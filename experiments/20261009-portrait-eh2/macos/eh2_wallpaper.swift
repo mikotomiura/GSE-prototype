@@ -1,9 +1,10 @@
 // EH2 of the portrait (macOS): machine checks of the desktop picture API (NSWorkspace).
 //
 // What it does, with placeholder images only:
-//   1. saves the current desktop picture and options of every screen (to a temporary file, not to
-//      the results) and refuses to run when a screen's picture is not a readable file (for example a
-//      moving aerial wallpaper, which this API cannot restore) unless --force is given
+//   1. saves the current desktop picture of every screen (the paths to a temporary file, the options
+//      in memory; neither goes to the results) and refuses to run when a screen's picture is not a
+//      readable file (for example a moving aerial wallpaper, which this API cannot restore) unless
+//      --force is given
 //   2. sets the picture per screen, reads it back and times each call
 //   3. measures the CPU time and resident memory of this process and of WallpaperAgent (or Dock)
 //      while idle and while updating every few seconds
@@ -27,6 +28,7 @@
 // Do not run it on a machine that is running a measurement: the CPU figures would disturb each other.
 
 import AppKit
+import CryptoKit
 import Foundation
 import ImageIO
 
@@ -195,14 +197,21 @@ func waitEnter(_ prompt: String) {
 
 let ws = NSWorkspace.shared
 let screens = NSScreen.screens
-struct Orig { let screen: NSScreen; let url: URL?; let options: [NSWorkspace.DesktopImageOptionKey: Any]; let w: Int; let h: Int }
+struct Orig { let screen: NSScreen; let url: URL?; let options: [NSWorkspace.DesktopImageOptionKey: Any]; let w: Int; let h: Int; let sha256: String? }
+
+// the hash confirms after the restore that the original file itself was not overwritten
+func fileHash(_ url: URL?) -> String? {
+    guard let u = url, let data = try? Data(contentsOf: u) else { return nil }
+    return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+}
 var orig: [Orig] = []
 var screenInfo: [[String: Any]] = []
 for (i, s) in screens.enumerated() {
     let scale = s.backingScaleFactor
     let w = Int(s.frame.width * scale)
     let h = Int(s.frame.height * scale)
-    orig.append(Orig(screen: s, url: ws.desktopImageURL(for: s), options: ws.desktopImageOptions(for: s) ?? [:], w: w, h: h))
+    let u = ws.desktopImageURL(for: s)
+    orig.append(Orig(screen: s, url: u, options: ws.desktopImageOptions(for: s) ?? [:], w: w, h: h, sha256: fileHash(u)))
     screenInfo.append(["index": i, "width_px": w, "height_px": h, "scale": Double(scale)])
 }
 res["screens"] = screenInfo
@@ -255,13 +264,17 @@ if let data = try? JSONSerialization.data(withJSONObject: restoreJSON, options: 
 }
 print("Saved the original pictures to \(restoreFile.path)")
 
+var restoredOnce = false
+
 func restore() {
+    if restoredOnce { return }
+    restoredOnce = true
     var restored: [Any] = []
     for o in orig {
         guard let u = o.url else { restored.append("original_missing"); continue }
         do {
             try ws.setDesktopImageURL(u, for: o.screen, options: o.options)
-            restored.append(ws.desktopImageURL(for: o.screen) == u)
+            restored.append(ws.desktopImageURL(for: o.screen) == u && fileHash(u) == o.sha256)
         } catch { restored.append(false) }
     }
     res["restored"] = restored
@@ -272,6 +285,23 @@ func restore() {
     } else {
         print("Restore was not confirmed. The original paths are kept in \(restoreFile.path) (see README).")
     }
+}
+
+// Ctrl+C or a termination request still restores the pictures and writes the results.
+signal(SIGINT, SIG_IGN)
+signal(SIGTERM, SIG_IGN)
+var signalSources: [DispatchSourceSignal] = []
+for sig in [SIGINT, SIGTERM] {
+    let src = DispatchSource.makeSignalSource(signal: sig, queue: DispatchQueue.global())
+    src.setEventHandler {
+        print("\nInterrupted: restoring the original pictures.")
+        res["interrupted"] = true
+        restore()
+        writeResults("")
+        exit(130)
+    }
+    src.resume()
+    signalSources.append(src)
 }
 
 do {
@@ -337,6 +367,13 @@ do {
             "striped_image_visible_on_other_space": askYesNo("Do you see the striped image on the second Space?"),
         ]
         waitEnter("Switch back to the first Space, then press Enter.")
+        // Everything after this (the share check and the restore) acts on the current Space.
+        var back = true
+        while ws.desktopImageURL(for: o0.screen) != imgs[0][0] {
+            print("The picture here is not the striped image, so this may not be the first Space. Switch back and press Enter, or type skip: ", terminator: "")
+            if (readLine() ?? "").trimmingCharacters(in: .whitespaces).lowercased() == "skip" { back = false; break }
+        }
+        res["manual_back_on_first_space_confirmed"] = back
         waitEnter("\nManual check B: start a screen share or a screen recording that shows the desktop, then press Enter. Three updates follow, 5 s apart.")
         for k in 0..<3 {
             try ws.setDesktopImageURL(imgs[0][(k + 1) % 2], for: o0.screen, options: opts)
@@ -348,7 +385,9 @@ do {
         ]
     }
 } catch {
-    res["error"] = String(describing: error)
+    // only the domain and code go to the results: the description can carry file paths
+    let ns = error as NSError
+    res["error"] = ["domain": ns.domain, "code": ns.code]
     print("Error: \(error)")
 }
 restore()

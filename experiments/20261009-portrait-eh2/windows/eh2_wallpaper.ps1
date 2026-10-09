@@ -2,8 +2,10 @@
 #
 # What it does, with placeholder images only:
 #   1. saves the current wallpaper of every monitor and the picture position (to a temporary file,
-#      not to the results), and refuses to run when the background is a slideshow, a solid colour or
-#      Windows Spotlight (those cannot be restored through this API) unless -Force is given
+#      not to the results), and refuses to run (unless -Force is given) when the background is a
+#      slideshow, a solid colour or Windows Spotlight, when a monitor's original picture file is
+#      missing, or when it is the copy Windows keeps in its Themes folder (overwritten as soon as the
+#      wallpaper changes): none of these can be restored through this API
 #   2. sets the wallpaper per monitor and for all monitors at once, reads it back and times each call
 #   3. measures the CPU time and working set of this process, explorer and dwm while idle and while
 #      updating every few seconds
@@ -117,6 +119,14 @@ function New-PlaceholderImage([string]$path, [int]$w, [int]$h, [int]$variant) {
     }
 }
 
+function Get-Sha256([string]$path) {
+    # .NET directly: Get-FileHash is missing on some Windows PowerShell 5.1 installations
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $fs = [System.IO.File]::OpenRead($path)
+    try { return ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '') }
+    finally { $fs.Dispose(); $sha.Dispose() }
+}
+
 function Get-ProcSample([string]$name) {
     # Sum over all processes of that name. Returns $null fields when access is denied (dwm often is).
     $cpu = 0.0; $ws = 0.0; $ok = $true; $n = 0
@@ -212,6 +222,12 @@ $origPos = $dw.GetPosition()  # 0 Center, 1 Tile, 2 Stretch, 3 Fit, 4 Fill, 5 Sp
 $res.monitors = $monitors
 $res.original_position = $origPos
 $res.original_exists = @($orig | ForEach-Object { [bool]($_.wallpaper -and (Test-Path -LiteralPath $_.wallpaper)) })
+$themes = Join-Path $env:APPDATA 'Microsoft\Windows\Themes'
+$res.original_in_themes_cache = @($orig | ForEach-Object { [bool]($_.wallpaper -and $_.wallpaper.StartsWith($themes, [StringComparison]::OrdinalIgnoreCase)) })
+foreach ($o in $orig) {
+    # the hash confirms after the restore that the original file itself was not overwritten
+    $o.sha256 = $(if ($o.wallpaper -and (Test-Path -LiteralPath $o.wallpaper)) { (Get-Sha256 $o.wallpaper) } else { $null })
+}
 if ($DryRun) {
     $lat = @()
     for ($i = 0; $i -lt $count; $i++) {
@@ -230,6 +246,12 @@ if ($DryRun) {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
     Write-Host "Dry run (the wallpaper was not changed). Results: $out"
     exit 0
+}
+if (-not $Force -and ((@($res.original_exists) -contains $false) -or (@($res.original_in_themes_cache) -contains $true))) {
+    Write-Host 'The original wallpaper of a monitor is missing, or it is the copy Windows keeps in its Themes folder'
+    Write-Host '(overwritten as soon as the wallpaper changes). It cannot be restored safely.'
+    Write-Host 'Pick a picture file in Settings > Personalisation > Background first, or pass -Force.'
+    exit 3
 }
 # The restore file is the only place that holds the original paths. It stays in %TEMP%.
 (@{ position = $origPos; monitors = $orig } | ConvertTo-Json -Depth 4) | Set-Content -LiteralPath $restoreFile -Encoding UTF8
@@ -315,6 +337,13 @@ try {
         }
         Write-Host 'Switch back to the first desktop, then press Enter.'
         Read-Host | Out-Null
+        # Everything after this (the share check and the restore) acts on the current desktop.
+        $back = $true
+        while ($dw.Get($orig[0].id) -ne $imgs[0][0]) {
+            $ans = (Read-Host 'The wallpaper here is not the striped image, so this may not be the first desktop. Switch back and press Enter, or type skip').Trim().ToLower()
+            if ($ans -eq 'skip') { $back = $false; break }
+        }
+        $res.manual_back_on_first_desktop_confirmed = $back
         Write-Host ''
         Write-Host 'Manual check B: screen share or recording.'
         Write-Host 'Start a screen share or a screen recording that shows the desktop, then press Enter. Three updates follow, 5 s apart.'
@@ -335,7 +364,8 @@ finally {
         if ($o.wallpaper -and (Test-Path -LiteralPath $o.wallpaper)) {
             try {
                 $dw.Set($o.id, $o.wallpaper)
-                $restored += ($dw.Get($o.id) -eq $o.wallpaper)
+                $sameFile = ((Get-Sha256 $o.wallpaper) -eq $o.sha256)
+                $restored += (($dw.Get($o.id) -eq $o.wallpaper) -and $sameFile)
             } catch { $restored += $false }
         } else {
             $restored += 'original_missing'

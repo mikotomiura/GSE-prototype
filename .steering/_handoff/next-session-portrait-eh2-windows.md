@@ -50,4 +50,6 @@ cd C:/wt/portrait-eh2-win
 - main checkout（`C:\GSE-prototype`）は別の作業が載っているので触らない。worktree で作業する。
 - 結果の JSON に機械の名前・ユーザー名・パスが入っていないことを、コミットの前に目で確かめる（スクリプトは入れない作り）。
 - 元の壁紙のパスは `%TEMP%\gse-eh2-restore-<日時>.json` にだけ置かれる。リポジトリに入れない。
+- ⚠️ **標準出力を notes・コミットメッセージに貼らない**（一時フォルダのパスにユーザー名が出る）。コミットの前に次を回し、何も出ないことを確かめる:
+  `grep -nE 'Users|/var/folders|DISPLAY#' experiments/20261009-portrait-eh2/results/eh2-windows-*.json experiments/20261009-portrait-eh2/notes-windows.md`
 - 数字は「この機械で測った値」として書く。一般化しない（「GSE が示した」と書かない）。
