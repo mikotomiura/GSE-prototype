@@ -2263,3 +2263,142 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **点検**（code-reviewer ∥ security-checker・`1660bd9a..0eaf8619`）: security は指摘 0（約 1.2 分）。code は HIGH 0・MEDIUM 2・LOW 6（約 3.5 分）→ 手順 5 の「DOI は原稿に既にある」と後の版の文の衝突（直した）・下書きのメタデータの段（下書き 23219322 で版が空・日付が前の版と確かめて書いた）・書き換える場所の一覧（足した）・「検査を足した」は言い過ぎ（数えて報告に）・表を作るスクリプトの差（書いた）・"were added"（直した）・英語の言い回し（直した）・CFF の `identifiers`（任意・足さない）。
 - **/cross-review**: 1 回目（Codex・`1660bd9a..0eaf8619`・パス限定 5 ファイル・今日 240,434 / 6 回）LOW 1・確かめ不足 1 → 「v1.0.1 と書いたバッジが全版の DOI へ向く（次の版で別の版へ誘導）」は**直さない**（バッジを全版へ向けるのは研究者の選択〔判断 222〕で、各版の README はその版の番号を書く。研究者が覆せる）。確かめ不足（表の直しの実装と検証が差分に無い）は判断 222 で確かめ済み。⚠️ **2 回目（直しの境界）は Codex の利用の上限で回せなかった**（`codex exec` が 2 回 `FAILED`・最小の呼び出しで "You've hit your usage limit … try again at 5:06 AM" を確かめた・台帳は増えていない）→ CLAUDE.md の縮退どおり **Claude 単独**（code-reviewer・`0eaf8619..f9fb62f1`・約 2.2 分）で代えた: HIGH 0・MEDIUM 2・LOW 6 → 「原稿は変えない」は 1.0.1 の組版の直しと食い違う（原稿のコードの DOI に絞った）・「README のコードの引用」が論文の欄の Code: と取り違えうる（BibTeX の `@software` と名指しし、論文の欄は 1.0.0 のままと書いた）・「its」の係り（文を分けた）・版と DOI を書く段（手順 2）・バッジの主語・この文書の履歴・`.zenodo.json` の他の欄・英日の「挙げて数える」・「版と DOI のほかは」の言い過ぎ（「`CITATION.cff`・`.zenodo.json`・README のほか」に）をすべて直した。3 回目は回さない（memory「cross-review は 2 巡」）。
 - **影響範囲**: `papers/ime-observation/{CITATION.cff,.zenodo.json,README.md,README.ja.md,kit/export/README.internal.md}`・`.codex/budget.json`・本ファイル・`tasklist.md`。公開物（これから）: 公開 repo の `v1.0.1`（D `48caf9ef` の上の E）と Zenodo の下書き 23219322 の publish（どちらも研究者に確かめる）。
+
+## 判断 224: v1.0.1 を出した —— PR #328 の merge・E を D の上に組んで研究者が push・Zenodo の新しい版を publish（2026-10-08・G-GEAR・研究者の選択〔再実行・publish ともに推奨どおり〕と操作〔push 2 つ〕・手順はメイン）
+
+- **PR #328**（判断 223 の枝）: Windows の check が 30 分の上限で cancel（`Loop run guard gate` の段が 25 分を超えた・小テストはすべて OK だが 1 本 40〜50 秒・直前の main の run では同じ段が 7 分）。Mac・frontend は緑。出荷フローの止まる条件として研究者に確かめた → 研究者の選択（推奨どおり）「Windows の job だけ 1 回再実行し、緑なら merge」→ 再実行（キューで待って 02:09 UTC 開始）は 15 分 22 秒で緑 → **merge `99e9307d`**（2026-10-08T02:25 UTC）→ main の CI（run 37717832523）は Mac・Windows・frontend とも緑。⚠️ Windows の上限の余裕が小さいことは起票済み（PR #256）。
+- **E**（`build_e.sh`・job の tmp・判断 220 の `rebuild_d.sh` と同じ形）: GitHub の main の新しいクローン（`core.autocrlf=false`・HEAD が `99e9307d` であることを確かめた）で本番の形の書き出し exit 0・201 ファイル → 公開 repo の作業クローン（D `48caf9ef` で clean・タグ `v1.0.1` が無いことを確かめた）に置き、`#!` の 41 ファイル（前の 40 ＋ `check_page_bounds.py`）に実行ビット → commit **`08583068ed3573ba6bf0600021dd73c0c797649b`**（親は D・作者と commit した人は noreply・英語のメッセージに元の commit の 40 桁と DOI 3 つ）→ 注釈付きタグ **`v1.0.1`＝`56700a1c29cdda872c0bff977f0156d34472e256`**。`git -c core.autocrlf=false archive v1.0.1` の木は書き出しとバイト一致（`diff -r`）、書き出しは枝の頭（`d8f892ef`）の試しの書き出しとバイト一致。D との差は 14 ファイル（判断 223 の試しと同じ）、データセットと共有する 8 ファイルは D と同じ（`git diff --quiet`）。zip（`--prefix=ime-conversion-logging-1.0.1/`）は 201 ファイル・実行ビット 41・3,874,652 バイト・SHA-256 `d8f9b80489e0ceff65aa0a1dec3b0cdc55cbe24848376c31c0bb2ea1837a9f9e`・MD5 `4bcd007b2f2b8cd78ece4ca68dbff3aa`。
+- **push**: ⚠️ 手元の bare の写し（`C:/wt/ime-conversion-logging.git`）への push も自動モードの判定（Create Public Surface）で止められた → 回避せず、研究者が `!` で 2 つとも push した（bare の写しと GitHub・どちらも `48caf9e..0858306` の fast-forward と新しいタグ）。`git ls-remote`: GitHub の `main` と `v1.0.1^{}` が `08583068`、`v1.0.1` が `56700a1c`、`v1.0.0^{}` は `48caf9ef` のまま。bare の写しも同じ。
+- **Zenodo**（下書き 23219322・token はプロセスの中で読むだけ）: 写された 1.0.0 の zip を消し（一覧が 1.0.0 の 1 つだけであることを確かめてから・204）→ 1.0.1 の zip を上げた（返った大きさと MD5 が手元と一致）→ メタデータ（GET したものを往復）: 版 1.0.1・公開日 2026-10-08・説明の 2 段落目を「release 1.0.1 … `CITATION.cff`・`.zenodo.json`・README のほかは組版とその確かめだけ … 1.0.0（DOI …23183441）と同じで、論文はそれを引く」に・関連の識別子の GitHub を `tree/v1.0.1` に（ほかの 3 つ・題・著者・ライセンス・キーワードは同じ）。予約の DOI は PUT の後も同じ。→ **研究者の選択（推奨どおり）「publish する」** → 直前に「下書きのまま・予約の DOI・ファイル 1・日付 2026-10-08」を確かめて publish（202・`state done`・DOI `10.5281/zenodo.23219322`）。
+- **外からの確かめ**（token なし）: `/api/records/23219322` は open・版 1.0.1・日付 2026-10-08・ファイル 1（MD5 一致）・concept `10.5281/zenodo.23183440`。全版の検索で 23219322（1.0.1）と 23183441（1.0.0）の 2 つ。`https://doi.org/10.5281/zenodo.23183440` は `zenodo.org/records/23219322` に解決、`…23219322`・`…23183441` も解決（302）。1.0.0 の記録は版 1.0.0・日付 2026-10-07・ファイル同じ。データセット 23183438 は 38 ファイル・`isCompiledBy` `…23183441` のまま。GitHub の `main` の `CITATION.cff` は 1.0.1・`…23219322`、README のバッジ（Zenodo の全版の DOI の SVG・shields の v1.0.1）は 200。
+- **残り**: PsyArXiv `j7k34_v1` は 02:29 UTC の時点で審査中（OSF の API は 403 "pending moderation"）。BRM への投稿（引き継ぎ -12）。⚠️ 公開 repo の作業クローン（job の tmp の `pub`）は job を消すと消える → 次に組むときは bare の写し（`main`＝E）から `core.autocrlf=false` でクローンする。
+- **影響範囲**: 本ファイル・`tasklist.md`・`.steering/_handoff/next-session-ime-paper-manuscript-12.md`。公開物: GitHub `mikotomiura/ime-conversion-logging`（`v1.0.1`＝`08583068`）・Zenodo 23219322（publish 済み）。
+
+## 判断 225: `counts_only` などの記述をコードどおりに直し（逸脱 D13）、連なりの長さを本当に捨てた 2 つの組を事後の解析で測る —— 設計を結果の前に固定（2026-10-10・G-GEAR・研究者の決定〔直す 2 つ〕と選択〔4 問とも推奨どおり〕・設計の細部はメイン・研究者が覆せる）
+
+- **経緯**: 照合攻撃の試作（`.steering/20261009-matching-attack-prototype/decisions.md` 判断 2）で、`runs = "count"` の組（`no_runs`・`bin1s_count`・`counts_only`）が英字の連なりの長さを捨てていないと分かった。研究者は (1) 説明をコードどおりに直して逸脱として記録し、(2) 長さを本当に捨てた組を事後の解析として 3 セルで測る、と決めた（引き継ぎ `next-session-ime-counts-only-fix.md` §2）。PsyArXiv `j7k34_v1` は対象範囲の外として却下された（最終・再投稿不可）。次の出し先は研究者が決める。
+- **着手時に測った状態**: IME 論文の判断は main で 223、枝 `origin/docs/ime-release-1.0.1`（main に入っていない）に 224 があった → 本タスクの枝 `fix/ime-counts-only` に取り込んでから 225 を使う。公開 repo の `main` と `v1.0.1^{}` は `08583068`。
+- **一次で確かめた事実**（2026-10-10・G-GEAR・`closed_set.py` `364cc833…`・`simulate_obs.py` `ab989955…`）:
+  - `apply_features(…, runs = "count")` は英字の連なりの行に最初の行の時刻を付けるだけで、行を消さない。`_tokens(…, "count")` は同じ時刻の英字の行を 1 トークンにまとめ、その個数に連なりの長さを入れる。`_distance` は同じ区分のトークンの個数の差を費用にし、列の順序も使う（編集距離）。
+  - `counts_only` のトークン列は、各トークンを個数ぶん展開すると `no_time` の打鍵ごとの区分の列に一致する（乱数で作った記録 2,000 本で不一致 0）。→ **`counts_only` は `no_time` と同じ情報（全打鍵の区分とその順序）を持ち、違うのは距離の数え方だけ**。同じく `no_runs`・`bin1s_count` が `all`・`bin1s` から捨てたのは、連なりの中の 2 打目以降の時刻だけ。
+  - 距離の例（引き継ぎ §1 の表を再現）: 英字 10 打と 20 打 → `no_time` 10.0・`counts_only` 10.0。8 打と 12 打 → 4.0・4.0。英字 5・記号・英字 3 と 英字 3・記号・英字 5 → `no_time` 2.0・`counts_only` 4.0。
+  - 原稿の結果の節「the numbers of key presses of each category in a trial, without their order or times」と結論の「using the numbers of keys of each category alone」も誤り（順序を使っている）。登録 §6.8 は順序について書いていない。
+- **研究者の選択（AskUserQuestion・4 問とも推奨どおり）**:
+  1. 組は **(a) と (b) の両方**。
+  2. **登録の推奨（「推奨できる粒度なし」）は変えず、事後の判定として並べる**。
+  3. 載せ方は **結果によらず、本文（方法・結果・要旨・結論・推奨 (c)）に 1 文ずつ＋値の表は補遺**。
+  4. 記録は **本ファイルに判断 225〜**。
+- **事後の 2 つの組（結果の前に固定）**: 時刻は使わない（打鍵ごとの区分の列から作る）。
+  - `letter_runs_unit`（(a)・登録の意図「no lengths of letter runs」に当たる）: 続く英字の打鍵を 1 トークン・個数 1 にまとめる。ほかの区分は 1 打 1 トークン（個数 1）のまま。順序は残す。
+  - `all_runs_unit`（(b)）: 同じ区分が続く打鍵を、区分を問わず 1 トークン・個数 1 にまとめる（BackSpace・矢印・Space などの数も捨てる）。順序は残す。
+  - (b) は (a) から作れる。→ 登録の「その組とそこから作れる組の最大」の規則で、`letter_runs_unit` の報告値は 2 つの `acc_raw` の大きい方、`all_runs_unit` は自分の `acc_raw`。登録の 6 組の値は変えない（事後の 2 組は `no_time`・`counts_only` からも作れるが、登録の値には混ぜない）。
+  - 攻撃は登録のまま: 予測の記録（`Predictor.raw`・種 20260929）・距離（`_distance`・時刻なし）・候補（K − 1 個のおとり・試行ごとの種）・同点の決め方（`_sub_seed(tseed, "tie", 組の名)` の乱数）・K = 10・100・1,000・S12 を除く（D8）・`--markers-in-obs`・ブロックを単位にした百分位の区間（B = 2,000・記述）。
+- **事後の判定（結果の前に固定）**: 登録の規則をそのまま当てる。K = 10 と 100 で報告値の Wilson の 95% 区間の上端が 2/K 以下なら、その K で偶然の水準の近く。macOS の 2 セルの両方・両方の K で近いとき「事後には近い」。事後の粒度は、近いもののうち細かい方（`letter_runs_unit` → `all_runs_unit` の順）。どちらも近くなければ「事後にも無い」。Windows は同じ判定を但し書きとして並べる。K = 1,000 は記述だけ。登録の推奨と判定は変えない。
+- **実装の方針**: `closed_set.py` と `simulate_obs.py` は 1 バイトも変えない（SHA-256 が補遺の出どころの表〔`supplement/provenance.tex`〕・`data.md`・`data.windows.md` と試作の `config.json`〔違えば止まる〕に固定されている）。→ 2 つのファイルの誤った注（`FEATURE_SETS` の「run length removed」・`simulate_obs.py` の「the length of a run … is removed」）は直さず、`kit/e2/README.md` と D13 で正す（引き継ぎ §3-2 は docstring も範囲に挙げていたが、この理由で外す）。新しいスクリプト `kit/e2/explore_run_lengths.py` が 2 つを import し、登録の評価の手順（候補・同点・区間）を写して、トークンの作り方だけを差し替える。
+  - **陽性の対照**: 同じ手順で登録の `no_time` と `counts_only` も計算し、セルの登録の結果ファイルと、K ごとの `n`・正答の数（`acc_raw`）・`mean_rank`・シナリオと速さごとの値・Wilson の区間・ブロックの区間が完全に一致しなければ、何も書かずに止まる。入力（corpus・recipes・config の SHA-256・種・B・整列の結果）も登録の結果ファイルと照らす。
+  - selftest は `closed_set._selftest_world` の合成の世界で、対照の 2 組が `closed_set.evaluate` と一致することと、トークンの作り方・距離の例を確かめる（30 秒以内・`kit/check.sh` が回す）。
+- **データと機**: 3 セルとも G-GEAR で回す。Windows は `experiment/runs/windows-msime-tsf-2/`。macOS の 2 セルは Zenodo のデータセット 23183438 の `macos-standard-live-{on,off}-1.zip`（公開・token なし）を job の tmp に取り、`data.md` の `run.json` などの SHA-256 と照らす。生ログは repo に入れず、外部の LLM に送らない。
+- **結果の前に見ていた値（開示）**: (i) 登録の 6 組のすべての値（2026-10-05〜06 から）。(ii) 照合攻撃の試作（`experiments/20261009-matching-attack-prototype/`）の Windows のセルの k = 1（試行 1 つ）で、(b) に近い加工 `S_rleinf`（同じ区分の連なりをすべて個数 1・時刻なし）の正答率 N = 10 で 11.2%・N = 100 で 1.68%・N = 1,000 で 0.27%（`no_time` は 90.6%・44.3%・7.64%）とシナリオごとの値。候補の引き方（位置ごとに一様・引き直し）と同点（1/m の期待値）が IME 論文と違う。(a) に当たる加工は、どのセルでも測っていない。macOS のセルでは (a)・(b) とも測っていない。→ D13 に書く。
+- **直す範囲**（一次で洗った・全文を grep: 「run length」「letter run」「without their order」「numbers of key(s)」「coarsening」「counts_only」「no_runs」「bin1s_count」ほか。PsyArXiv への言及は論文の木に無い〔repo の外の `C:/ime-submission/cover-letter.md` に `[PsyArXiv DOI]` の空欄がある・研究者に伝える〕）:
+
+  | 場所 | 今の記述 | 扱い |
+  |---|---|---|
+  | 登録 §6.8（OSF・凍結） | 「no lengths of letter runs」「1-second bins without run lengths」「neither」「`counts_only` is a coarsening of `no_time`」 | 書き換えない。D13 で扱う |
+  | `recoverability.tex` 方法（37〜41 行・50〜51 行） | 「no run lengths」「without run lengths」「neither times nor run lengths」「its coarsening `counts_only`」 | 登録の名と、実装が捨てたもの（連なりの中の時刻だけ）を書き、D13 を引く。事後の 2 組を足す |
+  | 同 結果（112〜116 行） | 「the numbers of key presses of each category in a trial, without their order or times」 | `no_time` と同じ情報を持ち距離の数え方だけが違う、に直す。事後の判定を 1 文 |
+  | `conclusions.tex` 55〜60 行 | 「using the numbers of keys of each category alone」 | 打鍵の区分とその順序だけ、に直す。事後の判定を 1 文 |
+  | `limitations.tex` 102〜103 行 | 「the numbers of keys of each category are expected to distinguish …」 | 主語を区分の列に直す（期待の文のまま） |
+  | `main.tex` 要旨・`recommendations.tex` (c) | 時刻なしの 2 つの粒度はどちらも届かない | 事後の判定を 1 文ずつ |
+  | `method.tex` 逸脱の段落と表 | Twelve deviations・D1〜D12 | D13 を足す |
+  | `kit/e2/README.md` 表と説明（118〜134・296〜297 行） | 「run length removed: one token per run」・粗さの順序 | コードどおりに直し、事後の組と新しいスクリプトを書く |
+  | `experiment/deviations.md` | D12 まで | D13 を足す・冒頭の段落も |
+  | `data.md` | 解析の記録 | 事後の解析の実行の記録（コマンド・入力と出力の SHA-256）を足す |
+  | `manuscript/tools/results_tables.py`・`generated/`・補遺 | 事後の値なし・注「counts_only is a coarsening」 | 事後の値と補遺の表を生成。注を直す |
+  | `supplement/provenance.tex` | 出どころの表 | 事後の結果ファイルの行を足す |
+  | `closed_set.py`・`simulate_obs.py` | 注が誤り | 変えない（上の理由） |
+
+- **/reimagine**: 使わない（分岐は上の 4 問で研究者が決めた。実装は既存の関数を写すだけ）。
+- **見直し**: 結果が出た後に本文の文を書くとき（載せ方は変えない）。研究者が組・判定・載せ方を覆したとき。
+
+## 判断 226: 事後の解析の結果 —— 2 つの組とも K = 10 では偶然の水準の近く・K = 100 では届かず、事後にも推奨できる粒度なし。原稿・README・D13 を直した（2026-10-10・G-GEAR・設計は判断 225 で固定・直しはメイン・研究者が覆せる）
+
+- **スクリプト** `kit/e2/explore_run_lengths.py`（SHA-256 `753f9210…`）: `closed_set.py`・`simulate_obs.py` を import するだけで変えない。selftest 32 件（合成の世界で対照の 2 組が `closed_set.evaluate` と一致・トークンと距離の例・閉包）。変異 12 本のうち 10 本が赤、残る 2 本は意味が同じ変更（正誤を読みで判定 ↔ 語句で判定〔おとりは読みが同じものを除くので同値〕・時刻なしでは距離の `timing` が効かない）。`kit/check.sh` 35 本緑。
+- **実行**（G-GEAR・Python 3.11.9・各セル約 2 分）: Windows は手元の run（計画 `b7bdf8fc…`・観測 `58f0bda6…`・`data.windows.md` と一致）。macOS は Zenodo 23183438 の書庫（SHA-256 は `data.md` と、MD5 は Zenodo の一覧と一致）を job の tmp に展開（`run.json`・計画・観測の SHA-256 も一致）。⚠️ 1 回目は macOS の 2 セルとも「計画と手順ファイルの SHA-256 が違う」で止まった（何も書いていない）→ 計画は macOS のタグの手順ファイル（`158cac1b…`・`36aad15a…`）から作られていた（HEAD の同名ファイルは D1〜D4 で変わっている）→ `git show ime-observation-prereg-macos:…` で取り出して回し直した。3 セルとも陽性の対照（登録の `no_time`・`counts_only` の全項目が K = 10・100・1,000 で一致）を通って書いた。2 回目の実行は 3 ファイルともバイト単位で同じ（off `9c913570…`・on `121a0300…`・Windows `3bc23a2d…`）。
+- **結果**（報告値・Wilson の 95% 区間・2/K は 0.200 と 0.020）:
+
+  | セル | 組 | K = 10 | K = 100 | K = 1,000 |
+  |---|---|---|---|---|
+  | macOS off | `letter_runs_unit` | 0.168 [0.155, 0.183] | 0.037 [0.030, 0.044] | 0.005 |
+  | macOS off | `all_runs_unit` | 0.106 [0.095, 0.118] | 0.017 [0.012, 0.022] | 0.001 |
+  | macOS on | `letter_runs_unit` | 0.162 [0.149, 0.176] | 0.037 [0.031, 0.044] | 0.004 |
+  | macOS on | `all_runs_unit` | 0.111 [0.101, 0.123] | 0.019 [0.015, 0.025] | 0.002 |
+  | Windows | 両方 | macOS off と完全に同じ（登録の組と同じ構造: 2 つの計画は文字・数字・記号の打鍵が同じ） | | |
+
+  - 事後の判定: K = 10 では 2 組とも両セルで近い、K = 100 では 2 組とも両セルで届かない（上端が 2/K を超える）→ **どちらも「両セル・両方の K」を満たさず、事後にも推奨できる粒度なし**。Windows も同じ。登録の推奨（なし）は変えていない。`letter_runs_unit` の報告値はどの K・セルでも自分の値（`all_runs_unit` より高い）。
+  - 参考（判定ではない）: `no_time` の K = 10 は約 0.90。長さを捨てると大きく下がるが、K = 100 では偶然の水準の 2 倍の幅に入らない。
+- **直したもの**（判断 225 の表のとおり）:
+  - `recoverability.tex`: 方法の 6 組の書き方（`no_runs`・`bin1s_count`・`counts_only` は連なりを 1 トークンにして長さを持つ・D13）・規則の段落（「its coarsening」→「registered as its coarsening」）・事後の解析の方法の段落（見ていた値の開示を含む）・結果の誤り（「without their order or times」→ `no_time` と同じ情報で距離の数え方だけが違う）・結果の事後の段落（値と判定は `\rv` から。K ごとの要約の語は値から決まり、結果が変われば手で直すとコメント）。
+  - 要旨（`main.tex`）: 問 4 の文を「no granularity … met the registered near-chance rule in any cell, so none is recommended; nor did two that drop run lengths (exploratory).」に組み直した。⚠️ 研究者の元の文（macOS の 2 セルで届かず、Windows も届かない、と分けて書く）を「in any cell」にまとめた —— 250 語の上限に入れるため（数え方は判断 221 と同じ・`\rv` を生成値で展開して空白で区切る・今 250 語）。研究者が覆せる。
+  - `conclusions.tex`（「the numbers of keys of each category alone」→「only the category of every key press in order」・事後の 1 文）・`recommendations.tex` (c)（事後の 1 文）・`limitations.tex`（逸脱の段落に D13・「種類ごとの数」の文に D13）・`method.tex`（Thirteen deviations・D13 の行）・`declarations.tex`（登録していないものに D13・結果の後の逸脱に D13・AI 宣言に「Claude が別の研究のためにコードを読んで見つけた」）。
+  - `results_tables.py`: 事後の結果を読む（登録の結果ファイルの SHA-256・陽性の対照・整列・除いた試行・閉包・最大の規則を照らし、違えば止まる）・値（`q4x.*`）・補遺の表（`closed-set-posthoc.tex`・横置き・登録の表と同じ幅の作り）。`windows_sets_clause` を `sets_clause` に一般化（登録の出力は変わらない・selftest で確かめた）。selftest 216 件（足した 22 件）・変異 8 本すべて赤。生成物で変わったのは `values.json`・`values.tex`（鍵が増えただけ）と新しい補遺の表だけ。
+  - `supplement.tex`（補遺の表を入れた）・`provenance.tex`（事後の結果ファイルの行）・`kit/e2/README.md`（表と説明をコードどおりに・事後の節・検証）・`experiment/deviations.md`（D13・冒頭の段落）・`data.md`・`data.windows.md`（実行の記録）。
+- **検査**: `build.sh --submission` はエラー 0・未定義 0・生成されていない値 0・頁の外 0・頁番号への重なり 0。overfull は `origin/main` を同じ手順でビルドした基準と比べ、本文 9・提出用 1 は同じ、補遺は 167 → 172（横置きの頁の柱 4〔BUILD.md の既知の形〕と出どころの表の長いファイル名 1〔既存の行と同じ形〕）。要旨 250 語。文体の検査 違反 0。
+- **研究者に確かめること（完了時）**: (1) 公開 repo の v1.0.2 と Zenodo の新しい版を出すか。⚠️ 原稿は今もコードの DOI に 1.0.0（`…23183441`）を引くが、1.0.0 には `explore_run_lengths.py` が無い → 原稿が引くコードの DOI を 1.0.2 にするか。(2) `attack-me` を回すか（原稿の外枠に事後の解析が入った）。(3) D13 に試作の Windows の数値（k = 1 の `S_rleinf`）を開示として書いた（引き継ぎ §4 は「論文の結果として引かない」—— 結果ではなく「見ていた値」として書いた。原稿の本文には数値を書いていない）。(4) repo の外の `C:/ime-submission/cover-letter.md` の `[PsyArXiv DOI]` の空欄（出し先しだい）。
+- **影響範囲**: `papers/ime-observation/{kit/e2/explore_run_lengths.py,kit/e2/README.md,experiment/deviations.md,experiment/data.md,experiment/data.windows.md,experiment/results/exploratory/closed_set_run_lengths_*.json,manuscript/main.tex,manuscript/sections/{recoverability,conclusions,recommendations,limitations,method,declarations}.tex,manuscript/supplement/{supplement,provenance}.tex,manuscript/tools/results_tables.py,manuscript/generated/{values.json,values.tex,closed-set-posthoc.tex}}`・本ファイル・`tasklist.md`。
+
+## 判断 227: 完了時のレビュー 1 巡目（code-reviewer ∥ security-checker ∥ Codex）の指摘を直した（2026-10-10・G-GEAR・直しはメイン）
+
+- **起動**: 範囲 `31f7ad62..HEAD`（コミット済み）。code-reviewer（約 5.4 分）・security-checker（約 2.5 分）・Codex（`run-codex-review.sh` をパス限定 15 ファイル・生成物と結果の JSON は送らない）を 1 つのメッセージで並列に。schema の検査は対象外（skip）。Rust・フロントエンドを触っていないので test-runner（cargo test）は回さず、Python の selftest と `kit/check.sh` をメインが回した。
+- **一次で裏取りして採ったもの**:
+  - code-reviewer MEDIUM 1（D13 の「for the coarsening of `all_runs_unit`」が、より遠いものを見ていたように読める）→ 「for a set built as `all_runs_unit` is (…)」に直した。
+  - code-reviewer MEDIUM 2（`q4x.judgement` の「neither … was near chance in both macOS cells」の直後に「at K = 10 both sets were near chance」が続き矛盾して見える・結論と推奨では K = 10 で近いことが出ない）→ 生成する語を「… at both K = 10 and K = 100 in both macOS cells」に。結論と推奨 (c) に「(both were near chance among 10 candidates but not among 100)」を足し、値から決まる手の語だとコメントした。要旨は 250 語の上限のため変えない（研究者に伝える）。
+  - code-reviewer MEDIUM 3（事後の 2 組は `no_time`・`counts_only` からも作れるので、登録の最大の規則に入りうる）→ 実測: 全セル・全 K で事後の 2 組の `acc_raw` は登録の 2 組の報告値より低い（例: K = 1,000 の macOS on で 0.0038 対 0.0762）→ 方法の段落と D13 に「登録の最大と値は変わらない」と書き、`read_posthoc` に「事後の組が登録の時刻なしの組より高ければ止まる」検査を足した。
+  - code-reviewer LOW: `read_posthoc` に corpus・recipes・config の SHA-256・`params`・`n_sessions` の照合を足した。`explore_run_lengths.py` は `n_sessions` を照らし、出力にも書く。`--ime-toggle-in-obs` を持たない理由と macOS の手順ファイルの注意を docstring と README に。既存の文「The accuracy of `counts_only`, the maximum over that set and the set derived from it」は誤り（`counts_only` から作れる登録の組は無い）→ 「the coarsest registered set, from which no other registered set is derived」に直した（今回の差分の外の既存の行）。
+  - Codex P2-1 ＝ code-reviewer LOW（判定が読む区間を検算していない・`acc_source` が最大を出した組か確かめていない）→ `read_posthoc` で、`acc_raw` が試行数の上の数であること・`acc_ci_raw` がその数の Wilson の区間（kit の `stats.wilson` と同じ式）であること・`acc` と `acc_ci` が出どころの組のものであることを確かめる。
+  - Codex P3（CLI を通した「不一致なら書かずに exit 2」の試験が無い）→ selftest に、`closed_set.py` の selftest と同じ作りの合成の計画と観測で、`closed_set.main` が登録の結果を書き、本スクリプトが通ること・登録の値を変えたもの・別の種・配列の登録ファイル・`features` が辞書でないもの・既にある `--out` で exit 2 になり書かない（既にあるものは残る）ことを足した。
+  - security-checker LOW ×2（壊れた入力で `KeyError` などのトレースバックになる）→ `explore_run_lengths.py` は `KeyError`・`TypeError`・`AttributeError` も exit 2 に揃え、登録ファイルが辞書でなければ止まる。`read_posthoc` は構造の違いを `ValueError` に変える。
+- **採らなかったもの**: Codex P2-2（3 セルの結果の JSON が差分に無い）→ 誤検知。結果の JSON は `7db79f0a` でコミット済みで、Codex に送るパスから外しただけ。
+- **検証**: `explore_run_lengths.py` の selftest 40 件（変異 5 本: 4 本赤・1 本〔登録ファイルが辞書かの検査〕は例外の捕捉が同じ結果を出すので同値）。`results_tables.py` の selftest 230 件（足した検査の変異 11 本すべて赤・前の変異 8 本も赤）。スクリプトを変えたので 3 セルを回し直した: 値は同じで、変わったのはコードの SHA-256 と `n_sessions` の 1 行（off `bfcc333f…`・on `483a1a29…`・Windows `95bb0e03…`・スクリプト `77aa1eea…`・2 回目とバイト単位で同じ・`data.md`・`data.windows.md` を差し替え）。`kit/check.sh` 35 本緑・`build.sh --submission` はエラー 0・未定義 0・生成されていない値 0・頁の外 0・overfull は基準と比べ本文と提出用は同じ・補遺 +5（既知の形）・要旨 250 語・文体の検査 違反 0。
+- **影響範囲**: `kit/e2/explore_run_lengths.py`・`kit/e2/README.md`・`experiment/{deviations,data,data.windows}.md`・`experiment/results/exploratory/closed_set_run_lengths_*.json`・`manuscript/sections/{recoverability,conclusions,recommendations}.tex`・`manuscript/tools/results_tables.py`・`manuscript/generated/{values.json,values.tex}`・`.codex/budget.json`（Codex の記帳）・本ファイル。
+
+## 判断 228: 完了時のレビュー 2 巡目（code-reviewer ∥ Codex・足した規則の境界）の指摘を直した（2026-10-10・G-GEAR・直しはメイン）
+
+- **起動**: 範囲 `cdd1c659..1b907333`（1 巡目の直し）。code-reviewer（約 5.5 分・HIGH 0・MEDIUM 3・LOW 7）と Codex（パス限定 9 ファイル・P2 ×2）を並列に。今日の Codex の台帳は 281,642 / 7 回（この枝。並行の枝 portrait-eh1-round3 は 119,939）。
+- **一次で裏取りして採ったもの**:
+  - code-reviewer MEDIUM（Windows の句に「両方の K で」が無く、結論と推奨で括弧の「10 候補では近い」の直後に来ると「Windows は 10 でも近くない」と読める）→ `q4x.windows` の両方の枝に「at both $K = 10$ and $K = 100$」を付けた。
+  - code-reviewer MEDIUM（登録の最大の検査が等号を通す・同点なら登録の `acc_source` が名前順で変わる・本文の「every registered value」は言い過ぎ）→ `>=` で止める。本文と D13 を「the registered accuracies, their Wilson intervals and the registered judgement are unchanged」に狭め、D13 にブロックの区間は計算し直していないと書いた。D13 の「it」を「each set」に。
+  - code-reviewer MEDIUM（`KeyError` などを `run()` 全体で捕まえると、スクリプト自身の誤りが入力の誤りに見える・`render` が `open` の後）→ 広い捕捉をやめ、登録ファイルの構造（`features` が辞書・`results` が辞書の辞書）を明示的に確かめて `ValueError` に。計画の先頭行は `.get` で読む。`render` を `open` の前に。CLI の否定試験で止まった理由の文も確かめる（`results` が辞書でない場合も足した）。
+  - Codex P2-1 ＝ code-reviewer LOW（区間の配列の長さを確かめていない・NaN）→ `acc`・`acc_raw` は 0〜1 の有限の数、`acc_ci_raw`・`acc_ci` は順に並んだ 2 つの数、ブロックの区間は同じか `[null, null]`（`load()` は標準の `json.loads` なので NaN を受け付ける —— 一次で確かめた）。
+  - Codex P2-2 ＝ code-reviewer LOW（結論と推奨の括弧の語が固定の文字列で、結果が変わると生成した判定の語と矛盾しうる）→ K ごとの語を値から生成する鍵 `q4x.byk`（例「among 10 candidates both were near chance, among 100 neither was」）を足し、結論・推奨・結果の段落の手書きの語と、手で直すと書いたコメントを置き換えた。
+  - code-reviewer LOW: `n = 0` の文言を分けた。生成する語の `K` を `$K$` に。
+- **検証**: `explore_run_lengths.py` の selftest 41 件。`results_tables.py` の selftest 240 件（足した規則の変異 9 本: 6 本赤・3 本は別の検査が同じ入力を先に拒む同値〔NaN は順序の比較・区間の `[null, null]` は Wilson の検算・`n = 0` は試行数の照合〕）。スクリプトを変えたので 3 セルを 2 回ずつ回した: 2 回ともバイト単位で同じで、前の版との差はコードの SHA-256 の 1 行だけ（off `9828814e…`・on `2877f46e…`・Windows `a20f4630…`・スクリプト `a99f2036…`・`data.md`・`data.windows.md` を差し替え）。`kit/check.sh` 35 本緑。`build.sh --submission` はエラー 0・未定義 0・生成されていない値 0・頁の外 0・overfull は基準と比べ本文と提出用は同じ・補遺 +5（既知）。要旨 250 語。文体の検査 違反 0。PDF の文で、判定の語・K ごとの語・Windows の句が値と矛盾しないことを読んで確かめた。
+- **3 巡目は回さない**（memory「cross-review は 2 巡」）。残る小さな点（LOW の「near chance among 10 candidates は平易に読むと強く響く」）は研究者に伝える。
+- **影響範囲**: `kit/e2/explore_run_lengths.py`・`experiment/{deviations,data,data.windows}.md`・`experiment/results/exploratory/closed_set_run_lengths_*.json`・`manuscript/sections/{recoverability,conclusions,recommendations}.tex`・`manuscript/tools/results_tables.py`・`manuscript/generated/{values.json,values.tex}`・`.codex/budget.json`・本ファイル。
+
+## 判断 229: PR #341 の merge と、公開 repo の v1.0.2 の準備 —— Zenodo の新しい版の下書きと DOI の予約・CITATION.cff と README を 1.0.2 に・原稿は 1.0.0 を残して D13 に 1.0.2 を添える（2026-10-10・G-GEAR・研究者の選択〔4 問とも推奨どおり〕・直しはメイン・研究者が覆せる）
+
+- **PR #341**（枝 `fix/ime-counts-only`・判断 225〜228）: `origin/main`（PR #340 の後）を取り込み（Codex の台帳は起点からの差分の和 388,659 / 11 回）→ CI は Mac 5 分 47 秒・Windows 14 分 35 秒・frontend すべて緑・`CLEAN` → **merge `23459bc2`**（`--merge`）→ main の CI（run 38023670452・push）が発火した（Mac・frontend は緑、Windows は実行中）。G-GEAR では main を別の worktree（`C:/wt/p321-submission`）が使っているので `git switch main` はしていない。計測の run が走っている証拠は無かったので、memory の規則どおり通常どおり PR を出した。
+- **研究者の選択（AskUserQuestion・4 問とも推奨どおり）**: (1) v1.0.2 と Zenodo の新しい版を出し、原稿は登録の解析に使った 1.0.0 の DOI を残したまま、D13 の解析に 1.0.2 の DOI を添える。(2) attack-me は今は回さない（次の出し先が決まり外枠を変えるときに）。(3) 要旨の問 4 の文は「in any cell」の形のまま。(4) D13 の試作の値は数値ごと書く。
+- **Zenodo**（memory「Zenodo token」の許可の範囲・token はプロセスの中で読むだけ）: 記録 23219322（1.0.1）に `actions/newversion` → 下書き **23273986**・予約の **DOI `10.5281/zenodo.23273986`**・concept 23183440・`unsubmitted`・版は空・日付 2026-10-10。⚠️ 下書きの中身を見るためにスクリプトをもう一度走らせ、2 回目の `newversion` は（下書きが既にあるので）失敗した → 作成を呼ばない読み取り専用のスクリプトで、concept 23183440 の下書きが 1 つだけであることを確かめた。
+- **直し**: `CITATION.cff`（版 1.0.2・doi `…23273986`）・`.zenodo.json`（版 1.0.2）・README 英日（バッジの文字 v1.0.2・BibTeX の `@software` を 1.0.2 と `…23273986` に・履歴の 6 に 1.0.2 と D13 の説明）・`kit/export/README.internal.md`（履歴に `v1.0.2`）。論文の欄の「Code:」は 1.0.0 のまま（判断 223 の方針）。原稿: `references.bib` に `release102`、`declarations.tex` のコードの段落と公開の段落に「D13 の解析は release 1.0.2 で足したスクリプト（DOI …23273986）で、release 1.0.0 の closed set の攻撃をそのまま import する」、`provenance.tex` の事後の行を「release v1.0.2」に。`build.sh --submission` はエラー 0・未定義 0・bibtex の警告 0・頁の外 0・overfull は基準と同じ（補遺 +5）・要旨 250 語・文体の検査 違反 0。参考文献は Miura 2026a（1.0.0）・2026b（1.0.2）・2026c（データ）に並んだ。
+- **これから**: 点検と /cross-review → PR → merge → 新しいクローンから書き出し → 公開 repo の作業クローン（bare の写し `C:/wt/ime-conversion-logging.git` から `core.autocrlf=false`）に commit とタグ `v1.0.2` → 研究者が `!` で push → 下書きの写された 1.0.1 の zip を消して 1.0.2 の zip を上げ、版・日付・説明・`tree/v1.0.2` を入れる → 研究者に確かめて publish。
+
+## 判断 230: v1.0.2 の準備の点検（code-reviewer ∥ Codex）の指摘を直した（2026-10-10・G-GEAR・直しはメイン）
+
+- **起動**: 範囲 `23459bc2..e0db6b3e`。code-reviewer（約 4.9 分・HIGH 0・MEDIUM 3・LOW 6）と Codex（パス限定 8 ファイル・不具合なし・「要確認」2 件）。main の CI（run 38023670452・`23459bc2`）は Mac・Windows・frontend とも緑で完了した。今日の Codex の台帳は 412,399 / 12 回。
+- **試しの書き出し**（`e0db6b3e` の新しいクローン・`core.autocrlf=false`）: 206 ファイル。v1.0.1（bare の写しの `main`＝`08583068`）との差は 26 ファイル（D13 の変更 21・今回の 6、重なり 2、書き出されない `README.internal.md` 1 を除く）。データセットと共有する 8 ファイルは 1.0.1 とバイト一致（データセットの版は変えない）。その木で `kit/check.sh` 32 本緑・`check_manifest.py --self` match。
+- **Codex の「要確認」**: (1) 履歴 6 が挙げるスクリプト・結果・補遺の表が配布物にあるか → 試しの書き出しの木にある。(2) 長さを捨てた組が英字の連なりの長さに不変か → selftest の「10 打と 20 打で距離 0」「長さだけが違う 2 つの記録で距離 0」がある。どちらも直す所なし。
+- **code-reviewer の指摘で直したもの**:
+  - MEDIUM: 原稿の Code availability は表を作るスクリプトが 1.0.0 にあると書くが、D13 の値と補遺の表を作るのは 1.0.2 の `results_tables.py` → 「the values and the supplementary table of D13 are generated by the script that makes the tables of release 1.0.2」を足し、which の係りも直した。公開の段落の文も「a script that release 1.0.2 adds … and that imports the closed-set attack unchanged」に（判断 229 の「公開の段落にも release 1.0.0 の…」は誤記 —— その文は版を書いていない）。
+  - MEDIUM: 補遺の出どころの冒頭「Every result file was made from an export of a freezing tag」は D13 の行と矛盾 → 「Every registered result file …; the exploratory result files have the code given in their rows」に。
+  - MEDIUM: README 英日の履歴 6 の「corrects their description」は言い過ぎ（凍結のコードの docstring は残した）・列挙の漏れ → 「in the manuscript and in `kit/e2/README.md` (the docstrings of the frozen code are left unchanged)」と、実行の記録（`data.md`・`data.windows.md`）を足した。LOW の「unchanged from release 1.0.0」と日本語の時制（「持っています」）も。
+  - LOW: `README.internal.md` の後の版の手順に「論文が後の版で足したコードを使うときは、その版の DOI をそのコードにだけ添え、補遺の出どころの表でその版を名指す」を足した。
+  - LOW（記録のみ）: `release` と `release102` は著者・年・題が同じで、a/b の順は BibTeX の並べ方による → 今回の `.bbl` で 1.0.0 が先（2026a）・1.0.2 が後（2026b）を確かめた。bib を変えたら `.bbl` で順を確かめる。同じ年の Miura は事前登録 2 つを含め 5 つ（a〜e）で、repo の中にラベルを直接書いた所は無い。
+- **検証**: `build.sh --submission` はエラー 0・未定義 0・bibtex の警告 0・頁の外 0・overfull は基準と同じ（補遺 +5）・要旨 250 語・文体の検査 違反 0。
+
+## 判断 231: v1.0.2 の準備の 2 巡目（code-reviewer ∥ Codex）の指摘を直した（2026-10-10・G-GEAR・直しはメイン）
+
+- **起動**: 範囲 `e0db6b3e..201f60b8`。Codex（パス限定 5 ファイル）は不具合なし・確認事項 3 件（表の値が 1.0.2 の表のスクリプトから作れるか → `build.sh` が生成物と照らして一致・`kit/e2/README.md` が 3 つの組とコードの注を名指して訂正しているか → している・組版 → 直した後に再ビルド済み）。code-reviewer（約 3.9 分）は HIGH 0・MEDIUM 1・LOW 5。
+- **直したもの**: MEDIUM（補遺の出どころの冒頭を「registered」に絞ったため、D10 で直した結果ファイルの行がどちらの区分にも入らない）→ 「Every result file other than the exploratory ones …」に。LOW: 原稿の文を「imports `kit/e2/closed_set.py` of release 1.0.0 unchanged」「generated by the version of `manuscript/tools/results_tables.py` in release 1.0.2」に（スクリプトは評価のループを写すので「攻撃を import」より正確に）。`closed_set.py` の誤りは docstring ではなく `FEATURE_SETS` の注 → README 英日・D13・`kit/e2/README.md` を「comments of `FEATURE_SETS` in `closed_set.py` and the docstring of `simulate_obs.py`」（README は「comments and docstrings」）に揃えた。`README.internal.md` の手順は「adds or changes」と、DOI を足す 2 ファイルを名指した。
+- **直さなかったもの**: 補遺の dwell の行の「of the commit of this article」（直しの前からの表現・D13 の外）・`method.tex` の「The analyses were run from exports of the freezing tags」（挙げた解析に限った文として読める）。
+- **検証**: `build.sh --submission` はエラー 0・未定義 0・bibtex の警告 0・頁の外 0・overfull は基準と同じ（補遺 +5）・文体の検査 違反 0。3 巡目は回さない（memory「cross-review は 2 巡」）。今日の Codex の台帳は記帳ファイルのとおり。

@@ -66,7 +66,11 @@ rules that is missing or fails), or an unexpected failure (only the type of the 
    READMEs; the links of the badges of the code point to the DOI of all versions and are not changed. The release is
    added to the history in both READMEs and in the history section of this note. The `Code:` of the article box in
    both READMEs keeps the DOI of release 1.0.0, like the manuscript, whose DOI of the code
-   (`manuscript/references.bib`, `manuscript/sections/declarations.tex`) is not changed. The draft copies the files
+   (`manuscript/references.bib`, `manuscript/sections/declarations.tex`) is not changed. When the article uses code
+   that a later release adds or changes (release 1.0.2: the script of deviation D13, and the script that makes the
+   tables for the values and the supplementary table of D13), the DOI of that release is added in
+   `manuscript/references.bib` and `manuscript/sections/declarations.tex` for that code only, and the provenance table
+   of the supplement names the release. The draft copies the files
    and the metadata of the version before, except the version, which is left empty. The copied files are removed from
    the draft before the archive of the new tag is uploaded, and the draft's version, publication date (copied from the
    version before), description, link to the tree of the tag and any other field changed in `.zenodo.json` are set
@@ -79,7 +83,7 @@ the export of the macOS freezing tag (made with that tag's own exporter and `--a
 the list of its files has the SHA-256 that the registration gives), tagged `ime-observation-prereg-macos`; the
 export of the Windows freezing tag, made in the same way, tagged `ime-observation-prereg-windows`; a commit that
 adds only `manuscript/outline.md` as it stood before the results were analysed; and the releases, each committed on
-top of the one before (`v1.0.0`, then `v1.0.1`). The author date
+top of the one before (`v1.0.0`, then `v1.0.1`, then `v1.0.2`). The author date
 of each of the first three commits is the date of the working commit it comes from, and the message names that
 commit. Scripts that start with `#!` are given the executable bit in the index.
 
