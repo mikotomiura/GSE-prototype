@@ -318,7 +318,8 @@ count is the number of its presses, and the distance charges the difference of t
 category; what they remove is the time of every press of a run after its first. With no times, the tokens of
 `counts_only` expanded by their counts give the category of every press in order, which is what `no_time` keeps:
 `counts_only` holds the same information as `no_time` and differs from it only in how the distance counts a run of
-letter keys. The docstrings of the two code files repeat the registered description; the files are not changed,
+letter keys. The comments of `FEATURE_SETS` in `closed_set.py` and the docstring of `simulate_obs.py` repeat the
+registered description; the files are not changed,
 because the registered results were computed with them and their SHA-256 are recorded with the results. The registered
 results, the registered judgement and the recommendation (none) do not change; the article describes the three sets
 as computed.

@@ -131,7 +131,8 @@ press of a run after its first. With no times, the tokens of `counts_only` expan
 of every press in order, which is what `no_time` keeps; the two sets hold the same information and differ only in how
 the distance counts a run of letter keys (one token of the run's length, or one token per press).
 
-The pre-registration (section 6.8) and the docstrings of `closed_set.py` (`FEATURE_SETS`) and `simulate_obs.py` describe
+The pre-registration (section 6.8), the comments of `FEATURE_SETS` in `closed_set.py` and the docstring of `simulate_obs.py`
+describe
 these three sets as having no run lengths. That description does not match the code; it is corrected by deviation D13
 (`../../experiment/deviations.md`). The two files are kept unchanged, because the registered results were computed
 with them and their SHA-256 are recorded with the results. The attack on two sets that do drop the lengths of runs is
