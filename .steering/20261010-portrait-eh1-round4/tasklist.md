@@ -4,8 +4,9 @@
 - [x] 第 3 回の PR #340 が merge 済み・main の CI が緑であることを確かめる
 - [x] 研究者に第 4 回の中身を聞く（判断 1・6 問）
 - [x] requirement / decisions を書く
-- [ ] design §3（基準）を書く・Claude が足した細部を判断 2 に書く
-- [ ] 固定の前の `/cross-review` 2 巡（基準の穴を探す）→ decisions
+- [x] design §3（基準）を書く・Claude が足した細部を判断 2 に書く
+- [x] 固定の前の `/cross-review` 1 巡目 → decisions 判断 3
+- [ ] 固定の前の `/cross-review` 2 巡目（1 巡目で足した規則の境界）→ decisions
 - [ ] design §3 をコミットして固定する（下見・スモークより前）
 
 ## 計器
