@@ -16,6 +16,6 @@
 
 ## 完了処理（/finish-task）
 - [x] レビュー 1 巡目（code-reviewer のみ・Codex は予算超過で省略・判断 5）→ 全部直した
-- [ ] レビュー 2 巡目（直した差分）
+- [x] レビュー 2 巡目（直した差分・code-reviewer のみ）→ 3 件を直した（判断 6）
 - [ ] commit → push → PR → CI 緑 → merge
 - [ ] issue #333 にコメントし、本文のチェックボックスを更新する
