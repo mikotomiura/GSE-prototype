@@ -1,0 +1,74 @@
+{
+  "_note": "Values fixed before any result was computed (2026-10-11). The researcher chose the segmentation, k, N, the treatment of the stop position and the processing from Claude's recommendations (.steering/20261011-g1-copy-self-trial/decisions.md, decision 1); the details are Claude's (decision 2). These are experiment values, not pass criteria (ADR-039 D6). Paths are relative to the repository root.",
+  "inputs": {
+    "copy_text": {"path": "experiments/20260801-controlled-friction-task/materials/copy.md", "sha256": "b337585fe9dd9bee5d7a954d4bb5f1599ad205d7beda27bd26bfcda5b33db5fc"},
+    "corpus_manifest": {"path": "experiments/20261009-length-sequence-uniqueness/results/corpus_manifest.json", "sha256": "69e9400ddf11001ba35c71c29cb3cb9d1cad6326a630672995d25e5e093860bf"},
+    "corpus_stats": {"path": "experiments/20261009-length-sequence-uniqueness/results/corpus_stats.json", "sha256": "b387a2b88ba88093fd5a465da291cda8003e58f3dd77e7cb471dc0078ff37e07"}
+  },
+  "code": {
+    "experiments/20261009-length-sequence-uniqueness/scripts/build_segments.py": "7b84a46bdc9ff6f6d44b3635f4f84533aea7a4f189d8d84ce5f0113c24f1cd8f",
+    "experiments/20261009-length-sequence-uniqueness/scripts/romaji_table.py": "d2101efb9f36201b7fb51ea7c4283c114854cf13bba8fae379b6f85ae381fbd2"
+  },
+  "records": {
+    "_note": "SHA-256 of the decrypted NDJSON (gse-unpack). The files stay outside the repository (data.md).",
+    "copy_blocks": ["P009_block01", "P009_block10", "P010_block01", "P010_block10"],
+    "control_blocks": ["P009_block02", "P009_block03", "P009_block04", "P009_block05", "P009_block06", "P009_block07", "P009_block08", "P009_block09",
+                       "P010_block02", "P010_block03", "P010_block04", "P010_block05", "P010_block06", "P010_block07", "P010_block08", "P010_block09"],
+    "sha256": {
+      "P009_block01": "47f3c9e6ce8893431f360497478ad0f82bfae4e942b0675a3aa0503518002331",
+      "P009_block02": "084694acead8a4a4343cf47e51cf7019b19d662e7c64e6679aa41417db8df6b4",
+      "P009_block03": "0e4ca7d44fa2728c2d92fb3e029ae0583e050a0ec3620a2ffe1d671d68075b77",
+      "P009_block04": "4150b1dbe2ce520cfef36d298dfd81bdf673306c72981bd5a4afad7d69fc0fd2",
+      "P009_block05": "00fda9c24839ec17b5c9f74681e70f2b7b2b78398eece827a3df231089ea89ab",
+      "P009_block06": "d67aa53ff1c9b6875de5a151a3804be4acdf4ef28865385fa43d43f89b20d20a",
+      "P009_block07": "ced8b1b58f1279cad24e8394bc58548c2a8c71e0f7b5a761116d720d939bb672",
+      "P009_block08": "45d7855717ace12b511cd0a5e62ca5f6428f12fad3a0fde19ab1e728ce4e4615",
+      "P009_block09": "362f275f9f4c6f39f936f221c5843c73ee908be4de1638d0c1de5b1b72845d85",
+      "P009_block10": "c0e559322f90af164d7029870fcc62e5bc022d5050ce9b679c73f766d4cb8a03",
+      "P010_block01": "9dd705a0f815cfc85f45891d77dd572c05ee438b96f99f113d2cf0e1f0190d15",
+      "P010_block02": "6340b8439b160a8a80fdfecc855fee6efbd3aaef2421f5251b1b8130c6810160",
+      "P010_block03": "eda65dffff9d2d1ae1a228a9567a322ffb9485af933c98cc1c467d1dd3b495a7",
+      "P010_block04": "9060b0b4fe9f9aff7f5214f7b7ce80a20436c4c98f0a5de7dfe00a86aca6a2df",
+      "P010_block05": "93e0d0f27d72921de6f6758459f4aa2f960e6f755c3450e466a413bbc74662c4",
+      "P010_block06": "68864bb6d637462ee89505231e716bb51dde748cf0bf07753c2c3e3e12959ea5",
+      "P010_block07": "dbebf12fa255b15a0dd1a7713ad50b4719501a9cf6a22bab3f4bf7998b52f211",
+      "P010_block08": "d2630533f7521451661ba945ba9cc07b7139777e09430471bb25d07d287ba751",
+      "P010_block09": "20a9e273d680ee42326e21f9802b7ddcf1703944f1a10f1f665c66151ae319c8",
+      "P010_block10": "ba0704c5f89246745b4b261481cd01b50c408089b7eafedcefc745c7cb236d77"
+    }
+  },
+  "record_rule": {
+    "counted_plus": ["alphabetic", "numeric"],
+    "counted_minus": ["backspace"],
+    "boundary": ["other"],
+    "clean_skip": ["enter", "space", "navigation", "modifier", "function", "escape", "delete", "tab"]
+  },
+  "text_rule": {
+    "max_line_bytes": 40000,
+    "counted_symbols": "！!＂\"“”＃#％%＆&’'‘（）()"
+  },
+  "alignment": {"lambda": 8, "max_group": 3},
+  "matching": {
+    "k": [1, 2, 3, 5, 8, 12, 20],
+    "N": [10, 100, 1000],
+    "draws_per_window": 50
+  },
+  "variants": {
+    "L_none": {"record": "plain", "kind": "none"},
+    "L_bin2": {"record": "plain", "kind": "bin", "w": 2},
+    "L_bin4": {"record": "plain", "kind": "bin", "w": 4},
+    "L_bin8": {"record": "plain", "kind": "bin", "w": 8},
+    "L_bin16": {"record": "plain", "kind": "bin", "w": 16},
+    "L_bininf": {"record": "plain", "kind": "bin", "w": null},
+    "L_merge2": {"record": "plain", "kind": "merge", "m": 2},
+    "L_merge5": {"record": "plain", "kind": "merge", "m": 5},
+    "L_mergeall": {"record": "plain", "kind": "merge", "m": null},
+    "L_sort": {"record": "plain", "kind": "sort"},
+    "Lclean_none": {"record": "clean", "kind": "none"}
+  },
+  "control_variants": ["L_none"],
+  "prior_comparison": {
+    "uniqueness": {"path": "experiments/20261009-length-sequence-uniqueness/results/matching.json", "sha256": "0d97c6a0ec1bd576f01c44862bc94c3b63dfde760ad49eb5292704a1c30aae6a", "definition": "B0", "conditions": ["ideal", "strong"]},
+    "prototype": {"path": "experiments/20261009-matching-attack-prototype/results/matching.json", "sha256": "082099b3c4d15d4cddad5f83ff746fbde5955282c829dd3fcc67a438582bef51", "variants": ["L_none"]}
+  }
+}
