@@ -17,5 +17,5 @@
 ## 完了処理（/finish-task）
 - [x] レビュー 1 巡目（code-reviewer のみ・Codex は予算超過で省略・判断 5）→ 全部直した
 - [x] レビュー 2 巡目（直した差分・code-reviewer のみ）→ 3 件を直した（判断 6）
-- [ ] commit → push → PR → CI 緑 → merge
-- [ ] issue #333 にコメントし、本文のチェックボックスを更新する
+- [x] commit → push → PR #344 → CI 緑 → merge `699f3677` → main の run 38060058034（発火を確認）
+- [x] issue #333 にコメントし（#issuecomment-6098585297）、本文のチェックボックス 3 つを更新した
