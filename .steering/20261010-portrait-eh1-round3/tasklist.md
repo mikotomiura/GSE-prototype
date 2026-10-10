@@ -23,4 +23,4 @@
 - [x] 研究者に判断 5 の 3 点を確かめる（判断 8）→ 親の decisions 判断 14 に還元
 - [x] まとめの `/cross-review` 2 巡 → decisions 判断 6・7
 - [x] 第 4 回の引き継ぎを書く
-- [ ] 完了時の出荷（push → PR → CI → merge）
+- [x] 完了時の出荷（PR #340・CI 緑・merge `72b6aca7`・main の CI 緑）
