@@ -75,7 +75,7 @@ if [ ! -f "$GSE_REPLAY" ] && [ -f "$GSE_REPLAY.exe" ]; then GSE_REPLAY="$GSE_REP
 # cfg <python expression on c (config.json)>: prints one non-negative integer or fails
 cfg() {
   local v
-  v="$("$PY" -c "import json,sys; c=json.load(open(sys.argv[1],encoding='utf-8')); v=$1; print(v) if type(v) is int and v >= 0 else sys.exit('config.json: $1 must be a non-negative integer')" "$EXP_DIR/config.json")"
+  v="$("$PY" -c "import json,sys; c=json.load(open(sys.argv[1],encoding='utf-8')); v=eval(sys.argv[2]); print(v) if type(v) is int and v >= 0 else sys.exit('config.json: ' + sys.argv[2] + ' must be a non-negative integer')" "$EXP_DIR/config.json" "$1")"
   v="${v%$'\r'}"  # Python on Windows ends the line with CRLF
   case "$v" in ''|*[!0-9]*) echo "config.json: $1 must be a non-negative integer" >&2; exit 2 ;; esac
   echo "$v"
