@@ -1,0 +1,63 @@
+{
+  "_note": "Values fixed before any result was computed (2026-10-09). Chosen by the researcher from Claude's recommendations (.steering/20261009-matching-attack-prototype/decisions.md, decision 1). These are experiment values, not pass criteria (ADR-039 D6). Paths are relative to the repository root.",
+  "inputs": {
+    "obs": {"path": "papers/ime-observation/experiment/runs/windows-msime-tsf-2/obs.jsonl", "sha256": "58f0bda61fa4310c58a643bb605a68c360f34378b651a3b85d58290fabcd2562"},
+    "plan": {"path": "papers/ime-observation/experiment/runs/windows-msime-tsf-2/plan.jsonl", "sha256": "b7bdf8fc120036f18ceff53d2bf8def43ef11a818a119bc24b0c7f4fbc4836b0"},
+    "run_manifest": {"path": "papers/ime-observation/experiment/runs/windows-msime-tsf-2/run.json", "sha256": "5c74a1fad735b5983152847d29a540e71673f7d13257950af9726ddd79a33d82"},
+    "corpus": {"path": "papers/ime-observation/kit/corpus/data/phrases.jsonl", "sha256": "c8f890cb4d0848bf04e6d7d95efe4e4d3dfd02a23eb1c7f103344f14d13e4620"},
+    "recipes": {"path": "papers/ime-observation/kit/gen/recipes.json", "sha256": "430ec52c67f0592bc1c9d038a972876a2608ed7c39eb2aabcf68efc4ff908411"},
+    "plan_config": {"path": "papers/ime-observation/experiment/plan_config.windows.json", "sha256": "400fe5314d0f660f2e776a7f86deb471ae1235a3bea4c1be457b26ebe0a9181f"},
+    "published_closed_set": {"path": "papers/ime-observation/experiment/results/windows/e2_closed_set_windows-msime-tsf.json", "sha256": "93b5eb2bb7e43056899b78b6bcf486505ec91bced94844d065dcdd74a8d238b7"},
+    "prior_matching": {"path": "experiments/20261009-length-sequence-uniqueness/results/matching.json", "sha256": "0d97c6a0ec1bd576f01c44862bc94c3b63dfde760ad49eb5292704a1c30aae6a"}
+  },
+  "code": {
+    "papers/ime-observation/kit/e2/closed_set.py": "364cc833b48a73aeb15b9416bff203ec21a71296e26534f914e3a2bb9bd067c3",
+    "papers/ime-observation/kit/e2/simulate_obs.py": "ab989955e7273e9290595318a96087c384d40e19565f351be17bf3f8d4733123",
+    "papers/ime-observation/kit/gen/generate_plan.py": "822538a52fd40ddc04e7ef406373f8d6cf5b0e7e22763b695fe61cef5fd5cb15",
+    "papers/ime-observation/kit/gen/romaji.py": "79db4d4ef74fb3e354aff769f0fe5c350cf57410c0adb2e7543d5594afd9f4b1",
+    "papers/ime-observation/kit/analysis/stats.py": "ead0ccaa50bb86b088b66899ef5b1e04fb9b995a582e520679e04d09cbbf5c07",
+    "experiments/20261009-length-sequence-uniqueness/scripts/romaji_table.py": "d2101efb9f36201b7fb51ea7c4283c114854cf13bba8fae379b6f85ae381fbd2",
+    "experiments/20261009-length-sequence-uniqueness/scripts/build_segments.py": "7b84a46bdc9ff6f6d44b3635f4f84533aea7a4f189d8d84ce5f0113c24f1cd8f"
+  },
+  "os": "windows",
+  "markers_in_obs": true,
+  "skip_scenarios": ["S12"],
+  "attacker_seed": 20260929,
+  "windows": {
+    "k": [1, 2, 3, 5, 8, 12, 20],
+    "within_block": true
+  },
+  "N": [10, 100, 1000],
+  "bootstrap": 2000,
+  "ci": 0.95,
+  "counted_categories": ["alphabetic", "numeric", "punctuation"],
+  "minus_categories": ["backspace"],
+  "boundary_categories": ["enter", "sentence_punctuation"],
+  "procedure_scenarios": ["S4", "S5", "S6", "S8", "S10", "S12", "S14"],
+  "variants": {
+    "L_none": {"attacker": "L", "kind": "none"},
+    "L_bin2": {"attacker": "L", "kind": "bin", "w": 2},
+    "L_bin4": {"attacker": "L", "kind": "bin", "w": 4},
+    "L_bin8": {"attacker": "L", "kind": "bin", "w": 8},
+    "L_bin16": {"attacker": "L", "kind": "bin", "w": 16},
+    "L_bininf": {"attacker": "L", "kind": "bin", "w": null},
+    "L_merge2": {"attacker": "L", "kind": "merge", "m": 2},
+    "L_merge5": {"attacker": "L", "kind": "merge", "m": 5},
+    "L_mergeall": {"attacker": "L", "kind": "merge", "m": null},
+    "L_sort": {"attacker": "L", "kind": "sort"},
+    "S_no_time": {"attacker": "S", "kind": "ime", "runs": "exact"},
+    "S_counts_only": {"attacker": "S", "kind": "ime", "runs": "count"},
+    "S_rle1": {"attacker": "S", "kind": "rle", "w": 1},
+    "S_rle2": {"attacker": "S", "kind": "rle", "w": 2},
+    "S_rle4": {"attacker": "S", "kind": "rle", "w": 4},
+    "S_rle8": {"attacker": "S", "kind": "rle", "w": 8},
+    "S_rle16": {"attacker": "S", "kind": "rle", "w": 16},
+    "S_rleinf": {"attacker": "S", "kind": "rle", "w": null},
+    "S_mchar": {"attacker": "S", "kind": "merge_categories", "groups": {"char": ["alphabetic", "numeric", "punctuation", "space"]}},
+    "S_mbound": {"attacker": "S", "kind": "merge_categories", "groups": {"bound": ["enter", "escape", "tab", "sentence_punctuation"]}},
+    "S_mboth": {"attacker": "S", "kind": "merge_categories", "groups": {"char": ["alphabetic", "numeric", "punctuation", "space"], "bound": ["enter", "escape", "tab", "sentence_punctuation"]}}
+  },
+  "diagnostic_variants": ["L_none", "S_no_time"],
+  "reproduce_ime": {"features": ["no_time", "counts_only"], "K": [10, 100, 1000], "seed": 20260929, "tag": "s0-"},
+  "prior_comparison": {"segmentation": "B0", "conditions": ["ideal", "strong"]}
+}
