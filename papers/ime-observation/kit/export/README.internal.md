@@ -66,7 +66,10 @@ rules that is missing or fails), or an unexpected failure (only the type of the 
    READMEs; the links of the badges of the code point to the DOI of all versions and are not changed. The release is
    added to the history in both READMEs and in the history section of this note. The `Code:` of the article box in
    both READMEs keeps the DOI of release 1.0.0, like the manuscript, whose DOI of the code
-   (`manuscript/references.bib`, `manuscript/sections/declarations.tex`) is not changed. The draft copies the files
+   (`manuscript/references.bib`, `manuscript/sections/declarations.tex`) is not changed. When the article uses code
+   that a later release adds (release 1.0.2 adds the script of deviation D13 and the values it feeds), the DOI of that
+   release is added in those two files for that code only, and the provenance table of the supplement names the
+   release. The draft copies the files
    and the metadata of the version before, except the version, which is left empty. The copied files are removed from
    the draft before the archive of the new tag is uploaded, and the draft's version, publication date (copied from the
    version before), description, link to the tree of the tag and any other field changed in `.zenodo.json` are set
