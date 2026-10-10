@@ -19,3 +19,9 @@
 - [x] レビュー 2 巡目（直した差分・code-reviewer のみ）→ 3 件を直した（判断 6）
 - [x] commit → push → PR #344 → CI 緑 → merge `699f3677` → main の run 38060058034（発火を確認）
 - [x] issue #333 にコメントし（#issuecomment-6098585297）、本文のチェックボックス 3 つを更新した
+
+## 追加（2026-10-11・研究者の依頼「残りの判断の箇所を AskUserQuestion して」）
+- [x] 残りの判断 12 個と G1 の扱いを AskUserQuestion で聞く（判断 7）
+- [x] 同意文 v2 の草案と ADR-039 に反映する
+- [ ] レビュー → commit → push → PR → CI 緑 → merge
+- [ ] issue #333 にコメント
