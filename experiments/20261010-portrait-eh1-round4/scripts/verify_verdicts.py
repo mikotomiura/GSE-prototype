@@ -17,6 +17,7 @@ CAL_LO, CAL_HI = 0.03, 0.08   # PCcal and PCsize: lower max > 0.03 and point max
 FORMS = ["raw-none", "raw-diffuse", "lattice-none", "lattice-diffuse"]
 KEYS = [f"{fs}/{k}" for fs in ("full", "small") for k in ("hgb", "lr")]
 LABELS = ["L300", "L60", "L1800"]
+N_NAMES = 27         # null passes: all 27 null95 < 0.03
 
 
 def f(x):
@@ -66,9 +67,18 @@ def main():
     summ = json.load(open(sys.argv[2], encoding="utf-8"))
     names = [n for n in summ if not n.startswith("_")]
     agree = disagree = 0
+    # The set to check must not come from the summary alone: a name dropped from the summary would otherwise drop
+    # out of the null and NaN checks too. Design 3.3: 27 names, the same in every label of e13.json.
+    if len(names) != N_NAMES:
+        print(f"  ! summary has {len(names)} names, design says {N_NAMES}")
+        disagree += 1
     for t in LABELS:
         lab = e13[t]
         cs = lab["configs"]
+        if set(cs) != set(names):
+            print(f"  ! {t}: e13 names differ from summary names: only e13 {sorted(set(cs) - set(names))}, "
+                  f"only summary {sorted(set(names) - set(cs))}")
+            disagree += 1
         fit_failed = lab.get("auc_A") is None
         S = {n: stats(cs[n]) for n in names if n in cs}
         nan = any(s["nan"] > 0 for s in S.values())
@@ -81,8 +91,10 @@ def main():
             v = cs.get(n, {}).get("null_gain_max_by_perm")
             if v is not None:
                 null95[n] = float(np.percentile([f(x) for x in v], 95))
-                if abs(null95[n] - f(cs[n]["null95"])) > 1e-12:
+                stored = f(cs[n]["null95"])
+                if not (math.isfinite(stored) and abs(null95[n] - stored) <= 1e-12):
                     print(f"  ! {t} {n}: null95 recomputed {null95[n]} != stored {cs[n]['null95']}")
+                    disagree += 1
         null_ok = len(null95) == len(names) and all(lt(v, MARGIN) for v in null95.values())
         forms = {}
         for fo in FORMS:
