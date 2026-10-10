@@ -296,7 +296,9 @@
         - [x] `kit/e2/explore_run_lengths.py`（陽性の対照つき）と selftest（32 件・変異で確かめた）（2026-10-10・判断 226）
         - [x] 3 セルで回す（macOS は Zenodo 23183438 から・手順ファイルは macOS のタグ）→ 事後にも推奨できる粒度なし（K = 10 は近い・K = 100 は届かない）（2026-10-10・判断 226）
         - [x] 原稿・README・D13・data.md・補遺を直し、ビルドと検査（要旨 250 語・overfull は基準＋補遺 5）（2026-10-10・判断 226）
-        - [ ] /finish-task（点検・/cross-review 2 巡・attack-me を回すか研究者に聞く）→ v1.0.2 と Zenodo の新しい版（研究者に確かめる）
+        - [x] /finish-task: 点検（code ∥ security ∥ Codex）2 巡を直した（判断 227・228）→ PR #341 → CI 緑 → merge `23459bc2` → main の CI 緑（2026-10-10）
+        - [x] 研究者の 4 問（v1.0.2 を出し原稿は 1.0.0 を残して D13 に 1.0.2 を添える・attack-me は今は回さない・要旨はこのまま・開示は数値ごと）（判断 229）
+        - [ ] v1.0.2: Zenodo の下書き 23273986（DOI `…23273986`）・CITATION.cff と README と原稿の直し・点検 2 巡（判断 229〜231）→ PR → merge → E と タグ `v1.0.2` → 研究者が push → Zenodo の publish（研究者に確かめる）
       - [x] 公開 repo の v1.0.1 と Zenodo のコードの記録の新しい版（判断 222・merge の後）
         - [x] Zenodo の新しい版の下書き 23219322・DOI `10.5281/zenodo.23219322` を予約・CITATION.cff と README を 1.0.1 に（BibTeX は 1.0.1・論文の欄は 1.0.0）・試しの書き出し 201 ファイル（共有の 8 ファイルは 1.0.0 と同じ）・点検と /cross-review（2 回目は Codex の上限で Claude 単独）（2026-10-08・判断 223）
         - [x] PR #328 → CI（Windows は時間切れ → 研究者の選択で 1 回再実行して緑）→ merge `99e9307d` → E `08583068`・タグ `v1.0.1` → 研究者が bare の写しと GitHub へ push → zip を下書きに上げてメタデータ → 研究者の選択で publish（DOI `10.5281/zenodo.23219322`・全版の DOI は 1.0.1 に解決）（2026-10-08・判断 224）
