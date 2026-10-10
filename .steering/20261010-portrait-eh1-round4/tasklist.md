@@ -10,14 +10,14 @@
 - [x] design §3 をコミットして固定する（下見・スモークより前）→ `1fa6c833`
 
 ## 計器
-- [ ] `experiments/20261010-portrait-eh1-round4/` を第 3 回から写す
-- [ ] `portrait.py`: 形の PC（大きさ）・多値の神託（5 本の帯）
-- [ ] `checks.py`: 形ごとの検査器の条件・`--pilot` で形の PC 4 本の λ の格子・第 3 回との照合
-- [ ] `selftest.py`: §3.7
+- [x] `experiments/20261010-portrait-eh1-round4/` を第 3 回から写す
+- [x] `portrait.py`: 形の PC（大きさ）・多値の神託（5 本の帯）
+- [x] `checks.py`: 形ごとの検査器の条件・`--pilot` で形の PC 4 本の λ の格子・第 3 回との照合
+- [x] `selftest.py`: §3.7（`b505ab44`）
 
 ## 下見とスモーク
-- [ ] 下見（SEED + 1・v2・P 40・PC だけ）→ λ を 4 本選ぶ → `config.json` に固定 → §8
-- [ ] スモーク → 所要とメモリを見積もる
+- [x] 下見（SEED + 1・v2・P 40・PC だけ）→ λ を 4 本選ぶ（すべて 0.35）→ `config.json` に固定 → §8（`62b951fe`）
+- [x] スモーク → 所要を見積もる（本番の `checks.py` は約 2.8 時間）
 
 ## 本番と仕上げ
 - [ ] 本番 v2（G-GEAR・計測の run・self-hosted CI と重ならない時間）
