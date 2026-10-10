@@ -7,7 +7,7 @@
 - [x] design §3（基準）を書く・Claude が足した細部を判断 2 に書く
 - [x] 固定の前の `/cross-review` 1 巡目 → decisions 判断 3
 - [x] 固定の前の `/cross-review` 2 巡目（1 巡目で足した規則の境界）→ decisions 判断 4
-- [ ] design §3 をコミットして固定する（下見・スモークより前）
+- [x] design §3 をコミットして固定する（下見・スモークより前）→ `1fa6c833`
 
 ## 計器
 - [ ] `experiments/20261010-portrait-eh1-round4/` を第 3 回から写す
