@@ -285,7 +285,7 @@ def load_trials(obs_paths, plan_paths, recipes_path, config_path, markers_in_obs
     for i, (op, pp) in enumerate(zip(obs_paths, plan_paths)):
         plan = closed_set.read_plan(pp)
         for what, mine in (("recipes", recipes_sha256), ("config", config_sha256)):
-            if plan[0]["%s_sha256" % what] != mine:
+            if plan[0].get("%s_sha256" % what) != mine:
                 raise ValueError("plan %d was built from a different %s file than --%s" % (i + 1, what, what))
         events, _, obs_os = closed_set.read_obs(op)
         seg, al = closed_set.segment_by_plan(events, plan, obs_os, markers_in_obs, False, tag="s%d-" % i)
@@ -309,6 +309,12 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, registere
         registered = closed_set._loads(f.read().decode("utf-8"))
     if not isinstance(registered, dict) or registered.get("format") != closed_set.FORMAT:
         raise ValueError("--registered is not a result file of closed_set.py (%s)" % closed_set.FORMAT)
+    # The structure that compare_registered reads; another structure is an input error, reported as such (an error of
+    # this script itself is not caught and keeps its traceback).
+    res = registered.get("results")
+    if (not isinstance(registered.get("features"), dict) or not isinstance(res, dict)
+            or not all(isinstance(v, dict) and all(isinstance(r, dict) for r in v.values()) for v in res.values())):
+        raise ValueError("--registered does not have the structure of a result file of closed_set.py")
     loaded = load_trials(obs_paths, plan_paths, recipes_path, config_path, markers_in_obs, skip_scenarios)
     corpus = generate_plan.load_corpus(corpus_path)
     results = {}
@@ -551,16 +557,21 @@ def selftest():
             return p
         tampered = json.loads(json.dumps(reg_doc))
         tampered["results"]["5"]["counts_only"]["mean_rank"] += 0.5
-        for name, reg_p, extra in (
-                ("a changed registered value", write_json("tampered.json", tampered), None),
-                ("another seed", reg_path, ["--seed", "4", "--bootstrap", "30"]),
-                ("a registered file that is not an object", write_json("list.json", []), None),
+        for name, reg_p, extra, why in (
+                ("a changed registered value", write_json("tampered.json", tampered), None,
+                 "does not reproduce the registered result file"),
+                ("another seed", reg_path, ["--seed", "4", "--bootstrap", "30"],
+                 "does not reproduce the registered result file"),
+                ("a registered file that is not an object", write_json("list.json", []), None,
+                 "is not a result file of closed_set.py"),
                 ("a registered file whose features are not an object",
-                 write_json("features.json", dict(reg_doc, features=[])), None)):
+                 write_json("features.json", dict(reg_doc, features=[])), None, "does not have the structure"),
+                ("a registered file whose results are not objects",
+                 write_json("results.json", dict(reg_doc, results={"5": []})), None, "does not have the structure")):
             out_bad = os.path.join(tmp, "bad.json")
             rc, msg = cli(reg_p, out_bad, extra)
-            check("command line: %s exits 2 and writes nothing" % name, rc == 2 and not os.path.exists(out_bad),
-                  "%r %s" % (rc, msg[-200:]))
+            check("command line: %s exits 2, says why and writes nothing" % name,
+                  rc == 2 and why in msg and not os.path.exists(out_bad), "%r %s" % (rc, msg[-200:]))
         out_kept = os.path.join(tmp, "kept.json")
         with open(out_kept, "wb") as f:
             f.write(b"kept\n")
@@ -616,15 +627,11 @@ def main(argv):
             raise ValueError("--skip-scenario names a scenario twice")
         result = run(args.obs, args.plan, args.corpus, args.recipes, args.config, args.registered, Ks, args.seed,
                      args.markers_in_obs, args.bootstrap, tuple(args.skip_scenario))
+        data = render(result)   # before the file is created, so that nothing is left if rendering fails
         with open(args.out, "xb") as f:
-            f.write(render(result))
+            f.write(data)
     except (ValueError, OSError) as e:
         print("explore_run_lengths.py: %s" % e, file=sys.stderr)
-        return 2
-    except (KeyError, TypeError, AttributeError) as e:
-        # A result file or plan of another shape: stop the same way, before anything is written.
-        print("explore_run_lengths.py: an input does not have the expected structure (%s: %s)" % (
-            type(e).__name__, e), file=sys.stderr)
         return 2
     print("exploratory closed set: no_time and counts_only reproduce the registered file at K = %s; written to %s" % (
         ",".join(str(k) for k in Ks), args.out))

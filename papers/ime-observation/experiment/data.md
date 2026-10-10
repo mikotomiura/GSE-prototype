@@ -154,9 +154,9 @@ runs was run for both macOS cells with `kit/e2/explore_run_lengths.py`, on the x
   result file at every K before anything was written. A second run gave byte-identical files.
 - **Code.** The SHA-256 of the six files the script runs are recorded in the output (`code_sha256`): among them
   `kit/e2/closed_set.py` `364cc833b48a73aeb15b9416bff203ec21a71296e26534f914e3a2bb9bd067c3` (that of release `v1.0.0`)
-  and `kit/e2/explore_run_lengths.py` `77aa1eeaf0a5fb2df9c1b7a626d4edf9e67c93349bd681e8fb4af1bd7598aa9c`.
-- **Output SHA-256.** on `483a1a29c5f847c3db8b8c9fe9420d2a3eed2d1b3fe4844112a8f20a3ac7f538`, off
-  `bfcc333f4412e3b935c448de668e51191a8576721977e2ea1a499a92d2fc34d1`.
+  and `kit/e2/explore_run_lengths.py` `a99f2036f0376c9cfe1a1e31b9b390c3e05e0ae0691f1fdc351ae057bf69ca65`.
+- **Output SHA-256.** on `2877f46e8fa152f27b57d50a1cc1c1fbd1ec2e03f4df8afb9455dd796d675a2f`, off
+  `9828814eeda4fb22936fcf64cb885957022e6b65150f25af1d9e6a18dbd6e1c7`.
 
 ## Deposit procedure
 

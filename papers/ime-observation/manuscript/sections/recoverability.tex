@@ -76,8 +76,8 @@ tie-breaking of each trial, the values of $K$ and the intervals were those of th
 computed \texttt{no\_time} and \texttt{counts\_only} and stopped unless they equalled the registered results. As
 \texttt{all\_runs\_unit} can be derived from \texttt{letter\_runs\_unit}, the accuracy of \texttt{letter\_runs\_unit}
 is the larger of the two. Both sets can also be derived from \texttt{no\_time} and \texttt{counts\_only}; at every $K$
-and in every cell they were less accurate than these, so the registered maxima, and every registered value, are
-unchanged. The registered near-chance rule was applied to both sets as an exploratory judgement, from
+and in every cell each was less accurate than both, so the registered accuracies, their Wilson intervals and the
+registered judgement are unchanged. The registered near-chance rule was applied to both sets as an exploratory judgement, from
 the two macOS cells, with the Windows judgement as its qualification; it is reported next to the registered judgement
 and does not change the recommendation. The two sets, the rule and the place of the result in this article were fixed
 after all registered results had been seen and before the analysis was run, and a related measurement on single trials
@@ -146,8 +146,7 @@ procedure presses one Return more, and in S4, where the Windows procedure presse
 the presses of letters, digits and punctuation are the same in every trial. The Windows judgement is therefore not an
 independent replication of the macOS one for these sets.
 
-% The words that summarise the exploratory judgement per K ("At K = 10 ... at K = 100 ...") follow from the values
-% <cell>.q4x.<set>.k<K>.near and are corrected by hand if the result files change; the sentence itself was to be here
+% Every word of the exploratory judgement is generated from the result files (q4x.*); the paragraph was to be here
 % whatever the result (deviation D13).
 \paragraph{Exploratory: feature sets without run lengths.} In the exploratory analysis of deviation D13, the accuracy of
 \texttt{letter\_runs\_unit} was \rv{macos-standard-live-off.q4x.letter_runs_unit.k10.acc} at $K = 10$ and
@@ -157,14 +156,14 @@ with it on; that of \texttt{all\_runs\_unit}, which also drops the numbers of re
 was \rv{macos-standard-live-off.q4x.all_runs_unit.k10.acc} and \rv{macos-standard-live-off.q4x.all_runs_unit.k100.acc}
 with live conversion off and \rv{macos-standard-live-on.q4x.all_runs_unit.k10.acc} and
 \rv{macos-standard-live-on.q4x.all_runs_unit.k100.acc} with it on. Under the registered rule, applied as an exploratory
-judgement, \rv{q4x.judgement}: at $K = 10$ both sets were near chance in both cells
-(\texttt{letter\_runs\_unit}: \rv{macos-standard-live-off.q4x.letter_runs_unit.k10.near} and
-\rv{macos-standard-live-on.q4x.letter_runs_unit.k10.near}; \texttt{all\_runs\_unit}:
-\rv{macos-standard-live-off.q4x.all_runs_unit.k10.near} and \rv{macos-standard-live-on.q4x.all_runs_unit.k10.near}),
-and at $K = 100$ neither was (\rv{macos-standard-live-off.q4x.letter_runs_unit.k100.near} and
-\rv{macos-standard-live-on.q4x.letter_runs_unit.k100.near}; \rv{macos-standard-live-off.q4x.all_runs_unit.k100.near} and
-\rv{macos-standard-live-on.q4x.all_runs_unit.k100.near}), so even with the lengths of runs dropped the rule would
-recommend \rv{q4x.granularity}. On Windows, under the same judgement,
+judgement, \rv{q4x.judgement}: in both cells, \rv{q4x.byk} (\texttt{letter\_runs\_unit} with live conversion off
+and on: \rv{macos-standard-live-off.q4x.letter_runs_unit.k10.near} and
+\rv{macos-standard-live-on.q4x.letter_runs_unit.k10.near} at $K = 10$,
+\rv{macos-standard-live-off.q4x.letter_runs_unit.k100.near} and
+\rv{macos-standard-live-on.q4x.letter_runs_unit.k100.near} at $K = 100$; \texttt{all\_runs\_unit}:
+\rv{macos-standard-live-off.q4x.all_runs_unit.k10.near} and \rv{macos-standard-live-on.q4x.all_runs_unit.k10.near},
+\rv{macos-standard-live-off.q4x.all_runs_unit.k100.near} and \rv{macos-standard-live-on.q4x.all_runs_unit.k100.near}).
+Applied to these two sets, the rule would recommend \rv{q4x.granularity}. On Windows, under the same judgement,
 \rv{q4x.windows}; as for the registered sets, its values equal those of the macOS cell with live conversion off. The
 registered judgement and recommendation do not change. The supplement gives both sets at every $K$, with the accuracy
 per speed and per scenario.

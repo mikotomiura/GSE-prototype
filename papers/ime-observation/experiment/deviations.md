@@ -352,8 +352,10 @@ single trials of the Windows cell, for a set built as `all_runs_unit` is (every 
 token of count 1, no times), an accuracy of 11.2% among 10 candidates, 1.68% among 100 and 0.27% among 1,000 (90.6%,
 44.3% and 7.64% for `no_time`), and its accuracy per scenario. No value of `letter_runs_unit`, and no value of either
 set on a macOS cell, had been seen. Both sets can also be derived from `no_time` and `counts_only`, so the registered
-maxima would change if either set were more accurate than these; at every K and in every cell it was less accurate, so
-the registered values are unchanged (the script that makes the tables of the article checks this).
+maxima would change if either set were as accurate as these or more; at every K and in every cell each set was less
+accurate, so the registered accuracies, their Wilson intervals and the registered judgement are unchanged (the script
+that makes the tables of the article checks the accuracies). The descriptive intervals that resample blocks were not
+recomputed with the two sets.
 
 ## The macOS cells are unchanged
 

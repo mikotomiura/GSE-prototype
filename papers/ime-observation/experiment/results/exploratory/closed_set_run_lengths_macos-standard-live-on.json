@@ -24,7 +24,7 @@
  "code_sha256": {
   "analysis/stats.py": "ead0ccaa50bb86b088b66899ef5b1e04fb9b995a582e520679e04d09cbbf5c07",
   "e2/closed_set.py": "364cc833b48a73aeb15b9416bff203ec21a71296e26534f914e3a2bb9bd067c3",
-  "e2/explore_run_lengths.py": "77aa1eeaf0a5fb2df9c1b7a626d4edf9e67c93349bd681e8fb4af1bd7598aa9c",
+  "e2/explore_run_lengths.py": "a99f2036f0376c9cfe1a1e31b9b390c3e05e0ae0691f1fdc351ae057bf69ca65",
   "e2/simulate_obs.py": "ab989955e7273e9290595318a96087c384d40e19565f351be17bf3f8d4733123",
   "gen/generate_plan.py": "822538a52fd40ddc04e7ef406373f8d6cf5b0e7e22763b695fe61cef5fd5cb15",
   "gen/romaji.py": "79db4d4ef74fb3e354aff769f0fe5c350cf57410c0adb2e7543d5594afd9f4b1"

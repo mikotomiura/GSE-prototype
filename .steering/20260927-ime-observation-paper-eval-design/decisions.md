@@ -2360,3 +2360,17 @@ Codex 2 巡目は今日足した規則の境界（`ba89bcbd..HEAD` の `delivery
 - **採らなかったもの**: Codex P2-2（3 セルの結果の JSON が差分に無い）→ 誤検知。結果の JSON は `7db79f0a` でコミット済みで、Codex に送るパスから外しただけ。
 - **検証**: `explore_run_lengths.py` の selftest 40 件（変異 5 本: 4 本赤・1 本〔登録ファイルが辞書かの検査〕は例外の捕捉が同じ結果を出すので同値）。`results_tables.py` の selftest 230 件（足した検査の変異 11 本すべて赤・前の変異 8 本も赤）。スクリプトを変えたので 3 セルを回し直した: 値は同じで、変わったのはコードの SHA-256 と `n_sessions` の 1 行（off `bfcc333f…`・on `483a1a29…`・Windows `95bb0e03…`・スクリプト `77aa1eea…`・2 回目とバイト単位で同じ・`data.md`・`data.windows.md` を差し替え）。`kit/check.sh` 35 本緑・`build.sh --submission` はエラー 0・未定義 0・生成されていない値 0・頁の外 0・overfull は基準と比べ本文と提出用は同じ・補遺 +5（既知の形）・要旨 250 語・文体の検査 違反 0。
 - **影響範囲**: `kit/e2/explore_run_lengths.py`・`kit/e2/README.md`・`experiment/{deviations,data,data.windows}.md`・`experiment/results/exploratory/closed_set_run_lengths_*.json`・`manuscript/sections/{recoverability,conclusions,recommendations}.tex`・`manuscript/tools/results_tables.py`・`manuscript/generated/{values.json,values.tex}`・`.codex/budget.json`（Codex の記帳）・本ファイル。
+
+## 判断 228: 完了時のレビュー 2 巡目（code-reviewer ∥ Codex・足した規則の境界）の指摘を直した（2026-10-10・G-GEAR・直しはメイン）
+
+- **起動**: 範囲 `cdd1c659..1b907333`（1 巡目の直し）。code-reviewer（約 5.5 分・HIGH 0・MEDIUM 3・LOW 7）と Codex（パス限定 9 ファイル・P2 ×2）を並列に。今日の Codex の台帳は 281,642 / 7 回（この枝。並行の枝 portrait-eh1-round3 は 119,939）。
+- **一次で裏取りして採ったもの**:
+  - code-reviewer MEDIUM（Windows の句に「両方の K で」が無く、結論と推奨で括弧の「10 候補では近い」の直後に来ると「Windows は 10 でも近くない」と読める）→ `q4x.windows` の両方の枝に「at both $K = 10$ and $K = 100$」を付けた。
+  - code-reviewer MEDIUM（登録の最大の検査が等号を通す・同点なら登録の `acc_source` が名前順で変わる・本文の「every registered value」は言い過ぎ）→ `>=` で止める。本文と D13 を「the registered accuracies, their Wilson intervals and the registered judgement are unchanged」に狭め、D13 にブロックの区間は計算し直していないと書いた。D13 の「it」を「each set」に。
+  - code-reviewer MEDIUM（`KeyError` などを `run()` 全体で捕まえると、スクリプト自身の誤りが入力の誤りに見える・`render` が `open` の後）→ 広い捕捉をやめ、登録ファイルの構造（`features` が辞書・`results` が辞書の辞書）を明示的に確かめて `ValueError` に。計画の先頭行は `.get` で読む。`render` を `open` の前に。CLI の否定試験で止まった理由の文も確かめる（`results` が辞書でない場合も足した）。
+  - Codex P2-1 ＝ code-reviewer LOW（区間の配列の長さを確かめていない・NaN）→ `acc`・`acc_raw` は 0〜1 の有限の数、`acc_ci_raw`・`acc_ci` は順に並んだ 2 つの数、ブロックの区間は同じか `[null, null]`（`load()` は標準の `json.loads` なので NaN を受け付ける —— 一次で確かめた）。
+  - Codex P2-2 ＝ code-reviewer LOW（結論と推奨の括弧の語が固定の文字列で、結果が変わると生成した判定の語と矛盾しうる）→ K ごとの語を値から生成する鍵 `q4x.byk`（例「among 10 candidates both were near chance, among 100 neither was」）を足し、結論・推奨・結果の段落の手書きの語と、手で直すと書いたコメントを置き換えた。
+  - code-reviewer LOW: `n = 0` の文言を分けた。生成する語の `K` を `$K$` に。
+- **検証**: `explore_run_lengths.py` の selftest 41 件。`results_tables.py` の selftest 240 件（足した規則の変異 9 本: 6 本赤・3 本は別の検査が同じ入力を先に拒む同値〔NaN は順序の比較・区間の `[null, null]` は Wilson の検算・`n = 0` は試行数の照合〕）。スクリプトを変えたので 3 セルを 2 回ずつ回した: 2 回ともバイト単位で同じで、前の版との差はコードの SHA-256 の 1 行だけ（off `9828814e…`・on `2877f46e…`・Windows `a20f4630…`・スクリプト `a99f2036…`・`data.md`・`data.windows.md` を差し替え）。`kit/check.sh` 35 本緑。`build.sh --submission` はエラー 0・未定義 0・生成されていない値 0・頁の外 0・overfull は基準と比べ本文と提出用は同じ・補遺 +5（既知）。要旨 250 語。文体の検査 違反 0。PDF の文で、判定の語・K ごとの語・Windows の句が値と矛盾しないことを読んで確かめた。
+- **3 巡目は回さない**（memory「cross-review は 2 巡」）。残る小さな点（LOW の「near chance among 10 candidates は平易に読むと強く響く」）は研究者に伝える。
+- **影響範囲**: `kit/e2/explore_run_lengths.py`・`experiment/{deviations,data,data.windows}.md`・`experiment/results/exploratory/closed_set_run_lengths_*.json`・`manuscript/sections/{recoverability,conclusions,recommendations}.tex`・`manuscript/tools/results_tables.py`・`manuscript/generated/{values.json,values.tex}`・`.codex/budget.json`・本ファイル。

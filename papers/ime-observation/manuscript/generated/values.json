@@ -6358,6 +6358,20 @@
     "no_time": false
    }
   },
+  "q4x.byk": {
+   "source": "exploratory/closed_set_run_lengths_macos-standard-live-on.json, exploratory/closed_set_run_lengths_macos-standard-live-off.json:results/10|100/*/acc_ci",
+   "text": "among 10 candidates both were near chance, among 100 neither was",
+   "value": {
+    "10": {
+     "all_runs_unit": true,
+     "letter_runs_unit": true
+    },
+    "100": {
+     "all_runs_unit": false,
+     "letter_runs_unit": false
+    }
+   }
+  },
   "q4x.granularity": {
    "source": "exploratory/closed_set_run_lengths_macos-standard-live-on.json, exploratory/closed_set_run_lengths_macos-standard-live-off.json:results/10|100/*/acc_ci",
    "text": "none",
@@ -6368,7 +6382,7 @@
   },
   "q4x.judgement": {
    "source": "exploratory/closed_set_run_lengths_macos-standard-live-on.json, exploratory/closed_set_run_lengths_macos-standard-live-off.json:results/10|100/*/acc_ci",
-   "text": "neither \\texttt{letter\\_runs\\_unit} nor \\texttt{all\\_runs\\_unit} was near chance at both K = 10 and K = 100 in both macOS cells",
+   "text": "neither \\texttt{letter\\_runs\\_unit} nor \\texttt{all\\_runs\\_unit} was near chance at both $K = 10$ and $K = 100$ in both macOS cells",
    "value": {
     "set": null,
     "status": "none"
@@ -6376,7 +6390,7 @@
   },
   "q4x.windows": {
    "source": "exploratory/closed_set_run_lengths_windows-msime-tsf.json:results/10|100/*/acc_ci",
-   "text": "neither \\texttt{letter\\_runs\\_unit} nor \\texttt{all\\_runs\\_unit} was near chance",
+   "text": "neither \\texttt{letter\\_runs\\_unit} nor \\texttt{all\\_runs\\_unit} was near chance at both $K = 10$ and $K = 100$",
    "value": {
     "all_runs_unit": false,
     "letter_runs_unit": false
