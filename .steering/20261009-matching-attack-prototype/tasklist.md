@@ -31,10 +31,11 @@
 ## 記録
 - [x] notes.md（結果・限界・逸脱）
 - [x] ADR-039 D6 に日付つきの注
-- [ ] issue #333 にコメント（レビューの後）
+- [x] issue #333 にコメント（2026-10-10・レビューの後）
 - [x] 引き継ぎに完了の印
 
 ## 完了処理（/finish-task）
 - [x] code-reviewer ∥ security-checker ∥ Codex 2 回（1 巡目 = 全体・判断 6）→ 直して回し直した
 - [x] 直した差分の 2 巡目（code-reviewer ∥ Codex 1 回・判断 7）→ 直して回し直した
-- [ ] commit → push → PR → CI 緑なら merge → main の CI 確認
+- [x] commit → push → PR #339 → CI 緑（4 件）→ merge `9be88ca1` → main の run 1 件（発火を確認）
+- [x] IME 論文の counts_only の直しの引き継ぎ `.steering/_handoff/next-session-ime-counts-only-fix.md`（研究者の決定 2026-10-10・PsyArXiv の却下を反映）
