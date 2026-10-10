@@ -17,5 +17,15 @@
 ## 完了処理（/finish-task）
 - [x] レビュー 1 巡目（code-reviewer のみ・Codex は予算超過で省略・判断 5）→ 全部直した
 - [x] レビュー 2 巡目（直した差分・code-reviewer のみ）→ 3 件を直した（判断 6）
-- [ ] commit → push → PR → CI 緑 → merge
-- [ ] issue #333 にコメントし、本文のチェックボックスを更新する
+- [x] commit → push → PR #344 → CI 緑 → merge `699f3677` → main の run 38060058034（発火を確認）
+- [x] issue #333 にコメントし（#issuecomment-6098585297）、本文のチェックボックス 3 つを更新した
+
+## 追加（2026-10-11・研究者の依頼「残りの判断の箇所を AskUserQuestion して」）
+- [x] 残りの判断 12 個と G1 の扱いを AskUserQuestion で聞く（判断 7）
+- [x] 同意文 v2 の草案と ADR-039 に反映する
+- [x] レビュー 1 巡目（Claude ∥ Codex）→ 判断 8 を聞いて全部直した
+- [x] レビュー 2 巡目（Claude ∥ Codex）→ 判断 9 を聞いて直した
+- [ ] push → PR → CI 緑 → merge
+- [x] 研究者本人の G1 の書き写しでの試しの計算の引き継ぎ（`.steering/_handoff/next-session-g1-copy-self-trial.md`）
+- [ ] これから募集する G1 の参加者向けの「復元できません」の文言の直し（別タスク・未起票）
+- [ ] issue #333 にコメント
