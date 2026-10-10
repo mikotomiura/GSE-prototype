@@ -1,0 +1,270 @@
+{
+ "raw-none-I300-W5": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "raw-diffuse-I300-W5": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "lattice-none-I300-W5": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "lattice-diffuse-I300-W5": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "raw-none-I300-W5-recent60": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "raw-diffuse-I300-W5-recent60": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "lattice-none-I300-W5-recent60": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "lattice-diffuse-I300-W5-recent60": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "PC1": {
+  "L300": "works",
+  "L60": "works",
+  "L1800": "fails"
+ },
+ "PCcal": {
+  "L300": "works",
+  "L60": "fails",
+  "L1800": "fails"
+ },
+ "PCcal0": {
+  "L300": "descriptive",
+  "L60": "descriptive",
+  "L1800": "descriptive"
+ },
+ "PCsize-raw-none": {
+  "L300": "works",
+  "L60": "works",
+  "L1800": "fails"
+ },
+ "PCsize-raw-diffuse": {
+  "L300": "works",
+  "L60": "works",
+  "L1800": "fails"
+ },
+ "PCsize-lattice-none": {
+  "L300": "works",
+  "L60": "works",
+  "L1800": "fails"
+ },
+ "PCsize-lattice-diffuse": {
+  "L300": "works",
+  "L60": "works",
+  "L1800": "fails"
+ },
+ "PCsize0-raw-none": {
+  "L300": "baseline_below",
+  "L60": "baseline_below",
+  "L1800": "baseline_below"
+ },
+ "PCsize0-raw-diffuse": {
+  "L300": "baseline_below",
+  "L60": "baseline_below",
+  "L1800": "baseline_below"
+ },
+ "PCsize0-lattice-none": {
+  "L300": "baseline_below",
+  "L60": "baseline_below",
+  "L1800": "baseline_below"
+ },
+ "PCsize0-lattice-diffuse": {
+  "L300": "baseline_below",
+  "L60": "baseline_below",
+  "L1800": "baseline_below"
+ },
+ "ORC300-I300-W5": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORC300-I300-W5-recent60": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCgap-I300-W5": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCgap-I300-W5-recent60": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCcum-I300-W5": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCcum-I300-W5-recent60": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCband-I300-W5": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCband-I300-W5-recent60": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "_detector": {
+  "L300": {
+   "pc1_ok": true,
+   "pccal_ok": true,
+   "null_ok": true,
+   "nan": false,
+   "fit_failed": false,
+   "forms": {
+    "raw-none": {
+     "pcsize_ok": true,
+     "pcsize_detects": true,
+     "baseline_ok": true,
+     "detector_ok": true,
+     "reasons": []
+    },
+    "raw-diffuse": {
+     "pcsize_ok": true,
+     "pcsize_detects": true,
+     "baseline_ok": true,
+     "detector_ok": true,
+     "reasons": []
+    },
+    "lattice-none": {
+     "pcsize_ok": true,
+     "pcsize_detects": true,
+     "baseline_ok": true,
+     "detector_ok": true,
+     "reasons": []
+    },
+    "lattice-diffuse": {
+     "pcsize_ok": true,
+     "pcsize_detects": true,
+     "baseline_ok": true,
+     "detector_ok": true,
+     "reasons": []
+    }
+   }
+  },
+  "L60": {
+   "pc1_ok": true,
+   "pccal_ok": false,
+   "null_ok": true,
+   "nan": false,
+   "fit_failed": false,
+   "forms": {
+    "raw-none": {
+     "pcsize_ok": true,
+     "pcsize_detects": true,
+     "baseline_ok": true,
+     "detector_ok": false,
+     "reasons": [
+      "weak_detector"
+     ]
+    },
+    "raw-diffuse": {
+     "pcsize_ok": true,
+     "pcsize_detects": true,
+     "baseline_ok": true,
+     "detector_ok": false,
+     "reasons": [
+      "weak_detector"
+     ]
+    },
+    "lattice-none": {
+     "pcsize_ok": true,
+     "pcsize_detects": true,
+     "baseline_ok": true,
+     "detector_ok": false,
+     "reasons": [
+      "weak_detector"
+     ]
+    },
+    "lattice-diffuse": {
+     "pcsize_ok": true,
+     "pcsize_detects": true,
+     "baseline_ok": true,
+     "detector_ok": false,
+     "reasons": [
+      "weak_detector"
+     ]
+    }
+   }
+  },
+  "L1800": {
+   "pc1_ok": false,
+   "pccal_ok": false,
+   "null_ok": true,
+   "nan": false,
+   "fit_failed": false,
+   "forms": {
+    "raw-none": {
+     "pcsize_ok": false,
+     "pcsize_detects": false,
+     "baseline_ok": true,
+     "detector_ok": false,
+     "reasons": [
+      "weak_detector",
+      "weak_shape_pc"
+     ]
+    },
+    "raw-diffuse": {
+     "pcsize_ok": false,
+     "pcsize_detects": false,
+     "baseline_ok": true,
+     "detector_ok": false,
+     "reasons": [
+      "weak_detector",
+      "weak_shape_pc"
+     ]
+    },
+    "lattice-none": {
+     "pcsize_ok": false,
+     "pcsize_detects": false,
+     "baseline_ok": true,
+     "detector_ok": false,
+     "reasons": [
+      "weak_detector",
+      "weak_shape_pc"
+     ]
+    },
+    "lattice-diffuse": {
+     "pcsize_ok": false,
+     "pcsize_detects": false,
+     "baseline_ok": true,
+     "detector_ok": false,
+     "reasons": [
+      "weak_detector",
+      "weak_shape_pc"
+     ]
+    }
+   }
+  }
+ }
+}
