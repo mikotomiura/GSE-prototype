@@ -33,7 +33,7 @@ ADR-039 D6 の照合の確かめを、人が打った記録で初めて試す。
 
 - 研究者が会話で示したフォルダ: `C:\Users\johnd\Downloads\test-20261010T152855Z-1-001\G1_test`（`G1_test01` = P009 の 10 ブロック、`G1_test02` = P010 の 10 ブロック ＋ block06 の重複 1 本。どれも `.age`）。
 - ファイル名にはセッションの日時が入っている。**ファイル名と日時を repo に書かない**（`protocol.md §7`・`data.md`）。記録には「P009 の block01」のように書く。
-- 復号には研究者の age の秘密鍵が要る（既定 `~/.gse/age-identity.txt`・repo の外）。この機械に鍵があるかは確かめていない。無ければ研究者に聞く。
+- 復号には研究者の age の秘密鍵が要る。G-GEAR では `C:\.gsege-identity.txt`（研究者が 2026-10-11 に示した。既定の `~/.gse/` ではないので、`gse-unpack` に `--identity` で渡す）。鍵の中身は表示しない・コピーしない・コミットしない。
 - **復号した NDJSON は repo の外**（セッションの scratchpad など）に置き、作業が終わったら消す。生の NDJSON・復号した記録は外部の LLM（Codex を含む）に送らない。Codex のレビューはコードと集計の結果だけにする（`docs/external-skills.md`・`data-privacy`）。
 - 記録の主: G1 の一次の記録は P010 を「実参加者・来所」、P009 を「除外」と書いているが、研究者は 2026-10-11 にどちらも本人の記録だと確かめた（記録の説明が古い・`.steering/20261010-release-tier1-table-consent-v2/decisions.md` 判断 9・ADR-039 D8 の注）。G1 の番号で、Phase1 の P009・P010 とは別。
 - どのブロックが書き写しかは、`blocks/P0xx.json`（この機械には無い・gitignore）か管理シートで確かめる。設計では最初と最後（block01・block10）だが、記録で確かめる（各ブロックの打鍵数や meta、研究者への確認）。P007 のように別の端末で打ったブロックがあるかも確かめる。
