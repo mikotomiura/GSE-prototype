@@ -6,7 +6,7 @@
 - [x] requirement / decisions を書く
 - [x] design §3（基準）を書く・Claude が足した細部を判断 2 に書く
 - [x] 固定の前の `/cross-review` 1 巡目 → decisions 判断 3
-- [ ] 固定の前の `/cross-review` 2 巡目（1 巡目で足した規則の境界）→ decisions
+- [x] 固定の前の `/cross-review` 2 巡目（1 巡目で足した規則の境界）→ decisions 判断 4
 - [ ] design §3 をコミットして固定する（下見・スモークより前）
 
 ## 計器
