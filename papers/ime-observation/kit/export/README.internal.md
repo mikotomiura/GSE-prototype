@@ -79,7 +79,7 @@ the export of the macOS freezing tag (made with that tag's own exporter and `--a
 the list of its files has the SHA-256 that the registration gives), tagged `ime-observation-prereg-macos`; the
 export of the Windows freezing tag, made in the same way, tagged `ime-observation-prereg-windows`; a commit that
 adds only `manuscript/outline.md` as it stood before the results were analysed; and the releases, each committed on
-top of the one before (`v1.0.0`, then `v1.0.1`). The author date
+top of the one before (`v1.0.0`, then `v1.0.1`, then `v1.0.2`). The author date
 of each of the first three commits is the date of the working commit it comes from, and the message names that
 commit. Scripts that start with `#!` are given the executable bit in the index.
 
