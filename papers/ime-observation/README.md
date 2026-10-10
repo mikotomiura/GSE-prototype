@@ -213,8 +213,8 @@ is, in order:
    tables changed only in the layout of Table 13.
 6. release 1.0.2, tagged `v1.0.2`. Three feature sets of the closed-set attack (`no_runs`, `bin1s_count` and
    `counts_only`) keep the lengths of runs of letter keys, although the registration describes them as dropping
-   them. The release corrects their description in the manuscript and in `kit/e2/README.md` (the docstrings of the
-   frozen code are left unchanged) and adds an exploratory analysis of two feature sets that drop them, recorded as
+   them. The release corrects their description in the manuscript and in `kit/e2/README.md` (the comments and
+   docstrings of the frozen code are left unchanged) and adds an exploratory analysis of two feature sets that drop them, recorded as
    deviation D13 in `experiment/deviations.md`: the script `kit/e2/explore_run_lengths.py`, its results in
    `experiment/results/exploratory/`, the records of its runs in `experiment/data.md` and
    `experiment/data.windows.md`, and the text, the values and a table of the supplement in the manuscript. The
