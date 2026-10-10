@@ -1,18 +1,18 @@
 # タスクリスト
 
 ## 設計
-- [x] 第 4 回の PR #343 が merge 済みであることを確かめる（main の CI は確認中）
+- [x] 第 4 回の PR #343 が merge 済み・main の CI が緑であることを確かめる
 - [x] 研究者に第 5 回の中身を聞く（判断 1・7 問）
 - [x] requirement / decisions を書く
 - [x] design §3（基準）を書く・Claude が足した細部を判断 2 に書く
 - [x] 固定の前の `/cross-review` 1 巡目 → decisions 判断 3（研究者の決定 1 問）
-- [ ] 固定の前の `/cross-review` 2 巡目（1 巡目で足した規則の境界）→ decisions 判断 4
-- [ ] design §3 をコミットして固定する（下見・スモークより前）
+- [x] 固定の前の `/cross-review` 2 巡目（1 巡目で足した規則の境界）→ decisions 判断 4
+- [x] design §3 をコミットして固定する（下見・スモークより前）→ このコミット（ハッシュは次のコミットで書く）
 
 ## 計器
 - [ ] `experiments/20261010-portrait-eh1-round5/` を第 4 回から写す
 - [ ] `portrait.py`: 先読みの PC（`ahead_values`）
-- [ ] `checks.py`: 組ごとの検査器の条件・`--pilot` の格子（目標 0.05 と 0.035）・`--replicate`・第 4 回との照合
+- [ ] `checks.py`: 組ごとの検査器の条件・`--pilot`（先読みの PC・目標 0.05）・`--pilot-replicate`（反復の対照 12 本・目標 0.035・P 240・L300）・`--replicate`・第 4 回との照合
 - [ ] `selftest.py`: §3.7
 - [ ] `run.sh`: `--replicate`
 - [ ] 照合のスクリプト（`verify_verdicts.py`・`verify_round4.py`・反復の数え直し）を写して直し、変異で失敗することを確かめる
