@@ -23,5 +23,7 @@
 ## 追加（2026-10-11・研究者の依頼「残りの判断の箇所を AskUserQuestion して」）
 - [x] 残りの判断 12 個と G1 の扱いを AskUserQuestion で聞く（判断 7）
 - [x] 同意文 v2 の草案と ADR-039 に反映する
-- [ ] レビュー → commit → push → PR → CI 緑 → merge
+- [x] レビュー 1 巡目（Claude ∥ Codex）→ 判断 8 を聞いて全部直した
+- [ ] レビュー 2 巡目 → push → PR → CI 緑 → merge
+- [ ] 研究者本人の G1 の書き写しでの試しの計算の引き継ぎ（別タスク）
 - [ ] issue #333 にコメント
