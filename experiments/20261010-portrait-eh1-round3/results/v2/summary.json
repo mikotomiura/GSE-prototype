@@ -1,0 +1,114 @@
+{
+ "raw-none-I300-W5": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "raw-diffuse-I300-W5": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "lattice-none-I300-W5": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "lattice-diffuse-I300-W5": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "raw-none-I300-W5-recent60": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "raw-diffuse-I300-W5-recent60": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "lattice-none-I300-W5-recent60": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "lattice-diffuse-I300-W5-recent60": {
+  "L300": "green",
+  "L60": "undecidable",
+  "L1800": "undecidable"
+ },
+ "PC1": {
+  "L300": "works",
+  "L60": "works",
+  "L1800": "fails"
+ },
+ "PCcal": {
+  "L300": "works",
+  "L60": "fails",
+  "L1800": "fails"
+ },
+ "PCcal0": {
+  "L300": "descriptive",
+  "L60": "descriptive",
+  "L1800": "descriptive"
+ },
+ "ORC300-I300-W5": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORC300-I300-W5-recent60": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCgap-I300-W5": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCgap-I300-W5-recent60": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCcum-I300-W5": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "ORCcum-I300-W5-recent60": {
+  "L300": "channel_narrow",
+  "L60": "channel_partial",
+  "L1800": "channel_partial"
+ },
+ "_detector": {
+  "L300": {
+   "pc1_ok": true,
+   "pccal_ok": true,
+   "null_ok": true,
+   "detector_ok": true,
+   "reasons": []
+  },
+  "L60": {
+   "pc1_ok": true,
+   "pccal_ok": false,
+   "null_ok": true,
+   "detector_ok": false,
+   "reasons": [
+    "weak_detector"
+   ]
+  },
+  "L1800": {
+   "pc1_ok": false,
+   "pccal_ok": false,
+   "null_ok": true,
+   "detector_ok": false,
+   "reasons": [
+    "weak_detector"
+   ]
+  }
+ }
+}
