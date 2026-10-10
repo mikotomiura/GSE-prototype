@@ -350,14 +350,14 @@
     "lower": 0.03,
     "upper": 0.08
   },
-  "_comment_pcsize": "Round 4 design 1.4, 3.2 and 3.9: the shape PC of each form (mapping-drift) on a 60 s clock that never looks at presses; the size level (f4) is v (q(u) when U < lam, else N), f1 and f3 are 0.5, f6 is 0.5 (lattice) or one uniform draw per drawn update (raw). lam is chosen per form by the pilot (checks.py --pilot) and written here before the smoke and the main run. PCsize works when its lower bound max > lower, its point estimate max <= upper, and the upper bound max of PCsize0 (lambda = 0) < e13.margin (design 3.2).",
+  "_comment_pcsize": "Round 4 design 1.4, 3.2 and 3.9: the shape PC of each form (mapping-drift) on a 60 s clock that never looks at presses; the size level (f4) is v (q(u) when U < lam, else N), f1 and f3 are 0.5, f6 is 0.5 (lattice) or one uniform draw per drawn update (raw). lam is chosen per form by the pilot (checks.py --pilot) and written here before the smoke and the main run. PCsize works when its lower bound max > lower, its point estimate max <= upper, and the upper bound max of PCsize0 (lambda = 0) < e13.margin (design 3.2). lam = 0.35 for all four forms was chosen by the pilot on 2026-10-10 14:01 (design section 8): the fitted L300 point estimates were 0.0519, 0.0466, 0.0549 and 0.0567 (raw-none, raw-diffuse, lattice-none, lattice-diffuse), each the closest to 0.05 in its own grid.",
   "pcsize": {
     "interval_s": 60,
     "lam": {
-      "raw-none": null,
-      "raw-diffuse": null,
-      "lattice-none": null,
-      "lattice-diffuse": null
+      "raw-none": 0.35,
+      "raw-diffuse": 0.35,
+      "lattice-none": 0.35,
+      "lattice-diffuse": 0.35
     },
     "pilot_grid": [
       0.05,
