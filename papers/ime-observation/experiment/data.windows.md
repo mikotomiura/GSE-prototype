@@ -211,9 +211,9 @@ listed above; `plan.jsonl` and `obs.jsonl` have the SHA-256 given for the closed
   minutes; `no_time` and `counts_only` reproduced every value of the registered result file at every K before anything
   was written. A second run gave a byte-identical file.
 - **Code.** As recorded in the output (`code_sha256`); `kit/e2/explore_run_lengths.py`
-  `753f9210c86de45f4419eabc28d4e408d588f989c84a986b4876e9d97e6e16c3`, `kit/e2/closed_set.py` that of release
+  `77aa1eeaf0a5fb2df9c1b7a626d4edf9e67c93349bd681e8fb4af1bd7598aa9c`, `kit/e2/closed_set.py` that of release
   `v1.0.0`.
-- **Output SHA-256.** `3bc23a2d0abe75dc269c571b73a6e7d3ffbd19e47cdcf99a7848c12aa8cc27be`.
+- **Output SHA-256.** `95bb0e034ace0f9d7bd902868e0071563c54d05f954c3345c99c02bcf7666810`.
 
 ## Machine that ran the deposit check
 

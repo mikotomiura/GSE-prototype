@@ -6368,7 +6368,7 @@
   },
   "q4x.judgement": {
    "source": "exploratory/closed_set_run_lengths_macos-standard-live-on.json, exploratory/closed_set_run_lengths_macos-standard-live-off.json:results/10|100/*/acc_ci",
-   "text": "neither \\texttt{letter\\_runs\\_unit} nor \\texttt{all\\_runs\\_unit} was near chance in both macOS cells",
+   "text": "neither \\texttt{letter\\_runs\\_unit} nor \\texttt{all\\_runs\\_unit} was near chance at both K = 10 and K = 100 in both macOS cells",
    "value": {
     "set": null,
     "status": "none"

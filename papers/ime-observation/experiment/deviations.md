@@ -348,9 +348,12 @@ to be used whatever its result. This deviation was made after all results had be
 in all three cells. Before the two sets and the rule above were fixed, a related value on the Windows cell had also
 been seen: a prototype of another study by the author, which matches the logs of consecutive trials against candidate
 texts with a similar attack but draws its own candidates and counts a tie among m candidates as 1/m, had measured on
-single trials of the Windows cell, for the coarsening of `all_runs_unit`, an accuracy of 11.2% among 10 candidates,
-1.68% among 100 and 0.27% among 1,000 (90.6%, 44.3% and 7.64% for `no_time`), and its accuracy per scenario. No value
-of `letter_runs_unit`, and no value of either set on a macOS cell, had been seen.
+single trials of the Windows cell, for a set built as `all_runs_unit` is (every run of presses of the same category one
+token of count 1, no times), an accuracy of 11.2% among 10 candidates, 1.68% among 100 and 0.27% among 1,000 (90.6%,
+44.3% and 7.64% for `no_time`), and its accuracy per scenario. No value of `letter_runs_unit`, and no value of either
+set on a macOS cell, had been seen. Both sets can also be derived from `no_time` and `counts_only`, so the registered
+maxima would change if either set were more accurate than these; at every K and in every cell it was less accurate, so
+the registered values are unchanged (the script that makes the tables of the article checks this).
 
 ## The macOS cells are unchanged
 

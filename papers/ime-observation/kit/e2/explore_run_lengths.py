@@ -42,9 +42,14 @@ with the token function as a parameter; two checks show that the copy is the reg
 The output (format e2-closed-posthoc/1) holds, per K, the values of the two new sets in the shape of the registered
 result file, the SHA-256 of every input and of the code, and the result of the comparison. The near-chance judgement is
 made from it by manuscript/tools/results_tables.py with the registered rule. --out is created fresh, never overwritten.
+The switch --ime-toggle-in-obs of closed_set.py is not offered: the registered runs did not use it. The procedure files
+must be those the plan was built from (for the macOS cells, those of their freezing tag; the plan records their
+SHA-256 and the run stops otherwise).
 """
 import argparse
+import contextlib
 import hashlib
+import io
 import json
 import os
 import random
@@ -228,12 +233,12 @@ def _plain(x):
 
 def compare_registered(registered, mine):
     """Differences between the registered result file and the run: the inputs, and every value of the two registered
-    sets at every K. mine: {"seed", "bootstrap", "n_trials", "alignment", "skipped_scenarios", "corpus_sha256",
-    "recipes_sha256", "config_sha256", "params", "results": {K: {set: values}}}. Returns a list of strings (empty: the
-    same)."""
+    sets at every K. mine: {"seed", "bootstrap", "n_sessions", "n_trials", "alignment", "skipped_scenarios",
+    "corpus_sha256", "recipes_sha256", "config_sha256", "params", "results": {K: {set: values}}}. Returns a list of
+    strings (empty: the same)."""
     diffs = []
-    for key in ("seed", "bootstrap", "n_trials", "alignment", "skipped_scenarios", "corpus_sha256", "recipes_sha256",
-                "config_sha256", "params"):
+    for key in ("seed", "bootstrap", "n_sessions", "n_trials", "alignment", "skipped_scenarios", "corpus_sha256",
+                "recipes_sha256", "config_sha256", "params"):
         if _plain(mine.get(key)) != registered.get(key):
             diffs.append("%s differs from the registered result file" % key)
     for f in CONTROLS:
@@ -302,7 +307,7 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, registere
         bootstrap, skip_scenarios):
     with open(registered_path, "rb") as f:
         registered = closed_set._loads(f.read().decode("utf-8"))
-    if registered.get("format") != closed_set.FORMAT:
+    if not isinstance(registered, dict) or registered.get("format") != closed_set.FORMAT:
         raise ValueError("--registered is not a result file of closed_set.py (%s)" % closed_set.FORMAT)
     loaded = load_trials(obs_paths, plan_paths, recipes_path, config_path, markers_in_obs, skip_scenarios)
     corpus = generate_plan.load_corpus(corpus_path)
@@ -310,7 +315,8 @@ def run(obs_paths, plan_paths, corpus_path, recipes_path, config_path, registere
     for K in Ks:
         results[str(K)] = evaluate(loaded["trials"], corpus, K, CONTROLS + NEW_SETS, seed, loaded["recipes"],
                                    loaded["config"], B=bootstrap)
-    mine = {"seed": seed, "bootstrap": bootstrap, "n_trials": loaded["n_trials"], "alignment": loaded["alignment"],
+    mine = {"seed": seed, "bootstrap": bootstrap, "n_sessions": len(obs_paths), "n_trials": loaded["n_trials"],
+            "alignment": loaded["alignment"],
             "skipped_scenarios": loaded["skipped"] if skip_scenarios else None,
             "corpus_sha256": _sha_file(corpus_path), "recipes_sha256": loaded["recipes_sha256"],
             "config_sha256": loaded["config_sha256"],
@@ -428,7 +434,8 @@ def selftest():
 
     # The copy of the evaluation reproduces closed_set.evaluate for the two registered sets, on a synthetic world.
     with tempfile.TemporaryDirectory() as tmp:
-        recipes, cfg, _, corpus, _, trials = closed_set._selftest_world(tmp, 60, 11, ["S1", "S2", "S6", "S10"])
+        recipes, cfg, _, corpus, corpus_path, trials = closed_set._selftest_world(tmp, 60, 11,
+                                                                                  ["S1", "S2", "S6", "S10"])
         for K in (5, 20):
             reg = closed_set.evaluate(trials, corpus, K, list(CONTROLS), 13, recipes, cfg, B=40)
             mine = evaluate(trials, corpus, K, CONTROLS + NEW_SETS, 13, recipes, cfg, B=40)
@@ -447,16 +454,17 @@ def selftest():
                       mine["letter_runs_unit"]["by_scenario"]) and alone["acc"] == alone["acc_raw"])
 
         # compare_registered: identical values pass, a changed value or input is reported.
-        reg_file = {"format": closed_set.FORMAT, "seed": 13, "bootstrap": 40, "n_trials": 60, "alignment": {"a": 1},
+        reg_file = {"format": closed_set.FORMAT, "seed": 13, "bootstrap": 40, "n_sessions": 1, "n_trials": 60,
+                    "alignment": {"a": 1},
                     "skipped_scenarios": None, "corpus_sha256": "c", "recipes_sha256": "r", "config_sha256": "g",
                     "params": {"p": 1},
                     "features": dict((f, {"timing": closed_set.FEATURE_SETS[f][0],
                                           "runs": closed_set.FEATURE_SETS[f][1]}) for f in CONTROLS),
                     "results": {"5": _plain(dict((f, reg[f]) for f in CONTROLS))}}
         reg_file = _plain(reg_file)
-        mine_run = {"seed": 13, "bootstrap": 40, "n_trials": 60, "alignment": {"a": 1}, "skipped_scenarios": None,
-                    "corpus_sha256": "c", "recipes_sha256": "r", "config_sha256": "g", "params": {"p": 1},
-                    "results": {"5": reg}}
+        mine_run = {"seed": 13, "bootstrap": 40, "n_sessions": 1, "n_trials": 60, "alignment": {"a": 1},
+                    "skipped_scenarios": None, "corpus_sha256": "c", "recipes_sha256": "r", "config_sha256": "g",
+                    "params": {"p": 1}, "results": {"5": reg}}
         check("compare_registered: the same values pass", compare_registered(reg_file, mine_run) == [],
               str(compare_registered(reg_file, mine_run)))
         changed = json.loads(json.dumps(reg_file))
@@ -474,6 +482,93 @@ def selftest():
         changed["features"]["counts_only"] = {"timing": "none", "runs": "exact"}
         check("compare_registered: a registered file without the registered sets is reported",
               compare_registered(changed, mine_run) != [])
+        changed = json.loads(json.dumps(reg_file))
+        changed["n_sessions"] = 2
+        check("compare_registered: another number of sessions is reported", compare_registered(changed, mine_run) != [])
+
+        # The command line, end to end: a plan and an observation built as in the self-test of closed_set.py, the
+        # registered result file written by closed_set.py, then this script.
+        recipes_json = os.path.join(_KIT, "gen", "recipes.json")
+        cli_cfg_path = os.path.join(tmp, "cfg_cli.json")
+        with open(cli_cfg_path, "wb") as f:
+            f.write(json.dumps(dict(cfg, scenarios=["S1", "S2", "S6"], n_per_cell_scenario_speed=3)).encode("utf-8"))
+        with open(cli_cfg_path, "rb") as f:
+            cli_cfg = closed_set._loads(f.read().decode("utf-8"))
+        rows, _ = generate_plan.plan_rows(corpus, recipes, cli_cfg, "macos", 3, _sha_file(cli_cfg_path),
+                                          _sha_file(recipes_json), "0" * 64)
+        plan_path = os.path.join(tmp, "plan.jsonl")
+        with open(plan_path, "wb") as f:
+            f.write(generate_plan.render_plan(rows))
+        header = ('{"type":"meta","format":"obs/1","os":"macos","logger_version":"0.0.0","manifest_sha256":"%s",'
+                  '"capabilities":{"unconditional":["key"],"threshold_gated":[],"config_gated":["ime_shadow"]}}'
+                  % ("0" * 64))
+        obs_lines, clock, last = [header], 1000000, -1
+        for r in rows[1:]:
+            if r["kind"] == "block":
+                clock += 5000
+                continue
+            clock += r["gap_before_ms"]
+            for t, c in closed_set.simulate(r, closed_set.KEYCAT, t0=clock):
+                last = max(t, last)
+                obs_lines.append('{"type":"key","t":%d,"category":"%s","press":true}' % (last, c))
+            clock += r["steps"][-1]["at_ms"] + 2000
+        obs_path = os.path.join(tmp, "obs_cli.ndjson")
+        with open(obs_path, "wb") as f:
+            f.write(("\n".join(obs_lines) + "\n").encode("utf-8"))
+        common = ["--obs", obs_path, "--plan", plan_path, "--corpus", corpus_path, "--recipes", recipes_json,
+                  "--config", cli_cfg_path, "--K", "5,20", "--seed", "3", "--bootstrap", "30"]
+        reg_path = os.path.join(tmp, "registered.json")
+        sink = io.StringIO()
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            rc_reg = closed_set.main(common + ["--features", ",".join(CONTROLS), "--out", reg_path])
+        check("command line: closed_set.py writes the registered file of the synthetic cell", rc_reg == 0,
+              sink.getvalue()[-300:])
+
+        def cli(registered, out, extra=()):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                rc = main(common[:-4] + list(extra or ["--seed", "3", "--bootstrap", "30"])
+                          + ["--registered", registered, "--out", out])
+            return rc, buf.getvalue()
+
+        out_ok = os.path.join(tmp, "posthoc.json")
+        rc, msg = cli(reg_path, out_ok)
+        ok_doc = None
+        if rc == 0 and os.path.isfile(out_ok):
+            with open(out_ok, "rb") as f:
+                ok_doc = json.loads(f.read().decode("utf-8"))
+        check("command line: a run against its registered file exits 0 and writes the two sets at every K",
+              rc == 0 and ok_doc is not None and ok_doc["registered_check"]["result"] == "identical"
+              and sorted(ok_doc["results"]) == ["20", "5"]
+              and all(sorted(ok_doc["results"][k]) == sorted(NEW_SETS) for k in ok_doc["results"]), msg[-300:])
+        with open(reg_path, "rb") as f:
+            reg_doc = json.loads(f.read().decode("utf-8"))
+
+        def write_json(name, doc):
+            p = os.path.join(tmp, name)
+            with open(p, "wb") as f:
+                f.write(json.dumps(doc).encode("utf-8"))
+            return p
+        tampered = json.loads(json.dumps(reg_doc))
+        tampered["results"]["5"]["counts_only"]["mean_rank"] += 0.5
+        for name, reg_p, extra in (
+                ("a changed registered value", write_json("tampered.json", tampered), None),
+                ("another seed", reg_path, ["--seed", "4", "--bootstrap", "30"]),
+                ("a registered file that is not an object", write_json("list.json", []), None),
+                ("a registered file whose features are not an object",
+                 write_json("features.json", dict(reg_doc, features=[])), None)):
+            out_bad = os.path.join(tmp, "bad.json")
+            rc, msg = cli(reg_p, out_bad, extra)
+            check("command line: %s exits 2 and writes nothing" % name, rc == 2 and not os.path.exists(out_bad),
+                  "%r %s" % (rc, msg[-200:]))
+        out_kept = os.path.join(tmp, "kept.json")
+        with open(out_kept, "wb") as f:
+            f.write(b"kept\n")
+        rc, msg = cli(reg_path, out_kept)
+        with open(out_kept, "rb") as f:
+            kept = f.read()
+        check("command line: an existing --out exits 2 and is left as it was", rc == 2 and kept == b"kept\n",
+              "%r %r" % (rc, kept))
 
     for f in fails:
         print("FAIL: " + f)
@@ -525,6 +620,11 @@ def main(argv):
             f.write(render(result))
     except (ValueError, OSError) as e:
         print("explore_run_lengths.py: %s" % e, file=sys.stderr)
+        return 2
+    except (KeyError, TypeError, AttributeError) as e:
+        # A result file or plan of another shape: stop the same way, before anything is written.
+        print("explore_run_lengths.py: an input does not have the expected structure (%s: %s)" % (
+            type(e).__name__, e), file=sys.stderr)
         return 2
     print("exploratory closed set: no_time and counts_only reproduce the registered file at K = %s; written to %s" % (
         ",".join(str(k) for k in Ks), args.out))

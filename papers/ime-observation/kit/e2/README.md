@@ -343,6 +343,11 @@ python3 explore_run_lengths.py --obs <run>/obs.jsonl --plan <run>/plan.jsonl --c
 python3 explore_run_lengths.py --selftest
 ```
 
+The procedure file must be the one the plan was built from: for the macOS cells, that of their freezing tag
+(`git show ime-observation-prereg-macos:kit/gen/<procedure file>`, see `../../experiment/data.md`); the run stops when
+the SHA-256 that the plan records differs. The registered runs did not use `--ime-toggle-in-obs`, which this script
+does not offer.
+
 The output (`e2-closed-posthoc/1`) holds, per K, the values of the two sets in the shape of the registered result file,
 the SHA-256 of the inputs and of the code, and the result of the comparison. The registered values and recommendation
 are not changed; the near-chance rule above is applied to the two sets as an exploratory judgement.

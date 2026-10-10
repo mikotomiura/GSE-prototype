@@ -75,7 +75,9 @@ dropped as well. Both keep the order of the tokens. The predicted logs, the dist
 tie-breaking of each trial, the values of $K$ and the intervals were those of the registered attack, and every run also
 computed \texttt{no\_time} and \texttt{counts\_only} and stopped unless they equalled the registered results. As
 \texttt{all\_runs\_unit} can be derived from \texttt{letter\_runs\_unit}, the accuracy of \texttt{letter\_runs\_unit}
-is the larger of the two. The registered near-chance rule was applied to both sets as an exploratory judgement, from
+is the larger of the two. Both sets can also be derived from \texttt{no\_time} and \texttt{counts\_only}; at every $K$
+and in every cell they were less accurate than these, so the registered maxima, and every registered value, are
+unchanged. The registered near-chance rule was applied to both sets as an exploratory judgement, from
 the two macOS cells, with the Windows judgement as its qualification; it is reported next to the registered judgement
 and does not change the recommendation. The two sets, the rule and the place of the result in this article were fixed
 after all registered results had been seen and before the analysis was run, and a related measurement on single trials
@@ -120,8 +122,8 @@ applied to the planned numbers of trials, whose properties Table~\ref{tab:nearch
 that keep no time. With live conversion off, the accuracy of \texttt{no\_time} was
 \rv{macos-standard-live-off.q4.no_time.k10.acc} at $K = 10$ and \rv{macos-standard-live-off.q4.no_time.k100.acc} at
 $K = 100$; with it on, \rv{macos-standard-live-on.q4.no_time.k10.acc} and
-\rv{macos-standard-live-on.q4.no_time.k100.acc}. The accuracy of \texttt{counts\_only}, the maximum over that set and
-the set derived from it, was \rv{macos-standard-live-off.q4.counts_only.k10.acc} and
+\rv{macos-standard-live-on.q4.no_time.k100.acc}. The accuracy of \texttt{counts\_only}, the coarsest registered set,
+from which no other registered set is derived, was \rv{macos-standard-live-off.q4.counts_only.k10.acc} and
 \rv{macos-standard-live-off.q4.counts_only.k100.acc} with live conversion off and
 \rv{macos-standard-live-on.q4.counts_only.k10.acc} and \rv{macos-standard-live-on.q4.counts_only.k100.acc} with it on.
 In both macOS cells the upper end of every one of these Wilson intervals lies above $2/K$, so neither set is near chance
