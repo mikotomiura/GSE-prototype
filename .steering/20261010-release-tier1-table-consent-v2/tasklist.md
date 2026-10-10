@@ -25,7 +25,7 @@
 - [x] 同意文 v2 の草案と ADR-039 に反映する
 - [x] レビュー 1 巡目（Claude ∥ Codex）→ 判断 8 を聞いて全部直した
 - [x] レビュー 2 巡目（Claude ∥ Codex）→ 判断 9 を聞いて直した
-- [ ] push → PR → CI 緑 → merge
+- [x] push → PR #345 → CI（Windows は 30 分の時間切れで 1 回回し直し）緑 → merge `b34b069c` → main の run 38067873907（発火を確認）
 - [x] 研究者本人の G1 の書き写しでの試しの計算の引き継ぎ（`.steering/_handoff/next-session-g1-copy-self-trial.md`）
 - [ ] これから募集する G1 の参加者向けの「復元できません」の文言の直し（別タスク・未起票）
-- [ ] issue #333 にコメント
+- [x] issue #333 にコメント（#issuecomment-6099705877）
