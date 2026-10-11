@@ -130,6 +130,39 @@ def test_end_to_end(cfg):
         check(p1 == p2, "run_task is deterministic")
 
 
+def test_explore_align():
+    import functools
+    import explore_align
+    from align import ORDER
+
+    def brute(x, c, lam):
+        @functools.lru_cache(None)
+        def f(i, j):
+            if i == 0 and j == 0:
+                return 0
+            best = None
+            for p, q in ORDER:
+                if i - p < 0 or j - q < 0:
+                    continue
+                prev = f(i - p, j - q)
+                if prev is None:
+                    continue
+                v = prev + abs(sum(x[i - p:i]) - sum(c[j - q:j])) + lam * (p - 1 + q - 1)
+                best = v if best is None or v < best else best
+            return best
+        return f(len(x), len(c))
+
+    rng = np.random.default_rng(3)
+    for k in (1, 2, 3, 5, 8):
+        x = rng.integers(-2, 40, size=k)
+        C = rng.integers(0, 40, size=(6, k))
+        got = explore_align.align_cost(x, C, 8)
+        want = [brute(tuple(int(v) for v in x), tuple(int(v) for v in row), 8) for row in C]
+        check(list(int(v) for v in got) == want, "align_cost equals the brute force (k=%d)" % k)
+    check(int(explore_align.align_cost(np.array([10, 8, 12, 30]), np.array([[10, 20, 30, 7]]), 8)[0]) == 8 + (7 + 8),  # 2:1 then 1:2 (both windows are used to the end); 1:1 throughout costs 53
+          "align_cost: an inserted boundary costs 8 instead of shifting every later segment")
+
+
 def main():
     cfg = load_config()
     check_inputs(cfg)
@@ -138,6 +171,7 @@ def main():
     test_align()
     test_processing()
     test_end_to_end(cfg)
+    test_explore_align()
     if FAILS:
         print("selftest: %d failures" % len(FAILS))
         return 1

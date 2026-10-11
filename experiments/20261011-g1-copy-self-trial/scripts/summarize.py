@@ -37,6 +37,7 @@ def main(argv):
     ap.add_argument("--matching", required=True)
     ap.add_argument("--corpus-stats", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--explore", default=None, help="results/explore_align.json (post-hoc; notes.md 逸脱 3)")
     a = ap.parse_args(argv)
     cfg = load_config()
     cc = read_json(a.crosscheck)["blocks"]
@@ -145,6 +146,25 @@ def main(argv):
     w("")
     w("陰性対照の ( ) は窓のあるブロックの数。")
     w("")
+    if a.explore:
+        ex = read_json(a.explore)
+        ec = {(c["variant"], c["k"], c["N"]): c for c in ex["cells"]}
+        w("## 5. 事後の探索: 区切りの乱れと、それを許す攻撃者（事前の固定に無い・notes.md 逸脱 3）")
+        w("")
+        w("1 窓あたり %d 回の抽選（本計算と同じ種の最初の %d 回）。L_align は区間の結合と分割を許す揃えの費用で比べる。"
+          "「乱れなし」は、ブロック全体の揃えで 1 対 1 でない組（区切りの挿入・欠落）の区間を含まない窓（4 ブロックの窓をまとめた割合）。"
+          % (ex["draws_per_window"], ex["draws_per_window"]))
+        w("")
+        w("| N | k | L_none 全体 | L_align 全体 | 乱れなしの窓 | L_none（乱れなし） | 乱れありの窓 | L_none（乱れあり） | L_align（乱れあり） |")
+        w("|---|---|---|---|---|---|---|---|---|")
+        for N in sorted({c["N"] for c in ex["cells"]}):
+            for k in ks:
+                n, al = ec[("L_none", k, N)], ec[("L_align", k, N)]
+                sc, si = n["split_pooled_windows"]["clean"], n["split_pooled_windows"]["irregular"]
+                w("| %d | %d | %s | %s | %d | %s | %d | %s | %s |" % (N, k, pct(n["overall"]), pct(al["overall"]), sc["windows"],
+                  pct(sc["acc_pooled"]), si["windows"], pct(si["acc_pooled"]),
+                  pct(al["split_pooled_windows"]["irregular"]["acc_pooled"])))
+        w("")
     with open(a.out, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(L))
     print("summarize: %s" % a.out)

@@ -51,9 +51,12 @@ main() {
   echo "== 照合と診断 =="
   run scripts/matching.py --work "$G1_WORK" --copy results/copy_segments.json --corpus raw/corpus_g1.json \
     --corpus-stats results/corpus_g1_stats.json --out results/matching.json --processes "$PROCS"
+  echo "== 事後の探索（区切りの乱れを許す攻撃者・notes.md 逸脱 3）=="
+  run scripts/explore_align.py --work "$G1_WORK" --copy results/copy_segments.json --corpus raw/corpus_g1.json \
+    --corpus-stats results/corpus_g1_stats.json --out results/explore_align.json --processes "$PROCS"
   echo "== 表 =="
   run scripts/summarize.py --crosscheck results/crosscheck.json --matching results/matching.json \
-    --corpus-stats results/corpus_g1_stats.json --out results/summary.md
+    --corpus-stats results/corpus_g1_stats.json --explore results/explore_align.json --out results/summary.md
 }
 
 case "${1:-all}" in

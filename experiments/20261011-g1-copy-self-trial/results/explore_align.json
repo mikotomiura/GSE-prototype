@@ -1,0 +1,2164 @@
+{
+ "format": "g1-explore-align/1",
+ "draws_per_window": 10,
+ "seed": "20261011",
+ "corpus_sha256": "238f38c4b614f963c9b118cc96c24084d31cfb9e226ef3df3f5f5b64e3215d43",
+ "cells": [
+  {
+   "variant": "L_align",
+   "k": 1,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 23,
+     "acc": 0.23427536231884058,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.2783333333333333
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.025
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 26,
+     "acc": 0.18599816849816847,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.2132957393483709
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.11190476190476191
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 23,
+     "acc": 0.29417184265010354,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.3561027568922306
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 29,
+     "acc": 0.298132183908046,
+     "split": {
+      "clean": {
+       "windows": 24,
+       "acc": 0.3602430555555556
+      },
+      "irregular": {
+       "windows": 5,
+       "acc": 0.0
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 81,
+     "acc_pooled": 0.3055893592004703
+    },
+    "irregular": {
+     "windows": 20,
+     "acc_pooled": 0.04416666666666667
+    }
+   },
+   "overall": 0.25314438934378963,
+   "min": 0.18599816849816847,
+   "max": 0.298132183908046
+  },
+  {
+   "variant": "L_align",
+   "k": 1,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 23,
+     "acc": 0.02002162474429647,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.02423670363783257
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.0
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 26,
+     "acc": 0.020582452672294197,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.017683005411209606
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.02845238095238095
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 23,
+     "acc": 0.03310441749940087,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.04007376855190632
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 29,
+     "acc": 0.029474602537171032,
+     "split": {
+      "clean": {
+       "windows": 24,
+       "acc": 0.035615144732415
+      },
+      "irregular": {
+       "windows": 5,
+       "acc": 0.0
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 81,
+     "acc_pooled": 0.029785673432049155
+    },
+    "irregular": {
+     "windows": 20,
+     "acc_pooled": 0.009958333333333333
+    }
+   },
+   "overall": 0.02579577436329064,
+   "min": 0.02002162474429647,
+   "max": 0.03310441749940087
+  },
+  {
+   "variant": "L_align",
+   "k": 2,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 22,
+     "acc": 0.6143939393939394,
+     "split": {
+      "clean": {
+       "windows": 16,
+       "acc": 0.7770833333333333
+      },
+      "irregular": {
+       "windows": 6,
+       "acc": 0.18055555555555558
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 25,
+     "acc": 0.506,
+     "split": {
+      "clean": {
+       "windows": 15,
+       "acc": 0.7666666666666667
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.11499999999999999
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 22,
+     "acc": 0.6931818181818182,
+     "split": {
+      "clean": {
+       "windows": 16,
+       "acc": 0.953125
+      },
+      "irregular": {
+       "windows": 6,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 28,
+     "acc": 0.681547619047619,
+     "split": {
+      "clean": {
+       "windows": 21,
+       "acc": 0.8539682539682539
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.16428571428571428
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 68,
+     "acc_pooled": 0.839950980392157
+    },
+    "irregular": {
+     "windows": 29,
+     "acc_pooled": 0.11666666666666667
+    }
+   },
+   "overall": 0.6237808441558441,
+   "min": 0.506,
+   "max": 0.6931818181818182
+  },
+  {
+   "variant": "L_align",
+   "k": 2,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 22,
+     "acc": 0.3046969696969697,
+     "split": {
+      "clean": {
+       "windows": 16,
+       "acc": 0.41666666666666663
+      },
+      "irregular": {
+       "windows": 6,
+       "acc": 0.006111111111111111
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 25,
+     "acc": 0.29046666666666665,
+     "split": {
+      "clean": {
+       "windows": 15,
+       "acc": 0.42744444444444446
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.08499999999999999
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 22,
+     "acc": 0.5068181818181818,
+     "split": {
+      "clean": {
+       "windows": 16,
+       "acc": 0.696875
+      },
+      "irregular": {
+       "windows": 6,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 28,
+     "acc": 0.4251530612244898,
+     "split": {
+      "clean": {
+       "windows": 21,
+       "acc": 0.5638095238095238
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.009183673469387754
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 68,
+     "acc_pooled": 0.5304166666666665
+    },
+    "irregular": {
+     "windows": 29,
+     "acc_pooled": 0.032791461412151064
+    }
+   },
+   "overall": 0.381783719851577,
+   "min": 0.29046666666666665,
+   "max": 0.5068181818181818
+  },
+  {
+   "variant": "L_align",
+   "k": 3,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 21,
+     "acc": 0.6452380952380953,
+     "split": {
+      "clean": {
+       "windows": 14,
+       "acc": 0.8964285714285715
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.14285714285714285
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 24,
+     "acc": 0.5291666666666667,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 0.9333333333333332
+      },
+      "irregular": {
+       "windows": 12,
+       "acc": 0.125
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 21,
+     "acc": 0.7039682539682539,
+     "split": {
+      "clean": {
+       "windows": 14,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.11190476190476192
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 27,
+     "acc": 0.7240740740740741,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.9868421052631579
+      },
+      "irregular": {
+       "windows": 8,
+       "acc": 0.1
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 59,
+     "acc_pooled": 0.9576271186440678
+    },
+    "irregular": {
+     "windows": 34,
+     "acc_pooled": 0.12009803921568626
+    }
+   },
+   "overall": 0.6506117724867725,
+   "min": 0.5291666666666667,
+   "max": 0.7240740740740741
+  },
+  {
+   "variant": "L_align",
+   "k": 3,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 21,
+     "acc": 0.5515873015873016,
+     "split": {
+      "clean": {
+       "windows": 14,
+       "acc": 0.7702380952380953
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.1142857142857143
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 24,
+     "acc": 0.42291666666666666,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 0.8208333333333333
+      },
+      "irregular": {
+       "windows": 12,
+       "acc": 0.024999999999999998
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 21,
+     "acc": 0.6523809523809524,
+     "split": {
+      "clean": {
+       "windows": 14,
+       "acc": 0.9785714285714285
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 27,
+     "acc": 0.6368518518518519,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.8997368421052631
+      },
+      "irregular": {
+       "windows": 8,
+       "acc": 0.0125
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 59,
+     "acc_pooled": 0.8716666666666666
+    },
+    "irregular": {
+     "windows": 34,
+     "acc_pooled": 0.03529411764705883
+    }
+   },
+   "overall": 0.5659341931216931,
+   "min": 0.42291666666666666,
+   "max": 0.6523809523809524
+  },
+  {
+   "variant": "L_align",
+   "k": 5,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 19,
+     "acc": 0.6763157894736842,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.12142857142857143
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 22,
+     "acc": 0.5545454545454546,
+     "split": {
+      "clean": {
+       "windows": 8,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.3
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 19,
+     "acc": 0.7578947368421053,
+     "split": {
+      "clean": {
+       "windows": 10,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 9,
+       "acc": 0.48888888888888893
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 25,
+     "acc": 0.662,
+     "split": {
+      "clean": {
+       "windows": 15,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.155
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 45,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 40,
+     "acc_pooled": 0.275
+    }
+   },
+   "overall": 0.662688995215311,
+   "min": 0.5545454545454546,
+   "max": 0.7578947368421053
+  },
+  {
+   "variant": "L_align",
+   "k": 5,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 19,
+     "acc": 0.6228070175438597,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 0.9402777777777778
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.07857142857142858
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 22,
+     "acc": 0.49318181818181817,
+     "split": {
+      "clean": {
+       "windows": 8,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.20357142857142857
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 19,
+     "acc": 0.6447368421052632,
+     "split": {
+      "clean": {
+       "windows": 10,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 9,
+       "acc": 0.25
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 25,
+     "acc": 0.64,
+     "split": {
+      "clean": {
+       "windows": 15,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.1
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 45,
+     "acc_pooled": 0.984074074074074
+    },
+    "irregular": {
+     "windows": 40,
+     "acc_pooled": 0.16625
+    }
+   },
+   "overall": 0.6001814194577353,
+   "min": 0.49318181818181817,
+   "max": 0.6447368421052632
+  },
+  {
+   "variant": "L_align",
+   "k": 8,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 16,
+     "acc": 0.7375,
+     "split": {
+      "clean": {
+       "windows": 9,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.39999999999999997
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 19,
+     "acc": 0.6973684210526315,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.5892857142857143
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 16,
+     "acc": 0.7125,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 11,
+       "acc": 0.5818181818181819
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 22,
+     "acc": 0.7106060606060606,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.36333333333333334
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 31,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 42,
+     "acc_pooled": 0.5019841269841271
+    }
+   },
+   "overall": 0.714493620414673,
+   "min": 0.6973684210526315,
+   "max": 0.7375
+  },
+  {
+   "variant": "L_align",
+   "k": 8,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 16,
+     "acc": 0.7020833333333333,
+     "split": {
+      "clean": {
+       "windows": 9,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.3190476190476191
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 19,
+     "acc": 0.5815789473684211,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.4321428571428571
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 16,
+     "acc": 0.59375,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 11,
+       "acc": 0.4090909090909091
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 22,
+     "acc": 0.6378787878787878,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.2033333333333333
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 31,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 42,
+     "acc_pooled": 0.35277777777777775
+    }
+   },
+   "overall": 0.6288227671451355,
+   "min": 0.5815789473684211,
+   "max": 0.7020833333333333
+  },
+  {
+   "variant": "L_align",
+   "k": 12,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 12,
+     "acc": 0.6958333333333333,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.4785714285714286
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 15,
+     "acc": 0.9866666666666667,
+     "split": {
+      "clean": {
+       "windows": 1,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.9857142857142858
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 12,
+     "acc": 0.7999999999999999,
+     "split": {
+      "clean": {
+       "windows": 1,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 11,
+       "acc": 0.7818181818181817
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 18,
+     "acc": 0.9611111111111111,
+     "split": {
+      "clean": {
+       "windows": 8,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.93
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 15,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 42,
+     "acc_pooled": 0.8345238095238094
+    }
+   },
+   "overall": 0.8609027777777778,
+   "min": 0.6958333333333333,
+   "max": 0.9866666666666667
+  },
+  {
+   "variant": "L_align",
+   "k": 12,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 12,
+     "acc": 0.5833333333333334,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.2857142857142857
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 15,
+     "acc": 0.9233333333333333,
+     "split": {
+      "clean": {
+       "windows": 1,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.9178571428571428
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 12,
+     "acc": 0.686111111111111,
+     "split": {
+      "clean": {
+       "windows": 1,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 11,
+       "acc": 0.6575757575757576
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 18,
+     "acc": 0.8416666666666667,
+     "split": {
+      "clean": {
+       "windows": 8,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.7150000000000001
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 15,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 42,
+     "acc_pooled": 0.696031746031746
+    }
+   },
+   "overall": 0.7586111111111111,
+   "min": 0.5833333333333334,
+   "max": 0.9233333333333333
+  },
+  {
+   "variant": "L_align",
+   "k": 20,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 4,
+     "acc": 1.0,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 1.0
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 7,
+     "acc": 1.0,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 1.0
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 4,
+     "acc": 1.0,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 1.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 10,
+     "acc": 1.0,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 1.0
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 0,
+     "acc_pooled": null
+    },
+    "irregular": {
+     "windows": 25,
+     "acc_pooled": 1.0
+    }
+   },
+   "overall": 1.0,
+   "min": 1.0,
+   "max": 1.0
+  },
+  {
+   "variant": "L_align",
+   "k": 20,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 4,
+     "acc": 0.875,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.875
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 7,
+     "acc": 1.0,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 1.0
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 4,
+     "acc": 1.0,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 1.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 10,
+     "acc": 1.0,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 1.0
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 0,
+     "acc_pooled": null
+    },
+    "irregular": {
+     "windows": 25,
+     "acc_pooled": 0.98
+    }
+   },
+   "overall": 0.96875,
+   "min": 0.875,
+   "max": 1.0
+  },
+  {
+   "variant": "L_none",
+   "k": 1,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 23,
+     "acc": 0.23427536231884058,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.2783333333333333
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.025
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 26,
+     "acc": 0.18599816849816847,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.2132957393483709
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.11190476190476191
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 23,
+     "acc": 0.29417184265010354,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.3561027568922306
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 29,
+     "acc": 0.298132183908046,
+     "split": {
+      "clean": {
+       "windows": 24,
+       "acc": 0.3602430555555556
+      },
+      "irregular": {
+       "windows": 5,
+       "acc": 0.0
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 81,
+     "acc_pooled": 0.3055893592004703
+    },
+    "irregular": {
+     "windows": 20,
+     "acc_pooled": 0.04416666666666667
+    }
+   },
+   "overall": 0.25314438934378963,
+   "min": 0.18599816849816847,
+   "max": 0.298132183908046
+  },
+  {
+   "variant": "L_none",
+   "k": 1,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 23,
+     "acc": 0.02002162474429647,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.02423670363783257
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.0
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 26,
+     "acc": 0.020582452672294197,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.017683005411209606
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.02845238095238095
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 23,
+     "acc": 0.03310441749940087,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.04007376855190632
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 29,
+     "acc": 0.029474602537171032,
+     "split": {
+      "clean": {
+       "windows": 24,
+       "acc": 0.035615144732415
+      },
+      "irregular": {
+       "windows": 5,
+       "acc": 0.0
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 81,
+     "acc_pooled": 0.029785673432049155
+    },
+    "irregular": {
+     "windows": 20,
+     "acc_pooled": 0.009958333333333333
+    }
+   },
+   "overall": 0.02579577436329064,
+   "min": 0.02002162474429647,
+   "max": 0.03310441749940087
+  },
+  {
+   "variant": "L_none",
+   "k": 2,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 22,
+     "acc": 0.6143939393939394,
+     "split": {
+      "clean": {
+       "windows": 16,
+       "acc": 0.7770833333333333
+      },
+      "irregular": {
+       "windows": 6,
+       "acc": 0.18055555555555558
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 25,
+     "acc": 0.506,
+     "split": {
+      "clean": {
+       "windows": 15,
+       "acc": 0.7666666666666667
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.11499999999999999
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 22,
+     "acc": 0.6931818181818182,
+     "split": {
+      "clean": {
+       "windows": 16,
+       "acc": 0.953125
+      },
+      "irregular": {
+       "windows": 6,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 28,
+     "acc": 0.681547619047619,
+     "split": {
+      "clean": {
+       "windows": 21,
+       "acc": 0.8539682539682539
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.16428571428571428
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 68,
+     "acc_pooled": 0.839950980392157
+    },
+    "irregular": {
+     "windows": 29,
+     "acc_pooled": 0.11666666666666667
+    }
+   },
+   "overall": 0.6237808441558441,
+   "min": 0.506,
+   "max": 0.6931818181818182
+  },
+  {
+   "variant": "L_none",
+   "k": 2,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 22,
+     "acc": 0.3046969696969697,
+     "split": {
+      "clean": {
+       "windows": 16,
+       "acc": 0.41666666666666663
+      },
+      "irregular": {
+       "windows": 6,
+       "acc": 0.006111111111111111
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 25,
+     "acc": 0.29046666666666665,
+     "split": {
+      "clean": {
+       "windows": 15,
+       "acc": 0.42744444444444446
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.08499999999999999
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 22,
+     "acc": 0.5068181818181818,
+     "split": {
+      "clean": {
+       "windows": 16,
+       "acc": 0.696875
+      },
+      "irregular": {
+       "windows": 6,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 28,
+     "acc": 0.4251530612244898,
+     "split": {
+      "clean": {
+       "windows": 21,
+       "acc": 0.5638095238095238
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.009183673469387754
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 68,
+     "acc_pooled": 0.5304166666666665
+    },
+    "irregular": {
+     "windows": 29,
+     "acc_pooled": 0.032791461412151064
+    }
+   },
+   "overall": 0.381783719851577,
+   "min": 0.29046666666666665,
+   "max": 0.5068181818181818
+  },
+  {
+   "variant": "L_none",
+   "k": 3,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 21,
+     "acc": 0.6523809523809524,
+     "split": {
+      "clean": {
+       "windows": 14,
+       "acc": 0.8964285714285715
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.16428571428571428
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 24,
+     "acc": 0.5270833333333333,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 0.9333333333333332
+      },
+      "irregular": {
+       "windows": 12,
+       "acc": 0.12083333333333333
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 21,
+     "acc": 0.7047619047619048,
+     "split": {
+      "clean": {
+       "windows": 14,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.1142857142857143
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 27,
+     "acc": 0.7240740740740741,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.9868421052631579
+      },
+      "irregular": {
+       "windows": 8,
+       "acc": 0.1
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 59,
+     "acc_pooled": 0.9576271186440678
+    },
+    "irregular": {
+     "windows": 34,
+     "acc_pooled": 0.12352941176470586
+    }
+   },
+   "overall": 0.6520750661375662,
+   "min": 0.5270833333333333,
+   "max": 0.7240740740740741
+  },
+  {
+   "variant": "L_none",
+   "k": 3,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 21,
+     "acc": 0.5515873015873016,
+     "split": {
+      "clean": {
+       "windows": 14,
+       "acc": 0.7702380952380953
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.1142857142857143
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 24,
+     "acc": 0.42291666666666666,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 0.8208333333333333
+      },
+      "irregular": {
+       "windows": 12,
+       "acc": 0.024999999999999998
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 21,
+     "acc": 0.6523809523809524,
+     "split": {
+      "clean": {
+       "windows": 14,
+       "acc": 0.9785714285714285
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.0
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 27,
+     "acc": 0.6368518518518519,
+     "split": {
+      "clean": {
+       "windows": 19,
+       "acc": 0.8997368421052631
+      },
+      "irregular": {
+       "windows": 8,
+       "acc": 0.0125
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 59,
+     "acc_pooled": 0.8716666666666666
+    },
+    "irregular": {
+     "windows": 34,
+     "acc_pooled": 0.03529411764705883
+    }
+   },
+   "overall": 0.5659341931216931,
+   "min": 0.42291666666666666,
+   "max": 0.6523809523809524
+  },
+  {
+   "variant": "L_none",
+   "k": 5,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 19,
+     "acc": 0.6973684210526315,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.17857142857142858
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 22,
+     "acc": 0.4318181818181818,
+     "split": {
+      "clean": {
+       "windows": 8,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.10714285714285714
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 19,
+     "acc": 0.7736842105263158,
+     "split": {
+      "clean": {
+       "windows": 10,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 9,
+       "acc": 0.5222222222222223
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 25,
+     "acc": 0.6779999999999999,
+     "split": {
+      "clean": {
+       "windows": 15,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.195
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 45,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 40,
+     "acc_pooled": 0.23500000000000001
+    }
+   },
+   "overall": 0.6452177033492823,
+   "min": 0.4318181818181818,
+   "max": 0.7736842105263158
+  },
+  {
+   "variant": "L_none",
+   "k": 5,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 19,
+     "acc": 0.6228070175438597,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 0.9402777777777778
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.07857142857142858
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 22,
+     "acc": 0.3909090909090909,
+     "split": {
+      "clean": {
+       "windows": 8,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.04285714285714286
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 19,
+     "acc": 0.6921052631578948,
+     "split": {
+      "clean": {
+       "windows": 10,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 9,
+       "acc": 0.35
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 25,
+     "acc": 0.64,
+     "split": {
+      "clean": {
+       "windows": 15,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.1
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 45,
+     "acc_pooled": 0.984074074074074
+    },
+    "irregular": {
+     "windows": 40,
+     "acc_pooled": 0.1325
+    }
+   },
+   "overall": 0.5864553429027113,
+   "min": 0.3909090909090909,
+   "max": 0.6921052631578948
+  },
+  {
+   "variant": "L_none",
+   "k": 8,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 16,
+     "acc": 0.671875,
+     "split": {
+      "clean": {
+       "windows": 9,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.25
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 19,
+     "acc": 0.45789473684210524,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.2642857142857143
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 16,
+     "acc": 0.70625,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 11,
+       "acc": 0.5727272727272728
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 22,
+     "acc": 0.7431818181818183,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.43499999999999994
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 31,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 42,
+     "acc_pooled": 0.38333333333333336
+    }
+   },
+   "overall": 0.6448003887559809,
+   "min": 0.45789473684210524,
+   "max": 0.7431818181818183
+  },
+  {
+   "variant": "L_none",
+   "k": 8,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 16,
+     "acc": 0.625,
+     "split": {
+      "clean": {
+       "windows": 9,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.14285714285714285
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 19,
+     "acc": 0.32105263157894737,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.07857142857142858
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 16,
+     "acc": 0.603125,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 11,
+       "acc": 0.4227272727272728
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 22,
+     "acc": 0.6454545454545454,
+     "split": {
+      "clean": {
+       "windows": 12,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.22000000000000003
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 31,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 42,
+     "acc_pooled": 0.2130952380952381
+    }
+   },
+   "overall": 0.5486580442583732,
+   "min": 0.32105263157894737,
+   "max": 0.6454545454545454
+  },
+  {
+   "variant": "L_none",
+   "k": 12,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 12,
+     "acc": 0.5916666666666667,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.3
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 15,
+     "acc": 0.6666666666666666,
+     "split": {
+      "clean": {
+       "windows": 1,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.6428571428571429
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 12,
+     "acc": 0.4916666666666667,
+     "split": {
+      "clean": {
+       "windows": 1,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 11,
+       "acc": 0.4454545454545455
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 18,
+     "acc": 0.8388888888888889,
+     "split": {
+      "clean": {
+       "windows": 8,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.71
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 15,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 42,
+     "acc_pooled": 0.55
+    }
+   },
+   "overall": 0.6472222222222223,
+   "min": 0.4916666666666667,
+   "max": 0.8388888888888889
+  },
+  {
+   "variant": "L_none",
+   "k": 12,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 12,
+     "acc": 0.5083333333333333,
+     "split": {
+      "clean": {
+       "windows": 5,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.15714285714285717
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 15,
+     "acc": 0.5066666666666666,
+     "split": {
+      "clean": {
+       "windows": 1,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 14,
+       "acc": 0.4714285714285714
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 12,
+     "acc": 0.4166666666666667,
+     "split": {
+      "clean": {
+       "windows": 1,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 11,
+       "acc": 0.36363636363636365
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 18,
+     "acc": 0.8222222222222223,
+     "split": {
+      "clean": {
+       "windows": 8,
+       "acc": 1.0
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.6799999999999999
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 15,
+     "acc_pooled": 1.0
+    },
+    "irregular": {
+     "windows": 42,
+     "acc_pooled": 0.44047619047619047
+    }
+   },
+   "overall": 0.5634722222222223,
+   "min": 0.4166666666666667,
+   "max": 0.8222222222222223
+  },
+  {
+   "variant": "L_none",
+   "k": 20,
+   "N": 100,
+   "chance": 0.01,
+   "blocks": {
+    "P009_block01": {
+     "windows": 4,
+     "acc": 0.0,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.0
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 7,
+     "acc": 0.8571428571428571,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.8571428571428571
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 4,
+     "acc": 0.375,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.375
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 10,
+     "acc": 0.8,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.8
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 0,
+     "acc_pooled": null
+    },
+    "irregular": {
+     "windows": 25,
+     "acc_pooled": 0.62
+    }
+   },
+   "overall": 0.5080357142857143,
+   "min": 0.0,
+   "max": 0.8571428571428571
+  },
+  {
+   "variant": "L_none",
+   "k": 20,
+   "N": 1000,
+   "chance": 0.001,
+   "blocks": {
+    "P009_block01": {
+     "windows": 4,
+     "acc": 0.0,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.0
+      }
+     }
+    },
+    "P009_block10": {
+     "windows": 7,
+     "acc": 0.7142857142857143,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 7,
+       "acc": 0.7142857142857143
+      }
+     }
+    },
+    "P010_block01": {
+     "windows": 4,
+     "acc": 0.075,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 4,
+       "acc": 0.075
+      }
+     }
+    },
+    "P010_block10": {
+     "windows": 10,
+     "acc": 0.8,
+     "split": {
+      "clean": {
+       "windows": 0,
+       "acc": null
+      },
+      "irregular": {
+       "windows": 10,
+       "acc": 0.8
+      }
+     }
+    }
+   },
+   "split_pooled_windows": {
+    "clean": {
+     "windows": 0,
+     "acc_pooled": null
+    },
+    "irregular": {
+     "windows": 25,
+     "acc_pooled": 0.532
+    }
+   },
+   "overall": 0.3973214285714286,
+   "min": 0.0,
+   "max": 0.8
+  }
+ ]
+}

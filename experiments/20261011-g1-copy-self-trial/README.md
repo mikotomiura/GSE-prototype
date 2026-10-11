@@ -30,4 +30,5 @@ G1_RECORDS=<復号した NDJSON> G1_WORK=<repo の外> ZIPS=<前の実測の raw
 | `scripts/crosscheck.py` | 照らし合わせ（集計を `results/crosscheck.json`、揃えの詳細を `G1_WORK`） |
 | `scripts/matching.py` | 照合・加工・診断 |
 | `scripts/summarize.py` | 表 |
+| `scripts/explore_align.py` | 事後の探索（区切りの乱れを許す攻撃者・notes.md 逸脱 3） |
 | `scripts/selftest.py` | 自己検査（記録を読まない） |
