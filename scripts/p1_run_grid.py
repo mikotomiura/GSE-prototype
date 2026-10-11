@@ -11,7 +11,7 @@
 - 出力: `<out>/<config_id>/<P-ID>/<session>/{baseline,pointer_b,modifier_m_plus}.json` (`p1_features_io` のレイアウトと同じ形)
   と `<out>/grid_manifest.json`。
 - ★ 長いセッションは release で: `GSE_REPLAY_BIN=src-tauri/target/release/gse-replay python scripts/p1_run_grid.py ...`
-  (`cargo run` は 1 呼び出しごとに起動するので、32 一式 × 3 極 × セッション数だけ遅い)。
+  (`cargo run` は 1 呼び出しごとに起動するので、33 一式 × 3 極 × セッション数だけ遅い)。
 
 ## ★ 格子 (`build_grid`)
 
@@ -19,12 +19,12 @@
 
 - 選択 (`role == "selection"`): そのキーの直積 (凍結 JSON では `q` × `hole_gap_ms` × `t1a_window_ms` = 27)。
   ID 例: `sel__q=0.995__hole_gap_ms=3000__t1a_window_ms=15000`。
-- 感度 (`role == "sensitivity_only"`): キーを 1 つずつ、運用値以外の値へ振る (他は運用値。凍結 JSON 1.1.0 では `w_ms` / `b_ms` / `idle_trim_max_ms` で 5 実行・事前宣言 v1.2 §6.3)。
+- 感度 (`role == "sensitivity_only"`): キーを 1 つずつ、運用値以外の値へ振る (他は運用値。凍結 JSON 1.2.0 では `w_ms` / `b_ms` / `idle_trim_max_ms` / `idle_trim_input_gap_ms` で 6 実行・事前宣言 v1.2 §6.3・v1.3 §7.3)。
   **Cartesian に組まない。** ID 例: `ofat__w_ms=15000`。
 - ⚠️★★★ **`warmup_count` は `q` の従属変数**。全一式に `q` と `warmup_count` を**対で** `--set` する (v1.1 冒頭 (5)・判断 7:
   CLI は連動しない)。⚠️ 判定は浮動小数点の式ではなく**対応表** `WARMUP_BY_Q` で行う
   (倍精度では `⌈1/(1−q)⌉` が `q` によって 1 ずれうる)。表に無い `q` が `search_space` にあれば格子を作らない (exit 3)。
-- 全一式に 7 キー (`w_ms` / `q` / `b_ms` / `hole_gap_ms` / `warmup_count` / `t1a_window_ms` / `idle_trim_max_ms`) を**明示的に** `--set` する
+- 全一式に 8 キー (`w_ms` / `q` / `b_ms` / `hole_gap_ms` / `warmup_count` / `t1a_window_ms` / `idle_trim_max_ms` / `idle_trim_input_gap_ms`) を**明示的に** `--set` する
   (⚠️ 凍結値と同じキーは封筒の `overrides` に載らないだけ。意図を `config` の値で照合するため、運用値も渡す)。
 
 ## ⚠️★★★ 規則 (d) (`is_valid_search_run`)
@@ -41,7 +41,7 @@
 PG-1 の値 (一人あたり episode 数の下限) が宣言されるまで、探索を **1 度も回さない**。値は凍結 JSON の新版のキー
 `pg1.min_episodes_per_participant` (bool でない int・1 以上) を読む (判断 19)。⚠️ 無い・型や範囲が違えば **exit 6**
 (`gse-replay` を 1 度も呼ばない・出力先も作らない)。値を推測で埋めない。
-既定の読み先は `src-tauri/prereg/p1-episode.json` (★ 現行 1.1.0 にも無いので、既定では必ず exit 6)。テストは `--prereg` で差し替える。
+既定の読み先は `src-tauri/prereg/p1-episode.json` (★ 現行 1.2.0 にも無いので、既定では必ず exit 6)。テストは `--prereg` で差し替える。
 manifest には、どちらを使ったか (`frozen` = 既定 / `file` = `--prereg`) と、その JSON の sha256 の先頭 16 桁を刻む。
 
 ## ★ manifest は最後に確定する
@@ -102,11 +102,20 @@ MANIFEST_NAME = "grid_manifest.json"
 #   ⚠️ **コードに書き写してよい値はこれだけ** (探索空間の値は凍結 JSON から読む)。式を浮動小数点で評価しない。
 WARMUP_BY_Q = {Decimal("0.99"): 100, Decimal("0.995"): 200, Decimal("0.999"): 1000}
 
-# ★ `--set` で渡す 7 キー (`run-features-all-poles.sh` の白リストと同じ。凍結 JSON の並び順)
+# ★ `--set` で渡す 8 キー (`run-features-all-poles.sh` の白リストと同じ。凍結 JSON の並び順)
 #   `idle_trim_min_gap_ms` は固定 (振らない) なので渡さない (事前宣言 v1.2 §6.3)。
-TUNABLE_KEYS = ("w_ms", "q", "b_ms", "hole_gap_ms", "warmup_count", "t1a_window_ms", "idle_trim_max_ms")
-# 0 を許すキー (`idle_trim_max_ms=0` は前処理なしの実行・事前宣言 v1.2 §6.4)
-_ZERO_ALLOWED_KEYS = ("idle_trim_max_ms",)
+TUNABLE_KEYS = (
+    "w_ms",
+    "q",
+    "b_ms",
+    "hole_gap_ms",
+    "warmup_count",
+    "t1a_window_ms",
+    "idle_trim_max_ms",
+    "idle_trim_input_gap_ms",
+)
+# 0 を許すキー (`idle_trim_max_ms=0` / `idle_trim_input_gap_ms=0` は前処理なしの実行・事前宣言 v1.2 §6.4・v1.3 §7.4)
+_ZERO_ALLOWED_KEYS = ("idle_trim_max_ms", "idle_trim_input_gap_ms")
 # 探索の対象になれるキー (`warmup_count` は従属なので、単独では振らない)
 _SEARCHED_KEYS = tuple(key for key in TUNABLE_KEYS if key != "warmup_count")
 _ROLES = ("selection", "sensitivity_only", "derived", "fixed")

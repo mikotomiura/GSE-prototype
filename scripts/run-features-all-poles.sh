@@ -51,7 +51,7 @@
 #     ⚠️ 相対パスは**呼び出し元の cwd** から解決する。
 #   bash scripts/run-features-all-poles.sh <session.ndjson> <outdir> -- --set <key>=<value> [--set <key>=<value> ...]
 #     ★ `--` の後ろの `--set` の組を、3 極すべての `gse-replay --features` へそのまま渡す（issue 004・探索格子の実行器が使う）。
-#     ⚠️ 許すのは `--set <key>=<value>` の組**だけ**: key は w_ms / q / b_ms / hole_gap_ms / warmup_count / t1a_window_ms / idle_trim_max_ms、
+#     ⚠️ 許すのは `--set <key>=<value>` の組**だけ**: key は w_ms / q / b_ms / hole_gap_ms / warmup_count / t1a_window_ms / idle_trim_max_ms / idle_trim_input_gap_ms、
 #        value は ^[0-9]+(\.[0-9]+)?$。`--pole` / `--features` / `--feature-config`・知らない key・形の違う value・
 #        **同じ key の 2 回指定**・`--` の後ろが空、はすべて exit 2（★ 極は本スクリプトだけが決める・後勝ちで黙って通さない）。
 #     ⚠️ `--` が無い呼び出しの挙動は変えない。
@@ -110,8 +110,8 @@ if [ "$#" -gt 0 ]; then
     KEY="${KV%%=*}"
     VALUE="${KV#*=}"
     case "$KEY" in
-      w_ms|q|b_ms|hole_gap_ms|warmup_count|t1a_window_ms|idle_trim_max_ms) ;;
-      *) reject "'--set' の key '${KEY}' は許可されていない（許可: w_ms q b_ms hole_gap_ms warmup_count t1a_window_ms idle_trim_max_ms）" ;;
+      w_ms|q|b_ms|hole_gap_ms|warmup_count|t1a_window_ms|idle_trim_max_ms|idle_trim_input_gap_ms) ;;
+      *) reject "'--set' の key '${KEY}' は許可されていない（許可: w_ms q b_ms hole_gap_ms warmup_count t1a_window_ms idle_trim_max_ms idle_trim_input_gap_ms）" ;;
     esac
     [[ "$VALUE" =~ $SET_VALUE_RE ]] || reject "'--set ${KEY}' の値 '${VALUE}' が ^[0-9]+(\\.[0-9]+)?\$ の形ではない"
     case "$SEEN_KEYS" in
