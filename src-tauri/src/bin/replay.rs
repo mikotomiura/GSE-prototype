@@ -1163,6 +1163,12 @@ enum ReplayEvent {
     /// ⚠️ 読み飛ばし専用（同上）。
     #[serde(rename = "secure_input")]
     SecureInput(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。EH3 のその日の条件（記録のみ・推論へ流さない）。
+    #[serde(rename = "eh3_day")]
+    Eh3Day(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。EH3 の招待を出した時刻（記録のみ・推論へ流さない）。
+    #[serde(rename = "invitation_present")]
+    InvitationPresent(#[allow(dead_code)] serde_json::Value),
     /// ⚠️★★★ **O1 の監査 criterion**（ADR-031 D1）。★ 読み飛ばし専用。
     ///
     /// ⚠️★★★ **2026-09-14 に足し忘れて実測で踏んだ。**★ `activity_label` 行を 1 本足した
@@ -1270,6 +1276,9 @@ impl ReplayEvent {
             ReplayEvent::FocusTransition(_) => None,
             ReplayEvent::PointerBin(_) => None,
             ReplayEvent::SecureInput(_) => None,
+            // EH3 の 2 行種も記録のみで推論へ流さない。
+            ReplayEvent::Eh3Day(_) => None,
+            ReplayEvent::InvitationPresent(_) => None,
             // ⚠️★★★ 監査 criterion（ADR-031）。★ 記録のみで推論へ流さない。
             ReplayEvent::ActivityLabel(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
@@ -3999,6 +4008,9 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             | ReplayEvent::FocusTransition(_)
             | ReplayEvent::PointerBin(_)
             | ReplayEvent::SecureInput(_)
+            // EH3 の 2 行種も読み飛ばす。
+            | ReplayEvent::Eh3Day(_)
+            | ReplayEvent::InvitationPresent(_)
             // ⚠️★★★ 監査 criterion (ADR-031)。★ 記録のみで推論へ流さない。
             | ReplayEvent::ActivityLabel(_)
             | ReplayEvent::SessionMeta { .. }
@@ -6438,6 +6450,39 @@ not json\n";
         let _ = std::fs::remove_file(&tmp);
     }
 
+    /// EH3 の 2 行種は `run_replay` を落とさず、FeatSnapshot の列を変えない（記録のみ）。
+    #[test]
+    fn eh3_lines_are_skipped_by_run_replay() {
+        let lines = [
+            r#"{"type":"eh3_day","t":120000,"day":3,"condition":"a_none"}"#,
+            r#"{"type":"invitation_present","t":121000}"#,
+        ];
+        for line in lines {
+            let ev: ReplayEvent = serde_json::from_str(line).expect("parse eh3 line");
+            assert_eq!(ev.timestamp(), None, "{line} は時刻順ソートから除外する");
+        }
+        let baseline_src =
+            std::fs::read_to_string(fixture_path("minimal.ndjson")).expect("read minimal fixture");
+        let mut ndjson = baseline_src.clone();
+        for line in lines {
+            ndjson.push_str(line);
+            ndjson.push('\n');
+        }
+        let tmp = std::env::temp_dir().join(format!(
+            "gse_eh3_lines_replay_{}.ndjson",
+            std::process::id()
+        ));
+        std::fs::write(&tmp, &ndjson).expect("write temp fixture");
+        let with_lines = run_replay(&tmp).expect("run_replay must accept eh3 lines");
+        let baseline = run_replay(&fixture_path("minimal.ndjson")).expect("baseline replay");
+        assert_eq!(
+            serde_json::to_string(&with_lines).expect("ser"),
+            serde_json::to_string(&baseline).expect("ser"),
+            "EH3 の行は FeatSnapshot の列を 1 byte も変えてはならない"
+        );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
     /// ⚠️★★★ **3 度目を止める**: `KNOWN_LINE_TYPES` の全行種が `ReplayEvent` で受理できること。
     ///
     /// ★ `hook_health`（2026-08-09）と `activity_label`（2026-09-14）で **同じ失敗を 2 回**踏んだ。
@@ -6527,6 +6572,14 @@ not json\n";
                 r#"{"type":"pointer_bin","t":1,"moved":0,"buttons":0,"wheel":0}"#,
             ),
             ("secure_input", r#"{"type":"secure_input","t":1,"on":true}"#),
+            (
+                "eh3_day",
+                r#"{"type":"eh3_day","t":1,"day":1,"condition":"a_seed"}"#,
+            ),
+            (
+                "invitation_present",
+                r#"{"type":"invitation_present","t":1}"#,
+            ),
         ];
 
         // ★ (1) 代表行がすべて deserialize できること。

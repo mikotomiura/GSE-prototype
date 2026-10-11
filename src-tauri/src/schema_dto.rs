@@ -94,6 +94,22 @@ pub enum LogEntryDto {
         #[serde(skip_serializing_if = "Option::is_none")]
         #[schemars(regex(pattern = r"^[0-9a-f]{16}$"))]
         o1_install_id: Option<String>,
+        /// EH3（肖像と招待の参加者内比較）モードの引き金 (`"marker"` | `"env"`)。**start 形状のみ**。
+        ///
+        /// EH3 は O1 の収集の器に載せた層なので、EH3 のときは `o1_mode` も出る。O1 の記録と分けるのはこの
+        /// フィールドである（`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 3 #1・R-L5）。
+        /// EH3 実施時にしか出ない（通常運用 / G1 / O1 の NDJSON は従来と byte 単位で同一・R-L6）。
+        /// `Option` である（旧ログには無い・ADR-005）。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        eh3_mode: Option<String>,
+        /// 招待用の研究の条件（EH3 のときだけ出て、常に `true`）。**start 形状のみ**。
+        ///
+        /// `session_meta.intervention_enabled`（Nudge の研究の条件）とは別に持つ。EH3 では Nudge は出さず
+        /// 招待だけを出すので、条件を 2 つとも記録に残して取り違えを防ぐ（ADR-035 D1 の内側の制約 ④ を
+        /// 招待の条件として読む・`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 1 #1 = R-1 (i)）。
+        /// `Option` である（ADR-005）。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        invitation_enabled: Option<bool>,
         /// ★ アプリの版 (**粗い semver のみ**)。**start 形状のみ** (ADR-013 D1)。
         ///
         /// ⚠️ git SHA / ビルドホスト名 / ビルド時刻 / マシン GUID は
@@ -458,6 +474,46 @@ pub enum LogEntryDto {
         recall_window_end_ms: u64,
         t: u64,
     },
+    /// EH3 のその日の条件（`meta.eh3_mode` があるときだけ出る）。
+    ///
+    /// その日を稼働日として数えた時点（その日に打鍵を初めて観測した時点）に 1 回出す。すでに数えた日に
+    /// アプリが起動したときにも、起動の時点で 1 回出す。ある時刻の条件は、その時刻と同じ日（現地時刻の
+    /// 4:00 区切り）の `eh3_day` 行で読む。`day` は 1 始まりの稼働日の番号（1〜15）。期間の後の日には出さない。
+    ///
+    /// 記録しないもの（`.steering/20261011-portrait-eh3-prereg/implementation-requirements.md` R-L1・R-P9）:
+    /// 壁紙を書き込んだ時刻・復元の成否・「戻せない背景なので動かさない」。本人が肖像を止める・戻す・
+    /// 自分で替えると、その後の書き込みが無くなり、時刻の列から本人の操作が読めてしまうため（台帳 肖13）。
+    ///
+    /// 時刻キーは `t`（区間指定削除の対象に入る・ADR-031 D6）。
+    Eh3Day {
+        t: u64,
+        day: u32,
+        condition: Eh3ConditionDto,
+    },
+    /// EH3 の招待を出した時刻（理由を載せない）。`meta.eh3_mode` があるときだけ出る。
+    ///
+    /// 解除の時刻は記録しない（即時の解除から「本人が止めた」が読めるため）。時間切れの解除は、提示の時刻と
+    /// 閉じるまでの時間（定数）から決まる。本人が招待を止めた後に提示が出なくなることは、この行の列から
+    /// 避けがたく読めるので、ADR-035 D4 の条件（系の負担の兆候としてだけ・オフライン・本人に返さない）の
+    /// 中で扱い、同意文書に書く。
+    ///
+    /// 時刻キーは `t`。
+    InvitationPresent { t: u64 },
+}
+
+/// EH3 のその日の条件。NDJSON 文字列は "blank" / "decor" / "a_none" / "a_seed"。
+///
+/// 空（元の壁紙）・D（日替わりの地模様）・A（その回の形）の終わりの扱いが none か seed か。
+#[derive(Serialize, JsonSchema)]
+pub enum Eh3ConditionDto {
+    #[serde(rename = "blank")]
+    Blank,
+    #[serde(rename = "decor")]
+    Decor,
+    #[serde(rename = "a_none")]
+    PortraitNone,
+    #[serde(rename = "a_seed")]
+    PortraitSeed,
 }
 
 /// ★ 収集仕様の自己記述 (ADR-013 D1)。`meta`(session_start) 行にのみ現れる。

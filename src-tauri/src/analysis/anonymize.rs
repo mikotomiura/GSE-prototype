@@ -462,6 +462,23 @@ mod tests {
             "capabilities が落ちた: {o3}"
         );
 
+        // ⑤ EH3 の 2 行種: `t` だけが相対化され、欄は増えも減りもしない（passthrough のゲート）。
+        let day = r#"{"type":"eh3_day","t":1005000,"day":2,"condition":"a_seed"}"#;
+        let v: Value = serde_json::from_str(&anonymize_line(day, 1_000_000).unwrap()).unwrap();
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys.len(), 4, "eh3_day の欄が変わった: {keys:?}");
+        assert_eq!(v["t"], 5000);
+        assert_eq!(v["day"], 2);
+        assert_eq!(v["condition"], "a_seed");
+        let inv = r#"{"type":"invitation_present","t":1007000}"#;
+        let v: Value = serde_json::from_str(&anonymize_line(inv, 1_000_000).unwrap()).unwrap();
+        assert_eq!(
+            v.as_object().unwrap().len(),
+            2,
+            "invitation_present は type と t だけ"
+        );
+        assert_eq!(v["t"], 7000);
+
         // ④ O1 の導入識別子は**保たれる**（端末を分ける解析の鍵。乱数由来で個人を指さない）。
         let meta_o1 = r#"{"type":"meta","session_start":1000000,"hmm_version":"0.4.0","o1_mode":"marker","o1_install_id":"0123456789abcdef","app_version":"0.1.40"}"#;
         let o4 = anonymize_line(meta_o1, 1_000_000).unwrap();
