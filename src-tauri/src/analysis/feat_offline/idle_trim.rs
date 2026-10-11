@@ -131,12 +131,321 @@ pub fn idle_trim(
     (kept, summary)
 }
 
+/// 長い無入力の前処理 (P1 事前宣言 v1.3 §7・ADR-030 補訂 5・`.steering/20261011-o1-awake-idle-label/`)。
+///
+/// # なぜ要るか
+///
+/// O1 のアプリは宣言したタスクを自分では外さないので、PC が起きていれば、席を外していても
+/// `feat` 行が 1Hz で続く。[`idle_trim`] は `feat` 行の穴の直前しか見ないので、行が途切れない
+/// 「起きたままの無入力」は残る (2026-10-09〜11 の研究者の実走では、3 日間 `feat` 行の穴が 0 個で、
+/// 30 分以上の無入力が `feat` 行のある時間の約 7 割を占めた)。
+///
+/// # 規則 (研究者裁定 2026-10-11・判断 3〜6)
+///
+/// 1. 入力の時刻を並べ、最初の入力が `file_first` より後なら頭に `file_first` を、最後の入力が
+///    `file_last` より前なら末尾に `file_last` を置く (入力が無ければ 2 点だけ)。
+/// 2. 隣り合う 2 点 `a < b` の差が `min_input_gap_ms` **以上**なら、その間の行を落とす:
+///    - `a` が入力なら、`a` 以上で最初の `feat` 行 (`a` を含む秒の行) を残し、それより後を落とす。
+///      ⚠️ `a` が `feat` 行の穴の中やファイルの最初より前にあるときは、残る行は `a` を含まず、
+///      穴の後ろ (ファイルの最初) の行になる ([`idle_trim`] の `R` と同じ規約)。
+///      `a` が `file_first` なら、`file_first` 以上を落とす。
+///    - `b` が入力なら、`b` より前を落とす (`b` を含む秒の行は残る)。`b` が `file_last` なら、`file_last` 以下を落とす。
+/// 3. `min_input_gap_ms == 0` なら何も落とさない。
+///
+/// 長さは壁時計で測る (区間の中の `feat` 行の穴を差し引かない)。原因のラベルは作らない。
+///
+/// # idle trim との関係
+///
+/// 呼び出し側は [`idle_trim`] の**後の**列を `feat_ts` に渡し、`file_first` / `file_last` には
+/// **前の**列の最小・最大を渡す。規則は入力と境だけで決まり、[`idle_trim`] は入力を含む秒の行を
+/// 落とさないので、落ちる行は 2 つの規則の和集合になる。`summary` が数えるのは、ここで新たに落とした行だけ。
+///
+/// # 先読み
+///
+/// retrospective である: 行を落とすかは、次の入力が `min_input_gap_ms` 以内に来るかで決まる
+/// (最大 `min_input_gap_ms` 先まで見る)。
+pub fn input_gap_trim(
+    feat_ts: &[u64],
+    input_ts: &[u64],
+    file_first: u64,
+    file_last: u64,
+    min_input_gap_ms: u64,
+) -> (Vec<u64>, IdleTrimSummary) {
+    let mut feat: Vec<u64> = feat_ts.to_vec();
+    feat.sort_unstable();
+    feat.dedup();
+    // ⚠️ 境が逆なら何も落とさない (呼び出し側は同じ列の min / max を渡すので起きないが、pub なので守る)。
+    if feat.is_empty() || min_input_gap_ms == 0 || file_first > file_last {
+        return (feat, IdleTrimSummary::default());
+    }
+    let mut input: Vec<u64> = input_ts.to_vec();
+    input.sort_unstable();
+    input.dedup();
+
+    // 区間の両端の点。`true` は入力 (その秒の行を残す)、`false` はファイルの境 (境の行も落とす)。
+    let mut points: Vec<(u64, bool)> = Vec::with_capacity(input.len() + 2);
+    if input.first().is_none_or(|&i| i > file_first) {
+        points.push((file_first, false));
+    }
+    points.extend(input.iter().map(|&i| (i, true)));
+    if input.last().is_none_or(|&i| i < file_last) {
+        points.push((file_last, false));
+    }
+
+    // 落とす範囲 `[lo, hi]` (両端を含む・昇順・互いに重ならない)。
+    // ⚠️ 半開区間にしない —— `file_last == u64::MAX` のとき上端を表せず、最後の行が残る (Codex 指摘・2026-10-11)。
+    let mut ranges: Vec<(u64, u64)> = Vec::new();
+    for pair in points.windows(2) {
+        let ((a, a_is_input), (b, b_is_input)) = (pair[0], pair[1]);
+        if b - a < min_input_gap_ms {
+            continue;
+        }
+        let lo = if a_is_input {
+            // `a` を含む秒の行 (a 以上で最初の行) は残す。無ければ何も落とさない。
+            match feat
+                .get(feat.partition_point(|&t| t < a))
+                .and_then(|&r| r.checked_add(1))
+            {
+                Some(lo) => lo,
+                None => continue,
+            }
+        } else {
+            a
+        };
+        // `b` が入力なら `b` を含む秒の行 (`b` 以上) は残す。`b > a ≥ 0` なので `b − 1` は下回らない。
+        let hi = if b_is_input { b - 1 } else { b };
+        if lo <= hi {
+            ranges.push((lo, hi));
+        }
+    }
+
+    let mut kept: Vec<u64> = Vec::with_capacity(feat.len());
+    let mut summary = IdleTrimSummary::default();
+    let mut open_span: Option<(usize, u64, u64)> = None;
+    let mut k = 0;
+    for &t in &feat {
+        while k < ranges.len() && ranges[k].1 < t {
+            k += 1;
+        }
+        let dropped = k < ranges.len() && ranges[k].0 <= t;
+        if dropped {
+            summary.dropped_feat_rows += 1;
+            open_span = match open_span {
+                Some((range, a, _)) if range == k => Some((range, a, t)),
+                other => {
+                    if let Some((_, a, b)) = other {
+                        summary.spans.push((a, b));
+                    }
+                    Some((k, t, t))
+                }
+            };
+        } else {
+            if let Some((_, a, b)) = open_span.take() {
+                summary.spans.push((a, b));
+            }
+            kept.push(t);
+        }
+    }
+    if let Some((_, a, b)) = open_span {
+        summary.spans.push((a, b));
+    }
+    (kept, summary)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const MIN_GAP: u64 = 60_000;
     const MAX_TRIM: u64 = 1_800_000;
+    const INPUT_GAP: u64 = 1_800_000;
+
+    /// `[0, to_s]` 秒の `feat` 行に `input_gap_trim` を掛ける (境はその列の最初と最後)。
+    fn gap_trim(feat: &[u64], input: &[u64], gap: u64) -> (Vec<u64>, IdleTrimSummary) {
+        let first = *feat.iter().min().expect("feat is not empty");
+        let last = *feat.iter().max().expect("feat is not empty");
+        input_gap_trim(feat, input, first, last, gap)
+    }
+
+    #[test]
+    fn input_gap_one_ms_short_of_the_threshold_keeps_every_row() {
+        let feat = feat_secs(0, 2000);
+        let input = [0, INPUT_GAP - 1, 2_000_000];
+        let (kept, summary) = gap_trim(&feat, &input, INPUT_GAP);
+        assert_eq!(kept, feat);
+        assert_eq!(summary, IdleTrimSummary::default());
+    }
+
+    #[test]
+    fn input_gap_exactly_the_threshold_drops_the_rows_between() {
+        let feat = feat_secs(0, 2000);
+        let input = [0, INPUT_GAP, 2_000_000];
+        let (kept, summary) = gap_trim(&feat, &input, INPUT_GAP);
+        let mut expected = vec![0];
+        expected.extend(feat_secs(1800, 2000));
+        assert_eq!(kept, expected);
+        assert_eq!(summary.dropped_feat_rows, 1799);
+        assert_eq!(summary.spans, vec![(1_000, 1_799_000)]);
+    }
+
+    /// 前の入力を含む秒の行 (11 秒) と、次の入力を含む秒の行 (1901 秒) は残す。
+    #[test]
+    fn input_gap_keeps_the_rows_covering_both_inputs() {
+        let feat = feat_secs(0, 2000);
+        let input = [0, 10_500, 1_900_500, 2_000_000];
+        let (kept, summary) = gap_trim(&feat, &input, INPUT_GAP);
+        let mut expected = feat_secs(0, 11);
+        expected.extend(feat_secs(1901, 2000));
+        assert_eq!(kept, expected);
+        assert_eq!(summary.dropped_feat_rows, 1889);
+        assert_eq!(summary.spans, vec![(12_000, 1_900_000)]);
+    }
+
+    /// ファイルの最初から最初の入力まで (入力を含む秒の行より前) を落とす。
+    #[test]
+    fn input_gap_at_the_file_head_drops_from_the_first_row() {
+        let feat = feat_secs(0, 2000);
+        let (kept, summary) = gap_trim(&feat, &[1_900_000, 2_000_000], INPUT_GAP);
+        assert_eq!(kept, feat_secs(1900, 2000));
+        assert_eq!(summary.spans, vec![(0, 1_899_000)]);
+    }
+
+    /// 最後の入力を含む秒の行の後ろから、ファイルの最後の行までを落とす。
+    #[test]
+    fn input_gap_at_the_file_tail_drops_to_the_last_row() {
+        let feat = feat_secs(0, 2000);
+        let (kept, summary) = gap_trim(&feat, &[0, 100_000], INPUT_GAP);
+        assert_eq!(kept, feat_secs(0, 100));
+        assert_eq!(summary.dropped_feat_rows, 1900);
+        assert_eq!(summary.spans, vec![(101_000, 2_000_000)]);
+    }
+
+    #[test]
+    fn no_input_drops_the_file_only_when_it_is_long_enough() {
+        let (kept, summary) = gap_trim(&feat_secs(0, 2000), &[], INPUT_GAP);
+        assert!(kept.is_empty());
+        assert_eq!(summary.spans, vec![(0, 2_000_000)]);
+        let short = feat_secs(0, 1000);
+        let (kept, summary) = gap_trim(&short, &[], INPUT_GAP);
+        assert_eq!(kept, short);
+        assert_eq!(summary, IdleTrimSummary::default());
+    }
+
+    /// `min_input_gap_ms == 0` は前処理なし (v1.2 の主と同じ)。
+    #[test]
+    fn input_gap_zero_keeps_every_row() {
+        let feat = feat_secs(0, 2000);
+        let (kept, summary) = gap_trim(&feat, &[], 0);
+        assert_eq!(kept, feat);
+        assert_eq!(summary, IdleTrimSummary::default());
+    }
+
+    /// 無入力の区間ごとに 1 本。間の入力を含む秒の行 (1900 秒) は残る。
+    #[test]
+    fn each_input_gap_is_its_own_span() {
+        let feat = feat_secs(0, 4000);
+        let input = [0, 1_900_000, 3_900_000, 4_000_000];
+        let (kept, summary) = gap_trim(&feat, &input, INPUT_GAP);
+        let mut expected = vec![0, 1_900_000];
+        expected.extend(feat_secs(3900, 4000));
+        assert_eq!(kept, expected);
+        assert_eq!(
+            summary.spans,
+            vec![(1_000, 1_899_000), (1_901_000, 3_899_000)]
+        );
+    }
+
+    /// 長さは壁時計で測る (区間の中の `feat` 行の穴を差し引かない)。穴をまたいでも 1 本。
+    #[test]
+    fn input_gap_is_measured_in_wall_time_across_a_feat_hole() {
+        let mut feat = feat_secs(0, 500);
+        feat.extend(feat_secs(1500, 2000));
+        let input = [0, 1_900_000, 2_000_000];
+        let (kept, summary) = gap_trim(&feat, &input, INPUT_GAP);
+        let mut expected = vec![0];
+        expected.extend(feat_secs(1900, 2000));
+        assert_eq!(kept, expected);
+        assert_eq!(summary.dropped_feat_rows, 500 + 400);
+        assert_eq!(summary.spans, vec![(1_000, 1_899_000)]);
+    }
+
+    /// ファイルの最初より前の入力も無入力の長さの起点になる。残すのはそれ以上で最初の行。
+    #[test]
+    fn input_before_the_file_starts_the_gap() {
+        let feat = feat_secs(1000, 2000);
+        let input = [0, 1_900_000, 2_000_000];
+        let (kept, summary) = gap_trim(&feat, &input, INPUT_GAP);
+        let mut expected = vec![1_000_000];
+        expected.extend(feat_secs(1900, 2000));
+        assert_eq!(kept, expected);
+        assert_eq!(summary.dropped_feat_rows, 899);
+    }
+
+    /// idle trim の後の列に、元の列の境を渡して掛けると、落ちる行は 2 つの規則の和集合になる。
+    /// 数えるのは idle trim が落とさなかった行だけ。
+    #[test]
+    fn input_gap_trim_after_idle_trim_is_the_union() {
+        let mut feat = feat_secs(0, 100);
+        feat.extend(feat_secs(200, 2400));
+        let input = secs(&[30, 2400]);
+        let (after_idle, idle) = idle_trim(&feat, &input, MIN_GAP, MAX_TRIM);
+        assert_eq!(idle.spans, vec![(31_000, 100_000)]);
+        let (kept, summary) = input_gap_trim(&after_idle, &input, 0, 2_400_000, INPUT_GAP);
+        let mut expected = feat_secs(0, 30);
+        expected.push(2_400_000);
+        assert_eq!(kept, expected);
+        assert_eq!(summary.dropped_feat_rows, 2200);
+        assert_eq!(summary.spans, vec![(200_000, 2_399_000)]);
+        let (alone, _) = input_gap_trim(&feat, &input, 0, 2_400_000, INPUT_GAP);
+        let union: Vec<u64> = alone
+            .into_iter()
+            .filter(|t| after_idle.binary_search(t).is_ok())
+            .collect();
+        assert_eq!(kept, union);
+    }
+
+    /// 境は idle trim の**前の**列から取る。idle trim が末尾を 30 分削ると後の列の最後は縮むが、
+    /// 無入力の長さは元の列で測る (code-reviewer M-1)。★ 後の列の境を渡すと何も落ちない (対照)。
+    #[test]
+    fn input_gap_is_measured_against_the_bounds_before_idle_trim() {
+        // 入力は 0 秒だけで、`feat` 行は 3000 秒まで続く。idle trim は 1201..=3000 秒を落とす。
+        let feat = feat_secs(0, 3000);
+        let input = [0];
+        let (after_idle, idle) = idle_trim(&feat, &input, MIN_GAP, MAX_TRIM);
+        assert_eq!(after_idle, feat_secs(0, 1200));
+        assert_eq!(idle.dropped_feat_rows, 1800);
+        let (kept, summary) = input_gap_trim(&after_idle, &input, 0, 3_000_000, INPUT_GAP);
+        assert_eq!(kept, vec![0]);
+        assert_eq!(summary.dropped_feat_rows, 1200);
+        assert_eq!(summary.spans, vec![(1_000, 1_200_000)]);
+        let (wrong, wrong_summary) = input_gap_trim(&after_idle, &input, 0, 1_200_000, INPUT_GAP);
+        assert_eq!(wrong, after_idle);
+        assert_eq!(wrong_summary, IdleTrimSummary::default());
+    }
+
+    /// 時刻が `u64::MAX` の最後の行も落とせる (半開区間だと上端を表せない・Codex 指摘)。
+    #[test]
+    fn the_last_row_at_u64_max_can_be_dropped() {
+        let feat = [u64::MAX - 2, u64::MAX];
+        let (kept, summary) = input_gap_trim(&feat, &[], u64::MAX - 2, u64::MAX, 1);
+        assert!(kept.is_empty());
+        assert_eq!(summary.spans, vec![(u64::MAX - 2, u64::MAX)]);
+        // 入力を含む秒の行が `u64::MAX` なら、その後ろには何も無い。
+        let (kept, summary) = input_gap_trim(&feat, &[u64::MAX - 1], u64::MAX - 2, u64::MAX, 1);
+        assert_eq!(kept, vec![u64::MAX]);
+        assert_eq!(summary.dropped_feat_rows, 1);
+    }
+
+    /// 境が逆 (`file_first > file_last`) なら何も落とさない (debug ビルドで引き算が下回らない・security-checker LOW)。
+    /// ⚠️ ガードを外したときに赤になるのは debug ビルド (overflow 検査) だけである。release では wrap した差が
+    /// 閾値を超えても範囲が立たず、緑のままになる (2 巡目の code-reviewer)。
+    #[test]
+    fn reversed_bounds_drop_nothing() {
+        let feat = feat_secs(0, 2000);
+        let (kept, summary) = input_gap_trim(&feat, &[], 2_000_000, 0, INPUT_GAP);
+        assert_eq!(kept, feat);
+        assert_eq!(summary, IdleTrimSummary::default());
+    }
 
     /// `[from_s, to_s]` 秒の 1Hz の `feat` 行 (ms)。
     fn feat_secs(from_s: u64, to_s: u64) -> Vec<u64> {

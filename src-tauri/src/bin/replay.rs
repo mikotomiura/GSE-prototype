@@ -244,9 +244,21 @@ struct FeatureProvenance {
     /// 観測区間を作る前に落とした `feat` 行の量 (事前宣言 v1.2 §6.1・`analysis::feat_offline::idle_trim`)。
     /// ★ 極によらない (前処理は極の前に 1 回だけ掛かる)。`config.idle_trim_max_ms == 0` なら 0 行・空配列。
     idle_trim: IdleTrimDto,
+    /// 長い無入力の前処理で落とした `feat` 行の量 (事前宣言 v1.3 §7.1・`idle_trim::input_gap_trim`)。
+    /// ★ `idle_trim` が先に落とした行は数えない (削った行の合計は 2 つの和)。極によらない。
+    /// `config.idle_trim_input_gap_ms == 0` なら 0 行・空配列。`spans` は 1 本 = 1 つの無入力の区間。
+    /// 露出は [`IdleTrimDto`] と同じ種類 (左端は入力を含む秒の直後・右端は次の入力の秒の直前。
+    /// ⚠️ ファイルの最初・最後に接する区間は、その境の行を含む)。加えて次が読める (security-checker LOW・2026-10-11):
+    /// - 右端からは (区間の中で `feat` 行が途切れていなければ)、無入力の後の**最初の入力の秒**が読める。解放の行・キーを解決できない行・`pointer_bin` 行なら、
+    ///   `rows[]` の `activity` には出ない秒である。
+    /// - 「その区間に `key` も `pointer_bin` も `idle_trim_input_gap_ms` 以上無かった」という不在。24 時間のファイルでは、
+    ///   `spans` の列がそのまま 1 日の入力の有無の時刻表 (長い不在の時刻) として読める。
+    ///
+    /// ⚠️ 落とした行は `rows[]` から消えるので、封筒全体から読める量はむしろ減る。封筒は `gse-dataset` へ共有しない。
+    input_gap_trim: IdleTrimDto,
 }
 
-/// [`FeatureProvenance::idle_trim`]。
+/// [`FeatureProvenance::idle_trim`] と [`FeatureProvenance::input_gap_trim`]。
 ///
 /// 落とした範囲は `observed_intervals` の穴と `rows[].quality.observability_mask.feat` からも読める。
 /// 範囲の左端は「最後の入力を含む秒の直後」なので、長い穴とファイルの最後ごとに次が baseline の出力にも出る
@@ -310,8 +322,10 @@ struct FeatureConfigDto {
     idle_trim_min_gap_ms: u64,
     /// 前処理で戻す幅の上限 (ms・P1 事前宣言 v1.2 §6.2)。`0` は前処理なしの実行 (§6.4)。
     idle_trim_max_ms: u64,
+    /// 長い無入力の前処理で、落とす無入力の長さの下限 (ms・P1 事前宣言 v1.3 §7.2)。`0` は前処理なし (§7.4)。
+    idle_trim_input_gap_ms: u64,
     /// この出力の**極** (ADR-030 D3・[`Pole::as_str`])。★ 1 実行 1 極で、極を持つのは**封筒だけ**
-    /// (行には載せない・判断 3)。⚠️ 上の設定 10 値とは別の軸で、`--set` では変えられない (`--pole` だけ)。
+    /// (行には載せない・判断 3)。⚠️ 上の設定 11 値とは別の軸で、`--set` では変えられない (`--pole` だけ)。
     pole: &'static str,
     /// この入力で、上の極が**計算できたか**。★ 常に出る (`baseline` は常に `true`)。
     /// ⚠️ 極 B / 極 M+ の判定は**入力に依存する** (`capabilities` の宣言 / 修飾キー行の有無)。
@@ -396,8 +410,8 @@ const FROZEN_P1_EPISODE_JSON: &str = include_str!("../../prereg/p1-episode.json"
 /// `--feature-config` で読む外部ファイルの上限 (バイト)。凍結 JSON は 2 KiB 程度。
 const MAX_FEATURE_CONFIG_BYTES: u64 = 64 * 1024;
 
-/// `--set` が受け取れるキー (= 凍結 JSON の `operational` の 10 キー・事前宣言 v1.2 で 2 キー足した)。
-const P1_OPERATIONAL_KEYS: [&str; 10] = [
+/// `--set` が受け取れるキー (= 凍結 JSON の `operational` の 11 キー・事前宣言 v1.2 で 2 キー、v1.3 で 1 キー足した)。
+const P1_OPERATIONAL_KEYS: [&str; 11] = [
     "w_ms",
     "q",
     "b_ms",
@@ -408,15 +422,16 @@ const P1_OPERATIONAL_KEYS: [&str; 10] = [
     "net_diff_min",
     "idle_trim_min_gap_ms",
     "idle_trim_max_ms",
+    "idle_trim_input_gap_ms",
 ];
 
-/// `idle_trim_max_ms` と `idle_trim_min_gap_ms` の上限 (24 時間・事前宣言 v1.2 §6.1)。
+/// `idle_trim_max_ms` / `idle_trim_min_gap_ms` / `idle_trim_input_gap_ms` の上限 (24 時間・事前宣言 v1.2 §6.1・v1.3 §7.1)。
 /// ⚠️ 自己 DoS の門ではなく、**24 時間を超える値 (明らかな桁の誤り) だけ**を止める。凍結値 60000 の
 /// 1440 倍未満の誤り (例: 1000 倍の 60000000 = 16.7 時間) は止めない —— その値は封筒の `overrides` に残る
 /// (研究者裁定 2026-10-09・上限を締めない)。
 const IDLE_TRIM_LIMIT_MS: u64 = 24 * 60 * 60 * 1000;
 
-/// 凍結 JSON の `operational` (P1 事前宣言 §1 の 8 値 ＋ v1.2 §6.2 の 2 値)。
+/// 凍結 JSON の `operational` (P1 事前宣言 §1 の 8 値 ＋ v1.2 §6.2 の 2 値 ＋ v1.3 §7.2 の 1 値)。
 ///
 /// ⚠️ `deny_unknown_fields` —— 未知のキーを黙って捨てると、綴りを間違えた設定が
 /// 「効いたつもり」で走る (fail-closed)。
@@ -435,6 +450,8 @@ struct P1Operational {
     /// (前処理を黙って無効にした出力を作らない)。
     idle_trim_min_gap_ms: u64,
     idle_trim_max_ms: u64,
+    /// ⚠️ 必須 —— 1.1.0 の形の `--feature-config` は長い無入力の前処理の値を持たないので拒否する。
+    idle_trim_input_gap_ms: u64,
 }
 
 /// 凍結 JSON のうち本ツールが読む部分 (`status` / `search_*` などは読まない)。
@@ -457,7 +474,7 @@ struct ConfigOverride {
 
 impl P1Operational {
     /// `(キー, JSON 値)` の列 (`P1_OPERATIONAL_KEYS` と同じ順)。overrides の比較に使う。
-    fn as_pairs(&self) -> [(&'static str, serde_json::Value); 10] {
+    fn as_pairs(&self) -> [(&'static str, serde_json::Value); 11] {
         [
             ("w_ms", self.w_ms.into()),
             ("q", self.q.into()),
@@ -469,6 +486,7 @@ impl P1Operational {
             ("net_diff_min", self.net_diff_min.into()),
             ("idle_trim_min_gap_ms", self.idle_trim_min_gap_ms.into()),
             ("idle_trim_max_ms", self.idle_trim_max_ms.into()),
+            ("idle_trim_input_gap_ms", self.idle_trim_input_gap_ms.into()),
         ]
     }
 
@@ -494,6 +512,7 @@ impl P1Operational {
             "net_diff_min" => self.net_diff_min = as_u64(value)?,
             "idle_trim_min_gap_ms" => self.idle_trim_min_gap_ms = as_u64(value)?,
             "idle_trim_max_ms" => self.idle_trim_max_ms = as_u64(value)?,
+            "idle_trim_input_gap_ms" => self.idle_trim_input_gap_ms = as_u64(value)?,
             _ => {
                 return Err(format!(
                     "--set: 未知のキー `{key}` (許可: {})",
@@ -560,6 +579,18 @@ impl P1Operational {
                 "idle_trim_min_gap_ms は {IDLE_TRIM_LIMIT_MS} (24 時間) 以下でなければならない"
             ));
         }
+        // ⚠️ 長い無入力の前処理 (事前宣言 v1.3 §7.1)。`0` は前処理なし。それ以外は「長い穴」
+        //   (`idle_trim_min_gap_ms`) 以上 —— それより短い無入力を落とすと、P1 が見たい停滞 (`W` の桁) そのものを削る。
+        //   上限は他の前処理の値と同じ 24 時間 (それを超える桁の誤りだけを止める)。
+        if self.idle_trim_input_gap_ms != 0
+            && (self.idle_trim_input_gap_ms < self.idle_trim_min_gap_ms
+                || self.idle_trim_input_gap_ms > IDLE_TRIM_LIMIT_MS)
+        {
+            return Err(format!(
+                "idle_trim_input_gap_ms ({}) は 0 か、idle_trim_min_gap_ms ({}) 以上 {IDLE_TRIM_LIMIT_MS} (24 時間) 以下でなければならない",
+                self.idle_trim_input_gap_ms, self.idle_trim_min_gap_ms
+            ));
+        }
         // ⚠️ 実装済みの推定法だけを通す。未実装の名前を封筒に刻むと、出力が嘘をつく。
         if self.theta_estimator != "nearest_rank" {
             // ⚠️ 外部ファイル由来の文字列は端末へそのまま出さない（`echo_untrusted`: 80 字で切り詰め・`{:?}` でエスケープ）。
@@ -581,7 +612,7 @@ struct ResolvedFeatureConfig {
     prereg_sha256_prefix: String,
     config_source: &'static str,
     overrides: Vec<ConfigOverride>,
-    /// ★ 極 (ADR-030 D3)。⚠️ `operational` の 10 値とは**別の軸**で、`--set` / `--feature-config` では
+    /// ★ 極 (ADR-030 D3)。⚠️ `operational` の 11 値とは**別の軸**で、`--set` / `--feature-config` では
     /// 変えられない (凍結 JSON に極は無い)。`resolve_feature_config` は常に `Baseline` で返し、
     /// `--pole` の値は [`Self::with_pole`] で足す。
     pole: Pole,
@@ -904,6 +935,7 @@ impl FeatureConfigDto {
             t1a_window_ms: c.t1a_window_ms,
             idle_trim_min_gap_ms: resolved.operational.idle_trim_min_gap_ms,
             idle_trim_max_ms: resolved.operational.idle_trim_max_ms,
+            idle_trim_input_gap_ms: resolved.operational.idle_trim_input_gap_ms,
             pole: c.pole.as_str(),
             pole_applicable,
             pole_not_applicable_reason,
@@ -2073,13 +2105,29 @@ fn main() -> ExitCode {
                 return ExitCode::from(1);
             }
         };
-        let (feat_ts, idle_trim_summary) =
+        let (after_idle_trim, idle_trim_summary) =
             gse_next_lib::analysis::feat_offline::idle_trim::idle_trim(
                 &raw_feat_ts,
                 &idle_trim_input_ts,
                 resolved_config.operational.idle_trim_min_gap_ms,
                 resolved_config.operational.idle_trim_max_ms,
             );
+        // ★ 事前宣言 v1.3 §7.1 (ADR-030 補訂 5): 入力の間が `idle_trim_input_gap_ms` 以上空いた区間の `feat` 行を落とす。
+        //   ⚠️ 境 (ファイルの最初と最後) は idle trim の**前の**列から取る —— 後の列から取ると、idle trim が
+        //   末尾を削ったぶんだけ無入力が短く測られ、落とすべき区間を見落とす。落ちる行は 2 つの規則の和集合になる。
+        let (feat_ts, input_gap_trim_summary) =
+            match (raw_feat_ts.iter().min(), raw_feat_ts.iter().max()) {
+                (Some(&first), Some(&last)) => {
+                    gse_next_lib::analysis::feat_offline::idle_trim::input_gap_trim(
+                        &after_idle_trim,
+                        &idle_trim_input_ts,
+                        first,
+                        last,
+                        resolved_config.operational.idle_trim_input_gap_ms,
+                    )
+                }
+                _ => (after_idle_trim, Default::default()),
+            };
         let task_kind_declarations = match collect_task_kind_declarations(&args.session_path) {
             Ok(v) => v,
             Err(msg) => {
@@ -2231,6 +2279,14 @@ fn main() -> ExitCode {
                 idle_trim: IdleTrimDto {
                     dropped_feat_rows: idle_trim_summary.dropped_feat_rows,
                     spans: idle_trim_summary
+                        .spans
+                        .iter()
+                        .map(|&(a_ms, b_ms)| ObservedIntervalDto { a_ms, b_ms })
+                        .collect(),
+                },
+                input_gap_trim: IdleTrimDto {
+                    dropped_feat_rows: input_gap_trim_summary.dropped_feat_rows,
+                    spans: input_gap_trim_summary
                         .spans
                         .iter()
                         .map(|&(a_ms, b_ms)| ObservedIntervalDto { a_ms, b_ms })
@@ -5099,7 +5155,7 @@ mod tests {
         v["operational"].clone()
     }
 
-    /// AC1 / AC2: 無指定なら凍結値の 10 個 (v1.2 で 2 つ足した) がそのまま出て、`overrides` は空・由来は `frozen`。
+    /// AC1 / AC2: 無指定なら凍結値の 11 個 (v1.2 で 2 つ、v1.3 で 1 つ足した) がそのまま出て、`overrides` は空・由来は `frozen`。
     #[test]
     fn resolve_without_flags_reproduces_the_frozen_values() {
         let resolved = resolve_feature_config(None, &[]).expect("frozen resolves");
@@ -5114,7 +5170,7 @@ mod tests {
         assert_eq!(dto["config_source"], "frozen");
         assert_eq!(dto["overrides"], serde_json::json!([]));
         assert_eq!(dto["prereg_id"], "p1-episode");
-        assert_eq!(dto["prereg_version"], "1.1.0");
+        assert_eq!(dto["prereg_version"], "1.2.0");
         let sha = dto["prereg_sha256_prefix"]
             .as_str()
             .expect("sha is a string");
@@ -5479,7 +5535,7 @@ mod tests {
         assert!(dto["pole_not_applicable_reason"].is_null());
     }
 
-    /// issue 004: 極は `--set` の 10 値とは別の軸で、`--set` / `--feature-config` から変えられない。
+    /// issue 004: 極は `--set` の 11 値とは別の軸で、`--set` / `--feature-config` から変えられない。
     #[test]
     fn pole_is_not_settable_through_set() {
         assert!(!P1_OPERATIONAL_KEYS.contains(&"pole"));
@@ -5872,7 +5928,11 @@ not json\n";
         for ok in [
             vec!["idle_trim_min_gap_ms=2001"],
             vec!["idle_trim_max_ms=86400000"],
-            vec!["idle_trim_min_gap_ms=86400000"],
+            // ★ v1.3: `idle_trim_input_gap_ms` は `idle_trim_min_gap_ms` 以上なので、長い穴を 30 分より長くするなら一緒に動かす。
+            vec![
+                "idle_trim_min_gap_ms=86400000",
+                "idle_trim_input_gap_ms=86400000",
+            ],
             vec!["hole_gap_ms=5000", "idle_trim_min_gap_ms=5001"],
         ] {
             let sets: Vec<String> = ok.iter().map(|s| s.to_string()).collect();
@@ -5882,13 +5942,15 @@ not json\n";
             );
         }
         for bad in [
-            vec!["idle_trim_min_gap_ms=2000"],     // = hole_gap_ms
-            vec!["idle_trim_min_gap_ms=0"],        // < hole_gap_ms
-            vec!["hole_gap_ms=60000"],             // 凍結の 60000 と等しくなる
-            vec!["idle_trim_max_ms=86400001"],     // 24 時間超
-            vec!["idle_trim_min_gap_ms=86400001"], // 24 時間超
-            vec!["idle_trim_max_ms=-1"],           // 型の不一致
-            vec!["idle_trim_min_gap_ms=60000.5"],  // 型の不一致
+            vec!["idle_trim_min_gap_ms=2000"], // = hole_gap_ms
+            vec!["idle_trim_min_gap_ms=0"],    // < hole_gap_ms
+            vec!["hole_gap_ms=60000"],         // 凍結の 60000 と等しくなる
+            vec!["idle_trim_max_ms=86400001"], // 24 時間超
+            // ⚠️ `idle_trim_input_gap_ms=0` を添える —— 添えないと v1.3 の「長い穴 ≤ 入力の間の閾値」で先に落ち、
+            //   24 時間の上限の検査を消しても緑のままになる (code-reviewer M-2)。
+            vec!["idle_trim_min_gap_ms=86400001", "idle_trim_input_gap_ms=0"], // 24 時間超
+            vec!["idle_trim_max_ms=-1"],                                       // 型の不一致
+            vec!["idle_trim_min_gap_ms=60000.5"],                              // 型の不一致
         ] {
             let sets: Vec<String> = bad.iter().map(|s| s.to_string()).collect();
             assert!(
@@ -5896,6 +5958,74 @@ not json\n";
                 "{bad:?} は Err でなければならない"
             );
         }
+    }
+
+    /// 事前宣言 v1.3 §7.4: `--set idle_trim_input_gap_ms=0` (長い無入力の前処理なしの実行 = v1.2 の主) は
+    /// `overrides` に残る。★ 凍結値と同じ `--set` は載らない (対照)。
+    #[test]
+    fn set_idle_trim_input_gap_zero_is_recorded_as_an_override() {
+        let resolved = resolve_feature_config(None, &["idle_trim_input_gap_ms=0".to_string()])
+            .expect("idle_trim_input_gap_ms=0 resolves");
+        assert_eq!(resolved.operational.idle_trim_input_gap_ms, 0);
+        assert_eq!(resolved.overrides.len(), 1);
+        assert_eq!(resolved.overrides[0].key, "idle_trim_input_gap_ms");
+        assert_eq!(resolved.overrides[0].frozen, serde_json::json!(1_800_000));
+        assert_eq!(resolved.overrides[0].value, serde_json::json!(0));
+
+        let same = resolve_feature_config(None, &["idle_trim_input_gap_ms=1800000".to_string()])
+            .expect("frozen value resolves");
+        assert!(same.overrides.is_empty());
+    }
+
+    /// 事前宣言 v1.3 §7.1 の検査: `idle_trim_input_gap_ms` は 0 か、`idle_trim_min_gap_ms` 以上 24 時間以下。
+    /// ★ 境界ちょうどの陽性対照を先に置く。
+    #[test]
+    fn idle_trim_input_gap_is_range_checked() {
+        for ok in [
+            vec!["idle_trim_input_gap_ms=0"],
+            vec!["idle_trim_input_gap_ms=60000"], // = idle_trim_min_gap_ms
+            vec!["idle_trim_input_gap_ms=86400000"],
+        ] {
+            let sets: Vec<String> = ok.iter().map(|s| s.to_string()).collect();
+            assert!(
+                resolve_feature_config(None, &sets).is_ok(),
+                "{ok:?} は通らなければならない"
+            );
+        }
+        for bad in [
+            vec!["idle_trim_input_gap_ms=1"],        // 0 でなく、長い穴より短い
+            vec!["idle_trim_input_gap_ms=59999"],    // 長い穴より 1 ms 短い
+            vec!["idle_trim_input_gap_ms=86400001"], // 24 時間超
+            vec!["idle_trim_min_gap_ms=1800001"],    // 凍結の 1800000 が長い穴より短くなる
+            vec!["idle_trim_input_gap_ms=-1"],       // 型の不一致
+        ] {
+            let sets: Vec<String> = bad.iter().map(|s| s.to_string()).collect();
+            assert!(
+                resolve_feature_config(None, &sets).is_err(),
+                "{bad:?} は Err でなければならない"
+            );
+        }
+    }
+
+    /// 事前宣言 v1.3: 長い無入力の前処理の値を持たない (1.1.0 の形の) `--feature-config` は `Err`
+    /// (前処理を黙って無効にした出力を作らない)。★ 値を足せば通る (対照)。
+    #[test]
+    fn feature_config_without_idle_trim_input_gap_is_rejected() {
+        let dir = envelope_tmp_dir("feature_config_no_input_gap");
+        let mut value: serde_json::Value =
+            serde_json::from_str(FROZEN_P1_EPISODE_JSON).expect("frozen JSON parses");
+        let ok = dir.join("ok.json");
+        std::fs::write(&ok, serde_json::to_vec(&value).expect("serialize")).expect("write");
+        assert!(resolve_feature_config(Some(&ok), &[]).is_ok());
+
+        value["operational"]
+            .as_object_mut()
+            .expect("operational is an object")
+            .remove("idle_trim_input_gap_ms");
+        let old = dir.join("old.json");
+        std::fs::write(&old, serde_json::to_vec(&value).expect("serialize")).expect("write");
+        assert!(resolve_feature_config(Some(&old), &[]).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// 事前宣言 v1.2: 前処理の 2 値を持たない (1.0.0 の形の) `--feature-config` は `Err`

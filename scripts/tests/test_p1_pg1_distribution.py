@@ -84,6 +84,8 @@ def make_envelope(pole, onsets, applicable=True, reason=None):
             "observed_intervals": [{"a_ms": 1_700_000_001_000, "b_ms": 1_700_000_220_000}],
             # ★ 今の binary の形 (事前宣言 v1.2 §6.1): 3 極とも同じ値を持つ
             "idle_trim": {"dropped_feat_rows": 4, "spans": [{"a_ms": 1_700_000_221_000, "b_ms": 1_700_000_224_000}]},
+            # ★ 事前宣言 v1.3 §7.1 (凍結 JSON 1.2.0 の binary の形)
+            "input_gap_trim": {"dropped_feat_rows": 0, "spans": []},
         },
         "config": {
             "w_ms": 30000,
@@ -96,6 +98,7 @@ def make_envelope(pole, onsets, applicable=True, reason=None):
             "t1a_window_ms": 30000,
             "idle_trim_min_gap_ms": 60000,
             "idle_trim_max_ms": 1800000,
+            "idle_trim_input_gap_ms": 1800000,
             "pole": pole,
             "pole_applicable": applicable,
             "pole_not_applicable_reason": None if applicable else reason,
@@ -496,12 +499,16 @@ class Pg1DistributionTest(LayoutCase):
             ("config", "config_source", "file"),
             ("config", "overrides", [{"key": "q", "value": 0.995}]),
             ("provenance", "idle_trim", {"dropped_feat_rows": 3, "spans": [{"a_ms": 1, "b_ms": 3}]}),
+            ("provenance", "input_gap_trim", {"dropped_feat_rows": 3, "spans": [{"a_ms": 1, "b_ms": 3}]}),
         )
         # ★ 1 極だけ `provenance.idle_trim` が欠ける / 形が壊れている封筒は拒否する (前処理の値を持つ封筒には必須)
         for label, broken in (
             ("欠ける", lambda env: env["provenance"].pop("idle_trim")),
             ("行数が負", lambda env: env["provenance"]["idle_trim"].__setitem__("dropped_feat_rows", -1)),
             ("spans の向きが逆", lambda env: env["provenance"]["idle_trim"].__setitem__("spans", [{"a_ms": 5, "b_ms": 4}])),
+            # ★ v1.3 §7.1: `config.idle_trim_input_gap_ms` を持つ封筒は `provenance.input_gap_trim` も必須
+            ("input_gap_trim が欠ける", lambda env: env["provenance"].pop("input_gap_trim")),
+            ("input_gap_trim の行数が負", lambda env: env["provenance"]["input_gap_trim"].__setitem__("dropped_feat_rows", -1)),
         ):
             with self.subTest(idle_trim=label):
                 root = self.base_layout()
@@ -615,6 +622,29 @@ class Pg1DistributionTest(LayoutCase):
         broken["config"]["overrides"] = "none"
         with self.assertRaises(fio.EnvelopeError):
             fio.project_pg1(broken)
+
+    def test_check_envelope_requires_trim_provenance_for_its_config_key(self):
+        # ★ 1 枚の封筒を直接検査する (極の間の一致の検査を通さない)。⚠️ 3 極のうち 1 極だけを壊すと、
+        #   極の間の不一致でも落ちるので、`config` に値があれば `provenance` も必須、という規則そのものを見られない。
+        ok = make_envelope("baseline", 1)
+        self.assertIs(fio.check_envelope(ok), ok)
+        for config_key, trim_key in (("idle_trim_max_ms", "idle_trim"), ("idle_trim_input_gap_ms", "input_gap_trim")):
+            for label, broken in (
+                ("欠ける", lambda env, k=trim_key: env["provenance"].pop(k)),
+                ("行数が負", lambda env, k=trim_key: env["provenance"][k].__setitem__("dropped_feat_rows", -1)),
+                ("spans の向きが逆", lambda env, k=trim_key: env["provenance"][k].__setitem__("spans", [{"a_ms": 5, "b_ms": 4}])),
+            ):
+                with self.subTest(trim=trim_key, case=label):
+                    env = make_envelope("baseline", 1)
+                    broken(env)
+                    with self.assertRaises(fio.EnvelopeError):
+                        fio.check_envelope(env)
+            # ★ 対照: 値を持たない旧い封筒には `provenance` を求めない
+            with self.subTest(trim=trim_key, case="旧い封筒"):
+                env = make_envelope("baseline", 1)
+                env["config"].pop(config_key)
+                env["provenance"].pop(trim_key)
+                self.assertIs(fio.check_envelope(env), env)
 
     def test_discover_returns_sorted_layout(self):
         root = self.base_layout()

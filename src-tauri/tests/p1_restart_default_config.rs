@@ -398,3 +398,133 @@ fn frozen_defaults_trim_an_idle_tail() {
         "前処理なしでは時刻表どおりに restop が測れる"
     );
 }
+
+/// 長い無入力の前処理の結合テスト用の入力。`feat` 行は `1_000..=feat_last_offset_ms`（1 Hz・穴なし）、
+/// 打鍵は `press_offsets_ms`（それぞれ `RELEASE_AFTER_PRESS_MS` 後に release）。
+fn build_input_gap_session(feat_last_offset_ms: u64, press_offsets_ms: &[u64]) -> String {
+    let at = |offset_ms: u64| SESSION_START_MS + offset_ms;
+    let mut events: Vec<(u64, String)> = Vec::new();
+    for (i, &offset_ms) in press_offsets_ms.iter().enumerate() {
+        let vk = 0x41 + i as u64;
+        events.push((
+            at(offset_ms),
+            json!({"type": "key", "t": at(offset_ms), "vk": vk, "press": true}).to_string(),
+        ));
+        let release = offset_ms + RELEASE_AFTER_PRESS_MS;
+        events.push((
+            at(release),
+            json!({"type": "key", "t": at(release), "vk": vk, "press": false}).to_string(),
+        ));
+    }
+    for offset_ms in (1_000..=feat_last_offset_ms).step_by(FEAT_STEP_MS as usize) {
+        events.push((
+            at(offset_ms),
+            json!({
+                "type": "feat", "t": at(offset_ms),
+                "f1": 0.0, "f3": 0.0, "f4": 0.0, "f5": 0.0, "f6": 0.0,
+                "p_flow": 0.34, "p_inc": 0.33, "p_stuck": 0.33,
+                "raw_x": 0.0, "raw_y": 0.0, "ewma_x": 0.0, "ewma_y": 0.0,
+                "obs": 0, "alpha": 0.3,
+            })
+            .to_string(),
+        ));
+    }
+    events.sort_by_key(|(t, _)| *t);
+    let mut lines = vec![
+        json!({"type": "meta", "session_start": SESSION_START_MS, "hmm_version": "0.5.0"})
+            .to_string(),
+        json!({"type": "session_start", "t": SESSION_START_MS}).to_string(),
+    ];
+    lines.extend(events.into_iter().map(|(_, line)| line));
+    let mut body = lines.join("\n");
+    body.push('\n');
+    body
+}
+
+/// 事前宣言 v1.3 §7.1: `feat` 行が途切れずに続いても、入力の間が 30 分以上空いた区間の行は凍結既定のまま落ち、
+/// 観測区間が 2 本に割れる。★ 同じ入力に `--set idle_trim_input_gap_ms=0` を渡すと、1 本に戻る（対照）。
+///
+/// 時刻表（セッション開始からの ms）: `feat` 行は 1_000..=2_000_000（1 Hz・穴なし）。打鍵は 1_200（release 1_280）・
+/// 1_900_000・2_000_000。1_280 → 1_900_000 の無入力（1_898_720 ms）が 30 分以上なので、1_280 を含む秒の行 2_000 は残し、
+/// 3_000..=1_899_000 の 1897 行を落とす。1_900_000 の行（次の打鍵を含む秒）は残る。
+#[test]
+fn frozen_defaults_drop_a_long_input_gap_without_a_feat_hole() {
+    let at = |offset_ms: u64| SESSION_START_MS + offset_ms;
+    let body = build_input_gap_session(2_000_000, &[1_200, 1_900_000, 2_000_000]);
+    let session = TempSession::write("input-gap", &body);
+
+    let trimmed = replay_features(&session);
+    assert_eq!(trimmed["config"]["overrides"], json!([]));
+    assert_eq!(trimmed["config"]["idle_trim_input_gap_ms"], 1_800_000);
+    assert_eq!(trimmed["config"]["prereg_version"], "1.2.0");
+    assert_eq!(
+        trimmed["provenance"]["idle_trim"],
+        json!({"dropped_feat_rows": 0, "spans": []}),
+        "穴もファイルの最後の無入力も無いので、無入力の末尾の前処理は何も落とさない"
+    );
+    assert_eq!(
+        trimmed["provenance"]["input_gap_trim"],
+        json!({
+            "dropped_feat_rows": 1897,
+            "spans": [{"a_ms": at(3_000), "b_ms": at(1_899_000)}],
+        })
+    );
+    assert_eq!(
+        trimmed["provenance"]["observed_intervals"],
+        json!([
+            {"a_ms": at(1_000), "b_ms": at(2_000)},
+            {"a_ms": at(1_900_000), "b_ms": at(2_000_000)},
+        ]),
+        "長い無入力の区間が観測区間から外れていない"
+    );
+
+    let untrimmed = replay_features_with(&session, &["--set", "idle_trim_input_gap_ms=0"]);
+    assert_eq!(
+        untrimmed["config"]["overrides"],
+        json!([{"key": "idle_trim_input_gap_ms", "frozen": 1_800_000, "value": 0}])
+    );
+    assert_eq!(
+        untrimmed["provenance"]["input_gap_trim"],
+        json!({"dropped_feat_rows": 0, "spans": []})
+    );
+    assert_eq!(
+        untrimmed["provenance"]["observed_intervals"],
+        json!([{"a_ms": at(1_000), "b_ms": at(2_000_000)}]),
+        "idle_trim_input_gap_ms=0 で前処理なしに戻っていない"
+    );
+}
+
+/// 事前宣言 v1.3 §7.1: 無入力の長さは idle trim の**前の**列の境で測る（code-reviewer M-1・2026-10-11）。
+///
+/// 時刻表: `feat` 行は 1_000..=2_401_000（40 分・穴なし）、打鍵は 1_200（release 1_280）だけ。
+/// idle trim はファイルの最後から 30 分（602_000..=2_401_000 の 1800 行）を落とす。後の列の最後は 601_000 になるが、
+/// 元の列で測った無入力（1_280 → 2_401_000）は 30 分以上なので、残る 3_000..=601_000（599 行）も本前処理が落とす。
+/// ⚠️ 後の列の境で測る誤った配線では、無入力が 10 分に縮んで何も落ちない。
+#[test]
+fn input_gap_trim_measures_the_tail_against_the_untrimmed_file() {
+    let at = |offset_ms: u64| SESSION_START_MS + offset_ms;
+    let session = TempSession::write(
+        "input-gap-tail",
+        &build_input_gap_session(2_401_000, &[1_200]),
+    );
+    let envelope = replay_features(&session);
+    assert_eq!(
+        envelope["provenance"]["idle_trim"],
+        json!({
+            "dropped_feat_rows": 1800,
+            "spans": [{"a_ms": at(602_000), "b_ms": at(2_401_000)}],
+        })
+    );
+    assert_eq!(
+        envelope["provenance"]["input_gap_trim"],
+        json!({
+            "dropped_feat_rows": 599,
+            "spans": [{"a_ms": at(3_000), "b_ms": at(601_000)}],
+        }),
+        "境を idle trim の後の列から取っている"
+    );
+    assert_eq!(
+        envelope["provenance"]["observed_intervals"],
+        json!([{"a_ms": at(1_000), "b_ms": at(2_000)}])
+    );
+}
