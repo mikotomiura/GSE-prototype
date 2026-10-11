@@ -1149,6 +1149,17 @@ pub enum LogEntry {
     ///
     /// ⚠️ **中身は一切取得しない。** ★ on/off の遷移だけである。
     SecureInput { timestamp: u64, on: bool },
+    /// EH3 のその日の条件（`schema_dto::LogRowDto::Eh3Day`）。
+    ///
+    /// その日を稼働日として数えた時点と、すでに数えた日にアプリが起動した時点で出す。
+    /// 値域は `eh3::Condition` で閉じている。
+    Eh3Day {
+        timestamp: u64,
+        day: u32,
+        condition: crate::eh3::Condition,
+    },
+    /// EH3 の招待を出した時刻（理由を載せない・解除の時刻は記録しない）。
+    InvitationPresent { timestamp: u64 },
     /// **G1: ブロック終了マーカー。** 現ファイルに `session_end` を書いて flush するが、
     /// ★ **書込先は切り替えない**。切り替えは次の `Rotate` が行う。
     ///
@@ -1203,6 +1214,8 @@ impl LogEntry {
             LogEntry::FocusTransition { .. } => "focus_transition",
             LogEntry::PointerBin { .. } => "pointer_bin",
             LogEntry::SecureInput { .. } => "secure_input",
+            LogEntry::Eh3Day { .. } => "eh3_day",
+            LogEntry::InvitationPresent { .. } => "invitation_present",
             // ★ ここから下は**行を書かない制御エントリ**である
             //   (`BlockEnd` / `Rotate` は `meta`(session_end/session_start) を副作用で書くが、
             //   ⚠️ それは `meta` 行であってこのエントリ自身の行ではない)。
@@ -1582,7 +1595,26 @@ fn keyboard_layout_fragment() -> String {
 /// ★ 値域は `O1Source` で型に閉じているので、⚠️ 外部由来の文字列が JSON を壊す経路は無い
 /// (`g1_mode` が security review MEDIUM で採った作法と同じ)。
 fn o1_mode_fragment() -> String {
-    o1_meta_fragment(crate::o1::mode(), crate::o1::install_id().as_deref())
+    let mut s = o1_meta_fragment(crate::o1::mode(), crate::o1::install_id().as_deref());
+    s.push_str(&eh3_meta_fragment(crate::eh3::mode()));
+    s
+}
+
+/// `meta` に足す EH3 の断片 (★ 非 EH3 なら空文字列 = 従来と 1 バイトも変わらない)。
+///
+/// ★ **`o1_mode` / `o1_install_id` の直後**に置く（EH3 は O1 の上でだけ立つ・`eh3::resolve`）。
+/// ★ `invitation_enabled` は招待用の研究の条件で、`intervention_enabled`（Nudge）とは別に持つ
+/// （`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 1 #1 = R-1 (i)。O1 は `session_meta` を
+/// 書かないので `meta` に置く・同 判断 3 帰結）。EH3 のときは常に真。
+/// ⚠️ 値域は `Eh3Source` と定数で閉じているので、外部由来の文字列が JSON を壊す経路は無い。
+fn eh3_meta_fragment(mode: Option<crate::eh3::Eh3Source>) -> String {
+    match mode {
+        Some(src) => format!(
+            r#","eh3_mode":"{}","invitation_enabled":true"#,
+            src.as_str()
+        ),
+        None => String::new(),
+    }
 }
 
 /// `o1_mode_fragment` の純関数部分 (テストから O1 / 非 O1 を切り替えられるよう分けた)。
@@ -1601,6 +1633,21 @@ fn o1_meta_fragment(mode: Option<crate::o1::O1Source>, install_id: Option<&str>)
         }
         None => String::new(),
     }
+}
+
+/// `eh3_day` 行の本文（改行なし）。値域は `eh3::Condition` で閉じている。
+fn format_eh3_day_line(timestamp: u64, day: u32, condition: crate::eh3::Condition) -> String {
+    format!(
+        r#"{{"type":"eh3_day","t":{},"day":{},"condition":"{}"}}"#,
+        timestamp,
+        day,
+        condition.as_str(),
+    )
+}
+
+/// `invitation_present` 行の本文（改行なし）。時刻しか書けない形にしてある（理由・状態・回数を持たない）。
+fn format_invitation_present_line(timestamp: u64) -> String {
+    format!(r#"{{"type":"invitation_present","t":{}}}"#, timestamp)
 }
 
 /// `meta`(session_start) 行を書く。★ **新しいファイルを開くたびに必ず呼ぶ**
@@ -2282,6 +2329,26 @@ impl SessionLogger {
                                 );
                                 dirty = true;
                             }
+                            LogEntry::Eh3Day {
+                                timestamp,
+                                day,
+                                condition,
+                            } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_eh3_day_line(timestamp, day, condition)
+                                );
+                                dirty = true;
+                            }
+                            LogEntry::InvitationPresent { timestamp } => {
+                                let _ = writeln!(
+                                    writer,
+                                    "{}",
+                                    format_invitation_present_line(timestamp)
+                                );
+                                dirty = true;
+                            }
                             LogEntry::BlockEnd => {
                                 // ★ 閉じるだけ。次のファイルは開かない (11 本目の空ファイル対策)。
                                 if !block_closed {
@@ -2923,6 +2990,54 @@ mod tests {
             o1_meta_fragment(Some(crate::o1::O1Source::Env), None),
             r#","o1_mode":"env""#
         );
+    }
+
+    /// writer が書く EH3 の 2 行種のキー集合を固定する（content-free・欄を増やすには要件の見直しが要る）。
+    #[test]
+    fn eh3_lines_are_content_free() {
+        use std::collections::BTreeSet;
+        let keys = |line: &str| -> BTreeSet<String> {
+            let v: serde_json::Value = serde_json::from_str(line).expect("json");
+            v.as_object().expect("object").keys().cloned().collect()
+        };
+        for c in [
+            crate::eh3::Condition::Blank,
+            crate::eh3::Condition::Decor,
+            crate::eh3::Condition::PortraitNone,
+            crate::eh3::Condition::PortraitSeed,
+        ] {
+            let line = format_eh3_day_line(1_700_000_000_000, 15, c);
+            assert_eq!(
+                keys(&line),
+                ["condition", "day", "t", "type"].map(String::from).into(),
+                "{line}"
+            );
+        }
+        let line = format_invitation_present_line(1_700_000_000_000);
+        assert_eq!(keys(&line), ["t", "type"].map(String::from).into());
+    }
+
+    #[test]
+    fn eh3_meta_fragment_is_empty_outside_eh3() {
+        // ★ 通常運用 / G1 / O1 の meta 行は 1 バイトも変わらない（R-L6）。
+        assert_eq!(eh3_meta_fragment(None), "");
+    }
+
+    #[test]
+    fn eh3_meta_fragment_carries_the_invitation_condition() {
+        assert_eq!(
+            eh3_meta_fragment(Some(crate::eh3::Eh3Source::Marker)),
+            r#","eh3_mode":"marker","invitation_enabled":true"#
+        );
+        // ★ 断片を足した meta 行が JSON として読めること（手書き JSON の壊れを検出する）
+        let line = format!(
+            r#"{{"type":"meta","session_start":1{}{}}}"#,
+            o1_meta_fragment(Some(crate::o1::O1Source::Marker), Some("0123456789abcdef")),
+            eh3_meta_fragment(Some(crate::eh3::Eh3Source::Env))
+        );
+        let v: serde_json::Value = serde_json::from_str(&line).expect("valid json");
+        assert_eq!(v["eh3_mode"], "env");
+        assert_eq!(v["invitation_enabled"], true);
     }
 
     // --- 診断ログ (gse-app.log) の置き場 ---
@@ -3583,6 +3698,12 @@ mod tests {
     /// ★ `line_type_matches_known_line_types` 用の代表エントリ (全 variant)。
     fn sample_entries_for_line_type() -> Vec<LogEntry> {
         vec![
+            LogEntry::Eh3Day {
+                timestamp: 1,
+                day: 1,
+                condition: crate::eh3::Condition::PortraitSeed,
+            },
+            LogEntry::InvitationPresent { timestamp: 1 },
             LogEntry::Key {
                 vk_code: 0x41,
                 timestamp: 1,

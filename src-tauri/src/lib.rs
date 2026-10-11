@@ -7,6 +7,9 @@ pub mod autostart;
 // ★ **このビルドが何を記録できるか**の単一情報源 (ADR-013 D1/D2)。OS API 非依存の宣言表。
 // ⚠️ 送出元ベースで決め `#[cfg]` を反映する (writer から導出すると macOS で ime_shadow を過大申告する)。
 pub mod capabilities;
+// EH3（肖像と招待の参加者内比較）の「EH3 モード」判定と日ごとの条件の割り当て（OS API 非依存）。
+// ★ O1 の収集の器の上に載せる層（.steering/20261011-portrait-eh3-impl/decisions.md 判断 3 #1）。
+pub mod eh3;
 // G1 統制タスク実験の「G1 モード」判定 (OS API 非依存の純ロジック + current_exe のみ)。
 // 効果 (ローテート / 5 分でのブロック終了 / プローブ停止 / 二重起動 fail-loud) は lib.rs が適用する。
 pub mod g1;
@@ -608,6 +611,63 @@ fn get_log_status(status: State<'_, LogStatusState>) -> LogStatusDto {
             actual_path: None,
         },
     }
+}
+
+/// 現地時刻の時差（秒）を 60 秒ごとに読み直すキャッシュ（EH3 の 4:00 区切りと時間帯に使う）。
+///
+/// ★ OS の時刻帯は `lib.rs` で引き、`eh3` / `analysis` には秒数だけを渡す（技術的制約 11）。
+struct UtcOffsetCache {
+    offset_secs: i32,
+    read_at_ms: Option<u64>,
+}
+
+impl UtcOffsetCache {
+    const REFRESH_MS: u64 = 60_000;
+
+    fn new() -> Self {
+        Self {
+            offset_secs: 0,
+            read_at_ms: None,
+        }
+    }
+
+    fn get(&mut self, now_ms: u64) -> i32 {
+        let stale = self
+            .read_at_ms
+            .is_none_or(|t| now_ms.abs_diff(t) >= Self::REFRESH_MS);
+        if stale {
+            self.offset_secs = chrono::Local::now().offset().local_minus_utc();
+            self.read_at_ms = Some(now_ms);
+        }
+        self.offset_secs
+    }
+}
+
+/// EH3: 日次の切り替え（O1 のローテート）が成立するたびに 1 進める。
+///
+/// 分析スレッドがこれを見て、新しいファイルにもその日の `eh3_day` 行を出し直す
+/// （ある時刻の条件をファイルの中で読めるようにする。条件は日中に変わらない）。
+static EH3_REEMIT_GEN: AtomicU64 = AtomicU64::new(0);
+
+/// EH3 のその日の条件を NDJSON へ送る（`eh3_day` 行）。送れなかったら `false`。
+///
+/// ⚠️ 1 日 1 行の索引なので、落ちるとその日の全部の打鍵の条件が読めなくなる。呼び出し側は `false` で
+/// `forget_emitted` を呼び、次の打鍵で出し直す。applog に日付と条件は出さない。
+fn send_eh3_day(tx: &Sender<LogEntry>, timestamp: u64, d: crate::eh3::DayAssignment) -> bool {
+    let Some(condition) = d.condition else {
+        return true;
+    };
+    let sent = tx
+        .try_send(LogEntry::Eh3Day {
+            timestamp,
+            day: d.day_index,
+            condition,
+        })
+        .is_ok();
+    if !sent {
+        tracing::warn!("EH3 daily condition row could not be queued; will retry");
+    }
+    sent
 }
 
 #[tauri::command]
@@ -1291,6 +1351,8 @@ fn o1_rotate(
         .tx
         .try_send(LogEntry::Rotate { new_path })
         .map_err(log_send_error)?;
+    // EH3: 新しいファイルにもその日の条件の行を出し直させる（EH3 でなければ誰も読まない）。
+    EH3_REEMIT_GEN.fetch_add(1, Ordering::AcqRel);
 
     // ⚠️★★ **ローテートはここで成立している。** ★ 基準を先に引き直す ——
     //   引き直さないと、下の `SessionMeta` が落ちたときに日次スレッドが 60 秒ごとに
@@ -3360,6 +3422,33 @@ pub fn run() {
         INTERVENTION_ENABLED.store(false, Ordering::Release);
     }
 
+    // EH3（肖像と招待の参加者内比較）の判定 —— 起動時に 1 回だけ読む。
+    //   EH3 は O1 の収集の器の上に載せた層なので、O1 でないときは立てない（`eh3::resolve`）。
+    //   Nudge は O1 と同じく出さない（上の `INTERVENTION_ENABLED = false` のまま・R-D2）。
+    //   ⚠️ 印が壊れているときは EH3 を立てない（既定の条件を勝手に選ばない）。
+    let eh3_detected = match crate::eh3::detect_from_env() {
+        Ok(d) => d,
+        Err(e) => {
+            tracing::error!("EH3 marker is present but invalid; EH3 is DISABLED: {e}");
+            None
+        }
+    };
+    if eh3_detected.is_some() && o1_source.is_none() {
+        tracing::warn!(
+            "EH3 marker is present but O1 mode is not active; EH3 is DISABLED \
+             (EH3 runs only on top of O1 collection)."
+        );
+    }
+    let eh3_mode = crate::eh3::resolve(eh3_detected, o1_source.is_some());
+    crate::eh3::set_mode(eh3_mode);
+    if let Some((src, _)) = eh3_mode {
+        // ⚠️ 割り当て（順序・文法）は applog にも出さない（条件の名前を参加者の端末の平文に残さない）。
+        tracing::warn!(
+            "EH3 MODE ENABLED (source={}): daily condition assignment is on, Nudge stays OFF.",
+            src.as_str()
+        );
+    }
+
     // セッションロガー — ★ **ここではまだ NDJSON を作らない** (follow-up F-3)。
     //
     // ⚠️ ★ `tauri-plugin-single-instance` に止められた 2 個目のプロセスは、止められる前に
@@ -3473,6 +3562,38 @@ pub fn run() {
         //   ★ ループの中で毎回読まず、ここで 1 回だけ確定させる (実行時トグルではない)。
         let o1_always_on = crate::o1::is_o1();
 
+        // EH3: その日の割り当て（4:00 区切り・打鍵を 1 回観測した日を数える）。EH3 でなければ何もしない。
+        //   ★ 時差は 60 秒ごとに読み直す（打鍵ごとに OS を引かない）。
+        //   ⚠️ 一時停止中の打鍵は数えない（止めている日を数えると、行は書かれないのに番号だけが進み、
+        //   翌日の `day` の欠けから「止めていた日に使った」が読める・data-privacy ルール 6）。
+        //   ★ 再開した時と日次の切り替えの後は、その日の行を出し直す（行が無いと同じ日の残りの条件が読めない）。
+        let mut eh3_days = crate::eh3::assignment().map(|a| {
+            let path = crate::eh3::state_path();
+            let load = match path.as_deref() {
+                Some(p) => crate::eh3::load_ledger(p),
+                None => {
+                    tracing::error!("EH3 day ledger path (home dir) is unavailable; no daily condition this run");
+                    crate::eh3::LedgerLoad::Broken
+                }
+            };
+            if path.is_some() && load == crate::eh3::LedgerLoad::Broken {
+                tracing::error!("EH3 day ledger is unreadable; no daily condition this run");
+            }
+            let tracker = crate::eh3::DayTracker::new(load, path, &a);
+            (a, tracker)
+        });
+        let mut utc_offset = UtcOffsetCache::new();
+        let mut eh3_was_paused = crate::recording::is_paused();
+        let mut eh3_reemit_gen = EH3_REEMIT_GEN.load(Ordering::Acquire);
+        if let Some((a, tracker)) = eh3_days.as_mut() {
+            let now = now_ms();
+            if let Some(d) = tracker.on_start(now, utc_offset.get(now), a) {
+                if !send_eh3_day(&log_tx_analysis, now, d) {
+                    tracker.forget_emitted();
+                }
+            }
+        }
+
         loop {
             // start_session が呼ばれるまでチャネルをドレインして処理をスキップする。
             // ⚠️★★★ O1 では門を通す (ADR-016 判断 4b-0 の「(B) 常時収集」)。
@@ -3548,6 +3669,31 @@ pub fn run() {
                     timestamp: k.timestamp,
                     is_press: k.is_press,
                 });
+                if k.is_press && !crate::recording::is_paused() {
+                    if let Some((a, tracker)) = eh3_days.as_mut() {
+                        let off = utc_offset.get(k.timestamp);
+                        if let Some(d) = tracker.on_press(k.timestamp, off, a) {
+                            if !send_eh3_day(&log_tx_analysis, k.timestamp, d) {
+                                tracker.forget_emitted();
+                            }
+                        }
+                    }
+                }
+            }
+            // EH3: 再開した・日次の切り替えがあった → その日の行を出し直す。
+            if let Some((a, tracker)) = eh3_days.as_mut() {
+                let paused = crate::recording::is_paused();
+                let gen = EH3_REEMIT_GEN.load(Ordering::Acquire);
+                if (eh3_was_paused && !paused) || gen != eh3_reemit_gen {
+                    let now = now_ms();
+                    if let Some(d) = tracker.reemit_today(now, utc_offset.get(now), a) {
+                        if !send_eh3_day(&log_tx_analysis, now, d) {
+                            tracker.forget_emitted();
+                        }
+                    }
+                }
+                eh3_was_paused = paused;
+                eh3_reemit_gen = gen;
             }
             if let Some(f) = out.feat {
                 *latest_feat_for_thread

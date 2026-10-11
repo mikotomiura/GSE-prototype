@@ -28,6 +28,13 @@
             }
           ]
         },
+        "eh3_mode": {
+          "description": "EH3（肖像と招待の参加者内比較）モードの引き金 (`\"marker\"` | `\"env\"`)。**start 形状のみ**。\n\nEH3 は O1 の収集の器に載せた層なので、EH3 のときは `o1_mode` も出る。O1 の記録と分けるのはこの フィールドである（`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 3 #1・R-L5）。 EH3 実施時にしか出ない（通常運用 / G1 / O1 の NDJSON は従来と byte 単位で同一・R-L6）。 `Option` である（旧ログには無い・ADR-005）。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "g1_mode": {
           "description": "G1 統制タスク実験モードの引き金 (`\"marker\"` | `\"env\"`)。**start 形状のみ**。\n\n⚠️ ★ **G1 実施時にしか出ない**ので、通常運用の NDJSON は従来と byte 単位で同一である (ゴールデンスナップショットと既存フィクスチャの非回帰がこれに依存する)。\n\n★ なぜ記録するか: マーカーが外れる / アプリをフォルダの外に出す / launcher の `open -a` で通常アプリが起動する、のいずれでも**黙って通常モードになる**。 この行が無いブロックは「G1 モードで取れていない」と**事後に判定できる** (`preregistration.md §5.4` 第 10 版 / `.steering/20260805-g1-app-mode-and-log-rotation`)。",
           "type": [
@@ -38,6 +45,13 @@
         "hmm_version": {
           "type": [
             "string",
+            "null"
+          ]
+        },
+        "invitation_enabled": {
+          "description": "招待用の研究の条件（EH3 のときだけ出て、常に `true`）。**start 形状のみ**。\n\n`session_meta.intervention_enabled`（Nudge の研究の条件）とは別に持つ。EH3 では Nudge は出さず 招待だけを出すので、条件を 2 つとも記録に残して取り違えを防ぐ（ADR-035 D1 の内側の制約 ④ を 招待の条件として読む・`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 1 #1 = R-1 (i)）。 `Option` である（ADR-005）。",
+          "type": [
+            "boolean",
             "null"
           ]
         },
@@ -983,6 +997,58 @@
           ]
         }
       }
+    },
+    {
+      "description": "EH3 のその日の条件（`meta.eh3_mode` があるときだけ出る）。\n\nその日を稼働日として数えた時点（その日に打鍵を初めて観測した時点）に 1 回出す。すでに数えた日に アプリが起動したときにも、起動の時点で 1 回出す。ある時刻の条件は、その時刻と同じ日（現地時刻の 4:00 区切り）の `eh3_day` 行で読む。`day` は 1 始まりの稼働日の番号（1〜15）。期間の後の日には出さない。\n\n記録しないもの（`.steering/20261011-portrait-eh3-prereg/implementation-requirements.md` R-L1・R-P9）: 壁紙を書き込んだ時刻・復元の成否・「戻せない背景なので動かさない」。本人が肖像を止める・戻す・ 自分で替えると、その後の書き込みが無くなり、時刻の列から本人の操作が読めてしまうため（台帳 肖13）。\n\n時刻キーは `t`（区間指定削除の対象に入る・ADR-031 D6）。",
+      "type": "object",
+      "required": [
+        "condition",
+        "day",
+        "t",
+        "type"
+      ],
+      "properties": {
+        "condition": {
+          "$ref": "#/definitions/Eh3ConditionDto"
+        },
+        "day": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "eh3_day"
+          ]
+        }
+      }
+    },
+    {
+      "description": "EH3 の招待を出した時刻（理由を載せない）。`meta.eh3_mode` があるときだけ出る。\n\n解除の時刻は記録しない（即時の解除から「本人が止めた」が読めるため）。時間切れの解除は、提示の時刻と 閉じるまでの時間（定数）から決まる。本人が招待を止めた後に提示が出なくなることは、この行の列から 避けがたく読めるので、ADR-035 D4 の条件（系の負担の兆候としてだけ・オフライン・本人に返さない）の 中で扱い、同意文書に書く。\n\n時刻キーは `t`。",
+      "type": "object",
+      "required": [
+        "t",
+        "type"
+      ],
+      "properties": {
+        "t": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "invitation_present"
+          ]
+        }
+      }
     }
   ],
   "definitions": {
@@ -1087,6 +1153,16 @@
         "want_to_struggle",
         "just_close",
         "silent"
+      ]
+    },
+    "Eh3ConditionDto": {
+      "description": "EH3 のその日の条件。NDJSON 文字列は \"blank\" / \"decor\" / \"a_none\" / \"a_seed\"。\n\n空（元の壁紙）・D（日替わりの地模様）・A（その回の形）の終わりの扱いが none か seed か。",
+      "type": "string",
+      "enum": [
+        "blank",
+        "decor",
+        "a_none",
+        "a_seed"
       ]
     },
     "ExpectedQuadrantDto": {

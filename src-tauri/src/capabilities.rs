@@ -98,6 +98,10 @@ pub const KNOWN_LINE_TYPES: &[&str] = &[
     "focus_transition",
     "pointer_bin",
     "secure_input",
+    // EH3（肖像と招待の参加者内比較）: その日の条件と、招待を出した時刻。
+    //   EH3 のときだけ `config_gated` に入る（EH3 でない記録の `meta` は 1 byte も変えない・R-L6）。
+    "eh3_day",
+    "invitation_present",
 ];
 
 /// **閾値ゲート付き**の行種 (ADR-013 D1)。
@@ -255,9 +259,25 @@ pub fn config_gated() -> Vec<&'static str> {
     if crate::input::observe::SECURE_INPUT_AVAILABLE {
         v.push("secure_input");
     }
+    v.extend(eh3_line_types(crate::eh3::is_eh3()));
 
     v.sort_unstable();
     v
+}
+
+/// EH3 のときだけ宣言する行種 (純関数)。
+///
+/// `config_gated` に置く: EH3 でない走行では送出元が丸ごと止まるので、0 行は「判定不能」である。
+/// EH3 でないときは何も足さない（O1 / G1 / 通常運用の `meta.capabilities` は従来と同じ文字列・R-L6）。
+///
+/// `invitation_present` は招待の状態機械（PR2）が送出元になるまで宣言しない
+/// （`activity_label` と同じく、writer だけで宣言すると過大申告になる・ADR-013 D2）。
+fn eh3_line_types(eh3: bool) -> Vec<&'static str> {
+    if eh3 {
+        vec!["eh3_day"]
+    } else {
+        Vec::new()
+    }
 }
 
 /// ⚠️ ★ **`meta` 行自身**。[`unconditional`] に載せない (その行がこの `meta` なので)。
@@ -450,18 +470,22 @@ mod tests {
         //   ★ M5 で送出元ができたら [`activity_label_has_no_emitter_until_it_is_wired`] が赤になり、
         //   **宣言の追加を強制する**。
         #[cfg(target_os = "windows")]
-        let emitterless: &[&str] = &["secure_input", "activity_label"];
+        let emitterless: &[&str] = &["secure_input", "activity_label", "invitation_present"];
         // ★ 2026-08-24: O1 の非打鍵チャネル (`focus_transition`/`pointer_bin`/`secure_input`) は
         //   macOS 側の送出元を実装したので、この行から外した (`observe_macos.rs`)。
         // ⚠️★★★ 2026-09-11 (issue 008): `ime_shadow` も外した ——
         //   macOS 側の送出元ができた (`ime_compose::drive` → `lib.rs::emit_ime_shadow`)。
         //   → ★ 非 Windows で「送出元が無い行種」は**無くなった**。
+        // `invitation_present` は送出元（招待の状態機械）ができるまで EH3 でも宣言しない（[`eh3_line_types`]）。
         #[cfg(not(target_os = "windows"))]
-        let emitterless: &[&str] = &["activity_label"];
+        let emitterless: &[&str] = &["activity_label", "invitation_present"];
+        // EH3 の走行でだけ宣言する行種（送出元はある・テストは EH3 ではない）。
+        let mode_gated: &[&str] = &["eh3_day"];
 
         let mut lhs: BTreeSet<&str> = declared();
         lhs.insert(SELF_LINE_TYPE);
         lhs.extend(emitterless.iter().copied());
+        lhs.extend(mode_gated.iter().copied());
 
         let known: BTreeSet<&str> = KNOWN_LINE_TYPES.iter().copied().collect();
         assert_eq!(lhs, known, "宣言集合が KNOWN_LINE_TYPES を割り切っていない");
@@ -553,6 +577,18 @@ mod tests {
             hook_mac_src.contains("ime_compose::drive("),
             "hook_macos が ime_compose::drive を呼んでいない (状態機械が回らない)"
         );
+    }
+
+    /// EH3 の行種は EH3 のときだけ宣言し、EH3 でないときは何も足さない（R-L6）。
+    #[test]
+    fn eh3_line_types_are_declared_only_in_eh3() {
+        assert!(eh3_line_types(false).is_empty());
+        assert_eq!(eh3_line_types(true), vec!["eh3_day"]);
+        // 宣言したものには writer がある（過大申告の逆アサート）
+        let in_source = line_types_in_logger_source();
+        for t in eh3_line_types(true) {
+            assert!(in_source.contains(t), "{t:?} の writer が logger.rs に無い");
+        }
     }
 
     /// ⚠️ 3 群は互いに素であること (混ぜると判定表が壊れる・ADR-013 D1)。

@@ -3,14 +3,14 @@
 設計は 2026-10-11 に研究者が承認した（design.md）。
 
 ## PR1 — 記録とモード
-- [ ] `eh3.rs`: 印 `eh3.mode` の解析（order・a_first・grammar・drift）・モードの決まり方（O1 前提・G1 優先）・テスト
-- [ ] 稼働日の数え方（4:00 区切り・打鍵 1 回）と条件の決定・`~/.gse/eh3_state.json`・テスト
-- [ ] `lib.rs`: EH3 の分岐（`INVITATION_ENABLED`・O1 の ESM を切る・Nudge は偽のまま）
-- [ ] `meta` の断片 `eh3_mode` / `invitation_enabled`（`logger.rs`）・EH3 でないとき空のテスト
-- [ ] 行種 `eh3_day` / `invitation_present`: `schema_dto.rs`・`logger.rs`・`capabilities.rs`・`replay.rs`・`redaction.rs`・`anonymize.rs`
-- [ ] `emit_schema` → `schema/current.json`・parity・capabilities_gate
-- [ ] `sync-session.{sh,ps1}` の振り分け
-- [ ] cargo test / clippy / replay snapshot → code-reviewer ∥ security-checker → コミット・PR
+- [x] `eh3.rs`: 印 `eh3.mode` の解析（order・a_first・grammar・drift）・モードの決まり方（O1 前提・G1 優先）・テスト
+- [x] 稼働日の数え方（4:00 区切り・打鍵 1 回）と条件の決定・`~/.gse/eh3_state.json`・テスト
+- [x] `lib.rs`: EH3 の分岐（`INVITATION_ENABLED`・O1 の ESM を切る・Nudge は偽のまま）
+- [x] `meta` の断片 `eh3_mode` / `invitation_enabled`（`logger.rs`）・EH3 でないとき空のテスト
+- [x] 行種 `eh3_day` / `invitation_present`: `schema_dto.rs`・`logger.rs`・`capabilities.rs`・`replay.rs`・`redaction.rs`・`anonymize.rs`
+- [x] `emit_schema` → `schema/current.json`・parity・capabilities_gate
+- [x] `sync-session.{sh,ps1}` の振り分け（変更不要: O1 の門で止まる・design §2.3）
+- [x] cargo test / clippy / replay snapshot → code-reviewer ∥ security-checker（判断 4）→ コミット・PR
 
 ## PR2 — 招待
 - [ ] `analysis/invitation.rs` 状態機械と §3.5 のテスト（陽性対照つき）

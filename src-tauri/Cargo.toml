@@ -119,6 +119,8 @@ serde = { version = "1", features = ["derive"] }
 # JSON → parse → JSON のラウンドトリップを bit-equal に保証するため有効化。
 # 無効だとデシリアル時に数 ULP のドリフトが入り snapshot 比較が落ちる。
 serde_json = { version = "1", features = ["float_roundtrip"] }
+# EH3: 現地時刻の時差（4:00 区切りの日・招待の時間帯）。lockfile に既にある版（tauri 経由）を使う。
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # Phase 1 dataset-repo-setup: Rust 型から JSON Schema を機械生成し、
 # gse-dataset 側の schema と drift しないよう CI で検知するために使用。
 # bin `emit_schema` 専用。production path (logger.rs 本体) は触らない。
