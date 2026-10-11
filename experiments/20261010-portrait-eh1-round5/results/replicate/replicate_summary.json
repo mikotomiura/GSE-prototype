@@ -1,0 +1,513 @@
+{
+ "_note": "Descriptive (round 5 design 3.10): how often the upper bound max of each 0.035 control falls below the margin (the numeric condition of green), not an error rate or a power; no pass or fail. Read each control with its point estimate and the band rule.",
+ "seeds": [
+  20261109,
+  20261110,
+  20261111,
+  20261112,
+  20261113,
+  20261114,
+  20261115,
+  20261116,
+  20261117,
+  20261118,
+  20261119,
+  20261120,
+  20261121,
+  20261122,
+  20261123,
+  20261124,
+  20261125,
+  20261126,
+  20261127,
+  20261128
+ ],
+ "n_replicates": 20,
+ "n_crashed": 0,
+ "n_fit_failed": 0,
+ "instrument_commit": "664621297e924a2c92aa6ee64a0f44a649065488",
+ "config_sha256": "c61a9c12cd20aa8c550e15b2c3562c5cafbc6f44db4f2b326266552b5fc9831f",
+ "controls": {
+  "PCsize-raw-none": {
+   "name": "PCsize-raw-none@0.20",
+   "lam": 0.2,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 2,
+    "detected": 0,
+    "middle": 18,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 0.1,
+   "share_green_numeric_ci95": [
+    0.012348527170294808,
+    0.31698271401908235
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.9,
+   "gain_max": {
+    "mean": 0.02893802575722241,
+    "sd": 0.0018657396489158242,
+    "min": 0.024092890138619816,
+    "max": 0.03170948500385984
+   },
+   "gain_mean4": {
+    "mean": 0.019348685103966624,
+    "sd": 0.0017672938363995875,
+    "min": 0.015365650713752399,
+    "max": 0.021918707872188303
+   },
+   "share_gain_max_in_band": 0.3,
+   "upper_max": {
+    "min": 0.028016434197202157,
+    "median": 0.03367014852995955,
+    "max": 0.03617123480239742
+   },
+   "band": "out_of_band"
+  },
+  "PCsize-raw-diffuse": {
+   "name": "PCsize-raw-diffuse@0.25",
+   "lam": 0.25,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 0,
+    "detected": 17,
+    "middle": 3,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 0.0,
+   "share_green_numeric_ci95": [
+    0.0,
+    0.16843347098308528
+   ],
+   "share_detected": 0.85,
+   "share_middle": 0.15,
+   "gain_max": {
+    "mean": 0.03864099651218126,
+    "sd": 0.0033974810875913603,
+    "min": 0.03210436099431313,
+    "max": 0.04376573758031577
+   },
+   "gain_mean4": {
+    "mean": 0.027185022215436942,
+    "sd": 0.0022440115414213164,
+    "min": 0.023054428583354186,
+    "max": 0.030179529178307157
+   },
+   "share_gain_max_in_band": 1.0,
+   "upper_max": {
+    "min": 0.03632197227706248,
+    "median": 0.043926076979719675,
+    "max": 0.04900014625460906
+   },
+   "band": "in_band"
+  },
+  "PCsize-lattice-none": {
+   "name": "PCsize-lattice-none@0.20",
+   "lam": 0.2,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 4,
+    "detected": 0,
+    "middle": 16,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 0.2,
+   "share_green_numeric_ci95": [
+    0.05733399705003276,
+    0.43661400299666825
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.8,
+   "gain_max": {
+    "mean": 0.02847821031681021,
+    "sd": 0.0019855771266500647,
+    "min": 0.02515094346022473,
+    "max": 0.03196821466872968
+   },
+   "gain_mean4": {
+    "mean": 0.01736015373818972,
+    "sd": 0.0013519551600841486,
+    "min": 0.01503426098010699,
+    "max": 0.01995701531124
+   },
+   "share_gain_max_in_band": 0.15,
+   "upper_max": {
+    "min": 0.029119071719834223,
+    "median": 0.032977349965142844,
+    "max": 0.03624297964880543
+   },
+   "band": "out_of_band"
+  },
+  "PCsize-lattice-diffuse": {
+   "name": "PCsize-lattice-diffuse@0.25",
+   "lam": 0.25,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 0,
+    "detected": 9,
+    "middle": 11,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 0.0,
+   "share_green_numeric_ci95": [
+    0.0,
+    0.16843347098308528
+   ],
+   "share_detected": 0.45,
+   "share_middle": 0.55,
+   "gain_max": {
+    "mean": 0.034306641338976145,
+    "sd": 0.0023170683645477278,
+    "min": 0.03064359111484971,
+    "max": 0.038726672297533016
+   },
+   "gain_mean4": {
+    "mean": 0.024834348405229918,
+    "sd": 0.001777525893972161,
+    "min": 0.022297693262846308,
+    "max": 0.027940632747675997
+   },
+   "share_gain_max_in_band": 1.0,
+   "upper_max": {
+    "min": 0.03461763139362036,
+    "median": 0.03884806938706483,
+    "max": 0.04304737060993952
+   },
+   "band": "in_band"
+  },
+  "PCahead-raw-none-I300-W5": {
+   "name": "PCahead-raw-none-I300-W5@1.00",
+   "lam": 1.0,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 20,
+    "detected": 0,
+    "middle": 0,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 1.0,
+   "share_green_numeric_ci95": [
+    0.8315665290169146,
+    1.0
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.0,
+   "gain_max": {
+    "mean": 0.010130895228024772,
+    "sd": 0.0015065275771876,
+    "min": 0.007272261235144684,
+    "max": 0.013096923463041255
+   },
+   "gain_mean4": {
+    "mean": 0.006040723297407391,
+    "sd": 0.001731037173940793,
+    "min": 0.0034421408761133865,
+    "max": 0.009822367361107864
+   },
+   "share_gain_max_in_band": 0.0,
+   "upper_max": {
+    "min": 0.009836810642585,
+    "median": 0.013257675983458101,
+    "max": 0.01724196317923331
+   },
+   "band": "out_of_band"
+  },
+  "PCahead-raw-diffuse-I300-W5": {
+   "name": "PCahead-raw-diffuse-I300-W5@1.00",
+   "lam": 1.0,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 20,
+    "detected": 0,
+    "middle": 0,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 1.0,
+   "share_green_numeric_ci95": [
+    0.8315665290169146,
+    1.0
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.0,
+   "gain_max": {
+    "mean": 0.00926453033973218,
+    "sd": 0.0016118901741857005,
+    "min": 0.005912417564188144,
+    "max": 0.01156768176311429
+   },
+   "gain_mean4": {
+    "mean": 0.005489154088734906,
+    "sd": 0.0019697577677462276,
+    "min": 0.0026348892401082125,
+    "max": 0.0089958726240775
+   },
+   "share_gain_max_in_band": 0.0,
+   "upper_max": {
+    "min": 0.008149536878499628,
+    "median": 0.012179606541587173,
+    "max": 0.016012210849858013
+   },
+   "band": "out_of_band"
+  },
+  "PCahead-lattice-none-I300-W5": {
+   "name": "PCahead-lattice-none-I300-W5@1.00",
+   "lam": 1.0,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 20,
+    "detected": 0,
+    "middle": 0,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 1.0,
+   "share_green_numeric_ci95": [
+    0.8315665290169146,
+    1.0
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.0,
+   "gain_max": {
+    "mean": 0.012225837746196871,
+    "sd": 0.0012853384224995493,
+    "min": 0.009580938613539147,
+    "max": 0.014707923931771005
+   },
+   "gain_mean4": {
+    "mean": 0.00992548758788888,
+    "sd": 0.0017558925389291175,
+    "min": 0.0065878854106463935,
+    "max": 0.013343189419736279
+   },
+   "share_gain_max_in_band": 0.0,
+   "upper_max": {
+    "min": 0.012959444850961219,
+    "median": 0.01664647854463322,
+    "max": 0.020490918045784248
+   },
+   "band": "out_of_band"
+  },
+  "PCahead-lattice-diffuse-I300-W5": {
+   "name": "PCahead-lattice-diffuse-I300-W5@1.00",
+   "lam": 1.0,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 20,
+    "detected": 0,
+    "middle": 0,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 1.0,
+   "share_green_numeric_ci95": [
+    0.8315665290169146,
+    1.0
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.0,
+   "gain_max": {
+    "mean": 0.011781529904866361,
+    "sd": 0.001288168068628541,
+    "min": 0.009664681360894156,
+    "max": 0.014050710486571916
+   },
+   "gain_mean4": {
+    "mean": 0.009572786798335994,
+    "sd": 0.0014925776095908315,
+    "min": 0.007120012241032203,
+    "max": 0.012948007304035725
+   },
+   "share_gain_max_in_band": 0.0,
+   "upper_max": {
+    "min": 0.013462471538950983,
+    "median": 0.015616046272770176,
+    "max": 0.019931017742563464
+   },
+   "band": "out_of_band"
+  },
+  "PCahead-raw-none-I300-W5-recent60": {
+   "name": "PCahead-raw-none-I300-W5-recent60@1.00",
+   "lam": 1.0,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 20,
+    "detected": 0,
+    "middle": 0,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 1.0,
+   "share_green_numeric_ci95": [
+    0.8315665290169146,
+    1.0
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.0,
+   "gain_max": {
+    "mean": 0.005315789010829419,
+    "sd": 0.0014362796317074205,
+    "min": 0.0029386426393517295,
+    "max": 0.008594362944318812
+   },
+   "gain_mean4": {
+    "mean": 0.0019315672879117076,
+    "sd": 0.002001590712659257,
+    "min": -0.0019218557700089456,
+    "max": 0.004395064556671713
+   },
+   "share_gain_max_in_band": 0.0,
+   "upper_max": {
+    "min": 0.005212933445884167,
+    "median": 0.008286795092186468,
+    "max": 0.012755203386689966
+   },
+   "band": "out_of_band"
+  },
+  "PCahead-raw-diffuse-I300-W5-recent60": {
+   "name": "PCahead-raw-diffuse-I300-W5-recent60@1.00",
+   "lam": 1.0,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 20,
+    "detected": 0,
+    "middle": 0,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 1.0,
+   "share_green_numeric_ci95": [
+    0.8315665290169146,
+    1.0
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.0,
+   "gain_max": {
+    "mean": 0.005351939614145212,
+    "sd": 0.0014307787473384686,
+    "min": 0.0029116841244147817,
+    "max": 0.008624927121060666
+   },
+   "gain_mean4": {
+    "mean": 0.0019199279093904385,
+    "sd": 0.00198276971152172,
+    "min": -0.0017410200970493783,
+    "max": 0.0044865640589264455
+   },
+   "share_gain_max_in_band": 0.0,
+   "upper_max": {
+    "min": 0.0052274612822360185,
+    "median": 0.00832705603727952,
+    "max": 0.012772646086921335
+   },
+   "band": "out_of_band"
+  },
+  "PCahead-lattice-none-I300-W5-recent60": {
+   "name": "PCahead-lattice-none-I300-W5-recent60@1.00",
+   "lam": 1.0,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 20,
+    "detected": 0,
+    "middle": 0,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 1.0,
+   "share_green_numeric_ci95": [
+    0.8315665290169146,
+    1.0
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.0,
+   "gain_max": {
+    "mean": 0.005618380949746799,
+    "sd": 0.001104927104145517,
+    "min": 0.003466766314160541,
+    "max": 0.006756417177246843
+   },
+   "gain_mean4": {
+    "mean": 0.00312154251553554,
+    "sd": 0.0013668497060496491,
+    "min": 9.679010150839829e-05,
+    "max": 0.004902329294959734
+   },
+   "share_gain_max_in_band": 0.0,
+   "upper_max": {
+    "min": 0.0055050304199149285,
+    "median": 0.008663015667657857,
+    "max": 0.009804863700900902
+   },
+   "band": "out_of_band"
+  },
+  "PCahead-lattice-diffuse-I300-W5-recent60": {
+   "name": "PCahead-lattice-diffuse-I300-W5-recent60@1.00",
+   "lam": 1.0,
+   "n_measured": 20,
+   "counts": {
+    "green_numeric": 20,
+    "detected": 0,
+    "middle": 0,
+    "strong": 0,
+    "unmeasurable_nan": 0,
+    "unmeasurable_fit_failed": 0,
+    "unmeasurable_crashed": 0
+   },
+   "share_green_numeric": 1.0,
+   "share_green_numeric_ci95": [
+    0.8315665290169146,
+    1.0
+   ],
+   "share_detected": 0.0,
+   "share_middle": 0.0,
+   "gain_max": {
+    "mean": 0.005620594916710636,
+    "sd": 0.0011450930340361225,
+    "min": 0.0032869342226005127,
+    "max": 0.006905387588399536
+   },
+   "gain_mean4": {
+    "mean": 0.002994993163949293,
+    "sd": 0.001310983042124659,
+    "min": -0.00011877634091239653,
+    "max": 0.00496717120411444
+   },
+   "share_gain_max_in_band": 0.0,
+   "upper_max": {
+    "min": 0.005542315763506689,
+    "median": 0.008617728114560477,
+    "max": 0.009745906791732564
+   },
+   "band": "out_of_band"
+  }
+ },
+ "n_in_band": 2
+}

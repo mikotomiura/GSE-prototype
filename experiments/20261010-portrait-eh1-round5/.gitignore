@@ -1,0 +1,8 @@
+.venv/
+work-*/
+results/*-smoke/
+results/pilot-*/
+results/.partial-*/
+results/.old-*/
+results/*/.capabilities.json.tmp
+__pycache__/
