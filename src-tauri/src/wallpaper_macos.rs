@@ -130,9 +130,7 @@ impl Backend for MacBackend {
             let screen = screen_at(mtm, &id).ok_or_else(|| "no such screen".to_string())?;
             let ws = NSWorkspace::sharedWorkspace();
             let url = NSURL::fileURLWithPath(&NSString::from_str(&path));
-            let options = ws
-                .desktopImageOptionsForScreen(&screen)
-                .unwrap_or_default();
+            let options = ws.desktopImageOptionsForScreen(&screen).unwrap_or_default();
             // SAFETY: options は NSWorkspace 自身が返した辞書（またはその型の空の辞書）で、
             // キーと値の型は API の約束どおり。
             unsafe { ws.setDesktopImageURL_forScreen_options_error(&url, &screen, &options) }
