@@ -14,5 +14,5 @@
 
 ## 完了処理
 - [x] /cross-review 2 巡（1 巡目: Codex 4・code-reviewer 13。2 巡目: Codex 4・code-reviewer 10。すべて一次で確かめて反映。1 巡目で ENJA15 の見落としが見つかり判断 5）
-- [ ] commit → push → PR → CI → merge → main の CI
+- [x] commit → push → PR #355 → CI 緑 → merge（1a8dbc27）→ main の CI 成功
 - [ ] 研究者が著者へ問い合わせを送る（研究者の作業）
