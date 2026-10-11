@@ -247,8 +247,14 @@ struct FeatureProvenance {
     /// 長い無入力の前処理で落とした `feat` 行の量 (事前宣言 v1.3 §7.1・`idle_trim::input_gap_trim`)。
     /// ★ `idle_trim` が先に落とした行は数えない (削った行の合計は 2 つの和)。極によらない。
     /// `config.idle_trim_input_gap_ms == 0` なら 0 行・空配列。`spans` は 1 本 = 1 つの無入力の区間。
-    /// 露出は [`IdleTrimDto`] と同じ種類 (左端は入力を含む秒の直後・右端は次の入力の秒の直前)。
-    /// 加えて「その区間に `key` も `pointer_bin` も `idle_trim_input_gap_ms` 以上無かった」という不在が読める。
+    /// 露出は [`IdleTrimDto`] と同じ種類 (左端は入力を含む秒の直後・右端は次の入力の秒の直前。
+    /// ⚠️ ファイルの最初・最後に接する区間は、その境の行を含む)。加えて次が読める (security-checker LOW・2026-10-11):
+    /// - 右端からは、無入力の後の**最初の入力の秒**が読める。解放の行・キーを解決できない行・`pointer_bin` 行なら、
+    ///   `rows[]` の `activity` には出ない秒である。
+    /// - 「その区間に `key` も `pointer_bin` も `idle_trim_input_gap_ms` 以上無かった」という不在。24 時間のファイルでは、
+    ///   `spans` の列がそのまま 1 日の入力の有無の時刻表 (長い不在の時刻) として読める。
+    ///
+    /// ⚠️ 落とした行は `rows[]` から消えるので、封筒全体から読める量はむしろ減る。封筒は `gse-dataset` へ共有しない。
     input_gap_trim: IdleTrimDto,
 }
 
@@ -419,7 +425,7 @@ const P1_OPERATIONAL_KEYS: [&str; 11] = [
     "idle_trim_input_gap_ms",
 ];
 
-/// `idle_trim_max_ms` と `idle_trim_min_gap_ms` の上限 (24 時間・事前宣言 v1.2 §6.1)。
+/// `idle_trim_max_ms` / `idle_trim_min_gap_ms` / `idle_trim_input_gap_ms` の上限 (24 時間・事前宣言 v1.2 §6.1・v1.3 §7.1)。
 /// ⚠️ 自己 DoS の門ではなく、**24 時間を超える値 (明らかな桁の誤り) だけ**を止める。凍結値 60000 の
 /// 1440 倍未満の誤り (例: 1000 倍の 60000000 = 16.7 時間) は止めない —— その値は封筒の `overrides` に残る
 /// (研究者裁定 2026-10-09・上限を締めない)。
@@ -5936,13 +5942,15 @@ not json\n";
             );
         }
         for bad in [
-            vec!["idle_trim_min_gap_ms=2000"],     // = hole_gap_ms
-            vec!["idle_trim_min_gap_ms=0"],        // < hole_gap_ms
-            vec!["hole_gap_ms=60000"],             // 凍結の 60000 と等しくなる
-            vec!["idle_trim_max_ms=86400001"],     // 24 時間超
-            vec!["idle_trim_min_gap_ms=86400001"], // 24 時間超
-            vec!["idle_trim_max_ms=-1"],           // 型の不一致
-            vec!["idle_trim_min_gap_ms=60000.5"],  // 型の不一致
+            vec!["idle_trim_min_gap_ms=2000"], // = hole_gap_ms
+            vec!["idle_trim_min_gap_ms=0"],    // < hole_gap_ms
+            vec!["hole_gap_ms=60000"],         // 凍結の 60000 と等しくなる
+            vec!["idle_trim_max_ms=86400001"], // 24 時間超
+            // ⚠️ `idle_trim_input_gap_ms=0` を添える —— 添えないと v1.3 の「長い穴 ≤ 入力の間の閾値」で先に落ち、
+            //   24 時間の上限の検査を消しても緑のままになる (code-reviewer M-2)。
+            vec!["idle_trim_min_gap_ms=86400001", "idle_trim_input_gap_ms=0"], // 24 時間超
+            vec!["idle_trim_max_ms=-1"],                                       // 型の不一致
+            vec!["idle_trim_min_gap_ms=60000.5"],                              // 型の不一致
         ] {
             let sets: Vec<String> = bad.iter().map(|s| s.to_string()).collect();
             assert!(

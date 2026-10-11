@@ -34,7 +34,7 @@
 次の 2 つを `excluded_rule_d` に載せる (⚠️ **ファイルは削除しない**。除外するかは manifest を読む側の責務):
 
 - `rule_d`: `config.q` / `config.warmup_count` が対応表と合わない。
-- `param_mismatch`: 意図して渡したパラメータ (7 キー) と `config` の値が違う (CLI が `--set` を無視した、など)。
+- `param_mismatch`: 意図して渡したパラメータ (8 キー) と `config` の値が違う (CLI が `--set` を無視した、など)。
 
 ## ⚠️★★★ PG-1 (事前宣言 §2.3)
 
@@ -54,7 +54,7 @@ manifest には、どちらを使ったか (`frozen` = 既定 / `file` = `--prer
       "prereg_source": "frozen" | "file", "prereg_sha256_prefix": "...",
       "envelope_identity": {"prereg_version", "prereg_sha256_prefix", "hmm_version", "provenance_hmm_version", "config_source"},
       "n_participants": n, "n_sessions": n, "sessions": [{"participant", "session"}, ...],
-      "configs": [{"id", "kind": "selection" | "sensitivity", "params": {7 キー}}, ...],
+      "configs": [{"id", "kind": "selection" | "sensitivity", "params": {8 キー}}, ...],
       "excluded_rule_d": [{"config_id", "participant", "session", "pole", "reasons": [...], "mismatch": {key: {"observed", "intended"}}}, ...],
       "outputs": [{"path": "<config_id>/<P-ID>/<session>/<pole>.json", "sha256": "..."}, ...]
     }
@@ -256,7 +256,7 @@ def build_grid(prereg):
     """凍結 JSON から探索格子を組む。`[{"id", "kind", "params"}]` (選択 → 感度の順・JSON の並び順)。
 
     ⚠️ `search_space` / `search_roles` / `operational` の形が想定と違えば `GridError` (JSON は直さない)。
-    `params` は 7 キー (`q` は `normalize` 済みの `Decimal`・残りは int)。
+    `params` は 8 キー (`q` は `normalize` 済みの `Decimal`・残りは int)。
     """
     sections = {}
     for name in ("operational", "search_space", "search_roles"):
@@ -333,7 +333,7 @@ def build_grid(prereg):
 
 
 def set_args(params):
-    """`run-features-all-poles.sh` に `--` の後ろで渡す引数 (7 キーすべて・`q` と `warmup_count` は対)。"""
+    """`run-features-all-poles.sh` に `--` の後ろで渡す引数 (8 キーすべて・`q` と `warmup_count` は対)。"""
     args = ["--"]
     for key in TUNABLE_KEYS:
         args += ["--set", f"{key}={_fmt_value(params[key])}"]
@@ -422,7 +422,7 @@ def run_poles(bash, ndjson, outdir, params):
 
 
 def _param_diffs(config, intended):
-    """意図して渡した 7 キーと封筒 `config` の値が違うキーを `{key: {"observed", "intended"}}` で返す。"""
+    """意図して渡した 8 キーと封筒 `config` の値が違うキーを `{key: {"observed", "intended"}}` で返す。"""
     diffs = {}
     for key in TUNABLE_KEYS:
         observed, want = config.get(key), intended[key]

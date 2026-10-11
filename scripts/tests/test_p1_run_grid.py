@@ -287,11 +287,11 @@ class GridBuildTest(unittest.TestCase):
                 # 選択でない 2 キーは運用値
                 self.assertEqual((params["w_ms"], params["b_ms"]), (30000, 30000), config["id"])
             else:
-                # ★ 感度 5 は運用値の 100 (q は運用値の 0.99)
+                # ★ 感度 6 は運用値の 100 (q は運用値の 0.99)
                 self.assertEqual(params["warmup_count"], 100, config["id"])
                 self.assertEqual(params["q"], Decimal("0.99"), config["id"])
                 self.assertEqual((params["hole_gap_ms"], params["t1a_window_ms"]), (2000, 30000), config["id"])
-            # ★ `--set` の引数: 7 キーすべて・`q` と `warmup_count` は同じ呼び出しで対になる
+            # ★ `--set` の引数: 8 キーすべて・`q` と `warmup_count` は同じ呼び出しで対になる
             args = grid.set_args(params)
             self.assertEqual(args[0], "--")
             pairs = [args[i + 1] for i in range(1, len(args), 2)]

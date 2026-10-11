@@ -146,6 +146,8 @@ pub fn idle_trim(
 ///    `file_last` より前なら末尾に `file_last` を置く (入力が無ければ 2 点だけ)。
 /// 2. 隣り合う 2 点 `a < b` の差が `min_input_gap_ms` **以上**なら、その間の行を落とす:
 ///    - `a` が入力なら、`a` 以上で最初の `feat` 行 (`a` を含む秒の行) を残し、それより後を落とす。
+///      ⚠️ `a` が `feat` 行の穴の中やファイルの最初より前にあるときは、残る行は `a` を含まず、
+///      穴の後ろ (ファイルの最初) の行になる ([`idle_trim`] の `R` と同じ規約)。
 ///      `a` が `file_first` なら、`file_first` 以上を落とす。
 ///    - `b` が入力なら、`b` より前を落とす (`b` を含む秒の行は残る)。`b` が `file_last` なら、`file_last` 以下を落とす。
 /// 3. `min_input_gap_ms == 0` なら何も落とさない。
@@ -172,7 +174,8 @@ pub fn input_gap_trim(
     let mut feat: Vec<u64> = feat_ts.to_vec();
     feat.sort_unstable();
     feat.dedup();
-    if feat.is_empty() || min_input_gap_ms == 0 {
+    // ⚠️ 境が逆なら何も落とさない (呼び出し側は同じ列の min / max を渡すので起きないが、pub なので守る)。
+    if feat.is_empty() || min_input_gap_ms == 0 || file_first > file_last {
         return (feat, IdleTrimSummary::default());
     }
     let mut input: Vec<u64> = input_ts.to_vec();
@@ -394,6 +397,34 @@ mod tests {
             .filter(|t| after_idle.binary_search(t).is_ok())
             .collect();
         assert_eq!(kept, union);
+    }
+
+    /// 境は idle trim の**前の**列から取る。idle trim が末尾を 30 分削ると後の列の最後は縮むが、
+    /// 無入力の長さは元の列で測る (code-reviewer M-1)。★ 後の列の境を渡すと何も落ちない (対照)。
+    #[test]
+    fn input_gap_is_measured_against_the_bounds_before_idle_trim() {
+        // 入力は 0 秒だけで、`feat` 行は 3000 秒まで続く。idle trim は 1201..=3000 秒を落とす。
+        let feat = feat_secs(0, 3000);
+        let input = [0];
+        let (after_idle, idle) = idle_trim(&feat, &input, MIN_GAP, MAX_TRIM);
+        assert_eq!(after_idle, feat_secs(0, 1200));
+        assert_eq!(idle.dropped_feat_rows, 1800);
+        let (kept, summary) = input_gap_trim(&after_idle, &input, 0, 3_000_000, INPUT_GAP);
+        assert_eq!(kept, vec![0]);
+        assert_eq!(summary.dropped_feat_rows, 1200);
+        assert_eq!(summary.spans, vec![(1_000, 1_200_000)]);
+        let (wrong, wrong_summary) = input_gap_trim(&after_idle, &input, 0, 1_200_000, INPUT_GAP);
+        assert_eq!(wrong, after_idle);
+        assert_eq!(wrong_summary, IdleTrimSummary::default());
+    }
+
+    /// 境が逆 (`file_first > file_last`) なら何も落とさない (debug ビルドで引き算が下回らない・security-checker LOW)。
+    #[test]
+    fn reversed_bounds_drop_nothing() {
+        let feat = feat_secs(0, 2000);
+        let (kept, summary) = input_gap_trim(&feat, &[], 2_000_000, 0, INPUT_GAP);
+        assert_eq!(kept, feat);
+        assert_eq!(summary, IdleTrimSummary::default());
     }
 
     /// `[from_s, to_s]` 秒の 1Hz の `feat` 行 (ms)。

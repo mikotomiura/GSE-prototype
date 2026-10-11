@@ -17,7 +17,7 @@ input_gap_trim(feat_ts, input_ts, file_first, file_last, min_input_gap_ms) -> (k
 
 `file_first` / `file_last` は前処理の前の `feat` 列の最小・最大の時刻（呼び出し側は idle trim の後の列を渡すので、境を別に渡す）。
 
-1. 入力の時刻を昇順に並べ、`file_first` と `file_last` を両端に置く（`[file_first, i_1, …, i_n, file_last]`。範囲の外の入力も残す）。
+1. 入力の時刻を昇順に並べる（範囲の外の入力も残す）。最初の入力が `file_first` より後のときだけ頭に `file_first` を、最後の入力が `file_last` より前のときだけ末尾に `file_last` を置く（点の列が昇順になる。code-reviewer L-8 で直した）。
 2. 隣り合う 2 点 `a < b` の差 `b − a` が `min_input_gap_ms` **以上**なら、その間を落とす区間とする:
    - `a` が入力なら、`R` = `a` 以上で最初の `feat` 行（最後の入力を含む秒の行・v1.2 判断 6 と同じ）を残し、`R < t` の行を落とす。`a` が `file_first` なら、`file_first ≤ t` の行を落とす。
    - `b` が入力なら、`t < b` の行を落とす（`b` を含む秒の行 = `b` 以上で最初の行は残る）。`b` が `file_last` なら、`t ≤ file_last` の行を落とす。

@@ -623,6 +623,29 @@ class Pg1DistributionTest(LayoutCase):
         with self.assertRaises(fio.EnvelopeError):
             fio.project_pg1(broken)
 
+    def test_check_envelope_requires_trim_provenance_for_its_config_key(self):
+        # ★ 1 枚の封筒を直接検査する (極の間の一致の検査を通さない)。⚠️ 3 極のうち 1 極だけを壊すと、
+        #   極の間の不一致でも落ちるので、`config` に値があれば `provenance` も必須、という規則そのものを見られない。
+        ok = make_envelope("baseline", 1)
+        self.assertIs(fio.check_envelope(ok), ok)
+        for config_key, trim_key in (("idle_trim_max_ms", "idle_trim"), ("idle_trim_input_gap_ms", "input_gap_trim")):
+            for label, broken in (
+                ("欠ける", lambda env, k=trim_key: env["provenance"].pop(k)),
+                ("行数が負", lambda env, k=trim_key: env["provenance"][k].__setitem__("dropped_feat_rows", -1)),
+                ("spans の向きが逆", lambda env, k=trim_key: env["provenance"][k].__setitem__("spans", [{"a_ms": 5, "b_ms": 4}])),
+            ):
+                with self.subTest(trim=trim_key, case=label):
+                    env = make_envelope("baseline", 1)
+                    broken(env)
+                    with self.assertRaises(fio.EnvelopeError):
+                        fio.check_envelope(env)
+            # ★ 対照: 値を持たない旧い封筒には `provenance` を求めない
+            with self.subTest(trim=trim_key, case="旧い封筒"):
+                env = make_envelope("baseline", 1)
+                env["config"].pop(config_key)
+                env["provenance"].pop(trim_key)
+                self.assertIs(fio.check_envelope(env), env)
+
     def test_discover_returns_sorted_layout(self):
         root = self.base_layout()
         found = fio.discover(root)

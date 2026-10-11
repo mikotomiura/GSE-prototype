@@ -34,3 +34,24 @@
 
 - **トレードオフ**: 30 分以上の休憩の直前に立った本物の onset は消える（v1.2 の代償 9 と同じ向き）。10〜30 分の区間が離席だった場合は残る（取りこぼし）。台紙に区分が無いので、どちらの量も測れていない。
 - **見直しタイミング**: 区分の付いたメモか、電源・画面の状態の行が手に入ったとき。
+
+## 判断 7: 作業中の点検（code-reviewer ∥ security-checker・2026-10-11）の指摘への対応
+
+対象は `9f1613b2`。HIGH は両者とも 0。
+
+| 指摘 | 対応 |
+|---|---|
+| CR M-1: 「境は idle trim の前の列から取る」を確かめるテストが無い（配線を後の列に変えても全部緑） | 単体テスト `input_gap_is_measured_against_the_bounds_before_idle_trim`（後の列の境を渡すと何も落ちない対照つき）と、結合テスト `input_gap_trim_measures_the_tail_against_the_untrimmed_file`（40 分の末尾・idle trim 1800 行＋本前処理 599 行）を足した。配線を後の列の境に変える変異で結合テストが赤になることを確かめた |
+| CR M-2: 陰性対照 `idle_trim_min_gap_ms=86400001` が新しい検査で先に落ち、24 時間の上限を消しても緑 | `idle_trim_input_gap_ms=0` を添えた |
+| CR M-3: 1 極だけ壊すテストは極の間の不一致でも落ち、「値があれば `provenance` も必須」の規則を見ていない | `check_envelope` を 1 枚に直接呼ぶテストを足した（2 種 × 3 通り＋旧い封筒の対照）。規則を外す変異で 3 件が赤 |
+| CR L-4: 「`a` を含む秒の行」が成り立たない場合（穴の中・境の外の入力） | doc comment に注記した（`idle_trim` の `R` と同じ規約） |
+| CR L-5 / SC LOW: `input_gap_trim` の doc の端の説明と露出の記述 | ファイルの境に接する区間の端、右端から読める最初の入力の秒、24 時間ファイルで在不在の時刻表として読めることを足した |
+| CR L-6: Python の「7 キー」「感度 5」の書き換え漏れ | 直した |
+| CR L-7: `IDLE_TRIM_LIMIT_MS` の doc | 3 キーに使うと書いた |
+| CR L-8: design.md の点の列の記述が古い | 直した |
+| CR L-9: 長い穴をまたぐ無入力の代償が無い | 事前宣言 §7.5 に代償 17 として足した（旧 17 は 18 へ・宣言と ADR-030 補訂 5 の参照も直した） |
+| SC MEDIUM: `secrets-filter.sh` が O1 のセッション名（`gse_o1_2026…`）を止めない | 今回は /cross-review に `.steering` を渡さない（パス限定）。フィルタの穴は別 issue として研究者に報告する |
+| SC LOW: `file_first > file_last` で debug ビルドが panic しうる | 先頭でガードし、テスト `reversed_bounds_drop_nothing` を足した |
+| SC LOW: 事前宣言に研究者の就寝・昼寝のメモが逐語で入っている（事前宣言は将来公開されうる） | 「30 分以上打っていない区間は、おおむね作業していなかった」に抽象化した。逐語は repo（private）の `.steering` の判断 3〜6 に残す |
+| SC LOW: `idle_trim_input_gap_ms` の下限が `idle_trim_min_gap_ms` 連動で、3 キーを一緒に下げると打鍵の間がほぼ全部落ちる | 対応しない。凍結値から外れた値はすべて `overrides` に残り、§6.3 で `idle_trim_min_gap_ms` は固定 |
+| SC LOW: verification.md に生活の区間の時刻がある | 残す（repo は private・メモとの突き合わせに要る）。Codex には渡さない |
