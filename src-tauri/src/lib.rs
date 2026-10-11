@@ -54,6 +54,12 @@ pub mod sensors;
 // メニューバー / タスクトレイの常駐アイコン (計測中かの表示 + いつでも終了)。
 // ⚠️ 窓を閉じると UI ごと消えるのに計測は生きている、という穴を塞ぐ。
 pub mod tray;
+// EH3: 肖像を壁紙に書く層（元の壁紙の保存・本人の差し替えの検出・復元の確認）。何も記録しない（R-P9）。
+pub mod wallpaper;
+#[cfg(target_os = "macos")]
+mod wallpaper_macos;
+#[cfg(target_os = "windows")]
+mod wallpaper_windows;
 
 use crate::analysis::engine::{CognitiveState, CognitiveStateEngine};
 use crate::analysis::heads::TaskDomain;
@@ -648,6 +654,342 @@ impl UtcOffsetCache {
 /// 分析スレッドがこれを見て、新しいファイルにもその日の `eh3_day` 行を出し直す
 /// （ある時刻の条件をファイルの中で読めるようにする。条件は日中に変わらない）。
 static EH3_REEMIT_GEN: AtomicU64 = AtomicU64::new(0);
+
+/// EH3: 壁紙のスレッドへの指示。
+enum WallCmd {
+    /// この画を出す（元の壁紙も含む）。
+    Show(crate::analysis::portrait::Show),
+    /// 期間の後・やめたとき: seed の印を残さずに元へ戻し、保存した元の状態を消す。
+    Finish,
+    /// 本人が「肖像を止めて壁紙を戻す」を選んだ（トレイ）。以後は書かない。⚠️ 記録しない。
+    StopByPerson,
+    /// ここまでの指示を終えたら知らせる（終了の前に seed を書き終えるのを待つ）。
+    Ack(crossbeam_channel::Sender<()>),
+}
+
+/// EH3: 壁紙のスレッドの送り口。⚠️ 分析スレッドより先に `run()` の中で作る（起動直後の画を落とさない）。
+static WALL_TX: std::sync::OnceLock<crossbeam_channel::Sender<WallCmd>> =
+    std::sync::OnceLock::new();
+/// EH3: 壁紙のスレッドの受け口（`setup()` で壁紙のスレッドが受け取るまでここに置く）。
+static WALL_RX: Mutex<Option<crossbeam_channel::Receiver<WallCmd>>> = Mutex::new(None);
+
+/// 壁紙の指示の通り道を作る（EH3 のとき、または保存した元の状態が端末に残っているときだけ）。
+/// 分析スレッドより先に呼ぶ。指示は壁紙のスレッドが動き出すまで溜まる。
+fn init_wall_channel() {
+    let pending = crate::wallpaper::default_paths().is_some_and(|(store, _)| store.is_file());
+    if !crate::eh3::is_eh3() && !pending {
+        return;
+    }
+    let (tx, rx) = crossbeam_channel::bounded::<WallCmd>(64);
+    if WALL_TX.set(tx).is_ok() {
+        *WALL_RX.lock().unwrap_or_else(|p| p.into_inner()) = Some(rx);
+    }
+}
+
+/// EH3: 終了の前に、分析スレッドへ肖像の「終わり」を頼む（終了の経路が立て、分析スレッドが下ろす）。
+static PORTRAIT_END_REQUESTED: AtomicBool = AtomicBool::new(false);
+/// EH3: 分析スレッドが終わりを書き終えたら知らせる先。
+static PORTRAIT_END_DONE: std::sync::OnceLock<(
+    crossbeam_channel::Sender<()>,
+    crossbeam_channel::Receiver<()>,
+)> = std::sync::OnceLock::new();
+
+fn send_wall(cmd: WallCmd) {
+    if let Some(tx) = WALL_TX.get() {
+        let _ = tx.try_send(cmd);
+    }
+}
+
+/// 壁紙のスレッドを起こす（EH3 のとき、または保存した元の状態が端末に残っているとき）。
+///
+/// ⚠️ ここは何も記録しない（`wallpaper.rs` のモジュールの doc・R-P9）。applog に出すのは、起動時の
+/// 「肖像の層が使えるか」の 1 行だけ（時刻と本人の操作が対応しない粒度）。
+fn spawn_wallpaper_thread(app: &tauri::AppHandle) {
+    let Some((store_path, work_dir)) = crate::wallpaper::default_paths() else {
+        if crate::eh3::is_eh3() {
+            tracing::warn!("EH3 portrait layer: unavailable (home dir)");
+        }
+        return;
+    };
+    let eh3 = crate::eh3::is_eh3();
+    // EH3 でもなく、戻すべき元の状態も無いときは通り道が作られていない（O1 / 通常運用は何もしない）
+    let Some(rx) = WALL_RX.lock().unwrap_or_else(|p| p.into_inner()).take() else {
+        return;
+    };
+    #[cfg(target_os = "macos")]
+    let runner: crate::wallpaper_macos::MainRunner = {
+        let handle = app.clone();
+        std::sync::Arc::new(move |job: Box<dyn FnOnce() + Send>| {
+            let _ = handle.run_on_main_thread(job);
+        })
+    };
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+    thread::spawn(move || {
+        #[cfg(target_os = "windows")]
+        let backend = match crate::wallpaper_windows::WindowsBackend::new() {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!("EH3 portrait layer: unavailable ({e})");
+                return;
+            }
+        };
+        #[cfg(target_os = "macos")]
+        let backend = crate::wallpaper_macos::MacBackend::new(runner);
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
+        {
+            let mut manager = crate::wallpaper::Manager::new(backend, store_path, work_dir);
+            if !eh3 {
+                // EH3 の印が外れた後の起動（やめた）: seed の印を残さずに元へ戻す。
+                manager.restore(true);
+                return;
+            }
+            match manager.readiness() {
+                Ok(true) => tracing::info!("EH3 portrait layer: enabled"),
+                Ok(false) => tracing::info!("EH3 portrait layer: enabled (checked later)"),
+                Err(why) => tracing::info!("EH3 portrait layer: not used ({why:?})"),
+            }
+            while let Ok(cmd) = rx.recv() {
+                match cmd {
+                    WallCmd::Show(show) => manager.show(&show),
+                    WallCmd::Finish => {
+                        manager.restore(true);
+                    }
+                    WallCmd::StopByPerson => manager.stop_by_person(),
+                    WallCmd::Ack(done) => {
+                        let _ = done.send(());
+                    }
+                }
+            }
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            let _ = (store_path, work_dir, rx);
+        }
+    });
+}
+
+/// トレイの「肖像を止めて壁紙を戻す」。⚠️ 記録しない（NDJSON・applog とも・R-P9）。
+pub(crate) fn stop_portrait_by_person() {
+    send_wall(WallCmd::StopByPerson);
+}
+
+/// 終了の前に肖像の「終わり」（A-seed なら seed）を書き終えるのを待つ時間（固定）。
+const PORTRAIT_EXIT_WAIT_MS: u64 = 2000;
+
+/// 終了の前に肖像の「終わり」を書かせ、**いつも同じ長さだけ**待つ。
+///
+/// ⚠️ 待つ長さを書き込みの成否や本人の操作（止めた・替えた）で変えない: 変えると `session_end` の時刻が
+/// 本人の操作と系統的にずれ、時刻から操作が読める（R-P9 の横の経路）。
+/// ⚠️ メインスレッドで呼ばない（macOS の壁紙の書き込みはメインスレッドで動くので、待つと書けない）。
+fn finish_portrait_before_exit() {
+    if !crate::eh3::is_eh3() || WALL_TX.get().is_none() {
+        return;
+    }
+    let started = std::time::Instant::now();
+    let (_, done_rx) = PORTRAIT_END_DONE.get_or_init(|| crossbeam_channel::bounded(1));
+    PORTRAIT_END_REQUESTED.store(true, Ordering::Release);
+    let wait = Duration::from_millis(PORTRAIT_EXIT_WAIT_MS);
+    let _ = done_rx.recv_timeout(wait);
+    if let Some(rest) = wait.checked_sub(started.elapsed()) {
+        thread::sleep(rest);
+    }
+}
+
+/// EH3: 分析スレッドで肖像の層を動かす殻（OS 依存の値をここで集め、純ロジックへ渡す）。
+struct PortraitRunner {
+    layer: crate::analysis::portrait::PortraitLayer,
+    day: Option<i64>,
+    last_tick_ms: Option<u64>,
+    presses: Vec<u64>,
+    finished: bool,
+    /// 材料にしている秒（epoch 秒）と、その秒の F 系列（出ていれば）。
+    second: Option<u64>,
+    feat_in_second: Option<[f64; 4]>,
+    /// 記録の一時停止の後、F 系列の 30 秒の窓から停止中の打鍵が抜けるまで材料にしない。
+    material_blocked_until_ms: u64,
+    /// 始まりを済ませ、まだ終わりを通っていない。
+    in_session: bool,
+    last_start_ms: u64,
+}
+
+impl PortraitRunner {
+    /// 実時間がこれ以上飛んだら、スリープから戻ったとみなす（招待の殻と同じ）。
+    const GAP_AS_RESUME_MS: u64 = 30_000;
+
+    /// F 系列の窓の長さ（`features.rs` の 30 秒のローリングウィンドウ）。
+    const FEATURE_WINDOW_MS: u64 = 30_000;
+
+    fn new(a: crate::eh3::Assignment) -> Self {
+        Self {
+            layer: crate::analysis::portrait::PortraitLayer::new(a),
+            day: None,
+            last_tick_ms: None,
+            presses: Vec::new(),
+            finished: false,
+            second: None,
+            feat_in_second: None,
+            material_blocked_until_ms: 0,
+            in_session: false,
+            last_start_ms: 0,
+        }
+    }
+
+    fn emit(show: Option<crate::analysis::portrait::Show>) {
+        if let Some(s) = show {
+            send_wall(WallCmd::Show(s));
+        }
+    }
+
+    /// 始まり（起動・復帰・日付の区切りの直後）。その日をまだ数えていなければ何も変えない。
+    fn start(&mut self, now: u64, off: i32, cond: Option<crate::eh3::Condition>) {
+        let day = crate::eh3::local_day(now, off);
+        self.day = Some(day);
+        self.presses.clear();
+        self.second = None;
+        self.feat_in_second = None;
+        self.in_session = true;
+        self.last_start_ms = now;
+        Self::emit(self.layer.start(now, day, cond, rand::random::<u64>()));
+    }
+
+    /// 復帰（終わりを通っていなければ、先に終わりを通す。直前に始めたばかりなら何もしない）。
+    fn resume(&mut self, now: u64, off: i32, cond: Option<crate::eh3::Condition>) {
+        if self.in_session && now.saturating_sub(self.last_start_ms) < 60_000 {
+            return; // 時計の飛びと復帰の通知の両方で 2 回始めない
+        }
+        if self.in_session {
+            self.end(); // スリープの直前の通知を取り逃した
+        }
+        self.start(now, off, cond);
+    }
+
+    /// その日を初めて数えた。
+    fn assigned(&mut self, now: u64, off: i32, cond: crate::eh3::Condition) {
+        let day = crate::eh3::local_day(now, off);
+        Self::emit(
+            self.layer
+                .condition_assigned(now, day, cond, rand::random::<u64>()),
+        );
+    }
+
+    /// 終わり（終了・スリープの直前・日付の区切り）。
+    fn end(&mut self) {
+        self.in_session = false;
+        Self::emit(self.layer.end());
+    }
+
+    /// この tick の F 系列（出たとき）を、いまの秒の材料として覚える。
+    fn feat(&mut self, f: &crate::analysis::loop_step::FeatSnapshot) {
+        self.feat_in_second = Some([f.f1, f.f3, f.f4, f.f6]);
+    }
+
+    /// 秒が進んだら、終わった秒の材料を層へ渡す（F 系列が出なかった秒も渡す: F は NaN・打鍵の有無は
+    /// 打鍵の時刻から作る。Python の試作と同じく 1 秒ごと）。
+    /// ⚠️ 記録の一時停止中と、その後 F 系列の窓（30 秒）から停止中の打鍵が抜けるまでは、打鍵を材料にしない。
+    fn advance_second(&mut self, now: u64, paused: bool) {
+        use crate::analysis::portrait::generator::Second;
+        if paused {
+            self.material_blocked_until_ms = now + Self::FEATURE_WINDOW_MS;
+        }
+        let sec = now / 1000;
+        let Some(prev) = self.second else {
+            self.second = Some(sec);
+            return;
+        };
+        if sec == prev {
+            return;
+        }
+        self.second = Some(sec);
+        let blocked = paused || now < self.material_blocked_until_ms;
+        let presses = std::mem::take(&mut self.presses);
+        let feat = self.feat_in_second.take();
+        let s = match (blocked, feat) {
+            (true, _) => Second {
+                f1: f64::NAN,
+                f3: f64::NAN,
+                f4: f64::NAN,
+                f6: f64::NAN,
+                active: false,
+            },
+            (false, f) => {
+                let [f1, f3, f4, f6] = f.unwrap_or([f64::NAN; 4]);
+                Second {
+                    f1,
+                    f3,
+                    f4,
+                    f6,
+                    active: !presses.is_empty(),
+                }
+            }
+        };
+        let presses = if blocked { Vec::new() } else { presses };
+        Self::emit(self.layer.second(now, s, &presses));
+    }
+
+    /// 毎回のループで: 日付の区切り・復帰・期間の後・電源の出来事・終了の前を扱う。
+    fn tick(
+        &mut self,
+        now: u64,
+        off: i32,
+        tracker: &crate::eh3::DayTracker,
+        a: &crate::eh3::Assignment,
+        power: Option<crate::input::power::PowerEvent>,
+    ) {
+        use crate::input::power::PowerEvent;
+        // 終了の前の「終わり」は、期間の後でも応える（待たせない）
+        let end_requested = PORTRAIT_END_REQUESTED.swap(false, Ordering::AcqRel);
+        if end_requested {
+            if !self.finished {
+                self.end();
+            }
+            if let Some((done_tx, _)) = PORTRAIT_END_DONE.get() {
+                // 壁紙のスレッドが書き終えたら、終了の経路へ知らせる
+                let (ack_tx, ack_rx) = crossbeam_channel::bounded(1);
+                send_wall(WallCmd::Ack(ack_tx));
+                let done = done_tx.clone();
+                thread::spawn(move || {
+                    let _ = ack_rx.recv_timeout(Duration::from_millis(1800));
+                    let _ = done.try_send(());
+                });
+            }
+            return;
+        }
+        if self.finished {
+            return;
+        }
+        if tracker.period_over(now, off) {
+            self.finished = true;
+            send_wall(WallCmd::Finish);
+            return;
+        }
+        let day = crate::eh3::local_day(now, off);
+        let resumed_by_gap = self
+            .last_tick_ms
+            .is_some_and(|t| now.saturating_sub(t) >= Self::GAP_AS_RESUME_MS || now < t);
+        self.last_tick_ms = Some(now);
+        match power {
+            Some(PowerEvent::Suspending) => {
+                if self.in_session {
+                    self.end();
+                }
+            }
+            Some(PowerEvent::Resumed) => self.resume(now, off, tracker.today(now, off, a)),
+            None => {}
+        }
+        if self.day.is_some_and(|d| d != day) {
+            if self.in_session {
+                self.end();
+            }
+            self.start(now, off, tracker.today(now, off, a));
+        } else if resumed_by_gap {
+            self.resume(now, off, tracker.today(now, off, a));
+        }
+        if self.in_session {
+            self.advance_second(now, crate::recording::is_paused());
+        }
+    }
+}
 
 /// EH3: いま招待を出しているか（分析スレッドが書き、overlay が `get_invitation_state` で読む）。
 static INVITATION_PRESENT: AtomicBool = AtomicBool::new(false);
@@ -3311,12 +3653,21 @@ fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>) {
         return;
     }
     tracing::info!("shutdown requested");
+    // EH3: 肖像の「終わり」（A-seed なら seed）を書いてから `End` を送る。待ち合わせはこの関数を呼んだ
+    //   スレッド（メインのことがある）ではなく、下のバックグラウンドのスレッドで行う。
+    let portrait_end = crate::eh3::is_eh3() && WALL_TX.get().is_some();
 
     // ログ終了マーカーを送信し、shutdown_rx を取得
-    let (session_path, shutdown_rx) = {
+    let (session_path, shutdown_rx, log_tx_end) = {
         let guard = log.lock().unwrap_or_else(|p| p.into_inner());
-        let _ = guard.tx.try_send(LogEntry::End);
-        (guard.current_path(), guard.shutdown_rx.clone())
+        if !portrait_end {
+            let _ = guard.tx.try_send(LogEntry::End);
+        }
+        (
+            guard.current_path(),
+            guard.shutdown_rx.clone(),
+            guard.tx.clone(),
+        )
     };
 
     let researcher_flow = wants_researcher_exit_flow(g1_mode().is_none(), &session_path);
@@ -3325,6 +3676,10 @@ fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>) {
 
     // バックグラウンドスレッドで分析→フォルダ表示→アプリ終了
     thread::spawn(move || {
+        if portrait_end {
+            finish_portrait_before_exit();
+            let _ = log_tx_end.try_send(LogEntry::End);
+        }
         // ロガースレッドのファイルクローズを channel で安全に待機 (最大2秒)
         let _ = shutdown_rx.recv_timeout(Duration::from_millis(2000));
 
@@ -3576,6 +3931,7 @@ pub fn run() {
     }
     let eh3_mode = crate::eh3::resolve(eh3_detected, o1_source.is_some());
     crate::eh3::set_mode(eh3_mode);
+    init_wall_channel();
     if let Some((src, _)) = eh3_mode {
         // ⚠️ 割り当て（順序・文法）は applog にも出さない（条件の名前を参加者の端末の平文に残さない）。
         tracing::warn!(
@@ -3722,12 +4078,23 @@ pub fn run() {
         let mut invitation = crate::eh3::is_eh3().then(InvitationRunner::new);
         let mut eh3_was_paused = crate::recording::is_paused();
         let mut eh3_reemit_gen = EH3_REEMIT_GEN.load(Ordering::Acquire);
+        // EH3: 肖像の層（壁紙）。スリープの通知は肖像の終わりと始まりにだけ使う（記録しない）。
+        let mut portrait = crate::eh3::assignment().map(PortraitRunner::new);
+        let power_rx = portrait.as_ref().map(|_| {
+            let (tx, rx) = crossbeam_channel::bounded::<crate::input::power::PowerEvent>(8);
+            crate::input::power::start(tx);
+            rx
+        });
         if let Some((a, tracker)) = eh3_days.as_mut() {
             let now = now_ms();
-            if let Some(d) = tracker.on_start(now, utc_offset.get(now), a) {
+            let off = utc_offset.get(now);
+            if let Some(d) = tracker.on_start(now, off, a) {
                 if !send_eh3_day(&log_tx_analysis, now, d) {
                     tracker.forget_emitted();
                 }
+            }
+            if let Some(p) = portrait.as_mut() {
+                p.start(now, off, tracker.today(now, off, a));
             }
         }
 
@@ -3813,6 +4180,12 @@ pub fn run() {
                             if !send_eh3_day(&log_tx_analysis, k.timestamp, d) {
                                 tracker.forget_emitted();
                             }
+                            if let (Some(p), Some(cond)) = (portrait.as_mut(), d.condition) {
+                                p.assigned(k.timestamp, off, cond);
+                            }
+                        }
+                        if let Some(p) = portrait.as_mut() {
+                            p.presses.push(k.timestamp);
                         }
                     }
                 }
@@ -3844,6 +4217,14 @@ pub fn run() {
                         timestamp: presented_at,
                     });
                 }
+            }
+            if let (Some(p), Some((a, tracker))) = (portrait.as_mut(), eh3_days.as_ref()) {
+                if let Some(f) = out.feat.as_ref() {
+                    p.feat(f);
+                }
+                let power = power_rx.as_ref().and_then(|rx| rx.try_recv().ok());
+                let off = utc_offset.get(tick_now);
+                p.tick(tick_now, off, tracker, a, power);
             }
             if let Some(f) = out.feat {
                 *latest_feat_for_thread
@@ -5249,6 +5630,9 @@ pub fn run() {
                 }
                 Err(e) => tracing::error!("Failed to pre-create overlay window: {}", e),
             }
+
+            // EH3: 壁紙のスレッド（EH3 のとき、または保存した元の壁紙が端末に残っているときだけ）。
+            spawn_wallpaper_thread(app.handle());
 
             // EH3: 招待の説明と設定の窓を隠したまま先に作る（overlay と同じく setup のメインスレッドで作る・
             //   Windows のデッドロックの回避）。閉じるボタンは隠すだけにする。

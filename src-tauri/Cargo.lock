@@ -1761,6 +1761,7 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
+ "png",
  "rand 0.8.5",
  "reqwest",
  "schemars 0.8.22",
