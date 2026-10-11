@@ -61,11 +61,11 @@ EXIT_SELFTEST_FAILED = 5
 # (e.g. "併せて出力に載せるもの") are never mistaken for the value table.
 #
 # v1.2 (2026-10-08) appended §6 instead of editing the frozen §1 / §2.1, so
-# each kind of table now has one anchor per version. The tables under all
+# each kind of table now has one anchor per version (v1.3, 2026-10-11, appended §7 the same way). The tables under all
 # anchors of a kind are merged; a key that appears under two anchors is drift
 # (two rows could disagree, and silently taking either one would hide it).
-OPERATIONAL_ANCHORS = ("## 1. 凍結する運用値", "### 6.2 足した運用値")
-SEARCH_ANCHORS = ("### 2.1 探索空間", "### 6.3 足した探索空間")
+OPERATIONAL_ANCHORS = ("## 1. 凍結する運用値", "### 6.2 足した運用値", "### 7.2 足した運用値")
+SEARCH_ANCHORS = ("### 2.1 探索空間", "### 6.3 足した探索空間", "### 7.3 足した探索空間")
 
 DERIVED_MARK_DOC = "従属"
 DERIVED_MARK_JSON = "derived:"
@@ -370,15 +370,15 @@ MUTATIONS = [
     (
         "json: add a key the document does not have",
         "json",
-        '"idle_trim_max_ms": 1800000\n  },',
-        '"idle_trim_max_ms": 1800000,\n    "bogus_key": 7\n  },',
+        '"idle_trim_input_gap_ms": 1800000\n  },',
+        '"idle_trim_input_gap_ms": 1800000,\n    "bogus_key": 7\n  },',
     ),
     # v1.2: the §6 tables are read as well, and a key under two anchors is drift.
     (
         "json: change an operational value added in v1.2",
         "json",
-        '"idle_trim_max_ms": 1800000\n  },',
-        '"idle_trim_max_ms": 1700000\n  },',
+        '"idle_trim_max_ms": 1800000,',
+        '"idle_trim_max_ms": 1700000,',
     ),
     (
         "doc: change an operational value in the v1.2 table",
@@ -429,6 +429,37 @@ MUTATIONS = [
         "json",
         '"idle_trim_max_ms": "sensitivity_only"',
         '"idle_trim_max_ms": "selection"',
+    ),
+    # v1.3: the §7 tables are read as well.
+    (
+        "json: change the operational value added in v1.3",
+        "json",
+        '"idle_trim_input_gap_ms": 1800000\n  },',
+        '"idle_trim_input_gap_ms": 1700000\n  },',
+    ),
+    (
+        "doc: change the operational value in the v1.3 table",
+        "doc",
+        "| `idle_trim_input_gap_ms` | `1800000` |",
+        "| `idle_trim_input_gap_ms` | `1700000` |",
+    ),
+    (
+        "doc: change the search space in the v1.3 table",
+        "doc",
+        "| `idle_trim_input_gap_ms` | `{0, 1800000}` |",
+        "| `idle_trim_input_gap_ms` | `{1800000}` |",
+    ),
+    (
+        "doc: change the role in the v1.3 search table",
+        "doc",
+        "| `idle_trim_input_gap_ms` | `{0, 1800000}` | 感度のみ |",
+        "| `idle_trim_input_gap_ms` | `{0, 1800000}` | 選択 |",
+    ),
+    (
+        "doc: repeat a v1.2 operational key in the v1.3 table (same value)",
+        "doc",
+        "| `idle_trim_input_gap_ms` | `1800000` |",
+        "| `idle_trim_max_ms` | `1800000` | dup | dup |\n| `idle_trim_input_gap_ms` | `1800000` |",
     ),
     (
         "json: move the operational value outside its own search space",

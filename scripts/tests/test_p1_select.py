@@ -45,7 +45,7 @@ FROZEN_PREREG = REPO_ROOT / "src-tauri" / "prereg" / "p1-episode.json"
 _ABSENT = object()
 
 WARMUP = {"0.99": 100, "0.995": 200, "0.999": 1000}  # ★ 事前宣言 v1.1 (5) の対応表 (規則 (d) の合成データ用)
-# (一式 ID, manifest の kind, q)。⚠️ 実物の格子 (32 一式) ではなく、選択 2 ＋ 感度 1 の小さな合成
+# (一式 ID, manifest の kind, q)。⚠️ 実物の格子 (33 一式) ではなく、選択 2 ＋ 感度 1 の小さな合成
 CONFIGS = [
     ("sel__q=0.99__hole_gap_ms=2000__t1a_window_ms=30000", "selection", "0.99"),
     ("sel__q=0.995__hole_gap_ms=2000__t1a_window_ms=30000", "selection", "0.995"),

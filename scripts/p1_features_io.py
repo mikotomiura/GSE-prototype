@@ -70,6 +70,14 @@ _CROSS_POLE_KEYS = (
     # ★ 事前宣言 v1.2 §6.1: 無入力の末尾の前処理は極の前に 1 回だけ掛かるので、落とした量も極によらない。
     #   ⚠️ 旧い封筒 (1.0.0 の binary) には無いので、無いこと同士は一致とみなす (版の混在は prereg_version で止まる)。
     ("provenance", "idle_trim"),
+    # ★ 事前宣言 v1.3 §7.1: 長い無入力の前処理も極の前に 1 回だけ掛かる (1.1.0 までの封筒には無い)。
+    ("provenance", "input_gap_trim"),
+)
+
+# 前処理の値 (`config`) と、落とした量 (`provenance`) の組 (事前宣言 v1.2 §6.1・v1.3 §7.1)。
+_TRIM_KEYS = (
+    ("idle_trim_max_ms", "idle_trim"),
+    ("idle_trim_input_gap_ms", "input_gap_trim"),
 )
 
 
@@ -227,23 +235,26 @@ def check_envelope(envelope, expected_pole=None, where="封筒"):
     if pole == "baseline" and not applicable:
         bad("baseline が非適用 (★ baseline は常に適用可)")
 
-    # ★ 事前宣言 v1.2 §6.1: 前処理の値 (`config.idle_trim_max_ms`) を持つ封筒は、落とした量
-    #   (`provenance.idle_trim`) も必ず持つ (同じ binary が両方を出す)。⚠️ 旧い封筒 (値を持たない) には求めない。
-    if "idle_trim_max_ms" in config:
-        trim = provenance.get("idle_trim")
+    # ★ 事前宣言 v1.2 §6.1 / v1.3 §7.1: 前処理の値 (`config.idle_trim_max_ms` / `config.idle_trim_input_gap_ms`) を
+    #   持つ封筒は、落とした量 (`provenance.idle_trim` / `provenance.input_gap_trim`) も必ず持つ (同じ binary が両方を出す)。
+    #   ⚠️ 旧い封筒 (値を持たない) には求めない。
+    for config_key, trim_key in _TRIM_KEYS:
+        if config_key not in config:
+            continue
+        trim = provenance.get(trim_key)
         if not isinstance(trim, dict):
-            bad(f"config に idle_trim_max_ms があるのに provenance.idle_trim がオブジェクトでない: {trim!r}")
+            bad(f"config に {config_key} があるのに provenance.{trim_key} がオブジェクトでない: {trim!r}")
         dropped = trim.get("dropped_feat_rows")
         if type(dropped) is not int or dropped < 0:
-            bad(f"provenance.idle_trim.dropped_feat_rows が 0 以上の整数ではない: {dropped!r}")
+            bad(f"provenance.{trim_key}.dropped_feat_rows が 0 以上の整数ではない: {dropped!r}")
         spans = trim.get("spans")
         if not isinstance(spans, list):
-            bad(f"provenance.idle_trim.spans が配列ではない: {spans!r}")
+            bad(f"provenance.{trim_key}.spans が配列ではない: {spans!r}")
         for j, span in enumerate(spans):
             a = span.get("a_ms") if isinstance(span, dict) else None
             b = span.get("b_ms") if isinstance(span, dict) else None
             if type(a) is not int or type(b) is not int or a > b:
-                bad(f"provenance.idle_trim.spans[{j}] が {{a_ms <= b_ms}} の整数の組ではない: {span!r}")
+                bad(f"provenance.{trim_key}.spans[{j}] が {{a_ms <= b_ms}} の整数の組ではない: {span!r}")
 
     for i, row in enumerate(rows):
         if not isinstance(row, dict):
