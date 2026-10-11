@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use objc2::MainThreadMarker;
 use objc2_app_kit::{NSScreen, NSWorkspace};
-use objc2_foundation::{NSDictionary, NSNumber, NSString, NSURL};
+use objc2_foundation::{NSNumber, NSString, NSURL};
 
 use crate::wallpaper::{Backend, Monitor};
 
@@ -121,7 +121,7 @@ impl Backend for MacBackend {
             let url = NSURL::fileURLWithPath(&NSString::from_str(&path));
             let options = ws
                 .desktopImageOptionsForScreen(&screen)
-                .unwrap_or_else(NSDictionary::new);
+                .unwrap_or_default();
             // SAFETY: options は NSWorkspace 自身が返した辞書（またはその型の空の辞書）で、
             // キーと値の型は API の約束どおり。
             unsafe { ws.setDesktopImageURL_forScreen_options_error(&url, &screen, &options) }
