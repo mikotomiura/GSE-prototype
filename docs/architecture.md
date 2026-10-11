@@ -451,6 +451,20 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
   ★ 分岐はすべて `o1::*` の純関数の中に閉じており、非 O1 では `session_active` と**同値**である
 - 詳細: `.steering/20260827-o1-collection-enablement/` / ADR-014 D6・D8 / ADR-016 判断 4b
 
+### EH3 の層（招待と肖像・2026-10-11）
+
+EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く。EH3 でないときの記録と挙動は変わらない。
+
+| 層 | 置き場 | スレッド | 記録 |
+|---|---|---|---|
+| 日の割り当て | `eh3.rs`（OS 非依存） | 分析スレッド（打鍵のたび・1 日 1 回だけ行を出す） | `eh3_day` |
+| 招待 | `analysis/invitation.rs`（状態機械・応答を入力に持たない）→ `lib.rs` の `InvitationRunner`（1 秒ごと）→ overlay の図像（`get_invitation_state` を poll） | 分析スレッド | `invitation_present`（時刻だけ） |
+| 肖像 | `analysis/portrait/`（何を出すか）→ `lib.rs` の `PortraitRunner`（1 秒ごと）→ 壁紙のスレッド（`wallpaper.rs` ＋ `wallpaper_{windows,macos}.rs`） | 分析スレッド → 壁紙のスレッド（Windows は COM の STA・macOS はメインスレッドへ依頼） | 記録しない（R-P9） |
+| 電源の通知 | `input/power_{windows,macos}.rs` | OS のコールバック（`try_send` だけ） | 記録しない |
+
+- 肖像の「終わり」は終了・スリープの直前・4:00 の区切り、「始まり」は起動・復帰・その日を数えた時点。終了の待ち合わせは固定の長さ（2 秒）でバックグラウンドのスレッドで行う（待ち時間から本人の操作が読めないように）。
+- EH3 では probe と自己申告のカードを止め、GSE の窓への遷移を `focus_transition` に書かない。
+
 ## 5. データフロー
 
 ### フロー 1: キーストローク → 状態推定（1Hz サイクル）
