@@ -8,7 +8,7 @@
 - [x] 実装の要件を書く
 - [x] 親の decisions に還元する（判断 16）
 - [x] `/cross-review` 2 巡（1 巡目: 文書の矛盾 ／ 2 巡目: 足した規則の境界）（判断 3・4）
-- [ ] 次の段の引き継ぎ（実装タスク・見本の選択・凍結の前の attack-me）
+- [x] 次の段の引き継ぎ（実装タスク・見本の選択・凍結の前の attack-me）→ `_handoff/next-session-portrait-eh3-implementation.md`
 - [ ] commit → push → PR → CI 緑なら merge
 
 ## 凍結の前に（本タスクの外）
