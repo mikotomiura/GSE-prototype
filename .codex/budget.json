@@ -30,8 +30,8 @@
   "_comment_merge_2026_10_11_o1_awake_idle": "2026-10-11: feature/o1-awake-idle-trim に origin/main（PR #348 の後）を merge した際、today が衝突した。共通の起点の today は 10-11 の 221461 / 6 回。origin/main は起点 ＋ 73198 / 2 回 = 294659 / 8、本ブランチは起点 ＋ /cross-review の Codex 3 回（103269 / 3 回）= 324730 / 9 → 和を採った: 221461 ＋ 73198 ＋ 103269 = 397928 / 11 回。",
   "today": {
     "date": "2026-10-11",
-    "tokens_used": 397928,
-    "invocations": 11
+    "tokens_used": 421671,
+    "invocations": 12
   },
   "history": [
     {
