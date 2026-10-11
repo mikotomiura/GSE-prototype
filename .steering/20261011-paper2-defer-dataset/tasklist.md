@@ -4,4 +4,5 @@
 - [x] ADR-039 D1 の注・見直しの条件
 - [x] 次の候補の調査の引き継ぎ（`_handoff/next-session-public-keystroke-matching-survey.md`）
 - [x] /cross-review（Codex 1 回・判断 2）
+- [x] 引き継ぎを、次のセッションで IME 論文の次の論文にするかを判定する形に改める（2026-10-12・研究者の指示）
 - [ ] push → PR → CI → merge
