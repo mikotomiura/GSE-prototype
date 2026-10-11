@@ -1,0 +1,96 @@
+"""Segments of the copy text and of the 1,500 decoy works under the G1 rule.
+
+  build_corpus.py --zips <earlier experiment's raw/zips> --out raw/corpus_g1.json
+                  --copy-out results/copy_segments.json --stats results/corpus_g1_stats.json [--processes 4]
+
+The works are the earlier experiment's corpus (corpus_stats.json corpus_work_ids, in that order); every zip is
+checked against corpus_manifest.json before it is read. The output holds only key counts per segment (-1 for an
+invalid segment); it is public-domain text, derived. JSON, not pickle.
+"""
+import argparse
+import os
+import statistics
+import sys
+from multiprocessing import Pool
+
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from common import check_inputs, load_config, read_json, repo_path, sha256_file, write_json
+from g1rule import G1Rule, copy_lines
+
+_RULE = None
+
+
+def _init():
+    global _RULE
+    _RULE = G1Rule(load_config())
+
+
+def work_keys(task):
+    work_id, path, want = task
+    bs = _RULE.bs
+    if sha256_file(path) != want:
+        raise SystemExit("build_corpus: %s does not match the manifest" % path)
+    text, _ = bs.read_zip_text(path)
+    lines, _ = bs.body_lines(text)
+    return work_id, [k for k, _ in _RULE.segments_of_lines(lines)]
+
+
+def main(argv):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--zips", required=True)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--copy-out", required=True)
+    ap.add_argument("--stats", required=True)
+    ap.add_argument("--processes", type=int, default=4)
+    a = ap.parse_args(argv)
+    cfg = load_config()
+    check_inputs(cfg)
+
+    rule = G1Rule(cfg)
+    segs = rule.segments_of_lines(copy_lines(repo_path(cfg["inputs"]["copy_text"]["path"])))
+    if any(k < 0 for k, _ in segs):
+        raise SystemExit("build_corpus: the copy text has an invalid segment")
+    write_json(a.copy_out, {"format": "copy-segments/1", "keys": [k for k, _ in segs], "units": [u for _, u in segs]})
+
+    stats_in = read_json(repo_path(cfg["inputs"]["corpus_stats"]["path"]))
+    manifest = read_json(repo_path(cfg["inputs"]["corpus_manifest"]["path"]))
+    sha = {e["work_id"]: e["sha256"] for e in manifest["works"] if e["role"] == "corpus" and "sha256" in e}
+    ids = stats_in["corpus_work_ids"]
+    tasks = [(w, os.path.join(a.zips, w + ".zip"), sha[w]) for w in ids]
+    out = {}
+    if a.processes > 1:
+        with Pool(a.processes, initializer=_init) as pool:
+            for n, (w, keys) in enumerate(pool.imap(work_keys, tasks, chunksize=4), 1):
+                out[w] = keys
+                if n % 100 == 0:
+                    print("build_corpus: %d works" % n, flush=True)
+    else:
+        _init()
+        for t in tasks:
+            w, keys = work_keys(t)
+            out[w] = keys
+    keys = [out[w] for w in ids]
+    write_json(a.out, {"format": "corpus-g1/1", "work_ids": ids, "keys": keys})
+    valid = [v for ks in keys for v in ks if v >= 0]
+    n_seg = sum(len(ks) for ks in keys)
+    write_json(a.stats, {
+        "format": "corpus-g1-stats/1",
+        "works": len(ids),
+        "segments": n_seg,
+        "valid": len(valid),
+        "valid_fraction": len(valid) / n_seg,
+        "zero_valid": sum(1 for v in valid if v == 0),
+        "mean_valid": statistics.fmean(valid),
+        "median_valid": statistics.median(valid),
+        "copy_segments": len(segs),
+        "copy_keys_total": sum(k for k, _ in segs),
+        "corpus_sha256": sha256_file(a.out),
+    })
+    print("build_corpus: %d works, %d segments (%d valid), copy text %d segments"
+          % (len(ids), n_seg, len(valid), len(segs)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

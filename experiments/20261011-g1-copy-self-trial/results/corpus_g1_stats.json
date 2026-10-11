@@ -1,0 +1,13 @@
+{
+ "format": "corpus-g1-stats/1",
+ "works": 1500,
+ "segments": 1985900,
+ "valid": 1933916,
+ "valid_fraction": 0.97382345536029,
+ "zero_valid": 212550,
+ "mean_valid": 25.993948547920386,
+ "median_valid": 23.0,
+ "copy_segments": 48,
+ "copy_keys_total": 1684,
+ "corpus_sha256": "238f38c4b614f963c9b118cc96c24084d31cfb9e226ef3df3f5f5b64e3215d43"
+}
