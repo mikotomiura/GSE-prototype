@@ -312,6 +312,78 @@ mod tests {
         assert_eq!(l.finish(), Some(Show::Original));
     }
 
+    /// 見本の書き出し（手で回す・F-1 の選択の材料）: `GSE_PORTRAIT_SAMPLES=<dir>` を置いて
+    /// `cargo test --lib render_portrait_samples -- --ignored`。合成の打鍵（書いては止まる 2 時間）で、
+    /// `raw` / `lattice` × drift `none` / `diffuse` の 2 時間後の画、その seed、D の地模様（3 日ぶん）を
+    /// 1280×720 の PNG にする。⚠️ 合成の材料であり、実際の打鍵の見え方ではない。
+    #[test]
+    #[ignore]
+    fn render_portrait_samples() {
+        use crate::eh3::{Drift, Grammar};
+        let Ok(dir) = std::env::var("GSE_PORTRAIT_SAMPLES") else {
+            return;
+        };
+        let dir = std::path::PathBuf::from(dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let save = |name: &str, c: &Canvas| {
+            let rgb = canvas::upscale_rgb8(c, 1280, 720);
+            let f = std::fs::File::create(dir.join(name)).unwrap();
+            let mut enc = png::Encoder::new(std::io::BufWriter::new(f), 1280, 720);
+            enc.set_color(png::ColorType::Rgb);
+            enc.set_depth(png::BitDepth::Eight);
+            let mut w = enc.write_header().unwrap();
+            w.write_image_data(&rgb).unwrap();
+        };
+        // 合成の打鍵: 書く区間（打鍵の速さと訂正が区間ごとに違う）と止まる区間が交互に来る
+        let mut r = SplitMix::new(7);
+        let mut seconds = Vec::new();
+        let mut t = 0u64;
+        while t < 2 * 3600 {
+            let typing = 60 + (r.unit() * 240.0) as u64;
+            let pause = 10 + (r.unit() * 110.0) as u64;
+            let (f1, f3, f4, f6) = (
+                80.0 + 400.0 * r.unit() as f64,
+                0.4 * r.unit() as f64,
+                1.0 + 15.0 * r.unit() as f64,
+                0.9 * r.unit() as f64,
+            );
+            for _ in 0..typing {
+                seconds.push(Second {
+                    f1,
+                    f3,
+                    f4,
+                    f6,
+                    active: r.unit() < 0.7,
+                });
+            }
+            for _ in 0..pause {
+                seconds.push(Second {
+                    f1: f64::NAN,
+                    f3: f64::NAN,
+                    f4: f64::NAN,
+                    f6: f64::NAN,
+                    active: false,
+                });
+            }
+            t += typing + pause;
+        }
+        for (grammar, gname) in [(Grammar::Raw, "raw"), (Grammar::Lattice, "lattice")] {
+            for (drift, dname) in [(Drift::None, "none"), (Drift::Diffuse, "diffuse")] {
+                let mut g = Generator::new(grammar, drift, 42);
+                for chunk in seconds.chunks(300) {
+                    g.update(chunk);
+                }
+                save(&format!("portrait-{gname}-{dname}.png"), g.image());
+                if let Some(s) = seed_fold(g.image()) {
+                    save(&format!("seed-{gname}-{dname}.png"), &s);
+                }
+            }
+        }
+        for day in 0..3 {
+            save(&format!("decor-day{day}.png"), &decor(20_000 + day));
+        }
+    }
+
     #[test]
     fn seed_of_a_ground_canvas_writes_nothing() {
         assert_eq!(seed_fold(&Canvas::ground()), None);
