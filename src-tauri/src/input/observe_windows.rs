@@ -24,13 +24,14 @@ use windows::Win32::UI::Input::{
     RIDEV_INPUTSINK, RIM_TYPEMOUSE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, PeekMessageW, RegisterClassW,
-    TranslateMessage, HWND_MESSAGE, MSG, PM_REMOVE, WINDOW_EX_STYLE, WINDOW_STYLE, WNDCLASSW,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetWindowThreadProcessId,
+    PeekMessageW, RegisterClassW, TranslateMessage, HWND_MESSAGE, MSG, PM_REMOVE, WINDOW_EX_STYLE,
+    WINDOW_STYLE, WNDCLASSW,
 };
 
 use crate::analysis::pointer_bin::{PointerAccum, PointerBin};
 
-use super::{FOCUS_TX, OBSERVATIONS_DROPPED, POINTER_TX};
+use super::{FocusEvent, FOCUS_TX, OBSERVATIONS_DROPPED, POINTER_TX};
 
 /// ★ Windows では両方とも実装がある（ADR-013 D1 の自己刻印に使う）。
 pub const FOCUS_AVAILABLE: bool = true;
@@ -110,7 +111,8 @@ fn now_ms() -> u64 {
 ///
 /// ## ⚠️★★★ ここで **HWND を外へ出さない**
 ///
-/// ★ 引数の `hwnd` は**読みさえしない**（`_hwnd` で捨てる）。
+/// ★ 引数の `hwnd` は「自分のプロセスの窓か」の 1 bit を作るためだけに読み、外へは出さない
+/// （`GetWindowThreadProcessId` は待たない呼び出し・`hook-constraints` を破らない）。
 /// ⚠️ ウィンドウ通し番号や distinct 数も**擬似識別子**になるので数えない（ADR-012 D4 L-c）。
 /// → ★ 送るのは **`u64` の時刻 1 個だけ**である。
 ///
@@ -120,7 +122,7 @@ fn now_ms() -> u64 {
 unsafe extern "system" fn foreground_event_callback(
     _hook: HWINEVENTHOOK,
     event: u32,
-    _hwnd: HWND,
+    hwnd: HWND,
     id_object: i32,
     id_child: i32,
     _id_event_thread: u32,
@@ -131,8 +133,13 @@ unsafe extern "system" fn foreground_event_callback(
     if event != EVENT_SYSTEM_FOREGROUND || id_object != 0 || id_child != 0 {
         return;
     }
+    let mut pid = 0u32;
+    // SAFETY: `hwnd` は OS がこのコールバックに渡した値で、読むだけ。失敗すると pid は 0 のまま
+    // （= 自分ではない側に倒れ、O1 と同じく行を出す）。
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+    let own = pid != 0 && pid == std::process::id();
     if let Some(tx) = FOCUS_TX.get() {
-        if tx.try_send(now_ms()).is_err() {
+        if tx.try_send(FocusEvent { t: now_ms(), own }).is_err() {
             // ⚠️★ コールバック内でログを書かない (`hook-constraints` 共通-1)。
             OBSERVATIONS_DROPPED.fetch_add(1, Ordering::Relaxed);
         }

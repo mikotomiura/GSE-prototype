@@ -567,6 +567,74 @@ impl DayTracker {
     }
 }
 
+/// 招待の設定のファイル名（`~/.gse/eh3_invitation.json`・端末の中だけ）。
+///
+/// ⚠️ 設定の値は NDJSON・applog・提出物に出さない（時間帯は生活時間の代理になりうる・ADR-035 D4・
+/// `.steering/20261011-portrait-eh3-impl/design.md` §2.3）。
+pub const INVITATION_SETTINGS_FILE_NAME: &str = "eh3_invitation.json";
+
+/// 招待の設定の置き場。
+pub fn invitation_settings_path() -> Option<PathBuf> {
+    crate::submission::home_dir().map(|h| h.join(".gse").join(INVITATION_SETTINGS_FILE_NAME))
+}
+
+/// 招待の設定を読む。
+///
+/// - 無い（初めての起動）: 既定値（ADR-035 D2: 出す・時期と上限は狭い側）。
+/// - あるのに読めない・壊れている: **出さない**・狭い側（本人が「出さない」を選んだ後にファイルが壊れても、
+///   黙って提示を再開しない）。applog には中身を含めずに 1 行だけ残す。
+pub fn load_invitation_settings(path: &Path) -> crate::analysis::invitation::Settings {
+    use crate::analysis::invitation::Settings;
+    match std::fs::read_to_string(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Settings::default(),
+        Ok(t) => match serde_json::from_str(&t) {
+            Ok(s) => s,
+            Err(_) => {
+                tracing::warn!("EH3 invitation settings file is unreadable; invitations are off");
+                Settings {
+                    enabled: false,
+                    ..Settings::default()
+                }
+            }
+        },
+        Err(_) => {
+            tracing::warn!("EH3 invitation settings file is unreadable; invitations are off");
+            Settings {
+                enabled: false,
+                ..Settings::default()
+            }
+        }
+    }
+}
+
+/// 招待の設定を書く（一時ファイル → 同期 → 置き換え）。
+pub fn save_invitation_settings(
+    path: &Path,
+    settings: &crate::analysis::invitation::Settings,
+) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let tmp = path.with_extension("json.tmp");
+    {
+        use std::io::Write;
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(&serde_json::to_vec(settings).map_err(std::io::Error::other)?)?;
+        f.sync_all()?;
+    }
+    std::fs::rename(&tmp, path)
+}
+
+/// フォーカス遷移の行を出すか (純関数)。
+///
+/// EH3 では、GSE 自身の窓へ移る遷移（`own`）と、GSE の窓から戻る遷移（直前が `own`）を記録しない。
+/// 招待の図像を押して説明と設定の窓を開いた・閉じたことが時刻の列から読めないようにする
+/// （`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 6 #3・台帳 肖13 の横の経路）。
+/// 代償: A → GSE → B と移ったときの A→B の 1 本も落ちる。EH3 でなければ常に出す（O1 の記録は変えない）。
+pub fn focus_row_allowed(eh3: bool, own: bool, last_own: bool) -> bool {
+    !(eh3 && (own || last_own))
+}
+
 static EH3: std::sync::OnceLock<Option<(Eh3Source, Assignment)>> = std::sync::OnceLock::new();
 
 /// 起動時に 1 回だけモードを確定させる。★ 2 回目以降は黙って無視する（`o1::set_mode` と同じ）。
@@ -850,6 +918,55 @@ mod tests {
         }
         .normalized();
         assert_eq!(l.days, vec![1, 3, 5]);
+    }
+
+    #[test]
+    fn invitation_settings_round_trip_and_fall_back_to_the_narrow_default() {
+        use crate::analysis::invitation::{DailyCap, Settings, TimeWindow};
+        let dir = std::env::temp_dir().join(format!("gse_eh3_inv_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let p = dir.join(INVITATION_SETTINGS_FILE_NAME);
+        assert_eq!(
+            load_invitation_settings(&p),
+            Settings::default(),
+            "無ければ既定"
+        );
+        let s = Settings {
+            enabled: false,
+            window: TimeWindow::Wide,
+            cap: DailyCap::Four,
+        };
+        save_invitation_settings(&p, &s).unwrap();
+        assert_eq!(load_invitation_settings(&p), s);
+        // 自由な値・未知の欄・壊れたファイルは読まず、「出さない」・狭い側に倒れる
+        let off = Settings {
+            enabled: false,
+            ..Settings::default()
+        };
+        for bad in [
+            r#"{"enabled":true,"window":"all_day","cap":"four"}"#,
+            r#"{"enabled":true,"window":"wide","cap":"four","threshold":0.1}"#,
+            "{",
+        ] {
+            std::fs::write(&p, bad).unwrap();
+            assert_eq!(load_invitation_settings(&p), off, "{bad}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn focus_rows_into_and_out_of_gse_are_dropped_only_in_eh3() {
+        // O1（EH3 でない）は従来どおり全部出す
+        for own in [false, true] {
+            for last in [false, true] {
+                assert!(focus_row_allowed(false, own, last));
+            }
+        }
+        // EH3: 他のアプリどうしは出す・GSE へ移る / GSE から戻るは出さない
+        assert!(focus_row_allowed(true, false, false));
+        assert!(!focus_row_allowed(true, true, false));
+        assert!(!focus_row_allowed(true, false, true));
+        assert!(!focus_row_allowed(true, true, true));
     }
 
     #[test]

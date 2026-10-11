@@ -42,12 +42,14 @@ extern "C" {
 
 use block2::RcBlock;
 use objc2::MainThreadMarker;
-use objc2_app_kit::{NSWorkspace, NSWorkspaceDidActivateApplicationNotification};
+use objc2_app_kit::{
+    NSRunningApplication, NSWorkspace, NSWorkspaceDidActivateApplicationNotification,
+};
 use objc2_foundation::{NSNotification, NSOperationQueue};
 
 use crate::analysis::pointer_bin::{PointerAccum, PointerBin};
 
-use super::{FOCUS_TX, OBSERVATIONS_DROPPED, POINTER_TX, SECURE_INPUT_TX};
+use super::{FocusEvent, FOCUS_TX, OBSERVATIONS_DROPPED, POINTER_TX, SECURE_INPUT_TX};
 
 /// ★ macOS では両方とも実装がある（ADR-013 D1 の自己刻印に使う）。
 pub const FOCUS_AVAILABLE: bool = true;
@@ -98,8 +100,11 @@ fn install_focus_observer() {
 
     let block: RcBlock<dyn Fn(NonNull<NSNotification>)> =
         RcBlock::new(|_notification: NonNull<NSNotification>| {
+            // 有効になったのが GSE 自身か（1 bit。他のアプリの識別子は読まない）。
+            // ⚠️ 通知はアプリ単位なので、GSE の窓どうしの切り替えではそもそも飛ばない。
+            let own = NSRunningApplication::currentApplication().isActive();
             if let Some(tx) = FOCUS_TX.get() {
-                if tx.try_send(now_ms()).is_err() {
+                if tx.try_send(FocusEvent { t: now_ms(), own }).is_err() {
                     OBSERVATIONS_DROPPED.fetch_add(1, Ordering::Relaxed);
                 }
             }

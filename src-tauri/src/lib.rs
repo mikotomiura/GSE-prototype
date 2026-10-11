@@ -649,6 +649,141 @@ impl UtcOffsetCache {
 /// （ある時刻の条件をファイルの中で読めるようにする。条件は日中に変わらない）。
 static EH3_REEMIT_GEN: AtomicU64 = AtomicU64::new(0);
 
+/// EH3: いま招待を出しているか（分析スレッドが書き、overlay が `get_invitation_state` で読む）。
+static INVITATION_PRESENT: AtomicBool = AtomicBool::new(false);
+
+/// EH3: 本人の招待の設定（外枠）。`None` はまだ読んでいない。
+static INVITATION_SETTINGS: Mutex<Option<crate::analysis::invitation::Settings>> = Mutex::new(None);
+
+/// いまの招待の設定（未読ならファイルから読む・読めなければ既定＝狭い側）。
+fn current_invitation_settings() -> crate::analysis::invitation::Settings {
+    let mut g = INVITATION_SETTINGS
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    *g.get_or_insert_with(|| {
+        crate::eh3::invitation_settings_path()
+            .map(|p| crate::eh3::load_invitation_settings(&p))
+            .unwrap_or_default()
+    })
+}
+
+/// 招待を出しているか（overlay の小図像の表示）。EH3 でなければ常に `false`。
+///
+/// ⚠️ 返すのは真偽だけ（理由・回数・残りを返さない・ADR-026 D4 / PC-10）。
+#[tauri::command]
+fn get_invitation_state() -> bool {
+    crate::eh3::is_eh3() && INVITATION_PRESENT.load(Ordering::Acquire)
+}
+
+/// 招待の設定（説明と設定の窓が読む）。
+#[tauri::command]
+fn get_invitation_settings() -> crate::analysis::invitation::Settings {
+    current_invitation_settings()
+}
+
+/// 招待の設定を変える（N 択だけ・serde が値域の外を拒む）。
+///
+/// ⚠️ 設定の変更は記録しない（NDJSON・applog とも）。状態機械の控えも解かない（外枠だけが変わる・ADR-035 D4）。
+#[tauri::command]
+fn set_invitation_settings(settings: crate::analysis::invitation::Settings) -> Result<(), String> {
+    if !crate::eh3::is_eh3() {
+        return Err("EH3 mode is not active".into());
+    }
+    let path = crate::eh3::invitation_settings_path()
+        .ok_or_else(|| "保存先 (~/.gse) を解決できませんでした。".to_string())?;
+    crate::eh3::save_invitation_settings(&path, &settings)
+        .map_err(|_| "設定を保存できませんでした。".to_string())?;
+    *INVITATION_SETTINGS
+        .lock()
+        .unwrap_or_else(|p| p.into_inner()) = Some(settings);
+    Ok(())
+}
+
+/// 説明と設定の窓を開く（図像を押した・トレイから）。
+///
+/// ⚠️ この操作は記録しない・状態機械に渡さない（応答として扱わない・R-I1・ADR-033）。
+#[tauri::command]
+fn open_invitation_settings(app: tauri::AppHandle) -> Result<(), String> {
+    show_invitation_settings_window(&app)
+}
+
+pub(crate) fn show_invitation_settings_window(app: &tauri::AppHandle) -> Result<(), String> {
+    let win = app
+        .get_webview_window(INVITATION_SETTINGS_LABEL)
+        .ok_or_else(|| "invitation settings window is not available".to_string())?;
+    win.show().map_err(|e| e.to_string())?;
+    let _ = win.set_focus();
+    Ok(())
+}
+
+/// 説明と設定の窓のラベル（`capabilities/default.json` の `windows` にも載せる）。
+const INVITATION_SETTINGS_LABEL: &str = "invitation-settings";
+
+/// EH3: 分析スレッドで招待の状態機械を 1 秒に 1 回進める薄い殻（OS 依存の値をここで集め、純ロジックへ渡す）。
+struct InvitationRunner {
+    machine: crate::analysis::invitation::InvitationMachine,
+    last_tick_ms: Option<u64>,
+    last_day: Option<i64>,
+    /// 最後の打鍵の時刻（一時停止に依らない・離席候補の判定にだけ使う）。
+    last_press_ms: Option<u64>,
+    /// 最新の推定の停滞。
+    p_stuck: f64,
+}
+
+impl InvitationRunner {
+    /// 実時間がこれ以上飛んだら、スリープなどでセッションが区切れたとみなす（招待を閉じ、停滞の区間を終える）。
+    const GAP_AS_BOUNDARY_MS: u64 = 30_000;
+
+    fn new() -> Self {
+        Self {
+            machine: crate::analysis::invitation::InvitationMachine::new(),
+            last_tick_ms: None,
+            last_day: None,
+            last_press_ms: None,
+            p_stuck: 0.0,
+        }
+    }
+
+    /// 1 秒たっていれば進める。新しく出したらその時刻を返す。
+    fn maybe_tick(&mut self, now_ms: u64, offset: &mut UtcOffsetCache) -> Option<u64> {
+        // 時計が戻った（NTP の補正・手動の変更）ときは待たずに区切りとして進める（待つと、出ていた図像が
+        // 戻った時間ぶん残り、60 秒の失効が効かない）。
+        let clock_back = self.last_tick_ms.is_some_and(|t| now_ms < t);
+        if !clock_back
+            && self
+                .last_tick_ms
+                .is_some_and(|t| now_ms.saturating_sub(t) < 1000)
+        {
+            return None;
+        }
+        let off = offset.get(now_ms);
+        let day = crate::eh3::local_day(now_ms, off);
+        let gap = clock_back
+            || self
+                .last_tick_ms
+                .is_some_and(|t| now_ms.saturating_sub(t) >= Self::GAP_AS_BOUNDARY_MS);
+        let boundary = gap || self.last_day.is_some_and(|d| d != day);
+        self.last_tick_ms = Some(now_ms);
+        self.last_day = Some(day);
+        let input = crate::analysis::invitation::TickInput {
+            now_ms,
+            local_day: day,
+            minute_of_day: crate::eh3::local_minute_of_day(now_ms, off),
+            p_stuck: self.p_stuck,
+            idle_ms: self
+                .last_press_ms
+                .map_or(u64::MAX, |t| now_ms.saturating_sub(t)),
+            research_enabled: crate::eh3::is_eh3(),
+            recording_active: !crate::recording::is_paused(),
+            settings: current_invitation_settings(),
+            session_boundary: boundary,
+        };
+        let out = self.machine.tick(&input);
+        INVITATION_PRESENT.store(out.present, Ordering::Release);
+        out.presented.then_some(now_ms)
+    }
+}
+
 /// EH3 のその日の条件を NDJSON へ送る（`eh3_day` 行）。送れなかったら `false`。
 ///
 /// ⚠️ 1 日 1 行の索引なので、落ちるとその日の全部の打鍵の条件が読めなくなる。呼び出し側は `false` で
@@ -3583,6 +3718,8 @@ pub fn run() {
             (a, tracker)
         });
         let mut utc_offset = UtcOffsetCache::new();
+        // EH3: 招待の状態機械（1 秒に 1 回進める）。入力は推定の停滞・無操作の長さ・本人の設定・研究の条件だけ。
+        let mut invitation = crate::eh3::is_eh3().then(InvitationRunner::new);
         let mut eh3_was_paused = crate::recording::is_paused();
         let mut eh3_reemit_gen = EH3_REEMIT_GEN.load(Ordering::Acquire);
         if let Some((a, tracker)) = eh3_days.as_mut() {
@@ -3663,7 +3800,7 @@ pub fn run() {
 
             // 中立記録型 → LogEntry 変換（architecture-rules ルール 6 遵守のため、
             // LogEntry への変換は analysis/ の外で行う）
-            if let Some(k) = out.key {
+            if let Some(k) = out.key.as_ref() {
                 let _ = log_tx_analysis.try_send(LogEntry::Key {
                     vk_code: k.vk_code,
                     timestamp: k.timestamp,
@@ -3694,6 +3831,19 @@ pub fn run() {
                 }
                 eh3_was_paused = paused;
                 eh3_reemit_gen = gen;
+            }
+            if let Some(inv) = invitation.as_mut() {
+                if let Some(k) = out.key.as_ref().filter(|k| k.is_press) {
+                    inv.last_press_ms = Some(k.timestamp);
+                }
+                if let Some(f) = out.feat.as_ref() {
+                    inv.p_stuck = f.p_stuck;
+                }
+                if let Some(presented_at) = inv.maybe_tick(tick_now, &mut utc_offset) {
+                    let _ = log_tx_analysis.try_send(LogEntry::InvitationPresent {
+                        timestamp: presented_at,
+                    });
+                }
             }
             if let Some(f) = out.feat {
                 *latest_feat_for_thread
@@ -3941,6 +4091,10 @@ pub fn run() {
                     // probe_id=null・source=self_marker で probe_triggered を emit する。
                     // realtime_label のログ自体は Task C の回答コマンドが行う (B は窓を確定して渡すまで)。
                     if shortcut.matches(mods, Code::KeyM) {
+                        // EH3: 自己申告のカードを出さない（画面に出るものは招待の図像だけ・判断 6 #4）。
+                        if crate::eh3::is_eh3() {
+                            return;
+                        }
                         let now = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap_or_default()
@@ -4160,7 +4314,8 @@ pub fn run() {
             // ⚠️ 容量を大きめ (256) に取る理由: ★ ドレインは 1 本のスレッドが回すが、
             //   フォアグラウンド遷移は**まとめて飛ぶ**ことがある (ウィンドウの復元時など)。
             //   ⚠️ 溢れたぶんは `observe::OBSERVATIONS_DROPPED` が数える (★ 黙って消さない)。
-            let (focus_tx, focus_rx) = crossbeam_channel::bounded::<u64>(256);
+            let (focus_tx, focus_rx) =
+                crossbeam_channel::bounded::<crate::input::observe::FocusEvent>(256);
             let (pointer_tx, pointer_rx) =
                 crossbeam_channel::bounded::<crate::analysis::pointer_bin::PointerBin>(256);
             // ⚠️★★★ `secure_input` は macOS のみ実装がある（Windows/その他では送信元が無い）。
@@ -4170,13 +4325,21 @@ pub fn run() {
 
             // ★ ドレインスレッド: 観測 → `LogEntry`。⚠️ 判断も集計もしない (そのまま流すだけ)。
             let log_tx_observe = log_tx_for_observe;
+            // EH3: GSE 自身の窓への遷移と、そこから戻る遷移は記録しない（判断 6 #3）。O1 では従来どおり。
+            let eh3_focus_filter = crate::eh3::is_eh3();
+            let mut last_focus_own = false;
             thread::spawn(move || loop {
                 crossbeam_channel::select! {
                     recv(focus_rx) -> msg => match msg {
-                        Ok(timestamp) => {
-                            // ⚠️ 送れなくても**待たない** (★ ログが詰まって観測が滞留するのを避ける)。
-                            let _ = log_tx_observe
-                                .try_send(LogEntry::FocusTransition { timestamp });
+                        Ok(ev) => {
+                            let allowed =
+                                crate::eh3::focus_row_allowed(eh3_focus_filter, ev.own, last_focus_own);
+                            last_focus_own = ev.own;
+                            if allowed {
+                                // ⚠️ 送れなくても**待たない** (★ ログが詰まって観測が滞留するのを避ける)。
+                                let _ = log_tx_observe
+                                    .try_send(LogEntry::FocusTransition { timestamp: ev.t });
+                            }
                         }
                         Err(_) => break,
                     },
@@ -4864,18 +5027,23 @@ pub fn run() {
                 let disabled_by_env =
                     probes_disabled_by_env(std::env::var("GSE_DISABLE_PROBES").ok().as_deref());
                 let disabled_by_g1 = g1_mode();
-                let probes_disabled = disabled_by_env || disabled_by_g1.is_some();
+                // EH3: ESM と日誌はアプリの外で取るので、アプリに通知の経路を作らない
+                //   （`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 3 #3）。
+                let disabled_by_eh3 = crate::eh3::is_eh3();
+                let probes_disabled = disabled_by_env || disabled_by_g1.is_some() || disabled_by_eh3;
                 if probes_disabled {
                     // ★ 実施ログに必ず 1 行残す。実機で「止まっているつもり」を防ぐ番兵であり、
                     // 実施後の客観検証は NDJSON 側 (probe_assignment 行 0) で行う。
                     tracing::warn!(
-                        "probe scheduler DISABLED (env={}, g1_mode={:?}) \
-                         (G1 controlled-friction experiment; preregistration.md 2.6 / 5.4). \
+                        "probe scheduler DISABLED (env={}, g1_mode={:?}, eh3={}) \
+                         (G1 controlled-friction experiment, preregistration.md 2.6 / 5.4; \
+                         or EH3, where ESM and diaries are collected outside the app). \
                          No scheduled probe_assignment / probe_triggered will be produced. \
                          NOTE: the self-marker hotkey is user-initiated and is NOT gated here; \
                          G1 forbids pressing it (protocol.md).",
                         disabled_by_env,
-                        disabled_by_g1
+                        disabled_by_g1,
+                        disabled_by_eh3
                     );
                 }
                 let app_handle = app.handle().clone();
@@ -5069,8 +5237,48 @@ pub fn run() {
             .visible(false)
             .build()
             {
-                Ok(_) => tracing::info!("Overlay window pre-created (hidden)"),
+                Ok(w) => {
+                    tracing::info!("Overlay window pre-created (hidden)");
+                    // EH3: 画面共有・録画からの受動的除外（共有の状態は検出しない・ADR-026 PC-8 / R-I11）。
+                    //   ⚠️ 削減であって遮断ではない（仮想カメラ・物理撮影は防げない）。
+                    if crate::eh3::is_eh3() {
+                        if let Err(e) = w.set_content_protected(true) {
+                            tracing::warn!("overlay content protection could not be set: {}", e);
+                        }
+                    }
+                }
                 Err(e) => tracing::error!("Failed to pre-create overlay window: {}", e),
+            }
+
+            // EH3: 招待の説明と設定の窓を隠したまま先に作る（overlay と同じく setup のメインスレッドで作る・
+            //   Windows のデッドロックの回避）。閉じるボタンは隠すだけにする。
+            if crate::eh3::is_eh3() {
+                match tauri::WebviewWindowBuilder::new(
+                    app,
+                    INVITATION_SETTINGS_LABEL,
+                    tauri::WebviewUrl::App("index.html".into()),
+                )
+                .title("GSE")
+                .inner_size(560.0, 640.0)
+                .resizable(true)
+                .visible(false)
+                .build()
+                {
+                    Ok(w) => {
+                        // 時間帯の選択（生活時間の代理）と研究の説明を画面共有から外す（受動的除外）。
+                        if let Err(e) = w.set_content_protected(true) {
+                            tracing::warn!("invitation settings content protection could not be set: {}", e);
+                        }
+                        let hide_target = w.clone();
+                        w.on_window_event(move |event| {
+                            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                                api.prevent_close();
+                                let _ = hide_target.hide();
+                            }
+                        });
+                    }
+                    Err(e) => tracing::error!("Failed to pre-create invitation settings window: {}", e),
+                }
             }
 
             // macOS: overlay 窓を非アクティブ NSPanel 化する (decisions D7)。
@@ -5150,6 +5358,10 @@ pub fn run() {
             // ⚠️★★★ O1 (R3): 作業の種類の宣言 (ADR-016 判断 4 / 4b)。
             //   ★ O1 モードの画面からしか呼ばれない (非 O1 では `Err` を返す)。
             get_o1_mode,
+            get_invitation_state,
+            get_invitation_settings,
+            set_invitation_settings,
+            open_invitation_settings,
             declare_task_kind,
             get_o1_enrollment,
             acknowledge_o1_enrollment,

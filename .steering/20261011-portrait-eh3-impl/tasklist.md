@@ -13,12 +13,13 @@
 - [x] cargo test / clippy / replay snapshot → code-reviewer ∥ security-checker（判断 4）→ コミット・PR
 
 ## PR2 — 招待
-- [ ] `analysis/invitation.rs` 状態機械と §3.5 のテスト（陽性対照つき）
-- [ ] `lib.rs` の 1Hz の差し込み・`get_invitation_state`・設定の保存と IPC
-- [ ] `InvitationGlyph.tsx`（候補 3 つ）・`Overlay.tsx` の表示・画面共有の除外
-- [ ] 説明と設定の窓（`InvitationSettings.tsx`）・トレイの入口
-- [ ] `check_invitation_surface.py`（M11 の 4 条件・`--selftest`）を CI に
-- [ ] tsc / cargo test / clippy → レビュー → コミット・PR
+- [x] `analysis/invitation.rs` 状態機械と §3.5 のテスト（陽性対照つき）
+- [x] `lib.rs` の 1Hz の差し込み・`get_invitation_state`・設定の保存と IPC
+- [x] `InvitationGlyph.tsx`（候補 3 つ）・`Overlay.tsx` の表示・画面共有の除外
+- [x] 説明と設定の窓（`InvitationSettings.tsx`）・トレイの入口
+- [x] `check_invitation_surface.py`（M11 の 4 条件・`--selftest`）を CI に
+- [x] tsc / cargo test / clippy → レビュー（判断 5・6）→ コミット・PR
+- [ ] 実機（Windows）で図像の表示・失効・説明と設定の窓・画面共有からの除外を確かめる（PR3 の実機の確認と一緒に）
 
 ## PR3 — 肖像と壁紙
 - [ ] `analysis/portrait/`: canvas・generator（raw / lattice × none / diffuse）・schedule（recent）・decor・ending・テスト

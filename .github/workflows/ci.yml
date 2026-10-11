@@ -916,6 +916,14 @@ jobs:
         run: python3 scripts/check_citations.py
         env:
           PYTHONUTF8: "1"
+      # EH3 の招待面の失敗条件 4 つ (ADR-026 M11: 文字と量・共有の検出 API・PC-12・引用)。
+      #   ★ 招待面の最初のコードと同じコミットで入れた。陽性対照 (--selftest) も毎回回す。
+      - name: Invitation surface gate (ADR-026 M11)
+        run: |
+          python3 scripts/check_invitation_surface.py
+          python3 scripts/check_invitation_surface.py --selftest
+        env:
+          PYTHONUTF8: "1"
 
   # ── タグ push: Windows ビルド ────────────────────────────────
   build-windows:

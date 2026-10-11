@@ -122,7 +122,7 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 ///
 /// | 行種 | 止まる条件 | 実測 |
 /// |---|---|---|
-/// | `probe_assignment` / `realtime_label` | ⚠️ **G1 実施中は常に止まる** | `lib.rs`: `probes_disabled = disabled_by_env \|\| disabled_by_g1.is_some()` |
+/// | `probe_assignment` / `realtime_label` | ⚠️ **G1 実施中と EH3 では常に止まる** | `lib.rs`: `probes_disabled = disabled_by_env \|\| disabled_by_g1.is_some() \|\| disabled_by_eh3` |
 /// | `intervention_decision` / `intervention_response` | ⚠️ **盲検較正 (`intervention_enabled=false`) では常に止まる** | `lib.rs`: `if !INTERVENTION_ENABLED { return safe_default(); }` |
 ///
 /// → ⚠️★★★ **G1 ログを D1 の判定表に掛けると `probe_assignment` 0 行が
@@ -270,11 +270,11 @@ pub fn config_gated() -> Vec<&'static str> {
 /// `config_gated` に置く: EH3 でない走行では送出元が丸ごと止まるので、0 行は「判定不能」である。
 /// EH3 でないときは何も足さない（O1 / G1 / 通常運用の `meta.capabilities` は従来と同じ文字列・R-L6）。
 ///
-/// `invitation_present` は招待の状態機械（PR2）が送出元になるまで宣言しない
-/// （`activity_label` と同じく、writer だけで宣言すると過大申告になる・ADR-013 D2）。
+/// 送出元: `eh3_day` は分析スレッドの稼働日の台帳、`invitation_present` は招待の状態機械
+/// （`lib.rs` の `InvitationRunner`）。
 fn eh3_line_types(eh3: bool) -> Vec<&'static str> {
     if eh3 {
-        vec!["eh3_day"]
+        vec!["eh3_day", "invitation_present"]
     } else {
         Vec::new()
     }
@@ -470,17 +470,16 @@ mod tests {
         //   ★ M5 で送出元ができたら [`activity_label_has_no_emitter_until_it_is_wired`] が赤になり、
         //   **宣言の追加を強制する**。
         #[cfg(target_os = "windows")]
-        let emitterless: &[&str] = &["secure_input", "activity_label", "invitation_present"];
+        let emitterless: &[&str] = &["secure_input", "activity_label"];
         // ★ 2026-08-24: O1 の非打鍵チャネル (`focus_transition`/`pointer_bin`/`secure_input`) は
         //   macOS 側の送出元を実装したので、この行から外した (`observe_macos.rs`)。
         // ⚠️★★★ 2026-09-11 (issue 008): `ime_shadow` も外した ——
         //   macOS 側の送出元ができた (`ime_compose::drive` → `lib.rs::emit_ime_shadow`)。
         //   → ★ 非 Windows で「送出元が無い行種」は**無くなった**。
-        // `invitation_present` は送出元（招待の状態機械）ができるまで EH3 でも宣言しない（[`eh3_line_types`]）。
         #[cfg(not(target_os = "windows"))]
-        let emitterless: &[&str] = &["activity_label", "invitation_present"];
+        let emitterless: &[&str] = &["activity_label"];
         // EH3 の走行でだけ宣言する行種（送出元はある・テストは EH3 ではない）。
-        let mode_gated: &[&str] = &["eh3_day"];
+        let mode_gated: &[&str] = &["eh3_day", "invitation_present"];
 
         let mut lhs: BTreeSet<&str> = declared();
         lhs.insert(SELF_LINE_TYPE);
@@ -583,7 +582,14 @@ mod tests {
     #[test]
     fn eh3_line_types_are_declared_only_in_eh3() {
         assert!(eh3_line_types(false).is_empty());
-        assert_eq!(eh3_line_types(true), vec!["eh3_day"]);
+        assert_eq!(eh3_line_types(true), vec!["eh3_day", "invitation_present"]);
+        // 送出元が lib.rs に実在する（writer だけで宣言しない・ADR-013 D2）
+        let lib = include_str!("lib.rs");
+        assert!(lib.contains("LogEntry::Eh3Day {"), "eh3_day の送出元が無い");
+        assert!(
+            lib.contains("LogEntry::InvitationPresent {"),
+            "invitation_present の送出元が無い"
+        );
         // 宣言したものには writer がある（過大申告の逆アサート）
         let in_source = line_types_in_logger_source();
         for t in eh3_line_types(true) {
