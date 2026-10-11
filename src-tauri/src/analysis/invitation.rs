@@ -197,7 +197,8 @@ impl InvitationMachine {
     /// 1 tick 進める。
     pub fn tick(&mut self, input: &TickInput) -> TickOutput {
         let now = input.now_ms;
-        if self.day != Some(input.local_day) {
+        // 日が進んだときだけ数え直す（時計が戻って前の日に戻っても、上限の数を戻さない）
+        if self.day.is_none_or(|d| input.local_day > d) {
             self.day = Some(input.local_day);
             self.count_today = 0;
         }
@@ -799,6 +800,29 @@ mod tests {
             vec![30],
             "間隔が明けた 31 分目に、続いている区間を出さない"
         );
+    }
+
+    /// 時計が前の日へ戻って、また進んでも、1 日の上限を数え直さない。
+    #[test]
+    fn going_back_a_day_does_not_reset_the_daily_count() {
+        let mut m = InvitationMachine::new();
+        let mut n = 0;
+        for s in 0..(6 * 3600u64) {
+            let mut i = input(
+                T0 + s * SEC,
+                alternating(s),
+                Settings {
+                    cap: DailyCap::One,
+                    ..widest()
+                },
+            );
+            i.local_day = if (s / 600) % 2 == 0 { 100 } else { 99 };
+            i.minute_of_day = TEN;
+            if m.tick(&i).presented {
+                n += 1;
+            }
+        }
+        assert_eq!(n, 1);
     }
 
     /// 記録の一時停止中は出さず、止めた tick で閉じる（判断 6 #1）。

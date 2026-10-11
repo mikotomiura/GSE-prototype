@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import InvitationGlyph from "./InvitationGlyph";
+import InvitationGlyph, { INVITATION_GLYPH } from "./InvitationGlyph";
 
 // EH3 の招待の「説明と設定」の窓（招待の図像を押す・トレイから開く）。
 //
@@ -37,6 +37,10 @@ const CAP_OPTIONS: { value: DailyCap; label: string }[] = [
 const InvitationSettings: React.FC = () => {
     const [value, setValue] = useState<InvitationSettingsValue | null>(null);
     const [status, setStatus] = useState<string>("");
+    // 保存中は替えさせない（続けて替えると、古い値を含む設定で上書きして「出さない」が戻りうる）
+    const [saving, setSaving] = useState(false);
+    // 同じ描画の中で続けて押されても 2 回送らないための錠（state はその描画の古い値を読む）
+    const savingRef = useRef(false);
 
     useEffect(() => {
         invoke<InvitationSettingsValue>("get_invitation_settings")
@@ -46,18 +50,25 @@ const InvitationSettings: React.FC = () => {
 
     // 保存できたときだけ画面の値を替える（失敗したのに選んだ値が出たままにならないように）。
     const save = (next: InvitationSettingsValue) => {
+        if (savingRef.current) return;
+        savingRef.current = true;
+        setSaving(true);
         invoke("set_invitation_settings", { settings: next })
             .then(() => {
                 setValue(next);
                 setStatus("保存しました。");
             })
-            .catch(() => setStatus("保存できませんでした。"));
+            .catch(() => setStatus("保存できませんでした。"))
+            .finally(() => {
+                savingRef.current = false;
+                setSaving(false);
+            });
     };
 
     return (
         <main className="invitation-settings">
             <h1>
-                <InvitationGlyph variant="door" />
+                <InvitationGlyph variant={INVITATION_GLYPH} />
                 この印について
             </h1>
             <p>
@@ -77,7 +88,7 @@ const InvitationSettings: React.FC = () => {
 
             {value && (
                 <form onSubmit={(e) => e.preventDefault()}>
-                    <fieldset>
+                    <fieldset disabled={saving}>
                         <legend>印を</legend>
                         <label>
                             <input
@@ -98,7 +109,7 @@ const InvitationSettings: React.FC = () => {
                             出さない
                         </label>
                     </fieldset>
-                    <fieldset>
+                    <fieldset disabled={saving}>
                         <legend>出る時間帯</legend>
                         {WINDOW_OPTIONS.map((o) => (
                             <label key={o.value}>
@@ -112,7 +123,7 @@ const InvitationSettings: React.FC = () => {
                             </label>
                         ))}
                     </fieldset>
-                    <fieldset>
+                    <fieldset disabled={saving}>
                         <legend>1 日の回数</legend>
                         {CAP_OPTIONS.map((o) => (
                             <label key={o.value}>

@@ -45,7 +45,12 @@ use crate::analysis::pointer_bin::PointerBin;
 pub struct FocusEvent {
     pub t: u64,
     pub own: bool,
+    /// 送り手が付ける通し番号（取りこぼしの位置を受け手が知るため。プロセスの中だけの数で、記録しない）。
+    pub seq: u64,
 }
+
+/// フォーカス遷移の通し番号の次の値（コールバックが `fetch_add` する）。
+pub static FOCUS_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// フォーカス遷移を送る先。
 pub static FOCUS_TX: OnceLock<Sender<FocusEvent>> = OnceLock::new();

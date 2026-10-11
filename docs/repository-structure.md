@@ -50,6 +50,10 @@ GSE-prototype/
 │   │   ├── packaging.rs          #     匿名化 + age 暗号化 SSOT (#[cfg(feature = "package")] gated)
 │   │   ├── overlay_panel.rs      #     macOS: overlay 窓の NSPanel 化 FFI グルー (#[cfg(macos)] gated)
 │   │   ├── autostart.rs          #     O1 自動起動 (G-1): macOS LaunchAgent / Windows HKCU Run (#[cfg] gated・判定は純関数)
+│   │   ├── eh3.rs                #     [NEW 2026-10-11] EH3 モードの判定・日ごとの条件の割り当て・稼働日の台帳 (OS API 非依存)
+│   │   ├── wallpaper.rs          #     [NEW 2026-10-11] EH3 の肖像を壁紙に書く層（元の壁紙の保存・復元の確認）。何も記録しない
+│   │   ├── wallpaper_windows.rs  #     IDesktopWallpaper (#[cfg(windows)])
+│   │   ├── wallpaper_macos.rs    #     NSWorkspace (#[cfg(macos)]・メインスレッド経由)
 │   │   ├── sensors.rs            #     センサーモジュール dispatch (#[cfg(macos)] gated)
 │   │   ├── sensors_macos.rs      #     macOS: SensorManager stub (CoreMotion 予約)
 │   │   ├── bin/                  #     サブコマンド実装
@@ -328,7 +332,7 @@ bin/emit_schema ──► schema/current.json (CI drift check ─── gse-data
 
 ## 6. 禁止パターン
 
-- ❌ `analysis/` 内で Windows API または macOS フレームワークを直接呼ぶ（OS 依存は `input/` + `sensors*.rs` + `overlay_panel.rs` + `autostart.rs` + `lib.rs` の `#[cfg]` に限る（⚠️ **2026-09-01 訂正: `sensors/` というディレクトリは無い**））
+- ❌ `analysis/` 内で Windows API または macOS フレームワークを直接呼ぶ（OS 依存は `input/` + `sensors*.rs` + `overlay_panel.rs` + `autostart.rs` + `wallpaper_*.rs` + `lib.rs` の `#[cfg]` に限る（⚠️ **2026-09-01 訂正: `sensors/` というディレクトリは無い**））
 - ❌ フックコールバック内でブロッキング操作を行う（チャネル send + Atomic store のみ）
 - ❌ `src/` (Frontend) にビジネスロジックを置く（状態推定は Rust 側で完結）
 - ❌ `winapi` crate を使用する（`windows` crate v0.58+ のみ）

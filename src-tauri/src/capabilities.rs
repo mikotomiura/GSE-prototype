@@ -502,6 +502,8 @@ mod tests {
     /// ## ⚠️★★★ このテストは「赤くなるために」置いてある
     ///
     /// ★ ADR-031 **M5** でプローブ発火と 6 択 UI を配線すると、**本テストが落ちる**。
+    /// ⚠️ 配線するときは、EH3 のモードでは出さない門（`!crate::eh3::is_eh3()`）も同時に入れる
+    /// （EH3 では ESM をアプリの外で取る・`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 3 #1）。
     /// → ★ そのとき [`config_gated`] へ `"activity_label"` を足し、
     /// [`declaration_partitions_known_line_types`] の `emitterless` から外し、本テストを消すこと。
     /// ⚠️ **順序を間違えると、記録できないものを「測ったが 0 行」と読ませることになる。**

@@ -5,7 +5,7 @@
 ## PR1 — 記録とモード
 - [x] `eh3.rs`: 印 `eh3.mode` の解析（order・a_first・grammar・drift）・モードの決まり方（O1 前提・G1 優先）・テスト
 - [x] 稼働日の数え方（4:00 区切り・打鍵 1 回）と条件の決定・`~/.gse/eh3_state.json`・テスト
-- [x] `lib.rs`: EH3 の分岐（`INVITATION_ENABLED`・O1 の ESM を切る・Nudge は偽のまま）
+- [x] `lib.rs`: EH3 の分岐（招待の研究の条件は `meta.invitation_enabled`・O1 の ESM を切る・Nudge は偽のまま）
 - [x] `meta` の断片 `eh3_mode` / `invitation_enabled`（`logger.rs`）・EH3 でないとき空のテスト
 - [x] 行種 `eh3_day` / `invitation_present`: `schema_dto.rs`・`logger.rs`・`capabilities.rs`・`replay.rs`・`redaction.rs`・`anonymize.rs`
 - [x] `emit_schema` → `schema/current.json`・parity・capabilities_gate
@@ -26,15 +26,16 @@
 - [x] Python との移植の検算（一時スクリプト・結果を decisions に）
 - [x] `input/power_{windows,macos}.rs`（スリープの直前の通知）
 - [x] `wallpaper.rs` ＋ `wallpaper_windows.rs` / `wallpaper_macos.rs`（保存・書き込み・本人の差し替えの検出・復元の読み戻しと SHA-256・異常終了の後の復元）
-- [x] `lib.rs` の結線（終わり・始まり・期間の後・トレイの「研究を終える」）
+- [x] `lib.rs` の結線（終わり・始まり・期間の後・トレイの「壁紙を元に戻す」）
 - [x] 肖像への操作が出力に写らない試験（§4.4・陽性対照つき）
-- [ ] Windows 実機の手動確認（復元・異常終了・再起動・スリープ・複数モニタ・本人の差し替え）
+- [x] Windows 実機の手動確認のうち自動でできる範囲（起動・日の割り当て・壁紙の差し替え・異常終了の後の復元・EH3 でない meta）（判断 8）
+- [ ] Windows 実機の残り（肖像の成長・終了時の seed・スリープ・再起動・複数モニタ・本人の差し替え・トレイ・招待の図像・画面共有）
 - [x] レビュー（判断 7）→ コミット（PR は PR2 の merge の後）
 
 ## PR4 — 配布と文書
-- [ ] `docs/eh3-distribution-tag.md`・同意文書の記録項目と participant-guide の案
-- [ ] functional-design / glossary / architecture / repository-structure / agent-shared の制約 11
-- [ ] ADR-035 の見直しの記録・研究者に Accepted を聞く
-- [ ] 図像の見本・形の文法の見本を研究者に見せる（F-1・F-3）
-- [ ] macOS 実機の引き継ぎ
-- [ ] /finish-task（/cross-review 2 巡）
+- [x] `docs/eh3-distribution-tag.md`・同意文書の記録項目の案（participant-guide の本文は研究者が確定する）
+- [x] functional-design / glossary / architecture / repository-structure / agent-shared の制約 11
+- [ ] ADR-035 の見直しと Accepted（研究者の決定: 実機の確認の後に繰り越す）
+- [x] 図像の見本・形の文法の見本を研究者に見せた（見本のページ。選択は研究者の決定で凍結の前に繰り越す）
+- [x] macOS 実機の引き継ぎ（`.steering/_handoff/next-session-portrait-eh3-macos-verification.md`）
+- [x] /finish-task（/cross-review 2 巡・判断 9・10）

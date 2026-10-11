@@ -185,7 +185,9 @@ impl Generator {
         let a_u = mat.iter().filter(|s| s.active).count() as u32;
         self.total_active += a_u;
         if self.neutral {
-            self.buffer.push(mat.to_vec());
+            // 打鍵の無い秒は描画に効かないので、中立の間に貯めるのは打鍵の秒だけ
+            self.buffer
+                .push(mat.iter().copied().filter(|s| s.active).collect());
             if self.total_active < NEUTRAL_ACTIVE_S {
                 return &self.base;
             }
@@ -429,7 +431,17 @@ mod tests {
                 sum / py.len() as f64
             ));
         }
-        std::fs::write(out_path, report).unwrap();
+        std::fs::write(out_path, &report).unwrap();
+        // 移植が崩れたら赤にする（f32 の丸めを超える差）
+        for line in report.lines() {
+            let max: f64 = line
+                .split("max |diff| = ")
+                .nth(1)
+                .and_then(|r| r.split(',').next())
+                .and_then(|v| v.trim().parse().ok())
+                .unwrap_or(f64::INFINITY);
+            assert!(max < 1e-4, "移植の差が大きい: {line}");
+        }
     }
 
     #[test]
