@@ -52,3 +52,7 @@
 - `docs/adr/` の ADR-039
 - `docs/experiment-tracking.md`
 - `experiments/20261009-length-sequence-uniqueness/`・`experiments/20261009-matching-attack-prototype/`・`experiments/20261011-g1-copy-self-trial/`（コードの再利用のみ・記録は使わない）
+
+## 運用メモ
+- /reimagine 適用: No
+- 理由: 研究者の回答（判断 15）。事前登録は凍結の前に `attack-me` で攻撃し、それが設計を壊して見直す役を果たす。

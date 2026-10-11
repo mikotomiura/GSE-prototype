@@ -1,0 +1,60 @@
+{
+  "_note": "Draft values (2026-10-12), not frozen. Fixed before any data was acquired. The researcher chose the release forms, attackers, utility side, ENJA15 ground truth, reporting policy and the post-acquisition check from Claude's recommendations (.steering/20261012-public-keystroke-matching-prereg/decisions.md, decisions 8-15); the numbers are Claude's proposals. These are experiment values, not pass criteria.",
+  "seed_file": "SEED",
+  "datasets": {
+    "klicke": {
+      "reference": "[V264]",
+      "acquisition_condition": "researcher decided to proceed after reading the authors' reply (decisions 4, 7)",
+      "files": "to be filled at acquisition: Drive file IDs, SHA-256, GitHub commit",
+      "use": ["argumentative essay keystroke logs (CSV)", "essays", "human scores"],
+      "do_not_use": ["demographics", "typing tests", "vocabulary test"],
+      "min_words": 50
+    },
+    "enja15": {
+      "reference": "[P273] [P359] [P360]",
+      "acquisition_condition": "license type and terms checked in the primary source (decisions 5, 7)",
+      "svn_revision": "to be filled at acquisition",
+      "sessions": "T (from-scratch translation); meaning of T/P/D to be confirmed in [P273]/[P359] before acquisition"
+    },
+    "keytar_model": {
+      "reference": "[V267]",
+      "zenodo_record": "17254163",
+      "file": "keytar.zip",
+      "size_mb": 15039.2,
+      "license": "cc-by-4.0",
+      "acquisition_condition": "researcher approved the 15 GB download (decision 10)",
+      "sha256": "to be filled at acquisition"
+    }
+  },
+  "key_categories": ["letter", "digit", "space", "punctuation", "backspace", "delete", "enter", "navigation", "modifier", "mouse", "other"],
+  "release_forms": {
+    "R0": {"keys": "raw", "text_change": "raw", "position": "keep", "word_count": "keep", "time": "keep"},
+    "R1": {"keys": "alnum->q", "text_change": "alnum->q", "position": "keep", "word_count": "keep", "time": "keep"},
+    "R2": {"keys": "category", "text_change": "drop", "position": "keep", "word_count": "keep", "time": "keep"},
+    "R3": {"keys": "category", "text_change": "drop", "position": "drop", "word_count": "drop", "time": "keep"},
+    "R3-t": {"base": "R3", "time_floor_ms": [10, 100, 1000]},
+    "R4": {"segment_counts_floor_w": [1, 2, 4, 8]},
+    "R5": {"keys": "alnum->random QWERTY neighbour", "text_change": "same substitution", "position": "keep", "word_count": "keep", "time": "keep"},
+    "R6": {"keys": "alnum identities permuted within segment", "text_change": "same permutation", "position": "keep", "word_count": "keep", "time": "keep"},
+    "R7": {"base": "R3", "suppress_p": [0.1, 0.25, 0.5]}
+  },
+  "attackers": {
+    "A1": {"forms": ["R0", "R1", "R2", "R5", "R6"]},
+    "A2": {"forms": "all", "lambda": 8, "max_group": 3},
+    "A3": {"forms": ["R0", "R1", "R2", "R3", "R3-t", "R5", "R6", "R7"], "train_fraction": 0.5, "min_digraph_count": 20},
+    "A4": {"forms": ["R0", "R1", "R2", "R3", "R3-t", "R5", "R6", "R7"], "writers_per_prompt": 125}
+  },
+  "matching": {
+    "N": [10, 100, 1000],
+    "k": [5, 10, 20, 50],
+    "draws_per_record": 20,
+    "window_starts_per_record": 5,
+    "ties": "1/m",
+    "bootstrap": {"unit": "writer", "resamples": 2000, "level": 0.95}
+  },
+  "utility": {
+    "pause_ms": 2000,
+    "metrics": ["keypresses", "final_words", "median_iki", "pauses_ge_2s", "p_burst_count", "p_burst_mean_len", "deletions", "mean_word_len"]
+  },
+  "enja15": {"N": [10, "all"], "attackers": ["A2"], "ground_truth": "translation text"}
+}
