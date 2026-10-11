@@ -12,6 +12,10 @@ import React from "react";
 // 図像の候補。研究者が見本で 1 つに選ぶ（F-3）。選ぶまでは "door" を使う。
 export type GlyphVariant = "door" | "horizon" | "steps";
 
+// 配布物で使う図像（overlay の図像と、説明と設定の窓の「この印」の両方がこれを使う）。
+// ⚠️ 選んだ図像に替えるときは、ここ 1 か所だけを替える（`docs/eh3-distribution-tag.md` §1）。
+export const INVITATION_GLYPH: GlyphVariant = "door";
+
 export const GLYPH_SIZE_PX = 40;
 
 const STROKE = "#4b5563";

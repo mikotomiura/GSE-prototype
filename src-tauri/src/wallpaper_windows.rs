@@ -131,9 +131,8 @@ impl Backend for WindowsBackend {
 
     fn background_is_picture(&mut self) -> Option<bool> {
         // SAFETY: COM の呼び出し。
-        let slideshow = unsafe { self.api.GetStatus() }
-            .map(|s| s.0 & DSS_SLIDESHOW.0 != 0)
-            .unwrap_or(true);
+        // 取得に失敗したときは「分からない」（一時的な COM の失敗で本人の差し替えと取り違えない）
+        let slideshow = unsafe { self.api.GetStatus() }.ok()?.0 & DSS_SLIDESHOW.0 != 0;
         let picture_type = matches!(Self::background_type(), Some(0) | None);
         Some(!slideshow && picture_type)
     }

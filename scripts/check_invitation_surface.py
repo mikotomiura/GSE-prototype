@@ -103,13 +103,18 @@ def check_glyph(root: Path) -> list[str]:
     for m in JSX_TEXT.finditer(code):
         t = m.group(1).strip()
         # TypeScript generics and comparisons also produce ">...<"; only flag runs that look like words
-        if t and re.search(r"[A-Za-z\u3040-\u30ff\u4e00-\u9fff]", t) and not re.search(r"[;=(){}]", t):
+        if t and re.search(r"[0-9A-Za-z\u3040-\u30ff\u4e00-\u9fff]", t) and not re.search(r"[;=(){},:.|]", t):
             problems.append(f"1: {GLYPH} has a text node: {t!r}")
     # attribute values ={...} and JSX children {...} (after a tag or after another child expression)
-    for m in re.finditer(r"=\{([^{}]*)\}|(?<=[>}])\s*\{([^{}]*)\}", code):
-        expr = (m.group(1) or m.group(2) or "").strip()
+    for m in re.finditer(r"=\{([^{}]*)\}", code):
+        expr = m.group(1).strip()
         if expr and not GLYPH_ALLOWED_EXPR.match(expr):
             problems.append(f"1: {GLYPH} interpolates a value: {{{expr}}}")
+    # a value drawn as a child (`<g>{x}</g>`) may only be the fixed shape table
+    for m in re.finditer(r"(?<=[>}])\s*\{([^{}]*)\}", code):
+        expr = m.group(1).strip()
+        if expr and expr != "paths[variant]":
+            problems.append(f"1: {GLYPH} draws a value as a child: {{{expr}}}")
     props = re.search(r"interface\s+InvitationGlyphProps\s*\{([^}]*)\}", code)
     if not props:
         problems.append(f"1: {GLYPH} has no InvitationGlyphProps (nothing to check)")
@@ -187,6 +192,9 @@ def check_capture_detection(root: Path) -> list[str]:
 def check_present_is_drawn(root: Path) -> list[str]:
     problems = []
     overlay = strip_comments(read(root, OVERLAY) or "")
+    guard = re.search(r"\{\s*invitationPresent\s*&&(.*?)<InvitationGlyph", overlay, re.S)
+    if guard and re.search(r"\b(false|0|null|undefined)\b|!\s*(true|1)\b", guard.group(1)):
+        problems.append(f"3: {OVERLAY} guards the glyph with a constant that is never true")
     if not re.search(r"invitationPresent\s*&&[^;]*<InvitationGlyph", overlay, re.S):
         problems.append(f"3: {OVERLAY} does not render <InvitationGlyph> when invitationPresent")
     # the window must be shown (not left 1x1 off screen) while the invitation is present
@@ -200,8 +208,11 @@ def check_present_is_drawn(root: Path) -> list[str]:
         problems.append(f"3: {LIB} get_invitation_state does not read INVITATION_PRESENT")
     if "INVITATION_PRESENT.store(out.present" not in lib:
         problems.append(f"3: {LIB} does not store the state machine's output in INVITATION_PRESENT")
-    machine = read(root, MACHINE) or ""
-    if "fn presents_when_everything_allows_it" not in machine:
+    settings = strip_comments(read(root, SETTINGS) or "")
+    if "variant={INVITATION_GLYPH}" not in settings:
+        problems.append(f"3: {SETTINGS} does not show the same glyph as the overlay (INVITATION_GLYPH)")
+    machine = strip_comments(read(root, MACHINE) or "")
+    if not re.search(r"fn presents_when_everything_allows_it\(\)\s*\{[^}]*assert(_eq|_ne)?!\(", machine):
         problems.append(f"3: {MACHINE} lacks the test that it presents when everything allows it")
     return problems
 
@@ -261,6 +272,14 @@ def selftest() -> int:
         ("2: capture detection", LIB, "fn get_invitation_state() -> bool {",
          "fn get_invitation_state() -> bool {\n    let _ = \"GraphicsCaptureSession\";", "2:"),
         ("3: overlay no longer draws", OVERLAY, "<InvitationGlyph variant={INVITATION_GLYPH} />", "<span />", "3:"),
+        ("1: digits in glyph", GLYPH, "{paths[variant]}", "{paths[variant]}<g>123</g>", "1:"),
+        ("1: number drawn as child", GLYPH, "{paths[variant]}", "{paths[variant]}<g>{123}</g>", "1:"),
+        ("3: constant false guard", OVERLAY, "{invitationPresent && !probeActive", "{invitationPresent && false && !probeActive", "3:"),
+        ("3: settings shows another glyph", SETTINGS, "variant={INVITATION_GLYPH}", 'variant="steps"', "3:"),
+        ("3: PC-12 test with only a comment", MACHINE, "fn presents_when_everything_allows_it() {",
+         "fn presents_when_everything_allows_it() { // assert\n    }\n    fn _old() {", "3:"),
+        ("3: negated true guard", OVERLAY, "{invitationPresent && !probeActive", "{invitationPresent && !true && !probeActive", "3:"),
+        ("3: empty PC-12 test", MACHINE, "fn presents_when_everything_allows_it() {", "fn presents_when_everything_allows_it() {}\n    fn _old() {", "3:"),
         ("3: window not shown", OVERLAY, "const visible = probeActive || nudgeVisible || invitationPresent;",
          "const visible = probeActive || nudgeVisible;", "3:"),
         ("3: state not stored", LIB, "INVITATION_PRESENT.store(out.present", "INVITATION_PRESENT.store(false", "3:"),
