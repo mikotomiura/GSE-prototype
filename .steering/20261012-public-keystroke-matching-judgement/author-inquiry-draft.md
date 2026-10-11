@@ -4,7 +4,7 @@
 
 - Kaggle の記録との関係（判断 3）は尋ねない。
 - 研究の詳しい設計（攻撃の手順）は書かない。目的と使い方だけを書く。
-- 書き出しの「an independent researcher at [affiliation]」は、所属を書くか、所属のない研究者として書くかのどちらかに研究者が直す（完了時のレビューの指摘）。
+- 所属は 2026-10-12 に Claude が「Independent Researcher（Hiroshima, Japan）」を選んだ（研究者が「ZEN University か Independent Researcher のどちらか好きなほう」と委ねた）。理由: IME 論文（BRM）・EMSE の論文・Zenodo・ORCID の登録と同じ書き方で、この研究は大学の研究として行うものではない。宛先のアドレスは 2025 年の論文の謝辞のもので、今も有効かは確かめていない。
 
 ---
 
@@ -12,7 +12,7 @@
 
 Dear Dr. Tian,
 
-I am [name], an independent researcher at [affiliation]. Thank you for making the KLiCKe corpus publicly available; its size and the pairing of keystroke logs with final texts make it a valuable resource.
+I am Mikoto Miura, an independent researcher based in Hiroshima, Japan. Thank you for making the KLiCKe corpus publicly available; its size and the pairing of keystroke logs with final texts make it a valuable resource.
 
 I am planning a secondary analysis of the corpus that examines how much information about the final text remains in keystroke logs after common de-identification steps applied before public release (for example, replacing alphanumeric characters with a placeholder, reducing keys to categories, or rounding timestamps). The aim is to give guidance to researchers who release keystroke data. The analysis would use only the keystroke logs and the essays; I would not use the demographic file, would not attempt to identify any participant, and would not redistribute the data.
 
@@ -25,6 +25,7 @@ Before I start, I would be grateful if you could help me with three questions:
 I will cite the corpus and your article in any publication. Thank you very much for your time.
 
 Kind regards,
-[name]
-[affiliation]
-[email]
+Mikoto Miura
+Independent Researcher, Hiroshima, Japan
+ORCID: 0009-0000-4196-0508
+mmiura.network@gmail.com
