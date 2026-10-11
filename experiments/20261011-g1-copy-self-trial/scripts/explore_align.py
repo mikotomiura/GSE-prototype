@@ -64,6 +64,7 @@ def _init(*args):
 
 
 def run_task(task):
+    matching.check_init()
     label, k, N = task
     g = matching._G
     cfg, seed, corpus, y = g["cfg"], g["seed"], g["corpus"], g["y"]

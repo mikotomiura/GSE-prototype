@@ -23,26 +23,33 @@ selftest() {
 }
 
 # どの git 作業ツリー（この repo・本体の checkout・別の worktree）の中も「中」とみなす。
-# 調べられない（ディレクトリが無い・cd できない）ときも「中」とみなす（fail-closed）。
-# Python 側（common.assert_private_dir）でも同じ判定をする。
+# Python 側（common.inside_git_tree）と同じ規則: いちばん近い既存の祖先から上へ .git を探す。
+# これは前段の速い検査で、記録から作ったファイルを書く前の門は Python 側（assert_private_dir・
+# write_private_json）にある。調べられない（cd できない）ときは「中」とみなす（fail-closed）。
 inside_git_tree() {
-  [ -d "$1" ] || return 0
-  ( cd "$1" 2>/dev/null ) || return 0
-  git -C "$1" rev-parse --show-toplevel >/dev/null 2>&1 && return 0
-  return 1
+  local p="$1"
+  while [ ! -e "$p" ]; do
+    local up
+    up=$(dirname "$p")
+    [ "$up" = "$p" ] && return 0
+    p="$up"
+  done
+  p=$(cd "$p" 2>/dev/null && pwd -P) || return 0
+  while :; do
+    [ -e "$p/.git" ] && return 0
+    [ "$p" = "/" ] && return 1
+    p=$(dirname "$p")
+  done
 }
 
 main() {
   : "${G1_RECORDS:?G1_RECORDS（復号した NDJSON のディレクトリ）を指定する}"
   : "${G1_WORK:?G1_WORK（repo の外の作業ディレクトリ）を指定する}"
-  if inside_git_tree "$G1_RECORDS"; then
-    echo "!! G1_RECORDS は既存の、どの git 作業ツリーの外のディレクトリにする（data.md）" >&2; exit 1
+  if [ ! -d "$G1_RECORDS" ]; then
+    echo "!! G1_RECORDS（${G1_RECORDS}）が無い" >&2; exit 1
   fi
-  if [ -e "$G1_WORK" ] && inside_git_tree "$G1_WORK"; then
-    echo "!! G1_WORK はどの git 作業ツリーの外に置く（data.md）" >&2; exit 1
-  fi
-  if [ ! -e "$G1_WORK" ] && inside_git_tree "$(dirname "$G1_WORK")"; then
-    echo "!! G1_WORK はどの git 作業ツリーの外に置く（data.md）" >&2; exit 1
+  if inside_git_tree "$G1_RECORDS" || inside_git_tree "$G1_WORK"; then
+    echo "!! G1_RECORDS と G1_WORK はどの git 作業ツリーの外に置く（data.md）" >&2; exit 1
   fi
   mkdir -p "$G1_WORK" results raw
   selftest

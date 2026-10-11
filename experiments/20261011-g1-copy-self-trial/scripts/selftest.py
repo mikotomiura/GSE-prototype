@@ -201,6 +201,46 @@ def test_guards(cfg):
             pass
 
 
+def test_round2_guards():
+    import build_corpus
+    from common import read_json, stats_body_sha256, write_private_json
+    # an initialiser failure is raised by the task, not swallowed by a respawning pool
+    build_corpus._INIT_ERROR = "test"
+    try:
+        build_corpus.work_keys(("x", "nofile", "0" * 64))
+        check(False, "build_corpus: an initialiser failure is raised by the task")
+    except RuntimeError:
+        pass
+    finally:
+        build_corpus._INIT_ERROR = None
+    matching._G["init_error"] = "test"
+    try:
+        matching.run_task(("copy", "B", 1, 10))
+        check(False, "matching: an initialiser failure is raised by the task")
+    except RuntimeError:
+        pass
+    finally:
+        del matching._G["init_error"]
+    # a hard link to another file is replaced, not written through
+    with tempfile.TemporaryDirectory() as d1, tempfile.TemporaryDirectory() as d2:
+        target = os.path.join(d1, "target.json")
+        write_json(target, {"keep": 1})
+        linked = os.path.join(d2, "records.json")
+        try:
+            os.link(target, linked)
+        except OSError:
+            linked = None
+        if linked:
+            write_private_json(linked, {"secret": 1})
+            check(read_json(target) == {"keep": 1}, "write_private_json does not write through a hard link")
+            check(read_json(linked) == {"secret": 1}, "write_private_json writes the new file")
+            check([n for n in os.listdir(d2) if n.startswith(".tmp-")] == [], "no temporary file is left")
+    st = {"a": 1, "median_valid": 23.0}
+    st["body_sha256"] = stats_body_sha256(st)
+    st2 = dict(st, median_valid=22.0)
+    check(stats_body_sha256(st2) != st["body_sha256"], "an edited stats value changes the body hash")
+
+
 def main():
     cfg = load_config()
     check_inputs(cfg)
@@ -211,6 +251,7 @@ def main():
     test_end_to_end(cfg)
     test_explore_align()
     test_guards(cfg)
+    test_round2_guards()
     if FAILS:
         print("selftest: %d failures" % len(FAILS))
         return 1

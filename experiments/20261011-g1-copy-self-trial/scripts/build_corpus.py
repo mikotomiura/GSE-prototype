@@ -16,18 +16,26 @@ from multiprocessing import Pool
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (check_corpus_current, check_inputs, corpus_build_key, load_config, read_json, repo_path,  # noqa: E402
-                    sha256_file, write_json)
+                    sha256_file, stats_body_sha256, write_json)
 from g1rule import G1Rule, copy_lines
 
 _RULE = None
+_INIT_ERROR = None
 
 
 def _init():
-    global _RULE
-    _RULE = G1Rule(load_config())
+    """Pool initializer. An exception here would make the pool respawn workers forever, so it is kept and
+    raised by the first task instead."""
+    global _RULE, _INIT_ERROR
+    try:
+        _RULE = G1Rule(load_config())
+    except BaseException as ex:  # noqa: BLE001 - re-raised as RuntimeError in work_keys
+        _INIT_ERROR = "%s: %s" % (type(ex).__name__, ex)
 
 
 def work_keys(task):
+    if _INIT_ERROR is not None:
+        raise RuntimeError("build_corpus: worker initialisation failed: %s" % _INIT_ERROR)
     work_id, path, want = task
     bs = _RULE.bs
     if sha256_file(path) != want:
@@ -49,6 +57,7 @@ def main(argv):
     cfg = load_config()
     if a.check:
         try:
+            check_inputs(cfg)
             check_corpus_current(cfg, a.stats, a.out, a.copy_out)
         except (SystemExit, OSError, ValueError) as ex:
             print("build_corpus: not current: %s" % ex)
@@ -86,7 +95,7 @@ def main(argv):
     write_json(a.out, {"format": "corpus-g1/1", "work_ids": ids, "keys": keys})
     valid = [v for ks in keys for v in ks if v >= 0]
     n_seg = sum(len(ks) for ks in keys)
-    write_json(a.stats, {
+    stats = {
         "format": "corpus-g1-stats/1",
         "works": len(ids),
         "segments": n_seg,
@@ -100,7 +109,9 @@ def main(argv):
         "corpus_sha256": sha256_file(a.out),
         "copy_segments_sha256": sha256_file(a.copy_out),
         "build_key": corpus_build_key(cfg),
-    })
+    }
+    stats["body_sha256"] = stats_body_sha256(stats)
+    write_json(a.stats, stats)
     print("build_corpus: %d works, %d segments (%d valid), copy text %d segments"
           % (len(ids), n_seg, len(valid), len(segs)))
     return 0

@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXP = os.path.dirname(HERE)
@@ -108,11 +109,22 @@ def assert_private_dir(path):
 
 def write_private_json(path, obj):
     """write_json for record-derived files: the directory must be outside every git checkout and the file
-    must not be a link (a link could lead into a checkout)."""
-    assert_private_dir(os.path.dirname(os.path.abspath(path)))
+    must not be a symbolic link. The data go to a new temporary file in that directory, which then replaces
+    the name, so a hard link to an existing file (possibly inside a checkout) is never written through."""
+    d = os.path.dirname(os.path.abspath(path))
+    assert_private_dir(d)
     if os.path.islink(path):
         raise SystemExit("refusing to write through a link: %s" % path)
-    write_json(path, obj)
+    fd, tmp = tempfile.mkstemp(prefix=".tmp-", suffix=".json", dir=d)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(obj, f, ensure_ascii=False, indent=1)
+            f.write("\n")
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
 
 
 def corpus_build_key(cfg):
@@ -123,10 +135,18 @@ def corpus_build_key(cfg):
     return sha256_bytes(json.dumps(parts, sort_keys=True, ensure_ascii=False).encode("utf-8"))
 
 
+def stats_body_sha256(stats):
+    """SHA-256 of corpus_g1_stats.json without its own body_sha256 field (detects an edited value)."""
+    body = {k: v for k, v in stats.items() if k != "body_sha256"}
+    return sha256_bytes(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+
+
 def check_corpus_current(cfg, stats_path, corpus_path, copy_path):
     """Stops unless corpus_g1_stats.json records the current build key and the SHA-256 of both outputs."""
     st = read_json(stats_path)
     bad = []
+    if st.get("body_sha256") != stats_body_sha256(st):
+        bad.append("corpus_g1_stats.json was edited")
     if st.get("build_key") != corpus_build_key(cfg):
         bad.append("build key (rule, inputs or code changed; rebuild with build_corpus.py)")
     if sha256_file(corpus_path) != st.get("corpus_sha256"):

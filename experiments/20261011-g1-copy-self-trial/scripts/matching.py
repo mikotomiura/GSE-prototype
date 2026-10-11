@@ -109,7 +109,16 @@ class Corpus(object):
 _G = {}
 
 
-def _init(corpus_path, copy_path, work, cfg, seed, median):
+def _init(*args):
+    """Pool initializer. An exception here would make the pool respawn workers forever, so it is kept and
+    raised by the first task instead."""
+    try:
+        _load(*args)
+    except BaseException as ex:  # noqa: BLE001 - re-raised as RuntimeError in run_task
+        _G["init_error"] = "%s: %s" % (type(ex).__name__, ex)
+
+
+def _load(corpus_path, copy_path, work, cfg, seed, median):
     keys = read_json(corpus_path)["keys"]
     _G.update({"corpus": Corpus(keys), "y": np.asarray(read_json(copy_path)["keys"], dtype=np.int64),
                "recs": read_json(os.path.join(work, "records.json"))["blocks"], "cfg": cfg, "seed": seed,
@@ -133,7 +142,13 @@ def window_truths(x, y, k, kind, cfg):
     return out
 
 
+def check_init():
+    if "init_error" in _G:
+        raise RuntimeError("worker initialisation failed: %s" % _G["init_error"])
+
+
 def run_task(task):
+    check_init()
     kind, label, k, N = task
     cfg, seed, corpus, y = _G["cfg"], _G["seed"], _G["corpus"], _G["y"]
     rec_key = "clean" if kind == "clean" else "plain"
