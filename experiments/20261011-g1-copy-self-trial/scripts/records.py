@@ -3,7 +3,8 @@
   records.py --records <dir of decrypted NDJSON> --work <dir outside the repository>
 
 Each block named in config.json records.copy_blocks / control_blocks is the one file under --records whose name
-starts with "<label>_" and whose SHA-256 is config.json records.sha256[label]. The output
+starts with "<label>_" and whose SHA-256 is config.json records.sha256[label] (a name holding "_dup" is the
+duplicate upload of P010 block06 and is not used). The output
 (<work>/records.json) holds, per block, the segment values of the plain and the cleaned record and per-segment
 counts of the keys; it stays outside the repository. Only the number of blocks is printed.
 """
@@ -73,7 +74,7 @@ def find_file(root, label, want):
     hits = []
     for dirpath, _, files in os.walk(root):
         for fn in files:
-            if fn.startswith(label + "_") and fn.endswith(".ndjson"):
+            if fn.startswith(label + "_") and fn.endswith(".ndjson") and "_dup" not in fn:  # the duplicate upload
                 p = os.path.join(dirpath, fn)
                 if sha256_file(p) == want:
                     hits.append(p)

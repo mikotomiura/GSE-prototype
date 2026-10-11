@@ -1,0 +1,374 @@
+{
+ "format": "g1-crosscheck/1",
+ "alignment": {
+  "lambda": 8,
+  "max_group": 3
+ },
+ "blocks": {
+  "P009_block01": {
+   "plain": {
+    "segments": 23,
+    "groups": {
+     "1:1": 19,
+     "2:1": 2
+    },
+    "text_reached": 21,
+    "text_segments": 48,
+    "sum_abs_group_diff": 63,
+    "record_keys": 842,
+    "text_keys_aligned": 805,
+    "one_to_one": {
+     "all": {
+      "n": 19,
+      "exact": 7,
+      "mean": 1.3157894736842106,
+      "mean_abs": 2.263157894736842,
+      "min": -2,
+      "max": 18,
+      "hist": {
+       "-2": 3,
+       "-1": 3,
+       "0": 7,
+       "1": 3,
+       "6": 1,
+       "7": 1,
+       "18": 1
+      }
+     },
+     "no_bs_no_num": {
+      "n": 8,
+      "exact": 4,
+      "mean": -0.75,
+      "mean_abs": 0.75,
+      "min": -2,
+      "max": 0,
+      "hist": {
+       "-2": 2,
+       "-1": 2,
+       "0": 4
+      }
+     },
+     "bs": {
+      "n": 11,
+      "exact": 3,
+      "mean": 2.8181818181818183,
+      "mean_abs": 3.3636363636363638,
+      "min": -2,
+      "max": 18,
+      "hist": {
+       "-2": 1,
+       "-1": 1,
+       "0": 3,
+       "1": 3,
+       "6": 1,
+       "7": 1,
+       "18": 1
+      }
+     },
+     "num": {
+      "n": 0
+     }
+    },
+    "per_segment": {
+     "enter": 5.173913043478261,
+     "space": 1.0434782608695652,
+     "backspace": 1.565217391304348,
+     "numeric": 0.0
+    },
+    "explore_habit_fit": {
+     "habits": [
+      "tu"
+     ],
+     "sum_abs": 2,
+     "exact": 6,
+     "n": 8,
+     "mean": -0.25
+    }
+   },
+   "clean": {
+    "segments": 21,
+    "groups": {
+     "1:1": 18,
+     "1:2": 1,
+     "2:1": 1
+    },
+    "text_reached": 21,
+    "text_segments": 48,
+    "sum_abs_group_diff": 61,
+    "record_keys": 844,
+    "text_keys_aligned": 805
+   }
+  },
+  "P009_block10": {
+   "plain": {
+    "segments": 26,
+    "groups": {
+     "1:1": 19,
+     "1:2": 1,
+     "2:1": 3
+    },
+    "text_reached": 24,
+    "text_segments": 48,
+    "sum_abs_group_diff": 43,
+    "record_keys": 943,
+    "text_keys_aligned": 938,
+    "one_to_one": {
+     "all": {
+      "n": 19,
+      "exact": 5,
+      "mean": -0.3684210526315789,
+      "mean_abs": 1.5263157894736843,
+      "min": -8,
+      "max": 4,
+      "hist": {
+       "-8": 1,
+       "-2": 1,
+       "-1": 8,
+       "0": 5,
+       "2": 2,
+       "3": 1,
+       "4": 1
+      }
+     },
+     "no_bs_no_num": {
+      "n": 9,
+      "exact": 5,
+      "mean": -0.4444444444444444,
+      "mean_abs": 0.4444444444444444,
+      "min": -1,
+      "max": 0,
+      "hist": {
+       "-1": 4,
+       "0": 5
+      }
+     },
+     "bs": {
+      "n": 10,
+      "exact": 0,
+      "mean": -0.3,
+      "mean_abs": 2.5,
+      "min": -8,
+      "max": 4,
+      "hist": {
+       "-8": 1,
+       "-2": 1,
+       "-1": 4,
+       "2": 2,
+       "3": 1,
+       "4": 1
+      }
+     },
+     "num": {
+      "n": 0
+     }
+    },
+    "per_segment": {
+     "enter": 4.923076923076923,
+     "space": 0.9230769230769231,
+     "backspace": 1.8076923076923077,
+     "numeric": 0.0
+    },
+    "explore_habit_fit": {
+     "habits": [
+      "si",
+      "tu"
+     ],
+     "sum_abs": 0,
+     "exact": 9,
+     "n": 9,
+     "mean": 0.0
+    }
+   },
+   "clean": {
+    "segments": 24,
+    "groups": {
+     "1:1": 21,
+     "1:2": 1,
+     "2:1": 1
+    },
+    "text_reached": 24,
+    "text_segments": 48,
+    "sum_abs_group_diff": 43,
+    "record_keys": 945,
+    "text_keys_aligned": 938
+   }
+  },
+  "P010_block01": {
+   "plain": {
+    "segments": 23,
+    "groups": {
+     "1:1": 19,
+     "2:1": 2
+    },
+    "text_reached": 21,
+    "text_segments": 48,
+    "sum_abs_group_diff": 35,
+    "record_keys": 800,
+    "text_keys_aligned": 805,
+    "one_to_one": {
+     "all": {
+      "n": 19,
+      "exact": 10,
+      "mean": 0.05263157894736842,
+      "mean_abs": 0.6842105263157895,
+      "min": -2,
+      "max": 3,
+      "hist": {
+       "-2": 1,
+       "-1": 4,
+       "0": 10,
+       "1": 2,
+       "2": 1,
+       "3": 1
+      }
+     },
+     "no_bs_no_num": {
+      "n": 4,
+      "exact": 3,
+      "mean": -0.25,
+      "mean_abs": 0.25,
+      "min": -1,
+      "max": 0,
+      "hist": {
+       "-1": 1,
+       "0": 3
+      }
+     },
+     "bs": {
+      "n": 15,
+      "exact": 7,
+      "mean": 0.13333333333333333,
+      "mean_abs": 0.8,
+      "min": -2,
+      "max": 3,
+      "hist": {
+       "-2": 1,
+       "-1": 3,
+       "0": 7,
+       "1": 2,
+       "2": 1,
+       "3": 1
+      }
+     },
+     "num": {
+      "n": 0
+     }
+    },
+    "per_segment": {
+     "enter": 2.739130434782609,
+     "space": 5.478260869565218,
+     "backspace": 2.4347826086956523,
+     "numeric": 0.08695652173913043
+    },
+    "explore_habit_fit": {
+     "habits": [
+      "tu"
+     ],
+     "sum_abs": 0,
+     "exact": 4,
+     "n": 4,
+     "mean": 0.0
+    }
+   },
+   "clean": {
+    "segments": 22,
+    "groups": {
+     "1:1": 20,
+     "2:1": 1
+    },
+    "text_reached": 21,
+    "text_segments": 48,
+    "sum_abs_group_diff": 34,
+    "record_keys": 801,
+    "text_keys_aligned": 805
+   }
+  },
+  "P010_block10": {
+   "plain": {
+    "segments": 29,
+    "groups": {
+     "1:1": 24,
+     "2:1": 1,
+     "3:1": 1
+    },
+    "text_reached": 26,
+    "text_segments": 48,
+    "sum_abs_group_diff": 45,
+    "record_keys": 1055,
+    "text_keys_aligned": 1022,
+    "one_to_one": {
+     "all": {
+      "n": 24,
+      "exact": 12,
+      "mean": 0.2916666666666667,
+      "mean_abs": 0.7916666666666666,
+      "min": -1,
+      "max": 8,
+      "hist": {
+       "-1": 6,
+       "0": 12,
+       "1": 5,
+       "8": 1
+      }
+     },
+     "no_bs_no_num": {
+      "n": 8,
+      "exact": 7,
+      "mean": -0.125,
+      "mean_abs": 0.125,
+      "min": -1,
+      "max": 0,
+      "hist": {
+       "-1": 1,
+       "0": 7
+      }
+     },
+     "bs": {
+      "n": 16,
+      "exact": 5,
+      "mean": 0.5,
+      "mean_abs": 1.125,
+      "min": -1,
+      "max": 8,
+      "hist": {
+       "-1": 5,
+       "0": 5,
+       "1": 5,
+       "8": 1
+      }
+     },
+     "num": {
+      "n": 0
+     }
+    },
+    "per_segment": {
+     "enter": 3.0689655172413794,
+     "space": 3.8275862068965516,
+     "backspace": 3.1724137931034484,
+     "numeric": 0.0
+    },
+    "explore_habit_fit": {
+     "habits": [
+      "n"
+     ],
+     "sum_abs": 0,
+     "exact": 8,
+     "n": 8,
+     "mean": 0.0
+    }
+   },
+   "clean": {
+    "segments": 27,
+    "groups": {
+     "1:1": 25,
+     "2:1": 1
+    },
+    "text_reached": 26,
+    "text_segments": 48,
+    "sum_abs_group_diff": 47,
+    "record_keys": 1057,
+    "text_keys_aligned": 1022
+   }
+  }
+ }
+}
