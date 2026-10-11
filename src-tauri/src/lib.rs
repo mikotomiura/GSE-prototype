@@ -670,6 +670,11 @@ enum WallCmd {
 /// EH3: 壁紙のスレッドの送り口。⚠️ 分析スレッドより先に `run()` の中で作る（起動直後の画を落とさない）。
 static WALL_TX: std::sync::OnceLock<crossbeam_channel::Sender<WallCmd>> =
     std::sync::OnceLock::new();
+/// EH3: 本人の「壁紙を元に戻す」と期間の終わりの要求（指示が時間切れで落ちても消えないように旗で持つ。
+/// 壁紙のスレッドが見て実行する）。
+static WALL_STOP_REQUESTED: AtomicBool = AtomicBool::new(false);
+static WALL_FINISH_REQUESTED: AtomicBool = AtomicBool::new(false);
+
 /// EH3: 壁紙のスレッドの受け口（`setup()` で壁紙のスレッドが受け取るまでここに置く）。
 static WALL_RX: Mutex<Option<crossbeam_channel::Receiver<WallCmd>>> = Mutex::new(None);
 
@@ -703,8 +708,17 @@ fn send_wall(cmd: WallCmd) {
         WallCmd::Show(_) => {
             let _ = tx.try_send(cmd);
         }
-        // 本人の停止・期間の終わり・終了の前の待ち合わせは落とさない（詰まっていても待って送る）
-        _ => {
+        // 本人の停止・期間の終わりは旗を立ててから知らせる（知らせが落ちても、壁紙のスレッドが旗を見て実行する）
+        WallCmd::StopByPerson => {
+            WALL_STOP_REQUESTED.store(true, Ordering::Release);
+            let _ = tx.try_send(cmd);
+        }
+        WallCmd::Finish => {
+            WALL_FINISH_REQUESTED.store(true, Ordering::Release);
+            let _ = tx.try_send(cmd);
+        }
+        // 終了の前の待ち合わせ（落ちたら終了の側が固定の時間だけ待つ）
+        WallCmd::Ack(_) => {
             let _ = tx.send_timeout(cmd, Duration::from_millis(1500));
         }
     }
@@ -759,16 +773,34 @@ fn spawn_wallpaper_thread(app: &tauri::AppHandle) {
                 Ok(false) => tracing::info!("EH3 portrait layer: enabled (checked later)"),
                 Err(why) => tracing::info!("EH3 portrait layer: not used ({why:?})"),
             }
-            while let Ok(cmd) = rx.recv() {
+            // 期間の終わりに戻しきれなかった（モニタが外れている・OS が受け付けない）ときは、戻せるまで
+            // 60 秒ごとに戻し直す（seed の印を残さない・R-P8）。
+            const FINISH_RETRY: Duration = Duration::from_secs(60);
+            let mut finish_pending = false;
+            let mut last_finish_try: Option<std::time::Instant> = None;
+            loop {
+                let cmd = match rx.recv_timeout(Duration::from_secs(1)) {
+                    Ok(c) => Some(c),
+                    Err(crossbeam_channel::RecvTimeoutError::Timeout) => None,
+                    Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
+                };
+                if WALL_STOP_REQUESTED.swap(false, Ordering::AcqRel) {
+                    manager.stop_by_person();
+                }
+                if WALL_FINISH_REQUESTED.swap(false, Ordering::AcqRel) {
+                    finish_pending = true;
+                    last_finish_try = None;
+                }
+                if finish_pending && last_finish_try.is_none_or(|t| t.elapsed() >= FINISH_RETRY) {
+                    last_finish_try = Some(std::time::Instant::now());
+                    finish_pending = !manager.restore(true);
+                }
                 match cmd {
-                    WallCmd::Show(show) => manager.show(&show),
-                    WallCmd::Finish => {
-                        manager.restore(true);
-                    }
-                    WallCmd::StopByPerson => manager.stop_by_person(),
-                    WallCmd::Ack(done) => {
+                    Some(WallCmd::Show(show)) if !finish_pending => manager.show(&show),
+                    Some(WallCmd::Ack(done)) => {
                         let _ = done.send(());
                     }
+                    _ => {}
                 }
             }
         }
@@ -1078,9 +1110,12 @@ struct InvitationRunner {
     last_day: Option<i64>,
     /// 最後の打鍵の時刻（離席候補の判定にだけ使う）。⚠️ 記録の一時停止中の打鍵は入れない。
     last_press_ms: Option<u64>,
-    /// 最新の推定の停滞。
+    /// 最新の推定の停滞と、その F 系列の時刻（再開の前に計算された値を使わないため）。
     p_stuck: f64,
+    p_stuck_at_ms: u64,
     /// 記録の一時停止の後、F 系列の 30 秒の窓から停止中の打鍵が抜けるまで、停滞を 0 とみなす。
+    /// ⚠️ 近似である: 推定（HMM の前向きの再帰）は窓の外の観測の影響も少し持ち越す。再開の後に新しく
+    /// 30 秒の保持を数え始めるので、提示は早くても再開から 60 秒後になる。
     stall_blocked_until_ms: u64,
 }
 
@@ -1095,8 +1130,15 @@ impl InvitationRunner {
             last_day: None,
             last_press_ms: None,
             p_stuck: 0.0,
+            p_stuck_at_ms: 0,
             stall_blocked_until_ms: 0,
         }
+    }
+
+    /// F 系列が出た: 推定の停滞とその時刻を覚える。
+    fn feat(&mut self, p_stuck: f64, at_ms: u64) {
+        self.p_stuck = p_stuck;
+        self.p_stuck_at_ms = at_ms;
     }
 
     /// F 系列の窓の長さ（停止中の打鍵が推定から抜けるまで）。
@@ -1123,6 +1165,10 @@ impl InvitationRunner {
         if paused {
             self.stall_blocked_until_ms = now_ms + Self::FEATURE_WINDOW_MS;
         }
+        // 時計が大きく戻ったら、未来に残った止めの期限を詰める
+        self.stall_blocked_until_ms = self
+            .stall_blocked_until_ms
+            .min(now_ms + Self::FEATURE_WINDOW_MS);
         // 時計が戻った（NTP の補正・手動の変更）ときは待たずに区切りとして進める（待つと、出ていた図像が
         // 戻った時間ぶん残り、60 秒の失効が効かない）。
         let clock_back = self.last_tick_ms.is_some_and(|t| now_ms < t);
@@ -1143,7 +1189,10 @@ impl InvitationRunner {
         let boundary = gap || paused || self.last_day.is_some_and(|d| d != day);
         self.last_tick_ms = Some(now_ms);
         self.last_day = Some(day);
-        let p_stuck = if now_ms < self.stall_blocked_until_ms {
+        // 期限の前と、期限の前に計算された（停止中の打鍵を窓に含みうる）値は使わない
+        let p_stuck = if now_ms < self.stall_blocked_until_ms
+            || self.p_stuck_at_ms < self.stall_blocked_until_ms
+        {
             0.0
         } else {
             self.p_stuck
@@ -4251,7 +4300,7 @@ pub fn run() {
                     inv.press(k.timestamp, crate::recording::is_paused());
                 }
                 if let Some(f) = out.feat.as_ref() {
-                    inv.p_stuck = f.p_stuck;
+                    inv.feat(f.p_stuck, f.timestamp);
                 }
                 let off = utc_offset.get(tick_now);
                 let assigned_today = eh3_days
@@ -4758,16 +4807,15 @@ pub fn run() {
             // 起動の直後は前面がどこか分からないので、最初の 1 本は GSE からの遷移かもしれないとみなす。
             // 観測を落としたとき（チャネルが満杯）も同じく分からなくなるので、次の 1 本を出さない。
             let mut last_focus_own = eh3_focus_filter;
-            let mut dropped_seen = crate::input::observe::OBSERVATIONS_DROPPED
-                .load(Ordering::Relaxed);
+            let mut last_focus_seq: Option<u64> = None;
             thread::spawn(move || loop {
                 crossbeam_channel::select! {
                     recv(focus_rx) -> msg => match msg {
                         Ok(ev) => {
-                            let dropped_now = crate::input::observe::OBSERVATIONS_DROPPED
-                                .load(Ordering::Relaxed);
-                            let unknown = eh3_focus_filter && dropped_now != dropped_seen;
-                            dropped_seen = dropped_now;
+                            // 通し番号が飛んだ = 直前の遷移を取りこぼした（その遷移が GSE へだったかもしれない）
+                            let gap = last_focus_seq.is_some_and(|s| ev.seq != s.wrapping_add(1));
+                            last_focus_seq = Some(ev.seq);
+                            let unknown = eh3_focus_filter && gap;
                             let allowed = !unknown
                                 && crate::eh3::focus_row_allowed(
                                     eh3_focus_filter,

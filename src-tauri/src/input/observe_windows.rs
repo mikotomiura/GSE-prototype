@@ -31,7 +31,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use crate::analysis::pointer_bin::{PointerAccum, PointerBin};
 
-use super::{FocusEvent, FOCUS_TX, OBSERVATIONS_DROPPED, POINTER_TX};
+use super::{FocusEvent, FOCUS_SEQ, FOCUS_TX, OBSERVATIONS_DROPPED, POINTER_TX};
 
 /// ★ Windows では両方とも実装がある（ADR-013 D1 の自己刻印に使う）。
 pub const FOCUS_AVAILABLE: bool = true;
@@ -139,7 +139,15 @@ unsafe extern "system" fn foreground_event_callback(
     unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
     let own = pid != 0 && pid == std::process::id();
     if let Some(tx) = FOCUS_TX.get() {
-        if tx.try_send(FocusEvent { t: now_ms(), own }).is_err() {
+        let seq = FOCUS_SEQ.fetch_add(1, Ordering::Relaxed);
+        if tx
+            .try_send(FocusEvent {
+                t: now_ms(),
+                own,
+                seq,
+            })
+            .is_err()
+        {
             // ⚠️★ コールバック内でログを書かない (`hook-constraints` 共通-1)。
             OBSERVATIONS_DROPPED.fetch_add(1, Ordering::Relaxed);
         }

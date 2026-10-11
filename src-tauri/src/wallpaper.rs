@@ -303,7 +303,10 @@ impl<B: Backend> Manager<B> {
                     l.iter().any(|(id, q)| *id == o.id && same_path(q, p))
                 };
                 let has_last = store.last_set.iter().any(|(id, _)| *id == o.id);
-                in_list(&store.last_set)
+                // 作業フォルダの下のファイルは常にこの層のもの（失敗と扱った後に OS が書いた場合も含む。
+                // 元の壁紙として作業フォルダの下を保存することは `snapshot` が拒む）
+                p.starts_with(&self.work_dir)
+                    || in_list(&store.last_set)
                     || in_list(&store.pending_set)
                     || (!has_last && same_path(p, &o.path))
             };
@@ -398,9 +401,10 @@ impl<B: Backend> Manager<B> {
         if let Some(store) = self.store.as_mut() {
             for (id, p) in written {
                 store.last_set.retain(|(i, _)| *i != id);
+                store.pending_set.retain(|(i, _)| *i != id);
                 store.last_set.push((id, p));
             }
-            store.pending_set.clear();
+            // 書けなかったモニタの予定は残す（失敗と扱った後に OS が書いても取り違えない）
             let _ = save_store(&self.store_path, store);
         }
     }
@@ -427,11 +431,24 @@ impl<B: Backend> Manager<B> {
                 let _ = self.backend.set_position(pos);
             }
         }
+        let connected: Vec<String> = self
+            .backend
+            .monitors()
+            .map(|ms| ms.into_iter().map(|m| m.id).collect())
+            .unwrap_or_default();
         let mut ok = true;
+        let mut paths_ok = true;
         let mut restored = Vec::new();
         for o in targets {
+            if !connected.contains(&o.id) {
+                // 外れているモニタは後で戻す（元の状態を残して、戻せるまで試す）
+                ok = false;
+                paths_ok = false;
+                continue;
+            }
             if self.backend.set(&o.id, &o.path).is_err() {
                 ok = false;
+                paths_ok = false;
                 continue;
             }
             let read_back =
@@ -440,6 +457,7 @@ impl<B: Backend> Manager<B> {
             if read_back {
                 restored.push(o.id.clone());
             }
+            paths_ok &= read_back;
             ok &= read_back && unchanged;
         }
         if let Some(s) = self.store.as_mut() {
@@ -447,11 +465,14 @@ impl<B: Backend> Manager<B> {
             // ⚠️ 戻せなかったモニタは「この層が書いた」記録を残す（消すと、肖像のままなのに本人の差し替えと
             // 取り違え、二度と戻さなくなる）。
             s.last_set.retain(|(id, _)| !restored.contains(id));
-            s.pending_set.clear();
+            s.pending_set.retain(|(id, _)| !restored.contains(id));
             let _ = save_store(&self.store_path, s);
         }
-        if ok && finish {
+        // 期間の終わりは、パスが戻れば片付ける（元のファイルの中身が変わっていても、それは本人のファイルで、
+        // 肖像と seed の画像を残し続ける理由にならない）
+        if finish && paths_ok {
             self.forget();
+            return true;
         }
         ok
     }
@@ -602,14 +623,16 @@ pub(crate) mod tests {
         let (mut m, d, originals) = setup("hash", 1);
         m.show(&Show::Image(some_image()));
         std::fs::write(&originals[0], b"overwritten by someone").unwrap();
+        // 期間の途中の戻し（空の日など）: パスが戻っても、中身が違えば「戻った」とは言わない
         assert!(
-            !m.restore(true),
+            !m.restore(false),
             "ファイルが変わっていたら、パスが戻っても戻ったとは言わない"
         );
         assert!(
             d.join(STORE_FILE_NAME).exists(),
             "確かめられなければ元の状態を残す"
         );
+        // 期間の終わりの片付けは別（finishing_cleans_up_even_if_the_original_file_was_edited）
     }
 
     #[test]
@@ -718,6 +741,40 @@ pub(crate) mod tests {
             "予定にあったファイルはこの層のもの: 元へ戻す"
         );
         assert_eq!(again.backend_mut().walls["m0"], originals[0]);
+    }
+
+    #[test]
+    fn a_late_write_after_a_reported_failure_is_still_ours() {
+        // OS が失敗を返したのに、後から書かれた（macOS の時間切れの後など）
+        let (mut m, d, originals) = setup("late", 1);
+        m.backend_mut().fail_sets = 1;
+        m.show(&Show::Image(some_image()));
+        let late = d.join("eh3").join("wall-a-0.png");
+        m.backend_mut().walls.insert("m0".into(), late);
+        assert!(m.restore(true), "作業フォルダの下はこの層のもの: 元へ戻す");
+        assert_eq!(m.backend_mut().walls["m0"], originals[0]);
+    }
+
+    #[test]
+    fn finishing_with_a_monitor_unplugged_waits_until_it_returns() {
+        let (mut m, _d, originals) = setup("unplug_finish", 2);
+        m.show(&Show::Image(some_image()));
+        m.backend_mut().sizes.retain(|(id, _, _)| id != "m1");
+        assert!(!m.restore(true), "外れたモニタが戻るまで終われない");
+        assert!(m.has_pending_original());
+        m.backend_mut().sizes.push(("m1".into(), 64, 36));
+        assert!(m.restore(true));
+        assert_eq!(m.backend_mut().walls["m1"], originals[1]);
+    }
+
+    #[test]
+    fn finishing_cleans_up_even_if_the_original_file_was_edited() {
+        let (mut m, d, originals) = setup("edited", 1);
+        m.show(&Show::Image(some_image()));
+        std::fs::write(&originals[0], b"edited by the person").unwrap();
+        assert!(m.restore(true), "パスが戻れば期間の終わりは片付ける");
+        assert!(!d.join("eh3").exists(), "肖像と seed の画像を残さない");
+        assert!(!d.join(STORE_FILE_NAME).exists());
     }
 
     #[test]

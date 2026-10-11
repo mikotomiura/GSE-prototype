@@ -193,7 +193,7 @@ def check_present_is_drawn(root: Path) -> list[str]:
     problems = []
     overlay = strip_comments(read(root, OVERLAY) or "")
     guard = re.search(r"\{\s*invitationPresent\s*&&(.*?)<InvitationGlyph", overlay, re.S)
-    if guard and re.search(r"\b(false|0|null|undefined)\b", guard.group(1)):
+    if guard and re.search(r"\b(false|0|null|undefined)\b|!\s*(true|1)\b", guard.group(1)):
         problems.append(f"3: {OVERLAY} guards the glyph with a constant that is never true")
     if not re.search(r"invitationPresent\s*&&[^;]*<InvitationGlyph", overlay, re.S):
         problems.append(f"3: {OVERLAY} does not render <InvitationGlyph> when invitationPresent")
@@ -211,8 +211,8 @@ def check_present_is_drawn(root: Path) -> list[str]:
     settings = strip_comments(read(root, SETTINGS) or "")
     if "variant={INVITATION_GLYPH}" not in settings:
         problems.append(f"3: {SETTINGS} does not show the same glyph as the overlay (INVITATION_GLYPH)")
-    machine = read(root, MACHINE) or ""
-    if not re.search(r"fn presents_when_everything_allows_it\(\)\s*\{[^}]*assert", machine):
+    machine = strip_comments(read(root, MACHINE) or "")
+    if not re.search(r"fn presents_when_everything_allows_it\(\)\s*\{[^}]*assert(_eq|_ne)?!\(", machine):
         problems.append(f"3: {MACHINE} lacks the test that it presents when everything allows it")
     return problems
 
@@ -276,6 +276,9 @@ def selftest() -> int:
         ("1: number drawn as child", GLYPH, "{paths[variant]}", "{paths[variant]}<g>{123}</g>", "1:"),
         ("3: constant false guard", OVERLAY, "{invitationPresent && !probeActive", "{invitationPresent && false && !probeActive", "3:"),
         ("3: settings shows another glyph", SETTINGS, "variant={INVITATION_GLYPH}", 'variant="steps"', "3:"),
+        ("3: PC-12 test with only a comment", MACHINE, "fn presents_when_everything_allows_it() {",
+         "fn presents_when_everything_allows_it() { // assert\n    }\n    fn _old() {", "3:"),
+        ("3: negated true guard", OVERLAY, "{invitationPresent && !probeActive", "{invitationPresent && !true && !probeActive", "3:"),
         ("3: empty PC-12 test", MACHINE, "fn presents_when_everything_allows_it() {", "fn presents_when_everything_allows_it() {}\n    fn _old() {", "3:"),
         ("3: window not shown", OVERLAY, "const visible = probeActive || nudgeVisible || invitationPresent;",
          "const visible = probeActive || nudgeVisible;", "3:"),

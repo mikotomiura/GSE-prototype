@@ -49,7 +49,7 @@ use objc2_foundation::{NSNotification, NSOperationQueue};
 
 use crate::analysis::pointer_bin::{PointerAccum, PointerBin};
 
-use super::{FocusEvent, FOCUS_TX, OBSERVATIONS_DROPPED, POINTER_TX, SECURE_INPUT_TX};
+use super::{FocusEvent, FOCUS_SEQ, FOCUS_TX, OBSERVATIONS_DROPPED, POINTER_TX, SECURE_INPUT_TX};
 
 /// ★ macOS では両方とも実装がある（ADR-013 D1 の自己刻印に使う）。
 pub const FOCUS_AVAILABLE: bool = true;
@@ -104,7 +104,15 @@ fn install_focus_observer() {
             // ⚠️ 通知はアプリ単位なので、GSE の窓どうしの切り替えではそもそも飛ばない。
             let own = NSRunningApplication::currentApplication().isActive();
             if let Some(tx) = FOCUS_TX.get() {
-                if tx.try_send(FocusEvent { t: now_ms(), own }).is_err() {
+                let seq = FOCUS_SEQ.fetch_add(1, Ordering::Relaxed);
+                if tx
+                    .try_send(FocusEvent {
+                        t: now_ms(),
+                        own,
+                        seq,
+                    })
+                    .is_err()
+                {
                     OBSERVATIONS_DROPPED.fetch_add(1, Ordering::Relaxed);
                 }
             }

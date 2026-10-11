@@ -461,15 +461,16 @@ pub fn save_ledger(path: &Path, ledger: &DayLedger) -> std::io::Result<()> {
 /// 打鍵と起動から、その日の割り当てを 1 日 1 回だけ出す。
 ///
 /// 状態は台帳と「この走行で行を出した日」だけ。台帳の保存の失敗は呼び出し側へ返さず、
-/// 次に数えた日にもう一度書く（数えた日は台帳の中身なので、書けなかった日を取りこぼさない）。
+/// 次の打鍵（60 秒おき）でもう一度書く（数えた日は台帳の中身なので、書けなかった日を取りこぼさない）。
 #[derive(Debug)]
 pub struct DayTracker {
     ledger: Option<DayLedger>,
     path: Option<PathBuf>,
     emitted_day: Option<i64>,
     /// 台帳の保存に失敗した（次の打鍵でもう一度書く。書けないまま終了すると、再起動の後にその日が
-    /// 数え直しになるので、書けるまで試す）。
+    /// 数え直しになるので、書けるまで試す。打鍵のたびに試さないよう 60 秒おきに間引く）。
     unsaved: bool,
+    last_save_try_ms: u64,
 }
 
 impl DayTracker {
@@ -495,17 +496,24 @@ impl DayTracker {
             path,
             emitted_day: None,
             unsaved: false,
+            last_save_try_ms: 0,
         }
     }
 
-    fn save(&mut self) {
+    /// 保存の再試行の間隔。
+    const SAVE_RETRY_MS: u64 = 60_000;
+
+    fn save(&mut self, now_ms: u64) {
+        self.last_save_try_ms = now_ms;
         if let (Some(p), Some(ledger)) = (&self.path, &self.ledger) {
             match save_ledger(p, ledger) {
                 Ok(()) => self.unsaved = false,
                 Err(e) => {
+                    // ⚠️ 日付も条件も出さない。失敗が続く間は最初の 1 回だけ残す。
+                    if !self.unsaved {
+                        tracing::warn!("EH3 day ledger could not be saved: {e}");
+                    }
                     self.unsaved = true;
-                    // ⚠️ 日付も条件も出さない（端末の中の台帳の失敗だけを残す）。
-                    tracing::warn!("EH3 day ledger could not be saved: {e}");
                 }
             }
         }
@@ -532,8 +540,8 @@ impl DayTracker {
         a: &Assignment,
     ) -> Option<DayAssignment> {
         let day = local_day(ts_ms, utc_offset_secs);
-        if self.unsaved {
-            self.save();
+        if self.unsaved && ts_ms.saturating_sub(self.last_save_try_ms) >= Self::SAVE_RETRY_MS {
+            self.save(ts_ms);
         }
         if self.emitted_day == Some(day) {
             return None;
@@ -548,7 +556,7 @@ impl DayTracker {
         self.emitted_day = Some(day);
         let got = got?;
         if newly {
-            self.save();
+            self.save(ts_ms);
         }
         got.condition.map(|_| got)
     }
@@ -913,6 +921,8 @@ mod tests {
             None,
             "同じ日の行は出し直さない"
         );
+        assert!(t.unsaved, "60 秒たつまでは試さない");
+        assert_eq!(t.on_press(NOON_JST + 61_000, JST, &a), None);
         assert!(!t.unsaved);
         assert!(matches!(load_ledger(&good), LedgerLoad::Loaded(l) if l.days.len() == 1));
         let _ = std::fs::remove_dir_all(&dir);

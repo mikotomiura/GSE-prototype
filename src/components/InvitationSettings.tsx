@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import InvitationGlyph, { INVITATION_GLYPH } from "./InvitationGlyph";
 
@@ -39,6 +39,8 @@ const InvitationSettings: React.FC = () => {
     const [status, setStatus] = useState<string>("");
     // 保存中は替えさせない（続けて替えると、古い値を含む設定で上書きして「出さない」が戻りうる）
     const [saving, setSaving] = useState(false);
+    // 同じ描画の中で続けて押されても 2 回送らないための錠（state はその描画の古い値を読む）
+    const savingRef = useRef(false);
 
     useEffect(() => {
         invoke<InvitationSettingsValue>("get_invitation_settings")
@@ -48,7 +50,8 @@ const InvitationSettings: React.FC = () => {
 
     // 保存できたときだけ画面の値を替える（失敗したのに選んだ値が出たままにならないように）。
     const save = (next: InvitationSettingsValue) => {
-        if (saving) return;
+        if (savingRef.current) return;
+        savingRef.current = true;
         setSaving(true);
         invoke("set_invitation_settings", { settings: next })
             .then(() => {
@@ -56,7 +59,10 @@ const InvitationSettings: React.FC = () => {
                 setStatus("保存しました。");
             })
             .catch(() => setStatus("保存できませんでした。"))
-            .finally(() => setSaving(false));
+            .finally(() => {
+                savingRef.current = false;
+                setSaving(false);
+            });
     };
 
     return (

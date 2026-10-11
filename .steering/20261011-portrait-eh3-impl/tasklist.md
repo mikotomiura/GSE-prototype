@@ -38,4 +38,4 @@
 - [ ] ADR-035 の見直しと Accepted（研究者の決定: 実機の確認の後に繰り越す）
 - [x] 図像の見本・形の文法の見本を研究者に見せた（見本のページ。選択は研究者の決定で凍結の前に繰り越す）
 - [x] macOS 実機の引き継ぎ（`.steering/_handoff/next-session-portrait-eh3-macos-verification.md`）
-- [ ] /finish-task（/cross-review 2 巡）
+- [x] /finish-task（/cross-review 2 巡・判断 9・10）
