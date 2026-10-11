@@ -22,14 +22,14 @@
 - [ ] 実機（Windows）で図像の表示・失効・説明と設定の窓・画面共有からの除外を確かめる（PR3 の実機の確認と一緒に）
 
 ## PR3 — 肖像と壁紙
-- [ ] `analysis/portrait/`: canvas・generator（raw / lattice × none / diffuse）・schedule（recent）・decor・ending・テスト
-- [ ] Python との移植の検算（一時スクリプト・結果を decisions に）
-- [ ] `input/power_{windows,macos}.rs`（スリープの直前の通知）
-- [ ] `wallpaper.rs` ＋ `wallpaper_windows.rs` / `wallpaper_macos.rs`（保存・書き込み・本人の差し替えの検出・復元の読み戻しと SHA-256・異常終了の後の復元）
-- [ ] `lib.rs` の結線（終わり・始まり・期間の後・トレイの「研究を終える」）
-- [ ] 肖像への操作が出力に写らない試験（§4.4・陽性対照つき）
+- [x] `analysis/portrait/`: canvas・generator（raw / lattice × none / diffuse）・schedule（recent）・decor・ending・テスト
+- [x] Python との移植の検算（一時スクリプト・結果を decisions に）
+- [x] `input/power_{windows,macos}.rs`（スリープの直前の通知）
+- [x] `wallpaper.rs` ＋ `wallpaper_windows.rs` / `wallpaper_macos.rs`（保存・書き込み・本人の差し替えの検出・復元の読み戻しと SHA-256・異常終了の後の復元）
+- [x] `lib.rs` の結線（終わり・始まり・期間の後・トレイの「研究を終える」）
+- [x] 肖像への操作が出力に写らない試験（§4.4・陽性対照つき）
 - [ ] Windows 実機の手動確認（復元・異常終了・再起動・スリープ・複数モニタ・本人の差し替え）
-- [ ] レビュー → コミット・PR
+- [x] レビュー（判断 7）→ コミット（PR は PR2 の merge の後）
 
 ## PR4 — 配布と文書
 - [ ] `docs/eh3-distribution-tag.md`・同意文書の記録項目と participant-guide の案

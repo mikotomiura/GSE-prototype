@@ -11,6 +11,8 @@ pub mod intervention;
 pub mod intervention_eval;
 // EH3 の招待（Physical Anchor の PC 面）を出すかどうかの状態機械。応答を入力に持たない（ADR-033）。
 pub mod invitation;
+// EH3 の肖像（壁紙）の層: 何を出すかだけを決める。壁紙への書き込みは OS 依存の層（`crate::wallpaper`）。
+pub mod portrait;
 // ★★★ 特徴量へ流すキーの集合 (ADR-016 D8 のゲート分割の「内側」)。
 // ⚠️ 本番と gse-replay の**両方**がここを通る。
 pub mod key_gate;
