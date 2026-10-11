@@ -10,6 +10,7 @@
 ## ★ いま有効なメモ
 
 | トラック | ファイル | 状態 |
+| 公開データでの照合の論文: 新規性と使えるデータセットの調査（GSE のデータセットの論文は共同研究者が見つかるまで見送り・ADR-039 D1 の 2026-10-11 の注） | `next-session-public-keystroke-matching-survey.md`（2026-10-11） | 現行・未着手 |
 |---|---|---|
 | ★★★ **IME 論文: OSF の登録の記録 → M4（Mac での macOS 本計測）** | ★★★ **`next-session-ime-paper-osf-m4.md`**（2026-10-02） | ★★★ **現行**。M3 の凍結が済んだ（凍結の commit `ff122e32`・タグ `ime-observation-prereg-macos`・一覧の SHA-256 `29b183ba…6c49`・判断 130・131）。PR #293 で main に入った（`2543f9fb`）。★ OSF の登録は送信済みで承認待ち（`https://osf.io/mbgxz`・2026-10-02）→ 公開になったら登録日とファイルの SHA-256 を確かめて URL と日付を `experiment/notes.md` へ → M4（Mac・公開の後）。前の `next-session-ime-paper-m3-freeze.md` を置き換える |
 | ~~**IME 論文: M3 の凍結（事前登録の印 → タグ → 書き出しの一覧の SHA-256）→ OSF の登録（研究者）**~~ | `next-session-ime-paper-m3-freeze.md`（2026-10-02） | ✅ **完了（凍結まで）**（2026-10-02・判断 130・131）。OSF の登録の記録は上の行へ。以下は当時の記述: attack-me round 5（判定 minor・判断 125）と完了時レビュー（判断 127〜129）を終え、PR #289 を merge（`c613bdf5`）。attack-me（stage `prereg`）は閉じた。次は凍結の前の最終の確認（研究者）→ 印 → タグ → 一覧の SHA-256 → OSF（研究者）。前の `next-session-ime-paper-m3-round5.md`・`next-session-ime-paper-m3.md` を置き換える |
