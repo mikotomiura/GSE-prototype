@@ -709,3 +709,55 @@ body {
   opacity: 0.7;
   font-size: 0.8rem;
 }
+
+/* EH3 の招待の図像: overlay の小窓の右上に固定の大きさで出す。
+   提示ごとに不変（大きさ・動き・色・出ている時間で強さや回数を表さない・R-I1）ので、
+   アニメーションも出現のフェードも付けない。 */
+.invitation-glyph {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 48px;
+  height: 48px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* EH3 の招待の説明と設定の窓（通常の窓。本人の量を置かない・ADR-035 D6）。 */
+.invitation-settings {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family: system-ui, sans-serif;
+  color: #1f2937;
+  background: #ffffff;
+  min-height: 100vh;
+  box-sizing: border-box;
+  line-height: 1.7;
+}
+
+.invitation-settings h1 {
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.invitation-settings fieldset {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin: 16px 0;
+  padding: 8px 16px 12px;
+}
+
+.invitation-settings label {
+  display: block;
+  margin: 4px 0;
+}
+
+.invitation-settings-status {
+  min-height: 1.5em;
+  color: #4b5563;
+}

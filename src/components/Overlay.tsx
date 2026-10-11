@@ -3,6 +3,7 @@ import { getCurrentWindow, currentMonitor, primaryMonitor } from "@tauri-apps/ap
 import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import ProbeCard from "./ProbeCard";
+import InvitationGlyph, { GLYPH_SIZE_PX, GlyphVariant } from "./InvitationGlyph";
 
 // プローブ/Nudge 単独表示時、overlay 窓は「カードの実寸ちょうど」に縮める (logical px)。
 // これにより窓=カードとなり透明余白が生じない → Windows でカード周囲のクリックを奪わない
@@ -14,6 +15,12 @@ const PROBE_FALLBACK_W = 380;
 const PROBE_FALLBACK_H = 470;
 const NUDGE_FALLBACK_W = 360;
 const NUDGE_FALLBACK_H = 250;
+// EH3 の招待の図像の候補（研究者が見本で 1 つに選ぶ・F-3）。
+const INVITATION_GLYPH: GlyphVariant = "door";
+// 招待の図像の窓の大きさ (logical px)。図像は固定の大きさで、提示ごとに変えない (R-I1)。
+const INVITATION_BOX = GLYPH_SIZE_PX + 8;
+// 招待の状態を読む間隔。Rust 側の状態機械が 1 秒に 1 回進むのに合わせる。
+const INVITATION_POLL_MS = 1000;
 // カードと画面端の余白 + カード切れ防止の僅かなパディング (透明余白を最小化するため 1px)。
 const CARD_SCREEN_MARGIN = 12;
 const CARD_FIT_PAD = 1;
@@ -124,6 +131,35 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision }) => {
     // 無応答フェードアウト (silent) 用タイマー。
     const nudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const currentWindow = useMemo(() => getCurrentWindow(), []);
+    // EH3: 招待を出しているか（Rust の状態機械の出力をそのまま映す。ここでは何も判定しない）。
+    // EH3 でなければ backend は常に false を返す。
+    const [invitationPresent, setInvitationPresent] = useState(false);
+
+    useEffect(() => {
+        let alive = true;
+        const read = () => {
+            invoke<boolean>("get_invitation_state")
+                .then((v) => {
+                    if (alive) setInvitationPresent(v);
+                })
+                .catch(() => {
+                    if (alive) setInvitationPresent(false);
+                });
+        };
+        read();
+        const t = setInterval(read, INVITATION_POLL_MS);
+        return () => {
+            alive = false;
+            clearInterval(t);
+        };
+    }, []);
+
+    // 招待の図像を押すと説明と設定の窓を開く。⚠️ この操作は記録しない・応答として扱わない (R-I1)。
+    const openInvitationSettings = () => {
+        invoke("open_invitation_settings").catch((e) => {
+            console.warn("open_invitation_settings failed:", e);
+        });
+    };
 
     // Nudge を閉じてユーザー応答 (dismiss 理由) を NDJSON へ記録する (WBS 0.8)。
     // 固定カテゴリのみを送る。中身・本文は一切送らない。
@@ -202,7 +238,9 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision }) => {
     // ★ `applyFullscreenBlock` は **box 化が失敗した環境の縮退路としてのみ**残す。
     useEffect(() => {
         const win = currentWindow;
-        const visible = probeActive || nudgeVisible;
+        // 招待の図像は probe / nudge と同じ箱の仕組みで出す（EH3 では probe も nudge も出ない）。
+        const invitationOnly = invitationPresent && !probeActive && !nudgeVisible;
+        const visible = probeActive || nudgeVisible || invitationPresent;
         let cancelled = false;
 
         // ⚠️ 縮退路専用。全画面化は「モニタ全域へ明示 setPosition + setSize」で行う。physical 座標で扱い DPI 二重
@@ -275,9 +313,11 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision }) => {
                     if (cancelled) return;
                     const scale = mon?.scaleFactor ?? 1;
                     // 実寸 (未測定なら一瞬のフォールバック)。測定が出たら本 effect が再実行され縮む。
-                    const cardSize = probeActive
-                        ? (probeCardSize ?? { w: PROBE_FALLBACK_W, h: PROBE_FALLBACK_H })
-                        : (nudgeCardSize ?? { w: NUDGE_FALLBACK_W, h: NUDGE_FALLBACK_H });
+                    const cardSize = invitationOnly
+                        ? { w: INVITATION_BOX, h: INVITATION_BOX }
+                        : probeActive
+                          ? (probeCardSize ?? { w: PROBE_FALLBACK_W, h: PROBE_FALLBACK_H })
+                          : (nudgeCardSize ?? { w: NUDGE_FALLBACK_W, h: NUDGE_FALLBACK_H });
                     // 窓がモニタを超えないよう clamp (高 DPI/小画面でカード下端=ボタンが画面外に
                     // 出るのを防ぐ。maxHeight を viewport 非依存にした代償をここで回復する)。
                     const marginPx = Math.round(CARD_SCREEN_MARGIN * scale);
@@ -325,7 +365,7 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision }) => {
 
         return () => { cancelled = true; };
         // probeCardSize/nudgeCardSize: 実寸測定が出たら窓をカード実寸へ縮め直す (透明余白を消す)。
-    }, [probeActive, nudgeVisible, currentWindow, probeCardSize, nudgeCardSize]);
+    }, [probeActive, nudgeVisible, invitationPresent, currentWindow, probeCardSize, nudgeCardSize]);
 
     // live action が none/defer に変わっても消さない (= ボタンを押す前に勝手に消える問題の修正)。
     useEffect(() => {
@@ -384,6 +424,18 @@ const Overlay: React.FC<OverlayProps> = ({ interventionDecision }) => {
                 overlay 窓は tauri-nspanel で非アクティブ Panel 化しクリックを webview へ配送する
                 (透明窓でもクリックが届く・フォーカスは奪わない。decisions D7)。 */}
             <ProbeCard onActiveChange={setProbeActive} onResize={handleProbeResize} />
+
+            {/* EH3 の招待の図像（文字なし・固定の大きさ・量を描かない。ADR-026 / R-I1）。 */}
+            {invitationPresent && !probeActive && !nudgeVisible && (
+                <button
+                    type="button"
+                    className="invitation-glyph"
+                    aria-label="説明と設定を開く"
+                    onClick={openInvitationSettings}
+                >
+                    <InvitationGlyph variant={INVITATION_GLYPH} />
+                </button>
+            )}
 
             <aside
                 ref={nudgeRef}

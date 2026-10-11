@@ -9,6 +9,8 @@ pub mod features;
 pub mod heads;
 pub mod intervention;
 pub mod intervention_eval;
+// EH3 の招待（Physical Anchor の PC 面）を出すかどうかの状態機械。応答を入力に持たない（ADR-033）。
+pub mod invitation;
 // ★★★ 特徴量へ流すキーの集合 (ADR-016 D8 のゲート分割の「内側」)。
 // ⚠️ 本番と gse-replay の**両方**がここを通る。
 pub mod key_gate;

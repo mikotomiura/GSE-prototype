@@ -32,11 +32,23 @@ use crossbeam_channel::Sender;
 
 use crate::analysis::pointer_bin::PointerBin;
 
-/// フォーカス遷移の **時刻** を送る先。
+/// フォーカス遷移 1 回ぶん。
 ///
-/// ⚠️★★★ **`u64` 1 個しか流れない。** ★ 型として「これ以上のものが運べない」形にしてある ——
-/// HWND を運ぼうとしたらコンパイルが通らない。
-pub static FOCUS_TX: OnceLock<Sender<u64>> = OnceLock::new();
+/// ⚠️★★★ **時刻と「GSE 自身の窓か」の真偽しか運べない。** ★ 型として「これ以上のものが運べない」形に
+/// してある —— HWND・PID・アプリ識別子を運ぼうとしたらコンパイルが通らない（ADR-014 D4 の禁止表）。
+/// `own` は自分のプロセスかどうかの 1 bit で、他のアプリを識別しない。
+///
+/// `own` を使うのは EH3 だけである: GSE の窓（招待の説明と設定の窓）への遷移とそこから戻る遷移を
+/// 記録しない（図像を押したことが時刻から読めないようにする・`.steering/20261011-portrait-eh3-impl/decisions.md`
+/// 判断 6 #3）。O1 の記録は変えない（`own` は NDJSON に出ない）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FocusEvent {
+    pub t: u64,
+    pub own: bool,
+}
+
+/// フォーカス遷移を送る先。
+pub static FOCUS_TX: OnceLock<Sender<FocusEvent>> = OnceLock::new();
 
 /// 1 秒ビンのポインタ活動を送る先（★ ゼロ抑制済み）。
 pub static POINTER_TX: OnceLock<Sender<PointerBin>> = OnceLock::new();
@@ -89,7 +101,11 @@ static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::n
 /// 観測を開始する。★ 送信端を先に登録してから呼ぶこと。
 ///
 /// ⚠️ 専用スレッドを起こして即座に返る（★ `init_hook` と同じ作法）。
-pub fn start(focus_tx: Sender<u64>, pointer_tx: Sender<PointerBin>, secure_tx: Sender<bool>) {
+pub fn start(
+    focus_tx: Sender<FocusEvent>,
+    pointer_tx: Sender<PointerBin>,
+    secure_tx: Sender<bool>,
+) {
     // ⚠️ 二重初期化しても壊れないように `OnceLock` の失敗は無視する
     //   (★ 2 回目の `start` は「既に動いている」が正しい振る舞い)。
     let _ = FOCUS_TX.set(focus_tx);

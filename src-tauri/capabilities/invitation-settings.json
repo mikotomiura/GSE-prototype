@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "invitation-settings",
+  "description": "EH3 invitation explanation and settings window (least privilege: core defaults only)",
+  "windows": ["invitation-settings"],
+  "permissions": ["core:default"]
+}

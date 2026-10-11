@@ -103,6 +103,8 @@ fn current_state(session_active: &AtomicBool) -> MeasureState {
 /// メニュー項目の ID。
 const MENU_QUIT: &str = "gse-tray-quit";
 const MENU_STATUS: &str = "gse-tray-status";
+/// EH3: 招待の説明と設定の窓を開く（招待を止めた後でも、ここから戻せる・ADR-035 D1 / D2）。
+const MENU_INVITATION: &str = "gse-tray-invitation";
 
 /// トレイを作り、1Hz で状態を追う更新スレッドを起こす。
 ///
@@ -140,7 +142,14 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         None::<&str>,
     )?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "GSE を終了", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&status, &PredefinedMenuItem::separator(app)?, &quit])?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let menu = if crate::eh3::is_eh3() {
+        let invitation =
+            MenuItem::with_id(app, MENU_INVITATION, "印の説明と設定", true, None::<&str>)?;
+        Menu::with_items(app, &[&status, &separator, &invitation, &quit])?
+    } else {
+        Menu::with_items(app, &[&status, &separator, &quit])?
+    };
 
     let mut builder = TrayIconBuilder::with_id("gse-tray")
         .menu(&menu)
@@ -152,6 +161,9 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             if event.id.as_ref() == MENU_QUIT {
                 tracing::info!("tray: quit requested");
                 crate::shutdown_and_exit(app);
+            } else if event.id.as_ref() == MENU_INVITATION {
+                // ⚠️ 開いたことは記録しない（applog にも出さない・R-I1）。
+                let _ = crate::show_invitation_settings_window(app);
             }
         });
     if let Some(icon) = app.default_window_icon() {
