@@ -24,7 +24,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from align import align, start_map  # noqa: E402
-from common import load_config, read_json, read_seed, seed_int, sha256_file, write_json  # noqa: E402
+from common import check_corpus_current, load_config, read_json, read_seed, seed_int, sha256_file, write_json  # noqa: E402
 
 
 # ---------------------------------------------------------------- processing and scoring
@@ -54,7 +54,7 @@ def scores(variant, x, t, D):
 
 def credit(ts, ds):
     """1 when the truth alone is closest, 1/m when it is one of m closest, 0 otherwise."""
-    best = int(ds.min()) if ds.size else ts
+    best = ds.min() if ds.size else ts
     if ts < best:
         return 1.0
     if ts > best:
@@ -162,7 +162,7 @@ def run_task(task):
                     vals[n].append(credit(*scores(cfg["variants"][n], x, t, D)))
         for n in names:
             per[n]["mean"].append(statistics.fmean(vals[n]))
-            per[n]["var"].append(statistics.pvariance(vals[n]))
+            per[n]["var"].append(statistics.variance(vals[n]))  # sample variance of the draws
     return task, per
 
 
@@ -199,9 +199,7 @@ def main(argv):
     a = ap.parse_args(argv)
     cfg = load_config()
     seed = read_seed()
-    cstats = read_json(a.corpus_stats)
-    if sha256_file(a.corpus) != cstats["corpus_sha256"]:
-        raise SystemExit("matching: %s does not match corpus_g1_stats.json" % a.corpus)
+    cstats = check_corpus_current(cfg, a.corpus_stats, a.corpus, a.copy)
     rc = cfg["records"]
     tasks = []
     for k in cfg["matching"]["k"]:

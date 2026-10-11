@@ -9,5 +9,7 @@
  "median_valid": 23.0,
  "copy_segments": 48,
  "copy_keys_total": 1684,
- "corpus_sha256": "238f38c4b614f963c9b118cc96c24084d31cfb9e226ef3df3f5f5b64e3215d43"
+ "corpus_sha256": "238f38c4b614f963c9b118cc96c24084d31cfb9e226ef3df3f5f5b64e3215d43",
+ "copy_segments_sha256": "aab80c7726b0f6c1e3b82d6bc3e21057f35bcf195034c34f514774cb9d88570b",
+ "build_key": "5865893917c1b26c8a12b91a8c67e3a131c8bef316bcf19c6405bbbfb269297e"
 }

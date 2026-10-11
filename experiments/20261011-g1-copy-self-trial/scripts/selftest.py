@@ -9,7 +9,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import matching  # noqa: E402
 from align import align, start_map  # noqa: E402
-from common import check_inputs, load_config, repo_path, write_json  # noqa: E402
+from common import REPO, assert_private_dir, check_inputs, corpus_build_key, load_config, repo_path, write_json  # noqa: E402
 from g1rule import G1Rule, copy_lines  # noqa: E402
 from records import segments  # noqa: E402
 
@@ -64,6 +64,16 @@ def test_records(cfg):
     st = segments([a, n, s, e, b, o], rule)[0][1]
     check(st == {"alphabetic": 1, "numeric": 1, "backspace": 1, "enter": 1, "space": 1}, "per-segment counts: %r" % st)
     check([v for v, _ in segments([n, a, o], rule)] == [2], "digits count")
+    cats = [a, o, o, b, a, o]
+    check([v for v, _ in segments(cats, rule)] == [1, 0, 0], "plain with two boundaries in a row")
+    check([v for v, _ in segments(cats, rule, clean=True)] == [1, 1], "clean: only the boundary right before the minus")
+    cats = [a, o, b, b, a, o]
+    check([v for v, _ in segments(cats, rule, clean=True)] == [1], "clean: only the first of two minuses is skipped")
+    try:
+        segments([a, "punctuation", o], rule)
+        check(False, "an unknown category stops")
+    except SystemExit:
+        pass
 
 
 def test_align():
@@ -75,6 +85,8 @@ def test_align():
     check(g == [(0, 1, 0, 1), (1, 2, 1, 2)], "the text may end early")
     check(start_map(align([10, 8, 12, 30], y, 8)) == {0: 0, 1: 1, 2: 1, 3: 2}, "start map")
     check(align([12, 19, 31], y, 8) == [(0, 1, 0, 1), (1, 2, 1, 2), (2, 3, 2, 3)], "small differences stay 1:1")
+    check(align([10], [10, 0], 0) == [(0, 1, 0, 1)], "end tie: the smallest text position")
+    check(align([5, 5], [10, 0], 0)[0] == (0, 2, 0, 1), "a 2:1 group when it costs less than 1:1 steps")
 
 
 def test_processing():
@@ -90,6 +102,10 @@ def test_processing():
     check(matching.credit(1, np.array([0, 19])) == 0.0, "credit 0")
     check(matching.credit(0, np.array([1, 2])) == 1.0, "credit 1")
     check(matching.credit(2, np.array([2, 2, 5])) == 1 / 3, "credit with ties")
+    t = np.array([5, -3, 9, 3])
+    ts, ds = matching.scores({"kind": "bin", "w": 4}, x, t, np.array([t, [50, 50, 50, 50]]))
+    check(matching.credit(ts, ds) == 0.5, "a decoy equal to the truth halves the credit")
+    check(matching.credit(1.0, np.array([1.5, 2.0])) == 1.0, "credit compares floats without truncation")
 
 
 def test_end_to_end(cfg):
@@ -163,6 +179,28 @@ def test_explore_align():
           "align_cost: an inserted boundary costs 8 instead of shifting every later segment")
 
 
+def test_guards(cfg):
+    try:
+        assert_private_dir(REPO)
+        check(False, "the repository is refused as a work directory")
+    except SystemExit:
+        pass
+    with tempfile.TemporaryDirectory() as d:
+        assert_private_dir(d)  # a temporary directory outside any checkout is accepted
+    check(corpus_build_key(cfg) == corpus_build_key(cfg), "build key is deterministic")
+    c2 = copymod.deepcopy(cfg)
+    c2["text_rule"]["counted_symbols"] += "x"
+    check(corpus_build_key(c2) != corpus_build_key(cfg), "build key follows the text rule")
+    import build_corpus
+    from multiprocessing import Pool
+    with Pool(1, initializer=build_corpus._init) as pool:
+        try:
+            pool.map(build_corpus.work_keys, [("x", os.path.join(REPO, "README.md"), "0" * 64)])
+            check(False, "a zip with the wrong SHA-256 stops the pool")
+        except RuntimeError:
+            pass
+
+
 def main():
     cfg = load_config()
     check_inputs(cfg)
@@ -172,6 +210,7 @@ def main():
     test_processing()
     test_end_to_end(cfg)
     test_explore_align()
+    test_guards(cfg)
     if FAILS:
         print("selftest: %d failures" % len(FAILS))
         return 1

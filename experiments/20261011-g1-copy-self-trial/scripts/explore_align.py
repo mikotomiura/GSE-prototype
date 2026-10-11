@@ -24,7 +24,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import matching  # noqa: E402
 from align import ORDER, align  # noqa: E402
-from common import load_config, read_json, read_seed, seed_int, sha256_file, write_json  # noqa: E402
+from common import check_corpus_current, load_config, read_json, read_seed, seed_int, write_json  # noqa: E402
 
 DRAWS = 10
 NS = (100, 1000)
@@ -101,9 +101,7 @@ def main(argv):
     a = ap.parse_args(argv)
     cfg = load_config()
     seed = read_seed()
-    cstats = read_json(a.corpus_stats)
-    if sha256_file(a.corpus) != cstats["corpus_sha256"]:
-        raise SystemExit("explore_align: %s does not match corpus_g1_stats.json" % a.corpus)
+    cstats = check_corpus_current(cfg, a.corpus_stats, a.corpus, a.copy)
     blocks = cfg["records"]["copy_blocks"]
     tasks = [(lab, k, N) for k in cfg["matching"]["k"] for N in NS for lab in blocks]
     args = (a.corpus, a.copy, a.work, cfg, seed, cstats["median_valid"])
@@ -127,11 +125,14 @@ def main(argv):
     for (v, k, N), bl in sorted(acc.items()):
         vals = [b["acc"] for b in bl.values() if b["acc"] is not None]
         split = {}
+        n_all = sum(b["windows"] for b in bl.values())
+        hit_all = sum(b["acc"] * b["windows"] for b in bl.values() if b["windows"])
         for name in ("clean", "irregular"):
             n = sum(b["split"][name]["windows"] for b in bl.values())
             hit = sum(b["split"][name]["acc"] * b["split"][name]["windows"] for b in bl.values() if b["split"][name]["windows"])
             split[name] = {"windows": n, "acc_pooled": hit / n if n else None}
         cells.append({"variant": v, "k": k, "N": N, "chance": 1.0 / N, "blocks": bl, "split_pooled_windows": split,
+                      "overall_pooled": hit_all / n_all if n_all else None, "windows": n_all,
                       "overall": statistics.fmean(vals) if vals else None,
                       "min": min(vals) if vals else None, "max": max(vals) if vals else None})
     write_json(a.out, {"format": "g1-explore-align/1", "draws_per_window": DRAWS, "seed": seed,

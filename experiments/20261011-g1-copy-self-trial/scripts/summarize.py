@@ -152,18 +152,22 @@ def main(argv):
         w("## 5. 事後の探索: 区切りの乱れと、それを許す攻撃者（事前の固定に無い・notes.md 逸脱 3）")
         w("")
         w("1 窓あたり %d 回の抽選（本計算と同じ種の最初の %d 回）。L_align は区間の結合と分割を許す揃えの費用で比べる。"
-          "「乱れなし」は、ブロック全体の揃えで 1 対 1 でない組（区切りの挿入・欠落）の区間を含まない窓（4 ブロックの窓をまとめた割合）。"
+          "「乱れなし」は、ブロック全体の揃えで 1 対 1 でない組（区切りの挿入・欠落）の区間を含まない窓。"
+          "ブロック平均は 4 ブロックの値の平均（§2 と同じ単位）、ほかの列は 4 ブロックの窓をまとめた割合。"
+          "乱れの有無は記録の値で決めた揃えに依存する（独立な分類ではない・notes.md）。"
           % (ex["draws_per_window"], ex["draws_per_window"]))
         w("")
-        w("| N | k | L_none 全体 | L_align 全体 | 乱れなしの窓 | L_none（乱れなし） | 乱れありの窓 | L_none（乱れあり） | L_align（乱れあり） |")
-        w("|---|---|---|---|---|---|---|---|---|")
+        w("| N | k | 窓 | L（ブロック平均） | L_align（ブロック平均） | L（まとめた） | L_align（まとめた） | 乱れなしの窓 | L（乱れなし） | L_align（乱れなし） | 乱れありの窓 | L（乱れあり） | L_align（乱れあり） |")
+        w("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
         for N in sorted({c["N"] for c in ex["cells"]}):
             for k in ks:
                 n, al = ec[("L_none", k, N)], ec[("L_align", k, N)]
                 sc, si = n["split_pooled_windows"]["clean"], n["split_pooled_windows"]["irregular"]
-                w("| %d | %d | %s | %s | %d | %s | %d | %s | %s |" % (N, k, pct(n["overall"]), pct(al["overall"]), sc["windows"],
-                  pct(sc["acc_pooled"]), si["windows"], pct(si["acc_pooled"]),
-                  pct(al["split_pooled_windows"]["irregular"]["acc_pooled"])))
+                ac, ai = al["split_pooled_windows"]["clean"], al["split_pooled_windows"]["irregular"]
+                w("| %d | %d | %d | %s | %s | %s | %s | %d | %s | %s | %d | %s | %s |" % (
+                  N, k, n["windows"], pct(n["overall"]), pct(al["overall"]), pct(n["overall_pooled"]),
+                  pct(al["overall_pooled"]), sc["windows"], pct(sc["acc_pooled"]), pct(ac["acc_pooled"]),
+                  si["windows"], pct(si["acc_pooled"]), pct(ai["acc_pooled"])))
         w("")
     with open(a.out, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(L))

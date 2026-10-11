@@ -22,23 +22,32 @@ selftest() {
   run scripts/selftest.py
 }
 
-inside_repo() {
-  local top abs
-  top=$(cd ../.. && pwd -P)
-  abs=$(cd "$1" && pwd -P)
-  case "${abs,,}/" in "${top,,}/"*) return 0 ;; esac
+# どの git 作業ツリー（この repo・本体の checkout・別の worktree）の中も「中」とみなす。
+# 調べられない（ディレクトリが無い・cd できない）ときも「中」とみなす（fail-closed）。
+# Python 側（common.assert_private_dir）でも同じ判定をする。
+inside_git_tree() {
+  [ -d "$1" ] || return 0
+  ( cd "$1" 2>/dev/null ) || return 0
+  git -C "$1" rev-parse --show-toplevel >/dev/null 2>&1 && return 0
   return 1
 }
 
 main() {
   : "${G1_RECORDS:?G1_RECORDS（復号した NDJSON のディレクトリ）を指定する}"
   : "${G1_WORK:?G1_WORK（repo の外の作業ディレクトリ）を指定する}"
-  mkdir -p "$G1_WORK" results raw
-  if inside_repo "$G1_RECORDS" || inside_repo "$G1_WORK"; then
-    echo "!! G1_RECORDS と G1_WORK は repo の外に置く（data.md）" >&2; exit 1
+  if inside_git_tree "$G1_RECORDS"; then
+    echo "!! G1_RECORDS は既存の、どの git 作業ツリーの外のディレクトリにする（data.md）" >&2; exit 1
   fi
+  if [ -e "$G1_WORK" ] && inside_git_tree "$G1_WORK"; then
+    echo "!! G1_WORK はどの git 作業ツリーの外に置く（data.md）" >&2; exit 1
+  fi
+  if [ ! -e "$G1_WORK" ] && inside_git_tree "$(dirname "$G1_WORK")"; then
+    echo "!! G1_WORK はどの git 作業ツリーの外に置く（data.md）" >&2; exit 1
+  fi
+  mkdir -p "$G1_WORK" results raw
   selftest
-  if [ ! -f raw/corpus_g1.json ] || [ ! -f results/corpus_g1_stats.json ]; then
+  if ! run scripts/build_corpus.py --check --out raw/corpus_g1.json --copy-out results/copy_segments.json \
+       --stats results/corpus_g1_stats.json; then
     : "${ZIPS:?ZIPS（前の実測の raw/zips）を指定する}"
     echo "== おとりのコーパス（G1 の規則・1,500 作品）=="
     run scripts/build_corpus.py --zips "$ZIPS" --out raw/corpus_g1.json --copy-out results/copy_segments.json \

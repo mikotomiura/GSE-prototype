@@ -15,7 +15,7 @@ import sys
 
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import load_config, sha256_file, write_json
+from common import assert_private_dir, load_config, sha256_file, write_private_json
 
 STAT_KEYS = ("alphabetic", "numeric", "backspace", "enter", "space")
 
@@ -37,6 +37,10 @@ def segments(cats, rule, clean=False):
     (plus, minus or boundary category) is a minus is not a boundary, and that minus is not counted."""
     plus, minus, bound = set(rule["counted_plus"]), set(rule["counted_minus"]), set(rule["boundary"])
     relevant = plus | minus | bound
+    unknown = set(cats) - relevant - set(rule["clean_skip"])
+    if unknown:
+        # a category of another app version (e.g. punctuation) would otherwise be dropped silently
+        raise SystemExit("records: categories outside config.json record_rule: %s" % sorted(unknown))
     skip_minus = set()
     skip_bound = set()
     if clean:
@@ -89,6 +93,7 @@ def main(argv):
     ap.add_argument("--work", required=True)
     a = ap.parse_args(argv)
     cfg = load_config()
+    assert_private_dir(a.records)
     rcfg = cfg["records"]
     rule = cfg["record_rule"]
     out = {}
@@ -98,8 +103,9 @@ def main(argv):
         clean = segments(cats, rule, clean=True)
         out[label] = {"plain": [v for v, _ in plain], "plain_stats": [s for _, s in plain],
                       "clean": [v for v, _ in clean]}
+    assert_private_dir(a.work)
     os.makedirs(a.work, exist_ok=True)
-    write_json(os.path.join(a.work, "records.json"), {"format": "g1-records/1", "blocks": out})
+    write_private_json(os.path.join(a.work, "records.json"), {"format": "g1-records/1", "blocks": out})
     print("records: %d blocks" % len(out))
     return 0
 

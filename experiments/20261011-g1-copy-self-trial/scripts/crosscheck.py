@@ -15,7 +15,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from align import align  # noqa: E402
-from common import load_config, prior_module, read_json, write_json  # noqa: E402
+from common import load_config, prior_module, read_json, write_json, write_private_json  # noqa: E402
 
 KINDS = {(1, 1): "1:1", (2, 1): "2:1", (1, 2): "1:2", (3, 1): "3:1", (1, 3): "1:3"}
 
@@ -99,7 +99,7 @@ def main(argv):
         clean, g_clean = check_block(b["clean"], None, y, units, cfg, rt)
         res[label] = {"plain": plain, "clean": clean}
         detail[label] = {"plain": {"x": b["plain"], "groups": g_plain}, "clean": {"x": b["clean"], "groups": g_clean}}
-    write_json(os.path.join(a.work, "alignment.json"), {"format": "g1-alignment/1", "blocks": detail})
+    write_private_json(os.path.join(a.work, "alignment.json"), {"format": "g1-alignment/1", "blocks": detail})
     write_json(a.out, {"format": "g1-crosscheck/1", "alignment": cfg["alignment"], "blocks": res})
     print("crosscheck: %d blocks" % len(res))
     return 0

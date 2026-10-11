@@ -15,7 +15,8 @@ from multiprocessing import Pool
 
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import check_inputs, load_config, read_json, repo_path, sha256_file, write_json
+from common import (check_corpus_current, check_inputs, corpus_build_key, load_config, read_json, repo_path,  # noqa: E402
+                    sha256_file, write_json)
 from g1rule import G1Rule, copy_lines
 
 _RULE = None
@@ -30,7 +31,7 @@ def work_keys(task):
     work_id, path, want = task
     bs = _RULE.bs
     if sha256_file(path) != want:
-        raise SystemExit("build_corpus: %s does not match the manifest" % path)
+        raise RuntimeError("build_corpus: %s does not match the manifest" % path)  # not SystemExit: a pool worker
     text, _ = bs.read_zip_text(path)
     lines, _ = bs.body_lines(text)
     return work_id, [k for k, _ in _RULE.segments_of_lines(lines)]
@@ -38,13 +39,24 @@ def work_keys(task):
 
 def main(argv):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--zips", required=True)
+    ap.add_argument("--zips", default=None)
     ap.add_argument("--out", required=True)
     ap.add_argument("--copy-out", required=True)
     ap.add_argument("--stats", required=True)
     ap.add_argument("--processes", type=int, default=4)
+    ap.add_argument("--check", action="store_true", help="exit 0 when the outputs are current, 1 otherwise")
     a = ap.parse_args(argv)
     cfg = load_config()
+    if a.check:
+        try:
+            check_corpus_current(cfg, a.stats, a.out, a.copy_out)
+        except (SystemExit, OSError, ValueError) as ex:
+            print("build_corpus: not current: %s" % ex)
+            return 1
+        print("build_corpus: current")
+        return 0
+    if not a.zips:
+        raise SystemExit("build_corpus: --zips is required to build")
     check_inputs(cfg)
 
     rule = G1Rule(cfg)
@@ -86,6 +98,8 @@ def main(argv):
         "copy_segments": len(segs),
         "copy_keys_total": sum(k for k, _ in segs),
         "corpus_sha256": sha256_file(a.out),
+        "copy_segments_sha256": sha256_file(a.copy_out),
+        "build_key": corpus_build_key(cfg),
     })
     print("build_corpus: %d works, %d segments (%d valid), copy text %d segments"
           % (len(ids), n_seg, len(valid), len(segs)))

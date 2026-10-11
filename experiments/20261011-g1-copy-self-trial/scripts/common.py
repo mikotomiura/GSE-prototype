@@ -70,7 +70,8 @@ def prior_module(name, cfg):
     with open(path, "rb") as f:
         data = f.read()
     if want is None or sha256_bytes(data) != want:
-        raise SystemExit("prior_module: %s does not match config.json" % rel)
+        # RuntimeError, not SystemExit: this also runs in pool workers, where SystemExit would hang the pool
+        raise RuntimeError("prior_module: %s does not match config.json" % rel)
     if name == "build_segments":
         prior_module("romaji_table", cfg)  # build_segments imports romaji_table by name
     spec = importlib.util.spec_from_loader(name, loader=None, origin=path)
@@ -85,6 +86,56 @@ def prior_module(name, cfg):
 def seed_int(*parts):
     """64-bit integer from the SHA-256 of the parts joined with ':'."""
     return int.from_bytes(hashlib.sha256(":".join(str(p) for p in parts).encode("utf-8")).digest()[:8], "big")
+
+
+def inside_git_tree(path):
+    """True when `path` (resolved) or one of its parents holds a .git entry (any checkout or worktree)."""
+    p = os.path.realpath(path)
+    while True:
+        if os.path.exists(os.path.join(p, ".git")):
+            return True
+        parent = os.path.dirname(p)
+        if parent == p:
+            return False
+        p = parent
+
+
+def assert_private_dir(path):
+    """Stops unless `path` is outside every git checkout (record-derived files go only there; data.md)."""
+    if inside_git_tree(path) or inside_git_tree(os.path.dirname(os.path.abspath(path))):
+        raise SystemExit("the work directory must be outside every git checkout: %s" % path)
+
+
+def write_private_json(path, obj):
+    """write_json for record-derived files: the directory must be outside every git checkout and the file
+    must not be a link (a link could lead into a checkout)."""
+    assert_private_dir(os.path.dirname(os.path.abspath(path)))
+    if os.path.islink(path):
+        raise SystemExit("refusing to write through a link: %s" % path)
+    write_json(path, obj)
+
+
+def corpus_build_key(cfg):
+    """SHA-256 of what the corpus and the copy segments are built from: the text rule, the inputs, the earlier
+    experiment's code and this experiment's build code. Stored in corpus_g1_stats.json and checked on reuse."""
+    parts = {"text_rule": cfg["text_rule"], "inputs": cfg["inputs"], "code": cfg["code"],
+             "own": {n: sha256_file(os.path.join(HERE, n)) for n in ("g1rule.py", "build_corpus.py", "common.py")}}
+    return sha256_bytes(json.dumps(parts, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+
+
+def check_corpus_current(cfg, stats_path, corpus_path, copy_path):
+    """Stops unless corpus_g1_stats.json records the current build key and the SHA-256 of both outputs."""
+    st = read_json(stats_path)
+    bad = []
+    if st.get("build_key") != corpus_build_key(cfg):
+        bad.append("build key (rule, inputs or code changed; rebuild with build_corpus.py)")
+    if sha256_file(corpus_path) != st.get("corpus_sha256"):
+        bad.append(corpus_path)
+    if sha256_file(copy_path) != st.get("copy_segments_sha256"):
+        bad.append(copy_path)
+    if bad:
+        raise SystemExit("the corpus is not current: %s" % "; ".join(bad))
+    return st
 
 
 def write_json(path, obj):
