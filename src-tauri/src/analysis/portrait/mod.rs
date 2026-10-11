@@ -167,14 +167,23 @@ impl PortraitLayer {
             self.presses.pop_front();
         }
         let gen = self.generator.as_mut()?;
-        self.pending.push(s);
         let sched = self.schedule.as_mut()?;
         let presses: Vec<u64> = self.presses.iter().copied().collect();
-        if !sched.due(now_ms, &presses) {
-            return None;
+        // 予定を先に見る: 材料は前の更新から予定の時刻までの秒（Python の [前の更新, u)）。
+        // いま渡された秒は、この更新の後の材料に回す。
+        let shown = if sched.due(now_ms, &presses) {
+            Some(Show::Image(
+                gen.update(&std::mem::take(&mut self.pending)).clone(),
+            ))
+        } else {
+            None
+        };
+        // 打鍵の無い秒は描画に効かない（水準は打鍵のあった秒だけで決まり、印の数は打鍵の秒の数で決まる）
+        // ので貯めない（長い不在で材料が際限なく増えないように）。
+        if s.active {
+            self.pending.push(s);
         }
-        let img = gen.update(&std::mem::take(&mut self.pending)).clone();
-        self.emit(Show::Image(img))
+        self.emit(shown?)
     }
 
     /// 終わり（終了・スリープの直前・日付の区切り）。A-seed なら seed を、それ以外は何も出さない。
@@ -192,7 +201,7 @@ impl PortraitLayer {
         }
     }
 
-    /// 期間の後・研究を終える: 元の壁紙へ（seed の印を残さない・R-P8）。
+    /// 期間の後・やめた後: 元の壁紙へ（seed の印を残さない・R-P8）。
     pub fn finish(&mut self) -> Option<Show> {
         self.condition = None;
         self.generator = None;

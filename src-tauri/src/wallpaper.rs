@@ -84,6 +84,10 @@ pub struct Store {
     pub stopped: bool,
     /// 最後にこの層が書いたファイル（モニタごと）。読み戻しと比べて本人の差し替えを見つける。
     pub last_set: Vec<(String, PathBuf)>,
+    /// これから書くファイル（OS に書く前に保存する）。書いた直後に落ちても、読み戻しがこれと同じなら
+    /// この層が書いたものと分かる（本人の差し替えと取り違えない）。
+    #[serde(default)]
+    pub pending_set: Vec<(String, PathBuf)>,
 }
 
 /// 元の状態のファイル名。
@@ -270,6 +274,7 @@ impl<B: Backend> Manager<B> {
             person_monitors: Vec::new(),
             stopped: false,
             last_set: Vec::new(),
+            pending_set: Vec::new(),
         })
     }
 
@@ -283,19 +288,27 @@ impl<B: Backend> Manager<B> {
             return;
         };
         let picture = self.backend.background_is_picture();
+        // いまつながっているモニタだけを見る（外れたモニタの「壁紙なし」を本人の差し替えと取り違えない）
+        let connected: Vec<String> = match self.backend.monitors() {
+            Ok(ms) => ms.into_iter().map(|m| m.id).collect(),
+            Err(_) => return,
+        };
         let mut newly = Vec::new();
         for o in &store.monitors {
-            if store.person_monitors.contains(&o.id) {
+            if store.person_monitors.contains(&o.id) || !connected.contains(&o.id) {
                 continue;
             }
-            let expected = store
-                .last_set
-                .iter()
-                .find(|(id, _)| *id == o.id)
-                .map(|(_, p)| p.clone())
-                .unwrap_or_else(|| o.path.clone());
+            let ours = |p: &Path| {
+                let in_list = |l: &Vec<(String, PathBuf)>| {
+                    l.iter().any(|(id, q)| *id == o.id && same_path(q, p))
+                };
+                let has_last = store.last_set.iter().any(|(id, _)| *id == o.id);
+                in_list(&store.last_set)
+                    || in_list(&store.pending_set)
+                    || (!has_last && same_path(p, &o.path))
+            };
             let changed = match self.backend.get(&o.id) {
-                Ok(Some(now)) => !same_path(&now, &expected),
+                Ok(Some(now)) => !ours(&now),
                 Ok(None) => true,
                 Err(_) => false,
             };
@@ -352,7 +365,8 @@ impl<B: Backend> Manager<B> {
             Err(_) => return,
         };
         let tag = self.next_tag();
-        let mut written = Vec::new();
+        // 書く画像を先に作り、書く予定を保存してから OS に書く（書いた直後に落ちても取り違えない）
+        let mut planned = Vec::new();
         for (i, m) in monitors.iter().enumerate() {
             // 元の状態に無いモニタ（後から挿した）と、本人が替えたモニタは書かない
             let ours = self.store.as_ref().is_some_and(|s| {
@@ -362,11 +376,23 @@ impl<B: Backend> Manager<B> {
                 continue;
             }
             let path = self.work_dir.join(format!("wall-{tag}-{i}.png"));
-            if write_png(&path, canvas, m.width.max(1), m.height.max(1)).is_err() {
-                continue;
+            if write_png(&path, canvas, m.width.max(1), m.height.max(1)).is_ok() {
+                planned.push((m.id.clone(), path));
             }
-            if self.backend.set(&m.id, &path).is_ok() {
-                written.push((m.id.clone(), path));
+        }
+        if planned.is_empty() {
+            return;
+        }
+        if let Some(store) = self.store.as_mut() {
+            store.pending_set = planned.clone();
+            if save_store(&self.store_path, store).is_err() {
+                return; // 予定を残せないなら書かない
+            }
+        }
+        let mut written = Vec::new();
+        for (id, path) in planned {
+            if self.backend.set(&id, &path).is_ok() {
+                written.push((id, path));
             }
         }
         if let Some(store) = self.store.as_mut() {
@@ -374,6 +400,7 @@ impl<B: Backend> Manager<B> {
                 store.last_set.retain(|(i, _)| *i != id);
                 store.last_set.push((id, p));
             }
+            store.pending_set.clear();
             let _ = save_store(&self.store_path, store);
         }
     }
@@ -401,6 +428,7 @@ impl<B: Backend> Manager<B> {
             }
         }
         let mut ok = true;
+        let mut restored = Vec::new();
         for o in targets {
             if self.backend.set(&o.id, &o.path).is_err() {
                 ok = false;
@@ -409,11 +437,17 @@ impl<B: Backend> Manager<B> {
             let read_back =
                 matches!(self.backend.get(&o.id), Ok(Some(p)) if same_path(&p, &o.path));
             let unchanged = sha256_file(&o.path).as_deref() == Some(o.sha256.as_str());
+            if read_back {
+                restored.push(o.id.clone());
+            }
             ok &= read_back && unchanged;
         }
         if let Some(s) = self.store.as_mut() {
-            // 元に戻したので、次に本人の差し替えを比べる相手は元の壁紙
-            s.last_set.clear();
+            // 戻ったモニタは、次に本人の差し替えを比べる相手が元の壁紙になる。
+            // ⚠️ 戻せなかったモニタは「この層が書いた」記録を残す（消すと、肖像のままなのに本人の差し替えと
+            // 取り違え、二度と戻さなくなる）。
+            s.last_set.retain(|(id, _)| !restored.contains(id));
+            s.pending_set.clear();
             let _ = save_store(&self.store_path, s);
         }
         if ok && finish {
@@ -463,6 +497,8 @@ pub(crate) mod tests {
         pub picture: bool,
         pub position: Option<i32>,
         pub sets: usize,
+        /// 次の N 回の `set` を失敗させる。
+        pub fail_sets: usize,
     }
 
     impl Backend for FakeBackend {
@@ -481,6 +517,10 @@ pub(crate) mod tests {
             Ok(self.walls.get(id).cloned())
         }
         fn set(&mut self, id: &str, path: &Path) -> Result<(), String> {
+            if self.fail_sets > 0 {
+                self.fail_sets -= 1;
+                return Err("busy".into());
+            }
             self.sets += 1;
             self.walls.insert(id.to_string(), path.to_path_buf());
             Ok(())
@@ -525,6 +565,7 @@ pub(crate) mod tests {
             picture: true,
             position: Some(4),
             sets: 0,
+            fail_sets: 0,
         };
         let m = Manager::new(backend, d.join(STORE_FILE_NAME), d.join("eh3"));
         (m, d, originals)
@@ -640,6 +681,60 @@ pub(crate) mod tests {
             m.backend_mut().walls["m1"],
             originals[1],
             "肖像のまま残さない"
+        );
+    }
+
+    #[test]
+    fn a_failed_restore_is_retried_and_not_mistaken_for_the_persons_change() {
+        let (mut m, _d, originals) = setup("retry", 1);
+        m.show(&Show::Image(some_image()));
+        m.backend_mut().fail_sets = 1; // 1 回目の復元で OS が受け付けない
+        assert!(!m.restore(true), "戻せなかったら true にしない");
+        assert!(m.has_pending_original(), "元の状態を残す");
+        assert!(
+            m.restore(true),
+            "2 回目は戻る（本人の差し替えと取り違えていない）"
+        );
+        assert_eq!(m.backend_mut().walls["m0"], originals[0]);
+    }
+
+    #[test]
+    fn a_crash_between_writing_and_saving_is_not_mistaken_for_the_persons_change() {
+        let (mut m, d, originals) = setup("pending", 1);
+        m.show(&Show::Image(some_image()));
+        // 2 枚目を書く予定を保存した直後に落ちた、を作る: 予定にあるファイルを OS に書いたが last_set は古い
+        let next = d.join("eh3").join("wall-b-0.png");
+        std::fs::write(&next, b"next").unwrap();
+        let store_path = d.join(STORE_FILE_NAME);
+        let mut st: Store = serde_json::from_slice(&std::fs::read(&store_path).unwrap()).unwrap();
+        st.pending_set = vec![("m0".into(), next.clone())];
+        std::fs::write(&store_path, serde_json::to_vec(&st).unwrap()).unwrap();
+        m.backend_mut().walls.insert("m0".into(), next);
+        let backend = m.backend_mut().clone();
+        drop(m);
+        let mut again = Manager::new(backend, store_path, d.join("eh3"));
+        assert!(
+            again.restore(true),
+            "予定にあったファイルはこの層のもの: 元へ戻す"
+        );
+        assert_eq!(again.backend_mut().walls["m0"], originals[0]);
+    }
+
+    #[test]
+    fn a_disconnected_monitor_is_not_the_persons_change() {
+        let (mut m, _d, originals) = setup("unplug", 2);
+        m.show(&Show::Image(some_image()));
+        // モニタ 1 を外す（壁紙の読み戻しもできない）→ 戻す → 挿し直してから終わりに戻す
+        m.backend_mut().sizes.retain(|(id, _, _)| id != "m1");
+        let portrait1 = m.backend_mut().walls.remove("m1").unwrap();
+        m.show(&Show::Image(some_image()));
+        m.backend_mut().sizes.push(("m1".into(), 64, 36));
+        m.backend_mut().walls.insert("m1".into(), portrait1);
+        assert!(m.restore(true));
+        assert_eq!(
+            m.backend_mut().walls["m1"],
+            originals[1],
+            "外れていたモニタも戻す"
         );
     }
 

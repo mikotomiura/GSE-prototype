@@ -661,7 +661,7 @@ enum WallCmd {
     Show(crate::analysis::portrait::Show),
     /// 期間の後・やめたとき: seed の印を残さずに元へ戻し、保存した元の状態を消す。
     Finish,
-    /// 本人が「肖像を止めて壁紙を戻す」を選んだ（トレイ）。以後は書かない。⚠️ 記録しない。
+    /// 本人が「壁紙を元に戻す」を選んだ（トレイ）。以後は書かない。⚠️ 記録しない。
     StopByPerson,
     /// ここまでの指示を終えたら知らせる（終了の前に seed を書き終えるのを待つ）。
     Ack(crossbeam_channel::Sender<()>),
@@ -695,8 +695,18 @@ static PORTRAIT_END_DONE: std::sync::OnceLock<(
 )> = std::sync::OnceLock::new();
 
 fn send_wall(cmd: WallCmd) {
-    if let Some(tx) = WALL_TX.get() {
-        let _ = tx.try_send(cmd);
+    let Some(tx) = WALL_TX.get() else {
+        return;
+    };
+    match cmd {
+        // 画の更新は落ちてもよい（次の予定で最新の画が出る）
+        WallCmd::Show(_) => {
+            let _ = tx.try_send(cmd);
+        }
+        // 本人の停止・期間の終わり・終了の前の待ち合わせは落とさない（詰まっていても待って送る）
+        _ => {
+            let _ = tx.send_timeout(cmd, Duration::from_millis(1500));
+        }
     }
 }
 
@@ -769,7 +779,7 @@ fn spawn_wallpaper_thread(app: &tauri::AppHandle) {
     });
 }
 
-/// トレイの「肖像を止めて壁紙を戻す」。⚠️ 記録しない（NDJSON・applog とも・R-P9）。
+/// トレイの「壁紙を元に戻す」。⚠️ 記録しない（NDJSON・applog とも・R-P9）。
 pub(crate) fn stop_portrait_by_person() {
     send_wall(WallCmd::StopByPerson);
 }
@@ -1066,10 +1076,12 @@ struct InvitationRunner {
     machine: crate::analysis::invitation::InvitationMachine,
     last_tick_ms: Option<u64>,
     last_day: Option<i64>,
-    /// 最後の打鍵の時刻（一時停止に依らない・離席候補の判定にだけ使う）。
+    /// 最後の打鍵の時刻（離席候補の判定にだけ使う）。⚠️ 記録の一時停止中の打鍵は入れない。
     last_press_ms: Option<u64>,
     /// 最新の推定の停滞。
     p_stuck: f64,
+    /// 記録の一時停止の後、F 系列の 30 秒の窓から停止中の打鍵が抜けるまで、停滞を 0 とみなす。
+    stall_blocked_until_ms: u64,
 }
 
 impl InvitationRunner {
@@ -1083,11 +1095,34 @@ impl InvitationRunner {
             last_day: None,
             last_press_ms: None,
             p_stuck: 0.0,
+            stall_blocked_until_ms: 0,
+        }
+    }
+
+    /// F 系列の窓の長さ（停止中の打鍵が推定から抜けるまで）。
+    const FEATURE_WINDOW_MS: u64 = 30_000;
+
+    /// 打鍵を観測した（記録の一時停止中は数えない: 止めた区間の状態を、再開の後の提示に残さない）。
+    fn press(&mut self, ts: u64, paused: bool) {
+        if !paused {
+            self.last_press_ms = Some(ts);
         }
     }
 
     /// 1 秒たっていれば進める。新しく出したらその時刻を返す。
-    fn maybe_tick(&mut self, now_ms: u64, offset: &mut UtcOffsetCache) -> Option<u64> {
+    ///
+    /// `assigned_today` はその日が期間の中の稼働日として割り当て済みか（期間の後・台帳が壊れた・
+    /// 割り当てが違う走行では偽で、招待を出さない＝条件の行が無い提示の行を作らない）。
+    fn maybe_tick(
+        &mut self,
+        now_ms: u64,
+        offset: &mut UtcOffsetCache,
+        assigned_today: bool,
+    ) -> Option<u64> {
+        let paused = crate::recording::is_paused();
+        if paused {
+            self.stall_blocked_until_ms = now_ms + Self::FEATURE_WINDOW_MS;
+        }
         // 時計が戻った（NTP の補正・手動の変更）ときは待たずに区切りとして進める（待つと、出ていた図像が
         // 戻った時間ぶん残り、60 秒の失効が効かない）。
         let clock_back = self.last_tick_ms.is_some_and(|t| now_ms < t);
@@ -1104,19 +1139,25 @@ impl InvitationRunner {
             || self
                 .last_tick_ms
                 .is_some_and(|t| now_ms.saturating_sub(t) >= Self::GAP_AS_BOUNDARY_MS);
-        let boundary = gap || self.last_day.is_some_and(|d| d != day);
+        // 一時停止中は区間を終わらせる（停止中に区間が貯まって、再開の直後に出る・使い切られるのを防ぐ）
+        let boundary = gap || paused || self.last_day.is_some_and(|d| d != day);
         self.last_tick_ms = Some(now_ms);
         self.last_day = Some(day);
+        let p_stuck = if now_ms < self.stall_blocked_until_ms {
+            0.0
+        } else {
+            self.p_stuck
+        };
         let input = crate::analysis::invitation::TickInput {
             now_ms,
             local_day: day,
             minute_of_day: crate::eh3::local_minute_of_day(now_ms, off),
-            p_stuck: self.p_stuck,
+            p_stuck,
             idle_ms: self
                 .last_press_ms
                 .map_or(u64::MAX, |t| now_ms.saturating_sub(t)),
-            research_enabled: crate::eh3::is_eh3(),
-            recording_active: !crate::recording::is_paused(),
+            research_enabled: crate::eh3::is_eh3() && assigned_today,
+            recording_active: !paused,
             settings: current_invitation_settings(),
             session_boundary: boundary,
         };
@@ -3933,7 +3974,7 @@ pub fn run() {
     crate::eh3::set_mode(eh3_mode);
     init_wall_channel();
     if let Some((src, _)) = eh3_mode {
-        // ⚠️ 割り当て（順序・文法）は applog にも出さない（条件の名前を参加者の端末の平文に残さない）。
+        // ⚠️ 割り当て（順序・文法）は applog に出さない（割り当ては印 `eh3.mode` と台帳 `eh3_state.json` にだけある）。
         tracing::warn!(
             "EH3 MODE ENABLED (source={}): daily condition assignment is on, Nudge stays OFF.",
             src.as_str()
@@ -4207,12 +4248,18 @@ pub fn run() {
             }
             if let Some(inv) = invitation.as_mut() {
                 if let Some(k) = out.key.as_ref().filter(|k| k.is_press) {
-                    inv.last_press_ms = Some(k.timestamp);
+                    inv.press(k.timestamp, crate::recording::is_paused());
                 }
                 if let Some(f) = out.feat.as_ref() {
                     inv.p_stuck = f.p_stuck;
                 }
-                if let Some(presented_at) = inv.maybe_tick(tick_now, &mut utc_offset) {
+                let off = utc_offset.get(tick_now);
+                let assigned_today = eh3_days
+                    .as_ref()
+                    .is_some_and(|(a, t)| t.today(tick_now, off, a).is_some());
+                if let Some(presented_at) =
+                    inv.maybe_tick(tick_now, &mut utc_offset, assigned_today)
+                {
                     let _ = log_tx_analysis.try_send(LogEntry::InvitationPresent {
                         timestamp: presented_at,
                     });
@@ -4708,13 +4755,25 @@ pub fn run() {
             let log_tx_observe = log_tx_for_observe;
             // EH3: GSE 自身の窓への遷移と、そこから戻る遷移は記録しない（判断 6 #3）。O1 では従来どおり。
             let eh3_focus_filter = crate::eh3::is_eh3();
-            let mut last_focus_own = false;
+            // 起動の直後は前面がどこか分からないので、最初の 1 本は GSE からの遷移かもしれないとみなす。
+            // 観測を落としたとき（チャネルが満杯）も同じく分からなくなるので、次の 1 本を出さない。
+            let mut last_focus_own = eh3_focus_filter;
+            let mut dropped_seen = crate::input::observe::OBSERVATIONS_DROPPED
+                .load(Ordering::Relaxed);
             thread::spawn(move || loop {
                 crossbeam_channel::select! {
                     recv(focus_rx) -> msg => match msg {
                         Ok(ev) => {
-                            let allowed =
-                                crate::eh3::focus_row_allowed(eh3_focus_filter, ev.own, last_focus_own);
+                            let dropped_now = crate::input::observe::OBSERVATIONS_DROPPED
+                                .load(Ordering::Relaxed);
+                            let unknown = eh3_focus_filter && dropped_now != dropped_seen;
+                            dropped_seen = dropped_now;
+                            let allowed = !unknown
+                                && crate::eh3::focus_row_allowed(
+                                    eh3_focus_filter,
+                                    ev.own,
+                                    last_focus_own,
+                                );
                             last_focus_own = ev.own;
                             if allowed {
                                 // ⚠️ 送れなくても**待たない** (★ ログが詰まって観測が滞留するのを避ける)。

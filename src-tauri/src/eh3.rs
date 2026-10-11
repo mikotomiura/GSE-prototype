@@ -467,6 +467,9 @@ pub struct DayTracker {
     ledger: Option<DayLedger>,
     path: Option<PathBuf>,
     emitted_day: Option<i64>,
+    /// 台帳の保存に失敗した（次の打鍵でもう一度書く。書けないまま終了すると、再起動の後にその日が
+    /// 数え直しになるので、書けるまで試す）。
+    unsaved: bool,
 }
 
 impl DayTracker {
@@ -491,6 +494,20 @@ impl DayTracker {
             ledger,
             path,
             emitted_day: None,
+            unsaved: false,
+        }
+    }
+
+    fn save(&mut self) {
+        if let (Some(p), Some(ledger)) = (&self.path, &self.ledger) {
+            match save_ledger(p, ledger) {
+                Ok(()) => self.unsaved = false,
+                Err(e) => {
+                    self.unsaved = true;
+                    // ⚠️ 日付も条件も出さない（端末の中の台帳の失敗だけを残す）。
+                    tracing::warn!("EH3 day ledger could not be saved: {e}");
+                }
+            }
         }
     }
 
@@ -515,6 +532,9 @@ impl DayTracker {
         a: &Assignment,
     ) -> Option<DayAssignment> {
         let day = local_day(ts_ms, utc_offset_secs);
+        if self.unsaved {
+            self.save();
+        }
         if self.emitted_day == Some(day) {
             return None;
         }
@@ -528,12 +548,7 @@ impl DayTracker {
         self.emitted_day = Some(day);
         let got = got?;
         if newly {
-            if let Some(p) = &self.path {
-                if let Err(e) = save_ledger(p, ledger) {
-                    // ⚠️ 日付も条件も出さない（端末の中の台帳の失敗だけを残す）。
-                    tracing::warn!("EH3 day ledger could not be saved: {e}");
-                }
-            }
+            self.save();
         }
         got.condition.map(|_| got)
     }
@@ -876,6 +891,30 @@ mod tests {
         let other = parse_assignment("order=A,D,E;a_first=none;grammar=raw;drift=none").unwrap();
         let mut t3 = DayTracker::new(load_ledger(&path), Some(path.clone()), &other);
         assert_eq!(t3.on_press(NOON_JST + 2 * DAY_MS, JST, &other), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_failed_save_is_retried_on_the_next_press() {
+        // 保存先を「ファイルの下」にして書けなくする → 書ける場所に直すと次の打鍵で保存される
+        let dir = std::env::temp_dir().join(format!("gse_eh3_unsaved_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let blocker = dir.join("blocker");
+        std::fs::write(&blocker, b"x").unwrap();
+        let a = assign();
+        let mut t = DayTracker::new(LedgerLoad::Fresh, Some(blocker.join(STATE_FILE_NAME)), &a);
+        assert!(t.on_press(NOON_JST, JST, &a).is_some());
+        assert!(t.unsaved, "書けなかったことを覚える");
+        let good = dir.join(STATE_FILE_NAME);
+        t.path = Some(good.clone());
+        assert_eq!(
+            t.on_press(NOON_JST + 1000, JST, &a),
+            None,
+            "同じ日の行は出し直さない"
+        );
+        assert!(!t.unsaved);
+        assert!(matches!(load_ledger(&good), LedgerLoad::Loaded(l) if l.days.len() == 1));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

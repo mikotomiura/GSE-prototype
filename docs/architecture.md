@@ -457,7 +457,7 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 
 | 層 | 置き場 | スレッド | 記録 |
 |---|---|---|---|
-| 日の割り当て | `eh3.rs`（OS 非依存） | 分析スレッド（打鍵のたび・1 日 1 回だけ行を出す） | `eh3_day` |
+| 日の割り当て | `eh3.rs`（OS 非依存） | 分析スレッド（その日の最初の打鍵で数える。起動・一時停止からの再開・日次の切り替えの後にもその日の行を出し直す） | `eh3_day` |
 | 招待 | `analysis/invitation.rs`（状態機械・応答を入力に持たない）→ `lib.rs` の `InvitationRunner`（1 秒ごと）→ overlay の図像（`get_invitation_state` を poll） | 分析スレッド | `invitation_present`（時刻だけ） |
 | 肖像 | `analysis/portrait/`（何を出すか）→ `lib.rs` の `PortraitRunner`（1 秒ごと）→ 壁紙のスレッド（`wallpaper.rs` ＋ `wallpaper_{windows,macos}.rs`） | 分析スレッド → 壁紙のスレッド（Windows は COM の STA・macOS はメインスレッドへ依頼） | 記録しない（R-P9） |
 | 電源の通知 | `input/power_{windows,macos}.rs` | OS のコールバック（`try_send` だけ） | 記録しない |

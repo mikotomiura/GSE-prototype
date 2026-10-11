@@ -12,6 +12,7 @@
 //! ⚠️ 何も記録しない（`wallpaper.rs` のモジュールの doc）。
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::Duration;
@@ -43,13 +44,21 @@ impl MacBackend {
         f: impl FnOnce(MainThreadMarker) -> T + Send + 'static,
     ) -> Result<T, String> {
         let (tx, rx) = mpsc::channel();
+        // 待ちきれなかった仕事は、後からメインスレッドが拾っても実行しない（呼び出し側は失敗と扱い済み）
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let flag = cancelled.clone();
         (self.run_on_main)(Box::new(move || {
+            if flag.load(Ordering::Acquire) {
+                return;
+            }
             if let Some(mtm) = MainThreadMarker::new() {
                 let _ = tx.send(f(mtm));
             }
         }));
-        rx.recv_timeout(MAIN_TIMEOUT)
-            .map_err(|_| "main thread did not answer".to_string())
+        rx.recv_timeout(MAIN_TIMEOUT).map_err(|_| {
+            cancelled.store(true, Ordering::Release);
+            "main thread did not answer".to_string()
+        })
     }
 }
 
@@ -105,11 +114,13 @@ impl Backend for MacBackend {
     fn get(&mut self, monitor_id: &str) -> Result<Option<PathBuf>, String> {
         let id = monitor_id.to_string();
         self.on_main(move |mtm| {
-            let screen = screen_at(mtm, &id)?;
+            // 画面が見つからない（外れた）は「壁紙なし」ではなく失敗にする（本人の差し替えと取り違えない）
+            let screen = screen_at(mtm, &id).ok_or_else(|| "no such screen".to_string())?;
             let ws = NSWorkspace::sharedWorkspace();
-            let url = ws.desktopImageURLForScreen(&screen)?;
-            file_path_of(&url)
-        })
+            Ok(ws
+                .desktopImageURLForScreen(&screen)
+                .and_then(|url| file_path_of(&url)))
+        })?
     }
 
     fn set(&mut self, monitor_id: &str, path: &Path) -> Result<(), String> {

@@ -3,7 +3,7 @@ import { getCurrentWindow, currentMonitor, primaryMonitor } from "@tauri-apps/ap
 import { PhysicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import ProbeCard from "./ProbeCard";
-import InvitationGlyph, { GLYPH_SIZE_PX, GlyphVariant } from "./InvitationGlyph";
+import InvitationGlyph, { GLYPH_SIZE_PX, INVITATION_GLYPH } from "./InvitationGlyph";
 
 // プローブ/Nudge 単独表示時、overlay 窓は「カードの実寸ちょうど」に縮める (logical px)。
 // これにより窓=カードとなり透明余白が生じない → Windows でカード周囲のクリックを奪わない
@@ -15,8 +15,6 @@ const PROBE_FALLBACK_W = 380;
 const PROBE_FALLBACK_H = 470;
 const NUDGE_FALLBACK_W = 360;
 const NUDGE_FALLBACK_H = 250;
-// EH3 の招待の図像の候補（研究者が見本で 1 つに選ぶ・F-3）。
-const INVITATION_GLYPH: GlyphVariant = "door";
 // 招待の図像の窓の大きさ (logical px)。図像は固定の大きさで、提示ごとに変えない (R-I1)。
 const INVITATION_BOX = GLYPH_SIZE_PX + 8;
 // 招待の状態を読む間隔。Rust 側の状態機械が 1 秒に 1 回進むのに合わせる。

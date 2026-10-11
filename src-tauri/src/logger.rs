@@ -1151,7 +1151,8 @@ pub enum LogEntry {
     SecureInput { timestamp: u64, on: bool },
     /// EH3 のその日の条件（`schema_dto::LogRowDto::Eh3Day`）。
     ///
-    /// その日を稼働日として数えた時点と、すでに数えた日にアプリが起動した時点で出す。
+    /// その日を稼働日として数えた時点と、すでに数えた日にアプリが起動した・一時停止から再開した・
+    /// 日次のファイルの切り替えがあった時点で出す（判断 4 G2〜G4）。
     /// 値域は `eh3::Condition` で閉じている。
     Eh3Day {
         timestamp: u64,
