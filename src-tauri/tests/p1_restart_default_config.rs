@@ -399,12 +399,6 @@ fn frozen_defaults_trim_an_idle_tail() {
     );
 }
 
-/// 事前宣言 v1.3 §7.1: `feat` 行が途切れずに続いても、入力の間が 30 分以上空いた区間の行は凍結既定のまま落ち、
-/// 観測区間が 2 本に割れる。★ 同じ入力に `--set idle_trim_input_gap_ms=0` を渡すと、1 本に戻る（対照）。
-///
-/// 時刻表（セッション開始からの ms）: `feat` 行は 1_000..=2_000_000（1 Hz・穴なし）。打鍵は 1_200（release 1_280）・
-/// 1_900_000・2_000_000。1_280 → 1_900_000 の無入力（1_898_720 ms）が 30 分以上なので、1_280 を含む秒の行 2_000 は残し、
-/// 3_000..=1_899_000 の 1897 行を落とす。1_900_000 の行（次の打鍵を含む秒）は残る。
 /// 長い無入力の前処理の結合テスト用の入力。`feat` 行は `1_000..=feat_last_offset_ms`（1 Hz・穴なし）、
 /// 打鍵は `press_offsets_ms`（それぞれ `RELEASE_AFTER_PRESS_MS` 後に release）。
 fn build_input_gap_session(feat_last_offset_ms: u64, press_offsets_ms: &[u64]) -> String {
@@ -447,6 +441,12 @@ fn build_input_gap_session(feat_last_offset_ms: u64, press_offsets_ms: &[u64]) -
     body
 }
 
+/// 事前宣言 v1.3 §7.1: `feat` 行が途切れずに続いても、入力の間が 30 分以上空いた区間の行は凍結既定のまま落ち、
+/// 観測区間が 2 本に割れる。★ 同じ入力に `--set idle_trim_input_gap_ms=0` を渡すと、1 本に戻る（対照）。
+///
+/// 時刻表（セッション開始からの ms）: `feat` 行は 1_000..=2_000_000（1 Hz・穴なし）。打鍵は 1_200（release 1_280）・
+/// 1_900_000・2_000_000。1_280 → 1_900_000 の無入力（1_898_720 ms）が 30 分以上なので、1_280 を含む秒の行 2_000 は残し、
+/// 3_000..=1_899_000 の 1897 行を落とす。1_900_000 の行（次の打鍵を含む秒）は残る。
 #[test]
 fn frozen_defaults_drop_a_long_input_gap_without_a_feat_hole() {
     let at = |offset_ms: u64| SESSION_START_MS + offset_ms;

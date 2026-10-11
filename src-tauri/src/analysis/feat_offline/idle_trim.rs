@@ -192,7 +192,8 @@ pub fn input_gap_trim(
         points.push((file_last, false));
     }
 
-    // 落とす範囲 `[lo, hi)` (昇順・互いに重ならない)。
+    // 落とす範囲 `[lo, hi]` (両端を含む・昇順・互いに重ならない)。
+    // ⚠️ 半開区間にしない —— `file_last == u64::MAX` のとき上端を表せず、最後の行が残る (Codex 指摘・2026-10-11)。
     let mut ranges: Vec<(u64, u64)> = Vec::new();
     for pair in points.windows(2) {
         let ((a, a_is_input), (b, b_is_input)) = (pair[0], pair[1]);
@@ -201,15 +202,19 @@ pub fn input_gap_trim(
         }
         let lo = if a_is_input {
             // `a` を含む秒の行 (a 以上で最初の行) は残す。無ければ何も落とさない。
-            match feat.get(feat.partition_point(|&t| t < a)) {
-                Some(&r) => r.saturating_add(1),
+            match feat
+                .get(feat.partition_point(|&t| t < a))
+                .and_then(|&r| r.checked_add(1))
+            {
+                Some(lo) => lo,
                 None => continue,
             }
         } else {
             a
         };
-        let hi = if b_is_input { b } else { b.saturating_add(1) };
-        if lo < hi {
+        // `b` が入力なら `b` を含む秒の行 (`b` 以上) は残す。`b > a ≥ 0` なので `b − 1` は下回らない。
+        let hi = if b_is_input { b - 1 } else { b };
+        if lo <= hi {
             ranges.push((lo, hi));
         }
     }
@@ -219,7 +224,7 @@ pub fn input_gap_trim(
     let mut open_span: Option<(usize, u64, u64)> = None;
     let mut k = 0;
     for &t in &feat {
-        while k < ranges.len() && ranges[k].1 <= t {
+        while k < ranges.len() && ranges[k].1 < t {
             k += 1;
         }
         let dropped = k < ranges.len() && ranges[k].0 <= t;
@@ -418,7 +423,22 @@ mod tests {
         assert_eq!(wrong_summary, IdleTrimSummary::default());
     }
 
+    /// 時刻が `u64::MAX` の最後の行も落とせる (半開区間だと上端を表せない・Codex 指摘)。
+    #[test]
+    fn the_last_row_at_u64_max_can_be_dropped() {
+        let feat = [u64::MAX - 2, u64::MAX];
+        let (kept, summary) = input_gap_trim(&feat, &[], u64::MAX - 2, u64::MAX, 1);
+        assert!(kept.is_empty());
+        assert_eq!(summary.spans, vec![(u64::MAX - 2, u64::MAX)]);
+        // 入力を含む秒の行が `u64::MAX` なら、その後ろには何も無い。
+        let (kept, summary) = input_gap_trim(&feat, &[u64::MAX - 1], u64::MAX - 2, u64::MAX, 1);
+        assert_eq!(kept, vec![u64::MAX]);
+        assert_eq!(summary.dropped_feat_rows, 1);
+    }
+
     /// 境が逆 (`file_first > file_last`) なら何も落とさない (debug ビルドで引き算が下回らない・security-checker LOW)。
+    /// ⚠️ ガードを外したときに赤になるのは debug ビルド (overflow 検査) だけである。release では wrap した差が
+    /// 閾値を超えても範囲が立たず、緑のままになる (2 巡目の code-reviewer)。
     #[test]
     fn reversed_bounds_drop_nothing() {
         let feat = feat_secs(0, 2000);

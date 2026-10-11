@@ -231,7 +231,7 @@ O1 の自然作業のセッション NDJSON から、1 Hz の特徴行（stall o
   落とした量は `provenance.idle_trim`。前処理なしの実行（`--set idle_trim_max_ms=0`）を必ず並べて報告する（2 本は真の値を挟む上下界ではない）。
 - **長い無入力の前処理**（2026-10-11・事前宣言 v1.3 §7）: 続けて、入力と入力の間（ファイルの最初と最後を含む）が `idle_trim_input_gap_ms`（30 分）以上
   空いた区間の `feat` 行を落とす（前後の入力を含む秒の行は残す）。O1 のアプリは宣言を自分では外さず、PC が起きていれば `feat` 行が途切れないことへの対処。
-  落とした量は `provenance.input_gap_trim`。この前処理なしの実行（`--set idle_trim_input_gap_ms=0`）を必ず並べて報告する。
+  落とした量は `provenance.input_gap_trim`。この前処理なし（`--set idle_trim_input_gap_ms=0`）、無入力の末尾の前処理なし（`idle_trim_max_ms=0`・v1.3 では長い無入力の前処理は掛かったまま）、両方なしの 3 本を並べて報告する（v1.3 §7.4）。
 - **振る舞い上の制約**: 出力は `gse-dataset` へ共有しない（`scripts/check_no_feature_output.sh`）。`features.rs` / `engine.rs` は変えない。
 
 ## 3. ユースケース

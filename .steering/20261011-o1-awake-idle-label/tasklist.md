@@ -9,5 +9,5 @@
 - [x] （裁定の後）設計 `design.md`・/reimagine は不要（規則の形は裁定 4 で決まった）
 - [x] （裁定の後）純関数とテスト（先に赤）・`replay.rs` の配線・凍結 JSON・事前宣言・ADR-030 補訂・用語集
 - [x] （裁定の後）cargo test・Python の P1 テスト・parity・実走ファイルでの確かめ
-- [ ] code-reviewer ∥ security-checker・/cross-review
+- [x] code-reviewer ∥ security-checker（判断 7）・/cross-review（Codex 3 回 ∥ code-reviewer 2 巡目・判断 8）
 - [ ] コミット・push・PR・CI・merge
