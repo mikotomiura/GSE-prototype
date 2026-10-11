@@ -993,7 +993,7 @@ mod tests {
             ..Settings::default()
         };
         for bad in [
-            r#"{"enabled":true,"window":"all_day","cap":"four"}"#,
+            r#"{"enabled":true,"window":"night_only","cap":"four"}"#,
             r#"{"enabled":true,"window":"wide","cap":"four","threshold":0.1}"#,
             "{",
         ] {
