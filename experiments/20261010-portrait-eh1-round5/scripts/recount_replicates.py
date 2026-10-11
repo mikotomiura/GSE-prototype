@@ -4,20 +4,28 @@ Usage: recount_replicates.py <config.json> <dir> <n> <first seed> <bootstrap> <P
   <dir> holds replicate_<r>.json and replicate_summary.json; <n>, <first seed>, <bootstrap> and <P> are the expected
   values written out by hand (round 5: 20, 20261109, 200, 240), not read from the instruments. The lambdas are read from
   config.json (replicate.lam, fixed before the run).
-Checks: the replicate set (count, rep_index, seeds, no duplicates), each replicate's header (controls and lambdas,
-config hash, commit, not dirty, bootstrap, P), and every field of the summary: top level (seeds, counts, commit, hash,
-n_in_band, reading) and per control (name, lambda, counts, shares, Clopper-Pearson, gain_max / mean4 stats, share in
-band, upper_max stats, band, and the not-estimable forms for 0 or 1 measured replicates). Exit 1 on any mismatch.
+Checks: the replicate set (count, rep_index, seeds, no duplicates), each replicate's header (controls and lambdas in
+order, the SHA-256 of the given config.json, a 40-hex commit shared by all, not dirty, bootstrap, P), and the summary:
+the key sets of the top level and of each control (for measured and for 0 measured replicates), top level values
+(seeds, counts, commit, hash, n_in_band, reading) and per control values (name, lambda, counts, shares, Clopper-Pearson,
+gain_max / mean4 stats, share in band, upper_max stats, band, sd nan for 1 measured replicate). Comparisons are strict
+about types (a bool never equals a number; an int field must be an int). Exit 1 on any mismatch.
 """
+import hashlib
 import json
 import math
+import re
 import statistics
 import sys
 from pathlib import Path
 
 from scipy.stats import beta
 
-cfg = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+if len(sys.argv) != 7:
+    sys.exit("usage: recount_replicates.py <config.json> <dir> <n> <first seed> <bootstrap> <P>")
+cfg_bytes = Path(sys.argv[1]).read_bytes()
+cfg = json.loads(cfg_bytes.decode("utf-8"))
+CFG_SHA = hashlib.sha256(cfg_bytes).hexdigest()
 d = Path(sys.argv[2])
 N, SEED0, BOOT, P = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])
 LAM = cfg["replicate"]["lam"]
@@ -35,11 +43,19 @@ def is_nan(x):
 
 
 def close(a, b):
-    if isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool):
+    """Strict comparison: bools only equal bools, ints only ints, floats only floats (within 1e-9);
+    dicts by key sets and values, lists elementwise."""
+    if type(a) is bool or type(b) is bool:
+        return type(a) is type(b) and a == b
+    if type(a) is int or type(b) is int:
+        return type(a) is type(b) and a == b
+    if type(a) is float and type(b) is float:
         return abs(a - b) <= 1e-9
+    if isinstance(a, dict) and isinstance(b, dict):
+        return sorted(a) == sorted(b) and all(close(a[k], b[k]) for k in a)
     if isinstance(a, list) and isinstance(b, list):
         return len(a) == len(b) and all(close(x, y) for x, y in zip(a, b))
-    return a == b
+    return type(a) is type(b) and a == b
 
 
 def check(where, key, mine, theirs):
@@ -53,14 +69,18 @@ reps = [json.loads(p.read_text(encoding="utf-8")) for p in paths]
 check("_", "number of replicate files", len(reps), N)
 expected_controls = {f"{b}@{lam:.2f}": lam for b, lam in LAM.items()}
 first = reps[0] if reps else {}
+COMMIT = first.get("instrument_commit")
+if not (isinstance(COMMIT, str) and re.fullmatch(r"[0-9a-f]{40}", COMMIT)):
+    bad.append(f"_ instrument_commit of the first replicate is not a 40-hex commit: {COMMIT!r}")
 for i, (p, r) in enumerate(zip(paths, reps)):
     w = p.name
     check(w, "rep_index", r.get("rep_index"), i)
     check(w, "seed", r.get("seed"), SEED0 + i)
     check(w, "controls", r.get("controls"), expected_controls)
+    check(w, "controls order", list(r.get("controls") or {}), list(expected_controls))
     check(w, "instrument_dirty", r.get("instrument_dirty"), False)
-    check(w, "instrument_commit", r.get("instrument_commit"), first.get("instrument_commit"))
-    check(w, "config_sha256", r.get("config_sha256"), first.get("config_sha256"))
+    check(w, "instrument_commit", r.get("instrument_commit"), COMMIT)
+    check(w, "config_sha256", r.get("config_sha256"), CFG_SHA)
     if not r.get("crashed"):
         check(w, "bootstrap", r.get("bootstrap"), BOOT)
         check(w, "n_sessions", r.get("n_sessions"), P)
@@ -95,12 +115,15 @@ for r in reps:
         per[base].append(rec)
 
 summ = json.loads((d / "replicate_summary.json").read_text(encoding="utf-8"))
+TOP = ["_note", "seeds", "n_replicates", "n_crashed", "n_fit_failed", "instrument_commit", "config_sha256", "controls",
+       "n_in_band"]
+check("_", "top-level keys", sorted(k for k in summ if k != "reading"), sorted(TOP))
 check("_", "seeds", summ.get("seeds"), [SEED0 + i for i in range(N)])
 check("_", "n_replicates", summ.get("n_replicates"), len(reps))
 check("_", "n_crashed", summ.get("n_crashed"), sum(bool(r.get("crashed")) for r in reps))
 check("_", "n_fit_failed", summ.get("n_fit_failed"), sum(bool(r.get("fit_failed")) for r in reps))
-check("_", "instrument_commit", summ.get("instrument_commit"), first.get("instrument_commit"))
-check("_", "config_sha256", summ.get("config_sha256"), first.get("config_sha256"))
+check("_", "instrument_commit", summ.get("instrument_commit"), COMMIT)
+check("_", "config_sha256", summ.get("config_sha256"), CFG_SHA)
 check("_", "control set", sorted(summ.get("controls", {})), sorted(LAM))
 
 n_in_band = 0
@@ -117,14 +140,20 @@ for base, recs in per.items():
     cnt["strong"] = sum(bool(x.get("strong")) for x in recs)
     check(base, "n_measured", n, s.get("n_measured"))
     check(base, "counts", cnt, s.get("counts"))
+    keys0 = ["name", "lam", "n_measured", "counts", "share_green_numeric", "band"]
+    keys = keys0 + ["share_green_numeric_ci95", "share_detected", "share_middle", "gain_max", "gain_mean4",
+                    "share_gain_max_in_band", "upper_max"]
+    check(base, "keys", sorted(s), sorted(keys if n else keys0))
     if n == 0:
-        check(base, "share_green_numeric (not estimable)", None, s.get("share_green_numeric"))
+        if not ("share_green_numeric" in s and s["share_green_numeric"] is None):
+            bad.append(f"{base} share_green_numeric: 0 measured replicates, expected null")
         check(base, "band", "not_judged", s.get("band"))
         print(f"{base}: no measured replicate; {cnt}")
         continue
     k = cnt["green_numeric"]
-    lo = 0.0 if k == 0 else beta.ppf(0.025, k, n - k + 1)
-    hi = 1.0 if k == n else beta.ppf(0.975, k + 1, n - k)
+    # the ends k = 0 and k = n in closed form; otherwise the beta quantiles
+    lo = 0.0 if k == 0 else (0.025 ** (1 / n) if k == n else float(beta.ppf(0.025, k, n - k + 1)))
+    hi = 1.0 if k == n else (1 - 0.025 ** (1 / n) if k == 0 else float(beta.ppf(0.975, k + 1, n - k)))
     check(base, "share_green", k / n, s.get("share_green_numeric"))
     check(base, "cp", [lo, hi], s.get("share_green_numeric_ci95"))
     check(base, "share_detected", cnt["detected"] / n, s.get("share_detected"))
@@ -157,6 +186,8 @@ for base, recs in per.items():
           f"{max(ups):+.4f}] band {band}")
 check("_", "n_in_band", n_in_band, summ.get("n_in_band"))
 check("_", "reading present iff no control in band", n_in_band == 0, "reading" in summ)
+if "reading" in summ and not (isinstance(summ["reading"], str) and "0.03" in summ["reading"]):
+    bad.append(f"_ reading is not the fixed sentence: {summ['reading']!r}")
 print(f"replicates: {len(reps)}; mismatches: {len(bad)}")
 for b in bad:
     print("  ", b)
