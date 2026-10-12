@@ -11,4 +11,6 @@
 - [x] 研究者に問う: まとめの置き場所 → `.idea` の既存文書の §12（判断 7）
 - [x] まとめを書く → `idea-section12.md`（`.idea` は worktree の外でこのセッションから書けないので、研究者が追記する）
 - [x] 次の段の引き継ぎ `.steering/_handoff/next-session-rhythm-stage-desk-check.md`（判断 8）
-- [ ] `/cross-review`（パス限定）・コミット・push
+- [x] `/cross-review`（パス限定）2 巡（判断 10・11・指摘はすべて一次で確かめて直した）
+- [ ] コミット・push・PR
+- [ ] 研究者が `idea-section12.md` を `.idea` に追記する（このセッションは worktree の外に書けない）
