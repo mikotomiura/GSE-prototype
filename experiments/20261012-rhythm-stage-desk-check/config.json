@@ -343,14 +343,15 @@
       ]
     }
   },
-  "_comment_ceiling": "design 3.0: SEED + seed_offset, P sessions of each world in prefer (the other sets at the smoke size, unused), AUC(A) and AUC(A_speed) per label and classifier, out of fold. A world is usable when the smaller of the two classifiers' L300 AUC(A_speed) is <= usable_max (equality is usable); the first usable world in prefer is chosen; none usable, or a world not measured -> back to the researcher. The first pilot 0 (2026-10-13, instruments bc034ebf) ran prefer [v2, v3] and found neither usable (design 3.0); the second runs v4 only (design section 8, decisions 16).",
+  "_comment_ceiling": "design 3.0: SEED + seed_offset, P sessions of each world in prefer (the other sets at the smoke size, unused), AUC(A) and AUC(A_speed) per label and classifier, out of fold. A world is usable when the smaller of the two classifiers' L300 AUC(A_speed) is <= usable_max (equality is usable); the first usable world in prefer is chosen; none usable, or a world not measured -> back to the researcher. The first pilot 0 (2026-10-13, instruments bc034ebf) ran prefer [v2, v3] and found neither usable (design 3.0); the second runs v4 only (design section 8, decisions 16). main_auc (design 3.2): in the main run and the pilot 1, a classifier whose AUC(A_speed) of a label is >= main_auc is at the ceiling and left out of every maximum of that label.",
   "ceiling": {
     "seed_offset": 1,
     "P": 40,
     "prefer": [
       "v4"
     ],
-    "usable_max": 0.85
+    "usable_max": 0.85,
+    "main_auc": 0.9
   },
   "_comment_speed": "design 1.5: the five speed quantities of a span [s, e). Intervals are differences of consecutive press times inside the span (ms); quantities 2 and 3 use the intervals below short_ms; a run (quantity 4) continues while the interval is below run_ms; quantity 5 counts the presses of the final last_s seconds; at L60 model A_speed adds quantities 1 and 2 of the lags earlier windows (a window before the session start has 0 presses and quantity 2 = short_ms).",
   "speed": {
@@ -358,5 +359,43 @@
     "run_ms": 200,
     "last_s": 10,
     "lags": 4
+  },
+  "_comment_pc_stall": "design 1.4, 3.2, 3.9: PC-stall of each candidate. Works when the lower bound of the max over the attackers > lower and the point estimate <= upper (and its PC0's upper < e13.margin). The pilot 1 (SEED + sets.pilot.seed_offset, sets.pilot.P sessions, L300, sets.pilot.bootstrap) chooses lam per candidate on pilot_grid with target (isotonic, EH1 select_lambda); 1.0 when no grid value reaches the target. lam is written after the pilot.",
+  "pc_stall": {
+    "lower": 0.03,
+    "upper": 0.08,
+    "target": 0.05,
+    "pilot_grid": [
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9,
+      0.95,
+      1.0
+    ],
+    "lam": {}
+  },
+  "_comment_describe": "design 3.4: stop events are gaps of event_s or longer; a change smaller than unchanged is 'unchanged'; the lag needs the crossing to hold for hold_s; Ridge alpha; GroupKFold folds; the time since the last press is capped at since_cap_s.",
+  "describe": {
+    "event_s": 10,
+    "unchanged": 0.05,
+    "hold_s": 1,
+    "ridge_alpha": 1.0,
+    "folds": 5,
+    "since_cap_s": 3600
   }
 }
