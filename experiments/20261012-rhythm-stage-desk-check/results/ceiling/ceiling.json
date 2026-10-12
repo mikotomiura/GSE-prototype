@@ -1,0 +1,84 @@
+{
+ "design": ".steering/20261012-rhythm-stage-desk-check/design.md 3.0",
+ "seed": 20261010,
+ "P": {
+  "v4": 40
+ },
+ "folds": 5,
+ "results": {
+  "v4": {
+   "L300": {
+    "n_rows": 7040,
+    "n_pos": 2011,
+    "n_sessions": 40,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.6966581396275545,
+     "auc_A_speed": 0.704869291673683,
+     "speed_minus_A": 0.008211152046128434,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7318152428495531,
+     "auc_A_speed": 0.7354403633465928,
+     "speed_minus_A": 0.003625120497039669,
+     "fit_failed": false
+    }
+   },
+   "L60": {
+    "n_rows": 7200,
+    "n_pos": 2066,
+    "n_sessions": 40,
+    "n_features_A": 11,
+    "n_features_A_speed": 24,
+    "hgb": {
+     "auc_A": 0.6848317935099262,
+     "auc_A_speed": 0.7054225554745597,
+     "speed_minus_A": 0.020590761964633497,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7050209279970555,
+     "auc_A_speed": 0.7105031430649871,
+     "speed_minus_A": 0.005482215067931562,
+     "fit_failed": false
+    }
+   },
+   "L1800": {
+    "n_rows": 6040,
+    "n_pos": 1113,
+    "n_sessions": 40,
+    "n_features_A": 15,
+    "n_features_A_speed": 33,
+    "hgb": {
+     "auc_A": 0.6891981419287637,
+     "auc_A_speed": 0.7000553088570214,
+     "speed_minus_A": 0.010857166928257667,
+     "fit_failed": false
+    },
+    "lr": {
+     "auc_A": 0.7354639187665523,
+     "auc_A_speed": 0.736679145351421,
+     "speed_minus_A": 0.0012152265848687227,
+     "fit_failed": false
+    }
+   }
+  }
+ },
+ "choice": {
+  "usable_max": 0.85,
+  "prefer": [
+   "v4"
+  ],
+  "per_world": {
+   "v4": {
+    "min_L300_auc_A_speed": 0.704869291673683,
+    "usable": true
+   }
+  },
+  "unmeasured": [],
+  "chosen": "v4",
+  "back_to_researcher": false
+ }
+}
