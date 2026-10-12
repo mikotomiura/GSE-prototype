@@ -192,7 +192,7 @@ case "$MODE" in
 esac
 SEED_RUN=$(( 10#$BASE_SEED + 10#$OFFSET ))
 if [ "$MODE" != pilot ]; then  # code-reviewer L5: before hours of generation and replay
-  "$PY" -c "import json,sys; sys.path.insert(0,'.'); import stage; c=json.load(open(sys.argv[1],encoding='utf-8')); m=[k for k in stage.candidates() if c['pc_stall']['lam'].get(k) is None]; sys.exit('config.json pc_stall.lam is not set for ' + str(m) + ': run the pilot first') if m else None" "$EXP_DIR/config.json"
+  "$PY" -c "import json,sys; sys.path.insert(0,'.'); import checks; b=checks.lam_problems(json.load(open(sys.argv[1],encoding='utf-8'))); sys.exit('config.json pc_stall.lam: ' + str(b)) if b else None" "$EXP_DIR/config.json"
 fi
 WORK="$EXP_DIR/work-$SUFFIX"
 OUT="$EXP_DIR/results/.partial-$SUFFIX"

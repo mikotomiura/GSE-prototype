@@ -792,12 +792,30 @@ def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
     return 0
 
 
+def lam_problems(cfg: dict) -> list[str]:
+    """design 3.9: every candidate has a lambda chosen on the pilot's grid (Codex round 2: a string, a NaN or a
+    value off the grid is not a pilot's choice)."""
+    ps = cfg["pc_stall"]
+    grid = [float(x) for x in ps["pilot_grid"]]
+    out = []
+    for c in st.candidates():
+        v = ps["lam"].get(c)
+        if v is None:
+            out.append(f"{c}: not set (run the pilot first)")
+        elif type(v) not in (int, float) or not any(abs(float(v) - x) < 1e-12 for x in grid):
+            out.append(f"{c}: {v!r} is not a value of pc_stall.pilot_grid")
+    extra = sorted(set(ps["lam"]) - set(st.candidates()))
+    if extra:
+        out.append(f"unknown names {extra}")
+    return out
+
+
 def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
     ps = cfg["pc_stall"]
     cands = st.candidates()
-    missing = [c for c in cands if ps["lam"].get(c) is None]
-    if missing:
-        raise SystemExit(f"config.json pc_stall.lam is not set for {missing}: run the pilot first")
+    bad = lam_problems(cfg)
+    if bad:
+        raise SystemExit(f"config.json pc_stall.lam: {bad}")
     ms = st.manifest_p(work)
     sids = [m["sid"] for m in ms]
     cn = st.config_names(cands)

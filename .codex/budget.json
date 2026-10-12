@@ -35,8 +35,8 @@
   "_comment_merge_2026_10_12_public_matching": "2026-10-12: docs/public-keystroke-matching-prereg に origin/main を merge した際、today が衝突した。共通の起点の today は 10-12 の 99497 / 2 回。和を採った: 起点 99497 / 2 ＋ 本ブランチ +101499 / +2（合成の記録の検査の /cross-review 2 巡の Codex） ＋ origin/main +108780 / +4 = 309776 / 8 回。",
   "today": {
     "date": "2026-10-13",
-    "tokens_used": 184689,
-    "invocations": 6
+    "tokens_used": 214879,
+    "invocations": 7
   },
   "history": [
     {

@@ -649,6 +649,20 @@ def test_judge(cfg: dict) -> None:
     check(v({}, nl=None)["detector"][c0]["reasons"] == ["null"], "judge: no null run -> not judged")
 
 
+def test_lam_config(cfg: dict) -> None:
+    """Codex round 2: the main run takes only lambdas of the pilot's grid, one per candidate."""
+    good = {c: 0.15 for c in st.candidates()}
+    mk = lambda lam: {**cfg, "pc_stall": {**cfg["pc_stall"], "lam": lam}}
+    check(ck.lam_problems(mk(good)) == [], "lambda config: one grid value per candidate passes")
+    for name, lam in (("missing", {k: v for k, v in list(good.items())[1:]}),
+                      ("a string", {**good, "S-raw-hold-sec": "0.15"}),
+                      ("NaN", {**good, "S-raw-hold-sec": float("nan")}),
+                      ("off the grid", {**good, "S-raw-hold-sec": 0.12}),
+                      ("above 1", {**good, "S-raw-hold-sec": 1.05}),
+                      ("an unknown name", {**good, "S-raw-hold-min": 0.15})):
+        check(len(ck.lam_problems(mk(lam))) == 1, f"lambda config: {name} is refused")
+
+
 def test_stats(cfg: dict) -> None:
     rng = np.random.default_rng(0)
     y = rng.integers(0, 2, 2000)
@@ -733,11 +747,10 @@ def test_work(work: Path, cfg: dict, seed: int, jobs: int) -> None:
 
     ms = st.manifest_p(work)
     n = len(ms)
-    if n < 40:
-        print(f"SKIP  PC at lambda 1 and the seg mutation (only {n} P sessions; they run with 40 or more)")
-        return
-    specs = [("PCs1", "PCs-S-raw-hold-sec", 1.0), ("MUT", "S-raw-hold-sec", None, "seg"),
-             ("PC0", "PC0-S-raw-hold-sec", 0.0), ("RAW", "S-raw-hold-sec", None)]
+    # the keys are names judge() knows (a PC-stall on the grid is descriptive; the mutation is read as a candidate)
+    PCS, MUT, PC0, RAW = "PCs-S-raw-hold-sec@1.00", "S-raw-hold-sec-MUTseg", "PC0-S-raw-hold-sec", "S-raw-hold-sec"
+    specs = [(PCS, "PCs-S-raw-hold-sec", 1.0), (MUT, "S-raw-hold-sec", None, "seg"), (PC0, "PC0-S-raw-hold-sec", 0.0),
+             (RAW, "S-raw-hold-sec", None)]
     scratch = Path(tempfile.mkdtemp(prefix="selftest-", dir=work))
     try:
         tab = ck.label_tables(work, [m["sid"] for m in ms], cfg, scratch)
@@ -745,18 +758,21 @@ def test_work(work: Path, cfg: dict, seed: int, jobs: int) -> None:
         s0 = st.load_session(work, ms[1])
         n0 = st.load_session(work, ms[0]).duration_s // 60
         direct = st.window_features(*st.series(s0, "S-raw-hold-sec", seed), s0.duration_s // 60)
-        check(np.array_equal(F["RAW"][n0: n0 + len(direct)], direct),
+        check(np.array_equal(F[RAW][n0: n0 + len(direct)], direct),
               "wiring: run_stage keeps the session order (the second session's rows are its own windows)")
+        if n < 40:  # Codex round 2: the wiring above runs on any run; the gains need the sessions of the pilot
+            print(f"SKIP  PC at lambda 1 and the seg mutation (only {n} P sessions; they run with 40 or more)")
+            return
         names = {}
         for i, (key, *_) in enumerate(specs):
             ck.save(scratch, f"F-{i}", F[key])
             names[key] = f"F-{i}"
         r = ck.e13_target("L300", tab["L300"], names, [], cfg, seed, jobs, 50, 0, scratch, [])
         g = {k: r["configs"][k]["gain_max"] for k in names}
-        check(g["PCs1"] > 0.10, f"PC: PCs-S-raw-hold-sec at lambda 1 -> L300 point max {g['PCs1']:+.3f} > 0.10 (main path)")
-        check(g["MUT"] > 0.10, f"mutation: seg mixed into the mapping -> L300 point max {g['MUT']:+.3f} > 0.10 (main path)")
-        check(g["PC0"] < 0.03, f"PC0-S-raw-hold-sec L300 point max {g['PC0']:+.3f} < 0.03 (negative control)")
-        print(f"     (S-raw-hold-sec unmutated L300 point max {g['RAW']:+.3f}; not judged here)")
+        check(g[PCS] > 0.10, f"PC: PCs-S-raw-hold-sec at lambda 1 -> L300 point max {g[PCS]:+.3f} > 0.10 (main path)")
+        check(g[MUT] > 0.10, f"mutation: seg mixed into the mapping -> L300 point max {g[MUT]:+.3f} > 0.10 (main path)")
+        check(g[PC0] < 0.03, f"PC0-S-raw-hold-sec L300 point max {g[PC0]:+.3f} < 0.03 (negative control)")
+        print(f"     (S-raw-hold-sec unmutated L300 point max {g[RAW]:+.3f}; not judged here)")
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
 
@@ -790,6 +806,7 @@ def main() -> int:
     test_twins(tmp)
     test_judge(cfg)
     test_stats(cfg)
+    test_lam_config(cfg)
     if a.gse_replay:
         test_replay_causal(a.gse_replay, tmp / "ours-v4", tmp)
     else:
