@@ -1,11 +1,11 @@
 {
-  "_note": "Draft 3 (2026-10-12), not frozen. Fixed before any data was acquired. The researcher chose among Claude's options in .steering/20261012-public-keystroke-matching-prereg/decisions.md: decisions 8-15 (design; in decisions 8 and 10 the researcher chose an option other than Claude's recommendation), decisions 16-23 (attack-me round 1), 24-25 (paper repository; OSF registration and Zenodo release) and 26-31 (attack-me round 2). The numbers are Claude's proposals adopted by the researcher. These are experiment values, not pass criteria. If this file and the Japanese draft disagree, the frozen English version is authoritative.",
+  "_note": "Draft 4 (2026-10-12), not frozen. Fixed before any data was acquired. The researcher chose among Claude's options in .steering/20261012-public-keystroke-matching-prereg/decisions.md: decisions 8-15 (design; in decisions 8 and 10 the researcher chose an option other than Claude's recommendation), decisions 16-23 (attack-me round 1), 24-25 (paper repository; OSF registration and Zenodo release) 26-31 (attack-me round 2) and 32-36 (attack-me round 3). The numbers are Claude's proposals adopted by the researcher. These are experiment values, not pass criteria. If this file and the Japanese draft disagree, the frozen English version is authoritative.",
   "registration": {"preregistration": "OSF registration (decision 25)", "code_and_aggregates": "Zenodo release of the paper repository (decisions 24, 25)", "data": "not redistributed; obtained from each source"},
-  "tools": {"python": "3.11.9", "numpy": "2.2.6", "scikit-learn": "pinned in requirements.txt when the code is written (before acquisition)", "keytar": "defaults of the released artifact; recorded in data.md at check 6"},
+  "tools": {"python": "3.11.9", "numpy": "2.2.6", "scikit-learn": "1.5.2", "keytar": "defaults of the released artifact; recorded in data.md at check 6"},
   "writer_id": "string of the distributed ID column, used verbatim in the seed derivation",
   "seed_file": "SEED",
   "seed_derivation": "int.from_bytes(sha256(f'{SEED}:{use}:{prompt}:{writer}:{N}:{k}:{draw}'.encode()).digest()[:8], 'big') -> numpy.random.default_rng; unused fields are empty strings",
-  "seed_uses": ["split", "eval_sample", "decoys", "window_start", "r5_sub", "r6_perm", "r7_drop", "bootstrap", "enja_decoys"],
+  "seed_uses": ["split", "eval_sample", "decoys", "window_start", "r5_sub", "r6_perm", "r7_drop", "bootstrap", "enja_decoys", "negative_control"],
   "datasets": {
     "klicke": {
       "reference": "[V264]",
@@ -60,7 +60,8 @@
     "end_full_text": "record and text both fully used",
     "no_path": "cost infinity; all infinite -> tie among all",
     "report_infinite": ["all candidates infinite", "only the true text infinite while a decoy is finite"],
-    "r7_group_cap": "ceil(3 / (1 - p)) for (1,q) and (p',1): 4 at p = 0.1 and 0.25, 6 at p = 0.5; groups ordered (1,1), then by size, (p',1) before (1,q) (decision 26)",
+    "r7_group_cap": "ceil(3 / (1 - p)) for (1,q) and (p',1): 4 at p = 0.1 and 0.25, 6 at p = 0.5; fixed (decisions 26, 33); the synthetic-log check reports the share of true groups above the cap and the cost inflation of the true text",
+    "r7_groups": {"0.1": [[1, 1], [2, 1], [1, 2], [3, 1], [1, 3], [4, 1], [1, 4]], "0.25": [[1, 1], [2, 1], [1, 2], [3, 1], [1, 3], [4, 1], [1, 4]], "0.5": [[1, 1], [2, 1], [1, 2], [3, 1], [1, 3], [4, 1], [1, 4], [5, 1], [1, 5], [6, 1], [1, 6]]},
     "implementation": "align.py from experiments/20261011-g1-copy-self-trial/scripts implements the window end only; full-text end, infinity reporting and the R7 cap are added as a wrapper and checked on synthetic logs before freezing"
   },
   "split": {"unit": "prompt", "folds": 2, "prompts_per_fold": 2, "seed_use": "split", "rule": "train on one pair of prompts, evaluate on the other, then swap; every writer is evaluated once; decoys never include a training writer (decision 29)"},
@@ -71,9 +72,9 @@
     "A1": {"forms": ["R0", "R1", "R2", "R5", "R6"]},
     "A1p": {"forms": ["R3", "R3-t", "R7"]},
     "A2": {"forms": ["R2", "R3", "R3-t", "R4", "R7"]},
-    "A2b": {"forms": ["R3-u"], "boundary_model": "logistic regression (scikit-learn, L2, C = 1.0, class_weight none, threshold 0.5)", "features": ["log interval to the previous press", "log interval to the next press", "log interval two presses before", "log interval two presses after"]},
-    "A3": {"forms": ["R0", "R1", "R2", "R3", "R3-t", "R3-u", "R5", "R6", "R7"], "min_digraph_count": 20, "R3-u": "A1' replay gives the final char sequence; aligned one-to-one from the start with all characters of the candidate (spaces and punctuation included), up to the shorter length (decision 27)"},
-    "A4": {"forms": ["R0", "R1", "R2", "R3", "R3-t"], "adaptive": false, "outside_threat_model": true, "input": "intervals between letter, digit and space presses only", "chunk_segments": 20, "in_strongest": false},
+    "A2b": {"forms": ["R3-u"], "boundary_model": "logistic regression (scikit-learn 1.5.2, L2, C = 1.0, solver lbfgs, max_iter 1000, class_weight none, threshold 0.5)", "preprocessing": "features standardised with the training mean and SD; a missing interval at the first or last presses is filled with the training median", "features": ["log interval to the previous press", "log interval to the next press", "log interval two presses before", "log interval two presses after"]},
+    "A3": {"forms": ["R0", "R1", "R2", "R3", "R3-t", "R3-u", "R5", "R6", "R7"], "min_digraph_count": 20, "R3-u": "combined score = mean per-term timing log-likelihood + length log-likelihood (decisions 27, 32). A1' replay (Home and End also treated as uncertain, cursor to the end, because Enter is merged into char) gives the final char sequence, aligned one-to-one from the start with all characters of the candidate; timing terms use only adjacent final chars that were consecutive presses in the record; length term = log-likelihood of (replayed char count - candidate char count) under the distribution estimated on the training logs"},
+    "A4": {"forms": ["R0", "R1", "R2", "R3", "R3-t"], "adaptive": false, "outside_threat_model": true, "input": "intervals between letter, digit and space presses only", "chunk_segments": "intervals covering 20 record segments (words) per chunk", "in_strongest": false},
     "eval_writers_per_prompt": 125,
     "eval_sample_seed_use": "eval_sample",
     "if_A4_reduced": "only the A4 rows use the reduced sample; the main table stays at 500 writers",
@@ -85,7 +86,7 @@
     "k": [5, 10, 20, 50],
     "window_starts_per_record": 5,
     "decoy_pool": "all eligible writers of the same prompt except the record's writer (all in the evaluation fold)",
-    "negative_control": "record swapped with writer B of the same prompt (seeded); B's text removed from the decoys",
+    "negative_control": "record swapped with writer B of the same prompt (seed use negative_control, one B per record, draw empty); B's text removed from the decoys; main forms x strongest attacker x N = 10 and 1000 x full text x 500 writers",
     "window_truth_mismatch": "map final-draft words to distributed-text words after whitespace normalisation (word edit-distance alignment); windows whose first word does not map are not used and are counted",
     "ties": "1/m",
     "bootstrap": {"unit": "writer", "stratified_by": "prompt", "resamples": 2000, "level": 0.95, "strongest_attacker": "max taken inside each resample"}
@@ -100,23 +101,27 @@
       "word_boundary": "separator press (space, punctuation, enter)",
       "pause": "inter-press interval (down to down)",
       "p_burst_mean_len": "mean char_count between pauses > 2000 ms",
-      "r_burst_mean_len": "mean char_count of bursts ended by a revision (R0: activity Remove/Cut or Replace; approximations: BackSpace or Delete press)",
+      "r_burst_mean_len": "mean char_count of bursts delineated by an insertion or deletion ([V264] Table 5): a burst ends at a revision or at an insertion away from the leading edge (R0: activity Remove/Cut, Replace, or input with position < current text length; approximations: BackSpace or Delete press, or A1' cursor not at the end)",
       "pause_mean_200ms": "mean of pauses > 200 ms",
       "within_word_pause_mean": "mean pause > 200 ms between two char presses not separated by a word_boundary",
-      "between_word_pause_mean": "mean pause > 200 ms adjacent to a word_boundary",
+      "between_word_pause_mean": "mean pause > 200 ms from a word_boundary press to the next char press (one interval per boundary)",
       "deletion_mean_len": "R0: mean deleted length from text_change of Remove/Cut and Replace; approx: run of consecutive BackSpace/Delete presses",
       "deletion_proportion": "deleted characters / (produced characters)",
       "insertion_mean_len": "R0: mean run of chars inserted where position < current text length; approx: A1' cursor not at end",
       "insertion_proportion": "inserted characters / produced characters",
-      "interval_variance_10": "variance of char_count across 10 equal time intervals of the active window"
+      "interval_variance_10": "standard deviation over the 10 equal time intervals of the active window of (production rate = char presses / interval duration) divided by the task maximum = the maximum interval production rate over all writers of the same prompt and form (decision 34; [V264] gives no operational definition)"
     },
     "approximations": "char count = char presses; deletion = BackSpace and Delete one char each; insertion = char presses when the A1' cursor is not at the end; word boundary = separator presses; R7 counts x 1/(1 - p)",
     "cell_definition": {"ok": "same inputs and formula as R0", "approx": "computed from other inputs by the approximation rules", "none": "not computed"},
     "sample": "all writers after exclusion; R5, R6 and R7 random processing once per record",
     "report": ["Spearman with R0", "median and 10/90 percentiles of ratio to R0", "Spearman with human scores, R0 and each form"],
-    "bootstrap": "writer unit, stratified by prompt, 2000 resamples, 95%, same draws as matching",
+    "bootstrap": "writer unit, stratified by prompt, 2000 resamples, 95%; same draws as the matching cells of the same sample (500 or all)",
+    "sample": "summary table and figure: the same 500 writers as the matching main table; all writers after exclusion in the appendix",
+    "ratio_zero": "writers whose R0 value is 0 or undefined are dropped from that metric's ratio; counts reported per metric and form",
+    "figure_y": "median Spearman with R0 over the fixed set of 10 metrics; not-computed metrics count as 0; R4 is 0 and annotated",
+    "check7": {"n": 50, "mismatch": "Spearman < 0.9 or median absolute difference > 10% of the R0 median, per metric", "if_inputlog_values_absent": "not done; reported"},
     "metrics": ["p_burst_mean_len", "r_burst_mean_len", "pause_mean_200ms", "within_word_pause_mean", "between_word_pause_mean", "deletion_mean_len", "deletion_proportion", "insertion_mean_len", "insertion_proportion", "interval_variance_10"],
     "per_prompt_then_mean": true
   },
-  "enja15": {"forms": ["R0j", "R3j", "R3j-t", "R4"], "time_floor_ms": [10, 100, 1000], "N": [10, "all"], "draws_N10": 20, "decoy_seed_use": "enja_decoys", "attackers": ["A0", "A2"], "ground_truth": "translation text", "exclusion": ["missing log or translation", "empty translation", "no Type=IME and no letter Type=insert event"], "bootstrap": "translator unit, stratified by source text, 2000 resamples, 95%", "question4_wording": "'exceeds' only when the lower bounds of both differences (vs 1/N and vs A0) are above 0 (decision 30)"}
+  "enja15": {"forms": ["R0j", "R3j", "R3j-t", "R4"], "time_floor_ms": [10, 100, 1000], "N": [10, "all"], "draws_N10": 20, "decoy_seed_use": "enja_decoys", "attackers": ["A0", "A2"], "ground_truth": "translation text", "exclusion": ["missing log or translation", "empty translation", "no Type=IME and no letter Type=insert event"], "bootstrap": "translator unit, 2000 resamples, 95%; if translators translate several source texts (crossed, check 5), resample translators with all their sessions, unstratified; if nested, stratify by source text", "question4_wording": "'exceeds' only when the lower bounds of both differences (vs 1/N and vs A0) are above 0 (decision 30)", "question4_form": "R3j decides; other forms reported with the same rule; R0j reference only (decision 35)", "question4_level": "mean over source texts; 1/N = mean of per-record 1/N", "A0": "record: Type=IME and letter Type=insert presses - [Back] presses; text: sum of standard IME keystroke counts of the readings"}
 }
