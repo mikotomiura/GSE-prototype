@@ -616,13 +616,9 @@ mod tests {
                 presented.push(s);
             }
         }
-        // 3:59:30 に出す。次の日の 1 回は、提示 + 失効 60 秒 + 間隔 30 分（s = 1890）より後の最初の区間
-        assert_eq!(presented.first(), Some(&30));
-        assert!(
-            presented.get(1).is_some_and(|&s| s >= 30 + 60 + 1800),
-            "{presented:?}"
-        );
-        assert_eq!(presented.len(), 2, "上限 1 は日ごと: {presented:?}");
+        // 3:59:30 に出す。次の日の 1 回は、提示 + 失効 60 秒 + 間隔 30 分（s = 1890）より後の
+        // 最初の区間（s = 1920 に始まり 30 秒後）。上限 1 は日ごとなので、それ以上は出ない。
+        assert_eq!(presented, vec![30, 1950]);
     }
 
     // ---- ADR-035 D1: 内側の制約は、設定を最大に広げても効く ----

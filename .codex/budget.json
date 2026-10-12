@@ -32,8 +32,8 @@
   "_comment_merge_2026_10_11_portrait_round5": "2026-10-11: docs/portrait-eh1-round5 に origin/main（PR #346 の後）を merge した際、today と履歴の 10-10 が衝突した。共通の起点（f6bf23ff）の today は 10-10 の 561519 / 17 回。履歴の 10-10: origin/main は起点のまま（561519 / 17）、本ブランチは起点 ＋ 固定の前の /cross-review 2 回（+69354 / +2）= 630873 / 19 → 本ブランチの値を採った（二重に足さない）。today の 10-11: 両側とも 0 から別々に記帳した → 和を採った: 本ブランチ 65876 / 2 回（まとめの /cross-review 2 巡の Codex 系統） ＋ origin/main 155585 / 4 回 = 221461 / 6 回。",
   "today": {
     "date": "2026-10-12",
-    "tokens_used": 32918,
-    "invocations": 1
+    "tokens_used": 53993,
+    "invocations": 2
   },
   "history": [
     {
