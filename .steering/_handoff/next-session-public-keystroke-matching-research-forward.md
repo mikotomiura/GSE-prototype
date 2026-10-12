@@ -75,7 +75,7 @@
 - 応答は日本語（AskUserQuestion の問い・選択肢も日本語・推奨と理由を添える）。★・⚠️ を多用しない。
 - docs を先に読む。必須 Skill（`reproducibility-discipline`・`citation-ssot`・`verify-before-claiming`・`subagent-delegation`・`data-privacy`）を参照してから手を動かす。
 - 有料の DB と有料の本文は使わない。
-- `git add -A` や `git add <dir>` を使わず、ファイルを明示してステージする。並行セッションがあるので worktree で作業する（`C:\GSE-wt-matching-prereg` を origin/main から新しいブランチで切り直す）。
+- `git add -A` や `git add <dir>` を使わず、ファイルを明示してステージする。並行セッションがあるので worktree で作業する。判断 50・51 とこの引き継ぎはブランチ `docs/public-keystroke-matching-prereg` にだけあり、main には入っていない（.steering だけの変更は push だけの運用）。新しいブランチは origin/main ではなく `origin/docs/public-keystroke-matching-prereg` から切る（例: `git -C C:\GSE-wt-matching-prereg switch -c docs/public-keystroke-matching-freeze origin/docs/public-keystroke-matching-prereg`）。そのブランチの最初の PR で main に入る。
 - Codex の予算は、回す前に origin/main の台帳も見る。
 - 公開する英語の成果物は学術的な英語・GSE への言及なし・記号や口語なし。
 - 置換のスクリプトは Write で作る（heredoc のバックスラッシュが壊れる）。config を書き換えたら、重複キーを検出する形で JSON を読む。
