@@ -25,11 +25,13 @@
 //! - 閉じた後の間隔: 30 分。⚠️ **起点は「提示 + 失効の時間」**であって、実際に閉じた時刻ではない。
 //!   本人が止めて早く閉じても、次に出せる時刻は早まらない（止めた・戻したの履歴が出す量を増やさない・ADR-035 D4 ①②）。
 //! - 1 日（現地 4:00 区切り）の上限: 本人の選択 {1, 2, 4}・既定 2。内側の上限 4（ADR-026 PC-6）。
-//! - 時間帯: 本人の選択 {9–18, 8–20, 6–22} 時・既定 9–18 時。夜間 22:00–6:00 は内側の制約で出さない。
+//! - 時間帯: 本人の選択 {終日, 9–18, 8–20, 6–22} 時・既定 終日。夜間の内側の制約は置かない
+//!   （`.steering/20261011-portrait-eh3-after-impl/decisions.md` 判断 2。ADR-035 D1 の内側の制約 3 は
+//!   Outdoor の型にかかり、本設計の招待は歩行・外出を促す型を持たない。屋外の型を足すなら戻る）。
 //!
 //! ## ADR-035 D1 の内側の制約（設定より内側で効く）
 //!
-//! ① 系の控え（閉じた後の間隔・1 区間 1 回）／② 上限 4（PC-6）／③ 夜間 22:00–6:00／
+//! ① 系の控え（閉じた後の間隔・1 区間 1 回）／② 上限 4（PC-6）／③ 安全条件（夜間の Outdoor 無効。屋外の型が無いので対象が無い）／
 //! ④ 研究の条件（`meta.invitation_enabled`。EH3 では真・`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 1 #1）。
 //! これに加えて、記録の一時停止中は出さない（出たのに記録が無い提示を作らない・判断 6 #1）。
 
@@ -49,10 +51,6 @@ pub const EXPIRY_MS: u64 = 60_000;
 pub const GAP_AFTER_CLOSE_MS: u64 = 30 * 60_000;
 /// 内側の 1 日の上限（ADR-026 PC-6・§6.3 の 2–4）。本人の選択はこの内側にだけ置く（ADR-035 D3）。
 pub const HARD_DAILY_CAP: u32 = 4;
-/// 夜間（内側の制約 ③）の始まりと終わり（現地時刻・0:00 からの分）。
-pub const NIGHT_START_MIN: u32 = 22 * 60;
-pub const NIGHT_END_MIN: u32 = 6 * 60;
-
 /// 1 日の上限の選択肢（N 択・ADR-035 D3）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -78,7 +76,9 @@ impl DailyCap {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TimeWindow {
-    /// 9:00–18:00（既定・狭い側）
+    /// 0:00–24:00（既定。控える側の既定は 1 日の上限が担う・判断 2）
+    AllDay,
+    /// 9:00–18:00
     Core,
     /// 8:00–20:00
     Extended,
@@ -87,11 +87,17 @@ pub enum TimeWindow {
 }
 
 impl TimeWindow {
-    pub const ALL: [TimeWindow; 3] = [TimeWindow::Core, TimeWindow::Extended, TimeWindow::Wide];
+    pub const ALL: [TimeWindow; 4] = [
+        TimeWindow::AllDay,
+        TimeWindow::Core,
+        TimeWindow::Extended,
+        TimeWindow::Wide,
+    ];
 
     /// `[start, end)`（0:00 からの分）。
     pub fn range(self) -> (u32, u32) {
         match self {
+            TimeWindow::AllDay => (0, 24 * 60),
             TimeWindow::Core => (9 * 60, 18 * 60),
             TimeWindow::Extended => (8 * 60, 20 * 60),
             TimeWindow::Wide => (6 * 60, 22 * 60),
@@ -110,11 +116,11 @@ pub struct Settings {
 }
 
 impl Default for Settings {
-    /// ADR-035 D2: 有無は「出す」、時間帯と上限は狭い側。
+    /// ADR-035 D2: 有無は「出す」、上限は狭い側。時間帯は終日（時計で出す時刻を絞らない・判断 2）。
     fn default() -> Self {
         Self {
             enabled: true,
-            window: TimeWindow::Core,
+            window: TimeWindow::AllDay,
             cap: DailyCap::Two,
         }
     }
@@ -127,7 +133,7 @@ pub struct TickInput {
     pub now_ms: u64,
     /// 現地の日（4:00 区切り・`eh3::local_day`）。上限の数え直しに使う。
     pub local_day: i64,
-    /// 現地時刻の 0:00 からの分（時間帯と夜間の判定）。
+    /// 現地時刻の 0:00 からの分（時間帯の判定）。
     pub minute_of_day: u32,
     /// 推定の停滞の確率（`clean_score` 済みでなくてよい・NaN は 0 として扱う）。
     pub p_stuck: f64,
@@ -171,10 +177,6 @@ fn in_minutes(m: u32, (start, end): (u32, u32)) -> bool {
     start <= m && m < end
 }
 
-fn is_night(m: u32) -> bool {
-    !(NIGHT_END_MIN..NIGHT_START_MIN).contains(&m)
-}
-
 impl InvitationMachine {
     pub fn new() -> Self {
         Self::default()
@@ -190,7 +192,6 @@ impl InvitationMachine {
         input.research_enabled
             && input.recording_active
             && input.settings.enabled
-            && !is_night(input.minute_of_day)
             && in_minutes(input.minute_of_day, input.settings.window.range())
     }
 
@@ -331,15 +332,23 @@ mod tests {
         run_from(TEN, p, settings, secs)
     }
 
-    /// 経路独立性の検査の時計: 5:00 から 18 時間（夜間・3 つの時間帯の境界をすべて通る）。
+    /// 経路独立性の検査の時計: 5:00 から 18 時間（終日でない 3 つの時間帯の境界をすべて通る）。
     const HIST_START_MIN: u32 = 5 * 60;
     const HIST_SECS: usize = 18 * 3600;
 
     fn widest() -> Settings {
         Settings {
             enabled: true,
-            window: TimeWindow::Wide,
+            window: TimeWindow::AllDay,
             cap: DailyCap::Four,
+        }
+    }
+
+    /// 時間帯を 9–18 時に狭めた設定（時間帯の境界の検査用）。
+    fn core() -> Settings {
+        Settings {
+            window: TimeWindow::Core,
+            ..Settings::default()
         }
     }
 
@@ -491,7 +500,7 @@ mod tests {
         let mut m = InvitationMachine::new();
         let mut last = true;
         for s in 0..60 {
-            let mut i = input(T0 + s * SEC, 0.9, Settings::default());
+            let mut i = input(T0 + s * SEC, 0.9, core());
             i.minute_of_day = if s < 40 { 17 * 60 + 59 } else { 18 * 60 };
             last = m.tick(&i).present;
         }
@@ -545,16 +554,77 @@ mod tests {
         assert!(stopped.get(1) >= normal.get(1), "{normal:?} / {stopped:?}");
     }
 
+    /// 既定（終日）では夜も出す。本人が時間帯を狭めたときだけ出さない（夜間の内側の制約は置かない・判断 2）。
+    #[test]
+    fn the_default_presents_at_night_and_a_narrowed_window_does_not() {
+        for minute in [23 * 60, 2 * 60, 5 * 60 + 59] {
+            assert_eq!(
+                run_from(minute, &|_| 0.9, &|_| Settings::default(), 60),
+                vec![30],
+                "既定は {minute} 分にも出す"
+            );
+            for window in [TimeWindow::Core, TimeWindow::Extended, TimeWindow::Wide] {
+                let s = Settings {
+                    window,
+                    ..Settings::default()
+                };
+                assert!(
+                    run_from(minute, &|_| 0.9, &|_| s, 60).is_empty(),
+                    "{window:?} は {minute} 分に出さない"
+                );
+            }
+        }
+    }
+
+    /// 既定（終日）では 0:00 を跨いでも閉じず、失効（60 秒）だけで閉じる。
+    #[test]
+    fn the_default_keeps_an_invitation_across_midnight_until_expiry() {
+        let mut m = InvitationMachine::new();
+        let mut present = Vec::new();
+        for s in 0..120 {
+            let o = m.tick(&input_from(
+                23 * 60 + 59,
+                T0 + s * SEC,
+                0.9,
+                Settings::default(),
+            ));
+            if o.present {
+                present.push(s);
+            }
+        }
+        // 23:59:30 に出て、0:00（s = 60）を越えても出たまま、60 秒で失効する
+        assert_eq!(present.first(), Some(&30));
+        assert_eq!(present.len() as u64, EXPIRY_MS / SEC, "{present:?}");
+        assert!(present.contains(&60));
+    }
+
+    /// 既定（終日）では 4:00 の日の区切りの直前にも出せる。区切りで上限は数え直すが、
+    /// 消えてから 30 分の間隔は消えない。
+    #[test]
+    fn the_day_boundary_resets_the_cap_but_not_the_gap() {
+        let settings = Settings {
+            cap: DailyCap::One,
+            ..Settings::default()
+        };
+        let mut m = InvitationMachine::new();
+        let mut presented = Vec::new();
+        for s in 0..(3 * 3600u64) {
+            let mut i = input_from(3 * 60 + 59, T0 + s * SEC, alternating(s), settings);
+            // 3:59:00 に始まり、s = 60 で 4:00（次の日）
+            i.local_day = if s < 60 { 100 } else { 101 };
+            if m.tick(&i).presented {
+                presented.push(s);
+            }
+        }
+        // 3:59:30 に出す。次の日の 1 回は、提示 + 失効 60 秒 + 間隔 30 分（s = 1890）より後の
+        // 最初の区間（s = 1920 に始まり 30 秒後）。上限 1 は日ごとなので、それ以上は出ない。
+        assert_eq!(presented, vec![30, 1950]);
+    }
+
     // ---- ADR-035 D1: 内側の制約は、設定を最大に広げても効く ----
 
     #[test]
     fn inner_constraints_hold_at_the_widest_settings() {
-        let mut m = InvitationMachine::new();
-        for s in 0..120 {
-            let mut i = input(T0 + s * SEC, 0.95, widest());
-            i.minute_of_day = 23 * 60;
-            assert!(!m.tick(&i).presented, "③ 夜間は出さない");
-        }
         let mut m = InvitationMachine::new();
         for s in 0..120 {
             let mut i = input(T0 + s * SEC, 0.95, widest());
@@ -642,7 +712,7 @@ mod tests {
             let quiet = quiet_seconds(&sc);
             let p = |s: u64| sc[s as usize];
             let h = history(seed);
-            for current in [Settings::default(), widest()] {
+            for current in [Settings::default(), core(), widest()] {
                 let constant = run_from(HIST_START_MIN, &p, &|_| current, sc.len() as u64);
                 let with_history = run_from(
                     HIST_START_MIN,
@@ -750,7 +820,7 @@ mod tests {
             let p = |s: u64| sc[s as usize];
             let h = history(seed);
             let n = sc.len() as u64;
-            for current in [Settings::default(), widest()] {
+            for current in [Settings::default(), core(), widest()] {
                 let constant = run_from(HIST_START_MIN, &p, &|_| current, n);
                 let leaky = run_leaky(&p, &|s| if quiet[s as usize] { h(s) } else { current }, n);
                 caught_1 |= leaky != constant;
@@ -773,13 +843,10 @@ mod tests {
     #[test]
     fn a_stall_triggered_outside_the_window_is_not_carried_over() {
         // 8:59:00 から停滞（契機は 8:59:30・時間帯 9–18 の外）。9:00 を越えても出さない。
-        let got = run_from(8 * 60 + 59, &|_| 0.9, &|_| Settings::default(), 600);
+        let got = run_from(8 * 60 + 59, &|_| 0.9, &|_| core(), 600);
         assert!(got.is_empty(), "{got:?}");
         // 対照: 9:00:00 から停滞なら 9:00:30 に出る
-        assert_eq!(
-            run_from(9 * 60, &|_| 0.9, &|_| Settings::default(), 600),
-            vec![30]
-        );
+        assert_eq!(run_from(9 * 60, &|_| 0.9, &|_| core(), 600), vec![30]);
     }
 
     /// 繰り越さない: 間隔の中で契機を満たした区間は、間隔が明けても出さない。

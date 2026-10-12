@@ -1039,7 +1039,7 @@ static INVITATION_PRESENT: AtomicBool = AtomicBool::new(false);
 /// EH3: 本人の招待の設定（外枠）。`None` はまだ読んでいない。
 static INVITATION_SETTINGS: Mutex<Option<crate::analysis::invitation::Settings>> = Mutex::new(None);
 
-/// いまの招待の設定（未読ならファイルから読む・読めなければ既定＝狭い側）。
+/// いまの招待の設定（未読ならファイルから読む・無ければ既定・読めなければ出さない）。
 fn current_invitation_settings() -> crate::analysis::invitation::Settings {
     let mut g = INVITATION_SETTINGS
         .lock()
