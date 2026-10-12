@@ -83,13 +83,16 @@ def oof_predict(X: np.ndarray, y: np.ndarray, groups: np.ndarray, kind: str, see
 # ---------------------------------------------------------------------------
 
 def _fit_job(args: tuple) -> tuple:
-    """One OOF AUC; a fold whose training side holds one class cannot be fitted (reported as None, as EH1)."""
+    """One OOF AUC. A fold whose training side holds one class cannot be fitted: that is checked before the fit
+    and reported as None (as EH1). Any other error (a feature table that does not line up, a bad fold count) is an
+    error of the instruments and stops the run instead of being read as a failed fit (/cross-review)."""
+    from sklearn.model_selection import GroupKFold
+
     key, X, y, groups, kind, seed, folds = args
     os.environ["OMP_NUM_THREADS"] = "1"
-    try:
-        return key, weighted_auc(oof_predict(X, y, groups, kind, seed, folds), y, np.ones(len(y)))
-    except ValueError:
+    if any(len(np.unique(y[tr])) < 2 for tr, _ in GroupKFold(n_splits=folds).split(X, y, groups)):
         return key, None
+    return key, weighted_auc(oof_predict(X, y, groups, kind, seed, folds), y, np.ones(len(y)))
 
 
 def measure(tabs: dict, seed: int, folds: int, jobs: int) -> dict:
@@ -131,11 +134,14 @@ def usable(res_world: dict, usable_max: float) -> dict:
 
 
 def choose(res: dict, cfg: dict) -> dict:
+    """design 3.0. A world that could not be measured (a failed fit or a NaN in its L300 AUC(A_speed)) is not read
+    as a ceiling: then no world is chosen and the run goes back to the researcher (design 3.0, before pilot 0)."""
     c = cfg["ceiling"]
     per = {w: usable(res[w], c["usable_max"]) for w in c["prefer"]}
-    chosen = next((w for w in c["prefer"] if per[w]["usable"]), None)
-    return {"usable_max": c["usable_max"], "prefer": c["prefer"], "per_world": per, "chosen": chosen,
-            "back_to_researcher": chosen is None}
+    unmeasured = [w for w in c["prefer"] if per[w].get("reason") == "fit_failed_or_nan"]
+    chosen = None if unmeasured else next((w for w in c["prefer"] if per[w]["usable"]), None)
+    return {"usable_max": c["usable_max"], "prefer": c["prefer"], "per_world": per, "unmeasured": unmeasured,
+            "chosen": chosen, "back_to_researcher": chosen is None}
 
 
 def main() -> int:

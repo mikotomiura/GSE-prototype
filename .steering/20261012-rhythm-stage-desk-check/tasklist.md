@@ -10,7 +10,9 @@
 - [x] 新規性の検索 1 ラウンド（`/literature-review`・引き継ぎ §3.5）→ `docs/literature/20261012-rhythm-stage-novelty.md`（S-RN・[P472]–[P482]・`98f6ed13`）
 - [x] 固定の前の `/cross-review` 2 巡（判断 8・11）→ 天井の下見 0・world v3・候補ごとの PC（判断 9・10）
 - [x] 研究者が判断 7・9 の理由の訂正を了承（判断 12）
-- [ ] 研究者が §9 の細部を確かめる（別セッションの前・`.steering/_handoff/next-session-rhythm-stage-ceiling.md`）
+- [x] 研究者が §9 の細部を確かめる（判断 14・変更なし）
+- [x] 下見 0 の計器（`experiments/20261012-rhythm-stage-desk-check/`・world v3・A・A_speed・`ceiling.py`・selftest）→ `4f50b7ed`
+- [ ] 計器の code-reviewer・`/cross-review`（下見 0 を回す前）
 - [ ] 下見 0（基準のモデルの天井・world の選び方）→ §3.0 に追記して固定
 
 ## 計器と本番（固定の後）

@@ -106,10 +106,12 @@ def speed5(presses: np.ndarray, s: float, e: float, sp: dict) -> list[float]:
     1 the number of presses; 2 the median and 3 the interquartile range of the press-to-press intervals below
     short_ms (2000 ms and 0 when there is none); 4 the mean length of the runs of presses whose intervals are
     below run_ms (a lone press is a run of 1, as F4 counts it; 0 with no press); 5 the presses of the final
-    last_s seconds. Only presses inside the span count (an interval needs both of its presses inside)."""
+    last_s seconds. Only presses inside the span count (an interval needs both of its presses inside).
+    The press times are whole ms divided by 1000, so the intervals are rounded back to whole ms before the
+    200 ms and 2000 ms boundaries are compared (10.2 - 10.0 is 199.9999... ms in floating point)."""
     p = presses[(presses >= s) & (presses < e)]
     n = len(p)
-    d = np.diff(p) * 1000.0
+    d = np.rint(np.diff(p) * 1000.0)
     short = d[d < sp["short_ms"]]
     if len(short):
         med = float(np.median(short))
@@ -137,7 +139,8 @@ def window_speed(sess: Trace, cfg: dict) -> np.ndarray:
     empty = np.array([0.0, float(sp["short_ms"])])
     for k in range(1, sp["lags"] + 1):
         lag = np.tile(empty, (n_w, 1))
-        lag[k:] = cur[: n_w - k, :2]
+        if k < n_w:  # a session of k windows or fewer keeps the empty value in every row
+            lag[k:] = cur[: n_w - k, :2]
         parts.append(lag)
     return np.hstack(parts)
 

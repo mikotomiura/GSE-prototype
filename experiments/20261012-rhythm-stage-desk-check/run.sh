@@ -104,8 +104,9 @@ cfg_sha = hashlib.sha256(open(os.path.join(exp_dir, "config.json"), "rb").read()
 json.dump({"mode": "ceiling", "git_commit": commit, "experiment_dir_dirty": dirty, "config_sha256": cfg_sha,
            "hmm_version_in_meta": hmm, "gse_replay": None, "seed": int(seed), "worlds": worlds.split(),
            "python": platform.python_version(), "platform": platform.platform(), "cpu_count": os.cpu_count(),
-           "jobs": int(jobs), "packages": {p: version(p) for p in ("numpy", "scipy", "scikit-learn")}},
-          open(out, "w"), indent=1)
+           "jobs": int(jobs),
+           "packages": {p: version(p) for p in ("numpy", "scipy", "scikit-learn", "threadpoolctl")}},
+          open(out, "w", encoding="utf-8", newline="\n"), indent=1)
 PYEOF
 
 old="$EXP_DIR/results/.old-$SUFFIX"

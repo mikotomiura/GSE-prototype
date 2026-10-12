@@ -135,31 +135,81 @@ def test_speed(cfg: dict) -> None:
     check(bl.speed5(p, 10.0, 10.2, sp)[0] == 2.0, "speed5: the span end is open")
     check(np.isclose(bl.speed5(np.array([0.0, 0.199, 0.4]), 0.0, 1.0, sp)[3], 1.5),
           "speed5: an interval of 199 ms continues a run, 201 ms breaks it")
+    # /cross-review (both): 10.2 - 10.0 is 199.9999... ms in floating point; exactly 200 ms must break the run
+    # and exactly 2000 ms must not count as short, wherever the presses sit in the session
+    ok200 = all(bl.speed5(np.array([t, t + 0.2]), t, t + 1.0, sp)[3] == 1.0 for t in (10.0, 1234.567, 3599.0))
+    check(ok200, "speed5: an interval of exactly 200 ms breaks a run at any session time")
+    ok2000 = all(bl.speed5(np.array([t, t + 2.0]), t, t + 5.0, sp)[1:3] == [2000.0, 0.0] for t in (0.3, 1234.567))
+    check(ok2000, "speed5: an interval of exactly 2000 ms is not short")
+    check(bl.speed5(np.array([9.9, 10.05]), 10.0, 20.0, sp)[:2] == [1.0, 2000.0],
+          "speed5: an interval across the span start does not count")
 
 
-def synthetic_trace(rng: np.random.Generator, dur: int) -> bl.Trace:
-    presses = np.sort(rng.uniform(0, dur, size=rng.integers(300, 900)))
+def bursty_trace(rng: np.random.Generator, dur: int, sid: str = "T") -> bl.Trace:
+    """Bursts of presses 100-300 ms apart separated by pauses of 0.5-30 s, in whole ms (as the generator)."""
+    t, ms = float(rng.uniform(0, 5000)), []
+    while t < dur * 1000:
+        for _ in range(int(rng.integers(1, 12))):
+            ms.append(int(t))
+            t += float(rng.uniform(100, 300))
+        t += float(rng.uniform(500, 30000))
+    ms_arr = np.asarray([m for m in ms if m < dur * 1000], dtype=np.int64)
+    presses = ms_arr / 1000.0
     seg = np.repeat(rng.integers(0, 5, size=dur // 60 + 1), 60)[:dur].astype(np.int8)
     active = np.zeros(dur, dtype=bool)
     active[presses.astype(int)] = True
-    return bl.Trace("T", dur, presses, active, seg)
+    return bl.Trace(sid, dur, presses, active, seg)
 
 
-def test_tables(cfg: dict) -> None:
+def test_tables(cfg: dict, tmp: Path) -> None:
     rng = np.random.default_rng(7)
-    tr = synthetic_trace(rng, 3600)
+    tr = bursty_trace(rng, 3600)
     ws = bl.window_speed(tr, cfg)
     check(ws.shape == (60, 5 + 2 * cfg["speed"]["lags"]), "A_speed: window quantities have 5 + 2 x lags columns")
     check(np.array_equal(ws[0, 5:7], [0.0, 2000.0]) and np.array_equal(ws[5, 5:7], ws[4, 0:2])
           and np.array_equal(ws[5, 11:13], ws[1, 0:2]), "A_speed: the lags are the earlier windows' quantities 1 and 2")
+    check(np.isfinite(ws[:, 1]).all() and (ws[:, 1] < 2000).mean() > 0.5,
+          "A_speed: the bursty test trace has short intervals in most windows (the causal test reaches quantities 2-4)")
+    short = bl.Trace("S", 120, tr.presses[tr.presses < 120], tr.active[:120], tr.seg[:120])
+    sws = bl.window_speed(short, cfg)
+    check(sws.shape == (2, 13) and np.array_equal(sws[:, 7:13], np.tile([0.0, 2000.0], (2, 3))),
+          "A_speed: a session shorter than the lags keeps the empty value")
     # causality: removing the presses after T leaves every window ending at or before T unchanged
     T = 1800
     cut = bl.Trace("T", tr.duration_s, tr.presses[tr.presses < T], tr.active.copy(), tr.seg)
     cut.active[T:] = False
     for name, f in (("window_speed", lambda s: bl.window_speed(s, cfg)),
                     ("span_speed L300", lambda s: bl.span_speed(s, cfg, 300)),
-                    ("presence_features", lambda s: bl.presence_features(s, cfg)[0])):
+                    ("span_speed L1800", lambda s: bl.span_speed(s, cfg, 1800)),
+                    ("presence_features", lambda s: bl.presence_features(s, cfg)[0]),
+                    ("presence_features_long L300", lambda s: bl.presence_features_long(s, cfg, 300)[0]),
+                    ("presence_features_long L1800", lambda s: bl.presence_features_long(s, cfg, 1800)[0])):
         check(np.array_equal(f(tr)[: T // 60], f(cut)[: T // 60]), f"causal: {name} before T unchanged by later presses")
+    # tables(): two sessions written as the generator writes labels/*.npz
+    work = tmp / "tables"
+    (work / "labels").mkdir(parents=True, exist_ok=True)
+    traces = [bursty_trace(rng, 3600, "P000"), bursty_trace(rng, 2400, "P001")]
+    for t in traces:
+        np.savez_compressed(work / "labels" / f"{t.sid}.npz", seg=t.seg, presses_ms=np.rint(t.presses * 1000).astype(np.int64),
+                            duration_s=np.int64(t.duration_s), start_ms=np.int64(0))
+    (work / "sessions.json").write_text(json.dumps([{"sid": t.sid, "set": "P"} for t in traces]), encoding="utf-8")
+    tab = bl.tables(work, bl.p_sids(work), cfg)
+    n_a = {"L60": 11, "L300": 15, "L1800": 15}
+    n_s = {"L60": 24, "L300": 33, "L1800": 33}
+    check(all(tab[l]["XA"].shape[1] == n_a[l] and tab[l]["XS"].shape[1] == n_s[l] for l in bl.LABELS),
+          "tables: A has 11 / 15 / 15 columns and A_speed 24 / 33 / 33 (L60 / L300 / L1800)")
+    check(all(np.array_equal(tab[l]["XS"][:, : n_a[l]], tab[l]["XA"]) and len(tab[l]["XS"]) == len(tab[l]["Y"])
+              for l in bl.LABELS), "tables: A_speed starts with A on the same rows")
+    first2 = int(np.argmax(tab["L60"]["G"] == 1))
+    check(first2 == 60 and np.array_equal(tab["L60"]["XS"][first2, 16:24], np.tile([0.0, 2000.0], 4)),
+          "tables: the lags do not leak from one session into the next")
+    w = 9  # the 10th window of session 1 ends at 600 s: L300 row = A300 + window quantities + span quantities
+    rows300 = np.nonzero(tab["L300"]["rows"])[0]
+    r = int(np.nonzero(rows300 == w)[0][0])
+    exp = np.concatenate([bl.window_speed(traces[0], cfg)[w], bl.speed5(traces[0].presses, 300, 600, cfg["speed"])])
+    check(np.array_equal(tab["L300"]["XS"][r, 15:], exp) and tab["L300"]["G"][r] == 0,
+          "tables: an L300 row holds its own window's and span's quantities")
+    check(int(tab["L1800"]["rows"].sum()) == (60 - 29) + (40 - 29), "tables: L1800 keeps the windows with a full span")
 
 
 def test_auc_and_choice(cfg: dict) -> None:
@@ -168,6 +218,19 @@ def test_auc_and_choice(cfg: dict) -> None:
     y = rng.integers(0, 2, 500)
     s = np.round(y + rng.normal(0, 1, 500), 1)  # ties included
     check(np.isclose(ce.weighted_auc(s, y, np.ones(500)), roc_auc_score(y, s)), "AUC: equals sklearn with ties")
+    X = rng.normal(size=(500, 3))
+    g = np.repeat(np.arange(50), 10)
+    y1 = (g % 2).astype(int)  # every fold trains on both classes
+    y_one = np.zeros(500, dtype=int)
+    y_one[:10] = 1  # one positive session: the fold that tests it trains on one class
+    check(ce._fit_job(("k", X, y_one, g, "lr", 1, 5))[1] is None, "fit: a training side with one class -> None")
+    check(ce._fit_job(("k", X, y1, g, "lr", 1, 5))[1] is not None, "fit: two classes everywhere -> an AUC")
+    try:
+        ce._fit_job(("k", X[:400], y1, g, "lr", 1, 5))
+        raised = False
+    except ValueError:
+        raised = True
+    check(raised, "fit: a table that does not line up raises (not read as a failed fit)")
 
     def res(v2_hgb, v2_lr, v3_hgb, v3_lr):
         mk = lambda h, l: {"L300": {"hgb": {"auc_A_speed": h}, "lr": {"auc_A_speed": l}}}
@@ -175,8 +238,12 @@ def test_auc_and_choice(cfg: dict) -> None:
     check(ce.choose(res(0.85, 0.95, 0.5, 0.5), cfg)["chosen"] == "v2", "choice: 0.85 exactly is usable; the smaller counts")
     check(ce.choose(res(0.86, 0.95, 0.80, 0.99), cfg)["chosen"] == "v3", "choice: v3 when v2 is not usable")
     check(ce.choose(res(0.80, 0.80, 0.70, 0.70), cfg)["chosen"] == "v2", "choice: v2 is preferred")
-    c = ce.choose(res(0.86, 0.9, None, 0.5), cfg)
-    check(c["chosen"] is None and c["back_to_researcher"], "choice: none usable (or a failed fit) -> back to the researcher")
+    c = ce.choose(res(0.86, 0.9, 0.86, 0.9), cfg)
+    check(c["chosen"] is None and c["back_to_researcher"], "choice: none usable -> back to the researcher")
+    c = ce.choose(res(None, 0.9, 0.8, 0.8), cfg)
+    check(c["chosen"] is None and c["unmeasured"] == ["v2"], "choice: an unmeasured v2 is not read as a ceiling")
+    c = ce.choose(res(0.8, 0.8, float("nan"), 0.8), cfg)
+    check(c["chosen"] is None and c["unmeasured"] == ["v3"], "choice: a NaN in v3 also goes back to the researcher")
 
 
 def main() -> int:
@@ -191,7 +258,7 @@ def main() -> int:
     tmp = Path(a.tmp)
     tmp.mkdir(parents=True, exist_ok=True)
     test_speed(cfg)
-    test_tables(cfg)
+    test_tables(cfg, tmp)
     test_auc_and_choice(cfg)
     test_world(cfg, config, Path(a.eh1_dir).resolve(), tmp, a.hmm_version)
     print(f"selftest: {len(FAILS)} failed" + (f": {FAILS}" if FAILS else ""))
