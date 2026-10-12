@@ -50,10 +50,16 @@ def item_type(cat):
 
 def a1prime(cats, uncertain_home_end=False):
     """Editor replay of the category column (decision 42: arrow_left, arrow_right, home and end move the cursor;
-    other navigation and the mouse put it at the end). Shortcuts (decision 43) are ignored."""
+    other navigation and the mouse put it at the end). Shortcuts (decision 43) are ignored. After a control press,
+    home and end go to the start and end of the document and the arrows are uncertain (end) (decision 47)."""
     sc = shortcut_flags(cats)
     doc, cur = [], 0
+    ctrl = False
     for i, c in enumerate(cats):
+        if c in ("control", "modifier"):
+            ctrl = ctrl or c == "control"
+            continue
+        after_ctrl, ctrl = ctrl, False
         if sc[i]:
             continue
         if c in ("letter", "digit", "char") + SEP_CATS:
@@ -66,6 +72,8 @@ def a1prime(cats, uncertain_home_end=False):
         elif c == "delete":
             if cur < len(doc):
                 del doc[cur]
+        elif c in ("arrow_left", "arrow_right") and after_ctrl:
+            cur = len(doc)
         elif c == "arrow_left":
             cur = max(0, cur - 1)
         elif c == "arrow_right":
@@ -73,11 +81,13 @@ def a1prime(cats, uncertain_home_end=False):
         elif c == "home":
             if uncertain_home_end:
                 cur = len(doc)
+            elif after_ctrl:
+                cur = 0
             else:
                 while cur > 0 and doc[cur - 1][0] != "n":
                     cur -= 1
         elif c == "end":
-            if uncertain_home_end:
+            if uncertain_home_end or after_ctrl:
                 cur = len(doc)
             else:
                 while cur < len(doc) and doc[cur][0] != "n":

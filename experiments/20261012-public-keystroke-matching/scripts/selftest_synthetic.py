@@ -67,8 +67,40 @@ def test_forms():
     check(set(form_R0(rec)[0]) >= {"pause_time", "activity", "text_change"}, "R0 keeps every column")
     check("pause_time" not in form_R1(rec)[0], "R1 drops the column not in the table")
     check(tuple(form_R2(rec)[0]) == R2_COLS, "R2 columns")
-    check(tuple(form_R3(rec)[0]) == R3_COLS == ("event_id", "down_time", "down_event", "up_event"),
-          "R3 columns: the press time only (decision 41)")
+    check(tuple(form_R3(rec)[0]) == R3_COLS == ("event_id", "down_time", "down_event"),
+          "R3 columns: the press time and the pressed key's category only (decisions 41, 45)")
+    check(a1prime(["letter", "letter", "enter", "letter", "control", "home", "digit", "control", "end", "space"]) ==
+          [("a", 6), ("a", 0), ("a", 1), ("n", 2), ("a", 3), ("s", 9)], "Ctrl+Home/End go to the document ends")
+    check(a1prime(["letter", "letter", "control", "arrow_left", "digit"]) == [("a", 0), ("a", 1), ("a", 4)],
+          "Ctrl+arrow is uncertain (end)")
+    # R6: strings that do not come from a press are masked; typed letters stay letters
+    from synthetic_logs import form_R6
+    for i in range(20):
+        r = Writer(40 + i, 50 + i, 60 + i, ops=DEFAULT_OPS).run()
+        r6 = form_R6(r, np.random.default_rng(i))
+        for o, x in zip(r6, r.rows):
+            if x["activity"] in ("Paste", "Remove/Cut") and x["text_change"] != "NoChange":
+                check(not any(ch.isalnum() and ch != "q" for ch in o["text_change"]), "R6 masks %r" % o["text_change"])
+            if x["activity"] == "Replace":
+                check(not any(ch.isalnum() and ch != "q" for ch in o["text_change"].split(" => ")[0]), "R6 replace")
+        check(word_lengths(a1_text(r6)) == word_lengths(r.final), "R6 keeps the word lengths")
+    # operations happen, including undo; Control rows come before the edit
+    counts = {}
+    for i in range(30):
+        r = Writer(70 + i, 80 + i, 90 + i, ops=DEFAULT_OPS).run()
+        for k2, v in r.op_counts.items():
+            counts[k2] = counts.get(k2, 0) + v
+        for a_, b_ in zip(r.rows, r.rows[1:]):
+            if a_["down_event"] == "Control" and b_["activity"] == "Paste":
+                check(b_["cursor_position"] - a_["cursor_position"] == len(b_["text_change"]) or
+                      b_["text_change"] == "NoChange", "the Control row is logged before the paste")
+    for k2 in DEFAULT_OPS:
+        check(counts.get(k2, 0) > 0, "operation %s happens (%r)" % (k2, counts))
+    try:
+        align_ext.align([1], [-1], 8, "window")
+        check(False, "a negative text segment is an input error")
+    except ValueError:
+        pass
     check(a1prime(["letter", "letter", "arrow_left", "letter", "end", "space", "home", "digit"]) ==
           [("a", 7), ("a", 0), ("a", 3), ("a", 1), ("s", 5)], "A1' moves with arrows, Home and End")
     check(a1prime(["letter", "letter", "navigation", "letter"]) == [("a", 0), ("a", 1), ("a", 3)],
@@ -127,12 +159,16 @@ def test_parts(cfg):
     check(s["R0"] == 0.0 and s["R2"] == 0.0, "positive control: R0 and R2 tell twins apart (%r)" % s)
     for f in ("R3", "R3-u", "R3-t(100)", "R7(0.25)"):
         check(s[f] == 1.0, "%s gives identical output for twins (%r)" % (f, s[f]))
-    s = sc.part_twins(40, "drag")["identical_output_share"]
-    for f in ("R3", "R3-u", "R3-t(100)", "R7(0.25)"):
-        check(s[f] == 1.0, "%s: a drag's length in the hold time does not reach the output (%r)" % (f, s[f]))
+    twd = sc.part_twins(40, "drag")
+    s = twd["identical_output_share"]
+    check(set(twd["columns_that_differ"].get("R3", {})) == {"down_time"},
+          "R3 twins differ only through the press times (%r)" % twd["columns_that_differ"].get("R3"))
+    check(s["R3"] < 1.0,"a drag's length stays as a lower bound of the next press interval (decision 44) (%r)" % s)
     r7 = sc.part_r7(15, cfg, NO_OPS, "selftest")
     check(r7["0.0"]["true_groups_above_cap_share"] == 0.0, "p = 0, no edits: true groups within the cap")
-    check(r7["0.0"]["dp_minus_true_cost_per_word"]["median"] == 0.0, "p = 0, no edits: DP finds the true path cost")
+    check(r7["0.0"]["dp_minus_true_correspondence_cost_per_word"]["median"] == 0.0,
+          "p = 0, no edits: DP finds the true path cost")
+    check(r7["0.0"]["cap_inflation_per_word"]["max"] == 0.0, "p = 0, no edits: no cap inflation")
     check(r7["0.5"]["dp_uses_group_of_4_or_more"] > 0, "groups of 4 or more are chosen at p = 0.5")
     a3 = sc.part_a3(30, 10, 19)
     check(a3["test_with_exact_replay"] >= 5, "A3: enough exact replays")

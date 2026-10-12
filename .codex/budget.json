@@ -33,8 +33,8 @@
   "_comment_merge_2026_10_11_paper2_defer": "2026-10-11: docs/paper2-defer-dataset に origin/main（PR #354 の前）を merge した際、today が衝突した。共通の起点の today は 10-11 の 397928 / 11 回。和を採った: 起点 397928 / 11 ＋ 本ブランチ +23743 / +1（ADR-039 D1 の注の /cross-review の Codex 1 回） ＋ origin/main +83076 / +2 = 504747 / 14 回。",
   "today": {
     "date": "2026-10-12",
-    "tokens_used": 99497,
-    "invocations": 2
+    "tokens_used": 154124,
+    "invocations": 3
   },
   "history": [
     {

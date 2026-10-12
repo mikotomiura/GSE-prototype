@@ -2,9 +2,11 @@
 
 Parts (results/synthetic_check.json; numbers in notes.md):
 1. paths: per form, which published columns give back the segment lengths (final-draft word lengths) and how well.
-2. twins: records that share every key category and time but differ in hidden choices; a form whose output is
-   identical for the two cannot give back what differs (columns other than categories and times carry nothing).
-3. r7: share of true groups above the cap, the true text's path cut, cost of the true correspondence vs the DP cost.
+2. twins: records with the same key-category sequence that differ in hidden choices. That an R3-family output is a
+   function of categories and press times is a property of the form; the twins check it on the implementation and
+   show the time path (with the "drag" timing, a drag's duration bounds the next press interval).
+3. r7: share of true groups above the cap, the true text's path cut, the cap's inflation of the true text's cost
+   (capped DP minus DP with groups up to 10), and the DP cost vs the true correspondence's cost.
 4. a3_r3u: how one replay error lowers the true text's timing term (decision 38).
 """
 import hashlib
@@ -20,7 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import align_ext  # noqa: E402
 from replay import a1_r2, a1_text, a1prime, lengths_of_items  # noqa: E402
-from synthetic_logs import (ALL_CATS, CHAR_CATS, DEFAULT_OPS, MOD_CATS, NAV_CATS, NO_OPS, Writer, category, form_R0, form_R1, form_R2,  # noqa: E402
+from synthetic_logs import (segment_rows, shortcut_flags, ALL_CATS, CHAR_CATS, DEFAULT_OPS, MOD_CATS, NAV_CATS, NO_OPS, Writer, category, form_R0, form_R1, form_R2,  # noqa: E402
                             form_R3, form_R3t, form_R3u, form_R5, form_R6, form_R7, record_segments,
                             word_lengths)
 
@@ -95,9 +97,12 @@ def ned(a, b):
 def part_paths(n, ops, label):
     res = defaultdict(lambda: {"wl_exact": 0, "total_exact": 0, "abs_total": [], "ned": [], "n": 0})
     wc_exact = 0
+    op_counts = defaultdict(int)
     for i in range(n):
         ks, hs, ls = rec_seeds("paths_" + label, i)
         rec = Writer(ks, hs, ls, ops=ops).run()
+        for kind, v in rec.op_counts.items():
+            op_counts[kind] += v
         wl = word_lengths(rec.final)
         total = sum(wl)
         rng = np.random.default_rng(seed_int("synthetic", "paths_form_" + label, str(i)))
@@ -130,6 +135,7 @@ def part_paths(n, ops, label):
                   "total_exact": round(d["total_exact"] / d["n"], 4), "abs_total": summary(d["abs_total"]),
                   "word_lengths_ned": summary(d["ned"]) if d["ned"] else None}
     out["R2:word_count_last_row_equals_whitespace_words"] = round(wc_exact / n, 4)
+    out["operations_executed"] = dict(sorted(op_counts.items()))
     return out
 
 
@@ -230,6 +236,10 @@ def true_groups(segs, row_word, n_words):
     return [tuple(g) for g in groups if not (g[0] == g[1] and g[2] == g[3])], nonmono
 
 
+# a group list without the cap: (1,1), then (p',1) and (1,q) up to 10 (to measure what the cap costs the true text)
+UNCAPPED = [(1, 1)] + [g for a in range(2, 11) for g in ((a, 1), (1, a))]
+
+
 def part_r7(n, cfg, ops, label):
     out = {}
     for p in (0.0, 0.1, 0.25, 0.5):
@@ -239,10 +249,12 @@ def part_r7(n, cfg, ops, label):
             groups, cap = list(align_ext.T.ORDER), 3
         above, n_groups, rec_above, cut, cut_window, used4 = 0, 0, 0, 0, defaultdict(int), 0
         diff, true_cost, dp_cost, nonmono_recs = [], [], [], 0
+        inflation, inflated, cut_uncapped = [], 0, 0
         win_n = defaultdict(int)
         for i in range(n):
             rec = Writer(*rec_seeds("r7_" + label, i), ops=ops).run()
-            keep = np.random.default_rng(seed_int("r7_drop", "synthetic", str(i), "", "", str(p))).random(len(rec.rows)) >= p
+            keep = np.random.default_rng(seed_int("synthetic", "r7_drop_" + label, str(i), "", "", str(p))).random(
+                len(rec.rows)) >= p
             kept = [j for j in range(len(rec.rows)) if keep[j]]
             cats = [category(rec.rows[j]["down_event"]) for j in kept]
             segs = record_segments(cats)
@@ -265,14 +277,22 @@ def part_r7(n, cfg, ops, label):
             tc = align_ext.path_cost(x, yy, tg, LAM)
             c, g = align_ext.align(x, yy, LAM, "full", groups=groups, max_group=cap)
             true_cost.append(tc / max(1, len(y)))
+            cu, _ = align_ext.align(x, yy, LAM, "full", groups=UNCAPPED, max_group=10)
+            cut_uncapped += int(cu == align_ext.INF)
             if c == align_ext.INF:
                 cut += 1
             else:
                 dp_cost.append(c / max(1, len(y)))
                 diff.append((c - tc) / max(1, len(y)))
                 used4 += int(any(max(b - a, d - e) >= 4 for a, b, e, d in g))
+                if cu < align_ext.INF:
+                    inflation.append((c - cu) / max(1, len(y)))
+                    inflated += int(c > cu)
             # windows: k consecutive R0 segments, the presses inside, suppressed, re-segmented, window end
-            r0segs = record_segments([category(r["down_event"]) for r in rec.rows])
+            r0cats = [category(r["down_event"]) for r in rec.rows]
+            r0segs = record_segments(r0cats)
+            r0rows = segment_rows(r0cats)
+            assert len(r0rows) == len(r0segs)
             r0_row_word = {}
             for j, r in enumerate(rec.rows):
                 fi = surv.get(r["event_id"])
@@ -290,14 +310,11 @@ def part_r7(n, cfg, ops, label):
                 w0 = max(set(first), key=lambda w: (first.count(w), -w))
                 if w0 + k > len(y):
                     continue
-                lo = r0segs[s][1][0]
-                last_idx = r0segs[s + k - 1][1]
-                hi = (last_idx[-1] if last_idx else lo)
-                # include the separator that closes the window's last segment
-                while hi + 1 < len(rec.rows) and category(rec.rows[hi + 1]["down_event"]) not in ("space", "punctuation", "enter"):
-                    hi += 1
-                hi = min(hi + 1, len(rec.rows) - 1)
+                # from the row after the separator before segment s to the separator closing segment s + k - 1
+                lo, hi = r0rows[s][0], r0rows[s + k - 1][1]
                 wk = [j for j in range(lo, hi + 1) if keep[j]]
+                xw_full = record_segments([r0cats[j] for j in range(lo, hi + 1)])
+                assert len(xw_full) == k, "the window has k R0 segments"
                 xw = [v for v, _ in record_segments([category(rec.rows[j]["down_event"]) for j in wk])]
                 cw, _ = align_ext.align(xw, [(1 - p) * v for v in y[w0:w0 + k]], LAM, "window", groups=groups,
                                         max_group=cap)
@@ -315,7 +332,10 @@ def part_r7(n, cfg, ops, label):
             "dp_uses_group_of_4_or_more": round(used4 / max(1, n - cut), 4),
             "true_correspondence_cost_per_word": summary(true_cost),
             "dp_cost_per_word": summary(dp_cost),
-            "dp_minus_true_cost_per_word": summary(diff),
+            "dp_minus_true_correspondence_cost_per_word": summary(diff),
+            "cap_inflation_per_word": summary(inflation),
+            "records_with_cap_inflation": round(inflated / max(1, len(inflation)), 4),
+            "true_text_path_cut_full_uncapped": round(cut_uncapped / n, 4),
         }
     return out
 
@@ -327,9 +347,12 @@ def char_rows(rows):
     (modifier and navigation presses skipped; any other press breaks the chain)."""
     prev_char = {}
     last = None
+    sc = shortcut_flags([category(r["down_event"]) for r in rows])
     for j, r in enumerate(rows):
         c = category(r["down_event"])
-        if c in CHAR_CATS:
+        if sc[j]:  # a shortcut press breaks the chain
+            last = None
+        elif c in CHAR_CATS:
             if last is not None:
                 prev_char[j] = last
             last = j

@@ -28,5 +28,6 @@
 
 ## 完了処理
 - [ ] 引き継ぎ（次のセッション: 凍結・取得の開始条件の確認・合成の記録の検査のコード）
-- [ ] `/cross-review` 2 巡
+- [x] `/cross-review` 1 巡目（合成の記録の検査・Codex 4 件・code-reviewer 12 件）→ 判断 44〜47 → 下書き 7
+- [ ] `/cross-review` 2 巡目（自分が足した規則の境界条件）
 - [ ] commit → push → PR → CI → merge → main の CI

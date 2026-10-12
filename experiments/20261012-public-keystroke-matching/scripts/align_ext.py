@@ -94,6 +94,8 @@ def free_end(x, y, lam, order):
 
 def align(x, y, lam, end, groups=None, max_group=3):
     """(cost, groups) with groups [(i0, i1, j0, j1)]; (inf, None) when no path exists."""
+    if any(v < 0 for v in y):
+        raise ValueError("align: the text has an invalid segment")  # an input error, not "no path"
     order = list(groups) if groups is not None else list(T.ORDER)
     if end == "full" and MUTATE == "full_as_window":
         end = "window"

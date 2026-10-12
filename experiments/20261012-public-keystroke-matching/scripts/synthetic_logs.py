@@ -10,7 +10,10 @@ What is an assumption about the real logs (to be checked at check 2 after acquis
 - Control/Alt/Shift/Meta rows have action time 0 and up time = down time ([V264] §2.1.5 sets their operation time to 0);
 - activity values and text change formats follow the Kaggle description [V265] (Input, Remove/Cut, Replace "a => b",
   Paste, Nonproduction, "Move From [a, b] To [c, d]", "NoChange");
-- an undo removes the last typed word and is logged as Remove/Cut.
+- an undo right after a word removes that word and is logged as Remove/Cut;
+- the released key (up_event) is the pressed key;
+- the Control row of a shortcut is logged with the state before the edit, the letter row with the state after;
+- the next press comes after a mouse operation is released (a drag's duration bounds the next press interval).
 
 Three random streams make "twins": records that share the key stream (categories and times) but differ in hidden
 choices (mouse targets, which word is copied, letters). Times depend only on the key stream unless the timing mode
@@ -167,7 +170,7 @@ class Writer:
             "text_change": text_change, "cursor_position": ed.cursor, "word_count": ws_word_count(ed.text()),
         }
         self.rows.append(r)
-        self.t = down
+        self.t = down + hold if key in MOUSE else down
         if c is not None:
             self.prev_char = c
         return r
@@ -393,29 +396,29 @@ class Writer:
             ed.clip = ed.text()[a:b]
             self.shortcut("c")
             self.click(len(ed.chars))
-            eid = len(self.rows) + 2  # the "v" row after the Control row
+            self.row("Control", gap_kind="mod")
+            eid = len(self.rows) + 1  # the "v" row
             for i, c in enumerate(ed.clip):
                 ed.chars.insert(ed.cursor + i, (c, ("paste", eid)))
             ed.cursor += len(ed.clip)
-            self.row("Control", gap_kind="mod")
             self.row("v", "Paste", ed.clip if ed.clip else "NoChange", "char")
             self.fix_last()
         elif kind == "cut":
             self.drag_select()
+            self.row("Control", gap_kind="mod")
             removed = ed.drop_sel()
             ed.clip = removed
-            self.row("Control", gap_kind="mod")
             self.row("x", "Remove/Cut" if removed else "Nonproduction", removed or "NoChange", "char")
             self.fix_last()
             self.to_end()
         elif kind == "undo":
             if ed.last_run and ed.last_run[1] == ed.cursor and ed.last_run[1] > ed.last_run[0]:
                 a, b = ed.last_run
+                self.row("Control", gap_kind="mod")
                 removed = ed.text()[a:b]
                 del ed.chars[a:b]
                 ed.cursor = a
                 ed.anchor = None
-                self.row("Control", gap_kind="mod")
                 self.row("z", "Remove/Cut", removed, "char")
                 self.fix_last()
                 ed.last_run = None
@@ -436,14 +439,23 @@ class Writer:
 
     def run(self):
         n_words = int(self.k.integers(*self.n_words))
-        kinds = list(self.ops)
+        kinds = [x for x in self.ops if x != "undo"]
         probs = np.array([self.ops[x] for x in kinds])
         p_any = float(probs.sum())
+        p_undo = self.ops.get("undo", 0.0)
+        self.counts = {}
         cap_next = False
         for i in range(n_words):
-            if i > 3 and self.k.random() < p_any:
-                self.op(kinds[int(self.k.choice(len(kinds), p=probs / p_any))])
+            if i > 3 and kinds and self.k.random() < p_any:
+                kind = kinds[int(self.k.choice(len(kinds), p=probs / p_any))]
+                self.op(kind)
+                self.counts[kind] = self.counts.get(kind, 0) + 1
             self.type_word(self.rand_word(), "word", capital=(i == 0 or cap_next or self.k.random() < 0.03))
+            if p_undo and i > 3 and self.k.random() < p_undo:
+                n0 = len(self.rows)
+                self.op("undo")
+                if len(self.rows) > n0:
+                    self.counts["undo"] = self.counts.get("undo", 0) + 1
             cap_next = False
             u = self.k.random()
             if u < 0.08:
@@ -454,7 +466,9 @@ class Writer:
             elif i < n_words - 1:
                 self.type_char(" ")
         self.type_char(".")
-        return Record(self.rows, self.ed)
+        rec = Record(self.rows, self.ed)
+        rec.op_counts = self.counts
+        return rec
 
 
 DEFAULT_OPS = {"mid_insert": 0.02, "mid_delete": 0.015, "sel_delete": 0.015, "replace": 0.01, "copy_paste": 0.01,
@@ -495,6 +509,24 @@ def shortcut_flags(cats):
             flags[i] = True
         armed = False
     return flags
+
+
+def segment_rows(cats):
+    """For each record segment of record_segments(cats), (first row, last row): from the row after the previous
+    closing separator to the closing separator (or the last row for a trailing open segment)."""
+    sc = shortcut_flags(cats)
+    out, start, counted = [], 0, False
+    for i, c in enumerate(cats):
+        if sc[i]:
+            continue
+        if c in ("letter", "digit", "backspace"):
+            counted = True
+        elif c in SEP_CATS:
+            out.append((start, i))
+            start, counted = i + 1, False
+    if counted:
+        out.append((start, len(cats) - 1))
+    return out
 
 
 def record_segments(cats, merge_char=False):
@@ -551,9 +583,10 @@ def form_R1(rec):
 
 
 R2_COLS = ("event_id", "down_time", "up_time", "action_time", "down_event", "up_event", "cursor_position", "word_count")
-# R3 and the forms built on it keep the press time only (decision 41): up and action times can carry a drag's
-# selection length or a held key's repeat count, and no attacker or metric uses them
-R3_COLS = ("event_id", "down_time", "down_event", "up_event")
+# R3 and the forms built on it keep the press time and the pressed key's category only (decisions 41, 45): up and
+# action times carry a drag's length or a held key's duration (a lower bound of it stays in the next press interval,
+# decision 44), the released key can differ from the pressed one, and no attacker or metric uses them
+R3_COLS = ("event_id", "down_time", "down_event")
 
 
 def form_R2(rec):
@@ -563,15 +596,14 @@ def form_R2(rec):
 def form_R3(rec, mutate=None):
     cols = R3_COLS + {"r3_keep_position": ("cursor_position",),
                       "r3_keep_up_time": ("up_time", "action_time")}.get(mutate, ())
-    return [{c: (category(r[c]) if c in ("down_event", "up_event") else r[c]) for c in cols} for r in rec.rows]
+    return [{c: (category(r[c]) if c == "down_event" else r[c]) for c in cols} for r in rec.rows]
 
 
 def form_R3u(rec):
     out = form_R3(rec)
     for o in out:
-        for c in ("down_event", "up_event"):
-            if o[c] in CHAR_CATS:
-                o[c] = "char"
+        if o["down_event"] in CHAR_CATS:
+            o["down_event"] = "char"
     return out
 
 
@@ -639,15 +671,27 @@ def form_R5(rec, rng):
 
 
 def form_R6(rec, rng):
+    """Letter/digit identities of the typed presses (Input and the typed side of Replace) are permuted within each
+    record segment, with the same permutation in text_change. Strings that do not come from a press (pasted text,
+    the replaced text, removed text) have letters and digits masked to q as in R1 (decision 46)."""
     cats = [category(r["down_event"]) for r in rec.rows]
-    keys = [r["down_event"] for r in rec.rows]
     out = [dict(r) for r in rec.rows]
-    for o in out:
+    for o, r in zip(out, rec.rows):
         del o["pause_time"]
+        tc = r["text_change"]
+        if r["activity"] in ("Paste", "Remove/Cut") and tc != "NoChange":
+            o["text_change"] = mask_q(tc)
+        elif r["activity"] == "Replace":
+            a, b = tc.split(" => ")
+            o["text_change"] = mask_q(a) + " => " + b
     for _, idx in record_segments(cats):
-        al = [i for i in idx if cats[i] in ("letter", "digit") and rec.rows[i]["activity"] == "Input"]
+        al = [i for i in idx if cats[i] in ("letter", "digit") and rec.rows[i]["activity"] in ("Input", "Replace")]
         perm = rng.permutation(len(al))
         for i, j in zip(al, perm):
             k = rec.rows[al[j]]["down_event"]
-            out[i]["down_event"] = out[i]["up_event"] = out[i]["text_change"] = k
+            out[i]["down_event"] = out[i]["up_event"] = k
+            if rec.rows[i]["activity"] == "Input":
+                out[i]["text_change"] = k
+            else:
+                out[i]["text_change"] = out[i]["text_change"].split(" => ")[0] + " => " + k
     return out
