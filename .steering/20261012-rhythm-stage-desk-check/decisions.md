@@ -108,3 +108,10 @@
   - 判断 7 の理由の訂正（判断 8・11）と、world v3 の意味の訂正（判断 11）を了承。v3 は作り直さず、問いが痩せることを宣言したうえで予備に残す（下見 0 で v2 が使えれば v3 は記述だけになる）。
   - 研究者が design §9 の細部を確かめてから、別のセッションで下見 0 の計器（world v3 の生成器・A と A_speed・OOF の AUC）を作る。引き継ぎは `.steering/_handoff/next-session-rhythm-stage-ceiling.md`。
 - **理由**: 下見 0 の後は §3.0 への値の追記しか許さない（design §3.0 の順序）ので、§9 を変えるなら下見 0 の前に限られる。このセッションは文脈が長く、計器の実装は新しい文脈のほうが確か。
+
+## 判断 13: 新規性の文献のラウンドの `/cross-review` と対応（2026-10-12）
+
+- 範囲: `98f6ed13`（`docs/literature/20261012-rhythm-stage-novelty.md`・`_index.md` の 1 行・`docs/references.md` の [P472]〜[P482]）。Claude（`code-reviewer`）は HIGH 2・MEDIUM 3・LOW 5、Codex は P2 4。逐語の引用 22 本は Claude の reviewer が一次の本文で全部確かめた（捏造・改変なし）。
+- **私の読み違い（HIGH-1）**: [P477] の "Animated displays in the periphery can cause distraction to a high-attention-centric motion intensive tasks." を、初稿は「先行研究 [6] の推奨の引用で著者の結果ではない」と訂正して否決していた。原稿を開き直すと、考察の "Some of the important recommendations from this paper:" に続く著者自身の推奨で、[6]（[P468]）は反対の側（閲覧を妨げなかった）として引かれていた。サブエージェント（angle 1）の読みが正しかった。カードの検証状態・claim 9・否決リスト・[P477] の備考を直した（[P477] は未マージの同じ PR の行なので備考を直し、読み違いの経緯を書き添えた）。
+- そのほか直したもの: [P468] を「代償なし」の側へ（HIGH-2）・[P474] の読みを「状態を示す設計が設計どおり読まれた・面接は誘導」に弱めた（MEDIUM-1・索引の行も）・[P475] の「状態計として読む行動」に推論と明記（MEDIUM-2）・否決リストに番号（MEDIUM-3）・既登録の再利用の欄（LOW-1）・claim 13 を 2-1 に（LOW-2）・[P114] を基礎の第 3 の軸として足した（LOW-3）・Dakadaka の逐語を文の終わりまで（LOW-4）・Maglio の主課題の書き方（LOW-5）。Codex の 4 件: 索引の「0 件」に対象と範囲を戻した・確定は 1 票目（原研究が支える）が支持であることを要すると明記・探索の生の記録を `survey-raw/` に写して残した（手元の一時パスは消した）・ゲーム化は表示あり／なしの差だけでは識別できない（打鍵と連動しない対照の表示や意図の確認が要る）とカード 5 に書いた。
+- `python scripts/check_citations.py` は直した後も「違反なし」。
