@@ -13,7 +13,7 @@ import InvitationGlyph, { INVITATION_GLYPH } from "./InvitationGlyph";
 // ⚠️ この画面の操作は記録しない（NDJSON・applog とも）。設定は端末の中の `~/.gse/eh3_invitation.json` だけ。
 // ⚠️ 文面は F-3 で研究者が確かめるまでの案である。
 
-type TimeWindow = "core" | "extended" | "wide";
+type TimeWindow = "all_day" | "core" | "extended" | "wide";
 type DailyCap = "one" | "two" | "four";
 
 interface InvitationSettingsValue {
@@ -23,6 +23,7 @@ interface InvitationSettingsValue {
 }
 
 const WINDOW_OPTIONS: { value: TimeWindow; label: string }[] = [
+    { value: "all_day", label: "時間帯を限らない" },
     { value: "core", label: "9 時から 18 時" },
     { value: "extended", label: "8 時から 20 時" },
     { value: "wide", label: "6 時から 22 時" },
@@ -72,13 +73,13 @@ const InvitationSettings: React.FC = () => {
                 この印について
             </h1>
             <p>
-                作業の途中で、画面の右上にこの印が出ることがあります。席を立って体を動かす、外の空気を吸いに出る、
-                といったことをしてもよい、というお誘いです。応じても応じなくてもかまいません。印はおよそ 1 分で消えます。
+                作業の途中で、画面の右上にこの印が出ることがあります。手を止めて、席を立ったり伸びをしたりして、
+                ひと息つき、作業から少し引いてみてもよい、というお誘いです。応じても応じなくてもかまいません。印はおよそ 1 分で消えます。
             </p>
             <p>
                 印が出るのは、打鍵の様子から、作業が進みにくくなっているかもしれない時間がしばらく続いたときです。
                 これは推定なので、外れることがあります。同じひと続きの時間の中では 1 回までで、消えてから 30 分はあけます。
-                出る時間帯と 1 日の回数は、下で選んだ範囲の中だけです。夜 22 時から朝 6 時までは出ません。
+                出る時間帯と 1 日の回数は、下で選んだ範囲の中だけです。
                 1 回ごとの印について、その理由は表示しません。
             </p>
             <p>

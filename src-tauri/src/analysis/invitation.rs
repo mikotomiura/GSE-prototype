@@ -25,11 +25,13 @@
 //! - 閉じた後の間隔: 30 分。⚠️ **起点は「提示 + 失効の時間」**であって、実際に閉じた時刻ではない。
 //!   本人が止めて早く閉じても、次に出せる時刻は早まらない（止めた・戻したの履歴が出す量を増やさない・ADR-035 D4 ①②）。
 //! - 1 日（現地 4:00 区切り）の上限: 本人の選択 {1, 2, 4}・既定 2。内側の上限 4（ADR-026 PC-6）。
-//! - 時間帯: 本人の選択 {9–18, 8–20, 6–22} 時・既定 9–18 時。夜間 22:00–6:00 は内側の制約で出さない。
+//! - 時間帯: 本人の選択 {終日, 9–18, 8–20, 6–22} 時・既定 終日。夜間の内側の制約は置かない
+//!   （`.steering/20261011-portrait-eh3-after-impl/decisions.md` 判断 2。ADR-035 D1 の内側の制約 3 は
+//!   Outdoor の型にかかり、本設計の招待は歩行・外出を促す型を持たない。屋外の型を足すなら戻る）。
 //!
 //! ## ADR-035 D1 の内側の制約（設定より内側で効く）
 //!
-//! ① 系の控え（閉じた後の間隔・1 区間 1 回）／② 上限 4（PC-6）／③ 夜間 22:00–6:00／
+//! ① 系の控え（閉じた後の間隔・1 区間 1 回）／② 上限 4（PC-6）／③ 安全条件（夜間の Outdoor 無効。屋外の型が無いので対象が無い）／
 //! ④ 研究の条件（`meta.invitation_enabled`。EH3 では真・`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 1 #1）。
 //! これに加えて、記録の一時停止中は出さない（出たのに記録が無い提示を作らない・判断 6 #1）。
 
@@ -37,10 +39,46 @@ use serde::{Deserialize, Serialize};
 
 use crate::analysis::intervention::AWAY_IDLE_MS;
 
-/// 契機の `p_stuck` の閾値。Nudge と同じ値（較正中の推定に新しい値を足さない・design §6）。
+/// 契機の `p_stuck` の閾値（本番の段）。Nudge と同じ値（較正中の推定に新しい値を足さない・design §6）。
 pub const TRIGGER_P_STUCK: f64 = 0.60;
-/// 契機の持続（`p_stuck ≥ 閾値` が続く長さ）。
+/// 契機の持続（本番の段。`p_stuck ≥ 閾値` が続く長さ）。
 pub const TRIGGER_HOLD_MS: u64 = 30_000;
+
+/// 契機の値の組。停滞の区間の始まり（閾値以上が `hold_ms` 続く）と終わり（閾値未満が
+/// `EPISODE_END_HOLD_MS` 続く）は同じ閾値で決める。
+///
+/// 段は 2 つ。本番（`MAIN`）と、試作と利用者の検証の段（`PROTO`・`eh3.mode` の `trigger=proto`）。
+/// 試作の段は招待を出やすい側に置き、その記録を根拠に本番の値を凍結の前に決める
+/// （`.steering/20261011-portrait-eh3-after-impl/decisions.md` 判断 4・`.steering/20261012-eh3-trigger-values/`）。
+/// ⚠️ `metrics.rs` の `p_stuck_trigger`（Stuck エピソードの定義）とは別の値であり、こちらを変えても動かない。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Trigger {
+    pub p_stuck: f64,
+    pub hold_ms: u64,
+}
+
+impl Trigger {
+    /// 本番の段（稿 §10.1 F-2・判断 1 #3）。
+    pub const MAIN: Trigger = Trigger {
+        p_stuck: TRIGGER_P_STUCK,
+        hold_ms: TRIGGER_HOLD_MS,
+    };
+    /// 試作と利用者の検証の段（`eh3.mode` の `trigger=proto`）。
+    ///
+    /// 研究者が決めた（2026-10-12・`.steering/20261012-eh3-trigger-values/decisions.md` 判断 2）。0.50 は、
+    /// 手を止めたときの頭打ち（0.54・Windows の実機）を越えるので、研究者が手を止めれば図像を確かめられる。
+    /// 研究者の O1 の記録（4 日・作業 9.6 時間）では、本番の値の契機 35 回に対して 42 回、既定の提示は 6 回に対して 7 回。
+    pub const PROTO: Trigger = Trigger {
+        p_stuck: 0.50,
+        hold_ms: 10_000,
+    };
+}
+
+impl Default for Trigger {
+    fn default() -> Self {
+        Self::MAIN
+    }
+}
 /// 停滞の区間が終わる条件（`p_stuck < 閾値` が続く長さ）。
 pub const EPISODE_END_HOLD_MS: u64 = 60_000;
 /// 提示から閉じるまで（実時間）。PC 面の曝露予算の実測は無い（PC-11）ので、見逃されても主課題を傷つけない側に短く置く。
@@ -49,10 +87,6 @@ pub const EXPIRY_MS: u64 = 60_000;
 pub const GAP_AFTER_CLOSE_MS: u64 = 30 * 60_000;
 /// 内側の 1 日の上限（ADR-026 PC-6・§6.3 の 2–4）。本人の選択はこの内側にだけ置く（ADR-035 D3）。
 pub const HARD_DAILY_CAP: u32 = 4;
-/// 夜間（内側の制約 ③）の始まりと終わり（現地時刻・0:00 からの分）。
-pub const NIGHT_START_MIN: u32 = 22 * 60;
-pub const NIGHT_END_MIN: u32 = 6 * 60;
-
 /// 1 日の上限の選択肢（N 択・ADR-035 D3）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -78,7 +112,9 @@ impl DailyCap {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TimeWindow {
-    /// 9:00–18:00（既定・狭い側）
+    /// 0:00–24:00（既定。控える側の既定は 1 日の上限が担う・判断 2）
+    AllDay,
+    /// 9:00–18:00
     Core,
     /// 8:00–20:00
     Extended,
@@ -87,11 +123,17 @@ pub enum TimeWindow {
 }
 
 impl TimeWindow {
-    pub const ALL: [TimeWindow; 3] = [TimeWindow::Core, TimeWindow::Extended, TimeWindow::Wide];
+    pub const ALL: [TimeWindow; 4] = [
+        TimeWindow::AllDay,
+        TimeWindow::Core,
+        TimeWindow::Extended,
+        TimeWindow::Wide,
+    ];
 
     /// `[start, end)`（0:00 からの分）。
     pub fn range(self) -> (u32, u32) {
         match self {
+            TimeWindow::AllDay => (0, 24 * 60),
             TimeWindow::Core => (9 * 60, 18 * 60),
             TimeWindow::Extended => (8 * 60, 20 * 60),
             TimeWindow::Wide => (6 * 60, 22 * 60),
@@ -110,11 +152,11 @@ pub struct Settings {
 }
 
 impl Default for Settings {
-    /// ADR-035 D2: 有無は「出す」、時間帯と上限は狭い側。
+    /// ADR-035 D2: 有無は「出す」、上限は狭い側。時間帯は終日（時計で出す時刻を絞らない・判断 2）。
     fn default() -> Self {
         Self {
             enabled: true,
-            window: TimeWindow::Core,
+            window: TimeWindow::AllDay,
             cap: DailyCap::Two,
         }
     }
@@ -127,7 +169,7 @@ pub struct TickInput {
     pub now_ms: u64,
     /// 現地の日（4:00 区切り・`eh3::local_day`）。上限の数え直しに使う。
     pub local_day: i64,
-    /// 現地時刻の 0:00 からの分（時間帯と夜間の判定）。
+    /// 現地時刻の 0:00 からの分（時間帯の判定）。
     pub minute_of_day: u32,
     /// 推定の停滞の確率（`clean_score` 済みでなくてよい・NaN は 0 として扱う）。
     pub p_stuck: f64,
@@ -150,11 +192,15 @@ pub struct TickOutput {
     pub present: bool,
     /// この tick で新しく出した（`invitation_present` 行を書く）。
     pub presented: bool,
+    /// この tick で停滞の区間が契機を満たした（出したかどうかに依らない）。記録には書かない。
+    /// 契機の値を記録で比べる道具（`examples/invitation_trigger_sweep.rs`）が数える。
+    pub triggered: bool,
 }
 
 /// 招待の状態機械。
 #[derive(Debug, Clone, Default)]
 pub struct InvitationMachine {
+    trigger: Trigger,
     stuck_since: Option<u64>,
     below_since: Option<u64>,
     in_episode: bool,
@@ -171,13 +217,18 @@ fn in_minutes(m: u32, (start, end): (u32, u32)) -> bool {
     start <= m && m < end
 }
 
-fn is_night(m: u32) -> bool {
-    !(NIGHT_END_MIN..NIGHT_START_MIN).contains(&m)
-}
-
 impl InvitationMachine {
+    /// 本番の段の契機で作る。
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// 段の契機を指定して作る。
+    pub fn with_trigger(trigger: Trigger) -> Self {
+        Self {
+            trigger,
+            ..Self::default()
+        }
     }
 
     /// いま招待を出しているか。
@@ -190,7 +241,6 @@ impl InvitationMachine {
         input.research_enabled
             && input.recording_active
             && input.settings.enabled
-            && !is_night(input.minute_of_day)
             && in_minutes(input.minute_of_day, input.settings.window.range())
     }
 
@@ -236,6 +286,7 @@ impl InvitationMachine {
         TickOutput {
             present: self.shown_at.is_some(),
             presented,
+            triggered,
         }
     }
 
@@ -252,10 +303,10 @@ impl InvitationMachine {
         } else {
             0.0
         };
-        if p >= TRIGGER_P_STUCK {
+        if p >= self.trigger.p_stuck {
             self.below_since = None;
             let since = *self.stuck_since.get_or_insert(now);
-            if !self.in_episode && now.saturating_sub(since) >= TRIGGER_HOLD_MS {
+            if !self.in_episode && now.saturating_sub(since) >= self.trigger.hold_ms {
                 self.in_episode = true;
                 return true;
             }
@@ -331,15 +382,23 @@ mod tests {
         run_from(TEN, p, settings, secs)
     }
 
-    /// 経路独立性の検査の時計: 5:00 から 18 時間（夜間・3 つの時間帯の境界をすべて通る）。
+    /// 経路独立性の検査の時計: 5:00 から 18 時間（終日でない 3 つの時間帯の境界をすべて通る）。
     const HIST_START_MIN: u32 = 5 * 60;
     const HIST_SECS: usize = 18 * 3600;
 
     fn widest() -> Settings {
         Settings {
             enabled: true,
-            window: TimeWindow::Wide,
+            window: TimeWindow::AllDay,
             cap: DailyCap::Four,
+        }
+    }
+
+    /// 時間帯を 9–18 時に狭めた設定（時間帯の境界の検査用）。
+    fn core() -> Settings {
+        Settings {
+            window: TimeWindow::Core,
+            ..Settings::default()
         }
     }
 
@@ -491,7 +550,7 @@ mod tests {
         let mut m = InvitationMachine::new();
         let mut last = true;
         for s in 0..60 {
-            let mut i = input(T0 + s * SEC, 0.9, Settings::default());
+            let mut i = input(T0 + s * SEC, 0.9, core());
             i.minute_of_day = if s < 40 { 17 * 60 + 59 } else { 18 * 60 };
             last = m.tick(&i).present;
         }
@@ -545,16 +604,77 @@ mod tests {
         assert!(stopped.get(1) >= normal.get(1), "{normal:?} / {stopped:?}");
     }
 
+    /// 既定（終日）では夜も出す。本人が時間帯を狭めたときだけ出さない（夜間の内側の制約は置かない・判断 2）。
+    #[test]
+    fn the_default_presents_at_night_and_a_narrowed_window_does_not() {
+        for minute in [23 * 60, 2 * 60, 5 * 60 + 59] {
+            assert_eq!(
+                run_from(minute, &|_| 0.9, &|_| Settings::default(), 60),
+                vec![30],
+                "既定は {minute} 分にも出す"
+            );
+            for window in [TimeWindow::Core, TimeWindow::Extended, TimeWindow::Wide] {
+                let s = Settings {
+                    window,
+                    ..Settings::default()
+                };
+                assert!(
+                    run_from(minute, &|_| 0.9, &|_| s, 60).is_empty(),
+                    "{window:?} は {minute} 分に出さない"
+                );
+            }
+        }
+    }
+
+    /// 既定（終日）では 0:00 を跨いでも閉じず、失効（60 秒）だけで閉じる。
+    #[test]
+    fn the_default_keeps_an_invitation_across_midnight_until_expiry() {
+        let mut m = InvitationMachine::new();
+        let mut present = Vec::new();
+        for s in 0..120 {
+            let o = m.tick(&input_from(
+                23 * 60 + 59,
+                T0 + s * SEC,
+                0.9,
+                Settings::default(),
+            ));
+            if o.present {
+                present.push(s);
+            }
+        }
+        // 23:59:30 に出て、0:00（s = 60）を越えても出たまま、60 秒で失効する
+        assert_eq!(present.first(), Some(&30));
+        assert_eq!(present.len() as u64, EXPIRY_MS / SEC, "{present:?}");
+        assert!(present.contains(&60));
+    }
+
+    /// 既定（終日）では 4:00 の日の区切りの直前にも出せる。区切りで上限は数え直すが、
+    /// 消えてから 30 分の間隔は消えない。
+    #[test]
+    fn the_day_boundary_resets_the_cap_but_not_the_gap() {
+        let settings = Settings {
+            cap: DailyCap::One,
+            ..Settings::default()
+        };
+        let mut m = InvitationMachine::new();
+        let mut presented = Vec::new();
+        for s in 0..(3 * 3600u64) {
+            let mut i = input_from(3 * 60 + 59, T0 + s * SEC, alternating(s), settings);
+            // 3:59:00 に始まり、s = 60 で 4:00（次の日）
+            i.local_day = if s < 60 { 100 } else { 101 };
+            if m.tick(&i).presented {
+                presented.push(s);
+            }
+        }
+        // 3:59:30 に出す。次の日の 1 回は、提示 + 失効 60 秒 + 間隔 30 分（s = 1890）より後の
+        // 最初の区間（s = 1920 に始まり 30 秒後）。上限 1 は日ごとなので、それ以上は出ない。
+        assert_eq!(presented, vec![30, 1950]);
+    }
+
     // ---- ADR-035 D1: 内側の制約は、設定を最大に広げても効く ----
 
     #[test]
     fn inner_constraints_hold_at_the_widest_settings() {
-        let mut m = InvitationMachine::new();
-        for s in 0..120 {
-            let mut i = input(T0 + s * SEC, 0.95, widest());
-            i.minute_of_day = 23 * 60;
-            assert!(!m.tick(&i).presented, "③ 夜間は出さない");
-        }
         let mut m = InvitationMachine::new();
         for s in 0..120 {
             let mut i = input(T0 + s * SEC, 0.95, widest());
@@ -642,7 +762,7 @@ mod tests {
             let quiet = quiet_seconds(&sc);
             let p = |s: u64| sc[s as usize];
             let h = history(seed);
-            for current in [Settings::default(), widest()] {
+            for current in [Settings::default(), core(), widest()] {
                 let constant = run_from(HIST_START_MIN, &p, &|_| current, sc.len() as u64);
                 let with_history = run_from(
                     HIST_START_MIN,
@@ -750,7 +870,7 @@ mod tests {
             let p = |s: u64| sc[s as usize];
             let h = history(seed);
             let n = sc.len() as u64;
-            for current in [Settings::default(), widest()] {
+            for current in [Settings::default(), core(), widest()] {
                 let constant = run_from(HIST_START_MIN, &p, &|_| current, n);
                 let leaky = run_leaky(&p, &|s| if quiet[s as usize] { h(s) } else { current }, n);
                 caught_1 |= leaky != constant;
@@ -773,13 +893,10 @@ mod tests {
     #[test]
     fn a_stall_triggered_outside_the_window_is_not_carried_over() {
         // 8:59:00 から停滞（契機は 8:59:30・時間帯 9–18 の外）。9:00 を越えても出さない。
-        let got = run_from(8 * 60 + 59, &|_| 0.9, &|_| Settings::default(), 600);
+        let got = run_from(8 * 60 + 59, &|_| 0.9, &|_| core(), 600);
         assert!(got.is_empty(), "{got:?}");
         // 対照: 9:00:00 から停滞なら 9:00:30 に出る
-        assert_eq!(
-            run_from(9 * 60, &|_| 0.9, &|_| Settings::default(), 600),
-            vec![30]
-        );
+        assert_eq!(run_from(9 * 60, &|_| 0.9, &|_| core(), 600), vec![30]);
     }
 
     /// 繰り越さない: 間隔の中で契機を満たした区間は、間隔が明けても出さない。
@@ -853,5 +970,109 @@ mod tests {
     #[test]
     fn nan_p_stuck_is_not_a_stall() {
         assert!(run(&|_| f64::NAN, &|_| widest(), 120).is_empty());
+    }
+
+    /// 段の契機で、p_stuck の列（1 秒 1 値）を流し、提示と契機の時刻を返す。
+    fn run_trigger(trigger: Trigger, p: &dyn Fn(u64) -> f64, secs: u64) -> (Vec<u64>, Vec<u64>) {
+        let mut m = InvitationMachine::with_trigger(trigger);
+        let (mut presented, mut triggered) = (Vec::new(), Vec::new());
+        for s in 0..secs {
+            let out = m.tick(&input(T0 + s * SEC, p(s), widest()));
+            if out.presented {
+                presented.push(s);
+            }
+            if out.triggered {
+                triggered.push(s);
+            }
+        }
+        (presented, triggered)
+    }
+
+    /// 試作の段（`.steering/20261012-eh3-trigger-values/`）は本番より出やすい側にある。
+    #[test]
+    #[allow(clippy::assertions_on_constants)] // 段の値は定数。書き換えたときに落とすための検査
+    fn the_proto_stage_is_easier_than_main() {
+        assert_eq!(InvitationMachine::new().trigger, Trigger::MAIN);
+        assert_eq!(Trigger::default(), Trigger::MAIN);
+        assert_eq!(Trigger::MAIN.p_stuck, 0.60);
+        assert_eq!(Trigger::MAIN.hold_ms, 30_000);
+        assert!(Trigger::PROTO.p_stuck <= Trigger::MAIN.p_stuck);
+        assert!(Trigger::PROTO.hold_ms <= Trigger::MAIN.hold_ms);
+        assert_ne!(Trigger::PROTO, Trigger::MAIN);
+    }
+
+    /// 境界: 閾値ちょうどが継続ちょうど続いた tick で出る。1 秒短い・閾値をわずかに下回るなら出ない。
+    #[test]
+    fn each_stage_presents_exactly_at_its_threshold_and_hold() {
+        for trigger in [Trigger::MAIN, Trigger::PROTO] {
+            let hold = trigger.hold_ms / SEC;
+            let at = trigger.p_stuck;
+            let (got, trig) = run_trigger(trigger, &|s| if s >= 10 { at } else { 0.0 }, 200);
+            assert_eq!(
+                got,
+                vec![10 + hold],
+                "{trigger:?}: 閾値ちょうどが継続ちょうど"
+            );
+            assert_eq!(trig, got, "{trigger:?}: 出せるときは契機と提示が同じ tick");
+            let (got, trig) = run_trigger(
+                trigger,
+                &|s| {
+                    if (10..10 + hold).contains(&s) {
+                        at
+                    } else {
+                        0.0
+                    }
+                },
+                200,
+            );
+            assert!(
+                got.is_empty() && trig.is_empty(),
+                "{trigger:?}: 1 秒足りない"
+            );
+            let below = at - 1e-9;
+            let (got, _) = run_trigger(trigger, &|_| below, 200);
+            assert!(got.is_empty(), "{trigger:?}: 閾値をわずかに下回る");
+        }
+    }
+
+    /// 段の値の違いが提示に届く: 試作の段だけが届く列で、本番は出さない。
+    #[test]
+    #[allow(clippy::assertions_on_constants)]
+    fn a_stall_only_proto_reaches_is_not_presented_on_main() {
+        let p = Trigger::PROTO.p_stuck;
+        let hold = Trigger::PROTO.hold_ms / SEC;
+        let (proto, _) = run_trigger(Trigger::PROTO, &|_| p, 120);
+        assert_eq!(proto, vec![hold]);
+        // 試作の段は閾値も継続も本番より緩い（前提が崩れたら黙って飛ばさずに落とす）
+        assert!(p < Trigger::MAIN.p_stuck && hold < Trigger::MAIN.hold_ms / SEC);
+        assert!(run_trigger(Trigger::MAIN, &|_| p, 120).0.is_empty());
+        let (main, _) = run_trigger(
+            Trigger::MAIN,
+            &|s| if s < hold + 1 { 0.9 } else { 0.0 },
+            120,
+        );
+        assert!(main.is_empty());
+    }
+
+    /// 区間の終わりも段の閾値で決まる: 閾値以上（本番の閾値未満）の間は区間が続き、2 回目を出さない。
+    #[test]
+    fn the_episode_ends_by_the_stage_threshold() {
+        let t = Trigger::PROTO;
+        let hold = t.hold_ms / SEC;
+        // 閾値ちょうどのまま 40 分続ける（間隔が明けても区間は終わらない）
+        let (got, trig) = run_trigger(t, &|_| t.p_stuck, 2400);
+        assert_eq!(got, vec![hold], "区間が続く限り 1 回");
+        assert_eq!(trig, vec![hold]);
+        // 契機の後、閾値を下回る 60 秒で区間が閉じ、間隔の後に新しい区間で出る
+        let gap_end = hold + (EXPIRY_MS + GAP_AFTER_CLOSE_MS) / SEC;
+        let p = |s: u64| {
+            if s <= hold || s > gap_end {
+                0.9
+            } else {
+                t.p_stuck - 0.01
+            }
+        };
+        let (got, _) = run_trigger(t, &p, gap_end + hold + 5);
+        assert_eq!(got, vec![hold, gap_end + 1 + hold]);
     }
 }

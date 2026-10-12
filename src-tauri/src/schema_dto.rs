@@ -110,6 +110,13 @@ pub enum LogEntryDto {
         /// `Option` である（ADR-005）。
         #[serde(skip_serializing_if = "Option::is_none")]
         invitation_enabled: Option<bool>,
+        /// 招待の契機の段 (`"main"` | `"proto"`)。EH3 のときだけ出る。**start 形状のみ**。
+        ///
+        /// `proto` は試作と利用者の検証の段で、招待を出やすい側の契機の値を使う。本番の値は
+        /// `proto` の記録を根拠に凍結の前に決めるので、解析で 2 つの段の記録を分けるためにこの欄を読む
+        /// （`.steering/20261012-eh3-trigger-values/`）。`Option` である（旧ログには無い・ADR-005）。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        invitation_trigger: Option<InvitationTriggerDto>,
         /// ★ アプリの版 (**粗い semver のみ**)。**start 形状のみ** (ADR-013 D1)。
         ///
         /// ⚠️ git SHA / ビルドホスト名 / ビルド時刻 / マシン GUID は
@@ -514,6 +521,15 @@ pub enum Eh3ConditionDto {
     PortraitNone,
     #[serde(rename = "a_seed")]
     PortraitSeed,
+}
+
+/// EH3 の招待の契機の段。NDJSON 文字列は "main" / "proto"（`eh3::TriggerStage::as_str`）。
+#[derive(Serialize, JsonSchema)]
+pub enum InvitationTriggerDto {
+    #[serde(rename = "main")]
+    Main,
+    #[serde(rename = "proto")]
+    Proto,
 }
 
 /// ★ 収集仕様の自己記述 (ADR-013 D1)。`meta`(session_start) 行にのみ現れる。
