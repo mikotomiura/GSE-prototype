@@ -25,9 +25,20 @@ import matching  # noqa: E402
 import seeds  # noqa: E402
 import utility  # noqa: E402
 
+MUTATE = os.environ.get("MAIN_MUTATE", "")
+
+
+def _no_duplicate_keys(pairs):
+    keys = [k for k, _ in pairs]
+    dup = sorted({k for k in keys if keys.count(k) > 1})
+    if dup:
+        raise ValueError("duplicate keys in config.json: %s" % dup)
+    return dict(pairs)
+
+
 def load_config():
     with open(os.path.join(HERE, "..", "config.json"), encoding="utf-8") as f:
-        return json.load(f)
+        return json.load(f, object_pairs_hook=_no_duplicate_keys)
 
 
 def load_writers(source, seed, args):
@@ -51,7 +62,10 @@ def prepare(writers):
 
 def build_models(train, seed, cfg):
     """Per fold: the character-pair table (R0), the A2-b boundary model (R3-u), the R3-u length term and the R7
-    duration regressions (training logs with the same processing)."""
+    duration regressions (training logs with the same processing). The training writers are taken in the order of
+    (prompt, writer), so that the models do not depend on the order of the loader."""
+    if MUTATE != "train_unsorted":
+        train = sorted(train, key=lambda w: (w.prompt, w.writer))
     digraph = A.DigraphTable([w.rows for w in train], cfg["attackers"]["A3"]["min_digraph_count"])
     pairs = [(w.rows, forms.release(w.rows, "R3-u", seed, w.prompt, w.writer)) for w in train]
     boundary = A.BoundaryModel(pairs, cfg)
@@ -112,9 +126,11 @@ def run(args):
         for wid in ids:
             others = [x for x in pool_ids[p] if x != wid]
             nc_b[(p, wid)] = others[int(seeds.rng(seed, "negative_control", p, wid).integers(0, len(others)))]
-    need_costs = set(sample_set) | {(p, b) for (p, _), b in nc_b.items()}
+    # only the records of the B writers return cost vectors (main forms, adaptive attackers)
+    need_costs = {(p, b) for (p, _), b in nc_b.items()}
     n_values = [int(n) for n in cfg["matching"]["N"]]
-    ctx = evaluate.Context(cfg, seed, pools, pool_ids, models, task_max, fold_of_prompt, forms.ALL, n_values)
+    ctx = evaluate.Context(cfg, seed, pools, pool_ids, models, task_max, fold_of_prompt, forms.ALL, n_values,
+                           nc_forms=forms.MAIN)
     tasks = []
     for p in prompts:
         for wid in pool_ids[p]:
@@ -142,14 +158,12 @@ def run(args):
     for name, keys in samples.items():
         res = [results[k] for k in keys]
         R, cols = aggregate.resamples(seed, [r["prompt"] for r in res], name)
-        cells, best = aggregate.summarise_cells(res, R, strongest)
-        out[name] = {"cells": cells, "strongest": aggregate.strip_boot(best),
-                     "contrasts": aggregate.contrasts(best, [tuple(c) for c in cfg["contrasts"]]),
-                     "counts": _counts(res)}
-        scores = [by_prompt[r["prompt"]][r["writer"]].score for r in res]
-        out[name]["utility"], out[name]["utility_figure"] = aggregate.utility_summary(res, scores, forms.ALL, R, cols)
+        out[name] = summarise_sample(res, R, cols, strongest, cfg, ctx.open_world_n,
+                                     [by_prompt[r["prompt"]][r["writer"]].score for r in res])
         if name == "main500":
-            out[name]["negative_control"] = negative_control(res, results, nc_b, pool_ids, seed, R, strongest)
+            best = out[name].pop("_best")
+            out[name]["negative_control"] = negative_control(res, results, nc_b, pool_ids, seed, R, strongest, best)
+        out[name].pop("_best", None)
     out["seconds"] = None if args.no_timing else round(time.time() - t0, 1)
     with open(args.out, "w", encoding="utf-8", newline="\n") as f:
         json.dump(_clean(out), f, indent=1, sort_keys=True)
@@ -157,10 +171,25 @@ def run(args):
     print("wrote", args.out, "tasks", len(tasks))
 
 
-def negative_control(res, results, nc_b, pool_ids, seed, R, strongest):
+def summarise_sample(res, R, cols, strongest, cfg, open_world_n, scores):
+    """Every aggregate of one sample (500 writers or all writers). '_best' keeps the strongest attacker with its
+    resamples for the negative control; the caller removes it before writing."""
+    cells, best, boot = aggregate.summarise_cells(res, R, strongest)
+    con, missing = aggregate.contrasts(best, cells, boot, [tuple(c) for c in cfg["contrasts"]], forms.ALL)
+    out = {"cells": cells, "strongest": aggregate.strip_boot(best), "contrasts": con, "contrasts_missing": missing,
+           "reference_A4": aggregate.reference_rows(cells), "counts": _counts(res),
+           "rebuilt_split": aggregate.split_by_rebuilt(res, R, cells),
+           "open_world": aggregate.open_world(res, R, best, cells, forms.ALL, open_world_n),
+           "window_bias": aggregate.window_bias(res), "_best": best}
+    out["utility"], out["utility_figure"] = aggregate.utility_summary(res, scores, forms.ALL, R, cols)
+    return out
+
+
+def negative_control(res, results, nc_b, pool_ids, seed, R, strongest, main_best, Ns=(10, 1000)):
     """The record of A is replaced by the record of B (same prompt, evaluation fold); the true text stays A's; decoys
-    exclude A and B. Main forms x adaptive attackers x N = 10 and 1000 x full text (the strongest is chosen inside
-    each resample, as in the main cells)."""
+    exclude A and B. Main forms x adaptive attackers x N = 10 and 1000 x full text. The strongest attacker is fixed
+    to the one selected by the point estimate of the main computation (same form and N, full text, 500 writers);
+    it is not selected again here (preregistration, "Diagnostics"). Every adaptive attacker is also reported."""
     fake = []
     for r in res:
         p, a = r["prompt"], r["writer"]
@@ -169,20 +198,38 @@ def negative_control(res, results, nc_b, pool_ids, seed, R, strongest):
         me, bi = ids.index(a), ids.index(b)
         costs_b = results[(p, b)]["costs"]
         cells = {}
-        for N in (10, 1000):
+        for N in Ns:
             for d in range(matching.DRAWS[N]):
                 dec = matching.draw_decoys(seed, p, a, N, ids, {me, bi}, d)
                 if dec is None:
                     break
                 cand = [me] + dec[0]
-                for f in forms.MAIN:
+                for f in costs_b:
                     for att, cv in costs_b[f].items():
-                        if att in strongest["full"]:
-                            evaluate._add(cells, ("full", f, att, N), matching.credit_stats(0, cv[cand]))
+                        evaluate._add(cells, ("full", f, att, N), matching.credit_stats(0, cv[cand]))
         evaluate._finish(cells)
         fake.append({"prompt": p, "writer": a, "full": cells, "window": {}})
-    cells, best = aggregate.summarise_cells(fake, R, strongest)
-    return {"strongest": aggregate.strip_boot(best), "cells": cells}
+    cells, nc_best, boot = aggregate.summarise_cells(fake, R, strongest)
+    fixed = {}
+    nc_forms = {f for r in res for f in results[(r["prompt"], nc_b[(r["prompt"], r["writer"])])]["costs"]}
+    for name, e in sorted(main_best.items()):
+        scope, f, N = name.split("|")[0], name.split("|")[1], name.split("|")[2:]
+        if scope != "full" or f not in nc_forms or len(N) != 1 or int(N[0]) not in Ns:
+            continue
+        att = e["attacker"]
+        if MUTATE == "nc_reselect" and name in nc_best:
+            att = nc_best[name]["attacker"]
+            fixed[name] = {"attacker": att, "acc": nc_best[name]["acc"], "ci": aggregate.ci(nc_best[name]["_boot"]),
+                           "x_chance": nc_best[name]["x_chance"], "chance": 1.0 / int(N[0])}
+            continue
+        key = ("full", f, att, int(N[0]))
+        c = cells.get(aggregate._name(key))
+        if c is None:
+            fixed[name] = {"attacker": att, "missing": True}
+            continue
+        fixed[name] = {"attacker": att, "acc": c["acc"], "ci": c["ci"], "x_chance": c["x_chance"],
+                       "chance": 1.0 / int(N[0])}
+    return {"fixed_attacker": fixed, "cells": cells}
 
 
 def _counts(res):

@@ -2,6 +2,7 @@
 
 Runs in worker processes. Only numbers leave this module (no rows, texts or keys).
 """
+import os
 import re
 
 import numpy as np
@@ -14,17 +15,32 @@ from align_ext import INF
 from corpus import replay_origins
 from synthetic_logs import category, record_segments
 
-STRONGEST_FULL = ("A0", "A1", "A1p", "A2", "A2b", "A3", "A3-sum", "A3-mean")
-STRONGEST_WINDOW = ("A0", "A2", "A2b", "A3", "A3-sum", "A3-mean")
+# the adaptive attackers of the strongest attacker; on R3-u, "A3" is the maximum of A3-sum and A3-mean, formed in
+# aggregate.py from their cells
+STRONGEST_FULL = ("A0", "A1", "A1p", "A2", "A2b", "A3")
+STRONGEST_WINDOW = ("A0", "A2", "A2b", "A3")
+R3U_A3 = ("A3-sum", "A3-mean")
 WINDOW_A2_EXTRA = ("R0", "R1", "R5", "R6")
 KS = (5, 10, 20, 50)
+OPEN_WORLD_N = 1000
+MUTATE = os.environ.get("MAIN_MUTATE", "")
+
+
+def adaptive_costs(costs_of_form):
+    """The cost vectors that the strongest attacker, the negative control and the open world read."""
+    return {a: cv for a, cv in costs_of_form.items() if a in STRONGEST_FULL or a in R3U_A3}
+
+
+def norm_ws(s):
+    """Whitespace normalisation of check 3: runs of whitespace become one space; leading and trailing removed."""
+    return " ".join(s.split())
 
 
 class Context:
     """What a worker needs besides the writer: config, seed, pools (candidate texts per prompt), models per fold."""
 
     def __init__(self, cfg, seed, pools, pool_ids, models, task_max, fold_of_prompt, form_list, n_values,
-                 windows=True, keep_costs=False):
+                 windows=True, keep_costs=False, open_world_n=OPEN_WORLD_N, nc_forms=None):
         self.cfg = cfg
         self.seed = seed
         self.pools = pools
@@ -36,6 +52,8 @@ class Context:
         self.n_values = n_values
         self.windows = windows
         self.keep_costs = keep_costs
+        self.open_world_n = open_world_n
+        self.nc_forms = form_list if nc_forms is None else nc_forms
 
 
 def full_costs(rel, cands, model, cfg, memo=None):
@@ -102,9 +120,12 @@ def window_costs(rel, cands, model, cfg, cache):
 def window_release(rel, row_range, seg_range):
     a, b = row_range
     if rel.base == "R4":
-        return forms.Released(rel.form, values=rel.values[seg_range[0]:seg_range[1] + 1])
+        s0 = seg_range[0] + (1 if MUTATE == "window_r4_shift" else 0)
+        return forms.Released(rel.form, values=rel.values[s0:seg_range[1] + 1])
     if rel.base == "R7":
         orig = [i for i, k in enumerate(rel.keep) if k]
+        if MUTATE == "window_r7_shift":
+            orig = list(range(len(rel.rows)))
         return forms.Released(rel.form, rows=[r for r, o in zip(rel.rows, orig) if a <= o <= b])
     return forms.Released(rel.form, rows=rel.rows[a:b + 1])
 
@@ -117,7 +138,9 @@ def evaluate_writer(w, ctx):
     pool, ids = ctx.pools[p], ctx.pool_ids[p]
     me = ids.index(w.writer)
     rels = {f: forms.release(w.rows, f, seed, p, w.writer) for f in ctx.forms}
-    res = {"writer": w.writer, "prompt": p, "full": {}, "window": {}, "utility": {}, "counts": {}, "costs": None}
+    final, origins = replay_origins(w.rows)
+    res = {"writer": w.writer, "prompt": p, "full": {}, "window": {}, "utility": {}, "counts": {}, "costs": None,
+           "rebuilt_match": norm_ws(final) == norm_ws(pool[me].text), "open_world": {}}
     memo = {}
     costs = {f: full_costs(rel, pool, model, cfg, memo) for f, rel in rels.items()}
     for N in ctx.n_values:
@@ -132,11 +155,15 @@ def evaluate_writer(w, ctx):
                     if a.startswith("A2-lam") and N != 1000:
                         continue
                     _add(res["full"], ("full", f, a, N), matching.credit_stats(0, cv[cand]))
+                if N == ctx.open_world_n:
+                    for a, cv in adaptive_costs(costs[f]).items():
+                        res["open_world"].setdefault((f, a), []).append((float(np.min(cv[cand])),
+                                                                         float(np.min(cv[dec[0]]))))
     _finish(res["full"])
     if ctx.keep_costs:
-        res["costs"] = {f: {a: cv for a, cv in c.items()} for f, c in costs.items()}
+        res["costs"] = {f: adaptive_costs(costs[f]) for f in ctx.nc_forms if f in costs}
     if ctx.windows:
-        _windows(w, ctx, rels, model, res)
+        _windows(w, ctx, rels, model, res, final, origins)
     tm = ctx.task_max[p]
     for f, rel in rels.items():
         res["utility"][f] = utility.metrics(rel, tm)
@@ -161,14 +188,19 @@ def _finish(cells):
                     "draws": n}
 
 
-def _windows(w, ctx, rels, model, res):
+def _windows(w, ctx, rels, model, res, final, origins):
     cfg, seed, p = ctx.cfg, ctx.seed, w.prompt
     pool, ids = ctx.pools[p], ctx.pool_ids[p]
     me = ids.index(w.writer)
-    final, origins = replay_origins(w.rows)
     words_final = re.findall(r"[A-Za-z0-9]+", final)
     words_dist = pool[me].words
-    res["counts"]["final_matches_text"] = int(words_final == words_dist)
+    res["counts"]["final_words_match_text"] = int(words_final == words_dist)
+    # bias of true windows: A2 cost per word of the whole record against the whole true text (full-text end)
+    res["window_bias"], res["window_bias_full"] = {}, {}
+    for f, rel in rels.items():
+        if A.applies("A2", rel.base) or rel.base in WINDOW_A2_EXTRA:
+            c = A.align_costs(A.record_values(rel), rel, [pool[me]], cfg)[0]
+            res["window_bias_full"][f] = float(c) / max(len(pool[me].words), 1)
     for k in KS:
         valid, reasons = matching.true_window_starts(w.rows, final, origins, words_final, words_dist, k)
         for r, n in reasons.items():
@@ -182,6 +214,10 @@ def _windows(w, ctx, rels, model, res):
             wrel = {f: window_release(rel, row_range, seg_range) for f, rel in rels.items()}
             caches = {f: {} for f in wrel}
             true_c = A.WindowCand(pool[me], ts, k)
+            for f, rel in wrel.items():
+                if f in res["window_bias_full"]:
+                    c = A.align_costs(A.record_values(rel), rel, [true_c], cfg, end="window")[0]
+                    res["window_bias"].setdefault((f, k), []).append(float(c) / k)
             for N in ctx.n_values:
                 for d in range(matching.DRAWS[N]):
                     dec = matching.draw_decoys(seed, p, w.writer, N, ids, {me}, "%d:%d" % (si, d), k)

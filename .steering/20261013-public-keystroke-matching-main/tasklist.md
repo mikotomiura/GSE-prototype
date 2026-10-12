@@ -11,7 +11,9 @@
 - [x] `utility.py`
 - [x] `run_main.py`・`run.sh`（合成のコーパスで通す・再実行でバイト一致）
 - [x] `selftest_main.py`（陽性対照・陰性対照・変異）
-- [ ] レビュー（code-reviewer・security-checker・`/cross-review`）
+- [x] レビュー 1 回目（code-reviewer・security-checker・コミット 66721d9d）
+- [ ] 凍結の後の直し（code-reviewer の指摘・notes.md「凍結の後・データの前の直し」）: 対比・陰性対照の攻撃者の固定・開いた世界・組み立て直しの分割・窓の偏り・有用性の集計・R3-u の A3・B だけの費用・学習の並び・表ごとの字の符号・自己検査（検査に名前・変異は狙った検査で落ちたかを照合・traceback は ERROR）
+- [ ] 直しのレビュー（code-reviewer・`/cross-review`・`raw/` を範囲に入れない）
 - [ ] 論文用のリポジトリへ写す（凍結の後のコミット）
 - [x] 実データの大きさでの時間: 1 記録 約 256 秒（単一コア・約 400 語・候補 1,200 本）。16 並列で主な表 約 3 時間・全員の補遺 約 22 時間
 - [ ] ENJA15 の読み込みと節（取得と T・P・D の確認の後）・A4（KeyTAR の取得の後）

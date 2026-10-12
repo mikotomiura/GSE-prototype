@@ -59,13 +59,15 @@ class Cand:
         self.alnum = sum(self.lens)
         self.nchars = len(self.text)
         self.starts = np.concatenate([[0], np.cumsum(self.lens)]).astype(np.int64)
-        self._codes = None
+        self._codes = {}
 
     def codes(self, table):
-        """The letters and digits of the words, concatenated, as character codes of the table."""
-        if self._codes is None:
-            self._codes = table.encode("".join(self.words))
-        return self._codes
+        """The letters and digits of the words, concatenated, as character codes of the table (kept per table: the
+        codes index that table's vocabulary)."""
+        c = self._codes.get(0 if MUTATE == "cand_codes_shared" else id(table))
+        if c is None:
+            c = self._codes[0 if MUTATE == "cand_codes_shared" else id(table)] = table.encode("".join(self.words))
+        return c
 
 
 class WindowCand:

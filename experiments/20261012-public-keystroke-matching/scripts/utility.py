@@ -9,12 +9,19 @@ Details fixed here before any data (listed in notes.md, "Implementation choices"
 - the cursor of the approximations is that of the A1' replay (R3-u: Home and End uncertain);
 - R0 insertion: an Input or Paste row whose inserted text starts before the end of the current text;
   produced characters are char presses in every form (R0 included);
-- the 10 equal time intervals divide the time from the first to the last row; the SD uses ddof = 0.
+- the 10 equal time intervals divide the time from the first to the last row; the SD uses ddof = 0;
+- a run of deletion or insertion is a run of consecutive rows, as registered: any other row between them, a
+  modifier row (Shift) included, ends it. Whether a modifier row should end a run is examined before check 7
+  (notes.md); a change would follow the registered procedure of check 7.
 """
+import os
+
 import numpy as np
 
 from replay import item_type
-from synthetic_logs import SEP_CATS, shortcut_flags
+from synthetic_logs import MOD_CATS, SEP_CATS, shortcut_flags
+
+MUTATE = os.environ.get("MAIN_MUTATE", "")
 
 METRICS = ["p_burst_mean_len", "r_burst_mean_len", "pause_mean_200ms", "within_word_pause_mean",
            "between_word_pause_mean", "deletion_mean_len", "deletion_proportion", "insertion_mean_len",
@@ -196,7 +203,9 @@ def metrics(rel, task_max, r0_rows=None):
         out["between_word_pause_mean"] = _mean(v)
     if want("deletion_mean_len"):
         runs, n = [], 0
-        for d in deleted:
+        for i, d in enumerate(deleted):
+            if cats[i] in MOD_CATS and MUTATE == "runs_modifier_transparent":
+                continue
             if d:
                 n += d
             elif n:
@@ -210,6 +219,8 @@ def metrics(rel, task_max, r0_rows=None):
     if want("insertion_mean_len") or want("insertion_proportion"):
         runs, n = [], 0
         for i in range(len(cats)):
+            if cats[i] in MOD_CATS and MUTATE == "runs_modifier_transparent":
+                continue
             if ins_away[i]:
                 n += (len(rel.rows[i]["text_change"]) if exact else 1)
             elif n:
