@@ -22,7 +22,7 @@
     "enja15": {
       "reference": "Carl et al. (2016); Zou and Carl (2026); CRITT TPR-DB (2016-)",
       "acquisition_condition": "license type and terms checked in the primary source",
-      "svn_revision": "to be filled at acquisition",
+      "svn_revision": "649 (acquired 2026-10-12T19:22:52Z through the DAV path !svn/bc/649; T sessions only: 76 Translog-II .xml and the 228 Alignment .atag, .src and .tgt files of the same sessions; the SHA-256 of each file is in enja15-manifest-r649.sha256, whose own SHA-256 is 401c922535f788cf0ae46eea92d6ef4703c3bf37ce6bd6af69ddad73c854a4c8)",
       "sessions": "T (from-scratch translation); meaning of T/P/D to be confirmed in Carl et al. (2016) and Zou and Carl (2026) before acquisition",
       "tools": {"SudachiPy": "0.7.0", "SudachiDict-core": "20260723.1", "romaji_table.py": {"path": "scripts/romaji_table.py", "sha256": "d2101efb9f36201b7fb51ea7c4283c114854cf13bba8fae379b6f85ae381fbd2"}}
     },

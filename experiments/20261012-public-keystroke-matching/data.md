@@ -17,8 +17,22 @@
 - 版の固定（取得のときに書く）: SVN のリビジョン・各ファイルの SHA-256。
 - 2026-09-13 に別の目的で取得した `P01_T1.xml` は使わない（版が固定されていない）。
 
+### 取得の前の確認（2026-10-13・事前登録「データ」の開始条件）
+
+- T・P・D の意味: [P483] §2 逐語 *"1. from-scratch translation (T) 2. translation dictation (D) 3. MT post-editing (P)"*。T は白紙からの翻訳で、事前登録の「使うセッション」と一致する。[P273] の APTIF の PDF は置き場（Dropbox）が 404 で読めず、[P359] は MDPI の PDF が curl に 403 を返した（Chrome では未確認）。T の意味は同じ著者・同じ研究の [P483] で確かめた。
+- ライセンスの種類: CRITT TPR-DB のページで食い違う（[P484]）。License のページは "CC BY-NC-SA"（版の記載なし）、TPR-DB のページの License の節は "Creative Commons Attribution-NonCommercial 4.0 International License"。どちらも非営利・出典の表示で、厳しい方は継承（SA）。本研究は非営利で、データを再配布せず集計だけを公開するので、どちらにも合う。厳しい方（BY-NC-SA）に従い、出典として [P273] [P360] [P484] を示す。
+- 参加者の同意: [P483] §2 逐語 *"they signed a form in which they agreed that their translation data would be made publicly available under a creative commons license"*（倫理の節の材料）。
+
+### 取得（2026-10-12T19:22:52Z・UTC）
+
+- 経路: DAV のリビジョン固定のパス `https://svn.code.sf.net/p/tprdb/svn/!svn/bc/649/TPRDB/ENJA15/`。取得の時点のリポジトリの最新は Revision 649。
+- 取得したもの: T のセッションだけ。`Translog-II/P??_T?.xml` 76 本（888 MB）と、同じセッションの `Alignment/` の `.atag`・`.src`・`.tgt` 各 76 本（3.2 MB）。P・D のセッションと `projects/` は取得していない。失敗 0。
+- 版: 各ファイルの SHA-256 は `enja15-manifest-r649.sha256`（この一覧の SHA-256 は `401c922535f788cf0ae46eea92d6ef4703c3bf37ce6bd6af69ddad73c854a4c8`）。置き場は `raw/enja15/`（git に入らない）。
+- 中身はまだ開いていない（検査 5 で数だけを出す）。
+
 ## KeyTAR の公開モデル [V267]
 
 - 入手先: Zenodo records/17254163 の `keytar.zip`（15,039 MB・CC BY 4.0・2026-10-12 に API とプレビューで確かめた）。
 - 取得の開始条件: 研究者が 15 GB の取得を認めた。取得の後、本計算の前に `model_licenses`・`ethics.txt`・`limitations.txt` を読む。
 - 版の固定（取得のときに書く）: `keytar.zip` の SHA-256。
+- 取得の開始: 2026-10-13（`raw/keytar/`）。Zenodo の API の記録の応答を `raw/keytar/zenodo_record_17254163.json` に保存した: `keytar.zip`・15,039,177,667 バイト・`md5:a56da07f5a086bcc8c9763abe1b00934`・cc-by-4.0。取得が終わったら md5 を照合し、SHA-256 をここと `config.json` に書く。
