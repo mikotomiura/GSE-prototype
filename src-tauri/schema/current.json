@@ -55,6 +55,17 @@
             "null"
           ]
         },
+        "invitation_trigger": {
+          "description": "招待の契機の段 (`\"main\"` | `\"proto\"`)。EH3 のときだけ出る。**start 形状のみ**。\n\n`proto` は試作と利用者の検証の段で、招待を出やすい側の契機の値を使う。本番の値は `proto` の記録を根拠に凍結の前に決めるので、解析で 2 つの段の記録を分けるためにこの欄を読む （`.steering/20261012-eh3-trigger-values/`）。`Option` である（旧ログには無い・ADR-005）。",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InvitationTriggerDto"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "keyboard_layout": {
           "description": "★ **キーボードレイアウトの識別子**（O1 / ADR-014 D4）。**start 形状のみ**。\n\n例: Windows `00000411`（日本語）/ macOS `com.apple.keylayout.US`。\n\n## ⚠️★★★ なぜ要るのか\n\n★ **文境界の妥当性が配列に依存する** —— macOS の keycode は**物理キー位置**なので、 Dvorak では `.` が US の `E` の位置に来る。→ ★ どの配列だったかが後から要る。\n\n⚠️★★★ **文字への変換はしていない**（`ToUnicodeEx` / `UCKeyTranslate` を呼ばない）。 ★ 取れなかった端末では**フィールドごと出ない**（0 値で埋めない）。",
           "type": [
@@ -1191,6 +1202,14 @@
         "none",
         "nudge",
         "defer"
+      ]
+    },
+    "InvitationTriggerDto": {
+      "description": "EH3 の招待の契機の段。NDJSON 文字列は \"main\" / \"proto\"（`eh3::TriggerStage::as_str`）。",
+      "type": "string",
+      "enum": [
+        "main",
+        "proto"
       ]
     },
     "LabelPoolDto": {

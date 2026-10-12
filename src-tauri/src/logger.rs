@@ -1597,7 +1597,9 @@ fn keyboard_layout_fragment() -> String {
 /// (`g1_mode` が security review MEDIUM で採った作法と同じ)。
 fn o1_mode_fragment() -> String {
     let mut s = o1_meta_fragment(crate::o1::mode(), crate::o1::install_id().as_deref());
-    s.push_str(&eh3_meta_fragment(crate::eh3::mode()));
+    s.push_str(&eh3_meta_fragment(
+        crate::eh3::mode().zip(crate::eh3::assignment().map(|a| a.trigger)),
+    ));
     s
 }
 
@@ -1607,12 +1609,15 @@ fn o1_mode_fragment() -> String {
 /// ★ `invitation_enabled` は招待用の研究の条件で、`intervention_enabled`（Nudge）とは別に持つ
 /// （`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 1 #1 = R-1 (i)。O1 は `session_meta` を
 /// 書かないので `meta` に置く・同 判断 3 帰結）。EH3 のときは常に真。
-/// ⚠️ 値域は `Eh3Source` と定数で閉じているので、外部由来の文字列が JSON を壊す経路は無い。
-fn eh3_meta_fragment(mode: Option<crate::eh3::Eh3Source>) -> String {
+/// ★ `invitation_trigger` は招待の契機の段（`main` | `proto`・`.steering/20261012-eh3-trigger-values/`）。
+/// 解析で試作の段の記録と本番の記録を分けるために、印に `trigger=` が無くても常に書く。
+/// ⚠️ 値域は `Eh3Source`・`TriggerStage` と定数で閉じているので、外部由来の文字列が JSON を壊す経路は無い。
+fn eh3_meta_fragment(mode: Option<(crate::eh3::Eh3Source, crate::eh3::TriggerStage)>) -> String {
     match mode {
-        Some(src) => format!(
-            r#","eh3_mode":"{}","invitation_enabled":true"#,
-            src.as_str()
+        Some((src, stage)) => format!(
+            r#","eh3_mode":"{}","invitation_enabled":true,"invitation_trigger":"{}""#,
+            src.as_str(),
+            stage.as_str()
         ),
         None => String::new(),
     }
@@ -3026,19 +3031,21 @@ mod tests {
 
     #[test]
     fn eh3_meta_fragment_carries_the_invitation_condition() {
+        use crate::eh3::{Eh3Source, TriggerStage};
         assert_eq!(
-            eh3_meta_fragment(Some(crate::eh3::Eh3Source::Marker)),
-            r#","eh3_mode":"marker","invitation_enabled":true"#
+            eh3_meta_fragment(Some((Eh3Source::Marker, TriggerStage::Main))),
+            r#","eh3_mode":"marker","invitation_enabled":true,"invitation_trigger":"main""#
         );
         // ★ 断片を足した meta 行が JSON として読めること（手書き JSON の壊れを検出する）
         let line = format!(
             r#"{{"type":"meta","session_start":1{}{}}}"#,
             o1_meta_fragment(Some(crate::o1::O1Source::Marker), Some("0123456789abcdef")),
-            eh3_meta_fragment(Some(crate::eh3::Eh3Source::Env))
+            eh3_meta_fragment(Some((Eh3Source::Env, TriggerStage::Proto)))
         );
         let v: serde_json::Value = serde_json::from_str(&line).expect("valid json");
         assert_eq!(v["eh3_mode"], "env");
         assert_eq!(v["invitation_enabled"], true);
+        assert_eq!(v["invitation_trigger"], "proto");
     }
 
     // --- 診断ログ (gse-app.log) の置き場 ---

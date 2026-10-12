@@ -39,10 +39,46 @@ use serde::{Deserialize, Serialize};
 
 use crate::analysis::intervention::AWAY_IDLE_MS;
 
-/// 契機の `p_stuck` の閾値。Nudge と同じ値（較正中の推定に新しい値を足さない・design §6）。
+/// 契機の `p_stuck` の閾値（本番の段）。Nudge と同じ値（較正中の推定に新しい値を足さない・design §6）。
 pub const TRIGGER_P_STUCK: f64 = 0.60;
-/// 契機の持続（`p_stuck ≥ 閾値` が続く長さ）。
+/// 契機の持続（本番の段。`p_stuck ≥ 閾値` が続く長さ）。
 pub const TRIGGER_HOLD_MS: u64 = 30_000;
+
+/// 契機の値の組。停滞の区間の始まり（閾値以上が `hold_ms` 続く）と終わり（閾値未満が
+/// `EPISODE_END_HOLD_MS` 続く）は同じ閾値で決める。
+///
+/// 段は 2 つ。本番（`MAIN`）と、試作と利用者の検証の段（`PROTO`・`eh3.mode` の `trigger=proto`）。
+/// 試作の段は招待を出やすい側に置き、その記録を根拠に本番の値を凍結の前に決める
+/// （`.steering/20261011-portrait-eh3-after-impl/decisions.md` 判断 4・`.steering/20261012-eh3-trigger-values/`）。
+/// ⚠️ `metrics.rs` の `p_stuck_trigger`（Stuck エピソードの定義）とは別の値であり、こちらを変えても動かない。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Trigger {
+    pub p_stuck: f64,
+    pub hold_ms: u64,
+}
+
+impl Trigger {
+    /// 本番の段（稿 §10.1 F-2・判断 1 #3）。
+    pub const MAIN: Trigger = Trigger {
+        p_stuck: TRIGGER_P_STUCK,
+        hold_ms: TRIGGER_HOLD_MS,
+    };
+    /// 試作と利用者の検証の段（`eh3.mode` の `trigger=proto`）。
+    ///
+    /// 研究者が決めた（2026-10-12・`.steering/20261012-eh3-trigger-values/decisions.md` 判断 2）。0.50 は、
+    /// 手を止めたときの頭打ち（0.54・Windows の実機）を越えるので、研究者が手を止めれば図像を確かめられる。
+    /// 研究者の O1 の記録（4 日・作業 9.6 時間）では、本番の値の契機 35 回に対して 42 回、既定の提示は 6 回に対して 7 回。
+    pub const PROTO: Trigger = Trigger {
+        p_stuck: 0.50,
+        hold_ms: 10_000,
+    };
+}
+
+impl Default for Trigger {
+    fn default() -> Self {
+        Self::MAIN
+    }
+}
 /// 停滞の区間が終わる条件（`p_stuck < 閾値` が続く長さ）。
 pub const EPISODE_END_HOLD_MS: u64 = 60_000;
 /// 提示から閉じるまで（実時間）。PC 面の曝露予算の実測は無い（PC-11）ので、見逃されても主課題を傷つけない側に短く置く。
@@ -156,11 +192,15 @@ pub struct TickOutput {
     pub present: bool,
     /// この tick で新しく出した（`invitation_present` 行を書く）。
     pub presented: bool,
+    /// この tick で停滞の区間が契機を満たした（出したかどうかに依らない）。記録には書かない。
+    /// 契機の値を記録で比べる道具（`examples/invitation_trigger_sweep.rs`）が数える。
+    pub triggered: bool,
 }
 
 /// 招待の状態機械。
 #[derive(Debug, Clone, Default)]
 pub struct InvitationMachine {
+    trigger: Trigger,
     stuck_since: Option<u64>,
     below_since: Option<u64>,
     in_episode: bool,
@@ -178,8 +218,17 @@ fn in_minutes(m: u32, (start, end): (u32, u32)) -> bool {
 }
 
 impl InvitationMachine {
+    /// 本番の段の契機で作る。
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// 段の契機を指定して作る。
+    pub fn with_trigger(trigger: Trigger) -> Self {
+        Self {
+            trigger,
+            ..Self::default()
+        }
     }
 
     /// いま招待を出しているか。
@@ -237,6 +286,7 @@ impl InvitationMachine {
         TickOutput {
             present: self.shown_at.is_some(),
             presented,
+            triggered,
         }
     }
 
@@ -253,10 +303,10 @@ impl InvitationMachine {
         } else {
             0.0
         };
-        if p >= TRIGGER_P_STUCK {
+        if p >= self.trigger.p_stuck {
             self.below_since = None;
             let since = *self.stuck_since.get_or_insert(now);
-            if !self.in_episode && now.saturating_sub(since) >= TRIGGER_HOLD_MS {
+            if !self.in_episode && now.saturating_sub(since) >= self.trigger.hold_ms {
                 self.in_episode = true;
                 return true;
             }
@@ -920,5 +970,109 @@ mod tests {
     #[test]
     fn nan_p_stuck_is_not_a_stall() {
         assert!(run(&|_| f64::NAN, &|_| widest(), 120).is_empty());
+    }
+
+    /// 段の契機で、p_stuck の列（1 秒 1 値）を流し、提示と契機の時刻を返す。
+    fn run_trigger(trigger: Trigger, p: &dyn Fn(u64) -> f64, secs: u64) -> (Vec<u64>, Vec<u64>) {
+        let mut m = InvitationMachine::with_trigger(trigger);
+        let (mut presented, mut triggered) = (Vec::new(), Vec::new());
+        for s in 0..secs {
+            let out = m.tick(&input(T0 + s * SEC, p(s), widest()));
+            if out.presented {
+                presented.push(s);
+            }
+            if out.triggered {
+                triggered.push(s);
+            }
+        }
+        (presented, triggered)
+    }
+
+    /// 試作の段（`.steering/20261012-eh3-trigger-values/`）は本番より出やすい側にある。
+    #[test]
+    #[allow(clippy::assertions_on_constants)] // 段の値は定数。書き換えたときに落とすための検査
+    fn the_proto_stage_is_easier_than_main() {
+        assert_eq!(InvitationMachine::new().trigger, Trigger::MAIN);
+        assert_eq!(Trigger::default(), Trigger::MAIN);
+        assert_eq!(Trigger::MAIN.p_stuck, 0.60);
+        assert_eq!(Trigger::MAIN.hold_ms, 30_000);
+        assert!(Trigger::PROTO.p_stuck <= Trigger::MAIN.p_stuck);
+        assert!(Trigger::PROTO.hold_ms <= Trigger::MAIN.hold_ms);
+        assert_ne!(Trigger::PROTO, Trigger::MAIN);
+    }
+
+    /// 境界: 閾値ちょうどが継続ちょうど続いた tick で出る。1 秒短い・閾値をわずかに下回るなら出ない。
+    #[test]
+    fn each_stage_presents_exactly_at_its_threshold_and_hold() {
+        for trigger in [Trigger::MAIN, Trigger::PROTO] {
+            let hold = trigger.hold_ms / SEC;
+            let at = trigger.p_stuck;
+            let (got, trig) = run_trigger(trigger, &|s| if s >= 10 { at } else { 0.0 }, 200);
+            assert_eq!(
+                got,
+                vec![10 + hold],
+                "{trigger:?}: 閾値ちょうどが継続ちょうど"
+            );
+            assert_eq!(trig, got, "{trigger:?}: 出せるときは契機と提示が同じ tick");
+            let (got, trig) = run_trigger(
+                trigger,
+                &|s| {
+                    if (10..10 + hold).contains(&s) {
+                        at
+                    } else {
+                        0.0
+                    }
+                },
+                200,
+            );
+            assert!(
+                got.is_empty() && trig.is_empty(),
+                "{trigger:?}: 1 秒足りない"
+            );
+            let below = at - 1e-9;
+            let (got, _) = run_trigger(trigger, &|_| below, 200);
+            assert!(got.is_empty(), "{trigger:?}: 閾値をわずかに下回る");
+        }
+    }
+
+    /// 段の値の違いが提示に届く: 試作の段だけが届く列で、本番は出さない。
+    #[test]
+    #[allow(clippy::assertions_on_constants)]
+    fn a_stall_only_proto_reaches_is_not_presented_on_main() {
+        let p = Trigger::PROTO.p_stuck;
+        let hold = Trigger::PROTO.hold_ms / SEC;
+        let (proto, _) = run_trigger(Trigger::PROTO, &|_| p, 120);
+        assert_eq!(proto, vec![hold]);
+        // 試作の段は閾値も継続も本番より緩い（前提が崩れたら黙って飛ばさずに落とす）
+        assert!(p < Trigger::MAIN.p_stuck && hold < Trigger::MAIN.hold_ms / SEC);
+        assert!(run_trigger(Trigger::MAIN, &|_| p, 120).0.is_empty());
+        let (main, _) = run_trigger(
+            Trigger::MAIN,
+            &|s| if s < hold + 1 { 0.9 } else { 0.0 },
+            120,
+        );
+        assert!(main.is_empty());
+    }
+
+    /// 区間の終わりも段の閾値で決まる: 閾値以上（本番の閾値未満）の間は区間が続き、2 回目を出さない。
+    #[test]
+    fn the_episode_ends_by_the_stage_threshold() {
+        let t = Trigger::PROTO;
+        let hold = t.hold_ms / SEC;
+        // 閾値ちょうどのまま 40 分続ける（間隔が明けても区間は終わらない）
+        let (got, trig) = run_trigger(t, &|_| t.p_stuck, 2400);
+        assert_eq!(got, vec![hold], "区間が続く限り 1 回");
+        assert_eq!(trig, vec![hold]);
+        // 契機の後、閾値を下回る 60 秒で区間が閉じ、間隔の後に新しい区間で出る
+        let gap_end = hold + (EXPIRY_MS + GAP_AFTER_CLOSE_MS) / SEC;
+        let p = |s: u64| {
+            if s <= hold || s > gap_end {
+                0.9
+            } else {
+                t.p_stuck - 0.01
+            }
+        };
+        let (got, _) = run_trigger(t, &p, gap_end + hold + 5);
+        assert_eq!(got, vec![hold, gap_end + 1 + hold]);
     }
 }
