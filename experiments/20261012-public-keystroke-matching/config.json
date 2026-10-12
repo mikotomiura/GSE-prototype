@@ -10,7 +10,7 @@
     "klicke": {
       "reference": "Tian et al. (2025)",
       "acquisition_condition": "after this registration is fixed; the authors' reply to an inquiry is not awaited (the terms of use are public); if the reply raises a concern about this use, the computation is stopped, the acquired data are deleted and this is reported",
-      "files": "to be filled at acquisition: Drive file IDs, SHA-256, GitHub commit",
+      "files": "acquired 2026-10-12T19:29:56Z from the Drive folder 13Q02Mvj7T-T1OpZzkEqfHwqM7oI61lLR linked by the README of github.com/terryyutian/KLiCKe-Corpus at commit 37b94b72d6cec485f3f475f712ea4032c9101875: WritingTask.zip only (Drive file 120FkdzVlVBsyYQdvwLhlcLToTDRDStb_, 699,610,000 bytes, SHA-256 ffa4d753fdb9a54f5cadd6836426d56a0cabe73ceade8e7e40dddbbae178555d); demographic_info.csv, TypingTests.zip and VocabularyKnowledgeTest.zip not acquired; the zip holds no demographic file; extracted members: keystrokelogs/csv (4,992), texts (4,992), holistic_scores.csv and writing_prompts.docx (the IDFX logs and the rating form are not extracted); the list of extracted members with their SHA-256 has SHA-256 8a039a71b8e8b142580cdd30467eeff58217d71ca65262dbab37965e585c2066 and stays outside the repository",
       "acquire": ["argumentative essay keystroke logs (CSV)", "essays", "human scores"],
       "do_not_acquire": ["demographics (record the zip SHA-256 only if bundled; do not extract)"],
       "do_not_use": ["typing tests", "vocabulary test"],

@@ -10,6 +10,14 @@
 - 取得の開始条件: 事前登録の凍結の後に取得する。著者への問い合わせ（`.steering/20261012-public-keystroke-matching-judgement/author-inquiry-draft.md`・研究者が 2026-10-12 に送付）の返事は待たない（判断 51）。返事で利用に懸念が示されたら、計算を止め、取得したデータを消し、その経緯を報告する。
 - 版の固定（取得のときに書く）: 取得の日・Drive のファイル ID・各ファイルの SHA-256・GitHub のリポジトリのコミット。
 
+### 取得（2026-10-12T19:29:56Z・UTC）
+
+- GitHub のリポジトリ `terryyutian/KLiCKe-Corpus` のコミット `37b94b72d6cec485f3f475f712ea4032c9101875`（2025-02-11）の README が指す Drive のフォルダ `13Q02Mvj7T-T1OpZzkEqfHwqM7oI61lLR`。フォルダの目録（ファイル名と ID）は `raw/klicke/drive_folder_listing.html`。Chrome は使わず curl で取得した。
+- 取得したもの: `WritingTask.zip` だけ（Drive のファイル ID `120FkdzVlVBsyYQdvwLhlcLToTDRDStb_`・699,610,000 バイト・SHA-256 `ffa4d753fdb9a54f5cadd6836426d56a0cabe73ceade8e7e40dddbbae178555d`）。`demographic_info.csv`・`TypingTests.zip`・`VocabularyKnowledgeTest.zip` は取得していない。
+- zip の目録（名前と大きさだけを見た）: `keystrokelogs/csv` 4,992・`keystrokelogs/idfx` 4,992・`texts` 4,992（`.txt`）・`holistic_scores.csv`（11,360,401 バイト）・`holistic_rating_form.docx`・`writing_prompts.docx`。人口統計のファイルは入っていない。ファイル名の ID は 8 桁の数字で、記録と本文で同じ 4,992 個（MTurk の worker ID の形ではない）。
+- 展開したもの: 記録の CSV・本文・`holistic_scores.csv`・`writing_prompts.docx`（IDFX と採点の様式は展開しない）。各ファイルの SHA-256 の一覧は `raw/klicke/manifest_extracted.sha256`（書き手の ID を含むので repo に入れない。一覧そのものの SHA-256 は `8a039a71b8e8b142580cdd30467eeff58217d71ca65262dbab37965e585c2066`）。展開は zip から決まるので、zip の SHA-256 で再現できる。
+- 中身はまだ開いていない（検査 1・2 で数と列名だけを出す）。`holistic_scores.csv` が 11 MB あり、採点のほかの列（本文など）を含みうるので、検査 2 で列名だけを確かめる。
+
 ## ENJA15 [P273] [P359] [P360]
 
 - 入手先: CRITT TPR-DB の SVN の DAV エンドポイント（`https://svn.code.sf.net/p/tprdb/svn/TPRDB/ENJA15/`・[P360]）。
