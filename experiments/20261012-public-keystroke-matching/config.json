@@ -5,7 +5,7 @@
   "writer_id": "string of the distributed ID column, used verbatim in the seed derivation",
   "seed_file": "SEED",
   "seed_derivation": "int.from_bytes(sha256(f'{SEED}:{use}:{prompt}:{writer}:{N}:{k}:{draw}'.encode()).digest()[:8], 'big') -> numpy.random.default_rng; unused fields are empty strings",
-  "seed_uses": ["split", "eval_sample", "decoys", "window_start", "r5_sub", "r6_perm", "r7_drop", "bootstrap", "enja_decoys", "negative_control", "check7"],
+  "seed_uses": ["split", "eval_sample", "decoys", "window_start", "r5_sub", "r6_perm", "r7_drop", "bootstrap", "enja_decoys", "negative_control", "check7", "synthetic"],
   "datasets": {
     "klicke": {
       "reference": "[V264]",
