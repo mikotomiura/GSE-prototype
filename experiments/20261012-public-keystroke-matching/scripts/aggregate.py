@@ -13,6 +13,7 @@ import utility
 
 B = 2000
 LEVEL = 0.95
+MIN_WRITERS_PERCENTILE = 10
 MUTATE = os.environ.get("MAIN_MUTATE", "")
 
 
@@ -74,7 +75,9 @@ def summarise_cells(results, R, strongest):
                              "mrr": float(np.nanmean(cell_matrix(results, key, "rr"))),
                              "all_inf": int(np.nansum(cell_matrix(results, key, "all_inf"))),
                              "only_true_inf": int(np.nansum(cell_matrix(results, key, "only_true_inf"))),
-                             "writer_p10_p50_p90": [float(np.nanquantile(v, q)) for q in (0.1, 0.5, 0.9)]}
+                             # with few writers a percentile is one writer's value; it is not released then
+                             "writer_p10_p50_p90": ([float(np.nanquantile(v, q)) for q in (0.1, 0.5, 0.9)]
+                                                    if np.sum(~np.isnan(v)) >= MIN_WRITERS_PERCENTILE else None)}
     groups = {}
     for key in boot:
         groups.setdefault((key[0], key[1]) + key[3:], []).append(key)
