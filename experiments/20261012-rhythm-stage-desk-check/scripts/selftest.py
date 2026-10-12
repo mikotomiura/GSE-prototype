@@ -464,14 +464,17 @@ def test_lags(cfg: dict) -> None:
     x[24 * hz:] = 0.8
     kind, lag = ck.event_lag(x, 20.0, cfg)
     check(kind == "lag" and abs(lag - 4.0) <= 0.1 + 1e-9, f"lags: a blip that does not hold 1 s is not the change ({lag})")
-    # negative: hold with the jitter wobble only (no response)
+    # negative (design section 8, decisions 18): hold without the wobble -> unchanged for every event. With the
+    # jitter wobble only, the lag measure answers in most events (the share is printed, not a gate): the lags of the
+    # six jitter candidates are not read (checks.describe marks them)
+    kinds = [ck.event_lag(np.full(40 * hz, v), 15.0, cfg)[0] for v in np.linspace(0, 1, 11)]
+    check(all(k == "unchanged" for k in kinds), "lags: hold without the wobble -> unchanged in every event")
     rng = np.random.default_rng(9)
-    kinds = []
-    for i in range(300):
-        x = np.clip(0.5 + st.ar1(40 * hz, rng), 0, 1)
-        kinds.append(ck.event_lag(x, 15.0, cfg)[0])
+    kinds = [ck.event_lag(np.clip(0.5 + st.ar1(40 * hz, rng), 0, 1), 15.0, cfg)[0] for _ in range(300)]
     share = np.mean([k in ("unchanged", "ge10") for k in kinds])
-    check(share >= 0.9, f"lags: hold + wobble only -> unchanged or >= 10 s in {share:.2f} of events")
+    print(f"     (descriptive) hold + wobble only -> unchanged or >= 10 s in {share:.2f} of events (decisions 18)")
+    check(all(not c.startswith("S-jitter-") or not ck.lags_readable(c) for c in st.candidates())
+          and sum(ck.lags_readable(c) for c in st.candidates()) == 18, "lags: the jitter candidates are marked unread")
     ev = ck.stop_events(np.array([0.5, 5.0, 16.0, 17.0, 40.0, 95.0]), 100, cfg)
     check(ev == [(5.0, 16.0), (17.0, 40.0)], f"lags: stop events {ev}")
 

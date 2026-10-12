@@ -577,6 +577,12 @@ def event_lag(x: np.ndarray, t_ev: float, cfg: dict) -> tuple[str, float]:
     return "ge10", float("nan")
 
 
+def lags_readable(name: str) -> bool:
+    """design section 8 (decisions 18): the wobble of the jitter candidates alone moves the lag measure in most events
+    (|m1 - m0| >= 0.05 within 10 s), so their lags are reported but not read."""
+    return not name.startswith("S-jitter-")
+
+
 def stop_events(presses: np.ndarray, duration_s: int, cfg: dict) -> list[tuple[float, float]]:
     """(t_s, t_r): consecutive presses at least event_s apart, with the 1 s before t_s and the 10 s (+ 1 s hold)
     after t_r inside the session."""
@@ -681,7 +687,8 @@ def describe(names: list[str], twin_names: list[str], ms: list[dict], cfg: dict,
             pq = np.vstack([p["pq"] for p in parts])
             since = np.concatenate([p["since"] for p in parts])
             gw = np.concatenate([np.full(len(p["since"]), i) for i, p in enumerate(parts)])
-            r = {"item2_per_second_auc": oof_auc_lr(Xs, ys, gs, folds, seed), "item2_lags": summarize_lags(lags)}
+            r = {"item2_per_second_auc": oof_auc_lr(Xs, ys, gs, folds, seed), "item2_lags": summarize_lags(lags),
+                 "item2_lags_readable": lags_readable(name)}
             typed = pq[:, 0] > 0
             med_ok = typed & (pq[:, 1] < cfg["speed"]["short_ms"])  # a window with an interval below 2 s
             corr = {}
