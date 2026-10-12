@@ -598,6 +598,33 @@ mod tests {
         assert!(present.contains(&60));
     }
 
+    /// 既定（終日）では 4:00 の日の区切りの直前にも出せる。区切りで上限は数え直すが、
+    /// 消えてから 30 分の間隔は消えない。
+    #[test]
+    fn the_day_boundary_resets_the_cap_but_not_the_gap() {
+        let settings = Settings {
+            cap: DailyCap::One,
+            ..Settings::default()
+        };
+        let mut m = InvitationMachine::new();
+        let mut presented = Vec::new();
+        for s in 0..(3 * 3600u64) {
+            let mut i = input_from(3 * 60 + 59, T0 + s * SEC, alternating(s), settings);
+            // 3:59:00 に始まり、s = 60 で 4:00（次の日）
+            i.local_day = if s < 60 { 100 } else { 101 };
+            if m.tick(&i).presented {
+                presented.push(s);
+            }
+        }
+        // 3:59:30 に出す。次の日の 1 回は、提示 + 失効 60 秒 + 間隔 30 分（s = 1890）より後の最初の区間
+        assert_eq!(presented.first(), Some(&30));
+        assert!(
+            presented.get(1).is_some_and(|&s| s >= 30 + 60 + 1800),
+            "{presented:?}"
+        );
+        assert_eq!(presented.len(), 2, "上限 1 は日ごと: {presented:?}");
+    }
+
     // ---- ADR-035 D1: 内側の制約は、設定を最大に広げても効く ----
 
     #[test]

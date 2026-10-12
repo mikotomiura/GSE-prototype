@@ -987,6 +987,11 @@ mod tests {
         };
         save_invitation_settings(&p, &s).unwrap();
         assert_eq!(load_invitation_settings(&p), s);
+        for window in TimeWindow::ALL {
+            let s = Settings { window, ..s };
+            save_invitation_settings(&p, &s).unwrap();
+            assert_eq!(load_invitation_settings(&p), s, "{window:?}");
+        }
         // 新しい値 "all_day" も、それ以前の値 "core" も読める
         for (text, window) in [("all_day", TimeWindow::AllDay), ("core", TimeWindow::Core)] {
             std::fs::write(
