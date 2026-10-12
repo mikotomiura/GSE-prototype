@@ -187,3 +187,8 @@ Claude は 2 問とも推奨を添え、研究者は 2 問とも推奨を選ん�
 - 英語の版の状態の行は、凍結の後に書き換えなくて済むよう「凍結の後のコミットと各ファイルの SHA-256 は OSF の登録に書く」の形にした（日本語の版の状態の行だけを凍結のときに書き換える）。
 - 論文用のリポジトリ `C:\keystroke-log-release-matching`（GitHub `mikotomiura/keystroke-log-release-matching`・private・2026-10-13 に `gh repo create` で作った）。最初のコミット `0041e89c1ad9e00a12e0672d4ba128d29f3b42ea`（作者 Mikoto Miura・前の論文用リポジトリと同じ）。中身: 英語の版（`preregistration.md`）・`config.json`・`SEED`・`notes.md`（合成の記録の検査の節の英訳・サブエージェントの訳を確かめて表 2 の行見出しの誤訳を直した）・`data.md`（英語）・`README.md`・`scripts/` 7 本・`results/synthetic_check.json`・`LICENSE`（Apache-2.0）・`LICENSE-DOCS`（CC BY 4.0）。そのリポジトリで自己検査が PASS。各ファイルの SHA-256 を `osf-registration-fields.md` の「Other」に書いた。
 - 環境の差: この機械の numpy は 2.4.6（`config.json` の `tools` は 2.2.6）。本計算の前に venv で固定する。
+
+## 判断 52: KeyTAR の取得と、凍結を待つ間の作業（研究者・AskUserQuestion 1 回・2026-10-13）
+
+- KeyTAR の公開モデル（Zenodo 17254163・`keytar.zip`・約 15 GB）: **凍結の後に取得してよい**（推奨を選んだ。他の選択肢は「今は取得しない」）。判断 10 の細部「取得の前に研究者に確かめる」を閉じる。取得したら SHA-256 を記録し、本計算の前に `model_licenses` と `ethics.txt` を読み、合わなければ A4 を行わない。
+- 凍結（最初の push と OSF への登録・どちらも研究者）を待つ間: **本計算のコードを合成の記録で書く**（推奨を選んだ。他の選択肢は「ENJA15 の利用条件の一次だけ確かめて止める」「ここで止める」）。データに触れないので凍結の前でも事前登録に反しない。
