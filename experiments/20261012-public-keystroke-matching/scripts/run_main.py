@@ -129,6 +129,8 @@ def run(args):
     # only the records of the B writers return cost vectors (main forms, adaptive attackers)
     need_costs = {(p, b) for (p, _), b in nc_b.items()}
     n_values = [int(n) for n in cfg["matching"]["N"]]
+    if args.open_world_n not in n_values:
+        raise SystemExit("--open-world-n must be one of the registered N %s" % n_values)
     ctx = evaluate.Context(cfg, seed, pools, pool_ids, models, task_max, fold_of_prompt, forms.ALL, n_values,
                            nc_forms=forms.MAIN, open_world_n=args.open_world_n)
     tasks = []

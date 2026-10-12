@@ -277,6 +277,8 @@ def open_world(results, R, best, cells, forms, n_open):
         bs = []
         for row in R:
             ix = np.repeat(start[row], lens[row]) + _ranges(lens[row])
+            if MUTATE == "open_world_offsets":
+                ix = np.repeat(start[row], lens[row])
             bs.append(auc(pos[ix], neg[ix]))
         bs = np.array(bs)
         each = {}

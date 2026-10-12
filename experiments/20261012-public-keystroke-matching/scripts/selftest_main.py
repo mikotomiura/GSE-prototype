@@ -359,6 +359,16 @@ def t_aggregate(seed, cfg):
           and close(ow["full|R3|10"]["ci"], want_ci) and ow["full|R3|10"]["draws"] == 24
           and close(ow["full|R3|10"]["auc_per_attacker"]["A0"], 0.0), "open_world",
           "open world: AUC and interval of the selected attacker over the pooled draws")
+    # writers with different numbers of draws, and writers without draws, against a plain concatenation
+    lens = [0, 1, 3, 2, 0, 5, 1, 1, 4, 0, 2, 3]
+    g = np.random.default_rng(3)
+    draws = [[(float(g.integers(0, 4)), float(g.integers(0, 4))) for _ in range(n)] for n in lens]
+    for r, d in zip(res, draws):
+        r["open_world"] = {("R3", "A2"): d} if d else {}
+    ow2 = aggregate.open_world(res, R, ow_best, ow_cells, ["R3"], 10)
+    cat = [aggregate.auc([a for i in row for a, _ in draws[i]], [b for i in row for _, b in draws[i]]) for row in R]
+    check(close(ow2["full|R3|10"]["ci"], aggregate.ci(cat)) and ow2["full|R3|10"]["draws"] == sum(lens),
+          "open_world_lengths", "open world: resamples of writers with unequal and missing draws equal a concatenation")
     check("full|R3-u|10" in ow and ow["full|R3-u|10"]["costs_of"] == "A3-mean"
           and close(ow["full|R3-u|10"]["auc"], aggregate.auc([float(i % 3) for i in range(12)], [1.5] * 12)),
           "open_world_r3u", "open world on R3-u: the A3 version with the larger point estimate")
@@ -534,6 +544,7 @@ MUTANTS = {
     "open_world_r3u_sum": ["open_world_r3u"],
     "utility_rp_all": ["utility_ratio_ci"],
     "auc_flip": ["auc", "open_world"],
+    "open_world_offsets": ["open_world_lengths"],
     "utility_ratio_pooled": ["utility_ratio_prompt"],
     "runs_modifier_transparent": ["utility_runs"],
     "window_r4_shift": ["window_r4"],
