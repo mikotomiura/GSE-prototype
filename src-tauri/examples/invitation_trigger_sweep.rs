@@ -89,7 +89,9 @@ fn load(path: &str, feats: &mut Vec<(u64, f64, bool)>, presses: &mut Vec<u64>) -
                 let (ps, pf, pi) = (f("p_stuck"), f("p_flow"), f("p_inc"));
                 // 時計の戻り・同じ時刻の行は、並べ替えると実際と違う時系列になるので受け付けない
                 if prev_feat.is_some_and(|q| t <= q) {
-                    return Err(format!("{path}: feat rows are not strictly increasing in t").into());
+                    return Err(
+                        format!("{path}: feat rows are not strictly increasing in t").into(),
+                    );
                 }
                 prev_feat = Some(t);
                 feats.push((t, ps, ps >= pf && ps >= pi));
