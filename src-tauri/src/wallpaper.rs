@@ -426,16 +426,27 @@ impl<B: Backend> Manager<B> {
             .iter()
             .filter(|o| !store.person_monitors.contains(&o.id))
             .collect();
-        if !targets.is_empty() {
-            if let Some(pos) = store.position {
-                let _ = self.backend.set_position(pos);
-            }
-        }
         let connected: Vec<String> = self
             .backend
             .monitors()
             .map(|ms| ms.into_iter().map(|m| m.id).collect())
             .unwrap_or_default();
+        // すでに元の壁紙を出しているモニタには書かない（空の日・この層がまだ書いていない日に、
+        // 本人の壁紙を同じ画像で書き直さない。`.steering/20261012-eh3-windows-device-rest/` 判断 2・3）。
+        // 書いた記録（`last_set`）ではなく読み戻しで決める（記録を失った異常終了の後でも、肖像が残る
+        // モニタは書き戻す）。
+        let showing_original: Vec<String> = targets
+            .iter()
+            .filter(|o| connected.contains(&o.id))
+            .filter(|o| matches!(self.backend.get(&o.id), Ok(Some(p)) if same_path(&p, &o.path)))
+            .map(|o| o.id.clone())
+            .collect();
+        let needs_write = targets.iter().any(|o| !showing_original.contains(&o.id));
+        if needs_write {
+            if let Some(pos) = store.position {
+                let _ = self.backend.set_position(pos);
+            }
+        }
         let mut ok = true;
         let mut paths_ok = true;
         let mut restored = Vec::new();
@@ -444,6 +455,11 @@ impl<B: Backend> Manager<B> {
                 // 外れているモニタは後で戻す（元の状態を残して、戻せるまで試す）
                 ok = false;
                 paths_ok = false;
+                continue;
+            }
+            if showing_original.contains(&o.id) {
+                restored.push(o.id.clone());
+                ok &= sha256_file(&o.path).as_deref() == Some(o.sha256.as_str());
                 continue;
             }
             if self.backend.set(&o.id, &o.path).is_err() {
@@ -616,6 +632,46 @@ pub(crate) mod tests {
         );
         assert!(!d.join("eh3").exists(), "seed の印（画像）を残さない");
         assert_eq!(m.backend_mut().position, Some(4));
+    }
+
+    /// 空の日（この層がまだ書いていない）に元の壁紙を見せても、壁紙にも位置にも書かない
+    /// （`.steering/20261012-eh3-windows-device-rest/` 判断 2 の見つかったこと 2）。
+    #[test]
+    fn showing_the_original_while_it_is_already_shown_writes_nothing() {
+        let (mut m, d, originals) = setup("blank_day", 2);
+        assert_eq!(m.readiness(), Ok(true));
+        // 起動の後に本人が位置（合わせ方）を替えた: 控えた値で上書きしない
+        m.backend_mut().position = Some(2);
+        m.show(&Show::Original);
+        assert_eq!(m.backend_mut().sets, 0, "替えていない壁紙を書き直さない");
+        assert_eq!(m.backend_mut().position, Some(2), "位置も書かない");
+        for (i, o) in originals.iter().enumerate() {
+            assert_eq!(&m.backend_mut().walls[&format!("m{i}")], o);
+        }
+        // 終わり（期間の終わり・やめたとき）も書かずに片付ける
+        assert!(m.restore(true));
+        assert_eq!(m.backend_mut().sets, 0);
+        assert!(!d.join(STORE_FILE_NAME).exists(), "元の状態を消す");
+    }
+
+    /// 一部のモニタだけ肖像が残っているときは、そのモニタだけを書き戻す。
+    #[test]
+    fn only_monitors_still_showing_the_portrait_are_written_back() {
+        let (mut m, _d, originals) = setup("partial", 2);
+        m.show(&Show::Image(some_image()));
+        // 1 回目の戻しで m0 だけ失敗する（m1 は元へ戻る）
+        m.backend_mut().fail_sets = 1;
+        assert!(!m.restore(false));
+        let before = m.backend_mut().sets;
+        assert!(m.restore(false), "2 回目で残りが戻る");
+        assert_eq!(
+            m.backend_mut().sets,
+            before + 1,
+            "元へ戻ったモニタは書かない"
+        );
+        for (i, o) in originals.iter().enumerate() {
+            assert_eq!(&m.backend_mut().walls[&format!("m{i}")], o);
+        }
     }
 
     #[test]
