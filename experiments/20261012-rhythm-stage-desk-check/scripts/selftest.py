@@ -139,7 +139,10 @@ def test_speed(cfg: dict) -> None:
     # and exactly 2000 ms must not count as short, wherever the presses sit in the session
     ok200 = all(bl.speed5(np.array([t, t + 0.2]), t, t + 1.0, sp)[3] == 1.0 for t in (10.0, 1234.567, 3599.0))
     check(ok200, "speed5: an interval of exactly 200 ms breaks a run at any session time")
-    ok2000 = all(bl.speed5(np.array([t, t + 2.0]), t, t + 5.0, sp)[1:3] == [2000.0, 0.0] for t in (0.3, 1234.567))
+    # intervals 1000 and 2000 ms: excluding 2000 gives median 1000 and IQR 0; including it would give 1500 and 500
+    # (a single 2000 ms interval would not tell the two apart: /cross-review round 2)
+    ok2000 = all(bl.speed5(np.array([t, t + 1.0, t + 3.0]), t, t + 5.0, sp)[1:3] == [1000.0, 0.0]
+                 for t in (0.3, 1234.567))
     check(ok2000, "speed5: an interval of exactly 2000 ms is not short")
     check(bl.speed5(np.array([9.9, 10.05]), 10.0, 20.0, sp)[:2] == [1.0, 2000.0],
           "speed5: an interval across the span start does not count")
