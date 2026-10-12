@@ -22,7 +22,10 @@
 - [x] round 3（major・局所・設計の判断 4 件）→ 判断 32〜36 → 下書き 4
 - [x] round 4（minor・再査読は要らない）→ 判断 37〜40 → 下書き 5
 - [x] 合成の記録の検査（凍結の前・`scripts/synthetic_logs.py`・R7 の道が切れる割合・align.py の包み）→ 判断 41〜43 → 下書き 6（`notes.md`）
-- [ ] 研究者に凍結を問う（判断 42 の 5 つの分け方は 2026-10-12 に確認済み）
+- [x] 研究者に凍結を問う → 英語の版と OSF の文面まで用意し、凍結は KLiCKe の返事の後（判断 49）
+- [x] 英語の版 `preregistration.en.md`・OSF の各欄の文面 `osf-registration-fields.md`
+- [x] 書誌番号の無かった引用を登録（[V280] Wagner & Eckhoff・[V281] Menlo Report（provisional）・[V282] Kerckhoffs（provisional））・PoPETs の注に [V271]
+- [ ] 凍結（KLiCKe の返事の後・論文用のリポジトリ・OSF・状態の行）
 - [x] 倫理の節の「同意は目的と手順を示したとだけ」を KLiCKe の一次と照らす（[V264] §2.1 にだけ当てはまり [V274] には同意の記載が無い → 2 つに分けて書いた）
 - [ ] PoPETs のオンライン発表・録画の要否（CFP: 対面は不要・費用なし。録画の要否は CFP に無い → 研究者が PC chairs に問い合わせる）
 

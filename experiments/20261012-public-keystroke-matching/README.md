@@ -5,7 +5,7 @@
 - 状態: **事前登録の下書き 8（未凍結）**。凍結の版は OSF に登録し、コードと集計は論文の git リポジトリのリリースを Zenodo に置く（判断 24・25）。データは取得していない。本計算のコードは書いていない（凍結の前の合成の記録の検査のコードだけがある: `scripts/`・結果は `notes.md`）。
 - 作業記録: `.steering/20261012-public-keystroke-matching-prereg/`（研究者の判断は `decisions.md` 判断 6〜48）
 - 前の作業: `.steering/20261012-public-keystroke-matching-judgement/`（判断 1〜5）・`docs/literature/20261012-public-keystroke-matching-novelty.md`・`docs/literature/20261012-public-keystroke-matching-prereg-search.md`
-- 結果の前に固定すること: `preregistration.md`・`config.json`・`SEED`
+- 結果の前に固定すること: `preregistration.md`・`config.json`・`SEED`（英語の版 `preregistration.en.md`・OSF の各欄の文面 `osf-registration-fields.md`。凍結は KLiCKe の著者の返事の後・判断 49）
 - 入力: `data.md`（取得の開始条件と版の固定の手順）
 - 再利用するコード（予定）: `experiments/20261011-g1-copy-self-trial/scripts/align.py`（区間の揃え）。研究者本人の記録は使わない（判断 6）
 
