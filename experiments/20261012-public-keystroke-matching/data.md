@@ -44,3 +44,4 @@
 - 取得の開始条件: 研究者が 15 GB の取得を認めた。取得の後、本計算の前に `model_licenses`・`ethics.txt`・`limitations.txt` を読む。
 - 版の固定（取得のときに書く）: `keytar.zip` の SHA-256。
 - 取得の開始: 2026-10-13（`raw/keytar/`）。Zenodo の API の記録の応答を `raw/keytar/zenodo_record_17254163.json` に保存した: `keytar.zip`・15,039,177,667 バイト・`md5:a56da07f5a086bcc8c9763abe1b00934`・cc-by-4.0。取得が終わったら md5 を照合し、SHA-256 をここと `config.json` に書く。
+- 取得の完了: 2026-10-12T21:56:20Z（UTC）・15,039,177,667 バイト（Zenodo の値と一致）・md5 `a56da07f5a086bcc8c9763abe1b00934`（Zenodo の値と一致）・SHA-256 `d2fe250a7219b7f6f796d52d2cacda35d5b2d3dab2f4847c0ddbbb6ca1159876`。まだ展開していない（検査 6 の前に `model_licenses`・`ethics.txt`・`limitations.txt` を読む）。

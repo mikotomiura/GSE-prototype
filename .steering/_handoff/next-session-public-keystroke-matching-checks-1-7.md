@@ -15,7 +15,7 @@
 - 取得（中身はまだ 1 行も開いていない）:
   - KLiCKe: `raw/klicke/WritingTask.zip`（SHA-256 `ffa4d753…`）。展開は `raw/klicke/extracted/WritingTask/`（`keystrokelogs/csv` 4,992・`texts` 4,992・`holistic_scores.csv`・`writing_prompts.docx`）。人口統計は取らず、zip にも無かった。
   - ENJA15: `raw/enja15/`（SVN r649・T のセッションだけ・`enja15-manifest-r649.sha256`）。ライセンスは CRITT のページで CC BY-NC 4.0 と CC BY-NC-SA が食い違う（[P484]・厳しい方に従う）。T の意味は [P483]。
-  - KeyTAR: `raw/keytar/keytar.zip` を取得中（2026-10-13 開始・約 1 MB/s・3 時間ほど）。背景の curl が終わると `keytar.zip.md5` と `keytar.zip.sha256` が書かれる。md5 を Zenodo の `a56da07f5a086bcc8c9763abe1b00934` と照合し、合えば SHA-256 を `data.md` と `config.json` の `keytar_model.sha256` に書く。途中で止まっていたら `curl -C -` で続きから。
+  - KeyTAR: `raw/keytar/keytar.zip`（2026-10-12T21:56:20Z に取得を終えた・大きさと md5 が Zenodo の値と一致・SHA-256 `d2fe250a…` を `data.md` と `config.json` に記録）。まだ展開していない。
 - 検査 2 の最初の項目（列名）だけ見た:
   - 記録の CSV: `"",DownEventID,UpEventID,DownTime,UpTime,ActionTime,DownEvent,UpEvent,CursorPosition,PauseTime,WordCount,TextChange,Activity`（4,991 本は引用符つき、1 本は引用符なし）。先頭の名無しの列は行の番号と見られる（確かめる）。
   - `holistic_scores.csv`: `ID,Prompt,Text,Score`。本文の列 `Text` を含む（11 MB）。

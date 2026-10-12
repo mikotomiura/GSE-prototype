@@ -33,7 +33,7 @@
       "size_mb": 15039.2,
       "license": "cc-by-4.0",
       "acquisition_condition": "researcher approved the 15 GB download",
-      "sha256": "to be filled at acquisition"
+      "sha256": "d2fe250a7219b7f6f796d52d2cacda35d5b2d3dab2f4847c0ddbbb6ca1159876 (acquired 2026-10-12T21:56:20Z UTC; 15,039,177,667 bytes; md5 matches the Zenodo record a56da07f5a086bcc8c9763abe1b00934)"
     }
   },
   "key_categories": ["letter", "digit", "space", "punctuation", "backspace", "delete", "enter", "arrow_left", "arrow_right", "home", "end", "navigation", "control", "modifier", "mouse", "other"],

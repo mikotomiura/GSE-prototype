@@ -178,7 +178,7 @@ R3-u の A3 の和の版（登録どおり・変えない）: 時刻の項の数
 取得の記録（`config.json` の `svn_revision`・`files`・`sha256` を埋めること）は凍結した値の変更ではなく、逸脱ではない。詳細は `data.md`。
 
 - ENJA15: 2026-10-12T19:22:52Z（UTC）に SVN のリビジョン 649 で T のセッションだけを取得した（Translog-II 76 本・Alignment 228 本・各ファイルの SHA-256 は `enja15-manifest-r649.sha256`）。取得の前に T の意味（[P483]）とライセンスの種類（[P484]・2 つのページで CC BY-NC 4.0 と CC BY-NC-SA が食い違い、どちらにも合うので厳しい方に従う）を確かめた。中身は開いていない。
-- KeyTAR: 2026-10-13 に取得を始めた（約 1 MB/s・数時間）。終わったら md5 を Zenodo の値と照合し SHA-256 を書く。
+- KeyTAR: 2026-10-12T21:56:20Z（UTC）に取得を終えた。大きさと md5 が Zenodo の値と一致した。SHA-256 `d2fe250a7219b7f6f796d52d2cacda35d5b2d3dab2f4847c0ddbbb6ca1159876`（`data.md`・`config.json`）。まだ展開していない。
 - KLiCKe: 2026-10-12T19:29:56Z（UTC）に `WritingTask.zip` だけを取得した（SHA-256 `ffa4d753…`）。人口統計の CSV と試験の zip は取得していない。zip に人口統計のファイルは無かった。使う記録の CSV・本文・採点の CSV・課題文だけを展開した（`data.md`）。中身は開いていない。
 
 ## データの検査（取得の後・本計算の前）

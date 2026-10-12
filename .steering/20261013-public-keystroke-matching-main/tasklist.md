@@ -18,5 +18,5 @@
 - [x] 実データの大きさでの時間: 1 記録 約 256 秒（単一コア・約 400 語・候補 1,200 本）。16 並列で主な表 約 3 時間・全員の補遺 約 22 時間
 - [ ] ENJA15 の読み込みと節（取得と T・P・D の確認の後）・A4（KeyTAR の取得の後）
 - [ ] 実データの読み込み（`load_klicke.py`・検査 2）: 例外に行の断片を出さない（書き手の通し番号と例外の型名だけを出す）・`Move From` の書式が合わない行は除外の理由に回す（security-checker LOW 2）・処理の前に `pip-audit`
-- [x] 取得: ENJA15（SVN r649・T だけ）・KLiCKe（WritingTask.zip だけ・人口統計なし）。KeyTAR は取得中（md5 の照合と SHA-256 の記録が残り）
+- [x] 取得: ENJA15（SVN r649・T だけ）・KLiCKe（WritingTask.zip だけ・人口統計なし）・KeyTAR（md5 が Zenodo と一致・SHA-256 を記録）
 - [ ] 取得の後の検査 1〜7（引き継ぎ `next-session-public-keystroke-matching-checks-1-7.md`）
