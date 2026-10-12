@@ -130,7 +130,7 @@ def run(args):
     need_costs = {(p, b) for (p, _), b in nc_b.items()}
     n_values = [int(n) for n in cfg["matching"]["N"]]
     ctx = evaluate.Context(cfg, seed, pools, pool_ids, models, task_max, fold_of_prompt, forms.ALL, n_values,
-                           nc_forms=forms.MAIN)
+                           nc_forms=forms.MAIN, open_world_n=args.open_world_n)
     tasks = []
     for p in prompts:
         for wid in pool_ids[p]:
@@ -150,7 +150,8 @@ def run(args):
     out = {"source": args.source, "seed_file_sha256": _sha(os.path.join(HERE, "..", "SEED")),
            "config_sha256": _sha(os.path.join(HERE, "..", "config.json")),
            "writers_after_exclusion": {p: len(pool_ids[p]) for p in prompts}, "excluded": excluded,
-           "folds": [fold_a, fold_b], "sample_sizes": {p: len(v) for p, v in sample.items()}}
+           "folds": [fold_a, fold_b], "sample_sizes": {p: len(v) for p, v in sample.items()},
+           "open_world_n": args.open_world_n}
     strongest = {"full": evaluate.STRONGEST_FULL, "window": evaluate.STRONGEST_WINDOW}
     samples = {"main500": sorted(sample_set)}
     if args.all:
@@ -162,7 +163,8 @@ def run(args):
                                      [by_prompt[r["prompt"]][r["writer"]].score for r in res])
         if name == "main500":
             best = out[name].pop("_best")
-            out[name]["negative_control"] = negative_control(res, results, nc_b, pool_ids, seed, R, strongest, best)
+            out[name]["negative_control"] = negative_control(res, results, nc_b, pool_ids, seed, R, strongest, best,
+                                                             out[name]["cells"])
         out[name].pop("_best", None)
     out["seconds"] = None if args.no_timing else round(time.time() - t0, 1)
     with open(args.out, "w", encoding="utf-8", newline="\n") as f:
@@ -185,11 +187,13 @@ def summarise_sample(res, R, cols, strongest, cfg, open_world_n, scores):
     return out
 
 
-def negative_control(res, results, nc_b, pool_ids, seed, R, strongest, main_best, Ns=(10, 1000)):
+def negative_control(res, results, nc_b, pool_ids, seed, R, strongest, main_best, main_cells, Ns=(10, 1000)):
     """The record of A is replaced by the record of B (same prompt, evaluation fold); the true text stays A's; decoys
     exclude A and B. Main forms x adaptive attackers x N = 10 and 1000 x full text. The strongest attacker is fixed
     to the one selected by the point estimate of the main computation (same form and N, full text, 500 writers);
-    it is not selected again here (preregistration, "Diagnostics"). Every adaptive attacker is also reported."""
+    it is not selected again here (preregistration, "Diagnostics"). On R3-u, "A3" is fixed to the version (sum or
+    mean) with the larger point estimate in the main computation, so that the maximum of the two versions is not
+    taken again here either. Every adaptive attacker is also reported."""
     fake = []
     for r in res:
         p, a = r["prompt"], r["writer"]
@@ -222,13 +226,16 @@ def negative_control(res, results, nc_b, pool_ids, seed, R, strongest, main_best
             fixed[name] = {"attacker": att, "acc": nc_best[name]["acc"], "ci": aggregate.ci(nc_best[name]["_boot"]),
                            "x_chance": nc_best[name]["x_chance"], "chance": 1.0 / int(N[0])}
             continue
-        key = ("full", f, att, int(N[0]))
+        costs_of = att
+        if f == "R3-u" and att == "A3" and MUTATE != "nc_r3u_composite":
+            costs_of = aggregate.r3u_a3_version(main_cells, "full", int(N[0]))
+        key = ("full", f, costs_of, int(N[0]))
         c = cells.get(aggregate._name(key))
         if c is None:
-            fixed[name] = {"attacker": att, "missing": True}
+            fixed[name] = {"attacker": att, "costs_of": costs_of, "missing": True}
             continue
-        fixed[name] = {"attacker": att, "acc": c["acc"], "ci": c["ci"], "x_chance": c["x_chance"],
-                       "chance": 1.0 / int(N[0])}
+        fixed[name] = {"attacker": att, "costs_of": costs_of, "acc": c["acc"], "ci": c["ci"],
+                       "x_chance": c["x_chance"], "chance": 1.0 / int(N[0])}
     return {"fixed_attacker": fixed, "cells": cells}
 
 
@@ -267,6 +274,8 @@ def main():
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--per-prompt", type=int, default=40, help="synthetic writers per prompt")
     ap.add_argument("--per-prompt-sample", type=int, default=125)
+    ap.add_argument("--open-world-n", type=int, default=evaluate.OPEN_WORLD_N,
+                    help="N of the open-world diagnostic (1000 as registered; smaller only for the self-test)")
     ap.add_argument("--no-timing", action="store_true", help="omit the run time so that reruns are byte-identical")
     run(ap.parse_args())
 

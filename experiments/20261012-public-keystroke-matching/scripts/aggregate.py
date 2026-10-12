@@ -186,8 +186,6 @@ def contrasts(best, cells, boot, pairs, forms):
             for tail in tails:
                 scope, rest = tail[-1], list(tail[:-1])
                 n1, n2 = "|".join([scope, a] + rest), "|".join([scope, b] + rest)
-                if n1 not in best and n2 not in best:
-                    continue
                 label = "%s - %s|%s|%s" % (a, b, "|".join(rest), scope)
                 if n1 not in best or n2 not in best:
                     missing.append(label)
@@ -267,15 +265,20 @@ def open_world(results, R, best, cells, forms, n_open):
             continue
         att = best[name]["attacker"]
         if f == "R3-u" and att == "A3":
-            att = r3u_a3_version(cells, "full", n_open)
+            att = R3U_A3[0] if MUTATE == "open_world_r3u_sum" else r3u_a3_version(cells, "full", n_open)
         per = [r.get("open_world", {}).get((f, att)) for r in results]
         if not any(per):
             continue
-        pos = [np.array([a for a, _ in p], dtype=float) if p else np.zeros(0) for p in per]
-        neg = [np.array([b for _, b in p], dtype=float) if p else np.zeros(0) for p in per]
-        point = auc(np.concatenate(pos), np.concatenate(neg))
-        bs = np.array([auc(np.concatenate([pos[i] for i in row]), np.concatenate([neg[i] for i in row]))
-                       for row in R])
+        lens = np.array([len(p) if p else 0 for p in per], dtype=np.int64)
+        pos = np.array([a for p in per if p for a, _ in p], dtype=float)
+        neg = np.array([b for p in per if p for _, b in p], dtype=float)
+        start = np.concatenate([[0], np.cumsum(lens)[:-1]])
+        point = auc(pos, neg)
+        bs = []
+        for row in R:
+            ix = np.repeat(start[row], lens[row]) + _ranges(lens[row])
+            bs.append(auc(pos[ix], neg[ix]))
+        bs = np.array(bs)
         each = {}
         atts = sorted({a for r in results for (ff, a) in r.get("open_world", {}) if ff == f})
         for a in atts:
@@ -283,8 +286,16 @@ def open_world(results, R, best, cells, forms, n_open):
             each[a] = auc(np.concatenate([np.array([x for x, _ in p], dtype=float) for p in pp if p]),
                           np.concatenate([np.array([y for _, y in p], dtype=float) for p in pp if p]))
         out[name] = {"attacker": best[name]["attacker"], "costs_of": att, "auc": point, "ci": ci(bs),
-                     "draws": int(sum(len(p) for p in pos)), "auc_per_attacker": each}
+                     "draws": int(lens.sum()), "auc_per_attacker": each}
     return out
+
+
+def _ranges(lens):
+    """[0..l0-1, 0..l1-1, ...] for the lengths."""
+    if not len(lens) or lens.sum() == 0:
+        return np.zeros(0, dtype=np.int64)
+    ends = np.cumsum(lens)
+    return np.arange(ends[-1]) - np.repeat(ends - lens, lens)
 
 
 def window_bias(results):
@@ -351,9 +362,12 @@ def _mean_range_ci(per_p, boot_rows):
     with np.testing.suppress_warnings() as sup:
         sup.filter(RuntimeWarning)
         bm = np.nanmean(B_, axis=0) if B_.size else np.array([])
+    # the mean is over the prompts with a value; how many there were, and in how many resamples a prompt had none
     return {"by_prompt": {p: _f(x) for p, x in per_p.items()},
             "mean": _f(np.mean(pv)) if pv else None,
             "range": [_f(min(pv)), _f(max(pv))] if pv else None,
+            "prompts_with_value": len(pv),
+            "resamples_with_a_prompt_missing": int(np.sum(np.isnan(B_).any(axis=0))) if B_.size else 0,
             "ci": ci(bm) if bm.size else None}
 
 
@@ -384,7 +398,7 @@ def utility_summary(results, scores, forms_list, R, cols):
                 rp = ratio[ix][~np.isnan(ratio[ix])]
                 for q in rq:
                     rq[q][p] = float(np.quantile(rp, q)) if len(rp) else np.nan
-                Rp = R[:, cols[p]]
+                Rp = R if MUTATE == "utility_rp_all" else R[:, cols[p]]
                 bsr.append(_spearman_rows(r0[Rp], v[Rp]))
                 bss.append(_spearman_rows(sc[Rp], v[Rp]))
                 for q in rq:
@@ -398,17 +412,22 @@ def utility_summary(results, scores, forms_list, R, cols):
                 "ratio_p90": _mean_range_ci(rq[0.9], brq[0.9]),
                 "ratio_dropped_r0": int(np.sum(~r0_ok)),
                 "ratio_dropped_form": int(np.sum(r0_ok & np.isnan(v))),
+                "ratio_dropped_by_prompt": {p: [int(np.sum(~r0_ok[prompts == p])),
+                                                int(np.sum((r0_ok & np.isnan(v))[prompts == p]))] for p in ps},
             }
     fig = {}
     for f in forms_list:
-        vals = []
+        vals, undefined = [], 0
         for m in utility.METRICS:
             e = out["%s|%s" % (m, f)]
             mean = e["spearman_r0"]["mean"]
+            undefined += e["cell"] != utility.NONE and mean is None
             vals.append(0.0 if e["cell"] == utility.NONE or mean is None else mean)
         cells = [utility.cell(m, f) for m in utility.METRICS]
+        # computed metrics whose correlation is undefined in every prompt also count as 0; their number is shown
         fig[f] = {"median_spearman_r0": float(np.median(vals)), "ok": cells.count(utility.OK),
-                  "approx": cells.count(utility.APPROX), "none": cells.count(utility.NONE)}
+                  "approx": cells.count(utility.APPROX), "none": cells.count(utility.NONE),
+                  "computed_but_undefined": int(undefined)}
     return out, fig
 
 

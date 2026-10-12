@@ -345,19 +345,34 @@ def t_aggregate(seed, cfg):
     # open-world AUC
     check(aggregate.auc([0, 0], [1, 1]) == 1.0 and aggregate.auc([1], [0]) == 0.0 and aggregate.auc([1], [1]) == 0.5
           and close(aggregate.auc([0, 2], [1, 3]), 0.75), "auc", "AUC: separated 1, reversed 0, tied 1/2, mixed 3/4")
+    ow_best = {"full|R3|10": {"attacker": "A2"}, "full|R3-u|10": {"attacker": "A3"}}
+    ow_cells = {"full|R3-u|A3-sum|10": {"acc": 0.2}, "full|R3-u|A3-mean|10": {"acc": 0.4}}
     for i, r in enumerate(res):
-        r["open_world"] = {("R3", pick): [(0.0, 1.0)] if i % 3 else [(2.0, 1.0)]}
-    ow = aggregate.open_world(res, R, best, cells, ["R3"], 10)
-    check("full|R3|10" in ow and close(ow["full|R3|10"]["auc"], aggregate.auc(
-        [0.0 if i % 3 else 2.0 for i in range(12)], [1.0] * 12)), "open_world",
-          "open world: the AUC of the selected attacker over the pooled draws")
+        r["open_world"] = {("R3", "A2"): [(0.0, 1.0), (float(i % 4), 2.0)], ("R3", "A0"): [(5.0, 1.0)],
+                           ("R3-u", "A3-sum"): [(3.0, 1.0)], ("R3-u", "A3-mean"): [(float(i % 3), 1.5)]}
+    ow = aggregate.open_world(res, R, ow_best, ow_cells, ["R3", "R3-u"], 10)
+    pos = [[0.0, float(i % 4)] for i in range(12)]
+    neg = [[1.0, 2.0] for _ in range(12)]
+    want_ci = aggregate.ci([aggregate.auc(sum((pos[i] for i in row), []), sum((neg[i] for i in row), []))
+                            for row in R])
+    check("full|R3|10" in ow and close(ow["full|R3|10"]["auc"], aggregate.auc(sum(pos, []), sum(neg, [])))
+          and close(ow["full|R3|10"]["ci"], want_ci) and ow["full|R3|10"]["draws"] == 24
+          and close(ow["full|R3|10"]["auc_per_attacker"]["A0"], 0.0), "open_world",
+          "open world: AUC and interval of the selected attacker over the pooled draws")
+    check("full|R3-u|10" in ow and ow["full|R3-u|10"]["costs_of"] == "A3-mean"
+          and close(ow["full|R3-u|10"]["auc"], aggregate.auc([float(i % 3) for i in range(12)], [1.5] * 12)),
+          "open_world_r3u", "open world on R3-u: the A3 version with the larger point estimate")
     # split by the rebuilt draft
     for i, r in enumerate(res):
         r["rebuilt_match"] = i < 8
     sp = aggregate.split_by_rebuilt(res, R, cells)
     v = np.array([r["full"][("full", "R3", "A2", 10)]["acc"] for r in res])
+    mm = np.where(np.arange(12) < 8, v, np.nan)
+    with np.errstate(invalid="ignore"):
+        bm = np.array([np.nanmean(mm[row]) if np.any(~np.isnan(mm[row])) else np.nan for row in R])
     check(sp["writers_match"] == 8 and close(sp["cells"]["full|R3|A2|10"]["match"]["acc"], v[:8].mean())
-          and close(sp["cells"]["full|R3|A2|10"]["mismatch"]["acc"], v[8:].mean()), "rebuilt_split",
+          and close(sp["cells"]["full|R3|A2|10"]["mismatch"]["acc"], v[8:].mean())
+          and close(sp["cells"]["full|R3|A2|10"]["match"]["ci"], aggregate.ci(bm)), "rebuilt_split",
           "accuracy split by the rebuilt draft's match")
 
 
@@ -389,6 +404,16 @@ def t_utility_summary(seed):
           for r in res if r["prompt"] == "P1" and r["writer"] != "w01"]
     check(close(e2["ratio_median"]["by_prompt"]["P1"], float(np.quantile(rp, 0.5))), "utility_ratio_prompt",
           "utility: the per-prompt ratio median uses that prompt's writers only")
+    r0 = np.array([r["utility"]["R0"]["p_burst_mean_len"] for r in res])
+    vu = np.array([np.nan if r["utility"]["R3-u"]["p_burst_mean_len"] is None
+                   else r["utility"]["R3-u"]["p_burst_mean_len"] for r in res])
+    rat = np.where((r0 != 0) & ~np.isnan(vu), vu / np.where(r0 != 0, r0, 1), np.nan)
+    per = []
+    for p in ("P0", "P1"):
+        Rp = R[:, cols[p]]
+        per.append([np.nanquantile(rat[row], 0.5) for row in Rp])
+    check(close(e2["ratio_median"]["ci"], aggregate.ci(np.mean(np.array(per), axis=0)), 1e-9), "utility_ratio_ci",
+          "utility: interval of the mean ratio median, recomputed from each prompt's resampled writers")
 
 
 def t_utility_runs():
@@ -414,23 +439,31 @@ def t_negative_control(seed):
         me = (j - 1) % 12  # this record is B of writer me: A0 always ranks writer me first
         a0 = np.ones(12)
         a0[me] = 0.0
-        results[("P0", a)] = {"costs": {"R3": {"A0": a0, "A2": rng.random(12)}}}
+        results[("P0", a)] = {"costs": {"R3": {"A0": a0, "A2": rng.random(12)},
+                                        "R3-u": {"A0": rng.random(12), "A3-sum": a0, "A3-mean": rng.random(12)}}}
     res = [{"prompt": "P0", "writer": a} for a in ids]
     R, _ = aggregate.resamples(seed, ["P0"] * 12, "nc", n=100)
-    main_best = {"full|R3|10": {"attacker": "A2"}}
-    nc = run_main.negative_control(res, results, nc_b, pool_ids, seed, R, STRONGEST, main_best, Ns=(10,))
+    main_best = {"full|R3|10": {"attacker": "A2"}, "full|R3-u|10": {"attacker": "A3"}}
+    main_cells = {"full|R3-u|A3-sum|10": {"acc": 0.30}, "full|R3-u|A3-mean|10": {"acc": 0.32}}
+    nc = run_main.negative_control(res, results, nc_b, pool_ids, seed, R, STRONGEST, main_best, main_cells, Ns=(10,))
     e = nc["fixed_attacker"].get("full|R3|10", {})
     a2 = nc["cells"]["full|R3|A2|10"]
     check(e.get("attacker") == "A2" and close(e.get("acc"), a2["acc"]) and close(e.get("ci"), a2["ci"])
           and nc["cells"]["full|R3|A0|10"]["acc"] == 1.0, "nc_fixed",
           "negative control: the attacker fixed by the main point estimate (A2 %.3f; A0 1.0 not taken)"
           % a2["acc"])
+    e = nc["fixed_attacker"].get("full|R3-u|10", {})
+    am = nc["cells"]["full|R3-u|A3-mean|10"]
+    check(e.get("costs_of") == "A3-mean" and close(e.get("acc"), am["acc"]) and close(e.get("ci"), am["ci"]),
+          "nc_fixed_r3u", "negative control on R3-u: the A3 version of the main point estimate (mean %.3f; "
+          "sum 1.0 not taken)" % am["acc"])
 
 
 def t_run(seed, tmp, cfg):
     out = os.path.join(tmp, "selftest_main_run.json")
     subprocess.run([sys.executable, os.path.join(HERE, "run_main.py"), "--out", out, "--per-prompt", "16",
-                    "--per-prompt-sample", "4", "--workers", "4", "--no-timing"], check=True, capture_output=True)
+                    "--per-prompt-sample", "4", "--workers", "4", "--no-timing", "--open-world-n", "10"], check=True,
+                   capture_output=True)
     with open(out, encoding="utf-8") as f:
         s = f.read()
     texts = [w.text for w in corpus.synthetic_corpus(seed, 4, 16, tag="main")]
@@ -445,10 +478,20 @@ def t_run(seed, tmp, cfg):
     check(all(w in m.get("contrasts", {}) for w in want) and not m.get("contrasts_missing"), "run_contrasts",
           "the run writes every config contrast (%d)" % len(want))
     fx = m.get("negative_control", {}).get("fixed_attacker", {})
-    check(len(fx) == len(forms.MAIN) and all(fx[n]["attacker"] == m["strongest"][n]["attacker"] for n in fx),
-          "run_nc", "the run's negative control uses the main strongest attacker for every main form")
-    check("rebuilt_split" in m and "window_bias" in m and "open_world" in m, "run_secondary",
-          "the run writes the secondary and diagnostic blocks")
+    want_nc = {n for n in m.get("strongest", {}) if n.split("|")[0] == "full" and n.split("|")[1] in forms.MAIN
+               and len(n.split("|")) == 3 and int(n.split("|")[2]) in (10, 1000)}
+    check(len(want_nc) > 0 and set(fx) == want_nc and not any(e.get("missing") for e in fx.values())
+          and all(fx[n]["attacker"] == m["strongest"][n]["attacker"] for n in fx), "run_nc",
+          "the run's negative control has a value with the main strongest attacker for every main form and N (%d)"
+          % len(want_nc))
+    ow = m.get("open_world", {})
+    want_ow = {"full|%s|10" % f for f in forms.ALL}
+    sample = m.get("cells", {}).get("full|R0|A0|10", {}).get("writers", 0)
+    check(set(ow) == want_ow and all(e["ci"] is not None and e["draws"] == 20 * sample for e in ow.values()),
+          "run_open_world", "the run's open world has an AUC and interval for every form (%d draws each)"
+          % (20 * sample))
+    check(m.get("rebuilt_split", {}).get("cells") and m.get("window_bias"), "run_secondary",
+          "the run writes the rebuilt split and the bias of true windows")
 
 
 def main():
@@ -487,6 +530,9 @@ MUTANTS = {
     "r3u_a3_sum_only": ["agg_r3u_a3"],
     "contrast_base_names": ["contrast_all", "contrast_a3"],
     "nc_reselect": ["nc_fixed"],
+    "nc_r3u_composite": ["nc_fixed_r3u"],
+    "open_world_r3u_sum": ["open_world_r3u"],
+    "utility_rp_all": ["utility_ratio_ci"],
     "auc_flip": ["auc", "open_world"],
     "utility_ratio_pooled": ["utility_ratio_prompt"],
     "runs_modifier_transparent": ["utility_runs"],

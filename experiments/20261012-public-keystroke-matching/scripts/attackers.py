@@ -64,9 +64,9 @@ class Cand:
     def codes(self, table):
         """The letters and digits of the words, concatenated, as character codes of the table (kept per table: the
         codes index that table's vocabulary)."""
-        c = self._codes.get(0 if MUTATE == "cand_codes_shared" else id(table))
+        c = self._codes.get(0 if MUTATE == "cand_codes_shared" else table)
         if c is None:
-            c = self._codes[0 if MUTATE == "cand_codes_shared" else id(table)] = table.encode("".join(self.words))
+            c = self._codes[0 if MUTATE == "cand_codes_shared" else table] = table.encode("".join(self.words))
         return c
 
 
