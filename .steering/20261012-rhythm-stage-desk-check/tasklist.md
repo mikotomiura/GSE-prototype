@@ -7,7 +7,7 @@
 
 ## 設計
 - [x] `design.md` の案（§9 に Claude が足した細部）
-- [ ] 新規性の検索 1 ラウンド（`/literature-review`・引き継ぎ §3.5）
+- [x] 新規性の検索 1 ラウンド（`/literature-review`・引き継ぎ §3.5）→ `docs/literature/20261012-rhythm-stage-novelty.md`（S-RN・[P472]–[P482]・`98f6ed13`）
 - [ ] 研究者が §9 の細部を確かめる
 - [ ] 固定の前の `/cross-review`（EH1 と同じく 2 巡）
 - [ ] 固定（`design.md` をコミット）
