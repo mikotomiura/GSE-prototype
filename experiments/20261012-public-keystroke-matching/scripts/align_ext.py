@@ -1,6 +1,6 @@
-"""Wrapper around the template align.py (preregistration.md "揃え"): full-text end, infinity handling, R7 groups.
+"""Wrapper around the template align.py (preregistration, "Alignment"): full-text end, infinity handling, R7 groups.
 
-The template experiments/20261011-g1-copy-self-trial/scripts/align.py implements the window end only. Here:
+The template align.py (kept verbatim in this directory) implements the window end only. Here:
 - end "window": the template align() is called as is, with its module ORDER replaced by the group list and max_group
   set to the cap (R7: 4 or 6), as the preregistration says;
 - end "full": the same recurrence and tie rule (strict improvement in group order) with the end fixed at (M, T);
@@ -12,7 +12,7 @@ import importlib.util
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE = os.path.normpath(os.path.join(HERE, "..", "..", "20261011-g1-copy-self-trial", "scripts", "align.py"))
+TEMPLATE = os.path.join(HERE, "align.py")
 INF = float("inf")
 MUTATE = os.environ.get("SYNTH_MUTATE", "")
 

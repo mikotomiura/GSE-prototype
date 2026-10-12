@@ -175,3 +175,15 @@ Claude は 2 問とも推奨を添え、研究者は 2 問とも推奨を選ん�
 - **返事が来たとき**: 内容（同意の文面・倫理審査の有無）を倫理の節に書く。利用に懸念が示されたら、計算を止め、取得したデータを消し、その経緯を報告する（事前登録の「データ」の節と「未決」に書く）。
 - 日程の目安: 凍結と取得と検査 1〜7 → 本計算（11/9 まで）→ 執筆・attack-me・`/cross-review`（11/27 まで）→ 投稿（11/30 AoE）。間に合わなければ Issue 4（2027-02-28）。
 - 引き継ぎは 2 つ: 10/26 の催促（`next-session-public-keystroke-matching-1026-reminder.md`）と、凍結から本計算まで（`next-session-public-keystroke-matching-research-forward.md`）。
+
+## 凍結の準備（2026-10-13・判断の要らない作業の記録）
+
+引き継ぎ `next-session-public-keystroke-matching-research-forward.md` の「1. 凍結の残り」の 1〜4・6 を行った。研究者の新しい判断は無い。
+
+- 判断 51 を日英の版・`config.json`・`data.md`・`README.md`・`osf-registration-fields.md` に入れた（下書き 9）。「未決（凍結の前に閉じる）」は「未決」にし、KLiCKe の返事と PoPETs の録画の行に「凍結の条件ではない」と書いた。判断 42 の確認（5 つでよい）も反映した。
+- [V281] Menlo Report と [V282] Kerckhoffs を一次で確かめ active にした（原本の SHA-256 と逐語は `docs/references.md`）。Menlo は CAIDA の置き場の同名の PDF が別の記事（IEEE S&P 2012 の Bailey ほか）だったので、最終版（August 2012）の写しを使った。英語の版の References に月・発行の部局・頁を足した。
+- 日英の食い違いをサブエージェント（Sonnet）で洗った: 英語の版の開示の節に R3-t(100) の 5%・R7(0.25) の 7% が欠けていた 1 件だけ（足した）。
+- 公開するファイルから GSE の中の参照を外した: `config.json` の `_note`（`.steering/` の文）・判断の番号 18 か所・[Vn]/[Pn] を著者と年に・`romaji_table.py` と `align.py` のパスを `scripts/` に。スクリプトの注釈（日本語の節の名・判断の番号・[V264] など）も同じに直した。`align.py`（SHA-256 `6c03dc66…`）と `romaji_table.py`（`d2101efb…`）は写しで、中身は変えていない。直した後に `selftest_synthetic.py` が PASS し、`synthetic_check.py` の出力が `results/synthetic_check.json` とバイト単位で一致した（注釈と参照だけの変更）。
+- 英語の版の状態の行は、凍結の後に書き換えなくて済むよう「凍結の後のコミットと各ファイルの SHA-256 は OSF の登録に書く」の形にした（日本語の版の状態の行だけを凍結のときに書き換える）。
+- 論文用のリポジトリ `C:\keystroke-log-release-matching`（GitHub `mikotomiura/keystroke-log-release-matching`・private・2026-10-13 に `gh repo create` で作った）。最初のコミット `0041e89c1ad9e00a12e0672d4ba128d29f3b42ea`（作者 Mikoto Miura・前の論文用リポジトリと同じ）。中身: 英語の版（`preregistration.md`）・`config.json`・`SEED`・`notes.md`（合成の記録の検査の節の英訳・サブエージェントの訳を確かめて表 2 の行見出しの誤訳を直した）・`data.md`（英語）・`README.md`・`scripts/` 7 本・`results/synthetic_check.json`・`LICENSE`（Apache-2.0）・`LICENSE-DOCS`（CC BY 4.0）。そのリポジトリで自己検査が PASS。各ファイルの SHA-256 を `osf-registration-fields.md` の「Other」に書いた。
+- 環境の差: この機械の numpy は 2.4.6（`config.json` の `tools` は 2.2.6）。本計算の前に venv で固定する。

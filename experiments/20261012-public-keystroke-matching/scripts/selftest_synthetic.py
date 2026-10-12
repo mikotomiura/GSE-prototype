@@ -68,7 +68,7 @@ def test_forms():
     check("pause_time" not in form_R1(rec)[0], "R1 drops the column not in the table")
     check(tuple(form_R2(rec)[0]) == R2_COLS, "R2 columns")
     check(tuple(form_R3(rec)[0]) == R3_COLS == ("event_id", "down_time", "down_event"),
-          "R3 columns: the press time and the pressed key's category only (decisions 41, 45)")
+          "R3 columns: the press time and the pressed key's category only")
     check(a1prime(["letter", "letter", "enter", "letter", "control", "home", "digit", "control", "end", "space"]) ==
           [("a", 6), ("a", 0), ("a", 1), ("n", 2), ("a", 3), ("s", 9)], "Ctrl+Home/End go to the document ends")
     check(a1prime(["letter", "letter", "control", "arrow_left", "digit"]) == [("a", 0), ("a", 1), ("a", 4)],
@@ -186,7 +186,7 @@ def test_parts(cfg):
     s = twd["identical_output_share"]
     check(set(twd["columns_that_differ"].get("R3", {})) == {"down_time"},
           "R3 twins differ only through the press times (%r)" % twd["columns_that_differ"].get("R3"))
-    check(s["R3"] < 1.0,"a drag's length stays as a lower bound of the next press interval (decision 44) (%r)" % s)
+    check(s["R3"] < 1.0,"a drag's length stays as a lower bound of the next press interval (%r)" % s)
     r7 = sc.part_r7(15, cfg, NO_OPS, "selftest")
     check(r7["0.0"]["true_groups_above_cap_share"] == 0.0, "p = 0, no edits: true groups within the cap")
     check(r7["0.0"]["dp_minus_true_correspondence_cost_per_word"]["median"] == 0.0,

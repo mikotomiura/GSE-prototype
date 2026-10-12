@@ -1,13 +1,13 @@
 # OSF の registration の各欄の文面（凍結のときに使う・未登録）
 
-作成 2026-10-12（下書き 8 の英語の版 `preregistration.en.md` に対応）。登録は研究者が自分のアカウントで行う（Claude はログインしない・判断 25）。
+作成 2026-10-12・2026-10-13 に判断 51 を反映（下書き 9 の英語の版 `preregistration.en.md` に対応）。登録は研究者が自分のアカウントで行う（Claude はログインしない・判断 25）。
 
 使い方:
 
 - テンプレートは OSF の標準の「OSF Preregistration」を想定した。欄の名前と順は登録のときにフォームで確かめる。データが既にある研究向けのテンプレート（二次データの解析向け）を選ぶ場合も、下の文面を対応する欄に入れればよい。
 - 英語の版 `preregistration.en.md`・`config.json`・`SEED` を登録にファイルとして添付する（凍結のときの論文用のリポジトリのコミットのもの）。各ファイルの SHA-256 を「Other」の欄に書く（凍結のときに計算する）。
 - 著者の欄は研究者が入れる（ここには書かない）。
-- 凍結は KLiCKe の著者の返事を見てから（判断 49）。返事で条件が変われば、英語の版と下の文面を直してから登録する。
+- 凍結は KLiCKe の著者の返事を待たない（判断 51 が判断 49 を改めた）。返事で利用に懸念が示されたら、計算を止め、取得したデータを消し、その経緯を報告する。
 
 ---
 
@@ -55,7 +55,7 @@ The data are public corpora. Before registration, only the documentation of the 
 
 **Data collection procedures**
 
-KLiCKe (Tian, Crossley & Van Waes, 2025): the keystroke logs, essays and human scores of the argumentative writing task, acquired after the researcher decides to proceed in light of the authors' reply to an inquiry; the demographics file is not acquired. ENJA15 (Carl, Aizawa & Yamada, 2016): from-scratch translation sessions from the TPR-DB repository at a fixed SVN revision, after the license and terms of use are confirmed. The public KeyTAR model (Qiu et al., 2026) from Zenodo record 17254163. Versions and SHA-256 of all files are recorded at acquisition (section "Data").
+KLiCKe (Tian, Crossley & Van Waes, 2025): the keystroke logs, essays and human scores of the argumentative writing task, acquired after this registration is fixed, without waiting for the authors' reply to an inquiry (the terms of use are public; if the reply raises a concern about this use, the computation is stopped, the acquired data are deleted, and this is reported); the demographics file is not acquired. ENJA15 (Carl, Aizawa & Yamada, 2016): from-scratch translation sessions from the TPR-DB repository at a fixed SVN revision, after the license and terms of use are confirmed. The public KeyTAR model (Qiu et al., 2026) from Zenodo record 17254163. Versions and SHA-256 of all files are recorded at acquisition (section "Data").
 
 **Sample size**
 
@@ -111,4 +111,4 @@ Secondary quantities (top-5 accuracy, mean reciprocal rank, per-writer accuracy 
 
 ## Other
 
-The authoritative version of the plan is the attached preregistration.en.md together with config.json and SEED. SHA-256: preregistration.en.md <to be filled at freezing>; config.json <to be filled at freezing>; SEED <to be filled at freezing>. Code and aggregated results will be released in the paper repository with a Zenodo DOI. Logs and texts are not redistributed. The plan and its text were drafted with an AI assistant (Claude, Anthropic) and decided by the researcher (section "Use of AI").
+The authoritative version of the plan is the attached preregistration.en.md together with config.json and SEED. The files are those of commit 0041e89c1ad9e00a12e0672d4ba128d29f3b42ea of the repository https://github.com/mikotomiura/keystroke-log-release-matching (private until the paper is submitted; the attached preregistration.en.md is the file preregistration.md of that commit). SHA-256: preregistration.md 4c13fe2b6dc27fdc4ec475ee34c62426e949e3746679f04990f9d69821d9a506; config.json 34f3d1cc86806415da8099d20804cf598ade485686656bbde4a432795f68964b; SEED d766284cd36eea562c99c5268cedd99a4bd2ae5ed9d75cb1bad330633cbbe9ff; notes.md 433bb13807d4322c5e651ab17563e5d481e313722be39c38cb2258f7869c827a; results/synthetic_check.json ff157d3dde9321d980f3868e83cb3ef4a00db6bd831650c44da979e50c83a70c; scripts/align.py 6c03dc66afa563903c2d65e90e7247c1faafeb32fe614209c31353f066e07543; scripts/align_ext.py 79579f266ab972277322ae7b3a2c0387c87eb783c3ebbd8638f49b55768c2a8d; scripts/replay.py 0456ba3427e14f79aa502308a38e34437067e667ceab1022d6ca84e248b564ad; scripts/romaji_table.py d2101efb9f36201b7fb51ea7c4283c114854cf13bba8fae379b6f85ae381fbd2; scripts/selftest_synthetic.py 8aa09de9ab4405f5bcad3769b7cabc0dd38ea9bd0437ddbbfe419aa3a349e990; scripts/synthetic_check.py 153f7e784cf4d4dfa5434874e10acc548ac3411f50623195c87892c208e630c5; scripts/synthetic_logs.py 5ac1b5d17e27437129eeebe15da8659819c7707cd43ca84fc85d0e54aa61f8b1. No data had been acquired when these files were committed. Code and aggregated results will be released in this repository with a Zenodo DOI. Logs and texts are not redistributed. The plan and its text were drafted with an AI assistant (Claude, Anthropic) and decided by the researcher (section "Use of AI").
