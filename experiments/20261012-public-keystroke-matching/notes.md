@@ -183,7 +183,11 @@ R3-u の A3 の和の版（登録どおり・変えない）: 時刻の項の数
 
 ## データの検査（取得の後・本計算の前）
 
-まだ行っていない（データは取得していない）。取得の後の検査 2 で、模擬の仮定（上）を実の記録で確かめる（`down_event` と `up_event` が違う行の数・貼り付けや取り消しの行の形・選択の後の位置・修飾キーの保持時間を含む）。
+途中（2026-10-13）。取得の前に pip-audit 2.10.1（使い捨ての venv）で `requirements.txt` を検査し、既知の脆弱性なし。
+
+検査 2 のうち列名だけを見た: 記録の CSV は `"",DownEventID,UpEventID,DownTime,UpTime,ActionTime,DownEvent,UpEvent,CursorPosition,PauseTime,WordCount,TextChange,Activity`（4,992 本で同じ列。4,991 本は引用符つき・1 本は引用符なし）。表に無い列は `UpEventID`・`PauseTime`・先頭の名無しの列で、規則どおりどの形でも出さない。`holistic_scores.csv` は `ID,Prompt,Text,Score`（本文の列を含む）。残りは引き継ぎ `.steering/_handoff/next-session-public-keystroke-matching-checks-1-7.md`。
+
+（以下は取得の前に書いた文）取得の後の検査 2 で、模擬の仮定（上）を実の記録で確かめる（`down_event` と `up_event` が違う行の数・貼り付けや取り消しの行の形・選択の後の位置・修飾キーの保持時間を含む）。
 
 ## 逸脱
 
