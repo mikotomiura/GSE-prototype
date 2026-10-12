@@ -48,9 +48,10 @@ def item_type(cat):
     return "s"
 
 
-def a1prime(cats, uncertain_home_end=False, modifier_arms=True):
-    """Editor replay of the category column. Shortcuts (the next letter/digit/char after a modifier) are ignored."""
-    sc = shortcut_flags(cats, None, modifier_arms)
+def a1prime(cats, uncertain_home_end=False):
+    """Editor replay of the category column (decision 42: arrow_left, arrow_right, home and end move the cursor;
+    other navigation and the mouse put it at the end). Shortcuts (decision 43) are ignored."""
+    sc = shortcut_flags(cats)
     doc, cur = [], 0
     for i, c in enumerate(cats):
         if sc[i]:
@@ -65,17 +66,17 @@ def a1prime(cats, uncertain_home_end=False, modifier_arms=True):
         elif c == "delete":
             if cur < len(doc):
                 del doc[cur]
-        elif c == "navigation_left":
+        elif c == "arrow_left":
             cur = max(0, cur - 1)
-        elif c == "navigation_right":
+        elif c == "arrow_right":
             cur = min(len(doc), cur + 1)
-        elif c == "navigation_home":
+        elif c == "home":
             if uncertain_home_end:
                 cur = len(doc)
             else:
                 while cur > 0 and doc[cur - 1][0] != "n":
                     cur -= 1
-        elif c == "navigation_end":
+        elif c == "end":
             if uncertain_home_end:
                 cur = len(doc)
             else:
@@ -86,23 +87,9 @@ def a1prime(cats, uncertain_home_end=False, modifier_arms=True):
     return doc
 
 
-def nav_detail(cats, keys):
-    """Released categories do not tell ArrowLeft from ArrowUp. The preregistration's A1' uses the key names of the
-    navigation presses (left/right, Home, End, the rest uncertain); in R3 those names are not in the category column.
-    This helper is used only where keys are given; see notes.md (the category list needs navigation sub-categories)."""
-    out = []
-    for c, k in zip(cats, keys):
-        if c == "navigation":
-            out.append({"ArrowLeft": "navigation_left", "ArrowRight": "navigation_right", "Home": "navigation_home",
-                        "End": "navigation_end"}.get(k, "navigation"))
-        else:
-            out.append(c)
-    return out
-
-
-def a1_r2(cats, positions, modifier_arms=True):
+def a1_r2(cats, positions):
     """A1 on R2: categories and the position after each row. A selection is only visible through the position."""
-    sc = shortcut_flags(cats, None, modifier_arms)
+    sc = shortcut_flags(cats)
     doc, prev = [], 0
     for i, (c, pos) in enumerate(zip(cats, positions)):
         if sc[i]:

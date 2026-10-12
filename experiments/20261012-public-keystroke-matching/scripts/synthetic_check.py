@@ -19,8 +19,8 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import align_ext  # noqa: E402
-from replay import a1_r2, a1_text, a1prime, lengths_of_items, nav_detail  # noqa: E402
-from synthetic_logs import (CHAR_CATS, DEFAULT_OPS, NO_OPS, Writer, category, form_R0, form_R1, form_R2,  # noqa: E402
+from replay import a1_r2, a1_text, a1prime, lengths_of_items  # noqa: E402
+from synthetic_logs import (ALL_CATS, CHAR_CATS, DEFAULT_OPS, MOD_CATS, NAV_CATS, NO_OPS, Writer, category, form_R0, form_R1, form_R2,  # noqa: E402
                             form_R3, form_R3t, form_R3u, form_R5, form_R6, form_R7, record_segments,
                             word_lengths)
 
@@ -65,7 +65,8 @@ def summary(xs):
         return None
     a = np.array(xs, dtype=float)
     return {"n": len(xs), "mean": round(float(a.mean()), 4), "p10": round(float(np.percentile(a, 10)), 4),
-            "median": round(float(np.median(a)), 4), "p90": round(float(np.percentile(a, 90)), 4)}
+            "median": round(float(np.median(a)), 4), "p90": round(float(np.percentile(a, 90)), 4),
+            "min": round(float(a.min()), 4), "max": round(float(a.max()), 4)}
 
 
 def keys_of(rows):
@@ -73,34 +74,10 @@ def keys_of(rows):
 
 
 def cats_of_rows(rows):
-    return [r["down_event"] if r["down_event"] in CHAR_CATS + ("char", "backspace", "delete", "navigation", "modifier",
-                                                               "mouse", "other") else category(r["down_event"])
-            for r in rows]
+    return [r["down_event"] if r["down_event"] in ALL_CATS else category(r["down_event"]) for r in rows]
 
 
 # --- 1. paths -----------------------------------------------------------------------------------------------------
-
-A1P_VARIANTS = {
-    # name: (navigation sub-categories from keys, modifier arms a shortcut)
-    "published_nav_arm": (False, True),
-    "published_nav_noarm": (False, False),
-    "split_nav_arm": (True, True),
-    "split_nav_noarm": (True, False),
-}
-
-
-def a1p_items(rec, rows, variant, uncertain_home_end=False):
-    split, arm = A1P_VARIANTS[variant]
-    cats = cats_of_rows(rows)
-    if split:
-        # rows keep their original order; navigation names come from R0 (what the preregistered A1' assumes)
-        cats = nav_detail(cats, [rec_key(rec, r) for r in rows])
-    return a1prime(cats, uncertain_home_end=uncertain_home_end, modifier_arms=arm)
-
-
-def rec_key(rec, row):
-    return rec.rows[row["_orig"] - 1]["down_event"] if "_orig" in row else rec.rows[row["event_id"] - 1]["down_event"]
-
 
 def ned(a, b):
     """Normalised edit distance of two sequences."""
@@ -138,15 +115,12 @@ def part_paths(n, ops, label):
             put(fname + ":A1(text_change+position)", word_lengths(a1_text(rows)))
         r2 = form_R2(rec)
         wc_exact += int(r2[-1]["word_count"] == len(rec.final.split()))
-        for arm in (True, False):
-            put("R2:A1(category+position)%s" % ("" if arm else "_noarm"),
-                lengths_of_items(a1_r2(cats_of_rows(r2), [r["cursor_position"] for r in r2], modifier_arms=arm)))
-        r3 = form_R3(rec)
-        for v in A1P_VARIANTS:
-            put("R3:A1'_" + v, lengths_of_items(a1p_items(rec, r3, v)))
+        put("R2:A1(category+position)", lengths_of_items(a1_r2(cats_of_rows(r2), [r["cursor_position"] for r in r2])))
+        put("R2:A1'", lengths_of_items(a1prime(cats_of_rows(r2))))
+        put("R3:A1'", lengths_of_items(a1prime(cats_of_rows(form_R3(rec)))))
         # R3-u: only the char count can come back
-        u = a1prime(cats_of_rows(form_R3u(rec)), uncertain_home_end=True, modifier_arms=False)
-        d = res["R3-u:A1'_charcount_noarm"]
+        u = a1prime(cats_of_rows(form_R3u(rec)), uncertain_home_end=True)
+        d = res["R3-u:A1'_charcount"]
         d["n"] += 1
         d["total_exact"] += int(len(u) == len(rec.final))
         d["abs_total"].append(abs(len(u) - len(rec.final)))
@@ -271,7 +245,7 @@ def part_r7(n, cfg, ops, label):
             keep = np.random.default_rng(seed_int("r7_drop", "synthetic", str(i), "", "", str(p))).random(len(rec.rows)) >= p
             kept = [j for j in range(len(rec.rows)) if keep[j]]
             cats = [category(rec.rows[j]["down_event"]) for j in kept]
-            segs = record_segments(cats, None, modifier_arms=False)
+            segs = record_segments(cats)
             surv = rec.surviving()
             widx = word_index_of_char(rec.final)
             row_word = {}
@@ -298,7 +272,7 @@ def part_r7(n, cfg, ops, label):
                 diff.append((c - tc) / max(1, len(y)))
                 used4 += int(any(max(b - a, d - e) >= 4 for a, b, e, d in g))
             # windows: k consecutive R0 segments, the presses inside, suppressed, re-segmented, window end
-            r0segs = record_segments([category(r["down_event"]) for r in rec.rows], [r["down_event"] for r in rec.rows])
+            r0segs = record_segments([category(r["down_event"]) for r in rec.rows])
             r0_row_word = {}
             for j, r in enumerate(rec.rows):
                 fi = surv.get(r["event_id"])
@@ -324,8 +298,7 @@ def part_r7(n, cfg, ops, label):
                     hi += 1
                 hi = min(hi + 1, len(rec.rows) - 1)
                 wk = [j for j in range(lo, hi + 1) if keep[j]]
-                xw = [v for v, _ in record_segments([category(rec.rows[j]["down_event"]) for j in wk], None,
-                                                   modifier_arms=False)]
+                xw = [v for v, _ in record_segments([category(rec.rows[j]["down_event"]) for j in wk])]
                 cw, _ = align_ext.align(xw, [(1 - p) * v for v in y[w0:w0 + k]], LAM, "window", groups=groups,
                                         max_group=cap)
                 win_n[k] += 1
@@ -360,7 +333,7 @@ def char_rows(rows):
             if last is not None:
                 prev_char[j] = last
             last = j
-        elif c in ("modifier", "navigation"):
+        elif c in MOD_CATS + NAV_CATS:
             continue
         else:
             last = None
@@ -418,7 +391,7 @@ def part_a3(n_train, n_test, n_decoys):
         rows = rec.rows
         cats = [category(r["down_event"]) for r in rows]
         merged = ["char" if c in CHAR_CATS else c for c in cats]
-        doc = a1prime(merged, uncertain_home_end=True, modifier_arms=False)
+        doc = a1prime(merged, uncertain_home_end=True)
         surv = rec.surviving()
         if [surv.get(rows[j]["event_id"]) for _, j in doc] != list(range(len(rec.final))):
             continue

@@ -27,6 +27,11 @@ MOD = {"Shift", "Control", "Alt", "Meta", "CapsLock"}
 MOUSE = {"Leftclick", "Rightclick", "Middleclick"}
 CHAR_CATS = ("letter", "digit", "space", "punctuation", "enter")
 SEP_CATS = ("space", "punctuation", "enter")
+# navigation and modifier categories after the synthetic-log check (decisions 41-43)
+NAV_KEYS = {"ArrowLeft": "arrow_left", "ArrowRight": "arrow_right", "Home": "home", "End": "end"}
+NAV_CATS = ("arrow_left", "arrow_right", "home", "end", "navigation")
+MOD_CATS = ("control", "modifier")
+ALL_CATS = CHAR_CATS + ("backspace", "delete") + NAV_CATS + MOD_CATS + ("mouse", "other", "char")
 
 QWERTY_ROWS = ["1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm"]
 
@@ -42,7 +47,9 @@ def category(key):
     if key == "Enter":
         return "enter"
     if key in NAV:
-        return "navigation"
+        return NAV_KEYS.get(key, "navigation")
+    if key in ("Control", "Meta"):
+        return "control"
     if key in MOD:
         return "modifier"
     if key in MOUSE:
@@ -474,22 +481,15 @@ class Record:
 
 # --- segments ---------------------------------------------------------------------------------------------------
 
-def shortcut_flags(cats, keys=None, modifier_arms=True):
-    """A letter or digit press right after a Control or Meta press (other modifiers skipped) is a shortcut.
-
-    The preregistration says "while Control or Meta is held"; with the modifier action time set to 0 ([V264] §2.1.5)
-    the held state is not in the times, so the rule is applied to the next non-modifier press. Category columns do
-    not say which modifier it was; a modifier press counts as Control/Meta only when keys are known (R0, R1, R5, R6),
-    otherwise any modifier other than a Shift-like one cannot be told apart, so every modifier is treated as a
-    possible Control (see notes.md)."""
+def shortcut_flags(cats):
+    """A shortcut is the next press that is not a modifier after a Control or Meta press ('control'), when it is a
+    letter, digit or R3-u char (decision 43). The preregistration's "while Control or Meta is held" cannot be read
+    from the times because the modifier action time is 0 ([V264] §2.1.5)."""
     flags = [False] * len(cats)
     armed = False
     for i, c in enumerate(cats):
-        if c == "modifier":
-            if keys is None:
-                armed = modifier_arms
-            elif keys[i] in ("Control", "Meta"):
-                armed = True
+        if c in MOD_CATS:
+            armed = armed or c == "control"
             continue
         if armed and c in ("letter", "digit", "char"):
             flags[i] = True
@@ -497,10 +497,10 @@ def shortcut_flags(cats, keys=None, modifier_arms=True):
     return flags
 
 
-def record_segments(cats, keys=None, merge_char=False, modifier_arms=True):
+def record_segments(cats, merge_char=False):
     """Record segments (preregistration.md 区間): [(value, [row indices])]. A trailing open segment is kept if it has
     a counted press. merge_char: the R3-u 'char' category has no separator (returns one segment)."""
-    sc = shortcut_flags(cats, keys, modifier_arms)
+    sc = shortcut_flags(cats)
     segs = []
     v, idx, counted = 0, [], False
     for i, c in enumerate(cats):
@@ -551,7 +551,9 @@ def form_R1(rec):
 
 
 R2_COLS = ("event_id", "down_time", "up_time", "action_time", "down_event", "up_event", "cursor_position", "word_count")
-R3_COLS = ("event_id", "down_time", "up_time", "action_time", "down_event", "up_event")
+# R3 and the forms built on it keep the press time only (decision 41): up and action times can carry a drag's
+# selection length or a held key's repeat count, and no attacker or metric uses them
+R3_COLS = ("event_id", "down_time", "down_event", "up_event")
 
 
 def form_R2(rec):
@@ -559,7 +561,8 @@ def form_R2(rec):
 
 
 def form_R3(rec, mutate=None):
-    cols = R3_COLS + (("cursor_position",) if mutate == "r3_keep_position" else ())
+    cols = R3_COLS + {"r3_keep_position": ("cursor_position",),
+                      "r3_keep_up_time": ("up_time", "action_time")}.get(mutate, ())
     return [{c: (category(r[c]) if c in ("down_event", "up_event") else r[c]) for c in cols} for r in rec.rows]
 
 
@@ -576,8 +579,6 @@ def form_R3t(rec, w):
     out = form_R3(rec)
     for o in out:
         o["down_time"] = (o["down_time"] // w) * w
-        o["up_time"] = (o["up_time"] // w) * w
-        o["action_time"] = o["up_time"] - o["down_time"]
     return out
 
 
@@ -593,9 +594,7 @@ def form_R7(rec, p, rng):
 
 
 def form_R4(rec, w):
-    cats = [category(r["down_event"]) for r in rec.rows]
-    keys = [r["down_event"] for r in rec.rows]
-    return [v // w for v, _ in record_segments(cats, keys)]
+    return [v // w for v, _ in record_segments([category(r["down_event"]) for r in rec.rows])]
 
 
 def neighbours(c):
@@ -645,7 +644,7 @@ def form_R6(rec, rng):
     out = [dict(r) for r in rec.rows]
     for o in out:
         del o["pause_time"]
-    for _, idx in record_segments(cats, keys):
+    for _, idx in record_segments(cats):
         al = [i for i in idx if cats[i] in ("letter", "digit") and rec.rows[i]["activity"] == "Input"]
         perm = rng.permutation(len(al))
         for i, j in zip(al, perm):
