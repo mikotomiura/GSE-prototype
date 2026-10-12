@@ -12,12 +12,19 @@
 //!
 //! - 契機: `TickOutput::triggered`（出したかどうかに依らない）。作業時間 1 時間あたりで出す。
 //! - 提示: 本人の設定の既定（終日・上限 2）での `presented`。
-//! - 作業時間: 最後の打鍵から 180 秒未満の `feat` 行の数（1 行 = 1 秒）。
+//! - 作業時間: 最後の打鍵から 180 秒未満の `feat` 行の時間（次の行までの間・1 行 1 秒まで）。
 //! - 停滞らしさ: 契機の直前の継続の窓で、`p_stuck` が 3 状態の最大だった行の割合と、窓の中の `p_stuck` の最大値。
 //!
-//! 殻（`lib.rs` の `InvitationRunner`）と同じく、`feat` 行が 30 秒以上空いたらセッションの区切りとし、
-//! 現地の日（4:00 区切り）が変わったら区切る。記録の一時停止の扱いは再現しない（O1 の記録には
-//! 一時停止の区間が残らないため。止めていた区間は `feat` 行の欠けとして区切りになる）。
+//! 渡したファイルはすべて 1 本の時系列に並べて 1 つの状態機械で回す（O1 は起動したまま日次でファイルを
+//! 替えるので、ファイルの境目で上限や間隔を数え直さない）。殻（`lib.rs` の `InvitationRunner`）と同じく、
+//! `feat` 行が 30 秒以上空いたらセッションの区切りとし、現地の日（4:00 区切り）が変わったら区切る。
+//!
+//! 殻と違うところ（数の読み方に関わる）:
+//! - 記録の一時停止は再現しない（O1 の記録には一時停止の区間が残らず、止めていた区間は `feat` 行の欠けと
+//!   して区切りになる）。再開の後 30 秒の停滞の無効化も再現しない。
+//! - 割り当て済みの日かどうか（期間の中か・台帳）は見ない（`research_enabled` は常に真）。提示の数は上限め。
+//! - 記録の `p_stuck` は小数 4 桁に丸めてある（`logger.rs`）。閾値ちょうどの比較（`≥`）では、丸める前に
+//!   閾値をわずかに下回った値（例: 0.49996）を道具だけが届いたと数える。向きは多め側だけで、量は小さい。
 //!
 //! ⚠️ 打鍵の内容は読まない（`key` 行は時刻と押下だけを使う）。結果は集計の数だけを stdout に出す。
 //! NDJSON の生ログと出力の行ごとの値を外部の LLM に送らない（`data-privacy`）。
@@ -53,15 +60,13 @@ struct Row {
     stuck_is_max: bool,
     /// 最後の打鍵（押下）の時刻。
     last_press: Option<u64>,
-    /// 区切りの後の最初の行（ファイルの先頭・30 秒以上の欠け）。
+    /// 前の行から 30 秒以上空いた（または時計が戻った）。最初の行は偽。
     after_gap: bool,
 }
 
-fn load(path: &str) -> Result<Vec<Row>> {
+/// 1 本のファイルから `feat` 行（時刻・確率）と打鍵の押下の時刻を読む。
+fn load(path: &str, feats: &mut Vec<(u64, f64, bool)>, presses: &mut Vec<u64>) -> Result<()> {
     let reader = BufReader::new(File::open(path)?);
-    let mut rows = Vec::new();
-    let mut last_press: Option<u64> = None;
-    let mut last_feat: Option<u64> = None;
     for line in reader.lines() {
         let line = line?;
         let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) else {
@@ -73,32 +78,55 @@ fn load(path: &str) -> Result<Vec<Row>> {
         match v.get("type").and_then(|x| x.as_str()) {
             Some("key") => {
                 if v.get("press").and_then(|x| x.as_bool()) == Some(true) {
-                    last_press = Some(t);
+                    presses.push(t);
                 }
             }
             Some("feat") => {
                 let f = |k: &str| v.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0);
                 let (ps, pf, pi) = (f("p_stuck"), f("p_flow"), f("p_inc"));
-                let after_gap =
-                    last_feat.is_none_or(|prev| t < prev || t - prev >= GAP_AS_BOUNDARY_MS);
-                last_feat = Some(t);
-                rows.push(Row {
-                    t,
-                    p_stuck: ps,
-                    stuck_is_max: ps >= pf && ps >= pi,
-                    last_press,
-                    after_gap,
-                });
+                feats.push((t, ps, ps >= pf && ps >= pi));
             }
             _ => {}
         }
+    }
+    Ok(())
+}
+
+/// すべてのファイルを 1 本の時系列に並べる。O1 は起動したまま日次でファイルを替えるので、
+/// ファイルの境目では状態機械を作り直さない（区切りは殻と同じく `feat` の欠けと日の変わり目だけ）。
+fn timeline(paths: &[String]) -> Result<Vec<Row>> {
+    let (mut feats, mut presses) = (Vec::new(), Vec::new());
+    for p in paths {
+        load(p, &mut feats, &mut presses)?;
+    }
+    feats.sort_by_key(|f| f.0);
+    feats.dedup_by_key(|f| f.0);
+    presses.sort_unstable();
+    let mut rows = Vec::with_capacity(feats.len());
+    let mut k = 0;
+    let mut last_press = None;
+    let mut prev: Option<u64> = None;
+    for (t, ps, is_max) in feats {
+        while k < presses.len() && presses[k] <= t {
+            last_press = Some(presses[k]);
+            k += 1;
+        }
+        let after_gap = prev.is_some_and(|q| t - q >= GAP_AS_BOUNDARY_MS);
+        prev = Some(t);
+        rows.push(Row {
+            t,
+            p_stuck: ps,
+            stuck_is_max: is_max,
+            last_press,
+            after_gap,
+        });
     }
     Ok(rows)
 }
 
 #[derive(Default)]
 struct Tally {
-    work_secs: u64,
+    work_ms: u64,
     triggers: u64,
     presented: u64,
     /// 契機の窓で `p_stuck` が 3 状態の最大だった行の割合の和（契機ごと）。
@@ -109,47 +137,52 @@ struct Tally {
     days_presented: std::collections::BTreeSet<i64>,
 }
 
-fn sweep(files: &[Vec<Row>], trigger: Trigger, offset: i32) -> Tally {
+fn sweep(rows: &[Row], trigger: Trigger, offset: i32) -> Tally {
     let mut tally = Tally::default();
-    let hold_rows = (trigger.hold_ms / 1000) as usize + 1;
-    for rows in files {
-        let mut m = InvitationMachine::with_trigger(trigger);
-        let mut last_day: Option<i64> = None;
-        for (i, r) in rows.iter().enumerate() {
-            let day = local_day(r.t, offset);
-            let idle_ms = r.last_press.map_or(u64::MAX, |p| r.t.saturating_sub(p));
-            if idle_ms < AWAY_IDLE_MS {
-                tally.work_secs += 1;
-                tally.days_with_work.insert(day);
+    let mut m = InvitationMachine::with_trigger(trigger);
+    let mut last_day: Option<i64> = None;
+    let mut seg_start = 0;
+    for (i, r) in rows.iter().enumerate() {
+        let day = local_day(r.t, offset);
+        let idle_ms = r.last_press.map_or(u64::MAX, |p| r.t.saturating_sub(p));
+        if idle_ms < AWAY_IDLE_MS {
+            // 作業時間は時刻で数える（次の行までの間、ただし 1 行 1 秒まで）
+            let dt = rows.get(i + 1).map_or(1000, |n| (n.t - r.t).min(1000));
+            tally.work_ms += dt;
+            tally.days_with_work.insert(day);
+        }
+        let boundary = r.after_gap || last_day.is_some_and(|d| d != day);
+        if boundary {
+            seg_start = i;
+        }
+        last_day = Some(day);
+        let out = m.tick(&TickInput {
+            now_ms: r.t,
+            local_day: day,
+            minute_of_day: local_minute_of_day(r.t, offset),
+            p_stuck: r.p_stuck,
+            idle_ms,
+            research_enabled: true,
+            recording_active: true,
+            settings: Settings::default(),
+            session_boundary: boundary,
+        });
+        if out.triggered {
+            tally.triggers += 1;
+            // 契機の直前の継続の窓（時刻で切り、区切りの前の行を入れない）
+            let from = r.t.saturating_sub(trigger.hold_ms);
+            let window: Vec<&Row> = rows[seg_start..=i].iter().filter(|w| w.t >= from).collect();
+            let share =
+                window.iter().filter(|w| w.stuck_is_max).count() as f64 / window.len() as f64;
+            tally.stuck_max_share_sum += share;
+            let peak = window.iter().map(|w| w.p_stuck).fold(0.0, f64::max);
+            if peak < MAIN_P {
+                tally.below_main += 1;
             }
-            let boundary = (r.after_gap && i > 0) || last_day.is_some_and(|d| d != day);
-            last_day = Some(day);
-            let out = m.tick(&TickInput {
-                now_ms: r.t,
-                local_day: day,
-                minute_of_day: local_minute_of_day(r.t, offset),
-                p_stuck: r.p_stuck,
-                idle_ms,
-                research_enabled: true,
-                recording_active: true,
-                settings: Settings::default(),
-                session_boundary: boundary,
-            });
-            if out.triggered {
-                tally.triggers += 1;
-                let window = &rows[i.saturating_sub(hold_rows - 1)..=i];
-                let share =
-                    window.iter().filter(|w| w.stuck_is_max).count() as f64 / window.len() as f64;
-                tally.stuck_max_share_sum += share;
-                let peak = window.iter().map(|w| w.p_stuck).fold(0.0, f64::max);
-                if peak < MAIN_P {
-                    tally.below_main += 1;
-                }
-            }
-            if out.presented {
-                tally.presented += 1;
-                tally.days_presented.insert(day);
-            }
+        }
+        if out.presented {
+            tally.presented += 1;
+            tally.days_presented.insert(day);
         }
     }
     tally
@@ -172,7 +205,7 @@ fn main() -> Result<()> {
     if paths.is_empty() {
         return Err("usage: invitation_trigger_sweep [--utc-offset-secs N] <a.ndjson> ...".into());
     }
-    let files = paths.iter().map(|p| load(p)).collect::<Result<Vec<_>>>()?;
+    let rows = timeline(&paths)?;
 
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
@@ -183,14 +216,14 @@ fn main() -> Result<()> {
     for &p in &THRESHOLDS {
         for &h in &HOLDS_SEC {
             let t = sweep(
-                &files,
+                &rows,
                 Trigger {
                     p_stuck: p,
                     hold_ms: h * 1000,
                 },
                 offset,
             );
-            let work_h = t.work_secs as f64 / 3600.0;
+            let work_h = t.work_ms as f64 / 3_600_000.0;
             let per_h = if work_h > 0.0 {
                 t.triggers as f64 / work_h
             } else {

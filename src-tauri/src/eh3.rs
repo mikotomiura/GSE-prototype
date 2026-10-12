@@ -153,12 +153,16 @@ pub struct Assignment {
     pub a_first: Ending,
     pub grammar: Grammar,
     pub drift: Drift,
-    /// 招待の契機の段。⚠️ `canonical` に含めない（段を替えても、数えた稼働日の台帳を捨てない）。
+    /// 招待の契機の段。`canonical` には試作のときだけ入る（段を替えたら台帳を使わない）。
     pub trigger: TriggerStage,
 }
 
 impl Assignment {
-    /// 正規の書式（台帳と割り当てを結び付けるために使う）。招待の契機の段は含めない。
+    /// 正規の書式（台帳と割り当てを結び付けるために使う）。
+    ///
+    /// 招待の契機の段は、試作のときだけ末尾に `;trigger=proto` を足す（本番の段の書式は段を足す前と同じで、
+    /// 既存の台帳はそのまま読める）。段を替えた印は別の割り当てとして扱い、試作の段で数えた日を本番の期間に
+    /// 持ち込まない（印を差し替えたら途中の日から始めない・`DayLedger::assignment` と同じ考え方）。
     pub fn canonical(&self) -> String {
         let b = |x: Block| match x {
             Block::Blank => "E",
@@ -182,7 +186,10 @@ impl Assignment {
                 Drift::None => "none",
                 Drift::Diffuse => "diffuse",
             },
-        )
+        ) + match self.trigger {
+            TriggerStage::Main => "",
+            TriggerStage::Proto => ";trigger=proto",
+        }
     }
 }
 
@@ -790,22 +797,28 @@ mod tests {
         }
     }
 
-    /// 招待の契機の段: 無ければ本番、`trigger=proto` で試作。段は台帳の結び付き（`canonical`）に入らない。
+    /// 招待の契機の段: 無ければ本番、`trigger=proto` で試作。試作の段は台帳の結び付き（`canonical`）に入る。
     #[test]
-    fn trigger_stage_is_optional_and_outside_the_canonical_form() {
+    fn trigger_stage_is_optional_and_binds_the_ledger() {
         assert_eq!(assign().trigger, TriggerStage::Main);
         let proto = parse_assignment(&format!("{OK};trigger=proto")).unwrap();
         assert_eq!(proto.trigger, TriggerStage::Proto);
         let main = parse_assignment(&format!("trigger = main ; {OK}")).unwrap();
         assert_eq!(main, assign());
-        // 段を替えても、数えた稼働日の台帳は同じ割り当てとして読む
-        assert_eq!(proto.canonical(), assign().canonical());
-        let ledger = DayLedger {
+        // 本番の段の書式は段を足す前と同じ（既存の台帳をそのまま読む）
+        assert_eq!(assign().canonical(), OK);
+        assert_eq!(proto.canonical(), format!("{OK};trigger=proto"));
+        // 試作の段で数えた日を本番の期間に持ち込まない（逆も同じ）
+        let ledger = |a: &Assignment| DayLedger {
             days: vec![100],
-            assignment: Some(assign().canonical()),
+            assignment: Some(a.canonical()),
         };
-        let tracker = DayTracker::new(LedgerLoad::Loaded(ledger), None, &proto);
-        assert!(tracker.ledger.is_some(), "段の違いで台帳を捨てない");
+        let t = DayTracker::new(LedgerLoad::Loaded(ledger(&proto)), None, &assign());
+        assert!(t.ledger.is_none(), "試作の台帳を本番で使わない");
+        let t = DayTracker::new(LedgerLoad::Loaded(ledger(&assign())), None, &proto);
+        assert!(t.ledger.is_none(), "本番の台帳を試作で使わない");
+        let t = DayTracker::new(LedgerLoad::Loaded(ledger(&proto)), None, &proto);
+        assert!(t.ledger.is_some(), "同じ段なら続ける");
         // 段の契機の値
         assert_eq!(
             TriggerStage::Main.trigger(),

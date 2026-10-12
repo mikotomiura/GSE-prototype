@@ -67,7 +67,7 @@ impl Trigger {
     ///
     /// 研究者が決めた（2026-10-12・`.steering/20261012-eh3-trigger-values/decisions.md` 判断 2）。0.50 は、
     /// 手を止めたときの頭打ち（0.54・Windows の実機）を越えるので、研究者が手を止めれば図像を確かめられる。
-    /// 研究者の O1 の記録（4 日・作業 9.6 時間）では、本番の値の契機 34 回に対して 41 回、既定の提示は 11 回に対して 12 回。
+    /// 研究者の O1 の記録（4 日・作業 9.6 時間）では、本番の値の契機 35 回に対して 42 回、既定の提示は 6 回に対して 7 回。
     pub const PROTO: Trigger = Trigger {
         p_stuck: 0.50,
         hold_ms: 10_000,
@@ -1037,22 +1037,21 @@ mod tests {
 
     /// 段の値の違いが提示に届く: 試作の段だけが届く列で、本番は出さない。
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn a_stall_only_proto_reaches_is_not_presented_on_main() {
         let p = Trigger::PROTO.p_stuck;
         let hold = Trigger::PROTO.hold_ms / SEC;
         let (proto, _) = run_trigger(Trigger::PROTO, &|_| p, 120);
         assert_eq!(proto, vec![hold]);
-        if p < Trigger::MAIN.p_stuck {
-            assert!(run_trigger(Trigger::MAIN, &|_| p, 120).0.is_empty());
-        }
-        if hold < Trigger::MAIN.hold_ms / SEC {
-            let (main, _) = run_trigger(
-                Trigger::MAIN,
-                &|s| if s < hold + 1 { 0.9 } else { 0.0 },
-                120,
-            );
-            assert!(main.is_empty());
-        }
+        // 試作の段は閾値も継続も本番より緩い（前提が崩れたら黙って飛ばさずに落とす）
+        assert!(p < Trigger::MAIN.p_stuck && hold < Trigger::MAIN.hold_ms / SEC);
+        assert!(run_trigger(Trigger::MAIN, &|_| p, 120).0.is_empty());
+        let (main, _) = run_trigger(
+            Trigger::MAIN,
+            &|s| if s < hold + 1 { 0.9 } else { 0.0 },
+            120,
+        );
+        assert!(main.is_empty());
     }
 
     /// 区間の終わりも段の閾値で決まる: 閾値以上（本番の閾値未満）の間は区間が続き、2 回目を出さない。
