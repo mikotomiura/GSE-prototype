@@ -17,14 +17,17 @@
 - [x] 研究者が world v4 を選ぶ（判断 16）→ v4 を足す（`5fcda976`）
 - [x] 下見 0 の 2 回目（v4 0.705 で使える）→ §3.0 に追記して固定
 - [x] world v4 の追加の差分の `/cross-review`（固定の後・判断 17・selftest に実測の項・§8 の 2 行目）
-- [ ] 次の段: 下見 1（PC-stall 24 本の λ・design §3.9）→ `stage.py`・`twins.py`・`checks.py`・selftest の残り → スモーク → 本番（world v4）
+- [x] 次の段: 下見 1（PC-stall 24 本の λ・design §3.9）→ `stage.py`・`twins.py`・`checks.py`・selftest の残り → スモーク
 
 ## 計器と本番（固定の後）
-- [ ] `experiments/<日付>-rhythm-stage-desk-check/` を作る（EH1 第 5 回から写す・`stage.py`・`twins.py`）
-- [ ] selftest・スモーク
-- [ ] 下見（PC-stall の λ）→ `config.json`
-- [ ] 本番 → `results/main/`・`notes.md`
+- [x] 計器の残り: `replay_all.py`（EH1 の写し）・`stage.py`・`twins.py`・`checks.py`・selftest の §3.7 の残り・`run.sh --pilot | --smoke | --main`（`e35491ef`）
+- [x] 遅れの量の負例が定義どおりでは通らない → 研究者の判断 18（jitter の遅れは読まない）
+- [x] 計器の code-reviewer（HIGH 0・MEDIUM 5・LOW 7）と Codex（3 本に分けて P1 1・P2 11）→ 直す（`48cbac51`）。F1 = 0 の扱い → 研究者の判断 19・尺度は変えない（判断 20）
+- [x] Codex 2 巡目（直しの差分・P2 3、うち 1 件は該当なし）→ 直す（`0c443794`）
+- [x] 下見 1（直した計器で回し直し）→ `config.json` の `pc_stall.lam`・design §8（`results/pilot/`）
+- [x] スモーク（`SEED + 2`・P 12・計器 `dab6dd66`・自己検査 0 件の失敗・768 s）
+- [ ] 本番（`bash run.sh --main`・CI の走っていない時・8〜15 時間の見込み）→ `results/main/`・`notes.md`
 
 ## 完了処理
-- [ ] `/cross-review`（計器）・code-reviewer
+- [x] `/cross-review`（計器）・code-reviewer（上の 2 巡）
 - [ ] 親タスクの判断 3・5 の見直しの材料として結果を渡す（研究者）
