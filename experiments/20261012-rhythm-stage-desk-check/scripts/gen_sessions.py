@@ -1,6 +1,6 @@
 """Generate synthetic keystroke sessions with stall labels (copied from EH1 round 5 of the portrait).
 
-The only change from experiments/20261010-portrait-eh1-round5/scripts/gen_sessions.py is --world v3
+The only change from experiments/20261010-portrait-eh1-round5/scripts/gen_sessions.py is --world v3 and v4
 (.steering/20261012-rhythm-stage-desk-check/design.md 1.6); v1 and v2 write the same sessions (selftest.py).
 
 Each session is a sequence of segments (FLOW, STRUGGLE, THINK, STALL_SILENT, AWAY, SLEEP).
@@ -9,7 +9,7 @@ copy or reorder segments (sets O, J and D). The NDJSON holds only key rows (and 
 session_start and session_meta rows that gse-replay reads); the labels are written to a
 separate file that the replay never sees.
 
-Usage: gen_sessions.py <config.json> <SEED file> <work dir> --hmm-version V [--world v1|v2|v3] [--smoke] [--p-n N]
+Usage: gen_sessions.py <config.json> <SEED file> <work dir> --hmm-version V [--world v1|v2|v3|v4] [--smoke] [--p-n N]
 """
 
 from __future__ import annotations
@@ -220,15 +220,16 @@ def main() -> int:
     ap.add_argument("work")
     ap.add_argument("--hmm-version", required=True)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--world", choices=("v1", "v2", "v3"), default="v1",
+    ap.add_argument("--world", choices=("v1", "v2", "v3", "v4"), default="v1",
                     help="v1 = frozen design 1.2; v2 = deviation: same pause structure for FLOW and STRUGGLE; "
-                         "v3 = v2 with FLOW's key intervals in STRUGGLE and v1's pause after a backspace")
+                         "v3 = v2 with FLOW's key intervals in STRUGGLE and v1's pause after a backspace; "
+                         "v4 = v2 with FLOW's key intervals in STRUGGLE (the stall shows only in corrections)")
     ap.add_argument("--p-n", type=int, default=None,
                     help="round 2 pilot only (design 3.10): the number of P sessions; the default output is unchanged")
     a = ap.parse_args()
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
     cfg["_hmm_version"] = a.hmm_version
-    if a.world in ("v2", "v3"):
+    if a.world in ("v2", "v3", "v4"):
         cfg["segments"] = cfg[f"segments_{a.world}"]
     seed = int(Path(a.seed_file).read_text().strip())
     work = Path(a.work)

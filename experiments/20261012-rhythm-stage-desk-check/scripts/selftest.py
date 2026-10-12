@@ -119,6 +119,25 @@ def test_world(cfg: dict, config: Path, eh1: Path, tmp: Path, hmm: str) -> None:
     check(st3["STRUGGLE"]["after_bs_ge2s"] > st2["STRUGGLE"]["after_bs_ge2s"] + 0.1
           and st3["STRUGGLE"]["n_after_bs"] > 50,
           "world v3: more gaps of 2 s or longer after a backspace in STRUGGLE than v2")
+    # world v4 (decisions 16): v2 with FLOW's key intervals in STRUGGLE, no pause after a backspace
+    v4 = cfg["segments_v4"]
+    s4 = v4["STRUGGLE"]
+    check(all(v4[k] == v2[k] for k in v2 if k != "STRUGGLE") and set(v4) == set(v2) and set(s4) == set(s2)
+          and all(s4[k] == s2[k] for k in s2 if k not in V3_CHANGED[:2])
+          and s4["flight_median_ms"] == v2["FLOW"]["flight_median_ms"] and s4["flight_sigma"] == v2["FLOW"]["flight_sigma"],
+          "world v4: only STRUGGLE's flight median and sigma differ from v2 (as FLOW), no pause field")
+    timing_keys = [k for k in v4["FLOW"] if k != "p_backspace"]
+    check(all(s4[k] == v4["FLOW"][k] for k in timing_keys if k not in ("dur_min_s", "dur_max_s"))
+          and s4["p_backspace"] != v4["FLOW"]["p_backspace"],
+          "world v4: STRUGGLE's key timing settings equal FLOW's; only the backspace rate (and the lengths) differ")
+    generate(HERE / "gen_sessions.py", config, seed_file, tmp / "ours-v4", "v4", hmm)
+    st4 = interval_stats(tmp / "ours-v4")
+    print(f"     v4 intervals {st4}")
+    check(abs(st4["STRUGGLE"]["short_median"] - st4["FLOW"]["short_median"]) / st4["FLOW"]["short_median"] < 0.1,
+          "world v4: STRUGGLE's short-interval median within 10% of FLOW's")
+    check(abs(st4["STRUGGLE"]["after_bs_ge2s"] - st4["FLOW"]["after_bs_ge2s"]) < 0.1
+          and st4["STRUGGLE"]["after_bs_ge2s"] < st3["STRUGGLE"]["after_bs_ge2s"] - 0.2,
+          "world v4: gaps after a backspace in STRUGGLE as in FLOW (no pause), unlike v3")
 
 
 def test_speed(cfg: dict) -> None:
@@ -235,17 +254,20 @@ def test_auc_and_choice(cfg: dict) -> None:
         raised = True
     check(raised, "fit: a table that does not line up raises (not read as a failed fit)")
 
+    # the rule on two worlds (the config's prefer may name one: the second pilot 0 runs v4 only)
+    ccfg = {**cfg, "ceiling": {**cfg["ceiling"], "prefer": ["v2", "v3"]}}
+
     def res(v2_hgb, v2_lr, v3_hgb, v3_lr):
         mk = lambda h, l: {"L300": {"hgb": {"auc_A_speed": h}, "lr": {"auc_A_speed": l}}}
         return {"v2": mk(v2_hgb, v2_lr), "v3": mk(v3_hgb, v3_lr)}
-    check(ce.choose(res(0.85, 0.95, 0.5, 0.5), cfg)["chosen"] == "v2", "choice: 0.85 exactly is usable; the smaller counts")
-    check(ce.choose(res(0.86, 0.95, 0.80, 0.99), cfg)["chosen"] == "v3", "choice: v3 when v2 is not usable")
-    check(ce.choose(res(0.80, 0.80, 0.70, 0.70), cfg)["chosen"] == "v2", "choice: v2 is preferred")
-    c = ce.choose(res(0.86, 0.9, 0.86, 0.9), cfg)
+    check(ce.choose(res(0.85, 0.95, 0.5, 0.5), ccfg)["chosen"] == "v2", "choice: 0.85 exactly is usable; the smaller counts")
+    check(ce.choose(res(0.86, 0.95, 0.80, 0.99), ccfg)["chosen"] == "v3", "choice: v3 when v2 is not usable")
+    check(ce.choose(res(0.80, 0.80, 0.70, 0.70), ccfg)["chosen"] == "v2", "choice: v2 is preferred")
+    c = ce.choose(res(0.86, 0.9, 0.86, 0.9), ccfg)
     check(c["chosen"] is None and c["back_to_researcher"], "choice: none usable -> back to the researcher")
-    c = ce.choose(res(None, 0.9, 0.8, 0.8), cfg)
+    c = ce.choose(res(None, 0.9, 0.8, 0.8), ccfg)
     check(c["chosen"] is None and c["unmeasured"] == ["v2"], "choice: an unmeasured v2 is not read as a ceiling")
-    c = ce.choose(res(0.8, 0.8, float("nan"), 0.8), cfg)
+    c = ce.choose(res(0.8, 0.8, float("nan"), 0.8), ccfg)
     check(c["chosen"] is None and c["unmeasured"] == ["v3"], "choice: a NaN in v3 also goes back to the researcher")
 
 

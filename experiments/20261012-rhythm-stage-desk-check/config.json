@@ -287,13 +287,68 @@
       1801
     ]
   },
-  "_comment_ceiling": "design 3.0 (pilot 0, before the freeze): SEED + seed_offset, P sessions of each world (the other sets at the smoke size, unused), AUC(A) and AUC(A_speed) per label and classifier, out of fold. A world is usable when the smaller of the two classifiers' L300 AUC(A_speed) is <= usable_max (equality is usable); the first usable world in prefer is chosen; none usable -> back to the researcher.",
+  "_comment_segments_v4": "design 1.6 (researcher, decisions 16, after pilot 0 found no usable world): world v4 = world v2 with STRUGGLE's flight_median_ms and flight_sigma as FLOW (150, 0.25) and no pause after a backspace, so the key timing of FLOW and STRUGGLE is drawn alike; the stall regime shows only in the backspace rate (0.25 vs 0.03) and in the segment structure (lengths and transitions). Everything else is as in segments_v2.",
+  "segments_v4": {
+    "FLOW": {
+      "dur_min_s": 180,
+      "dur_max_s": 900,
+      "burst_dur_min_s": 1.0,
+      "burst_dur_max_s": 4.0,
+      "flight_median_ms": 150,
+      "flight_sigma": 0.25,
+      "gap_median_ms": 1500,
+      "gap_sigma": 0.6,
+      "gap_cap_ms": 8000,
+      "p_backspace": 0.03
+    },
+    "STRUGGLE": {
+      "dur_min_s": 120,
+      "dur_max_s": 600,
+      "burst_dur_min_s": 1.0,
+      "burst_dur_max_s": 4.0,
+      "flight_median_ms": 150,
+      "flight_sigma": 0.25,
+      "gap_median_ms": 1500,
+      "gap_sigma": 0.6,
+      "gap_cap_ms": 8000,
+      "p_backspace": 0.25
+    },
+    "THINK": {
+      "dur_min_s": 10,
+      "dur_max_s": 180
+    },
+    "STALL_SILENT": {
+      "dur_min_s": 10,
+      "dur_max_s": 180
+    },
+    "AWAY": {
+      "bands_s": [
+        [
+          60,
+          300
+        ],
+        [
+          300,
+          1200
+        ],
+        [
+          1200,
+          5400
+        ]
+      ],
+      "band_p": [
+        0.4,
+        0.4,
+        0.2
+      ]
+    }
+  },
+  "_comment_ceiling": "design 3.0: SEED + seed_offset, P sessions of each world in prefer (the other sets at the smoke size, unused), AUC(A) and AUC(A_speed) per label and classifier, out of fold. A world is usable when the smaller of the two classifiers' L300 AUC(A_speed) is <= usable_max (equality is usable); the first usable world in prefer is chosen; none usable, or a world not measured -> back to the researcher. The first pilot 0 (2026-10-13, instruments bc034ebf) ran prefer [v2, v3] and found neither usable (design 3.0); the second runs v4 only (design section 8, decisions 16).",
   "ceiling": {
     "seed_offset": 1,
     "P": 40,
     "prefer": [
-      "v2",
-      "v3"
+      "v4"
     ],
     "usable_max": 0.85
   },
