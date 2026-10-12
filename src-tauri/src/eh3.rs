@@ -115,6 +115,37 @@ pub enum Drift {
     Diffuse,
 }
 
+/// 招待の契機の段（`.steering/20261012-eh3-trigger-values/`）。
+///
+/// 試作と利用者の検証の段では招待を出やすい側の値を使い、その記録を根拠に本番の値を凍結の前に決める
+/// （`.steering/20261011-portrait-eh3-after-impl/decisions.md` 判断 4）。印に `trigger=` が無ければ本番。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TriggerStage {
+    /// 本番（稿 §10.1 F-2）。
+    #[default]
+    Main,
+    /// 試作と利用者の検証の段。
+    Proto,
+}
+
+impl TriggerStage {
+    /// `meta` 行の `invitation_trigger` に書く固定文字列（印の値と同じ）。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TriggerStage::Main => "main",
+            TriggerStage::Proto => "proto",
+        }
+    }
+
+    /// この段の契機の値。
+    pub fn trigger(self) -> crate::analysis::invitation::Trigger {
+        match self {
+            TriggerStage::Main => crate::analysis::invitation::Trigger::MAIN,
+            TriggerStage::Proto => crate::analysis::invitation::Trigger::PROTO,
+        }
+    }
+}
+
 /// 1 人の参加者の割り当て。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Assignment {
@@ -122,10 +153,12 @@ pub struct Assignment {
     pub a_first: Ending,
     pub grammar: Grammar,
     pub drift: Drift,
+    /// 招待の契機の段。⚠️ `canonical` に含めない（段を替えても、数えた稼働日の台帳を捨てない）。
+    pub trigger: TriggerStage,
 }
 
 impl Assignment {
-    /// 正規の書式（台帳と割り当てを結び付けるために使う）。
+    /// 正規の書式（台帳と割り当てを結び付けるために使う）。招待の契機の段は含めない。
     pub fn canonical(&self) -> String {
         let b = |x: Block| match x {
             Block::Blank => "E",
@@ -177,6 +210,7 @@ impl Condition {
 /// 印の中身を割り当てに直す (純関数)。
 ///
 /// ★ 4 つのキーがすべて 1 回ずつ揃い、値が値域の中にあるときだけ通す。
+/// 任意のキー `trigger`（`main` | `proto`）は 0 回か 1 回。無ければ本番の段。
 /// ⚠️ 欠け・重複・未知のキー・余分な空白以外の文字は拒む（立てたつもりを作らない）。
 /// ⚠️ エラーの文に印の値を入れない（applog に割り当ての一部を平文で残さない）。
 /// 先頭の BOM（メモ帳の UTF-8 保存）は読み飛ばす。
@@ -186,6 +220,7 @@ pub fn parse_assignment(text: &str) -> Result<Assignment, String> {
     let mut a_first: Option<Ending> = None;
     let mut grammar: Option<Grammar> = None;
     let mut drift: Option<Drift> = None;
+    let mut trigger: Option<TriggerStage> = None;
     for part in line.split(';') {
         let (key, value) = part.split_once('=').ok_or("eh3.mode: a part has no '='")?;
         let (key, value) = (key.trim(), value.trim());
@@ -226,6 +261,16 @@ pub fn parse_assignment(text: &str) -> Result<Assignment, String> {
                     _ => return Err("eh3.mode: bad drift".into()),
                 });
             }
+            "trigger" => {
+                if trigger.is_some() {
+                    return Err("eh3.mode: trigger given twice".into());
+                }
+                trigger = Some(match value {
+                    "main" => TriggerStage::Main,
+                    "proto" => TriggerStage::Proto,
+                    _ => return Err("eh3.mode: bad trigger".into()),
+                });
+            }
             _ => return Err("eh3.mode: unknown key".into()),
         }
     }
@@ -234,6 +279,7 @@ pub fn parse_assignment(text: &str) -> Result<Assignment, String> {
         a_first: a_first.ok_or("eh3.mode: a_first missing")?,
         grammar: grammar.ok_or("eh3.mode: grammar missing")?,
         drift: drift.ok_or("eh3.mode: drift missing")?,
+        trigger: trigger.unwrap_or_default(),
     })
 }
 
@@ -735,9 +781,42 @@ mod tests {
             "order=E,D,A;a_first=yes;grammar=raw;drift=none",
             "order=E,D,A;a_first=seed;grammar=ordinal;drift=none", // 外した文法
             "order=E,D,A;a_first=seed;grammar=raw;drift=fade",
+            "order=E,D,A;a_first=seed;grammar=raw;drift=none;trigger=fast", // 未知の段
+            "order=E,D,A;a_first=seed;grammar=raw;drift=none;trigger=",     // 段の値が空
+            "order=E,D,A;a_first=seed;grammar=raw;drift=none;trigger=proto;trigger=main", // 段の重複
+            "order=E,D,A;a_first=seed;grammar=raw;drift=none;trigger=PROTO", // 大文字は別の値
         ] {
             assert!(parse_assignment(bad).is_err(), "should reject {bad:?}");
         }
+    }
+
+    /// 招待の契機の段: 無ければ本番、`trigger=proto` で試作。段は台帳の結び付き（`canonical`）に入らない。
+    #[test]
+    fn trigger_stage_is_optional_and_outside_the_canonical_form() {
+        assert_eq!(assign().trigger, TriggerStage::Main);
+        let proto = parse_assignment(&format!("{OK};trigger=proto")).unwrap();
+        assert_eq!(proto.trigger, TriggerStage::Proto);
+        let main = parse_assignment(&format!("trigger = main ; {OK}")).unwrap();
+        assert_eq!(main, assign());
+        // 段を替えても、数えた稼働日の台帳は同じ割り当てとして読む
+        assert_eq!(proto.canonical(), assign().canonical());
+        let ledger = DayLedger {
+            days: vec![100],
+            assignment: Some(assign().canonical()),
+        };
+        let tracker = DayTracker::new(LedgerLoad::Loaded(ledger), None, &proto);
+        assert!(tracker.ledger.is_some(), "段の違いで台帳を捨てない");
+        // 段の契機の値
+        assert_eq!(
+            TriggerStage::Main.trigger(),
+            crate::analysis::invitation::Trigger::MAIN
+        );
+        assert_eq!(
+            TriggerStage::Proto.trigger(),
+            crate::analysis::invitation::Trigger::PROTO
+        );
+        assert_eq!(TriggerStage::Main.as_str(), "main");
+        assert_eq!(TriggerStage::Proto.as_str(), "proto");
     }
 
     #[test]

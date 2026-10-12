@@ -1123,9 +1123,10 @@ impl InvitationRunner {
     /// 実時間がこれ以上飛んだら、スリープなどでセッションが区切れたとみなす（招待を閉じ、停滞の区間を終える）。
     const GAP_AS_BOUNDARY_MS: u64 = 30_000;
 
-    fn new() -> Self {
+    /// `trigger` は割り当ての段の契機（`eh3::TriggerStage::trigger`）。
+    fn new(trigger: crate::analysis::invitation::Trigger) -> Self {
         Self {
-            machine: crate::analysis::invitation::InvitationMachine::new(),
+            machine: crate::analysis::invitation::InvitationMachine::with_trigger(trigger),
             last_tick_ms: None,
             last_day: None,
             last_press_ms: None,
@@ -4165,7 +4166,8 @@ pub fn run() {
         });
         let mut utc_offset = UtcOffsetCache::new();
         // EH3: 招待の状態機械（1 秒に 1 回進める）。入力は推定の停滞・無操作の長さ・本人の設定・研究の条件だけ。
-        let mut invitation = crate::eh3::is_eh3().then(InvitationRunner::new);
+        let mut invitation =
+            crate::eh3::assignment().map(|a| InvitationRunner::new(a.trigger.trigger()));
         let mut eh3_was_paused = crate::recording::is_paused();
         let mut eh3_reemit_gen = EH3_REEMIT_GEN.load(Ordering::Acquire);
         // EH3: 肖像の層（壁紙）。スリープの通知は肖像の終わりと始まりにだけ使う（記録しない）。
