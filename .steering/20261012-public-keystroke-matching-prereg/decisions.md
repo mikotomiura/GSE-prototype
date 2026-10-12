@@ -202,3 +202,9 @@ Claude は 2 問とも推奨を添え、研究者は 2 問とも推奨を選ん�
 3. ブートストラップの種の `writer` の欄に入れる標本の名前を `main500`（500 人）と `all`（全員）に固定する（config の `matching.bootstrap.sample_names`）。
 
 日英の版と `config.json` を直した（下書き 10）。論文用のリポジトリに新しいコミットを作り、OSF の文面の SHA-256 を書き換える。
+
+## 凍結（2026-10-13・研究者が OSF に登録）
+
+- OSF の DOI **10.17605/OSF.IO/Y5R7N**。登録の日時 2026-10-12 16:43:33 UTC（日本時間 10-13 01:43）。テンプレート「OSF Preregistration」v4。公開（エンバーゴなし。Claude はエンバーゴを推奨していた。PoPETs の二重盲検では、論文での登録の示し方を投稿の段で確かめる）。
+- OSF の API で確かめた: 添付の `preregistration.md`・`config.json`・`SEED` の SHA-256 が論文用のリポジトリのコミット `cf5353da` と一致。Other の欄のコミットと SHA-256 も一致。選択式の欄は推奨どおり（Foreknowledge は「limited observation」・Study type は Descriptive と Simulation・因果なし・盲検化なし）。
+- 以後の変更は `notes.md` の「逸脱」に書く。取得（KLiCKe・ENJA15・KeyTAR）はこの後に進める。
