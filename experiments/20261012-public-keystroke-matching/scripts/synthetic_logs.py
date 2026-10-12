@@ -513,7 +513,8 @@ def shortcut_flags(cats):
 
 def segment_rows(cats):
     """For each record segment of record_segments(cats), (first row, last row): from the row after the previous
-    closing separator to the closing separator (or the last row for a trailing open segment)."""
+    closing separator to the closing separator (or the last row for a trailing open segment). For category columns
+    with separators (R0 and the forms that keep them); there is no merge_char variant."""
     sc = shortcut_flags(cats)
     out, start, counted = [], 0, False
     for i, c in enumerate(cats):
@@ -660,7 +661,7 @@ def form_R5(rec, rng):
             if r["activity"] == "Input":
                 o["text_change"] = s
             elif r["activity"] == "Replace":
-                a, b = r["text_change"].split(" => ")
+                a, b = r["text_change"].rsplit(" => ", 1)
                 o["text_change"] = "".join(sub(c) for c in a) + " => " + s
             elif r["activity"] in ("Paste", "Remove/Cut") and r["text_change"] != "NoChange":
                 o["text_change"] = "".join(sub(c) for c in r["text_change"])
@@ -682,8 +683,14 @@ def form_R6(rec, rng):
         if r["activity"] in ("Paste", "Remove/Cut") and tc != "NoChange":
             o["text_change"] = mask_q(tc)
         elif r["activity"] == "Replace":
-            a, b = tc.split(" => ")
+            a, b = tc.rsplit(" => ", 1)  # the typed side is one key
             o["text_change"] = mask_q(a) + " => " + b
+    sc = shortcut_flags(cats)
+    for i, r in enumerate(rec.rows):
+        # a typed letter or digit outside every segment (after a lone Control press) is masked, not left as is
+        if sc[i] and r["activity"] in ("Input", "Replace") and cats[i] in ("letter", "digit"):
+            out[i]["down_event"] = out[i]["up_event"] = "q"
+            out[i]["text_change"] = mask_q(out[i]["text_change"])
     for _, idx in record_segments(cats):
         al = [i for i in idx if cats[i] in ("letter", "digit") and rec.rows[i]["activity"] in ("Input", "Replace")]
         perm = rng.permutation(len(al))
@@ -693,5 +700,5 @@ def form_R6(rec, rng):
             if rec.rows[i]["activity"] == "Input":
                 out[i]["text_change"] = k
             else:
-                out[i]["text_change"] = out[i]["text_change"].split(" => ")[0] + " => " + k
+                out[i]["text_change"] = out[i]["text_change"].rsplit(" => ", 1)[0] + " => " + k
     return out

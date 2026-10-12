@@ -82,7 +82,7 @@ def test_forms():
             if x["activity"] in ("Paste", "Remove/Cut") and x["text_change"] != "NoChange":
                 check(not any(ch.isalnum() and ch != "q" for ch in o["text_change"]), "R6 masks %r" % o["text_change"])
             if x["activity"] == "Replace":
-                check(not any(ch.isalnum() and ch != "q" for ch in o["text_change"].split(" => ")[0]), "R6 replace")
+                check(not any(ch.isalnum() and ch != "q" for ch in o["text_change"].rsplit(" => ", 1)[0]), "R6 replace")
         check(word_lengths(a1_text(r6)) == word_lengths(r.final), "R6 keeps the word lengths")
     # operations happen, including undo; Control rows come before the edit
     counts = {}
@@ -95,7 +95,30 @@ def test_forms():
                 check(b_["cursor_position"] - a_["cursor_position"] == len(b_["text_change"]) or
                       b_["text_change"] == "NoChange", "the Control row is logged before the paste")
     for k2 in DEFAULT_OPS:
-        check(counts.get(k2, 0) > 0, "operation %s happens (%r)" % (k2, counts))
+        check(counts.get(k2, 0) > 0, "operation %s is called (%r)" % (k2, counts))
+    effects = sc.part_paths(30, DEFAULT_OPS, "selftest")["operations_executed"]
+    for k2 in ("effect:paste", "effect:move", "effect:replace", "effect:cut", "effect:undo"):
+        check(effects.get(k2, 0) > 0, "%s has an effect in the rows (%r)" % (k2, effects))
+    # undo and cut: the Control row is logged before the edit (its position is not the position after the edit)
+    for i in range(30):
+        r = Writer(70 + i, 80 + i, 90 + i, ops=DEFAULT_OPS).run()
+        for z_, a_, b_ in zip(r.rows, r.rows[1:], r.rows[2:]):
+            if a_["down_event"] == "Control" and b_["down_event"] in ("z", "x") and b_["activity"] == "Remove/Cut":
+                # a Control row does not change the state: it carries the state of the row before it
+                check((a_["cursor_position"], a_["word_count"]) == (z_["cursor_position"], z_["word_count"]),
+                      "the Control row comes before the %s edit" % b_["down_event"])
+    # R6: a typed letter after a lone Control press is masked
+    lone = Writer(1, 2, 3, ops=NO_OPS).run()
+    rows = [dict(x) for x in lone.rows]
+    j = next(i for i, x in enumerate(rows) if x["activity"] == "Input" and x["down_event"].isalpha())
+    rows.insert(j, dict(rows[j], down_event="Control", up_event="Control", activity="Nonproduction",
+                        text_change="NoChange"))
+    lone.rows = rows
+    r6 = form_R6(lone, np.random.default_rng(0))
+    check(r6[j + 1]["down_event"] == "q" and r6[j + 1]["text_change"] == "q", "R6 masks a letter after a lone Control")
+    # A3 chain: a shortcut press breaks the chain of consecutive char presses
+    ch = sc.char_rows([{"down_event": k3, "down_time": 0} for k3 in ("a", "Control", "c", "b", "d")])
+    check(ch == {4: 3}, "a shortcut breaks the A3 chain (%r)" % (ch,))
     try:
         align_ext.align([1], [-1], 8, "window")
         check(False, "a negative text segment is an input error")
@@ -169,6 +192,13 @@ def test_parts(cfg):
     check(r7["0.0"]["dp_minus_true_correspondence_cost_per_word"]["median"] == 0.0,
           "p = 0, no edits: DP finds the true path cost")
     check(r7["0.0"]["cap_inflation_per_word"]["max"] == 0.0, "p = 0, no edits: no cap inflation")
+    g25, cap25 = align_ext.r7_groups(cfg, 0.25)
+    c_cap, _ = align_ext.align([25], [5] * 5, 8, "full", groups=g25, max_group=cap25)
+    c_unc, _ = align_ext.align([25], [5] * 5, 8, "full", groups=sc.UNCAPPED, max_group=10)
+    check(c_cap == align_ext.INF and c_unc == 32, "positive control: the cap cuts what groups up to 10 allow")
+    c_cap, _ = align_ext.align([10, 27], [5, 3, 4, 4, 1, 1, 4], 8, "full", groups=g25, max_group=cap25)
+    c_unc, _ = align_ext.align([10, 27], [5, 3, 4, 4, 1, 1, 4], 8, "full", groups=sc.UNCAPPED, max_group=10)
+    check(c_unc == 55 and c_cap == 59, "positive control: the cap inflates a finite cost (%r %r)" % (c_cap, c_unc))
     check(r7["0.5"]["dp_uses_group_of_4_or_more"] > 0, "groups of 4 or more are chosen at p = 0.5")
     a3 = sc.part_a3(30, 10, 19)
     check(a3["test_with_exact_replay"] >= 5, "A3: enough exact replays")

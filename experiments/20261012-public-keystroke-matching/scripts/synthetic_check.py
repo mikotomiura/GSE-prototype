@@ -102,7 +102,19 @@ def part_paths(n, ops, label):
         ks, hs, ls = rec_seeds("paths_" + label, i)
         rec = Writer(ks, hs, ls, ops=ops).run()
         for kind, v in rec.op_counts.items():
-            op_counts[kind] += v
+            op_counts["called:" + kind] += v
+        for r in rec.rows:
+            a, k = r["activity"], r["down_event"]
+            if a == "Paste" and r["text_change"] != "NoChange":
+                op_counts["effect:paste"] += 1
+            elif a.startswith("Move From"):
+                op_counts["effect:move"] += 1
+            elif a == "Replace":
+                op_counts["effect:replace"] += 1
+            elif a == "Remove/Cut" and k == "x":
+                op_counts["effect:cut"] += 1
+            elif a == "Remove/Cut" and k == "z":
+                op_counts["effect:undo"] += 1
         wl = word_lengths(rec.final)
         total = sum(wl)
         rng = np.random.default_rng(seed_int("synthetic", "paths_form_" + label, str(i)))
@@ -249,7 +261,7 @@ def part_r7(n, cfg, ops, label):
             groups, cap = list(align_ext.T.ORDER), 3
         above, n_groups, rec_above, cut, cut_window, used4 = 0, 0, 0, 0, defaultdict(int), 0
         diff, true_cost, dp_cost, nonmono_recs = [], [], [], 0
-        inflation, inflated, cut_uncapped = [], 0, 0
+        inflation, inflated, cut_uncapped, cut_by_cap = [], 0, 0, 0
         win_n = defaultdict(int)
         for i in range(n):
             rec = Writer(*rec_seeds("r7_" + label, i), ops=ops).run()
@@ -281,6 +293,7 @@ def part_r7(n, cfg, ops, label):
             cut_uncapped += int(cu == align_ext.INF)
             if c == align_ext.INF:
                 cut += 1
+                cut_by_cap += int(cu < align_ext.INF)
             else:
                 dp_cost.append(c / max(1, len(y)))
                 diff.append((c - tc) / max(1, len(y)))
@@ -299,22 +312,26 @@ def part_r7(n, cfg, ops, label):
                 if fi is not None and widx[fi] is not None:
                     r0_row_word[j] = widx[fi]
             wrng = np.random.default_rng(seed_int("synthetic", "r7_window", str(i), "", "", str(p)))
+            nonempty = [s for s in range(len(r0segs)) if r0segs[s][1]]
             for k in (5, 10, 20, 50):
-                starts = [s for s in range(len(r0segs) - k + 1) if r0segs[s][1]]
+                # a window is k non-empty R0 segments in a row (empty segments between them are inside, not counted;
+                # decision 48)
+                starts = nonempty[:len(nonempty) - k + 1]
                 if not starts:
                     continue
-                s = starts[int(wrng.integers(0, len(starts)))]
+                si = int(wrng.integers(0, len(starts)))
+                s, e = nonempty[si], nonempty[si + k - 1]
                 first = [r0_row_word[j] for j in r0segs[s][1] if j in r0_row_word]
                 if not first:
                     continue
                 w0 = max(set(first), key=lambda w: (first.count(w), -w))
                 if w0 + k > len(y):
                     continue
-                # from the row after the separator before segment s to the separator closing segment s + k - 1
-                lo, hi = r0rows[s][0], r0rows[s + k - 1][1]
+                # from the row after the separator before segment s to the separator closing segment e
+                lo, hi = r0rows[s][0], r0rows[e][1]
                 wk = [j for j in range(lo, hi + 1) if keep[j]]
                 xw_full = record_segments([r0cats[j] for j in range(lo, hi + 1)])
-                assert len(xw_full) == k, "the window has k R0 segments"
+                assert sum(1 for _, ix in xw_full if ix) == k, "the window has k non-empty R0 segments"
                 xw = [v for v, _ in record_segments([category(rec.rows[j]["down_event"]) for j in wk])]
                 cw, _ = align_ext.align(xw, [(1 - p) * v for v in y[w0:w0 + k]], LAM, "window", groups=groups,
                                         max_group=cap)
@@ -336,6 +353,7 @@ def part_r7(n, cfg, ops, label):
             "cap_inflation_per_word": summary(inflation),
             "records_with_cap_inflation": round(inflated / max(1, len(inflation)), 4),
             "true_text_path_cut_full_uncapped": round(cut_uncapped / n, 4),
+            "true_text_path_cut_by_cap_only": cut_by_cap,
         }
     return out
 

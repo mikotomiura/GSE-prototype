@@ -27,7 +27,7 @@ def a1_text(rows):
                 continue
             t = t[:pos] + t[pos + len(tc):]
         elif act == "Replace":
-            a, b = tc.split(" => ")
+            a, b = tc.rsplit(" => ", 1)  # the typed side is one key
             s = pos - len(b)
             t = t[:s] + b + t[s + len(a):]
         elif act.startswith("Move From"):
