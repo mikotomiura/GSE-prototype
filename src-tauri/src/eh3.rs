@@ -603,9 +603,9 @@ pub fn invitation_settings_path() -> Option<PathBuf> {
 
 /// 招待の設定を読む。
 ///
-/// - 無い（初めての起動）: 既定値（ADR-035 D2: 出す・時期と上限は狭い側）。
-/// - あるのに読めない・壊れている: **出さない**・狭い側（本人が「出さない」を選んだ後にファイルが壊れても、
-///   黙って提示を再開しない）。applog には中身を含めずに 1 行だけ残す。
+/// - 無い（初めての起動）: 既定値（ADR-035 D2: 出す・上限は狭い側の 2・時間帯は終日 —— 判断 2）。
+/// - あるのに読めない・壊れている: **出さない**（時間帯と上限は既定値。本人が「出さない」を選んだ後に
+///   ファイルが壊れても、黙って提示を再開しない）。applog には中身を含めずに 1 行だけ残す。
 pub fn load_invitation_settings(path: &Path) -> crate::analysis::invitation::Settings {
     use crate::analysis::invitation::Settings;
     match std::fs::read_to_string(path) {
@@ -970,7 +970,7 @@ mod tests {
     }
 
     #[test]
-    fn invitation_settings_round_trip_and_fall_back_to_the_narrow_default() {
+    fn invitation_settings_round_trip_and_fall_back_to_off() {
         use crate::analysis::invitation::{DailyCap, Settings, TimeWindow};
         let dir = std::env::temp_dir().join(format!("gse_eh3_inv_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -987,7 +987,24 @@ mod tests {
         };
         save_invitation_settings(&p, &s).unwrap();
         assert_eq!(load_invitation_settings(&p), s);
-        // 自由な値・未知の欄・壊れたファイルは読まず、「出さない」・狭い側に倒れる
+        // 新しい値 "all_day" も、それ以前の値 "core" も読める
+        for (text, window) in [("all_day", TimeWindow::AllDay), ("core", TimeWindow::Core)] {
+            std::fs::write(
+                &p,
+                format!(r#"{{"enabled":true,"window":"{text}","cap":"two"}}"#),
+            )
+            .unwrap();
+            assert_eq!(
+                load_invitation_settings(&p),
+                Settings {
+                    enabled: true,
+                    window,
+                    cap: DailyCap::Two,
+                },
+                "{text}"
+            );
+        }
+        // 自由な値・未知の欄・壊れたファイルは読まず、「出さない」側に倒れる
         let off = Settings {
             enabled: false,
             ..Settings::default()

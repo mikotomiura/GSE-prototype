@@ -38,13 +38,14 @@
   - ADR-035 D2 の「時期の範囲と上限 = 狭い側」のうち、時期の範囲の既定を狭い側に置かない。控える側の既定は上限の既定 2 が担う、と読む。ADR-035 の本文は書き換えず、見直しの記録（引き継ぎ §2 の 4）に D1 の内側の制約 3（対象が無い・屋外の型を足すなら戻る）と D2 のこの読み方を書く。
   - 実装: `analysis/invitation.rs`（`TimeWindow::AllDay`・既定・夜間の判定を削除・テスト）、`eh3.rs` のテストの未知の値の例、`InvitationSettings.tsx`（選択肢と文面）、稿 §10.1。
   - RP §9 の「夜間 22:00–6:00 は Outdoor 無効」は屋外の型についての文で、今も正しいので直さない。
+- **既存の設定ファイル**: 保存は常に全体を書くので、前の版で一度でも保存した人のファイルには `"window":"core"` が残り、終日にはならない（読めるので後方互換は保つ）。新しい版で `"all_day"` を保存した後に前の版を起動すると、未知の値として「出さない」に倒れる。事前登録の凍結の前で本番の被験者はまだいないので実害は無いが、配布物を更新するときは案内でこの 2 点に触れる（code-reviewer・security-checker の LOW）。
 - **検証**: `cargo test --lib` 912 passed・clippy `-D warnings` 緑・`check_invitation_surface.py` と `--selftest`（24 の陽性対照）緑・`tsc --noEmit` 緑。夜（23:00・2:00・5:59）に既定で出て、狭めた 3 つの時間帯では出ないことをテスト `the_default_presents_at_night_and_a_narrowed_window_does_not` で固定した。
 
 ## 判断 3（2026-10-12・研究者の了承のもと）: Windows の実機の確認（今夜の範囲）
 
 - **研究者の決定**: 今夜は壁紙まわりを行い、スリープ・再起動・日中の招待の図像は後日。研究者の O1 の配布物は起動していなかった（tasklist で確認）。
 - **方法**: `0c446058` の debug の exe（フロントエンド埋め込み）を、`USERPROFILE`・`HOME`・`GSE_DATASET` を scratchpad の一時フォルダに替え、`GSE_O1_MODE=1`・`GSE_EH3_MODE=order=A,E,D;a_first=seed;grammar=raw;drift=none` で起動した。打鍵とトレイの操作は研究者。壁紙は `TranscodedWallpaper` の SHA-256、状態ファイル `eh3_wallpaper_original.json`、画面のキャプチャ（`CopyFromScreen`）と `GetWindowDisplayAffinity` で確かめた。
-- **試験の前の壁紙**: 1920×1080 のモニタ 1 台。元の画像のパスと SHA-256 は端末の外に出さない（研究者の私物のファイル名のため、ここには `TranscodedWallpaper` の SHA-256 `8c636bb5144aba84f12a276a8c877197d78c0d8c05802474e7233374f6b03e29` だけを書く）。
+- **試験の前の壁紙**: 1920×1080 のモニタ 1 台。元の画像のパスと SHA-256 は端末の外に出さない（研究者の私物のファイル名のため）。`TranscodedWallpaper` の SHA-256 も、元の画像と照合できてしまうので値は書かず、試験の前と後で一致したことだけを書く（security-checker の LOW）。
 
 | # | 確かめたこと | 結果 |
 |---|---|---|

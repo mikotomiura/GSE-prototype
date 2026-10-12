@@ -576,6 +576,28 @@ mod tests {
         }
     }
 
+    /// 既定（終日）では 0:00 を跨いでも閉じず、失効（60 秒）だけで閉じる。
+    #[test]
+    fn the_default_keeps_an_invitation_across_midnight_until_expiry() {
+        let mut m = InvitationMachine::new();
+        let mut present = Vec::new();
+        for s in 0..120 {
+            let o = m.tick(&input_from(
+                23 * 60 + 59,
+                T0 + s * SEC,
+                0.9,
+                Settings::default(),
+            ));
+            if o.present {
+                present.push(s);
+            }
+        }
+        // 23:59:30 に出て、0:00（s = 60）を越えても出たまま、60 秒で失効する
+        assert_eq!(present.first(), Some(&30));
+        assert_eq!(present.len() as u64, EXPIRY_MS / SEC, "{present:?}");
+        assert!(present.contains(&60));
+    }
+
     // ---- ADR-035 D1: 内側の制約は、設定を最大に広げても効く ----
 
     #[test]
@@ -801,10 +823,7 @@ mod tests {
         let got = run_from(8 * 60 + 59, &|_| 0.9, &|_| core(), 600);
         assert!(got.is_empty(), "{got:?}");
         // 対照: 9:00:00 から停滞なら 9:00:30 に出る
-        assert_eq!(
-            run_from(9 * 60, &|_| 0.9, &|_| core(), 600),
-            vec![30]
-        );
+        assert_eq!(run_from(9 * 60, &|_| 0.9, &|_| core(), 600), vec![30]);
     }
 
     /// 繰り越さない: 間隔の中で契機を満たした区間は、間隔が明けても出さない。
