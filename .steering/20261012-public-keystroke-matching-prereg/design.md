@@ -1,5 +1,7 @@
 # 設計
 
+> 注（2026-10-12）: この文書は判断 8〜15 の前に書いた Claude の案で、その後の判断 10・16〜31 で変わった点（KeyTAR を使う・攻撃者の一覧・指標と主な表・除外・課題での学習と評価の分割など）を反映していない。現行の設計は `experiments/20261012-public-keystroke-matching/preregistration.md`（下書き 3）と `decisions.md` を正とする。
+
 事前登録（`experiments/<YYYYMMDD>-<name>/preregistration.md`）に書く内容の設計。ここでは Claude の案と、研究者に問う論点を分ける。研究者の判断は `decisions.md`（判断 8 以降）。数値はデータを見る前に決める。
 
 ## 前提として一次で確かめたこと

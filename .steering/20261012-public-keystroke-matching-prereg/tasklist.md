@@ -17,8 +17,10 @@
 - [x] `experiments/20261012-public-keystroke-matching/` の下書き（preregistration・config・SEED・README・data.md）
 
 ## 凍結の前の攻撃（やること 3）
-- [ ] `attack-me`（stage `prereg`）
-- [ ] 指摘の裏取りと対応の案（研究者が採否を決める）
+- [x] `attack-me`（stage `prereg`）round 1（major）→ 判断 16〜23 → 下書き 2
+- [x] round 2（minor・設計の判断 5 件）→ 判断 26〜31 → 下書き 3
+- [ ] round 3（変えた箇所に限る）と指摘の裏取り
+- [ ] 合成の記録の検査（凍結の前・`scripts/synthetic_logs.py`・R7 の道が切れる割合・align.py の包み）
 
 ## 完了処理
 - [ ] 引き継ぎ（次のセッション: 凍結・取得の開始条件の確認・合成の記録の検査のコード）
