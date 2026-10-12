@@ -8,10 +8,10 @@
 #               ceiling.seed_offset, ceiling.P P sessions of each world in ceiling.prefer, AUC(A) and AUC(A_speed) per
 #               label and classifier, and the chosen world. Writes results/ceiling/ (committed).
 #   --pilot     design 3.9 (pilot 1, after the freeze): SEED + sets.pilot.seed_offset, sets.pilot.P P sessions of world
-#               v4 through gse-replay, the self-tests on them (scope pilot), then PC1 and the PC-stall of each of the
+#               v4 through gse-replay, the self-tests on them, then PC1 and the PC-stall of each of the
 #               24 candidates on [0] + pc_stall.pilot_grid, L300 only. No candidate is run. Writes results/pilot/
 #               (committed). Write the chosen lambdas to config.json pc_stall.lam and the numbers to design section 8.
-#   --smoke     the pipeline check of the main run: SEED, 12 P sessions and their twins, every self-test, then the
+#   --smoke     the pipeline check of the main run: SEED + 2 (not the main run's sessions), 12 P sessions and their twins, every self-test, then the
 #               checks with bootstrap 200 and 2 permutations. Writes results/main-smoke/ (git-ignored).
 #   --main      design 3.1-3.6: SEED, sets.P.n P sessions of world v4 and their twins through gse-replay, every
 #               self-test, then the checks. Writes results/main/ (committed). Run it when no CI job is running on
@@ -21,7 +21,7 @@
 # Environment:
 #   PYTHON      python with requirements.txt installed (default: .venv next to this file)
 #   GSE_REPLAY  the gse-replay binary of EH1 (design 1.1: C:/wt/_target-portrait-eh1/release/gse-replay.exe, SHA-256
-#               71d09dab...986); required by --pilot, --smoke and --main. It is not built here.
+#               71d09dab...986, checked); required by --pilot, --smoke and --main. It is not built here.
 #
 # The generated NDJSON, labels and per-second features stay in work-*/ (git-ignored). Only the aggregated JSON is
 # committed.
@@ -32,6 +32,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 EXP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EH1_DIR="$EXP_DIR/../20261010-portrait-eh1-round5"
 WORLD="v4"  # design 3.0: the world chosen by pilot 0 (the freeze)
+EXPECTED_REPLAY_SHA="71d09dab44526f2322a05833ae1a0fb33ffcc4908bfba796258276f083d78986"  # design 1.1
 MODE=""
 JOBS=8
 while [ $# -gt 0 ]; do
@@ -66,6 +67,9 @@ if [ "$MODE" != ceiling ]; then
     # Windows (EH1 round 1 notes W1): git-bash resolves the name without .exe for -x, but Python's open() does not
     if [ ! -f "$GSE_REPLAY" ] && [ -f "$GSE_REPLAY.exe" ]; then GSE_REPLAY="$GSE_REPLAY.exe"; fi
     [ -f "$GSE_REPLAY" ] || { echo "gse-replay not found: $GSE_REPLAY" >&2; exit 2; }
+    # design 1.1: the EH1 build only (code-reviewer L6)
+    REPLAY_SHA="$(sha256sum "$GSE_REPLAY" | cut -d' ' -f1)"
+    [ "$REPLAY_SHA" = "$EXPECTED_REPLAY_SHA" ] || { echo "gse-replay SHA-256 $REPLAY_SHA is not the EH1 build (design 1.1)" >&2; exit 2; }
     REPLAY_ARGS=(--gse-replay "$GSE_REPLAY")
   elif [ "$MODE" != selftest ]; then
     echo "GSE_REPLAY is required (design 1.1: the EH1 build, not built here)" >&2; exit 2
@@ -138,13 +142,13 @@ prepare() {
   PYTHONUTF8=1 "$PY" "$REPO_ROOT/scripts/capabilities_gate.py" "$work/ndjson" --require key --json > "$caps_tmp" || return 1
   mv "$caps_tmp" "$work/capabilities.json" || return 1
   echo "Step 0 OK: capabilities gate passed (seed $seed)"
-  "$PY" replay_all.py "$GSE_REPLAY" "$work" || return 1
+  "$PY" replay_all.py "$GSE_REPLAY" "$work" --jobs "$JOBS" || return 1
 }
 
 # twins <work>: design 3.4 item 6, the twin of each P session through gse-replay
 twins() {
   "$PY" twins.py "$EXP_DIR/config.json" "$1/SEED.run" "$1" --hmm-version "$HMM_VERSION" || return 1
-  "$PY" replay_all.py "$GSE_REPLAY" "$1/twins" || return 1
+  "$PY" replay_all.py "$GSE_REPLAY" "$1/twins" --jobs "$JOBS" || return 1
 }
 
 if [ "$MODE" = selftest ]; then
@@ -183,10 +187,13 @@ fi
 
 case "$MODE" in
   pilot) SUFFIX="pilot"; OFFSET="$(cfg "c['sets']['pilot']['seed_offset']")"; P_N="$(cfg "c['sets']['pilot']['P']")" ;;
-  smoke) SUFFIX="main-smoke"; OFFSET=0; P_N=12 ;;
+  smoke) SUFFIX="main-smoke"; OFFSET=2; P_N=12 ;;  # SEED + 2: the smoke does not look at the main run's sessions
   main) SUFFIX="main"; OFFSET=0; P_N="$(cfg "c['sets']['P']['n']")" ;;
 esac
 SEED_RUN=$(( 10#$BASE_SEED + 10#$OFFSET ))
+if [ "$MODE" != pilot ]; then  # code-reviewer L5: before hours of generation and replay
+  "$PY" -c "import json,sys; sys.path.insert(0,'.'); import stage; c=json.load(open(sys.argv[1],encoding='utf-8')); m=[k for k in stage.candidates() if c['pc_stall']['lam'].get(k) is None]; sys.exit('config.json pc_stall.lam is not set for ' + str(m) + ': run the pilot first') if m else None" "$EXP_DIR/config.json"
+fi
 WORK="$EXP_DIR/work-$SUFFIX"
 OUT="$EXP_DIR/results/.partial-$SUFFIX"
 rm -rf "$WORK" "$OUT"
@@ -196,11 +203,11 @@ mkdir -p "$OUT"
 prepare "$SEED_RUN" "$WORK" --smoke --p-n "$P_N"
 mv "$WORK/capabilities.json" "$OUT/capabilities.json"
 if [ "$MODE" = pilot ]; then
-  selftest "${REPLAY_ARGS[@]}" --work "$WORK" --seed-file "$WORK/SEED.run" --scope pilot
+  selftest "${REPLAY_ARGS[@]}" --work "$WORK" --seed-file "$WORK/SEED.run" --jobs "$JOBS"
   "$PY" checks.py "$EXP_DIR/config.json" "$WORK/SEED.run" "$WORK" "$OUT" --jobs "$JOBS" --pilot
 else
   twins "$WORK"
-  selftest "${REPLAY_ARGS[@]}" --work "$WORK" --seed-file "$WORK/SEED.run"
+  selftest "${REPLAY_ARGS[@]}" --work "$WORK" --seed-file "$WORK/SEED.run" --jobs "$JOBS" --require-twins
   SMOKE_ARG=()
   [ "$MODE" = smoke ] && SMOKE_ARG=(--smoke)
   "$PY" checks.py "$EXP_DIR/config.json" "$WORK/SEED.run" "$WORK" "$OUT" --jobs "$JOBS" "${SMOKE_ARG[@]}"

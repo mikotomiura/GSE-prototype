@@ -229,7 +229,8 @@ def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], 
     use = [a for a in ATTACKERS if a.split("/")[1] not in ceil]
     both_ceiling = not use
     rec = {n: maxima(v, use) for n, v in attk.items()}
-    nan = any(r["n_nan_bounds"] > 0 for r in rec.values())
+    # label-wide (design 3.1), over the judged names only: PC-corr is outside the detector (design 1.4)
+    nan = any(r["n_nan_bounds"] > 0 for n, r in rec.items() if kind_of(n) != "descriptive")
     null95 = None if nulls is None else {n: null95_of(v, use) for n, v in nulls.items()}
     broken = bool(fit_failed or nan or both_ceiling)
     pc1 = rec.get("PC1")
@@ -288,7 +289,7 @@ def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], 
         elif k == "descriptive":
             verdicts[n] = "descriptive"
     judged = [n for n in rec if kind_of(n) != "descriptive"]
-    null_all = None if null95 is None else bool(judged and all(_lt(null95[n], margin) for n in judged if n in null95))
+    null_all = None if null95 is None else bool(judged and all(n in null95 and _lt(null95[n], margin) for n in judged))
     return {"ceiling_kinds": ceil, "attackers_used": use, "nan": bool(nan), "fit_failed": bool(fit_failed),
             "pc1_ok": bool(pc1_ok), "null_all_73_ok": null_all, "null95": null95, "maxima": rec,
             "detector": detector, "verdicts": verdicts}
@@ -395,20 +396,20 @@ def _stage_task(args: tuple) -> tuple:
     sess = st.load_session(WORK, m)
     n_w = sess.duration_s // 60
     out = {}
-    for key, name, lam in specs:
-        a, r = st.series(sess, name, SEED, lam=lam)
+    for key, name, lam, *mut in specs:
+        a, r = st.series(sess, name, SEED, lam=lam, mutation=mut[0] if mut else None)
         out[key] = st.window_features(a, r, n_w).astype(np.float64)
     return m["sid"], out
 
 
 def run_stage(specs: list[tuple], ms: list[dict], work: Path, seed: int, jobs: int) -> dict:
-    """specs: (key, name, lambda). Returns key -> features of all windows of the sessions in ms, in order."""
+    """specs: (key, name, lambda[, mutation]). Returns key -> features of all windows of the sessions in ms, in order."""
     tasks = [(m, specs) for m in ms]
     got = {}
     with ProcessPoolExecutor(max_workers=jobs, initializer=_init_stage, initargs=(str(work), seed)) as ex:
         for sid, out in ex.map(_stage_task, tasks, chunksize=1):
             got[sid] = out
-    return {k: np.vstack([got[m["sid"]][k] for m in ms]) for k, _, _ in specs}
+    return {sp[0]: np.vstack([got[m["sid"]][sp[0]] for m in ms]) for sp in specs}
 
 
 # ---------------------------------------------------------------------------
@@ -587,9 +588,9 @@ def stop_events(presses: np.ndarray, duration_s: int, cfg: dict) -> list[tuple[f
     """(t_s, t_r): consecutive presses at least event_s apart, with the 1 s before t_s and the 10 s (+ 1 s hold)
     after t_r inside the session."""
     dsc = cfg["describe"]
-    g = np.diff(presses)
+    g = np.rint(np.diff(presses) * 1000.0)  # whole ms, as speed5 (10.0 s exactly is an event)
     out = []
-    for i in np.nonzero(g >= dsc["event_s"])[0]:
+    for i in np.nonzero(g >= dsc["event_s"] * 1000)[0]:
         ts, tr = float(presses[i]), float(presses[i + 1])
         if ts >= 1.0 and tr + dsc["event_s"] + dsc["hold_s"] + 0.1 <= duration_s:
             out.append((ts, tr))
@@ -637,7 +638,7 @@ def _twin_task(args: tuple) -> tuple:
 
 
 def oof_auc_lr(X: np.ndarray, y: np.ndarray, g: np.ndarray, folds: int, seed: int) -> float:
-    if one_class_fold(y, g, folds):
+    if len(np.unique(g)) < folds or one_class_fold(y, g, folds):  # too few sessions left after a filter: NaN
         return float("nan")
     return weighted_auc(oof_predict(X, y, g, "lr", seed, folds), y, np.ones(len(y)))
 
@@ -648,6 +649,8 @@ def oof_r2(X: np.ndarray, y: np.ndarray, g: np.ndarray, folds: int, alpha: float
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
 
+    if len(np.unique(g)) < folds:  # too few sessions left after a filter
+        return float("nan")
     pred = np.zeros(len(y))
     for tr, te in GroupKFold(n_splits=folds).split(X, y, g):
         pred[te] = make_pipeline(StandardScaler(), Ridge(alpha=alpha)).fit(X[tr], y[tr]).predict(X[te])
@@ -743,12 +746,15 @@ def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
         merged, timing, per = {}, [], {}
         batches = [("PC1", [("PC1", "PC1", None)])]
         batches += [(c, [(f"PCs-{c}@{x:.2f}", f"PCs-{c}", x) for x in [0.0] + grid]) for c in cands]
+        keys = [k for _, sp in batches for k, _, _ in sp]
+        if len(set(keys)) != len(keys):  # Codex: two grid values that print alike would overwrite each other
+            raise SystemExit("pc_stall.pilot_grid: two values share a name at two decimals")
         auc_s = None
         for b, specs in batches:
             tb = time.time()
             F = run_stage(specs, ms, work, seed, jobs)
             names = {}
-            for i, (key, _, _) in enumerate(specs):
+            for i, (key, *_) in enumerate(specs):
                 save(scratch, f"F-{b}-{i}", F[key])
                 names[key] = f"F-{b}-{i}"
             del F
@@ -804,7 +810,7 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
         tab = label_tables(work, sids, cfg, scratch)
         F = run_stage(specs, ms, work, seed, jobs)
         names = {}
-        for i, (key, _, _) in enumerate(specs):
+        for i, (key, *_) in enumerate(specs):
             save(scratch, f"F-{i}", F[key])
             names[key] = f"F-{i}"
         del F

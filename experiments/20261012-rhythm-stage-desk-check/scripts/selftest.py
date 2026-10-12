@@ -11,7 +11,7 @@ A failing test stops the run. A failure is fixed in the instruments; the definit
 changed (design 3.7).
 
 Usage: selftest.py <config.json> <EH1 round 5 dir> <tmp dir> --hmm-version V [--gse-replay BIN]
-                   [--work DIR --seed-file FILE] [--scope all|pilot]
+                   [--work DIR --seed-file FILE [--require-twins] [--jobs N]]
 """
 
 from __future__ import annotations
@@ -375,6 +375,38 @@ def test_stage_causal() -> None:
                              "f1": np.zeros(30), "f4": np.zeros(30)})
     ua, _, stp = st.drive_sub(inp)
     check(ua[199] < ua[200] and not stp[200] and stp[199], "causal (sub): a press at 20.0 s counts from t = 20.0 s")
+    # inside a second (Codex): cut at T2 = 1800.35 s; the points before T2 do not change
+    T2 = 1800.35
+    keep = sess.presses < T2
+    active2 = np.zeros(sess.duration_s, dtype=bool)
+    active2[sess.presses[keep].astype(int)] = True
+    feat2 = {c: v.copy() for c, v in sess.feat.items()}
+    for c in feat2:  # ticks k >= 1800 cover presses at or after 1800 s
+        feat2[c][1800:] = rng.permutation(feat2[c][1800:])
+    extra = np.array([1800.36, 1800.5, 1800.9])  # presses inside the cut second, after T2
+    cut2 = st.Session(sess.sid, sess.duration_s, sess.presses[keep], active2, sess.seg, feat2, sess.key_seed)
+    more = st.Session(sess.sid, sess.duration_s, np.sort(np.concatenate([sess.presses[keep], extra])),
+                      active2 | (np.arange(sess.duration_s) == 1800), sess.seg, feat2, sess.key_seed)
+    j2 = int(np.ceil(T2 * st.HZ))  # the points t < T2
+    c2, m2 = all_series(cut2), all_series(more)
+    check(same_series(c2, m2, j2) and same_series(a, c2, j2),
+          "causal (stage): presses later in the same second (after 1800.35 s) leave every point before it unchanged")
+    check(not same_series(c2, m2), "causal (stage): those presses do change later points (negative control)")
+    # the wobble of the first points does not depend on the session length (Codex)
+    w_long, w_short = st.wobble(5000, 3, 99), st.wobble(1200, 3, 99)
+    check(all(np.array_equal(w_long[i][:1200], w_short[i]) for i in (0, 1)),
+          "causal (jitter): the wobble of a and r over the first points does not depend on the session length")
+    # no press at all (Codex): no drive, stopped everywhere
+    empty = st.StageInput(30, {"presses": np.zeros(0), "active": np.zeros(30, dtype=bool), "keys": np.zeros(30),
+                               "f1": np.zeros(30), "f4": np.zeros(30)})
+    ua, ur, stp = st.drive_sub(empty)
+    check(not ua.any() and not ur.any() and stp.all(), "sub: a session without a press gives 0 and stopped")
+    # decisions 19: F1 = 0 (no interval in the window) is tempo 0; 80 ms is 1; NaN holds
+    inp = st.StageInput(6, {"presses": np.array([0.5, 1.5, 2.5]), "active": np.array([1, 1, 1, 0, 0, 0], dtype=bool),
+                            "keys": np.zeros(6), "f1": np.array([80.0, 0.0, np.nan, 340.0, 0.0, 600.0]),
+                            "f4": np.zeros(6)})
+    _, ur, _ = st.drive_sec(inp)
+    check(np.allclose(ur[10::10], [1.0, 0.0, 0.0, 0.5, 0.0]), f"sec: F1 80 / 0 / NaN (holds 0) / 340 / 0 -> {ur[10::10]}")
 
 
 def test_stops() -> None:
@@ -469,6 +501,15 @@ def test_lags(cfg: dict) -> None:
     # six jitter candidates are not read (checks.describe marks them)
     kinds = [ck.event_lag(np.full(40 * hz, v), 15.0, cfg)[0] for v in np.linspace(0, 1, 11)]
     check(all(k == "unchanged" for k in kinds), "lags: hold without the wobble -> unchanged in every event")
+    # the 0.05 boundary from both sides (code-reviewer M4): small noise and a 0.04 ramp are unchanged, a 0.06 step
+    # is a lag
+    rng = np.random.default_rng(10)
+    noisy = [ck.event_lag(0.5 + rng.normal(0, 0.005, 40 * hz), 15.0, cfg)[0] for _ in range(50)]
+    ramp = np.concatenate([np.full(15 * hz, 0.5), 0.5 + 0.04 * np.arange(10 * hz) / (10 * hz), np.full(15 * hz, 0.54)])
+    step = np.concatenate([np.full(17 * hz, 0.5), np.full(23 * hz, 0.56)])
+    check(all(k == "unchanged" for k in noisy) and ck.event_lag(ramp, 15.0, cfg)[0] == "unchanged"
+          and ck.event_lag(step, 15.0, cfg) == ("lag", 2.0),
+          "lags: noise of sd 0.005 and a 0.04 ramp are unchanged; a 0.06 step at 2 s is a lag of 2 s")
     rng = np.random.default_rng(9)
     kinds = [ck.event_lag(np.clip(0.5 + st.ar1(40 * hz, rng), 0, 1), 15.0, cfg)[0] for _ in range(300)]
     share = np.mean([k in ("unchanged", "ge10") for k in kinds])
@@ -477,6 +518,10 @@ def test_lags(cfg: dict) -> None:
           and sum(ck.lags_readable(c) for c in st.candidates()) == 18, "lags: the jitter candidates are marked unread")
     ev = ck.stop_events(np.array([0.5, 5.0, 16.0, 17.0, 40.0, 95.0]), 100, cfg)
     check(ev == [(5.0, 16.0), (17.0, 40.0)], f"lags: stop events {ev}")
+    # exactly 10 000 ms is an event wherever it sits (code-reviewer L1: 1234.567 + 10 - 1234.567 < 10 in floats)
+    ok = all(len(ck.stop_events(np.array([t, round(t + 10.0, 3), 1700.0]), 1800, cfg)) == 2
+             for t in np.round(np.arange(1.0, 1500.0, 0.007)[:3000], 3))
+    check(ok, "lags: a gap of exactly 10 s is an event at any session time")
 
 
 def test_pc() -> None:
@@ -579,8 +624,25 @@ def test_judge(cfg: dict) -> None:
     jj = v({}, au={"hgb": 0.95, "lr": 0.91})
     check(jj["verdicts"][c0] == "undecidable" and jj["detector"][c0]["reasons"] == ["ceiling"],
           "judge: both classifiers at the ceiling -> undecidable (ceiling)")
-    check(v({c0: {**att(0.0, -0.01, 0.02), "small/lr": {"gain": 0.0, "ci95": [float("nan"), 0.02]}}})["verdicts"][c1]
-          == "undecidable", "judge: a NaN bound makes the label undecidable")
+    jj = v({c0: {**att(0.0, -0.01, 0.02), "small/lr": {"gain": 0.0, "ci95": [float("nan"), 0.02]}}})
+    check(jj["verdicts"][c0] == "undecidable" and jj["verdicts"][c1] == "undecidable",
+          "judge: a NaN bound makes the label undecidable (the candidate with it and the other)")
+    jj = v({"PC-corr": {**att(0.0, -0.01, 0.02), "small/lr": {"gain": 0.0, "ci95": [float("nan"), 0.02]}}})
+    check(jj["verdicts"][c0] == "green" and jj["verdicts"]["PC-corr"] == "descriptive",
+          "judge: a NaN bound of PC-corr (descriptive) does not stop the label")
+    # one attacker alone (code-reviewer M3): the maxima take each attacker in use
+    for a_ in ck.ATTACKERS:
+        one = {**att(0.0, -0.01, 0.02), a_: {"gain": 0.05, "ci95": [0.031, 0.07]}}
+        up = {**att(0.0, -0.01, 0.02), a_: {"gain": 0.01, "ci95": [-0.01, 0.031]}}
+        check(v({c0: one})["verdicts"][c0] == "red_detected" and v({c0: up})["verdicts"][c0] == "red_unconfirmed",
+              f"judge: {a_} alone above the bounds -> red detected / unconfirmed")
+    # the null is the 95th percentile of the per-permutation maxima: 1 of 20 at 0.05 passes, 2 of 20 do not
+    for k, want in ((1, []), (2, ["null"])):
+        nl = {**nulls, c0: [{**{a: 0.0 for a in ck.ATTACKERS}, "small/lr": 0.05}] * k
+              + [{a: 0.0 for a in ck.ATTACKERS}] * (20 - k)}
+        check(v({}, nl=nl)["detector"][c0]["reasons"] == want, f"judge: {k} of 20 permutations at 0.05 on one attacker")
+    jj = ck.judge(base(), {n: nulls[n] for n in list(nulls)[:-1]}, auc, cands, cfg, False)
+    check(jj["null_all_73_ok"] is False, "judge: a judged name without a null is not read as a passing overall null")
     jj = ck.judge({}, {}, None, cands, cfg, True)
     check(all(jj["verdicts"].get(c, "undecidable") == "undecidable" for c in cands)
           and jj["detector"][c0]["reasons"][0] == "fit_failed", "judge: a failed fit -> undecidable")
@@ -652,47 +714,51 @@ def test_replay_causal(binary: str, work: Path, tmp: Path) -> None:
 
 def test_twins_work(work: Path) -> None:
     tw_dir = work / "twins"
-    ok = True
-    for sid in bl.p_sids(work):
+    sids = bl.p_sids(work)
+    ok = len(sids) > 0 and (tw_dir / "feat").is_dir() and sorted(bl.p_sids(tw_dir)) == sorted(sids)
+    for sid in sids if ok else []:
         o = np.load(work / "labels" / f"{sid}.npz")["presses_ms"]
         t = np.load(tw_dir / "labels" / f"{sid}.npz")["presses_ms"]
         ok &= np.array_equal(np.bincount(o // 1000), np.bincount(t // 1000)) and np.all(np.diff(t) > 0)
         ok &= np.isfinite(np.load(tw_dir / "feat" / f"{sid}.npz")["f1"]).mean() > 0.9
-    check(ok, "twins (run data): per-second counts kept, order kept, replayed")
+    check(ok, f"twins (run data): every one of the {len(sids)} P sessions has a replayed twin with its per-second "
+          "counts and order")
 
 
-def l300_gain(work: Path, cfg: dict, name: str, lam: float | None, mutation: str | None, seed: int) -> float:
-    """The L300 point estimate max of one stage name over the four attackers (no bootstrap)."""
+def test_work(work: Path, cfg: dict, seed: int, jobs: int) -> None:
+    """design 3.7 (PC at lambda 1, the seg mutation) through the main run's own path: run_stage -> label_tables ->
+    the scratch memory maps -> build_x -> _fit_job -> e13_target (code-reviewer M2)."""
+    import shutil
+    import tempfile
+
     ms = st.manifest_p(work)
-    tab = bl.tables(work, [m["sid"] for m in ms], cfg)["L300"]
-    F = []
-    for m in ms:
-        sess = st.load_session(work, m)
-        F.append(st.window_features(*st.series(sess, name, seed, lam=lam, mutation=mutation), sess.duration_s // 60))
-    F = np.vstack(F)
-    rows = np.nonzero(tab["rows"])[0]
-    D = ck.diffs(F, tab["G_all"], 2)
-    Y, G, XS = tab["Y"], tab["G"], tab["XS"]
-    ones = np.ones(len(Y))
-    gains = []
-    for k in ck.KINDS:
-        a = ck.weighted_auc(ck.oof_predict(XS, Y, G, k, seed, cfg["e13"]["folds"]), Y, ones)
-        for X in (np.hstack([XS, F[rows]]), np.hstack([XS, F[rows], D[rows]])):
-            gains.append(ck.weighted_auc(ck.oof_predict(X, Y, G, k, seed, cfg["e13"]["folds"]), Y, ones) - a)
-    return max(gains)
-
-
-def test_work(work: Path, cfg: dict, seed: int) -> None:
-    n = len(bl.p_sids(work))
+    n = len(ms)
     if n < 40:
         print(f"SKIP  PC at lambda 1 and the seg mutation (only {n} P sessions; they run with 40 or more)")
         return
-    g = l300_gain(work, cfg, "PCs-S-raw-hold-sec", 1.0, None, seed)
-    check(g > 0.10, f"PC: PCs-S-raw-hold-sec at lambda 1 -> L300 point max {g:+.3f} > 0.10")
-    g = l300_gain(work, cfg, "S-raw-hold-sec", None, "seg", seed)
-    check(g > 0.10, f"mutation: seg mixed into the mapping -> L300 point max {g:+.3f} > 0.10")
-    g0 = l300_gain(work, cfg, "PC0-S-raw-hold-sec", None, None, seed)
-    print(f"     (PC0-S-raw-hold-sec L300 point max {g0:+.3f}, for comparison)")
+    specs = [("PCs1", "PCs-S-raw-hold-sec", 1.0), ("MUT", "S-raw-hold-sec", None, "seg"),
+             ("PC0", "PC0-S-raw-hold-sec", 0.0), ("RAW", "S-raw-hold-sec", None)]
+    scratch = Path(tempfile.mkdtemp(prefix="selftest-", dir=work))
+    try:
+        tab = ck.label_tables(work, [m["sid"] for m in ms], cfg, scratch)
+        F = ck.run_stage(specs, ms, work, seed, jobs)
+        s0 = st.load_session(work, ms[1])
+        n0 = st.load_session(work, ms[0]).duration_s // 60
+        direct = st.window_features(*st.series(s0, "S-raw-hold-sec", seed), s0.duration_s // 60)
+        check(np.array_equal(F["RAW"][n0: n0 + len(direct)], direct),
+              "wiring: run_stage keeps the session order (the second session's rows are its own windows)")
+        names = {}
+        for i, (key, *_) in enumerate(specs):
+            ck.save(scratch, f"F-{i}", F[key])
+            names[key] = f"F-{i}"
+        r = ck.e13_target("L300", tab["L300"], names, [], cfg, seed, jobs, 50, 0, scratch, [])
+        g = {k: r["configs"][k]["gain_max"] for k in names}
+        check(g["PCs1"] > 0.10, f"PC: PCs-S-raw-hold-sec at lambda 1 -> L300 point max {g['PCs1']:+.3f} > 0.10 (main path)")
+        check(g["MUT"] > 0.10, f"mutation: seg mixed into the mapping -> L300 point max {g['MUT']:+.3f} > 0.10 (main path)")
+        check(g["PC0"] < 0.03, f"PC0-S-raw-hold-sec L300 point max {g['PC0']:+.3f} < 0.03 (negative control)")
+        print(f"     (S-raw-hold-sec unmutated L300 point max {g['RAW']:+.3f}; not judged here)")
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
 
 
 def main() -> int:
@@ -704,9 +770,8 @@ def main() -> int:
     ap.add_argument("--gse-replay", default=None, help="design 3.7: the gse-replay causality test (skipped without it)")
     ap.add_argument("--work", default=None, help="the run's replayed sessions: twins, PC at 1 and the mutation")
     ap.add_argument("--seed-file", default=None)
-    ap.add_argument("--scope", choices=("all", "pilot"), default="all",
-                    help="pilot: pilot 1 decides only the lambda of each PC-stall, so the tests of the descriptions "
-                         "(design 3.4: the lag measure) are left to the smoke and the main run")
+    ap.add_argument("--require-twins", action="store_true", help="the smoke and the main run: the twins must exist")
+    ap.add_argument("--jobs", type=int, default=8)
     a = ap.parse_args()
     config = Path(a.config).resolve()
     cfg = json.loads(config.read_text(encoding="utf-8"))
@@ -720,10 +785,7 @@ def main() -> int:
     test_stage_causal()
     test_stops()
     test_window_features()
-    if a.scope == "all":
-        test_lags(cfg)
-    else:
-        print("SKIP  lags (design 3.4 descriptions): not used by pilot 1; they run before the smoke and the main run")
+    test_lags(cfg)
     test_pc()
     test_twins(tmp)
     test_judge(cfg)
@@ -734,10 +796,12 @@ def main() -> int:
         print("SKIP  causal (gse-replay): no --gse-replay")
     if a.work:
         work = Path(a.work)
-        if (work / "twins" / "feat").is_dir():
+        if a.require_twins:
             test_twins_work(work)
+        else:
+            print("SKIP  twins (run data): not required in this mode")
         seed = int(Path(a.seed_file).read_text().strip()) if a.seed_file else 1
-        test_work(work, cfg, seed)
+        test_work(work, cfg, seed, a.jobs)
     print(f"selftest: {len(FAILS)} failed" + (f": {FAILS}" if FAILS else ""))
     return 1 if FAILS else 0
 

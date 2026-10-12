@@ -144,7 +144,10 @@ def drive_sec(inp: StageInput) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     dur = inp.duration_s
     n = dur * HZ
     ua_s = hold_nan(np.minimum(1.0, inp["keys"] / K_MAX))
-    ur_s = hold_nan(interval_to_u(inp["f1"]))
+    f1 = inp["f1"]
+    # decisions 19: gse-replay's F1 is 0.0 when the 30 s window holds no interval (features.rs); that second's tempo
+    # is 0 (as res=sub's "no interval below 2 s"), not the fastest value of the formula. NaN still holds.
+    ur_s = hold_nan(np.where(f1 == 0, 0.0, interval_to_u(f1)))
     k = np.arange(n) // HZ - 1  # the second used at point j
     kk = np.maximum(k, 0)
     known = k >= 0
@@ -160,6 +163,8 @@ def drive_sub(inp: StageInput) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """res=sub: (u_a, u_r, stopped) at 10 Hz from the press times."""
     n = inp.duration_s * HZ
     pm = np.rint(np.asarray(inp["presses"]) * 1000.0).astype(np.int64)
+    if len(pm) == 0:  # no press: no drive and stopped everywhere (Codex: the indexing below needs a press)
+        return np.zeros(n), np.zeros(n), np.ones(n, dtype=bool)
     jj = -(-pm // 100)  # the first point j with 100 j >= m
     keep = jj < n
     w = np.exp(-((jj[keep] * 100 - pm[keep]) / 1000.0) / TAU_S)
@@ -172,7 +177,7 @@ def drive_sub(inp: StageInput) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     ivl[1:] = np.diff(pm)
     last_ivl = np.where(cnt >= 2, ivl[np.maximum(cnt - 1, 0)], np.iinfo(np.int64).max)
     ur = np.where(last_ivl < STOP_MS, interval_to_u(last_ivl.astype(np.float64)), 0.0)
-    last = np.where(cnt > 0, pm[np.maximum(cnt - 1, 0)] if len(pm) else 0, 0)
+    last = np.where(cnt > 0, pm[np.maximum(cnt - 1, 0)], 0)
     stopped = (cnt == 0) | (t_ms - last >= STOP_MS)
     return ua, ur, stopped
 
@@ -234,16 +239,25 @@ def apply_stop(m: np.ndarray, stopped: np.ndarray, kind: str) -> np.ndarray:
     return np.where(stopped, held, m)
 
 
+def ar1_from(x0: np.ndarray, e: np.ndarray) -> np.ndarray:
+    """AR(1) with coefficient JIT_PHI from the start values x0 (one per column) and standard normal innovations e
+    (n x columns), scaled to the stationary standard deviation JIT_SD."""
+    sd_e = JIT_SD * math.sqrt(1.0 - JIT_PHI ** 2)
+    return lfilter([1.0], [1.0, -JIT_PHI], sd_e * e, axis=0, zi=(JIT_PHI * JIT_SD * x0)[None, :])[0]
+
+
 def ar1(n: int, rng: np.random.Generator) -> np.ndarray:
-    """AR(1) with coefficient JIT_PHI and stationary standard deviation JIT_SD, started from its stationary law."""
-    x0 = float(rng.normal(0.0, JIT_SD))
-    e = rng.normal(0.0, JIT_SD * math.sqrt(1.0 - JIT_PHI ** 2), n)
-    return lfilter([1.0], [1.0, -JIT_PHI], e, zi=[JIT_PHI * x0])[0]
+    """One AR(1) series started from its stationary law (selftest)."""
+    return ar1_from(rng.standard_normal(1), rng.standard_normal((n, 1)))[:, 0]
 
 
 def wobble(n: int, seed: int, key_seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """The wobble of a and r from one stream: the two start values, then the innovations of a and r drawn in pairs
+    point by point, so that the first m points do not depend on the session length n (Codex: drawing a's n
+    innovations before r's made r's start depend on n)."""
     rng = np.random.default_rng(np.random.SeedSequence([seed, key_seed & 0xFFFFFFFF, JITTER_TAG]))
-    return ar1(n, rng), ar1(n, rng)
+    w = ar1_from(rng.standard_normal(2), rng.standard_normal((n, 2)))
+    return w[:, 0], w[:, 1]
 
 
 def shape(ua: np.ndarray, ur: np.ndarray, stopped: np.ndarray, mapping: str, stop: str, seed: int,
