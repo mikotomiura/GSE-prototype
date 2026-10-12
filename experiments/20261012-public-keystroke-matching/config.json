@@ -1,20 +1,27 @@
 {
-  "_note": "Draft values (2026-10-12), not frozen. Fixed before any data was acquired. The researcher chose the release forms, attackers, utility side, ENJA15 ground truth, reporting policy and the post-acquisition check from Claude's recommendations (.steering/20261012-public-keystroke-matching-prereg/decisions.md, decisions 8-15); the numbers are Claude's proposals. These are experiment values, not pass criteria.",
+  "_note": "Draft 2 (2026-10-12), not frozen. Fixed before any data was acquired. The researcher chose among Claude's options in .steering/20261012-public-keystroke-matching-prereg/decisions.md: decisions 8-15 (design; in decisions 8 and 10 the researcher chose an option other than Claude's recommendation) and decisions 16-23 (responses to the attack-me round 1 review). The numbers are Claude's proposals. These are experiment values, not pass criteria.",
   "seed_file": "SEED",
+  "seed_derivation": "int.from_bytes(sha256(f'{SEED}:{use}:{prompt}:{writer}:{N}:{k}:{draw}'.encode()).digest()[:8], 'big') -> numpy.random.default_rng; unused fields are empty strings",
+  "seed_uses": ["split", "eval_sample", "decoys", "window_start", "r5_sub", "r6_perm", "r7_drop", "bootstrap", "enja_decoys"],
   "datasets": {
     "klicke": {
       "reference": "[V264]",
       "acquisition_condition": "researcher decided to proceed after reading the authors' reply (decisions 4, 7)",
       "files": "to be filled at acquisition: Drive file IDs, SHA-256, GitHub commit",
-      "use": ["argumentative essay keystroke logs (CSV)", "essays", "human scores"],
-      "do_not_use": ["demographics", "typing tests", "vocabulary test"],
-      "min_words": 50
+      "acquire": ["argumentative essay keystroke logs (CSV)", "essays", "human scores"],
+      "do_not_acquire": ["demographics (record the zip SHA-256 only if bundled; do not extract)"],
+      "do_not_use": ["typing tests", "vocabulary test"],
+      "prompts": 4,
+      "writers_reported": 4992,
+      "min_words": 50,
+      "active_window": "first keypress to the last event whose text_change is non-empty (R0), applied to every form"
     },
     "enja15": {
       "reference": "[P273] [P359] [P360]",
       "acquisition_condition": "license type and terms checked in the primary source (decisions 5, 7)",
       "svn_revision": "to be filled at acquisition",
-      "sessions": "T (from-scratch translation); meaning of T/P/D to be confirmed in [P273]/[P359] before acquisition"
+      "sessions": "T (from-scratch translation); meaning of T/P/D to be confirmed in [P273]/[P359] before acquisition",
+      "tools": {"SudachiPy": "0.7.0", "SudachiDict-core": "20260723.1", "romaji_table.py": {"path": "experiments/20261009-length-sequence-uniqueness/scripts/romaji_table.py", "sha256": "d2101efb9f36201b7fb51ea7c4283c114854cf13bba8fae379b6f85ae381fbd2"}}
     },
     "keytar_model": {
       "reference": "[V267]",
@@ -27,34 +34,54 @@
     }
   },
   "key_categories": ["letter", "digit", "space", "punctuation", "backspace", "delete", "enter", "navigation", "modifier", "mouse", "other"],
+  "key_categories_r3u": {"char": ["letter", "digit", "space", "punctuation", "enter"]},
   "release_forms": {
-    "R0": {"keys": "raw", "text_change": "raw", "position": "keep", "word_count": "keep", "time": "keep"},
-    "R1": {"keys": "alnum->q", "text_change": "alnum->q", "position": "keep", "word_count": "keep", "time": "keep"},
-    "R2": {"keys": "category", "text_change": "drop", "position": "keep", "word_count": "keep", "time": "keep"},
-    "R3": {"keys": "category", "text_change": "drop", "position": "drop", "word_count": "drop", "time": "keep"},
-    "R3-t": {"base": "R3", "time_floor_ms": [10, 100, 1000]},
-    "R4": {"segment_counts_floor_w": [1, 2, 4, 8]},
-    "R5": {"keys": "alnum->random QWERTY neighbour", "text_change": "same substitution", "position": "keep", "word_count": "keep", "time": "keep"},
-    "R6": {"keys": "alnum identities permuted within segment", "text_change": "same permutation", "position": "keep", "word_count": "keep", "time": "keep"},
-    "R7": {"base": "R3", "suppress_p": [0.1, 0.25, 0.5]}
+    "R0": {"keys": "raw", "activity": "keep", "text_change": "raw", "position": "keep", "word_count": "keep", "time": "keep", "table": "main"},
+    "R1": {"keys": "alnum->q", "activity": "keep", "text_change": "alnum->q", "position": "keep", "word_count": "keep", "time": "keep", "table": "main"},
+    "R2": {"keys": "category", "activity": "drop", "text_change": "drop", "position": "keep", "word_count": "keep", "time": "keep", "table": "main"},
+    "R3": {"keys": "category", "activity": "drop", "text_change": "drop", "position": "drop", "word_count": "drop", "time": "keep", "table": "main"},
+    "R3-u": {"base": "R3", "keys": "category with letter/digit/space/punctuation/enter merged into char", "table": "main"},
+    "R3-t": {"base": "R3", "time_floor_ms": [10, 100, 1000], "table": "main"},
+    "R4": {"segment_values_floor_w": [1, 2, 4, 8], "table": "main"},
+    "R7": {"base": "R3", "suppress_p": [0.1, 0.25, 0.5], "unit": "event (press and release), independent Bernoulli", "table": "main"},
+    "R5": {"keys": "alnum->random QWERTY neighbour", "activity": "keep", "text_change": "same substitution", "position": "keep", "word_count": "keep", "time": "keep", "table": "appendix"},
+    "R6": {"keys": "alnum identities permuted within segment", "activity": "keep", "text_change": "same permutation", "position": "keep", "word_count": "keep", "time": "keep", "table": "appendix"}
+  },
+  "alignment": {
+    "groups": [[1, 1], [2, 1], [1, 2], [3, 1], [1, 3]],
+    "lambda": 8,
+    "lambda_sensitivity": [4, 16],
+    "ties": "earlier group in the list; at the end, the smallest text position",
+    "end_window": "record fully used, text may end early",
+    "end_full_text": "record and text both fully used",
+    "no_path": "cost infinity; all infinite -> tie among all"
   },
   "attackers": {
+    "adaptive": true,
+    "train_fraction": 0.5,
+    "A0": {"forms": "all"},
     "A1": {"forms": ["R0", "R1", "R2", "R5", "R6"]},
-    "A2": {"forms": "all", "lambda": 8, "max_group": 3},
-    "A3": {"forms": ["R0", "R1", "R2", "R3", "R3-t", "R5", "R6", "R7"], "train_fraction": 0.5, "min_digraph_count": 20},
-    "A4": {"forms": ["R0", "R1", "R2", "R3", "R3-t", "R5", "R6", "R7"], "writers_per_prompt": 125}
+    "A1p": {"forms": ["R3", "R3-t", "R7"]},
+    "A2": {"forms": ["R2", "R3", "R3-t", "R4", "R7"]},
+    "A2b": {"forms": ["R3-u"], "boundary_model": "logistic regression on neighbouring inter-key intervals"},
+    "A3": {"forms": ["R0", "R1", "R2", "R3", "R3-t", "R5", "R6", "R7"], "min_digraph_count": 20},
+    "A4": {"forms": ["R0", "R1", "R2", "R3", "R3-t"], "adaptive": false, "chunk_segments": 20, "in_strongest": false},
+    "eval_writers_per_prompt": 125
   },
   "matching": {
     "N": [10, 100, 1000],
+    "draws_per_record": {"10": 20, "100": 20, "1000": 5},
     "k": [5, 10, 20, 50],
-    "draws_per_record": 20,
     "window_starts_per_record": 5,
+    "decoy_pool": "all eligible writers of the same prompt except the record's writer",
     "ties": "1/m",
-    "bootstrap": {"unit": "writer", "resamples": 2000, "level": 0.95}
+    "bootstrap": {"unit": "writer", "stratified_by": "prompt", "resamples": 2000, "level": 0.95, "strongest_attacker": "max taken inside each resample"}
   },
+  "contrasts": [["R2", "R3"], ["R3", "R3-u"], ["R3", "R3-t"], ["R1", "R3"]],
   "utility": {
-    "pause_ms": 2000,
-    "metrics": ["keypresses", "final_words", "median_iki", "pauses_ge_2s", "p_burst_count", "p_burst_mean_len", "deletions", "mean_word_len"]
+    "metrics_source": "[V264] Table 5",
+    "metrics": ["p_burst_mean_len", "r_burst_mean_len", "pause_mean_200ms", "within_word_pause_mean", "between_word_pause_mean", "deletion_mean_len", "deletion_proportion", "insertion_mean_len", "insertion_proportion", "interval_variance_10"],
+    "per_prompt_then_mean": true
   },
-  "enja15": {"N": [10, "all"], "attackers": ["A2"], "ground_truth": "translation text"}
+  "enja15": {"forms": ["R0j", "R3j", "R3j-t", "R4"], "time_floor_ms": [10, 100, 1000], "N": [10, "all"], "attackers": ["A0", "A2"], "ground_truth": "translation text"}
 }
