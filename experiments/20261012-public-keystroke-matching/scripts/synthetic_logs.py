@@ -1,14 +1,14 @@
-"""Synthetic keystroke logs for the pre-freeze check (preregistration.md, "公開の他の列から長さが戻らないかの検査").
+"""Synthetic keystroke logs for the pre-freeze check (preregistration, "Check on synthetic logs").
 
-No human data. An editor simulation writes rows with the KLiCKe columns ([V264] §2.1.5: event ID, down/up/pause/action
+No human data. An editor simulation writes rows with the KLiCKe columns (Tian et al., 2025, section 2.1.5: event ID, down/up/pause/action
 time, position, word count, text change, activity, and the pressed key) and keeps the true correspondence (which press
 put each character of the final text there). The release forms of config.json "release_forms" are applied to the rows.
 
 What is an assumption about the real logs (to be checked at check 2 after acquisition, not before):
 - one row per key press or mouse operation; a paste, a cut, an undo and a drag are one row each;
-- the position after a selection is the moving end of the selection ([V264] §2.1.5: "the endpoint of the selection");
-- Control/Alt/Shift/Meta rows have action time 0 and up time = down time ([V264] §2.1.5 sets their operation time to 0);
-- activity values and text change formats follow the Kaggle description [V265] (Input, Remove/Cut, Replace "a => b",
+- the position after a selection is the moving end of the selection (Tian et al., 2025, section 2.1.5: "the endpoint of the selection");
+- Control/Alt/Shift/Meta rows have action time 0 and up time = down time (Tian et al., 2025, section 2.1.5, sets their operation time to 0);
+- activity values and text change formats follow the Kaggle description (The Learning Agency Lab, 2023) (Input, Remove/Cut, Replace "a => b",
   Paste, Nonproduction, "Move From [a, b] To [c, d]", "NoChange");
 - an undo right after a word removes that word and is logged as Remove/Cut;
 - the released key (up_event) is the pressed key;
@@ -30,7 +30,7 @@ MOD = {"Shift", "Control", "Alt", "Meta", "CapsLock"}
 MOUSE = {"Leftclick", "Rightclick", "Middleclick"}
 CHAR_CATS = ("letter", "digit", "space", "punctuation", "enter")
 SEP_CATS = ("space", "punctuation", "enter")
-# navigation and modifier categories after the synthetic-log check (decisions 41-43)
+# navigation and modifier categories after the synthetic-log check
 NAV_KEYS = {"ArrowLeft": "arrow_left", "ArrowRight": "arrow_right", "Home": "home", "End": "end"}
 NAV_CATS = ("arrow_left", "arrow_right", "home", "end", "navigation")
 MOD_CATS = ("control", "modifier")
@@ -82,7 +82,7 @@ def key_of_char(c):
 
 
 def word_lengths(text):
-    """Text segments (preregistration.md 区間): runs of letters and digits, the value is the run length."""
+    """Text segments (preregistration, "Segments"): runs of letters and digits, the value is the run length."""
     return [len(m) for m in re.findall(r"[A-Za-z0-9]+", text)]
 
 
@@ -497,8 +497,8 @@ class Record:
 
 def shortcut_flags(cats):
     """A shortcut is the next press that is not a modifier after a Control or Meta press ('control'), when it is a
-    letter, digit or R3-u char (decision 43). The preregistration's "while Control or Meta is held" cannot be read
-    from the times because the modifier action time is 0 ([V264] §2.1.5)."""
+    letter, digit or R3-u char. The preregistration's "while Control or Meta is held" cannot be read
+    from the times because the modifier action time is 0 (Tian et al., 2025, section 2.1.5)."""
     flags = [False] * len(cats)
     armed = False
     for i, c in enumerate(cats):
@@ -531,7 +531,7 @@ def segment_rows(cats):
 
 
 def record_segments(cats, merge_char=False):
-    """Record segments (preregistration.md 区間): [(value, [row indices])]. A trailing open segment is kept if it has
+    """Record segments (preregistration, "Segments"): [(value, [row indices])]. A trailing open segment is kept if it has
     a counted press. merge_char: the R3-u 'char' category has no separator (returns one segment)."""
     sc = shortcut_flags(cats)
     segs = []
@@ -584,9 +584,9 @@ def form_R1(rec):
 
 
 R2_COLS = ("event_id", "down_time", "up_time", "action_time", "down_event", "up_event", "cursor_position", "word_count")
-# R3 and the forms built on it keep the press time and the pressed key's category only (decisions 41, 45): up and
-# action times carry a drag's length or a held key's duration (a lower bound of it stays in the next press interval,
-# decision 44), the released key can differ from the pressed one, and no attacker or metric uses them
+# R3 and the forms built on it keep the press time and the pressed key's category only: up and
+# action times carry a drag's length or a held key's duration (a lower bound of it stays in the next press interval),
+# the released key can differ from the pressed one, and no attacker or metric uses them
 R3_COLS = ("event_id", "down_time", "down_event")
 
 
@@ -674,7 +674,7 @@ def form_R5(rec, rng):
 def form_R6(rec, rng):
     """Letter/digit identities of the typed presses (Input and the typed side of Replace) are permuted within each
     record segment, with the same permutation in text_change. Strings that do not come from a press (pasted text,
-    the replaced text, removed text) have letters and digits masked to q as in R1 (decision 46)."""
+    the replaced text, removed text) have letters and digits masked to q as in R1."""
     cats = [category(r["down_event"]) for r in rec.rows]
     out = [dict(r) for r in rec.rows]
     for o, r in zip(out, rec.rows):

@@ -7,7 +7,7 @@
 - 入手先: GitHub の README が指す Google Drive のフォルダ（zip 3 つと人口統計の CSV。2026-10-12 に構成だけを見た・[V264] の行）。
 - 利用条件: Inputlog のページ [V273] 逐語 *"These files can be downloaded and used freely. However, if you wish to use them in your research project, please reference this repository as an original"*。
 - 取得するもの: 議論文の課題の記録（CSV）・本文・人の採点だけ。人口統計のファイルは取得しない（調査票が MTurk の worker ID を尋ねている・[V264] の付録 A）。zip に同梱されていれば展開せず、zip の SHA-256 だけを記録する。打ち写しの試験・語彙の試験も使わない。
-- 取得の開始条件: 著者への問い合わせ（`.steering/20261012-public-keystroke-matching-judgement/author-inquiry-draft.md`・研究者が送付済み）の返事を見て、研究者が進めると決めた。
+- 取得の開始条件: 事前登録の凍結の後に取得する。著者への問い合わせ（`.steering/20261012-public-keystroke-matching-judgement/author-inquiry-draft.md`・研究者が 2026-10-12 に送付）の返事は待たない（判断 51）。返事で利用に懸念が示されたら、計算を止め、取得したデータを消し、その経緯を報告する。
 - 版の固定（取得のときに書く）: 取得の日・Drive のファイル ID・各ファイルの SHA-256・GitHub のリポジトリのコミット。
 
 ## ENJA15 [P273] [P359] [P360]
