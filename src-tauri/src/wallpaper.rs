@@ -441,7 +441,11 @@ impl<B: Backend> Manager<B> {
             .filter(|o| matches!(self.backend.get(&o.id), Ok(Some(p)) if same_path(&p, &o.path)))
             .map(|o| o.id.clone())
             .collect();
-        let needs_write = targets.iter().any(|o| !showing_original.contains(&o.id));
+        // 外れているモニタはいま書けないので数えない（位置は全モニタ共通で、書けるモニタが無いのに
+        // 本人の位置を控えた値で上書きしない。つながった後の戻しで書く）
+        let needs_write = targets
+            .iter()
+            .any(|o| connected.contains(&o.id) && !showing_original.contains(&o.id));
         if needs_write {
             if let Some(pos) = store.position {
                 let _ = self.backend.set_position(pos);
@@ -652,6 +656,40 @@ pub(crate) mod tests {
         assert!(m.restore(true));
         assert_eq!(m.backend_mut().sets, 0);
         assert!(!d.join(STORE_FILE_NAME).exists(), "元の状態を消す");
+    }
+
+    /// 外れたモニタに肖像が残っていても、つながっているモニタがすべて元なら位置を書かない。
+    /// つながった後の戻しでそのモニタと位置を書く。
+    #[test]
+    fn a_disconnected_portrait_monitor_does_not_rewrite_the_position() {
+        let (mut m, _d, originals) = setup("unplugged_pos", 2);
+        m.show(&Show::Image(some_image()));
+        // m1 を外す（肖像のまま）・m0 は先に元へ戻る
+        let m1 = m.backend_mut().sizes.remove(1);
+        assert!(!m.restore(false), "外れたモニタが残るので false");
+        let sets = m.backend_mut().sets;
+        m.backend_mut().position = Some(2); // 本人が位置を替えた
+        assert!(!m.restore(false));
+        assert_eq!(m.backend_mut().sets, sets, "書けるモニタが無い");
+        assert_eq!(m.backend_mut().position, Some(2), "位置を上書きしない");
+        // つながった後は戻す
+        m.backend_mut().sizes.push(m1);
+        assert!(m.restore(false));
+        assert_eq!(&m.backend_mut().walls["m1"], &originals[1]);
+        assert_eq!(m.backend_mut().position, Some(4));
+    }
+
+    /// 元を出しているモニタでも、元のファイルの中身が変わっていれば「戻った」とは言わない（書きもしない）。
+    #[test]
+    fn an_edited_original_already_shown_is_not_reported_as_restored() {
+        let (mut m, d, originals) = setup("edited_shown", 1);
+        assert_eq!(m.readiness(), Ok(true));
+        std::fs::write(&originals[0], "edited by the person").unwrap();
+        assert!(!m.restore(false));
+        assert_eq!(m.backend_mut().sets, 0);
+        // 終わりはパスが元なら片付ける（既存の `finishing_cleans_up_even_if_the_original_file_was_edited` と同じ）
+        assert!(m.restore(true));
+        assert!(!d.join(STORE_FILE_NAME).exists());
     }
 
     /// 一部のモニタだけ肖像が残っているときは、そのモニタだけを書き戻す。
