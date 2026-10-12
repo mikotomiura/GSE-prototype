@@ -6,7 +6,7 @@
 
 - 入手先: GitHub の README が指す Google Drive のフォルダ（zip 3 つと人口統計の CSV。2026-10-12 に構成だけを見た・[V264] の行）。
 - 利用条件: Inputlog のページ [V273] 逐語 *"These files can be downloaded and used freely. However, if you wish to use them in your research project, please reference this repository as an original"*。
-- 使うもの: 議論文の課題の記録（CSV）・本文・人の採点。使わないもの: 人口統計・打ち写しの試験・語彙の試験。
+- 取得するもの: 議論文の課題の記録（CSV）・本文・人の採点だけ。人口統計のファイルは取得しない（調査票が MTurk の worker ID を尋ねている・[V264] の付録 A）。zip に同梱されていれば展開せず、zip の SHA-256 だけを記録する。打ち写しの試験・語彙の試験も使わない。
 - 取得の開始条件: 著者への問い合わせ（`.steering/20261012-public-keystroke-matching-judgement/author-inquiry-draft.md`・研究者が送付済み）の返事を見て、研究者が進めると決めた。
 - 版の固定（取得のときに書く）: 取得の日・Drive のファイル ID・各ファイルの SHA-256・GitHub のリポジトリのコミット。
 
