@@ -34,8 +34,8 @@
   "_comment_merge_2026_10_12_eh3_after_impl": "2026-10-12: docs/portrait-eh3-after-impl に origin/main（PR #355 の後）を merge した際、台帳が衝突した。10-12 は両側とも起点が無い（本ブランチの起点は 10-11 の 481004 / 13 回）ので和を採った: 本ブランチ 53993 / 2 回（EH3 の夜間の制約を外したタスクの /cross-review の Codex 2 巡）＋ origin/main 99497 / 2 回 = 153490 / 4 回。history の 10-11 は origin/main の 504747 / 14 回（本ブランチの 481004 / 13 回を含む）を採った。",
   "today": {
     "date": "2026-10-12",
-    "tokens_used": 153490,
-    "invocations": 4
+    "tokens_used": 208277,
+    "invocations": 6
   },
   "history": [
     {
