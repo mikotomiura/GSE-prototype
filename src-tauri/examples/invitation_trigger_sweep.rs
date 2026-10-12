@@ -15,6 +15,8 @@
 //! - 作業時間: 最後の打鍵から 180 秒未満の `feat` 行の時間（次の行までの間・1 行 1 秒まで）。
 //! - 停滞らしさ: 契機の直前の継続の窓で、`p_stuck` が 3 状態の最大だった行の割合と、窓の中の `p_stuck` の最大値。
 //!
+//! 各ファイルの `feat` 行は時刻が狭義単調でなければならず、ファイルどうしで同じ時刻の行があってもいけない
+//! （どちらも並べ替えると実際と違う時系列になるので、黙って直さずに止める）。
 //! 渡したファイルはすべて 1 本の時系列に並べて 1 つの状態機械で回す（O1 は起動したまま日次でファイルを
 //! 替えるので、ファイルの境目で上限や間隔を数え直さない）。殻（`lib.rs` の `InvitationRunner`）と同じく、
 //! `feat` 行が 30 秒以上空いたらセッションの区切りとし、現地の日（4:00 区切り）が変わったら区切る。
@@ -67,6 +69,7 @@ struct Row {
 /// 1 本のファイルから `feat` 行（時刻・確率）と打鍵の押下の時刻を読む。
 fn load(path: &str, feats: &mut Vec<(u64, f64, bool)>, presses: &mut Vec<u64>) -> Result<()> {
     let reader = BufReader::new(File::open(path)?);
+    let mut prev_feat: Option<u64> = None;
     for line in reader.lines() {
         let line = line?;
         let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) else {
@@ -84,6 +87,11 @@ fn load(path: &str, feats: &mut Vec<(u64, f64, bool)>, presses: &mut Vec<u64>) -
             Some("feat") => {
                 let f = |k: &str| v.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0);
                 let (ps, pf, pi) = (f("p_stuck"), f("p_flow"), f("p_inc"));
+                // 時計の戻り・同じ時刻の行は、並べ替えると実際と違う時系列になるので受け付けない
+                if prev_feat.is_some_and(|q| t <= q) {
+                    return Err(format!("{path}: feat rows are not strictly increasing in t").into());
+                }
+                prev_feat = Some(t);
                 feats.push((t, ps, ps >= pf && ps >= pi));
             }
             _ => {}
@@ -99,8 +107,12 @@ fn timeline(paths: &[String]) -> Result<Vec<Row>> {
     for p in paths {
         load(p, &mut feats, &mut presses)?;
     }
+    // ファイルどうしは並べ替えて繋ぐ（各ファイルの中は狭義単調を確かめてある）。
+    // 重なるファイル（同じ時刻の行が 2 本ある）は、どちらを採るかで数が変わるので受け付けない。
     feats.sort_by_key(|f| f.0);
-    feats.dedup_by_key(|f| f.0);
+    if feats.windows(2).any(|w| w[0].0 == w[1].0) {
+        return Err("input files overlap (same feat timestamp in two files)".into());
+    }
     presses.sort_unstable();
     let mut rows = Vec::with_capacity(feats.len());
     let mut k = 0;
