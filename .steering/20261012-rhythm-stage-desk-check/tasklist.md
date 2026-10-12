@@ -16,7 +16,8 @@
 - [x] 下見 0 の 1 回目（v2 0.997・v3 0.884 で使える world なし → 研究者に戻す・`32acef1f`）
 - [x] 研究者が world v4 を選ぶ（判断 16）→ v4 を足す（`5fcda976`）
 - [x] 下見 0 の 2 回目（v4 0.705 で使える）→ §3.0 に追記して固定
-- [ ] world v4 の追加の差分の `/cross-review`（固定の後・計器の誤りなら §8）
+- [x] world v4 の追加の差分の `/cross-review`（固定の後・判断 17・selftest に実測の項・§8 の 2 行目）
+- [ ] 次の段: 下見 1（PC-stall 24 本の λ・design §3.9）→ `stage.py`・`twins.py`・`checks.py`・selftest の残り → スモーク → 本番（world v4）
 
 ## 計器と本番（固定の後）
 - [ ] `experiments/<日付>-rhythm-stage-desk-check/` を作る（EH1 第 5 回から写す・`stage.py`・`twins.py`）

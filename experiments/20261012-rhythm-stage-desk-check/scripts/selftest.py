@@ -74,20 +74,27 @@ def interval_stats(work: Path) -> dict:
     """Per kind (FLOW, STRUGGLE): the intervals below 1 s, and among the gaps after a backspace the share >= 2 s."""
     seg_of = {0: "FLOW", 1: "STRUGGLE"}
     short = {"FLOW": [], "STRUGGLE": []}
+    gaps = {"FLOW": [], "STRUGGLE": []}
     after_bs = {"FLOW": [], "STRUGGLE": []}
+    vks = {"FLOW": [], "STRUGGLE": []}
     for sid in bl.p_sids(work):
         t, v = press_rows(work / "ndjson" / f"{sid}.ndjson")
         seg = np.load(work / "labels" / f"{sid}.npz")["seg"]
         d = np.diff(t)
         sec = np.minimum(t // 1000, len(seg) - 1)
         for code, kind in seg_of.items():
+            vks[kind] += v[seg[sec] == code].tolist()
             m = (seg[sec[:-1]] == code) & (seg[sec[1:]] == code)  # both presses in a segment of this kind
             short[kind] += d[m & (d < 1000)].tolist()
+            gaps[kind] += d[m & (d >= 1000)].tolist()
             # the pause after a backspace acts on the gap after a burst whose last press is a backspace, so look
             # at the gaps (intervals of 1 s or longer: a flight of 150 or 320 ms median almost never reaches 1 s) that follow a backspace
             after_bs[kind] += (d[m & (v[:-1] == 8) & (d >= 1000)] >= 2000).tolist()
-    return {k: {"short_median": float(np.median(short[k])), "after_bs_ge2s": float(np.mean(after_bs[k])),
-                "n_after_bs": len(after_bs[k])} for k in short}
+    q = lambda a, p: float(np.percentile(a, p)) if len(a) else float("nan")
+    return {k: {"short_median": float(np.median(short[k])), "short_p10": q(short[k], 10), "short_p90": q(short[k], 90),
+                "gap_p10": q(gaps[k], 10), "gap_p50": q(gaps[k], 50), "gap_p90": q(gaps[k], 90),
+                "bs_rate": float(np.mean(np.asarray(vks[k]) == 8)), "n_presses": len(vks[k]),
+                "after_bs_ge2s": float(np.mean(after_bs[k])), "n_after_bs": len(after_bs[k])} for k in short}
 
 
 def test_world(cfg: dict, config: Path, eh1: Path, tmp: Path, hmm: str) -> None:
@@ -138,6 +145,13 @@ def test_world(cfg: dict, config: Path, eh1: Path, tmp: Path, hmm: str) -> None:
     check(abs(st4["STRUGGLE"]["after_bs_ge2s"] - st4["FLOW"]["after_bs_ge2s"]) < 0.1
           and st4["STRUGGLE"]["after_bs_ge2s"] < st3["STRUGGLE"]["after_bs_ge2s"] - 0.2,
           "world v4: gaps after a backspace in STRUGGLE as in FLOW (no pause), unlike v3")
+    # Codex (v4 diff): check the generated output, not only the settings
+    f4, g4 = st4["FLOW"], st4["STRUGGLE"]
+    check(all(abs(g4[k] - f4[k]) / f4[k] < 0.1 for k in ("short_p10", "short_p90", "gap_p10", "gap_p50", "gap_p90")),
+          "world v4: the 10/90 percentiles of the short intervals and the 10/50/90 of the gaps within 10% of FLOW's")
+    check(abs(g4["bs_rate"] - s4["p_backspace"]) < 0.02 and abs(f4["bs_rate"] - v4["FLOW"]["p_backspace"]) < 0.01
+          and min(g4["n_presses"], f4["n_presses"]) > 5000,
+          f"world v4: the generated backspace rates {g4['bs_rate']:.3f} / {f4['bs_rate']:.3f} match STRUGGLE / FLOW")
 
 
 def test_speed(cfg: dict) -> None:
