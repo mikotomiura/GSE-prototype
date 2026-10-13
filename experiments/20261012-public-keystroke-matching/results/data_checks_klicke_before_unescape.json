@@ -1,0 +1,324 @@
+{
+ "check1": {
+  "files": {
+   "scores": {
+    "encoding": "cp1252",
+    "score_unparsable": 0
+   },
+   "ids_logs": 4992,
+   "ids_texts": 4992,
+   "ids_scores": 4992,
+   "ids_union": 4992,
+   "score_rows": 4992,
+   "ids_with_more_than_one_score_row": 0,
+   "ids_in_more_than_one_prompt": 0
+  },
+  "writers": 4992,
+  "rows_total": 16982157,
+  "rows_per_writer": {
+   "0": 427.0,
+   "10": 1718.0,
+   "25": 2196.75,
+   "50": 3057.5,
+   "75": 4255.5,
+   "90": 5534.8,
+   "100": 18480.0
+  },
+  "active_rows_total_kept": 16831060,
+  "load_errors": {},
+  "log_encoding": {
+   "utf-8": 4971,
+   "cp1252": 21
+  },
+  "text_encoding": {
+   "utf-8": 4992
+  },
+  "first_column_row_number_from_1": 4992,
+  "first_column_row_number_from_0": 0,
+  "prompts": 4,
+  "writers_per_prompt": {
+   "APPEARANCE": 1234,
+   "COMPETITION": 1136,
+   "HAPPINESS": 1329,
+   "MATERIALISM": 1293
+  },
+  "kept_per_prompt": {
+   "APPEARANCE": 1234,
+   "COMPETITION": 1136,
+   "HAPPINESS": 1329,
+   "MATERIALISM": 1293
+  },
+  "excluded": {},
+  "kept": 4992
+ },
+ "check2": {
+  "columns": [
+   "",
+   "DownEventID",
+   "UpEventID",
+   "DownTime",
+   "UpTime",
+   "ActionTime",
+   "DownEvent",
+   "UpEvent",
+   "CursorPosition",
+   "PauseTime",
+   "WordCount",
+   "TextChange",
+   "Activity"
+  ],
+  "column_map": {
+   "DownEventID": "event_id",
+   "DownTime": "down_time",
+   "UpTime": "up_time",
+   "ActionTime": "action_time",
+   "DownEvent": "down_event",
+   "UpEvent": "up_event",
+   "CursorPosition": "cursor_position",
+   "WordCount": "word_count",
+   "TextChange": "text_change",
+   "Activity": "activity"
+  },
+  "columns_not_in_table": [
+   "",
+   "UpEventID",
+   "PauseTime"
+  ],
+  "activity_values": {
+   "Input": 13560209,
+   "Remove/Cut": 1969082,
+   "Nonproduction": 1442356,
+   "Replace": 9300,
+   "Paste": 1133,
+   "Move From": 77
+  },
+  "key_values_not_in_map": {
+   "<other value: length 2>": {
+    "rows": 9381,
+    "writers": 2136
+   },
+   "Tab": {
+    "rows": 2152,
+    "writers": 1341
+   },
+   "ContextMenu": {
+    "rows": 1134,
+    "writers": 37
+   },
+   "NumLock": {
+    "rows": 483,
+    "writers": 179
+   },
+   "Insert": {
+    "rows": 362,
+    "writers": 153
+   },
+   "AudioVolumeDown": {
+    "rows": 272,
+    "writers": 25
+   },
+   "Unidentified": {
+    "rows": 194,
+    "writers": 29
+   },
+   "F12": {
+    "rows": 182,
+    "writers": 22
+   },
+   "AudioVolumeUp": {
+    "rows": 178,
+    "writers": 29
+   },
+   "F2": {
+    "rows": 146,
+    "writers": 1
+   },
+   "Dead": {
+    "rows": 82,
+    "writers": 11
+   },
+   "Process": {
+    "rows": 79,
+    "writers": 6
+   },
+   "Escape": {
+    "rows": 52,
+    "writers": 17
+   },
+   "AudioVolumeMute": {
+    "rows": 48,
+    "writers": 25
+   },
+   "ModeChange": {
+    "rows": 37,
+    "writers": 1
+   },
+   "F3": {
+    "rows": 36,
+    "writers": 1
+   },
+   "F15": {
+    "rows": 33,
+    "writers": 2
+   },
+   "ScrollLock": {
+    "rows": 31,
+    "writers": 6
+   },
+   "MediaTrackNext": {
+    "rows": 27,
+    "writers": 4
+   },
+   "F11": {
+    "rows": 23,
+    "writers": 21
+   },
+   "OS": {
+    "rows": 13,
+    "writers": 5
+   },
+   "MediaPlayPause": {
+    "rows": 11,
+    "writers": 10
+   },
+   "Clear": {
+    "rows": 9,
+    "writers": 5
+   },
+   "AltGraph": {
+    "rows": 7,
+    "writers": 6
+   },
+   "Unknownclick": {
+    "rows": 4,
+    "writers": 3
+   },
+   "MediaTrackPrevious": {
+    "rows": 4,
+    "writers": 3
+   },
+   "F10": {
+    "rows": 4,
+    "writers": 2
+   },
+   "F1": {
+    "rows": 3,
+    "writers": 3
+   },
+   "Cancel": {
+    "rows": 1,
+    "writers": 1
+   },
+   "F9": {
+    "rows": 1,
+    "writers": 1
+   },
+   "F6": {
+    "rows": 1,
+    "writers": 1
+   },
+   "Pause": {
+    "rows": 1,
+    "writers": 1
+   },
+   "Help": {
+    "rows": 1,
+    "writers": 1
+   }
+  },
+  "single_char_non_ascii_key_rows_by_category": {
+   "punctuation": 8,
+   "letter": 26
+  },
+  "rows_by_category": {
+   "letter": 10793194,
+   "space": 2441330,
+   "backspace": 1952314,
+   "modifier": 697843,
+   "punctuation": 272200,
+   "arrow_right": 268687,
+   "mouse": 185437,
+   "arrow_left": 142707,
+   "navigation": 118680,
+   "enter": 45637,
+   "delete": 25686,
+   "other": 14992,
+   "digit": 10981,
+   "control": 10759,
+   "end": 1273,
+   "home": 437
+  },
+  "up_event_id_differs_from_down_event_id": 0,
+  "assumption_counts": {
+   "down_event_differs_from_up_event": 104668,
+   "leftclick_activity_Replace": 3,
+   "leftclick_activity_not_move_or_nonproduction": 3,
+   "modifier_action_time_nonzero": 25609,
+   "modifier_action_time_nonzero_CapsLock": 24748,
+   "modifier_action_time_nonzero_Meta": 861,
+   "modifier_rows_Alt": 834,
+   "modifier_rows_CapsLock": 24886,
+   "modifier_rows_Control": 9861,
+   "modifier_rows_Meta": 898,
+   "modifier_rows_Shift": 672123,
+   "shortcut_effect_letter_multi_insert": 11,
+   "shortcut_effect_letter_remove": 698,
+   "shortcut_effect_not_after_control_letter_multi_insert": 8,
+   "shortcut_effect_not_after_control_letter_remove": 392,
+   "shortcut_effect_not_after_control_paste": 566,
+   "shortcut_effect_paste": 1133
+  }
+ },
+ "check3": {
+  "writers": 4992,
+  "exact_match_after_whitespace_normalisation": 72,
+  "share": 0.0144,
+  "normalised_edit_distance": {
+   "0": 0.0,
+   "10": 0.0045,
+   "25": 0.0065,
+   "50": 0.0096,
+   "75": 0.0145,
+   "90": 0.0222,
+   "100": 0.8312
+  },
+  "normalised_edit_distance_bins": {
+   "0": 72,
+   "(0, 0.01]": 2547,
+   "(0.01, 0.05]": 2298,
+   "(0.05, 0.1]": 43,
+   "(0.1, 0.5]": 27,
+   "> 0.5": 5
+  }
+ },
+ "check4": {
+  "segments": 2761290,
+  "equal": 2217048,
+  "share_equal": 0.8029,
+  "rule_minus_true_histogram (clipped at +-6)": {
+   "-6": 54650,
+   "-5": 12445,
+   "-4": 16587,
+   "-3": 20876,
+   "-2": 34697,
+   "-1": 69217,
+   "0": 2217048,
+   "1": 45945,
+   "2": 72409,
+   "3": 64901,
+   "4": 55176,
+   "5": 29886,
+   "6": 67453
+  },
+  "writers_all_segments_equal": 0,
+  "share_of_segments_equal_per_writer": {
+   "0": 0.0966,
+   "10": 0.661,
+   "25": 0.7523,
+   "50": 0.8294,
+   "75": 0.8877,
+   "90": 0.93,
+   "100": 0.9968
+  }
+ }
+}

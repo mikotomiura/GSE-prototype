@@ -1,6 +1,6 @@
-# 入力データ（取得の前・下書き）
+# 入力データ
 
-どのデータもまだ取得していない。取得したら、この文書に版と SHA-256 を書き、`config.json` の `to be filled at acquisition` を埋める。記録と本文は公開データだが repo に入れない（`raw/`・git に入らない）。repo に入れるのは集計だけ。記録と本文を外部の LLM（Codex を含む）に送らない。
+3 つとも取得した（2026-10-12〜13・各節の「取得」）。版と SHA-256 はこの文書と `config.json` に書いた。取得の後の検査は `notes.md` の「データの検査」。記録と本文は公開データだが repo に入れない（`raw/`・git に入らない）。repo に入れるのは集計だけ。記録と本文を外部の LLM（Codex を含む）に送らない。
 
 ## KLiCKe [V264]
 
@@ -16,7 +16,7 @@
 - 取得したもの: `WritingTask.zip` だけ（Drive のファイル ID `120FkdzVlVBsyYQdvwLhlcLToTDRDStb_`・699,610,000 バイト・SHA-256 `ffa4d753fdb9a54f5cadd6836426d56a0cabe73ceade8e7e40dddbbae178555d`）。`demographic_info.csv`・`TypingTests.zip`・`VocabularyKnowledgeTest.zip` は取得していない。
 - zip の目録（名前と大きさだけを見た）: `keystrokelogs/csv` 4,992・`keystrokelogs/idfx` 4,992・`texts` 4,992（`.txt`）・`holistic_scores.csv`（11,360,401 バイト）・`holistic_rating_form.docx`・`writing_prompts.docx`。人口統計のファイルは入っていない。ファイル名の ID は 8 桁の数字で、記録と本文で同じ 4,992 個（MTurk の worker ID の形ではない）。
 - 展開したもの: 記録の CSV・本文・`holistic_scores.csv`・`writing_prompts.docx`（IDFX と採点の様式は展開しない）。各ファイルの SHA-256 の一覧は `raw/klicke/manifest_extracted.sha256`（書き手の ID を含むので repo に入れない。一覧そのものの SHA-256 は `8a039a71b8e8b142580cdd30467eeff58217d71ca65262dbab37965e585c2066`）。展開は zip から決まるので、zip の SHA-256 で再現できる。
-- 中身はまだ開いていない（検査 1・2 で数と列名だけを出す）。`holistic_scores.csv` が 11 MB あり、採点のほかの列（本文など）を含みうるので、検査 2 で列名だけを確かめる。
+- 検査 1・2（2026-10-13・数と列名だけ）: `holistic_scores.csv` の列は `ID,Prompt,Text,Score`。`Text` の列は読み込みに使わず、本文は `texts/<ID>.txt` を使う。記録の CSV は `TextChange`・`DownEvent`・`UpEvent` で改行・タブ・二重引用符・バックスラッシュをバックスラッシュつきの 2 字で書いている（読み込みで戻す・`notes.md` の逸脱 D1）。記録の CSV の 21 本と `holistic_scores.csv` は utf-8 で読めず cp1252 で読む。
 
 ## ENJA15 [P273] [P359] [P360]
 
@@ -36,7 +36,7 @@
 - 経路: DAV のリビジョン固定のパス `https://svn.code.sf.net/p/tprdb/svn/!svn/bc/649/TPRDB/ENJA15/`。取得の時点のリポジトリの最新は Revision 649。
 - 取得したもの: T のセッションだけ。`Translog-II/P??_T?.xml` 76 本（888 MB）と、同じセッションの `Alignment/` の `.atag`・`.src`・`.tgt` 各 76 本（3.2 MB）。P・D のセッションと `projects/` は取得していない。失敗 0。
 - 版: 各ファイルの SHA-256 は `enja15-manifest-r649.sha256`（この一覧の SHA-256 は `401c922535f788cf0ae46eea92d6ef4703c3bf37ce6bd6af69ddad73c854a4c8`）。置き場は `raw/enja15/`（git に入らない）。
-- 中身はまだ開いていない（検査 5 で数だけを出す）。
+- 検査 5（2026-10-13・数と名前と値の形だけ）: 76 セッション・訳者 39・原文 6（交差）。訳文は各 XML の `LogFile/FinalTextUTF8` を使い、`Alignment/*.tgt` は使わない（`notes.md`）。
 
 ## KeyTAR の公開モデル [V267]
 
@@ -44,4 +44,13 @@
 - 取得の開始条件: 研究者が 15 GB の取得を認めた。取得の後、本計算の前に `model_licenses`・`ethics.txt`・`limitations.txt` を読む。
 - 版の固定（取得のときに書く）: `keytar.zip` の SHA-256。
 - 取得の開始: 2026-10-13（`raw/keytar/`）。Zenodo の API の記録の応答を `raw/keytar/zenodo_record_17254163.json` に保存した: `keytar.zip`・15,039,177,667 バイト・`md5:a56da07f5a086bcc8c9763abe1b00934`・cc-by-4.0。取得が終わったら md5 を照合し、SHA-256 をここと `config.json` に書く。
-- 取得の完了: 2026-10-12T21:56:20Z（UTC）・15,039,177,667 バイト（Zenodo の値と一致）・md5 `a56da07f5a086bcc8c9763abe1b00934`（Zenodo の値と一致）・SHA-256 `d2fe250a7219b7f6f796d52d2cacda35d5b2d3dab2f4847c0ddbbb6ca1159876`。まだ展開していない（検査 6 の前に `model_licenses`・`ethics.txt`・`limitations.txt` を読む）。
+- 取得の完了: 2026-10-12T21:56:20Z（UTC）・15,039,177,667 バイト（Zenodo の値と一致）・md5 `a56da07f5a086bcc8c9763abe1b00934`（Zenodo の値と一致）・SHA-256 `d2fe250a7219b7f6f796d52d2cacda35d5b2d3dab2f4847c0ddbbb6ca1159876`。
+
+### 検査 6（2026-10-13）
+
+- 読んだ文書（`raw/keytar/docs_extracted/`）: `README.md`・`license.txt`（MIT）・`citation.txt`・`code_artifact/README.md`・`use.txt`・`destructive.txt`・`install.sh`・`data_artifact/README.md`・`ethics.txt`・`limitations.txt`・`provenance.txt`・`code_artifact/artifact/LICENSE`（Apache 2.0・open-instruct）と、推論のコード（`scripts/eval/evaluate_key.py`・`convert_data_inference.py`・`claims/llm_reconstruction/`）。`model_licenses`（`code_artifact/artifact/assets/model_licenses/`）は llama・opt・pythia・tulu の利用条件で、KeyTAR のチェックポイントの基（`allenai/OLMo-1B-0724-hf`・Hugging Face の API で `apache-2.0`）のものではない。利用条件と ethics は本研究の使い方に反しない（`notes.md` の検査 6）。A4 を行う。
+- 展開したもの（`raw/keytar/extracted/`・git に入らない）: `data_artifact/data/key_ground_truth_olmo/`（`.jsonl` を除く・`pytorch_model.bin` の SHA-256 `d09f06db0f3dbaebf28a6a80e4d4651629dbf8ca3d20bc6d5656ee5d13f7144f`・2,559,611,026 バイト）と `data_artifact/data/key_ground_truth/test/`（学習の書式を確かめるため）。
+- 使うチェックポイント: `key_ground_truth_olmo`（元の打鍵の間隔で学習した方。`key_cache_olmo` はキャッシュから取った間隔で学習した方で、使わない）。基は OLMo-1B-0724（16 層・隠れ 2,048・語彙 50,304・bfloat16 で保存）。
+- KeyTAR の既定の設定（`scripts/eval/evaluate_key.py` の `model.generate` の引数）: `max_new_tokens` 50・`num_beams` 64・`num_beam_groups` 16・`diversity_penalty` 0.8・`no_repeat_ngram_size` 2・`num_return_sequences` 50・`do_sample` False・`top_k` 50・`temperature` 1.0・`top_p` 1.0・`repetition_penalty` 1.0。読み込みは `AutoModelForCausalLM.from_pretrained(..., device_map="auto")` で型の指定なし（float32）。transformers 4.49.0。
+- 入力の書式（成果物の学習のデータ `key_ground_truth/test` の `messages`）: 対話の型（`<|user|>`・`<|assistant|>`）で、利用者の文は "Translate the Time intervals to Keystrokes.\nTime intervals: " に間隔を空白で区切った整数（ms）を続けたもの。間隔は Shift と句読点を含む全部の押下の間で、上限 1,023 で切られている（10,481 例の最大が 1,023）。例の 52% は文脈なしの 1 往復、残りは同じ書き手の前の文を 1〜4 往復含む。
+- A4 の実装の段で決めること（登録の「英字・数字・Space の押下だけ」「20 区間の塊」は固定）: 間隔の上限 1,023 を当てるか・前の往復を入れないこと・復元の 50 本のうち比べる 1 本（既定の出力の先頭）。検査 6 の時間は、上限を当て・前の往復なしで測った。

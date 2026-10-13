@@ -183,12 +183,103 @@ R3-u の A3 の和の版（登録どおり・変えない）: 時刻の項の数
 
 ## データの検査（取得の後・本計算の前）
 
-途中（2026-10-13）。取得の前に pip-audit 2.10.1（使い捨ての venv）で `requirements.txt` を検査し、既知の脆弱性なし。
+2026-10-13。取得の前に pip-audit 2.10.1（使い捨ての venv）で `requirements.txt` を検査し、既知の脆弱性なし。照合と有用性の本計算の値は 1 つも計算していない。記録と本文の中身は開いていない（スクリプトは数・ハッシュ・分布だけを出し、書き手の ID も出さない）。
 
-検査 2 のうち列名だけを見た: 記録の CSV は `"",DownEventID,UpEventID,DownTime,UpTime,ActionTime,DownEvent,UpEvent,CursorPosition,PauseTime,WordCount,TextChange,Activity`（4,992 本で同じ列。4,991 本は引用符つき・1 本は引用符なし）。表に無い列は `UpEventID`・`PauseTime`・先頭の名無しの列で、規則どおりどの形でも出さない。`holistic_scores.csv` は `ID,Prompt,Text,Score`（本文の列を含む）。残りは引き継ぎ `.steering/_handoff/next-session-public-keystroke-matching-checks-1-7.md`。
+### 再現
 
-（以下は取得の前に書いた文）取得の後の検査 2 で、模擬の仮定（上）を実の記録で確かめる（`down_event` と `up_event` が違う行の数・貼り付けや取り消しの行の形・選択の後の位置・修飾キーの保持時間を含む）。
+```bash
+cd experiments/20261012-public-keystroke-matching
+PY=~/.venvs/pkm-main/Scripts/python
+$PY -I scripts/check_klicke.py --root raw/klicke/extracted/WritingTask --out results/data_checks_klicke.json          # 検査 1〜4（約 2 分・16 並列）
+$PY -I scripts/check_klicke_format.py --root raw/klicke/extracted/WritingTask --out results/data_checks_klicke_format.json  # 形式の確かめ（登録の量ではない）
+$PY -I scripts/enja15_structure.py --root raw/enja15 --out results/enja15_structure.json  # 検査 5: 要素と属性の名前
+$PY -I scripts/enja15_values.py --root raw/enja15 --out results/enja15_values.json        # 検査 5: 数と値の種類
+$PY -I scripts/enja15_ime_path_check.py --root raw/enja15 --out results/enja15_ime_path_check.json  # IME の経路の検査
+```
+
+`results/data_checks_klicke_before_unescape.json` と `results/data_checks_klicke_format_before_unescape.json` は、下の逸脱 D1 の直す前の出力。
+
+### 検査で決めたこと（どれも照合と有用性の値を見る前・検査の数だけを見て決めた）
+
+- 読み込み（`scripts/load_klicke.py`）: 列の対応は引き継ぎのとおり（`DownEventID` → `event_id` ほか）。先頭の名無しの列・`UpEventID`・`PauseTime` は使わない。課題と採点は `holistic_scores.csv` の `ID`・`Prompt`・`Score`。本文は `texts/<ID>.txt`（README の "~5,000 persuasive texts" のファイル）とし、`holistic_scores.csv` の `Text` の列は読み込みの対象にしない（`Text` と `texts/` の照合は登録に無いので計算しない）。読めない記録（`Move From` の書式が合わない行・` => ` の無い Replace の行・列の数が違う行・数にならない値）は除外の理由「unreadable log」に回し、例外には理由の符号と例外の型名だけを出す（実の記録では 0 本）。utf-8 で読めないファイルは cp1252 で読む（数は検査 1）。
+- 検査 2 の「ショートカットの効果を持つ行」: `activity` が Paste の行と、英字・数字の押下で `activity` が Remove/Cut の行（切り取り・取り消し）。押したキー自身の種類と、直前の修飾（Shift・Alt・CapsLock）でない押下の種類で分けて数えた。
+- 検査 4 の「R0 の真の対応から数えた値」: 区間の規則の各区間（`record_segments`・R0 の種類の列）について、その区間で数えた押下が打ち、R0 の再生（`corpus.replay_origins`）の最終稿に残った英字・数字の数。規則の値（英字・数字 +1・BackSpace −1）との差を数える。後の区間での削除・選択の削除・貼り付けで消えた字は、規則では数え、真の対応では数えないので、差に入る。
+- 検査 5 の訳文: Translog-II の XML の `LogFile/FinalTextUTF8`（そのセッションの記録そのものの最終の訳文）。`Alignment/*.tgt` は使わない。
+
+### 検査 1（KLiCKe）
+
+- SHA-256: `WritingTask.zip` と展開した各ファイル（取得の節と `data.md`）。
+- 書き手 4,992 人。記録の CSV・本文・採点の行の ID の集合は 3 つとも同じ 4,992 個。採点の行は 4,992 行で、同じ ID の行が 2 つ以上あるものは 0。
+- 課題ごと: APPEARANCE 1,234・COMPETITION 1,136・HAPPINESS 1,329・MATERIALISM 1,293（[V264] の「課題ごとに 1,136〜1,329 人」と一致）。
+- 複数の課題に現れる ID: 0（課題での分割で学習の組から除く書き手は無い）。
+- 除外: 0（記録・本文・採点の欠け 0・本文が 50 語未満 0・読めない記録 0）。
+- 行の数: 16,982,157（書き手あたり 最小 427・10% 1,718・中央 3,057.5・90% 5,535・最大 18,480）。能動的に書いた時間に切った後の行は 16,831,060。
+- 文字コード: 記録の CSV は 4,971 本が utf-8、21 本が utf-8 で読めず cp1252 で読んだ。本文は 4,992 本とも utf-8。`holistic_scores.csv` は utf-8 で読めず cp1252 で読んだ（使う列は `ID`・`Prompt`・`Score` だけ）。
+- 先頭の名無しの列は、4,992 本とも 1 から始まる行の番号だった。
+
+### 検査 2（KLiCKe）
+
+- 列名: `"",DownEventID,UpEventID,DownTime,UpTime,ActionTime,DownEvent,UpEvent,CursorPosition,PauseTime,WordCount,TextChange,Activity`（4,992 本で同じ。4,991 本は引用符つき・1 本は引用符なし）。表に無い列は先頭の名無しの列（行の番号）・`UpEventID`・`PauseTime`で、どの形でも出さない（R0 の行も Kaggle の列だけ）。`DownEventID` と `UpEventID` が違う行は 0。`holistic_scores.csv` は `ID,Prompt,Text,Score`。
+- エスケープ（想定に無かった形・逸脱 D1）: `TextChange`・`DownEvent`・`UpEvent` で、改行が `\n`（バックスラッシュと n の 2 字）、タブが `\t`、二重引用符が `\"`、バックスラッシュが `\\` と書かれていた（`TextChange` の中で 57,492・11・9,789・2,276 回。ほかのバックスラッシュの並びは 0）。押したキーが `"` の行は `\"`（8,243 行）、`\` の行は `\\`（1,138 行）。
+- `Activity` の値: Input 13,560,209・Remove/Cut 1,969,082・Nonproduction 1,442,356・Replace 9,300・Paste 1,133・Move From 77（ほかの値は無い）。
+- 押したキーの値のうち対応表（`key_categories`）に無い値（「その他」に入る・計 5,611 行）: Tab 2,152 行（1,341 人）・ContextMenu 1,134（37）・NumLock 483（179）・Insert 362（153）・AudioVolumeDown 272（25）・Unidentified 194（29）・F12 182（22）・AudioVolumeUp 178（29）・F2 146（1）・Dead 82（11）・Process 79（6）・Escape 52（17）・AudioVolumeMute 48（25）・ModeChange 37（1）・F3 36（1）・F15 33（2）・ScrollLock 31（6）・MediaTrackNext 27（4）・F11 23（21）・OS 13（5）・MediaPlayPause 11（10）・Clear 9（5）・AltGraph 7（6）・Unknownclick 4（3）・MediaTrackPrevious 4（3）・F10 4（2）・F1 3（3）・Cancel・F9・F6・Pause・Help 各 1（1）。Unknownclick はマウスの集合（Leftclick・Rightclick・Middleclick）に無いので「その他」、AltGraph は修飾の集合に無いので「その他」になる（対応表どおり・変えない）。
+- 1 字の非 ASCII のキー: 種類が英字になる値 26 行・句読点になる値 8 行（本文の区間の規則は ASCII の英数字だけを語にするので、この 26 行は記録の側だけで数えられる）。
+- 種類ごとの行: 英字 10,793,194・Space 2,441,330・BackSpace 1,952,314・その他の修飾 697,843・句読点 281,581・右の矢印 268,687・マウス 185,437・左の矢印 142,707・その他の移動 118,680・Enter 45,637・Delete 25,686・数字 10,981・Control と Meta 10,759・その他 5,611・End 1,273・Home 437。
+- 模擬の仮定を確かめる数:
+  - `down_event` と `up_event` が違う行: 104,668（全行の 0.62%）。
+  - `text_change` に " => " が 2 つ以上ある行: 0。
+  - `text_change` が `NoChange` の Paste の行: 0。
+  - ショートカットの効果を持つ行のうち、直前の修飾でない押下が Control でない行（「Control の次の 1 押下」が外れる数）: Paste 1,133 行のうち 566（50%）。内訳は、押したキー自身が Space 300・マウス 106・英字 147（直前が英字 79・その他のキー 58・ほか 10）・その他のキー 11・句読点 1・Enter 1。英字・数字の押下の Remove/Cut 698 行のうち 392（直前が英字 356・マウス 26・左右の矢印 10）。英字の押下の Paste で直前が英字の 79 と、英字の Remove/Cut で直前が英字の 356 は、Control を押したまま 2 つ目を押した形（限界に書いた形）と合う。Space・マウスの押下が Paste の行になる形は模擬に無かった（右クリックのメニューからの貼り付けなど。区間の規則では Space は区切り、マウスは数えない）。
+  - 修飾キーの `action_time` が 0 でない行: 25,609。CapsLock 24,886 行のうち 24,748・Meta 898 行のうち 861。Shift（672,123 行）・Control（9,861 行）・Alt（834 行）は 0 でない行が 0。[V264] §2.1.5 の「修飾キーの操作の時間は 0」は Shift・Control・Alt では成り立ち、CapsLock と Meta では成り立たない。保持時間はどの攻撃者も使わず、R3 系は落とすので、手順は変えない。区間の規則の「Control か Meta の次の 1 押下」は Meta の保持時間が読める記録でも同じ規則のまま。
+  - Leftclick の行のうち `activity` が Move でも Nonproduction でもない行: 3（3 行とも Replace）。
+
+### 検査 3（KLiCKe・エスケープを戻した後）
+
+R0 の再生の最終稿と配布の本文が、空白の連なりを 1 つの空白にし前後を落とした後で完全に一致した書き手: 4,992 人中 4,842 人（97.0%）。正規化編集距離（文字の Levenshtein ÷ 長い方の長さ）の分布: 0 が 4,842・(0, 0.01] が 118・(0.01, 0.05] が 15・(0.05, 0.1] が 5・(0.1, 0.5] が 10・0.5 超が 2（最大 0.83）。一致しない 150 人は全文の照合に残し、一致の有無で分けた正答率を出す（登録どおり）。
+
+直す前（エスケープを戻さない読み込み）: 完全一致 72 人（1.4%）・正規化編集距離の中央値 0.0096（逸脱 D1）。
+
+形式の確かめ（登録の量ではない・照合と有用性の値ではない）: 一致しない 150 人の差は、文字の種類で見ると英字・空白・句読点の挿入と削除が主で、位置は本文の全体に散らばる（`results/data_checks_klicke_format.json`）。
+
+### 検査 4（KLiCKe）
+
+区間の規則の区間 2,770,660 個のうち、規則の値と真の対応の値が一致したのは 2,225,601 個（80.3%）。差（規則 − 真の対応）の分布: −6 以下 54,680・−5 12,454・−4 16,593・−3 20,886・−2 34,801・−1 69,446・0 2,225,601・+1 44,701・+2 72,180・+3 65,197・+4 55,697・+5 30,196・+6 以上 68,228。書き手ごとの一致の割合: 中央 0.83（10% 0.66・90% 0.93・最小 0.06・最大 0.997）。すべての区間が一致した書き手は 0。誤差は表に添えるだけで、区間の規則は変えない（登録どおり）。
+
+### 検査 5（ENJA15）
+
+- 構造（要素と属性の名前だけ・`results/enja15_structure.json`）: `LogFile/Events` の下に `Key`（126,803）・`Eye`（5,606,352）・`Fix`（234,454）・`Mouse`（2,254）・`System`（152）・`Interface`（46）。`Key` の属性は `Type`・`Value`・`Time`・`Cursor`（全部）と、一部に `IMEtext`（9,016）・`Text`（7,667）・`Block`・`X`・`Y`・`Width`・`Height`。最終の訳文は `LogFile/FinalTextUTF8`、原文は `Standard/Settings/SourceTextUTF8` ほか。`Alignment` は `.atag`・`.src`・`.tgt` が各 76 本で、名前は XML と同じ。
+- 数: セッション 76・訳文 76（空の訳文 0）・訳者 39・原文 6。原文ごとの訳者は 13・13・12・13・12・13。訳者ごとの原文は、2 つが 37 人・1 つが 2 人。1 人でも 2 つ以上の原文を訳した訳者がいるので交差（登録どおり、訳者を引いてその全セッションを使い、層別しない）。除外 0（記録か訳文の欠け 0・空の訳文 0・`Type="IME"` も英字の `Type="insert"` も無いセッション 0）。原文ごとの訳者が 10 人以上なので、N = 10 のセルはどの原文でも出せる。
+- `Type` の値: IME 91,746・navi 18,637・insert 9,165・delete 7,132・return 108・edit 9・speech 6。
+- `Value` の形（値そのものは出さない）: `Type="IME"` は括弧つきのキー名（`[A]`〜`[Z]`・`[Back]` 4,848・`[Space]` 6,474・`[Return]` 41・`[ProcessKey]` 1,486・`[Oemcomma]` 877・`[OemPeriod]` 590・`[D0]`〜`[D9]`・`[Left]`・`[Right]` ほか）。`Type="insert"` は 9,165 行のうち、英字 1 字 193・数字 1 字 7・ASCII の記号 1 字 28・空白 1 字 6・空 27、残りの 8,904 行は日本語の 1 字か文字列（平仮名・漢字・片仮名などの組。確定した文字列）。`Type="delete"` は `[Back]` 6,750・`[Delete]` 382。`Type="navi"` は `[Left]`・`[Right]`・`[Up]`・`[Down]`・`[Shift+Left]` などの移動のキー名。`Type="return"` は `[Return]`。`Type="edit"` は `[Ctrl+C]`。`Type="speech"` は文字 1 字（6 行）。
+- `IMEtext` の種類: `Type="insert"` の行に 8,778（ASCII の英字だけ 8,054・英字と数字 724。確定した文字列を打ったローマ字の列）・`Type="delete"` 232・`Type="return"` 6。どれも ASCII の英字と数字だけ。`Text` の属性は delete・navi・insert・edit・return の行にあり、日本語と ASCII の文字列（消した・選んだ文字列）。
+- 登録の区間の規則と A0 の「`Type="IME"` か `Type="insert"` のうち英字の押下」は、IME の行では `Value` が `[A]`〜`[Z]`、insert の行では `Value` が英字 1 字の行に当たる。「`[Back]` −1」は IME（4,848）と delete（6,750）の両方の行に `[Back]` がある。登録の文は「のうち」を英字の押下にだけ掛けているので、字面では両方の `[Back]` を数える。ENJA15 の実装の段で、この読み方を「実装で決めたこと」に書く（照合の値を見る前）。
+- IME の経路の検査（`scripts/enja15.py` の R3j の最初の版・`scripts/enja15_ime_path_check.py`）: 76 セッションすべてに、未確定の文字列の更新（IME の英字の押下）・変換（`[Space]` など）・確定（insert の文字列）があり、69 セッションに変換の直後（3 押下以内）の `[Escape]` か `[Back]`（変換の取り消しの形）がある。R3j の後の行は 126,803 行で、どの行も列は時刻・`Type`・種類の 3 つだけ、`Type` と種類は閉じた一覧の値、どの値もそのセッションの `Value`・`IMEtext`・`Text` などの文字列と一致せず、日本語の文字列を含まない（PASS）。`Value` を残す変異と、確定の文字列を種類の値に入れる変異は、どちらも落ちた。R3j の種類の対応（`[Space]`・`[F7]`〜`[F10]` を変換、IME の `[Return]` と insert の文字列を確定、句読点（、。，．）を含む確定を「句読点の確定」）は最初の版で、ENJA15 の実装の段で確かめ直す。
+
+### 検査 6（KeyTAR）
+
+`keytar.zip` から文書を取り出して読んだ（`raw/keytar/docs_extracted/`）。
+
+- 利用条件: 成果物の `license.txt` は MIT（著作権 Mufan Qiu・Lihsuan Chuang）。Zenodo の記録は CC BY 4.0。`code_artifact/artifact/LICENSE` は Apache 2.0（AllenAI の open-instruct）。登録の `model_licenses` は `code_artifact/artifact/assets/model_licenses/`（llama・opt・pythia・tulu の利用条件。open-instruct が同梱するもので、KeyTAR のチェックポイントの基のモデルではない）。チェックポイントの基は `allenai/OLMo-1B-0724-hf`（`config.json` の `_name_or_path`・学習のスクリプト `finetune_key_ground_truth.sh`）で、その利用条件は成果物に無い。Hugging Face の API（2026-10-13）で `allenai/OLMo-1B-0724-hf` の `cardData.license` は `apache-2.0`。
+- `ethics.txt`: 公開データ（Dhakal らの 136M keystrokes）を再生し、攻撃は実験の機械の上だけで行ったとある。`limitations.txt`: キャッシュの側路の攻撃の限界（標準の prime+probe・静かな機械・i7-2600 と Ubuntu 24.04）。`use.txt`: 打鍵の時間の間隔から入力を推すのに使え、意味のある日常の文に向き、パスワードなど型の無い入力には向かない。
+- 本研究の使い方（KLiCKe の記録の間隔から本文を推し、候補との距離を測る）は、これらの条件に反しない。A4 は行う。
+- チェックポイント: 2 つある。`key_ground_truth_olmo`（元の打鍵の間隔で学習）と `key_cache_olmo`（キャッシュから取った間隔で学習）。A4 は元の打鍵の間隔なので `key_ground_truth_olmo` を使う（`pytorch_model.bin` の SHA-256 `d09f06db0f3dbaebf28a6a80e4d4651629dbf8ca3d20bc6d5656ee5d13f7144f`）。
+- 既定の設定（`scripts/eval/evaluate_key.py`・`data.md` にも書く）: transformers 4.49.0・`max_new_tokens` 50・`num_beams` 64・`num_beam_groups` 16・`diversity_penalty` 0.8・`no_repeat_ngram_size` 2・`num_return_sequences` 50・`do_sample` False・`top_k` 50・`temperature` 1.0・`top_p` 1.0・`repetition_penalty` 1.0・型の指定なし（float32 で読む）。入力は対話の型（`<|user|>` と `<|assistant|>`）で "Translate the Time intervals to Keystrokes.\nTime intervals: " に間隔を続けた文。
+- 学習のデータの間隔の形（公開の Dhakal らのデータ・本研究の記録ではない）: 「,」で区切った整数（ms）で、Shift や句読点の押下も含む全部の押下の間の間隔。上限 1023 で切られている様子。
+
+- venv: 本計算とは別の `~/.venvs/pkm-keytar`（PyTorch 2.7.1+cu128・transformers 4.49.0・`env.md`・`requirements-keytar.txt`）。pip-audit で transformers 4.49.0 などに既知の勧告がある（`env.md`）。成果物の版のまま使い、記録した SHA-256 のチェックポイントを手元で読むだけにする。
+- 推論の時間と GPU のメモリ（`scripts/check6_keytar.py`・`results/check6_keytar.json`）: 除外の後の書き手を（課題, ID）の順に並べ、`seeds.rng(SEED, "eval_sample", draw = "check6")` で 1 人を引いた（登録はこの検査の種の欄を書いていないので、既存の `eval_sample` の `draw` に `check6` を入れた）。R0 の英字・数字・Space の押下の間隔を 20 区間ずつの塊にし（上限 1,023 ms・前の往復なし）、既定の設定で 1 塊ずつ生成した。復元した文字列は読まず、保存もしない。結果: 塊 36 個・推論の合計 168 秒（塊あたりの中央 4.7 秒）・チェックポイントの読み込み 3.8 秒・GPU のメモリの最大は確保 8.99 GiB・予約 12.29 GiB（16 GiB の GPU に収まる）・float32。
+- 500 人の見積もり（登録の未決「A4 の 500 人が手元の GPU で回るか」）: 全員の塊の数は書き手あたり平均 28.1（10% 15・中央 25・90% 44・最大 207）。A4 の入力の間隔は R0・R1・R2・R3 で同じ（どれも押下の時刻と英字・数字・Space の別を保つ）で、R3-t(w) の 3 つが別なので、1 人あたり 4 通り。全文は 4 × 28.1 塊 × 4.7 秒 ≈ 530 秒、窓（5 つの始まり × k = 5・10・20・50 で塊 1・1・1・3）は 4 × 30 塊 × 4.7 秒 ≈ 560 秒（窓の塊は短いので上限の見積もり）。500 人で全文 約 73 時間・窓 約 78 時間、計 約 150 時間（GPU を連続で約 6 日）。人数を減らすかは研究者が決める（減らすなら A4 の行だけを課題ごとに同数ずつ減らし逸脱に書く・登録どおり）。
+
+### 検査 7（KLiCKe）
+
+行わない。配布に Inputlog の指標の値が無い: GitHub のリポジトリ（コミット `37b94b72`）は `LICENSE` と `README.md` だけ、Drive のフォルダは `WritingTask.zip`・`TypingTests.zip`・`VocabularyKnowledgeTest.zip`・`demographic_info.csv` の 4 つ、`WritingTask.zip` は記録の CSV・IDFX（Inputlog の形式の記録）・本文・`holistic_scores.csv`（`ID,Prompt,Text,Score`）・採点の様式・課題文だけ（名前と列名だけで確かめた）。Inputlog を自分で回さない（登録どおり）。したがって有用性の式は確かめられず、削除・挿入の連なりが修飾の行で切れる点（[V264] Table 5 の "one deletion activity" の読み方）は、登録の字面どおりのまま限界に書く。
 
 ## 逸脱
 
-凍結: 2026-10-12 16:43:33 UTC・コミット `cf5353da`・OSF の DOI 10.17605/OSF.IO/Y5R7N。凍結の後の逸脱は、まだない。
+凍結: 2026-10-12 16:43:33 UTC・コミット `cf5353da`・OSF の DOI 10.17605/OSF.IO/Y5R7N。
+
+### D1（2026-10-13・検査 2 と 3）: 配布の CSV のエスケープを戻して読む
+
+- 何が想定と違ったか: 登録とコードは `activity` と `text_change` の書式を Kaggle の説明 [V265] の形と想定していた。KLiCKe の CSV は `TextChange`・`DownEvent`・`UpEvent` の 4 つの文字（改行・タブ・二重引用符・バックスラッシュ）を、バックスラッシュを前に付けた 2 字で書いていた（数は検査 2）。そのまま読むと、R0 の再生（`corpus.replay_origins`・A1 の `a1_text` も同じ書式を読む）で、改行 1 字が 2 字として挿入され、`cursor_position`（1 字として進む）とずれる。押したキーが `"` と `\` の行は 2 字の値になり、種類が句読点でなく「その他」に入る。
+- 直したこと: 読み込み（`load_klicke.py` の `unescape`）で、この 4 つを左から 1 回で元の文字に戻す。手順（再生・区間の規則・攻撃者・除外）は変えていない。
+- 直す前と後の検査の値: 検査 3 の完全一致は 72 人（1.4%）→ 4,842 人（97.0%）。正規化編集距離の中央値は 0.0096 → 0。押したキーの「その他」は 14,992 行 → 5,611 行（2 字の記号の値 9,381 行が句読点に）。検査 4 の区間は 2,761,290 個（一致 80.29%）→ 2,770,660 個（80.33%）。直す前の出力は `results/data_checks_klicke_before_unescape.json` と `results/data_checks_klicke_format_before_unescape.json`。照合と有用性の値は、直す前も後も計算していない。

@@ -1,0 +1,23 @@
+{
+ "sessions": 76,
+ "mutate": null,
+ "pass": true,
+ "fails": {},
+ "counts": {
+  "category backspace": 11598,
+  "category commit": 7474,
+  "category commit_punct": 1471,
+  "category convert": 6555,
+  "category enter": 108,
+  "category letter": 74529,
+  "category navigation": 19096,
+  "category other": 5972,
+  "has_cancel_escape_or_back_after_convert": 69,
+  "has_commit": 76,
+  "has_composition_update": 76,
+  "has_conversion": 76,
+  "has_imetext": 76,
+  "has_text_attribute": 76,
+  "rows": 126803
+ }
+}
