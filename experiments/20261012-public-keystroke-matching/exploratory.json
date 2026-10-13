@@ -1,0 +1,31 @@
+{
+ "_note": "Exploratory analyses not in the preregistration (decisions 55 and 56; notes.md, 'Exploratory analyses'). Fixed before any matching or utility value of the main computation was seen. They do not change config.json (the frozen values) and are not used for the main conclusions (questions 1 to 4).",
+ "seed_uses": ["exploratory_unicity", "exploratory_dp"],
+ "unicity": {
+  "input": "distributed texts of the writers after exclusion only (no logs); words are runs of letters and digits, a length is the number of letters and digits of a word",
+  "samples": ["main500", "all"],
+  "k": [1, 50],
+  "window_starts_per_writer": 5,
+  "window_start_seed": "exploratory_unicity (prompt, writer, k): 5 starts without replacement among the n - k + 1 starts (all when fewer)",
+  "N": [10, 100, 1000],
+  "candidates": "the writer's text and the decoys of the main full-text matching (matching.draw_decoys, seed use decoys, k empty, draw = draw number); draws 20, 20 and 5",
+  "unique": "no decoy contains the length sequence at any position",
+  "secondary": "credit 1/m among the m candidate texts (the true one included) that contain the sequence",
+  "bootstrap": "the resamples of the main computation for the same sample (writer unit, stratified by prompt, 2000, 95%)",
+  "entropy_reference": "plug-in conditional entropy of word lengths of order 0, 1 and 2 over all distributed texts after exclusion; k* = log2 N / h",
+  "name": "uniqueness among N candidates (not re-identification); no extrapolation beyond the N tried"
+ },
+ "dp": {
+  "base": "R3",
+  "forms": ["R-DP(0.5)", "R-DP(1)", "R-DP(2)", "R-DP(4)"],
+  "epsilon": [0.5, 1, 2, 4],
+  "segment_counts": {"sensitivity": 1, "noise": "two-sided geometric, alpha = exp(-epsilon)", "unit": "the count of counted letter and digit presses of one record segment", "add": "letter presses at slots drawn uniformly (before the first row of the segment, after each counted letter or digit press); time = floor of the midpoint of the previous and next rows (the previous row's time when last)", "remove": "min(|Z|, c) counted letter or digit presses drawn uniformly without replacement"},
+  "intervals": {"cap_ms": 2000, "sensitivity": 2000, "noise": "two-sided geometric, alpha = exp(-epsilon / 2000)", "unit": "one press interval (down to down) after clipping at the cap", "after": "negative values set to 0; times rebuilt from the first row"},
+  "order": "segment counts, then intervals; event_id renumbered",
+  "sampling": "Z = G1 - G2 with numpy geometric(1 - alpha) - 1; seed use exploratory_dp (prompt, writer, draw 'eps:<epsilon>'); one draw per writer and epsilon, the same record in evaluation and training; a simulation for evaluation, not a deployable implementation",
+  "privacy_unit": "event level (one segment count, one interval); not a writer-level guarantee",
+  "attackers": "as R3 (A0, A1', A2, A3); candidate texts unchanged; the A3 character-pair table is built from the training R0 times with the interval mechanism at the same epsilon",
+  "scope": "as the main computation (full text and windows k = 5, 10, 20, 50; N = 10, 100, 1000; same draws; 500 writers; same resamples); R3 is run alongside for the contrasts R3 - R-DP(epsilon); no negative control",
+  "utility": "the R3 code; availability of the R3 column, every computed value marked approximate"
+ }
+}
