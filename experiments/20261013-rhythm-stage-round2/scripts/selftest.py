@@ -111,7 +111,12 @@ def interval_stats(work: Path) -> dict:
 
 def test_world(cfg: dict, config: Path, eh1: Path, tmp: Path, hmm: str) -> None:
     eh1_cfg = json.loads((eh1 / "config.json").read_text(encoding="utf-8"))
-    check(all(cfg[k] == eh1_cfg[k] for k in GEN_KEYS + ("e13",)), "world: generator settings and e13 equal EH1 round 5")
+    # round 2 design 1.2: sets.pilot is the only generator setting changed (P 240, bootstrap 2000; the generator never
+    # reads it), so it is compared to its round 2 value and the rest to EH1 round 5
+    strip = lambda c: {k: ({kk: vv for kk, vv in c[k].items() if kk != "pilot"} if k == "sets" else c[k])
+                       for k in GEN_KEYS + ("e13",)}
+    check(strip(cfg) == strip(eh1_cfg) and cfg["sets"]["pilot"] == {"seed_offset": 1, "P": 240, "bootstrap": 2000},
+          "world: generator settings and e13 equal EH1 round 5 (sets.pilot is round 2's)")
     v2, v3 = cfg["segments_v2"], cfg["segments_v3"]
     same_rest = all(v3[k] == v2[k] for k in v2 if k != "STRUGGLE") and set(v3) == set(v2)
     s2, s3 = v2["STRUGGLE"], v3["STRUGGLE"]
@@ -714,6 +719,14 @@ def test_select_lambda(cfg: dict) -> None:
     r = sel(wig, [x - 0.008 for x in wig])
     check(r["lam"] == 0.125 and r["fit"][4][1] == r["fit"][5][1],
           "select_lambda: a raw g of exactly 0.08 in the band may win by its pooled fitted value (design 3.9)")
+    over = [0.01, 0.02, 0.03, 0.04, 0.085, 0.035, 0.09, 0.10, 0.11, 0.12, 0.13, 0.14]
+    r = sel(over, [x - 0.008 for x in over])
+    check(r["fit"][4][1] <= 0.08 and 0.125 not in r["band"] and r["lam"] == 0.1,
+          "select_lambda: the band uses the raw g (0.085 is out even when its pooled value is 0.06)")
+    near = [0.01, 0.02, 0.03, 0.04, 0.051, 0.059, 0.07, 0.08, 0.09, 0.10, 0.11, 0.12]
+    r = sel(near, [x - 0.008 for x in near])
+    check(r["ties"] == [0.125, 0.15] and r["lam"] == 0.125,
+          "select_lambda: distances equal at 6 decimals tie (unrounded, 0.059 would win by float error)")
     nf = {"PC1": {"lower_max": 0.2}, ck.pilot_key("S-raw-hold-sec", 0.025): None}
     check(ck.choose_all(nf, cfg)["S-raw-hold-sec"]["lam"] is None, "pilot: a candidate with no finite value -> no choice")
     # the path the pilot takes: names -> merged maxima -> choice -> config.json -> the main run's check
@@ -721,32 +734,65 @@ def test_select_lambda(cfg: dict) -> None:
     keys = [ck.pilot_key(c, x) for c in cands for x in [0.0] + grid]
     check(len(set(keys)) == len(keys) == 13 * len(cands) and ck.pilot_key(cands[0], 0.025).endswith("@0.025")
           and ck.pilot_key(cands[0], 0.075).endswith("@0.075"), "pilot: 13 distinct names per candidate (three decimals)")
+    rec = lambda g, lo: {"gain_max": g, "lower_max": lo, "upper_max": g + 0.008, "n_nan_bounds": 0}
     shift = {c: i % 5 for i, c in enumerate(cands)}  # candidate i aims at the grid index 4 + its shift
-    merged = {"PC1": {"gain_max": 0.3, "lower_max": 0.25, "upper_max": 0.35, "n_nan_bounds": 0}}
+    merged = {"PC1": rec(0.3, 0.25)}
     for c in cands:
-        merged[ck.pilot_key(c, 0.0)] = {"gain_max": 0.055, "lower_max": 0.05, "upper_max": 0.06, "n_nan_bounds": 0}
+        merged[ck.pilot_key(c, 0.0)] = rec(0.004, -0.004)
         for i, x in enumerate(grid):
             g = round(0.055 + 0.01 * (i - 4 - shift[c]) + 0.001, 6)
-            merged[ck.pilot_key(c, x)] = {"gain_max": g, "lower_max": g - 0.008, "upper_max": g + 0.008, "n_nan_bounds": 0}
+            merged[ck.pilot_key(c, x)] = rec(g, g - 0.008)
     sels = ck.choose_all(merged, cfg)
     want = {c: grid[4 + shift[c]] for c in cands}
-    check({c: sels[c]["lam"] for c in cands} == want, "pilot: each candidate gets its own lambda (lambda = 0 is never chosen)")
+    check({c: sels[c]["lam"] for c in cands} == want, "pilot: each candidate gets its own lambda")
+    zero = dict(merged)
+    for c in cands:  # lambda 0 would win if it were a choice: exactly the aim, the grid at 0.07 and above
+        zero[ck.pilot_key(c, 0.0)] = rec(0.055, 0.05)
+        for i, x in enumerate(grid):
+            zero[ck.pilot_key(c, x)] = rec(0.07 + 0.01 * i, 0.062 + 0.01 * i)
+    zs = ck.choose_all(zero, cfg)
+    check(all(zs[c]["lam"] == grid[0] and zs[c]["fit"][0][0] == grid[0] for c in cands),
+          "pilot: lambda = 0 is never a choice (it would win at exactly the aim)")
+    st_, ss = ck.pilot_decide(merged, {"PC1": {"fit_failed": False}}, cfg, [])
+    check(st_ is None and {c: ss[c]["lam"] for c in cands} == want, "pilot: decide -> no stop and the choices")
+    nfm = dict(merged)
+    for x in grid:
+        nfm[ck.pilot_key(cands[0], x)] = None
+    st_, ss = ck.pilot_decide(nfm, {"PC1": {"fit_failed": False}}, cfg, [])
+    check(st_ == "no_finite_pcs" and ss[cands[0]]["lam"] is None, "pilot: decide -> a candidate with no finite value stops")
+    st_, ss = ck.pilot_decide({**merged, "PC1": rec(0.1, 0.1)}, {"PC1": {"fit_failed": False}}, cfg, [])
+    check(st_ == "weak_detector" and ss == {}, "pilot: decide -> a weak PC1 stops with no selection")
+    sp = cfg["sets"]["pilot"]
+    good = {"stop": None, "rule": {k: cfg["pc_stall"][k] for k in ck.RULE_KEYS}, "seed": 20261013 + sp["seed_offset"],
+            "n_sessions": sp["P"], "bootstrap": sp["bootstrap"], "selection": sels,
+            "configs": {k: {kk: v[kk] for kk in ck.REC_KEYS} for k, v in merged.items()}}
     with tempfile.TemporaryDirectory() as d:
         cp, pp = Path(d) / "config.json", Path(d) / "pilot.json"
+        (Path(d) / "SEED").write_text("20261013\n", encoding="utf-8")
         cp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        pp.write_text(json.dumps({"stop": None, "selection": sels}), encoding="utf-8")
+        pp.write_text(json.dumps(good), encoding="utf-8")
         ck.apply_pilot(cp, pp)
         back = json.loads(cp.read_text(encoding="utf-8"))
-        check(back["pc_stall"]["lam"] == want and ck.lam_problems(back) == []
-              and {k: v for k, v in back.items() if k != "pc_stall"} == {k: v for k, v in cfg.items() if k != "pc_stall"},
-              "pilot: --apply-pilot writes the choices, the main run accepts them, nothing else changes")
-        pp.write_text(json.dumps({"stop": "weak_detector", "selection": {}}), encoding="utf-8")
-        try:
-            ck.apply_pilot(cp, pp)
-            refused = False
-        except SystemExit:
-            refused = True
-        check(refused, "pilot: a stopped pilot writes no lambda")
+        rest = lambda c: {**c, "pc_stall": {k: v for k, v in c["pc_stall"].items() if k != "lam"}}
+        check(back["pc_stall"]["lam"] == want and ck.lam_problems(back) == [] and rest(back) == rest(cfg),
+              "pilot: --apply-pilot writes pc_stall.lam only, the main run accepts it")
+        cp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        tampered = {**sels, cands[0]: {**sels[cands[0]], "lam": grid[0]}}
+        for name, bad in (("a stopped pilot (no selection)", {**good, "stop": "weak_detector", "selection": {}}),
+                          ("a stopped pilot with a full selection", {**good, "stop": "no_finite_pcs"}),
+                          ("a round 1 pilot.json (no stop, no rule)", {k: v for k, v in good.items() if k not in ("stop", "rule")}),
+                          ("another seed", {**good, "seed": 20261010}),
+                          ("another P", {**good, "n_sessions": 40}),
+                          ("another rule", {**good, "rule": {**good["rule"], "aim": 0.05}}),
+                          ("a selection that does not follow from the maxima", {**good, "selection": tampered})):
+            pp.write_text(json.dumps(bad), encoding="utf-8")
+            try:
+                ck.apply_pilot(cp, pp)
+                refused = False
+            except SystemExit:
+                refused = True
+            check(refused and json.loads(cp.read_text(encoding="utf-8"))["pc_stall"]["lam"] == cfg["pc_stall"]["lam"],
+                  f"pilot: --apply-pilot refuses {name} and leaves config.json as it was")
     ok = {"PC1": {"fit_failed": False}}
     pc1 = lambda lo: {"PC1": {"lower_max": lo}}
     check(ck.pilot_stop(pc1(0.11), ok, cfg, []) is None, "pilot stop: PC1 lower bound 0.11 -> go on")

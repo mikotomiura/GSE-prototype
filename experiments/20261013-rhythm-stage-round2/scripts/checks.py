@@ -767,13 +767,62 @@ def choose_all(merged: dict, cfg: dict) -> dict:
     return out
 
 
+RULE_KEYS = ("pilot_grid", "aim", "lower", "upper")
+
+
+def pilot_decide(merged: dict, per: dict, cfg: dict, ceil: list[str]) -> tuple[str | None, dict]:
+    """Round 2 design 3.9: (stop, selection). A stop leaves no lambda to write: the pilot's own stop, or a candidate
+    with no finite point estimate (its selection stays as a record)."""
+    stop = pilot_stop(merged, per, cfg, ceil)
+    if stop:
+        return stop, {}
+    sels = choose_all(merged, cfg)
+    if any(s["lam"] is None for s in sels.values()):
+        return "no_finite_pcs", sels
+    return None, sels
+
+
+def _num(v):
+    """A maximum read back from pilot.json (clean() writes NaN as the string "nan")."""
+    return float("nan") if v in ("nan", None) else float(v)
+
+
+def pilot_mismatch(p: dict, cfg: dict, base_seed: int) -> list[str]:
+    """The reasons a pilot.json is not the pilot of this config (Codex and code-reviewer round 2: an old pilot.json, a
+    pilot of another seed or size, or a rule changed after the pilot must not fill pc_stall.lam)."""
+    sp, ps = cfg["sets"]["pilot"], cfg["pc_stall"]
+    out = []
+    if "stop" not in p or "rule" not in p:
+        return ["not a round 2 pilot.json (no stop or rule)"]
+    if p["stop"]:
+        out.append(f"the pilot stopped ({p['stop']})")
+    if p.get("seed") != base_seed + sp["seed_offset"]:
+        out.append(f"seed {p.get('seed')} is not SEED + {sp['seed_offset']} = {base_seed + sp['seed_offset']}")
+    if p.get("n_sessions") != sp["P"] or p.get("bootstrap") != sp["bootstrap"]:
+        out.append(f"P {p.get('n_sessions')} / bootstrap {p.get('bootstrap')} is not {sp['P']} / {sp['bootstrap']}")
+    if p["rule"] != {k: ps[k] for k in RULE_KEYS}:
+        out.append(f"the rule {p['rule']} is not the config's")
+    if not out:
+        merged = {k: ({kk: _num(v[kk]) for kk in ("gain_max", "lower_max")} if v else None)
+                  for k, v in p.get("configs", {}).items()}
+        again = choose_all(merged, cfg)
+        if {c: again[c]["lam"] for c in st.candidates()} != {c: p["selection"].get(c, {}).get("lam")
+                                                              for c in st.candidates()}:
+            out.append("the selection does not follow from the pilot's maxima")
+    return out
+
+
 def apply_pilot(cfg_path: Path, pilot_path: Path) -> int:
-    """Write the pilot's choices to config.json pc_stall.lam (the rest of the file is kept as it is)."""
+    """Write the pilot's choices to config.json pc_stall.lam (the rest of the file is kept as it is). The pilot must be
+    the round 2 pilot of this config: SEED (the file next to config.json) + offset, P, bootstrap, the rule, and the
+    selection recomputed from its maxima."""
     p = json.loads(pilot_path.read_text(encoding="utf-8"))
-    if p.get("stop") or not p.get("selection"):
-        raise SystemExit(f"the pilot stopped ({p.get('stop')}): no lambda to write")
     text = cfg_path.read_text(encoding="utf-8")
     cfg = json.loads(text)
+    base_seed = int((cfg_path.parent / "SEED").read_text().strip())
+    bad = pilot_mismatch(p, cfg, base_seed)
+    if bad:
+        raise SystemExit(f"refused to write pc_stall.lam: {bad}")
     cfg["pc_stall"]["lam"] = {c: p["selection"][c]["lam"] for c in st.candidates()}
     bad = lam_problems(cfg)
     if bad:
@@ -822,17 +871,14 @@ def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
             per[b] = {"fit_failed": False}
             print(f"pilot {b}: {time.time() - tb:.0f} s (total {time.time() - t0:.0f} s)", flush=True)
         ceil = ceiling_kinds(auc_s, cfg)
-        stop = pilot_stop(merged, per, cfg, ceil)
-        sels = {} if stop else choose_all(merged, cfg)
-        if any(s["lam"] is None for s in sels.values()):  # a candidate with no finite point estimate (design 3.9)
-            stop = "no_finite_pcs"  # the selection stays in pilot.json as a record; --apply-pilot refuses it
+        stop, sels = pilot_decide(merged, per, cfg, ceil)
         dump(out / "pilot.json", {
             "_note": ("Pilot 1 (round 2 design 3.9): SEED + 1, P sessions of world v4, PC1 and the PC-stall of each "
                       "candidate on [0] + the grid, L300 only, no null. Not a result of the main run. "
                       "`checks.py --apply-pilot` writes the chosen lambdas to config.json pc_stall.lam; the numbers go "
                       "to design section 8. With `stop` set no lambda is chosen (back to the researcher)."),
             "seed": seed, "n_sessions": len(sids), "bootstrap": nboot, "auc_A_speed": auc_s, "ceiling_kinds": ceil,
-            "stop": stop,
+            "stop": stop, "rule": {k: ps[k] for k in RULE_KEYS},
             "configs": {k: ({kk: v[kk] for kk in REC_KEYS} | {"attackers": v["attackers"]} if v else None)
                         for k, v in merged.items()},
             "per_batch": per, "selection": sels, "timing": timing, "wall_s": time.time() - t0})
@@ -841,7 +887,9 @@ def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
         for c in cands:
             line = " ".join(f"{x:.3f}:{merged[pilot_key(c, x)]['gain_max']:+.3f}/{merged[pilot_key(c, x)]['lower_max']:+.3f}"
                             for x in [0.0] + grid if merged.get(pilot_key(c, x)))
-            print(f"{c}: lambda {sels[c]['lam'] if sels else None} ({sels[c]['rule'] if sels else 'stop'})\n   {line}")
+            z = merged.get(pilot_key(c, 0.0))
+            mark = "  [lambda 0 upper >= 0.03: stall_baseline expected]" if z and not _lt(z["upper_max"], cfg["e13"]["margin"]) else ""
+            print(f"{c}: lambda {sels[c]['lam'] if sels else None} ({sels[c]['rule'] if sels else 'stop'}){mark}\n   {line}")
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     print(f"pilot done in {time.time() - t0:.0f} s", flush=True)

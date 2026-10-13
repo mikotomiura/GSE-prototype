@@ -14,6 +14,6 @@
 | 使う集合 | P だけ（と、その双子） |
 | 読むもの | 下見 0 は `labels/*.npz` の打鍵の時刻（`presses_ms`）とセグメントの符号（`seg`）だけを読む。キーの種類・`gse-replay` の出力は読まない（基準のモデル A・A_speed は打鍵の時刻だけから作る・design §1.5）。ステージの写像は打鍵の時刻・秒ごとの有無・F 系列の `keys`・`f1`・`f4` だけを読む（`stage.ALLOWED_INPUT`・design §1.2）。`seg` は陽性対照（PC1・PC-stall）と判定だけが、`f3` は PC-corr だけが読む。`twins.py` は双子を書くためだけに元の NDJSON のキーの種類を写す（ステージは読まない） |
 | 置き場所 | `work-pilot/`・`work-main-smoke/`・`work-main/`・`work-selftest/`（`.gitignore`。走り終えると消す）。コミットするのは `results/pilot/`・`results/main/` の集計した JSON だけ（`results/main-smoke/` は無視） |
-| 再生成 | `bash run.sh --pilot`・`--smoke`・`--main`（どれも自己検査を先に回す。`GSE_REPLAY` が要る・`env.md`）。下見 1 の後に `checks.py --apply-pilot config.json results/pilot/pilot.json` で λ を書く |
+| 再生成 | `bash run.sh --pilot`・`--smoke`・`--main`（どれも自己検査を先に回す。`GSE_REPLAY` が要る・`env.md`）。下見 1 の後に、この入れ物から `$PYTHON scripts/checks.py --apply-pilot config.json results/pilot/pilot.json` で λ を書く（別の seed・大きさ・規則の `pilot.json` と止まった下見は拒む） |
 
 - 合成の NDJSON も外部の LLM（Codex を含む）に渡さない（引き継ぎ §3）。

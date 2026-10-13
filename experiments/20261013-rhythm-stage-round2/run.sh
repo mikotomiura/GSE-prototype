@@ -12,8 +12,9 @@
 #   --pilot     design 3.9 (pilot 1, after the freeze): SEED + sets.pilot.seed_offset, sets.pilot.P P sessions of world
 #               v4 through gse-replay, the self-tests on them, then PC1 and the PC-stall of each of the
 #               24 candidates on [0] + pc_stall.pilot_grid, L300 only. No candidate is run. Writes results/pilot/
-#               (committed). Then `checks.py --apply-pilot config.json results/pilot/pilot.json` (from scripts/)
-#               writes the chosen lambdas to config.json pc_stall.lam; the numbers go to design section 8.
+#               (committed). Then, from this directory, `$PYTHON scripts/checks.py --apply-pilot config.json
+#               results/pilot/pilot.json` writes the chosen lambdas to config.json pc_stall.lam (it refuses a pilot.json
+#               of another seed, size or rule, or a stopped pilot); the numbers go to design section 8.
 #   --smoke     the pipeline check of the main run: SEED + 2 (not the main run's sessions), 12 P sessions and their twins, every self-test, then the
 #               checks with bootstrap 200 and 2 permutations. Writes results/main-smoke/ (git-ignored).
 #   --main      design 3.1-3.6: SEED, sets.P.n P sessions of world v4 and their twins through gse-replay, every
@@ -219,3 +220,12 @@ provenance "$OUT/provenance.json" "$SEED_RUN" "$WORLD"
 publish "$SUFFIX"
 rm -rf "$WORK"
 echo "done: $EXP_DIR/results/$SUFFIX"
+if [ "$MODE" = pilot ]; then  # round 2 design 3.9: a stopped pilot chooses no lambda (code-reviewer round 2)
+  STOP="$("$PY" -c "import json,sys; print(json.load(open(sys.argv[1],encoding='utf-8')).get('stop') or '')" "$EXP_DIR/results/pilot/pilot.json")"
+  STOP="${STOP%$'\r'}"
+  if [ -n "$STOP" ]; then
+    echo "=== PILOT STOPPED: $STOP — no lambda is chosen; back to the researcher (round 2 design 3.9) ===" >&2
+  else
+    echo "next: $PY scripts/checks.py --apply-pilot config.json results/pilot/pilot.json (from $EXP_DIR)"
+  fi
+fi
