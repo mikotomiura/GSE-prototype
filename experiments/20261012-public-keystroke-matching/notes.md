@@ -289,6 +289,15 @@ code-reviewer・security-checker・Codex（パス限定・`raw/` と結果の JS
 
 行わない。配布に Inputlog の指標の値が無い: GitHub のリポジトリ（コミット `37b94b72`）は `LICENSE` と `README.md` だけ、Drive のフォルダは `WritingTask.zip`・`TypingTests.zip`・`VocabularyKnowledgeTest.zip`・`demographic_info.csv` の 4 つ、`WritingTask.zip` は記録の CSV・IDFX（Inputlog の形式の記録）・本文・`holistic_scores.csv`（`ID,Prompt,Text,Score`）・採点の様式・課題文だけ（名前と列名だけで確かめた）。Inputlog を自分で回さない（登録どおり）。したがって有用性の式は確かめられず、削除・挿入の連なりが修飾の行で切れる点（[V264] Table 5 の "one deletion activity" の読み方）は、登録の字面どおりのまま限界に書く。
 
+## 実装で決めたこと: A4（データの後・照合の値の前・2026-10-13）
+
+判断 56（500 人・`max_new_tokens` 50 のまま）を受けて、登録に細部の無いところを、A4 の照合の値を 1 つも見る前に次のとおり決めた（`scripts/a4_keytar.py` と `scripts/evaluate.py` の冒頭の注にも書いた）。
+
+- 生成（KeyTAR の venv・`scripts/a4_keytar.py`）: 書き手は本計算と同じ 500 人（除外の後・`eval_sample`）。入力の間隔は R0・R1・R2・R3 で同じ（押下の時刻と英字・数字・Space の別が同じ）なので 1 通り（`t0`）、R3-t(w) は時刻を `form_R3t` と同じに丸めた 3 通り。全文は能動的に書いた時間の行、窓は本計算の窓（`matching.true_window_starts` の有効な窓から `pick_window_starts` で引いた始まり・同じ行の範囲）の行で、英字・数字・Space の押下（ショートカットを除く）の間隔を記録の区間 20 個ぶんずつの塊にする（検査 6 の `chunks`・上限 1,023 ms・前の往復なし）。成果物の既定の設定で生成し、返った列の先頭（成果物の `evaluate_key.py` の Top-1）を同じ切り方で取り出す。塊の復元は空白 1 つでつなぐ。間隔の無い塊は空の文字列。同じ書き手の同じ入力は 1 回だけ生成する。
+- 復元の置き場: `raw/derived/a4/`（git に入らない・中身は読まない・印字しない・外へ送らない）。書き手ごとの 1 ファイルで、途中から再開できる。結果のファイル `results/a4_generation.json` には数と時間だけを書く。
+- 照合（本計算の側・`evaluate.py`）: 復元と候補の本文（窓では窓の本文 `WindowCand.text`）を、どちらも小文字にし、英数字以外の文字を空白にし、空白の連なりを 1 つにして前後を落としてから、Levenshtein の距離を候補の長さで割る（成果物の `calculate_metrics.py` の正規化 `distance / max(len(target), 1)`）。英数字以外を空白にするのは、入力に句読点の押下が無く、復元に句読点が出ても出なくても同じに比べるため。最小の候補を選ぶ（同点は 1/m）。距離は `Levenshtein` 0.27.1（本計算の venv に足す・`requirements.txt`）で計算する。R0・R1・R2・R3 は同じ復元（`t0`）を使い、R3-t(w) はそれぞれの復元を使う。抽選・おとり・窓のおとりは本計算と同じ。A4 のセルは `reference_A4` に出し、最も強い攻撃者に入れない（登録どおり）。
+- 限界（判断 56）: `max_new_tokens` 50 は 20 区間の塊（間隔 70〜144 個）を復元しきるには短く、各塊の復元は途中で切れる。A4 の正答率はこの条件つきで読む。
+
 ## 探索的な分析の手順（判断 55・56・本計算の照合の結果を見る前・2026-10-13）
 
 事前登録に無い探索的な分析を 2 つ足す（判断 55）。登録した値と手順は変えないので逸脱ではない。論文では「事前登録に無い探索的な分析」と明記し、主の結論（問い 1〜4）に使わない。ここに書いた手順は、本計算（`run_main.py` の実データの段）の照合と有用性の値を 1 つも見る前に、この節のコミットで固定する。値は `exploratory.json`（`config.json` は凍結の値なので変えない）。種の用途の名を 2 つ足す（`exploratory_unicity`・`exploratory_dp`。式は事前登録の式のまま。`config.json` の `seed_uses` は変えず、`scripts/seeds.py` の一覧に足す）。根拠のサーヴェイは `docs/literature/20261013-length-unicity-and-dp-release.md`（[V287]〜[V298]）。

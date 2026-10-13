@@ -9,6 +9,7 @@ py -3.11 -m venv ~/.venvs/pkm-main
 ~/.venvs/pkm-main/Scripts/python -m pip install -r requirements.txt
 ```
 
+- Added on 2026-10-13 for the implementation of ENJA15 and A4 (before any matching value): SudachiPy 0.7.0 and SudachiDict-core 20260723.1 (the versions of `config.json` `enja15.tools`; the readings of the ENJA15 translations) and Levenshtein 0.27.1 with RapidFuzz 3.14.1 (the normalised edit distance of A4, the library of the KeyTAR artifact's `calculate_metrics.py`). pip-audit 2.10.1 on `requirements.txt`: no known vulnerabilities (2026-10-13).
 - The check on synthetic logs before fixing (`scripts/synthetic_check.py`) was run with numpy 2.4.6; its output is identical under the pinned environment (checked with `run.sh`).
 - The KeyTAR model (attacker A4) runs in a second virtual environment, separate from the main computation (check 6, 2026-10-13): Python 3.11.9, PyTorch 2.7.1+cu128 (CUDA 12.8; the GPU is an NVIDIA GeForce RTX 5060 Ti, 16 GB, compute capability 12.0, driver 610.88), transformers 4.49.0 (the version the artifact pins), accelerate 1.4.0, datasets 3.3.2 (used only to read the format of the released training data). Full list: `requirements-keytar.txt`.
 
