@@ -26,6 +26,16 @@
 - ★ 同じ Loop のゲート 3 本は ubuntu の `frontend-check`（`timeout-minutes: 15`）でも回っており、そちらはジョブ全体で約 2 分 → 時間を食っているのは **Windows の git-bash 上での実行**。
 - 同日の別の run（`36394632998`）では macOS の self-hosted runner が「Complete job」で通信を失って failure（検査はすべて緑）→ 1 回の再実行で success。
 
+- 追記（2026-10-13・PR #365 の出荷中）: PR #365 の run `38343081748`（attempt 1 と 2）と `38349281801` の Windows ジョブが 3 回続けて 30 分で cancelled（どれも Loop run guard gate の途中）。手順ごとの時間（秒）を直近の緑の run と比べると、遅いのはゲートだけではなかった:
+
+  | 手順 | 10-12 の緑の run（約 20 本） | 10-13 の打ち切り（2 本） |
+  |---|---|---|
+  | Cargo build | 102〜131 | 495・498 |
+  | Cargo test | 95〜114 | 460・389 |
+  | Loop run guard gate | 304〜438 | 347・501（打ち切り） |
+
+  打ち切りの間ずっと、同じ PC で別のセッションの計算（`C:\wt\eh3-windows-device-rest` の rhythm-stage-desk-check の `checks.py`・日本時間 10:35 開始・multiprocessing で 16 並列）が動いていた。日本時間 14:5x に 10 秒測ると python 18 プロセスが CPU を約 14.4 コア分使い、全体の負荷は 100%。attempt 1（日本時間 12:43〜）は、このセッションの 16 並列の自己検査（`selftest_main.py`）とも重なっていた。→ CPU を使い切る並列の計算があると、build と test まで 4〜5 倍に遅くなり、ゲートの前に時間を使い切る。§2 の 1〜3（上限・ゲートの時間）より、4（runner と作業の PC の共有・重い計算の並列数）が効く見込み。
+
 ## §2 決めること（別タスクで）
 
 1. `check` の Windows ジョブの `timeout-minutes` を上げるか（⚠️ 上げても並行作業で遅くなる根本は残る）
