@@ -49,7 +49,11 @@ def active_rows(rows):
 
 
 def exclusion_reason(w):
-    """None when the writer is kept; otherwise the reason (preregistration, "Data", exclusion)."""
+    """None when the writer is kept; otherwise the reason (preregistration, "Data", exclusion). A log that the
+    loader could not read (load_klicke.py: reason code in extra['load_error']) counts as a missing log, reported
+    under its own name."""
+    if w.extra.get("load_error"):
+        return "unreadable log"
     if not w.rows:
         return "missing log"
     if not w.text:

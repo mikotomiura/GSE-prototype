@@ -10,7 +10,7 @@
     "klicke": {
       "reference": "Tian et al. (2025)",
       "acquisition_condition": "after this registration is fixed; the authors' reply to an inquiry is not awaited (the terms of use are public); if the reply raises a concern about this use, the computation is stopped, the acquired data are deleted and this is reported",
-      "files": "to be filled at acquisition: Drive file IDs, SHA-256, GitHub commit",
+      "files": "acquired 2026-10-12T19:29:56Z from the Drive folder 13Q02Mvj7T-T1OpZzkEqfHwqM7oI61lLR linked by the README of github.com/terryyutian/KLiCKe-Corpus at commit 37b94b72d6cec485f3f475f712ea4032c9101875: WritingTask.zip only (Drive file 120FkdzVlVBsyYQdvwLhlcLToTDRDStb_, 699,610,000 bytes, SHA-256 ffa4d753fdb9a54f5cadd6836426d56a0cabe73ceade8e7e40dddbbae178555d); demographic_info.csv, TypingTests.zip and VocabularyKnowledgeTest.zip not acquired; the zip holds no demographic file; extracted members: keystrokelogs/csv (4,992), texts (4,992), holistic_scores.csv and writing_prompts.docx (the IDFX logs and the rating form are not extracted); the list of extracted members with their SHA-256 has SHA-256 8a039a71b8e8b142580cdd30467eeff58217d71ca65262dbab37965e585c2066 and stays outside the repository",
       "acquire": ["argumentative essay keystroke logs (CSV)", "essays", "human scores"],
       "do_not_acquire": ["demographics (record the zip SHA-256 only if bundled; do not extract)"],
       "do_not_use": ["typing tests", "vocabulary test"],
@@ -22,7 +22,7 @@
     "enja15": {
       "reference": "Carl et al. (2016); Zou and Carl (2026); CRITT TPR-DB (2016-)",
       "acquisition_condition": "license type and terms checked in the primary source",
-      "svn_revision": "to be filled at acquisition",
+      "svn_revision": "649 (acquired 2026-10-12T19:22:52Z through the DAV path !svn/bc/649; T sessions only: 76 Translog-II .xml and the 228 Alignment .atag, .src and .tgt files of the same sessions; the SHA-256 of each file is in enja15-manifest-r649.sha256, whose own SHA-256 is 401c922535f788cf0ae46eea92d6ef4703c3bf37ce6bd6af69ddad73c854a4c8)",
       "sessions": "T (from-scratch translation); meaning of T/P/D to be confirmed in Carl et al. (2016) and Zou and Carl (2026) before acquisition",
       "tools": {"SudachiPy": "0.7.0", "SudachiDict-core": "20260723.1", "romaji_table.py": {"path": "scripts/romaji_table.py", "sha256": "d2101efb9f36201b7fb51ea7c4283c114854cf13bba8fae379b6f85ae381fbd2"}}
     },
@@ -33,7 +33,7 @@
       "size_mb": 15039.2,
       "license": "cc-by-4.0",
       "acquisition_condition": "researcher approved the 15 GB download",
-      "sha256": "to be filled at acquisition"
+      "sha256": "d2fe250a7219b7f6f796d52d2cacda35d5b2d3dab2f4847c0ddbbb6ca1159876 (acquired 2026-10-12T21:56:20Z UTC; 15,039,177,667 bytes; md5 matches the Zenodo record a56da07f5a086bcc8c9763abe1b00934)"
     }
   },
   "key_categories": ["letter", "digit", "space", "punctuation", "backspace", "delete", "enter", "arrow_left", "arrow_right", "home", "end", "navigation", "control", "modifier", "mouse", "other"],

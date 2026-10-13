@@ -1,0 +1,309 @@
+{
+ "check3_length_difference_replay_minus_text": {
+  "-1": 25,
+  "-2": 13,
+  "0": 63,
+  "1": 21,
+  "2": 4,
+  "3": 3,
+  "5": 1,
+  "6": 1,
+  "7": 1,
+  "<=-10": 1,
+  ">=10": 17
+ },
+ "check3_first_difference_decile": {
+  "0": 19,
+  "1": 17,
+  "2": 25,
+  "3": 8,
+  "4": 12,
+  "5": 13,
+  "6": 13,
+  "7": 8,
+  "8": 14,
+  "9": 21
+ },
+ "check3_opcodes": {
+  "_chars delete replay": {
+   "count": 10677,
+   "writers": null
+  },
+  "_chars insert text": {
+   "count": 5910,
+   "writers": null
+  },
+  "_chars replace replay": {
+   "count": 1000,
+   "writers": null
+  },
+  "_chars replace text": {
+   "count": 833,
+   "writers": null
+  },
+  "delete | replay letter | text -": {
+   "count": 183,
+   "writers": 78
+  },
+  "insert | replay - | text letter": {
+   "count": 110,
+   "writers": 53
+  },
+  "replace | replay letter | text letter": {
+   "count": 106,
+   "writers": 26
+  },
+  "insert | replay - | text letter+space": {
+   "count": 98,
+   "writers": 37
+  },
+  "insert | replay - | text space": {
+   "count": 86,
+   "writers": 45
+  },
+  "delete | replay letter+space | text -": {
+   "count": 75,
+   "writers": 32
+  },
+  "replace | replay letter | text letter+space": {
+   "count": 52,
+   "writers": 21
+  },
+  "replace | replay letter+space | text letter": {
+   "count": 30,
+   "writers": 9
+  },
+  "delete | replay letter+punct .+space | text -": {
+   "count": 23,
+   "writers": 13
+  },
+  "delete | replay punct . | text -": {
+   "count": 16,
+   "writers": 11
+  },
+  "insert | replay - | text letter+punct .+space": {
+   "count": 14,
+   "writers": 10
+  },
+  "replace | replay letter | text space": {
+   "count": 13,
+   "writers": 12
+  },
+  "insert | replay - | text punct .": {
+   "count": 10,
+   "writers": 9
+  },
+  "replace | replay non-ascii Pf | text non-ascii So": {
+   "count": 8,
+   "writers": 3
+  },
+  "delete | replay letter+punct ,+space | text -": {
+   "count": 7,
+   "writers": 7
+  },
+  "replace | replay space | text non-ascii So": {
+   "count": 7,
+   "writers": 3
+  },
+  "delete | replay punct .+space | text -": {
+   "count": 7,
+   "writers": 6
+  },
+  "replace | replay letter | text punct .": {
+   "count": 6,
+   "writers": 4
+  },
+  "delete | replay space | text -": {
+   "count": 5,
+   "writers": 3
+  },
+  "insert | replay - | text letter+punct ,+space": {
+   "count": 5,
+   "writers": 5
+  },
+  "delete | replay punct , | text -": {
+   "count": 5,
+   "writers": 4
+  },
+  "replace | replay letter+punct ,+space | text letter": {
+   "count": 4,
+   "writers": 4
+  },
+  "insert | replay - | text letter+punct ,+punct .+space": {
+   "count": 4,
+   "writers": 3
+  },
+  "delete | replay letter+punct ,+punct .+space | text -": {
+   "count": 4,
+   "writers": 3
+  },
+  "insert | replay - | text letter+punct .": {
+   "count": 4,
+   "writers": 4
+  },
+  "replace | replay letter | text letter+punct .+space": {
+   "count": 3,
+   "writers": 3
+  },
+  "replace | replay punct . | text letter": {
+   "count": 3,
+   "writers": 3
+  },
+  "replace | replay punct - | text non-ascii So": {
+   "count": 3,
+   "writers": 2
+  },
+  "delete | replay punct ,+space | text -": {
+   "count": 2,
+   "writers": 2
+  },
+  "delete | replay letter+punct '+space | text -": {
+   "count": 2,
+   "writers": 2
+  },
+  "insert | replay - | text punct ,": {
+   "count": 2,
+   "writers": 1
+  },
+  "insert | replay - | text letter+punct '+punct ,+punct .+space": {
+   "count": 2,
+   "writers": 2
+  },
+  "delete | replay digit+letter+space | text -": {
+   "count": 2,
+   "writers": 1
+  },
+  "insert | replay - | text letter+punct '+space": {
+   "count": 2,
+   "writers": 2
+  },
+  "delete | replay letter+punct . | text -": {
+   "count": 2,
+   "writers": 2
+  },
+  "replace | replay punct , | text space": {
+   "count": 2,
+   "writers": 2
+  },
+  "replace | replay letter+punct -+punct .+space | text letter": {
+   "count": 2,
+   "writers": 2
+  },
+  "replace | replay letter | text letter+punct ,+space": {
+   "count": 2,
+   "writers": 2
+  },
+  "delete | replay letter+punct '+punct ,+punct -+punct .+space | text -": {
+   "count": 2,
+   "writers": 2
+  },
+  "replace | replay non-ascii Pd | text non-ascii So": {
+   "count": 2,
+   "writers": 2
+  },
+  "replace | replay punct . | text space": {
+   "count": 2,
+   "writers": 2
+  },
+  "replace | replay letter | text letter+punct .": {
+   "count": 2,
+   "writers": 2
+  },
+  "insert | replay - | text digit": {
+   "count": 2,
+   "writers": 2
+  },
+  "delete | replay letter+punct '+punct ,+punct .+space | text -": {
+   "count": 2,
+   "writers": 2
+  },
+  "delete | replay letter+punct , | text -": {
+   "count": 2,
+   "writers": 2
+  },
+  "insert | replay - | text punct .+space": {
+   "count": 2,
+   "writers": 2
+  },
+  "insert | replay - | text punct ,+space": {
+   "count": 1,
+   "writers": 1
+  },
+  "insert | replay - | text letter+punct \"+punct '+punct ,+space": {
+   "count": 1,
+   "writers": 1
+  },
+  "delete | replay letter+punct [+space | text -": {
+   "count": 1,
+   "writers": 1
+  },
+  "delete | replay letter+punct \\+space | text -": {
+   "count": 1,
+   "writers": 1
+  },
+  "replace | replay punct - | text letter": {
+   "count": 1,
+   "writers": 1
+  },
+  "delete | replay digit+letter+punct .+space | text -": {
+   "count": 1,
+   "writers": 1
+  },
+  "replace | replay punct , | text letter": {
+   "count": 1,
+   "writers": 1
+  },
+  "replace | replay letter | text letter+punct :": {
+   "count": 1,
+   "writers": 1
+  },
+  "replace | replay letter+punct ?+space | text letter+punct .": {
+   "count": 1,
+   "writers": 1
+  },
+  "insert | replay - | text letter+punct \\": {
+   "count": 1,
+   "writers": 1
+  }
+ },
+ "check2_shortcut_effect_rows": {
+  "paste | own letter | previous non-modifier control": 567,
+  "letter_remove | own letter | previous non-modifier letter": 356,
+  "letter_remove | own letter | previous non-modifier control": 306,
+  "paste | own space | previous non-modifier letter": 209,
+  "paste | own letter | previous non-modifier letter": 79,
+  "paste | own mouse | previous non-modifier mouse": 67,
+  "paste | own letter | previous non-modifier other": 58,
+  "paste | own space | previous non-modifier space": 49,
+  "letter_remove | own letter | previous non-modifier mouse": 26,
+  "paste | own space | previous non-modifier mouse": 21,
+  "paste | own mouse | previous non-modifier space": 17,
+  "paste | own space | previous non-modifier backspace": 13,
+  "paste | own mouse | previous non-modifier enter": 13,
+  "paste | own other | previous non-modifier letter": 9,
+  "letter_remove | own letter | previous non-modifier arrow_left": 6,
+  "paste | own mouse | previous non-modifier backspace": 5,
+  "paste | own space | previous non-modifier punctuation": 4,
+  "letter_remove | own letter | previous non-modifier arrow_right": 4,
+  "paste | own letter | previous non-modifier backspace": 3,
+  "paste | own letter | previous non-modifier mouse": 3,
+  "paste | own other | previous non-modifier space": 2,
+  "paste | own space | previous non-modifier arrow_right": 2,
+  "paste | own mouse | previous non-modifier delete": 1,
+  "paste | own mouse | previous non-modifier navigation": 1,
+  "paste | own space | previous non-modifier home": 1,
+  "paste | own mouse | previous non-modifier letter": 1,
+  "paste | own space | previous non-modifier arrow_left": 1,
+  "paste | own mouse | previous non-modifier punctuation": 1,
+  "paste | own letter | previous non-modifier end": 1,
+  "paste | own letter | previous non-modifier arrow_right": 1,
+  "paste | own punctuation | previous non-modifier arrow_right": 1,
+  "paste | own enter | previous non-modifier other": 1,
+  "paste | own letter | previous non-modifier space": 1,
+  "paste | own letter | previous non-modifier enter": 1
+ },
+ "check2_key_values_of_length_2": {
+  "Lu(ascii)+Nd(ascii)": 187,
+  "Lu(ascii)+Lu(ascii)": 13
+ }
+}

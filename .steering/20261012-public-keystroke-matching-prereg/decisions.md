@@ -208,3 +208,24 @@ Claude は 2 問とも推奨を添え、研究者は 2 問とも推奨を選ん�
 - OSF の DOI **10.17605/OSF.IO/Y5R7N**。登録の日時 2026-10-12 16:43:33 UTC（日本時間 10-13 01:43）。テンプレート「OSF Preregistration」v4。公開（エンバーゴなし。Claude はエンバーゴを推奨していた。PoPETs の二重盲検では、論文での登録の示し方を投稿の段で確かめる）。
 - OSF の API で確かめた: 添付の `preregistration.md`・`config.json`・`SEED` の SHA-256 が論文用のリポジトリのコミット `cf5353da` と一致。Other の欄のコミットと SHA-256 も一致。選択式の欄は推奨どおり（Foreknowledge は「limited observation」・Study type は Descriptive と Simulation・因果なし・盲検化なし）。
 - 以後の変更は `notes.md` の「逸脱」に書く。取得（KLiCKe・ENJA15・KeyTAR）はこの後に進める。
+
+## 判断 54: KLiCKe の著者の返事と、その後の連絡（研究者・AskUserQuestion 1 回・2026-10-13）
+
+KLiCKe の著者（Yu Tian）から **2026-10-13 に返事が来た**（研究者が会話に貼った。本文とアドレスは repo に入れない）。要旨:
+
+- 利用条件: コーパスは MIT License で公開している。元の論文と出典の明記を勧める。本研究の二次解析は意図された研究利用に合う。GitHub の `terryyutian/KLiCKe-Corpus` の LICENSE が MIT であることを GitHub の API で確かめた（2026-10-13）。
+- 同意と倫理: データの収集は IRB の承認を得た。Amazon Mechanical Turk で募集し、参加者はデータを研究目的で使うことに informed consent を与えた。公開の前に個人を特定できる情報を確かめた。
+- 本研究への懸念: 特に無い。匿名化した打鍵の記録から最終の文がどこまで戻るかを調べるのは、匿名化の効果と限界を知るうえで有益だとする。
+- 勧め: 結果は主に集計で報告し、個々の参加者の、扱いに注意が要る情報や個人を特定できる情報を出さない。結果を知りたいとのこと。
+
+判断 51 の「懸念が示されたら止める」には当たらない。本計算はこのまま進める。勧めは事前登録と合っている（英語の版「Only aggregates are put in the repository. Results per writer and excerpts of texts and logs are not published」・「Not published: the data ... and results per writer」）。逸脱は要らない。返事に無いのは、審査した機関の名と、同意の書面が公開での共有に触れていたか。
+
+研究者の決定（Claude の推奨を 3 つとも選んだ）:
+
+1. 受け取った日は 2026-10-13。10/26 の催促は要らなくなった（引き継ぎ `next-session-public-keystroke-matching-1026-reminder.md` は日程の確認だけが残る）。
+2. お礼の返信を送り、審査した機関の名（と、できれば同意の書面が公開での共有に触れていたか）を尋ねる。他の選択肢は「お礼だけ」「返信しない」。下書きは `reply-drafts-20261013.md` の 1。送るのは研究者。
+3. PoPETs の program chairs への録画と発表の要否の問い合わせはまだ送っていない。Claude が下書きした（同じファイルの 2・宛先は CFP の `pets27-chairs@petsymposium.org`）。送るのは研究者。
+
+論文の倫理の節の英語の案は同じファイルの最後。Menlo Report の段の「the data are used under their terms of use, Inputlog, n.d.」は、論文では MIT License（GitHub のリポジトリ）と著者の確認を出典にする。解析の手順は変わらないので逸脱ではない。
+
+送付（2026-10-13・研究者）: 判断 54 の下書き 2 通（Dr. Tian へのお礼と審査機関の問い・PoPETs の program chairs への録画と発表の要否の問い）を、研究者が 2026-10-13 に自分のメールで送った。返事が来たら日付と要旨をここに書く。PoPETs から「録画か発表が必須」と返ってきたら、投稿先を考え直す（候補は引き継ぎ `next-session-public-keystroke-matching-1026-reminder.md`）。

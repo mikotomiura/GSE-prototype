@@ -1,0 +1,313 @@
+{
+ "check3_length_difference_replay_minus_text": {
+  "-3": 1,
+  "0": 12,
+  "1": 22,
+  "2": 79,
+  "3": 97,
+  "4": 176,
+  "5": 158,
+  "6": 294,
+  "7": 248,
+  "8": 286,
+  "9": 323,
+  "<=-10": 1,
+  ">=10": 3223
+ },
+ "check3_first_difference_decile": {
+  "0": 1289,
+  "1": 1815,
+  "2": 1247,
+  "3": 440,
+  "4": 88,
+  "5": 17,
+  "6": 10,
+  "7": 5,
+  "8": 3,
+  "9": 6
+ },
+ "check3_opcodes": {
+  "_chars delete replay": {
+   "count": 91101,
+   "writers": null
+  },
+  "_chars replace replay": {
+   "count": 50074,
+   "writers": null
+  },
+  "_chars replace text": {
+   "count": 34548,
+   "writers": null
+  },
+  "_chars insert text": {
+   "count": 21446,
+   "writers": null
+  },
+  "replace | replay letter+punct \\ | text punct .+space": {
+   "count": 5659,
+   "writers": 2734
+  },
+  "replace | replay punct \\ | text space": {
+   "count": 4610,
+   "writers": 2215
+  },
+  "replace | replay letter+punct \\ | text space": {
+   "count": 4366,
+   "writers": 2402
+  },
+  "delete | replay letter+punct \\ | text -": {
+   "count": 3289,
+   "writers": 2099
+  },
+  "replace | replay punct \\ | text letter": {
+   "count": 2866,
+   "writers": 1549
+  },
+  "delete | replay letter | text -": {
+   "count": 2732,
+   "writers": 1239
+  },
+  "insert | replay - | text letter": {
+   "count": 2433,
+   "writers": 1099
+  },
+  "replace | replay punct \\ | text punct .": {
+   "count": 1846,
+   "writers": 1395
+  },
+  "delete | replay letter+space | text -": {
+   "count": 1500,
+   "writers": 912
+  },
+  "replace | replay letter+punct \\ | text punct .": {
+   "count": 1371,
+   "writers": 786
+  },
+  "insert | replay - | text letter+space": {
+   "count": 1318,
+   "writers": 672
+  },
+  "delete | replay letter+punct .+space | text -": {
+   "count": 1310,
+   "writers": 1280
+  },
+  "delete | replay letter+punct .+punct \\+space | text -": {
+   "count": 860,
+   "writers": 833
+  },
+  "insert | replay - | text space": {
+   "count": 845,
+   "writers": 523
+  },
+  "delete | replay letter+punct \\+space | text -": {
+   "count": 793,
+   "writers": 637
+  },
+  "delete | replay punct \\ | text -": {
+   "count": 684,
+   "writers": 538
+  },
+  "delete | replay letter+punct . | text -": {
+   "count": 654,
+   "writers": 635
+  },
+  "replace | replay letter | text letter": {
+   "count": 521,
+   "writers": 291
+  },
+  "delete | replay punct . | text -": {
+   "count": 393,
+   "writers": 367
+  },
+  "replace | replay letter | text space": {
+   "count": 390,
+   "writers": 324
+  },
+  "replace | replay letter+punct \\ | text punct ?+space": {
+   "count": 352,
+   "writers": 307
+  },
+  "insert | replay - | text letter+punct .": {
+   "count": 352,
+   "writers": 316
+  },
+  "delete | replay punct .+space | text -": {
+   "count": 348,
+   "writers": 341
+  },
+  "delete | replay letter+punct .+punct \\ | text -": {
+   "count": 314,
+   "writers": 302
+  },
+  "delete | replay space | text -": {
+   "count": 287,
+   "writers": 245
+  },
+  "insert | replay - | text punct .+space": {
+   "count": 276,
+   "writers": 237
+  },
+  "insert | replay - | text punct .": {
+   "count": 240,
+   "writers": 206
+  },
+  "replace | replay punct \\ | text punct ?": {
+   "count": 214,
+   "writers": 193
+  },
+  "replace | replay letter+punct \\ | text letter+punct .+space": {
+   "count": 194,
+   "writers": 183
+  },
+  "insert | replay - | text letter+punct .+space": {
+   "count": 192,
+   "writers": 159
+  },
+  "replace | replay letter+punct \\ | text letter+space": {
+   "count": 172,
+   "writers": 126
+  },
+  "delete | replay letter+punct .+punct ?+space | text -": {
+   "count": 168,
+   "writers": 168
+  },
+  "replace | replay punct \\ | text punct .+space": {
+   "count": 150,
+   "writers": 146
+  },
+  "replace | replay punct \\ | text letter+punct .": {
+   "count": 143,
+   "writers": 136
+  },
+  "delete | replay punct , | text -": {
+   "count": 143,
+   "writers": 116
+  },
+  "insert | replay - | text punct \"": {
+   "count": 126,
+   "writers": 94
+  },
+  "delete | replay punct \"+punct \\ | text -": {
+   "count": 118,
+   "writers": 83
+  },
+  "insert | replay - | text punct ,": {
+   "count": 115,
+   "writers": 97
+  },
+  "replace | replay punct \\ | text letter+space": {
+   "count": 113,
+   "writers": 106
+  },
+  "replace | replay punct \\ | text punct ,": {
+   "count": 109,
+   "writers": 84
+  },
+  "replace | replay letter+punct \\+space | text punct .": {
+   "count": 105,
+   "writers": 93
+  },
+  "delete | replay letter+punct .+punct ?+punct \\+space | text -": {
+   "count": 100,
+   "writers": 99
+  },
+  "replace | replay punct \\ | text letter+punct .+space": {
+   "count": 97,
+   "writers": 87
+  },
+  "replace | replay letter | text letter+space": {
+   "count": 91,
+   "writers": 59
+  },
+  "replace | replay letter+punct \\ | text punct :": {
+   "count": 91,
+   "writers": 36
+  },
+  "replace | replay letter+punct .+punct \\ | text space": {
+   "count": 82,
+   "writers": 78
+  },
+  "replace | replay letter+punct \\ | text letter": {
+   "count": 71,
+   "writers": 59
+  },
+  "replace | replay letter+space | text letter": {
+   "count": 65,
+   "writers": 43
+  },
+  "replace | replay letter+punct \\ | text punct !+space": {
+   "count": 60,
+   "writers": 55
+  },
+  "delete | replay letter+punct ,+space | text -": {
+   "count": 59,
+   "writers": 56
+  },
+  "replace | replay letter+punct \\ | text punct ?": {
+   "count": 56,
+   "writers": 51
+  },
+  "replace | replay letter | text punct .": {
+   "count": 56,
+   "writers": 51
+  },
+  "replace | replay punct \\ | text punct !": {
+   "count": 55,
+   "writers": 49
+  },
+  "delete | replay punct ,+space | text -": {
+   "count": 54,
+   "writers": 49
+  },
+  "delete | replay letter+punct ,+punct .+space | text -": {
+   "count": 51,
+   "writers": 51
+  },
+  "insert | replay - | text punct ,+space": {
+   "count": 50,
+   "writers": 47
+  }
+ },
+ "check2_shortcut_effect_rows": {
+  "paste | own letter | previous non-modifier control": 567,
+  "letter_remove | own letter | previous non-modifier letter": 356,
+  "letter_remove | own letter | previous non-modifier control": 306,
+  "paste | own space | previous non-modifier letter": 209,
+  "paste | own letter | previous non-modifier letter": 79,
+  "paste | own mouse | previous non-modifier mouse": 67,
+  "paste | own letter | previous non-modifier other": 58,
+  "paste | own space | previous non-modifier space": 49,
+  "letter_remove | own letter | previous non-modifier mouse": 26,
+  "paste | own space | previous non-modifier mouse": 21,
+  "paste | own mouse | previous non-modifier space": 17,
+  "paste | own space | previous non-modifier backspace": 13,
+  "paste | own mouse | previous non-modifier enter": 13,
+  "paste | own other | previous non-modifier letter": 9,
+  "letter_remove | own letter | previous non-modifier arrow_left": 6,
+  "paste | own mouse | previous non-modifier backspace": 5,
+  "letter_remove | own letter | previous non-modifier arrow_right": 4,
+  "paste | own space | previous non-modifier punctuation": 3,
+  "paste | own letter | previous non-modifier backspace": 3,
+  "paste | own letter | previous non-modifier mouse": 3,
+  "paste | own other | previous non-modifier space": 2,
+  "paste | own space | previous non-modifier arrow_right": 2,
+  "paste | own mouse | previous non-modifier delete": 1,
+  "paste | own space | previous non-modifier other": 1,
+  "paste | own mouse | previous non-modifier navigation": 1,
+  "paste | own space | previous non-modifier home": 1,
+  "paste | own mouse | previous non-modifier letter": 1,
+  "paste | own space | previous non-modifier arrow_left": 1,
+  "paste | own mouse | previous non-modifier punctuation": 1,
+  "paste | own letter | previous non-modifier end": 1,
+  "paste | own letter | previous non-modifier arrow_right": 1,
+  "paste | own punctuation | previous non-modifier arrow_right": 1,
+  "paste | own enter | previous non-modifier other": 1,
+  "paste | own letter | previous non-modifier space": 1,
+  "paste | own letter | previous non-modifier enter": 1
+ },
+ "check2_key_values_of_length_2": {
+  "Po(ascii)+Po(ascii)": 9381,
+  "Lu(ascii)+Nd(ascii)": 187,
+  "Lu(ascii)+Lu(ascii)": 13
+ }
+}
