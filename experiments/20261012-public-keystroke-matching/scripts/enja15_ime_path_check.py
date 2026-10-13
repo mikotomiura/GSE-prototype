@@ -4,6 +4,7 @@ attribute) remains in any column after R3j. Counts only.
 
     python -I scripts/enja15_ime_path_check.py --root raw/enja15 --out results/enja15_ime_path_check.json
     ENJA_MUTATE=keep_value python -I scripts/enja15_ime_path_check.py ...   # must FAIL (exit 1)
+    (mutants: keep_value, category_from_value, drop_rows; an empty --root must also FAIL)
 
 Checks per session: (1) every R3j row has exactly the keys time, type and category; (2) time is an int, type is in
 TYPES and category in R3J_CATEGORIES (closed lists, so no value can carry a string of the log); (3) no R3j value
@@ -28,6 +29,8 @@ def r3j(events):
     if MUTATE == "keep_value":
         for row, (_, _, a) in zip(rows, events):
             row["value"] = a.get("Value")
+    if MUTATE == "drop_rows":
+        rows = []
     if MUTATE == "category_from_value":
         for row, (_, _, a) in zip(rows, events):
             if row["category"] in ("commit", "commit_punct"):
@@ -70,6 +73,9 @@ def check_session(path):
                                                                 for s in strings)):
                 c["fail_string_remains"] += 1
     c["rows"] = len(rows)
+    c["key_events"] = len(ev)
+    if len(rows) != len(ev):
+        c["fail_rows_differ_from_key_events"] += 1
     for row in rows:
         c["category " + str(row.get("category")) if row.get("category") in enja15.R3J_CATEGORIES else "category <not in list>"] += 1
     return c
@@ -86,6 +92,16 @@ def main():
         if fn.endswith(".xml"):
             tot.update(check_session(os.path.join(d, fn)))
             sessions += 1
+    # the check must not pass vacuously (review): sessions exist, every Key event gives one R3j row, and the paths
+    # the check is about (composition update, conversion, cancel, commit, IMEtext, Text) occur
+    if sessions == 0:
+        tot["fail_no_session"] += 1
+    if tot["rows"] == 0:
+        tot["fail_no_row"] += 1
+    for k in ("has_composition_update", "has_conversion", "has_cancel_escape_or_back_after_convert", "has_commit",
+              "has_imetext", "has_text_attribute"):
+        if tot[k] == 0:
+            tot["fail_path_absent_" + k] += 1
     fails = {k: v for k, v in tot.items() if k.startswith("fail")}
     out = {"sessions": sessions, "mutate": MUTATE or None, "pass": not fails, "fails": fails,
            "counts": dict(sorted(tot.items()))}

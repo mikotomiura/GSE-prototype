@@ -15,7 +15,21 @@ import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 
 NAME = re.compile(r"^P(\d+)_T(\d+)$")
-BRACKET = re.compile(r"^\[[A-Za-z0-9 _+\-]{1,24}\]$")
+# Closed lists (review): a bracketed value is written verbatim only when it is a key name of the .NET Keys
+# enumeration used by Translog-II, optionally after Ctrl+ or Shift+; a Type only when it is a known Type.
+BRACKET = re.compile(r"^\[(?:(?:Ctrl|Shift|Alt)\+)?([A-Za-z0-9]{1,24})\]$")
+NET_KEYS = {
+    "Back", "Tab", "Return", "Enter", "Escape", "Space", "Delete", "Insert", "Home", "End", "Left", "Right", "Up",
+    "Down", "PageUp", "PageDown", "Prior", "Next", "Capital", "CapsLock", "ControlKey", "ShiftKey", "Menu",
+    "LControlKey", "RControlKey", "LShiftKey", "RShiftKey", "LMenu", "RMenu", "LWin", "RWin", "Apps", "ProcessKey",
+    "None", "Decimal", "Subtract", "Add", "Multiply", "Divide", "Separator", "NumLock", "Scroll", "Pause", "Clear",
+    "LaunchApplication1", "LaunchApplication2", "KanaMode", "KanjiMode", "IMEConvert", "IMENonconvert",
+    "IMEModeChange", "IMEAccept", "Oemcomma", "OemPeriod", "OemMinus", "Oemplus", "OemQuestion", "Oemtilde",
+    "OemOpenBrackets", "OemCloseBrackets", "OemPipe", "OemQuotes", "OemSemicolon", "OemBackslash", "Oem1", "Oem2",
+    "Oem3", "Oem4", "Oem5", "Oem6", "Oem7", "Oem8", "Oem102", "C", "V", "X", "Z", "A"} \
+    | {chr(c) for c in range(ord("A"), ord("Z") + 1)} | {"D%d" % i for i in range(10)} \
+    | {"NumPad%d" % i for i in range(10)} | {"F%d" % i for i in range(1, 25)}
+TYPES = {"IME", "insert", "delete", "navi", "return", "edit", "speech"}
 
 
 def char_class(c):
@@ -38,13 +52,16 @@ def classes(s):
     return "+".join(sorted({char_class(c) for c in s})) if s else "<empty>"
 
 
-def shape(v):
+def shape(v, t=None):
     if v is None:
         return "<absent>"
     if v == "":
         return "<empty>"
-    if BRACKET.match(v):
+    m = BRACKET.match(v)
+    if m and m.group(1) in NET_KEYS and t != "insert":  # insert values are typed text
         return v
+    if v.startswith("[") and v.endswith("]"):
+        return "<bracketed value not in the key list: length %d>" % len(v)
     if len(v) == 1:
         if v.isascii() and v.isalpha():
             return "<one ascii letter>"
@@ -64,9 +81,10 @@ def session(path):
         tag = el.tag
         if tag == "Key":
             t = el.get("Type")
+            t = t if t in TYPES else "<other type>"
             v = el.get("Value")
             c["Type " + str(t)] += 1
-            c["Type %s | Value %s" % (t, shape(v))] += 1
+            c["Type %s | Value %s" % (t, shape(v, t))] += 1
             if el.get("IMEtext") is not None:
                 c["Type %s | IMEtext %s" % (t, classes(el.get("IMEtext")))] += 1
             if el.get("Text") is not None:

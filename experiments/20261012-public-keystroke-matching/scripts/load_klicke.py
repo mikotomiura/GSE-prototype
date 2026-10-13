@@ -18,8 +18,10 @@ row without " => ", makes the log unreadable (reason "unreadable log"), and the 
 """
 import csv
 import io
+import math
 import os
 import re
+from collections import Counter
 
 from corpus import WriterData
 
@@ -40,10 +42,21 @@ UNESCAPE = {"\\": "\\", '"': '"', "n": "\n", "t": "\t"}
 ESCAPED_COLS = ("down_event", "up_event", "text_change")
 
 
+ANY_ESCAPE = re.compile(r"\\(.?)", re.S)
+
+
+def count_escapes(s, where, c):
+    """Counts the backslash sequences of a raw value by the character after the backslash (check 2; reproduces
+    'no other backslash sequence occurs'): n, t, quote, backslash, or 'other' / 'end of value'."""
+    for m in ANY_ESCAPE.finditer(s):
+        k = m.group(1)
+        c["%s backslash then %s" % (where, k if k in UNESCAPE else ("end of value" if k == "" else "other"))] += 1
+
+
 def unescape(s):
     return ESCAPE.sub(lambda m: UNESCAPE[m.group(1)], s) if "\\" in s else s
 
-csv.field_size_limit(1 << 30)
+csv.field_size_limit(16 << 20)  # 16 MiB; a larger field makes the log unreadable (type name only)
 
 
 class LogError(Exception):
@@ -52,6 +65,8 @@ class LogError(Exception):
 
 def _num(s, integral):
     v = float(s)
+    if not math.isfinite(v):
+        raise LogError("non-finite number")
     if integral or v.is_integer():
         if not v.is_integer():
             raise LogError("non-integer value")
@@ -60,11 +75,17 @@ def _num(s, integral):
 
 
 def decode(b):
-    """utf-8 (a BOM is dropped); the encoding used is returned with the string."""
+    """utf-8 (a BOM is dropped), else cp1252; the encoding used is returned with the string. Bytes that cp1252
+    does not define are replaced and the encoding is then reported as 'cp1252 with replacement' (counted in check 1;
+    such a log is read, not excluded)."""
     try:
         return b.decode("utf-8-sig"), "utf-8"
     except UnicodeDecodeError:
-        return b.decode("cp1252", errors="replace"), "cp1252"
+        pass
+    try:
+        return b.decode("cp1252"), "cp1252"
+    except UnicodeDecodeError:
+        return b.decode("cp1252", errors="replace"), "cp1252 with replacement"
 
 
 def read_log(path):
@@ -72,11 +93,19 @@ def read_log(path):
     (rows, extra). Raises LogError with a reason code."""
     with open(path, "rb") as f:
         s, enc = decode(f.read())
-    reader = csv.reader(_lines(s))
+    reader = csv.reader(_lines(s), strict=True)
+    try:
+        return _read_rows(reader, enc)
+    except csv.Error:
+        raise LogError("csv format") from None
+
+
+def _read_rows(reader, enc):
     header = next(reader, None)
     if header != EXPECTED_HEADER:
         raise LogError("header differs")
     rows, id_diff, seq1, seq0 = [], 0, True, True
+    esc = Counter()
     for n, rec in enumerate(reader):
         if len(rec) != len(header):
             raise LogError("field count differs")
@@ -84,6 +113,8 @@ def read_log(path):
         try:
             r = {COLMAP[k]: d[k] for k in COLMAP}
             for c in ESCAPED_COLS:
+                if "\\" in r[c]:
+                    count_escapes(r[c], "text_change" if c == "text_change" else "key", esc)
                 r[c] = unescape(r[c])
             for c in INT_COLS:
                 r[c] = _num(r[c], True)
@@ -103,7 +134,7 @@ def read_log(path):
         if act == "Replace" and " => " not in r["text_change"]:
             raise LogError("Replace without =>")
         rows.append(r)
-    return rows, {"encoding": enc, "up_event_id_differs": id_diff, "first_column_row_number_from_1": seq1,
+    return rows, {"encoding": enc, "escapes": esc, "up_event_id_differs": id_diff, "first_column_row_number_from_1": seq1,
                   "first_column_row_number_from_0": seq0}
 
 
@@ -118,6 +149,8 @@ def read_scores(path):
     for d in reader:
         try:
             sc = float(d["Score"])
+            if not math.isfinite(sc):
+                raise ValueError
         except ValueError:
             sc, bad_score = None, bad_score + 1
         out.setdefault(d["ID"], []).append((d["Prompt"], sc))

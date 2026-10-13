@@ -257,16 +257,38 @@
    "modifier_rows_Control": 9861,
    "modifier_rows_Meta": 898,
    "modifier_rows_Shift": 672123,
+   "paste_nochange": 0,
+   "shortcut_effect_letter_multi_insert": 0,
    "shortcut_effect_letter_remove": 698,
+   "shortcut_effect_not_after_control_letter_multi_insert": 0,
    "shortcut_effect_not_after_control_letter_remove": 392,
    "shortcut_effect_not_after_control_paste": 566,
-   "shortcut_effect_paste": 1133
+   "shortcut_effect_paste": 1133,
+   "text_change_two_or_more_arrows": 0
+  },
+  "escape_sequences_in_distributed_values": {
+   "key backslash then \"": 16486,
+   "key backslash then \\": 2276,
+   "text_change backslash then \"": 9789,
+   "text_change backslash then \\": 2276,
+   "text_change backslash then n": 57492,
+   "text_change backslash then t": 11
   }
  },
  "check3": {
   "writers": 4992,
   "exact_match_after_whitespace_normalisation": 4842,
   "share": 0.97,
+  "by_log_encoding": {
+   "cp1252": {
+    "writers": 21,
+    "exact_match": 14
+   },
+   "utf-8": {
+    "writers": 4971,
+    "exact_match": 4828
+   }
+  },
   "normalised_edit_distance": {
    "0": 0.0,
    "10": 0.0,
@@ -289,6 +311,10 @@
   "segments": 2770660,
   "equal": 2225601,
   "share_equal": 0.8033,
+  "segments_without_counted_press": 389216,
+  "segments_with_counted_press": 2381444,
+  "equal_among_segments_with_counted_press": 1836385,
+  "share_equal_among_segments_with_counted_press": 0.7711,
   "rule_minus_true_histogram (clipped at +-6)": {
    "-6": 54680,
    "-5": 12454,
@@ -313,6 +339,28 @@
    "75": 0.8883,
    "90": 0.9302,
    "100": 0.9968
+  },
+  "share_of_segments_with_counted_press_equal_per_writer": {
+   "0": 0.0075,
+   "10": 0.6181,
+   "25": 0.7185,
+   "50": 0.8043,
+   "75": 0.8699,
+   "90": 0.9174,
+   "100": 0.9963
+  }
+ },
+ "check6_a4_chunks_per_writer": {
+  "writers": 4992,
+  "mean": 28.1,
+  "percentiles": {
+   "0": 2.0,
+   "10": 15.0,
+   "25": 19.0,
+   "50": 25.0,
+   "75": 34.0,
+   "90": 44.0,
+   "100": 207.0
   }
  }
 }

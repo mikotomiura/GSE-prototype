@@ -27,17 +27,38 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import corpus  # noqa: E402
+import check6_keytar  # noqa: E402  (chunks() only; torch is imported inside its main)
 import load_klicke  # noqa: E402
 from synthetic_logs import category, record_segments, shortcut_flags  # noqa: E402
 
 MODIFIER_KEYS = {"Shift", "Control", "Alt", "Meta", "CapsLock"}
-NAME = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,23}$")
 ALNUM = re.compile(r"[A-Za-z0-9]")
 
 
+# Closed lists of what may be written verbatim (review: a regex for "looks like a name" also passes a word typed as
+# a value). Activity values of the Kaggle description; key names of the W3C UI Events key values (special keys only,
+# no printable character) and the mouse values of the logger.
+ACTIVITIES = {"Input", "Remove/Cut", "Nonproduction", "Replace", "Paste"}
+KEY_NAMES = {
+    "Unidentified", "Alt", "AltGraph", "CapsLock", "Control", "Fn", "FnLock", "Hyper", "Meta", "NumLock", "ScrollLock",
+    "Shift", "Super", "Symbol", "SymbolLock", "OS", "Enter", "Tab", "Space", "ArrowDown", "ArrowLeft", "ArrowRight",
+    "ArrowUp", "End", "Home", "PageDown", "PageUp", "Backspace", "Clear", "Copy", "CrSel", "Cut", "Delete", "EraseEof",
+    "ExSel", "Insert", "Paste", "Redo", "Undo", "Accept", "Again", "Attn", "Cancel", "ContextMenu", "Escape",
+    "Execute", "Find", "Finish", "Help", "Pause", "Play", "Props", "Select", "ZoomIn", "ZoomOut", "BrightnessDown",
+    "BrightnessUp", "Eject", "LogOff", "Power", "PowerOff", "PrintScreen", "Hibernate", "Standby", "WakeUp",
+    "AllCandidates", "Alphanumeric", "CodeInput", "Compose", "Convert", "Dead", "FinalMode", "GroupFirst", "GroupLast",
+    "GroupNext", "GroupPrevious", "ModeChange", "NextCandidate", "NonConvert", "PreviousCandidate", "Process",
+    "SingleCandidate", "HangulMode", "HanjaMode", "JunjaMode", "Eisu", "Hankaku", "Hiragana", "HiraganaKatakana",
+    "KanaMode", "KanjiMode", "Katakana", "Romaji", "Zenkaku", "ZenkakuHankaku", "AudioVolumeDown", "AudioVolumeUp",
+    "AudioVolumeMute", "MediaPlayPause", "MediaPlay", "MediaPause", "MediaStop", "MediaTrackNext",
+    "MediaTrackPrevious", "MediaFastForward", "MediaRewind", "BrowserBack", "BrowserForward", "BrowserHome",
+    "BrowserRefresh", "BrowserSearch", "BrowserStop", "BrowserFavorites", "LaunchMail", "LaunchApplication1",
+    "LaunchApplication2", "Leftclick", "Rightclick", "Middleclick", "Unknownclick"} | {"F%d" % i for i in range(1, 25)}
+
+
 def safe_value(v):
-    """A key or activity value is written only when it looks like a key name; otherwise its shape only."""
-    if NAME.match(v) or v in ("Remove/Cut",):
+    """A key or activity value is written verbatim only when it is in a closed list; otherwise its length only."""
+    if v in ACTIVITIES or v in KEY_NAMES:
         return v
     return "<other value: length %d>" % len(v)
 
@@ -66,8 +87,15 @@ def levenshtein(a, b):
     return int(prev[m])
 
 
+REGISTERED_ZERO = ("down_event_differs_from_up_event", "text_change_two_or_more_arrows", "paste_nochange",
+                   "shortcut_effect_paste", "shortcut_effect_letter_remove", "shortcut_effect_letter_multi_insert",
+                   "shortcut_effect_not_after_control_paste", "shortcut_effect_not_after_control_letter_remove",
+                   "shortcut_effect_not_after_control_letter_multi_insert", "modifier_action_time_nonzero",
+                   "leftclick_activity_not_move_or_nonproduction")
+
+
 def check2(rows):
-    c = Counter()
+    c = Counter({k: 0 for k in REGISTERED_ZERO})
     act, other_keys, nonascii = Counter(), Counter(), Counter()
     cats = [category(r["down_event"]) for r in rows]
     sc = shortcut_flags(cats)
@@ -117,10 +145,10 @@ def check4(rows, final, origins):
     for ci, o in enumerate(origins):
         if o is not None and ALNUM.match(final[ci]):
             surv[o] += 1
-    diffs = []
+    out = []  # (rule - true, the segment has no counted press)
     for v, idx in record_segments(cats):
-        diffs.append(v - sum(surv.get(r, 0) for r in idx))
-    return diffs
+        out.append((v - sum(surv.get(r, 0) for r in idx), not idx))
+    return out
 
 
 def work(w):
@@ -129,7 +157,8 @@ def work(w):
            "encoding": w.extra.get("encoding"), "text_encoding": w.extra.get("text_encoding"),
            "up_event_id_differs": w.extra.get("up_event_id_differs", 0),
            "row_number_from_1": w.extra.get("first_column_row_number_from_1"),
-           "row_number_from_0": w.extra.get("first_column_row_number_from_0")}
+           "row_number_from_0": w.extra.get("first_column_row_number_from_0"),
+           "escapes": w.extra.get("escapes", Counter())}
     if w.rows:
         out["c2"] = check2(w.rows)
     w.rows = corpus.active_rows(w.rows)
@@ -144,6 +173,7 @@ def work(w):
     out["match"] = a == b
     out["ned"] = 0.0 if a == b else levenshtein(a, b) / max(len(a), len(b))
     out["seg_diffs"] = check4(w.rows, final, origins)
+    out["a4_chunks"] = len(check6_keytar.chunks(w.rows))
     return out
 
 
@@ -177,8 +207,12 @@ def main():
             other_writers.update(set(o))
     kept = [r for r in res if not r["excluded"]]
     ned = [r["ned"] for r in kept]
-    diffs = [d for r in kept for d in r["seg_diffs"]]
+    diffs = [d for r in kept for d, _ in r["seg_diffs"]]
+    diffs_ne = [d for r in kept for d, e in r["seg_diffs"] if not e]
     hist = Counter(max(-6, min(6, d)) for d in diffs)
+    esc = Counter()
+    for r in res:
+        esc.update(r["escapes"])
     out = {
         "check1": {
             "files": report,
@@ -209,11 +243,15 @@ def main():
             "rows_by_category": dict(cats.most_common()),
             "up_event_id_differs_from_down_event_id": sum(r["up_event_id_differs"] for r in res),
             "assumption_counts": dict(sorted(c2.items())),
+            "escape_sequences_in_distributed_values": dict(sorted(esc.items())),
         },
         "check3": {
             "writers": len(kept),
             "exact_match_after_whitespace_normalisation": sum(1 for r in kept if r["match"]),
             "share": round(sum(1 for r in kept if r["match"]) / max(len(kept), 1), 4),
+            "by_log_encoding": {e: {"writers": sum(1 for r in kept if r["encoding"] == e),
+                                    "exact_match": sum(1 for r in kept if r["encoding"] == e and r["match"])}
+                                for e in sorted({r["encoding"] for r in kept})},
             "normalised_edit_distance": q(ned),
             "normalised_edit_distance_bins": {
                 "0": sum(1 for x in ned if x == 0), "(0, 0.01]": sum(1 for x in ned if 0 < x <= 0.01),
@@ -225,11 +263,21 @@ def main():
             "segments": len(diffs),
             "equal": sum(1 for d in diffs if d == 0),
             "share_equal": round(sum(1 for d in diffs if d == 0) / max(len(diffs), 1), 4),
+            "segments_without_counted_press": len(diffs) - len(diffs_ne),
+            "segments_with_counted_press": len(diffs_ne),
+            "equal_among_segments_with_counted_press": sum(1 for d in diffs_ne if d == 0),
+            "share_equal_among_segments_with_counted_press": round(sum(1 for d in diffs_ne if d == 0)
+                                                                   / max(len(diffs_ne), 1), 4),
             "rule_minus_true_histogram (clipped at +-6)": {str(k): hist[k] for k in sorted(hist)},
-            "writers_all_segments_equal": sum(1 for r in kept if all(d == 0 for d in r["seg_diffs"])),
-            "share_of_segments_equal_per_writer": q([sum(1 for d in r["seg_diffs"] if d == 0) / len(r["seg_diffs"])
+            "writers_all_segments_equal": sum(1 for r in kept if all(d == 0 for d, _ in r["seg_diffs"])),
+            "share_of_segments_equal_per_writer": q([sum(1 for d, _ in r["seg_diffs"] if d == 0) / len(r["seg_diffs"])
                                                      for r in kept if r["seg_diffs"]]),
+            "share_of_segments_with_counted_press_equal_per_writer": q(
+                [sum(1 for d, e in r["seg_diffs"] if not e and d == 0) / sum(1 for _, e in r["seg_diffs"] if not e)
+                 for r in kept if any(not e for _, e in r["seg_diffs"])]),
         },
+        "check6_a4_chunks_per_writer": {"writers": len(kept), "mean": round(float(np.mean([r["a4_chunks"] for r in kept])), 2),
+                                        "percentiles": q([r["a4_chunks"] for r in kept])},
     }
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
@@ -237,8 +285,8 @@ def main():
 
 
 def safe_prompt(p, i):
-    """Prompt names are the task names of the distribution (not the writers' content); long values are cut."""
-    return p if len(p) <= 60 else p[:60] + "..."
+    """Prompt names are the task names of the distribution: written only as one upper-case word, else numbered."""
+    return p if re.fullmatch(r"[A-Z]{1,20}", p) else "<prompt %d>" % i
 
 
 if __name__ == "__main__":

@@ -10,9 +10,12 @@ The reconstructions are neither written nor printed and no matching value is com
 - Input (as fixed for A4, R0 of that writer): the intervals between consecutive letter, digit and space presses
   (shortcuts excluded), in chunks covering 20 record segments; integer ms, capped at 1023 as in the released
   training data; one user turn without earlier turns: "Translate the Time intervals to Keystrokes.\nTime intervals: "
-  followed by the intervals separated by spaces (the released training data). These input details are for this
+  followed by the intervals separated by spaces, as in the "messages" of the released training dataset
+  key_ground_truth (the raw jsonl in raw_data.zip separates them by commas; the model was trained on spaces). These input details are for this
   timing check and are settled when A4 is written.
 - Generation: the defaults of the artifact's scripts/eval/evaluate_key.py (GEN below), float32 as loaded there.
+  max_new_tokens = 50 is shorter than a 20-segment chunk needs (the artifact's sentences have 37 to 58
+  characters), so the measured time underestimates the time of a full reconstruction of a chunk.
 """
 import argparse
 import json
@@ -33,6 +36,32 @@ GEN = dict(max_new_tokens=50, output_scores=True, return_dict_in_generate=True, 
 PROMPT = "Translate the Time intervals to Keystrokes.\nTime intervals: "
 CAP = 1023
 CHUNK_SEGMENTS = 20
+# the checkpoint files read by from_pretrained (data.md): verified before loading, offline (security review)
+CHECKPOINT_SHA256 = {
+    "pytorch_model.bin": "d09f06db0f3dbaebf28a6a80e4d4651629dbf8ca3d20bc6d5656ee5d13f7144f",
+    "config.json": "e23765bc5707b77d56cec9f61ec89c5bf1bbcd73a97d820216834a346d5c4ee9",
+    "generation_config.json": "b5869df64082766f4c2e8165436f2b9ca4f8313f4cdeacfdf9216ec5dc2330b5",
+    "special_tokens_map.json": "a6188c1e366f8ed715e60ff39c46a8c500fc33508e2affeb23e8c547c5853193",
+    "tokenizer.json": "ff3f2a2fc3b88f6f8504650e2ebb8e018bc4206a90eb41f1a9ff351e02e44ff9",
+    "tokenizer_config.json": "24bd0934b2eb00d90a2f40b8f1c66284c3d96070d26cb9d12a6b21c8522007df"}
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+
+def verify_checkpoint(model_dir):
+    import hashlib
+    if not os.path.isdir(model_dir):
+        raise SystemExit("--model must be a local directory")
+    for name, want in CHECKPOINT_SHA256.items():
+        h = hashlib.sha256()
+        with open(os.path.join(model_dir, name), "rb") as f:
+            for b in iter(lambda: f.read(1 << 24), b""):
+                h.update(b)
+        if h.hexdigest() != want:
+            raise SystemExit("SHA-256 of %s differs from data.md" % name)
+    with open(os.path.join(model_dir, "config.json"), encoding="utf-8") as f:
+        if "auto_map" in json.load(f):
+            raise SystemExit("config.json asks for remote code")
 
 
 def chunks(rows):
@@ -81,9 +110,11 @@ def main():
     ch = chunks(corpus.active_rows(w.rows))
     del writers, kept, w
 
+    verify_checkpoint(args.model)
     t0 = time.time()
-    tok = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(args.model, device_map="auto").eval()
+    tok = AutoTokenizer.from_pretrained(args.model, local_files_only=True, trust_remote_code=False)
+    model = AutoModelForCausalLM.from_pretrained(args.model, device_map="auto", local_files_only=True,
+                                                 trust_remote_code=False).eval()
     load_s = time.time() - t0
     torch.cuda.reset_peak_memory_stats()
     times, in_tokens = [], []
