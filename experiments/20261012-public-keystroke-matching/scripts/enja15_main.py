@@ -143,6 +143,14 @@ def source_mean(values, sessions, weights=None):
     return float(np.mean(list(means.values()))), means
 
 
+def _records_per_source(sessions, values):
+    out = {}
+    for s in sessions:
+        if s.name in values:
+            out[s.source] = out.get(s.source, 0) + 1
+    return out
+
+
 def resample_weights(sessions, seed, n=B):
     translators = sorted({s.translator for s in sessions})
     g = seeds.rng(seed, "bootstrap", "", "enja15")
@@ -184,7 +192,9 @@ def summarise(sessions, credits, seed):
             for att, (pt, per, bt) in vals.items():
                 e = {"acc": pt, "ci": ci(bt), "chance": ch_pt, "x_chance": pt / ch_pt,
                      "diff_chance": pt - ch_pt, "diff_chance_ci": ci(bt - ch_b),
-                     "per_source": {k: per[k] for k in sorted(per)}, "records": len(credits[(form, att, N)])}
+                     "per_source": {k: per[k] for k in sorted(per)},
+                     "records_per_source": {k: n for k, n in sorted(_records_per_source(sessions, credits[(form, att, N)]).items())},
+                     "records": len(credits[(form, att, N)])}
                 if att != "A0" and "A0" in vals:
                     e["diff_A0"] = pt - vals["A0"][0]
                     e["diff_A0_ci"] = ci(bt - vals["A0"][2])
@@ -227,11 +237,12 @@ def load_sessions(root, reader, stats):
 def describe(sessions):
     rec = [len(enja15.record_segments(s.rows)) for s in sessions]
     txt = [len(s.text_values) for s in sessions]
-    q = lambda v: [float(np.quantile(v, x)) for x in (0.1, 0.5, 0.9)]  # noqa: E731
+    q = lambda v: [float(np.quantile(v, x)) for x in (0.1, 0.5, 0.9)] if len(v) else None  # noqa: E731
     return {"sessions": len(sessions), "translators": len({s.translator for s in sessions}),
             "source_texts": len({s.source for s in sessions}),
+            "sessions_without_text_segment": sum(1 for t in txt if t == 0),
             "record_segments_p10_p50_p90": q(rec), "text_segments_p10_p50_p90": q(txt),
-            "record_to_text_segment_ratio_p10_p50_p90": q([a / b for a, b in zip(rec, txt)])}
+            "record_to_text_segment_ratio_p10_p50_p90": q([a / b for a, b in zip(rec, txt) if b])}
 
 
 def run(sessions, seed, extra=None):
@@ -241,7 +252,8 @@ def run(sessions, seed, extra=None):
     out = {"describe": describe(sessions), "counts": counts, "bootstrap": boot, "cells": cells,
            "question4": {"form": "R3j", "attacker": "A2", "N": "all",
                          "exceeds": q4.get("exceeds") if q4 else None},
-           "note": "R0j, R3j and R3j-t(w) have the same costs for A0 and A2 (the rules read the category column)"}
+           "note": "R0j, R3j and R3j-t(w) have the same costs for A0 and A2 (the rules read the category column)",
+           "mutate": MUTATE}
     if extra:
         out.update(extra)
     return out
@@ -255,6 +267,12 @@ def main():
     seed = seeds.read_seed()
     stats = {}
     sessions, excluded = load_sessions(args.root, enja15.Reader(), stats)
+    per_tr = {}
+    for s in sessions:
+        per_tr.setdefault(s.translator, set()).add(s.source)
+    if not any(len(v) >= 2 for v in per_tr.values()):
+        raise SystemExit("the design is nested (check 5 found it crossed): the bootstrap for a nested design "
+                         "(stratified by source text) is not implemented")
     out = run(sessions, seed, {"excluded": excluded, "text_token_fallbacks": stats})
     with open(args.out, "w", encoding="utf-8", newline="\n") as f:
         json.dump(out, f, indent=1, sort_keys=True)

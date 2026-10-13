@@ -253,6 +253,13 @@ def run(args):
            "writers_after_exclusion": {p: len(pool_ids[p]) for p in prompts}, "excluded": excluded,
            "folds": [fold_a, fold_b], "sample_sizes": {p: len(v) for p, v in sample.items()},
            "open_world_n": args.open_world_n}
+    if MUTATE:
+        out["mutate"] = MUTATE
+    if args.a4_dir and not args.a4_partial:
+        have = {k for k, r in results.items() if r.get("a4")}
+        if not sample_set <= have:
+            raise SystemExit("--a4-dir lacks %d of the %d writers of the sample (--a4-partial to allow)"
+                             % (len(sample_set - have), len(sample_set)))
     if args.forms != "main" or args.a4_dir:
         out["forms"] = form_list
         out["a4_writers"] = sum(1 for r in results.values() if r.get("a4"))
@@ -382,6 +389,7 @@ def main():
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--forms", choices=("main", "dp"), default="main")
     ap.add_argument("--a4-dir", default=None, help="reconstructions of scripts/a4_keytar.py (adds the A4 cells)")
+    ap.add_argument("--a4-partial", action="store_true", help="allow writers of the sample without a reconstruction")
     ap.add_argument("--per-prompt", type=int, default=40, help="synthetic writers per prompt")
     ap.add_argument("--per-prompt-sample", type=int, default=125)
     ap.add_argument("--open-world-n", type=int, default=evaluate.OPEN_WORLD_N,

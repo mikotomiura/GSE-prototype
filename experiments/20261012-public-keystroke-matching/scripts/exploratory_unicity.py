@@ -68,6 +68,8 @@ def pool_index(pool_lens, k):
         u = np.unique(np.stack([h1, h2], axis=1), axis=0)
         keys.append(u)
         owners.append(np.full(len(u), j, dtype=np.int64))
+    if not keys:
+        return np.zeros(0, np.uint64), np.zeros(0, np.uint64), np.zeros(0, np.int64)
     K = np.concatenate(keys)
     O = np.concatenate(owners)
     order = np.lexsort((O, K[:, 1], K[:, 0]))
@@ -221,7 +223,7 @@ def main():
         res = [prompt_values(t) for t in tasks]
     values = {(p, wid): v for p, out in res for wid, v in out.items()}
     out = {"source": args.source, "excluded": excluded, "writers_after_exclusion": {p: len(pool_ids[p]) for p in prompts},
-           "kmax": args.kmax, "starts_per_writer": STARTS, "N": list(NS)}
+           "kmax": args.kmax, "starts_per_writer": STARTS, "N": list(NS), "mutate": MUTATE}
     samples = {"main500": sorted((p, w) for p, ids in sample.items() for w in ids),
                "all": sorted((p, w) for p in prompts for w in pool_ids[p])}
     for name, keys in samples.items():

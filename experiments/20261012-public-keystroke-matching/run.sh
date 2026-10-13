@@ -16,6 +16,7 @@ if [ "$STAGE" = synthetic ] || [ "$STAGE" = all ]; then
   "$PY" scripts/selftest_main.py
   "$PY" scripts/selftest_enja15.py
   "$PY" scripts/selftest_exploratory.py
+  "$PY" scripts/selftest_a4.py
   "$PY" scripts/run_main.py --source synthetic --out results/main_synthetic.json --workers "$WORKERS" --no-timing
 fi
 

@@ -14,6 +14,11 @@ The privacy unit is one segment count and one interval (event level), not a writ
 independent numpy geometric(1 - alpha) - 1, from the seed use exploratory_dp: a simulation for evaluation, not a
 deployable implementation.
 
+Letters and digits are released as one category ('letter') in R-DP: an added press must not be told apart from
+a kept one (codex review, 2026-10-13). The guarantee holds for each mechanism under its own neighbouring relation
+(a: one counted press more or less in one segment, the rest of the category column fixed; b: one interval different,
+the rows fixed); the composed release is not claimed to be DP for the insertion of a press with its time (notes.md).
+
 origin: for each output row, the index of an input row; an added press takes the index of the next input row after
 it (the window rule: a window keeps the rows whose origin lies in its R0 row range).
 """
@@ -111,6 +116,8 @@ def release(r3_rows, eps, rng):
     """(rows, origin) of R-DP(eps) from R3 rows (event_id, down_time, down_event = category)."""
     if not r3_rows:
         return [], []
+    if MUTATE != "dp_keep_digit":
+        r3_rows = [dict(r, down_event="letter") if r["down_event"] == "digit" else r for r in r3_rows]
     rows, origin = count_mechanism(r3_rows, eps, rng)
     times = interval_mechanism([r["down_time"] for r in rows], eps, rng)
     for k, (r, t) in enumerate(zip(rows, times)):

@@ -58,7 +58,8 @@ def verify_checkpoint(model_dir):
             for b in iter(lambda: f.read(1 << 24), b""):
                 h.update(b)
         if h.hexdigest() != want:
-            raise SystemExit("SHA-256 of %s differs from data.md" % name)
+            print("SHA-256 of %s differs from data.md" % name, flush=True)
+            sys.exit(3)  # a4_keytar.PERMANENT
     # another weight file in the folder would be loaded instead of the verified .bin (safetensors first): refuse
     extra = [f for f in os.listdir(model_dir) if f not in CHECKPOINT_SHA256 and f != "convert.sh"]
     if extra:

@@ -85,7 +85,10 @@ def test_dp():
     rows = rec()
     r3 = forms.release(rows, "R3", SEED, "P", "w")
     big, origin = dp.release(r3.rows, 1e9, np.random.default_rng(0))
-    check("large eps keeps the categories", [r["down_event"] for r in big] == [r["down_event"] for r in r3.rows])
+    merged = ["letter" if r["down_event"] == "digit" else r["down_event"] for r in r3.rows]
+    check("large eps keeps the categories (digits as letters)", [r["down_event"] for r in big] == merged)
+    check("synthetic record has digits", "digit" in [r["down_event"] for r in r3.rows])
+    check("no digit category in R-DP", "digit" not in [r["down_event"] for r in big])
     check("large eps origin is the identity", origin == list(range(len(r3.rows))))
     t = [r["down_time"] for r in r3.rows]
     clip = [t[0]] + list(t[0] + np.cumsum(np.minimum(np.diff(t), dp.CAP)))
@@ -95,7 +98,7 @@ def test_dp():
     check("geometric mean 0", abs(z.mean()) < 0.02)
     check("geometric P(0)", abs(np.mean(z == 0) - (1 - np.exp(-1)) / (1 + np.exp(-1))) < 0.005)
     small, origin = dp.release(r3.rows, 0.5, np.random.default_rng(1))
-    cats0 = [r["down_event"] for r in r3.rows]
+    cats0 = ["letter" if r["down_event"] == "digit" else r["down_event"] for r in r3.rows]
     cats1 = [r["down_event"] for r in small]
     check("count noise changes the letters", [c for c in cats0 if c == "letter"] != [c for c in cats1 if c == "letter"])
     check("other rows kept in order", [c for c in cats0 if c not in ("letter", "digit")] ==

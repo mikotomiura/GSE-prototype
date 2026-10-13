@@ -91,6 +91,8 @@ def load_a4(ctx, w):
     """The reconstructions of a writer, or None (no file: not in the A4 sample)."""
     if not ctx.a4_dir:
         return None
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", w.writer) or not re.fullmatch(r"[A-Za-z0-9]+", w.prompt):
+        raise ValueError("unexpected ID or prompt format (the ID is not printed)")
     path = os.path.join(ctx.a4_dir, "%s__%s.json" % (w.prompt, w.writer))
     if not os.path.exists(path):
         return None
@@ -98,6 +100,14 @@ def load_a4(ctx, w):
         d = json.load(f)
     if d.get("prompt") != w.prompt or d.get("writer") != w.writer:
         raise ValueError("A4 file does not belong to the writer")
+    fp = d.get("fingerprint") or {}
+    if fp.get("dry") is not False or not fp.get("checkpoint"):
+        raise ValueError("A4 file without the fingerprint of a real generation")
+    v = d.get("variants") or {}
+    if sorted(v) != sorted(set(A4_FORMS.values())) or not all(
+            isinstance(x.get("full"), str) and isinstance(x.get("windows"), dict)
+            and all(isinstance(t, str) for t in x["windows"].values()) for x in v.values()):
+        raise ValueError("A4 file with an unexpected structure")
     return d["variants"]
 
 

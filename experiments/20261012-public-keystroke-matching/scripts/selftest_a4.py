@@ -63,10 +63,11 @@ def main():
                         win[key] = " ".join(words[s:s + k])
                     rec[v] = {"full": w.text, "windows": win}
                 with open(os.path.join(tmp, "%s__%s.json" % (p, wid)), "w", encoding="utf-8") as f:
-                    json.dump({"prompt": p, "writer": wid, "variants": rec}, f)
+                    json.dump({"prompt": p, "writer": wid, "variants": rec,
+                               "fingerprint": dict(a4_keytar.fingerprint(), dry=False)}, f)
         out = os.path.join(tmp, "out.json")
         args = argparse.Namespace(source="synthetic", root=None, out=out, workers=1, all=False, forms="main",
-                                  a4_dir=tmp, per_prompt=per, per_prompt_sample=take, open_world_n=10,
+                                  a4_dir=tmp, a4_partial=False, per_prompt=per, per_prompt_sample=take, open_world_n=10,
                                   no_timing=True)
         run_main.run(args)
         with open(out, encoding="utf-8") as f:
@@ -80,6 +81,20 @@ def main():
         check("A4 not strongest", all(v["attacker"] != "A4" for v in res["main500"]["strongest"].values()))
         check("A4 not on R4", not any("|R4(" in k for k in ref))
         check("a4 writers", res["a4_writers"] == sum(len(v) for v in sample.values()))
+        # a file without the fingerprint of a real generation is refused
+        p0, w0 = sorted(sample)[0], sample[sorted(sample)[0]][0]
+        path = os.path.join(tmp, "%s__%s.json" % (p0, w0))
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        d["fingerprint"]["dry"] = True
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(d, f)
+        ctx = argparse.Namespace(a4_dir=tmp)
+        try:
+            evaluate.load_a4(ctx, kept[p0][w0])
+            check("dry file refused", False)
+        except ValueError:
+            pass
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("FAIL" if FAIL else "PASS", len(FAIL))

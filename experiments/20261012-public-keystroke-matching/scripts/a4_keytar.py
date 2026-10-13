@@ -13,13 +13,18 @@ Fixed before any matching value (notes.md, "Implementation choices: A4"):
   a writer whose file is complete is skipped (the run can be resumed);
 - input variants: the press times of R0, R1, R2 and R3 are the same (key 't0'); R3-t(w) floors them (keys 't10',
   't100', 't1000', as form_R3t);
+- a chunk without an interval is dropped (check6_keytar.chunks), so it adds nothing to the joined reconstruction;
 - full text: the letter, digit and space presses (shortcuts excluded) of the active rows, in chunks covering 20 record
   segments (check6_keytar.chunks); windows: the same on the rows of each window of the main computation (the valid
   true windows of matching.true_window_starts and the starts of matching.pick_window_starts, keyed 'k:start index');
 - generation: the artifact's defaults (check6_keytar.GEN, max_new_tokens 50: decision 56), one user turn without
-  earlier turns; the first returned sequence is decoded and cut as in the artifact's evaluate_key.py; the chunk
-  reconstructions are joined with one space; a chunk without an interval gives an empty string; identical inputs of
-  one writer are generated once.
+  earlier turns; the generated tokens of the first returned sequence are decoded (the artifact's evaluate_key.py
+  decodes the whole sequence and keeps what follows the last "assistant", which also cuts a reconstruction that
+  contains that word; codex review) and stripped of "\n|>" as there; the chunk
+  reconstructions are joined with one space; identical inputs of one writer are generated once;
+- each file carries the fingerprint of the generation (checkpoint, code hashes, settings); a resumed run refuses a
+  file with another fingerprint and generates an unreadable or incomplete file again; writes are flushed to disk
+  before the rename; the summary adds the counts and times of earlier attempts (reviews of 2026-10-13).
 """
 import argparse
 import json
@@ -99,10 +104,10 @@ class Generator:
                                          return_tensors="pt").to("cuda:0")
         with self.torch.no_grad():
             out = self.model.generate(x, **K.GEN)
-        text = self.tok.decode(out.sequences[0], skip_special_tokens=True)
+        text = self.tok.decode(out.sequences[0][x.shape[1]:], skip_special_tokens=True)
         del out
         self.torch.cuda.empty_cache()
-        return text.split("assistant")[-1].strip("\n|>")
+        return text.strip("\n|>")
 
 
 def reconstruct(chunks, gen, cache, stats):
@@ -123,9 +128,47 @@ def reconstruct(chunks, gen, cache, stats):
     return " ".join(parts)
 
 
+def fingerprint():
+    """What a file was generated with; a file with another fingerprint is not reused or matched (codex review)."""
+    import hashlib
+    with open(os.path.abspath(__file__), "rb") as f:
+        code = hashlib.sha256(f.read()).hexdigest()
+    with open(os.path.join(HERE, "check6_keytar.py"), "rb") as f:
+        code6 = hashlib.sha256(f.read()).hexdigest()
+    return {"checkpoint": K.CHECKPOINT_SHA256["pytorch_model.bin"], "a4_keytar_sha256": code,
+            "check6_keytar_sha256": code6, "dry": MUTATE == "dry",
+            "generation": {k: v for k, v in K.GEN.items() if k not in ("output_scores", "return_dict_in_generate")},
+            "variants": sorted(VARIANTS), "ks": list(KS), "cap_ms": K.CAP, "chunk_segments": K.CHUNK_SEGMENTS}
+
+
+PERMANENT = 3  # exit code of a stop that a restart cannot cure (a4_run_resumable.sh stops on it)
+
+
+def complete(path, fp):
+    """True when the file is readable, has this fingerprint and every variant; a file that cannot be read (a write
+    cut by a power loss) is removed and generated again; a file with another fingerprint stops the run."""
+    if not os.path.exists(path):
+        return False
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+    except (ValueError, OSError):
+        os.remove(path)
+        return False
+    if d.get("fingerprint") != fp:
+        print("a file of another generation is in --out-dir (the fingerprint differs); move it away", flush=True)
+        sys.exit(PERMANENT)
+    v = d.get("variants") or {}
+    if sorted(v) != sorted(VARIANTS) or not all(isinstance(x.get("full"), str) for x in v.values()):
+        os.remove(path)
+        return False
+    return True
+
+
 def out_path(out_dir, prompt, writer):
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", writer) or not re.fullmatch(r"[A-Z]+", prompt):
-        raise SystemExit("unexpected ID or prompt format (the ID is not printed)")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", writer) or not re.fullmatch(r"[A-Za-z0-9]+", prompt):
+        print("unexpected ID or prompt format (the ID is not printed)", flush=True)
+        sys.exit(PERMANENT)
     return os.path.join(out_dir, "%s__%s.json" % (prompt, writer))
 
 
@@ -138,15 +181,22 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="stop after this many writers (0: all)")
     args = ap.parse_args()
     seed = seeds.read_seed()
+    if MUTATE and os.path.abspath(args.out_dir).replace("\\", "/").find("/raw/") >= 0:
+        print("A4_MUTATE is set: refusing to write under raw/", flush=True)
+        sys.exit(PERMANENT)
     os.makedirs(args.out_dir, exist_ok=True)
+    for name in os.listdir(args.out_dir):
+        if name.endswith(".tmp"):
+            os.remove(os.path.join(args.out_dir, name))
     sample = sample_writers(args.root, seed)
     gen = Generator(args.model) if MUTATE != "dry" else Generator.__new__(Generator)
     stats = {"writers_total": len(sample), "writers_done_before": 0, "writers_done_now": 0, "generated": 0,
              "reused": 0, "seconds": 0.0, "chunks_full": 0, "chunks_windows": 0}
     t0 = time.time()
+    fp = fingerprint()
     for n, w in enumerate(sample):
         path = out_path(args.out_dir, w.prompt, w.writer)
-        if os.path.exists(path):
+        if complete(path, fp):
             stats["writers_done_before"] += 1
             continue
         if args.limit and stats["writers_done_now"] >= args.limit:
@@ -163,12 +213,27 @@ def main():
                       "windows": {key: reconstruct(c, gen, cache, stats) for key, c in d["windows"].items()}}
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump({"prompt": w.prompt, "writer": w.writer, "variants": rec}, f, ensure_ascii=False)
+            json.dump({"prompt": w.prompt, "writer": w.writer, "fingerprint": fp, "variants": rec}, f,
+                      ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp, path)
         stats["writers_done_now"] += 1
         print("writer %d/%d done (%.0f s so far)" % (n + 1, len(sample), time.time() - t0), flush=True)
     stats["seconds"] = round(stats["seconds"], 1)
     stats["wall_seconds"] = round(time.time() - t0, 1)
+    stats["attempts"] = 1
+    if os.path.exists(args.summary):  # a restarted run adds to the counts and times of the earlier attempts
+        try:
+            with open(args.summary, encoding="utf-8") as f:
+                prev = json.load(f)
+        except ValueError:
+            prev = {}
+        if prev.get("fingerprint") == fp:
+            for key in ("writers_done_now", "generated", "reused", "seconds", "wall_seconds", "chunks_full",
+                        "chunks_windows", "attempts"):
+                stats[key] = round(stats[key] + prev.get(key, 0), 1)
+    stats["fingerprint"] = fp
     stats["generation"] = {k: v for k, v in K.GEN.items() if k not in ("output_scores", "return_dict_in_generate")}
     stats["input"] = {"prompt": K.PROMPT, "cap_ms": K.CAP, "chunk_segments": K.CHUNK_SEGMENTS, "earlier_turns": 0,
                       "variants": sorted(VARIANTS), "ks": list(KS), "compared": "first returned sequence"}
