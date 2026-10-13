@@ -63,7 +63,8 @@ def main():
                         win[key] = " ".join(words[s:s + k])
                     rec[v] = {"full": w.text, "windows": win}
                 with open(os.path.join(tmp, "%s__%s.json" % (p, wid)), "w", encoding="utf-8") as f:
-                    json.dump({"prompt": p, "writer": wid, "variants": rec,
+                    json.dump({"prompt": p, "writer": wid, "variants": rec, "stats": {},
+                               "source": a4_keytar.source_hashes(w),
                                "fingerprint": dict(a4_keytar.fingerprint(), dry=False)}, f)
         out = os.path.join(tmp, "out.json")
         args = argparse.Namespace(source="synthetic", root=None, out=out, workers=1, all=False, forms="main",
@@ -86,7 +87,7 @@ def main():
         path = os.path.join(tmp, "%s__%s.json" % (p0, w0))
         with open(path, encoding="utf-8") as f:
             d = json.load(f)
-        d["fingerprint"]["dry"] = True
+        d["fingerprint"]["dry"] = True  # also a different fingerprint
         with open(path, "w", encoding="utf-8") as f:
             json.dump(d, f)
         ctx = argparse.Namespace(a4_dir=tmp)

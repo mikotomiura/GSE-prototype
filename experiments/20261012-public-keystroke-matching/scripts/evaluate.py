@@ -87,8 +87,14 @@ def a4_costs(rec, cands):
     return out
 
 
+_A4_FP = None
+
+
 def load_a4(ctx, w):
-    """The reconstructions of a writer, or None (no file: not in the A4 sample)."""
+    """The reconstructions of a writer, or None (no file: not in the A4 sample). The record must pass
+    a4_keytar.check_record with the fingerprint of the current code and settings and the hashes of this writer's log
+    and text (codex review, round 2)."""
+    global _A4_FP
     if not ctx.a4_dir:
         return None
     if not re.fullmatch(r"[A-Za-z0-9_-]+", w.writer) or not re.fullmatch(r"[A-Za-z0-9]+", w.prompt):
@@ -96,18 +102,14 @@ def load_a4(ctx, w):
     path = os.path.join(ctx.a4_dir, "%s__%s.json" % (w.prompt, w.writer))
     if not os.path.exists(path):
         return None
+    import a4_keytar
+    if _A4_FP is None:
+        _A4_FP = a4_keytar.fingerprint()
     with open(path, encoding="utf-8") as f:
         d = json.load(f)
-    if d.get("prompt") != w.prompt or d.get("writer") != w.writer:
-        raise ValueError("A4 file does not belong to the writer")
-    fp = d.get("fingerprint") or {}
-    if fp.get("dry") is not False or not fp.get("checkpoint"):
-        raise ValueError("A4 file without the fingerprint of a real generation")
-    v = d.get("variants") or {}
-    if sorted(v) != sorted(set(A4_FORMS.values())) or not all(
-            isinstance(x.get("full"), str) and isinstance(x.get("windows"), dict)
-            and all(isinstance(t, str) for t in x["windows"].values()) for x in v.values()):
-        raise ValueError("A4 file with an unexpected structure")
+    why = a4_keytar.check_record(d, _A4_FP, w.prompt, w.writer, a4_keytar.source_hashes(w))
+    if why:
+        raise ValueError("A4 file not usable (%s)" % why)
     return d["variants"]
 
 

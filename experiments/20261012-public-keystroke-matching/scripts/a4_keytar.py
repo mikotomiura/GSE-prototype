@@ -128,25 +128,73 @@ def reconstruct(chunks, gen, cache, stats):
     return " ".join(parts)
 
 
-def fingerprint():
-    """What a file was generated with; a file with another fingerprint is not reused or matched (codex review)."""
+def _sha_file(path):
     import hashlib
-    with open(os.path.abspath(__file__), "rb") as f:
-        code = hashlib.sha256(f.read()).hexdigest()
-    with open(os.path.join(HERE, "check6_keytar.py"), "rb") as f:
-        code6 = hashlib.sha256(f.read()).hexdigest()
-    return {"checkpoint": K.CHECKPOINT_SHA256["pytorch_model.bin"], "a4_keytar_sha256": code,
-            "check6_keytar_sha256": code6, "dry": MUTATE == "dry",
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
+# the code that decides the inputs and the generation; the SEED decides the sample and the windows
+FINGERPRINT_FILES = ("a4_keytar.py", "check6_keytar.py", "corpus.py", "matching.py", "seeds.py", "synthetic_logs.py",
+                     "load_klicke.py", "align_ext.py", "align.py")
+
+
+def fingerprint():
+    """What a file was generated with: the checkpoint, the hashes of the code and the SEED, the settings and the input
+    rules. A file with another fingerprint is not reused (generation) and not matched (evaluate.load_a4)."""
+    return {"checkpoint": K.CHECKPOINT_SHA256["pytorch_model.bin"],
+            "code_sha256": {n: _sha_file(os.path.join(HERE, n)) for n in FINGERPRINT_FILES},
+            "seed_sha256": _sha_file(os.path.join(HERE, "..", "SEED")), "dry": MUTATE == "dry",
             "generation": {k: v for k, v in K.GEN.items() if k not in ("output_scores", "return_dict_in_generate")},
             "variants": sorted(VARIANTS), "ks": list(KS), "cap_ms": K.CAP, "chunk_segments": K.CHUNK_SEGMENTS}
+
+
+def source_hashes(w):
+    """SHA-256 of the writer's log file and of the text (after \\r\\n -> \\n); the log is None without a file."""
+    import hashlib
+    p = w.extra.get("log_path")
+    return {"log_sha256": _sha_file(p) if p else None,
+            "text_sha256": hashlib.sha256((w.text or "").encode("utf-8")).hexdigest()}
+
+
+def check_record(d, fp, prompt, writer, src=None):
+    """The reason a stored record is not usable, or None. Shared by the generation (resume) and evaluate.load_a4:
+    owner, fingerprint, source hashes (when given), and the structure (every variant with a string 'full' and a
+    dict of strings 'windows' with the same keys in every variant)."""
+    if not isinstance(d, dict):
+        return "not an object"
+    if d.get("prompt") != prompt or d.get("writer") != writer:
+        return "another writer"
+    if d.get("fingerprint") != fp:
+        return "fingerprint"
+    if src is not None and d.get("source") != src:
+        return "source"
+    v = d.get("variants")
+    if not isinstance(v, dict) or sorted(v) != sorted(VARIANTS):
+        return "variants"
+    keys = None
+    for x in v.values():
+        if not isinstance(x, dict) or not isinstance(x.get("full"), str) or not isinstance(x.get("windows"), dict):
+            return "structure"
+        if not all(isinstance(t, str) for t in x["windows"].values()):
+            return "structure"
+        if keys is not None and sorted(x["windows"]) != keys:
+            return "window keys"
+        keys = sorted(x["windows"])
+    if not isinstance(d.get("stats"), dict):
+        return "stats"
+    return None
 
 
 PERMANENT = 3  # exit code of a stop that a restart cannot cure (a4_run_resumable.sh stops on it)
 
 
-def complete(path, fp):
-    """True when the file is readable, has this fingerprint and every variant; a file that cannot be read (a write
-    cut by a power loss) is removed and generated again; a file with another fingerprint stops the run."""
+def complete(path, fp, w, src):
+    """True when the stored record is usable. An unreadable or malformed file (a write cut by a power loss) is removed
+    and generated again; a file of another generation or source stops the run (exit PERMANENT)."""
     if not os.path.exists(path):
         return False
     try:
@@ -155,11 +203,11 @@ def complete(path, fp):
     except (ValueError, OSError):
         os.remove(path)
         return False
-    if d.get("fingerprint") != fp:
-        print("a file of another generation is in --out-dir (the fingerprint differs); move it away", flush=True)
+    why = check_record(d, fp, w.prompt, w.writer, src)
+    if why in ("fingerprint", "source", "another writer"):
+        print("a file of another generation or input is in --out-dir (%s); move it away" % why, flush=True)
         sys.exit(PERMANENT)
-    v = d.get("variants") or {}
-    if sorted(v) != sorted(VARIANTS) or not all(isinstance(x.get("full"), str) for x in v.values()):
+    if why:
         os.remove(path)
         return False
     return True
@@ -172,6 +220,14 @@ def out_path(out_dir, prompt, writer):
     return os.path.join(out_dir, "%s__%s.json" % (prompt, writer))
 
 
+def under(path, root):
+    a, b = os.path.realpath(path), os.path.realpath(root)
+    try:
+        return os.path.commonpath([a, b]) == b
+    except ValueError:  # another drive
+        return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True)
@@ -181,7 +237,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="stop after this many writers (0: all)")
     args = ap.parse_args()
     seed = seeds.read_seed()
-    if MUTATE and os.path.abspath(args.out_dir).replace("\\", "/").find("/raw/") >= 0:
+    if MUTATE and under(args.out_dir, os.path.join(HERE, "..", "raw")):
         print("A4_MUTATE is set: refusing to write under raw/", flush=True)
         sys.exit(PERMANENT)
     os.makedirs(args.out_dir, exist_ok=True)
@@ -190,55 +246,56 @@ def main():
             os.remove(os.path.join(args.out_dir, name))
     sample = sample_writers(args.root, seed)
     gen = Generator(args.model) if MUTATE != "dry" else Generator.__new__(Generator)
-    stats = {"writers_total": len(sample), "writers_done_before": 0, "writers_done_now": 0, "generated": 0,
-             "reused": 0, "seconds": 0.0, "chunks_full": 0, "chunks_windows": 0}
     t0 = time.time()
     fp = fingerprint()
+    done_now = 0
     for n, w in enumerate(sample):
         path = out_path(args.out_dir, w.prompt, w.writer)
-        if complete(path, fp):
-            stats["writers_done_before"] += 1
+        src = source_hashes(w)
+        if complete(path, fp, w, src):
             continue
-        if args.limit and stats["writers_done_now"] >= args.limit:
+        if args.limit and done_now >= args.limit:
             break
         load_klicke.fill_rows(w)
         rows = corpus.active_rows(w.rows)
         w.rows = []
         inputs = writer_inputs(rows, w.text, seed, w.prompt, w.writer)
+        stats = {"generated": 0, "reused": 0, "seconds": 0.0, "chunks_full": 0, "chunks_windows": 0}
         cache, rec = {}, {}
         for v, d in inputs.items():
             stats["chunks_full"] += len(d["full"])
             stats["chunks_windows"] += sum(len(c) for c in d["windows"].values())
             rec[v] = {"full": reconstruct(d["full"], gen, cache, stats),
                       "windows": {key: reconstruct(c, gen, cache, stats) for key, c in d["windows"].items()}}
+        stats["seconds"] = round(stats["seconds"], 1)
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump({"prompt": w.prompt, "writer": w.writer, "fingerprint": fp, "variants": rec}, f,
-                      ensure_ascii=False)
+            json.dump({"prompt": w.prompt, "writer": w.writer, "fingerprint": fp, "source": src, "stats": stats,
+                       "variants": rec}, f, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, path)
-        stats["writers_done_now"] += 1
+        done_now += 1
         print("writer %d/%d done (%.0f s so far)" % (n + 1, len(sample), time.time() - t0), flush=True)
-    stats["seconds"] = round(stats["seconds"], 1)
-    stats["wall_seconds"] = round(time.time() - t0, 1)
-    stats["attempts"] = 1
-    if os.path.exists(args.summary):  # a restarted run adds to the counts and times of the earlier attempts
-        try:
-            with open(args.summary, encoding="utf-8") as f:
-                prev = json.load(f)
-        except ValueError:
-            prev = {}
-        if prev.get("fingerprint") == fp:
-            for key in ("writers_done_now", "generated", "reused", "seconds", "wall_seconds", "chunks_full",
-                        "chunks_windows", "attempts"):
-                stats[key] = round(stats[key] + prev.get(key, 0), 1)
-    stats["fingerprint"] = fp
-    stats["generation"] = {k: v for k, v in K.GEN.items() if k not in ("output_scores", "return_dict_in_generate")}
-    stats["input"] = {"prompt": K.PROMPT, "cap_ms": K.CAP, "chunk_segments": K.CHUNK_SEGMENTS, "earlier_turns": 0,
-                      "variants": sorted(VARIANTS), "ks": list(KS), "compared": "first returned sequence"}
+    # the summary sums the stats stored with each writer (so a crash of an attempt loses nothing)
+    tot = {"writers_total": len(sample), "writers_with_file": 0, "generated": 0, "reused": 0, "seconds": 0.0,
+           "chunks_full": 0, "chunks_windows": 0}
+    for w in sample:
+        path = out_path(args.out_dir, w.prompt, w.writer)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            st = json.load(f).get("stats") or {}
+        tot["writers_with_file"] += 1
+        for key in ("generated", "reused", "seconds", "chunks_full", "chunks_windows"):
+            tot[key] += st.get(key, 0)
+    tot["seconds"] = round(tot["seconds"], 1)
+    tot["seconds_per_writer"] = round(tot["seconds"] / tot["writers_with_file"], 1) if tot["writers_with_file"] else None
+    tot["fingerprint"] = fp
+    tot["input"] = {"prompt": K.PROMPT, "cap_ms": K.CAP, "chunk_segments": K.CHUNK_SEGMENTS, "earlier_turns": 0,
+                    "variants": sorted(VARIANTS), "ks": list(KS), "compared": "first returned sequence"}
     with open(args.summary, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(stats, f, indent=1, sort_keys=True)
+        json.dump(tot, f, indent=1, sort_keys=True)
         f.write("\n")
 
 
