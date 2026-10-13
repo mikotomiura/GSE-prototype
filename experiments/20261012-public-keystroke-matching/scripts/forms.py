@@ -4,6 +4,7 @@ The transformations are those of synthetic_logs.py (checked before fixing). The 
 once per record with the seed uses r5_sub, r6_perm and r7_drop (prompt, writer; for R7 the probability p is in the
 draw field, so the three levels use separate streams), and the same processed record is used by matching and utility.
 """
+import dp
 import seeds
 from corpus import Rec
 from synthetic_logs import (category, form_R0, form_R1, form_R2, form_R3, form_R3t, form_R3u, form_R5, form_R6,
@@ -13,6 +14,8 @@ MAIN = ["R0", "R1", "R2", "R3", "R3-u", "R3-t(10)", "R3-t(100)", "R3-t(1000)", "
         "R7(0.1)", "R7(0.25)", "R7(0.5)"]
 APPENDIX = ["R5", "R6"]
 ALL = MAIN + APPENDIX
+# exploratory (decisions 55 and 56; not in the preregistration): run separately with R3 as the reference
+DP = ["R3", "R-DP(0.5)", "R-DP(1)", "R-DP(2)", "R-DP(4)"]
 
 
 def param(form):
@@ -20,24 +23,25 @@ def param(form):
     if "(" not in form:
         return form, None
     base, v = form[:-1].split("(")
-    return base, (float(v) if base == "R7" else int(v))
+    return base, (float(v) if base in ("R7", "R-DP") else int(v))
 
 
 class Released:
     """A released record: rows (or R4 values), the category column the attackers read and, for R7, the kept mask."""
 
-    def __init__(self, form, rows=None, values=None, keep=None):
+    def __init__(self, form, rows=None, values=None, keep=None, origin=None):
         self.form = form
         self.base, self.p = param(form)
         self.rows = rows
         self.values = values
         self.keep = keep
+        self.origin = origin
 
     def cats(self):
         """The category column: R2 and the R3 family release categories; other forms release keys."""
         if self.rows is None:
             return None
-        if self.base in ("R2", "R3", "R3-u", "R3-t", "R7"):
+        if self.base in ("R2", "R3", "R3-u", "R3-t", "R7", "R-DP"):
             return [r["down_event"] for r in self.rows]
         return [category(r["down_event"]) for r in self.rows]
 
@@ -65,6 +69,10 @@ def release(rows, form, seed, prompt, writer):
     if base == "R7":
         out, keep = form_R7(rec, p, seeds.rng(seed, "r7_drop", prompt, writer, "", "", str(p)))
         return Released(form, out, keep=[bool(k) for k in keep])
+    if base == "R-DP":
+        eps = form[:-1].split("(")[1]
+        out, origin = dp.release(form_R3(rec), p, seeds.rng(seed, "exploratory_dp", prompt, writer, "", "", "eps:" + eps))
+        return Released(form, out, origin=origin)
     if base == "R5":
         return Released(form, form_R5(rec, seeds.rng(seed, "r5_sub", prompt, writer)))
     if base == "R6":

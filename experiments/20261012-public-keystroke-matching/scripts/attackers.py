@@ -35,10 +35,10 @@ MUTATE = os.environ.get("MAIN_MUTATE", "")
 APPLICABLE = {
     "A0": None,  # all forms
     "A1": ("R0", "R1", "R2", "R5", "R6"),
-    "A1p": ("R3", "R3-t", "R7"),
-    "A2": ("R2", "R3", "R3-t", "R4", "R7"),
+    "A1p": ("R3", "R3-t", "R7", "R-DP"),
+    "A2": ("R2", "R3", "R3-t", "R4", "R7", "R-DP"),
     "A2b": ("R3-u",),
-    "A3": ("R0", "R1", "R2", "R3", "R3-t", "R3-u", "R5", "R6", "R7"),
+    "A3": ("R0", "R1", "R2", "R3", "R3-t", "R3-u", "R5", "R6", "R7", "R-DP"),
 }
 TYPE_OF = {"letter": "L", "digit": "D", "space": "S", "punctuation": "P", "enter": "E"}
 
@@ -192,24 +192,63 @@ def _press_features(times, i):
     return [iv(i - 1, i), iv(i, i + 1), iv(i - 2, i - 1), iv(i + 1, i + 2)]
 
 
+def pack_triples(triples):
+    """(characters, codes, values) arrays of digraph_triples (compact for the parent process)."""
+    vocab = {}
+    a = np.array([vocab.setdefault(x, len(vocab)) for x, _, _ in triples], dtype=np.int32)
+    b = np.array([vocab.setdefault(y, len(vocab)) for _, y, _ in triples], dtype=np.int32)
+    v = np.array([t for _, _, t in triples], dtype=float)
+    chars = sorted(vocab, key=vocab.get)
+    return chars, a, b, v
+
+
+def unpack_triples(packed):
+    chars, a, b, v = packed
+    for i in range(len(v)):
+        yield chars[a[i]], chars[b[i]], float(v[i])
+
+
+def pack_xy(X, y):
+    arr = np.array([[np.nan if t is None else t for t in row] for row in X], dtype=float).reshape(len(X), 4)
+    return arr, np.array(y, dtype=bool)
+
+
+def boundary_xy(r0_rows, r3u):
+    """Features and labels (is the R0 key a separator) of the R3-u char presses of one training log."""
+    cats = r3u.cats()
+    sc = shortcut_flags(cats)
+    times = r3u.times()
+    X, y = [], []
+    for i, c in enumerate(cats):
+        if c == "char" and not sc[i]:
+            X.append(_press_features(times, i))
+            y.append(category(r0_rows[i]["down_event"]) in SEP_CATS)
+    return X, y
+
+
 class BoundaryModel:
     """Logistic regression on R3-u char presses: is the char a separator (space, punctuation, Enter)?
     config.json attackers.A2b: L2, C = 1.0, lbfgs, max_iter 1000, no class weight, threshold 0.5; features
     standardised with the training mean and SD; a missing interval is filled with the training median."""
 
-    def __init__(self, train_pairs, cfg):
-        X, y = [], []
-        for r0_rows, r3u in train_pairs:
-            cats = r3u.cats()
-            sc = shortcut_flags(cats)
-            times = r3u.times()
-            for i, c in enumerate(cats):
-                if c == "char" and not sc[i]:
-                    X.append(_press_features(times, i))
-                    y.append(category(r0_rows[i]["down_event"]) in SEP_CATS)
-        cols = list(zip(*X)) if X else [[]] * 4
-        self.median = [float(np.median([v for v in col if v is not None])) for col in cols]
-        F = self._fill(X)
+    def __init__(self, train_pairs, cfg, xy=None):
+        """train_pairs: (R0 rows, R3-u release) of the training logs; or xy: the concatenation of boundary_xy over
+        them in the same order (the streaming build of run_main.py; the same model)."""
+        if xy is None:
+            X, y = [], []
+            for r0_rows, r3u in train_pairs:
+                a, b = boundary_xy(r0_rows, r3u)
+                X.extend(a)
+                y.extend(b)
+        else:
+            X, y = xy
+        if isinstance(X, np.ndarray):  # packed (run_main.py): a missing interval is nan
+            self.median = [float(np.median(X[~np.isnan(X[:, j]), j])) for j in range(X.shape[1])]
+            F = np.where(np.isnan(X), np.array(self.median)[None, :], X) if len(X) else np.zeros((0, 4))
+        else:
+            cols = list(zip(*X)) if X else [[]] * 4
+            self.median = [float(np.median([v for v in col if v is not None])) for col in cols]
+            F = self._fill(X)
         self.mean = F.mean(axis=0)
         self.sd = F.std(axis=0)
         self.sd[self.sd == 0] = 1.0
@@ -272,20 +311,30 @@ def key_char(k):
     return {"Space": " ", "Enter": "\n"}.get(k, k)
 
 
+def digraph_triples(rows):
+    """(character a, character b, log interval) of the consecutive character presses of one R0 log (char_chain)."""
+    cats = [category(r["down_event"]) for r in rows]
+    out = []
+    for a, b in char_chain(cats, None):
+        ca, cb = norm_char(key_char(rows[a]["down_event"])), norm_char(key_char(rows[b]["down_event"]))
+        out.append((ca, cb, log_iv(rows[b]["down_time"] - rows[a]["down_time"])))
+    return out
+
+
 class DigraphTable:
     """Mean and variance of log intervals per character pair, with fallbacks to the character-type pair and to all
     intervals when fewer than min_count (config.json attackers.A3.min_digraph_count = 20)."""
 
-    def __init__(self, train_r0_rows, min_count=20):
+    def __init__(self, train_r0_rows, min_count=20, triples=None):
+        """train_r0_rows: R0 rows of the training logs; or triples: the concatenation of digraph_triples over them
+        in the same order (the streaming build of run_main.py; the same table)."""
+        if triples is None:
+            triples = [t for rows in train_r0_rows for t in digraph_triples(rows)]
         by_pair, by_type, allv = {}, {}, []
-        for rows in train_r0_rows:
-            cats = [category(r["down_event"]) for r in rows]
-            for a, b in char_chain(cats, None):
-                ca, cb = norm_char(key_char(rows[a]["down_event"])), norm_char(key_char(rows[b]["down_event"]))
-                v = log_iv(rows[b]["down_time"] - rows[a]["down_time"])
-                by_pair.setdefault((ca, cb), []).append(v)
-                by_type.setdefault((char_type(ca), char_type(cb)), []).append(v)
-                allv.append(v)
+        for ca, cb, v in triples:
+            by_pair.setdefault((ca, cb), []).append(v)
+            by_type.setdefault((char_type(ca), char_type(cb)), []).append(v)
+            allv.append(v)
         self.min_count = min_count
         self.all = _mv(allv)
         self.type = {k: _mv(v) for k, v in by_type.items() if len(v) >= min_count}

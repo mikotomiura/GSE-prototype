@@ -1,7 +1,15 @@
 """Per-record computation of the main run: costs, credits over the draws, windows and utility for one writer.
 
 Runs in worker processes. Only numbers leave this module (no rows, texts or keys).
+
+A4 (notes.md, "Implementation choices: A4"): the reconstructions of scripts/a4_keytar.py (local files, never
+returned) are compared with the candidate texts (window texts in windows) after lower-casing, replacing every
+character that is not a letter or digit by a space and collapsing whitespace; the cost is the Levenshtein distance
+divided by the candidate's length (the artifact's calculate_metrics.py). R0, R1, R2 and R3 use the reconstruction of
+the raw press times ('t0'), R3-t(w) that of the floored times ('t<w>'). Only the 500 writers of the main tables have
+reconstructions; the cells are reported under reference_A4 and never enter the strongest attacker.
 """
+import json
 import os
 import re
 
@@ -40,7 +48,7 @@ class Context:
     """What a worker needs besides the writer: config, seed, pools (candidate texts per prompt), models per fold."""
 
     def __init__(self, cfg, seed, pools, pool_ids, models, task_max, fold_of_prompt, form_list, n_values,
-                 windows=True, keep_costs=False, open_world_n=OPEN_WORLD_N, nc_forms=None):
+                 windows=True, keep_costs=False, open_world_n=OPEN_WORLD_N, nc_forms=None, a4_dir=None):
         self.cfg = cfg
         self.seed = seed
         self.pools = pools
@@ -54,6 +62,43 @@ class Context:
         self.keep_costs = keep_costs
         self.open_world_n = open_world_n
         self.nc_forms = form_list if nc_forms is None else nc_forms
+        self.a4_dir = a4_dir
+
+
+A4_FORMS = {"R0": "t0", "R1": "t0", "R2": "t0", "R3": "t0", "R3-t(10)": "t10", "R3-t(100)": "t100",
+            "R3-t(1000)": "t1000"}
+_NONALNUM = re.compile(r"[^a-z0-9]+")
+
+
+def a4_norm(s):
+    return _NONALNUM.sub(" ", s.lower()).strip()
+
+
+def a4_costs(rec, cands):
+    """Normalised edit distance of the reconstruction to each candidate (distance / candidate length)."""
+    import Levenshtein
+    r = a4_norm(rec)
+    out = np.empty(len(cands))
+    for i, c in enumerate(cands):
+        t = c.a4 if hasattr(c, "a4") else a4_norm(c.text)
+        out[i] = Levenshtein.distance(r, t) / max(len(t), 1)
+        if MUTATE == "a4_unnormalised":
+            out[i] = Levenshtein.distance(r, t)
+    return out
+
+
+def load_a4(ctx, w):
+    """The reconstructions of a writer, or None (no file: not in the A4 sample)."""
+    if not ctx.a4_dir:
+        return None
+    path = os.path.join(ctx.a4_dir, "%s__%s.json" % (w.prompt, w.writer))
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        d = json.load(f)
+    if d.get("prompt") != w.prompt or d.get("writer") != w.writer:
+        raise ValueError("A4 file does not belong to the writer")
+    return d["variants"]
 
 
 def full_costs(rel, cands, model, cfg, memo=None):
@@ -82,8 +127,15 @@ def full_costs(rel, cands, model, cfg, memo=None):
         elif b == "R7":
             out["A3"] = A.a3_r7_costs(rel, cands, model["r7"][rel.p], cfg)
         else:
-            out["A3"] = A.a3_costs(rel, cands, model["digraph"])
+            out["A3"] = A.a3_costs(rel, cands, a3_table(model, rel))
     return out
+
+
+def a3_table(model, rel):
+    """The character-pair table: R0 times; R-DP(eps): training times with the interval mechanism at eps."""
+    if rel.base == "R-DP" and MUTATE != "dp_plain_table":
+        return model["digraph_dp"][rel.p]
+    return model["digraph"]
 
 
 def window_costs(rel, cands, model, cfg, cache):
@@ -113,7 +165,7 @@ def window_costs(rel, cands, model, cfg, cache):
         if b == "R7":
             out["A3"] = A.a3_r7_costs(rel, cands, model["r7"][rel.p], cfg, end="window")
         else:
-            out["A3"] = A.a3_costs(rel, cands, model["digraph"], end="window", cache=cache)
+            out["A3"] = A.a3_costs(rel, cands, a3_table(model, rel), end="window", cache=cache)
     return out
 
 
@@ -127,6 +179,8 @@ def window_release(rel, row_range, seg_range):
         if MUTATE == "window_r7_shift":
             orig = list(range(len(rel.rows)))
         return forms.Released(rel.form, rows=[r for r, o in zip(rel.rows, orig) if a <= o <= b])
+    if rel.base == "R-DP":
+        return forms.Released(rel.form, rows=[r for r, o in zip(rel.rows, rel.origin) if a <= o <= b])
     return forms.Released(rel.form, rows=rel.rows[a:b + 1])
 
 
@@ -143,6 +197,19 @@ def evaluate_writer(w, ctx):
            "rebuilt_match": norm_ws(final) == norm_ws(pool[me].text), "open_world": {}}
     memo = {}
     costs = {f: full_costs(rel, pool, model, cfg, memo) for f, rel in rels.items()}
+    a4 = load_a4(ctx, w)
+    if a4 is not None:
+        for p_ in pool:
+            if not hasattr(p_, "a4"):
+                p_.a4 = a4_norm(p_.text)
+        a4c = {}
+        for f in rels:
+            v = A4_FORMS.get(f)
+            if v is not None:
+                if v not in a4c:
+                    a4c[v] = a4_costs(a4[v]["full"], pool)
+                costs[f]["A4"] = a4c[v]
+    res["a4"] = a4 is not None
     for N in ctx.n_values:
         for d in range(matching.DRAWS[N]):
             dec = matching.draw_decoys(seed, p, w.writer, N, ids, {me}, d)
@@ -163,7 +230,7 @@ def evaluate_writer(w, ctx):
     if ctx.keep_costs:
         res["costs"] = {f: adaptive_costs(costs[f]) for f in ctx.nc_forms if f in costs}
     if ctx.windows:
-        _windows(w, ctx, rels, model, res, final, origins)
+        _windows(w, ctx, rels, model, res, final, origins, a4)
     tm = ctx.task_max[p]
     for f, rel in rels.items():
         res["utility"][f] = utility.metrics(rel, tm)
@@ -188,7 +255,7 @@ def _finish(cells):
                     "draws": n}
 
 
-def _windows(w, ctx, rels, model, res, final, origins):
+def _windows(w, ctx, rels, model, res, final, origins, a4=None):
     cfg, seed, p = ctx.cfg, ctx.seed, w.prompt
     pool, ids = ctx.pools[p], ctx.pool_ids[p]
     me = ids.index(w.writer)
@@ -226,7 +293,15 @@ def _windows(w, ctx, rels, model, res, final, origins):
                     idx, g = dec
                     cands = [true_c] + [A.WindowCand(pool[j], matching.decoy_window(g, len(pool[j].words), k), k)
                                         for j in idx]
+                    a4c = {}
                     for f, rel in wrel.items():
-                        for a, cv in window_costs(rel, cands, model, cfg, caches[f]).items():
+                        wc = window_costs(rel, cands, model, cfg, caches[f])
+                        v = A4_FORMS.get(f)
+                        if a4 is not None and v is not None:
+                            key = "%d:%d" % (k, si)
+                            if v not in a4c:
+                                a4c[v] = a4_costs(a4[v]["windows"][key], cands)
+                            wc["A4"] = a4c[v]
+                        for a, cv in wc.items():
                             _add(res["window"], ("window", f, a, N, k), matching.credit_stats(0, cv))
     _finish(res["window"])

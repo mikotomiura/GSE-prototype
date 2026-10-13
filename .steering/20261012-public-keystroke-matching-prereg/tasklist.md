@@ -35,10 +35,10 @@
 - [x] 探索的な分析の手順を研究者が決め、本計算の照合の結果を見る前に `notes.md` に書いてコミット（判断 56・`exploratory.json`）
 
 ## 実装と本計算（引き継ぎ `next-session-public-keystroke-matching-enja15-a4-impl.md`・判断 56）
-- [ ] ENJA15（区間・R0j・R3j・R3j-t(w)・R4(w)・A0・A2・訳文の区間・おとり・訳者のブートストラップ）・実装で決めたことを notes に
-- [ ] A4（KeyTAR の生成のスクリプト・復元を手元に置く・照合の側で正規化編集距離）
-- [ ] 探索的な分析 1（unicity）・2（R-DP(ε)）
-- [ ] `run_main.py` の KLiCKe の読み込み（作業のプロセスで読む・学習のモデルを流して作る）・`run.sh` の実データの段
+- [x] ENJA15（区間・R0j・R3j・R3j-t(w)・R4(w)・A0・A2・訳文の区間・おとり・訳者のブートストラップ）・実装で決めたことを notes に（`4d6bb503`）
+- [x] A4（KeyTAR の生成のスクリプト・復元を手元に置く・照合の側で正規化編集距離）・生成を GPU で開始（2026-10-13 16:15・1 人約 9 分）
+- [x] 探索的な分析 1（unicity）・2（R-DP(ε)）
+- [x] `run_main.py` の KLiCKe の読み込み（作業のプロセスで読む・学習のモデルを流して作る・合成でバイト一致）・`run.sh` の実データの段
 - [ ] 自己検査と変異・レビュー（code-reviewer・security-checker・`/cross-review`）
 - [ ] 本計算（主の表 500 人 → 補遺の全員）・A4 の GPU（約 6 日）・ENJA15・探索的な分析
 

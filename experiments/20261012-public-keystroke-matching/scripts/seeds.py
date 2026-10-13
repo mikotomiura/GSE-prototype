@@ -6,7 +6,9 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 USES = ("split", "eval_sample", "decoys", "window_start", "r5_sub", "r6_perm", "r7_drop", "bootstrap", "enja_decoys",
-        "negative_control", "check7", "synthetic")
+        "negative_control", "check7", "synthetic",
+        # exploratory analyses (decisions 55 and 56; exploratory.json; config.json seed_uses is frozen and unchanged)
+        "exploratory_unicity", "exploratory_dp")
 
 
 def read_seed(path=None):

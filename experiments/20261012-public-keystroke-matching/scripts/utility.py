@@ -44,6 +44,8 @@ _ROW = {
 
 def column(form):
     base = form.split("(")[0]
+    if base == "R-DP":  # exploratory: computed as R3, every value approximate (cell)
+        return 2
     if base in ("R0", "R1", "R5", "R6"):
         return 0
     if base == "R3-t":
@@ -52,7 +54,10 @@ def column(form):
 
 
 def cell(metric, form):
-    return _ROW[metric][column(form)]
+    v = _ROW[metric][column(form)]
+    if form.startswith("R-DP(") and v != NONE:
+        return APPROX
+    return v
 
 
 def is_char(c):
