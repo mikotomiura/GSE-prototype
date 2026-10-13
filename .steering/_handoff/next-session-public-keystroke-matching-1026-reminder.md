@@ -3,6 +3,8 @@
 作成 2026-10-12（判断 51 の後）。公開データでの照合の論文（PoPETs 2027 Issue 3・締切 2026-11-30 AoE）。
 並行して、凍結から本計算までは別の引き継ぎ `next-session-public-keystroke-matching-research-forward.md` で進んでいる。このメモは催促と日程の確認だけを扱う。
 
+**2026-10-13 追記（判断 54）**: KLiCKe の著者から 2026-10-13 に返事が来た（懸念なし）。**催促は送らない。** お礼の返信と PoPETs の program chairs への問いの下書きは `.steering/20261012-public-keystroke-matching-prereg/reply-drafts-20261013.md`。10/26 ごろのセッションでは、下の「やること」の 2（PoPETs の返事）と 3（日程の確認）と、Dr. Tian から機関名の返事が来たかだけを確かめる。
+
 ## 新しいセッションで最初に打ち込む文
 
 ```
