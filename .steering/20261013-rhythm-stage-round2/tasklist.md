@@ -13,7 +13,7 @@
 - [x] 固定（どの結果よりも前にコミット）
 
 ## 計器と本番（固定の後）
-- [ ] 下見 1（`--pilot`・P 240）→ `pc_stall.lam`・design §8
+- [x] 下見 1（`--pilot`・P 240）→ `pc_stall.lam`・design §8（止まらず・6034 s）
 - [ ] スモーク（`--smoke`）
 - [ ] 本番（`--main --jobs 16`・CI が走っていない時）→ `results/main/`・`notes.md`
 - [ ] notes の `/cross-review`
