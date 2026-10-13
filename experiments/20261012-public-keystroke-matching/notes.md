@@ -289,6 +289,18 @@ code-reviewer・security-checker・Codex（パス限定・`raw/` と結果の JS
 
 行わない。配布に Inputlog の指標の値が無い: GitHub のリポジトリ（コミット `37b94b72`）は `LICENSE` と `README.md` だけ、Drive のフォルダは `WritingTask.zip`・`TypingTests.zip`・`VocabularyKnowledgeTest.zip`・`demographic_info.csv` の 4 つ、`WritingTask.zip` は記録の CSV・IDFX（Inputlog の形式の記録）・本文・`holistic_scores.csv`（`ID,Prompt,Text,Score`）・採点の様式・課題文だけ（名前と列名だけで確かめた）。Inputlog を自分で回さない（登録どおり）。したがって有用性の式は確かめられず、削除・挿入の連なりが修飾の行で切れる点（[V264] Table 5 の "one deletion activity" の読み方）は、登録の字面どおりのまま限界に書く。
 
+## 実装で決めたこと: ENJA15（データの後・照合の値の前・2026-10-13）
+
+登録の ENJA15 の節に細部の無いところを、ENJA15 の照合の値を 1 つも見る前に次のとおり決めた（`scripts/enja15.py` と `scripts/enja15_main.py` の冒頭の注にも書いた）。
+
+- R3j の種類の対応（検査 5 の最初の版を確かめ直した）: IME の `[A]`〜`[Z]` と、insert の英字 1 字は「英字」。`[Back]`（IME と delete）は「BackSpace」。IME の `[Space]`・`[F7]`〜`[F10]` は「変換」。IME の `[Return]` と、insert の空でない文字列（ASCII の 1 字を除く）は「確定」で、文字列に 、。，． のどれかを含めば「句読点の確定」。`Type="return"` は「Enter」。移動は `Type="navi"` のすべてと、IME の `[Left]`・`[Right]`・`[Up]`・`[Down]`・`[Home]`・`[End]`・`[PageUp]`・`[Next]`・`[Prior]`・`[PageDown]`（`[Prior]` と `[PageDown]` は .NET の Keys で `[PageUp]` と `[Next]` の別名なので足した。検査 5 の値の一覧には現れない）。ほかはすべて「その他」（IME の数字・記号・`[Escape]`・`[ProcessKey]`・delete の `[Delete]`・edit・speech・insert の ASCII の 1 字の記号と空の値）。足した後に IME の経路の検査を回し直し、PASS・出力は前と同じ（変異 `keep_value`・`category_from_value` は落ちる）。
+- 記録の区間: 英字 +1、`[Back]` −1（IME と delete の両方。登録の字面の読み・検査 5）、「句読点の確定」で区間を閉じる（空の区間も閉じる。KLiCKe の規則と同じ）。最後の閉じていない区間は数えた押下があれば含める。Enter（`Type="return"`）では閉じない（登録の記録の規則に無い。本文の側は改行で区切るので、改行の多い訳文では記録の区間が少なくなり、(1,2) などの組で揃う）。数字の押下は数えない（登録は「英字の押下」。本文の側は数字を 1 打と数える）。
+- 訳文の区間: `FinalTextUTF8` を 、。，． と改行で区切り、空白だけの区間は区間にしない。区間の値は、SudachiPy（分割の単位 C）の語の読みを前の試作の規則（`experiments/20261009-length-sequence-uniqueness/scripts/build_segments.py` の `token_units`）で平仮名・`ー`・`#` の列にし、区間ごとにつないでから `romaji_table.count_keys` で数える（語の境目をまたぐ促音を正しく数えるため）。1 字ずつ打つ字（数字・ラテン文字・1 打の記号）は 1 打。読みの定まらない語（数字と漢字の混じりなど）は、読みが仮名だけならその読み、そうでなければ空白でない字 1 つにつき 1 打（数を `text_token_fallbacks` に出す）。前の試作と違い、読みの定まらない語のある区間も捨てない（登録に除外の規則が無い）。
+- 形と攻撃者: R0j・R3j・R3j-t(10・100・1,000)・R4(1・2・4・8)。A0 と A2 は種類の列だけを読むので、R0j・R3j・R3j-t(w) の費用は同じになる（そのまま全部報告し、注に書く。R0j の「照合が自明」は確定の文字列を読む攻撃者のことで、登録の攻撃者 A0・A2 は読まない）。A2 は登録の揃え（組・λ = 8・全文の終点）。R4(w) は記録と訳文の両方の区間の値を floor(値/w)。範囲は全文だけ（登録の ENJA15 の節に窓は無い）。
+- 候補と抽選: 同じ原文のセッション（名前の順）。N = 全員はその原文の全セッション、N = 10 は他のセッションから重複なしに 9 本を 20 回（種 `enja_decoys`・`prompt` に原文の番号・`writer` にセッションの名前・`N` に 10・`draw` に抽選の番号）。同点は 1/m。
+- 集計とブートストラップ: 各原文の中で記録の平均、それを原文で平均（正答率・1/N・A0 の正答率とも）。訳者を復元抽出で引き、その全セッションを重みつきで使う（交差・層別しない・2,000 回・種 `bootstrap`・`writer` の欄に標本の名 `enja15`）。原文が欠けた回の数を出す。差は各回の中で取る。「上回る」は 1/N との差と A0 との差の両方の区間の下限が 0 を超えるときだけ（判定は R3j・A2・全文・N = 全員）。原文ごとの値は記述として出す。
+- 自己検査: `scripts/selftest_enja15.py`（合成のセッション・人のデータなし）。変異 3 つ（A2 を窓の終点にする・おとりに正解を入れる・原文で平均せず記録で寄せる）がどれも狙った検査で落ちることを確かめた。
+
 ## 実装で決めたこと: A4（データの後・照合の値の前・2026-10-13）
 
 判断 56（500 人・`max_new_tokens` 50 のまま）を受けて、登録に細部の無いところを、A4 の照合の値を 1 つも見る前に次のとおり決めた（`scripts/a4_keytar.py` と `scripts/evaluate.py` の冒頭の注にも書いた）。
