@@ -21,6 +21,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -663,6 +664,100 @@ def test_lam_config(cfg: dict) -> None:
         check(len(ck.lam_problems(mk(lam))) == 1, f"lambda config: {name} is refused")
 
 
+def test_select_lambda(cfg: dict) -> None:
+    """Round 2 design 3.7 (the addition) and 3.9: the band (l > 0.03, g <= 0.08), the aim 0.055 on the isotonic fit,
+    the ties, NaN and the fallback; then the pilot's names -> choice -> config.json -> lam_problems (Codex)."""
+    ps = cfg["pc_stall"]
+    grid = [float(x) for x in ps["pilot_grid"]]
+    check(grid == [round(0.025 * i, 3) for i in range(1, 13)] and ps["aim"] == 0.055 and ps["lower"] == 0.03
+          and ps["upper"] == 0.08, "select_lambda: the round 2 grid (0.025 to 0.300) and the aim 0.055")
+    nan = float("nan")
+    sel = lambda g, lo: ck.select_lambda(grid, g, lo, ps["aim"], ps["lower"], ps["upper"])
+    a = [round(0.01 * (i + 1) + 0.003, 6) for i in range(12)]  # 0.013, 0.023, ..., 0.053 at 0.125, 0.063 at 0.150
+    lo_a = [round(x - 0.008, 6) for x in a]
+    check(sel(a, lo_a)["lam"] == 0.125, "select_lambda: in the band, the fitted value closest to 0.055")
+    lo_b = list(lo_a)
+    lo_b[4] = 0.03
+    check(sel(a, lo_b)["lam"] == 0.15, "select_lambda: the closest with a lower bound of exactly 0.03 is out of the band")
+    lo_n = list(lo_a)
+    lo_n[4] = nan
+    check(sel(a, lo_n)["lam"] == 0.15, "select_lambda: a NaN lower bound is out of the band")
+    g_n = list(a)
+    g_n[4] = nan
+    r = sel(g_n, lo_a)
+    check(r["lam"] == 0.15 and r["excluded"] == [0.125], "select_lambda: a NaN point estimate is left out")
+    small = [0.01 + 0.001 * i for i in range(11)]
+    r = sel(small + [0.08], [x - 0.008 for x in small] + [0.07])
+    check(r["band"] == [0.3] and r["lam"] == 0.3, "select_lambda: a point estimate of exactly 0.08 is in the band")
+    r = sel(small + [0.0801], [x - 0.008 for x in small] + [0.07])
+    check(r["band"] == [] and "no lambda in the band" in r["rule"] and r["lam"] == 0.3,
+          "select_lambda: above 0.08 is out of the band; none in the band -> the closest over the grid")
+    r = sel(small + [0.021], [x - 0.008 for x in small] + [0.013])
+    check(r["band"] == [] and r["lam"] == 0.3, "select_lambda: all below the band -> the closest (the largest) over the grid")
+    flat = [0.01, 0.02, 0.03, 0.04, 0.055, 0.055, 0.055, 0.07, 0.08, 0.09, 0.10, 0.11]
+    check(sel(flat, [x - 0.008 for x in flat])["lam"] == 0.15, "select_lambda: three tied -> the middle")
+    bumpy = [0.01, 0.02, 0.03, 0.04, 0.06, 0.05, 0.07, 0.08, 0.09, 0.10, 0.11, 0.12]
+    r = sel(bumpy, [x - 0.008 for x in bumpy])
+    check(r["fit"][4][1] == r["fit"][5][1] and r["lam"] == 0.125, "select_lambda: a pooled pair -> the smaller middle")
+    check(sel([nan] * 12, [nan] * 12)["lam"] is None, "select_lambda: no finite point estimate -> no choice")
+    lo_gap = [x - 0.008 for x in flat]
+    lo_gap[5] = 0.02  # 0.150 of the tied run 0.125-0.175 drops out of the band: the ties 0.125 and 0.175 are apart
+    r = sel(flat, lo_gap)
+    check(r["ties"] == [0.125, 0.175] and r["lam"] == 0.125, "select_lambda: ties apart on the grid -> the smaller middle")
+    two = [0.01, 0.02, 0.03, 0.04, 0.045, 0.05, 0.06, 0.065, 0.07, 0.08, 0.09, 0.10]
+    r = sel(two, [x - 0.008 for x in two])
+    check(r["ties"] == [0.15, 0.175] and r["lam"] == 0.15, "select_lambda: one below and one above at the same distance -> the smaller")
+    top = [0.01, 0.012, 0.014, 0.016, 0.018, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02]
+    r = sel(top, [x - 0.008 for x in top])
+    check(r["band"] == [] and r["lam"] == 0.225, "select_lambda: none in the band, a flat top -> the middle of the flat top")
+    wig = [0.01, 0.02, 0.03, 0.04, 0.08, 0.03, 0.07, 0.09, 0.10, 0.11, 0.12, 0.13]
+    r = sel(wig, [x - 0.008 for x in wig])
+    check(r["lam"] == 0.125 and r["fit"][4][1] == r["fit"][5][1],
+          "select_lambda: a raw g of exactly 0.08 in the band may win by its pooled fitted value (design 3.9)")
+    nf = {"PC1": {"lower_max": 0.2}, ck.pilot_key("S-raw-hold-sec", 0.025): None}
+    check(ck.choose_all(nf, cfg)["S-raw-hold-sec"]["lam"] is None, "pilot: a candidate with no finite value -> no choice")
+    # the path the pilot takes: names -> merged maxima -> choice -> config.json -> the main run's check
+    cands = st.candidates()
+    keys = [ck.pilot_key(c, x) for c in cands for x in [0.0] + grid]
+    check(len(set(keys)) == len(keys) == 13 * len(cands) and ck.pilot_key(cands[0], 0.025).endswith("@0.025")
+          and ck.pilot_key(cands[0], 0.075).endswith("@0.075"), "pilot: 13 distinct names per candidate (three decimals)")
+    shift = {c: i % 5 for i, c in enumerate(cands)}  # candidate i aims at the grid index 4 + its shift
+    merged = {"PC1": {"gain_max": 0.3, "lower_max": 0.25, "upper_max": 0.35, "n_nan_bounds": 0}}
+    for c in cands:
+        merged[ck.pilot_key(c, 0.0)] = {"gain_max": 0.055, "lower_max": 0.05, "upper_max": 0.06, "n_nan_bounds": 0}
+        for i, x in enumerate(grid):
+            g = round(0.055 + 0.01 * (i - 4 - shift[c]) + 0.001, 6)
+            merged[ck.pilot_key(c, x)] = {"gain_max": g, "lower_max": g - 0.008, "upper_max": g + 0.008, "n_nan_bounds": 0}
+    sels = ck.choose_all(merged, cfg)
+    want = {c: grid[4 + shift[c]] for c in cands}
+    check({c: sels[c]["lam"] for c in cands} == want, "pilot: each candidate gets its own lambda (lambda = 0 is never chosen)")
+    with tempfile.TemporaryDirectory() as d:
+        cp, pp = Path(d) / "config.json", Path(d) / "pilot.json"
+        cp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        pp.write_text(json.dumps({"stop": None, "selection": sels}), encoding="utf-8")
+        ck.apply_pilot(cp, pp)
+        back = json.loads(cp.read_text(encoding="utf-8"))
+        check(back["pc_stall"]["lam"] == want and ck.lam_problems(back) == []
+              and {k: v for k, v in back.items() if k != "pc_stall"} == {k: v for k, v in cfg.items() if k != "pc_stall"},
+              "pilot: --apply-pilot writes the choices, the main run accepts them, nothing else changes")
+        pp.write_text(json.dumps({"stop": "weak_detector", "selection": {}}), encoding="utf-8")
+        try:
+            ck.apply_pilot(cp, pp)
+            refused = False
+        except SystemExit:
+            refused = True
+        check(refused, "pilot: a stopped pilot writes no lambda")
+    ok = {"PC1": {"fit_failed": False}}
+    pc1 = lambda lo: {"PC1": {"lower_max": lo}}
+    check(ck.pilot_stop(pc1(0.11), ok, cfg, []) is None, "pilot stop: PC1 lower bound 0.11 -> go on")
+    check(ck.pilot_stop(pc1(0.10), ok, cfg, []) == "weak_detector", "pilot stop: PC1 lower bound exactly 0.10 -> stop")
+    check(ck.pilot_stop(pc1(nan), ok, cfg, []) == "weak_detector", "pilot stop: a NaN PC1 lower bound -> stop")
+    check(ck.pilot_stop({"PC1": None}, ok, cfg, []) == "weak_detector", "pilot stop: no PC1 -> stop")
+    check(ck.pilot_stop(pc1(0.2), {**ok, "S-raw-hold-sec": {"fit_failed": True}}, cfg, []) == "fit_failed",
+          "pilot stop: a failed fit -> stop")
+    check(ck.pilot_stop(pc1(0.2), ok, cfg, ["hgb", "lr"]) == "ceiling", "pilot stop: both classifiers at the ceiling -> stop")
+
+
 def test_stats(cfg: dict) -> None:
     rng = np.random.default_rng(0)
     y = rng.integers(0, 2, 2000)
@@ -674,15 +769,7 @@ def test_stats(cfg: dict) -> None:
     yp = ck.stratified_permutation(y, strata, rng)
     check(all(y[strata == s].sum() == yp[strata == s].sum() for s in range(4)) and not np.array_equal(y, yp),
           "stats: the permutation keeps the positives of each stratum")
-    grid = [round(0.05 * i, 2) for i in range(1, 21)]
-    lin = [0.1 * x for x in grid]
-    check(ck.select_lambda(grid, lin, 0.05, 0.08)["lam"] == 0.5, "select_lambda: monotone values -> the closest")
-    bumpy = list(lin)
-    bumpy[9], bumpy[10], bumpy[11] = 0.06, 0.04, 0.05
-    check(ck.select_lambda(grid, bumpy, 0.05, 0.08)["lam"] == 0.55, "select_lambda: a pooled block -> its middle")
-    check(ck.select_lambda(grid, [0.01] * 20, 0.05, 0.08)["lam"] == 1.0, "select_lambda: all below the target -> 1.0")
-    check(ck.select_lambda(grid, [0.09] * 20, 0.05, 0.08)["lam"] == 0.05, "select_lambda: the smallest above the upper bound")
-    check(ck.select_lambda(grid, [float("nan")] * 20, 0.05, 0.08)["lam"] == 1.0, "select_lambda: no finite value -> 1.0")
+    test_select_lambda(cfg)
     F = rng.normal(size=(10, 3))
     g = np.array([0] * 4 + [1] * 6)
     D = ck.diffs(F, g, 2)

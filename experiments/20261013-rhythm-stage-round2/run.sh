@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Rhythm stage desk check: synthetic traces only, no participants.
-# Design: .steering/20261012-rhythm-stage-desk-check/design.md (frozen 2b7db259; world v4).
+# Rhythm stage desk check, round 2: synthetic traces only, no participants.
+# Design: .steering/20261013-rhythm-stage-round2/design.md (round 2: the lambda choice and the seed), on top of
+# .steering/20261012-rhythm-stage-desk-check/design.md (round 1, frozen 2b7db259; world v4). Copied from
+# experiments/20261012-rhythm-stage-desk-check/run.sh (b2d02846). Round 2 does not run --ceiling (design 0).
 #
 # Usage: bash run.sh (--selftest | --ceiling | --pilot | --smoke | --main) [--jobs N]
 #   --selftest  design 3.7: every self-test (the gse-replay causality test when GSE_REPLAY is set).
@@ -10,7 +12,8 @@
 #   --pilot     design 3.9 (pilot 1, after the freeze): SEED + sets.pilot.seed_offset, sets.pilot.P P sessions of world
 #               v4 through gse-replay, the self-tests on them, then PC1 and the PC-stall of each of the
 #               24 candidates on [0] + pc_stall.pilot_grid, L300 only. No candidate is run. Writes results/pilot/
-#               (committed). Write the chosen lambdas to config.json pc_stall.lam and the numbers to design section 8.
+#               (committed). Then `checks.py --apply-pilot config.json results/pilot/pilot.json` (from scripts/)
+#               writes the chosen lambdas to config.json pc_stall.lam; the numbers go to design section 8.
 #   --smoke     the pipeline check of the main run: SEED + 2 (not the main run's sessions), 12 P sessions and their twins, every self-test, then the
 #               checks with bootstrap 200 and 2 permutations. Writes results/main-smoke/ (git-ignored).
 #   --main      design 3.1-3.6: SEED, sets.P.n P sessions of world v4 and their twins through gse-replay, every

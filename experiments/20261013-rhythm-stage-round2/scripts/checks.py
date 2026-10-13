@@ -1,7 +1,11 @@
 """Checks of the rhythm stage desk check: item 1 (verdicts, design 3.1-3.3), items 2-4 and 6 (descriptions, 3.4),
 the importance of the red candidates (3.6) and the pilot 1 (the lambda of each PC-stall, 3.9).
 
-Design: .steering/20261012-rhythm-stage-desk-check/design.md (frozen 2b7db259; world v4).
+Design: .steering/20261012-rhythm-stage-desk-check/design.md (frozen 2b7db259; world v4); round 2
+(.steering/20261013-rhythm-stage-round2/design.md 3.9) replaces select_lambda and the pilot's choice (pilot_key,
+pilot_stop, choose_all, apply_pilot).
+
+Usage (round 2, after the pilot): checks.py --apply-pilot <config.json> <results/pilot/pilot.json>
 
 The statistics are copied from experiments/20261010-portrait-eh1-round5/scripts/checks.py (auc_prep, auc_w,
 weighted_auc, oof_predict, stratified_permutation, isotonic_blocks, select_lambda, the bootstrap and the null) with
@@ -115,33 +119,34 @@ def isotonic_blocks(y: list[float]) -> list[tuple[int, int, float]]:
     return [(b[0], b[1], b[2]) for b in blocks]
 
 
-def select_lambda(lams: list[float], vals: list[float], target: float, upper: float) -> dict:
-    """design 3.9: choose lambda from the L300 point estimates of the candidates (lambda > 0)."""
-    pairs = sorted((float(l), float(v)) for l, v in zip(lams, vals) if np.isfinite(v))
-    excluded = sorted(float(l) for l, v in zip(lams, vals) if not np.isfinite(v))
-    if not pairs:
-        return {"lam": 1.0, "rule": "no finite candidate -> 1.0", "excluded": excluded, "fit": []}
-    xs = [p[0] for p in pairs]
-    blocks = isotonic_blocks([p[1] for p in pairs])
+def select_lambda(lams: list[float], gains: list[float], lowers: list[float], aim: float, lower: float,
+                  upper: float) -> dict:
+    """Round 2 design 3.9: choose lambda (> 0) of one candidate from the pilot's L300 maxima over the attackers in
+    use. gains: the point estimate g, lowers: the lower bound l of the 95% interval, per lambda. In the band:
+    l > lower and g <= upper (the comparisons of design 3.2; a NaN bound is out). The isotonic fit of g (NaN g left
+    out) gives g_hat; among the lambdas in the band (else among all) the smallest |g_hat - aim| (rounded to 6
+    decimals) wins; the ties are the lambdas of that pool with the same distance, in ascending order, and of them the
+    middle index (the smaller of two middles) wins. No finite g -> lam None (the pilot stops)."""
+    trip = sorted((float(x), float(g), float(lo)) for x, g, lo in zip(lams, gains, lowers))
+    excluded = [x for x, g, _ in trip if not np.isfinite(g)]
+    kept = [(x, g, lo) for x, g, lo in trip if np.isfinite(g)]
+    if not kept:
+        return {"lam": None, "rule": "no finite point estimate -> no choice (back to the researcher)",
+                "excluded": excluded, "fit": [], "band": []}
+    xs = [t[0] for t in kept]
     fit = [0.0] * len(xs)
-    for s, e, v in blocks:
+    for s, e, v in isotonic_blocks([t[1] for t in kept]):
         for i in range(s, e + 1):
             fit[i] = v
-    out = {"excluded": excluded, "fit": [[x, f] for x, f in zip(xs, fit)]}
-    if all(f < target for f in fit):
-        return {**out, "lam": 1.0, "rule": "all fitted values below the target -> 1.0"}
-    if xs[0] == min(lams) and fit[0] > upper:
-        return {**out, "lam": xs[0], "rule": "the smallest candidate is already above the upper bound -> it"}
-    dist = [round(abs(f - target), 6) for f in fit]
-    best = min(dist)
-    i0 = min(i for i, d in enumerate(dist) if d == best)
-    s = e = i0
-    while s > 0 and round(fit[s - 1], 12) == round(fit[i0], 12):
-        s -= 1
-    while e < len(fit) - 1 and round(fit[e + 1], 12) == round(fit[i0], 12):
-        e += 1
-    mid = s + (e - s) // 2  # the middle of the run (the smaller of two middles)
-    return {**out, "lam": xs[mid], "rule": "closest fitted value; the middle of its run of equal values"}
+    band = [i for i, (_, g, lo) in enumerate(kept) if _gt(lo, lower) and g <= upper]
+    pool, rule = (band, "in the band") if band else (list(range(len(xs))), "no lambda in the band -> over the grid")
+    dist = {i: round(abs(fit[i] - aim), 6) for i in pool}
+    best = min(dist.values())
+    ties = [i for i in pool if dist[i] == best]
+    pick = ties[(len(ties) - 1) // 2]  # the middle (the smaller of two middles)
+    return {"lam": xs[pick], "rule": f"{rule}; the fitted value closest to the aim; the middle of the ties",
+            "excluded": excluded, "fit": [[x, f] for x, f in zip(xs, fit)], "band": [xs[i] for i in band],
+            "ties": [xs[i] for i in ties]}
 
 
 def clean(o):
@@ -731,6 +736,53 @@ def describe(names: list[str], twin_names: list[str], ms: list[dict], cfg: dict,
 # Main
 # ---------------------------------------------------------------------------
 
+def pilot_key(cand: str, lam: float) -> str:
+    """The pilot's name of the PC-stall of a candidate at lambda (three decimals: 0.025 and 0.075 stay apart)."""
+    return f"PCs-{cand}@{float(lam):.3f}"
+
+
+def pilot_stop(merged: dict, per: dict, cfg: dict, ceil: list[str]) -> str | None:
+    """Round 2 design 3.9: the pilot chooses no lambda when a fit failed, both classifiers are at the ceiling, or
+    PC1 does not work (its lower bound must be finite and > e13.pc_lower; Codex: a NaN must not pass)."""
+    if any(v.get("fit_failed") for v in per.values()) or not per:
+        return "fit_failed"
+    if all(k in ceil for k in KINDS):
+        return "ceiling"
+    pc1 = merged.get("PC1")
+    if not pc1 or not _gt(pc1["lower_max"], cfg["e13"]["pc_lower"]):
+        return "weak_detector"
+    return None
+
+
+def choose_all(merged: dict, cfg: dict) -> dict:
+    """Round 2 design 3.9: the lambda of every candidate from the pilot's maxima (lambda = 0 is never a choice)."""
+    ps = cfg["pc_stall"]
+    grid = [float(x) for x in ps["pilot_grid"]]
+    out = {}
+    for c in st.candidates():
+        recs = [merged.get(pilot_key(c, x)) for x in grid]
+        g = [r["gain_max"] if r else float("nan") for r in recs]
+        lo = [r["lower_max"] if r else float("nan") for r in recs]
+        out[c] = select_lambda(grid, g, lo, ps["aim"], ps["lower"], ps["upper"])
+    return out
+
+
+def apply_pilot(cfg_path: Path, pilot_path: Path) -> int:
+    """Write the pilot's choices to config.json pc_stall.lam (the rest of the file is kept as it is)."""
+    p = json.loads(pilot_path.read_text(encoding="utf-8"))
+    if p.get("stop") or not p.get("selection"):
+        raise SystemExit(f"the pilot stopped ({p.get('stop')}): no lambda to write")
+    text = cfg_path.read_text(encoding="utf-8")
+    cfg = json.loads(text)
+    cfg["pc_stall"]["lam"] = {c: p["selection"][c]["lam"] for c in st.candidates()}
+    bad = lam_problems(cfg)
+    if bad:
+        raise SystemExit(f"pilot selection is not on the grid: {bad}")
+    cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    print(json.dumps(cfg["pc_stall"]["lam"], indent=1))
+    return 0
+
+
 def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
     """design 3.9: PC1 and the PC-stall of each candidate on [0] + the grid, L300 only, one candidate at a time."""
     ps = cfg["pc_stall"]
@@ -745,10 +797,10 @@ def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
         tab = label_tables(work, sids, cfg, scratch)
         merged, timing, per = {}, [], {}
         batches = [("PC1", [("PC1", "PC1", None)])]
-        batches += [(c, [(f"PCs-{c}@{x:.2f}", f"PCs-{c}", x) for x in [0.0] + grid]) for c in cands]
+        batches += [(c, [(pilot_key(c, x), f"PCs-{c}", x) for x in [0.0] + grid]) for c in cands]
         keys = [k for _, sp in batches for k, _, _ in sp]
         if len(set(keys)) != len(keys):  # Codex: two grid values that print alike would overwrite each other
-            raise SystemExit("pc_stall.pilot_grid: two values share a name at two decimals")
+            raise SystemExit("pc_stall.pilot_grid: two values share a name at three decimals")
         auc_s = None
         for b, specs in batches:
             tb = time.time()
@@ -770,22 +822,26 @@ def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
             per[b] = {"fit_failed": False}
             print(f"pilot {b}: {time.time() - tb:.0f} s (total {time.time() - t0:.0f} s)", flush=True)
         ceil = ceiling_kinds(auc_s, cfg)
-        sels = {}
-        for c in cands:
-            vals = [merged[k]["gain_max"] if merged.get(k) else float("nan") for k in (f"PCs-{c}@{x:.2f}" for x in grid)]
-            sels[c] = select_lambda(grid, vals, ps["target"], ps["upper"])
+        stop = pilot_stop(merged, per, cfg, ceil)
+        sels = {} if stop else choose_all(merged, cfg)
+        if any(s["lam"] is None for s in sels.values()):  # a candidate with no finite point estimate (design 3.9)
+            stop = "no_finite_pcs"  # the selection stays in pilot.json as a record; --apply-pilot refuses it
         dump(out / "pilot.json", {
-            "_note": ("Pilot 1 (design 3.9): SEED + 1, P sessions of world v4, PC1 and the PC-stall of each candidate on "
-                      "[0] + the grid, L300 only, no null. Not a result of the main run. The chosen lambdas go to "
-                      "config.json pc_stall.lam and the numbers to design section 8."),
+            "_note": ("Pilot 1 (round 2 design 3.9): SEED + 1, P sessions of world v4, PC1 and the PC-stall of each "
+                      "candidate on [0] + the grid, L300 only, no null. Not a result of the main run. "
+                      "`checks.py --apply-pilot` writes the chosen lambdas to config.json pc_stall.lam; the numbers go "
+                      "to design section 8. With `stop` set no lambda is chosen (back to the researcher)."),
             "seed": seed, "n_sessions": len(sids), "bootstrap": nboot, "auc_A_speed": auc_s, "ceiling_kinds": ceil,
+            "stop": stop,
             "configs": {k: ({kk: v[kk] for kk in REC_KEYS} | {"attackers": v["attackers"]} if v else None)
                         for k, v in merged.items()},
             "per_batch": per, "selection": sels, "timing": timing, "wall_s": time.time() - t0})
+        if stop:
+            print(f"pilot STOP: {stop} (no lambda chosen; back to the researcher, design 3.9)", flush=True)
         for c in cands:
-            line = " ".join(f"{x:.2f}:{merged[f'PCs-{c}@{x:.2f}']['gain_max']:+.3f}" for x in [0.0] + grid
-                            if merged.get(f"PCs-{c}@{x:.2f}"))
-            print(f"{c}: lambda {sels[c]['lam']} ({sels[c]['rule']})\n   {line}")
+            line = " ".join(f"{x:.3f}:{merged[pilot_key(c, x)]['gain_max']:+.3f}/{merged[pilot_key(c, x)]['lower_max']:+.3f}"
+                            for x in [0.0] + grid if merged.get(pilot_key(c, x)))
+            print(f"{c}: lambda {sels[c]['lam'] if sels else None} ({sels[c]['rule'] if sels else 'stop'})\n   {line}")
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     print(f"pilot done in {time.time() - t0:.0f} s", flush=True)
@@ -868,6 +924,9 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
 
 
 def main() -> int:
+    import sys
+    if len(sys.argv) == 4 and sys.argv[1] == "--apply-pilot":  # checks.py --apply-pilot <config.json> <pilot.json>
+        return apply_pilot(Path(sys.argv[2]), Path(sys.argv[3]))
     ap = argparse.ArgumentParser()
     ap.add_argument("config")
     ap.add_argument("seed_file")

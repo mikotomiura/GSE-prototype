@@ -1,5 +1,5 @@
 {
-  "_comment": "Rhythm stage desk check (synthetic traces only, no participants). The generator settings (session, segments, segments_v2, transitions, keys, sets) and e13 are copied unchanged from experiments/20261010-portrait-eh1-round5/config.json; segments_v3, ceiling and speed are new (.steering/20261012-rhythm-stage-desk-check/design.md 1.5, 1.6 and 3.0).",
+  "_comment": "Rhythm stage desk check, round 2 (synthetic traces only, no participants). Copied from experiments/20261012-rhythm-stage-desk-check/config.json (b2d02846); round 2 changes only sets.pilot (P 240, bootstrap 2000), pc_stall.pilot_grid (0.025 to 0.300), pc_stall.aim (new) and pc_stall.lam (written after the pilot) (.steering/20261013-rhythm-stage-round2/design.md 0, 1.2 and 3.9). Rhythm stage desk check (synthetic traces only, no participants). The generator settings (session, segments, segments_v2, transitions, keys, sets) and e13 are copied unchanged from experiments/20261010-portrait-eh1-round5/config.json; segments_v3, ceiling and speed are new (.steering/20261012-rhythm-stage-desk-check/design.md 1.5, 1.6 and 3.0).",
   "session": {
     "duration_s": 10800,
     "final_flow_s": 60,
@@ -251,8 +251,8 @@
     },
     "pilot": {
       "seed_offset": 1,
-      "P": 40,
-      "bootstrap": 200
+      "P": 240,
+      "bootstrap": 2000
     }
   },
   "e13": {
@@ -360,59 +360,26 @@
     "last_s": 10,
     "lags": 4
   },
-  "_comment_pc_stall": "design 1.4, 3.2, 3.9: PC-stall of each candidate. Works when the lower bound of the max over the attackers > lower and the point estimate <= upper (and its PC0's upper < e13.margin). The pilot 1 (SEED + sets.pilot.seed_offset, sets.pilot.P sessions, L300, sets.pilot.bootstrap) chooses lam per candidate on pilot_grid with target (isotonic, EH1 select_lambda); 1.0 when no grid value reaches the target. lam is written after the pilot.",
+  "_comment_pc_stall": "Round 2 design 3.9: the pilot 1 (SEED + sets.pilot.seed_offset, sets.pilot.P sessions, L300, sets.pilot.bootstrap) runs [0] + pilot_grid; per candidate the lambdas with lower bound max > lower and point estimate max <= upper are in the band, and of those (else of all) the one whose isotonic point estimate is closest to aim wins (checks.select_lambda). A candidate with no finite point estimate stops the pilot. lam is written after the pilot by checks.py --apply-pilot. As round 1 (design 1.4, 3.2): the PC-stall of a candidate works when the lower bound of the max over the attackers > lower and the point estimate <= upper (and its PC0's upper < e13.margin). Round 1's target (0.05) is replaced by aim.",
   "pc_stall": {
     "lower": 0.03,
     "upper": 0.08,
-    "target": 0.05,
     "pilot_grid": [
+      0.025,
       0.05,
+      0.075,
       0.1,
+      0.125,
       0.15,
+      0.175,
       0.2,
+      0.225,
       0.25,
-      0.3,
-      0.35,
-      0.4,
-      0.45,
-      0.5,
-      0.55,
-      0.6,
-      0.65,
-      0.7,
-      0.75,
-      0.8,
-      0.85,
-      0.9,
-      0.95,
-      1.0
+      0.275,
+      0.3
     ],
-    "lam": {
-      "S-raw-hold-sec": 0.05,
-      "S-raw-hold-sub": 0.05,
-      "S-raw-decay-sec": 0.05,
-      "S-raw-decay-sub": 0.05,
-      "S-raw-ground-sec": 0.05,
-      "S-raw-ground-sub": 0.05,
-      "S-smooth-hold-sec": 0.15,
-      "S-smooth-hold-sub": 0.15,
-      "S-smooth-decay-sec": 0.15,
-      "S-smooth-decay-sub": 0.15,
-      "S-smooth-ground-sec": 0.15,
-      "S-smooth-ground-sub": 0.15,
-      "S-rank-hold-sec": 0.15,
-      "S-rank-hold-sub": 0.15,
-      "S-rank-decay-sec": 0.15,
-      "S-rank-decay-sub": 0.15,
-      "S-rank-ground-sec": 0.15,
-      "S-rank-ground-sub": 0.15,
-      "S-jitter-hold-sec": 0.1,
-      "S-jitter-hold-sub": 0.1,
-      "S-jitter-decay-sec": 0.1,
-      "S-jitter-decay-sub": 0.1,
-      "S-jitter-ground-sec": 0.15,
-      "S-jitter-ground-sub": 0.15
-    }
+    "lam": {},
+    "aim": 0.055
   },
   "_comment_describe": "design 3.4: stop events are gaps of event_s or longer; a change smaller than unchanged is 'unchanged'; the lag needs the crossing to hold for hold_s; Ridge alpha; GroupKFold folds; the time since the last press is capped at since_cap_s.",
   "describe": {
