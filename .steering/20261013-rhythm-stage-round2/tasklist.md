@@ -16,7 +16,7 @@
 - [x] 下見 1（`--pilot`・P 240）→ `pc_stall.lam`・design §8（止まらず・6034 s）
 - [x] スモーク（`--smoke`・581 s・selftest 0 failed）
 - [x] 本番（`--main --jobs 16`・CI が走っていない時）→ `results/main/`・`notes.md`（16261 s・selftest 0 failed）
-- [ ] notes の `/cross-review`
+- [x] notes の `/cross-review`（2 巡・判断 5・6）
 
 ## 完了処理
 - [ ] 中間の world を研究者と検討する（判断 16 とぶつかりうる点を先に示す・第 1 回の判断 21）
