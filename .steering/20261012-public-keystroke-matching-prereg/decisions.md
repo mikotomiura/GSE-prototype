@@ -227,3 +227,5 @@ KLiCKe の著者（Yu Tian）から **2026-10-13 に返事が来た**（研究�
 3. PoPETs の program chairs への録画と発表の要否の問い合わせはまだ送っていない。Claude が下書きした（同じファイルの 2・宛先は CFP の `pets27-chairs@petsymposium.org`）。送るのは研究者。
 
 論文の倫理の節の英語の案は同じファイルの最後。Menlo Report の段の「the data are used under their terms of use, Inputlog, n.d.」は、論文では MIT License（GitHub のリポジトリ）と著者の確認を出典にする。解析の手順は変わらないので逸脱ではない。
+
+送付（2026-10-13・研究者）: 判断 54 の下書き 2 通（Dr. Tian へのお礼と審査機関の問い・PoPETs の program chairs への録画と発表の要否の問い）を、研究者が 2026-10-13 に自分のメールで送った。返事が来たら日付と要旨をここに書く。PoPETs から「録画か発表が必須」と返ってきたら、投稿先を考え直す（候補は引き継ぎ `next-session-public-keystroke-matching-1026-reminder.md`）。
