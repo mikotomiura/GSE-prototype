@@ -26,7 +26,7 @@
 - [x] Codex 2 巡目（直しの差分・P2 3、うち 1 件は該当なし）→ 直す（`0c443794`）
 - [x] 下見 1（直した計器で回し直し）→ `config.json` の `pc_stall.lam`・design §8（`results/pilot/`）
 - [x] スモーク（`SEED + 2`・P 12・計器 `dab6dd66`・自己検査 0 件の失敗・768 s）
-- [ ] 本番（`bash run.sh --main`・CI の走っていない時・8〜15 時間の見込み）→ `results/main/`・`notes.md`
+- [x] 本番（`bash run.sh --main --jobs 16`・計器 `60eb1021`・約 5 時間）→ `results/main/`・`notes.md`。L300 は緑 14・赤 0・判定不能 10（`raw` 6 は PC-stall が弱く、`smooth-hold`・`smooth-decay` 4 は強すぎ）、L60 は緑 16・判定不能 8、L1800 は 24 本とも判定不能（PC1 が届かない）
 
 ## 完了処理
 - [x] `/cross-review`（計器）・code-reviewer（上の 2 巡）
