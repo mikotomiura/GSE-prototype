@@ -578,7 +578,7 @@ def form_R1(rec):
         o = keymap_row(r, lambda k: "q" if len(k) == 1 and k.isalnum() else k)
         if not o["activity"].startswith("Move From"):
             o["text_change"] = mask_q(r["text_change"]) if r["text_change"] != "NoChange" else "NoChange"
-        del o["pause_time"]
+        o.pop("pause_time", None)  # KLiCKe rows do not carry it (load_klicke drops PauseTime)
         out.append(o)
     return out
 
@@ -654,7 +654,7 @@ def form_R5(rec, rng):
     out = []
     for r in rec.rows:
         o = dict(r)
-        del o["pause_time"]
+        o.pop("pause_time", None)  # KLiCKe rows do not carry it (load_klicke drops PauseTime)
         if len(r["down_event"]) == 1 and r["down_event"].isalnum():
             s = sub(r["down_event"])
             o["down_event"] = o["up_event"] = s
@@ -678,7 +678,7 @@ def form_R6(rec, rng):
     cats = [category(r["down_event"]) for r in rec.rows]
     out = [dict(r) for r in rec.rows]
     for o, r in zip(out, rec.rows):
-        del o["pause_time"]
+        o.pop("pause_time", None)  # KLiCKe rows do not carry it (load_klicke drops PauseTime)
         tc = r["text_change"]
         if r["activity"] in ("Paste", "Remove/Cut") and tc != "NoChange":
             o["text_change"] = mask_q(tc)
