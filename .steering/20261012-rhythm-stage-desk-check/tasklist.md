@@ -30,4 +30,6 @@
 
 ## 完了処理
 - [x] `/cross-review`（計器）・code-reviewer（上の 2 巡）
+- [x] 本番の notes の `/cross-review`（Codex P2 3・code-reviewer HIGH 3）→ notes を直す（判断 21）
+- [ ] 再実行（λ の選び方を直す・新しい seed・別の固定）→ その後に中間の world を検討（判断 21）
 - [ ] 親タスクの判断 3・5 の見直しの材料として結果を渡す（研究者）
