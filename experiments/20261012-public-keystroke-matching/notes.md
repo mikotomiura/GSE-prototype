@@ -328,6 +328,7 @@ code-reviewer（HIGH なし）・security-checker（CRITICAL・HIGH なし）・
 - 境界: unicity で候補のどれも k 語に満たないとき・ENJA15 で句読点だけの訳文（区間 0 個・数を出す）・ENJA15 のデータが入れ子なら止める（交差の検査 5 の前提・Codex P2・code-reviewer LOW）。ENJA15 の原文ごとの値に記録の数を添える（security-checker LOW。原文ごとのセッションは 12〜13 本）。
 - 文書の食い違い: `exploratory.json` の種の文・間隔の無い塊は落とす（空の文字列ではない）・`run.sh` に `selftest_a4.py`（code-reviewer LOW）。
 - 直さなかったこと: チェックポイントの照合と読み込みの間の隙間（手元のファイル・PyTorch は `weights_only=True`・security-checker LOW）。
+- Codex の 2 巡目（コミット `f16e9460`・足した規則の境界）: 指紋に入力を決めるコード（`corpus.py`・`matching.py`・`seeds.py`・`synthetic_logs.py`・`load_klicke.py`・`align_ext.py`・`align.py`）と `SEED` の SHA-256 を足し、各ファイルにその書き手の記録のファイルと本文の SHA-256 を書く。生成の再開と照合は同じ `a4_keytar.check_record` で、持ち主・指紋の完全な一致・入力のハッシュ・構造（窓のキーが 4 つの形でそろう）を確かめる（前は照合の側が「模擬でない」ことしか見ていなかった）。数と時間は書き手ごとにファイルへ書き、要約は全ファイルから足し直す（前は止まった回の数が失われた）。`raw/` の守りは実体のパスの包含で判定する（コミット `d61bf234`）。指紋に入れたコードは、生成を再開した後は変えない。
 
 ## 探索的な分析の手順（判断 55・56・本計算の照合の結果を見る前・2026-10-13）
 
