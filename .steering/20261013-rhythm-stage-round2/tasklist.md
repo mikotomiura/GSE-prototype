@@ -14,8 +14,8 @@
 
 ## 計器と本番（固定の後）
 - [x] 下見 1（`--pilot`・P 240）→ `pc_stall.lam`・design §8（止まらず・6034 s）
-- [ ] スモーク（`--smoke`）
-- [ ] 本番（`--main --jobs 16`・CI が走っていない時）→ `results/main/`・`notes.md`
+- [x] スモーク（`--smoke`・581 s・selftest 0 failed）
+- [x] 本番（`--main --jobs 16`・CI が走っていない時）→ `results/main/`・`notes.md`（16261 s・selftest 0 failed）
 - [ ] notes の `/cross-review`
 
 ## 完了処理
