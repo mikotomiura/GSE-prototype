@@ -1,6 +1,7 @@
 """The rhythm stage of the desk check: keystrokes -> two drawing parameters per frame (design 1.2-1.4).
 
-Design: .steering/20261012-rhythm-stage-desk-check/design.md (frozen 2b7db259; world v4).
+Design: .steering/20261012-rhythm-stage-desk-check/design.md (frozen 2b7db259; world v4), with the L1800 controls of
+.steering/20261014-rhythm-stage-graded-world/design.md 1.4 (PC1-1800 and PCl-<candidate>).
 
 Every series is taken at 10 Hz (point j at t = j / 10 s) and has two parameters in [0, 1]: the amplitude a and the
 tempo r. A candidate S-<mapping>-<stop>-<res> is built in this order: the drive values (res) -> the mapping -> the
@@ -24,6 +25,8 @@ Details Claude added to make the definitions computable (design section 9 lists 
   stopped then acts as for the candidate); q of block b is the stall share of seconds [60 b - 300, 60 b) clipped at
   0 (0.0 for the first block, whose span is empty).
 - PC1: a(t) is the stall share of seconds [floor(t) - 60, floor(t)) clipped at 0 (0.0 when empty).
+- L1800 controls (graded world design 1.4): PC1-1800 is PC1 over [floor(t) - 1800, floor(t)); PCl-<candidate> is the
+  PC-stall of the candidate with q of block b over [60 b - 1800, 60 b), and the same U and N (the same tag).
 """
 
 from __future__ import annotations
@@ -55,6 +58,9 @@ CHANGE_EPS = 1e-6
 PC_BLOCK_S = 60
 PC_SPAN_S = 300
 PC1_SPAN_S = 60
+PCL_SPAN_S = 1800  # graded world design 1.4: the L1800 controls
+PC1L_NAME = "PC1-1800"
+PCL_PREFIX = "PCl-"
 JITTER_TAG = 31  # design 3.8
 PC_TAG = 37
 
@@ -289,15 +295,15 @@ def stall_share(seg: np.ndarray, a: int, b: int) -> float:
     return float(st.mean()) if len(st) else 0.0
 
 
-def pc_blocks(seg: np.ndarray, duration_s: int, key_seed: int, seed: int, lam: float) -> dict:
+def pc_blocks(seg: np.ndarray, duration_s: int, key_seed: int, seed: int, lam: float, span_s: int = PC_SPAN_S) -> dict:
     """PC-stall (design 1.4): per 60 s block, U then N (always both, whatever lambda is), q = the stall share of the
-    preceding 300 s, and the value q if U < lam else N."""
+    preceding span_s seconds (300; 1800 for PCl, graded world design 1.4), and the value q if U < lam else N."""
     rng = np.random.default_rng(np.random.SeedSequence([seed, key_seed & 0xFFFFFFFF, PC_TAG]))
     nb = -(-duration_s // PC_BLOCK_S)
     U, N, q = np.zeros(nb), np.zeros(nb), np.zeros(nb)
     for b in range(nb):
         U[b], N[b] = float(rng.random()), float(rng.random())
-        q[b] = stall_share(seg, b * PC_BLOCK_S - PC_SPAN_S, b * PC_BLOCK_S)
+        q[b] = stall_share(seg, b * PC_BLOCK_S - span_s, b * PC_BLOCK_S)
     return {"U": U, "N": N, "q": q, "value": np.where(U < lam, q, N)}
 
 
@@ -323,11 +329,11 @@ def series(sess: Session, name: str, seed: int, lam: float | None = None, mutati
         elif mutation is not None:
             raise ValueError(mutation)
         return a, r
-    if name == "PC1":
+    if name in ("PC1", PC1L_NAME):
         _, r = candidate_series(inp, "S-raw-hold-sec", seed, sess.key_seed)
         st = np.concatenate([[0.0], np.cumsum(np.isin(sess.seg, STALL_CODES))])
         f = np.arange(n) // HZ  # floor(t)
-        lo = np.maximum(f - PC1_SPAN_S, 0)
+        lo = np.maximum(f - (PC1_SPAN_S if name == "PC1" else PCL_SPAN_S), 0)
         span = f - lo
         a = np.where(span > 0, (st[f] - st[lo]) / np.maximum(span, 1), 0.0)
         return a, r
@@ -337,14 +343,15 @@ def series(sess: Session, name: str, seed: int, lam: float | None = None, mutati
         ur_s = hold_nan(np.clip(1.0 - sess.feat["f3"], 0.0, 1.0))  # declared exception: f3 (design 1.4)
         ur = np.where(k >= 0, ur_s[np.maximum(k, 0)], 0.0)
         return shape(ua, ur, stopped, "raw", "hold", seed, sess.key_seed)
-    if name.startswith(("PCs-", "PC0-")):
+    if name.startswith(("PCs-", "PC0-", PCL_PREFIX)):
         cand = name[4:]
         if name.startswith("PC0-"):
             lam = 0.0
         assert lam is not None, f"{name} needs lam"
         m, s, r = parse(cand)
         _, _, stopped = drive(inp, r)
-        blk = pc_blocks(sess.seg, sess.duration_s, sess.key_seed, seed, lam)["value"]
+        span = PCL_SPAN_S if name.startswith(PCL_PREFIX) else PC_SPAN_S
+        blk = pc_blocks(sess.seg, sess.duration_s, sess.key_seed, seed, lam, span)["value"]
         ua = np.repeat(blk, PC_BLOCK_S * HZ)[:n]
         ur = np.full(n, 0.5)
         return shape(ua, ur, stopped, m, s, seed, sess.key_seed)
@@ -383,9 +390,11 @@ def window_features(a: np.ndarray, r: np.ndarray, n_w: int) -> np.ndarray:
 
 
 def config_names(cands: list[str]) -> dict:
-    """design 1.4: the 73 judged names plus PC-corr (descriptive)."""
+    """design 1.4: the 73 judged names plus PC-corr (descriptive); pc1_1800 and pcl are fitted on L1800 only
+    (graded world design 1.2, 1.4)."""
     return {"candidates": list(cands), "pc1": ["PC1"], "pcs": [f"PCs-{c}" for c in cands],
-            "pc0": [f"PC0-{c}" for c in cands], "pccorr": ["PC-corr"]}
+            "pc0": [f"PC0-{c}" for c in cands], "pccorr": ["PC-corr"],
+            "pc1_1800": [PC1L_NAME], "pcl": [f"{PCL_PREFIX}{c}" for c in cands]}
 
 
 def manifest_p(work: Path) -> list[dict]:

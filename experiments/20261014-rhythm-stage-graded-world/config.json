@@ -1,5 +1,5 @@
 {
-  "_comment": "Rhythm stage desk check, round 2 (synthetic traces only, no participants). Copied from experiments/20261012-rhythm-stage-desk-check/config.json (b2d02846); round 2 changes only sets.pilot (P 240, bootstrap 2000), pc_stall.pilot_grid (0.025 to 0.300), pc_stall.aim (new) and pc_stall.lam (written after the pilot) (.steering/20261013-rhythm-stage-round2/design.md 0, 1.2 and 3.9). Rhythm stage desk check (synthetic traces only, no participants). The generator settings (session, segments, segments_v2, transitions, keys, sets) and e13 are copied unchanged from experiments/20261010-portrait-eh1-round5/config.json; segments_v3, ceiling and speed are new (.steering/20261012-rhythm-stage-desk-check/design.md 1.5, 1.6 and 3.0).",
+  "_comment": "Rhythm stage desk check, graded world (synthetic traces only, no participants). Copied from experiments/20261013-rhythm-stage-round2/config.json (d98103a0); this task changes only ceiling (the three steps and their rule), pc_stall.lam (a table per step, empty until the pilot of the step) and pc_stall.lam_1800 (new, the same) (.steering/20261014-rhythm-stage-graded-world/design.md 0, 1.2, 1.3 and 3.0). The graded world's STRUGGLE settings are made by gen_sessions.py from segments_v4 and segments_v2 (_comment_graded) and are not written here. Rhythm stage desk check, round 2 (synthetic traces only, no participants). Copied from experiments/20261012-rhythm-stage-desk-check/config.json (b2d02846); round 2 changes only sets.pilot (P 240, bootstrap 2000), pc_stall.pilot_grid (0.025 to 0.300), pc_stall.aim (new) and pc_stall.lam (written after the pilot) (.steering/20261013-rhythm-stage-round2/design.md 0, 1.2 and 3.9). Rhythm stage desk check (synthetic traces only, no participants). The generator settings (session, segments, segments_v2, transitions, keys, sets) and e13 are copied unchanged from experiments/20261010-portrait-eh1-round5/config.json; segments_v3, ceiling and speed are new (.steering/20261012-rhythm-stage-desk-check/design.md 1.5, 1.6 and 3.0).",
   "session": {
     "duration_s": 10800,
     "final_flow_s": 60,
@@ -343,14 +343,15 @@
       ]
     }
   },
-  "_comment_ceiling": "design 3.0: SEED + seed_offset, P sessions of each world in prefer (the other sets at the smoke size, unused), AUC(A) and AUC(A_speed) per label and classifier, out of fold. A world is usable when the smaller of the two classifiers' L300 AUC(A_speed) is <= usable_max (equality is usable); the first usable world in prefer is chosen; none usable, or a world not measured -> back to the researcher. The first pilot 0 (2026-10-13, instruments bc034ebf) ran prefer [v2, v3] and found neither usable (design 3.0); the second runs v4 only (design section 8, decisions 16). main_auc (design 3.2): in the main run and the pilot 1, a classifier whose AUC(A_speed) of a label is >= main_auc is at the ceiling and left out of every maximum of that label.",
+  "_comment_ceiling": "graded world design 3.0 (pilot 0, after the freeze, before any pilot 1): SEED + seed_offset, P sessions of each step in steps (the other sets at the smoke size, unused), AUC(A) and AUC(A_speed) per label and classifier, out of fold. A step is ceiling when both classifiers' L300 AUC(A_speed) are >= main_auc (equality is at the ceiling), unmeasured when a fit failed or a value is NaN, else go. Only go steps run the pilot 1, the smoke and the main run. The steps are not moved after pilot 0 (round 1 decisions 16). main_auc (round 1 design 3.2): in the main run and the pilot 1, a classifier whose AUC(A_speed) of a label is >= main_auc is at the ceiling and left out of every maximum of that label. Round 1 and 2's prefer and usable_max are removed.",
   "ceiling": {
     "seed_offset": 1,
-    "P": 40,
-    "prefer": [
-      "v4"
-    ],
-    "usable_max": 0.85,
+    "P": 240,
+    "steps": {
+      "t025": 0.25,
+      "t050": 0.5,
+      "t075": 0.75
+    },
     "main_auc": 0.9
   },
   "_comment_speed": "design 1.5: the five speed quantities of a span [s, e). Intervals are differences of consecutive press times inside the span (ms); quantities 2 and 3 use the intervals below short_ms; a run (quantity 4) continues while the interval is below run_ms; quantity 5 counts the presses of the final last_s seconds; at L60 model A_speed adds quantities 1 and 2 of the lags earlier windows (a window before the session start has 0 presses and quantity 2 = short_ms).",
@@ -360,7 +361,7 @@
     "last_s": 10,
     "lags": 4
   },
-  "_comment_pc_stall": "Round 2 design 3.9: the pilot 1 (SEED + sets.pilot.seed_offset, sets.pilot.P sessions, L300, sets.pilot.bootstrap) runs [0] + pilot_grid; per candidate the lambdas with lower bound max > lower and point estimate max <= upper are in the band, and of those (else of all) the one whose isotonic point estimate is closest to aim wins (checks.select_lambda). A candidate with no finite point estimate stops the pilot. lam is written after the pilot by checks.py --apply-pilot. As round 1 (design 1.4, 3.2): the PC-stall of a candidate works when the lower bound of the max over the attackers > lower and the point estimate <= upper (and its PC0's upper < e13.margin). Round 1's target (0.05) is replaced by aim.",
+  "_comment_pc_stall": "graded world design 1.2: lam and lam_1800 are tables per step (lam.<step>.<candidate>), written after the pilot of the step by checks.py --apply-pilot config.json results/<step>/pilot/pilot.json <step> (lam_1800.<step> is not written when the pilot's L1800 part stopped). The main run checks them against the step's pilot.json. Round 2 design 3.9: the pilot 1 (SEED + sets.pilot.seed_offset, sets.pilot.P sessions, L300, sets.pilot.bootstrap) runs [0] + pilot_grid; per candidate the lambdas with lower bound max > lower and point estimate max <= upper are in the band, and of those (else of all) the one whose isotonic point estimate is closest to aim wins (checks.select_lambda). A candidate with no finite point estimate stops the pilot. lam is written after the pilot by checks.py --apply-pilot. As round 1 (design 1.4, 3.2): the PC-stall of a candidate works when the lower bound of the max over the attackers > lower and the point estimate <= upper (and its PC0's upper < e13.margin). Round 1's target (0.05) is replaced by aim.",
   "pc_stall": {
     "lower": 0.03,
     "upper": 0.08,
@@ -378,33 +379,9 @@
       0.275,
       0.3
     ],
-    "lam": {
-      "S-raw-hold-sec": 0.075,
-      "S-raw-hold-sub": 0.075,
-      "S-raw-decay-sec": 0.075,
-      "S-raw-decay-sub": 0.075,
-      "S-raw-ground-sec": 0.075,
-      "S-raw-ground-sub": 0.075,
-      "S-smooth-hold-sec": 0.1,
-      "S-smooth-hold-sub": 0.1,
-      "S-smooth-decay-sec": 0.1,
-      "S-smooth-decay-sub": 0.1,
-      "S-smooth-ground-sec": 0.125,
-      "S-smooth-ground-sub": 0.125,
-      "S-rank-hold-sec": 0.125,
-      "S-rank-hold-sub": 0.125,
-      "S-rank-decay-sec": 0.125,
-      "S-rank-decay-sub": 0.125,
-      "S-rank-ground-sec": 0.125,
-      "S-rank-ground-sub": 0.125,
-      "S-jitter-hold-sec": 0.1,
-      "S-jitter-hold-sub": 0.1,
-      "S-jitter-decay-sec": 0.1,
-      "S-jitter-decay-sub": 0.1,
-      "S-jitter-ground-sec": 0.1,
-      "S-jitter-ground-sub": 0.1
-    },
-    "aim": 0.055
+    "lam": {},
+    "aim": 0.055,
+    "lam_1800": {}
   },
   "_comment_describe": "design 3.4: stop events are gaps of event_s or longer; a change smaller than unchanged is 'unchanged'; the lag needs the crossing to hold for hold_s; Ridge alpha; GroupKFold folds; the time since the last press is capped at since_cap_s.",
   "describe": {
@@ -414,5 +391,6 @@
     "ridge_alpha": 1.0,
     "folds": 5,
     "since_cap_s": 3600
-  }
+  },
+  "_comment_graded": "graded world design 1.3: --world graded --t T copies segments_v4 and sets STRUGGLE's flight_median_ms = m4^(1-t) * m2^t and flight_sigma = (1-t) * s4 + t * s2 (m, s of segments_v4 and segments_v2: 150 / 320 ms, 0.25 / 0.35). t = 0 is v4 and t = 1 is v2 exactly."
 }

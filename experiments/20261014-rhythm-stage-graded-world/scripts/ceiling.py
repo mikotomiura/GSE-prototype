@@ -1,15 +1,17 @@
-"""Pilot 0 of the rhythm stage desk check (design 3.0): the ceiling of the baseline models, before the freeze.
+"""Pilot 0 of the rhythm stage desk check: the ceiling of the baseline models. Graded world
+(.steering/20261014-rhythm-stage-graded-world/design.md 3.0): run after the freeze on the three steps of
+config.json ceiling.steps; each step is go, ceiling (both classifiers' L300 AUC(A_speed) >= ceiling.main_auc) or
+unmeasured (a failed fit or a NaN in L300). The positions of the steps are not changed after this (decisions 16).
+Round 1 and 2's rule (choose one world of ceiling.prefer by usable_max) is removed.
 
-For each world, label (L300, L60, L1800) and classifier (hgb, lr): AUC(A) and AUC(A_speed), out of fold on the
+For each step, label (L300, L60, L1800) and classifier (hgb, lr): AUC(A) and AUC(A_speed), out of fold on the
 P sessions (session-grouped 5-fold, as EH1). No stage candidate and no positive control is computed: the pilot
-looks at the baseline models only (design 3.0). Then the world is chosen by the frozen rule: usable when the
-smaller of the two classifiers' L300 AUC(A_speed) is <= ceiling.usable_max; the first usable world of
-ceiling.prefer is chosen; when none is usable the main run does not start (back to the researcher).
+looks at the baseline models only (design 3.0).
 
 The statistics (auc_prep, auc_w, weighted_auc, oof_predict) are copied unchanged from
 experiments/20261010-portrait-eh1-round5/scripts/checks.py.
 
-Usage: ceiling.py <config.json> <seed file> <out dir> --work v2=<work dir> --work v3=<work dir> [--jobs N]
+Usage: ceiling.py <config.json> <seed file> <out dir> --work t025=<work dir> --work t050=<work dir> ... [--jobs N]
 """
 
 from __future__ import annotations
@@ -123,25 +125,18 @@ def measure(tabs: dict, seed: int, folds: int, jobs: int) -> dict:
     return res
 
 
-def usable(res_world: dict, usable_max: float) -> dict:
-    """design 3.0: the smaller of the two classifiers' L300 AUC(A_speed) <= usable_max (equality is usable).
-    A failed fit or a NaN makes the world unusable (no value to judge on)."""
-    vals = [res_world["L300"][k]["auc_A_speed"] for k in KINDS]
+def step_status(res_step: dict, main_auc: float) -> dict:
+    """graded world design 3.0: ceiling when both classifiers' L300 AUC(A_speed) are >= main_auc (equality is at the
+    ceiling, as design 3.2); unmeasured when a fit failed or a value is NaN (not read as a ceiling); else go."""
+    vals = [res_step["L300"][k]["auc_A_speed"] for k in KINDS]
     if any(v is None or (isinstance(v, float) and math.isnan(v)) for v in vals):
-        return {"min_L300_auc_A_speed": None, "usable": False, "reason": "fit_failed_or_nan"}
-    m = min(vals)
-    return {"min_L300_auc_A_speed": m, "usable": bool(m <= usable_max)}
+        return {"L300_auc_A_speed": vals, "status": "unmeasured"}
+    return {"L300_auc_A_speed": vals, "status": "ceiling" if all(v >= main_auc for v in vals) else "go"}
 
 
-def choose(res: dict, cfg: dict) -> dict:
-    """design 3.0. A world that could not be measured (a failed fit or a NaN in its L300 AUC(A_speed)) is not read
-    as a ceiling: then no world is chosen and the run goes back to the researcher (design 3.0, before pilot 0)."""
+def choose_steps(res: dict, cfg: dict) -> dict:
     c = cfg["ceiling"]
-    per = {w: usable(res[w], c["usable_max"]) for w in c["prefer"]}
-    unmeasured = [w for w in c["prefer"] if per[w].get("reason") == "fit_failed_or_nan"]
-    chosen = None if unmeasured else next((w for w in c["prefer"] if per[w]["usable"]), None)
-    return {"usable_max": c["usable_max"], "prefer": c["prefer"], "per_world": per, "unmeasured": unmeasured,
-            "chosen": chosen, "back_to_researcher": chosen is None}
+    return {s: {"t": c["steps"][s], **step_status(res[s], c["main_auc"])} for s in c["steps"]}
 
 
 def main() -> int:
@@ -155,19 +150,24 @@ def main() -> int:
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
     seed = int(Path(a.seed_file).read_text().strip())
     works = dict(w.split("=", 1) for w in a.work)
-    if sorted(works) != sorted(cfg["ceiling"]["prefer"]):
-        raise SystemExit(f"--work must name exactly the worlds {cfg['ceiling']['prefer']}")
+    steps = cfg["ceiling"]["steps"]
+    if sorted(works) != sorted(steps):
+        raise SystemExit(f"--work must name exactly the steps {sorted(steps)}")
     tabs = {}
     n_p = {}
     for world, wd in works.items():
+        w = json.loads((Path(wd) / "world.json").read_text(encoding="utf-8"))
+        if w != {"world": "graded", "t": float(steps[world])}:
+            raise SystemExit(f"{wd}/world.json is {w}, not the graded world at t = {steps[world]} ({world})")
         sids = bl.p_sids(Path(wd))
         if len(sids) != cfg["ceiling"]["P"]:
             raise SystemExit(f"{world}: {len(sids)} P sessions, expected {cfg['ceiling']['P']}")
         n_p[world] = len(sids)
         tabs[world] = bl.tables(Path(wd), sids, cfg)
     res = measure(tabs, seed, cfg["e13"]["folds"], a.jobs)
-    out = {"design": ".steering/20261012-rhythm-stage-desk-check/design.md 3.0", "seed": seed, "P": n_p,
-           "folds": cfg["e13"]["folds"], "results": res, "choice": choose(res, cfg)}
+    out = {"design": ".steering/20261014-rhythm-stage-graded-world/design.md 3.0", "seed": seed, "P": n_p,
+           "folds": cfg["e13"]["folds"], "main_auc": cfg["ceiling"]["main_auc"], "results": res,
+           "steps": choose_steps(res, cfg)}
     Path(a.out).mkdir(parents=True, exist_ok=True)
     with open(Path(a.out) / "ceiling.json", "w", encoding="utf-8", newline="\n") as fh:
         json.dump(out, fh, indent=1)
@@ -177,7 +177,8 @@ def main() -> int:
             for kind in KINDS:
                 r = res[world][label][kind]
                 print(f"{world} {label} {kind}: AUC(A) {r['auc_A']} AUC(A_speed) {r['auc_A_speed']}")
-    print(f"choice: {out['choice']}")
+    for s, v in out["steps"].items():
+        print(f"step {s} (t = {v['t']}): {v['status']} (L300 AUC(A_speed) hgb / lr {v['L300_auc_A_speed']})")
     return 0
 
 

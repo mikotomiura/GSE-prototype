@@ -2,6 +2,9 @@
 
 The only change from experiments/20261010-portrait-eh1-round5/scripts/gen_sessions.py is --world v3 and v4
 (.steering/20261012-rhythm-stage-desk-check/design.md 1.6); v1 and v2 write the same sessions (selftest.py).
+Graded world (.steering/20261014-rhythm-stage-graded-world/design.md 1.3): --world graded --t T copies
+segments_v4 and sets only STRUGGLE's flight_median_ms and flight_sigma between v4 (t = 0) and v2 (t = 1); the
+world and t are written to world.json next to sessions.json.
 
 Each session is a sequence of segments (FLOW, STRUGGLE, THINK, STALL_SILENT, AWAY, SLEEP).
 A segment carries its own key presses relative to its start, so that sessions can share,
@@ -9,12 +12,14 @@ copy or reorder segments (sets O, J and D). The NDJSON holds only key rows (and 
 session_start and session_meta rows that gse-replay reads); the labels are written to a
 separate file that the replay never sees.
 
-Usage: gen_sessions.py <config.json> <SEED file> <work dir> --hmm-version V [--world v1|v2|v3|v4] [--smoke] [--p-n N]
+Usage: gen_sessions.py <config.json> <SEED file> <work dir> --hmm-version V [--world v1|v2|v3|v4|graded] [--t T]
+                       [--smoke] [--p-n N]
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -48,6 +53,19 @@ def derive_rng(seed: int, *names: object) -> np.random.Generator:
 def key_seed(seed: int, *names: object) -> int:
     digest = hashlib.sha256(("key|" + "|".join(str(n) for n in names) + f"|{seed}").encode()).digest()
     return int.from_bytes(digest[:8], "little") & ((1 << 63) - 1)
+
+
+def graded_segments(cfg: dict, t: float) -> dict:
+    """design 1.3: segments_v4 with STRUGGLE's flight_median_ms = m4^(1-t) * m2^t and flight_sigma =
+    (1-t) * s4 + t * s2, where m and s are those of segments_v4 (t = 0) and segments_v2 (t = 1). Both forms give
+    the v4 and v2 values exactly at the two ends (design 1.3)."""
+    if not 0.0 <= t <= 1.0:
+        raise ValueError(f"t must be in [0, 1], got {t}")
+    s4, s2 = cfg["segments_v4"]["STRUGGLE"], cfg["segments_v2"]["STRUGGLE"]
+    seg = copy.deepcopy(cfg["segments_v4"])
+    seg["STRUGGLE"]["flight_median_ms"] = s4["flight_median_ms"] ** (1.0 - t) * s2["flight_median_ms"] ** t
+    seg["STRUGGLE"]["flight_sigma"] = (1.0 - t) * s4["flight_sigma"] + t * s2["flight_sigma"]
+    return seg
 
 
 def draw_dwell(rng: np.random.Generator, cfg: dict) -> int:
@@ -220,17 +238,23 @@ def main() -> int:
     ap.add_argument("work")
     ap.add_argument("--hmm-version", required=True)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--world", choices=("v1", "v2", "v3", "v4"), default="v1",
+    ap.add_argument("--world", choices=("v1", "v2", "v3", "v4", "graded"), default="v1",
                     help="v1 = frozen design 1.2; v2 = deviation: same pause structure for FLOW and STRUGGLE; "
                          "v3 = v2 with FLOW's key intervals in STRUGGLE and v1's pause after a backspace; "
-                         "v4 = v2 with FLOW's key intervals in STRUGGLE (the stall shows only in corrections)")
+                         "v4 = v2 with FLOW's key intervals in STRUGGLE (the stall shows only in corrections); "
+                         "graded = between v4 (t = 0) and v2 (t = 1) in STRUGGLE's key intervals (needs --t)")
+    ap.add_argument("--t", type=float, default=None, help="graded world only: the step t in [0, 1]")
     ap.add_argument("--p-n", type=int, default=None,
                     help="round 2 pilot only (design 3.10): the number of P sessions; the default output is unchanged")
     a = ap.parse_args()
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
     cfg["_hmm_version"] = a.hmm_version
+    if (a.world == "graded") != (a.t is not None):
+        ap.error("--t is required with --world graded and only with it")
     if a.world in ("v2", "v3", "v4"):
         cfg["segments"] = cfg[f"segments_{a.world}"]
+    elif a.world == "graded":
+        cfg["segments"] = graded_segments(cfg, a.t)
     seed = int(Path(a.seed_file).read_text().strip())
     work = Path(a.work)
     (work / "ndjson").mkdir(parents=True, exist_ok=True)
@@ -327,6 +351,7 @@ def main() -> int:
         emit(f"Dsl{i:02d}", "D_sleep", segs, key_seed(seed, "Dsl", i), {})
 
     (work / "sessions.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    (work / "world.json").write_text(json.dumps({"world": a.world, "t": a.t}), encoding="utf-8")
     print(f"generated {len(manifest)} sessions into {work}")
     return 0
 

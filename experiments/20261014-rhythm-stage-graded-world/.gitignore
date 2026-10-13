@@ -1,6 +1,7 @@
 .venv/
 work-*/
 results/*-smoke/
+results/*/*-smoke/
 results/.partial-*/
 results/.old-*/
 results/*/.capabilities.json.tmp

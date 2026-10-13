@@ -3,9 +3,11 @@ the importance of the red candidates (3.6) and the pilot 1 (the lambda of each P
 
 Design: .steering/20261012-rhythm-stage-desk-check/design.md (frozen 2b7db259; world v4); round 2
 (.steering/20261013-rhythm-stage-round2/design.md 3.9) replaces select_lambda and the pilot's choice (pilot_key,
-pilot_stop, choose_all, apply_pilot).
+pilot_stop, choose_all, apply_pilot). The graded world (.steering/20261014-rhythm-stage-graded-world/design.md 1.2,
+1.4, 3.9) adds the L1800 controls (PC1-1800, PCl-; fitted on L1800 only), a pilot with an L300 and an L1800 part,
+the lambdas per step, and the checks of the step (world.json, pilot.json).
 
-Usage (round 2, after the pilot): checks.py --apply-pilot <config.json> <results/pilot/pilot.json>
+Usage (after the pilot of a step): checks.py --apply-pilot <config.json> <results/<step>/pilot/pilot.json> <step>
 
 The statistics are copied from experiments/20261010-portrait-eh1-round5/scripts/checks.py (auc_prep, auc_w,
 weighted_auc, oof_predict, stratified_permutation, isotonic_blocks, select_lambda, the bootstrap and the null) with
@@ -14,12 +16,14 @@ classifier whose AUC(A_speed) is at the ceiling is left out of every maximum of 
 training side holds one class is reported as a failed fit (checked before the fit, as ceiling.py); any other error
 stops the run.
 
-Usage: checks.py <config.json> <seed file> <work dir> <results dir> [--jobs N] [--smoke | --pilot]
-  (no mode)  the main run: 24 candidates, PC1, PC-stall and PC0 of each candidate, PC-corr; three labels; bootstrap
-             e13.bootstrap, e13.null_perms permutations; the descriptions (needs <work>/twins replayed)
+Usage: checks.py <config.json> <seed file> <work dir> <results dir> --step <step> [--jobs N]
+                 [--smoke | --pilot] [--pilot-json <results/<step>/pilot/pilot.json>]
+  (no mode)  the main run: 24 candidates, PC1, PC-stall and PC0 of each candidate, PC-corr; three labels, and on
+             L1800 PC1-1800 and PCl- of each candidate; bootstrap e13.bootstrap, e13.null_perms permutations; the
+             descriptions (needs <work>/twins replayed); --pilot-json is required
   --smoke    the same with bootstrap 200 and 2 permutations (pipeline check only)
-  --pilot    design 3.9: PC1 and the PC-stall of each candidate on the lambda grid, L300 only, bootstrap
-             sets.pilot.bootstrap, no null; one candidate at a time; writes pilot.json
+  --pilot    design 3.9: the L300 part (PC1 and PCs-) and the L1800 part (PC1-1800 and PCl-) on the lambda grid,
+             bootstrap sets.pilot.bootstrap, no null; one candidate at a time; writes pilot.json
 """
 
 from __future__ import annotations
@@ -174,18 +178,37 @@ def dump(path: Path, obj) -> None:
 # Names and verdicts (design 3.2, 3.3): pure functions, unit-tested in selftest.py
 # ---------------------------------------------------------------------------
 
-def kind_of(name: str) -> str:
-    if name == "PC1":
+def kind_of(name: str, tag: str) -> str:
+    """The role of a name on a label (graded world design 1.2, 1.4): on L1800 the strong control is PC1-1800 and the
+    PC-stall is PCl-, and the round 2 PC1 and PCs- are descriptive; on L300 and L60 as round 2, and PC1-1800 and PCl-
+    (fitted on L1800 only) are refused. A name on the pilot's grid (with @) is descriptive."""
+    l1800 = tag == "L1800"
+    if name == st.PC1L_NAME:
+        if not l1800:
+            raise ValueError(f"{name} is fitted on L1800 only, not on {tag}")
         return "pc1"
+    if name == "PC1":
+        return "descriptive" if l1800 else "pc1"
     if name == "PC-corr":
         return "descriptive"
+    if name.startswith(st.PCL_PREFIX):
+        if "@" in name:
+            return "descriptive"
+        if not l1800:
+            raise ValueError(f"{name} is fitted on L1800 only, not on {tag}")
+        return "pcs"
     if name.startswith("PCs-"):
-        return "descriptive" if "@" in name else "pcs"
+        return "descriptive" if ("@" in name or l1800) else "pcs"
     if name.startswith("PC0-"):
         return "pc0"
     if name.startswith("S-"):
         return "candidate"
     raise ValueError(name)
+
+
+def control_names(tag: str) -> tuple[str, str]:
+    """(the strong control, the PC-stall prefix) judged on a label (graded world design 1.4)."""
+    return (st.PC1L_NAME, st.PCL_PREFIX) if tag == "L1800" else ("PC1", "PCs-")
 
 
 def _gt(a: float, b: float) -> bool:
@@ -220,8 +243,10 @@ def null95_of(null_by_perm: list[dict], use: list[str]) -> float:
     return float(np.percentile([max(p[a] for a in use) for p in null_by_perm], 95))
 
 
-def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], cfg: dict, fit_failed: bool) -> dict:
-    """One label (design 3.2, 3.3).
+def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], cfg: dict, fit_failed: bool, *,
+          tag: str, forced: str | None = None) -> dict:
+    """One label (design 3.2, 3.3). tag: the label (its controls, graded world design 1.4). forced: a reason that
+    makes every candidate undecidable (pilot_stop on L1800 when the pilot's L1800 part stopped, design 3.9).
     attk: name -> attacker -> {"gain", "ci95"} (empty when the fits failed).
     nulls: name -> list over the permutations of attacker -> gain (None when no permutation was run).
     auc_s: kind -> AUC(A_speed) (None when the fits failed).
@@ -235,21 +260,22 @@ def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], 
     both_ceiling = not use
     rec = {n: maxima(v, use) for n, v in attk.items()}
     # label-wide (design 3.1), over the judged names only: PC-corr is outside the detector (design 1.4)
-    nan = any(r["n_nan_bounds"] > 0 for n, r in rec.items() if kind_of(n) != "descriptive")
+    nan = any(r["n_nan_bounds"] > 0 for n, r in rec.items() if kind_of(n, tag) != "descriptive")
     null95 = None if nulls is None else {n: null95_of(v, use) for n, v in nulls.items()}
     broken = bool(fit_failed or nan or both_ceiling)
-    pc1 = rec.get("PC1")
+    pc1_name, prefix = control_names(tag)
+    pc1 = rec.get(pc1_name)
     pc1_ok = pc1 is not None and not broken and _gt(pc1["lower_max"], pc_lower)
     detector, verdicts = {}, {}
     for c in cands:
-        r, pcs, pc0 = rec.get(c), rec.get(f"PCs-{c}"), rec.get(f"PC0-{c}")
+        r, pcs, pc0 = rec.get(c), rec.get(f"{prefix}{c}"), rec.get(f"PC0-{c}")
         stall_ok = (pcs is not None and not broken and _gt(pcs["lower_max"], ps["lower"])
                     and bool(np.isfinite(pcs["gain_max"]) and pcs["gain_max"] <= ps["upper"]))
         base_ok = pc0 is not None and not broken and _lt(pc0["upper_max"], margin)
         if null95 is None:
             null_ok = None
         else:
-            four = [c, f"PCs-{c}", f"PC0-{c}", "PC1"]
+            four = [c, f"{prefix}{c}", f"PC0-{c}", pc1_name]
             null_ok = bool(all(n in null95 and _lt(null95[n], margin) for n in four))
         reasons = []
         if fit_failed:
@@ -268,6 +294,8 @@ def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], 
             reasons.append("stall_baseline")
         stop_path = (not broken and pc1_ok and null_ok is True and pc0 is not None
                      and _gt(pc0["lower_max"], ps["lower"]))
+        if forced:
+            reasons, stop_path = [forced], False
         detector[c] = {"detector_ok": not reasons, "reasons": reasons, "pcs_ok": bool(stall_ok),
                        "pc0_below": bool(base_ok), "null_ok": null_ok, "stop_path": bool(stop_path)}
         if stop_path:
@@ -282,7 +310,7 @@ def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], 
             v = "red_unconfirmed"
         verdicts[c] = v
     for n in rec:
-        k = kind_of(n)
+        k = kind_of(n, tag)
         if k == "pc1":
             verdicts[n] = "works" if pc1_ok else "fails"
         elif k == "pcs":
@@ -293,7 +321,7 @@ def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], 
             verdicts[n] = "baseline_below" if d is not None and d["pc0_below"] else "baseline_not_below"
         elif k == "descriptive":
             verdicts[n] = "descriptive"
-    judged = [n for n in rec if kind_of(n) != "descriptive"]
+    judged = [n for n in rec if kind_of(n, tag) != "descriptive"]
     null_all = None if null95 is None else bool(judged and all(n in null95 and _lt(null95[n], margin) for n in judged))
     return {"ceiling_kinds": ceil, "attackers_used": use, "nan": bool(nan), "fit_failed": bool(fit_failed),
             "pc1_ok": bool(pc1_ok), "null_all_73_ok": null_all, "null95": null95, "maxima": rec,
@@ -433,9 +461,12 @@ def label_tables(work: Path, sids: list[str], cfg: dict, scratch: Path) -> dict:
 
 
 def e13_target(tag: str, tab: dict, names: dict, desc_a: list[str], cfg: dict, seed: int, jobs: int, nboot: int,
-               nperm: int, scratch: Path, cands: list[str]) -> dict:
+               nperm: int, scratch: Path, cands: list[str], null_names: list[str] | None = None,
+               forced: str | None = None) -> dict:
     """One label. names: name -> scratch file of its window features. desc_a: the names whose gain over model A
-    (B' = A + the stage) is described (design 1.5)."""
+    (B' = A + the stage) is described (design 1.5). null_names: the names whose null is run (None = all; graded
+    world design 1.2: on L1800 not the descriptive PC1 and PCs-). forced: see judge."""
+    perm_names = list(names) if null_names is None else [n for n in names if n in set(null_names)]
     folds = cfg["e13"]["folds"]
     Y, G, strata = tab["Y"], tab["G"], tab["strata"]
     n_sess = int(G.max()) + 1
@@ -443,8 +474,9 @@ def e13_target(tag: str, tab: dict, names: dict, desc_a: list[str], cfg: dict, s
 
     def fit_all(y: np.ndarray, t: str, with_desc: bool) -> dict:
         want = "pred" if t == "obs" else "auc"
+        which = names if t == "obs" else {n: names[n] for n in perm_names}
         js = [((t, "S", None, k), tag, "S", None, None, k, y, seed, folds, want) for k in KINDS]
-        js += [((t, n, fs, k), tag, "S", f, fs, k, y, seed, folds, want) for n, f in names.items() for fs in FSETS
+        js += [((t, n, fs, k), tag, "S", f, fs, k, y, seed, folds, want) for n, f in which.items() for fs in FSETS
                for k in KINDS]
         if with_desc:
             js += [((t, "A", None, k), tag, "A", None, None, k, y, seed, folds, want) for k in KINDS]
@@ -465,7 +497,7 @@ def e13_target(tag: str, tab: dict, names: dict, desc_a: list[str], cfg: dict, s
     preds = fit_all(Y, "obs", True)
     if any(v is None for v in preds.values()):
         res["auc_A_speed"] = None
-        res.update(judge({}, None if not nperm else {}, None, cands, cfg, True))
+        res.update(judge({}, None if not nperm else {}, None, cands, cfg, True, tag=tag, forced=forced))
         return res
     ones = np.ones(len(Y))
     auc_s = {k: weighted_auc(preds[("obs", "S", None, k)], Y, ones) for k in KINDS}
@@ -511,23 +543,23 @@ def e13_target(tag: str, tab: dict, names: dict, desc_a: list[str], cfg: dict, s
     res["gain_over_A"] = over_a
     nulls = None
     if nperm:
-        nulls = {n: [] for n in names}
+        nulls = {n: [] for n in perm_names}
         prng = np.random.default_rng(np.random.SeedSequence([seed, 911, LABEL_ID[tag]]))
         for pi in range(nperm):
             yp = stratified_permutation(Y, strata, prng)
             pp = fit_all(yp, f"perm{pi}", False)
             if any(v is None for v in pp.values()):
                 res["null_fit_failed"] = True
-                res.update(judge(attk, None, auc_s, cands, cfg, True))
+                res.update(judge(attk, None, auc_s, cands, cfg, True, tag=tag, forced=forced))
                 res["configs"] = attk
                 return res
-            for n in names:
+            for n in perm_names:
                 nulls[n].append({f"{fs}/{k}": pp[(f"perm{pi}", n, fs, k)] - pp[(f"perm{pi}", "S", None, k)]
                                  for fs in FSETS for k in KINDS})
-    j = judge(attk, nulls, auc_s, cands, cfg, False)
+    j = judge(attk, nulls, auc_s, cands, cfg, False, tag=tag, forced=forced)
     for n in names:
         res["configs"][n] = {"attackers": attk[n], **j["maxima"][n], "verdict": j["verdicts"].get(n)}
-        if nulls is not None:
+        if nulls is not None and n in nulls:
             res["configs"][n]["null_by_perm"] = nulls[n]
             res["configs"][n]["null95"] = j["null95"][n]
     for k in ("ceiling_kinds", "attackers_used", "nan", "fit_failed", "pc1_ok", "null_all_73_ok", "detector"):
@@ -736,31 +768,37 @@ def describe(names: list[str], twin_names: list[str], ms: list[dict], cfg: dict,
 # Main
 # ---------------------------------------------------------------------------
 
-def pilot_key(cand: str, lam: float) -> str:
-    """The pilot's name of the PC-stall of a candidate at lambda (three decimals: 0.025 and 0.075 stay apart)."""
-    return f"PCs-{cand}@{float(lam):.3f}"
+def pilot_key(cand: str, lam: float, prefix: str = "PCs-") -> str:
+    """The pilot's name of the PC-stall of a candidate at lambda (three decimals: 0.025 and 0.075 stay apart);
+    prefix PCl- for the L1800 control (graded world design 1.4)."""
+    return f"{prefix}{cand}@{float(lam):.3f}"
 
 
-def pilot_stop(merged: dict, per: dict, cfg: dict, ceil: list[str]) -> str | None:
+# graded world design 1.2, 1.4, 3.9: the pilot has two parts; each has its strong control and its PC-stall prefix
+PILOT_PARTS = {"L300": ("PC1", "PCs-", "lam"), "L1800": (st.PC1L_NAME, st.PCL_PREFIX, "lam_1800")}
+
+
+def pilot_stop(merged: dict, per: dict, cfg: dict, ceil: list[str], pc1_name: str = "PC1") -> str | None:
     """Round 2 design 3.9: the pilot chooses no lambda when a fit failed, both classifiers are at the ceiling, or
-    PC1 does not work (its lower bound must be finite and > e13.pc_lower; Codex: a NaN must not pass)."""
+    the strong control does not work (its lower bound must be finite and > e13.pc_lower; Codex: a NaN must not pass).
+    ceil is the ceiling of the part's own label (graded world design 3.7: L1800 reads L1800's AUC(A_speed))."""
     if any(v.get("fit_failed") for v in per.values()) or not per:
         return "fit_failed"
     if all(k in ceil for k in KINDS):
         return "ceiling"
-    pc1 = merged.get("PC1")
+    pc1 = merged.get(pc1_name)
     if not pc1 or not _gt(pc1["lower_max"], cfg["e13"]["pc_lower"]):
         return "weak_detector"
     return None
 
 
-def choose_all(merged: dict, cfg: dict) -> dict:
+def choose_all(merged: dict, cfg: dict, prefix: str = "PCs-") -> dict:
     """Round 2 design 3.9: the lambda of every candidate from the pilot's maxima (lambda = 0 is never a choice)."""
     ps = cfg["pc_stall"]
     grid = [float(x) for x in ps["pilot_grid"]]
     out = {}
     for c in st.candidates():
-        recs = [merged.get(pilot_key(c, x)) for x in grid]
+        recs = [merged.get(pilot_key(c, x, prefix)) for x in grid]
         g = [r["gain_max"] if r else float("nan") for r in recs]
         lo = [r["lower_max"] if r else float("nan") for r in recs]
         out[c] = select_lambda(grid, g, lo, ps["aim"], ps["lower"], ps["upper"])
@@ -770,13 +808,14 @@ def choose_all(merged: dict, cfg: dict) -> dict:
 RULE_KEYS = ("pilot_grid", "aim", "lower", "upper")
 
 
-def pilot_decide(merged: dict, per: dict, cfg: dict, ceil: list[str]) -> tuple[str | None, dict]:
+def pilot_decide(merged: dict, per: dict, cfg: dict, ceil: list[str], pc1_name: str = "PC1",
+                 prefix: str = "PCs-") -> tuple[str | None, dict]:
     """Round 2 design 3.9: (stop, selection). A stop leaves no lambda to write: the pilot's own stop, or a candidate
     with no finite point estimate (its selection stays as a record)."""
-    stop = pilot_stop(merged, per, cfg, ceil)
+    stop = pilot_stop(merged, per, cfg, ceil, pc1_name)
     if stop:
         return stop, {}
-    sels = choose_all(merged, cfg)
+    sels = choose_all(merged, cfg, prefix)
     if any(s["lam"] is None for s in sels.values()):
         return "no_finite_pcs", sels
     return None, sels
@@ -787,145 +826,248 @@ def _num(v):
     return float("nan") if v in ("nan", None) else float(v)
 
 
-def pilot_mismatch(p: dict, cfg: dict, base_seed: int) -> list[str]:
-    """The reasons a pilot.json is not the pilot of this config (Codex and code-reviewer round 2: an old pilot.json, a
-    pilot of another seed or size, or a rule changed after the pilot must not fill pc_stall.lam)."""
+def step_t(cfg: dict, step: str) -> float:
+    steps = cfg["ceiling"]["steps"]
+    if step not in steps:
+        raise SystemExit(f"unknown step {step!r}: not in config.json ceiling.steps {sorted(steps)}")
+    return float(steps[step])
+
+
+def world_problems(work: Path, cfg: dict, step: str) -> list[str]:
+    """graded world design 1.2, 3.7: the work directory was made with --world graded --t of this step."""
+    f = work / "world.json"
+    if not f.exists():
+        return [f"{f} is missing"]
+    w = json.loads(f.read_text(encoding="utf-8"))
+    want = {"world": "graded", "t": step_t(cfg, step)}
+    return [] if w == want else [f"{f} is {w}, not {want} (step {step})"]
+
+
+def pilot_check(p: dict, cfg: dict, base_seed: int, step: str) -> dict:
+    """graded world design 1.2, 3.7: is this pilot.json the pilot of this config and this step? Checks the world, t
+    and step (the three steps share a seed: Codex and code-reviewer round 1), the seed, P, bootstrap and rule (round 2
+    design 3.7), then recomputes each part's selection from its maxima. Returns the errors, the L300 lambdas, the
+    L1800 lambdas (None when the L1800 part stopped) and the L1800 stop."""
     sp, ps = cfg["sets"]["pilot"], cfg["pc_stall"]
-    out = []
-    if "stop" not in p or "rule" not in p:
-        return ["not a round 2 pilot.json (no stop or rule)"]
-    if p["stop"]:
-        out.append(f"the pilot stopped ({p['stop']})")
+    out = {"errors": [], "lam": None, "lam_1800": None, "stop_1800": None}
+    err = out["errors"]
+    if "parts" not in p or "rule" not in p or "stop" not in p:
+        err.append("not a graded world pilot.json (no parts, rule or stop)")
+        return out
+    t = step_t(cfg, step)
+    if p.get("world") != "graded" or p.get("step") != step or p.get("t") != t:
+        err.append(f"world {p.get('world')} / step {p.get('step')} / t {p.get('t')} is not graded / {step} / {t}")
     if p.get("seed") != base_seed + sp["seed_offset"]:
-        out.append(f"seed {p.get('seed')} is not SEED + {sp['seed_offset']} = {base_seed + sp['seed_offset']}")
+        err.append(f"seed {p.get('seed')} is not SEED + {sp['seed_offset']} = {base_seed + sp['seed_offset']}")
     if p.get("n_sessions") != sp["P"] or p.get("bootstrap") != sp["bootstrap"]:
-        out.append(f"P {p.get('n_sessions')} / bootstrap {p.get('bootstrap')} is not {sp['P']} / {sp['bootstrap']}")
+        err.append(f"P {p.get('n_sessions')} / bootstrap {p.get('bootstrap')} is not {sp['P']} / {sp['bootstrap']}")
     if p["rule"] != {k: ps[k] for k in RULE_KEYS}:
-        out.append(f"the rule {p['rule']} is not the config's")
-    if not out:
+        err.append(f"the rule {p['rule']} is not the config's")
+    if p["stop"]:
+        err.append(f"the L300 part of the pilot stopped ({p['stop']}): the step does not go on (design 3.9)")
+    if err:
+        return out
+    for tag, (_, prefix, key) in PILOT_PARTS.items():
+        part = p["parts"].get(tag)
+        if not isinstance(part, dict) or "stop" not in part or "selection" not in part:
+            err.append(f"the {tag} part is missing")
+            continue
+        if tag == "L300" and part["stop"] != p["stop"]:
+            err.append("the L300 part's stop is not the pilot's stop")
+            continue
+        if tag == "L1800" and part["stop"]:
+            out["stop_1800"] = part["stop"]
+            continue
         merged = {k: ({kk: _num(v[kk]) for kk in ("gain_max", "lower_max")} if v else None)
-                  for k, v in p.get("configs", {}).items()}
-        again = choose_all(merged, cfg)
-        if {c: again[c]["lam"] for c in st.candidates()} != {c: p["selection"].get(c, {}).get("lam")
-                                                              for c in st.candidates()}:
-            out.append("the selection does not follow from the pilot's maxima")
+                  for k, v in part.get("configs", {}).items()}
+        again = choose_all(merged, cfg, prefix)
+        mine = {c: part["selection"].get(c, {}).get("lam") for c in st.candidates()}
+        if {c: again[c]["lam"] for c in st.candidates()} != mine:
+            err.append(f"the {tag} selection does not follow from the pilot's maxima")
+            continue
+        out[key] = mine
     return out
 
 
-def apply_pilot(cfg_path: Path, pilot_path: Path) -> int:
-    """Write the pilot's choices to config.json pc_stall.lam (the rest of the file is kept as it is). The pilot must be
-    the round 2 pilot of this config: SEED (the file next to config.json) + offset, P, bootstrap, the rule, and the
-    selection recomputed from its maxima."""
+def apply_pilot(cfg_path: Path, pilot_path: Path, step: str) -> int:
+    """Write the pilot's choices to config.json pc_stall.lam.<step> and pc_stall.lam_1800.<step> (the rest of the
+    file is kept as it is). An L1800 part that stopped writes no lam_1800.<step> (graded world design 1.2)."""
     p = json.loads(pilot_path.read_text(encoding="utf-8"))
-    text = cfg_path.read_text(encoding="utf-8")
-    cfg = json.loads(text)
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     base_seed = int((cfg_path.parent / "SEED").read_text().strip())
-    bad = pilot_mismatch(p, cfg, base_seed)
-    if bad:
-        raise SystemExit(f"refused to write pc_stall.lam: {bad}")
-    cfg["pc_stall"]["lam"] = {c: p["selection"][c]["lam"] for c in st.candidates()}
-    bad = lam_problems(cfg)
+    chk = pilot_check(p, cfg, base_seed, step)
+    if chk["errors"]:
+        raise SystemExit(f"refused to write pc_stall.lam.{step}: {chk['errors']}")
+    cfg["pc_stall"]["lam"][step] = chk["lam"]
+    if chk["lam_1800"] is not None:
+        cfg["pc_stall"]["lam_1800"][step] = chk["lam_1800"]
+    else:
+        cfg["pc_stall"]["lam_1800"].pop(step, None)
+    bad = lam_problems(cfg, step, "lam") + (lam_problems(cfg, step, "lam_1800") if chk["lam_1800"] is not None else [])
     if bad:
         raise SystemExit(f"pilot selection is not on the grid: {bad}")
     cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-    print(json.dumps(cfg["pc_stall"]["lam"], indent=1))
+    print(json.dumps({"lam": chk["lam"], "lam_1800": chk["lam_1800"], "stop_1800": chk["stop_1800"]}, indent=1))
     return 0
 
 
-def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
-    """design 3.9: PC1 and the PC-stall of each candidate on [0] + the grid, L300 only, one candidate at a time."""
-    ps = cfg["pc_stall"]
-    grid = [float(x) for x in ps["pilot_grid"]]
+def pilot_part(tag: str, tab: dict, ms: list[dict], work: Path, cfg: dict, seed: int, jobs: int, nboot: int,
+               scratch: Path, t0: float) -> dict:
+    """design 3.9 (round 2) and its graded world addition: the strong control and the PC-stall of each candidate on
+    [0] + the grid, on one label, one candidate at a time."""
+    pc1_name, prefix, _ = PILOT_PARTS[tag]
+    grid = [float(x) for x in cfg["pc_stall"]["pilot_grid"]]
     cands = st.candidates()
+    merged, timing, per = {}, [], {}
+    batches = [(f"{tag}-{pc1_name}", [(pc1_name, pc1_name, None)])]
+    batches += [(f"{tag}-{c}", [(pilot_key(c, x, prefix), f"{prefix}{c}", x) for x in [0.0] + grid]) for c in cands]
+    keys = [k for _, sp in batches for k, _, _ in sp]
+    if len(set(keys)) != len(keys):  # Codex: two grid values that print alike would overwrite each other
+        raise SystemExit("pc_stall.pilot_grid: two values share a name at three decimals")
+    auc_s = None
+    for b, specs in batches:
+        tb = time.time()
+        F = run_stage(specs, ms, work, seed, jobs)
+        names = {}
+        for i, (key, *_) in enumerate(specs):
+            save(scratch, f"F-{b}-{i}", F[key])
+            names[key] = f"F-{b}-{i}"
+        del F
+        ts = time.time() - tb
+        r = e13_target(tag, tab[tag], names, [], cfg, seed, jobs, nboot, 0, scratch, [])
+        if r.get("auc_A_speed") is None:
+            per[b] = {"fit_failed": True}
+            merged.update({k: None for k in names})
+            continue
+        auc_s = r["auc_A_speed"]
+        merged.update({k: v for k, v in r["configs"].items()})
+        timing.append({"batch": b, "n_configs": len(specs), "stage_s": ts, **r["timing"]})
+        per[b] = {"fit_failed": False}
+        print(f"pilot {b}: {time.time() - tb:.0f} s (total {time.time() - t0:.0f} s)", flush=True)
+    ceil = ceiling_kinds(auc_s, cfg)
+    stop, sels = pilot_decide(merged, per, cfg, ceil, pc1_name, prefix)
+    for c in cands:
+        line = " ".join(f"{x:.3f}:{merged[pilot_key(c, x, prefix)]['gain_max']:+.3f}/"
+                        f"{merged[pilot_key(c, x, prefix)]['lower_max']:+.3f}"
+                        for x in [0.0] + grid if merged.get(pilot_key(c, x, prefix)))
+        z = merged.get(pilot_key(c, 0.0, prefix))
+        mark = ("  [lambda 0 upper >= 0.03: stall_baseline expected]"
+                if z and not _lt(z["upper_max"], cfg["e13"]["margin"]) else "")
+        print(f"{tag} {c}: lambda {sels[c]['lam'] if sels else None} ({sels[c]['rule'] if sels else 'stop'}){mark}"
+              f"\n   {line}")
+    return {"stop": stop, "auc_A_speed": auc_s, "ceiling_kinds": ceil,
+            "configs": {k: ({kk: v[kk] for kk in REC_KEYS} | {"attackers": v["attackers"]} if v else None)
+                        for k, v in merged.items()},
+            "per_batch": per, "selection": sels, "timing": timing}
+
+
+def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str) -> int:
+    """design 3.9 and the graded world addition: the L300 part (PC1, PCs-), then the L1800 part (PC1-1800, PCl-)
+    on the same sessions. A stopped L300 part stops the step; the L1800 part is then not run."""
+    bad = world_problems(work, cfg, step)
+    if bad:
+        raise SystemExit(f"pilot: {bad}")
     ms = st.manifest_p(work)
     sids = [m["sid"] for m in ms]
     t0 = time.time()
     scratch = Path(tempfile.mkdtemp(prefix="pilot-", dir=work))
     nboot = cfg["sets"]["pilot"]["bootstrap"]
+    ps = cfg["pc_stall"]
     try:
         tab = label_tables(work, sids, cfg, scratch)
-        merged, timing, per = {}, [], {}
-        batches = [("PC1", [("PC1", "PC1", None)])]
-        batches += [(c, [(pilot_key(c, x), f"PCs-{c}", x) for x in [0.0] + grid]) for c in cands]
-        keys = [k for _, sp in batches for k, _, _ in sp]
-        if len(set(keys)) != len(keys):  # Codex: two grid values that print alike would overwrite each other
-            raise SystemExit("pc_stall.pilot_grid: two values share a name at three decimals")
-        auc_s = None
-        for b, specs in batches:
-            tb = time.time()
-            F = run_stage(specs, ms, work, seed, jobs)
-            names = {}
-            for i, (key, *_) in enumerate(specs):
-                save(scratch, f"F-{b}-{i}", F[key])
-                names[key] = f"F-{b}-{i}"
-            del F
-            ts = time.time() - tb
-            r = e13_target("L300", tab["L300"], names, [], cfg, seed, jobs, nboot, 0, scratch, [])
-            if r.get("auc_A_speed") is None:
-                per[b] = {"fit_failed": True}
-                merged.update({k: None for k in names})
-                continue
-            auc_s = r["auc_A_speed"]
-            merged.update({k: v for k, v in r["configs"].items()})
-            timing.append({"batch": b, "n_configs": len(specs), "stage_s": ts, **r["timing"]})
-            per[b] = {"fit_failed": False}
-            print(f"pilot {b}: {time.time() - tb:.0f} s (total {time.time() - t0:.0f} s)", flush=True)
-        ceil = ceiling_kinds(auc_s, cfg)
-        stop, sels = pilot_decide(merged, per, cfg, ceil)
+        parts = {"L300": pilot_part("L300", tab, ms, work, cfg, seed, jobs, nboot, scratch, t0)}
+        if parts["L300"]["stop"]:
+            parts["L1800"] = {"stop": "not_run_l300_stopped", "selection": {}, "configs": {}}
+        else:
+            parts["L1800"] = pilot_part("L1800", tab, ms, work, cfg, seed, jobs, nboot, scratch, t0)
         dump(out / "pilot.json", {
-            "_note": ("Pilot 1 (round 2 design 3.9): SEED + 1, P sessions of world v4, PC1 and the PC-stall of each "
-                      "candidate on [0] + the grid, L300 only, no null. Not a result of the main run. "
-                      "`checks.py --apply-pilot` writes the chosen lambdas to config.json pc_stall.lam; the numbers go "
-                      "to design section 8. With `stop` set no lambda is chosen (back to the researcher)."),
-            "seed": seed, "n_sessions": len(sids), "bootstrap": nboot, "auc_A_speed": auc_s, "ceiling_kinds": ceil,
-            "stop": stop, "rule": {k: ps[k] for k in RULE_KEYS},
-            "configs": {k: ({kk: v[kk] for kk in REC_KEYS} | {"attackers": v["attackers"]} if v else None)
-                        for k, v in merged.items()},
-            "per_batch": per, "selection": sels, "timing": timing, "wall_s": time.time() - t0})
-        if stop:
-            print(f"pilot STOP: {stop} (no lambda chosen; back to the researcher, design 3.9)", flush=True)
-        for c in cands:
-            line = " ".join(f"{x:.3f}:{merged[pilot_key(c, x)]['gain_max']:+.3f}/{merged[pilot_key(c, x)]['lower_max']:+.3f}"
-                            for x in [0.0] + grid if merged.get(pilot_key(c, x)))
-            z = merged.get(pilot_key(c, 0.0))
-            mark = "  [lambda 0 upper >= 0.03: stall_baseline expected]" if z and not _lt(z["upper_max"], cfg["e13"]["margin"]) else ""
-            print(f"{c}: lambda {sels[c]['lam'] if sels else None} ({sels[c]['rule'] if sels else 'stop'}){mark}\n   {line}")
+            "_note": ("Pilot 1 (round 2 design 3.9, graded world design 3.9): SEED + 1, P sessions of the graded world "
+                      "at this step; the L300 part (PC1 and the PC-stall of each candidate on [0] + the grid) and the "
+                      "L1800 part (PC1-1800 and PCl- of each candidate), no null. Not a result of the main run. "
+                      "`checks.py --apply-pilot config.json <this file> <step>` writes the chosen lambdas to "
+                      "pc_stall.lam.<step> and pc_stall.lam_1800.<step>; the numbers go to design section 8. A stopped "
+                      "L300 part stops the step; a stopped L1800 part leaves L1800 undecidable (pilot_stop)."),
+            "world": "graded", "t": step_t(cfg, step), "step": step,
+            "seed": seed, "n_sessions": len(sids), "bootstrap": nboot, "rule": {k: ps[k] for k in RULE_KEYS},
+            "stop": parts["L300"]["stop"], "parts": parts, "wall_s": time.time() - t0})
+        for tag, part in parts.items():
+            if part["stop"]:
+                print(f"pilot {tag} STOP: {part['stop']} (design 3.9)", flush=True)
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     print(f"pilot done in {time.time() - t0:.0f} s", flush=True)
     return 0
 
 
-def lam_problems(cfg: dict) -> list[str]:
-    """design 3.9: every candidate has a lambda chosen on the pilot's grid (Codex round 2: a string, a NaN or a
-    value off the grid is not a pilot's choice)."""
+def lam_problems(cfg: dict, step: str, key: str = "lam") -> list[str]:
+    """design 3.9: every candidate has a lambda chosen on the pilot's grid, for this step (graded world design 1.2:
+    pc_stall.lam and pc_stall.lam_1800 are tables per step; Codex round 2: a string, a NaN or a value off the grid
+    is not a pilot's choice)."""
     ps = cfg["pc_stall"]
     grid = [float(x) for x in ps["pilot_grid"]]
+    table = ps[key].get(step)
+    if not isinstance(table, dict):
+        return [f"pc_stall.{key}.{step}: not set (run the pilot of the step and --apply-pilot first)"]
     out = []
     for c in st.candidates():
-        v = ps["lam"].get(c)
+        v = table.get(c)
         if v is None:
-            out.append(f"{c}: not set (run the pilot first)")
+            out.append(f"{key}.{step}.{c}: not set")
         elif type(v) not in (int, float) or not any(abs(float(v) - x) < 1e-12 for x in grid):
-            out.append(f"{c}: {v!r} is not a value of pc_stall.pilot_grid")
-    extra = sorted(set(ps["lam"]) - set(st.candidates()))
+            out.append(f"{key}.{step}.{c}: {v!r} is not a value of pc_stall.pilot_grid")
+    extra = sorted(set(table) - set(st.candidates()))
     if extra:
-        out.append(f"unknown names {extra}")
+        out.append(f"{key}.{step}: unknown names {extra}")
     return out
 
 
-def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
-    ps = cfg["pc_stall"]
-    cands = st.candidates()
-    bad = lam_problems(cfg)
+def main_lams(cfg: dict, pilot_json: Path, base_seed: int, step: str) -> tuple[dict, dict | None, str | None]:
+    """graded world design 1.2: the main run reads the step's pilot.json itself, not only config.json. Returns the
+    L300 lambdas, the L1800 lambdas (None when the L1800 part stopped) and the L1800 stop."""
+    if not pilot_json.exists():
+        raise SystemExit(f"{pilot_json} is missing (run the pilot of step {step} first)")
+    chk = pilot_check(json.loads(pilot_json.read_text(encoding="utf-8")), cfg, base_seed, step)
+    if chk["errors"]:
+        raise SystemExit(f"{pilot_json}: {chk['errors']}")
+    bad = lam_problems(cfg, step, "lam")
+    if bad or cfg["pc_stall"]["lam"][step] != chk["lam"]:
+        raise SystemExit(f"config.json pc_stall.lam.{step} is not the pilot's choice: {bad}")
+    if chk["stop_1800"] is None:
+        bad = lam_problems(cfg, step, "lam_1800")
+        if bad or cfg["pc_stall"]["lam_1800"][step] != chk["lam_1800"]:
+            raise SystemExit(f"config.json pc_stall.lam_1800.{step} is not the pilot's choice: {bad}")
+    elif step in cfg["pc_stall"]["lam_1800"]:
+        raise SystemExit(f"config.json pc_stall.lam_1800.{step} is set but the pilot's L1800 part stopped")
+    return chk["lam"], chk["lam_1800"], chk["stop_1800"]
+
+
+def label_names(names: dict, tag: str, cn: dict) -> tuple[dict, list[str] | None]:
+    """graded world design 1.2: the names fitted on a label and the names whose null is run (None = all). PC1-1800
+    and PCl- are fitted on L1800 only; on L1800 the round 2 PC1 and PCs- are descriptive with no null."""
+    extra = set(cn["pc1_1800"] + cn["pcl"])
+    if tag != "L1800":
+        return {n: f for n, f in names.items() if n not in extra}, None
+    fitted = dict(names)
+    nulls = [n for n in fitted if kind_of(n, tag) != "descriptive"] + [n for n in cn["pccorr"] if n in fitted]
+    return fitted, nulls
+
+
+def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str, pilot_json: Path,
+             base_seed: int) -> int:
+    bad = world_problems(work, cfg, step)
     if bad:
-        raise SystemExit(f"config.json pc_stall.lam: {bad}")
+        raise SystemExit(f"main: {bad}")
+    lam, lam1800, stop1800 = main_lams(cfg, pilot_json, base_seed, step)
+    cands = st.candidates()
     ms = st.manifest_p(work)
     sids = [m["sid"] for m in ms]
     cn = st.config_names(cands)
     specs = ([(c, c, None) for c in cands] + [("PC1", "PC1", None)]
-             + [(f"PCs-{c}", f"PCs-{c}", float(ps["lam"][c])) for c in cands]
+             + [(f"PCs-{c}", f"PCs-{c}", float(lam[c])) for c in cands]
              + [(f"PC0-{c}", f"PC0-{c}", 0.0) for c in cands] + [("PC-corr", "PC-corr", None)])
+    if stop1800 is None:
+        specs += ([(st.PC1L_NAME, st.PC1L_NAME, None)]
+                  + [(f"{st.PCL_PREFIX}{c}", f"{st.PCL_PREFIX}{c}", float(lam1800[c])) for c in cands])
     t0 = time.time()
     scratch = Path(tempfile.mkdtemp(prefix="main-", dir=work))
     try:
@@ -940,8 +1082,12 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
         desc_a = cands + cn["pccorr"]
         e13 = {}
         for tag in LABELS:
-            e13[tag] = e13_target(tag, tab[tag], names, desc_a, cfg, seed, jobs, cfg["e13"]["bootstrap"],
-                                  cfg["e13"]["null_perms"], scratch, cands)
+            fitted, null_names = label_names(names, tag, cn)
+            forced = "pilot_stop" if (tag == "L1800" and stop1800) else None
+            e13[tag] = e13_target(tag, tab[tag], fitted, desc_a, cfg, seed, jobs, cfg["e13"]["bootstrap"],
+                                  cfg["e13"]["null_perms"], scratch, cands, null_names, forced)
+            if forced:
+                e13[tag]["pilot_stop_1800"] = stop1800
             verd = {c: e13[tag]["configs"].get(c, {}).get("verdict", "undecidable") for c in cands}
             imp = {}
             for c in cands:
@@ -954,15 +1100,18 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
                   flush=True)
         e13["primary"] = "L300"
         e13["seed"] = seed
+        e13["step"], e13["t"] = step, step_t(cfg, step)
         dump(out / "e13.json", e13)
         desc = describe(cands + cn["pccorr"], cands, ms, cfg, seed, work, jobs)
         dump(out / "describe.json", {"_note": "Descriptive (design 3.4): no verdict.", **desc})
         summ = {c: {t: e13[t]["configs"].get(c, {}).get("verdict", "undecidable") for t in LABELS} for c in cands}
-        summ["_controls"] = {n: {t: e13[t]["configs"].get(n, {}).get("verdict") for t in LABELS}
-                             for n in cn["pc1"] + cn["pcs"] + cn["pc0"] + cn["pccorr"]}
+        ctrl = cn["pc1"] + cn["pcs"] + cn["pc0"] + cn["pccorr"] + cn["pc1_1800"] + cn["pcl"]
+        summ["_controls"] = {n: {t: e13[t]["configs"].get(n, {}).get("verdict") for t in LABELS} for n in ctrl}
         summ["_detector"] = {t: {k: e13[t].get(k) for k in ("auc_A_speed", "auc_A", "ceiling_kinds", "pc1_ok",
-                                                            "null_all_73_ok", "nan", "fit_failed", "detector")}
+                                                            "null_all_73_ok", "nan", "fit_failed", "detector",
+                                                            "pilot_stop_1800")}
                              for t in LABELS}
+        summ["_step"] = {"step": step, "t": step_t(cfg, step)}
         summ["_wall_s"] = time.time() - t0
         dump(out / "summary.json", summ)
     finally:
@@ -973,27 +1122,33 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int) -> int:
 
 def main() -> int:
     import sys
-    if len(sys.argv) == 4 and sys.argv[1] == "--apply-pilot":  # checks.py --apply-pilot <config.json> <pilot.json>
-        return apply_pilot(Path(sys.argv[2]), Path(sys.argv[3]))
+    if len(sys.argv) == 5 and sys.argv[1] == "--apply-pilot":  # checks.py --apply-pilot <config> <pilot.json> <step>
+        return apply_pilot(Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4])
     ap = argparse.ArgumentParser()
     ap.add_argument("config")
     ap.add_argument("seed_file")
     ap.add_argument("work")
     ap.add_argument("results")
     ap.add_argument("--jobs", type=int, default=8)
+    ap.add_argument("--step", required=True, help="graded world design 1.1: t025, t050 or t075")
+    ap.add_argument("--pilot-json", default=None, help="the main run and the smoke: the step's pilot.json")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--smoke", action="store_true")
     g.add_argument("--pilot", action="store_true")
     a = ap.parse_args()
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
+    step_t(cfg, a.step)
     if a.smoke:
         cfg["e13"]["bootstrap"], cfg["e13"]["null_perms"] = 200, 2
     seed = int(Path(a.seed_file).read_text().strip())
+    base_seed = int((Path(a.config).parent / "SEED").read_text().strip())
     work, out = Path(a.work), Path(a.results)
     out.mkdir(parents=True, exist_ok=True)
     if a.pilot:
-        return pilot(cfg, seed, work, out, a.jobs)
-    return main_run(cfg, seed, work, out, a.jobs)
+        return pilot(cfg, seed, work, out, a.jobs, a.step)
+    if not a.pilot_json:
+        raise SystemExit("--pilot-json is required by the main run and the smoke (graded world design 1.2)")
+    return main_run(cfg, seed, work, out, a.jobs, a.step, Path(a.pilot_json), base_seed)
 
 
 if __name__ == "__main__":
