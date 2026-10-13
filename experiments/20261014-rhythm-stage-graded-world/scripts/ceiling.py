@@ -17,6 +17,7 @@ Usage: ceiling.py <config.json> <seed file> <out dir> --work t025=<work dir> --w
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -125,6 +126,15 @@ def measure(tabs: dict, seed: int, folds: int, jobs: int) -> dict:
     return res
 
 
+def cfg_fingerprint(cfg: dict) -> str:
+    """graded world design 1.2 (cross-review round 2): the SHA-256 of config.json without the keys that start with _
+    (comments) and without pc_stall.lam and pc_stall.lam_1800 (written after the pilots). pilot 0 and each pilot 1
+    record it; the later steps refuse a record made under another config."""
+    c = {k: v for k, v in cfg.items() if not k.startswith("_")}
+    c["pc_stall"] = {k: v for k, v in c["pc_stall"].items() if k not in ("lam", "lam_1800")}
+    return hashlib.sha256(json.dumps(c, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+
+
 def step_status(res_step: dict, main_auc: float) -> dict:
     """graded world design 3.0: ceiling when both classifiers' L300 AUC(A_speed) are >= main_auc (equality is at the
     ceiling, as design 3.2); unmeasured when a fit failed or a value is NaN (not read as a ceiling); else go."""
@@ -166,7 +176,8 @@ def main() -> int:
         tabs[world] = bl.tables(Path(wd), sids, cfg)
     res = measure(tabs, seed, cfg["e13"]["folds"], a.jobs)
     out = {"design": ".steering/20261014-rhythm-stage-graded-world/design.md 3.0", "seed": seed, "P": n_p,
-           "folds": cfg["e13"]["folds"], "main_auc": cfg["ceiling"]["main_auc"], "results": res,
+           "folds": cfg["e13"]["folds"], "main_auc": cfg["ceiling"]["main_auc"],
+           "config_fingerprint": cfg_fingerprint(cfg), "results": res,
            "steps": choose_steps(res, cfg)}
     Path(a.out).mkdir(parents=True, exist_ok=True)
     with open(Path(a.out) / "ceiling.json", "w", encoding="utf-8", newline="\n") as fh:

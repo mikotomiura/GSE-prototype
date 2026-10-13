@@ -111,12 +111,12 @@ selftest() {
   rm -rf "$ST_TMP"
 }
 
-# provenance <out file> <seed> <worlds> (design 3.8; worlds names the step and t, graded world design 1.2)
+# provenance <out file> <seed> <worlds> [<step> <t>] (design 3.8; graded world design 1.2: the step and t)
 provenance() {
-  "$PY" - "$1" "$HMM_VERSION" "$EXP_DIR" "$JOBS" "$2" "$3" "$MODE" "${GSE_REPLAY:-}" <<'PYEOF'
+  "$PY" - "$1" "$HMM_VERSION" "$EXP_DIR" "$JOBS" "$2" "$3" "$MODE" "${GSE_REPLAY:-}" "${4:-}" "${5:-}" <<'PYEOF'
 import hashlib, json, os, platform, subprocess, sys
 from importlib.metadata import version
-out, hmm, exp_dir, jobs, seed, worlds, mode, binary = sys.argv[1:9]
+out, hmm, exp_dir, jobs, seed, worlds, mode, binary, step, t = sys.argv[1:11]
 commit = subprocess.run(["git", "-C", exp_dir, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
 r = subprocess.run(["git", "-C", exp_dir, "status", "--porcelain", "--", ".", ":(exclude)results"],
                    capture_output=True, text=True)
@@ -127,6 +127,7 @@ if binary:
     replay = {"path": binary, "sha256": hashlib.sha256(open(binary, "rb").read()).hexdigest()}
 json.dump({"mode": mode, "git_commit": commit, "experiment_dir_dirty": dirty, "config_sha256": cfg_sha,
            "hmm_version_in_meta": hmm, "gse_replay": replay, "seed": int(seed), "worlds": worlds.split(),
+           "step": step or None, "t": float(t) if t else None,
            "python": platform.python_version(), "platform": platform.platform(), "cpu_count": os.cpu_count(),
            "jobs": int(jobs),
            "packages": {p: version(p) for p in ("numpy", "scipy", "scikit-learn", "threadpoolctl")}},
@@ -172,7 +173,9 @@ twins() {
 step_t() {
   local v
   v="$("$PY" -c "import json,sys; s=json.load(open(sys.argv[1],encoding='utf-8'))['ceiling']['steps']; print(repr(float(s[sys.argv[2]]))) if sys.argv[2] in s else sys.exit('unknown step ' + sys.argv[2])" "$EXP_DIR/config.json" "$1")"
-  echo "${v%$'\r'}"
+  v="${v%$'\r'}"
+  [ -n "$v" ] || return 1  # code-reviewer round 2 L4
+  echo "$v"
 }
 
 if [ "$MODE" = selftest ]; then
@@ -211,11 +214,10 @@ if [ "$MODE" = ceiling ]; then
 fi
 
 T="$(step_t "$STEP")"
-# graded world design 3.0: only a go step runs the pilot 1, the smoke and the main run
-STATUS="$("$PY" -c "import json,sys; print(json.load(open(sys.argv[1],encoding='utf-8'))['steps'][sys.argv[2]]['status'])" "$EXP_DIR/results/ceiling/ceiling.json" "$STEP")" \
-  || { echo "results/ceiling/ceiling.json has no status for $STEP (run --ceiling first)" >&2; exit 2; }
-STATUS="${STATUS%$'\r'}"
-[ "$STATUS" = go ] || { echo "step $STEP is $STATUS in results/ceiling/ceiling.json: not run (design 3.0)" >&2; exit 2; }
+[ -n "$T" ] || { echo "unknown step $STEP" >&2; exit 2; }
+# graded world design 3.0: only a go step of ceiling.json made under this config (fingerprint, seed, P, t, main_auc)
+"$PY" -c "import json,sys; sys.path.insert(0,'.'); import checks; from pathlib import Path; p=Path(sys.argv[1]); checks.check_ceiling_file(json.load(open(p,encoding='utf-8')), p, sys.argv[2])" \
+  "$EXP_DIR/config.json" "$STEP"
 case "$MODE" in
   pilot) SUFFIX="$STEP/pilot"; OFFSET="$(cfg "c['sets']['pilot']['seed_offset']")"; P_N="$(cfg "c['sets']['pilot']['P']")" ;;
   smoke) SUFFIX="$STEP/main-smoke"; OFFSET=2; P_N=12 ;;  # SEED + 2: the smoke does not look at the main run's sessions
@@ -247,7 +249,7 @@ else
   "$PY" checks.py "$EXP_DIR/config.json" "$WORK/SEED.run" "$WORK" "$OUT" --jobs "$JOBS" --step "$STEP" \
     --pilot-json "$PILOT_JSON" "${SMOKE_ARG[@]}"
 fi
-provenance "$OUT/provenance.json" "$SEED_RUN" "$WORLD step=$STEP t=$T"
+provenance "$OUT/provenance.json" "$SEED_RUN" "$WORLD" "$STEP" "$T"
 publish "$SUFFIX"
 rm -rf "$WORK"
 echo "done: $EXP_DIR/results/$SUFFIX"

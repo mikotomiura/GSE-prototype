@@ -794,8 +794,12 @@ def test_judge_1800(cfg: dict, cands: list[str], att) -> None:
     check(not jj["nan"] and jj["verdicts"][c0] == "green", "judge L1800: a NaN bound of the descriptive PC1 does not stop the label")
     check(jj["null_all_73_ok"] is True, "judge L1800: the overall null is over the judged names (no null run for PC1, PCs-)")
     jj = v(forced="pilot_stop")
-    check(all(jj["verdicts"][c] == "undecidable" and jj["detector"][c]["reasons"] == ["pilot_stop"] for c in cands),
-          "judge L1800: a stopped L1800 part of the pilot -> every candidate undecidable (pilot_stop)")
+    check(all(jj["verdicts"][c] == "undecidable" and jj["detector"][c]["reasons"][0] == "pilot_stop" for c in cands)
+          and jj["null_all_73_ok"] is None,
+          "judge L1800: a stopped L1800 part of the pilot -> every candidate undecidable (pilot_stop first); no overall null")
+    jj = ck.judge(base(), nulls, {"hgb": 0.95, "lr": 0.95}, cands, cfg, False, tag="L1800", forced="pilot_stop")
+    check(jj["detector"][c0]["reasons"] == ["pilot_stop", "ceiling"],
+          "judge L1800: the forced reason keeps the other reasons (code-reviewer round 2 L2)")
     for n in (P1, f"{PL}{c0}"):
         try:
             ck.kind_of(n, "L300")
@@ -949,65 +953,93 @@ def test_select_lambda(cfg: dict) -> None:
           "pilot: the L300 part reads PC1 and PCs-, the L1800 part PC1-1800 and PCl-")
 
 
-def pilot_doc(cfg: dict, step: str, merged: dict, sels: dict, merged18: dict, sels18: dict, base_seed: int) -> dict:
+def pilot_doc(cfg: dict, step: str, parts: dict, base_seed: int) -> dict:
     sp = cfg["sets"]["pilot"]
-    part = lambda m, s_, stop=None: {"stop": stop, "selection": s_, "auc_A_speed": {"hgb": 0.7, "lr": 0.7},
-                                     "ceiling_kinds": [],
-                                     "configs": {k: {kk: v[kk] for kk in ck.REC_KEYS} for k, v in m.items()}}
-    return {"world": "graded", "t": cfg["ceiling"]["steps"][step], "step": step, "stop": None,
+    return {"world": "graded", "t": cfg["ceiling"]["steps"][step], "step": step, "stop": parts["L300"]["stop"],
             "rule": {k: cfg["pc_stall"][k] for k in ck.RULE_KEYS}, "seed": base_seed + sp["seed_offset"],
-            "n_sessions": sp["P"], "bootstrap": sp["bootstrap"],
-            "parts": {"L300": part(merged, sels), "L1800": part(merged18, sels18)}}
+            "n_sessions": sp["P"], "bootstrap": sp["bootstrap"], "config_fingerprint": ce.cfg_fingerprint(cfg),
+            "parts": parts}
+
+
+def part_doc(tag: str, merged: dict, cfg: dict, auc=None) -> dict:
+    """A part as pilot_part writes it, from hand-made maxima (part_result gives its stop and selection)."""
+    auc = auc or {"hgb": 0.7, "lr": 0.7}
+    per = {f"{tag}-{k}": {"fit_failed": False} for k in ("x", "y")}
+    stop, sels, ceil = ck.part_result(tag, merged, per, auc, cfg)
+    return {"stop": stop, "selection": sels, "auc_A_speed": auc, "ceiling_kinds": ceil, "per_batch": per,
+            "configs": {k: ({kk: v[kk] for kk in ck.REC_KEYS} if v else None) for k, v in merged.items()}}
 
 
 def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
-    """graded world design 1.2, 3.7: pilot.json -> lam.<step>, lam_1800.<step> -> the main run's check; another step,
-    a stopped part, a tampered selection or a hand-edited config are refused."""
+    """graded world design 1.2, 3.7 (and the cross-review round 2): pilot.json -> lam.<step>, lam_1800.<step> -> the
+    main run's check; the L1800 choices differ from the L300 ones, so the two parts cannot be swapped unseen; the other
+    steps' tables are kept; another step, a stopped or recomputed-differently part, a tampered selection, another config
+    or a hand-edited config are refused."""
     cands = st.candidates()
     grid = [float(x) for x in cfg["pc_stall"]["pilot_grid"]]
     base_seed = 20261016
-    # the L1800 part: the same maxima under PCl- names, shifted by one grid step
-    merged18 = {(st.PC1L_NAME if k == "PC1" else k.replace("PCs-", st.PCL_PREFIX, 1)): v for k, v in merged.items()}
-    sels18 = ck.choose_all(merged18, cfg, st.PCL_PREFIX)
-    check({c: sels18[c]["lam"] for c in cands} == want and ck.choose_all(merged18, cfg)[cands[0]]["lam"] is None,
-          "pilot (L1800): the PCl- names give the choices; the PCs- names are not read for L1800")
-    good = pilot_doc(cfg, "t050", merged, sels, merged18, sels18, base_seed)
+    rec = lambda g, lo: {"gain_max": g, "lower_max": lo, "upper_max": g + 0.008, "n_nan_bounds": 0}
+    # the L1800 part: the L300 maxima under PCl- names, one grid step later (code-reviewer round 2 M1)
+    merged18 = {st.PC1L_NAME: rec(0.3, 0.25)}
+    for c in cands:
+        merged18[ck.pilot_key(c, 0.0, st.PCL_PREFIX)] = rec(0.004, -0.004)
+        for i, x in enumerate(grid):
+            src = merged[ck.pilot_key(c, grid[max(i - 1, 0)])]
+            merged18[ck.pilot_key(c, x, st.PCL_PREFIX)] = src if i > 0 else rec(0.0, -0.008)
+    want18 = {c: grid[grid.index(want[c]) + 1] for c in cands}
+    check({c: s["lam"] for c, s in ck.choose_all(merged18, cfg, st.PCL_PREFIX).items()} == want18 and want18 != want
+          and ck.choose_all(merged18, cfg)[cands[0]]["lam"] is None,
+          "pilot (L1800): the PCl- names give their own choices (not L300's); PCs- names are not read for L1800")
+    p300, p18 = part_doc("L300", merged, cfg), part_doc("L1800", merged18, cfg)
+    check(p300["stop"] is None and p18["stop"] is None, "pilot: the hand-made parts do not stop")
+    # part_result reads the part's own label's AUC (code-reviewer round 2 M3)
+    s18c = ck.part_result("L1800", merged18, p18["per_batch"], {"hgb": 0.92, "lr": 0.95}, cfg)
+    s300 = ck.part_result("L300", merged, p300["per_batch"], {"hgb": 0.7, "lr": 0.7}, cfg)
+    check(s18c[0] == "ceiling" and s300[0] is None, "pilot: a part at its own label's ceiling stops; the other part does not")
+    good = pilot_doc(cfg, "t050", {"L300": p300, "L1800": p18}, base_seed)
+    old = {c: grid[0] for c in cands}  # another step's tables, written before (Codex round 2 P1)
+    pre = json.loads(json.dumps(cfg))
+    pre["pc_stall"]["lam"]["t025"] = old
+    pre["pc_stall"]["lam_1800"]["t025"] = old
     with tempfile.TemporaryDirectory() as d:
         cp, pp = Path(d) / "config.json", Path(d) / "pilot.json"
         (Path(d) / "SEED").write_text(f"{base_seed}\n", encoding="utf-8")
-        fresh = lambda: cp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        fresh = lambda c=pre: cp.write_text(json.dumps(c, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         fresh()
         pp.write_text(json.dumps(good), encoding="utf-8")
         ck.apply_pilot(cp, pp, "t050")
         back = json.loads(cp.read_text(encoding="utf-8"))
         rest = lambda c: {**c, "pc_stall": {k: v for k, v in c["pc_stall"].items() if k not in ("lam", "lam_1800")}}
-        check(back["pc_stall"]["lam"] == {"t050": want} and back["pc_stall"]["lam_1800"] == {"t050": want}
-              and rest(back) == rest(cfg), "pilot: --apply-pilot writes lam.t050 and lam_1800.t050 only")
-        lam, lam18, stop18 = ck.main_lams(back, pp, base_seed, "t050")
-        check(lam == want and lam18 == want and stop18 is None, "main: the step's pilot.json and config.json agree")
-        hand = json.loads(json.dumps(back))
-        hand["pc_stall"]["lam_1800"]["t050"][cands[0]] = grid[0] if want[cands[0]] != grid[0] else grid[1]
-        try:
-            ck.main_lams(hand, pp, base_seed, "t050")
-            refused = False
-        except SystemExit:
-            refused = True
-        check(refused, "main: a hand-edited lam_1800.<step> that is not the pilot's choice stops the run")
+        check(back["pc_stall"]["lam"] == {"t025": old, "t050": want}
+              and back["pc_stall"]["lam_1800"] == {"t025": old, "t050": want18} and rest(back) == rest(pre),
+              "pilot: --apply-pilot writes lam.t050 (L300's) and lam_1800.t050 (L1800's), keeps t025, nothing else")
+        check(ck.main_lams(back, pp, base_seed, "t050") == (want, want18, None),
+              "main: the step's pilot.json and config.json agree (L300 and L1800 each its own)")
+        for name, hand in (("lam.<step>", "lam"), ("lam_1800.<step>", "lam_1800")):
+            h = json.loads(json.dumps(back))
+            h["pc_stall"][hand]["t050"][cands[0]] = grid[0] if h["pc_stall"][hand]["t050"][cands[0]] != grid[0] else grid[1]
+            try:
+                ck.main_lams(h, pp, base_seed, "t050")
+                refused = False
+            except SystemExit:
+                refused = True
+            check(refused, f"main: a hand-edited {name} that is not the pilot's choice stops the run")
         try:
             ck.main_lams(back, pp, base_seed, "t025")
             refused = False
         except SystemExit:
             refused = True
         check(refused, "main: the pilot.json of step t050 is refused for step t025")
-        # a stopped L1800 part: lam only; the main run reads the stop from pilot.json
-        stopped = json.loads(json.dumps(good))
-        stopped["parts"]["L1800"] = {"stop": "weak_detector", "selection": {}, "configs": {}}
+        # a stopped L1800 part (PC1-1800 weak): lam only; the main run reads the stop from pilot.json
+        weak18 = part_doc("L1800", {**merged18, st.PC1L_NAME: rec(0.12, 0.08)}, cfg)
+        stopped = pilot_doc(cfg, "t050", {"L300": p300, "L1800": weak18}, base_seed)
+        check(weak18["stop"] == "weak_detector", "pilot: a weak PC1-1800 stops the L1800 part")
         fresh()
         pp.write_text(json.dumps(stopped), encoding="utf-8")
         ck.apply_pilot(cp, pp, "t050")
         back2 = json.loads(cp.read_text(encoding="utf-8"))
-        check(back2["pc_stall"]["lam"] == {"t050": want} and back2["pc_stall"]["lam_1800"] == {},
-              "pilot: a stopped L1800 part writes lam.<step> and no lam_1800.<step>")
+        check(back2["pc_stall"]["lam"] == {"t025": old, "t050": want} and back2["pc_stall"]["lam_1800"] == {"t025": old},
+              "pilot: a stopped L1800 part writes lam.<step> and no lam_1800.<step> (t025 kept)")
         check(ck.main_lams(back2, pp, base_seed, "t050") == (want, None, "weak_detector"),
               "main: a stopped L1800 part -> L1800 undecidable (pilot_stop), L300 and L60 go on")
         try:
@@ -1016,21 +1048,30 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
         except SystemExit:
             refused = True
         check(refused, "main: lam_1800.<step> set while the pilot's L1800 part stopped stops the run")
-        tampered = {**sels18, cands[0]: {**sels18[cands[0]], "lam": grid[0] if want[cands[0]] != grid[0] else grid[1]}}
+        swap = lambda part, **kw: {**good, "parts": {**good["parts"], part: {**good["parts"][part], **kw}}}
+        flip = lambda sels_, c: {**sels_, c: {**sels_[c], "lam": grid[0] if sels_[c]["lam"] != grid[0] else grid[1]}}
+        edited = json.loads(json.dumps(pre))
+        edited["e13"]["pc_lower"] = 0.11
         bad_cases = (
             ("another step (t025's t)", {**good, "step": "t025", "t": 0.25}),
             ("the right step name with another t", {**good, "t": 0.25}),
             ("another world", {**good, "world": "v4"}),
-            ("a stopped L300 part", {**good, "stop": "weak_detector",
-                                     "parts": {**good["parts"], "L300": {**good["parts"]["L300"], "stop": "weak_detector"}}}),
-            ("an L300 part whose stop differs from the pilot's", {**good, "parts": {**good["parts"], "L300": {
-                **good["parts"]["L300"], "stop": "fit_failed"}}}),
+            ("a stopped L300 part", {**swap("L300", stop="weak_detector"), "stop": "weak_detector"}),
+            ("an L300 stop that differs from the pilot's", {**good, "stop": "fit_failed"}),
+            ("an L1800 part claimed stopped while its values do not stop", swap("L1800", stop="weak_detector")),
+            ("an L1800 part claimed fine while its values stop", {**stopped, "parts": {
+                **stopped["parts"], "L1800": {**weak18, "stop": None, "selection": p18["selection"]}}}),
             ("a missing L1800 part", {**good, "parts": {"L300": good["parts"]["L300"]}}),
-            ("an L1800 selection that does not follow from the maxima",
-             {**good, "parts": {**good["parts"], "L1800": {**good["parts"]["L1800"], "selection": tampered}}}),
+            ("an L1800 part without its fits", {**good, "parts": {**good["parts"], "L1800": {
+                k: v for k, v in p18.items() if k != "per_batch"}}}),
+            ("an L300 selection that does not follow from the maxima", swap("L300", selection=flip(p300["selection"], cands[0]))),
+            ("an L1800 selection that does not follow from the maxima", swap("L1800", selection=flip(p18["selection"], cands[0]))),
+            ("L300's selection put in the L1800 part", swap("L1800", selection=p300["selection"])),
             ("a round 2 pilot.json (no parts)", {k: v for k, v in good.items() if k != "parts"}),
             ("another seed", {**good, "seed": 20261014}),
-            ("another rule", {**good, "rule": {**good["rule"], "aim": 0.05}}))
+            ("another P", {**good, "n_sessions": 40}),
+            ("another rule", {**good, "rule": {**good["rule"], "aim": 0.05}}),
+            ("another config (fingerprint)", {**good, "config_fingerprint": ce.cfg_fingerprint(edited)}))
         for name, bad in bad_cases:
             fresh()
             pp.write_text(json.dumps(bad), encoding="utf-8")
@@ -1039,8 +1080,58 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
                 refused = False
             except SystemExit:
                 refused = True
-            check(refused and json.loads(cp.read_text(encoding="utf-8"))["pc_stall"] == cfg["pc_stall"],
+            check(refused and json.loads(cp.read_text(encoding="utf-8"))["pc_stall"] == pre["pc_stall"],
                   f"pilot: --apply-pilot refuses {name} and leaves config.json as it was")
+        fresh(edited)
+        pp.write_text(json.dumps(good), encoding="utf-8")
+        try:
+            ck.apply_pilot(cp, pp, "t050")
+            refused = False
+        except SystemExit:
+            refused = True
+        check(refused, "pilot: a config.json changed after the pilot (e13.pc_lower) refuses the pilot (fingerprint)")
+    check(ce.cfg_fingerprint(back) == ce.cfg_fingerprint(pre) == ce.cfg_fingerprint({**pre, "_comment": "x"}),
+          "fingerprint: the lambda tables and the comments do not change it")
+    test_ceiling_gate(cfg, base_seed)
+    test_label_plan()
+
+
+def test_ceiling_gate(cfg: dict, base_seed: int) -> None:
+    """graded world design 3.0 (cross-review round 2): a step runs only when ceiling.json says go and was made under
+    this config."""
+    doc = {"seed": base_seed + cfg["ceiling"]["seed_offset"], "main_auc": cfg["ceiling"]["main_auc"],
+           "P": {s: cfg["ceiling"]["P"] for s in cfg["ceiling"]["steps"]}, "config_fingerprint": ce.cfg_fingerprint(cfg),
+           "steps": {s: {"t": t, "status": "go"} for s, t in cfg["ceiling"]["steps"].items()}}
+    check(ck.ceiling_problems(doc, cfg, base_seed, "t050") == [], "ceiling gate: a go step of this config passes")
+    moved = json.loads(json.dumps(cfg))
+    moved["ceiling"]["steps"]["t050"] = 0.45
+    for name, d_, c_ in (
+            ("a ceiling step", {**doc, "steps": {**doc["steps"], "t050": {"t": 0.5, "status": "ceiling"}}}, cfg),
+            ("an unmeasured step", {**doc, "steps": {**doc["steps"], "t050": {"t": 0.5, "status": "unmeasured"}}}, cfg),
+            ("a step missing", {**doc, "steps": {"t025": doc["steps"]["t025"]}}, cfg),
+            ("another seed", {**doc, "seed": base_seed}, cfg),
+            ("another P", {**doc, "P": {**doc["P"], "t050": 40}}, cfg),
+            ("another main_auc", {**doc, "main_auc": 0.85}, cfg),
+            ("a t moved in config.json after pilot 0", doc, moved),
+            ("another config (fingerprint)", {**doc, "config_fingerprint": "0" * 64}, cfg)):
+        check(ck.ceiling_problems(d_, c_, base_seed, "t050") != [], f"ceiling gate: {name} is refused")
+
+
+def test_label_plan() -> None:
+    """graded world design 1.2, 3.9 (code-reviewer round 2 M3): the main run's plan per label."""
+    cands = st.candidates()
+    cn = st.config_names(cands)
+    base = cands + cn["pc1"] + cn["pcs"] + cn["pc0"] + cn["pccorr"]
+    names = {n: f"F-{i}" for i, n in enumerate(base + cn["pc1_1800"] + cn["pcl"])}
+    for tag in ("L300", "L60"):
+        f, nl, forced = ck.label_plan(names, tag, cn, "weak_detector")
+        check(sorted(f) == sorted(base) and nl is None and forced is None,
+              f"label plan: {tag} fits the round 2 names with every null and is never forced (even if L1800 stopped)")
+    f, nl, forced = ck.label_plan(names, "L1800", cn, None)
+    check(sorted(f) == sorted(names) and forced is None, "label plan: L1800 with its controls is not forced")
+    stopped = {n: v for n, v in names.items() if n in base}  # the main run leaves the 25 out when L1800 stopped
+    f, nl, forced = ck.label_plan(stopped, "L1800", cn, "weak_detector")
+    check(sorted(f) == sorted(base) and forced == "pilot_stop", "label plan: L1800 forced to pilot_stop when its part stopped")
 
 
 def test_stats(cfg: dict) -> None:

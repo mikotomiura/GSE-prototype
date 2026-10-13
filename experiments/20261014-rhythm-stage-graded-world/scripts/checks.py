@@ -40,6 +40,7 @@ from pathlib import Path
 import numpy as np
 
 import baseline as bl
+import ceiling as ce
 import stage as st
 
 KINDS = ("hgb", "lr")
@@ -294,8 +295,8 @@ def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], 
             reasons.append("stall_baseline")
         stop_path = (not broken and pc1_ok and null_ok is True and pc0 is not None
                      and _gt(pc0["lower_max"], ps["lower"]))
-        if forced:
-            reasons, stop_path = [forced], False
+        if forced:  # code-reviewer round 2 L2: the forced reason first, the others kept
+            reasons, stop_path = [forced] + reasons, False
         detector[c] = {"detector_ok": not reasons, "reasons": reasons, "pcs_ok": bool(stall_ok),
                        "pc0_below": bool(base_ok), "null_ok": null_ok, "stop_path": bool(stop_path)}
         if stop_path:
@@ -322,7 +323,8 @@ def judge(attk: dict, nulls: dict | None, auc_s: dict | None, cands: list[str], 
         elif k == "descriptive":
             verdicts[n] = "descriptive"
     judged = [n for n in rec if kind_of(n, tag) != "descriptive"]
-    null_all = None if null95 is None else bool(judged and all(n in null95 and _lt(null95[n], margin) for n in judged))
+    null_all = None if (null95 is None or forced) else bool(judged and all(n in null95 and _lt(null95[n], margin)
+                                                                          for n in judged))
     return {"ceiling_kinds": ceil, "attackers_used": use, "nan": bool(nan), "fit_failed": bool(fit_failed),
             "pc1_ok": bool(pc1_ok), "null_all_73_ok": null_all, "null95": null95, "maxima": rec,
             "detector": detector, "verdicts": verdicts}
@@ -843,11 +845,52 @@ def world_problems(work: Path, cfg: dict, step: str) -> list[str]:
     return [] if w == want else [f"{f} is {w}, not {want} (step {step})"]
 
 
+def part_result(tag: str, merged: dict, per: dict, auc_s: dict | None, cfg: dict) -> tuple[str | None, dict, list]:
+    """design 3.9: (stop, selection, ceiling) of one part of the pilot from its own maxima, fits and AUC(A_speed)
+    (the ceiling of the part's own label: code-reviewer round 2 M3). pilot_part writes it; pilot_check recomputes it."""
+    pc1_name, prefix, _ = PILOT_PARTS[tag]
+    ceil = ceiling_kinds(auc_s, cfg)
+    stop, sels = pilot_decide(merged, per, cfg, ceil, pc1_name, prefix)
+    return stop, sels, ceil
+
+
+def ceiling_problems(doc: dict, cfg: dict, base_seed: int, step: str) -> list[str]:
+    """graded world design 3.0 (cross-review round 2): the step runs only when results/ceiling/ceiling.json says go
+    for it and was made under this config (fingerprint, seed, P, t, main_auc)."""
+    c = cfg["ceiling"]
+    out = []
+    s = doc.get("steps", {}).get(step)
+    if not isinstance(s, dict):
+        return [f"ceiling.json has no step {step} (run --ceiling first)"]
+    if s.get("status") != "go":
+        out.append(f"step {step} is {s.get('status')} in ceiling.json: not run (design 3.0)")
+    if s.get("t") != step_t(cfg, step):
+        out.append(f"ceiling.json t {s.get('t')} is not config.json's {step_t(cfg, step)}")
+    if doc.get("seed") != base_seed + c["seed_offset"]:
+        out.append(f"ceiling.json seed {doc.get('seed')} is not SEED + {c['seed_offset']}")
+    if doc.get("main_auc") != c["main_auc"] or doc.get("P", {}).get(step) != c["P"]:
+        out.append(f"ceiling.json main_auc {doc.get('main_auc')} / P {doc.get('P', {}).get(step)} are not the config's")
+    if doc.get("config_fingerprint") != ce.cfg_fingerprint(cfg):
+        out.append("ceiling.json was made under another config.json (fingerprint)")
+    return out
+
+
+def check_ceiling_file(cfg: dict, cfg_path: Path, step: str) -> None:
+    base_seed = int((cfg_path.parent / "SEED").read_text().strip())
+    f = cfg_path.parent / "results" / "ceiling" / "ceiling.json"
+    if not f.exists():
+        raise SystemExit(f"{f} is missing (run --ceiling first)")
+    bad = ceiling_problems(json.loads(f.read_text(encoding="utf-8")), cfg, base_seed, step)
+    if bad:
+        raise SystemExit(f"{f}: {bad}")
+
+
 def pilot_check(p: dict, cfg: dict, base_seed: int, step: str) -> dict:
     """graded world design 1.2, 3.7: is this pilot.json the pilot of this config and this step? Checks the world, t
-    and step (the three steps share a seed: Codex and code-reviewer round 1), the seed, P, bootstrap and rule (round 2
-    design 3.7), then recomputes each part's selection from its maxima. Returns the errors, the L300 lambdas, the
-    L1800 lambdas (None when the L1800 part stopped) and the L1800 stop."""
+    and step (the three steps share a seed: Codex and code-reviewer round 1), the seed, P, bootstrap, rule and the
+    config's fingerprint (cross-review round 2), then recomputes each part's stop and selection from its maxima, fits
+    and AUC (part_result). Returns the errors, the L300 lambdas, the L1800 lambdas (None when the L1800 part stopped)
+    and the L1800 stop."""
     sp, ps = cfg["sets"]["pilot"], cfg["pc_stall"]
     out = {"errors": [], "lam": None, "lam_1800": None, "stop_1800": None}
     err = out["errors"]
@@ -863,24 +906,31 @@ def pilot_check(p: dict, cfg: dict, base_seed: int, step: str) -> dict:
         err.append(f"P {p.get('n_sessions')} / bootstrap {p.get('bootstrap')} is not {sp['P']} / {sp['bootstrap']}")
     if p["rule"] != {k: ps[k] for k in RULE_KEYS}:
         err.append(f"the rule {p['rule']} is not the config's")
+    if p.get("config_fingerprint") != ce.cfg_fingerprint(cfg):
+        err.append("the pilot was made under another config.json (fingerprint)")
     if p["stop"]:
         err.append(f"the L300 part of the pilot stopped ({p['stop']}): the step does not go on (design 3.9)")
     if err:
         return out
     for tag, (_, prefix, key) in PILOT_PARTS.items():
         part = p["parts"].get(tag)
-        if not isinstance(part, dict) or "stop" not in part or "selection" not in part:
-            err.append(f"the {tag} part is missing")
+        need = ("stop", "selection", "configs", "per_batch", "auc_A_speed")
+        if not isinstance(part, dict) or any(k not in part for k in need):
+            err.append(f"the {tag} part is missing or incomplete")
+            continue
+        merged = {k: ({kk: _num(v[kk]) for kk in ("gain_max", "lower_max")} if v else None)
+                  for k, v in part["configs"].items()}
+        auc = None if part["auc_A_speed"] is None else {k: _num(v) for k, v in part["auc_A_speed"].items()}
+        stop, again, _ = part_result(tag, merged, part["per_batch"], auc, cfg)
+        if stop != part["stop"]:
+            err.append(f"the {tag} part's stop {part['stop']} does not follow from its values ({stop})")
             continue
         if tag == "L300" and part["stop"] != p["stop"]:
             err.append("the L300 part's stop is not the pilot's stop")
             continue
-        if tag == "L1800" and part["stop"]:
-            out["stop_1800"] = part["stop"]
+        if tag == "L1800" and stop:
+            out["stop_1800"] = stop
             continue
-        merged = {k: ({kk: _num(v[kk]) for kk in ("gain_max", "lower_max")} if v else None)
-                  for k, v in part.get("configs", {}).items()}
-        again = choose_all(merged, cfg, prefix)
         mine = {c: part["selection"].get(c, {}).get("lam") for c in st.candidates()}
         if {c: again[c]["lam"] for c in st.candidates()} != mine:
             err.append(f"the {tag} selection does not follow from the pilot's maxima")
@@ -944,8 +994,7 @@ def pilot_part(tag: str, tab: dict, ms: list[dict], work: Path, cfg: dict, seed:
         timing.append({"batch": b, "n_configs": len(specs), "stage_s": ts, **r["timing"]})
         per[b] = {"fit_failed": False}
         print(f"pilot {b}: {time.time() - tb:.0f} s (total {time.time() - t0:.0f} s)", flush=True)
-    ceil = ceiling_kinds(auc_s, cfg)
-    stop, sels = pilot_decide(merged, per, cfg, ceil, pc1_name, prefix)
+    stop, sels, ceil = part_result(tag, merged, per, auc_s, cfg)
     for c in cands:
         line = " ".join(f"{x:.3f}:{merged[pilot_key(c, x, prefix)]['gain_max']:+.3f}/"
                         f"{merged[pilot_key(c, x, prefix)]['lower_max']:+.3f}"
@@ -989,6 +1038,7 @@ def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str) -> 
                       "L300 part stops the step; a stopped L1800 part leaves L1800 undecidable (pilot_stop)."),
             "world": "graded", "t": step_t(cfg, step), "step": step,
             "seed": seed, "n_sessions": len(sids), "bootstrap": nboot, "rule": {k: ps[k] for k in RULE_KEYS},
+            "config_fingerprint": ce.cfg_fingerprint(cfg),
             "stop": parts["L300"]["stop"], "parts": parts, "wall_s": time.time() - t0})
         for tag, part in parts.items():
             if part["stop"]:
@@ -1041,6 +1091,13 @@ def main_lams(cfg: dict, pilot_json: Path, base_seed: int, step: str) -> tuple[d
     return chk["lam"], chk["lam_1800"], chk["stop_1800"]
 
 
+def label_plan(names: dict, tag: str, cn: dict, stop1800: str | None) -> tuple[dict, list[str] | None, str | None]:
+    """graded world design 1.2, 3.9: (the names fitted on the label, the names whose null is run, the forced reason).
+    Only L1800 is forced to pilot_stop, and only when the pilot's L1800 part stopped (code-reviewer round 2 M3)."""
+    fitted, nulls = label_names(names, tag, cn)
+    return fitted, nulls, ("pilot_stop" if (tag == "L1800" and stop1800) else None)
+
+
 def label_names(names: dict, tag: str, cn: dict) -> tuple[dict, list[str] | None]:
     """graded world design 1.2: the names fitted on a label and the names whose null is run (None = all). PC1-1800
     and PCl- are fitted on L1800 only; on L1800 the round 2 PC1 and PCs- are descriptive with no null."""
@@ -1052,12 +1109,13 @@ def label_names(names: dict, tag: str, cn: dict) -> tuple[dict, list[str] | None
     return fitted, nulls
 
 
-def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str, pilot_json: Path,
-             base_seed: int) -> int:
+def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str,
+             lams: tuple[dict, dict | None, str | None]) -> int:
+    """lams: main_lams of the unmodified config (main() checks it before the smoke changes the bootstrap)."""
     bad = world_problems(work, cfg, step)
     if bad:
         raise SystemExit(f"main: {bad}")
-    lam, lam1800, stop1800 = main_lams(cfg, pilot_json, base_seed, step)
+    lam, lam1800, stop1800 = lams
     cands = st.candidates()
     ms = st.manifest_p(work)
     sids = [m["sid"] for m in ms]
@@ -1082,8 +1140,7 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str, 
         desc_a = cands + cn["pccorr"]
         e13 = {}
         for tag in LABELS:
-            fitted, null_names = label_names(names, tag, cn)
-            forced = "pilot_stop" if (tag == "L1800" and stop1800) else None
+            fitted, null_names, forced = label_plan(names, tag, cn, stop1800)
             e13[tag] = e13_target(tag, tab[tag], fitted, desc_a, cfg, seed, jobs, cfg["e13"]["bootstrap"],
                                   cfg["e13"]["null_perms"], scratch, cands, null_names, forced)
             if forced:
@@ -1138,17 +1195,20 @@ def main() -> int:
     a = ap.parse_args()
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
     step_t(cfg, a.step)
-    if a.smoke:
-        cfg["e13"]["bootstrap"], cfg["e13"]["null_perms"] = 200, 2
+    check_ceiling_file(cfg, Path(a.config), a.step)  # graded world design 3.0: a go step of this config only
     seed = int(Path(a.seed_file).read_text().strip())
     base_seed = int((Path(a.config).parent / "SEED").read_text().strip())
     work, out = Path(a.work), Path(a.results)
-    out.mkdir(parents=True, exist_ok=True)
     if a.pilot:
+        out.mkdir(parents=True, exist_ok=True)
         return pilot(cfg, seed, work, out, a.jobs, a.step)
     if not a.pilot_json:
         raise SystemExit("--pilot-json is required by the main run and the smoke (graded world design 1.2)")
-    return main_run(cfg, seed, work, out, a.jobs, a.step, Path(a.pilot_json), base_seed)
+    lams = main_lams(cfg, Path(a.pilot_json), base_seed, a.step)  # before the smoke changes the config
+    if a.smoke:
+        cfg["e13"]["bootstrap"], cfg["e13"]["null_perms"] = 200, 2
+    out.mkdir(parents=True, exist_ok=True)
+    return main_run(cfg, seed, work, out, a.jobs, a.step, lams)
 
 
 if __name__ == "__main__":

@@ -43,15 +43,17 @@
 - `stage.py`: L1800 の専用の対照（§1.4）を足す。`PC1-1800` と `PCl-<候補>`。乱数の引き方（区切りごとに `U`・`N` の順）は PC-stall と同じタグで同じにする。
 - `checks.py`:
   - `kind_of` にラベルを渡す。L1800 では `PC1-1800` が強い対照、`PCl-<候補>` が候補ごとの対照、元の `PC1`・`PCs-<候補>` は記述。L300・L60 では第 2 回のまま。
-  - **当てはめる名前をラベルごとに分ける**: `PC1-1800`・`PCl-<候補>` の 25 本は L1800 でだけ当てはめ、L300・L60 では当てはめない（L300・L60 の名前の集合・NaN の判定・73 本の帰無の論理積は第 2 回と同じになる）。L1800 の元の `PC1`・`PCs-<候補>` は記述として当てはめ、ブートストラップの区間は出すが帰無は回さない（`PC-corr` と同じ扱い）。
+  - **当てはめる名前をラベルごとに分ける**: `PC1-1800`・`PCl-<候補>` の 25 本は L1800 でだけ当てはめ、L300・L60 では当てはめない（L300・L60 の名前の集合・NaN の判定・73 本の帰無の論理積は第 2 回と同じになる）。L1800 の元の `PC1`・`PCs-<候補>` は記述として当てはめ、ブートストラップの区間は出すが帰無は回さない。`PC-corr` は第 2 回と同じく帰無も回す（記述で、判定には読まない。固定の前の `/cross-review` 2 巡目で、初稿の「`PC-corr` と同じ扱い」が第 2 回の計器と合わないと指摘された）。
   - L1800 の `judge` は、強い対照に `PC1-1800`、候補ごとの対照に `PCl-<候補>`、土台に `PC0-<候補>` を使う（λ = 0 では `PCl-<候補>` と `PC0-<候補>` は同じ列になる）。帰無の 4 本は、候補・`PCl-<候補>`・`PC0-<候補>`・`PC1-1800`。L1800 の記述でない名前は 73 本（候補 24・`PC1-1800`・`PCl-` 24・`PC0-` 24）。
   - 下見 1 に L1800 の分を足す（§3.9 への追加）。`pilot.json` に `world`・`t`・段の名前を書き、L300 の分と L1800 の分の止まりと選択を別々に記録する。
   - `pilot_mismatch` に、`world` が `graded`・`t` と段の名前が `--step` と `config.json` の `ceiling.steps` に一致すること、を足す（同じ seed の 3 段で、別の段の `pilot.json` を当てられないようにする）。
+  - config の指紋（`_` で始まる注釈と `pc_stall.lam`・`lam_1800` を除いた `config.json` の SHA-256・`ceiling.cfg_fingerprint`）を `ceiling.json` と `pilot.json` に書き、後の段で照合する。`pilot.json` の各部の止まりと選択は、部の値（最大・当てはめの成否・その部のラベルの AUC(A_speed)）から計算し直して照合する（`part_result`・固定の前の `/cross-review` 2 巡目）。
+  - 本番のラベルごとの組み立て（当てはめる名前・帰無を回す名前・強制する理由）は `label_plan` にまとめる。強制の理由（`pilot_stop`）は、ほかの理由を消さずに先頭に付ける。強制したラベルでは `null_all_73_ok` を出さない。
   - `--apply-pilot <config.json> <pilot.json> --step <段>` は、`pc_stall.lam.<段>` と `pc_stall.lam_1800.<段>` を書く。L1800 の分だけが止まった `pilot.json` からは `lam.<段>` だけを書き、`lam_1800.<段>` は書かない。
   - 本番は `--step` の `pilot.json`（`results/<段>/pilot/pilot.json`）を読み、`pilot_mismatch` を通したうえで、`lam.<段>` がその選択と一致することを確かめる。L1800 は、`pilot.json` が L1800 の分の止まりを記録していれば、専用の対照を回さず 24 本を判定不能（理由 `pilot_stop`）とする。止まっていなければ `lam_1800.<段>` がその選択と一致することを確かめる（config だけを読まない）。
 - `ceiling.py`: `ceiling.steps` の 3 段を測り、§3.0 の規則で段ごとに `go`・`ceiling`・`unmeasured`（NaN）を決めて `results/ceiling/ceiling.json` に書く。
 - `selftest.py`: §3.7 への追加の検査を足す。
-- `run.sh`: `--step` を足す。`--pilot`・`--smoke`・`--main` は、その段が `results/ceiling/ceiling.json` で `go` でなければ止まる。`--main` は §1.2 の `pilot.json` の照合が通らなければ止まる。`--ceiling` は `ceiling.steps` の段を `--world graded --t` で作る。`provenance.json` に段の名前・`t`・計器のコミットを書く。`data.md`・`env.md`: このタスクの design・seed・所要に合わせる。
+- `run.sh`: `--step` を足す。`--pilot`・`--smoke`・`--main` は、その段が `results/ceiling/ceiling.json` で `go` で、かつ `ceiling.json` が今の config で作られたもの（指紋・seed・P・t・`main_auc`）でなければ止まる（`checks.ceiling_problems`。`checks.py` の入口も同じ照合をする）。`--main` は §1.2 の `pilot.json` の照合が通らなければ止まる。`--ceiling` は `ceiling.steps` の段を `--world graded --t` で作る。`provenance.json` に段の名前・`t`・計器のコミットを書く。`data.md`・`env.md`: このタスクの design・seed・所要に合わせる。
 - 上のほかの計器（写像・L300 と L60 の陽性対照・攻撃者・判定・記述・双子）は変えない。
 
 ### 1.3 段の world `g(t)`
@@ -122,7 +124,7 @@
   - L1800 の `judge` が `PC1-1800`・`PCl-` で検査器を読み、`PC1`・`PCs-` を記述にする。手で作った値で確かめる: 元の PC1 が働いても PC1-1800 が働かなければ `weak_detector`。その逆なら働く。帰無の 4 本は L1800 で `PC1-1800`・`PCl-<候補>` になる。
   - L300・L60 で当てはめる名前の集合が第 2 回と同じで、`PC1-1800`・`PCl-` を含まない。L1800 の記述の名前に NaN を入れても、L1800 の `nan` と `null_all_73_ok` は変わらない。
   - L1800 の分だけが止まった `pilot.json` で、L1800 の 24 本が `pilot_stop` で判定不能になり、L300・L60 の判定は変わらない。`config.json` の `lam_1800.<段>` を手で書き換えても、`pilot.json` と一致しなければ本番が止まる。
-- 下見 0 の規則: L300 の 2 つの分類器が 0.90・0.90 なら `ceiling`、0.8999・0.95 なら `go`、NaN を含めば `unmeasured`。`ceiling`・`unmeasured` の段では `run.sh --pilot --step` が止まる。
+- 下見 0 の規則: L300 の 2 つの分類器が 0.90・0.90 なら `ceiling`、0.8999・0.95 なら `go`、NaN を含めば `unmeasured`。`ceiling`・`unmeasured` の段・別の seed・P・t・`main_auc`・指紋の `ceiling.json` は、`checks.ceiling_problems` が拒む（`run.sh` の門はこの関数を呼ぶ。`run.sh` そのものを通した検査はしない）。
 - `--apply-pilot`: `lam.<段>` と `lam_1800.<段>` を、それぞれの下見（L300・L1800）の値から計算し直した選択と照合してから書く（第 2 回 design §3.7 の照合を L1800 にも当てる）。別の段の `pilot.json`（同じ seed・P・規則で `t` だけが違う）は拒む。L1800 の分だけが止まった `pilot.json` からは `lam.<段>` だけを書く。
 - 下見 1 の L1800 の天井による止まりは、L1800 の AUC(A_speed) で判定する（L300 の値を渡すと止まり方が変わる手作りの組で確かめる）。
 

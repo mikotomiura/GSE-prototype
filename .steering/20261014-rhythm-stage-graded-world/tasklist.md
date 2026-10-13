@@ -4,9 +4,9 @@
 - [x] 中間の world の形を研究者と決める（第 2 回の判断 7）
 - [x] `design.md`（第 2 回との違いだけ: 補間の式と 3 段・段ごとの下見 0 と天井の規則・L1800 の専用の対照・seed・費用の見積もり）
 - [x] 固定の前の `/cross-review` 1 巡目 → 判断 2
-- [ ] 第 2 回の計器を写して直す（`gen_sessions.py --world` の段・`stage.py` の L1800 の対照・`checks.py`・`ceiling.py`・selftest・`run.sh`・`config.json`・`SEED`）
-- [ ] 固定の前の `/cross-review` 2 巡目（直しの差分・計器を含む）
-- [ ] selftest（gse-replay を使わない分）
+- [x] 第 2 回の計器を写して直す（写し `2adf0fc3`・直し `c61f2bce`・`gen_sessions.py --world` の段・`stage.py` の L1800 の対照・`checks.py`・`ceiling.py`・selftest・`run.sh`・`config.json`・`SEED`）
+- [x] 固定の前の `/cross-review` 2 巡目（直しの差分・計器を含む）→ 判断 4
+- [x] selftest（gse-replay を使わない分・264 項目・0 件の失敗・変異 19 通りを捕まえた）
 - [ ] design と計器をコミット（どの下見 0 よりも前）
 
 ## 段ごと（固定の後・t = 0.25 / 0.5 / 0.75）
