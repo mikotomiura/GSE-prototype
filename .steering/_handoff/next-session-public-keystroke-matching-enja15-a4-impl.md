@@ -1,6 +1,6 @@
 # 次のセッション: 公開データでの照合の論文 —— ENJA15 と A4 の実装、そして本計算
 
-作成 2026-10-13。前の引き継ぎ `next-session-public-keystroke-matching-checks-1-7.md` の検査 1〜7 は済んだ（`experiments/20261012-public-keystroke-matching/notes.md` の「データの検査」・逸脱 D1）。投稿の目標は PoPETs 2027 Issue 3（締切 2026-11-30 AoE）。機械は G-GEAR。10/26 の催促は `next-session-public-keystroke-matching-1026-reminder.md`。
+作成 2026-10-13。前の引き継ぎ `next-session-public-keystroke-matching-checks-1-7.md` の検査 1〜7 は済んだ（`experiments/20261012-public-keystroke-matching/notes.md` の「データの検査」・逸脱 D1）。投稿の目標は PoPETs 2027 Issue 3（締切 2026-11-30 AoE）。機械は G-GEAR。KLiCKe の著者（Dr. Tian）からは 2026-10-13 に返事が来た（懸念なし・MIT・IRB・集計で報告する勧めは事前登録と同じ・判断 54）。10/26 の催促は要らない。研究者が 10-13 に送った 2 通（Dr. Tian への審査機関の問い・PoPETs の program chairs への録画と発表の要否の問い）の返事を待つ（`next-session-public-keystroke-matching-1026-reminder.md`）。PoPETs から「録画か発表が必須」と返ってきたら投稿先を考え直す。
 
 ## 新しいセッションで最初に打ち込む文
 
