@@ -38,6 +38,7 @@ ALNUM = re.compile(r"[A-Za-z0-9]")
 # Closed lists of what may be written verbatim (review: a regex for "looks like a name" also passes a word typed as
 # a value). Activity values of the Kaggle description; key names of the W3C UI Events key values (special keys only,
 # no printable character) and the mouse values of the logger.
+PROMPTS = {"APPEARANCE", "COMPETITION", "HAPPINESS", "MATERIALISM"}
 ACTIVITIES = {"Input", "Remove/Cut", "Nonproduction", "Replace", "Paste"}
 KEY_NAMES = {
     "Unidentified", "Alt", "AltGraph", "CapsLock", "Control", "Fn", "FnLock", "Hyper", "Meta", "NumLock", "ScrollLock",
@@ -285,8 +286,9 @@ def main():
 
 
 def safe_prompt(p, i):
-    """Prompt names are the task names of the distribution: written only as one upper-case word, else numbered."""
-    return p if re.fullmatch(r"[A-Z]{1,20}", p) else "<prompt %d>" % i
+    """Prompt names are written only when they are the four task names of Tian et al. (2025) (closed list), else
+    numbered."""
+    return p if p in PROMPTS else "<prompt %d>" % i
 
 
 if __name__ == "__main__":

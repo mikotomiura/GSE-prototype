@@ -4,7 +4,7 @@ attribute) remains in any column after R3j. Counts only.
 
     python -I scripts/enja15_ime_path_check.py --root raw/enja15 --out results/enja15_ime_path_check.json
     ENJA_MUTATE=keep_value python -I scripts/enja15_ime_path_check.py ...   # must FAIL (exit 1)
-    (mutants: keep_value, category_from_value, drop_rows; an empty --root must also FAIL)
+    (mutants: keep_value, category_from_value, drop_rows, duplicate_first; an empty --root must also FAIL)
 
 Checks per session: (1) every R3j row has exactly the keys time, type and category; (2) time is an int, type is in
 TYPES and category in R3J_CATEGORIES (closed lists, so no value can carry a string of the log); (3) no R3j value
@@ -31,6 +31,8 @@ def r3j(events):
             row["value"] = a.get("Value")
     if MUTATE == "drop_rows":
         rows = []
+    if MUTATE == "duplicate_first" and rows:
+        rows = [dict(rows[0]) for _ in rows]
     if MUTATE == "category_from_value":
         for row, (_, _, a) in zip(rows, events):
             if row["category"] in ("commit", "commit_punct"):
@@ -76,6 +78,10 @@ def check_session(path):
     c["key_events"] = len(ev)
     if len(rows) != len(ev):
         c["fail_rows_differ_from_key_events"] += 1
+    # each row is the R3j of its own Key event: the same time and Type, and the category of that event
+    for row, (tm, t, a) in zip(rows, ev):
+        if row.get("time") != tm or row.get("type") != t or row.get("category") != enja15.category(t, a):
+            c["fail_row_not_its_event"] += 1
     for row in rows:
         c["category " + str(row.get("category")) if row.get("category") in enja15.R3J_CATEGORIES else "category <not in list>"] += 1
     return c

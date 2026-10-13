@@ -59,6 +59,10 @@ def verify_checkpoint(model_dir):
                 h.update(b)
         if h.hexdigest() != want:
             raise SystemExit("SHA-256 of %s differs from data.md" % name)
+    # another weight file in the folder would be loaded instead of the verified .bin (safetensors first): refuse
+    extra = [f for f in os.listdir(model_dir) if f not in CHECKPOINT_SHA256 and f != "convert.sh"]
+    if extra:
+        raise SystemExit("unverified files in the checkpoint folder: %d" % len(extra))
     with open(os.path.join(model_dir, "config.json"), encoding="utf-8") as f:
         if "auto_map" in json.load(f):
             raise SystemExit("config.json asks for remote code")
@@ -114,7 +118,7 @@ def main():
     t0 = time.time()
     tok = AutoTokenizer.from_pretrained(args.model, local_files_only=True, trust_remote_code=False)
     model = AutoModelForCausalLM.from_pretrained(args.model, device_map="auto", local_files_only=True,
-                                                 trust_remote_code=False).eval()
+                                                 trust_remote_code=False, use_safetensors=False).eval()
     load_s = time.time() - t0
     torch.cuda.reset_peak_memory_stats()
     times, in_tokens = [], []
