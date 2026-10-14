@@ -16,4 +16,4 @@
 ## 完了処理
 - [x] notes（段ごとの判定を前の 3 回と並べる）
 - [x] notes の `/cross-review`（2 巡）—— 1 巡目 → 判断 6・2 巡目 → 判断 7
-- [ ] 引き継ぎ（次の手は研究者が決める）
+- [x] 引き継ぎ（次の手は研究者が決める）→ `.steering/_handoff/next-session-rhythm-stage-after-speed-confound.md`
