@@ -51,7 +51,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
   `capabilities.rs` (収集能力の自己記述・ADR-013)、`overlay_panel.rs`
 - `src-tauri/src/bin/` — `gse-replay` (回帰/評価 CLI)、`gse-cohort` (被験者横断判定)、`emit_schema` (JSON Schema 生成)、
   `gse-package` / `gse-unpack` / `gse-submit` (`--features package`)
-- `docs/` — 永続ドキュメント (**25 md**・2026-10-07 に数え直した + `architecture/` + `adr/` + `literature/` + `mitou_submission/` + ★ `theory/`)
+- `docs/` — 永続ドキュメント (**27 md**・2026-10-15 に数え直した + `architecture/` + `adr/` + `literature/` + `mitou_submission/` + ★ `theory/`)
   ★ `docs/theory/` は理論の文書（**theory candidate・`EH0`・SSOT の主張ではない**。2026-09-19 に `.idea/` から移した）
 - `.steering/` — タスク単位の作業記録 (`[YYYYMMDD]-[task-name]/`)
 - `.claude/` — Claude Code 用 (skills / agents / commands / hooks)
@@ -192,6 +192,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/preregistration-p1-episode.md` | ★ **P1 の episode 定義パラメータ** (`W` / `q` / `B` / `hole_gap_ms` / `warmup_count` / 分位点の推定法 / `T1a` の窓) を確認する時。⚠️ **v0.3 とは別の契約**（向こうは較正スモークの合否、こちらは P1 の解析パラメータで**合否を判定しない**）。★ 値の SSOT は `src-tauri/prereg/p1-episode.json`（`gse-replay --features` が既定として読む）。一致は `scripts/check_prereg_parity.py` が検査する |
 | `docs/wbs-verification-halfyear.md` | 検証の 26 週マイルストーン・WBS・改訂予定を確認したい時 |
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
+| `docs/ethics-review-routes.md` | 人を対象とする研究の倫理審査の経路（費用ゼロ・所属に委員会が無い場合）と、投稿先ごとの倫理と費用の規程を確かめる時。照合の論文・BRM の IME 論文・AI 疲労の核 2 で共通に使う。法的な判断ではない |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
 | `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜039**) の根拠を確認したい時 |
