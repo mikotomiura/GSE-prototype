@@ -11,6 +11,8 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| **ワクワクと打鍵からのタンジブリティの設計の議論**（肖像と招待の分け方は EH3 で実装済み・手応えの経路と本人の関与が未決・実装しない） | **`next-session-tangibility-design.md`**（2026-10-14） | **現行・未着手**。`/start-task` → 調査 1 ラウンド → 論点ごとに研究者が決める。F-1 を EH3 の凍結の前に実物で選ぶかもここで決める |
+| **AI 疲労と動機の主張（`.idea` の核 1・2）を GSE の外の別の研究にできるか**（空白か・価値・論文にできるか） | **`next-session-ai-fatigue-motivation-claims.md`**（2026-10-14） | **現行・未着手**。先に AI 疲労 DB（別の研究者のプロジェクト）の C・共同の構想との重なりを研究者に確かめる → grill → `/literature-review` 1 ラウンド |
 | **公開データでの照合の論文: 凍結 → 取得 → 検査 → 本計算**（PoPETs 2027 Issue 3・締切 2026-11-30 AoE を目標・G-GEAR） | **`next-session-public-keystroke-matching-research-forward.md`**（2026-10-12） | **現行**。事前登録は下書き 8（未凍結）・合成の記録の検査は済み（PR #358）。判断 51: KLiCKe の返事を待たずに進める。ただし凍結（OSF）が取得より先。取得の後は記録と本文の中身を Claude も読まない（集計だけ）。前の `next-session-public-keystroke-matching-freeze.md` を置き換える |
 | 公開データでの照合の論文: KLiCKe の著者への催促と日程の確認（2026-10-26 ごろ） | `next-session-public-keystroke-matching-1026-reminder.md`（2026-10-12） | **現行・10/26 に使う**。問い合わせは 2026-10-12 に送った（判断 50）。返事が無ければ催促の下書きを研究者に渡す。PoPETs の録画の要否の問い合わせの確認と、代わりの投稿先の候補（未確認）もここ |
 | ~~公開データでの照合の論文: 合成の記録の検査と凍結~~ | `next-session-public-keystroke-matching-freeze.md`（2026-10-12） | 置き換え済み（判断 51）。上の 2 行へ |
