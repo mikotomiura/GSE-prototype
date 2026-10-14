@@ -334,6 +334,15 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
         check(ok, f"confound: gen_typing with {'no speed' if kind_speed is None else 'z = K'} shifts only the burst "
                   f"intervals ({len(fl)}) by {shift}, not the gaps ({len(gp)}) or the burst lengths, z read at "
                   f"the press time")
+    # Codex round 2 and 3: an interval that does not advance the time stops the generator
+    under = ConstSpeed()
+    under.K = -1e6
+    try:
+        gs.gen_typing(np.random.default_rng(11), "STRUGGLE", 60_000, cfg2, under, 0)
+        raised = False
+    except ValueError:
+        raised = True
+    check(raised, "confound: a key interval that underflows to 0 stops gen_typing")
     # c = 0 against graded t = 0.5 (keys and labels), and c > 0 differs
     generate(gen, config, seed_file, tmp / "ours-c0", "confound", hmm, c=0.0)
     generate(gen, config, seed_file, tmp / "ours-c0.5", "confound", hmm, c=0.5)
@@ -375,16 +384,19 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
              "Dsl": ["Dsl00"], "Dco": ["Dco00"], "Dsh": ["Dsh00a", "Dsh01a"]}
     for unit, sids in units.items():
         for sid in sids:
-            n_in, short_in, short_out = window_intervals(w, sid, WINDOWS[unit])
             # a few short intervals inside are possible without z (the rest of a burst plus an unshifted gap, or an
-            # interval across a segment boundary: code-reviewer round 2 M), so a rate, not zero
+            # interval across a segment boundary: code-reviewer round 2 M), so a rate, not zero; each window alone
+            # (Codex round 3: a short window is not diluted by a long one)
+            for win in WINDOWS[unit]:
+                n_in, short_in, short_out = window_intervals(w, sid, [win])
+                check(sid in man and n_in >= 5 and short_in <= 0.02 * n_in and short_out >= 100,
+                      f"confound wiring: {sid}: {n_in} intervals start inside {win} s, {short_in} of them below "
+                      f"400 ms; {short_out} below 400 ms outside")
             x0 = WINDOWS[unit][0][0] * 1000
             t_w = np.load(w / "labels" / f"{sid}.npz")["presses_ms"]
             t_0 = np.load(tmp / "ours-c0" / "labels" / f"{sid}.npz")["presses_ms"]
-            before = np.array_equal(t_w[t_w < x0], t_0[t_0 < x0]) and (t_0 < x0).sum() > 100
-            check(sid in man and n_in >= 5 and short_in <= 0.02 * n_in and short_out >= 100 and before,
-                  f"confound wiring: {sid}: {n_in} intervals start inside {WINDOWS[unit]} s, {short_in} of them "
-                  f"below 400 ms; {short_out} below 400 ms outside; the presses before {x0 // 1000} s equal c = 0's")
+            check(np.array_equal(t_w[t_w < x0], t_0[t_0 < x0]) and (t_0 < x0).sum() > 100,
+                  f"confound wiring: {sid}: the presses before {x0 // 1000} s equal c = 0's (nothing outside slowed)")
     for i in (0, 1):
         a_j = json.loads((w / "speed_jumps.json").read_text(encoding="utf-8"))["pairs"][f"{i:02d}"]["a"]
         check(a_j["max_abs_z_jump"] in (0.0, BIG_Z) and a_j["median_abs_z_jump"] in (0.0, BIG_Z),
@@ -395,14 +407,14 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
         a_t = np.load(w / "labels" / f"Dsh{i:02d}a.npz")["presses_ms"]
         b_t = np.load(w / "labels" / f"Dsh{i:02d}b.npz")["presses_ms"]
         a_d, a_s = np.diff(a_t), a_t[:-1]
-        lo, hi = WINDOWS["Dsh"][0]
-        slowed = Counter(a_d[(a_s >= lo * 1000) & (a_s < hi * 1000)].tolist())
         in_b = Counter(np.diff(b_t).tolist())
-        kept = sum(min(n, in_b[v]) for v, n in slowed.items())
-        total = sum(slowed.values())
-        check(len(a_t) == len(b_t) and not np.array_equal(a_t, b_t) and total >= 5 and kept >= 0.8 * total,
-              f"confound wiring: Dsh{i:02d}b has {kept} of the {total} intervals slowed in a (the segments move "
-              f"with their keys)")
+        for lo, hi in WINDOWS["Dsh"]:
+            slowed = Counter(a_d[(a_s >= lo * 1000) & (a_s < hi * 1000)].tolist())
+            kept = sum(min(n, in_b[v]) for v, n in slowed.items())
+            total = sum(slowed.values())
+            check(len(a_t) == len(b_t) and not np.array_equal(a_t, b_t) and total >= 5 and kept >= 0.8 * total,
+                  f"confound wiring: Dsh{i:02d}b has {kept} of the {total} intervals slowed in a in {(lo, hi)} s "
+                  f"(the segments move with their keys)")
     check(np.array_equal(np.load(w / "labels" / "Dno00.npz")["presses_ms"],
                          np.load(tmp / "ours-c0" / "labels" / "Dno00.npz")["presses_ms"]),
           "confound wiring: D_noobs is not slowed")
@@ -429,6 +441,9 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
         r = subprocess.run([sys.executable, str(gen), str(config), str(seed_file), str(tmp / "ours-bad"),
                             "--hmm-version", hmm, "--smoke", *args], capture_output=True)
         check(r.returncode != 0, f"confound: gen_sessions refuses {' '.join(args)}")
+    r = subprocess.run([sys.executable, str(gen), str(config), str(seed_file), str(tmp / "ours-c4"), "--hmm-version",
+                        hmm, "--smoke", "--world", "confound", "--c", "4"], capture_output=True)
+    check(r.returncode == 0, "confound: gen_sessions accepts the upper bound --c 4")
 
 
 # graded world design 1.3: the values written out (not computed by the instrument's function; code-reviewer M4)

@@ -1186,6 +1186,9 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str,
         jumps = work / "speed_jumps.json"  # confound world design 3.3 (h): described only
         if not jumps.exists():  # code-reviewer round 2 L: every confound work directory has it
             raise SystemExit(f"{jumps} is missing (confound world design 1.2)")
+        jd = json.loads(jumps.read_text(encoding="utf-8"))
+        if jd.get("c") != step_c(cfg, step) or not jd.get("pairs"):  # Codex round 3: this step's record
+            raise SystemExit(f"{jumps} has c {jd.get('c')} and {len(jd.get('pairs') or {})} pairs, not step {step}'s")
         shutil.copyfile(jumps, out / "speed_jumps.json")
         summ["_wall_s"] = time.time() - t0
         dump(out / "summary.json", summ)
