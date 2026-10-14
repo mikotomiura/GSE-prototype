@@ -22,5 +22,5 @@
 - [x] 問い合わせ B の更新版の下書き `inquiry-b-v2.md`（判断 3）
 
 ## 完了処理
-- [ ] `/finish-task`（code-reviewer＋`/cross-review`）
-- [ ] push まで（PR は研究者が確かめてから）
+- [x] `/finish-task`（code-reviewer＋`/cross-review` 2 巡・判断 4・5）
+- [x] push まで（PR は研究者が確かめてから）
