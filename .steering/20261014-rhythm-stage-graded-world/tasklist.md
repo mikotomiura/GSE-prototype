@@ -15,4 +15,4 @@
 
 ## 完了処理
 - [x] notes（段ごとの判定を第 1 回・第 2 回と並べる・判断 6）
-- [ ] notes の `/cross-review`（2 巡）
+- [ ] notes の `/cross-review`（2 巡）—— 1 巡目 → 判断 7
