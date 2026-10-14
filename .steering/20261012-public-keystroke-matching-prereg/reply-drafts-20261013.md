@@ -54,11 +54,15 @@ The corpus authors informed us (personal communication, 13 and 14 October 2026) 
 
 Hi Yu,
 
-Thank you very much for the clarification. Knowing that the data collection was approved by the IRB at Georgia State University, and that participants were informed that their data would be used for research purposes by the broader research community, is exactly what I needed for the ethics section.
+Thank you so much for getting back to me with these details. The IRB approval at Georgia State University and the scope of the consent are exactly what I needed, and I will describe them accurately in the ethics section.
 
-I expect to finish the paper by the end of this month, and I will contact you again and send it to you then.
+The analysis is now underway, and I expect the paper to be finished by the end of this month. I will write to you again and share it with you then.
+
+Thank you again for your generous help, and for making the KLiCKe corpus available to the research community.
 
 Best regards,
-[name]
+Mikoto
+
+（2026-10-14 に作り直した版。前の版は、返事の中身を長く繰り返していた。）
 
 （注: 「by the end of this month」は約束になる。間に合うか不安なら「in the coming weeks」にする。倫理の節に「personal communication」として書く許可は、先方が「helpful for your ethics section」と書いているので改めて尋ねない。）
