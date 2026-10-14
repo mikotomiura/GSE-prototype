@@ -1,0 +1,584 @@
+{
+ "xml_files": 76,
+ "name_pattern_P_T": 76,
+ "participants": 39,
+ "texts": 6,
+ "sessions_per_text": {
+  "1": 13,
+  "2": 13,
+  "3": 12,
+  "4": 13,
+  "5": 12,
+  "6": 13
+ },
+ "alignment_files_by_extension": {
+  ".atag": 76,
+  ".src": 76,
+  ".tgt": 76
+ },
+ "alignment_stems_equal_xml_stems": true,
+ "element_paths": {
+  "Interface/Standard/Import2006Flag": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/Settings": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/SourceField": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/TargetField": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/pluginDependances": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Events": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Events/Eye": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Fix": {
+   "count": 234454,
+   "files": 75
+  },
+  "LogFile/Events/Interface": {
+   "count": 46,
+   "files": 2
+  },
+  "LogFile/Events/Key": {
+   "count": 126803,
+   "files": 76
+  },
+  "LogFile/Events/Mouse": {
+   "count": 2254,
+   "files": 63
+  },
+  "LogFile/Events/System": {
+   "count": 152,
+   "files": 76
+  },
+  "LogFile/FinalTextChar": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/FinalTextChar/CharPos": {
+   "count": 23831,
+   "files": 76
+  },
+  "LogFile/FinalTextUTF8": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/Description": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/FileName": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/Interface": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/Languages": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/Plugins": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/fullScreen": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/lockWindows": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/maxWindow": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/offlineGWM": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/promptSubjectName": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/showTimer": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/useExtendedTranslations": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/useSourceText": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/versionString": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/SourceTextChar": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/SourceTextChar/CharPos": {
+   "count": 60568,
+   "files": 76
+  },
+  "LogFile/TargetTextChar": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/TargetTextChar/CharPos": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/VersionString": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/endTime": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/startTime": {
+   "count": 76,
+   "files": 76
+  },
+  "Project/Interface/Standard": {
+   "count": 76,
+   "files": 76
+  },
+  "Project/Plugins/EyeSampler": {
+   "count": 76,
+   "files": 76
+  },
+  "Project/Plugins/Key_Logger": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/SourceBackgroundColor": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/SourceText": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/SourceTextUTF8": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TargetBackgroundColor": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TargetText": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TargetTextUTF8": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TranslationWindow": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/lineHeight": {
+   "count": 76,
+   "files": 76
+  }
+ },
+ "attribute_names": {
+  "Interface/Standard/SourceField@Height": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/SourceField@Width": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/SourceField@X": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/SourceField@Y": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/TargetField@Height": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/TargetField@Width": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/TargetField@X": {
+   "count": 76,
+   "files": 76
+  },
+  "Interface/Standard/TargetField@Y": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Events/Eye@Cursor": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Eye@CursorD": {
+   "count": 3823758,
+   "files": 76
+  },
+  "LogFile/Events/Eye@CursorR": {
+   "count": 3607128,
+   "files": 76
+  },
+  "LogFile/Events/Eye@CursorU": {
+   "count": 3403326,
+   "files": 75
+  },
+  "LogFile/Events/Eye@TT": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Eye@Time": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Eye@Win": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Eye@WinD": {
+   "count": 3871585,
+   "files": 76
+  },
+  "LogFile/Events/Eye@WinR": {
+   "count": 3651075,
+   "files": 76
+  },
+  "LogFile/Events/Eye@WinU": {
+   "count": 3361694,
+   "files": 75
+  },
+  "LogFile/Events/Eye@Xl": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Eye@Xr": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Eye@Yl": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Eye@Yr": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Eye@pl": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Eye@pr": {
+   "count": 5606352,
+   "files": 76
+  },
+  "LogFile/Events/Fix@Block": {
+   "count": 117227,
+   "files": 75
+  },
+  "LogFile/Events/Fix@Cursor": {
+   "count": 229020,
+   "files": 75
+  },
+  "LogFile/Events/Fix@CursorD": {
+   "count": 116096,
+   "files": 75
+  },
+  "LogFile/Events/Fix@CursorU": {
+   "count": 102526,
+   "files": 75
+  },
+  "LogFile/Events/Fix@Dur": {
+   "count": 117227,
+   "files": 75
+  },
+  "LogFile/Events/Fix@TT": {
+   "count": 234454,
+   "files": 75
+  },
+  "LogFile/Events/Fix@Time": {
+   "count": 234454,
+   "files": 75
+  },
+  "LogFile/Events/Fix@Win": {
+   "count": 234454,
+   "files": 75
+  },
+  "LogFile/Events/Fix@WinD": {
+   "count": 117227,
+   "files": 75
+  },
+  "LogFile/Events/Fix@WinU": {
+   "count": 113214,
+   "files": 75
+  },
+  "LogFile/Events/Fix@X": {
+   "count": 117227,
+   "files": 75
+  },
+  "LogFile/Events/Fix@Y": {
+   "count": 117227,
+   "files": 75
+  },
+  "LogFile/Events/Interface@Hw": {
+   "count": 46,
+   "files": 2
+  },
+  "LogFile/Events/Interface@Sw": {
+   "count": 46,
+   "files": 2
+  },
+  "LogFile/Events/Interface@Time": {
+   "count": 46,
+   "files": 2
+  },
+  "LogFile/Events/Interface@Ww": {
+   "count": 46,
+   "files": 2
+  },
+  "LogFile/Events/Interface@Xw": {
+   "count": 46,
+   "files": 2
+  },
+  "LogFile/Events/Interface@Yw": {
+   "count": 46,
+   "files": 2
+  },
+  "LogFile/Events/Key@Block": {
+   "count": 453,
+   "files": 16
+  },
+  "LogFile/Events/Key@Cursor": {
+   "count": 126803,
+   "files": 76
+  },
+  "LogFile/Events/Key@Height": {
+   "count": 9252,
+   "files": 76
+  },
+  "LogFile/Events/Key@IMEtext": {
+   "count": 9016,
+   "files": 76
+  },
+  "LogFile/Events/Key@Text": {
+   "count": 7667,
+   "files": 76
+  },
+  "LogFile/Events/Key@Time": {
+   "count": 126803,
+   "files": 76
+  },
+  "LogFile/Events/Key@Type": {
+   "count": 126803,
+   "files": 76
+  },
+  "LogFile/Events/Key@Value": {
+   "count": 126803,
+   "files": 76
+  },
+  "LogFile/Events/Key@Width": {
+   "count": 9252,
+   "files": 76
+  },
+  "LogFile/Events/Key@X": {
+   "count": 16411,
+   "files": 76
+  },
+  "LogFile/Events/Key@Y": {
+   "count": 16411,
+   "files": 76
+  },
+  "LogFile/Events/Mouse@Block": {
+   "count": 132,
+   "files": 30
+  },
+  "LogFile/Events/Mouse@Cursor": {
+   "count": 2254,
+   "files": 63
+  },
+  "LogFile/Events/Mouse@Text": {
+   "count": 132,
+   "files": 30
+  },
+  "LogFile/Events/Mouse@Time": {
+   "count": 2254,
+   "files": 63
+  },
+  "LogFile/Events/Mouse@Value": {
+   "count": 2254,
+   "files": 63
+  },
+  "LogFile/Events/System@Time": {
+   "count": 152,
+   "files": 76
+  },
+  "LogFile/Events/System@Value": {
+   "count": 152,
+   "files": 76
+  },
+  "LogFile/FinalTextChar/CharPos@Cursor": {
+   "count": 23831,
+   "files": 76
+  },
+  "LogFile/FinalTextChar/CharPos@Height": {
+   "count": 23831,
+   "files": 76
+  },
+  "LogFile/FinalTextChar/CharPos@Value": {
+   "count": 23831,
+   "files": 76
+  },
+  "LogFile/FinalTextChar/CharPos@Width": {
+   "count": 23831,
+   "files": 76
+  },
+  "LogFile/FinalTextChar/CharPos@X": {
+   "count": 23831,
+   "files": 76
+  },
+  "LogFile/FinalTextChar/CharPos@Y": {
+   "count": 23831,
+   "files": 76
+  },
+  "LogFile/Project/Languages@source": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/Project/Languages@target": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/SourceTextChar/CharPos@Cursor": {
+   "count": 60568,
+   "files": 76
+  },
+  "LogFile/SourceTextChar/CharPos@Height": {
+   "count": 60568,
+   "files": 76
+  },
+  "LogFile/SourceTextChar/CharPos@Value": {
+   "count": 60568,
+   "files": 76
+  },
+  "LogFile/SourceTextChar/CharPos@Width": {
+   "count": 60568,
+   "files": 76
+  },
+  "LogFile/SourceTextChar/CharPos@X": {
+   "count": 60568,
+   "files": 76
+  },
+  "LogFile/SourceTextChar/CharPos@Y": {
+   "count": 60568,
+   "files": 76
+  },
+  "LogFile/TargetTextChar/CharPos@Cursor": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/TargetTextChar/CharPos@Height": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/TargetTextChar/CharPos@Value": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/TargetTextChar/CharPos@Width": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/TargetTextChar/CharPos@X": {
+   "count": 76,
+   "files": 76
+  },
+  "LogFile/TargetTextChar/CharPos@Y": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/SourceBackgroundColor@RGB": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TargetBackgroundColor@RGB": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TranslationWindow@Height": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TranslationWindow@STO": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TranslationWindow@Split": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TranslationWindow@VHO": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TranslationWindow@Width": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TranslationWindow@X": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/TranslationWindow@Y": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/lineHeight@source": {
+   "count": 76,
+   "files": 76
+  },
+  "Standard/Settings/lineHeight@target": {
+   "count": 76,
+   "files": 76
+  }
+ }
+}

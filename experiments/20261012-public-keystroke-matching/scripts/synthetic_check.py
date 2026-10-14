@@ -1,4 +1,4 @@
-"""The pre-freeze check on synthetic logs (preregistration.md, "公開の他の列から長さが戻らないかの検査"). No human data.
+"""The pre-freeze check on synthetic logs (preregistration, "Check on synthetic logs"). No human data.
 
 Parts (results/synthetic_check.json; numbers in notes.md):
 1. paths: per form, which published columns give back the segment lengths (final-draft word lengths) and how well.
@@ -7,7 +7,7 @@ Parts (results/synthetic_check.json; numbers in notes.md):
    show the time path (with the "drag" timing, a drag's duration bounds the next press interval).
 3. r7: share of true groups above the cap, the true text's path cut, the cap's inflation of the true text's cost
    (capped DP minus DP with groups up to 10), and the DP cost vs the true correspondence's cost.
-4. a3_r3u: how one replay error lowers the true text's timing term (decision 38).
+4. a3_r3u: how one replay error lowers the true text's timing term.
 """
 import hashlib
 import json
@@ -314,8 +314,7 @@ def part_r7(n, cfg, ops, label):
             wrng = np.random.default_rng(seed_int("synthetic", "r7_window", str(i), "", "", str(p)))
             nonempty = [s for s in range(len(r0segs)) if r0segs[s][1]]
             for k in (5, 10, 20, 50):
-                # a window is k non-empty R0 segments in a row (empty segments between them are inside, not counted;
-                # decision 48)
+                # a window is k non-empty R0 segments in a row (empty segments between them are inside, not counted)
                 starts = nonempty[:len(nonempty) - k + 1]
                 if not starts:
                     continue

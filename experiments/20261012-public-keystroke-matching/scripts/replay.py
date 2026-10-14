@@ -1,6 +1,6 @@
 """Reconstructions of the final draft from a released form (preregistration.md, attackers A1 and A1').
 
-- a1_text: A1 for forms with text_change and position (R0, R1, R5, R6), the [V279] type of reconstruction.
+- a1_text: A1 for forms with text_change and position (R0, R1, R5, R6), the type of reconstruction of Inubushi (2024).
 - a1_r2: A1 for R2 (categories and position only).
 - a1prime: A1' (categories only), the editor replay; uncertain moves put the cursor at the end.
 Each returns the final draft as a list of items (type, row index); type 'a' letter/digit, 's' space/punctuation,
@@ -49,9 +49,9 @@ def item_type(cat):
 
 
 def a1prime(cats, uncertain_home_end=False):
-    """Editor replay of the category column (decision 42: arrow_left, arrow_right, home and end move the cursor;
-    other navigation and the mouse put it at the end). Shortcuts (decision 43) are ignored. After a control press,
-    home and end go to the start and end of the document and the arrows are uncertain (end) (decision 47)."""
+    """Editor replay of the category column (arrow_left, arrow_right, home and end move the cursor;
+    other navigation and the mouse put it at the end). Shortcuts are ignored. After a control press,
+    home and end go to the start and end of the document and the arrows are uncertain (end)."""
     sc = shortcut_flags(cats)
     doc, cur = [], 0
     ctrl = False

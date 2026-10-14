@@ -1,5 +1,7 @@
 # 次のセッション: 公開データでの照合の論文 —— KLiCKe の返事の後の凍結
 
+> 置き換え済み（2026-10-12・判断 51）。返事を待たずに進めることになった。現行は `next-session-public-keystroke-matching-research-forward.md`（凍結から本計算まで）と `next-session-public-keystroke-matching-1026-reminder.md`（10/26 の催促）。以下は当時の記述。
+
 作成 2026-10-12、更新 2026-10-12（判断 41〜49・合成の記録の検査と `/cross-review` 2 巡の後）。作業は worktree `C:\GSE-wt-matching-prereg`（ブランチ `docs/public-keystroke-matching-prereg`）。この版は main にマージ済みの見込み（PR の番号は `git log` の merge コミットで確かめる）。
 
 ## 今の状態
