@@ -9,4 +9,4 @@
 - [x] check_citations.py 違反なし
 - [x] summary.md の表
 - [x] 研究者の決定を decisions.md に
-- [ ] /cross-review・コミット・push
+- [x] /cross-review（2 巡）・コミット・push（PR は研究者が確かめてから）
