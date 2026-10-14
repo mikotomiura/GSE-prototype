@@ -40,6 +40,25 @@ Kind regards,
 
 ## 論文の倫理の節の材料（返事の要旨から・英語の案）
 
-The corpus authors informed us (personal communication, 13 October 2026) that the data collection was approved by an Institutional Review Board, that participants recruited through Amazon Mechanical Turk gave informed consent to the use of their data for research purposes, that the data were reviewed for personally identifiable information before public release, and that the dataset is released under the MIT License. They saw no particular concern with the present analysis and recommended reporting the findings in aggregate and not disclosing potentially sensitive or identifying information about individual participants. We follow this recommendation: only aggregates are reported, and no result for an individual writer and no excerpt of a text or a log is published.
+The corpus authors informed us (personal communication, 13 and 14 October 2026) that the data collection was approved by the Institutional Review Board of Georgia State University, that participants recruited through Amazon Mechanical Turk gave informed consent to the use of their data for research purposes and were informed that their data would be used for research purposes by the broader research community, that the data were reviewed for personally identifiable information before public release, and that the dataset is released under the MIT License. They saw no particular concern with the present analysis and recommended reporting the findings in aggregate and not disclosing potentially sensitive or identifying information about individual participants. We follow this recommendation: only aggregates are reported, and no result for an individual writer and no excerpt of a text or a log is published.
 
 返事に無いこと（書かない）: 倫理審査の機関名、同意の書面が公開での共有に触れていたか。お礼の返信で尋ねる。答えが無ければ上の案のままとし、同意が「研究目的での利用」で、公開での共有に触れたかは確かめられなかったと書く。
+
+2026-10-14 追記（判断 54 の返事）: Dr. Tian から機関名（Georgia State University の IRB）と同意の範囲（"used for research purposes by the broader research community"）の答えが来たので、上の英語の案に書き足した。同意の文言は「研究コミュニティによる研究目的での利用」で、一般への公開を明示した文言ではない。論文では著者の言葉のまま書き、「公開での共有に同意した」とは書かない。
+
+## 3. Dr. Tian へのお礼と、論文の完成の知らせの予告（2026-10-14 の返事への返信）
+
+研究者の決定（2026-10-14）。送るのは研究者。先方は「Hi Mikoto」で書き、「Yu Tian」と署名しているので、宛名は「Hi Yu,」とした。前の 2 通に揃えるなら「Dear Dr. Tian,」。
+
+**Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis
+
+Hi Yu,
+
+Thank you very much for the clarification. Knowing that the data collection was approved by the IRB at Georgia State University, and that participants were informed that their data would be used for research purposes by the broader research community, is exactly what I needed for the ethics section.
+
+I expect to finish the paper by the end of this month, and I will contact you again and send it to you then.
+
+Best regards,
+[name]
+
+（注: 「by the end of this month」は約束になる。間に合うか不安なら「in the coming weeks」にする。倫理の節に「personal communication」として書く許可は、先方が「helpful for your ethics section」と書いているので改めて尋ねない。）
