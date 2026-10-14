@@ -1264,8 +1264,9 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
     good = pilot_doc(cfg, "c100", {"L300": p300, "L1800": p18}, base_seed)
     old = {c: grid[0] for c in cands}  # another step's tables, written before (Codex round 2 P1)
     pre = json.loads(json.dumps(cfg))
-    pre["pc_stall"]["lam"]["c050"] = old
-    pre["pc_stall"]["lam_1800"]["c050"] = old
+    # only c050 before: the real config.json gains a table per step as the steps run (design 8, 2026-10-15)
+    pre["pc_stall"]["lam"] = {"c050": old}
+    pre["pc_stall"]["lam_1800"] = {"c050": old}
     with tempfile.TemporaryDirectory() as d:
         cp, pp = Path(d) / "config.json", Path(d) / "pilot.json"
         (Path(d) / "SEED").write_text(f"{base_seed}\n", encoding="utf-8")
