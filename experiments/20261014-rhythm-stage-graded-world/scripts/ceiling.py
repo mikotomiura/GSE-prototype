@@ -126,13 +126,33 @@ def measure(tabs: dict, seed: int, folds: int, jobs: int) -> dict:
     return res
 
 
+def _no_comments(o):
+    """o without the keys that start with _ (comments), at every depth (Codex round 3)."""
+    if isinstance(o, dict):
+        return {k: _no_comments(v) for k, v in o.items() if not k.startswith("_")}
+    if isinstance(o, list):
+        return [_no_comments(v) for v in o]
+    return o
+
+
 def cfg_fingerprint(cfg: dict) -> str:
     """graded world design 1.2 (cross-review round 2): the SHA-256 of config.json without the keys that start with _
-    (comments) and without pc_stall.lam and pc_stall.lam_1800 (written after the pilots). pilot 0 and each pilot 1
-    record it; the later steps refuse a record made under another config."""
-    c = {k: v for k, v in cfg.items() if not k.startswith("_")}
+    (comments, at every depth) and without pc_stall.lam and pc_stall.lam_1800 (written after the pilots). pilot 0 and
+    each pilot 1 record it; the later steps refuse a record made under another config."""
+    c = _no_comments(cfg)
     c["pc_stall"] = {k: v for k, v in c["pc_stall"].items() if k not in ("lam", "lam_1800")}
     return hashlib.sha256(json.dumps(c, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+
+
+def code_fingerprint(scripts: Path | None = None) -> str:
+    """graded world design 1.2 (Codex round 3): the SHA-256 of the instruments (scripts/*.py and run.sh, line ends
+    as LF). pilot 0 and each pilot 1 record it; after a change of the instruments their records no longer pass, so they
+    are run again (design 3.3 addition (f))."""
+    scripts = scripts or Path(__file__).resolve().parent
+    h = hashlib.sha256()
+    for f in sorted(scripts.glob("*.py")) + [scripts.parent / "run.sh"]:
+        h.update(f.name.encode() + b"\0" + f.read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    return h.hexdigest()
 
 
 def step_status(res_step: dict, main_auc: float) -> dict:
@@ -177,7 +197,7 @@ def main() -> int:
     res = measure(tabs, seed, cfg["e13"]["folds"], a.jobs)
     out = {"design": ".steering/20261014-rhythm-stage-graded-world/design.md 3.0", "seed": seed, "P": n_p,
            "folds": cfg["e13"]["folds"], "main_auc": cfg["ceiling"]["main_auc"],
-           "config_fingerprint": cfg_fingerprint(cfg), "results": res,
+           "config_fingerprint": cfg_fingerprint(cfg), "code_fingerprint": code_fingerprint(), "results": res,
            "steps": choose_steps(res, cfg)}
     Path(a.out).mkdir(parents=True, exist_ok=True)
     with open(Path(a.out) / "ceiling.json", "w", encoding="utf-8", newline="\n") as fh:

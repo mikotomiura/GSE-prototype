@@ -958,6 +958,7 @@ def pilot_doc(cfg: dict, step: str, parts: dict, base_seed: int) -> dict:
     return {"world": "graded", "t": cfg["ceiling"]["steps"][step], "step": step, "stop": parts["L300"]["stop"],
             "rule": {k: cfg["pc_stall"][k] for k in ck.RULE_KEYS}, "seed": base_seed + sp["seed_offset"],
             "n_sessions": sp["P"], "bootstrap": sp["bootstrap"], "config_fingerprint": ce.cfg_fingerprint(cfg),
+            "code_fingerprint": ce.code_fingerprint(),
             "parts": parts}
 
 
@@ -1071,7 +1072,8 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
             ("another seed", {**good, "seed": 20261014}),
             ("another P", {**good, "n_sessions": 40}),
             ("another rule", {**good, "rule": {**good["rule"], "aim": 0.05}}),
-            ("another config (fingerprint)", {**good, "config_fingerprint": ce.cfg_fingerprint(edited)}))
+            ("another config (fingerprint)", {**good, "config_fingerprint": ce.cfg_fingerprint(edited)}),
+            ("other instruments (code fingerprint)", {**good, "code_fingerprint": "0" * 64}))
         for name, bad in bad_cases:
             fresh()
             pp.write_text(json.dumps(bad), encoding="utf-8")
@@ -1090,8 +1092,22 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
         except SystemExit:
             refused = True
         check(refused, "pilot: a config.json changed after the pilot (e13.pc_lower) refuses the pilot (fingerprint)")
-    check(ce.cfg_fingerprint(back) == ce.cfg_fingerprint(pre) == ce.cfg_fingerprint({**pre, "_comment": "x"}),
-          "fingerprint: the lambda tables and the comments do not change it")
+    deep = json.loads(json.dumps(pre))
+    deep["pc_stall"]["_comment_x"] = "x"
+    check(ce.cfg_fingerprint(back) == ce.cfg_fingerprint(pre) == ce.cfg_fingerprint({**pre, "_comment": "x"})
+          == ce.cfg_fingerprint(deep), "fingerprint: the lambda tables and the comments (at any depth) do not change it")
+    deep["pc_stall"]["aim"] = 0.06
+    check(ce.cfg_fingerprint(deep) != ce.cfg_fingerprint(pre), "fingerprint: a setting inside a section changes it")
+    with tempfile.TemporaryDirectory() as d:
+        sd = Path(d) / "scripts"
+        sd.mkdir()
+        (Path(d) / "run.sh").write_bytes(b"a\r\nb\n")
+        (sd / "x.py").write_bytes(b"print(1)\n")
+        f1 = ce.code_fingerprint(sd)
+        (Path(d) / "run.sh").write_bytes(b"a\nb\n")
+        f2 = ce.code_fingerprint(sd)
+        (sd / "x.py").write_bytes(b"print(2)\n")
+        check(f1 == f2 != ce.code_fingerprint(sd), "code fingerprint: line ends do not change it; a change of a script does")
     test_ceiling_gate(cfg, base_seed)
     test_label_plan()
 
@@ -1099,8 +1115,11 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
 def test_ceiling_gate(cfg: dict, base_seed: int) -> None:
     """graded world design 3.0 (cross-review round 2): a step runs only when ceiling.json says go and was made under
     this config."""
+    mk = lambda h, l: {"L300": {"hgb": {"auc_A_speed": h}, "lr": {"auc_A_speed": l}}}
     doc = {"seed": base_seed + cfg["ceiling"]["seed_offset"], "main_auc": cfg["ceiling"]["main_auc"],
            "P": {s: cfg["ceiling"]["P"] for s in cfg["ceiling"]["steps"]}, "config_fingerprint": ce.cfg_fingerprint(cfg),
+           "code_fingerprint": ce.code_fingerprint(),
+           "results": {s: mk(0.7, 0.72) for s in cfg["ceiling"]["steps"]},
            "steps": {s: {"t": t, "status": "go"} for s, t in cfg["ceiling"]["steps"].items()}}
     check(ck.ceiling_problems(doc, cfg, base_seed, "t050") == [], "ceiling gate: a go step of this config passes")
     moved = json.loads(json.dumps(cfg))
@@ -1113,7 +1132,10 @@ def test_ceiling_gate(cfg: dict, base_seed: int) -> None:
             ("another P", {**doc, "P": {**doc["P"], "t050": 40}}, cfg),
             ("another main_auc", {**doc, "main_auc": 0.85}, cfg),
             ("a t moved in config.json after pilot 0", doc, moved),
-            ("another config (fingerprint)", {**doc, "config_fingerprint": "0" * 64}, cfg)):
+            ("another config (fingerprint)", {**doc, "config_fingerprint": "0" * 64}, cfg),
+            ("other instruments (code fingerprint)", {**doc, "code_fingerprint": "0" * 64}, cfg),
+            ("a go status over values at the ceiling", {**doc, "results": {**doc["results"], "t050": mk(0.93, 0.95)}}, cfg),
+            ("a go status with no measured values", {k: v for k, v in doc.items() if k != "results"}, cfg)):
         check(ck.ceiling_problems(d_, c_, base_seed, "t050") != [], f"ceiling gate: {name} is refused")
 
 

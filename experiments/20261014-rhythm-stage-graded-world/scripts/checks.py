@@ -864,6 +864,13 @@ def ceiling_problems(doc: dict, cfg: dict, base_seed: int, step: str) -> list[st
         return [f"ceiling.json has no step {step} (run --ceiling first)"]
     if s.get("status") != "go":
         out.append(f"step {step} is {s.get('status')} in ceiling.json: not run (design 3.0)")
+    res = doc.get("results", {}).get(step)
+    try:  # Codex round 3: the status must follow from the measured values
+        again = ce.step_status(res, c["main_auc"])["status"]
+    except (KeyError, TypeError):
+        again = None
+    if again != s.get("status"):
+        out.append(f"step {step}: the status {s.get('status')} does not follow from the measured values ({again})")
     if s.get("t") != step_t(cfg, step):
         out.append(f"ceiling.json t {s.get('t')} is not config.json's {step_t(cfg, step)}")
     if doc.get("seed") != base_seed + c["seed_offset"]:
@@ -872,6 +879,8 @@ def ceiling_problems(doc: dict, cfg: dict, base_seed: int, step: str) -> list[st
         out.append(f"ceiling.json main_auc {doc.get('main_auc')} / P {doc.get('P', {}).get(step)} are not the config's")
     if doc.get("config_fingerprint") != ce.cfg_fingerprint(cfg):
         out.append("ceiling.json was made under another config.json (fingerprint)")
+    if doc.get("code_fingerprint") != ce.code_fingerprint():
+        out.append("ceiling.json was made by other instruments (code fingerprint): run --ceiling again (design 3.3 (f))")
     return out
 
 
@@ -908,6 +917,8 @@ def pilot_check(p: dict, cfg: dict, base_seed: int, step: str) -> dict:
         err.append(f"the rule {p['rule']} is not the config's")
     if p.get("config_fingerprint") != ce.cfg_fingerprint(cfg):
         err.append("the pilot was made under another config.json (fingerprint)")
+    if p.get("code_fingerprint") != ce.code_fingerprint():
+        err.append("the pilot was made by other instruments (code fingerprint): run it again (design 3.3 (f))")
     if p["stop"]:
         err.append(f"the L300 part of the pilot stopped ({p['stop']}): the step does not go on (design 3.9)")
     if err:
@@ -1038,7 +1049,7 @@ def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str) -> 
                       "L300 part stops the step; a stopped L1800 part leaves L1800 undecidable (pilot_stop)."),
             "world": "graded", "t": step_t(cfg, step), "step": step,
             "seed": seed, "n_sessions": len(sids), "bootstrap": nboot, "rule": {k: ps[k] for k in RULE_KEYS},
-            "config_fingerprint": ce.cfg_fingerprint(cfg),
+            "config_fingerprint": ce.cfg_fingerprint(cfg), "code_fingerprint": ce.code_fingerprint(),
             "stop": parts["L300"]["stop"], "parts": parts, "wall_s": time.time() - t0})
         for tag, part in parts.items():
             if part["stop"]:

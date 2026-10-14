@@ -7,7 +7,7 @@
 - [x] 第 2 回の計器を写して直す（写し `2adf0fc3`・直し `c61f2bce`・`gen_sessions.py --world` の段・`stage.py` の L1800 の対照・`checks.py`・`ceiling.py`・selftest・`run.sh`・`config.json`・`SEED`）
 - [x] 固定の前の `/cross-review` 2 巡目（直しの差分・計器を含む）→ 判断 4
 - [x] selftest（gse-replay を使わない分・264 項目・0 件の失敗・変異 19 通りを捕まえた）
-- [ ] design と計器をコミット（どの下見 0 よりも前）
+- [x] design と計器をコミット（どの下見 0 よりも前・固定・2 巡目の直しの Codex の確かめ → 判断 5）
 
 ## 段ごと（固定の後・t = 0.25 / 0.5 / 0.75）
 - [ ] 下見 0（天井の測り）→ 天井の段はここで止めて判定不能として記録
