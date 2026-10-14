@@ -1,0 +1,27 @@
+{
+ "mode": "ceiling",
+ "git_commit": "a67478685159654aaf681b686999c47099f4978b",
+ "experiment_dir_dirty": false,
+ "config_sha256": "e2b9dbb07bebdbf560d378d67c01092dd31ec8bb5a163f3e4e7e818fd50d2052",
+ "hmm_version_in_meta": "0.5.0",
+ "gse_replay": null,
+ "seed": 20261017,
+ "worlds": [
+  "graded",
+  "t025",
+  "t050",
+  "t075"
+ ],
+ "step": null,
+ "t": null,
+ "python": "3.11.9",
+ "platform": "Windows-10-10.0.26300-SP0",
+ "cpu_count": 16,
+ "jobs": 4,
+ "packages": {
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "scikit-learn": "1.9.1",
+  "threadpoolctl": "3.7.0"
+ }
+}
