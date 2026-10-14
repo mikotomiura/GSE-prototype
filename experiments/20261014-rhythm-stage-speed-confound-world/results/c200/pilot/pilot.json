@@ -26,7 +26,7 @@
   "upper": 0.08
  },
  "config_fingerprint": "ff60037bd5bcdeea79fa982589a741a92aaf8b9b84231a09cd36ac9e42ad4835",
- "code_fingerprint": "0af1b66ccb349a2a7ec5cfb0952871f2611a9b9cf302d66592503fb85d7ad0df",
+ "code_fingerprint": "7da1a18321f1475e60d8f6f4e8427b5a82089b9840f3c35fc021e2f43f96c911",
  "stop": null,
  "parts": {
   "L300": {
@@ -14197,176 +14197,176 @@
     {
      "batch": "L300-PC1",
      "n_configs": 1,
-     "stage_s": 1.7332794666290283,
-     "wall_s_obs": 14.040900707244873,
+     "stage_s": 1.6427810192108154,
+     "wall_s_obs": 14.142545938491821,
      "n_fits_obs": 8
     },
     {
      "batch": "L300-S-raw-hold-sec",
      "n_configs": 13,
-     "stage_s": 5.256268262863159,
-     "wall_s_obs": 60.06439566612244,
+     "stage_s": 5.126298189163208,
+     "wall_s_obs": 59.03196120262146,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-raw-hold-sub",
      "n_configs": 13,
-     "stage_s": 6.6315460205078125,
-     "wall_s_obs": 59.472740650177,
+     "stage_s": 6.647435665130615,
+     "wall_s_obs": 58.969624042510986,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-raw-decay-sec",
      "n_configs": 13,
-     "stage_s": 6.084448575973511,
-     "wall_s_obs": 62.759926080703735,
+     "stage_s": 6.028501987457275,
+     "wall_s_obs": 62.709006547927856,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-raw-decay-sub",
      "n_configs": 13,
-     "stage_s": 7.490693807601929,
-     "wall_s_obs": 62.372745513916016,
+     "stage_s": 7.467689514160156,
+     "wall_s_obs": 62.37884044647217,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-raw-ground-sec",
      "n_configs": 13,
-     "stage_s": 5.550781726837158,
-     "wall_s_obs": 61.75683093070984,
+     "stage_s": 5.438902378082275,
+     "wall_s_obs": 61.79371690750122,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-raw-ground-sub",
      "n_configs": 13,
-     "stage_s": 7.040539264678955,
-     "wall_s_obs": 63.449761629104614,
+     "stage_s": 6.870466470718384,
+     "wall_s_obs": 63.30265140533447,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-smooth-hold-sec",
      "n_configs": 13,
-     "stage_s": 5.725961923599243,
-     "wall_s_obs": 63.499624252319336,
+     "stage_s": 5.700136661529541,
+     "wall_s_obs": 63.389034032821655,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-smooth-hold-sub",
      "n_configs": 13,
-     "stage_s": 7.206468105316162,
-     "wall_s_obs": 63.38339686393738,
+     "stage_s": 7.1455161571502686,
+     "wall_s_obs": 63.45434308052063,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-smooth-decay-sec",
      "n_configs": 13,
-     "stage_s": 6.529862880706787,
-     "wall_s_obs": 58.937291383743286,
+     "stage_s": 6.496037006378174,
+     "wall_s_obs": 59.13095474243164,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-smooth-decay-sub",
      "n_configs": 13,
-     "stage_s": 7.9671311378479,
-     "wall_s_obs": 59.47831654548645,
+     "stage_s": 7.884001970291138,
+     "wall_s_obs": 59.10473608970642,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-smooth-ground-sec",
      "n_configs": 13,
-     "stage_s": 5.999401330947876,
-     "wall_s_obs": 65.65414762496948,
+     "stage_s": 5.948761224746704,
+     "wall_s_obs": 64.51630067825317,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-smooth-ground-sub",
      "n_configs": 13,
-     "stage_s": 7.424144744873047,
-     "wall_s_obs": 65.43071842193604,
+     "stage_s": 7.386453628540039,
+     "wall_s_obs": 65.19719409942627,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-rank-hold-sec",
      "n_configs": 13,
-     "stage_s": 382.3106858730316,
-     "wall_s_obs": 60.292973279953,
+     "stage_s": 377.7605173587799,
+     "wall_s_obs": 60.57874822616577,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-rank-hold-sub",
      "n_configs": 13,
-     "stage_s": 365.2908594608307,
-     "wall_s_obs": 59.99404430389404,
+     "stage_s": 380.4692370891571,
+     "wall_s_obs": 59.82789206504822,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-rank-decay-sec",
      "n_configs": 13,
-     "stage_s": 388.73427081108093,
-     "wall_s_obs": 61.70597577095032,
+     "stage_s": 383.26728677749634,
+     "wall_s_obs": 63.25541567802429,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-rank-decay-sub",
      "n_configs": 13,
-     "stage_s": 383.2857446670532,
-     "wall_s_obs": 62.10102152824402,
+     "stage_s": 386.9995048046112,
+     "wall_s_obs": 64.01204037666321,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-rank-ground-sec",
      "n_configs": 13,
-     "stage_s": 373.4412033557892,
-     "wall_s_obs": 62.57463622093201,
+     "stage_s": 376.3475968837738,
+     "wall_s_obs": 66.66591715812683,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-rank-ground-sub",
      "n_configs": 13,
-     "stage_s": 385.0846412181854,
-     "wall_s_obs": 64.81096959114075,
+     "stage_s": 380.19351840019226,
+     "wall_s_obs": 70.21583914756775,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-jitter-hold-sec",
      "n_configs": 13,
-     "stage_s": 7.146612167358398,
-     "wall_s_obs": 59.63493990898132,
+     "stage_s": 7.4190309047698975,
+     "wall_s_obs": 59.892887115478516,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-jitter-hold-sub",
      "n_configs": 13,
-     "stage_s": 8.736915349960327,
-     "wall_s_obs": 59.33468174934387,
+     "stage_s": 8.616653442382812,
+     "wall_s_obs": 59.96967887878418,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-jitter-decay-sec",
      "n_configs": 13,
-     "stage_s": 7.826754808425903,
-     "wall_s_obs": 61.693124532699585,
+     "stage_s": 7.777120113372803,
+     "wall_s_obs": 62.45186519622803,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-jitter-decay-sub",
      "n_configs": 13,
-     "stage_s": 9.249905109405518,
-     "wall_s_obs": 62.16111087799072,
+     "stage_s": 9.206071615219116,
+     "wall_s_obs": 62.36733865737915,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-jitter-ground-sec",
      "n_configs": 13,
-     "stage_s": 7.307541131973267,
-     "wall_s_obs": 61.78880858421326,
+     "stage_s": 7.300232887268066,
+     "wall_s_obs": 61.845014333724976,
      "n_fits_obs": 56
     },
     {
      "batch": "L300-S-jitter-ground-sub",
      "n_configs": 13,
-     "stage_s": 8.71246886253357,
-     "wall_s_obs": 61.35930943489075,
+     "stage_s": 8.73301386833191,
+     "wall_s_obs": 62.546661138534546,
      "n_fits_obs": 56
     }
    ]
@@ -28506,180 +28506,180 @@
     {
      "batch": "L1800-PC1-1800",
      "n_configs": 1,
-     "stage_s": 1.7188565731048584,
-     "wall_s_obs": 8.781405687332153,
+     "stage_s": 1.7027463912963867,
+     "wall_s_obs": 8.769332647323608,
      "n_fits_obs": 8
     },
     {
      "batch": "L1800-S-raw-hold-sec",
      "n_configs": 13,
-     "stage_s": 5.812134742736816,
-     "wall_s_obs": 49.05962920188904,
+     "stage_s": 5.797577381134033,
+     "wall_s_obs": 49.53594160079956,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-raw-hold-sub",
      "n_configs": 13,
-     "stage_s": 7.302957057952881,
-     "wall_s_obs": 49.24028730392456,
+     "stage_s": 7.210383653640747,
+     "wall_s_obs": 49.34614610671997,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-raw-decay-sec",
      "n_configs": 13,
-     "stage_s": 6.725604295730591,
-     "wall_s_obs": 53.591052532196045,
+     "stage_s": 6.64993953704834,
+     "wall_s_obs": 53.20300912857056,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-raw-decay-sub",
      "n_configs": 13,
-     "stage_s": 8.170055150985718,
-     "wall_s_obs": 53.692081928253174,
+     "stage_s": 8.123978614807129,
+     "wall_s_obs": 53.73919367790222,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-raw-ground-sec",
      "n_configs": 13,
-     "stage_s": 6.133148431777954,
-     "wall_s_obs": 51.49427795410156,
+     "stage_s": 6.1694300174713135,
+     "wall_s_obs": 51.219101905822754,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-raw-ground-sub",
      "n_configs": 13,
-     "stage_s": 7.521130561828613,
-     "wall_s_obs": 52.067033529281616,
+     "stage_s": 7.478251218795776,
+     "wall_s_obs": 52.09379172325134,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-smooth-hold-sec",
      "n_configs": 13,
-     "stage_s": 6.366109371185303,
-     "wall_s_obs": 50.79120397567749,
+     "stage_s": 6.299725770950317,
+     "wall_s_obs": 50.229228019714355,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-smooth-hold-sub",
      "n_configs": 13,
-     "stage_s": 7.812304973602295,
-     "wall_s_obs": 50.31535625457764,
+     "stage_s": 7.667229652404785,
+     "wall_s_obs": 51.1927649974823,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-smooth-decay-sec",
      "n_configs": 13,
-     "stage_s": 7.092187166213989,
-     "wall_s_obs": 52.421361207962036,
+     "stage_s": 7.172053337097168,
+     "wall_s_obs": 52.38469862937927,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-smooth-decay-sub",
      "n_configs": 13,
-     "stage_s": 8.851029634475708,
-     "wall_s_obs": 52.421671628952026,
+     "stage_s": 8.439759016036987,
+     "wall_s_obs": 52.858261823654175,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-smooth-ground-sec",
      "n_configs": 13,
-     "stage_s": 6.574711084365845,
-     "wall_s_obs": 52.39892792701721,
+     "stage_s": 6.521909952163696,
+     "wall_s_obs": 52.689719676971436,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-smooth-ground-sub",
      "n_configs": 13,
-     "stage_s": 8.02626633644104,
-     "wall_s_obs": 51.82536005973816,
+     "stage_s": 7.998776912689209,
+     "wall_s_obs": 52.664353370666504,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-rank-hold-sec",
      "n_configs": 13,
-     "stage_s": 369.3632490634918,
-     "wall_s_obs": 50.53098511695862,
+     "stage_s": 381.42006278038025,
+     "wall_s_obs": 50.895831823349,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-rank-hold-sub",
      "n_configs": 13,
-     "stage_s": 374.11896324157715,
-     "wall_s_obs": 50.50101375579834,
+     "stage_s": 379.3740289211273,
+     "wall_s_obs": 50.711376905441284,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-rank-decay-sec",
      "n_configs": 13,
-     "stage_s": 384.8367557525635,
-     "wall_s_obs": 52.83073019981384,
+     "stage_s": 370.2140085697174,
+     "wall_s_obs": 51.408857583999634,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-rank-decay-sub",
      "n_configs": 13,
-     "stage_s": 381.3796920776367,
-     "wall_s_obs": 52.30057740211487,
+     "stage_s": 381.9250991344452,
+     "wall_s_obs": 51.625630140304565,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-rank-ground-sec",
      "n_configs": 13,
-     "stage_s": 370.5760531425476,
-     "wall_s_obs": 50.175044536590576,
+     "stage_s": 378.43070340156555,
+     "wall_s_obs": 49.48736119270325,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-rank-ground-sub",
      "n_configs": 13,
-     "stage_s": 381.74769496917725,
-     "wall_s_obs": 50.4424774646759,
+     "stage_s": 380.6677393913269,
+     "wall_s_obs": 50.613863706588745,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-jitter-hold-sec",
      "n_configs": 13,
-     "stage_s": 7.72182297706604,
-     "wall_s_obs": 50.710941791534424,
+     "stage_s": 7.693616151809692,
+     "wall_s_obs": 50.197937965393066,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-jitter-hold-sub",
      "n_configs": 13,
-     "stage_s": 9.294222831726074,
-     "wall_s_obs": 51.500375747680664,
+     "stage_s": 9.160706043243408,
+     "wall_s_obs": 50.54698467254639,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-jitter-decay-sec",
      "n_configs": 13,
-     "stage_s": 8.602018594741821,
-     "wall_s_obs": 53.03698468208313,
+     "stage_s": 8.37216329574585,
+     "wall_s_obs": 52.636221408843994,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-jitter-decay-sub",
      "n_configs": 13,
-     "stage_s": 9.806352376937866,
-     "wall_s_obs": 52.775410890579224,
+     "stage_s": 9.856377363204956,
+     "wall_s_obs": 53.091963052749634,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-jitter-ground-sec",
      "n_configs": 13,
-     "stage_s": 7.923377990722656,
-     "wall_s_obs": 50.77062630653381,
+     "stage_s": 7.872158527374268,
+     "wall_s_obs": 49.889952182769775,
      "n_fits_obs": 56
     },
     {
      "batch": "L1800-S-jitter-ground-sub",
      "n_configs": 13,
-     "stage_s": 9.492204666137695,
-     "wall_s_obs": 51.188854455947876,
+     "stage_s": 9.317532062530518,
+     "wall_s_obs": 50.34217119216919,
      "n_fits_obs": 56
     }
    ]
   }
  },
- "wall_s": 8573.404283046722
+ "wall_s": 8594.882576227188
 }

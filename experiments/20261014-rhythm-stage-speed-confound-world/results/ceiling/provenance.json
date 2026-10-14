@@ -1,8 +1,8 @@
 {
  "mode": "ceiling",
- "git_commit": "e72d0b974a333f5332abae8d53c11811dc4460aa",
+ "git_commit": "f7266cfe2fd78c27ce35a1ec882b3442a9695a0d",
  "experiment_dir_dirty": false,
- "config_sha256": "2b84fe66249d01756a60407169a9dbe777e302634f7cda9ea60f489f013a5ac2",
+ "config_sha256": "fbab19ff7359d30cc73f3ce0a3b4f67b38ea8e3933c0720940dbeea33ad7603c",
  "hmm_version_in_meta": "0.5.0",
  "gse_replay": null,
  "seed": 20261021,
@@ -17,7 +17,7 @@
  "python": "3.11.9",
  "platform": "Windows-10-10.0.26300-SP0",
  "cpu_count": 16,
- "jobs": 8,
+ "jobs": 12,
  "packages": {
   "numpy": "2.4.6",
   "scipy": "1.17.1",
