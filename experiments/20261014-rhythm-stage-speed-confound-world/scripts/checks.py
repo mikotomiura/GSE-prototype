@@ -898,7 +898,7 @@ def check_ceiling_file(cfg: dict, cfg_path: Path, step: str) -> None:
 
 
 def pilot_check(p: dict, cfg: dict, base_seed: int, step: str) -> dict:
-    """graded world design 1.2, 3.7: is this pilot.json the pilot of this config and this step? Checks the world, t
+    """graded world design 1.2, 3.7: is this pilot.json the pilot of this config and this step? Checks the world, c
     and step (the three steps share a seed: Codex and code-reviewer round 1), the seed, P, bootstrap, rule and the
     config's fingerprint (cross-review round 2), then recomputes each part's stop and selection from its maxima, fits
     and AUC (part_result). Returns the errors, the L300 lambdas, the L1800 lambdas (None when the L1800 part stopped)
@@ -1184,8 +1184,9 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str,
                              for t in LABELS}
         summ["_step"] = {"step": step, "c": step_c(cfg, step)}
         jumps = work / "speed_jumps.json"  # confound world design 3.3 (h): described only
-        if jumps.exists():
-            shutil.copyfile(jumps, out / "speed_jumps.json")
+        if not jumps.exists():  # code-reviewer round 2 L: every confound work directory has it
+            raise SystemExit(f"{jumps} is missing (confound world design 1.2)")
+        shutil.copyfile(jumps, out / "speed_jumps.json")
         summ["_wall_s"] = time.time() - t0
         dump(out / "summary.json", summ)
     finally:

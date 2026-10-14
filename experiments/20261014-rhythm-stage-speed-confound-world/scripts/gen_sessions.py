@@ -74,6 +74,9 @@ def graded_segments(cfg: dict, t: float) -> dict:
     return seg
 
 
+C_MAX = 4.0  # Codex round 2: the steps are 0.5 / 1 / 2; a large c makes the intervals underflow
+
+
 def confound_delta(cfg: dict) -> float:
     """confound world design 1.3: the stall in log units, ln(STRUGGLE's median at base_t / FLOW's median)."""
     seg = graded_segments(cfg, cfg["speed_confound"]["base_t"])
@@ -147,6 +150,8 @@ def gen_typing(rng: np.random.Generator, kind: str, dur_ms: int, cfg: dict, spee
                 if speed is not None:
                     mu = mu + speed.z(t0_ms + t)
                 nxt = t + float(rng.lognormal(mu, p["flight_sigma"]))
+                if not nxt > t:  # Codex round 2: an interval that underflows would never end the burst
+                    raise ValueError(f"a key interval does not advance the time ({t} ms, mu {mu})")
                 if nxt >= burst_end:
                     t = burst_end  # the pause is measured from the drawn end, so slow typing does not lengthen it
                     break
@@ -223,9 +228,10 @@ def continuous(rng: np.random.Generator, total_ms: int, cfg: dict, speed: Speed 
 
 
 def shuffle_jumps(sp: Speed, body: list[Segment], tail: Segment, perm: np.ndarray) -> dict:
-    """confound world design 3.3 (h): at each boundary between consecutive segments, z of the first second of the
-    next segment minus z of the last second of the one before, both at the times the segments were drawn (the
-    a-order). In a they are neighbouring seconds; in b the shuffle makes the jumps."""
+    """confound world design 3.3 (h): at each boundary between consecutive segments, the jump of z (= c * w, in the
+    log units of the key interval): z of the first second of the next segment minus z of the last second of the one
+    before, both at the times the segments were drawn (the a-order). In a they are the same or neighbouring seconds;
+    in b the shuffle makes the jumps."""
     starts = np.concatenate([[0], np.cumsum([s.dur_ms for s in body])]).astype(np.int64)
     first = {k: int(starts[k] // 1000) for k in range(len(body))}
     last = {k: int((starts[k + 1] - 1) // 1000) for k in range(len(body))}
@@ -234,8 +240,8 @@ def shuffle_jumps(sp: Speed, body: list[Segment], tail: Segment, perm: np.ndarra
     for role, order in (("a", list(range(len(body)))), ("b", [int(k) for k in perm])):
         seq = order + [len(body)]
         j = np.array([sp.c * (sp.w(first[y]) - sp.w(last[x])) for x, y in zip(seq[:-1], seq[1:])])
-        out[role] = {"n": int(len(j)), "median_abs": float(np.median(np.abs(j))) if len(j) else 0.0,
-                     "max_abs": float(np.max(np.abs(j))) if len(j) else 0.0}
+        out[role] = {"n": int(len(j)), "median_abs_z_jump": float(np.median(np.abs(j))) if len(j) else 0.0,
+                     "max_abs_z_jump": float(np.max(np.abs(j))) if len(j) else 0.0}
     return out
 
 
@@ -329,8 +335,8 @@ def main() -> int:
         ap.error("--t is required with --world graded and only with it")
     if (a.world == "confound") != (a.c is not None):
         ap.error("--c is required with --world confound and only with it")
-    if a.c is not None and not (math.isfinite(a.c) and a.c >= 0.0):
-        ap.error(f"--c must be a finite number >= 0, got {a.c}")
+    if a.c is not None and not (math.isfinite(a.c) and 0.0 <= a.c <= C_MAX):
+        ap.error(f"--c must be a number in [0, {C_MAX}], got {a.c}")
     if a.world in ("v2", "v3", "v4"):
         cfg["segments"] = cfg[f"segments_{a.world}"]
     elif a.world == "graded":
@@ -455,7 +461,10 @@ def main() -> int:
 
     (work / "sessions.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     if a.world == "confound":  # confound world design 3.3 (h): described only, not judged
-        (work / "speed_jumps.json").write_text(json.dumps({"c": a.c, "pairs": jumps}, indent=1), encoding="utf-8")
+        doc = {"quantity": "z jump at the segment boundaries: c * (w(first second of the next segment) - "
+                           "w(last second of the one before)), log units of the key interval (design 3.3 (h))",
+               "c": a.c, "pairs": jumps}
+        (work / "speed_jumps.json").write_text(json.dumps(doc, indent=1), encoding="utf-8")
     world = {"world": a.world, "c": a.c} if a.world == "confound" else {"world": a.world, "t": a.t}
     (work / "world.json").write_text(json.dumps(world), encoding="utf-8")
     print(f"generated {len(manifest)} sessions into {work}")

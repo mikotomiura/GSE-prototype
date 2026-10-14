@@ -193,7 +193,8 @@ BIG_Z = 3.0  # the test series: intervals about 20 times longer inside a window
 # round 1 H2: the time origin of each part)
 WINDOWS = {"P": [(1000, 4000), (10740, 10800)], "O": [(3600, 4740), (4740, 4800)],
            "Dde": [(3600, 4740), (4740, 4800)], "Dsl": [(10800, 12540), (12540, 12600)], "Dco": [(2000, 3000)],
-           "Dsh": [(1000, 2000)]}
+           "Dsh": [(1000, 2000), (5340, 5400)]}
+MADE: list = []  # (names, c, duration_s) of every WindowSpeed made (code-reviewer round 2 H2)
 
 
 class WindowSpeed:
@@ -201,6 +202,7 @@ class WindowSpeed:
 
     def __init__(self, seed, names, c, cfg, duration_s):
         self.names, self.c = names, 1.0
+        MADE.append((tuple(names), c, duration_s))
 
     def z(self, tau_ms):
         return BIG_Z if any(a * 1000 <= tau_ms < b * 1000 for a, b in WINDOWS.get(self.names[0], [])) else 0.0
@@ -219,6 +221,39 @@ def window_intervals(work: Path, sid: str, windows: list) -> tuple[int, int, int
     return int(inside.sum()), int((inside & (d < 400)).sum()), int((~inside & (d < 400)).sum())
 
 
+class RecRng:
+    """A generator that records the lognormal and uniform draws of gen_typing (code-reviewer round 2 M)."""
+
+    def __init__(self, g):
+        self.g, self.calls = g, []
+
+    def lognormal(self, mean, sigma):
+        self.calls.append(("lognormal", float(mean), float(sigma)))
+        return self.g.lognormal(mean, sigma)
+
+    def uniform(self, lo, hi):
+        self.calls.append(("uniform", float(lo), float(hi)))
+        return self.g.uniform(lo, hi)
+
+    def random(self):
+        return self.g.random()
+
+    def integers(self, *a):
+        return self.g.integers(*a)
+
+
+class ConstSpeed:
+    """z = K at every time; records the times it is read at."""
+    K = 0.7
+
+    def __init__(self):
+        self.c, self.taus = 1.0, []
+
+    def z(self, tau_ms):
+        self.taus.append(tau_ms)
+        return self.K
+
+
 def run_gen_in_process(config: Path, seed_file: Path, work: Path, hmm: str, speed_cls) -> None:
     old_argv, old_speed = sys.argv, gs.Speed
     sys.argv = ["gen_sessions.py", str(config), str(seed_file), str(work), "--hmm-version", hmm, "--world",
@@ -234,11 +269,14 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
     """confound world design 3.7."""
     gen = HERE / "gen_sessions.py"
     # the copied generator and the paths that do not use the speed series
-    src_ok = GRADED_SRC.exists() and hashlib.sha256(GRADED_SRC.read_bytes()).hexdigest() == GRADED_SRC_SHA
+    # line ends made LF before hashing, as ceiling.code_fingerprint (a CRLF checkout is the same file)
+    src_ok = (GRADED_SRC.exists()
+              and hashlib.sha256(GRADED_SRC.read_bytes().replace(b"\r\n", b"\n")).hexdigest() == GRADED_SRC_SHA)
     check(src_ok, f"confound: the graded world generator {GRADED_SRC.name} is the 424d9500 file (SHA-256)")
     if src_ok:
         src_cfg = GRADED_SRC.parent.parent / "config.json"
-        for world, t in (("v1", None), ("v2", None), ("v3", None), ("v4", None), ("graded", 0.5)):
+        for world, t in (("v1", None), ("v2", None), ("v3", None), ("v4", None), ("graded", 0.25), ("graded", 0.5),
+                         ("graded", 0.75)):
             tag = world if t is None else f"{world}{t}"
             generate(GRADED_SRC, src_cfg, seed_file, tmp / f"src-{tag}", world, hmm, t)
             ours = tmp / f"ours-{tag}"
@@ -270,6 +308,32 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
     check(gs.Speed(20261020, ("P", 4), 1.0, cfg, 5).w(0) != sp.w(0), "confound: another P session has another series")
     half, two = gs.Speed(20261020, ("P", 3), 0.5, cfg, 5), gs.Speed(20261020, ("P", 3), 2.0, cfg, 5)
     check(all(two.z(k * 1000.0) == 4 * half.z(k * 1000.0) != 0 for k in range(5)), "confound: z is c times w")
+    # code-reviewer round 2 H1: z at a session time reads w of its whole second, times c (not w * delta again)
+    exact = all(x.z(k * 1000.0 + f) == x.c * x.w(k) for x in (half, sp, two) for k in range(5) for f in (0.0, 999.9))
+    check(exact and sp.z(999.9) != sp.z(1000.0) and abs(sp.z(0.0) - hand[0]) < 1e-12,
+          "confound: z(k s + f ms) = c * w(k) for f in [0, 1000) and changes at the next whole second")
+    # code-reviewer round 2 M: only the intervals inside a burst are shifted, by exactly z, read at the press time
+    cfg2 = {**cfg, "segments": gs.graded_segments(cfg, 0.5)}
+    p_s = cfg2["segments"]["STRUGGLE"]
+    for kind_speed in (None, ConstSpeed()):
+        rec = RecRng(np.random.default_rng(11))
+        seg_ = gs.gen_typing(rec, "STRUGGLE", 60_000, cfg2, kind_speed, 5_000)
+        shift = 0.0 if kind_speed is None else ConstSpeed.K
+        fl = [c_ for c_ in rec.calls if c_[0] == "lognormal" and c_[2] == p_s["flight_sigma"]]
+        gp = [c_ for c_ in rec.calls if c_[0] == "lognormal" and c_[2] == p_s["gap_sigma"]]
+        un = {c_[1:] for c_ in rec.calls if c_[0] == "uniform"}
+        ok = (len(fl) == len(seg_.presses) > 10 and len(gp) > 3 and len(fl) + len(gp) == sum(
+            c_[0] == "lognormal" for c_ in rec.calls)
+              and all(c_[1] == np.log(p_s["flight_median_ms"]) + shift for c_ in fl)
+              and all(c_[1] == np.log(p_s["gap_median_ms"]) for c_ in gp)
+              and un <= {(0.0, 300.0), (float(p_s["burst_dur_min_s"]), float(p_s["burst_dur_max_s"]))})
+        if kind_speed is not None:
+            taus = kind_speed.taus
+            ok = ok and len(taus) == len(seg_.presses) and all(
+                0 <= tau - 5_000 - pr[0] < 1 for tau, pr in zip(taus, seg_.presses))
+        check(ok, f"confound: gen_typing with {'no speed' if kind_speed is None else 'z = K'} shifts only the burst "
+                  f"intervals ({len(fl)}) by {shift}, not the gaps ({len(gp)}) or the burst lengths, z read at "
+                  f"the press time")
     # c = 0 against graded t = 0.5 (keys and labels), and c > 0 differs
     generate(gen, config, seed_file, tmp / "ours-c0", "confound", hmm, c=0.0)
     generate(gen, config, seed_file, tmp / "ours-c0.5", "confound", hmm, c=0.5)
@@ -285,28 +349,53 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
           "confound: a graded t = 0.5 work directory (the same value 0.5) is refused as step c050")
     check(ck.world_problems(tmp / "ours-v4", cfg, "c050") != [], "confound: a v4 work directory is refused as a step")
     jumps = json.loads((tmp / "ours-c0.5" / "speed_jumps.json").read_text(encoding="utf-8"))
-    check(jumps["c"] == 0.5 and len(jumps["pairs"]) == 2
+    check(jumps["c"] == 0.5 and len(jumps["pairs"]) == 2 and jumps["quantity"].startswith("z jump")
           and all(v["b"]["n"] == v["a"]["n"] > 0 for v in jumps["pairs"].values()),
           "confound: speed_jumps.json has each D_shuffled pair's boundaries in a and b")
     # the wiring: a test series that is large only inside windows of session time
     w = tmp / "ours-window"
+    MADE.clear()
     run_gen_in_process(config, seed_file, w, hmm, WindowSpeed)
     man = {m["sid"]: m for m in json.loads((w / "sessions.json").read_text(encoding="utf-8"))}
+    # code-reviewer round 2 H2: one series per unit, made once, with the unit's own name and length, and c from --c
+    sets_ = cfg["sets"]
+    n_of = lambda prefix: len({m["pair"] for m in man.values() if m["sid"].startswith(prefix)})
+    want = ({(("P", i), cfg["session"]["duration_s"]) for i in range(12)}
+            | {(("O", i), sets_["O"]["prefix_s"] + sets_["O"]["shared_suffix_s"]) for i in range(n_of("Oa"))}
+            | {(("Dsh", i), sets_["D_shuffled"]["duration_s"]) for i in range(n_of("Dsh"))}
+            | {(("Dde", i), sets_["D_diffend"]["shared_prefix_s"] + sets_["D_diffend"]["suffix_s"])
+               for i in range(n_of("Dde"))}
+            | {(("Dco", 0), sets_["D_continuous"]["duration_s"]), (("Dsl", 0), sets_["D_sleep"]["duration_s"])})
+    got = [(names, dur) for names, _, dur in MADE]
+    check(len(got) == len(set(got)) and set(got) == want and all(c_ == 1.0 for _, c_, _ in MADE)
+          and n_of("Oa") == 4 and n_of("Dsh") == 2 and n_of("Dde") == 2,
+          f"confound wiring: {len(got)} series, one per unit, named by the unit (P i, O i, Dsh i, Dde i, Dco 0, "
+          f"Dsl 0) with its length and c = 1")
     units = {"P": ["P000", "P005"], "O": ["Oa00", "Ob00", "Oa03"], "Dde": ["Dde00a", "Dde00b", "Dde01b"],
              "Dsl": ["Dsl00"], "Dco": ["Dco00"], "Dsh": ["Dsh00a", "Dsh01a"]}
     for unit, sids in units.items():
         for sid in sids:
             n_in, short_in, short_out = window_intervals(w, sid, WINDOWS[unit])
-            check(sid in man and n_in >= 5 and short_in == 0 and short_out >= 100,
+            # a few short intervals inside are possible without z (the rest of a burst plus an unshifted gap, or an
+            # interval across a segment boundary: code-reviewer round 2 M), so a rate, not zero
+            x0 = WINDOWS[unit][0][0] * 1000
+            t_w = np.load(w / "labels" / f"{sid}.npz")["presses_ms"]
+            t_0 = np.load(tmp / "ours-c0" / "labels" / f"{sid}.npz")["presses_ms"]
+            before = np.array_equal(t_w[t_w < x0], t_0[t_0 < x0]) and (t_0 < x0).sum() > 100
+            check(sid in man and n_in >= 5 and short_in <= 0.02 * n_in and short_out >= 100 and before,
                   f"confound wiring: {sid}: {n_in} intervals start inside {WINDOWS[unit]} s, {short_in} of them "
-                  f"below 400 ms; {short_out} below 400 ms outside")
+                  f"below 400 ms; {short_out} below 400 ms outside; the presses before {x0 // 1000} s equal c = 0's")
+    for i in (0, 1):
+        a_j = json.loads((w / "speed_jumps.json").read_text(encoding="utf-8"))["pairs"][f"{i:02d}"]["a"]
+        check(a_j["max_abs_z_jump"] in (0.0, BIG_Z) and a_j["median_abs_z_jump"] in (0.0, BIG_Z),
+              f"confound: Dsh{i:02d}a's z jumps under the test series are 0 or {BIG_Z} ({a_j})")
     for i in (0, 1):
         # the b-session carries the segments drawn in a: the intervals slowed inside the a-window (those that do not
         # cross a segment boundary) reappear in b, wherever the shuffle put them (a multiset check)
         a_t = np.load(w / "labels" / f"Dsh{i:02d}a.npz")["presses_ms"]
         b_t = np.load(w / "labels" / f"Dsh{i:02d}b.npz")["presses_ms"]
         a_d, a_s = np.diff(a_t), a_t[:-1]
-        (lo, hi), = WINDOWS["Dsh"]
+        lo, hi = WINDOWS["Dsh"][0]
         slowed = Counter(a_d[(a_s >= lo * 1000) & (a_s < hi * 1000)].tolist())
         in_b = Counter(np.diff(b_t).tolist())
         kept = sum(min(n, in_b[v]) for v, n in slowed.items())
@@ -336,7 +425,7 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
     print(f"     diagnostic: SD over P sessions of the log FLOW short-interval median at c = 0 / 0.5 / 1 / 2: {sds}")
     for args in (["--world", "confound"], ["--world", "graded", "--t", "0.5", "--c", "1"], ["--world", "v4", "--c", "1"],
                  ["--world", "confound", "--c", "-1"], ["--world", "confound", "--c", "nan"],
-                 ["--world", "confound", "--c", "inf"]):
+                 ["--world", "confound", "--c", "inf"], ["--world", "confound", "--c", "5"]):
         r = subprocess.run([sys.executable, str(gen), str(config), str(seed_file), str(tmp / "ours-bad"),
                             "--hmm-version", hmm, "--smoke", *args], capture_output=True)
         check(r.returncode != 0, f"confound: gen_sessions refuses {' '.join(args)}")
@@ -1217,6 +1306,8 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
             ("another step (c050's c)", {**good, "step": "c050", "c": 0.5}),
             ("the right step name with another c", {**good, "c": 0.5}),
             ("another world", {**good, "world": "v4"}),
+            ("a graded world pilot.json at the same value", {**{k: v for k, v in good.items() if k != "c"},
+                                                              "world": "graded", "t": good["c"]}),
             ("a stopped L300 part", {**swap("L300", stop="weak_detector"), "stop": "weak_detector"}),
             ("an L300 stop that differs from the pilot's", {**good, "stop": "fit_failed"}),
             ("an L1800 part claimed stopped while its values do not stop", swap("L1800", stop="weak_detector")),
@@ -1291,7 +1382,7 @@ def test_ceiling_gate(cfg: dict, base_seed: int) -> None:
             ("another seed", {**doc, "seed": base_seed}, cfg),
             ("another P", {**doc, "P": {**doc["P"], "c100": 40}}, cfg),
             ("another main_auc", {**doc, "main_auc": 0.85}, cfg),
-            ("a t moved in config.json after pilot 0", doc, moved),
+            ("a c moved in config.json after pilot 0", doc, moved),
             ("another config (fingerprint)", {**doc, "config_fingerprint": "0" * 64}, cfg),
             ("other instruments (code fingerprint)", {**doc, "code_fingerprint": "0" * 64}, cfg),
             ("a go status over values at the ceiling", {**doc, "results": {**doc["results"], "c100": mk(0.93, 0.95)}}, cfg),
