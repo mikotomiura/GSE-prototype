@@ -1,0 +1,7 @@
+scale_id,scale,citation,construct_scope,n_items_coded,items_source,license_of_article,items_obtained,note
+LAU,AI Fatigue Scale (15 items),"Lau et al. 2026 [P362] (preprint [P485])",AI 疲労,15,"出版版 Table 1（画像）・前刷り p.18 Table 1",CC BY-NC-ND 4.0（Crossref・論文の許諾。尺度の使用条件ではない）,yes,前置きの文は出版版と前刷りで違う（出版版 "Consider each statement and rate the extent to which, on average, it reflects your experience with AI"）。項目の文言は同じ
+ZEF,Zoom Exhaustion & Fatigue Scale (15 items),"Fauville et al. 2021 [P437]",ビデオ会議疲労（参照・比較の相手）,15,"Table 3（質問の形）・Table 2（短い形）",CC BY 4.0,yes,motivational の 2 項目は MFI の reduced motivation に由来（S-MR カード 1）。Table 3 の * の意味は未照合
+ZL_MF,AI misinformation fatigue (8 items),"Zhao & Liu 2026 (doi:10.3389/fpsyg.2026.1879080・PMC13501034)",AI の認知的疲労（誤情報）,8,Table 2,CC BY 4.0,yes,Choi et al. 2018 から改変（本文）。項目の削除の記載は無い
+ZL_PF,AI privacy fatigue (8 items),"Zhao & Liu 2026 (同上)",AI の認知的疲労（プライバシー）,8,Table 2,CC BY 4.0,yes,同上
+AA_AF,AI fatigue (4 items) in Alwahaishi & Ahmed 2026,"[P488] (PMC13290586)",AI 疲労,0,本文・補足資料に無い,—,no,出典は Kim et al. 2023（SSRN doi:10.2139/ssrn.4573394）。題名は AI 不安の分析で、疲労の尺度の開発ではない（題名からの読み・本文は未読）。データは著者に求めれば出るとする
+MFI,Multidimensional Fatigue Inventory (20 items),"Smets et al. 1995（未登録）",一般の疲労（参照・アンカー）,0,公開の本文に全項目は無い,—,partial,reduced motivation のうち ZEF に入った 2 項目だけをアンカーに使う。尺度としてはコード化しない
