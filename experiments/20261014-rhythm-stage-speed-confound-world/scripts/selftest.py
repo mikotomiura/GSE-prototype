@@ -7,6 +7,9 @@ window features, the lag measure, the positive controls, the twins, the verdicts
 causality of gse-replay (with --gse-replay), and on the run's own sessions (with --work) the twins, the PC-stall at
 lambda 1 and the seg mutation (40 P sessions or more).
 
+Confound world (.steering/20261014-rhythm-stage-speed-confound-world/design.md 3.7): the copied generator, the
+speed series (its draw order, c times w, c = 0 against graded t = 0.5) and its wiring (a test series by session time),
+world.json, the refusals of --c; the steps are c050 / c100 / c200.
 Graded world (.steering/20261014-rhythm-stage-graded-world/design.md 3.7): the steps of the world, the L1800 controls
 (PC1-1800, PCl-), the judge on L1800, the step rule of pilot 0, and the pilot's and the main run's checks of the
 step (pilot.json, lam.<step>, lam_1800.<step>).
@@ -26,6 +29,7 @@ import json
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -52,8 +56,8 @@ def check(cond: bool, name: str) -> None:
 
 
 def generate(script: Path, config: Path, seed_file: Path, work: Path, world: str, hmm: str,
-             t: float | None = None) -> None:
-    extra = [] if t is None else ["--t", repr(float(t))]
+             t: float | None = None, c: float | None = None) -> None:
+    extra = ([] if t is None else ["--t", repr(float(t))]) + ([] if c is None else ["--c", repr(float(c))])
     subprocess.run([sys.executable, str(script), str(config), str(seed_file), str(work), "--hmm-version", hmm,
                     "--world", world, "--smoke", *extra], check=True, capture_output=True)
 
@@ -176,6 +180,166 @@ def test_world(cfg: dict, config: Path, eh1: Path, tmp: Path, hmm: str) -> None:
           and min(g4["n_presses"], f4["n_presses"]) > 5000,
           f"world v4: the generated backspace rates {g4['bs_rate']:.3f} / {f4['bs_rate']:.3f} match STRUGGLE / FLOW")
     test_graded(cfg, config, seed_file, tmp, hmm, st2, st4)
+    test_confound(cfg, config, seed_file, tmp, hmm)
+
+
+# confound world design 1.3, 3.7: the copied generator (graded world, 424d9500) and the written values
+GRADED_SRC = HERE.parent.parent / "20261014-rhythm-stage-graded-world" / "scripts" / "gen_sessions.py"
+GRADED_SRC_SHA = "8bd3ffa9dde633e4c86aea03f58aa61767205b84a54eacf8751accf4763fafd4"
+DELTA_WANT = 0.3788428508487583  # ln(219.08902300206645 / 150), python repr 2026-10-14
+CONFOUND_STEPS = {"c050": 0.5, "c100": 1.0, "c200": 2.0}
+BIG_Z = 3.0  # the test series: intervals about 20 times longer inside a window
+# the windows (s) of the test series per unit name: a part drawn by markov and a final FLOW per set (code-reviewer
+# round 1 H2: the time origin of each part)
+WINDOWS = {"P": [(1000, 4000), (10740, 10800)], "O": [(3600, 4740), (4740, 4800)],
+           "Dde": [(3600, 4740), (4740, 4800)], "Dsl": [(10800, 12540), (12540, 12600)], "Dco": [(2000, 3000)],
+           "Dsh": [(1000, 2000)]}
+
+
+class WindowSpeed:
+    """A test series for gen_sessions.Speed: z = BIG_Z at the session times inside the unit's windows, else 0."""
+
+    def __init__(self, seed, names, c, cfg, duration_s):
+        self.names, self.c = names, 1.0
+
+    def z(self, tau_ms):
+        return BIG_Z if any(a * 1000 <= tau_ms < b * 1000 for a, b in WINDOWS.get(self.names[0], [])) else 0.0
+
+    def w(self, k):
+        return self.z(k * 1000.0)
+
+
+def window_intervals(work: Path, sid: str, windows: list) -> tuple[int, int, int]:
+    """(intervals starting inside the windows, of them below 400 ms, intervals below 400 ms starting outside)."""
+    t = np.load(work / "labels" / f"{sid}.npz")["presses_ms"]
+    d, start = np.diff(t), t[:-1]
+    inside = np.zeros(len(d), dtype=bool)
+    for a, b in windows:
+        inside |= (start >= a * 1000) & (start < b * 1000)
+    return int(inside.sum()), int((inside & (d < 400)).sum()), int((~inside & (d < 400)).sum())
+
+
+def run_gen_in_process(config: Path, seed_file: Path, work: Path, hmm: str, speed_cls) -> None:
+    old_argv, old_speed = sys.argv, gs.Speed
+    sys.argv = ["gen_sessions.py", str(config), str(seed_file), str(work), "--hmm-version", hmm, "--world",
+                "confound", "--c", "1", "--smoke"]
+    gs.Speed = speed_cls
+    try:
+        gs.main()
+    finally:
+        sys.argv, gs.Speed = old_argv, old_speed
+
+
+def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str) -> None:
+    """confound world design 3.7."""
+    gen = HERE / "gen_sessions.py"
+    # the copied generator and the paths that do not use the speed series
+    src_ok = GRADED_SRC.exists() and hashlib.sha256(GRADED_SRC.read_bytes()).hexdigest() == GRADED_SRC_SHA
+    check(src_ok, f"confound: the graded world generator {GRADED_SRC.name} is the 424d9500 file (SHA-256)")
+    if src_ok:
+        src_cfg = GRADED_SRC.parent.parent / "config.json"
+        for world, t in (("v1", None), ("v2", None), ("v3", None), ("v4", None), ("graded", 0.5)):
+            tag = world if t is None else f"{world}{t}"
+            generate(GRADED_SRC, src_cfg, seed_file, tmp / f"src-{tag}", world, hmm, t)
+            ours = tmp / f"ours-{tag}"
+            if not ours.exists():
+                generate(gen, config, seed_file, ours, world, hmm, t)
+            same = (digest(ours) == digest(tmp / f"src-{tag}")
+                    and (ours / "world.json").read_bytes() == (tmp / f"src-{tag}" / "world.json").read_bytes())
+            check(same, f"confound: world {tag} writes what the graded world generator writes (with world.json)")
+    # the settings and the stall
+    seg = gs.graded_segments(cfg, cfg["speed_confound"]["base_t"])
+    check(cfg["speed_confound"]["base_t"] == 0.5 and cfg["speed_confound"]["tau_s"] == 300
+          and abs(seg["STRUGGLE"]["flight_median_ms"] - 219.08902300206645) < 1e-12
+          and abs(seg["STRUGGLE"]["flight_sigma"] - 0.3) < 1e-12 and abs(gs.confound_delta(cfg) - DELTA_WANT) < 1e-12,
+          f"confound: base_t 0.5, tau_s 300, STRUGGLE 219.089... ms / 0.3 and delta {gs.confound_delta(cfg)!r}")
+    check(cfg["ceiling"]["steps"] == CONFOUND_STEPS, "confound: the steps are c050 / c100 / c200 at 0.5 / 1 / 2")
+    # the draw order of the series (u, d(0), eps_0, ...) and its growth on demand
+    sp = gs.Speed(20261020, ("P", 3), 1.0, cfg, 5)
+    r = gs.derive_rng(20261020, "speed", "P", 3)
+    u, d0, e0, e1 = (float(r.standard_normal()) for _ in range(4))
+    rho = np.exp(-1.0 / 300)
+    q = np.sqrt(1.0 - rho * rho)
+    hand = [DELTA_WANT * (u + d0), DELTA_WANT * (u + rho * d0 + q * e0),
+            DELTA_WANT * (u + rho * (rho * d0 + q * e0) + q * e1)]
+    check(all(abs(sp.w(k) - hand[k]) < 1e-12 for k in range(3)),
+          f"confound: w(0..2) {[sp.w(k) for k in range(3)]} follow u, d(0), eps_0, eps_1 of the speed stream")
+    short, long_ = gs.Speed(20261020, ("P", 3), 1.0, cfg, 10), gs.Speed(20261020, ("P", 3), 1.0, cfg, 3000)
+    check(all(short.w(k) == long_.w(k) for k in range(0, 2500, 7)), "confound: the series grown on demand equals "
+          "the series drawn long at once")
+    check(gs.Speed(20261020, ("P", 4), 1.0, cfg, 5).w(0) != sp.w(0), "confound: another P session has another series")
+    half, two = gs.Speed(20261020, ("P", 3), 0.5, cfg, 5), gs.Speed(20261020, ("P", 3), 2.0, cfg, 5)
+    check(all(two.z(k * 1000.0) == 4 * half.z(k * 1000.0) != 0 for k in range(5)), "confound: z is c times w")
+    # c = 0 against graded t = 0.5 (keys and labels), and c > 0 differs
+    generate(gen, config, seed_file, tmp / "ours-c0", "confound", hmm, c=0.0)
+    generate(gen, config, seed_file, tmp / "ours-c0.5", "confound", hmm, c=0.5)
+    check(digest(tmp / "ours-c0") == digest(tmp / "ours-graded0.5"),
+          "confound c = 0: the NDJSON, labels and sessions.json equal graded t = 0.5's")
+    check(digest(tmp / "ours-c0.5") != digest(tmp / "ours-graded0.5"), "confound c = 0.5 differs from graded t = 0.5 "
+          "(negative control)")
+    wj = json.loads((tmp / "ours-c0.5" / "world.json").read_text(encoding="utf-8"))
+    check(wj == {"world": "confound", "c": 0.5} and ck.world_problems(tmp / "ours-c0.5", cfg, "c050") == [],
+          f"confound c = 0.5: world.json {wj} passes the check of step c050")
+    check(ck.world_problems(tmp / "ours-c0.5", cfg, "c100") != [], "confound c = 0.5: refused as step c100")
+    check(ck.world_problems(tmp / "ours-graded0.5", cfg, "c050") != [],
+          "confound: a graded t = 0.5 work directory (the same value 0.5) is refused as step c050")
+    check(ck.world_problems(tmp / "ours-v4", cfg, "c050") != [], "confound: a v4 work directory is refused as a step")
+    jumps = json.loads((tmp / "ours-c0.5" / "speed_jumps.json").read_text(encoding="utf-8"))
+    check(jumps["c"] == 0.5 and len(jumps["pairs"]) == 2
+          and all(v["b"]["n"] == v["a"]["n"] > 0 for v in jumps["pairs"].values()),
+          "confound: speed_jumps.json has each D_shuffled pair's boundaries in a and b")
+    # the wiring: a test series that is large only inside windows of session time
+    w = tmp / "ours-window"
+    run_gen_in_process(config, seed_file, w, hmm, WindowSpeed)
+    man = {m["sid"]: m for m in json.loads((w / "sessions.json").read_text(encoding="utf-8"))}
+    units = {"P": ["P000", "P005"], "O": ["Oa00", "Ob00", "Oa03"], "Dde": ["Dde00a", "Dde00b", "Dde01b"],
+             "Dsl": ["Dsl00"], "Dco": ["Dco00"], "Dsh": ["Dsh00a", "Dsh01a"]}
+    for unit, sids in units.items():
+        for sid in sids:
+            n_in, short_in, short_out = window_intervals(w, sid, WINDOWS[unit])
+            check(sid in man and n_in >= 5 and short_in == 0 and short_out >= 100,
+                  f"confound wiring: {sid}: {n_in} intervals start inside {WINDOWS[unit]} s, {short_in} of them "
+                  f"below 400 ms; {short_out} below 400 ms outside")
+    for i in (0, 1):
+        # the b-session carries the segments drawn in a: the intervals slowed inside the a-window (those that do not
+        # cross a segment boundary) reappear in b, wherever the shuffle put them (a multiset check)
+        a_t = np.load(w / "labels" / f"Dsh{i:02d}a.npz")["presses_ms"]
+        b_t = np.load(w / "labels" / f"Dsh{i:02d}b.npz")["presses_ms"]
+        a_d, a_s = np.diff(a_t), a_t[:-1]
+        (lo, hi), = WINDOWS["Dsh"]
+        slowed = Counter(a_d[(a_s >= lo * 1000) & (a_s < hi * 1000)].tolist())
+        in_b = Counter(np.diff(b_t).tolist())
+        kept = sum(min(n, in_b[v]) for v, n in slowed.items())
+        total = sum(slowed.values())
+        check(len(a_t) == len(b_t) and not np.array_equal(a_t, b_t) and total >= 5 and kept >= 0.8 * total,
+              f"confound wiring: Dsh{i:02d}b has {kept} of the {total} intervals slowed in a (the segments move "
+              f"with their keys)")
+    check(np.array_equal(np.load(w / "labels" / "Dno00.npz")["presses_ms"],
+                         np.load(tmp / "ours-c0" / "labels" / "Dno00.npz")["presses_ms"]),
+          "confound wiring: D_noobs is not slowed")
+    # the spread of the session medians (a diagnostic only: confound world design 3.7, Codex round 1)
+    sds = []
+    for c in (0.0, 0.5, 1.0, 2.0):
+        wc = tmp / f"ours-c{c}"
+        if not wc.exists():
+            generate(gen, config, seed_file, wc, "confound", hmm, c=c)
+        meds = []
+        for f in sorted((wc / "labels").glob("P*.npz")):
+            z = np.load(f)
+            t, seg = z["presses_ms"], z["seg"]
+            dd = np.diff(t)
+            sec = np.minimum(t[:-1] // 1000, len(seg) - 1)
+            ok = (dd < 1000) & (seg[sec] == 0) & (seg[np.minimum(t[1:] // 1000, len(seg) - 1)] == 0)
+            if ok.sum():
+                meds.append(np.log(np.median(dd[ok])))
+        sds.append(round(float(np.std(meds)), 4))
+    print(f"     diagnostic: SD over P sessions of the log FLOW short-interval median at c = 0 / 0.5 / 1 / 2: {sds}")
+    for args in (["--world", "confound"], ["--world", "graded", "--t", "0.5", "--c", "1"], ["--world", "v4", "--c", "1"],
+                 ["--world", "confound", "--c", "-1"], ["--world", "confound", "--c", "nan"],
+                 ["--world", "confound", "--c", "inf"]):
+        r = subprocess.run([sys.executable, str(gen), str(config), str(seed_file), str(tmp / "ours-bad"),
+                            "--hmm-version", hmm, "--smoke", *args], capture_output=True)
+        check(r.returncode != 0, f"confound: gen_sessions refuses {' '.join(args)}")
 
 
 # graded world design 1.3: the values written out (not computed by the instrument's function; code-reviewer M4)
@@ -205,20 +369,16 @@ def test_graded(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str, s
     check(digest(tmp / "ours-g0") != digest(tmp / "ours-g1"), "graded: t = 0 and t = 1 differ (negative control)")
     meds = [st4["STRUGGLE"]["short_median"]]
     for t in GRADED_WANT:
-        w = tmp / f"ours-g{t}"
+        w = tmp / f"ours-graded{t}"
         generate(HERE / "gen_sessions.py", config, seed_file, w, "graded", hmm, t)
         stt = interval_stats(w)
         meds.append(stt["STRUGGLE"]["short_median"])
-        step = next(k for k, v in cfg["ceiling"]["steps"].items() if v == t)
-        check(json.loads((w / "world.json").read_text(encoding="utf-8")) == {"world": "graded", "t": t}
-              and ck.world_problems(w, cfg, step) == [],
-              f"graded t = {t}: world.json names the graded world at t and passes the check of step {step}")
-        other = next(k for k, v in cfg["ceiling"]["steps"].items() if v != t)
-        check(ck.world_problems(w, cfg, other) != [], f"graded t = {t}: the work directory is refused as step {other}")
+        # confound world design 3.7: kept apart from the step table (the steps are the widths c now)
+        check(json.loads((w / "world.json").read_text(encoding="utf-8")) == {"world": "graded", "t": t},
+              f"graded t = {t}: world.json names the graded world at t")
     meds.append(st2["STRUGGLE"]["short_median"])
     print(f"     STRUGGLE short-interval medians v4, t 0.25 / 0.5 / 0.75, v2: {meds}")
     check(all(a < b for a, b in zip(meds, meds[1:])), "graded: STRUGGLE's short-interval median rises with t (v4 to v2)")
-    check(ck.world_problems(tmp / "ours-v4", cfg, "t025") != [], "graded: a v4 work directory is refused as a step")
     for args in (["--world", "graded"], ["--world", "v4", "--t", "0.5"], ["--world", "graded", "--t", "1.5"]):
         r = subprocess.run([sys.executable, str(HERE / "gen_sessions.py"), str(config), str(seed_file),
                             str(tmp / "ours-bad"), "--hmm-version", hmm, "--smoke", *args], capture_output=True)
@@ -343,16 +503,16 @@ def test_auc_and_choice(cfg: dict) -> None:
     mk = lambda h, l: {"L300": {"hgb": {"auc_A_speed": h}, "lr": {"auc_A_speed": l}}}
     ma = cfg["ceiling"]["main_auc"]
     check(ma == 0.9 and cfg["ceiling"]["P"] == 240 and cfg["ceiling"]["seed_offset"] == 1
-          and cfg["ceiling"]["steps"] == {"t025": 0.25, "t050": 0.5, "t075": 0.75},
-          "steps: three steps at 0.25 / 0.5 / 0.75, P 240, SEED + 1, the ceiling at 0.90")
+          and cfg["ceiling"]["steps"] == {"c050": 0.5, "c100": 1.0, "c200": 2.0},
+          "steps: three steps at c = 0.5 / 1 / 2, P 240, SEED + 1, the ceiling at 0.90")
     check(ce.step_status(mk(0.90, 0.90), ma)["status"] == "ceiling", "steps: 0.90 and 0.90 -> ceiling (equality is the ceiling)")
     check(ce.step_status(mk(0.8999, 0.95), ma)["status"] == "go", "steps: one classifier below 0.90 -> go")
     check(ce.step_status(mk(0.95, 0.8999), ma)["status"] == "go", "steps: the other classifier below 0.90 -> go")
     check(ce.step_status(mk(float("nan"), 0.95), ma)["status"] == "unmeasured", "steps: a NaN -> unmeasured (not a ceiling)")
     check(ce.step_status(mk(None, 0.5), ma)["status"] == "unmeasured", "steps: a failed fit -> unmeasured")
-    got = ce.choose_steps({"t025": mk(0.7, 0.7), "t050": mk(0.92, 0.89), "t075": mk(0.95, 0.91)}, cfg)
-    check({k: v["status"] for k, v in got.items()} == {"t025": "go", "t050": "go", "t075": "ceiling"}
-          and got["t050"]["t"] == 0.5, "steps: each step gets its own status")
+    got = ce.choose_steps({"c050": mk(0.7, 0.7), "c100": mk(0.92, 0.89), "c200": mk(0.95, 0.91)}, cfg)
+    check({k: v["status"] for k, v in got.items()} == {"c050": "go", "c100": "go", "c200": "ceiling"}
+          and got["c100"]["c"] == 1.0, "steps: each step gets its own status")
 
 
 # ---------------------------------------------------------------------------
@@ -825,14 +985,14 @@ def test_lam_config(cfg: dict) -> None:
     check(all(isinstance(cfg["pc_stall"][k], dict) and set(cfg["pc_stall"][k]) <= steps for k in ("lam", "lam_1800")),
           "lambda config: lam and lam_1800 are tables keyed by the steps (no round 2 lambdas copied over)")
     good = {c: 0.15 for c in st.candidates()}
-    mk = lambda lam: {**cfg, "pc_stall": {**cfg["pc_stall"], "lam": {"t025": lam}, "lam_1800": {"t025": lam}}}
-    check(ck.lam_problems(mk(good), "t025") == [] and ck.lam_problems(mk(good), "t025", "lam_1800") == [],
+    mk = lambda lam: {**cfg, "pc_stall": {**cfg["pc_stall"], "lam": {"c050": lam}, "lam_1800": {"c050": lam}}}
+    check(ck.lam_problems(mk(good), "c050") == [] and ck.lam_problems(mk(good), "c050", "lam_1800") == [],
           "lambda config: one grid value per candidate passes (lam and lam_1800 of the step)")
-    check(ck.lam_problems(mk(good), "t050") != [], "lambda config: another step's table does not pass")
-    check(ck.lam_problems({**cfg, "pc_stall": {**cfg["pc_stall"], "lam": good}}, "t025") != [],
+    check(ck.lam_problems(mk(good), "c100") != [], "lambda config: another step's table does not pass")
+    check(ck.lam_problems({**cfg, "pc_stall": {**cfg["pc_stall"], "lam": good}}, "c050") != [],
           "lambda config: a round 2 table (not per step) does not pass")
-    mk = lambda lam: {**cfg, "pc_stall": {**cfg["pc_stall"], "lam": {"t025": lam}}}
-    mkp = lambda lam: (mk(lam), "t025")
+    mk = lambda lam: {**cfg, "pc_stall": {**cfg["pc_stall"], "lam": {"c050": lam}}}
+    mkp = lambda lam: (mk(lam), "c050")
     for name, lam in (("missing", {k: v for k, v in list(good.items())[1:]}),
                       ("a string", {**good, "S-raw-hold-sec": "0.15"}),
                       ("NaN", {**good, "S-raw-hold-sec": float("nan")}),
@@ -955,7 +1115,7 @@ def test_select_lambda(cfg: dict) -> None:
 
 def pilot_doc(cfg: dict, step: str, parts: dict, base_seed: int) -> dict:
     sp = cfg["sets"]["pilot"]
-    return {"world": "graded", "t": cfg["ceiling"]["steps"][step], "step": step, "stop": parts["L300"]["stop"],
+    return {"world": "confound", "c": cfg["ceiling"]["steps"][step], "step": step, "stop": parts["L300"]["stop"],
             "rule": {k: cfg["pc_stall"][k] for k in ck.RULE_KEYS}, "seed": base_seed + sp["seed_offset"],
             "n_sessions": sp["P"], "bootstrap": sp["bootstrap"], "config_fingerprint": ce.cfg_fingerprint(cfg),
             "code_fingerprint": ce.code_fingerprint(),
@@ -997,54 +1157,54 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
     s18c = ck.part_result("L1800", merged18, p18["per_batch"], {"hgb": 0.92, "lr": 0.95}, cfg)
     s300 = ck.part_result("L300", merged, p300["per_batch"], {"hgb": 0.7, "lr": 0.7}, cfg)
     check(s18c[0] == "ceiling" and s300[0] is None, "pilot: a part at its own label's ceiling stops; the other part does not")
-    good = pilot_doc(cfg, "t050", {"L300": p300, "L1800": p18}, base_seed)
+    good = pilot_doc(cfg, "c100", {"L300": p300, "L1800": p18}, base_seed)
     old = {c: grid[0] for c in cands}  # another step's tables, written before (Codex round 2 P1)
     pre = json.loads(json.dumps(cfg))
-    pre["pc_stall"]["lam"]["t025"] = old
-    pre["pc_stall"]["lam_1800"]["t025"] = old
+    pre["pc_stall"]["lam"]["c050"] = old
+    pre["pc_stall"]["lam_1800"]["c050"] = old
     with tempfile.TemporaryDirectory() as d:
         cp, pp = Path(d) / "config.json", Path(d) / "pilot.json"
         (Path(d) / "SEED").write_text(f"{base_seed}\n", encoding="utf-8")
         fresh = lambda c=pre: cp.write_text(json.dumps(c, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         fresh()
         pp.write_text(json.dumps(good), encoding="utf-8")
-        ck.apply_pilot(cp, pp, "t050")
+        ck.apply_pilot(cp, pp, "c100")
         back = json.loads(cp.read_text(encoding="utf-8"))
         rest = lambda c: {**c, "pc_stall": {k: v for k, v in c["pc_stall"].items() if k not in ("lam", "lam_1800")}}
-        check(back["pc_stall"]["lam"] == {"t025": old, "t050": want}
-              and back["pc_stall"]["lam_1800"] == {"t025": old, "t050": want18} and rest(back) == rest(pre),
-              "pilot: --apply-pilot writes lam.t050 (L300's) and lam_1800.t050 (L1800's), keeps t025, nothing else")
-        check(ck.main_lams(back, pp, base_seed, "t050") == (want, want18, None),
+        check(back["pc_stall"]["lam"] == {"c050": old, "c100": want}
+              and back["pc_stall"]["lam_1800"] == {"c050": old, "c100": want18} and rest(back) == rest(pre),
+              "pilot: --apply-pilot writes lam.c100 (L300's) and lam_1800.c100 (L1800's), keeps c050, nothing else")
+        check(ck.main_lams(back, pp, base_seed, "c100") == (want, want18, None),
               "main: the step's pilot.json and config.json agree (L300 and L1800 each its own)")
         for name, hand in (("lam.<step>", "lam"), ("lam_1800.<step>", "lam_1800")):
             h = json.loads(json.dumps(back))
-            h["pc_stall"][hand]["t050"][cands[0]] = grid[0] if h["pc_stall"][hand]["t050"][cands[0]] != grid[0] else grid[1]
+            h["pc_stall"][hand]["c100"][cands[0]] = grid[0] if h["pc_stall"][hand]["c100"][cands[0]] != grid[0] else grid[1]
             try:
-                ck.main_lams(h, pp, base_seed, "t050")
+                ck.main_lams(h, pp, base_seed, "c100")
                 refused = False
             except SystemExit:
                 refused = True
             check(refused, f"main: a hand-edited {name} that is not the pilot's choice stops the run")
         try:
-            ck.main_lams(back, pp, base_seed, "t025")
+            ck.main_lams(back, pp, base_seed, "c050")
             refused = False
         except SystemExit:
             refused = True
-        check(refused, "main: the pilot.json of step t050 is refused for step t025")
+        check(refused, "main: the pilot.json of step c100 is refused for step c050")
         # a stopped L1800 part (PC1-1800 weak): lam only; the main run reads the stop from pilot.json
         weak18 = part_doc("L1800", {**merged18, st.PC1L_NAME: rec(0.12, 0.08)}, cfg)
-        stopped = pilot_doc(cfg, "t050", {"L300": p300, "L1800": weak18}, base_seed)
+        stopped = pilot_doc(cfg, "c100", {"L300": p300, "L1800": weak18}, base_seed)
         check(weak18["stop"] == "weak_detector", "pilot: a weak PC1-1800 stops the L1800 part")
         fresh()
         pp.write_text(json.dumps(stopped), encoding="utf-8")
-        ck.apply_pilot(cp, pp, "t050")
+        ck.apply_pilot(cp, pp, "c100")
         back2 = json.loads(cp.read_text(encoding="utf-8"))
-        check(back2["pc_stall"]["lam"] == {"t025": old, "t050": want} and back2["pc_stall"]["lam_1800"] == {"t025": old},
-              "pilot: a stopped L1800 part writes lam.<step> and no lam_1800.<step> (t025 kept)")
-        check(ck.main_lams(back2, pp, base_seed, "t050") == (want, None, "weak_detector"),
+        check(back2["pc_stall"]["lam"] == {"c050": old, "c100": want} and back2["pc_stall"]["lam_1800"] == {"c050": old},
+              "pilot: a stopped L1800 part writes lam.<step> and no lam_1800.<step> (c050 kept)")
+        check(ck.main_lams(back2, pp, base_seed, "c100") == (want, None, "weak_detector"),
               "main: a stopped L1800 part -> L1800 undecidable (pilot_stop), L300 and L60 go on")
         try:
-            ck.main_lams(back, pp, base_seed, "t050")
+            ck.main_lams(back, pp, base_seed, "c100")
             refused = False
         except SystemExit:
             refused = True
@@ -1054,8 +1214,8 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
         edited = json.loads(json.dumps(pre))
         edited["e13"]["pc_lower"] = 0.11
         bad_cases = (
-            ("another step (t025's t)", {**good, "step": "t025", "t": 0.25}),
-            ("the right step name with another t", {**good, "t": 0.25}),
+            ("another step (c050's c)", {**good, "step": "c050", "c": 0.5}),
+            ("the right step name with another c", {**good, "c": 0.5}),
             ("another world", {**good, "world": "v4"}),
             ("a stopped L300 part", {**swap("L300", stop="weak_detector"), "stop": "weak_detector"}),
             ("an L300 stop that differs from the pilot's", {**good, "stop": "fit_failed"}),
@@ -1078,7 +1238,7 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
             fresh()
             pp.write_text(json.dumps(bad), encoding="utf-8")
             try:
-                ck.apply_pilot(cp, pp, "t050")
+                ck.apply_pilot(cp, pp, "c100")
                 refused = False
             except SystemExit:
                 refused = True
@@ -1087,7 +1247,7 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
         fresh(edited)
         pp.write_text(json.dumps(good), encoding="utf-8")
         try:
-            ck.apply_pilot(cp, pp, "t050")
+            ck.apply_pilot(cp, pp, "c100")
             refused = False
         except SystemExit:
             refused = True
@@ -1120,23 +1280,23 @@ def test_ceiling_gate(cfg: dict, base_seed: int) -> None:
            "P": {s: cfg["ceiling"]["P"] for s in cfg["ceiling"]["steps"]}, "config_fingerprint": ce.cfg_fingerprint(cfg),
            "code_fingerprint": ce.code_fingerprint(),
            "results": {s: mk(0.7, 0.72) for s in cfg["ceiling"]["steps"]},
-           "steps": {s: {"t": t, "status": "go"} for s, t in cfg["ceiling"]["steps"].items()}}
-    check(ck.ceiling_problems(doc, cfg, base_seed, "t050") == [], "ceiling gate: a go step of this config passes")
+           "steps": {s: {"c": c, "status": "go"} for s, c in cfg["ceiling"]["steps"].items()}}
+    check(ck.ceiling_problems(doc, cfg, base_seed, "c100") == [], "ceiling gate: a go step of this config passes")
     moved = json.loads(json.dumps(cfg))
-    moved["ceiling"]["steps"]["t050"] = 0.45
+    moved["ceiling"]["steps"]["c100"] = 0.9
     for name, d_, c_ in (
-            ("a ceiling step", {**doc, "steps": {**doc["steps"], "t050": {"t": 0.5, "status": "ceiling"}}}, cfg),
-            ("an unmeasured step", {**doc, "steps": {**doc["steps"], "t050": {"t": 0.5, "status": "unmeasured"}}}, cfg),
-            ("a step missing", {**doc, "steps": {"t025": doc["steps"]["t025"]}}, cfg),
+            ("a ceiling step", {**doc, "steps": {**doc["steps"], "c100": {"c": 1.0, "status": "ceiling"}}}, cfg),
+            ("an unmeasured step", {**doc, "steps": {**doc["steps"], "c100": {"c": 1.0, "status": "unmeasured"}}}, cfg),
+            ("a step missing", {**doc, "steps": {"c050": doc["steps"]["c050"]}}, cfg),
             ("another seed", {**doc, "seed": base_seed}, cfg),
-            ("another P", {**doc, "P": {**doc["P"], "t050": 40}}, cfg),
+            ("another P", {**doc, "P": {**doc["P"], "c100": 40}}, cfg),
             ("another main_auc", {**doc, "main_auc": 0.85}, cfg),
             ("a t moved in config.json after pilot 0", doc, moved),
             ("another config (fingerprint)", {**doc, "config_fingerprint": "0" * 64}, cfg),
             ("other instruments (code fingerprint)", {**doc, "code_fingerprint": "0" * 64}, cfg),
-            ("a go status over values at the ceiling", {**doc, "results": {**doc["results"], "t050": mk(0.93, 0.95)}}, cfg),
+            ("a go status over values at the ceiling", {**doc, "results": {**doc["results"], "c100": mk(0.93, 0.95)}}, cfg),
             ("a go status with no measured values", {k: v for k, v in doc.items() if k != "results"}, cfg)):
-        check(ck.ceiling_problems(d_, c_, base_seed, "t050") != [], f"ceiling gate: {name} is refused")
+        check(ck.ceiling_problems(d_, c_, base_seed, "c100") != [], f"ceiling gate: {name} is refused")
 
 
 def test_label_plan() -> None:
@@ -1298,7 +1458,7 @@ def main() -> int:
     test_stats(cfg)
     test_lam_config(cfg)
     if a.gse_replay:
-        test_replay_causal(a.gse_replay, tmp / "ours-g0.5", tmp)
+        test_replay_causal(a.gse_replay, tmp / "ours-c0.5", tmp)  # confound world: a c050 work directory
     else:
         print("SKIP  causal (gse-replay): no --gse-replay")
     if a.work:

@@ -5,7 +5,9 @@ Design: .steering/20261012-rhythm-stage-desk-check/design.md (frozen 2b7db259; w
 (.steering/20261013-rhythm-stage-round2/design.md 3.9) replaces select_lambda and the pilot's choice (pilot_key,
 pilot_stop, choose_all, apply_pilot). The graded world (.steering/20261014-rhythm-stage-graded-world/design.md 1.2,
 1.4, 3.9) adds the L1800 controls (PC1-1800, PCl-; fitted on L1800 only), a pilot with an L300 and an L1800 part,
-the lambdas per step, and the checks of the step (world.json, pilot.json).
+the lambdas per step, and the checks of the step (world.json, pilot.json). The confound world
+(.steering/20261014-rhythm-stage-speed-confound-world/design.md 1.2) keeps all of it with the steps renamed: the
+step's value is the width c of the speed confound (step_c) and the world is "confound".
 
 Usage (after the pilot of a step): checks.py --apply-pilot <config.json> <results/<step>/pilot/pilot.json> <step>
 
@@ -828,7 +830,7 @@ def _num(v):
     return float("nan") if v in ("nan", None) else float(v)
 
 
-def step_t(cfg: dict, step: str) -> float:
+def step_c(cfg: dict, step: str) -> float:
     steps = cfg["ceiling"]["steps"]
     if step not in steps:
         raise SystemExit(f"unknown step {step!r}: not in config.json ceiling.steps {sorted(steps)}")
@@ -836,12 +838,13 @@ def step_t(cfg: dict, step: str) -> float:
 
 
 def world_problems(work: Path, cfg: dict, step: str) -> list[str]:
-    """graded world design 1.2, 3.7: the work directory was made with --world graded --t of this step."""
+    """graded world design 1.2, 3.7 (confound world 1.2): the work directory was made with --world confound --c of
+    this step."""
     f = work / "world.json"
     if not f.exists():
         return [f"{f} is missing"]
     w = json.loads(f.read_text(encoding="utf-8"))
-    want = {"world": "graded", "t": step_t(cfg, step)}
+    want = {"world": "confound", "c": step_c(cfg, step)}
     return [] if w == want else [f"{f} is {w}, not {want} (step {step})"]
 
 
@@ -856,7 +859,7 @@ def part_result(tag: str, merged: dict, per: dict, auc_s: dict | None, cfg: dict
 
 def ceiling_problems(doc: dict, cfg: dict, base_seed: int, step: str) -> list[str]:
     """graded world design 3.0 (cross-review round 2): the step runs only when results/ceiling/ceiling.json says go
-    for it and was made under this config (fingerprint, seed, P, t, main_auc)."""
+    for it and was made under this config (fingerprint, seed, P, c, main_auc)."""
     c = cfg["ceiling"]
     out = []
     s = doc.get("steps", {}).get(step)
@@ -871,8 +874,8 @@ def ceiling_problems(doc: dict, cfg: dict, base_seed: int, step: str) -> list[st
         again = None
     if again != s.get("status"):
         out.append(f"step {step}: the status {s.get('status')} does not follow from the measured values ({again})")
-    if s.get("t") != step_t(cfg, step):
-        out.append(f"ceiling.json t {s.get('t')} is not config.json's {step_t(cfg, step)}")
+    if s.get("c") != step_c(cfg, step):
+        out.append(f"ceiling.json c {s.get('c')} is not config.json's {step_c(cfg, step)}")
     if doc.get("seed") != base_seed + c["seed_offset"]:
         out.append(f"ceiling.json seed {doc.get('seed')} is not SEED + {c['seed_offset']}")
     if doc.get("main_auc") != c["main_auc"] or doc.get("P", {}).get(step) != c["P"]:
@@ -904,11 +907,11 @@ def pilot_check(p: dict, cfg: dict, base_seed: int, step: str) -> dict:
     out = {"errors": [], "lam": None, "lam_1800": None, "stop_1800": None}
     err = out["errors"]
     if "parts" not in p or "rule" not in p or "stop" not in p:
-        err.append("not a graded world pilot.json (no parts, rule or stop)")
+        err.append("not a confound world pilot.json (no parts, rule or stop)")
         return out
-    t = step_t(cfg, step)
-    if p.get("world") != "graded" or p.get("step") != step or p.get("t") != t:
-        err.append(f"world {p.get('world')} / step {p.get('step')} / t {p.get('t')} is not graded / {step} / {t}")
+    c = step_c(cfg, step)
+    if p.get("world") != "confound" or p.get("step") != step or p.get("c") != c:
+        err.append(f"world {p.get('world')} / step {p.get('step')} / c {p.get('c')} is not confound / {step} / {c}")
     if p.get("seed") != base_seed + sp["seed_offset"]:
         err.append(f"seed {p.get('seed')} is not SEED + {sp['seed_offset']} = {base_seed + sp['seed_offset']}")
     if p.get("n_sessions") != sp["P"] or p.get("bootstrap") != sp["bootstrap"]:
@@ -1041,13 +1044,13 @@ def pilot(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str) -> 
         else:
             parts["L1800"] = pilot_part("L1800", tab, ms, work, cfg, seed, jobs, nboot, scratch, t0)
         dump(out / "pilot.json", {
-            "_note": ("Pilot 1 (round 2 design 3.9, graded world design 3.9): SEED + 1, P sessions of the graded world "
+            "_note": ("Pilot 1 (round 2 design 3.9, graded world design 3.9): SEED + 1, P sessions of the confound world "
                       "at this step; the L300 part (PC1 and the PC-stall of each candidate on [0] + the grid) and the "
                       "L1800 part (PC1-1800 and PCl- of each candidate), no null. Not a result of the main run. "
                       "`checks.py --apply-pilot config.json <this file> <step>` writes the chosen lambdas to "
                       "pc_stall.lam.<step> and pc_stall.lam_1800.<step>; the numbers go to design section 8. A stopped "
                       "L300 part stops the step; a stopped L1800 part leaves L1800 undecidable (pilot_stop)."),
-            "world": "graded", "t": step_t(cfg, step), "step": step,
+            "world": "confound", "c": step_c(cfg, step), "step": step,
             "seed": seed, "n_sessions": len(sids), "bootstrap": nboot, "rule": {k: ps[k] for k in RULE_KEYS},
             "config_fingerprint": ce.cfg_fingerprint(cfg), "code_fingerprint": ce.code_fingerprint(),
             "stop": parts["L300"]["stop"], "parts": parts, "wall_s": time.time() - t0})
@@ -1168,7 +1171,7 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str,
                   flush=True)
         e13["primary"] = "L300"
         e13["seed"] = seed
-        e13["step"], e13["t"] = step, step_t(cfg, step)
+        e13["step"], e13["c"] = step, step_c(cfg, step)
         dump(out / "e13.json", e13)
         desc = describe(cands + cn["pccorr"], cands, ms, cfg, seed, work, jobs)
         dump(out / "describe.json", {"_note": "Descriptive (design 3.4): no verdict.", **desc})
@@ -1179,7 +1182,10 @@ def main_run(cfg: dict, seed: int, work: Path, out: Path, jobs: int, step: str,
                                                             "null_all_73_ok", "nan", "fit_failed", "detector",
                                                             "pilot_stop_1800")}
                              for t in LABELS}
-        summ["_step"] = {"step": step, "t": step_t(cfg, step)}
+        summ["_step"] = {"step": step, "c": step_c(cfg, step)}
+        jumps = work / "speed_jumps.json"  # confound world design 3.3 (h): described only
+        if jumps.exists():
+            shutil.copyfile(jumps, out / "speed_jumps.json")
         summ["_wall_s"] = time.time() - t0
         dump(out / "summary.json", summ)
     finally:
@@ -1198,14 +1204,14 @@ def main() -> int:
     ap.add_argument("work")
     ap.add_argument("results")
     ap.add_argument("--jobs", type=int, default=8)
-    ap.add_argument("--step", required=True, help="graded world design 1.1: t025, t050 or t075")
+    ap.add_argument("--step", required=True, help="confound world design 0: c050, c100 or c200")
     ap.add_argument("--pilot-json", default=None, help="the main run and the smoke: the step's pilot.json")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--smoke", action="store_true")
     g.add_argument("--pilot", action="store_true")
     a = ap.parse_args()
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
-    step_t(cfg, a.step)
+    step_c(cfg, a.step)
     check_ceiling_file(cfg, Path(a.config), a.step)  # graded world design 3.0: a go step of this config only
     seed = int(Path(a.seed_file).read_text().strip())
     base_seed = int((Path(a.config).parent / "SEED").read_text().strip())

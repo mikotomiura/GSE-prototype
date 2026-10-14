@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Rhythm stage desk check, graded world: synthetic traces only, no participants.
-# Design: .steering/20261014-rhythm-stage-graded-world/design.md (the graded world, the steps, pilot 0 per step, the
-# L1800 controls, the lambdas per step), on top of .steering/20261013-rhythm-stage-round2/design.md (round 2: the
-# lambda choice) and .steering/20261012-rhythm-stage-desk-check/design.md (round 1). Copied from
-# experiments/20261013-rhythm-stage-round2/run.sh (d98103a0).
+# Rhythm stage desk check, confound world: synthetic traces only, no participants.
+# Design: .steering/20261014-rhythm-stage-speed-confound-world/design.md (the confound world: the speed factor and
+# drift of width c, the steps c050 / c100 / c200), on top of .steering/20261014-rhythm-stage-graded-world/design.md
+# (pilot 0 per step, the L1800 controls, the lambdas per step), .steering/20261013-rhythm-stage-round2/design.md
+# (round 2: the lambda choice) and .steering/20261012-rhythm-stage-desk-check/design.md (round 1). Copied from
+# experiments/20261014-rhythm-stage-graded-world/run.sh (424d9500).
 #
-# Usage: bash run.sh (--selftest | --ceiling | --pilot | --smoke | --main) [--step t025|t050|t075] [--jobs N]
+# Usage: bash run.sh (--selftest | --ceiling | --pilot | --smoke | --main) [--step c050|c100|c200] [--jobs N]
 #   --selftest  design 3.7: every self-test (the gse-replay causality test when GSE_REPLAY is set).
 #   --ceiling   design 3.0 (pilot 0, after the freeze, before any pilot 1): the self-tests without gse-replay, then
-#               SEED + ceiling.seed_offset, ceiling.P P sessions of each step in ceiling.steps (--world graded --t),
+#               SEED + ceiling.seed_offset, ceiling.P P sessions of each step in ceiling.steps (--world confound --c),
 #               AUC(A) and AUC(A_speed) per label and classifier, and each step's status (go, ceiling, unmeasured).
 #               Writes results/ceiling/ (committed).
 #   --pilot     design 3.9 (needs --step; the step must be go in results/ceiling/ceiling.json): SEED +
@@ -38,7 +39,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 EXP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EH1_DIR="$EXP_DIR/../20261010-portrait-eh1-round5"
-WORLD="graded"  # graded world design 1.3: the step's t comes from config.json ceiling.steps
+WORLD="confound"  # confound world design 1.2: the step's width c comes from config.json ceiling.steps
 EXPECTED_REPLAY_SHA="71d09dab44526f2322a05833ae1a0fb33ffcc4908bfba796258276f083d78986"  # design 1.1
 MODE=""
 JOBS=8
@@ -56,10 +57,10 @@ done
 case "$JOBS" in ''|*[!0-9]*) echo "--jobs must be a positive integer" >&2; exit 2 ;; esac
 [ "$JOBS" -ge 1 ] || { echo "--jobs must be a positive integer" >&2; exit 2; }
 case "$MODE" in
-  pilot|smoke|main) [ -n "$STEP" ] || { echo "--$MODE needs --step (t025, t050 or t075)" >&2; exit 2; } ;;
+  pilot|smoke|main) [ -n "$STEP" ] || { echo "--$MODE needs --step (c050, c100 or c200)" >&2; exit 2; } ;;
   *) [ -z "$STEP" ] || { echo "--step is for --pilot, --smoke and --main only" >&2; exit 2; } ;;
 esac
-case "$STEP" in ''|t[0-9][0-9][0-9]) ;; *) echo "--step must look like t025" >&2; exit 2 ;; esac
+case "$STEP" in ''|c[0-9][0-9][0-9]) ;; *) echo "--step must look like c050" >&2; exit 2 ;; esac
 
 if [ -n "${PYTHON:-}" ]; then
   PY="$PYTHON"
@@ -111,12 +112,12 @@ selftest() {
   rm -rf "$ST_TMP"
 }
 
-# provenance <out file> <seed> <worlds> [<step> <t>] (design 3.8; graded world design 1.2: the step and t)
+# provenance <out file> <seed> <worlds> [<step> <c>] (design 3.8; confound world design 1.2: the step and c)
 provenance() {
   "$PY" - "$1" "$HMM_VERSION" "$EXP_DIR" "$JOBS" "$2" "$3" "$MODE" "${GSE_REPLAY:-}" "${4:-}" "${5:-}" <<'PYEOF'
 import hashlib, json, os, platform, subprocess, sys
 from importlib.metadata import version
-out, hmm, exp_dir, jobs, seed, worlds, mode, binary, step, t = sys.argv[1:11]
+out, hmm, exp_dir, jobs, seed, worlds, mode, binary, step, c = sys.argv[1:11]
 commit = subprocess.run(["git", "-C", exp_dir, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
 r = subprocess.run(["git", "-C", exp_dir, "status", "--porcelain", "--", ".", ":(exclude)results"],
                    capture_output=True, text=True)
@@ -127,7 +128,7 @@ if binary:
     replay = {"path": binary, "sha256": hashlib.sha256(open(binary, "rb").read()).hexdigest()}
 json.dump({"mode": mode, "git_commit": commit, "experiment_dir_dirty": dirty, "config_sha256": cfg_sha,
            "hmm_version_in_meta": hmm, "gse_replay": replay, "seed": int(seed), "worlds": worlds.split(),
-           "step": step or None, "t": float(t) if t else None,
+           "step": step or None, "c": float(c) if c else None,
            "python": platform.python_version(), "platform": platform.platform(), "cpu_count": os.cpu_count(),
            "jobs": int(jobs),
            "packages": {p: version(p) for p in ("numpy", "scipy", "scikit-learn", "threadpoolctl")}},
@@ -155,7 +156,7 @@ prepare() {
   mkdir -p "$work" || return 1
   echo "$seed" > "$work/SEED.run" || return 1
   "$PY" gen_sessions.py "$EXP_DIR/config.json" "$work/SEED.run" "$work" --hmm-version "$HMM_VERSION" --world "$WORLD" \
-    --t "$T" "$@" || return 1
+    --c "$C" "$@" || return 1
   local caps_tmp="$work/.capabilities.json.tmp"
   PYTHONUTF8=1 "$PY" "$REPO_ROOT/scripts/capabilities_gate.py" "$work/ndjson" --require key --json > "$caps_tmp" || return 1
   mv "$caps_tmp" "$work/capabilities.json" || return 1
@@ -169,8 +170,8 @@ twins() {
   "$PY" replay_all.py "$GSE_REPLAY" "$1/twins" --jobs "$JOBS" || return 1
 }
 
-# step_t <step>: the step's t from config.json ceiling.steps (graded world design 1.2)
-step_t() {
+# step_c <step>: the step's width c from config.json ceiling.steps (confound world design 1.2)
+step_c() {
   local v
   v="$("$PY" -c "import json,sys; s=json.load(open(sys.argv[1],encoding='utf-8'))['ceiling']['steps']; print(repr(float(s[sys.argv[2]]))) if sys.argv[2] in s else sys.exit('unknown step ' + sys.argv[2])" "$EXP_DIR/config.json" "$1")"
   v="${v%$'\r'}"
@@ -196,26 +197,26 @@ if [ "$MODE" = ceiling ]; then
   STEPS="${STEPS%$'\r'}"
   WORK_ARGS=()
   for S in $STEPS; do
-    T="$(step_t "$S")"
+    C="$(step_c "$S")"
     WORK="$EXP_DIR/work-ceiling-$S"
     rm -rf "$WORK"
     mkdir -p "$WORK"
     echo "$SEED_RUN" > "$WORK/SEED.run"
     "$PY" gen_sessions.py "$EXP_DIR/config.json" "$WORK/SEED.run" "$WORK" --hmm-version "$HMM_VERSION" --world "$WORLD" \
-      --t "$T" --smoke --p-n "$P_N"
+      --c "$C" --smoke --p-n "$P_N"
     WORK_ARGS+=(--work "$S=$WORK")
   done
   "$PY" ceiling.py "$EXP_DIR/config.json" "$EXP_DIR/work-ceiling-${STEPS%% *}/SEED.run" "$OUT" "${WORK_ARGS[@]}" --jobs "$JOBS"
-  GSE_REPLAY="" provenance "$OUT/provenance.json" "$SEED_RUN" "graded $STEPS"
+  GSE_REPLAY="" provenance "$OUT/provenance.json" "$SEED_RUN" "confound $STEPS"
   publish "$SUFFIX"
   for S in $STEPS; do rm -rf "$EXP_DIR/work-ceiling-$S"; done
   echo "done: $EXP_DIR/results/$SUFFIX/ceiling.json (append the values and each step's status to design section 8, then commit)"
   exit 0
 fi
 
-T="$(step_t "$STEP")"
-[ -n "$T" ] || { echo "unknown step $STEP" >&2; exit 2; }
-# graded world design 3.0: only a go step of ceiling.json made under this config (fingerprint, seed, P, t, main_auc)
+C="$(step_c "$STEP")"
+[ -n "$C" ] || { echo "unknown step $STEP" >&2; exit 2; }
+# graded world design 3.0: only a go step of ceiling.json made under this config (fingerprint, seed, P, c, main_auc)
 "$PY" -c "import json,sys; sys.path.insert(0,'.'); import checks; from pathlib import Path; p=Path(sys.argv[1]); checks.check_ceiling_file(json.load(open(p,encoding='utf-8')), p, sys.argv[2])" \
   "$EXP_DIR/config.json" "$STEP"
 case "$MODE" in
@@ -249,7 +250,7 @@ else
   "$PY" checks.py "$EXP_DIR/config.json" "$WORK/SEED.run" "$WORK" "$OUT" --jobs "$JOBS" --step "$STEP" \
     --pilot-json "$PILOT_JSON" "${SMOKE_ARG[@]}"
 fi
-provenance "$OUT/provenance.json" "$SEED_RUN" "$WORLD" "$STEP" "$T"
+provenance "$OUT/provenance.json" "$SEED_RUN" "$WORLD" "$STEP" "$C"
 publish "$SUFFIX"
 rm -rf "$WORK"
 echo "done: $EXP_DIR/results/$SUFFIX"

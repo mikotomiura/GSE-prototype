@@ -1,5 +1,5 @@
 {
-  "_comment": "Rhythm stage desk check, graded world (synthetic traces only, no participants). Copied from experiments/20261013-rhythm-stage-round2/config.json (d98103a0); this task changes only ceiling (the three steps and their rule), pc_stall.lam (a table per step, empty until the pilot of the step) and pc_stall.lam_1800 (new, the same) (.steering/20261014-rhythm-stage-graded-world/design.md 0, 1.2, 1.3 and 3.0). The graded world's STRUGGLE settings are made by gen_sessions.py from segments_v4 and segments_v2 (_comment_graded) and are not written here. Rhythm stage desk check, round 2 (synthetic traces only, no participants). Copied from experiments/20261012-rhythm-stage-desk-check/config.json (b2d02846); round 2 changes only sets.pilot (P 240, bootstrap 2000), pc_stall.pilot_grid (0.025 to 0.300), pc_stall.aim (new) and pc_stall.lam (written after the pilot) (.steering/20261013-rhythm-stage-round2/design.md 0, 1.2 and 3.9). Rhythm stage desk check (synthetic traces only, no participants). The generator settings (session, segments, segments_v2, transitions, keys, sets) and e13 are copied unchanged from experiments/20261010-portrait-eh1-round5/config.json; segments_v3, ceiling and speed are new (.steering/20261012-rhythm-stage-desk-check/design.md 1.5, 1.6 and 3.0).",
+  "_comment": "Rhythm stage desk check, confound world (synthetic traces only, no participants; .steering/20261014-rhythm-stage-speed-confound-world/design.md: copied from experiments/20261014-rhythm-stage-graded-world/config.json (424d9500), changed: ceiling.steps are the widths c050 / c100 / c200, speed_confound added). The copied comment follows: graded world Copied from experiments/20261013-rhythm-stage-round2/config.json (d98103a0); this task changes only ceiling (the three steps and their rule), pc_stall.lam (a table per step, empty until the pilot of the step) and pc_stall.lam_1800 (new, the same) (.steering/20261014-rhythm-stage-graded-world/design.md 0, 1.2, 1.3 and 3.0). The graded world's STRUGGLE settings are made by gen_sessions.py from segments_v4 and segments_v2 (_comment_graded) and are not written here. Rhythm stage desk check, round 2 (synthetic traces only, no participants). Copied from experiments/20261012-rhythm-stage-desk-check/config.json (b2d02846); round 2 changes only sets.pilot (P 240, bootstrap 2000), pc_stall.pilot_grid (0.025 to 0.300), pc_stall.aim (new) and pc_stall.lam (written after the pilot) (.steering/20261013-rhythm-stage-round2/design.md 0, 1.2 and 3.9). Rhythm stage desk check (synthetic traces only, no participants). The generator settings (session, segments, segments_v2, transitions, keys, sets) and e13 are copied unchanged from experiments/20261010-portrait-eh1-round5/config.json; segments_v3, ceiling and speed are new (.steering/20261012-rhythm-stage-desk-check/design.md 1.5, 1.6 and 3.0).",
   "session": {
     "duration_s": 10800,
     "final_flow_s": 60,
@@ -343,14 +343,14 @@
       ]
     }
   },
-  "_comment_ceiling": "graded world design 3.0 (pilot 0, after the freeze, before any pilot 1): SEED + seed_offset, P sessions of each step in steps (the other sets at the smoke size, unused), AUC(A) and AUC(A_speed) per label and classifier, out of fold. A step is ceiling when both classifiers' L300 AUC(A_speed) are >= main_auc (equality is at the ceiling), unmeasured when a fit failed or a value is NaN, else go. Only go steps run the pilot 1, the smoke and the main run. The steps are not moved after pilot 0 (round 1 decisions 16). main_auc (round 1 design 3.2): in the main run and the pilot 1, a classifier whose AUC(A_speed) of a label is >= main_auc is at the ceiling and left out of every maximum of that label. Round 1 and 2's prefer and usable_max are removed.",
+  "_comment_ceiling": "graded world design 3.0, kept by the confound world (steps = widths c; pilot 0, after the freeze, before any pilot 1): SEED + seed_offset, P sessions of each step in steps (the other sets at the smoke size, unused), AUC(A) and AUC(A_speed) per label and classifier, out of fold. A step is ceiling when both classifiers' L300 AUC(A_speed) are >= main_auc (equality is at the ceiling), unmeasured when a fit failed or a value is NaN, else go. Only go steps run the pilot 1, the smoke and the main run. The steps are not moved after pilot 0 (round 1 decisions 16). main_auc (round 1 design 3.2): in the main run and the pilot 1, a classifier whose AUC(A_speed) of a label is >= main_auc is at the ceiling and left out of every maximum of that label. Round 1 and 2's prefer and usable_max are removed.",
   "ceiling": {
     "seed_offset": 1,
     "P": 240,
     "steps": {
-      "t025": 0.25,
-      "t050": 0.5,
-      "t075": 0.75
+      "c050": 0.5,
+      "c100": 1.0,
+      "c200": 2.0
     },
     "main_auc": 0.9
   },
@@ -392,5 +392,10 @@
     "folds": 5,
     "since_cap_s": 3600
   },
-  "_comment_graded": "graded world design 1.3: --world graded --t T copies segments_v4 and sets STRUGGLE's flight_median_ms = m4^(1-t) * m2^t and flight_sigma = (1-t) * s4 + t * s2 (m, s of segments_v4 and segments_v2: 150 / 320 ms, 0.25 / 0.35). t = 0 is v4 and t = 1 is v2 exactly."
+  "_comment_graded": "graded world design 1.3: --world graded --t T copies segments_v4 and sets STRUGGLE's flight_median_ms = m4^(1-t) * m2^t and flight_sigma = (1-t) * s4 + t * s2 (m, s of segments_v4 and segments_v2: 150 / 320 ms, 0.25 / 0.35). t = 0 is v4 and t = 1 is v2 exactly.",
+  "_comment_speed_confound": "confound world design 1.3: --world confound --c C uses the graded segments at base_t (the stall delta = ln(STRUGGLE's median / FLOW's median) = 0.5 ln(320 / 150) in log units) and draws every FLOW and STRUGGLE key interval inside a burst as lognormal(ln(median) + z(tau), sigma) with z(tau) = c * delta * (u + d(floor(tau / 1000 ms))): u ~ N(0, 1) per unit (a session or a pair), d a stationary unit Ornstein-Uhlenbeck series per second with time constant tau_s. The widths c of the steps are in ceiling.steps.",
+  "speed_confound": {
+    "base_t": 0.5,
+    "tau_s": 300
+  }
 }

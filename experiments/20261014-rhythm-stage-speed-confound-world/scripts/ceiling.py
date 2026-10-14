@@ -1,5 +1,7 @@
 """Pilot 0 of the rhythm stage desk check: the ceiling of the baseline models. Graded world
-(.steering/20261014-rhythm-stage-graded-world/design.md 3.0): run after the freeze on the three steps of
+(.steering/20261014-rhythm-stage-graded-world/design.md 3.0), kept by the confound world
+(.steering/20261014-rhythm-stage-speed-confound-world/design.md 3.0; the steps are the widths c of the speed
+confound, world.json {"world": "confound", "c": c}): run after the freeze on the three steps of
 config.json ceiling.steps; each step is go, ceiling (both classifiers' L300 AUC(A_speed) >= ceiling.main_auc) or
 unmeasured (a failed fit or a NaN in L300). The positions of the steps are not changed after this (decisions 16).
 Round 1 and 2's rule (choose one world of ceiling.prefer by usable_max) is removed.
@@ -11,7 +13,7 @@ looks at the baseline models only (design 3.0).
 The statistics (auc_prep, auc_w, weighted_auc, oof_predict) are copied unchanged from
 experiments/20261010-portrait-eh1-round5/scripts/checks.py.
 
-Usage: ceiling.py <config.json> <seed file> <out dir> --work t025=<work dir> --work t050=<work dir> ... [--jobs N]
+Usage: ceiling.py <config.json> <seed file> <out dir> --work c050=<work dir> --work c100=<work dir> ... [--jobs N]
 """
 
 from __future__ import annotations
@@ -166,7 +168,7 @@ def step_status(res_step: dict, main_auc: float) -> dict:
 
 def choose_steps(res: dict, cfg: dict) -> dict:
     c = cfg["ceiling"]
-    return {s: {"t": c["steps"][s], **step_status(res[s], c["main_auc"])} for s in c["steps"]}
+    return {s: {"c": c["steps"][s], **step_status(res[s], c["main_auc"])} for s in c["steps"]}
 
 
 def main() -> int:
@@ -187,15 +189,15 @@ def main() -> int:
     n_p = {}
     for world, wd in works.items():
         w = json.loads((Path(wd) / "world.json").read_text(encoding="utf-8"))
-        if w != {"world": "graded", "t": float(steps[world])}:
-            raise SystemExit(f"{wd}/world.json is {w}, not the graded world at t = {steps[world]} ({world})")
+        if w != {"world": "confound", "c": float(steps[world])}:
+            raise SystemExit(f"{wd}/world.json is {w}, not the confound world at c = {steps[world]} ({world})")
         sids = bl.p_sids(Path(wd))
         if len(sids) != cfg["ceiling"]["P"]:
             raise SystemExit(f"{world}: {len(sids)} P sessions, expected {cfg['ceiling']['P']}")
         n_p[world] = len(sids)
         tabs[world] = bl.tables(Path(wd), sids, cfg)
     res = measure(tabs, seed, cfg["e13"]["folds"], a.jobs)
-    out = {"design": ".steering/20261014-rhythm-stage-graded-world/design.md 3.0", "seed": seed, "P": n_p,
+    out = {"design": ".steering/20261014-rhythm-stage-speed-confound-world/design.md 3.0", "seed": seed, "P": n_p,
            "folds": cfg["e13"]["folds"], "main_auc": cfg["ceiling"]["main_auc"],
            "config_fingerprint": cfg_fingerprint(cfg), "code_fingerprint": code_fingerprint(), "results": res,
            "steps": choose_steps(res, cfg)}
@@ -209,7 +211,7 @@ def main() -> int:
                 r = res[world][label][kind]
                 print(f"{world} {label} {kind}: AUC(A) {r['auc_A']} AUC(A_speed) {r['auc_A_speed']}")
     for s, v in out["steps"].items():
-        print(f"step {s} (t = {v['t']}): {v['status']} (L300 AUC(A_speed) hgb / lr {v['L300_auc_A_speed']})")
+        print(f"step {s} (c = {v['c']}): {v['status']} (L300 AUC(A_speed) hgb / lr {v['L300_auc_A_speed']})")
     return 0
 
 
