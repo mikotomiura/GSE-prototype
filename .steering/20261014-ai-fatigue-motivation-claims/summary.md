@@ -1,6 +1,8 @@
 # まとめ: 核 1・2 を別の研究にできるか（2026-10-14）
 
-根拠は `docs/literature/20261014-ai-fatigue-motivation-discriminant.md`（S-AF2）。「0 件」は今回の網（各 angle 1.8〜4.7 分・題名と抄録の検索が中心）の範囲で見つからなかった、の意味。
+根拠は `docs/literature/20261014-ai-fatigue-motivation-discriminant.md`（S-AF2）。
+
+「C」は AI 疲労 DB の作業の記号で、測定論の論文（提案書 v2 §6.3 の論文の構想・Q10 で DB の研究者が「共同で進める」と答えた）を指す。記号は `.steering/20261001-ai-fatigue-34-screening/requirement.md:22`（A 34 件の判定・B 新規性の確認・C 測定論の論文・D 追加候補の絞り込み）。「0 件」は今回の網（各 angle 1.8〜4.7 分・題名と抄録の検索が中心）の範囲で見つからなかった、の意味。
 
 ## 主張ごと
 
