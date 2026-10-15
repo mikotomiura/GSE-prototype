@@ -1,4 +1,9 @@
-"""Selftest of split.py (design 3.6). Synthetic arrays only; no gse-replay, no generated sessions.
+"""Selftest of split.py and compare.py (design 3.7). Synthetic arrays only; no gse-replay, no generated sessions.
+
+Copied from experiments/20261015-rhythm-stage-speed-cause-split/scripts/selftest_split.py (d282691d), changed for the
+shape world (design 1.4, 1.5, 3.3 (j)): the settings are under config.json split; the check of the imported earlier
+instrument is gone (split.py imports this task's checks and stage); added the r-side controls' names, specs and
+reading, the planted level and var signals against the drops, git_state, and compare.py.
 
 Usage: selftest_split.py <config.json>
 """
@@ -8,12 +13,14 @@ from __future__ import annotations
 import json
 import math
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 import numpy as np
 
+import compare as cp
 import split as sp
 
 ck, st = sp.ck, sp.st
@@ -38,32 +45,6 @@ def raises(fn, *a) -> bool:
 
 # ---------------------------------------------------------------------------
 
-def t_prev(cfg: dict) -> None:
-    check(sp.prev_problems(cfg) == [], f"the confound world's instrument matches config.json: {sp.prev_problems(cfg)}")
-    tmp = Path(tempfile.mkdtemp(prefix="st-prev-"))
-    try:
-        for rel in cfg["prev"]["sha256"]:
-            (tmp / rel).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(sp.PREV_DIR / rel, tmp / rel)
-        check(sp.prev_problems(cfg, tmp) == [], "a faithful copy passes")
-        p = tmp / "scripts" / "checks.py"
-        b = bytearray(p.read_bytes())
-        b[-2] ^= 1
-        p.write_bytes(bytes(b))
-        check(any("checks.py" in x for x in sp.prev_problems(cfg, tmp)), "one byte changed in checks.py is caught")
-        shutil.copyfile(sp.PREV_DIR / "scripts" / "checks.py", p)
-        (tmp / "scripts" / "extra.py").write_text("", encoding="utf-8")
-        check(any("extra.py" in x for x in sp.prev_problems(cfg, tmp)), "an extra script is caught")
-        (tmp / "scripts" / "extra.py").unlink()
-        (tmp / "results" / "c100" / "main" / "e13.json").unlink()
-        check(any("missing" in x for x in sp.prev_problems(cfg, tmp)), "a missing e13.json is caught")
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-    bad = json.loads(json.dumps(cfg))
-    bad["prev"]["dir"] = "../elsewhere"
-    check(any("prev.dir" in x for x in sp.prev_problems(bad)), "a prev.dir other than the imported one is caught")
-
-
 def stage_names(fs: str) -> list[str]:
     names = ck.feature_names(sp.LABEL)[-3 * len(st.FEAT_NAMES):]
     return names[: len(st.FEAT_NAMES)] if fs == "small" else names
@@ -77,37 +58,43 @@ def keep_ok(keep_fn, drop: list[str], fs: str, n_dropped: int) -> bool:
 
 
 def t_keep(cfg: dict) -> None:
+    drops = cfg["split"]["drops"]
     want = {"R2": (6, 2), "Rall": (30, 10), "A2": (6, 2)}
-    check(set(cfg["drops"]) == set(want), f"the drop groups are {sorted(want)}")
-    check(set(cfg["drops"]["Rall"]) == {n for n in st.FEAT_NAMES if n.startswith("r_")}, "Rall is every r_ quantity")
+    check(set(drops) == set(want), f"the drop groups are {sorted(want)}")
+    check(set(drops["Rall"]) == {n for n in st.FEAT_NAMES if n.startswith("r_")}, "Rall is every r_ quantity")
+    check(drops["R2"] == ["r_absdiff", "r_sd"] and drops["A2"] == ["a_absdiff", "a_sd"], "R2 and A2 as the cause split")
     for g, (nfull, nsmall) in want.items():
-        check(keep_ok(sp.keep_columns, cfg["drops"][g], "full", nfull), f"{g} full drops {nfull} named columns")
-        check(keep_ok(sp.keep_columns, cfg["drops"][g], "small", nsmall), f"{g} small drops {nsmall} named columns")
+        check(keep_ok(sp.keep_columns, drops[g], "full", nfull), f"{g} full drops {nfull} named columns")
+        check(keep_ok(sp.keep_columns, drops[g], "small", nsmall), f"{g} small drops {nsmall} named columns")
     check(sp.keep_columns([], "full") == list(range(60)) and sp.keep_columns([], "small") == list(range(20)),
           "no drop keeps every column in order")
     check(raises(sp.keep_columns, ["r_nope"], "full"), "an unknown quantity is refused")
 
     def shifted(drop, fs):  # mutation: one index off
         return [min(i + 1, 59 if fs == "full" else 19) for i in sp.keep_columns(drop, fs)]
-    check(not keep_ok(shifted, cfg["drops"]["R2"], "full", 6), "mutation: shifted indices are caught")
+    check(not keep_ok(shifted, drops["R2"], "full", 6), "mutation: shifted indices are caught")
 
     def no_diffs(drop, fs):  # mutation: the differences not dropped
         k = [i for i, n in enumerate(st.FEAT_NAMES) if n not in set(drop)]
         return k if fs == "small" else k + list(range(20, 60))
-    check(not keep_ok(no_diffs, cfg["drops"]["R2"], "full", 6), "mutation: d1_/d2_ left in are caught")
+    check(not keep_ok(no_diffs, drops["R2"], "full", 6), "mutation: d1_/d2_ left in are caught")
 
 
-def synth_scratch(tmp: Path, n_sess: int = 12, per: int = 40, nb: int = 5, seed: int = 7) -> dict:
-    """A synthetic L300 table in the scratch layout of checks.label_tables / main_split."""
+def synth_scratch(tmp: Path, n_sess: int = 12, per: int = 40, nb: int = 5, seed: int = 7, plant=None) -> dict:
+    """A synthetic L300 table in the scratch layout of checks.label_tables / main_split. plant(F, y, rng) puts a
+    signal into the stage features (default: r_absdiff + 0.7 y)."""
     rng = np.random.default_rng(seed)
     n = n_sess * per
     G = np.repeat(np.arange(n_sess), per)
     y = (rng.random(n) < 0.3).astype(int)
     S = rng.normal(size=(n, nb)) + 0.8 * y[:, None] * (np.arange(nb) == 0)
-    S[:, 1] = np.where(rng.random(n) < 0.7, 0.0, rng.random(n))  # many repeated values (design 3.6)
+    S[:, 1] = np.where(rng.random(n) < 0.7, 0.0, rng.random(n))  # many repeated values
     S[rng.random(n) < 0.02, 2] = np.nan
     F = rng.normal(size=(n, len(st.FEAT_NAMES)))
-    F[:, st.FEAT_NAMES.index("r_absdiff")] += 0.7 * y
+    if plant is None:
+        F[:, st.FEAT_NAMES.index("r_absdiff")] += 0.7 * y
+    else:
+        plant(F, y, rng)
     ck.save(tmp, f"{sp.LABEL}-S", S)
     ck.save(tmp, f"{sp.LABEL}-rows", np.arange(n))
     ck.save(tmp, f"{sp.LABEL}-G", G)
@@ -117,6 +104,8 @@ def synth_scratch(tmp: Path, n_sess: int = 12, per: int = 40, nb: int = 5, seed:
 
 
 def t_build_and_models(cfg: dict) -> None:
+    bins = cfg["split"]["bins"]
+    drops = cfg["split"]["drops"]
     tmp = Path(tempfile.mkdtemp(prefix="st-build-"))
     try:
         d = synth_scratch(tmp)
@@ -124,8 +113,8 @@ def t_build_and_models(cfg: dict) -> None:
         nb = d["S"].shape[1]
         for fs in sp.FS:
             full = ck.build_x(sp.LABEL, "S", "F-0", fs)
-            X, nbb = sp.build("F-0", fs, cfg["drops"]["R2"])
-            keep = sp.keep_columns(cfg["drops"]["R2"], fs)
+            X, nbb = sp.build("F-0", fs, drops["R2"])
+            keep = sp.keep_columns(drops["R2"], fs)
             check(nbb == nb and np.array_equal(X[:, :nb], full[:, :nb], equal_nan=True),
                   f"build {fs}: the base columns are A_speed unchanged")
             check(np.array_equal(X[:, nb:], full[:, nb:][:, keep]), f"build {fs}: the stage block keeps the kept columns")
@@ -139,21 +128,21 @@ def t_build_and_models(cfg: dict) -> None:
         from sklearn.preprocessing import KBinsDiscretizer
         X, _ = sp.build("F-0", "small", [])
         tr = np.arange(len(X)) < len(X) * 3 // 4
-        m = sp.make_lrbin(nb, X.shape[1] - nb, False, cfg["bins"])
+        m = sp.make_lrbin(nb, X.shape[1] - nb, False, bins)
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             m.fit(X[tr], d["y"][tr])
-            ref = KBinsDiscretizer(n_bins=cfg["bins"], encode="onehot-dense", strategy="quantile",
+            ref = KBinsDiscretizer(n_bins=bins, encode="onehot-dense", strategy="quantile",
                                    quantile_method="averaged_inverted_cdf", subsample=None).fit(
                 SimpleImputer(strategy="median").fit_transform(X[tr, :nb]))
         ct = m.steps[0][1]
         kb = ct.named_transformers_["base"].named_steps["u"].transformer_list[0][1]
         check(all(np.array_equal(a, b) for a, b in zip(kb.bin_edges_, ref.bin_edges_)),
               "lrbin: the bin edges are those of the training rows")
-        check(len(kb.bin_edges_[1]) - 1 < cfg["bins"], "lrbin: repeated values drop bins without failing")
+        check(len(kb.bin_edges_[1]) - 1 < bins, "lrbin: repeated values drop bins without failing")
         check(type(ct.named_transformers_["stage"]).__name__ == "SimpleImputer", "lrbin: the stage columns are not binned")
-        m2 = sp.make_lrbin(nb, X.shape[1] - nb, True, cfg["bins"])
+        m2 = sp.make_lrbin(nb, X.shape[1] - nb, True, bins)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             m2.fit(X[tr], d["y"][tr])
@@ -171,7 +160,7 @@ def t_build_and_models(cfg: dict) -> None:
               "multipliers: those of checks.e13_target for L300 (SeedSequence([seed, 313, 0]))")
         np.save(tmp / "mults.npy", mults)
         for kind in ("lr", "hgb"):
-            sp._base_job((kind, y, 5, 3, cfg["bins"]))
+            sp._base_job((kind, y, 5, 3, bins))
         for fs in sp.FS:
             preds_b, preds_a = {}, {}
             for kind in ("lr", "hgb"):
@@ -179,27 +168,65 @@ def t_build_and_models(cfg: dict) -> None:
                 preds_a[kind] = ck._fit_job((0, sp.LABEL, "S", None, None, kind, y, 5, 3, "pred"))[1]
             _, boots = ck._boot_job(("x", preds_b, preds_a, y, G, list(mults)))
             for kind in ("lr", "hgb"):
-                _, r = sp._fit_job((0, kind, "F-0", fs, [], y, 5, 3, cfg["bins"]))
+                _, r = sp._fit_job((0, kind, "F-0", fs, [], y, 5, 3, bins))
                 ones = np.ones(len(y))
                 gain = ck.weighted_auc(preds_b[(fs, kind)], y, ones) - ck.weighted_auc(preds_a[kind], y, ones)
                 b = boots[f"{fs}/{kind}"]
                 ci = [float(np.percentile(b, 2.5)), float(np.percentile(b, 97.5))]
                 check(r["gain"] == gain and r["ci95"] == ci, f"{fs}/{kind}: split's gain and interval equal checks'")
-        sp._base_job(("lrbin", y, 5, 3, cfg["bins"]))
-        _, r = sp._fit_job((0, "lrbin", "F-0", "full", [], y, 5, 3, cfg["bins"]))
-        _, r2 = sp._fit_job((0, "lrbin2", "F-0", "full", [], y, 5, 3, cfg["bins"]))
+        sp._base_job(("lrbin", y, 5, 3, bins))
+        _, r = sp._fit_job((0, "lrbin", "F-0", "full", [], y, 5, 3, bins))
+        _, r2 = sp._fit_job((0, "lrbin2", "F-0", "full", [], y, 5, 3, bins))
         check(math.isfinite(r["gain"]) and math.isfinite(r2["gain"]), "lrbin and lrbin2 fit")
         check((tmp / "base-lrbin.npy").exists() and not (tmp / "base-lrbin2.npy").exists(),
               "lrbin2 shares the base of lrbin")
-        _, rd = sp._fit_job((0, "lr", "F-0", "full", cfg["drops"]["R2"], y, 5, 3, cfg["bins"]))
-        _, rn = sp._fit_job((0, "lr", "F-0", "full", [], y, 5, 3, cfg["bins"]))
+        _, rd = sp._fit_job((0, "lr", "F-0", "full", drops["R2"], y, 5, 3, bins))
+        _, rn = sp._fit_job((0, "lr", "F-0", "full", [], y, 5, 3, bins))
         check(rd["gain"] < rn["gain"], "dropping r_absdiff (the planted signal) lowers the gain")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def gains_by_drop(cfg: dict, plant, seed: int) -> dict:
+    """design 3.7: the small/lr gain of a planted signal under each drop (none, R2, Rall, A2)."""
+    bins = cfg["split"]["bins"]
+    drops = {"none": [], **cfg["split"]["drops"]}
+    tmp = Path(tempfile.mkdtemp(prefix="st-plant-"))
+    try:
+        d = synth_scratch(tmp, n_sess=24, per=60, seed=seed, plant=plant)
+        sp._init(str(tmp))
+        np.save(tmp / "mults.npy", sp.multipliers(5, d["n_sess"], 20))
+        sp._base_job(("lr", d["y"], 5, 3, bins))
+        return {k: sp._fit_job((0, "lr", "F-0", "small", v, d["y"], 5, 3, bins))[1]["gain"] for k, v in drops.items()}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def plant_level(F, y, rng):
+    """The type of PCr-level: the level of r moves with the label (mean, quantiles, end)."""
+    for n in ("r_mean", "r_p10", "r_p50", "r_p90", "r_end"):
+        F[:, st.FEAT_NAMES.index(n)] += 0.6 * y
+
+
+def plant_var(F, y, rng):
+    """The type of PCr-var: the spread of r moves with the label (sd, mean |diff|, the outer quantiles apart)."""
+    for n, s in (("r_sd", 0.6), ("r_absdiff", 0.6), ("r_p10", -0.3), ("r_p90", 0.3)):
+        F[:, st.FEAT_NAMES.index(n)] += s * y
+
+
+def t_planted(cfg: dict) -> None:
+    """design 3.7: where the two r-side signal types live against the drops."""
+    lv = gains_by_drop(cfg, plant_level, 11)
+    check(lv["none"] > 0.05 and lv["R2"] > 0.03 and lv["Rall"] < 0.03,
+          f"planted level: kept after R2 ({lv['R2']:+.3f}), gone after Rall ({lv['Rall']:+.3f})")
+    va = gains_by_drop(cfg, plant_var, 12)
+    check(va["none"] > 0.05 and va["R2"] < va["none"] and va["Rall"] < 0.03,
+          f"planted var: lowered by R2 ({va['none']:+.3f} -> {va['R2']:+.3f}), gone after Rall ({va['Rall']:+.3f})")
+    check(abs(lv["A2"] - lv["none"]) < 0.02, "planted level: A2 (the a side) leaves it")
+
+
 def t_gate(cfg: dict) -> None:
-    tol = cfg["gate_tol"]
+    tol = cfg["split"]["gate_tol"]
     prev = {"auc_A_speed": {"hgb": 0.9, "lr": 0.8},
             "configs": {n: {"attackers": {a: {"gain": 0.05, "ci95": [0.04, 0.06]} for a in ("full/lr", "small/hgb")}}
                         for n in ("S-a", "PCs-S-a")}}
@@ -247,16 +274,22 @@ def t_gate(cfg: dict) -> None:
     g = got_of()
     g["auc_A_speed"]["lr"] += 1e-6
     check(not gt(g)["ok"], "gate: AUC(A_speed) is compared")
+    # the gate reads the shape of this task's e13.json: L300 -> configs -> name -> attackers
+    e13_like = {"L300": {"auc_A_speed": prev["auc_A_speed"], "configs": {
+        n: {"attackers": v["attackers"], "verdict": "green"} for n, v in prev["configs"].items()}}}
+    check(sp.gate(e13_like["L300"], got_of(), tol, names, atk)["ok"], "gate: the e13.json layout of checks.main_run passes")
+
+
+def mx(lo, hi, gain=None):
+    g = (lo + hi) / 2 if gain is None else gain
+    return {"gain_max": g, "lower_max": lo, "upper_max": hi, "n_nan": sum(math.isnan(x) for x in (g, lo, hi))}
 
 
 def t_read(cfg: dict) -> None:
-    m, pl, pu = cfg["read"]["margin"], cfg["read"]["pc_lower"], cfg["read"]["pc_upper"]
-    check(m == 0.03 and pl == 0.03 and pu == 0.08, "the reading thresholds are 0.03 and 0.08 (design 3.2, 3.3)")
-
-    def mx(lo, hi, gain=None):
-        g = (lo + hi) / 2 if gain is None else gain
-        return {"gain_max": g, "lower_max": lo, "upper_max": hi,
-                "n_nan": sum(math.isnan(x) for x in (g, lo, hi))}
+    rd = cfg["split"]["read"]
+    m, pl, pu = rd["margin"], rd["pc_lower"], rd["pc_upper"]
+    check(m == 0.03 and pl == 0.03 and pu == 0.08 and rd["pcr_upper"] == 0.08,
+          "the reading thresholds are 0.03 and 0.08 (design 3.3 (j))")
     pcs, pc0 = mx(0.04, 0.07), mx(-0.01, 0.01)
     check(sp.reading(mx(0.031, 0.05), pcs, pc0, m, pl, pu) == "remains", "remains above 0.03")
     check(sp.reading(mx(0.03, 0.05), pcs, pc0, m, pl, pu) == "undetermined", "a lower bound of exactly 0.03 does not remain")
@@ -272,7 +305,6 @@ def t_read(cfg: dict) -> None:
     check(sp.reading(mx(nan, nan), pcs, pc0, m, pl, pu) == "undetermined", "a NaN candidate is undetermined")
     check(sp.reading(mx(0.04, 0.05), mx(nan, nan), pc0, m, pl, pu) == "unreadable", "a NaN PC-stall is unreadable")
     check(sp.reading(mx(0.04, 0.05), pcs, mx(nan, nan), m, pl, pu) == "unreadable", "a NaN PC0 is unreadable")
-    # cross-review 2: a NaN in one field only
     check(sp.reading(mx(nan, 0.02, 0.01), pcs, pc0, m, pl, pu) == "undetermined",
           "a candidate with a NaN lower bound only does not vanish")
     check(sp.reading(mx(0.04, nan, 0.05), pcs, pc0, m, pl, pu) == "undetermined",
@@ -296,22 +328,133 @@ def t_read(cfg: dict) -> None:
         check(sp.reading(mm, pcs, pc0, m, pl, pu) == "undetermined", f"a NaN lower bound never remains ({order})")
         check(sp.reading(mx(0.04, 0.05), mm, pc0, m, pl, pu) == "unreadable",
               f"a PC-stall with a NaN lower bound is unreadable ({order})")
-    v = sp.variants(cfg)
+    v = sp.variants()
     check(len(v) == 13 and ("lrbin2", "none") in v and not any(m_ == "lrbin2" and d != "none" for m_, d in v),
           "13 variants; lrbin2 without drops")
 
 
-def t_versions(cfg: dict) -> None:
-    check(sp.package_problems(cfg) == [], f"the versions are the confound world's: {sp.package_problems(cfg)}")
+def t_pcr(cfg: dict) -> None:
+    """design 3.3 (j): the r-side controls' reading, variants and specs."""
+    rd = cfg["split"]["read"]
+    m, u = rd["margin"], rd["pcr_upper"]
+    base = mx(-0.01, 0.01)
+    rr = lambda ctl, b=base: sp.pcr_reading(ctl, b, m, u)
+    nan = float("nan")
+    check(rr(mx(0.031, 0.07, 0.05)) == "works", "pcr: lower above 0.03, gain <= 0.08 -> works")
+    check(rr(mx(0.031, 0.12, 0.08)) == "works", "pcr: a gain of exactly 0.08 works")
+    check(rr(mx(0.031, 0.12, 0.0801)) == "over", "pcr: a gain above 0.08 -> over")
+    check(rr(mx(0.03, 0.07)) == "unclear", "pcr: a lower bound of exactly 0.03 does not work")
+    check(rr(mx(-0.01, 0.029)) == "fails", "pcr: upper below 0.03 -> fails")
+    check(rr(mx(-0.01, 0.03)) == "unclear", "pcr: an upper bound of exactly 0.03 does not fail")
+    check(rr(mx(0.04, 0.07), mx(0.0, 0.03)) == "unreadable", "pcr: its baseline's upper bound of exactly 0.03 -> unreadable")
+    check(rr(mx(0.04, 0.07), mx(0.0, 0.029)) == "works", "pcr: its baseline below 0.03 is fine")
+    check(rr(mx(nan, 0.07, 0.05)) == "unreadable", "pcr: a NaN in the control -> unreadable")
+    check(rr(mx(0.04, 0.07), mx(-0.01, 0.01, nan)) == "unreadable", "pcr: a NaN in its baseline -> unreadable")
+    check(rr(None) == "not_calibrated" and rr(mx(0.04, 0.07), None) == "not_calibrated",
+          "pcr: no lambda (not fitted) -> not_calibrated")
+    # mutation: the comparisons swapped would make a failing control work
+    check(rr(mx(-0.05, -0.01)) != "works", "pcr: a control below 0 never works")
+    pv = sp.pcr_variants(cfg)
+    check(pv == [(mm, d) for mm in sp.MODELS for d in ("none", "R2", "Rall")] and len(pv) == 9,
+          "pcr: 9 variants (lr, hgb, lrbin x none, R2, Rall)")
     bad = json.loads(json.dumps(cfg))
-    bad["versions"]["sklearn"] = "0.0.0"
+    bad["split"]["pcr_drops"] = ["none", "A2"]
+    check(raises(sp.pcr_variants, bad), "pcr: A2 among pcr_drops is refused")
+    cands = st.candidates()
+    lam_r = {"level": {c: 0.1 for c in cands}, "var": {c: (None if i % 3 == 0 else 0.2) for i, c in enumerate(cands)}}
+    specs = sp.pcr_specs(lam_r)
+    n_var = sum(v is not None for v in lam_r["var"].values())
+    check(len(specs) == 2 * (24 + n_var) and len({k for k, _, _ in specs}) == len(specs),
+          "pcr: a control and its baseline per family and candidate with a lambda; none for a null")
+    check(all((lam == 0.0) == ("0-" in name) for _, name, lam in specs), "pcr: the baselines are at lambda 0, the controls not")
+    check(all(name.startswith(st.PCR_PREFIXES) for _, name, _ in specs), "pcr: every spec name is an r-side control")
+    check(("PCrl-S-raw-hold-sec", "PCrl-S-raw-hold-sec", 0.1) in specs
+          and not any(n == f"PCrv-{cands[0]}" for _, n, _ in specs), "pcr: the null var lambda of the first candidate is not fitted")
+    names = st.pcr_names(cands)
+    check(sorted(names) == ["level", "var"] and names["level"][cands[0]] == (f"PCrl-{cands[0]}", f"PCrl0-{cands[0]}")
+          and names["var"][cands[0]] == (f"PCrv-{cands[0]}", f"PCrv0-{cands[0]}"), "pcr: the names per family")
+    check(all(ck.kind_of(n, t) == "descriptive" for fam in names.values() for pair in fam.values() for n in pair
+              for t in ("L300", "L60", "L1800")), "pcr: the r-side controls are descriptive on every label (never judged)")
+
+
+def t_versions(cfg: dict) -> None:
+    check(sp.package_problems(cfg) == [], f"the versions are the copied instruments': {sp.package_problems(cfg)}")
+    bad = json.loads(json.dumps(cfg))
+    bad["split"]["versions"]["sklearn"] = "0.0.0"
     check(len(sp.package_problems(bad)) == 1, "another scikit-learn version is caught")
+
+
+def t_git_state() -> None:
+    """design 1.4: git_state leaves results/ out (negative control: a change under scripts/ counts)."""
+    tmp = Path(tempfile.mkdtemp(prefix="st-git-"))
+    old = sp.EXP_DIR
+    try:
+        run = lambda *a: subprocess.run(["git", *a], cwd=tmp, capture_output=True, text=True, check=True)
+        run("init", "-q")
+        run("config", "user.email", "x@example.invalid")
+        run("config", "user.name", "x")
+        (tmp / "scripts").mkdir()
+        (tmp / "scripts" / "a.py").write_text("1\n", encoding="utf-8")
+        run("add", "scripts/a.py")
+        run("commit", "-q", "-m", "x")
+        sp.EXP_DIR = tmp
+        check(sp.git_state()["dirty"] is False, "git_state: a clean tree is not dirty")
+        (tmp / "results" / "d100" / "main").mkdir(parents=True)
+        (tmp / "results" / "d100" / "main" / "e13.json").write_text("{}", encoding="utf-8")
+        check(sp.git_state()["dirty"] is False, "git_state: untracked results/ are not counted")
+        (tmp / "scripts" / "a.py").write_text("2\n", encoding="utf-8")
+        check(sp.git_state()["dirty"] is True, "git_state: a change under scripts/ is counted (negative control)")
+    finally:
+        sp.EXP_DIR = old
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def t_compare(cfg: dict) -> None:
+    """design 1.5: the comparison copies what it reads; a step that did not run is not_run, never green."""
+    cands = ["S-a", "S-b"]
+    summ = lambda v300: {**{c: {"L300": v, "L60": "green", "L1800": "green"} for c, v in zip(cands, v300)}, "_x": {}}
+    e13 = {t: {"auc_A_speed": {"hgb": 0.8, "lr": 0.7}} for t in cp.LABELS}
+    split = {"counts": {"lr|R2": {}}, "readings": {k: {c: "vanishes" for c in cands} for k in cp.R2_KEYS},
+             "pcr_counts": {}, "pcr_readings": {k: {"level": {}, "var": {}} for k in cp.R2_KEYS}}
+    col_ceiling = cp.world_column("ceiling", None, None, None)
+    check(col_ceiling == {"status": "ceiling", "ran": False, "reading_i": "not_run"}, "compare: a ceiling step is not_run")
+    col_nomain = cp.world_column("go", None, None, None)
+    check(not col_nomain["ran"], "compare: a go step with no main run is not_run")
+    red = cp.world_column("go", summ(["red_detected", "green"]), e13, split)
+    green = cp.world_column("go", summ(["green", "green"]), e13, None)
+    check(red["has_red_L300"] and not green["has_red_L300"] and green["split"] == "not_run",
+          "compare: red and green are copied; a missing split is not_run")
+    check(red["verdict_counts"]["L300"]["red_detected"] == 1 and red["verdict_counts"]["L300"]["green"] == 1,
+          "compare: the counts follow the verdicts")
+    stop = cp.world_column("go", summ(["red_detected_stop_path", "green"]), e13, None)
+    check(stop["has_red_L300"], "compare: red_detected_stop_path counts as red")
+    unconf = cp.world_column("go", summ(["red_unconfirmed", "undecidable"]), e13, None)
+    check(not unconf["has_red_L300"], "compare: red_unconfirmed and undecidable are not red")
+    check(cp.reading_i(green, red) == "drift" and cp.reading_i(red, green) == "factor"
+          and cp.reading_i(red, red) == "either" and cp.reading_i(green, green) == "neither_alone",
+          "compare: the table of design 3.3 (i)")
+    check(cp.reading_i(col_ceiling, red) == "not_run" and cp.reading_i(green, col_nomain) == "not_run",
+          "compare: no reading when either world did not run (mutation: not_run read as green)")
+    check(sorted(cfg["compare"]["pairs"]) == ["1", "2"]
+          and all(set(v) == {"confound", "factor", "drift"} for v in cfg["compare"]["pairs"].values())
+          and all(cfg["ceiling"]["worlds"][v[w]] == w for v in cfg["compare"]["pairs"].values() for w in ("factor", "drift"))
+          and all(cfg["ceiling"]["steps"][v["factor"]] == cfg["ceiling"]["steps"][v["drift"]] == float(c)
+                  for c, v in cfg["compare"]["pairs"].items()),
+          "compare: the pairs put the factor and drift steps of the same c next to the confound world's")
+    exp_root = Path(sp.EXP_DIR).parent
+    check(cp.load_prev(cfg, exp_root).keys() == cfg["compare"]["prev_sha256"].keys(),
+          "compare: the earlier tasks' files match their SHA-256")
+    bad = json.loads(json.dumps(cfg))
+    k0 = next(iter(bad["compare"]["prev_sha256"]))
+    bad["compare"]["prev_sha256"][k0] = "0" * 64
+    check(raises(cp.load_prev, bad, exp_root), "compare: a SHA-256 that does not match stops")
 
 
 def main() -> int:
     cfg = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    for t in (t_prev, t_versions, t_keep, t_build_and_models, t_gate, t_read):
+    for t in (t_versions, t_keep, t_build_and_models, t_planted, t_gate, t_read, t_pcr, t_compare):
         t(cfg)
+    t_git_state()
     for f in FAILS:
         print(f"FAIL: {f}")
     print(f"selftest_split: ok {OK[0]}, failed {len(FAILS)}")

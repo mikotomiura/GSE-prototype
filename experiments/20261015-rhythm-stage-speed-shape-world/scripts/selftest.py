@@ -10,6 +10,13 @@ lambda 1 and the seg mutation (40 P sessions or more).
 Confound world (.steering/20261014-rhythm-stage-speed-confound-world/design.md 3.7): the copied generator, the
 speed series (its draw order, c times w, c = 0 against graded t = 0.5) and its wiring (a test series by session time),
 world.json, the refusals of --c; the steps are c050 / c100 / c200.
+Shape world (.steering/20261015-rhythm-stage-speed-shape-world/design.md 3.7; copied from
+experiments/20261014-rhythm-stage-speed-confound-world/scripts/selftest.py at 7d38df98): the confound world's generator
+and stage (SHA-256) write and draw what ours do; the factor and drift worlds (the decomposition of w, c = 0 against
+graded t = 0.5, the wiring of each world, world.json and the steps f100 / f200 / d100 / d200 with ceiling.worlds); the
+r-side controls PCrl- / PCrv- (their drive, stream, lambda 0, causality, and lambda 1 on the main path); the pilot's
+L300r part and pc_r.lam (apply, check, fingerprint). The confound world's checks below are kept with the step names
+replaced.
 Graded world (.steering/20261014-rhythm-stage-graded-world/design.md 3.7): the steps of the world, the L1800 controls
 (PC1-1800, PCl-), the judge on L1800, the step rule of pilot 0, and the pilot's and the main run's checks of the
 step (pilot.json, lam.<step>, lam_1800.<step>).
@@ -181,28 +188,36 @@ def test_world(cfg: dict, config: Path, eh1: Path, tmp: Path, hmm: str) -> None:
           f"world v4: the generated backspace rates {g4['bs_rate']:.3f} / {f4['bs_rate']:.3f} match STRUGGLE / FLOW")
     test_graded(cfg, config, seed_file, tmp, hmm, st2, st4)
     test_confound(cfg, config, seed_file, tmp, hmm)
+    test_shape(cfg, config, seed_file, tmp, hmm)
 
 
 # confound world design 1.3, 3.7: the copied generator (graded world, 424d9500) and the written values
 GRADED_SRC = HERE.parent.parent / "20261014-rhythm-stage-graded-world" / "scripts" / "gen_sessions.py"
 GRADED_SRC_SHA = "8bd3ffa9dde633e4c86aea03f58aa61767205b84a54eacf8751accf4763fafd4"
 DELTA_WANT = 0.3788428508487583  # ln(219.08902300206645 / 150), python repr 2026-10-14
-CONFOUND_STEPS = {"c050": 0.5, "c100": 1.0, "c200": 2.0}
+# shape world design 1.2, 3.7: the confound world's generator and stage (7d38df98) and the steps of this task
+CONFOUND_SRC = HERE.parent.parent / "20261014-rhythm-stage-speed-confound-world" / "scripts" / "gen_sessions.py"
+CONFOUND_SRC_SHA = "d391f2fd76413100403c6f6370edd9418433cef35288d935f601bbc638353e23"
+STAGE_SRC = CONFOUND_SRC.parent / "stage.py"
+STAGE_SRC_SHA = "ccc73914e6fd3cb6002fdf6d839f1d719cd020dcaa2718658924420876e8207b"
+SHAPE_STEPS = {"f100": 1.0, "f200": 2.0, "d100": 1.0, "d200": 2.0}
+SHAPE_WORLDS = {"f100": "factor", "f200": "factor", "d100": "drift", "d200": "drift"}
 BIG_Z = 3.0  # the test series: intervals about 20 times longer inside a window
 # the windows (s) of the test series per unit name: a part drawn by markov and a final FLOW per set (code-reviewer
 # round 1 H2: the time origin of each part)
 WINDOWS = {"P": [(1000, 4000), (10740, 10800)], "O": [(3600, 4740), (4740, 4800)],
            "Dde": [(3600, 4740), (4740, 4800)], "Dsl": [(10800, 12540), (12540, 12600)], "Dco": [(2000, 3000)],
            "Dsh": [(1000, 2000), (5340, 5400)]}
-MADE: list = []  # (names, c, duration_s) of every WindowSpeed made (code-reviewer round 2 H2)
+MADE: list = []  # (names, c, duration_s, shape) of every WindowSpeed made (code-reviewer round 2 H2)
 
 
 class WindowSpeed:
-    """A test series for gen_sessions.Speed: z = BIG_Z at the session times inside the unit's windows, else 0."""
+    """A test series for gen_sessions.Speed: z = BIG_Z at the session times inside the unit's windows, else 0. The
+    shape is recorded (shape world design 3.7: each world asks for its own)."""
 
-    def __init__(self, seed, names, c, cfg, duration_s):
+    def __init__(self, seed, names, c, cfg, duration_s, shape="both"):
         self.names, self.c = names, 1.0
-        MADE.append((tuple(names), c, duration_s))
+        MADE.append((tuple(names), c, duration_s, shape))
 
     def z(self, tau_ms):
         return BIG_Z if any(a * 1000 <= tau_ms < b * 1000 for a, b in WINDOWS.get(self.names[0], [])) else 0.0
@@ -254,10 +269,10 @@ class ConstSpeed:
         return self.K
 
 
-def run_gen_in_process(config: Path, seed_file: Path, work: Path, hmm: str, speed_cls) -> None:
+def run_gen_in_process(config: Path, seed_file: Path, work: Path, hmm: str, speed_cls, world: str = "confound") -> None:
     old_argv, old_speed = sys.argv, gs.Speed
     sys.argv = ["gen_sessions.py", str(config), str(seed_file), str(work), "--hmm-version", hmm, "--world",
-                "confound", "--c", "1", "--smoke"]
+                world, "--c", "1", "--smoke"]
     gs.Speed = speed_cls
     try:
         gs.main()
@@ -291,7 +306,20 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
           and abs(seg["STRUGGLE"]["flight_median_ms"] - 219.08902300206645) < 1e-12
           and abs(seg["STRUGGLE"]["flight_sigma"] - 0.3) < 1e-12 and abs(gs.confound_delta(cfg) - DELTA_WANT) < 1e-12,
           f"confound: base_t 0.5, tau_s 300, STRUGGLE 219.089... ms / 0.3 and delta {gs.confound_delta(cfg)!r}")
-    check(cfg["ceiling"]["steps"] == CONFOUND_STEPS, "confound: the steps are c050 / c100 / c200 at 0.5 / 1 / 2")
+    # shape world design 3.7: the confound world's own generator (7d38df98) writes what ours writes for it
+    csrc_ok = (CONFOUND_SRC.exists()
+               and hashlib.sha256(CONFOUND_SRC.read_bytes().replace(b"\r\n", b"\n")).hexdigest() == CONFOUND_SRC_SHA)
+    check(csrc_ok, f"shape: the confound world generator {CONFOUND_SRC.name} is the 7d38df98 file (SHA-256)")
+    if csrc_ok:
+        csrc_cfg = CONFOUND_SRC.parent.parent / "config.json"
+        for c_ in (0.5, 1.0):
+            generate(CONFOUND_SRC, csrc_cfg, seed_file, tmp / f"csrc-c{c_}", "confound", hmm, c=c_)
+            generate(gen, config, seed_file, tmp / f"ours-confound{c_}", "confound", hmm, c=c_)
+            a_, b_ = tmp / f"csrc-c{c_}", tmp / f"ours-confound{c_}"
+            same = (digest(a_) == digest(b_) and all((a_ / f).read_bytes() == (b_ / f).read_bytes()
+                                                    for f in ("world.json", "speed_jumps.json")))
+            check(same, f"shape: confound c = {c_} writes what the confound world generator writes (world.json, "
+                        f"speed_jumps.json)")
     # the draw order of the series (u, d(0), eps_0, ...) and its growth on demand
     sp = gs.Speed(20261020, ("P", 3), 1.0, cfg, 5)
     r = gs.derive_rng(20261020, "speed", "P", 3)
@@ -351,20 +379,35 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
     check(digest(tmp / "ours-c0.5") != digest(tmp / "ours-graded0.5"), "confound c = 0.5 differs from graded t = 0.5 "
           "(negative control)")
     wj = json.loads((tmp / "ours-c0.5" / "world.json").read_text(encoding="utf-8"))
-    check(wj == {"world": "confound", "c": 0.5} and ck.world_problems(tmp / "ours-c0.5", cfg, "c050") == [],
-          f"confound c = 0.5: world.json {wj} passes the check of step c050")
-    check(ck.world_problems(tmp / "ours-c0.5", cfg, "c100") != [], "confound c = 0.5: refused as step c100")
-    check(ck.world_problems(tmp / "ours-graded0.5", cfg, "c050") != [],
-          "confound: a graded t = 0.5 work directory (the same value 0.5) is refused as step c050")
-    check(ck.world_problems(tmp / "ours-v4", cfg, "c050") != [], "confound: a v4 work directory is refused as a step")
+    check(wj == {"world": "confound", "c": 0.5}, f"confound c = 0.5: world.json {wj}")
+    # shape world design 3.7: a confound, graded or v4 work directory is refused as any step of this task
+    check(all(ck.world_problems(tmp / w_, cfg, s_) != [] for w_ in ("ours-confound1.0", "ours-graded0.5", "ours-v4")
+              for s_ in SHAPE_STEPS), "shape: confound c = 1, graded t = 0.5 and v4 work directories are refused as steps")
     jumps = json.loads((tmp / "ours-c0.5" / "speed_jumps.json").read_text(encoding="utf-8"))
     check(jumps["c"] == 0.5 and len(jumps["pairs"]) == 2 and jumps["quantity"].startswith("z jump")
           and all(v["b"]["n"] == v["a"]["n"] > 0 for v in jumps["pairs"].values()),
           "confound: speed_jumps.json has each D_shuffled pair's boundaries in a and b")
-    # the wiring: a test series that is large only inside windows of session time
-    w = tmp / "ours-window"
+    wiring(cfg, config, seed_file, tmp, hmm, "confound")
+    # the spread of the session medians (a diagnostic only: confound world design 3.7, Codex round 1)
+    diagnostic_spread(config, seed_file, tmp, hmm, "confound")
+    for args in (["--world", "confound"], ["--world", "graded", "--t", "0.5", "--c", "1"], ["--world", "v4", "--c", "1"],
+                 ["--world", "confound", "--c", "-1"], ["--world", "confound", "--c", "nan"],
+                 ["--world", "confound", "--c", "inf"], ["--world", "confound", "--c", "5"]):
+        r = subprocess.run([sys.executable, str(gen), str(config), str(seed_file), str(tmp / "ours-bad"),
+                            "--hmm-version", hmm, "--smoke", *args], capture_output=True)
+        check(r.returncode != 0, f"confound: gen_sessions refuses {' '.join(args)}")
+    r = subprocess.run([sys.executable, str(gen), str(config), str(seed_file), str(tmp / "ours-c4"), "--hmm-version",
+                        hmm, "--smoke", "--world", "confound", "--c", "4"], capture_output=True)
+    check(r.returncode == 0, "confound: gen_sessions accepts the upper bound --c 4")
+
+
+def wiring(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str, world: str) -> None:
+    """confound world design 3.7 (shape world 3.7: for each world): a test series that is large only inside windows
+    of session time."""
+    shape = gs.SPEED_WORLDS[world]
+    w = tmp / f"ours-window-{world}"
     MADE.clear()
-    run_gen_in_process(config, seed_file, w, hmm, WindowSpeed)
+    run_gen_in_process(config, seed_file, w, hmm, WindowSpeed, world)
     man = {m["sid"]: m for m in json.loads((w / "sessions.json").read_text(encoding="utf-8"))}
     # code-reviewer round 2 H2: one series per unit, made once, with the unit's own name and length, and c from --c
     sets_ = cfg["sets"]
@@ -375,11 +418,11 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
             | {(("Dde", i), sets_["D_diffend"]["shared_prefix_s"] + sets_["D_diffend"]["suffix_s"])
                for i in range(n_of("Dde"))}
             | {(("Dco", 0), sets_["D_continuous"]["duration_s"]), (("Dsl", 0), sets_["D_sleep"]["duration_s"])})
-    got = [(names, dur) for names, _, dur in MADE]
-    check(len(got) == len(set(got)) and set(got) == want and all(c_ == 1.0 for _, c_, _ in MADE)
-          and n_of("Oa") == 4 and n_of("Dsh") == 2 and n_of("Dde") == 2,
-          f"confound wiring: {len(got)} series, one per unit, named by the unit (P i, O i, Dsh i, Dde i, Dco 0, "
-          f"Dsl 0) with its length and c = 1")
+    got = [(names, dur) for names, _, dur, _ in MADE]
+    check(len(got) == len(set(got)) and set(got) == want and all(c_ == 1.0 for _, c_, _, _ in MADE)
+          and all(sh == shape for *_, sh in MADE) and n_of("Oa") == 4 and n_of("Dsh") == 2 and n_of("Dde") == 2,
+          f"{world} wiring: {len(got)} series, one per unit, named by the unit (P i, O i, Dsh i, Dde i, Dco 0, "
+          f"Dsl 0) with its length, c = 1 and the shape {shape}")
     units = {"P": ["P000", "P005"], "O": ["Oa00", "Ob00", "Oa03"], "Dde": ["Dde00a", "Dde00b", "Dde01b"],
              "Dsl": ["Dsl00"], "Dco": ["Dco00"], "Dsh": ["Dsh00a", "Dsh01a"]}
     for unit, sids in units.items():
@@ -390,17 +433,17 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
             for win in WINDOWS[unit]:
                 n_in, short_in, short_out = window_intervals(w, sid, [win])
                 check(sid in man and n_in >= 5 and short_in <= 0.02 * n_in and short_out >= 100,
-                      f"confound wiring: {sid}: {n_in} intervals start inside {win} s, {short_in} of them below "
+                      f"{world} wiring: {sid}: {n_in} intervals start inside {win} s, {short_in} of them below "
                       f"400 ms; {short_out} below 400 ms outside")
             x0 = WINDOWS[unit][0][0] * 1000
             t_w = np.load(w / "labels" / f"{sid}.npz")["presses_ms"]
             t_0 = np.load(tmp / "ours-c0" / "labels" / f"{sid}.npz")["presses_ms"]
             check(np.array_equal(t_w[t_w < x0], t_0[t_0 < x0]) and (t_0 < x0).sum() > 100,
-                  f"confound wiring: {sid}: the presses before {x0 // 1000} s equal c = 0's (nothing outside slowed)")
+                  f"{world} wiring: {sid}: the presses before {x0 // 1000} s equal c = 0's (nothing outside slowed)")
     for i in (0, 1):
         a_j = json.loads((w / "speed_jumps.json").read_text(encoding="utf-8"))["pairs"][f"{i:02d}"]["a"]
         check(a_j["max_abs_z_jump"] in (0.0, BIG_Z) and a_j["median_abs_z_jump"] in (0.0, BIG_Z),
-              f"confound: Dsh{i:02d}a's z jumps under the test series are 0 or {BIG_Z} ({a_j})")
+              f"{world}: Dsh{i:02d}a's z jumps under the test series are 0 or {BIG_Z} ({a_j})")
     for i in (0, 1):
         # the b-session carries the segments drawn in a: the intervals slowed inside the a-window (those that do not
         # cross a segment boundary) reappear in b, wherever the shuffle put them (a multiset check)
@@ -413,17 +456,22 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
             kept = sum(min(n, in_b[v]) for v, n in slowed.items())
             total = sum(slowed.values())
             check(len(a_t) == len(b_t) and not np.array_equal(a_t, b_t) and total >= 5 and kept >= 0.8 * total,
-                  f"confound wiring: Dsh{i:02d}b has {kept} of the {total} intervals slowed in a in {(lo, hi)} s "
+                  f"{world} wiring: Dsh{i:02d}b has {kept} of the {total} intervals slowed in a in {(lo, hi)} s "
                   f"(the segments move with their keys)")
     check(np.array_equal(np.load(w / "labels" / "Dno00.npz")["presses_ms"],
                          np.load(tmp / "ours-c0" / "labels" / "Dno00.npz")["presses_ms"]),
-          "confound wiring: D_noobs is not slowed")
-    # the spread of the session medians (a diagnostic only: confound world design 3.7, Codex round 1)
+          f"{world} wiring: D_noobs is not slowed")
+
+
+def diagnostic_spread(config: Path, seed_file: Path, tmp: Path, hmm: str, world: str) -> None:
+    """confound world design 3.7 (a diagnostic only, not a test): the SD over P sessions of the log FLOW
+    short-interval median at c = 0 / 0.5 / 1 / 2."""
+    gen = HERE / "gen_sessions.py"
     sds = []
     for c in (0.0, 0.5, 1.0, 2.0):
-        wc = tmp / f"ours-c{c}"
+        wc = tmp / (f"ours-c{c}" if world == "confound" else f"ours-{world}{c}")
         if not wc.exists():
-            generate(gen, config, seed_file, wc, "confound", hmm, c=c)
+            generate(gen, config, seed_file, wc, world, hmm, c=c)
         meds = []
         for f in sorted((wc / "labels").glob("P*.npz")):
             z = np.load(f)
@@ -434,16 +482,80 @@ def test_confound(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str)
             if ok.sum():
                 meds.append(np.log(np.median(dd[ok])))
         sds.append(round(float(np.std(meds)), 4))
-    print(f"     diagnostic: SD over P sessions of the log FLOW short-interval median at c = 0 / 0.5 / 1 / 2: {sds}")
-    for args in (["--world", "confound"], ["--world", "graded", "--t", "0.5", "--c", "1"], ["--world", "v4", "--c", "1"],
-                 ["--world", "confound", "--c", "-1"], ["--world", "confound", "--c", "nan"],
-                 ["--world", "confound", "--c", "inf"], ["--world", "confound", "--c", "5"]):
+    print(f"     diagnostic ({world}): SD over P sessions of the log FLOW short-interval median at c = 0 / 0.5 / 1 / 2: "
+          f"{sds}")
+
+
+def test_shape(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str) -> None:
+    """shape world design 1.2, 3.7: the factor and drift worlds."""
+    gen = HERE / "gen_sessions.py"
+    check(cfg["ceiling"]["steps"] == SHAPE_STEPS and cfg["ceiling"]["worlds"] == SHAPE_WORLDS
+          and gs.SPEED_WORLDS == {"confound": "both", "factor": "factor", "drift": "drift"},
+          "shape: the steps f100 / f200 / d100 / d200 at c = 1 / 2 with their worlds")
+    # the decomposition of w, and each shape's w from the stream by hand
+    for names in (("P", 3), ("O", 1), ("Dsh", 0)):
+        both, fac, dri = (gs.Speed(20261020, names, 1.0, cfg, 5, sh) for sh in ("both", "factor", "drift"))
+        ks = range(0, 2500, 7)
+        check(all(abs(both.w(k) - (fac.w(k) + dri.w(k))) <= 1e-12 * max(1.0, abs(both.w(k))) for k in ks),
+              f"shape {names}: w of the confound world is the factor's plus the drift's")
+        r = gs.derive_rng(20261020, "speed", *names)
+        u, d0, e0 = (float(r.standard_normal()) for _ in range(3))
+        rho = np.exp(-1.0 / 300)
+        q = np.sqrt(1.0 - rho * rho)
+        check(all(fac.w(k) == DELTA_WANT * u or abs(fac.w(k) - DELTA_WANT * u) < 1e-12 for k in ks)
+              and len({fac.w(k) for k in ks}) == 1, f"shape {names}: the factor's w is delta * u at every second")
+        check(abs(dri.w(0) - DELTA_WANT * d0) < 1e-12 and abs(dri.w(1) - DELTA_WANT * (rho * d0 + q * e0)) < 1e-12
+              and dri.w(0) != dri.w(1), f"shape {names}: the drift's w is delta * d(k) (no u)")
+        check(all(fac.z(k * 1000.0 + 500) == fac.c * fac.w(k) for k in range(5)), f"shape {names}: z = c * w (factor)")
+    two = gs.Speed(20261020, ("P", 3), 2.0, cfg, 5, "drift")
+    one = gs.Speed(20261020, ("P", 3), 1.0, cfg, 5, "drift")
+    check(all(two.z(k * 1000.0) == 2 * one.z(k * 1000.0) != 0 for k in range(5)), "shape: the drift's z is c times w")
+    try:
+        gs.Speed(1, ("P", 0), 1.0, cfg, 5, "other")
+        bad_shape = False
+    except ValueError:
+        bad_shape = True
+    check(bad_shape, "shape: an unknown shape is refused")
+    # c = 0 against graded t = 0.5, c = 1 differs, world.json and speed_jumps.json, and the steps' check
+    for world in ("factor", "drift"):
+        generate(gen, config, seed_file, tmp / f"ours-{world}0.0", world, hmm, c=0.0)
+        generate(gen, config, seed_file, tmp / f"ours-{world}1.0", world, hmm, c=1.0)
+        check(digest(tmp / f"ours-{world}0.0") == digest(tmp / "ours-graded0.5"),
+              f"{world} c = 0: the NDJSON, labels and sessions.json equal graded t = 0.5's")
+        check(digest(tmp / f"ours-{world}1.0") != digest(tmp / "ours-graded0.5")
+              and digest(tmp / f"ours-{world}1.0") != digest(tmp / "ours-confound1.0"),
+              f"{world} c = 1 differs from graded t = 0.5 and from confound c = 1 (negative control)")
+        wj = json.loads((tmp / f"ours-{world}1.0" / "world.json").read_text(encoding="utf-8"))
+        check(wj == {"world": world, "c": 1.0}, f"{world} c = 1: world.json {wj}")
+        jumps = json.loads((tmp / f"ours-{world}1.0" / "speed_jumps.json").read_text(encoding="utf-8"))
+        maxes = [v[r_]["max_abs_z_jump"] for v in jumps["pairs"].values() for r_ in ("a", "b")]
+        check(jumps["c"] == 1.0 and len(jumps["pairs"]) == 2
+              and ((world == "factor" and all(x == 0.0 for x in maxes)) or (world == "drift" and max(maxes) > 0)),
+              f"{world}: speed_jumps.json has the pairs; the factor's jumps are 0, the drift's are not ({maxes})")
+    want_ok = {("ours-factor1.0", "f100"), ("ours-drift1.0", "d100")}
+    for w_ in ("ours-factor1.0", "ours-drift1.0"):
+        for s_ in SHAPE_STEPS:
+            got_ok = ck.world_problems(tmp / w_, cfg, s_) == []
+            check(got_ok == ((w_, s_) in want_ok), f"shape: {w_} {'passes' if got_ok else 'is refused'} as step {s_}")
+    bad_cfg = json.loads(json.dumps(cfg))
+    del bad_cfg["ceiling"]["worlds"]["d200"]
+    try:
+        ck.step_world(bad_cfg, "d100")
+        refused = False
+    except SystemExit:
+        refused = True
+    check(refused, "shape: a ceiling.worlds that does not name every step is refused")
+    # the wiring of each world (the test series replaces Speed, so the wiring is the same code for all three)
+    for world in ("factor", "drift"):
+        wiring(cfg, config, seed_file, tmp, hmm, world)
+    diagnostic_spread(config, seed_file, tmp, hmm, "factor")
+    diagnostic_spread(config, seed_file, tmp, hmm, "drift")
+    for args in (["--world", "factor"], ["--world", "drift"], ["--world", "factor", "--c", "-1"],
+                 ["--world", "drift", "--c", "5"], ["--world", "drift", "--c", "nan"],
+                 ["--world", "factor", "--t", "0.5"]):
         r = subprocess.run([sys.executable, str(gen), str(config), str(seed_file), str(tmp / "ours-bad"),
                             "--hmm-version", hmm, "--smoke", *args], capture_output=True)
-        check(r.returncode != 0, f"confound: gen_sessions refuses {' '.join(args)}")
-    r = subprocess.run([sys.executable, str(gen), str(config), str(seed_file), str(tmp / "ours-c4"), "--hmm-version",
-                        hmm, "--smoke", "--world", "confound", "--c", "4"], capture_output=True)
-    check(r.returncode == 0, "confound: gen_sessions accepts the upper bound --c 4")
+        check(r.returncode != 0, f"shape: gen_sessions refuses {' '.join(args)}")
 
 
 # graded world design 1.3: the values written out (not computed by the instrument's function; code-reviewer M4)
@@ -607,16 +719,18 @@ def test_auc_and_choice(cfg: dict) -> None:
     mk = lambda h, l: {"L300": {"hgb": {"auc_A_speed": h}, "lr": {"auc_A_speed": l}}}
     ma = cfg["ceiling"]["main_auc"]
     check(ma == 0.9 and cfg["ceiling"]["P"] == 240 and cfg["ceiling"]["seed_offset"] == 1
-          and cfg["ceiling"]["steps"] == {"c050": 0.5, "c100": 1.0, "c200": 2.0},
-          "steps: three steps at c = 0.5 / 1 / 2, P 240, SEED + 1, the ceiling at 0.90")
+          and cfg["ceiling"]["steps"] == SHAPE_STEPS and cfg["ceiling"]["worlds"] == SHAPE_WORLDS,
+          "steps: f100 / f200 / d100 / d200 (c = 1 / 2), P 240, SEED + 1, the ceiling at 0.90")
     check(ce.step_status(mk(0.90, 0.90), ma)["status"] == "ceiling", "steps: 0.90 and 0.90 -> ceiling (equality is the ceiling)")
     check(ce.step_status(mk(0.8999, 0.95), ma)["status"] == "go", "steps: one classifier below 0.90 -> go")
     check(ce.step_status(mk(0.95, 0.8999), ma)["status"] == "go", "steps: the other classifier below 0.90 -> go")
     check(ce.step_status(mk(float("nan"), 0.95), ma)["status"] == "unmeasured", "steps: a NaN -> unmeasured (not a ceiling)")
     check(ce.step_status(mk(None, 0.5), ma)["status"] == "unmeasured", "steps: a failed fit -> unmeasured")
-    got = ce.choose_steps({"c050": mk(0.7, 0.7), "c100": mk(0.92, 0.89), "c200": mk(0.95, 0.91)}, cfg)
-    check({k: v["status"] for k, v in got.items()} == {"c050": "go", "c100": "go", "c200": "ceiling"}
-          and got["c100"]["c"] == 1.0, "steps: each step gets its own status")
+    got = ce.choose_steps({"f100": mk(0.95, 0.91), "f200": mk(0.92, 0.89), "d100": mk(0.8, 0.7), "d200": mk(0.7, 0.7)},
+                          cfg)
+    check({k: v["status"] for k, v in got.items()} == {"f100": "ceiling", "f200": "go", "d100": "go", "d200": "go"}
+          and got["d100"]["c"] == 1.0 and got["d100"]["world"] == "drift" and got["f200"]["world"] == "factor",
+          "steps: each step gets its own status, c and world")
 
 
 # ---------------------------------------------------------------------------
@@ -871,6 +985,8 @@ def test_pc() -> None:
     a = st.series(sess, "PC1", 1)[0]
     check(abs(a[100 * st.HZ + 5] - st.stall_share(sess.seg, 40, 100)) < 1e-12, "PC1: the stall share of the 60 s before")
     test_pc_1800(sess)
+    test_pcr(sess)
+    test_stage_source(sess)
 
 
 def test_pc_1800(base: st.Session) -> None:
@@ -914,6 +1030,113 @@ def test_pc_1800(base: st.Session) -> None:
     for c in ("S-raw-hold-sec", "S-rank-ground-sub", "S-jitter-decay-sec"):
         x, y = st.series(sess, f"{st.PCL_PREFIX}{c}", 1, lam=0.0), st.series(sess, f"PC0-{c}", 1)
         check(np.array_equal(x[0], y[0]) and np.array_equal(x[1], y[1]), f"PCl-{c} at lambda 0 is PC0-{c}")
+
+
+def test_stage_source(sess: st.Session) -> None:
+    """shape world design 3.7: the names of the confound world's stage draw what its file (7d38df98) draws."""
+    import importlib.util
+    ok = (STAGE_SRC.exists()
+          and hashlib.sha256(STAGE_SRC.read_bytes().replace(b"\r\n", b"\n")).hexdigest() == STAGE_SRC_SHA)
+    check(ok, f"stage: the confound world's {STAGE_SRC.name} is the 7d38df98 file (SHA-256)")
+    if not ok:
+        return
+    spec = importlib.util.spec_from_file_location("stage_confound_src", STAGE_SRC)
+    old = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = old  # the dataclass Session looks its module up there
+    spec.loader.exec_module(old)
+    osess = old.Session(sess.sid, sess.duration_s, sess.presses, sess.active, sess.seg, sess.feat, sess.key_seed)
+    cands = st.candidates()
+    names = ([(c, None) for c in cands] + [("PC1", None), ("PC-corr", None), (st.PC1L_NAME, None)]
+             + [(f"PCs-{c}", 0.4) for c in cands] + [(f"PC0-{c}", None) for c in cands]
+             + [(f"{st.PCL_PREFIX}{c}", 0.4) for c in cands])
+    same = all(np.array_equal(x, y) for n, lam in names
+               for x, y in zip(st.series(sess, n, 3, lam=lam), old.series(osess, n, 3, lam=lam)))
+    check(same and len(names) == 24 * 4 + 3, f"stage: the {len(names)} earlier names equal the confound world's stage")
+    check(st.FEAT_NAMES == old.FEAT_NAMES and np.array_equal(
+        st.window_features(*st.series(sess, cands[0], 3), 10), old.window_features(*old.series(osess, cands[0], 3), 10)),
+        "stage: the window features equal the confound world's")
+
+
+def test_pcr(base: st.Session) -> None:
+    """shape world design 1.3, 3.7: the r-side controls."""
+    cfg = json.loads((HERE.parent / "config.json").read_text(encoding="utf-8"))
+    check(st.PCR_VAR_SD == cfg["pc_r"]["var_sd"] == 0.2 and st.PCR_TAG == 43 and st.PCRV_TAG == 47
+          and len({st.PC_TAG, st.PCR_TAG, st.PCRV_TAG, st.JITTER_TAG}) == 4,
+          "PCr: var_sd 0.2 (config.json and stage.py agree), streams 43 and 47 apart from the others")
+    check(st.pcr_parse("PCrl-S-raw-hold-sec") == ("level", "S-raw-hold-sec", False)
+          and st.pcr_parse("PCrv0-S-rank-ground-sub") == ("var", "S-rank-ground-sub", True),
+          "PCr: the names parse to family, candidate and lambda 0")
+    for bad in ("PCrx-S-raw-hold-sec", "PCrl-S-raw-hold-min", "PCrl-raw-hold-sec"):
+        check(raises_value(st.pcr_parse, bad), f"PCr: {bad} is refused")
+    sess = base
+    n = sess.duration_s * st.HZ
+    # the blocks: PC-stall's construction from their own stream
+    b37 = st.pc_blocks(sess.seg, sess.duration_s, sess.key_seed, 1, 0.5)
+    b43 = st.pc_blocks(sess.seg, sess.duration_s, sess.key_seed, 1, 0.5, st.PC_SPAN_S, st.PCR_TAG)
+    check(not np.array_equal(b37["U"], b43["U"]) and np.array_equal(b37["q"], b43["q"]),
+          "PCr: the blocks have the PC-stall's q from another stream (U, N)")
+    v = np.repeat(b43["value"], st.PC_BLOCK_S * st.HZ)[:n]
+    check(np.array_equal(st.pcr_drive(sess, "level", 0.5, 1), v), "PCr-level: u_r is the block value at every point")
+    # level through raw / hold: r is the block value where moving, a is 0.5 where moving
+    for res in st.RESOLUTIONS:
+        a, r = st.series(sess, f"PCrl-S-raw-hold-{res}", 1, lam=0.5)
+        _, _, stp = st.drive(st.stage_input(sess), res)
+        check(np.array_equal(r[~stp], np.clip(v, 0, 1)[~stp]) and np.all(a[~stp] == 0.5) and (~stp).sum() > 1000,
+              f"PCr-level ({res}): r = the block value and a = 0.5 at the moving points")
+    # var: the mean stays 0.5 and the spread of each block is var_sd * its value
+    vd = st.pcr_drive(sess, "var", 1.0, 1)
+    vals = st.pc_blocks(sess.seg, sess.duration_s, sess.key_seed, 1, 1.0, st.PC_SPAN_S, st.PCR_TAG)["value"]
+    blocks = vd[: (n // 600) * 600].reshape(-1, 600)
+    sds, wants = blocks.std(axis=1), st.PCR_VAR_SD * vals[: len(blocks)]
+    keep = wants > 0.02
+    check(keep.sum() >= 10 and np.all(np.abs(sds[keep] / wants[keep] - 1) < 0.1)
+          and abs(blocks.mean() - 0.5) < 0.02, f"PCr-var: block sd = var_sd * value (within 10 %, {keep.sum()} blocks), mean 0.5")
+    zero = vals[: len(blocks)] == 0
+    check(np.all(sds[zero] == 0), "PCr-var: a block of value 0 does not move")
+    a, r = st.series(sess, "PCrv-S-raw-hold-sec", 1, lam=1.0)
+    _, _, stp = st.drive(st.stage_input(sess), "sec")
+    check(np.allclose(r[~stp], np.clip(vd, 0, 1)[~stp]) and np.all(a[~stp] == 0.5),
+          "PCr-var (raw, hold, sec): r = the drive (clipped) and a = 0.5 at the moving points")
+    # the level and var families use the same blocks; lambda 0 does not read the labels; lambda 1 does
+    lv = st.pcr_drive(sess, "level", 0.3, 1)
+    e = np.random.default_rng(np.random.SeedSequence([1, sess.key_seed & 0xFFFFFFFF, st.PCRV_TAG])).standard_normal(n)
+    check(np.allclose(st.pcr_drive(sess, "var", 0.3, 1), 0.5 + st.PCR_VAR_SD * lv * e),
+          "PCr: level and var share the blocks (var = 0.5 + var_sd * level value * e)")
+    rng = np.random.default_rng(31)
+    perm = st.Session(sess.sid, sess.duration_s, sess.presses, sess.active, rng.permutation(sess.seg), sess.feat,
+                      sess.key_seed)
+    ok = all(np.array_equal(st.series(sess, f"{pre}{c}", 1)[1], st.series(perm, f"{pre}{c}", 1)[1])
+             for pre in ("PCrl0-", "PCrv0-") for c in st.candidates())
+    check(ok, "PCr: PCrl0 and PCrv0 of every candidate do not depend on the labels")
+    for pre in ("PCrl-", "PCrv-"):
+        check(not np.array_equal(st.series(sess, f"{pre}S-raw-hold-sec", 1, lam=1.0)[1],
+                                 st.series(perm, f"{pre}S-raw-hold-sec", 1, lam=1.0)[1]),
+              f"PCr: {pre} at lambda 1 does (negative control)")
+        x0 = st.series(sess, f"{pre}S-raw-hold-sec", 1, lam=0.0)
+        y0 = st.series(sess, f"{pre[:-1]}0-S-raw-hold-sec", 1)
+        check(all(np.array_equal(p_, q_) for p_, q_ in zip(x0, y0)), f"PCr: {pre} at lambda 0 is its baseline")
+    # causal: the labels after T change nothing before T
+    T = 2000
+    seg3 = sess.seg.copy()
+    seg3[T:] = 1 - np.minimum(seg3[T:], 1)
+    late = st.Session(sess.sid, sess.duration_s, sess.presses, sess.active, seg3, sess.feat, sess.key_seed)
+    for name in ("PCrl-S-raw-hold-sec", "PCrv-S-smooth-decay-sub", "PCrl-S-rank-ground-sec", "PCrv-S-jitter-hold-sub"):
+        x, y = st.series(sess, name, 1, lam=1.0), st.series(late, name, 1, lam=1.0)
+        check(all(np.array_equal(p_[: T * st.HZ], q_[: T * st.HZ]) for p_, q_ in zip(x, y))
+              and not all(np.array_equal(p_, q_) for p_, q_ in zip(x, y)),
+              f"{name}: the stall after T changes no value before T (and some after: negative control)")
+    # the stop of the candidate acts on the control: ground puts r to 0 while stopped
+    a, r = st.series(sess, "PCrl-S-raw-ground-sub", 1, lam=1.0)
+    _, _, stp = st.drive(st.stage_input(sess), "sub")
+    check(np.all(r[stp] == 0) and np.all(a[stp] == 0) and stp.sum() > 100, "PCr: the candidate's stop (ground) acts on r and a")
+
+
+def raises_value(fn, *a) -> bool:
+    try:
+        fn(*a)
+    except (ValueError, AssertionError):
+        return True
+    return False
 
 
 def test_twins(tmp: Path) -> None:
@@ -1086,17 +1309,32 @@ def test_lam_config(cfg: dict) -> None:
     """Codex round 2: the main run takes only lambdas of the pilot's grid, one per candidate; graded world design
     1.2: per step, and the copied config holds none."""
     steps = set(cfg["ceiling"]["steps"])
-    check(all(isinstance(cfg["pc_stall"][k], dict) and set(cfg["pc_stall"][k]) <= steps for k in ("lam", "lam_1800")),
-          "lambda config: lam and lam_1800 are tables keyed by the steps (no round 2 lambdas copied over)")
+    check(all(isinstance(cfg["pc_stall"][k], dict) and set(cfg["pc_stall"][k]) <= steps for k in ("lam", "lam_1800"))
+          and isinstance(cfg["pc_r"]["lam"], dict) and set(cfg["pc_r"]["lam"]) <= steps,
+          "lambda config: lam, lam_1800 and pc_r.lam are tables keyed by the steps (no lambdas copied over)")
     good = {c: 0.15 for c in st.candidates()}
-    mk = lambda lam: {**cfg, "pc_stall": {**cfg["pc_stall"], "lam": {"c050": lam}, "lam_1800": {"c050": lam}}}
-    check(ck.lam_problems(mk(good), "c050") == [] and ck.lam_problems(mk(good), "c050", "lam_1800") == [],
+    mk = lambda lam: {**cfg, "pc_stall": {**cfg["pc_stall"], "lam": {"f100": lam}, "lam_1800": {"f100": lam}}}
+    check(ck.lam_problems(mk(good), "f100") == [] and ck.lam_problems(mk(good), "f100", "lam_1800") == [],
           "lambda config: one grid value per candidate passes (lam and lam_1800 of the step)")
-    check(ck.lam_problems(mk(good), "c100") != [], "lambda config: another step's table does not pass")
-    check(ck.lam_problems({**cfg, "pc_stall": {**cfg["pc_stall"], "lam": good}}, "c050") != [],
+    check(ck.lam_problems(mk(good), "d100") != [], "lambda config: another step's table does not pass")
+    check(ck.lam_problems({**cfg, "pc_stall": {**cfg["pc_stall"], "lam": good}}, "f100") != [],
           "lambda config: a round 2 table (not per step) does not pass")
-    mk = lambda lam: {**cfg, "pc_stall": {**cfg["pc_stall"], "lam": {"c050": lam}}}
-    mkp = lambda lam: (mk(lam), "c050")
+    # shape world design 1.3: pc_r.lam.<step> = {level, var} x every candidate, a grid value or null
+    goodr = {"level": dict(good), "var": {c: (None if i % 2 else 0.2) for i, c in enumerate(st.candidates())}}
+    mkr = lambda t: {**cfg, "pc_r": {**cfg["pc_r"], "lam": {"d100": t}}}
+    check(ck.lam_r_problems(mkr(goodr), "d100") == [], "pc_r config: grid values and nulls per family pass")
+    check(ck.lam_r_problems(mkr(goodr), "f100") != [], "pc_r config: another step's table does not pass")
+    for name, t in (("a missing family", {"level": goodr["level"]}),
+                    ("an extra family", {**goodr, "both": goodr["level"]}),
+                    ("a missing candidate", {**goodr, "var": dict(list(goodr["var"].items())[1:])}),
+                    ("off the grid", {**goodr, "level": {**goodr["level"], "S-raw-hold-sec": 0.12}}),
+                    ("a string", {**goodr, "var": {**goodr["var"], "S-raw-hold-sec": "0.2"}}),
+                    ("NaN", {**goodr, "var": {**goodr["var"], "S-raw-hold-sec": float("nan")}})):
+        check(ck.lam_r_problems(mkr(t), "d100") != [], f"pc_r config: {name} is refused")
+    check(ck.lam_r_problems(mkr({**goodr, "level": {**goodr["level"], "S-raw-hold-sec": 0.8}}), "d100") == [],
+          "pc_r config: a value of the extended grid (0.8) passes")
+    mk = lambda lam: {**cfg, "pc_stall": {**cfg["pc_stall"], "lam": {"f100": lam}}}
+    mkp = lambda lam: (mk(lam), "f100")
     for name, lam in (("missing", {k: v for k, v in list(good.items())[1:]}),
                       ("a string", {**good, "S-raw-hold-sec": "0.15"}),
                       ("NaN", {**good, "S-raw-hold-sec": float("nan")}),
@@ -1219,7 +1457,8 @@ def test_select_lambda(cfg: dict) -> None:
 
 def pilot_doc(cfg: dict, step: str, parts: dict, base_seed: int) -> dict:
     sp = cfg["sets"]["pilot"]
-    return {"world": "confound", "c": cfg["ceiling"]["steps"][step], "step": step, "stop": parts["L300"]["stop"],
+    return {"world": cfg["ceiling"]["worlds"][step], "c": cfg["ceiling"]["steps"][step], "step": step,
+            "stop": parts["L300"]["stop"], "rule_r": {"pilot_grid": ck.pcr_grid(cfg)},
             "rule": {k: cfg["pc_stall"][k] for k in ck.RULE_KEYS}, "seed": base_seed + sp["seed_offset"],
             "n_sessions": sp["P"], "bootstrap": sp["bootstrap"], "config_fingerprint": ce.cfg_fingerprint(cfg),
             "code_fingerprint": ce.code_fingerprint(),
@@ -1233,6 +1472,15 @@ def part_doc(tag: str, merged: dict, cfg: dict, auc=None) -> dict:
     stop, sels, ceil = ck.part_result(tag, merged, per, auc, cfg)
     return {"stop": stop, "selection": sels, "auc_A_speed": auc, "ceiling_kinds": ceil, "per_batch": per,
             "configs": {k: ({kk: v[kk] for kk in ck.REC_KEYS} if v else None) for k, v in merged.items()}}
+
+
+def r_part_doc(merged_r: dict, cfg: dict, auc=None) -> dict:
+    """The L300r part as pilot_r_part writes it, from hand-made maxima (shape world design 1.3)."""
+    auc = auc or {"hgb": 0.7, "lr": 0.7}
+    sels, ceil = ck.pilot_r_result(merged_r, auc, cfg)
+    return {"stop": None, "selection": sels, "auc_A_speed": auc, "ceiling_kinds": ceil,
+            "per_batch": {f"{ck.PILOT_R_TAG}-x": {"fit_failed": False}},
+            "configs": {k: ({kk: v[kk] for kk in ck.REC_KEYS} if v else None) for k, v in merged_r.items()}}
 
 
 def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
@@ -1257,59 +1505,119 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
           "pilot (L1800): the PCl- names give their own choices (not L300's); PCs- names are not read for L1800")
     p300, p18 = part_doc("L300", merged, cfg), part_doc("L1800", merged18, cfg)
     check(p300["stop"] is None and p18["stop"] is None, "pilot: the hand-made parts do not stop")
+    # shape world design 1.3: the L300r part, level one grid step earlier than L300 and var one later, and the var of
+    # the first candidate with no finite value (null, not a stop)
+    rgrid = ck.pcr_grid(cfg)
+    check(rgrid[: len(grid)] == grid and rgrid[len(grid):] == [0.4, 0.5, 0.6, 0.8, 1.0],
+          "pilot (L300r): pc_r.pilot_grid is the PC-stall's grid and 0.4 / 0.5 / 0.6 / 0.8 / 1.0 (decisions 10)")
+    merged_r = {}
+    for c in cands:
+        for i, x in enumerate(rgrid):  # the PC-stall's grid values as before; the steps above 0.3 far over the band
+            if i >= len(grid):
+                far = rec(0.2 + i * 0.01, 0.19 + i * 0.01)
+                merged_r[ck.pilot_key(c, x, "PCrl-")] = far
+                merged_r[ck.pilot_key(c, x, "PCrv-")] = None if c == cands[0] else far
+                continue
+            merged_r[ck.pilot_key(c, x, "PCrl-")] = merged[ck.pilot_key(c, grid[min(i + 1, len(grid) - 1)])]
+            merged_r[ck.pilot_key(c, x, "PCrv-")] = (None if c == cands[0] else
+                                                     merged[ck.pilot_key(c, grid[max(i - 1, 0)])] if i else rec(0.0, -0.008))
+        merged_r[ck.pilot_key(c, 0.0, "PCrl-")] = merged_r[ck.pilot_key(c, 0.0, "PCrv-")] = rec(0.004, -0.004)
+    want_r = {"level": {c: grid[grid.index(want[c]) - 1] for c in cands},
+              "var": {c: (None if c == cands[0] else grid[grid.index(want[c]) + 1]) for c in cands}}
+    pr = r_part_doc(merged_r, cfg)
+    got_r = {f: {c: pr["selection"][f][c]["lam"] for c in cands} for f in ck.PCR_FAMILIES}
+    check(got_r == want_r and want_r["level"] != want and ck.PCR_FAMILIES == {"level": "PCrl-", "var": "PCrv-"},
+          "pilot (L300r): each family has its own choices; a candidate with no finite value gets null")
+    # a control that reaches the band only above 0.3 is chosen there (the extended grid is read)
+    late = dict(merged_r)
+    for i, x in enumerate(rgrid):
+        g_ = {0.6: 0.056, 0.8: 0.07, 1.0: 0.078}.get(x, 0.005 + 0.001 * i)  # rising: one closest value, no ties
+        late[ck.pilot_key(cands[2], x, "PCrl-")] = rec(g_, g_ - 0.011)
+    check(ck.pilot_r_result(late, {"hgb": 0.7, "lr": 0.7}, cfg)[0]["level"][cands[2]]["lam"] == 0.6,
+          "pilot (L300r): a control in the band only at 0.6 and above gets 0.6 (the grid beyond 0.3 is used)")
+    check(ck.choose_all(late, cfg, "PCrl-")[cands[2]]["lam"] == grid[-1],
+          "pilot (L300r): the PC-stall's grid alone would stop at 0.3 (negative control)")
     # part_result reads the part's own label's AUC (code-reviewer round 2 M3)
     s18c = ck.part_result("L1800", merged18, p18["per_batch"], {"hgb": 0.92, "lr": 0.95}, cfg)
     s300 = ck.part_result("L300", merged, p300["per_batch"], {"hgb": 0.7, "lr": 0.7}, cfg)
     check(s18c[0] == "ceiling" and s300[0] is None, "pilot: a part at its own label's ceiling stops; the other part does not")
-    good = pilot_doc(cfg, "c100", {"L300": p300, "L1800": p18}, base_seed)
+    good = pilot_doc(cfg, "d100", {"L300": p300, "L1800": p18, ck.PILOT_R_TAG: pr}, base_seed)
     old = {c: grid[0] for c in cands}  # another step's tables, written before (Codex round 2 P1)
+    old_r = {"level": dict(old), "var": dict(old)}
     pre = json.loads(json.dumps(cfg))
-    # only c050 before: the real config.json gains a table per step as the steps run (design 8, 2026-10-15)
-    pre["pc_stall"]["lam"] = {"c050": old}
-    pre["pc_stall"]["lam_1800"] = {"c050": old}
+    # only f100 before: the real config.json gains a table per step as the steps run (confound world design 8)
+    pre["pc_stall"]["lam"] = {"f100": old}
+    pre["pc_stall"]["lam_1800"] = {"f100": old}
+    pre["pc_r"]["lam"] = {"f100": old_r}
+    # shape world design 1.3: checked by name before --apply-pilot relies on it (a failure here, not a refusal below)
+    check(ce.cfg_fingerprint(pre) == ce.cfg_fingerprint({**pre, "pc_r": {**pre["pc_r"], "lam": {}}}),
+          "fingerprint: pc_r.lam (written after the pilots) does not change it")
     with tempfile.TemporaryDirectory() as d:
         cp, pp = Path(d) / "config.json", Path(d) / "pilot.json"
         (Path(d) / "SEED").write_text(f"{base_seed}\n", encoding="utf-8")
         fresh = lambda c=pre: cp.write_text(json.dumps(c, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         fresh()
         pp.write_text(json.dumps(good), encoding="utf-8")
-        ck.apply_pilot(cp, pp, "c100")
+        ck.apply_pilot(cp, pp, "d100")
         back = json.loads(cp.read_text(encoding="utf-8"))
-        rest = lambda c: {**c, "pc_stall": {k: v for k, v in c["pc_stall"].items() if k not in ("lam", "lam_1800")}}
-        check(back["pc_stall"]["lam"] == {"c050": old, "c100": want}
-              and back["pc_stall"]["lam_1800"] == {"c050": old, "c100": want18} and rest(back) == rest(pre),
-              "pilot: --apply-pilot writes lam.c100 (L300's) and lam_1800.c100 (L1800's), keeps c050, nothing else")
-        check(ck.main_lams(back, pp, base_seed, "c100") == (want, want18, None),
-              "main: the step's pilot.json and config.json agree (L300 and L1800 each its own)")
-        for name, hand in (("lam.<step>", "lam"), ("lam_1800.<step>", "lam_1800")):
+        rest = lambda c: {**c, "pc_stall": {k: v for k, v in c["pc_stall"].items() if k not in ("lam", "lam_1800")},
+                          "pc_r": {k: v for k, v in c["pc_r"].items() if k != "lam"}}
+        check(back["pc_stall"]["lam"] == {"f100": old, "d100": want}
+              and back["pc_stall"]["lam_1800"] == {"f100": old, "d100": want18}
+              and back["pc_r"]["lam"] == {"f100": old_r, "d100": want_r} and rest(back) == rest(pre),
+              "pilot: --apply-pilot writes lam.d100 (L300's), lam_1800.d100 (L1800's) and pc_r.lam.d100 (L300r's), "
+              "keeps f100, nothing else")
+        check(ck.main_lams(back, pp, base_seed, "d100") == (want, want18, None)
+              and ck.main_lams_r(back, pp, base_seed, "d100") == want_r,
+              "main: the step's pilot.json and config.json agree (L300, L1800 and L300r each its own)")
+        hand_edits = [(f"lam.<step>", lambda h: h["pc_stall"]["lam"]["d100"]),
+                      (f"lam_1800.<step>", lambda h: h["pc_stall"]["lam_1800"]["d100"]),
+                      ("pc_r.lam.<step>.level", lambda h: h["pc_r"]["lam"]["d100"]["level"]),
+                      ("pc_r.lam.<step>.var", lambda h: h["pc_r"]["lam"]["d100"]["var"])]
+        for name, where in hand_edits:
             h = json.loads(json.dumps(back))
-            h["pc_stall"][hand]["c100"][cands[0]] = grid[0] if h["pc_stall"][hand]["c100"][cands[0]] != grid[0] else grid[1]
-            try:
-                ck.main_lams(h, pp, base_seed, "c100")
-                refused = False
-            except SystemExit:
-                refused = True
-            check(refused, f"main: a hand-edited {name} that is not the pilot's choice stops the run")
+            t = where(h)
+            t[cands[1]] = grid[0] if t[cands[1]] != grid[0] else grid[1]
+            refused = []
+            for fn in (ck.main_lams, ck.main_lams_r):
+                try:
+                    fn(h, pp, base_seed, "d100")
+                    refused.append(False)
+                except SystemExit:
+                    refused.append(True)
+            check(refused[0] if name.startswith("lam") else refused[1],
+                  f"main: a hand-edited {name} that is not the pilot's choice stops the run")
+        h = json.loads(json.dumps(back))
+        h["pc_r"]["lam"]["d100"]["level"], h["pc_r"]["lam"]["d100"]["var"] = (h["pc_r"]["lam"]["d100"]["var"],
+                                                                               h["pc_r"]["lam"]["d100"]["level"])
         try:
-            ck.main_lams(back, pp, base_seed, "c050")
+            ck.main_lams_r(h, pp, base_seed, "d100")
             refused = False
         except SystemExit:
             refused = True
-        check(refused, "main: the pilot.json of step c100 is refused for step c050")
+        check(refused, "main: pc_r.lam with the families swapped stops the run")
+        for other in ("f100", "d200"):
+            try:
+                ck.main_lams(back, pp, base_seed, other)
+                refused = False
+            except SystemExit:
+                refused = True
+            check(refused, f"main: the pilot.json of step d100 is refused for step {other}")
         # a stopped L1800 part (PC1-1800 weak): lam only; the main run reads the stop from pilot.json
         weak18 = part_doc("L1800", {**merged18, st.PC1L_NAME: rec(0.12, 0.08)}, cfg)
-        stopped = pilot_doc(cfg, "c100", {"L300": p300, "L1800": weak18}, base_seed)
+        stopped = pilot_doc(cfg, "d100", {"L300": p300, "L1800": weak18, ck.PILOT_R_TAG: pr}, base_seed)
         check(weak18["stop"] == "weak_detector", "pilot: a weak PC1-1800 stops the L1800 part")
         fresh()
         pp.write_text(json.dumps(stopped), encoding="utf-8")
-        ck.apply_pilot(cp, pp, "c100")
+        ck.apply_pilot(cp, pp, "d100")
         back2 = json.loads(cp.read_text(encoding="utf-8"))
-        check(back2["pc_stall"]["lam"] == {"c050": old, "c100": want} and back2["pc_stall"]["lam_1800"] == {"c050": old},
-              "pilot: a stopped L1800 part writes lam.<step> and no lam_1800.<step> (c050 kept)")
-        check(ck.main_lams(back2, pp, base_seed, "c100") == (want, None, "weak_detector"),
+        check(back2["pc_stall"]["lam"] == {"f100": old, "d100": want} and back2["pc_stall"]["lam_1800"] == {"f100": old}
+              and back2["pc_r"]["lam"] == {"f100": old_r, "d100": want_r},
+              "pilot: a stopped L1800 part writes lam.<step> and pc_r.lam.<step>, no lam_1800.<step> (f100 kept)")
+        check(ck.main_lams(back2, pp, base_seed, "d100") == (want, None, "weak_detector"),
               "main: a stopped L1800 part -> L1800 undecidable (pilot_stop), L300 and L60 go on")
         try:
-            ck.main_lams(back, pp, base_seed, "c100")
+            ck.main_lams(back, pp, base_seed, "d100")
             refused = False
         except SystemExit:
             refused = True
@@ -1319,11 +1627,26 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
         edited = json.loads(json.dumps(pre))
         edited["e13"]["pc_lower"] = 0.11
         bad_cases = (
-            ("another step (c050's c)", {**good, "step": "c050", "c": 0.5}),
-            ("the right step name with another c", {**good, "c": 0.5}),
+            ("another step of the same c (f100)", {**good, "step": "f100", "world": "factor"}),
+            ("another step (d200's c)", {**good, "step": "d200", "c": 2.0}),
+            ("the right step name with another c", {**good, "c": 2.0}),
             ("another world", {**good, "world": "v4"}),
+            ("the factor world at the same c", {**good, "world": "factor"}),
+            ("the confound world at the same c", {**good, "world": "confound"}),
             ("a graded world pilot.json at the same value", {**{k: v for k, v in good.items() if k != "c"},
                                                               "world": "graded", "t": good["c"]}),
+            ("a missing L300r part", {**good, "parts": {k: v for k, v in good["parts"].items() if k != ck.PILOT_R_TAG}}),
+            ("an L300r part claimed stopped", swap(ck.PILOT_R_TAG, stop="weak_detector")),
+            ("an L300r part without its fits", {**good, "parts": {**good["parts"], ck.PILOT_R_TAG: {
+                k: v for k, v in pr.items() if k != "per_batch"}}}),
+            ("an L300r level selection that does not follow from the maxima", swap(ck.PILOT_R_TAG, selection={
+                **pr["selection"], "level": flip(pr["selection"]["level"], cands[1])})),
+            ("an L300r var null replaced by a value", swap(ck.PILOT_R_TAG, selection={
+                **pr["selection"], "var": {**pr["selection"]["var"], cands[0]: {"lam": grid[0]}}})),
+            ("another L300r grid", {**good, "rule_r": {"pilot_grid": grid}}),
+            ("no L300r grid", {k: v for k, v in good.items() if k != "rule_r"}),
+            ("the L300r families swapped", swap(ck.PILOT_R_TAG, selection={
+                "level": pr["selection"]["var"], "var": pr["selection"]["level"]})),
             ("a stopped L300 part", {**swap("L300", stop="weak_detector"), "stop": "weak_detector"}),
             ("an L300 stop that differs from the pilot's", {**good, "stop": "fit_failed"}),
             ("an L1800 part claimed stopped while its values do not stop", swap("L1800", stop="weak_detector")),
@@ -1345,16 +1668,17 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
             fresh()
             pp.write_text(json.dumps(bad), encoding="utf-8")
             try:
-                ck.apply_pilot(cp, pp, "c100")
+                ck.apply_pilot(cp, pp, "d100")
                 refused = False
             except SystemExit:
                 refused = True
-            check(refused and json.loads(cp.read_text(encoding="utf-8"))["pc_stall"] == pre["pc_stall"],
+            now = json.loads(cp.read_text(encoding="utf-8"))
+            check(refused and now["pc_stall"] == pre["pc_stall"] and now["pc_r"] == pre["pc_r"],
                   f"pilot: --apply-pilot refuses {name} and leaves config.json as it was")
         fresh(edited)
         pp.write_text(json.dumps(good), encoding="utf-8")
         try:
-            ck.apply_pilot(cp, pp, "c100")
+            ck.apply_pilot(cp, pp, "d100")
             refused = False
         except SystemExit:
             refused = True
@@ -1365,6 +1689,13 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
           == ce.cfg_fingerprint(deep), "fingerprint: the lambda tables and the comments (at any depth) do not change it")
     deep["pc_stall"]["aim"] = 0.06
     check(ce.cfg_fingerprint(deep) != ce.cfg_fingerprint(pre), "fingerprint: a setting inside a section changes it")
+    vs = json.loads(json.dumps(pre))
+    vs["pc_r"]["var_sd"] = 0.3
+    check(ce.cfg_fingerprint(vs) != ce.cfg_fingerprint(pre) and back["pc_r"]["lam"] != pre["pc_r"]["lam"],
+          "fingerprint: pc_r.lam does not change it (above), pc_r.var_sd does")
+    ws = json.loads(json.dumps(pre))
+    ws["ceiling"]["worlds"]["d100"] = "factor"
+    check(ce.cfg_fingerprint(ws) != ce.cfg_fingerprint(pre), "fingerprint: a step's world changes it")
     with tempfile.TemporaryDirectory() as d:
         sd = Path(d) / "scripts"
         sd.mkdir()
@@ -1387,23 +1718,27 @@ def test_ceiling_gate(cfg: dict, base_seed: int) -> None:
            "P": {s: cfg["ceiling"]["P"] for s in cfg["ceiling"]["steps"]}, "config_fingerprint": ce.cfg_fingerprint(cfg),
            "code_fingerprint": ce.code_fingerprint(),
            "results": {s: mk(0.7, 0.72) for s in cfg["ceiling"]["steps"]},
-           "steps": {s: {"c": c, "status": "go"} for s, c in cfg["ceiling"]["steps"].items()}}
-    check(ck.ceiling_problems(doc, cfg, base_seed, "c100") == [], "ceiling gate: a go step of this config passes")
+           "steps": {s: {"world": cfg["ceiling"]["worlds"][s], "c": c, "status": "go"}
+                     for s, c in cfg["ceiling"]["steps"].items()}}
+    check(ck.ceiling_problems(doc, cfg, base_seed, "d100") == [], "ceiling gate: a go step of this config passes")
     moved = json.loads(json.dumps(cfg))
-    moved["ceiling"]["steps"]["c100"] = 0.9
+    moved["ceiling"]["steps"]["d100"] = 0.9
     for name, d_, c_ in (
-            ("a ceiling step", {**doc, "steps": {**doc["steps"], "c100": {"c": 1.0, "status": "ceiling"}}}, cfg),
-            ("an unmeasured step", {**doc, "steps": {**doc["steps"], "c100": {"c": 1.0, "status": "unmeasured"}}}, cfg),
-            ("a step missing", {**doc, "steps": {"c050": doc["steps"]["c050"]}}, cfg),
+            ("a ceiling step", {**doc, "steps": {**doc["steps"], "d100": {**doc["steps"]["d100"], "status": "ceiling"}}}, cfg),
+            ("an unmeasured step", {**doc, "steps": {**doc["steps"], "d100": {**doc["steps"]["d100"],
+                                                                              "status": "unmeasured"}}}, cfg),
+            ("a step missing", {**doc, "steps": {"f100": doc["steps"]["f100"]}}, cfg),
+            ("another world for the step", {**doc, "steps": {**doc["steps"], "d100": {**doc["steps"]["d100"],
+                                                                                      "world": "factor"}}}, cfg),
             ("another seed", {**doc, "seed": base_seed}, cfg),
-            ("another P", {**doc, "P": {**doc["P"], "c100": 40}}, cfg),
+            ("another P", {**doc, "P": {**doc["P"], "d100": 40}}, cfg),
             ("another main_auc", {**doc, "main_auc": 0.85}, cfg),
             ("a c moved in config.json after pilot 0", doc, moved),
             ("another config (fingerprint)", {**doc, "config_fingerprint": "0" * 64}, cfg),
             ("other instruments (code fingerprint)", {**doc, "code_fingerprint": "0" * 64}, cfg),
-            ("a go status over values at the ceiling", {**doc, "results": {**doc["results"], "c100": mk(0.93, 0.95)}}, cfg),
+            ("a go status over values at the ceiling", {**doc, "results": {**doc["results"], "d100": mk(0.93, 0.95)}}, cfg),
             ("a go status with no measured values", {k: v for k, v in doc.items() if k != "results"}, cfg)):
-        check(ck.ceiling_problems(d_, c_, base_seed, "c100") != [], f"ceiling gate: {name} is refused")
+        check(ck.ceiling_problems(d_, c_, base_seed, "d100") != [], f"ceiling gate: {name} is refused")
 
 
 def test_label_plan() -> None:
@@ -1502,8 +1837,12 @@ def test_work(work: Path, cfg: dict, seed: int, jobs: int) -> None:
     # the keys are names judge() knows (a PC-stall on the grid is descriptive; the mutation is read as a candidate)
     PCS, MUT, PC0, RAW = "PCs-S-raw-hold-sec@1.00", "S-raw-hold-sec-MUTseg", "PC0-S-raw-hold-sec", "S-raw-hold-sec"
     PCL = f"{st.PCL_PREFIX}S-raw-hold-sec@1.00"  # graded world design 3.7: the L1800 control on the main path
+    # shape world design 3.7: the r-side controls at lambda 1 and their baselines on the main path
+    PRL, PRV = "PCrl-S-raw-hold-sub@1.00", "PCrv-S-raw-hold-sub@1.00"
+    PRL0, PRV0 = "PCrl0-S-raw-hold-sub", "PCrv0-S-raw-hold-sub"
     specs = [(PCS, "PCs-S-raw-hold-sec", 1.0), (MUT, "S-raw-hold-sec", None, "seg"), (PC0, "PC0-S-raw-hold-sec", 0.0),
-             (RAW, "S-raw-hold-sec", None), (PCL, f"{st.PCL_PREFIX}S-raw-hold-sec", 1.0)]
+             (RAW, "S-raw-hold-sec", None), (PCL, f"{st.PCL_PREFIX}S-raw-hold-sec", 1.0),
+             (PRL, "PCrl-S-raw-hold-sub", 1.0), (PRV, "PCrv-S-raw-hold-sub", 1.0), (PRL0, PRL0, 0.0), (PRV0, PRV0, 0.0)]
     scratch = Path(tempfile.mkdtemp(prefix="selftest-", dir=work))
     try:
         tab = ck.label_tables(work, [m["sid"] for m in ms], cfg, scratch)
@@ -1529,6 +1868,10 @@ def test_work(work: Path, cfg: dict, seed: int, jobs: int) -> None:
         check(g[PCS] > 0.10, f"PC: PCs-S-raw-hold-sec at lambda 1 -> L300 point max {g[PCS]:+.3f} > 0.10 (main path)")
         check(g[MUT] > 0.10, f"mutation: seg mixed into the mapping -> L300 point max {g[MUT]:+.3f} > 0.10 (main path)")
         check(g[PC0] < 0.03, f"PC0-S-raw-hold-sec L300 point max {g[PC0]:+.3f} < 0.03 (negative control)")
+        check(g[PRL] > 0.10, f"PCr: PCrl-S-raw-hold-sub at lambda 1 -> L300 point max {g[PRL]:+.3f} > 0.10 (main path)")
+        check(g[PRV] > 0.05, f"PCr: PCrv-S-raw-hold-sub at lambda 1 -> L300 point max {g[PRV]:+.3f} > 0.05 (main path)")
+        check(g[PRL0] < 0.03 and g[PRV0] < 0.03,
+              f"PCr: their baselines at lambda 0 -> {g[PRL0]:+.3f} / {g[PRV0]:+.3f} < 0.03 (negative control)")
         print(f"     (S-raw-hold-sec unmutated L300 point max {g[RAW]:+.3f}; not judged here)")
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
@@ -1565,7 +1908,7 @@ def main() -> int:
     test_stats(cfg)
     test_lam_config(cfg)
     if a.gse_replay:
-        test_replay_causal(a.gse_replay, tmp / "ours-c0.5", tmp)  # confound world: a c050 work directory
+        test_replay_causal(a.gse_replay, tmp / "ours-drift1.0", tmp)  # shape world: a d100 work directory
     else:
         print("SKIP  causal (gse-replay): no --gse-replay")
     if a.work:

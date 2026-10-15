@@ -5,6 +5,10 @@ confound, world.json {"world": "confound", "c": c}): run after the freeze on the
 config.json ceiling.steps; each step is go, ceiling (both classifiers' L300 AUC(A_speed) >= ceiling.main_auc) or
 unmeasured (a failed fit or a NaN in L300). The positions of the steps are not changed after this (decisions 16).
 Round 1 and 2's rule (choose one world of ceiling.prefer by usable_max) is removed.
+The shape world (.steering/20261015-rhythm-stage-speed-shape-world/design.md 1.2, 3.0; copied from
+experiments/20261014-rhythm-stage-speed-confound-world/scripts/ceiling.py at 7d38df98): the four steps f100 / f200 /
+d100 / d200 have their world in config.json ceiling.worlds (world.json {"world": "factor" or "drift", "c": c}), and the
+fingerprint of the config leaves out pc_r.lam too (written after the pilots).
 
 For each step, label (L300, L60, L1800) and classifier (hgb, lr): AUC(A) and AUC(A_speed), out of fold on the
 P sessions (session-grouped 5-fold, as EH1). No stage candidate and no positive control is computed: the pilot
@@ -140,9 +144,11 @@ def _no_comments(o):
 def cfg_fingerprint(cfg: dict) -> str:
     """graded world design 1.2 (cross-review round 2): the SHA-256 of config.json without the keys that start with _
     (comments, at every depth) and without pc_stall.lam and pc_stall.lam_1800 (written after the pilots). pilot 0 and
-    each pilot 1 record it; the later steps refuse a record made under another config."""
+    each pilot 1 record it; the later steps refuse a record made under another config. Shape world design 1.3: and
+    without pc_r.lam (pc_r.var_sd stays in)."""
     c = _no_comments(cfg)
     c["pc_stall"] = {k: v for k, v in c["pc_stall"].items() if k not in ("lam", "lam_1800")}
+    c["pc_r"] = {k: v for k, v in c["pc_r"].items() if k != "lam"}
     return hashlib.sha256(json.dumps(c, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
 
 
@@ -168,7 +174,7 @@ def step_status(res_step: dict, main_auc: float) -> dict:
 
 def choose_steps(res: dict, cfg: dict) -> dict:
     c = cfg["ceiling"]
-    return {s: {"c": c["steps"][s], **step_status(res[s], c["main_auc"])} for s in c["steps"]}
+    return {s: {"world": c["worlds"][s], "c": c["steps"][s], **step_status(res[s], c["main_auc"])} for s in c["steps"]}
 
 
 def main() -> int:
@@ -182,22 +188,22 @@ def main() -> int:
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
     seed = int(Path(a.seed_file).read_text().strip())
     works = dict(w.split("=", 1) for w in a.work)
-    steps = cfg["ceiling"]["steps"]
-    if sorted(works) != sorted(steps):
-        raise SystemExit(f"--work must name exactly the steps {sorted(steps)}")
+    steps, worlds = cfg["ceiling"]["steps"], cfg["ceiling"]["worlds"]
+    if sorted(works) != sorted(steps) or sorted(worlds) != sorted(steps):
+        raise SystemExit(f"--work and ceiling.worlds must name exactly the steps {sorted(steps)}")
     tabs = {}
     n_p = {}
     for world, wd in works.items():
         w = json.loads((Path(wd) / "world.json").read_text(encoding="utf-8"))
-        if w != {"world": "confound", "c": float(steps[world])}:
-            raise SystemExit(f"{wd}/world.json is {w}, not the confound world at c = {steps[world]} ({world})")
+        if w != {"world": worlds[world], "c": float(steps[world])}:
+            raise SystemExit(f"{wd}/world.json is {w}, not the {worlds[world]} world at c = {steps[world]} ({world})")
         sids = bl.p_sids(Path(wd))
         if len(sids) != cfg["ceiling"]["P"]:
             raise SystemExit(f"{world}: {len(sids)} P sessions, expected {cfg['ceiling']['P']}")
         n_p[world] = len(sids)
         tabs[world] = bl.tables(Path(wd), sids, cfg)
     res = measure(tabs, seed, cfg["e13"]["folds"], a.jobs)
-    out = {"design": ".steering/20261014-rhythm-stage-speed-confound-world/design.md 3.0", "seed": seed, "P": n_p,
+    out = {"design": ".steering/20261015-rhythm-stage-speed-shape-world/design.md 3.0", "seed": seed, "P": n_p,
            "folds": cfg["e13"]["folds"], "main_auc": cfg["ceiling"]["main_auc"],
            "config_fingerprint": cfg_fingerprint(cfg), "code_fingerprint": code_fingerprint(), "results": res,
            "steps": choose_steps(res, cfg)}
@@ -211,7 +217,7 @@ def main() -> int:
                 r = res[world][label][kind]
                 print(f"{world} {label} {kind}: AUC(A) {r['auc_A']} AUC(A_speed) {r['auc_A_speed']}")
     for s, v in out["steps"].items():
-        print(f"step {s} (c = {v['c']}): {v['status']} (L300 AUC(A_speed) hgb / lr {v['L300_auc_A_speed']})")
+        print(f"step {s} ({v['world']}, c = {v['c']}): {v['status']} (L300 AUC(A_speed) hgb / lr {v['L300_auc_A_speed']})")
     return 0
 
 

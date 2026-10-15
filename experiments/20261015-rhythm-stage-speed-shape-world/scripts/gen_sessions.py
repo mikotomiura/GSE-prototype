@@ -10,6 +10,11 @@ the graded segments at t = speed_confound.base_t and draws every FLOW and STRUGG
 median shifted by z(tau) = c * w(tau), where w is a session speed factor plus an Ornstein-Uhlenbeck drift drawn
 from a stream of its own (Speed). Without --world confound no Speed is made and the sessions are those of the
 copied generator; c = 0 writes the keys and labels of --world graded --t base_t.
+Shape worlds (.steering/20261015-rhythm-stage-speed-shape-world/design.md 1.2; copied from
+experiments/20261014-rhythm-stage-speed-confound-world/scripts/gen_sessions.py at 7d38df98): --world factor --c C keeps
+only the session factor (z = c * delta * u) and --world drift --c C only the drift (z = c * delta * d(k)). The draws of
+u and d are those of the confound world (same stream, same order, whatever the shape), so at the same seed a unit's u
+(factor) or d series (drift) is the one it has in the confound world. The other worlds write what the copied file writes.
 
 Each session is a sequence of segments (FLOW, STRUGGLE, THINK, STALL_SILENT, AWAY, SLEEP).
 A segment carries its own key presses relative to its start, so that sessions can share,
@@ -18,7 +23,7 @@ session_start and session_meta rows that gse-replay reads); the labels are writt
 separate file that the replay never sees.
 
 Usage: gen_sessions.py <config.json> <SEED file> <work dir> --hmm-version V
-                       [--world v1|v2|v3|v4|graded|confound] [--t T] [--c C] [--smoke] [--p-n N]
+                       [--world v1|v2|v3|v4|graded|confound|factor|drift] [--t T] [--c C] [--smoke] [--p-n N]
 """
 
 from __future__ import annotations
@@ -75,6 +80,7 @@ def graded_segments(cfg: dict, t: float) -> dict:
 
 
 C_MAX = 4.0  # Codex round 2: the steps are 0.5 / 1 / 2; a large c makes the intervals underflow
+SPEED_WORLDS = {"confound": "both", "factor": "factor", "drift": "drift"}  # shape world design 1.2
 
 
 def confound_delta(cfg: dict) -> float:
@@ -90,9 +96,14 @@ class Speed:
     order from derive_rng(seed, "speed", *names), apart from the streams of the segments and the keys. w does not
     depend on c, so z at 2c is exactly twice z at c (a product by 2 is exact in floating point).
     The series grows on demand, one draw per second in order, so w(k) does not depend on how far it was read: markov
-    draws a whole segment before it cuts the last one at the session end, so the keys can run past duration_s."""
+    draws a whole segment before it cuts the last one at the session end, so the keys can run past duration_s.
+    shape (shape world design 1.2): "both" (the confound world), "factor" (w = delta * u) or "drift" (w = delta * d(k)).
+    The draws do not depend on the shape: "factor" still grows d, so u, d(0), eps_0, ... are the same numbers."""
 
-    def __init__(self, seed: int, names: tuple, c: float, cfg: dict, duration_s: int) -> None:
+    def __init__(self, seed: int, names: tuple, c: float, cfg: dict, duration_s: int, shape: str = "both") -> None:
+        if shape not in ("both", "factor", "drift"):
+            raise ValueError(f"unknown speed shape {shape!r}")
+        self.shape = shape
         self._r = derive_rng(seed, "speed", *names)
         self._rho = math.exp(-1.0 / cfg["speed_confound"]["tau_s"])
         self._q = math.sqrt(1.0 - self._rho * self._rho)
@@ -110,6 +121,10 @@ class Speed:
         if k < 0:
             raise ValueError(f"second {k} is before the session start")
         self._grow(k)
+        if self.shape == "factor":
+            return self._delta * self._u
+        if self.shape == "drift":
+            return self._delta * self._d[k]
         return self._delta * (self._u + self._d[k])
 
     def z(self, tau_ms: float) -> float:
@@ -317,15 +332,16 @@ def main() -> int:
     ap.add_argument("work")
     ap.add_argument("--hmm-version", required=True)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--world", choices=("v1", "v2", "v3", "v4", "graded", "confound"), default="v1",
+    ap.add_argument("--world", choices=("v1", "v2", "v3", "v4", "graded", "confound", "factor", "drift"), default="v1",
                     help="v1 = frozen design 1.2; v2 = deviation: same pause structure for FLOW and STRUGGLE; "
                          "v3 = v2 with FLOW's key intervals in STRUGGLE and v1's pause after a backspace; "
                          "v4 = v2 with FLOW's key intervals in STRUGGLE (the stall shows only in corrections); "
                          "graded = between v4 (t = 0) and v2 (t = 1) in STRUGGLE's key intervals (needs --t); "
                          "confound = graded at speed_confound.base_t with a speed factor and drift of width c "
+                         "(needs --c); factor / drift = the confound world with the factor only / the drift only "
                          "(needs --c)")
     ap.add_argument("--t", type=float, default=None, help="graded world only: the step t in [0, 1]")
-    ap.add_argument("--c", type=float, default=None, help="confound world only: the width c >= 0")
+    ap.add_argument("--c", type=float, default=None, help="confound, factor and drift worlds only: the width c >= 0")
     ap.add_argument("--p-n", type=int, default=None,
                     help="round 2 pilot only (design 3.10): the number of P sessions; the default output is unchanged")
     a = ap.parse_args()
@@ -333,21 +349,21 @@ def main() -> int:
     cfg["_hmm_version"] = a.hmm_version
     if (a.world == "graded") != (a.t is not None):
         ap.error("--t is required with --world graded and only with it")
-    if (a.world == "confound") != (a.c is not None):
-        ap.error("--c is required with --world confound and only with it")
+    if (a.world in SPEED_WORLDS) != (a.c is not None):
+        ap.error("--c is required with --world confound, factor or drift and only with them")
     if a.c is not None and not (math.isfinite(a.c) and 0.0 <= a.c <= C_MAX):
         ap.error(f"--c must be a number in [0, {C_MAX}], got {a.c}")
     if a.world in ("v2", "v3", "v4"):
         cfg["segments"] = cfg[f"segments_{a.world}"]
     elif a.world == "graded":
         cfg["segments"] = graded_segments(cfg, a.t)
-    elif a.world == "confound":
+    elif a.world in SPEED_WORLDS:
         cfg["segments"] = graded_segments(cfg, cfg["speed_confound"]["base_t"])
     seed = int(Path(a.seed_file).read_text().strip())
 
     def mk(names: tuple, duration_s: int) -> Speed | None:
         """confound world design 1.3: the speed series of a unit (a session or a pair); None outside the world."""
-        return Speed(seed, names, a.c, cfg, duration_s) if a.world == "confound" else None
+        return Speed(seed, names, a.c, cfg, duration_s, SPEED_WORLDS[a.world]) if a.world in SPEED_WORLDS else None
 
     work = Path(a.work)
     (work / "ndjson").mkdir(parents=True, exist_ok=True)
@@ -460,12 +476,12 @@ def main() -> int:
         emit(f"Dsl{i:02d}", "D_sleep", segs, key_seed(seed, "Dsl", i), {})
 
     (work / "sessions.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
-    if a.world == "confound":  # confound world design 3.3 (h): described only, not judged
+    if a.world in SPEED_WORLDS:  # confound world design 3.3 (h): described only, not judged
         doc = {"quantity": "z jump at the segment boundaries: c * (w(first second of the next segment) - "
                            "w(last second of the one before)), log units of the key interval (design 3.3 (h))",
                "c": a.c, "pairs": jumps}
         (work / "speed_jumps.json").write_text(json.dumps(doc, indent=1), encoding="utf-8")
-    world = {"world": a.world, "c": a.c} if a.world == "confound" else {"world": a.world, "t": a.t}
+    world = {"world": a.world, "c": a.c} if a.world in SPEED_WORLDS else {"world": a.world, "t": a.t}
     (work / "world.json").write_text(json.dumps(world), encoding="utf-8")
     print(f"generated {len(manifest)} sessions into {work}")
     return 0

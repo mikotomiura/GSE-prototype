@@ -1,17 +1,17 @@
-"""Cause split of the red res=sub candidates of the confound world (L300): (a) the base A_speed with a non-linear
-transform for lr (lrbin), (b) the stage's window features with groups dropped.
+"""Cause split readings of a shape world step (L300), run after the main run on the same rows: (a) the base A_speed
+with a non-linear transform for lr (lrbin), (b) the stage's window features with groups dropped, and the r-side
+controls PCrl- / PCrv- (design 1.3, 3.3 (j)).
 
-Design: .steering/20261015-rhythm-stage-speed-cause-split/design.md. The rows, the stage's window features, the
-fits of lr and hgb, the AUC and the bootstrap are those of the confound world's instrument
-(experiments/20261014-rhythm-stage-speed-confound-world/scripts, imported, not copied; its files are checked against
-the SHA-256 in config.json after the import and before anything is computed, design 1.1; run.sh also checks them
-with --check-prev before the rows are made). New here: the lrbin models (design 1.3), the dropped
-columns (1.4), the gate against the confound world's e13.json (1.5) and the readings (3.1-3.3).
+Design: .steering/20261015-rhythm-stage-speed-shape-world/design.md 1.4, 3.3 (j). Copied from
+experiments/20261015-rhythm-stage-speed-cause-split/scripts/split.py (d282691d), changed: it imports this task's
+checks and stage (no earlier instrument is imported, so the SHA-256 check of one is gone); the gate compares the
+no-drop lr and hgb values with this step's own e13.json (the main run's, or the smoke's); the r-side controls of each
+candidate (lambdas from pc_r.lam.<step>, checked against the step's pilot.json) are fitted with lr, hgb and lrbin on
+the drops none / R2 / Rall and read (pcr_reading); git_state does not count results/.
 
-Usage: split.py <config.json> <work dir> <out dir> --step <step> --seed <seed> [--jobs N] [--smoke]
-                [--replay-sha <sha256>]
-       split.py <config.json> --check-prev   (only the SHA-256 check of the confound world's instrument)
-  --smoke  bootstrap smoke_bootstrap and no gate (the smoke has other sessions than the main run, design 3.6)
+Usage: split.py <config.json> <work dir> <out dir> --step <step> --seed <seed> --main-dir <results/<step>/main>
+                [--jobs N] [--smoke] [--replay-sha <sha256>]
+  --smoke  bootstrap split.smoke_bootstrap, P sets.smoke size (12); the gate reads --main-dir (the smoke's main run)
 """
 
 from __future__ import annotations
@@ -33,52 +33,31 @@ from pathlib import Path
 
 import numpy as np
 
+import checks as ck
+import stage as st
+
 EXP_DIR = Path(__file__).resolve().parents[1]
-PREV_DIR = (EXP_DIR.parent / "20261014-rhythm-stage-speed-confound-world").resolve()
-sys.path.insert(0, str(PREV_DIR / "scripts"))
-
-import checks as ck  # noqa: E402
-import stage as st  # noqa: E402
-
 LABEL = "L300"
 FS = ("full", "small")
 MODELS = ("lr", "hgb", "lrbin")
 DESC_MODELS = ("lrbin2",)
 DROPS = ("none", "R2", "Rall", "A2")
 READ_KEYS = ("remains", "vanishes", "undetermined", "unreadable")
+PCR_READ_KEYS = ("works", "over", "fails", "unclear", "unreadable", "not_calibrated")
+SMOKE_P = 12  # run.sh --smoke
 
 
 # ---------------------------------------------------------------------------
-# Checks of the inputs (design 1.1, 1.5)
+# Checks of the inputs (design 1.4)
 # ---------------------------------------------------------------------------
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def prev_problems(cfg: dict, prev_dir: Path = PREV_DIR) -> list[str]:
-    """design 1.1: the confound world's instrument is the one whose SHA-256 config.json holds (every file listed, and
-    no other *.py in its scripts/)."""
-    want = cfg["prev"]["sha256"]
-    bad = []
-    if (EXP_DIR / cfg["prev"]["dir"]).resolve() != PREV_DIR:
-        bad.append(f"config.json prev.dir {cfg['prev']['dir']} is not {PREV_DIR}")
-    for rel, h in want.items():
-        p = prev_dir / rel
-        if not p.is_file():
-            bad.append(f"{p} is missing")
-        elif sha256(p) != h:
-            bad.append(f"{p} has SHA-256 {sha256(p)}, not {h}")
-    listed = {r for r in want if r.startswith("scripts/") and r.endswith(".py")}
-    have = {f"scripts/{p.name}" for p in (prev_dir / "scripts").glob("*.py")}
-    if have != listed:
-        bad.append(f"the scripts of {prev_dir} are {sorted(have)}, config.json lists {sorted(listed)}")
-    return bad
-
-
 def keep_columns(drop: list[str], fs: str) -> list[int]:
-    """design 1.4: the indices of the stage block (the window's 20, and for full the differences to the two earlier
-    windows, 20 each, in that order: checks.feature_names) that stay when the quantities in drop are dropped."""
+    """The indices of the stage block (the window's 20, and for full the differences to the two earlier windows, 20
+    each, in that order: checks.feature_names) that stay when the quantities in drop are dropped."""
     unknown = sorted(set(drop) - set(st.FEAT_NAMES))
     if unknown:
         raise ValueError(f"unknown stage features {unknown}")
@@ -89,10 +68,10 @@ def keep_columns(drop: list[str], fs: str) -> list[int]:
 
 def gate(prev_l300: dict, got: dict, tol: float, names: list[str], attackers: list[str],
          kinds: tuple[str, ...] = ("hgb", "lr")) -> dict:
-    """design 1.5: AUC(A_speed) of hgb and lr and, per name and attacker, the gain and both ends of its 95% interval
-    of the rebuilt rows against the confound world's e13.json (L300). got: {"auc_A_speed": {k: v}, "configs":
-    {name: {attacker: {"gain", "ci95"}}}}. Every expected value (kinds, names x attackers) must be in got and in
-    e13.json, and nothing else in got (cross-review 1: a missing name must stop the gate)."""
+    """design 1.4 (the cause split's design 1.5): AUC(A_speed) of hgb and lr and, per name and attacker, the gain and
+    both ends of its 95% interval of the split's fits against the step's e13.json (L300). got: {"auc_A_speed": {k: v},
+    "configs": {name: {attacker: {"gain", "ci95"}}}}. Every expected value (kinds, names x attackers) must be in got and
+    in e13.json, and nothing else in got."""
     diffs, missing = [], []
     want_keys = {(n, a) for n in names for a in attackers}
     got_keys = {(n, a) for n, attk in got["configs"].items() for a in attk}
@@ -125,17 +104,17 @@ def gate(prev_l300: dict, got: dict, tol: float, names: list[str], attackers: li
 
 
 # ---------------------------------------------------------------------------
-# Readings (design 3.1-3.3)
+# Readings (the cause split's design 3.1-3.3; design 3.3 (j))
 # ---------------------------------------------------------------------------
 
 def _max_or_nan(vals: list[float]) -> float:
-    """The maximum, or NaN when any value is NaN (Python's max drops a NaN that is not first: cross-review 1)."""
+    """The maximum, or NaN when any value is NaN (Python's max drops a NaN that is not first)."""
     vals = [float(v) for v in vals]
     return float("nan") if any(math.isnan(v) for v in vals) else max(vals)
 
 
 def maxima(attk: dict) -> dict:
-    """design 3.1: over the two attackers (full, small) of one variant; NaN when either attacker's value is NaN."""
+    """Over the two attackers (full, small) of one variant; NaN when either attacker's value is NaN."""
     return {"gain_max": _max_or_nan([r["gain"] for r in attk.values()]),
             "lower_max": _max_or_nan([r["ci95"][0] for r in attk.values()]),
             "upper_max": _max_or_nan([r["ci95"][1] for r in attk.values()]),
@@ -143,10 +122,8 @@ def maxima(attk: dict) -> dict:
 
 
 def reading(cand: dict, pcs: dict, pc0: dict, margin: float, pc_lower: float, pc_upper: float) -> str:
-    """design 3.2, 3.3 (the maxima of one variant). A NaN anywhere makes the comparison false: unreadable or
-    undetermined, never remains or vanishes. The PC-stall works as in the confound world's judge (stall_ok): its
-    lower bound max > pc_lower and its point estimate max <= pc_upper. Any NaN in a control's maxima makes it
-    unreadable, any NaN in the candidate's makes it undetermined, whichever field holds it (cross-review 2)."""
+    """The cause split's design 3.2, 3.3 (the maxima of one variant). A NaN anywhere makes the comparison false:
+    unreadable or undetermined, never remains or vanishes."""
     if pcs["n_nan"] or pc0["n_nan"]:
         return "unreadable"
     if not (pcs["lower_max"] > pc_lower and pcs["gain_max"] <= pc_upper and pc0["upper_max"] < margin):
@@ -160,8 +137,23 @@ def reading(cand: dict, pcs: dict, pc0: dict, margin: float, pc_lower: float, pc
     return "undetermined"
 
 
+def pcr_reading(ctl: dict | None, base: dict | None, margin: float, upper: float) -> str:
+    """design 3.3 (j): an r-side control of one family and candidate in one variant. None (no lambda) ->
+    not_calibrated; a NaN in either, or its lambda 0 baseline's upper bound max >= margin -> unreadable; then works
+    (lower > margin, gain <= upper), over (lower > margin, gain > upper), fails (upper bound < margin), else unclear."""
+    if ctl is None or base is None:
+        return "not_calibrated"
+    if ctl["n_nan"] or base["n_nan"] or not base["upper_max"] < margin:
+        return "unreadable"
+    if ctl["lower_max"] > margin:
+        return "works" if ctl["gain_max"] <= upper else "over"
+    if ctl["upper_max"] < margin:
+        return "fails"
+    return "unclear"
+
+
 # ---------------------------------------------------------------------------
-# Models (design 1.3)
+# Models (the cause split's design 1.3)
 # ---------------------------------------------------------------------------
 
 def make_lrbin(nb: int, nf: int, bin_stage: bool, n_bins: int):
@@ -197,7 +189,7 @@ def oof_predict_bin(X: np.ndarray, y: np.ndarray, groups: np.ndarray, nb: int, b
 
     pred = np.zeros(len(y))
     with threadpool_limits(1), warnings.catch_warnings():
-        # KBinsDiscretizer warns when it removes bins of a repeated value or a constant column (design 3.6)
+        # KBinsDiscretizer warns when it removes bins of a repeated value or a constant column
         warnings.filterwarnings("ignore", category=UserWarning, module=r"sklearn\.preprocessing\._discretization")
         for tr, te in GroupKFold(n_splits=folds).split(X, y, groups):
             model = make_lrbin(nb, X.shape[1] - nb, bin_stage, n_bins)
@@ -280,67 +272,96 @@ def run_pool(fn, jobs_list: list, jobs: int, scratch: Path) -> dict:
 
 def multipliers(seed: int, n_sess: int, nboot: int) -> np.ndarray:
     """The bootstrap multipliers of checks.e13_target for L300 (LABEL_ID 0), drawn the same way; shared by every
-    variant (design 1.6)."""
+    variant (the cause split's design 1.6)."""
     rng = np.random.default_rng(np.random.SeedSequence([seed, 313, ck.LABEL_ID[LABEL]]))
     return np.array([np.bincount(rng.integers(0, n_sess, size=n_sess), minlength=n_sess).astype(float)
                      for _ in range(nboot)])
 
 
 def package_problems(cfg: dict) -> list[str]:
-    """design 1.1: the Python and package versions of the confound world (cross-review 1)."""
-    want = cfg["versions"]
+    """The Python and package versions of the copied instruments (config.json split.versions)."""
+    want = cfg["split"]["versions"]
     have = {"python": platform.python_version(),
             **{m: __import__(m).__version__ for m in ("numpy", "scipy", "sklearn", "threadpoolctl")}}
     return [f"{k} is {have[k]}, not {v}" for k, v in want.items() if have.get(k) != v]
 
 
-def variants(cfg: dict) -> list[tuple[str, str]]:
-    """design 1.3, 1.4: (model, drop); lrbin2 without drops (descriptive)."""
+def variants() -> list[tuple[str, str]]:
+    """(model, drop) of the 72 names; lrbin2 without drops (descriptive)."""
     return [(m, d) for m in MODELS for d in DROPS] + [(m, "none") for m in DESC_MODELS]
 
 
+def pcr_variants(cfg: dict) -> list[tuple[str, str]]:
+    """design 1.4: (model, drop) of the r-side controls."""
+    drops = list(cfg["split"]["pcr_drops"])
+    if not set(drops) <= set(DROPS) or "A2" in drops:
+        raise SystemExit(f"split.pcr_drops {drops} must be among none / R2 / Rall")
+    return [(m, d) for m in MODELS for d in drops]
+
+
+def pcr_specs(lam_r: dict) -> list[tuple[str, str, float]]:
+    """design 1.3, 1.4: (key, name, lambda) of the r-side controls whose family and candidate have a lambda; each with
+    its lambda 0 baseline."""
+    out = []
+    for fam, table in st.pcr_names(st.candidates()).items():
+        for c, (ctl, base) in table.items():
+            lam = lam_r[fam][c]
+            if lam is not None:
+                out += [(ctl, ctl, float(lam)), (base, base, 0.0)]
+    return out
+
+
 def git_state() -> dict:
+    """design 1.4: the commit and whether the experiment directory differs from it, results/ left out."""
     def run(*a):
-        return subprocess.run(["git", *a], cwd=EXP_DIR, capture_output=True, text=True, check=False).stdout.strip()
-    return {"commit": run("rev-parse", "HEAD"), "dirty": bool(run("status", "--porcelain", "--", "."))}
+        return subprocess.run(["git", *a], cwd=EXP_DIR, capture_output=True, text=True, check=False)
+    r = run("status", "--porcelain", "--", ".", ":(exclude)results")
+    return {"commit": run("rev-parse", "HEAD").stdout.strip(),
+            "dirty": bool(r.stdout.strip()) if r.returncode == 0 else None}
 
 
 def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int, smoke: bool,
-               replay_sha: str | None) -> int:
+               replay_sha: str | None, main_dir: Path) -> int:
     t0 = time.time()
-    bad = prev_problems(cfg) + package_problems(cfg)
+    bad = package_problems(cfg)
     if bad:
         raise SystemExit(f"design 1.1: {bad}")
-    prev_cfg = json.loads((PREV_DIR / "config.json").read_text(encoding="utf-8"))
-    if step not in cfg["steps"]:
-        raise SystemExit(f"step {step} is not one of {cfg['steps']}")
-    bad = ck.world_problems(work, prev_cfg, step)
+    bad = ck.world_problems(work, cfg, step)
     if bad:
-        raise SystemExit(f"design 1.1: {bad}")
-    lam = prev_cfg["pc_stall"]["lam"][step]
+        raise SystemExit(f"design 1.4: {bad}")
+    base_seed = int((EXP_DIR / "SEED").read_text().strip())
+    pilot_json = EXP_DIR / "results" / step / "pilot" / "pilot.json"
+    lam = ck.main_lams(cfg, pilot_json, base_seed, step)[0]
+    lam_r = ck.main_lams_r(cfg, pilot_json, base_seed, step)
+    sc = cfg["split"]
     cands = st.candidates()
     names = cands + [f"PCs-{c}" for c in cands] + [f"PC0-{c}" for c in cands]
     specs = ([(c, c, None) for c in cands] + [(f"PCs-{c}", f"PCs-{c}", float(lam[c])) for c in cands]
              + [(f"PC0-{c}", f"PC0-{c}", 0.0) for c in cands])
+    rspecs = pcr_specs(lam_r)
+    rnames = [k for k, _, _ in rspecs]
     ms = st.manifest_p(work)
     sids = [m["sid"] for m in ms]
-    n_p = cfg["sets"]["smoke_P" if smoke else "P"]
+    n_p = SMOKE_P if smoke else cfg["sets"]["P"]["n"]
     if len(sids) != n_p:
-        raise SystemExit(f"{len(sids)} P sessions in {work}, design 1.1 wants {n_p}")
-    folds = prev_cfg["e13"]["folds"]
-    n_bins = cfg["bins"]
-    nboot = cfg["smoke_bootstrap" if smoke else "bootstrap"]
-    drops = {"none": [], **cfg["drops"]}
+        raise SystemExit(f"{len(sids)} P sessions in {work}, design 1.4 wants {n_p}")
+    folds = cfg["e13"]["folds"]
+    n_bins = sc["bins"]
+    nboot = sc["smoke_bootstrap" if smoke else "bootstrap"]
+    drops = {"none": [], **sc["drops"]}
+    e13_path = main_dir / "e13.json"
+    if not e13_path.exists():
+        raise SystemExit(f"{e13_path} is missing (the gate compares with the step's main run, design 1.4)")
     scratch = Path(tempfile.mkdtemp(prefix="split-", dir=work))
     try:
-        tab = ck.label_tables(work, sids, prev_cfg, scratch)[LABEL]
-        F = ck.run_stage(specs, ms, work, seed, jobs)
+        tab = ck.label_tables(work, sids, cfg, scratch)[LABEL]
+        F = ck.run_stage(specs + rspecs, ms, work, seed, jobs)
         fname = {}
-        for i, (key, *_) in enumerate(specs):
+        for i, (key, *_) in enumerate(specs + rspecs):
             ck.save(scratch, f"F-{i}", F[key])
             fname[key] = f"F-{i}"
         del F
-        print(f"stage runs: {len(specs)} x {len(sids)} in {time.time() - t0:.0f} s", flush=True)
+        print(f"stage runs: {len(specs) + len(rspecs)} x {len(sids)} in {time.time() - t0:.0f} s", flush=True)
         Y, G = tab["Y"], tab["G"]
         n_sess = int(G.max()) + 1
         np.save(scratch / "mults.npy", multipliers(seed, n_sess, nboot))
@@ -351,13 +372,13 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
                 raise SystemExit(f"a fold's training side holds one class: {got}")
             return got
 
-        # design 1.5: before the gate only what the gate compares (lr, hgb); lrbin after it (cross-review 1)
+        # before the gate only what the gate compares (lr, hgb); lrbin after it
         auc_base = bases(("lr", "hgb"))
         print(f"bases {auc_base} at {time.time() - t0:.0f} s", flush=True)
 
-        def fit(vs: list[tuple[str, str]]) -> dict:
+        def fit(vs: list[tuple[str, str]], ns: list[str]) -> dict:
             js = [((m, d, n, fs), m, fname[n], fs, drops[d], Y, seed, folds, n_bins)
-                  for m, d in vs for n in names for fs in FS]
+                  for m, d in vs for n in ns for fs in FS]
             got = run_pool(_fit_job, js, jobs, scratch)
             if any(v is None for v in got.values()):
                 raise SystemExit("a fold's training side holds one class")
@@ -365,29 +386,34 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
 
         res: dict = {}
         first = [("lr", "none"), ("hgb", "none")]
-        res.update(fit(first))
+        res.update(fit(first, names))
         print(f"lr and hgb (no drop) at {time.time() - t0:.0f} s", flush=True)
-        gate_doc: dict = {"skipped": "smoke"} if smoke else {}
-        if not smoke:
-            prev_e13 = json.loads((PREV_DIR / "results" / step / "main" / "e13.json").read_text(encoding="utf-8"))
-            got = {"auc_A_speed": {k: auc_base[k] for k in ("hgb", "lr")},
-                   "configs": {n: {f"{fs}/{m}": res[(m, "none", n, fs)] for m, _ in first for fs in FS}
-                               for n in names}}
-            gate_doc = gate(prev_e13[LABEL], got, cfg["gate_tol"], names, [f"{fs}/{m}" for m, _ in first for fs in FS])
-            ck.dump(out / "reproduce.json", gate_doc)
-            if not gate_doc["ok"]:
-                print(f"=== GATE FAILED (design 1.5): {gate_doc['n_over_tol']} over tol, missing "
-                      f"{len(gate_doc['missing'])}; (a) and (b) not run ===", file=sys.stderr, flush=True)
-                return 3
-            print(f"gate ok: {gate_doc['n_compared']} values, max |diff| {gate_doc['max_abs_diff']:.3g}", flush=True)
+        prev_e13 = json.loads(e13_path.read_text(encoding="utf-8"))
+        got = {"auc_A_speed": {k: auc_base[k] for k in ("hgb", "lr")},
+               "configs": {n: {f"{fs}/{m}": res[(m, "none", n, fs)] for m, _ in first for fs in FS} for n in names}}
+        gate_doc = gate(prev_e13[LABEL], got, sc["gate_tol"], names, [f"{fs}/{m}" for m, _ in first for fs in FS])
+        gate_doc["e13"] = str(e13_path)
+        gate_doc["e13_sha256"] = sha256(e13_path)
+        ck.dump(out / "reproduce.json", gate_doc)
+        if not gate_doc["ok"]:
+            print(f"=== GATE FAILED (design 1.4): {gate_doc['n_over_tol']} over tol, missing "
+                  f"{len(gate_doc['missing'])}; the readings are not run ===", file=sys.stderr, flush=True)
+            return 3
+        print(f"gate ok: {gate_doc['n_compared']} values, max |diff| {gate_doc['max_abs_diff']:.3g}", flush=True)
         auc_base.update(bases(("lrbin",)))
-        rest = [v for v in variants(cfg) if v not in first]
-        res.update(fit(rest))
-        doc = {"_note": "Exploratory (design 0): readings, not verdicts; the confound world's verdicts stand.",
-               "step": step, "seed": seed, "smoke": smoke, "n_sessions": n_sess, "n_windows": int(len(Y)),
-               "auc_base": {**auc_base, "lrbin2": auc_base["lrbin"]}, "variants": {}, "readings": {}}
-        rd = cfg["read"]
-        for m, d in variants(cfg):
+        res.update(fit([v for v in variants() if v not in first], names))
+        rv = pcr_variants(cfg)
+        if rnames:
+            res.update(fit(rv, rnames))
+        print(f"fits done at {time.time() - t0:.0f} s", flush=True)
+        doc = {"_note": "Exploratory (design 3.3 (j)): readings, not verdicts; the step's verdicts are in "
+                        "results/<step>/main/summary.json.",
+               "step": step, "world": ck.step_world(cfg, step), "c": ck.step_c(cfg, step), "seed": seed,
+               "smoke": smoke, "n_sessions": n_sess, "n_windows": int(len(Y)),
+               "auc_base": {**auc_base, "lrbin2": auc_base["lrbin"]}, "variants": {}, "readings": {},
+               "pcr_lam": lam_r, "pcr_variants": {}, "pcr_readings": {}}
+        rd = sc["read"]
+        for m, d in variants():
             vk = f"{m}|{d}"
             per = {}
             for n in names:
@@ -396,12 +422,26 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
             doc["variants"][vk] = per
             doc["readings"][vk] = {c: reading(per[c], per[f"PCs-{c}"], per[f"PC0-{c}"], rd["margin"],
                                               rd["pc_lower"], rd["pc_upper"]) for c in cands}
-        prev_summ = PREV_DIR / "results" / step / "main" / "summary.json"
-        if prev_summ.exists():
-            s = json.loads(prev_summ.read_text(encoding="utf-8"))
-            doc["confound_world_verdicts_L300"] = {c: s[c][LABEL] for c in cands}
+        for m, d in rv:
+            vk = f"{m}|{d}"
+            per = {}
+            for n in rnames:
+                attk = {f"{fs}/{m}": res[(m, d, n, fs)] for fs in FS}
+                per[n] = {"attackers": attk, **maxima(attk)}
+            doc["pcr_variants"][vk] = per
+            doc["pcr_readings"][vk] = {
+                fam: {c: pcr_reading(per.get(ctl), per.get(base), rd["margin"], rd["pcr_upper"])
+                      for c, (ctl, base) in table.items()}
+                for fam, table in st.pcr_names(cands).items()}
+        summ = main_dir / "summary.json"
+        if summ.exists():
+            s = json.loads(summ.read_text(encoding="utf-8"))
+            doc["verdicts_L300"] = {c: s[c][LABEL] for c in cands}
         doc["counts"] = {vk: {k: sum(v == k for v in r.values()) for k in READ_KEYS}
                          for vk, r in doc["readings"].items()}
+        doc["pcr_counts"] = {vk: {fam: {k: sum(v == k for v in r.values()) for k in PCR_READ_KEYS}
+                                  for fam, r in fams.items()}
+                             for vk, fams in doc["pcr_readings"].items()}
         doc["wall_s"] = time.time() - t0
         ck.dump(out / "split.json", doc)
         prov_pkgs = {}
@@ -409,9 +449,9 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
             prov_pkgs[mod] = __import__(mod).__version__
         ck.dump(out / "provenance.json", {
             "seed": seed, "step": step, "smoke": smoke, "jobs": jobs, "git": git_state(),
-            "config_sha256": sha256(EXP_DIR / "config.json"), "prev_dir": str(PREV_DIR),
-            "prev_sha256_checked": cfg["prev"]["sha256"], "gse_replay_sha256": replay_sha,
-            "python": platform.python_version(), "packages": prov_pkgs, "wall_s": time.time() - t0})
+            "config_sha256": sha256(EXP_DIR / "config.json"), "main_dir": str(main_dir),
+            "gse_replay_sha256": replay_sha, "python": platform.python_version(), "packages": prov_pkgs,
+            "wall_s": time.time() - t0})
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     print(f"all done in {time.time() - t0:.0f} s", flush=True)
@@ -421,29 +461,20 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("config")
-    ap.add_argument("work", nargs="?")
-    ap.add_argument("out", nargs="?")
-    ap.add_argument("--step")
-    ap.add_argument("--seed", type=int)
+    ap.add_argument("work")
+    ap.add_argument("out")
+    ap.add_argument("--step", required=True)
+    ap.add_argument("--seed", type=int, required=True)
+    ap.add_argument("--main-dir", required=True)
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--replay-sha")
-    ap.add_argument("--check-prev", action="store_true")
     a = ap.parse_args()
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
-    if a.check_prev:
-        bad = prev_problems(cfg)
-        if bad:
-            print("\n".join(bad), file=sys.stderr)
-            return 2
-        print(f"prev ok: {len(cfg['prev']['sha256'])} files")
-        return 0
-    if not (a.work and a.out and a.step and a.seed is not None):
-        ap.error("work, out, --step and --seed are required")
     os.environ["OMP_NUM_THREADS"] = "1"
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    return main_split(cfg, Path(a.work), out, a.step, a.seed, a.jobs, a.smoke, a.replay_sha)
+    return main_split(cfg, Path(a.work), out, a.step, a.seed, a.jobs, a.smoke, a.replay_sha, Path(a.main_dir))
 
 
 if __name__ == "__main__":

@@ -27,6 +27,12 @@ Details Claude added to make the definitions computable (design section 9 lists 
 - PC1: a(t) is the stall share of seconds [floor(t) - 60, floor(t)) clipped at 0 (0.0 when empty).
 - L1800 controls (graded world design 1.4): PC1-1800 is PC1 over [floor(t) - 1800, floor(t)); PCl-<candidate> is the
   PC-stall of the candidate with q of block b over [60 b - 1800, 60 b), and the same U and N (the same tag).
+- r-side controls (shape world design 1.3; copied from experiments/20261014-rhythm-stage-speed-confound-world/scripts/
+  stage.py at 7d38df98, the names above unchanged): the PC-stall with a and r swapped. The blocks are PC-stall's (60 s,
+  q over the preceding 300 s, the value q if U < lam else N) from a stream of their own (tag PCR_TAG), shared by both
+  families. PCrl-<candidate> (level): u_a = 0.5, u_r = the block value. PCrv-<candidate> (var): u_a = 0.5,
+  u_r = 0.5 + var_sd * value * e_j, e_j independent standard normals per point (tag PCRV_TAG). PCrl0- and PCrv0- are the
+  same at lam = 0. Both go through the candidate's stop, mapping and (jitter) wobble, as the PC-stall.
 """
 
 from __future__ import annotations
@@ -63,6 +69,10 @@ PC1L_NAME = "PC1-1800"
 PCL_PREFIX = "PCl-"
 JITTER_TAG = 31  # design 3.8
 PC_TAG = 37
+PCR_TAG = 43  # shape world design 1.3: the blocks of the r-side controls
+PCRV_TAG = 47  # shape world design 1.3: the point noise of PCr-var
+PCR_VAR_SD = 0.2  # shape world design 1.3 (config.json pc_r.var_sd; selftest checks they agree)
+PCR_PREFIXES = ("PCrl-", "PCrl0-", "PCrv-", "PCrv0-")  # level, level at lam 0, var, var at lam 0
 
 MAPPINGS = ("raw", "smooth", "rank", "jitter")
 STOPS = ("hold", "decay", "ground")
@@ -295,10 +305,12 @@ def stall_share(seg: np.ndarray, a: int, b: int) -> float:
     return float(st.mean()) if len(st) else 0.0
 
 
-def pc_blocks(seg: np.ndarray, duration_s: int, key_seed: int, seed: int, lam: float, span_s: int = PC_SPAN_S) -> dict:
+def pc_blocks(seg: np.ndarray, duration_s: int, key_seed: int, seed: int, lam: float, span_s: int = PC_SPAN_S,
+              tag: int = PC_TAG) -> dict:
     """PC-stall (design 1.4): per 60 s block, U then N (always both, whatever lambda is), q = the stall share of the
-    preceding span_s seconds (300; 1800 for PCl, graded world design 1.4), and the value q if U < lam else N."""
-    rng = np.random.default_rng(np.random.SeedSequence([seed, key_seed & 0xFFFFFFFF, PC_TAG]))
+    preceding span_s seconds (300; 1800 for PCl, graded world design 1.4), and the value q if U < lam else N. tag: the
+    stream (PC_TAG; PCR_TAG for the r-side controls, shape world design 1.3)."""
+    rng = np.random.default_rng(np.random.SeedSequence([seed, key_seed & 0xFFFFFFFF, tag]))
     nb = -(-duration_s // PC_BLOCK_S)
     U, N, q = np.zeros(nb), np.zeros(nb), np.zeros(nb)
     for b in range(nb):
@@ -314,9 +326,33 @@ def candidate_series(inp: StageInput, name: str, seed: int, key_seed: int) -> tu
     return shape(ua, ur, stopped, m, s, seed, key_seed)
 
 
+def pcr_parse(name: str) -> tuple[str, str, bool]:
+    """shape world design 1.3: (family "level" or "var", the candidate, at lam 0) of an r-side control name."""
+    head, _, cand = name.partition("-")
+    fam = {"PCrl": ("level", False), "PCrl0": ("level", True), "PCrv": ("var", False), "PCrv0": ("var", True)}
+    if head not in fam or not cand.startswith("S-"):
+        raise ValueError(name)
+    parse(cand)
+    return fam[head][0], cand, fam[head][1]
+
+
+def pcr_drive(sess: Session, family: str, lam: float, seed: int) -> np.ndarray:
+    """shape world design 1.3: u_r of an r-side control at 10 Hz."""
+    n = sess.duration_s * HZ
+    blk = pc_blocks(sess.seg, sess.duration_s, sess.key_seed, seed, lam, PC_SPAN_S, PCR_TAG)["value"]
+    v = np.repeat(blk, PC_BLOCK_S * HZ)[:n]
+    if family == "level":
+        return v
+    if family == "var":
+        e = np.random.default_rng(np.random.SeedSequence([seed, sess.key_seed & 0xFFFFFFFF, PCRV_TAG])).standard_normal(n)
+        return 0.5 + PCR_VAR_SD * v * e
+    raise ValueError(family)
+
+
 def series(sess: Session, name: str, seed: int, lam: float | None = None, mutation: str | None = None
            ) -> tuple[np.ndarray, np.ndarray]:
-    """(a, r) at 10 Hz of a candidate or a control. Names: S-..., PC1, PCs-S-...(lam), PC0-S-..., PC-corr.
+    """(a, r) at 10 Hz of a candidate or a control. Names: S-..., PC1, PCs-S-...(lam), PC0-S-..., PC-corr, and the
+    r-side controls PCrl-S-...(lam), PCrv-S-...(lam), PCrl0-S-..., PCrv0-S-... (shape world design 1.3).
     mutation "seg" (selftest only, design 3.7): the candidate's amplitude mixed half and half with the stall
     indicator of the last completed second."""
     n = sess.duration_s * HZ
@@ -355,6 +391,15 @@ def series(sess: Session, name: str, seed: int, lam: float | None = None, mutati
         ua = np.repeat(blk, PC_BLOCK_S * HZ)[:n]
         ur = np.full(n, 0.5)
         return shape(ua, ur, stopped, m, s, seed, sess.key_seed)
+    if name.startswith(PCR_PREFIXES):
+        family, cand, zero = pcr_parse(name)
+        if zero:
+            lam = 0.0
+        assert lam is not None, f"{name} needs lam"
+        m, s, r = parse(cand)
+        _, _, stopped = drive(inp, r)
+        ua = np.full(n, 0.5)
+        return shape(ua, pcr_drive(sess, family, lam, seed), stopped, m, s, seed, sess.key_seed)
     raise ValueError(name)
 
 
@@ -387,6 +432,12 @@ def window_features(a: np.ndarray, r: np.ndarray, n_w: int) -> np.ndarray:
         since = np.where(any_ch, (WIN_POINTS - (last_i + 1)) * DT, WIN_POINTS * DT)
         out.append(np.stack([mean, sd, p10, p50, p90, ground, absdiff, ac, X[:, -1], since], axis=1))
     return np.hstack(out)
+
+
+def pcr_names(cands: list[str]) -> dict:
+    """shape world design 1.4: the r-side controls of each candidate, per family: (control, its lam 0 baseline)."""
+    return {"level": {c: (f"PCrl-{c}", f"PCrl0-{c}") for c in cands},
+            "var": {c: (f"PCrv-{c}", f"PCrv0-{c}") for c in cands}}
 
 
 def config_names(cands: list[str]) -> dict:
