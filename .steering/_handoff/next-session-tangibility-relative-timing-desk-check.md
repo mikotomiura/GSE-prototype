@@ -18,8 +18,11 @@
 
 - 背景のステージの机上の検査の計器と合成の world: 第 1 回 `experiments/20261012-rhythm-stage-desk-check/`・第 2 回 `experiments/20261013-rhythm-stage-round2/`・第 3 回 `experiments/20261014-rhythm-stage-graded-world/`（ブランチ `docs/rhythm-stage-desk-check` → `docs/rhythm-stage-round2` → `docs/rhythm-stage-graded-world` に積み重なっている。2026-10-14 の時点で push 済み・PR なし。マージの順は研究者が決める）。
 - 第 3 回の notes の「親タスクへの材料」: 中間の world（t = 0.25〜0.75）では、速さの要約（A_speed）が L300 の停滞をほぼ完全に見分けた（AUC 0.995〜0.998）。
+- その後の 2 段（2026-10-15 に origin で確かめた）: ブランチ `docs/rhythm-stage-speed-confound` の揺れの world（`experiments/20261014-rhythm-stage-speed-confound-world/notes.md`）と原因の切り分け（`experiments/20261015-rhythm-stage-speed-cause-split/notes.md`・L300 の `res=sub` の赤の上乗せが描画の `r` の揺れの量に集まった・`rank` の写像の比べを含む）、ブランチ `docs/rhythm-stage-speed-shape` の揺れの形を分けた world（grill 済み・引き継ぎ `next-session-rhythm-stage-speed-shape-world.md`）。
 
 ## 3. 決めること（研究者）
+
+0. **最初に重なりを確かめる**: §2 のその後の 2 段の notes を読み、相対のタイミングの写像（`rank` など）が既に測られていないか、天井の前提が変わっていないかを確かめてから問いを立てる。
 
 1. **問いの立て方**: 「相対のタイミングの写像が A_speed を超えて停滞を写すか」と立てると、第 3 回と同じ天井に当たる。「相対のタイミングの写像そのものが停滞をどれだけ識別するか（比べる基準は速さの写像）」に立て直す案がある（判断 17 の注意）。
 2. **相対のタイミングの定義**: 隣り合う打鍵の間隔の比・窓の中の間隔を中央値で割ったもの・順位など。長い休止（停滞そのもの）を比に含めるか、上限で切るか。
