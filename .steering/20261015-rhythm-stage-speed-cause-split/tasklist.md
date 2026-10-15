@@ -10,10 +10,10 @@
 - [x] 固定の前の `/cross-review` 1 巡目（design と計器）・対応を decisions に
 - [x] 固定の前の `/cross-review` 2 巡目（足した規則の境界）・対応を decisions に
 - [x] 固定（design と計器をコミット・push）
-- [ ] 回す前に `gh run list` と `Get-CimInstance Win32_Process` を一次で確かめる（a4_keytar が終わるまで待つ）
-- [ ] c100: スモーク → 本番（照合の門 → (a)・(b)）
-- [ ] c200: スモーク → 本番
-- [ ] notes.md（実行の記録・結果・読み・逸脱）
+- [x] 回す前に `gh run list` と `Get-CimInstance Win32_Process` を一次で確かめる（判断 6 で a4_keytar と並べて回した）
+- [x] c100: スモーク → 本番（照合の門 → (a)・(b)）
+- [x] c200: スモーク → 本番
+- [x] notes.md（実行の記録・結果・読み・逸脱）
 - [ ] notes の `/cross-review`
 - [ ] 引き継ぎ（次: L60 の格子のタスク・揺れの形の world）
 - [ ] PR（前のタスクと 1 本・計測が終わってから）

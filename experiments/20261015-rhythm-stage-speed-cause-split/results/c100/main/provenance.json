@@ -1,0 +1,38 @@
+{
+ "seed": 20261020,
+ "step": "c100",
+ "smoke": false,
+ "jobs": 12,
+ "git": {
+  "commit": "c98e1b2f4e92df7959af74bd37c3dfae53932c19",
+  "dirty": false
+ },
+ "config_sha256": "e4f85800d66ec9cb4dfb7a7177da9b500bda9815965499d1d11937494104b665",
+ "prev_dir": "C:\\wt\\rhythm-stage-speed-confound\\experiments\\20261014-rhythm-stage-speed-confound-world",
+ "prev_sha256_checked": {
+  "config.json": "fbab19ff7359d30cc73f3ce0a3b4f67b38ea8e3933c0720940dbeea33ad7603c",
+  "run.sh": "fc4ed2298737f727624f4a109a491e9dc805aca049a3cfb8d3d85982e9ad362c",
+  "SEED": "782a7b8dfbbde439fa723a89345dd2e3cd4dee1e026ba94733f817ef9515bd2b",
+  "scripts/baseline.py": "570f93c3fcedb339da77ddb38d451c66a999cdef55bd2933aca59f1d07856aa6",
+  "scripts/ceiling.py": "e4e0a7e5ce71418744100ab14f1876d1a6a48d4fd71b7ee0a0c55d3b2366c96b",
+  "scripts/checks.py": "bd82462bcbdafea4ef0dbd43713bdc660307b245cc9a0d33acfaf8e2e76a6aa4",
+  "scripts/gen_sessions.py": "d391f2fd76413100403c6f6370edd9418433cef35288d935f601bbc638353e23",
+  "scripts/replay_all.py": "ef97720a4330d1ebeaf01139e8e8bfd5e369a5879659791eb44686682a2db28a",
+  "scripts/selftest.py": "bb272426a1e9d13d4e26d6236906ced8bf4ad833e1b4a513f051a0ad4cc90031",
+  "scripts/stage.py": "ccc73914e6fd3cb6002fdf6d839f1d719cd020dcaa2718658924420876e8207b",
+  "scripts/twins.py": "db6e603b3529808cc47480fdec1bc3cee99dd2fb207cac08cd05d0ad0e4e2903",
+  "results/c100/main/e13.json": "a5c1ec8d0e1c1767980ff13a0e7748153bb4619bc99a796edc7d1ea9aa906ba6",
+  "results/c200/main/e13.json": "168da4faf72ad15a4a956f96242bbb892a290f1c8da84d45a87e0ef91f56766a",
+  "results/c100/main/summary.json": "42017dda08cc1e5081172f79790e209a0aef70bda5a40245064a2a6970afb433",
+  "results/c200/main/summary.json": "162277c30047be1802088f7a18b895d78af5a69072cbebccbf69c04ecfca0ac3"
+ },
+ "gse_replay_sha256": "71d09dab44526f2322a05833ae1a0fb33ffcc4908bfba796258276f083d78986",
+ "python": "3.11.9",
+ "packages": {
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "sklearn": "1.9.1",
+  "threadpoolctl": "3.7.0"
+ },
+ "wall_s": 6011.675171852112
+}

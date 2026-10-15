@@ -1,0 +1,11 @@
+{
+ "ok": true,
+ "tol": 1e-09,
+ "n_compared": 866,
+ "n_expected": 866,
+ "max_abs_diff": 0.0,
+ "missing": [],
+ "nonfinite": [],
+ "over_tol": [],
+ "n_over_tol": 0
+}
