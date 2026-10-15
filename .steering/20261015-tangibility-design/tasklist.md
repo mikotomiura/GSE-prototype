@@ -27,5 +27,5 @@
 - [x] 4 angle の結果を受け取り、一次を照合し、3 票で検証する
 - [x] カード・references.md・_index.md・check_citations を違反なしまで・単独でコミット
 - [x] 材料 3 つを研究者に確かめる（判断 25）・再識別の候補を G-GEAR の引き継ぎへ
-- [ ] /cross-review（文書の差分だけを渡す）
+- [x] /cross-review 2 巡（判断 26・27。Codex には文書の差分だけを渡した）
 - [ ] push（PR は研究者に確かめてから）
