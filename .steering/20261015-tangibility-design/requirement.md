@@ -1,4 +1,4 @@
-# ワクワクと打鍵からのタンジブリティの設計の議論（tangibility-design）
+# ワクワクと打鍵からのタンジビリティの設計の議論（tangibility-design）
 
 引き継ぎ: `.steering/_handoff/next-session-tangibility-design.md`（2026-10-14・ブランチ `docs/handoff-tangibility-ai-fatigue` の `0b393c75`）。
 

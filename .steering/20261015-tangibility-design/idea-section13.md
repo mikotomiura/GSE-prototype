@@ -1,4 +1,4 @@
-## 13. 打鍵からの手応え（タンジブリティ）の設計（2026-10-15・タスク `tangibility-design`）
+## 13. 打鍵からの手応え（タンジビリティ）の設計（2026-10-15・タスク `tangibility-design`）
 
 > 一次は `.steering/20261015-tangibility-design/`（ブランチ `docs/tangibility-design`）の `decisions.md` 判断 1〜17（判断 18・19 は `/cross-review` の対応の記録）と、調査 S-TG のカード `docs/literature/20261015-tangibility-agency-trace-replay.md`（[P485]–[P502]）。本節は要約で、一次ではない。EH0 の案で、ADR ではない。版管理の写しは同じタスクの `idea-section13.md`。
 
