@@ -386,9 +386,63 @@
       0.275,
       0.3
     ],
-    "lam": {},
+    "lam": {
+      "d100": {
+        "S-raw-hold-sec": 0.3,
+        "S-raw-hold-sub": 0.3,
+        "S-raw-decay-sec": 0.3,
+        "S-raw-decay-sub": 0.3,
+        "S-raw-ground-sec": 0.3,
+        "S-raw-ground-sub": 0.3,
+        "S-smooth-hold-sec": 0.3,
+        "S-smooth-hold-sub": 0.3,
+        "S-smooth-decay-sec": 0.3,
+        "S-smooth-decay-sub": 0.3,
+        "S-smooth-ground-sec": 0.3,
+        "S-smooth-ground-sub": 0.3,
+        "S-rank-hold-sec": 0.3,
+        "S-rank-hold-sub": 0.3,
+        "S-rank-decay-sec": 0.3,
+        "S-rank-decay-sub": 0.3,
+        "S-rank-ground-sec": 0.3,
+        "S-rank-ground-sub": 0.3,
+        "S-jitter-hold-sec": 0.3,
+        "S-jitter-hold-sub": 0.3,
+        "S-jitter-decay-sec": 0.3,
+        "S-jitter-decay-sub": 0.3,
+        "S-jitter-ground-sec": 0.3,
+        "S-jitter-ground-sub": 0.3
+      }
+    },
     "aim": 0.055,
-    "lam_1800": {}
+    "lam_1800": {
+      "d100": {
+        "S-raw-hold-sec": 0.3,
+        "S-raw-hold-sub": 0.3,
+        "S-raw-decay-sec": 0.3,
+        "S-raw-decay-sub": 0.3,
+        "S-raw-ground-sec": 0.3,
+        "S-raw-ground-sub": 0.3,
+        "S-smooth-hold-sec": 0.3,
+        "S-smooth-hold-sub": 0.3,
+        "S-smooth-decay-sec": 0.3,
+        "S-smooth-decay-sub": 0.3,
+        "S-smooth-ground-sec": 0.3,
+        "S-smooth-ground-sub": 0.3,
+        "S-rank-hold-sec": 0.3,
+        "S-rank-hold-sub": 0.3,
+        "S-rank-decay-sec": 0.3,
+        "S-rank-decay-sub": 0.3,
+        "S-rank-ground-sec": 0.3,
+        "S-rank-ground-sub": 0.3,
+        "S-jitter-hold-sec": 0.3,
+        "S-jitter-hold-sub": 0.3,
+        "S-jitter-decay-sec": 0.3,
+        "S-jitter-decay-sub": 0.3,
+        "S-jitter-ground-sec": 0.3,
+        "S-jitter-ground-sub": 0.3
+      }
+    }
   },
   "_comment_describe": "design 3.4: stop events are gaps of event_s or longer; a change smaller than unchanged is 'unchanged'; the lag needs the crossing to hold for hold_s; Ridge alpha; GroupKFold folds; the time since the last press is capped at since_cap_s.",
   "describe": {
@@ -427,7 +481,62 @@
       0.8,
       1.0
     ],
-    "lam": {}
+    "lam": {
+      "d100": {
+        "level": {
+          "S-raw-hold-sec": 0.4,
+          "S-raw-hold-sub": 0.4,
+          "S-raw-decay-sec": 0.3,
+          "S-raw-decay-sub": 0.3,
+          "S-raw-ground-sec": 0.3,
+          "S-raw-ground-sub": 0.3,
+          "S-smooth-hold-sec": 0.4,
+          "S-smooth-hold-sub": 0.4,
+          "S-smooth-decay-sec": 0.4,
+          "S-smooth-decay-sub": 0.4,
+          "S-smooth-ground-sec": 0.5,
+          "S-smooth-ground-sub": 0.5,
+          "S-rank-hold-sec": 0.5,
+          "S-rank-hold-sub": 0.5,
+          "S-rank-decay-sec": 0.5,
+          "S-rank-decay-sub": 0.5,
+          "S-rank-ground-sec": 0.5,
+          "S-rank-ground-sub": 0.5,
+          "S-jitter-hold-sec": 0.4,
+          "S-jitter-hold-sub": 0.4,
+          "S-jitter-decay-sec": 0.4,
+          "S-jitter-decay-sub": 0.4,
+          "S-jitter-ground-sec": 0.4,
+          "S-jitter-ground-sub": 0.4
+        },
+        "var": {
+          "S-raw-hold-sec": 0.4,
+          "S-raw-hold-sub": 0.4,
+          "S-raw-decay-sec": 0.4,
+          "S-raw-decay-sub": 0.4,
+          "S-raw-ground-sec": 0.5,
+          "S-raw-ground-sub": 0.5,
+          "S-smooth-hold-sec": 0.5,
+          "S-smooth-hold-sub": 0.5,
+          "S-smooth-decay-sec": 0.4,
+          "S-smooth-decay-sub": 0.5,
+          "S-smooth-ground-sec": 0.6,
+          "S-smooth-ground-sub": 0.6,
+          "S-rank-hold-sec": 0.4,
+          "S-rank-hold-sub": 0.4,
+          "S-rank-decay-sec": 0.4,
+          "S-rank-decay-sub": 0.4,
+          "S-rank-ground-sec": 0.4,
+          "S-rank-ground-sub": 0.4,
+          "S-jitter-hold-sec": 0.5,
+          "S-jitter-hold-sub": 0.5,
+          "S-jitter-decay-sec": 0.5,
+          "S-jitter-decay-sub": 0.5,
+          "S-jitter-ground-sec": 0.5,
+          "S-jitter-ground-sub": 0.5
+        }
+      }
+    }
   },
   "_comment_split": "shape world design 1.4 (from experiments/20261015-rhythm-stage-speed-cause-split/config.json, 6599c5e4): after the main run, on the same rows, L300 only: the base models lr, hgb, lrbin (bins quantile bins of each A_speed column next to its value) with the stage groups in drops dropped; lrbin2 descriptive. The 72 names (candidates, PCs-, PC0-) take every drop; the 96 r-side controls take none / R2 with lr, hgb, lrbin (pcr_drops; with Rall a control's features are its lambda 0 baseline's, since its a does not depend on lambda: cross-review 1). The gate compares the no-drop lr and hgb values with this step's results/<step>/main/e13.json (gate_tol). read: as the cause split; pcr_upper is the upper end of the band of the r-side controls' reading (design 3.3 (j)).",
   "split": {
