@@ -19,5 +19,5 @@
 ## 完了処理
 - [x] `.idea` §13 と版管理の写し `idea-section13.md`
 - [x] 別タスクの引き継ぎ（判断 2 の検査・判断 3 の F-1 の見比べ）
-- [ ] /cross-review（Codex に NDJSON・打鍵の内容を渡さない）
-- [ ] push（PR は研究者に確かめてから）
+- [x] /cross-review 2 巡（判断 18・19。Codex には文書の差分だけを渡した）
+- [x] push（PR は研究者に確かめてから）
