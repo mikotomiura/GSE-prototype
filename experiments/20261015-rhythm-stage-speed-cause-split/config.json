@@ -1,0 +1,40 @@
+{
+  "_comment": "Cause split of the red res=sub candidates of the confound world, L300 only (synthetic traces only, no participants; .steering/20261015-rhythm-stage-speed-cause-split/design.md). The rows are rebuilt with the confound world's instrument (prev.dir, imported, not copied; its files and the e13.json / summary.json used by the gate are checked against prev.sha256 before anything runs, design 1.1). The confound world's config.json gives the generator settings, e13.folds and pc_stall.lam.<step> (the PC-stall of each candidate).",
+  "prev": {
+    "dir": "../20261014-rhythm-stage-speed-confound-world",
+    "hmm_version": "0.5.0",
+    "gse_replay_sha256": "71d09dab44526f2322a05833ae1a0fb33ffcc4908bfba796258276f083d78986",
+    "sha256": {
+      "config.json": "fbab19ff7359d30cc73f3ce0a3b4f67b38ea8e3933c0720940dbeea33ad7603c",
+      "run.sh": "fc4ed2298737f727624f4a109a491e9dc805aca049a3cfb8d3d85982e9ad362c",
+      "SEED": "782a7b8dfbbde439fa723a89345dd2e3cd4dee1e026ba94733f817ef9515bd2b",
+      "scripts/baseline.py": "570f93c3fcedb339da77ddb38d451c66a999cdef55bd2933aca59f1d07856aa6",
+      "scripts/ceiling.py": "e4e0a7e5ce71418744100ab14f1876d1a6a48d4fd71b7ee0a0c55d3b2366c96b",
+      "scripts/checks.py": "bd82462bcbdafea4ef0dbd43713bdc660307b245cc9a0d33acfaf8e2e76a6aa4",
+      "scripts/gen_sessions.py": "d391f2fd76413100403c6f6370edd9418433cef35288d935f601bbc638353e23",
+      "scripts/replay_all.py": "ef97720a4330d1ebeaf01139e8e8bfd5e369a5879659791eb44686682a2db28a",
+      "scripts/selftest.py": "bb272426a1e9d13d4e26d6236906ced8bf4ad833e1b4a513f051a0ad4cc90031",
+      "scripts/stage.py": "ccc73914e6fd3cb6002fdf6d839f1d719cd020dcaa2718658924420876e8207b",
+      "scripts/twins.py": "db6e603b3529808cc47480fdec1bc3cee99dd2fb207cac08cd05d0ad0e4e2903",
+      "results/c100/main/e13.json": "a5c1ec8d0e1c1767980ff13a0e7748153bb4619bc99a796edc7d1ea9aa906ba6",
+      "results/c200/main/e13.json": "168da4faf72ad15a4a956f96242bbb892a290f1c8da84d45a87e0ef91f56766a",
+      "results/c100/main/summary.json": "42017dda08cc1e5081172f79790e209a0aef70bda5a40245064a2a6970afb433",
+      "results/c200/main/summary.json": "162277c30047be1802088f7a18b895d78af5a69072cbebccbf69c04ecfca0ac3"
+    }
+  },
+  "steps": ["c100", "c200"],
+  "sets": {"P": 240, "smoke_P": 12, "smoke_seed_offset": 2},
+  "bootstrap": 2000,
+  "smoke_bootstrap": 200,
+  "_comment_bins": "design 1.3: lrbin = each A_speed column as the one-hot of bins quantile bins (edges on the training side of each fold, repeated edges dropped) next to its value; lrbin2 bins the stage columns too (descriptive).",
+  "bins": 10,
+  "_comment_drops": "design 1.4: the stage quantities dropped (with their d1_ / d2_ differences in the full attacker). R2 is the main one, Rall drops all of r, A2 is the comparison on the a side.",
+  "drops": {
+    "R2": ["r_absdiff", "r_sd"],
+    "Rall": ["r_mean", "r_sd", "r_p10", "r_p50", "r_p90", "r_ground", "r_absdiff", "r_ac1", "r_end", "r_since_change"],
+    "A2": ["a_absdiff", "a_sd"]
+  },
+  "_comment_read": "design 3.2, 3.3: a candidate is read only when its PC-stall's lower bound max > pc_lower and its PC0's upper bound max < margin (same variant); remains when its lower bound max > margin, vanishes when its upper bound max < margin.",
+  "read": {"margin": 0.03, "pc_lower": 0.03},
+  "gate_tol": 1e-9
+}
