@@ -4,7 +4,8 @@ transform for lr (lrbin), (b) the stage's window features with groups dropped.
 Design: .steering/20261015-rhythm-stage-speed-cause-split/design.md. The rows, the stage's window features, the
 fits of lr and hgb, the AUC and the bootstrap are those of the confound world's instrument
 (experiments/20261014-rhythm-stage-speed-confound-world/scripts, imported, not copied; its files are checked against
-the SHA-256 in config.json before anything runs, design 1.1). New here: the lrbin models (design 1.3), the dropped
+the SHA-256 in config.json after the import and before anything is computed, design 1.1; run.sh also checks them
+with --check-prev before the rows are made). New here: the lrbin models (design 1.3), the dropped
 columns (1.4), the gate against the confound world's e13.json (1.5) and the readings (3.1-3.3).
 
 Usage: split.py <config.json> <work dir> <out dir> --step <step> --seed <seed> [--jobs N] [--smoke]
@@ -18,6 +19,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import platform
 import shutil
@@ -85,11 +87,18 @@ def keep_columns(drop: list[str], fs: str) -> list[int]:
     return keep if fs == "small" else keep + [nf + i for i in keep] + [2 * nf + i for i in keep]
 
 
-def gate(prev_l300: dict, got: dict, tol: float) -> dict:
+def gate(prev_l300: dict, got: dict, tol: float, names: list[str], attackers: list[str],
+         kinds: tuple[str, ...] = ("hgb", "lr")) -> dict:
     """design 1.5: AUC(A_speed) of hgb and lr and, per name and attacker, the gain and both ends of its 95% interval
     of the rebuilt rows against the confound world's e13.json (L300). got: {"auc_A_speed": {k: v}, "configs":
-    {name: {attacker: {"gain", "ci95"}}}}."""
+    {name: {attacker: {"gain", "ci95"}}}}. Every expected value (kinds, names x attackers) must be in got and in
+    e13.json, and nothing else in got (cross-review 1: a missing name must stop the gate)."""
     diffs, missing = [], []
+    want_keys = {(n, a) for n in names for a in attackers}
+    got_keys = {(n, a) for n, attk in got["configs"].items() for a in attk}
+    missing += [f"{n}/{a} (rebuilt)" for n, a in sorted(want_keys - got_keys)]
+    missing += [f"{n}/{a} (unexpected)" for n, a in sorted(got_keys - want_keys)]
+    missing += [f"auc_A_speed/{k} (rebuilt)" for k in kinds if k not in got["auc_A_speed"]]
     for k, v in got["auc_A_speed"].items():
         p = prev_l300.get("auc_A_speed", {}).get(k)
         if p is None:
@@ -108,8 +117,10 @@ def gate(prev_l300: dict, got: dict, tol: float) -> dict:
     nonfinite = [w for d, w in diffs if not np.isfinite(d)]
     over = sorted(((d, w) for d, w in diffs if np.isfinite(d) and d > tol), reverse=True)
     worst = max((d for d, _ in diffs if np.isfinite(d)), default=float("nan"))
-    ok = not missing and not nonfinite and not over and len(diffs) > 0
-    return {"ok": ok, "tol": tol, "n_compared": len(diffs), "max_abs_diff": worst, "missing": missing,
+    n_want = len(kinds) + 3 * len(want_keys)
+    ok = not missing and not nonfinite and not over and len(diffs) == n_want and n_want > 0
+    return {"ok": ok, "tol": tol, "n_compared": len(diffs), "n_expected": n_want, "max_abs_diff": worst,
+            "missing": missing,
             "nonfinite": nonfinite, "over_tol": [[w, d] for d, w in over[:50]], "n_over_tol": len(over)}
 
 
@@ -117,17 +128,25 @@ def gate(prev_l300: dict, got: dict, tol: float) -> dict:
 # Readings (design 3.1-3.3)
 # ---------------------------------------------------------------------------
 
+def _max_or_nan(vals: list[float]) -> float:
+    """The maximum, or NaN when any value is NaN (Python's max drops a NaN that is not first: cross-review 1)."""
+    vals = [float(v) for v in vals]
+    return float("nan") if any(math.isnan(v) for v in vals) else max(vals)
+
+
 def maxima(attk: dict) -> dict:
-    """design 3.1: over the two attackers (full, small) of one variant."""
-    return {"gain_max": max(r["gain"] for r in attk.values()),
-            "lower_max": max(r["ci95"][0] for r in attk.values()),
-            "upper_max": max(r["ci95"][1] for r in attk.values())}
+    """design 3.1: over the two attackers (full, small) of one variant; NaN when either attacker's value is NaN."""
+    return {"gain_max": _max_or_nan([r["gain"] for r in attk.values()]),
+            "lower_max": _max_or_nan([r["ci95"][0] for r in attk.values()]),
+            "upper_max": _max_or_nan([r["ci95"][1] for r in attk.values()]),
+            "n_nan": sum(math.isnan(float(x)) for r in attk.values() for x in (r["gain"], *r["ci95"]))}
 
 
-def reading(cand: dict, pcs: dict, pc0: dict, margin: float, pc_lower: float) -> str:
+def reading(cand: dict, pcs: dict, pc0: dict, margin: float, pc_lower: float, pc_upper: float) -> str:
     """design 3.2, 3.3 (the maxima of one variant). A NaN anywhere makes the comparison false: unreadable or
-    undetermined, never remains or vanishes."""
-    if not (pcs["lower_max"] > pc_lower and pc0["upper_max"] < margin):
+    undetermined, never remains or vanishes. The PC-stall works as in the confound world's judge (stall_ok): its
+    lower bound max > pc_lower and its point estimate max <= pc_upper."""
+    if not (pcs["lower_max"] > pc_lower and pcs["gain_max"] <= pc_upper and pc0["upper_max"] < margin):
         return "unreadable"
     if cand["lower_max"] > margin:
         return "remains"
@@ -254,6 +273,22 @@ def run_pool(fn, jobs_list: list, jobs: int, scratch: Path) -> dict:
 # Main
 # ---------------------------------------------------------------------------
 
+def multipliers(seed: int, n_sess: int, nboot: int) -> np.ndarray:
+    """The bootstrap multipliers of checks.e13_target for L300 (LABEL_ID 0), drawn the same way; shared by every
+    variant (design 1.6)."""
+    rng = np.random.default_rng(np.random.SeedSequence([seed, 313, ck.LABEL_ID[LABEL]]))
+    return np.array([np.bincount(rng.integers(0, n_sess, size=n_sess), minlength=n_sess).astype(float)
+                     for _ in range(nboot)])
+
+
+def package_problems(cfg: dict) -> list[str]:
+    """design 1.1: the Python and package versions of the confound world (cross-review 1)."""
+    want = cfg["versions"]
+    have = {"python": platform.python_version(),
+            **{m: __import__(m).__version__ for m in ("numpy", "scipy", "sklearn", "threadpoolctl")}}
+    return [f"{k} is {have[k]}, not {v}" for k, v in want.items() if have.get(k) != v]
+
+
 def variants(cfg: dict) -> list[tuple[str, str]]:
     """design 1.3, 1.4: (model, drop); lrbin2 without drops (descriptive)."""
     return [(m, d) for m in MODELS for d in DROPS] + [(m, "none") for m in DESC_MODELS]
@@ -268,7 +303,7 @@ def git_state() -> dict:
 def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int, smoke: bool,
                replay_sha: str | None) -> int:
     t0 = time.time()
-    bad = prev_problems(cfg)
+    bad = prev_problems(cfg) + package_problems(cfg)
     if bad:
         raise SystemExit(f"design 1.1: {bad}")
     prev_cfg = json.loads((PREV_DIR / "config.json").read_text(encoding="utf-8"))
@@ -303,14 +338,16 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
         print(f"stage runs: {len(specs)} x {len(sids)} in {time.time() - t0:.0f} s", flush=True)
         Y, G = tab["Y"], tab["G"]
         n_sess = int(G.max()) + 1
-        # the multipliers of checks.e13_target (L300: LABEL_ID 0), drawn the same way, shared by every variant
-        rng = np.random.default_rng(np.random.SeedSequence([seed, 313, ck.LABEL_ID[LABEL]]))
-        mults = np.array([np.bincount(rng.integers(0, n_sess, size=n_sess), minlength=n_sess).astype(float)
-                          for _ in range(nboot)])
-        np.save(scratch / "mults.npy", mults)
-        auc_base = run_pool(_base_job, [(m, Y, seed, folds, n_bins) for m in MODELS], jobs, scratch)
-        if any(v is None for v in auc_base.values()):
-            raise SystemExit(f"a fold's training side holds one class: {auc_base}")
+        np.save(scratch / "mults.npy", multipliers(seed, n_sess, nboot))
+
+        def bases(models: tuple[str, ...]) -> dict:
+            got = run_pool(_base_job, [(m, Y, seed, folds, n_bins) for m in models], jobs, scratch)
+            if any(v is None for v in got.values()):
+                raise SystemExit(f"a fold's training side holds one class: {got}")
+            return got
+
+        # design 1.5: before the gate only what the gate compares (lr, hgb); lrbin after it (cross-review 1)
+        auc_base = bases(("lr", "hgb"))
         print(f"bases {auc_base} at {time.time() - t0:.0f} s", flush=True)
 
         def fit(vs: list[tuple[str, str]]) -> dict:
@@ -331,13 +368,14 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
             got = {"auc_A_speed": {k: auc_base[k] for k in ("hgb", "lr")},
                    "configs": {n: {f"{fs}/{m}": res[(m, "none", n, fs)] for m, _ in first for fs in FS}
                                for n in names}}
-            gate_doc = gate(prev_e13[LABEL], got, cfg["gate_tol"])
+            gate_doc = gate(prev_e13[LABEL], got, cfg["gate_tol"], names, [f"{fs}/{m}" for m, _ in first for fs in FS])
             ck.dump(out / "reproduce.json", gate_doc)
             if not gate_doc["ok"]:
                 print(f"=== GATE FAILED (design 1.5): {gate_doc['n_over_tol']} over tol, missing "
                       f"{len(gate_doc['missing'])}; (a) and (b) not run ===", file=sys.stderr, flush=True)
                 return 3
             print(f"gate ok: {gate_doc['n_compared']} values, max |diff| {gate_doc['max_abs_diff']:.3g}", flush=True)
+        auc_base.update(bases(("lrbin",)))
         rest = [v for v in variants(cfg) if v not in first]
         res.update(fit(rest))
         doc = {"_note": "Exploratory (design 0): readings, not verdicts; the confound world's verdicts stand.",
@@ -352,7 +390,7 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
                 per[n] = {"attackers": attk, **maxima(attk)}
             doc["variants"][vk] = per
             doc["readings"][vk] = {c: reading(per[c], per[f"PCs-{c}"], per[f"PC0-{c}"], rd["margin"],
-                                              rd["pc_lower"]) for c in cands}
+                                              rd["pc_lower"], rd["pc_upper"]) for c in cands}
         prev_summ = PREV_DIR / "results" / step / "main" / "summary.json"
         if prev_summ.exists():
             s = json.loads(prev_summ.read_text(encoding="utf-8"))

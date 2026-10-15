@@ -163,9 +163,12 @@ def t_build_and_models(cfg: dict) -> None:
 
         # the lr and hgb route equals checks.e13_target's (_fit_job + _boot_job) on the same multipliers
         y, G = d["y"], d["G"]
-        rng = np.random.default_rng(np.random.SeedSequence([5, 313, 0]))
-        mults = np.array([np.bincount(rng.integers(0, d["n_sess"], size=d["n_sess"]), minlength=d["n_sess"]
-                                      ).astype(float) for _ in range(50)])
+        mults = sp.multipliers(5, d["n_sess"], 50)
+        rng = np.random.default_rng(np.random.SeedSequence([5, 313, ck.LABEL_ID["L300"]]))
+        ref = [np.bincount(rng.integers(0, d["n_sess"], size=d["n_sess"]), minlength=d["n_sess"]).astype(float)
+               for _ in range(50)]
+        check(ck.LABEL_ID["L300"] == 0 and np.array_equal(mults, np.array(ref)),
+              "multipliers: those of checks.e13_target for L300 (SeedSequence([seed, 313, 0]))")
         np.save(tmp / "mults.npy", mults)
         for kind in ("lr", "hgb"):
             sp._base_job((kind, y, 5, 3, cfg["bins"]))
@@ -212,44 +215,82 @@ def t_gate(cfg: dict) -> None:
         if drop_name:
             g["configs"]["S-new"] = {"full/lr": {"gain": 0.0, "ci95": [0.0, 0.0]}}
         return g
-    check(sp.gate(prev, got_of(), tol)["ok"], "gate: equal values pass")
-    check(sp.gate(prev, got_of(0.5 * tol), tol)["ok"], "gate: a difference within tol passes")
-    check(not sp.gate(prev, got_of(2 * tol), tol)["ok"], "gate: a difference over tol stops")
-    check(not sp.gate(prev, got_of(drop_name=True), tol)["ok"], "gate: a name missing from e13.json stops")
-    check(not sp.gate(prev, got_of(nan=True), tol)["ok"], "gate: a NaN stops")
-    check(not sp.gate(prev, {"auc_A_speed": {}, "configs": {}}, tol)["ok"], "gate: nothing compared stops")
+    names, atk = ["S-a", "PCs-S-a"], ["full/lr", "small/hgb"]
+
+    def gt(g, n=names, a=atk):
+        return sp.gate(prev, g, tol, n, a)
+    r = gt(got_of())
+    check(r["ok"] and r["n_compared"] == r["n_expected"] == 2 + 3 * 4, "gate: equal values pass, every value compared")
+    g = got_of()
+    del g["configs"]["PCs-S-a"]
+    check(not gt(g)["ok"], "gate: a name missing from the rebuilt values stops")
+    g = got_of()
+    del g["configs"]["S-a"]["small/hgb"]
+    check(not gt(g)["ok"], "gate: an attacker missing from the rebuilt values stops")
+    g = got_of()
+    del g["auc_A_speed"]["hgb"]
+    check(not gt(g)["ok"], "gate: a missing AUC(A_speed) stops")
+    check(not gt(got_of(), names + ["S-b"])["ok"], "gate: an expected name absent from both stops")
+    check(gt(got_of(0.5 * tol))["ok"], "gate: a difference within tol passes")
+    check(not gt(got_of(2 * tol))["ok"], "gate: a difference over tol stops")
+    check(not gt(got_of(drop_name=True))["ok"], "gate: a name missing from e13.json stops")
+    check(not gt(got_of(nan=True))["ok"], "gate: a NaN stops")
+    check(not gt({"auc_A_speed": {}, "configs": {}})["ok"], "gate: nothing compared stops")
+    check(not sp.gate(prev, {"auc_A_speed": {}, "configs": {}}, tol, [], [], ())["ok"], "gate: an empty expectation stops")
     g = got_of()
     g["auc_A_speed"]["lr"] += 1e-6
-    check(not sp.gate(prev, g, tol)["ok"], "gate: AUC(A_speed) is compared")
+    check(not gt(g)["ok"], "gate: AUC(A_speed) is compared")
 
 
 def t_read(cfg: dict) -> None:
-    m, pl = cfg["read"]["margin"], cfg["read"]["pc_lower"]
-    check(m == 0.03 and pl == 0.03, "the reading thresholds are 0.03 (design 3.2, 3.3)")
+    m, pl, pu = cfg["read"]["margin"], cfg["read"]["pc_lower"], cfg["read"]["pc_upper"]
+    check(m == 0.03 and pl == 0.03 and pu == 0.08, "the reading thresholds are 0.03 and 0.08 (design 3.2, 3.3)")
 
     def mx(lo, hi):
         return {"gain_max": (lo + hi) / 2, "lower_max": lo, "upper_max": hi}
     pcs, pc0 = mx(0.04, 0.07), mx(-0.01, 0.01)
-    check(sp.reading(mx(0.031, 0.05), pcs, pc0, m, pl) == "remains", "remains above 0.03")
-    check(sp.reading(mx(0.03, 0.05), pcs, pc0, m, pl) == "undetermined", "a lower bound of exactly 0.03 does not remain")
-    check(sp.reading(mx(0.0, 0.029), pcs, pc0, m, pl) == "vanishes", "vanishes below 0.03")
-    check(sp.reading(mx(0.0, 0.03), pcs, pc0, m, pl) == "undetermined", "an upper bound of exactly 0.03 does not vanish")
-    check(sp.reading(mx(0.04, 0.05), mx(0.03, 0.07), pc0, m, pl) == "unreadable", "PC-stall lower 0.03 is unreadable")
-    check(sp.reading(mx(0.04, 0.05), pcs, mx(0.0, 0.03), m, pl) == "unreadable", "PC0 upper 0.03 is unreadable")
+    check(sp.reading(mx(0.031, 0.05), pcs, pc0, m, pl, pu) == "remains", "remains above 0.03")
+    check(sp.reading(mx(0.03, 0.05), pcs, pc0, m, pl, pu) == "undetermined", "a lower bound of exactly 0.03 does not remain")
+    check(sp.reading(mx(0.0, 0.029), pcs, pc0, m, pl, pu) == "vanishes", "vanishes below 0.03")
+    check(sp.reading(mx(0.0, 0.03), pcs, pc0, m, pl, pu) == "undetermined", "an upper bound of exactly 0.03 does not vanish")
+    check(sp.reading(mx(0.04, 0.05), mx(0.03, 0.07), pc0, m, pl, pu) == "unreadable", "PC-stall lower 0.03 is unreadable")
+    check(sp.reading(mx(0.04, 0.05), pcs, mx(0.0, 0.03), m, pl, pu) == "unreadable", "PC0 upper 0.03 is unreadable")
+    check(sp.reading(mx(0.04, 0.05), mx(0.07, 0.11), pc0, m, pl, pu) == "unreadable",
+          "a PC-stall point estimate above 0.08 is unreadable")
+    check(sp.reading(mx(0.04, 0.05), mx(0.06, 0.10), pc0, m, pl, pu) == "remains",
+          "a PC-stall point estimate of exactly 0.08 is readable")
     nan = float("nan")
-    check(sp.reading(mx(nan, nan), pcs, pc0, m, pl) == "undetermined", "a NaN candidate is undetermined")
-    check(sp.reading(mx(0.04, 0.05), mx(nan, nan), pc0, m, pl) == "unreadable", "a NaN PC-stall is unreadable")
-    check(sp.reading(mx(0.04, 0.05), pcs, mx(nan, nan), m, pl) == "unreadable", "a NaN PC0 is unreadable")
+    check(sp.reading(mx(nan, nan), pcs, pc0, m, pl, pu) == "undetermined", "a NaN candidate is undetermined")
+    check(sp.reading(mx(0.04, 0.05), mx(nan, nan), pc0, m, pl, pu) == "unreadable", "a NaN PC-stall is unreadable")
+    check(sp.reading(mx(0.04, 0.05), pcs, mx(nan, nan), m, pl, pu) == "unreadable", "a NaN PC0 is unreadable")
     a = {"full/lr": {"gain": 0.02, "ci95": [0.01, 0.05]}, "small/lr": {"gain": 0.03, "ci95": [0.0, 0.04]}}
-    check(sp.maxima(a) == {"gain_max": 0.03, "lower_max": 0.01, "upper_max": 0.05}, "maxima over the two attackers")
+    check(sp.maxima(a) == {"gain_max": 0.03, "lower_max": 0.01, "upper_max": 0.05, "n_nan": 0},
+          "maxima over the two attackers")
+    for order in ("full first", "small first"):
+        b = {"full/lr": {"gain": 0.05, "ci95": [0.04, 0.06]}, "small/lr": {"gain": 0.02, "ci95": [nan, 0.03]}}
+        if order == "small first":
+            b = dict(reversed(list(b.items())))
+        mm = sp.maxima(b)
+        check(math.isnan(mm["lower_max"]) and mm["n_nan"] == 1 and mm["upper_max"] == 0.06,
+              f"maxima: a NaN of one attacker makes the maximum NaN ({order})")
+        check(sp.reading(mm, pcs, pc0, m, pl, pu) == "undetermined", f"a NaN lower bound never remains ({order})")
+        check(sp.reading(mx(0.04, 0.05), mm, pc0, m, pl, pu) == "unreadable",
+              f"a PC-stall with a NaN lower bound is unreadable ({order})")
     v = sp.variants(cfg)
     check(len(v) == 13 and ("lrbin2", "none") in v and not any(m_ == "lrbin2" and d != "none" for m_, d in v),
           "13 variants; lrbin2 without drops")
 
 
+def t_versions(cfg: dict) -> None:
+    check(sp.package_problems(cfg) == [], f"the versions are the confound world's: {sp.package_problems(cfg)}")
+    bad = json.loads(json.dumps(cfg))
+    bad["versions"]["sklearn"] = "0.0.0"
+    check(len(sp.package_problems(bad)) == 1, "another scikit-learn version is caught")
+
+
 def main() -> int:
     cfg = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    for t in (t_prev, t_keep, t_build_and_models, t_gate, t_read):
+    for t in (t_prev, t_versions, t_keep, t_build_and_models, t_gate, t_read):
         t(cfg)
     for f in FAILS:
         print(f"FAIL: {f}")

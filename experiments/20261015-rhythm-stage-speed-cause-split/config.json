@@ -34,7 +34,9 @@
     "Rall": ["r_mean", "r_sd", "r_p10", "r_p50", "r_p90", "r_ground", "r_absdiff", "r_ac1", "r_end", "r_since_change"],
     "A2": ["a_absdiff", "a_sd"]
   },
-  "_comment_read": "design 3.2, 3.3: a candidate is read only when its PC-stall's lower bound max > pc_lower and its PC0's upper bound max < margin (same variant); remains when its lower bound max > margin, vanishes when its upper bound max < margin.",
-  "read": {"margin": 0.03, "pc_lower": 0.03},
+  "_comment_read": "design 3.2, 3.3: a candidate is read only when its PC-stall's lower bound max > pc_lower and point estimate max <= pc_upper (the confound world's stall_ok) and its PC0's upper bound max < margin (same variant); remains when its lower bound max > margin, vanishes when its upper bound max < margin.",
+  "read": {"margin": 0.03, "pc_lower": 0.03, "pc_upper": 0.08},
+  "_comment_versions": "design 1.1: the versions of the confound world (its provenance.json); split.py stops on any other.",
+  "versions": {"python": "3.11.9", "numpy": "2.4.6", "scipy": "1.17.1", "sklearn": "1.9.1", "threadpoolctl": "3.7.0"},
   "gate_tol": 1e-9
 }

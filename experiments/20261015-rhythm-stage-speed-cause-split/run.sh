@@ -115,12 +115,16 @@ set +e
   --replay-sha "$REPLAY_SHA" "${SMOKE_ARG[@]}"
 RC=$?
 set -e
+if [ "$RC" -ne 0 ]; then
+  # cross-review 1: a failed run (the gate included) never replaces results/<step>/<mode>/ and keeps the rows
+  FAILED="$EXP_DIR/results/.failed-$STEP-$MODE"
+  rm -rf "$FAILED"
+  mv "$OUT" "$FAILED"
+  echo "split.py exited $RC; what it wrote is in $FAILED, the rows stay in $WORK; $DEST is unchanged" >&2
+  exit "$RC"
+fi
 rm -rf "$DEST"
 mkdir -p "$(dirname "$DEST")"
 mv "$OUT" "$DEST"
 rm -rf "$WORK"
-if [ "$RC" -ne 0 ]; then
-  echo "split.py exited $RC; what it wrote is in $DEST" >&2
-  exit "$RC"
-fi
 echo "done: $DEST"
