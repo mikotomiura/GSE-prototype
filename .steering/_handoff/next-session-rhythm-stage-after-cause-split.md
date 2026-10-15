@@ -27,9 +27,9 @@
 - 2026-10-15 20 時の時点で、G-GEAR では `a4_keytar.py`（PID 11008・14040、10-14 01:45 開始）がまだ走っている。G-GEAR は Windows の CI の runner を兼ねるので、PR は出していない。
 - 次のセッションの最初に、`Get-CimInstance Win32_Process` と `gh run list` を一次で見る。計測が終わっていれば、2 つのタスクをまとめて 1 本の PR を出す（`experiments/` を含むので PR が要る）。CI が緑なら merge し、main の CI を確かめる。
 
-## 3. 次にやること（研究者が選ぶ）
+## 3. 次にやること
 
-研究者に、次の 2 つの候補とその推奨を示して選んでもらう。
+研究者は 2026-10-15 に候補 1（揺れの形を分けた world）を選んだ。中身は `.steering/_handoff/next-session-rhythm-stage-speed-shape-world.md`。下は選ぶ前に示した 2 つの候補。
 
 1. **揺れの形を変えた world**（元の引き継ぎで予定していた、別のタスク）。
    - 倍率だけの world と、漂いだけの world を作る。
