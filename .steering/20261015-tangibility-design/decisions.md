@@ -195,7 +195,7 @@
 
 - **判断日時**: 2026-10-16（研究者・自由記述 ＋ AskUserQuestion・複数選択で推奨の 2 つ）
 - **研究者の逐語**: 「G-GEARで行っている処理やタスクはG-GEARの方で行わせましょう.G-GEARでタスクを実行している間にこちらの方でできるものを決めたい」
-- **採用**: 相対のタイミングの机上の検査（判断 17）は G-GEAR で行う。Mac では (1) F-1 の見比べの画づくり（判断 3・`next-session-eh3-f1-wallpaper-viewing.md`）と (2) 自分らしさの認識と状態の漏れを両方測った研究があるかの絞った反証側の調査と [P492] [P493] の本文（`next-session-tangibility-narrow-novelty-survey.md`）を進める。どちらも G-GEAR の結果に依存しない。
+- **採用**: 相対のタイミングの机上の検査（判断 17）は G-GEAR で行う。Mac では (1) F-1 の見比べの画づくり（判断 3・`next-session-eh3-f1-wallpaper-viewing.md`。2026-10-16 に分け方の検査と 1 本にまとめ `next-session-eh3-pre-freeze-f1-and-separation.md` へ）と (2) 自分らしさの認識と状態の漏れを両方測った研究があるかの絞った反証側の調査と [P492] [P493] の本文（`next-session-tangibility-narrow-novelty-survey.md`）を進める。どちらも G-GEAR の結果に依存しない。
 - **今は選ばなかったもの**: 分け方の検査の実装（判断 2・EH3 の配布物の固定との順序を先に決める）・小面の A・C の設計の文書。
 
 ## 判断 22: G-GEAR の机上の検査のトラックは、今は論文にせず材料として残す

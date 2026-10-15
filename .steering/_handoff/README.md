@@ -13,8 +13,9 @@
 |---|---|---|
 | **ワクワクと打鍵からのタンジブリティの設計の議論** | `next-session-tangibility-design.md`（2026-10-14） | **済み（2026-10-15）**。`.steering/20261015-tangibility-design/` 判断 1〜17・調査 S-TG・`.idea` §13。次は下の 3 本 |
 | **相対のタイミングの写像は停滞と速さを写すか**（案 D の机上の検査・G-GEAR で行う） | **`next-session-tangibility-relative-timing-desk-check.md`**（2026-10-15） | **現行・未着手**。問いの立て方（第 3 回の天井を避ける）を研究者が決める |
-| **肖像と招待の分け方を機械で守る検査** | **`next-session-portrait-separation-check.md`**（2026-10-15） | **現行・未着手**。EH3 の配布物の固定との順序を先に研究者に確かめる |
-| **EH3 の F-1 を自分の壁紙で数日見比べる** | **`next-session-eh3-f1-wallpaper-viewing.md`**（2026-10-15） | **現行・未着手・Mac**。EH3 の凍結の前に要る |
+| ~~肖像と招待の分け方を機械で守る検査~~ | `next-session-portrait-separation-check.md`（2026-10-15） | 置き換え済み（2026-10-16）。下の「EH3 の凍結の前の準備」の段 2 へ |
+| **EH3 の凍結の前の準備**（F-1 を自分の壁紙で数日見比べる → 肖像と招待の分け方の検査） | **`next-session-eh3-pre-freeze-f1-and-separation.md`**（2026-10-16） | **現行・未着手・Mac**。F-1 → 分け方の検査の順。EH3 の配布物の固定の前に要る |
+| ~~EH3 の F-1 を自分の壁紙で数日見比べる~~ | `next-session-eh3-f1-wallpaper-viewing.md`（2026-10-15） | 置き換え済み（2026-10-16）。上の行の段 1 へ |
 | **自分らしさの認識と状態の漏れを両方測った研究はあるか**（絞った反証側の調査・[P492] [P493] の本文） | **`next-session-tangibility-narrow-novelty-survey.md`**（2026-10-16） | **現行・未着手・Mac**。G-GEAR の机上の検査と並行 |
 | **AI 疲労と動機の主張（`.idea` の核 1・2）を GSE の外の別の研究にできるか**（空白か・価値・論文にできるか） | **`next-session-ai-fatigue-motivation-claims.md`**（2026-10-14） | **現行・未着手**。先に AI 疲労 DB（別の研究者のプロジェクト）の C・共同の構想との重なりを研究者に確かめる → grill → `/literature-review` 1 ラウンド |
 | **公開データでの照合の論文: 凍結 → 取得 → 検査 → 本計算**（PoPETs 2027 Issue 3・締切 2026-11-30 AoE を目標・G-GEAR） | **`next-session-public-keystroke-matching-research-forward.md`**（2026-10-12） | **現行**。事前登録は下書き 8（未凍結）・合成の記録の検査は済み（PR #358）。判断 51: KLiCKe の返事を待たずに進める。ただし凍結（OSF）が取得より先。取得の後は記録と本文の中身を Claude も読まない（集計だけ）。前の `next-session-public-keystroke-matching-freeze.md` を置き換える |
