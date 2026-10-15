@@ -145,9 +145,14 @@ def maxima(attk: dict) -> dict:
 def reading(cand: dict, pcs: dict, pc0: dict, margin: float, pc_lower: float, pc_upper: float) -> str:
     """design 3.2, 3.3 (the maxima of one variant). A NaN anywhere makes the comparison false: unreadable or
     undetermined, never remains or vanishes. The PC-stall works as in the confound world's judge (stall_ok): its
-    lower bound max > pc_lower and its point estimate max <= pc_upper."""
+    lower bound max > pc_lower and its point estimate max <= pc_upper. Any NaN in a control's maxima makes it
+    unreadable, any NaN in the candidate's makes it undetermined, whichever field holds it (cross-review 2)."""
+    if pcs["n_nan"] or pc0["n_nan"]:
+        return "unreadable"
     if not (pcs["lower_max"] > pc_lower and pcs["gain_max"] <= pc_upper and pc0["upper_max"] < margin):
         return "unreadable"
+    if cand["n_nan"]:
+        return "undetermined"
     if cand["lower_max"] > margin:
         return "remains"
     if cand["upper_max"] < margin:

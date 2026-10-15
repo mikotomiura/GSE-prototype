@@ -115,16 +115,25 @@ set +e
   --replay-sha "$REPLAY_SHA" "${SMOKE_ARG[@]}"
 RC=$?
 set -e
+FAILED="$EXP_DIR/results/.failed-$STEP-$MODE"
 if [ "$RC" -ne 0 ]; then
-  # cross-review 1: a failed run (the gate included) never replaces results/<step>/<mode>/ and keeps the rows
-  FAILED="$EXP_DIR/results/.failed-$STEP-$MODE"
-  rm -rf "$FAILED"
+  # cross-review 1: a failed run (the gate included) never replaces results/<step>/<mode>/ and keeps the rows (until
+  # the next run of the same step and mode, which starts by removing work-<step>-<mode>/); cross-review 2: an earlier
+  # failure's record is kept under a numbered name, not overwritten
+  if [ -e "$FAILED" ]; then
+    i=1
+    while [ -e "$FAILED.$i" ]; do i=$((i + 1)); done
+    mv "$FAILED" "$FAILED.$i"
+  fi
   mv "$OUT" "$FAILED"
   echo "split.py exited $RC; what it wrote is in $FAILED, the rows stay in $WORK; $DEST is unchanged" >&2
   exit "$RC"
 fi
-rm -rf "$DEST"
+# cross-review 2: the earlier results are moved aside, not removed, until the new ones are in place
 mkdir -p "$(dirname "$DEST")"
+rm -rf "$DEST.old"
+[ ! -e "$DEST" ] || mv "$DEST" "$DEST.old"
 mv "$OUT" "$DEST"
-rm -rf "$WORK"
+rm -rf "$DEST.old" "$WORK"
+[ ! -e "$FAILED" ] || echo "note: an earlier failure's record is still in $FAILED* (kept; remove it by hand when read)"
 echo "done: $DEST"

@@ -233,7 +233,14 @@ def t_gate(cfg: dict) -> None:
     check(not gt(got_of(), names + ["S-b"])["ok"], "gate: an expected name absent from both stops")
     check(gt(got_of(0.5 * tol))["ok"], "gate: a difference within tol passes")
     check(not gt(got_of(2 * tol))["ok"], "gate: a difference over tol stops")
-    check(not gt(got_of(drop_name=True))["ok"], "gate: a name missing from e13.json stops")
+    check(not gt(got_of(drop_name=True))["ok"], "gate: an unexpected name in the rebuilt values stops")
+    for what, cut in (("a name", lambda q: q["configs"].pop("PCs-S-a")),
+                      ("an attacker", lambda q: q["configs"]["S-a"]["attackers"].pop("small/hgb")),
+                      ("AUC(A_speed) of hgb", lambda q: q["auc_A_speed"].pop("hgb"))):
+        prev2 = json.loads(json.dumps(prev))
+        cut(prev2)
+        r2 = sp.gate(prev2, got_of(), tol, names, atk)
+        check(not r2["ok"] and r2["missing"], f"gate: {what} missing from e13.json stops (and is listed as missing)")
     check(not gt(got_of(nan=True))["ok"], "gate: a NaN stops")
     check(not gt({"auc_A_speed": {}, "configs": {}})["ok"], "gate: nothing compared stops")
     check(not sp.gate(prev, {"auc_A_speed": {}, "configs": {}}, tol, [], [], ())["ok"], "gate: an empty expectation stops")
@@ -246,8 +253,10 @@ def t_read(cfg: dict) -> None:
     m, pl, pu = cfg["read"]["margin"], cfg["read"]["pc_lower"], cfg["read"]["pc_upper"]
     check(m == 0.03 and pl == 0.03 and pu == 0.08, "the reading thresholds are 0.03 and 0.08 (design 3.2, 3.3)")
 
-    def mx(lo, hi):
-        return {"gain_max": (lo + hi) / 2, "lower_max": lo, "upper_max": hi}
+    def mx(lo, hi, gain=None):
+        g = (lo + hi) / 2 if gain is None else gain
+        return {"gain_max": g, "lower_max": lo, "upper_max": hi,
+                "n_nan": sum(math.isnan(x) for x in (g, lo, hi))}
     pcs, pc0 = mx(0.04, 0.07), mx(-0.01, 0.01)
     check(sp.reading(mx(0.031, 0.05), pcs, pc0, m, pl, pu) == "remains", "remains above 0.03")
     check(sp.reading(mx(0.03, 0.05), pcs, pc0, m, pl, pu) == "undetermined", "a lower bound of exactly 0.03 does not remain")
@@ -263,6 +272,17 @@ def t_read(cfg: dict) -> None:
     check(sp.reading(mx(nan, nan), pcs, pc0, m, pl, pu) == "undetermined", "a NaN candidate is undetermined")
     check(sp.reading(mx(0.04, 0.05), mx(nan, nan), pc0, m, pl, pu) == "unreadable", "a NaN PC-stall is unreadable")
     check(sp.reading(mx(0.04, 0.05), pcs, mx(nan, nan), m, pl, pu) == "unreadable", "a NaN PC0 is unreadable")
+    # cross-review 2: a NaN in one field only
+    check(sp.reading(mx(nan, 0.02, 0.01), pcs, pc0, m, pl, pu) == "undetermined",
+          "a candidate with a NaN lower bound only does not vanish")
+    check(sp.reading(mx(0.04, nan, 0.05), pcs, pc0, m, pl, pu) == "undetermined",
+          "a candidate with a NaN upper bound only does not remain")
+    check(sp.reading(mx(0.04, 0.05, nan), pcs, pc0, m, pl, pu) == "undetermined",
+          "a candidate with a NaN point estimate only is undetermined")
+    check(sp.reading(mx(0.04, 0.05), mx(0.04, nan, 0.05), pc0, m, pl, pu) == "unreadable",
+          "a PC-stall with a NaN upper bound only is unreadable")
+    check(sp.reading(mx(0.04, 0.05), pcs, mx(-0.01, 0.01, nan), m, pl, pu) == "unreadable",
+          "a PC0 with a NaN point estimate only is unreadable")
     a = {"full/lr": {"gain": 0.02, "ci95": [0.01, 0.05]}, "small/lr": {"gain": 0.03, "ci95": [0.0, 0.04]}}
     check(sp.maxima(a) == {"gain_max": 0.03, "lower_max": 0.01, "upper_max": 0.05, "n_nan": 0},
           "maxima over the two attackers")
