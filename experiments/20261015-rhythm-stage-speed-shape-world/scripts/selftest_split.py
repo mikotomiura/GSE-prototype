@@ -462,7 +462,16 @@ def t_compare(cfg: dict) -> None:
     sp2["pcr_readings"]["lr|R2"]["var"][cands[0]] = "fails"
     sp2["pcr_readings"]["lrbin|none"]["level"][cands[1]] = "over"
     sp2["main_ceiling_kinds_L300"] = ["hgb"]
+    sp2["pcr_readings"]["lr|R2"]["level"][cands[2]] = "unclear"
     t = cp.pcr_r2_table(sp2)
+    check(t["lr|R2"]["level"][cands[2]] == {"none": "works", "R2": "unclear", "used": False, "why": "r2_unclear"},
+          "compare: an unclear R2 reading is not used (cross-review 3)")
+    sp3 = json.loads(json.dumps(split))
+    sp3["main_ceiling_kinds_L300"] = ["lr"]
+    t3 = cp.pcr_r2_table(sp3)
+    check(all(not v["used"] and v["why"] == "ceiling" for vk in ("lr|R2", "lrbin|R2") for f in t3[vk].values()
+              for v in f.values()) and all(v["used"] for f in t3["hgb|R2"].values() for v in f.values()),
+          "compare: lr at the ceiling leaves out lr and lrbin, not hgb (cross-review 3)")
     check(t["lr|R2"]["var"][cands[0]] == {"none": "fails", "R2": "fails", "used": False, "why": "none_not_working"}
           and t["lr|R2"]["level"][cands[0]]["used"] and t["lrbin|R2"]["level"][cands[1]]["used"]
           and all(not v["used"] and v["why"] == "ceiling" for f in t["hgb|R2"].values() for v in f.values()),

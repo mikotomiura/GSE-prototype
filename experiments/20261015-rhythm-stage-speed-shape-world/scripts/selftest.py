@@ -1052,7 +1052,10 @@ def test_stage_source(sess: st.Session) -> None:
              + [(f"{st.PCL_PREFIX}{c}", 0.4) for c in cands])
     same = all(np.array_equal(x, y) for n, lam in names
                for x, y in zip(st.series(sess, n, 3, lam=lam), old.series(osess, n, 3, lam=lam)))
-    check(same, f"stage: the {len(names)} earlier names equal the confound world's stage")
+    cn = st.config_names(cands)
+    want_names = set(cands + cn["pc1"] + cn["pcs"] + cn["pc0"] + cn["pccorr"] + cn["pc1_1800"] + cn["pcl"])
+    check(same and {n for n, _ in names} == want_names and len(names) == len(want_names),
+          f"stage: the {len(names)} earlier names (every name of config_names) equal the confound world's stage")
     check(not np.array_equal(st.series(sess, f"PCs-{cands[0]}", 3, lam=0.4)[0],
                              old.series(osess, f"PCs-{cands[0]}", 3, lam=0.9)[0]),
           "stage: the comparison tells another lambda apart (negative control)")

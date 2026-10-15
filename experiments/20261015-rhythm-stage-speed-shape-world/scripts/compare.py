@@ -87,9 +87,11 @@ def world_column(status: str, summary: dict | None, e13: dict | None, split: dic
 
 def pcr_r2_table(split: dict) -> dict:
     """design 3.3 (j) (cross-review 2): per model, family and candidate, the r-side control's none and R2 readings and
-    whether its R2 reading is used: only when the same model and family work (or over) at none and the model was not at
-    the ceiling in the main run's L300; else not_used with the reason."""
+    whether its R2 reading is used: only when the same model and family work (or over) at none, the model was not at
+    the ceiling in the main run's L300 (lrbin counts as lr), and the R2 reading itself is works, over or fails (unclear,
+    unreadable and not_calibrated are not read: cross-review 3); else not used, with the reason."""
     ceil = split["main_ceiling_kinds_L300"]
+    base_of = {"lr": "lr", "lrbin": "lr", "hgb": "hgb"}
     out = {}
     for vk in R2_KEYS:
         model = vk.split("|")[0]
@@ -98,7 +100,9 @@ def pcr_r2_table(split: dict) -> dict:
         for fam in r2:
             out[vk][fam] = {}
             for c, r in r2[fam].items():
-                why = ("ceiling" if model in ceil else None) or (None if none[fam][c] in WORKING else "none_not_working")
+                why = ("ceiling" if base_of[model] in ceil else
+                       "none_not_working" if none[fam][c] not in WORKING else
+                       None if r in ("works", "over", "fails") else f"r2_{r}")
                 out[vk][fam][c] = {"none": none[fam][c], "R2": r, "used": why is None, **({"why": why} if why else {})}
     return out
 
