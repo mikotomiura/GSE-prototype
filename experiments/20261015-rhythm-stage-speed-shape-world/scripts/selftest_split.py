@@ -412,11 +412,15 @@ def t_git_state() -> None:
 
 def t_compare(cfg: dict) -> None:
     """design 1.5: the comparison copies what it reads; a step that did not run is not_run, never green."""
-    cands = ["S-a", "S-b"]
-    summ = lambda v300: {**{c: {"L300": v, "L60": "green", "L1800": "green"} for c, v in zip(cands, v300)}, "_x": {}}
+    cands = st.candidates()
+
+    def summ(v300):  # the first two candidates as given, the other 22 green
+        v = list(v300) + ["green"] * (len(cands) - len(v300))
+        return {**{c: {"L300": x, "L60": "green", "L1800": "green"} for c, x in zip(cands, v)}, "_x": {}}
     e13 = {t: {"auc_A_speed": {"hgb": 0.8, "lr": 0.7}} for t in cp.LABELS}
+    pcr = {f"{m}|{d}": {f: {c: "works" for c in cands} for f in ("level", "var")} for m in sp.MODELS for d in ("none", "R2")}
     split = {"counts": {"lr|R2": {}}, "readings": {k: {c: "vanishes" for c in cands} for k in cp.R2_KEYS},
-             "pcr_counts": {}, "pcr_readings": {k: {"level": {}, "var": {}} for k in cp.R2_KEYS}}
+             "pcr_counts": {}, "pcr_readings": pcr, "main_ceiling_kinds_L300": []}
     col_ceiling = cp.world_column("ceiling", None, None, None)
     check(col_ceiling == {"status": "ceiling", "ran": False, "state": "not_run"}, "compare: a ceiling step is not_run")
     col_nomain = cp.world_column("go", None, None, None)
@@ -429,7 +433,7 @@ def t_compare(cfg: dict) -> None:
     nosha = cp.world_column("go", summ(["red_detected", "green"]), e13, split, None, "new")
     check(stale["split"] == "stale" and nosha["split"] == "stale",
           "compare: a split whose gate read another e13.json (or none) is stale (cross-review 1)")
-    check(red["verdict_counts"]["L300"]["red_detected"] == 1 and red["verdict_counts"]["L300"]["green"] == 1,
+    check(red["verdict_counts"]["L300"]["red_detected"] == 1 and red["verdict_counts"]["L300"]["green"] == 23,
           "compare: the counts follow the verdicts")
     stop = cp.world_column("go", summ(["red_detected_stop_path", "green"]), e13, None)
     check(stop["state"] == "red", "compare: red_detected_stop_path counts as red")
@@ -445,8 +449,27 @@ def t_compare(cfg: dict) -> None:
           "compare: no reading when either world did not run (mutation: not_run read as green)")
     check(cp.reading_i(h, unset, red) == "unsettled" and cp.reading_i(h, red, unset) == "unsettled",
           "compare: no reading when either world is unsettled (all undecidable is not clean)")
-    check(cp.reading_i(green, green, red) == "no_target" and cp.reading_i(unset, green, red) == "no_target",
-          "compare: no reading when the confound world itself has no red there")
+    check(cp.reading_i(green, green, red) == "no_target" and cp.reading_i(unset, green, red) == "confound_unsettled"
+          and cp.reading_i(col_ceiling, green, red) == "confound_not_run",
+          "compare: no reading when the confound world itself has no red there (and why)")
+    check(raises(cp.world_state, {c: "green" for c in cands[:23]})
+          and raises(cp.world_state, {**{c: "green" for c in cands}, "S-extra-x-y": "green"}),
+          "compare: a summary without exactly the 24 candidates stops (not clean: cross-review 2)")
+    # design 3.3 (j) (cross-review 2): a control's R2 reading is used only when the same model and family work at none
+    # and the model was not at the ceiling
+    sp2 = json.loads(json.dumps(split))
+    sp2["pcr_readings"]["lr|none"]["var"][cands[0]] = "fails"
+    sp2["pcr_readings"]["lr|R2"]["var"][cands[0]] = "fails"
+    sp2["pcr_readings"]["lrbin|none"]["level"][cands[1]] = "over"
+    sp2["main_ceiling_kinds_L300"] = ["hgb"]
+    t = cp.pcr_r2_table(sp2)
+    check(t["lr|R2"]["var"][cands[0]] == {"none": "fails", "R2": "fails", "used": False, "why": "none_not_working"}
+          and t["lr|R2"]["level"][cands[0]]["used"] and t["lrbin|R2"]["level"][cands[1]]["used"]
+          and all(not v["used"] and v["why"] == "ceiling" for f in t["hgb|R2"].values() for v in f.values()),
+          "compare: the R2 reading of a control is not used when its none does not work or its model was at the ceiling")
+    col = cp.world_column("go", summ(["red_detected", "green"]), e13, sp2, "h", "h")
+    check(col["split"]["main_ceiling_kinds_L300"] == ["hgb"] and col["split"]["pcr_R2"] == t,
+          "compare: the column carries the ceiling and the table of used readings")
     t_compare_build(cfg, summ, e13, split)
     check(sorted(cfg["compare"]["pairs"]) == ["1", "2"]
           and all(set(v) == {"confound", "factor", "drift"} for v in cfg["compare"]["pairs"].values())

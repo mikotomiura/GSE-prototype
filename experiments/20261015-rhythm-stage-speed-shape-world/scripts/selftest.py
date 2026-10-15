@@ -1052,7 +1052,10 @@ def test_stage_source(sess: st.Session) -> None:
              + [(f"{st.PCL_PREFIX}{c}", 0.4) for c in cands])
     same = all(np.array_equal(x, y) for n, lam in names
                for x, y in zip(st.series(sess, n, 3, lam=lam), old.series(osess, n, 3, lam=lam)))
-    check(same and len(names) == 24 * 4 + 3, f"stage: the {len(names)} earlier names equal the confound world's stage")
+    check(same, f"stage: the {len(names)} earlier names equal the confound world's stage")
+    check(not np.array_equal(st.series(sess, f"PCs-{cands[0]}", 3, lam=0.4)[0],
+                             old.series(osess, f"PCs-{cands[0]}", 3, lam=0.9)[0]),
+          "stage: the comparison tells another lambda apart (negative control)")
     check(st.FEAT_NAMES == old.FEAT_NAMES and np.array_equal(
         st.window_features(*st.series(sess, cands[0], 3), 10), old.window_features(*old.series(osess, cands[0], 3), 10)),
         "stage: the window features equal the confound world's")
@@ -1485,7 +1488,7 @@ def r_part_doc(merged_r: dict, cfg: dict, auc=None) -> dict:
     """The L300r part as pilot_r_part writes it, from hand-made maxima (shape world design 1.3)."""
     auc = auc or {"hgb": 0.7, "lr": 0.7}
     sels, ceil = ck.pilot_r_result(merged_r, auc, cfg)
-    per = {f"{ck.PILOT_R_TAG}-{f}-{c}": {"fit_failed": any(
+    per = {f"{ck.PILOT_R_TAG}-{f}-{c}": {"fit_failed": all(
         merged_r.get(ck.pilot_key(c, x, p)) is None for x in [0.0] + ck.pcr_grid(cfg))}
         for f, p in ck.PCR_FAMILIES.items() for c in st.candidates()}
     return {"stop": None, "selection": sels, "auc_A_speed": auc, "ceiling_kinds": ceil, "per_batch": per,
@@ -1531,6 +1534,7 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
             merged_r[ck.pilot_key(c, x, "PCrv-")] = (None if c == cands[0] else
                                                      merged[ck.pilot_key(c, grid[max(i - 1, 0)])] if i else rec(0.0, -0.008))
         merged_r[ck.pilot_key(c, 0.0, "PCrl-")] = merged_r[ck.pilot_key(c, 0.0, "PCrv-")] = rec(0.004, -0.004)
+    merged_r[ck.pilot_key(cands[0], 0.0, "PCrv-")] = None  # a failed batch is null throughout (cross-review 2)
     want_r = {"level": {c: grid[grid.index(want[c]) - 1] for c in cands},
               "var": {c: (None if c == cands[0] else grid[grid.index(want[c]) + 1]) for c in cands}}
     pr = r_part_doc(merged_r, cfg)
@@ -1657,6 +1661,10 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
                 f: {c: {"lam": None} for c in cands} for f in ck.PCR_FAMILIES})),
             ("an L300r value nulled while its batch did not fail", swap(ck.PILOT_R_TAG, configs={
                 **pr["configs"], ck.pilot_key(cands[1], 0.1, "PCrl-"): None})),
+            ("an L300r value emptied to {} while its batch did not fail", swap(ck.PILOT_R_TAG, configs={
+                **pr["configs"], ck.pilot_key(cands[1], 0.1, "PCrl-"): {}})),
+            ("an L300r failed batch with a finite value (at lambda 0, which the selection does not read)",
+             swap(ck.PILOT_R_TAG, configs={**pr["configs"], ck.pilot_key(cands[0], 0.0, "PCrv-"): rec(0.004, -0.004)})),
             ("an L300r part with a batch missing", swap(ck.PILOT_R_TAG, per_batch={
                 k: v for k, v in pr["per_batch"].items() if not k.endswith(cands[1])})),
             ("no L300r grid", {k: v for k, v in good.items() if k != "rule_r"}),

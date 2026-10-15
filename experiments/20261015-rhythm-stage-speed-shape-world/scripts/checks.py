@@ -995,9 +995,15 @@ def pilot_r_check(p: dict, cfg: dict, err: list[str]) -> dict | None:
     if set(part["configs"]) != set(want) or set(part["per_batch"]) != set(want.values()):
         err.append(f"the {PILOT_R_TAG} part does not hold every name and batch of pc_r.pilot_grid")
         return None
-    bad_null = [k for k, v in part["configs"].items() if v is None and not part["per_batch"][want[k]].get("fit_failed")]
-    if bad_null:
-        err.append(f"the {PILOT_R_TAG} part has {len(bad_null)} null values whose batch did not fail (e.g. {bad_null[0]})")
+    # cross-review 2: a value is null or holds its maxima; a failed batch is null throughout (pilot_r_part writes it so),
+    # a batch that did not fail has no null
+    shape_bad = [k for k, v in part["configs"].items()
+                 if v is not None and not (isinstance(v, dict) and all(kk in v for kk in ("gain_max", "lower_max")))]
+    failed = {b for b, v in part["per_batch"].items() if isinstance(v, dict) and v.get("fit_failed") is True}
+    bad_null = [k for k, v in part["configs"].items() if (v is None) != (want[k] in failed)]
+    if shape_bad or bad_null or any(not isinstance(v, dict) for v in part["per_batch"].values()):
+        err.append(f"the {PILOT_R_TAG} part has {len(shape_bad)} malformed values and {len(bad_null)} values whose "
+                   f"null does not follow their batch's fit_failed (e.g. {(shape_bad + bad_null + [None])[0]})")
         return None
     merged = {k: ({kk: _num(v[kk]) for kk in ("gain_max", "lower_max")} if v else None)
               for k, v in part["configs"].items()}

@@ -7,7 +7,7 @@ experiments/20261015-rhythm-stage-speed-cause-split/scripts/split.py (d282691d),
 checks and stage (no earlier instrument is imported, so the SHA-256 check of one is gone); the gate compares the
 no-drop lr and hgb values with this step's own e13.json (the main run's, or the smoke's); the r-side controls of each
 candidate (lambdas from pc_r.lam.<step>, checked against the step's pilot.json) are fitted with lr, hgb and lrbin on
-the drops none / R2 / Rall and read (pcr_reading); git_state does not count results/.
+the drops none / R2 and read (pcr_reading); git_state does not count results/.
 
 Usage: split.py <config.json> <work dir> <out dir> --step <step> --seed <seed> --main-dir <results/<step>/main>
                 [--jobs N] [--smoke] [--replay-sha <sha256>]
@@ -436,7 +436,7 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
                       for c, (ctl, base) in table.items()}
                 for fam, table in st.pcr_names(cands).items()}
         # cross-review 1 (code-reviewer): the main run's ceiling (a model at the ceiling may leave a control short)
-        doc["main_ceiling_kinds_L300"] = prev_e13[LABEL].get("ceiling_kinds")
+        doc["main_ceiling_kinds_L300"] = list(prev_e13[LABEL]["ceiling_kinds"])  # required (cross-review 2)
         summ = main_dir / "summary.json"
         if summ.exists():
             s = json.loads(summ.read_text(encoding="utf-8"))
