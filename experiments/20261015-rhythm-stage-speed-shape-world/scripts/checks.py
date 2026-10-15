@@ -987,6 +987,18 @@ def pilot_r_check(p: dict, cfg: dict, err: list[str]) -> dict | None:
     if p.get("rule_r") != {"pilot_grid": pcr_grid(cfg)}:
         err.append(f"the {PILOT_R_TAG} rule {p.get('rule_r')} is not the config's pc_r.pilot_grid")
         return None
+    # cross-review 1 (Codex): every name of every family, candidate and lambda is there, and a null only where its
+    # batch's fits failed (an emptied part must not pass as "every control uncalibrated")
+    grid = pcr_grid(cfg)
+    want = {pilot_key(c, x, prefix): f"{PILOT_R_TAG}-{f}-{c}" for f, prefix in PCR_FAMILIES.items()
+            for c in st.candidates() for x in [0.0] + grid}
+    if set(part["configs"]) != set(want) or set(part["per_batch"]) != set(want.values()):
+        err.append(f"the {PILOT_R_TAG} part does not hold every name and batch of pc_r.pilot_grid")
+        return None
+    bad_null = [k for k, v in part["configs"].items() if v is None and not part["per_batch"][want[k]].get("fit_failed")]
+    if bad_null:
+        err.append(f"the {PILOT_R_TAG} part has {len(bad_null)} null values whose batch did not fail (e.g. {bad_null[0]})")
+        return None
     merged = {k: ({kk: _num(v[kk]) for kk in ("gain_max", "lower_max")} if v else None)
               for k, v in part["configs"].items()}
     auc = None if part["auc_A_speed"] is None else {k: _num(v) for k, v in part["auc_A_speed"].items()}
@@ -1098,6 +1110,9 @@ def pilot_r_part(tab: dict, ms: list[dict], work: Path, cfg: dict, seed: int, jo
     merged, timing, per = {}, [], {}
     batches = [(f"{PILOT_R_TAG}-{f}-{c}", [(pilot_key(c, x, prefix), f"{prefix}{c}", x) for x in [0.0] + grid])
                for f, prefix in PCR_FAMILIES.items() for c in st.candidates()]
+    keys = [k for _, sp in batches for k, _, _ in sp]
+    if len(set(keys)) != len(keys):  # as pilot_part (code-reviewer, cross-review 1): names alike at three decimals
+        raise SystemExit("pc_r.pilot_grid: two values share a name at three decimals")
     auc_s = None
     for b, specs in batches:
         tb = time.time()

@@ -355,11 +355,12 @@ def t_pcr(cfg: dict) -> None:
     # mutation: the comparisons swapped would make a failing control work
     check(rr(mx(-0.05, -0.01)) != "works", "pcr: a control below 0 never works")
     pv = sp.pcr_variants(cfg)
-    check(pv == [(mm, d) for mm in sp.MODELS for d in ("none", "R2", "Rall")] and len(pv) == 9,
-          "pcr: 9 variants (lr, hgb, lrbin x none, R2, Rall)")
-    bad = json.loads(json.dumps(cfg))
-    bad["split"]["pcr_drops"] = ["none", "A2"]
-    check(raises(sp.pcr_variants, bad), "pcr: A2 among pcr_drops is refused")
+    check(pv == [(mm, d) for mm in sp.MODELS for d in ("none", "R2")] and len(pv) == 6,
+          "pcr: 6 variants (lr, hgb, lrbin x none, R2; no Rall: cross-review 1)")
+    for drops in (["none", "A2"], ["none", "R2", "Rall"], ["R2"]):
+        bad = json.loads(json.dumps(cfg))
+        bad["split"]["pcr_drops"] = drops
+        check(raises(sp.pcr_variants, bad), f"pcr: pcr_drops {drops} is refused")
     cands = st.candidates()
     lam_r = {"level": {c: 0.1 for c in cands}, "var": {c: (None if i % 3 == 0 else 0.2) for i, c in enumerate(cands)}}
     specs = sp.pcr_specs(lam_r)
@@ -417,24 +418,36 @@ def t_compare(cfg: dict) -> None:
     split = {"counts": {"lr|R2": {}}, "readings": {k: {c: "vanishes" for c in cands} for k in cp.R2_KEYS},
              "pcr_counts": {}, "pcr_readings": {k: {"level": {}, "var": {}} for k in cp.R2_KEYS}}
     col_ceiling = cp.world_column("ceiling", None, None, None)
-    check(col_ceiling == {"status": "ceiling", "ran": False, "reading_i": "not_run"}, "compare: a ceiling step is not_run")
+    check(col_ceiling == {"status": "ceiling", "ran": False, "state": "not_run"}, "compare: a ceiling step is not_run")
     col_nomain = cp.world_column("go", None, None, None)
     check(not col_nomain["ran"], "compare: a go step with no main run is not_run")
-    red = cp.world_column("go", summ(["red_detected", "green"]), e13, split)
+    red = cp.world_column("go", summ(["red_detected", "green"]), e13, split, "h", "h")
     green = cp.world_column("go", summ(["green", "green"]), e13, None)
-    check(red["has_red_L300"] and not green["has_red_L300"] and green["split"] == "not_run",
-          "compare: red and green are copied; a missing split is not_run")
+    check(red["state"] == "red" and green["state"] == "clean" and green["split"] == "not_run"
+          and isinstance(red["split"], dict), "compare: red and clean are copied; a missing split is not_run")
+    stale = cp.world_column("go", summ(["red_detected", "green"]), e13, split, "old", "new")
+    nosha = cp.world_column("go", summ(["red_detected", "green"]), e13, split, None, "new")
+    check(stale["split"] == "stale" and nosha["split"] == "stale",
+          "compare: a split whose gate read another e13.json (or none) is stale (cross-review 1)")
     check(red["verdict_counts"]["L300"]["red_detected"] == 1 and red["verdict_counts"]["L300"]["green"] == 1,
           "compare: the counts follow the verdicts")
     stop = cp.world_column("go", summ(["red_detected_stop_path", "green"]), e13, None)
-    check(stop["has_red_L300"], "compare: red_detected_stop_path counts as red")
-    unconf = cp.world_column("go", summ(["red_unconfirmed", "undecidable"]), e13, None)
-    check(not unconf["has_red_L300"], "compare: red_unconfirmed and undecidable are not red")
-    check(cp.reading_i(green, red) == "drift" and cp.reading_i(red, green) == "factor"
-          and cp.reading_i(red, red) == "either" and cp.reading_i(green, green) == "neither_alone",
+    check(stop["state"] == "red", "compare: red_detected_stop_path counts as red")
+    for vs in (["red_unconfirmed", "green"], ["undecidable", "green"], ["undecidable", "undecidable"]):
+        check(cp.world_column("go", summ(vs), e13, None)["state"] == "unsettled",
+              f"compare: {vs} is unsettled, not no red (cross-review 1)")
+    h = red
+    unset = cp.world_column("go", summ(["undecidable", "undecidable"]), e13, None)
+    check(cp.reading_i(h, green, red) == "red_in_drift_only" and cp.reading_i(h, red, green) == "red_in_factor_only"
+          and cp.reading_i(h, red, red) == "red_in_both" and cp.reading_i(h, green, green) == "red_in_neither",
           "compare: the table of design 3.3 (i)")
-    check(cp.reading_i(col_ceiling, red) == "not_run" and cp.reading_i(green, col_nomain) == "not_run",
+    check(cp.reading_i(h, col_ceiling, red) == "not_run" and cp.reading_i(h, green, col_nomain) == "not_run",
           "compare: no reading when either world did not run (mutation: not_run read as green)")
+    check(cp.reading_i(h, unset, red) == "unsettled" and cp.reading_i(h, red, unset) == "unsettled",
+          "compare: no reading when either world is unsettled (all undecidable is not clean)")
+    check(cp.reading_i(green, green, red) == "no_target" and cp.reading_i(unset, green, red) == "no_target",
+          "compare: no reading when the confound world itself has no red there")
+    t_compare_build(cfg, summ, e13, split)
     check(sorted(cfg["compare"]["pairs"]) == ["1", "2"]
           and all(set(v) == {"confound", "factor", "drift"} for v in cfg["compare"]["pairs"].values())
           and all(cfg["ceiling"]["worlds"][v[w]] == w for v in cfg["compare"]["pairs"].values() for w in ("factor", "drift"))
@@ -448,6 +461,42 @@ def t_compare(cfg: dict) -> None:
     k0 = next(iter(bad["compare"]["prev_sha256"]))
     bad["compare"]["prev_sha256"][k0] = "0" * 64
     check(raises(cp.load_prev, bad, exp_root), "compare: a SHA-256 that does not match stops")
+
+
+def t_compare_build(cfg: dict, summ, e13: dict, split: dict) -> None:
+    """compare.build on a made-up results directory: the worlds of ceiling.json, the stale split, a not-run step."""
+    tmp = Path(tempfile.mkdtemp(prefix="st-cmp-"))
+    try:
+        steps = cfg["ceiling"]["steps"]
+        ceil = {"steps": {s: {"world": cfg["ceiling"]["worlds"][s], "c": c, "status": "ceiling" if s == "f100" else "go"}
+                          for s, c in steps.items()}}
+        (tmp / "results" / "ceiling").mkdir(parents=True)
+        (tmp / "results" / "ceiling" / "ceiling.json").write_text(json.dumps(ceil), encoding="utf-8")
+        for s in ("f200", "d100", "d200"):
+            m = tmp / "results" / s / "main"
+            m.mkdir(parents=True)
+            (m / "summary.json").write_text(json.dumps(summ(["red_detected" if s == "d200" else "green", "green"])),
+                                            encoding="utf-8")
+            (m / "e13.json").write_text(json.dumps(e13), encoding="utf-8")
+            sd = tmp / "results" / s / "split"
+            sd.mkdir(parents=True)
+            (sd / "split.json").write_text(json.dumps(split), encoding="utf-8")
+            sha = cp.sha256(m / "e13.json") if s != "d100" else "0" * 64
+            (sd / "reproduce.json").write_text(json.dumps({"e13_sha256": sha}), encoding="utf-8")
+        prev = cp.load_prev(cfg, Path(sp.EXP_DIR).parent)
+        doc = cp.build(cfg, tmp, prev)
+        w1, w2 = doc["by_c"]["1"]["worlds"], doc["by_c"]["2"]["worlds"]
+        check(w1["factor"]["state"] == "not_run" and w1["drift"]["split"] == "stale" and doc["by_c"]["1"]["reading_i"]
+              == "not_run" and w1["confound"]["step"] == "c100" and w1["confound"]["ran"],
+              "compare build: f100 at the ceiling is not_run, d100's split is stale, the confound column is c100's")
+        check(doc["by_c"]["2"]["reading_i"] == "red_in_drift_only" and isinstance(w2["drift"]["split"], dict),
+              "compare build: c = 2 reads the factor (clean) and drift (red) columns")
+        bad = json.loads((tmp / "results" / "ceiling" / "ceiling.json").read_text(encoding="utf-8"))
+        bad["steps"]["d100"]["world"] = "factor"
+        (tmp / "results" / "ceiling" / "ceiling.json").write_text(json.dumps(bad), encoding="utf-8")
+        check(raises(cp.build, cfg, tmp, prev), "compare build: a step whose world differs in ceiling.json stops")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def main() -> int:

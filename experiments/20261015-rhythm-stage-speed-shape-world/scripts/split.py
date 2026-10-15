@@ -294,8 +294,10 @@ def variants() -> list[tuple[str, str]]:
 def pcr_variants(cfg: dict) -> list[tuple[str, str]]:
     """design 1.4: (model, drop) of the r-side controls."""
     drops = list(cfg["split"]["pcr_drops"])
-    if not set(drops) <= set(DROPS) or "A2" in drops:
-        raise SystemExit(f"split.pcr_drops {drops} must be among none / R2 / Rall")
+    # cross-review 1: with Rall (or A2) a control's remaining features are those of its lambda 0 baseline (its a does
+    # not depend on lambda), so it could never work there
+    if drops != ["none", "R2"]:
+        raise SystemExit(f"split.pcr_drops {drops} must be none and R2 (design 1.4)")
     return [(m, d) for m in MODELS for d in drops]
 
 
@@ -433,6 +435,8 @@ def main_split(cfg: dict, work: Path, out: Path, step: str, seed: int, jobs: int
                 fam: {c: pcr_reading(per.get(ctl), per.get(base), rd["margin"], rd["pcr_upper"])
                       for c, (ctl, base) in table.items()}
                 for fam, table in st.pcr_names(cands).items()}
+        # cross-review 1 (code-reviewer): the main run's ceiling (a model at the ceiling may leave a control short)
+        doc["main_ceiling_kinds_L300"] = prev_e13[LABEL].get("ceiling_kinds")
         summ = main_dir / "summary.json"
         if summ.exists():
             s = json.loads(summ.read_text(encoding="utf-8"))

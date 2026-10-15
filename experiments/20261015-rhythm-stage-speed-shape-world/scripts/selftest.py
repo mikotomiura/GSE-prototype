@@ -507,9 +507,10 @@ def test_shape(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str) ->
         check(abs(dri.w(0) - DELTA_WANT * d0) < 1e-12 and abs(dri.w(1) - DELTA_WANT * (rho * d0 + q * e0)) < 1e-12
               and dri.w(0) != dri.w(1), f"shape {names}: the drift's w is delta * d(k) (no u)")
         check(all(fac.z(k * 1000.0 + 500) == fac.c * fac.w(k) for k in range(5)), f"shape {names}: z = c * w (factor)")
-    two = gs.Speed(20261020, ("P", 3), 2.0, cfg, 5, "drift")
-    one = gs.Speed(20261020, ("P", 3), 1.0, cfg, 5, "drift")
-    check(all(two.z(k * 1000.0) == 2 * one.z(k * 1000.0) != 0 for k in range(5)), "shape: the drift's z is c times w")
+    for sh in ("factor", "drift"):  # cross-review 1 (Codex): both shapes, c = 1 against c = 2
+        two = gs.Speed(20261020, ("P", 3), 2.0, cfg, 5, sh)
+        one = gs.Speed(20261020, ("P", 3), 1.0, cfg, 5, sh)
+        check(all(two.z(k * 1000.0) == 2 * one.z(k * 1000.0) != 0 for k in range(5)), f"shape: the {sh}'s z is c times w")
     try:
         gs.Speed(1, ("P", 0), 1.0, cfg, 5, "other")
         bad_shape = False
@@ -552,7 +553,7 @@ def test_shape(cfg: dict, config: Path, seed_file: Path, tmp: Path, hmm: str) ->
     diagnostic_spread(config, seed_file, tmp, hmm, "drift")
     for args in (["--world", "factor"], ["--world", "drift"], ["--world", "factor", "--c", "-1"],
                  ["--world", "drift", "--c", "5"], ["--world", "drift", "--c", "nan"],
-                 ["--world", "factor", "--t", "0.5"]):
+                 ["--world", "factor", "--c", "1", "--t", "0.5"]):  # cross-review 1: only --t is wrong
         r = subprocess.run([sys.executable, str(gen), str(config), str(seed_file), str(tmp / "ours-bad"),
                             "--hmm-version", hmm, "--smoke", *args], capture_output=True)
         check(r.returncode != 0, f"shape: gen_sessions refuses {' '.join(args)}")
@@ -1125,6 +1126,12 @@ def test_pcr(base: st.Session) -> None:
         check(all(np.array_equal(p_[: T * st.HZ], q_[: T * st.HZ]) for p_, q_ in zip(x, y))
               and not all(np.array_equal(p_, q_) for p_, q_ in zip(x, y)),
               f"{name}: the stall after T changes no value before T (and some after: negative control)")
+    # cross-review 1 (code-reviewer): the a of an r-side control depends on neither lambda nor family, so with every
+    # r quantity dropped a control's features are its baseline's (design 1.4: the controls take no Rall)
+    for c in ("S-raw-hold-sub", "S-smooth-decay-sec", "S-rank-ground-sub", "S-jitter-hold-sec"):
+        a_s = [st.series(sess, f"PCrl-{c}", 1, lam=0.7)[0], st.series(sess, f"PCrv-{c}", 1, lam=0.2)[0],
+               st.series(sess, f"PCrl0-{c}", 1)[0], st.series(sess, f"PCrv0-{c}", 1)[0]]
+        check(all(np.array_equal(a_s[0], x) for x in a_s[1:]), f"PCr {c}: a is the same for both families and every lambda")
     # the stop of the candidate acts on the control: ground puts r to 0 while stopped
     a, r = st.series(sess, "PCrl-S-raw-ground-sub", 1, lam=1.0)
     _, _, stp = st.drive(st.stage_input(sess), "sub")
@@ -1478,8 +1485,10 @@ def r_part_doc(merged_r: dict, cfg: dict, auc=None) -> dict:
     """The L300r part as pilot_r_part writes it, from hand-made maxima (shape world design 1.3)."""
     auc = auc or {"hgb": 0.7, "lr": 0.7}
     sels, ceil = ck.pilot_r_result(merged_r, auc, cfg)
-    return {"stop": None, "selection": sels, "auc_A_speed": auc, "ceiling_kinds": ceil,
-            "per_batch": {f"{ck.PILOT_R_TAG}-x": {"fit_failed": False}},
+    per = {f"{ck.PILOT_R_TAG}-{f}-{c}": {"fit_failed": any(
+        merged_r.get(ck.pilot_key(c, x, p)) is None for x in [0.0] + ck.pcr_grid(cfg))}
+        for f, p in ck.PCR_FAMILIES.items() for c in st.candidates()}
+    return {"stop": None, "selection": sels, "auc_A_speed": auc, "ceiling_kinds": ceil, "per_batch": per,
             "configs": {k: ({kk: v[kk] for kk in ck.REC_KEYS} if v else None) for k, v in merged_r.items()}}
 
 
@@ -1644,6 +1653,12 @@ def test_apply_pilot(cfg: dict, merged: dict, sels: dict, want: dict) -> None:
             ("an L300r var null replaced by a value", swap(ck.PILOT_R_TAG, selection={
                 **pr["selection"], "var": {**pr["selection"]["var"], cands[0]: {"lam": grid[0]}}})),
             ("another L300r grid", {**good, "rule_r": {"pilot_grid": grid}}),
+            ("an emptied L300r part (every control null)", swap(ck.PILOT_R_TAG, configs={}, selection={
+                f: {c: {"lam": None} for c in cands} for f in ck.PCR_FAMILIES})),
+            ("an L300r value nulled while its batch did not fail", swap(ck.PILOT_R_TAG, configs={
+                **pr["configs"], ck.pilot_key(cands[1], 0.1, "PCrl-"): None})),
+            ("an L300r part with a batch missing", swap(ck.PILOT_R_TAG, per_batch={
+                k: v for k, v in pr["per_batch"].items() if not k.endswith(cands[1])})),
             ("no L300r grid", {k: v for k, v in good.items() if k != "rule_r"}),
             ("the L300r families swapped", swap(ck.PILOT_R_TAG, selection={
                 "level": pr["selection"]["var"], "var": pr["selection"]["level"]})),

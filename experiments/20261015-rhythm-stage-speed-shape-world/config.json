@@ -429,7 +429,7 @@
     ],
     "lam": {}
   },
-  "_comment_split": "shape world design 1.4 (from experiments/20261015-rhythm-stage-speed-cause-split/config.json, 6599c5e4): after the main run, on the same rows, L300 only: the base models lr, hgb, lrbin (bins quantile bins of each A_speed column next to its value) with the stage groups in drops dropped; lrbin2 descriptive. The 72 names (candidates, PCs-, PC0-) take every drop; the 96 r-side controls take none / R2 / Rall with lr, hgb, lrbin (pcr_drops). The gate compares the no-drop lr and hgb values with this step's results/<step>/main/e13.json (gate_tol). read: as the cause split; pcr_upper is the upper end of the band of the r-side controls' reading (design 3.3 (j)).",
+  "_comment_split": "shape world design 1.4 (from experiments/20261015-rhythm-stage-speed-cause-split/config.json, 6599c5e4): after the main run, on the same rows, L300 only: the base models lr, hgb, lrbin (bins quantile bins of each A_speed column next to its value) with the stage groups in drops dropped; lrbin2 descriptive. The 72 names (candidates, PCs-, PC0-) take every drop; the 96 r-side controls take none / R2 with lr, hgb, lrbin (pcr_drops; with Rall a control's features are its lambda 0 baseline's, since its a does not depend on lambda: cross-review 1). The gate compares the no-drop lr and hgb values with this step's results/<step>/main/e13.json (gate_tol). read: as the cause split; pcr_upper is the upper end of the band of the r-side controls' reading (design 3.3 (j)).",
   "split": {
     "bootstrap": 2000,
     "smoke_bootstrap": 200,
@@ -458,8 +458,7 @@
     },
     "pcr_drops": [
       "none",
-      "R2",
-      "Rall"
+      "R2"
     ],
     "read": {
       "margin": 0.03,
