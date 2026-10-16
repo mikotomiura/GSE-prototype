@@ -1,28 +1,16 @@
-# タスクリスト
+# tasklist
 
-## 準備
-- [ ] 関連する docs を読む
-- [ ] 影響範囲を file-finder で調査
-
-## 実装
-- [ ] タスク 1
-- [ ] タスク 2
-- [ ] タスク 3
-
-## テスト
-- [ ] 単体テストを追加
-- [ ] 統合テストを追加（必要なら）
-- [ ] テストが通ることを確認
-
-## レビュー
-- [ ] code-reviewer によるレビュー
-- [ ] HIGH 指摘への対応
-
-## ドキュメント
-- [ ] docs の更新（必要なら）
-- [ ] glossary への用語追加（必要なら）
-
-## 完了処理
-- [ ] design.md の最終化
-- [ ] decisions.md の作成（重要な判断があった場合）
-- [ ] git commit
+- [x] `handmark_spike.rs`: 環境変数の解釈・窓の生成・NSPanel 化・除外の設定と読み返し（fail-closed）・通知・計測の CSV・閉じる処理
+- [x] `lib.rs`: mod 宣言・setup で窓を作る・分析スレッドで通知・CloseRequested から外す・invoke の登録（すべて cfg macos）
+- [x] `tray.rs`: 「小面を閉じる」
+- [x] `capabilities/handmark.json`
+- [x] `src/main.tsx` の分岐と `src/components/HandmarkSurface.tsx`
+- [x] cargo test・clippy・tsc・check_invitation_surface.py
+- [x] 合成の打鍵のスクリプト
+- [x] 実機: 窓が出る・前面・クリックの透過・フォーカス（AX）
+- [x] 実機: fail-closed（模擬の失敗で窓が出ない）
+- [x] 実機: 遅れ 約 200 回 → 95 パーセンタイル・最大
+- [x] 研究者の手順書（取り込みの目視・抜き取り撮影・試視）
+- [ ] code-reviewer + security-checker・指摘対応
+- [ ] 結果を results.md に書く（Claude の分は済み・研究者の目視と試視の欄が残り）
+- [ ] /finish-task（/cross-review 必須・PR は出さず push で止める）

@@ -3,13 +3,16 @@ import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 import InvitationSettings from "./components/InvitationSettings";
+import HandmarkSurface from "./components/HandmarkSurface";
 
 // Layer 2: React マウント前にウィンドウ別の背景制御。
 // overlay ウィンドウでは index.html のインライン背景 (#0f172a) を透過に切り替える。
 // main ウィンドウでは #0f172a のままにし、CSS/React 依存なしで黒画面を防止する。
 // getCurrentWindow() は __TAURI_INTERNALS__ を参照する同期 API なので安全。
 const windowLabel = getCurrentWindow().label;
-if (windowLabel === "overlay") {
+// 手跡の小面の試作の窓も透明にする（spike）。
+const isHandmark = windowLabel === "handmark";
+if (windowLabel === "overlay" || isHandmark) {
   document.body.style.backgroundColor = "transparent";
 }
 // EH3 の招待の説明と設定の窓は App（メイン窓の処理）を通さずに描く。
@@ -58,7 +61,13 @@ class ErrorBoundary extends React.Component<
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      {isInvitationSettings ? <InvitationSettings /> : <App />}
+      {isHandmark ? (
+        <HandmarkSurface />
+      ) : isInvitationSettings ? (
+        <InvitationSettings />
+      ) : (
+        <App />
+      )}
     </ErrorBoundary>
   </React.StrictMode>
 );

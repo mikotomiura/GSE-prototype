@@ -107,6 +107,9 @@ const MENU_STATUS: &str = "gse-tray-status";
 const MENU_INVITATION: &str = "gse-tray-invitation";
 /// EH3: 肖像を止めて元の壁紙に戻す（いつでも・記録しない・R-P8 / R-P9）。
 const MENU_PORTRAIT_STOP: &str = "gse-tray-portrait-stop";
+/// 手跡の小面の試作を閉じる（spike・窓が出ているときだけ項目を出す）。
+#[cfg(target_os = "macos")]
+const MENU_HANDMARK_CLOSE: &str = "gse-tray-handmark-close";
 
 /// トレイを作り、1Hz で状態を追う更新スレッドを起こす。
 ///
@@ -162,6 +165,14 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
     } else {
         Menu::with_items(app, &[&status, &separator, &quit])?
     };
+    // 手跡の小面の試作: 窓が出ているときだけ「小面を閉じる」を終了の前に足す。
+    #[cfg(target_os = "macos")]
+    if crate::handmark_spike::is_shown(app) {
+        let handmark_close =
+            MenuItem::with_id(app, MENU_HANDMARK_CLOSE, "小面を閉じる", true, None::<&str>)?;
+        let position = menu.items()?.len().saturating_sub(1);
+        menu.insert(&handmark_close, position)?;
+    }
 
     let mut builder = TrayIconBuilder::with_id("gse-tray")
         .menu(&menu)
@@ -179,6 +190,10 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             } else if event.id.as_ref() == MENU_INVITATION {
                 // ⚠️ 開いたことは記録しない（applog にも出さない・R-I1）。
                 let _ = crate::show_invitation_settings_window(app);
+            }
+            #[cfg(target_os = "macos")]
+            if event.id.as_ref() == MENU_HANDMARK_CLOSE {
+                crate::handmark_spike::close(app);
             }
         });
     if let Some(icon) = app.default_window_icon() {

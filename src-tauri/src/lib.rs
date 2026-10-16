@@ -45,6 +45,8 @@ pub mod recording;
 // ⚠️★★★ O1 (R3): 被験者による **区間指定削除** (ADR-014 D7-iii / 判断 3 の根拠 3)。
 //   ★ OS API を呼ばない純粋なファイル層なので `input/` にも `analysis/` にも入れない。
 pub mod redaction;
+// 手跡の案 A の小面の試作（spike・本線に入れない・GSE_HANDMARK_SPIKE=1 のときだけ動く）。
+mod handmark_spike;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -4223,6 +4225,10 @@ pub fn run() {
             // イベント受信 (タイムアウトは次の 1Hz マークまで)
             let input = match rx.recv_timeout(timeout) {
                 Ok(event) => {
+                    // 手跡の小面の試作: 打鍵の時刻だけを窓へ知らせる（環境変数が無ければ何もしない）。
+                    if event.is_press {
+                        crate::handmark_spike::notify_key(event.timestamp);
+                    }
                     // ペーストイベント (Ctrl+V / Cmd+V) を NDJSON に記録する。
                     // フック層は VK + 修飾キー状態のみから is_paste を立てる。
                     // (b) 自力解決率 (v0.4 manual_contribution_ratio) 向けに、フック外 (本スレッド)
@@ -5785,6 +5791,10 @@ pub fn run() {
                 }
             }
 
+            // 手跡の小面の試作（GSE_HANDMARK_SPIKE=1 のときだけ）。トレイより先に作る（トレイが項目の有無を見る）。
+            #[cfg(target_os = "macos")]
+            crate::handmark_spike::setup(app);
+
             // ★★ 常駐トレイ。⚠️ **窓を閉じると UI ごと消えるのに計測は生きている**という穴を塞ぐ
             //   (`tray.rs` のモジュールコメント参照)。★ 失敗しても起動は止めない
             //   — トレイが出ないことより、アプリが起動しないことのほうが重い。
@@ -5802,7 +5812,7 @@ pub fn run() {
             if !matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
                 return;
             }
-            if window.label() == "overlay" {
+            if window.label() == "overlay" || window.label() == crate::handmark_spike::LABEL {
                 return;
             }
             tracing::info!("main window close requested -> shutting down");
@@ -5817,6 +5827,7 @@ pub fn run() {
         .manage(LogStatusState(log_target))
         .invoke_handler(tauri::generate_handler![
             greet,
+            handmark_spike::handmark_spike_latency,
             get_cognitive_state,
             get_intervention_decision,
             force_nudge,
