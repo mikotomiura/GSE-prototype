@@ -8,4 +8,4 @@
 - [x] 用語表に 1 行・theory/README を確かめる
 - [x] 誤記・番号の検査（タンジブリティ 0 件・使った [Pn] が references.md に実在）
 - [x] /cross-review（文書の差分だけ）と対応の記録
-- [ ] コミット・push（PR は出さない）
+- [x] コミット・push（PR は出さない）
