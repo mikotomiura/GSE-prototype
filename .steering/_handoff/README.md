@@ -13,7 +13,8 @@
 |---|---|---|
 | **ワクワクと打鍵からのタンジビリティの設計の議論** | `next-session-tangibility-design.md`（2026-10-14） | **済み（2026-10-15）**。`.steering/20261015-tangibility-design/` 判断 1〜17・調査 S-TG・`.idea` §13。次は下の 3 本 |
 | ~~手跡の案 A: Mac で小面が取り込みに写る → 会議の画面共有で写るかを確かめ、案 A の扱いを選び直す~~ | `next-session-handmark-capture-exclusion-mac.md`（2026-10-16） | **済み（2026-10-16）**。Chrome と Zoom の自動では写らず、標準のスクリーンショットと Zoom のフィルタリングなしでは写る（試作の `results.md` §2.1・陽性対照つき）。親タスクの判断 30: Mac でも範囲を限って写るのを許す。worktree `/Users/johnd/GSE-prototype-handmark-a` は残す（研究者）。次は手跡の理論の語（下の行） |
-| **手跡（Handmark）を計測終端型実践肖像論の 4 つ目の語として書く** | **`next-session-handmark-theory-term.md`**（2026-10-16） | **現行・未着手・Mac**。親タスクの判断 28。判断 30（Mac で写るのを許した理由）とつなげて書く（2026-10-16 追記） |
+| **手跡の表現を議論する**（小面の見た目と中身・案 C と D の形・背景の層で動く表現） | **`next-session-handmark-expression-design.md`**（2026-10-16） | **現行・未着手・Mac・次に行う**（研究者の選択）。理論の語より先 |
+| **手跡（Handmark）を計測終端型実践肖像論の 4 つ目の語として書く** | **`next-session-handmark-theory-term.md`**（2026-10-16） | **現行・未着手・Mac・表現の議論の後**。親タスクの判断 28。判断 30（Mac で写るのを許した理由）とつなげて書く（2026-10-16 追記） |
 | **相対のタイミングの写像は停滞と速さを写すか**（案 D の机上の検査・G-GEAR で行う） | **`next-session-tangibility-relative-timing-desk-check.md`**（2026-10-15） | **現行・未着手**。問いの立て方（第 3 回の天井を避ける）を研究者が決める |
 | ~~肖像と招待の分け方を機械で守る検査~~ | `next-session-portrait-separation-check.md`（2026-10-15） | 置き換え済み（2026-10-16）。下の「EH3 の凍結の前の準備」の段 2 へ |
 | **EH3 の凍結の前の準備**（F-1 を自分の壁紙で数日見比べる → 肖像と招待の分け方の検査） | **`next-session-eh3-pre-freeze-f1-and-separation.md`**（2026-10-16） | **現行・未着手・Mac**。F-1 → 分け方の検査の順。EH3 の配布物の固定の前に要る |
