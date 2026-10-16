@@ -8,6 +8,8 @@
 .steering/_handoff/next-session-tangibility-relative-timing-desk-check.md を読んで、/start-task で机上の検査のタスクを立て、§3 の問いの立て方を研究者と決めるところから始めて。
 ```
 
+G-GEAR での始め方（2026-10-16 追記）: この引き継ぎはブランチ `docs/tangibility-design` にだけある。先に `git fetch origin` をして、このブランチを取ってから読む。机上の検査の作業ブランチは、計器のある `docs/rhythm-stage-speed-shape`（またはその時点の最新の段）から切る。手跡の理論の語（判断 28・`next-session-handmark-theory-term.md`）は Mac 側で進めるので、ここでは触れない。
+
 ## 1. 背景（2026-10-15 に決まったこと）
 
 - タスク `.steering/20261015-tangibility-design/`（ブランチ `docs/tangibility-design`）の判断 14・17。
