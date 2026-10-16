@@ -404,6 +404,8 @@ pub fn handmark_spike_ripple(
     }
     #[cfg(not(target_os = "macos"))]
     {
+        // seq は macOS の CSV でしか読まないので、ここで読まないと Windows で dead_code になる。
+        let _ = record.seq;
         Err("handmark spike is macOS only".to_string())
     }
 }
