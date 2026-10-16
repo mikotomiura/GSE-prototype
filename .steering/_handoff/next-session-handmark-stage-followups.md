@@ -14,6 +14,12 @@
 .steering/_handoff/next-session-handmark-stage-followups.md を読んで、§3 の B（手跡の理論の語）へ進んで。
 ```
 
+2026-10-17 追記: A・B は済んだ（§3 の追記）。次のセッションは残りの計測から始める。
+
+```
+.steering/_handoff/next-session-handmark-stage-followups.md を読んで、§3 の「残り」の計測（低電力モードを切ったとき・電源につないだときの負荷、標準のスクリーンショットの食い違いの切り分け）から始めて。
+```
+
 このメモは枝 `spike/handmark-stage`（worktree `/Users/johnd/GSE-prototype-handmark-stage`）にある。コミットの前に `git branch --show-current` を確かめる。
 
 ## 1. 何が決まったか（`.steering/20261016-handmark-stage-spike/decisions.md`）
