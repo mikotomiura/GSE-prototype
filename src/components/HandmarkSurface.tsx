@@ -1,5 +1,7 @@
 // 手跡の案 A の小面の試作（spike・本線に入れない）。
-// 打鍵のたびに中心の点から波紋を 1 つ広げて消す（表現の議論の判断 5: 28 px・250 ms・打ち切り・灰）。
+// 打鍵のたびに中心の点から波紋を 1 つ広げて消す（表現の議論の判断 5: 250 ms・打ち切り）。
+// 大きさと色は handmark-stage-spike の判断 1（候補台の乙: 40 px・墨の輪 3 px＋白い縁 1.5 px）。
+// 墨と白の 2 色なので、壁紙の明暗に依らずどちらかが立つ。配色の明暗では切り替えない。
 // 式は見本のページの甲-2 と同じ。数値・文字は描かない（親タスク判断 16）。
 // 計測を有効にして起動したときだけ、遅れと波紋の一生（描いた時刻と進み）を Rust へ返す。
 import { useEffect, useRef } from "react";
@@ -13,16 +15,17 @@ interface HandmarkKeyPayload {
 }
 
 /** 窓の一辺（Rust の SIDE と一致させる）。 */
-const BOX_PX = 32;
+const BOX_PX = 52;
 /** 小面の大きさ（直径）。 */
-const SIZE_PX = 28;
+const SIZE_PX = 40;
 /** 波紋の動きの長さ。 */
 const RIPPLE_MS = 250;
-
-const COLORS = {
-  light: { base: "#9aa3ab", hi: "#ffffff" },
-  dark: { base: "#5e676f", hi: "#f2f4f6" },
-} as const;
+/** 地の点と輪の色（墨）と、その外側の縁の色（白）。 */
+const INK = "#2a3036";
+const EDGE = "#ffffff";
+/** 輪の線の太さと、点と輪の外側の白い縁の太さ。 */
+const RING_W = 3;
+const EDGE_W = 1.5;
 
 /** 描いている波紋。計測のために、最初と最後に描いたフレームの時刻と進みの最大を持つ。 */
 interface Ripple {
@@ -70,7 +73,6 @@ export default function HandmarkSurface() {
     canvas.height = BOX_PX * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const dark = window.matchMedia("(prefers-color-scheme: dark)");
     const center = BOX_PX / 2;
     const radius = SIZE_PX / 2;
 
@@ -80,9 +82,12 @@ export default function HandmarkSurface() {
     let disposed = false;
 
     const draw = (now: number): void => {
-      const { base, hi } = dark.matches ? COLORS.dark : COLORS.light;
       ctx.clearRect(0, 0, BOX_PX, BOX_PX);
-      ctx.fillStyle = base;
+      ctx.fillStyle = EDGE;
+      ctx.beginPath();
+      ctx.arc(center, center, radius * 0.32 + EDGE_W, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = INK;
       ctx.beginPath();
       ctx.arc(center, center, radius * 0.32, 0, Math.PI * 2);
       ctx.fill();
@@ -103,11 +108,17 @@ export default function HandmarkSurface() {
       ripple.lastFrame = now;
       ripple.maxT = Math.max(ripple.maxT, tc);
       const e = ease(tc);
+      const ringR = radius * (0.36 + 0.7 * e);
       ctx.globalAlpha = 1 - e;
-      ctx.strokeStyle = hi;
-      ctx.lineWidth = Math.max(1.2, radius * 0.12);
+      ctx.strokeStyle = EDGE;
+      ctx.lineWidth = RING_W + EDGE_W * 2;
       ctx.beginPath();
-      ctx.arc(center, center, radius * (0.36 + 0.7 * e), 0, Math.PI * 2);
+      ctx.arc(center, center, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = RING_W;
+      ctx.beginPath();
+      ctx.arc(center, center, ringR, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
     };
@@ -124,8 +135,6 @@ export default function HandmarkSurface() {
     };
 
     draw(performance.now());
-    const onScheme = (): void => draw(performance.now());
-    dark.addEventListener("change", onScheme);
 
     getCurrentWebviewWindow()
       .listen<HandmarkKeyPayload>("handmark-key", (event) => {
@@ -169,7 +178,6 @@ export default function HandmarkSurface() {
 
     return () => {
       disposed = true;
-      dark.removeEventListener("change", onScheme);
       if (frame !== null) {
         cancelAnimationFrame(frame);
       }
