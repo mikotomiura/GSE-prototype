@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "handmark-stage",
+  "description": "Handmark stage (background layer) spike window (macOS only, enabled by GSE_HANDMARK_STAGE_SPIKE=1; least privilege: core defaults only)",
+  "windows": ["handmark-stage"],
+  "permissions": ["core:default"]
+}

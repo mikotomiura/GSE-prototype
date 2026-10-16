@@ -47,6 +47,8 @@ pub mod recording;
 pub mod redaction;
 // 手跡の案 A の小面の試作（spike・本線に入れない・GSE_HANDMARK_SPIKE=1 のときだけ動く）。
 mod handmark_spike;
+// 手跡の背景の層の試作（spike・本線に入れない・GSE_HANDMARK_STAGE_SPIKE=1 のときだけ動く）。
+mod handmark_stage_spike;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -4229,6 +4231,7 @@ pub fn run() {
                     //   一時停止中は知らせない（EH3 の打鍵の扱いと同じ・data-privacy）。
                     if event.is_press && !crate::recording::is_paused() {
                         crate::handmark_spike::notify_key(event.timestamp);
+                        crate::handmark_stage_spike::notify_key();
                     }
                     // ペーストイベント (Ctrl+V / Cmd+V) を NDJSON に記録する。
                     // フック層は VK + 修飾キー状態のみから is_paste を立てる。
@@ -5795,6 +5798,9 @@ pub fn run() {
             // 手跡の小面の試作（GSE_HANDMARK_SPIKE=1 のときだけ）。トレイより先に作る（トレイが項目の有無を見る）。
             #[cfg(target_os = "macos")]
             crate::handmark_spike::setup(app);
+            // 手跡の背景の層の試作（GSE_HANDMARK_STAGE_SPIKE=1 のときだけ）。
+            #[cfg(target_os = "macos")]
+            crate::handmark_stage_spike::setup(app);
 
             // ★★ 常駐トレイ。⚠️ **窓を閉じると UI ごと消えるのに計測は生きている**という穴を塞ぐ
             //   (`tray.rs` のモジュールコメント参照)。★ 失敗しても起動は止めない
@@ -5823,6 +5829,15 @@ pub fn run() {
                 crate::handmark_spike::close(window.app_handle());
                 return;
             }
+            // 手跡の背景の層の試作: 閉じる要求は止めて隠すだけにする。
+            if window.label() == crate::handmark_stage_spike::LABEL {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                }
+                #[cfg(target_os = "macos")]
+                crate::handmark_stage_spike::close(window.app_handle());
+                return;
+            }
             if window.label() == "overlay" {
                 return;
             }
@@ -5840,6 +5855,7 @@ pub fn run() {
             greet,
             handmark_spike::handmark_spike_latency,
             handmark_spike::handmark_spike_ripple,
+            handmark_stage_spike::handmark_stage_tick,
             get_cognitive_state,
             get_intervention_decision,
             force_nudge,

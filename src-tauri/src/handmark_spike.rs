@@ -42,7 +42,7 @@ fn flag_on(value: Option<&str>) -> bool {
     value == Some("1")
 }
 
-fn env_flag(name: &str) -> bool {
+pub(crate) fn env_flag(name: &str) -> bool {
     flag_on(std::env::var(name).ok().as_deref())
 }
 
