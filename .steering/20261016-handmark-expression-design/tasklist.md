@@ -14,4 +14,4 @@
 ## 完了処理
 - [x] design.md に論点と結論を整理する
 - [x] 試作タスクへの引き継ぎを書く（次は試作 → 理論の語・研究者の選択）
-- [ ] git commit → push（PR は出さない）
+- [x] git commit → push（PR は出さない・f35ad0e4）
