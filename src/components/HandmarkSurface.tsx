@@ -23,9 +23,11 @@ const RIPPLE_MS = 250;
 /** 地の点と輪の色（墨）と、その外側の縁の色（白）。 */
 const INK = "#2a3036";
 const EDGE = "#ffffff";
-/** 輪の線の太さと、点と輪の外側の白い縁の太さ。 */
-const RING_W = 3;
+/** 輪の線の太さと、点と輪の外側の白い縁の太さ（試視で白い下地の輪が見えにくかったので 3 → 4・判断 2）。 */
+const RING_W = 4;
 const EDGE_W = 1.5;
+/** 輪が薄れはじめる広がりの進み。ここまでは濃いまま広がる（判断 2）。 */
+const FADE_FROM = 0.5;
 
 /** 描いている波紋。計測のために、最初と最後に描いたフレームの時刻と進みの最大を持つ。 */
 interface Ripple {
@@ -109,7 +111,7 @@ export default function HandmarkSurface() {
       ripple.maxT = Math.max(ripple.maxT, tc);
       const e = ease(tc);
       const ringR = radius * (0.36 + 0.7 * e);
-      ctx.globalAlpha = 1 - e;
+      ctx.globalAlpha = e < FADE_FROM ? 1 : 1 - (e - FADE_FROM) / (1 - FADE_FROM);
       ctx.strokeStyle = EDGE;
       ctx.lineWidth = RING_W + EDGE_W * 2;
       ctx.beginPath();

@@ -125,7 +125,7 @@ mod imp {
     use tauri_nspanel::ManagerExt;
 
     /// 小面の一辺（論理 px）と、画面の端からの余白。
-    /// 40 px の波紋の輪の最大（半径 約 24.2 px・白い縁を含む）が収まる大きさ（本タスク判断 1）。
+    /// 40 px の波紋の輪の最大（半径 約 24.7 px・線 4 px と白い縁を含む）が収まる大きさ（本タスク判断 1・2）。
     /// src/components/HandmarkSurface.tsx の BOX_PX と一致させる。
     const SIDE: f64 = 52.0;
     /// 40 px の円の縁が作業領域の端から約 16 px になる余白（前の試作と同じ距離）。

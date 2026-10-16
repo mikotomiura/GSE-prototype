@@ -19,6 +19,10 @@ const WINDOW_MS = 30_000;
 const STOP_MS = 2_000;
 /** 1 秒の刻み。 */
 const TICK_MS = 1_000;
+/** 直近 1 秒の打鍵 1 つあたりの位相の速さ（ラジアン毎秒・前の版の 1 秒の進みと同じ量）。 */
+const SPEED_PER_KEY = 0.05;
+/** これより遅くなったら止める。 */
+const MIN_SPEED = 0.002;
 
 export default function HandmarkStage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -47,9 +51,13 @@ export default function HandmarkStage() {
     let amp = 0;
     let ampFrom = 0;
     let ampTo = 0;
+    // 位相は描くたびに速さ × 経過時間で進める（チョイチョイ打っても流れが途切れない・判断 3）。
+    // 速さの目標は 1 秒ごとに決め（res=sec）、その 1 秒のあいだに滑らかに移す。
     let phase = 0;
-    let phaseFrom = 0;
-    let phaseTo = 0;
+    let speed = 0;
+    let speedFrom = 0;
+    let speedTo = 0;
+    let lastFrameAt: number | null = null;
     let tickAt = performance.now();
     let frame: number | null = null;
     let framesThisTick = 0;
@@ -61,7 +69,11 @@ export default function HandmarkStage() {
       const k = Math.min(1, (now - tickAt) / TICK_MS);
       const e = k * k * (3 - 2 * k);
       amp = ampFrom + (ampTo - ampFrom) * e;
-      phase = phaseFrom + (phaseTo - phaseFrom) * e;
+      speed = speedFrom + (speedTo - speedFrom) * e;
+      // 描画が止まっていた間（全画面のアプリなど）の分は進めない。
+      const dt = lastFrameAt === null ? 0 : Math.min(now - lastFrameAt, 100);
+      lastFrameAt = now;
+      phase += (speed * dt) / 1000;
       ctx.clearRect(0, 0, width, height);
       for (let i = 0; i < LINES; i++) {
         const y0 = (height * (i + 1)) / (LINES + 1);
@@ -89,10 +101,15 @@ export default function HandmarkStage() {
       framesThisTick += 1;
     };
 
-    // 移り変わりのあいだだけ描画のループを回す。目標に着いたら止める（負荷を抑える）。
+    // 流れているあいだと、振れ幅の移り変わりのあいだだけ描画のループを回す（負荷を抑える）。
     const loop = (now: number): void => {
       draw(now);
-      frame = now - tickAt < TICK_MS ? requestAnimationFrame(loop) : null;
+      if (now - tickAt < TICK_MS || speed > 0) {
+        frame = requestAnimationFrame(loop);
+      } else {
+        frame = null;
+        lastFrameAt = null;
+      }
     };
     const ensureLoop = (): void => {
       if (frame === null) {
@@ -111,12 +128,15 @@ export default function HandmarkStage() {
       const lastSec = presses.filter((t) => now - t <= TICK_MS).length;
       const stopped = presses.length === 0 || now - presses[presses.length - 1] > STOP_MS;
       ampFrom = amp;
-      phaseFrom = phase;
+      speedFrom = speed;
       ampTo = stopped ? amp * 0.85 : Math.min(1, presses.length / 150);
-      phaseTo = phase + (stopped ? 0 : Math.min(lastSec, 10) * 0.05);
+      // 直近 1 秒に打鍵があれば、その数の速さへ半分だけ寄せる。無ければ 0.6 倍ずつ落とす（数秒で止まる）。
+      const rate = Math.min(lastSec, 10) * SPEED_PER_KEY;
+      const nextSpeed = lastSec > 0 ? 0.5 * speed + 0.5 * rate : speed * 0.6;
+      speedTo = nextSpeed < MIN_SPEED ? 0 : nextSpeed;
       tickAt = now;
       // 目に見える変化があるときだけ描き直す。
-      if (Math.abs(ampTo - ampFrom) > 1e-3 || phaseTo !== phaseFrom) {
+      if (Math.abs(ampTo - ampFrom) > 1e-3 || speedFrom > 0 || speedTo > 0) {
         ensureLoop();
       }
       if (measure) {
