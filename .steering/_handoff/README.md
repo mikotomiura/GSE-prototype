@@ -12,6 +12,7 @@
 | トラック | ファイル | 状態 |
 |---|---|---|
 | **ワクワクと打鍵からのタンジビリティの設計の議論** | `next-session-tangibility-design.md`（2026-10-14） | **済み（2026-10-15）**。`.steering/20261015-tangibility-design/` 判断 1〜17・調査 S-TG・`.idea` §13。次は下の 3 本 |
+| **手跡の案 A: Mac で小面が取り込みに写る → 会議の画面共有で写るかを確かめ、案 A の扱いを選び直す** | **`next-session-handmark-capture-exclusion-mac.md`**（2026-10-16） | **現行・未着手・Mac**。前段の小面の試作（`next-session-handmark-a-surface-spike.md`）は済み（`.steering/20261016-handmark-a-surface-spike/`・判断 10 で閉じた）。親タスクの判断 29 |
 | **相対のタイミングの写像は停滞と速さを写すか**（案 D の机上の検査・G-GEAR で行う） | **`next-session-tangibility-relative-timing-desk-check.md`**（2026-10-15） | **現行・未着手**。問いの立て方（第 3 回の天井を避ける）を研究者が決める |
 | ~~肖像と招待の分け方を機械で守る検査~~ | `next-session-portrait-separation-check.md`（2026-10-15） | 置き換え済み（2026-10-16）。下の「EH3 の凍結の前の準備」の段 2 へ |
 | **EH3 の凍結の前の準備**（F-1 を自分の壁紙で数日見比べる → 肖像と招待の分け方の検査） | **`next-session-eh3-pre-freeze-f1-and-separation.md`**（2026-10-16） | **現行・未着手・Mac**。F-1 → 分け方の検査の順。EH3 の配布物の固定の前に要る |
