@@ -12,7 +12,8 @@
 //!   中身は 1 秒ごとの描画の量と窓の見え方だけ（打鍵の時刻もキーの種類も持たない）。
 //!   ⚠️ ただし描画は打鍵の後の数秒しか回らないので、毎秒の `frames` は「その秒に打っていたか」の粗い代わりの値になる。
 //!   行の時刻は窓を開いてからの相対で、ファイル名にも起動時刻を入れない（プロセス番号だけ）。
-//!   CSV は OS の一時ディレクトリに残るので、試作の計測の後は消す（手順書）。
+//!   ⚠️ それでもファイルの作成・更新の時刻と行の相対時刻から、打っていた時間帯は推定できる。
+//!   CSV を読める者には時間帯が分かる前提で、試作の計測の後は消す（手順書）。
 //! - 共有の種別は既定のまま出す（写るかを測る）。`GSE_HANDMARK_STAGE_SPIKE_PROTECT=1` のときだけ「なし」にし、
 //!   読み返せなければ出さない（小面と同じ fail-closed）。
 
@@ -236,7 +237,7 @@ mod imp {
         if guard.is_none() {
             let dir = std::env::temp_dir().join("gse-handmark-spike");
             std::fs::create_dir_all(&dir).map_err(|e| format!("create_dir_all: {e}"))?;
-            // 起動時刻を入れると、行の相対時刻と合わせて打っていた時間帯が戻せてしまうので、プロセス番号だけにする。
+            // 起動時刻を名前に入れない（ファイルの作成時刻からは推定できるので、保護ではなく露出を減らすだけ）。
             let path = dir.join(format!("stage-pid{}.csv", std::process::id()));
             let mut file = std::fs::File::create(&path).map_err(|e| format!("create csv: {e}"))?;
             file.write_all(b"tick,t_ms,frames,doc_visible,lag_ms,occlusion_visible\n")

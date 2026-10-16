@@ -9,7 +9,7 @@
 - [x] 候補台（5 候補 × 5 下地・実寸）を作り、研究者に選んでもらう → 乙（判断 1）
 - [x] `HandmarkSurface.tsx` と `handmark_spike.rs` に乙を入れ、窓の大きさを輪の最大に合わせる（52 px）
 - [x] tsc・cargo check が通る
-- [ ] 実際の窓が明るい壁紙と暗い壁紙の上で見えるか（研究者の目・段 3 の試視にまとめる・2026-10-16 研究者）
+- [x] 実際の窓の見え方（研究者の目・白い下地で輪が見えにくい → 判断 2。暗い壁紙は未確認）
 
 ## 段 2: 背景の層の実現性
 - [x] 背景の層の技術の調べ（survey-results.md §2・この枝にあった）
@@ -23,9 +23,9 @@
 
 ## 段 3: 研究者の試視
 - [x] 手順書（manual-check.md）
-- [ ] 研究者が背景と右下の小面を一緒に見る
+- [x] 研究者が背景と右下の小面を一緒に見る（results.md §7・指摘を判断 2・3 で直した。直した版は未試視）
 
 ## 完了処理
-- [ ] results.md
-- [ ] code-reviewer・security-checker・/cross-review
+- [x] results.md
+- [x] code-reviewer・security-checker・/cross-review（2 巡・判断 4・5）
 - [ ] git commit・push（PR は出さない）

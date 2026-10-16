@@ -134,8 +134,9 @@ export default function HandmarkStage() {
       ampFrom = amp;
       speedFrom = speed;
       ampTo = stopped ? amp * 0.85 : Math.min(1, presses.length / 150);
-      // 振れ幅の変化が 1 画素に満たなくなったら 0 に切る（見えない変化のために描き続けない）。
-      if (stopped && ampTo * height * AMP_GAIN < 0.5) {
+      // 1 秒の減り幅が 0.5 画素に満たなくなったら、0 へ一度で移す（見えない変化のために描き続けず、
+      // かつ描かないまま揺れが残って止まることも無くす。振れ幅は描くときにしか更新されないため）。
+      if (stopped && Math.abs(ampTo - amp) * height * AMP_GAIN <= 0.5) {
         ampTo = 0;
       }
       // 直近 1 秒に打鍵があれば、その数の速さへ半分だけ寄せる。無ければ 0.6 倍ずつ落とす（数秒で止まる）。
