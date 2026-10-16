@@ -5839,6 +5839,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             handmark_spike::handmark_spike_latency,
+            handmark_spike::handmark_spike_ripple,
             get_cognitive_state,
             get_intervention_decision,
             force_nudge,
