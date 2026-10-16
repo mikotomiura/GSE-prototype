@@ -9,10 +9,10 @@
 ```bash
 cd /Users/johnd/GSE-prototype-handmark-a
 export GSE_DATASET="$(mktemp -d)/gse-spike"; echo "$GSE_DATASET"
-GSE_HANDMARK_SPIKE=1 GSE_DEBUG=1 VITE_GSE_DEBUG=1 npx tauri dev
+env -u GSE_HANDMARK_SPIKE_MEASURE GSE_HANDMARK_SPIKE=1 GSE_DEBUG=1 VITE_GSE_DEBUG=1 npx tauri dev
 ```
 
-- 計測の環境変数（`GSE_HANDMARK_SPIKE_MEASURE`）は付けません。CSV は書かれません（前の試作の判断 4）。
+- 計測の環境変数（`GSE_HANDMARK_SPIKE_MEASURE`）は `env -u` で外しています。外すので、ターミナルに残っていても CSV は書かれません（前の試作の判断 4・本人の打鍵の時刻を残さない）。
 - 本体の窓で「開始する」を押します。小面はセッション中だけ動きます。
 - セッション中は、本体がいつもどおり打鍵の時刻とキーの種類を NDJSON に書きます（中身は書きません）。書き先は上の一時フォルダです。終わったら、トレイ（メニューバーの GSE）の「GSE を終了」で止め、次で消してください。
 
