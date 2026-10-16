@@ -393,6 +393,114 @@ mod tests {
         }
     }
 
+    /// F-1 の見比べの壁紙（手で回す・`.steering/20261016-eh3-pre-freeze/` 判断 2）:
+    /// `GSE_F1_VIEWING=<dir>` を置いて `cargo test --lib render_f1_viewing_days -- --ignored`。
+    /// 見本（上）と違い、配る物と同じ [`PortraitLayer`]（5 分ごとの予定・`active` の秒だけを貯める・
+    /// 終わりの seed）を通し、壁紙と同じ `write_png` で画面の大きさ（2560×1664）に書く。
+    /// 1 日 = 1 セッション・`GSE_F1_HOURS` 時間（既定 4・判断 4）の合成の打鍵。日ごとに列と生成器の seed を変える。
+    /// `GSE_F1_HOURS` に `2,3,4` のように複数を書くと、day 1 だけを 4 候補 × 各時間で書く（長さを決める試し）。
+    /// ⚠️ 合成の材料であり、実際の打鍵の見え方ではない。
+    #[test]
+    #[ignore]
+    fn render_f1_viewing_days() {
+        let Ok(dir) = std::env::var("GSE_F1_VIEWING") else {
+            return;
+        };
+        let dir = std::path::PathBuf::from(dir);
+        let (w, h) = (2560u32, 1664u32);
+        let hours: Vec<u64> = std::env::var("GSE_F1_HOURS")
+            .unwrap_or_else(|_| "4".into())
+            .split(',')
+            .map(|s| s.trim().parse().unwrap())
+            .collect();
+        // 判断 4: drift は配る物の経路では見えないので文法 2 つだけを見る。順は判断 2 #4 の乱数の順
+        // （raw-none, lattice-diffuse, lattice-none, raw-diffuse）を文法に読んだ raw→lattice→lattice→raw・各 2 日
+        let order = ["raw-none", "lattice-none", "lattice-none", "raw-none"];
+        let trial = ["raw-none", "lattice-diffuse", "lattice-none", "raw-diffuse"];
+        let counts = std::cell::RefCell::new(String::new());
+        let run = |cand: &str, day: u64, hours: u64| -> (Canvas, Canvas) {
+            let mut updates = 0u32;
+            let (g, d) = cand.split_once('-').unwrap();
+            let a = parse_assignment(&format!("order=A,E,D;a_first=seed;grammar={g};drift={d}"))
+                .unwrap();
+            let mut layer = PortraitLayer::new(a);
+            let mut shown = layer.start(T0, 0, Some(Condition::PortraitSeed), 2000 + day);
+            let mut r = SplitMix::new(1000 + day);
+            let mut t = 0u64;
+            while t < hours * 3600 {
+                let typing = 60 + (r.unit() * 240.0) as u64;
+                let pause = 10 + (r.unit() * 110.0) as u64;
+                let (f1, f3, f4, f6) = (
+                    80.0 + 400.0 * r.unit() as f64,
+                    0.4 * r.unit() as f64,
+                    1.0 + 15.0 * r.unit() as f64,
+                    0.9 * r.unit() as f64,
+                );
+                for k in 0..typing + pause {
+                    let now = T0 + (t + k) * 1000;
+                    let active = k < typing && r.unit() < 0.7;
+                    let s = if k < typing {
+                        Second {
+                            f1,
+                            f3,
+                            f4,
+                            f6,
+                            active,
+                        }
+                    } else {
+                        Second {
+                            f1: f64::NAN,
+                            f3: f64::NAN,
+                            f4: f64::NAN,
+                            f6: f64::NAN,
+                            active: false,
+                        }
+                    };
+                    let presses: Vec<u64> = if active {
+                        vec![now.saturating_sub(1000) + (r.unit() * 999.0) as u64]
+                    } else {
+                        Vec::new()
+                    };
+                    if let Some(x) = layer.second(now, s, &presses) {
+                        shown = Some(x);
+                        updates += 1;
+                    }
+                }
+                t += typing + pause;
+            }
+            let Some(Show::Image(daytime)) = shown else {
+                panic!("{cand} day {day}: no image was shown");
+            };
+            let Some(Show::Image(seed)) = layer.end() else {
+                panic!("{cand} day {day}: no seed");
+            };
+            counts.borrow_mut().push_str(&format!(
+                "day {day}\t{cand}\t{hours} h\t{updates} updates\n"
+            ));
+            (daytime, seed)
+        };
+        let save = |name: String, c: &Canvas| {
+            crate::wallpaper::write_png(&dir.join(name), c, w, h).unwrap();
+        };
+        if hours.len() > 1 {
+            for &hr in &hours {
+                for cand in trial {
+                    let (daytime, seed) = run(cand, 1, hr);
+                    save(format!("trial-{hr}h-{cand}-day.png"), &daytime);
+                    save(format!("trial-{hr}h-{cand}-seed.png"), &seed);
+                }
+            }
+        } else {
+            for day in 1..=8u64 {
+                let cand = order[((day - 1) / 2) as usize];
+                let (daytime, seed) = run(cand, day, hours[0]);
+                save(format!("day{day}-{cand}-day.png"), &daytime);
+                save(format!("day{day}-{cand}-seed.png"), &seed);
+            }
+        }
+        std::fs::write(dir.join("updates.tsv"), counts.into_inner()).unwrap();
+    }
+
     #[test]
     fn seed_of_a_ground_canvas_writes_nothing() {
         assert_eq!(seed_fold(&Canvas::ground()), None);
