@@ -11,6 +11,6 @@
 - [x] 実機: fail-closed（模擬の失敗で窓が出ない）
 - [x] 実機: 遅れ 約 200 回 → 95 パーセンタイル・最大
 - [x] 研究者の手順書（取り込みの目視・抜き取り撮影・試視）
-- [ ] code-reviewer + security-checker・指摘対応
+- [x] code-reviewer + security-checker・指摘対応（判断 8）
 - [ ] 結果を results.md に書く（Claude の分は済み・研究者の目視と試視の欄が残り）
 - [ ] /finish-task（/cross-review 必須・PR は出さず push で止める）

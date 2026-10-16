@@ -46,3 +46,11 @@
 
 - **判断日時**: 2026-10-16（研究者・推奨どおり）
 - **理由**: 本線に入れない試作で、形はヒアリングで決まった。
+
+## 判断 8: Step G のレビューの指摘への対応
+
+- **判断日時**: 2026-10-16（HIGH は規約で対応・MEDIUM は研究者・AskUserQuestion・推奨どおり）
+- **HIGH（code-reviewer）**: Windows では macOS 専用の定数・static・構造体が使われずに残り、CI の clippy `-D warnings` が赤になる。macOS 専用の項目に `#[cfg(target_os = "macos")]` を付けた。Windows を対象にコンパイルできないので、試作の cfg を存在しない OS 名に一時的に書き換えて macOS で clippy を回した。修正前のコミットでは dead_code の誤りが 6 件出て（陽性対照）、修正後は通った。
+- **MEDIUM 1（security-checker）**: 記録の一時停止中も小面への通知と計測の CSV が止まらなかった。通知の条件に `!recording::is_paused()` を足し（EH3 の `lib.rs:4274` と同じ）、CSV に書く直前にも一時停止を見る。
+- **MEDIUM 2（code-reviewer）**: design.md の「持ち越さない」と、終了後も残る計測の CSV の文面が合わなかった。CSV を例外として書き足した。
+- **そのままにしたもの**: トレイの「小面を閉じる」が閉じた後も残る（押しても害はない・試作）。sharingType の読み返しは「設定が入った」ことしか示さない（results.md は既にそう書いている。「写らない」は研究者の目視で判定する）。LOW（emit_to が target Any の JS リスナーにも届く・CSV の作り方・環境変数の毎回の読み出し・invoke の戻り値の型）は記録だけ。emit_to の性質は、本体に入れるときに窓の側から取りに来る形にするかを決める材料にする。

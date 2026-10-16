@@ -4226,7 +4226,8 @@ pub fn run() {
             let input = match rx.recv_timeout(timeout) {
                 Ok(event) => {
                     // 手跡の小面の試作: 打鍵の時刻だけを窓へ知らせる（環境変数が無ければ何もしない）。
-                    if event.is_press {
+                    //   一時停止中は知らせない（EH3 の打鍵の扱いと同じ・data-privacy）。
+                    if event.is_press && !crate::recording::is_paused() {
                         crate::handmark_spike::notify_key(event.timestamp);
                     }
                     // ペーストイベント (Ctrl+V / Cmd+V) を NDJSON に記録する。

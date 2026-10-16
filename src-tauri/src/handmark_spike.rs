@@ -12,19 +12,27 @@
 //! - 持ち越さない。状態はこのプロセスの中だけ。
 //! - 取り込みから外せないときは窓を出さない（試作の判断 6・fail-closed）。
 
+// ⚠️ macOS 以外では、label・計測の可否・コマンドの入口だけが残る。macOS 専用の項目に cfg を付けないと
+//   Windows で dead_code になり、CI の clippy -D warnings が赤になる（code-reviewer の HIGH）。
+#[cfg(target_os = "macos")]
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// 小面の窓の label。capabilities/handmark.json と src/main.tsx の分岐と一致させる。
 pub const LABEL: &str = "handmark";
 /// 打鍵を窓へ知らせるイベント名。
-pub const KEY_EVENT: &str = "handmark-key";
+#[cfg(target_os = "macos")]
+const KEY_EVENT: &str = "handmark-key";
 
+#[cfg(target_os = "macos")]
 const ENV_ENABLE: &str = "GSE_HANDMARK_SPIKE";
 const ENV_MEASURE: &str = "GSE_HANDMARK_SPIKE_MEASURE";
+#[cfg(target_os = "macos")]
 const ENV_FORCE_PROTECT_FAIL: &str = "GSE_HANDMARK_SPIKE_FORCE_PROTECT_FAIL";
 
 /// 窓が出ていて打鍵を送ってよいときだけ true。閉じたら false に戻す。
+#[cfg(target_os = "macos")]
 static ACTIVE: AtomicBool = AtomicBool::new(false);
+#[cfg(target_os = "macos")]
 static SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// 環境変数の値を真偽に読む。`GSE_DEBUG` と同じく "1" のときだけ真。
@@ -42,6 +50,7 @@ pub fn measure_enabled() -> bool {
 }
 
 /// 窓へ送る中身。キーの種類も内容も持たない。
+#[cfg(target_os = "macos")]
 #[derive(Clone, serde::Serialize)]
 struct KeyPayload {
     seq: u64,
@@ -52,6 +61,7 @@ struct KeyPayload {
 }
 
 /// 計測の CSV の 1 行。通し番号と遅れ（ミリ秒）だけ。
+#[cfg(target_os = "macos")]
 fn csv_line(seq: u64, latency_ms: f64) -> String {
     format!("{seq},{latency_ms:.1}\n")
 }
@@ -230,6 +240,10 @@ mod imp {
     }
 
     pub fn record_latency(seq: u64, latency_ms: f64) -> Result<(), String> {
+        // 遅れは窓から後で返ってくるので、書く直前にも一時停止を見る（止めたはずの記録を残さない）。
+        if crate::recording::is_paused() {
+            return Ok(());
+        }
         let mut guard = CSV.lock().map_err(|_| "csv lock poisoned".to_string())?;
         if guard.is_none() {
             let dir = std::env::temp_dir().join("gse-handmark-spike");
@@ -297,6 +311,7 @@ mod tests {
         assert!(!flag_on(Some(" 1")));
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn a_csv_line_carries_only_the_sequence_and_the_latency() {
         assert_eq!(csv_line(0, 12.34), "0,12.3\n");
