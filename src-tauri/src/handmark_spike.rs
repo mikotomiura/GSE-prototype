@@ -10,7 +10,9 @@
 //! - 本人の操作を記録しない。窓はマウスを受けない。計測の CSV は `GSE_HANDMARK_SPIKE_MEASURE=1` のときだけ
 //!   書き、中身は通し番号と遅れだけ（キーの種類も内容も持たない）。
 //! - 持ち越さない。状態はこのプロセスの中だけ。
-//! - 取り込みから外せないときは窓を出さない（試作の判断 6・fail-closed）。
+//! - 共有の種別（sharingType）を「なし」に設定して読み返せないときは窓を出さない（試作の判断 6・fail-closed）。
+//!   ⚠️ 読み返しが示すのは「設定が入った」ことまでで、取り込みに実際に写らないかは確かめていない
+//!   （新しい macOS の取り込みの方式が設定を守らないという報告がある・未確認）。写らないかは研究者の目視で判定する。
 
 // ⚠️ macOS 以外では、label・計測の可否・コマンドの入口だけが残る。macOS 専用の項目に cfg を付けないと
 //   Windows で dead_code になり、CI の clippy -D warnings が赤になる（code-reviewer の HIGH）。
@@ -133,7 +135,11 @@ mod imp {
                 }
                 let _ = APP.set(app.handle().clone());
                 ACTIVE.store(true, Ordering::Release);
-                tracing::info!(measure = measure_enabled(), "handmark spike: surface shown");
+                tracing::info!(
+                    measure = measure_enabled(),
+                    "handmark spike: surface shown (sharingType set to None and read back; \
+                     exclusion from actual capture is NOT verified by this check)"
+                );
             }
             Err(e) => {
                 // fail-closed（試作の判断 6）: 取り込みから外せたと確かめられないなら出さない。
@@ -143,7 +149,8 @@ mod imp {
         }
     }
 
-    /// NSPanel 化・クリック透過・位置・取り込みからの除外と読み返し。どれかが失敗したら Err。
+    /// NSPanel 化・クリック透過・位置・共有の種別の設定と読み返し。どれかが失敗したら Err。
+    /// ⚠️ Ok でも、取り込みに実際に写らないことまでは示さない。
     fn prepare(app: &AppHandle<Wry>, window: &tauri::WebviewWindow<Wry>) -> Result<(), String> {
         crate::overlay_panel::convert_overlay_to_panel(window)
             .map_err(|e| format!("NSPanel conversion failed: {e}"))?;

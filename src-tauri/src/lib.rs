@@ -5813,7 +5813,17 @@ pub fn run() {
             if !matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
                 return;
             }
-            if window.label() == "overlay" || window.label() == crate::handmark_spike::LABEL {
+            // 手跡の小面の試作: 閉じる要求は止めて、トレイと同じ「隠すだけ」の経路に流す
+            //   （NSPanel にした窓を壊すとプロセスごと落ちる・試作の判断 9）。
+            if window.label() == crate::handmark_spike::LABEL {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                }
+                #[cfg(target_os = "macos")]
+                crate::handmark_spike::close(window.app_handle());
+                return;
+            }
+            if window.label() == "overlay" {
                 return;
             }
             tracing::info!("main window close requested -> shutting down");

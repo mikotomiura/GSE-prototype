@@ -13,4 +13,4 @@
 - [x] 研究者の手順書（取り込みの目視・抜き取り撮影・試視）
 - [x] code-reviewer + security-checker・指摘対応（判断 8）
 - [ ] 結果を results.md に書く（Claude の分は済み・研究者の目視と試視の欄が残り）
-- [ ] /finish-task（/cross-review 必須・PR は出さず push で止める）
+- [x] /finish-task（/cross-review 済み・判断 9・PR は出さず push で止める）
