@@ -5856,6 +5856,7 @@ pub fn run() {
             handmark_spike::handmark_spike_latency,
             handmark_spike::handmark_spike_ripple,
             handmark_stage_spike::handmark_stage_tick,
+            handmark_stage_spike::handmark_stage_measure_enabled,
             get_cognitive_state,
             get_intervention_decision,
             force_nudge,

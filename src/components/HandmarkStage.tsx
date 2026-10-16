@@ -23,6 +23,8 @@ const TICK_MS = 1_000;
 const SPEED_PER_KEY = 0.05;
 /** これより遅くなったら止める。 */
 const MIN_SPEED = 0.002;
+/** 振れ幅 1 のときの線の揺れ（画面の高さに対する割合）。 */
+const AMP_GAIN = 0.05;
 
 export default function HandmarkStage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -59,6 +61,8 @@ export default function HandmarkStage() {
     let speedTo = 0;
     let lastFrameAt: number | null = null;
     let tickAt = performance.now();
+    // 移り変わりを始めた刻みだけ期限を延ばす（毎秒の刻みと切り離して、止まるべきときに確実に止める）。
+    let transitionUntil = 0;
     let frame: number | null = null;
     let framesThisTick = 0;
     let tickIndex = 0;
@@ -77,7 +81,7 @@ export default function HandmarkStage() {
       ctx.clearRect(0, 0, width, height);
       for (let i = 0; i < LINES; i++) {
         const y0 = (height * (i + 1)) / (LINES + 1);
-        const a = (6 + amp * height * 0.05) * (0.6 + 0.4 * Math.sin(i * 1.7));
+        const a = (6 + amp * height * AMP_GAIN) * (0.6 + 0.4 * Math.sin(i * 1.7));
         ctx.beginPath();
         for (let x = 0; x <= width; x += 6) {
           const y = y0 + a * Math.sin((x / width) * Math.PI * (2 + i * 0.35) + phase * (1 + i * 0.13) + i);
@@ -104,7 +108,7 @@ export default function HandmarkStage() {
     // 流れているあいだと、振れ幅の移り変わりのあいだだけ描画のループを回す（負荷を抑える）。
     const loop = (now: number): void => {
       draw(now);
-      if (now - tickAt < TICK_MS || speed > 0) {
+      if (now < transitionUntil || speed > 0) {
         frame = requestAnimationFrame(loop);
       } else {
         frame = null;
@@ -130,13 +134,18 @@ export default function HandmarkStage() {
       ampFrom = amp;
       speedFrom = speed;
       ampTo = stopped ? amp * 0.85 : Math.min(1, presses.length / 150);
+      // 振れ幅の変化が 1 画素に満たなくなったら 0 に切る（見えない変化のために描き続けない）。
+      if (stopped && ampTo * height * AMP_GAIN < 0.5) {
+        ampTo = 0;
+      }
       // 直近 1 秒に打鍵があれば、その数の速さへ半分だけ寄せる。無ければ 0.6 倍ずつ落とす（数秒で止まる）。
       const rate = Math.min(lastSec, 10) * SPEED_PER_KEY;
       const nextSpeed = lastSec > 0 ? 0.5 * speed + 0.5 * rate : speed * 0.6;
       speedTo = nextSpeed < MIN_SPEED ? 0 : nextSpeed;
       tickAt = now;
-      // 目に見える変化があるときだけ描き直す。
-      if (Math.abs(ampTo - ampFrom) > 1e-3 || speedFrom > 0 || speedTo > 0) {
+      // 目に見える変化（0.5 画素以上）があるときだけ描き直す。
+      if (Math.abs(ampTo - ampFrom) * height * AMP_GAIN > 0.5 || speedFrom > 0 || speedTo > 0) {
+        transitionUntil = now + TICK_MS;
         ensureLoop();
       }
       if (measure) {
@@ -156,7 +165,24 @@ export default function HandmarkStage() {
     const timer = window.setInterval(tick, TICK_MS);
 
     draw(performance.now());
-    window.addEventListener("resize", resize);
+    // canvas の大きさを変えると中身が消えるので、描き直す。止まっているときは位相を進めない。
+    const onResize = (): void => {
+      resize();
+      draw(performance.now());
+      if (frame === null) {
+        lastFrameAt = null;
+      }
+    };
+    window.addEventListener("resize", onResize);
+
+    // 計測するかは起動時に問い合わせる（最初の打鍵の前の秒も記録する）。
+    invoke<boolean>("handmark_stage_measure_enabled")
+      .then((on) => {
+        measure = measure || on;
+      })
+      .catch(() => {
+        // 問い合わせの失敗は背景の動作に影響させない（最初の打鍵で分かる）。
+      });
 
     getCurrentWebviewWindow()
       .listen<StageKeyPayload>("handmark-stage-key", (event) => {
@@ -177,7 +203,7 @@ export default function HandmarkStage() {
     return () => {
       disposed = true;
       window.clearInterval(timer);
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
       if (frame !== null) {
         cancelAnimationFrame(frame);
       }

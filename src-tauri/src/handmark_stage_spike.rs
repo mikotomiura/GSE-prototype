@@ -10,6 +10,9 @@
 //! - 壁紙の画像を読まない・書かない（EH3 の壁紙の経路に触れない）。
 //! - 本人の操作を記録しない。窓はマウスを受けない。計測の CSV は `GSE_HANDMARK_SPIKE_MEASURE=1` のときだけ書き、
 //!   中身は 1 秒ごとの描画の量と窓の見え方だけ（打鍵の時刻もキーの種類も持たない）。
+//!   ⚠️ ただし描画は打鍵の後の数秒しか回らないので、毎秒の `frames` は「その秒に打っていたか」の粗い代わりの値になる。
+//!   行の時刻は窓を開いてからの相対で、ファイル名にも起動時刻を入れない（プロセス番号だけ）。
+//!   CSV は OS の一時ディレクトリに残るので、試作の計測の後は消す（手順書）。
 //! - 共有の種別は既定のまま出す（写るかを測る）。`GSE_HANDMARK_STAGE_SPIKE_PROTECT=1` のときだけ「なし」にし、
 //!   読み返せなければ出さない（小面と同じ fail-closed）。
 
@@ -88,7 +91,7 @@ mod imp {
     use std::sync::{Mutex, OnceLock};
     use tauri::{AppHandle, Emitter, Manager, Wry};
 
-    // CGWindowLevelKey（CGWindowLevel.h）。デスクトップの層とアイコンの層。
+    // CGWindowLevelKey（CGWindowLevel.h）のデスクトップの層（アイコンの層 kCGDesktopIconWindowLevelKey より下）。
     const K_CG_DESKTOP_WINDOW_LEVEL_KEY: i32 = 2;
 
     #[link(name = "CoreGraphics", kind = "framework")]
@@ -233,11 +236,8 @@ mod imp {
         if guard.is_none() {
             let dir = std::env::temp_dir().join("gse-handmark-spike");
             std::fs::create_dir_all(&dir).map_err(|e| format!("create_dir_all: {e}"))?;
-            let started = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis())
-                .unwrap_or(0);
-            let path = dir.join(format!("stage-{started}.csv"));
+            // 起動時刻を入れると、行の相対時刻と合わせて打っていた時間帯が戻せてしまうので、プロセス番号だけにする。
+            let path = dir.join(format!("stage-pid{}.csv", std::process::id()));
             let mut file = std::fs::File::create(&path).map_err(|e| format!("create csv: {e}"))?;
             file.write_all(b"tick,t_ms,frames,doc_visible,lag_ms,occlusion_visible\n")
                 .map_err(|e| format!("write csv header: {e}"))?;
@@ -277,6 +277,12 @@ pub use imp::{close, is_shown, notify_key, setup};
 #[cfg(not(target_os = "macos"))]
 pub fn notify_key() {}
 
+/// 背景の窓が起動時に、計測するかを問い合わせる（最初の打鍵の前の秒も記録するため）。
+#[tauri::command]
+pub fn handmark_stage_measure_enabled(window: tauri::WebviewWindow) -> bool {
+    window.label() == LABEL && crate::handmark_spike::measure_enabled()
+}
+
 /// 窓が 1 秒ごとに返す描画の記録を受ける。計測を有効にして起動し、背景の窓から呼ばれたときだけ書く。
 #[tauri::command]
 pub fn handmark_stage_tick(
@@ -289,6 +295,11 @@ pub fn handmark_stage_tick(
 ) -> Result<(), String> {
     if window.label() != LABEL || !crate::handmark_spike::measure_enabled() {
         return Err("handmark stage measurement is not enabled".to_string());
+    }
+    // 閉じた（隠した）後は受け付けない（窓のタイマーは回り続けるため）。
+    #[cfg(target_os = "macos")]
+    if !ACTIVE.load(Ordering::Acquire) {
+        return Err("handmark stage is closed".to_string());
     }
     let record = TickRecord {
         tick,
