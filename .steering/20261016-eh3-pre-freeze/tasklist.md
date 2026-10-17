@@ -19,4 +19,6 @@
 - [x] 陽性対照（参照を 1 行・`p_stuck` で止める分岐を 1 つ → 赤）
 - [x] cargo test / clippy / fmt
 - [x] code-reviewer ∥ security-checker（HIGH 1・MEDIUM 3 を直す・判断 6）
-- [ ] /finish-task（/cross-review・CI の Windows・macOS）
+- [x] /cross-review（判断 7・指摘を直して push）
+- [ ] PR・CI の Windows・macOS（F-1 の結論が出てタスクを閉じるときに出す・研究者の指示 2026-10-17）
+- [ ] /finish-task

@@ -6949,6 +6949,8 @@ mod portrait_separation_tests {
         exempt: &'static [&'static str],
         /// `super::` を 1 段だけ許すか（`analysis/portrait/` の下の子のモジュール）。
         one_super: bool,
+        /// ほかに禁じる識別子（殻では推定の欄の `obs`・`alpha`。肖像の側の `alpha` は描画の引数なので禁じない）。
+        extra: &'static [&'static str],
     }
 
     /// 肖像の側（`analysis/portrait/`・`wallpaper*.rs`）で許す `crate::` の参照。
@@ -6991,7 +6993,9 @@ mod portrait_separation_tests {
             .filter(|id| !rules.exempt.contains(&id.as_str()))
             .filter(|id| {
                 let lower = id.to_ascii_lowercase();
-                CONTAINS.iter().any(|w| lower.contains(w)) || EXACT.contains(&lower.as_str())
+                CONTAINS.iter().any(|w| lower.contains(w))
+                    || EXACT.contains(&lower.as_str())
+                    || rules.extra.contains(&id.as_str())
             })
             .collect();
         for path in crate_paths(code) {
@@ -7005,7 +7009,7 @@ mod portrait_separation_tests {
         }
         // 相対の参照で `analysis/portrait/` の外へ出る経路（`super::super::heads` など）
         let escapes = if rules.one_super {
-            code.contains("super::super")
+            code.contains("super::super") || code.contains("super::{")
         } else {
             code.contains("super::")
         };
@@ -7038,19 +7042,18 @@ mod portrait_separation_tests {
         ("wallpaper_windows.rs", include_str!("wallpaper_windows.rs")),
     ];
 
-    /// `lib.rs` の `struct PortraitRunner` から `impl PortraitRunner` の終わりまで（見つからなければ赤）。
-    fn portrait_runner_source() -> &'static str {
-        let src = include_str!("lib.rs");
-        let s = src
-            .find("\nstruct PortraitRunner {")
-            .expect("struct PortraitRunner が lib.rs に無い（検査が無効になっている）");
-        let i = s + src[s..]
-            .find("\nimpl PortraitRunner {")
-            .expect("impl PortraitRunner が lib.rs に無い（検査が無効になっている）");
-        let e = i + src[i..]
-            .find("\n}\n")
-            .expect("impl PortraitRunner の終わりが取れない（検査が無効になっている）");
-        &src[s..e + 2]
+    /// `struct PortraitRunner` から `impl PortraitRunner` の終わり（字下げの無い `}`）まで。
+    ///
+    /// 行で探す（`lines()` は `\r` を落とす）: `*.rs` は `.gitattributes` で LF に固定していないので、
+    /// Windows の checkout で CRLF になっても同じに切れる（2026-10-17・/cross-review MEDIUM）。
+    fn runner_block(src: &str) -> Option<String> {
+        let lines: Vec<&str> = src.lines().collect();
+        let s = lines.iter().position(|l| *l == "struct PortraitRunner {")?;
+        let i = s + lines[s..]
+            .iter()
+            .position(|l| *l == "impl PortraitRunner {")?;
+        let e = i + lines[i..].iter().position(|l| *l == "}")?;
+        Some(lines[s..=e].join("\n"))
     }
 
     #[test]
@@ -7061,6 +7064,7 @@ mod portrait_separation_tests {
                 exempt: &[],
                 one_super: name.starts_with("analysis/portrait/")
                     && name != "analysis/portrait/mod.rs",
+                extra: &[],
             };
             let v = violations(&shipped_part(src), &rules);
             assert!(
@@ -7069,13 +7073,15 @@ mod portrait_separation_tests {
             );
         }
         // 呼び出し側の殻（推定の値は `feat` の引数の型としてだけ通る）
-        let runner = portrait_runner_source();
+        let runner = runner_block(include_str!("lib.rs"))
+            .expect("PortraitRunner が lib.rs から切り出せない（検査が無効になっている）");
         let rules = Rules {
             allowed: RUNNER_ALLOWED,
             exempt: &["FeatSnapshot", "loop_step"],
             one_super: false,
+            extra: &["obs", "alpha"],
         };
-        let v = violations(&shipped_part(runner), &rules);
+        let v = violations(&shipped_part(&runner), &rules);
         assert!(
             v.is_empty(),
             "PortraitRunner が推定・招待を参照している（肖像と招待の分け方）: {v:?}"
@@ -7093,6 +7099,7 @@ mod portrait_separation_tests {
             allowed: PORTRAIT_ALLOWED,
             exempt: &[],
             one_super: true,
+            extra: &[],
         };
         let caught = |code: &str| !violations(&shipped_part(code), &r).is_empty();
         // 推定を扱う側のファイルでは見つかる
@@ -7114,6 +7121,11 @@ mod portrait_separation_tests {
         assert!(!caught("use crate::eh3::{Assignment, Condition};"));
         // 相対の参照で外へ出る
         assert!(caught("use super::super::heads::writing;"));
+        assert!(caught("use super::{super::heads::writing};"));
+        // CRLF で checkout されても殻を切り出せる
+        let crlf = "x\r\nstruct PortraitRunner {\r\n}\r\n\r\nimpl PortraitRunner {\r\n    fn tick() {}\r\n}\r\nfn after() {}\r\n";
+        let block = runner_block(crlf).expect("CRLF で切り出せない");
+        assert!(block.contains("fn tick()") && !block.contains("after"));
         // 語の一覧に無い兄弟のモジュールも、`crate::` なら許可リストで止まる
         assert!(caught("use crate::analysis::metrics::Summary;"));
     }

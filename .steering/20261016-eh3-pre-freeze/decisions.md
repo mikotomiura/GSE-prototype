@@ -80,3 +80,16 @@
 - **MEDIUM 3**（`crate::eh3` を前方一致で許すと `Trigger` などの招待の経路を通す）: 許可を型・関数の名前に絞った（`Assignment`・`Condition`・`Drift`・`Grammar`、殻は加えて `DayTracker`・`local_day`）。`{...}` でまとめた import はほどいて照合する（入れ子はほどかず赤に倒れる）。
 - **陽性対照**（追加・2026-10-17・控えから戻し `cmp` で一致を確かめた）: 改名を戻す → 赤（`["level", "level"]`）／`PortraitRunner::tick` に `INVITATION_PRESENT` → 赤／`generator.rs` の `draw` に `p_stuck` → 赤。
 - **見送った LOW**: 終了の経路（`PORTRAIT_END_REQUESTED` → `end` → `Ack` の順）を通すテスト（大域の旗と `PORTRAIT_END_DONE` を伴い、並行するテストと干渉する。順序は差分で変えていない）／f3・f4・f6 と打鍵への感度の対照（f1 で比べ方が鈍くないことは確かめた）／`use crate as c;` の別名は拾えない。判断 5 の「限界」に加える。
+
+## 判断 7: /cross-review（a515ac47..ca9d7865）の指摘を直す
+
+- **判断日時**: 2026-10-17（研究者の指示: cross-review と push まで行い、PR はタスクを閉じるときに出す・AskUserQuestion・推奨どおり）
+- **結果**: 両者一致なし。Claude のみ 2 件（MEDIUM 1・LOW 1）、Codex のみ 3 件。差分は 583 行（警告の閾値 500 を超えたが手動承認の 2000 未満）。
+- **採用して直したもの**:
+  1. （Claude・MEDIUM・一次で確かめた）殻の切り出しが `"\n}\n"` を探していて、`*.rs` は `.gitattributes` で LF に固定していないため、Windows の checkout で CRLF になると見つからず panic する。→ 行で探す `runner_block` に替え、CRLF の合成のソースで切り出せることを対照に置いた。さらに `lib.rs`・肖像の側のソースを丸ごと CRLF にして 4 本が緑になることを手元で確かめた（戻して `cmp` で一致）。
+  2. （Codex）`use super::{super::heads::writing};` が `super::super` の文字列の検査をすり抜ける。→ `analysis/portrait/` の子では `super::{` も外へ出る経路として拾う。対照を足した。
+  3. （Claude・LOW）推定の欄 `obs`・`alpha` が語の一覧に無い。→ 殻の検査にだけ足した（肖像の側の `alpha` は `canvas.rs` の描画の引数なので禁じない）。陽性対照: 殻の `feat` が `f.obs` で材料を捨てる → 参照・振る舞いの両方が赤。
+- **記録に回したもの**（判断 5 の「限界」に加える）:
+  - （Codex）テストのモジュールより後ろに置いた配る項目は見ない。現状 5 ファイルとも、テストのモジュールがファイルの終わりまで続く。
+  - （Codex）`run()` の中で、推定で `p.feat()`・`p.tick()` を呼ぶか自体を決める経路は、どちらの検査も守らない（振る舞いの検査の `drive` は `run()` の呼び出し順を手で写したもの）。
+  - （Claude・LOW）一時停止の値を、`in_session` でない tick でも読むようになった。`is_paused` は Atomic の load だけで、振る舞いは変わらない（確認の記録）。
