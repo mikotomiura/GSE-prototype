@@ -16,6 +16,10 @@ Input files (one row per unit; `coder` is coder1 / coder2 / reconciled):
   items_<coder>.csv        item-level codes (C2b), keyed by version_id and item_no
   c4f_<coder>.csv          one row per recalculated result (source: text/table; consistent: yes/no/na; gross: 1/0)
   c4f_ai.csv               the AI draft for C4f (optional; human-AI agreement, report-only)
+  screening.csv            candidate screening (--screening only): one row per record and stage with
+                           record_id, population, stage (1 title/abstract, 2 full text, 3 centre), author1, ai,
+                           final. Stages 1-2: include / exclude / pending (final at stage 1: include / exclude);
+                           stage 3: A / B / boundary (final: A / B). Author 1 decides where the two differ
   links.csv                E5 links (record_id, group_id) for every record of an E5 group; the group's one coded
                            record is in records_*.csv, the others are NOT coded and appear only here
 The set of an instrument version (and of its items) is derived, never read: the first set,
@@ -29,6 +33,7 @@ Usage:
     python3 c_synthesis.py --tables <dir> [--coder reconciled]
     python3 c_synthesis.py --agreement <dir>
     python3 c_synthesis.py --screening-order <candidates.csv>
+    python3 c_synthesis.py --screening <screening.csv>    (writes out/screening_agreement.csv next to the input)
 """
 
 import argparse
@@ -133,6 +138,14 @@ REQUIRED = {
     "c4f": ["record_id", "result_id", "source", "consistent", "gross"],
 }
 LINK_COLUMNS = ["record_id", "group_id"]
+# Screening of the additional candidates (author 1 and an AI screener; author 1 decides where they differ)
+SCREEN_COLUMNS = ["record_id", "population", "stage", "author1", "ai", "final"]
+SCREEN_STAGES = ["1", "2", "3"]
+SCREEN_VOCAB = {   # stage -> column -> allowed values
+    "1": {"screeners": {"include", "exclude", "pending"}, "final": {"include", "exclude"}},
+    "2": {"screeners": {"include", "exclude", "pending"}, "final": {"include", "exclude", "pending"}},
+    "3": {"screeners": {"A", "B", "boundary"}, "final": {"A", "B"}},
+}
 
 
 class InputError(Exception):
@@ -293,6 +306,69 @@ def screening_order(candidates):
             if queues[g]:
                 order.append((g, queues[g].pop(0)))
     return order
+
+
+# --- screening agreement (registration: screening of the additional candidates) ----------
+
+def load_screening(path):
+    """screening.csv rows, validated: columns, empty cells, code lists per stage, duplicate (record_id, stage),
+    and the final value (equal to the common value where the screeners agree; a common boundary is resolved)."""
+    name = Path(path).name
+    if not Path(path).exists():
+        raise InputError(f"missing file {name}")
+    fields, rows = read_table(path)
+    if not fields:
+        raise InputError(f"{name}: empty file (no header)")
+    missing = [c for c in SCREEN_COLUMNS if c not in fields]
+    if missing:
+        raise InputError(f"{name}: missing columns {missing}")
+    seen = set()
+    for r in rows:
+        for col in SCREEN_COLUMNS:
+            if (r.get(col) or "") == "":                      # None = a short row: same as empty
+                raise InputError(f"{name}: empty cell in {col}")
+        if r["stage"] not in SCREEN_STAGES:
+            raise InputError(f"{name}: value {r['stage']!r} not allowed in column stage")
+        check_cell(name, "population", r["population"])
+        vocab = SCREEN_VOCAB[r["stage"]]
+        for col in ("author1", "ai"):
+            if r[col] not in vocab["screeners"]:
+                raise InputError(f"{name}: value {r[col]!r} not allowed in column {col} at stage {r['stage']}")
+        if r["final"] not in vocab["final"]:
+            raise InputError(f"{name}: value {r['final']!r} not allowed in column final at stage {r['stage']}")
+        key = (r["record_id"], r["stage"])
+        if key in seen:
+            raise InputError(f"{name}: record {r['record_id']} listed twice at stage {r['stage']}")
+        seen.add(key)
+        if r["author1"] == r["ai"] and r["final"] != r["author1"] and r["author1"] != "boundary":
+            raise InputError(f"{name}: record {r['record_id']} stage {r['stage']}: both screeners said "
+                             f"{r['author1']!r} but final is {r['final']!r}")
+    return rows
+
+
+def screening_agreement(rows):
+    """One dict per stage: agreement before reconciliation, records each screener sent on, how the differing
+    records were decided, and (stage 3) records either screener judged boundary. Percent agreement is the
+    observed proportion (0-1); kappa is None where undefined, as in cohen_kappa."""
+    out = []
+    for st in SCREEN_STAGES:
+        rs = [r for r in rows if str(r["stage"]) == st]
+        a = [r["author1"] for r in rs]
+        b = [r["ai"] for r in rs]
+        diff = [r for r in rs if r["author1"] != r["ai"]]
+        sent = (lambda col: len(rs)) if st == "3" else (lambda col: sum(r[col] in ("include", "pending") for r in rs))
+        as_a1 = sum(r["final"] == r["author1"] for r in diff)
+        as_ai = sum(r["final"] == r["ai"] for r in diff)
+        out.append({
+            "stage": int(st), "n": len(rs),
+            "percent_agreement": (sum(x == y for x, y in zip(a, b)) / len(rs)) if rs else None,
+            "kappa": cohen_kappa(a, b),
+            "author1_sent_on": sent("author1"), "ai_sent_on": sent("ai"),
+            "differed": len(diff), "decided_as_author1": as_a1, "decided_as_ai": as_ai,
+            "decided_otherwise": len(diff) - as_a1 - as_ai,
+            "boundary_either": sum("boundary" in (r["author1"], r["ai"]) for r in rs) if st == "3" else "",
+        })
+    return out
 
 
 # --- derived values (GSRR-43, GSRR-48) -------------------------------------
@@ -884,6 +960,7 @@ def main():
     ap.add_argument("--coder", default="reconciled")
     ap.add_argument("--agreement", type=Path)
     ap.add_argument("--screening-order", type=Path)
+    ap.add_argument("--screening", type=Path)
     a = ap.parse_args()
     if a.screening_order:
         for g, i in screening_order(read_csv(a.screening_order)):
@@ -919,6 +996,16 @@ def main():
             return 3
         write_csv(out / "agreement.csv", rows)
         print(f"agreement rows={len(rows)}")
+    elif a.screening:
+        out = a.screening.parent / "out"
+        out.mkdir(exist_ok=True)
+        try:
+            rows = screening_agreement(load_screening(a.screening))
+        except InputError as e:
+            print(f"STOPPED: {e}", file=sys.stderr)
+            return 3
+        write_csv(out / "screening_agreement.csv", rows)
+        print(f"screening stages={len(rows)}")
     else:
         ap.print_help()
         return 2

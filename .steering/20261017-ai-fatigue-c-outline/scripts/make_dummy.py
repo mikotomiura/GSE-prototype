@@ -741,4 +741,76 @@ assert got_s1 != rec_s1, "coder2 and reconciled values must give different S1 ta
 c2b_exp = cs.c2b_tables(b_c2["items"], b_c2["vsets"], "main", lenient=True, insts=b_c2["insts"])
 assert [{k: v for k, v in r.items() if k != "analysis"} for r in s3_c2] == c2b_exp, "S3 must use the coder given"
 assert [r for r in s3_c2 if r["version_id"] != "SUMMARY"] != [r for r in s3_rec if r["version_id"] != "SUMMARY"]
+# screening agreement (author 1 vs AI screener, three stages)
+SCR_COLS = ["record_id", "population", "stage", "author1", "ai", "final"]
+POP_ = "students_learners"
+scr_rows = (
+    # stage 1: 4 records. agree on 3 (i/i, e/e, i/i), differ on 1 (include vs exclude, author 1 decides include)
+    [("S1", 1, "include", "include", "include"), ("S2", 1, "exclude", "exclude", "exclude"),
+     ("S3", 1, "include", "include", "include"), ("S4", 1, "include", "exclude", "include")]
+    # stage 2: 4 records. differ on 3: author1 wins, ai wins, neither
+    + [("S1", 2, "include", "include", "include"), ("S3", 2, "include", "exclude", "include"),
+       ("S4", 2, "exclude", "include", "include"), ("S5", 2, "pending", "exclude", "include")]
+    # stage 3: 4 records. agree on 2 (A/A, boundary/boundary resolved B), differ on 2
+    + [("S1", 3, "A", "A", "A"), ("S3", 3, "boundary", "boundary", "B"),
+       ("S4", 3, "A", "B", "B"), ("S5", 3, "boundary", "A", "A")]
+)
+
+
+def scr_write(name, rows, cols=SCR_COLS):
+    p = out / name
+    with open(p, "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(cols)
+        for rid, st, a1, ai, fin in rows:
+            w.writerow([rid, POP_, st, a1, ai, fin])
+    return p
+
+
+scr_p = scr_write("screening.csv", scr_rows)
+sa = {r["stage"]: r for r in cs.screening_agreement(cs.load_screening(scr_p))}
+# stage 1: n=4, agree 3 -> 0.75; kappa: a=[i,e,i,i] b=[i,e,i,e]: pe=(3*2+1*2)/16=0.5 -> (0.75-0.5)/0.5=0.5
+assert sa[1]["n"] == 4 and sa[1]["percent_agreement"] == 0.75 and abs(sa[1]["kappa"] - 0.5) < 1e-12, sa[1]
+assert (sa[1]["author1_sent_on"], sa[1]["ai_sent_on"]) == (3, 2), sa[1]
+assert (sa[1]["differed"], sa[1]["decided_as_author1"], sa[1]["decided_as_ai"], sa[1]["decided_otherwise"]) == (1, 1, 0, 0)
+assert sa[1]["boundary_either"] == ""
+# stage 2: n=4, agree 1 -> 0.25; a=[i,i,e,p] b=[i,e,i,e]: pe=(2*2 + 1*2 + 1*0)/16 -> i:ca=2,cb=2 ->4; e:1*2=2; p:1*0 -> 6/16
+#   kappa=(0.25-0.375)/(0.625)=-0.2
+assert sa[2]["percent_agreement"] == 0.25 and abs(sa[2]["kappa"] - (-0.2)) < 1e-12, sa[2]
+assert (sa[2]["author1_sent_on"], sa[2]["ai_sent_on"]) == (3, 2), sa[2]
+assert (sa[2]["differed"], sa[2]["decided_as_author1"], sa[2]["decided_as_ai"], sa[2]["decided_otherwise"]) == (3, 1, 1, 1), sa[2]
+# stage 3: n=4, agree 2 -> 0.5; a=[A,bd,A,bd] b=[A,bd,B,A]: pe=(A:2*2 + bd:2*1 + B:0)/16=6/16 -> kappa=(0.5-0.375)/0.625=0.2
+assert sa[3]["percent_agreement"] == 0.5 and abs(sa[3]["kappa"] - 0.2) < 1e-12, sa[3]
+assert (sa[3]["author1_sent_on"], sa[3]["ai_sent_on"]) == (4, 4), sa[3]
+assert (sa[3]["differed"], sa[3]["decided_as_author1"], sa[3]["decided_as_ai"], sa[3]["decided_otherwise"]) == (2, 0, 2, 0), sa[3]
+assert sa[3]["boundary_either"] == 2, sa[3]
+assert cs.screening_agreement([])[0]["kappa"] is None and cs.screening_agreement([])[2]["boundary_either"] == 0
+# CLI: writes out/screening_agreement.csv next to the input, exit 3 on bad input
+assert cs.main.__module__ == "c_synthesis"
+import subprocess
+rc_ = subprocess.run([sys.executable, str(Path(cs.__file__)), "--screening", str(scr_p)], capture_output=True)
+assert rc_.returncode == 0 and (out / "out" / "screening_agreement.csv").exists(), rc_
+# kappa undefined when both screeners use one category only
+assert cs.screening_agreement(cs.load_screening(scr_write("screening_one.csv", [("S1", 1, "include", "include", "include")])))[0]["kappa"] is None
+
+
+def scr_must_stop(label, rows, needle, cols=SCR_COLS):
+    p = scr_write(f"screening_bad_{label}.csv", rows, cols)
+    try:
+        cs.load_screening(p)
+    except cs.InputError as e:
+        assert needle in str(e), (label, str(e))
+        bad = subprocess.run([sys.executable, str(Path(cs.__file__)), "--screening", str(p)], capture_output=True)
+        assert bad.returncode == 3, (label, bad.returncode)
+        return
+    raise AssertionError(f"screening {label}: expected InputError")
+
+
+scr_must_stop("final_boundary", [("S1", 3, "A", "B", "boundary")], "not allowed in column final")
+scr_must_stop("final_pending_stage1", [("S1", 1, "include", "exclude", "pending")], "not allowed in column final")
+scr_must_stop("duplicate", [("S1", 1, "include", "include", "include"), ("S1", 1, "include", "include", "include")], "twice")
+scr_must_stop("agree_final_differs", [("S1", 2, "include", "include", "exclude")], "both screeners")
+scr_must_stop("stage3_value_in_stage1", [("S1", 1, "A", "include", "include")], "not allowed in column author1")
+scr_must_stop("missing_column", [("S1", 1, "include", "include", "include")], "missing columns", cols=SCR_COLS[:-1] + ["finl"])
+scr_must_stop("empty_cell", [("S1", 1, "include", "", "include")], "empty cell in ai")
 print(f"dummy tables in {out}; all boundary tests passed")

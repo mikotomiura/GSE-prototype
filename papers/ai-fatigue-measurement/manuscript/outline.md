@@ -78,14 +78,17 @@ manuscript:
   twice, at least four weeks apart (GSRR-44). The agreement reported is between two passes of one coder, not between
   coders, and no claim of independent coding is made. The coder wrote the earlier narrative review, so the codes carry
   that view of what counts as a problem (GSRR-46).
-- The main set is the set of studies included by 31 December 2026 by two independent screeners, the first author and
-  an AI screener whose accuracy was checked against human decisions before registration; the first author decided
-  where they differed (GSRR-33, GSRR-37, GSRR-39). It does not rest on two human screeners; the screening by both
+- The main set is the set of studies included by 31 December 2026 after screening by the first author and an AI
+  screener, each on their own; the first author decided where they differed (GSRR-33, GSRR-38, GSRR-39). The AI
+  screener was checked against human decisions on records that had been used to refine the criteria, so its accuracy
+  may be optimistic (GSRR-37). Only free full texts were used; records without one stayed pending and were not coded
+  (GSRR-65). It does not rest on two human screeners; the screening by both
   authors after the manuscript draft is a sensitivity analysis, done knowing the results (GSRR-62). The set was drawn
   from one literature database built from free sources, and the first author, who screened it, knew the coding rules;
   before registration, the first author had screened 79 of the additional candidates after reading AI-generated
-  appraisals (GSRR-34, GSRR-65). It is not a census of the literature on AI and fatigue. Every claim about the main set
-  is about that set.
+  appraisals (GSRR-34, GSRR-65). Human screening before registration was uneven across population groups; all
+  candidates were screened again in an order that alternates between groups (GSRR-33). It is not a census of the
+  literature on AI and fatigue. Every claim about the main set is about that set.
 
 ## Relation to the authors' earlier narrative review
 
@@ -131,7 +134,8 @@ validity evidence.
 
 The released materials (the code table with codes, item numbers and source pages but no item text; the screening
 decisions made after registration; the scripts) are the means by which the tables can be recomputed and the scheme
-reused. They are not claimed as new findings. The tables can be recomputed from the code table; checking the C2b codes
+reused; whether other people apply the scheme in the same way has not been tested. They are not claimed as new
+findings. The tables can be recomputed from the code table; checking the C2b codes
 themselves requires the original instruments at the pages given.
 
 ## Rule for the abstract
@@ -142,7 +146,8 @@ the main set only:
 - one sentence on the scope of the set, which is never removed: a set drawn from one literature database built from
   free sources, screened by the first author and an AI screener, closed on 31 December 2026, and not a census of the
   literature; with the number of studies and instruments coded and the number of candidates still unscreened on that
-  date;
+  date; if any problem statement changes when both authors screen the set (sensitivity analysis 5), or if that
+  screening was not done, the sentence says so (GSRR-62);
 - how the coding was done: by one coder, the first author, twice;
 - the three things TRACE links, each with counts and no evaluative word: the distribution of the representative level
   of attribution (C1); for the instruments first seen in the main set with printed items, for each
@@ -374,12 +379,17 @@ columns; no value is filled in before coding.
   | Main set | — | — | — | — | — |
   | Late stratum | — | — | — | — | — |
   | Exploration set | — | — | — | — | — |
+  | Pending at full text on 31 December 2026 | — | | | — | |
   | Unscreened on 31 December 2026 | — | | | — | |
+
+  A note gives, for each screening stage, the agreement between the first author and the AI screener, the records
+  each sent on, the differences decided each way and the records judged boundary (GSRR-37); this agreement is not
+  the AI screener's accuracy.
 
 - Table 4: agreement between the two coding passes of one coder per code (percentage agreement, kappa with bootstrap
   95% CI, n), with the calibration passes, the main set and the exploration set in separate columns; the C4f agreement
   with the AI draft; records coded in one pass only. The heading states that this is agreement within one coder
-  (GSRR-44).
+  (GSRR-44), and a note that calibration agreement may be higher than on new studies (GSRR-65).
 - Table 5: C1 representative level (L1a, L1b, L2, L3, L4, L5, L6, excluded values), count and, where allowed,
   proportion.
 - Table 6: C2a origin, modification (per kind: stated / found by comparison / no change / not verifiable) and format;
@@ -410,7 +420,9 @@ columns; no value is filled in before coding.
   that made records not evaluable (GSRR-57).
 
 - Table 13: sensitivity analyses (problem statements as in Table 12, with C7 by condition), with analysis 5 (main set
-  decided by both authors after the draft) in its own columns and the number of studies it added and removed.
+  decided by both authors after the draft) in its own columns and the number of studies it added and removed; the
+  record-level tables under analysis 5 go in the supplement. If analysis 5 was not done, its column is empty with the
+  reason (GSRR-62).
 - Table 14: recommendations.
 
   | Recommendation | Code | Row of Table 12 | Source: existing standard (cited) or proposal of this scheme | Question → what is measured → evidence needed → wording allowed (proposal) |

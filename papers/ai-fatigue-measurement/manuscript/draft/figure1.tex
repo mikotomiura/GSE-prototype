@@ -13,10 +13,10 @@
   node distance=7mm and 9mm]
   \node[box] (cand) {Additional candidates in the source database\\(n = ---)};
   \node[side, right=of cand] (unscr) {Unscreened on 31 December 2026\\(n = ---, by population group)};
-  \node[box, below=of cand] (scr) {Screened by both authors, final decision\\recorded on or before 31 December 2026\\(n = ---)};
+  \node[box, below=of cand] (scr) {Screened by the first author and the AI screener;\\final decision recorded on or before 31 December 2026\\(n = ---; pending at full text: n = ---)};
   \node[side, right=of scr] (excl) {Excluded, by code\\(n = ---; E2 and E3 by population group)};
   \node[box, below=of scr] (incl) {Included primary studies\\(records n = ---)};
-  \node[side, right=of incl] (calib) {Calibration records, removed\\(n = ---; rounds = ---;\\small-pool rule applied: ---)};
+  \node[side, right=of incl] (agree) {Agreement of the two screeners per stage,\\and differences decided each way\\(Table~3 note; not the AI screener's accuracy)};
   \node[box, below=of incl] (main) {Main set\\records: n = ---\\studies, E5-linked records counted once:\\n = ---};
   \node[side, right=of main] (late) {Late stratum: included after\\31 December 2026, before main coding\\(n = ---; reported outside the primary counts)};
   \node[box, below=10mm of main] (expl) {Exploration set (reported separately)\\primary studies from the exploratory\\bibliography of 34 records: 10;\\item-coded instruments: 4};
@@ -25,7 +25,6 @@
   \draw[arr] (scr) -- (incl);
   \draw[arr] (scr) -- (excl);
   \draw[arr] (incl) -- (main);
-  \draw[arr] (incl) -- (calib);
   \draw[arr, dashed] (unscr.east) -- ++(4mm,0) |- (late.east);
 \end{tikzpicture}
 \end{document}
