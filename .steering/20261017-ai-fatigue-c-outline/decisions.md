@@ -157,3 +157,19 @@
 - 変えたもの（`registration-en.md`）: 題を TRACE に（"Protocol for a registered methodological review"）・C4f に statcheck との 3 つの違い（検定ごとの判定・表の値を含む・割合と間接効果）と結果単位の数の報告・GSRR-56 に「使われた尺度の版」「C4f の結果単位」「研究ごとの表」・GSRR-64 の一覧と検査の一覧・添付 5（原稿の外枠）。
 - 脚本: `c_synthesis.py` に `c4f_result_table`・`instruments_used`・`per_study_table` と 3 つの CSV の出力を足した。`make_dummy.py` に検査を足し、全検査が緑。新しい検査が効くことは変異 2 つ（版を初出の集合で絞る・記録の 0 件を落とす）で赤になることで確かめた。
 - 登録版に書いた「表の中の値を含む」は研究者にまだ確かめていない既定（同判断 5）。
+
+## 判断 14: 外枠のプレ査読 round 2 を受けた登録版 0.8（2026-10-17）
+
+- 経緯: `.steering/20261017-ai-fatigue-c-manuscript/decisions.md` 判断 6（外枠の attack-me round 2 と研究者の採否）。
+- 変えたもの（`registration-en.md`）:
+  - GSRR-1 の題を見出しと同じ TRACE の題にし、TRACE の定義（帰属 C1・項目 C2・報告が述べ結論づけること C4〜C7）を置いた。
+  - GSRR-10 の「narrative review の問題が別の集合でも見られるかを問う」を、記述と存在の陳述に改め、narrative review の観察は並べるだけと書いた。「tested」の小見出しを改めた。背景の 2 文に「出典は登録時に」の印。
+  - GSRR-12 の SQ1 を「群ごとにどう分布するか」に改め、群の間の比較の文を書かないと明記。
+  - GSRR-43 の C7: 「within」の意味を限り、各条件を met / not met で記録する。条件ごとの unresolved。
+  - C4f: r を再計算の対象に加えた。z は報告されたときだけ。表の値の扱い（表の注の自由度・N から推す自由度・アスタリスクだけの p・本文と表の重複）と、結果ごとの出どころ（本文 / 表）。statcheck との違いを 4 つに（多重比較で調整した p を数えないことを足した）。
+  - GSRR-56: C7 を条件ごと・C6a と C7 (iii) が両方立つ記録の数・使われた尺度の版に言語・AI への言及・項目数・C4f の出どころ。
+  - GSRR-57: C7 を 3 つの問題の型に分けた（研究者の選択）。群・centre の間でも多い少ないを言わない。
+  - GSRR-63: 「頻度の問い」を「集合にある実践の記述・割合は文献の頻度の推定ではない」に。
+  - GSRR-65 の限界に名前の照合の限界。添付 5 に版・日付・SHA-256。
+- 脚本: `c_synthesis.py` に `c7_conditions`（条件ごと・自分の入力だけで unresolved・centre では (ii) を not_applicable）・問題の文の C7 を 3 型に・`c6a_c7iii_overlap` と CSV・C4f の `source` 列（必須）と出どころ別の数・使われた尺度の版の `language`・`items_full`（必須）・`refers_to_ai`。`make_dummy.py` に検査を足し、全検査が緑。C7 (i) の判定を壊した変異で赤になることを確かめた。
+- 登録版の prereg の attack-me（round 1〜3）の後の変更なので、登録の前に差分を確かめる（研究者が round を回すかを決める）。

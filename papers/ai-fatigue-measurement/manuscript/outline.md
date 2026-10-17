@@ -1,10 +1,13 @@
 # Manuscript outline
 
+Version 2, 17 October 2026.
+
 This outline fixes the structure of the manuscript, the evidence for each claim and the rules for reporting before
 any record of the confirmation set is coded. It contains no result value and no expectation about results. Each claim
 names the item of the registration that defines it (GSRR numbers refer to the registered protocol, Generalized
 Systematic Review Registration form), the output from which its values are copied, and the table or figure that
-reports it. This outline is attached to the registration, so the version fixed before coding can be checked; any
+reports it. This outline is to be attached to the registration with its version, date and SHA-256, so the version
+fixed before coding can be checked; any
 difference between it and the manuscript is reported as a deviation (Table 2). The registration, its codebook and its
 amendments take precedence over this outline wherever they differ.
 
@@ -13,8 +16,8 @@ amendments take precedence over this outline wherever they differ.
 TRACE: Tracing how studies of "AI fatigue" attribute, measure and report fatigue. A registered methodological review
 
 The title is fixed with the registration and is not changed after the results are known. It repeats the registered
-title, with the article type in place of "Protocol for a registered methodological review". TRACE is the name of the
-registered coding scheme (Contribution 1), not of a measure of fatigue.
+title (GSRR-1), with the article type in place of "Protocol for a registered methodological review". TRACE is the
+name of the registered coding scheme (GSRR-1, Contribution 1), not of a measure of fatigue.
 
 ## Journal requirements to be met
 
@@ -42,8 +45,9 @@ manuscript:
 - Primary answers come from the confirmation set only (GSRR-11). The exploration set, from which the rules were
   built, is reported in a separate table and is never used to state that a problem was observed in the confirmation
   set (GSRR-57). The late stratum is reported separately and outside the primary counts (GSRR-39). Tables of
-  different sets may stand side by side; no statement says that a value is larger, smaller, more or less common in
-  one set than in another.
+  different sets, centres or population groups may stand side by side; no statement says that a value is larger,
+  smaller, more or less common in one of them than in another (GSRR-12, GSRR-57). Proportions describe the coded set
+  and are not estimates of how often a practice occurs in the literature (GSRR-63).
 - A table based on fewer than 10 studies reports counts only (GSRR-39). A statement about a problem type is one of
   "was observed in the confirmation set", "was not observed in the confirmation set" or "could not be evaluated", each
   with the count, the number of evaluable records and the number unresolved (GSRR-57). These statements report
@@ -51,25 +55,32 @@ manuscript:
   other word of frequency or severity ("common", "widespread", "rare", "serious") is used about a problem type, and
   the words "replicate", "replication" and "confirm" are not used about the observations of the narrative review.
 - The item-content types (C2b) are described and are not called problems (GSRR-57). C2b is a researcher
-  classification of item wording. It is not a content-validity assessment in the sense of COSMIN, which requires
-  experts and the target population (GSRR-10), and it shows what items ask about, not what scores contain (GSRR-65).
+  classification of item wording. It is not a content-validity assessment in the sense of COSMIN, which asks
+  members of the target population and professionals to rate the items (Terwee et al., 2018), and it shows what items
+  ask about, not what scores contain (GSRR-65).
   It covers instruments whose items are printed; instruments with items unavailable are counted, and may differ from
   the others (GSRR-65).
 - The level of attribution (C1) is described and is not a problem type; claiming "AI fatigue" on a weak attribution is
   counted only through C7 (ii).
 - C2d records whether reports disclose items, reliability in the sample, factor analyses and reasons for the choice;
   it does not rate measurement properties. C2d and C4 describe reporting and are not quality ratings (GSRR-55).
-- C7 says how far a conclusion is supported by what was measured; it does not judge whether a finding is true
-  (GSRR-57). Its three conditions compare different things: (i) causal wording with the design, (ii) the term "AI
-  fatigue" with the level of attribution, and (iii) the construct term of the conclusion with the name of the main
-  instrument. Condition (iii) and C6a compare names, not the content of the instruments. C7 is therefore always
-  reported by condition, and the Discussion does not treat "beyond what was measured" as a single quantity.
-- Coder agreement is agreement between two coders who built the rules and wrote the narrative review together, not
-  agreement between independent perspectives (GSRR-46). If coder 2 was unavailable, the coding is reported as single
-  coding and no claim of independent coding is made (GSRR-44).
+- C7 checks three conditions under which a conclusion goes beyond what was measured; it does not judge whether a
+  finding is true (GSRR-57). The conditions compare different things: (i) causal wording with the design, (ii) the
+  term "AI fatigue" with the level of attribution, and (iii) the construct term of the conclusion with the name of the
+  main instrument. Each condition is its own problem type (GSRR-57), so the abstract, Tables 11 to 13 and the
+  Discussion report them separately and never as a single quantity. Condition (iii) and C6a compare names, not the
+  content of the instruments, and the number of records in which both hold is reported. "Within what was measured"
+  means only that none of the three conditions holds; it does not mean that the item content of the instrument
+  supports the conclusion.
+- The coding rules were written by the first author (GSRR-4). The two default coders share the view of what counts
+  as a problem that comes from the earlier narrative review, so their agreement is agreement between coders who share
+  that view, not between independent perspectives (GSRR-46). If coder 2 was a third person who did not write the
+  rules, or if the first author coded twice, the coding is reported as such and no claim of independent coding is
+  made (GSRR-44).
 - The confirmation set is the set of studies for which both screeners' final inclusion decision was recorded by
   31 December 2026. It was drawn from one literature database built from free sources, and was screened after
-  registration by the authors, who knew the coding rules (GSRR-33, GSRR-65). It is not a census of the literature on AI
+  registration by the authors, who knew the coding rules; before registration, the first author had seen the titles,
+  abstracts and AI-generated appraisals of 71 of the additional candidates (GSRR-33, GSRR-34, GSRR-65). It is not a census of the literature on AI
   and fatigue, and the population groups were screened unevenly before registration (GSRR-42). Every claim about the
   confirmation set is about that set.
 
@@ -82,21 +93,28 @@ findings. What this review adds, and what the manuscript claims as new, is limit
 1. rules fixed and registered before coding;
 2. primary counts from records that were not used to build the rules;
 3. item-level coding of instrument content with targets (C2b);
-4. the codes the narrative review does not apply study by study: C3, C6a, and C7 per study (the narrative review
-   discusses causal reading of cross-sectional associations, which C6b also codes, only for the set as a whole);
+4. the codes the narrative review does not apply study by study: C3, C6a, and the three conditions of C7 per study
+   (the narrative review discusses causal reading of cross-sectional associations, which C6b also codes, only for the
+   set as a whole);
 5. the recalculation and consistency rules of C4 applied to every record (the narrative review reports individual
    inconsistencies).
+
+The registration describes the confirmation set under these rules and states, for each problem type, whether it is
+present (GSRR-10, GSRR-57); the observations of the narrative review are set beside these statements, not tested
+against them. The manuscript claims nothing about the narrative review beyond what is in its text.
 
 If the narrative review is not yet published when this manuscript is submitted, it is cited as a preprint or as an
 unpublished manuscript, and the overlap of authors is stated in the Declarations (GSRR-19, GSRR-20).
 
 ## Contributions
 
-The contributions are stated around one question: what a study of "AI fatigue" measured, and how far its conclusions
-can go from what it measured. The registered coding scheme is the means of answering it.
+The contributions are stated around one question: when a study reports fatigue in relation to AI, how is the fatigue
+tied to AI, and do its title and conclusion stay within that tie and within what its instrument was named and
+designed to show? The registered coding scheme answers it with checks of attribution, names and design, not with
+validity evidence.
 
 1. **TRACE, a registered coding scheme that links three things in each study: how fatigue is tied to AI, what the
-   fatigue items ask about, and what the conclusions claim.** Seven codes (C1 to C7) with their rules and a codebook
+   fatigue items ask about, and what the report states and concludes (GSRR-1).** Seven codes (C1 to C7) with their rules and a codebook
    for item content, fixed before the main coding of the confirmation set; amendments made after calibration are
    listed in Table 2. Its only reliability evidence is the agreement between its authors (see Scope).
 2. **A description of how a set of studies not used to build the rules attributes fatigue to AI, measures it and
@@ -104,8 +122,9 @@ can go from what it measured. The registered coding scheme is the means of answe
 3. **Item-level content of the fatigue instruments** (new point 3): for instruments first seen in the confirmation
    set and whose items are printed, the composition by type of item content and, for reduced interest, avoidance and
    futility, the target of the item; the number of instruments with items unavailable is given beside it.
-4. **Recommendations for authors and reviewers** that separate what existing standards already ask from what can be
-   asked only with this scheme (Section 5.3, Table 14).
+4. **Recommendations for authors and reviewers** that separate what existing standards already ask from steps that
+   the standards cited here do not name (Section 5.3, Table 14). The latter are proposals that follow from the
+   definitions of the codes; they are not findings and are not among the five new points.
 
 The released materials (the code table with codes, item numbers and source pages but no item text; the screening
 decisions made after registration; the scripts) are the means by which the tables can be recomputed and the scheme
@@ -114,22 +133,31 @@ themselves requires the original instruments at the pages given.
 
 ## Rule for the abstract
 
-Fixed before coding. The abstract reports, for the confirmation set only:
+Fixed before coding. The abstract states the question of the review (Contributions) in one sentence and reports, for
+the confirmation set only:
 
 - one sentence on the scope of the set, which is never removed: a set drawn from one literature database built from
   free sources, screened by authors who knew the rules, closed on 31 December 2026, and not a census of the
   literature; with the number of studies and instruments coded, the number of calibration records removed and the
   number of candidates still unscreened on that date;
-- how the coding was done: by two coders who are co-authors of the narrative review, or by one coder if GSRR-44 applied;
+- how the coding was done, as it happened under GSRR-44: by the two default coders, who share the view of the
+  narrative review; by the first author and a third person; or by the first author twice;
 - the three things TRACE links, each with counts and no evaluative word: the distribution of the representative level
-  of attribution (C1); for each item-content type, the number of instruments with at least one item of that type and
-  the number of instruments evaluable (C2b); and, for each problem type of GSRR-57, the registered statement with its
-  count, the number of evaluable records and the number unresolved.
+  of attribution (C1); for the instruments first seen in the confirmation set with printed items, for each
+  item-content type, the number of instruments with at least one item of that type and the number evaluable, with the
+  number of instruments with items unavailable (C2b); and, for each problem type of GSRR-57, including each condition
+  of C7, the registered statement with its count, the number of evaluable records and the number unresolved.
 
-It gives no value from the exploration set and no comparison with it. It contains no recommendation. If the abstract
-does not fit the word limit, the problem statements are combined into one sentence that keeps, for each type, the
-statement, the count, the number of evaluable records and the number unresolved; no count and no denominator is
-removed, and neither the scope sentence nor the C1 and C2b sentences are removed.
+It gives no value from the exploration set and no comparison with it. It contains no recommendation. The
+availability sentence names the per-instrument and per-study tables. If the abstract does not fit the word limit,
+the steps are taken in this order, and only as far as needed: (1) the problem statements are grouped by code (C4,
+C5, C6, C7), one sentence per group, keeping for each type the statement, the count, the number of evaluable records
+and the number unresolved; (2) the C4 types are given in the form "observed: …; not observed: …", with the counts for
+each type in Table 12, and the abstract gives the number of evaluable records for C4 as a range. No count or
+denominator is removed for C1, C2b, C5, C6 or any condition of C7, and neither the question, the scope sentence nor
+the C1 and C2b sentences are removed; (3) if it is still over the limit, the Background is reduced to one sentence
+of at most 15 words. A mock abstract built from empty tables (`abstract-mock.md`) shows that the rule fits 250 words
+only with step 2 and compact wording (about 247 words), so the abstract is written in that wording from the start.
 
 ## Section plan
 
@@ -139,24 +167,26 @@ Sections are numbered here for reference; the manuscript follows the heading lev
 
 Background (studies that report fatigue in relation to AI are increasing, and reviews of the topic report scales
 without validation evidence and unclear construct boundaries; each statement is cited to a source checked against a
-free primary text). What was done (TRACE; a registered methodological review of the studies included from a
-literature database; seven codes; the coding as in the rule above). Results by the rule above. Availability
-(registration, outline, code table, codebook, scripts).
+free primary text). The question (above). What was done (TRACE; a registered methodological review of the studies
+included from a literature database; seven codes; the coding as in the rule above). Results by the rule above.
+Availability (registration, outline, code table with the per-instrument and per-study tables, codebook, scripts).
 
 ### 1. Introduction
 
 - The first paragraph says that the review covers studies that measure fatigue in relation to the use of AI systems,
   whether or not they call it "AI fatigue": the term is used for constructs that range from fatigue attributed to AI
   in the items to general fatigue measured among AI users (centre B, GSRR-12).
-- The question: what such a study measured, and how far its conclusions can go from what it measured. A conclusion
-  about "AI fatigue" depends on whether the measure ties fatigue to AI, on what the fatigue items ask about, and on
-  whether the report is internally consistent. Item wording shows what an instrument asks about; it does not show
-  what scores contain, which is a question of structural validity. The eligibility of this review counts
+- The question: how such a study ties fatigue to AI, and whether its title and conclusion stay within that tie and
+  within what its instrument was named and designed to show. A conclusion about "AI fatigue" depends on whether the
+  measure ties fatigue to AI, on what the fatigue items ask about, and on whether what the report states is
+  internally consistent and matches its conclusion. Item wording shows what an instrument asks about; it does not
+  show what scores contain, which is a question of structural and construct validity and requires correlational or
+  factor-analytic data. The eligibility of this review counts
   motivational and behavioural depletion as fatigue (GSRR-24), so items about reduced interest, avoidance or
   irritation are described, not treated as outside the construct. Overlapping samples change how much evidence a set
   of reports carries.
-- What is known, from measurement research in general: a measure's name does not tell what it measures, and
-  instruments are dropped, added to and altered while keeping the same name; a methodological review is how such
+- What is known, from measurement research in general: a measure's name does not tell what it measures, and items
+  are dropped, added and altered while the instrument keeps the same name; a methodological review is how such
   flexibility becomes visible (Elson et al., 2023). Studies of measurement practice in other fields count what reports
   disclose (Perrig et al., 2024). For AI-related instruments, systematic reviews have assessed measurement properties
   with COSMIN (for example, Lintner, 2024, on AI literacy scales), and a registered review of AI anxiety and attitude
@@ -176,11 +206,15 @@ literature database; seven codes; the coding as in the rule above). Results by t
 - Technostress and its exhaustion component; general fatigue scales adapted to AI; scales built for AI.
 - Measurement flexibility and names: the nominal fallacy and undisclosed changes to instruments (Elson et al., 2023);
   where C2a (modification), C2d (disclosure), C6a and C7 (iii) (names) apply these known problems to this literature.
+- Content validity in COSMIN (Terwee et al., 2018) and reviews that apply COSMIN to AI-related instruments (Lintner,
+  2024): they evaluate studies that develop or validate an instrument, whereas this review codes how instruments are
+  used and reported in studies that apply them. The unit of evaluation differs, and C2b is not a COSMIN rating.
 - Reviews that counted measurement practice for constructs related to AI and in HCI (Perrig et al., 2024, and others
   to be found), and how C2d differs from their codes: a citation alone does not count as a reason for the choice in
   C2d. No count of this review is compared with theirs.
 - Methodological studies and their reporting (Mbuagbaw et al., 2020; Murad & Wang, 2017; Long et al., 2024 on
-  registration and reporting quality); recalculation of reported statistics (Nuijten et al., 2016).
+  registration and reporting quality); recalculation of reported statistics (Nuijten et al., 2016) and its use
+  outside psychology (to be searched).
 - Only literature read in a free full text or a free abstract is cited; each citation is checked against its primary
   source before the manuscript is complete.
 
@@ -201,8 +235,11 @@ that the method can be read without the registration.
    stratum, candidate pool and calibration sample, small-pool rule, minimum sizes (GSRR-39).
 5. Coding: units, instrument and main-instrument rules, missing-value codes, and the codes C1 to C7 with the C4f and
    C6b rules (GSRR-43); the codebook (version 2); the use of AI drafts for C4f and C5 only (GSRR-44). For C4f, a short
-   table of what it shares with statcheck (Nuijten et al., 2016) and where it differs: tests judged one by one rather
-   than by scanning the whole text; values in tables included; percentages and indirect effects added; done by people.
+   table of what it shares with statcheck (Nuijten et al., 2016), which recalculates p from t, F, r, χ² and Z with their
+   degrees of freedom, and where it differs: tests judged one by one rather than by scanning the whole text; values in
+   tables included, with the rules for degrees of freedom in table notes, asterisk-only p-values and tests reported
+   twice; p-values adjusted for multiple testing not counted; z recalculated only when reported; percentages and
+   indirect effects added; done by people.
 6. Calibration, coding, blinding and reconciliation (GSRR-44 to GSRR-48), including the procedure if coder 2 is
    unavailable, and what the agreement between the two coders can and cannot show (GSRR-46).
 7. Synthesis: derived values, missing data, the tables, the problem statements and the sensitivity analyses
@@ -220,11 +257,14 @@ that the method can be read without the registration.
 4. RQ2 instruments and items: origin, modification and format; adaptation procedures; reported disclosure; every
    instrument version used in the confirmation set; item content per instrument first seen in the confirmation set;
    AI-side variable instruments (Tables 6, 7, 8 and 15).
-5. RQ3 reporting completeness and consistency, with C4f per record and per recalculated result (Table 9).
+5. RQ3 reporting completeness and consistency, with C4f per record and per recalculated result, by source (text or
+   table) (Table 9).
 6. RQ4 sample overlap (Table 10).
-7. RQ5 title and abstract versus content, and SQ2 conclusions by condition of C7 (Table 11).
+7. RQ5 title and abstract versus content, and SQ2 conclusions by condition of C7, with the number of records in which
+   C6a and C7 (iii) both hold (Table 11).
 8. Problem statements (Table 12).
-9. SQ1 by centre (supplementary tables; C7 with conditions (i) and (iii) only).
+9. SQ1 by centre (supplementary tables set side by side, without comparison statements; C7 conditions (i) and (iii)
+   only).
 10. Sensitivity analyses 1 to 4 (Table 13).
 11. Exploration set and late stratum (supplementary tables, labelled as such).
 
@@ -241,21 +281,26 @@ Written after the results. Its structure is fixed now:
    descriptive codes, in the terms of the description.
 2. Relation to the narrative review. For observations that correspond to a problem type of GSRR-57 (C4 to C7), what
    the problem statements say in the confirmation set. For observations that correspond to a descriptive code (C1,
-   C2a, C2b, C2c), what the description shows, without calling it a problem. In both cases the comparison is with the
-   statements of the narrative review, not with the exploration set, and no statement says that something is more or
-   less common, or that an observation was replicated or confirmed (Scope).
+   C2a, C2b, C2c), what the description shows, without calling it a problem. In both cases the statements of the
+   narrative review are set beside the statements for the confirmation set; the values of the exploration set, from
+   which most of the narrative review's reports come, are not. No statement says that something is more or less
+   common, or that an observation was replicated or confirmed (Scope).
 3. Recommendations for authors and reviewers (Table 14). The section opens by saying that the recommendations do not
    follow from the counts of this review; they are given whether or not the corresponding problem was observed. Each
    row has the code it concerns and one of two sources:
    - an existing standard applied to studies of AI-related fatigue, cited to it (for example, reporting every item
-     administered and justifying modifications of an existing measure, Elson et al., 2023; Perrig et al., 2024);
-   - a step that this scheme makes explicit and that the existing standards cited here do not name, stated as a
-     proposal (for example, stating the level at which fatigue is tied to AI, C1; naming the construct of the
-     conclusion in the terms of the instrument that measured it, C6a and C7).
-   Table 14 also gives, for a reader planning or reviewing a study, the path from the research question to what is
-   measured, the evidence needed and the wording a conclusion may use. Recommendations are not placed in the abstract
-   or the conclusions.
-4. Limitations (GSRR-65 in full, with any added by deviations).
+     administered and justifying modifications of an existing measure, and not inferring content from a measure's
+     name, which bears on C6a and C7 (iii), Elson et al., 2023);
+   - a step that this scheme makes explicit and that the standards cited here do not name, stated as a proposal (for
+     example, stating the level at which fatigue is tied to AI, C1; not using the term "AI fatigue" in a conclusion
+     when the instrument does not tie fatigue to AI, C7 (ii)).
+   A note to Table 14 lists the standards that were checked before a step was called a proposal (at least Elson et
+   al., 2023, and Flake & Fried, 2020; Perrig et al., 2024, is cited as a review of measurement practice, not as a
+   standard). Each row also names the row of Table 12 for its code, without a count. The last column of Table 14 (the
+   path from the research question to what is measured, the evidence needed and the wording a conclusion may use) is
+   a proposal of this scheme. Recommendations are not placed in the abstract or the conclusions.
+4. Limitations (GSRR-65 in full, with any added by deviations), including that the name checks of C6a and C7 (iii)
+   do not compare content, so "within what was measured" does not mean that the items support the conclusion.
 
 ### 6. Conclusions
 
@@ -284,18 +329,18 @@ the flow figures from the released screening decisions.
 | R1 | Distribution of the representative level of attribution of the main fatigue instrument; values for other instruments in the supplement. | RQ1; GSRR-43 (C1) | Script output, C1 tables | Section 4.3; Table 5; abstract |
 | R2a | Origin, modification and format of the fatigue instruments; reported adaptation procedures; reported disclosure. | RQ2; GSRR-43 (C2a, C2c, C2d) | Script output, instrument tables | Section 4.4; Table 6 |
 | R2b | Item-content composition of each instrument first seen in the confirmation set with printed items, the number of instruments with at least one item of each type, and the targets of reduced-interest, avoidance and futility items; the number of instruments with items unavailable. | RQ2; GSRR-43 (C2b), GSRR-56; codebook version 2 | Script output, C2b per instrument; per-instrument summary table | Section 4.4; Table 7; abstract |
-| R2d | Every instrument version used by a study of the confirmation set, the set in which it was first seen, the number of studies using it, its origin and disclosure, and its item counts by type. | RQ2; GSRR-56 (instruments used) | Script output, instruments used | Section 4.4; Table 15 |
+| R2d | Every instrument version used by a study of the confirmation set, the set in which it was first seen, its language, the number of studies using it, its origin, format and disclosure, whether it refers to AI, its number of items, and its item counts by type. | RQ2; GSRR-56 (instruments used) | Script output, instruments used | Section 4.4; Table 15 |
 | R2c | Types of instrument used for the AI-side variable. | RQ2; GSRR-43 (C3) | Script output, C3 table | Section 4.4; Table 8 |
-| R3 | Reporting completeness and internal consistency by rule, including the recalculation summary per record and per result, and gross inconsistencies. | RQ3; GSRR-43 (C4 and the C4f rules), GSRR-56 | Script output, C4 tables and C4f per result | Section 4.5; Table 9 |
+| R3 | Reporting completeness and internal consistency by rule, including the recalculation summary per record and per result, by source, and gross inconsistencies. | RQ3; GSRR-43 (C4 and the C4f rules), GSRR-56 | Script output, C4 tables and C4f per result | Section 4.5; Table 9 |
 | R4 | Records linked as the same sample, records with unconfirmed signs of overlap, and studies remaining when linked records are counted once; independence is not established. | RQ4; GSRR-43 (C5) | Script output, C5 and RQ4 tables | Section 4.6; Table 10 |
 | R5 | Construct term of the title against the name of the main instrument, with its item composition next to it; causal wording against design. | RQ5; GSRR-43 (C6 and the C6b rules) | Script output, C6 tables | Section 4.7; Table 11 |
-| S2 | Conclusions within or beyond what was measured, by condition (i), (ii) and (iii). | SQ2; GSRR-43 (C7) | Script output, C7 table | Section 4.7; Table 11 |
-| PS1 | The problem statements of the registration for the confirmation set. | GSRR-57 | Script output, problem statements | Section 4.8; Table 12; abstract |
+| S2 | Each condition of C7 ((i), (ii) and (iii)) separately, and the records in which C6a and C7 (iii) both hold. | SQ2; GSRR-43 (C7), GSRR-56 | Script output, C7 table | Section 4.7; Table 11 |
+| PS1 | The problem statements of the registration for the confirmation set, with each condition of C7 as its own type. | GSRR-57 | Script output, problem statements | Section 4.8; Table 12; abstract |
 | S1 | Answers to RQ2 to RQ5 and SQ2 by centre, with C7 by conditions (i) and (iii) only. | SQ1; GSRR-12 | Script output, centre tables | Section 4.9; supplement |
 | SE1 | The problem statements under sensitivity analyses 1, 2 and 4, and the C2b tables under analysis 3. | GSRR-62 | Script output, sensitivity outputs | Section 4.10; Table 13 |
 | EX1 | The exploration set and the late stratum under the same rules, labelled as such and not compared with the confirmation set. | GSRR-39, GSRR-56, GSRR-57 | Script output, tables by set | Section 4.11; supplement |
 | PT1 | The C1 to C7 values of each coded study. | GSRR-56 (per-study table) | Script output, per-study table | Supplement |
-| D1 | Recommendations, each tied to one code and to either an existing standard or a proposal of this scheme. Not a finding of this review. | Not registered (discussion) | The registered definitions of GSRR-43; the cited standards | Section 5.3; Table 14 |
+| D1 | Recommendations, each tied to one code and to either an existing standard or a proposal of this scheme. Not a finding of this review. | Not registered (discussion) | The registered definitions of GSRR-43; the standards listed in the note to Table 14 | Section 5.3; Table 14 |
 | L1 | The limitations of the review. | GSRR-65 | The registration and the record of deviations | Section 5.4 |
 
 ## Tables and figures
@@ -337,28 +382,36 @@ columns; no value is filled in before coding.
 - Table 8: C3 AI-side variable instruments.
 - Table 9: C4 rules (a) to (f), with the record summary and the gross-inconsistency summary of (f), and for (f) the
   number of recalculated results per record (distribution) and the number of consistent, inconsistent and grossly
-  inconsistent results.
+  inconsistent results, in total and by source (text or table).
 - Table 10: C5 categories and the RQ4 study counts.
-- Table 11: C6a, C6b and C7 by condition (i), (ii) and (iii), each condition in its own row with what it compares.
+- Table 11: C6a, C6b and C7 by condition (i), (ii) and (iii), each condition in its own row with what it compares;
+  beside condition (iii), the item composition (C2b) of the main instrument; and the number of records in which C6a
+  and C7 (iii) both hold.
 - Table 12: problem statements.
 
   | Problem type | Code and value | Statement | Count | Evaluable records | Not verifiable | Not applicable | Unresolved |
   |---|---|---|---|---|---|---|---|
   | — | — | observed / not observed / could not be evaluated | — | — | — | — | — |
 
-- Table 13: sensitivity analyses.
+  One row for each problem type of GSRR-57; C7 has three rows, one per condition.
+
+- Table 13: sensitivity analyses (problem statements as in Table 12, with C7 by condition).
 - Table 14: recommendations.
 
-  | Recommendation | Code | Source: existing standard (cited) or proposal of this scheme | Question → what is measured → evidence needed → wording allowed |
-  |---|---|---|---|
-  | — | — | — | — |
+  | Recommendation | Code | Row of Table 12 | Source: existing standard (cited) or proposal of this scheme | Question → what is measured → evidence needed → wording allowed (proposal) |
+  |---|---|---|---|---|
+  | — | — | — | — | — |
 
-- Table 15: every instrument version used by a study of the confirmation set. A note says that the column "first
-  seen" lists where a version appeared first and is not a comparison between sets.
+  with a note listing the standards checked before a step was called a proposal.
 
-  | Instrument version | First seen (set) | Studies using it | Origin | Item disclosure | FAT | MOT | AVO | FUT | IRR | OTH | Unresolved |
-  |---|---|---|---|---|---|---|---|---|---|---|---|
-  | — | — | — | — | — | — | — | — | — | — | — | — |
+- Table 15: every instrument version used by a study of the confirmation set. Notes say that the column "first
+  seen" lists where a version appeared first and is not a comparison between sets, and that the item counts of a
+  version first seen in the exploration set are the values re-coded with codebook version 2 (GSRR-44, step 4), which
+  are not used in the problem statements.
+
+  | Instrument version | Language | First seen (set) | Studies using it | Origin | Format | Item disclosure | Refers to AI (C1 L1a or L1b) | Items (printed / full) | FAT | MOT | AVO | FUT | IRR | OTH | Unresolved |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
 
 - Supplement: the completed reporting checklist; tables by population group and by centre; the exploration set and
   the late stratum; C1 for fatigue instruments other than the main one; the per-instrument summary table; the
@@ -368,22 +421,29 @@ columns; no value is filled in before coding.
 
 - The target journal, and the rewriting of the requirements section to its instructions.
 - The expansion of the name TRACE, and a check immediately before submission that no measure, checklist or reporting
-  guideline in this field already uses the name.
+  guideline in this field already uses the name; the verb of the subtitle is reconsidered with the expansion, so that
+  "TRACE: Tracing" does not repeat the word.
 - The second author's details, and the registration identifier and date.
 - The authorship of the narrative review, how it is cited (published, preprint or unpublished manuscript) and how its
-  relation to this review is stated, to be agreed with the co-author when the manuscript draft is complete.
+  relation to this review is stated, to be agreed with the co-author when the manuscript draft is complete. Until
+  then, this outline refers to the shared view of the coders (GSRR-46), and the Declarations state the authorship as
+  agreed.
 - Whether a reporting guideline for methodological studies has been published (checked immediately before
   submission).
 - The script that copies values from the synthesis output into the manuscript.
 - The sources for the background sentences of the abstract and introduction (that studies are increasing, and what
   existing reviews of the topic report), and the background literature beyond the references of the registration,
-  including reviews that counted measurement practice for AI-related constructs; each checked against a free primary
-  source.
+  including reviews that counted measurement practice for AI-related constructs (for example, Bach et al., 2022, on
+  trust in AI) and uses of statcheck-type recalculation outside psychology; each checked against a free primary
+  source. Flake and Fried (2020) is checked against a free full text before it is cited.
 
 ## References in this outline
 
 - Elson, M., Hussey, I., Alsalti, T., & Arslan, R. C. (2023). Psychological measures aren't toothbrushes.
   *Communications Psychology*, 1, 25. https://doi.org/10.1038/s44271-023-00026-9
+- Flake, J. K., & Fried, E. I. (2020). Measurement schmeasurement: Questionable measurement practices and how to avoid
+  them. *Advances in Methods and Practices in Psychological Science*, 3(4), 456–465.
+  https://doi.org/10.1177/2515245920952393
 - Jonaid, A. (2026). Measurement properties and cross-cultural validity of AI anxiety and AI attitude scales: A COSMIN
   systematic review [Preregistration]. OSF. https://doi.org/10.17605/osf.io/3qasd
 - Lawson, D. O., et al. (2020). Reporting of methodological studies in health research: A protocol for the
@@ -405,5 +465,8 @@ columns; no value is filled in before coding.
 - Perrig, S. A. C., Aeschbach, L. F., Scharowski, N., von Felten, N., Opwis, K., & Brühlmann, F. (2024). Measurement
   practices in user experience (UX) research: A systematic quantitative literature review. *Frontiers in Computer
   Science*, 6, 1368860. https://doi.org/10.3389/fcomp.2024.1368860
+- Terwee, C. B., Prinsen, C. A. C., Chiarotto, A., et al. (2018). COSMIN methodology for evaluating the content
+  validity of patient-reported outcome measures: A Delphi study. *Quality of Life Research*, 27(5), 1159–1170.
+  https://doi.org/10.1007/s11136-018-1829-0
 - van den Akker, O. R., et al. (2023). Increasing the transparency of systematic reviews: Presenting a generalized
   registration form. *Systematic Reviews*, 12, 170. https://doi.org/10.1186/s13643-023-02281-7

@@ -1,18 +1,19 @@
-"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.7).
+"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.8).
 
 Implements, from the code tables (CSV):
 - calibration draws and the post-registration screening order (GSRR-33, GSRR-39)
-- derived values: C1 representative value, C4f record summary, C7 (GSRR-43, GSRR-48)
+- derived values: C1 representative value, C4f record summary, C7 and each of its conditions (GSRR-43, GSRR-48)
 - agreement per set: percentage agreement and Cohen's kappa with bootstrap CI (GSRR-47)
 - tables per set, population group and centre; C2a/C2c/C2d; C2b per instrument;
   C4f per recalculated result; every instrument version used in a set; the per-study table;
-  RQ4 study counts; problem statements; sensitivity analyses 1-4 (GSRR-56, GSRR-57, GSRR-62)
+  RQ4 study counts; records where C6a and C7 (iii) both hold; problem statements (C7 by condition);
+  sensitivity analyses 1-4 (GSRR-56, GSRR-57, GSRR-62)
 
 Input files (one row per unit; `coder` is coder1 / coder2 / reconciled):
   records_<coder>.csv      record-level codes (C1 per main instrument, C3-C7 inputs)
   instruments_<coder>.csv  instrument-level codes (C2a, C2c, C2d)
   items_<coder>.csv        item-level codes (C2b), keyed by version_id and item_no
-  c4f_<coder>.csv          one row per recalculated result (consistent: yes/no/na; gross: 1/0)
+  c4f_<coder>.csv          one row per recalculated result (source: text/table; consistent: yes/no/na; gross: 1/0)
   c4f_ai.csv               the AI draft for C4f (optional; for human-AI agreement)
   links.csv                E5 links (record_id, group_id)
 The set of an instrument version (and of its items) is derived, never read: the first set,
@@ -58,15 +59,16 @@ VOCAB = {
     "set": {"exploration", "confirmation", "late", "calibration"},
     "type": set(C2B_TYPES) | {"unresolved"},
     "consistent": {"yes", "no", "na", "unresolved"},
+    "source": {"text", "table"},
 }
 REQUIRED = {
     "records": ["record_id", "set", "population", "centre", "peer_reviewed", "C3", "C4a", "C4b", "C4c",
                 "C4d", "C4e_codebook", "C4e_agreement", "C5", "C6a", "C6b", "conclusion_identified",
                 "main_instrument_identified", "conclusion_ai_fatigue_term", "conclusion_family",
                 "main_instrument_family", "conclusion_sentence"] + [f"C1_{lv}" for lv in C1_LEVELS],
-    "instruments": ["record_id", "instrument_id", "version_id"],
+    "instruments": ["record_id", "instrument_id", "version_id", "language", "items_full"],
     "items": ["version_id", "item_no", "type", "boundary", "secondary_type", "target"],
-    "c4f": ["record_id", "result_id", "consistent", "gross"],
+    "c4f": ["record_id", "result_id", "source", "consistent", "gross"],
 }
 
 
@@ -218,6 +220,31 @@ def c7(rec, rep):
     return "beyond" if (cond_i or cond_ii or cond_iii) else "within"
 
 
+def c7_conditions(rec, rep):
+    """GSRR-57: each condition of C7 is its own problem type. A condition is unresolved only if
+    its own inputs are; (ii) is not_applicable when rep is '' (centre tables)."""
+    if "unresolved" in (rec.get("conclusion_identified"), rec.get("main_instrument_identified")):
+        return {k: "unresolved" for k in ("C7_i", "C7_ii", "C7_iii")}
+    if rec.get("conclusion_identified") != "1" or rec.get("main_instrument_identified") != "1":
+        return {k: "cannot_decide" for k in ("C7_i", "C7_ii", "C7_iii")}
+    out = {}
+    out["C7_i"] = ("unresolved" if rec.get("C6b") == "unresolved"
+                   else "met" if rec.get("C6b") == "mismatch" else "not_met")
+    if rep == "":
+        out["C7_ii"] = "not_applicable"
+    elif "unresolved" in (rec.get("conclusion_ai_fatigue_term"), rep):
+        out["C7_ii"] = "unresolved"
+    else:
+        out["C7_ii"] = "met" if (rec.get("conclusion_ai_fatigue_term") == "1" and rep in C7_WEAK_LEVELS) else "not_met"
+    if "unresolved" in (rec.get("conclusion_family"), rec.get("main_instrument_family")):
+        out["C7_iii"] = "unresolved"
+    else:
+        cf = families(rec["conclusion_family"]) - NO_FAMILY
+        mf = families(rec["main_instrument_family"]) - NO_FAMILY
+        out["C7_iii"] = "met" if (cf and mf and not (cf & mf)) else "not_met"
+    return out
+
+
 def c4f_gross(results):
     vals = [r.get("gross", "0") for r in results]
     if not vals:
@@ -236,6 +263,7 @@ def derive(recs, c4f_rows):
         r["C4f"] = c4f_summary(by_rec[r["record_id"]])
         r["C4f_gross"] = c4f_gross(by_rec[r["record_id"]])
         r["C7"] = c7(r, r["C1_rep"])
+        r.update(c7_conditions(r, r["C1_rep"]))
     return recs
 
 
@@ -365,7 +393,7 @@ def count_table(rows, key, label, n_studies=None):
 
 
 RECORD_CODES = ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d", "C4e_codebook", "C4e_agreement",
-                "C4f", "C4f_gross", "C5", "C6a", "C6b", "C7"]
+                "C4f", "C4f_gross", "C5", "C6a", "C6b", "C7", "C7_i", "C7_ii", "C7_iii"]
 INSTRUMENT_CODES = ["origin", "format", "mod_items_dropped", "mod_items_added", "mod_reworded",
                     "mod_instructions_only", "mod_response_scale", "mod_scoring", "mod_translated",
                     "C2c_backtranslation", "C2c_content_validity", "C2c_pilot", "C2c_factor_check",
@@ -444,8 +472,16 @@ PROBLEMS = {
     "C5 signs not confirmed": ("C5", {"signs_not_confirmed"}),
     "C6a different family": ("C6a", {"different_family"}),
     "C6b mismatch": ("C6b", {"mismatch"}),
-    "C7 beyond": ("C7", {"beyond"}),
+    "C7 (i) causal wording not supported by the design": ("C7_i", {"met"}),
+    "C7 (ii) AI-fatigue term with attribution at L3 to L6": ("C7_ii", {"met"}),
+    "C7 (iii) conclusion term and instrument name in different term families": ("C7_iii", {"met"}),
 }
+
+
+def c6a_c7iii_overlap(rows):
+    """Records in which both name checks (C6a and C7 (iii)) are met, so that the two problem
+    types are not read as independent."""
+    return sum(1 for r in rows if r.get("C6a") == "different_family" and r.get("C7_iii") == "met")
 
 
 def problem_statements(rows):
@@ -475,18 +511,32 @@ def c4f_result_table(recs, c4f_rows, set_name):
     out = [{"set": set_name, "row": "results", "value": k, "count": vals[k]}
            for k in ["yes", "no", "na", "unresolved"]]
     out.append({"set": set_name, "row": "results", "value": "gross", "count": sum(1 for r in rows if r.get("gross") == "1")})
+    src = Counter((r.get("source", ""), r["consistent"]) for r in rows)
+    out += [{"set": set_name, "row": f"results_from_{so}", "value": k, "count": src[(so, k)]}
+            for so in ["text", "table"] for k in ["yes", "no", "na", "unresolved"]]
     out += [{"set": set_name, "row": "results_per_record", "value": str(k), "count": n}
             for k, n in sorted(dist.items())]
     return out
 
 
-INSTRUMENT_USE_CODES = ["origin", "format", "C2d_item_disclosure"]
+INSTRUMENT_USE_CODES = ["language", "origin", "format", "C2d_item_disclosure", "items_full"]
+
+
+def refers_to_ai(recs):
+    """Whether the items or instructions of a version refer to AI (C1 L1a or L1b), from the records
+    that use it as the main instrument. Values that differ across records are listed."""
+    vals = set()
+    for r in recs:
+        lv = [r.get(f"C1_{x}", "") for x in ("L1a", "L1b")]
+        vals.add("unresolved" if "unresolved" in lv else "yes" if "1" in lv else "no")
+    return "|".join(sorted(vals)) if vals else "not_main_instrument"
 
 
 def instruments_used(recs, insts, items, vsets, set_name):
     """GSRR-56: every instrument version used by a record of `set_name`, whichever set it was first
     seen in, with item-type counts (no proportions). Not a comparison between sets (GSRR-57)."""
     ids = {r["record_id"] for r in recs if r["set"] == set_name}
+    rec_by_id = {r["record_id"]: r for r in recs}
     by_version = defaultdict(list)
     for it in items:
         by_version[it["version_id"]].append(it)
@@ -499,7 +549,9 @@ def instruments_used(recs, insts, items, vsets, set_name):
         its = by_version.get(vid, [])
         c = Counter(it["type"] for it in its)
         row = {"set": set_name, "version_id": vid, "first_seen": vsets.get(vid, ""),
-               "records_using": len({i["record_id"] for i in used[vid]}), "items_available": len(its)}
+               "records_using": len({i["record_id"] for i in used[vid]}), "items_available": len(its),
+               "refers_to_ai": refers_to_ai([rec_by_id[i["record_id"]] for i in used[vid]
+                                             if i.get("instrument_id") == "main" and i["record_id"] in rec_by_id])}
         for k in INSTRUMENT_USE_CODES:
             row[k] = "|".join(sorted({i.get(k, "") for i in used[vid]}))
         for t in C2B_TYPES + ["unresolved"]:
@@ -509,7 +561,7 @@ def instruments_used(recs, insts, items, vsets, set_name):
 
 
 PER_STUDY_CODES = ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d", "C4e_codebook", "C4e_agreement",
-                   "C4f", "C4f_gross", "C5", "C6a", "C6b", "C7"]
+                   "C4f", "C4f_gross", "C5", "C6a", "C6b", "C7", "C7_i", "C7_ii", "C7_iii"]
 
 
 def per_study_table(recs):
@@ -545,6 +597,7 @@ def build_tables(d, coder="reconciled"):
             sub = [dict(r) for r in r_s if r["record_id"] in ids]
             for r in sub:
                 r["C7"] = c7(dict(r, conclusion_ai_fatigue_term="0"), "")
+                r.update(c7_conditions(r, ""))
             t = record_tables(sub, [i for i in i_s if i["record_id"] in ids],
                               {"set": s, "split": "centre", "group": c})
             tables += [x for x in t if x["code"] != "C1_rep"]
@@ -555,7 +608,8 @@ def build_tables(d, coder="reconciled"):
     conf = [r for r in recs if r["set"] == "confirmation"]
     return {"recs": recs, "tables": tables, "c2b": c2b, "rq4": rq4, "vsets": vsets, "items": items,
             "c4f_results": c4f_res, "instruments_used": used, "per_study": per_study_table(recs),
-            "problems": problem_statements(conf), "n_conf": len(conf)}
+            "problems": problem_statements(conf), "n_conf": len(conf),
+            "c6a_c7iii_overlap": c6a_c7iii_overlap(conf)}
 
 
 def sensitivity(d):
@@ -613,6 +667,7 @@ def main():
         write_csv(out / "problem_statements.csv", res["problems"])
         write_csv(out / "sensitivity.csv", sens)
         write_csv(out / "sensitivity_c2b_lenient.csv", s3)
+        write_csv(out / "c6a_c7iii_overlap.csv", [{"set": "confirmation", "records_both_met": res["c6a_c7iii_overlap"]}])
         print(f"confirmation studies={res['n_conf']} proportions={'yes' if res['n_conf'] >= MIN_STUDIES else 'no'}")
     elif a.agreement:
         out = a.agreement / "out"

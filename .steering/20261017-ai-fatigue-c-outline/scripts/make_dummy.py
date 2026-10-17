@@ -61,7 +61,7 @@ for n, i in enumerate(ids):
     inst = {"record_id": i, "instrument_id": "main", "version_id": vid,
             "origin": rng.choice(["new", "existing_ai", "adapted_general", "unchanged_general",
                                   "general_not_verifiable"]),
-            "format": "multi_item"}
+            "format": "multi_item", "language": "en", "items_full": "12"}
     for k in cs.INSTRUMENT_CODES:
         inst.setdefault(k, rng.choice(["stated", "found_not_stated", "no_change", "not_verifiable"]))
     insts.append(inst)
@@ -75,7 +75,8 @@ c4f = []
 for i in ids:
     for k in range(2):
         cons = rng.choice(["yes", "yes", "no", "na"])
-        c4f.append({"record_id": i, "result_id": f"{i}-r{k}", "consistent": cons,
+        c4f.append({"record_id": i, "result_id": f"{i}-r{k}", "source": "table" if k else "text",
+                    "consistent": cons,
                     "gross": "1" if cons == "no" and rng.random() < 0.5 else "0"})
 links = [{"record_id": "D016", "group_id": "G1"}, {"record_id": "D017", "group_id": "G1"},
          {"record_id": "D020", "group_id": "G2"}, {"record_id": "D021", "group_id": "G2"}]
@@ -145,6 +146,10 @@ iu = cs.instruments_used([{"record_id": "x", "set": "exploration"}, {"record_id"
                          {"E1": "exploration", "N9": "confirmation"}, "confirmation")
 assert [(r["version_id"], r["first_seen"], r["records_using"]) for r in iu] == [("E1", "exploration", 1), ("N9", "confirmation", 1)]
 assert iu[0]["FAT"] == 1 and iu[0]["AVO"] == 1 and iu[1]["FAT"] is None    # no items -> no counts
+assert iu[0]["refers_to_ai"] == "not_main_instrument"          # instrument_id missing -> not the main one
+assert cs.refers_to_ai([{"C1_L1a": "0", "C1_L1b": "1"}, {"C1_L1a": "0", "C1_L1b": "0"}]) == "no|yes"
+assert all(r["refers_to_ai"] in {"yes", "no", "no|yes", "unresolved"} or "|" in r["refers_to_ai"]
+           for r in res["instruments_used"]), {r["refers_to_ai"] for r in res["instruments_used"]}
 assert all(r["set"] != "calibration" for r in res["instruments_used"])
 # per-study table: primary sets only, no calibration records
 ps_ = res["per_study"]
@@ -168,6 +173,28 @@ assert cs.c7(dict(base, conclusion_family="none", main_instrument_family="fatigu
 assert cs.c7(dict(base, conclusion_family="fatigue", main_instrument_family="fatigue", conclusion_ai_fatigue_term="1"), "L3") == "beyond"
 assert cs.c7(dict(base, conclusion_identified="0", C6b="mismatch"), "L1a") == "cannot_decide"
 assert cs.c7(dict(base, C6b="unresolved", conclusion_family="fatigue", main_instrument_family="fatigue"), "L1a") == "unresolved"
+# C7 by condition (GSRR-57): each condition is its own problem type
+cc = cs.c7_conditions(dict(base, conclusion_family="burnout", main_instrument_family="fatigue",
+                           C6b="mismatch", conclusion_ai_fatigue_term="1"), "L1a")
+assert cc == {"C7_i": "met", "C7_ii": "not_met", "C7_iii": "met"}, cc
+cc = cs.c7_conditions(dict(base, conclusion_family="fatigue", main_instrument_family="fatigue",
+                           conclusion_ai_fatigue_term="1"), "L4")
+assert cc == {"C7_i": "not_met", "C7_ii": "met", "C7_iii": "not_met"}, cc
+# an unresolved input makes only its own condition unresolved
+cc = cs.c7_conditions(dict(base, conclusion_family="fatigue", main_instrument_family="fatigue",
+                           C6b="unresolved"), "L1a")
+assert cc == {"C7_i": "unresolved", "C7_ii": "not_met", "C7_iii": "not_met"}, cc
+assert cs.c7_conditions(dict(base, conclusion_family="fatigue", main_instrument_family="fatigue"), "")["C7_ii"] == "not_applicable"
+assert set(cs.c7_conditions(dict(base, conclusion_identified="0"), "L1a").values()) == {"cannot_decide"}
+names = [p_["problem_type"] for p_ in res["problems"]]
+assert sum(1 for n_ in names if n_.startswith("C7 (")) == 3 and "C7 beyond" not in names, names
+assert cs.c6a_c7iii_overlap([{"C6a": "different_family", "C7_iii": "met"}, {"C6a": "same_family", "C7_iii": "met"}]) == 1
+centre = [t for t in res["tables"] if t["split"] == "centre" and t["code"] == "C7_ii"]
+assert centre and {t["value"] for t in centre} == {"not_applicable"}, centre
+# C4f results by source (text / table)
+src_rows = {(r["row"], r["value"]): r["count"] for r in res["c4f_results"] if r["set"] == "confirmation"}
+assert sum(src_rows[(f"results_from_{so}", k)] for so in ["text", "table"] for k in ["yes", "no", "na", "unresolved"]) == \
+    sum(src_rows[("results", k)] for k in ["yes", "no", "na", "unresolved"])
 # C1 representative
 assert cs.c1_representative({"C1_L1b": "1", "C1_L2": "1"}) == "L1b"
 assert cs.c1_representative({"C1_L3": "unresolved"}) == "unresolved"
