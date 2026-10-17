@@ -1,0 +1,179 @@
+"""summary.md の主表を、6 回の一次の JSON と照らす（design の「check_summary.py」）。
+
+使い方（この dir で）:
+    python check_summary.py          # 照合。bad 0 なら終了コード 0
+    python check_summary.py --emit   # 一次から期待の行を出す（表を書くときの写し元）
+
+主表は summary.md の `<!-- main-table:begin -->` と `<!-- main-table:end -->` の間。
+各行の最初の列は行の鍵で、SOURCES が鍵ごとに一次の場所を持つ。
+"""
+from __future__ import annotations
+
+import json
+import re
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+EXP = ROOT / "experiments"
+
+R1 = "20261012-rhythm-stage-desk-check"
+R2 = "20261013-rhythm-stage-round2"
+GW = "20261014-rhythm-stage-graded-world"
+CW = "20261014-rhythm-stage-speed-confound-world"
+SW = "20261015-rhythm-stage-speed-shape-world"
+
+LABELS = ("L300", "L60", "L1800")
+N_CAND = 24
+
+# 鍵 → (種類, 入れ物, 段)
+#   main:     本番を回した段（summary.json の判定と _detector の AUC）
+#   ceiling:  天井で止めた段（ceiling.json の steps の status と L300 の AUC）
+#   unusable: 第 1 回の 1 回目の下見 0 で使えなかった world（choice.per_world）
+SOURCES = {
+    "r1-v2": ("unusable", R1, "v2"),
+    "r1-v3": ("unusable", R1, "v3"),
+    "r1-v4": ("main", R1, None),
+    "r2-v4": ("main", R2, None),
+    "g-t025": ("ceiling", GW, "t025"),
+    "g-t050": ("ceiling", GW, "t050"),
+    "g-t075": ("ceiling", GW, "t075"),
+    "h-c050": ("ceiling", CW, "c050"),
+    "h-c100": ("main", CW, "c100"),
+    "h-c200": ("main", CW, "c200"),
+    "f-f100": ("ceiling", SW, "f100"),
+    "f-f200": ("main", SW, "f200"),
+    "d-d100": ("main", SW, "d100"),
+    "d-d200": ("main", SW, "d200"),
+}
+
+JP = {
+    "green": "緑",
+    "red_detected": "赤・検出",
+    "red_unconfirmed": "赤・未確認",
+    "undecidable": "判定不能",
+}
+ORDER = ("緑", "赤・検出", "赤・未確認", "判定不能")
+NOT_RUN = {"ceiling": "走っていない（天井）", "unusable": "走っていない（使えない）"}
+STATE = {"main": "先へ進む", "ceiling": "天井", "unusable": "使えない"}
+
+
+def load(path: Path):
+    with path.open(encoding="utf-8") as f:
+        return json.load(f)
+
+
+def counts_text(verdicts: list[str], bad: list[str], key: str, label: str) -> str:
+    c = {k: 0 for k in ORDER}
+    for v in verdicts:
+        if v == "red_detected_stop_path":
+            bad.append(f"{key} {label}: red_detected_stop_path が出ている（まとめは 0 本を前提にしている）")
+            v = "red_detected"
+        if v not in JP:
+            bad.append(f"{key} {label}: 知らない判定 {v!r}")
+            continue
+        c[JP[v]] += 1
+    if sum(c.values()) != N_CAND:
+        bad.append(f"{key} {label}: 判定の合計が {sum(c.values())}（{N_CAND} でない）")
+    return "・".join(f"{k} {c[k]}" for k in ORDER if c[k])
+
+
+def main_dir(box: str, step: str | None) -> Path:
+    if step is None:
+        return EXP / box / "results" / "main"
+    return EXP / box / "results" / step / "main"
+
+
+def expected(key: str, bad: list[str]) -> list[str]:
+    kind, box, step = SOURCES[key]
+    if kind == "main":
+        s = load(main_dir(box, step) / "summary.json")
+        cands = sorted(k for k in s if k.startswith("S-"))
+        if len(cands) != N_CAND:
+            bad.append(f"{key}: summary.json の候補が {len(cands)} 本")
+        auc = s["_detector"]["L300"]["auc_A_speed"]
+        aucs = (auc["hgb"], auc["lr"])
+        source = "本番"
+        cols = [counts_text([s[c][lab] for c in cands], bad, key, lab) for lab in LABELS]
+    elif kind == "ceiling":
+        c = load(EXP / box / "results" / "ceiling" / "ceiling.json")
+        st = c["steps"][step]
+        if st["status"] != "ceiling":
+            bad.append(f"{key}: ceiling.json の status が {st['status']!r}")
+        aucs = tuple(st["L300_auc_A_speed"])
+        source = "下見 0"
+        cols = [NOT_RUN["ceiling"]] * 3
+    else:
+        c = load(EXP / box / "results" / "ceiling-1" / "ceiling.json")
+        pw = c["choice"]["per_world"][step]
+        if pw["usable"]:
+            bad.append(f"{key}: ceiling-1 で usable が真")
+        r = c["results"][step]["L300"]
+        aucs = (r["hgb"]["auc_A_speed"], r["lr"]["auc_A_speed"])
+        source = "下見 0（P 40）"
+        cols = [NOT_RUN["unusable"]] * 3
+    auc_text = f"{aucs[0]:.3f} / {aucs[1]:.3f}"
+    return [key, STATE[kind], source, auc_text, *cols]
+
+
+def table_rows(text: str, bad: list[str]) -> dict[str, list[str]]:
+    m = re.search(r"<!-- main-table:begin -->(.*?)<!-- main-table:end -->", text, re.S)
+    if not m:
+        bad.append("summary.md に主表の印が無い")
+        return {}
+    rows: dict[str, list[str]] = {}
+    for line in m.group(1).splitlines():
+        line = line.strip()
+        if not line.startswith("|") or set(line) <= set("|-: "):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        cells[0] = cells[0].strip("`")
+        key = cells[0]
+        if key == "鍵":
+            continue
+        if key in rows:
+            bad.append(f"主表の鍵 {key} が重複")
+        rows[key] = cells
+    return rows
+
+
+# 主表の列: 鍵 | 回 | world と段 | 下見 0 | AUC の出どころ | L300 の AUC(A_speed) hgb / lr | L300 | L60 | L1800
+# 照らすのは 鍵・下見 0・出どころ・AUC・3 ラベル（回と world の説明の列は照らさない）
+CHECK_COLS = (0, 3, 4, 5, 6, 7, 8)
+
+
+def main(argv: list[str]) -> int:
+    bad: list[str] = []
+    if "--emit" in argv:
+        for key in SOURCES:
+            e = expected(key, bad)
+            print("| `" + e[0] + "` | | | " + " | ".join(e[1:]) + " |")
+        for b in bad:
+            print("bad:", b)
+        return 1 if bad else 0
+    text = (HERE / "summary.md").read_text(encoding="utf-8")
+    rows = table_rows(text, bad)
+    for key in SOURCES:
+        if key not in rows:
+            bad.append(f"主表に鍵 {key} が無い")
+            continue
+        cells = rows[key]
+        if len(cells) != 9:
+            bad.append(f"{key}: 列の数が {len(cells)}（9 でない）")
+            continue
+        got = [cells[i] for i in CHECK_COLS]
+        e = expected(key, bad)
+        if got != e:
+            bad.append(f"{key}: 主表 {got} ／ 一次 {e}")
+    for key in rows:
+        if key not in SOURCES:
+            bad.append(f"主表に知らない鍵 {key}")
+    for b in bad:
+        print("bad:", b)
+    print(f"rows {len(rows)} / sources {len(SOURCES)} / bad {len(bad)}")
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
