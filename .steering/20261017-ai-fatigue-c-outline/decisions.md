@@ -38,3 +38,10 @@
 - 34 件は C では探索の集合なので、主の数は変わらない。検証の集合（追加候補・Q11〜Q14）は未定のまま。
 - 同じ最終判定は、同じ日の別のタスク（`../20261017-ai-fatigue-narrative-review/decisions.md` 判断 3）にも記録がある。DB の xlsx は書き換えていない。
 - 資金: なし。
+
+## 判断 5: narrative review の草稿との関係（2026-10-17・ユーザー・AskUserQuestion）
+
+- 事実: 同じ 34 件の書誌に立つ narrative review の草稿（`~/Downloads/AI_Fatigue_Critical_Narrative_Review_Polished_2026-10-16.docx.md`・SHA-256 `ff336c32…`）が、C の M1・M4・M5・M6 にあたる観察の多くを 11 報告の範囲で述べている（`overlap-narrative-review.md`）。
+- 決定: 草稿を先行の文献として引き、C は「草稿の問題が、登録した規則で別の集合に当てても見られるか」を問う登録した検証にする（推奨どおり）。却下: C の中身を草稿に入れる／いまは決めない。
+- 事実（ユーザーの答え）: ユーザーは草稿の著者に入っている → C の [GSRR-20] に著者の重なりを書き、限界に足した。
+- 別のタスク `20261017-ai-fatigue-narrative-review` の記録は読んだだけで、変えていない。
