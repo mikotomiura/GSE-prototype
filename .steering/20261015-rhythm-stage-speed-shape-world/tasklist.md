@@ -21,5 +21,5 @@
 
 ## 報告
 - [x] notes.md（`h(c)` の同じ段と並べる・限り）
-- [ ] `/cross-review` 2 巡
+- [x] `/cross-review` 2 巡（判断 15・16）
 - [ ] 引き継ぎ・PR
