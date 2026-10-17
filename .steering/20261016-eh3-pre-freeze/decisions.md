@@ -67,3 +67,16 @@
 | 4 | `analysis/portrait/extra.rs` を足す | ファイルの照合が赤 |
 
 - **限界**: 参照の検査はコメント行と `#[cfg(test)]` より後を見ない。行の途中のコメントや文字列の中の語は数える（赤に倒れる側）。振る舞いの検査は合成の 2 時間・1 つの割り当て（`raw`・`none`・`a_first=seed`）だけで、`a_first=none`・`lattice`・日付の区切り・スリープの経路は通していない。
+
+## 判断 6: code-reviewer ∥ security-checker の指摘を直す（9c47e03c に対して）
+
+- **判断日時**: 2026-10-17
+- **security-checker**: CRITICAL・HIGH・MEDIUM なし。LOW 1 件（`with_outputs` が本番のコードにも入る・将来固定の種を渡しうる）→ doc コメントに「本番は `new` だけ」と書いた。
+- **code-reviewer HIGH（一次で確かめた・正しい）**: 参照の検査は最初の `#[cfg(test)]` で切っていたが、`generator.rs:161` は impl の中のテスト用の関数（`with_walk_start`）で、161〜288 行（描画の本体）を見ていなかった。`wallpaper.rs:522` も同じ型。したがって判断 5 #5 の改名の理由（`level` が誤って赤になる）は、9c47e03c の検査では観測されていなかった。
+  - 直し: 切る位置を「字下げの無い `#[cfg(test)]` の次の行が `mod`（`pub` / `pub(crate)` を許す）」に限った。直した後、改名を戻すと `level` で赤になる（改名の理由がいまは成り立つ）。最初の直しでは `wallpaper.rs` のテストのモジュールが `pub(crate) mod tests` で始まるのを見落とし、赤に倒れて気づいた。
+  - 再発防止の対照をコミットするテスト `the_reference_check_catches_each_kind_of_leak` に置いた（impl の中の `#[cfg(test)]` の後ろの `p_stuck` を拾う・テストのモジュールの中は拾わない、など）。
+- **MEDIUM 1**（振る舞いの検査は `FeatSnapshot` の引数しか変えないので、`PortraitRunner` が大域の推定・招待の状態を読む経路は緑のまま通る）: 正しい。陽性対照で確かめた（`tick` に `INVITATION_PRESENT` を読む分岐を足しても振る舞いの検査は緑）。→ `lib.rs` の `struct PortraitRunner` から `impl PortraitRunner` の終わりまでを切り出して参照の検査にかけた（`FeatSnapshot`・`loop_step` は `feat` の引数の型として許す・`crate::` は許可リスト）。同じ陽性対照で赤（`["INVITATION_PRESENT"]`）。
+- **MEDIUM 2**（`super::super` のような相対の参照が素通り）: `analysis/portrait/` の子は `super::` を 1 段だけ、それ以外（`mod.rs`・`wallpaper*.rs`・殻）は `super::` を許さない。
+- **MEDIUM 3**（`crate::eh3` を前方一致で許すと `Trigger` などの招待の経路を通す）: 許可を型・関数の名前に絞った（`Assignment`・`Condition`・`Drift`・`Grammar`、殻は加えて `DayTracker`・`local_day`）。`{...}` でまとめた import はほどいて照合する（入れ子はほどかず赤に倒れる）。
+- **陽性対照**（追加・2026-10-17・控えから戻し `cmp` で一致を確かめた）: 改名を戻す → 赤（`["level", "level"]`）／`PortraitRunner::tick` に `INVITATION_PRESENT` → 赤／`generator.rs` の `draw` に `p_stuck` → 赤。
+- **見送った LOW**: 終了の経路（`PORTRAIT_END_REQUESTED` → `end` → `Ack` の順）を通すテスト（大域の旗と `PORTRAIT_END_DONE` を伴い、並行するテストと干渉する。順序は差分で変えていない）／f3・f4・f6 と打鍵への感度の対照（f1 で比べ方が鈍くないことは確かめた）／`use crate as c;` の別名は拾えない。判断 5 の「限界」に加える。

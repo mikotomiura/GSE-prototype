@@ -870,6 +870,7 @@ impl PortraitRunner {
         Self::with_outputs(a, Box::new(send_wall), rand::random::<u64>)
     }
 
+    /// 出口と種を差し替えて作る（分け方の検査のため）。⚠️ 本番は [`Self::new`] だけを使う（固定の種を渡さない）。
     fn with_outputs(
         a: crate::eh3::Assignment,
         wall: Box<dyn FnMut(WallCmd)>,
@@ -6874,25 +6875,106 @@ mod portrait_separation_tests {
         assert_ne!(base, drive(stuck, 120.0));
     }
 
-    /// ソースを識別子に切る（`#[cfg(test)]` より後と、コメントの行を除く）。
-    fn identifiers(src: &str) -> Vec<String> {
-        let head = src.split("#[cfg(test)]").next().unwrap_or(src);
+    /// 配る部分の本文: テストのモジュール（字下げの無い `#[cfg(test)]` の次の行が `mod`・`pub(crate) mod`）より前で、
+    /// コメントの行を除いたもの。
+    ///
+    /// ⚠️ impl の中の `#[cfg(test)]`（テスト用の関数）では切らない。最初の `#[cfg(test)]` で切ると、
+    /// `generator.rs` は 161 行目で切れて描画の本体を見落としていた（2026-10-17・code-reviewer HIGH）。
+    fn shipped_part(src: &str) -> String {
+        let lines: Vec<&str> = src.lines().collect();
+        let end = (0..lines.len())
+            .find(|&i| {
+                lines[i] == "#[cfg(test)]"
+                    && lines.get(i + 1).is_some_and(|n| {
+                        let n = n
+                            .trim_start_matches("pub(crate) ")
+                            .trim_start_matches("pub ");
+                        n.starts_with("mod ")
+                    })
+            })
+            .unwrap_or(lines.len());
+        lines[..end]
+            .iter()
+            .filter(|l| !l.trim_start().starts_with("//"))
+            .copied()
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// 識別子に切る。
+    fn identifiers(code: &str) -> Vec<String> {
         let mut out = Vec::new();
-        for line in head.lines().filter(|l| !l.trim_start().starts_with("//")) {
-            let mut cur = String::new();
-            for ch in line.chars().chain(std::iter::once(' ')) {
-                if ch.is_ascii_alphanumeric() || ch == '_' {
-                    cur.push(ch);
-                } else if !cur.is_empty() {
-                    out.push(std::mem::take(&mut cur));
-                }
+        let mut cur = String::new();
+        for ch in code.chars().chain(std::iter::once(' ')) {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                cur.push(ch);
+            } else if !cur.is_empty() {
+                out.push(std::mem::take(&mut cur));
             }
         }
         out
     }
 
-    /// 推定・招待を指す識別子と、許可リストの外の `crate::` の参照を返す。
-    fn violations(src: &str) -> Vec<String> {
+    /// `crate::` で始まる参照を、`{...}` でまとめた import はほどいて返す（入れ子はほどかない: 許可リストに
+    /// 当たらず赤に倒れる）。
+    fn crate_paths(code: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut rest = code;
+        while let Some(i) = rest.find("crate::") {
+            let tail = &rest[i..];
+            let path: String = tail
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == ':')
+                .collect();
+            let after = &tail[path.len()..];
+            match after.strip_prefix('{') {
+                Some(group) if path.ends_with("::") => {
+                    let group = &group[..group.find('}').unwrap_or(group.len())];
+                    for item in group.split(',').map(str::trim).filter(|x| !x.is_empty()) {
+                        out.push(format!("{path}{item}"));
+                    }
+                }
+                _ => out.push(path),
+            }
+            rest = &rest[i + "crate::".len()..];
+        }
+        out
+    }
+
+    /// どこを調べるか（ファイルごとに許すものが違う）。
+    struct Rules {
+        /// `crate::` の参照で許すもの（一致するか、その下）。
+        allowed: &'static [&'static str],
+        /// 禁止の語に当たっても許す識別子（`PortraitRunner::feat` の引数の型）。
+        exempt: &'static [&'static str],
+        /// `super::` を 1 段だけ許すか（`analysis/portrait/` の下の子のモジュール）。
+        one_super: bool,
+    }
+
+    /// 肖像の側（`analysis/portrait/`・`wallpaper*.rs`）で許す `crate::` の参照。
+    const PORTRAIT_ALLOWED: &[&str] = &[
+        "crate::eh3::Assignment",
+        "crate::eh3::Condition",
+        "crate::eh3::Drift",
+        "crate::eh3::Grammar",
+        "crate::analysis::portrait",
+        "crate::wallpaper",
+        "crate::submission::home_dir",
+    ];
+
+    /// `PortraitRunner`（`lib.rs`）で許す `crate::` の参照。
+    const RUNNER_ALLOWED: &[&str] = &[
+        "crate::eh3::Assignment",
+        "crate::eh3::Condition",
+        "crate::eh3::DayTracker",
+        "crate::eh3::local_day",
+        "crate::analysis::portrait",
+        "crate::analysis::loop_step::FeatSnapshot",
+        "crate::input::power::PowerEvent",
+    ];
+
+    /// 推定・招待を指す識別子と、許す範囲の外への参照を返す。
+    fn violations(code: &str, rules: &Rules) -> Vec<String> {
         const CONTAINS: [&str; 6] = [
             "engine",
             "intervention",
@@ -6904,32 +6986,31 @@ mod portrait_separation_tests {
         const EXACT: [&str; 7] = [
             "p_flow", "p_inc", "raw_x", "raw_y", "ewma_x", "ewma_y", "level",
         ];
-        const ALLOWED_CRATE_PATHS: [&str; 4] = [
-            "crate::eh3",
-            "crate::analysis::portrait",
-            "crate::wallpaper",
-            "crate::submission::home_dir",
-        ];
-        let mut found: Vec<String> = identifiers(src)
+        let mut found: Vec<String> = identifiers(code)
             .into_iter()
+            .filter(|id| !rules.exempt.contains(&id.as_str()))
             .filter(|id| {
                 let lower = id.to_ascii_lowercase();
                 CONTAINS.iter().any(|w| lower.contains(w)) || EXACT.contains(&lower.as_str())
             })
             .collect();
-        let head = src.split("#[cfg(test)]").next().unwrap_or(src);
-        for line in head.lines().filter(|l| !l.trim_start().starts_with("//")) {
-            let mut rest = line;
-            while let Some(i) = rest.find("crate::") {
-                let path: String = rest[i..]
-                    .chars()
-                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == ':')
-                    .collect();
-                if !ALLOWED_CRATE_PATHS.iter().any(|p| path.starts_with(p)) {
-                    found.push(path);
-                }
-                rest = &rest[i + "crate::".len()..];
+        for path in crate_paths(code) {
+            let ok = rules
+                .allowed
+                .iter()
+                .any(|a| path == *a || path.strip_prefix(a).is_some_and(|r| r.starts_with("::")));
+            if !ok {
+                found.push(path);
             }
+        }
+        // 相対の参照で `analysis/portrait/` の外へ出る経路（`super::super::heads` など）
+        let escapes = if rules.one_super {
+            code.contains("super::super")
+        } else {
+            code.contains("super::")
+        };
+        if escapes {
+            found.push("super::".to_string());
         }
         found
     }
@@ -6957,18 +7038,84 @@ mod portrait_separation_tests {
         ("wallpaper_windows.rs", include_str!("wallpaper_windows.rs")),
     ];
 
+    /// `lib.rs` の `struct PortraitRunner` から `impl PortraitRunner` の終わりまで（見つからなければ赤）。
+    fn portrait_runner_source() -> &'static str {
+        let src = include_str!("lib.rs");
+        let s = src
+            .find("\nstruct PortraitRunner {")
+            .expect("struct PortraitRunner が lib.rs に無い（検査が無効になっている）");
+        let i = s + src[s..]
+            .find("\nimpl PortraitRunner {")
+            .expect("impl PortraitRunner が lib.rs に無い（検査が無効になっている）");
+        let e = i + src[i..]
+            .find("\n}\n")
+            .expect("impl PortraitRunner の終わりが取れない（検査が無効になっている）");
+        &src[s..e + 2]
+    }
+
     #[test]
     fn the_portrait_sources_do_not_refer_to_the_estimate_or_the_invitation() {
         for (name, src) in PORTRAIT_SOURCES {
-            let v = violations(src);
+            let rules = Rules {
+                allowed: PORTRAIT_ALLOWED,
+                exempt: &[],
+                one_super: name.starts_with("analysis/portrait/")
+                    && name != "analysis/portrait/mod.rs",
+            };
+            let v = violations(&shipped_part(src), &rules);
             assert!(
                 v.is_empty(),
                 "{name} が推定・招待を参照している（肖像と招待の分け方）: {v:?}"
             );
         }
-        // 対照: 同じ探し方で、推定を扱う側のファイルでは見つかる（探し方が空回りしていない）
-        assert!(violations(include_str!("lib.rs")).contains(&"p_stuck".to_string()));
-        assert!(violations("use crate::analysis::invitation;").len() >= 2);
+        // 呼び出し側の殻（推定の値は `feat` の引数の型としてだけ通る）
+        let runner = portrait_runner_source();
+        let rules = Rules {
+            allowed: RUNNER_ALLOWED,
+            exempt: &["FeatSnapshot", "loop_step"],
+            one_super: false,
+        };
+        let v = violations(&shipped_part(runner), &rules);
+        assert!(
+            v.is_empty(),
+            "PortraitRunner が推定・招待を参照している（肖像と招待の分け方）: {v:?}"
+        );
+        assert!(
+            runner.contains("fn tick("),
+            "PortraitRunner の切り出しが短すぎる"
+        );
+    }
+
+    /// 探し方が空回りしていないこと（陽性対照）。
+    #[test]
+    fn the_reference_check_catches_each_kind_of_leak() {
+        let r = Rules {
+            allowed: PORTRAIT_ALLOWED,
+            exempt: &[],
+            one_super: true,
+        };
+        let caught = |code: &str| !violations(&shipped_part(code), &r).is_empty();
+        // 推定を扱う側のファイルでは見つかる
+        assert!(caught(include_str!("lib.rs")));
+        assert!(caught("use crate::analysis::invitation;"));
+        // impl の中の `#[cfg(test)]` の後ろにある本体も見る（HIGH の再発防止）
+        assert!(caught(
+            "impl A {\n    #[cfg(test)]\n    fn x() {}\n    fn y(f: F) -> f64 { f.p_stuck }\n}\n"
+        ));
+        // テストのモジュールの中は見ない
+        assert!(!caught(
+            "fn y() {}\n#[cfg(test)]\nmod tests {\n    fn z() { p_stuck(); }\n}\n"
+        ));
+        assert!(!caught(
+            "fn y() {}\n#[cfg(test)]\npub(crate) mod tests {\n    fn z() { p_stuck(); }\n}\n"
+        ));
+        // まとめた import の中の、許していない名前
+        assert!(caught("use crate::eh3::{Assignment, Trigger};"));
+        assert!(!caught("use crate::eh3::{Assignment, Condition};"));
+        // 相対の参照で外へ出る
+        assert!(caught("use super::super::heads::writing;"));
+        // 語の一覧に無い兄弟のモジュールも、`crate::` なら許可リストで止まる
+        assert!(caught("use crate::analysis::metrics::Summary;"));
     }
 
     /// 検査の対象の一覧が、ディレクトリにある実際のファイルと一致する（足したファイルの漏れを防ぐ）。

@@ -18,5 +18,5 @@
 - [x] 参照の検査（`analysis/portrait/` の全 .rs と `wallpaper*.rs`・ファイル数の照合）
 - [x] 陽性対照（参照を 1 行・`p_stuck` で止める分岐を 1 つ → 赤）
 - [x] cargo test / clippy / fmt
-- [ ] code-reviewer ∥ security-checker
+- [x] code-reviewer ∥ security-checker（HIGH 1・MEDIUM 3 を直す・判断 6）
 - [ ] /finish-task（/cross-review・CI の Windows・macOS）
