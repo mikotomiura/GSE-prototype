@@ -17,4 +17,4 @@
 ## 完了処理
 - [x] コミット・push（`docs/rhythm-stage-summary`・2026-10-17）
 - [ ] PR: `a4_keytar` が終わってから、`docs/rhythm-stage-speed-confound` → `docs/rhythm-stage-speed-shape` → このブランチの順に、前のものが main に入るたびに rebase して出す（台帳の衝突は起点からの差分の和で解く）
-- [ ] 研究者に `.idea` §12 への追記を頼む
+- [x] `.idea` §12 に §12.5 として追記した（2026-10-17・研究者の指示で Claude が `C:\GSE-prototype\.idea\` に書いた・§12.4 と §13 の間）
