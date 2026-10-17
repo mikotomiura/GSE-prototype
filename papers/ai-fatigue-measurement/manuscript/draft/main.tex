@@ -1,0 +1,272 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=25mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage[round,authoryear]{natbib}
+\usepackage[hidelinks]{hyperref}
+\setlist{nosep}
+\newcommand{\tbd}[1]{\textbf{[#1]}}
+
+\title{TRACE: How studies of ``AI fatigue'' tie fatigue to AI, measure it and report it.\\
+A registered methodological review}
+\author{Mikoto Miura (Independent Researcher) \and \tbd{Author 2: name, affiliation}}
+\date{Draft for discussion between the authors, 17 October 2026. Not for circulation.}
+
+\begin{document}
+\maketitle
+
+\begin{quote}\small
+\textbf{Status of this draft.} The protocol is not yet registered, and no record of the main set has been coded. The
+Introduction, Background and Method follow registration draft 0.10 and the manuscript outline (version 3). The Results
+and Discussion contain only the headings, the table shells and what each part will report; they contain no result and
+no expectation about results. Items in bold brackets are to be agreed between the authors.
+\end{quote}
+
+\begin{abstract}
+\noindent\textbf{Background.} Work on AI-related fatigue is growing; reviews call for validated measures and place it
+within digital burnout.
+\textbf{Question.} How do such studies tie fatigue to AI, and do their titles and conclusions stay within that tie,
+their design and their instruments' names?
+\textbf{Methods.} TRACE, a registered methodological review, coded studies from one free-source literature database,
+screened by authors who knew the rules and closed on 31 December 2026 (not a census). \tbd{Coding as it happened: two
+coders sharing the view of an earlier narrative review / the first author and a third person / the first author twice}
+applied seven codes.
+\textbf{Results.} \tbd{Written from the tables after coding, by the registered abstract rule.}
+\textbf{Availability.} Registration, outline, code table with per-instrument and per-study tables, codebook and scripts
+are open.
+\end{abstract}
+
+\section{Introduction}
+
+This review covers studies that measure fatigue in relation to the use of AI systems, whether or not they call it
+``AI fatigue''. Under that term the literature places constructs that range from fatigue attributed to AI in the items
+of a scale to general fatigue measured among people who use AI. Work on the topic is growing
+\citep{ragolane2025}. One review calls for standardized, validated measures of AI fatigue \citep{sosinski2026};
+another places AI fatigue within digital burnout, with which it shares symptoms \citep{ragolane2025}.
+
+A conclusion about ``AI fatigue'' depends on three things: whether the measure ties fatigue to AI, what the fatigue
+items ask about, and whether what the report states is internally consistent and matches its conclusion. Item wording
+shows what an instrument asks about. It does not show what the scores contain, which is a question of structural and
+construct validity and needs correlational or factor-analytic data. This review counts motivational and behavioural
+depletion as fatigue, so items about reduced interest, avoidance or irritation are described rather than treated as
+outside the construct. Overlapping samples change how much evidence a set of reports carries.
+
+Measurement research in general shows that a measure's name does not tell what it measures, and that items are
+dropped, added and altered while the instrument keeps the same name; a methodological review is one way to make such
+flexibility visible \citep{elson2023}. Studies of measurement practice in other fields count what reports disclose
+\citep{perrig2024}, and reviews of research on trust in AI have counted how often studies built their own
+questionnaire items rather than using existing questionnaires \citep{bach2022,benk2024}. For AI-related instruments,
+systematic reviews have assessed measurement properties with COSMIN \citep[for example,][on AI literacy
+scales]{lintner2024}, and a registered review of AI anxiety and attitude scales has no results yet
+\citep{jonaid2026}.
+
+We did not find a review of AI-fatigue studies that tabulates, study by study, how fatigue is tied to AI, what the
+fatigue items ask about, whether the reports are internally consistent, and whether titles and conclusions stay within
+the level of attribution, the design and the name of the instrument. For internal consistency, 16 searches of free
+sources (Europe PMC, OpenAlex and a web search engine, 17 October 2026) found no such review; for the other points, the
+claim rests only on the reviews we had read.
+
+Our earlier critical narrative review \tbd{citation and authorship to be agreed} described measurement problems in 11
+reports drawn from the same exploratory bibliography, without registration. We cite it as prior work and do not
+restate its observations as findings. What this review adds is limited to five points: rules fixed and registered
+before coding; primary counts from records that were not used to build the rules; item-level coding of instrument
+content with targets; codes that the narrative review does not apply study by study (the AI-side variable, the title
+checks and the three conditions on the main conclusion); and recalculation and consistency rules applied to every
+record. The observations of the narrative review are set beside our statements, not tested against them.
+
+The review asks one question: when a study reports fatigue in relation to AI, how is the fatigue tied to AI, and do
+its title and conclusion stay within that tie, the study's design and the name of its instrument? The registered
+coding scheme, TRACE, answers it with checks of attribution, names and design, not with validity evidence. The
+primary research questions are:
+\begin{itemize}
+  \item RQ1 (attribution): at which level do studies tie their main fatigue instrument to AI?
+  \item RQ2 (instruments and items): how do fatigue instruments break down by origin and modification, reported
+  adaptation procedures, reported measurement properties and item content, and what instruments are used for the
+  AI-side variable?
+  \item RQ3 (reporting): how complete and how internally consistent is reporting?
+  \item RQ4 (sample overlap): how many records are linked as the same sample or show unconfirmed signs of overlap, and
+  how many studies remain when linked records are counted once?
+  \item RQ5 (title versus content): do titles and abstracts match the name of the main instrument, the design and the
+  level of attribution?
+\end{itemize}
+The secondary questions are how these answers are distributed within each of the source database's two eligibility
+groups (SQ1) and, for each of three conditions, whether a study's main conclusion meets it (SQ2).
+
+The contributions are: (1) TRACE, a registered coding scheme that links, in each study, how fatigue is tied to AI,
+what the fatigue items ask about, and what the report states and concludes; (2) a description of how a set of studies
+not used to build the rules attributes fatigue to AI, measures it and reports it; (3) the item-level content of the
+fatigue instruments; and (4) recommendations for authors and reviewers that separate what existing standards already
+ask from steps that the standards cited here do not name. The released code table, codebook and scripts let the tables
+be recomputed and the scheme be reused; they are not claimed as findings.
+
+\section{Background}
+
+\subsection{Fatigue, exhaustion and burnout}
+The eligibility of this review defines fatigue to include exhaustion, burnout and motivational and behavioural
+depletion \tbd{the definition of the source database, quoted from the registration}. The definition shapes two
+outcomes: the share of items about reduced interest is partly set at entry, and the value ``no attribution to AI'' is
+truncated because studies without any relation to AI are excluded.
+
+\subsection{Technostress, adapted scales and scales built for AI}
+\tbd{Technostress and its exhaustion component; general fatigue scales reworded for AI; scales built for AI. Sources to
+be read in free full text and registered before they are cited.}
+
+\subsection{Measurement flexibility and names}
+A measure's name is often read as a statement about its content, and instruments are changed while their names stay the
+same \citep{elson2023}. Four codes of this review apply these known problems to the AI-fatigue literature: the
+modification of instruments (C2a), what reports disclose about them (C2d), and two checks that compare names (C6a for
+the title and the third condition of C7 for the main conclusion). The name checks compare names; they do not compare
+the content of instruments.
+
+\subsection{Content validity and reviews of measurement properties}
+COSMIN evaluates the content validity of an instrument by asking members of the target population and professionals to
+rate its items \citep{terwee2018}, and reviews of AI-related instruments have applied COSMIN to studies that develop or
+validate an instrument \citep{lintner2024}. This review codes how instruments are used and reported in studies that
+apply them. The unit of evaluation differs, and the item-content coding of this review (C2b) is a researcher
+classification of item wording, not a COSMIN rating.
+
+\subsection{Reviews of measurement practice}
+Reviews of measurement practice in user-experience research have counted item disclosure, adaptation and reasons for
+choosing scales \citep{perrig2024}. In research on trust in AI, one review counted that 12 of 16 studies that measured
+trust with questionnaires developed their own \citep{bach2022}, and a review of highly cited studies counted that 27\%
+developed their own items and 58\% used standardized questionnaires \citep{benk2024}. No count of this review is
+compared with these counts. Unlike some of these codes, a citation alone does not count as a reason for choosing an
+instrument in C2d.
+
+\subsection{Methodological studies and recalculation}
+Methodological studies examine how research is designed and reported \citep{mbuagbaw2020}; their reporting has its own
+guideline \citep{murad2017}, and its quality has been found wanting \citep{long2024}. Recalculating reported statistics
+from their inputs is established in psychology \citep{nuijten2016} and has been used outside it, for example to
+recalculate ratios and P-values from reported confidence intervals in medical abstracts \citep{georgescu2018}.
+
+\section{Method}
+
+\subsection{Registration and reporting}
+The protocol was registered with the Generalized Systematic Review Registration form \citep{vandenakker2023} on
+\tbd{date} (\tbd{identifier}), with the C2b codebook (version 2), the synthesis script and its test generator, the
+screening order and the manuscript outline as attachments. Amendments are listed in Table~2 with their dates, reasons
+and affected items. The report follows the checklist for meta-epidemiological methodology research
+\citep{murad2017}, supplemented by the items of PRISMA 2020 that it lacks \citep{page2021}; the broader guideline for
+methodological studies \citep{lawson2020} was still under development at registration.
+
+\subsection{Source of records}
+Records come from a literature database built by both authors from free sources: an exploratory bibliography of 34
+records and additional candidates. This review ran no search of its own. \tbd{Searches and their dates, from the
+registration attachment.}
+
+\subsection{Eligibility and screening}
+Eligibility follows the source database. Both authors screened, and the final decision was recorded with its date.
+Before registration the first author had screened 71 additional candidates at title and abstract level after reading
+AI-generated preliminary appraisals; the second author had not read these appraisals. After registration the remaining
+candidates are screened in a fixed order, alternating between population groups, and every decision is released.
+
+\subsection{Sets}
+The exploration set is the 10 primary studies included from the exploratory bibliography and four item-coded
+instruments; the rules were built from it, and it is reported separately. The main set is the primary studies among
+the additional candidates for which both screeners' final decision was recorded on or before 31 December 2026, less
+the calibration records. Studies included later and before main coding form a late stratum, reported outside the
+primary counts. Calibration records are drawn at random from the closed pool (seed 20261017), or from the exploration
+set if the pool has 24 studies or fewer. A table based on fewer than 10 coded studies reports counts without
+proportions.
+
+\subsection{Coding}
+Units are the record (C1 and C3 to C7), the fatigue instrument (C2) and the item (C2b). Missing values have their own
+codes, and a missing code stands alone in a cell. Table~1 lists the seven codes and their values.
+\begin{itemize}
+  \item C1, level of attribution: from items that mention AI to no mention, with a representative value per instrument.
+  \item C2a to C2d: origin and modification, item content (types and, for reduced interest, avoidance and futility,
+  targets), reported adaptation procedures, and reported measurement properties.
+  \item C3: the instrument used for the AI-side variable.
+  \item C4: completeness and internal consistency, including recalculation (C4f).
+  \item C5: sample overlap, without deciding sameness.
+  \item C6: the title against the name of the main instrument (C6a), causal wording against design (C6b), and an
+  AI-fatigue term in the title against the level of attribution (C6c).
+  \item C7: three conditions on the main conclusion, each its own problem type: causal wording not supported by the
+  design; an AI-fatigue term while the main instrument ties fatigue to AI only through a definition, a label, an
+  interview theme or not at all; and a construct term in a different family from the instrument's name.
+\end{itemize}
+C4f follows the logic of statcheck \citep{nuijten2016}, which recalculates p from reported test statistics and degrees
+of freedom, with four differences: coders judge each test rather than scanning the whole text; values in tables are
+included; p-values that the report says are adjusted for multiple testing are not counted; and percentages and indirect
+effects are added. The work is done by people. An AI assistant drafts values for C4f and for the bibliographic matches
+of C5 only; the drafts are stored unopened with their SHA-256 and opened only after both coders have fixed their own
+values.
+
+\subsection{Calibration, coding and reconciliation}
+\tbd{Who coded, as it happened.} By default both authors code every record independently. Coding stops calibrating when
+percentage agreement reaches 80\% on every registered unit; otherwise more records are drawn, up to two further rounds.
+Both default coders share the view of an earlier narrative review, so their agreement is agreement between coders who
+share that view. Disagreements are discussed, and those that remain are coded unresolved.
+
+\subsection{Synthesis}
+All values are computed by the registered script from the reconciled code table. The review describes; it estimates no
+effect and tests no hypothesis. For each problem type, the records that can show or not show the problem are defined in
+advance; among them, a problem type ``was observed in the main set'' if at least one record shows it, ``was not observed
+in the main set'' if none does, and ``could not be evaluated'' if no record can show it. Each statement gives the count,
+the number of evaluable records, the number not evaluable and the number unresolved. These statements report presence
+or absence in this set; they are not frequencies. Sensitivity analyses use peer-reviewed records only, remove records
+with unconfirmed signs of overlap, count the secondary type of boundary items, and use each coder's values in turn.
+
+\section{Results}
+\tbd{Written only after the tables have been generated from the code table, in the registered terms.}
+
+\begin{enumerate}
+  \item Records and sets (Figure~1, Table~3).
+  \item Coder agreement (Table~4).
+  \item RQ1 attribution (Table~5).
+  \item RQ2 instruments and items (Tables~6, 7, 8 and 15).
+  \item RQ3 reporting (Table~9).
+  \item RQ4 sample overlap (Table~10).
+  \item RQ5 and SQ2: titles and conclusions (Table~11).
+  \item Problem statements (Table~12).
+  \item SQ1 by centre (supplement).
+  \item Sensitivity analyses (Table~13).
+  \item Exploration set and late stratum (supplement).
+\end{enumerate}
+
+\begin{table}[h]
+\centering
+\caption{Problem statements for the main set (shell).}
+\small
+\begin{tabularx}{\linewidth}{XXXcccc}
+\toprule
+Problem type & Code and value & Statement & Count & Evaluable & Not evaluable & Unresolved \\
+\midrule
+--- & --- & observed / not observed / could not be evaluated & --- & --- & --- & --- \\
+\bottomrule
+\end{tabularx}
+
+\smallskip
+\raggedright\footnotesize One row per registered problem type; C7 has three rows, one per condition. A note gives,
+for each row, the values that made records not evaluable.
+\end{table}
+
+\section{Discussion}
+\tbd{Written after the results, in four parts: what the main set shows, question by question; the relation to the
+narrative review, with its observations set beside the statements for the main set; recommendations for authors and
+reviewers, each tied to a code and to either an existing standard or a proposal of this scheme, given whether or not
+the corresponding problem was observed; and the limitations.}
+
+\section{Conclusions}
+\tbd{The scope sentence and the registered statements of the abstract, without additional claims.}
+
+\section*{Declarations}
+\textbf{Funding.} None.
+\textbf{Competing interests.} No financial interests. Both authors built the source literature database \tbd{and wrote
+the earlier narrative review}.
+\textbf{Ethics.} Not applicable; no human participants.
+\textbf{Use of AI.} An AI assistant drafted values for C4f and C5 as described in the Method \tbd{and any other use in
+preparing the manuscript}.
+\textbf{Author contributions.} \tbd{to be agreed}
+\textbf{Data and code availability.} The registration, the code table, the codebook (CC BY 4.0) and the scripts (MIT
+licence) are in the OSF project of the registration \tbd{link}.
+
+\bibliographystyle{apalike}
+\bibliography{refs}
+
+\end{document}
