@@ -85,11 +85,20 @@ def main_dir(box: str, step: str | None) -> Path:
     return EXP / box / "results" / step / "main"
 
 
+def has_ceiling_dir(box: str) -> bool:
+    return (EXP / box / "results" / "ceiling").exists()
+
+
 def main_state(key: str, box: str, step: str | None, bad: list[str]) -> str:
     """本番を回した段の「下見 0」の列を一次から決める。"""
+    if box in (R1, R2):
+        # 第 1 回・第 2 回の本番の world は provenance.json の worlds で確かめる
+        worlds = load(main_dir(box, step) / "provenance.json").get("worlds")
+        if worlds != ["v4"]:
+            bad.append(f"{key}: 本番の provenance の worlds が {worlds!r}（v4 でない）")
     if box == R2:
         # 第 2 回は下見 0 を回していない（第 1 回の固定で選んだ v4 を使う）
-        if (EXP / box / "results" / "ceiling").exists():
+        if has_ceiling_dir(box):
             bad.append(f"{key}: 第 2 回に results/ceiling がある（下見 0 を回していない前提）")
         return "—（第 1 回の v4）"
     c = load(EXP / box / "results" / "ceiling" / "ceiling.json")
@@ -114,7 +123,7 @@ def expected(key: str, bad: list[str]) -> list[str]:
         det = s["_detector"]["L300"]
         auc = det["auc_A_speed"]
         aucs = (auc["hgb"], auc["lr"])
-        kinds_text = "・".join(det["ceiling_kinds"]) or "なし"
+        kinds_text = "・".join(sorted(det["ceiling_kinds"])) or "なし"
         state = main_state(key, box, step, bad)
         source = "本番"
         cols = [counts_text([s[c][lab] for c in cands], bad, key, lab) for lab in LABELS]
@@ -166,7 +175,55 @@ def table_rows(text: str, bad: list[str]) -> dict[str, list[str]]:
 # ただし探索的と併記する段は world の列に「探索的」を含むことを確かめる）
 N_COLS = 10
 CHECK_COLS = (0, 3, 4, 5, 6, 7, 8, 9)
+# 探索的と併記する段は一次の JSON に印が無い（揺れの world の notes「接続」の規則 (f) による）ので、
+# 鍵を定数で持つ。表の world の列と、本文の §4・§7 の併記の文（EXPLORATORY_TEXT が 2 回以上）を確かめる。
 EXPLORATORY = {"h-c200"}
+EXPLORATORY_TEXT = "`h(2)` は探索的と併記"
+
+# 読みの表（split-table）: 段 → compare.json の (c, world)。列は lr|none・lr|R2・lrbin|R2・hgb|none・hgb|R2
+SPLIT_ROWS = {"h(1)": ("1", "confound"), "d(1)": ("1", "drift"), "h(2)": ("2", "confound"),
+              "f(2)": ("2", "factor"), "d(2)": ("2", "drift")}
+SPLIT_COLS = ("lr|none", "lr|R2", "lrbin|R2", "hgb|none", "hgb|R2")
+
+
+def split_cell(c: dict) -> str:
+    n = (c["remains"], c["vanishes"], c["undetermined"], c["unreadable"])
+    if n[3] == N_CAND:
+        return f"読めない {N_CAND}"
+    if sum(n) != N_CAND:
+        return f"合計が {sum(n)}"
+    return " / ".join(str(x) for x in n)
+
+
+def check_split(text: str, bad: list[str]) -> int:
+    m = re.search(r"<!-- split-table:begin -->(.*?)<!-- split-table:end -->", text, re.S)
+    if not m:
+        bad.append("summary.md に読みの表の印が無い")
+        return 0
+    comp = load(EXP / SW / "results" / "compare" / "compare.json")
+    seen = {}
+    for line in m.group(1).splitlines():
+        line = line.strip()
+        if not line.startswith("| `"):
+            continue
+        cells = [c.strip().replace(r"\|", "|") for c in line.strip("|").split(" | ")]
+        key = cells[0].strip("`")
+        if key in seen:
+            bad.append(f"読みの表の段 {key} が重複")
+        seen[key] = cells
+    for key, (c, world) in SPLIT_ROWS.items():
+        if key not in seen:
+            bad.append(f"読みの表に段 {key} が無い")
+            continue
+        counts = comp["by_c"][c]["worlds"][world]["split"]["counts"]
+        exp = [split_cell(counts[v]) for v in SPLIT_COLS]
+        got = seen[key][1:]
+        if got != exp:
+            bad.append(f"読みの表 {key}: 表 {got} ／ 一次 {exp}")
+    for key in seen:
+        if key not in SPLIT_ROWS:
+            bad.append(f"読みの表に知らない段 {key}")
+    return len(seen)
 
 
 def main(argv: list[str]) -> int:
@@ -194,12 +251,15 @@ def main(argv: list[str]) -> int:
             bad.append(f"{key}: 主表 {got} ／ 一次 {e}")
         if key in EXPLORATORY and "探索的" not in cells[2]:
             bad.append(f"{key}: 探索的と併記する段なのに world の列に「探索的」が無い")
+    if text.count(EXPLORATORY_TEXT) < 2:
+        bad.append(f"本文に「{EXPLORATORY_TEXT}」が 2 回以上無い（§4・§7）")
+    n_split = check_split(text, bad)
     for key in rows:
         if key not in SOURCES:
             bad.append(f"主表に知らない鍵 {key}")
     for b in bad:
         print("bad:", b)
-    print(f"rows {len(rows)} / sources {len(SOURCES)} / bad {len(bad)}")
+    print(f"rows {len(rows)} / sources {len(SOURCES)} / split rows {n_split} / bad {len(bad)}")
     return 1 if bad else 0
 
 
