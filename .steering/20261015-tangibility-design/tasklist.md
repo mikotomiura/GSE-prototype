@@ -39,5 +39,5 @@
 - [x] カード・references.md・_index.md・check_citations を違反なしまで
 - [x] 単独でコミット（2fa9d396）
 - [x] 材料 4 つを研究者に確かめる（判断 33）・個人ごとの読み手の候補を G-GEAR の引き継ぎへ
-- [ ] [P517] の本文（研究者が PDF を渡したら）
-- [ ] 共存のラウンド（handmark-expression-design 判断 11）
+- [x] [P517] の本文（研究者が Chrome でボットよけを通した・判断 34）
+- [x] 共存のラウンド S-CO（handmark-expression-design 判断 11〜13・b0ed6815）
