@@ -27,6 +27,6 @@ worktree `/Users/johnd/GSE-prototype-af-c`（ブランチ `docs/ai-fatigue-c-out
 ## 守ること
 
 - 結果を先取りしない。尺度の項目を逐語で公開物に載せない。GSE の話を混ぜない。
-- 原稿の草稿を組む段階では、必要に応じて MacTeX を使う（研究者の指示・2026-10-17）。
+- 原稿の草稿を組む段階では、必要に応じて MacTeX を使う。.docx などオフィス系の出力は LibreOffice（`soffice`）を使う（研究者の指示・2026-10-17）。
 - 出典は `citation-ssot`（次は P526）。PR は研究者が確かめてから（push で止める）。`git add -A` を使わない。
 - TRACE の展開と同名の有無は、投稿の前に調べ直す。
