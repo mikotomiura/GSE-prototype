@@ -22,4 +22,5 @@
 ## 報告
 - [x] notes.md（`h(c)` の同じ段と並べる・限り）
 - [x] `/cross-review` 2 巡（判断 15・16）
-- [ ] 引き継ぎ・PR
+- [x] 引き継ぎ（`_handoff/next-session-rhythm-stage-after-shape-world.md`）
+- [ ] PR（`a4_keytar` が終わってから・前のブランチの PR の merge の後に rebase）
