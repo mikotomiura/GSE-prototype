@@ -853,6 +853,10 @@ struct PortraitRunner {
     /// 始まりを済ませ、まだ終わりを通っていない。
     in_session: bool,
     last_start_ms: u64,
+    /// 壁紙のスレッドへの指示の出口（本番は `send_wall`）。差し替えられるのは分け方の検査のため。
+    wall: Box<dyn FnMut(WallCmd)>,
+    /// セッションの種（本番は `rand::random`）。
+    seed: fn() -> u64,
 }
 
 impl PortraitRunner {
@@ -863,6 +867,14 @@ impl PortraitRunner {
     const FEATURE_WINDOW_MS: u64 = 30_000;
 
     fn new(a: crate::eh3::Assignment) -> Self {
+        Self::with_outputs(a, Box::new(send_wall), rand::random::<u64>)
+    }
+
+    fn with_outputs(
+        a: crate::eh3::Assignment,
+        wall: Box<dyn FnMut(WallCmd)>,
+        seed: fn() -> u64,
+    ) -> Self {
         Self {
             layer: crate::analysis::portrait::PortraitLayer::new(a),
             day: None,
@@ -874,12 +886,14 @@ impl PortraitRunner {
             material_blocked_until_ms: 0,
             in_session: false,
             last_start_ms: 0,
+            wall,
+            seed,
         }
     }
 
-    fn emit(show: Option<crate::analysis::portrait::Show>) {
+    fn emit(&mut self, show: Option<crate::analysis::portrait::Show>) {
         if let Some(s) = show {
-            send_wall(WallCmd::Show(s));
+            (self.wall)(WallCmd::Show(s));
         }
     }
 
@@ -892,7 +906,8 @@ impl PortraitRunner {
         self.feat_in_second = None;
         self.in_session = true;
         self.last_start_ms = now;
-        Self::emit(self.layer.start(now, day, cond, rand::random::<u64>()));
+        let shown = self.layer.start(now, day, cond, (self.seed)());
+        self.emit(shown);
     }
 
     /// 復帰（終わりを通っていなければ、先に終わりを通す。直前に始めたばかりなら何もしない）。
@@ -909,16 +924,15 @@ impl PortraitRunner {
     /// その日を初めて数えた。
     fn assigned(&mut self, now: u64, off: i32, cond: crate::eh3::Condition) {
         let day = crate::eh3::local_day(now, off);
-        Self::emit(
-            self.layer
-                .condition_assigned(now, day, cond, rand::random::<u64>()),
-        );
+        let shown = self.layer.condition_assigned(now, day, cond, (self.seed)());
+        self.emit(shown);
     }
 
     /// 終わり（終了・スリープの直前・日付の区切り）。
     fn end(&mut self) {
         self.in_session = false;
-        Self::emit(self.layer.end());
+        let shown = self.layer.end();
+        self.emit(shown);
     }
 
     /// この tick の F 系列（出たとき）を、いまの秒の材料として覚える。
@@ -966,10 +980,12 @@ impl PortraitRunner {
             }
         };
         let presses = if blocked { Vec::new() } else { presses };
-        Self::emit(self.layer.second(now, s, &presses));
+        let shown = self.layer.second(now, s, &presses);
+        self.emit(shown);
     }
 
     /// 毎回のループで: 日付の区切り・復帰・期間の後・電源の出来事・終了の前を扱う。
+    /// `paused` は記録の一時停止（呼び出し側が `crate::recording::is_paused()` を渡す）。
     fn tick(
         &mut self,
         now: u64,
@@ -977,6 +993,7 @@ impl PortraitRunner {
         tracker: &crate::eh3::DayTracker,
         a: &crate::eh3::Assignment,
         power: Option<crate::input::power::PowerEvent>,
+        paused: bool,
     ) {
         use crate::input::power::PowerEvent;
         // 終了の前の「終わり」は、期間の後でも応える（待たせない）
@@ -988,7 +1005,7 @@ impl PortraitRunner {
             if let Some((done_tx, _)) = PORTRAIT_END_DONE.get() {
                 // 壁紙のスレッドが書き終えたら、終了の経路へ知らせる
                 let (ack_tx, ack_rx) = crossbeam_channel::bounded(1);
-                send_wall(WallCmd::Ack(ack_tx));
+                (self.wall)(WallCmd::Ack(ack_tx));
                 let done = done_tx.clone();
                 thread::spawn(move || {
                     let _ = ack_rx.recv_timeout(Duration::from_millis(1800));
@@ -1002,7 +1019,7 @@ impl PortraitRunner {
         }
         if tracker.period_over(now, off) {
             self.finished = true;
-            send_wall(WallCmd::Finish);
+            (self.wall)(WallCmd::Finish);
             return;
         }
         let day = crate::eh3::local_day(now, off);
@@ -1028,7 +1045,7 @@ impl PortraitRunner {
             self.resume(now, off, tracker.today(now, off, a));
         }
         if self.in_session {
-            self.advance_second(now, crate::recording::is_paused());
+            self.advance_second(now, paused);
         }
     }
 }
@@ -4322,7 +4339,14 @@ pub fn run() {
                 }
                 let power = power_rx.as_ref().and_then(|rx| rx.try_recv().ok());
                 let off = utc_offset.get(tick_now);
-                p.tick(tick_now, off, tracker, a, power);
+                p.tick(
+                    tick_now,
+                    off,
+                    tracker,
+                    a,
+                    power,
+                    crate::recording::is_paused(),
+                );
             }
             if let Some(f) = out.feat {
                 *latest_feat_for_thread
@@ -6664,6 +6688,322 @@ mod debug_readout_tests {
         assert!(
             !head[gate..].contains(")}"),
             "debugView gate が読み出しブロックの前で閉じている (被験者に出てしまう)"
+        );
+    }
+}
+
+/// EH3: 肖像と招待の分け方を機械で守る（`.steering/20261016-eh3-pre-freeze/decisions.md` 判断 3・5）。
+///
+/// - 振る舞い: 同じ f1..f6・打鍵・時計に対して推定の値だけを変えても、壁紙への指示とその時刻が変わらない。
+///   参照の検査では拾えない「呼び出し側（`PortraitRunner`）が推定で更新を起こす・止める」経路を拾う。
+/// - 参照: 肖像の側のソース（`analysis/portrait/` の全 `.rs`・`wallpaper*.rs`）が推定・招待を参照しない。
+#[cfg(test)]
+mod portrait_separation_tests {
+    use super::*;
+    use crate::analysis::loop_step::FeatSnapshot;
+    use crate::analysis::portrait::generator::SplitMix;
+    use crate::analysis::portrait::Show;
+    use crate::eh3::{parse_assignment, DayTracker, LedgerLoad};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    const T0: u64 = 1_760_000_000_000;
+
+    /// 壁紙への指示を、届いた時刻と一緒に比べられる形にしたもの（`Ack` は中の送り口を比べない）。
+    #[derive(Debug, Clone, PartialEq)]
+    enum Out {
+        Show(Show),
+        Finish,
+        StopByPerson,
+        Ack,
+    }
+
+    /// 推定の欄（HMM と X/Y の出力）。肖像はこれを材料にしてはならない。
+    #[derive(Clone, Copy)]
+    struct Estimate {
+        p_flow: f64,
+        p_inc: f64,
+        p_stuck: f64,
+        xy: f64,
+        obs: usize,
+        alpha: f64,
+    }
+
+    /// 分析のループ（`run` の中）と同じ順で、合成の 2 時間を肖像の殻に通し、壁紙への指示を集める。
+    /// `estimate` は秒ごとの推定の値、`f1_shift` は f1 に足す値（比べ方が鈍くないことの対照）。
+    fn drive(estimate: impl Fn(u64) -> Estimate, f1_shift: f64) -> Vec<(u64, Out)> {
+        let a = parse_assignment("order=A,E,D;a_first=seed;grammar=raw;drift=none").unwrap();
+        let mut tracker = DayTracker::new(LedgerLoad::Fresh, None, &a);
+        let clock = Rc::new(RefCell::new(0u64));
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let (c, g) = (Rc::clone(&clock), Rc::clone(&got));
+        let wall = Box::new(move |cmd: WallCmd| {
+            let out = match cmd {
+                WallCmd::Show(s) => Out::Show(s),
+                WallCmd::Finish => Out::Finish,
+                WallCmd::StopByPerson => Out::StopByPerson,
+                WallCmd::Ack(_) => Out::Ack,
+            };
+            g.borrow_mut().push((*c.borrow(), out));
+        });
+        let mut p = PortraitRunner::with_outputs(a, wall, || 7);
+        *clock.borrow_mut() = T0;
+        let _ = tracker.on_start(T0, 0, &a);
+        p.start(T0, 0, tracker.today(T0, 0, &a));
+
+        let mut r = SplitMix::new(11);
+        let mut t = 0u64;
+        while t < 2 * 3600 {
+            let typing = 60 + (r.unit() * 240.0) as u64;
+            let pause = 10 + (r.unit() * 110.0) as u64;
+            let f = [
+                80.0 + 400.0 * r.unit() as f64 + f1_shift,
+                0.4 * r.unit() as f64,
+                1.0 + 15.0 * r.unit() as f64,
+                0.9 * r.unit() as f64,
+            ];
+            for k in 0..typing + pause {
+                let sec = t + k;
+                let now = T0 + 1000 + sec * 1000;
+                *clock.borrow_mut() = now;
+                if k < typing && r.unit() < 0.7 {
+                    let press = now - 400;
+                    if let Some(d) = tracker.on_press(press, 0, &a) {
+                        if let Some(cond) = d.condition {
+                            p.assigned(press, 0, cond);
+                        }
+                    }
+                    p.presses.push(press);
+                }
+                let e = estimate(sec);
+                p.feat(&FeatSnapshot {
+                    timestamp: now,
+                    f1: f[0],
+                    f3: f[1],
+                    f4: f[2],
+                    f5: 0.2,
+                    f6: f[3],
+                    p_flow: e.p_flow,
+                    p_inc: e.p_inc,
+                    p_stuck: e.p_stuck,
+                    raw_x: e.xy,
+                    raw_y: -e.xy,
+                    ewma_x: e.xy,
+                    ewma_y: -e.xy,
+                    obs: e.obs,
+                    alpha: e.alpha,
+                    keys: 10,
+                    bs_keys: 1,
+                });
+                p.tick(now, 0, &tracker, &a, None, false);
+            }
+            t += typing + pause;
+        }
+        p.end();
+        let out = got.borrow().clone();
+        out
+    }
+
+    fn stuck(_: u64) -> Estimate {
+        Estimate {
+            p_flow: 0.02,
+            p_inc: 0.03,
+            p_stuck: 0.95,
+            xy: 3.0,
+            obs: 2,
+            alpha: 0.9,
+        }
+    }
+
+    fn flowing(_: u64) -> Estimate {
+        Estimate {
+            p_flow: 0.97,
+            p_inc: 0.02,
+            p_stuck: 0.01,
+            xy: -3.0,
+            obs: 0,
+            alpha: 0.1,
+        }
+    }
+
+    fn erratic(sec: u64) -> Estimate {
+        let mut r = SplitMix::new(sec.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let (a, b) = (r.unit() as f64, r.unit() as f64);
+        let (lo, hi) = (a.min(b), a.max(b));
+        Estimate {
+            p_flow: lo,
+            p_inc: hi - lo,
+            p_stuck: 1.0 - hi,
+            xy: 6.0 * r.unit() as f64 - 3.0,
+            obs: (sec % 3) as usize,
+            alpha: r.unit() as f64,
+        }
+    }
+
+    #[test]
+    fn the_portrait_does_not_change_with_the_estimate() {
+        let base = drive(stuck, 0.0);
+        let images = base
+            .iter()
+            .filter(|(_, o)| matches!(o, Out::Show(Show::Image(_))))
+            .count();
+        // 空回りの防止: 比べる列に画が十分に出ている（予定の更新と終わりの seed）
+        assert!(
+            images >= 3,
+            "画が {images} 回しか出ていない（検査が空回りしている）"
+        );
+        for (name, other) in [
+            ("停滞が低いまま", drive(flowing, 0.0)),
+            ("秒ごとに乱れる", drive(erratic, 0.0)),
+        ] {
+            assert_eq!(
+                base.len(),
+                other.len(),
+                "推定（{name}）で壁紙への指示の回数が変わった（肖像に推定が漏れている）"
+            );
+            for (i, (x, y)) in base.iter().zip(&other).enumerate() {
+                assert!(
+                    x == y,
+                    "推定（{name}）で {i} 番目の壁紙への指示（時刻 {} / {}）が変わった（肖像に推定が漏れている）",
+                    x.0,
+                    y.0
+                );
+            }
+        }
+        // 対照: 材料（f1）を変えれば列が変わる（比べ方が鈍くない）
+        assert_ne!(base, drive(stuck, 120.0));
+    }
+
+    /// ソースを識別子に切る（`#[cfg(test)]` より後と、コメントの行を除く）。
+    fn identifiers(src: &str) -> Vec<String> {
+        let head = src.split("#[cfg(test)]").next().unwrap_or(src);
+        let mut out = Vec::new();
+        for line in head.lines().filter(|l| !l.trim_start().starts_with("//")) {
+            let mut cur = String::new();
+            for ch in line.chars().chain(std::iter::once(' ')) {
+                if ch.is_ascii_alphanumeric() || ch == '_' {
+                    cur.push(ch);
+                } else if !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                }
+            }
+        }
+        out
+    }
+
+    /// 推定・招待を指す識別子と、許可リストの外の `crate::` の参照を返す。
+    fn violations(src: &str) -> Vec<String> {
+        const CONTAINS: [&str; 6] = [
+            "engine",
+            "intervention",
+            "invitation",
+            "stuck",
+            "featsnapshot",
+            "loop_step",
+        ];
+        const EXACT: [&str; 7] = [
+            "p_flow", "p_inc", "raw_x", "raw_y", "ewma_x", "ewma_y", "level",
+        ];
+        const ALLOWED_CRATE_PATHS: [&str; 4] = [
+            "crate::eh3",
+            "crate::analysis::portrait",
+            "crate::wallpaper",
+            "crate::submission::home_dir",
+        ];
+        let mut found: Vec<String> = identifiers(src)
+            .into_iter()
+            .filter(|id| {
+                let lower = id.to_ascii_lowercase();
+                CONTAINS.iter().any(|w| lower.contains(w)) || EXACT.contains(&lower.as_str())
+            })
+            .collect();
+        let head = src.split("#[cfg(test)]").next().unwrap_or(src);
+        for line in head.lines().filter(|l| !l.trim_start().starts_with("//")) {
+            let mut rest = line;
+            while let Some(i) = rest.find("crate::") {
+                let path: String = rest[i..]
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == ':')
+                    .collect();
+                if !ALLOWED_CRATE_PATHS.iter().any(|p| path.starts_with(p)) {
+                    found.push(path);
+                }
+                rest = &rest[i + "crate::".len()..];
+            }
+        }
+        found
+    }
+
+    /// 検査の対象（肖像の側のソース）。ファイルを足したら、ここにも足す（足さないと下の照合が赤になる）。
+    const PORTRAIT_SOURCES: [(&str, &str); 7] = [
+        (
+            "analysis/portrait/mod.rs",
+            include_str!("analysis/portrait/mod.rs"),
+        ),
+        (
+            "analysis/portrait/canvas.rs",
+            include_str!("analysis/portrait/canvas.rs"),
+        ),
+        (
+            "analysis/portrait/generator.rs",
+            include_str!("analysis/portrait/generator.rs"),
+        ),
+        (
+            "analysis/portrait/schedule.rs",
+            include_str!("analysis/portrait/schedule.rs"),
+        ),
+        ("wallpaper.rs", include_str!("wallpaper.rs")),
+        ("wallpaper_macos.rs", include_str!("wallpaper_macos.rs")),
+        ("wallpaper_windows.rs", include_str!("wallpaper_windows.rs")),
+    ];
+
+    #[test]
+    fn the_portrait_sources_do_not_refer_to_the_estimate_or_the_invitation() {
+        for (name, src) in PORTRAIT_SOURCES {
+            let v = violations(src);
+            assert!(
+                v.is_empty(),
+                "{name} が推定・招待を参照している（肖像と招待の分け方）: {v:?}"
+            );
+        }
+        // 対照: 同じ探し方で、推定を扱う側のファイルでは見つかる（探し方が空回りしていない）
+        assert!(violations(include_str!("lib.rs")).contains(&"p_stuck".to_string()));
+        assert!(violations("use crate::analysis::invitation;").len() >= 2);
+    }
+
+    /// 検査の対象の一覧が、ディレクトリにある実際のファイルと一致する（足したファイルの漏れを防ぐ）。
+    #[test]
+    fn every_portrait_source_is_checked() {
+        fn walk(dir: &std::path::Path, base: &std::path::Path, out: &mut Vec<String>) {
+            for e in std::fs::read_dir(dir).expect("ディレクトリが読めない") {
+                let p = e.expect("ディレクトリが読めない").path();
+                if p.is_dir() {
+                    walk(&p, base, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    let rel = p.strip_prefix(base).unwrap().to_string_lossy();
+                    out.push(rel.replace('\\', "/"));
+                }
+            }
+        }
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut actual = Vec::new();
+        walk(&src.join("analysis/portrait"), &src, &mut actual);
+        for e in std::fs::read_dir(&src).expect("src が読めない") {
+            let name = e.expect("src が読めない").file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("wallpaper") && name.ends_with(".rs") {
+                actual.push(name.into_owned());
+            }
+        }
+        actual.sort();
+        let mut listed: Vec<String> = PORTRAIT_SOURCES
+            .iter()
+            .map(|(n, _)| n.to_string())
+            .collect();
+        listed.sort();
+        assert_eq!(
+            actual, listed,
+            "肖像の側のソースと検査の対象の一覧（PORTRAIT_SOURCES）が合わない"
         );
     }
 }

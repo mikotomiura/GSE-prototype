@@ -205,7 +205,7 @@ impl Generator {
     }
 
     /// 水準（打鍵のあった秒の平均を範囲で正規化）。値が無ければ `None`。
-    fn level(mat: &[Second], k: usize) -> Option<f64> {
+    fn normalized_mean(mat: &[Second], k: usize) -> Option<f64> {
         let (lo, hi) = RAW_RANGES[k];
         let vals: Vec<f64> = mat
             .iter()
@@ -226,10 +226,10 @@ impl Generator {
             return;
         }
         let m = a_u.div_ceil(ACTIVE_PER_MARK) as usize;
-        let levels = [0, 1, 2, 3].map(|k| Self::level(mat, k));
+        let means = [0, 1, 2, 3].map(|k| Self::normalized_mean(mat, k));
         match self.grammar {
-            Grammar::Raw => self.draw_raw(levels, m),
-            Grammar::Lattice => self.draw_lattice(levels, m),
+            Grammar::Raw => self.draw_raw(means, m),
+            Grammar::Lattice => self.draw_lattice(means, m),
         }
     }
 
@@ -248,8 +248,8 @@ impl Generator {
         }
     }
 
-    fn draw_raw(&mut self, levels: [Option<f64>; 4], m: usize) {
-        let [n1, n3, n4, n6] = levels.map(|v| v.unwrap_or(0.5) as f32);
+    fn draw_raw(&mut self, means: [Option<f64>; 4], m: usize) {
+        let [n1, n3, n4, n6] = means.map(|v| v.unwrap_or(0.5) as f32);
         for i in 0..m {
             let fi = i as f32;
             let hue = 0.55 - 0.5 * n3 + 0.03 * (fi * 1.7).sin();
@@ -261,8 +261,8 @@ impl Generator {
         }
     }
 
-    fn draw_lattice(&mut self, levels: [Option<f64>; 4], m: usize) {
-        for (k, v) in levels.iter().enumerate() {
+    fn draw_lattice(&mut self, means: [Option<f64>; 4], m: usize) {
+        for (k, v) in means.iter().enumerate() {
             if let Some(v) = v {
                 self.lat_cls[k] = Some(lattice_class(*v, self.lat_cls[k]));
             }

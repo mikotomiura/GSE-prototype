@@ -30,4 +30,34 @@
 
 ## 段 2: 分け方の検査
 
-（段 1 の後に書く。方針は decisions.md 判断 3）
+方針は decisions.md 判断 3、細部は判断 5。
+
+### アプローチ
+
+1. `PortraitRunner`（`lib.rs`）の出口を差し替えられるようにする（振る舞いは変えない）。
+   - 壁紙のスレッドへの指示（`Show`・`Finish`・`Ack`）を、大域の `send_wall` を直接呼ぶ代わりに、持たせた受け口 `wall: Box<dyn FnMut(WallCmd)>` へ渡す。本番の受け口は `send_wall`。順序（終わりの `Show` の後に `Ack`）はそのまま保たれる。
+   - セッションの種（`rand::random`）も持たせた関数から取る（本番は `rand::random`）。
+   - `tick` が中で読んでいた `crate::recording::is_paused()` を引数にする（呼び出し側が渡す）。大域の一時停止は他のテストが並行して切り替えるので、検査の中で読まない。
+2. 振る舞いの検査（`lib.rs` のテストのモジュール `portrait_separation_tests`）
+   - 分析のループと同じ順で、合成の列（2 時間・書く区間と止まる区間・1 秒に 1 回）を `DayTracker`・`PortraitRunner` に通す（打鍵 → `on_press`・`assigned`・`presses`、`feat`、`tick`、最後に `end`）。受け口に届いた指示を `(時刻, 中身)` の列として集める。
+   - 推定の欄（`p_flow`・`p_inc`・`p_stuck`・`raw_x`・`raw_y`・`ewma_x`・`ewma_y`・`obs`・`alpha`）だけを変えた 3 通り（停滞が高いまま・低いまま・秒ごとに乱れる）で、集めた列が完全に一致することを確かめる。
+   - 空回りの防止: 画（`Show::Image`）が 3 回以上出ていること。対照として、f1 の値だけを変えると列が変わることも確かめる（比べ方が鈍くない）。
+3. 参照の検査（同じモジュール）
+   - 対象: `analysis/portrait/` の全 `.rs` と `src/wallpaper*.rs`（引き継ぎ §3 の「肖像」の範囲）。`include_str!` で読み、`#[cfg(test)]` より前・コメント行を除いた本文を、識別子に切って調べる。
+   - 禁止: `engine`・`intervention`・`invitation`・`stuck`・`featsnapshot`・`loop_step` を含む識別子（大文字小文字を問わない）と、`p_flow`・`p_inc`・`raw_x`・`raw_y`・`ewma_x`・`ewma_y`・`level` に一致する識別子。
+   - 許可リスト: `crate::` の参照は `crate::eh3`・`crate::analysis::portrait`・`crate::wallpaper`・`crate::submission::home_dir` で始まるものだけ。
+   - ファイルの数の照合: ディレクトリを実際に読み、`.rs` の集合が検査の対象の一覧と一致しなければ赤（足したファイルの漏れを防ぐ）。
+   - 対照: 同じ切り方で `lib.rs` を調べると `p_stuck` が見つかる（探し方が空回りしていない）。
+   - 生成器の内部の関数 `level`（正規化した平均）は、禁止の語と同じ名なので `normalized_mean` に改名する（振る舞いは変えない）。
+4. 陽性対照（コミットしない）: `analysis/portrait/mod.rs` に `use crate::analysis::invitation;` を 1 行足す → 参照の検査が赤。`PortraitRunner::feat` に `p_stuck` で材料を捨てる分岐を 1 つ足す → 振る舞いの検査が赤。結果を tasklist と decisions に書く。
+
+### 変更対象ファイル
+
+- `src-tauri/src/lib.rs` — `PortraitRunner` の受け口・種・`tick` の引数、呼び出し側、テストのモジュール `portrait_separation_tests`
+- `src-tauri/src/analysis/portrait/generator.rs` — `level` → `normalized_mean`（改名だけ）
+
+### テスト戦略
+
+- 新しい 2 本と既存の肖像のテストが緑。`cargo test --workspace`・`clippy -D warnings`・`fmt --check`。
+- 陽性対照で 2 本がそれぞれ赤になるのを見る。
+- CI の Windows・macOS の両方で緑（`wallpaper_windows.rs` も `include_str!` の対象なので、macOS でも中身は読まれる）。
