@@ -59,3 +59,13 @@ Assign a target when `type` or `secondary_type` is `MOT`, `AVO` or `FUT`. Otherw
 ## Limitation
 
 Item wording does not show what scores contain. An item that does not ask about motivation directly may still contribute to scores that reflect reduced motivation. Testing that requires correlational or factor-analytic data.
+
+## Sources of anchors
+
+Anchors are short phrases from published items, used as examples only.
+
+- Lau, G. R., Kasturiratna, K. T. A. S., Goh, A. Y. H., Tong, E. M. W., & Hartanto, A. (2026). AI fatigue in human–AI interaction: Conceptual framework, scale development and validation, and associations with AI engagement. *Computers in Human Behavior Reports*, 23, 101186. https://doi.org/10.1016/j.chbr.2026.101186. Table 1, items 5 ("frustrated"), 6 ("irritated"), 7 ("discouraged"), 8 ("I avoid using AI even when it could help me."), 10 ("new AI features") and 12 ("My eyes can feel strained ...").
+- Fauville, G., Luo, M., Queiroz, A. C. M., Bailenson, J. N., & Hancock, J. (2021). Zoom Exhaustion & Fatigue Scale. *Computers in Human Behavior Reports*, 4, 100119. https://doi.org/10.1016/j.chbr.2021.100119. Tables 2 and 3: the motivational items, and items 2 ("exhausted"), 5 ("irritable"), 7 ("avoid social situations"), 8 ("want to be alone"), 9 ("need time by yourself"), 12 ("too tired to do other things"), 13 ("emotionally drained") and 15 ("moody").
+- Zhao, W., & Liu, J. (2026). Risk perception and generative AI discontinuance intention: mediating effect of cognitive fatigue and moderating effect of AI dependence. *Frontiers in Psychology*, 17, 1879080. https://doi.org/10.3389/fpsyg.2026.1879080. Table 2: "tired of constantly evaluating ...", "I've lost interest in ...", "I have become less proactive in ...", "... is pointless", "I doubt whether my efforts ... have any real impact", "assessing the reliability of AI-generated content", "protecting personal data", "privacy settings in AI tools".
+- Target examples are fragments of the anchors above ("doing anything", "having to do things" and "other things" from the Zoom Exhaustion & Fatigue Scale motivational items; "social situations" and "be alone" from its social items; "using AI" from Lau et al. item 8).
+- Constructed examples (not from a published scale): "I feel full of energy", "I am interested in ...".
