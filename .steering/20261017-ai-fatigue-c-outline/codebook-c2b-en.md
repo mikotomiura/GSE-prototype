@@ -1,17 +1,18 @@
 # Codebook for C2b: what each scale item asks about, and toward what
 
-Attachment to the registration. **Version 2 (2026-10-17).** The English text is the authoritative version.
+Attachment to the registration. **Version 2 (2026-10-17; final text fixed at registration, with its SHA-256 recorded).** The English text is the authoritative version.
 
 Changes from version 1 (fixed 2026-10-15 in Japanese and used only for exploration):
 - `OTH` is split into `FAT` (tiredness or depletion) and `OTH`.
 - `OTHER` is added as a target.
 - The coder values are changed.
+- Reverse-keyed items, counting rules and the sources of anchors are written out.
 
 Any later change will be versioned and logged as an amendment, with the reason and the affected rows.
 
 ## Principles
 
-- Code the **item wording only**. The scale authors' factor name is copied into `author_factor` and is not used for coding. When the wording-based code and the factor name disagree, this is counted in `mismatch`.
+- Code the **item wording only**. The scale authors' factor name is copied into `author_factor` and is not used for coding. For the exploration records only, disagreement between the wording-based code and the factor name was recorded in `mismatch`; this column is not coded for other records.
 - Instructions or stems (for example, "After video conferencing ...") are copied into `context`. They show the situation the item refers to. They are not used to decide the type.
 - Give each item one primary type. If an item falls between two types, set `boundary` = 1 and record the other type in `secondary_type`. Give the reason in one sentence in `rationale`.
 - Reverse-keyed items take the type of the dimension they ask about, from either pole. For example, "I feel full of energy" is `FAT`, and "I am interested in ..." is `MOT`.
