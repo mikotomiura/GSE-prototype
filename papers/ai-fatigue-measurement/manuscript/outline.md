@@ -79,9 +79,11 @@ manuscript:
   coders, and no claim of independent coding is made. The coder wrote the earlier narrative review, so the codes carry
   that view of what counts as a problem (GSRR-46).
 - The main set is the set of studies included by 31 December 2026 after screening by the first author and an AI
-  screener, each on their own; the first author decided where they differed (GSRR-33, GSRR-38, GSRR-39). The AI
-  screener was checked against human decisions on records that had been used to refine the criteria, so its accuracy
-  may be optimistic (GSRR-37). Only free full texts were used; records without one stayed pending and were not coded
+  screener, each judging a record on their own within a stage; the first author decided where they differed, and had
+  read the AI screener's answers on those records before the next stage (GSRR-33, GSRR-34, GSRR-38, GSRR-39). The AI
+  screener was checked against human decisions on records that had been used to refine the criteria and that include
+  more studies of centre-A and a different mix of population groups than the candidates, so its accuracy may be
+  optimistic (GSRR-37). Only free full texts were used; records without one stayed pending and were not coded
   (GSRR-65). It does not rest on two human screeners; the screening by both
   authors after the manuscript draft is a sensitivity analysis, done knowing the results (GSRR-62). The set was drawn
   from one literature database built from free sources, and the first author, who screened it, knew the coding rules;
@@ -389,7 +391,8 @@ columns; no value is filled in before coding.
 - Table 4: agreement between the two coding passes of one coder per code (percentage agreement, kappa with bootstrap
   95% CI, n), with the calibration passes, the main set and the exploration set in separate columns; the C4f agreement
   with the AI draft; records coded in one pass only. The heading states that this is agreement within one coder
-  (GSRR-44), and a note that calibration agreement may be higher than on new studies (GSRR-65).
+  (GSRR-44), and a note that calibration agreement may be higher than on new studies and that units with fewer than 5
+  comparisons were not calibrated (GSRR-65).
 - Table 5: C1 representative level (L1a, L1b, L2, L3, L4, L5, L6, excluded values), count and, where allowed,
   proportion.
 - Table 6: C2a origin, modification (per kind: stated / found by comparison / no change / not verifiable) and format;
