@@ -1,0 +1,35 @@
+id,stage1,stage1_code,stage1_read,stage2,stage2_code,stage2_read,centre
+AF001,include,,abstract,include,,full text,centre-A
+AF002,include,,title only,pending,E6,abstract,
+AF003,include,,title only,pending,E6,abstract,
+AF004,include,,abstract,include,,full text,centre-B
+AF005,include,,abstract,include,,full text,centre-A
+AF006,include,,abstract,include,,full text,centre-A
+AF007,include,,abstract,include,,full text,centre-A
+AF008,include,,abstract,include,,full text,centre-A
+AF009,include,,abstract,pending,E6,abstract,
+AF010,include,,abstract,include,,full text,centre-A
+AF011,include,,abstract,include,,full text,centre-A
+AF012,include,,abstract,include,,full text,centre-B
+AF013,exclude,E4,abstract,,,,
+AF014,exclude,E4,abstract,,,,
+AF015,exclude,E4,abstract,,,,
+AF016,exclude,E4,abstract,,,,
+AF017,exclude,E4,title only,,,,
+AF018,exclude,E4,abstract,,,,
+AF019,include,,abstract,include,,full text,centre-B
+AF020,include,,abstract,exclude,E2,full text,
+AF021,include,,abstract,pending,E6,abstract,
+AF022,include,,abstract,exclude,E2,full text,
+AF023,include,,abstract,exclude,E2,full text,
+AF024,include,,abstract,include,,full text,centre-A
+AF025,exclude,E4,abstract,,,,
+AF026,exclude,E4,abstract,,,,
+AF027,exclude,E4,abstract,,,,
+AF028,exclude,E4,abstract,,,,
+AF029,exclude,E4,abstract,,,,
+AF030,exclude,E4,abstract,,,,
+AF031,exclude,E4,abstract,,,,
+AF032,exclude,E4,abstract,,,,
+AF033,exclude,E4,abstract,,,,
+AF034,exclude,E4,title only,,,,
