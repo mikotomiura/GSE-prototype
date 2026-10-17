@@ -1,10 +1,11 @@
-"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.6).
+"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.7).
 
 Implements, from the code tables (CSV):
 - calibration draws and the post-registration screening order (GSRR-33, GSRR-39)
 - derived values: C1 representative value, C4f record summary, C7 (GSRR-43, GSRR-48)
 - agreement per set: percentage agreement and Cohen's kappa with bootstrap CI (GSRR-47)
 - tables per set, population group and centre; C2a/C2c/C2d; C2b per instrument;
+  C4f per recalculated result; every instrument version used in a set; the per-study table;
   RQ4 study counts; problem statements; sensitivity analyses 1-4 (GSRR-56, GSRR-57, GSRR-62)
 
 Input files (one row per unit; `coder` is coder1 / coder2 / reconciled):
@@ -463,8 +464,65 @@ def problem_statements(rows):
     return out
 
 
+def c4f_result_table(recs, c4f_rows, set_name):
+    """GSRR-56: C4f per recalculated result, beside the record summary. Results cluster in records,
+    so the number of recalculated results per record is given as a distribution."""
+    ids = {r["record_id"] for r in recs if r["set"] == set_name}
+    rows = [r for r in c4f_rows if r["record_id"] in ids]
+    per_rec = Counter(r["record_id"] for r in rows)
+    dist = Counter(per_rec.get(i, 0) for i in ids)
+    vals = Counter(r["consistent"] for r in rows)
+    out = [{"set": set_name, "row": "results", "value": k, "count": vals[k]}
+           for k in ["yes", "no", "na", "unresolved"]]
+    out.append({"set": set_name, "row": "results", "value": "gross", "count": sum(1 for r in rows if r.get("gross") == "1")})
+    out += [{"set": set_name, "row": "results_per_record", "value": str(k), "count": n}
+            for k, n in sorted(dist.items())]
+    return out
+
+
+INSTRUMENT_USE_CODES = ["origin", "format", "C2d_item_disclosure"]
+
+
+def instruments_used(recs, insts, items, vsets, set_name):
+    """GSRR-56: every instrument version used by a record of `set_name`, whichever set it was first
+    seen in, with item-type counts (no proportions). Not a comparison between sets (GSRR-57)."""
+    ids = {r["record_id"] for r in recs if r["set"] == set_name}
+    by_version = defaultdict(list)
+    for it in items:
+        by_version[it["version_id"]].append(it)
+    used = defaultdict(list)
+    for i in insts:
+        if i["record_id"] in ids:
+            used[i["version_id"]].append(i)
+    out = []
+    for vid in sorted(used):
+        its = by_version.get(vid, [])
+        c = Counter(it["type"] for it in its)
+        row = {"set": set_name, "version_id": vid, "first_seen": vsets.get(vid, ""),
+               "records_using": len({i["record_id"] for i in used[vid]}), "items_available": len(its)}
+        for k in INSTRUMENT_USE_CODES:
+            row[k] = "|".join(sorted({i.get(k, "") for i in used[vid]}))
+        for t in C2B_TYPES + ["unresolved"]:
+            row[t] = c[t] if its else None
+        out.append(row)
+    return out
+
+
+PER_STUDY_CODES = ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d", "C4e_codebook", "C4e_agreement",
+                   "C4f", "C4f_gross", "C5", "C6a", "C6b", "C7"]
+
+
+def per_study_table(recs):
+    """Supplementary table: one row per coded record of the primary sets, C1-C7 values (no item text)."""
+    rows = [r for r in recs if r["set"] in PRIMARY_SETS]
+    rows.sort(key=lambda r: (PRIMARY_SETS.index(r["set"]), r["record_id"]))
+    return [{"record_id": r["record_id"], "set": r["set"], "population": r["population"],
+             "centre": r["centre"], **{k: r.get(k, "") for k in PER_STUDY_CODES}} for r in rows]
+
+
 def build_tables(d, coder="reconciled"):
-    recs = derive(load(d, "records", coder), load(d, "c4f", coder))
+    c4f_rows = load(d, "c4f", coder)
+    recs = derive(load(d, "records", coder), c4f_rows)
     insts = load(d, "instruments", coder)
     items = load(d, "items", coder)
     links = read_csv(d / "links.csv")
@@ -472,7 +530,7 @@ def build_tables(d, coder="reconciled"):
     for i in insts:
         i["set"] = rs.get(i["record_id"], "")
     vsets = version_sets(insts, recs)
-    tables, c2b, rq4 = [], [], []
+    tables, c2b, rq4, c4f_res, used = [], [], [], [], []
     for s in PRIMARY_SETS:          # calibration records are never in these sets
         r_s = [r for r in recs if r["set"] == s]
         i_s = [i for i in insts if i["set"] == s]
@@ -492,8 +550,11 @@ def build_tables(d, coder="reconciled"):
             tables += [x for x in t if x["code"] != "C1_rep"]
         c2b += c2b_tables(items, vsets, s)
         rq4.append(rq4_counts(recs, links, s))
+        c4f_res += c4f_result_table(recs, c4f_rows, s)
+        used += instruments_used(recs, insts, items, vsets, s)
     conf = [r for r in recs if r["set"] == "confirmation"]
     return {"recs": recs, "tables": tables, "c2b": c2b, "rq4": rq4, "vsets": vsets, "items": items,
+            "c4f_results": c4f_res, "instruments_used": used, "per_study": per_study_table(recs),
             "problems": problem_statements(conf), "n_conf": len(conf)}
 
 
@@ -546,6 +607,9 @@ def main():
         write_csv(out / "tables.csv", res["tables"])
         write_csv(out / "c2b.csv", res["c2b"])
         write_csv(out / "rq4.csv", res["rq4"])
+        write_csv(out / "c4f_results.csv", res["c4f_results"])
+        write_csv(out / "instruments_used.csv", res["instruments_used"])
+        write_csv(out / "per_study.csv", res["per_study"])
         write_csv(out / "problem_statements.csv", res["problems"])
         write_csv(out / "sensitivity.csv", sens)
         write_csv(out / "sensitivity_c2b_lenient.csv", s3)

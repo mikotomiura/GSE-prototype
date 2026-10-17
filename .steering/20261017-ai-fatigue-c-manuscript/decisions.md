@@ -22,3 +22,20 @@
 - IME 論文の外枠の形（題・規程・主張の範囲・寄与・抄録の規則・節の計画・主張と根拠の表・表の入れ物・未決）に合わせた。
 - narrative review との関係は独立の節にし、新しいと言えるものを 5 点に限った（`overlap-narrative-review.md` の「違い」の列から）。
 - 見積もり（`feasibility.md`）の数は外枠に入れていない。
+
+## 判断 5（2026-10-17）外枠のプレ査読（attack-me・outline round 1）への対応
+
+- 記録: `attack-me/outline-c-manuscript/round-1/`（判定 major・指摘 F1〜F26 は `verdict.md`）。査読者 3 人（全員有効）・意図の監査役・Codex（研究者の承認を得て送った。外枠の全文と登録版の Background and questions の節。研究者の求めで「どこが面白いか」も問うた）。
+- 研究者の採否（AskUserQuestion）:
+  - 設計の判断が要らない直しはすべて直す（推奨どおり）。
+  - 推奨の節は「既存の基準を当てたもの」と「この枠組みの提案」に分ける。表 14。抄録と結論に入れない（推奨どおり）。
+  - 尺度の表を 2 つ足す: 検証の集合の研究が使った尺度の版すべて（表 15）と、研究ごとの C1〜C7 の表（付録）（推奨どおり）。
+  - 焦点を「測ったものから結論がどこまで行けるか」に移す（Codex の指摘・推奨どおり）。
+  - 外枠を登録の添付 5 にする・C4f は statcheck との違いを書き結果単位の数も出す・抄録は 3 つの面（C1・C2b・問題の文）を必ず残す（いずれも推奨どおり）。
+  - 題: 研究者が「新しい手順の提案なら親しみやすい名前にしたい」と述べ、符号化の手順に名前を付ける案を選んだ。題は "TRACE: Tracing how studies of "AI fatigue" attribute, measure and report fatigue. A registered methodological review"。TRACE の展開（仮に Tracing Reports' Attribution, Content and Evidence）は後で詰める。2026-10-17 の簡易の検索（Web 2 回）では、研究の報告の手引き・尺度で同名のものは見つからなかった（金融の FINRA TRACE は別分野）。投稿の前に調べ直す。
+  - narrative review の著者・引き方・関係の書き方: 研究者が「草稿が完成してから共著者と直接相談する」と決めた。外枠の未決に置き、登録版の文（両著者が著者）は今は変えない。
+- 研究者に確かめていない、メインの既定（round 2 か研究者の確認で見直す）:
+  - C4f で表の中の値を再計算の対象に含める（登録版にはこれまで書かれていなかった。R3 の問いに答えるため含める側で書いた）。
+  - C7 の条件 (iii) と C6a が名前を比べることを、範囲の節に書き、C7 を常に条件ごとに報告する（F10。登録のコードは変えない）。
+- 出典: Elson et al. 2023 を [P524]、Lintner 2024 を [P525] として `docs/references.md` に登録（本文は Europe PMC で照合）。
+- 登録版を 0.7 にし、合成の脚本に 3 つの出力（C4f の結果単位・使われた尺度の版・研究ごとの表）を足した（`.steering/20261017-ai-fatigue-c-outline/decisions.md` 判断 13）。

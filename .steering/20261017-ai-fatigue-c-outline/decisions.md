@@ -150,3 +150,10 @@
 - 検査（make_dummy.py の assert）を足した。対象: 版の集合、項目の無い尺度、分母、研究数、複数値、centre の C7、緩い数え方、一致の範囲、入力の検査、感度分析。どれも通った。
 - 足した検査が、古い検査の書き方の誤りを 1 つ見つけた。同じ辞書を並べていたので、研究の数が 1 と数えられていた。検査のほうを直した。
 - この直しには、3 巡目の /cross-review をかけていない。
+
+## 判断 13: 外枠のプレ査読を受けた登録版 0.7（2026-10-17）
+
+- 経緯: `.steering/20261017-ai-fatigue-c-manuscript/decisions.md` 判断 5（外枠の attack-me round 1 と研究者の採否）。
+- 変えたもの（`registration-en.md`）: 題を TRACE に（"Protocol for a registered methodological review"）・C4f に statcheck との 3 つの違い（検定ごとの判定・表の値を含む・割合と間接効果）と結果単位の数の報告・GSRR-56 に「使われた尺度の版」「C4f の結果単位」「研究ごとの表」・GSRR-64 の一覧と検査の一覧・添付 5（原稿の外枠）。
+- 脚本: `c_synthesis.py` に `c4f_result_table`・`instruments_used`・`per_study_table` と 3 つの CSV の出力を足した。`make_dummy.py` に検査を足し、全検査が緑。新しい検査が効くことは変異 2 つ（版を初出の集合で絞る・記録の 0 件を落とす）で赤になることで確かめた。
+- 登録版に書いた「表の中の値を含む」は研究者にまだ確かめていない既定（同判断 5）。

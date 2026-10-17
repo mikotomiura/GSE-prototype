@@ -126,6 +126,30 @@ assert cs.c7(dict(base := {"conclusion_identified": "1", "main_instrument_identi
                             "main_instrument_family": "fatigue"}), "") == "within"
 assert cs.c7(dict(base, conclusion_identified="unresolved"), "L1a") == "unresolved"
 assert cs.c7(dict(base, conclusion_family="none|fatigue", main_instrument_family="none|burnout"), "L1a") == "beyond"
+# C4f per result: counts match the reconciled rows of the set; records without results count as 0
+rr_ = [{"record_id": "a", "set": "confirmation"}, {"record_id": "b", "set": "confirmation"},
+       {"record_id": "c", "set": "exploration"}]
+cr_ = [{"record_id": "a", "consistent": "no", "gross": "1"}, {"record_id": "a", "consistent": "yes", "gross": "0"},
+       {"record_id": "c", "consistent": "no", "gross": "0"}]
+t4 = {(r["row"], r["value"]): r["count"] for r in cs.c4f_result_table(rr_, cr_, "confirmation")}
+assert t4[("results", "no")] == 1 and t4[("results", "yes")] == 1 and t4[("results", "gross")] == 1, t4
+assert t4[("results_per_record", "2")] == 1 and t4[("results_per_record", "0")] == 1, t4
+conf_res = [r for r in res["c4f_results"] if r["set"] == "confirmation" and r["row"] == "results_per_record"]
+assert sum(r["count"] for r in conf_res) == 15, conf_res
+# instruments used: a version first seen in exploration is listed for the confirmation set too
+iu = cs.instruments_used([{"record_id": "x", "set": "exploration"}, {"record_id": "y", "set": "confirmation"}],
+                         [{"record_id": "x", "version_id": "E1", "origin": "new"},
+                          {"record_id": "y", "version_id": "E1", "origin": "new"},
+                          {"record_id": "y", "version_id": "N9", "origin": "adapted"}],
+                         [{"version_id": "E1", "type": "FAT"}, {"version_id": "E1", "type": "AVO"}],
+                         {"E1": "exploration", "N9": "confirmation"}, "confirmation")
+assert [(r["version_id"], r["first_seen"], r["records_using"]) for r in iu] == [("E1", "exploration", 1), ("N9", "confirmation", 1)]
+assert iu[0]["FAT"] == 1 and iu[0]["AVO"] == 1 and iu[1]["FAT"] is None    # no items -> no counts
+assert all(r["set"] != "calibration" for r in res["instruments_used"])
+# per-study table: primary sets only, no calibration records
+ps_ = res["per_study"]
+assert ps_ and all(r["set"] in cs.PRIMARY_SETS for r in ps_)
+assert sum(1 for r in ps_ if r["set"] == "confirmation") == 15
 # lenient C2b: secondary types count in the per-version and the aggregate rows alike
 li = [{"version_id": "N1", "type": "OTH", "boundary": "1", "secondary_type": "FAT", "target": ""},
       {"version_id": "N1", "type": "OTH", "boundary": "1", "secondary_type": "OTH", "target": ""}]
