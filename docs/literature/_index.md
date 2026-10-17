@@ -11,6 +11,11 @@
 `python scripts/check_citations.py`（未登録参照 / 同一名前空間内の key 重複 / tombstone の引用 / 欠番）
 落合フォーマット精読カードは下表のトピック単位で作成済み。
 
+**検証の規約の変更（2026-10-17）**: この日から、claim の検証は 3 つの軸（内的妥当性・外的妥当性と外挿・効果量の頑健性）を
+軸ごとに別の判定役（`evidence-axis-judge`）が独立に判定する形になり、カード見出しは `[内 ○ / 外 留保 / 頑 ○]` の形になった
+（`.claude/commands/literature-review.md` Step 4）。それより前のカードの `3-0` / `2-1` は、同じ評価者（メイン）が
+3 つの視点で付けた判定で、独立の 3 人の票ではない。付け直していない。旧い規約では、内的妥当性が落ちても `2-1` で確定になりえた。
+
 | 日付 | トピック | ファイル | カード数 | 「やり残し」要約 |
 |---|---|---|---|---|
 | 2026-06-28 | probe-timing-interruptibility | [20260628-probe-timing-interruptibility.md](20260628-probe-timing-interruptibility.md) | 5 | HCI は timing を「介入の快適化（opportune moment）」へ最適化、ESM は「無偏測定（signal-contingent + stratified）」を確立。両者を同一システムで層分離（L0 較正=stratified random / L2' 介入=opportunity 合わせ）する規約が空白＝GSE の差分 |

@@ -95,6 +95,7 @@ board は events を issue ごとに畳んだ (最終 event 優先) 表示。単
 | ガード (loop-guard.sh) | script | 無料・機械的 |
 | 統合レビュー (code-reviewer / security-checker) | Opus | 見逃しコストが高い |
 | 論文のプレ査読の査読者役・意図の監査役 (paper-reviewer / attack-me) | Opus | 見逃しコストが高い（道具の方針は `.claude/agents/paper-reviewer.md`） |
+| 文献の claim の軸ごとの独立判定 (evidence-axis-judge / literature-review) | Opus | カードに入ると後から直しにくい（道具の方針は `.claude/agents/evidence-axis-judge.md`） |
 | 第二意見 (codex-consult / cross-review) | gpt-6-astra（★ 2026-09-25 に gpt-5.5〔Legacy〕から更新） | 別 LLM の独立性が価値・見逃しコストが高い |
 
 この表は `.claude/agents/*.md` の frontmatter `model:` と一致させる (L7 が drift を検出する)。
