@@ -15,5 +15,6 @@
 - [x] `/cross-review` 2 巡目（足した言い方の境目）→ 直す（判断 7）
 
 ## 完了処理
-- [ ] コミット・push（PR は `a4_keytar` が終わり、前の 2 本が main に入ってから rebase して出す）
+- [x] コミット・push（`docs/rhythm-stage-summary`・2026-10-17）
+- [ ] PR: `a4_keytar` が終わってから、`docs/rhythm-stage-speed-confound` → `docs/rhythm-stage-speed-shape` → このブランチの順に、前のものが main に入るたびに rebase して出す（台帳の衝突は起点からの差分の和で解く）
 - [ ] 研究者に `.idea` §12 への追記を頼む
