@@ -21,5 +21,5 @@
 - [x] agent の `model:` と `loop-engineering.md` の表の一致
 
 ## レビュー
-- [ ] `/finish-task`（code-reviewer ＋ `/cross-review`）
-- [ ] HIGH 指摘への対応
+- [x] `/finish-task`（code-reviewer ＋ `/cross-review` 2 巡・判断 6・7）
+- [x] HIGH 指摘への対応（実物の agent での確認は引き継ぎ next-session-evidence-axis-judge-live-check.md）
