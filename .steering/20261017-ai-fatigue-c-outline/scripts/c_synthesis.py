@@ -1,4 +1,4 @@
-"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.5).
+"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.6).
 
 Implements, from the code tables (CSV):
 - calibration draws and the post-registration screening order (GSRR-33, GSRR-39)
@@ -10,9 +10,13 @@ Implements, from the code tables (CSV):
 Input files (one row per unit; `coder` is coder1 / coder2 / reconciled):
   records_<coder>.csv      record-level codes (C1 per main instrument, C3-C7 inputs)
   instruments_<coder>.csv  instrument-level codes (C2a, C2c, C2d)
-  items_<coder>.csv        item-level codes (C2b)
-  c4f_<coder>.csv          one row per recalculated result
+  items_<coder>.csv        item-level codes (C2b), keyed by version_id and item_no
+  c4f_<coder>.csv          one row per recalculated result (consistent: yes/no/na; gross: 1/0)
+  c4f_ai.csv               the AI draft for C4f (optional; for human-AI agreement)
   links.csv                E5 links (record_id, group_id)
+The set of an instrument version (and of its items) is derived, never read: the first set,
+in the order exploration, confirmation, late, in which a record uses the version.
+Missing files, missing columns and values outside the code lists stop the script.
 
 Usage:
     python3 c_synthesis.py --tables <dir> [--coder reconciled]
@@ -48,6 +52,56 @@ SCREEN_SEED = 20261018
 BOOT_SEED = 20261017
 BOOT_N = 2000
 PRIMARY_SETS = ["confirmation", "exploration", "late"]
+FIRST_SEEN_ORDER = ["exploration", "confirmation", "late"]
+VOCAB = {
+    "set": {"exploration", "confirmation", "late", "calibration"},
+    "type": set(C2B_TYPES) | {"unresolved"},
+    "consistent": {"yes", "no", "na", "unresolved"},
+}
+REQUIRED = {
+    "records": ["record_id", "set", "population", "centre", "peer_reviewed", "C3", "C4a", "C4b", "C4c",
+                "C4d", "C4e_codebook", "C4e_agreement", "C5", "C6a", "C6b", "conclusion_identified",
+                "main_instrument_identified", "conclusion_ai_fatigue_term", "conclusion_family",
+                "main_instrument_family", "conclusion_sentence"] + [f"C1_{lv}" for lv in C1_LEVELS],
+    "instruments": ["record_id", "instrument_id", "version_id"],
+    "items": ["version_id", "item_no", "type", "boundary", "secondary_type", "target"],
+    "c4f": ["record_id", "result_id", "consistent", "gross"],
+}
+
+
+class InputError(Exception):
+    pass
+
+
+def load(d, kind, coder):
+    path = d / f"{kind}_{coder}.csv"
+    if not path.exists():
+        raise InputError(f"missing file {path.name}")
+    rows = read_csv(path)
+    cols = set(rows[0]) if rows else set()
+    missing = [c for c in REQUIRED[kind] if rows and c not in cols]
+    if missing:
+        raise InputError(f"{path.name}: missing columns {missing}")
+    for r in rows:
+        for col, allowed in VOCAB.items():
+            if col in r and r[col] not in allowed:
+                raise InputError(f"{path.name}: value {r[col]!r} not allowed in column {col}")
+        for col in REQUIRED[kind]:
+            if r.get(col, "") == "" and col not in {"secondary_type", "target", "conclusion_sentence"}:
+                raise InputError(f"{path.name}: empty cell in {col} (use not_verifiable / not_applicable)")
+    return rows
+
+
+def version_sets(insts, recs):
+    """First set (exploration, confirmation, late) in which a record uses each version."""
+    rec_set = {r["record_id"]: r["set"] for r in recs}
+    used = defaultdict(set)
+    for i in insts:
+        used[i["version_id"]].add(rec_set.get(i["record_id"], ""))
+    out = {}
+    for v, ss in used.items():
+        out[v] = next((s for s in FIRST_SEEN_ORDER if s in ss), "calibration")
+    return out
 
 
 def read_csv(path):
@@ -147,6 +201,8 @@ def c4f_summary(results):
 def c7(rec, rep):
     """(i)-(iii) of C7. 'cannot_decide' only if the conclusion or the main instrument
     cannot be identified."""
+    if "unresolved" in (rec.get("conclusion_identified"), rec.get("main_instrument_identified")):
+        return "unresolved"
     if rec.get("conclusion_identified") != "1" or rec.get("main_instrument_identified") != "1":
         return "cannot_decide"
     inputs = [rec.get("C6b", ""), rec.get("conclusion_ai_fatigue_term", ""),
@@ -156,8 +212,18 @@ def c7(rec, rep):
     cond_i = rec.get("C6b") == "mismatch"
     cond_ii = rec.get("conclusion_ai_fatigue_term") == "1" and rep in C7_WEAK_LEVELS
     cf, mf = families(rec["conclusion_family"]), families(rec["main_instrument_family"])
-    cond_iii = bool(cf - NO_FAMILY) and bool(mf - NO_FAMILY) and not (cf & mf)
+    cf, mf = cf - NO_FAMILY, mf - NO_FAMILY
+    cond_iii = bool(cf) and bool(mf) and not (cf & mf)
     return "beyond" if (cond_i or cond_ii or cond_iii) else "within"
+
+
+def c4f_gross(results):
+    vals = [r.get("gross", "0") for r in results]
+    if not vals:
+        return "not_applicable"
+    if "unresolved" in vals:
+        return "unresolved"
+    return "any_gross" if "1" in vals else "no_gross"
 
 
 def derive(recs, c4f_rows):
@@ -167,6 +233,7 @@ def derive(recs, c4f_rows):
     for r in recs:
         r["C1_rep"] = c1_representative(r)
         r["C4f"] = c4f_summary(by_rec[r["record_id"]])
+        r["C4f_gross"] = c4f_gross(by_rec[r["record_id"]])
         r["C7"] = c7(r, r["C1_rep"])
     return recs
 
@@ -221,13 +288,24 @@ def pair_rows(rows1, rows2, key_fields, code, filt=None, unit_field="record_id")
 
 def run_agreement(d):
     out = []
-    t = {c: {n: read_csv(d / f"{n}_{c}.csv") for n in ["records", "instruments", "items", "c4f"]}
+    t = {c: {n: load(d, n, c) for n in ["records", "instruments", "items", "c4f"]}
          for c in ["coder1", "coder2"]}
     for c in t:
         derive(t[c]["records"], t[c]["c4f"])
+        vs = version_sets(t[c]["instruments"], t[c]["records"])
+        rs = {r["record_id"]: r["set"] for r in t[c]["records"]}
+        for i in t[c]["instruments"]:
+            i["set"] = rs.get(i["record_id"], "")
+        for it in t[c]["items"]:
+            it["set"] = vs.get(it["version_id"], "")
+            it["record_id"] = it["version_id"]
+    ids1 = {r["record_id"] for r in t["coder1"]["records"]}
+    ids2 = {r["record_id"] for r in t["coder2"]["records"]}
+    out.append({"set": "all", "unit": "record", "code": "unpaired_records",
+                "n": len(ids1 ^ ids2)})
     sets = sorted({r["set"] for r in t["coder1"]["records"]})
     rec_codes = [f"C1_{lv}" for lv in C1_LEVELS] + ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d",
-                 "C4e_codebook", "C4e_agreement", "C5", "C6a", "C6b", "conclusion_sentence"]
+                 "C4e_codebook", "C4e_agreement", "C4f", "C4f_gross", "C5", "C6a", "C6b"]
     inst_codes = ["origin", "format", "mod_items_dropped", "mod_items_added", "mod_reworded",
                   "mod_instructions_only", "mod_response_scale", "mod_scoring", "mod_translated",
                   "C2c_backtranslation", "C2c_content_validity", "C2c_pilot", "C2c_factor_check",
@@ -238,6 +316,10 @@ def run_agreement(d):
             res = agreement(pair_rows(in_set(t["coder1"]["records"]), in_set(t["coder2"]["records"]),
                                       ["record_id"], code))
             out.append(dict(set=s, unit="record", code=code, **res))
+        sp = pair_rows(in_set(t["coder1"]["records"]), in_set(t["coder2"]["records"]),
+                       ["record_id"], "conclusion_sentence")
+        out.append({"set": s, "unit": "record", "code": "conclusion_sentence", "n": len(sp),
+                    "percent_agreement": (sum(a == b for _, a, b in sp) / len(sp)) if sp else None})
         for code in inst_codes:
             res = agreement(pair_rows(in_set(t["coder1"]["instruments"]), in_set(t["coder2"]["instruments"]),
                                       ["record_id", "instrument_id"], code))
@@ -250,22 +332,39 @@ def run_agreement(d):
                                   filt=lambda a, b: a.get("boundary") == "1" and b.get("boundary") == "1",
                                   unit_field="version_id"))
         out.append(dict(set=s, unit="item", code="secondary_type", **res))
+    ai_path = d / "c4f_ai.csv"
+    if ai_path.exists():
+        human = load(d, "c4f", "reconciled")
+        ai = read_csv(ai_path)
+        res = agreement(pair_rows(human, ai, ["record_id", "result_id"], "consistent"))
+        out.append(dict(set="all", unit="result", code="C4f_human_vs_ai", **res))
     return out
 
 
 # --- tables (GSRR-56, GSRR-57, GSRR-62) ------------------------------------
 
-def count_table(rows, key, label):
-    vals = [r.get(key, "") for r in rows]
-    denom = [v for v in vals if v not in EXCLUDED]
-    allow_prop = len(rows) >= MIN_STUDIES
-    return [{**label, "code": key, "value": v, "count": n, "denominator": len(denom),
-             "proportion": (n / len(denom)) if (allow_prop and v not in EXCLUDED and denom) else None}
+MULTI_VALUE = {"C3"}
+
+
+def count_table(rows, key, label, n_studies=None):
+    """Counts per value. Proportions only if the table's own study count is >= MIN_STUDIES.
+    Multi-value codes (all that apply, '|'-separated) count each value once per row."""
+    if n_studies is None:
+        n_studies = len({r.get("record_id", id(r)) for r in rows})
+    vals = []
+    for r in rows:
+        v = r.get(key, "")
+        vals += v.split("|") if key in MULTI_VALUE and v else [v]
+    denom_rows = [r for r in rows if r.get(key, "") not in EXCLUDED]
+    allow_prop = n_studies >= MIN_STUDIES
+    return [{**label, "code": key, "value": v, "count": n, "denominator": len(denom_rows),
+             "studies": n_studies,
+             "proportion": (n / len(denom_rows)) if (allow_prop and v not in EXCLUDED and denom_rows) else None}
             for v, n in sorted(Counter(vals).items())]
 
 
 RECORD_CODES = ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d", "C4e_codebook", "C4e_agreement",
-                "C4f", "C5", "C6a", "C6b", "C7"]
+                "C4f", "C4f_gross", "C5", "C6a", "C6b", "C7"]
 INSTRUMENT_CODES = ["origin", "format", "mod_items_dropped", "mod_items_added", "mod_reworded",
                     "mod_instructions_only", "mod_response_scale", "mod_scoring", "mod_translated",
                     "C2c_backtranslation", "C2c_content_validity", "C2c_pilot", "C2c_factor_check",
@@ -274,43 +373,51 @@ INSTRUMENT_CODES = ["origin", "format", "mod_items_dropped", "mod_items_added", 
 
 def record_tables(recs, insts, label):
     out = []
+    n = len({r["record_id"] for r in recs})
     for key in RECORD_CODES:
-        out += count_table(recs, key, label)
+        out += count_table(recs, key, label, n)
     for key in INSTRUMENT_CODES:
-        out += count_table(insts, key, label)
+        out += count_table(insts, key, label, n)
     return out
 
 
-def c2b_tables(items, insts, set_name, lenient=False):
-    """Per instrument version first seen in `set_name` (not in exploration), with items available."""
-    explore = {i["version_id"] for i in insts if i["set"] == "exploration"}
-    in_set = {i["version_id"] for i in insts if i["set"] == set_name}
-    first_seen = in_set - explore if set_name != "exploration" else in_set
+def item_types(it, lenient):
+    """Types an item counts for. Lenient: also its secondary type, once, if different."""
+    ts = [it["type"]]
+    if lenient and it.get("boundary") == "1" and it.get("secondary_type") and it["secondary_type"] != it["type"]:
+        ts.append(it["secondary_type"])
+    return ts
+
+
+def c2b_tables(items, vsets, set_name, lenient=False):
+    """Per instrument version first seen in `set_name` (vsets from version_sets), with items available.
+    Counts are always given; proportions only if >= MIN_NEW_INSTRUMENTS versions have items."""
+    first_seen = {v for v, s in vsets.items() if s == set_name}
     by_version = defaultdict(list)
     for it in items:
         by_version[it["version_id"]].append(it)
     available = sorted(v for v in first_seen if by_version.get(v))
     unavailable = sorted(v for v in first_seen if not by_version.get(v))
+    prop_ok = len(available) >= MIN_NEW_INSTRUMENTS
     rows = []
-    if len(available) >= MIN_NEW_INSTRUMENTS:
-        for vid in available:
-            its = by_version[vid]
-            c = Counter(it["type"] for it in its)
-            if lenient:
-                c.update(it["secondary_type"] for it in its if it.get("boundary") == "1" and it.get("secondary_type"))
-            for t in C2B_TYPES + ["unresolved"]:
-                rows.append({"set": set_name, "version_id": vid, "type": t, "count": c[t],
-                             "denominator": len(its), "proportion": c[t] / len(its)})
-        for t in C2B_TYPES:
-            rows.append({"set": set_name, "version_id": "ALL", "type": t,
-                         "instruments_with_type": sum(1 for v in available if any(i["type"] == t for i in by_version[v])),
-                         "denominator": len(available)})
-        tg = Counter(it["target"] for v in available for it in by_version[v] if it["type"] in TARGETED_TYPES)
-        for tv, n in sorted(tg.items()):
-            rows.append({"set": set_name, "version_id": "ALL", "type": "target:" + tv, "count": n})
+    for vid in available:
+        its = by_version[vid]
+        c = Counter(t for it in its for t in item_types(it, lenient))
+        for t in C2B_TYPES + ["unresolved"]:
+            rows.append({"set": set_name, "version_id": vid, "type": t, "count": c[t],
+                         "denominator": len(its), "proportion": (c[t] / len(its)) if prop_ok else None})
+    for t in C2B_TYPES:
+        rows.append({"set": set_name, "version_id": "ALL", "type": t,
+                     "instruments_with_type": sum(1 for v in available
+                                                  if any(t in item_types(i, lenient) for i in by_version[v])),
+                     "denominator": len(available)})
+    tg = Counter(it["target"] for v in available for it in by_version[v]
+                 if set(item_types(it, lenient)) & TARGETED_TYPES)
+    for tv, n in sorted(tg.items()):
+        rows.append({"set": set_name, "version_id": "ALL", "type": "target:" + tv, "count": n})
     rows.append({"set": set_name, "version_id": "SUMMARY", "type": "instruments",
                  "with_items": len(available), "items_unavailable": len(unavailable),
-                 "proportions_reported": len(available) >= MIN_NEW_INSTRUMENTS})
+                 "proportions_reported": prop_ok})
     return rows
 
 
@@ -332,6 +439,7 @@ PROBLEMS = {
     "C4e codebook not available": ("C4e_codebook", {"no"}),
     "C4e agreement none": ("C4e_agreement", {"none"}),
     "C4f any inconsistency": ("C4f", {"any_inconsistency"}),
+    "C4f any gross inconsistency": ("C4f_gross", {"any_gross"}),
     "C5 signs not confirmed": ("C5", {"signs_not_confirmed"}),
     "C6a different family": ("C6a", {"different_family"}),
     "C6b mismatch": ("C6b", {"mismatch"}),
@@ -356,10 +464,14 @@ def problem_statements(rows):
 
 
 def build_tables(d, coder="reconciled"):
-    recs = derive(read_csv(d / f"records_{coder}.csv"), read_csv(d / f"c4f_{coder}.csv"))
-    insts = read_csv(d / f"instruments_{coder}.csv")
-    items = read_csv(d / f"items_{coder}.csv")
+    recs = derive(load(d, "records", coder), load(d, "c4f", coder))
+    insts = load(d, "instruments", coder)
+    items = load(d, "items", coder)
     links = read_csv(d / "links.csv")
+    rs = {r["record_id"]: r["set"] for r in recs}
+    for i in insts:
+        i["set"] = rs.get(i["record_id"], "")
+    vsets = version_sets(insts, recs)
     tables, c2b, rq4 = [], [], []
     for s in PRIMARY_SETS:          # calibration records are never in these sets
         r_s = [r for r in recs if r["set"] == s]
@@ -374,32 +486,31 @@ def build_tables(d, coder="reconciled"):
             ids = {r["record_id"] for r in r_s if r["centre"] == c}
             sub = [dict(r) for r in r_s if r["record_id"] in ids]
             for r in sub:
-                r["C7"] = c7(dict(r, conclusion_ai_fatigue_term="0"), r["C1_rep"])
+                r["C7"] = c7(dict(r, conclusion_ai_fatigue_term="0"), "")
             t = record_tables(sub, [i for i in i_s if i["record_id"] in ids],
                               {"set": s, "split": "centre", "group": c})
             tables += [x for x in t if x["code"] != "C1_rep"]
-        c2b += c2b_tables(items, insts, s)
+        c2b += c2b_tables(items, vsets, s)
         rq4.append(rq4_counts(recs, links, s))
     conf = [r for r in recs if r["set"] == "confirmation"]
-    return {"recs": recs, "tables": tables, "c2b": c2b, "rq4": rq4,
+    return {"recs": recs, "tables": tables, "c2b": c2b, "rq4": rq4, "vsets": vsets, "items": items,
             "problems": problem_statements(conf), "n_conf": len(conf)}
 
 
 def sensitivity(d):
+    """GSRR-62: S1, S2 and S4 on the problem statements; S3 on C2b."""
     base = build_tables(d)
     recs = base["recs"]
     conf = [r for r in recs if r["set"] == "confirmation"]
-    insts = read_csv(d / "instruments_reconciled.csv")
-    items = read_csv(d / "items_reconciled.csv")
     out = []
     out += [dict(s, analysis="S1 peer-reviewed only") for s in
             problem_statements([r for r in conf if r.get("peer_reviewed") == "1"])]
     out += [dict(s, analysis="S2 signs-not-confirmed removed") for s in
             problem_statements([r for r in conf if r.get("C5") != "signs_not_confirmed"])]
-    s3 = [dict(r, analysis="S3 lenient C2b") for r in c2b_tables(items, insts, "confirmation", lenient=True)]
+    s3 = [dict(r, analysis="S3 lenient C2b") for r in c2b_tables(base["items"], base["vsets"], "confirmation", lenient=True)]
     s4 = []
     for c in ["coder1", "coder2"]:
-        if (d / f"records_{c}.csv").exists():
+        if all((d / f"{k}_{c}.csv").exists() for k in REQUIRED):
             s4 += [dict(s, analysis=f"S4 {c} values") for s in build_tables(d, c)["problems"]]
     return out + s4, s3
 
@@ -424,7 +535,11 @@ def main():
         for g, i in screening_order(read_csv(a.screening_order)):
             print(f"{g},{i}")
     elif a.tables:
-        res = build_tables(a.tables, a.coder)
+        try:
+            res = build_tables(a.tables, a.coder)
+        except InputError as e:
+            print(f"STOPPED: {e}", file=sys.stderr)
+            return 3
         sens, s3 = sensitivity(a.tables)
         out = a.tables / "out"
         out.mkdir(exist_ok=True)
@@ -438,7 +553,11 @@ def main():
     elif a.agreement:
         out = a.agreement / "out"
         out.mkdir(exist_ok=True)
-        rows = run_agreement(a.agreement)
+        try:
+            rows = run_agreement(a.agreement)
+        except InputError as e:
+            print(f"STOPPED: {e}", file=sys.stderr)
+            return 3
         write_csv(out / "agreement.csv", rows)
         print(f"agreement rows={len(rows)}")
     else:

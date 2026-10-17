@@ -1,6 +1,6 @@
 # How do studies of "AI fatigue" attribute fatigue to AI, measure it, and report it? Protocol for a methodological review
 
-Registration draft 0.5 (2026-10-17). Not yet registered. Form: Generalized Systematic Review Registration (GSRR; van den Akker et al., 2023). Each GSRR item is answered under its own number. Fields to be filled at registration are marked **[at registration]**.
+Registration draft 0.6 (2026-10-17). Not yet registered. Form: Generalized Systematic Review Registration (GSRR; van den Akker et al., 2023). Each GSRR item is answered under its own number. Fields to be filled at registration are marked **[at registration]**.
 
 ---
 
@@ -213,7 +213,7 @@ E5 records are not coded. They stay linked to their group for C5 (GSRR-43).
 - **Late stratum.** Studies included after 2026-12-31 and before stage 5 begins are reported as a separate stratum, outside the primary counts. They are coded by both coders under the same rules. Studies included after stage 5 begins are listed but not coded.
 - **Candidate pool and calibration sample.** The candidate pool is the confirmation set as closed on 2026-12-31, before calibration records are removed. Calibration records are drawn with Python `random.sample` from the pool's record IDs, sorted alphabetically. The first round uses seed 20261017. Round k (k = 2, 3) uses seed 20261017 + k − 1 and draws from the IDs not yet drawn.
 - **Small pool.** If the pool has 24 studies or fewer (fewer than the 15 that calibration can remove plus the minimum of 10), calibration is done on exploration-set records instead, and no confirmation-set record is removed. Exploration records are drawn by the same procedure from the exploration-set IDs (seed 20261019 + k − 1), at most two rounds (10 records). If agreement is still below 80%, the procedure in GSRR-44 step 2 for low agreement applies. Exploration records used for calibration are flagged and reported separately within the exploration table.
-- **Minimum size.** The minimum is counted after calibration records are removed. If the confirmation set has fewer than 10 studies, we report counts only, without proportions. For C2b, if fewer than 3 instruments with available items are first seen in the confirmation set, we describe each instrument instead of giving proportions. The number of "items unavailable" instruments is always shown next to the C2b tables.
+- **Minimum size.** The minimum is counted after calibration records are removed, in studies (records), not instruments. It applies to every table on its own: a table (a set, a population group or a centre) based on fewer than 10 studies reports counts only, without proportions. For C2b, if fewer than 3 instruments with available items are first seen in the confirmation set, each instrument's counts are still given, without proportions. The number of "items unavailable" instruments is always shown next to the C2b tables.
 
 **[GSRR-40] Screening procedure justification.** Coding is the costly part of this review. Re-screening would repeat the source database's two-screener process.
 
@@ -232,6 +232,7 @@ General rules:
   - C2 is coded per fatigue instrument within a record.
   - C2b is coded per item.
 - **Fatigue instrument.** C1, C2 and C6a refer to the study's fatigue instrument(s), not to instruments for the AI-side variable.
+- **Set of an instrument version.** A version belongs to the first set, in the order exploration, confirmation, late, in which a record uses it. Its items take the same set. "First seen in the confirmation set" means this set is the confirmation set.
 - **Instrument.** The set of items actually administered in the study, for example a subscale only when only the subscale was used. An instrument version is identified by its item wording together with its language. Items are coded as printed in the report, including translations, and the language is recorded. If the report gives no items but states that an existing scale was used without modification, the items may be taken from the cited source; such items are flagged (`item_source` = source). Otherwise the instrument is coded "items unavailable". If only some items are printed, the denominator for C2b is the number of printed items, and the instrument's full item count is shown next to it.
 - **Main instrument.** The fatigue instrument whose variable is named first in the abstract's results. If the abstract has no results, it is the instrument described first in the methods.
 - **Main relation.** The first relation between an AI-side variable and fatigue reported in the abstract's results.
@@ -244,7 +245,7 @@ General rules:
 | C2b | Item content (per item; codebook version 2 attached) | **Type**: `FAT` tiredness or depletion; `MOT` reduced interest, willingness or initiative; `AVO` avoidance, restriction or withdrawal; `FUT` futility or helplessness; `IRR` irritation or other negative affect; `OTH` other (load, comprehension, bodily or sensory symptoms, sleep). **Target**, assigned only when the type or secondary type is `MOT`, `AVO` or `FUT`: `TASK`, `AI_USE`, `AI_VERIFY`, `AI_PRIV`, `SOCIAL`, `OTHER`. Boundary items carry a secondary type. Reverse-keyed items take the type of the dimension they ask about, from either pole (for example, "I feel full of energy" is `FAT`). Items that cannot be obtained are coded "items unavailable" |
 | C2c | Adaptation procedure reported (adapted instruments only) | back-translation / content validity / pilot / factor check: each reported or not |
 | C2d | Measurement properties reported (per instrument) | Item disclosure: all / some / none. Reliability in this sample: reported / not. Factor analysis in this sample: reported / not. Reason for choosing the instrument: given (a sentence on why it fits the construct or population; a citation alone does not count) / not. No COSMIN rating is made |
-| C3 | AI-side variable instrument (all that apply) | amount of use / dependence or addiction type (source scale) / attitude or acceptance / other / none |
+| C3 | AI-side variable instrument (all that apply; each value is counted once per record) | amount of use / dependence or addiction type (source scale) / attitude or acceptance / other / none |
 | C4 | Reporting completeness and internal consistency (values per rule) | (a) N in the text vs. table denominators: consistent / inconsistent (which) / not verifiable. (b) Direction of the main relation in the abstract, results and discussion: consistent / inconsistent (where) / not applicable. (c) Discriminant validity: the report's own stated criterion vs. its reported values: consistent / inconsistent / no criterion stated / not applicable. We bring in no thresholds of our own. (d) Ethics statements within the report (approval present, approving body): consistent / inconsistent / not reported. (e) Qualitative coding, in two columns: codebook available (yes / no) and agreement (value given / index named only / none); both not applicable for quantitative studies. (f) Recalculation: see the rules below this table |
 | C5 | Sample overlap | Category: linked by the source database as the same sample (E5 group) / signs present but not confirmed / no signs. Signs, each recorded: shared authors, region, survey site, grant number, identical N. We do not decide sameness ourselves |
 | C6 | Title and abstract versus content | (a) Construct term in the title vs. the name of the main instrument. Term families: {fatigue, tiredness, 疲労, 疲れ}; {exhaustion, depletion, 消耗, 枯渇}; {burnout, バーンアウト, 燃え尽き}. A construct term is any word of these families, including inflected forms and compounds (tired, fatigued, exhausted, techno-exhaustion). Values: same family (at least one family shared, so a name with two families matches either) / different family / instrument name has no family term / instrument unnamed or not verifiable / no construct term in the title. This is a name check only. The item content of the main instrument (its C2b type composition) is reported next to it and is not turned into a match or mismatch. (b) Causal wording vs. design: see the rules below this table |
@@ -258,7 +259,7 @@ General rules:
 - **Who recalculates.** Both coders recalculate independently. The AI draft is generated by author 1 and stored unopened, with its SHA-256 recorded. It is opened only after both coders have fixed their values, and is then used only as a cross-check; its agreement with the human values is reported. Data are the reconciled human values.
 - These rules follow the logic of statcheck (Nuijten et al., 2016). A test is one-tailed only if the report says one-tailed, one-sided or directional for it.
 - **Tolerance.** A value is consistent if it falls within the range implied by rounding the inputs to their reported decimals.
-- **Unit.** Each recalculated result. Each record is then summarised as any inconsistency / none / cannot be calculated / not applicable (no recalculable result).
+- **Unit.** Each recalculated result. Each record is then summarised as any inconsistency / none / cannot be calculated / not applicable (no recalculable result), and separately as any gross inconsistency / none.
 
 **C6b causal wording rules.**
 - **Causal terms** (in the title or abstract, counted only in a claim about a relation between an AI-side variable and fatigue, and in inflected forms of the same word only):
@@ -298,7 +299,9 @@ General rules:
 - C2b: kappa per item for the primary type, for `boundary`, and for the secondary type among items both coders marked as boundary.
 - C2a, C2c and C2d: kappa per instrument.
 - C2b target: kappa over all items, with "no target" as a category.
-- C3–C6: kappa per record. C7 is derived, so no kappa is computed for it; agreement on the conclusion sentence is reported.
+- C3–C6, including the C4f record summary and its gross-inconsistency summary: kappa per record. C7 is derived, so no kappa is computed for it; for the conclusion sentence, only the percentage of identical choices is reported.
+- C4f: agreement between the reconciled human values and the AI draft, per recalculated result.
+- Records coded by only one coder are counted and reported.
 - Percentage agreement is reported alongside every kappa.
 - 95% CIs by bootstrap (2,000 resamples, seed 20261017) over records, and over instrument versions for item-level codes.
 - If both coders use a single category, kappa is undefined and only percentage agreement is reported.
@@ -349,7 +352,7 @@ General rules:
 
 **[GSRR-57] Criteria for conclusions.**
 - **Problem types** are fixed as follows (C1 is described, not a problem type, because the eligibility criteria admit studies of a general fatigue construct examined in relation to AI use, GSRR-24; the problem is claiming "AI fatigue" on such a basis, which C7 (ii) captures):
-  - C4: "inconsistent" in rules (a)–(d); "any inconsistency" in rule (f); in rule (e), "codebook not available" and "agreement: none";
+  - C4: "inconsistent" in rules (a)–(d); "any inconsistency" and, separately, "any gross inconsistency" in rule (f); in rule (e), "codebook not available" and "agreement: none";
   - C5: "signs present but not confirmed";
   - C6a: "different family"; C6b: "mismatch";
   - C7: "beyond what was measured".
@@ -367,7 +370,7 @@ General rules:
 
 **[GSRR-61] Publication bias analyses.** Not applicable (no effect estimates).
 
-**[GSRR-62] Sensitivity analyses.**
+**[GSRR-62] Sensitivity analyses.** Analyses 1, 2 and 4 are applied to the problem statements of GSRR-57; analysis 3 is applied to the C2b tables.
 1. Peer-reviewed records only.
 2. Records in the C5 category "signs present but not confirmed" removed.
 3. C2b counted with secondary types included: each boundary item counts once for its primary type and once for its secondary type, and the denominator stays the instrument's item count.
@@ -383,7 +386,7 @@ General rules:
 - the problem statements of GSRR-57;
 - sensitivity analyses 1–4 of GSRR-62.
 
-`make_dummy.py` builds a dummy code table, runs the script on it and checks boundary cases with assertions (for example small pools, two-family names, unresolved inputs, minimum sizes and E5 links). Both files are attached to the registration with their SHA-256 **[at registration]**.
+The script stops if a required file or column is missing, a cell is empty or a value is outside the code lists. `make_dummy.py` builds a dummy code table, runs the script on it and checks boundary cases with assertions: calibration draws and small pools, the screening order, C1 and C7 derivation (two-family names, missing terms, unresolved inputs, the centre tables), denominators, minimum sizes in studies, multi-value codes, version sets, C2b with and without secondary types, agreement coverage, sensitivity outputs, input validation and E5 links. Both files are attached to the registration with their SHA-256 **[at registration]**.
 
 **[GSRR-65] Miscellaneous synthesis details.**
 - Amendments after registration are logged with their date, reason and affected items, and listed in the report.

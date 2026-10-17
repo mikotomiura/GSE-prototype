@@ -58,7 +58,7 @@ recs = [rec(i, sets[i]) for i in ids]
 insts, items = [], []
 for n, i in enumerate(ids):
     vid = f"V{n % 14:02d}"
-    inst = {"record_id": i, "set": sets[i], "instrument_id": "main", "version_id": vid,
+    inst = {"record_id": i, "instrument_id": "main", "version_id": vid,
             "origin": rng.choice(["new", "existing_ai", "adapted_general", "unchanged_general",
                                   "general_not_verifiable"]),
             "format": "multi_item"}
@@ -68,11 +68,15 @@ for n, i in enumerate(ids):
 for v in range(13):            # V13 has no items -> items unavailable
     for k in range(1, 9):
         t = rng.choice(["MOT", "AVO", "FUT", "IRR", "FAT", "FAT", "OTH"])
-        items.append({"record_id": "", "set": "", "version_id": f"V{v:02d}", "item_no": str(k), "type": t,
+        items.append({"version_id": f"V{v:02d}", "item_no": str(k), "type": t,
                       "boundary": rng.choice(["0", "0", "1"]), "secondary_type": rng.choice(["MOT", "FAT"]),
                       "target": rng.choice(["TASK", "AI_USE"]) if t in cs.TARGETED_TYPES else ""})
-c4f = [{"record_id": i, "result_id": f"{i}-r{k}", "consistent": rng.choice(["yes", "yes", "no", "na"])}
-       for i in ids for k in range(2)]
+c4f = []
+for i in ids:
+    for k in range(2):
+        cons = rng.choice(["yes", "yes", "no", "na"])
+        c4f.append({"record_id": i, "result_id": f"{i}-r{k}", "consistent": cons,
+                    "gross": "1" if cons == "no" and rng.random() < 0.5 else "0"})
 links = [{"record_id": "D016", "group_id": "G1"}, {"record_id": "D017", "group_id": "G1"},
          {"record_id": "D020", "group_id": "G2"}, {"record_id": "D021", "group_id": "G2"}]
 
@@ -84,13 +88,12 @@ for coder in ["reconciled", "coder1", "coder2"]:
             r["C6b"] = "match" if r["C6b"] != "match" else "mismatch"
         for x in it[::5]:
             x["type"] = "OTH"
-    for x in it:   # items carry the set of a record that uses the version (for per-set agreement)
-        x["set"] = next((ii["set"] for ii in insts if ii["version_id"] == x["version_id"]), "")
     write(f"records_{coder}.csv", rr)
     write(f"instruments_{coder}.csv", insts)
     write(f"items_{coder}.csv", it)
     write(f"c4f_{coder}.csv", c4f)
 write("links.csv", links)
+write("c4f_ai.csv", [dict(r, consistent=("no" if r["consistent"] == "yes" and rng.random() < 0.1 else r["consistent"])) for r in c4f])
 pool = [i for i in ids if sets[i] in ("confirmation", "calibration")]
 (out / "pool_ids.txt").write_text("\n".join(pool), encoding="utf-8")
 (out / "exploration_ids.txt").write_text("\n".join(i for i in ids if sets[i] == "exploration"), encoding="utf-8")
@@ -101,8 +104,35 @@ res = cs.build_tables(out)
 conf = [r for r in res["recs"] if r["set"] == "confirmation"]
 assert res["n_conf"] == 15 == len(conf), res["n_conf"]
 assert not any(t["set"] == "calibration" for t in res["tables"]), "calibration records leaked into tables"
+# versions: V10-V13 are first used by calibration records (n = 10..13) and also by confirmation
+# records (n = 24..27 -> V10..V13), so they are first seen in the confirmation set
+assert res["vsets"]["V10"] == "confirmation" and res["vsets"]["V00"] == "exploration", res["vsets"]
 summ = [r for r in res["c2b"] if r["version_id"] == "SUMMARY" and r["set"] == "confirmation"][0]
-assert summ["with_items"] + summ["items_unavailable"] >= 1
+assert summ["with_items"] == 3 and summ["items_unavailable"] == 1, summ          # V13 has no items
+per_version = [r for r in res["c2b"] if r["set"] == "confirmation" and r["version_id"].startswith("V")]
+assert per_version and all(r["proportion"] is not None for r in per_version)
+# cannot_decide stays in the denominator (GSRR-53)
+ct = cs.count_table([{"record_id": str(k), "C7": v} for k, v in enumerate(["beyond"] * 9 + ["cannot_decide"])], "C7", {})
+assert {r["value"]: r["denominator"] for r in ct}["cannot_decide"] == 10
+# minimum size counts studies, not instruments: 5 studies with 3 instruments each
+rows15 = [{"record_id": f"S{k // 3}", "origin": "new"} for k in range(15)]
+assert cs.count_table(rows15, "origin", {})[0]["proportion"] is None
+# multi-value C3
+c3 = cs.count_table([{"record_id": "a", "C3": "amount_of_use|attitude"}], "C3", {})
+assert {r["value"] for r in c3} == {"amount_of_use", "attitude"}
+# centre tables drop (ii): an unresolved C1 does not make C7 unresolved
+assert cs.c7(dict(base := {"conclusion_identified": "1", "main_instrument_identified": "1", "C6b": "match",
+                            "conclusion_ai_fatigue_term": "0", "conclusion_family": "fatigue",
+                            "main_instrument_family": "fatigue"}), "") == "within"
+assert cs.c7(dict(base, conclusion_identified="unresolved"), "L1a") == "unresolved"
+assert cs.c7(dict(base, conclusion_family="none|fatigue", main_instrument_family="none|burnout"), "L1a") == "beyond"
+# lenient C2b: secondary types count in the per-version and the aggregate rows alike
+li = [{"version_id": "N1", "type": "OTH", "boundary": "1", "secondary_type": "FAT", "target": ""},
+      {"version_id": "N1", "type": "OTH", "boundary": "1", "secondary_type": "OTH", "target": ""}]
+lt = cs.c2b_tables(li, {"N1": "confirmation"}, "confirmation", lenient=True)
+assert [r for r in lt if r["version_id"] == "N1" and r["type"] == "FAT"][0]["count"] == 1
+assert [r for r in lt if r["version_id"] == "N1" and r["type"] == "OTH"][0]["count"] == 2   # same type not doubled
+assert [r for r in lt if r["version_id"] == "ALL" and r["type"] == "FAT"][0]["instruments_with_type"] == 1
 rq4 = [r for r in res["rq4"] if r["set"] == "confirmation"][0]
 assert rq4["records"] == 15 and rq4["studies"] == 13, rq4          # G1 (D016, D017), G2 (D020, D021)
 # C7: two-family instrument name matches either family
@@ -121,11 +151,41 @@ assert cs.c1_representative({"C1_L3": "unresolved"}) == "unresolved"
 ps = cs.problem_statements([{"C4a": "not_verifiable"}, {"C4a": "unresolved"}])
 assert ps[0]["statement"] == "could not be evaluated" and ps[0]["unresolved"] == 1
 # minimum sizes
-assert cs.count_table([{"x": "a"}] * 9, "x", {})[0]["proportion"] is None
-assert cs.count_table([{"x": "a"}] * 10, "x", {})[0]["proportion"] == 1.0
+assert cs.count_table([{"record_id": str(k), "x": "a"} for k in range(9)], "x", {})[0]["proportion"] is None
+assert cs.count_table([{"record_id": str(k), "x": "a"} for k in range(10)], "x", {})[0]["proportion"] == 1.0
 two = cs.c2b_tables([{"version_id": v, "type": "FAT"} for v in ["N1", "N2"]],
-                    [{"version_id": v, "set": "confirmation"} for v in ["N1", "N2", "N3"]], "confirmation")
+                    {"N1": "confirmation", "N2": "confirmation", "N3": "confirmation"}, "confirmation")
 assert two[-1]["with_items"] == 2 and two[-1]["items_unavailable"] == 1 and not two[-1]["proportions_reported"]
+assert [r for r in two if r["version_id"] == "N1" and r["type"] == "FAT"][0]["count"] == 1   # counts kept
+assert [r for r in two if r["version_id"] == "N1" and r["type"] == "FAT"][0]["proportion"] is None
+# agreement covers C4f, C4f_gross, the conclusion sentence and human-AI C4f
+ag = cs.run_agreement(out)
+codes = {(r["set"], r["code"]) for r in ag}
+for c in ["C4f", "C4f_gross", "C1_rep", "conclusion_sentence", "type", "secondary_type", "origin"]:
+    assert ("confirmation", c) in codes, c
+assert ("all", "C4f_human_vs_ai") in codes
+assert [r for r in ag if r["set"] == "confirmation" and r["code"] == "type"][0]["n"] > 0
+# input validation stops on a bad value and on a missing file
+bad = out / "bad"
+bad.mkdir(exist_ok=True)
+for kind in ["records", "instruments", "items", "c4f"]:
+    (bad / f"{kind}_reconciled.csv").write_text((out / f"{kind}_reconciled.csv").read_text(encoding="utf-8"), encoding="utf-8")
+txt = (bad / "items_reconciled.csv").read_text(encoding="utf-8").replace(",FAT,", ",FATIGUE,", 1)
+(bad / "items_reconciled.csv").write_text(txt, encoding="utf-8")
+try:
+    cs.build_tables(bad)
+    raise AssertionError("bad vocabulary must stop")
+except cs.InputError:
+    pass
+(bad / "c4f_reconciled.csv").unlink()
+try:
+    cs.build_tables(bad)
+    raise AssertionError("missing file must stop")
+except cs.InputError:
+    pass
+sens, s3 = cs.sensitivity(out)
+assert {r["analysis"] for r in sens} >= {"S1 peer-reviewed only", "S2 signs-not-confirmed removed",
+                                         "S4 coder1 values", "S4 coder2 values"} and s3
 # draws
 pool25 = [f"P{i:02d}" for i in range(25)]
 assert cs.draw_calibration(pool25, 1)[0].startswith("P")
