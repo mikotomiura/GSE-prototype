@@ -74,10 +74,11 @@ manuscript:
   content of the instruments, and the number of records in which both hold is reported. "Within what was measured"
   means only that none of the three conditions holds; it does not mean that the item content of the instrument
   supports the conclusion.
-- The coding rules were written by the first author (GSRR-4), who is also the only coder and codes every record
-  twice, at least four weeks apart (GSRR-44). The agreement reported is between two passes of one coder, not between
-  coders, and no claim of independent coding is made. The coder wrote the earlier narrative review, so the codes carry
-  that view of what counts as a problem (GSRR-46).
+- The coding rules were written by the first author (GSRR-4), who codes every record twice, at least four weeks
+  apart; the second author codes a random sample of at least 20% of the main set, or all of it, once and
+  independently (GSRR-44). Agreement within the first author and agreement between the two authors are reported
+  separately; independent coding is claimed only for the records the second author coded. Both authors wrote the
+  earlier narrative review, so their agreement is agreement between coders who share that view (GSRR-46).
 - The main set is the set of studies included by 31 December 2026 after screening by the first author and an AI
   screener, each judging a record on their own within a stage; the first author decided where they differed, and had
   read the AI screener's answers on those records before the next stage (GSRR-33, GSRR-34, GSRR-38, GSRR-39). The AI
@@ -124,7 +125,8 @@ validity evidence.
 1. **TRACE, a registered coding scheme that links three things in each study: how fatigue is tied to AI, what the
    fatigue items ask about, and what the report states and concludes (GSRR-1).** Seven codes (C1 to C7) with their rules and a codebook
    for item content, fixed before the main coding of the main set; amendments made after calibration are
-   listed in Table 2. Its only reliability evidence is the agreement between two coding passes of one coder (see Scope).
+   listed in Table 2. Its reliability evidence is the agreement between two coding passes of one coder and, on the
+   records the second author coded, between the two authors (see Scope).
 2. **A description of how a set of studies not used to build the rules attributes fatigue to AI, measures it and
    reports it** (RQ1 to RQ5, SQ1, SQ2), with the problem statements of the registration (new points 2, 4 and 5 above).
 3. **Item-level content of the fatigue instruments** (new point 3): for instruments first seen in the main
@@ -150,7 +152,8 @@ the main set only:
   literature; with the number of studies and instruments coded and the number of candidates still unscreened on that
   date; if any problem statement changes when both authors screen the set (sensitivity analysis 5), or if that
   screening was not done, the sentence says so (GSRR-62);
-- how the coding was done: by one coder, the first author, twice;
+- how the coding was done: by the first author twice, and by the second author for all records or for a random sample
+  (with its size), with the agreement between them;
 - the three things TRACE links, each with counts and no evaluative word: the distribution of the representative level
   of attribution (C1); for the instruments first seen in the main set with printed items, for each
   item-content type, the number of instruments with at least one item of that type, out of the instruments with coded
@@ -258,8 +261,9 @@ that the method can be read without the registration.
    tables included, with the rules for degrees of freedom in table notes, asterisk-only p-values and tests reported
    twice; p-values adjusted for multiple testing not counted; z recalculated only when reported; percentages and
    indirect effects added; done by people.
-6. Calibration, coding, blinding and reconciliation (GSRR-44 to GSRR-48): one coder, two passes at least four weeks
-   apart, and what the agreement between the passes can and cannot show (GSRR-44, GSRR-46).
+6. Calibration, coding, blinding and reconciliation (GSRR-44 to GSRR-48): the first author's two passes at least four
+   weeks apart, the second author's coding of a sample or of all records, and what each kind of agreement can and
+   cannot show (GSRR-44, GSRR-46).
 7. Synthesis: derived values, missing data, the tables, the problem statements and the sensitivity analyses
    (GSRR-52 to GSRR-62); the script and its tests (GSRR-64).
 8. Deviations from the registration and from this outline, each with its reason (also in Table 2).
@@ -269,8 +273,8 @@ that the method can be read without the registration.
 1. Records and sets: flow diagram; candidates screened and unscreened on 31 December 2026 by population group;
    exclusions by code and, for E2 and E3, by population group; agreement between the first author and the AI screener
    at each stage; studies and E5-linked records (Figure 1, Table 3).
-2. Agreement between the two coding passes per code and set, including the calibration passes, with the AI-draft
-   cross-check for C4f, which is agreement with a draft, not with a correct value (Table 4).
+2. Agreement between the two authors on the records the second author coded, and between the first author's two
+   coding passes per code and set, including the calibration passes, with the AI-draft cross-check for C4f, which is agreement with a draft, not with a correct value (Table 4).
 3. RQ1 attribution (Table 5).
 4. RQ2 instruments and items: origin, modification and format; adaptation procedures; reported disclosure; every
    instrument version used in the main set; item content per instrument first seen in the main set;
@@ -343,7 +347,7 @@ the flow figures from the released screening decisions.
 |---|---|---|---|---|
 | SC1 | The flow of records from the additional candidates to the main set, the late stratum, and the unscreened candidates by population group; agreement between the first author and the AI screener at each stage. | GSRR-32, GSRR-33, GSRR-37, GSRR-39, GSRR-41 | Released screening decisions | Section 4.1; Figure 1; Table 3 |
 | SC2 | The number of studies and of records, with E5-linked records counted once and separately. | GSRR-39, GSRR-56 (RQ4) | Script output, RQ4 study counts | Section 4.1; Table 3 |
-| AG1 | Agreement between the two coding passes of one coder per code and set, including the calibration passes (GSRR-44, GSRR-46), and between the reconciled values and the AI draft for C4f; the number of records coded in one pass only. | GSRR-44, GSRR-46, GSRR-47 | Script output, agreement | Section 4.2; Table 4 |
+| AG1 | Agreement between the two authors on the records the second author coded, and between the two coding passes of the first author per code and set, including the calibration passes (GSRR-44, GSRR-46, GSRR-47), and between the reconciled values and the AI draft for C4f; the number of records coded in one pass only. | GSRR-44, GSRR-46, GSRR-47 | Script output, agreement | Section 4.2; Table 4 |
 | R1 | Distribution of the representative level of attribution of the main fatigue instrument; values for other instruments in the supplement. | RQ1; GSRR-43 (C1) | Script output, C1 tables | Section 4.3; Table 5; abstract |
 | R2a | Origin, modification and format of the fatigue instruments; reported adaptation procedures; reported disclosure. | RQ2; GSRR-43 (C2a, C2c, C2d) | Script output, instrument tables | Section 4.4; Table 6 |
 | R2b | Item-content composition of each instrument first seen in the main set with printed items, the number of instruments with at least one item of each type, and the targets of reduced-interest, avoidance and futility items; the number of instruments with items unavailable. | RQ2; GSRR-43 (C2b), GSRR-56; codebook version 2 | Script output, C2b per instrument; per-instrument summary table | Section 4.4; Table 7; abstract |
@@ -388,11 +392,12 @@ columns; no value is filled in before coding.
   each sent on, the differences decided each way and the records judged boundary (GSRR-37); this agreement is not
   the AI screener's accuracy.
 
-- Table 4: agreement between the two coding passes of one coder per code (percentage agreement, kappa with bootstrap
-  95% CI, n), with the calibration passes, the main set and the exploration set in separate columns; the C4f agreement
+- Table 4: agreement per code (percentage agreement, kappa with bootstrap 95% CI, n): between the two authors on the
+  records the second author coded, and between the two coding passes of the first author for the calibration passes,
+  the main set and the exploration set, in separate columns; the C4f agreement
   with the AI draft; records coded in one pass only. The heading states that this is agreement within one coder
-  (GSRR-44), and a note that calibration agreement may be higher than on new studies and that units with fewer than 5
-  comparisons were not calibrated (GSRR-65).
+  for the passes and agreement between coders for the two authors (GSRR-44), with a note that calibration agreement may be
+  higher than on new studies and that units with fewer than 5 comparisons were not calibrated (GSRR-65).
 - Table 5: C1 representative level (L1a, L1b, L2, L3, L4, L5, L6, excluded values), count and, where allowed,
   proportion.
 - Table 6: C2a origin, modification (per kind: stated / found by comparison / no change / not verifiable) and format;

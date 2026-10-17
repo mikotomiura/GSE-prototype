@@ -12,7 +12,7 @@ TRACE is the name of this review's coding scheme (GSRR-43); it is not an acronym
 
 **[GSRR-2] Contributors.** Two authors.
 - Author 1 (first author): Mikoto Miura, Independent Researcher. ORCID: https://orcid.org/0009-0000-4196-0508. Lead, screener and the only coder.
-- Author 2 (co-author): **[at registration: name, affiliation, ORCID]**. Screener in sensitivity analysis 5 (GSRR-62) and reader of the manuscript. Author 2 does not code.
+- Author 2 (co-author): **[at registration: name, affiliation, ORCID]**. Second coder of a random sample of at least 20% of the main set, or of all of it (GSRR-44); screener in sensitivity analysis 5 (GSRR-62); reader of the manuscript.
 - Both authors built the source literature database.
 
 **[GSRR-3] Subjects.** Human–AI interaction; occupational and educational psychology; psychometrics; meta-research.
@@ -25,8 +25,8 @@ TRACE is the name of this review's coding scheme (GSRR-43); it is not an acronym
 | Eligibility screening of the 34 exploratory records in the source database | Authors 1 and 2, before registration (GSRR-37) |
 | Eligibility screening of the additional candidates (main set) | Author 1 and the AI screener, independently; author 1 decides where they differ (GSRR-33) |
 | Second screening after the manuscript draft | Authors 1 and 2 (sensitivity analysis 5, GSRR-62) |
-| Coding (C1–C7) | Author 1, twice, at least four weeks apart (GSRR-44) |
-| Reconciliation of the two passes | Author 1 (GSRR-48) |
+| Coding (C1–C7) | Author 1, twice, at least four weeks apart; author 2, once and independently, for a random sample of at least 20% of the main set or for all of it (GSRR-44) |
+| Reconciliation | Author 1 for the two passes; authors 1 and 2 together for the records author 2 coded (GSRR-48) |
 | AI screener (Claude Opus, Anthropic) | Judges eligibility and centre under fixed instructions (attachment 6). It is a screener, not a coder |
 | AI assistant (Claude, Anthropic) | Drafts values for C4f and C5 only. In each pass, author 1 makes the recalculations or records the signs before opening a draft, and then checks every drafted value (GSRR-44). The assistant is not a coder |
 | Tables and the check of every number in them | Author 1 builds the tables by script and checks every number in the manuscript against the script output |
@@ -47,6 +47,7 @@ TRACE is the name of this review's coding scheme (GSRR-43); it is not an acronym
 4. **Calibration coding** on the exploration set, in parallel with stage 3: author 1 codes all its primary studies twice, in November and December 2026, at least four weeks apart (GSRR-44). These codes are used only to refine definitions and are not data. Any change is registered as an amendment before stage 5 begins. No main-set record is used for calibration.
 5. **Main coding.**
    - Author 1 codes the main set twice, at least four weeks apart.
+   - Author 2 codes, once and independently, a random sample of at least 20% of the main set, or all of it (GSRR-44).
    - The exploration set is coded again under the final rules, also twice. Its results go in a separate table, flagged as calibration material.
 6. Reconciliation, synthesis and reporting.
 7. **Second screening after the manuscript draft** by authors 1 and 2, reported as sensitivity analysis 5 (GSRR-62).
@@ -295,7 +296,7 @@ General rules:
 - **Mismatch:** causal wording in a study whose design has no manipulation.
 - **Match:** any other design, or "no causal wording".
 
-**[GSRR-44] Extraction stages.** This is a single-coder review: author 1 codes every record twice, at least four weeks apart, and the second pass is made without looking at the first. The agreement reported is agreement between two passes of one coder, not between coders, and no claim of independent coding is made.
+**[GSRR-44] Extraction stages.** Author 1 codes every record twice, at least four weeks apart, and the second pass is made without looking at the first. Author 2 codes part or all of the main set once, independently (step 6). Two kinds of agreement are therefore reported: between the two passes of author 1 (consistency of one coder), and between author 1 and author 2 on the records author 2 coded (agreement between coders). Independent coding is claimed only for the records author 2 coded.
 1. **Worked examples.** Before calibration, author 1 tries the definitions on worked examples that include multiple instruments, a qualitative study and missing values.
 2. **Calibration** (GSRR-39). Author 1 codes all primary studies of the exploration set twice: the first pass in November 2026 and the second in December 2026, at least four weeks later. Agreement between the two passes is computed on each of these units: each C1 level; C2a, C2c and C2d per instrument; C2b primary type, boundary and target per item; C3, C4 (a)–(d), each column of C4 (e), C5, C6a, C6b and the C6c title input per record; the C4f judgement of each result recalculated in both passes; the conclusion sentence, whether the conclusion and the main instrument could be identified, whether the conclusion uses an AI-fatigue term, and the construct-term family of the conclusion. For every unit with at least 5 comparisons (records, instruments, items or results, as the unit requires) and below 80% percentage agreement, the definitions are amended and the amendment is registered before main coding; units with fewer than 5 comparisons are reported but do not trigger an amendment, so they are not calibrated (GSRR-65). The units with fewer than 5 comparisons are listed with the calibration results. An amendment is based only on the disagreements between the two calibration passes, and the record IDs it rests on are listed with it; nothing read while screening the additional candidates is used. Amended definitions are not checked again before main coding; their agreement is seen in the two passes of main coding (GSRR-47) and noted as a limitation (GSRR-65). Derived values and the agreement with the AI draft are not criteria. Kappa is reported alongside percentage agreement but is not a criterion, because rare categories make it unstable in 10 studies. Calibration codes are not data.
 3. **Main coding.** Author 1 codes all records of the main set, the late stratum and the exploration set twice under the final codebook, at least four weeks apart. The first pass takes the records in ascending order of record ID, and is saved with its SHA-256 and closed before the second begins; the second pass takes the same list in an order drawn with Python `random.shuffle`, using a generator freshly seeded with 20261020.
@@ -304,11 +305,13 @@ General rules:
    - For C4f, author 1 recomputes every value in both passes before seeing the draft, and the draft is opened only after the third pass (GSRR-43, GSRR-48); the agreement between human and AI values is reported.
    - For C5, the AI bibliographic matches are generated by author 1 and stored unopened, with their SHA-256 recorded. In each pass, author 1 first records the signs of overlap from the reports; the matches are opened only after both passes and the third pass have fixed the C5 codes, and every match is then checked.
 
+6. **Second coder.** Before stage 5 begins, author 2 states whether they will code all records of the main set or a random sample; this choice is made before any main-set record is coded, depends only on author 2's time, and is recorded with its date. The sample is at least 20% of the coded main-set studies and at least 5 (all if there are 5 or fewer): ceil(0.20 × n) records, drawn with Python `random.sample` from the record IDs sorted alphabetically, using a generator freshly seeded with 20261021 (script, GSRR-64). Before coding, author 2 reads the codebook and tries the worked examples of step 1; author 2 does not take part in calibration. Author 2 codes once, under the final codebook, without seeing author 1's codes, the AI drafts or the version-1 codebook values. This follows the practice of having a second reviewer code a sample when one reviewer codes the rest (Shea et al., 2017, item 6). If author 2 cannot begin within 8 weeks of the main set being closed, a person who did not write the rules may be asked to code the sample instead; if no one can, it is not done, and the review is reported as single-coder, as a deviation.
+
 **[GSRR-45] Extractor instructions.** This protocol, the C2b codebook (version 2) and a coding form with the definitions above.
 
-**[GSRR-46] Extractor blinding.** Author 1 knows the research questions and the rules. The second pass is made without looking at the first. The C4f AI draft and the C5 bibliographic matches are opened only after both passes and the third pass are fixed (GSRR-43, GSRR-44, GSRR-48). The version-1 codebook values are not consulted. Author 1 wrote the earlier narrative review, so the codes carry author 1's view of what counts as a problem (GSRR-65).
+**[GSRR-46] Extractor blinding.** Author 1 knows the research questions and the rules. The second pass is made without looking at the first. The C4f AI draft and the C5 bibliographic matches are opened only after both passes and the third pass are fixed (GSRR-43, GSRR-44, GSRR-48). The version-1 codebook values are not consulted. Author 2 codes without seeing author 1's codes or the AI drafts (GSRR-44, step 6). Author 1 wrote the earlier narrative review, so the codes carry author 1's view of what counts as a problem (GSRR-65).
 
-**[GSRR-47] Extraction reliability.** Agreement between the two passes of author 1:
+**[GSRR-47] Extraction reliability.** Agreement between author 1 (reconciled codes) and author 2 is reported on the records author 2 coded, for the same codes and units as below, with percentage agreement and kappa; it is set beside the threshold of good agreement in Shea et al. (2017), at least 80%, which is a point of reference, not a stopping rule. Agreement between the two passes of author 1:
 - C1: Cohen's kappa for each level, as a binary code, and for the representative value.
 - C2b: kappa per item for the primary type, for `boundary`, and for the secondary type among items marked as boundary in both passes.
 - C2a, C2c and C2d: kappa per instrument.
@@ -325,13 +328,14 @@ General rules:
 
 **[GSRR-48] Extraction reconciliation procedure.**
 - Disagreements between the two passes are resolved by a third pass by author 1, made with both earlier passes and the full text visible.
+- For the records author 2 coded, differences between author 1's reconciled codes and author 2's codes are then discussed by both, with the full text; the agreed value is the data for those records. Records author 2 did not code keep author 1's reconciled values.
 - Disagreements that remain are coded "unresolved". Unresolved codes are excluded from proportions, and their number is reported; the exception is C2b, where unresolved items stay in the item denominator as their own category (GSRR-53). A derived value (the C1 representative value, the C4f record summary, C6c, C7) is "unresolved" if any of its inputs is.
 - A sensitivity analysis uses each pass's values in turn (GSRR-62).
 - Codes of both passes and the reconciled codes are kept.
 
 **[GSRR-49] Extraction procedure justification.**
 - Each code answers one question: RQ1 = C1; RQ2 = C2a–C2d and C3; RQ3 = C4; RQ4 = C5; RQ5 = C6; SQ2 = C7. SQ1 is answered by grouping.
-- Most codes require judgement. A second human coder was not available without a workload the co-author could not take on, so author 1 codes twice, at least four weeks apart. The two passes show how consistently one coder applies the rules; they do not show whether another person would apply them in the same way.
+- Most codes require judgement. Coding every record by two people would fall on the co-author, whose time is limited, so author 1 codes every record twice and author 2 codes a random sample of at least 20%, or all records if author 2 can (Shea et al., 2017, item 6). The two passes show how consistently one coder applies the rules; the agreement with author 2 shows, on the records author 2 coded, whether another person applies them in the same way.
 
 **[GSRR-50] Data management and sharing.**
 - At publication, the following go in the same OSF project as this registration: the code table (CSV), the codebook and the coding form under CC BY 4.0, and the scripts under the MIT licence.
@@ -402,7 +406,7 @@ General rules:
 **[GSRR-63] Synthesis procedure justification.** The questions ask what practices are present in the coded set. Counts with denominators answer them; proportions describe the coded set and are not estimates of how often a practice occurs in the literature.
 
 **[GSRR-64] Synthesis data management and sharing.** As in GSRR-50. The synthesis script `c_synthesis.py` implements:
-- the screening order;
+- the screening order and the draw of the second coder's sample;
 - the derived values (C1 representative value, C4f summary, C6c, C7 and each of its conditions);
 - agreement per set and unit (GSRR-47), and the screening agreement between author 1 and the AI screener per stage, with the differences decided each way and the records judged boundary (GSRR-37);
 - the tables of GSRR-56 by set; the record-level tables also by population group and by centre (the centre tables leave out C1, C6c and C7 (ii), GSRR-12); C4f per result and the RQ4 counts also by population group; the C2b tables and the instruments used by set only; including C2a, C2c, C2d, C2b per instrument, the instruments used, C4f per result, the per-study table and RQ4 study counts;
@@ -430,10 +434,10 @@ The script stops if a required file or column is missing, a cell is empty or a v
   - The search drew on free sources only.
   - The eligibility criteria shape the outcomes. E3 removes studies with no relation to AI, so C1 "L6 none" is truncated. The fatigue definition includes motivational depletion, so the share of `MOT` items is partly set at entry.
   - Item content does not show what scores contain.
-  - Coding is by one person in two passes. The agreement reported is within one coder, not between coders (GSRR-44), and the coder wrote the earlier narrative review (GSRR-46).
+  - If author 2 codes a sample, most records are coded by one person in two passes, and agreement between coders is known only for the sample (GSRR-44). Both authors wrote the earlier narrative review, so agreement between them is agreement between coders who share that view (GSRR-46). Author 2 does not take part in calibration.
   - Calibration uses studies that the coder had read and partly coded while building the rules, so calibration agreement may be higher than agreement on new studies. Amended definitions are not checked before main coding (GSRR-44).
   - Calibration runs while the coder screens the additional candidates; amendments rest only on calibration disagreements (GSRR-44), but the coder's reading of candidates cannot be kept out of the coder's mind.
-  - No second person checks the numbers in the tables (GSRR-59), and no second person codes.
+  - No second person checks the numbers in the tables (GSRR-59).
   - The person who decides eligibility after registration is the coder, who knows the rules (GSRR-33). The fixed order, the AI screener's independent judgements and the released decisions show this influence but do not remove it.
   - The exploration set was used to build the rules and for calibration, and is then coded again; its tables are calibration material (GSRR-39).
   - Codebook version 2 was written after the exploration results were seen (GSRR-10).
@@ -450,6 +454,7 @@ The script stops if a required file or column is missing, a cell is empty or a v
 - Page, M. J., et al. (2021). The PRISMA 2020 statement: an updated guideline for reporting systematic reviews. *BMJ*, 372, n71. https://doi.org/10.1136/bmj.n71
 - Perrig, S. A. C., Aeschbach, L. F., Scharowski, N., von Felten, N., Opwis, K., & Brühlmann, F. (2024). Measurement practices in user experience (UX) research: a systematic quantitative literature review. *Frontiers in Computer Science*, 6, 1368860. https://doi.org/10.3389/fcomp.2024.1368860
 - Ragolane, M., & Patel, S. (2025). Too much, too fast: understanding AI fatigue in the digital acceleration era. *International Journal of Arts, Humanities & Social Science*, 6(8), 53–60. https://doi.org/10.56734/ijahss.v6n8a7
+- Shea, B. J., Reeves, B. C., Wells, G., Thuku, M., Hamel, C., Moran, J., et al. (2017). AMSTAR 2: a critical appraisal tool for systematic reviews that include randomised or non-randomised studies of healthcare interventions, or both. *BMJ*, 358, j4008. https://doi.org/10.1136/bmj.j4008
 - Sosiński, P., & Piasecka, N. (2026). AI fatigue and mental health implications: a comprehensive literature review. *Quality in Sport*, 55, 70890. https://doi.org/10.12775/QS.2026.54.70890
 - van den Akker, O. R., et al. (2023). Increasing the transparency of systematic reviews: presenting a generalized registration form. *Systematic Reviews*, 12, 170. https://doi.org/10.1186/s13643-023-02281-7
 

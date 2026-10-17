@@ -300,6 +300,26 @@ assert cs.cohen_kappa(list("aaaa"), list("aaaa")) is None
 order = cs.screening_order([{"record_id": f"R{i}", "population": g} for i, g in
                             enumerate(["students_learners"] * 3 + ["health_professionals"] * 3)])
 assert [g for g, _ in order[:2]] == ["students_learners", "health_professionals"]
+# second coder's sample
+assert cs.SECOND_CODER_SEED == 20261021 and cs.SECOND_CODER_SHARE == 0.20
+sc_ids = lambda n: [f"M{i:02d}" for i in range(1, n + 1)]
+assert cs.second_coder_sample(sc_ids(3)) == sc_ids(3)
+assert cs.second_coder_sample(sc_ids(5)) == sc_ids(5)
+for n_, k_ in [(24, 5), (30, 6), (31, 7)]:
+    assert len(cs.second_coder_sample(sc_ids(n_))) == k_, (n_, k_)
+sc_a = cs.second_coder_sample(sc_ids(30))
+assert sc_a == cs.second_coder_sample(sc_ids(30))
+sc_shuf = sc_ids(30)
+random.Random(1).shuffle(sc_shuf)
+assert sc_shuf != sc_ids(30) and cs.second_coder_sample(sc_shuf) == sc_a
+assert set(sc_a) <= set(sc_ids(30)) and sc_a == sorted(sc_a)
+for bad_ in ([], ["M01", "M02", "M01"]):
+    try:
+        cs.second_coder_sample(bad_)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"second_coder_sample({bad_}): expected ValueError")
 # === registration draft 0.10 assertions ====================================
 # item 1: the set label is "main"; "confirmation" is gone from the vocabulary and from the output text
 assert "main" in cs.VOCAB["set"] and "confirmation" not in cs.VOCAB["set"] and "confirmation" not in cs.PRIMARY_SETS

@@ -2,6 +2,7 @@
 
 Implements, from the code tables (CSV):
 - the post-registration screening order (GSRR-33)
+- the draw of the second coder's sample from the coded main set
 - derived values: C1 representative value, C4f record summary, C6c, C7 and each of its conditions (GSRR-43, GSRR-48)
 - agreement per set: percentage agreement and Cohen's kappa with bootstrap CI (GSRR-47)
 - tables per set, population group and centre; C2a/C2c/C2d; C2b per instrument;
@@ -33,11 +34,13 @@ Usage:
     python3 c_synthesis.py --tables <dir> [--coder reconciled]
     python3 c_synthesis.py --agreement <dir>
     python3 c_synthesis.py --screening-order <candidates.csv>
+    python3 c_synthesis.py --draw-second-coder <ids.txt>    (record IDs of the coded main set, one per line)
     python3 c_synthesis.py --screening <screening.csv>    (writes out/screening_agreement.csv next to the input)
 """
 
 import argparse
 import csv
+import math
 import random
 import sys
 from collections import Counter, defaultdict
@@ -58,6 +61,8 @@ NO_FAMILY = {"no_family_term", "none", "instrument_unnamed", "not_verifiable"}
 MIN_STUDIES = 10
 MIN_NEW_INSTRUMENTS = 3
 SCREEN_SEED = 20261018
+SECOND_CODER_SEED = 20261021
+SECOND_CODER_SHARE = 0.20
 BOOT_SEED = 20261017
 BOOT_N = 2000
 PRIMARY_SETS = ["main", "exploration", "late"]
@@ -306,6 +311,21 @@ def screening_order(candidates):
             if queues[g]:
                 order.append((g, queues[g].pop(0)))
     return order
+
+
+# --- second coder's sample -------------------------------------------------
+
+def second_coder_sample(ids):
+    """Sort IDs, k = max(5, ceil(SECOND_CODER_SHARE * n)) capped at n, draw with a generator freshly
+    seeded with SECOND_CODER_SEED, return the drawn IDs sorted. Empty list or duplicate IDs stop."""
+    ids = list(ids)
+    if not ids:
+        raise ValueError("no record IDs")
+    if len(set(ids)) != len(ids):
+        raise ValueError("duplicate record IDs: " + ", ".join(sorted(i for i, c in Counter(ids).items() if c > 1)))
+    ids = sorted(ids)
+    k = min(len(ids), max(5, math.ceil(SECOND_CODER_SHARE * len(ids))))
+    return sorted(random.Random(SECOND_CODER_SEED).sample(ids, k))
 
 
 # --- screening agreement (registration: screening of the additional candidates) ----------
@@ -961,10 +981,20 @@ def main():
     ap.add_argument("--agreement", type=Path)
     ap.add_argument("--screening-order", type=Path)
     ap.add_argument("--screening", type=Path)
+    ap.add_argument("--draw-second-coder", type=Path)
     a = ap.parse_args()
     if a.screening_order:
         for g, i in screening_order(read_csv(a.screening_order)):
             print(f"{g},{i}")
+    elif a.draw_second_coder:
+        try:
+            ids = [ln.strip() for ln in a.draw_second_coder.read_text(encoding="utf-8").splitlines() if ln.strip()]
+            drawn = second_coder_sample(ids)
+        except ValueError as e:
+            print(f"STOPPED: {e}", file=sys.stderr)
+            return 3
+        for i in drawn:
+            print(i)
     elif a.tables:
         try:
             res = build_tables(a.tables, a.coder)
