@@ -14,12 +14,12 @@
 - [x] 固定のコミット（どの下見 0 よりも前）
 
 ## 実行（回す前に Win32_Process・gh run list を notes に）
-- [ ] 下見 0（2 world × c100・c200）
-- [ ] go の段: 下見 1（λ: PC-stall・PCr-level・PCr-var）
-- [ ] go の段: スモーク
-- [ ] go の段: 本番（項目 1〜6 と読み）
+- [x] 下見 0（2 world × c100・c200）（f100 は天井）
+- [x] go の段: 下見 1（λ: PC-stall・PCr-level・PCr-var）
+- [x] go の段: スモーク
+- [x] go の段: 本番（項目 1〜6 と読み）・`--compare`
 
 ## 報告
-- [ ] notes.md（`h(c)` の同じ段と並べる・限り）
+- [x] notes.md（`h(c)` の同じ段と並べる・限り）
 - [ ] `/cross-review` 2 巡
 - [ ] 引き継ぎ・PR

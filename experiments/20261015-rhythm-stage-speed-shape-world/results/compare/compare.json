@@ -1,0 +1,3899 @@
+{
+ "_note": "Descriptive (design 1.5, 3.3 (i)): copied verdicts and readings, no test; rows are not paired across worlds (only the component draws are).",
+ "by_c": {
+  "1": {
+   "worlds": {
+    "confound": {
+     "status": "go",
+     "ran": true,
+     "auc_A_speed": {
+      "L300": {
+       "hgb": 0.9303011887758826,
+       "lr": 0.8439113439856981
+      },
+      "L60": {
+       "hgb": 0.9166413234963677,
+       "lr": 0.8394510337815245
+      },
+      "L1800": {
+       "hgb": 0.7410869234041009,
+       "lr": 0.7621151637787421
+      }
+     },
+     "verdict_counts": {
+      "L300": {
+       "green": 14,
+       "red_detected": 8,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 2,
+       "undecidable": 0
+      },
+      "L60": {
+       "green": 6,
+       "red_detected": 6,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 12
+      },
+      "L1800": {
+       "green": 24,
+       "red_detected": 0,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 0
+      }
+     },
+     "verdicts_L300": {
+      "S-jitter-decay-sec": "green",
+      "S-jitter-decay-sub": "red_detected",
+      "S-jitter-ground-sec": "green",
+      "S-jitter-ground-sub": "red_detected",
+      "S-jitter-hold-sec": "green",
+      "S-jitter-hold-sub": "red_detected",
+      "S-rank-decay-sec": "green",
+      "S-rank-decay-sub": "red_detected",
+      "S-rank-ground-sec": "green",
+      "S-rank-ground-sub": "red_unconfirmed",
+      "S-rank-hold-sec": "green",
+      "S-rank-hold-sub": "red_unconfirmed",
+      "S-raw-decay-sec": "green",
+      "S-raw-decay-sub": "red_detected",
+      "S-raw-ground-sec": "green",
+      "S-raw-ground-sub": "red_detected",
+      "S-raw-hold-sec": "green",
+      "S-raw-hold-sub": "red_detected",
+      "S-smooth-decay-sec": "green",
+      "S-smooth-decay-sub": "green",
+      "S-smooth-ground-sec": "green",
+      "S-smooth-ground-sub": "green",
+      "S-smooth-hold-sec": "green",
+      "S-smooth-hold-sub": "red_detected"
+     },
+     "state": "red",
+     "split": {
+      "counts": {
+       "lr|none": {
+        "remains": 8,
+        "vanishes": 14,
+        "undetermined": 2,
+        "unreadable": 0
+       },
+       "lr|R2": {
+        "remains": 0,
+        "vanishes": 19,
+        "undetermined": 5,
+        "unreadable": 0
+       },
+       "lr|Rall": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lr|A2": {
+        "remains": 8,
+        "vanishes": 14,
+        "undetermined": 2,
+        "unreadable": 0
+       },
+       "hgb|none": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "hgb|R2": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "hgb|Rall": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "hgb|A2": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "lrbin|none": {
+        "remains": 7,
+        "vanishes": 16,
+        "undetermined": 1,
+        "unreadable": 0
+       },
+       "lrbin|R2": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lrbin|Rall": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lrbin|A2": {
+        "remains": 7,
+        "vanishes": 17,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lrbin2|none": {
+        "remains": 7,
+        "vanishes": 14,
+        "undetermined": 3,
+        "unreadable": 0
+       }
+      },
+      "R2": {
+       "lr|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "undetermined",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "undetermined",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "vanishes",
+        "S-smooth-hold-sub": "vanishes",
+        "S-smooth-decay-sec": "vanishes",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "vanishes",
+        "S-smooth-ground-sub": "vanishes",
+        "S-rank-hold-sec": "vanishes",
+        "S-rank-hold-sub": "undetermined",
+        "S-rank-decay-sec": "vanishes",
+        "S-rank-decay-sub": "undetermined",
+        "S-rank-ground-sec": "vanishes",
+        "S-rank-ground-sub": "undetermined",
+        "S-jitter-hold-sec": "vanishes",
+        "S-jitter-hold-sub": "vanishes",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "vanishes",
+        "S-jitter-ground-sub": "vanishes"
+       },
+       "lrbin|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "vanishes",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "vanishes",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "vanishes",
+        "S-smooth-hold-sub": "vanishes",
+        "S-smooth-decay-sec": "vanishes",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "vanishes",
+        "S-smooth-ground-sub": "vanishes",
+        "S-rank-hold-sec": "vanishes",
+        "S-rank-hold-sub": "vanishes",
+        "S-rank-decay-sec": "vanishes",
+        "S-rank-decay-sub": "vanishes",
+        "S-rank-ground-sec": "vanishes",
+        "S-rank-ground-sub": "vanishes",
+        "S-jitter-hold-sec": "vanishes",
+        "S-jitter-hold-sub": "vanishes",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "vanishes",
+        "S-jitter-ground-sub": "vanishes"
+       },
+       "hgb|R2": {
+        "S-raw-hold-sec": "unreadable",
+        "S-raw-hold-sub": "unreadable",
+        "S-raw-decay-sec": "unreadable",
+        "S-raw-decay-sub": "unreadable",
+        "S-raw-ground-sec": "unreadable",
+        "S-raw-ground-sub": "unreadable",
+        "S-smooth-hold-sec": "unreadable",
+        "S-smooth-hold-sub": "unreadable",
+        "S-smooth-decay-sec": "unreadable",
+        "S-smooth-decay-sub": "unreadable",
+        "S-smooth-ground-sec": "unreadable",
+        "S-smooth-ground-sub": "unreadable",
+        "S-rank-hold-sec": "unreadable",
+        "S-rank-hold-sub": "unreadable",
+        "S-rank-decay-sec": "unreadable",
+        "S-rank-decay-sub": "unreadable",
+        "S-rank-ground-sec": "unreadable",
+        "S-rank-ground-sub": "unreadable",
+        "S-jitter-hold-sec": "unreadable",
+        "S-jitter-hold-sub": "unreadable",
+        "S-jitter-decay-sec": "unreadable",
+        "S-jitter-decay-sub": "unreadable",
+        "S-jitter-ground-sec": "unreadable",
+        "S-jitter-ground-sub": "unreadable"
+       }
+      },
+      "pcr_counts": null,
+      "main_ceiling_kinds_L300": null,
+      "pcr_R2": null
+     },
+     "step": "c100"
+    },
+    "factor": {
+     "status": "ceiling",
+     "ran": false,
+     "state": "not_run",
+     "step": "f100"
+    },
+    "drift": {
+     "status": "go",
+     "ran": true,
+     "auc_A_speed": {
+      "L300": {
+       "hgb": 0.9491789062196175,
+       "lr": 0.8813866390541363
+      },
+      "L60": {
+       "hgb": 0.9330210199057448,
+       "lr": 0.8907586806628924
+      },
+      "L1800": {
+       "hgb": 0.7889455697015446,
+       "lr": 0.8097020873979177
+      }
+     },
+     "verdict_counts": {
+      "L300": {
+       "green": 9,
+       "red_detected": 7,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 8
+      },
+      "L60": {
+       "green": 0,
+       "red_detected": 0,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 24
+      },
+      "L1800": {
+       "green": 18,
+       "red_detected": 0,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 6
+      }
+     },
+     "verdicts_L300": {
+      "S-jitter-decay-sec": "green",
+      "S-jitter-decay-sub": "red_detected",
+      "S-jitter-ground-sec": "green",
+      "S-jitter-ground-sub": "red_detected",
+      "S-jitter-hold-sec": "green",
+      "S-jitter-hold-sub": "red_detected",
+      "S-rank-decay-sec": "undecidable",
+      "S-rank-decay-sub": "undecidable",
+      "S-rank-ground-sec": "undecidable",
+      "S-rank-ground-sub": "undecidable",
+      "S-rank-hold-sec": "undecidable",
+      "S-rank-hold-sub": "undecidable",
+      "S-raw-decay-sec": "green",
+      "S-raw-decay-sub": "red_detected",
+      "S-raw-ground-sec": "green",
+      "S-raw-ground-sub": "red_detected",
+      "S-raw-hold-sec": "green",
+      "S-raw-hold-sub": "red_detected",
+      "S-smooth-decay-sec": "green",
+      "S-smooth-decay-sub": "green",
+      "S-smooth-ground-sec": "undecidable",
+      "S-smooth-ground-sub": "undecidable",
+      "S-smooth-hold-sec": "green",
+      "S-smooth-hold-sub": "red_detected"
+     },
+     "state": "red",
+     "split": {
+      "counts": {
+       "lr|none": {
+        "remains": 7,
+        "vanishes": 9,
+        "undetermined": 0,
+        "unreadable": 8
+       },
+       "lr|R2": {
+        "remains": 0,
+        "vanishes": 15,
+        "undetermined": 1,
+        "unreadable": 8
+       },
+       "lr|Rall": {
+        "remains": 0,
+        "vanishes": 16,
+        "undetermined": 0,
+        "unreadable": 8
+       },
+       "lr|A2": {
+        "remains": 6,
+        "vanishes": 9,
+        "undetermined": 1,
+        "unreadable": 8
+       },
+       "hgb|none": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "hgb|R2": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "hgb|Rall": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "hgb|A2": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "lrbin|none": {
+        "remains": 4,
+        "vanishes": 4,
+        "undetermined": 0,
+        "unreadable": 16
+       },
+       "lrbin|R2": {
+        "remains": 0,
+        "vanishes": 8,
+        "undetermined": 0,
+        "unreadable": 16
+       },
+       "lrbin|Rall": {
+        "remains": 0,
+        "vanishes": 8,
+        "undetermined": 0,
+        "unreadable": 16
+       },
+       "lrbin|A2": {
+        "remains": 3,
+        "vanishes": 3,
+        "undetermined": 0,
+        "unreadable": 18
+       },
+       "lrbin2|none": {
+        "remains": 3,
+        "vanishes": 4,
+        "undetermined": 0,
+        "unreadable": 17
+       }
+      },
+      "R2": {
+       "lr|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "vanishes",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "undetermined",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "vanishes",
+        "S-smooth-hold-sub": "vanishes",
+        "S-smooth-decay-sec": "vanishes",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "unreadable",
+        "S-smooth-ground-sub": "unreadable",
+        "S-rank-hold-sec": "unreadable",
+        "S-rank-hold-sub": "unreadable",
+        "S-rank-decay-sec": "unreadable",
+        "S-rank-decay-sub": "unreadable",
+        "S-rank-ground-sec": "unreadable",
+        "S-rank-ground-sub": "unreadable",
+        "S-jitter-hold-sec": "vanishes",
+        "S-jitter-hold-sub": "vanishes",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "vanishes",
+        "S-jitter-ground-sub": "vanishes"
+       },
+       "lrbin|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "vanishes",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "vanishes",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "unreadable",
+        "S-smooth-hold-sub": "unreadable",
+        "S-smooth-decay-sec": "unreadable",
+        "S-smooth-decay-sub": "unreadable",
+        "S-smooth-ground-sec": "unreadable",
+        "S-smooth-ground-sub": "unreadable",
+        "S-rank-hold-sec": "unreadable",
+        "S-rank-hold-sub": "unreadable",
+        "S-rank-decay-sec": "unreadable",
+        "S-rank-decay-sub": "unreadable",
+        "S-rank-ground-sec": "unreadable",
+        "S-rank-ground-sub": "unreadable",
+        "S-jitter-hold-sec": "unreadable",
+        "S-jitter-hold-sub": "unreadable",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "unreadable",
+        "S-jitter-ground-sub": "unreadable"
+       },
+       "hgb|R2": {
+        "S-raw-hold-sec": "unreadable",
+        "S-raw-hold-sub": "unreadable",
+        "S-raw-decay-sec": "unreadable",
+        "S-raw-decay-sub": "unreadable",
+        "S-raw-ground-sec": "unreadable",
+        "S-raw-ground-sub": "unreadable",
+        "S-smooth-hold-sec": "unreadable",
+        "S-smooth-hold-sub": "unreadable",
+        "S-smooth-decay-sec": "unreadable",
+        "S-smooth-decay-sub": "unreadable",
+        "S-smooth-ground-sec": "unreadable",
+        "S-smooth-ground-sub": "unreadable",
+        "S-rank-hold-sec": "unreadable",
+        "S-rank-hold-sub": "unreadable",
+        "S-rank-decay-sec": "unreadable",
+        "S-rank-decay-sub": "unreadable",
+        "S-rank-ground-sec": "unreadable",
+        "S-rank-ground-sub": "unreadable",
+        "S-jitter-hold-sec": "unreadable",
+        "S-jitter-hold-sub": "unreadable",
+        "S-jitter-decay-sec": "unreadable",
+        "S-jitter-decay-sub": "unreadable",
+        "S-jitter-ground-sec": "unreadable",
+        "S-jitter-ground-sub": "unreadable"
+       }
+      },
+      "pcr_counts": {
+       "lr|none": {
+        "level": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "lr|R2": {
+        "level": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 23,
+         "over": 0,
+         "fails": 0,
+         "unclear": 1,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "hgb|none": {
+        "level": {
+         "works": 0,
+         "over": 0,
+         "fails": 23,
+         "unclear": 1,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 0,
+         "over": 0,
+         "fails": 22,
+         "unclear": 2,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "hgb|R2": {
+        "level": {
+         "works": 0,
+         "over": 0,
+         "fails": 23,
+         "unclear": 1,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 0,
+         "over": 0,
+         "fails": 22,
+         "unclear": 2,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "lrbin|none": {
+        "level": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "lrbin|R2": {
+        "level": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 21,
+         "over": 0,
+         "fails": 2,
+         "unclear": 1,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       }
+      },
+      "main_ceiling_kinds_L300": [
+       "hgb"
+      ],
+      "pcr_R2": {
+       "lr|R2": {
+        "level": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        },
+        "var": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        }
+       },
+       "lrbin|R2": {
+        "level": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        },
+        "var": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        }
+       },
+       "hgb|R2": {
+        "level": {
+         "S-raw-hold-sec": {
+          "none": "fails",
+          "R2": "unclear",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-hold-sub": {
+          "none": "unclear",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         }
+        },
+        "var": {
+         "S-raw-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-ground-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-ground-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         }
+        }
+       }
+      }
+     },
+     "step": "d100"
+    }
+   },
+   "reading_i": "not_run"
+  },
+  "2": {
+   "worlds": {
+    "confound": {
+     "status": "go",
+     "ran": true,
+     "auc_A_speed": {
+      "L300": {
+       "hgb": 0.8100894815992653,
+       "lr": 0.7703879106130369
+      },
+      "L60": {
+       "hgb": 0.8318421794184688,
+       "lr": 0.7692655330710008
+      },
+      "L1800": {
+       "hgb": 0.7347630803743816,
+       "lr": 0.7489431770957836
+      }
+     },
+     "verdict_counts": {
+      "L300": {
+       "green": 15,
+       "red_detected": 4,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 5,
+       "undecidable": 0
+      },
+      "L60": {
+       "green": 1,
+       "red_detected": 1,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 22
+      },
+      "L1800": {
+       "green": 21,
+       "red_detected": 0,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 3
+      }
+     },
+     "verdicts_L300": {
+      "S-jitter-decay-sec": "green",
+      "S-jitter-decay-sub": "red_unconfirmed",
+      "S-jitter-ground-sec": "green",
+      "S-jitter-ground-sub": "red_detected",
+      "S-jitter-hold-sec": "green",
+      "S-jitter-hold-sub": "red_unconfirmed",
+      "S-rank-decay-sec": "green",
+      "S-rank-decay-sub": "red_unconfirmed",
+      "S-rank-ground-sec": "green",
+      "S-rank-ground-sub": "red_unconfirmed",
+      "S-rank-hold-sec": "green",
+      "S-rank-hold-sub": "red_unconfirmed",
+      "S-raw-decay-sec": "green",
+      "S-raw-decay-sub": "red_detected",
+      "S-raw-ground-sec": "green",
+      "S-raw-ground-sub": "red_detected",
+      "S-raw-hold-sec": "green",
+      "S-raw-hold-sub": "red_detected",
+      "S-smooth-decay-sec": "green",
+      "S-smooth-decay-sub": "green",
+      "S-smooth-ground-sec": "green",
+      "S-smooth-ground-sub": "green",
+      "S-smooth-hold-sec": "green",
+      "S-smooth-hold-sub": "green"
+     },
+     "state": "red",
+     "split": {
+      "counts": {
+       "lr|none": {
+        "remains": 4,
+        "vanishes": 15,
+        "undetermined": 5,
+        "unreadable": 0
+       },
+       "lr|R2": {
+        "remains": 0,
+        "vanishes": 19,
+        "undetermined": 5,
+        "unreadable": 0
+       },
+       "lr|Rall": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lr|A2": {
+        "remains": 2,
+        "vanishes": 17,
+        "undetermined": 5,
+        "unreadable": 0
+       },
+       "hgb|none": {
+        "remains": 3,
+        "vanishes": 17,
+        "undetermined": 1,
+        "unreadable": 3
+       },
+       "hgb|R2": {
+        "remains": 0,
+        "vanishes": 21,
+        "undetermined": 0,
+        "unreadable": 3
+       },
+       "hgb|Rall": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "hgb|A2": {
+        "remains": 3,
+        "vanishes": 16,
+        "undetermined": 1,
+        "unreadable": 4
+       },
+       "lrbin|none": {
+        "remains": 6,
+        "vanishes": 15,
+        "undetermined": 3,
+        "unreadable": 0
+       },
+       "lrbin|R2": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lrbin|Rall": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lrbin|A2": {
+        "remains": 6,
+        "vanishes": 15,
+        "undetermined": 3,
+        "unreadable": 0
+       },
+       "lrbin2|none": {
+        "remains": 6,
+        "vanishes": 15,
+        "undetermined": 3,
+        "unreadable": 0
+       }
+      },
+      "R2": {
+       "lr|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "undetermined",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "undetermined",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "vanishes",
+        "S-smooth-hold-sub": "vanishes",
+        "S-smooth-decay-sec": "vanishes",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "vanishes",
+        "S-smooth-ground-sub": "vanishes",
+        "S-rank-hold-sec": "vanishes",
+        "S-rank-hold-sub": "undetermined",
+        "S-rank-decay-sec": "vanishes",
+        "S-rank-decay-sub": "undetermined",
+        "S-rank-ground-sec": "vanishes",
+        "S-rank-ground-sub": "undetermined",
+        "S-jitter-hold-sec": "vanishes",
+        "S-jitter-hold-sub": "vanishes",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "vanishes",
+        "S-jitter-ground-sub": "vanishes"
+       },
+       "lrbin|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "vanishes",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "vanishes",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "vanishes",
+        "S-smooth-hold-sub": "vanishes",
+        "S-smooth-decay-sec": "vanishes",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "vanishes",
+        "S-smooth-ground-sub": "vanishes",
+        "S-rank-hold-sec": "vanishes",
+        "S-rank-hold-sub": "vanishes",
+        "S-rank-decay-sec": "vanishes",
+        "S-rank-decay-sub": "vanishes",
+        "S-rank-ground-sec": "vanishes",
+        "S-rank-ground-sub": "vanishes",
+        "S-jitter-hold-sec": "vanishes",
+        "S-jitter-hold-sub": "vanishes",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "vanishes",
+        "S-jitter-ground-sub": "vanishes"
+       },
+       "hgb|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "vanishes",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "vanishes",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "vanishes",
+        "S-smooth-hold-sub": "vanishes",
+        "S-smooth-decay-sec": "vanishes",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "vanishes",
+        "S-smooth-ground-sub": "vanishes",
+        "S-rank-hold-sec": "vanishes",
+        "S-rank-hold-sub": "vanishes",
+        "S-rank-decay-sec": "vanishes",
+        "S-rank-decay-sub": "vanishes",
+        "S-rank-ground-sec": "vanishes",
+        "S-rank-ground-sub": "vanishes",
+        "S-jitter-hold-sec": "vanishes",
+        "S-jitter-hold-sub": "unreadable",
+        "S-jitter-decay-sec": "unreadable",
+        "S-jitter-decay-sub": "unreadable",
+        "S-jitter-ground-sec": "vanishes",
+        "S-jitter-ground-sub": "vanishes"
+       }
+      },
+      "pcr_counts": null,
+      "main_ceiling_kinds_L300": null,
+      "pcr_R2": null
+     },
+     "step": "c200"
+    },
+    "factor": {
+     "status": "go",
+     "ran": true,
+     "auc_A_speed": {
+      "L300": {
+       "hgb": 0.9794921794323813,
+       "lr": 0.874299980065061
+      },
+      "L60": {
+       "hgb": 0.9486969047896827,
+       "lr": 0.8248389068217461
+      },
+      "L1800": {
+       "hgb": 0.9110753690280232,
+       "lr": 0.802828201015042
+      }
+     },
+     "verdict_counts": {
+      "L300": {
+       "green": 4,
+       "red_detected": 0,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 4,
+       "undecidable": 16
+      },
+      "L60": {
+       "green": 1,
+       "red_detected": 9,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 6,
+       "undecidable": 8
+      },
+      "L1800": {
+       "green": 0,
+       "red_detected": 0,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 24
+      }
+     },
+     "verdicts_L300": {
+      "S-jitter-decay-sec": "green",
+      "S-jitter-decay-sub": "green",
+      "S-jitter-ground-sec": "undecidable",
+      "S-jitter-ground-sub": "undecidable",
+      "S-jitter-hold-sec": "undecidable",
+      "S-jitter-hold-sub": "undecidable",
+      "S-rank-decay-sec": "undecidable",
+      "S-rank-decay-sub": "undecidable",
+      "S-rank-ground-sec": "undecidable",
+      "S-rank-ground-sub": "undecidable",
+      "S-rank-hold-sec": "undecidable",
+      "S-rank-hold-sub": "undecidable",
+      "S-raw-decay-sec": "green",
+      "S-raw-decay-sub": "red_unconfirmed",
+      "S-raw-ground-sec": "green",
+      "S-raw-ground-sub": "red_unconfirmed",
+      "S-raw-hold-sec": "red_unconfirmed",
+      "S-raw-hold-sub": "red_unconfirmed",
+      "S-smooth-decay-sec": "undecidable",
+      "S-smooth-decay-sub": "undecidable",
+      "S-smooth-ground-sec": "undecidable",
+      "S-smooth-ground-sub": "undecidable",
+      "S-smooth-hold-sec": "undecidable",
+      "S-smooth-hold-sub": "undecidable"
+     },
+     "state": "unsettled",
+     "split": {
+      "counts": {
+       "lr|none": {
+        "remains": 0,
+        "vanishes": 4,
+        "undetermined": 4,
+        "unreadable": 16
+       },
+       "lr|R2": {
+        "remains": 0,
+        "vanishes": 7,
+        "undetermined": 2,
+        "unreadable": 15
+       },
+       "lr|Rall": {
+        "remains": 0,
+        "vanishes": 5,
+        "undetermined": 0,
+        "unreadable": 19
+       },
+       "lr|A2": {
+        "remains": 0,
+        "vanishes": 3,
+        "undetermined": 3,
+        "unreadable": 18
+       },
+       "hgb|none": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "hgb|R2": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "hgb|Rall": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "hgb|A2": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "lrbin|none": {
+        "remains": 0,
+        "vanishes": 3,
+        "undetermined": 0,
+        "unreadable": 21
+       },
+       "lrbin|R2": {
+        "remains": 0,
+        "vanishes": 3,
+        "undetermined": 0,
+        "unreadable": 21
+       },
+       "lrbin|Rall": {
+        "remains": 0,
+        "vanishes": 0,
+        "undetermined": 0,
+        "unreadable": 24
+       },
+       "lrbin|A2": {
+        "remains": 0,
+        "vanishes": 3,
+        "undetermined": 0,
+        "unreadable": 21
+       },
+       "lrbin2|none": {
+        "remains": 0,
+        "vanishes": 1,
+        "undetermined": 0,
+        "unreadable": 23
+       }
+      },
+      "R2": {
+       "lr|R2": {
+        "S-raw-hold-sec": "undetermined",
+        "S-raw-hold-sub": "undetermined",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "vanishes",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "unreadable",
+        "S-smooth-hold-sub": "unreadable",
+        "S-smooth-decay-sec": "unreadable",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "unreadable",
+        "S-smooth-ground-sub": "unreadable",
+        "S-rank-hold-sec": "unreadable",
+        "S-rank-hold-sub": "unreadable",
+        "S-rank-decay-sec": "unreadable",
+        "S-rank-decay-sub": "unreadable",
+        "S-rank-ground-sec": "unreadable",
+        "S-rank-ground-sub": "unreadable",
+        "S-jitter-hold-sec": "unreadable",
+        "S-jitter-hold-sub": "unreadable",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "unreadable",
+        "S-jitter-ground-sub": "unreadable"
+       },
+       "lrbin|R2": {
+        "S-raw-hold-sec": "unreadable",
+        "S-raw-hold-sub": "unreadable",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "vanishes",
+        "S-raw-ground-sec": "unreadable",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "unreadable",
+        "S-smooth-hold-sub": "unreadable",
+        "S-smooth-decay-sec": "unreadable",
+        "S-smooth-decay-sub": "unreadable",
+        "S-smooth-ground-sec": "unreadable",
+        "S-smooth-ground-sub": "unreadable",
+        "S-rank-hold-sec": "unreadable",
+        "S-rank-hold-sub": "unreadable",
+        "S-rank-decay-sec": "unreadable",
+        "S-rank-decay-sub": "unreadable",
+        "S-rank-ground-sec": "unreadable",
+        "S-rank-ground-sub": "unreadable",
+        "S-jitter-hold-sec": "unreadable",
+        "S-jitter-hold-sub": "unreadable",
+        "S-jitter-decay-sec": "unreadable",
+        "S-jitter-decay-sub": "unreadable",
+        "S-jitter-ground-sec": "unreadable",
+        "S-jitter-ground-sub": "unreadable"
+       },
+       "hgb|R2": {
+        "S-raw-hold-sec": "unreadable",
+        "S-raw-hold-sub": "unreadable",
+        "S-raw-decay-sec": "unreadable",
+        "S-raw-decay-sub": "unreadable",
+        "S-raw-ground-sec": "unreadable",
+        "S-raw-ground-sub": "unreadable",
+        "S-smooth-hold-sec": "unreadable",
+        "S-smooth-hold-sub": "unreadable",
+        "S-smooth-decay-sec": "unreadable",
+        "S-smooth-decay-sub": "unreadable",
+        "S-smooth-ground-sec": "unreadable",
+        "S-smooth-ground-sub": "unreadable",
+        "S-rank-hold-sec": "unreadable",
+        "S-rank-hold-sub": "unreadable",
+        "S-rank-decay-sec": "unreadable",
+        "S-rank-decay-sub": "unreadable",
+        "S-rank-ground-sec": "unreadable",
+        "S-rank-ground-sub": "unreadable",
+        "S-jitter-hold-sec": "unreadable",
+        "S-jitter-hold-sub": "unreadable",
+        "S-jitter-decay-sec": "unreadable",
+        "S-jitter-decay-sub": "unreadable",
+        "S-jitter-ground-sec": "unreadable",
+        "S-jitter-ground-sub": "unreadable"
+       }
+      },
+      "pcr_counts": {
+       "lr|none": {
+        "level": {
+         "works": 22,
+         "over": 0,
+         "fails": 0,
+         "unclear": 2,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 22,
+         "over": 0,
+         "fails": 0,
+         "unclear": 2,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "lr|R2": {
+        "level": {
+         "works": 20,
+         "over": 0,
+         "fails": 0,
+         "unclear": 4,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 14,
+         "over": 0,
+         "fails": 2,
+         "unclear": 8,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "hgb|none": {
+        "level": {
+         "works": 0,
+         "over": 0,
+         "fails": 24,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 0,
+         "over": 0,
+         "fails": 24,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "hgb|R2": {
+        "level": {
+         "works": 0,
+         "over": 0,
+         "fails": 24,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 0,
+         "over": 0,
+         "fails": 24,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "lrbin|none": {
+        "level": {
+         "works": 15,
+         "over": 0,
+         "fails": 0,
+         "unclear": 9,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 9,
+         "over": 0,
+         "fails": 0,
+         "unclear": 15,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "lrbin|R2": {
+        "level": {
+         "works": 14,
+         "over": 0,
+         "fails": 0,
+         "unclear": 10,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 4,
+         "over": 0,
+         "fails": 5,
+         "unclear": 15,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       }
+      },
+      "main_ceiling_kinds_L300": [
+       "hgb"
+      ],
+      "pcr_R2": {
+       "lr|R2": {
+        "level": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-hold-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        },
+        "var": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-jitter-ground-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-ground-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         }
+        }
+       },
+       "lrbin|R2": {
+        "level": {
+         "S-raw-hold-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-raw-hold-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-raw-decay-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-rank-decay-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-hold-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-decay-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-decay-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        },
+        "var": {
+         "S-raw-hold-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-raw-hold-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-raw-decay-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-raw-decay-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-hold-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-smooth-hold-sub": {
+          "none": "unclear",
+          "R2": "fails",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "unclear",
+          "R2": "fails",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-rank-hold-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-rank-hold-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-rank-decay-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-rank-decay-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-decay-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-ground-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-ground-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         }
+        }
+       },
+       "hgb|R2": {
+        "level": {
+         "S-raw-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         }
+        },
+        "var": {
+         "S-raw-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-raw-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-smooth-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-rank-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-hold-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-hold-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-decay-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-decay-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-ground-sec": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         },
+         "S-jitter-ground-sub": {
+          "none": "fails",
+          "R2": "fails",
+          "used": false,
+          "why": "ceiling"
+         }
+        }
+       }
+      }
+     },
+     "step": "f200"
+    },
+    "drift": {
+     "status": "go",
+     "ran": true,
+     "auc_A_speed": {
+      "L300": {
+       "hgb": 0.8359331631996775,
+       "lr": 0.7902763474319348
+      },
+      "L60": {
+       "hgb": 0.8485099073039607,
+       "lr": 0.7926523452547642
+      },
+      "L1800": {
+       "hgb": 0.7409089948126657,
+       "lr": 0.7671018003147824
+      }
+     },
+     "verdict_counts": {
+      "L300": {
+       "green": 15,
+       "red_detected": 6,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 3,
+       "undecidable": 0
+      },
+      "L60": {
+       "green": 4,
+       "red_detected": 4,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 16
+      },
+      "L1800": {
+       "green": 24,
+       "red_detected": 0,
+       "red_detected_stop_path": 0,
+       "red_unconfirmed": 0,
+       "undecidable": 0
+      }
+     },
+     "verdicts_L300": {
+      "S-jitter-decay-sec": "green",
+      "S-jitter-decay-sub": "red_detected",
+      "S-jitter-ground-sec": "green",
+      "S-jitter-ground-sub": "red_detected",
+      "S-jitter-hold-sec": "green",
+      "S-jitter-hold-sub": "red_detected",
+      "S-rank-decay-sec": "green",
+      "S-rank-decay-sub": "red_unconfirmed",
+      "S-rank-ground-sec": "green",
+      "S-rank-ground-sub": "red_unconfirmed",
+      "S-rank-hold-sec": "green",
+      "S-rank-hold-sub": "green",
+      "S-raw-decay-sec": "green",
+      "S-raw-decay-sub": "red_detected",
+      "S-raw-ground-sec": "green",
+      "S-raw-ground-sub": "red_detected",
+      "S-raw-hold-sec": "green",
+      "S-raw-hold-sub": "red_detected",
+      "S-smooth-decay-sec": "green",
+      "S-smooth-decay-sub": "green",
+      "S-smooth-ground-sec": "green",
+      "S-smooth-ground-sub": "green",
+      "S-smooth-hold-sec": "green",
+      "S-smooth-hold-sub": "red_unconfirmed"
+     },
+     "state": "red",
+     "split": {
+      "counts": {
+       "lr|none": {
+        "remains": 6,
+        "vanishes": 15,
+        "undetermined": 3,
+        "unreadable": 0
+       },
+       "lr|R2": {
+        "remains": 0,
+        "vanishes": 23,
+        "undetermined": 1,
+        "unreadable": 0
+       },
+       "lr|Rall": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lr|A2": {
+        "remains": 6,
+        "vanishes": 17,
+        "undetermined": 1,
+        "unreadable": 0
+       },
+       "hgb|none": {
+        "remains": 6,
+        "vanishes": 18,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "hgb|R2": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "hgb|Rall": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "hgb|A2": {
+        "remains": 5,
+        "vanishes": 17,
+        "undetermined": 0,
+        "unreadable": 2
+       },
+       "lrbin|none": {
+        "remains": 6,
+        "vanishes": 16,
+        "undetermined": 2,
+        "unreadable": 0
+       },
+       "lrbin|R2": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lrbin|Rall": {
+        "remains": 0,
+        "vanishes": 24,
+        "undetermined": 0,
+        "unreadable": 0
+       },
+       "lrbin|A2": {
+        "remains": 6,
+        "vanishes": 17,
+        "undetermined": 1,
+        "unreadable": 0
+       },
+       "lrbin2|none": {
+        "remains": 6,
+        "vanishes": 14,
+        "undetermined": 4,
+        "unreadable": 0
+       }
+      },
+      "R2": {
+       "lr|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "vanishes",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "undetermined",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "vanishes",
+        "S-smooth-hold-sub": "vanishes",
+        "S-smooth-decay-sec": "vanishes",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "vanishes",
+        "S-smooth-ground-sub": "vanishes",
+        "S-rank-hold-sec": "vanishes",
+        "S-rank-hold-sub": "vanishes",
+        "S-rank-decay-sec": "vanishes",
+        "S-rank-decay-sub": "vanishes",
+        "S-rank-ground-sec": "vanishes",
+        "S-rank-ground-sub": "vanishes",
+        "S-jitter-hold-sec": "vanishes",
+        "S-jitter-hold-sub": "vanishes",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "vanishes",
+        "S-jitter-ground-sub": "vanishes"
+       },
+       "lrbin|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "vanishes",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "vanishes",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "vanishes",
+        "S-smooth-hold-sub": "vanishes",
+        "S-smooth-decay-sec": "vanishes",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "vanishes",
+        "S-smooth-ground-sub": "vanishes",
+        "S-rank-hold-sec": "vanishes",
+        "S-rank-hold-sub": "vanishes",
+        "S-rank-decay-sec": "vanishes",
+        "S-rank-decay-sub": "vanishes",
+        "S-rank-ground-sec": "vanishes",
+        "S-rank-ground-sub": "vanishes",
+        "S-jitter-hold-sec": "vanishes",
+        "S-jitter-hold-sub": "vanishes",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "vanishes",
+        "S-jitter-ground-sub": "vanishes"
+       },
+       "hgb|R2": {
+        "S-raw-hold-sec": "vanishes",
+        "S-raw-hold-sub": "vanishes",
+        "S-raw-decay-sec": "vanishes",
+        "S-raw-decay-sub": "vanishes",
+        "S-raw-ground-sec": "vanishes",
+        "S-raw-ground-sub": "vanishes",
+        "S-smooth-hold-sec": "vanishes",
+        "S-smooth-hold-sub": "vanishes",
+        "S-smooth-decay-sec": "vanishes",
+        "S-smooth-decay-sub": "vanishes",
+        "S-smooth-ground-sec": "vanishes",
+        "S-smooth-ground-sub": "vanishes",
+        "S-rank-hold-sec": "vanishes",
+        "S-rank-hold-sub": "vanishes",
+        "S-rank-decay-sec": "vanishes",
+        "S-rank-decay-sub": "vanishes",
+        "S-rank-ground-sec": "vanishes",
+        "S-rank-ground-sub": "vanishes",
+        "S-jitter-hold-sec": "vanishes",
+        "S-jitter-hold-sub": "vanishes",
+        "S-jitter-decay-sec": "vanishes",
+        "S-jitter-decay-sub": "vanishes",
+        "S-jitter-ground-sec": "vanishes",
+        "S-jitter-ground-sub": "vanishes"
+       }
+      },
+      "pcr_counts": {
+       "lr|none": {
+        "level": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "lr|R2": {
+        "level": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 22,
+         "over": 0,
+         "fails": 2,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "hgb|none": {
+        "level": {
+         "works": 18,
+         "over": 0,
+         "fails": 0,
+         "unclear": 6,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 22,
+         "over": 0,
+         "fails": 0,
+         "unclear": 2,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "hgb|R2": {
+        "level": {
+         "works": 18,
+         "over": 0,
+         "fails": 0,
+         "unclear": 6,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 20,
+         "over": 0,
+         "fails": 1,
+         "unclear": 3,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "lrbin|none": {
+        "level": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       },
+       "lrbin|R2": {
+        "level": {
+         "works": 24,
+         "over": 0,
+         "fails": 0,
+         "unclear": 0,
+         "unreadable": 0,
+         "not_calibrated": 0
+        },
+        "var": {
+         "works": 18,
+         "over": 0,
+         "fails": 2,
+         "unclear": 4,
+         "unreadable": 0,
+         "not_calibrated": 0
+        }
+       }
+      },
+      "main_ceiling_kinds_L300": [],
+      "pcr_R2": {
+       "lr|R2": {
+        "level": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        },
+        "var": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        }
+       },
+       "lrbin|R2": {
+        "level": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        },
+        "var": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "fails",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         }
+        }
+       },
+       "hgb|R2": {
+        "level": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-hold-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-decay-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-decay-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-ground-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-jitter-ground-sub": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         }
+        },
+        "var": {
+         "S-raw-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-raw-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-decay-sec": {
+          "none": "unclear",
+          "R2": "unclear",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-smooth-decay-sub": {
+          "none": "unclear",
+          "R2": "fails",
+          "used": false,
+          "why": "none_not_working"
+         },
+         "S-smooth-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-smooth-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-rank-ground-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-hold-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sec": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-decay-sub": {
+          "none": "works",
+          "R2": "works",
+          "used": true
+         },
+         "S-jitter-ground-sec": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         },
+         "S-jitter-ground-sub": {
+          "none": "works",
+          "R2": "unclear",
+          "used": false,
+          "why": "r2_unclear"
+         }
+        }
+       }
+      }
+     },
+     "step": "d200"
+    }
+   },
+   "reading_i": "unsettled"
+  }
+ },
+ "prev_sha256_checked": {
+  "20261014-rhythm-stage-speed-confound-world/results/ceiling/ceiling.json": "570694dddec156745102466c8f56e7245afcda0d2d7bf624757f94041fdd12db",
+  "20261014-rhythm-stage-speed-confound-world/results/c100/main/summary.json": "42017dda08cc1e5081172f79790e209a0aef70bda5a40245064a2a6970afb433",
+  "20261014-rhythm-stage-speed-confound-world/results/c100/main/e13.json": "a5c1ec8d0e1c1767980ff13a0e7748153bb4619bc99a796edc7d1ea9aa906ba6",
+  "20261014-rhythm-stage-speed-confound-world/results/c200/main/summary.json": "162277c30047be1802088f7a18b895d78af5a69072cbebccbf69c04ecfca0ac3",
+  "20261014-rhythm-stage-speed-confound-world/results/c200/main/e13.json": "168da4faf72ad15a4a956f96242bbb892a290f1c8da84d45a87e0ef91f56766a",
+  "20261015-rhythm-stage-speed-cause-split/results/c100/main/split.json": "489b58a3a748d6544c43f03122465a419dc5589cdb0a46111d052672e4a18a9e",
+  "20261015-rhythm-stage-speed-cause-split/results/c200/main/split.json": "4f36343d17e4c3b43c0c9f6b152ef84eaf00378f8e01dab74ad07ecb6ab25382"
+ }
+}
