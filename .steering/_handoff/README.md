@@ -11,6 +11,8 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| **AI 疲労の測定論のメタ研究（C）: 追加候補の選別を AI で行う設計 → 登録版を一人のコードに書き換える → 相談文を短くする**（worktree `/Users/johnd/GSE-prototype-af-c`） | **`next-session-ai-fatigue-c-ai-screening.md`**（2026-10-17） | **現行**。草稿・登録の添付は用意済み（`.steering/20261017-ai-fatigue-c-outline/` 判断 21〜24）。研究者が一人で 2 回コードし、較正は探索の集合で行うと決めた。追加の候補 264 件は 2 人目の判定が無いので、評価指標を作ってから AI で判定を付ける |
+| ~~**C: 外枠を詰める → 登録版の差分の確認 → /cross-review → 相談文**~~ | `next-session-ai-fatigue-c-outline-finalize.md`（2026-10-17） | 完了（2026-10-17・判断 15〜24）。草稿と登録の添付まで進めた。後続は上の行 |
 | **公開データでの照合の論文: 凍結 → 取得 → 検査 → 本計算**（PoPETs 2027 Issue 3・締切 2026-11-30 AoE を目標・G-GEAR） | **`next-session-public-keystroke-matching-research-forward.md`**（2026-10-12） | **現行**。事前登録は下書き 8（未凍結）・合成の記録の検査は済み（PR #358）。判断 51: KLiCKe の返事を待たずに進める。ただし凍結（OSF）が取得より先。取得の後は記録と本文の中身を Claude も読まない（集計だけ）。前の `next-session-public-keystroke-matching-freeze.md` を置き換える |
 | 公開データでの照合の論文: KLiCKe の著者への催促と日程の確認（2026-10-26 ごろ） | `next-session-public-keystroke-matching-1026-reminder.md`（2026-10-12） | **現行・10/26 に使う**。問い合わせは 2026-10-12 に送った（判断 50）。返事が無ければ催促の下書きを研究者に渡す。PoPETs の録画の要否の問い合わせの確認と、代わりの投稿先の候補（未確認）もここ |
 | ~~公開データでの照合の論文: 合成の記録の検査と凍結~~ | `next-session-public-keystroke-matching-freeze.md`（2026-10-12） | 置き換え済み（判断 51）。上の 2 行へ |

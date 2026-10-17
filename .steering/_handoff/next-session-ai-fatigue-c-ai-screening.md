@@ -1,0 +1,46 @@
+# 引き継ぎ: C の追加候補の選別を AI で行う設計 → 登録版を一人のコードに書き換える → 相談文を短くする
+
+作成 2026-10-17（Mac）。返答・記録・AskUserQuestion の引数は日本語で。記号を多用しない。決めてほしいことは AskUserQuestion で、推奨と理由を添えて聞く。
+
+## 始め方
+
+worktree `/Users/johnd/GSE-prototype-af-c`（ブランチ `docs/ai-fatigue-c-outline`・push 済み・PR なし）で新しいセッションを開き、次を打ち込む。
+
+```
+.steering/_handoff/next-session-ai-fatigue-c-ai-screening.md を読んで、§2 の順に進めて。
+```
+
+## 1. ここまで（一次は各ファイル。経緯は `.steering/20261017-ai-fatigue-c-outline/decisions.md` 判断 21〜24）
+
+- 草稿: `papers/ai-fatigue-measurement/manuscript/draft/`（`main.tex`・`tables.tex`・`figure1.tex`。PDF は `latexmk -pdf figure1.tex main.tex`、docx は `python3 make_docx.py`）。序論・背景・方法・考察の結果に依らない部分は書いた。図 1 と表 1〜15 は枠だけ。
+- 登録版: `.steering/20261017-ai-fatigue-c-outline/registration-en.md`（0.10 に判断 23 の書き足し）。添付は `registration-attachments/`（コード用紙・検索式）と脚本（`scripts/make_coding_form.py`・`make_screening_candidates.py`・`hash_attachments.py`）。選別の順は登録の日に作る（試しは `registration-attachments/dryrun/`・264 件）。
+- 相談文: `.steering/20261017-ai-fatigue-c-outline/coauthor-consult.md`（Discord 向けの短い版・docx は git に入れない）。
+- 研究者が 2026-10-17 に決めたこと（判断 24）:
+  - コードは研究者一人で 2 回（4 週以上あけて）。論文には「1 人のコード」と書く。共著者はコードしない。
+  - 較正は探索の集合（10 研究）で、登録の後の 11 月と 12 月に 2 回。80% に届かない単位は本番の前にコードブックを直して登録する。主の集合から較正の記録を抜かない。
+  - 相談文は「草稿を見て直すところを教えてほしい」と「投稿先に意見があれば」だけにする。題・著者情報の項・全文をどこまで読んだか・コード担当・登録の時期の項は削る。
+  - 追加の候補（264 件）の選別は、評価指標を具体に作ってから、サブエージェントで判定を付ける（このセッションの主題）。
+- 選別の事実（メインが一次で確かめた）: 2 人目の判定（`~/Downloads/AI_fatigue_database_2026-10-16_judge2.xlsx`）は最初の 34 件だけ（一致 32/34・κ = 0.892・合意案あり）。追加の候補 264 件（221 件 ＋ レビュー向けの探索の 43 件）には 2 人目の判定が無い。判定者 1 は題名・抄録の段で 71 件（含める 49・保留 15・除外 7）、全文の段で 8 件。表は `/Users/johnd/GSE-prototype/.steering/20261002-ai-fatigue-v2/archive/AI_fatigue_additional_candidates_judge1.xlsx`（SHA-256 `93bcc9ba…`）。
+- 群の無い 51 件は unknown（判断 23）。うち 50 件はレビュー等（2 回の独立の読みで一致・`evidence/groups-51.json`）。
+
+## 2. 次にやること（この順）
+
+1. **AI の選別の設計を決める（研究者に AskUserQuestion）。** 論点:
+   - 役割: AI を「2 人目の選別者」にするのか（主の集合 = 判定者 1 と AI の最終判定がそろった研究）、判定者 1 を置き換えるのか、人の判定の前の予備判定にとどめるのか。今の登録版 GSRR-33・39 は「2 人の人の最終判定」で、AI だけの判定は主の集合から除くと書いている。
+   - 評価指標: 元の DB の適格性（GSRR-24・E1〜E7・判定者用ファイルの『判定基準』・`/Users/johnd/GSE-prototype/.steering/20260930-ai-fatigue-protocol/protocol-ja.md` 付録 B）を、題名・抄録の段と全文の段それぞれで、AI が当てられる問いの列（はい・いいえ・分からないと根拠の箇所）に直す。中心-A・中心-B の区別も要るか。
+   - 精度の確かめ: 2 人の合意がある最初の 34 件で、AI の判定と人の合意の一致（κ・感度・特異度）を測る。合格の線と、届かないときの扱いを先に決める。⚠️ 34 件は規則づくりに使った集合で、AI の判定基準も 34 件を見て作ると精度が甘く出る。基準を書いてから 34 件に当てる順にし、限界に書く。
+   - 判定者 1 の 79 件の判定との突き合わせ（一致しないときに誰が決めるか）。
+   - 全文の段: 無料で全文が取れない候補の扱い。
+2. **登録との順序を決める。** 推奨: AI の選別の手順と評価指標を登録版に書いて登録してから、264 件に当てる（登録の前に主の集合の候補を判定させない。判定者 1 が見た AI の評価版〈2026-09-30〉は開示済み）。研究者が「先に判定を付ける」を選ぶなら、その旨と理由を登録版に書く。
+3. **登録版を書き換える**（1・2 が決まってから一度に）: 一人のコード（GSRR-4・44・46・47・48・59・62 の 4・65、表 4 の見出し、草稿の方法と限界、外枠）、較正を探索の集合で（GSRR-39・44）、選別（GSRR-33・34・39・57 の言い方）、全文をどこまで読んだかの一文の削除（GSRR-34）。脚本の coder1・coder2 は「1 回目・2 回目」として使えるかを確かめ、make_dummy を緑に保つ。
+4. **相談文を短くする**: 草稿を見て直すところと、投稿先の意見だけ。登録に載せる名前の表記と所属（あれば ORCID）は一言で頼む。docx を作り直す。
+5. **確かめ**: 登録版の差分は大きいので、prereg の attack-me（差分だけ）か /cross-review を回すかを研究者に聞く（Codex の予算は `.codex/budget.json` を先に見る）。
+
+## 3. 守ること
+
+- 結果を先取りしない。主の集合の候補の中身（判定）を、手順を決める前に AI に付けさせない。尺度の項目を逐語で公開物に載せない。GSE の話を混ぜない。
+- 公開物（`papers/`）は英語・内部の番号やパスを書かない。`.steering/20260927-ime-observation-paper-eval-design/issues/_style_check.py` で違反 0 件を確かめる。
+- 抄録・全文は repo に写さない（scratchpad だけ）。判定者 2 のファイルは Downloads にある（repo の外）。
+- 出典は citation-ssot（append-only）。断定に使う一次はメインが開く。
+- `git add -A` を使わない。PR は研究者が確かめてから（push で止める）。共著者への連絡は研究者が行う。
+- attack-me の round 4 の `tmp/` は、研究者が最後の round の採否を決め終えたら消す。
