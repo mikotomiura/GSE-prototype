@@ -6,12 +6,12 @@
 - [x] grill（判断 1〜4）・ブランチ `docs/rhythm-stage-summary`（`docs/rhythm-stage-speed-shape` の上）
 
 ## 作る
-- [ ] `summary.md`（design の節 0〜9）
-- [ ] `check_summary.py`（bad 0）・変異 4 通りで落ちることを確かめ decisions に書く
-- [ ] `idea-section12-addendum.md`
+- [x] `summary.md`（design の節 0〜9）
+- [x] `check_summary.py`（bad 0）・変異 11 通りで落ちることを確かめ decisions に書く（判断 5）
+- [x] `idea-section12-addendum.md`
 
 ## レビュー
-- [ ] `/cross-review` 1 巡目（自文書と 6 回の記録との矛盾）→ 直す
+- [x] `/cross-review` 1 巡目（自文書と 6 回の記録との矛盾）→ 直す（判断 6）
 - [ ] `/cross-review` 2 巡目（足した言い方の境目）→ 直す
 
 ## 完了処理

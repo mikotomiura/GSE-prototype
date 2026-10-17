@@ -85,15 +85,37 @@ def main_dir(box: str, step: str | None) -> Path:
     return EXP / box / "results" / step / "main"
 
 
+def main_state(key: str, box: str, step: str | None, bad: list[str]) -> str:
+    """本番を回した段の「下見 0」の列を一次から決める。"""
+    if box == R2:
+        # 第 2 回は下見 0 を回していない（第 1 回の固定で選んだ v4 を使う）
+        if (EXP / box / "results" / "ceiling").exists():
+            bad.append(f"{key}: 第 2 回に results/ceiling がある（下見 0 を回していない前提）")
+        return "—（第 1 回の v4）"
+    c = load(EXP / box / "results" / "ceiling" / "ceiling.json")
+    if box == R1:
+        ok = c["choice"]["chosen"] == "v4" and c["choice"]["per_world"]["v4"]["usable"]
+    else:
+        ok = c["steps"][step]["status"] == "go"
+    if not ok:
+        bad.append(f"{key}: 下見 0 で先へ進む段になっていない")
+    return STATE["main"]
+
+
 def expected(key: str, bad: list[str]) -> list[str]:
     kind, box, step = SOURCES[key]
+    state = STATE[kind]
+    kinds_text = "—"
     if kind == "main":
         s = load(main_dir(box, step) / "summary.json")
         cands = sorted(k for k in s if k.startswith("S-"))
         if len(cands) != N_CAND:
             bad.append(f"{key}: summary.json の候補が {len(cands)} 本")
-        auc = s["_detector"]["L300"]["auc_A_speed"]
+        det = s["_detector"]["L300"]
+        auc = det["auc_A_speed"]
         aucs = (auc["hgb"], auc["lr"])
+        kinds_text = "・".join(det["ceiling_kinds"]) or "なし"
+        state = main_state(key, box, step, bad)
         source = "本番"
         cols = [counts_text([s[c][lab] for c in cands], bad, key, lab) for lab in LABELS]
     elif kind == "ceiling":
@@ -114,7 +136,7 @@ def expected(key: str, bad: list[str]) -> list[str]:
         source = "下見 0（P 40）"
         cols = [NOT_RUN["unusable"]] * 3
     auc_text = f"{aucs[0]:.3f} / {aucs[1]:.3f}"
-    return [key, STATE[kind], source, auc_text, *cols]
+    return [key, state, source, auc_text, kinds_text, *cols]
 
 
 def table_rows(text: str, bad: list[str]) -> dict[str, list[str]]:
@@ -138,9 +160,13 @@ def table_rows(text: str, bad: list[str]) -> dict[str, list[str]]:
     return rows
 
 
-# 主表の列: 鍵 | 回 | world と段 | 下見 0 | AUC の出どころ | L300 の AUC(A_speed) hgb / lr | L300 | L60 | L1800
-# 照らすのは 鍵・下見 0・出どころ・AUC・3 ラベル（回と world の説明の列は照らさない）
-CHECK_COLS = (0, 3, 4, 5, 6, 7, 8)
+# 主表の列: 鍵 | 回 | world と段 | 下見 0 | AUC の出どころ | L300 の AUC(A_speed) hgb / lr |
+#           L300 で外した分類器 | L300 | L60 | L1800
+# 照らすのは 鍵・下見 0・出どころ・AUC・外した分類器・3 ラベル（回と world の説明の列は照らさない。
+# ただし探索的と併記する段は world の列に「探索的」を含むことを確かめる）
+N_COLS = 10
+CHECK_COLS = (0, 3, 4, 5, 6, 7, 8, 9)
+EXPLORATORY = {"h-c200"}
 
 
 def main(argv: list[str]) -> int:
@@ -148,7 +174,7 @@ def main(argv: list[str]) -> int:
     if "--emit" in argv:
         for key in SOURCES:
             e = expected(key, bad)
-            print("| `" + e[0] + "` | | | " + " | ".join(e[1:]) + " |")
+            print("| `" + e[0] + "` | | | " + " | ".join(e[1:]) + " |")  # 回と world の列は手で書く
         for b in bad:
             print("bad:", b)
         return 1 if bad else 0
@@ -159,13 +185,15 @@ def main(argv: list[str]) -> int:
             bad.append(f"主表に鍵 {key} が無い")
             continue
         cells = rows[key]
-        if len(cells) != 9:
-            bad.append(f"{key}: 列の数が {len(cells)}（9 でない）")
+        if len(cells) != N_COLS:
+            bad.append(f"{key}: 列の数が {len(cells)}（{N_COLS} でない）")
             continue
         got = [cells[i] for i in CHECK_COLS]
         e = expected(key, bad)
         if got != e:
             bad.append(f"{key}: 主表 {got} ／ 一次 {e}")
+        if key in EXPLORATORY and "探索的" not in cells[2]:
+            bad.append(f"{key}: 探索的と併記する段なのに world の列に「探索的」が無い")
     for key in rows:
         if key not in SOURCES:
             bad.append(f"主表に知らない鍵 {key}")
