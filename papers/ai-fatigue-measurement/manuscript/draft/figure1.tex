@@ -1,0 +1,31 @@
+% Figure 1: flow of records (shell). Every count is left as a dash until the records have been screened and coded.
+\documentclass[border=4pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\begin{document}
+\sffamily\small\hyphenpenalty=10000
+\begin{tikzpicture}[
+  box/.style={draw, align=left, text width=62mm, inner sep=5pt},
+  side/.style={draw, align=left, text width=62mm, inner sep=5pt},
+  arr/.style={-{Stealth[length=2.2mm]}},
+  node distance=7mm and 9mm]
+  \node[box] (cand) {Additional candidates in the source database\\(n = ---)};
+  \node[side, right=of cand] (unscr) {Unscreened on 31 December 2026\\(n = ---, by population group)};
+  \node[box, below=of cand] (scr) {Screened by both authors, final decision\\recorded on or before 31 December 2026\\(n = ---)};
+  \node[side, right=of scr] (excl) {Excluded, by code\\(n = ---; E2 and E3 by population group)};
+  \node[box, below=of scr] (incl) {Included primary studies\\(records n = ---)};
+  \node[side, right=of incl] (calib) {Calibration records, removed\\(n = ---; rounds = ---;\\small-pool rule applied: ---)};
+  \node[box, below=of incl] (main) {Main set\\records: n = ---\\studies (E5-linked records counted once): n = ---};
+  \node[side, right=of main] (late) {Late stratum: included after\\31 December 2026, before main coding\\(n = ---; reported outside the primary counts)};
+  \node[box, below=10mm of main] (expl) {Exploration set (reported separately)\\primary studies from the exploratory\\bibliography of 34 records: 10;\\item-coded instruments: 4};
+  \draw[arr] (cand) -- (scr);
+  \draw[arr] (cand) -- (unscr);
+  \draw[arr] (scr) -- (incl);
+  \draw[arr] (scr) -- (excl);
+  \draw[arr] (incl) -- (main);
+  \draw[arr] (incl) -- (calib);
+  \draw[arr, dashed] (unscr.east) -- ++(4mm,0) |- (late.east);
+\end{tikzpicture}
+\end{document}

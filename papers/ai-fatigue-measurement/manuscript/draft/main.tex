@@ -6,6 +6,8 @@
 \usepackage{microtype}
 \usepackage{booktabs}
 \usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{pdflscape}
 \usepackage{enumitem}
 \usepackage[round,authoryear]{natbib}
 \usepackage[hidelinks]{hyperref}
@@ -113,8 +115,19 @@ outcomes: the share of items about reduced interest is partly set at entry, and 
 truncated because studies without any relation to AI are excluded.
 
 \subsection{Technostress, adapted scales and scales built for AI}
-\tbd{Technostress and its exhaustion component; general fatigue scales reworded for AI; scales built for AI. Sources to
-be read in free full text and registered before they are cited.}
+Fatigue tied to a technology is measured in at least three ways. Technostress scales treat fatigue as one strain
+among several; in the Spanish-language RED/TIC scale, fatigue is one of four factors beside scepticism, anxiety and
+inefficiency, and in a sample of 2,850 teachers most of the reliable variance belonged to the general factor
+(hierarchical omega .89 for the general factor and .22 for fatigue) \citep{ortega2023}. Scales for the fatigue of one
+technology have been assembled from general instruments: the motivational dimension of the Zoom Exhaustion \&
+Fatigue Scale was built from items of a general fatigue inventory \citep{fauville2021}. Scales built for fatigue
+attributed to AI have also appeared; one has 15 items on four factors, cognitive, emotional, physical and behavioural
+\citep{lau2026}.
+
+These routes tie fatigue to AI at different points: in the sample, when a general or technostress scale is given to
+people who use AI; in the instructions or the items, when a general scale is reworded; and in the construct, when a
+scale is built for AI. C1 records the point at which a study ties its fatigue instrument to AI, and C2a records the
+route by which the instrument was obtained. Neither code judges which route is better.
 
 \subsection{Measurement flexibility and names}
 A measure's name is often read as a statement about its content, and instruments are changed while their names stay the
@@ -229,29 +242,47 @@ with unconfirmed signs of overlap, count the secondary type of boundary items, a
   \item Exploration set and late stratum (supplement).
 \end{enumerate}
 
-\setcounter{table}{11}% numbered as in the outline: Tables 1--11 and 13--15 are not drafted yet
-\begin{table}[h]
-\centering
-\caption{Problem statements for the main set (shell).}
-\small
-\begin{tabularx}{\linewidth}{XXXcccc}
-\toprule
-Problem type & Code and value & Statement & Count & Evaluable & Not evaluable & Unresolved \\
-\midrule
---- & --- & observed / not observed / could not be evaluated & --- & --- & --- & --- \\
-\bottomrule
-\end{tabularx}
-
-\smallskip
-\raggedright\footnotesize One row per registered problem type; C7 has three rows, one per condition. A note gives,
-for each row, the values that made records not evaluable.
-\end{table}
+The figure and the tables are placed after the Declarations. Their rows and columns are fixed by the registration
+and the outline; every value is left as a dash until coding.
 
 \section{Discussion}
-\tbd{Written after the results, in four parts: what the main set shows, question by question; the relation to the
-narrative review, with its observations set beside the statements for the main set; recommendations for authors and
-reviewers, each tied to a code and to either an existing standard or a proposal of this scheme, given whether or not
-the corresponding problem was observed; and the limitations.}
+
+\subsection{What the main set shows}
+\tbd{Written after the results, question by question, in the terms of the problem statements and, for the descriptive
+codes, in the terms of the description.}
+
+\subsection{Relation to the narrative review}
+\tbd{Written after the results. The observations of the narrative review are set beside the statements for the main
+set; the values of the exploration set are not. No statement says that something is more or less common, or that an
+observation was replicated or confirmed.}
+
+\subsection{Recommendations for authors and reviewers}
+The recommendations in Table~14 do not follow from the counts of this review; they are given whether or not the
+corresponding problem was observed. Each row names the code it concerns and one of two sources: an existing standard,
+cited to it, or a step that this scheme makes explicit and that the standards cited here do not name, stated as a
+proposal. For example, guidelines for psychological journals already ask authors to show that a published measure
+was administered as published and to justify any modification \citep{elson2023}; we know of no standard that asks
+authors to state the level at which a fatigue measure is tied to AI, so that row is a proposal.
+\tbd{Remaining rows, after the standards in the note to Table~14 have been checked.}
+
+\subsection{Limitations}
+The rules were built from the exploration set, and the C2b codebook (version 2) was written after the exploration
+results had been seen. Before registration the first author had seen the titles, abstracts and AI-generated
+appraisals of 71 additional candidates. After registration, the people who decide eligibility are the coders, who
+know the rules; the fixed screening order and the released decisions show this influence but do not remove it. Human
+screening of the additional candidates is uneven across population groups, and the source database drew on free
+sources only, so the main set is not a census and its proportions are not estimates for the literature.
+
+The eligibility criteria shape some outcomes. Studies with no relation to AI are excluded, so the value of no
+attribution to AI (C1, L6) is truncated; and the fatigue definition includes motivational depletion, so the share of
+items about reduced interest is partly set at entry. C2b relies on printed items: instruments whose items are not
+printed are coded as items unavailable, and the instruments with printed items may differ systematically from the
+others. Item content shows what an instrument asks about, not what its scores contain.
+
+C6a and the third condition of C7 compare names. A conclusion coded within what was measured meets none of the three
+conditions; it is not shown that the items support it. Both authors wrote the earlier narrative review, and by
+default both code, so their agreement is agreement between coders who share that view. \tbd{Limitations added by
+deviations from the registration, if any.}
 
 \section{Conclusions}
 \tbd{The scope sentence and the registered statements of the abstract, without additional claims.}
@@ -267,6 +298,11 @@ preparing the manuscript}.
 \textbf{Data and code availability.} The registration, the code table, the codebook (CC BY 4.0) and the scripts (MIT
 licence) are in the OSF project of the registration \tbd{link}.
 
+\clearpage
+\section*{Figure and tables}
+\input{tables}
+
+\clearpage
 \bibliographystyle{apalike}
 \bibliography{refs}
 
