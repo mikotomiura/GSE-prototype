@@ -4,7 +4,8 @@ pandoc reads a tabularx table as equal columns without rules or a table number, 
 breaks words inside the cell ("Statemen-t"). This script:
 - sizes each column from its text (never narrower than the longest word),
 - draws the top rule, the rule under the header and the bottom rule (as booktabs does in the PDF),
-- puts "Table N." before each caption, numbered as LaTeX numbers them (one per \\caption inside a table),
+- puts "Table N." and "Figure N." before each caption, numbered as LaTeX numbers them (one per \\caption inside a
+  table or a figure environment),
 - sets the table text in 10 pt, or in 8 or 7 pt when the longest words of the columns do not fit at 10 pt,
 - sets the page to A4 and puts the tables that are landscape in the PDF on landscape pages of their own.
 Figure 1 (figure1.tex) is built first and converted to PNG, because Word cannot show the PDF.
@@ -105,7 +106,8 @@ def main():
     subprocess.run(["pdftoppm", "-r", "200", "-png", "-singlefile", "figure1.pdf", "figure1"], cwd=HERE, check=True)
     subprocess.run(["pandoc", "main.tex", "--citeproc", "--bibliography=refs.bib", "--default-image-extension=png",
                     "-o", str(OUT)], cwd=HERE, check=True)
-    tables = table_numbers(TEX.read_text(encoding="utf-8") + TABLES.read_text(encoding="utf-8"))
+    tex_all = TEX.read_text(encoding="utf-8") + TABLES.read_text(encoding="utf-8")
+    tables = table_numbers(tex_all)
     numbers = [n for n, _ in tables]
     with zipfile.ZipFile(OUT) as z:
         parts = {n: z.read(n) for n in z.namelist()}
@@ -117,6 +119,16 @@ def main():
         return m.group(1) + f'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Table {next(captions)}. </w:t></w:r>'
 
     doc, n_captions = re.subn(r'(<w:p><w:pPr><w:pStyle w:val="TableCaption" /></w:pPr>)', number_caption, doc)
+
+    figures = iter(range(1, 1 + len(re.findall(r"\\begin\{figure\}.*?\\caption\{", tex_all, flags=re.S))))
+    n_figures_tex = len(re.findall(r"\\begin\{figure\}.*?\\caption\{", tex_all, flags=re.S))
+
+    def number_figure(m):
+        return m.group(1) + f'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Figure {next(figures)}. </w:t></w:r>'
+
+    doc, n_figures = re.subn(r'(<w:p><w:pPr><w:pStyle w:val="ImageCaption" /></w:pPr>)', number_figure, doc)
+    if n_figures != n_figures_tex:
+        raise SystemExit(f"figure captions in main.tex: {n_figures_tex}, in docx: {n_figures}")
     landscape = iter(flag for _, flag in tables)
 
     def fix(m):
@@ -145,7 +157,7 @@ def main():
     with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in parts.items():
             z.writestr(name, data)
-    print(f"{OUT.name}: {n_tables} table(s) fixed, numbered {numbers}")
+    print(f"{OUT.name}: {n_tables} table(s) fixed, numbered {numbers}; {n_figures} figure caption(s) numbered")
 
 
 if __name__ == "__main__":
