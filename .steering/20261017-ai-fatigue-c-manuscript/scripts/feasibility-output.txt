@@ -1,0 +1,53 @@
+candidates.xlsx SHA-256 93bcc9bac0f8b233c1c6e74ca50183beb73d26a34e4c77d94f5910f1c7cd162a
+records 264 (table 221 + review search 43)
+by population: {'workers_other': 50, 'students_learners': 32, 'unknown': 5, 'consumers_general': 14, 'review_type': 7, 'health_professionals': 93, 'teachers_researchers': 19, 'unlabelled': 1, 'review_search': 43}
+by status: {'J1_include': 49, 'J1_exclude': 7, 'AI_include': 83, 'fulltext_done': 8, 'AI_exclude': 59, 'J1_pending': 15, 'review_search': 43}
+title term among TA-stage records: {('J1_include', True): 25, ('J1_exclude', True): 3, ('AI_include', True): 37, ('AI_include', False): 46, ('AI_exclude', False): 53, ('J1_include', False): 24, ('J1_exclude', False): 4, ('J1_pending', True): 6, ('J1_pending', False): 9, ('AI_exclude', True): 6}
+no free version: 48
+E5 groups: 11 records in them: 23
+
+== scenario low: expected included records if all 264 are finished = 32.6
+expected included records by population (all finished): {'students_learners': 7.9, 'teachers_researchers': 3.0, 'workers_other': 7.3, 'health_professionals': 11.9, 'consumers_general': 2.1, 'unknown': 0.4, 'review_type': 0.0, 'unlabelled': 0.0, 'review_search': 0.0}
+N_done | hours(2 people, this scenario) | pool median [10%,90%] | P(pool>=25) | kept median | groups with >=10 (mean) | per-group median at N
+    30 |     12 |   3 [1,5] | 0.00 |   3 | 0.00 | {'students_learners': 1, 'teachers_researchers': 0, 'workers_other': 1, 'health_professionals': 0, 'consumers_general': 0, 'unknown': 0}
+    60 |     24 |   7 [4,9] | 0.00 |   7 | 0.00 | {'students_learners': 2, 'teachers_researchers': 1, 'workers_other': 2, 'health_professionals': 0, 'consumers_general': 1, 'unknown': 0}
+    90 |     37 |  11 [7,14] | 0.00 |  11 | 0.00 | {'students_learners': 3, 'teachers_researchers': 2, 'workers_other': 2, 'health_professionals': 1, 'consumers_general': 2, 'unknown': 0}
+   120 |     50 |  14 [11,18] | 0.00 |  14 | 0.00 | {'students_learners': 5, 'teachers_researchers': 3, 'workers_other': 3, 'health_professionals': 1, 'consumers_general': 2, 'unknown': 0}
+   150 |     63 |  18 [14,23] | 0.04 |  18 | 0.05 | {'students_learners': 6, 'teachers_researchers': 3, 'workers_other': 4, 'health_professionals': 2, 'consumers_general': 2, 'unknown': 0}
+   180 |     76 |  21 [17,26] | 0.20 |  21 | 0.13 | {'students_learners': 7, 'teachers_researchers': 3, 'workers_other': 4, 'health_professionals': 3, 'consumers_general': 2, 'unknown': 0}
+   220 |     91 |  25 [20,30] | 0.52 |  22 | 0.15 | {'students_learners': 7, 'teachers_researchers': 3, 'workers_other': 6, 'health_professionals': 4, 'consumers_general': 2, 'unknown': 0}
+   264 |    111 |  31 [26,38] | 0.94 |  26 | 0.62 | {'students_learners': 6, 'teachers_researchers': 2, 'workers_other': 6, 'health_professionals': 9, 'consumers_general': 2, 'unknown': 0}
+
+== scenario central: expected included records if all 264 are finished = 61.3
+expected included records by population (all finished): {'students_learners': 12.7, 'teachers_researchers': 5.6, 'workers_other': 14.6, 'health_professionals': 22.2, 'consumers_general': 4.0, 'unknown': 1.1, 'review_type': 0.1, 'unlabelled': 0.0, 'review_search': 0.9}
+N_done | hours(2 people, this scenario) | pool median [10%,90%] | P(pool>=25) | kept median | groups with >=10 (mean) | per-group median at N
+    30 |     20 |   6 [4,9] | 0.00 |   6 | 0.00 | {'students_learners': 2, 'teachers_researchers': 0, 'workers_other': 1, 'health_professionals': 1, 'consumers_general': 1, 'unknown': 1}
+    60 |     41 |  13 [9,16] | 0.00 |  13 | 0.00 | {'students_learners': 3, 'teachers_researchers': 2, 'workers_other': 2, 'health_professionals': 1, 'consumers_general': 2, 'unknown': 1}
+    90 |     62 |  20 [16,24] | 0.09 |  20 | 0.00 | {'students_learners': 5, 'teachers_researchers': 3, 'workers_other': 4, 'health_professionals': 2, 'consumers_general': 4, 'unknown': 1}
+   120 |     84 |  28 [23,32] | 0.78 |  23 | 0.04 | {'students_learners': 7, 'teachers_researchers': 5, 'workers_other': 5, 'health_professionals': 3, 'consumers_general': 3, 'unknown': 1}
+   150 |    105 |  34 [29,40] | 0.99 |  29 | 0.46 | {'students_learners': 9, 'teachers_researchers': 5, 'workers_other': 6, 'health_professionals': 4, 'consumers_general': 3, 'unknown': 1}
+   180 |    126 |  40 [34,46] | 1.00 |  35 | 1.09 | {'students_learners': 11, 'teachers_researchers': 5, 'workers_other': 8, 'health_professionals': 6, 'consumers_general': 3, 'unknown': 1}
+   220 |    152 |  48 [41,54] | 1.00 |  43 | 1.95 | {'students_learners': 11, 'teachers_researchers': 5, 'workers_other': 13, 'health_professionals': 8, 'consumers_general': 4, 'unknown': 1}
+   264 |    187 |  59 [52,66] | 1.00 |  54 | 2.69 | {'students_learners': 11, 'teachers_researchers': 5, 'workers_other': 13, 'health_professionals': 19, 'consumers_general': 4, 'unknown': 1}
+
+== scenario high: expected included records if all 264 are finished = 93.8
+expected included records by population (all finished): {'students_learners': 17.4, 'teachers_researchers': 8.5, 'workers_other': 23.0, 'health_professionals': 34.4, 'consumers_general': 6.0, 'unknown': 1.9, 'review_type': 0.4, 'unlabelled': 0.1, 'review_search': 2.1}
+N_done | hours(2 people, this scenario) | pool median [10%,90%] | P(pool>=25) | kept median | groups with >=10 (mean) | per-group median at N
+    30 |     33 |  10 [7,13] | 0.00 |  10 | 0.00 | {'students_learners': 3, 'teachers_researchers': 1, 'workers_other': 2, 'health_professionals': 1, 'consumers_general': 1, 'unknown': 1}
+    60 |     67 |  19 [16,23] | 0.05 |  19 | 0.00 | {'students_learners': 4, 'teachers_researchers': 3, 'workers_other': 3, 'health_professionals': 2, 'consumers_general': 3, 'unknown': 2}
+    90 |    102 |  31 [26,36] | 0.95 |  26 | 0.02 | {'students_learners': 6, 'teachers_researchers': 5, 'workers_other': 5, 'health_professionals': 3, 'consumers_general': 5, 'unknown': 2}
+   120 |    137 |  42 [37,48] | 1.00 |  37 | 0.73 | {'students_learners': 9, 'teachers_researchers': 8, 'workers_other': 7, 'health_professionals': 5, 'consumers_general': 5, 'unknown': 2}
+   150 |    171 |  52 [46,58] | 1.00 |  47 | 1.96 | {'students_learners': 13, 'teachers_researchers': 8, 'workers_other': 11, 'health_professionals': 7, 'consumers_general': 5, 'unknown': 2}
+   180 |    205 |  62 [55,69] | 1.00 |  57 | 2.79 | {'students_learners': 15, 'teachers_researchers': 8, 'workers_other': 14, 'health_professionals': 10, 'consumers_general': 6, 'unknown': 2}
+   220 |    248 |  74 [66,81] | 1.00 |  69 | 3.17 | {'students_learners': 16, 'teachers_researchers': 8, 'workers_other': 21, 'health_professionals': 15, 'consumers_general': 6, 'unknown': 2}
+   264 |    306 |  90 [82,98] | 1.00 |  85 | 3.23 | {'students_learners': 16, 'teachers_researchers': 8, 'workers_other': 21, 'health_professionals': 30, 'consumers_general': 6, 'unknown': 2}
+
+== hours (central rates) to finish the first N records in the screening order
+N_done | FT 20 min | FT 30 min | FT 45 min
+    60 |     28 |     41 |     60
+    90 |     43 |     62 |     92
+   120 |     57 |     84 |    124
+   150 |     72 |    105 |    155
+   180 |     87 |    126 |    186
+   220 |    105 |    152 |    224
+   264 |    129 |    187 |    276
