@@ -74,17 +74,18 @@ manuscript:
   content of the instruments, and the number of records in which both hold is reported. "Within what was measured"
   means only that none of the three conditions holds; it does not mean that the item content of the instrument
   supports the conclusion.
-- The coding rules were written by the first author (GSRR-4). The two default coders share the view of what counts
-  as a problem that comes from the earlier narrative review, so their agreement is agreement between coders who share
-  that view, not between independent perspectives (GSRR-46). If coder 2 was a third person who did not write the
-  rules, the agreement is reported as agreement with a coder who did not write the rules. If the first author coded
-  twice, the results are reported as single-coder results and no claim of independent coding is made (GSRR-44).
-- The main set is the set of studies for which both screeners' final inclusion decision was recorded by
-  31 December 2026. It was drawn from one literature database built from free sources, and was screened after
-  registration by the authors, who knew the coding rules; before registration, the first author had seen the titles,
-  abstracts and AI-generated appraisals of 71 of the additional candidates (GSRR-33, GSRR-34, GSRR-65). It is not a census of the literature on AI
-  and fatigue, and the population groups were screened unevenly before registration (GSRR-42). Every claim about the
-  main set is about that set.
+- The coding rules were written by the first author (GSRR-4), who is also the only coder and codes every record
+  twice, at least four weeks apart (GSRR-44). The agreement reported is between two passes of one coder, not between
+  coders, and no claim of independent coding is made. The coder wrote the earlier narrative review, so the codes carry
+  that view of what counts as a problem (GSRR-46).
+- The main set is the set of studies included by 31 December 2026 by two independent screeners, the first author and
+  an AI screener whose accuracy was checked against human decisions before registration; the first author decided
+  where they differed (GSRR-33, GSRR-37, GSRR-39). It does not rest on two human screeners; the screening by both
+  authors after the manuscript draft is a sensitivity analysis, done knowing the results (GSRR-62). The set was drawn
+  from one literature database built from free sources, and the first author, who screened it, knew the coding rules;
+  before registration, the first author had screened 79 of the additional candidates after reading AI-generated
+  appraisals (GSRR-34, GSRR-65). It is not a census of the literature on AI and fatigue. Every claim about the main set
+  is about that set.
 
 ## Relation to the authors' earlier narrative review
 
@@ -118,7 +119,7 @@ validity evidence.
 1. **TRACE, a registered coding scheme that links three things in each study: how fatigue is tied to AI, what the
    fatigue items ask about, and what the report states and concludes (GSRR-1).** Seven codes (C1 to C7) with their rules and a codebook
    for item content, fixed before the main coding of the main set; amendments made after calibration are
-   listed in Table 2. Its only reliability evidence is the agreement between its coders (see Scope).
+   listed in Table 2. Its only reliability evidence is the agreement between two coding passes of one coder (see Scope).
 2. **A description of how a set of studies not used to build the rules attributes fatigue to AI, measures it and
    reports it** (RQ1 to RQ5, SQ1, SQ2), with the problem statements of the registration (new points 2, 4 and 5 above).
 3. **Item-level content of the fatigue instruments** (new point 3): for instruments first seen in the main
@@ -139,11 +140,10 @@ Fixed before coding. The abstract states the question of the review (Contributio
 the main set only:
 
 - one sentence on the scope of the set, which is never removed: a set drawn from one literature database built from
-  free sources, screened by authors who knew the rules, closed on 31 December 2026, and not a census of the
-  literature; with the number of studies and instruments coded, the number of calibration records removed and the
-  number of candidates still unscreened on that date;
-- how the coding was done, as it happened under GSRR-44: by the two default coders, who share the view of the
-  narrative review; by the first author and a third person; or by the first author twice;
+  free sources, screened by the first author and an AI screener, closed on 31 December 2026, and not a census of the
+  literature; with the number of studies and instruments coded and the number of candidates still unscreened on that
+  date;
+- how the coding was done: by one coder, the first author, twice;
 - the three things TRACE links, each with counts and no evaluative word: the distribution of the representative level
   of attribution (C1); for the instruments first seen in the main set with printed items, for each
   item-content type, the number of instruments with at least one item of that type, out of the instruments with coded
@@ -237,11 +237,13 @@ that the method can be read without the registration.
    why it was chosen.
 2. Source of records: the literature database built by both authors and its searches (GSRR-21 to GSRR-32); the
    exploratory bibliography and the additional candidates; no search of this review's own.
-3. Eligibility and screening: criteria (GSRR-24, GSRR-35); the two-screener process; what was screened before
-   registration and by whom (GSRR-32, GSRR-34); the fixed screening order after registration and the release of every
-   decision (GSRR-33, GSRR-41).
-4. Sets: exploration set (the 10 primary studies and four item-coded instruments of GSRR-39), main set, late
-   stratum, candidate pool and calibration sample, small-pool rule, minimum sizes (GSRR-39).
+3. Eligibility and screening: criteria (GSRR-24, GSRR-35); the first author and the AI screener as independent
+   screeners at each stage, and how differences were decided (GSRR-33, GSRR-38); the AI screener's instructions, and
+   its accuracy against human decisions on the exploratory records before registration (GSRR-36, GSRR-37); how free
+   full texts were obtained; what was screened before registration and by whom (GSRR-32, GSRR-34); the fixed screening
+   order after registration and the release of every decision (GSRR-33, GSRR-41).
+4. Sets: exploration set (the 10 primary studies and four item-coded instruments of GSRR-39), used for calibration;
+   main set; late stratum; minimum sizes (GSRR-39).
 5. Coding: units, instrument and main-instrument rules, missing-value codes, and the codes C1 to C7 with the C4f and
    C6b rules (GSRR-43); the codebook (version 2); the use of AI drafts for C4f and C5 only (GSRR-44). For C4f, a short
    table of what it shares with statcheck (Nuijten et al., 2016), which recalculates p from t, F, r, χ² and Z with their
@@ -249,8 +251,8 @@ that the method can be read without the registration.
    tables included, with the rules for degrees of freedom in table notes, asterisk-only p-values and tests reported
    twice; p-values adjusted for multiple testing not counted; z recalculated only when reported; percentages and
    indirect effects added; done by people.
-6. Calibration, coding, blinding and reconciliation (GSRR-44 to GSRR-48), including the procedure if coder 2 is
-   unavailable, and what the agreement between the two coders can and cannot show (GSRR-46).
+6. Calibration, coding, blinding and reconciliation (GSRR-44 to GSRR-48): one coder, two passes at least four weeks
+   apart, and what the agreement between the passes can and cannot show (GSRR-44, GSRR-46).
 7. Synthesis: derived values, missing data, the tables, the problem statements and the sensitivity analyses
    (GSRR-52 to GSRR-62); the script and its tests (GSRR-64).
 8. Deviations from the registration and from this outline, each with its reason (also in Table 2).
@@ -258,10 +260,10 @@ that the method can be read without the registration.
 ### 4. Results
 
 1. Records and sets: flow diagram; candidates screened and unscreened on 31 December 2026 by population group;
-   exclusions by code and, for E2 and E3, by population group; calibration rounds and records removed; whether the
-   small-pool rule applied; studies and E5-linked records (Figure 1, Table 3).
-2. Coder agreement per code and set, with the AI-draft cross-check for C4f, which is agreement with a draft, not with a
-   correct value (Table 4).
+   exclusions by code and, for E2 and E3, by population group; agreement between the first author and the AI screener
+   at each stage; studies and E5-linked records (Figure 1, Table 3).
+2. Agreement between the two coding passes per code and set, including the calibration passes, with the AI-draft
+   cross-check for C4f, which is agreement with a draft, not with a correct value (Table 4).
 3. RQ1 attribution (Table 5).
 4. RQ2 instruments and items: origin, modification and format; adaptation procedures; reported disclosure; every
    instrument version used in the main set; item content per instrument first seen in the main set;
@@ -274,7 +276,7 @@ that the method can be read without the registration.
 8. Problem statements (Table 12).
 9. SQ1 by centre (supplementary tables set side by side, without comparison statements; without C1 and C6c, and
    with C7 conditions (i) and (iii) only).
-10. Sensitivity analyses 1 to 4 (Table 13).
+10. Sensitivity analyses 1 to 5 (Table 13).
 11. Exploration set and late stratum (supplementary tables, labelled as such).
 
 The text of each subsection is written only after the tables have been generated from the code table. It states what
@@ -332,9 +334,9 @@ the flow figures from the released screening decisions.
 
 | ID | Claim | Registered definition | Evidence | Reported in |
 |---|---|---|---|---|
-| SC1 | The flow of records from the additional candidates to the main set, the calibration records removed, the late stratum, and the unscreened candidates by population group. | GSRR-32, GSRR-33, GSRR-39, GSRR-41 | Released screening decisions; calibration draws output by the script | Section 4.1; Figure 1; Table 3 |
+| SC1 | The flow of records from the additional candidates to the main set, the late stratum, and the unscreened candidates by population group; agreement between the first author and the AI screener at each stage. | GSRR-32, GSRR-33, GSRR-37, GSRR-39, GSRR-41 | Released screening decisions | Section 4.1; Figure 1; Table 3 |
 | SC2 | The number of studies and of records, with E5-linked records counted once and separately. | GSRR-39, GSRR-56 (RQ4) | Script output, RQ4 study counts | Section 4.1; Table 3 |
-| AG1 | Agreement between coders per code and set (between coders who share the rules, GSRR-46), and between the reconciled human values and the AI draft for C4f; the number of single-coded records. | GSRR-46, GSRR-47 | Script output, agreement | Section 4.2; Table 4 |
+| AG1 | Agreement between the two coding passes of one coder per code and set, including the calibration passes (GSRR-44, GSRR-46), and between the reconciled values and the AI draft for C4f; the number of records coded in one pass only. | GSRR-44, GSRR-46, GSRR-47 | Script output, agreement | Section 4.2; Table 4 |
 | R1 | Distribution of the representative level of attribution of the main fatigue instrument; values for other instruments in the supplement. | RQ1; GSRR-43 (C1) | Script output, C1 tables | Section 4.3; Table 5; abstract |
 | R2a | Origin, modification and format of the fatigue instruments; reported adaptation procedures; reported disclosure. | RQ2; GSRR-43 (C2a, C2c, C2d) | Script output, instrument tables | Section 4.4; Table 6 |
 | R2b | Item-content composition of each instrument first seen in the main set with printed items, the number of instruments with at least one item of each type, and the targets of reduced-interest, avoidance and futility items; the number of instruments with items unavailable. | RQ2; GSRR-43 (C2b), GSRR-56; codebook version 2 | Script output, C2b per instrument; per-instrument summary table | Section 4.4; Table 7; abstract |
@@ -346,7 +348,7 @@ the flow figures from the released screening decisions.
 | S2 | Each condition of C7 ((i), (ii) and (iii)) separately, and the records in which C6a and C7 (iii) both hold. | SQ2; GSRR-43 (C7), GSRR-56 | Script output, C7 table | Section 4.7; Table 11 |
 | PS1 | The problem statements of the registration for the main set, with each condition of C7 as its own type. | GSRR-57 | Script output, problem statements | Section 4.8; Table 12; abstract |
 | S1 | Answers to RQ2 to RQ5 and SQ2 by centre, without C1 and C6c, and with C7 by conditions (i) and (iii) only. | SQ1; GSRR-12 | Script output, centre tables | Section 4.9; supplement |
-| SE1 | The problem statements under sensitivity analyses 1, 2 and 4, and the C2b tables under analysis 3. | GSRR-62 | Script output, sensitivity outputs | Section 4.10; Table 13 |
+| SE1 | The problem statements under sensitivity analyses 1, 2, 4 and 5, the record-level tables under analysis 5, and the C2b tables under analysis 3. | GSRR-62 | Script output, sensitivity outputs; for analysis 5, the script run on the code tables of the set decided by both authors | Section 4.10; Table 13 |
 | EX1 | The exploration set and the late stratum under the same rules, labelled as such and not compared with the main set. | GSRR-39, GSRR-56, GSRR-57 | Script output, tables by set | Section 4.11; supplement |
 | PT1 | The C1 to C7 values of each coded study. | GSRR-56 (per-study table) | Script output, per-study table | Supplement |
 | D1 | Recommendations, each tied to one code and to either an existing standard or a proposal of this scheme. Not a finding of this review. | Not registered (discussion) | The registered definitions of GSRR-43; the standards listed in the note to Table 14 | Section 5.3; Table 14 |
@@ -361,8 +363,8 @@ in a table of fewer than 10 studies shows a count without a proportion. Values e
 ("not verifiable", "not applicable", "unresolved") are shown in every table. The shells below fix the rows and
 columns; no value is filled in before coding.
 
-- Figure 1: flow diagram (additional candidates; screened; excluded by code; main set; calibration records;
-  late stratum; unscreened on 31 December 2026).
+- Figure 1: flow diagram (additional candidates; screened by the first author and the AI screener; excluded by code;
+  main set; late stratum; unscreened on 31 December 2026).
 - Table 1: the codes C1 to C7, their units and their values (from the registration).
 - Table 2: deviations from the registration and from this outline, with dates and reasons.
 - Table 3: sets and their composition.
@@ -370,14 +372,14 @@ columns; no value is filled in before coding.
   | | Records | Studies (E5 counted once) | Instruments | By population group (six columns) | Centre-A / Centre-B |
   |---|---|---|---|---|---|
   | Main set | — | — | — | — | — |
-  | Calibration records | — | — | — | — | — |
   | Late stratum | — | — | — | — | — |
   | Exploration set | — | — | — | — | — |
   | Unscreened on 31 December 2026 | — | | | — | |
 
-- Table 4: agreement per code (percentage agreement, kappa with bootstrap 95% CI, n), main and exploration
-  sets in separate columns; the C4f agreement with the AI draft; single-coded records. The heading states that the
-  coders share the rules (GSRR-46).
+- Table 4: agreement between the two coding passes of one coder per code (percentage agreement, kappa with bootstrap
+  95% CI, n), with the calibration passes, the main set and the exploration set in separate columns; the C4f agreement
+  with the AI draft; records coded in one pass only. The heading states that this is agreement within one coder
+  (GSRR-44).
 - Table 5: C1 representative level (L1a, L1b, L2, L3, L4, L5, L6, excluded values), count and, where allowed,
   proportion.
 - Table 6: C2a origin, modification (per kind: stated / found by comparison / no change / not verifiable) and format;
@@ -407,7 +409,8 @@ columns; no value is filled in before coding.
   One row for each problem type of GSRR-57; C7 has three rows, one per condition. A note gives, for each row, the values
   that made records not evaluable (GSRR-57).
 
-- Table 13: sensitivity analyses (problem statements as in Table 12, with C7 by condition).
+- Table 13: sensitivity analyses (problem statements as in Table 12, with C7 by condition), with analysis 5 (main set
+  decided by both authors after the draft) in its own columns and the number of studies it added and removed.
 - Table 14: recommendations.
 
   | Recommendation | Code | Row of Table 12 | Source: existing standard (cited) or proposal of this scheme | Question → what is measured → evidence needed → wording allowed (proposal) |
@@ -438,8 +441,7 @@ columns; no value is filled in before coding.
 - The second author's details, and the registration identifier and date.
 - The authorship of the narrative review, how it is cited (published, preprint or unpublished manuscript) and how its
   relation to this review is stated, to be agreed with the co-author when the manuscript draft is complete. Until
-  then, this outline refers to the shared view of the coders (GSRR-46), and the Declarations state the authorship as
-  agreed.
+  then, this outline refers to the view of the coder (GSRR-46), and the Declarations state the authorship as agreed.
 - Whether a reporting guideline for methodological studies has been published (checked immediately before
   submission).
 - The script that copies values from the synthesis output into the manuscript.

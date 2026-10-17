@@ -62,14 +62,14 @@ def rec(rid, set_name):
 all_ids = [f"D{i:03d}" for i in range(1, 33)]
 sets = {}
 for n, i in enumerate(all_ids):
-    sets[i] = "exploration" if n < 10 else "calibration" if n < 15 else "late" if n >= 30 else "main"
+    sets[i] = "exploration" if n < 10 else "late" if n >= 30 else "main"
 ids = [i for i in all_ids if i not in E5_UNCODED]          # E5-linked duplicates are not coded
 recs = [rec(i, sets[i]) for i in ids]
 insts, items = [], []
 for n, i in enumerate(all_ids):
     if i in E5_UNCODED:
         continue
-    vid = "VCAL" if i == "D015" else f"V{n % 14:02d}"        # VCAL: used by a calibration record only
+    vid = f"V{n % 14:02d}"
     inst = {"record_id": i, "instrument_id": "main", "version_id": vid,
             "origin": rng.choice(["new", "existing_ai", "adapted_general", "unchanged_general",
                                   "general_not_verifiable"]),
@@ -128,18 +128,14 @@ for coder in ["reconciled", "coder1", "coder2"]:
     write(f"c4f_{coder}.csv", cc)
 write("links.csv", links)
 write("c4f_ai.csv", [dict(r, consistent=("no" if r["consistent"] == "yes" and rng.random() < 0.1 else r["consistent"])) for r in c4f])
-pool = [i for i in ids if sets[i] in ("main", "calibration")]
-(out / "pool_ids.txt").write_text("\n".join(pool), encoding="utf-8")
-(out / "exploration_ids.txt").write_text("\n".join(i for i in ids if sets[i] == "exploration"), encoding="utf-8")
 write("candidates.csv", [{"record_id": r["record_id"], "population": r["population"]} for r in recs])
 
 # --- boundary tests ---------------------------------------------------------
 res = cs.build_tables(out)
 conf = [r for r in res["recs"] if r["set"] == "main"]
-assert res["n_main"] == 13 == len(conf), res["n_main"]     # 15 main studies minus 2 uncoded E5 duplicates
-assert not any(t["set"] == "calibration" for t in res["tables"]), "calibration records leaked into tables"
-# versions: V10-V13 are first used by calibration records (n = 10..13) and also by main
-# records (n = 24..27 -> V10..V13), so they are first seen in the main set
+assert res["n_main"] == 18 == len(conf), res["n_main"]     # 20 main studies minus 2 uncoded E5 duplicates
+assert {t["set"] for t in res["tables"]} <= set(cs.PRIMARY_SETS)
+# versions: V10-V13 are first used by main records (n = 10..13), so they are first seen in the main set
 assert res["vsets"]["V10"] == "main" and res["vsets"]["V00"] == "exploration", res["vsets"]
 summ = [r for r in res["c2b"] if r["version_id"] == "SUMMARY" and r["set"] == "main"][0]
 assert summ["with_items"] == 3 and summ["items_unavailable"] == 1, summ          # V13 has no items
@@ -170,7 +166,7 @@ assert t4[("results", "no")] == 1 and t4[("results", "yes")] == 1 and t4[("resul
 assert t4[("results_per_record", "2")] == 1 and t4[("results_per_record", "0")] == 1, t4
 conf_res = [r for r in res["c4f_results"] if r["set"] == "main" and r["row"] == "results_per_record"
             and r["split"] == "all"]          # CHANGED: the table now also has population rows
-assert sum(r["count"] for r in conf_res) == 13, conf_res
+assert sum(r["count"] for r in conf_res) == 18, conf_res
 # instruments used: a version first seen in exploration is listed for the main set too
 iu = cs.instruments_used([{"record_id": "x", "set": "exploration"}, {"record_id": "y", "set": "main"}],
                          [{"record_id": "x", "version_id": "E1", "origin": "new"},
@@ -198,11 +194,11 @@ assert iu2[0]["refers_to_ai"] == "no"
 assert all("instructions_refer_to_ai" in r and r["origin"] for r in res["instruments_used"])
 assert all(r["refers_to_ai"] in {"yes", "no", "no|yes", "unresolved"} or "|" in r["refers_to_ai"]
            for r in res["instruments_used"]), {r["refers_to_ai"] for r in res["instruments_used"]}
-assert all(r["set"] != "calibration" for r in res["instruments_used"])
-# per-study table: primary sets only, no calibration records
+assert all(r["set"] in cs.PRIMARY_SETS for r in res["instruments_used"])
+# per-study table: primary sets only
 ps_ = res["per_study"]
 assert ps_ and all(r["set"] in cs.PRIMARY_SETS for r in ps_)
-assert sum(1 for r in ps_ if r["set"] == "main") == 13
+assert sum(1 for r in ps_ if r["set"] == "main") == 18
 # lenient C2b: secondary types count in the per-version and the aggregate rows alike
 li = [{"version_id": "N1", "type": "OTH", "boundary": "1", "secondary_type": "FAT", "target": ""},
       {"version_id": "N1", "type": "OTH", "boundary": "1", "secondary_type": "OTH", "target": ""}]
@@ -211,10 +207,10 @@ assert [r for r in lt if r["version_id"] == "N1" and r["type"] == "FAT"][0]["cou
 assert [r for r in lt if r["version_id"] == "N1" and r["type"] == "OTH"][0]["count"] == 2   # same type not doubled
 assert [r for r in lt if r["version_id"] == "ALL" and r["type"] == "FAT"][0]["instruments_with_type"] == 1
 rq4 = [r for r in res["rq4"] if r["set"] == "main" and r["split"] == "all"][0]
-# CHANGED (E5 records are not coded): 13 coded records + 2 uncoded linked duplicates (D017, D021) = 15 records;
-# each E5 group (G1, G2) is counted once, so 13 studies
-assert rq4["records_coded"] == 13 and rq4["records_uncoded_linked"] == 2 and rq4["records"] == 15, rq4
-assert rq4["studies"] == 13 and rq4["records_in_e5_groups"] == 4, rq4
+# CHANGED (E5 records are not coded): 18 coded records + 2 uncoded linked duplicates (D017, D021) = 20 records;
+# each E5 group (G1, G2) is counted once, so 18 studies
+assert rq4["records_coded"] == 18 and rq4["records_uncoded_linked"] == 2 and rq4["records"] == 20, rq4
+assert rq4["studies"] == 18 and rq4["records_in_e5_groups"] == 4, rq4
 # C7: two-family instrument name matches either family
 base = {"conclusion_identified": "1", "main_instrument_identified": "1", "C6b": "match",
         "conclusion_ai_fatigue_term": "0"}
@@ -298,18 +294,6 @@ except cs.InputError:
 sens, s3 = cs.sensitivity(out)
 assert {r["analysis"] for r in sens} >= {"S1 peer-reviewed only", "S2 signs-not-confirmed removed",
                                          "S4 coder1 values", "S4 coder2 values"} and s3
-# draws
-pool25 = [f"P{i:02d}" for i in range(25)]
-assert cs.draw_calibration(pool25, 1)[0].startswith("P")
-try:
-    cs.draw_calibration(pool25[:24], 1)
-    raise AssertionError("small pool without exploration IDs must fail")
-except ValueError:
-    pass
-assert cs.draw_calibration(pool25[:24], 1, (), [f"E{i}" for i in range(10)])[0].startswith("E")
-r1 = cs.draw_calibration(pool25, 1)
-r2 = cs.draw_calibration(pool25, 2, r1)
-assert not set(r1) & set(r2)
 # kappa
 assert cs.cohen_kappa(list("aabb"), list("aabb")) == 1.0
 assert cs.cohen_kappa(list("aaaa"), list("aaaa")) is None
@@ -438,7 +422,7 @@ for st_ in ("main", "exploration"):
     assert (st_, "C4f_results_one_coder_only") in ag_ and (st_, "C4f_result_judgement") in ag_
     assert ag_[(st_, "conclusion_family")]["percent_agreement"] is not None
     assert (st_, "C4e_codebook") in ag_ and (st_, "C4e_agreement") in ag_          # C4 (e): one row per column
-assert sum(ag_[(st_, "C4f_results_one_coder_only")]["n"] for st_ in ("main", "exploration", "late", "calibration")
+assert sum(ag_[(st_, "C4f_results_one_coder_only")]["n"] for st_ in ("main", "exploration", "late")
            if (st_, "C4f_results_one_coder_only") in ag_) > 0
 j_ = ag_[("main", "C4f_result_judgement")]
 assert j_["n"] > 0 and j_["percent_agreement"] is not None and j_["percent_agreement"] < 1 and "kappa" in j_, j_
@@ -449,56 +433,48 @@ assert cs.c4f_judgement({"consistent": "no", "gross": "1"}) == "grossly_inconsis
 assert cs.c4f_judgement({"consistent": "no", "gross": "0"}) == "inconsistent"
 assert cs.c4f_judgement({"consistent": "na", "gross": "0"}) == "cannot_be_calculated"
 assert cs.family_key("fatigue|burnout") == cs.family_key("burnout|fatigue")
-# item 11: small pool -> exploration draws use study record IDs only; all drawn -> calibration material
-expl_recs = [r for r in res["recs"] if r["set"] == "exploration"]
-expl_ids = cs.exploration_study_ids(res["recs"])
-assert len(expl_ids) == 10 and expl_ids == sorted(r["record_id"] for r in expl_recs)
-inst_ids = sorted({i["version_id"] for i in insts} | {"main"})
-d1 = cs.draw_calibration(pool25[:24], 1, (), expl_ids, inst_ids)
-assert set(d1) <= set(expl_ids) and not set(d1) & set(inst_ids)
-assert not cs.all_exploration_drawn(d1, expl_ids)
-d2 = cs.draw_calibration(pool25[:24], 2, d1, expl_ids, inst_ids)
-assert cs.all_exploration_drawn(d1 + d2, expl_ids) and not set(d1) & set(d2)
-try:
-    cs.draw_calibration(pool25[:24], 3, d1 + d2, expl_ids, inst_ids)
-    raise AssertionError("small pool allows two rounds only")
-except ValueError:
-    pass
-try:
-    cs.draw_calibration(pool25[:24], 1, (), expl_ids + ["V01"], inst_ids)
-    raise AssertionError("instrument IDs must be refused")
-except ValueError:
-    pass
-assert res["exploration_calibration_material"] is False and not any(t["calibration_material"] for t in res["tables"]
-                                                                   if t["set"] == "exploration")
-flag = out / "flag"
-flag.mkdir(exist_ok=True)
+# calibration protocol (GSRR-39, GSRR-44): the exploration set is always calibration material; no "calibration" set
+assert res["exploration_calibration_material"] is True
+assert all(t["calibration_material"] is True for t in res["tables"] if t["set"] == "exploration")
+assert any(t["set"] == "exploration" for t in res["tables"])
+assert all("calibration_material" not in t for t in res["tables"] if t["set"] in ("main", "late"))
+assert "calibration_draw" not in cs.VOCAB and "calibration" not in cs.VOCAB["set"]
+assert all("calibration_draw" not in r for r in res["per_study"])
+for gone in ("draw_calibration", "all_exploration_drawn", "exploration_study_ids", "exploration_calibration_flag",
+             "CAL_ONLY", "CAL_SEED", "EXPL_CAL_SEED", "SMALL_POOL"):
+    assert not hasattr(cs, gone), gone
+# a records CSV with set "calibration" stops the script
+cdir = out / "calset"
+cdir.mkdir(exist_ok=True)
 for kind in ["records", "instruments", "items", "c4f"]:
-    (flag / f"{kind}_reconciled.csv").write_text((out / f"{kind}_reconciled.csv").read_text(encoding="utf-8"), encoding="utf-8")
-(flag / "links.csv").write_text((out / "links.csv").read_text(encoding="utf-8"), encoding="utf-8")
-fr = cs.read_csv(flag / "records_reconciled.csv")
-for r_ in fr:
-    r_["calibration_draw"] = "1" if r_["set"] == "exploration" else "0"
-with open(flag / "records_reconciled.csv", "w", encoding="utf-8", newline="") as f_:
-    w_ = csv.DictWriter(f_, fieldnames=list(fr[0]))
+    (cdir / f"{kind}_reconciled.csv").write_text((out / f"{kind}_reconciled.csv").read_text(encoding="utf-8"), encoding="utf-8")
+(cdir / "links.csv").write_text((out / "links.csv").read_text(encoding="utf-8"), encoding="utf-8")
+cr = cs.read_csv(cdir / "records_reconciled.csv")
+cr[0]["set"] = "calibration"
+with open(cdir / "records_reconciled.csv", "w", encoding="utf-8", newline="") as f_:
+    w_ = csv.DictWriter(f_, fieldnames=list(cr[0]))
     w_.writeheader()
-    w_.writerows(fr)
-fres = cs.build_tables(flag)
-assert fres["exploration_calibration_material"] is True
-assert all(t["calibration_material"] is True for t in fres["tables"] if t["set"] == "exploration")
-assert all("calibration_material" not in t for t in fres["tables"] if t["set"] == "main")
-fr[0]["calibration_draw"] = "0"                                      # one exploration study not drawn -> not flagged
-fr_exp = [r_ for r_ in fr if r_["set"] == "exploration"]
-fr_exp[0]["calibration_draw"] = "0"
-assert not cs.exploration_calibration_flag(fr)
-# item 12: a version used only by calibration records belongs to no set and appears in no set table
-assert res["vsets"]["VCAL"] == cs.CAL_ONLY and cs.CAL_ONLY not in cs.PRIMARY_SETS
-assert not any(r["version_id"] == "VCAL" for r in res["c2b"] + res["instruments_used"])
-assert all(r["set"] != cs.CAL_ONLY for r in res["c2b"] + res["instruments_used"])
-cal_only = cs.version_sets([{"record_id": "c1", "version_id": "Z"}, {"record_id": "m1", "version_id": "Y"},
-                            {"record_id": "c1", "version_id": "Y"}],
-                           [{"record_id": "c1", "set": "calibration"}, {"record_id": "m1", "set": "main"}])
-assert cal_only == {"Z": cs.CAL_ONLY, "Y": "main"}, cal_only
+    w_.writerows(cr)
+try:
+    cs.build_tables(cdir)
+    raise AssertionError('set "calibration" must stop')
+except cs.InputError:
+    pass
+# version_sets: first set in FIRST_SEEN_ORDER; a version in no primary set is an input error
+vs_ = cs.version_sets([{"record_id": "e1", "version_id": "Z"}, {"record_id": "m1", "version_id": "Z"},
+                       {"record_id": "m1", "version_id": "Y"}],
+                      [{"record_id": "e1", "set": "exploration"}, {"record_id": "m1", "set": "main"}])
+assert vs_ == {"Z": "exploration", "Y": "main"}, vs_
+try:
+    cs.version_sets([{"record_id": "x1", "version_id": "Q"}], [{"record_id": "x1", "set": "calibration"}])
+    raise AssertionError("a version in no primary set must stop")
+except cs.InputError:
+    pass
+try:
+    cs.version_sets([{"record_id": "unknown", "version_id": "Q"}], [{"record_id": "m1", "set": "main"}])
+    raise AssertionError("a version whose record is unknown must stop")
+except cs.InputError:
+    pass
 # C6b has no "no causal wording" value: such a record is coded match (GSRR-43), so the value is refused
 vr = cs.read_csv(out / "records_reconciled.csv")
 vr[0]["C6b"] = "no_causal_wording"
@@ -714,10 +690,10 @@ assert not set(E5_UNCODED) & coded_ids_ and set(E5_UNCODED) <= {l_["record_id"] 
 assert not set(E5_UNCODED) & {r["record_id"] for r in cs.read_csv(out / "c4f_reconciled.csv")}
 assert not set(E5_UNCODED) & {r["record_id"] for r in cs.read_csv(out / "instruments_reconciled.csv")}
 tab_main = {r["value"]: r for r in res["tables"] if r["set"] == "main" and r["split"] == "all" and r["code"] == "C6b"}
-assert all(r["studies"] == 13 for r in tab_main.values()), tab_main      # the 10-study minimum counts coded records
+assert all(r["studies"] == 18 for r in tab_main.values()), tab_main      # the 10-study minimum counts coded records
 rq_pop = [r for r in res["rq4"] if r["set"] == "main" and r["split"] == "population"]
-assert sum(r["records_coded"] for r in rq_pop) == 13 and sum(r["records_uncoded_linked"] for r in rq_pop) == 2
-assert sum(r["studies"] for r in rq_pop) == 13
+assert sum(r["records_coded"] for r in rq_pop) == 18 and sum(r["records_uncoded_linked"] for r in rq_pop) == 2
+assert sum(r["studies"] for r in rq_pop) == 18
 # an uncoded E5 record counts under the set and population group of its group's coded record (GSRR-35)
 pop_of_ = {r["record_id"]: r["population"] for r in res["recs"]}
 for g_ in {r["group"] for r in rq_pop}:

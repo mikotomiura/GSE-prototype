@@ -35,9 +35,8 @@ within digital burnout.
 \textbf{Question.} How do such studies tie fatigue to AI, and do their titles and conclusions stay within that tie,
 their design and their instruments' names?
 \textbf{Methods.} TRACE, a registered methodological review, coded studies from one free-source literature database,
-screened by authors who knew the rules and closed on 31 December 2026 (not a census). \tbd{Coding as it happened: two
-coders sharing the view of an earlier narrative review / the first author and a third person / the first author twice}
-applied seven codes.
+screened by the first author and an AI screener and closed on 31 December 2026 (not a census). One coder applied
+seven codes twice.
 \textbf{Results.} \tbd{Written from the tables after coding, by the registered abstract rule.}
 \textbf{Availability.} Registration, outline, code table with per-instrument and per-study tables, codebook and scripts
 are open.
@@ -162,7 +161,7 @@ recalculate ratios and P-values from reported confidence intervals in medical ab
 \subsection{Registration and reporting}
 The protocol was registered with the Generalized Systematic Review Registration form \citep{vandenakker2023} on
 \tbd{date} (\tbd{identifier}), with the C2b codebook (version 2), the synthesis script and its test generator, the
-screening order and the manuscript outline as attachments. Amendments are listed in Table~2 with their dates, reasons
+screening order, the instructions for the AI screener and the manuscript outline as attachments. Amendments are listed in Table~2 with their dates, reasons
 and affected items. The report follows the checklist for meta-epidemiological methodology research
 \citep{murad2017}, supplemented by the items of PRISMA 2020 that it lacks \citep{page2021}; the broader guideline for
 methodological studies \citep{lawson2020} was still under development at registration.
@@ -173,19 +172,26 @@ records and additional candidates. This review ran no search of its own. \tbd{Se
 registration attachment.}
 
 \subsection{Eligibility and screening}
-Eligibility follows the source database. Both authors screened, and the final decision was recorded with its date.
-Before registration the first author had screened 71 additional candidates at title and abstract level after reading
-AI-generated preliminary appraisals; the second author had not read these appraisals. After registration the remaining
-candidates are screened in a fixed order, alternating between population groups, and every decision is released.
+Eligibility follows the source database. Both authors screened the 34 exploratory records. The additional candidates
+were screened after registration by two independent screeners, the first author and an AI screener (Claude Opus,
+Anthropic), at three stages: title and abstract, full text, and centre. The AI screener followed registered
+instructions that turn the eligibility criteria into seven questions, each answered with the passage that supports it,
+and saw only the instructions and the record; the first author did not see its judgement of a record before recording
+their own. Where the two differed, the first author decided at that stage. Before registration, the AI screener was
+checked against the two human screeners' final decisions on the 34 exploratory records, with pass lines set in
+advance: it passed on every record that the humans included or left pending, and agreed with them at full text
+(kappa 0.89) and on the centre of every included study. These records were used to refine the source database's
+criteria, so this accuracy may be optimistic. Only free full texts were used; records without one stayed pending.
+Before registration the first author had screened 79 additional candidates after reading AI-generated preliminary
+appraisals; all candidates were screened again, in a fixed order alternating between population groups, from a
+database that showed no earlier judgement, and every decision is released.
 
 \subsection{Sets}
 The exploration set is the 10 primary studies included from the exploratory bibliography and four item-coded
-instruments; the rules were built from it, and it is reported separately. The main set is the primary studies among
-the additional candidates for which both screeners' final decision was recorded on or before 31 December 2026, less
-the calibration records. Studies included later and before main coding form a late stratum, reported outside the
-primary counts. Calibration records are drawn at random from the closed pool (seed 20261017), or from the exploration
-set if the pool has 24 studies or fewer. A table based on fewer than 10 coded studies reports counts without
-proportions.
+instruments; the rules were built from it, it was used for calibration, and it is reported separately. The main set is
+the primary studies among the additional candidates whose final decision to include was recorded on or before
+31 December 2026. Studies included later and before main coding form a late stratum, reported outside the primary
+counts. A table based on fewer than 10 coded studies reports counts without proportions.
 
 \subsection{Coding}
 Units are the record (C1 and C3 to C7), the fatigue instrument (C2) and the item (C2b). Missing values have their own
@@ -204,17 +210,19 @@ codes, and a missing code stands alone in a cell. Table~1 lists the seven codes 
   interview theme or not at all; and a construct term in a different family from the instrument's name.
 \end{itemize}
 C4f follows the logic of statcheck \citep{nuijten2016}, which recalculates p from reported test statistics and degrees
-of freedom, with four differences: coders judge each test rather than scanning the whole text; values in tables are
+of freedom, with four differences: the coder judges each test rather than scanning the whole text; values in tables are
 included; p-values that the report says are adjusted for multiple testing are not counted; and percentages and indirect
 effects are added. The work is done by people. An AI assistant drafts values for C4f and for the bibliographic matches
-of C5 only; the drafts are stored unopened with their SHA-256 and opened only after both coders have fixed their own
-values.
+of C5 only; the drafts are stored unopened with their SHA-256 and opened only after the values of both coding passes
+are fixed.
 
 \subsection{Calibration, coding and reconciliation}
-\tbd{Who coded, as it happened.} By default both authors code every record independently. Coding stops calibrating when
-percentage agreement reaches 80\% on every registered unit; otherwise more records are drawn, up to two further rounds.
-Both default coders share the view of an earlier narrative review, so their agreement is agreement between coders who
-share that view. Disagreements are discussed, and those that remain are coded unresolved.
+One coder, the first author, coded every record twice, at least four weeks apart, without looking at the first pass
+during the second. For calibration, all studies of the exploration set were coded twice in November and December 2026;
+every registered unit below 80\% agreement between the passes led to an amendment of the definitions, registered
+before main coding. The main set, the late stratum and the exploration set were then coded twice under the final
+rules. A third pass, with both earlier passes visible, resolved differences; those that remained are coded
+unresolved. The agreement reported is within one coder, not between coders.
 
 \subsection{Synthesis}
 All values are computed by the registered script from the reconciled code table. The review describes; it estimates no
@@ -223,14 +231,17 @@ advance; among them, a problem type ``was observed in the main set'' if at least
 in the main set'' if none does, and ``could not be evaluated'' if no record can show it. Each statement gives the count,
 the number of evaluable records, the number not evaluable and the number unresolved. These statements report presence
 or absence in this set; they are not frequencies. Sensitivity analyses use peer-reviewed records only, remove records
-with unconfirmed signs of overlap, count the secondary type of boundary items, and use each coder's values in turn.
+with unconfirmed signs of overlap, count the secondary type of boundary items, and use each pass's values in turn.
+In a fifth analysis, both authors screened again, at full text and centre, every candidate that either screener had
+sent to full text, after the second author had read the manuscript draft; studies this added were coded once, and the
+tables and problem statements were computed again. This screening was done with the results known.
 
 \section{Results}
 \tbd{Written only after the tables have been generated from the code table, in the registered terms.}
 
 \begin{enumerate}
   \item Records and sets (Figure~1, Table~3).
-  \item Coder agreement (Table~4).
+  \item Agreement between the two coding passes (Table~4).
   \item RQ1 attribution (Table~5).
   \item RQ2 instruments and items (Tables~6, 7, 8 and 15).
   \item RQ3 reporting (Table~9).
@@ -267,11 +278,14 @@ authors to state the level at which a fatigue measure is tied to AI, so that row
 
 \subsection{Limitations}
 The rules were built from the exploration set, and the C2b codebook (version 2) was written after the exploration
-results had been seen. Before registration the first author had seen the titles, abstracts and AI-generated
-appraisals of 71 additional candidates. After registration, the people who decide eligibility are the coders, who
-know the rules; the fixed screening order and the released decisions show this influence but do not remove it. Human
-screening of the additional candidates is uneven across population groups, and the source database drew on free
-sources only, so the main set is not a census and its proportions are not estimates for the literature.
+results had been seen. The main set rests on one human screener and an AI screener, not on two human screeners, and
+the AI screener's accuracy was checked on records that had been used to refine the criteria and that differ from the
+additional candidates in their mix of studies; the screening by both authors is a sensitivity analysis made with the
+results known. Before registration the first author had screened 79 additional candidates after reading AI-generated
+appraisals, and may remember them. The person who decides eligibility is the coder, who knows the rules; the fixed
+screening order, the AI screener's independent judgements and the released decisions show this influence but do not
+remove it. Only free full texts were used, and the source database drew on free sources only, so the main set is not
+a census and its proportions are not estimates for the literature.
 
 The eligibility criteria shape some outcomes. Studies with no relation to AI are excluded, so the value of no
 attribution to AI (C1, L6) is truncated; and the fatigue definition includes motivational depletion, so the share of
@@ -280,8 +294,10 @@ printed are coded as items unavailable, and the instruments with printed items m
 others. Item content shows what an instrument asks about, not what its scores contain.
 
 C6a and the third condition of C7 compare names. A conclusion coded within what was measured meets none of the three
-conditions; it is not shown that the items support it. Both authors wrote the earlier narrative review, and by
-default both code, so their agreement is agreement between coders who share that view. \tbd{Limitations added by
+conditions; it is not shown that the items support it. Coding was done by one person in two passes, so the agreement
+reported shows how consistently one coder applied the rules, not whether another person would apply them in the same
+way; the coder wrote the earlier narrative review, and the codes carry that view. The exploration set was used to
+build the rules and for calibration, and its tables are calibration material. \tbd{Limitations added by
 deviations from the registration, if any.}
 
 \section{Conclusions}
@@ -292,8 +308,8 @@ deviations from the registration, if any.}
 \textbf{Competing interests.} No financial interests. Both authors built the source literature database \tbd{and wrote
 the earlier narrative review}.
 \textbf{Ethics.} Not applicable; no human participants.
-\textbf{Use of AI.} An AI assistant drafted values for C4f and C5 as described in the Method \tbd{and any other use in
-preparing the manuscript}.
+\textbf{Use of AI.} An AI screener judged eligibility as the second independent screener, and an AI assistant drafted
+values for C4f and C5, as described in the Method \tbd{and any other use in preparing the manuscript}.
 \textbf{Author contributions.} \tbd{to be agreed}
 \textbf{Data and code availability.} The registration, the code table, the codebook (CC BY 4.0) and the scripts (MIT
 licence) are in the OSF project of the registration \tbd{link}.

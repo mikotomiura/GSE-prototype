@@ -10,10 +10,9 @@ contains no result and no expectation. The word count is given at the end for ea
 and place AI fatigue within digital burnout. **Question.** When a study reports fatigue in relation
 to AI, how is the fatigue tied to AI, and do its title and conclusion stay within that tie, the study's design
 and the name of its instrument? **Methods.** TRACE, a registered methodological review, coded studies
-from one literature database built from free sources, screened by authors who knew the rules, closed on 31 December
-2026; it is not a census of the literature. Seven codes were applied by two coders who share the view of an earlier
-narrative review. **Results.** We coded n studies and n instruments; n calibration records were removed and n
-candidates remained unscreened. The representative level of attribution was: items n, instructions n, single question
+from one literature database built from free sources, screened by the first author and an AI screener, closed on
+31 December 2026; it is not a census of the literature. One coder applied seven codes twice. **Results.** We coded n
+studies and n instruments; n candidates remained unscreened. The representative level of attribution was: items n, instructions n, single question
 n, definition n, variable label n, interview theme n, none n. Of n instruments first seen with
 printed items (n with items unavailable), the number with at least one item of each type was: fatigue n, reduced
 interest n, avoidance n, futility n, irritation n, other n. Inconsistent sample sizes (rule a) was observed (n of n
@@ -38,10 +37,9 @@ are given as pairs, title first. Every statement keeps its count, evaluable reco
 **Background.** Work on AI-related fatigue is growing; reviews call for validated measures and place it within
 digital burnout. **Question.** How do such studies tie fatigue to AI, and do their titles and conclusions stay
 within that tie, their design and their instruments' names? **Methods.** TRACE, a registered
-methodological review, coded studies from one free-source literature database, screened by authors who knew the rules
-and closed on 31 December 2026 (not a census). Two coders sharing the view of an earlier narrative review applied
-seven codes. **Results.** We coded n studies and n instruments (n calibration records removed; n candidates
-unscreened). Attribution: items n, instructions n, single question n, definition n, label n, interview n, none n. Of n
+methodological review, coded studies from one free-source literature database, screened by the first author and an
+AI screener and closed on 31 December 2026 (not a census). One coder applied seven codes twice. **Results.** We coded
+n studies and n instruments (n candidates unscreened). Attribution: items n, instructions n, single question n, definition n, label n, interview n, none n. Of n
 instruments first seen with printed items (n unavailable), n had fatigue items, n reduced interest, n avoidance, n
 futility, n irritation, n other. Of the reporting checks (n to n evaluable records each; Table 12), observed: …; not
 observed: …. Unconfirmed sample overlap: observed (n/n, n unresolved). Titles; conclusions: causal wording beyond the
@@ -55,10 +53,10 @@ Counted with `wc -w` on the abstract text only, with each placeholder (n, n/n, �
 
 | Version | Words |
 |---|---|
-| Step 0 | 381 |
-| Steps 1 and 2, compact wording, before the names of the C4 types are filled in | 218 |
-| The same, with the eight C4 types named (estimated at about two words each) | about 234 |
+| Step 0 | 367 |
+| Steps 1 and 2, compact wording, before the names of the C4 types are filled in | 209 |
+| The same, with the eight C4 types named (estimated at about two words each) | about 225 |
 
-Counted on 17 October 2026, after C6c was added and the title and conclusion checks were paired. The rule fits the
+Counted again on 17 October 2026, after the methods sentence was changed to one coder and an AI screener. The rule fits the
 limit of 250 words only with Step 2 and compact wording. If it is still over the limit, Step 3 applies: the Background
 is reduced to one sentence of at most 15 words. A journal limit below 250 words needs Step 4 of the rule.

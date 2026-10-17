@@ -1,7 +1,7 @@
-"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.10).
+"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.11).
 
 Implements, from the code tables (CSV):
-- calibration draws and the post-registration screening order (GSRR-33, GSRR-39)
+- the post-registration screening order (GSRR-33)
 - derived values: C1 representative value, C4f record summary, C6c, C7 and each of its conditions (GSRR-43, GSRR-48)
 - agreement per set: percentage agreement and Cohen's kappa with bootstrap CI (GSRR-47)
 - tables per set, population group and centre; C2a/C2c/C2d; C2b per instrument;
@@ -21,11 +21,13 @@ Input files (one row per unit; `coder` is coder1 / coder2 / reconciled):
 The set of an instrument version (and of its items) is derived, never read: the first set,
 in the order exploration, main, late, in which a record uses the version.
 Missing files, missing columns and values outside the code lists stop the script.
+coder1 and coder2 are author 1's first and second coding passes (GSRR-44). The calibration passes on the
+exploration set are compared by running --agreement on their own directory, where every record has set
+exploration. Calibration codes are not data; no record has a set "calibration".
 
 Usage:
     python3 c_synthesis.py --tables <dir> [--coder reconciled]
     python3 c_synthesis.py --agreement <dir>
-    python3 c_synthesis.py --draw-calibration <pool_ids.txt> --round K [--drawn <f>] [--exploration <f>]
     python3 c_synthesis.py --screening-order <candidates.csv>
 """
 
@@ -48,12 +50,8 @@ POPULATION_ORDER = [
 EXCLUDED = {"not_verifiable", "not_applicable", "unresolved", ""}
 # Family cells that give no term to compare (C7 (iii)); also used for the C6a rules.
 NO_FAMILY = {"no_family_term", "none", "instrument_unnamed", "not_verifiable"}
-CAL_ONLY = "calibration_only"   # a version used only by calibration records: in no set (GSRR-43)
 MIN_STUDIES = 10
 MIN_NEW_INSTRUMENTS = 3
-CAL_SEED = 20261017
-EXPL_CAL_SEED = 20261019
-SMALL_POOL = 24          # 15 removable by calibration + 10 needed - 1
 SCREEN_SEED = 20261018
 BOOT_SEED = 20261017
 BOOT_N = 2000
@@ -73,11 +71,10 @@ FAMILY_VALUES = {"fatigue", "exhaustion", "burnout", "none", "no_family_term", "
 # GSRR-64: every coded column is checked against its code list (flat: column names are unique across files).
 # '' is listed only for columns that may be empty.
 VOCAB = {
-    "set": {"exploration", "main", "late", "calibration"},
+    "set": {"exploration", "main", "late"},
     "population": set(POPULATION_ORDER),
     "centre": {"A", "B"},
     "peer_reviewed": {"0", "1"},
-    "calibration_draw": {"", "0", "1"},
     "C3": {"amount_of_use", "dependence", "attitude", "other", "none"} | MISSING,
     "C4a": {"consistent", "inconsistent", "no_comparison_possible", "not_verifiable", "not_applicable",
             "unresolved"},
@@ -239,14 +236,17 @@ def load_links(d, recs):
 
 def version_sets(insts, recs):
     """First set (exploration, main, late) in which a record uses each version.
-    A version used only by calibration records belongs to no set (CAL_ONLY)."""
+    A version with no record in any of these sets is an input error."""
     rec_set = {r["record_id"]: r["set"] for r in recs}
     used = defaultdict(set)
     for i in insts:
         used[i["version_id"]].add(rec_set.get(i["record_id"], ""))
     out = {}
     for v, ss in used.items():
-        out[v] = next((s for s in FIRST_SEEN_ORDER if s in ss), CAL_ONLY)
+        first = next((s for s in FIRST_SEEN_ORDER if s in ss), None)
+        if first is None:
+            raise InputError(f"instrument version {v!r} is used by no record of the exploration, main or late set")
+        out[v] = first
     return out
 
 
@@ -273,42 +273,7 @@ def families(value):
     return {v for v in value.split("|") if v} if value else set()
 
 
-# --- draws (GSRR-33, GSRR-39) ---------------------------------------------
-
-def exploration_study_ids(recs):
-    """Record IDs of the primary studies of the exploration set (never instrument IDs)."""
-    return sorted({r["record_id"] for r in recs if r.get("set") == "exploration"})
-
-
-def all_exploration_drawn(drawn, exploration_ids):
-    """GSRR-39: True if every exploration study has been used for calibration."""
-    return bool(exploration_ids) and set(exploration_ids) <= set(drawn)
-
-
-def draw_calibration(pool_ids, round_k, already_drawn=(), exploration_ids=(), instrument_ids=()):
-    """Round k draws 5 from the IDs not yet drawn (seed + k - 1).
-
-    Pool of SMALL_POOL or fewer: draw from the record IDs of the primary studies of the
-    exploration set (at most two rounds); instrument IDs are refused.
-    Otherwise draw from the pool (at most three rounds).
-    """
-    if len(pool_ids) <= SMALL_POOL:
-        if not exploration_ids:
-            raise ValueError("small pool: exploration IDs are required (--exploration)")
-        if set(exploration_ids) & set(instrument_ids):
-            raise ValueError("small pool: exploration draws use study record IDs, not instrument IDs")
-        if round_k > 2:
-            raise ValueError("small pool: at most two calibration rounds on exploration records")
-        source, seed = exploration_ids, EXPL_CAL_SEED
-    else:
-        if round_k > 3:
-            raise ValueError("at most three calibration rounds")
-        source, seed = pool_ids, CAL_SEED
-    remaining = sorted(set(source) - set(already_drawn))
-    if len(remaining) < 5:
-        raise ValueError(f"only {len(remaining)} records left to draw")
-    return sorted(random.Random(seed + round_k - 1).sample(remaining, 5))
-
+# --- screening order (GSRR-33) ---------------------------------------------
 
 def screening_order(candidates):
     """Per group: sort IDs, shuffle with a generator freshly seeded with SCREEN_SEED.
@@ -539,7 +504,7 @@ def run_agreement(d):
             i["set"] = rs.get(i["record_id"], "")
         for it in t[c]["items"]:
             v_set = vs.get(it["version_id"], "")
-            it["set"] = "calibration" if v_set == CAL_ONLY else v_set   # agreement label only; no table
+            it["set"] = v_set
             it["record_id"] = it["version_id"]
         for x in t[c]["c4f"]:
             x["set"] = rs.get(x["record_id"], "")
@@ -806,7 +771,7 @@ def instructions_refer_to_ai(recs):
 def instruments_used(recs, insts, items, vsets, set_name):
     """GSRR-56: every instrument version used by a record of `set_name`, whichever set it was first
     seen in, with item-type counts (no proportions). Not a comparison between sets (GSRR-57).
-    Calibration-only versions are in no set and never appear here."""
+    Every version belongs to a set (version_sets)."""
     ids = {r["record_id"] for r in recs if r["set"] == set_name}
     rec_by_id = {r["record_id"]: r for r in recs}
     by_version = defaultdict(list)
@@ -840,20 +805,12 @@ PER_STUDY_CODES = ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d", "C4e_codebook", "
                    "C4f", "C4f_gross", "C5", "C6a", "C6b", "C6c", "C7", "C7_i", "C7_ii", "C7_iii"]
 
 
-def exploration_calibration_flag(recs):
-    """GSRR-39 (small pool): True if every exploration study was used for calibration (optional records
-    column calibration_draw = 1). The whole exploration table is then calibration material."""
-    expl = {r["record_id"] for r in recs if r["set"] == "exploration"}
-    drawn = {r["record_id"] for r in recs if r["set"] == "exploration" and r.get("calibration_draw") == "1"}
-    return all_exploration_drawn(drawn, expl)
-
-
 def per_study_table(recs):
     """Supplementary table: one row per coded record of the primary sets, C1-C7 values (no item text)."""
     rows = [r for r in recs if r["set"] in PRIMARY_SETS]
     rows.sort(key=lambda r: (PRIMARY_SETS.index(r["set"]), r["record_id"]))
     return [{"record_id": r["record_id"], "set": r["set"], "population": r["population"],
-             "centre": r["centre"], "calibration_draw": r.get("calibration_draw", ""),
+             "centre": r["centre"],
              **{k: r.get(k, "") for k in PER_STUDY_CODES}} for r in rows]
 
 
@@ -868,11 +825,12 @@ def build_tables(d, coder="reconciled"):
         i["set"] = rs.get(i["record_id"], "")
     vsets = version_sets(insts, recs)
     tables, c2b, rq4, c4f_res, used = [], [], [], [], []
-    cal_flag = exploration_calibration_flag(recs)
-    for s in PRIMARY_SETS:          # calibration records are never in these sets
+    # GSRR-39: the exploration set is always calibration material (its calibration codes are not data)
+    cal_flag = any(r["set"] == "exploration" for r in recs)
+    for s in PRIMARY_SETS:
         r_s = [r for r in recs if r["set"] == s]
         i_s = [i for i in insts if i["set"] == s]
-        extra = {"calibration_material": cal_flag} if s == "exploration" else {}
+        extra = {"calibration_material": True} if s == "exploration" else {}
         tables += record_tables(r_s, i_s, {"set": s, "split": "all", "group": "all", **extra})
         for g in sorted({r["population"] for r in r_s}):
             ids = {r["record_id"] for r in r_s if r["population"] == g}
@@ -925,27 +883,9 @@ def main():
     ap.add_argument("--tables", type=Path)
     ap.add_argument("--coder", default="reconciled")
     ap.add_argument("--agreement", type=Path)
-    ap.add_argument("--draw-calibration", type=Path)
-    ap.add_argument("--round", type=int, default=1)
-    ap.add_argument("--drawn", type=Path)
-    ap.add_argument("--exploration", type=Path,
-                    help="IDs (text) or a records CSV; only the primary studies of the exploration set are used")
-    ap.add_argument("--instruments", type=Path, help="instruments CSV; its IDs are refused as draw sources")
     ap.add_argument("--screening-order", type=Path)
     a = ap.parse_args()
-    if a.draw_calibration:
-        ids = a.draw_calibration.read_text(encoding="utf-8").split()
-        drawn = a.drawn.read_text(encoding="utf-8").split() if a.drawn else []
-        expl, inst_ids = [], []
-        if a.exploration and a.exploration.suffix == ".csv":      # a records table: primary studies only
-            expl = exploration_study_ids(read_csv(a.exploration))
-        elif a.exploration:
-            expl = a.exploration.read_text(encoding="utf-8").split()
-        if a.instruments:
-            inst_ids = sorted({r["version_id"] for r in read_csv(a.instruments)} |
-                              {r.get("instrument_id", "") for r in read_csv(a.instruments)})
-        print("\n".join(draw_calibration(ids, a.round, drawn, expl, inst_ids)))
-    elif a.screening_order:
+    if a.screening_order:
         for g, i in screening_order(read_csv(a.screening_order)):
             print(f"{g},{i}")
     elif a.tables:
