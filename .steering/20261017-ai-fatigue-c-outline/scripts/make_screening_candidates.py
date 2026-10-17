@@ -1,7 +1,8 @@
 """Make the input of the screening order (GSRR-33): the remaining candidates and their population group.
 
 Remaining candidates: every additional candidate (GSRR-32: the 221 of the sheet 'スクリーニング' and the 43
-review-search records of the sheet '探索の一覧') without a final decision by both screeners on the registration day.
+review-search records of the sheet '探索の一覧'). All of them are screened again after registration, whatever was
+decided before (GSRR-33, decision 28), so no earlier decision is read.
 Population group: the first segment of the content group of the source database (column Q), mapped to the codes of
 c_synthesis.py. Records with no population group in the source database (review-type records, records added by hand,
 the review-search records) are put in the group 'unknown' (GSRR-16, decision of 2026-10-17); the reading that showed
@@ -31,7 +32,6 @@ LABELS = {
     "レビュー等": "unknown",  # review-type records have no participants, so no population group
     "": "unknown",            # no content group (a record added by hand)
 }
-UNDECIDED = "未判定"
 FIRST_DATA_ROW = 5  # rows 1-4 of 'スクリーニング' are the title and the header
 
 
@@ -60,8 +60,7 @@ def candidates(path):
         label = v.get("Q", "").split("｜")[0].strip()
         if label not in LABELS:
             raise SystemExit(f"row {n} ({rid}): unknown group label {label!r}")
-        if v.get("F", UNDECIDED) == UNDECIDED:  # column F: the final decision, recorded once both have screened
-            out.append((rid, LABELS[label]))
+        out.append((rid, LABELS[label]))  # every record, whatever its earlier decision (GSRR-33)
     for n, v in sheet(z, "探索の一覧"):
         k = v.get("K", "").strip()
         if not re.match(r"R\d\d", k):

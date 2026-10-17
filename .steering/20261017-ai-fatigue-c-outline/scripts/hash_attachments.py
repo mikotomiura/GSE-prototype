@@ -1,8 +1,7 @@
-"""List the registration attachments with their SHA-256 (registration, Attachments 1-5).
+"""List the registration attachments with their SHA-256 (registration, Attachments 1-6).
 
-Run on the day of registration, after the screening order list has been made from the candidates still without a
-final decision by both screeners (GSRR-33). Writes registration-attachments/sha256.txt and prints it. Stops if an
-attachment is missing, so a list with a gap cannot be attached.
+Run on the day of registration, after the screening order list has been made from all 264 additional candidates
+(GSRR-33). Writes registration-attachments/sha256.txt and prints it. Stops if an attachment is missing, so a list with a gap cannot be attached.
 
 Usage: python3 hash_attachments.py
 """
@@ -32,6 +31,10 @@ ATTACHMENTS = [
     (3, "query strings of the source database's searches", ATT / "query-strings.md"),
     (4, "screening order list", ATT / "screening-order.csv"),
     (5, "manuscript outline", REPO / "papers" / "ai-fatigue-measurement" / "manuscript" / "outline.md"),
+    (6, "AI screener: instructions", ATT / "ai-screening" / "instructions.md"),
+    (6, "AI screener: call wording and settings", ATT / "ai-screening" / "call.md"),
+    (6, "AI screener: check on the 34 exploratory records", ATT / "ai-screening" / "check-34.csv"),
+    (6, "AI screener: readme", ATT / "ai-screening" / "README.md"),
 ]
 
 
