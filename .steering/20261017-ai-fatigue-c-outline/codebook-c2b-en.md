@@ -54,8 +54,8 @@ Assign a target when `type` or `secondary_type` is `MOT`, `AVO` or `FUT`. Otherw
 
 ## Counting
 
-- Primary count: each item counts once, for its primary `type`. The denominator is the instrument's item count.
-- Lenient count (sensitivity analysis): each boundary item also counts once for its `secondary_type`. The denominator stays the instrument's item count.
+- Primary count: each item counts once, for its primary `type`. The denominator is the number of coded items (the printed items, or the items taken from the cited source; registration GSRR-43), with the full item count beside it. Unresolved items stay in the denominator as their own category (registration GSRR-53).
+- Lenient count (sensitivity analysis): each boundary item also counts once for its `secondary_type`. The denominator stays the number of coded items.
 
 ## Limitation
 

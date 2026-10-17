@@ -1,6 +1,6 @@
 # TRACE: How studies of "AI fatigue" tie fatigue to AI, measure it and report it. Protocol for a registered methodological review
 
-Registration draft 0.9 (2026-10-17). Not yet registered. Form: Generalized Systematic Review Registration (GSRR; van den Akker et al., 2023). Each GSRR item is answered under its own number. Fields to be filled at registration are marked **[at registration]**.
+Registration draft 0.10 (2026-10-17). Not yet registered. Form: Generalized Systematic Review Registration (GSRR; van den Akker et al., 2023). Each GSRR item is answered under its own number. Fields to be filled at registration are marked **[at registration]**.
 
 ---
 
@@ -8,7 +8,7 @@ Registration draft 0.9 (2026-10-17). Not yet registered. Form: Generalized Syste
 
 **[GSRR-1] Title.** TRACE: How studies of "AI fatigue" tie fatigue to AI, measure it and report it. Protocol for a registered methodological review.
 
-TRACE is the name of this review's coding scheme (GSRR-43); it is not an acronym and not the name of a measure of fatigue. It links three things in each study: how fatigue is tied to AI (C1), what the fatigue items ask about (C2), and what the report states and concludes (C4 to C7: whether reported values are internally consistent, and whether the title and conclusion stay within what was measured).
+TRACE is the name of this review's coding scheme (GSRR-43); it is not an acronym and not the name of a measure of fatigue. It links three things in each study: how fatigue is tied to AI (C1), what the fatigue items ask about (C2), and what the report states and concludes (C3 to C7: what is measured on the AI side, whether reporting is complete and internally consistent, whether samples overlap, and whether the title and the main conclusion pass three checks against the design, the level of attribution and the name of the main instrument). These checks compare designs, attribution levels and names; they are not validity evidence.
 
 **[GSRR-2] Contributors.** Two authors.
 - Author 1 (first author): Mikoto Miura, Independent Researcher. ORCID: https://orcid.org/0009-0000-4196-0508. Lead and coder 1.
@@ -26,7 +26,7 @@ TRACE is the name of this review's coding scheme (GSRR-43); it is not an acronym
 | Eligibility screening in the source database | Authors 1 and 2 (see GSRR-33) |
 | Coding (C1–C7) | Coder 1 and coder 2, independently |
 | Reconciliation | Coders 1 and 2 (GSRR-48) |
-| AI assistant (Claude, Anthropic) | Drafts values for C4f and C5 only. A human independently recomputes or checks every drafted value (GSRR-44). The assistant is not a coder |
+| AI assistant (Claude, Anthropic) | Drafts values for C4f and C5 only. Both coders make their own recalculations or record their own signs before opening a draft, and then check every drafted value (GSRR-44). The assistant is not a coder |
 | Tables and the check of every number in them | Author 1 builds; author 2 checks against the code table |
 | Registration | Author 1 |
 
@@ -41,14 +41,14 @@ TRACE is the name of this review's coding scheme (GSRR-43); it is not an acronym
 **[GSRR-6] Review stages.**
 1. Exploration. Done before registration (GSRR-10).
 2. Registration of this protocol and its codebook (version 2).
-3. **Closing the confirmation set on 2026-12-31** (GSRR-39).
-4. **Calibration coding.** Five records are drawn at random from the closed candidate pool, or from the exploration set if the pool is small (GSRR-39). They are used only to refine definitions and are excluded from all confirmation-set counts. Any change is registered as an amendment before stage 5 begins.
+3. **Closing the main set on 2026-12-31** (GSRR-39).
+4. **Calibration coding.** Five records are drawn at random from the closed candidate pool, or from the exploration set if the pool is small (GSRR-39). They are used only to refine definitions and are excluded from all main-set counts. Any change is registered as an amendment before stage 5 begins.
 5. **Main coding.**
-   - The confirmation set is coded by two coders, independently.
+   - The main set is coded by two coders, independently.
    - The exploration set is re-coded under the same rules, also by two coders independently. Its results go in a separate table.
 6. Reconciliation, synthesis and reporting.
 
-**[GSRR-7] Current review stage.** Stage 2. No record of the confirmation set has been coded. The confirmation set is not closed.
+**[GSRR-7] Current review stage.** Stage 2. No record of the main set has been coded. The main set is not closed.
 
 **[GSRR-8] Start date.** 2026-10-01 (first written notes on measurement issues).
 
@@ -58,22 +58,23 @@ TRACE is the name of this review's coding scheme (GSRR-43); it is not an acronym
 
 **[GSRR-10] Background.**
 
-*Rationale.* Work on "AI fatigue" is growing (Ragolane & Patel, 2025). Existing reviews call for standardized, validated measures of AI fatigue (Sosiński & Piasecka, 2026) and place AI fatigue within digital burnout, with which it shares symptoms (Ragolane & Patel, 2025). Systematic reviews of AI-related self-report instruments are evaluating measurement properties with COSMIN (for example, Lintner, 2024). One registered review covers AI anxiety and attitude scales (Jonaid, 2026). The item-content coding in this review (C2b) is a researcher classification of item wording. It is not a COSMIN content-validity assessment, which requires experts and the target population. Studies of measurement practice in user-experience research have counted item disclosure, adaptation and reasons for choosing scales (Perrig et al., 2024). We did not find a review of AI-fatigue studies that tabulates, study by study, three things:
+*Rationale.* Work on "AI fatigue" is growing (Ragolane & Patel, 2025). One review calls for standardized, validated measures of AI fatigue (Sosiński & Piasecka, 2026); another places AI fatigue within digital burnout, with which it shares symptoms (Ragolane & Patel, 2025). Measurement research in general warns that a measure's name does not show what it measures, and that items are dropped, added and altered under the same name (Elson et al., 2023). Systematic reviews of AI-related self-report instruments are evaluating measurement properties with COSMIN (for example, Lintner, 2024). One registered review covers AI anxiety and attitude scales (Jonaid, 2026). The item-content coding in this review (C2b) is a researcher classification of item wording. It is not a COSMIN content-validity assessment, which requires experts and the target population. Studies of measurement practice in user-experience research have counted item disclosure, adaptation and reasons for choosing scales (Perrig et al., 2024). We did not find a review of AI-fatigue studies that tabulates, study by study, four things:
 - how fatigue is tied to AI,
-- what fatigue items ask about, and
-- whether reports are internally consistent.
+- what fatigue items ask about,
+- whether reports are internally consistent, and
+- whether titles and conclusions stay within the level of attribution, the design and the name of the instrument.
 
-The last point was checked in 16 searches of free sources (Europe PMC, OpenAlex and a web search engine; 2026-10-17). The first two were checked only in the reviews we had already read.
+The third point was checked in 16 searches of free sources (Europe PMC, OpenAlex and a web search engine; 2026-10-17). The others were checked only in the reviews we had already read.
 
 *Prior work by the same authors.* Our critical narrative review (unpublished draft, 2026; both authors of this review are its authors) described such problems qualitatively. It covered 11 reports drawn from a 34-record exploratory bibliography: the 10 primary studies in our exploration set and one report whose full text was unavailable. It was not preregistered.
 
-*What this review does.* It describes, under rules fixed in advance, how studies of AI-related fatigue tie fatigue to AI, what their fatigue items ask about, and whether what their reports state and conclude stays within what they measured. For the problem types of GSRR-57 it reports whether each is present in the confirmation set; these are statements of presence, not frequencies, and they do not test whether the observations of the narrative review are reproduced. The observations of the narrative review are set beside them. The primary counts come from records that were not used to build the rules. Before registration, author 1 had read the full text of none of them, and author 2's full-text reading is recorded at registration **[at registration]**. Both authors screen their full texts after registration (GSRR-33).
+*What this review does.* It describes, under rules fixed in advance (amendments after calibration are registered before main coding, GSRR-6), how studies of AI-related fatigue tie fatigue to AI, what their fatigue items ask about, and whether what their reports state and conclude stays within what they measured. For the problem types of GSRR-57 it reports whether each is present in the main set; these state whether a problem type is present or absent in the set, not how often it occurs, and they do not test whether the observations of the narrative review are reproduced. The observations of the narrative review are set beside them; the words "confirm", "replicate" and "replication" are not used about them. The primary counts come from records that were not used to build the rules. Before registration, author 1 had read the full text of none of them, and author 2's full-text reading is recorded at registration **[at registration]**. Both authors screen their full texts after registration (GSRR-33).
 
 *How the issues noted during exploration map to the codes.* The table maps the seven issues noted during exploration (below) to the codes. "Problem type" means the code has values that GSRR-57 reports as observed or not observed. The other codes are described.
 
 | Issue noted during exploration | Code | Reported as | In the narrative review? |
 |---|---|---|---|
-| Fatigue tied to AI at different levels | C1 (described); C7 (ii) (problem type) | C1 distribution; C7 (ii) problem statement | Yes |
+| Fatigue tied to AI at different levels | C1 (described); C6c and C7 (ii) (problem types) | C1 distribution; C6c and C7 (ii) problem statements | Yes |
 | AI-side variables measured with addiction-type scales | C3 | Described | No |
 | General fatigue scales reworded for AI | C2a, C2c | Described | Yes |
 | Avoidance, irritation, futility and reduced interest within a fatigue score | C2b | Described | Yes |
@@ -95,7 +96,7 @@ The last point was checked in 16 searches of free sources (Europe PMC, OpenAlex 
 - **2026-10-17.** The item coding of 2026-10-15 was corrected after an internal review, and codebook version 2 was written. Version 2 was therefore written after the exploration results were seen.
 - **2026-10-17.** The source database's final decisions on the 34 records were set: 10 primary studies included, 3 pending for unavailable full text, 21 excluded. These 10 studies and the four instruments form the exploration set (GSRR-39).
 
-**[GSRR-11] Primary research questions.** All primary answers come from the confirmation set. They are descriptive (GSRR-57).
+**[GSRR-11] Primary research questions.** All primary answers come from the main set. They are descriptive (GSRR-57).
 - **RQ1 (attribution).** At which level do studies tie their main fatigue instrument to AI? (C1)
 - **RQ2 (instruments and items).** How do fatigue instruments break down by:
   - origin and modification (C2a)?
@@ -105,14 +106,14 @@ The last point was checked in 16 searches of free sources (Europe PMC, OpenAlex 
   - the type of instrument used for the AI-side variable (C3)?
 - **RQ3 (reporting).** How complete and how internally consistent is reporting? (C4)
 - **RQ4 (sample overlap).** Consider the records, the records linked by the source database as the same sample, and the records with signs of overlap that could not be confirmed. How many are there of each? How many studies remain when linked records are counted once? (C5) We do not establish independence.
-- **RQ5 (title versus content).** Do titles and abstracts match what was measured and the design? (C6)
+- **RQ5 (title versus content).** Do titles and abstracts match the name of the main instrument, the design and the level of attribution? (C6)
 
 **[GSRR-12] Secondary research questions.**
 - **SQ1.** How are the answers to RQ2–RQ5 and SQ2 distributed within each of the source database's two eligibility groups? The tables of the two groups stand side by side; no statement says that a value is larger, smaller, more or less common in one group than in the other.
   - Centre-A: fatigue attributed to AI in its definition, measurement or analysis.
   - Centre-B: a general fatigue construct examined in relation to AI use.
-  - RQ1 is not compared across these groups, because the grouping is defined by attribution and the comparison would be circular. For the same reason, SQ1 reports C7 conditions (i) and (iii) only.
-- **SQ2.** Under the three conditions of C7, does each study's main conclusion go beyond what it measured?
+  - RQ1 is not tabulated by these groups, because the grouping is defined by attribution and the tables would be circular. For the same reason, SQ1 leaves out C6c and reports C7 conditions (i) and (iii) only.
+- **SQ2.** For each of the three conditions of C7, does the study's main conclusion meet it?
 
 **[GSRR-13] Expectations / hypotheses.** None. Our questions came from the exploration set, so a hypothesis would partly be tested on the material that suggested it.
 
@@ -167,15 +168,15 @@ No paid databases were used.
 
 **[GSRR-29] Results of contacting authors.** Not applicable (GSRR-28).
 
-**[GSRR-30] Search expiration and repetition.** No update search. The confirmation set closes on 2026-12-31 (GSRR-39).
+**[GSRR-30] Search expiration and repetition.** No update search. The main set closes on 2026-12-31 (GSRR-39).
 
 **[GSRR-31] Search strategy justification.** The review asks about measurement and reporting practice in an already assembled body of studies. It does not estimate an effect, so a new exhaustive search is not needed. The limits are stated in GSRR-65.
 
 **[GSRR-32] Miscellaneous search strategy details.**
 - The source database collected 225 records, which became 220 after merging versions, plus one record added by hand. These 221 are the additional candidates. On 2026-10-17, author 1 had screened 79 of them: 71 at title and abstract level and 8 (all review-type records, none included) at full-text level.
 - The review-aimed search produced a list of 46 records, separate from the 221. Three of them are also in the 34-record bibliography or the 221. The other 43 were unscreened on 2026-10-17. In this protocol, "additional candidates" means the 221 and these 43 (264 records).
-- A planned systematic search for the source database has not been run. If it runs, its new records are candidates on the same terms: those with both final decisions by 2026-12-31 enter the confirmation set, later ones the late stratum (GSRR-39).
-- The three exploratory records pending for unavailable full text join the exploration set if their full texts are obtained and they are included. They are never part of the confirmation set.
+- A planned systematic search for the source database has not been run. If it runs, its new records are candidates on the same terms: those with both final decisions by 2026-12-31 enter the main set, later ones the late stratum (GSRR-39).
+- The three exploratory records pending for unavailable full text join the exploration set if their full texts are obtained and they are included. They are never part of the main set.
 
 ## Screening (eligibility)
 
@@ -209,14 +210,14 @@ E5 records are not coded. They stay linked to their group for C5 (GSRR-43).
 
 **[GSRR-39] Sampling and sample size.**
 - **Exploration set.** The 10 primary studies the source database included from the 34-record bibliography, and the four item-coded instruments. Coded again after registration (GSRR-6).
-- **Confirmation set.** Primary studies among the additional candidates for which both screeners' final inclusion decision was recorded in the source database on or before 2026-12-31. Excluded from it:
+- **Main set.** Primary studies among the additional candidates for which both screeners' final inclusion decision was recorded in the source database on or before 2026-12-31. Excluded from it:
   - the exploration records, even if found again;
   - records still screened by one screener only, or by AI only, on that date;
   - the calibration records.
 - **Late stratum.** Studies included after 2026-12-31 and before stage 5 begins are reported as a separate stratum, outside the primary counts. They are coded by both coders under the same rules. Studies included after stage 5 begins are listed but not coded.
-- **Candidate pool and calibration sample.** The candidate pool is the confirmation set as closed on 2026-12-31, before calibration records are removed. Calibration records are drawn with Python `random.sample` from the pool's record IDs, sorted alphabetically. The first round uses seed 20261017. Round k (k = 2, 3) uses seed 20261017 + k − 1 and draws from the IDs not yet drawn.
-- **Small pool.** If the pool has 24 studies or fewer (fewer than the 15 that calibration can remove plus the minimum of 10), calibration is done on exploration-set records instead, and no confirmation-set record is removed. Exploration records are drawn by the same procedure from the exploration-set IDs (seed 20261019 + k − 1), at most two rounds (10 records). If agreement is still below 80%, the procedure in GSRR-44 step 2 for low agreement applies. Exploration records used for calibration are flagged and reported separately within the exploration table.
-- **Minimum size.** The minimum is counted after calibration records are removed, in studies (records), not instruments. It applies to every table on its own: a table (a set, a population group or a centre) based on fewer than 10 studies reports counts only, without proportions. For C2b, if fewer than 3 instruments with available items are first seen in the confirmation set, each instrument's counts are still given, without proportions. The number of "items unavailable" instruments is always shown next to the C2b tables.
+- **Candidate pool and calibration sample.** The candidate pool is the main set as closed on 2026-12-31, before calibration records are removed. Calibration records are drawn with Python `random.sample` from the pool's record IDs, sorted alphabetically. The first round uses seed 20261017. Round k (k = 2, 3) uses seed 20261017 + k − 1 and draws from the IDs not yet drawn.
+- **Small pool.** If the pool has 24 studies or fewer (fewer than the 15 that calibration can remove plus the minimum of 10), calibration is done on exploration-set records instead, and no main-set record is removed. Exploration records are drawn by the same procedure from the record IDs of the primary studies in the exploration set on 2026-12-31, not from instruments (seed 20261019 + k − 1), at most two rounds (10 records). If every exploration study is used for calibration, the whole exploration table is flagged as calibration material. If agreement is still below 80%, the procedure in GSRR-44 step 2 for low agreement applies. Exploration records used for calibration are flagged and reported separately within the exploration table.
+- **Minimum size.** The minimum is counted after calibration records are removed, in coded records, not instruments; E5-linked records are not coded (GSRR-35), so each coded record is one study. It applies to every table on its own: a table (a set, a population group or a centre) based on fewer than 10 studies reports counts only, without proportions. The 10-study rule does not apply to the proportions of item types within one instrument, which follow the C2b rule. For C2b, if fewer than 3 instruments with available items are first seen in the main set, each instrument's counts are still given, without proportions. The number of "items unavailable" instruments is always shown next to the C2b tables.
 
 **[GSRR-40] Screening procedure justification.** Coding is the costly part of this review. Re-screening would repeat the source database's two-screener process.
 
@@ -235,8 +236,8 @@ General rules:
   - C2 is coded per fatigue instrument within a record.
   - C2b is coded per item.
 - **Fatigue instrument.** C1, C2 and C6a refer to the study's fatigue instrument(s), not to instruments for the AI-side variable.
-- **Set of an instrument version.** A version belongs to the first set, in the order exploration, confirmation, late, in which a record uses it. Its items take the same set. "First seen in the confirmation set" means this set is the confirmation set.
-- **Instrument.** The set of items actually administered in the study, for example a subscale only when only the subscale was used. An instrument version is identified by its item wording together with its language. Items are coded as printed in the report, including translations, and the language is recorded. If the report gives no items but states that an existing scale was used without modification, the items may be taken from the cited source; such items are flagged (`item_source` = source). Otherwise the instrument is coded "items unavailable". If only some items are printed, the denominator for C2b is the number of printed items, and the instrument's full item count is shown next to it.
+- **Set of an instrument version.** A version belongs to the first set, in the order exploration, main, late, in which a record uses it. Its items take the same set. "First seen in the main set" means this set is the main set. A version used only by calibration records belongs to no set and is not reported in the set tables.
+- **Instrument.** The set of items actually administered in the study, for example a subscale only when only the subscale was used. An instrument version is identified by its item wording together with its language. Items are coded as printed in the report, including translations, and the language is recorded. If the report gives no items but states that an existing scale was used without modification, the items are taken from the cited source and flagged (`item_source` = source). For such an instrument, C2a origin is the existing scale's name or "existing general scale, wording not verifiable", and each kind of modification is "not verifiable", because a comparison with the source would compare the source with itself. Otherwise the instrument is coded "items unavailable". The C2b denominator is the number of coded items: the printed items, or the items taken from the cited source. The instrument's full item count is shown next to it.
 - **Main instrument.** The fatigue instrument whose variable is named first in the abstract's results. If the abstract has no results, it is the instrument described first in the methods.
 - **Main relation.** The first relation between an AI-side variable and fatigue reported in the abstract's results.
 - **Abstract's results.** The sentences of the abstract that report a finding, with or without a heading.
@@ -249,21 +250,21 @@ General rules:
 | C2c | Adaptation procedure reported (adapted instruments only) | back-translation / content validity / pilot / factor check: each reported or not |
 | C2d | Measurement properties reported (per instrument) | Item disclosure: all / some / none. Reliability in this sample: reported / not. Factor analysis in this sample: reported / not. Reason for choosing the instrument: given (a sentence on why it fits the construct or population; a citation alone does not count) / not. No COSMIN rating is made |
 | C3 | AI-side variable instrument (all that apply; each value is counted once per record) | amount of use / dependence or addiction type (source scale) / attitude or acceptance / other / none |
-| C4 | Reporting completeness and internal consistency (values per rule) | (a) N in the text vs. table denominators: consistent / inconsistent (which) / not verifiable. (b) Direction of the main relation in the abstract, results and discussion: consistent / inconsistent (where) / not applicable. (c) Discriminant validity: the report's own stated criterion vs. its reported values: consistent / inconsistent / no criterion stated / not applicable. We bring in no thresholds of our own. (d) Ethics statements within the report (approval present, approving body): consistent / inconsistent / not reported. (e) Qualitative coding, in two columns: codebook available (yes / no) and agreement (value given / index named only / none); both not applicable for quantitative studies. (f) Recalculation: see the rules below this table |
+| C4 | Reporting completeness and internal consistency (values per rule) | (a) N in the text vs. table denominators: consistent / inconsistent (which) / no comparison possible (N given in only one place). (b) Direction of the main relation in the abstract, results and discussion: consistent / inconsistent (where) / not applicable. (c) Discriminant validity: the report's own stated criterion vs. its reported values: consistent / inconsistent / no criterion stated / not applicable. We bring in no thresholds of our own. (d) Ethics statements within the report (approval present, approving body): consistent / inconsistent / not reported. (e) Qualitative coding, in two columns: codebook available (yes / no) and agreement (value given / index named only / none); both not applicable for quantitative studies. (f) Recalculation: see the rules below this table |
 | C5 | Sample overlap | Category: linked by the source database as the same sample (E5 group) / signs present but not confirmed / no signs. Signs, each recorded: shared authors, region, survey site, grant number, identical N. We do not decide sameness ourselves |
-| C6 | Title and abstract versus content | (a) Construct term in the title vs. the name of the main instrument. Term families: {fatigue, tiredness, 疲労, 疲れ}; {exhaustion, depletion, 消耗, 枯渇}; {burnout, バーンアウト, 燃え尽き}. A construct term is any word of these families, including inflected forms and compounds (tired, fatigued, exhausted, techno-exhaustion). Values: same family (at least one family shared, so a name with two families matches either) / different family / instrument name has no family term / instrument unnamed or not verifiable / no construct term in the title. This is a name check only. The item content of the main instrument (its C2b type composition) is reported next to it and is not turned into a match or mismatch. (b) Causal wording vs. design: see the rules below this table |
-| C7 | Does the main conclusion go beyond what was measured? | The main conclusion is the first sentence of the abstract's conclusion section. If there is none, it is the last sentence of the abstract. It is copied verbatim. "Beyond what was measured" if any of these holds. (i) C6b is a mismatch. (ii) The conclusion uses an AI-fatigue term ("AI fatigue", "AI-induced fatigue", "AI-related fatigue", "GenAI fatigue", or the Japanese equivalent) while the main instrument's C1 representative value is L3, L4, L5 or L6. (iii) The construct term in the conclusion is in a different term family from the name of the main instrument, by the C6a rules. (iii) does not hold if the conclusion has no construct term or the instrument name has no family term. Otherwise "within what was measured". "Within what was measured" means only that none of (i)–(iii) holds; it does not mean that the item content of the instrument supports the conclusion. Each condition is also recorded on its own as met / not met, and each is a separate problem type (GSRR-57); the summary value is reported only in the per-study table. "Cannot decide" if, and only if, the conclusion or the main instrument cannot be identified; it is checked before (i)–(iii). Coders code only the conclusion sentence and its construct term; C7 is then derived by script from the reconciled codes. If any input is "unresolved", the summary value of C7 is "unresolved"; a condition is "unresolved" only if one of its own inputs is |
+| C6 | Title and abstract versus content | (a) Construct term in the title vs. the name of the main instrument. Term families: {fatigue, tiredness, 疲労, 疲れ}; {exhaustion, depletion, 消耗, 枯渇}; {burnout, バーンアウト, 燃え尽き}. A construct term is any word of these families, including inflected forms and compounds (tired, fatigued, exhausted, techno-exhaustion). Values: same family (at least one family shared, so a name with two families matches either) / different family / instrument name has no family term / instrument unnamed / not verifiable / no construct term in the title. This is a name check only. The item content of the main instrument (its C2b type composition) is reported next to it and is not turned into a match or mismatch. (b) Causal wording vs. design: see the rules below this table. (c) AI-fatigue term in the title vs. attribution. Coders record whether the title uses an AI-fatigue term (the list in C7 (ii)): yes / no. C6c is then derived by script: "AI-fatigue term with L3–L6" if yes and the main instrument's C1 representative value is L3, L4, L5 or L6; "AI-fatigue term with L1a–L2" if yes and the value is L1a, L1b or L2; "no AI-fatigue term in the title" if no; "cannot decide" if the main instrument cannot be identified |
+| C7 | Does the main conclusion meet any of three conditions (design, attribution level, names)? | The main conclusion is the first sentence of the abstract's conclusion section. If there is none, it is the last sentence of the abstract. It is copied verbatim. "Beyond what was measured" if any of these holds. (i) C6b is a mismatch. (ii) The conclusion uses an AI-fatigue term ("AI fatigue", "AI-induced fatigue", "AI-related fatigue", "GenAI fatigue", or the Japanese equivalent) while the main instrument's C1 representative value is L3, L4, L5 or L6. (iii) The construct term in the conclusion is in a different term family from the name of the main instrument, by the C6a rules. (iii) is "no term to compare" if the conclusion has no construct term or the instrument name has no family term. Otherwise "within what was measured". "Within what was measured" means only that none of (i)–(iii) holds; it does not mean that the item content of the instrument supports the conclusion. Each condition is also recorded on its own as met / not met (and, for (iii), no term to compare), and each is a separate problem type (GSRR-57); the summary value is reported only in the per-study table. "Cannot decide" is checked first: if the conclusion cannot be identified, all three conditions are "cannot decide"; if only the main instrument cannot be identified, (i) is still derived and (ii) and (iii) are "cannot decide". Coders code only the conclusion sentence and its construct term; C7 is then derived by script from the reconciled codes. If any input is "unresolved", the summary value of C7 is "unresolved"; a condition is "unresolved" only if one of its own inputs is |
 
 **C4f recalculation rules.**
 - **What is recalculated.**
-  - p-values from reported test statistics and degrees of freedom (t, F, r, χ², z). A z is recalculated only when the report gives it, including a column labelled z or critical ratio in a table of estimates; coders do not form z from an estimate and its standard error. Tests are two-tailed unless the report says otherwise. A p-value that the report says is adjusted for multiple testing is not counted. A p-value reported as an inequality (for example, p < .001) is consistent if the recalculated value satisfies it. An inconsistency that changes the conclusion at α = .05 is also counted separately as a gross inconsistency.
+  - p-values from reported test statistics and degrees of freedom (t, F, r, χ², z). A z is recalculated only when the report gives it, including a column labelled z or critical ratio in a table of estimates; coders do not form z from an estimate and its standard error. Tests are two-tailed unless the report says otherwise. A p-value that the report says is adjusted for multiple testing is not counted. A p-value reported as an inequality (for example, p < .001) is consistent if the recalculated value satisfies it. A p-value printed as p = .000 is read as p < .001, and "ns" or "n.s." as p ≥ .05 (or p ≥ the α the report states). A test statistic reported with neither a p-value nor a significance marker is not recalculated. An inconsistency that changes the conclusion at α = .05 is also counted separately as a gross inconsistency.
   - Values in tables are included. Degrees of freedom given in a table note are used; degrees of freedom that would have to be inferred from the sample size are not, and the result is "cannot be calculated". A p-value shown only by asterisks is treated as an inequality at the threshold stated in the table note; without a stated threshold it is "cannot be calculated". "Cannot be calculated" stays in the denominator (GSRR-53). A test reported in both the text and a table is counted once, from the text. Each result records whether it came from the text or a table.
   - Percentages from counts and denominators.
   - An indirect effect as a×b, only for a single-mediator path where a, b and the indirect effect are reported at the same level of standardization.
 - **Who recalculates.** Both coders recalculate independently. The AI draft is generated by author 1 and stored unopened, with its SHA-256 recorded. It is opened only after both coders have fixed their values, and is then used only as a cross-check; its agreement with the human values is reported. Data are the reconciled human values.
 - These rules follow the logic of statcheck (Nuijten et al., 2016), which recalculates p from t, F, r, χ² and Z with their degrees of freedom, with four differences: the coders judge each test rather than scanning the whole text, so a test is one-tailed only if the report says one-tailed, one-sided or directional for that test; values printed in tables are included; p-values that the report says are adjusted for multiple testing are not counted; and percentages and indirect effects are added. The procedure is carried out by people, not by statcheck.
 - **Tolerance.** A value is consistent if it falls within the range implied by rounding the inputs to their reported decimals.
-- **Unit.** Each recalculated result. Each record is then summarised as any inconsistency / none / cannot be calculated / not applicable (no recalculable result), and separately as any gross inconsistency / none. Because results cluster in records, the number of recalculated results per record and the number of consistent, inconsistent and grossly inconsistent results are also reported (GSRR-56).
+- **Unit.** Each recalculated result. Each record is then summarised by the first value that applies: any inconsistency (at least one inconsistent result); none (at least one consistent result and no inconsistent one); cannot be calculated (results to recalculate, none of which could be calculated); not applicable (no result to recalculate). The gross-inconsistency summary uses the same order, with any gross inconsistency in place of any inconsistency. Because results cluster in records, the number of recalculated results per record and the number of consistent, inconsistent and grossly inconsistent results are also reported (GSRR-56).
 
 **C6b causal wording rules.**
 - **Causal terms** (in the title or abstract, counted only in a claim about a relation between an AI-side variable and fatigue, and in inflected forms of the same word only):
@@ -285,12 +286,12 @@ General rules:
 
 **[GSRR-44] Extraction stages.**
 1. **Worked examples.** Before calibration, both coders try the definitions on worked examples that include multiple instruments, a qualitative study and missing values.
-2. **Calibration** (GSRR-39). It ends when percentage agreement is at least 80% on every unit listed in GSRR-47, excluding derived values. Otherwise, five more records are drawn (GSRR-39) and also excluded from the counts, up to two further rounds. If agreement is still below 80%, the definitions are amended, the amendment is registered, and the low agreement is reported. Kappa is reported alongside percentage agreement but is not a stopping criterion, because rare categories make it unstable in five records.
-3. **Main coding.** Both coders code all records of the confirmation set and the exploration set independently.
-4. **Use of exploration codes for instruments.** If a confirmation study uses an instrument already coded in the exploration set, its C2b values come from the re-coded exploration values, but only if the item wording is verbatim identical. Otherwise the instrument is coded as a new version.
+2. **Calibration** (GSRR-39). It ends when percentage agreement is at least 80% on each of these units: each C1 level; C2a, C2c and C2d per instrument; C2b primary type, boundary and target per item; C3, C4 (a)–(d), each column of C4 (e), C5, C6a, C6b and the C6c title input per record; the C4f judgement of each result both coders recalculated; and the conclusion sentence and the construct-term family of the conclusion. Derived values and the agreement with the AI draft are not stopping criteria. Otherwise, five more records are drawn (GSRR-39) and also excluded from the counts, up to two further rounds. If agreement is still below 80%, the definitions are amended, the amendment is registered, and the low agreement is reported. Kappa is reported alongside percentage agreement but is not a stopping criterion, because rare categories make it unstable in five records.
+3. **Main coding.** Both coders code all records of the main set and the exploration set independently.
+4. **Use of exploration codes for instruments.** If a main-set study uses an instrument already coded in the exploration set, its C2b values come from the re-coded exploration values (the main coding under the final codebook, not the calibration codes), but only if the item wording is verbatim identical. Otherwise the instrument is coded as a new version.
 5. **AI drafts** are allowed only for C4f and C5.
    - For C4f, both coders recompute every value before seeing the draft (GSRR-43), and the agreement between human and AI values is reported.
-   - For C5, each coder first records the signs of overlap from the reports; only then does the coder open the AI bibliographic matches and check every one of them.
+   - For C5, the AI bibliographic matches are generated by author 1 and stored unopened, with their SHA-256 recorded. Each coder first records the signs of overlap from the reports; only then does the coder open the matches and check every one of them.
 
 **If coder 2 is unavailable.** Author 2 is coder 2 by default. If author 2 cannot code, a third person who did not write the rules is sought. If no such person is available, author 1 codes twice, at least four weeks apart. The results are then labelled as single-coder results, and no claim of independent coding is made.
 
@@ -303,17 +304,19 @@ General rules:
 - C2b: kappa per item for the primary type, for `boundary`, and for the secondary type among items both coders marked as boundary.
 - C2a, C2c and C2d: kappa per instrument.
 - C2b target: kappa over all items, with "no target" as a category.
-- C3–C6, including the C4f record summary and its gross-inconsistency summary: kappa per record. C7 is derived, so no kappa is computed for it; for the conclusion sentence, only the percentage of identical choices is reported.
-- C4f: agreement between the reconciled human values and the AI draft, per recalculated result.
+- C3, C4 (a)–(d), each column of C4 (e), C5, C6a, C6b, the C6c title input, and the C4f record summary and its gross-inconsistency summary: kappa per record.
+- C4f per result: the number of results recalculated by only one coder, and, for results both coders recalculated, kappa for the judgement (consistent / inconsistent / grossly inconsistent / cannot be calculated).
+- C6c and C7 are derived, so no kappa is computed for them. For the conclusion sentence and for the construct-term family of the conclusion, the percentage of identical choices is reported.
+- C4f: agreement between the reconciled human values and the AI draft, per recalculated result. It is reported only and is not a stopping criterion.
 - Records coded by only one coder are counted and reported.
 - Percentage agreement is reported alongside every kappa.
 - 95% CIs by bootstrap (2,000 resamples, seed 20261017) over records, and over instrument versions for item-level codes.
 - If both coders use a single category, kappa is undefined and only percentage agreement is reported.
-- Reported separately for the exploration set and the confirmation set.
+- Reported separately for the exploration set and the main set.
 
 **[GSRR-48] Extraction reconciliation procedure.**
 - Coders discuss the full text.
-- Disagreements that remain are coded "unresolved". Unresolved codes are excluded from proportions, and their number is reported. A derived value (the C1 representative value, the C4f record summary, C7) is "unresolved" if any of its inputs is.
+- Disagreements that remain are coded "unresolved". Unresolved codes are excluded from proportions, and their number is reported; the exception is C2b, where unresolved items stay in the item denominator as their own category (GSRR-53). A derived value (the C1 representative value, the C4f record summary, C6c, C7) is "unresolved" if any of its inputs is.
 - In the single-coder procedure (GSRR-44), disagreements between the two passes are resolved by a third pass by author 1, made with both earlier passes visible, and the record is flagged.
 - A sensitivity analysis uses each coder's values in turn (GSRR-62).
 - Codes before and after reconciliation are both kept.
@@ -335,10 +338,11 @@ General rules:
 **[GSRR-52] Planned data transformations.**
 - C1 representative value (GSRR-43).
 - Per-record summary of C4f (GSRR-43).
+- C6c from the title input and C1 (GSRR-43).
 - C7 from its coded inputs (GSRR-43).
 - Per-instrument C2b summary (GSRR-56).
 
-**[GSRR-53] Missing data.** Values excluded from denominators: "not verifiable", "not applicable" and "unresolved". All other values, including "not reported", "cannot be calculated", "cannot decide", "no construct term in the title" and "instrument name has no family term", are findings and stay in the denominators. Excluded values are still shown in every table. For C2b, the denominator is the instrument's item count; unresolved items are shown as their own category.
+**[GSRR-53] Missing data.** Values excluded from the denominators of the descriptive tables: "not verifiable" (the needed text could not be accessed), "not applicable" and "unresolved". All other values, including "not reported", "cannot be calculated", "cannot decide", "no construct term in the title", "instrument name has no family term", "instrument unnamed" and "no term to compare", are findings and stay in these denominators. Excluded values are still shown in every table. Instruments coded "items unavailable" are outside the C2b denominators and are counted beside them. For C2b, the denominator is the number of coded items (GSRR-43), with the full item count beside it; unresolved items stay in this denominator as their own category, an exception to GSRR-48. Which records are evaluable for a problem statement is defined per problem type in GSRR-57, not by these denominators.
 
 **[GSRR-54] Data validation.** Bibliographic details are checked against Crossref. Retractions and corrections are checked (GSRR-24).
 
@@ -346,26 +350,28 @@ General rules:
 
 **[GSRR-56] Synthesis plan.**
 - Per question:
-  - counts and proportions of each C1 level (representative value), C2a, C2c, C2d, C3, each C4 rule, the three C5 categories, C6a and C6b, and each condition of C7; and the number of records in which both C6a "different family" and C7 (iii) hold, since both are name checks.
-  - **C2b primary quantity**: for each instrument first seen in the confirmation set, the number and proportion of its items by primary type, with the instrument's item count as the denominator. Each instrument version counts once, however many studies use it. We also report, for each type, the number of instruments with at least one item of that type, and the target distribution for `MOT`, `AVO` and `FUT` items.
-  - **Instruments used**: every instrument version used by a study of the set, whichever set it was first seen in, with its language, the number of studies using it, its origin, format and item disclosure, whether its items or instructions refer to AI (C1 L1a or L1b), its number of items (printed / full), and its item counts by type (counts only). This table lists; it does not compare sets.
+  - counts and proportions of each C1 level (representative value), C2a, C2c, C2d, C3, each C4 rule, the three C5 categories, C6a, C6b and C6c, and each condition of C7; and the number of records in which both C6a "different family" and C7 (iii) hold, since both are name checks.
+  - **C2b primary quantity**: for each instrument first seen in the main set, the number and proportion of its items by primary type, with the number of coded items as the denominator (GSRR-53). Each instrument version counts once, however many studies use it. We also report, for each type, the number of instruments with at least one item of that type, and the target distribution for `MOT`, `AVO` and `FUT` items.
+  - **Instruments used**: every instrument version used by a study of the set, whichever set it was first seen in, with its language, the number of studies using it, its format, whether its items refer to AI (C1 L1a, a property of the wording), the number of records using it with each value of the properties that can differ between records (instructions referring to AI, C1 L1b; origin; item disclosure), its number of items (printed / full), and its item counts by type (counts only). This table lists; it does not compare sets.
   - **C4f per result**: the counts per recalculated result, by source (text or table), and the number of results per record, beside the per-record summary.
   - **Per-study table** (supplement): one row per coded study with its C1–C7 values; no item text.
   - For C5 and RQ4, records and studies (E5-linked records counted once) are counted separately. E5 records are not coded otherwise, so C1–C4, C6 and C7 tables count coded records.
-- All tables are shown separately for the confirmation set, the exploration set and the late stratum, and by population group.
+- All tables are shown separately for the main set, the exploration set and the late stratum, and by population group.
 - SQ1 is answered by tables split into centre-A and centre-B, set side by side without comparison statements.
 - Descriptive only: no significance tests, no prevalence estimates and no comparisons between sets.
 - If part of the plan cannot be done (GSRR-39 minimum sizes), we report what was not done and why.
 
 **[GSRR-57] Criteria for conclusions.**
-- **Problem types** are fixed as follows (C1 is described, not a problem type, because the eligibility criteria admit studies of a general fatigue construct examined in relation to AI use, GSRR-24; the problem is claiming "AI fatigue" on such a basis, which C7 (ii) captures):
+- **Problem types** are fixed as follows (C1 is described, not a problem type, because the eligibility criteria admit studies of a general fatigue construct examined in relation to AI use, GSRR-24; the problem is claiming "AI fatigue" on such a basis, which C6c captures in the title and C7 (ii) in the conclusion):
   - C4: "inconsistent" in rules (a)–(d); "any inconsistency" and, separately, "any gross inconsistency" in rule (f); in rule (e), "codebook not available" and "agreement: none";
   - C5: "signs present but not confirmed";
-  - C6a: "different family"; C6b: "mismatch";
+  - C6a: "different family"; C6b: "mismatch"; C6c: "AI-fatigue term with L3–L6";
   - C7: each condition separately, as three problem types: (i) causal wording not supported by the design; (ii) an AI-fatigue term in the conclusion while the main instrument's C1 representative value is L3 to L6; (iii) the construct term of the conclusion and the name of the main instrument in different term families. (iii) and C6a are name checks; they do not compare the content of the instruments.
 - C2b types are not problem types. Their distribution is described, without calling any type a problem, because this review's eligibility definition includes motivational and behavioural depletion (GSRR-24).
-- For each problem type, among the confirmation-set records with an evaluable value (GSRR-53): if at least one shows it, we write that it "was observed in the confirmation set"; if none does, that it "was not observed in the confirmation set"; if no record is evaluable, that it "could not be evaluated". Each statement gives the count, the number of evaluable records and the number unresolved.
-- Values inherited from the exploration coding (GSRR-44, step 4) are not used to say that a problem was observed in the confirmation set.
+- **Evaluable records.** A record is evaluable for a problem type only if its value can show or not show the problem: C4 (a)–(d) consistent or inconsistent; C4 (e) a codebook value of yes or no, and an agreement value of value given, index named only or none; C4f any inconsistency or none (records with at least one calculated result), and likewise for the gross summary; C5 any category; C6a same or different family; C6b match or mismatch; C6c any of its three derived values other than "cannot decide"; each condition of C7 met or not met. Other values ("not reported", "no criterion stated", "no comparison possible", "cannot be calculated", "cannot decide", "no term to compare", "instrument name has no family term", "instrument unnamed", "no construct term in the title") make a record not evaluable for that problem type.
+- For each problem type, among the evaluable main-set records: if at least one shows it, we write that it "was observed in the main set"; if none does, that it "was not observed in the main set"; if no record is evaluable, that it "could not be evaluated". Each statement gives the count, the number of evaluable records, the number not evaluable and the number unresolved. In the abstract, the abstract rule of the outline applies (attachment 5).
+- Values inherited from the exploration coding (GSRR-44, step 4) concern C2b, which is not a problem type, so they never enter a problem statement.
+- The words "confirm", "replicate" and "replication" are not used about the observations of the narrative review, and no word of frequency or severity ("common", "rare", "widespread", "serious") is used about a problem type.
 - We do not conclude that problems are more or less common than in the exploration set, or in one centre or population group than in another.
 - C7 checks three conditions under which a conclusion goes beyond what was measured: the design, the level of attribution and the names. It does not judge whether a finding is true, and it does not compare the item content of an instrument with the conclusion.
 
@@ -380,20 +386,20 @@ General rules:
 **[GSRR-62] Sensitivity analyses.** Analyses 1, 2 and 4 are applied to the problem statements of GSRR-57; analysis 3 is applied to the C2b tables.
 1. Peer-reviewed records only.
 2. Records in the C5 category "signs present but not confirmed" removed.
-3. C2b counted with secondary types included: each boundary item counts once for its primary type and once for its secondary type, and the denominator stays the instrument's item count.
+3. C2b counted with secondary types included: each boundary item counts once for its primary type and once for its secondary type, and the denominator stays the number of coded items.
 4. Each coder's values in place of the reconciled values.
 
 **[GSRR-63] Synthesis procedure justification.** The questions ask what practices are present in the coded set. Counts with denominators answer them; proportions describe the coded set and are not estimates of how often a practice occurs in the literature.
 
 **[GSRR-64] Synthesis data management and sharing.** As in GSRR-50. The synthesis script `c_synthesis.py` implements:
 - the screening order and the calibration draws;
-- the derived values (C1 representative value, C4f summary, C7 and each of its conditions);
+- the derived values (C1 representative value, C4f summary, C6c, C7 and each of its conditions);
 - agreement per set and unit (GSRR-47);
-- the tables of GSRR-56 by set, population group and centre, including C2a, C2c, C2d, C2b per instrument, the instruments used, C4f per result, the per-study table and RQ4 study counts;
+- the tables of GSRR-56 by set, population group and centre (the centre tables leave out C1, C6c and C7 (ii), GSRR-12), including C2a, C2c, C2d, C2b per instrument, the instruments used, C4f per result, the per-study table and RQ4 study counts;
 - the problem statements of GSRR-57;
 - sensitivity analyses 1–4 of GSRR-62.
 
-The script stops if a required file or column is missing, a cell is empty or a value is outside the code lists. `make_dummy.py` builds a dummy code table, runs the script on it and checks boundary cases with assertions: calibration draws and small pools, the screening order, C1 and C7 derivation (two-family names, missing terms, unresolved inputs, the centre tables, each condition of C7 on its own), denominators, minimum sizes in studies, multi-value codes, version sets, C2b with and without secondary types, the instruments used (including versions first seen in another set, and whether a version refers to AI), C4f per result (including by source), the per-study table, agreement coverage, sensitivity outputs, input validation and E5 links. Both files are attached to the registration with their SHA-256 **[at registration]**.
+The script stops if a required file or column is missing, a cell is empty or a value is outside the code lists. `make_dummy.py` builds a dummy code table, runs the script on it and checks boundary cases with assertions: calibration draws and small pools, the screening order, C1, C6c and C7 derivation (two-family names, missing terms, unresolved inputs, "cannot decide" when only the main instrument is unknown, the centre tables without C1, C6c and C7 (ii), each condition of C7 on its own), denominators, evaluable records per problem type (including a set in which no record is evaluable), the C4f summary order (a record with consistent and incalculable results), two-coder agreement on C4f results, minimum sizes in studies, multi-value codes, version sets, C2b with and without secondary types, the instruments used (including versions first seen in another set, whether a version refers to AI, and versions whose records differ in instructions, origin or disclosure), C4f per result (including by source), the per-study table, agreement coverage, sensitivity outputs, input validation and E5 links. Both files are attached to the registration with their SHA-256 **[at registration]**.
 
 **[GSRR-65] Miscellaneous synthesis details.**
 - Amendments after registration are logged with their date, reason and affected items, and listed in the report.
@@ -412,6 +418,7 @@ The script stops if a required file or column is missing, a cell is empty or a v
 
 ## References
 
+- Elson, M., Hussey, I., Alsalti, T., & Arslan, R. C. (2023). Psychological measures aren't toothbrushes. *Communications Psychology*, 1, 25. https://doi.org/10.1038/s44271-023-00026-9
 - Jonaid, A. (2026). Measurement properties and cross-cultural validity of AI anxiety and AI attitude scales: A COSMIN systematic review [Preregistration]. OSF. https://doi.org/10.17605/osf.io/3qasd
 - Lawson, D. O., et al. (2020). Reporting of methodological studies in health research: a protocol for the development of the MethodologIcal STudy reportIng Checklist (MISTIC). *BMJ Open*, 10, e040478. https://doi.org/10.1136/bmjopen-2020-040478
 - Lintner, T. (2024). A systematic review of AI literacy scales. *npj Science of Learning*, 9, 50. https://doi.org/10.1038/s41539-024-00264-4
@@ -429,4 +436,4 @@ The script stops if a required file or column is missing, a cell is empty or a v
 2. Synthesis script and dummy-table generator (written and tested on 2026-10-17), and the coding form **[at registration]**.
 3. Query strings of the source database's searches **[at registration]**.
 4. The screening order list for the remaining candidates (GSRR-33) **[at registration]**.
-5. The manuscript outline (structure, claims and evidence, abstract rule and table shells), with its version, date and SHA-256, fixed with this registration; differences between it and the manuscript are reported as deviations **[at registration]**.
+5. The manuscript outline (structure, claims and evidence, abstract rule and table shells), with its version, date and SHA-256, fixed with this registration **[at registration]**. Its scope rules, abstract rule, claims-and-evidence table and table shells bind the report, and differences from them are reported as deviations. Its discussion plan and recommendations are not registered. Where the outline and this registration differ, this registration takes precedence.
