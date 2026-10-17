@@ -73,3 +73,4 @@
 
 - 新しい agent の定義は、セッションの開始時に読み込まれる agent の一覧に、あとから入らない（worktree に置いた定義は "Agent type 'evidence-axis-judge' not found"）。検証は `general-purpose` に定義を演じさせて行った（`verification.md`）。実物の起動はマージ後のセッションで確かめる。
 - 検証から足した細則は判断 5 と `verification.md` の「直したこと」。対応表の 5 行は変えていない。
+- `/cross-review` 1 巡目の後（判断 6）: 対応表は 6 行になった（頑が × なら PLAUSIBLE の行 4 を挟んだ）。上の「新しい Step 4 の骨格」の 5 行の表は承認時の版で、現行は `literature-review.md` Step 4-4。表の前に判定のそろいを確かめる段、台帳に上限と直接性の列を足した。
