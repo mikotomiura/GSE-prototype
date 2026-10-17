@@ -35,6 +35,9 @@ ATTACHMENTS = [
     (6, "AI screener: call wording and settings", ATT / "ai-screening" / "call.md"),
     (6, "AI screener: check on the 34 exploratory records", ATT / "ai-screening" / "check-34.csv"),
     (6, "AI screener: readme", ATT / "ai-screening" / "README.md"),
+    (6, "screening tools: batches, inputs, format check, final decisions, release", TASK / "scripts" / "c_screening.py"),
+    (6, "screening tools: checks on dummy records", TASK / "scripts" / "check_screening.py"),
+    (6, "screening database generator", TASK / "scripts" / "make_trace_db.py"),
 ]
 
 

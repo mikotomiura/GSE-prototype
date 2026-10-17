@@ -5,6 +5,11 @@ empty screening columns in the fixed screening order (GSRR-33). It carries no AI
 earlier judgements: author 1 screens all 264 records afresh, without seeing the AI screener's output, which is
 kept in a separate file after registration (decision 26).
 
+Author 1 judges stage 1 on the sheet '段1' (title and abstract only: it has no full-text column), and stages 2 and 3
+together on the sheet '段2・3', which also shows the full-text status (GSRR-33, decision 33). The columns
+'最終…' are filled only for records on which the two screeners differ; c_screening.py reads both sheets by
+their headers.
+
 Inputs live outside the repository (abstracts and full texts are not copied into it):
     <data>/records264.json   ID, title, DOI, year, journal, source, same-study group, population group, order
     <data>/meta.json         authors, abstract and its source, OA status and locations, script download
@@ -35,6 +40,13 @@ STAGE_CHOICES = "未判定,含める,除外,保留"
 CENTRE_CHOICES = "未判定,中心-A,中心-B,境界（保留）"
 CODE_CHOICES = "E1,E2,E3,E4,E5,E6,E7"
 READ_CHOICES = "題名のみ,抄録,全文の一部,全文"
+STAGE1_FINAL = "含める,除外"
+CENTRE_FINAL = "中心-A,中心-B"
+BATCH = 9  # records per batch (GSRR-33)
+STAGE1_COLS = ["ID", "順", "束", "対象の群", "論文タイトル", "判定", "除外理由", "読んだ範囲", "根拠メモ", "最終",
+               "最終の除外理由"]
+STAGE2_COLS = ["ID", "順", "対象の群", "論文タイトル", "全文", "ファイル", "判定", "除外理由", "中心", "読んだ範囲",
+               "根拠メモ", "最終", "最終の除外理由", "最終の中心", "同じ標本の相手（E5）"]
 
 CRITERIA = [
     ("問い", "AI の系を使う・監督する・評価する人の一次研究で、疲労をその AI の利用と関係づけて定義・測定・質的に分析しているもの。疲労＝認知・情動・身体・動機・行動の消耗、疲弊、燃え尽き様の消耗。"),
@@ -67,6 +79,22 @@ def header(ws, cols, widths):
         ws.cell(row=ws.max_row, column=i).font = HEAD
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     ws.freeze_panes = "B2"  # a string: ws.cell(...) would create row 2 and push the data down
+
+
+def fill_inputs(ws, cols, choices, free=("根拠メモ",)):
+    """Drop-down lists and the blue fill on the columns author 1 fills in."""
+    last = ws.max_row
+    for name, values in choices:
+        letter = ws.cell(row=1, column=cols.index(name) + 1).column_letter
+        dv = DataValidation(type="list", formula1=f'"{values}"', allow_blank=True)
+        ws.add_data_validation(dv)
+        dv.add(f"{letter}2:{letter}{last}")
+    idx = {cols.index(n) for n, _ in choices} | {cols.index(n) for n in free}
+    for row in ws.iter_rows(min_row=2, max_row=last):
+        for i in idx:
+            row[i].fill = INPUT
+        row[cols.index("論文タイトル")].alignment = WRAP
+    ws.auto_filter.ref = f"A1:{ws.cell(row=1, column=len(cols)).column_letter}{last}"
 
 
 def fulltext_file(rid, ftdir):
@@ -114,9 +142,10 @@ def main():
     for line in [
         ["TRACE｜追加候補の文献 DB（判定者 1 用）"],
         [f"作成 {today}。追加候補 264 件（元の DB の追加候補 221 件と、レビューを狙った探索の 43 件）。"],
-        ["『スクリーニング』の青い欄に記入する。行は登録で決めた選別の順（群ごとに乱数で並べ、群を交互に並べた順）。上から順に判定する。"],
+        ["段 1（題名・抄録）は『段1』、段 2（全文）と段 3（中心）は『段2・3』の青い欄に記入する。行は登録で決めた選別の順（群ごとに乱数で並べ、群を交互に並べた順）。束（9 件ずつ）ごとに上から判定する。束の ID は c_screening.py が示す。"],
+        ["段 1 は題名と抄録だけで判定する。その束の段 1 をコミットするまで、『段2・3』『全文』のシートと fulltext フォルダを開かない。段 2 で含めた記録には、同じときに中心も付ける。『最終…』の欄は、AI と食い違った記録にだけ、AI の答えを読んでから記入する。"],
         ["このファイルには AI の判定も、以前の判定（2026-10 の判定者 1 の判定・AI の評価版）も入れていない。264 件すべてを空欄から判定する。AI の判定は登録の後に別のファイルで付け、両方がそろってから食い違いを見る。"],
-        ["題名・抄録段 → 全文段 → 中心の段の順。基準は『判定基準』。抄録は『文献DB』にある（取れなかった件はリンク先で読む）。全文は fulltext フォルダの <ID>.pdf・<ID>.html（出版社の記事ページ）・<ID>.xml（PMC の本文。同じ名前の .txt は本文を機械で抜き出したもの）。一覧は『全文』のシート。"],
+        ["基準は『判定基準』。抄録は『文献DB』にある（取れなかった件はリンク先で読む）。全文は fulltext フォルダの <ID>.pdf・<ID>.html（出版社の記事ページ）・<ID>.xml（PMC の本文。同じ名前の .txt は本文を機械で抜き出したもの）。一覧は『全文』のシート。"],
         [f"全文あり: {n_ft} 件 / 264 件（無料で公開された版だけ。有料の版は使わない）。"],
         ["対象の群は並べ替えのためで、判定の材料ではない。群の無い記録（レビュー型など）は『不明』に入れた。"],
     ]:
@@ -126,24 +155,23 @@ def main():
         row[0].alignment = WRAP
     ws["A1"].font = Font(bold=True, size=13)
 
-    sc = wb.create_sheet("スクリーニング")
-    cols = ["ID", "順", "対象の群", "論文タイトル", "題名・抄録段", "除外理由（題名・抄録段）", "全文段", "除外理由（全文段）",
-            "中心の段", "読んだ範囲", "根拠メモ", "判定日", "全文"]
-    header(sc, cols, [9, 5, 16, 60, 12, 12, 10, 12, 14, 12, 40, 12, 18])
+    s1 = wb.create_sheet("段1")
+    header(s1, STAGE1_COLS, [9, 5, 5, 16, 60, 12, 12, 12, 40, 12, 14])
+    for r in recs:
+        s1.append([r["id"], r["order"] + 1, r["order"] // BATCH + 1, r["population"], r["title"], "未判定", "", "", "",
+                   "", ""])
+    fill_inputs(s1, STAGE1_COLS, [("判定", STAGE_CHOICES), ("除外理由", CODE_CHOICES), ("読んだ範囲", READ_CHOICES),
+                                  ("最終", STAGE1_FINAL), ("最終の除外理由", CODE_CHOICES)])
+
+    s2 = wb.create_sheet("段2・3")
+    header(s2, STAGE2_COLS, [9, 5, 16, 60, 18, 14, 10, 12, 14, 12, 40, 10, 14, 12, 14])
     for r in recs:
         st = fulltext_status(r["id"], meta, chrome, ftdir)[0]
-        sc.append([r["id"], r["order"] + 1, r["population"], r["title"], "未判定", "", "未判定", "", "未判定", "", "", "", st])
-    last = sc.max_row
-    for col, choices in [("E", STAGE_CHOICES), ("G", STAGE_CHOICES), ("I", CENTRE_CHOICES), ("F", CODE_CHOICES),
-                         ("H", CODE_CHOICES), ("J", READ_CHOICES)]:
-        dv = DataValidation(type="list", formula1=f'"{choices}"', allow_blank=True)
-        sc.add_data_validation(dv)
-        dv.add(f"{col}2:{col}{last}")
-    for row in sc.iter_rows(min_row=2, max_row=last):
-        for c in row[4:12]:
-            c.fill = INPUT
-        row[3].alignment = WRAP
-    sc.auto_filter.ref = f"A1:M{last}"
+        s2.append([r["id"], r["order"] + 1, r["population"], r["title"], st, fulltext_file(r["id"], ftdir), "未判定", "",
+                   "未判定", "", "", "", "", "", ""])
+    fill_inputs(s2, STAGE2_COLS, [("判定", STAGE_CHOICES), ("除外理由", CODE_CHOICES), ("中心", CENTRE_CHOICES),
+                                  ("読んだ範囲", READ_CHOICES), ("最終", STAGE_CHOICES), ("最終の除外理由", CODE_CHOICES),
+                                  ("最終の中心", CENTRE_FINAL)], free=("根拠メモ", "同じ標本の相手（E5）"))
 
     db = wb.create_sheet("文献DB")
     cols = ["ID", "論文タイトル", "著者", "年", "掲載誌・媒体", "DOI", "リンク", "出どころ", "同じ研究の群", "対象の群",
