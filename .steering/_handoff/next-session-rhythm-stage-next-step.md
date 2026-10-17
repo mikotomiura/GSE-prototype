@@ -53,3 +53,7 @@
 - タンジビリティ関連の機械検査（主に案 D「相対のタイミングの写像は停滞と速さを写すか」・`origin/docs/tangibility-design` の `next-session-tangibility-relative-timing-desk-check.md`）は、公開データでの照合の論文の重い処理（A4 の GPU の生成と CPU の本計算）が終わってから、価値があれば G-GEAR で行う。CPU を本計算と取り合わないため（机上の検査は 1 段 約 15 時間・照合の論文の締切 11-30 が先）。
 - 価値の見立て（Claude・決定ではない）: 背景のステージの検査で、打鍵 1 つずつの時刻から作ったテンポの秒ごとの揺れ（`r_absdiff`・`r_sd`）に停滞の手がかりが残った（summary.md §4）。相対のタイミングはこの種の量なので、案 D の前提（全体の速さを割り引けば状態を写さない）は検査する価値がある。問いは A_speed を基準にすると天井に当たるので、その引き継ぎの §3 の 1 のとおり立て直す。始めるときの引き継ぎは `next-session-tangibility-relative-timing-desk-check-ggear.md`（このブランチ）。
 - このセッションで背景のステージの次の段を決めるとき、案 D の検査と計器や問いを共有できるか（同じ world・同じ攻撃者で両方を測るか）も併せて考える。
+
+## 7. 済み（2026-10-17・同じ日の次のセッション）
+
+決めた。一次は `.steering/20261017-rhythm-stage-summary/decisions.md` 判断 8。次は試作の写像と案 D と入力の契約を 1 本のタスクで机上で検査することで、始めるときの引き継ぎは `next-session-tangibility-relative-timing-desk-check-ggear.md`（§0 の条件と §5 の検査の項目の候補）。`.idea` §12.6 に要約を足した。このメモは役目を終えた。
