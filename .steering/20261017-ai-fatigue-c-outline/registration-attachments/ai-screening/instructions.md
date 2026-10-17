@@ -1,6 +1,6 @@
 # Instructions for the AI screener
 
-This text is given, unchanged, to the AI screener for every record. The AI screener is one of two independent screeners of the additional candidates (the other is author 1). It sees only this text and the record's inputs listed in section 2. It does not see the source database's classification, either human screener's judgement, or any earlier AI appraisal.
+This text is given, unchanged, to the AI screener for every record. The AI screener is one of two independent screeners of the additional candidates (the other is author 1). It sees only this text and the record's inputs listed in section 2, and it does not open web pages or use any other source. It does not see the source database's classification, either human screener's judgement, or any earlier AI appraisal.
 
 ## 1. The question this database collects studies for
 
@@ -15,7 +15,7 @@ Research design and reporting quality are not used to decide eligibility. The di
 
 ## 2. Inputs
 
-- Stage 1 (title and abstract): the record ID, title, and the abstract as retrieved. If no abstract was retrieved, you may open the record's landing page from its DOI or URL to read the abstract. Write what you read in `read`.
+- Stage 1 (title and abstract): the record ID, title, and the abstract as retrieved. If no abstract was retrieved, judge from the title alone and write `title only` in `read`. Do not open web pages.
 - Stage 2 (full text): the record ID and the full text, if a free full text was found. Only publicly and freely available full texts are used. Do not use other sources.
 - Stage 3 (centre): the full text of a record included at stage 2.
 
@@ -30,7 +30,7 @@ Answer every question with `yes`, `no` or `unclear`, and give the place in the i
 | Q3 | Is AI used only as a tool to detect or predict fatigue (for example, a machine-learning model classifying drowsiness from sensor data), with no people using, supervising or evaluating AI as the object of study? | yes → E1 |
 | Q4 | Is fatigue, in the sense of section 1, defined, measured or qualitatively analysed? Names vary: fatigue, exhaustion, burnout, depletion, tiredness, weariness, drained, and fatigue compounds such as decision fatigue. At stage 1, answer `no` only if the title or abstract states that the study has no fatigue measure or analysis; an abstract that lists measures or outcomes without fatigue is `unclear`, because abstracts often omit secondary measures. At stage 2, answer from the measures and analyses reported in the full text. | no → E2 |
 | Q5 | Is that fatigue examined in relation to the AI use (as an outcome, correlate, mediator or theme of the AI use), rather than measured only in a part of the study unrelated to AI? | no → E3 |
-| Q6 | Is the language of the full text English or Japanese, or is an English or Japanese version available? Answer from the language of the body, not of the title or abstract. At stage 1, answer `unclear` unless the record's page or bibliography states the body language. | no → E7 |
+| Q6 | Is the language of the full text English or Japanese, or is an English or Japanese version available? Answer from the language of the body, not of the title or abstract. At stage 1, answer `unclear` unless the input states the body language. | no → E7 |
 | Q7 | (Stage 2 only.) Does the full text report the same sample as another record, as a duplicate or secondary report? Answer `yes` only if the full text itself says so (for example, "data were previously reported in"). | yes → E5 |
 
 ## 4. Decisions
@@ -62,7 +62,7 @@ One JSON object per record and stage, with these fields and nothing else:
   "id": "record ID",
   "stage": 1,
   "read": "title only | abstract | part of full text | full text",
-  "source": "where the abstract or full text was read (URL)",
+  "source": "the source line given in the input (URL or database)",
   "answers": {
     "Q1": {"answer": "yes | no | unclear", "where": "place in the input", "quote": "at most 25 words"},
     "Q2": {}, "Q3": {}, "Q4": {}, "Q5": {}, "Q6": {}, "Q7": {}
