@@ -173,3 +173,15 @@
   - GSRR-65 の限界に名前の照合の限界。添付 5 に版・日付・SHA-256。
 - 脚本: `c_synthesis.py` に `c7_conditions`（条件ごと・自分の入力だけで unresolved・centre では (ii) を not_applicable）・問題の文の C7 を 3 型に・`c6a_c7iii_overlap` と CSV・C4f の `source` 列（必須）と出どころ別の数・使われた尺度の版の `language`・`items_full`（必須）・`refers_to_ai`。`make_dummy.py` に検査を足し、全検査が緑。C7 (i) の判定を壊した変異で赤になることを確かめた。
 - 登録版の prereg の attack-me（round 1〜3）の後の変更なので、登録の前に差分を確かめる（研究者が round を回すかを決める）。
+
+## 判断 15: 見出し・TRACE・背景の出典・比較の軸（2026-10-17・引き継ぎ `next-session-ai-fatigue-c-outline-finalize.md` §2-1〜4）
+
+- 研究者の決定（AskUserQuestion・すべて推奨どおり）:
+  - 副題は tie を先頭にした 3 動詞「TRACE: How studies of "AI fatigue" tie fatigue to AI, measure it and report it」。外枠・登録版 GSRR-1 と見出し・README を揃えた。問いの文（抄録・序論・寄与の前文）は帰属を先に置いた今の形のままで揃っていることを確かめた。
+  - TRACE は展開しない（頭字語ではなく名前）。却下: 4 要素の展開（Agreement が符号化者の一致と紛れる）・短い展開（項目の中身が入らない）・改名。
+  - 同名の調べ（2026-10-17・WebSearch）: 生態学のモデルの文書化の枠組み TRACE（Schmolke et al. 2010・Grimm et al. 2014）と、司法精神医療の臨床家向けの尺度 The Relational Aspects of CarE (TRACE) scale があった。分野の中の同名は見つからない。投稿の直前に確かめ直す（外枠の未決）。
+- 背景の文の出典: 前の文「レビューが妥当化の証拠の無い尺度と構成概念の境のあいまいさを指摘している」は、一次の本文より強かった（どちらのレビューも「境があいまい」とは書いていない）。出典に合わせて言い方を直した: 「仕事が増えている（[P361] Ragolane & Patel 2025・55 頁）」「レビューは妥当化された尺度を求め（[P528] Sosiński & Piasecka 2026・PDF 14 頁）、AI 疲労をデジタル燃え尽きの中に置く（[P361]）」。外枠・抄録の見本・登録版 GSRR-10 を直した。GSRR-10 の COSMIN の文に Lintner 2024 [P525] を足した。メインの判断で研究者には問うていない（出典に合わせる直し）。
+- 抄録の見本の語数: 手順 0 が 364 → 365 語、簡潔な版は 231 語のまま（前の値を同じ数え方で再現してから数えた）。
+- 比較の軸: AI への信頼の研究で質問紙の出どころを数えたレビュー 2 本（[P529] Bach et al. 2022・[P530] Benk et al. 2024）と、statcheck 型の再計算を医学の抄録で使った先例（[P531] Georgescu & Wren 2018）を外枠の背景に足した。Flake & Fried 2020 [P527] は PsyArXiv（OSF 503）・出版社（403）・Leiden の置き場（JavaScript の画面）のどれでも本文が取れず、provisional のまま。経済学の再計算の先例（Bruns et al. 2023・MetaArXiv）も OSF が落ちていて未照合で、引いていない。
+- 登録版を 0.9 にした。
+- 差分の確かめ方（研究者の決定・推奨どおり）: prereg の attack-me を round 4 として差分だけで回す。起点は引き継ぎの e9629d8d（0.7）ではなく 25e787b2（0.6 の最後）にした。e9629d8d からだと 0.7 の変更（C4f と statcheck の違い・GSRR-56・64）が抜けるため。

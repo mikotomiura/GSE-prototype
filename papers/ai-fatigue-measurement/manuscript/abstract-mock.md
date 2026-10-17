@@ -6,8 +6,8 @@ contains no result and no expectation. The word count is given at the end for ea
 
 ## Step 0 (no shortening)
 
-**Background.** Studies that report fatigue in relation to AI are increasing, and reviews of the topic report scales
-without validation evidence and unclear construct boundaries. **Question.** When a study reports fatigue in relation
+**Background.** Work on fatigue in relation to AI is growing, and reviews of the topic call for validated measures
+and place AI fatigue within digital burnout. **Question.** When a study reports fatigue in relation
 to AI, how is the fatigue tied to AI, and do its title and conclusion stay within that tie and within what its
 instrument was named and designed to show? **Methods.** TRACE, a registered methodological review, coded studies
 from one literature database built from free sources, screened by authors who knew the rules, closed on 31 December
@@ -33,8 +33,8 @@ Step 1 (one sentence per code group) changes nothing here, because the problem s
 code. Step 2 gives the C4 types as "observed: …; not observed: …", with their counts in Table 12. The wording of the
 other sentences is also tightened; the content kept by the rule is unchanged.
 
-**Background.** Studies of fatigue in relation to AI are increasing; reviews report unvalidated scales and unclear
-construct boundaries. **Question.** How do such studies tie fatigue to AI, and do their titles and conclusions stay
+**Background.** Work on AI-related fatigue is growing; reviews call for validated measures and place it within
+digital burnout. **Question.** How do such studies tie fatigue to AI, and do their titles and conclusions stay
 within that tie and within what their instruments were named and designed to show? **Methods.** TRACE, a registered
 methodological review, coded studies from one free-source literature database, screened by authors who knew the rules
 and closed on 31 December 2026 (not a census). Two coders sharing the view of an earlier narrative review applied
@@ -54,7 +54,7 @@ Counted with `wc -w` on the abstract text only, with each placeholder (n, n/n, �
 
 | Version | Words |
 |---|---|
-| Step 0 | 364 |
+| Step 0 | 365 |
 | Steps 1 and 2, compact wording, before the names of the C4 types are filled in | 231 |
 | The same, with the eight C4 types named (estimated at about two words each) | about 247 |
 

@@ -1,14 +1,14 @@
-# TRACE: Tracing how studies of "AI fatigue" attribute, measure and report fatigue. Protocol for a registered methodological review
+# TRACE: How studies of "AI fatigue" tie fatigue to AI, measure it and report it. Protocol for a registered methodological review
 
-Registration draft 0.8 (2026-10-17). Not yet registered. Form: Generalized Systematic Review Registration (GSRR; van den Akker et al., 2023). Each GSRR item is answered under its own number. Fields to be filled at registration are marked **[at registration]**.
+Registration draft 0.9 (2026-10-17). Not yet registered. Form: Generalized Systematic Review Registration (GSRR; van den Akker et al., 2023). Each GSRR item is answered under its own number. Fields to be filled at registration are marked **[at registration]**.
 
 ---
 
 ## Metadata
 
-**[GSRR-1] Title.** TRACE: Tracing how studies of "AI fatigue" attribute, measure and report fatigue. Protocol for a registered methodological review.
+**[GSRR-1] Title.** TRACE: How studies of "AI fatigue" tie fatigue to AI, measure it and report it. Protocol for a registered methodological review.
 
-TRACE is the name of this review's coding scheme (GSRR-43), not of a measure of fatigue. It links three things in each study: how fatigue is tied to AI (C1), what the fatigue items ask about (C2), and what the report states and concludes (C4 to C7: whether reported values are internally consistent, and whether the title and conclusion stay within what was measured).
+TRACE is the name of this review's coding scheme (GSRR-43); it is not an acronym and not the name of a measure of fatigue. It links three things in each study: how fatigue is tied to AI (C1), what the fatigue items ask about (C2), and what the report states and concludes (C4 to C7: whether reported values are internally consistent, and whether the title and conclusion stay within what was measured).
 
 **[GSRR-2] Contributors.** Two authors.
 - Author 1 (first author): Mikoto Miura, Independent Researcher. ORCID: https://orcid.org/0009-0000-4196-0508. Lead and coder 1.
@@ -58,7 +58,7 @@ TRACE is the name of this review's coding scheme (GSRR-43), not of a measure of 
 
 **[GSRR-10] Background.**
 
-*Rationale.* Studies of "AI fatigue" are multiplying. Existing reviews note that the scales lack validation evidence and that construct boundaries are unclear **[sources checked against free primary texts and cited at registration]**. Systematic reviews of AI-related self-report instruments are evaluating measurement properties with COSMIN. One registered review covers AI anxiety and attitude scales (Jonaid, 2026). The item-content coding in this review (C2b) is a researcher classification of item wording. It is not a COSMIN content-validity assessment, which requires experts and the target population. Studies of measurement practice in user-experience research have counted item disclosure, adaptation and reasons for choosing scales (Perrig et al., 2024). We did not find a review of AI-fatigue studies that tabulates, study by study, three things:
+*Rationale.* Work on "AI fatigue" is growing (Ragolane & Patel, 2025). Existing reviews call for standardized, validated measures of AI fatigue (Sosiński & Piasecka, 2026) and place AI fatigue within digital burnout, with which it shares symptoms (Ragolane & Patel, 2025). Systematic reviews of AI-related self-report instruments are evaluating measurement properties with COSMIN (for example, Lintner, 2024). One registered review covers AI anxiety and attitude scales (Jonaid, 2026). The item-content coding in this review (C2b) is a researcher classification of item wording. It is not a COSMIN content-validity assessment, which requires experts and the target population. Studies of measurement practice in user-experience research have counted item disclosure, adaptation and reasons for choosing scales (Perrig et al., 2024). We did not find a review of AI-fatigue studies that tabulates, study by study, three things:
 - how fatigue is tied to AI,
 - what fatigue items ask about, and
 - whether reports are internally consistent.
@@ -414,10 +414,13 @@ The script stops if a required file or column is missing, a cell is empty or a v
 
 - Jonaid, A. (2026). Measurement properties and cross-cultural validity of AI anxiety and AI attitude scales: A COSMIN systematic review [Preregistration]. OSF. https://doi.org/10.17605/osf.io/3qasd
 - Lawson, D. O., et al. (2020). Reporting of methodological studies in health research: a protocol for the development of the MethodologIcal STudy reportIng Checklist (MISTIC). *BMJ Open*, 10, e040478. https://doi.org/10.1136/bmjopen-2020-040478
+- Lintner, T. (2024). A systematic review of AI literacy scales. *npj Science of Learning*, 9, 50. https://doi.org/10.1038/s41539-024-00264-4
 - Murad, M. H., & Wang, Z. (2017). Guidelines for reporting meta-epidemiological methodology research. *Evidence-Based Medicine*, 22(4), 139–142. https://doi.org/10.1136/ebmed-2017-110713
 - Nuijten, M. B., Hartgerink, C. H. J., van Assen, M. A. L. M., Epskamp, S., & Wicherts, J. M. (2016). The prevalence of statistical reporting errors in psychology (1985–2013). *Behavior Research Methods*, 48, 1205–1226. https://doi.org/10.3758/s13428-015-0664-2
 - Page, M. J., et al. (2021). The PRISMA 2020 statement: an updated guideline for reporting systematic reviews. *BMJ*, 372, n71. https://doi.org/10.1136/bmj.n71
 - Perrig, S. A. C., Aeschbach, L. F., Scharowski, N., von Felten, N., Opwis, K., & Brühlmann, F. (2024). Measurement practices in user experience (UX) research: a systematic quantitative literature review. *Frontiers in Computer Science*, 6, 1368860. https://doi.org/10.3389/fcomp.2024.1368860
+- Ragolane, M., & Patel, S. (2025). Too much, too fast: understanding AI fatigue in the digital acceleration era. *International Journal of Arts, Humanities & Social Science*, 6(8), 53–60. https://doi.org/10.56734/ijahss.v6n8a7
+- Sosiński, P., & Piasecka, N. (2026). AI fatigue and mental health implications: a comprehensive literature review. *Quality in Sport*, 55, 70890. https://doi.org/10.12775/QS.2026.54.70890
 - van den Akker, O. R., et al. (2023). Increasing the transparency of systematic reviews: presenting a generalized registration form. *Systematic Reviews*, 12, 170. https://doi.org/10.1186/s13643-023-02281-7
 
 ## Attachments

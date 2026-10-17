@@ -1,4 +1,4 @@
-# TRACE: Tracing how studies of "AI fatigue" attribute, measure and report fatigue
+# TRACE: How studies of "AI fatigue" tie fatigue to AI, measure it and report it
 
 Materials for a methodological review (meta-research) of how studies of AI-related fatigue attribute fatigue to AI,
 measure it and report it. The protocol will be registered with the Generalized Systematic Review Registration form;

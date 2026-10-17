@@ -13,11 +13,12 @@ amendments take precedence over this outline wherever they differ.
 
 ## Title
 
-TRACE: Tracing how studies of "AI fatigue" attribute, measure and report fatigue. A registered methodological review
+TRACE: How studies of "AI fatigue" tie fatigue to AI, measure it and report it. A registered methodological review
 
 The title is fixed with the registration and is not changed after the results are known. It repeats the registered
 title (GSRR-1), with the article type in place of "Protocol for a registered methodological review". TRACE is the
-name of the registered coding scheme (GSRR-1, Contribution 1), not of a measure of fatigue.
+name of the registered coding scheme (GSRR-1, Contribution 1); it is not an acronym and not the name of a measure
+of fatigue.
 
 ## Journal requirements to be met
 
@@ -165,9 +166,9 @@ Sections are numbered here for reference; the manuscript follows the heading lev
 
 ### Abstract
 
-Background (studies that report fatigue in relation to AI are increasing, and reviews of the topic report scales
-without validation evidence and unclear construct boundaries; each statement is cited to a source checked against a
-free primary text). The question (above). What was done (TRACE; a registered methodological review of the studies
+Background (work on fatigue in relation to AI is growing, Ragolane & Patel, 2025; reviews of the topic call for
+validated measures of AI fatigue, Sosiński & Piasecka, 2026, and place it within digital burnout, with which it shares
+symptoms, Ragolane & Patel, 2025; the citations appear in the Introduction, not in the abstract). The question (above). What was done (TRACE; a registered methodological review of the studies
 included from a literature database; seven codes; the coding as in the rule above). Results by the rule above.
 Availability (registration, outline, code table with the per-instrument and per-study tables, codebook, scripts).
 
@@ -209,12 +210,14 @@ Availability (registration, outline, code table with the per-instrument and per-
 - Content validity in COSMIN (Terwee et al., 2018) and reviews that apply COSMIN to AI-related instruments (Lintner,
   2024): they evaluate studies that develop or validate an instrument, whereas this review codes how instruments are
   used and reported in studies that apply them. The unit of evaluation differs, and C2b is not a COSMIN rating.
-- Reviews that counted measurement practice for constructs related to AI and in HCI (Perrig et al., 2024, and others
-  to be found), and how C2d differs from their codes: a citation alone does not count as a reason for the choice in
+- Reviews that counted measurement practice in HCI (Perrig et al., 2024) and for trust in AI, where they counted how
+  many studies built their own questionnaire items and how many used existing questionnaires (Bach et al., 2022;
+  Benk et al., 2024), and how C2a and C2d differ from their codes: a citation alone does not count as a reason for the choice in
   C2d. No count of this review is compared with theirs.
 - Methodological studies and their reporting (Mbuagbaw et al., 2020; Murad & Wang, 2017; Long et al., 2024 on
   registration and reporting quality); recalculation of reported statistics (Nuijten et al., 2016) and its use
-  outside psychology (to be searched).
+  outside psychology (for example, the recalculation of ratios and P-values from reported confidence intervals in
+  medical abstracts, Georgescu & Wren, 2018).
 - Only literature read in a free full text or a free abstract is cited; each citation is checked against its primary
   source before the manuscript is complete.
 
@@ -420,9 +423,9 @@ columns; no value is filled in before coding.
 ## Open items before the manuscript is complete
 
 - The target journal, and the rewriting of the requirements section to its instructions.
-- The expansion of the name TRACE, and a check immediately before submission that no measure, checklist or reporting
-  guideline in this field already uses the name; the verb of the subtitle is reconsidered with the expansion, so that
-  "TRACE: Tracing" does not repeat the word.
+- A check immediately before submission that no measure, checklist or reporting guideline in this field already uses
+  the name TRACE. A search on 17 October 2026 found the name used outside this field: a framework for documenting
+  ecological models and a clinical self-report scale of relational aspects of care.
 - The second author's details, and the registration identifier and date.
 - The authorship of the narrative review, how it is cited (published, preprint or unpublished manuscript) and how its
   relation to this review is stated, to be agreed with the co-author when the manuscript draft is complete. Until
@@ -431,19 +434,26 @@ columns; no value is filled in before coding.
 - Whether a reporting guideline for methodological studies has been published (checked immediately before
   submission).
 - The script that copies values from the synthesis output into the manuscript.
-- The sources for the background sentences of the abstract and introduction (that studies are increasing, and what
-  existing reviews of the topic report), and the background literature beyond the references of the registration,
-  including reviews that counted measurement practice for AI-related constructs (for example, Bach et al., 2022, on
-  trust in AI) and uses of statcheck-type recalculation outside psychology; each checked against a free primary
-  source. Flake and Fried (2020) is checked against a free full text before it is cited.
+- Background literature beyond what is cited here, each item checked against a free primary source. Flake and Fried
+  (2020) is checked against a free full text before it is cited; on 17 October 2026 neither the preprint server nor
+  the publisher's page could be read.
 
 ## References in this outline
 
+- Bach, T. A., Khan, A., Hallock, H., Beltrão, G., & Sousa, S. (2022). A systematic literature review of user trust in
+  AI-enabled systems: An HCI perspective. *International Journal of Human–Computer Interaction*, 40(5), 1251–1266.
+  https://doi.org/10.1080/10447318.2022.2138826
+- Benk, M., Kerstan, S., von Wangenheim, F., & Ferrario, A. (2024). Twenty-four years of empirical research on trust
+  in AI: A bibliometric review of trends, overlooked issues, and future directions. *AI & Society*, 40(4),
+  2083–2106. https://doi.org/10.1007/s00146-024-02059-y
 - Elson, M., Hussey, I., Alsalti, T., & Arslan, R. C. (2023). Psychological measures aren't toothbrushes.
   *Communications Psychology*, 1, 25. https://doi.org/10.1038/s44271-023-00026-9
 - Flake, J. K., & Fried, E. I. (2020). Measurement schmeasurement: Questionable measurement practices and how to avoid
   them. *Advances in Methods and Practices in Psychological Science*, 3(4), 456–465.
   https://doi.org/10.1177/2515245920952393
+- Georgescu, C., & Wren, J. D. (2018). Algorithmic identification of discrepancies between published ratios and their
+  reported confidence intervals and P-values. *Bioinformatics*, 34(10), 1758–1766.
+  https://doi.org/10.1093/bioinformatics/btx811
 - Jonaid, A. (2026). Measurement properties and cross-cultural validity of AI anxiety and AI attitude scales: A COSMIN
   systematic review [Preregistration]. OSF. https://doi.org/10.17605/osf.io/3qasd
 - Lawson, D. O., et al. (2020). Reporting of methodological studies in health research: A protocol for the
@@ -465,6 +475,10 @@ columns; no value is filled in before coding.
 - Perrig, S. A. C., Aeschbach, L. F., Scharowski, N., von Felten, N., Opwis, K., & Brühlmann, F. (2024). Measurement
   practices in user experience (UX) research: A systematic quantitative literature review. *Frontiers in Computer
   Science*, 6, 1368860. https://doi.org/10.3389/fcomp.2024.1368860
+- Ragolane, M., & Patel, S. (2025). Too much, too fast: Understanding AI fatigue in the digital acceleration era.
+  *International Journal of Arts, Humanities & Social Science*, 6(8), 53–60. https://doi.org/10.56734/ijahss.v6n8a7
+- Sosiński, P., & Piasecka, N. (2026). AI fatigue and mental health implications: A comprehensive literature review.
+  *Quality in Sport*, 55, 70890. https://doi.org/10.12775/QS.2026.54.70890
 - Terwee, C. B., Prinsen, C. A. C., Chiarotto, A., et al. (2018). COSMIN methodology for evaluating the content
   validity of patient-reported outcome measures: A Delphi study. *Quality of Life Research*, 27(5), 1159–1170.
   https://doi.org/10.1007/s11136-018-1829-0
