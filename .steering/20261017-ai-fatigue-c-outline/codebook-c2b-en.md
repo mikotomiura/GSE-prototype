@@ -14,7 +14,7 @@ Any later change will be versioned and logged as an amendment, with the reason a
 - Code the **item wording only**. The scale authors' factor name is copied into `author_factor` and is not used for coding. When the wording-based code and the factor name disagree, this is counted in `mismatch`.
 - Instructions or stems (for example, "After video conferencing ...") are copied into `context`. They show the situation the item refers to. They are not used to decide the type.
 - Give each item one primary type. If an item falls between two types, set `boundary` = 1 and record the other type in `secondary_type`. Give the reason in one sentence in `rationale`.
-- Reverse-keyed items are coded as worded, before reversal.
+- Reverse-keyed items take the type of the dimension they ask about, from either pole. For example, "I feel full of energy" is `FAT`, and "I am interested in ..." is `MOT`.
 
 ## Step 1: content type (`type`)
 
@@ -47,14 +47,14 @@ Assign a target when `type` or `secondary_type` is `MOT`, `AVO` or `FUT`. Otherw
 `scale_id, item_no, item_text, context, author_factor, type, secondary_type, boundary, target, mismatch, rationale, source_page, coder`
 
 - `item_text`: verbatim, in the final questionnaire form. It is kept in the working file only and is not released (see registration [GSRR-50]).
-- `mismatch`: 1 if the authors' factor name claims motivation but `type` is not `MOT`, or if the factor name does not claim motivation but `type` is `MOT`. Otherwise 0. This compares naming with wording. It is not an evaluation of factor structure.
+- `mismatch`: kept from version 1 for the exploration records only. It is not used in the registered synthesis.
 - `coder`: `coder1` or `coder2`. AI-drafted values are not allowed for C2b.
 - Anchors quote short phrases from published items, with their sources. Full items are kept in the working file only.
 
 ## Counting
 
-- Strict count: items whose primary `type` is `MOT`.
-- Lenient count (sensitivity analysis): also includes boundary items whose `secondary_type` is `MOT`.
+- Primary count: each item counts once, for its primary `type`. The denominator is the instrument's item count.
+- Lenient count (sensitivity analysis): each boundary item also counts once for its `secondary_type`. The denominator stays the instrument's item count.
 
 ## Limitation
 
