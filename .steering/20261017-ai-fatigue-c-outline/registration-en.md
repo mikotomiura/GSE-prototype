@@ -8,9 +8,10 @@ Registration draft 0.6 (2026-10-17). Not yet registered. Form: Generalized Syste
 
 **[GSRR-1] Title.** How do studies of "AI fatigue" attribute fatigue to AI, measure it, and report it? Protocol for a methodological review.
 
-**[GSRR-2] Contributors.** Two authors **[at registration: names, affiliations, ORCID]**.
-- Author 1 (first author) is the lead and coder 1.
-- Author 2 (co-author) is coder 2 by default (see GSRR-44).
+**[GSRR-2] Contributors.** Two authors.
+- Author 1 (first author): Mikoto Miura, Independent Researcher. ORCID: https://orcid.org/0009-0000-4196-0508. Lead and coder 1.
+- Author 2 (co-author): **[at registration: name, affiliation, ORCID]**.
+- Author 2 is coder 2 by default (see GSRR-44).
 - Both authors built the source literature database.
 
 **[GSRR-3] Subjects.** Human–AI interaction; occupational and educational psychology; psychometrics; meta-research.
