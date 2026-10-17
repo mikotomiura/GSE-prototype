@@ -124,7 +124,7 @@ The third point was checked in 16 searches of free sources (Europe PMC, OpenAlex
 **[GSRR-16] Additional variables.** Grouping variables:
 - centre-A or centre-B (GSRR-12);
 - design (C6b);
-- population group, as recorded in the source database: students and learners; teachers and researchers; workers outside health and education; health professionals; consumers and general users; unknown;
+- population group, as recorded in the source database: students and learners; teachers and researchers; workers outside health and education; health professionals; consumers and general users; unknown. Records with no population group in the source database, including review-type records, which have no participants, are in the group unknown (GSRR-33);
 - peer-reviewed or not. Peer-reviewed means journal articles (any), and full conference papers whose venue states peer review. Preprints, theses, abstracts and reports are not peer-reviewed.
 
 ## Software, funding, conflicts
@@ -145,7 +145,7 @@ The third point was checked in 16 searches of free sources (Europe PMC, OpenAlex
 **[GSRR-21] Databases.** This review runs no search of its own. Records come from the source database. Its sources were:
 - 53 logged, targeted public-web queries on 2026-09-18, which produced the 34-record exploratory bibliography;
 - documented searches of free databases on 2026-09-29 to 2026-10-01: Europe PMC, Semantic Scholar, OpenAlex, Crossref, J-STAGE and CiNii Research;
-- a search aimed at reviews in Europe PMC, OpenAlex, Crossref and Semantic Scholar.
+- a search aimed at reviews in Europe PMC, OpenAlex, Crossref and Semantic Scholar on 2026-10-02.
 
 No paid databases were used.
 
@@ -184,6 +184,7 @@ No paid databases were used.
 - **After registration**, the screeners know these coding rules. To limit the effect of that knowledge:
   - the remaining candidates are all additional candidates without a final decision by both screeners on the registration date, whatever their screening stage (including the 71 screened by author 1 at title and abstract level and the 43 review-search records);
   - they are screened in a fixed order: within each population group the record IDs, sorted alphabetically, are shuffled with Python `random.shuffle`, using a generator freshly seeded with 20261018 for each group; the groups are then interleaved, one record from each group in the order listed in GSRR-16, so that progress by 2026-12-31 does not depend on the group;
+  - records with no population group in the source database are placed in the group unknown. Before registration, 51 of the 264 additional candidates had none: the 43 review-search records, seven records that the source database's machine classification labels review-type, and one record added by hand. To see why, an AI assistant read their titles and abstracts twice, in two independent readings with fixed definitions, only for document type and population group, not for eligibility: both readings found 50 to be documents without participants (reviews, study or review protocols, commentaries and a correction notice); the readings differed on the remaining record, which has no abstract, and its document type was left undetermined. No human read the abstracts of the 43 review-search records for this purpose;
   - the resulting order list and its SHA-256 are attached to the registration, with the Python version used **[at registration]**;
   - no coding is done during screening;
   - every screening decision made after registration is released with its date, each screener's judgement and the exclusion code (GSRR-41);
