@@ -10,8 +10,8 @@
 |---|---|---|---|---|---|---|---|---|
 | Lau et al. AI Fatigue Scale [P362] | 15 | 0 | 2（どちらも AI_USE: 7 discouraged・10 ignore） | 4（すべて AI_USE） | 0 | 3 | 8 | 0 |
 | ZEF（参照）[P437] | 15 | 2（TASK） | 4（TASK 3・SOCIAL 1） | 3（すべて SOCIAL） | 0 | 2 | 8 | 1（motivational の "too tired to do other things" は文言では疲労） |
-| Zhao & Liu AI misinformation fatigue | 8 | 2（AI_VERIFY） | 3（AI_VERIFY） | 0 | 2（AI_VERIFY） | 0 | 4 | 2（疲労と名乗る因子に MOT が 2） |
-| Zhao & Liu AI privacy fatigue | 8 | 2（AI_PRIV） | 3（AI_PRIV） | 0 | 2（AI_PRIV） | 0 | 4 | 2（同上） |
+| Zhao & Liu AI misinformation fatigue [P514] | 8 | 2（AI_VERIFY） | 3（AI_VERIFY） | 0 | 2（AI_VERIFY） | 0 | 4 | 2（疲労と名乗る因子に MOT が 2） |
+| Zhao & Liu AI privacy fatigue [P514] | 8 | 2（AI_PRIV） | 3（AI_PRIV） | 0 | 2（AI_PRIV） | 0 | 4 | 2（同上） |
 | [P488] の AI 疲労 4 項目 | — | 項目未入手 | | | | | | |
 
 ## 読めること（項目の内容の範囲で）

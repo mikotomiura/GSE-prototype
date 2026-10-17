@@ -28,3 +28,9 @@
 - ZEF は ScienceDirect の本文（Chrome）で Table 2・Table 3 を読んだ。CC BY 4.0。
 - Zhao & Liu は Europe PMC の全文 XML（PMC13501034・CC BY 4.0）の Table 2 から取った。
 - [P488] は全文 XML に AI 疲労の項目が無い（補足資料も無い。データは著者に求めれば出るとする）。出典は Kim et al. 2023（SSRN・AI 不安の論文）→ 項目未入手とした。
+
+## 判断 5: 出典の採番（2026-10-17）
+
+- Zhao & Liu 2026 を `docs/references.md` に [P514] として登録した（書誌は Crossref で照合）。
+- 理由: 核 2 のブランチ（`docs/ai-fatigue-core2-discriminant`）が [P498]–[P513] を使っている。番号は恒久なので、核 2 の後の番号を取る。
+- main へ入れる順は、`docs/ai-fatigue-motivation-claims` → 核 2 → 核 1。核 1 を取り込むときは、`references.md` の末尾の衝突を [P513] の後に [P514] を置いて解く。
