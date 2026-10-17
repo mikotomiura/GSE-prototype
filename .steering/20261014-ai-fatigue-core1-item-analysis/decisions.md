@@ -34,3 +34,9 @@
 - Zhao & Liu 2026 を `docs/references.md` に [P514] として登録した（書誌は Crossref で照合）。
 - 理由: 核 2 のブランチ（`docs/ai-fatigue-core2-discriminant`）が [P498]–[P513] を使っている。番号は恒久なので、核 2 の後の番号を取る。
 - main へ入れる順は、`docs/ai-fatigue-motivation-claims` → 核 2 → 核 1。核 1 を取り込むときは、`references.md` の末尾の衝突を [P513] の後に [P514] を置いて解く。
+
+## 判断 6: /cross-review の指摘への対応（2026-10-17）
+
+- Claude 側は cross-reviewer が自分で読んだ（code-reviewer を別に起動していない）。独立なのは Codex との間だけ。Codex は完走した。
+- 集計の数は両者とも items.csv から数え直して一致。
+- 直した: (1) scales.csv の LAU 行の note が引用符で囲まれず 11 列になっていた → 囲んで全行 9 列を確かめた（Codex のみ）。(2) summary「読めること」3 の「得点に入る」を「掲載項目に含まれる」に弱め、採点規則は未照合と書いた（両者一致）。(3) 限界に、AI 系 3 尺度は 2 系統・対象は下位尺度の構成から来る・因子名との食い違いは命名の比較で因子構造の評価ではない、を足した。(4)「読めること」2 で Lau を `AVO` と書き分けた。(5)「代表的」は表から言えないと注記した。(6) 受け入れ条件にチェック・[P514] の行から運用のメモを外した（判断 5 に残る）。(7) codebook に ZEF "need time by yourself" の確定を追記した。
