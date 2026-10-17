@@ -159,7 +159,7 @@ assert cs.c7(dict(base := {"conclusion_identified": "1", "main_instrument_identi
                             "conclusion_ai_fatigue_term": "0", "conclusion_family": "fatigue",
                             "main_instrument_family": "fatigue"}), "") == "within"
 assert cs.c7(dict(base, conclusion_identified="unresolved"), "L1a") == "unresolved"
-assert cs.c7(dict(base, conclusion_family="none|fatigue", main_instrument_family="none|burnout"), "L1a") == "beyond"
+assert cs.c7(dict(base, conclusion_family="fatigue", main_instrument_family="burnout"), "L1a") == "beyond"
 # C4f per result: counts match the reconciled rows of the set; records without results count as 0
 rr_ = [{"record_id": "a", "set": "main"}, {"record_id": "b", "set": "main"},
        {"record_id": "c", "set": "exploration"}]
@@ -586,38 +586,93 @@ def must_stop(label, kind, mutate=None, drop=None, needle=None):
     raise AssertionError(f"{label}: invalid input must stop")
 
 
-must_stop("c3_bad", "records", lambda rs: rs[0].update(C3="amount_of_use|sleep"), needle="C3")
-must_stop("c3_rep", "records", lambda rs: rs[0].update(C3="amount_of_use|amount_of_use"), needle="repeated")
-must_stop("family_rep", "records", lambda rs: rs[0].update(conclusion_family="fatigue|fatigue"), needle="repeated")
-must_stop("centre", "records", lambda rs: rs[0].update(centre="C"), needle="centre")
-must_stop("centre_empty_unknown", "records", lambda rs: rs[3].update(centre="a"), needle="centre")   # case counts
-must_stop("population", "records", lambda rs: rs[0].update(population="pensioners"), needle="population")
-must_stop("peer", "records", lambda rs: rs[0].update(peer_reviewed="yes"), needle="peer_reviewed")
-must_stop("c1", "records", lambda rs: rs[0].update(C1_L2="2"), needle="C1_L2")
-must_stop("c4b", "records", lambda rs: rs[0].update(C4b="maybe"), needle="C4b")
-must_stop("c4e", "records", lambda rs: rs[0].update(C4e_agreement="some"), needle="C4e_agreement")
-must_stop("c5", "records", lambda rs: rs[0].update(C5="linked"), needle="C5")
-must_stop("ident", "records", lambda rs: rs[0].update(conclusion_identified="yes"), needle="conclusion_identified")
-must_stop("mi_ident", "records", lambda rs: rs[0].update(main_instrument_identified="2"), needle="main_instrument_identified")
-must_stop("ai_term", "records", lambda rs: rs[0].update(conclusion_ai_fatigue_term="yes"), needle="conclusion_ai_fatigue_term")
-must_stop("family", "records", lambda rs: rs[0].update(main_instrument_family="happiness"), needle="main_instrument_family")
-must_stop("set", "records", lambda rs: rs[0].update(set="pilot"), needle="set")
-must_stop("gross_pair", "c4f", lambda rs: rs[0].update(consistent="yes", gross="1"), needle="gross")
-must_stop("gross_na", "c4f", lambda rs: rs[0].update(consistent="na", gross="1"), needle="gross")
-must_stop("c4f_source", "c4f", lambda rs: rs[0].update(source="figure"), needle="source")
-must_stop("origin_missing", "instruments", drop="origin", needle="origin")
-must_stop("c2d_missing", "instruments", drop="C2d_reason", needle="C2d_reason")
-must_stop("origin_bad", "instruments", lambda rs: rs[0].update(origin="invented"), needle="origin")
-must_stop("mod_bad", "instruments", lambda rs: rs[0].update(mod_scoring="yes"), needle="mod_scoring")
-must_stop("c2c_empty", "instruments", lambda rs: rs[0].update(C2c_pilot=""), needle="C2c_pilot")
-must_stop("items_full", "instruments", lambda rs: rs[0].update(items_full="twelve"), needle="items_full")
-must_stop("item_boundary", "items", lambda rs: rs[0].update(boundary="yes"), needle="boundary")
-must_stop("item_target", "items", lambda rs: rs[0].update(target="NOWHERE"), needle="target")
-must_stop("item_secondary", "items", lambda rs: rs[0].update(secondary_type="XYZ"), needle="secondary_type")
-must_stop("item_source_missing", "items", drop="item_source", needle="item_source")
+must_stop("c3_bad", "records", lambda rs: rs[0].update(C3="amount_of_use|sleep"), needle="'sleep' not allowed in column C3")
+must_stop("c3_rep", "records", lambda rs: rs[0].update(C3="amount_of_use|amount_of_use"), needle="repeated value in column C3")
+must_stop("family_rep", "records", lambda rs: rs[0].update(conclusion_family="fatigue|fatigue"), needle="repeated value in column conclusion_family")
+must_stop("centre", "records", lambda rs: rs[0].update(centre="C"), needle="'C' not allowed in column centre")
+must_stop("centre_empty_unknown", "records", lambda rs: rs[3].update(centre="a"), needle="'a' not allowed in column centre")   # case counts
+must_stop("population", "records", lambda rs: rs[0].update(population="pensioners"), needle="'pensioners' not allowed in column population")
+must_stop("peer", "records", lambda rs: rs[0].update(peer_reviewed="yes"), needle="'yes' not allowed in column peer_reviewed")
+must_stop("c1", "records", lambda rs: rs[0].update(C1_L2="2"), needle="'2' not allowed in column C1_L2")
+must_stop("c4b", "records", lambda rs: rs[0].update(C4b="maybe"), needle="'maybe' not allowed in column C4b")
+must_stop("c4e", "records", lambda rs: rs[0].update(C4e_agreement="some"), needle="'some' not allowed in column C4e_agreement")
+must_stop("c5", "records", lambda rs: rs[0].update(C5="linked"), needle="'linked' not allowed in column C5")
+must_stop("ident", "records", lambda rs: rs[0].update(conclusion_identified="yes"), needle="'yes' not allowed in column conclusion_identified")
+must_stop("mi_ident", "records", lambda rs: rs[0].update(main_instrument_identified="2"), needle="'2' not allowed in column main_instrument_identified")
+must_stop("ai_term", "records", lambda rs: rs[0].update(conclusion_ai_fatigue_term="yes"), needle="'yes' not allowed in column conclusion_ai_fatigue_term")
+must_stop("family", "records", lambda rs: rs[0].update(main_instrument_family="happiness"), needle="'happiness' not allowed in column main_instrument_family")
+must_stop("set", "records", lambda rs: rs[0].update(set="pilot"), needle="'pilot' not allowed in column set")
+must_stop("gross_pair", "c4f", lambda rs: rs[0].update(consistent="yes", gross="1"), needle="gross=1 in result")
+must_stop("gross_na", "c4f", lambda rs: rs[0].update(consistent="na", gross="1"), needle="gross=1 in result")
+must_stop("c4f_source", "c4f", lambda rs: rs[0].update(source="figure"), needle="'figure' not allowed in column source")
+must_stop("origin_missing", "instruments", drop="origin", needle="missing columns ['origin']")
+must_stop("c2d_missing", "instruments", drop="C2d_reason", needle="missing columns ['C2d_reason']")
+must_stop("origin_bad", "instruments", lambda rs: rs[0].update(origin="invented"), needle="'invented' not allowed in column origin")
+must_stop("mod_bad", "instruments", lambda rs: rs[0].update(mod_scoring="yes"), needle="'yes' not allowed in column mod_scoring")
+must_stop("c2c_empty", "instruments", lambda rs: rs[0].update(C2c_pilot=""), needle="empty cell in C2c_pilot")
+must_stop("items_full", "instruments", lambda rs: rs[0].update(items_full="twelve"), needle="'twelve' is not a whole number in column items_full")
+must_stop("item_boundary", "items", lambda rs: rs[0].update(boundary="yes"), needle="'yes' not allowed in column boundary")
+must_stop("item_target", "items", lambda rs: rs[0].update(target="NOWHERE"), needle="'NOWHERE' not allowed in column target")
+must_stop("item_secondary", "items", lambda rs: rs[0].update(secondary_type="XYZ"), needle="'XYZ' not allowed in column secondary_type")
+must_stop("item_source_missing", "items", drop="item_source", needle="missing columns ['item_source']")
 # E5 (GSRR-35): a second coded record in one group, or a group without a coded record, stops
-must_stop("e5_two_coded", "links", lambda rs: rs.append({"record_id": "D018", "group_id": "G1"}), needle="G1")
-must_stop("e5_no_coded", "links", lambda rs: rs.append({"record_id": "D099", "group_id": "G9"}), needle="G9")
+must_stop("e5_two_coded", "links", lambda rs: rs.append({"record_id": "D018", "group_id": "G1"}), needle="E5 group G1 has 2 coded records")
+must_stop("e5_no_coded", "links", lambda rs: rs.append({"record_id": "D099", "group_id": "G9"}), needle="E5 group G9 has 0 coded records")
+# GSRR-43: a missing code stands alone in a multi-value cell (positive control: must_stop clones are valid)
+must_stop("mi_family_unresolved", "records", lambda rs: rs[0].update(main_instrument_family="fatigue|unresolved"),
+          needle="must stand alone in column main_instrument_family")
+must_stop("concl_family_nv", "records", lambda rs: rs[0].update(conclusion_family="fatigue|not_verifiable"),
+          needle="must stand alone in column conclusion_family")
+must_stop("family_none_combined", "records", lambda rs: rs[0].update(conclusion_family="none|fatigue"),
+          needle="missing code 'none' must stand alone in column conclusion_family")
+must_stop("c3_none_combined", "records", lambda rs: rs[0].update(C3="none|amount_of_use"),
+          needle="must stand alone in column C3")
+must_stop("c3_missing_combined", "records", lambda rs: rs[0].update(C3="attitude|not_applicable"),
+          needle="'not_applicable' must stand alone in column C3")
+# GSRR-35 / GSRR-43: C5 = e5_group exactly for the coded records of E5 groups (both directions)
+must_stop("c5_linked_not_e5", "records",
+          lambda rs: [r_.update(C5="no_signs") for r_ in rs if r_["record_id"] == "D016"],
+          needle="coded record D016 is in E5 group but C5 is 'no_signs'")
+must_stop("c5_e5_not_linked", "records",
+          lambda rs: [r_.update(C5="e5_group") for r_ in rs if r_["record_id"] == "D001"],
+          needle="record D001 has C5 e5_group but is not in links.csv")
+
+
+def must_stop_short(label, kind, drop_n, needle):
+    """Short rows (GSRR-64): the last drop_n cells of the last data row are missing, so DictReader gives None."""
+    dd = clone("short_" + label)
+    cs.build_tables(dd)                                     # positive control
+    path = dd / (f"{kind}_reconciled.csv" if kind != "links" else "links.csv")
+    lines = path.read_text(encoding="utf-8").rstrip("\n").split("\n")
+    lines[-1] = ",".join(lines[-1].split(",")[:-drop_n])
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        cs.build_tables(dd)
+    except cs.InputError as e_:
+        assert needle in str(e_), (label, str(e_))
+        return
+    raise AssertionError(f"{label}: a short row must stop")
+
+
+for kind_ in ["records", "instruments", "c4f"]:
+    hdr_ = cs.read_table(out / f"{kind_}_reconciled.csv")[0]
+    must_stop_short(kind_, kind_, 1, f"empty cell in {hdr_[-1]}")
+must_stop_short("items_required", "items", 3, "empty cell in boundary")    # boundary, secondary_type, target missing
+dd_ = clone("short_items_optional")                                        # optional trailing cells: None reads as empty
+p_ = dd_ / "items_reconciled.csv"
+ln_ = p_.read_text(encoding="utf-8").rstrip("\n").split("\n")
+ln_[-1] = ",".join(ln_[-1].split(",")[:-1])
+p_.write_text("\n".join(ln_) + "\n", encoding="utf-8")
+assert cs.build_tables(dd_)["c2b"]
+dd_ = clone("short_links")                                                 # a links row with only a record_id
+cs.build_tables(dd_)
+with open(dd_ / "links.csv", "a", encoding="utf-8", newline="") as f_:
+    f_.write("D099\n")
+try:
+    cs.build_tables(dd_)
+    raise AssertionError("a links row without group_id must stop")
+except cs.InputError as e_:
+    assert "links.csv: empty cell" in str(e_), e_
 # an empty file still fails the header check; a header-only file passes the header check
 for kind_ in ["records", "instruments", "items", "c4f"]:
     dd_ = clone("empty_" + kind_)
@@ -663,6 +718,13 @@ assert all(r["studies"] == 13 for r in tab_main.values()), tab_main      # the 1
 rq_pop = [r for r in res["rq4"] if r["set"] == "main" and r["split"] == "population"]
 assert sum(r["records_coded"] for r in rq_pop) == 13 and sum(r["records_uncoded_linked"] for r in rq_pop) == 2
 assert sum(r["studies"] for r in rq_pop) == 13
+# an uncoded E5 record counts under the set and population group of its group's coded record (GSRR-35)
+pop_of_ = {r["record_id"]: r["population"] for r in res["recs"]}
+for g_ in {r["group"] for r in rq_pop}:
+    want_ = sum(1 for u_, c_ in (("D017", "D016"), ("D021", "D020")) if pop_of_[c_] == g_ and sets[c_] == "main")
+    got_ = [r["records_uncoded_linked"] for r in rq_pop if r["group"] == g_]
+    assert got_ == [want_], (g_, got_, want_)
+assert any(r["records_uncoded_linked"] > 0 for r in rq_pop)
 r4 = cs.rq4_counts([{"record_id": "a", "set": "main", "population": "p", "C5": "e5_group"},
                     {"record_id": "b", "set": "main", "population": "p", "C5": "signs_not_confirmed"},
                     {"record_id": "c", "set": "main", "population": "q", "C5": "no_signs"}],
@@ -687,8 +749,8 @@ for row_ in ("results", "results_per_record"):
         tot_ = sum(r["count"] for r in c4f_pop if r["row"] == row_ and r["value"] == val_)
         all_ = sum(r["count"] for r in res["c4f_results"] if r["set"] == "main" and r["split"] == "all"
                    and r["row"] == row_ and r["value"] == val_)
-        if row_ == "results":
-            assert tot_ == all_, (row_, val_, tot_, all_)               # population groups partition the results
+        assert tot_ == all_, (row_, val_, tot_, all_)                   # population groups partition the rows
+    assert {r["value"] for r in res["c4f_results"] if r["set"] == "main" and r["row"] == row_ and r["split"] == "all"}, row_
 assert "split" not in res["c2b"][0] and all("split" not in r for r in res["instruments_used"])
 # fix 8: sensitivity() uses the coder it is given (S1-S3), not silently the reconciled values
 s_rec, s3_rec = cs.sensitivity(out)

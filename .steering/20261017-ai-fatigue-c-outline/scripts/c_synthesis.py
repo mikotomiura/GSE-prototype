@@ -161,6 +161,16 @@ def check_cell(name, col, value):
     parts = value.split("|") if col in MULTI_VALUE else [value]
     if len(set(parts)) != len(parts):
         raise InputError(f"{name}: repeated value in column {col}: {value!r}")
+    if len(parts) > 1:
+        # GSRR-43: a missing code stands alone. So do the values that mean "nothing to name": "none" in C3
+        # (no AI-side measure) and, in the family columns, "none" (no construct term), "no_family_term" and
+        # "instrument_unnamed".
+        alone = MISSING | {"not_reported"} | ({"none"} if col == "C3" else set()) | (
+            {"none", "no_family_term", "instrument_unnamed"} if col in ("conclusion_family", "main_instrument_family")
+            else set())
+        stray = [p for p in parts if p in alone]
+        if stray:
+            raise InputError(f"{name}: missing code {stray[0]!r} must stand alone in column {col}: {value!r}")
     for p in parts:
         if p not in allowed:
             raise InputError(f"{name}: value {p!r} not allowed in column {col}")
@@ -178,8 +188,11 @@ def load(d, kind, coder):
         raise InputError(f"{path.name}: missing columns {missing}")
     for r in rows:
         for col in REQUIRED[kind]:
-            if r.get(col, "") == "" and col not in OPTIONAL_EMPTY:
+            if (r.get(col) or "") == "" and col not in OPTIONAL_EMPTY:     # None = a short row: same as empty
                 raise InputError(f"{path.name}: empty cell in {col} (use not_verifiable / not_applicable)")
+        for col in fields:
+            if r.get(col) is None:
+                r[col] = ""
         for col in list(r):
             if col is not None and (col in REQUIRED[kind] or col in VOCAB):
                 check_cell(path.name, col, r[col] or "")
@@ -202,7 +215,7 @@ def load_links(d, recs):
         raise InputError(f"links.csv: missing columns {missing}")
     seen = set()
     for l in links:
-        if any(l.get(c, "") == "" for c in LINK_COLUMNS):
+        if any((l.get(c) or "") == "" for c in LINK_COLUMNS):         # None = a short row: same as empty
             raise InputError("links.csv: empty cell")
         if l["record_id"] in seen:
             raise InputError(f"links.csv: record {l['record_id']} listed twice")
@@ -213,6 +226,14 @@ def load_links(d, recs):
         if per_group[g] != 1:
             raise InputError(f"links.csv: E5 group {g} has {per_group[g]} coded records (must be exactly 1; "
                              "E5-linked duplicates are not coded)")
+    # GSRR-35: C5 = e5_group exactly for the coded records that are in an E5 group
+    linked = {l["record_id"] for l in links}
+    for r in recs:
+        in_group, is_e5 = r["record_id"] in linked, r.get("C5") == "e5_group"
+        if in_group and not is_e5:
+            raise InputError(f"links.csv: coded record {r['record_id']} is in E5 group but C5 is {r.get('C5')!r}")
+        if is_e5 and not in_group:
+            raise InputError(f"records: record {r['record_id']} has C5 e5_group but is not in links.csv")
     return links
 
 
