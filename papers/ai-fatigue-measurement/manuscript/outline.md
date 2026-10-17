@@ -398,11 +398,12 @@ columns; no value is filled in before coding.
   and C7 (iii) both hold.
 - Table 12: problem statements.
 
-  | Problem type | Code and value | Statement | Count | Evaluable records | Not verifiable | Not applicable | Unresolved |
-  |---|---|---|---|---|---|---|---|
-  | — | — | observed / not observed / could not be evaluated | — | — | — | — | — |
+  | Problem type | Code and value | Statement | Count | Evaluable records | Not evaluable | Unresolved |
+  |---|---|---|---|---|---|---|
+  | — | — | observed / not observed / could not be evaluated | — | — | — | — |
 
-  One row for each problem type of GSRR-57; C7 has three rows, one per condition.
+  One row for each problem type of GSRR-57; C7 has three rows, one per condition. A note gives, for each row, the values
+  that made records not evaluable (GSRR-57).
 
 - Table 13: sensitivity analyses (problem statements as in Table 12, with C7 by condition).
 - Table 14: recommendations.

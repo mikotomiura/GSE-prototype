@@ -27,6 +27,11 @@ def write(name, rows):
         w.writerows(rows)
 
 
+# E5 groups (GSRR-35): only one record per group is coded; the other members appear in links.csv only
+E5_CODED = {"D016", "D020"}
+E5_UNCODED = {"D017": "G1", "D021": "G2"}
+
+
 def rec(rid, set_name):
     r = {"record_id": rid, "set": set_name,
          "population": rng.choice(["students_learners", "workers_other", "health_professionals"]),
@@ -40,7 +45,7 @@ def rec(rid, set_name):
         r[k] = rng.choice(["consistent", "inconsistent", "not_verifiable"])
     r["C4e_codebook"] = rng.choice(["yes", "no", "not_applicable"])
     r["C4e_agreement"] = rng.choice(["value_given", "index_only", "none", "not_applicable"])
-    r["C5"] = rng.choice(["e5_group", "signs_not_confirmed", "no_signs"])
+    r["C5"] = "e5_group" if rid in E5_CODED else rng.choice(["signs_not_confirmed", "no_signs"])
     r["C6a"] = rng.choice(["same_family", "different_family", "no_construct_term", "no_family_term",
                            "instrument_unnamed"])
     r["C6b"] = rng.choice(["match", "mismatch"])
@@ -54,20 +59,23 @@ def rec(rid, set_name):
     return r
 
 
-ids = [f"D{i:03d}" for i in range(1, 33)]
+all_ids = [f"D{i:03d}" for i in range(1, 33)]
 sets = {}
-for n, i in enumerate(ids):
+for n, i in enumerate(all_ids):
     sets[i] = "exploration" if n < 10 else "calibration" if n < 15 else "late" if n >= 30 else "main"
+ids = [i for i in all_ids if i not in E5_UNCODED]          # E5-linked duplicates are not coded
 recs = [rec(i, sets[i]) for i in ids]
 insts, items = [], []
-for n, i in enumerate(ids):
+for n, i in enumerate(all_ids):
+    if i in E5_UNCODED:
+        continue
     vid = "VCAL" if i == "D015" else f"V{n % 14:02d}"        # VCAL: used by a calibration record only
     inst = {"record_id": i, "instrument_id": "main", "version_id": vid,
             "origin": rng.choice(["new", "existing_ai", "adapted_general", "unchanged_general",
                                   "general_not_verifiable"]),
             "format": "multi_item", "language": "en", "items_full": "12"}
     for k in cs.INSTRUMENT_CODES:
-        inst.setdefault(k, rng.choice(["stated", "found_not_stated", "no_change", "not_verifiable"]))
+        inst.setdefault(k, rng.choice(sorted(cs.VOCAB[k] - {"unresolved"})))
     insts.append(inst)
 for v in range(13):            # V13 has no items -> items unavailable
     for k in range(1, 9):
@@ -85,6 +93,7 @@ for i in ids:
                     "gross": "1" if cons == "no" and rng.random() < 0.5 else "0"})
 links = [{"record_id": "D016", "group_id": "G1"}, {"record_id": "D017", "group_id": "G1"},
          {"record_id": "D020", "group_id": "G2"}, {"record_id": "D021", "group_id": "G2"}]
+assert not E5_UNCODED.keys() & {r["record_id"] for r in recs}, "E5-linked duplicates must not be coded"
 
 for coder in ["reconciled", "coder1", "coder2"]:
     rr = [dict(r) for r in recs]
@@ -105,6 +114,14 @@ for coder in ["reconciled", "coder1", "coder2"]:
                    "gross": "0"})                                      # a result recalculated by coder 2 only
         for x in cc[::5]:
             x["consistent"] = "no" if x["consistent"] == "yes" else "yes"
+            if x["consistent"] != "no":
+                x["gross"] = "0"                                           # gross needs an inconsistent result
+        for r in rr[::7]:
+            r["conclusion_ai_fatigue_term"] = "1" if r["conclusion_ai_fatigue_term"] == "0" else "0"
+        for r in rr[1::6]:
+            r["conclusion_identified"] = "0" if r["conclusion_identified"] == "1" else "1"
+        for r in rr[2::5]:
+            r["main_instrument_identified"] = "0" if r["main_instrument_identified"] == "1" else "1"
     write(f"records_{coder}.csv", rr)
     write(f"instruments_{coder}.csv", insts)
     write(f"items_{coder}.csv", it)
@@ -119,7 +136,7 @@ write("candidates.csv", [{"record_id": r["record_id"], "population": r["populati
 # --- boundary tests ---------------------------------------------------------
 res = cs.build_tables(out)
 conf = [r for r in res["recs"] if r["set"] == "main"]
-assert res["n_main"] == 15 == len(conf), res["n_main"]
+assert res["n_main"] == 13 == len(conf), res["n_main"]     # 15 main studies minus 2 uncoded E5 duplicates
 assert not any(t["set"] == "calibration" for t in res["tables"]), "calibration records leaked into tables"
 # versions: V10-V13 are first used by calibration records (n = 10..13) and also by main
 # records (n = 24..27 -> V10..V13), so they are first seen in the main set
@@ -151,8 +168,9 @@ cr_ = [{"record_id": "a", "consistent": "no", "gross": "1"}, {"record_id": "a", 
 t4 = {(r["row"], r["value"]): r["count"] for r in cs.c4f_result_table(rr_, cr_, "main")}
 assert t4[("results", "no")] == 1 and t4[("results", "yes")] == 1 and t4[("results", "gross")] == 1, t4
 assert t4[("results_per_record", "2")] == 1 and t4[("results_per_record", "0")] == 1, t4
-conf_res = [r for r in res["c4f_results"] if r["set"] == "main" and r["row"] == "results_per_record"]
-assert sum(r["count"] for r in conf_res) == 15, conf_res
+conf_res = [r for r in res["c4f_results"] if r["set"] == "main" and r["row"] == "results_per_record"
+            and r["split"] == "all"]          # CHANGED: the table now also has population rows
+assert sum(r["count"] for r in conf_res) == 13, conf_res
 # instruments used: a version first seen in exploration is listed for the main set too
 iu = cs.instruments_used([{"record_id": "x", "set": "exploration"}, {"record_id": "y", "set": "main"}],
                          [{"record_id": "x", "version_id": "E1", "origin": "new"},
@@ -184,7 +202,7 @@ assert all(r["set"] != "calibration" for r in res["instruments_used"])
 # per-study table: primary sets only, no calibration records
 ps_ = res["per_study"]
 assert ps_ and all(r["set"] in cs.PRIMARY_SETS for r in ps_)
-assert sum(1 for r in ps_ if r["set"] == "main") == 15
+assert sum(1 for r in ps_ if r["set"] == "main") == 13
 # lenient C2b: secondary types count in the per-version and the aggregate rows alike
 li = [{"version_id": "N1", "type": "OTH", "boundary": "1", "secondary_type": "FAT", "target": ""},
       {"version_id": "N1", "type": "OTH", "boundary": "1", "secondary_type": "OTH", "target": ""}]
@@ -192,8 +210,11 @@ lt = cs.c2b_tables(li, {"N1": "main"}, "main", lenient=True)
 assert [r for r in lt if r["version_id"] == "N1" and r["type"] == "FAT"][0]["count"] == 1
 assert [r for r in lt if r["version_id"] == "N1" and r["type"] == "OTH"][0]["count"] == 2   # same type not doubled
 assert [r for r in lt if r["version_id"] == "ALL" and r["type"] == "FAT"][0]["instruments_with_type"] == 1
-rq4 = [r for r in res["rq4"] if r["set"] == "main"][0]
-assert rq4["records"] == 15 and rq4["studies"] == 13, rq4          # G1 (D016, D017), G2 (D020, D021)
+rq4 = [r for r in res["rq4"] if r["set"] == "main" and r["split"] == "all"][0]
+# CHANGED (E5 records are not coded): 13 coded records + 2 uncoded linked duplicates (D017, D021) = 15 records;
+# each E5 group (G1, G2) is counted once, so 13 studies
+assert rq4["records_coded"] == 13 and rq4["records_uncoded_linked"] == 2 and rq4["records"] == 15, rq4
+assert rq4["studies"] == 13 and rq4["records_in_e5_groups"] == 4, rq4
 # C7: two-family instrument name matches either family
 base = {"conclusion_identified": "1", "main_instrument_identified": "1", "C6b": "match",
         "conclusion_ai_fatigue_term": "0"}
@@ -225,7 +246,8 @@ assert centre and not {t["code"] for t in centre} & {"C1_rep", "C6c", "C7_ii"}, 
 assert {"C7_i", "C7_iii", "C6a", "C6b"} <= {t["code"] for t in centre}
 assert {"C6c", "C1_rep", "C7_ii"} <= {t["code"] for t in res["tables"] if t["split"] in ("all", "population")}
 # C4f results by source (text / table)
-src_rows = {(r["row"], r["value"]): r["count"] for r in res["c4f_results"] if r["set"] == "main"}
+src_rows = {(r["row"], r["value"]): r["count"] for r in res["c4f_results"]
+            if r["set"] == "main" and r["split"] == "all"}
 assert sum(src_rows[(f"results_from_{so}", k)] for so in ["text", "table"] for k in ["yes", "no", "na", "unresolved"]) == \
     sum(src_rows[("results", k)] for k in ["yes", "no", "na", "unresolved"])
 # C1 representative
@@ -254,6 +276,7 @@ bad = out / "bad"
 bad.mkdir(exist_ok=True)
 for kind in ["records", "instruments", "items", "c4f"]:
     (bad / f"{kind}_reconciled.csv").write_text((out / f"{kind}_reconciled.csv").read_text(encoding="utf-8"), encoding="utf-8")
+(bad / "links.csv").write_text((out / "links.csv").read_text(encoding="utf-8"), encoding="utf-8")
 bad_items = cs.read_csv(bad / "items_reconciled.csv")
 bad_items[0]["type"] = "FATIGUE"                                  # not in the code list
 write_to = bad / "items_reconciled.csv"
@@ -347,6 +370,7 @@ vbad = out / "vbad"
 vbad.mkdir(exist_ok=True)
 for kind in ["records", "instruments", "items", "c4f"]:
     (vbad / f"{kind}_reconciled.csv").write_text((out / f"{kind}_reconciled.csv").read_text(encoding="utf-8"), encoding="utf-8")
+(vbad / "links.csv").write_text((out / "links.csv").read_text(encoding="utf-8"), encoding="utf-8")
 vr = cs.read_csv(vbad / "records_reconciled.csv")
 vr[0]["C6a"] = "unnamed_or_not_verifiable"                           # the old combined value is refused
 with open(vbad / "records_reconciled.csv", "w", encoding="utf-8", newline="") as f_:
@@ -451,6 +475,7 @@ flag = out / "flag"
 flag.mkdir(exist_ok=True)
 for kind in ["records", "instruments", "items", "c4f"]:
     (flag / f"{kind}_reconciled.csv").write_text((out / f"{kind}_reconciled.csv").read_text(encoding="utf-8"), encoding="utf-8")
+(flag / "links.csv").write_text((out / "links.csv").read_text(encoding="utf-8"), encoding="utf-8")
 fr = cs.read_csv(flag / "records_reconciled.csv")
 for r_ in fr:
     r_["calibration_draw"] = "1" if r_["set"] == "exploration" else "0"
@@ -488,4 +513,194 @@ except cs.InputError:
     pass
 # the C7 summary value is reported only in the per-study table (GSRR-43), never in the set tables
 assert "C7" not in {t_["code"] for t_ in res["tables"]}, "C7 summary must not be in the tables"
+# === review round 2 assertions ===============================================
+# fix 1: not_verifiable is its own value (excluded from denominators, not evaluable), not not_met / no_term_to_compare
+nv_ = dict(base, conclusion_family="fatigue", main_instrument_family="fatigue", conclusion_ai_fatigue_term="0")
+assert cs.c7_conditions(dict(nv_, C6b="not_verifiable"), "L1a") == \
+    {"C7_i": "not_verifiable", "C7_ii": "not_met", "C7_iii": "not_met"}
+assert cs.c7_conditions(dict(nv_, main_instrument_family="not_verifiable"), "L1a")["C7_iii"] == "not_verifiable"
+assert cs.c7_conditions(dict(nv_, main_instrument_family="no_family_term"), "L1a")["C7_iii"] == "no_term_to_compare"
+assert cs.c7_conditions(dict(nv_, conclusion_family="none"), "L1a")["C7_iii"] == "no_term_to_compare"
+assert cs.c7_conditions(dict(nv_, main_instrument_family="not_verifiable", conclusion_family="none"),
+                        "L1a")["C7_iii"] == "not_verifiable"                  # the unverifiable name comes first
+assert cs.c7_conditions(dict(nv_, main_instrument_family="unresolved"), "L1a")["C7_iii"] == "unresolved"
+assert cs.c7(dict(nv_, C6b="not_verifiable"), "L1a") == "not_verifiable"       # nothing met, one not verifiable
+assert cs.c7(dict(nv_, C6b="not_verifiable", main_instrument_family="burnout"), "L1a") == "beyond"   # (iii) met
+ps_nv = {p_["problem_type"]: p_ for p_ in cs.problem_statements([{"C7_i": "not_verifiable", "C7_iii": "not_verifiable"}])}
+assert ps_nv["C7 (i) causal wording not supported by the design"]["evaluable"] == 0
+assert ps_nv["C7 (iii) conclusion term and instrument name in different term families"]["evaluable"] == 0
+dn_nv = {r["value"]: r["denominator"] for r in cs.count_table(
+    [{"record_id": str(k), "C7_i": v} for k, v in enumerate(["met", "not_met", "not_verifiable"])], "C7_i", {})}
+assert dn_nv["not_verifiable"] == 2, dn_nv                                     # excluded from the denominator (GSRR-53)
+# fix 2: C6c order. Title 'no' wins whatever the main instrument
+tc = dict(base, title_ai_fatigue_term="no")
+assert cs.c6c(dict(tc, main_instrument_identified="0"), "L4") == "no_ai_term"
+assert cs.c6c(dict(tc, main_instrument_identified="0"), "") == "no_ai_term"
+assert cs.c6c(dict(tc, main_instrument_identified="unresolved"), "unresolved") == "no_ai_term"
+ty = dict(base, title_ai_fatigue_term="yes")
+assert cs.c6c(dict(ty, main_instrument_identified="0"), "L1a") == "cannot_decide"
+assert cs.c6c(ty, "not_verifiable") == "cannot_decide" and cs.c6c(ty, "") == "cannot_decide"
+assert cs.c6c(dict(ty, main_instrument_identified="unresolved"), "L3") == "unresolved"
+assert cs.c6c(dict(ty, title_ai_fatigue_term="unresolved", main_instrument_identified="0"), "L3") == "unresolved"
+assert cs.c6c(ty, "L1b") == "ai_term_L1a_L2" and cs.c6c(ty, "L5") == "ai_term_L3_L6"
+# fix 3: only a non-gross inconsistency -> no_gross (a calculated result and no gross one)
+assert cs.c4f_gross([{"consistent": "no", "gross": "0"}]) == "no_gross"
+assert cs.c4f_summary([{"consistent": "no", "gross": "0"}]) == "any_inconsistency"
+assert cs.c4f_gross([{"consistent": "no", "gross": "0"}, {"consistent": "na", "gross": "0"}]) == "no_gross"
+# fix 4: input validation (GSRR-64). Positive control: an unchanged clone loads; each mutation stops
+import shutil  # noqa: E402
+
+
+def clone(name):
+    dd = out / name
+    if dd.exists():
+        shutil.rmtree(dd)
+    dd.mkdir()
+    for f_ in [f"{k}_{c_}.csv" for k in ["records", "instruments", "items", "c4f"] for c_ in ["reconciled", "coder1", "coder2"]] \
+            + ["links.csv"]:
+        shutil.copy(out / f_, dd / f_)
+    return dd
+
+
+def rewrite(dd, kind, mutate=None, drop=None):
+    path = dd / (f"{kind}_reconciled.csv" if kind != "links" else "links.csv")
+    rows_ = cs.read_csv(path)
+    if mutate:
+        mutate(rows_)
+    cols_ = [c_ for c_ in rows_[0] if c_ != drop]
+    with open(path, "w", encoding="utf-8", newline="") as f_:
+        w2 = csv.DictWriter(f_, fieldnames=cols_, extrasaction="ignore")
+        w2.writeheader()
+        w2.writerows(rows_)
+
+
+def must_stop(label, kind, mutate=None, drop=None, needle=None):
+    dd = clone("val_" + label)
+    cs.build_tables(dd)                                     # positive control: the clone is valid
+    rewrite(dd, kind, mutate, drop)
+    try:
+        cs.build_tables(dd)
+    except cs.InputError as e_:
+        assert needle is None or needle in str(e_), (label, str(e_))
+        return
+    raise AssertionError(f"{label}: invalid input must stop")
+
+
+must_stop("c3_bad", "records", lambda rs: rs[0].update(C3="amount_of_use|sleep"), needle="C3")
+must_stop("c3_rep", "records", lambda rs: rs[0].update(C3="amount_of_use|amount_of_use"), needle="repeated")
+must_stop("family_rep", "records", lambda rs: rs[0].update(conclusion_family="fatigue|fatigue"), needle="repeated")
+must_stop("centre", "records", lambda rs: rs[0].update(centre="C"), needle="centre")
+must_stop("centre_empty_unknown", "records", lambda rs: rs[3].update(centre="a"), needle="centre")   # case counts
+must_stop("population", "records", lambda rs: rs[0].update(population="pensioners"), needle="population")
+must_stop("peer", "records", lambda rs: rs[0].update(peer_reviewed="yes"), needle="peer_reviewed")
+must_stop("c1", "records", lambda rs: rs[0].update(C1_L2="2"), needle="C1_L2")
+must_stop("c4b", "records", lambda rs: rs[0].update(C4b="maybe"), needle="C4b")
+must_stop("c4e", "records", lambda rs: rs[0].update(C4e_agreement="some"), needle="C4e_agreement")
+must_stop("c5", "records", lambda rs: rs[0].update(C5="linked"), needle="C5")
+must_stop("ident", "records", lambda rs: rs[0].update(conclusion_identified="yes"), needle="conclusion_identified")
+must_stop("mi_ident", "records", lambda rs: rs[0].update(main_instrument_identified="2"), needle="main_instrument_identified")
+must_stop("ai_term", "records", lambda rs: rs[0].update(conclusion_ai_fatigue_term="yes"), needle="conclusion_ai_fatigue_term")
+must_stop("family", "records", lambda rs: rs[0].update(main_instrument_family="happiness"), needle="main_instrument_family")
+must_stop("set", "records", lambda rs: rs[0].update(set="pilot"), needle="set")
+must_stop("gross_pair", "c4f", lambda rs: rs[0].update(consistent="yes", gross="1"), needle="gross")
+must_stop("gross_na", "c4f", lambda rs: rs[0].update(consistent="na", gross="1"), needle="gross")
+must_stop("c4f_source", "c4f", lambda rs: rs[0].update(source="figure"), needle="source")
+must_stop("origin_missing", "instruments", drop="origin", needle="origin")
+must_stop("c2d_missing", "instruments", drop="C2d_reason", needle="C2d_reason")
+must_stop("origin_bad", "instruments", lambda rs: rs[0].update(origin="invented"), needle="origin")
+must_stop("mod_bad", "instruments", lambda rs: rs[0].update(mod_scoring="yes"), needle="mod_scoring")
+must_stop("c2c_empty", "instruments", lambda rs: rs[0].update(C2c_pilot=""), needle="C2c_pilot")
+must_stop("items_full", "instruments", lambda rs: rs[0].update(items_full="twelve"), needle="items_full")
+must_stop("item_boundary", "items", lambda rs: rs[0].update(boundary="yes"), needle="boundary")
+must_stop("item_target", "items", lambda rs: rs[0].update(target="NOWHERE"), needle="target")
+must_stop("item_secondary", "items", lambda rs: rs[0].update(secondary_type="XYZ"), needle="secondary_type")
+must_stop("item_source_missing", "items", drop="item_source", needle="item_source")
+# E5 (GSRR-35): a second coded record in one group, or a group without a coded record, stops
+must_stop("e5_two_coded", "links", lambda rs: rs.append({"record_id": "D018", "group_id": "G1"}), needle="G1")
+must_stop("e5_no_coded", "links", lambda rs: rs.append({"record_id": "D099", "group_id": "G9"}), needle="G9")
+# an empty file still fails the header check; a header-only file passes the header check
+for kind_ in ["records", "instruments", "items", "c4f"]:
+    dd_ = clone("empty_" + kind_)
+    (dd_ / f"{kind_}_reconciled.csv").write_text("", encoding="utf-8")
+    try:
+        cs.build_tables(dd_)
+        raise AssertionError(f"empty {kind_} file must fail the header check")
+    except cs.InputError as e_:
+        assert "empty file" in str(e_) or "no header" in str(e_), e_
+dd_ = clone("empty_links")
+(dd_ / "links.csv").write_text("", encoding="utf-8")
+try:
+    cs.build_tables(dd_)
+    raise AssertionError("empty links file must fail")
+except cs.InputError:
+    pass
+dd_ = clone("header_only_items")
+(dd_ / "items_reconciled.csv").write_text(",".join(cs.REQUIRED["items"]) + "\n", encoding="utf-8")
+assert cs.build_tables(dd_)["c2b"]                           # no items: every instrument is "items unavailable"
+dd_ = clone("header_only_cols")
+(dd_ / "items_reconciled.csv").write_text("version_id,item_no\n", encoding="utf-8")
+try:
+    cs.build_tables(dd_)
+    raise AssertionError("a header-only file with missing columns must fail")
+except cs.InputError as e_:
+    assert "missing columns" in str(e_)
+# a repeated value in a multi-value cell counts once even if it got past validation
+assert {r["value"]: r["count"] for r in cs.count_table(
+    [{"record_id": "a", "C3": "amount_of_use|amount_of_use|attitude"}], "C3", {})} == {"amount_of_use": 1, "attitude": 1}
+# the stop surfaces as exit code 3 from the command line
+import subprocess  # noqa: E402
+dd_ = clone("cli_stop")
+rewrite(dd_, "records", lambda rs: rs[0].update(centre="C"))
+proc = subprocess.run([sys.executable, str(Path(cs.__file__)), "--tables", str(dd_)], capture_output=True, text=True)
+assert proc.returncode == 3 and "STOPPED" in proc.stderr, (proc.returncode, proc.stderr)
+# fix 5: E5-linked records are not coded; they appear only in links.csv
+coded_ids_ = {r["record_id"] for r in cs.read_csv(out / "records_reconciled.csv")}
+assert not set(E5_UNCODED) & coded_ids_ and set(E5_UNCODED) <= {l_["record_id"] for l_ in links}
+assert not set(E5_UNCODED) & {r["record_id"] for r in cs.read_csv(out / "c4f_reconciled.csv")}
+assert not set(E5_UNCODED) & {r["record_id"] for r in cs.read_csv(out / "instruments_reconciled.csv")}
+tab_main = {r["value"]: r for r in res["tables"] if r["set"] == "main" and r["split"] == "all" and r["code"] == "C6b"}
+assert all(r["studies"] == 13 for r in tab_main.values()), tab_main      # the 10-study minimum counts coded records
+rq_pop = [r for r in res["rq4"] if r["set"] == "main" and r["split"] == "population"]
+assert sum(r["records_coded"] for r in rq_pop) == 13 and sum(r["records_uncoded_linked"] for r in rq_pop) == 2
+assert sum(r["studies"] for r in rq_pop) == 13
+r4 = cs.rq4_counts([{"record_id": "a", "set": "main", "population": "p", "C5": "e5_group"},
+                    {"record_id": "b", "set": "main", "population": "p", "C5": "signs_not_confirmed"},
+                    {"record_id": "c", "set": "main", "population": "q", "C5": "no_signs"}],
+                   [{"record_id": "a", "group_id": "G"}, {"record_id": "a2", "group_id": "G"},
+                    {"record_id": "a3", "group_id": "G"}], "main")
+assert (r4["records_coded"], r4["records_uncoded_linked"], r4["records"], r4["studies"]) == (3, 2, 5, 3), r4
+assert r4["signs_not_confirmed"] == 1 and r4["records_in_e5_groups"] == 3, r4
+r4p = cs.rq4_counts([{"record_id": "a", "set": "main", "population": "p"}, {"record_id": "c", "set": "main", "population": "q"}],
+                    [{"record_id": "a", "group_id": "G"}, {"record_id": "a2", "group_id": "G"}], "main", "q")
+assert (r4p["records"], r4p["studies"], r4p["group"]) == (1, 1, "q"), r4p       # another group's duplicates do not leak
+# fix 6: agreement for the conclusion / main-instrument identification and the AI-fatigue-term code
+for c_ in ["conclusion_identified", "main_instrument_identified", "conclusion_ai_fatigue_term"]:
+    rows_c = [ag_[(st_, c_)] for st_ in ("main", "exploration") if (st_, c_) in ag_]
+    assert len(rows_c) == 2 and all(r["n"] > 0 and r["percent_agreement"] is not None and "kappa" in r for r in rows_c), c_
+    assert any(r["percent_agreement"] < 1 for r in rows_c), c_              # the dummy coder 2 differs on them
+# fix 7: C4f per result and RQ4 are also given by population group; C2b and instruments used are not
+c4f_pop = [r for r in res["c4f_results"] if r["set"] == "main" and r["split"] == "population"]
+assert c4f_pop and {r["group"] for r in c4f_pop} == {r["group"] for r in rq_pop} and \
+    {r["group"] for r in c4f_pop} <= set(cs.POPULATION_ORDER)
+for row_ in ("results", "results_per_record"):
+    for val_ in {r["value"] for r in res["c4f_results"] if r["set"] == "main" and r["row"] == row_ and r["split"] == "all"}:
+        tot_ = sum(r["count"] for r in c4f_pop if r["row"] == row_ and r["value"] == val_)
+        all_ = sum(r["count"] for r in res["c4f_results"] if r["set"] == "main" and r["split"] == "all"
+                   and r["row"] == row_ and r["value"] == val_)
+        if row_ == "results":
+            assert tot_ == all_, (row_, val_, tot_, all_)               # population groups partition the results
+assert "split" not in res["c2b"][0] and all("split" not in r for r in res["instruments_used"])
+# fix 8: sensitivity() uses the coder it is given (S1-S3), not silently the reconciled values
+s_rec, s3_rec = cs.sensitivity(out)
+s_c2, s3_c2 = cs.sensitivity(out, "coder2")
+b_c2 = cs.build_tables(out, "coder2")
+b_main = [r for r in b_c2["recs"] if r["set"] == "main"]
+exp_s1 = cs.problem_statements([r for r in b_main if r.get("peer_reviewed") == "1"])
+got_s1 = [{k: v for k, v in r.items() if k != "analysis"} for r in s_c2 if r["analysis"] == "S1 peer-reviewed only"]
+assert got_s1 == exp_s1, "S1 must use the coder given"
+rec_s1 = [{k: v for k, v in r.items() if k != "analysis"} for r in s_rec if r["analysis"] == "S1 peer-reviewed only"]
+assert got_s1 != rec_s1, "coder2 and reconciled values must give different S1 tables in the dummy"
+c2b_exp = cs.c2b_tables(b_c2["items"], b_c2["vsets"], "main", lenient=True, insts=b_c2["insts"])
+assert [{k: v for k, v in r.items() if k != "analysis"} for r in s3_c2] == c2b_exp, "S3 must use the coder given"
+assert [r for r in s3_c2 if r["version_id"] != "SUMMARY"] != [r for r in s3_rec if r["version_id"] != "SUMMARY"]
 print(f"dummy tables in {out}; all boundary tests passed")

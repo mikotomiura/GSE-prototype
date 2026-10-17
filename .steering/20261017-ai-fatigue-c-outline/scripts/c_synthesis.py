@@ -16,7 +16,8 @@ Input files (one row per unit; `coder` is coder1 / coder2 / reconciled):
   items_<coder>.csv        item-level codes (C2b), keyed by version_id and item_no
   c4f_<coder>.csv          one row per recalculated result (source: text/table; consistent: yes/no/na; gross: 1/0)
   c4f_ai.csv               the AI draft for C4f (optional; human-AI agreement, report-only)
-  links.csv                E5 links (record_id, group_id)
+  links.csv                E5 links (record_id, group_id) for every record of an E5 group; the group's one coded
+                           record is in records_*.csv, the others are NOT coded and appear only here
 The set of an instrument version (and of its items) is derived, never read: the first set,
 in the order exploration, main, late, in which a record uses the version.
 Missing files, missing columns and values outside the code lists stop the script.
@@ -58,52 +59,161 @@ BOOT_SEED = 20261017
 BOOT_N = 2000
 PRIMARY_SETS = ["main", "exploration", "late"]
 FIRST_SEEN_ORDER = ["exploration", "main", "late"]
+MISSING = {"not_verifiable", "not_applicable", "unresolved"}
+FLAG = {"0", "1", "unresolved"}
+CONSISTENCY = {"consistent", "inconsistent", "not_verifiable", "not_applicable", "unresolved"}
+MOD_VALUES = {"stated", "found_not_stated", "no_change"} | MISSING
+REPORTED = {"reported", "not_reported"} | MISSING
+INSTRUMENT_CODES = ["origin", "format", "mod_items_dropped", "mod_items_added", "mod_reworded",
+                    "mod_instructions_only", "mod_response_scale", "mod_scoring", "mod_translated",
+                    "C2c_backtranslation", "C2c_content_validity", "C2c_pilot", "C2c_factor_check",
+                    "C2d_item_disclosure", "C2d_reliability", "C2d_factor_analysis", "C2d_reason"]
+FAMILY_VALUES = {"fatigue", "exhaustion", "burnout", "none", "no_family_term", "instrument_unnamed",
+                 "not_verifiable", "unresolved"}
+# GSRR-64: every coded column is checked against its code list (flat: column names are unique across files).
+# '' is listed only for columns that may be empty.
 VOCAB = {
     "set": {"exploration", "main", "late", "calibration"},
-    "type": set(C2B_TYPES) | {"unresolved"},
-    "consistent": {"yes", "no", "na", "unresolved"},
-    "source": {"text", "table"},
+    "population": set(POPULATION_ORDER),
+    "centre": {"A", "B"},
+    "peer_reviewed": {"0", "1"},
+    "calibration_draw": {"", "0", "1"},
+    "C3": {"amount_of_use", "dependence", "attitude", "other", "none"} | MISSING,
     "C4a": {"consistent", "inconsistent", "no_comparison_possible", "not_verifiable", "not_applicable",
             "unresolved"},
+    "C4b": CONSISTENCY,
+    "C4c": CONSISTENCY | {"no_criterion_stated"},
+    "C4d": CONSISTENCY | {"not_reported"},
+    "C4e_codebook": {"yes", "no"} | MISSING,
+    "C4e_agreement": {"value_given", "index_only", "none"} | MISSING,
+    "C5": {"e5_group", "signs_not_confirmed", "no_signs", "not_verifiable", "unresolved"},
     "C6a": {"same_family", "different_family", "no_family_term", "instrument_unnamed", "not_verifiable",
             "no_construct_term", "unresolved"},
+    "conclusion_identified": FLAG,
+    "main_instrument_identified": FLAG,
+    "conclusion_ai_fatigue_term": FLAG,
+    "conclusion_family": FAMILY_VALUES,
+    "main_instrument_family": FAMILY_VALUES,
     "title_ai_fatigue_term": {"yes", "no", "unresolved"},
     # C6b: "no causal wording" is a match (GSRR-43), so it is coded as match, not as its own value
     "C6b": {"match", "mismatch", "not_verifiable", "unresolved"},
+    # instruments
+    "origin": {"new", "existing_ai", "adapted_general", "unchanged_general", "general_not_verifiable",
+               "not_verifiable", "unresolved"},
+    "format": {"multi_item", "single_item", "qualitative", "not_verifiable", "unresolved"},
+    "C2d_item_disclosure": {"all", "some", "none", "not_verifiable", "unresolved"},
+    "C2d_reliability": REPORTED, "C2d_factor_analysis": REPORTED,
+    "C2d_reason": {"given", "not_given"} | MISSING,
+    # items
+    "type": set(C2B_TYPES) | {"unresolved"},
+    "boundary": FLAG,
+    "secondary_type": {""} | set(C2B_TYPES) | {"unresolved"},
+    "target": {"", "TASK", "AI_USE", "AI_VERIFY", "AI_PRIV", "SOCIAL", "OTHER", "unresolved"},
+    "item_source": {"printed", "source"},
+    # c4f
+    "consistent": {"yes", "no", "na", "unresolved"},
+    "source": {"text", "table"},
+    "gross": FLAG,
 }
+for _lv in C1_LEVELS:
+    VOCAB[f"C1_{_lv}"] = FLAG | {"not_verifiable"}
+for _k in INSTRUMENT_CODES:
+    if _k.startswith("mod_"):
+        VOCAB[_k] = MOD_VALUES
+    elif _k.startswith("C2c_"):
+        VOCAB[_k] = REPORTED
+MULTI_VALUE = {"C3", "conclusion_family", "main_instrument_family"}   # '|'-separated, each value once
+INTEGER_COLS = {"items_full", "item_no"}                              # digits (items_full may be a missing code)
+OPTIONAL_EMPTY = {"secondary_type", "target", "conclusion_sentence"}
 REQUIRED = {
     "records": ["record_id", "set", "population", "centre", "peer_reviewed", "C3", "C4a", "C4b", "C4c",
                 "C4d", "C4e_codebook", "C4e_agreement", "C5", "C6a", "C6b", "conclusion_identified",
                 "main_instrument_identified", "conclusion_ai_fatigue_term", "conclusion_family",
                 "main_instrument_family", "conclusion_sentence",
                 "title_ai_fatigue_term"] + [f"C1_{lv}" for lv in C1_LEVELS],
-    "instruments": ["record_id", "instrument_id", "version_id", "language", "items_full"],
-    "items": ["version_id", "item_no", "type", "boundary", "secondary_type", "target"],
+    "instruments": ["record_id", "instrument_id", "version_id", "language", "items_full"] + INSTRUMENT_CODES,
+    "items": ["version_id", "item_no", "type", "boundary", "secondary_type", "target", "item_source"],
     "c4f": ["record_id", "result_id", "source", "consistent", "gross"],
 }
+LINK_COLUMNS = ["record_id", "group_id"]
 
 
 class InputError(Exception):
     pass
 
 
+def read_table(path):
+    """(header, rows). The header is read even when there are no data rows; an empty file has none (None)."""
+    with open(path, encoding="utf-8", newline="") as f:
+        rd = csv.DictReader(f)
+        return rd.fieldnames, list(rd)
+
+
+def check_cell(name, col, value):
+    """One cell against its code list; multi-value cells are split and may not repeat a value."""
+    if col in INTEGER_COLS:
+        if not (value.isdigit() or (col == "items_full" and value in MISSING)):
+            raise InputError(f"{name}: value {value!r} is not a whole number in column {col}")
+        return
+    allowed = VOCAB.get(col)
+    if allowed is None:
+        return
+    parts = value.split("|") if col in MULTI_VALUE else [value]
+    if len(set(parts)) != len(parts):
+        raise InputError(f"{name}: repeated value in column {col}: {value!r}")
+    for p in parts:
+        if p not in allowed:
+            raise InputError(f"{name}: value {p!r} not allowed in column {col}")
+
+
 def load(d, kind, coder):
     path = d / f"{kind}_{coder}.csv"
     if not path.exists():
         raise InputError(f"missing file {path.name}")
-    rows = read_csv(path)
-    cols = set(rows[0]) if rows else set()
-    missing = [c for c in REQUIRED[kind] if rows and c not in cols]
+    fields, rows = read_table(path)
+    if not fields:
+        raise InputError(f"{path.name}: empty file (no header)")
+    missing = [c for c in REQUIRED[kind] if c not in fields]
     if missing:
         raise InputError(f"{path.name}: missing columns {missing}")
     for r in rows:
-        for col, allowed in VOCAB.items():
-            if col in r and r[col] not in allowed:
-                raise InputError(f"{path.name}: value {r[col]!r} not allowed in column {col}")
         for col in REQUIRED[kind]:
-            if r.get(col, "") == "" and col not in {"secondary_type", "target", "conclusion_sentence"}:
+            if r.get(col, "") == "" and col not in OPTIONAL_EMPTY:
                 raise InputError(f"{path.name}: empty cell in {col} (use not_verifiable / not_applicable)")
+        for col in list(r):
+            if col is not None and (col in REQUIRED[kind] or col in VOCAB):
+                check_cell(path.name, col, r[col] or "")
+        if kind == "c4f" and r["gross"] == "1" and r["consistent"] != "no":
+            raise InputError(f"{path.name}: gross=1 in result {r['result_id']} that is not inconsistent")
     return rows
+
+
+def load_links(d, recs):
+    """E5 links (record_id, group_id) for the linked records, coded or not (GSRR-35). Linked records other than
+    the one coded record of a group are not coded, so a group has exactly one coded record."""
+    path = d / "links.csv"
+    if not path.exists():
+        raise InputError("missing file links.csv")
+    fields, links = read_table(path)
+    if not fields:
+        raise InputError("links.csv: empty file (no header)")
+    missing = [c for c in LINK_COLUMNS if c not in fields]
+    if missing:
+        raise InputError(f"links.csv: missing columns {missing}")
+    seen = set()
+    for l in links:
+        if any(l.get(c, "") == "" for c in LINK_COLUMNS):
+            raise InputError("links.csv: empty cell")
+        if l["record_id"] in seen:
+            raise InputError(f"links.csv: record {l['record_id']} listed twice")
+        seen.add(l["record_id"])
+    coded = {r["record_id"] for r in recs}
+    per_group = Counter(l["group_id"] for l in links if l["record_id"] in coded)
+    for g in {l["group_id"] for l in links}:
+        if per_group[g] != 1:
+            raise InputError(f"links.csv: E5 group {g} has {per_group[g]} coded records (must be exactly 1; "
+                             "E5-linked duplicates are not coded)")
+    return links
 
 
 def version_sets(insts, recs):
@@ -242,15 +352,18 @@ def c4f_gross(results):
 
 
 def c6c(rec, rep):
-    """C6c (GSRR-43): the title input and the main instrument's C1 representative value.
-    Unresolved input -> unresolved; main instrument unknown (or no C1 level) -> cannot_decide."""
+    """C6c (GSRR-43), in this order: title input 'no' -> no_ai_term whatever the main instrument; unresolved
+    title -> unresolved; 'yes' and the main instrument not identified (or no usable C1 value) -> cannot_decide;
+    'yes' with L3-L6 -> ai_term_L3_L6; 'yes' with L1a/L1b/L2 -> ai_term_L1a_L2; unresolved inputs -> unresolved."""
     title, mi = rec.get("title_ai_fatigue_term"), rec.get("main_instrument_identified")
-    if "unresolved" in (title, mi):
+    if title == "unresolved":
+        return "unresolved"
+    if title == "no":
+        return "no_ai_term"
+    if mi == "unresolved":
         return "unresolved"
     if mi != "1":
         return "cannot_decide"
-    if title == "no":
-        return "no_ai_term"
     if rep == "unresolved":
         return "unresolved"
     if rep in C7_WEAK_LEVELS:
@@ -265,7 +378,8 @@ def c7_conditions(rec, rep):
     conclusion unknown -> all three; only the main instrument unknown -> (i) is still derived (from C6b),
     (ii) and (iii) are cannot_decide. A condition is unresolved only if one of its own inputs is.
     (ii) is not_applicable when rep is '' (centre tables). (iii) is no_term_to_compare when the conclusion
-    has no construct term or the instrument name has no family term."""
+    has no construct term or the instrument name has no family term; not_verifiable if the instrument name is.
+    (i) is not_verifiable if C6b is. not_verifiable is an excluded value (GSRR-53), not evaluable."""
     ci, mi = rec.get("conclusion_identified"), rec.get("main_instrument_identified")
     if ci == "unresolved":
         return {k: "unresolved" for k in ("C7_i", "C7_ii", "C7_iii")}
@@ -273,6 +387,7 @@ def c7_conditions(rec, rep):
         return {k: "cannot_decide" for k in ("C7_i", "C7_ii", "C7_iii")}
     out = {}
     out["C7_i"] = ("unresolved" if rec.get("C6b") == "unresolved"
+                   else "not_verifiable" if rec.get("C6b") == "not_verifiable"
                    else "met" if rec.get("C6b") == "mismatch" else "not_met")
     if mi == "unresolved":
         out["C7_ii"] = out["C7_iii"] = "unresolved"
@@ -288,6 +403,8 @@ def c7_conditions(rec, rep):
         out["C7_ii"] = "met" if (rec.get("conclusion_ai_fatigue_term") == "1" and rep in C7_WEAK_LEVELS) else "not_met"
     if "unresolved" in (rec.get("conclusion_family"), rec.get("main_instrument_family")):
         out["C7_iii"] = "unresolved"
+    elif families(rec["main_instrument_family"]) == {"not_verifiable"}:
+        out["C7_iii"] = "not_verifiable"          # the instrument name cannot be verified (GSRR-43)
     else:
         cf = families(rec["conclusion_family"]) - NO_FAMILY
         mf = families(rec["main_instrument_family"]) - NO_FAMILY
@@ -298,7 +415,7 @@ def c7_conditions(rec, rep):
 
 def c7(rec, rep):
     """Summary of C7: unresolved if any condition is; beyond if any condition is met; cannot_decide if
-    any condition cannot be decided; otherwise within."""
+    any condition cannot be decided; not_verifiable if none is met and any is not verifiable; otherwise within."""
     vals = list(c7_conditions(rec, rep).values())
     if "unresolved" in vals:
         return "unresolved"
@@ -306,6 +423,8 @@ def c7(rec, rep):
         return "beyond"
     if "cannot_decide" in vals:
         return "cannot_decide"
+    if "not_verifiable" in vals:
+        return "not_verifiable"
     return "within"
 
 
@@ -412,11 +531,9 @@ def run_agreement(d):
     # C6c and C7 are derived: no kappa. The C6c title input is a coded input.
     rec_codes = [f"C1_{lv}" for lv in C1_LEVELS] + ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d",
                  "C4e_codebook", "C4e_agreement", "C4f", "C4f_gross", "C5", "C6a", "C6b",
-                 "title_ai_fatigue_term"]
-    inst_codes = ["origin", "format", "mod_items_dropped", "mod_items_added", "mod_reworded",
-                  "mod_instructions_only", "mod_response_scale", "mod_scoring", "mod_translated",
-                  "C2c_backtranslation", "C2c_content_validity", "C2c_pilot", "C2c_factor_check",
-                  "C2d_item_disclosure", "C2d_reliability", "C2d_factor_analysis", "C2d_reason"]
+                 "title_ai_fatigue_term", "conclusion_identified", "main_instrument_identified",
+                 "conclusion_ai_fatigue_term"]
+    inst_codes = INSTRUMENT_CODES
     for s in sets:
         in_set = lambda rows: [r for r in rows if r.get("set") == s]
         for code in rec_codes:
@@ -461,9 +578,6 @@ def run_agreement(d):
 
 # --- tables (GSRR-56, GSRR-57, GSRR-62) ------------------------------------
 
-MULTI_VALUE = {"C3"}
-
-
 def count_table(rows, key, label, n_studies=None):
     """Counts per value. Proportions only if the table's own study count is >= MIN_STUDIES.
     Multi-value codes (all that apply, '|'-separated) count each value once per row."""
@@ -472,7 +586,7 @@ def count_table(rows, key, label, n_studies=None):
     vals = []
     for r in rows:
         v = r.get(key, "")
-        vals += v.split("|") if key in MULTI_VALUE and v else [v]
+        vals += list(dict.fromkeys(v.split("|"))) if key in MULTI_VALUE and v else [v]
     denom_rows = [r for r in rows if r.get(key, "") not in EXCLUDED]
     allow_prop = n_studies >= MIN_STUDIES
     return [{**label, "code": key, "value": v, "count": n, "denominator": len(denom_rows),
@@ -486,12 +600,6 @@ RECORD_CODES = ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d", "C4e_codebook", "C4e
                 "C4f", "C4f_gross", "C5", "C6a", "C6b", "C6c", "C7_i", "C7_ii", "C7_iii"]
 # GSRR-12 / GSRR-64: the centre tables are split by attribution, so they leave out C1, C6c and C7 (ii)
 CENTRE_OMIT = {"C1_rep", "C6c", "C7_ii"}
-INSTRUMENT_CODES = ["origin", "format", "mod_items_dropped", "mod_items_added", "mod_reworded",
-                    "mod_instructions_only", "mod_response_scale", "mod_scoring", "mod_translated",
-                    "C2c_backtranslation", "C2c_content_validity", "C2c_pilot", "C2c_factor_check",
-                    "C2d_item_disclosure", "C2d_reliability", "C2d_factor_analysis", "C2d_reason"]
-
-
 def record_tables(recs, insts, label):
     out = []
     n = len({r["record_id"] for r in recs})
@@ -551,13 +659,22 @@ def c2b_tables(items, vsets, set_name, lenient=False, insts=()):
     return rows
 
 
-def rq4_counts(recs, links, set_name):
+def rq4_counts(recs, links, set_name, group_name=None):
+    """RQ4 (GSRR-56): records = coded records + linked uncoded E5 records of the groups of those coded records;
+    studies = coded records with each E5 group counted once. `links` lists (record_id, group_id) for the linked
+    records; E5-linked duplicates are not coded (GSRR-35). group_name restricts to one population group."""
     group = {l["record_id"]: l["group_id"] for l in links}
-    rows = [r for r in recs if r["set"] == set_name]
-    studies = {group.get(r["record_id"], r["record_id"]) for r in rows}
-    linked = [r for r in rows if r["record_id"] in group]
-    return {"set": set_name, "records": len(rows), "studies": len(studies),
-            "records_in_e5_groups": len(linked),
+    coded_ids = {r["record_id"] for r in recs}
+    rows = [r for r in recs if r["set"] == set_name and (group_name is None or r.get("population") == group_name)]
+    studies = {("E5", group[r["record_id"]]) if r["record_id"] in group else ("record", r["record_id"])
+               for r in rows}
+    groups_here = {group[r["record_id"]] for r in rows if r["record_id"] in group}
+    uncoded = [l for l in links if l["record_id"] not in coded_ids and l["group_id"] in groups_here]
+    return {"set": set_name, "split": "all" if group_name is None else "population",
+            "group": "all" if group_name is None else group_name,
+            "records_coded": len(rows), "records_uncoded_linked": len(uncoded),
+            "records": len(rows) + len(uncoded), "studies": len(studies),
+            "records_in_e5_groups": sum(1 for r in rows if r["record_id"] in group) + len(uncoded),
             "signs_not_confirmed": sum(1 for r in rows if r.get("C5") == "signs_not_confirmed")}
 
 
@@ -616,21 +733,23 @@ def problem_statements(rows):
     return out
 
 
-def c4f_result_table(recs, c4f_rows, set_name):
+def c4f_result_table(recs, c4f_rows, set_name, group_name=None):
     """GSRR-56: C4f per recalculated result, beside the record summary. Results cluster in records,
     so the number of recalculated results per record is given as a distribution."""
-    ids = {r["record_id"] for r in recs if r["set"] == set_name}
+    ids = {r["record_id"] for r in recs if r["set"] == set_name
+           and (group_name is None or r.get("population") == group_name)}
+    lab = {"set": set_name, "split": "all" if group_name is None else "population",
+           "group": "all" if group_name is None else group_name}
     rows = [r for r in c4f_rows if r["record_id"] in ids]
     per_rec = Counter(r["record_id"] for r in rows)
     dist = Counter(per_rec.get(i, 0) for i in ids)
     vals = Counter(r["consistent"] for r in rows)
-    out = [{"set": set_name, "row": "results", "value": k, "count": vals[k]}
-           for k in ["yes", "no", "na", "unresolved"]]
-    out.append({"set": set_name, "row": "results", "value": "gross", "count": sum(1 for r in rows if r.get("gross") == "1")})
+    out = [{**lab, "row": "results", "value": k, "count": vals[k]} for k in ["yes", "no", "na", "unresolved"]]
+    out.append({**lab, "row": "results", "value": "gross", "count": sum(1 for r in rows if r.get("gross") == "1")})
     src = Counter((r.get("source", ""), r["consistent"]) for r in rows)
-    out += [{"set": set_name, "row": f"results_from_{so}", "value": k, "count": src[(so, k)]}
+    out += [{**lab, "row": f"results_from_{so}", "value": k, "count": src[(so, k)]}
             for so in ["text", "table"] for k in ["yes", "no", "na", "unresolved"]]
-    out += [{"set": set_name, "row": "results_per_record", "value": str(k), "count": n}
+    out += [{**lab, "row": "results_per_record", "value": str(k), "count": n}
             for k, n in sorted(dist.items())]
     return out
 
@@ -722,7 +841,7 @@ def build_tables(d, coder="reconciled"):
     recs = derive(load(d, "records", coder), c4f_rows)
     insts = load(d, "instruments", coder)
     items = load(d, "items", coder)
-    links = read_csv(d / "links.csv")
+    links = load_links(d, recs)
     rs = {r["record_id"]: r["set"] for r in recs}
     for i in insts:
         i["set"] = rs.get(i["record_id"], "")
@@ -739,6 +858,8 @@ def build_tables(d, coder="reconciled"):
             tables += record_tables([r for r in r_s if r["record_id"] in ids],
                                     [i for i in i_s if i["record_id"] in ids],
                                     {"set": s, "split": "population", "group": g, **extra})
+            rq4.append(rq4_counts(recs, links, s, g))                 # GSRR-56: also by population group
+            c4f_res += c4f_result_table(recs, c4f_rows, s, g)
         for c in ["A", "B"]:          # SQ1: RQ2-RQ5 and C7 (i), (iii)
             ids = {r["record_id"] for r in r_s if r["centre"] == c}
             sub = [dict(r) for r in r_s if r["record_id"] in ids]
@@ -759,9 +880,10 @@ def build_tables(d, coder="reconciled"):
             "c6a_c7iii_overlap": c6a_c7iii_overlap(conf)}
 
 
-def sensitivity(d):
-    """GSRR-62: S1, S2 and S4 on the problem statements; S3 on C2b."""
-    base = build_tables(d)
+def sensitivity(d, coder="reconciled"):
+    """GSRR-62: S1, S2 and S4 on the problem statements; S3 on C2b. S1-S3 use the `coder` values (the same
+    as the main tables); S4 runs each coder in turn."""
+    base = build_tables(d, coder)
     recs = base["recs"]
     conf = [r for r in recs if r["set"] == "main"]
     out = []
@@ -811,7 +933,7 @@ def main():
         except InputError as e:
             print(f"STOPPED: {e}", file=sys.stderr)
             return 3
-        sens, s3 = sensitivity(a.tables)
+        sens, s3 = sensitivity(a.tables, a.coder)
         out = a.tables / "out"
         out.mkdir(exist_ok=True)
         write_csv(out / "tables.csv", res["tables"])
