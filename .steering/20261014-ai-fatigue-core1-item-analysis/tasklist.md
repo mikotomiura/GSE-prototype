@@ -6,4 +6,4 @@
 - [x] 集計と限界（summary.md）
 - [x] 出典の登録（Zhao & Liu を [P514] に登録。核 2 の [P498]–[P513] の後。main へは核 2 を先に入れる・判断 5）
 - [x] /cross-review（判断 6）
-- [ ] push（PR は研究者が確かめてから）
+- [x] push（PR は研究者が確かめてから・main へは motivation-claims → 核 2 → 核 1 の順）
