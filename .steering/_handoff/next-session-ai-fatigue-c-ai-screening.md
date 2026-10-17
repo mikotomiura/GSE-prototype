@@ -1,5 +1,7 @@
 # 引き継ぎ: C の追加候補の選別を AI で行う設計 → 登録版を一人のコードに書き換える → 相談文を短くする
 
+> 使用済み（2026-10-18）: §2 の 1〜5 を終えた。続きは `next-session-ai-fatigue-c-screening-tools.md`。
+
 作成 2026-10-17（Mac）。返答・記録・AskUserQuestion の引数は日本語で。記号を多用しない。決めてほしいことは AskUserQuestion で、推奨と理由を添えて聞く。
 
 ## 始め方
