@@ -394,14 +394,14 @@ def cmd_prepare(a):
     w = work_dir(a, a.stage, a.batch)
     if w.exists() and any((w / d).exists() and any((w / d).iterdir()) for d in ("out1", "out2", "out3")):
         raise Stop(f"{w} already has outputs; it is not prepared again")
-    recs = {r["id"]: r for r in json.loads((a.data / "records264.json").read_text(encoding="utf-8"))}
+    import make_trace_db as db
+    recs = {r["id"]: r for r in db.load_records(str(a.data))}   # the 264 and the coverage sample (decision 38)
     meta = json.loads((a.data / "meta.json").read_text(encoding="utf-8"))
     chrome_p = a.data / "chrome_status.json"
     chrome = json.loads(chrome_p.read_text(encoding="utf-8")) if chrome_p.exists() else {}
     missing = [i for i in ids if i not in recs]
     if missing:
-        raise Stop(f"records not in records264.json: {missing}")
-    import make_trace_db as db
+        raise Stop(f"records not in records264.json or records-coverage.json: {missing}")
     for d in ("in", "ft", "out1", "out2", "out3"):
         (w / d).mkdir(parents=True, exist_ok=True)
     shutil.copyfile(a.instructions, w / "instructions.md")

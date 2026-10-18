@@ -1,6 +1,7 @@
 """Make the TRACE screening database (xlsx) for author 1 (decisions 26 and 28).
 
-The workbook holds bibliographic data, abstracts and the full-text status of the 264 additional candidates, and
+The workbook holds bibliographic data, abstracts and the full-text status of the 264 additional candidates and the
+300 records of the coverage sample (decision 38; screened with them, in the same order), and
 empty screening columns in the fixed screening order (GSRR-33). It carries no AI judgement and none of author 1's
 earlier judgements: author 1 screens all 264 records afresh, without seeing the AI screener's output, which is
 kept in a separate file after registration (decision 26).
@@ -12,6 +13,7 @@ their headers.
 
 Inputs live outside the repository (abstracts and full texts are not copied into it):
     <data>/records264.json   ID, title, DOI, year, journal, source, same-study group, population group, order
+    <data>/records-coverage.json (optional) the coverage sample in the same form (make_coverage_records.py)
     <data>/meta.json         authors, abstract and its source, OA status and locations, script download
     <data>/chrome_status.json (optional) result of the browser pass per record
     <fulltext>/<ID>.pdf      saved free full texts
@@ -175,6 +177,22 @@ def drive_link(name, drive):
     return (drive[name], name) if name in drive else None
 
 
+def load_records(data):
+    """The records to screen: records264.json and, if present, records-coverage.json, sorted by their screening
+    order. Stops on an ID listed twice or an order missing or used twice (make_coverage_records.py order sets it)."""
+    recs = load(os.path.join(data, "records264.json"))
+    cov = os.path.join(data, "records-coverage.json")
+    if os.path.exists(cov):
+        recs = recs + load(cov)
+    ids = [r["id"] for r in recs]
+    orders = [r.get("order") for r in recs]
+    if len(set(ids)) != len(ids):
+        sys.exit("a record is listed twice in records264.json and records-coverage.json")
+    if any(not isinstance(o, int) for o in orders) or len(set(orders)) != len(orders):
+        sys.exit("screening order missing or repeated; run make_coverage_records.py order")
+    return sorted(recs, key=lambda r: r["order"])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
@@ -184,7 +202,8 @@ def main():
     out = os.path.expanduser(a.out)
     data = os.path.expanduser(a.data)
     ftdir = os.path.expanduser(a.fulltext)
-    recs = sorted(load(os.path.join(data, "records264.json")), key=lambda r: r["order"])
+    recs = load_records(data)
+    n_cov = sum(r["id"].startswith("CS") for r in recs)
     meta = load(os.path.join(data, "meta.json"), {})
     chrome = load(os.path.join(data, "chrome_status.json"), {})
     ja = load(os.path.join(data, "ja.json"), {})            # machine translations (decision 35), optional
@@ -195,19 +214,23 @@ def main():
     old = entered(out)
     lost = sorted(set().union(*(set(v) for v in old.values())) - set(bib_row)) if old else []
     if lost:
-        sys.exit(f"{out} has records not in records264.json ({', '.join(lost[:10])}); nothing written")
+        sys.exit(f"{out} has records not in the records to screen ({', '.join(lost[:10])}); nothing written")
 
     wb = Workbook()
     st.intro(wb.active, "TRACE｜追加候補の文献 DB（判定者 1 用）",
-             f"作成 {today}・追加候補 {len(recs)} 件・全文あり {n_ft} 件（無料で公開された版だけ）", [
+             f"作成 {today}・追加候補 {len(recs) - n_cov} 件と確かめの標本 {n_cov} 件・全文あり {n_ft} 件（無料で公開された版だけ）", [
         ("進め方", [
             "段 1（題名・抄録）は『段1』、段 2（全文）と段 3（中心）は『段2・3』の青い欄に記入する。行は登録で決めた選別の順。束（9 件ずつ）ごとに上から判定する。束の ID は c_screening.py が示す。",
             "段 1 は題名と抄録だけで判定する。ID を押すと『文献DB』のその記録の抄録（英語と日本語）へ飛ぶ。その束の段 1 をコミットするまで、『段2・3』『全文』のシートと全文のファイルは開かない。",
             "段 2 で含めた記録には、同じときに中心も付ける。全文は『段2・3』の「ファイル」のリンクから Google Drive で開く。",
             "『最終…』の欄は、AI と食い違った記録にだけ、AI の答えを読んでから記入する。",
         ]),
+        ("確かめの標本（ID が CS で始まる記録）", [
+            "DB の外にどれだけ見落としがあるかを確かめるために、別の検索から無作為に抜いた記録（判断 38）。追加候補と同じ束・同じ規則で判定する。対象の群の欄は「確かめの標本」。",
+            "全文は、段 1 を通った記録にだけ、登録の後に取りに行く（GSRR-33）。段 1 の時点では全文が無いのが正しい。",
+        ]),
         ("このファイルに入っていないもの", [
-            "AI の判定も、以前の判定（2026-10 の判定者 1 の判定・AI の評価版）も入れていない。264 件すべてを空欄から判定する。",
+            f"AI の判定も、以前の判定（2026-10 の判定者 1 の判定・AI の評価版）も入れていない。{len(recs)} 件すべてを空欄から判定する。",
         ]),
         ("日本語訳について", [
             "題名と抄録の日本語は Claude による機械訳で、読む助けにすぎない。判定の根拠は英語の原文とする。AI の選別者には英語だけを渡している。",

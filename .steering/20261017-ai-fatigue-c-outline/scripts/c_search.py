@@ -36,6 +36,7 @@ import argparse
 import csv
 import datetime
 import hashlib
+import html
 import http.server
 import json
 import random
@@ -321,6 +322,20 @@ def norm_title(t):
     return "".join(ch for ch in t if ch.isalnum())
 
 
+EPMC_TAGS = re.compile(r"</?(?:b|bold|br|h\d|i|italic|p|sub|sup|title|sc|u)\b[^>]*>", re.I)
+
+
+def clean_markup(text):
+    """Europe PMC text carries a few HTML tags (headings, italics, sub/superscripts) and character references, and
+    also bare "<" as the less-than sign ("p < 0.001"). Only the known tags are removed (a heading becomes a space), the
+    references are decoded (twice: titles hold "&lt;i&gt;"), and every other "<" is kept. 2026-10-18: removing "<...>"
+    blindly cut the text from a less-than sign to the next tag (for example "(p < 0.001) <h4>Conclusion" became
+    "(pConclusion")."""
+    t = html.unescape(html.unescape(text or ""))
+    t = EPMC_TAGS.sub(" ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
 def oa_abstract(inv):
     if not inv:
         return ""
@@ -359,11 +374,11 @@ def records_europepmc(out):
     for p in logged_files(out, "europepmc", "europepmc-[0-9]*.json"):
         for r in json.loads(p.read_text(encoding="utf-8"))["resultList"]["result"]:
             yield {"source": "europepmc", "source_id": f"{r.get('source', '')}:{r.get('id', '')}",
-                   "doi": norm_doi(r.get("doi")), "title": r.get("title", ""), "year": r.get("pubYear"),
+                   "doi": norm_doi(r.get("doi")), "title": clean_markup(r.get("title", "")), "year": r.get("pubYear"),
                    "type": "; ".join((r.get("pubTypeList") or {}).get("pubType", [])),
                    "venue": ((r.get("journalInfo") or {}).get("journal") or {}).get("title", "")
                    or r.get("bookOrReportDetails", {}).get("publisher", ""),
-                   "abstract": re.sub(r"<[^>]+>", "", r.get("abstractText", "") or "")}
+                   "abstract": clean_markup(r.get("abstractText", ""))}
 
 
 def records_acm(out):
@@ -586,6 +601,10 @@ def selftest():
     check("doi without 10. is empty", norm_doi("arXiv:1234") == "")
     check("title normalised", norm_title("AI Fatigue: a Scale!") == norm_title("ai fatigue — a scale"))
     check("abstract rebuilt", oa_abstract({"b": [1], "a": [0]}) == "a b")
+    check("a less-than sign survives tag removal",
+          clean_markup("in UC (p < 0.001).<h4>Conclusion</h4>PAIR (<i>n</i> = 3, p<0.05)")
+          == "in UC (p < 0.001). Conclusion PAIR ( n = 3, p<0.05)")
+    check("references in titles decoded", clean_markup("Beyond the &lt;i&gt;AJR&lt;/i&gt; &amp; more") == "Beyond the AJR & more")
     check("ACM DOI from any link form", acm_doi("/doi/abs/10.1145/3544548.3581234") == "10.1145/3544548.3581234"
           and acm_doi("/doi/10.1016/j.x.2026.1") == "10.1016/j.x.2026.1" and acm_doi("/action/x") == "")
     import tempfile

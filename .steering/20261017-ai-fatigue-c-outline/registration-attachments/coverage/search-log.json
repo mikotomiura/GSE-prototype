@@ -1,5 +1,5 @@
 {
- "merged": "2026-10-18T18:23:43+09:00",
+ "merged": "2026-10-18T18:43:48+09:00",
  "python": "3.14.4",
  "records_by_source": {
   "openalex": 10827,
@@ -215,7 +215,7 @@
  "groups_of_3_or_more": 116,
  "merged_groups_with_short_title": 3,
  "new_with_abstract": 9270,
- "sample_with_abstract": 251,
+ "sample_with_abstract": 253,
  "inputs": {
   "openalex-1925-t1-001.json": "2149c91a150967f05559acbc44182b34bc524389590571fa86e47dba01562043",
   "openalex-1962-t1-001.json": "b6d1d00dbc4e35cd4d25de2f4f9c58b852dc431849e25239c7cba44e27654076",
@@ -323,11 +323,11 @@
   "europepmc-001.json": "81e0c8df58cbe8053c24ca603e6caaf6cd8b8b11575a9423568e4f801840f3d4",
   "europepmc-002.json": "fbebbd32a7bc303dc8605c4279abc85c27d3467038168e84f44cb935fea392fd",
   "acm-results.json": "42e2d85365b0976aa857dff44207787822b844ed7fe077dedc01f23bac88d5bb",
-  "records264.json": "440f3b6a8cc42d9088e710f7df3c8e0e64df0aa273edc111cddb5f28a5b35c82",
+  "records264.json": "4efd2f9c0de843aa2a3a9d23005391f600619bd4b984430c49a12090b6dce07c",
   "AI_fatigue_database_2026-10-18_final.xlsx": "0db64ecd5ffde5c270dba09450c487d52c3e45f677fea3097d89d7178dd31641"
  },
  "outputs": {
-  "new_records.json": "c8b0b17d1ff760ab3f3503b2d81d3aaea4163b62cf67157251f6df717eca3065",
-  "new-records.csv": "573638797c024bdc31ab5a9df550c641406d49d7ca1cb8a7a9811fe028eece38"
+  "new_records.json": "f20d5954892c2e8e9e7564cb6510168ec1d8ff7dd2aa515091f3d1d45b69dfa1",
+  "new-records.csv": "f144117b03437e259228569e1589191775cd4cb343d3f2ab7180088158723687"
  }
 }

@@ -131,7 +131,8 @@ def main():
         return
     if not a.out:
         raise SystemExit("--out is needed")
-    recs = sorted(load(os.path.join(data, "records264.json")), key=lambda r: r["order"])
+    import make_trace_db as tdb
+    recs = tdb.load_records(data)   # the 264 additional candidates and, if present, the coverage sample
     meta = load(os.path.join(data, "meta.json"), {})
     ja = {**load(os.path.join(data, "ja.json"), {}), **load(os.path.join(data, "ja34.json"), {})}
 
@@ -145,7 +146,9 @@ def main():
     for r in recs:
         m = meta.get(r["id"], {})
         doi = str(r.get("doi") or "")
-        rows.append({"id": r["id"], "set": "追加候補（264 件）", "order": r["order"] + 1, "population": r["population"],
+        cov = r["id"].startswith("CS")
+        rows.append({"id": r["id"], "set": "確かめの標本（300 件）" if cov else "追加候補（264 件）",
+                     "order": r["order"] + 1, "population": r["population"],
                      "title": r["title"], "authors": m.get("authors", ""), "year": r.get("year"),
                      "journal": r.get("journal") or "", "doi": doi if doi.startswith("10.") else "",
                      "abstract": (m.get("abstract") or "").strip(), "abstract_source": m.get("abstract_source", ""),
@@ -156,7 +159,7 @@ def main():
     n34 = {k: sum(r["decision"] == k for r in r34) for k in ("含める", "保留", "除外")}
 
     wb = Workbook()
-    st.intro(wb.active, "TRACE｜全体の文献 DB（探索 34 件＋追加候補 264 件）",
+    st.intro(wb.active, "TRACE｜全体の文献 DB（探索 34 件＋追加候補 264 件＋確かめの標本 300 件）",
              f"作成 {datetime.date.today().isoformat()}・{len(rows)} 件・読むための一覧で、ここでは判定しない", [
         ("中身", [
             f"探索の 34 件（AF001〜AF034）: 元の文献 DB の最終版（2026-10-18）の最終判定（含める {n34['含める']}・保留 {n34['保留']}・除外 {n34['除外']}）。"

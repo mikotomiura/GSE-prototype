@@ -628,4 +628,31 @@ try:
 except SystemExit as ex:
     assert "not empty" in str(ex)
 
+# --- the coverage sample (decision 38): read with the 264, in the screening order; a repeated order stops ------
+cov_ = [{"id": f"CS{i:05d}", "title": f"Coverage {i}", "doi": f"10.9/cs{i}", "year": "2025", "journal": "J",
+         "source": "確かめの検索: openalex", "group": "", "population": "確かめの標本", "origin": "o", "order": N + i - 1}
+        for i in (1, 2)]
+json.dump(cov_, open(data / "records-coverage.json", "w", encoding="utf-8"))
+recs_ = make_trace_db.load_records(str(data))
+assert [r["id"] for r in recs_][-2:] == ["CS00001", "CS00002"] and len(recs_) == N + 2
+cov_x = root / "coverage.xlsx"
+sys.argv = ["make_trace_db.py", "--data", str(data), "--fulltext", str(ftdir), "--out", str(cov_x)]
+make_trace_db.main()
+s1_ids = [r[0].value for r in load_workbook(cov_x)["段1"].iter_rows(min_row=2)]
+assert s1_ids[-2:] == ["CS00001", "CS00002"], s1_ids[-3:]
+json.dump([dict(cov_[0]), dict(cov_[1], order=0)], open(data / "records-coverage.json", "w", encoding="utf-8"))
+try:
+    make_trace_db.load_records(str(data))
+    raise AssertionError("a repeated screening order must stop")
+except SystemExit as e:
+    assert "order" in str(e)
+json.dump([dict(cov_[0], id="D01")], open(data / "records-coverage.json", "w", encoding="utf-8"))
+try:
+    make_trace_db.load_records(str(data))
+    raise AssertionError("an ID in both files must stop")
+except SystemExit as e:
+    assert "twice" in str(e)
+(data / "records-coverage.json").unlink()
+assert len(make_trace_db.load_records(str(data))) == N   # control: without the file, the 264 alone
+
 print(f"screening tools checked in {root}; all checks passed")

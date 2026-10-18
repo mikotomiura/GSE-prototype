@@ -24,19 +24,20 @@
    - 抽出: `python3 -I c_search.py merge $OUT --records264 ~/Documents/TRACE/data/records264.json --source-db <元の DB の最終版.xlsx>`
    - `$OUT/new-records.csv` と `$OUT/search-log.json` を `registration-attachments/coverage/` に写す（書誌と数だけ。抄録の入った `new_records.json` と書き出しは写さない）。
    - 添付 3 の第 16 節・GSRR-7・10・21・32 の **[at registration]** に、日時・件数・ファイルの SHA-256 を書く。
-5. 確かめの標本 300 件を選別の材料に足す（判断 38）。
+5. 確かめの標本 300 件を選別の材料に足す（判断 38）。**2026-10-18 に済み**（判断 41）。
    - 抄録の日本語の機械訳を足す（`ja.json` に CS の ID で）。
-   - `make_screening_candidates.py` が確かめの標本を群 `coverage_sample` として出すこと、TRACE の DB と `c_screening.py` が CS の記録を読めることを確かめる（作業は #5 の残り）。
+   - `make_screening_candidates.py` が確かめの標本を群 `coverage_sample` として出し、TRACE の DB と `c_screening.py` が CS の記録を読む（`records-coverage.json`・`make_coverage_records.py`）。
 
 ## 当日（メイン）
 
 1. 登録版の GSRR-2 に、共著者の名前・所属・ORCID を書く。
-2. 選別の順を作る。dryrun との diff が空であることを確かめる（2026-10-18 に確かめたときは同じだった）。TRACE の DB の行の順はこの順。
+2. 選別の順を作る。dryrun（2026-10-18・確かめの標本を入れた 564 件）との diff が空であることを確かめ、材料の order を振り直す（2026-10-18 に dryrun の順で振ってある）。TRACE の DB の行の順はこの順。
    ```
    cd scripts
-   python3 make_screening_candidates.py <判定者 1 の表.xlsx> > /tmp/candidates.csv
+   python3 make_screening_candidates.py <判定者 1 の表.xlsx（AI_fatigue_additional_candidates_judge1.xlsx）> ../registration-attachments/coverage/new-records.csv > /tmp/candidates.csv
    python3 c_synthesis.py --screening-order /tmp/candidates.csv > ../registration-attachments/screening-order.csv
-   diff ../registration-attachments/screening-order.csv ../registration-attachments/dryrun/screening-order-2026-10-17.csv
+   diff ../registration-attachments/screening-order.csv ../registration-attachments/dryrun/screening-order-2026-10-18.csv
+   python3 make_coverage_records.py order --data ~/Documents/TRACE/data --order ../registration-attachments/screening-order.csv
    ```
 3. 使った Python の版を GSRR-33 に書く（`python3 --version`）。
 4. 確かめる。
@@ -44,7 +45,7 @@
    - `python3 make_dummy.py` が緑であること。
    - `uv run --with openpyxl python check_screening.py` が緑であること（選別の道具・判断 33）。
    - TRACE の DB を作り直したら、『段1』に全文の列が無く、『段2・3』があること（`make_trace_db.py`）。判定が 1 件も入っていない今の DB を上書きしてよい。
-5. 添付 3（検索式・`query-strings.md`。第 16 節は確かめの検索）と GSRR-25 の **[at registration]** の中身を確かめる。選別の順の一覧に確かめの標本（群 `coverage_sample`・300 件）が入っていること。dryrun との diff は、確かめの標本の分だけ増えるのが正しい。
+5. 添付 3（検索式・`query-strings.md`。第 16 節は確かめの検索）と GSRR-25 の **[at registration]** の中身を確かめる。選別の順の一覧に確かめの標本（群 `coverage_sample`・300 件）が入っていること。dryrun は 2026-10-18 の版（564 件）と比べる。
 6. `python3 hash_attachments.py` で `sha256.txt` を作り、次の箇所に SHA-256 を書く。
    - 添付 2・3（確かめの検索の道具 2 本・新しい記録の一覧・検索の記録）・4・5・6（6 には選別の道具 3 本が入る）
    - GSRR-33（選別の順の一覧）

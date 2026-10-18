@@ -8,8 +8,11 @@ c_synthesis.py. Records with no population group in the source database (review-
 the review-search records) are put in the group 'unknown' (GSRR-16, decision of 2026-10-17); the reading that showed
 why they have none is recorded in decisions.md (judgement 23), not used here.
 
+With a second argument, the coverage sample (new-records.csv of c_search.py merge) is added as the group
+coverage_sample (decision 38).
+
 Run on the registration day against the current copy of the screening workbook:
-    python3 make_screening_candidates.py <workbook.xlsx> > candidates.csv
+    python3 make_screening_candidates.py <workbook.xlsx> ../registration-attachments/coverage/new-records.csv > candidates.csv
     python3 c_synthesis.py --screening-order candidates.csv > ../registration-attachments/screening-order.csv
 Stops on a group label it does not know, a record listed twice, or a reading-list row it cannot read.
 """
@@ -77,12 +80,28 @@ def candidates(path):
     return out
 
 
+def coverage_sample(path):
+    """The records drawn into the coverage sample (decision 38): new-records.csv of c_search.py merge, rows with
+    coverage_sample 1. They form one more screening-order group, coverage_sample (GSRR-33)."""
+    with open(path, encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    if not rows or "coverage_sample" not in rows[0]:
+        raise SystemExit(f"{path}: not a new-records.csv (no column coverage_sample)")
+    drawn = [(r["record_id"], "coverage_sample") for r in rows if r["coverage_sample"] == "1"]
+    if len(drawn) != 300:
+        raise SystemExit(f"{path}: {len(drawn)} drawn records, expected 300")
+    return drawn
+
+
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         raise SystemExit(__doc__)
     w = csv.writer(sys.stdout, lineterminator="\n")
     w.writerow(["record_id", "population"])
-    rows = candidates(sys.argv[1])
+    rows = candidates(sys.argv[1]) + (coverage_sample(sys.argv[2]) if len(sys.argv) == 3 else [])
+    ids = [i for i, _ in rows]
+    if len(set(ids)) != len(ids):
+        raise SystemExit("a coverage record has the ID of a candidate")
     for rid, pop in rows:
         w.writerow([rid, pop])
     counts = {}

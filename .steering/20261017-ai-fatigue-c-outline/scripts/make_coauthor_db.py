@@ -24,6 +24,7 @@ import math
 import os
 import random
 import shutil
+import sys
 
 from openpyxl import Workbook
 
@@ -96,6 +97,10 @@ def main(argv=None):
             raise SystemExit("--stage 2 needs --batch and --ids")
         with open(os.path.expanduser(a.ids), encoding="utf-8") as f:
             want = [ln.strip() for ln in f if ln.strip()]
+        cov = [i for i in want if i.startswith("CS")]
+        if cov:   # the coverage sample is screened by author 1 and the AI screener only (decision 38)
+            print(f"left out {len(cov)} records of the coverage sample: {cov[:5]}", file=sys.stderr)
+            want = [i for i in want if not i.startswith("CS")]
         byid = {r["id"]: r for r in recs}
         missing = [i for i in want if i not in byid]
         if missing:
