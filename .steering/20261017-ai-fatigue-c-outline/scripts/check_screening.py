@@ -557,4 +557,35 @@ try:
 except cs.Stop as ex:
     assert "fewer than 200 words" in str(ex)
 
+# --- author 2's workbooks (make_coauthor_db.py, decision 34) ---------------------------------
+import make_coauthor_db as cdb  # noqa: E402
+assert len(cdb.stage1_sample(IDS)) == 5 and cdb.stage1_sample(IDS) == cdb.stage1_sample(list(reversed(IDS)))
+assert len(cdb.stage1_sample([f"X{i:03d}" for i in range(264)])) == 53
+co1, co2 = root / "co1", root / "co2"
+cdb.main(["--stage", "1", "--data", str(data), "--fulltext", str(ftdir), "--out", str(co1)])
+wb1 = load_workbook(co1 / "TRACE_共著者_段1.xlsx")
+assert wb1.sheetnames == ["はじめに", "段1", "文献DB", "判定基準"]
+r1 = list(wb1["段1"].iter_rows(values_only=True))
+assert [c for c in r1[0] if c and c.startswith("最終")] == [] and "全文" not in r1[0]
+assert sorted(r[0] for r in r1[1:]) == sorted(cdb.stage1_sample(IDS))
+assert [r[1] for r in r1[1:]] == sorted(r[1] for r in r1[1:])  # in the screening order
+assert {r[3] for r in r1[1:]} == {"未判定"} and all(not r[4] and not r[5] and not r[6] for r in r1[1:])
+ids_f = root / "co2-ids.txt"
+ids_f.write_text("D11\nD01\nD14\n", encoding="utf-8")
+cdb.main(["--stage", "2", "--batch", "b01", "--ids", str(ids_f), "--data", str(data), "--fulltext", str(ftdir),
+          "--out", str(co2)])
+wb2 = load_workbook(co2 / "TRACE_共著者_段2_b01.xlsx")
+r2 = list(wb2["段2・3"].iter_rows(values_only=True))
+assert [r[0] for r in r2[1:]] == ["D01", "D11", "D14"] and [c for c in r2[0] if c and c.startswith("最終")] == []
+assert sorted(p.name for p in (co2 / "fulltext").iterdir()) == ["D01.html", "D11.html"]  # D14 has none
+for wbx in (wb1, wb2):  # nothing from author 1 or the AI screener: only the drop-down defaults
+    for ws in wbx.worksheets:
+        for row in ws.iter_rows(values_only=True):
+            assert not any(isinstance(v, str) and v in ("含める", "除外", "保留", "中心-A", "中心-B") for v in row), row
+try:
+    cdb.main(["--stage", "1", "--data", str(data), "--fulltext", str(ftdir), "--out", str(co1)])
+    raise AssertionError("a filled folder was overwritten")
+except SystemExit as ex:
+    assert "not empty" in str(ex)
+
 print(f"screening tools checked in {root}; all checks passed")
