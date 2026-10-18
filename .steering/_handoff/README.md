@@ -17,7 +17,8 @@
 | **手跡の試作: 小面を波紋にする・背景の層の実現性を Mac で確かめる** | **`next-session-handmark-spike-ripple-and-stage.md`**（2026-10-16） | **現行・未着手・Mac・次に行う**（研究者の選択: 試作 → 理論の語） |
 | **手跡（Handmark）を計測終端型実践肖像論の 4 つ目の語として書く** | **`next-session-handmark-theory-term.md`**（2026-10-16） | **現行・未着手・Mac・試作の後**。親タスクの判断 28。判断 30（Mac で写るのを許した理由）とつなげて書く（2026-10-16 追記） |
 | **手跡と線の表現は「そもそもなぜ面白いのか」を議論する**（具体の議論でもよい） | **`next-session-handmark-why-interesting.md`**（2026-10-17） | 2026-10-18 に実施（記録は `.steering/20261017-handmark-why-interesting/decisions.md` 判断 1〜6） |
-| **背景の「自然世界」の案の先行研究を大まかに調べ、先人の案を借りながら議論する** | **`next-session-handmark-nature-world-survey.md`**（2026-10-18） | **現行・未着手**。`/literature-review` を 1 ラウンド・その後に議論。見本のページの感想を最初に聞く |
+| **背景の「自然世界」の案の先行研究を大まかに調べ、先人の案を借りながら議論する** | **`next-session-handmark-nature-world-survey.md`**（2026-10-18） | **済み（2026-10-18）**。調べは S-NW（`docs/literature/20261018-handmark-nature-world.md`・[P534]〜[P554]）、議論は `.steering/20261017-handmark-why-interesting/decisions.md` 判断 7〜12。次は下の 1 本 |
+| **自然世界の見本（版 3）を改め、打鍵の影響の強さを伏せて見比べる** | **`next-session-handmark-nature-v3-grading.md`**（2026-10-18） | **現行・未着手**。Mac で完結。写像・基層・段・伏せ方を研究者に確かめながら見本を直し、設計者本人が伏せて評定してから開示する |
 | **相対のタイミングの写像は停滞と速さを写すか**（案 D の机上の検査・G-GEAR で行う） | **`next-session-tangibility-relative-timing-desk-check.md`**（2026-10-15） | **現行・未着手**。問いの立て方（第 3 回の天井を避ける）を研究者が決める |
 | ~~肖像と招待の分け方を機械で守る検査~~ | `next-session-portrait-separation-check.md`（2026-10-15） | 置き換え済み（2026-10-16）。下の「EH3 の凍結の前の準備」の段 2 へ |
 | **EH3 の凍結の前の準備**（F-1 を自分の壁紙で数日見比べる → 肖像と招待の分け方の検査） | **`next-session-eh3-pre-freeze-f1-and-separation.md`**（2026-10-16） | **現行・未着手・Mac**。F-1 → 分け方の検査の順。EH3 の配布物の固定の前に要る |
