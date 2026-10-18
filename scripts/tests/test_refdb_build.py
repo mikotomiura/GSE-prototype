@@ -302,6 +302,8 @@ class XlsxTest(Base):
         self.assertEqual(wb["書誌"].max_row, 1 + 6)
         self.assertEqual(wb["書誌"]["A2"].value, "P1")
         self.assertEqual(build.verify(out), [])  # xlsx も manifest のハッシュに載る
+        m = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(m["xlsx_removed_control_chars"], 0)  # 0 件でも数を載せる（未計測と区別する）
 
     def test_deliver_refuses_partial_outputs(self):
         # --no-bib と一緒だと、前の回の GSE文献DB.bib が残って新旧が混ざるので止める
@@ -385,6 +387,33 @@ class XlsxTest(Base):
         self.assertEqual(((to / "GSE文献DB.xlsx").read_bytes(), (to / "GSE文献DB.bib").read_bytes()), (b"old-x", b"old-b"))
         self.assertEqual(build.deliver(out, "N", to), ["GSE文献DB.xlsx", "GSE文献DB.bib"])
         self.assertEqual((to / "GSE文献DB.bib").read_bytes(), b"new-b")
+        self.assertEqual(sorted(p.name for p in to.iterdir()), ["GSE文献DB.bib", "GSE文献DB.xlsx"])  # 前の版の写しも残らない
+
+    def test_deliver_failure_while_swapping_restores_previous(self):
+        out, to = self.root / "o", self.root / "文献DB"
+        out.mkdir()
+        to.mkdir()
+        (out / "N.xlsx").write_bytes(b"new-x")
+        (out / "N_bibtex.bib").write_bytes(b"new-b")
+        (to / "GSE文献DB.xlsx").write_bytes(b"old-x")
+        (to / "GSE文献DB.bib").write_bytes(b"old-b")
+        orig, n = Path.replace, [0]
+
+        def flaky(self_, target):
+            # 入れ替えの順は 古い xlsx を退避 → 新しい xlsx → 古い bib を退避 → 新しい bib。4 回目で止める
+            n[0] += 1
+            if n[0] == 4:
+                raise OSError("ファイルがロックされている")
+            return orig(self_, target)
+
+        Path.replace = flaky
+        try:
+            with self.assertRaises(OSError):
+                build.deliver(out, "N", to)
+        finally:
+            Path.replace = orig
+        self.assertEqual(sorted(p.name for p in to.iterdir()), ["GSE文献DB.bib", "GSE文献DB.xlsx"])
+        self.assertEqual(((to / "GSE文献DB.xlsx").read_bytes(), (to / "GSE文献DB.bib").read_bytes()), (b"old-x", b"old-b"))
 
     def test_bib_entries(self):
         text = "@article{P1,\n  title = {A}\n}\n@misc{P3_doi101e,\n  note = {x @ y}\n}\n"

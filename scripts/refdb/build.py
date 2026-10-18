@@ -654,7 +654,7 @@ def put(ws, row: int, col: int, v, stats: dict | None = None) -> None:
     """値を書く。= で始まる文字列は数式にせず文字列のまま置く。制御文字は外して数え、上限を超える文字列は止める。"""
     if isinstance(v, str):
         v, n = CONTROL_RE.subn("", v)
-        if n and stats is not None:
+        if stats is not None:
             stats["xlsx_removed_control_chars"] = stats.get("xlsx_removed_control_chars", 0) + n
         if len(v) > XLSX_CELL_MAX:
             head = ws.cell(row=1, column=col).value
@@ -670,7 +670,7 @@ def write_xlsx(rows: list[dict], human: list[str], items: list[dict], bibtex: st
         from openpyxl.styles import Font
     except ImportError as e:
         raise RuntimeError("openpyxl が無い（~/.venvs/gse-provision/bin/python で回すか、--no-xlsx）") from e
-    stats: dict = {}
+    stats: dict = {"xlsx_removed_control_chars": 0}
     # xlsx のバイト列は回すたびに変わる（openpyxl が保存の時刻を書き、zip の各項目にも時刻が入る）。
     # 同じ入力かどうかは、xlsx のハッシュではなく CSV のハッシュで見る
     wb = Workbook()
@@ -726,24 +726,42 @@ def write_xlsx(rows: list[dict], human: list[str], items: list[dict], bibtex: st
 
 def deliver(out: Path, name: str, to: Path) -> list[str]:
     """作業の成果物のうち xlsx と BibTeX を、渡し先へ日付なしの名前で写す（上書き）。
-    両方を一時の名前で写し終えてから入れ替える。片方でも無ければ何も写さずに止める（新旧を混ぜない）。"""
+    両方を一時の名前で写し終えてから入れ替える。入れ替えの途中で止まったら、前の版を戻す（新旧を混ぜない）。
+    片方でも無ければ何も写さずに止める。"""
     srcs = {dst: out / src.format(name=name) for src, dst in DELIVER.items()}
     lacking = [str(p) for p in srcs.values() if not p.exists()]
     if lacking:
         raise RuntimeError(f"--deliver で渡すものが無い: {lacking}（何も写していない）")
     to.mkdir(parents=True, exist_ok=True)
     tmps: dict[str, Path] = {}
+    backups: dict[str, Path] = {}  # 入れ替える前の版（止まったら戻す）
+    placed: list[str] = []
     try:
         for dst, p in srcs.items():
             fd, t = tempfile.mkstemp(prefix=f".{dst}.", suffix=".tmp", dir=to)
             os.close(fd)
             tmps[dst] = Path(t)  # 写す前に覚える（写す途中で止まっても消せるように）
             shutil.copyfile(p, t)
-        for dst, t in tmps.items():
-            t.replace(to / dst)
+        try:
+            for dst in srcs:
+                if (to / dst).exists():
+                    b = to / f".{dst}.prev"
+                    (to / dst).replace(b)
+                    backups[dst] = b
+                tmps[dst].replace(to / dst)
+                placed.append(dst)
+        except BaseException:
+            for dst in placed:
+                (to / dst).unlink(missing_ok=True)
+            for dst, b in backups.items():
+                b.replace(to / dst)
+            backups.clear()
+            raise
     finally:
         for t in tmps.values():
             t.unlink(missing_ok=True)
+        for b in backups.values():
+            b.unlink(missing_ok=True)
     return list(srcs)
 
 
