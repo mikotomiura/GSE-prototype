@@ -1,7 +1,32 @@
 # 一次テキストの来歴（2026-10-18）
 
 - 一次テキストの本体（pdftotext の抽出・抄録の逐語）は著作物なので repo に入れない。置き場は作業時の scratchpad（`/private/tmp/claude-501/-Users-johnd-GSE-prototype/f99bdc93-3f93-41b7-863c-4ad0bd1f8194/scratchpad/survey/primary/`）で、セッションの後は消える。claims.md の「一次テキスト」の列はこの抽出のファイル名と行番号を指す。
-- 各ファイルの取得先の URL は `search-logs/sq1.md`〜`sq6.md`（探索役の記録の写し）に書かれている。[P535] marti-2001.txt だけは取得先が記録されていない。
+- ファイルごとの取得先（2026-10-18・`/cross-review` 2 巡目の Codex の指摘で作った）。探索役が URL を記録しなかったものは「記録なし」と書いた。取り直すときは DOI から原本を取り、下の SHA-256 で同じ抽出かを確かめる。版が違えば行番号も変わるので、claims.md の行番号は逐語の引用で引き直す。
+- 抽出の手段: PDF は `pdftotext`（poppler 26.04.0・オプションなし）。HTML は探索役がテキストにしたが、手段は記録されていない。原本のハッシュは取っていない（原本の PDF は scratchpad に一部しか残っていない）。
+
+| 抽出ファイル | ID | DOI | 取得先 | 抽出 |
+|---|---|---|---|---|
+| ishii-1998.txt | [P534] | 10.1145/286498.286652 | 記録なし（探索役は「MIT Media Lab publications の PDF」とだけ記録） | PDF→pdftotext |
+| marti-2001.txt | [P535] | — | 記録なし | PDF→pdftotext |
+| focusbuddy-2026.txt | [P536] | arXiv:2609.00412 | https://arxiv.org/abs/2609.00412（の PDF） | PDF→pdftotext |
+| epstein-2016.txt | [P537] | 10.1145/2971648.2971656 | https://homes.cs.washington.edu/~jfogarty/publications/ubicomp2016.pdf | PDF→pdftotext |
+| mekler-2017.txt | [P538] | 10.1016/j.chb.2015.08.048 | https://glassmanlab.seas.harvard.edu/annotated_works/mekler17.pdf | PDF→pdftotext |
+| ahn-2024.txt | [P539] | 10.1038/s41746-024-01133-5 | https://pmc.ncbi.nlm.nih.gov/articles/PMC11109260/ | HTML→テキスト（探索役の手段・未記録） |
+| alt-2010.txt | [P540] | 10.1109/PERCOMW.2010.5470542 | 記録なし | PDF→pdftotext |
+| skog-2003.txt | [P541] | 10.1109/INFVIS.2003.1249031 | 記録なし（[P112] の URL の PDF と同じ版かは未照合） | PDF→pdftotext（OCR の崩れあり） |
+| vogel-2004.txt | [P542] | 10.1145/1029632.1029656 | 記録なし | PDF→pdftotext |
+| hudson-1996.txt | [P543] | 10.1145/240080.240295 | 記録なし | PDF→pdftotext |
+| prpa-2018-respire.txt | [P544] | 10.1145/3170427.3180282 | 記録なし（探索役は metacreation.net の PDF と記録・完全な URL なし） | PDF→pdftotext |
+| prpa-2018-attending.txt | [P545] | 10.1145/3196709.3196765 | 記録なし | PDF→pdftotext |
+| ishii-1997.txt | [P546] | 10.1145/258549.258715 | https://arl.human.cornell.edu/879Readings/HiroshiIshii_Tangible%20Bits.pdf | PDF→pdftotext |
+| wisneski-1998.txt | [P547] | 10.1007/3-540-69706-3_4 | https://dam-prod.media.mit.edu/x/files/publishedmedia/Papers/314-Ambient%20Displays%20Turning%20Architectural/Published/PDF | PDF→pdftotext |
+| weiser-1996.txt（ファイル名の年は依頼時の仮のもの・書誌は 1995-12-21） | [P548] | — | https://calmtech.com/papers/designing-calm-technology | HTML→テキスト（探索役の手段・未記録） |
+| shelton-2017-abstract.txt | [P549・P550] | 10.22496/atct20161230121・10.1145/3014812.3014821 | OpenAlex の abstract_inverted_index から復元 | API→復元 |
+| pratt-2010.txt | [P551] | 10.1177/0956797610387440 | https://www.psychologicalscience.org/journals/psychological-science/0956797610387440/ | 抄録の写し |
+| volk-1994.txt | [P552] | 10.2466/pms.1994.79.3f.1632 | https://soar.wichita.edu/items/51253e0a-55b4-4ab3-8aa7-293768025c4b | 抄録の写し |
+| eich-2023.txt | [P553] | 10.3758/s13414-023-02749-7 | 記録なし（txt の冒頭は DOI のみ） | PDF→pdftotext |
+| morrison-smith-2021.txt | [P554] | 10.20380/GI2021.04 | 記録なし（探索役は graphicsinterface.org の PDF と記録） | PDF→pdftotext |
+| consolvo-2008.txt | [P100（既登録）] | 10.1145/1357054.1357335 | 記録なし | PDF→pdftotext |
 - 検証の規約: 枝 `docs/literature-review-vote-rule` のコミット `41411a8994dce85e5623fdbe9ed15736d402dfe0` の `.claude/commands/literature-review.md` Step 4・Step 5 と `.claude/agents/evidence-axis-judge.md`。
 - 取り直したときの照合用に、抽出ファイルの SHA-256 を残す（同じ版・同じ抽出の手段なら一致する）。
 
