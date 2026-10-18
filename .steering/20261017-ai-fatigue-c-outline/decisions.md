@@ -662,7 +662,7 @@
 
 - 研究者が選んだこと（どれも推奨どおり）: 履歴は写さず今の物だけで始める（元のコミット f03a171f をコミット文に書いた）／積むのは研究の物だけ（日本語の検討の記録・案内・相談文・改善提案と、抄録・全文・訳・検索の書き出し・AI の生の出力は積まない）／移した後は TRACE だけで直し、GSE-prototype の同じファイルは消して移し先の案内（`MOVED.md`・`papers/ai-fatigue-measurement/README.md`）を残す。作る前に名前・置き場所・中身・GSE 側を消すことを確かめた（推奨どおり）。
 - 作った物: https://github.com/mikotomiura/TRACE（private のまま・公開と共有の設定は変えていない）、手元は `~/TRACE`。配置は前のまま（`registration-en.md`・`codebook-c2b-en.md`・`registration-attachments/`・`scripts/`〔`make_guide_docx.py` は案内の道具なので GSE に残した〕・`manuscript/`）。脚本の直しは `hash_attachments.py` の外枠の場所の 1 か所と、`make_screening_candidates.py` の注の 1 行（decisions.md への言及）だけ。
-- README: ロゴ（`docs/assets/logo-light.svg`・`logo-dark.svg`。`<picture>` で GitHub の明暗に合わせる）、流れの gif（`flow.gif`・記録→選別→符号化→集計の 4 枚のカードが順に光る・暗い地の上に描いたので明暗どちらでも読める）、問い・手順・配置・再現の手順・置かない物・公開の予定（日付の約束は書かない）。ロゴは白と暗い地の上、gif は 3 つのコマを画像で見た。gif の作り方の脚本は repo に入れていない（`$CLAUDE_JOB_DIR/tmp/gif/make_flow.py`。作り直すなら移す）。
+- README: ロゴ（`docs/assets/logo-light.svg`・`logo-dark.svg`。`<picture>` で GitHub の明暗に合わせる）、流れの gif（`flow.gif`・記録→選別→符号化→集計の 4 枚のカードが順に光る・暗い地の上に描いたので明暗どちらでも読める）、問い・手順・配置・再現の手順・置かない物・公開の予定（日付の約束は書かない）。ロゴは白と暗い地の上、gif は 3 つのコマを画像で見た。gif は `docs/make_flow.py` で作り直せる（同じバイトになることを確かめた）。
 - 確かめ（`~/TRACE` の中で）: make_dummy・2 つの selftest・check_screening が緑、符号化の様式の作り直しで差分なし、草稿の組版はエラー 0。`hash_attachments.py` は選別の順（登録の日に作る）が無いので止まる（README に書いた）。
 - 登録の下書き（TRACE の e201c9c）: GSRR-33 に判定のコミット先としてこのリポジトリを名指しし、GSRR-41 に公表のときに履歴ごと公開して登録から繋ぐこと、GSRR-65 に公表まで非公開であることを書いた。
 - `registration-day.md`: 冒頭に TRACE で打つことを書き、共著者に聞くこと（判断 34・45 の形）・版の表記・コミットの先を直した。
