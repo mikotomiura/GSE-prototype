@@ -415,6 +415,35 @@ class XlsxTest(Base):
         self.assertEqual(sorted(p.name for p in to.iterdir()), ["GSE文献DB.bib", "GSE文献DB.xlsx"])
         self.assertEqual(((to / "GSE文献DB.xlsx").read_bytes(), (to / "GSE文献DB.bib").read_bytes()), (b"old-x", b"old-b"))
 
+    def test_failed_restore_keeps_backup_and_next_run_stops(self):
+        out, to = self.root / "o", self.root / "文献DB"
+        out.mkdir()
+        to.mkdir()
+        (out / "N.xlsx").write_bytes(b"new-x")
+        (out / "N_bibtex.bib").write_bytes(b"new-b")
+        (to / "GSE文献DB.xlsx").write_bytes(b"old-x")
+        (to / "GSE文献DB.bib").write_bytes(b"old-b")
+        orig, n = Path.replace, [0]
+
+        def flaky(self_, target):
+            n[0] += 1
+            if n[0] >= 4:  # 入れ替えの 4 回目からすべて失敗（戻すのも失敗）
+                raise OSError("ファイルがロックされている")
+            return orig(self_, target)
+
+        Path.replace = flaky
+        try:
+            with self.assertRaises(OSError):
+                build.deliver(out, "N", to)
+        finally:
+            Path.replace = orig
+        prev = sorted(p.name for p in to.glob(".GSE文献DB*.prev"))
+        self.assertTrue(prev)  # 戻せなかった退避は消さない
+        self.assertIn(b"old-x", [(to / p).read_bytes() for p in prev])
+        with self.assertRaises(RuntimeError):  # 次の回は退避を見つけて止まり、上書きしない
+            build.deliver(out, "N", to)
+        self.assertEqual(sorted(p.name for p in to.glob(".GSE文献DB*.prev")), prev)
+
     def test_bib_entries(self):
         text = "@article{P1,\n  title = {A}\n}\n@misc{P3_doi101e,\n  note = {x @ y}\n}\n"
         got = build.bib_entries(text)

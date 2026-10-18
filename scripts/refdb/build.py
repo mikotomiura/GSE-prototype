@@ -733,8 +733,12 @@ def deliver(out: Path, name: str, to: Path) -> list[str]:
     if lacking:
         raise RuntimeError(f"--deliver で渡すものが無い: {lacking}（何も写していない）")
     to.mkdir(parents=True, exist_ok=True)
+    left = sorted(p.name for p in to.glob(".GSE文献DB*.prev"))
+    if left:
+        raise RuntimeError(f"前の回の退避が残っている: {left}（前の回が入れ替えの途中で落ちた。元の名前に戻すか消してから回す）")
     tmps: dict[str, Path] = {}
-    backups: dict[str, Path] = {}  # 入れ替える前の版（止まったら戻す）
+    backups: dict[str, Path] = {}  # 入れ替える前の版（止まったら戻す。消すのは入れ替えが全部済んだときだけ）
+    done = False
     placed: list[str] = []
     try:
         for dst, p in srcs.items():
@@ -750,18 +754,21 @@ def deliver(out: Path, name: str, to: Path) -> list[str]:
                     backups[dst] = b
                 tmps[dst].replace(to / dst)
                 placed.append(dst)
+            done = True
         except BaseException:
+            # 戻すのに失敗しても、残った退避は消さない（次の回が上の検査で止まり、人が戻せる）
             for dst in placed:
                 (to / dst).unlink(missing_ok=True)
-            for dst, b in backups.items():
+            for dst, b in list(backups.items()):
                 b.replace(to / dst)
-            backups.clear()
+                del backups[dst]
             raise
     finally:
         for t in tmps.values():
             t.unlink(missing_ok=True)
-        for b in backups.values():
-            b.unlink(missing_ok=True)
+        if done:
+            for b in backups.values():
+                b.unlink(missing_ok=True)
     return list(srcs)
 
 

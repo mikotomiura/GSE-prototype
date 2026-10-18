@@ -9,4 +9,7 @@
 - [x] `/literature-review` に DB を作り直す段を足し、`empirical-prompt-tuning` で確かめる（Lite・2 回とも成功・判断 10）
 - [x] 実データで作り直し、2026-10-18 の件数と一致を確かめる・シートとページを更新する（判断 15）
 - [x] `/cross-review`（Claude 2 回・Codex 3 回・判断 11〜14）
-- [ ] push（PR は研究者に確かめてから）
+- [x] Drive の並べ方を「文献DB」（スプレッドシート・xlsx・.bib）と「文献DB/作業」に（判断 16・17）
+- [x] xlsx（説明・一覧・書誌）と --deliver（判断 17〜20・/cross-review: Claude 1 回・Codex 3 回）
+- [x] push
+- [ ] PR（研究者が時期を決める）
