@@ -216,7 +216,8 @@ def main():
         if r["id"] == "S04-36":
             note = (note + " ").strip() + "全文はワーキングペーパー版（題名が少し違う）"
         ab = (m.get("abstract") or "").strip()
-        rows.append([r["id"], r["title"], jt(r), ab or "（抄録は取れなかった）", (ja.get(r["id"]) or {}).get("abstract_ja", ""),
+        note = "　".join(x for x in (note, m.get("abstract_note", "")) if x)
+        rows.append([r["id"], r["title"], jt(r), ab or "（抄録なし: どの出どころにも見つからなかった。題名だけで判定する）", (ja.get(r["id"]) or {}).get("abstract_ja", ""),
                      m.get("authors", ""), r.get("year"), r.get("journal"), doi, m.get("abstract_source", ""),
                      r.get("group", ""), r["population"], r.get("source"), note])
     st.table(db, cols, [10, 36, 30, 70, 60, 24, 6, 22, 24, 12, 18, 14, 16, 24], rows,

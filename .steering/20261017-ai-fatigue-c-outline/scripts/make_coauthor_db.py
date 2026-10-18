@@ -139,7 +139,7 @@ def main(argv=None):
         m = meta.get(r["id"], {})
         doi = str(r.get("doi") or "")
         doi = doi if doi.startswith("10.") else ""
-        brows.append([r["id"], r["title"], jt(r), (m.get("abstract") or "").strip() or "（抄録は取れなかった）",
+        brows.append([r["id"], r["title"], jt(r), (m.get("abstract") or "").strip() or "（抄録なし: どの出どころにも見つからなかった。題名だけで判定する）",
                       (ja.get(r["id"]) or {}).get("abstract_ja", ""), m.get("authors", ""), r.get("year"),
                       r.get("journal"), doi])
     st.table(bib, ["ID", "論文タイトル", "題名（日本語・機械訳）", "抄録", "抄録（日本語・機械訳）", "著者", "年", "掲載誌・媒体",
