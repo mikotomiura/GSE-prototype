@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -30,6 +31,18 @@ def _get(url: str, headers: dict | None = None, timeout: int = 20):
         return json.load(r)
 
 
+def _permanent(e: Exception) -> bool:
+    """404・410 は「無い」と覚えてよい。タイムアウトや 429・5xx は一過性なのでキャッシュに残さない（次の --fetch で取り直す）。"""
+    return isinstance(e, urllib.error.HTTPError) and e.code in (404, 410)
+
+
+def _retry(rec: dict) -> bool:
+    """前の回にキャッシュした抄録の無い記録のうち、失敗が一過性だけのもの（429・名前解決の失敗など）は取り直す。
+    2026-10-18 の回は一過性の失敗も保存していた（429 が 26 件・名前解決が 7 件）。"""
+    errs = [v for k, v in rec.items() if k.startswith("err")]
+    return not rec.get("abs") and any("404" not in e and "410" not in e for e in errs)
+
+
 def _inverted(ii: dict) -> str:
     pos = [(p, w) for w, ps in ii.items() for p in ps]
     return " ".join(w for _, w in sorted(pos))
@@ -45,10 +58,12 @@ def _save(out: dict, path: Path) -> None:
 def fetch_abstracts(keys: list[str], path: Path) -> int:
     """OpenAlex → Semantic Scholar → Crossref の順。DOI と arXiv のものだけ。"""
     out = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    todo = [k for k in keys if k not in out and doi_of(k)]
+    todo = [k for k in keys if (k not in out or _retry(out[k])) and doi_of(k)]
+    transient = 0
     for n, k in enumerate(todo, 1):
         doi = urllib.parse.quote(doi_of(k), safe="/")
         rec: dict = {"src": None, "abs": ""}
+        flaky = False
         try:
             j = _get("https://api.openalex.org/works/doi:" + doi)
             if j.get("abstract_inverted_index"):
@@ -56,6 +71,7 @@ def fetch_abstracts(keys: list[str], path: Path) -> int:
             rec["type"], rec["title"] = j.get("type"), j.get("title")
         except Exception as e:  # noqa: BLE001  取れなければ次の取り先へ
             rec["err_oa"] = str(e)[:80]
+            flaky |= not _permanent(e)
         if not rec["abs"]:
             try:
                 j = _get(f"https://api.semanticscholar.org/graph/v1/paper/DOI:{doi}?fields=abstract")
@@ -63,6 +79,7 @@ def fetch_abstracts(keys: list[str], path: Path) -> int:
                     rec.update(src="s2", abs=j["abstract"])
             except Exception as e:  # noqa: BLE001
                 rec["err_s2"] = str(e)[:80]
+                flaky |= not _permanent(e)
             time.sleep(1.1)
         if not rec["abs"]:
             try:
@@ -71,12 +88,16 @@ def fetch_abstracts(keys: list[str], path: Path) -> int:
                     rec.update(src="crossref", abs=j["abstract"])
             except Exception as e:  # noqa: BLE001
                 rec["err_cr"] = str(e)[:80]
-        out[k] = rec
+                flaky |= not _permanent(e)
+        if rec["abs"] or not flaky:
+            out[k] = rec
+        else:
+            transient += 1
         if n % 25 == 0:
             _save(out, path)
         time.sleep(0.15)
     _save(out, path)
-    print(f"抄録: {len(todo)} 件を問い合わせた（キャッシュ {len(out)} 件）")
+    print(f"抄録: {len(todo)} 件を問い合わせた（キャッシュ {len(out)} 件・一過性の失敗で残さなかった {transient} 件）")
     return len(todo)
 
 
@@ -85,14 +106,19 @@ def fetch_csl(keys: list[str], path: Path) -> int:
     out = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     todo = [k for k in keys if k not in out and doi_of(k)]
     hdr = {**UA, "Accept": "application/vnd.citationstyles.csl+json"}
+    transient = 0
     for n, k in enumerate(todo, 1):
         try:
             out[k] = _get("https://doi.org/" + urllib.parse.quote(doi_of(k), safe="/"), hdr, 25)
         except Exception as e:  # noqa: BLE001
-            out[k] = {"_err": str(e)[:80]}
+            if _permanent(e):
+                out[k] = {"_err": str(e)[:80]}
+            else:
+                transient += 1
         if n % 50 == 0:
             _save(out, path)
         time.sleep(0.2)
     _save(out, path)
-    print(f"CSL: {len(todo)} 件を問い合わせた（失敗 {sum('_err' in out[k] for k in todo)}）")
+    failed = sum("_err" in out[k] for k in todo if k in out)
+    print(f"CSL: {len(todo)} 件を問い合わせた（無い {failed}・一過性の失敗で残さなかった {transient}）")
     return len(todo)

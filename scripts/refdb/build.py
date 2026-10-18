@@ -23,6 +23,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -40,11 +41,25 @@ OFF_CARD = "カード外"
 UNCITED = "未引用"
 ORPHAN_STATE = "正本に無い"
 
-EXIT_ORPHANS = 3
+FORMULA_LEAD = ("=", "+", "-", "@")
+
+
+def output_names(name: str) -> list[str]:
+    return [f"{name}.csv", f"{name}.html", f"{name}.csl.json", f"{name}_biblatex.bib", f"{name}_bibtex.bib",
+            "missing_summaries.json", "manifest.json"]
+
+
+EXIT_ORPHANS = 3  # 読んだ・メモが黙って消えうるので止めた（消えた key・空の key・重なり）
 
 ROW_RE = re.compile(r"^\| \[([PV]\d+)\] \| ")
 CITE_RE = re.compile(r"\[([PV]\d+)\]")
-TEMP_RE = re.compile(r"(確定|PLAUSIBLE BUT UNPROVEN|判定不能|否決|confirmed|refuted|3-0|2-1|1-2|0-3)")
+# 票（3-0 など）は日付（2026-03-04）の中に当てない。「確定した」「否決された」の動詞にも当てない
+TEMP_RE = re.compile(
+    r"(確定(?![しさす])|PLAUSIBLE BUT UNPROVEN|判定不能|否決(?![しさす])|confirmed|refuted"
+    r"|(?<![\d-])(?:3-0|2-1|1-2|0-3)(?![\d-]))"
+)
+# references.md の重複の列は「—」か、番号で始まる短い印（→P430・=V9・[P270]・→ **[P116] が正**・[V187] と同じ主題…）
+DUP_RE = re.compile(r"^(—|[→←=]?\s*(?:\*\*)?\[?[PV]\d+.{0,60})$")
 # 頁（pp.1851–1860・7:2072）・論文番号（e2013097118）・範囲の後ろ側（2023–2026）は年にしない
 YEAR_RE = re.compile(r"(?<![0-9A-Za-z./–-])(1[89]\d\d|20[0-4]\d)(?!\d|\.\d)")
 MARKS_RE = re.compile(r"[★⚠️]+")
@@ -68,11 +83,12 @@ class GitSource:
         return r.stdout if r.returncode == 0 else None
 
     def ls(self, branch: str, prefix: str, recursive: bool) -> list[str]:
-        args = ["ls-tree", "--name-only"] + (["-r"] if recursive else []) + [branch, "--", prefix]
+        # -z: 日本語のパスを引用符と 8 進のエスケープで返させない
+        args = ["ls-tree", "-z", "--name-only"] + (["-r"] if recursive else []) + [branch, "--", prefix]
         r = self._git(*args)
         if r.returncode != 0:
             raise RuntimeError(f"枝を読めない: {branch}（{r.stderr.strip()}）")
-        return [x for x in r.stdout.split("\n") if x]
+        return [x for x in r.stdout.split("\0") if x]
 
     def commit(self, branch: str) -> str:
         r = self._git("rev-parse", branch)
@@ -140,10 +156,10 @@ def parse_ref_line(line: str) -> dict | None:
     c = [x.strip() for x in line.strip().strip("|").split(" | ")]
     if len(c) < 7:
         return None
-    if len(c) == 7:
-        note, dup, st = c[5], "—", c[6]
-    else:
+    if len(c) >= 8 and DUP_RE.match(c[-2]):
         note, dup, st = " | ".join(c[5:-2]), c[-2], c[-1]
+    else:  # 7 列（重複の列が無い）。接地に ' | ' があれば接地に戻す
+        note, dup, st = " | ".join(c[5:-1]), "—", c[-1]
     return {
         "id": c[0].strip("[]"), "key": c[1], "at": c[2], "src": c[3],
         "url": c[4].strip("<>"), "note": note, "dup": dup, "st": st,
@@ -339,34 +355,60 @@ class OrphanError(Exception):
         self.orphans = orphans
 
 
+class KeepConflict(Exception):
+    """読んだ・メモを 1 行に結び直せない（空の key・同じ key の 2 行・付け替え先の重なり）。"""
+
+    def __init__(self, problems: list[str]):
+        super().__init__(f"読んだ・メモを結び直せない行が {len(problems)} 件ある")
+        self.problems = problems
+
+
 def read_keep(path: Path) -> list[list[str]]:
     """シートの「一覧」。CSV か、Sheets の get_values の返り値（2 次元の配列・{"values": …} も可）。"""
     text = path.read_text(encoding="utf-8-sig")
     if path.suffix.lower() == ".json":
         j = json.loads(text)
         if isinstance(j, dict):
-            j = j.get("values", [])
+            if "values" not in j:
+                raise ValueError(f"--keep の JSON に values が無い（キー: {sorted(j)}）。get_values の返り値か確かめる")
+            j = j["values"]
+        if not isinstance(j, list) or not all(isinstance(r, list) for r in j):
+            raise ValueError("--keep の JSON が 2 次元の配列でない")
         return [[("" if c is None else str(c)) for c in r] for r in j]
     return list(csv.reader(io.StringIO(text)))
 
 
-def keep_map(table: list[list[str]], human: list[str]) -> dict[str, dict]:
+def has_content(vals: dict) -> bool:
+    return any(v.strip() for v in vals.values())
+
+
+def keep_map(table: list[list[str]], human: list[str], checkbox: list[str]) -> dict[str, dict]:
+    """key → 人が書いた列の値。表の形が違えば ValueError、1 行に結び直せなければ KeepConflict で止める。"""
     if not table:
-        return {}
-    h = table[0]
-    if "key" not in h:
-        raise ValueError("--keep の表に key の列が無い")
+        raise ValueError("--keep の表が空（見出しの行も無い）")
+    h = [c.strip() for c in table[0]]
+    lacking = [c for c in ["key", *human] if c not in h]
+    if lacking:
+        raise ValueError(f"--keep の表に {lacking} の列が無い（見出し: {h}）")
     ki = h.index("key")
-    cols = [(c, h.index(c)) for c in human if c in h]
-    out = {}
-    for r in table[1:]:
-        if ki >= len(r) or not r[ki]:
-            continue
+    cols = [(c, h.index(c)) for c in human]
+    out: dict[str, dict] = {}
+    problems = []
+    for n, r in enumerate(table[1:], start=2):
         vals = {c: (r[i] if i < len(r) else "") for c, i in cols}
-        # 読んだ はチェックボックスで、付けていない行は FALSE で返る。それは書いた内容に数えない
-        vals = {c: ("" if v.strip().upper() == "FALSE" else v) for c, v in vals.items()}
-        if any(v.strip() for v in vals.values()):
-            out[r[ki]] = vals
+        # チェックボックスの列は、付けていない行が FALSE で返る。それは書いた内容に数えない
+        vals = {c: ("" if c in checkbox and v.strip().upper() == "FALSE" else v) for c, v in vals.items()}
+        key = r[ki].strip() if ki < len(r) else ""
+        if not has_content(vals):
+            continue
+        if not key:
+            problems.append(f"{n} 行目: key が空なのに書いた内容がある {vals}")
+        elif key in out and out[key] != vals:
+            problems.append(f"{n} 行目: key {key} の行が 2 つあり、書いた内容が違う {out[key]} / {vals}")
+        else:
+            out[key] = vals
+    if problems:
+        raise KeepConflict(problems)
     return out
 
 
@@ -376,25 +418,31 @@ def rejoin(rows: list[dict], kept: dict[str, dict], human: list[str],
     for r in rows:
         for c in human:
             r[c] = ""
-    joined, orphans = 0, []
+    placed: dict[str, str] = {}  # 付け替え先の key → 元の key
+    problems, orphans = [], []
     for k, vals in kept.items():
-        target = by_key.get(rekey.get(k, k))
-        if target is None:
+        new = rekey.get(k, k)
+        if by_key.get(new) is None:
             orphans.append({"key": k, **vals})
             continue
-        for c in human:
-            if vals.get(c):
-                target[c] = vals[c]
-        joined += 1
+        if new in placed:
+            problems.append(f"{placed[new]} と {k} が同じ key {new} に入る（--rekey を確かめる）")
+            continue
+        placed[new] = k
+    if problems:
+        raise KeepConflict(problems)
     if orphans and not keep_orphans:
         raise OrphanError(orphans)
+    for new, k in placed.items():
+        for c in human:
+            by_key[new][c] = kept[k].get(c, "")
     for o in orphans:
         r = {c: "" for c in COLUMNS}
         r.update({"ID": "—", "key": o["key"], "状態": ORPHAN_STATE, "_cards": [], "_cc": [], "_strands": [], "_other": []})
         for c in human:
             r[c] = o.get(c, "")
         rows.append(r)
-    return {"joined": joined, "orphans": len(orphans)}
+    return {"joined": len(placed), "orphans": len(orphans)}
 
 
 # ---------------------------------------------------------------- 5. CSV・ページ・CSL
@@ -428,7 +476,8 @@ def page_data(rows: list[dict], data: dict, summaries: dict, labels: dict) -> li
 
 def write_page(rows, data, summaries, labels, cfg, sub: str, path: Path) -> None:
     tpl = (HERE / "template.html").read_text(encoding="utf-8")
-    js = lambda o: json.dumps(o, ensure_ascii=False).replace("</", "<\\/")  # noqa: E731
+    # <script> の中に置くので < をすべて \u003c にする（</script> も <!-- も作らせない）
+    js = lambda o: json.dumps(o, ensure_ascii=False).replace("<", "\\u003c")  # noqa: E731
     strands = [s["name"] for s in cfg["strands"]] + [OFF_CARD, UNCITED]
     for ph in ("__DATA__", "__STRANDS__", "__SUB__"):
         if ph not in tpl:
@@ -603,6 +652,11 @@ def run(args, source=None) -> int:
     out = Path(args.out).expanduser() if args.out else cache / "out" / today
     summaries_path = Path(args.summaries)
 
+    # シートの値は、ネットに出る前・何かを書く前に読んで形を確かめる（ここで止まれば何も書かない）
+    kept = None
+    if args.keep:
+        kept = keep_map(read_keep(Path(args.keep).expanduser()), human, cfg.get("checkbox_columns", ["読んだ"]))
+
     data = collect(source, branches)
     summaries = load_json(summaries_path, {})
     if args.fetch:
@@ -619,47 +673,53 @@ def run(args, source=None) -> int:
 
     rekey = dict(x.split("=", 1) for x in (args.rekey or []))
     rj = {"joined": 0, "orphans": 0}
-    if args.keep:
-        kept = keep_map(read_keep(Path(args.keep).expanduser()), human)
-        try:
-            rj = rejoin(rows, kept, human, rekey, args.keep_orphans)
-        except OrphanError as e:
-            print(f"止めた: {e}。--rekey 旧=新 で対応を渡すか、--keep-orphans で末尾に残す。", file=sys.stderr)
-            for o in e.orphans:
-                print("  " + json.dumps(o, ensure_ascii=False), file=sys.stderr)
-            return EXIT_ORPHANS
+    if kept is not None:
+        rj = rejoin(rows, kept, human, rekey, args.keep_orphans)
     else:
         for r in rows:
             for c in human:
                 r[c] = ""
 
+    # 一時のフォルダに全部作ってから出力先へ移す。途中で止まったら出力先は前の回のまま（新旧が混ざらない）
     out.mkdir(parents=True, exist_ok=True)
-    base = out / f"GSE文献DB_{today}"
-    write_csv(rows, human, base.with_name(base.name + ".csv"))
-    n = sum(1 for r in rows if r["状態"] != ORPHAN_STATE)
-    sub = f"{len(branches)} 枝の docs/references.md を key でまとめた {n} 件・{today} 時点の写し"
-    write_page(rows, data, summaries, labels, cfg, sub, base.with_name(base.name + ".html"))
-    items, csl_counts = build_csl(rows, csl_raw, summaries)
-    csl_path = base.with_name(base.name + ".csl.json")
-    csl_path.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
-    bib = {} if args.no_bib else write_bib(csl_path, base)
-    missing = missing_summaries(rows, data, summaries, abstracts)
-    (out / "missing_summaries.json").write_text(json.dumps(missing, ensure_ascii=False, indent=1), encoding="utf-8")
+    stage = Path(tempfile.mkdtemp(prefix=".refdb-", dir=out))
+    try:
+        name = f"GSE文献DB_{today}"
+        write_csv(rows, human, stage / f"{name}.csv")
+        n = sum(1 for r in rows if r["状態"] != ORPHAN_STATE)
+        sub = f"{len(branches)} 枝の docs/references.md を key でまとめた {n} 件・{today} 時点の写し"
+        write_page(rows, data, summaries, labels, cfg, sub, stage / f"{name}.html")
+        items, csl_counts = build_csl(rows, csl_raw, summaries)
+        csl_path = stage / f"{name}.csl.json"
+        csl_path.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+        bib = {} if args.no_bib else write_bib(csl_path, stage / name)
+        missing = missing_summaries(rows, data, summaries, abstracts)
+        (stage / "missing_summaries.json").write_text(json.dumps(missing, ensure_ascii=False, indent=1), encoding="utf-8")
+        formula_cells = sum(1 for r in rows for c in COLUMNS + human if str(r.get(c, ""))[:1] in FORMULA_LEAD)
+        manifest = {
+            "date": today,
+            "branches": {b: source.commit(b) for b in branches},
+            "works": n,
+            "card_cited": sum(1 for r in rows if r["_cards"]),
+            "summaries": sum(1 for r in rows if r["key"] in summaries),
+            "claims_works": sum(1 for r in rows if r["_cc"]),
+            "claims_lines": sum(len(r["_cc"]) for r in rows),
+            "collided_ids": len(data["collided"]),
+            "missing_summaries": len(missing),
+            "formula_like_cells": formula_cells,
+            "skipped_lines": data["skipped"],
+            **csl_counts, "bib": bib, "kept": rj,
+        }
+        (stage / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+        produced = {p.name for p in stage.iterdir()}
+        for old in output_names(name):
+            if old not in produced and (out / old).exists():
+                (out / old).unlink()  # 今回作らなかったもの（--no-bib の .bib）を前の回から残さない
+        for p in stage.iterdir():
+            p.replace(out / p.name)
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
 
-    manifest = {
-        "date": today,
-        "branches": {b: source.commit(b) for b in branches},
-        "works": n,
-        "card_cited": sum(1 for r in rows if r["_cards"]),
-        "summaries": sum(1 for r in rows if r["key"] in summaries),
-        "claims_works": sum(1 for r in rows if r["_cc"]),
-        "claims_lines": sum(len(r["_cc"]) for r in rows),
-        "collided_ids": len(data["collided"]),
-        "missing_summaries": len(missing),
-        "skipped_lines": data["skipped"],
-        **csl_counts, "bib": bib, "kept": rj,
-    }
-    (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"出力: {out}")
     print(f"文献 {n}・要約 {manifest['summaries']}・カードでの記述 {manifest['claims_works']} 件"
           f"（{manifest['claims_lines']} 行）・番号の衝突 {manifest['collided_ids']}・要約が無いカード引用 {len(missing)}")
@@ -667,9 +727,29 @@ def run(args, source=None) -> int:
           + (f"・.bib {bib}" if bib else ""))
     if args.keep:
         print(f"読んだ・メモ: {rj['joined']} 件を結び直した・正本に無い {rj['orphans']} 件")
+    if formula_cells:
+        print(f"注意: = + - @ で始まるセルが {formula_cells} 個ある。シートで数式として読まれないか確かめる", file=sys.stderr)
     if data["skipped"]:
         print(f"読めなかった行 {len(data['skipped'])} 件（manifest.json の skipped_lines）", file=sys.stderr)
     return 0
+
+
+def main(argv=None, source=None) -> int:
+    try:
+        return run(parse_args(argv), source=source)
+    except OrphanError as e:
+        print(f"止めた: {e}。--rekey 旧=新 で対応を渡すか、--keep-orphans で末尾に残す。何も書いていない。", file=sys.stderr)
+        for o in e.orphans:
+            print("  " + json.dumps(o, ensure_ascii=False), file=sys.stderr)
+        return EXIT_ORPHANS
+    except KeepConflict as e:
+        print(f"止めた: {e}。シートを直してから読み直す。何も書いていない。", file=sys.stderr)
+        for x in e.problems:
+            print("  " + x, file=sys.stderr)
+        return EXIT_ORPHANS
+    except (RuntimeError, ValueError) as e:
+        print(f"エラー: {e}", file=sys.stderr)
+        return 2
 
 
 def parse_args(argv=None):
@@ -691,8 +771,4 @@ def parse_args(argv=None):
 
 if __name__ == "__main__":
     sys.path.insert(0, str(HERE))
-    try:
-        sys.exit(run(parse_args()))
-    except RuntimeError as e:
-        print(f"エラー: {e}", file=sys.stderr)
-        sys.exit(2)
+    sys.exit(main())

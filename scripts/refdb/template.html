@@ -178,17 +178,16 @@ function years() {
   $("yrsel").textContent = S.y0 === null ? "棒を押すとその年から、もう一度押すとそこまでに絞る" : (S.y0 === S.y1 ? `${S.y0} 年` : `${S.y0}〜${S.y1} 年`) + "（棒を押し直すと解除）";
 }
 function hi(s) {
-  let out = esc(s);
-  for (const w of S.q.split(/\s+/).filter((w) => w.length > 1)) {
-    const re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-    out = out.replace(re, (m) => `<mark>${m}</mark>`);
-  }
-  return out;
+  // 語は元の文字列で探し、切った断片ごとにエスケープする（&amp; の中や、挿れた <mark> 自身に当てない）
+  const words = S.q.split(/\s+/).filter((w) => w.length > 1).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const str = String(s);
+  if (!words.length) return esc(str);
+  return str.split(new RegExp(`(${words.join("|")})`, "gi")).map((part, i) => (i % 2 ? `<mark>${esc(part)}</mark>` : esc(part))).join("");
 }
 function row(d) {
   const tags = d.strands.map((s) => `<span class="tag${s === "カード外" || s === "未引用" ? " plain" : ""}">${esc(s)}</span>`).join("")
     + (d.coll ? `<span class="tag warn">番号の衝突</span>` : "") + (d.st !== "active" ? `<span class="tag plain">${esc(d.st)}</span>` : "");
-  const link = d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.url)}</a>` : "（なし）";
+  const link = /^https?:\/\//i.test(d.url) ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.url)}</a>` : (d.url ? esc(d.url) : "（なし）");
   const cards = d.cards.length ? d.cards.map((c) => `${esc(c.t)}（${esc(c.f)}）`).join("<br>") : "（なし）";
   return `<details class="item"><summary><span class="id">${hi(d.id)}</span><span class="ti"><span class="t">${hi(d.at)}</span><br><span class="s">${hi(d.src)}</span>${d.sum ? `<span class="sm">${hi(d.sum)}</span>` : ""}</span><span class="yr">${d.yr || ""}</span><span class="tags">${tags}</span></summary>
   <div class="body">${d.feat ? `<p class="feat">${hi(d.feat)}</p>` : ""}${d.sum ? `<p class="basis">要約の材料: ${esc(d.basis)}（Claude が書いた要約。引く前に原著で確かめる）</p>` : ""}

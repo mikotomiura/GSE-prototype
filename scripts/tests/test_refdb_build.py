@@ -33,6 +33,8 @@ REFS_MAIN = HEAD + "\n".join([
     "| [P2] | doi:10.1/b | Bb, B. — Beta | CHI '10, pp.1851–1860 | — | 接地 B | active |",
     # 接地の中に ' | ' がある
     "| [V1] | url:example-c | Cc, C. — Gamma | Web, 2019 | https://example.org/c | 前半 | 後半 | — | **provisional** |",
+    # 7 列で、接地の中に ' | ' がある
+    "| [V3] | url:example-f | Ff, F. — Phi | Web, 2018 | — | 前 | 後 | active |",
     # どこからも引かれない
     "| [P3] | doi:10.1/d | Dd, D. — Delta | *J. D* 2021 | — | 接地 D | — | active |",
 ]) + "\n"
@@ -109,11 +111,11 @@ class Base(unittest.TestCase):
 
     def run_build(self, *extra: str) -> tuple[int, Path]:
         out = self.root / "out"
-        args = build.parse_args([
+        argv = [
             "--config", str(self.root / "config.json"), "--summaries", str(self.root / "summaries.json"),
             "--cache", str(self.root / "cache"), "--out", str(out), "--date", "2026-10-18", "--no-bib", *extra,
-        ])
-        return build.run(args, source=self.src), out
+        ]
+        return build.main(argv, source=self.src), out
 
     def rows(self, out: Path) -> dict[str, dict]:
         with (out / "GSE文献DB_2026-10-18.csv").open(encoding="utf-8-sig") as fp:
@@ -128,6 +130,13 @@ class ParseTest(unittest.TestCase):
         self.assertEqual((b["id"], b["note"], b["dup"], b["st"]), ("P2", "接地 B", "—", "active"))
         self.assertEqual(c["note"], "前半 | 後半")
         self.assertIsNone(build.parse_ref_line("| [P9] | 列が | 足りない |"))
+        f = build.parse_ref_line(REFS_MAIN.split("\n")[5])
+        self.assertEqual((f["id"], f["note"], f["dup"], f["st"]), ("V3", "前 | 後", "—", "active"))
+        g = build.parse_ref_line("| [P8] | k | A — T | S | — | 接地 | →P430 | superseded |")
+        self.assertEqual((g["note"], g["dup"], g["st"]), ("接地", "→P430", "superseded"))
+        for dup in ("[P270]", "→ **[P116] が正**", "[V187] と同じ主題（別の論文）", "=V9"):
+            h = build.parse_ref_line(f"| [P8] | k | A — T | S | — | 接地 | {dup} | active |")
+            self.assertEqual((h["note"], h["dup"]), ("接地", dup), dup)
 
     def test_year(self):
         cases = {
@@ -144,6 +153,12 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(build.fill_url("—", "doi:10.1/x"), "https://doi.org/10.1/x")
         self.assertEqual(build.fill_url("", "arXiv:2101.1"), "https://arxiv.org/abs/2101.1")
         self.assertEqual(build.fill_url("—", "url:x"), "")
+
+    def test_temperature_not_in_dates_or_verbs(self):
+        self.assertEqual(build.TEMP_RE.findall("2026-03-04 に 2026-12-10 で確定した"), [])
+        self.assertEqual(build.TEMP_RE.findall("版（2026-12-1）"), [])  # 前の数字だけが手がかり
+        self.assertEqual(build.TEMP_RE.findall("[検証済 2-1 / 3-0]・確定"), ["2-1", "3-0", "確定"])
+        self.assertEqual(build.TEMP_RE.findall("否決（0-3）"), ["否決", "0-3"])
 
     def test_clean_keeps_inequalities(self):
         self.assertEqual(build.clean("★ d = .43 > .29・<https://a.b/c> **太字**"), "d = .43 > .29・https://a.b/c 太字")
@@ -182,7 +197,8 @@ class BuildTest(Base):
         rc, out = self.run_build()
         self.assertEqual(rc, 0)
         r = self.rows(out)
-        self.assertEqual(len(r), 5)
+        self.assertEqual(len(r), 6)
+        self.assertEqual(r["url:example-f"]["接地（全文）"], "前 | 後")
         a = r["doi:10.1/a"]
         self.assertEqual(a["ID"], "P1; V2（side）")
         self.assertEqual(a["名前空間"], "PV")
@@ -205,19 +221,86 @@ class BuildTest(Base):
         self.assertEqual(r["doi:10.1/b"]["URL"], "https://doi.org/10.1/b")
         self.assertEqual(r["doi:10.1/b"]["要約の材料"], build.NO_SUMMARY_CITED)
         m = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual((m["works"], m["summaries"], m["claims_works"], m["collided_ids"]), (5, 1, 4, 1))
-        self.assertEqual((m["csl_from_cache"], m["csl_minimal"]), (2, 3))
+        self.assertEqual((m["works"], m["summaries"], m["claims_works"], m["collided_ids"]), (6, 1, 4, 1))
+        self.assertEqual((m["csl_from_cache"], m["csl_minimal"]), (2, 4))
         missing = json.loads((out / "missing_summaries.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(x["key"] for x in missing), ["doi:10.1/b", "doi:10.1/e", "url:example-c"])
         self.assertEqual([x["abstract"] for x in missing if x["key"] == "doi:10.1/e"], ["Epsilon abstract"])
         html = (out / "GSE文献DB_2026-10-18.html").read_text(encoding="utf-8")
         self.assertNotIn("__DATA__", html)
-        self.assertIn("2 枝の docs/references.md を key でまとめた 5 件", html)
+        self.assertIn("2 枝の docs/references.md を key でまとめた 6 件", html)
 
     def test_unique_cite_keys_on_collision(self):
         _, out = self.run_build()
         ids = [x["id"] for x in json.loads((out / "GSE文献DB_2026-10-18.csl.json").read_text(encoding="utf-8"))]
-        self.assertEqual(sorted(ids), sorted(["P1", "P2", "V1", "P3", "P3_doi101e"]))
+        self.assertEqual(sorted(ids), sorted(["P1", "P2", "V1", "V3", "P3", "P3_doi101e"]))
+
+
+class OutputTest(Base):
+    def test_failed_run_leaves_previous_outputs(self):
+        rc, out = self.run_build()
+        self.assertEqual(rc, 0)
+        before = {p.name: p.read_bytes() for p in out.iterdir()}
+        (self.root / "tree" / "origin__main" / "docs" / "references.md").write_text(
+            REFS_MAIN + "| [P7] | doi:10.1/g | Gg — Gamma2 | J 2020 | — | 接地 | — | active |\n", encoding="utf-8")
+        orig = build.write_page
+        build.write_page = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("壊した"))
+        try:
+            rc2, _ = self.run_build()
+        finally:
+            build.write_page = orig
+        self.assertEqual(rc2, 2)
+        self.assertEqual({p.name: p.read_bytes() for p in out.iterdir()}, before)
+
+    def test_no_bib_removes_stale_bib(self):
+        _, out = self.run_build()
+        stale = out / "GSE文献DB_2026-10-18_bibtex.bib"
+        stale.write_text("古い", encoding="utf-8")
+        self.run_build()
+        self.assertFalse(stale.exists())
+
+    def test_script_embedding(self):
+        evil = {"doi:10.1/a": {**SUMMARIES["doi:10.1/a"], "summary": "a</script><!--<script>b"}}
+        (self.root / "summaries.json").write_text(json.dumps(evil, ensure_ascii=False), encoding="utf-8")
+        _, out = self.run_build()
+        html = (out / "GSE文献DB_2026-10-18.html").read_text(encoding="utf-8")
+        data = html.split("const DATA = ", 1)[1].split(";\n", 1)[0]
+        self.assertNotIn("<", data)
+        self.assertIn("a\\u003c/script>", data)
+
+
+class FetchTest(unittest.TestCase):
+    def test_transient_failures_are_not_cached(self):
+        import urllib.error
+        import fetch
+        calls = []
+
+        def fake(url, headers=None, timeout=20):
+            calls.append(url)
+            if "doi.org/10.1/gone" in url:
+                raise urllib.error.HTTPError(url, 404, "nf", {}, None)
+            raise TimeoutError("timed out")
+
+        orig_get, orig_sleep = fetch._get, fetch.time.sleep
+        fetch._get, fetch.time.sleep = fake, lambda s: None
+        try:
+            with TemporaryDirectory() as d:
+                p = Path(d) / "csl.json"
+                fetch.fetch_csl(["doi:10.1/gone", "doi:10.1/slow"], p)
+                got = json.loads(p.read_text(encoding="utf-8"))
+                self.assertEqual(sorted(got), ["doi:10.1/gone"])
+                a = Path(d) / "abs.json"
+                old = {"doi:10.1/old429": {"src": None, "abs": "", "err_s2": "HTTP Error 429: "},
+                       "doi:10.1/old404": {"src": None, "abs": "", "err_oa": "HTTP Error 404: Not Found"}}
+                a.write_text(json.dumps(old), encoding="utf-8")
+                calls.clear()
+                fetch.fetch_abstracts(["doi:10.1/slow", "doi:10.1/old429", "doi:10.1/old404"], a)
+                got = json.loads(a.read_text(encoding="utf-8"))
+                self.assertEqual(sorted(got), ["doi:10.1/old404", "doi:10.1/old429"])
+                self.assertTrue(any("old429" in u for u in calls))  # 前の回の 429 は取り直す
+                self.assertFalse(any("old404" in u for u in calls))
+        finally:
+            fetch._get, fetch.time.sleep = orig_get, orig_sleep
 
 
 class KeepTest(Base):
@@ -262,7 +345,7 @@ class KeepTest(Base):
         r = self.rows(out)
         self.assertEqual((r["url:gone"]["ID"], r["url:gone"]["状態"], r["url:gone"]["メモ"]), ("—", build.ORPHAN_STATE, "大事なメモ"))
         m = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(m["works"], 5)
+        self.assertEqual(m["works"], 6)
 
     def test_unchecked_box_is_not_a_memo(self):
         # get_values はチェックを外した 読んだ を "FALSE" で返す。消えた key でもそれだけなら止めない
@@ -273,9 +356,46 @@ class KeepTest(Base):
         self.assertEqual(r["doi:10.1/b"]["読んだ"], "TRUE")
         self.assertEqual(r["doi:10.1/a"]["読んだ"], "")
 
-    def test_keep_without_key_column(self):
-        with self.assertRaises(ValueError):
-            build.keep_map([["ID", "メモ"], ["P1", "x"]], ["読んだ", "メモ"])
+    def test_bad_sheet_stops_before_writing(self):
+        # 列の名前が違う・values が無い・空の表は、黙って空の 読んだ・メモ にせず止める（何も書かない）
+        bad = {
+            "renamed": ([["key", "読んだ ", "メモ欄"], ["doi:10.1/b", "TRUE", "x"]], False),
+            "no_values": ({"error": {"code": 400}}, True),
+            "empty": ([], True),
+        }
+        for name, (table, as_json) in bad.items():
+            with self.subTest(name):
+                if as_json:
+                    path = self.root / f"{name}.json"
+                    path.write_text(json.dumps(table), encoding="utf-8")
+                else:
+                    path = self.write_sheet(table, False)
+                rc, out = self.run_build("--keep", str(path))
+                self.assertEqual(rc, 2)
+                self.assertFalse((out / "GSE文献DB_2026-10-18.csv").exists())
+
+    def test_rows_that_cannot_be_rejoined_stop(self):
+        cases = {
+            "empty_key": [["key", "読んだ", "メモ"], ["", "", "手で足した行"]],
+            "duplicate": [["key", "読んだ", "メモ"], ["doi:10.1/b", "TRUE", "m1"], ["doi:10.1/b", "", "m2"]],
+        }
+        for name, sheet in cases.items():
+            with self.subTest(name):
+                rc, out = self.run_build("--keep", str(self.write_sheet(sheet, False)))
+                self.assertEqual(rc, build.EXIT_ORPHANS)
+                self.assertFalse((out / "GSE文献DB_2026-10-18.csv").exists())
+        same = [["key", "読んだ", "メモ"], ["doi:10.1/b", "", "m"], ["doi:10.1/b", "", "m"], ["doi:10.1/a", "", ""]]
+        self.assertEqual(build.keep_map(same, ["読んだ", "メモ"], ["読んだ"]), {"doi:10.1/b": {"読んだ": "", "メモ": "m"}})
+
+    def test_rekey_collision_stops(self):
+        sheet = [["key", "読んだ", "メモ"], ["url:gone", "", "A"], ["doi:10.1/d", "", "B"]]
+        rc, out = self.run_build("--keep", str(self.write_sheet(sheet, False)), "--rekey", "url:gone=doi:10.1/d")
+        self.assertEqual(rc, build.EXIT_ORPHANS)
+        self.assertFalse((out / "GSE文献DB_2026-10-18.csv").exists())
+
+    def test_false_in_memo_is_kept(self):
+        got = build.keep_map([["key", "読んだ", "メモ"], ["a", "FALSE", "false"]], ["読んだ", "メモ"], ["読んだ"])
+        self.assertEqual(got, {"a": {"読んだ": "", "メモ": "false"}})
 
 
 
