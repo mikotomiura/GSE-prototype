@@ -34,6 +34,13 @@ One row per coded record (the one coded record of an E5 group included; the othe
 | `main_instrument_family` | Term family or families in the name of the main instrument (C6a, C7 (iii)). | burnout, exhaustion, fatigue, instrument_unnamed, no_family_term, none, not_verifiable, unresolved | yes |  |
 | `conclusion_sentence` | The main conclusion, copied verbatim (empty if it cannot be identified). | free text |  | yes |
 | `title_ai_fatigue_term` | Whether the title uses an AI-fatigue term (C6c). | no, unresolved, yes |  |  |
+| `design` | Design category of the study (C6b design categories); mixed if the study has components of different designs. | case_study, cross_sectional, diary_esm, longitudinal, mixed, not_verifiable, other_unclear, pre_post, qualitative, quasi_experiment, randomized_experiment, scale_development, unresolved |  |  |
+| `ai_manipulated` | 1 if the AI-side variable was manipulated in any component of the design, 0 if not (an intervention unrelated to AI counts as 0); a mismatch in C6b needs 0, and a design with no manipulation (cross_sectional, longitudinal, diary_esm, case_study, qualitative, scale_development) cannot have 1. | 0, 1, not_verifiable, unresolved |  |  |
+| `design_location` | Page or section where the design is described (working record, free text, not released). | free text |  | yes |
+| `C6_location` | Page or section of the abstract sentence used for C6b (working record, free text, not released). | free text |  | yes |
+| `C6_rationale` | One-line reason for the C6a, C6b and C6c title-input codes (working record, free text, not released; no agreement is computed). | free text |  | yes |
+| `C7_location` | Page or section of the conclusion sentence (working record, free text, not released). | free text |  | yes |
+| `C7_rationale` | One-line reason for the C7 inputs (working record, free text, not released; no agreement is computed). | free text |  | yes |
 | `C1_L1a` | C1 level L1a for the main instrument: 1 if it applies (all that apply). | 0, 1, not_verifiable, unresolved |  |  |
 | `C1_L1b` | C1 level L1b for the main instrument: 1 if it applies (all that apply). | 0, 1, not_verifiable, unresolved |  |  |
 | `C1_L2` | C1 level L2 for the main instrument: 1 if it applies (all that apply). | 0, 1, not_verifiable, unresolved |  |  |
@@ -96,6 +103,10 @@ One row per recalculated result (C4f).
 | `source` | Where the result is reported: text or table. | table, text |  |  |
 | `consistent` | Whether the recalculated value is consistent with the reported one (na: cannot be calculated). | na, no, unresolved, yes |  |  |
 | `gross` | 1 if the inconsistency changes the conclusion at alpha = .05 (only for inconsistent results). | 0, 1, unresolved |  |  |
+| `location` | Page, section or table where the result is reported (free text, required). | an ID or free text |  |  |
+| `statistic` | Kind of statistic recalculated. | F, chi2, indirect_effect, percentage, r, t, unresolved, z |  |  |
+| `reported_value` | The value as printed, for example p < .001 (working record, free text, required, not released). | an ID or free text |  |  |
+| `recalculated_value` | The recalculated value (working record, free text, not released); empty only when consistent is na. | free text |  | yes |
 
 ## links.csv
 

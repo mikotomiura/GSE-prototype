@@ -217,13 +217,15 @@ Units are the record (C1 and C3 to C7), the fatigue instrument (C2) and the item
 codes, and a missing code stands alone in a cell. Table~1 lists the seven codes and their values.
 \begin{itemize}
   \item C1, level of attribution: from items that mention AI to no mention, with a representative value per instrument.
+  The order is how close the AI mention is to the respondent's answer, not a ranking of measurement quality.
   \item C2a to C2d: origin and modification, item content (types and, for reduced interest, avoidance and futility,
   targets), reported adaptation procedures, and reported measurement properties.
   \item C3: the instrument used for the AI-side variable.
   \item C4: completeness and internal consistency, including recalculation (C4f).
   \item C5: sample overlap, without deciding sameness.
   \item C6: the title against the name of the main instrument (C6a), causal wording against design (C6b), and an
-  AI-fatigue term in the title against the level of attribution (C6c).
+  AI-fatigue term in the title against the level of attribution (C6c). The design category and whether the AI-side
+  variable was manipulated are coded with C6b.
   \item C7: three conditions on the main conclusion, each its own problem type: causal wording not supported by the
   design; an AI-fatigue term while the main instrument ties fatigue to AI only through a definition, a label, an
   interview theme or not at all; and a construct term in a different family from the instrument's name.
@@ -251,7 +253,11 @@ effect and tests no hypothesis. For each problem type, the records that can show
 advance; among them, a problem type ``was observed in the main set'' if at least one record shows it, ``was not observed
 in the main set'' if none does, and ``could not be evaluated'' if no record can show it. Each statement gives the count,
 the number of evaluable records, the number not evaluable and the number unresolved. These statements report presence
-or absence in this set; they are not frequencies. Sensitivity analyses use peer-reviewed records only, remove records
+or absence in this set; they are not frequencies. The problem types fall into three categories that are reported
+separately and never added together: reporting (C4, C5); names and attribution (C6a, C6c, C7 (ii), C7 (iii)), which
+record differences between words, not defects of measurement; and possible inferential overreach (C6b, C7 (i)).
+Because C6c and C7 (ii) compare wording with the instrument and not with the design, they are stated separately for
+studies that did and did not manipulate the AI-side variable, and for studies where this could not be verified. Sensitivity analyses use peer-reviewed records only, remove records
 with unconfirmed signs of overlap, count the secondary type of boundary items, and use each pass's values in turn.
 In a fifth analysis, both authors screened again, at full text and centre, every candidate that either screener had
 sent to full text by 31 December 2026, after the second author had read the manuscript draft; studies this added

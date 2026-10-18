@@ -1,1 +1,1 @@
-record_id,result_id,source,consistent,gross
+record_id,result_id,source,consistent,gross,location,statistic,reported_value,recalculated_value

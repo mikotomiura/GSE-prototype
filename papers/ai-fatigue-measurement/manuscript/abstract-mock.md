@@ -45,7 +45,7 @@ n studies and n instruments (n candidates unscreened). Attribution: items n, ins
 instruments first seen with printed items (n unavailable), n had fatigue items, n reduced interest, n avoidance, n
 futility, n irritation, n other. Of the reporting checks (n to n evaluable records each; Table 12), observed: …; not
 observed: …. Unconfirmed sample overlap: observed (n/n, n unresolved). Titles; conclusions: causal wording beyond the
-design, observed (n/n, n); observed (n/n, n). "AI fatigue" with attribution at levels 3–6, observed (n/n, n);
+design, observed (n/n, n); observed (n/n, n). "AI fatigue" with attribution at levels 3–6 (AI not manipulated; other designs in Table 12), observed (n/n, n);
 observed (n/n, n). Construct term outside the instrument-name family, observed (n/n, n); observed (n/n, n). **Availability.** Registration, outline, code table with per-instrument and per-study
 tables, codebook and scripts are open.
 
@@ -56,9 +56,9 @@ Counted with `wc -w` on the abstract text only, with each placeholder (n, n/n, �
 | Version | Words |
 |---|---|
 | Step 0 | 378 |
-| Steps 1 and 2, compact wording, before the names of the C4 types are filled in | 219 |
-| The same, with the eight C4 types named (estimated at about two words each) | about 235 |
+| Steps 1 and 2, compact wording, before the names of the C4 types are filled in | 227 |
+| The same, with the eight C4 types named (estimated at about two words each) | about 243 |
 
 Counted again on 18 October 2026, after the methods sentence was changed to the AI screener and the second coder. The rule fits the
 limit of 250 words only with Step 2 and compact wording. If it is still over the limit, Step 3 applies: the Background
-is reduced to one sentence of at most 15 words. A journal limit below 250 words needs Step 4 of the rule.
+is reduced to one sentence of at most 15 words. A journal limit below 250 words needs Step 4 of the rule. Counted again on 19 October 2026, after C6c and C7 (ii) were split by manipulation of the AI-side variable and the abstract kept only the not-manipulated subset (8 more words).

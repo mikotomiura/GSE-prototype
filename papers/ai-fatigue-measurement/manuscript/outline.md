@@ -1,6 +1,6 @@
 # Manuscript outline
 
-Version 4, 18 October 2026.
+Version 5, 19 October 2026.
 
 This outline fixes the structure of the manuscript, the evidence for each claim and the rules for reporting before
 any record of the main set is coded. It contains no result value and no expectation about results. Each claim
@@ -63,8 +63,14 @@ manuscript:
   ask about, not what scores contain (GSRR-65).
   It covers instruments whose items are printed; instruments with items unavailable are counted, and may differ from
   the others (GSRR-65).
-- The level of attribution (C1) is described and is not a problem type; claiming "AI fatigue" on a weak attribution is
-  counted through C6c (in the title) and C7 (ii) (in the main conclusion).
+- The level of attribution (C1) is described and is not a problem type, and its order is not a ranking of measurement
+  quality; claiming "AI fatigue" on a weak attribution is counted through C6c (in the title) and C7 (ii) (in the main
+  conclusion). These compare wording with the instrument, not with the design, so they are stated separately for
+  records whose AI-side variable was manipulated, was not manipulated, and whose manipulation is not verifiable or
+  unresolved (GSRR-57), and never combined.
+- The problem types fall into three categories that are reported and discussed separately and never added together
+  (GSRR-57): reporting (C4, C5); names and attribution (C6a, C6c, C7 (ii), C7 (iii)), which record differences
+  between words and are not called defects of measurement; and possible inferential overreach (C6b, C7 (i)).
 - C2d records whether reports disclose items, reliability in the sample, factor analyses and reasons for the choice;
   it does not rate measurement properties. C2d and C4 describe reporting and are not quality ratings (GSRR-55).
 - C7 checks three conditions under which a conclusion goes beyond what was measured; it does not judge whether a
@@ -164,6 +170,8 @@ the main set only:
   items, with the number of instruments with items unavailable (C2b; the per-instrument proportions, which are the
   primary C2b quantity, are in Table 7); and, for each problem type of GSRR-57, including each condition
   of C7 and C6c, the registered statement with its count, the number of evaluable records and the number unresolved.
+  For C6c and C7 (ii) the abstract gives the statements for records whose AI-side variable was not manipulated, and
+  refers to Table 12 for the other two subsets ("other designs in Table 12").
 
 It gives no value from the exploration set and no comparison with it, and no value from the late stratum or the
 coverage check (Table 16 reports the coverage count). It contains no recommendation. The
@@ -177,9 +185,9 @@ the C1 and C2b sentences are removed; (3) if it is still over the limit, the Bac
 of at most 15 words; (4) if the journal's limit is below 250 words and the abstract is still over it, the C4 types
 are replaced by one sentence that reports the number of C4 problem types observed, not observed and not evaluable
 and refers to Table 12, and the C5 and C6 statements are given in the same compact form as the C4 types in step 2.
-No count or denominator is removed for C1, C2b or any condition of C7. The C4 and C5 statements in Table 12 keep
+No count or denominator is removed for C1, C2b or any condition of C7 (C6c and C7 (ii) keep the subset rule above). The C4 and C5 statements in Table 12 keep
 their counts and denominators whatever the abstract does. A mock abstract built from empty tables (`abstract-mock.md`) shows that the rule fits 250 words
-only with step 2 and compact wording (about 234 words), so the abstract is written in that wording from the start.
+only with step 2 and compact wording (about 243 words since C6c and C7 (ii) were split by manipulation), so the abstract is written in that wording from the start.
 
 ## Section plan
 
@@ -366,9 +374,9 @@ the flow figures from the released screening decisions.
 | R2c | Types of instrument used for the AI-side variable. | RQ2; GSRR-43 (C3) | Script output, C3 table | Section 4.4; Table 8 |
 | R3 | Reporting completeness and internal consistency by rule, including the recalculation summary per record and per result, by source, and gross inconsistencies. | RQ3; GSRR-43 (C4 and the C4f rules), GSRR-56 | Script output, C4 tables and C4f per result | Section 4.5; Table 9 |
 | R4 | Records linked as the same sample, records with unconfirmed signs of overlap, and studies remaining when linked records are counted once; independence is not established. | RQ4; GSRR-43 (C5) | Script output, C5 and RQ4 tables | Section 4.6; Table 10 |
-| R5 | Construct term of the title against the name of the main instrument, with its item composition next to it; causal wording against design; an AI-fatigue term in the title against the level of attribution. | RQ5; GSRR-43 (C6 and the C6b rules) | Script output, C6 tables | Section 4.7; Table 11 |
+| R5 | Construct term of the title against the name of the main instrument, with its item composition next to it; causal wording against design; an AI-fatigue term in the title against the level of attribution, by manipulation of the AI-side variable; the design categories. | RQ5; GSRR-43 (C6 and the C6b rules) | Script output, C6 tables | Section 4.7; Table 11 |
 | S2 | Each condition of C7 ((i), (ii) and (iii)) separately, and the records in which C6a and C7 (iii) both hold. | SQ2; GSRR-43 (C7), GSRR-56 | Script output, C7 table | Section 4.7; Table 11 |
-| PS1 | The problem statements of the registration for the main set, with each condition of C7 as its own type. | GSRR-57 | Script output, problem statements | Section 4.8; Table 12; abstract |
+| PS1 | The problem statements of the registration for the main set, in three categories, with each condition of C7 as its own type and C6c and C7 (ii) by manipulation of the AI-side variable. | GSRR-57 | Script output, problem statements | Section 4.8; Table 12; abstract |
 | S1 | Answers to RQ2 to RQ5 and SQ2 by centre, without C1 and C6c, and with C7 by conditions (i) and (iii) only. | SQ1; GSRR-12 | Script output, centre tables | Section 4.9; supplement |
 | SE1 | The problem statements under sensitivity analyses 1, 2, 4 and 5, the record-level tables under analysis 5, and the C2b tables under analysis 3. | GSRR-62 | Script output, sensitivity outputs; for analysis 5, the script run on the code tables of the set decided by both authors | Section 4.10; Table 13 |
 | EX1 | The exploration set, the late stratum and the coverage stratum under the same rules, labelled as such and not compared with the main set. | GSRR-39, GSRR-56, GSRR-57 | Script output, tables by set | Section 4.11; supplement |
@@ -430,16 +438,19 @@ columns; no value is filled in before coding.
   inconsistent results, in total and by source (text or table).
 - Table 10: C5 categories and the RQ4 study counts.
 - Table 11: C6a, C6b, C6c and C7 by condition (i), (ii) and (iii), each condition in its own row with what it compares;
-  beside condition (iii), the item composition (C2b) of the main instrument; and the number of records in which C6a
-  and C7 (iii) both hold.
+  beside condition (iii), the item composition (C2b) of the main instrument; the number of records in which C6a
+  and C7 (iii) both hold; the design categories and whether the AI-side variable was manipulated; and C6c and C7 (ii)
+  by manipulation.
 - Table 12: problem statements.
 
-  | Problem type | Code and value | Statement | Count | Evaluable records | Not evaluable | Unresolved |
-  |---|---|---|---|---|---|---|
-  | — | — | observed / not observed / could not be evaluated | — | — | — | — |
+  | Category | Problem type | Code and value | Statement | Count | Evaluable records | Not evaluable | Unresolved |
+  |---|---|---|---|---|---|---|---|
+  | — | — | — | observed / not observed / could not be evaluated | — | — | — | — |
 
-  One row for each problem type of GSRR-57; C7 has three rows, one per condition. A note gives, for each row, the values
-  that made records not evaluable (GSRR-57).
+  Rows are grouped by the three categories of GSRR-57 (reporting; names and attribution; possible inferential
+  overreach), with no total across rows or categories. One row for each problem type; C7 has one row per condition;
+  C6c and C7 (ii) have three rows each (AI-side variable not manipulated, manipulated, not verifiable or unresolved). A
+  note gives, for each row, the values that made records not evaluable (GSRR-57).
 
 - Table 13: sensitivity analyses (problem statements as in Table 12, with C7 by condition), with analysis 5 (main set
   decided by both authors after the draft) in its own columns and the number of studies it added and removed; the

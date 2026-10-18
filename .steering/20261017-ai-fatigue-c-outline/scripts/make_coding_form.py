@@ -50,6 +50,13 @@ DESCRIPTIONS = {
     "main_instrument_family": "Term family or families in the name of the main instrument (C6a, C7 (iii)).",
     "conclusion_sentence": "The main conclusion, copied verbatim (empty if it cannot be identified).",
     "title_ai_fatigue_term": "Whether the title uses an AI-fatigue term (C6c).",
+    "design": "Design category of the study (C6b design categories); mixed if the study has components of different designs.",
+    "ai_manipulated": "1 if the AI-side variable was manipulated in any component of the design, 0 if not (an intervention unrelated to AI counts as 0); a mismatch in C6b needs 0, and a design with no manipulation (cross_sectional, longitudinal, diary_esm, case_study, qualitative, scale_development) cannot have 1.",
+    "design_location": "Page or section where the design is described (working record, free text, not released).",
+    "C6_location": "Page or section of the abstract sentence used for C6b (working record, free text, not released).",
+    "C6_rationale": "One-line reason for the C6a, C6b and C6c title-input codes (working record, free text, not released; no agreement is computed).",
+    "C7_location": "Page or section of the conclusion sentence (working record, free text, not released).",
+    "C7_rationale": "One-line reason for the C7 inputs (working record, free text, not released; no agreement is computed).",
     # instruments
     "instrument_id": "Instrument ID within the record.",
     "version_id": "Instrument version ID: the same item wording in the same language gets the same ID.",
@@ -84,6 +91,10 @@ DESCRIPTIONS = {
     "source": "Where the result is reported: text or table.",
     "consistent": "Whether the recalculated value is consistent with the reported one (na: cannot be calculated).",
     "gross": "1 if the inconsistency changes the conclusion at alpha = .05 (only for inconsistent results).",
+    "location": "Page, section or table where the result is reported (free text, required).",
+    "statistic": "Kind of statistic recalculated.",
+    "reported_value": "The value as printed, for example p < .001 (working record, free text, required, not released).",
+    "recalculated_value": "The recalculated value (working record, free text, not released); empty only when consistent is na.",
     # links
     "group_id": "E5 group ID of the source database.",
 }

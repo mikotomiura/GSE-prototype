@@ -83,6 +83,14 @@ INSTRUMENT_CODES = ["origin", "format", "mod_items_dropped", "mod_items_added", 
                     "mod_instructions_only", "mod_response_scale", "mod_scoring", "mod_translated",
                     "C2c_backtranslation", "C2c_content_validity", "C2c_pilot", "C2c_factor_check",
                     "C2d_item_disclosure", "C2d_reliability", "C2d_factor_analysis", "C2d_reason"]
+# C6b design categories (GSRR-43): the coder codes the design to code C6b
+DESIGNS = ["cross_sectional", "longitudinal", "diary_esm", "case_study", "qualitative", "scale_development",
+           "other_unclear", "randomized_experiment", "quasi_experiment", "pre_post", "mixed", "not_verifiable",
+           "unresolved"]
+# designs with no manipulation of the AI-side variable; with them ai_manipulated "1" is an error, except for
+# other_unclear (the design is not known well enough to say) and mixed (a component may manipulate)
+NO_MANIPULATION_DESIGNS = {"cross_sectional", "longitudinal", "diary_esm", "case_study", "qualitative",
+                           "scale_development"}
 FAMILY_VALUES = {"fatigue", "exhaustion", "burnout", "none", "no_family_term", "instrument_unnamed",
                  "not_verifiable", "unresolved"}
 # GSRR-64: every coded column is checked against its code list (flat: column names are unique across files).
@@ -111,6 +119,9 @@ VOCAB = {
     "title_ai_fatigue_term": {"yes", "no", "unresolved"},
     # C6b: "no causal wording" is a match (GSRR-43), so it is coded as match, not as its own value
     "C6b": {"match", "mismatch", "not_verifiable", "unresolved"},
+    # design of the study (C6b design categories) and whether the AI-side variable was manipulated (GSRR-43)
+    "design": set(DESIGNS),
+    "ai_manipulated": {"0", "1", "not_verifiable", "unresolved"},
     # instruments
     "origin": {"new", "existing_ai", "adapted_general", "unchanged_general", "general_not_verifiable",
                "not_verifiable", "unresolved"},
@@ -128,6 +139,7 @@ VOCAB = {
     "consistent": {"yes", "no", "na", "unresolved"},
     "source": {"text", "table"},
     "gross": FLAG,
+    "statistic": {"t", "F", "r", "chi2", "z", "percentage", "indirect_effect", "unresolved"},
 }
 for _lv in C1_LEVELS:
     VOCAB[f"C1_{_lv}"] = FLAG | {"not_verifiable"}
@@ -138,16 +150,21 @@ for _k in INSTRUMENT_CODES:
         VOCAB[_k] = REPORTED
 MULTI_VALUE = {"C3", "conclusion_family", "main_instrument_family"}   # '|'-separated, each value once
 INTEGER_COLS = {"items_full", "item_no"}                              # digits (items_full may be a missing code)
-OPTIONAL_EMPTY = {"secondary_type", "target", "conclusion_sentence"}
+# Evidence columns are free text working records (never released except the location columns); recalculated_value is
+# empty only for a result that cannot be calculated (consistent = na), checked in load()
+OPTIONAL_EMPTY = {"secondary_type", "target", "conclusion_sentence", "design_location", "C6_location",
+                  "C6_rationale", "C7_location", "C7_rationale", "recalculated_value"}
 REQUIRED = {
     "records": ["record_id", "set", "population", "centre", "peer_reviewed", "C3", "C4a", "C4b", "C4c",
                 "C4d", "C4e_codebook", "C4e_agreement", "C5", "C6a", "C6b", "conclusion_identified",
                 "main_instrument_identified", "conclusion_ai_fatigue_term", "conclusion_family",
                 "main_instrument_family", "conclusion_sentence",
-                "title_ai_fatigue_term"] + [f"C1_{lv}" for lv in C1_LEVELS],
+                "title_ai_fatigue_term", "design", "ai_manipulated", "design_location", "C6_location",
+                "C6_rationale", "C7_location", "C7_rationale"] + [f"C1_{lv}" for lv in C1_LEVELS],
     "instruments": ["record_id", "instrument_id", "version_id", "language", "items_full"] + INSTRUMENT_CODES,
     "items": ["version_id", "item_no", "type", "boundary", "secondary_type", "target", "item_source"],
-    "c4f": ["record_id", "result_id", "source", "consistent", "gross"],
+    "c4f": ["record_id", "result_id", "source", "consistent", "gross", "location", "statistic", "reported_value",
+            "recalculated_value"],
 }
 LINK_COLUMNS = ["record_id", "group_id"]
 # Screening of the additional candidates (author 1 and an AI screener; author 1 decides where they differ)
@@ -220,7 +237,22 @@ def load(d, kind, coder):
                 check_cell(path.name, col, r[col] or "")
         if kind == "c4f" and r["gross"] == "1" and r["consistent"] != "no":
             raise InputError(f"{path.name}: gross=1 in result {r['result_id']} that is not inconsistent")
+        if kind == "c4f" and r["recalculated_value"] == "" and r["consistent"] != "na":
+            raise InputError(f"{path.name}: empty recalculated_value in result {r['result_id']} "
+                             "(empty only when consistent is na)")
+        if kind == "records":
+            check_manipulation(path.name, r)
     return rows
+
+
+def check_manipulation(name, r):
+    """Impossible combinations of the design, the manipulation of the AI-side variable and C6b (GSRR-43)."""
+    rid = r["record_id"]
+    if r["C6b"] == "mismatch" and r["ai_manipulated"] != "0":
+        raise InputError(f"{name}: record {rid} has C6b mismatch but ai_manipulated {r['ai_manipulated']!r} "
+                         "(a mismatch needs a design with no manipulation: ai_manipulated 0)")
+    if r["design"] in NO_MANIPULATION_DESIGNS and r["ai_manipulated"] == "1":
+        raise InputError(f"{name}: record {rid} has design {r['design']} but ai_manipulated 1")
 
 
 def load_links(d, recs):
@@ -707,7 +739,7 @@ def run_agreement(d):
     rec_codes = [f"C1_{lv}" for lv in C1_LEVELS] + ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d",
                  "C4e_codebook", "C4e_agreement", "C4f", "C4f_gross", "C5", "C6a", "C6b",
                  "title_ai_fatigue_term", "conclusion_identified", "main_instrument_identified",
-                 "conclusion_ai_fatigue_term"]
+                 "conclusion_ai_fatigue_term", "design", "ai_manipulated"]
     inst_codes = INSTRUMENT_CODES
     for s in sets:
         in_set = lambda rows: [r for r in rows if r.get("set") == s]
@@ -772,7 +804,7 @@ def count_table(rows, key, label, n_studies=None):
 
 # The C7 summary value is reported only in the per-study table (GSRR-43); the tables count each condition.
 RECORD_CODES = ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d", "C4e_codebook", "C4e_agreement",
-                "C4f", "C4f_gross", "C5", "C6a", "C6b", "C6c", "C7_i", "C7_ii", "C7_iii"]
+                "C4f", "C4f_gross", "C5", "C6a", "C6b", "design", "ai_manipulated", "C6c", "C7_i", "C7_ii", "C7_iii"]
 # GSRR-12 / GSRR-64: the centre tables are split by attribution, so they leave out C1, C6c and C7 (ii)
 CENTRE_OMIT = {"C1_rep", "C6c", "C7_ii"}
 def record_tables(recs, insts, label):
@@ -853,23 +885,36 @@ def rq4_counts(recs, links, set_name, group_name=None):
             "signs_not_confirmed": sum(1 for r in rows if r.get("C5") == "signs_not_confirmed")}
 
 
-PROBLEMS = {
-    "C4a inconsistent": ("C4a", {"inconsistent"}),
-    "C4b inconsistent": ("C4b", {"inconsistent"}),
-    "C4c inconsistent": ("C4c", {"inconsistent"}),
-    "C4d inconsistent": ("C4d", {"inconsistent"}),
-    "C4e codebook not available": ("C4e_codebook", {"no"}),
-    "C4e agreement none": ("C4e_agreement", {"none"}),
-    "C4f any inconsistency": ("C4f", {"any_inconsistency"}),
-    "C4f any gross inconsistency": ("C4f_gross", {"any_gross"}),
-    "C5 signs not confirmed": ("C5", {"signs_not_confirmed"}),
-    "C6a different family": ("C6a", {"different_family"}),
-    "C6b mismatch": ("C6b", {"mismatch"}),
-    "C6c AI-fatigue term with L3 to L6": ("C6c", {"ai_term_L3_L6"}),
-    "C7 (i) causal wording not supported by the design": ("C7_i", {"met"}),
-    "C7 (ii) AI-fatigue term with attribution at L3 to L6": ("C7_ii", {"met"}),
-    "C7 (iii) conclusion term and instrument name in different term families": ("C7_iii", {"met"}),
-}
+# GSRR-57 problem types, in three categories (the order of the rows). Each entry: (name, code, values that show the
+# problem, category). C6c and C7 (ii) depend on the attribution of the AI-side variable, so they are also split by
+# whether that variable was manipulated (SPLIT_BY_MANIPULATION).
+CAT_REPORTING = "reporting"
+CAT_NAMES = "names and attribution"
+CAT_OVERREACH = "possible inferential overreach"
+CATEGORIES = [CAT_REPORTING, CAT_NAMES, CAT_OVERREACH]
+MANIPULATION_SUBSETS = [   # (label, ai_manipulated values)
+    ("AI-side variable not manipulated", {"0"}),
+    ("AI-side variable manipulated", {"1"}),
+    ("manipulation not verifiable or unresolved", {"not_verifiable", "unresolved"}),
+]
+SPLIT_BY_MANIPULATION = {"C6c", "C7_ii"}
+PROBLEM_TYPES = [
+    ("C4a inconsistent", "C4a", {"inconsistent"}, CAT_REPORTING),
+    ("C4b inconsistent", "C4b", {"inconsistent"}, CAT_REPORTING),
+    ("C4c inconsistent", "C4c", {"inconsistent"}, CAT_REPORTING),
+    ("C4d inconsistent", "C4d", {"inconsistent"}, CAT_REPORTING),
+    ("C4e codebook not available", "C4e_codebook", {"no"}, CAT_REPORTING),
+    ("C4e agreement none", "C4e_agreement", {"none"}, CAT_REPORTING),
+    ("C4f any inconsistency", "C4f", {"any_inconsistency"}, CAT_REPORTING),
+    ("C4f any gross inconsistency", "C4f_gross", {"any_gross"}, CAT_REPORTING),
+    ("C5 signs not confirmed", "C5", {"signs_not_confirmed"}, CAT_REPORTING),
+    ("C6a different family", "C6a", {"different_family"}, CAT_NAMES),
+    ("C6c AI-fatigue term with L3 to L6", "C6c", {"ai_term_L3_L6"}, CAT_NAMES),
+    ("C7 (ii) AI-fatigue term with attribution at L3 to L6", "C7_ii", {"met"}, CAT_NAMES),
+    ("C7 (iii) conclusion term and instrument name in different term families", "C7_iii", {"met"}, CAT_NAMES),
+    ("C6b mismatch", "C6b", {"mismatch"}, CAT_OVERREACH),
+    ("C7 (i) causal wording not supported by the design", "C7_i", {"met"}, CAT_OVERREACH),
+]
 # GSRR-57: values that can show or not show the problem. Every other value makes the record not evaluable.
 EVALUABLE = {
     "C4a": {"consistent", "inconsistent"}, "C4b": {"consistent", "inconsistent"},
@@ -889,22 +934,37 @@ def c6a_c7iii_overlap(rows):
     return sum(1 for r in rows if r.get("C6a") == "different_family" and r.get("C7_iii") == "met")
 
 
+def _statement(vals, key, bad):
+    evaluable = [v for v in vals if v in EVALUABLE[key]]
+    n = sum(1 for v in evaluable if v in bad)
+    if not evaluable:
+        st = "could not be evaluated"
+    else:
+        st = "was observed in the main set" if n else "was not observed in the main set"
+    return {"count": n, "evaluable": len(evaluable),
+            "not_evaluable": len(vals) - len(evaluable) - vals.count("unresolved"),
+            "unresolved": vals.count("unresolved"), "statement": st}
+
+
 def problem_statements(rows):
     """GSRR-57: count among the records evaluable for the problem type (EVALUABLE); each statement gives the
     count, the evaluable records, the not-evaluable ones (unresolved counted separately) and the unresolved ones;
-    none evaluable -> "could not be evaluated"."""
+    none evaluable -> "could not be evaluated". Every row carries its category; the rows are ordered by category
+    (CATEGORIES), and C6c and C7 (ii) have three rows each, one per subset of records by whether the AI-side
+    variable was manipulated (the statement is computed within the subset)."""
     out = []
-    for name, (key, bad) in PROBLEMS.items():
-        vals = [r.get(key, "") for r in rows]
-        evaluable = [v for v in vals if v in EVALUABLE[key]]
-        n = sum(1 for v in evaluable if v in bad)
-        if not evaluable:
-            st = "could not be evaluated"
-        else:
-            st = "was observed in the main set" if n else "was not observed in the main set"
-        out.append({"problem_type": name, "count": n, "evaluable": len(evaluable),
-                    "not_evaluable": len(vals) - len(evaluable) - vals.count("unresolved"),
-                    "unresolved": vals.count("unresolved"), "statement": st})
+    for cat in CATEGORIES:
+        for name, key, bad, c in PROBLEM_TYPES:
+            if c != cat:
+                continue
+            if key in SPLIT_BY_MANIPULATION:
+                for label, ms in MANIPULATION_SUBSETS:
+                    sub = [r for r in rows if r.get("ai_manipulated", "") in ms]
+                    out.append({"category": cat, "problem_type": f"{name} ({label})", "subset": label,
+                                **_statement([r.get(key, "") for r in sub], key, bad)})
+            else:
+                out.append({"category": cat, "problem_type": name, "subset": "all",
+                            **_statement([r.get(key, "") for r in rows], key, bad)})
     return out
 
 
@@ -991,7 +1051,8 @@ def instruments_used(recs, insts, items, vsets, set_name):
 
 
 PER_STUDY_CODES = ["C1_rep", "C3", "C4a", "C4b", "C4c", "C4d", "C4e_codebook", "C4e_agreement",
-                   "C4f", "C4f_gross", "C5", "C6a", "C6b", "C6c", "C7", "C7_i", "C7_ii", "C7_iii"]
+                   "C4f", "C4f_gross", "C5", "C6a", "C6b", "design", "ai_manipulated", "C6c", "C7", "C7_i", "C7_ii",
+                   "C7_iii"]
 
 
 def per_study_table(recs):

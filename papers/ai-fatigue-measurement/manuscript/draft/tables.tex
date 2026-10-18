@@ -16,7 +16,7 @@
 \toprule
 Code & Unit & What is coded & Values \\
 \midrule
-C1 & Fatigue instrument & Level at which the instrument ties fatigue to AI; one representative value per instrument & L1a items mention AI; L1b only the instructions or stem; L2 a single question; L3 only the definition; L4 only a variable label; L5 only an interview theme; L6 none \\
+C1 & Fatigue instrument & Level at which the instrument ties fatigue to AI; one representative value per instrument & L1a items mention AI; L1b only the instructions or stem; L2 a single question; L3 only the definition; L4 only a variable label; L5 only an interview theme; L6 none. The order is not a ranking of measurement quality \\
 C2a & Fatigue instrument & Origin, modification and format & Origin: new / existing AI-specific scale / adapted general scale / unchanged general scale / general scale, wording not verifiable. Seven kinds of modification, each stated / found by comparison / no change confirmed / not verifiable. Format: multi-item scale / single item / qualitative \\
 C2b & Item & Item content (codebook version 2) & Types FAT, MOT, AVO, FUT, IRR, OTH; for MOT, AVO and FUT a target (TASK, AI\_USE, AI\_VERIFY, AI\_PRIV, SOCIAL, OTHER); items unavailable \\
 C2c & Adapted instrument & Adaptation procedures reported & Back-translation, content validity, pilot, factor check: each reported or not \\
@@ -24,7 +24,7 @@ C2d & Fatigue instrument & Measurement properties reported & Item disclosure (al
 C3 & Record & Instrument for the AI-side variable & Amount of use / dependence or addiction / attitude or acceptance / other / none \\
 C4 & Record; C4f each recalculated result & Completeness and internal consistency & Rules (a) to (d) consistent / inconsistent; (e) codebook and agreement for qualitative coding; (f) each result consistent / inconsistent (gross or not) / cannot be calculated, summarised per record \\
 C5 & Record & Sample overlap & Linked as the same sample (E5 group; source database for the exploration set, screening for the additional candidates) / signs present but not confirmed / no signs \\
-C6 & Record & Title and abstract against content & (a) title term and instrument name: same / different family; (b) causal wording and design: match / mismatch; (c) AI-fatigue term in the title with attribution L3 to L6 / with L1a to L2 / no such term \\
+C6 & Record & Title and abstract against content & (a) title term and instrument name: same / different family; (b) causal wording and design: match / mismatch, with the design category and whether the AI-side variable was manipulated; (c) AI-fatigue term in the title with attribution L3 to L6 / with L1a to L2 / no such term \\
 C7 & Record & Main conclusion against three conditions & (i) design, (ii) level of attribution, (iii) names: each met / not met \\
 \bottomrule
 \end{tabularx}
@@ -222,11 +222,12 @@ Check & What it compares & Values & Count & Shown beside it \\
 \midrule
 C6a & Construct term of the title and name of the main instrument & One row per value & --- & \\
 C6b & Causal wording and design & One row per value & --- & \\
-C6c & AI-fatigue term in the title and level of attribution & One row per value & --- & \\
+C6c & AI-fatigue term in the title and level of attribution & One row per value, by manipulation of the AI-side variable & --- & \\
 C7 (i) & Main conclusion and design & Met / not met & --- & \\
-C7 (ii) & AI-fatigue term in the conclusion and level of attribution & Met / not met & --- & \\
+C7 (ii) & AI-fatigue term in the conclusion and level of attribution & Met / not met, by manipulation of the AI-side variable & --- & \\
 C7 (iii) & Construct term of the conclusion and name of the main instrument & Met / not met / no term to compare & --- & Item composition of the main instrument (C2b) \\
 C6a and C7 (iii) & Records in which both hold & & --- & \\
+Design & Design category and whether the AI-side variable was manipulated & One row per value & --- & \\
 \bottomrule
 \end{tabularx}
 
@@ -242,6 +243,7 @@ C6a and C7 (iii) & Records in which both hold & & --- & \\
 \toprule
 Problem type & Code and value & Statement & Count & Evaluable & Not evaluable & Unresolved \\
 \midrule
+\multicolumn{7}{l}{\emph{Reporting}} \\
 Sample size in text and tables & C4 (a) inconsistent & --- & --- & --- & --- & --- \\
 Direction of the main relation & C4 (b) inconsistent & --- & --- & --- & --- & --- \\
 Discriminant validity against the report's own criterion & C4 (c) inconsistent & --- & --- & --- & --- & --- \\
@@ -251,18 +253,25 @@ Qualitative coding: agreement & C4 (e) agreement: none & --- & --- & --- & --- &
 Recalculation & C4f any inconsistency & --- & --- & --- & --- & --- \\
 Recalculation, gross & C4f any gross inconsistency & --- & --- & --- & --- & --- \\
 Sample overlap & C5 signs present but not confirmed & --- & --- & --- & --- & --- \\
+\multicolumn{7}{l}{\emph{Names and attribution}} \\
 Title and instrument name & C6a different family & --- & --- & --- & --- & --- \\
-Causal wording and design & C6b mismatch & --- & --- & --- & --- & --- \\
-AI-fatigue term in the title & C6c with L3 to L6 & --- & --- & --- & --- & --- \\
-Conclusion: design & C7 (i) met & --- & --- & --- & --- & --- \\
-Conclusion: level of attribution & C7 (ii) met & --- & --- & --- & --- & --- \\
+AI-fatigue term in the title, AI-side variable not manipulated & C6c with L3 to L6 & --- & --- & --- & --- & --- \\
+\quad manipulated & C6c with L3 to L6 & --- & --- & --- & --- & --- \\
+\quad not verifiable or unresolved & C6c with L3 to L6 & --- & --- & --- & --- & --- \\
+Conclusion: level of attribution, AI-side variable not manipulated & C7 (ii) met & --- & --- & --- & --- & --- \\
+\quad manipulated & C7 (ii) met & --- & --- & --- & --- & --- \\
+\quad not verifiable or unresolved & C7 (ii) met & --- & --- & --- & --- & --- \\
 Conclusion: names & C7 (iii) met & --- & --- & --- & --- & --- \\
+\multicolumn{7}{l}{\emph{Possible inferential overreach}} \\
+Causal wording and design & C6b mismatch & --- & --- & --- & --- & --- \\
+Conclusion: design & C7 (i) met & --- & --- & --- & --- & --- \\
 \bottomrule
 \end{tabularx}
 
 \smallskip
 \raggedright\footnotesize Each statement reads ``was observed in the main set'', ``was not observed in the main set''
-or ``could not be evaluated''. A note gives, for each row, the values that made records not evaluable.
+or ``could not be evaluated''. A note gives, for each row, the values that made records not evaluable. Rows are not added
+across rows or categories. Names and attribution record differences between words, not defects of measurement.
 \end{table}
 
 \begin{table}[!htbp]

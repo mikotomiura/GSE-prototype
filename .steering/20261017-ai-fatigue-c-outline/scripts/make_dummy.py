@@ -5,6 +5,7 @@ Builds the dummy tables, runs the synthesis on them, and checks expected values 
 """
 
 import csv
+from collections import Counter
 import random
 import sys
 import tempfile
@@ -32,6 +33,13 @@ E5_CODED = {"D016", "D020"}
 E5_UNCODED = {"D017": "G1", "D021": "G2"}
 
 
+RATIONALE = "RATIONALE-SECRET-zq7"      # must never appear in an output file
+REPORTED_VALUE = "REPORTED-VALUE-zq7"   # likewise for the c4f values
+DESIGN_CYCLE = [("cross_sectional", "0"), ("randomized_experiment", "1"), ("longitudinal", "0"),
+                ("quasi_experiment", "1"), ("pre_post", "0"), ("mixed", "1"), ("diary_esm", "0"),
+                ("qualitative", "0"), ("not_verifiable", "not_verifiable"), ("other_unclear", "0")]
+
+
 def rec(rid, set_name):
     r = {"record_id": rid, "set": set_name,
          "population": rng.choice(["students_learners", "workers_other", "health_professionals"]),
@@ -56,6 +64,13 @@ def rec(rid, set_name):
     r["conclusion_ai_fatigue_term"] = rng.choice(["0", "1"])
     r["conclusion_family"] = rng.choice(["fatigue", "exhaustion", "burnout", "none"])
     r["main_instrument_family"] = rng.choice(["fatigue", "exhaustion|fatigue", "burnout"])
+    # design and manipulation are assigned without rng, so the draws above stay the same
+    k = int(rid[1:]) % len(DESIGN_CYCLE)
+    r["design"], r["ai_manipulated"] = DESIGN_CYCLE[k]
+    if r["C6b"] == "mismatch" and r["ai_manipulated"] != "0":      # a mismatch needs a design with no manipulation
+        r["design"], r["ai_manipulated"] = "cross_sectional", "0"
+    r["design_location"], r["C6_location"], r["C7_location"] = f"p.{k}", "abstract", "abstract last sentence"
+    r["C6_rationale"], r["C7_rationale"] = f"{RATIONALE}-C6-{rid}", f"{RATIONALE}-C7-{rid}"
     return r
 
 
@@ -65,6 +80,18 @@ for n, i in enumerate(all_ids):
     sets[i] = "exploration" if n < 10 else "coverage" if n >= 32 else "late" if n >= 30 else "main"
 ids = [i for i in all_ids if i not in E5_UNCODED]          # E5-linked duplicates are not coded
 recs = [rec(i, sets[i]) for i in ids]
+# Controlled main records for the split of C6c and C7 (ii) by manipulation (title input yes, a single C1 level):
+# id -> (C1 level, design, ai_manipulated)
+CONTROLLED = {"D011": ("L4", "randomized_experiment", "1"), "D012": ("L3", "cross_sectional", "0"),
+              "D013": ("L1a", "quasi_experiment", "1"), "D014": ("L5", "not_verifiable", "not_verifiable"),
+              "D015": ("L6", "other_unclear", "unresolved"), "D018": ("L4", "pre_post", "0"),
+              "D019": ("L2", "mixed", "1")}
+for r in recs:
+    if r["record_id"] in CONTROLLED:
+        lv_, r["design"], r["ai_manipulated"] = CONTROLLED[r["record_id"]]
+        for x in LV:
+            r[f"C1_{x}"] = "1" if x == lv_ else "0"
+        r.update(C6b="match", title_ai_fatigue_term="yes", main_instrument_identified="1")
 insts, items = [], []
 for n, i in enumerate(all_ids):
     if i in E5_UNCODED:
@@ -90,7 +117,11 @@ for i in ids:
         cons = rng.choice(["yes", "yes", "no", "na"])
         c4f.append({"record_id": i, "result_id": f"{i}-r{k}", "source": "table" if k else "text",
                     "consistent": cons,
-                    "gross": "1" if cons == "no" and rng.random() < 0.5 else "0"})
+                    "gross": "1" if cons == "no" and rng.random() < 0.5 else "0",
+                    "location": f"Table {k + 1}", "statistic": ["t", "F", "r", "chi2", "z", "percentage",
+                                                                 "indirect_effect"][(len(c4f) + k) % 7],
+                    "reported_value": f"{REPORTED_VALUE}-{i}-{k}",
+                    "recalculated_value": "" if cons == "na" else f"{REPORTED_VALUE}-recalc-{i}-{k}"})
 links = [{"record_id": "D016", "group_id": "G1"}, {"record_id": "D017", "group_id": "G1"},
          {"record_id": "D020", "group_id": "G2"}, {"record_id": "D021", "group_id": "G2"}]
 assert not E5_UNCODED.keys() & {r["record_id"] for r in recs}, "E5-linked duplicates must not be coded"
@@ -102,6 +133,12 @@ for coder in ["reconciled", "coder1", "coder2"]:
     if coder == "coder2":
         for r in rr[::4]:
             r["C6b"] = "match" if r["C6b"] != "match" else "mismatch"
+            if r["C6b"] == "mismatch" and r["ai_manipulated"] != "0":
+                r["C6b"] = "match"                                       # a mismatch needs ai_manipulated 0
+        for r in rr[::5]:
+            r["design"] = "other_unclear" if r["design"] != "other_unclear" else "mixed"
+        for r in rr[::8]:
+            r["ai_manipulated"] = "0" if r["ai_manipulated"] == "1" else r["ai_manipulated"]
         for r in rr[::3]:
             r["title_ai_fatigue_term"] = "no" if r["title_ai_fatigue_term"] == "yes" else "yes"
         for r in rr[::6]:
@@ -111,9 +148,11 @@ for coder in ["reconciled", "coder1", "coder2"]:
         dropped = cc[::9]                                              # results recalculated by coder 1 only
         cc = [x for x in cc if x not in dropped]
         cc.append({"record_id": "D016", "result_id": "D016-extra", "source": "text", "consistent": "yes",
-                   "gross": "0"})                                      # a result recalculated by coder 2 only
+                   "gross": "0", "location": "p.3", "statistic": "t", "reported_value": f"{REPORTED_VALUE}-x",
+                   "recalculated_value": f"{REPORTED_VALUE}-x2"})                                      # a result recalculated by coder 2 only
         for x in cc[::5]:
             x["consistent"] = "no" if x["consistent"] == "yes" else "yes"
+            x["recalculated_value"] = x["recalculated_value"] or f"{REPORTED_VALUE}-flip"
             if x["consistent"] != "no":
                 x["gross"] = "0"                                           # gross needs an inconsistent result
         for r in rr[::7]:
@@ -234,7 +273,9 @@ assert cc == {"C7_i": "unresolved", "C7_ii": "not_met", "C7_iii": "not_met"}, cc
 assert cs.c7_conditions(dict(base, conclusion_family="fatigue", main_instrument_family="fatigue"), "")["C7_ii"] == "not_applicable"
 assert set(cs.c7_conditions(dict(base, conclusion_identified="0"), "L1a").values()) == {"cannot_decide"}
 names = [p_["problem_type"] for p_ in res["problems"]]
-assert sum(1 for n_ in names if n_.startswith("C7 (")) == 3 and "C7 beyond" not in names, names
+# REWRITTEN (manipulation split): C7 (i) and (iii) have one row each, C7 (ii) has three (one per subset)
+assert sum(1 for n_ in names if n_.startswith("C7 (")) == 5 and "C7 beyond" not in names, names
+assert sum(1 for n_ in names if n_.startswith("C7 (ii)")) == 3 and sum(1 for n_ in names if n_.startswith("C6c")) == 3
 assert cs.c6a_c7iii_overlap([{"C6a": "different_family", "C7_iii": "met"}, {"C6a": "same_family", "C7_iii": "met"}]) == 1
 # CHANGED (item 7): the centre tables leave out C1, C6c and C7 (ii) (they no longer list C7_ii as not_applicable)
 centre = [t for t in res["tables"] if t["split"] == "centre"]
@@ -344,17 +385,25 @@ assert ps["C4f any inconsistency"]["evaluable"] == 0 and ps["C4f any inconsisten
 # other values are not evaluable for their problem type (and stay in the descriptive denominators, GSRR-53)
 ps = {p_["problem_type"]: p_ for p_ in cs.problem_statements(
     [{"C4e_codebook": "not_applicable", "C4e_agreement": "index_only", "C6a": "no_family_term", "C6b": "match",
-      "C7_iii": "no_term_to_compare", "C7_i": "cannot_decide", "C6c": "cannot_decide", "C5": "no_signs"}])}
+      "C7_iii": "no_term_to_compare", "C7_i": "cannot_decide", "C6c": "cannot_decide", "C5": "no_signs",
+      "ai_manipulated": "0"}])}
 assert ps["C4e codebook not available"]["evaluable"] == 0 and ps["C4e agreement none"]["evaluable"] == 1
 assert ps["C6a different family"]["evaluable"] == 0 and ps["C6b mismatch"]["evaluable"] == 1
 assert ps["C7 (iii) conclusion term and instrument name in different term families"]["evaluable"] == 0
 assert ps["C7 (i) causal wording not supported by the design"]["evaluable"] == 0
-assert ps["C6c AI-fatigue term with L3 to L6"]["evaluable"] == 0 and ps["C5 signs not confirmed"]["evaluable"] == 1
+# REWRITTEN (manipulation split): the C6c row is now per subset; this record is in "not manipulated"
+assert ps["C6c AI-fatigue term with L3 to L6 (AI-side variable not manipulated)"]["evaluable"] == 0
+assert ps["C6c AI-fatigue term with L3 to L6 (AI-side variable not manipulated)"]["not_evaluable"] == 1
+assert ps["C5 signs not confirmed"]["evaluable"] == 1
 dn = {r["value"]: r["denominator"] for r in cs.count_table(
     [{"record_id": str(k), "C4a": v} for k, v in enumerate(["consistent", "no_comparison_possible", "not_verifiable"])],
     "C4a", {})}
 assert dn["no_comparison_possible"] == 2 and dn["not_verifiable"] == 2, dn          # finding stays; not_verifiable out
-assert all(p_["evaluable"] + p_["not_evaluable"] == res["n_main"] for p_ in res["problems"])
+# REWRITTEN (manipulation split): rows with a subset add up over the three subsets to the main set
+_tot = Counter()
+for p_ in res["problems"]:
+    _tot[p_["problem_type"].split(" (AI-side")[0].split(" (manipulation")[0]] += p_["evaluable"] + p_["not_evaluable"]
+assert all(v_ == res["n_main"] for v_ in _tot.values()) and len(_tot) == len(cs.PROBLEM_TYPES), _tot
 # item 3: C4f summary order (GSRR-43 Unit)
 yes_, no_, na_ = ({"consistent": v, "gross": "0"} for v in ("yes", "no", "na"))
 assert cs.c4f_summary([yes_, na_]) == "none"                         # consistent + incalculable -> none
@@ -418,7 +467,8 @@ assert cs.c6c(dict(t_, main_instrument_identified="0"), "L4") == "cannot_decide"
 assert cs.c6c(dict(t_, title_ai_fatigue_term="unresolved"), "L4") == "unresolved"
 assert cs.c6c(t_, "unresolved") == "unresolved"
 assert all(r["C6c"] in {"ai_term_L3_L6", "ai_term_L1a_L2", "no_ai_term", "cannot_decide", "unresolved"} for r in res["recs"])
-assert "C6c AI-fatigue term with L3 to L6" in names and "C6c" in res["per_study"][0]
+# REWRITTEN (manipulation split): the single C6c row is now three rows
+assert "C6c AI-fatigue term with L3 to L6 (AI-side variable manipulated)" in names and "C6c" in res["per_study"][0]
 assert any(r["analysis"].startswith("S1") and r["problem_type"].startswith("C6c") for r in sens)
 assert any(r["analysis"].startswith("S4 coder2") and r["problem_type"].startswith("C6c") for r in sens)
 assert ("main", "title_ai_fatigue_term") in codes and ("main", "C6c") not in codes and ("main", "C7") not in codes
@@ -652,7 +702,10 @@ def must_stop_short(label, kind, drop_n, needle):
 
 for kind_ in ["records", "instruments", "c4f"]:
     hdr_ = cs.read_table(out / f"{kind_}_reconciled.csv")[0]
-    must_stop_short(kind_, kind_, 1, f"empty cell in {hdr_[-1]}")
+    # CHANGED: the last columns of records and c4f are now optional free text (may be empty), so the short row
+    # must reach back to the last required column
+    n_opt_ = next(k_ for k_, c_ in enumerate(reversed(hdr_)) if c_ not in cs.OPTIONAL_EMPTY)
+    must_stop_short(kind_, kind_, n_opt_ + 1, f"empty cell in {hdr_[-1 - n_opt_]}")
 must_stop_short("items_required", "items", 3, "empty cell in boundary")    # boundary, secondary_type, target missing
 dd_ = clone("short_items_optional")                                        # optional trailing cells: None reads as empty
 p_ = dd_ / "items_reconciled.csv"
@@ -939,4 +992,131 @@ rc_c = subprocess.run([sys.executable, str(Path(cs.__file__)), "--screening", st
 assert rc_c.returncode == 0 and (out / "out" / "coverage.csv").exists(), rc_c
 cov_out = list(csv.DictReader(open(out / "out" / "coverage.csv", encoding="utf-8")))
 assert cov_out[0]["drawn"] == "6" and cov_out[0]["new_records"] == "10" and cov_out[0]["complete"] == "0", cov_out
+# === design, manipulation, split rows, categories, evidence columns ========================================
+# (1) C6c / C7 (ii) split by manipulation: unit test on small rows
+_lab = {l_: ms_ for l_, ms_ in cs.MANIPULATION_SUBSETS}
+assert [l_ for l_, _ in cs.MANIPULATION_SUBSETS] == ["AI-side variable not manipulated", "AI-side variable manipulated",
+                                                    "manipulation not verifiable or unresolved"]
+_rows = [{"ai_manipulated": "1", "C6c": "ai_term_L3_L6", "C7_ii": "met"},
+         {"ai_manipulated": "0", "C6c": "ai_term_L1a_L2", "C7_ii": "not_met"},
+         {"ai_manipulated": "0", "C6c": "no_ai_term", "C7_ii": "cannot_decide"},
+         {"ai_manipulated": "not_verifiable", "C6c": "cannot_decide", "C7_ii": "cannot_decide"},
+         {"ai_manipulated": "unresolved", "C6c": "unresolved", "C7_ii": "unresolved"}]
+_ps = {p_["problem_type"]: p_ for p_ in cs.problem_statements(_rows)}
+for _key, _name in [("C6c", "C6c AI-fatigue term with L3 to L6"),
+                    ("C7_ii", "C7 (ii) AI-fatigue term with attribution at L3 to L6")]:
+    _no, _yes, _nv = (_ps[f"{_name} ({l_})"] for l_ in _lab)
+    assert (_yes["count"], _yes["evaluable"], _yes["not_evaluable"], _yes["unresolved"]) == (1, 1, 0, 0), _yes
+    assert _yes["statement"] == "was observed in the main set"
+    assert (_no["count"], _no["evaluable"]) == (0, 1 if _key == "C7_ii" else 2), _no       # C6c: both values evaluable
+    assert _no["statement"] == "was not observed in the main set"
+    assert (_nv["count"], _nv["evaluable"], _nv["not_evaluable"], _nv["unresolved"]) == (0, 0, 1, 1), _nv
+    assert _nv["statement"] == "could not be evaluated"
+    assert _no["subset"] == "AI-side variable not manipulated" and _yes["subset"] == "AI-side variable manipulated"
+# a record without ai_manipulated is in no subset
+assert all(p_["evaluable"] + p_["not_evaluable"] + p_["unresolved"] == 0 for p_ in
+           cs.problem_statements([{"C6c": "ai_term_L3_L6"}]) if p_["subset"] != "all")
+# on the dummy tables: the controlled records D011 (randomized experiment, manipulated, title input yes, L4) ...
+_by = {r_["record_id"]: r_ for r_ in res["recs"]}
+assert _by["D011"]["C6c"] == "ai_term_L3_L6" and _by["D011"]["ai_manipulated"] == "1"
+assert _by["D011"]["design"] == "randomized_experiment" and _by["D012"]["ai_manipulated"] == "0"
+_main_ps = {p_["problem_type"]: p_ for p_ in res["problems"]}
+for _key, _name in [("C6c", "C6c AI-fatigue term with L3 to L6")]:
+    for l_, ms_ in cs.MANIPULATION_SUBSETS:
+        sub_ = [r_ for r_ in conf if r_["ai_manipulated"] in ms_]
+        ev_ = [r_ for r_ in sub_ if r_[_key] in cs.EVALUABLE[_key]]
+        row_ = _main_ps[f"{_name} ({l_})"]
+        assert row_["count"] == sum(r_[_key] == "ai_term_L3_L6" for r_ in ev_), (l_, row_)
+        assert row_["evaluable"] == len(ev_), (l_, row_)
+assert _main_ps["C6c AI-fatigue term with L3 to L6 (AI-side variable manipulated)"]["count"] >= 1     # D011, D013 is L1a
+assert _main_ps["C6c AI-fatigue term with L3 to L6 (AI-side variable not manipulated)"]["count"] >= 2  # D012, D018
+for l_, ms_ in cs.MANIPULATION_SUBSETS:
+    sub_ = [r_ for r_ in conf if r_["ai_manipulated"] in ms_]
+    row_ = _main_ps[f"C7 (ii) AI-fatigue term with attribution at L3 to L6 ({l_})"]
+    assert row_["evaluable"] == sum(r_["C7_ii"] in ("met", "not_met") for r_ in sub_), (l_, row_)
+    assert row_["count"] == sum(r_["C7_ii"] == "met" for r_ in sub_), (l_, row_)
+# (2) categories and their order
+_cat = {p_["problem_type"]: p_["category"] for p_ in res["problems"]}
+assert all("category" in p_ for p_ in res["problems"])
+_expected = {"reporting": ["C4a inconsistent", "C4b inconsistent", "C4c inconsistent", "C4d inconsistent",
+                           "C4e codebook not available", "C4e agreement none", "C4f any inconsistency",
+                           "C4f any gross inconsistency", "C5 signs not confirmed"],
+             "names and attribution": ["C6a different family", "C6c", "C6c", "C6c", "C7 (ii)", "C7 (ii)", "C7 (ii)",
+                                       "C7 (iii)"],
+             "possible inferential overreach": ["C6b mismatch", "C7 (i)"]}
+_got = {}
+for p_ in res["problems"]:
+    _got.setdefault(p_["category"], []).append(p_["problem_type"])
+assert list(_got) == ["reporting", "names and attribution", "possible inferential overreach"], list(_got)
+for c_, exp_ in _expected.items():
+    assert len(_got[c_]) == len(exp_) and all(g_.startswith(e_) for g_, e_ in zip(_got[c_], exp_)), (c_, _got[c_])
+assert [p_["category"] for p_ in res["problems"]] == sorted((p_["category"] for p_ in res["problems"]),
+                                                            key=cs.CATEGORIES.index)      # grouped, in order
+# sensitivity analyses carry the category and the split rows
+_sens, _ = cs.sensitivity(out)
+for a_ in ("S1 peer-reviewed only", "S2 signs-not-confirmed removed", "S4 coder1 values", "S4 coder2 values"):
+    _rows_a = [r_ for r_ in _sens if r_["analysis"] == a_]
+    assert len(_rows_a) == len(res["problems"]) and all(r_["category"] for r_ in _rows_a), a_
+    assert [r_["problem_type"] for r_ in _rows_a] == [p_["problem_type"] for p_ in res["problems"]], a_
+# (3) new columns are in the tables and the per-study table
+for code_ in ("design", "ai_manipulated"):
+    assert any(t_["code"] == code_ and t_["set"] == "main" for t_ in res["tables"]), code_
+    assert code_ in res["per_study"][0], code_
+assert {t_["value"] for t_ in res["tables"] if t_["code"] == "design" and t_["set"] == "main"} >= \
+    {"randomized_experiment", "cross_sectional"}
+assert set(cs.VOCAB["design"]) == {"cross_sectional", "longitudinal", "diary_esm", "case_study", "qualitative",
+                                   "scale_development", "other_unclear", "randomized_experiment", "quasi_experiment",
+                                   "pre_post", "mixed", "not_verifiable", "unresolved"}
+assert cs.VOCAB["ai_manipulated"] == {"0", "1", "not_verifiable", "unresolved"}
+# (4) validation
+must_stop("c6b_mismatch_manipulated", "records",
+          lambda rs: rs[0].update(C6b="mismatch", design="randomized_experiment", ai_manipulated="1"),
+          needle="C6b mismatch but ai_manipulated '1'")
+must_stop("c6b_mismatch_nv", "records", lambda rs: rs[0].update(C6b="mismatch", ai_manipulated="not_verifiable"),
+          needle="C6b mismatch but ai_manipulated")
+must_stop("cross_sectional_manipulated", "records",
+          lambda rs: rs[0].update(C6b="match", design="cross_sectional", ai_manipulated="1"),
+          needle="design cross_sectional but ai_manipulated 1")
+must_stop("qualitative_manipulated", "records",
+          lambda rs: rs[0].update(C6b="match", design="qualitative", ai_manipulated="1"),
+          needle="design qualitative but ai_manipulated 1")
+must_stop("design_bad", "records", lambda rs: rs[0].update(design="experiment"), needle="'experiment' not allowed in column design")
+must_stop("manip_bad", "records", lambda rs: rs[0].update(ai_manipulated="yes"), needle="not allowed in column ai_manipulated")
+must_stop("manip_empty", "records", lambda rs: rs[0].update(ai_manipulated=""), needle="empty cell in ai_manipulated")
+must_stop("c4f_recalc_empty_yes", "c4f", lambda rs: rs[0].update(consistent="yes", recalculated_value=""),
+          needle="empty recalculated_value")
+must_stop("c4f_statistic_bad", "c4f", lambda rs: rs[0].update(statistic="p"), needle="'p' not allowed in column statistic")
+must_stop("c4f_location_empty", "c4f", lambda rs: rs[0].update(location=""), needle="empty cell in location")
+must_stop("c4f_reported_empty", "c4f", lambda rs: rs[0].update(reported_value=""), needle="empty cell in reported_value")
+# allowed combinations (positive controls): an intervention unrelated to AI, a mixed design that manipulates,
+# a missing recalculated value for a result that cannot be calculated, and empty evidence columns
+_dd = clone("val_allowed")
+rewrite(_dd, "records", lambda rs: rs[0].update(C6b="match", design="pre_post", ai_manipulated="0",
+                                                C6_rationale="", C7_rationale="", design_location="",
+                                                C6_location="", C7_location=""))
+rewrite(_dd, "records", lambda rs: rs[1].update(C6b="match", design="mixed", ai_manipulated="1"))
+rewrite(_dd, "c4f", lambda rs: rs[0].update(consistent="na", gross="0", recalculated_value=""))
+cs.build_tables(_dd)
+# (5) agreement covers the new codes; the evidence columns are not compared
+_ag = {(r_["set"], r_["code"]): r_ for r_ in cs.run_agreement(out)}
+for c_ in ("design", "ai_manipulated"):
+    assert ("main", c_) in _ag and _ag[("main", c_)]["n"] > 0, c_
+assert not any(r_["code"] in ("design_location", "C6_location", "C6_rationale", "C7_location", "C7_rationale",
+                              "location", "statistic", "reported_value", "recalculated_value")
+               for r_ in cs.run_agreement(out))
+# (6) no public output file contains a rationale or a c4f value (working records)
+_pub = clone("pub")
+for _cmd in ("--tables", "--agreement"):
+    _p = subprocess.run([sys.executable, str(Path(cs.__file__)), _cmd, str(_pub)], capture_output=True, text=True)
+    assert _p.returncode == 0, _p.stderr
+_files = sorted((_pub / "out").glob("*.csv"))
+assert len(_files) >= 10 and any(f_.name == "agreement.csv" for f_ in _files), _files
+_text = {f_.name: f_.read_text(encoding="utf-8") for f_ in _files}
+assert "ai_manipulated" in _text["tables.csv"] and "category" in _text["problem_statements.csv"]
+# positive control: the strings are in the input files, so an empty search would not mean anything
+assert RATIONALE in (_pub / "records_reconciled.csv").read_text(encoding="utf-8")
+assert REPORTED_VALUE in (_pub / "c4f_reconciled.csv").read_text(encoding="utf-8")
+for name_, t_ in _text.items():
+    for secret_ in (RATIONALE, REPORTED_VALUE, "RATIONALE", "REPORTED-VALUE"):
+        assert secret_ not in t_, (name_, secret_)
 print(f"dummy tables in {out}; all boundary tests passed")
