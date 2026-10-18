@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <style>
-/* 配置: 上に仮のデスクトップ（舞台）、下に見比べの操作、最後に制約と見る点。 */
+/* 配置: 上に仮のデスクトップ（舞台）、下に見比べの操作、伏せた見比べの欄、最後に制約と見る点。 */
 :root {
   --bg: #eef0ec;
   --surface: #f8f9f6;
@@ -36,9 +36,11 @@ body {
 .wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; }
 header { display: grid; gap: 4px; }
 h1 { font-family: var(--display); font-weight: 600; font-size: 1.7rem; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 1.05rem; margin: 0 0 4px; }
 .lede { color: var(--muted); margin: 0; max-width: 65ch; }
 .stage-box { position: relative; width: 100%; aspect-ratio: 16 / 10; max-width: 100%; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: #222; }
 #stage { width: 100%; height: 100%; display: block; }
+.meter { font-size: 0.85rem; color: var(--muted); margin: -10px 0 0; font-variant-numeric: tabular-nums; }
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 24px; }
 fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 8px; }
 legend { font-size: 0.78rem; letter-spacing: 0.08em; color: var(--muted); padding: 0; margin-bottom: 6px; }
@@ -56,11 +58,34 @@ legend { font-size: 0.78rem; letter-spacing: 0.08em; color: var(--muted); paddin
 }
 #pad:focus { outline: 2px solid var(--accent); outline-offset: 2px; color: var(--ink); }
 .ver-note { font-size: 0.88rem; color: var(--muted); margin: 0; min-height: 3.4em; }
+button {
+  font: inherit; font-size: 0.9rem; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--surface); color: var(--ink);
+}
+button.primary { background: var(--accent); color: var(--accent-ink); }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+section.blind { border-top: 1px solid var(--line); padding-top: 16px; display: grid; gap: 12px; }
+section.blind p { margin: 0; font-size: 0.92rem; }
+.blind-step, .blind-done { display: grid; gap: 12px; }
+.blind-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
+.blind-code { font-family: var(--display); font-size: 1.4rem; font-weight: 600; }
+.items { display: grid; gap: 10px; }
+.item { display: grid; gap: 4px; }
+.item .q { font-size: 0.92rem; }
+.item .q small { color: var(--muted); }
+.scale { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 0.8rem; color: var(--muted); }
+.scale .seg span { padding: 3px 11px; }
+textarea { width: 100%; font: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
 section.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px 32px; border-top: 1px solid var(--line); padding-top: 16px; }
-section.notes h2 { font-family: var(--display); font-weight: 600; font-size: 1.05rem; margin: 0 0 4px; }
 section.notes ul { margin: 0; padding-left: 1.2em; }
 section.notes li { margin: 2px 0; font-size: 0.92rem; }
 section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
+[hidden] { display: none !important; }
+/* 伏せた見比べの間は、強さや写し方を示すものを隠す。 */
+body.blinding .open-only { display: none !important; }
+body:not(.blinding) .blind-only { display: none !important; }
 </style>
 
 <div class="wrap">
@@ -70,53 +95,96 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   </header>
 
   <div class="stage-box"><canvas id="stage" aria-label="仮のデスクトップの背景"></canvas></div>
+  <p class="meter open-only" id="meter" aria-live="off">動く量を数えています…</p>
 
   <div class="controls">
-    <fieldset>
+    <fieldset class="open-only">
       <legend>版</legend>
       <div class="seg">
-        <label><input type="radio" name="ver" value="1" id="ver1"><span>1 線のまま</span></label>
-        <label><input type="radio" name="ver" value="2" id="ver2"><span>2 線と面</span></label>
-        <label><input type="radio" name="ver" value="3" id="ver3" checked><span>3 自然世界</span></label>
+        <label><input type="radio" name="ver" value="1"><span>1 線のまま</span></label>
+        <label><input type="radio" name="ver" value="2"><span>2 線と面</span></label>
+        <label><input type="radio" name="ver" value="3" checked><span>3 自然世界</span></label>
       </div>
       <label class="check" id="fixedWrap"><input type="checkbox" id="fixedPx"> 太さを px で固定する（いまの試作と同じ）</label>
       <p class="ver-note" id="verNote"></p>
     </fieldset>
 
+    <fieldset class="open-only" id="v3Wrap">
+      <legend>版 3 の設定</legend>
+      <div class="seg" role="group" aria-label="打鍵の影響の強さ">
+        <label><input type="radio" name="gain" value="0"><span>影響 0</span></label>
+        <label><input type="radio" name="gain" value="0.33"><span>0.33</span></label>
+        <label><input type="radio" name="gain" value="0.67"><span>0.67</span></label>
+        <label><input type="radio" name="gain" value="1" checked><span>1</span></label>
+      </div>
+      <div class="seg" role="group" aria-label="基層の漂い">
+        <label><input type="radio" name="base" value="noise" checked><span>基層 周期なし</span></label>
+        <label><input type="radio" name="base" value="sine"><span>基層 周期あり（元）</span></label>
+      </div>
+    </fieldset>
+
     <fieldset>
       <legend>打鍵</legend>
-      <div class="seg">
-        <label><input type="radio" name="pat" value="normal" id="patNormal" checked><span>ふつう</span></label>
-        <label><input type="radio" name="pat" value="fast" id="patFast"><span>速打ち</span></label>
-        <label><input type="radio" name="pat" value="sparse" id="patSparse"><span>ちょいちょい</span></label>
-        <label><input type="radio" name="pat" value="none" id="patNone"><span>止める</span></label>
+      <div class="seg open-only">
+        <label><input type="radio" name="pat" value="normal" checked><span>ふつう</span></label>
+        <label><input type="radio" name="pat" value="steady"><span>一定のリズム</span></label>
+        <label><input type="radio" name="pat" value="fast"><span>速打ち</span></label>
+        <label><input type="radio" name="pat" value="sparse"><span>ちょいちょい</span></label>
+        <label><input type="radio" name="pat" value="none"><span>止める</span></label>
       </div>
       <div id="pad" tabindex="0">ここを押してから打つと、その打鍵でも動きます（文字は出しません）</div>
     </fieldset>
 
-    <fieldset>
+    <fieldset class="open-only">
       <legend>見え方の条件</legend>
       <div class="seg">
-        <label><input type="radio" name="wall" value="light" id="wallLight"><span>明るい壁紙</span></label>
-        <label><input type="radio" name="wall" value="dark" id="wallDark"><span>暗い壁紙</span></label>
-        <label><input type="radio" name="wall" value="photo" id="wallPhoto" checked><span>写真風</span></label>
+        <label><input type="radio" name="wall" value="light"><span>明るい壁紙</span></label>
+        <label><input type="radio" name="wall" value="dark"><span>暗い壁紙</span></label>
+        <label><input type="radio" name="wall" value="photo" checked><span>写真風</span></label>
       </div>
       <div class="seg">
-        <label><input type="radio" name="res" value="1440" id="res1440"><span>幅 1440</span></label>
-        <label><input type="radio" name="res" value="2560" id="res2560" checked><span>幅 2560</span></label>
-        <label><input type="radio" name="res" value="3840" id="res3840"><span>幅 3840</span></label>
+        <label><input type="radio" name="res" value="1440"><span>幅 1440</span></label>
+        <label><input type="radio" name="res" value="2560" checked><span>幅 2560</span></label>
+        <label><input type="radio" name="res" value="3840"><span>幅 3840</span></label>
       </div>
       <label class="check"><input type="checkbox" id="cover"> 作業の窓を重ねる</label>
     </fieldset>
   </div>
 
-  <section class="notes">
+  <section class="blind" aria-labelledby="blindTitle">
+    <h2 id="blindTitle">伏せた見比べ</h2>
+    <p class="open-only">版 3 の打鍵の影響の強さを 4 段に振り、符号で伏せて決まった順に見せます。どの符号がどの強さかはページの表には出しません。始めると、強さ・動く量・写し方の数値と合成の打鍵が隠れ、上の欄で自分で打って見ます。</p>
+    <div class="row open-only"><button class="primary" id="blindStart">伏せた見比べを始める</button></div>
+
+    <div class="blind-only blind-step" id="blindStep">
+      <div class="blind-head">
+        <span id="blindPos"></span>
+        <span class="blind-code" id="blindCode"></span>
+      </div>
+      <p>上の欄を押して、ふだんの作業のつもりで 1 分ほど打ってから付けてください。止めたり速めたりしてかまいません。1 はまったく当てはまらない、7 はとても当てはまる、です。</p>
+      <div class="items" id="items"></div>
+      <label class="item"><span class="q">気づいたこと（任意）</span><textarea id="memo" rows="2"></textarea></label>
+      <div class="row">
+        <button id="blindPrev">前の符号へ</button>
+        <button class="primary" id="blindNext">次の符号へ</button>
+        <button id="blindQuit">やめる</button>
+      </div>
+    </div>
+
+    <div class="blind-only blind-done" id="blindDone" hidden>
+      <p>4 つとも付け終わりました。下の文字列を写してチャットに貼ってください。送信も保存もしていません。</p>
+      <textarea id="result" rows="8" readonly></textarea>
+      <div class="row"><button id="copy">写す</button><button id="blindBack">見比べに戻る</button></div>
+    </div>
+  </section>
+
+  <section class="notes open-only">
     <div>
       <h2>自然世界に置いた制約</h2>
       <ul>
         <li>育たない・溜まらない。草も粒も数は最初から決まっていて、打っても増えない。</li>
         <li>天気や季節にしない。色も向きも打鍵で変わらない。</li>
-        <li>打鍵が動かすのは風の強さだけ。打鍵がなくても霧と粒はゆっくり漂う。</li>
+        <li>打鍵が動かすのは風だけ（速さが平均の強さ、不規則さが息）。霧・草の小さな揺れ・粒の上下は打鍵に依らず漂い、その進みも打鍵で変わらない。</li>
       </ul>
     </div>
     <div>
@@ -124,13 +192,14 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
       <ul>
         <li>幅 3840 と明るい壁紙で、どの版が見えるか。</li>
         <li>窓を重ねたとき、縁に残る部分で動きが分かるか。</li>
-        <li>自分の打鍵が速さとして感じられるか、注意を引きすぎないか。</li>
+        <li>一定のリズムと、ふつう（まとまりと間）で、風の息が違って見えるか。</li>
+        <li>基層の周期なしと周期ありで、繰り返しが目につくか。</li>
         <li>版 3 が「自分の作業が一緒にいる」か「別の何かがいる」か。</li>
       </ul>
     </div>
     <div>
       <h2>写し方</h2>
-      <p>どの版も試作の背景の層と同じく、1 秒ごとに目標を決めて滑らかに近づけます。速さは直近 1 秒の打鍵の数に半分ずつ寄せ、止まると 0.6 倍ずつ落ちます。揺れの深さは直近 30 秒の打鍵の数から決めます。推定（行き詰まりなど）は使いません。</p>
+      <p>どの版も試作の背景の層と同じく、1 秒ごとに目標を決めて滑らかに近づけます。速さは直近 1 秒の打鍵の数に半分ずつ寄せ、止まると 0.6 倍ずつ落ちます。版 3 の不規則さは、直近 10 秒の 2 秒未満の打鍵の間隔のばらつき（変動係数）から決めます。打鍵の影響の強さは風の強さに掛け、息は風に比例するので同じだけ弱まります。動く量は 160×100 に縮めた画面で 0.1 秒ごとの明るさの差を取り、差が 3 以上の画素の割合と差の平均を 1 秒ごとに出します。推定（行き詰まりなど）は使いません。</p>
     </div>
   </section>
 </div>
@@ -144,10 +213,10 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   const notes = {
     "1": "いまの試作の線 9 本です。既定では太さと揺れを画面の大きさに比例させています。チェックを入れると、いまの試作と同じ px 固定になります。打鍵が止まると静かになります。",
     "2": "線のあいだを薄い帯で満たします。細さに頼らず面で見せる版です。打鍵が止まると静かになります。",
-    "3": "霧の帯・草の群れ・漂う粒です。打鍵は風として加わり、草をなびかせ粒を押します。打鍵がなくても霧と粒はゆっくり漂います。"
+    "3": "霧の帯・草の群れ・漂う粒です。打鍵は風として加わり、速さが草をなびかせ粒を押し、不規則さが風の息になります。霧と草の小さな揺れと粒の上下は打鍵に依らず漂います。"
   };
 
-  const state = { ver: "3", fixedPx: false, pat: reduceMotion ? "none" : "normal", wall: "photo", res: 2560, cover: false };
+  const state = { ver: "3", fixedPx: false, pat: reduceMotion ? "none" : "normal", wall: "photo", res: 2560, cover: false, gain: 1, base: "noise" };
 
   // 仮想の画面。幅だけを選び、高さは 16:10 にそろえる。
   let W = 0, H = 0, S = 1;
@@ -191,13 +260,44 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     }
   }
 
+  // ---- 周期の無いノイズ（格子の勾配ノイズ。格子の向きは整数の hash で決まり、繰り返さない） ----
+  function hash2(i, j) {
+    let h = Math.imul(i | 0, 0x27d4eb2d) ^ Math.imul(((j | 0) + 0x3c6ef372) | 0, 0x165667b1);
+    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  function grad(i, j, x, y) {
+    const a = hash2(i, j) / 4294967296 * Math.PI * 2;
+    return Math.cos(a) * x + Math.sin(a) * y;
+  }
+  function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  function noise2(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+    const u = fade(fx), v = fade(fy);
+    const n00 = grad(ix, iy, fx, fy), n10 = grad(ix + 1, iy, fx - 1, fy);
+    const n01 = grad(ix, iy + 1, fx, fy - 1), n11 = grad(ix + 1, iy + 1, fx - 1, fy - 1);
+    const nx0 = n00 + (n10 - n00) * u, nx1 = n01 + (n11 - n01) * u;
+    return (nx0 + (nx1 - nx0) * v) * 1.41;
+  }
+  // 2 つの帯域を、整数比にならない倍率で重ねる。おおよそ -1〜1。
+  function fbm(x, y) { return noise2(x, y) * 0.68 + noise2(x * 2.07 + 17.3, y * 2.13 + 5.1) * 0.32; }
+
   // ---- 打鍵の材料（時刻だけ） ----
   const presses = [];
   function press(t) { presses.push(t); }
 
-  // 合成の打鍵。ふつうはまとまりと間を交互にする。
-  let burstUntil = 0, pauseUntil = 0;
+  // 合成の打鍵。ふつうはまとまりと間を交互にする。一定のリズムは間隔のばらつきが小さい。
+  let burstUntil = 0, pauseUntil = 0, steadyNext = 0;
   function synth(now, dt) {
+    if (blind.on) return;
+    if (state.pat === "steady") {
+      if (now >= steadyNext) {
+        press(now);
+        steadyNext = now + 200 * (1 + (Math.random() - 0.5) * 0.12);
+      }
+      return;
+    }
     let rate = 0;
     if (state.pat === "fast") rate = 8;
     else if (state.pat === "sparse") rate = 0.65;
@@ -213,22 +313,47 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
 
   // ---- 試作と同じ 1 秒ごとの写し方 ----
   const WINDOW_MS = 30000, STOP_MS = 2000, TICK_MS = 1000, SPEED_PER_KEY = 0.05, MIN_SPEED = 0.002;
+  const IRREG_MS = 10000, IRREG_MIN_GAPS = 4;
   let amp = 0, ampFrom = 0, ampTo = 0, speed = 0, speedFrom = 0, speedTo = 0, phase = 0;
+  let irreg = 0, irregFrom = 0, irregTo = 0;
   let tickAt = performance.now();
+
+  // 直近の打鍵の間隔の変動係数を 0〜1 に写す。2 秒以上の間は止まりとして数えない。
+  function irregularity(now) {
+    const gaps = [];
+    for (let i = 1; i < presses.length; i++) {
+      if (now - presses[i] > IRREG_MS) continue;
+      const g = presses[i] - presses[i - 1];
+      if (g < STOP_MS) gaps.push(g);
+    }
+    if (gaps.length < IRREG_MIN_GAPS) return null;
+    const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const sd = Math.sqrt(gaps.reduce((a, b) => a + (b - mean) * (b - mean), 0) / gaps.length);
+    return Math.max(0, Math.min(1, (sd / mean - 0.1) / 0.9));
+  }
+
   function tick() {
     const now = performance.now();
     while (presses.length && now - presses[0] > WINDOW_MS) presses.shift();
     const lastSec = presses.filter((t) => now - t <= TICK_MS).length;
     const stopped = presses.length === 0 || now - presses[presses.length - 1] > STOP_MS;
-    ampFrom = amp; speedFrom = speed;
+    ampFrom = amp; speedFrom = speed; irregFrom = irreg;
     ampTo = stopped ? amp * 0.85 : Math.min(1, presses.length / 150);
     if (stopped && ampTo < 0.002) ampTo = 0;
     const rate = Math.min(lastSec, 10) * SPEED_PER_KEY;
     const next = lastSec > 0 ? 0.5 * speed + 0.5 * rate : speed * 0.6;
     speedTo = next < MIN_SPEED ? 0 : next;
+    const ir = irregularity(now);
+    irregTo = ir === null ? irreg * 0.85 : 0.5 * irreg + 0.5 * ir;
+    if (irregTo < 0.002) irregTo = 0;
     tickAt = now;
+    updateReadout(lastSec);
   }
-  setInterval(tick, TICK_MS);
+
+  function resetTyping() {
+    presses.length = 0;
+    amp = ampFrom = ampTo = 0; speed = speedFrom = speedTo = 0; irreg = irregFrom = irregTo = 0;
+  }
 
   // ---- 自然世界の要素（数は固定） ----
   let blades = [], motes = [];
@@ -299,24 +424,44 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     }
   }
 
+  // 基層の漂い。drift は打鍵に依らない基層の時間で、霧・草の小さな揺れ・粒の上下はこれだけで動く。
   let drift = 0;
-  function drawNature(t, dt) {
-    // 風は打鍵の速さから（向きは一定・色は変えない）。drift は打鍵に依らない基層の時間。
-    const wind = Math.min(1, speed / 0.4);
+  function fogEdge(b, x, lower) {
+    if (state.base === "sine") {
+      const a = H * 0.022 * (1 + b * 0.2);
+      return lower
+        ? a * Math.sin(x / W * Math.PI * (1.1 + b * 0.25) + drift * 0.1 + b * 2)
+        : a * Math.sin(x / W * Math.PI * (1.4 + b * 0.3) + drift * 0.12 * (1 + b * 0.2) + b);
+    }
+    const a = H * 0.034 * (1 + b * 0.2);
+    return lower
+      ? a * fbm(x / W * 1.3 + b * 3.1 + 40, drift * 0.05 + b * 23)
+      : a * fbm(x / W * 1.6 + b * 7.3, drift * 0.06 * (1 + b * 0.2) + b * 11);
+  }
+  function baseSway(seed) {
+    return state.base === "sine" ? Math.sin(drift * 0.7 + seed) * 0.07 : fbm(seed * 13.7, drift * 0.35) * 0.1;
+  }
+  function baseLift(seed) {
+    return state.base === "sine" ? Math.sin(drift * 0.5 + seed) * 4 : fbm(seed * 9.1 + 300, drift * 0.25) * 6;
+  }
+
+  // 風の息。不規則さが大きいほど、場所と時間で風の強さがむらになる。むらの模様は基層の時間で進む。
+  function gustAt(x) {
+    return Math.max(0, 1 + 0.9 * irreg * fbm(x / W * 2.2 + 500, drift * 1.1));
+  }
+
+  function drawNature(dt) {
+    // 風は打鍵の速さから（向きは一定・色は変えない）。打鍵の影響の強さを掛ける。
+    const wind = state.gain * Math.min(1, speed / 0.4);
     drift += dt / 1000;
 
-    // 霧の帯（上の 6 割）。基層の漂いに、打鍵の位相を少しだけ足す。
+    // 霧の帯（上の 6 割）。基層だけで動き、打鍵では変わらない。
+    const step = Math.max(8, Math.round(10 * S));
     for (let b = 0; b < 4; b++) {
       const yc = H * (0.12 + b * 0.14);
-      const a = H * (0.018 + 0.02 * amp) * (1 + b * 0.2);
-      const step = Math.max(8, Math.round(10 * S));
       ctx.beginPath();
-      for (let x = 0; x <= W + step; x += step) {
-        ctx.lineTo(x, yc + a * Math.sin(x / W * Math.PI * (1.4 + b * 0.3) + drift * 0.12 * (1 + b * 0.2) + phase * 0.6 + b));
-      }
-      for (let x = W + step; x >= 0; x -= step) {
-        ctx.lineTo(x, yc + H * 0.05 + a * Math.sin(x / W * Math.PI * (1.1 + b * 0.25) + drift * 0.1 + phase * 0.5 + b * 2));
-      }
+      for (let x = 0; x <= W + step; x += step) ctx.lineTo(x, yc + fogEdge(b, x, false));
+      for (let x = W + step; x >= 0; x -= step) ctx.lineTo(x, yc + H * 0.05 + fogEdge(b, x, true));
       ctx.closePath();
       ctx.fillStyle = b % 2 === 0 ? "rgba(255,255,255,0.12)" : "rgba(18,22,27,0.06)";
       ctx.fill();
@@ -324,10 +469,11 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
 
     // 漂う粒。基層の流れ＋風の押し。数は固定で、端から出たら反対から入る。
     for (const m of motes) {
-      const vx = (6 + 70 * wind) * m.k * S;
-      const vy = Math.sin(drift * 0.5 + m.seed) * 4 * S;
+      const vx = (6 + 70 * wind * gustAt(m.x)) * m.k * S;
+      const vy = baseLift(m.seed) * S;
       m.x += vx * dt / 1000; m.y += vy * dt / 1000;
       if (m.x > W + 10) m.x -= W + 20;
+      if (m.y < -10) m.y += H * 0.9; else if (m.y > H * 0.9 + 10) m.y -= H * 0.9;
       const r = m.r * S;
       ctx.beginPath(); ctx.arc(m.x, m.y, r * 1.9, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(18,22,27,0.14)"; ctx.fill();
@@ -335,10 +481,10 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
       ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fill();
     }
 
-    // 草の群れ。基層の小さな揺れ＋風で右へなびく。風の波は打鍵の位相で横へ渡る。
+    // 草の群れ。基層の小さな揺れ＋風で右へなびく。風の波は打鍵の位相で横へ渡る（風の側）。
     for (const bl of blades) {
-      const sway = Math.sin(drift * 0.7 + bl.seed) * 0.07;
-      const gust = wind * (0.32 + 0.22 * Math.sin(bl.x / W * 9 - phase * 3 + bl.depth));
+      const sway = baseSway(bl.seed);
+      const gust = wind * gustAt(bl.x) * (0.32 + 0.22 * Math.sin(bl.x / W * 9 - phase * 3 + bl.depth));
       const bend = (sway + gust) * bl.h;
       ctx.beginPath();
       ctx.moveTo(bl.x, bl.y);
@@ -357,6 +503,43 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     for (let i = 0; i < 14; i++) ctx.fillRect(x + 48 * S, y + (80 + i * 34) * S, w * (0.55 + 0.3 * Math.sin(i * 2.1)) - 96 * S, 10 * S);
   }
 
+  // ---- 動く量（縮めた画面の明るさの差） ----
+  const MW = 160, MH = 100, SAMPLE_MS = 100, DIFF_MIN = 3;
+  const mcan = document.createElement("canvas");
+  mcan.width = MW; mcan.height = MH;
+  const mctx = mcan.getContext("2d", { willReadFrequently: true });
+  let prevLum = null, sampleAt = 0;
+  let accMoved = 0, accDiff = 0, accN = 0;
+  let shownMoved = null, shownDiff = null;
+  function sampleMotion(now) {
+    if (blind.on || now - sampleAt < SAMPLE_MS) return;
+    sampleAt = now;
+    mctx.drawImage(canvas, 0, 0, MW, MH);
+    const d = mctx.getImageData(0, 0, MW, MH).data;
+    const lum = new Float32Array(MW * MH);
+    for (let i = 0, p = 0; p < lum.length; i += 4, p++) lum[p] = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    if (prevLum) {
+      let moved = 0, sum = 0;
+      for (let p = 0; p < lum.length; p++) {
+        const e = Math.abs(lum[p] - prevLum[p]);
+        sum += e;
+        if (e >= DIFF_MIN) moved++;
+      }
+      accMoved += moved / lum.length; accDiff += sum / lum.length; accN++;
+    }
+    prevLum = lum;
+  }
+  const meter = document.getElementById("meter");
+  function updateReadout(lastSec) {
+    if (accN > 0) { shownMoved = accMoved / accN; shownDiff = accDiff / accN; }
+    accMoved = accDiff = 0; accN = 0;
+    if (blind.on) return;
+    const motion = shownMoved === null ? "動く量を数えています…"
+      : `動いた画素 ${(shownMoved * 100).toFixed(1)}%・明るさの差の平均 ${shownDiff.toFixed(2)}（0.1 秒ごと）`;
+    meter.textContent = `${motion}　｜　直近 1 秒の打鍵 ${lastSec}・速さ ${speedTo.toFixed(2)}・不規則さ ${irregTo.toFixed(2)}`;
+  }
+  function resetMotion() { prevLum = null; accMoved = accDiff = 0; accN = 0; shownMoved = shownDiff = null; }
+
   let last = null;
   function frame(now) {
     const dt = last === null ? 16 : Math.min(now - last, 100);
@@ -366,29 +549,148 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     const e = k * k * (3 - 2 * k);
     amp = ampFrom + (ampTo - ampFrom) * e;
     speed = speedFrom + (speedTo - speedFrom) * e;
+    irreg = irregFrom + (irregTo - irregFrom) * e;
     phase += speed * dt / 1000;
 
     ctx.drawImage(wallCanvas, 0, 0);
-    if (state.ver === "3") drawNature(now, reduceMotion ? dt * 0.3 : dt);
+    if (state.ver === "3") drawNature(reduceMotion ? dt * 0.3 : dt);
     else drawLines(state.ver === "2");
     drawCover();
+    sampleMotion(now);
     requestAnimationFrame(frame);
   }
 
+  // ---- 伏せた見比べ ----
+  // 符号と強さの割り当てと順は、ページの外で乱数で決めて記録し（ハッシュで封をした）、ここでは裏返して符号化してある。
+  const SEAL = "fSIwM2I0OGVjZDY4ODk4NzAwIjoidGxhcyIsXSJWIiwiSCIsIlciLCJUIls6InJlZHJvIix9MDoiVyIsMToiViIsMzMuMDoiVCIsNzYuMDoiSCJ7OiJuZ2lzc2Eiew==";
+  const sealed = JSON.parse(atob(SEAL).split("").reverse().join(""));
+  const ITEMS = [
+    ["agency", "主体感", "自分が動かしている"],
+    ["weight", "重さ", "遅い・鈍い"],
+    ["other", "別のものらしさ", "別の何かが並んで動いている"],
+    ["together", "自分の作業が一緒にいる感じ", "自分の操作や内容が一緒にいる"]
+  ];
+  const blind = { on: false, pos: 0, answers: sealed.order.map(() => ({})), memos: sealed.order.map(() => ""), saved: null };
+
+  const itemsEl = document.getElementById("items");
+  ITEMS.forEach(([key, name, gloss]) => {
+    const wrap = document.createElement("div");
+    wrap.className = "item";
+    const q = document.createElement("div");
+    q.className = "q";
+    q.textContent = `${name} `;
+    const small = document.createElement("small");
+    small.textContent = `（${gloss}）`;
+    q.appendChild(small);
+    const scale = document.createElement("div");
+    scale.className = "scale";
+    const seg = document.createElement("div");
+    seg.className = "seg";
+    seg.setAttribute("role", "radiogroup");
+    seg.setAttribute("aria-label", name);
+    for (let v = 1; v <= 7; v++) {
+      const lab = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "radio"; input.name = `r-${key}`; input.value = String(v);
+      input.addEventListener("change", () => { blind.answers[blind.pos][key] = v; syncBlind(); });
+      const span = document.createElement("span");
+      span.textContent = String(v);
+      lab.append(input, span);
+      seg.appendChild(lab);
+    }
+    scale.append("1 当てはまらない", seg, "7 とても");
+    wrap.append(q, scale);
+    itemsEl.appendChild(wrap);
+  });
+
+  const memoEl = document.getElementById("memo");
+  memoEl.addEventListener("input", () => { blind.memos[blind.pos] = memoEl.value; });
+  const stepEl = document.getElementById("blindStep");
+  const doneEl = document.getElementById("blindDone");
+
+  function showStep() {
+    const code = sealed.order[blind.pos];
+    state.gain = sealed.assign[code];
+    resetTyping();
+    document.getElementById("blindPos").textContent = `${blind.pos + 1} / ${sealed.order.length} 番目`;
+    document.getElementById("blindCode").textContent = `符号 ${code}`;
+    ITEMS.forEach(([key]) => {
+      document.querySelectorAll(`input[name="r-${key}"]`).forEach((el) => { el.checked = Number(el.value) === blind.answers[blind.pos][key]; });
+    });
+    memoEl.value = blind.memos[blind.pos];
+    syncBlind();
+  }
+  function syncBlind() {
+    const done = ITEMS.every(([key]) => blind.answers[blind.pos][key]);
+    const lastStep = blind.pos === sealed.order.length - 1;
+    const next = document.getElementById("blindNext");
+    next.textContent = lastStep ? "付け終える" : "次の符号へ";
+    next.disabled = !done;
+    document.getElementById("blindPrev").disabled = blind.pos === 0;
+  }
+  function startBlind() {
+    blind.saved = { ver: state.ver, gain: state.gain, base: state.base, pat: state.pat, wall: state.wall, res: state.res, cover: state.cover };
+    blind.on = true; blind.pos = 0;
+    state.ver = "3"; state.base = "noise"; state.pat = "none"; state.cover = false;
+    if (state.wall !== "photo" || state.res !== 2560) { state.wall = "photo"; state.res = 2560; setSize(); }
+    document.body.classList.add("blinding");
+    stepEl.hidden = false; doneEl.hidden = true;
+    showStep();
+    document.getElementById("pad").focus();
+  }
+  function stopBlind() {
+    blind.on = false;
+    Object.assign(state, blind.saved);
+    setSize(); resetTyping(); resetMotion(); syncControls();
+    document.body.classList.remove("blinding");
+    stepEl.hidden = false; doneEl.hidden = true;
+  }
+  function finishBlind() {
+    const out = {
+      page: "手跡の背景 見本台・版 3 の伏せた見比べ",
+      date: new Date().toISOString().slice(0, 10),
+      scale: "1 まったく当てはまらない 〜 7 とても当てはまる",
+      ratings: sealed.order.map((code, i) => ({ order: i + 1, code, ...blind.answers[i], memo: blind.memos[i] }))
+    };
+    document.getElementById("result").value = JSON.stringify(out, null, 2);
+    stepEl.hidden = true; doneEl.hidden = false;
+  }
+  document.getElementById("blindStart").addEventListener("click", startBlind);
+  document.getElementById("blindQuit").addEventListener("click", stopBlind);
+  document.getElementById("blindPrev").addEventListener("click", () => { if (blind.pos > 0) { blind.pos--; showStep(); } });
+  document.getElementById("blindNext").addEventListener("click", () => {
+    if (blind.pos < sealed.order.length - 1) { blind.pos++; showStep(); document.getElementById("pad").focus(); }
+    else finishBlind();
+  });
+  document.getElementById("blindBack").addEventListener("click", stopBlind);
+  document.getElementById("copy").addEventListener("click", async () => {
+    const ta = document.getElementById("result");
+    const btn = document.getElementById("copy");
+    ta.select();
+    try { await navigator.clipboard.writeText(ta.value); btn.textContent = "写しました"; }
+    catch { btn.textContent = "選択しました。手で写してください"; }
+  });
+
   // ---- 操作 ----
-  function sync() {
+  function syncControls() {
     document.getElementById("verNote").textContent = notes[state.ver];
     document.getElementById("fixedWrap").hidden = state.ver !== "1";
+    document.getElementById("v3Wrap").hidden = state.ver !== "3";
+    for (const name of ["ver", "gain", "base", "pat", "wall", "res"]) {
+      document.querySelectorAll(`input[name="${name}"]`).forEach((el) => { el.checked = String(state[name]) === el.value; });
+    }
+    document.getElementById("cover").checked = state.cover;
   }
-  document.querySelectorAll('input[name="ver"]').forEach((el) => el.addEventListener("change", () => { state.ver = el.value; sync(); }));
+  document.querySelectorAll('input[name="ver"]').forEach((el) => el.addEventListener("change", () => { state.ver = el.value; resetMotion(); syncControls(); }));
+  document.querySelectorAll('input[name="gain"]').forEach((el) => el.addEventListener("change", () => { state.gain = Number(el.value); }));
+  document.querySelectorAll('input[name="base"]').forEach((el) => el.addEventListener("change", () => { state.base = el.value; }));
   document.querySelectorAll('input[name="pat"]').forEach((el) => {
-    if (el.value === state.pat) el.checked = true;
-    el.addEventListener("change", () => { state.pat = el.value; burstUntil = 0; pauseUntil = 0; });
+    el.addEventListener("change", () => { state.pat = el.value; burstUntil = 0; pauseUntil = 0; steadyNext = 0; });
   });
-  document.querySelectorAll('input[name="wall"]').forEach((el) => el.addEventListener("change", () => { state.wall = el.value; buildWall(); }));
-  document.querySelectorAll('input[name="res"]').forEach((el) => el.addEventListener("change", () => { state.res = Number(el.value); setSize(); }));
+  document.querySelectorAll('input[name="wall"]').forEach((el) => el.addEventListener("change", () => { state.wall = el.value; buildWall(); resetMotion(); }));
+  document.querySelectorAll('input[name="res"]').forEach((el) => el.addEventListener("change", () => { state.res = Number(el.value); setSize(); resetMotion(); }));
   document.getElementById("fixedPx").addEventListener("change", (ev) => { state.fixedPx = ev.target.checked; });
-  document.getElementById("cover").addEventListener("change", (ev) => { state.cover = ev.target.checked; });
+  document.getElementById("cover").addEventListener("change", (ev) => { state.cover = ev.target.checked; resetMotion(); });
 
   // 手で打つ欄。時刻だけを取り、キーの種類は見ない。
   const pad = document.getElementById("pad");
@@ -399,7 +701,8 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   });
 
   setSize();
-  sync();
+  syncControls();
+  setInterval(tick, TICK_MS);
   requestAnimationFrame(frame);
 })();
 </script>
