@@ -735,7 +735,7 @@ def run(args, source=None) -> int:
         for old in output_names(name):
             if old not in produced and (out / old).exists():
                 (out / old).unlink()  # 今回作らなかったもの（--no-bib の .bib）を前の回から残さない
-        for p in sorted(stage.iterdir(), key=lambda p: p.name == "manifest.json"):
+        for p in sorted(stage.iterdir(), key=lambda p: (p.name == "manifest.json", p.name)):
             p.replace(out / p.name)
     finally:
         shutil.rmtree(stage, ignore_errors=True)
@@ -754,7 +754,36 @@ def run(args, source=None) -> int:
     return 0
 
 
+def verify(out: Path) -> list[str]:
+    """出力先の成果物が manifest.json の SHA-256 と合うか。合わないもの・無いものを返す（空なら揃っている）。"""
+    mp = out / "manifest.json"
+    if not mp.exists():
+        return ["manifest.json が無い"]
+    hashes = json.loads(mp.read_text(encoding="utf-8")).get("sha256") or {}
+    if not hashes:
+        return ["manifest.json に sha256 が無い"]
+    bad = []
+    for name, h in sorted(hashes.items()):
+        p = out / name
+        if not p.exists():
+            bad.append(f"{name} が無い")
+        elif hashlib.sha256(p.read_bytes()).hexdigest() != h:
+            bad.append(f"{name} が manifest と合わない（前の回のものが残っている）")
+    return bad
+
+
 def main(argv=None, source=None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv[:1] == ["--verify"]:
+        if len(argv) != 2:
+            print("使い方: build.py --verify <出力先>", file=sys.stderr)
+            return 2
+        bad = verify(Path(argv[1]).expanduser())
+        for b in bad:
+            print("不一致: " + b, file=sys.stderr)
+        print("揃っている" if not bad else f"{len(bad)} 件が合わない。回し直す")
+        return 0 if not bad else 1
     try:
         return run(parse_args(argv), source=source)
     except OrphanError as e:

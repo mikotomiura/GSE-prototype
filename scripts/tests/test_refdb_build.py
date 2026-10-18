@@ -409,10 +409,10 @@ class KeepTest(Base):
     def test_manifest_hashes_and_moves_last(self):
         _, out = self.run_build()
         m = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
-        import hashlib
-        for name, h in m["sha256"].items():
-            self.assertEqual(hashlib.sha256((out / name).read_bytes()).hexdigest(), h, name)
-        self.assertNotIn("manifest.json", m["sha256"])
+        produced = {p.name for p in out.iterdir()} - {"manifest.json"}
+        self.assertEqual(set(m["sha256"]), produced)  # 成果物がすべて載っている（空の辞書では通らない）
+        self.assertEqual(build.verify(out), [])
+        self.assertEqual(build.main(["--verify", str(out)]), 0)
         moved = []
         orig = Path.replace
 
@@ -426,6 +426,31 @@ class KeepTest(Base):
         finally:
             Path.replace = orig
         self.assertEqual(moved[-1], "manifest.json")
+
+    def test_failure_while_moving_is_detected(self):
+        # 前の回を作り、メモだけ違う回を、移す段の途中（3 つ目のファイル）で止める
+        sheet1 = [["key", "読んだ", "メモ"], ["doi:10.1/b", "", "前"]]
+        sheet2 = [["key", "読んだ", "メモ"], ["doi:10.1/b", "", "後"]]
+        _, out = self.run_build("--keep", str(self.write_sheet(sheet1, False)))
+        old_manifest = (out / "manifest.json").read_bytes()
+        orig, n = Path.replace, [0]
+
+        def flaky(self_, target):
+            n[0] += 1
+            if n[0] == 3:
+                raise OSError("ディスクが一杯")
+            return orig(self_, target)
+
+        Path.replace = flaky
+        try:
+            with self.assertRaises(OSError):
+                self.run_build("--keep", str(self.write_sheet(sheet2, False)))
+        finally:
+            Path.replace = orig
+        self.assertEqual((out / "manifest.json").read_bytes(), old_manifest)  # manifest は前の回のまま
+        self.assertNotEqual(build.verify(out), [])  # 新旧が混ざったことが分かる
+        self.assertEqual(build.main(["--verify", str(out)]), 1)
+        self.assertEqual([p for p in out.iterdir() if p.name.startswith(".refdb-")], [])
 
     def test_false_in_memo_is_kept(self):
         got = build.keep_map([["key", "読んだ", "メモ"], ["a", "FALSE", "false"]], ["読んだ", "メモ"], ["読んだ"])
