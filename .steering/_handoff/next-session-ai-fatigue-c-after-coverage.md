@@ -22,6 +22,15 @@ worktree `/Users/johnd/GSE-prototype-af-c`（ブランチ `docs/ai-fatigue-c-out
 
 ## 2. 次にやること（この順）
 
+### 2.0 共著者への案内を作り直す（最初にやる・2026-10-18 の研究者の依頼）
+- 研究者（逐語）「.docxは, 研究の内容と分析に行い方と、全体の作業の流れを教える感じにしない？」
+- 今の案内（`.steering/20261017-ai-fatigue-c-outline/coauthor-guide.md`・Drive は `TRACE/TRACE_Co-Author/TRACE_共著者への案内_2026-10-18.docx`）は、お願いすることとファイルの使い方が中心。これを、共著者が研究の全体を理解できる案内に作り直す。3 本の柱:
+  1. 研究の内容: 問い（RQ1〜RQ5・SQ1〜SQ2・登録版 GSRR-11・12）、TRACE の 7 つのコード（C1〜C7）が何を見るか、叙述的レビューとの違い（外枠の「Relation to the authors' earlier narrative review」）、本体の集合・探索の集合・確かめの標本（判断 38）。
+  2. 分析の行い方: 選別の段（段 1・段 2・3 の意味と、段に分ける理由）、符号化の中身（records・instruments・items・c4f・links の 5 つの様式に何を書くか。判断 45 の後の説明の会話を参照）、一致の見方（AMSTAR 2 の項目 5・6・80% の規則・判断 34・44）、集計（問題の型が見られたか・見られなかったか・評価できないか・GSRR-57。頻度は言わない）、感度分析。
+  3. 全体の作業の流れ: 今の §6 の全体のスケジュールの表（判断 46）と、共著者の 3 回の受け渡し（段 1・全文の段・符号化）と話し合い・原稿の確認。
+- 事実は登録版・外枠・判断の記録で確かめてから書く（verify-before-claiming）。docx は `python3 -I scripts/make_guide_docx.py coauthor-guide.md coauthor-guide.docx` で作り、Quick Look で表と日本語を見る。Drive に上書きする前に、Drive の文が最後に置いた版と同じか（研究者が手を入れていないか）を確かめる。研究者はフォルダや冊の名前を何度か変えているので、置き場所は ls で確かめてから。
+- 未決の 2 つも研究者に聞く: Word で番号つきの箇条書きの番号が出ているか（Quick Look では描かれない）、相談文の「草稿・登録の下書き・原稿の外枠を貼っておきます」を直すか、登録版と外枠の docx も用意するか（判断 43 では選ばれなかった）。
+
 ### 2.1 研究者に確かめる
 - Drive の `TRACE_database.xlsx` を Excel で開き、段 1 に CS で始まる 300 件が交互に並んでいること、ID から文献DB の抄録（英語と日本語）へ飛べることを見てもらう（Excel は閉じてから脚本を打つ）。
 - 共著者への相談文（`coauthor-consult.md` / docx）を送る時期。研究者は「土台・DB・中身が揃って実行するだけになってから送る」と決めている。送るのは研究者。送る物は Drive の `TRACE/TRACE_Co-Author/` にそろえた（判断 43・46・47: 草稿の PDF・全体の案内〔全体のスケジュールの表つき・docx は `scripts/make_guide_docx.py` で作る〕・`TRACE_Co-Author_judge-sheet/TRACE_co-author_stage1.xlsx` に段 1 の本番の冊。研究者がフォルダと冊の名前を変えた）。`TRACE/` 直下の古い `main.docx`・`coauthor-consult.docx` は 2026-10-18 の直しの前の版。
