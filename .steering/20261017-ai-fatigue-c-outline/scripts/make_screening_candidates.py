@@ -100,8 +100,9 @@ def main():
     w.writerow(["record_id", "population"])
     rows = candidates(sys.argv[1]) + (coverage_sample(sys.argv[2]) if len(sys.argv) == 3 else [])
     ids = [i for i, _ in rows]
-    if len(set(ids)) != len(ids):
-        raise SystemExit("a coverage record has the ID of a candidate")
+    dup = sorted({i for i in ids if ids.count(i) > 1})
+    if dup:
+        raise SystemExit(f"a coverage record has the ID of a candidate: {dup[:5]}")
     for rid, pop in rows:
         w.writerow([rid, pop])
     counts = {}

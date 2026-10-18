@@ -43,6 +43,7 @@
 4. 確かめる。
    - `python3 make_coding_form.py ../registration-attachments/coding-form` でコード用紙を作り直し、git diff が空であること。
    - `python3 make_dummy.py` が緑であること。
+   - `python3 -I c_search.py selftest` と `python3 -I make_coverage_records.py selftest` が緑であること（確かめの検索・判断 40〜42）。
    - `uv run --with openpyxl python check_screening.py` が緑であること（選別の道具・判断 33）。
    - TRACE の DB を作り直したら、『段1』に全文の列が無く、『段2・3』があること（`make_trace_db.py`）。判定が 1 件も入っていない今の DB を上書きしてよい。
 5. 添付 3（検索式・`query-strings.md`。第 16 節は確かめの検索）と GSRR-25 の **[at registration]** の中身を確かめる。選別の順の一覧に確かめの標本（群 `coverage_sample`・300 件）が入っていること。dryrun は 2026-10-18 の版（564 件）と比べる。

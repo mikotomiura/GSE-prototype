@@ -126,6 +126,16 @@ def get_json(url, tries=4, headers=None):
     raise SystemExit(f"request failed after {tries} tries: {url[:120]} ({str(err)[:200]})")
 
 
+FORCE = False
+
+
+def refuse_overwrite(out, source):
+    """The search is run once (GSRR-30): an export whose log exists is never overwritten, unless --force is given."""
+    if (out / f"{source}-log.json").exists() and not FORCE:
+        raise SystemExit(f"{out / (source + '-log.json')} exists: the {source} export is done; nothing overwritten "
+                         f"(use --force only to discard it on purpose)")
+
+
 def write_log(out, source, entry):
     path = out / f"{source}-log.json"
     path.write_text(json.dumps(entry, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -159,7 +169,8 @@ def export_openalex(out, tries=3):
     `tries` times, then the export stops). The year counts must add up to the total."""
     q = query_openalex()
     headers = openalex_headers()
-    for old in out.glob("openalex-[0-9]*.json"):
+    refuse_overwrite(out, "openalex")
+    for old in out.glob("openalex-*-t*-*.json"):   # pages of an unfinished run (no log yet)
         old.unlink()
     started = now()
     g = get_json("https://api.openalex.org/works?" + urllib.parse.urlencode(
@@ -174,7 +185,7 @@ def export_openalex(out, tries=3):
     if sum(groups.values()) != total:
         raise SystemExit(f"OpenAlex: year groups and records without a year ({groups['null']}) do not add up to "
                          f"{total}: {sum(groups.values())}")
-    files, n, retries, repeated = [], 0, {}, {}
+    files, n, retries, repeated, extra = [], 0, {}, {}, {}
     for year in sorted(groups):
         for t in range(1, tries + 1):
             pages, ids = openalex_pages(out, q, headers, year, f"t{t}")
@@ -182,6 +193,7 @@ def export_openalex(out, tries=3):
                 rep_ = sorted(k for k, c in Counter(ids).items() if c > 1)
                 if rep_:
                     repeated[year] = rep_   # the same record returned twice in one run (2026-10-18: 2023, 1)
+                extra[year] = len(ids) - len(set(ids))   # occurrences beyond the first (a record may repeat 3 times)
                 break
             retries[year] = t
             for p in pages:
@@ -191,20 +203,21 @@ def export_openalex(out, tries=3):
                              f"after {tries} tries")
         files += pages
         n += len(ids)
-    if n - sum(len(v) for v in repeated.values()) != total:
+    if n - sum(extra.values()) != total:
         raise SystemExit(f"OpenAlex: {n} records read, {total} reported, repeats {repeated}")
     oql = (json.loads(files[0].read_text(encoding="utf-8"))["meta"].get("x_query") or {}).get("oql", "")
     entry = {"source": "OpenAlex API", "api_key_sent": bool(headers), "query": q, "interpreted_as": oql,
              "filter": "title_and_abstract.search, then publication_year one year at a time", "date_limit": None,
              "type_limit": None, "started": started, "finished": now(), "reported_count": total,
              "year_counts": groups, "years_paged_again": retries, "retrieved": n,
-             "repeated_ids": repeated, "unique_retrieved": n - sum(len(v) for v in repeated.values()),
+             "repeated_ids": repeated, "unique_retrieved": n - sum(extra.values()),
              "files": {p.name: sha256(p) for p in files}}
     print(json.dumps({k: v for k, v in entry.items() if k not in ("files", "year_counts")}, ensure_ascii=False))
     write_log(out, "openalex", entry)
 
 
 def export_europepmc(out):
+    refuse_overwrite(out, "europepmc")
     q = query_europepmc()
     base = "https://www.ebi.ac.uk/europepmc/webservices/rest/search?"
     started, pages, cursor, n, reported = now(), [], "*", 0, None
@@ -240,6 +253,9 @@ def acm_receive(out, port):
     printed at start, from the ACM Digital Library origin, under MAX_POST bytes, whose query is the registered ACM
     query and whose records match its reported count, is saved; anything else gets 403/400 and the server waits on."""
     token = hashlib.sha256(str(time.time_ns()).encode() + bytes(16)).hexdigest()[:24]
+    refuse_overwrite(out, "acm")
+    import threading
+    lock = threading.Lock()
 
     class H(http.server.BaseHTTPRequestHandler):
         timeout = 30   # a connection that sends nothing (Chrome opens some ahead of time) is dropped after 30 s
@@ -262,6 +278,8 @@ def acm_receive(out, port):
             print(f"refused ({code}): {why}", flush=True)
 
         def do_POST(self):
+            if self.server.claimed:
+                return self._refuse(409, "already saved")
             if self.path != "/" + token:
                 return self._refuse(403, "wrong path")
             if self.headers.get("Origin") != "https://dl.acm.org":
@@ -281,6 +299,10 @@ def acm_receive(out, port):
                 ok = False
             if not ok:
                 return self._refuse(400, "not the registered query, or records do not match the reported count")
+            with lock:   # one POST is saved; the server stops only after its log is written (done, below)
+                if self.server.claimed:
+                    return self._refuse(409, "already saved")
+                self.server.claimed = True
             p = out / "acm-results.json"
             p.write_bytes(body)
             entry = {"source": "ACM Digital Library web interface (ACM Guide to Computing Literature)",
@@ -303,6 +325,7 @@ def acm_receive(out, port):
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), H)   # one silent connection blocks no other
     srv.timeout = 1
     srv.done = False
+    srv.claimed = False
     print(f"listening on http://127.0.0.1:{port}/{token}\nrun in the ACM tab: await acmExport(QUERY, {port}, '{token}')\n"
           f"QUERY:\n{query_acm()}", flush=True)
     while not srv.done:
@@ -322,7 +345,7 @@ def norm_title(t):
     return "".join(ch for ch in t if ch.isalnum())
 
 
-EPMC_TAGS = re.compile(r"</?(?:b|bold|br|h\d|i|italic|p|sub|sup|title|sc|u)\b[^>]*>", re.I)
+EPMC_TAGS = re.compile(r"</?(?:b|bold|br|h\d|i|italic|p|sub|sup|title|sc|u)(?:\s[^<>]*)?/?>", re.I)
 
 
 def clean_markup(text):
@@ -357,13 +380,15 @@ def records_openalex(out):
     """Each record once. A record that OpenAlex returned twice is read once only if the log lists it as repeated;
     any other repeat is kept, so that the merge stops on it."""
     log = json.loads((out / "openalex-log.json").read_text(encoding="utf-8"))
-    allowed = {i for v in log.get("repeated_ids", {}).values() for i in v}
+    allowed = {(y, i) for y, v in log.get("repeated_ids", {}).items() for i in v}
     seen = set()
-    for p in logged_files(out, "openalex", "openalex-[0-9]*.json"):
+    for p in logged_files(out, "openalex", "openalex-*-t*-*.json"):
+        year = p.name.split("-")[1]
         for w in json.loads(p.read_text(encoding="utf-8"))["results"]:
-            if w.get("id") in allowed and w["id"] in seen:
+            key = (year, w.get("id"))
+            if key in allowed and key in seen:
                 continue
-            seen.add(w.get("id"))
+            seen.add(key)
             yield {"source": "openalex", "source_id": w.get("id", ""), "doi": norm_doi(w.get("doi")),
                    "title": w.get("display_name") or w.get("title") or "", "year": w.get("publication_year"),
                    "type": w.get("type", ""), "venue": ((w.get("primary_location") or {}).get("source") or {})
@@ -512,9 +537,13 @@ def summarise(g):
             "sources": sorted({r["source"] for r in g}), "source_ids": sorted({r["source_id"] for r in g})}
 
 
-def remove_known(groups, known):
+def remove_known(groups, known, ok_titles=None):
+    """Remove every group that shares a DOI, or a title that may merge (title_keys over the search records: at
+    least TITLE_MIN characters and at most TITLE_MAX_DOIS DOIs), with a record of the source database."""
+    if ok_titles is None:
+        ok_titles = title_keys([r for g in groups for r in g])
     kd = {k["doi"]: k["id"] for k in known if k["doi"]}
-    kt = {k["t"]: k["id"] for k in known if len(k["t"]) >= TITLE_MIN}
+    kt = {k["t"]: k["id"] for k in known if len(k["t"]) >= TITLE_MIN and k["t"] in ok_titles}
     new, matched = [], []
     for g in groups:
         hit = sorted({kd[r["doi"]] for r in g if r["doi"] in kd} | {kt[norm_title(r["title"])] for r in g
@@ -559,7 +588,7 @@ def merge(out, records264, xlsx):
         recs += got
     known = source_db(records264, xlsx)
     groups = merge_records(recs)
-    new, matched = remove_known(groups, known)
+    new, matched = remove_known(groups, known, title_keys(recs))
     rows = assign_ids(new)
     sample = set(draw_sample([r["id"] for r in rows]))
     for r in rows:
@@ -604,6 +633,8 @@ def selftest():
     check("a less-than sign survives tag removal",
           clean_markup("in UC (p < 0.001).<h4>Conclusion</h4>PAIR (<i>n</i> = 3, p<0.05)")
           == "in UC (p < 0.001). Conclusion PAIR ( n = 3, p<0.05)")
+    check("a tag never swallows a less-than sign", clean_markup("high-dimensional (n<p) settings where k>2")
+          == "high-dimensional (n<p) settings where k>2")
     check("references in titles decoded", clean_markup("Beyond the &lt;i&gt;AJR&lt;/i&gt; &amp; more") == "Beyond the AJR & more")
     check("ACM DOI from any link form", acm_doi("/doi/abs/10.1145/3544548.3581234") == "10.1145/3544548.3581234"
           and acm_doi("/doi/10.1016/j.x.2026.1") == "10.1016/j.x.2026.1" and acm_doi("/action/x") == "")
@@ -641,6 +672,9 @@ def selftest():
     new2, _ = remove_known(g, known_t)
     check("known title removed (whole group)", len(new2) == 1 and new2[0][0]["title"] == TC)
     _, m3 = remove_known(merge_records([R("acm", "10.9/z", "Index")]), [{"id": "S02", "doi": "", "t": "index"}])
+    g4 = merge_records([R("openalex", f"10.9/{i}", T) for i in range(4)])
+    n4, _ = remove_known(g4, [{"id": "S03", "doi": "", "t": norm_title(T)}])
+    check("a known title carried by more than 3 DOIs removes nothing", len(n4) == 4)
     check("a short known title does not remove", m3 == [])
     ids = [f"CS{i:04d}" for i in range(1, 1001)]
     s1, s2 = draw_sample(ids), draw_sample(list(reversed(ids)))
@@ -666,9 +700,12 @@ def main():
     ap.add_argument("cmd", choices=["openalex", "europepmc", "acm-receive", "merge", "selftest", "queries"])
     ap.add_argument("out", nargs="?", type=Path)
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--force", action="store_true", help="discard an existing export (never for the registered run)")
     ap.add_argument("--records264", type=Path)
     ap.add_argument("--source-db", type=Path)
     a = ap.parse_args()
+    global FORCE
+    FORCE = a.force
     if a.cmd == "selftest":
         selftest()
     if a.cmd == "queries":

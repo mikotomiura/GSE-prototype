@@ -46,6 +46,7 @@ async function acmExport(QUERY, PORT, TOKEN) {
     for (let n = 1; read.length < count; n++) {
       await wait(8000);
       const p = await page(n, sort);
+      if (p.count !== count) throw new Error(`the reported count changed on page ${n}: ${count} -> ${p.count}`);
       if (!p.recs.length) break;
       read = read.concat(p.recs);
     }

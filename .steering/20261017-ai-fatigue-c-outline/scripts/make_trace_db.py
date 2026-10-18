@@ -3,7 +3,7 @@
 The workbook holds bibliographic data, abstracts and the full-text status of the 264 additional candidates and the
 300 records of the coverage sample (decision 38; screened with them, in the same order), and
 empty screening columns in the fixed screening order (GSRR-33). It carries no AI judgement and none of author 1's
-earlier judgements: author 1 screens all 264 records afresh, without seeing the AI screener's output, which is
+earlier judgements: author 1 screens all records (264 and 300) afresh, without seeing the AI screener's output, which is
 kept in a separate file after registration (decision 26).
 
 Author 1 judges stage 1 on the sheet '段1' (title and abstract only: it has no full-text column), and stages 2 and 3
