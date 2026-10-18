@@ -31,6 +31,9 @@ worktree `/Users/johnd/GSE-prototype-af-c`（ブランチ `docs/ai-fatigue-c-out
 - 事実は登録版・外枠・判断の記録で確かめてから書く（verify-before-claiming）。docx は `python3 -I scripts/make_guide_docx.py coauthor-guide.md coauthor-guide.docx` で作り、Quick Look で表と日本語を見る。Drive に上書きする前に、Drive の文が最後に置いた版と同じか（研究者が手を入れていないか）を確かめる。研究者はフォルダや冊の名前を何度か変えているので、置き場所は ls で確かめてから。
 - 未決の 2 つも研究者に聞く: Word で番号つきの箇条書きの番号が出ているか（Quick Look では描かれない）、相談文の「草稿・登録の下書き・原稿の外枠を貼っておきます」を直すか、登録版と外枠の docx も用意するか（判断 43 では選ばれなかった）。
 
+### 2.0b TRACE 専用のリポジトリ（判断 51・登録の前に）
+- 非公開で作り、公表で公開する。作る前に、名前・積む物と積まない物・`c_screening.py` の書き出し先とコミットの手順・`registration-day.md` と登録の下書きの書き換え・GSE-prototype の履歴の扱いを決める（判断 51 の一覧）。2.0 は済んだ（判断 48〜50）。
+
 ### 2.1 研究者に確かめる
 - Drive の `TRACE_database.xlsx` を Excel で開き、段 1 に CS で始まる 300 件が交互に並んでいること、ID から文献DB の抄録（英語と日本語）へ飛べることを見てもらう（Excel は閉じてから脚本を打つ）。
 - 共著者への相談文（`coauthor-consult.md` / docx）を送る時期。研究者は「土台・DB・中身が揃って実行するだけになってから送る」と決めている。送るのは研究者。送る物は Drive の `TRACE/TRACE_Co-Author/` にそろえた（判断 43・46・47: 草稿の PDF・全体の案内〔全体のスケジュールの表つき・docx は `scripts/make_guide_docx.py` で作る〕・`TRACE_Co-Author_judge-sheet/TRACE_co-author_stage1.xlsx` に段 1 の本番の冊。研究者がフォルダと冊の名前を変えた）。`TRACE/` 直下の古い `main.docx`・`coauthor-consult.docx` は 2026-10-18 の直しの前の版。
