@@ -34,7 +34,7 @@ python3 scripts/refdb/build.py --keep <シートの一覧.json> --out "<Drive �
 - `.bib` には pandoc が要る。無ければ `--no-bib`。
 - ある時点の枝を読み直すときは `--pin 枝=commit`（2026-10-18 の照合は §6）。
 
-出力は一時のフォルダで全部作ってから出力先へ移すので、途中で止まった回は出力先が前の回のまま残る。`manifest.json` の `formula_like_cells` が 1 以上なら、`= + - @` で始まるセルがあり、Google スプレッドシートで数式として読まれうるので、貼る前に確かめる。
+出力は出力先の中の一時のフォルダ（`.refdb-*`）で全部作ってから、1 ファイルずつ出力先へ移す。作る段で止まった回（pandoc の失敗・読んだ・メモの検査など）は、出力先が前の回のまま残る。移す段で止まった（ディスクが一杯・Ctrl-C）ときは新旧が混ざりうるので、`manifest.json` の日付と件数で確かめてから使う。電源断などで `.refdb-*` が残ったら消してよい。`manifest.json` の `formula_like_cells` が 1 以上なら、`= + - @` で始まるセルがあり、Google スプレッドシートで数式として読まれうるので、貼る前に確かめる。
 
 出るもの（ファイル名に日付）: `GSE文献DB_<日付>.csv`（20 列・BOM 付き）・`.html`（検索のページ）・`.csl.json`・`_biblatex.bib`・`_bibtex.bib`・`missing_summaries.json`（カードから引かれているのに要約が無いもの）・`manifest.json`（読んだ枝の commit と件数）。
 

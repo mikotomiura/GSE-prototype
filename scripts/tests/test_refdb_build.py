@@ -286,9 +286,13 @@ class FetchTest(unittest.TestCase):
         try:
             with TemporaryDirectory() as d:
                 p = Path(d) / "csl.json"
-                fetch.fetch_csl(["doi:10.1/gone", "doi:10.1/slow"], p)
+                p.write_text(json.dumps({"doi:10.1/was429": {"_err": "HTTP Error 429: Too Many Requests"},
+                                         "doi:10.1/ok": {"title": "T"}}), encoding="utf-8")
+                fetch.fetch_csl(["doi:10.1/gone", "doi:10.1/slow", "doi:10.1/was429", "doi:10.1/ok"], p)
                 got = json.loads(p.read_text(encoding="utf-8"))
-                self.assertEqual(sorted(got), ["doi:10.1/gone"])
+                self.assertEqual(sorted(got), ["doi:10.1/gone", "doi:10.1/ok", "doi:10.1/was429"])
+                self.assertTrue(any("was429" in u for u in calls))  # 前の回の 429 は取り直す
+                self.assertFalse(any("10.1/ok" in u for u in calls))
                 a = Path(d) / "abs.json"
                 old = {"doi:10.1/old429": {"src": None, "abs": "", "err_s2": "HTTP Error 429: "},
                        "doi:10.1/old404": {"src": None, "abs": "", "err_oa": "HTTP Error 404: Not Found"}}
