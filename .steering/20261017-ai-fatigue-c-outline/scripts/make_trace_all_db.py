@@ -3,7 +3,7 @@
 
 The 34 exploratory records carry the final decisions of the source database (sheet 'スクリーニング': the column
 '最終判定', the exclusion code of '除外理由' and the centre written as '用途: 中心-A/B' in '自由記入'). The final
-version is AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx (AF002 included on 2026-10-18 from its full text,
+version is AI_fatigue_database_2026-10-18_final.xlsx (AF002 included on 2026-10-18 from its full text,
 decision 37). The decisions differing from registration-attachments/ai-screening/check-34.csv (the decisions as of
 2026-10-17, against which the AI screener was checked) are printed and noted in the book. The 264 additional candidates carry no decision: they are
 screened only after registration, in author 1's workbook (make_trace_db.py), and this book holds none of author 1's,
@@ -13,12 +13,12 @@ way round GSRR-33 (no full text before a batch's stage 1 is committed); they are
 Inputs (outside the repository, except check-34.csv):
     <data>/records264.json, meta.json, ja.json       as for make_trace_db.py
     <data>/ja34.json (optional)                      machine translations of the 34 titles and abstracts
-    --source-db   the source database, final version (AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx)
+    --source-db   the source database, final version (AI_fatigue_database_2026-10-18_final.xlsx)
     --abstracts34 the stage-1 inputs of the check on the 34 records (<ID>.stage1.txt), which hold the abstracts
 
 Run (openpyxl via uv):
     uv run --with openpyxl python make_trace_all_db.py --data ~/Documents/TRACE/data \
-        --source-db "$TRACE_DRIVE/../AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx" \
+        --source-db "$TRACE_DRIVE/../AI_fatigue_database_2026-10-18_final.xlsx" \
         --abstracts34 ~/TRACE-screening/check34-r3/in --out "$TRACE_DRIVE/TRACE_database_all.xlsx"
     --dump34 <file> writes the 34 records (title and abstract) as JSON, the input of the translation.
 """

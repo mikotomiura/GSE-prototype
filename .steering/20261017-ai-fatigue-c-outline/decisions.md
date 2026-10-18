@@ -461,3 +461,4 @@
 - `check-34.csv`（添付 6・AI の選別者の確かめ）は 2026-10-17 の最終判定を相手にした記録なので書き換えない（登録版に書いた）。
 - 全体の DB: `make_trace_all_db.py` の出どころを最終版の『スクリーニング』にした（最終判定・除外理由・『自由記入』の「用途: 中心-X」。AF006 は自由記入が判定者 1 の 1 回目のままなので、中心は判断 4 の決定〔check-34.csv〕から取る）。`check-34.csv` と違う記録は印字し、DB の注記に書く。`update_trace_db.py` の `--source-db` の既定を Drive の最終版にした。
 - AF002 の全文は `~/Documents/TRACE/fulltext34/AF002.pdf` に写した（repo の外。Downloads は消えることがあるため）。全体の DB は 34 件の全文へのリンクを持たないので、Drive には置いていない。
+- 追記（同じ日）: 研究者（逐語）「'/Users/johnd/Downloads/AI_fatigue_database_2026-10-18_final.xlsx'ごめん最終的なAI疲労DBはこれになった」。最終版は `AI_fatigue_database_2026-10-18_final.xlsx`（SHA-256 `0db64ecd5ffde5c2…`・Drive の `AI-fatigue/` のものとハッシュ一致）。前の `judge_final_fixed` は Downloads にも Drive にも無く、ファイルどうしは比べられなかった。全体の DB が使う欄（34 件の最終判定・除外理由・中心・題名・年・著者・掲載誌・DOI）は、前の版から作った全体の DB と全件一致（違い 0）。数も同じ（含める 11・保留 2・除外 21）。脚本と outline.md の参照を最終版の名前に替え、全体の DB を作り直した。

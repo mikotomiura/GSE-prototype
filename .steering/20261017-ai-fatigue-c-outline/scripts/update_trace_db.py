@@ -29,7 +29,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="~/Documents/TRACE/data")
     ap.add_argument("--fulltext", default="~/Documents/TRACE/fulltext")
-    ap.add_argument("--source-db", default=str(drive_trace().parent / "AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx"))
+    ap.add_argument("--source-db", default=str(drive_trace().parent / "AI_fatigue_database_2026-10-18_final.xlsx"))
     ap.add_argument("--abstracts34", default="~/TRACE-screening/check34-r3/in")
     ap.add_argument("--wait", type=int, default=600)
     a = ap.parse_args()
