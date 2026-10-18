@@ -46,6 +46,8 @@
 
 ## 登録の後すぐ（選別・束ごとに繰り返す。判断 33）
 
+順番（判断 34）: 登録したらすぐ、判定者 1 と AI の選別を束ごとに回す。共著者（B+ を引き受けた場合）は後を追う。段 1 の 2 割は `make_coauthor_db.py --stage 1` の 1 冊、段 2 は束が全文段に回るたびに `--stage 2 --batch bNN --ids <その束の ID>` の 1 冊を渡す。登録の前には誰も判定しない（見本の `--preview` だけ配ってよい）。
+
 道具は `scripts/c_screening.py`（`uv run --with openpyxl python c_screening.py <命令>`）。repo に置くのは ID・判定・SHA-256・時刻だけで（`screening/`）、抄録・全文・AI の出力の JSON は `~/TRACE-screening/s<段>-<束>/` に置く。
 
 段 1（題名・抄録）:

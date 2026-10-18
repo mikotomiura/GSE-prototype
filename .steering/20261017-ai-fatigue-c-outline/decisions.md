@@ -419,3 +419,5 @@
   - 見本（`--preview`。登録の後に配り直すまで判定しない旨を冒頭に書く）を `~/TRACE-coauthor/stage1-preview/` に作った。Quick Look で日本語の見出し・未判定・青い欄が見えることを確かめた（LibreOffice の PDF 変換では日本語のフォントが入らず消えるので、見た目の確かめには使わない）。
   - 検査は check_screening.py の末尾（2 割の件数・seed の再現・判定が入っていないこと・全文の写し・記入済みのフォルダを上書きしない）。
   - 未着手: 共著者が返したファイルを読み込み、3 人目の判定として扱う道具（c_screening.py）。登録版の書き換えと同じく、共著者の返事の後。
+- 順番（AskUserQuestion・推奨どおり）: 登録の後、判定者 1 と AI の選別を先に回し、共著者は後を追う。登録の前には誰も判定しない。`registration-day.md` に書いた。
+- 道具の確かめ方: docx は pandoc で作る。xlsx の見た目は Quick Look（`qlmanage -t`）で見る。pandoc 3.12 は xlsx を読めるが表の文字だけで、色・列幅・プルダウンは見られない。LibreOffice の PDF は日本語のフォントが入らない。
