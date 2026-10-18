@@ -17,6 +17,7 @@ import argparse
 import collections
 import csv
 import datetime as dt
+import hashlib
 import io
 import json
 import re
@@ -390,6 +391,9 @@ def keep_map(table: list[list[str]], human: list[str], checkbox: list[str]) -> d
     lacking = [c for c in ["key", *human] if c not in h]
     if lacking:
         raise ValueError(f"--keep の表に {lacking} の列が無い（見出し: {h}）")
+    doubled = [c for c in ["key", *human] if h.count(c) > 1]
+    if doubled:
+        raise ValueError(f"--keep の表に {doubled} の列が 2 つ以上ある（どちらを読むか決められない）")
     ki = h.index("key")
     cols = [(c, h.index(c)) for c in human]
     out: dict[str, dict] = {}
@@ -639,6 +643,19 @@ def load_json(p: Path, default):
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
 
 
+def parse_rekey(pairs: list[str]) -> dict[str, str]:
+    """--rekey 旧=新 の並び。同じ旧 key に違う新 key が 2 つあれば止める（後勝ちでメモを別の文献へ移さない）。"""
+    out: dict[str, str] = {}
+    for x in pairs:
+        if "=" not in x:
+            raise ValueError(f"--rekey は 旧=新 の形で渡す: {x}")
+        old, new = (y.strip() for y in x.split("=", 1))
+        if out.get(old, new) != new:
+            raise ValueError(f"--rekey で {old} の付け替え先が 2 つある（{out[old]} / {new}）")
+        out[old] = new
+    return out
+
+
 def run(args, source=None) -> int:
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
     branches = args.branches.split(",") if args.branches else cfg["branches"]
@@ -671,7 +688,7 @@ def run(args, source=None) -> int:
     labels = card_labels(source, branches)
     rows = build_rows(data, claims, summaries, labels, cfg)
 
-    rekey = dict(x.split("=", 1) for x in (args.rekey or []))
+    rekey = parse_rekey(args.rekey or [])
     rj = {"joined": 0, "orphans": 0}
     if kept is not None:
         rj = rejoin(rows, kept, human, rekey, args.keep_orphans)
@@ -710,12 +727,15 @@ def run(args, source=None) -> int:
             "skipped_lines": data["skipped"],
             **csl_counts, "bib": bib, "kept": rj,
         }
+        # 成果物の SHA-256 を manifest に持たせ、manifest は最後に移す。
+        # 移す段で止まっても、manifest が古いままか、ハッシュが合わないことで分かる
+        manifest["sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(stage.iterdir())}
         (stage / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
         produced = {p.name for p in stage.iterdir()}
         for old in output_names(name):
             if old not in produced and (out / old).exists():
                 (out / old).unlink()  # 今回作らなかったもの（--no-bib の .bib）を前の回から残さない
-        for p in stage.iterdir():
+        for p in sorted(stage.iterdir(), key=lambda p: p.name == "manifest.json"):
             p.replace(out / p.name)
     finally:
         shutil.rmtree(stage, ignore_errors=True)

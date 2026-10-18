@@ -366,6 +366,7 @@ class KeepTest(Base):
             "renamed": ([["key", "読んだ ", "メモ欄"], ["doi:10.1/b", "TRUE", "x"]], False),
             "no_values": ({"error": {"code": 400}}, True),
             "empty": ([], True),
+            "doubled": ([["key", "読んだ", "メモ", "メモ"], ["doi:10.1/b", "", "", "重要"]], False),
         }
         for name, (table, as_json) in bad.items():
             with self.subTest(name):
@@ -396,6 +397,35 @@ class KeepTest(Base):
         rc, out = self.run_build("--keep", str(self.write_sheet(sheet, False)), "--rekey", "url:gone=doi:10.1/d")
         self.assertEqual(rc, build.EXIT_ORPHANS)
         self.assertFalse((out / "GSE文献DB_2026-10-18.csv").exists())
+
+    def test_rekey_two_targets_for_one_key_stops(self):
+        sheet = [["key", "読んだ", "メモ"], ["url:gone", "", "A"]]
+        rc, out = self.run_build("--keep", str(self.write_sheet(sheet, False)),
+                                 "--rekey", "url:gone=doi:10.1/d", "--rekey", "url:gone=doi:10.1/b")
+        self.assertEqual(rc, 2)
+        self.assertFalse((out / "GSE文献DB_2026-10-18.csv").exists())
+        self.assertEqual(build.parse_rekey(["a=b", "a=b"]), {"a": "b"})
+
+    def test_manifest_hashes_and_moves_last(self):
+        _, out = self.run_build()
+        m = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+        import hashlib
+        for name, h in m["sha256"].items():
+            self.assertEqual(hashlib.sha256((out / name).read_bytes()).hexdigest(), h, name)
+        self.assertNotIn("manifest.json", m["sha256"])
+        moved = []
+        orig = Path.replace
+
+        def spy(self_, target):
+            moved.append(Path(target).name)
+            return orig(self_, target)
+
+        Path.replace = spy
+        try:
+            self.run_build()
+        finally:
+            Path.replace = orig
+        self.assertEqual(moved[-1], "manifest.json")
 
     def test_false_in_memo_is_kept(self):
         got = build.keep_map([["key", "読んだ", "メモ"], ["a", "FALSE", "false"]], ["読んだ", "メモ"], ["読んだ"])
