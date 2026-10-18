@@ -1,0 +1,30 @@
+{
+  "branches": [
+    "origin/main",
+    "origin/docs/tangibility-design",
+    "origin/docs/ai-fatigue-c-outline",
+    "origin/docs/ai-fatigue-core1-item-analysis",
+    "origin/docs/ai-fatigue-core2-discriminant",
+    "origin/docs/ai-fatigue-motivation-claims"
+  ],
+  "branch_names": {
+    "origin/main": "main",
+    "origin/docs/tangibility-design": "tangibility-design",
+    "origin/docs/ai-fatigue-c-outline": "ai-fatigue-c-outline",
+    "origin/docs/ai-fatigue-core1-item-analysis": "ai-fatigue-core1",
+    "origin/docs/ai-fatigue-core2-discriminant": "ai-fatigue-core2",
+    "origin/docs/ai-fatigue-motivation-claims": "ai-fatigue-motivation"
+  },
+  "human_columns": ["読んだ", "メモ"],
+  "strands": [
+    {"name": "1 較正・自己申告・プローブ", "patterns": ["calibration-sampling", "probe-timing", "recovery-labeling", "self-resolution", "auto-onset"]},
+    {"name": "2 介入・摩擦・AI への依存", "patterns": ["intervention-content", "activation-layer", "agentic-coding", "friction-retention", "behavioral-economics", "ai-escape", "avoidance-guilt", "motivation-fatigue-reentry"]},
+    {"name": "3 打鍵の動態・IME・停滞の推定", "patterns": ["task-type-writing", "desk-behavior", "silence-discrimination", "typing-dynamics", "japanese-ime", "stall-onset", "content-free-revision", "resumption-restop", "controlled-task", "scope-detection"]},
+    {"name": "4 ambient・表現の媒体・周辺の注意", "patterns": ["self-state-externalization", "auditory-modality", "sound-necessity", "design-parsimony", "portable-ambient", "smartphone-ambient", "interruption-coupling", "legibility-demotion", "pc-invitation-surface", "third-place-norms"]},
+    {"name": "5 理論・規範", "patterns": ["theory-scaffold", "unmeasured-embodied-return", "authority-return-burden", "non-domination", "digital-nature"]},
+    {"name": "6 肖像・生成芸術", "patterns": ["autographic-book", "data-portrait", "generative-art-process"]},
+    {"name": "7 手跡・タンジビリティ", "patterns": ["rhythm-stage", "tangibility-", "handmark-"]},
+    {"name": "8 打鍵データの公開・再識別", "patterns": ["keystroke-release", "public-keystroke-matching", "length-unicity"]},
+    {"name": "9 AI 疲労", "patterns": ["ai-fatigue"]}
+  ]
+}

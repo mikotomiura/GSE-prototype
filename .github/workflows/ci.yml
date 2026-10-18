@@ -800,6 +800,11 @@ jobs:
         run: python3 -m unittest scripts.tests.test_check_schema_parity
         env:
           PYTHONUTF8: "1"
+      # 文献 DB の作り直し（scripts/refdb/・git もネットも使わない）
+      - name: Literature DB build test
+        run: python3 -m unittest scripts.tests.test_refdb_build
+        env:
+          PYTHONUTF8: "1"
       # ⚠️★★★ **supply-chain 検査器のテストはここでも走らせる** (F-1 / F-2・2026-09-12)。
       #   ★ `supply-chain.yml` にも配線してあるが、あちらは `paths:` 限定なので
       #   **依存や toolchain を触らない PR では 1 度も走らない**。

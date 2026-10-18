@@ -1,0 +1,698 @@
+#!/usr/bin/env python3
+"""文献 DB を作り直す（.steering/20261018-literature-db/）。
+
+正本は各枝の docs/references.md（判断 1）。それを key でまとめ、精読カードでの記述と
+要約（docs/literature/refdb/summaries.json）を重ね、シートの「一覧」へ貼る CSV・
+検索のページ・CSL-JSON・.bib 2 本を作る。シートで人が書いた列（読んだ・メモ）は
+--keep で渡すと key で結び直す。
+
+    python3 scripts/refdb/build.py [--out DIR] [--keep SHEET.csv|SHEET.json] [--fetch]
+
+ネットに出るのは --fetch のときだけ（判断 7）。手順の全体は scripts/refdb/README.md。
+"""
+
+from __future__ import annotations
+
+import argparse
+import collections
+import csv
+import datetime as dt
+import io
+import json
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parent.parent
+DEFAULT_CACHE = Path.home() / ".cache" / "gse-refdb"
+
+COLUMNS = [
+    "ID", "番号の衝突", "名前空間", "著者・題", "出典", "年", "研究の筋", "要約", "特徴",
+    "要約の材料", "カードでの記述", "接地（全文）", "カード", "カード外の引用元", "状態", "枝",
+    "key", "URL",
+]
+NO_SUMMARY_UNCITED = "（要約なし: カードから引かれていない）"
+NO_SUMMARY_CITED = "（要約なし: まだ書いていない）"
+OFF_CARD = "カード外"
+UNCITED = "未引用"
+ORPHAN_STATE = "正本に無い"
+
+EXIT_ORPHANS = 3
+
+ROW_RE = re.compile(r"^\| \[([PV]\d+)\] \| ")
+CITE_RE = re.compile(r"\[([PV]\d+)\]")
+TEMP_RE = re.compile(r"(確定|PLAUSIBLE BUT UNPROVEN|判定不能|否決|confirmed|refuted|3-0|2-1|1-2|0-3)")
+# 頁（pp.1851–1860・7:2072）・論文番号（e2013097118）・範囲の後ろ側（2023–2026）は年にしない
+YEAR_RE = re.compile(r"(?<![0-9A-Za-z./–-])(1[89]\d\d|20[0-4]\d)(?!\d|\.\d)")
+MARKS_RE = re.compile(r"[★⚠️]+")
+ANGLE_URL_RE = re.compile(r"<(https?://[^>\s]+)>")
+
+
+# ---------------------------------------------------------------- 読む元
+
+
+class GitSource:
+    """`git show <枝>:<path>` で読む。作業ツリーは切り替えない。"""
+
+    def __init__(self, repo: Path = REPO):
+        self.repo = repo
+
+    def _git(self, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", "-C", str(self.repo), *args], capture_output=True, text=True)
+
+    def read(self, branch: str, path: str) -> str | None:
+        r = self._git("show", f"{branch}:{path}")
+        return r.stdout if r.returncode == 0 else None
+
+    def ls(self, branch: str, prefix: str, recursive: bool) -> list[str]:
+        args = ["ls-tree", "--name-only"] + (["-r"] if recursive else []) + [branch, "--", prefix]
+        r = self._git(*args)
+        if r.returncode != 0:
+            raise RuntimeError(f"枝を読めない: {branch}（{r.stderr.strip()}）")
+        return [x for x in r.stdout.split("\n") if x]
+
+    def commit(self, branch: str) -> str:
+        r = self._git("rev-parse", branch)
+        if r.returncode != 0:
+            raise RuntimeError(f"枝が無い: {branch}（git fetch を先に）")
+        return r.stdout.strip()
+
+
+class PinnedSource:
+    """枝の名前はそのままに、決めた commit を読む（--pin・実データの照合で 2026-10-18 の時点を読むため）。"""
+
+    def __init__(self, source, pins: dict[str, str]):
+        self.source, self.pins = source, pins
+
+    def read(self, branch: str, path: str) -> str | None:
+        return self.source.read(self.pins.get(branch, branch), path)
+
+    def ls(self, branch: str, prefix: str, recursive: bool) -> list[str]:
+        return self.source.ls(self.pins.get(branch, branch), prefix, recursive)
+
+    def commit(self, branch: str) -> str:
+        return self.source.commit(self.pins.get(branch, branch))
+
+
+class DirSource:
+    """テスト用。<root>/<枝の / を __ にした名前>/ を枝の中身として読む。"""
+
+    def __init__(self, root: Path):
+        self.root = Path(root)
+
+    def _dir(self, branch: str) -> Path:
+        return self.root / branch.replace("/", "__")
+
+    def read(self, branch: str, path: str) -> str | None:
+        p = self._dir(branch) / path
+        return p.read_text(encoding="utf-8") if p.is_file() else None
+
+    def ls(self, branch: str, prefix: str, recursive: bool) -> list[str]:
+        base = self._dir(branch)
+        if not base.is_dir():
+            raise RuntimeError(f"枝を読めない: {branch}")
+        top = base / prefix
+        if not top.exists():
+            return []
+        it = top.rglob("*") if recursive else top.iterdir()
+        return sorted(str(p.relative_to(base)) for p in it if p.is_file())
+
+    def commit(self, branch: str) -> str:
+        return "fixture"
+
+
+# ---------------------------------------------------------------- 1. 書誌と引用
+
+
+def clean(s: str) -> str:
+    s = MARKS_RE.sub("", s).replace("**", "")
+    s = ANGLE_URL_RE.sub(r"\1", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def parse_ref_line(line: str) -> dict | None:
+    """references.md の 1 行。8 列（重複の列あり）と 7 列（なし）を扱い、接地の中の ' | ' は接地に戻す。"""
+    if not ROW_RE.match(line):
+        return None
+    c = [x.strip() for x in line.strip().strip("|").split(" | ")]
+    if len(c) < 7:
+        return None
+    if len(c) == 7:
+        note, dup, st = c[5], "—", c[6]
+    else:
+        note, dup, st = " | ".join(c[5:-2]), c[-2], c[-1]
+    return {
+        "id": c[0].strip("[]"), "key": c[1], "at": c[2], "src": c[3],
+        "url": c[4].strip("<>"), "note": note, "dup": dup, "st": st,
+    }
+
+
+def collect(source, branches: list[str]) -> dict:
+    works: dict[str, dict] = {}
+    idmap: dict[tuple[str, str], str] = {}
+    skipped: list[str] = []
+    for b in branches:
+        text = source.read(b, "docs/references.md")
+        if text is None:
+            raise RuntimeError(f"{b} に docs/references.md が無い")
+        for line in text.split("\n"):
+            if not ROW_RE.match(line):
+                continue
+            r = parse_ref_line(line)
+            if r is None:
+                skipped.append(f"{b}: {line[:80]}")
+                continue
+            idmap[(b, r["id"])] = r["key"]
+            w = works.setdefault(r["key"], {
+                "key": r["key"], "ids": {}, "at": r["at"], "src": r["src"], "url": r["url"],
+                "note": r["note"], "st": r["st"], "branches": [],
+            })
+            w["ids"].setdefault(r["id"], []).append(b)
+            if b not in w["branches"]:
+                w["branches"].append(b)
+    cite: dict[str, set] = collections.defaultdict(set)
+    other: dict[str, set] = collections.defaultdict(set)
+    for b in branches:
+        files = source.ls(b, "docs", True) + source.ls(b, "experiments", True)
+        for f in files:
+            if not f.endswith(".md") or f == "docs/references.md":
+                continue
+            text = source.read(b, f) or ""
+            for i in set(CITE_RE.findall(text)):
+                k = idmap.get((b, i))
+                if not k:
+                    continue
+                if is_card_path(f):
+                    cite[k].add(f.split("/")[-1])
+                else:
+                    other[k].add(f)
+    # 同じ番号が枝によって別の文献を指す（番号の衝突）
+    by_id: dict[str, set] = collections.defaultdict(set)
+    for (b, i), k in idmap.items():
+        by_id[i].add(k)
+    collided = {i for i, ks in by_id.items() if len(ks) > 1}
+    return {
+        "works": works, "idmap": idmap, "skipped": skipped, "collided": collided,
+        "cite": {k: sorted(v) for k, v in cite.items()},
+        "other": {k: sorted(v) for k, v in other.items()},
+    }
+
+
+def is_card_path(f: str) -> bool:
+    return f.startswith("docs/literature/") and not f.endswith("_index.md")
+
+
+# ---------------------------------------------------------------- 2. カードでの記述
+
+
+def collect_claims(source, branches: list[str], idmap: dict) -> dict[str, list[dict]]:
+    out: dict[str, dict] = collections.defaultdict(dict)
+    for b in branches:
+        for f in source.ls(b, "docs/literature/", False):
+            fn = f.split("/")[-1]
+            if not fn.endswith(".md") or fn.startswith("_") or "template" in fn:
+                continue
+            for line in (source.read(b, f) or "").split("\n"):
+                if not (line.startswith("|") or line.startswith("### ")):
+                    continue
+                ids = set(CITE_RE.findall(line))
+                if not ids:
+                    continue
+                if line.startswith("|"):
+                    cells = [c.strip() for c in line.strip().strip("|").split("|")]
+                    if all(set(c) <= set("-: ") for c in cells):
+                        continue
+                    txt = max(cells, key=len)
+                else:
+                    txt = line[4:]
+                t = TEMP_RE.findall(line)
+                temp = t[-1] if t else ""
+                txt = clean(CITE_RE.sub("", txt).replace("`", ""))[:220]
+                for i in ids:
+                    k = idmap.get((b, i))
+                    if k:
+                        out[k][(fn[:8], txt)] = temp
+    return {k: [{"d": d, "t": t, "temp": tp} for (d, t), tp in v.items()] for k, v in out.items()}
+
+
+def card_labels(source, branches: list[str]) -> dict[str, str]:
+    """カードのファイル名 → _index.md の題（60 字まで）。最初に見つけた枝のもの。"""
+    labels: dict[str, str] = {}
+    for b in branches:
+        for line in (source.read(b, "docs/literature/_index.md") or "").split("\n"):
+            m = re.match(r"^\|[^|]*\| ([^|]*) \| \[[^\]]*\]\(([^)]+\.md)\)", line)
+            if m and m.group(2) not in labels:
+                labels[m.group(2)] = clean(m.group(1).replace("`", ""))[:60]
+    return labels
+
+
+# ---------------------------------------------------------------- 4. 行
+
+
+def year_of(src: str) -> int | None:
+    """出典の年。注記（最初の「（」から後）より前の最後の年を採る（頁の 1936–1962 や e2013… を年にしない）。
+    前に無ければ全体の最初の年。"""
+    head = YEAR_RE.findall(re.split(r"（| \(", src, maxsplit=1)[0])
+    if head:
+        return int(head[-1])
+    m = YEAR_RE.findall(src)
+    return int(m[0]) if m else None
+
+
+def fill_url(url: str, key: str) -> str:
+    if url and url != "—":
+        return url
+    t, _, v = key.partition(":")
+    if t == "doi":
+        return "https://doi.org/" + v
+    if t == "arXiv":
+        return "https://arxiv.org/abs/" + v
+    return "" if url == "—" else url
+
+
+def strands_of(cards: list[str], strand_map: list[dict]) -> list[str]:
+    got = []
+    for s in strand_map:
+        if any(any(p in c for p in s["patterns"]) for c in cards):
+            got.append(s["name"])
+    return got
+
+
+def build_rows(data: dict, claims: dict, summaries: dict, labels: dict, cfg: dict) -> list[dict]:
+    short = cfg.get("branch_names", {})
+    rows = []
+    for k, w in data["works"].items():
+        ids = list(w["ids"])
+        cards = data["cite"].get(k, [])
+        other = data["other"].get(k, [])
+        if cards:
+            strands = strands_of(cards, cfg["strands"]) or ["未分類"]
+        else:
+            strands = [OFF_CARD] if other else [UNCITED]
+        s = summaries.get(k)
+        if s:
+            basis = s.get("basis", "")
+        else:
+            basis = NO_SUMMARY_CITED if cards else NO_SUMMARY_UNCITED
+        cc = claims.get(k, [])
+        # 番号が文献の枝の一部にしか無いときは、どの枝の番号かを添える
+        id_labels = [
+            i if len(ids) == 1 or w["ids"][i] == w["branches"]
+            else f"{i}（{', '.join(short.get(b, b) for b in w['ids'][i])}）"
+            for i in ids
+        ]
+        rows.append({
+            "ID": "; ".join(id_labels),
+            "番号の衝突": "あり" if any(i in data["collided"] for i in ids) else "",
+            "名前空間": "".join(sorted({i[0] for i in ids}, key="PV".index)),
+            "著者・題": clean(w["at"]),
+            "出典": clean(w["src"]),
+            "年": year_of(w["src"]) or "",
+            "研究の筋": " / ".join(strands),
+            "要約": s.get("summary", "") if s else "",
+            "特徴": s.get("features", "") if s else "",
+            "要約の材料": basis,
+            "カードでの記述": " ／ ".join(
+                f"{c['d']}・{c['temp']}: {c['t']}" if c["temp"] else f"{c['d']}: {c['t']}" for c in cc
+            ),
+            "接地（全文）": clean(w["note"]),
+            "カード": " / ".join(f"{labels.get(c, c[9:-3])}（{c[:8]}）" for c in cards),
+            "カード外の引用元": " / ".join(o.removeprefix("docs/") for o in other),
+            "状態": clean(w["st"]),
+            "枝": ", ".join(short.get(b, b) for b in w["branches"]),
+            "key": k,
+            "URL": fill_url(w["url"], k),
+            "_cards": cards, "_cc": cc, "_strands": strands, "_other": other,
+        })
+    return rows
+
+
+# ---------------------------------------------------------------- 読んだ・メモの結び直し
+
+
+class OrphanError(Exception):
+    def __init__(self, orphans: list[dict]):
+        super().__init__(f"正本に無い key に読んだ・メモが {len(orphans)} 件ある")
+        self.orphans = orphans
+
+
+def read_keep(path: Path) -> list[list[str]]:
+    """シートの「一覧」。CSV か、Sheets の get_values の返り値（2 次元の配列・{"values": …} も可）。"""
+    text = path.read_text(encoding="utf-8-sig")
+    if path.suffix.lower() == ".json":
+        j = json.loads(text)
+        if isinstance(j, dict):
+            j = j.get("values", [])
+        return [[("" if c is None else str(c)) for c in r] for r in j]
+    return list(csv.reader(io.StringIO(text)))
+
+
+def keep_map(table: list[list[str]], human: list[str]) -> dict[str, dict]:
+    if not table:
+        return {}
+    h = table[0]
+    if "key" not in h:
+        raise ValueError("--keep の表に key の列が無い")
+    ki = h.index("key")
+    cols = [(c, h.index(c)) for c in human if c in h]
+    out = {}
+    for r in table[1:]:
+        if ki >= len(r) or not r[ki]:
+            continue
+        vals = {c: (r[i] if i < len(r) else "") for c, i in cols}
+        # 読んだ はチェックボックスで、付けていない行は FALSE で返る。それは書いた内容に数えない
+        vals = {c: ("" if v.strip().upper() == "FALSE" else v) for c, v in vals.items()}
+        if any(v.strip() for v in vals.values()):
+            out[r[ki]] = vals
+    return out
+
+
+def rejoin(rows: list[dict], kept: dict[str, dict], human: list[str],
+           rekey: dict[str, str], keep_orphans: bool) -> dict:
+    by_key = {r["key"]: r for r in rows}
+    for r in rows:
+        for c in human:
+            r[c] = ""
+    joined, orphans = 0, []
+    for k, vals in kept.items():
+        target = by_key.get(rekey.get(k, k))
+        if target is None:
+            orphans.append({"key": k, **vals})
+            continue
+        for c in human:
+            if vals.get(c):
+                target[c] = vals[c]
+        joined += 1
+    if orphans and not keep_orphans:
+        raise OrphanError(orphans)
+    for o in orphans:
+        r = {c: "" for c in COLUMNS}
+        r.update({"ID": "—", "key": o["key"], "状態": ORPHAN_STATE, "_cards": [], "_cc": [], "_strands": [], "_other": []})
+        for c in human:
+            r[c] = o.get(c, "")
+        rows.append(r)
+    return {"joined": joined, "orphans": len(orphans)}
+
+
+# ---------------------------------------------------------------- 5. CSV・ページ・CSL
+
+
+def write_csv(rows: list[dict], human: list[str], path: Path) -> None:
+    cols = COLUMNS + human
+    with path.open("w", encoding="utf-8-sig", newline="") as fp:
+        wr = csv.writer(fp)
+        wr.writerow(cols)
+        for r in rows:
+            wr.writerow([r.get(c, "") for c in cols])
+
+
+def page_data(rows: list[dict], data: dict, summaries: dict, labels: dict) -> list[dict]:
+    out = []
+    for r in rows:
+        k = r["key"]
+        w = data["works"].get(k)
+        s = summaries.get(k, {})
+        out.append({
+            "id": r["ID"], "coll": r["番号の衝突"] == "あり", "ns": r["名前空間"],
+            "at": r["著者・題"], "src": r["出典"], "yr": r["年"] or None, "strands": r["_strands"],
+            "cards": [{"t": labels.get(c, c[9:-3]), "f": c} for c in r["_cards"]],
+            "other": r["_other"], "st": r["状態"], "br": r["枝"], "key": k, "url": r["URL"],
+            "note": r["接地（全文）"] if w else "", "sum": s.get("summary", ""),
+            "feat": s.get("features", ""), "basis": s.get("basis", ""), "cc": r["_cc"],
+        })
+    return out
+
+
+def write_page(rows, data, summaries, labels, cfg, sub: str, path: Path) -> None:
+    tpl = (HERE / "template.html").read_text(encoding="utf-8")
+    js = lambda o: json.dumps(o, ensure_ascii=False).replace("</", "<\\/")  # noqa: E731
+    strands = [s["name"] for s in cfg["strands"]] + [OFF_CARD, UNCITED]
+    for ph in ("__DATA__", "__STRANDS__", "__SUB__"):
+        if ph not in tpl:
+            raise RuntimeError(f"template.html に {ph} が無い")
+    html = (tpl.replace("__SUB__", sub)
+            .replace("__STRANDS__", js(strands))
+            .replace("__DATA__", js(page_data(rows, data, summaries, labels))))
+    path.write_text(html, encoding="utf-8")
+
+
+CSL_KEEP = ["type", "title", "author", "editor", "container-title", "volume", "issue", "page",
+            "issued", "DOI", "URL", "publisher", "ISBN", "event", "collection-title", "number"]
+CSL_STR = ["title", "container-title", "volume", "issue", "page", "DOI", "URL", "publisher",
+           "ISBN", "event", "collection-title", "number"]
+
+
+def first_str(v):
+    """DataCite 経由で配列や数で来る欄を、先頭の要素の文字列にする。"""
+    while isinstance(v, list):
+        if not v:
+            return None
+        v = v[0]
+    if isinstance(v, dict):
+        return None
+    return None if v is None else str(v)
+
+
+# doi.org は Crossref の型名で返すことがある。CSL の型名に直さないと pandoc がすべて @misc にする
+CROSSREF_TYPES = {
+    "journal-article": "article-journal", "proceedings-article": "paper-conference",
+    "book-chapter": "chapter", "posted-content": "article", "edited-book": "book",
+    "monograph": "book", "reference-entry": "entry", "dissertation": "thesis",
+}
+NAME_PARTS = ["family", "given", "literal", "suffix", "non-dropping-particle", "dropping-particle"]
+
+
+def name_of(a) -> dict | None:
+    """人名は名前の部分だけ残す（Crossref の affiliation・role の入れ子を pandoc に渡さない）。"""
+    if not isinstance(a, dict):
+        return None
+    n = {k: first_str(a[k]) for k in NAME_PARTS if k in a and first_str(a[k])}
+    return n or None
+
+
+def fix_issued(v) -> dict | None:
+    """date-parts の null や文字を外し、数だけ残す。空なら None（欄ごと外す）。"""
+    if not isinstance(v, dict):
+        return None
+    parts = []
+    for dp in v.get("date-parts") or []:
+        if not isinstance(dp, list):
+            continue
+        nums = []
+        for x in dp:
+            if isinstance(x, bool):
+                break
+            if isinstance(x, int):
+                nums.append(x)
+            elif isinstance(x, str) and x.strip().isdigit():
+                nums.append(int(x))
+            else:
+                break
+        if nums:
+            parts.append(nums)
+    return {"date-parts": parts} if parts else None
+
+
+def csl_item(r: dict, raw: dict | None, cite_key: str, summary: str) -> tuple[dict, bool]:
+    item: dict = {"id": cite_key}
+    from_cache = bool(raw) and "_err" not in raw
+    if from_cache:
+        for f in CSL_KEEP:
+            if f not in raw:
+                continue
+            v = raw[f]
+            if f == "type":
+                v = first_str(v)
+                v = CROSSREF_TYPES.get(v, v)
+            elif f in CSL_STR:
+                v = first_str(v)
+            elif f == "issued":
+                v = fix_issued(v)
+            elif f in ("author", "editor"):
+                v = [n for n in (name_of(a) for a in v) if n] if isinstance(v, list) else None
+            if v:
+                item[f] = v
+    if "title" not in item:
+        at = r["著者・題"]
+        item["title"] = at.split(" — ", 1)[1] if " — " in at else at
+        if " — " in at:
+            item.setdefault("author", [{"literal": at.split(" — ", 1)[0]}])
+        if r["出典"]:
+            item.setdefault("container-title", r["出典"])
+        if r["年"]:
+            item.setdefault("issued", {"date-parts": [[int(r["年"])]]})
+        if r["URL"]:
+            item.setdefault("URL", r["URL"])
+        if r["key"].startswith("doi:"):
+            item.setdefault("DOI", r["key"][4:])
+        item.setdefault("type", "document")
+    item.setdefault("type", "document")
+    if r["研究の筋"]:
+        item["keyword"] = r["研究の筋"].replace(" / ", ", ")
+    item["note"] = f"GSE {r['ID']}" + (f" ｜ {summary}" if summary else "")
+    return item, from_cache
+
+
+def build_csl(rows: list[dict], csl_raw: dict, summaries: dict) -> tuple[list[dict], dict]:
+    items, used, n_cache = [], set(), 0
+    for r in rows:
+        if r["状態"] == ORPHAN_STATE:
+            continue
+        ck = r["ID"].split("; ")[0].split("（")[0]
+        if ck in used:
+            ck = ck + "_" + re.sub(r"[^A-Za-z0-9]", "", r["key"])[-8:]
+        used.add(ck)
+        it, hit = csl_item(r, csl_raw.get(r["key"]), ck, summaries.get(r["key"], {}).get("summary", ""))
+        n_cache += hit
+        items.append(it)
+    return items, {"csl_from_cache": n_cache, "csl_minimal": len(items) - n_cache}
+
+
+def write_bib(csl_path: Path, out_base: Path) -> dict:
+    pandoc = shutil.which("pandoc")
+    if not pandoc:
+        raise RuntimeError("pandoc が無い（brew install pandoc・または --no-bib）")
+    counts = {}
+    for fmt in ("biblatex", "bibtex"):
+        p = out_base.parent / f"{out_base.name}_{fmt}.bib"
+        r = subprocess.run([pandoc, "-f", "csljson", "-t", fmt, str(csl_path), "-o", str(p)],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError(f"pandoc（{fmt}）が失敗: {r.stderr.strip()[:300]}")
+        counts[fmt] = len(re.findall(r"^@\w+\{", p.read_text(encoding="utf-8"), re.M))
+    return counts
+
+
+# ---------------------------------------------------------------- 要約が無いもの
+
+
+def missing_summaries(rows: list[dict], data: dict, summaries: dict, abstracts: dict) -> list[dict]:
+    out = []
+    for r in rows:
+        k = r["key"]
+        if not r["_cards"] or k in summaries:
+            continue
+        a = abstracts.get(k, {}) or {}
+        out.append({
+            "key": k, "id": r["ID"], "title": r["著者・題"], "venue": r["出典"],
+            "abstract": (a.get("abs") or "")[:3000], "gse_note": r["接地（全文）"][:700],
+        })
+    return out
+
+
+# ---------------------------------------------------------------- 全体
+
+
+def load_json(p: Path, default):
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
+
+
+def run(args, source=None) -> int:
+    cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
+    branches = args.branches.split(",") if args.branches else cfg["branches"]
+    human = cfg.get("human_columns", ["読んだ", "メモ"])
+    source = source or GitSource()
+    pins = dict(x.split("=", 1) for x in (args.pin or []))
+    if pins:
+        source = PinnedSource(source, pins)
+    cache = Path(args.cache).expanduser()
+    today = args.date or dt.date.today().isoformat()
+    out = Path(args.out).expanduser() if args.out else cache / "out" / today
+    summaries_path = Path(args.summaries)
+
+    data = collect(source, branches)
+    summaries = load_json(summaries_path, {})
+    if args.fetch:
+        import fetch  # noqa: PLC0415  ネットに出るのはここだけ
+        cited = [k for k in data["works"] if k in data["cite"]]
+        fetch.fetch_abstracts(cited, cache / "abstracts.json")
+        fetch.fetch_csl(list(data["works"]), cache / "csl_raw.json")
+    abstracts = load_json(cache / "abstracts.json", {})
+    csl_raw = load_json(cache / "csl_raw.json", {})
+
+    claims = collect_claims(source, branches, data["idmap"])
+    labels = card_labels(source, branches)
+    rows = build_rows(data, claims, summaries, labels, cfg)
+
+    rekey = dict(x.split("=", 1) for x in (args.rekey or []))
+    rj = {"joined": 0, "orphans": 0}
+    if args.keep:
+        kept = keep_map(read_keep(Path(args.keep).expanduser()), human)
+        try:
+            rj = rejoin(rows, kept, human, rekey, args.keep_orphans)
+        except OrphanError as e:
+            print(f"止めた: {e}。--rekey 旧=新 で対応を渡すか、--keep-orphans で末尾に残す。", file=sys.stderr)
+            for o in e.orphans:
+                print("  " + json.dumps(o, ensure_ascii=False), file=sys.stderr)
+            return EXIT_ORPHANS
+    else:
+        for r in rows:
+            for c in human:
+                r[c] = ""
+
+    out.mkdir(parents=True, exist_ok=True)
+    base = out / f"GSE文献DB_{today}"
+    write_csv(rows, human, base.with_name(base.name + ".csv"))
+    n = sum(1 for r in rows if r["状態"] != ORPHAN_STATE)
+    sub = f"{len(branches)} 枝の docs/references.md を key でまとめた {n} 件・{today} 時点の写し"
+    write_page(rows, data, summaries, labels, cfg, sub, base.with_name(base.name + ".html"))
+    items, csl_counts = build_csl(rows, csl_raw, summaries)
+    csl_path = base.with_name(base.name + ".csl.json")
+    csl_path.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+    bib = {} if args.no_bib else write_bib(csl_path, base)
+    missing = missing_summaries(rows, data, summaries, abstracts)
+    (out / "missing_summaries.json").write_text(json.dumps(missing, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    manifest = {
+        "date": today,
+        "branches": {b: source.commit(b) for b in branches},
+        "works": n,
+        "card_cited": sum(1 for r in rows if r["_cards"]),
+        "summaries": sum(1 for r in rows if r["key"] in summaries),
+        "claims_works": sum(1 for r in rows if r["_cc"]),
+        "claims_lines": sum(len(r["_cc"]) for r in rows),
+        "collided_ids": len(data["collided"]),
+        "missing_summaries": len(missing),
+        "skipped_lines": data["skipped"],
+        **csl_counts, "bib": bib, "kept": rj,
+    }
+    (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"出力: {out}")
+    print(f"文献 {n}・要約 {manifest['summaries']}・カードでの記述 {manifest['claims_works']} 件"
+          f"（{manifest['claims_lines']} 行）・番号の衝突 {manifest['collided_ids']}・要約が無いカード引用 {len(missing)}")
+    print(f"CSL: キャッシュから {csl_counts['csl_from_cache']}・最小限で作った {csl_counts['csl_minimal']}"
+          + (f"・.bib {bib}" if bib else ""))
+    if args.keep:
+        print(f"読んだ・メモ: {rj['joined']} 件を結び直した・正本に無い {rj['orphans']} 件")
+    if data["skipped"]:
+        print(f"読めなかった行 {len(data['skipped'])} 件（manifest.json の skipped_lines）", file=sys.stderr)
+    return 0
+
+
+def parse_args(argv=None):
+    p = argparse.ArgumentParser(description="文献 DB を作り直す（scripts/refdb/README.md）")
+    p.add_argument("--config", default=str(HERE / "config.json"))
+    p.add_argument("--branches", help="読む枝をカンマ区切りで（設定を上書き）")
+    p.add_argument("--pin", action="append", metavar="枝=commit", help="その枝を決めた commit で読む（何度でも）")
+    p.add_argument("--out", help="出力先（既定 ~/.cache/gse-refdb/out/<日付>/）")
+    p.add_argument("--date", help="ファイル名と manifest の日付（既定は今日）")
+    p.add_argument("--keep", help="シートの「一覧」（CSV か get_values の JSON）。読んだ・メモを key で結び直す")
+    p.add_argument("--rekey", action="append", metavar="旧=新", help="消えた key の付け替え（何度でも）")
+    p.add_argument("--keep-orphans", action="store_true", help="正本に無い key のメモを末尾に残す")
+    p.add_argument("--fetch", action="store_true", help="抄録と CSL を足りない分だけ取りに行く（ネットに出る）")
+    p.add_argument("--cache", default=str(DEFAULT_CACHE))
+    p.add_argument("--summaries", default=str(REPO / "docs" / "literature" / "refdb" / "summaries.json"))
+    p.add_argument("--no-bib", action="store_true", help=".bib を作らない（pandoc が無いとき）")
+    return p.parse_args(argv)
+
+
+if __name__ == "__main__":
+    sys.path.insert(0, str(HERE))
+    try:
+        sys.exit(run(parse_args()))
+    except RuntimeError as e:
+        print(f"エラー: {e}", file=sys.stderr)
+        sys.exit(2)

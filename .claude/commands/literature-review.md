@@ -206,6 +206,7 @@ ADR / preregistration に影響する場合は、該当 ADR の「根拠」節�
 - [ ] gate 用途なら **go / no-go / de-risk 先行**のいずれかを明言した
 - [ ] ⚠️ `python3 scripts/check_citations.py` が **`=== 違反なし ===`** で終わった（★ 下記 2）
 - [ ] ⚠️ **このラウンドを単独でコミットした**（★ 下記 1）
+- [ ] 文献 DB を作り直し、新しい書誌の要約を足して、シートと検索のページに反映した（下記 3）
 
 ## ★ ラウンドを閉じる（⚠️ 次ラウンドを始める前に）
 
@@ -233,6 +234,21 @@ python3 scripts/check_citations.py
 > **`=== VIOLATION N 件 ===` として全件出力する**（★ 早期 `break` / `return` は無い）。
 > → ★ 繰り返すのは **「打ち切られるから」ではなく「是正が新しい違反を生むから」**である。
 
+### 3. 文献 DB を作り直す（1 と 2 の後に）
+
+`references.md` に足した書誌を、スプレッドシート「GSE 文献DB」・検索のページ・`.bib` に反映する。手順の詳細は `scripts/refdb/README.md`（以下はその順番だけ）。
+
+1. 読む枝を決める。`build.py` は `git show <枝>:docs/references.md` で読むので、作業ツリーの未コミットの変更は読まない（1 のコミットが先）。
+   - この枝を push 済みなら `git fetch origin` し、`scripts/refdb/config.json` の `branches` に `origin/<この枝>` があるか見る。無ければ足す（main に入ったら外す）。
+   - push 前なら、`--branches` に config の枝の一覧を渡し、その中の `origin/<この枝>` をローカルの枝名 `<この枝>` に置き換える。`--branches` は config の `branches` を丸ごと置き換えるので、ほかの枝も全部書く。
+2. シートの「一覧」の値を読む（Sheets の `get_values`・範囲 `一覧!A1:T`）。返った JSON をファイルに書く。読んだ・メモを消さないため、これを飛ばさない。
+3. 試しに回す: `python3 scripts/refdb/build.py --fetch --keep <2 のファイル>`（`--out` を付けないので出力は `~/.cache/gse-refdb/out/<日付>/`）。回すのは、この試しと 5 の本番の 2 回で、引数は `--out` のほかは同じにする。`pandoc` が無いと `.bib` で止まるので、そのときは `brew install pandoc` を研究者に頼むか、試しだけ `--no-bib` を付ける。
+   - 終了コードを見るので、出力を `| tail` などのパイプに通さない。
+   - 終了コード 3 で止まったら、表示された key のメモを `--rekey 旧=新` か `--keep-orphans` で扱う。どちらにするかは研究者に聞き、答えを足して試しを回し直す。key を直す場所は `references.md` だけで、シートの key を手で直さない。止まった回は `manifest.json` が出ないので、報告には止まった理由と聞いた問いを書く。
+4. `missing_summaries.json` が空でなければ、`scripts/refdb/summary_prompt.md` の依頼文で要約を書かせ、`merge_summaries.py` で検査して `--write` で足す。「数値を目で確かめる」に出たものは目で見る。`summaries.json` の変更はこのラウンドの後に別のコミットにする。
+5. `--out` に Drive のフォルダ GSE を渡して作り直し、README §2 の手順でシートの「一覧」を差し替え、§4 で検索のページを同じ URL に出し直す。
+6. 報告に `manifest.json` の件数（文献・要約・カードでの記述・要約が無いもの・CSL を最小限で作った数・結び直した読んだ・メモ）を書く。
+
 ## アンチパターン
 
 - ❌ RQ を分解せず 1 問のまま検索する（温度が平均化されて gate 判定を誤る）
@@ -246,6 +262,8 @@ python3 scripts/check_citations.py
 - ❌ 未確認の DOI / URL を書く（`provisional` で登録して確認に回す）
 - ❌ 既存 [n] を renumber する / 削除する（inline 番号が全部ずれる）
 - ❌ 凍結済み preregistration を本コマンドで書き換える
+- ❌ シートの「一覧」を読まずに文献 DB を作り直して貼る（読んだ・メモが消える）
+- ❌ シートの値を `references.md` へ書き戻す（書誌の正本は `references.md`）
 
 ## 関連
 
