@@ -7,11 +7,13 @@
 set -u
 cd "$(dirname "$0")/.."
 PYK="${PYK:-$HOME/.venvs/pkm-keytar/Scripts/python}"
+# A4_SCRIPT=scripts/a4_keytar_cpu_fallback.py adds the CPU fallback of deviation D3 (notes.md)
+A4_SCRIPT="${A4_SCRIPT:-scripts/a4_keytar.py}"
 LOG=raw/derived_a4_progress.log
 for attempt in $(seq 1 200); do
   until nvidia-smi -L >/dev/null 2>&1; do echo "$(date -u +%FT%TZ) GPU not visible; waiting" >> "$LOG"; sleep 300; done
   echo "$(date -u +%FT%TZ) attempt $attempt" >> "$LOG"
-  "$PYK" -I scripts/a4_keytar.py --root raw/klicke/extracted/WritingTask \
+  "$PYK" -I "$A4_SCRIPT" --root raw/klicke/extracted/WritingTask \
       --model raw/keytar/extracted/data_artifact/data/key_ground_truth_olmo \
       --out-dir raw/derived/a4 --summary results/a4_generation.json >> "$LOG" 2>&1
   code=$?
