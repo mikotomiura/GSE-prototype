@@ -17,16 +17,20 @@
 
 ## 外にあるもの
 
-- スプレッドシート「GSE 文献DB」: https://docs.google.com/spreadsheets/d/1v7frJm2a6BkXzepEpglB62AT_2c3t0NzJ2mNA8UfRFw/edit （シート: 検索・集計・一覧・凡例。「一覧」のシート ID は 2123943520）
+- **文献 DB の本体はスプレッドシート「GSE 文献DB」**: https://docs.google.com/spreadsheets/d/1v7frJm2a6BkXzepEpglB62AT_2c3t0NzJ2mNA8UfRFw/edit （シート: 検索・集計・一覧・凡例。「一覧」のシート ID は 2123943520）。CSV はこのシートへ値を流し込むための受け渡し用で、DB ではない（§2）
 - 検索のページ: https://claude.ai/artifact/Js8ZBgzkWAZBHdgrzqjwSA （同じ URL に出し直す）
-- 書誌のファイルと CSV: Google Drive のフォルダ GSE（手元では Drive for desktop の同期フォルダ。パスにメールアドレスが入るので、ここには書かない）
-- フォルダ GSE のサブフォルダ「文献DB」: 2026-10-18 に手で作った版（`GSE文献DB_2026-10-18.csv`・`GSE文献DB_v2_2026-10-18.csv`・`.csl.json`・`.bib` 2 本）と、最初の差し替えの前の「一覧」の書き出し（`一覧_差し替え前_2026-10-18.csv`）。§6 の照合の正解はここにある
+- Google Drive のフォルダ GSE の中の「文献DB」（手元では Drive for desktop の同期フォルダ。パスにメールアドレスが入るので、ここには書かない。2026-10-18 に研究者が決めた並べ方）:
+  - `文献DB/`: スプレッドシート「GSE 文献DB」と、書誌のファイル（`.bib` 2 本・`.csl.json`）と検索のページの `.html` の最新版
+  - `文献DB/作業/`: `build.py` の出力先（CSV・`manifest.json`・`missing_summaries.json` と、上の成果物の元）
+  - `文献DB/作業/手作り_2026-10-18/`: 2026-10-18 に手で作った版（`GSE文献DB_2026-10-18.csv`・`GSE文献DB_v2_2026-10-18.csv`・`.csl.json`・`.bib` 2 本）と、最初の差し替えの前の「一覧」の書き出し（`一覧_差し替え前_2026-10-18.csv`）。§6 の照合の正解はここにある
 
 ## 1. 作り直す
 
 ```bash
 git fetch origin                                  # build.py は fetch しない
-python3 scripts/refdb/build.py --keep <シートの一覧.json> --out "<Drive のフォルダ GSE>"
+python3 scripts/refdb/build.py --keep <シートの一覧.json> --out "<文献DB/作業>"
+python3 scripts/refdb/build.py --verify "<文献DB/作業>"     # 「揃っている」を確かめる
+cp "<文献DB/作業>"/GSE文献DB_<日付>{.html,.csl.json,_biblatex.bib,_bibtex.bib} "<文献DB>"/
 ```
 
 - 読む枝は `config.json` の `branches`。作業中の枝を足すときは `config.json` に足すか、`--branches origin/main,origin/docs/x` で一時的に上書きする。枝が main に入ったら設定から外す（判断 5）。
@@ -53,7 +57,7 @@ python3 scripts/refdb/build.py --keep <シートの一覧.json> --out "<Drive �
 
 906 行を Sheets の API で送ると量が大きすぎるので、CSV を Drive で変換して写す（memory `abstract-sources-and-drive-ids`）。
 
-1. `--out` で Drive の同期フォルダ GSE に CSV を書く（§1）。
+1. `--out` で `文献DB/作業` に CSV を書く（§1）。
 2. Chrome で Drive のその CSV を開き、「Google スプレッドシートで開く」を押す。同じフォルダに一時のシートができる。
 3. 一時のシートの最初のシートを、`copy_sheet_to_another_spreadsheet` で「GSE 文献DB」へ写す。
 4. 「一覧」の `A2:T` を消してから（行が減ったとき古い行が残らないように）、写したシートの値を `copyPaste`（`PASTE_VALUES`）で「一覧」の `A1` へ貼る。
@@ -82,11 +86,11 @@ python3 scripts/refdb/build.py --keep <シートの一覧.json> --out "<Drive �
 
 ## 5. 書誌のファイル
 
-`.bib` 2 本と `.csl.json` は §1 の `--out` でフォルダ GSE に出る。引用キーは最初の番号（例 `P534`）。番号の衝突で重なるときは key の末尾 8 字を足す（例 `P485_okp7zsv1`）。`keyword` に研究の筋、`note` に「GSE <ID> ｜ <要約>」。
+`.bib` 2 本と `.csl.json` は §1 で `文献DB/作業` に出て、`文献DB` へ写す。引用キーは最初の番号（例 `P534`）。番号の衝突で重なるときは key の末尾 8 字を足す（例 `P485_okp7zsv1`）。`keyword` に研究の筋、`note` に「GSE <ID> ｜ <要約>」。
 
 ## 6. 2026-10-18 の版との照合
 
-2026-10-18 に手で作った版（フォルダ GSE のサブフォルダ「文献DB」の `GSE文献DB_v2_2026-10-18.csv` ほか）と同じ時点を読むには:
+2026-10-18 に手で作った版（`文献DB/作業/手作り_2026-10-18/` の `GSE文献DB_v2_2026-10-18.csv` ほか）と同じ時点を読むには:
 
 ```bash
 python3 scripts/refdb/build.py --date 2026-10-18 \
