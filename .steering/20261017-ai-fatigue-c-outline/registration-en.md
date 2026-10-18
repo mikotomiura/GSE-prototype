@@ -99,6 +99,7 @@ The third point was checked in 16 searches of free sources (Europe PMC, OpenAlex
 - **2026-10-16.** The narrative review draft was revised.
 - **2026-10-17.** The item coding of 2026-10-15 was corrected after an internal review, and codebook version 2 was written. Version 2 was therefore written after the exploration results were seen.
 - **2026-10-17.** The source database's final decisions on the 34 records were set: 10 primary studies included, 3 pending for unavailable full text, 21 excluded. These 10 studies and the four instruments form the exploration set (GSRR-39).
+- **2026-10-18.** The full text of one pending record (AF002) was obtained, and author 1 judged it from the full text: included, centre-A. Under GSRR-32 it joins the exploration set, which now has 11 primary studies; 2 records remain pending for unavailable full text. The check of the AI screener on the 34 records (attachment 6, `check-34.csv`) was made against the decisions of 2026-10-17 and is left as it was.
 - **2026-10-17 and 2026-10-18.** The instructions for the AI screener (attachment 6) were written from the source database's criteria and then applied to the 34 exploratory records, in three rounds; between the rounds one question was clarified and web access was removed (GSRR-37). The AI screener has not judged any additional candidate. A database of the 264 additional candidates (bibliographic data, abstracts and free full texts, with no judgements) was built for screening.
 
 **[GSRR-11] Primary research questions.** All primary answers come from the main set. They are descriptive (GSRR-57).
@@ -181,7 +182,7 @@ No paid databases were used.
 - The source database collected 225 records, which became 220 after merging versions, plus one record added by hand. These 221 are part of the additional candidates (next item). On 2026-10-17, author 1 had screened 79 of them: 71 at title and abstract level, and 8 at full-text level (4 excluded, 4 pending; none included). These earlier judgements are not used: all 264 additional candidates are screened again after registration (GSRR-33).
 - The review-aimed search produced a list of 46 records, separate from the 221. Three of them are also in the 34-record bibliography or the 221. The other 43 were unscreened on 2026-10-17. In this protocol, "additional candidates" means the 221 and these 43 (264 records).
 - A planned systematic search for the source database has not been run. If it runs, its new records are candidates on the same terms: those with a final decision by 2026-12-31 enter the main set, later ones the late stratum (GSRR-39).
-- The three exploratory records pending for unavailable full text join the exploration set if their full texts are obtained and they are included. They are never part of the main set.
+- The exploratory records pending for unavailable full text (three on 2026-10-17; two since AF002 was included on 2026-10-18) join the exploration set if their full texts are obtained and they are included. They are never part of the main set.
 
 ## Screening (eligibility)
 

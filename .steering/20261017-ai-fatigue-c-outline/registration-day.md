@@ -8,7 +8,7 @@
    - 登録に載せる名前（英語）・所属・ORCID
    - 2 人目のコードを全件にするか 2 割にするか。これは本番のコードの前（2027 年 1 月）まででよく、登録の時点では要らない。
 2. OSF の全文 3 件（R02・R22・R35）は 2026-10-18 に取り直した（OSF の登録の書式を API から組み立てた・判断 36）。済み。
-   - 全文や抄録を足したら、`uv run --with openpyxl python update_trace_db.py --source-db ~/Downloads/AI_fatigue_database_2026-10-16_judge2.xlsx` を 1 回打つ。Drive の `AI-fatigue/TRACE/fulltext` への写し・同期待ち・Drive のリンクの表・2 冊の DB（判定者 1 用は記入を引き継ぐ）までを行う（判断 36）。抄録を差し替えたら、先に `ja.json` の訳を足す。
+   - 全文や抄録を足したら、`uv run --with openpyxl python update_trace_db.py` を 1 回打つ。Drive の `AI-fatigue/TRACE/fulltext` への写し・同期待ち・Drive のリンクの表・2 冊の DB（判定者 1 用は記入を引き継ぐ）までを行う（判断 36）。抄録を差し替えたら、先に `ja.json` の訳を足す。
    - 判定者 1 の DB を Excel で開いたまま作り直さない（閉じてから打つ）。
 
 ## 当日（メイン）

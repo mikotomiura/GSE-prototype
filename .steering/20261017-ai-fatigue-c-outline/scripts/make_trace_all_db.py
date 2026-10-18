@@ -1,9 +1,11 @@
 """Make the whole TRACE database (xlsx): the 34 exploratory records and the 264 additional candidates in one book
 (decision 36). It is for reading; nobody screens in it.
 
-The 34 exploratory records carry the final decisions of the source database: decision and centre from
-registration-attachments/ai-screening/check-34.csv (AF006 included, AF024 excluded, decision 4), the exclusion
-code from the source database's sheet 'スクリーニング'. The 264 additional candidates carry no decision: they are
+The 34 exploratory records carry the final decisions of the source database (sheet 'スクリーニング': the column
+'最終判定', the exclusion code of '除外理由' and the centre written as '用途: 中心-A/B' in '自由記入'). The final
+version is AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx (AF002 included on 2026-10-18 from its full text,
+decision 37). The decisions differing from registration-attachments/ai-screening/check-34.csv (the decisions as of
+2026-10-17, against which the AI screener was checked) are printed and noted in the book. The 264 additional candidates carry no decision: they are
 screened only after registration, in author 1's workbook (make_trace_db.py), and this book holds none of author 1's,
 the AI screener's or author 2's judgements. Full-text links of the 264 are left out, so that the book cannot be a
 way round GSRR-33 (no full text before a batch's stage 1 is committed); they are in author 1's workbook.
@@ -11,12 +13,12 @@ way round GSRR-33 (no full text before a batch's stage 1 is committed); they are
 Inputs (outside the repository, except check-34.csv):
     <data>/records264.json, meta.json, ja.json       as for make_trace_db.py
     <data>/ja34.json (optional)                      machine translations of the 34 titles and abstracts
-    --source-db   the source database with the two screeners' workbooks (AI_fatigue_database_2026-10-16_judge2.xlsx)
+    --source-db   the source database, final version (AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx)
     --abstracts34 the stage-1 inputs of the check on the 34 records (<ID>.stage1.txt), which hold the abstracts
 
 Run (openpyxl via uv):
     uv run --with openpyxl python make_trace_all_db.py --data ~/Documents/TRACE/data \
-        --source-db ~/Downloads/AI_fatigue_database_2026-10-16_judge2.xlsx \
+        --source-db "$TRACE_DRIVE/../AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx" \
         --abstracts34 ~/TRACE-screening/check34-r3/in --out "$TRACE_DRIVE/TRACE_database_all.xlsx"
     --dump34 <file> writes the 34 records (title and abstract) as JSON, the input of the translation.
 """
@@ -37,7 +39,6 @@ from openpyxl import Workbook
 TASK = Path(__file__).resolve().parent.parent
 CHECK34 = TASK / "registration-attachments" / "ai-screening" / "check-34.csv"
 DECISION = {"include": "含める", "exclude": "除外", "pending": "保留"}
-CENTRE = {"centre-A": "中心-A", "centre-B": "中心-B"}
 NO_ABSTRACT = "（抄録なし: どの出どころにも見つからなかった。題名だけで判定する）"
 
 
@@ -70,27 +71,43 @@ def records34(source_db, abstracts_dir):
     bib, scr = sheet(wb, "文献DB"), sheet(wb, "スクリーニング")
     with open(CHECK34, encoding="utf-8") as f:
         human = {r["record_id"]: r for r in csv.DictReader(f)}
-    if set(human) != set(bib):
+    if not set(human) == set(bib) == set(scr):
         raise SystemExit(f"check-34.csv and the source database list different records: {sorted(set(human) ^ set(bib))}")
     out = []
     for rid in sorted(human):
-        b, h = bib[rid], human[rid]
-        dec = DECISION[h["human_final"]]
-        code = ""
+        b, s = bib[rid], scr[rid]
+        dec = str(s.get("最終判定") or "").strip()
+        if dec not in DECISION.values():
+            raise SystemExit(f"{rid}: 最終判定 {dec!r} is not 含める, 除外 or 保留")
+        code, centre = "", ""
         if dec == "除外":
-            m = re.search(r"E\d", str(scr.get(rid, {}).get("除外理由") or ""))
+            m = re.search(r"E\d", str(s.get("除外理由") or ""))
             code = m.group(0) if m else ""
+        if dec == "含める":
+            m = re.search(r"用途: (中心-[AB])", str(s.get("自由記入") or ""))
+            if m:
+                centre = m.group(1)
+            elif human[rid]["human_final"] == "include":  # decided by the researcher (AF006, decision 4)
+                centre = {"centre-A": "中心-A", "centre-B": "中心-B"}[human[rid]["human_centre"]]
+            else:
+                raise SystemExit(f"{rid}: included, with no centre in 自由記入 or check-34.csv")
         ab, src = abstract34(os.path.join(os.path.expanduser(abstracts_dir), f"{rid}.stage1.txt"))
         note = ""
         if rid == "AF006":
             note = "最終判定: 要協議の後、研究者が含めると決めた（2026-10-17・判断 4）。"
         if rid == "AF024":
             note = "最終判定: 要協議の後、研究者が除外と決めた（2026-10-17・判断 4）。除外理由は判定者 2 の推奨（E2）。"
+        if dec != DECISION[human[rid]["human_final"]]:
+            print(f"{rid}: {DECISION[human[rid]['human_final']]} in check-34.csv (2026-10-17) -> {dec} in the final version")
+            note = (note + " ").lstrip() + (f"2026-10-17 の最終判定（AI の選別者の確かめの相手・check-34.csv）は"
+                                            f"{DECISION[human[rid]['human_final']]}。")
+        if rid == "AF002":
+            note += "2026-10-18 に研究者が共有した出版社の版の全文で判定者 1 が判定し直し、含める（中心-A）にした（E6 の理由がなくなった）。"
         doi = str(b.get("DOI") or "")
         out.append({"id": rid, "title": str(b.get("論文タイトル") or ""), "authors": str(b.get("著者（短縮表示）") or ""),
                     "year": b.get("巻号年"), "journal": str(b.get("掲載誌・媒体") or ""),
                     "doi": doi if doi.startswith("10.") else "", "abstract": ab, "abstract_source": src,
-                    "decision": dec, "code": code, "centre": CENTRE.get(h["human_centre"], ""), "note": note})
+                    "decision": dec, "code": code, "centre": centre, "note": note})
     return out
 
 
@@ -140,8 +157,8 @@ def main():
     st.intro(wb.active, "TRACE｜全体の文献 DB（探索 34 件＋追加候補 264 件）",
              f"作成 {datetime.date.today().isoformat()}・{len(rows)} 件・読むための一覧で、ここでは判定しない", [
         ("中身", [
-            f"探索の 34 件（AF001〜AF034）: 元の文献 DB の最終判定（含める {n34['含める']}・保留 {n34['保留']}・除外 {n34['除外']}）。"
-            "判定者 1 と 2 の合意で、要協議の 2 件は研究者が決めた（AF006 含める・AF024 除外）。中心は 2 人の判定。",
+            f"探索の 34 件（AF001〜AF034）: 元の文献 DB の最終版（2026-10-18）の最終判定（含める {n34['含める']}・保留 {n34['保留']}・除外 {n34['除外']}）。"
+            "判定者 1 と 2 の合意で、要協議の 2 件は研究者が決めた（AF006 含める・AF024 除外）。AF002 は全文を得て 2026-10-18 に含めた。",
             f"追加候補の {len(recs)} 件: 判定は空欄。登録の後に判定者 1・AI・共著者が判定する。",
         ]),
         ("この冊に入れていないもの", [

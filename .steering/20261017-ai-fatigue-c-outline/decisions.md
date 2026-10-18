@@ -451,3 +451,13 @@
 - OSF の全文 3 件: OSF が戻った（API が応答）。R02（vg4f7）と R35（3gzy2）はシステマティックレビューの登録、R22（5ts3f）は OSF の事前登録で、どれも論文のファイルが無く、登録の書式そのものが文書。R40（INPLASY の登録・PDF）と同じく、登録の中身を全文として保存した。`scripts/osf_registration_html.py` が OSF の API から、書式の見出し・問い・登録者の答え（逐語）を HTML に組み立てる（書式の説明文と選ばれなかった選択肢は除く。API から組み立てたことをページに書く）。`chrome_status.json` に取り方を「OSF API」と書いた（控え: `backup/chrome_status.before-osf-2026-10-18.json`）。全文は 206 → 209 件。
 - 1 本の手順: `scripts/update_trace_db.py`（全文を Drive へ写す〔消さない〕→ Drive の ID を待つ → `drive_links.py` → 2 冊の DB）。
 - 添付 6 の目録（`hash_attachments.py`）には足さない: `make_trace_all_db.py`（読むための冊で、選別に使わない）・`osf_registration_html.py`（全文の取り方）・`update_trace_db.py`（手順のまとめ）。添付 6 の `c_screening.py`・`make_trace_db.py` の中身は変わったので、ハッシュは登録の日に取り直す（登録の日の手順どおり）。
+
+## 判断 37: AF002 の全文と、元の文献 DB の最終版（2026-10-18・研究者）
+
+- 研究者（逐語）「'/Users/johnd/Downloads/AF002_Yang_2026.pdf'AF002ゲットしたよ.あとは、AI疲労DBの最終的な結果はこれになります'/Users/johnd/Downloads/AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx'」
+- 元の文献 DB の最終版: `AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx`（SHA-256 `9c637759ec167d16…`）。Drive の `AI-fatigue/` にも同じもの（ハッシュ一致）。前の `AI_fatigue_database_2026-10-16_judge2.xlsx` は Downloads にも Drive にも見当たらなかった。シートの構成は前と同じ。
+- 最終判定の違い（メインが一次で確かめた）: 『スクリーニング』の最終判定を `check-34.csv` の human_final と比べると、違うのは AF002 だけ（保留 E6 → 含める・中心-A）。判定者 1 が、研究者が共有した出版社の版の全文（`AF002_Yang_2026.pdf`・SHA-256 `2f59c99fed3f5f67…`）で判定し直した記録が『自由記入』『判定者1_全文抽出』『判定者1_品質評価』にある。判定者 2 は全文を見ておらず（合意の列は保留のまま）、全文で照合した後に中心-A として採ることを勧めていた。AF006・AF024 は前のとおり（判断 4）。
+- 探索の集合: 含める 11（中心-A 8・中心-B 3）・保留 2（AF003・AF009）・除外 21。登録版の GSRR-32 に「保留の記録は全文が得られて含めれば探索の集合に入る（主の集合には入らない）」とすでに書いてあるので、規則どおりの出来事として登録版の時系列（2026-10-18）と GSRR-32 の数を足した。`outline.md` の材料の集合の行も足した。
+- `check-34.csv`（添付 6・AI の選別者の確かめ）は 2026-10-17 の最終判定を相手にした記録なので書き換えない（登録版に書いた）。
+- 全体の DB: `make_trace_all_db.py` の出どころを最終版の『スクリーニング』にした（最終判定・除外理由・『自由記入』の「用途: 中心-X」。AF006 は自由記入が判定者 1 の 1 回目のままなので、中心は判断 4 の決定〔check-34.csv〕から取る）。`check-34.csv` と違う記録は印字し、DB の注記に書く。`update_trace_db.py` の `--source-db` の既定を Drive の最終版にした。
+- AF002 の全文は `~/Documents/TRACE/fulltext34/AF002.pdf` に写した（repo の外。Downloads は消えることがあるため）。全体の DB は 34 件の全文へのリンクを持たないので、Drive には置いていない。

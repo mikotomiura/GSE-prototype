@@ -8,7 +8,8 @@
 New abstracts need their translations in ja.json first; this script does not translate.
 
 Run (openpyxl via uv):
-    uv run --with openpyxl python update_trace_db.py --source-db ~/Downloads/AI_fatigue_database_2026-10-16_judge2.xlsx
+    uv run --with openpyxl python update_trace_db.py
+(--source-db defaults to the final version of the source database, next to the TRACE folder on Drive.)
 """
 
 import argparse
@@ -28,7 +29,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="~/Documents/TRACE/data")
     ap.add_argument("--fulltext", default="~/Documents/TRACE/fulltext")
-    ap.add_argument("--source-db", required=True)
+    ap.add_argument("--source-db", default=str(drive_trace().parent / "AI_fatigue_database_2026-10-18_judge_final_fixed.xlsx"))
     ap.add_argument("--abstracts34", default="~/TRACE-screening/check34-r3/in")
     ap.add_argument("--wait", type=int, default=600)
     a = ap.parse_args()
