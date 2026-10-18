@@ -7,6 +7,6 @@
 - [x] `scripts/refdb/summary_prompt.md`（要約を書く依頼文）と `merge_summaries.py`（検査して足す。実データ 675 件で写しの重なり 0）
 - [x] シートとページへ反映する手順の文書（`scripts/refdb/README.md`）
 - [x] `/literature-review` に DB を作り直す段を足し、`empirical-prompt-tuning` で確かめる（Lite・2 回とも成功・判断 10）
-- [ ] 実データで作り直し、2026-10-18 の件数と一致を確かめる・シートとページを更新する
+- [x] 実データで作り直し、2026-10-18 の件数と一致を確かめる・シートとページを更新する（判断 15）
 - [x] `/cross-review`（Claude 2 回・Codex 3 回・判断 11〜14）
 - [ ] push（PR は研究者に確かめてから）

@@ -20,6 +20,7 @@
 - スプレッドシート「GSE 文献DB」: https://docs.google.com/spreadsheets/d/1v7frJm2a6BkXzepEpglB62AT_2c3t0NzJ2mNA8UfRFw/edit （シート: 検索・集計・一覧・凡例。「一覧」のシート ID は 2123943520）
 - 検索のページ: https://claude.ai/artifact/Js8ZBgzkWAZBHdgrzqjwSA （同じ URL に出し直す）
 - 書誌のファイルと CSV: Google Drive のフォルダ GSE（手元では Drive for desktop の同期フォルダ。パスにメールアドレスが入るので、ここには書かない）
+- フォルダ GSE のサブフォルダ「文献DB」: 2026-10-18 に手で作った版（`GSE文献DB_2026-10-18.csv`・`GSE文献DB_v2_2026-10-18.csv`・`.csl.json`・`.bib` 2 本）と、最初の差し替えの前の「一覧」の書き出し（`一覧_差し替え前_2026-10-18.csv`）。§6 の照合の正解はここにある
 
 ## 1. 作り直す
 
@@ -85,7 +86,7 @@ python3 scripts/refdb/build.py --keep <シートの一覧.json> --out "<Drive �
 
 ## 6. 2026-10-18 の版との照合
 
-2026-10-18 に手で作った版（フォルダ GSE の `GSE文献DB_v2_2026-10-18.csv` ほか）と同じ時点を読むには:
+2026-10-18 に手で作った版（フォルダ GSE のサブフォルダ「文献DB」の `GSE文献DB_v2_2026-10-18.csv` ほか）と同じ時点を読むには:
 
 ```bash
 python3 scripts/refdb/build.py --date 2026-10-18 \
