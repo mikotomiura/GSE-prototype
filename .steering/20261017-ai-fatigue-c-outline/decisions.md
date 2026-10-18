@@ -439,3 +439,15 @@
   - 研究者の選択（AskUserQuestion・推奨どおり: Chrome で取りに行く）で、出版社のページから 6 件（S02-04・S02-05・S14-43・S08-03・S12-24・R27）。ページの中で計算した検算の値（文字数と文字コードの和）と手元のファイルを照合した（細い空白 U+2009 のような見えない文字まで一致）。S12-24 は Crossref の題名検索で DOI を見つけた。R27 はウェブ検索で掲載誌を見つけた。ほかの題名だけの記録は、似た題名の別の論文しか出ず、取り違えを避けて使わない。
   - 残り 9 件（S04-30・S12-23・X01・R31・R19・R15・R40・R44・R45）は題名だけで判定する。R44 は記事に抄録が無い、R45 は訂正のお知らせ、R40 はレビューのプロトコル登録（INPLASY）。
   - DB の「注記」に、抄録をどこから取ったか（差し替えた理由・ページの URL）を出す。抄録の無い欄は「（抄録なし: どの出どころにも見つからなかった。題名だけで判定する）」。取り直した 15 件は訳した（検算済み）。
+
+## 判断 36: 全体の DB・DB の置き場所を Drive に・OSF の全文 3 件（2026-10-18・研究者・AskUserQuestion）
+
+- 研究者の答え（AskUserQuestion・どちらも推奨どおり）: 「全体の DB」は、追加候補 264 件と探索の 34 件を 1 冊にしたもの。判定者 1 が記入する DB の本物は Google Drive に置き、Excel のアプリで開く。続けて研究者がフォルダの ID（`1HUmAY2q_yqs_qNYENOTnCv2dE8kJMikc`）を送った。Drive の `Doe_Systems/Reserch_production/GSE/AI-fatigue/TRACE`（`main.docx`・`coauthor-consult.docx` がある所）で、判断 35 でメインが作った `マイドライブ/TRACE` とは別のフォルダだった。メインは「ここに置け」の意味と読んだ（文が途中で切れていたので、完了報告で確かめる）。
+- 置き場所: 全文の `fulltext`（228 ファイル）を `マイドライブ/TRACE` から研究者の `AI-fatigue/TRACE` へ動かし、空になった `マイドライブ/TRACE` を消した。動かした後も 228 件すべての Drive の ID が前の `drive_links.json` と同じ（拡張属性で照合）で、Drive の側でも `fulltext` の親が研究者のフォルダになった（MCP のメタデータ）。共有は前後とも所有者だけで、変えていない。
+- 判定者 1 用の DB: `AI-fatigue/TRACE/TRACE_database.xlsx`。手元の `~/Documents/TRACE/TRACE_database.xlsx` は判定が入っていないこと（記入欄 0）を確かめ、Drive の版と全セル一致を確かめてから `~/Documents/TRACE/backup/` へ動かした（本物を 1 つにする）。`c_screening.py` の `--xlsx` の既定を Drive のその場所にした（同期のパスにメールアドレスが入るので、repo には書かず glob で探す。`TRACE_DRIVE` で上書きできる。見つからなければ存在しないパスを返し、別の写しを黙って読まない）。
+- 作り直しで記入を消さない: `make_trace_db.py` は、出力の DB がすでにあれば、『段1』『段2・3』の青い欄に記入された値を ID で新しい DB に引き継ぎ、古い版を `~/Documents/TRACE/backup/` に写してから置き換える。古い版にあって新しい版に無い記録があれば、何も書かずに止まる。`check_screening.py` に確かめを足した（引き継ぎ・控え・止まること）。引き継ぎを外した写しと、止まる条件を外した写しは赤になる。
+- 全体の DB: `scripts/make_trace_all_db.py` → `AI-fatigue/TRACE/TRACE_database_all.xlsx`（読むための冊・シートは はじめに・一覧・文献DB）。34 件は元の DB の最終判定（判定と中心は添付 6 の `check-34.csv`、除外理由は元の DB の『スクリーニング』。含める 10〔中心-A 7・中心-B 3〕・保留 3・除外 21。AF006・AF024 は判断 4 の決定を注記）。書誌は元の DB の『文献DB』、抄録は 34 件の確かめの入力（`~/TRACE-screening/check34-r3/in`。4 件は抄録なし）。264 件は判定を空欄にし、判定者 1・AI・共著者のどの判定も入れない。264 件の全文のリンクは入れない（GSRR-33 の、束の段 1 の前に全文を開かない決まりの抜け道にしないため）。34 件と 264 件は DOI・題名で重なりなし。
+- 34 件の題名・抄録の機械訳: Sonnet のサブエージェント 1 本（要約・注釈を入れない指示）→ `~/Documents/TRACE/data/ja34.json`。メインが検算: キーの一致・空欄の対応・日本語の有無・長さの比・数値の欠け（なし）。
+- OSF の全文 3 件: OSF が戻った（API が応答）。R02（vg4f7）と R35（3gzy2）はシステマティックレビューの登録、R22（5ts3f）は OSF の事前登録で、どれも論文のファイルが無く、登録の書式そのものが文書。R40（INPLASY の登録・PDF）と同じく、登録の中身を全文として保存した。`scripts/osf_registration_html.py` が OSF の API から、書式の見出し・問い・登録者の答え（逐語）を HTML に組み立てる（書式の説明文と選ばれなかった選択肢は除く。API から組み立てたことをページに書く）。`chrome_status.json` に取り方を「OSF API」と書いた（控え: `backup/chrome_status.before-osf-2026-10-18.json`）。全文は 206 → 209 件。
+- 1 本の手順: `scripts/update_trace_db.py`（全文を Drive へ写す〔消さない〕→ Drive の ID を待つ → `drive_links.py` → 2 冊の DB）。
+- 添付 6 の目録（`hash_attachments.py`）には足さない: `make_trace_all_db.py`（読むための冊で、選別に使わない）・`osf_registration_html.py`（全文の取り方）・`update_trace_db.py`（手順のまとめ）。添付 6 の `c_screening.py`・`make_trace_db.py` の中身は変わったので、ハッシュは登録の日に取り直す（登録の日の手順どおり）。

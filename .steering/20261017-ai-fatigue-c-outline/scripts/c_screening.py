@@ -50,6 +50,19 @@ from pathlib import Path
 
 TASK = Path(__file__).resolve().parent.parent
 ATT = TASK / "registration-attachments"
+DRIVE_TRACE = "マイドライブ/Doe_Systems/Reserch_production/GSE/AI-fatigue/TRACE"
+
+
+def drive_trace():
+    """The Google Drive folder AI-fatigue/TRACE as synced by Drive for desktop, where author 1's workbook lives
+    (decision 36). TRACE_DRIVE overrides it. If no synced folder is found, a path that does not exist is returned,
+    so that a command reading the workbook fails instead of reading another copy."""
+    if os.environ.get("TRACE_DRIVE"):
+        return Path(os.environ["TRACE_DRIVE"])
+    hits = sorted(Path("~/Library/CloudStorage").expanduser().glob("GoogleDrive-*/" + DRIVE_TRACE))
+    return hits[0] if hits else Path("~/Library/CloudStorage/(Google Drive not found)") / DRIVE_TRACE
+
+
 DEFAULTS = {
     "state": TASK / "screening",
     "order": ATT / "screening-order.csv",
@@ -58,7 +71,7 @@ DEFAULTS = {
     "work": Path("~/TRACE-screening"),
     "data": Path("~/Documents/TRACE/data"),
     "fulltext": Path("~/Documents/TRACE/fulltext"),
-    "xlsx": Path("~/Documents/TRACE/TRACE_database.xlsx"),
+    "xlsx": drive_trace() / "TRACE_database.xlsx",
 }
 BATCH = 9
 CODES = {f"E{i}" for i in range(1, 8)}

@@ -102,8 +102,9 @@ assert "全文" not in h1 and "ファイル" not in h1, h1  # GSRR-33: no full-t
 assert [r[2].value for r in wb["段1"].iter_rows(min_row=2)] == [i // 9 + 1 for i in range(N)]
 
 
-def fill(sheet, rid, **cells):
-    wb = load_workbook(xlsx)
+def fill(sheet, rid, path=None, **cells):
+    path = path or xlsx
+    wb = load_workbook(path)
     ws = wb[sheet]
     head = [c.value for c in ws[1]]
     for row in ws.iter_rows(min_row=2):
@@ -113,7 +114,34 @@ def fill(sheet, rid, **cells):
             break
     else:
         raise AssertionError(rid)
-    wb.save(xlsx)
+    wb.save(path)
+
+
+# a rebuild carries over what author 1 entered, keeps a copy of the old file, and refuses to drop a record
+carry_x = root / "carry.xlsx"
+sys.argv = ["make_trace_db.py", "--data", str(data), "--fulltext", str(ftdir), "--out", str(carry_x)]
+make_trace_db.main()
+fill("段1", "D01", carry_x, **{"判定": "除外", "除外理由": "E2", "根拠メモ": "memo 1"})
+fill("段2・3", "D02", carry_x, **{"判定": "含める", "中心": "中心-A"})
+make_trace_db.main()
+cw = load_workbook(carry_x)
+h1, h2 = [c.value for c in cw["段1"][1]], [c.value for c in cw["段2・3"][1]]
+r1 = {r[0].value: [c.value for c in r] for r in cw["段1"].iter_rows(min_row=2)}
+r2 = {r[0].value: [c.value for c in r] for r in cw["段2・3"].iter_rows(min_row=2)}
+assert (r1["D01"][h1.index("判定")], r1["D01"][h1.index("除外理由")], r1["D01"][h1.index("根拠メモ")]) == ("除外", "E2", "memo 1")
+assert (r2["D02"][h2.index("判定")], r2["D02"][h2.index("中心")]) == ("含める", "中心-A")
+assert r1["D03"][h1.index("判定")] == "未判定"
+assert any(p.name.startswith("carry.") for p in (root / "backup").iterdir())
+saved = (data / "records264.json").read_text(encoding="utf-8")
+json.dump(json.loads(saved)[1:], open(data / "records264.json", "w", encoding="utf-8"))
+before = carry_x.read_bytes()
+try:
+    make_trace_db.main()
+    raise AssertionError("a rebuild dropped D01")
+except SystemExit as e:
+    assert "D01" in str(e), e
+assert carry_x.read_bytes() == before
+(data / "records264.json").write_text(saved, encoding="utf-8")
 
 
 def ai_out(w, rid, stage, decision, code="", centre="", quote="supporting words", read=None, **over):

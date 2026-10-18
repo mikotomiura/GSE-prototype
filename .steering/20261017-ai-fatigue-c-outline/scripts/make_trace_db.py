@@ -18,17 +18,24 @@ Inputs live outside the repository (abstracts and full texts are not copied into
     <fulltext>/<ID>.xml      free full text as Europe PMC JATS XML (with <ID>.txt, its text extracted by machine)
     <fulltext>/<ID>.html     free full text as the publisher's article page, saved by the researcher
 
+The workbook author 1 fills in lives in the Google Drive folder AI-fatigue/TRACE and is opened with the Excel app
+(decision 36). If the output file exists, the values author 1 has entered in the blue columns of '段1' and '段2・3'
+are carried over by ID into the new workbook, and the old file is first copied to <data>/../backup/; the script
+stops if the old file has a record that the new one lacks, so a rebuild cannot drop a judgement.
+
 Run (openpyxl via uv):
     uv run --with openpyxl python make_trace_db.py --data ~/Documents/TRACE/data \
-        --fulltext ~/Documents/TRACE/fulltext --out ~/Documents/TRACE/TRACE_database.xlsx
+        --fulltext ~/Documents/TRACE/fulltext --out "$TRACE_DRIVE/TRACE_database.xlsx"
 """
 
 import argparse
 import datetime
 import json
 import os
+import shutil
+import sys
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 import trace_style as st
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -124,6 +131,37 @@ def fulltext_status(rid, meta, chrome, ftdir):
     return ("無料の版なし（OpenAlex: closed）" if oa == "closed" else "未取得"), "", ""
 
 
+STAGE1_INPUTS = {"判定", "除外理由", "読んだ範囲", "根拠メモ", "最終", "最終の除外理由"}
+STAGE2_INPUTS = {"判定", "除外理由", "中心", "読んだ範囲", "根拠メモ", "最終", "最終の除外理由", "最終の中心",
+                 "同じ標本の相手（E5）"}
+
+
+def entered(path):
+    """What author 1 has entered in an existing workbook: {sheet: {ID: {column: value}}}, blue columns only."""
+    if not os.path.exists(path):
+        return {}
+    wb = load_workbook(path, read_only=True)
+    out = {}
+    for name, inputs in (("段1", STAGE1_INPUTS), ("段2・3", STAGE2_INPUTS)):
+        if name not in wb.sheetnames:
+            continue
+        rows = list(wb[name].iter_rows(values_only=True))
+        head = [str(c) if c is not None else "" for c in rows[0]]
+        out[name] = {str(d["ID"]).strip(): {k: d[k] for k in inputs if k in d and d[k] not in (None, "", "未判定")}
+                     for d in (dict(zip(head, r)) for r in rows[1:]) if d.get("ID")}
+    return out
+
+
+def carry(rows, cols, kept):
+    """Put the entered values back into the new rows (the ID is the first column). Returns the number of cells."""
+    n = 0
+    for vals in rows:
+        for k, v in kept.get(vals[0], {}).items():
+            vals[cols.index(k)] = v
+            n += 1
+    return n
+
+
 def link_cell(target, label):
     return (target, label) if target else None
 
@@ -143,6 +181,7 @@ def main():
     ap.add_argument("--fulltext", required=True)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
+    out = os.path.expanduser(a.out)
     data = os.path.expanduser(a.data)
     ftdir = os.path.expanduser(a.fulltext)
     recs = sorted(load(os.path.join(data, "records264.json")), key=lambda r: r["order"])
@@ -153,6 +192,10 @@ def main():
     today = datetime.date.today().isoformat()
     n_ft = sum(fulltext_status(r["id"], meta, chrome, ftdir)[0] == "あり" for r in recs)
     bib_row = {r["id"]: i + 2 for i, r in enumerate(recs)}  # row of each record in '文献DB'
+    old = entered(out)
+    lost = sorted(set().union(*(set(v) for v in old.values())) - set(bib_row)) if old else []
+    if lost:
+        sys.exit(f"{out} has records not in records264.json ({', '.join(lost[:10])}); nothing written")
 
     wb = Workbook()
     st.intro(wb.active, "TRACE｜追加候補の文献 DB（判定者 1 用）",
@@ -178,10 +221,11 @@ def main():
         return (ja.get(r["id"]) or {}).get("title_ja", "")
 
     s1 = wb.create_sheet("段1")
-    st.table(s1, STAGE1_COLS, [10, 5, 5, 14, 52, 40, 11, 10, 11, 32, 10, 12],
-             [[r["id"], r["order"] + 1, r["order"] // BATCH + 1, r["population"], r["title"], jt(r), "未判定", "", "",
-               "", "", ""] for r in recs],
-             inputs={"判定", "除外理由", "読んだ範囲", "根拠メモ", "最終", "最終の除外理由"},
+    rows1 = [[r["id"], r["order"] + 1, r["order"] // BATCH + 1, r["population"], r["title"], jt(r), "未判定", "", "",
+              "", "", ""] for r in recs]
+    kept = carry(rows1, STAGE1_COLS, old.get("段1", {}))
+    st.table(s1, STAGE1_COLS, [10, 5, 5, 14, 52, 40, 11, 10, 11, 32, 10, 12], rows1,
+             inputs=STAGE1_INPUTS,
              wrap={"対象の群", "論文タイトル", "題名（日本語・機械訳）", "根拠メモ"},
              links={"ID": lambda v: (f"#'文献DB'!A{bib_row[v[0]]}", v[0])},
              tab="2563EB", height=lambda v: st.text_height((v[3], 14), (v[4], 52), (v[5], 40)))
@@ -192,11 +236,11 @@ def main():
         return drive_link(v[6], drive) if v[6] else None
 
     s2 = wb.create_sheet("段2・3")
-    st.table(s2, STAGE2_COLS, [10, 5, 14, 46, 34, 14, 14, 11, 10, 13, 11, 30, 10, 12, 12, 14],
-             [[r["id"], r["order"] + 1, r["population"], r["title"], jt(r), fulltext_status(r["id"], meta, chrome, ftdir)[0],
-               fulltext_file(r["id"], ftdir), "未判定", "", "未判定", "", "", "", "", "", ""] for r in recs],
-             inputs={"判定", "除外理由", "中心", "読んだ範囲", "根拠メモ", "最終", "最終の除外理由", "最終の中心",
-                     "同じ標本の相手（E5）"},
+    rows2 = [[r["id"], r["order"] + 1, r["population"], r["title"], jt(r), fulltext_status(r["id"], meta, chrome, ftdir)[0],
+              fulltext_file(r["id"], ftdir), "未判定", "", "未判定", "", "", "", "", "", ""] for r in recs]
+    kept += carry(rows2, STAGE2_COLS, old.get("段2・3", {}))
+    st.table(s2, STAGE2_COLS, [10, 5, 14, 46, 34, 14, 14, 11, 10, 13, 11, 30, 10, 12, 12, 14], rows2,
+             inputs=STAGE2_INPUTS,
              wrap={"対象の群", "論文タイトル", "題名（日本語・機械訳）", "根拠メモ"},
              links={"ID": lambda v: (f"#'文献DB'!A{bib_row[v[0]]}", v[0]), "ファイル": ft_link},
              tab="0D9488", height=lambda v: st.text_height((v[2], 14), (v[3], 46), (v[4], 34)))
@@ -238,8 +282,16 @@ def main():
     st.table(cr, ["項目", "内容"], [22, 120], [list(x) for x in CRITERIA], wrap={"内容"}, tab="64748B",
              height=lambda v: st.text_height((v[1], 120)))
 
-    wb.save(os.path.expanduser(a.out))
-    print(f"wrote {a.out}: {len(recs)} records, full text {n_ft}, translations {len(ja)}, Drive links {len(drive)}")
+    if os.path.exists(out):
+        bak = os.path.join(os.path.dirname(data.rstrip("/")), "backup")
+        os.makedirs(bak, exist_ok=True)
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        shutil.copy2(out, os.path.join(bak, f"{os.path.splitext(os.path.basename(out))[0]}.{stamp}.xlsx"))
+    tmp = out + ".tmp.xlsx"
+    wb.save(tmp)
+    os.replace(tmp, out)
+    print(f"wrote {out}: {len(recs)} records, full text {n_ft}, translations {len(ja)}, Drive links {len(drive)}, "
+          f"entered cells carried over {kept}")
 
 
 if __name__ == "__main__":
