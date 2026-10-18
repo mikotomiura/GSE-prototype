@@ -1,0 +1,28 @@
+{
+ "source": "ACM Digital Library web interface (ACM Guide to Computing Literature)",
+ "query": "(Title:(fatigue OR exhaustion OR exhausted OR burnout OR \"burn-out\" OR depletion OR depleted OR tiredness OR weariness) OR Abstract:(fatigue OR exhaustion OR exhausted OR burnout OR \"burn-out\" OR depletion OR depleted OR tiredness OR weariness)) AND (Title:(\"artificial intelligence\" OR \"generative AI\" OR GenAI OR ChatGPT OR \"large language model\" OR \"large language models\" OR LLM OR chatbot OR \"AI tool\" OR \"AI tools\" OR \"AI assistant\" OR \"AI-assisted\" OR \"AI use\") OR Abstract:(\"artificial intelligence\" OR \"generative AI\" OR GenAI OR ChatGPT OR \"large language model\" OR \"large language models\" OR LLM OR chatbot OR \"AI tool\" OR \"AI tools\" OR \"AI assistant\" OR \"AI-assisted\" OR \"AI use\")) NOT (Title:(\"fatigue life\" OR \"fatigue crack\" OR \"fatigue strength\" OR \"fatigue damage\" OR \"driver fatigue\" OR \"driver drowsiness\" OR \"fatigue detection\" OR \"muscle fatigue\" OR battery OR alloy OR welded) OR Abstract:(\"fatigue life\" OR \"fatigue crack\" OR \"fatigue strength\" OR \"fatigue damage\" OR \"driver fatigue\" OR \"driver drowsiness\" OR \"fatigue detection\" OR \"muscle fatigue\" OR battery OR alloy OR welded))",
+ "query_sent": "(Title:(fatigue OR exhaustion OR exhausted OR burnout OR \"burn-out\" OR depletion OR depleted OR tiredness OR weariness) OR Abstract:(fatigue OR exhaustion OR exhausted OR burnout OR \"burn-out\" OR depletion OR depleted OR tiredness OR weariness)) AND (Title:(\"artificial intelligence\" OR \"generative AI\" OR GenAI OR ChatGPT OR \"large language model\" OR \"large language models\" OR LLM OR chatbot OR \"AI tool\" OR \"AI tools\" OR \"AI assistant\" OR \"AI-assisted\" OR \"AI use\") OR Abstract:(\"artificial intelligence\" OR \"generative AI\" OR GenAI OR ChatGPT OR \"large language model\" OR \"large language models\" OR LLM OR chatbot OR \"AI tool\" OR \"AI tools\" OR \"AI assistant\" OR \"AI-assisted\" OR \"AI use\")) NOT (Title:(\"fatigue life\" OR \"fatigue crack\" OR \"fatigue strength\" OR \"fatigue damage\" OR \"driver fatigue\" OR \"driver drowsiness\" OR \"fatigue detection\" OR \"muscle fatigue\" OR battery OR alloy OR welded) OR Abstract:(\"fatigue life\" OR \"fatigue crack\" OR \"fatigue strength\" OR \"fatigue damage\" OR \"driver fatigue\" OR \"driver drowsiness\" OR \"fatigue detection\" OR \"muscle fatigue\" OR battery OR alloy OR welded))",
+ "date_limit": null,
+ "type_limit": null,
+ "started": "2026-10-18T09:11:45.562Z",
+ "finished": "2026-10-18T09:22:09.736Z",
+ "reported_count": 702,
+ "retrieved": 702,
+ "passes": [
+  {
+   "pass": 1,
+   "sort": "relevance",
+   "read": 702,
+   "unique_so_far": 701
+  },
+  {
+   "pass": 2,
+   "sort": "EpubDate_asc",
+   "read": 702,
+   "unique_so_far": 702
+  }
+ ],
+ "files": {
+  "acm-results.json": "42e2d85365b0976aa857dff44207787822b844ed7fe077dedc01f23bac88d5bb"
+ }
+}

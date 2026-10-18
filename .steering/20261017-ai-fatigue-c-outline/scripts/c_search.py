@@ -133,27 +133,73 @@ def write_log(out, source, entry):
 
 # --- exports ------------------------------------------------------------------------------------------------------
 
-def export_openalex(out):
-    q = query_openalex()
+def openalex_pages(out, q, headers, year, tag):
+    """One cursor run over one publication year; returns (page files, record IDs)."""
     base = "https://api.openalex.org/works?"
-    started, pages, cursor, n, reported = now(), [], "*", 0, None
-    headers = openalex_headers()
+    pages, ids, cursor = [], [], "*"
     while cursor:
-        url = base + urllib.parse.urlencode({"filter": "title_and_abstract.search:" + q, "per-page": 200,
-                                             "cursor": cursor})
+        url = base + urllib.parse.urlencode({"filter": f"title_and_abstract.search:{q},publication_year:{year}",
+                                             "per-page": 200, "cursor": cursor})
         d = get_json(url, headers=headers)
-        reported = d["meta"]["count"] if reported is None else reported
-        p = out / f"openalex-{len(pages) + 1:03d}.json"
+        p = out / f"openalex-{year}-{tag}-{len(pages) + 1:03d}.json"
         p.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
         pages.append(p)
-        n += len(d["results"])
+        ids += [w["id"] for w in d["results"]]
         cursor = d["meta"].get("next_cursor") if d["results"] else None
-        time.sleep(1)
-    entry = {"source": "OpenAlex API", "api_key_sent": bool(headers), "query": q,
-             "filter": "title_and_abstract.search", "date_limit": None,
-             "type_limit": None, "started": started, "finished": now(), "reported_count": reported,
-             "retrieved": n, "files": {p.name: sha256(p) for p in pages}}
-    print(json.dumps({k: v for k, v in entry.items() if k != "files"}, ensure_ascii=False))
+        time.sleep(0.5)
+    return pages, ids
+
+
+def export_openalex(out, tries=3):
+    """OpenAlex's cursor paging over the whole result repeated and skipped records (2026-10-18: 10,838 read for
+    10,827 reported, 10,813 unique). So the result is cut by publication year (group_by), each year is paged on its
+    own (records without a year as one more slice, publication_year:null), and a year is kept only when its unique
+    records equal its count and no record repeats; otherwise its pages are removed and the year is paged again (up to
+    `tries` times, then the export stops). The year counts must add up to the total."""
+    q = query_openalex()
+    headers = openalex_headers()
+    for old in out.glob("openalex-[0-9]*.json"):
+        old.unlink()
+    started = now()
+    g = get_json("https://api.openalex.org/works?" + urllib.parse.urlencode(
+        {"filter": "title_and_abstract.search:" + q, "group_by": "publication_year", "per-page": 200}), headers=headers)
+    total, groups = g["meta"]["count"], {x["key"]: x["count"] for x in g["group_by"]}
+    if not all(re.fullmatch(r"\d{4}", k) for k in groups):
+        raise SystemExit(f"OpenAlex: a year group is not a year: {sorted(groups)}")
+    # records without a publication year are in no group (2026-10-18: 34); they are paged as one more slice
+    no_year = get_json("https://api.openalex.org/works?" + urllib.parse.urlencode(
+        {"filter": f"title_and_abstract.search:{q},publication_year:null", "per-page": 1}), headers=headers)
+    groups["null"] = no_year["meta"]["count"]
+    if sum(groups.values()) != total:
+        raise SystemExit(f"OpenAlex: year groups and records without a year ({groups['null']}) do not add up to "
+                         f"{total}: {sum(groups.values())}")
+    files, n, retries, repeated = [], 0, {}, {}
+    for year in sorted(groups):
+        for t in range(1, tries + 1):
+            pages, ids = openalex_pages(out, q, headers, year, f"t{t}")
+            if len(set(ids)) == groups[year]:   # every record of the year, each at least once
+                rep_ = sorted(k for k, c in Counter(ids).items() if c > 1)
+                if rep_:
+                    repeated[year] = rep_   # the same record returned twice in one run (2026-10-18: 2023, 1)
+                break
+            retries[year] = t
+            for p in pages:
+                p.unlink()
+        else:
+            raise SystemExit(f"OpenAlex {year}: {len(ids)} read ({len(set(ids))} unique) for {groups[year]}, "
+                             f"after {tries} tries")
+        files += pages
+        n += len(ids)
+    if n - sum(len(v) for v in repeated.values()) != total:
+        raise SystemExit(f"OpenAlex: {n} records read, {total} reported, repeats {repeated}")
+    oql = (json.loads(files[0].read_text(encoding="utf-8"))["meta"].get("x_query") or {}).get("oql", "")
+    entry = {"source": "OpenAlex API", "api_key_sent": bool(headers), "query": q, "interpreted_as": oql,
+             "filter": "title_and_abstract.search, then publication_year one year at a time", "date_limit": None,
+             "type_limit": None, "started": started, "finished": now(), "reported_count": total,
+             "year_counts": groups, "years_paged_again": retries, "retrieved": n,
+             "repeated_ids": repeated, "unique_retrieved": n - sum(len(v) for v in repeated.values()),
+             "files": {p.name: sha256(p) for p in files}}
+    print(json.dumps({k: v for k, v in entry.items() if k not in ("files", "year_counts")}, ensure_ascii=False))
     write_log(out, "openalex", entry)
 
 
@@ -195,6 +241,8 @@ def acm_receive(out, port):
     token = hashlib.sha256(str(time.time_ns()).encode() + bytes(16)).hexdigest()[:24]
 
     class H(http.server.BaseHTTPRequestHandler):
+        timeout = 30   # a connection that sends nothing (Chrome opens some ahead of time) is dropped after 30 s
+
         def _cors(self):
             self.send_header("Access-Control-Allow-Origin", "https://dl.acm.org")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
@@ -226,7 +274,8 @@ def acm_receive(out, port):
                 recs = d["records"]
                 ok = (d.get("query") == query_acm() and isinstance(recs, list)
                       and len(recs) == d.get("reported_count")
-                      and all(isinstance(r, dict) and r.get("href") for r in recs))
+                      and all(isinstance(r, dict) and r.get("href") for r in recs)
+                      and len({r["href"] for r in recs}) == len(recs))
             except (ValueError, KeyError, TypeError):
                 ok = False
             if not ok:
@@ -237,6 +286,7 @@ def acm_receive(out, port):
                      "query": query_acm(), "query_sent": d.get("query"), "date_limit": None, "type_limit": None,
                      "started": d.get("started"), "finished": d.get("finished"),
                      "reported_count": d.get("reported_count"), "retrieved": len(d.get("records", [])),
+                     "passes": d.get("passes"),
                      "files": {p.name: sha256(p)}}
             write_log(out, "acm", entry)
             self.send_response(200)
@@ -249,7 +299,8 @@ def acm_receive(out, port):
         def log_message(self, *a):
             pass
 
-    srv = http.server.HTTPServer(("127.0.0.1", port), H)
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), H)   # one silent connection blocks no other
+    srv.timeout = 1
     srv.done = False
     print(f"listening on http://127.0.0.1:{port}/{token}\nrun in the ACM tab: await acmExport(QUERY, {port}, '{token}')\n"
           f"QUERY:\n{query_acm()}", flush=True)
@@ -288,8 +339,16 @@ def logged_files(out, source, pattern):
 
 
 def records_openalex(out):
+    """Each record once. A record that OpenAlex returned twice is read once only if the log lists it as repeated;
+    any other repeat is kept, so that the merge stops on it."""
+    log = json.loads((out / "openalex-log.json").read_text(encoding="utf-8"))
+    allowed = {i for v in log.get("repeated_ids", {}).values() for i in v}
+    seen = set()
     for p in logged_files(out, "openalex", "openalex-[0-9]*.json"):
         for w in json.loads(p.read_text(encoding="utf-8"))["results"]:
+            if w.get("id") in allowed and w["id"] in seen:
+                continue
+            seen.add(w.get("id"))
             yield {"source": "openalex", "source_id": w.get("id", ""), "doi": norm_doi(w.get("doi")),
                    "title": w.get("display_name") or w.get("title") or "", "year": w.get("publication_year"),
                    "type": w.get("type", ""), "venue": ((w.get("primary_location") or {}).get("source") or {})
@@ -374,9 +433,29 @@ def source_db(records264, xlsx):
 
 # --- merge, remove, draw ------------------------------------------------------------------------------------------
 
+TITLE_MIN = 15        # a normalised title shorter than this ("Index", "Editorial", "Preface") never merges
+TITLE_MAX_DOIS = 3    # nor does a title carried by more distinct DOIs than this (chapters of one book, columns)
+
+
+def title_keys(recs):
+    """The normalised titles that may merge records: at least TITLE_MIN characters, and carried by at most
+    TITLE_MAX_DOIS distinct DOIs (2026-10-18: "Index" had 19 DOIs, a book title 43). Versions of one report (a
+    preprint and its article) share a title with one to three DOIs."""
+    dois = {}
+    for r in recs:
+        t = norm_title(r["title"])
+        if t:
+            dois.setdefault(t, set())
+            if r["doi"]:
+                dois[t].add(r["doi"])
+    return {t for t, d in dois.items() if len(t) >= TITLE_MIN and len(d) <= TITLE_MAX_DOIS}
+
+
 def merge_records(recs):
-    """Union records that share a DOI or a normalised title. Returns a list of groups (lists of records)."""
+    """Union records that share a DOI, or a normalised title that may merge (title_keys), transitively.
+    Returns a list of groups (lists of records)."""
     parent = list(range(len(recs)))
+    ok_titles = title_keys(recs)
 
     def find(i):
         while parent[i] != i:
@@ -386,7 +465,8 @@ def merge_records(recs):
 
     seen = {}
     for i, r in enumerate(recs):
-        for key in (("d", r["doi"]), ("t", norm_title(r["title"]))):
+        t = norm_title(r["title"])
+        for key in (("d", r["doi"]), ("t", t if t in ok_titles else "")):
             if not key[1]:
                 continue
             if key in seen:
@@ -419,7 +499,7 @@ def summarise(g):
 
 def remove_known(groups, known):
     kd = {k["doi"]: k["id"] for k in known if k["doi"]}
-    kt = {k["t"]: k["id"] for k in known if k["t"]}
+    kt = {k["t"]: k["id"] for k in known if len(k["t"]) >= TITLE_MIN}
     new, matched = [], []
     for g in groups:
         hit = sorted({kd[r["doi"]] for r in g if r["doi"] in kd} | {kt[norm_title(r["title"])] for r in g
@@ -524,15 +604,25 @@ def selftest():
               == ["openalex-001.json"])
     R = lambda s, d, t: {"source": s, "source_id": s + t, "doi": d, "title": t, "year": 2025, "type": "",
                          "venue": "", "abstract": ""}
-    g = merge_records([R("openalex", "10.1/x", "A"), R("europepmc", "", "a"), R("acm", "10.1/x", "B"),
-                       R("acm", "10.1/y", "C")])
+    TA, TB, TC = "Fatigue and generative AI use", "A different title of the same report", "Another study entirely"
+    g = merge_records([R("openalex", "10.1/x", TA), R("europepmc", "", TA.lower()), R("acm", "10.1/x", TB),
+                       R("acm", "10.1/y", TC)])
     check("merge by DOI and title, transitively", sorted(len(x) for x in g) == [1, 3])
+    T = "A generic but long enough title"
+    gen = merge_records([R("openalex", f"10.9/{i}", T) for i in range(4)])
+    check("a title carried by more than 3 DOIs does not merge", sorted(len(x) for x in gen) == [1, 1, 1, 1])
+    ver = merge_records([R("openalex", "10.9/pre", T), R("openalex", "10.9/art", T), R("europepmc", "", T)])
+    check("versions (2 DOIs, one title) merge", [len(x) for x in ver] == [3])
+    short = merge_records([R("openalex", "10.9/a", "Index"), R("acm", "10.9/b", "Index")])
+    check("a short title does not merge", sorted(len(x) for x in short) == [1, 1])
     known = [{"id": "AF001", "doi": "10.1/y", "t": ""}]
     new, matched = remove_known(g, known)
     check("known DOI removed", len(new) == 1 and matched[0][1] == ["AF001"])
-    known_t = [{"id": "S01", "doi": "", "t": norm_title("A")}]
+    known_t = [{"id": "S01", "doi": "", "t": norm_title(TA)}]
     new2, _ = remove_known(g, known_t)
-    check("known title removed (whole group)", len(new2) == 1 and new2[0][0]["title"] == "C")
+    check("known title removed (whole group)", len(new2) == 1 and new2[0][0]["title"] == TC)
+    _, m3 = remove_known(merge_records([R("acm", "10.9/z", "Index")]), [{"id": "S02", "doi": "", "t": "index"}])
+    check("a short known title does not remove", m3 == [])
     ids = [f"CS{i:04d}" for i in range(1, 1001)]
     s1, s2 = draw_sample(ids), draw_sample(list(reversed(ids)))
     check("sample size", len(s1) == SAMPLE_SIZE)

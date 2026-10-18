@@ -10,8 +10,8 @@
 2. OSF の全文 3 件（R02・R22・R35）は 2026-10-18 に取り直した（OSF の登録の書式を API から組み立てた・判断 36）。済み。
    - 全文や抄録を足したら、`uv run --with openpyxl python update_trace_db.py` を 1 回打つ。Drive の `AI-fatigue/TRACE/fulltext` への写し・同期待ち・Drive のリンクの表・2 冊の DB（判定者 1 用は記入を引き継ぐ）までを行う（判断 36）。抄録を差し替えたら、先に `ja.json` の訳を足す。
    - 判定者 1 の DB を Excel で開いたまま作り直さない（閉じてから打つ）。
-3. 研究者: OpenAlex の無料の API キーを申請し（https://help.openalex.org/api/authentication/）、届いたキーを `~/.config/openalex/api_key` に 1 行で置く（`chmod 600`）。メインはキーの値を見ない。
-4. 確かめの検索を 1 回だけ走らせる（判断 38）。3 つの情報源を同じ日に。書き出しは repo の外（抄録が入る）。
+3. 研究者: OpenAlex の無料の API キーを申請し（2026-10-18 に済み）（https://help.openalex.org/api/authentication/）、届いたキーを `~/.config/openalex/api_key` に 1 行で置く（`chmod 600`）。メインはキーの値を見ない。
+4. 確かめの検索を 1 回だけ走らせる（判断 38）。**2026-10-18 に済み**（判断 40。書き出しは `~/Documents/TRACE/search/2026-10-18/`、書誌と数は `registration-attachments/coverage/`）。やり直さない（やり直すと標本が変わる）。3 つの情報源を同じ日に。書き出しは repo の外（抄録が入る）。
    ```
    cd scripts
    OUT=~/Documents/TRACE/search/$(date +%Y-%m-%d)
