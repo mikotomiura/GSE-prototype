@@ -657,3 +657,13 @@
 - 確かめ: latexmk でエラー 0（21 ページ・表 3 の見出しに 3pt のはみ出しが 1 つ）。表 3・4・12〜14・16 と図 1 を画像で見た（図 1 の改行を 2 度直した）。docx は 16 表に番号が付き、LibreOffice の PDF で表 3・4・13・14 を見た。
 - Drive: 置き換えの前に、HEAD の元から草稿を作り直して Drive の版と比べ、PDF の文字は同じ・docx は作成日時（core.xml）だけ違うことを確かめた。案内は手元の前回の docx と cmp で同じ。草稿の docx と PDF、案内を置き換えた。案内の冒頭の「草稿は前の形のまま」を「草稿はこの案内の形・登録の下書きは前の形」に直した。
 - 研究者（逐語）「それか配布用の.pdfも.docxにする？」→ AskUserQuestion で docx と PDF の両方を共著者フォルダに置く（推奨どおり）。案内のファイル一覧に docx の行を足した。
+
+## 判断 53: TRACE リポジトリを作り、研究の物を移した（2026-10-19・研究者・AskUserQuestion 3 回）
+
+- 研究者が選んだこと（どれも推奨どおり）: 履歴は写さず今の物だけで始める（元のコミット f03a171f をコミット文に書いた）／積むのは研究の物だけ（日本語の検討の記録・案内・相談文・改善提案と、抄録・全文・訳・検索の書き出し・AI の生の出力は積まない）／移した後は TRACE だけで直し、GSE-prototype の同じファイルは消して移し先の案内（`MOVED.md`・`papers/ai-fatigue-measurement/README.md`）を残す。作る前に名前・置き場所・中身・GSE 側を消すことを確かめた（推奨どおり）。
+- 作った物: https://github.com/mikotomiura/TRACE（private のまま・公開と共有の設定は変えていない）、手元は `~/TRACE`。配置は前のまま（`registration-en.md`・`codebook-c2b-en.md`・`registration-attachments/`・`scripts/`〔`make_guide_docx.py` は案内の道具なので GSE に残した〕・`manuscript/`）。脚本の直しは `hash_attachments.py` の外枠の場所の 1 か所と、`make_screening_candidates.py` の注の 1 行（decisions.md への言及）だけ。
+- README: ロゴ（`docs/assets/logo-light.svg`・`logo-dark.svg`。`<picture>` で GitHub の明暗に合わせる）、流れの gif（`flow.gif`・記録→選別→符号化→集計の 4 枚のカードが順に光る・暗い地の上に描いたので明暗どちらでも読める）、問い・手順・配置・再現の手順・置かない物・公開の予定（日付の約束は書かない）。ロゴは白と暗い地の上、gif は 3 つのコマを画像で見た。gif の作り方の脚本は repo に入れていない（`$CLAUDE_JOB_DIR/tmp/gif/make_flow.py`。作り直すなら移す）。
+- 確かめ（`~/TRACE` の中で）: make_dummy・2 つの selftest・check_screening が緑、符号化の様式の作り直しで差分なし、草稿の組版はエラー 0。`hash_attachments.py` は選別の順（登録の日に作る）が無いので止まる（README に書いた）。
+- 登録の下書き（TRACE の e201c9c）: GSRR-33 に判定のコミット先としてこのリポジトリを名指しし、GSRR-41 に公表のときに履歴ごと公開して登録から繋ぐこと、GSRR-65 に公表まで非公開であることを書いた。
+- `registration-day.md`: 冒頭に TRACE で打つことを書き、共著者に聞くこと（判断 34・45 の形）・版の表記・コミットの先を直した。
+- 気づいた点: gif と README は判断 52 の共著者の形（選別の 2 人目・符号化は全部）で書いてある。共著者が引き受けなければ、草稿と一緒に直す。

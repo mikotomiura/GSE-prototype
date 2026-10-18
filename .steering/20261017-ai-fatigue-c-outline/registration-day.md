@@ -1,12 +1,13 @@
 # 登録の当日の手順（C・TRACE）
 
-作成 2026-10-18。上から順に行う。「研究者」と書いた手順は研究者が行い、それ以外はメインが行う。
+作成 2026-10-18（2026-10-19 に TRACE リポジトリへの移動に合わせて直した・判断 53）。上から順に行う。
+脚本・登録版・添付・外枠・草稿は `~/TRACE`（https://github.com/mikotomiura/TRACE・非公開）にある。下の `cd scripts` は `cd ~/TRACE/scripts`、`registration-attachments/` は `~/TRACE/registration-attachments/` と読む。コミットと push はすべて `~/TRACE` で行う。「研究者」と書いた手順は研究者が行い、それ以外はメインが行う。
 
 ## 前の日まで
 
 1. 研究者: 共著者に相談文（`coauthor-consult.md`・docx）を送り、次の 2 つを受け取る。
    - 登録に載せる名前（英語）・所属・ORCID
-   - 2 人目のコードを全件にするか 2 割にするか。これは本番のコードの前（2027 年 1 月）まででよく、登録の時点では要らない。
+   - 選別の 2 人目（段 1 の 2 割と全文・中心の段）と、本体の集合の符号化を全部引き受けられるか（判断 34・45。引き受けられなければ登録の下書きの戻す規則に従う）。
 2. OSF の全文 3 件（R02・R22・R35）は 2026-10-18 に取り直した（OSF の登録の書式を API から組み立てた・判断 36）。済み。
    - 全文や抄録を足したら、`uv run --with openpyxl python update_trace_db.py` を 1 回打つ。Drive の `AI-fatigue/TRACE/fulltext` への写し・同期待ち・Drive のリンクの表・2 冊の DB（判定者 1 用は記入を引き継ぐ）までを行う（判断 36）。抄録を差し替えたら、先に `ja.json` の訳を足す。
    - 判定者 1 の DB を Excel で開いたまま作り直さない（閉じてから打つ）。
@@ -52,12 +53,12 @@
    - GSRR-33（選別の順の一覧）
    - GSRR-64（脚本）
 7. 冒頭を書き換える。
-   - 「Registration draft 0.12 … Not yet registered」を版 1.0 と登録の日付にする。
+   - 「Registration draft 0.14 … Not yet registered」（その時の版）を版 1.0 と登録の日付にする。
    - 残った **[at registration]** を grep し、0 件にする。
 8. 確かめる。
    - 体裁の検査（`_style_check.py`）。残るのは、意図して置いている日本語の語の一覧の 3 件だけ。
    - 草稿の組版（`latexmk`）。
-9. 登録版・添付・`sha256.txt` をコミットし、push する。
+9. 登録版・添付・`sha256.txt` を `~/TRACE` でコミットし、push する。
 
 ## 当日（研究者）
 
@@ -68,7 +69,7 @@
 
 順番（判断 34）: 登録したらすぐ、判定者 1 と AI の選別を束ごとに回す。共著者（B+ を引き受けた場合）は後を追う。段 1 の 2 割は `make_coauthor_db.py --stage 1` の 1 冊、段 2 は束が全文段に回るたびに `--stage 2 --batch bNN --ids <その束の ID>` の 1 冊を渡す。登録の前には誰も判定しない（見本の `--preview` だけ配ってよい）。
 
-道具は `scripts/c_screening.py`（`uv run --with openpyxl python c_screening.py <命令>`）。repo に置くのは ID・判定・SHA-256・時刻だけで（`screening/`）、抄録・全文・AI の出力の JSON は `~/TRACE-screening/s<段>-<束>/` に置く。
+道具は `~/TRACE/scripts/c_screening.py`（`uv run --with openpyxl python c_screening.py <命令>`）。判定は `~/TRACE/screening/` に書き出され、`~/TRACE` でコミット・push する。repo に置くのは ID・判定・SHA-256・時刻だけで（`screening/`）、抄録・全文・AI の出力の JSON は `~/TRACE-screening/s<段>-<束>/` に置く。
 
 段 1（題名・抄録）:
 1. `next --stage 1` で束を切る（9 件・固定の順）。`batches.csv` をコミットする。
