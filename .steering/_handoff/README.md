@@ -11,7 +11,8 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
-| **C（TRACE）: 追加候補 264 件の選別を回す道具**（worktree `/Users/johnd/GSE-prototype-af-c`） | `next-session-ai-fatigue-c-screening-tools.md`（2026-10-18） | 完了（2026-10-18・判断 33）。道具は `scripts/c_screening.py`。次は登録の当日（`.steering/20261017-ai-fatigue-c-outline/registration-day.md`。共著者の返事と OSF の復旧を待っている） |
+| **C（TRACE）: DB を仕上げる（全体の DB・判定者 1 用の DB・Google Drive との同期）**（worktree `/Users/johnd/GSE-prototype-af-c`） | **`next-session-ai-fatigue-c-db-finish.md`**（2026-10-18） | **現行**。判断 34（共著者を選別の 2 人目・B+・返事待ち）と判断 35（DB の見た目・日本語の機械訳・全文の Drive リンク・抄録の補完）の後。まず「全体の DB」が何を指すかを聞く |
+| **C（TRACE）: 追加候補 264 件の選別を回す道具**（worktree `/Users/johnd/GSE-prototype-af-c`） | `next-session-ai-fatigue-c-screening-tools.md`（2026-10-18） | 完了（2026-10-18・判断 33〜35）。後続は上の行。道具は `scripts/c_screening.py`。次は登録の当日（`.steering/20261017-ai-fatigue-c-outline/registration-day.md`。共著者の返事と OSF の復旧を待っている） |
 | ~~**AI 疲労の測定論のメタ研究（C）: 追加候補の選別を AI で行う設計 → 登録版を一人のコードに書き換える → 相談文を短くする**~~（worktree `/Users/johnd/GSE-prototype-af-c`） | `next-session-ai-fatigue-c-ai-screening.md`（2026-10-17） | 完了（判断 25〜32）。後続は上の行。以下は当時の記述: 草稿・登録の添付は用意済み（`.steering/20261017-ai-fatigue-c-outline/` 判断 21〜24）。研究者が一人で 2 回コードし、較正は探索の集合で行うと決めた。追加の候補 264 件は 2 人目の判定が無いので、評価指標を作ってから AI で判定を付ける |
 | ~~**C: 外枠を詰める → 登録版の差分の確認 → /cross-review → 相談文**~~ | `next-session-ai-fatigue-c-outline-finalize.md`（2026-10-17） | 完了（2026-10-17・判断 15〜24）。草稿と登録の添付まで進めた。後続は上の行 |
 | **公開データでの照合の論文: 凍結 → 取得 → 検査 → 本計算**（PoPETs 2027 Issue 3・締切 2026-11-30 AoE を目標・G-GEAR） | **`next-session-public-keystroke-matching-research-forward.md`**（2026-10-12） | **現行**。事前登録は下書き 8（未凍結）・合成の記録の検査は済み（PR #358）。判断 51: KLiCKe の返事を待たずに進める。ただし凍結（OSF）が取得より先。取得の後は記録と本文の中身を Claude も読まない（集計だけ）。前の `next-session-public-keystroke-matching-freeze.md` を置き換える |
