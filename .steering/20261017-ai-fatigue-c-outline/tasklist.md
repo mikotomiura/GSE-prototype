@@ -71,7 +71,8 @@
 返事が無くても進められるもの:
 - [x] TRACE リポジトリ（判断 51・53）: https://github.com/mikotomiura/TRACE（非公開・手元 `~/TRACE`）。README・ロゴ・流れの gif
 - [x] `registration-day.md` を直す: 共著者に聞くこと・版の表記・コミットと push の先（`~/TRACE`）・共著者の冊の受け渡し（人 2 人の形の節・判断 55）
-- [ ] /cross-review（判断 52〜55 の差分。GSE-prototype の検討の記録と TRACE リポジトリの両方）
+- [x] /cross-review（判断 52〜55 の差分。GSE-prototype の検討の記録と TRACE リポジトリの両方・判断 56 で対応）
+- [ ] 登録の下書きを人 2 人の形に書き換えるとき、GSRR-41 の公開物に author2 の列・`author2-workbooks.csv`・`screening-final.csv` を足す。片方の人だけが中心を付けた記録は合意で決め件数を報告する、と GSRR-33 に書く（判断 56）
 - [x] 登録の下書き GSRR-33・41・65 の「どこにコミットするか」をリポジトリに合わせる（TRACE の e201c9c）
 - [ ] 研究者: Word で案内を開き、番号つきの箇条書きと表を見る（上の項と同じ）
 - [ ] 研究者: Drive の `TRACE_database.xlsx` の段 1 を見る（上の項と同じ）
