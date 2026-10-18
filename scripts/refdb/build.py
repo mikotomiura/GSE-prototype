@@ -18,6 +18,7 @@ import collections
 import csv
 import datetime as dt
 import hashlib
+import os
 import io
 import json
 import re
@@ -375,7 +376,10 @@ def read_keep(path: Path) -> list[list[str]]:
     text = path.read_text(encoding="utf-8-sig")
     # 拡張子でなく中身で見る（Sheets の MCP は大きな返り値を .txt に保存する・2026-10-18 に実測）
     if path.suffix.lower() == ".json" or text.lstrip()[:1] in ("{", "["):
-        j = json.loads(text)
+        try:
+            j = json.loads(text)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"--keep を JSON として読めない（先頭が {{ か [ なので JSON とみなした）: {e}") from e
         if isinstance(j, dict):
             if "values" not in j:
                 raise ValueError(f"--keep の JSON に values が無い（キー: {sorted(j)}）。get_values の返り値か確かめる")
@@ -604,6 +608,9 @@ def build_csl(rows: list[dict], csl_raw: dict, summaries: dict) -> tuple[list[di
         ck = r["ID"].split("; ")[0].split("（")[0]
         if ck in used:
             ck = ck + "_" + re.sub(r"[^A-Za-z0-9]", "", r["key"])[-8:]
+        base, k = ck, 2
+        while ck in used:  # 末尾を足しても重なるときは番号を足す
+            ck, k = f"{base}_{k}", k + 1
         used.add(ck)
         it, hit = csl_item(r, csl_raw.get(r["key"]), ck, summaries.get(r["key"], {}).get("summary", ""))
         n_cache += hit
@@ -639,19 +646,33 @@ def bib_entries(text: str) -> dict[str, str]:
     return out
 
 
-def put(ws, row: int, col: int, v) -> None:
-    """値を書く。= で始まる文字列は数式にせず文字列のまま置く。"""
+XLSX_CELL_MAX = 32767  # Excel のセルの上限。openpyxl は超えた分を黙って切る（2026-10-18 に再現）
+CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")  # xlsx に書けない制御文字（openpyxl は例外で全体を落とす）
+
+
+def put(ws, row: int, col: int, v, stats: dict | None = None) -> None:
+    """値を書く。= で始まる文字列は数式にせず文字列のまま置く。制御文字は外して数え、上限を超える文字列は止める。"""
+    if isinstance(v, str):
+        v, n = CONTROL_RE.subn("", v)
+        if n and stats is not None:
+            stats["xlsx_removed_control_chars"] = stats.get("xlsx_removed_control_chars", 0) + n
+        if len(v) > XLSX_CELL_MAX:
+            head = ws.cell(row=1, column=col).value
+            raise RuntimeError(f"xlsx のセルが上限 {XLSX_CELL_MAX} 字を超える（シート {ws.title}・{row} 行目・列 {head}・{len(v)} 字）")
     c = ws.cell(row=row, column=col, value=v)
     if isinstance(v, str) and v.startswith("="):
         c.data_type = "s"
 
 
-def write_xlsx(rows: list[dict], human: list[str], items: list[dict], bibtex: str, info: dict, path: Path) -> None:
+def write_xlsx(rows: list[dict], human: list[str], items: list[dict], bibtex: str, info: dict, path: Path) -> dict:
     try:
         from openpyxl import Workbook  # noqa: PLC0415  無いときは --no-xlsx で外せる
         from openpyxl.styles import Font
     except ImportError as e:
         raise RuntimeError("openpyxl が無い（~/.venvs/gse-provision/bin/python で回すか、--no-xlsx）") from e
+    stats: dict = {}
+    # xlsx のバイト列は回すたびに変わる（openpyxl が保存の時刻を書き、zip の各項目にも時刻が入る）。
+    # 同じ入力かどうかは、xlsx のハッシュではなく CSV のハッシュで見る
     wb = Workbook()
     readme = wb.active
     readme.title = "説明"
@@ -667,8 +688,8 @@ def write_xlsx(rows: list[dict], human: list[str], items: list[dict], bibtex: st
         ("書誌の正本", "各枝の docs/references.md（作り方は repo の scripts/refdb/README.md）"),
     ] + [(f"枝 {b}", c) for b, c in info["branches"].items()]
     for i, (k, v) in enumerate(lines, 1):
-        put(readme, i, 1, k)
-        put(readme, i, 2, str(v))  # 数は右寄せになり広い列の右端へ隠れるので、説明では文字で置く
+        put(readme, i, 1, k, stats)
+        put(readme, i, 2, str(v), stats)  # 数は右寄せになり広い列の右端へ隠れるので、説明では文字で置く
     readme["A1"].font = Font(bold=True, size=14)
     readme.column_dimensions["A"].width = 48
     readme.column_dimensions["B"].width = 110
@@ -676,11 +697,11 @@ def write_xlsx(rows: list[dict], human: list[str], items: list[dict], bibtex: st
     ws = wb.create_sheet("一覧")
     cols = COLUMNS + human
     for j, c in enumerate(cols, 1):
-        put(ws, 1, j, c)
+        put(ws, 1, j, c, stats)
         ws.cell(row=1, column=j).font = Font(bold=True)
     for i, r in enumerate(rows, 2):
         for j, c in enumerate(cols, 1):
-            put(ws, i, j, r.get(c, ""))
+            put(ws, i, j, r.get(c, ""), stats)
     ws.freeze_panes = "B2"
     ws.auto_filter.ref = ws.dimensions
     widths = {"ID": 14, "著者・題": 60, "出典": 36, "年": 7, "研究の筋": 30, "要約": 60, "特徴": 50, "key": 32, "URL": 40}
@@ -690,31 +711,40 @@ def write_xlsx(rows: list[dict], human: list[str], items: list[dict], bibtex: st
     bs = wb.create_sheet("書誌")
     entries = bib_entries(bibtex)
     for j, c in enumerate(["引用キー", "ID", "key", "種類", "BibTeX"], 1):
-        put(bs, 1, j, c)
+        put(bs, 1, j, c, stats)
         bs.cell(row=1, column=j).font = Font(bold=True)
     for i, (it, r) in enumerate(zip(items, [r for r in rows if r["状態"] != ORPHAN_STATE]), 2):
         for j, v in enumerate([it["id"], r["ID"], r["key"], it.get("type", ""), entries.get(it["id"], "")], 1):
-            put(bs, i, j, v)
+            put(bs, i, j, v, stats)
     bs.freeze_panes = "B2"
     bs.auto_filter.ref = bs.dimensions
     for col, w in zip("ABCDE", (16, 14, 32, 16, 100)):
         bs.column_dimensions[col].width = w
     wb.save(path)
+    return stats
 
 
 def deliver(out: Path, name: str, to: Path) -> list[str]:
-    """作業の成果物のうち xlsx と BibTeX を、渡し先へ日付なしの名前で写す（上書き）。"""
+    """作業の成果物のうち xlsx と BibTeX を、渡し先へ日付なしの名前で写す（上書き）。
+    両方を一時の名前で写し終えてから入れ替える。片方でも無ければ何も写さずに止める（新旧を混ぜない）。"""
+    srcs = {dst: out / src.format(name=name) for src, dst in DELIVER.items()}
+    lacking = [str(p) for p in srcs.values() if not p.exists()]
+    if lacking:
+        raise RuntimeError(f"--deliver で渡すものが無い: {lacking}（何も写していない）")
     to.mkdir(parents=True, exist_ok=True)
-    done = []
-    for src, dst in DELIVER.items():
-        p = out / src.format(name=name)
-        if not p.exists():
-            continue
-        tmp = to / f".{dst}.tmp"
-        shutil.copyfile(p, tmp)
-        tmp.replace(to / dst)
-        done.append(dst)
-    return done
+    tmps: dict[str, Path] = {}
+    try:
+        for dst, p in srcs.items():
+            fd, t = tempfile.mkstemp(prefix=f".{dst}.", suffix=".tmp", dir=to)
+            os.close(fd)
+            tmps[dst] = Path(t)  # 写す前に覚える（写す途中で止まっても消せるように）
+            shutil.copyfile(p, t)
+        for dst, t in tmps.items():
+            t.replace(to / dst)
+    finally:
+        for t in tmps.values():
+            t.unlink(missing_ok=True)
+    return list(srcs)
 
 
 # ---------------------------------------------------------------- 要約が無いもの
@@ -755,6 +785,8 @@ def parse_rekey(pairs: list[str]) -> dict[str, str]:
 
 
 def run(args, source=None) -> int:
+    if args.deliver and (args.no_xlsx or args.no_bib):
+        raise ValueError("--deliver は xlsx と .bib の両方を渡す。--no-xlsx / --no-bib とは一緒に使えない（前の回のものが残って新旧が混ざる）")
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
     branches = args.branches.split(",") if args.branches else cfg["branches"]
     human = cfg.get("human_columns", ["読んだ", "メモ"])
@@ -829,7 +861,7 @@ def run(args, source=None) -> int:
         # 移す段で止まっても、manifest が古いままか、ハッシュが合わないことで分かる
         if not args.no_xlsx:
             bibtex = "" if args.no_bib else (stage / f"{name}_bibtex.bib").read_text(encoding="utf-8")
-            write_xlsx(rows, human, items, bibtex, manifest, stage / f"{name}.xlsx")
+            manifest.update(write_xlsx(rows, human, items, bibtex, manifest, stage / f"{name}.xlsx"))
         manifest["sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(stage.iterdir())}
         (stage / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
         produced = {p.name for p in stage.iterdir()}

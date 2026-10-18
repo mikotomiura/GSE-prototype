@@ -184,6 +184,13 @@ class CslTest(unittest.TestCase):
         self.assertIsNone(build.fix_issued({"date-parts": [["spring"]]}))
         self.assertEqual(build.fix_issued({"date-parts": [["2019", 3]]}), {"date-parts": [[2019, 3]]})
 
+    def test_cite_key_recollision(self):
+        rows = [{"ID": i, "key": k, "状態": "active", "著者・題": "A — T", "出典": "", "年": "", "URL": "", "研究の筋": ""}
+                for i, k in [("P1", "doi:a/zzzzzzzz"), ("P1_zzzzzzzz", "doi:b"), ("P1", "doi:c/zzzzzzzz")]]
+        items, _ = build.build_csl(rows, {}, {})
+        ids = [it["id"] for it in items]
+        self.assertEqual(len(ids), len(set(ids)), ids)
+
     def test_minimal_when_fetch_failed(self):
         row = {"著者・題": "Ee, E. — Epsilon", "出典": "*J. E* 2022", "年": 2022, "URL": "", "key": "doi:10.1/e",
                "研究の筋": "", "ID": "P3"}
@@ -282,8 +289,7 @@ class XlsxTest(Base):
     def test_sheets_rows_and_formula_guard(self):
         evil = {"doi:10.1/a": {**SUMMARIES["doi:10.1/a"], "summary": "=HYPERLINK(\"x\")"}}
         (self.root / "summaries.json").write_text(json.dumps(evil, ensure_ascii=False), encoding="utf-8")
-        deliver_to = self.root / "文献DB"
-        rc, out = self.run_build("--deliver", str(deliver_to), xlsx=True)
+        rc, out = self.run_build(xlsx=True)
         self.assertEqual(rc, 0)
         from openpyxl import load_workbook
         wb = load_workbook(out / "GSE文献DB_2026-10-18.xlsx")
@@ -296,8 +302,39 @@ class XlsxTest(Base):
         self.assertEqual(wb["書誌"].max_row, 1 + 6)
         self.assertEqual(wb["書誌"]["A2"].value, "P1")
         self.assertEqual(build.verify(out), [])  # xlsx も manifest のハッシュに載る
-        self.assertEqual(sorted(p.name for p in deliver_to.iterdir()), ["GSE文献DB.xlsx"])  # --no-bib なので .bib は無い
-        self.assertEqual((deliver_to / "GSE文献DB.xlsx").read_bytes(), (out / "GSE文献DB_2026-10-18.xlsx").read_bytes())
+
+    def test_deliver_refuses_partial_outputs(self):
+        # --no-bib と一緒だと、前の回の GSE文献DB.bib が残って新旧が混ざるので止める
+        deliver_to = self.root / "文献DB"
+        rc, out = self.run_build("--deliver", str(deliver_to), xlsx=True)
+        self.assertEqual(rc, 2)
+        self.assertFalse(deliver_to.exists())
+
+    def test_control_chars_and_cell_limit(self):
+        evil = {"doi:10.1/a": {**SUMMARIES["doi:10.1/a"], "summary": "a\x01b\x00c"}}
+        (self.root / "summaries.json").write_text(json.dumps(evil, ensure_ascii=False), encoding="utf-8")
+        rc, out = self.run_build(xlsx=True)
+        self.assertEqual(rc, 0)
+        from openpyxl import load_workbook
+        ws = load_workbook(out / "GSE文献DB_2026-10-18.xlsx")["一覧"]
+        self.assertEqual(ws.cell(row=2, column=build.COLUMNS.index("要約") + 1).value, "abc")
+        m = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(m["xlsx_removed_control_chars"], 2)
+        before = {p.name: p.read_bytes() for p in out.iterdir()}
+        long = {"doi:10.1/a": {**SUMMARIES["doi:10.1/a"], "summary": "x" * (build.XLSX_CELL_MAX + 1)}}
+        (self.root / "summaries.json").write_text(json.dumps(long, ensure_ascii=False), encoding="utf-8")
+        rc2, _ = self.run_build(xlsx=True)
+        self.assertEqual(rc2, 2)  # 黙って切らずに止める
+        self.assertEqual({p.name: p.read_bytes() for p in out.iterdir()}, before)
+
+    def test_deliver_itself_refuses_missing(self):
+        # 引数の検査とは別に、deliver() も片方が無ければ何も写さない
+        out, to = self.root / "o", self.root / "文献DB"
+        out.mkdir()
+        (out / "N.xlsx").write_bytes(b"x")
+        with self.assertRaises(RuntimeError):
+            build.deliver(out, "N", to)
+        self.assertFalse(to.exists())
 
     def test_bibtex_lands_on_its_row(self):
         def fake_bib(csl_path, base):  # pandoc の代わりに、CSL の引用キーで .bib を書く
@@ -320,6 +357,34 @@ class XlsxTest(Base):
         got = {bs.cell(row=i, column=1).value: bs.cell(row=i, column=5).value for i in range(2, bs.max_row + 1)}
         self.assertEqual(got["P3_doi101e"], "@misc{P3_doi101e,\n  title = {T P3_doi101e}\n}")
         self.assertEqual(sorted(p.name for p in deliver_to.iterdir()), ["GSE文献DB.bib", "GSE文献DB.xlsx"])
+        self.assertEqual((deliver_to / "GSE文献DB.xlsx").read_bytes(), (out / "GSE文献DB_2026-10-18.xlsx").read_bytes())
+
+    def test_deliver_failure_leaves_previous_and_no_tmp(self):
+        out, to = self.root / "o", self.root / "文献DB"
+        out.mkdir()
+        to.mkdir()
+        (out / "N.xlsx").write_bytes(b"new-x")
+        (out / "N_bibtex.bib").write_bytes(b"new-b")
+        (to / "GSE文献DB.xlsx").write_bytes(b"old-x")
+        (to / "GSE文献DB.bib").write_bytes(b"old-b")
+        orig, n = build.shutil.copyfile, [0]
+
+        def flaky(a, b):
+            n[0] += 1
+            if n[0] == 2:
+                raise OSError("ディスクが一杯")
+            return orig(a, b)
+
+        build.shutil.copyfile = flaky
+        try:
+            with self.assertRaises(OSError):
+                build.deliver(out, "N", to)
+        finally:
+            build.shutil.copyfile = orig
+        self.assertEqual(sorted(p.name for p in to.iterdir()), ["GSE文献DB.bib", "GSE文献DB.xlsx"])  # 一時のものが残らない
+        self.assertEqual(((to / "GSE文献DB.xlsx").read_bytes(), (to / "GSE文献DB.bib").read_bytes()), (b"old-x", b"old-b"))
+        self.assertEqual(build.deliver(out, "N", to), ["GSE文献DB.xlsx", "GSE文献DB.bib"])
+        self.assertEqual((to / "GSE文献DB.bib").read_bytes(), b"new-b")
 
     def test_bib_entries(self):
         text = "@article{P1,\n  title = {A}\n}\n@misc{P3_doi101e,\n  note = {x @ y}\n}\n"
