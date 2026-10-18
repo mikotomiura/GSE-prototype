@@ -38,7 +38,7 @@
 - [x] `c_search.py`・`acm_export.js`（自己検査と変異・Europe PMC で試しに通す）
 - [x] `c_synthesis.py`・`make_dummy.py` に層 coverage と見落としの数の見込み
 - [x] 登録版 0.12・骨子 Version 4・草稿・添付 3 の第 16 節・手順・添付の目録
-- [ ] /cross-review（判断 36〜38 の差分）
+- [x] /cross-review 1 巡目（判断 36〜38 の差分・判断 39 で対応）
 - [ ] 研究者: OpenAlex の API キーを `~/.config/openalex/api_key` に置く
 - [ ] 検索の本番（3 つの情報源を同じ日に）・抽出・`registration-attachments/coverage/` に書誌と数・登録版の **[at registration]**
 - [ ] 確かめの標本 300 件を DB の材料に（訳・`make_screening_candidates.py`・`make_trace_db.py`・`c_screening.py` が CS の記録を読む）
