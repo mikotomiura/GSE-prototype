@@ -1,0 +1,231 @@
+<title>GSE 文献の索引</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Zen+Old+Mincho:wght@600&display=swap">
+<style>
+/* Layout: 左に絞り込みの欄、右に文献の行。行は開くと接地とカードを読める。狭い画面では欄を上に積む */
+:root {
+  --bg: #f5f6f4;
+  --panel: #ffffff;
+  --ink: #1d2427;
+  --muted: #5d6a6e;
+  --line: #d9dfdd;
+  --accent: #1f6f6b;
+  --accent-soft: #dcefec;
+  --warn: #9a5b12;
+  --warn-soft: #f6ead8;
+  --bar: #9fc7c2;
+  --f-display: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --f-body: "IBM Plex Sans JP", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121718; --panel: #1a2123; --ink: #e3e9e7; --muted: #95a3a2; --line: #2c3638;
+  --accent: #6cc3ba; --accent-soft: #1d3634; --warn: #e2a95e; --warn-soft: #3a2c1a; --bar: #2f6460; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121718; --panel: #1a2123; --ink: #e3e9e7; --muted: #95a3a2; --line: #2c3638;
+  --accent: #6cc3ba; --accent-soft: #1d3634; --warn: #e2a95e; --warn-soft: #3a2c1a; --bar: #2f6460; color-scheme: dark }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+h1 { font-family: var(--f-display); font-weight: 600; font-size: 1.7rem; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+.sub { color: var(--muted); font-size: .86rem; }
+.search { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.search input { flex: 1 1 320px; min-width: 0; font: inherit; font-size: 1rem; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+.search input:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.count { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.count b { color: var(--ink); font-weight: 500; font-size: 1.15rem; }
+.reset { font: inherit; font-size: .85rem; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.reset:hover { color: var(--ink); border-color: var(--muted); }
+.main { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr); } }
+aside { display: grid; gap: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.facet h2 { font-size: .74rem; font-weight: 600; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; text-transform: uppercase; }
+.opt { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; width: 100%; text-align: left; font: inherit; font-size: .86rem; color: var(--ink);
+  background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 4px 8px; cursor: pointer; position: relative; overflow: hidden; }
+.opt .fill { position: absolute; inset: 0 auto 0 0; background: var(--accent-soft); z-index: 0; transition: width .2s; }
+.opt span { position: relative; z-index: 1; }
+.opt .n { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--muted); font-size: .8rem; }
+.opt:hover { border-color: var(--line); }
+.opt[aria-pressed="true"] { border-color: var(--accent); }
+.opt[aria-pressed="true"] span:first-child { font-weight: 600; color: var(--accent); }
+.opt.zero { opacity: .45; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: .82rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.years svg { width: 100%; height: 64px; display: block; }
+.years .lbl { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: .72rem; color: var(--muted); }
+.years .sel { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+.list { display: grid; gap: 8px; min-width: 0; }
+details.item { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+details.item[open] { border-color: var(--accent); }
+details.item summary { list-style: none; cursor: pointer; padding: 10px 14px; display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; }
+details.item summary::-webkit-details-marker { display: none; }
+.id { font-family: var(--f-mono); font-size: .8rem; color: var(--accent); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ti { min-width: 0; }
+.ti .t { font-weight: 500; overflow-wrap: anywhere; }
+.ti .s { color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
+.yr { font-family: var(--f-mono); font-size: .8rem; color: var(--muted); }
+.tags { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { font-size: .72rem; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.tag.plain { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+@media (max-width: 560px) { details.item summary { grid-template-columns: minmax(0, 1fr) auto; } .id { grid-column: 1 / 3; } .tags { grid-column: 1 / 3; } }
+.body { padding: 0 14px 14px; display: grid; gap: 10px; border-top: 1px solid var(--line); margin-top: 2px; padding-top: 12px; }
+.body dl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: .86rem; }
+.body dt { color: var(--muted); }
+.body dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+.body a { color: var(--accent); }
+.note { font-size: .88rem; max-width: 72ch; margin: 0; }
+.ti .sm { display: block; margin-top: 4px; font-size: .84rem; color: var(--ink); opacity: .85; max-width: 80ch; }
+.feat { margin: 0; font-size: .84rem; font-family: var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+.basis { margin: 0; font-size: .76rem; color: var(--muted); }
+.cc h3 { font-size: .74rem; letter-spacing: .08em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+.cc ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: .85rem; max-width: 80ch; }
+.cd { font-family: var(--f-mono); font-size: .74rem; color: var(--muted); margin-right: 6px; }
+.tp { font-size: .7rem; padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); margin-right: 6px; }
+.more { text-align: center; }
+.more button { font: inherit; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; }
+.empty { padding: 30px; text-align: center; color: var(--muted); background: var(--panel); border: 1px dashed var(--line); border-radius: 8px; }
+footer { color: var(--muted); font-size: .8rem; max-width: 90ch; }
+mark { background: var(--warn-soft); color: inherit; padding: 0 1px; }
+@media (prefers-reduced-motion: reduce) { .opt .fill { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>GSE 文献の索引</h1>
+    <span class="sub">6 枝の docs/references.md を key でまとめた 906 件・2026-10-18 時点の写し</span>
+  </header>
+  <div class="search">
+    <input id="q" type="search" placeholder="題・要約・特徴・カードでの記述・接地・DOI・ID で探す（例: 注意、IME、Respire、P534）" autocomplete="off">
+    <span class="count" id="count"></span>
+    <button class="reset" id="reset" type="button">条件を消す</button>
+  </div>
+  <div class="main">
+    <aside aria-label="絞り込み">
+      <section class="facet"><h2>研究の筋</h2><div id="f-strand"></div></section>
+      <section class="facet"><h2>名前空間</h2><div class="chips" id="f-ns"></div></section>
+      <section class="facet"><h2>状態</h2><div class="chips" id="f-st"></div></section>
+      <section class="facet years"><h2>年</h2><svg id="yrchart" viewBox="0 0 260 64" preserveAspectRatio="none" aria-label="年ごとの件数"></svg><div class="lbl" id="yrlbl"></div><div class="sel" id="yrsel"></div></section>
+      <section class="facet"><h2>注意</h2><div class="chips" id="f-flag"></div></section>
+    </aside>
+    <section class="list" id="list" aria-live="polite"></section>
+  </div>
+  <footer>
+    研究の筋は、その文献を引いた精読カード（docs/literature/）の筋をすべて持つ。どのカードにも引かれていないものは、筋を推測で付けず「カード外」（ADR・設計文書などからだけ引かれている）か「未引用」とした。
+    「番号の衝突」は、同じ番号が枝によって別の文献を指すもので、この番号で引くときは枝を確かめる。書誌の正本は各枝の references.md で、このページは自動では更新されない。
+  </footer>
+</div>
+
+<script>
+const DATA = __DATA__;
+const STRANDS = __STRANDS__;
+const S = { q: "", strand: null, ns: null, st: null, flag: null, y0: null, y1: null, limit: 60 };
+try { const s = JSON.parse(localStorage.getItem("gse-refidx") || "null"); if (s) Object.assign(S, s, { limit: 60 }); } catch (e) {}
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+DATA.forEach((d) => { d._h = [d.id, d.at, d.src, d.sum, d.feat, d.note, d.key, d.cards.map((c) => c.t).join(" "), d.cc.map((c) => c.t).join(" "), d.other.join(" ")].join(" ").toLowerCase(); });
+const YEARS = DATA.map((d) => d.yr).filter(Boolean);
+const YMIN = Math.max(1950, Math.min(...YEARS)), YMAX = Math.max(...YEARS);
+
+function pass(d, skip) {
+  if (skip !== "q" && S.q) { for (const w of S.q.toLowerCase().split(/\s+/).filter(Boolean)) if (!d._h.includes(w)) return false; }
+  if (skip !== "strand" && S.strand && !d.strands.includes(S.strand)) return false;
+  if (skip !== "ns" && S.ns && !d.ns.includes(S.ns)) return false;
+  if (skip !== "st" && S.st && d.st !== S.st) return false;
+  if (skip !== "flag" && S.flag === "coll" && !d.coll) return false;
+  if (skip !== "flag" && S.flag === "prov" && !d.st.startsWith("provisional")) return false;
+  if (skip !== "yr" && S.y0 !== null && (!d.yr || d.yr < S.y0 || d.yr > S.y1)) return false;
+  return true;
+}
+function save() { try { const { limit, ...rest } = S; localStorage.setItem("gse-refidx", JSON.stringify(rest)); } catch (e) {} }
+
+function facetList(el, key, values, label) {
+  const base = DATA.filter((d) => pass(d, key));
+  const max = Math.max(1, ...values.map((v) => base.filter((d) => match(d, key, v)).length));
+  el.innerHTML = values.map((v) => {
+    const n = base.filter((d) => match(d, key, v)).length;
+    return `<button type="button" class="opt${n ? "" : " zero"}" aria-pressed="${S[key] === v}" data-k="${key}" data-v="${esc(v)}"><i class="fill" style="width:${(n / max) * 100}%"></i><span>${esc(label ? label(v) : v)}</span><span class="n">${n}</span></button>`;
+  }).join("");
+}
+function chips(el, key, values) {
+  const base = DATA.filter((d) => pass(d, key));
+  el.innerHTML = values.map(([v, l]) => {
+    const n = base.filter((d) => match(d, key, v)).length;
+    return `<button type="button" class="chip" aria-pressed="${S[key] === v}" data-k="${key}" data-v="${esc(v)}">${esc(l)} <span class="n">${n}</span></button>`;
+  }).join("");
+}
+function match(d, key, v) {
+  if (key === "strand") return d.strands.includes(v);
+  if (key === "ns") return d.ns.includes(v);
+  if (key === "st") return d.st === v;
+  if (key === "flag") return v === "coll" ? d.coll : d.st.startsWith("provisional");
+  return false;
+}
+function years() {
+  const base = DATA.filter((d) => pass(d, "yr"));
+  const span = YMAX - YMIN + 1, counts = new Array(span).fill(0);
+  base.forEach((d) => { if (d.yr && d.yr >= YMIN) counts[d.yr - YMIN]++; });
+  const max = Math.max(1, ...counts), w = 260 / span;
+  $("yrchart").innerHTML = counts.map((c, i) => {
+    const y = YMIN + i, on = S.y0 === null || (y >= S.y0 && y <= S.y1), h = (c / max) * 60;
+    return `<rect x="${i * w + 0.3}" y="${62 - h}" width="${Math.max(w - 0.6, 0.6)}" height="${h}" fill="${on ? "var(--accent)" : "var(--bar)"}" data-y="${y}" style="cursor:pointer"><title>${y}: ${c} 件</title></rect>`;
+  }).join("") + `<line x1="0" y1="62.5" x2="260" y2="62.5" stroke="var(--line)" stroke-width="1"/>`;
+  $("yrlbl").innerHTML = `<span>${YMIN}</span><span>${Math.round((YMIN + YMAX) / 2)}</span><span>${YMAX}</span>`;
+  $("yrsel").textContent = S.y0 === null ? "棒を押すとその年から、もう一度押すとそこまでに絞る" : (S.y0 === S.y1 ? `${S.y0} 年` : `${S.y0}〜${S.y1} 年`) + "（棒を押し直すと解除）";
+}
+function hi(s) {
+  let out = esc(s);
+  for (const w of S.q.split(/\s+/).filter((w) => w.length > 1)) {
+    const re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    out = out.replace(re, (m) => `<mark>${m}</mark>`);
+  }
+  return out;
+}
+function row(d) {
+  const tags = d.strands.map((s) => `<span class="tag${s === "カード外" || s === "未引用" ? " plain" : ""}">${esc(s)}</span>`).join("")
+    + (d.coll ? `<span class="tag warn">番号の衝突</span>` : "") + (d.st !== "active" ? `<span class="tag plain">${esc(d.st)}</span>` : "");
+  const link = d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.url)}</a>` : "（なし）";
+  const cards = d.cards.length ? d.cards.map((c) => `${esc(c.t)}（${esc(c.f)}）`).join("<br>") : "（なし）";
+  return `<details class="item"><summary><span class="id">${hi(d.id)}</span><span class="ti"><span class="t">${hi(d.at)}</span><br><span class="s">${hi(d.src)}</span>${d.sum ? `<span class="sm">${hi(d.sum)}</span>` : ""}</span><span class="yr">${d.yr || ""}</span><span class="tags">${tags}</span></summary>
+  <div class="body">${d.feat ? `<p class="feat">${hi(d.feat)}</p>` : ""}${d.sum ? `<p class="basis">要約の材料: ${esc(d.basis)}（Claude が書いた要約。引く前に原著で確かめる）</p>` : ""}
+  ${d.cc.length ? `<div class="cc"><h3>カードでの記述</h3><ul>${d.cc.map((c) => `<li><span class="cd">${esc(c.d)}</span>${c.temp ? `<span class="tp">${esc(c.temp)}</span>` : ""}${hi(c.t)}</li>`).join("")}</ul></div>` : ""}
+  <div class="cc"><h3>GSE での接地</h3><p class="note">${hi(d.note || "（接地の記述なし）")}</p></div><dl>
+  <dt>key</dt><dd>${esc(d.key)}</dd><dt>リンク</dt><dd>${link}</dd><dt>引いたカード</dt><dd>${cards}</dd>
+  ${d.other.length ? `<dt>カード外の引用元</dt><dd>${d.other.map(esc).join("<br>")}</dd>` : ""}
+  <dt>枝</dt><dd>${esc(d.br)}</dd></dl></div></details>`;
+}
+function render() {
+  facetList($("f-strand"), "strand", STRANDS);
+  chips($("f-ns"), "ns", [["P", "P 理論・先行研究"], ["V", "V 検証の方法論"]]);
+  chips($("f-st"), "st", [["active", "active"], ["provisional", "provisional"], ["superseded", "superseded"]]);
+  chips($("f-flag"), "flag", [["coll", "番号の衝突あり"], ["prov", "書誌が未確定"]]);
+  years();
+  const hits = DATA.filter((d) => pass(d));
+  $("count").innerHTML = `<b>${hits.length}</b> / ${DATA.length} 件`;
+  $("list").innerHTML = hits.length
+    ? hits.slice(0, S.limit).map(row).join("") + (hits.length > S.limit ? `<div class="more"><button type="button" id="more">さらに ${Math.min(60, hits.length - S.limit)} 件を表示（残り ${hits.length - S.limit}）</button></div>` : "")
+    : `<div class="empty">条件に合う文献はありません。語を短くするか、絞り込みを外してください。</div>`;
+  save();
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-k]");
+  if (b) { const k = b.dataset.k, v = b.dataset.v; S[k] = S[k] === v ? null : v; S.limit = 60; render(); return; }
+  const r = e.target.closest("rect[data-y]");
+  if (r) {
+    const y = +r.dataset.y;
+    if (S.y0 === null) { S.y0 = y; S.y1 = YMAX; }
+    else if (S.y1 === YMAX && y >= S.y0 && S.y0 !== y) { S.y1 = y; }
+    else { S.y0 = null; S.y1 = null; }
+    S.limit = 60; render(); return;
+  }
+  if (e.target.id === "more") { S.limit += 60; render(); }
+  if (e.target.id === "reset") { Object.assign(S, { q: "", strand: null, ns: null, st: null, flag: null, y0: null, y1: null, limit: 60 }); $("q").value = ""; render(); }
+});
+let t; $("q").value = S.q;
+$("q").addEventListener("input", (e) => { clearTimeout(t); t = setTimeout(() => { S.q = e.target.value.trim(); S.limit = 60; render(); }, 120); });
+render();
+</script>
