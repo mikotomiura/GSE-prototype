@@ -569,7 +569,7 @@ r1 = list(wb1["段1"].iter_rows(values_only=True))
 assert [c for c in r1[0] if c and c.startswith("最終")] == [] and "全文" not in r1[0]
 assert sorted(r[0] for r in r1[1:]) == sorted(cdb.stage1_sample(IDS))
 assert [r[1] for r in r1[1:]] == sorted(r[1] for r in r1[1:])  # in the screening order
-assert {r[3] for r in r1[1:]} == {"未判定"} and all(not r[4] and not r[5] and not r[6] for r in r1[1:])
+assert {r[4] for r in r1[1:]} == {"未判定"} and all(not r[5] and not r[6] and not r[7] for r in r1[1:])
 ids_f = root / "co2-ids.txt"
 ids_f.write_text("D11\nD01\nD14\n", encoding="utf-8")
 cdb.main(["--stage", "2", "--batch", "b01", "--ids", str(ids_f), "--data", str(data), "--fulltext", str(ftdir),

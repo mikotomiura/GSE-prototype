@@ -29,6 +29,8 @@ import json
 import os
 
 from openpyxl import Workbook
+
+import trace_style as st
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.datavalidation import DataValidation
 
@@ -43,10 +45,10 @@ READ_CHOICES = "題名のみ,抄録,全文の一部,全文"
 STAGE1_FINAL = "含める,除外"
 CENTRE_FINAL = "中心-A,中心-B"
 BATCH = 9  # records per batch (GSRR-33)
-STAGE1_COLS = ["ID", "順", "束", "対象の群", "論文タイトル", "判定", "除外理由", "読んだ範囲", "根拠メモ", "最終",
-               "最終の除外理由"]
-STAGE2_COLS = ["ID", "順", "対象の群", "論文タイトル", "全文", "ファイル", "判定", "除外理由", "中心", "読んだ範囲",
-               "根拠メモ", "最終", "最終の除外理由", "最終の中心", "同じ標本の相手（E5）"]
+STAGE1_COLS = ["ID", "順", "束", "対象の群", "論文タイトル", "題名（日本語・機械訳）", "判定", "除外理由", "読んだ範囲",
+               "根拠メモ", "最終", "最終の除外理由"]
+STAGE2_COLS = ["ID", "順", "対象の群", "論文タイトル", "題名（日本語・機械訳）", "全文", "ファイル", "判定", "除外理由", "中心",
+               "読んだ範囲", "根拠メモ", "最終", "最終の除外理由", "最終の中心", "同じ標本の相手（E5）"]
 
 CRITERIA = [
     ("問い", "AI の系を使う・監督する・評価する人の一次研究で、疲労をその AI の利用と関係づけて定義・測定・質的に分析しているもの。疲労＝認知・情動・身体・動機・行動の消耗、疲弊、燃え尽き様の消耗。"),
@@ -122,6 +124,19 @@ def fulltext_status(rid, meta, chrome, ftdir):
     return ("無料の版なし（OpenAlex: closed）" if oa == "closed" else "未取得"), "", ""
 
 
+def link_cell(target, label):
+    return (target, label) if target else None
+
+
+def drive_link(name, drive):
+    """The Drive link of a full text. For Europe PMC XML, its machine-extracted text, which reads in a browser."""
+    if name.endswith(".xml"):
+        txt = name[:-4] + ".txt"
+        if txt in drive:
+            return drive[txt], txt
+    return (drive[name], name) if name in drive else None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
@@ -133,78 +148,97 @@ def main():
     recs = sorted(load(os.path.join(data, "records264.json")), key=lambda r: r["order"])
     meta = load(os.path.join(data, "meta.json"), {})
     chrome = load(os.path.join(data, "chrome_status.json"), {})
+    ja = load(os.path.join(data, "ja.json"), {})            # machine translations (decision 35), optional
+    drive = load(os.path.join(data, "drive_links.json"), {})  # file name -> Google Drive URL, optional
     today = datetime.date.today().isoformat()
+    n_ft = sum(fulltext_status(r["id"], meta, chrome, ftdir)[0] == "あり" for r in recs)
+    bib_row = {r["id"]: i + 2 for i, r in enumerate(recs)}  # row of each record in '文献DB'
 
     wb = Workbook()
-    ws = wb.active
-    ws.title = "はじめに"
-    n_ft = sum(fulltext_status(r["id"], meta, chrome, ftdir)[0] == "あり" for r in recs)
-    for line in [
-        ["TRACE｜追加候補の文献 DB（判定者 1 用）"],
-        [f"作成 {today}。追加候補 264 件（元の DB の追加候補 221 件と、レビューを狙った探索の 43 件）。"],
-        ["段 1（題名・抄録）は『段1』、段 2（全文）と段 3（中心）は『段2・3』の青い欄に記入する。行は登録で決めた選別の順（群ごとに乱数で並べ、群を交互に並べた順）。束（9 件ずつ）ごとに上から判定する。束の ID は c_screening.py が示す。"],
-        ["段 1 は題名と抄録だけで判定する。その束の段 1 をコミットするまで、『段2・3』『全文』のシートと fulltext フォルダを開かない。段 2 で含めた記録には、同じときに中心も付ける。『最終…』の欄は、AI と食い違った記録にだけ、AI の答えを読んでから記入する。"],
-        ["このファイルには AI の判定も、以前の判定（2026-10 の判定者 1 の判定・AI の評価版）も入れていない。264 件すべてを空欄から判定する。AI の判定は登録の後に別のファイルで付け、両方がそろってから食い違いを見る。"],
-        ["基準は『判定基準』。抄録は『文献DB』にある（取れなかった件はリンク先で読む）。全文は fulltext フォルダの <ID>.pdf・<ID>.html（出版社の記事ページ）・<ID>.xml（PMC の本文。同じ名前の .txt は本文を機械で抜き出したもの）。一覧は『全文』のシート。"],
-        [f"全文あり: {n_ft} 件 / 264 件（無料で公開された版だけ。有料の版は使わない）。"],
-        ["対象の群は並べ替えのためで、判定の材料ではない。群の無い記録（レビュー型など）は『不明』に入れた。"],
-    ]:
-        ws.append(line)
-    ws.column_dimensions["A"].width = 140
-    for row in ws.iter_rows():
-        row[0].alignment = WRAP
-    ws["A1"].font = Font(bold=True, size=13)
+    st.intro(wb.active, "TRACE｜追加候補の文献 DB（判定者 1 用）",
+             f"作成 {today}・追加候補 {len(recs)} 件・全文あり {n_ft} 件（無料で公開された版だけ）", [
+        ("進め方", [
+            "段 1（題名・抄録）は『段1』、段 2（全文）と段 3（中心）は『段2・3』の青い欄に記入する。行は登録で決めた選別の順。束（9 件ずつ）ごとに上から判定する。束の ID は c_screening.py が示す。",
+            "段 1 は題名と抄録だけで判定する。ID を押すと『文献DB』のその記録の抄録（英語と日本語）へ飛ぶ。その束の段 1 をコミットするまで、『段2・3』『全文』のシートと全文のファイルは開かない。",
+            "段 2 で含めた記録には、同じときに中心も付ける。全文は『段2・3』の「ファイル」のリンクから Google Drive で開く。",
+            "『最終…』の欄は、AI と食い違った記録にだけ、AI の答えを読んでから記入する。",
+        ]),
+        ("このファイルに入っていないもの", [
+            "AI の判定も、以前の判定（2026-10 の判定者 1 の判定・AI の評価版）も入れていない。264 件すべてを空欄から判定する。",
+        ]),
+        ("日本語訳について", [
+            "題名と抄録の日本語は Claude による機械訳で、読む助けにすぎない。判定の根拠は英語の原文とする。AI の選別者には英語だけを渡している。",
+        ]),
+        ("注意", [
+            "対象の群は並べ替えのためで、判定の材料ではない。群の無い記録（レビュー型など）は『不明』に入れた。基準は『判定基準』。",
+        ]),
+    ])
+
+    def jt(r):
+        return (ja.get(r["id"]) or {}).get("title_ja", "")
 
     s1 = wb.create_sheet("段1")
-    header(s1, STAGE1_COLS, [9, 5, 5, 16, 60, 12, 12, 12, 40, 12, 14])
-    for r in recs:
-        s1.append([r["id"], r["order"] + 1, r["order"] // BATCH + 1, r["population"], r["title"], "未判定", "", "", "",
-                   "", ""])
-    fill_inputs(s1, STAGE1_COLS, [("判定", STAGE_CHOICES), ("除外理由", CODE_CHOICES), ("読んだ範囲", READ_CHOICES),
-                                  ("最終", STAGE1_FINAL), ("最終の除外理由", CODE_CHOICES)])
+    st.table(s1, STAGE1_COLS, [10, 5, 5, 14, 52, 40, 11, 10, 11, 32, 10, 12],
+             [[r["id"], r["order"] + 1, r["order"] // BATCH + 1, r["population"], r["title"], jt(r), "未判定", "", "",
+               "", "", ""] for r in recs],
+             inputs={"判定", "除外理由", "読んだ範囲", "根拠メモ", "最終", "最終の除外理由"},
+             wrap={"対象の群", "論文タイトル", "題名（日本語・機械訳）", "根拠メモ"},
+             links={"ID": lambda v: (f"#'文献DB'!A{bib_row[v[0]]}", v[0])},
+             tab="2563EB", height=lambda v: st.text_height((v[3], 14), (v[4], 52), (v[5], 40)))
+    st.choices(s1, STAGE1_COLS, [("判定", STAGE_CHOICES), ("除外理由", CODE_CHOICES), ("読んだ範囲", READ_CHOICES),
+                                 ("最終", STAGE1_FINAL), ("最終の除外理由", CODE_CHOICES)])
+
+    def ft_link(v):
+        return drive_link(v[6], drive) if v[6] else None
 
     s2 = wb.create_sheet("段2・3")
-    header(s2, STAGE2_COLS, [9, 5, 16, 60, 18, 14, 10, 12, 14, 12, 40, 10, 14, 12, 14])
-    for r in recs:
-        st = fulltext_status(r["id"], meta, chrome, ftdir)[0]
-        s2.append([r["id"], r["order"] + 1, r["population"], r["title"], st, fulltext_file(r["id"], ftdir), "未判定", "",
-                   "未判定", "", "", "", "", "", ""])
-    fill_inputs(s2, STAGE2_COLS, [("判定", STAGE_CHOICES), ("除外理由", CODE_CHOICES), ("中心", CENTRE_CHOICES),
-                                  ("読んだ範囲", READ_CHOICES), ("最終", STAGE_CHOICES), ("最終の除外理由", CODE_CHOICES),
-                                  ("最終の中心", CENTRE_FINAL)], free=("根拠メモ", "同じ標本の相手（E5）"))
+    st.table(s2, STAGE2_COLS, [10, 5, 14, 46, 34, 14, 14, 11, 10, 13, 11, 30, 10, 12, 12, 14],
+             [[r["id"], r["order"] + 1, r["population"], r["title"], jt(r), fulltext_status(r["id"], meta, chrome, ftdir)[0],
+               fulltext_file(r["id"], ftdir), "未判定", "", "未判定", "", "", "", "", "", ""] for r in recs],
+             inputs={"判定", "除外理由", "中心", "読んだ範囲", "根拠メモ", "最終", "最終の除外理由", "最終の中心",
+                     "同じ標本の相手（E5）"},
+             wrap={"対象の群", "論文タイトル", "題名（日本語・機械訳）", "根拠メモ"},
+             links={"ID": lambda v: (f"#'文献DB'!A{bib_row[v[0]]}", v[0]), "ファイル": ft_link},
+             tab="0D9488", height=lambda v: st.text_height((v[2], 14), (v[3], 46), (v[4], 34)))
+    st.choices(s2, STAGE2_COLS, [("判定", STAGE_CHOICES), ("除外理由", CODE_CHOICES), ("中心", CENTRE_CHOICES),
+                                 ("読んだ範囲", READ_CHOICES), ("最終", STAGE_CHOICES), ("最終の除外理由", CODE_CHOICES),
+                                 ("最終の中心", CENTRE_FINAL)])
 
     db = wb.create_sheet("文献DB")
-    cols = ["ID", "論文タイトル", "著者", "年", "掲載誌・媒体", "DOI", "リンク", "出どころ", "同じ研究の群", "対象の群",
-            "抄録", "抄録の出どころ", "注記"]
-    header(db, cols, [9, 50, 30, 6, 28, 26, 30, 16, 22, 16, 90, 14, 30])
+    cols = ["ID", "論文タイトル", "題名（日本語・機械訳）", "抄録", "抄録（日本語・機械訳）", "著者", "年", "掲載誌・媒体",
+            "DOI", "抄録の出どころ", "同じ研究の群", "対象の群", "出どころ", "注記"]
+    rows = []
     for r in recs:
         m = meta.get(r["id"], {})
         doi = str(r.get("doi") or "")
-        link = "https://doi.org/" + doi if doi.startswith("10.") else ""
+        doi = doi if doi.startswith("10.") else ""
         note = r.get("population_note", "")
         if r["id"] == "S04-36":
             note = (note + " ").strip() + "全文はワーキングペーパー版（題名が少し違う）"
-        db.append([r["id"], r["title"], m.get("authors", ""), r.get("year"), r.get("journal"), doi, link, r.get("source"),
-                   r.get("group", ""), r["population"], m.get("abstract", ""), m.get("abstract_source", ""), note])
-    for row in db.iter_rows(min_row=2):
-        row[10].alignment = WRAP
-        row[1].alignment = WRAP
+        ab = (m.get("abstract") or "").strip()
+        rows.append([r["id"], r["title"], jt(r), ab or "（抄録は取れなかった）", (ja.get(r["id"]) or {}).get("abstract_ja", ""),
+                     m.get("authors", ""), r.get("year"), r.get("journal"), doi, m.get("abstract_source", ""),
+                     r.get("group", ""), r["population"], r.get("source"), note])
+    st.table(db, cols, [10, 36, 30, 70, 60, 24, 6, 22, 24, 12, 18, 14, 16, 24], rows,
+             wrap={"論文タイトル", "題名（日本語・機械訳）", "抄録", "抄録（日本語・機械訳）", "著者", "掲載誌・媒体", "注記"},
+             links={"DOI": lambda v: link_cell("https://doi.org/" + v[8] if v[8] else "", v[8])},
+             tab="64748B", height=lambda v: st.text_height((v[1], 36), (v[2], 30), (v[3], 70), (v[4], 60)))
 
     ft = wb.create_sheet("全文")
-    header(ft, ["ID", "全文", "ファイル", "取得元", "取り方", "OA の状態（OpenAlex）"], [9, 26, 14, 70, 10, 18])
+    rows = []
     for r in recs:
-        st, url, how = fulltext_status(r["id"], meta, chrome, ftdir)
-        ft.append([r["id"], st, fulltext_file(r["id"], ftdir), url, how, meta.get(r["id"], {}).get("oa_status") or ""])
+        stt, url, how = fulltext_status(r["id"], meta, chrome, ftdir)
+        rows.append([r["id"], stt, fulltext_file(r["id"], ftdir), url, how, meta.get(r["id"], {}).get("oa_status") or ""])
+    st.table(ft, ["ID", "全文", "ファイル", "取得元", "取り方", "OA の状態（OpenAlex）"], [10, 24, 16, 60, 12, 18], rows,
+             links={"ファイル": lambda v: drive_link(v[2], drive) if v[2] else None,
+                    "取得元": lambda v: link_cell(v[3], v[3])}, tab="64748B")
 
     cr = wb.create_sheet("判定基準")
-    header(cr, ["項目", "内容"], [22, 120])
-    for k, v in CRITERIA:
-        cr.append([k, v])
-    for row in cr.iter_rows(min_row=2):
-        row[1].alignment = WRAP
+    st.table(cr, ["項目", "内容"], [22, 120], [list(x) for x in CRITERIA], wrap={"内容"}, tab="64748B",
+             height=lambda v: st.text_height((v[1], 120)))
 
     wb.save(os.path.expanduser(a.out))
-    print(f"wrote {a.out}: {len(recs)} records, full text {n_ft}")
+    print(f"wrote {a.out}: {len(recs)} records, full text {n_ft}, translations {len(ja)}, Drive links {len(drive)}")
 
 
 if __name__ == "__main__":

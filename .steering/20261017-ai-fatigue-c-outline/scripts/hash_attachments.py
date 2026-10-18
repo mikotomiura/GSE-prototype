@@ -38,6 +38,8 @@ ATTACHMENTS = [
     (6, "screening tools: batches, inputs, format check, final decisions, release", TASK / "scripts" / "c_screening.py"),
     (6, "screening tools: checks on dummy records", TASK / "scripts" / "check_screening.py"),
     (6, "screening database generator", TASK / "scripts" / "make_trace_db.py"),
+    (6, "screening database: look of the workbooks", TASK / "scripts" / "trace_style.py"),
+    (6, "screening database: Google Drive links of the full texts", TASK / "scripts" / "drive_links.py"),
 ]
 
 
