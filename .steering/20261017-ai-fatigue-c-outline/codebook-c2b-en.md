@@ -7,6 +7,7 @@ Changes from version 1 (fixed 2026-10-15 in Japanese and used only for explorati
 - `OTHER` is added as a target.
 - The coder values are changed.
 - Reverse-keyed items, counting rules and the sources of anchors are written out.
+- Added on 2026-10-19, before registration: what counts as one item, items that ask about two things, negated items, instrument versions and item availability, and no change during main coding.
 
 Any later change will be versioned and logged as an amendment, with the reason and the affected rows.
 
@@ -15,7 +16,19 @@ Any later change will be versioned and logged as an amendment, with the reason a
 - Code the **item wording only**. The scale authors' factor name is copied into `author_factor` and is not used for coding. For the exploration records only, disagreement between the wording-based code and the factor name was recorded in `mismatch`; this column is not coded for other records.
 - Instructions or stems (for example, "After video conferencing ...") are copied into `context`. They show the situation the item refers to. They are not used to decide the type.
 - Give each item one primary type. If an item falls between two types, set `boundary` = 1 and record the other type in `secondary_type`. Give the reason in one sentence in `rationale`.
-- Reverse-keyed items take the type of the dimension they ask about, from either pole. For example, "I feel full of energy" is `FAT`, and "I am interested in ..." is `MOT`.
+- Reverse-keyed items take the type of the dimension they ask about, from either pole. For example, "I feel full of energy" is `FAT`, and "I am interested in ..." is `MOT`. Negated items are coded the same way: "I do not feel like doing anything" is `MOT`.
+- **One item** is one statement with its own response. A statement with sub-parts that each have their own response gives one item per sub-part. A statement answered once is one item, whatever it contains. The instructions or stem are never an item.
+- **An item that asks about two things** in one statement (for example, tiredness and lost interest, or a bodily symptom and reduced motivation) takes as primary type the state the respondent is asked to rate; if two states are joined (by "and" or "or"), the first named. Set `boundary` = 1 and record the other as `secondary_type`. An item where tiredness is given as the reason for something else follows the anchor "too tired to do other things" (primary `FAT`, secondary `MOT`).
+
+## Instrument versions and item availability
+
+- An instrument version is identified by its item wording together with its language (registration GSRR-43). Versions with the same name but different wording, a different number of items or a different language are separate versions and are never merged. A translation is its own version, coded from the translated wording as printed.
+- If the report neither prints the items nor states that an existing scale was used without modification, the instrument is coded "items unavailable".
+- If the report states that an existing scale was used without modification, the items are taken from the cited source (`item_source` = source). If the cited source cannot be accessed, or it holds more than one version and the report does not say which was used, the instrument is coded "items unavailable".
+
+## No change during main coding
+
+The codebook may be amended only from the disagreements of the calibration passes, before main coding (registration GSRR-44). During main coding it is not changed: a case the rules do not settle is coded under the rules as they stand (for an item, with the reason in `rationale`) and listed; the list is reported with the deviations (Table 2).
 
 ## Step 1: content type (`type`)
 

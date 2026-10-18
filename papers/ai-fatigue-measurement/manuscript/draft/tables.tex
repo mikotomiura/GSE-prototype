@@ -1,4 +1,4 @@
-% Figure 1 and Tables 1-15. Rows and columns follow the registration and the manuscript outline; Table 1 is filled
+% Figure 1 and Tables 1-16. Rows and columns follow the registration and the manuscript outline; Table 1 is filled
 % from the registration, Table 14 holds the rows the outline names, and every other value is a dash until coding.
 % Column types are limited to l, c and X so that pandoc can read the tables for the Word copy (make_docx.py).
 
@@ -51,53 +51,67 @@ Date & Registration item or outline section & Change and reason & Codes or table
 \begin{table}[!htbp]
 \centering
 \caption{Sets and their composition (shell).}
-\small
-\begin{tabularx}{\linewidth}{XXXXXX}
+\footnotesize
+\begin{tabularx}{\linewidth}{p{27mm}XXXXXXX}
 \toprule
-Set & Records & Studies (E5 counted once) & Instruments & Six population groups & Centre A / Centre B \\
+Set & Records & Studies (E5 counted once) & Fatigue instruments used & Instrument versions & Items coded & Six population groups & Centre A / Centre B \\
 \midrule
-Main set & --- & --- & --- & --- & --- \\
-Late stratum & --- & --- & --- & --- & --- \\
-Coverage stratum & --- & --- & --- & --- & --- \\
-Exploration set & --- & --- & --- & --- & --- \\
-Pending at full text on 31 December 2026 & --- & & & --- & \\
-Unscreened on 31 December 2026 & --- & & & --- & \\
+Main set & --- & --- & --- & --- & --- & --- & --- \\
+Late stratum & --- & --- & --- & --- & --- & --- & --- \\
+Coverage stratum & --- & --- & --- & --- & --- & --- & --- \\
+Exploration set & --- & --- & --- & --- & --- & --- & --- \\
+Pending at full text at the closing date & --- & & & & & --- & \\
+Unscreened at the closing date & --- & & & & & --- & \\
 \bottomrule
 \end{tabularx}
 
 \smallskip
-\raggedright\footnotesize A note gives, for each screening stage, the agreement between the first author and the AI screener
-(percentage and kappa), the records each sent on, the differences decided as each had judged, and the records judged
-boundary at the centre stage, all of which the first author assigned to centre A or B. This agreement is not the AI
-screener's accuracy.
+\raggedright\footnotesize Records, studies, instruments, versions and items are different units and are not compared
+with each other. Fatigue instruments used counts each instrument once per study; instrument versions counts each
+version once, however many studies use it; items coded counts the items of the versions first seen in that set. A note
+gives, for each screening stage, the agreement between each pair of screeners (first author, second author, AI
+screener; percentage and kappa), the records each sent on, how the differences were decided, the records on which the
+two authors agreed and the AI screener differed, and the records judged boundary at the centre stage, all of which were
+assigned to centre A or B. Agreement with the AI screener is not its accuracy.
 \end{table}
 
 \begin{table}[!htbp]
 \centering
-\caption{Agreement between the two authors, and between two coding passes of the first author (shell).}
+\caption{Agreement between the two authors (between coders), and between the two coding passes of the first author
+(within one coder) (shell).}
 \footnotesize
-\begin{tabularx}{\linewidth}{p{34mm}XXXXXXXXX}
+\begin{tabularx}{\linewidth}{Xccc}
 \toprule
-Code or unit & Calib., agreement (\%) & Calib., kappa (95\% CI) & Calib., n & Main set, agreement (\%) & Main set, kappa (95\% CI) & Main set, n & Explor. set, agreement (\%) & Explor. set, kappa (95\% CI) & Explor. set, n \\
+Code or unit & Agreement (\%) & Kappa (95\% CI) & n \\
 \midrule
-C1 to C3, C4 (a) to (e), C5, C6 (one row each) & --- & --- & --- & --- & --- & --- & --- & --- & --- \\
-C4f: results found in one pass only & --- & & --- & --- & & --- & --- & & --- \\
-C4f: judgement on results found in both passes & --- & --- & --- & --- & --- & --- & --- & --- & --- \\
-C7: construct term of the conclusion (family) & --- & --- & --- & --- & --- & --- & --- & --- & --- \\
-C4f: agreement with the AI draft & & & & --- & & --- & --- & & --- \\
-Records coded in one pass only & --- & & & --- & & & --- & & \\
+\multicolumn{4}{l}{\emph{A. Between the two authors: main set, the first author's reconciled codes and the second author's codes}} \\
+C1 to C3, C4 (a) to (e), C5, C6 (one row each) & --- & --- & --- \\
+C4f: results found by one author only & --- & & --- \\
+C4f: judgement on results found by both & --- & --- & --- \\
+C7: construct term of the conclusion (family) & --- & & --- \\
+\multicolumn{4}{l}{\emph{B. Within the first author: calibration passes on the exploration set}} \\
+C1 to C3, C4 (a) to (e), C5, C6 (one row each) & --- & --- & --- \\
+C4f: results found in one pass only & --- & & --- \\
+C4f: judgement on results found in both passes & --- & --- & --- \\
+C7: construct term of the conclusion (family) & --- & & --- \\
+Records coded in one pass only & & & --- \\
+\multicolumn{4}{l}{\emph{C. Within the first author: main set}} \\
+The rows of panel B & --- & --- & --- \\
+C4f: agreement of the reconciled values with the AI draft & --- & & --- \\
+\multicolumn{4}{l}{\emph{D. Within the first author: exploration set coded again under the final rules}} \\
+The rows of panel B & --- & --- & --- \\
+C4f: agreement of the reconciled values with the AI draft & --- & & --- \\
 \bottomrule
 \end{tabularx}
 
 \smallskip
-\raggedright\footnotesize A first block of columns gives agreement between the first author's reconciled codes and the second author's codes on
-the records the second author coded (all records or a random sample, with its size), set beside 80\%. Calib.,
-calibration passes on the exploration set; Explor., exploration set coded again under the final rules.
-Kappa with a bootstrap 95\% confidence interval. The two passes are by the same coder, at least four weeks apart, so
-their agreement is within one coder, not between coders. The calibration studies had been read and partly coded by the coder
-while building the rules, so calibration agreement may be higher than on new studies. Units with fewer than 5
-comparisons in calibration are reported but were not calibrated. Agreement with the AI draft is
-agreement with a draft, not with a correct value.
+\raggedright\footnotesize Panel A is agreement between two coders, set beside 80\% \citep{shea2017}. Panels B to D are
+agreement within one coder: the two passes are by the same person, at least four weeks apart. Kappa with a bootstrap
+95\% confidence interval; for the C7 construct term, percentage agreement only. A unit with no comparison shows n = 0
+and a dash in the other cells; if both coders or passes use one category only, kappa is undefined and shown as a
+dash. The calibration studies had been read and partly coded by the coder while building the rules, so calibration
+agreement may be higher than on new studies. Units with fewer than 5 comparisons in calibration are reported but were
+not calibrated. Agreement with the AI draft is agreement with a draft, not with a correct value.
 \end{table}
 
 \begin{table}[!htbp]
@@ -278,19 +292,20 @@ across rows or categories. Names and attribution record differences between word
 \centering
 \caption{Sensitivity analyses of the problem statements (shell).}
 \small
-\begin{tabularx}{\linewidth}{XXXXXXX}
+\begin{tabularx}{\linewidth}{XXXXXX}
 \toprule
-Problem type & Main analysis & 1: peer-reviewed only & 2: overlap signs removed & 4: pass 1 & 4: pass 2 & 5: screened by both authors \\
+Problem type & Main analysis & 1: peer-reviewed only & 2: overlap signs removed & 4: pass 1 & 4: pass 2 \\
 \midrule
-One row per row of Table 12 & --- & --- & --- & --- & --- & --- \\
+What the analysis changes & --- & Records & Records & Codes & Codes \\
+One row per row of Table 12 & --- & --- & --- & --- & --- \\
 \bottomrule
 \end{tabularx}
 
 \smallskip
-\raggedright\footnotesize Analysis 3 applies to the C2b tables and is reported beside Table 7. Analysis 5 uses the main set
-as decided by both authors after the manuscript draft, with the results known; the numbers of studies it added and
-removed are given in a note, and the record-level tables of the main set under analysis 5 are in the supplement.
-If analysis 5 was not done, its column is empty and the note gives the reason.
+\raggedright\footnotesize Analyses 1 and 2 change which records are counted; analysis 4 changes the codes, using each
+pass of the first author in place of the reconciled values. No analysis changes the screening. A note gives the number
+of records each analysis removes. Analysis 3 changes how C2b items are counted; it applies to the C2b tables and is
+reported beside Table 7.
 \end{table}
 
 \begin{table}[!htbp]
@@ -301,15 +316,18 @@ If analysis 5 was not done, its column is empty and the note gives the reason.
 \toprule
 Recommendation & Code & Row of Table 12 & Source & Question, measure, evidence and wording (proposal) \\
 \midrule
+\multicolumn{5}{l}{\emph{A. Asked by an existing standard}} \\
 Show that a published measure was administered as published, and justify and document any modification & C2a, C2d & None (descriptive codes) & Existing standard \citep{elson2023} & --- \\
 Do not infer what an instrument measures from its name & C6a, C7 (iii) & C6a; C7 (iii) & Existing standard \citep{elson2023} & --- \\
+\multicolumn{5}{l}{\emph{B. Proposed by this scheme; not named by the standards checked}} \\
 State the level at which the fatigue measure is tied to AI & C1 & None (C1 is described) & Proposal of this scheme & --- \\
 Do not use ``AI fatigue'' in a title or conclusion when the instrument does not tie fatigue to AI & C6c, C7 (ii) & C6c; C7 (ii) & Proposal of this scheme & --- \\
 \bottomrule
 \end{tabularx}
 
 \smallskip
-\raggedright\footnotesize The recommendations do not follow from the counts of this review. Standards checked before
+\raggedright\footnotesize The recommendations do not follow from the counts of this review, and the proposals in
+panel B are not derived from its data. The last column is filled for proposals only. Standards checked before
 a step was called a proposal: \citet{elson2023}; \tbd{others to be checked}. \citet{perrig2024} is cited as a review of
 measurement practice, not as a standard.
 \end{table}
@@ -336,7 +354,7 @@ not used in the problem statements.
 
 \begin{table}[!htbp]
 \centering
-\caption{The coverage check (shell).}
+\caption{The coverage check: eligible records among the new records of one coverage search (shell).}
 \small
 \begin{tabularx}{\linewidth}{Xlll}
 \toprule
@@ -354,5 +372,6 @@ Main-set studies retrieved by the coverage search & --- & & \\
 \smallskip
 \raggedright\footnotesize Proportions are of the decided records of the coverage sample, with Clopper--Pearson
 intervals; the implied number multiplies them by the number of new records. It concerns the coverage search (one query
-in three free sources), not the whole literature, and it is not an estimate of how often a problem type occurs.
+in three free sources) and the new records it returned, not the whole literature or studies it did not return, and it
+is not an estimate of how often a problem type occurs.
 \end{table}

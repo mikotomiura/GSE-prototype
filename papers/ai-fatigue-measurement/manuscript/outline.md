@@ -1,6 +1,6 @@
 # Manuscript outline
 
-Version 5, 19 October 2026.
+Version 6, 19 October 2026.
 
 This outline fixes the structure of the manuscript, the evidence for each claim and the rules for reporting before
 any record of the main set is coded. It contains no result value and no expectation about results. Each claim
@@ -401,23 +401,28 @@ columns; no value is filled in before coding.
 - Table 2: deviations from the registration and from this outline, with dates and reasons.
 - Table 3: sets and their composition.
 
-  | | Records | Studies (E5 counted once) | Instruments | By population group (six columns) | Centre-A / Centre-B |
-  |---|---|---|---|---|---|
-  | Main set | — | — | — | — | — |
-  | Late stratum | — | — | — | — | — |
-  | Coverage stratum | — | — | — | — | — |
-  | Exploration set | — | — | — | — | — |
-  | Pending at full text on 31 December 2026 | — | | | — | |
-  | Unscreened on 31 December 2026 | — | | | — | |
+  | | Records | Studies (E5 counted once) | Fatigue instruments used | Instrument versions | Items coded | By population group (six columns) | Centre-A / Centre-B |
+  |---|---|---|---|---|---|---|---|
+  | Main set | — | — | — | — | — | — | — |
+  | Late stratum | — | — | — | — | — | — | — |
+  | Coverage stratum | — | — | — | — | — | — | — |
+  | Exploration set | — | — | — | — | — | — | — |
+  | Pending at full text on 31 December 2026 | — | | | | | — | |
+  | Unscreened on 31 December 2026 | — | | | | | — | |
+
+  A note says that records, studies, instruments used (each instrument once per study), instrument versions (each
+  version once, however many studies use it) and items coded (the items of the versions first seen in that set) are
+  different units and are not compared with each other.
 
   A note gives, for each screening stage, the agreement between the first author and the AI screener, the records
   each sent on, the differences decided each way and the records judged boundary (GSRR-37); this agreement is not
   the AI screener's accuracy.
 
-- Table 4: agreement per code (percentage agreement, kappa with bootstrap 95% CI, n): between the two authors on the
-  records the second author coded, and between the two coding passes of the first author for the calibration passes,
-  the main set and the exploration set, in separate columns; the C4f agreement
-  with the AI draft; records coded in one pass only. The heading states that this is agreement within one coder
+- Table 4: agreement per code (percentage agreement, kappa with bootstrap 95% CI, n), in separate panels: A, between
+  the two authors on the records the second author coded; B to D, between the two coding passes of the first author
+  for the calibration passes, the main set and the exploration set; the C4f agreement
+  with the AI draft; records coded in one pass only. A unit with no comparison shows n = 0 and a dash; an undefined
+  kappa is shown as a dash. The heading states that this is agreement within one coder
   for the passes and agreement between coders for the two authors (GSRR-44), with a note that calibration agreement may be
   higher than on new studies and that units with fewer than 5 comparisons were not calibrated (GSRR-65).
 - Table 5: C1 representative level (L1a, L1b, L2, L3, L4, L5, L6, excluded values), count and, where allowed,
@@ -452,7 +457,9 @@ columns; no value is filled in before coding.
   C6c and C7 (ii) have three rows each (AI-side variable not manipulated, manipulated, not verifiable or unresolved). A
   note gives, for each row, the values that made records not evaluable (GSRR-57).
 
-- Table 13: sensitivity analyses (problem statements as in Table 12, with C7 by condition), with analysis 5 (main set
+- Table 13: sensitivity analyses (problem statements as in Table 12, with C7 by condition), with a first row saying
+  what each analysis changes (records for 1 and 2, codes for 4) and a note with the number of records each removes,
+  and with analysis 5 (main set
   decided by both authors after the draft) in its own columns and the number of studies it added and removed; the
   record-level tables under analysis 5 go in the supplement. If analysis 5 was not done, its column is empty with the
   reason (GSRR-62).
@@ -462,7 +469,9 @@ columns; no value is filled in before coding.
   |---|---|---|---|---|
   | — | — | — | — | — |
 
-  with a note listing the standards checked before a step was called a proposal.
+  Rows are grouped in two panels: asked by an existing standard (cited), and proposed by this scheme (not named by
+  the standards checked); the note says that the proposals are not derived from the data of this review, and lists
+  the standards checked before a step was called a proposal.
 
 - Table 15: every instrument version used by a study of the main set. Notes say that the column "first
   seen" lists where a version appeared first and is not a comparison between sets, and that the item counts of a
@@ -473,7 +482,7 @@ columns; no value is filled in before coding.
   |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
   | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
 
-- Table 16: the coverage check (GSRR-39). Top: records found in each source (OpenAlex, Europe PMC, ACM Digital
+- Table 16: the coverage check (GSRR-39); its caption says that it concerns the new records of one coverage search. Top: records found in each source (OpenAlex, Europe PMC, ACM Digital
   Library), after merging, matching the source database, and new. Bottom: the coverage sample drawn, decided and not
   decided; included and pending at full text; the proportion included, and included or pending, with Clopper–Pearson
   95% intervals, and while records remain undecided the bounds over all drawn records; the implied number of eligible
