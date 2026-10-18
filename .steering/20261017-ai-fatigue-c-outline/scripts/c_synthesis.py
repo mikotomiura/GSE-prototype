@@ -1,4 +1,4 @@
-"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.11).
+"""Registered synthesis for the AI-fatigue methodological review (registration draft 0.12).
 
 Implements, from the code tables (CSV):
 - the post-registration screening order (GSRR-33)
@@ -10,6 +10,8 @@ Implements, from the code tables (CSV):
   RQ4 study counts; records where C6a and C7 (iii) both hold; problem statements (evaluable records
   per problem type, GSRR-57; C7 by condition);
   sensitivity analyses 1-4 (GSRR-56, GSRR-57, GSRR-62)
+- the coverage check: screening agreement by pool, and the records of the coverage sample included, with
+  Clopper-Pearson 95% intervals and the implied number of eligible new records (GSRR-39, GSRR-56; decision 38)
 
 Input files (one row per unit; `coder` is coder1 / coder2 / reconciled):
   records_<coder>.csv      record-level codes (C1 per main instrument, C3-C7 inputs)
@@ -20,11 +22,13 @@ Input files (one row per unit; `coder` is coder1 / coder2 / reconciled):
   screening.csv            candidate screening (--screening only): one row per record and stage with
                            record_id, population, stage (1 title/abstract, 2 full text, 3 centre), author1, ai,
                            final. Stages 1-2: include / exclude / pending (final at stage 1: include / exclude);
-                           stage 3: A / B / boundary (final: A / B). Author 1 decides where the two differ
+                           stage 3: A / B / boundary (final: A / B). Author 1 decides where the two differ.
+                           Records of the coverage sample have population coverage_sample (their population
+                           group is recorded at coding, in records_*.csv)
   links.csv                E5 links (record_id, group_id) for every record of an E5 group; the group's one coded
                            record is in records_*.csv, the others are NOT coded and appear only here
 The set of an instrument version (and of its items) is derived, never read: the first set,
-in the order exploration, main, late, in which a record uses the version.
+in the order exploration, main, late, coverage, in which a record uses the version.
 Missing files, missing columns and values outside the code lists stop the script.
 coder1 and coder2 are author 1's first and second coding passes (GSRR-44). The calibration passes on the
 exploration set are compared by running --agreement on their own directory, where every record has set
@@ -35,7 +39,9 @@ Usage:
     python3 c_synthesis.py --agreement <dir>
     python3 c_synthesis.py --screening-order <candidates.csv>
     python3 c_synthesis.py --draw-second-coder <ids.txt>    (record IDs of the coded main set, one per line)
-    python3 c_synthesis.py --screening <screening.csv>    (writes out/screening_agreement.csv next to the input)
+    python3 c_synthesis.py --screening <screening.csv> [--coverage-new N]
+        (writes out/screening_agreement.csv next to the input; with --coverage-new, the number of new records of
+        the coverage search, also out/coverage.csv)
 """
 
 import argparse
@@ -54,6 +60,7 @@ POPULATION_ORDER = [
     "students_learners", "teachers_researchers", "workers_other",
     "health_professionals", "consumers_general", "unknown",
 ]
+COVERAGE_GROUP = "coverage_sample"   # the screening-order group of the coverage sample (GSRR-33, decision 38)
 # GSRR-53: values excluded from denominators. All other values are substantive and stay in.
 EXCLUDED = {"not_verifiable", "not_applicable", "unresolved", ""}
 # Family cells that give no term to compare (C7 (iii)); also used for the C6a rules.
@@ -65,8 +72,8 @@ SECOND_CODER_SEED = 20261021
 SECOND_CODER_SHARE = 0.20
 BOOT_SEED = 20261017
 BOOT_N = 2000
-PRIMARY_SETS = ["main", "exploration", "late"]
-FIRST_SEEN_ORDER = ["exploration", "main", "late"]
+PRIMARY_SETS = ["main", "exploration", "late", "coverage"]
+FIRST_SEEN_ORDER = ["exploration", "main", "late", "coverage"]
 MISSING = {"not_verifiable", "not_applicable", "unresolved"}
 FLAG = {"0", "1", "unresolved"}
 CONSISTENCY = {"consistent", "inconsistent", "not_verifiable", "not_applicable", "unresolved"}
@@ -81,7 +88,7 @@ FAMILY_VALUES = {"fatigue", "exhaustion", "burnout", "none", "no_family_term", "
 # GSRR-64: every coded column is checked against its code list (flat: column names are unique across files).
 # '' is listed only for columns that may be empty.
 VOCAB = {
-    "set": {"exploration", "main", "late"},
+    "set": {"exploration", "main", "late", "coverage"},
     "population": set(POPULATION_ORDER),
     "centre": {"A", "B"},
     "peer_reviewed": {"0", "1"},
@@ -253,7 +260,7 @@ def load_links(d, recs):
 
 
 def version_sets(insts, recs):
-    """First set (exploration, main, late) in which a record uses each version.
+    """First set (exploration, main, late, coverage) in which a record uses each version.
     A version with no record in any of these sets is an input error."""
     rec_set = {r["record_id"]: r["set"] for r in recs}
     used = defaultdict(set)
@@ -263,7 +270,7 @@ def version_sets(insts, recs):
     for v, ss in used.items():
         first = next((s for s in FIRST_SEEN_ORDER if s in ss), None)
         if first is None:
-            raise InputError(f"instrument version {v!r} is used by no record of the exploration, main or late set")
+            raise InputError(f"instrument version {v!r} is used by no record of the exploration, main, late or coverage set")
         out[v] = first
     return out
 
@@ -299,7 +306,8 @@ def screening_order(candidates):
     by_group = defaultdict(list)
     for c in candidates:
         by_group[c["population"]].append(c["record_id"])
-    groups = POPULATION_ORDER + sorted(set(by_group) - set(POPULATION_ORDER))
+    known = POPULATION_ORDER + [COVERAGE_GROUP]
+    groups = known + sorted(set(by_group) - set(known))
     queues = {}
     for g in groups:
         ids = sorted(by_group.get(g, []))
@@ -349,7 +357,8 @@ def load_screening(path):
                 raise InputError(f"{name}: empty cell in {col}")
         if r["stage"] not in SCREEN_STAGES:
             raise InputError(f"{name}: value {r['stage']!r} not allowed in column stage")
-        check_cell(name, "population", r["population"])
+        if r["population"] != COVERAGE_GROUP:
+            check_cell(name, "population", r["population"])
         vocab = SCREEN_VOCAB[r["stage"]]
         for col in ("author1", "ai"):
             if r[col] not in vocab["screeners"]:
@@ -366,10 +375,17 @@ def load_screening(path):
     return rows
 
 
-def screening_agreement(rows):
+def screening_agreement(rows, pool="all"):
     """One dict per stage: agreement before reconciliation, records each screener sent on, how the differing
     records were decided, and (stage 3) records either screener judged boundary. Percent agreement is the
-    observed proportion (0-1); kappa is None where undefined, as in cohen_kappa."""
+    observed proportion (0-1); kappa is None where undefined, as in cohen_kappa.
+    pool: all / candidates (the additional candidates) / coverage_sample."""
+    if pool == "candidates":
+        rows = [r for r in rows if r["population"] != COVERAGE_GROUP]
+    elif pool == COVERAGE_GROUP:
+        rows = [r for r in rows if r["population"] == COVERAGE_GROUP]
+    elif pool != "all":
+        raise ValueError(f"unknown pool {pool!r}")
     out = []
     for st in SCREEN_STAGES:
         rs = [r for r in rows if str(r["stage"]) == st]
@@ -380,7 +396,7 @@ def screening_agreement(rows):
         as_a1 = sum(r["final"] == r["author1"] for r in diff)
         as_ai = sum(r["final"] == r["ai"] for r in diff)
         out.append({
-            "stage": int(st), "n": len(rs),
+            "pool": pool, "stage": int(st), "n": len(rs),
             "percent_agreement": (sum(x == y for x, y in zip(a, b)) / len(rs)) if rs else None,
             "kappa": cohen_kappa(a, b),
             "author1_sent_on": sent("author1"), "ai_sent_on": sent("ai"),
@@ -388,6 +404,59 @@ def screening_agreement(rows):
             "decided_otherwise": len(diff) - as_a1 - as_ai,
             "boundary_either": sum("boundary" in (r["author1"], r["ai"]) for r in rs) if st == "3" else "",
         })
+    return out
+
+
+# --- coverage check (GSRR-39, GSRR-56; decision 38) ------------------------
+
+def binom_cdf(k, n, p):
+    return sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(k + 1))
+
+
+def clopper_pearson(k, n, alpha=0.05):
+    """Exact two-sided interval for k successes in n trials, by bisection on the binomial CDF."""
+    if n == 0:
+        return None, None
+
+    def solve(f):
+        lo, hi = 0.0, 1.0
+        for _ in range(200):
+            mid = (lo + hi) / 2
+            if f(mid):
+                lo = mid
+            else:
+                hi = mid
+        return (lo + hi) / 2
+    lower = 0.0 if k == 0 else solve(lambda p: 1 - binom_cdf(k - 1, n, p) < alpha / 2)
+    upper = 1.0 if k == n else solve(lambda p: binom_cdf(k, n, p) > alpha / 2)
+    return lower, upper
+
+
+def coverage_estimate(rows, n_new):
+    """From the screening rows of the coverage sample: how many were drawn and decided, how many were included at
+    full text (and how many are pending), the proportions with Clopper-Pearson 95% intervals, and these proportions
+    times the number of new records (n_new). Two rows: included only, and included or pending. A record is decided
+    when it has a stage-1 exclusion or a stage-2 final value; records not decided are counted and left out of the
+    denominator. These are counts of eligible records, not estimates of how often a problem type occurs."""
+    cov = [r for r in rows if r["population"] == COVERAGE_GROUP]
+    drawn = {r["record_id"] for r in cov}
+    s1 = {r["record_id"]: r["final"] for r in cov if str(r["stage"]) == "1"}
+    s2 = {r["record_id"]: r["final"] for r in cov if str(r["stage"]) == "2"}
+    for rid in s2:
+        if s1.get(rid) != "include":
+            raise InputError(f"coverage record {rid} has a full-text decision without passing stage 1")
+    decided = {rid for rid, v in s1.items() if v == "exclude"} | set(s2)
+    included = sum(v == "include" for v in s2.values())
+    pending = sum(v == "pending" for v in s2.values())
+    out = []
+    for label, k in [("included", included), ("included_or_pending", included + pending)]:
+        n = len(decided)
+        lo, hi = clopper_pearson(k, n)
+        out.append({"measure": label, "drawn": len(drawn), "decided": n, "not_decided": len(drawn) - n,
+                    "k": k, "proportion": k / n if n else None, "ci_lower": lo, "ci_upper": hi,
+                    "new_records": n_new,
+                    "implied_eligible": k / n * n_new if n else None,
+                    "implied_lower": lo * n_new if n else None, "implied_upper": hi * n_new if n else None})
     return out
 
 
@@ -982,6 +1051,7 @@ def main():
     ap.add_argument("--screening-order", type=Path)
     ap.add_argument("--screening", type=Path)
     ap.add_argument("--draw-second-coder", type=Path)
+    ap.add_argument("--coverage-new", type=int)
     a = ap.parse_args()
     if a.screening_order:
         for g, i in screening_order(read_csv(a.screening_order)):
@@ -1030,12 +1100,16 @@ def main():
         out = a.screening.parent / "out"
         out.mkdir(exist_ok=True)
         try:
-            rows = screening_agreement(load_screening(a.screening))
+            scr = load_screening(a.screening)
+            rows = [r for pool in ("all", "candidates", COVERAGE_GROUP) for r in screening_agreement(scr, pool)]
+            cov = coverage_estimate(scr, a.coverage_new) if a.coverage_new is not None else None
         except InputError as e:
             print(f"STOPPED: {e}", file=sys.stderr)
             return 3
         write_csv(out / "screening_agreement.csv", rows)
-        print(f"screening stages={len(rows)}")
+        if cov is not None:
+            write_csv(out / "coverage.csv", cov)
+        print(f"screening rows={len(rows)}" + ("" if cov is None else f" coverage decided={cov[0]['decided']}"))
     else:
         ap.print_help()
         return 2

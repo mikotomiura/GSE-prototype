@@ -29,5 +29,17 @@
 - [x] OSF の全文 3 件（R02・R22・R35）
 - [x] 1 本の手順（update_trace_db.py）
 - [x] 元の DB の最終版（AF002 を含める）を全体の DB に入れ、登録版の時系列・GSRR-32 を足す（判断 37）
-- [ ] 研究者が Excel で 2 冊を開き、リンク・プルダウン・色を確かめる
+- [x] 研究者が Excel で 2 冊を開き、リンク・プルダウン・色を確かめる（2026-10-18・研究者: できていた）
+- [ ] コミット・push（PR は研究者が確かめてから）
+
+## 見落としを数える検索（判断 38・2026-10-18）
+- [x] 提案を読み、OpenAlex・Europe PMC・ACM DL で数え直す
+- [x] 研究者と決める（案 D の形・Q6・期間と種類の制限なし・3 つの情報源・300 件・別の層で符号化・12/31 を保つ）
+- [x] `c_search.py`・`acm_export.js`（自己検査と変異・Europe PMC で試しに通す）
+- [x] `c_synthesis.py`・`make_dummy.py` に層 coverage と見落としの数の見込み
+- [x] 登録版 0.12・骨子 Version 4・草稿・添付 3 の第 16 節・手順・添付の目録
+- [ ] /cross-review（判断 36〜38 の差分）
+- [ ] 研究者: OpenAlex の API キーを `~/.config/openalex/api_key` に置く
+- [ ] 検索の本番（3 つの情報源を同じ日に）・抽出・`registration-attachments/coverage/` に書誌と数・登録版の **[at registration]**
+- [ ] 確かめの標本 300 件を DB の材料に（訳・`make_screening_candidates.py`・`make_trace_db.py`・`c_screening.py` が CS の記録を読む）
 - [ ] コミット・push（PR は研究者が確かめてから）

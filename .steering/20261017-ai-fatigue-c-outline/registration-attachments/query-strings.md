@@ -1,4 +1,4 @@
-# Query strings of the source database's searches
+# Query strings of the source database's searches, and of this review's coverage search
 
 Attachment to the registration (GSRR-25). All times are Japan Standard Time (UTC+9). Search IDs S-xx are the labels the source database uses for its survey rounds. "Hit count" is the total the interface reported. Query strings are copied verbatim; Japanese terms are kept as written, with an English gloss.
 
@@ -31,6 +31,7 @@ Counts are those recorded when the 259 records were cross-checked against the se
 13. Non-search additions and other routes into the candidate list
 14. Review-aimed search (2026-10-02 02:50 to 03:53), which produced the 43 review-search records
 15. One record added by hand
+16. Coverage search of this review (run once before registration; not a search of the source database)
 
 ---
 
@@ -474,3 +475,24 @@ Every query as run, copied from the search log:
 ## 15. One record added by hand
 
 - One record (a conference short paper) was found by the researcher on 2026-10-01 in the AIS eLibrary while reading the 34 records of the base bibliography, and added to the candidates by hand. It was not found by a search.
+
+## 16. Coverage search of this review
+
+- **Purpose:** count eligible studies that the source database does not hold (registration GSRR-21, GSRR-32, GSRR-39). It is not a search of the source database, and its records are never candidates for the main set. Sections 1 to 15 describe the source database; this section describes the only search this review runs.
+- **Sources and interfaces:** OpenAlex API (filter `title_and_abstract.search`); Europe PMC REST API (field `TITLE_ABS`, which returns the same count as `TITLE` OR `ABSTRACT`: checked on 2026-10-18 with `fatigue`, 176,047 both ways, and with a word that does not exist, 0); ACM Digital Library web interface, ACM Guide to Computing Literature (fields `Title` OR `Abstract`), read page by page (50 records) by `acm_export.js` in the browser, after the site's own bot check had passed by itself. OpenAlex was queried with author 1's free API key, sent in a request header and not recorded (the search log says only whether a key was used); no key or contact address was sent to Europe PMC or the ACM Digital Library **[at registration: confirm]**.
+- **Filters:** none. No date limit, no document-type limit, no language limit.
+- **Date and time of the run:** **[at registration: per source, start and end, JST]**.
+- **Counts reported by each source and records retrieved:** **[at registration]**. The merge stops if the records read differ from the count the source reported.
+- **Export files:** kept outside the repository (they hold abstracts) and not released. Their names and SHA-256 are listed here **[at registration]**.
+- **Merging and removal (GSRR-32):** **[at registration: records by source; after merging; matching the source database (the 34 exploratory records and the 264 additional candidates); new records]**.
+- **Coverage sample (GSRR-39):** 300 new records drawn with Python `random.sample`, seed 20261022, from the IDs CS0001 onwards sorted alphabetically. The list of new records (ID, DOI, title, year, sources, and whether drawn) is attached **[at registration: file and SHA-256]**.
+- **Tools:** `scripts/c_search.py` (export, merging, removal, draw; `selftest` checks the merging, the removal and the draw on made-up records) and `scripts/acm_export.js` **[at registration: SHA-256]**.
+- **Check before the run (GSRR-26):** on 2026-10-18 the OpenAlex query, restricted to 2022-11-30 onwards and to articles, reviews and preprints, retrieved all 11 included exploratory records (11 of 11 are in OpenAlex). These records shaped the terms, so the check is optimistic. Counts the same day, for planning only: OpenAlex 6,526 (with those restrictions); Europe PMC 1,455 (no restriction); ACM Digital Library 702 (no restriction).
+
+### Query strings (verbatim)
+
+| Source | Query string |
+|---|---|
+| OpenAlex | (fatigue OR exhaustion OR exhausted OR burnout OR "burn-out" OR depletion OR depleted OR tiredness OR weariness) AND ("artificial intelligence" OR "generative AI" OR GenAI OR ChatGPT OR "large language model" OR "large language models" OR LLM OR chatbot OR "AI tool" OR "AI tools" OR "AI assistant" OR "AI-assisted" OR "AI use") NOT ("fatigue life" OR "fatigue crack" OR "fatigue strength" OR "fatigue damage" OR "driver fatigue" OR "driver drowsiness" OR "fatigue detection" OR "muscle fatigue" OR battery OR alloy OR welded) |
+| Europe PMC | (TITLE_ABS:fatigue OR TITLE_ABS:exhaustion OR TITLE_ABS:exhausted OR TITLE_ABS:burnout OR TITLE_ABS:"burn-out" OR TITLE_ABS:depletion OR TITLE_ABS:depleted OR TITLE_ABS:tiredness OR TITLE_ABS:weariness) AND (TITLE_ABS:"artificial intelligence" OR TITLE_ABS:"generative AI" OR TITLE_ABS:GenAI OR TITLE_ABS:ChatGPT OR TITLE_ABS:"large language model" OR TITLE_ABS:"large language models" OR TITLE_ABS:LLM OR TITLE_ABS:chatbot OR TITLE_ABS:"AI tool" OR TITLE_ABS:"AI tools" OR TITLE_ABS:"AI assistant" OR TITLE_ABS:"AI-assisted" OR TITLE_ABS:"AI use") NOT (TITLE_ABS:"fatigue life" OR TITLE_ABS:"fatigue crack" OR TITLE_ABS:"fatigue strength" OR TITLE_ABS:"fatigue damage" OR TITLE_ABS:"driver fatigue" OR TITLE_ABS:"driver drowsiness" OR TITLE_ABS:"fatigue detection" OR TITLE_ABS:"muscle fatigue" OR TITLE_ABS:battery OR TITLE_ABS:alloy OR TITLE_ABS:welded) |
+| ACM Digital Library | (Title:(fatigue OR exhaustion OR exhausted OR burnout OR "burn-out" OR depletion OR depleted OR tiredness OR weariness) OR Abstract:(fatigue OR exhaustion OR exhausted OR burnout OR "burn-out" OR depletion OR depleted OR tiredness OR weariness)) AND (Title:("artificial intelligence" OR "generative AI" OR GenAI OR ChatGPT OR "large language model" OR "large language models" OR LLM OR chatbot OR "AI tool" OR "AI tools" OR "AI assistant" OR "AI-assisted" OR "AI use") OR Abstract:("artificial intelligence" OR "generative AI" OR GenAI OR ChatGPT OR "large language model" OR "large language models" OR LLM OR chatbot OR "AI tool" OR "AI tools" OR "AI assistant" OR "AI-assisted" OR "AI use")) NOT (Title:("fatigue life" OR "fatigue crack" OR "fatigue strength" OR "fatigue damage" OR "driver fatigue" OR "driver drowsiness" OR "fatigue detection" OR "muscle fatigue" OR battery OR alloy OR welded) OR Abstract:("fatigue life" OR "fatigue crack" OR "fatigue strength" OR "fatigue damage" OR "driver fatigue" OR "driver drowsiness" OR "fatigue detection" OR "muscle fatigue" OR battery OR alloy OR welded)) |

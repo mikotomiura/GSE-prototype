@@ -1,0 +1,510 @@
+"""The coverage search of this review and the draw of the coverage sample (GSRR-21, GSRR-32, GSRR-39; decision 38).
+
+One search, run once before registration, in three free sources, with the same query (Q6) in title and abstract,
+no date limit and no document-type limit:
+    openalex   OpenAlex API, filter title_and_abstract.search
+    europepmc  Europe PMC REST API, field TITLE_ABS (= TITLE OR ABSTRACT)
+    acm        ACM Digital Library web interface (ACM Guide to Computing Literature), fields Title OR Abstract;
+               the result list is read in the browser by acm_export.js and posted to `acm-receive`
+The exports (raw API pages, with abstracts) are kept outside the repository; only counts, query strings, file names
+and SHA-256 go into attachment 3.
+
+Then `merge`:
+1. normalises every record (DOI: lower case, without the https://doi.org/ prefix; title: NFKC, lower case, letters
+   and digits only);
+2. merges records that share a DOI or a normalised title (any source, transitively);
+3. removes every merged record that shares a DOI or a normalised title with a record of the source database
+   (the 34 exploratory records and the 264 additional candidates);
+4. gives the remaining "new records" IDs CS0001... in the order of (normalised title, DOI);
+5. draws the coverage sample: min(SAMPLE_SIZE, n) IDs with Python random.sample from the sorted IDs, using a
+   generator freshly seeded with SAMPLE_SEED; the drawn IDs are returned sorted.
+
+Usage (paths outside the repository):
+    python3 c_search.py openalex  <out_dir>
+    python3 c_search.py europepmc <out_dir>
+    python3 c_search.py acm-receive <out_dir> [--port N]      # then run acm_export.js in an ACM DL tab
+    python3 c_search.py merge <out_dir> --records264 <records264.json> --source-db <AI_fatigue_database...xlsx>
+    python3 c_search.py selftest
+`merge` writes <out_dir>/new_records.json (with abstracts; never committed), <out_dir>/new-records.csv (ID, DOI,
+title, year, sources and whether drawn: bibliographic data only; attachment 3) and <out_dir>/search-log.json (counts,
+dates and SHA-256, no abstracts; attachment 3), and prints the counts and
+the SHA-256 of every file it read or wrote. It stops on a missing export, an export whose record count differs from
+the count the source reported, or a source-database file it cannot read.
+"""
+
+import argparse
+import csv
+import datetime
+import hashlib
+import http.server
+import json
+import random
+import re
+import sys
+import time
+import unicodedata
+import urllib.parse
+import urllib.request
+import zipfile
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+SAMPLE_SIZE = 300
+SAMPLE_SEED = 20261022
+
+# --- the query (Q6 of the proposal; decision 38) ------------------------------------------------------------------
+FATIGUE = ["fatigue", "exhaustion", "exhausted", "burnout", '"burn-out"', "depletion", "depleted", "tiredness",
+           "weariness"]
+AI = ['"artificial intelligence"', '"generative AI"', "GenAI", "ChatGPT", '"large language model"',
+      '"large language models"', "LLM", "chatbot", '"AI tool"', '"AI tools"', '"AI assistant"', '"AI-assisted"',
+      '"AI use"']
+TECHNICAL = ['"fatigue life"', '"fatigue crack"', '"fatigue strength"', '"fatigue damage"', '"driver fatigue"',
+             '"driver drowsiness"', '"fatigue detection"', '"muscle fatigue"', "battery", "alloy", "welded"]
+
+
+def group(terms):
+    return "(" + " OR ".join(terms) + ")"
+
+
+def query_openalex():
+    return f"{group(FATIGUE)} AND {group(AI)} NOT {group(TECHNICAL)}"
+
+
+def query_europepmc():
+    f = lambda terms: "(" + " OR ".join(f"TITLE_ABS:{t}" for t in terms) + ")"
+    return f"{f(FATIGUE)} AND {f(AI)} NOT {f(TECHNICAL)}"
+
+
+def query_acm():
+    f = lambda terms: f"(Title:{group(terms)} OR Abstract:{group(terms)})"
+    return f"{f(FATIGUE)} AND {f(AI)} NOT {f(TECHNICAL)}"
+
+
+QUERIES = {"openalex": query_openalex, "europepmc": query_europepmc, "acm": query_acm}
+
+
+# --- helpers ------------------------------------------------------------------------------------------------------
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
+def now():
+    return datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).isoformat(timespec="seconds")
+
+
+OPENALEX_KEY_FILE = Path.home() / ".config" / "openalex" / "api_key"
+
+
+def openalex_headers():
+    """The researcher's free OpenAlex API key, read from OPENALEX_KEY_FILE (written by the researcher, never by this
+    script), sent as an Authorization header so that it appears in no URL, file or log. Without the file, no key."""
+    if OPENALEX_KEY_FILE.exists():
+        key = OPENALEX_KEY_FILE.read_text(encoding="utf-8").strip()
+        if key:
+            return {"Authorization": "Bearer " + key}
+    return {}
+
+
+def get_json(url, tries=4, headers=None):
+    for i in range(tries):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=headers or {}), timeout=120) as r:
+                return json.load(r)
+        except Exception as e:  # network errors are retried, then reported
+            err = e
+            time.sleep(10 * (i + 1))
+    raise SystemExit(f"request failed after {tries} tries: {url[:120]} ({str(err)[:200]})")
+
+
+def write_log(out, source, entry):
+    path = out / f"{source}-log.json"
+    path.write_text(json.dumps(entry, ensure_ascii=False, indent=1), encoding="utf-8")
+    return path
+
+
+# --- exports ------------------------------------------------------------------------------------------------------
+
+def export_openalex(out):
+    q = query_openalex()
+    base = "https://api.openalex.org/works?"
+    started, pages, cursor, n, reported = now(), [], "*", 0, None
+    headers = openalex_headers()
+    while cursor:
+        url = base + urllib.parse.urlencode({"filter": "title_and_abstract.search:" + q, "per-page": 200,
+                                             "cursor": cursor})
+        d = get_json(url, headers=headers)
+        reported = d["meta"]["count"] if reported is None else reported
+        p = out / f"openalex-{len(pages) + 1:03d}.json"
+        p.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        pages.append(p)
+        n += len(d["results"])
+        cursor = d["meta"].get("next_cursor") if d["results"] else None
+        time.sleep(1)
+    entry = {"source": "OpenAlex API", "api_key_used": bool(headers), "query": q,
+             "filter": "title_and_abstract.search", "date_limit": None,
+             "type_limit": None, "started": started, "finished": now(), "reported_count": reported,
+             "retrieved": n, "files": {p.name: sha256(p) for p in pages}}
+    print(json.dumps({k: v for k, v in entry.items() if k != "files"}, ensure_ascii=False))
+    write_log(out, "openalex", entry)
+
+
+def export_europepmc(out):
+    q = query_europepmc()
+    base = "https://www.ebi.ac.uk/europepmc/webservices/rest/search?"
+    started, pages, cursor, n, reported = now(), [], "*", 0, None
+    while True:
+        url = base + urllib.parse.urlencode({"query": q, "format": "json", "resultType": "core", "pageSize": 1000,
+                                             "cursorMark": cursor})
+        d = get_json(url)
+        reported = d["hitCount"] if reported is None else reported
+        res = d.get("resultList", {}).get("result", [])
+        if not res:
+            break
+        p = out / f"europepmc-{len(pages) + 1:03d}.json"
+        p.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        pages.append(p)
+        n += len(res)
+        nxt = d.get("nextCursorMark")
+        if not nxt or nxt == cursor:
+            break
+        cursor = nxt
+        time.sleep(1)
+    entry = {"source": "Europe PMC REST API", "query": q, "field": "TITLE_ABS", "date_limit": None,
+             "type_limit": None, "started": started, "finished": now(), "reported_count": reported,
+             "retrieved": n, "files": {p.name: sha256(p) for p in pages}}
+    print(json.dumps({k: v for k, v in entry.items() if k != "files"}, ensure_ascii=False))
+    write_log(out, "europepmc", entry)
+
+
+def acm_receive(out, port):
+    """Receive the ACM result list posted by acm_export.js, save it, then stop."""
+    class H(http.server.BaseHTTPRequestHandler):
+        def _cors(self):
+            self.send_header("Access-Control-Allow-Origin", "https://dl.acm.org")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self._cors()
+            self.end_headers()
+
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers["Content-Length"]))
+            d = json.loads(body)
+            p = out / "acm-results.json"
+            p.write_bytes(body)
+            entry = {"source": "ACM Digital Library web interface (ACM Guide to Computing Literature)",
+                     "query": query_acm(), "query_sent": d.get("query"), "date_limit": None, "type_limit": None,
+                     "started": d.get("started"), "finished": d.get("finished"),
+                     "reported_count": d.get("reported_count"), "retrieved": len(d.get("records", [])),
+                     "files": {p.name: sha256(p)}}
+            write_log(out, "acm", entry)
+            self.send_response(200)
+            self._cors()
+            self.end_headers()
+            self.wfile.write(b"saved")
+            print(json.dumps({k: v for k, v in entry.items() if k != "files"}, ensure_ascii=False))
+            self.server.done = True
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", port), H)
+    srv.done = False
+    print(f"listening on http://127.0.0.1:{port}/ ; query for acm_export.js:\n{query_acm()}")
+    while not srv.done:
+        srv.handle_request()
+
+
+# --- normalising --------------------------------------------------------------------------------------------------
+
+def norm_doi(d):
+    d = (d or "").strip().lower()
+    d = re.sub(r"^(https?://(dx\.)?doi\.org/|doi:)", "", d)
+    return d if d.startswith("10.") else ""
+
+
+def norm_title(t):
+    t = unicodedata.normalize("NFKC", t or "").lower()
+    return "".join(ch for ch in t if ch.isalnum())
+
+
+def oa_abstract(inv):
+    if not inv:
+        return ""
+    pos = sorted((i, w) for w, idx in inv.items() for i in idx)
+    return " ".join(w for _, w in pos)
+
+
+def records_openalex(out):
+    for p in sorted(out.glob("openalex-[0-9]*.json")):
+        for w in json.loads(p.read_text(encoding="utf-8"))["results"]:
+            yield {"source": "openalex", "source_id": w.get("id", ""), "doi": norm_doi(w.get("doi")),
+                   "title": w.get("display_name") or w.get("title") or "", "year": w.get("publication_year"),
+                   "type": w.get("type", ""), "venue": ((w.get("primary_location") or {}).get("source") or {})
+                   .get("display_name", ""), "abstract": oa_abstract(w.get("abstract_inverted_index"))}
+
+
+def records_europepmc(out):
+    for p in sorted(out.glob("europepmc-[0-9]*.json")):
+        for r in json.loads(p.read_text(encoding="utf-8"))["resultList"]["result"]:
+            yield {"source": "europepmc", "source_id": f"{r.get('source', '')}:{r.get('id', '')}",
+                   "doi": norm_doi(r.get("doi")), "title": r.get("title", ""), "year": r.get("pubYear"),
+                   "type": "; ".join((r.get("pubTypeList") or {}).get("pubType", [])),
+                   "venue": ((r.get("journalInfo") or {}).get("journal") or {}).get("title", "")
+                   or r.get("bookOrReportDetails", {}).get("publisher", ""),
+                   "abstract": re.sub(r"<[^>]+>", "", r.get("abstractText", "") or "")}
+
+
+def records_acm(out):
+    p = out / "acm-results.json"
+    for r in json.loads(p.read_text(encoding="utf-8"))["records"]:
+        doi = norm_doi((r.get("href") or "").replace("/doi/", "", 1))
+        yield {"source": "acm", "source_id": r.get("href", ""), "doi": doi, "title": r.get("title", ""),
+               "year": r.get("date", ""), "type": r.get("type", ""), "venue": r.get("venue", ""), "abstract": ""}
+
+
+READERS = {"openalex": records_openalex, "europepmc": records_europepmc, "acm": records_acm}
+
+
+# --- the source database (34 + 264) -------------------------------------------------------------------------------
+
+M = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+
+
+def xlsx_rows(path, name):
+    z = zipfile.ZipFile(path)
+    shared = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        shared = ["".join(si.itertext()) for si in ET.fromstring(z.read("xl/sharedStrings.xml"))]
+    wb = ET.fromstring(z.read("xl/workbook.xml"))
+    rels = {r.get("Id"): r.get("Target") for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))}
+    for s in wb.find(M + "sheets"):
+        if s.get("name") == name:
+            target = rels[s.get(REL)].lstrip("/")
+            target = target if target.startswith("xl/") else "xl/" + target
+            for r in ET.fromstring(z.read(target)).iter(M + "row"):
+                cells = {}
+                for c in r.findall(M + "c"):
+                    col = re.match(r"[A-Z]+", c.get("r")).group()
+                    v = c.find(M + "v")
+                    if c.get("t") == "s" and v is not None:
+                        cells[col] = shared[int(v.text)]
+                    elif c.get("t") == "inlineStr":
+                        cells[col] = "".join(c.itertext())
+                    else:
+                        cells[col] = v.text if v is not None else ""
+                yield cells
+            return
+    raise SystemExit(f"sheet {name!r} not found in {path}")
+
+
+def source_db(records264, xlsx):
+    recs = json.loads(Path(records264).read_text(encoding="utf-8"))
+    if len(recs) != 264:
+        raise SystemExit(f"{records264}: {len(recs)} records, expected 264")
+    out = [{"id": r["id"], "doi": norm_doi(r.get("doi")), "t": norm_title(r.get("title"))} for r in recs]
+    n34 = 0
+    for c in xlsx_rows(xlsx, "文献DB"):  # A = ID, E = title, H = DOI
+        if re.fullmatch(r"AF\d{3}", c.get("A", "").strip()):
+            out.append({"id": c["A"].strip(), "doi": norm_doi(c.get("H")), "t": norm_title(c.get("E"))})
+            n34 += 1
+    if n34 != 34:
+        raise SystemExit(f"{xlsx}: {n34} exploratory records in '文献DB', expected 34")
+    return out
+
+
+# --- merge, remove, draw ------------------------------------------------------------------------------------------
+
+def merge_records(recs):
+    """Union records that share a DOI or a normalised title. Returns a list of groups (lists of records)."""
+    parent = list(range(len(recs)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    seen = {}
+    for i, r in enumerate(recs):
+        for key in (("d", r["doi"]), ("t", norm_title(r["title"]))):
+            if not key[1]:
+                continue
+            if key in seen:
+                parent[find(i)] = find(seen[key])
+            else:
+                seen[key] = i
+    groups = {}
+    for i, r in enumerate(recs):
+        groups.setdefault(find(i), []).append(r)
+    return list(groups.values())
+
+
+ABSTRACT_PREFERENCE = ["europepmc", "openalex", "acm"]  # OpenAlex abstracts can lose text around < and >
+
+
+def summarise(g):
+    def first(field):
+        for src in ABSTRACT_PREFERENCE:
+            for r in g:
+                if r["source"] == src and r[field]:
+                    return r[field]
+        return ""
+    return {"doi": sorted({r["doi"] for r in g if r["doi"]})[0] if any(r["doi"] for r in g) else "",
+            "dois": sorted({r["doi"] for r in g if r["doi"]}), "title": first("title"), "year": first("year"),
+            "type": first("type"), "venue": first("venue"), "abstract": first("abstract"),
+            "abstract_source": next((s for s in ABSTRACT_PREFERENCE for r in g if r["source"] == s and r["abstract"]),
+                                    ""),
+            "sources": sorted({r["source"] for r in g}), "source_ids": sorted({r["source_id"] for r in g})}
+
+
+def remove_known(groups, known):
+    kd = {k["doi"]: k["id"] for k in known if k["doi"]}
+    kt = {k["t"]: k["id"] for k in known if k["t"]}
+    new, matched = [], []
+    for g in groups:
+        hit = sorted({kd[r["doi"]] for r in g if r["doi"] in kd} | {kt[norm_title(r["title"])] for r in g
+                                                                     if norm_title(r["title"]) in kt})
+        (matched if hit else new).append((g, hit))
+    return [g for g, _ in new], [(g, h) for g, h in matched]
+
+
+def assign_ids(groups):
+    rows = sorted((summarise(g) for g in groups), key=lambda s: (norm_title(s["title"]), s["doi"]))
+    for i, s in enumerate(rows, 1):
+        s["id"] = f"CS{i:04d}"
+    return rows
+
+
+def draw_sample(ids):
+    ids = sorted(ids)
+    if len(set(ids)) != len(ids):
+        raise ValueError("duplicate IDs")
+    return sorted(random.Random(SAMPLE_SEED).sample(ids, min(SAMPLE_SIZE, len(ids))))
+
+
+def merge(out, records264, xlsx):
+    recs, read = [], {}
+    for src, reader in READERS.items():
+        log = out / f"{src}-log.json"
+        if not log.exists():
+            raise SystemExit(f"missing export of {src}: {log}")
+        entry = json.loads(log.read_text(encoding="utf-8"))
+        for name, h in entry["files"].items():
+            if sha256(out / name) != h:
+                raise SystemExit(f"{name}: SHA-256 differs from {log.name}")
+            read[name] = h
+        got = list(reader(out))
+        if len(got) != entry["reported_count"]:
+            raise SystemExit(f"{src}: {len(got)} records read, the source reported {entry['reported_count']}")
+        recs += got
+    known = source_db(records264, xlsx)
+    groups = merge_records(recs)
+    new, matched = remove_known(groups, known)
+    rows = assign_ids(new)
+    sample = set(draw_sample([r["id"] for r in rows]))
+    for r in rows:
+        r["coverage_sample"] = r["id"] in sample
+    (out / "new_records.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
+    with open(out / "new-records.csv", "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["record_id", "doi", "title", "year", "sources", "coverage_sample"])
+        for r in rows:
+            w.writerow([r["id"], r["doi"], r["title"], r["year"], "|".join(r["sources"]),
+                        "1" if r["coverage_sample"] else "0"])
+    by_src = {s: sum(1 for r in recs if r["source"] == s) for s in READERS}
+    log = {"merged": now(), "python": sys.version.split()[0], "records_by_source": by_src,
+           "records_total": len(recs), "after_merging": len(groups), "matching_source_database": len(matched),
+           "matched_source_ids": sorted({i for _, h in matched for i in h}), "new_records": len(rows),
+           "sample_size": len(sample), "sample_seed": SAMPLE_SEED,
+           "new_with_abstract": sum(1 for r in rows if r["abstract"]),
+           "sample_with_abstract": sum(1 for r in rows if r["coverage_sample"] and r["abstract"]),
+           "inputs": {**read, Path(records264).name: sha256(records264), Path(xlsx).name: sha256(xlsx)},
+           "outputs": {n: sha256(out / n) for n in ("new_records.json", "new-records.csv")}}
+    (out / "search-log.json").write_text(json.dumps(log, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(json.dumps(log, ensure_ascii=False, indent=1))
+
+
+# --- self test ----------------------------------------------------------------------------------------------------
+
+def selftest():
+    ok = True
+
+    def check(name, cond):
+        nonlocal ok
+        print(("PASS " if cond else "FAIL ") + name)
+        ok &= bool(cond)
+
+    check("doi prefix removed", norm_doi("https://doi.org/10.1/AbC") == "10.1/abc")
+    check("doi without 10. is empty", norm_doi("arXiv:1234") == "")
+    check("title normalised", norm_title("AI Fatigue: a Scale!") == norm_title("ai fatigue — a scale"))
+    check("abstract rebuilt", oa_abstract({"b": [1], "a": [0]}) == "a b")
+    R = lambda s, d, t: {"source": s, "source_id": s + t, "doi": d, "title": t, "year": 2025, "type": "",
+                         "venue": "", "abstract": ""}
+    g = merge_records([R("openalex", "10.1/x", "A"), R("europepmc", "", "a"), R("acm", "10.1/x", "B"),
+                       R("acm", "10.1/y", "C")])
+    check("merge by DOI and title, transitively", sorted(len(x) for x in g) == [1, 3])
+    known = [{"id": "AF001", "doi": "10.1/y", "t": ""}]
+    new, matched = remove_known(g, known)
+    check("known DOI removed", len(new) == 1 and matched[0][1] == ["AF001"])
+    known_t = [{"id": "S01", "doi": "", "t": norm_title("A")}]
+    new2, _ = remove_known(g, known_t)
+    check("known title removed (whole group)", len(new2) == 1 and new2[0][0]["title"] == "C")
+    ids = [f"CS{i:04d}" for i in range(1, 1001)]
+    s1, s2 = draw_sample(ids), draw_sample(list(reversed(ids)))
+    check("sample size", len(s1) == SAMPLE_SIZE)
+    check("sample does not depend on input order", s1 == s2)
+    check("sample is the seeded draw", s1 == sorted(random.Random(20261022).sample(sorted(ids), 300)))
+    check("all when fewer than the sample size", draw_sample(ids[:10]) == ids[:10])
+    try:
+        draw_sample(["a", "a"])
+        check("duplicate IDs stop", False)
+    except ValueError:
+        check("duplicate IDs stop", True)
+    s = summarise([dict(R("openalex", "10.1/x", "T"), abstract="oa text"),
+                   dict(R("europepmc", "", "T"), abstract="epmc text")])
+    check("abstract taken from Europe PMC first", s["abstract"] == "epmc text" and s["abstract_source"] == "europepmc")
+    check("queries keep the three term groups", all(q().count("OR") > 25 and "NOT" in q() for q in QUERIES.values()))
+    print("selftest:", "PASS" if ok else "FAIL")
+    sys.exit(0 if ok else 1)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=["openalex", "europepmc", "acm-receive", "merge", "selftest", "queries"])
+    ap.add_argument("out", nargs="?", type=Path)
+    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--records264", type=Path)
+    ap.add_argument("--source-db", type=Path)
+    a = ap.parse_args()
+    if a.cmd == "selftest":
+        selftest()
+    if a.cmd == "queries":
+        for k, q in QUERIES.items():
+            print(f"{k}:\n{q()}\n")
+        return
+    if a.out is None:
+        ap.error("out_dir is required")
+    a.out.mkdir(parents=True, exist_ok=True)
+    if a.cmd == "openalex":
+        export_openalex(a.out)
+    elif a.cmd == "europepmc":
+        export_europepmc(a.out)
+    elif a.cmd == "acm-receive":
+        acm_receive(a.out, a.port)
+    elif a.cmd == "merge":
+        if not (a.records264 and a.source_db):
+            ap.error("merge needs --records264 and --source-db")
+        merge(a.out, a.records264, a.source_db)
+
+
+if __name__ == "__main__":
+    main()

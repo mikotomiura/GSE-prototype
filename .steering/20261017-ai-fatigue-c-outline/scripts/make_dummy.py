@@ -59,10 +59,10 @@ def rec(rid, set_name):
     return r
 
 
-all_ids = [f"D{i:03d}" for i in range(1, 33)]
+all_ids = [f"D{i:03d}" for i in range(1, 35)]
 sets = {}
 for n, i in enumerate(all_ids):
-    sets[i] = "exploration" if n < 10 else "late" if n >= 30 else "main"
+    sets[i] = "exploration" if n < 10 else "coverage" if n >= 32 else "late" if n >= 30 else "main"
 ids = [i for i in all_ids if i not in E5_UNCODED]          # E5-linked duplicates are not coded
 recs = [rec(i, sets[i]) for i in ids]
 insts, items = [], []
@@ -324,7 +324,7 @@ for bad_ in ([], ["M01", "M02", "M01"]):
 # item 1: the set label is "main"; "confirmation" is gone from the vocabulary and from the output text
 assert "main" in cs.VOCAB["set"] and "confirmation" not in cs.VOCAB["set"] and "confirmation" not in cs.PRIMARY_SETS
 assert all(r["statement"].endswith("the main set") for r in res["problems"] if r["evaluable"]), res["problems"]
-assert {r["set"] for r in res["tables"]} == {"main", "exploration", "late"}
+assert {r["set"] for r in res["tables"]} == {"main", "exploration", "late", "coverage"}
 # item 2: evaluable records per problem type (GSRR-57)
 ps = {p_["problem_type"]: p_ for p_ in cs.problem_statements(
     [{"C4a": "inconsistent"}, {"C4a": "consistent"}, {"C4a": "no_comparison_possible"}, {"C4a": "not_verifiable"},
@@ -833,4 +833,77 @@ scr_must_stop("agree_final_differs", [("S1", 2, "include", "include", "exclude")
 scr_must_stop("stage3_value_in_stage1", [("S1", 1, "A", "include", "include")], "not allowed in column author1")
 scr_must_stop("missing_column", [("S1", 1, "include", "include", "include")], "missing columns", cols=SCR_COLS[:-1] + ["finl"])
 scr_must_stop("empty_cell", [("S1", 1, "include", "", "include")], "empty cell in ai")
+# === coverage check (decision 38) =========================================
+# the coverage stratum is tabulated as its own set and never enters the problem statements
+cov_ids_ = {r["record_id"] for r in res["recs"] if r["set"] == "coverage"}
+assert cov_ids_ and res["n_main"] == sum(r["set"] == "main" for r in res["recs"])
+assert not cov_ids_ & {r["record_id"] for r in res["per_study"] if r["set"] == "main"}
+assert cs.FIRST_SEEN_ORDER[-1] == "coverage" and "coverage" in cs.VOCAB["set"]
+# screening order: the coverage sample is one group, after the six population groups
+order_c = cs.screening_order([{"record_id": f"C{i}", "population": "coverage_sample"} for i in range(3)]
+                             + [{"record_id": f"U{i}", "population": "unknown"} for i in range(2)]
+                             + [{"record_id": f"T{i}", "population": "students_learners"} for i in range(1)])
+assert [g for g, _ in order_c] == ["students_learners", "unknown", "coverage_sample", "unknown",
+                                   "coverage_sample", "coverage_sample"], order_c
+# the coverage sample comes before any group the code does not know, whatever its name
+assert [g for g, _ in cs.screening_order([{"record_id": "X", "population": "a_extra"},
+                                          {"record_id": "C", "population": "coverage_sample"}])] == \
+    ["coverage_sample", "a_extra"]
+# screening agreement by pool, and the coverage estimate
+cov_rows_ = [("S1", 1, "include", "include", "include"), ("S1", 2, "include", "include", "include"),
+             ("C1", 1, "include", "include", "include"), ("C1", 2, "include", "exclude", "include"),
+             ("C2", 1, "exclude", "exclude", "exclude"),
+             ("C3", 1, "include", "exclude", "include"), ("C3", 2, "pending", "pending", "pending"),
+             ("C4", 1, "exclude", "include", "exclude"), ("C5", 1, "include", "include", "include")]
+
+
+def cov_write(name, rows):
+    p_ = out / name
+    with open(p_, "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(SCR_COLS)
+        for rid, st, a1, ai, fin in rows:
+            w.writerow([rid, "coverage_sample" if rid.startswith("C") else POP_, st, a1, ai, fin])
+    return p_
+
+
+cov_scr = cs.load_screening(cov_write("screening_cov.csv", cov_rows_))
+by_pool = {(r["pool"], r["stage"]): r for pl in ("all", "candidates", "coverage_sample")
+           for r in cs.screening_agreement(cov_scr, pl)}
+assert (by_pool[("all", 1)]["n"], by_pool[("candidates", 1)]["n"], by_pool[("coverage_sample", 1)]["n"]) == (6, 1, 5)
+assert by_pool[("coverage_sample", 2)]["n"] == 2 and by_pool[("candidates", 2)]["n"] == 1
+try:
+    cs.screening_agreement(cov_scr, "main")
+except ValueError:
+    pass
+else:
+    raise AssertionError("unknown pool must stop")
+ce = {r["measure"]: r for r in cs.coverage_estimate(cov_scr, 1000)}
+# drawn 5 (C1-C5); decided: C2, C4 (excluded at stage 1), C1, C3 (stage 2) = 4; C5 not decided
+assert (ce["included"]["drawn"], ce["included"]["decided"], ce["included"]["not_decided"]) == (5, 4, 1), ce
+assert ce["included"]["k"] == 1 and ce["included_or_pending"]["k"] == 2
+assert ce["included"]["proportion"] == 0.25 and ce["included"]["implied_eligible"] == 250.0
+lo_, hi_ = cs.clopper_pearson(1, 4)
+assert (ce["included"]["ci_lower"], ce["included"]["ci_upper"]) == (lo_, hi_)
+assert abs(ce["included"]["implied_upper"] - hi_ * 1000) < 1e-9
+# Clopper-Pearson against scipy.stats.beta (values computed once, 2026-10-18)
+for (k_, n_), (l_, h_) in {(0, 300): (0.0, 0.012221), (5, 300): (0.005433, 0.038464),
+                          (300, 300): (0.987779, 1.0), (3, 10): (0.06674, 0.652453)}.items():
+    got_ = cs.clopper_pearson(k_, n_)
+    assert abs(got_[0] - l_) < 1e-6 and abs(got_[1] - h_) < 1e-6, (k_, n_, got_)
+assert cs.clopper_pearson(0, 0) == (None, None)
+# a full-text decision without passing stage 1 stops
+try:
+    cs.coverage_estimate(cs.load_screening(cov_write("screening_cov_bad.csv", [("C9", 2, "include", "include",
+                                                                                   "include")])), 10)
+except cs.InputError as e:
+    assert "without passing stage 1" in str(e)
+else:
+    raise AssertionError("coverage: stage 2 without stage 1 must stop")
+# the population of a coded record may not be the screening group of the coverage sample
+assert "coverage_sample" not in cs.VOCAB["population"]
+# CLI: --coverage-new writes out/coverage.csv
+rc_c = subprocess.run([sys.executable, str(Path(cs.__file__)), "--screening", str(out / "screening_cov.csv"),
+                       "--coverage-new", "1000"], capture_output=True)
+assert rc_c.returncode == 0 and (out / "out" / "coverage.csv").exists(), rc_c
 print(f"dummy tables in {out}; all boundary tests passed")

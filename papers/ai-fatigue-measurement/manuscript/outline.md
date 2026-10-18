@@ -1,6 +1,6 @@
 # Manuscript outline
 
-Version 3, 17 October 2026.
+Version 4, 18 October 2026.
 
 This outline fixes the structure of the manuscript, the evidence for each claim and the rules for reporting before
 any record of the main set is coded. It contains no result value and no expectation about results. Each claim
@@ -45,7 +45,8 @@ manuscript:
   reliability of the coding; they are not estimates about the literature.
 - Primary answers come from the main set only (GSRR-11). The exploration set, from which the rules were
   built, is reported in a separate table and is never used to state that a problem was observed in the main
-  set (GSRR-57). The late stratum is reported separately and outside the primary counts (GSRR-39). Tables of
+  set (GSRR-57). The late stratum and the coverage stratum are reported separately and outside the primary counts
+  (GSRR-39); the coverage stratum is never used to say whether a problem type is present. Tables of
   different sets, centres or population groups may stand side by side; no statement says that a value is larger,
   smaller, more or less common in one of them than in another (GSRR-12, GSRR-57). Proportions describe the coded set
   and are not estimates of how often a practice occurs in the literature (GSRR-63).
@@ -91,7 +92,10 @@ manuscript:
   before registration, the first author had screened 79 of the additional candidates after reading AI-generated
   appraisals (GSRR-34, GSRR-65). Human screening before registration was uneven across population groups; all
   candidates were screened again in an order that alternates between groups (GSRR-33). It is not a census of the
-  literature on AI and fatigue. Every claim about the main set is about that set.
+  literature on AI and fatigue. Every claim about the main set is about that set. How many eligible studies lie
+  outside that database is estimated from a random sample of 300 records found by one search of this review's own
+  in three free sources (the coverage check, GSRR-21, GSRR-39); the estimate concerns that search, not the whole
+  literature.
 
 ## Relation to the authors' earlier narrative review
 
@@ -161,7 +165,8 @@ the main set only:
   primary C2b quantity, are in Table 7); and, for each problem type of GSRR-57, including each condition
   of C7 and C6c, the registered statement with its count, the number of evaluable records and the number unresolved.
 
-It gives no value from the exploration set and no comparison with it. It contains no recommendation. The
+It gives no value from the exploration set and no comparison with it, and no value from the late stratum or the
+coverage check (Table 16 reports the coverage count). It contains no recommendation. The
 availability sentence names the per-instrument and per-study tables. If the abstract does not fit the word limit,
 the steps are taken in this order, and only as far as needed: (1) the problem statements are grouped by code (C4,
 C5, C6, C7), one sentence per group, keeping for each type the statement, the count, the number of evaluable records
@@ -246,14 +251,17 @@ that the method can be read without the registration.
    attachment, the list of amendments with dates, reasons and affected items (GSRR-65), and the reporting checklist and
    why it was chosen.
 2. Source of records: the literature database built by both authors and its searches (GSRR-21 to GSRR-32); the
-   exploratory bibliography and the additional candidates; no search of this review's own.
+   exploratory bibliography and the additional candidates. The coverage search of this review (GSRR-21 to GSRR-27,
+   GSRR-32): sources, query, date, counts, merging and removal of source-database records, and the draw of the
+   coverage sample.
 3. Eligibility and screening: criteria (GSRR-24, GSRR-35); the first author and the AI screener as independent
    screeners at each stage, and how differences were decided (GSRR-33, GSRR-38); the AI screener's instructions, and
    its accuracy against human decisions on the exploratory records before registration (GSRR-36, GSRR-37); how free
    full texts were obtained; what was screened before registration and by whom (GSRR-32, GSRR-34); the fixed screening
-   order after registration and the release of every decision (GSRR-33, GSRR-41).
-4. Sets: exploration set (the 10 primary studies and four item-coded instruments of GSRR-39), used for calibration;
-   main set; late stratum; minimum sizes (GSRR-39).
+   order after registration and the release of every decision (GSRR-33, GSRR-41); the coverage sample screened in
+   the same order and by the same rules (GSRR-33).
+4. Sets: exploration set (the 11 primary studies and four item-coded instruments of GSRR-39), used for calibration;
+   main set; late stratum; coverage sample and coverage stratum, and the coverage count; minimum sizes (GSRR-39).
 5. Coding: units, instrument and main-instrument rules, missing-value codes, and the codes C1 to C7 with the C4f and
    C6b rules (GSRR-43); the codebook (version 2); the use of AI drafts for C4f and C5 only (GSRR-44). For C4f, a short
    table of what it shares with statcheck (Nuijten et al., 2016), which recalculates p from t, F, r, χ² and Z with their
@@ -272,7 +280,9 @@ that the method can be read without the registration.
 
 1. Records and sets: flow diagram; candidates screened and unscreened on 31 December 2026 by population group;
    exclusions by code and, for E2 and E3, by population group; agreement between the first author and the AI screener
-   at each stage; studies and E5-linked records (Figure 1, Table 3).
+   at each stage; studies and E5-linked records (Figure 1, Table 3). The coverage check: new records found, the
+   coverage sample, its screening, the coverage count and the main-set studies the coverage search also retrieved
+   (Table 16).
 2. Agreement between the two authors on the records the second author coded, and between the first author's two
    coding passes per code and set, including the calibration passes, with the AI-draft cross-check for C4f, which is agreement with a draft, not with a correct value (Table 4).
 3. RQ1 attribution (Table 5).
@@ -288,7 +298,7 @@ that the method can be read without the registration.
 9. SQ1 by centre (supplementary tables set side by side, without comparison statements; without C1 and C6c, and
    with C7 conditions (i) and (iii) only).
 10. Sensitivity analyses 1 to 5 (Table 13).
-11. Exploration set and late stratum (supplementary tables, labelled as such).
+11. Exploration set, late stratum and coverage stratum (supplementary tables, labelled as such).
 
 The text of each subsection is written only after the tables have been generated from the code table. It states what
 the tables show in the registered terms and does not add interpretation. If the minimum-size rule leaves tables with
@@ -346,6 +356,7 @@ the flow figures from the released screening decisions.
 | ID | Claim | Registered definition | Evidence | Reported in |
 |---|---|---|---|---|
 | SC1 | The flow of records from the additional candidates to the main set, the late stratum, and the unscreened candidates by population group; agreement between the first author and the AI screener at each stage. | GSRR-32, GSRR-33, GSRR-37, GSRR-39, GSRR-41 | Released screening decisions | Section 4.1; Figure 1; Table 3 |
+| CV1 | The coverage check: records found by the coverage search in each source, merged, matching the source database and new; the coverage sample and its screening; the number included and pending, the proportions with Clopper–Pearson 95% intervals and the implied number of eligible studies outside the source database; the included main-set studies that the coverage search also retrieved. An estimate of a number of eligible records, not of how often a problem occurs. | GSRR-21, GSRR-26, GSRR-32, GSRR-39, GSRR-56 | Search log of the coverage search; released screening decisions; script output, coverage count | Section 4.1; Figure 1; Table 16 |
 | SC2 | The number of studies and of records, with E5-linked records counted once and separately. | GSRR-39, GSRR-56 (RQ4) | Script output, RQ4 study counts | Section 4.1; Table 3 |
 | AG1 | Agreement between the two authors on the records the second author coded, and between the two coding passes of the first author per code and set, including the calibration passes (GSRR-44, GSRR-46, GSRR-47), and between the reconciled values and the AI draft for C4f; the number of records coded in one pass only. | GSRR-44, GSRR-46, GSRR-47 | Script output, agreement | Section 4.2; Table 4 |
 | R1 | Distribution of the representative level of attribution of the main fatigue instrument; values for other instruments in the supplement. | RQ1; GSRR-43 (C1) | Script output, C1 tables | Section 4.3; Table 5; abstract |
@@ -360,7 +371,7 @@ the flow figures from the released screening decisions.
 | PS1 | The problem statements of the registration for the main set, with each condition of C7 as its own type. | GSRR-57 | Script output, problem statements | Section 4.8; Table 12; abstract |
 | S1 | Answers to RQ2 to RQ5 and SQ2 by centre, without C1 and C6c, and with C7 by conditions (i) and (iii) only. | SQ1; GSRR-12 | Script output, centre tables | Section 4.9; supplement |
 | SE1 | The problem statements under sensitivity analyses 1, 2, 4 and 5, the record-level tables under analysis 5, and the C2b tables under analysis 3. | GSRR-62 | Script output, sensitivity outputs; for analysis 5, the script run on the code tables of the set decided by both authors | Section 4.10; Table 13 |
-| EX1 | The exploration set and the late stratum under the same rules, labelled as such and not compared with the main set. | GSRR-39, GSRR-56, GSRR-57 | Script output, tables by set | Section 4.11; supplement |
+| EX1 | The exploration set, the late stratum and the coverage stratum under the same rules, labelled as such and not compared with the main set. | GSRR-39, GSRR-56, GSRR-57 | Script output, tables by set | Section 4.11; supplement |
 | PT1 | The C1 to C7 values of each coded study. | GSRR-56 (per-study table) | Script output, per-study table | Supplement |
 | D1 | Recommendations, each tied to one code and to either an existing standard or a proposal of this scheme. Not a finding of this review. | Not registered (discussion) | The registered definitions of GSRR-43; the standards listed in the note to Table 14 | Section 5.3; Table 14 |
 | L1 | The limitations of the review. | GSRR-65 | The registration and the record of deviations | Section 5.4 |
@@ -375,7 +386,9 @@ in a table of fewer than 10 studies shows a count without a proportion. Values e
 columns; no value is filled in before coding.
 
 - Figure 1: flow diagram (additional candidates; screened by the first author and the AI screener; excluded by code;
-  main set; late stratum; unscreened on 31 December 2026).
+  main set; late stratum; unscreened on 31 December 2026), with the coverage search beside it (records by source;
+  merged; matching the source database; new; coverage sample; screened; excluded by code; coverage stratum; not
+  decided).
 - Table 1: the codes C1 to C7, their units and their values (from the registration).
 - Table 2: deviations from the registration and from this outline, with dates and reasons.
 - Table 3: sets and their composition.
@@ -384,6 +397,7 @@ columns; no value is filled in before coding.
   |---|---|---|---|---|---|
   | Main set | — | — | — | — | — |
   | Late stratum | — | — | — | — | — |
+  | Coverage stratum | — | — | — | — | — |
   | Exploration set | — | — | — | — | — |
   | Pending at full text on 31 December 2026 | — | | | — | |
   | Unscreened on 31 December 2026 | — | | | — | |
@@ -447,6 +461,22 @@ columns; no value is filled in before coding.
   | Instrument version | Language | First seen (set) | Studies using it | Format | Items refer to AI (L1a) | Records by instructions (L1b), origin and disclosure | Items (printed / full) | FAT | MOT | AVO | FUT | IRR | OTH | Unresolved |
   |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
   | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+
+- Table 16: the coverage check (GSRR-39). Top: records found in each source (OpenAlex, Europe PMC, ACM Digital
+  Library), after merging, matching the source database, and new. Bottom: the coverage sample drawn, decided and not
+  decided; included and pending at full text; the proportion included, and included or pending, with Clopper–Pearson
+  95% intervals; the implied number of eligible studies outside the source database with its interval. A last row
+  gives the included main-set studies and how many of them the coverage search retrieved. A note says that the
+  implied number concerns the coverage search, not the whole literature, and is not an estimate of how often a
+  problem type occurs.
+
+  | | Records | Proportion (95% CI) | Implied number (95% CI) |
+  |---|---|---|---|
+  | Found (by source), merged, matching the source database, new | — | | |
+  | Coverage sample: drawn / decided / not decided | — | | |
+  | Included | — | — | — |
+  | Included or pending | — | — | — |
+  | Main-set studies retrieved by the coverage search | — | | |
 
 - Supplement: the completed reporting checklist; tables by population group and by centre; the exploration set and
   the late stratum; C1 for fatigue instruments other than the main one; the per-instrument summary table; the

@@ -29,8 +29,8 @@ FILES = {
 DESCRIPTIONS = {
     # records
     "record_id": "Record ID of the source database.",
-    "set": "Set of the record (registration GSRR-39): exploration, main or late. Calibration codes go in their own directory, with every record in set exploration.",
-    "population": "Population group of the source database (GSRR-16).",
+    "set": "Set of the record (registration GSRR-39): exploration, main, late or coverage (the coverage stratum). Calibration codes go in their own directory, with every record in set exploration.",
+    "population": "Population group of the source database (GSRR-16); for the coverage stratum, the group recorded by author 1 at the full-text stage.",
     "centre": "Centre of the source database.",
     "peer_reviewed": "1 if the record is peer reviewed (sensitivity analysis 1).",
     "C3": "AI-side variable instrument, all that apply.",

@@ -13,8 +13,8 @@ One row per coded record (the one coded record of an E5 group included; the othe
 | Column | What is coded | Values accepted | Multi-value | May be empty |
 |---|---|---|---|---|
 | `record_id` | Record ID of the source database. | an ID or free text |  |  |
-| `set` | Set of the record (registration GSRR-39): exploration, main or late. Calibration codes go in their own directory, with every record in set exploration. | exploration, late, main |  |  |
-| `population` | Population group of the source database (GSRR-16). | consumers_general, health_professionals, students_learners, teachers_researchers, unknown, workers_other |  |  |
+| `set` | Set of the record (registration GSRR-39): exploration, main, late or coverage (the coverage stratum). Calibration codes go in their own directory, with every record in set exploration. | coverage, exploration, late, main |  |  |
+| `population` | Population group of the source database (GSRR-16); for the coverage stratum, the group recorded by author 1 at the full-text stage. | consumers_general, health_professionals, students_learners, teachers_researchers, unknown, workers_other |  |  |
 | `centre` | Centre of the source database. | A, B |  |  |
 | `peer_reviewed` | 1 if the record is peer reviewed (sensitivity analysis 1). | 0, 1 |  |  |
 | `C3` | AI-side variable instrument, all that apply. | amount_of_use, attitude, dependence, none, not_applicable, not_verifiable, other, unresolved | yes |  |
