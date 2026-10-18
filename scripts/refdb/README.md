@@ -10,7 +10,6 @@
 |---|---|
 | `build.py` | 作り直しのコマンド（下の §1） |
 | `fetch.py` | 抄録と CSL の取得（`build.py --fetch` のときだけ・キャッシュにあるものは取り直さない） |
-| `../requirements-dev.txt` | xlsx を書く openpyxl（`~/.venvs/gse-provision` に入れてある。無ければ `--no-xlsx`） |
 | `config.json` | 読む枝・枝の短い名前・研究の筋（カードのファイル名に含まれる語 → 筋）・人が書く列 |
 | `template.html` | 検索のページのひな形 |
 | `summary_prompt.md` | 要約を書く依頼文（§3） |
@@ -21,25 +20,24 @@
 - **文献 DB の本体はスプレッドシート「GSE 文献DB」**: https://docs.google.com/spreadsheets/d/1v7frJm2a6BkXzepEpglB62AT_2c3t0NzJ2mNA8UfRFw/edit （シート: 検索・集計・一覧・凡例。「一覧」のシート ID は 2123943520）。CSV はこのシートへ値を流し込むための受け渡し用で、DB ではない（§2）
 - 検索のページ: https://claude.ai/artifact/Js8ZBgzkWAZBHdgrzqjwSA （同じ URL に出し直す）
 - Google Drive のフォルダ GSE の中の「文献DB」（手元では Drive for desktop の同期フォルダ。パスにメールアドレスが入るので、ここには書かない。2026-10-18 に研究者が決めた並べ方）:
-  - `文献DB/`: 置くのは 3 つだけ（判断 17）。スプレッドシート「GSE 文献DB」（本体）、`GSE文献DB.xlsx`（一覧・書誌・説明を 1 つにした写し）、`GSE文献DB.bib`（BibTeX・論文の原稿が使う形）。xlsx と .bib は日付の無い名前で、作り直すたびに上書きする
-  - `文献DB/作業/`: `build.py` の出力先（日付つきの CSV・`.html`・`.csl.json`・`.bib` 2 本・`.xlsx`・`manifest.json`・`missing_summaries.json`）
+  - `文献DB/`: 置くのは 2 つだけ（判断 17・21）。スプレッドシート「GSE 文献DB」（本体）と `GSE文献DB.bib`（BibTeX・論文の原稿が使う形）。.bib は日付の無い名前で、作り直すたびに上書きする。xlsx は 2026-10-19 にやめた（スプレッドシートと .bib の写しにすぎず、使う場面が無かった・判断 21）
+  - `文献DB/作業/`: `build.py` の出力先（日付つきの CSV・`.html`・`.csl.json`・`.bib` 2 本と、`manifest.json`・`missing_summaries.json`）。残るのは最新の 1 組だけで、作り直すと前の日付の組を消す（判断 21）
   - `文献DB/作業/手作り_2026-10-18/`: 2026-10-18 に手で作った版（`GSE文献DB_2026-10-18.csv`・`GSE文献DB_v2_2026-10-18.csv`・`.csl.json`・`.bib` 2 本）と、最初の差し替えの前の「一覧」の書き出し（`一覧_差し替え前_2026-10-18.csv`）。§6 の照合の正解はここにある
 
 ## 1. 作り直す
 
 ```bash
 git fetch origin                                  # build.py は fetch しない
-PY=~/.venvs/gse-provision/bin/python                       # openpyxl が入っている
-$PY scripts/refdb/build.py --keep <シートの一覧の値> --out "<文献DB/作業>" --deliver "<文献DB>"
-$PY scripts/refdb/build.py --verify "<文献DB/作業>"          # 「揃っている」を確かめる
+python3 scripts/refdb/build.py --keep <シートの一覧の値> --out "<文献DB/作業>" --deliver "<文献DB>"
+python3 scripts/refdb/build.py --verify "<文献DB/作業>"       # 「揃っている」を確かめる
 ```
 
 - 読む枝は `config.json` の `branches`。作業中の枝を足すときは `config.json` に足すか、`--branches origin/main,origin/docs/x` で一時的に上書きする。枝が main に入ったら設定から外す（判断 5）。
 - 出力先の既定は `~/.cache/gse-refdb/out/<日付>/`（判断 6）。試しに回すときは `--out` を付けない。
 - 新しい書誌の抄録と CSL は `--fetch` で取る（判断 7）。タイムアウト・429 などの一過性の失敗はキャッシュに残さず、次の `--fetch` で取り直す（404 だけ「無い」と覚える）。付けないとキャッシュだけで作り、キャッシュに無い書誌は手元の題・出典・年から最小限に作る（件数を表示する）。
-- `.bib` には pandoc が要る。無ければ `--no-bib`。`.xlsx` には openpyxl が要る。無ければ `--no-xlsx`。
-- `--deliver <文献DB>` は、作り終えて出力先へ移した後に、`GSE文献DB.xlsx` と `GSE文献DB.bib` を日付の無い名前で上書きする。2 本を一時の名前で写し終えてから入れ替え、入れ替えの途中で止まったら前の版を戻す（例外で止まったとき。電源断などでプロセスごと落ちたとき、または戻すことにも失敗したときは、`.GSE文献DB.*.prev` が残る。次の回はそれを見つけて止まるので、元の名前に戻すか消してから回す）。同じ「文献DB」へ 2 つの作り直しを同時に回さない（排他はしていない）。`文献DB` の xlsx と .bib は作り直せば同じものができる写しなので、壊れても作り直せばよい（読んだ・メモはスプレッドシートにある）。`--no-xlsx`・`--no-bib` とは一緒に使えない。
-- xlsx のバイト列は、同じ入力でも回すたびに変わる（openpyxl が保存の時刻を書く）。同じ入力かどうかは CSV のハッシュで見る。xlsx のセルが 32,767 字を超えると止まり、xlsx に書けない制御文字は外して `manifest.json` の `xlsx_removed_control_chars` に数える。
+- `.bib` には pandoc が要る。無ければ `--no-bib`。
+- 作り終えて出力先へ移した後に、出力先の直下から前の日付の組（`GSE文献DB_<日付>` の CSV・`.html`・`.csl.json`・`.bib` 2 本と、前に作っていた `.xlsx`）を消す。サブフォルダ（`手作り_2026-10-18` など）と、名前の形が違うファイルには触れない。途中で止まった回は何も消さない。古い組は `--pin` で作り直せる。`--date` で古い日付を作り直すと新しい日付の組が消えるので、そのときは `--out` を別にする。
+- `--deliver <文献DB>` は、作り終えて出力先へ移した後に、BibTeX を `GSE文献DB.bib` の名前で上書きする。一時の名前で写し終えてから 1 回の rename で入れ替えるので、途中で止まっても前の版のまま。`--no-bib` とは一緒に使えない。
 - `--keep` のシートの値は、Sheets の `get_values` の返り値をそのまま渡してよい（拡張子が `.txt` でも中身が JSON なら読む）。
 - ある時点の枝を読み直すときは `--pin 枝=commit`（2026-10-18 の照合は §6）。
 
@@ -90,7 +88,7 @@ $PY scripts/refdb/build.py --verify "<文献DB/作業>"          # 「揃って�
 
 ## 5. 書誌のファイル
 
-`.bib` 2 本と `.csl.json` は §1 で `文献DB/作業` に出る。`--deliver` で `文献DB` に写るのは BibTeX の 1 本（`GSE文献DB.bib`）だけ（論文の原稿 2 本がどちらも BibTeX を使うため・判断 17）。xlsx の「書誌」のシートにも、1 行 1 件で同じ BibTeX の項目が入る。引用キーは最初の番号（例 `P534`）。番号の衝突で重なるときは key の末尾 8 字を足す（例 `P485_okp7zsv1`）。`keyword` に研究の筋、`note` に「GSE <ID> ｜ <要約>」。
+`.bib` 2 本と `.csl.json` は §1 で `文献DB/作業` に出る。`--deliver` で `文献DB` に写るのは BibTeX の 1 本（`GSE文献DB.bib`）だけ（論文の原稿 2 本がどちらも BibTeX を使うため・判断 17）。引用キーは最初の番号（例 `P534`）。番号の衝突で重なるときは key の末尾 8 字を足す（例 `P485_okp7zsv1`）。`keyword` に研究の筋、`note` に「GSE <ID> ｜ <要約>」。
 
 ## 6. 2026-10-18 の版との照合
 

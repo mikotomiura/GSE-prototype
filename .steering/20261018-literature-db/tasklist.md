@@ -12,4 +12,5 @@
 - [x] Drive の並べ方を「文献DB」（スプレッドシート・xlsx・.bib）と「文献DB/作業」に（判断 16・17）
 - [x] xlsx（説明・一覧・書誌）と --deliver（判断 17〜20・/cross-review: Claude 1 回・Codex 3 回）
 - [x] push
+- [x] xlsx をやめ、作業に最新の 1 組だけ残す（判断 21）
 - [ ] PR（研究者が時期を決める）

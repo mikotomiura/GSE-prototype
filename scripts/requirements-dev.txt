@@ -38,6 +38,3 @@ python-pptx==1.0.2
 # ⚠️ ubuntu-latest に同梱されている保証は取れなかったので明示的に入れる。
 pyyaml==6.0.3
 
-# 文献 DB の xlsx（scripts/refdb/build.py・.steering/20261018-literature-db/ 判断 17）。
-# 無くても build.py は --no-xlsx で動き、テストは xlsx の部分だけ飛ばす。
-openpyxl==3.1.5

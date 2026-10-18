@@ -801,9 +801,6 @@ jobs:
         env:
           PYTHONUTF8: "1"
       # 文献 DB の作り直し（scripts/refdb/・git もネットも使わない）
-      # openpyxl が無いと xlsx のテストは飛ぶので、版を固定して入れる（scripts/requirements-dev.txt と同じ版）
-      - name: Install openpyxl (literature DB xlsx)
-        run: python3 -m pip install --quiet "openpyxl==3.1.5"
       - name: Literature DB build test
         run: python3 -m unittest scripts.tests.test_refdb_build
         env:

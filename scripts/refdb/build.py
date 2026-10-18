@@ -48,11 +48,15 @@ FORMULA_LEAD = ("=", "+", "-", "@")
 
 def output_names(name: str) -> list[str]:
     return [f"{name}.csv", f"{name}.html", f"{name}.csl.json", f"{name}_biblatex.bib", f"{name}_bibtex.bib",
-            f"{name}.xlsx", "missing_summaries.json", "manifest.json"]
+            "missing_summaries.json", "manifest.json"]
 
 
-# --deliver で「文献DB」へ渡すもの（作業の名前 → 渡し先の日付なしの名前・判断 17）
-DELIVER = {"{name}.xlsx": "GSE文献DB.xlsx", "{name}_bibtex.bib": "GSE文献DB.bib"}
+# 作業の出力先で、日付つきの名前の成果物（作り直したら、今回の日付以外のものを消す・判断 21）
+DATED_RE = re.compile(r"^GSE文献DB_(\d{4}-\d{2}-\d{2})(?:\.csv|\.html|\.csl\.json|_biblatex\.bib|_bibtex\.bib|\.xlsx)$")
+
+
+# --deliver で「文献DB」へ渡すもの（作業の名前 → 渡し先の日付なしの名前・判断 17・21）
+DELIVER_SRC, DELIVER_DST = "{name}_bibtex.bib", "GSE文献DB.bib"
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v7frJm2a6BkXzepEpglB62AT_2c3t0NzJ2mNA8UfRFw/edit"
 PAGE_URL = "https://claude.ai/artifact/Js8ZBgzkWAZBHdgrzqjwSA"
 
@@ -633,143 +637,33 @@ def write_bib(csl_path: Path, out_base: Path) -> dict:
     return counts
 
 
-# ---------------------------------------------------------------- xlsx（一覧・書誌・説明を 1 つに）
-
-
-def bib_entries(text: str) -> dict[str, str]:
-    """pandoc が書いた .bib を、引用キー → 項目の全文に分ける。"""
-    out = {}
-    for ent in re.split(r"\n(?=@)", text.strip()):
-        m = re.match(r"@\w+\{([^,]+),", ent)
-        if m:
-            out[m.group(1)] = ent.strip()
-    return out
-
-
-XLSX_CELL_MAX = 32767  # Excel のセルの上限。openpyxl は超えた分を黙って切る（2026-10-18 に再現）
-CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")  # xlsx に書けない制御文字（openpyxl は例外で全体を落とす）
-
-
-def put(ws, row: int, col: int, v, stats: dict | None = None) -> None:
-    """値を書く。= で始まる文字列は数式にせず文字列のまま置く。制御文字は外して数え、上限を超える文字列は止める。"""
-    if isinstance(v, str):
-        v, n = CONTROL_RE.subn("", v)
-        if stats is not None:
-            stats["xlsx_removed_control_chars"] = stats.get("xlsx_removed_control_chars", 0) + n
-        if len(v) > XLSX_CELL_MAX:
-            head = ws.cell(row=1, column=col).value
-            raise RuntimeError(f"xlsx のセルが上限 {XLSX_CELL_MAX} 字を超える（シート {ws.title}・{row} 行目・列 {head}・{len(v)} 字）")
-    c = ws.cell(row=row, column=col, value=v)
-    if isinstance(v, str) and v.startswith("="):
-        c.data_type = "s"
-
-
-def write_xlsx(rows: list[dict], human: list[str], items: list[dict], bibtex: str, info: dict, path: Path) -> dict:
-    try:
-        from openpyxl import Workbook  # noqa: PLC0415  無いときは --no-xlsx で外せる
-        from openpyxl.styles import Font
-    except ImportError as e:
-        raise RuntimeError("openpyxl が無い（~/.venvs/gse-provision/bin/python で回すか、--no-xlsx）") from e
-    stats: dict = {"xlsx_removed_control_chars": 0}
-    # xlsx のバイト列は回すたびに変わる（openpyxl が保存の時刻を書き、zip の各項目にも時刻が入る）。
-    # 同じ入力かどうかは、xlsx のハッシュではなく CSV のハッシュで見る
-    wb = Workbook()
-    readme = wb.active
-    readme.title = "説明"
-    lines = [
-        ("GSE 文献DB（xlsx の写し）", ""),
-        ("本体", f"Google スプレッドシート「GSE 文献DB」 {SHEET_URL}（読んだ・メモはそちらに書く。この xlsx に書いても作り直しで戻らない）"),
-        ("検索のページ", PAGE_URL),
-        ("作った日", info["date"]),
-        ("文献", info["works"]),
-        ("要約", info["summaries"]),
-        ("カードでの記述", f"{info['claims_works']} 件（{info['claims_lines']} 行）"),
-        ("番号の衝突", info["collided_ids"]),
-        ("書誌の正本", "各枝の docs/references.md（作り方は repo の scripts/refdb/README.md）"),
-    ] + [(f"枝 {b}", c) for b, c in info["branches"].items()]
-    for i, (k, v) in enumerate(lines, 1):
-        put(readme, i, 1, k, stats)
-        put(readme, i, 2, str(v), stats)  # 数は右寄せになり広い列の右端へ隠れるので、説明では文字で置く
-    readme["A1"].font = Font(bold=True, size=14)
-    readme.column_dimensions["A"].width = 48
-    readme.column_dimensions["B"].width = 110
-
-    ws = wb.create_sheet("一覧")
-    cols = COLUMNS + human
-    for j, c in enumerate(cols, 1):
-        put(ws, 1, j, c, stats)
-        ws.cell(row=1, column=j).font = Font(bold=True)
-    for i, r in enumerate(rows, 2):
-        for j, c in enumerate(cols, 1):
-            put(ws, i, j, r.get(c, ""), stats)
-    ws.freeze_panes = "B2"
-    ws.auto_filter.ref = ws.dimensions
-    widths = {"ID": 14, "著者・題": 60, "出典": 36, "年": 7, "研究の筋": 30, "要約": 60, "特徴": 50, "key": 32, "URL": 40}
-    for j, c in enumerate(cols, 1):
-        ws.column_dimensions[ws.cell(row=1, column=j).column_letter].width = widths.get(c, 18)
-
-    bs = wb.create_sheet("書誌")
-    entries = bib_entries(bibtex)
-    for j, c in enumerate(["引用キー", "ID", "key", "種類", "BibTeX"], 1):
-        put(bs, 1, j, c, stats)
-        bs.cell(row=1, column=j).font = Font(bold=True)
-    for i, (it, r) in enumerate(zip(items, [r for r in rows if r["状態"] != ORPHAN_STATE]), 2):
-        for j, v in enumerate([it["id"], r["ID"], r["key"], it.get("type", ""), entries.get(it["id"], "")], 1):
-            put(bs, i, j, v, stats)
-    bs.freeze_panes = "B2"
-    bs.auto_filter.ref = bs.dimensions
-    for col, w in zip("ABCDE", (16, 14, 32, 16, 100)):
-        bs.column_dimensions[col].width = w
-    wb.save(path)
-    return stats
-
-
-def deliver(out: Path, name: str, to: Path) -> list[str]:
-    """作業の成果物のうち xlsx と BibTeX を、渡し先へ日付なしの名前で写す（上書き）。
-    両方を一時の名前で写し終えてから入れ替える。入れ替えの途中で止まったら、前の版を戻す（新旧を混ぜない）。
-    片方でも無ければ何も写さずに止める。"""
-    srcs = {dst: out / src.format(name=name) for src, dst in DELIVER.items()}
-    lacking = [str(p) for p in srcs.values() if not p.exists()]
-    if lacking:
-        raise RuntimeError(f"--deliver で渡すものが無い: {lacking}（何も写していない）")
+def deliver(out: Path, name: str, to: Path) -> str:
+    """作業の BibTeX を、渡し先へ日付なしの名前で写す（上書き）。
+    一時の名前で写し終えてから 1 回の rename で入れ替えるので、途中で止まっても前の版のまま。"""
+    src = out / DELIVER_SRC.format(name=name)
+    if not src.exists():
+        raise RuntimeError(f"--deliver で渡すものが無い: {src}（何も写していない）")
     to.mkdir(parents=True, exist_ok=True)
-    left = sorted(p.name for p in to.glob(".GSE文献DB*.prev"))
-    if left:
-        raise RuntimeError(f"前の回の退避が残っている: {left}（前の回が入れ替えの途中で落ちた。元の名前に戻すか消してから回す）")
-    tmps: dict[str, Path] = {}
-    backups: dict[str, Path] = {}  # 入れ替える前の版（止まったら戻す。消すのは入れ替えが全部済んだときだけ）
-    done = False
-    placed: list[str] = []
+    fd, t = tempfile.mkstemp(prefix=f".{DELIVER_DST}.", suffix=".tmp", dir=to)
+    os.close(fd)
     try:
-        for dst, p in srcs.items():
-            fd, t = tempfile.mkstemp(prefix=f".{dst}.", suffix=".tmp", dir=to)
-            os.close(fd)
-            tmps[dst] = Path(t)  # 写す前に覚える（写す途中で止まっても消せるように）
-            shutil.copyfile(p, t)
-        try:
-            for dst in srcs:
-                if (to / dst).exists():
-                    b = to / f".{dst}.prev"
-                    (to / dst).replace(b)
-                    backups[dst] = b
-                tmps[dst].replace(to / dst)
-                placed.append(dst)
-            done = True
-        except BaseException:
-            # 戻すのに失敗しても、残った退避は消さない（次の回が上の検査で止まり、人が戻せる）
-            for dst in placed:
-                (to / dst).unlink(missing_ok=True)
-            for dst, b in list(backups.items()):
-                b.replace(to / dst)
-                del backups[dst]
-            raise
+        shutil.copyfile(src, t)
+        Path(t).replace(to / DELIVER_DST)
     finally:
-        for t in tmps.values():
-            t.unlink(missing_ok=True)
-        if done:
-            for b in backups.values():
-                b.unlink(missing_ok=True)
-    return list(srcs)
+        Path(t).unlink(missing_ok=True)
+    return DELIVER_DST
+
+
+def prune(out: Path, today: str) -> list[str]:
+    """出力先から、今回の日付以外の日付つきの成果物を消す（最新の 1 組だけ残す）。サブフォルダには触れない。"""
+    gone = []
+    for p in sorted(out.iterdir()):
+        m = DATED_RE.match(p.name)
+        # .xlsx はもう作らない（判断 21）。前の回のものは日付によらず消す
+        if m and (m.group(1) != today or p.suffix == ".xlsx") and p.is_file():
+            p.unlink()
+            gone.append(p.name)
+    return gone
 
 
 # ---------------------------------------------------------------- 要約が無いもの
@@ -810,8 +704,8 @@ def parse_rekey(pairs: list[str]) -> dict[str, str]:
 
 
 def run(args, source=None) -> int:
-    if args.deliver and (args.no_xlsx or args.no_bib):
-        raise ValueError("--deliver は xlsx と .bib の両方を渡す。--no-xlsx / --no-bib とは一緒に使えない（前の回のものが残って新旧が混ざる）")
+    if args.deliver and args.no_bib:
+        raise ValueError("--deliver は .bib を渡す。--no-bib とは一緒に使えない（前の回のものが渡し先に残る）")
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
     branches = args.branches.split(",") if args.branches else cfg["branches"]
     human = cfg.get("human_columns", ["読んだ", "メモ"])
@@ -884,9 +778,6 @@ def run(args, source=None) -> int:
         }
         # 成果物の SHA-256 を manifest に持たせ、manifest は最後に移す。
         # 移す段で止まっても、manifest が古いままか、ハッシュが合わないことで分かる
-        if not args.no_xlsx:
-            bibtex = "" if args.no_bib else (stage / f"{name}_bibtex.bib").read_text(encoding="utf-8")
-            manifest.update(write_xlsx(rows, human, items, bibtex, manifest, stage / f"{name}.xlsx"))
         manifest["sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(stage.iterdir())}
         (stage / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
         produced = {p.name for p in stage.iterdir()}
@@ -897,11 +788,14 @@ def run(args, source=None) -> int:
             p.replace(out / p.name)
     finally:
         shutil.rmtree(stage, ignore_errors=True)
-    delivered = deliver(out, name, Path(args.deliver).expanduser()) if args.deliver else []
+    pruned = prune(out, today)
+    delivered = deliver(out, name, Path(args.deliver).expanduser()) if args.deliver else ""
 
     print(f"出力: {out}")
+    if pruned:
+        print(f"前の回の {len(pruned)} 本を消した（{pruned[0]} など）")
     if delivered:
-        print(f"渡した: {args.deliver} に {'・'.join(delivered)}")
+        print(f"渡した: {args.deliver} に {delivered}")
     print(f"文献 {n}・要約 {manifest['summaries']}・カードでの記述 {manifest['claims_works']} 件"
           f"（{manifest['claims_lines']} 行）・番号の衝突 {manifest['collided_ids']}・要約が無いカード引用 {len(missing)}")
     print(f"CSL: キャッシュから {csl_counts['csl_from_cache']}・最小限で作った {csl_counts['csl_minimal']}"
@@ -976,8 +870,7 @@ def parse_args(argv=None):
     p.add_argument("--cache", default=str(DEFAULT_CACHE))
     p.add_argument("--summaries", default=str(REPO / "docs" / "literature" / "refdb" / "summaries.json"))
     p.add_argument("--no-bib", action="store_true", help=".bib を作らない（pandoc が無いとき）")
-    p.add_argument("--no-xlsx", action="store_true", help=".xlsx を作らない（openpyxl が無いとき）")
-    p.add_argument("--deliver", help="xlsx と BibTeX を日付なしの名前（GSE文献DB.xlsx・GSE文献DB.bib）で写す先（Drive の「文献DB」）")
+    p.add_argument("--deliver", help="BibTeX を日付なしの名前（GSE文献DB.bib）で写す先（Drive の「文献DB」）")
     return p.parse_args(argv)
 
 
