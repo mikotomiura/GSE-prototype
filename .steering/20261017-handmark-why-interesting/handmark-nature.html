@@ -1,0 +1,405 @@
+<title>手跡の背景 見本台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* 配置: 上に仮のデスクトップ（舞台）、下に見比べの操作、最後に制約と見る点。 */
+:root {
+  --bg: #eef0ec;
+  --surface: #f8f9f6;
+  --ink: #1d2420;
+  --muted: #5b655f;
+  --line: #cfd5cf;
+  --accent: #3f6b57;
+  --accent-ink: #ffffff;
+  --display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151a17; --surface: #1d2420; --ink: #e4e9e4; --muted: #9aa69f;
+    --line: #34403a; --accent: #8fc2a8; --accent-ink: #10201a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151a17; --surface: #1d2420; --ink: #e4e9e4; --muted: #9aa69f;
+  --line: #34403a; --accent: #8fc2a8; --accent-ink: #10201a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.7;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: grid; gap: 4px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 1.7rem; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 65ch; }
+.stage-box { position: relative; width: 100%; aspect-ratio: 16 / 10; max-width: 100%; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: #222; }
+#stage { width: 100%; height: 100%; display: block; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 24px; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 8px; }
+legend { font-size: 0.78rem; letter-spacing: 0.08em; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg label { cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: inline-block; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 0.9rem; }
+.seg input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; cursor: pointer; }
+.check input { accent-color: var(--accent); }
+#pad {
+  border: 1px dashed var(--muted); border-radius: 6px; padding: 12px; font-size: 0.9rem; color: var(--muted);
+  background: var(--surface); cursor: text; user-select: none;
+}
+#pad:focus { outline: 2px solid var(--accent); outline-offset: 2px; color: var(--ink); }
+.ver-note { font-size: 0.88rem; color: var(--muted); margin: 0; min-height: 3.4em; }
+section.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px 32px; border-top: 1px solid var(--line); padding-top: 16px; }
+section.notes h2 { font-family: var(--display); font-weight: 600; font-size: 1.05rem; margin: 0 0 4px; }
+section.notes ul { margin: 0; padding-left: 1.2em; }
+section.notes li { margin: 2px 0; font-size: 0.92rem; }
+section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>手跡の背景 見本台</h1>
+    <p class="lede">デスクトップの背景に置く表現を 3 版で見比べるページです。打鍵の時刻だけで動きます。合成の打鍵か、下の欄で打った打鍵を使い、キーの種類は読まず、記録も送信もしません。</p>
+  </header>
+
+  <div class="stage-box"><canvas id="stage" aria-label="仮のデスクトップの背景"></canvas></div>
+
+  <div class="controls">
+    <fieldset>
+      <legend>版</legend>
+      <div class="seg">
+        <label><input type="radio" name="ver" value="1" id="ver1"><span>1 線のまま</span></label>
+        <label><input type="radio" name="ver" value="2" id="ver2"><span>2 線と面</span></label>
+        <label><input type="radio" name="ver" value="3" id="ver3" checked><span>3 自然世界</span></label>
+      </div>
+      <label class="check" id="fixedWrap"><input type="checkbox" id="fixedPx"> 太さを px で固定する（いまの試作と同じ）</label>
+      <p class="ver-note" id="verNote"></p>
+    </fieldset>
+
+    <fieldset>
+      <legend>打鍵</legend>
+      <div class="seg">
+        <label><input type="radio" name="pat" value="normal" id="patNormal" checked><span>ふつう</span></label>
+        <label><input type="radio" name="pat" value="fast" id="patFast"><span>速打ち</span></label>
+        <label><input type="radio" name="pat" value="sparse" id="patSparse"><span>ちょいちょい</span></label>
+        <label><input type="radio" name="pat" value="none" id="patNone"><span>止める</span></label>
+      </div>
+      <div id="pad" tabindex="0">ここを押してから打つと、その打鍵でも動きます（文字は出しません）</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>見え方の条件</legend>
+      <div class="seg">
+        <label><input type="radio" name="wall" value="light" id="wallLight"><span>明るい壁紙</span></label>
+        <label><input type="radio" name="wall" value="dark" id="wallDark"><span>暗い壁紙</span></label>
+        <label><input type="radio" name="wall" value="photo" id="wallPhoto" checked><span>写真風</span></label>
+      </div>
+      <div class="seg">
+        <label><input type="radio" name="res" value="1440" id="res1440"><span>幅 1440</span></label>
+        <label><input type="radio" name="res" value="2560" id="res2560" checked><span>幅 2560</span></label>
+        <label><input type="radio" name="res" value="3840" id="res3840"><span>幅 3840</span></label>
+      </div>
+      <label class="check"><input type="checkbox" id="cover"> 作業の窓を重ねる</label>
+    </fieldset>
+  </div>
+
+  <section class="notes">
+    <div>
+      <h2>自然世界に置いた制約</h2>
+      <ul>
+        <li>育たない・溜まらない。草も粒も数は最初から決まっていて、打っても増えない。</li>
+        <li>天気や季節にしない。色も向きも打鍵で変わらない。</li>
+        <li>打鍵が動かすのは風の強さだけ。打鍵がなくても霧と粒はゆっくり漂う。</li>
+      </ul>
+    </div>
+    <div>
+      <h2>見るところ</h2>
+      <ul>
+        <li>幅 3840 と明るい壁紙で、どの版が見えるか。</li>
+        <li>窓を重ねたとき、縁に残る部分で動きが分かるか。</li>
+        <li>自分の打鍵が速さとして感じられるか、注意を引きすぎないか。</li>
+        <li>版 3 が「自分の作業が一緒にいる」か「別の何かがいる」か。</li>
+      </ul>
+    </div>
+    <div>
+      <h2>写し方</h2>
+      <p>どの版も試作の背景の層と同じく、1 秒ごとに目標を決めて滑らかに近づけます。速さは直近 1 秒の打鍵の数に半分ずつ寄せ、止まると 0.6 倍ずつ落ちます。揺れの深さは直近 30 秒の打鍵の数から決めます。推定（行き詰まりなど）は使いません。</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("stage");
+  const ctx = canvas.getContext("2d");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const notes = {
+    "1": "いまの試作の線 9 本です。既定では太さと揺れを画面の大きさに比例させています。チェックを入れると、いまの試作と同じ px 固定になります。打鍵が止まると静かになります。",
+    "2": "線のあいだを薄い帯で満たします。細さに頼らず面で見せる版です。打鍵が止まると静かになります。",
+    "3": "霧の帯・草の群れ・漂う粒です。打鍵は風として加わり、草をなびかせ粒を押します。打鍵がなくても霧と粒はゆっくり漂います。"
+  };
+
+  const state = { ver: "3", fixedPx: false, pat: reduceMotion ? "none" : "normal", wall: "photo", res: 2560, cover: false };
+
+  // 仮想の画面。幅だけを選び、高さは 16:10 にそろえる。
+  let W = 0, H = 0, S = 1;
+  let wallCanvas = null;
+
+  function setSize() {
+    W = state.res; H = Math.round(W * 10 / 16);
+    canvas.width = W; canvas.height = H;
+    S = H / 900;
+    buildWall();
+    buildWorld();
+  }
+
+  function buildWall() {
+    wallCanvas = document.createElement("canvas");
+    wallCanvas.width = W; wallCanvas.height = H;
+    const w = wallCanvas.getContext("2d");
+    if (state.wall === "light") {
+      const g = w.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#f4f5f2"); g.addColorStop(1, "#e3e6e1");
+      w.fillStyle = g; w.fillRect(0, 0, W, H);
+    } else if (state.wall === "dark") {
+      const g = w.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, "#14181d"); g.addColorStop(1, "#202631");
+      w.fillStyle = g; w.fillRect(0, 0, W, H);
+    } else {
+      // 明暗の混じる中間調の壁紙（写真の代わり）。
+      const g = w.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#9fb4c4"); g.addColorStop(0.55, "#c9c2ad"); g.addColorStop(1, "#5d6b4f");
+      w.fillStyle = g; w.fillRect(0, 0, W, H);
+      let seed = 7;
+      const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      for (let i = 0; i < 90; i++) {
+        const x = rnd() * W, y = rnd() * H, r = (0.04 + rnd() * 0.16) * H;
+        const rg = w.createRadialGradient(x, y, 0, x, y, r);
+        const light = rnd() > 0.5;
+        rg.addColorStop(0, light ? "rgba(255,250,235,0.22)" : "rgba(30,38,30,0.20)");
+        rg.addColorStop(1, "rgba(0,0,0,0)");
+        w.fillStyle = rg; w.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+    }
+  }
+
+  // ---- 打鍵の材料（時刻だけ） ----
+  const presses = [];
+  function press(t) { presses.push(t); }
+
+  // 合成の打鍵。ふつうはまとまりと間を交互にする。
+  let burstUntil = 0, pauseUntil = 0;
+  function synth(now, dt) {
+    let rate = 0;
+    if (state.pat === "fast") rate = 8;
+    else if (state.pat === "sparse") rate = 0.65;
+    else if (state.pat === "normal") {
+      if (now > burstUntil && now > pauseUntil) {
+        if (Math.random() < 0.5) burstUntil = now + 3000 + Math.random() * 5000;
+        else pauseUntil = now + 1000 + Math.random() * 2500;
+      }
+      rate = now < burstUntil ? 4.5 : 0;
+    }
+    if (rate > 0 && Math.random() < rate * dt / 1000) press(now);
+  }
+
+  // ---- 試作と同じ 1 秒ごとの写し方 ----
+  const WINDOW_MS = 30000, STOP_MS = 2000, TICK_MS = 1000, SPEED_PER_KEY = 0.05, MIN_SPEED = 0.002;
+  let amp = 0, ampFrom = 0, ampTo = 0, speed = 0, speedFrom = 0, speedTo = 0, phase = 0;
+  let tickAt = performance.now();
+  function tick() {
+    const now = performance.now();
+    while (presses.length && now - presses[0] > WINDOW_MS) presses.shift();
+    const lastSec = presses.filter((t) => now - t <= TICK_MS).length;
+    const stopped = presses.length === 0 || now - presses[presses.length - 1] > STOP_MS;
+    ampFrom = amp; speedFrom = speed;
+    ampTo = stopped ? amp * 0.85 : Math.min(1, presses.length / 150);
+    if (stopped && ampTo < 0.002) ampTo = 0;
+    const rate = Math.min(lastSec, 10) * SPEED_PER_KEY;
+    const next = lastSec > 0 ? 0.5 * speed + 0.5 * rate : speed * 0.6;
+    speedTo = next < MIN_SPEED ? 0 : next;
+    tickAt = now;
+  }
+  setInterval(tick, TICK_MS);
+
+  // ---- 自然世界の要素（数は固定） ----
+  let blades = [], motes = [];
+  function buildWorld() {
+    let seed = 11;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    blades = [];
+    const rows = 5;
+    for (let r = 0; r < rows; r++) {
+      const depth = r / (rows - 1);
+      const y = H * (0.66 + depth * 0.32);
+      const n = 34 + r * 10;
+      for (let i = 0; i < n; i++) {
+        blades.push({
+          x: (i + rnd() * 0.9) / n * W,
+          y: y + (rnd() - 0.5) * H * 0.03,
+          h: H * (0.05 + rnd() * 0.05) * (0.55 + depth * 0.6),
+          w: 0.55 + depth * 0.75,
+          seed: rnd() * 6.28,
+          depth
+        });
+      }
+    }
+    motes = [];
+    for (let i = 0; i < 140; i++) {
+      motes.push({ x: rnd() * W, y: rnd() * H * 0.9, r: 1 + rnd() * 2.2, seed: rnd() * 6.28, k: 0.5 + rnd() });
+    }
+  }
+
+  // 暗い縁の上に明るい芯を重ね、壁紙の明暗に依らず見せる。
+  function dualStroke(width, darkA, lightA) {
+    ctx.globalAlpha = darkA; ctx.strokeStyle = "#12161b"; ctx.lineWidth = width * 2.5; ctx.stroke();
+    ctx.globalAlpha = lightA; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = width; ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function waveY(i, x, a) {
+    const y0 = (H * (i + 1)) / 10;
+    return y0 + a * Math.sin((x / W) * Math.PI * (2 + i * 0.35) + phase * (1 + i * 0.13) + i);
+  }
+  function lineAmp(i) {
+    const base = state.fixedPx && state.ver === "1" ? 6 : 6 * S;
+    return (base + amp * H * 0.05) * (0.6 + 0.4 * Math.sin(i * 1.7));
+  }
+
+  function drawLines(withBands) {
+    const step = Math.max(6, Math.round(6 * S));
+    if (withBands) {
+      for (let i = 0; i < 8; i++) {
+        ctx.beginPath();
+        const a1 = lineAmp(i), a2 = lineAmp(i + 1);
+        for (let x = 0; x <= W + step; x += step) ctx.lineTo(x, waveY(i, x, a1));
+        for (let x = W + step; x >= 0; x -= step) ctx.lineTo(x, waveY(i + 1, x, a2));
+        ctx.closePath();
+        ctx.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.13)" : "rgba(18,22,27,0.08)";
+        ctx.fill();
+      }
+    }
+    const lw = state.fixedPx && state.ver === "1" ? 1.2 : 1.2 * S;
+    for (let i = 0; i < 9; i++) {
+      ctx.beginPath();
+      const a = lineAmp(i);
+      for (let x = 0; x <= W; x += step) {
+        const y = waveY(i, x, a);
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      dualStroke(lw, 0.16, i % 3 === 0 ? 0.55 : 0.35);
+    }
+  }
+
+  let drift = 0;
+  function drawNature(t, dt) {
+    // 風は打鍵の速さから（向きは一定・色は変えない）。drift は打鍵に依らない基層の時間。
+    const wind = Math.min(1, speed / 0.4);
+    drift += dt / 1000;
+
+    // 霧の帯（上の 6 割）。基層の漂いに、打鍵の位相を少しだけ足す。
+    for (let b = 0; b < 4; b++) {
+      const yc = H * (0.12 + b * 0.14);
+      const a = H * (0.018 + 0.02 * amp) * (1 + b * 0.2);
+      const step = Math.max(8, Math.round(10 * S));
+      ctx.beginPath();
+      for (let x = 0; x <= W + step; x += step) {
+        ctx.lineTo(x, yc + a * Math.sin(x / W * Math.PI * (1.4 + b * 0.3) + drift * 0.12 * (1 + b * 0.2) + phase * 0.6 + b));
+      }
+      for (let x = W + step; x >= 0; x -= step) {
+        ctx.lineTo(x, yc + H * 0.05 + a * Math.sin(x / W * Math.PI * (1.1 + b * 0.25) + drift * 0.1 + phase * 0.5 + b * 2));
+      }
+      ctx.closePath();
+      ctx.fillStyle = b % 2 === 0 ? "rgba(255,255,255,0.12)" : "rgba(18,22,27,0.06)";
+      ctx.fill();
+    }
+
+    // 漂う粒。基層の流れ＋風の押し。数は固定で、端から出たら反対から入る。
+    for (const m of motes) {
+      const vx = (6 + 70 * wind) * m.k * S;
+      const vy = Math.sin(drift * 0.5 + m.seed) * 4 * S;
+      m.x += vx * dt / 1000; m.y += vy * dt / 1000;
+      if (m.x > W + 10) m.x -= W + 20;
+      const r = m.r * S;
+      ctx.beginPath(); ctx.arc(m.x, m.y, r * 1.9, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(18,22,27,0.14)"; ctx.fill();
+      ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fill();
+    }
+
+    // 草の群れ。基層の小さな揺れ＋風で右へなびく。風の波は打鍵の位相で横へ渡る。
+    for (const bl of blades) {
+      const sway = Math.sin(drift * 0.7 + bl.seed) * 0.07;
+      const gust = wind * (0.32 + 0.22 * Math.sin(bl.x / W * 9 - phase * 3 + bl.depth));
+      const bend = (sway + gust) * bl.h;
+      ctx.beginPath();
+      ctx.moveTo(bl.x, bl.y);
+      ctx.quadraticCurveTo(bl.x + bend * 0.25, bl.y - bl.h * 0.55, bl.x + bend, bl.y - bl.h + Math.abs(bend) * 0.25);
+      dualStroke(bl.w * S, 0.14, 0.45 + bl.depth * 0.2);
+    }
+  }
+
+  function drawCover() {
+    if (!state.cover) return;
+    const x = W * 0.1, y = H * 0.08, w = W * 0.66, h = H * 0.78;
+    ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fillRect(x + 6 * S, y + 10 * S, w, h);
+    ctx.fillStyle = "#fbfbfa"; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "#e7e8e5"; ctx.fillRect(x, y, w, 34 * S);
+    ctx.fillStyle = "#d3d6d2";
+    for (let i = 0; i < 14; i++) ctx.fillRect(x + 48 * S, y + (80 + i * 34) * S, w * (0.55 + 0.3 * Math.sin(i * 2.1)) - 96 * S, 10 * S);
+  }
+
+  let last = null;
+  function frame(now) {
+    const dt = last === null ? 16 : Math.min(now - last, 100);
+    last = now;
+    synth(now, dt);
+    const k = Math.min(1, (now - tickAt) / TICK_MS);
+    const e = k * k * (3 - 2 * k);
+    amp = ampFrom + (ampTo - ampFrom) * e;
+    speed = speedFrom + (speedTo - speedFrom) * e;
+    phase += speed * dt / 1000;
+
+    ctx.drawImage(wallCanvas, 0, 0);
+    if (state.ver === "3") drawNature(now, reduceMotion ? dt * 0.3 : dt);
+    else drawLines(state.ver === "2");
+    drawCover();
+    requestAnimationFrame(frame);
+  }
+
+  // ---- 操作 ----
+  function sync() {
+    document.getElementById("verNote").textContent = notes[state.ver];
+    document.getElementById("fixedWrap").hidden = state.ver !== "1";
+  }
+  document.querySelectorAll('input[name="ver"]').forEach((el) => el.addEventListener("change", () => { state.ver = el.value; sync(); }));
+  document.querySelectorAll('input[name="pat"]').forEach((el) => {
+    if (el.value === state.pat) el.checked = true;
+    el.addEventListener("change", () => { state.pat = el.value; burstUntil = 0; pauseUntil = 0; });
+  });
+  document.querySelectorAll('input[name="wall"]').forEach((el) => el.addEventListener("change", () => { state.wall = el.value; buildWall(); }));
+  document.querySelectorAll('input[name="res"]').forEach((el) => el.addEventListener("change", () => { state.res = Number(el.value); setSize(); }));
+  document.getElementById("fixedPx").addEventListener("change", (ev) => { state.fixedPx = ev.target.checked; });
+  document.getElementById("cover").addEventListener("change", (ev) => { state.cover = ev.target.checked; });
+
+  // 手で打つ欄。時刻だけを取り、キーの種類は見ない。
+  const pad = document.getElementById("pad");
+  pad.addEventListener("keydown", (ev) => {
+    if (ev.repeat) return;
+    if (ev.key !== "Tab") ev.preventDefault();
+    press(performance.now());
+  });
+
+  setSize();
+  sync();
+  requestAnimationFrame(frame);
+})();
+</script>
