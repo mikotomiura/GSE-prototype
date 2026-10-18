@@ -39,9 +39,9 @@ Usage:
     python3 c_synthesis.py --agreement <dir>
     python3 c_synthesis.py --screening-order <candidates.csv>
     python3 c_synthesis.py --draw-second-coder <ids.txt>    (record IDs of the coded main set, one per line)
-    python3 c_synthesis.py --screening <screening.csv> [--coverage-new N]
-        (writes out/screening_agreement.csv next to the input; with --coverage-new, the number of new records of
-        the coverage search, also out/coverage.csv)
+    python3 c_synthesis.py --screening <screening.csv> [--coverage-sample <new-records.csv>]
+        (writes out/screening_agreement.csv next to the input; with --coverage-sample, the list of new records of
+        the coverage search with the drawn ones marked, also out/coverage.csv)
 """
 
 import argparse
@@ -432,14 +432,30 @@ def clopper_pearson(k, n, alpha=0.05):
     return lower, upper
 
 
-def coverage_estimate(rows, n_new):
-    """From the screening rows of the coverage sample: how many were drawn and decided, how many were included at
-    full text (and how many are pending), the proportions with Clopper-Pearson 95% intervals, and these proportions
-    times the number of new records (n_new). Two rows: included only, and included or pending. A record is decided
-    when it has a stage-1 exclusion or a stage-2 final value; records not decided are counted and left out of the
-    denominator. These are counts of eligible records, not estimates of how often a problem type occurs."""
+def read_coverage_sample(path):
+    """new-records.csv of c_search.py merge: (number of new records, the IDs drawn into the coverage sample)."""
+    fields, rows = read_table(path)
+    if "record_id" not in fields or "coverage_sample" not in fields:
+        raise InputError(f"{Path(path).name}: missing columns record_id / coverage_sample")
+    if len({r["record_id"] for r in rows}) != len(rows):
+        raise InputError(f"{Path(path).name}: a record listed twice")
+    return len(rows), {r["record_id"] for r in rows if r["coverage_sample"] == "1"}
+
+
+def coverage_estimate(rows, n_new, drawn):
+    """The coverage count (GSRR-39). drawn: the IDs of the coverage sample (from new-records.csv), so that drawn
+    records never screened are counted. A record is decided when it is excluded at stage 1 or has a stage-2 final
+    value; a record that passed stage 1 and waits for its full text is not decided. Two measures: included, and
+    included or pending. For each: the proportion of decided records with a Clopper-Pearson 95% interval, and,
+    because undecided records are not missing at random (records waiting for a full text passed stage 1), bounds
+    over all drawn records: undecided counted as not eligible (lower) and as eligible (upper), each with the outer
+    end of its interval. complete is 1 only when every drawn record is decided; the decided-only proportion is the
+    reported value only then. Each value is multiplied by n_new. These are counts of eligible records among the new
+    records, not estimates of how often a problem type occurs."""
     cov = [r for r in rows if r["population"] == COVERAGE_GROUP]
-    drawn = {r["record_id"] for r in cov}
+    stray = sorted({r["record_id"] for r in cov} - set(drawn))
+    if stray:
+        raise InputError(f"coverage records not in the coverage sample: {stray[:5]}")
     s1 = {r["record_id"]: r["final"] for r in cov if str(r["stage"]) == "1"}
     s2 = {r["record_id"]: r["final"] for r in cov if str(r["stage"]) == "2"}
     for rid in s2:
@@ -448,15 +464,23 @@ def coverage_estimate(rows, n_new):
     decided = {rid for rid, v in s1.items() if v == "exclude"} | set(s2)
     included = sum(v == "include" for v in s2.values())
     pending = sum(v == "pending" for v in s2.values())
+    n_drawn, n_dec = len(drawn), len(decided)
+    und = n_drawn - n_dec
+    scale = lambda x: None if x is None else x * n_new
     out = []
     for label, k in [("included", included), ("included_or_pending", included + pending)]:
-        n = len(decided)
-        lo, hi = clopper_pearson(k, n)
-        out.append({"measure": label, "drawn": len(drawn), "decided": n, "not_decided": len(drawn) - n,
-                    "k": k, "proportion": k / n if n else None, "ci_lower": lo, "ci_upper": hi,
+        lo, hi = clopper_pearson(k, n_dec)
+        lo_all, _ = clopper_pearson(k, n_drawn)
+        _, hi_all = clopper_pearson(k + und, n_drawn)
+        out.append({"measure": label, "drawn": n_drawn, "decided": n_dec, "not_decided": und,
+                    "complete": int(und == 0), "k": k, "proportion": k / n_dec if n_dec else None,
+                    "ci_lower": lo, "ci_upper": hi,
+                    "bound_lower": k / n_drawn if n_drawn else None, "bound_lower_ci": lo_all,
+                    "bound_upper": (k + und) / n_drawn if n_drawn else None, "bound_upper_ci": hi_all,
                     "new_records": n_new,
-                    "implied_eligible": k / n * n_new if n else None,
-                    "implied_lower": lo * n_new if n else None, "implied_upper": hi * n_new if n else None})
+                    "implied_eligible": scale(k / n_dec if n_dec else None),
+                    "implied_lower": scale(lo), "implied_upper": scale(hi),
+                    "implied_bound_lower_ci": scale(lo_all), "implied_bound_upper_ci": scale(hi_all)})
     return out
 
 
@@ -1051,7 +1075,7 @@ def main():
     ap.add_argument("--screening-order", type=Path)
     ap.add_argument("--screening", type=Path)
     ap.add_argument("--draw-second-coder", type=Path)
-    ap.add_argument("--coverage-new", type=int)
+    ap.add_argument("--coverage-sample", type=Path)
     a = ap.parse_args()
     if a.screening_order:
         for g, i in screening_order(read_csv(a.screening_order)):
@@ -1102,7 +1126,10 @@ def main():
         try:
             scr = load_screening(a.screening)
             rows = [r for pool in ("all", "candidates", COVERAGE_GROUP) for r in screening_agreement(scr, pool)]
-            cov = coverage_estimate(scr, a.coverage_new) if a.coverage_new is not None else None
+            cov = None
+            if a.coverage_sample:
+                n_new, drawn = read_coverage_sample(a.coverage_sample)
+                cov = coverage_estimate(scr, n_new, drawn)
         except InputError as e:
             print(f"STOPPED: {e}", file=sys.stderr)
             return 3

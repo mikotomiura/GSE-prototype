@@ -15,7 +15,7 @@ Then `merge`:
 2. merges records that share a DOI or a normalised title (any source, transitively);
 3. removes every merged record that shares a DOI or a normalised title with a record of the source database
    (the 34 exploratory records and the 264 additional candidates);
-4. gives the remaining "new records" IDs CS0001... in the order of (normalised title, DOI);
+4. gives the remaining "new records" IDs CS00001... in the order of (normalised title, DOI, source IDs);
 5. draws the coverage sample: min(SAMPLE_SIZE, n) IDs with Python random.sample from the sorted IDs, using a
    generator freshly seeded with SAMPLE_SEED; the drawn IDs are returned sorted.
 
@@ -46,6 +46,7 @@ import unicodedata
 import urllib.parse
 import urllib.request
 import zipfile
+from collections import Counter
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -112,8 +113,11 @@ def openalex_headers():
 
 def get_json(url, tries=4, headers=None):
     for i in range(tries):
+        req = urllib.request.Request(url)
+        for k, v in (headers or {}).items():
+            req.add_unredirected_header(k, v)   # never forwarded to a redirect target
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=headers or {}), timeout=120) as r:
+            with urllib.request.urlopen(req, timeout=120) as r:
                 return json.load(r)
         except Exception as e:  # network errors are retried, then reported
             err = e
@@ -145,7 +149,7 @@ def export_openalex(out):
         n += len(d["results"])
         cursor = d["meta"].get("next_cursor") if d["results"] else None
         time.sleep(1)
-    entry = {"source": "OpenAlex API", "api_key_used": bool(headers), "query": q,
+    entry = {"source": "OpenAlex API", "api_key_sent": bool(headers), "query": q,
              "filter": "title_and_abstract.search", "date_limit": None,
              "type_limit": None, "started": started, "finished": now(), "reported_count": reported,
              "retrieved": n, "files": {p.name: sha256(p) for p in pages}}
@@ -181,8 +185,15 @@ def export_europepmc(out):
     write_log(out, "europepmc", entry)
 
 
+MAX_POST = 20 * 1024 * 1024
+
+
 def acm_receive(out, port):
-    """Receive the ACM result list posted by acm_export.js, save it, then stop."""
+    """Receive the ACM result list posted by acm_export.js, save it, then stop. Only a POST to the one-time path
+    printed at start, from the ACM Digital Library origin, under MAX_POST bytes, whose query is the registered ACM
+    query and whose records match its reported count, is saved; anything else gets 403/400 and the server waits on."""
+    token = hashlib.sha256(str(time.time_ns()).encode() + bytes(16)).hexdigest()[:24]
+
     class H(http.server.BaseHTTPRequestHandler):
         def _cors(self):
             self.send_header("Access-Control-Allow-Origin", "https://dl.acm.org")
@@ -194,9 +205,32 @@ def acm_receive(out, port):
             self._cors()
             self.end_headers()
 
+        def _refuse(self, code, why):
+            self.send_response(code)
+            self._cors()
+            self.end_headers()
+            self.wfile.write(why.encode())
+            print(f"refused ({code}): {why}", flush=True)
+
         def do_POST(self):
-            body = self.rfile.read(int(self.headers["Content-Length"]))
-            d = json.loads(body)
+            if self.path != "/" + token:
+                return self._refuse(403, "wrong path")
+            if self.headers.get("Origin") != "https://dl.acm.org":
+                return self._refuse(403, "wrong origin")
+            n = int(self.headers.get("Content-Length") or 0)
+            if not 0 < n <= MAX_POST:
+                return self._refuse(400, "bad size")
+            body = self.rfile.read(n)
+            try:
+                d = json.loads(body)
+                recs = d["records"]
+                ok = (d.get("query") == query_acm() and isinstance(recs, list)
+                      and len(recs) == d.get("reported_count")
+                      and all(isinstance(r, dict) and r.get("href") for r in recs))
+            except (ValueError, KeyError, TypeError):
+                ok = False
+            if not ok:
+                return self._refuse(400, "not the registered query, or records do not match the reported count")
             p = out / "acm-results.json"
             p.write_bytes(body)
             entry = {"source": "ACM Digital Library web interface (ACM Guide to Computing Literature)",
@@ -209,7 +243,7 @@ def acm_receive(out, port):
             self._cors()
             self.end_headers()
             self.wfile.write(b"saved")
-            print(json.dumps({k: v for k, v in entry.items() if k != "files"}, ensure_ascii=False))
+            print(json.dumps({k: v for k, v in entry.items() if k != "files"}, ensure_ascii=False), flush=True)
             self.server.done = True
 
         def log_message(self, *a):
@@ -217,7 +251,8 @@ def acm_receive(out, port):
 
     srv = http.server.HTTPServer(("127.0.0.1", port), H)
     srv.done = False
-    print(f"listening on http://127.0.0.1:{port}/ ; query for acm_export.js:\n{query_acm()}")
+    print(f"listening on http://127.0.0.1:{port}/{token}\nrun in the ACM tab: await acmExport(QUERY, {port}, '{token}')\n"
+          f"QUERY:\n{query_acm()}", flush=True)
     while not srv.done:
         srv.handle_request()
 
@@ -242,8 +277,18 @@ def oa_abstract(inv):
     return " ".join(w for _, w in pos)
 
 
+def logged_files(out, source, pattern):
+    """The export files listed in the source's log, in order; every file on disk that matches the pattern must be
+    listed (a stale page from an earlier run stops the merge)."""
+    names = list(json.loads((out / f"{source}-log.json").read_text(encoding="utf-8"))["files"])
+    extra = sorted(p.name for p in out.glob(pattern) if p.name not in names)
+    if extra:
+        raise SystemExit(f"{source}: files not in {source}-log.json: {extra}")
+    return [out / n for n in names]
+
+
 def records_openalex(out):
-    for p in sorted(out.glob("openalex-[0-9]*.json")):
+    for p in logged_files(out, "openalex", "openalex-[0-9]*.json"):
         for w in json.loads(p.read_text(encoding="utf-8"))["results"]:
             yield {"source": "openalex", "source_id": w.get("id", ""), "doi": norm_doi(w.get("doi")),
                    "title": w.get("display_name") or w.get("title") or "", "year": w.get("publication_year"),
@@ -252,7 +297,7 @@ def records_openalex(out):
 
 
 def records_europepmc(out):
-    for p in sorted(out.glob("europepmc-[0-9]*.json")):
+    for p in logged_files(out, "europepmc", "europepmc-[0-9]*.json"):
         for r in json.loads(p.read_text(encoding="utf-8"))["resultList"]["result"]:
             yield {"source": "europepmc", "source_id": f"{r.get('source', '')}:{r.get('id', '')}",
                    "doi": norm_doi(r.get("doi")), "title": r.get("title", ""), "year": r.get("pubYear"),
@@ -265,9 +310,15 @@ def records_europepmc(out):
 def records_acm(out):
     p = out / "acm-results.json"
     for r in json.loads(p.read_text(encoding="utf-8"))["records"]:
-        doi = norm_doi((r.get("href") or "").replace("/doi/", "", 1))
+        doi = acm_doi(r.get("href"))
         yield {"source": "acm", "source_id": r.get("href", ""), "doi": doi, "title": r.get("title", ""),
                "year": r.get("date", ""), "type": r.get("type", ""), "venue": r.get("venue", ""), "abstract": ""}
+
+
+def acm_doi(href):
+    """The DOI in an ACM result link, whatever its form (/doi/..., /doi/abs/..., /doi/book/...)."""
+    m = re.search(r"10\.\d{4,}/[^\s?#]+", href or "")
+    return norm_doi(m.group(0) if m else "")
 
 
 READERS = {"openalex": records_openalex, "europepmc": records_europepmc, "acm": records_acm}
@@ -378,9 +429,11 @@ def remove_known(groups, known):
 
 
 def assign_ids(groups):
-    rows = sorted((summarise(g) for g in groups), key=lambda s: (norm_title(s["title"]), s["doi"]))
+    rows = sorted((summarise(g) for g in groups), key=lambda s: (norm_title(s["title"]), s["doi"], s["source_ids"]))
+    if len(rows) > 99999:
+        raise SystemExit(f"{len(rows)} new records: more than the ID width allows")
     for i, s in enumerate(rows, 1):
-        s["id"] = f"CS{i:04d}"
+        s["id"] = f"CS{i:05d}"
     return rows
 
 
@@ -403,6 +456,9 @@ def merge(out, records264, xlsx):
                 raise SystemExit(f"{name}: SHA-256 differs from {log.name}")
             read[name] = h
         got = list(reader(out))
+        dup = [k for k, c in Counter(r["source_id"] for r in got).items() if c > 1]
+        if dup:
+            raise SystemExit(f"{src}: {len(dup)} records listed twice (for example {dup[0]}); pages overlap")
         if len(got) != entry["reported_count"]:
             raise SystemExit(f"{src}: {len(got)} records read, the source reported {entry['reported_count']}")
         recs += got
@@ -425,6 +481,9 @@ def merge(out, records264, xlsx):
            "records_total": len(recs), "after_merging": len(groups), "matching_source_database": len(matched),
            "matched_source_ids": sorted({i for _, h in matched for i in h}), "new_records": len(rows),
            "sample_size": len(sample), "sample_seed": SAMPLE_SEED,
+           "groups_of_3_or_more": sum(1 for g in groups if len(g) >= 3),
+           "merged_groups_with_short_title": sum(1 for g in groups if len(g) > 1
+                                                 and min(len(norm_title(r["title"])) for r in g) < 15),
            "new_with_abstract": sum(1 for r in rows if r["abstract"]),
            "sample_with_abstract": sum(1 for r in rows if r["coverage_sample"] and r["abstract"]),
            "inputs": {**read, Path(records264).name: sha256(records264), Path(xlsx).name: sha256(xlsx)},
@@ -447,6 +506,22 @@ def selftest():
     check("doi without 10. is empty", norm_doi("arXiv:1234") == "")
     check("title normalised", norm_title("AI Fatigue: a Scale!") == norm_title("ai fatigue — a scale"))
     check("abstract rebuilt", oa_abstract({"b": [1], "a": [0]}) == "a b")
+    check("ACM DOI from any link form", acm_doi("/doi/abs/10.1145/3544548.3581234") == "10.1145/3544548.3581234"
+          and acm_doi("/doi/10.1016/j.x.2026.1") == "10.1016/j.x.2026.1" and acm_doi("/action/x") == "")
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        t = Path(td)
+        (t / "openalex-001.json").write_text("{}")
+        (t / "openalex-002.json").write_text("{}")
+        (t / "openalex-log.json").write_text(json.dumps({"files": {"openalex-001.json": ""}}))
+        try:
+            logged_files(t, "openalex", "openalex-[0-9]*.json")
+            check("a stale page not in the log stops", False)
+        except SystemExit:
+            check("a stale page not in the log stops", True)
+        (t / "openalex-002.json").unlink()
+        check("logged pages are read", [p.name for p in logged_files(t, "openalex", "openalex-[0-9]*.json")]
+              == ["openalex-001.json"])
     R = lambda s, d, t: {"source": s, "source_id": s + t, "doi": d, "title": t, "year": 2025, "type": "",
                          "venue": "", "abstract": ""}
     g = merge_records([R("openalex", "10.1/x", "A"), R("europepmc", "", "a"), R("acm", "10.1/x", "B"),

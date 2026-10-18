@@ -878,14 +878,39 @@ except ValueError:
     pass
 else:
     raise AssertionError("unknown pool must stop")
-ce = {r["measure"]: r for r in cs.coverage_estimate(cov_scr, 1000)}
-# drawn 5 (C1-C5); decided: C2, C4 (excluded at stage 1), C1, C3 (stage 2) = 4; C5 not decided
-assert (ce["included"]["drawn"], ce["included"]["decided"], ce["included"]["not_decided"]) == (5, 4, 1), ce
+DRAWN_ = {"C1", "C2", "C3", "C4", "C5", "C6"}      # C6 was drawn and never screened
+ce = {r["measure"]: r for r in cs.coverage_estimate(cov_scr, 1000, DRAWN_)}
+# drawn 6; decided: C2, C4 (excluded at stage 1), C1, C3 (stage 2) = 4; C5 (waits for its full text) and C6 not
+assert (ce["included"]["drawn"], ce["included"]["decided"], ce["included"]["not_decided"]) == (6, 4, 2), ce
+assert ce["included"]["complete"] == 0
 assert ce["included"]["k"] == 1 and ce["included_or_pending"]["k"] == 2
 assert ce["included"]["proportion"] == 0.25 and ce["included"]["implied_eligible"] == 250.0
 lo_, hi_ = cs.clopper_pearson(1, 4)
 assert (ce["included"]["ci_lower"], ce["included"]["ci_upper"]) == (lo_, hi_)
 assert abs(ce["included"]["implied_upper"] - hi_ * 1000) < 1e-9
+# bounds over all drawn records: undecided as not eligible (1/6) and as eligible (3/6), with the outer CI ends
+assert abs(ce["included"]["bound_lower"] - 1 / 6) < 1e-12 and ce["included"]["bound_upper"] == 0.5
+assert ce["included"]["bound_lower_ci"] == cs.clopper_pearson(1, 6)[0]
+assert ce["included"]["bound_upper_ci"] == cs.clopper_pearson(3, 6)[1]
+assert abs(ce["included_or_pending"]["bound_upper"] - 4 / 6) < 1e-12
+# the case of the review: many quick stage-1 exclusions, full texts still waiting -> the decided-only proportion
+# is low, and only the bounds show it; complete is 0
+early_ = [(f"C{i}", 1, "exclude", "exclude", "exclude") for i in range(1, 9)] + \
+    [(f"C{i}", 1, "include", "include", "include") for i in range(9, 11)]
+ce2 = {r["measure"]: r for r in cs.coverage_estimate(cs.load_screening(cov_write("screening_cov_early.csv", early_)),
+                                                     100, {f"C{i}" for i in range(1, 11)})}
+assert ce2["included"]["proportion"] == 0.0 and ce2["included"]["bound_upper"] == 0.2 and ce2["included"]["complete"] == 0
+# complete when every drawn record is decided
+ce3 = cs.coverage_estimate(cs.load_screening(cov_write("screening_cov_done.csv", early_[:8])), 100,
+                           {f"C{i}" for i in range(1, 9)})
+assert ce3[0]["complete"] == 1 and ce3[0]["bound_lower"] == ce3[0]["bound_upper"] == ce3[0]["proportion"] == 0.0
+# a screened coverage record that was not drawn stops
+try:
+    cs.coverage_estimate(cov_scr, 1000, {"C1"})
+except cs.InputError as e:
+    assert "not in the coverage sample" in str(e)
+else:
+    raise AssertionError("coverage: a record not drawn must stop")
 # Clopper-Pearson against scipy.stats.beta (values computed once, 2026-10-18)
 for (k_, n_), (l_, h_) in {(0, 300): (0.0, 0.012221), (5, 300): (0.005433, 0.038464),
                           (300, 300): (0.987779, 1.0), (3, 10): (0.06674, 0.652453)}.items():
@@ -895,15 +920,23 @@ assert cs.clopper_pearson(0, 0) == (None, None)
 # a full-text decision without passing stage 1 stops
 try:
     cs.coverage_estimate(cs.load_screening(cov_write("screening_cov_bad.csv", [("C9", 2, "include", "include",
-                                                                                   "include")])), 10)
+                                                                                   "include")])), 10, {"C9"})
 except cs.InputError as e:
     assert "without passing stage 1" in str(e)
 else:
     raise AssertionError("coverage: stage 2 without stage 1 must stop")
 # the population of a coded record may not be the screening group of the coverage sample
 assert "coverage_sample" not in cs.VOCAB["population"]
-# CLI: --coverage-new writes out/coverage.csv
+# CLI: --coverage-sample (new-records.csv of c_search.py) writes out/coverage.csv
+with open(out / "new-records.csv", "w", encoding="utf-8", newline="") as f:
+    w_ = csv.writer(f)
+    w_.writerow(["record_id", "doi", "title", "year", "sources", "coverage_sample"])
+    for i in range(1, 11):
+        w_.writerow([f"C{i}", "", f"t{i}", "2025", "openalex", "1" if i <= 6 else "0"])
+assert cs.read_coverage_sample(out / "new-records.csv") == (10, DRAWN_)
 rc_c = subprocess.run([sys.executable, str(Path(cs.__file__)), "--screening", str(out / "screening_cov.csv"),
-                       "--coverage-new", "1000"], capture_output=True)
+                       "--coverage-sample", str(out / "new-records.csv")], capture_output=True, text=True)
 assert rc_c.returncode == 0 and (out / "out" / "coverage.csv").exists(), rc_c
+cov_out = list(csv.DictReader(open(out / "out" / "coverage.csv", encoding="utf-8")))
+assert cov_out[0]["drawn"] == "6" and cov_out[0]["new_records"] == "10" and cov_out[0]["complete"] == "0", cov_out
 print(f"dummy tables in {out}; all boundary tests passed")

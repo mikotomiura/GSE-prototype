@@ -282,6 +282,9 @@ def main():
     st.table(cr, ["項目", "内容"], [22, 120], [list(x) for x in CRITERIA], wrap={"内容"}, tab="64748B",
              height=lambda v: st.text_height((v[1], 120)))
 
+    lock = os.path.join(os.path.dirname(out), "~$" + os.path.basename(out))
+    if os.path.exists(lock):  # Excel has the workbook open: its unsaved entries would be lost or would overwrite this
+        sys.exit(f"{out} is open in Excel ({lock} exists); close it and run again. Nothing written")
     if os.path.exists(out):
         bak = os.path.join(os.path.dirname(data.rstrip("/")), "backup")
         os.makedirs(bak, exist_ok=True)

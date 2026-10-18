@@ -60,6 +60,8 @@ def drive_trace():
     if os.environ.get("TRACE_DRIVE"):
         return Path(os.environ["TRACE_DRIVE"])
     hits = sorted(Path("~/Library/CloudStorage").expanduser().glob("GoogleDrive-*/" + DRIVE_TRACE))
+    if len(hits) > 1:  # several synced accounts hold the folder: do not pick one (set TRACE_DRIVE)
+        return Path("~/Library/CloudStorage/(several Google Drive accounts; set TRACE_DRIVE)") / DRIVE_TRACE
     return hits[0] if hits else Path("~/Library/CloudStorage/(Google Drive not found)") / DRIVE_TRACE
 
 

@@ -142,6 +142,18 @@ except SystemExit as e:
     assert "D01" in str(e), e
 assert carry_x.read_bytes() == before
 (data / "records264.json").write_text(saved, encoding="utf-8")
+# a rebuild while Excel has the workbook open (its lock file ~$<name> exists) stops and writes nothing
+lock_ = carry_x.parent / ("~$" + carry_x.name)
+lock_.write_text("")
+before = carry_x.read_bytes()
+try:
+    make_trace_db.main()
+    raise AssertionError("a rebuild ran while the workbook was open in Excel")
+except SystemExit as e:
+    assert "open in Excel" in str(e), e
+assert carry_x.read_bytes() == before
+lock_.unlink()
+make_trace_db.main()                                   # control: without the lock file the rebuild runs
 
 
 def ai_out(w, rid, stage, decision, code="", centre="", quote="supporting words", read=None, **over):

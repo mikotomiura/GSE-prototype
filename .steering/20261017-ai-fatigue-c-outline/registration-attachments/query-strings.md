@@ -478,14 +478,14 @@ Every query as run, copied from the search log:
 
 ## 16. Coverage search of this review
 
-- **Purpose:** count eligible studies that the source database does not hold (registration GSRR-21, GSRR-32, GSRR-39). It is not a search of the source database, and its records are never candidates for the main set. Sections 1 to 15 describe the source database; this section describes the only search this review runs.
+- **Purpose:** count eligible records that the source database does not hold (registration GSRR-21, GSRR-32, GSRR-39). It is not a search of the source database, and its records are never candidates for the main set. Sections 1 to 15 describe the source database; this section describes the only search this review runs.
 - **Sources and interfaces:** OpenAlex API (filter `title_and_abstract.search`); Europe PMC REST API (field `TITLE_ABS`, which returns the same count as `TITLE` OR `ABSTRACT`: checked on 2026-10-18 with `fatigue`, 176,047 both ways, and with a word that does not exist, 0); ACM Digital Library web interface, ACM Guide to Computing Literature (fields `Title` OR `Abstract`), read page by page (50 records) by `acm_export.js` in the browser, after the site's own bot check had passed by itself. OpenAlex was queried with author 1's free API key, sent in a request header and not recorded (the search log says only whether a key was used); no key or contact address was sent to Europe PMC or the ACM Digital Library **[at registration: confirm]**.
 - **Filters:** none. No date limit, no document-type limit, no language limit.
 - **Date and time of the run:** **[at registration: per source, start and end, JST]**.
 - **Counts reported by each source and records retrieved:** **[at registration]**. The merge stops if the records read differ from the count the source reported.
 - **Export files:** kept outside the repository (they hold abstracts) and not released. Their names and SHA-256 are listed here **[at registration]**.
 - **Merging and removal (GSRR-32):** **[at registration: records by source; after merging; matching the source database (the 34 exploratory records and the 264 additional candidates); new records]**.
-- **Coverage sample (GSRR-39):** 300 new records drawn with Python `random.sample`, seed 20261022, from the IDs CS0001 onwards sorted alphabetically. The list of new records (ID, DOI, title, year, sources, and whether drawn) is attached **[at registration: file and SHA-256]**.
+- **Coverage sample (GSRR-39):** 300 new records drawn with Python `random.sample`, seed 20261022, from the IDs CS00001 onwards sorted alphabetically. The list of new records (ID, DOI, title, year, sources, and whether drawn) is attached **[at registration: file and SHA-256]**.
 - **Tools:** `scripts/c_search.py` (export, merging, removal, draw; `selftest` checks the merging, the removal and the draw on made-up records) and `scripts/acm_export.js` **[at registration: SHA-256]**.
 - **Check before the run (GSRR-26):** on 2026-10-18 the OpenAlex query, restricted to 2022-11-30 onwards and to articles, reviews and preprints, retrieved all 11 included exploratory records (11 of 11 are in OpenAlex). These records shaped the terms, so the check is optimistic. Counts the same day, for planning only: OpenAlex 6,526 (with those restrictions); Europe PMC 1,455 (no restriction); ACM Digital Library 702 (no restriction).
 

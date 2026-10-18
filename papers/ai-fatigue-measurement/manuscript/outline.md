@@ -92,8 +92,8 @@ manuscript:
   before registration, the first author had screened 79 of the additional candidates after reading AI-generated
   appraisals (GSRR-34, GSRR-65). Human screening before registration was uneven across population groups; all
   candidates were screened again in an order that alternates between groups (GSRR-33). It is not a census of the
-  literature on AI and fatigue. Every claim about the main set is about that set. How many eligible studies lie
-  outside that database is estimated from a random sample of 300 records found by one search of this review's own
+  literature on AI and fatigue. Every claim about the main set is about that set. How many eligible records lie
+  outside that database are estimated from a random sample of 300 records found by one search of this review's own
   in three free sources (the coverage check, GSRR-21, GSRR-39); the estimate concerns that search, not the whole
   literature.
 
@@ -356,7 +356,7 @@ the flow figures from the released screening decisions.
 | ID | Claim | Registered definition | Evidence | Reported in |
 |---|---|---|---|---|
 | SC1 | The flow of records from the additional candidates to the main set, the late stratum, and the unscreened candidates by population group; agreement between the first author and the AI screener at each stage. | GSRR-32, GSRR-33, GSRR-37, GSRR-39, GSRR-41 | Released screening decisions | Section 4.1; Figure 1; Table 3 |
-| CV1 | The coverage check: records found by the coverage search in each source, merged, matching the source database and new; the coverage sample and its screening; the number included and pending, the proportions with Clopper–Pearson 95% intervals and the implied number of eligible studies outside the source database; the included main-set studies that the coverage search also retrieved. An estimate of a number of eligible records, not of how often a problem occurs. | GSRR-21, GSRR-26, GSRR-32, GSRR-39, GSRR-56 | Search log of the coverage search; released screening decisions; script output, coverage count | Section 4.1; Figure 1; Table 16 |
+| CV1 | The coverage check: records found by the coverage search in each source, merged, matching the source database and new; the coverage sample and its screening; the number included and pending, the proportions with Clopper–Pearson 95% intervals (and, while records remain undecided, the bounds with them counted as not eligible and as eligible) and the implied number of eligible records outside the source database; the included main-set studies that the coverage search also retrieved. An estimate of a number of eligible records, not of how often a problem occurs. | GSRR-21, GSRR-26, GSRR-32, GSRR-39, GSRR-56 | Search log of the coverage search; released screening decisions; script output, coverage count | Section 4.1; Figure 1; Table 16 |
 | SC2 | The number of studies and of records, with E5-linked records counted once and separately. | GSRR-39, GSRR-56 (RQ4) | Script output, RQ4 study counts | Section 4.1; Table 3 |
 | AG1 | Agreement between the two authors on the records the second author coded, and between the two coding passes of the first author per code and set, including the calibration passes (GSRR-44, GSRR-46, GSRR-47), and between the reconciled values and the AI draft for C4f; the number of records coded in one pass only. | GSRR-44, GSRR-46, GSRR-47 | Script output, agreement | Section 4.2; Table 4 |
 | R1 | Distribution of the representative level of attribution of the main fatigue instrument; values for other instruments in the supplement. | RQ1; GSRR-43 (C1) | Script output, C1 tables | Section 4.3; Table 5; abstract |
@@ -465,7 +465,8 @@ columns; no value is filled in before coding.
 - Table 16: the coverage check (GSRR-39). Top: records found in each source (OpenAlex, Europe PMC, ACM Digital
   Library), after merging, matching the source database, and new. Bottom: the coverage sample drawn, decided and not
   decided; included and pending at full text; the proportion included, and included or pending, with Clopper–Pearson
-  95% intervals; the implied number of eligible studies outside the source database with its interval. A last row
+  95% intervals, and while records remain undecided the bounds over all drawn records; the implied number of eligible
+  records outside the source database with its interval. A last row
   gives the included main-set studies and how many of them the coverage search retrieved. A note says that the
   implied number concerns the coverage search, not the whole literature, and is not an estimate of how often a
   problem type occurs.

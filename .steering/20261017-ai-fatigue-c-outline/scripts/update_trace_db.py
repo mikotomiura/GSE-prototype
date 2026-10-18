@@ -1,7 +1,7 @@
 """After full texts or abstracts change, bring the Drive copy and both databases up to date in one run (decision 36).
 
 1. Copy to the Drive folder AI-fatigue/TRACE/fulltext every file of ~/Documents/TRACE/fulltext that is missing there
-   or differs in size (never deletes anything on Drive).
+   or differs in size, or is newer there with different content (SHA-256); never deletes anything on Drive.
 2. Wait until Drive for desktop has given each file a Drive ID (up to --wait seconds), then write drive_links.json.
 3. Rebuild author 1's workbook (TRACE_database.xlsx, carrying over what author 1 has entered) and the whole database
    (TRACE_database_all.xlsx) in the Drive folder.
@@ -13,6 +13,7 @@ Run (openpyxl via uv):
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
@@ -24,6 +25,14 @@ from drive_links import item_id
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
 
 def main():
     ap = argparse.ArgumentParser()
@@ -41,7 +50,8 @@ def main():
     copied = []
     for name in sorted(os.listdir(ft)):
         src, dst = os.path.join(ft, name), dft / name
-        if not dst.exists() or dst.stat().st_size != os.path.getsize(src):
+        if (not dst.exists() or dst.stat().st_size != os.path.getsize(src)
+                or (os.path.getmtime(src) > dst.stat().st_mtime and sha256(src) != sha256(dst))):
             shutil.copy2(src, dst)
             copied.append(name)
     print(f"copied to Drive: {len(copied)} {copied[:10]}")

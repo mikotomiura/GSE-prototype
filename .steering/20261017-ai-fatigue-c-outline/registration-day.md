@@ -18,9 +18,9 @@
    python3 -I c_search.py selftest
    python3 -I c_search.py openalex  $OUT     # 研究者のキー（~/.config/openalex/api_key）を使う。無ければキーなしで走り、枠切れは HTTP 429
    python3 -I c_search.py europepmc $OUT
-   python3 -I c_search.py acm-receive $OUT   # 待ち受けたまま、ブラウザで次をする
+   python3 -I -u c_search.py acm-receive $OUT   # 待ち受けたまま、ブラウザで次をする（-u で合言葉がすぐ出る）
    ```
-   - ACM: 自分で開いたタブで `https://dl.acm.org/` を開き、サイトの確かめが自然に通るのを待つ（押さない）。`acm_export.js` の中身を貼り、`await acmExport(<c_search.py queries の acm の式>, 8765)` を走らせる。待ち受けが保存して止まる。
+   - ACM: 自分で開いたタブで `https://dl.acm.org/` を開き、サイトの確かめが自然に通るのを待つ（押さない）。`acm_export.js` の中身を貼り、待ち受けが出した `await acmExport(QUERY, 8765, "<その回だけの合言葉>")` を、QUERY に式を入れて走らせる。待ち受けは、決めた式・件数が合う・ACM のページからの 1 回だけを保存して止まる。
    - 抽出: `python3 -I c_search.py merge $OUT --records264 ~/Documents/TRACE/data/records264.json --source-db <元の DB の最終版.xlsx>`
    - `$OUT/new-records.csv` と `$OUT/search-log.json` を `registration-attachments/coverage/` に写す（書誌と数だけ。抄録の入った `new_records.json` と書き出しは写さない）。
    - 添付 3 の第 16 節・GSRR-7・10・21・32 の **[at registration]** に、日時・件数・ファイルの SHA-256 を書く。
@@ -92,5 +92,5 @@
 
 選別の後: `screening-csv` → `python3 c_synthesis.py --screening ../screening/screening.csv`（前半・後半の 2 本も同じく）→ `review-quotes` → 研究者が `~/TRACE-screening/quote-review.csv` の全行に scale_item（yes/no）を付ける → `release --out <公開の置き場所>` → `verify-removed --out <同じ>`。
 
-- 選別の後（確かめの検査）: `python3 c_synthesis.py --screening ../screening/screening.csv --coverage-new <新しい記録の数>` で `coverage.csv`（表 16）。
+- 選別の後（確かめの検査）: `python3 c_synthesis.py --screening ../screening/screening.csv --coverage-sample ../registration-attachments/coverage/new-records.csv` で `coverage.csv`（表 16）。判定の済んでいない記録が残っていれば `complete` が 0 になり、上下の幅で読む。
 - 11 月: 較正の 1 回目（探索の集合の 11 研究）。12 月: 4 週以上あけて 2 回目。

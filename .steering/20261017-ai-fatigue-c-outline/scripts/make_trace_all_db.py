@@ -85,9 +85,11 @@ def records34(source_db, abstracts_dir):
             code = m.group(0) if m else ""
         if dec == "含める":
             m = re.search(r"用途: (中心-[AB])", str(s.get("自由記入") or ""))
-            if m:
+            if rid == "AF006":  # 自由記入 still holds author 1's first judgement; the centre is decision 4's
+                centre = {"centre-A": "中心-A", "centre-B": "中心-B"}[human[rid]["human_centre"]]
+            elif m:
                 centre = m.group(1)
-            elif human[rid]["human_final"] == "include":  # decided by the researcher (AF006, decision 4)
+            elif human[rid]["human_final"] == "include":  # decided by the researcher (decision 4)
                 centre = {"centre-A": "中心-A", "centre-B": "中心-B"}[human[rid]["human_centre"]]
             else:
                 raise SystemExit(f"{rid}: included, with no centre in 自由記入 or check-34.csv")
