@@ -1,5 +1,5 @@
 #!/bin/bash
-# 週次 cargo ビルド成果物の自動掃除 (launchd: local.gse.cargo-sweep)
+# 毎日の cargo ビルド成果物の自動掃除 (launchd: local.gse.cargo-sweep)
 #
 # ⚠️★★★ このファイルが**正本**である。`~/.local/bin/gse-cargo-sweep.sh` は
 #   `install-cargo-sweep-launchd.sh` がここからコピーした複製にすぎない。
@@ -13,11 +13,20 @@
 # 方針: --time N で「N 日以上触られていない」成果物だけを消す。
 #   活きているビルドキャッシュは残るのでフルビルドにはならない。
 #
+# ⚠️★★★ 2026-10-18 に「週次・14 日」→「毎日・3 日」へ改めた。
+#   ★ 実測: 週次・14 日でも空きは 8.8Gi まで落ちていた。溜まっていたのは
+#   (1) ワークツリー 5 本がそれぞれ持つ target (sweep 対象がメインクローンだけだった)、
+#   (2) incremental の古いセッション (`gse_next_lib` だけで 36 個・1 個 100〜200MB)。
+#   → 対象を全ワークツリーへ広げ、incremental の古いセッションも消す。
+#   ⚠️ target をワークツリー間で共有 (CARGO_TARGET_DIR) する案は**採らない**:
+#   `release/gse-replay` が最後にビルドしたワークツリーの物で上書きされ、実験が別ブランチの
+#   バイナリで走りうる (`resource_isolation: per-worktree` の前提を壊す)。
+#
 # ⚠️ CI 側の同等ガードは `.github/actions/disk-guard/action.yml`。
-#   ★ 役割が違う: こちらは**予防**(週次・実機全体)、あちらは**直前の救命**(ジョブごと・workspace のみ)。
+#   ★ 役割が違う: こちらは**予防**(毎日・実機全体)、あちらは**直前の救命**(ジョブごと・workspace のみ)。
 set -u
 
-KEEP_DAYS="${GSE_SWEEP_KEEP_DAYS:-14}"
+KEEP_DAYS="${GSE_SWEEP_KEEP_DAYS:-3}"
 LOG="$HOME/Library/Logs/gse-cargo-sweep.log"
 PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export PATH
@@ -38,7 +47,7 @@ fi
 
 # ⚠️★★★ 2026-08-31 の実測: この分岐が**実際に踏まれていた**。
 #   11:54 に 1 度成功した後、いつの間にか cargo-sweep が消えており、
-#   以後この週次ジョブは毎回ここで exit 1 していた (ログを見に行くまで誰も気づかない)。
+#   以後この定期ジョブは毎回ここで exit 1 していた (ログを見に行くまで誰も気づかない)。
 #   ★ ログに ERROR を書くだけでなく **非 0 で終える**ことで、launchd の
 #   `launchctl list local.gse.cargo-sweep` の最終終了コードにも現れるようにしてある。
 if ! command -v cargo-sweep >/dev/null 2>&1; then
@@ -81,9 +90,31 @@ fi
 local_clone=""
 [ -d "$HOME/GSE-prototype" ] && local_clone="$HOME/GSE-prototype"
 
+# ★ incremental の古いセッションを消す (`<target>/<profile>/incremental/<crate>-<hash>/`)。
+#   ⚠️ <crate>-<hash> は build/check/test/rust-analyzer などビルドの仕方ごとに別物が積まれ、
+#   使われなくなった組み合わせは誰も消さない。★ mtime が KEEP_DAYS より古いものだけ消す。
+prune_incremental() {
+  local target="$1"
+  [ -d "$target" ] || return 0
+  find "$target" -maxdepth 3 -type d -name incremental -prune -print 2>/dev/null |
+    while IFS= read -r inc; do
+      find "$inc" -mindepth 1 -maxdepth 1 -type d -mtime +"$KEEP_DAYS" -exec rm -rf {} + 2>/dev/null
+    done
+}
+
+# ★ ローカルクローンに紐づく全ワークツリー (本体を除く)。⚠️ 失敗しても必須判定には含めない
+#   (ワークツリーは作っては消すので、無いこと自体は異常ではない)。
+worktrees=()
+if [ -n "$local_clone" ]; then
+  while IFS= read -r wt; do
+    [ "$wt" = "$local_clone" ] && continue
+    [ -d "$wt" ] && worktrees+=("$wt")
+  done < <(git -C "$local_clone" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
+fi
+
 swept_local=0
 swept_runner=0
-for dir in "$local_clone" "$RUNNER_WS"; do
+for dir in "$local_clone" "$RUNNER_WS" "${worktrees[@]+"${worktrees[@]}"}"; do
   [ -n "$dir" ] || continue
   # ⚠️ TOCTOU (code-reviewer MEDIUM): 冒頭の pgrep は起動時 1 回きり。★ その直後に
   #   ジョブが割り当てられると、mtime 基準の削除が**走行中ビルドの参照ファイル**を消しうる。
@@ -94,7 +125,12 @@ for dir in "$local_clone" "$RUNNER_WS"; do
   fi
   echo "--- sweep: $dir"
   if cargo-sweep sweep --time "$KEEP_DAYS" --recursive "$dir"; then
-    [ "$dir" = "$local_clone" ] && swept_local=1 || swept_runner=1
+    for t in "$dir"/target "$dir"/src-tauri/target; do prune_incremental "$t"; done
+    if [ "$dir" = "$local_clone" ]; then
+      swept_local=1
+    elif [ "$dir" = "$RUNNER_WS" ]; then
+      swept_runner=1
+    fi
   else
     echo "  (失敗・続行)"
   fi
