@@ -54,7 +54,12 @@ def main(argv=None):
     ap.add_argument("--fulltext", default="~/Documents/TRACE/fulltext")
     ap.add_argument("--out", required=True)
     ap.add_argument("--preview", action="store_true", help="mark the workbook as a preview (before registration)")
+    ap.add_argument("--hold", action="store_true",
+                    help="the real workbook, made in advance: it says not to start until the researcher reports "
+                         "that the protocol is registered (GSRR-33)")
     a = ap.parse_args(argv)
+    if a.preview and a.hold:
+        ap.error("--preview and --hold exclude each other")
     data, ftdir, out = (os.path.expanduser(x) for x in (a.data, a.fulltext, a.out))
     recs = sorted(db.load(os.path.join(data, "records264.json")), key=lambda r: r["order"])
     meta = db.load(os.path.join(data, "meta.json"), {})
@@ -77,6 +82,9 @@ def main(argv=None):
     ]
     if a.preview:  # before registration nobody screens (GSRR-33): the workbook only shows the work
         common = [("見本", ["見本です。登録の後に配り直すまで、判定は始めないでください。"])] + common
+    elif a.hold:   # the real workbook, handed over before registration: screening starts only after it
+        common = [("始める日", ["研究者から「登録が済んだ」と連絡があるまで、判定は始めないでください（登録の前には誰も判定しない決まりです）。"
+                               "このファイルは、その連絡の後にそのまま使います。"])] + common
     if a.stage == 1:
         pick = stage1_sample([r["id"] for r in recs])
         rows = [r for r in recs if r["id"] in pick]

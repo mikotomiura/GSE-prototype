@@ -24,7 +24,7 @@ worktree `/Users/johnd/GSE-prototype-af-c`（ブランチ `docs/ai-fatigue-c-out
 
 ### 2.1 研究者に確かめる
 - Drive の `TRACE_database.xlsx` を Excel で開き、段 1 に CS で始まる 300 件が交互に並んでいること、ID から文献DB の抄録（英語と日本語）へ飛べることを見てもらう（Excel は閉じてから脚本を打つ）。
-- 共著者への相談文（`coauthor-consult.md` / docx）を送る時期。研究者は「土台・DB・中身が揃って実行するだけになってから送る」と決めている。送るのは研究者。Drive の `coauthor-consult.docx`・`main.docx` は 2026-10-18 の直しの前の版なので、送る前に作り直す（docx は pandoc。Drive に置くかは研究者に確かめる）。
+- 共著者への相談文（`coauthor-consult.md` / docx）を送る時期。研究者は「土台・DB・中身が揃って実行するだけになってから送る」と決めている。送るのは研究者。送る物は Drive の `TRACE/共著者へ/` にそろえた（判断 43: 草稿の docx・PDF・全体の案内・`登録の後に使う/` に段 1 の本番の冊）。`TRACE/` 直下の古い `main.docx`・`coauthor-consult.docx` は 2026-10-18 の直しの前の版。
 
 ### 2.2 共著者の返事が来たら（判断 34 の未着手）
 - 登録版の書き換え（GSRR-2・33・37・38・39・40・41・62・65・表 1・2）、`c_screening.py` を判定者 3 人に、共著者が返したファイルの取り込み。確かめの標本は共著者の分に入れない（判断 38）。`make_coauthor_db.py` は 264 件だけを読む。
