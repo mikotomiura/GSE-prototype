@@ -109,11 +109,12 @@ class Base(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def run_build(self, *extra: str) -> tuple[int, Path]:
+    def run_build(self, *extra: str, xlsx: bool = False, bib: bool = False) -> tuple[int, Path]:
         out = self.root / "out"
         argv = [
             "--config", str(self.root / "config.json"), "--summaries", str(self.root / "summaries.json"),
-            "--cache", str(self.root / "cache"), "--out", str(out), "--date", "2026-10-18", "--no-bib", *extra,
+            "--cache", str(self.root / "cache"), "--out", str(out), "--date", "2026-10-18",
+            *([] if bib else ["--no-bib"]), *([] if xlsx else ["--no-xlsx"]), *extra,
         ]
         return build.main(argv, source=self.src), out
 
@@ -269,6 +270,64 @@ class OutputTest(Base):
         self.assertIn("a\\u003c/script>", data)
 
 
+try:
+    import openpyxl  # noqa: F401
+    HAVE_OPENPYXL = True
+except ImportError:  # CI の python3 には入っていない。xlsx の部分だけ飛ばす
+    HAVE_OPENPYXL = False
+
+
+@unittest.skipUnless(HAVE_OPENPYXL, "openpyxl が無い（pip install -r scripts/requirements-dev.txt）")
+class XlsxTest(Base):
+    def test_sheets_rows_and_formula_guard(self):
+        evil = {"doi:10.1/a": {**SUMMARIES["doi:10.1/a"], "summary": "=HYPERLINK(\"x\")"}}
+        (self.root / "summaries.json").write_text(json.dumps(evil, ensure_ascii=False), encoding="utf-8")
+        deliver_to = self.root / "文献DB"
+        rc, out = self.run_build("--deliver", str(deliver_to), xlsx=True)
+        self.assertEqual(rc, 0)
+        from openpyxl import load_workbook
+        wb = load_workbook(out / "GSE文献DB_2026-10-18.xlsx")
+        self.assertEqual(wb.sheetnames, ["説明", "一覧", "書誌"])
+        ws = wb["一覧"]
+        self.assertEqual([c.value for c in ws[1]], build.COLUMNS + ["読んだ", "メモ"])
+        self.assertEqual(ws.max_row, 1 + 6)
+        cell = ws.cell(row=2, column=build.COLUMNS.index("要約") + 1)
+        self.assertEqual((cell.value, cell.data_type), ("=HYPERLINK(\"x\")", "s"))  # 数式にしない
+        self.assertEqual(wb["書誌"].max_row, 1 + 6)
+        self.assertEqual(wb["書誌"]["A2"].value, "P1")
+        self.assertEqual(build.verify(out), [])  # xlsx も manifest のハッシュに載る
+        self.assertEqual(sorted(p.name for p in deliver_to.iterdir()), ["GSE文献DB.xlsx"])  # --no-bib なので .bib は無い
+        self.assertEqual((deliver_to / "GSE文献DB.xlsx").read_bytes(), (out / "GSE文献DB_2026-10-18.xlsx").read_bytes())
+
+    def test_bibtex_lands_on_its_row(self):
+        def fake_bib(csl_path, base):  # pandoc の代わりに、CSL の引用キーで .bib を書く
+            items = json.loads(Path(csl_path).read_text(encoding="utf-8"))
+            for fmt in ("biblatex", "bibtex"):
+                Path(f"{base}_{fmt}.bib").write_text(
+                    "".join(f"@misc{{{it['id']},\n  title = {{T {it['id']}}}\n}}\n" for it in items), encoding="utf-8")
+            return {"biblatex": len(items), "bibtex": len(items)}
+
+        orig = build.write_bib
+        build.write_bib = fake_bib
+        try:
+            deliver_to = self.root / "文献DB"
+            rc, out = self.run_build("--deliver", str(deliver_to), xlsx=True, bib=True)
+        finally:
+            build.write_bib = orig
+        self.assertEqual(rc, 0)
+        from openpyxl import load_workbook
+        bs = load_workbook(out / "GSE文献DB_2026-10-18.xlsx")["書誌"]
+        got = {bs.cell(row=i, column=1).value: bs.cell(row=i, column=5).value for i in range(2, bs.max_row + 1)}
+        self.assertEqual(got["P3_doi101e"], "@misc{P3_doi101e,\n  title = {T P3_doi101e}\n}")
+        self.assertEqual(sorted(p.name for p in deliver_to.iterdir()), ["GSE文献DB.bib", "GSE文献DB.xlsx"])
+
+    def test_bib_entries(self):
+        text = "@article{P1,\n  title = {A}\n}\n@misc{P3_doi101e,\n  note = {x @ y}\n}\n"
+        got = build.bib_entries(text)
+        self.assertEqual(sorted(got), ["P1", "P3_doi101e"])
+        self.assertTrue(got["P3_doi101e"].startswith("@misc{P3_doi101e,"))
+
+
 class FetchTest(unittest.TestCase):
     def test_transient_failures_are_not_cached(self):
         import urllib.error
@@ -350,6 +409,14 @@ class KeepTest(Base):
         self.assertEqual((r["url:gone"]["ID"], r["url:gone"]["状態"], r["url:gone"]["メモ"]), ("—", build.ORPHAN_STATE, "大事なメモ"))
         m = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(m["works"], 6)
+
+    def test_json_saved_as_txt(self):
+        p = self.root / "sheet.txt"
+        p.write_text(json.dumps({"range": "x", "values": [["key", "URL", "読んだ", "メモ"], ["doi:10.1/b", "u", "", "メモ"]]},
+                                ensure_ascii=False), encoding="utf-8")
+        rc, out = self.run_build("--keep", str(p))
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.rows(out)["doi:10.1/b"]["メモ"], "メモ")
 
     def test_unchecked_box_is_not_a_memo(self):
         # get_values はチェックを外した 読んだ を "FALSE" で返す。消えた key でもそれだけなら止めない

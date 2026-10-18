@@ -246,7 +246,7 @@ python3 scripts/check_citations.py
    - 終了コードを見るので、出力を `| tail` などのパイプに通さない。
    - 終了コード 3 で止まったら、表示された key のメモを `--rekey 旧=新` か `--keep-orphans` で扱う。どちらにするかは研究者に聞き、答えを足して試しを回し直す。key を直す場所は `references.md` だけで、シートの key を手で直さない。止まった回は `manifest.json` が出ないので、報告には止まった理由と聞いた問いを書く。
 4. `missing_summaries.json` が空でなければ、`scripts/refdb/summary_prompt.md` の依頼文で要約を書かせ、`merge_summaries.py` で検査して `--write` で足す。「数値を目で確かめる」に出たものは目で見る。`summaries.json` の変更はこのラウンドの後に別のコミットにする。
-5. `--out` に Drive の `文献DB/作業` を渡して作り直し、`--verify` で揃っていることを確かめてから、成果物（`.html`・`.csl.json`・`.bib` 2 本）を `文献DB` へ写す（README §1）。README §2 の手順でシートの「一覧」を差し替え、§4 で検索のページを同じ URL に出し直す。文献 DB の本体はスプレッドシートで、CSV はそこへ流し込むための受け渡し用。
+5. `~/.venvs/gse-provision/bin/python` で、`--out` に Drive の `文献DB/作業`、`--deliver` に `文献DB` を渡して作り直し、`--verify` で揃っていることを確かめる（README §1。`文献DB` には `GSE文献DB.xlsx` と `GSE文献DB.bib` が上書きされる）。README §2 の手順でシートの「一覧」を差し替え、§4 で検索のページを同じ URL に出し直す。文献 DB の本体はスプレッドシートで、CSV はそこへ流し込むための受け渡し用。
 6. 報告に `manifest.json` の件数（文献・要約・カードでの記述・要約が無いもの・CSL を最小限で作った数・結び直した読んだ・メモ）を書く。
 
 ## アンチパターン
