@@ -73,7 +73,10 @@
 - [x] TRACE リポジトリ（判断 51・53）: https://github.com/mikotomiura/TRACE（非公開・手元 `~/TRACE`）。README・ロゴ・流れの gif
 - [x] `registration-day.md` を直す: 共著者に聞くこと・版の表記・コミットと push の先（`~/TRACE`）・共著者の冊の受け渡し（人 2 人の形の節・判断 55）
 - [x] /cross-review（判断 52〜55 の差分。GSE-prototype の検討の記録と TRACE リポジトリの両方・判断 56 で対応）
-- [ ] 研究者: 反例集のキー（TRACE の `registration-attachments/validation-cases/key.csv`・`key-items.csv`）の期待するコードを、登録の前にすべて確かめる（判断 58）
+- [x] 研究者: 反例集のキー（TRACE の `registration-attachments/validation-cases/key.csv`・`key-items.csv`）の期待するコードを、登録の前にすべて確かめる（判断 58）。2026-10-19 に済み・値の変更 0・対象の定義 2 つを直した（判断 64）
+- [x] 判断 64 の差分の /cross-review（2 巡・判断 65）
+- [ ] 研究者: 言い換えた V03 の逆転項目「I feel well rested」（`FAT`）を確かめ、findings.md の「not yet done」を日付に替える（判断 65・F10）
+- [ ] 研究者: Drive の共著者への案内（C2b の対象の説明）を、作り直した `coauthor-guide.docx` に置き換えるか決める（判断 65）
 - [x] 草稿に段 1 の除外の監査と反例集を足し、Drive の草稿を置き換えた（判断 60）
 - [x] 符号化の冊（`c_coding_book.py`・検査と変異）と Drive の見本（判断 60）
 - [ ] 登録の下書きを人 2 人の形に書き換えるとき、段 1 の除外の監査（第一著者だけで除いた記録から 30 件・seed 20261024・網のときに抜く・2 人とも全文で独立に判定・含めれば元の集合へ〔追加候補なら本体・確かめの標本なら確かめの層〕・一致は本体と分ける）を GSRR-33・37・41・65 に入れる（草稿は判断 60 で済み・判断 58・59）

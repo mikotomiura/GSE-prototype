@@ -806,3 +806,23 @@
 - キーの確かめの表（Codex・Claude）: 導かれる値（exp_*）も確かめる行に入れた（脚本とキーが同じ誤りをしていれば check_validation_cases では分からないため。322 行＝14 件×23 列）。変種（V05b・V08b）は対応を明示し、親の事例に「Variant <id>」の行が無ければ止める。本文の無い事例・key.csv に無い項目の事例で止める。同期するクラウドのフォルダには書かない。作り直す前に、前の表が作ったときから変わっていない（更新の時刻＝作った時刻）ことを確かめた。
 - Discord の文（Claude）: 量を少なく見せていた。→「（2 人の判定があまり合わなかったら、残りの 450 件くらいも）」「確かめの分が数十本加わる」を足した（日付や決まりは書いていない）。
 - 引き継ぎ（Claude）: 見出しの判断の番号、関数の名前（`cmd_coauthor_ids`・`screening_csv_two`）を直し、§2.2 に GSRR-64 の一覧と添付 2 の目録を見ることを足した。判断 62 で Drive の草稿を置き換えたことの記録漏れは、ここに書く（判断 62 の後に、b007365 から作り直した版と Drive の版が同じことを確かめてから置き換えた）。
+
+## 判断 64: 反例集のキーの確かめの結果を反映する（2026-10-19・研究者・AskUserQuestion 1 回）
+
+- 研究者が確かめの表に記入し、結果を `~/Downloads/TRACE_反例集キー_確認結果.xlsx`（全行）と `~/Downloads/TRACE_反例集キー_違う・迷う.csv`（違う・迷うの行）で渡した。読んだ数: 『入力のコード』322 行がすべて「合っている」、『項目のコード』11 行が「合っている」9・「迷う」2・「違う」0・「未確認」0。キーの値は 1 つも変わらない。
+- 迷う 1（V03「I cannot get myself to start my assignments」の対象）: コードブック第 2 版 Step 2 の `TASK`（no specific target named）と `OTHER`（a named target not listed above）の両方に当たる。研究者の指摘どおり定義の穴だった。研究者の選択（推奨どおり）: `TASK` を「作業や活動。一般でも、回答者自身の名指された作業（仕事・学業・家事）でも」に広げ、`OTHER` を「作業ではない、上にない名指された対象」に絞る。教示や前置きは対象を変えない。理由: RQ2 の問いは減った意欲が AI に向くか作業に向くかで、作業が名指されているかは問いに無い。キーは `TASK` のまま。
+- 迷う 2（V04 項目 7「I am tired of correcting what the AI assistant writes」の対象）: `AI_VERIFY` は「AI 出力の真偽・信頼性の判断」で、修正は真偽の判断とは限らない。研究者の選択（推奨どおり）: `AI_VERIFY` を「AI の出力を確かめる・直す・その真偽や信頼性を判断する」に広げ、AI の出力に対する作業は `AI_VERIFY`、AI を使う・取り入れるは `AI_USE` と区別を書いた。キーは `AI_VERIFY` のまま。
+- コードブックの例に反例集の項目の文（my assignments・correcting what the AI writes）を使わなかった。共著者は事例をキーなしで解く前にコードブックを読むので、例が答えになる。例は "my work"・"my studies"・"fixing errors in AI-generated text" にした。
+- 直したもの（TRACE）: `codebook-c2b-en.md`（版 2 のまま・変更の行を冒頭に足した。登録の前なので版 2 の最終の文として固定される）、`findings.md`（Version 0.2・冒頭の not yet done を確かめた日と結果に・F8・F9 を新しい「決めた」節に・V04 の境界の注を F9 へ）、登録の下書き 0.16（GSRR-44 の 1 に確かめたことと 2 つの対象の定義を決めたこと）、草稿の冒頭の注記を 0.16 に。外枠は中身が変わらないので版を上げていない。`key.csv`・`key-items.csv`・`cases.md`・`c_synthesis.py`・`make_dummy.py` は変えていない（対象は導かれる値に入らない。探索の符号化済みの表に対象の値は無い）。
+
+## 判断 65: 判断 64 の差分の /cross-review（TRACE `3105112..70002e9`）の指摘と対応（2026-10-19・研究者・AskUserQuestion 1 回）
+
+- 回し方は判断 56 と同じ（TRACE をジョブの一時ディレクトリに写し、フィルタと `.codex` をつないで Codex、並べて code-reviewer〔Opus〕）。
+- 両者（一次で確かめた）: `TASK` を広げたので `SOCIAL`（友人と話す）・`AI_USE`（AI を使って仕事をする）と重なる。研究者の選択（推奨どおり）: 優先の順を Step 2 に書いた（(1) AI が対象か手段: `AI_VERIFY`・`AI_PRIV`・ほかは `AI_USE` (2) 人との接触 `SOCIAL` (3) 作業や活動 `TASK` (4) ほかの名指し `OTHER`）。キー 11 項目と探索の 46 項目（2026-10-15 の符号化）の対象はどれも変わらない（46 項目は items.csv から読んで確かめた）。
+- code-reviewer（HIGH・確かめた）: 判断 64 で足した「教示が AI を述べても自分の仕事の項目は `TASK`」と例 "fixing errors in AI-generated text" "my studies" は、V03 と V04 の答えをほぼ言っていた（判断 64 で事例の文を避けたつもりで、言い換えにしただけだった）。→ その一文を消し、例を "household chores"・"checking code written by AI" にした。Codex の「教示を無視すると省略された対象が決まらない」も、この一文を消したことで閉じた（原則「項目の文だけで符号化する」は前から）。
+- code-reviewer（既にあった漏れ）: 逆転項目の例 "I feel full of energy" が V03 の項目と逐語で同じ。研究者の選択（推奨どおり）: 事例の方を "I feel well rested"（`FAT` のまま）に変え、コードブックと登録の例は変えない（F10）。この 1 行は研究者がもう一度確かめる。
+- Codex（中）: `AI_VERIFY` の表と補足の範囲（editing）が合わない。→ 補足を優先の順に置き換え、表を「AI の出力を確かめる・直す・真偽や信頼性を判断する（AI の出力は AI の生成した情報を含む）」に。code-reviewer の「or information が AI でない情報まで入る」もこれで閉じた。
+- code-reviewer: 登録の時系列に 10-19 の改訂が無い → 足した（10-15 の文は版 1 のもの）。「14 cases」→「12 cases and 2 variants」。322 は `case_id`・`finding` の列を除いた数と書いた。新しい例を「作った例」の一覧に。コードブックの冒頭に「revised 2026-10-19」。F8 の RQ2 の言い方を登録の文（toward what target）に合わせた。
+- 採らなかった: Codex の「新しい境界を試す事例を足す」。足すと研究者が新しいキーを確かめ直す必要があり、優先の順は 1 つに決める規則なので、確かめは較正の 2 回（GSRR-44）に任せる。研究者に伝える。
+- GSE: `coauthor-guide.md` の C2b の対象の説明を新しい定義に合わせ、手元の `coauthor-guide.docx` を `make_guide_docx.py` で作り直した（Drive の案内は置き換えていない）。
+- 2 巡目（TRACE `70002e9..d403145`・両者）: 教示の一文を消したので、原則が「教示は型を決めない」だけになり、V03 は教示（ChatGPT で課題）から「AI が手段」と読めて `AI_USE` にもなった（両者 HIGH・一致）。→ 原則を「型も対象も決めない」に、優先の (1) を「項目の中で AI が対象か手段として名指されるとき」に（項目の文だけで符号化する原則からの帰結なので研究者に聞かずに直した）。AI の中の順は研究者の選択（推奨どおり）で `AI_PRIV`・`AI_VERIFY`・`AI_USE`。F9 の「AI の出力への作業は AI_VERIFY」をコードブックの文（確かめる・直す）に合わせた。`AI_PRIV` の例 "protecting personal data" に AI の文脈を添えた。事例の無い境界（TASK と SOCIAL・TASK と AI_USE・AI_PRIV と AI_VERIFY）を findings の Kept に「較正で見る」と書いた。登録 GSRR-44 の 1 に、言い換えた 1 項目を登録の前に確かめ直すことを。10-19 の時系列の「46 項目」は、第一著者の作業ファイル（GSE の `.steering/20261014-ai-fatigue-core1-item-analysis/items.csv`）と照らした、と書いた。TRACE `ed6a3c5` を main に push。
