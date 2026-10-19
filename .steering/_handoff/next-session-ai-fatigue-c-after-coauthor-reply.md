@@ -30,7 +30,7 @@
 - 本番の冊で、まだ作れないもの: 段 2・3 の冊（第一著者の段 1 と網が済み、`c_screening.py coauthor-ids --stage 2` が ID を出してから）、符号化の本番の冊（本体の集合を閉じ、較正の直しを登録してから `c_coding_book.py make --coder author2 --ids`）。
 - 登録の下書きは 0.15 で、まだ前の形（第一著者と独立の AI）。草稿と案内だけが人 2 人の形に先行している（草稿の冒頭の状態の注記にそう書いてある）。
 - 道具: 選別は `c_screening.py`（`mode --set two-human | ai-screener`）、共著者の選別の冊は `make_coauthor_db.py`、符号化の冊と書き出しは `c_coding_book.py`。検査は `make_dummy.py`・`check_screening.py`・`check_validation_cases.py`・`check_coding_book.py [--mutate]`（openpyxl は `uv run --with openpyxl`）。
-- 研究者に残っていること（返事と並行）: 反例集のキー（`registration-attachments/validation-cases/key.csv`・`key-items.csv`）の期待するコードをすべて確かめる（`findings.md` に「not yet done」とある。登録の前まで。確かめの表は `~/Documents/TRACE/key-check/TRACE_反例集キーの確かめ.xlsx`・判断 62。研究者の依頼で Drive の `AI-fatigue/TRACE_第一著者のみ/` にも写した（TRACE フォルダの外・共有は研究者だけ。TRACE フォルダや `TRACE_Co-Author` を共著者に共有しても見えない。この写しを共著者に共有しない）。研究者が Drive の写しに記入したら、そちらを読む。違う・迷うの行が来たら key.csv・key-items.csv・findings.md を直し `check_validation_cases.py` を走らせる）／Drive の `fulltext` を共著者に閲覧のみで共有する（研究者が行う）。
+- 研究者に残っていること（返事と並行）: 反例集のキー（`registration-attachments/validation-cases/key.csv`・`key-items.csv`）の期待するコードをすべて確かめる（`findings.md` に「not yet done」とある。登録の前まで。確かめの表は `~/Documents/TRACE/key-check/TRACE_反例集キーの確かめ.xlsx`・判断 62。研究者の依頼で Drive の `AI-fatigue/TRACE_第一著者のみ/` にも写した（TRACE フォルダの外・共有は研究者だけ。この写しを共著者に共有しない）。研究者が Drive の写しに記入したら、そちらを読む。違う・迷うの行が来たら key.csv・key-items.csv・findings.md を直し `check_validation_cases.py` を走らせる）。Drive の共有（2026-10-19 に研究者から聞き、メタデータで確かめた）: TRACE の中で共著者に見えるのは `fulltext/` だけで、「リンクを知っている全員が閲覧可」になっている。TRACE フォルダと `TRACE_Co-Author/` は研究者だけ。`TRACE_Co-Author/` の草稿・案内・段 1 の冊・符号化の見本を共著者がどう受け取るか（共有か直接送るか）は研究者が決める。共有の設定はメインからは変えない。
 
 ## 2. 次にやること（この順）
 
