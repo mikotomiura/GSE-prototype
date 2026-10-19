@@ -11,7 +11,8 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
-| **C（TRACE）: 共著者の返事を待つ間と、返事の後の登録の書き換え**（研究の物は `~/TRACE`・記録は worktree `/Users/johnd/GSE-prototype-af-c`） | **`next-session-ai-fatigue-c-after-two-human-tools.md`**（2026-10-19） | **現行**。人 2 人の形の道具ができた（判断 55〜57）。前の `next-session-ai-fatigue-c-three-screeners.md` を置き換える |
+| **C（TRACE）: 共著者への相談の前の仕上げ（草稿の更新と Drive の置き換え・符号化のスプレッドシート）**（研究の物は `~/TRACE`・記録は worktree `/Users/johnd/GSE-prototype-af-c`） | **`next-session-ai-fatigue-c-ready-for-consult.md`**（2026-10-19） | **現行・先にこちら**。研究者の方針「完全に準備できてから相談を行う」。判断 55〜59 の後 |
+| **C（TRACE）: 共著者の返事の後の登録の書き換え**（同上） | **`next-session-ai-fatigue-c-after-two-human-tools.md`**（2026-10-19） | **現行・相談の後に使う**（§2 の「共著者の返事の後」）。「返事の前」の項は上の行に移した。前の `next-session-ai-fatigue-c-three-screeners.md` を置き換える |
 | ~~**C（TRACE）: 選別の道具を判断 54 の形に（判定は人 2 人・AI は段 1 の網）・判断 44 の未決**~~ | `next-session-ai-fatigue-c-three-screeners.md`（2026-10-19） | 完了（判断 55〜57）。後続は上の行。以下は当時の記述: 前は `next-session-ai-fatigue-c-after-coverage.md` → `next-session-ai-fatigue-c-draft-and-repo.md`（判断 48〜53・草稿の直し・TRACE リポジトリ）。共著者の返事待ちの項は `tasklist.md` の末尾 |
 | **C（TRACE）: DB を仕上げる（全体の DB・判定者 1 用の DB・Google Drive との同期）**（worktree `/Users/johnd/GSE-prototype-af-c`） | `next-session-ai-fatigue-c-db-finish.md`（2026-10-18） | 完了（後続は上の行）。判断 34（共著者を選別の 2 人目・B+・返事待ち）と判断 35（DB の見た目・日本語の機械訳・全文の Drive リンク・抄録の補完）の後。まず「全体の DB」が何を指すかを聞く |
 | **C（TRACE）: 追加候補 264 件の選別を回す道具**（worktree `/Users/johnd/GSE-prototype-af-c`） | `next-session-ai-fatigue-c-screening-tools.md`（2026-10-18） | 完了（2026-10-18・判断 33〜35）。後続は上の行。道具は `scripts/c_screening.py`。次は登録の当日（`.steering/20261017-ai-fatigue-c-outline/registration-day.md`。共著者の返事と OSF の復旧を待っている） |
