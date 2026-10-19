@@ -53,3 +53,46 @@
 - 出典: Terwee et al. 2018（COSMIN の内容的妥当性の方法）を [P526]（Springer の OA の PDF で照合）、Flake & Fried 2020 を [P527]（provisional。書誌は OpenAlex で照合、無料の版 PsyArXiv は OSF が 503 で本文を取れず未照合。照合するまで主張の根拠に使わない）。
 - 残したもの: narrative review の著者（判断 5 のまま。外枠は「共有する見方」と書き、著者の断定を減らした。登録版 GSRR-46 の文は変えていない）、背景の文の出典、比較の軸の文献、TRACE の展開。
 - /cross-review: かけていない（このタスクの途中の段。登録版の差分の確認と合わせて、研究者の判断で行う）。
+
+## 判断 7（2026-10-20）投稿先の客観的な比較（まだ決めない）
+
+- 研究者の問い: 論文ができたらどこに出すか、どこなら通りやすいか。答え（AskUserQuestion）: まだ決めない。分析だけ残す。
+- 前提: 費用ゼロ（APC・掲載料を払わない）。第 1 著者は所属なし。
+- 公式ページで確かめたこと（2026-10-20 に WebFetch で取得）:
+  - Meta-Psychology（open.lnu.se/index.php/metapsychology/about）: "There is no fee for publishing"。範囲に "systematic reviews, meta-analyses" を含む。"Meta-Psychology does not publish a limited number of studies or seek to have a certain rejection rate" / "Novelty is not considered a criterium"。査読は公開・署名あり。投稿時にプレプリントが要る。
+  - Research Synthesis Methods（Cambridge・author-instructions）: 2025 年から全件 OA。"Authors without a Transformative Agreement or funding to pay an APC are granted waivers by Cambridge University Press."。ただし範囲は統合の方法で、一次研究の測定を数える本稿とは合いにくい（メインの判断）。
+  - AMPPS（APS・apc-waivers-policy）: 免除の申請に "Confirmation from the corresponding author's department administration and/or acquisition librarian" が要り、採択後に判定する。所属なしでの扱いは書かれていない。APC $1,000 は APS の別ページ（サブエージェントが取得・メインは未照合）。
+- 未確認（出版社のページが自動取得を 403 で拒んだ）: CHB / CHB Reports・IJHCI・BIT・BRM・Assessment・Psychological Methods・EJPA・SPPS・Collabra・RSOS の現行の費用と規程、PCI RR の公式ページ（対象範囲・既存データの水準・無料の friendly 誌）。ハイブリッド誌の購読型ルートが無料かは、誌ごとに公式で確かめていない。
+- 採択率: 公式の現行値は取れなかった。Psychological Methods 約 16%（APA 2015 年の統計）、SPPS 17%（2012〜2013 年の編集者の報告）など古い値だけ。CHB の値は第三者の推定で根拠不明のため使わない。
+- 先例（測定の実践を批判するレビューの掲載先）: AMPPS（Flake & Fried 2020）、SPPS（Flake, Pek & Hehman 2017）、Communications Psychology（Elson et al. 2023）。AI 疲労・AI 不安の尺度の測定レビューは見つからなかった。
+- メインの推奨（採られていない）: Meta-Psychology。費用ゼロが公式で確定し、範囲が合い、新しさを問わない。弱みは、AI 疲労の研究を書く人（CHB などの読者）に届きにくいこと。
+- 時期の注: PCI RR の Stage 1 は主のコード化（2026-12-31 に集合が締まった後）より前に原則受理が要るので、今の登録の日程とぶつかる。使うなら日程の見直しが要る。
+- 追記（2026-10-20・研究者の指摘「購読型の道があるのでは」を受けて Chrome で公式ページを読んだ）:
+  - CHB（sciencedirect の open-access-options）: "two choices to publish your research: Open access / Subscription"。購読型は "No open access publication fee."。OA の APC は USD 4840。"Your publication choice will have no effect on the peer review process or acceptance of your submission."。自己保存の猶予は 24 か月。投稿規程: 論文の種類に "literature reviews"。査読は二重匿名。抄録 250 語以内・ハイライト 3〜5 点。データは Option C（公開か、できない理由の記述）。人を対象とする研究でなければ倫理承認は不要。
+  - IJHCI（T&F の投稿規程）: "There are no submission fees, publication fees or page charges for this journal."。OA は Open Select で任意（APC は OA を選んだときだけ）。論文の種類に "Review Articles"。"There are no word limits for papers in this journal."
+  - 帰結: 「費用ゼロ」の条件では CHB と IJHCI も候補に残る（判断 7 の未確認のうち 2 誌が確定）。
+- 追記（2026-10-20・読み手の確かめ）: 候補 264 件（`~/Documents/TRACE/data/records264.json`）の掲載誌に CHB・IJHCI・BIT は 0 件。多いのは Applied Clinical Informatics 7、Frontiers in Psychology 8（大小文字の表記揺れを合算）、Acta Psychologica 7、JAMA Network Open 5、Cureus 5。分野の語では psycholog 20・educat 17・informatic 16・medical 10・nurs 7。対象者は医療者 93 件が最多。探索の集合の記録（`.steering/` の AI 疲労の各タスク）での言及は Acta Psychologica・Frontiers in Psychology・Scientific Reports が多く、CHB Reports 6 回・CHB 3 回・IJHCI 1 回（言及の回数で、研究の数ではない）。→ AI 疲労の研究を書いている人の多くは心理学の総合誌と医療情報の雑誌にいて、CHB・IJHCI の読者と重なるのは一部。
+- 追記（2026-10-20・目的から並べ直す）: 研究者の差し戻し「難易度や格の高さを重視していない？手段が目的になってる？」を受け、目的を聞いた。答え: 「AI 疲労の研究のやり方を変える」と「測定の方法論として出す」が五分五分。
+  - 読み手の実態: 候補 264 件は 186 誌に散らばる（最多でも 8 件）。本拠地の雑誌は無く、届くかどうかは見つかるか（PubMed 等の索引）と読めるか（OA）で決まる。
+  - 公式で確かめたこと（Chrome）: Meta-Psychology は NLM Catalog に ISSN 2003-2714 が無い（PubMed に載らない）。PLOS ONE は論文の種類に systematic review があり、Registered Report の枠もある。掲載料は Research Article で $2,596〜$3,165（表の行と誌の対応は読み切れていない）。PLOS の PFA は "authors unable to pay all or part of their publication fees and who can demonstrate financial need"・投稿時に申請・"A decision is usually sent to the author within 10 business days"・"case-by-case"・"Information about applications for fee assistance are not disclosed to journal editors or reviewers"。Journal of Clinical Epidemiology は購読型なら無料（OA は USD 4560）。Collabra・RSOS はボット判定の確認ページで読めず未確認（突破していない）。
+  - メインの案: PLOS ONE に PFA を付けて出す（OA・PubMed で医療者の著者にも届き、方法論の論文も載る）。PFA が全額でなければ査読の前に取り下げ、Meta-Psychology に出す。どちらでもプレプリントを先に出す。CHB・IJHCI・JCE の購読型は、読めない形になるので目的に合わない。
+- 追記（2026-10-20・研究者の求め「購読云々関係なしで再分析」）: 条件を「掲載料ゼロで出せる道がある」だけにして並べ直した。
+  - 追加で確かめたこと（Chrome）: JAMIA は "If you do not select the open access option, your paper will be published with standard subscription-based access and you will not be charged."。Reviews は "Word count: up to 4000 words" / "Tables: up to 4"。Acta Psychologica は完全 OA で APC USD 2650（購読の道なし）。Applied Clinical Informatics は投稿規程のページが見つからず未確認。
+  - 原稿の大きさ（`~/TRACE/manuscript/draft`）: 表 16（tables.tex の table 環境）、本文は結果が空の段で概算 4,300〜7,400 語（数え方で幅）。
+  - 読み手の塊（264 件）: 医療情報（ACI 7・JAMIA 4・JAMIA Open 4・JMIR 系 6・ほか）約 24 件が最大、心理学の OA 誌（Frontiers in Psychology 8・Acta Psychologica 7・BMC Psychology 2・Scientific Reports 2）約 19 件。CHB・IJHCI は 0。
+  - メインの見立て: 掲載料ゼロの道が確かな 5 誌（Meta-Psychology・IJHCI・CHB・JCE・JAMIA）のうち、2 つの目的の両方に効くのは JCE（メタ研究の掲載先で、医療者の研究の読者がいる）。方法論だけなら Meta-Psychology。JAMIA は読み手に最も近いが Review の上限（4,000 語・表 4）に収まらない。CHB・IJHCI はどちらの目的にも強くない。JCE の語数・表の上限と範囲（対象が医療に限られない研究を載せるか）は未確認。
+- 追記（2026-10-20・JCE と ACI の規程を確かめた）:
+  - JCE（guide-for-authors）: 範囲に "Meta-science"・"Developing and evaluating outcome measures"・"Research integrity and culture"。原則受けないものに "Meta-research studies that demonstrate weaknesses or limitations in the evidence ecosystem but lack reflection on how these might be addressed"・"Bibliometric studies and those on infodemiology, social media trends, and health informatics"・"systematic reviews ... where the main focus is not on the methods"・"Studies limited to one country, jurisdiction, or clinical area"。上限は "Original Research: 3,000 words, 100 references, 5 figures, 5 tables"。Registered Reports あり。→ 範囲は方法論として合う（推奨の表 14 が「どう直すか」に当たる）が、3,000 語・表 5 に TRACE（表 16）は大きく削らないと入らず、医療の外の対象（264 件の約 6 割）が誌の目的「health care decision-making」から遠い。
+  - ACI（connect.thieme.com の Author Guidelines）: OA の道は "Gold Open Access" か "Hybrid Open Access" と書かれ、OA を選んだときの 2026 年の APC は $3,620。購読で出す場合の費用、論文の種類と上限はこのページに無く未確認（旧 PDF の URL はこのページへ転送された）。範囲は臨床の情報学で、TRACE の対象の一部にしか当たらない。
+
+## 判断 8（2026-10-20）投稿の計画（仮に決めた）
+
+- 研究者の答え: 「一旦投稿の計画はこの形にしようか」（判断 7 の分析の後）。
+- 計画:
+  1. 本命は Meta-Psychology、予備は IJHCI。どちらも掲載料ゼロ・語数の上限なし（判断 7 で公式を確かめた）。JCE（3,000 語・表 5）と JAMIA（Review 4,000 語・表 4）は形式で外す。CHB は目的のどちらにも強くないので外す。
+  2. 原稿は本文の表を 7〜8 に絞り、残りを補足に回す。本文: 記録の流れ（図）・コードの一覧・C1・C2b・C6/C7・問題の文・推奨、C4/C5 は要約表 1 つ。補足: 逸脱・集合の内訳（流れの図に統合）・一致の詳細・C2 の残り・C3・C4/C5 の詳細・感度の分析・尺度の版の一覧・網羅の確かめ。登録したコードはすべて報告する（削らない）。
+  3. Meta-Psychology にはプレプリントと同時に出す（同誌の必須）。コード表と脚本は OSF。不採択なら同じ原稿を IJHCI へ。
+  4. 現場の著者へ届ける別の短い論文（医療者の部分の推奨など）は、採択後に必要なら考える。本体の計画には入れない。
+- 投稿先を選んだ根拠は目的（研究のやり方を変える・測定の方法論として出す、が五分五分）で、格や採択率は補助にとどめた。
+- 符号化は第 2 著者が本体の集合の全部（判断 45 の写し・GSE 側の記録）。外枠 `outline.md:85-86` と登録版 `registration-en.md:15・29・51・352` はまだ「少なくとも 20%、または全部」の文で、揃えるかは研究者が決める（未変更）。
+- 次の段: 外枠の「Journal requirements」の節を Meta-Psychology の規程で書き直し、表の本文と補足の分け方を外枠に入れる（研究者の指示を待つ）。
