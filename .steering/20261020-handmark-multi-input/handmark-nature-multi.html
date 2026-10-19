@@ -53,6 +53,7 @@ legend { font-size: 0.78rem; letter-spacing: 0.08em; color: var(--muted); paddin
 .check { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; cursor: pointer; }
 .check input { accent-color: var(--accent); }
 .check small { color: var(--muted); }
+.check.sub { padding-left: 1.6em; }
 #pad {
   border: 1px dashed var(--muted); border-radius: 6px; padding: 12px; font-size: 0.9rem; color: var(--muted);
   background: var(--surface); cursor: text; user-select: none;
@@ -78,6 +79,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
       <legend>入力（入れる・切る）</legend>
       <label class="check"><input type="checkbox" id="useKeys" checked> 打鍵 <small>風（草のなびき・粒の横の流れ）</small></label>
       <label class="check"><input type="checkbox" id="useCursor" checked> カーソル <small>近くの草だけが、動いた向きへなびく</small></label>
+      <label class="check sub"><input type="checkbox" id="useCursorMotes" checked> カーソルで近くの粒も押す <small>切ると草だけ</small></label>
       <label class="check"><input type="checkbox" id="useClick" checked> クリック <small>その場に一回きりの波紋</small></label>
       <label class="check"><input type="checkbox" id="useWheel" checked> ホイール <small>粒を縦に押す</small></label>
     </fieldset>
@@ -115,7 +117,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
       <h2>置いた制約</h2>
       <ul>
         <li>育たない・溜まらない。草・粒の数は最初から決まっていて、波紋も同時に 6 つまでの決まった枠を使い回す。</li>
-        <li>跡は数秒で消える。草のなびきは約 0.7 秒、粒の縦のずれは約 1 秒で半分に戻り、波紋は 1.6 秒で消える。カーソルの通った跡は描かない。</li>
+        <li>跡は数秒で消える。草のなびきは約 0.7 秒、カーソルで押した粒のずれは約 0.9 秒、ホイールの粒の縦のずれは約 1 秒で半分に戻り、波紋は 1.6 秒で消える。カーソルの通った跡は描かない。</li>
         <li>天気や季節にしない。色と風の向きは入力で変わらない。霧はどの入力にも依らない基層のまま。</li>
         <li>数や評価を出さない。打った数・動かした量・押した回数はどこにも出さない。</li>
       </ul>
@@ -123,7 +125,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     <div>
       <h2>見るところ</h2>
       <ul>
-        <li>どの動きが自分のどの手の動きから来たか、見分けられるか。</li>
+        <li>どの動きが自分のどの手の動きから来たか、見分けられるか。粒は打鍵（横に全体）・ホイール（縦に全体）・カーソル（周りだけ）の 3 つを受けるので、範囲で見分けられるか。</li>
         <li>入力を足すほど「自分の作業が一緒にいる」に寄るか、「別の何かがいる」や騒がしさに寄るか。入れ切りで比べる。</li>
         <li>カーソルを止めたとき、草がすぐ静まるか（置いたままの位置で何かが続かないか）。</li>
         <li>作業の窓を重ねたとき、窓の上で押した波紋が縁から見えることをどう感じるか。</li>
@@ -131,7 +133,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     </div>
     <div>
       <h2>写し方</h2>
-      <p>打鍵は版 4 と同じ（強さ 1）。カーソルは、描画のたびに位置を 1 点だけ読み、前の点との差から横の速さを出します。草の中ほどからの距離が画面の高さの 0.16 倍より近い草だけに、近さの 2 乗で重みを付けて、速さの向きへ押します。押しは約 0.7 秒で半分に減ります。クリックは押した点から輪を広げ、1.6 秒で消します。ホイールは 1 回ごとに粒全体を縦にずらし（下へ回すと上へ）、ずれは約 1 秒で半分に戻ります。打鍵以外の値は描画の中で使うだけで、列にも溜めず、外へも出しません（打鍵は版 4 と同じく、直近 30 秒の打鍵の時刻だけを持ちます）。入力を切ると、その入力の跡はすぐ消えます。舞台の上ではホイールでページはスクロールしません。クリックは左ボタンだけを使います。「動きを減らす」設定では、漂いと粒の流れだけを遅くし、跡の消え方は変えません。推定（行き詰まりなど）は使いません。</p>
+      <p>打鍵は版 4 と同じ（強さ 1）。カーソルは、描画のたびに位置を 1 点だけ読み、前の点との差から横の速さを出します。草の中ほどからの距離が画面の高さの 0.16 倍より近い草だけに、近さの 2 乗で重みを付けて、速さの向きへ押します。押しは約 0.7 秒で半分に減ります。粒も、カーソルから画面の高さの 0.14 倍より近いものだけを、動いた向き（縦横）へ描く位置だけずらし、ずれは約 0.9 秒で半分に戻ります。クリックは押した点から輪を広げ、1.6 秒で消します。ホイールは 1 回ごとに粒全体を縦にずらし（下へ回すと上へ）、ずれは約 1 秒で半分に戻ります。打鍵以外の値は描画の中で使うだけで、列にも溜めず、外へも出しません（打鍵は版 4 と同じく、直近 30 秒の打鍵の時刻だけを持ちます）。入力を切ると、その入力の跡はすぐ消えます。舞台の上ではホイールでページはスクロールしません。クリックは左ボタンだけを使います。「動きを減らす」設定では、漂いと粒の流れだけを遅くし、跡の消え方は変えません。推定（行き詰まりなど）は使いません。</p>
     </div>
   </section>
 </div>
@@ -143,7 +145,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const state = { pat: "none", wall: "photo", res: 2560, cover: false, base: "noise",
-    useKeys: true, useCursor: true, useClick: true, useWheel: true };
+    useKeys: true, useCursor: true, useCursorMotes: true, useClick: true, useWheel: true };
 
   // 仮想の画面。幅だけを選び、高さは 16:10 にそろえる。
   let W = 0, H = 0, S = 1;
@@ -270,8 +272,10 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
 
   // ---- 打鍵以外の入力。どれも最後の 1 点と、数秒で 0 へ戻る値だけを持つ（列を持たない） ----
   // カーソル: 前の点と今の点だけ。速さは舞台の座標で横向きのみ。
-  const cursor = { x: 0, y: 0, px: 0, py: 0, inside: false, fresh: false, vx: 0 };
+  const cursor = { x: 0, y: 0, px: 0, py: 0, inside: false, fresh: false, vx: 0, vy: 0 };
   const CURSOR_R = 0.16, CURSOR_HALF_MS = 700, CURSOR_PUSH = 6, CURSOR_MAX = 0.9;
+  // 粒: カーソルの周りだけ、描く位置をずらす。ずれは画面の高さに対する割合。
+  const MOTE_R = 0.14, MOTE_HALF_MS = 900, MOTE_PUSH = 0.25, MOTE_MAX = 0.06;
   // クリック: 決まった数の枠を使い回す。古いものから上書きする。
   const RIPPLE_SLOTS = 6, RIPPLE_MS = 1600;
   const ripples = Array.from({ length: RIPPLE_SLOTS }, () => ({ x: 0, y: 0, t0: -Infinity }));
@@ -288,7 +292,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     const p = toStage(ev);
     cursor.x = p.x; cursor.y = p.y; cursor.inside = true;
   });
-  canvas.addEventListener("pointerleave", () => { cursor.inside = false; cursor.fresh = false; cursor.vx = 0; });
+  canvas.addEventListener("pointerleave", () => { cursor.inside = false; cursor.fresh = false; cursor.vx = 0; cursor.vy = 0; });
   canvas.addEventListener("pointerdown", (ev) => {
     if (!state.useClick || ev.button !== 0) return;
     const p = toStage(ev);
@@ -309,9 +313,11 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     // 描画のたびに 1 点だけ読み、前の点との差から横の速さを出す（実物で描画のたびに位置を読むのと同じ形）。
     if (cursor.inside && cursor.fresh) {
       const v = (cursor.x - cursor.px) / Math.max(dt, 1) * 1000;
+      const w = (cursor.y - cursor.py) / Math.max(dt, 1) * 1000;
       cursor.vx = cursor.vx * 0.6 + v * 0.4;
+      cursor.vy = cursor.vy * 0.6 + w * 0.4;
     } else {
-      cursor.vx = 0;
+      cursor.vx = 0; cursor.vy = 0;
     }
     cursor.px = cursor.x; cursor.py = cursor.y; cursor.fresh = cursor.inside;
     wheelOff *= Math.pow(0.5, dt / WHEEL_HALF_MS);
@@ -343,7 +349,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     }
     motes = [];
     for (let i = 0; i < 140; i++) {
-      motes.push({ x: rnd() * W, y: rnd() * H * 0.9, r: 1 + rnd() * 2.2, seed: rnd() * 6.28, k: 0.5 + rnd() });
+      motes.push({ x: rnd() * W, y: rnd() * H * 0.9, r: 1 + rnd() * 2.2, seed: rnd() * 6.28, k: 0.5 + rnd(), ox: 0, oy: 0 });
     }
     for (const rp of ripples) rp.t0 = -Infinity;
     wheelOff = wheelShown = 0;
@@ -387,17 +393,30 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
 
     // 漂う粒。基層の流れ＋打鍵の風（横）＋ホイールの縦のずれ（描く位置だけをずらし、粒そのものは動かさない）。
     const lift = state.useWheel ? wheelShown * H : 0;
+    const mdecay = Math.pow(0.5, dt / MOTE_HALF_MS);
+    const mR = MOTE_R * H, mMax = MOTE_MAX * H;
+    const pushMotes = state.useCursor && state.useCursorMotes && (cursor.vx !== 0 || cursor.vy !== 0);
     for (const m of motes) {
+      // カーソルの押し（周りの粒だけ・描く位置のずれ。実時間で戻る）。
+      m.ox *= mdecay; m.oy *= mdecay;
+      if (pushMotes) {
+        const d = Math.hypot(cursor.x - (m.x + m.ox), cursor.y - (m.y + m.oy + lift * m.k));
+        if (d < mR) {
+          const f = (1 - d / mR) * (1 - d / mR);
+          m.ox = Math.max(-mMax, Math.min(mMax, m.ox + cursor.vx * f * MOTE_PUSH * dt / 1000));
+          m.oy = Math.max(-mMax, Math.min(mMax, m.oy + cursor.vy * f * MOTE_PUSH * dt / 1000));
+        }
+      }
       const vx = (6 + 70 * wind * gustAt(m.x)) * m.k * S;
       const vy = baseLift(m.seed) * S;
       m.x += vx * mdt / 1000; m.y += vy * mdt / 1000;
       if (m.x > W + 10) m.x -= W + 20;
       if (m.y < -10) m.y += H * 0.9; else if (m.y > H * 0.9 + 10) m.y -= H * 0.9;
-      const y = m.y + lift * m.k;
+      const x = m.x + m.ox, y = m.y + m.oy + lift * m.k;
       const r = m.r * S;
-      ctx.beginPath(); ctx.arc(m.x, y, r * 1.9, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(x, y, r * 1.9, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(18,22,27,0.14)"; ctx.fill();
-      ctx.beginPath(); ctx.arc(m.x, y, r, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fill();
     }
 
@@ -472,12 +491,13 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   }
 
   // ---- 操作 ----
-  for (const id of ["useKeys", "useCursor", "useClick", "useWheel"]) {
+  for (const id of ["useKeys", "useCursor", "useCursorMotes", "useClick", "useWheel"]) {
     document.getElementById(id).addEventListener("change", (ev) => {
       state[id] = ev.target.checked;
       // 切ったら、その入力の跡を残さない（入れ直したときに前の跡が出てこない）。
       if (!state[id]) {
         if (id === "useCursor") for (const bl of blades) bl.push = 0;
+        if (id === "useCursor" || id === "useCursorMotes") for (const m of motes) { m.ox = 0; m.oy = 0; }
         if (id === "useClick") for (const rp of ripples) rp.t0 = -Infinity;
         if (id === "useWheel") wheelOff = wheelShown = 0;
       }
@@ -510,7 +530,9 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
       }
       return { blades: blades.length, motes: motes.length, rippleSlots: ripples.length,
         ripplesLive: ripples.filter((r) => now - r.t0 >= 0 && now - r.t0 < RIPPLE_MS).length,
-        maxPushNear, maxPushFar, wheelShown, presses: presses.length };
+        maxPushNear, maxPushFar, wheelShown, presses: presses.length,
+        maxMoteOff: motes.reduce((a, m) => Math.max(a, Math.hypot(m.ox, m.oy)), 0) / H,
+        movedMotes: motes.filter((m) => Math.hypot(m.ox, m.oy) > 0.002 * H).length };
     };
   }
 
