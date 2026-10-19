@@ -1,0 +1,509 @@
+<meta charset="utf-8">
+<title>手跡の背景 多入力</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* 配置: 上に仮のデスクトップ（舞台）、下に入力の入れ切りと見え方の操作、最後に制約と見る点。 */
+:root {
+  --bg: #eef0ec;
+  --surface: #f8f9f6;
+  --ink: #1d2420;
+  --muted: #5b655f;
+  --line: #cfd5cf;
+  --accent: #3f6b57;
+  --accent-ink: #ffffff;
+  --display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151a17; --surface: #1d2420; --ink: #e4e9e4; --muted: #9aa69f;
+    --line: #34403a; --accent: #8fc2a8; --accent-ink: #10201a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151a17; --surface: #1d2420; --ink: #e4e9e4; --muted: #9aa69f;
+  --line: #34403a; --accent: #8fc2a8; --accent-ink: #10201a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.7;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: grid; gap: 4px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 1.7rem; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 1.05rem; margin: 0 0 4px; }
+.lede { color: var(--muted); margin: 0; max-width: 65ch; }
+.stage-box { position: relative; width: 100%; aspect-ratio: 16 / 10; max-width: 100%; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: #222; touch-action: none; }
+#stage { width: 100%; height: 100%; display: block; cursor: default; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 24px; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 8px; align-content: start; }
+legend { font-size: 0.78rem; letter-spacing: 0.08em; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg label { cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: inline-block; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 0.9rem; }
+.seg input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; cursor: pointer; }
+.check input { accent-color: var(--accent); }
+.check small { color: var(--muted); }
+#pad {
+  border: 1px dashed var(--muted); border-radius: 6px; padding: 12px; font-size: 0.9rem; color: var(--muted);
+  background: var(--surface); cursor: text; user-select: none;
+}
+#pad:focus { outline: 2px solid var(--accent); outline-offset: 2px; color: var(--ink); }
+section.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px 32px; border-top: 1px solid var(--line); padding-top: 16px; }
+section.notes ul { margin: 0; padding-left: 1.2em; }
+section.notes li { margin: 2px 0; font-size: 0.92rem; }
+section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
+[hidden] { display: none !important; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>手跡の背景 多入力</h1>
+    <p class="lede">自然世界の背景（版 3）に、打鍵の他にカーソル・クリック・ホイールを足した見本です。入力ごとに別のものが動きます。舞台の上でマウスを動かす・押す・回すと試せます（ブラウザでは舞台の中の入力しか拾えません）。キーの種類も位置も記録せず、送信もしません。</p>
+  </header>
+
+  <div class="stage-box"><canvas id="stage" aria-label="仮のデスクトップの背景"></canvas></div>
+
+  <div class="controls">
+    <fieldset>
+      <legend>入力（入れる・切る）</legend>
+      <label class="check"><input type="checkbox" id="useKeys" checked> 打鍵 <small>風（草のなびき・粒の横の流れ）</small></label>
+      <label class="check"><input type="checkbox" id="useCursor" checked> カーソル <small>近くの草だけが、動いた向きへなびく</small></label>
+      <label class="check"><input type="checkbox" id="useClick" checked> クリック <small>その場に一回きりの波紋</small></label>
+      <label class="check"><input type="checkbox" id="useWheel" checked> ホイール <small>粒を縦に押す</small></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>打鍵</legend>
+      <div class="seg">
+        <label><input type="radio" name="pat" value="normal"><span>ふつう</span></label>
+        <label><input type="radio" name="pat" value="steady"><span>一定のリズム</span></label>
+        <label><input type="radio" name="pat" value="fast"><span>速打ち</span></label>
+        <label><input type="radio" name="pat" value="sparse"><span>ちょいちょい</span></label>
+        <label><input type="radio" name="pat" value="none" checked><span>止める</span></label>
+      </div>
+      <div id="pad" tabindex="0">ここを押してから打つと、その打鍵でも動きます（文字は出しません）</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>見え方の条件</legend>
+      <div class="seg">
+        <label><input type="radio" name="wall" value="light"><span>明るい壁紙</span></label>
+        <label><input type="radio" name="wall" value="dark"><span>暗い壁紙</span></label>
+        <label><input type="radio" name="wall" value="photo" checked><span>写真風</span></label>
+      </div>
+      <div class="seg">
+        <label><input type="radio" name="res" value="1440"><span>幅 1440</span></label>
+        <label><input type="radio" name="res" value="2560" checked><span>幅 2560</span></label>
+        <label><input type="radio" name="res" value="3840"><span>幅 3840</span></label>
+      </div>
+      <label class="check"><input type="checkbox" id="cover"> 作業の窓を重ねる</label>
+    </fieldset>
+  </div>
+
+  <section class="notes">
+    <div>
+      <h2>置いた制約</h2>
+      <ul>
+        <li>育たない・溜まらない。草・粒の数は最初から決まっていて、波紋も同時に 6 つまでの決まった枠を使い回す。</li>
+        <li>跡は数秒で消える。草のなびきは約 0.7 秒、粒の縦のずれは約 1 秒で半分に戻り、波紋は 1.6 秒で消える。カーソルの通った跡は描かない。</li>
+        <li>天気や季節にしない。色も向きも入力で変わらない。霧はどの入力にも依らない基層のまま。</li>
+        <li>数や評価を出さない。打った数・動かした量・押した回数はどこにも出さない。</li>
+      </ul>
+    </div>
+    <div>
+      <h2>見るところ</h2>
+      <ul>
+        <li>どの動きが自分のどの手の動きから来たか、見分けられるか。</li>
+        <li>入力を足すほど「自分の作業が一緒にいる」に寄るか、「別の何かがいる」や騒がしさに寄るか。入れ切りで比べる。</li>
+        <li>カーソルを止めたとき、草がすぐ静まるか（置いたままの位置で何かが続かないか）。</li>
+        <li>作業の窓を重ねたとき、窓の上で押した波紋が縁から見えることをどう感じるか。</li>
+      </ul>
+    </div>
+    <div>
+      <h2>写し方</h2>
+      <p>打鍵は版 4 と同じ（強さ 1）。カーソルは、描画のたびに位置を 1 点だけ読み、前の点との差から横の速さを出します。草の中ほどからの距離が画面の高さの 0.16 倍より近い草だけに、近さの 2 乗で重みを付けて、速さの向きへ押します。押しは約 0.7 秒で半分に減ります。クリックは押した点から輪を広げ、1.6 秒で消します。ホイールは 1 回ごとに粒全体を縦にずらし（下へ回すと上へ）、ずれは約 1 秒で半分に戻ります。どの値も描画の中で使うだけで、列にも溜めず、外へも出しません。推定（行き詰まりなど）は使いません。</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("stage");
+  const ctx = canvas.getContext("2d");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const state = { pat: "none", wall: "photo", res: 2560, cover: false, base: "noise",
+    useKeys: true, useCursor: true, useClick: true, useWheel: true };
+
+  // 仮想の画面。幅だけを選び、高さは 16:10 にそろえる。
+  let W = 0, H = 0, S = 1;
+  let wallCanvas = null;
+
+  function setSize() {
+    W = state.res; H = Math.round(W * 10 / 16);
+    canvas.width = W; canvas.height = H;
+    S = H / 900;
+    buildWall();
+    buildWorld();
+  }
+
+  function buildWall() {
+    wallCanvas = document.createElement("canvas");
+    wallCanvas.width = W; wallCanvas.height = H;
+    const w = wallCanvas.getContext("2d");
+    if (state.wall === "light") {
+      const g = w.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#f4f5f2"); g.addColorStop(1, "#e3e6e1");
+      w.fillStyle = g; w.fillRect(0, 0, W, H);
+    } else if (state.wall === "dark") {
+      const g = w.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, "#14181d"); g.addColorStop(1, "#202631");
+      w.fillStyle = g; w.fillRect(0, 0, W, H);
+    } else {
+      // 明暗の混じる中間調の壁紙（写真の代わり）。
+      const g = w.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#9fb4c4"); g.addColorStop(0.55, "#c9c2ad"); g.addColorStop(1, "#5d6b4f");
+      w.fillStyle = g; w.fillRect(0, 0, W, H);
+      let seed = 7;
+      const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      for (let i = 0; i < 90; i++) {
+        const x = rnd() * W, y = rnd() * H, r = (0.04 + rnd() * 0.16) * H;
+        const rg = w.createRadialGradient(x, y, 0, x, y, r);
+        const light = rnd() > 0.5;
+        rg.addColorStop(0, light ? "rgba(255,250,235,0.22)" : "rgba(30,38,30,0.20)");
+        rg.addColorStop(1, "rgba(0,0,0,0)");
+        w.fillStyle = rg; w.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+    }
+  }
+
+  // ---- 周期の無いノイズ（版 4 と同じ） ----
+  function hash2(i, j) {
+    let h = Math.imul(i | 0, 0x27d4eb2d) ^ Math.imul(((j | 0) + 0x3c6ef372) | 0, 0x165667b1);
+    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  function grad(i, j, x, y) {
+    const a = hash2(i, j) / 4294967296 * Math.PI * 2;
+    return Math.cos(a) * x + Math.sin(a) * y;
+  }
+  function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  function noise2(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+    const u = fade(fx), v = fade(fy);
+    const n00 = grad(ix, iy, fx, fy), n10 = grad(ix + 1, iy, fx - 1, fy);
+    const n01 = grad(ix, iy + 1, fx, fy - 1), n11 = grad(ix + 1, iy + 1, fx - 1, fy - 1);
+    const nx0 = n00 + (n10 - n00) * u, nx1 = n01 + (n11 - n01) * u;
+    return (nx0 + (nx1 - nx0) * v) * 1.41;
+  }
+  function fbm(x, y) { return noise2(x, y) * 0.68 + noise2(x * 2.07 + 17.3, y * 2.13 + 5.1) * 0.32; }
+
+  // ---- 打鍵の材料（時刻だけ・版 4 と同じ） ----
+  const presses = [];
+  function press(t) { presses.push(t); }
+
+  let burstUntil = 0, pauseUntil = 0, steadyNext = 0;
+  function synth(now, dt) {
+    if (state.pat === "steady") {
+      if (now >= steadyNext) {
+        press(now);
+        steadyNext = now + 200 * (1 + (Math.random() - 0.5) * 0.12);
+      }
+      return;
+    }
+    let rate = 0;
+    if (state.pat === "fast") rate = 8;
+    else if (state.pat === "sparse") rate = 0.65;
+    else if (state.pat === "normal") {
+      if (now > burstUntil && now > pauseUntil) {
+        if (Math.random() < 0.5) burstUntil = now + 3000 + Math.random() * 5000;
+        else pauseUntil = now + 1000 + Math.random() * 2500;
+      }
+      rate = now < burstUntil ? 4.5 : 0;
+    }
+    if (rate > 0 && Math.random() < rate * dt / 1000) press(now);
+  }
+
+  const WINDOW_MS = 30000, STOP_MS = 2000, TICK_MS = 1000, SPEED_PER_KEY = 0.05, MIN_SPEED = 0.002;
+  const IRREG_MS = 10000, IRREG_MIN_GAPS = 4;
+  let speed = 0, speedFrom = 0, speedTo = 0, phase = 0;
+  let irreg = 0, irregFrom = 0, irregTo = 0;
+  let tickAt = performance.now();
+
+  function irregularity(now) {
+    const gaps = [];
+    for (let i = 1; i < presses.length; i++) {
+      if (now - presses[i] > IRREG_MS) continue;
+      const g = presses[i] - presses[i - 1];
+      if (g < STOP_MS) gaps.push(g);
+    }
+    if (gaps.length < IRREG_MIN_GAPS) return null;
+    const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const sd = Math.sqrt(gaps.reduce((a, b) => a + (b - mean) * (b - mean), 0) / gaps.length);
+    return Math.max(0, Math.min(1, (sd / mean - 0.1) / 0.9));
+  }
+
+  function tick() {
+    const now = performance.now();
+    while (presses.length && now - presses[0] > WINDOW_MS) presses.shift();
+    const lastSec = presses.filter((t) => now - t <= TICK_MS).length;
+    speedFrom = speed; irregFrom = irreg;
+    const rate = Math.min(lastSec, 10) * SPEED_PER_KEY;
+    const next = lastSec > 0 ? 0.5 * speed + 0.5 * rate : speed * 0.6;
+    speedTo = next < MIN_SPEED ? 0 : next;
+    const ir = irregularity(now);
+    irregTo = ir === null ? irreg * 0.85 : 0.5 * irreg + 0.5 * ir;
+    if (irregTo < 0.002) irregTo = 0;
+    tickAt = now;
+  }
+
+  // ---- 打鍵以外の入力。どれも最後の 1 点と、数秒で 0 へ戻る値だけを持つ（列を持たない） ----
+  // カーソル: 前の点と今の点だけ。速さは舞台の座標で横向きのみ。
+  const cursor = { x: 0, y: 0, px: 0, py: 0, inside: false, fresh: false, vx: 0 };
+  const CURSOR_R = 0.16, CURSOR_HALF_MS = 700, CURSOR_PUSH = 6, CURSOR_MAX = 0.9;
+  // クリック: 決まった数の枠を使い回す。古いものから上書きする。
+  const RIPPLE_SLOTS = 6, RIPPLE_MS = 1600;
+  const ripples = Array.from({ length: RIPPLE_SLOTS }, () => ({ x: 0, y: 0, t0: -Infinity }));
+  let rippleNext = 0;
+  // ホイール: 粒全体の縦のずれ 1 つ。
+  const WHEEL_STEP = 0.05, WHEEL_MAX = 0.15, WHEEL_HALF_MS = 1000;
+  let wheelOff = 0, wheelShown = 0;
+
+  function toStage(ev) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H };
+  }
+  canvas.addEventListener("pointermove", (ev) => {
+    const p = toStage(ev);
+    cursor.x = p.x; cursor.y = p.y; cursor.inside = true;
+  });
+  canvas.addEventListener("pointerleave", () => { cursor.inside = false; cursor.fresh = false; cursor.vx = 0; });
+  canvas.addEventListener("pointerdown", (ev) => {
+    if (!state.useClick) return;
+    const p = toStage(ev);
+    const slot = ripples[rippleNext];
+    slot.x = p.x; slot.y = p.y; slot.t0 = performance.now();
+    rippleNext = (rippleNext + 1) % RIPPLE_SLOTS;
+  });
+  canvas.addEventListener("wheel", (ev) => {
+    if (!state.useWheel) return;
+    ev.preventDefault();
+    // 1 回ごとに向きだけを使い、大きさは 1 刻みにそろえる（トラックパッドの細かい刻みは小さく足す）。
+    const k = Math.max(-1, Math.min(1, ev.deltaY / 100));
+    wheelOff = Math.max(-WHEEL_MAX, Math.min(WHEEL_MAX, wheelOff - k * WHEEL_STEP));
+  }, { passive: false });
+
+  function updatePointer(dt) {
+    // 描画のたびに 1 点だけ読み、前の点との差から横の速さを出す（実物で描画のたびに位置を読むのと同じ形）。
+    if (cursor.inside && cursor.fresh) {
+      const v = (cursor.x - cursor.px) / Math.max(dt, 1) * 1000;
+      cursor.vx = cursor.vx * 0.6 + v * 0.4;
+    } else {
+      cursor.vx = 0;
+    }
+    cursor.px = cursor.x; cursor.py = cursor.y; cursor.fresh = cursor.inside;
+    wheelOff *= Math.pow(0.5, dt / WHEEL_HALF_MS);
+    wheelShown += (wheelOff - wheelShown) * (1 - Math.exp(-dt / 150));
+  }
+
+  // ---- 自然世界の要素（数は固定） ----
+  let blades = [], motes = [];
+  function buildWorld() {
+    let seed = 11;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    blades = [];
+    const rows = 5;
+    for (let r = 0; r < rows; r++) {
+      const depth = r / (rows - 1);
+      const y = H * (0.66 + depth * 0.32);
+      const n = 34 + r * 10;
+      for (let i = 0; i < n; i++) {
+        blades.push({
+          x: (i + rnd() * 0.9) / n * W,
+          y: y + (rnd() - 0.5) * H * 0.03,
+          h: H * (0.05 + rnd() * 0.05) * (0.55 + depth * 0.6),
+          w: 0.55 + depth * 0.75,
+          seed: rnd() * 6.28,
+          depth,
+          push: 0
+        });
+      }
+    }
+    motes = [];
+    for (let i = 0; i < 140; i++) {
+      motes.push({ x: rnd() * W, y: rnd() * H * 0.9, r: 1 + rnd() * 2.2, seed: rnd() * 6.28, k: 0.5 + rnd() });
+    }
+    for (const rp of ripples) rp.t0 = -Infinity;
+    wheelOff = wheelShown = 0;
+  }
+
+  function dualStroke(width, darkA, lightA) {
+    ctx.globalAlpha = darkA; ctx.strokeStyle = "#12161b"; ctx.lineWidth = width * 2.5; ctx.stroke();
+    ctx.globalAlpha = lightA; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = width; ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // 基層の漂い（版 4 と同じ）。drift は入力に依らない基層の時間。
+  let drift = 0;
+  function fogEdge(b, x, lower) {
+    const a = H * 0.055 * (1 + b * 0.2);
+    return lower
+      ? a * fbm(x / W * 1.3 + b * 3.1 + 40, drift * 0.09 + b * 23)
+      : a * fbm(x / W * 1.6 + b * 7.3, drift * 0.105 * (1 + b * 0.2) + b * 11);
+  }
+  function baseSway(seed) { return fbm(seed * 13.7, drift * 0.35) * 0.1; }
+  function baseLift(seed) { return fbm(seed * 9.1 + 300, drift * 0.25) * 6; }
+  function gustAt(x) { return Math.max(0, 1 + 0.9 * irreg * fbm(x / W * 2.2 + 500, drift * 1.1)); }
+
+  function drawNature(dt, now) {
+    const wind = state.useKeys ? Math.min(1, speed / 0.4) : 0;
+    drift += dt / 1000;
+
+    // 霧の帯。基層だけで動き、どの入力でも変わらない。
+    const step = Math.max(8, Math.round(10 * S));
+    for (let b = 0; b < 4; b++) {
+      const yc = H * (0.12 + b * 0.14);
+      ctx.beginPath();
+      for (let x = 0; x <= W + step; x += step) ctx.lineTo(x, yc + fogEdge(b, x, false));
+      for (let x = W + step; x >= 0; x -= step) ctx.lineTo(x, yc + H * 0.05 + fogEdge(b, x, true));
+      ctx.closePath();
+      ctx.fillStyle = b % 2 === 0 ? "rgba(255,255,255,0.12)" : "rgba(18,22,27,0.06)";
+      ctx.fill();
+    }
+
+    // 漂う粒。基層の流れ＋打鍵の風（横）＋ホイールの縦のずれ（描く位置だけをずらし、粒そのものは動かさない）。
+    const lift = state.useWheel ? wheelShown * H : 0;
+    for (const m of motes) {
+      const vx = (6 + 70 * wind * gustAt(m.x)) * m.k * S;
+      const vy = baseLift(m.seed) * S;
+      m.x += vx * dt / 1000; m.y += vy * dt / 1000;
+      if (m.x > W + 10) m.x -= W + 20;
+      if (m.y < -10) m.y += H * 0.9; else if (m.y > H * 0.9 + 10) m.y -= H * 0.9;
+      const y = m.y + lift * m.k;
+      const r = m.r * S;
+      ctx.beginPath(); ctx.arc(m.x, y, r * 1.9, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(18,22,27,0.14)"; ctx.fill();
+      ctx.beginPath(); ctx.arc(m.x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fill();
+    }
+
+    // 草の群れ。基層の小さな揺れ＋打鍵の風＋カーソルの押し（近くの草だけ・数秒で戻る）。
+    const decay = Math.pow(0.5, dt / CURSOR_HALF_MS);
+    const R = CURSOR_R * H;
+    const cv = state.useCursor ? Math.max(-1, Math.min(1, cursor.vx / (W * 0.4))) : 0;
+    for (const bl of blades) {
+      bl.push *= decay;
+      if (cv !== 0) {
+        const d = Math.hypot(cursor.x - bl.x, cursor.y - (bl.y - bl.h * 0.5));
+        if (d < R) {
+          const f = (1 - d / R) * (1 - d / R);
+          bl.push = Math.max(-CURSOR_MAX, Math.min(CURSOR_MAX, bl.push + cv * f * CURSOR_PUSH * dt / 1000));
+        }
+      }
+      const sway = baseSway(bl.seed);
+      const gust = wind * gustAt(bl.x) * (0.32 + 0.22 * Math.sin(bl.x / W * 9 - phase * 3 + bl.depth));
+      const bend = (sway + gust + (state.useCursor ? bl.push : 0)) * bl.h;
+      ctx.beginPath();
+      ctx.moveTo(bl.x, bl.y);
+      ctx.quadraticCurveTo(bl.x + bend * 0.25, bl.y - bl.h * 0.55, bl.x + bend, bl.y - bl.h + Math.abs(bend) * 0.25);
+      dualStroke(bl.w * S, 0.14, 0.45 + bl.depth * 0.2);
+    }
+  }
+
+  // 波紋。押した点から 2 重の輪が広がり、1.6 秒で消える。窓を重ねたときは窓の上に描かない（背景の層なので）。
+  function drawRipples(now) {
+    for (const rp of ripples) {
+      const t = (now - rp.t0) / RIPPLE_MS;
+      if (!(t >= 0 && t < 1)) continue;
+      const e = 1 - Math.pow(1 - t, 3);
+      const a = Math.pow(1 - t, 1.5);
+      for (const [k, lag] of [[1, 0], [0.62, 0.18]]) {
+        const tt = Math.max(0, e - lag);
+        if (tt <= 0) continue;
+        ctx.beginPath();
+        ctx.ellipse(rp.x, rp.y, (8 + 150 * tt) * S * k, (5 + 90 * tt) * S * k, 0, 0, Math.PI * 2);
+        dualStroke(1.3 * S, 0.18 * a, 0.7 * a);
+      }
+    }
+  }
+
+  function drawCover() {
+    if (!state.cover) return;
+    const x = W * 0.1, y = H * 0.08, w = W * 0.66, h = H * 0.78;
+    ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fillRect(x + 6 * S, y + 10 * S, w, h);
+    ctx.fillStyle = "#fbfbfa"; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "#e7e8e5"; ctx.fillRect(x, y, w, 34 * S);
+    ctx.fillStyle = "#d3d6d2";
+    for (let i = 0; i < 14; i++) ctx.fillRect(x + 48 * S, y + (80 + i * 34) * S, w * (0.55 + 0.3 * Math.sin(i * 2.1)) - 96 * S, 10 * S);
+  }
+
+  let last = null;
+  function frame(now) {
+    const dt = last === null ? 16 : Math.min(now - last, 100);
+    last = now;
+    synth(now, dt);
+    const k = Math.min(1, (now - tickAt) / TICK_MS);
+    const e = k * k * (3 - 2 * k);
+    speed = speedFrom + (speedTo - speedFrom) * e;
+    irreg = irregFrom + (irregTo - irregFrom) * e;
+    phase += speed * dt / 1000;
+    updatePointer(dt);
+
+    ctx.drawImage(wallCanvas, 0, 0);
+    drawNature(reduceMotion ? dt * 0.3 : dt, now);
+    drawRipples(now);
+    drawCover();
+    requestAnimationFrame(frame);
+  }
+
+  // ---- 操作 ----
+  for (const id of ["useKeys", "useCursor", "useClick", "useWheel"]) {
+    document.getElementById(id).addEventListener("change", (ev) => { state[id] = ev.target.checked; });
+  }
+  document.querySelectorAll('input[name="pat"]').forEach((el) => {
+    el.addEventListener("change", () => { state.pat = el.value; burstUntil = 0; pauseUntil = 0; steadyNext = 0; });
+  });
+  document.querySelectorAll('input[name="wall"]').forEach((el) => el.addEventListener("change", () => { state.wall = el.value; buildWall(); }));
+  document.querySelectorAll('input[name="res"]').forEach((el) => el.addEventListener("change", () => { state.res = Number(el.value); setSize(); }));
+  document.getElementById("cover").addEventListener("change", (ev) => { state.cover = ev.target.checked; });
+
+  // 手で打つ欄。時刻だけを取り、キーの種類は見ない。
+  const pad = document.getElementById("pad");
+  pad.addEventListener("keydown", (ev) => {
+    if (ev.repeat) return;
+    if (ev.key !== "Tab") ev.preventDefault();
+    if (state.useKeys) press(performance.now());
+  });
+
+  // 確かめ用。URL に ?probe を付けたときだけ、いまの状態の数を返す口を置く（溜めない・送らない）。
+  if (new URLSearchParams(location.search).has("probe")) {
+    window.__probe = () => {
+      const now = performance.now();
+      let maxPushNear = 0, maxPushFar = 0;
+      for (const bl of blades) {
+        const d = Math.hypot(cursor.x - bl.x, cursor.y - (bl.y - bl.h * 0.5));
+        if (d < CURSOR_R * H) maxPushNear = Math.max(maxPushNear, Math.abs(bl.push));
+        else maxPushFar = Math.max(maxPushFar, Math.abs(bl.push));
+      }
+      return { blades: blades.length, motes: motes.length, rippleSlots: ripples.length,
+        ripplesLive: ripples.filter((r) => now - r.t0 >= 0 && now - r.t0 < RIPPLE_MS).length,
+        maxPushNear, maxPushFar, wheelShown, presses: presses.length };
+    };
+  }
+
+  setSize();
+  setInterval(tick, TICK_MS);
+  requestAnimationFrame(frame);
+})();
+</script>
