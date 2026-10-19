@@ -46,7 +46,7 @@
    - `python3 make_dummy.py` が緑であること。
    - `python3 -I c_search.py selftest` と `python3 -I make_coverage_records.py selftest` が緑であること（確かめの検索・判断 40〜42）。
    - `uv run --with openpyxl python check_screening.py` が緑であること（選別の道具・判断 33）。
-   - `python3 check_validation_cases.py` が緑であること（反例集のキーと脚本の導出が一致する・判断 58）。
+   - `python3 check_validation_cases.py` が緑であること（反例集のキーと脚本の導出が一致する・判断 58）。共著者には反例集の `cases.md` だけを渡す（キーと所見は渡さない）。
    - TRACE の DB を作り直したら、『段1』に全文の列が無く、『段2・3』があること（`make_trace_db.py`）。判定が 1 件も入っていない今の DB を上書きしてよい。
 5. 添付 3（検索式・`query-strings.md`。第 16 節は確かめの検索）と GSRR-25 の **[at registration]** の中身を確かめる。選別の順の一覧に確かめの標本（群 `coverage_sample`・300 件）が入っていること。dryrun は 2026-10-18 の版（564 件）と比べる。
 6. `python3 hash_attachments.py` で `sha256.txt` を作り、次の箇所に SHA-256 を書く。
@@ -108,7 +108,7 @@
 1. 段 1 の束は上の「段 1」の 1〜6 と同じ（`next`・`prepare`・研究者が判定・`export-author` → コミット・push → `gate` → AI → `check-ai` → 目録をコミット）。7 の `differences --stage 1` は使わない（止まる）。
 2. 共著者の 2 割の冊が戻ったら: `import-coauthor --stage 1 --book sample --file <戻った冊>` → `coauthor/` をコミット・push。第一著者の判定が 2 割の記録すべてでコミット・push されていないと止まる。
 3. `coauthor-agreement` で 2 割の一致を出す（含める・除外の一致の割合。除外理由は数えない）。`coauthor/sample-agreement.csv` をコミットする。80% 以上なら残りは要らない。
-4. 第一著者の段 1 がすべて済んだら: `coauthor-ids --stage 1 --book net1` → 出た `coauthor/net1.ids` をコミット → `make_coauthor_db.py --stage 1 --book net1 --ids ../screening/coauthor/net1.ids --out <置き場所>`。80% に届かなかったときは、同じ命令が網ではなく段 1 の残りの全部を出す。
+4. 第一著者の段 1 がすべて済んだら: `coauthor-ids --stage 1 --book net1` → 出た `coauthor/net1.ids` をコミット → `make_coauthor_db.py --stage 1 --book net1 --ids ../screening/coauthor/net1.ids --out <置き場所>`。80% に届かなかったときは、同じ命令が網ではなく段 1 の残りの全部を出す。同じ命令が、段 1 の除外の監査も抜く（判断 59）: 第一著者だけで除いた記録（2 割にも網にも入らない除外）から 30 件（seed 20261024・少なければ全部）を `coauthor/audit.ids` に書く。80% に届かなかったときは、第一著者だけの除外が無いので空になる。`audit.ids` もコミットする。監査の記録は全文段に回る記録として扱われ、第一著者の段 2・3 の束にも、共著者の段 2・3 の冊にも、印なしで入る。確かめの標本の記録が当たったら、その全文を取り寄せてから冊を作る（`coauthor-ids --stage 2` が、全文の無い監査の記録を警告で出す）。
 5. 追加の冊が戻ったら `import-coauthor --stage 1 --book net1 --file <戻った冊>` → コミット・push。
 6. `export-final --stage 1 --batch bNN`（束ごと）。どちらかの人が含めれば全文段へ。2 人とも除いて除外理由が違う記録は、2 人で決めた理由を研究者が『最終の除外理由』に書く（命令が記録を名指しして止まる）。共著者の判定を待つ記録があると止まる。コミット・push。
 
@@ -116,7 +116,7 @@
 1. `next --stage 2`。第一著者か共著者が段 1 で含めた記録が順に 9 件たまれば切れる（段 1 の最終を待たない）。来る記録がもう無いとき、または 12 月 31 日の締めにだけ `--short`。
 2. 研究者: 『段2・3』で判定し、含める記録には中心も付ける → `export-author --stage 2 --batch bNN` → コミット・push。
 3. 共著者の段 2・3 の冊: `coauthor-ids --stage 2 --book h1` → `coauthor/h1.ids` をコミット → `make_coauthor_db.py --stage 2 --book h1 --ids ../screening/coauthor/h1.ids --out <置き場所>`。確かめの標本の記録も入る（判断 54）。
-4. 冊が戻ったら `import-coauthor --stage 2 --book h1 --file <戻った冊>` → コミット・push。冊のすべての記録で第一著者の段 2 の判定がコミット・push されていないと止まる。取り込みは、そのときの第一著者の束のコミットを `coauthor/books.csv` に記録する。取り込んだ後に第一著者の判定を書き出し直す・手で直してコミットすると、`export-final` と `release` が止まる（段 1 も同じ）。
+4. 冊が戻ったら `import-coauthor --stage 2 --book h1 --file <戻った冊>` → コミット・push。冊のすべての記録（監査の記録も）で第一著者の段 2 の判定がコミット・push されていないと止まる。取り込みは、そのときの第一著者の束のコミットを `coauthor/books.csv` に記録する。取り込んだ後に第一著者の判定を書き出し直す・手で直してコミットすると、`export-final` と `release` が止まる（段 1 も同じ）。
 5. `differences --stage 2 --batch bNN` が、2 人で決める記録（判定・除外理由が違う、または 2 人とも理由のない保留）を 2 人の値と一緒に出す。2 人で全文を見て決め、研究者が『最終』を記入する（AI の答えは使わない）。E5 で除くなら『同じ標本の相手（E5）』も書く。
 6. `export-final --stage 2 --batch bNN` → コミット・push。
 7. `differences --stage 3 --batch bNN` → 2 人の中心が違う・どちらかが境界・どちらかが中心を付けていない（含めなかった）記録を、2 人で決めて『最終の中心』に書く。
@@ -124,7 +124,7 @@
 
 保留の記録に後で全文が見つかったら（判断 55）: `next --stage 2 --revisit ID` で束を切り、研究者は『最終…』の欄を空にしてから判定し、`export-author` → コミット・push。続けて `coauthor-ids --stage 2 --book h2` が、その回の共著者の判定がまだ無い記録を出すので、冊を作って共著者に渡す。前の回の共著者の判定は数えない（新しい冊が戻るまで `export-final` は止まる）。
 
-選別の後（人 2 人の形）: `screening-csv` が 4 本を書く。`screening-final.csv`（全記録の最終の値・1 人で決まった記録も入る）は、確かめの検査（`--coverage-sample`）が `screening.csv` の隣から自動で読む（両方の形で同じ）。残りの 3 本:`screening.csv`（段 1 は 2 割の記録だけ、段 2・3 は 2 人が判定した記録）を `c_synthesis.py --screening` に渡す。`screening-stage1-extra.csv`（網と残り。無作為の標本ではないので一致は別に読む）と `screening-net.csv`（網が何件を回し、共著者が何件を含めたか）は数を報告する。前半・後半の 2 本は作らない（AI の答えを読みながら進む偏りは、この形には無い）。`screening-csv` は、片方の人だけが中心を付けた（もう片方が全文段で含めなかった）記録の数も出す。この記録の中心は 2 人の合意で決まる。`release` は判定に共著者の列を足し、`author2-workbooks.csv`（冊ごとの作った時刻・取り込んだ時刻・戻った冊の SHA-256）も書く。
+選別の後（人 2 人の形）: `screening-csv` が 5 本を書く。監査を抜いていない、または抜いた記録に全文段の最終が無いと止まる（`release` も）。`screening-final.csv`（全記録の最終の値・1 人で決まった記録も入る）は、確かめの検査（`--coverage-sample`）が `screening.csv` の隣から自動で読む（両方の形で同じ）。残りの 4 本:`screening.csv`（段 1 は 2 割の記録だけ、段 2・3 は 2 人が判定した記録。監査の記録は入れない）を `c_synthesis.py --screening` に渡す。`screening-stage1-extra.csv`（網と残り。無作為の標本ではないので一致は別に読む）と `screening-net.csv`（網が何件を回し、共著者が何件を含めたか）は数を報告する。`screening-audit.csv`（監査の記録ごとに、段 1 の最終と、全文段の 2 人の判定と最終）は、本体の一致とは分けて報告する（選ばれた記録の集まりなので）。監査で 2 人が含めた記録は、元の集合に入る（追加候補なら本体の集合、確かめの標本なら確かめの層）。前半・後半の 2 本は作らない（AI の答えを読みながら進む偏りは、この形には無い）。`screening-csv` は、片方の人だけが中心を付けた（もう片方が全文段で含めなかった）記録の数も出す。この記録の中心は 2 人の合意で決まる。`release` は判定に共著者の列を足し、`author2-workbooks.csv`（冊ごとの作った時刻・取り込んだ時刻・戻った冊の SHA-256）も書く。
 
 ### 選別の後（今の形）
 
