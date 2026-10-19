@@ -1,0 +1,72 @@
+{
+ "chunks_full": 57124,
+ "chunks_windows": 70788,
+ "fingerprint": {
+  "cap_ms": 1023,
+  "checkpoint": "d09f06db0f3dbaebf28a6a80e4d4651629dbf8ca3d20bc6d5656ee5d13f7144f",
+  "chunk_segments": 20,
+  "code_sha256": {
+   "a4_keytar.py": "b02f4842911266a9cb9383debe7d7ff0758292112ca988d9d5e2ffc507604d26",
+   "align.py": "6c03dc66afa563903c2d65e90e7247c1faafeb32fe614209c31353f066e07543",
+   "align_ext.py": "79579f266ab972277322ae7b3a2c0387c87eb783c3ebbd8638f49b55768c2a8d",
+   "check6_keytar.py": "f39755e3e86466134f2ace7cc781be20e84dccbdf0ae37e54eecc1cbb7370c83",
+   "corpus.py": "12feb26dbdd0e5b4a5ecc8af6121a68e8baa641f02873d01142ad82ae09ece99",
+   "load_klicke.py": "aa9c83be6f09e40a4b847716c5ad3af720caa9dee7b9fb051999bf6b7acf1c04",
+   "matching.py": "54c12923fc4404792ea62575d9a8f66593b5ef513efd520564837a977920fe7b",
+   "seeds.py": "02f459609f57256302ea772754cd2bee27107c4171a0491caea90dc46e272146",
+   "synthetic_logs.py": "da0e77941da616efe5737e0a4b39aa7b7dfa9684313ed6996bf54e3fd6d3e2a4"
+  },
+  "dry": false,
+  "generation": {
+   "diversity_penalty": 0.8,
+   "do_sample": false,
+   "max_new_tokens": 50,
+   "no_repeat_ngram_size": 2,
+   "num_beam_groups": 16,
+   "num_beams": 64,
+   "num_return_sequences": 50,
+   "repetition_penalty": 1.0,
+   "temperature": 1.0,
+   "top_k": 50,
+   "top_p": 1.0
+  },
+  "ks": [
+   5,
+   10,
+   20,
+   50
+  ],
+  "seed_sha256": "d766284cd36eea562c99c5268cedd99a4bd2ae5ed9d75cb1bad330633cbbe9ff",
+  "variants": [
+   "t0",
+   "t10",
+   "t100",
+   "t1000"
+  ]
+ },
+ "generated": 125728,
+ "input": {
+  "cap_ms": 1023,
+  "chunk_segments": 20,
+  "compared": "first returned sequence",
+  "earlier_turns": 0,
+  "ks": [
+   5,
+   10,
+   20,
+   50
+  ],
+  "prompt": "Translate the Time intervals to Keystrokes.\nTime intervals: ",
+  "variants": [
+   "t0",
+   "t10",
+   "t100",
+   "t1000"
+  ]
+ },
+ "reused": 2184,
+ "seconds": 501124.3,
+ "seconds_per_writer": 1002.2,
+ "writers_total": 500,
+ "writers_with_file": 500
+}
