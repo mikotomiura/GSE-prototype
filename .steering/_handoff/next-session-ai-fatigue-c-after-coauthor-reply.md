@@ -29,10 +29,14 @@
   - 符号化の見本 `TRACE_Co-Author_coding-sheet/TRACE_符号化_author2_見本.xlsx`（架空の EX001・書き出せない）。
 - 本番の冊で、まだ作れないもの: 段 2・3 の冊（第一著者の段 1 と網が済み、`c_screening.py coauthor-ids --stage 2` が ID を出してから）、符号化の本番の冊（本体の集合を閉じ、較正の直しを登録してから `c_coding_book.py make --coder author2 --ids`）。
 - 登録の下書きは 0.15 で、まだ前の形（第一著者と独立の AI）。草稿と案内だけが人 2 人の形に先行している（草稿の冒頭の状態の注記にそう書いてある）。
-- 道具: 選別は `c_screening.py`（`mode --set two-human | ai-screener`）、共著者の選別の冊は `make_coauthor_db.py`、符号化の冊と書き出しは `c_coding_book.py`。検査は `make_dummy.py`・`check_screening.py`・`check_validation_cases.py`・`check_coding_book.py [--mutate]`（openpyxl は `uv run --with openpyxl`）。
+- 道具: 選別は `c_screening.py`（`mode --set two-human | ai-screener`）、共著者の選別の冊は `make_coauthor_db.py`、符号化の冊と書き出しは `c_coding_book.py`。検査は `make_dummy.py`・`check_synthesis_mutants.py`（約 10 分）・`check_screening.py`・`check_validation_cases.py`・`check_coding_book.py [--mutate]`（`--mutate` は約 15 分。openpyxl は `uv run --with openpyxl`）。
 - 研究者に残っていること（返事と並行）: 反例集のキー（`registration-attachments/validation-cases/key.csv`・`key-items.csv`）の期待するコードをすべて確かめる（`findings.md` に「not yet done」とある。登録の前まで。確かめの表は `~/Documents/TRACE/key-check/TRACE_反例集キーの確かめ.xlsx`・判断 62。研究者の依頼で Drive の `AI-fatigue/TRACE_第一著者のみ/` にも写した（TRACE フォルダの外・共有は研究者だけ。この写しを共著者に共有しない）。研究者が Drive の写しに記入したら、そちらを読む。違う・迷うの行が来たら key.csv・key-items.csv・findings.md を直し `check_validation_cases.py` を走らせる）。Drive の共有（2026-10-19 に研究者から聞き、メタデータで確かめた）: TRACE の中で共著者に見えるのは `fulltext/` だけで、「リンクを知っている全員が閲覧可」になっている。TRACE フォルダと `TRACE_Co-Author/` は研究者だけ。`TRACE_Co-Author/` の草稿・案内・段 1 の冊・符号化の見本を共著者がどう受け取るか（共有か直接送るか）は研究者が決める。共有の設定はメインからは変えない。
 
 ## 2. 次にやること（この順）
+
+### 2.0 先に済んでいるかを見る
+
+- 反例集のキーの確かめ（`next-session-ai-fatigue-c-key-check.md`）が済んでいるか。`registration-attachments/validation-cases/findings.md` の冒頭が「not yet done」のままなら、研究者に聞く（返事の後の書き換えと並べてよいが、登録の前には要る）。
 
 ### 2.1 返事を読んで、形を決める
 
@@ -61,7 +65,7 @@ C の場合: 草稿・README・`assets/flow.gif`（`assets/make_flow.py`）・�
 
 ### 2.3 区切りで
 
-- 検査を全部走らせる（上の 4 本・`make_coding_form.py` の作り直しで差分なし・草稿の組版でエラー 0）。
+- 検査を全部走らせる（§1 の検査の全部・`make_coding_form.py` の作り直しで差分なし・草稿の組版でエラー 0）。⚠️ `check_coding_book.py --mutate` は判断 63 の集計の脚本の直しの後に回し直していない（冊の道具は変えていないが未確認）。ここで必ず回す。
 - /cross-review（Claude の code-reviewer と Codex を直接並べる。TRACE はジョブの一時の場所に `git clone` した写しに GSE の `scripts/secrets-filter.sh` と `scripts/run-codex-review.sh` を写し、`.codex` を GSE のものにつなぐ・判断 56・61 のやり方）。
 - 判断を `decisions.md` に、タスクリストを `tasklist.md` に。TRACE は main に push、GSE はブランチに push（PR は研究者が確かめてから）。
 
