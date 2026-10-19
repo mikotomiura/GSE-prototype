@@ -79,7 +79,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
       <legend>入力（入れる・切る）</legend>
       <label class="check"><input type="checkbox" id="useKeys" checked> 打鍵 <small>風（草のなびき・粒の横の流れ）</small></label>
       <label class="check"><input type="checkbox" id="useCursor" checked> カーソル <small>近くの草だけが、動いた向きへなびく</small></label>
-      <label class="check sub"><input type="checkbox" id="useCursorMotes" checked> カーソルで近くの粒も押す <small>切ると草だけ</small></label>
+      <label class="check sub"><input type="checkbox" id="useCursorMotes" checked> 動かす間、近くの粒がカーソルへ寄る <small>切ると草だけ</small></label>
       <label class="check"><input type="checkbox" id="useClick" checked> クリック <small>その場に一回きりの波紋</small></label>
       <label class="check"><input type="checkbox" id="useWheel" checked> ホイール <small>粒を縦に押す</small></label>
     </fieldset>
@@ -117,7 +117,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
       <h2>置いた制約</h2>
       <ul>
         <li>育たない・溜まらない。草・粒の数は最初から決まっていて、波紋も同時に 6 つまでの決まった枠を使い回す。</li>
-        <li>跡は数秒で消える。草のなびきは約 0.7 秒、カーソルで押した粒のずれは約 0.9 秒、ホイールの粒の縦のずれは約 1 秒で半分に戻り、波紋は 1.6 秒で消える。カーソルの通った跡は描かない。</li>
+        <li>跡は数秒で消える。草のなびきは約 0.7 秒、カーソルへ寄った粒は止めると約 0.9 秒、ホイールの粒の縦のずれは約 1 秒で半分に戻り、波紋は 1.6 秒で消える。カーソルの通った跡は描かない。</li>
         <li>天気や季節にしない。色と風の向きは入力で変わらない。霧はどの入力にも依らない基層のまま。</li>
         <li>数や評価を出さない。打った数・動かした量・押した回数はどこにも出さない。</li>
       </ul>
@@ -125,7 +125,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     <div>
       <h2>見るところ</h2>
       <ul>
-        <li>どの動きが自分のどの手の動きから来たか、見分けられるか。粒は打鍵（横に全体）・ホイール（縦に全体）・カーソル（周りだけ）の 3 つを受けるので、範囲で見分けられるか。</li>
+        <li>どの動きが自分のどの手の動きから来たか、見分けられるか。粒は打鍵（横に全体）・ホイール（縦に全体）・カーソル（周りの粒が寄る）の 3 つを受けるので、見分けられるか。</li>
         <li>入力を足すほど「自分の作業が一緒にいる」に寄るか、「別の何かがいる」や騒がしさに寄るか。入れ切りで比べる。</li>
         <li>カーソルを止めたとき、草がすぐ静まるか（置いたままの位置で何かが続かないか）。</li>
         <li>作業の窓を重ねたとき、窓の上で押した波紋が縁から見えることをどう感じるか。</li>
@@ -133,7 +133,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     </div>
     <div>
       <h2>写し方</h2>
-      <p>打鍵は版 4 と同じ（強さ 1）。カーソルは、描画のたびに位置を 1 点だけ読み、前の点との差から横の速さを出します。草の中ほどからの距離が画面の高さの 0.16 倍より近い草だけに、近さの 2 乗で重みを付けて、速さの向きへ押します。押しは約 0.7 秒で半分に減ります。粒も、カーソルから画面の高さの 0.14 倍より近いものだけを、動いた向き（縦横）へ描く位置だけずらし、ずれは約 0.9 秒で半分に戻ります。クリックは押した点から輪を広げ、1.6 秒で消します。ホイールは 1 回ごとに粒全体を縦にずらし（下へ回すと上へ）、ずれは約 1 秒で半分に戻ります。打鍵以外の値は描画の中で使うだけで、列にも溜めず、外へも出しません（打鍵は版 4 と同じく、直近 30 秒の打鍵の時刻だけを持ちます）。入力を切ると、その入力の跡はすぐ消えます。舞台の上ではホイールでページはスクロールしません。クリックは左ボタンだけを使います。「動きを減らす」設定では、漂いと粒の流れだけを遅くし、跡の消え方は変えません。推定（行き詰まりなど）は使いません。</p>
+      <p>打鍵は版 4 と同じ（強さ 1）。カーソルは、描画のたびに位置を 1 点だけ読み、前の点との差から横の速さを出します。草の中ほどからの距離が画面の高さの 0.16 倍より近い草だけに、近さの 2 乗で重みを付けて、速さの向きへ押します。押しは約 0.7 秒で半分に減ります。粒は、カーソルを動かしている間だけ、画面の高さの 0.18 倍より近いものがカーソルへ寄ります（寄る速さはカーソルの速さに比例）。描く位置だけをずらし、止めると約 0.9 秒で半分に戻ります。止めたカーソルの周りに粒は溜まりません。クリックは押した点から輪を広げ、1.6 秒で消します。ホイールは 1 回ごとに粒全体を縦にずらし（下へ回すと上へ）、ずれは約 1 秒で半分に戻ります。打鍵以外の値は描画の中で使うだけで、列にも溜めず、外へも出しません（打鍵は版 4 と同じく、直近 30 秒の打鍵の時刻だけを持ちます）。入力を切ると、その入力の跡はすぐ消えます。舞台の上ではホイールでページはスクロールしません。クリックは左ボタンだけを使います。「動きを減らす」設定では、漂いと粒の流れだけを遅くし、跡の消え方は変えません。推定（行き詰まりなど）は使いません。</p>
     </div>
   </section>
 </div>
@@ -274,8 +274,8 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   // カーソル: 前の点と今の点だけ。速さは舞台の座標で横向きのみ。
   const cursor = { x: 0, y: 0, px: 0, py: 0, inside: false, fresh: false, vx: 0, vy: 0 };
   const CURSOR_R = 0.16, CURSOR_HALF_MS = 700, CURSOR_PUSH = 6, CURSOR_MAX = 0.9;
-  // 粒: カーソルの周りだけ、描く位置をずらす。ずれは画面の高さに対する割合。
-  const MOTE_R = 0.14, MOTE_HALF_MS = 900, MOTE_PUSH = 0.25, MOTE_MAX = 0.06;
+  // 粒: カーソルを動かしている間だけ、周りの粒の描く位置をカーソルへ寄せる。ずれの上限は画面の高さに対する割合。
+  const MOTE_R = 0.18, MOTE_HALF_MS = 900, MOTE_PULL = 0.0006, MOTE_MAX = 0.08;
   // クリック: 決まった数の枠を使い回す。古いものから上書きする。
   const RIPPLE_SLOTS = 6, RIPPLE_MS = 1600;
   const ripples = Array.from({ length: RIPPLE_SLOTS }, () => ({ x: 0, y: 0, t0: -Infinity }));
@@ -397,14 +397,18 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     const mR = MOTE_R * H, mMax = MOTE_MAX * H;
     const pushMotes = state.useCursor && state.useCursorMotes && (cursor.vx !== 0 || cursor.vy !== 0);
     for (const m of motes) {
-      // カーソルの押し（周りの粒だけ・描く位置のずれ。実時間で戻る）。
+      // カーソルへ寄る（動かしている間だけ・周りの粒だけ・描く位置のずれ。止めると実時間で戻る）。
       m.ox *= mdecay; m.oy *= mdecay;
       if (pushMotes) {
-        const d = Math.hypot(cursor.x - (m.x + m.ox), cursor.y - (m.y + m.oy + lift * m.k));
-        if (d < mR) {
-          const f = (1 - d / mR) * (1 - d / mR);
-          m.ox = Math.max(-mMax, Math.min(mMax, m.ox + cursor.vx * f * MOTE_PUSH * dt / 1000));
-          m.oy = Math.max(-mMax, Math.min(mMax, m.oy + cursor.vy * f * MOTE_PUSH * dt / 1000));
+        const dx = cursor.x - (m.x + m.ox), dy = cursor.y - (m.y + m.oy + lift * m.k);
+        const d = Math.hypot(dx, dy);
+        if (d < mR && d > 1) {
+          const f = 1 - d / mR;
+          // 寄る量はカーソルの速さに比例。1 フレームで残りの距離の 2 割を超えず、カーソルを追い越さない。
+          const step = Math.min(d * 0.2, Math.hypot(cursor.vx, cursor.vy) * f * MOTE_PULL * dt);
+          m.ox += dx / d * step; m.oy += dy / d * step;
+          const o = Math.hypot(m.ox, m.oy);
+          if (o > mMax) { m.ox *= mMax / o; m.oy *= mMax / o; }
         }
       }
       const vx = (6 + 70 * wind * gustAt(m.x)) * m.k * S;
@@ -532,7 +536,12 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
         ripplesLive: ripples.filter((r) => now - r.t0 >= 0 && now - r.t0 < RIPPLE_MS).length,
         maxPushNear, maxPushFar, wheelShown, presses: presses.length,
         maxMoteOff: motes.reduce((a, m) => Math.max(a, Math.hypot(m.ox, m.oy)), 0) / H,
-        movedMotes: motes.filter((m) => Math.hypot(m.ox, m.oy) > 0.002 * H).length };
+        movedMotes: motes.filter((m) => Math.hypot(m.ox, m.oy) > 0.002 * H).length,
+        // 位置そのもの（ずれ無し）がカーソルから MOTE_R 内の粒について、ずれ無しとずれ込みの距離の平均（画面の高さ比）。
+        near: (() => { let n = 0, d0 = 0, d1 = 0;
+          for (const m of motes) { const a = Math.hypot(cursor.x - m.x, cursor.y - m.y);
+            if (a < MOTE_R * H) { n++; d0 += a; d1 += Math.hypot(cursor.x - m.x - m.ox, cursor.y - m.y - m.oy); } }
+          return n ? { n, plain: d0 / n / H, drawn: d1 / n / H } : { n }; })() };
     };
   }
 
