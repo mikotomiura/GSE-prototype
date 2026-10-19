@@ -12,18 +12,18 @@
 
 ## 始め方
 
-研究の物は `~/TRACE`（https://github.com/mikotomiura/TRACE・非公開・main は 57bf451）。検討の記録は worktree
+研究の物は `~/TRACE`（https://github.com/mikotomiura/TRACE・非公開・main は 3105112）。検討の記録は worktree
 `/Users/johnd/GSE-prototype-af-c`（ブランチ `docs/ai-fatigue-c-outline`）の `.steering/20261017-ai-fatigue-c-outline/`
-（判断は `decisions.md` の 62 まで）。
+（判断は `decisions.md` の 63 まで）。
 
 ```
 .steering/_handoff/next-session-ai-fatigue-c-after-coauthor-reply.md を読んで、§2 から進めて。共著者の返事はこれ: <返事を貼る>
 ```
 
-## 1. いまの状態（判断 60・61 の後）
+## 1. いまの状態（判断 60〜63 の後）
 
 - 共著者に送った物（研究者が Discord で送る。文は `coauthor-discord.md`、長い版は `coauthor-consult.md`）。Drive の `TRACE/TRACE_Co-Author/` に:
-  - 草稿 `TRACE_草稿_2026-10-18.docx`・`.pdf`（TRACE の 57bf451 の tex から作った版。TRACE 直下にも同じ docx）。人 2 人の形・段 1 の除外の監査・反例集まで入っている。
+  - 草稿 `TRACE_草稿_2026-10-18.docx`・`.pdf`（TRACE の 3105112 の tex から作った版。TRACE 直下にも同じ docx）。人 2 人の形・段 1 の除外の監査・反例集まで入っている。
   - 案内 `TRACE_共著者への案内_2026-10-18.docx`（手元の `coauthor-guide.md` から `scripts/make_guide_docx.py` で作る）。
   - 段 1 の本番の冊 `TRACE_Co-Author_judge-sheet/TRACE_co-author_stage1.xlsx`（113 件・`--hold`・判定 0 件）。
   - 符号化の見本 `TRACE_Co-Author_coding-sheet/TRACE_符号化_author2_見本.xlsx`（架空の EX001・書き出せない）。
@@ -44,7 +44,7 @@
 
 ### 2.2 登録の下書きを書き換える（A の場合。B は該当する所だけ）
 
-`~/TRACE/registration-en.md`（0.15 → 0.16）。書き換えの前に、草稿（`manuscript/draft/main.tex`）の選別・符号化の節と、道具の実際の動き（`c_screening.py` の `coauthor_ids`・`draw_audit`・`audit_rows`・`screening_csv`、`c_coding_book.py`）を読み、登録をそれに合わせる。
+`~/TRACE/registration-en.md`（0.15 → 0.16）。書き換えの前に、草稿（`manuscript/draft/main.tex`）の選別・符号化の節と、道具の実際の動き（`c_screening.py` の `cmd_coauthor_ids`・`draw_audit`・`audit_rows`・`screening_csv_two`、`c_coding_book.py`）を読み、登録をそれに合わせる。
 
 - 共著者の名前と役割: GSRR-2・表 1（役割の表）・表 2。
 - 選別（判断 34・44・45・54〜59）: GSRR-33・34・36〜41。判定者は人 2 人、AI は段 1 の網だけ（判定者にしない）。段 1 は共著者が 264 件と 300 件のそれぞれから無作為の 2 割（seed 20261018・20261023、合わせて 113 件）、80% に届かなければ残りも。どちらかが回せば全文の段へ。全文と中心は 2 人とも全部、一致すればその値、食い違えば 2 人で全文を見て合意（AI の答えは使わない）。網は、第一著者が除き AI が回すべきと答えた記録と、AI の出力が 2 回とも落ちた束の除外（判断 57）。保留の記録に全文が見つかれば共著者も判定し直す（判断 55）。片方の人だけが中心を付けた記録は合意で決め、件数を報告する（判断 56）。
@@ -52,9 +52,10 @@
 - 公開物（GSRR-41）: author2 の列・`author2-workbooks.csv`・`screening-final.csv`・`screening-audit.csv`。
 - 符号化（判断 45）: GSRR-44 の 6（今は「2 割以上か全部」）を全部に。GSRR-47・48・49 の一致と調整を、共著者が本体の集合を全部 1 回符号化する形に。共著者の書き出しの名前は `<file>_author2.csv`（列の辞書と `c_coding_book.py`）。反例集は共著者が本番の前に答えを見ずに解く（`cases.md` のとおり）。
 - 感度分析（GSRR-62）: 分析 5（共著者の選別の古い形）を外すか直す。外枠 `manuscript/outline.md` の分析 5 と「12 月 31 日」の箇所も合わせる（外枠の版を上げる）。
+- GSRR-64 の止まりの一覧（判断 63 で表どうしの検査を書き足した）と、添付 2 の目録（`check_synthesis_mutants.py` を足した）が、書き換えた後の脚本と合っているかを見る。
 - GSRR-9 の終わりの日（2027-03-31 は間に合わない・判断 46）を、研究者と決めた現実の日に。
 - GSRR-65 の限界に、草稿の限界の段落との違いが無いか見る（草稿は 0.15 の GSRR-65 から閉じた因果の語の一覧と操作の文を写した）。
-- 書き換えたら、草稿の冒頭の状態の注記から「登録の下書きより先行」の断りを外し、版の番号を新しい登録の下書き・外枠に合わせる。Drive の草稿（共著者フォルダの docx と PDF、TRACE 直下の docx）を置き換える（置き換えの前に、57bf451 から作り直した版と Drive の版を比べ、研究者の手直しが無いことを確かめる。PDF は文字、docx は作成日時以外）。案内の冒頭の状態の文（草稿と登録の下書きの関係）も直し、Drive の案内を置き換える（前回の docx とバイトで同じか確かめてから）。
+- 書き換えたら、草稿の冒頭の状態の注記から「登録の下書きより先行」の断りを外し、版の番号を新しい登録の下書き・外枠に合わせる。Drive の草稿（共著者フォルダの docx と PDF、TRACE 直下の docx）を置き換える（置き換えの前に、3105112 から作り直した版と Drive の版を比べ、研究者の手直しが無いことを確かめる。PDF は文字、docx は作成日時以外）。案内の冒頭の状態の文（草稿と登録の下書きの関係）も直し、Drive の案内を置き換える（前回の docx とバイトで同じか確かめてから）。
 
 C の場合: 草稿・README・`assets/flow.gif`（`assets/make_flow.py`）・案内を今の登録の形（第一著者と独立の AI）に戻す。道具は `mode --set ai-screener` でそのまま使える。監査と符号化の冊は人 2 人の形の物なので、残すか外すかを研究者に聞く。
 
