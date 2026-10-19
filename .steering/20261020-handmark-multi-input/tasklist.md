@@ -19,7 +19,9 @@
 - [x] カーソル・クリック・ホイールが別の要素を動かし、跡が数秒で消えることを画面で確かめる
 - [x] 数が増えないこと・数値が出ないことを確かめる
 - [x] 公開する（https://claude.ai/artifact/4FCokjbqZd13PXgVw2MkSg）
-- [ ] 研究者が画面を見て、写し方・強さを直すか決める
+- [x] 研究者の問いで粒の写し方を足し、寄る形に改めた（判断 10・11）
+- [ ] 研究者が画面を見て、写し方・強さを直すか決める（次の段）
+- [x] /cross-review 2 巡目（判断 10・11 の差分）と直し（Version 5）
 
 ## レビュー
 - [x] /cross-review（1 巡目: code-reviewer と Codex を別々に起動。両者一致 2 件・片方だけ 18 件）
@@ -27,5 +29,6 @@
 - [x] 直した見本を画面で確かめ直し、出し直す（Version 2）
 
 ## 完了処理
-- [ ] design.md の最終化
-- [ ] コミット・push（PR は研究者に確かめてから）
+- [x] design.md の最終化
+- [x] コミット・push（PR は A4 の処理が終わるまで出さない）
+- [x] 次のセッションへの引き継ぎ（`.steering/_handoff/next-session-handmark-input-adr.md`・ADR の起票）

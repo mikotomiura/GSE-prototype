@@ -133,7 +133,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
     </div>
     <div>
       <h2>写し方</h2>
-      <p>打鍵は版 4 と同じ（強さ 1）。カーソルは、描画のたびに位置を 1 点だけ読み、前の点との差から横の速さを出します。草の中ほどからの距離が画面の高さの 0.16 倍より近い草だけに、近さの 2 乗で重みを付けて、速さの向きへ押します。押しは約 0.7 秒で半分に減ります。粒は、カーソルを動かしている間だけ、画面の高さの 0.18 倍より近いものがカーソルへ寄ります（寄る速さはカーソルの速さに比例）。描く位置だけをずらし、止めると約 0.9 秒で半分に戻ります。止めたカーソルの周りに粒は溜まりません。クリックは押した点から輪を広げ、1.6 秒で消します。ホイールは 1 回ごとに粒全体を縦にずらし（下へ回すと上へ）、ずれは約 1 秒で半分に戻ります。打鍵以外の値は描画の中で使うだけで、列にも溜めず、外へも出しません（打鍵は版 4 と同じく、直近 30 秒の打鍵の時刻だけを持ちます）。入力を切ると、その入力の跡はすぐ消えます。舞台の上ではホイールでページはスクロールしません。クリックは左ボタンだけを使います。「動きを減らす」設定では、漂いと粒の流れだけを遅くし、跡の消え方は変えません。推定（行き詰まりなど）は使いません。</p>
+      <p>打鍵は版 4 と同じ（強さ 1）。カーソルは、描画のたびに位置を 1 点だけ読み、前の点との差から速さを出します（草には横の速さだけ、粒には縦横の速さを使います）。草の中ほどからの距離が画面の高さの 0.16 倍より近い草だけに、近さの 2 乗で重みを付けて、速さの向きへ押します。押しは約 0.7 秒で半分に減ります。粒は、カーソルを動かしている間だけ、画面の高さの 0.18 倍より近いものがカーソルへ寄ります（寄る速さはカーソルの速さに比例）。描く位置だけをずらし、止めると約 0.9 秒で半分に戻り、周りに粒は残りません（動かし続ける間は、決まった上限まで寄ります）。クリックは押した点から輪を広げ、1.6 秒で消します。ホイールは 1 回ごとに粒全体を縦にずらし（下へ回すと上へ）、ずれは約 1 秒で半分に戻ります。打鍵以外の値は描画の中で使うだけで、列にも溜めず、外へも出しません（打鍵は版 4 と同じく、直近 30 秒の打鍵の時刻だけを持ちます）。入力を切ると、その入力の跡はすぐ消えます。舞台の上ではホイールでページはスクロールしません。クリックは左ボタンだけを使います。「動きを減らす」設定では、漂いと粒の流れだけを遅くし、跡の消え方は変えません。推定（行き詰まりなど）は使いません。</p>
     </div>
   </section>
 </div>
@@ -271,9 +271,11 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   }
 
   // ---- 打鍵以外の入力。どれも最後の 1 点と、数秒で 0 へ戻る値だけを持つ（列を持たない） ----
-  // カーソル: 前の点と今の点だけ。速さは舞台の座標で横向きのみ。
+  // カーソル: 前の点と今の点だけ。速さは舞台の座標で、草には横だけ、粒には縦横を使う。
   const cursor = { x: 0, y: 0, px: 0, py: 0, inside: false, fresh: false, vx: 0, vy: 0 };
   const CURSOR_R = 0.16, CURSOR_HALF_MS = 700, CURSOR_PUSH = 6, CURSOR_MAX = 0.9;
+  // これより遅い速さ（画面の高さ/秒）は止まっているとみなす。
+  const CURSOR_STILL = 0.01;
   // 粒: カーソルを動かしている間だけ、周りの粒の描く位置をカーソルへ寄せる。ずれの上限は画面の高さに対する割合。
   const MOTE_R = 0.18, MOTE_HALF_MS = 900, MOTE_PULL = 0.0006, MOTE_MAX = 0.08;
   // クリック: 決まった数の枠を使い回す。古いものから上書きする。
@@ -282,7 +284,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   let rippleNext = 0;
   // ホイール: 粒全体の縦のずれ 1 つ。
   const WHEEL_STEP = 0.05, WHEEL_MAX = 0.15, WHEEL_HALF_MS = 1000;
-  let wheelOff = 0, wheelShown = 0;
+  let wheelOff = 0, wheelShown = 0, lastLift = 0;
 
   function toStage(ev) {
     const r = canvas.getBoundingClientRect();
@@ -310,12 +312,15 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   }, { passive: false });
 
   function updatePointer(dt) {
-    // 描画のたびに 1 点だけ読み、前の点との差から横の速さを出す（実物で描画のたびに位置を読むのと同じ形）。
+    // 描画のたびに 1 点だけ読み、前の点との差から速さを出す（実物で描画のたびに位置を読むのと同じ形）。
+    // 平滑化は実時間（画面の更新の速さに依らない）。ごく遅い速さは 0 に落とし、止めたら寄せない。
     if (cursor.inside && cursor.fresh) {
       const v = (cursor.x - cursor.px) / Math.max(dt, 1) * 1000;
       const w = (cursor.y - cursor.py) / Math.max(dt, 1) * 1000;
-      cursor.vx = cursor.vx * 0.6 + v * 0.4;
-      cursor.vy = cursor.vy * 0.6 + w * 0.4;
+      const a = 1 - Math.pow(0.6, dt / 16.7);
+      cursor.vx += (v - cursor.vx) * a;
+      cursor.vy += (w - cursor.vy) * a;
+      if (Math.hypot(cursor.vx, cursor.vy) < CURSOR_STILL * H) { cursor.vx = 0; cursor.vy = 0; }
     } else {
       cursor.vx = 0; cursor.vy = 0;
     }
@@ -393,6 +398,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
 
     // 漂う粒。基層の流れ＋打鍵の風（横）＋ホイールの縦のずれ（描く位置だけをずらし、粒そのものは動かさない）。
     const lift = state.useWheel ? wheelShown * H : 0;
+    lastLift = lift;
     const mdecay = Math.pow(0.5, dt / MOTE_HALF_MS);
     const mR = MOTE_R * H, mMax = MOTE_MAX * H;
     const pushMotes = state.useCursor && state.useCursorMotes && (cursor.vx !== 0 || cursor.vy !== 0);
@@ -404,8 +410,8 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
         const d = Math.hypot(dx, dy);
         if (d < mR && d > 1) {
           const f = 1 - d / mR;
-          // 寄る量はカーソルの速さに比例。1 フレームで残りの距離の 2 割を超えず、カーソルを追い越さない。
-          const step = Math.min(d * 0.2, Math.hypot(cursor.vx, cursor.vy) * f * MOTE_PULL * dt);
+          // 寄る量はカーソルの速さに比例。残りの距離に対する上限を実時間で決め（60 回/秒で 2 割）、カーソルを追い越さない。
+          const step = Math.min(d * (1 - Math.pow(0.8, dt / 16.7)), Math.hypot(cursor.vx, cursor.vy) * f * MOTE_PULL * dt);
           m.ox += dx / d * step; m.oy += dy / d * step;
           const o = Math.hypot(m.ox, m.oy);
           if (o > mMax) { m.ox *= mMax / o; m.oy *= mMax / o; }
@@ -414,8 +420,9 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
       const vx = (6 + 70 * wind * gustAt(m.x)) * m.k * S;
       const vy = baseLift(m.seed) * S;
       m.x += vx * mdt / 1000; m.y += vy * mdt / 1000;
-      if (m.x > W + 10) m.x -= W + 20;
-      if (m.y < -10) m.y += H * 0.9; else if (m.y > H * 0.9 + 10) m.y -= H * 0.9;
+      // 端から反対側へ回り込んだ粒は、カーソルのずれを持ち越さない。
+      if (m.x > W + 10) { m.x -= W + 20; m.ox = m.oy = 0; }
+      if (m.y < -10) { m.y += H * 0.9; m.ox = m.oy = 0; } else if (m.y > H * 0.9 + 10) { m.y -= H * 0.9; m.ox = m.oy = 0; }
       const x = m.x + m.ox, y = m.y + m.oy + lift * m.k;
       const r = m.r * S;
       ctx.beginPath(); ctx.arc(x, y, r * 1.9, 0, Math.PI * 2);
@@ -498,6 +505,7 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
   for (const id of ["useKeys", "useCursor", "useCursorMotes", "useClick", "useWheel"]) {
     document.getElementById(id).addEventListener("change", (ev) => {
       state[id] = ev.target.checked;
+      if (id === "useCursor") document.getElementById("useCursorMotes").disabled = !state.useCursor;
       // 切ったら、その入力の跡を残さない（入れ直したときに前の跡が出てこない）。
       if (!state[id]) {
         if (id === "useCursor") for (const bl of blades) bl.push = 0;
@@ -534,13 +542,15 @@ section.notes p { margin: 0; font-size: 0.92rem; color: var(--muted); }
       }
       return { blades: blades.length, motes: motes.length, rippleSlots: ripples.length,
         ripplesLive: ripples.filter((r) => now - r.t0 >= 0 && now - r.t0 < RIPPLE_MS).length,
-        maxPushNear, maxPushFar, wheelShown, presses: presses.length,
+        maxPushNear, maxPushFar, wheelShown, presses: presses.length, cursorSpeed: Math.hypot(cursor.vx, cursor.vy) / H,
         maxMoteOff: motes.reduce((a, m) => Math.max(a, Math.hypot(m.ox, m.oy)), 0) / H,
         movedMotes: motes.filter((m) => Math.hypot(m.ox, m.oy) > 0.002 * H).length,
-        // 位置そのもの（ずれ無し）がカーソルから MOTE_R 内の粒について、ずれ無しとずれ込みの距離の平均（画面の高さ比）。
+        // カーソルの寄せが無いときの描く位置（ホイールのずれは含む）がカーソルから MOTE_R 内の粒について、
+        // 寄せが無いときと、いまの描く位置の、カーソルまでの距離の平均（画面の高さ比）。
+        // 寄せる処理は描く位置で粒を選ぶので、選ばれる粒の集合はここと少し違いうる。
         near: (() => { let n = 0, d0 = 0, d1 = 0;
-          for (const m of motes) { const a = Math.hypot(cursor.x - m.x, cursor.y - m.y);
-            if (a < MOTE_R * H) { n++; d0 += a; d1 += Math.hypot(cursor.x - m.x - m.ox, cursor.y - m.y - m.oy); } }
+          for (const m of motes) { const y0 = m.y + lastLift * m.k; const a = Math.hypot(cursor.x - m.x, cursor.y - y0);
+            if (a < MOTE_R * H) { n++; d0 += a; d1 += Math.hypot(cursor.x - m.x - m.ox, cursor.y - y0 - m.oy); } }
           return n ? { n, plain: d0 / n / H, drawn: d1 / n / H } : { n }; })() };
     };
   }
