@@ -46,6 +46,7 @@
    - `python3 make_dummy.py` が緑であること。
    - `python3 -I c_search.py selftest` と `python3 -I make_coverage_records.py selftest` が緑であること（確かめの検索・判断 40〜42）。
    - `uv run --with openpyxl python check_screening.py` が緑であること（選別の道具・判断 33）。
+   - `python3 check_validation_cases.py` が緑であること（反例集のキーと脚本の導出が一致する・判断 58）。
    - TRACE の DB を作り直したら、『段1』に全文の列が無く、『段2・3』があること（`make_trace_db.py`）。判定が 1 件も入っていない今の DB を上書きしてよい。
 5. 添付 3（検索式・`query-strings.md`。第 16 節は確かめの検索）と GSRR-25 の **[at registration]** の中身を確かめる。選別の順の一覧に確かめの標本（群 `coverage_sample`・300 件）が入っていること。dryrun は 2026-10-18 の版（564 件）と比べる。
 6. `python3 hash_attachments.py` で `sha256.txt` を作り、次の箇所に SHA-256 を書く。
