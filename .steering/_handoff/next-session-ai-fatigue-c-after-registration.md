@@ -13,7 +13,7 @@
 
 ## 1. 研究者がすること（当日の 11・12）
 
-- OSF Registries で GSRR の様式を選び、各項目に `~/TRACE/registration-en.md`（版 1.0）の文を写す。添付 1〜7 と `registration-attachments/sha256.txt` を上げる。
+- OSF にプロジェクトを作り、`~/Documents/TRACE/osf-upload/files/` を上げ、プロジェクトから GSRR の登録を作って `osf-upload/osf-fields.md` の文を欄ごとに写す（判断 78。反例集のキーと所見は上げない）。
 - 登録の識別子（DOI）と日付をメインに伝える。
 
 ## 2. メインがすること（識別子が来たら）
