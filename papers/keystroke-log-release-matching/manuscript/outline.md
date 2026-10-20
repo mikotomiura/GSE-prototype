@@ -35,7 +35,7 @@ body.
 | 8 Discussion and limitations | `sections/discussion.tex` | Partly | Limitations first |
 | 9 Conclusion | `sections/conclusion.tex` | Yes | After the main computation |
 | Ethical considerations | `sections/ethics.tex` | No | Draft |
-| Open science | `sections/open-science.tex` | No | Not written |
+| Open science | `sections/open-science.tex` | No | Draft |
 | AI use | `sections/ai-use.tex` | No | Draft |
 | Appendices (after the references): all writers for A0 to A3, forms R5 and R6, the full KeyTAR rows | to be added | Yes | After the main computation |
 
