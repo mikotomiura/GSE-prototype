@@ -99,7 +99,7 @@ Kind regards,
 
 **Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis（前のスレッドへの返信として送る・2026-10-20 研究者が決定）
 
-**CC**: Scott Crossley（[メールアドレス]・KLiCKe の共著者で、Kaggle のコンペの Citation の著者・判断 64）
+**CC**: Scott Crossley <scott.crossley@vanderbilt.edu>（Vanderbilt の Data Science Institute の affiliates のページに載る住所・2026-10-20 に検索で確認。所属は Peabody College の Special Education。送る前に最近の論文の連絡先などで確かめる・KLiCKe の共著者で、Kaggle のコンペの Citation の著者・判断 64）
 
 Hi Yu (and Scott, copied here),
 
