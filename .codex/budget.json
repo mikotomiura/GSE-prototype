@@ -35,9 +35,9 @@
   "_comment_merge_2026_10_13_public_matching": "2026-10-13: docs/public-keystroke-matching-freeze に origin/main を merge した際、today と history の 10-12 が衝突した。共通の起点（c97f4fb0）は 10-12 の 309776 / 8 回。10-12 は本ブランチで増えていないので origin/main の 517454 / 15 回を採った。10-13 は和: 本ブランチ 67500 / 2 回（本計算のコードの直しの Codex レビュー 2 巡）＋ origin/main 214879 / 7 回 = 282379 / 9 回。",
   "_comment_merge_2026_10_12_public_matching": "2026-10-12: docs/public-keystroke-matching-prereg に origin/main を merge した際、today が衝突した。共通の起点の today は 10-12 の 99497 / 2 回。和を採った: 起点 99497 / 2 ＋ 本ブランチ +101499 / +2（合成の記録の検査の /cross-review 2 巡の Codex） ＋ origin/main +108780 / +4 = 309776 / 8 回。",
   "today": {
-    "date": "2026-10-13",
-    "tokens_used": 517280,
-    "invocations": 13
+    "date": "2026-10-21",
+    "tokens_used": 51803,
+    "invocations": 1
   },
   "history": [
     {
@@ -284,6 +284,11 @@
       "date": "2026-10-12",
       "tokens_used": 517454,
       "invocations": 15
+    },
+    {
+      "date": "2026-10-13",
+      "tokens_used": 517280,
+      "invocations": 13
     }
   ],
   "_comment_history_2026_09_11": "⚠️★★★ 2026-09-11: history から 7 件が消えていたので復元した (1970-01-01 / 2026-06-16 / 08-01 / 08-02 / 08-03 / 08-05 / 08-06)。★ 消えた 5 件は歴代最大級の消費日 (08-03 が 614107・08-01 が 363718) であり、⚠️ **上限を 200000→300000 へ上げた同じ commit で最大消費の記録が消える**のは、意図が正しくても改竄に見える。★ 実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)。→ ★ history は append-only とし、消さない。 ★★★ 2026-09-21 訂正（研究者判断・blockers.md 起票 22）: ⚠️ **上の『実測: history を回転させるコードは repo 内に存在しない (手作業の削除だった)』は誤りである。** ★ 回転させるコードは scripts/run-codex-review.sh の `d['history'] = sorted(...)[-30:]` に在った。★ 2026-09-21 に実測: 日付が 09-20 → 09-21 へ変わった最初の記帳で、歴代最古の 2026-08-12 (25290 / 1 回) が実際に消えた。→ ★ 切り捨てを外し、消えた 1 件を実測値で戻した。★ history の件数上限は【置かない】と裁定した（研究者判断 2026-09-21）。⚠️ 本文は当時の記録として残してあるので、この訂正と併せて読むこと。",
