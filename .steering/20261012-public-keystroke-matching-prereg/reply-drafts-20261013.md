@@ -85,3 +85,33 @@ Thank you for your time.
 
 Kind regards,
 [name]
+
+## 4. Dr. Tian へ、論文の草稿を送る（2026-10-20 に下書き・送るのは研究者）
+
+送る時期: 本計算の結果と考察を入れた草稿ができたとき（投稿の前。11/10〜11/25 の目安）。前の返信（下書き 3）で「今月中」と書いて送ったなら、遅れを詫びる 1 文（[ ] 内の任意の文）を入れる。`[ ]` は結果が出てから埋める。
+
+送る前に確かめること:
+- 添付は PDF の草稿だけ。個々の書き手の結果・本文や記録の抜粋を含めない（先方の勧めと事前登録のとおり）。
+- PoPETs は二重盲検。先方が査読者に当たる可能性があるので、草稿を他に回さないよう頼む文を入れる（下の最後の段落）。
+- 倫理の節は先方の言葉を要約して書いているので、その段落を本文に貼って正確か確かめてもらう。
+
+**Subject**: Draft paper using the KLiCKe corpus (for your review before submission)
+
+Hi Yu,
+
+[I am sorry this has taken longer than I expected.] I have now finished a full draft of the paper that uses the KLiCKe corpus, and I attach it here. As promised, I wanted you to see it before it is submitted.
+
+In brief, the paper asks how well the processing applied to publicly released keystroke logs, such as the masking of letters and digits used in a recent Kaggle competition, protects against matching a log to its text. KLiCKe is the data on which we evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate, for example: against the attackers we tried, at N = 1,000, the q masking allowed accuracy of X times the chance level, while form Y reduced it to Z and kept most of the standard process measures.] All results are reported in aggregate, as you recommended; the paper contains no result for an individual writer and no excerpt of an essay or a log.
+
+I would be grateful if you could check one paragraph in particular. The ethics section describes the collection and consent of KLiCKe based on your messages:
+
+> [paste the KLiCKe paragraph of the ethics section here]
+
+If anything in it is inaccurate or you would prefer different wording, please let me know. Any other comments on how the paper describes the corpus would also be very welcome. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date].
+
+Because the venue uses double-blind review, I would appreciate it if you could keep the draft to yourself for now.
+
+Thank you again for making the corpus available and for your help with this study.
+
+Best regards,
+Mikoto
