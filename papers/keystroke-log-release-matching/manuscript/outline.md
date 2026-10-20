@@ -109,6 +109,8 @@ Agreements not to re-identify, which releasing parties also use, are discussed a
   and that its data were not matched (after the results; the date is reported).
 - The scope in which the attack code is published (the preregistration's three options), and the reasons.
 - The KLiCKe authors receive the paper when it is complete.
+- Submitted version: the personal communication is undated and the registration link is withheld (anonymised copy of the study repository instead); both are restored in the camera-ready version.
+- Code: published only for the two corpora evaluated; no code reads other released logs.
 
 ## Not claimed in Section 3
 

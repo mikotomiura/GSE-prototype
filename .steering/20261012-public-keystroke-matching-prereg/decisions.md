@@ -325,3 +325,9 @@ round 2 の判定は minor revision（R1 major・R2 minor・R3 minor）。記録
 研究者の決定（2 問とも推奨を選んだ）:
 1. 1 頁目と「目的と害」は (a) を主にする。主張は「公開する側が自ら掲げた目的（Kaggle の逐語 "To prevent reproduction of the essay text"）を、その加工が照合に対して満たすか」の検証。(b) は「教室の記録が 1 クラス単位で公開されたら」の条件つきで書く。他の選択肢は「(b) を主のまま条件を明記」「両方を並べる」。事前登録の (a)(b) の範囲内で、逸脱ではない。
 2. round 2 の minor の直し（verdict.md の 3）を全部承認。直したら attack-me（stage: outline）はここで閉じ、投稿前の通しの attack-me（stage: manuscript）でまとめて確かめる。他の選択肢は「round 3 も回す」。
+
+## 判断 63: 攻撃コードの公開範囲と、二重盲検での登録の示し方（研究者・AskUserQuestion 1 回・2026-10-20）
+
+1. 攻撃コードは事前登録の案 (2): KLiCKe と ENJA15 を読み・加工し・評価するコードは公開し、他の公開された記録を直接読むコードは書かず公開しない（Kaggle のデータを読むコードは書いていない）。他の選択肢は (1) 全部公開・(3) 求めに応じて共有。倫理の節と open science の節に書いた。
+2. 二重盲検では、論文用 repo を anonymous.4open.science などで匿名化した複製で示し、OSF の登録のリンクは採択まで伏せる（登録の日付と事前登録の SHA-256 は本文に書く）。投稿版では personal communication の日付を外した（camera-ready で戻す）。他の選択肢は「OSF をそのままリンク」「PC chairs に先に問う」。
+- 気づいたこと（判断不要・記録）: `config.json` の現在の SHA-256（afc73eec…）は登録の値（54158b3b…）と違う。notes.md l.178 のとおり取得の記録（svn_revision・files・sha256）を埋めたためで、凍結した値の変更ではない。論文の方法の節でこのことを書く。
