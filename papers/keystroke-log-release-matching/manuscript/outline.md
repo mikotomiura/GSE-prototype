@@ -30,7 +30,7 @@ body.
 | 3 Threat model | `sections/threat-model.tex` | No | Draft, revised after the first pre-submission review |
 | 4 Data and release forms | `sections/data.tex` | Counts after exclusion | Draft; the counts after exclusion are left blank |
 | 5 Attackers | `sections/attackers.tex` | No | Draft |
-| 6 Evaluation protocol | `sections/protocol.tex` | No | Not written |
+| 6 Evaluation protocol | `sections/protocol.tex` | No | Draft; the list of deviations is updated after the main computation |
 | 7 Results, with a short subsection on the Japanese translation logs (question 4) | `sections/results.tex` | Yes | After the main computation |
 | 8 Discussion and limitations | `sections/discussion.tex` | Partly | Limitations first |
 | 9 Conclusion | `sections/conclusion.tex` | Yes | After the main computation |
