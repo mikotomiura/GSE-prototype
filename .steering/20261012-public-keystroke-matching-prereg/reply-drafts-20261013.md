@@ -98,13 +98,17 @@ Kind regards,
 
 **Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis（前のスレッドへの返信として送る・2026-10-20 研究者が決定）
 
+**CC**: Scott Crossley（[メールアドレス]・KLiCKe の共著者で、Kaggle のコンペの Citation の著者・判断 64）
+
 Hi Yu,
 
 [I am sorry this has taken longer than I expected.] I have now finished a full draft of the paper that uses the KLiCKe corpus, and I attach it here. As promised, I wanted you to see it before it is submitted.
 
 In brief, the paper asks how well the processing applied to publicly released keystroke logs, such as the masking of letters and digits used in a recent Kaggle competition, protects against matching a log to its text. KLiCKe is the data on which we evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate.] All results are reported in aggregate, as you recommended, with no result for an individual writer and no excerpt of an essay or a log.
 
-In the ethics section, I describe the IRB approval at Georgia State University and the scope of consent as you explained them to me. If you would like anything worded differently, I would be glad to change it. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date]. Because the venue uses double-blind review, I would appreciate it if you could keep the draft to yourself for now.
+I have copied Scott, because he is also among the authors of the Kaggle competition "Linking Writing Processes to Writing Quality", which the paper discusses as an example of a release. The competition data were not used in this study and were not matched against any text; the paper names the competition only to describe how its logs were processed.
+
+In the ethics section, I describe the IRB approval at Georgia State University and the scope of consent as you explained them to me. If you would like anything worded differently, I would be glad to change it. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date]. Because the venue uses double-blind review, I would appreciate it if you could both keep the draft to yourselves for now.
 
 I would also like to thank you more personally. I work as an independent researcher, without an institution behind me, and questions of research ethics have always been something I had to face on my own. A large, carefully documented corpus that is openly available, together with your clear and generous answers to my questions, made this study possible in a way it otherwise could not have been. I am very grateful.
 

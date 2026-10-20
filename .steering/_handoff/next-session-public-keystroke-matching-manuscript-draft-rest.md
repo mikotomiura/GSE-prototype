@@ -53,11 +53,11 @@
 
 - §7 結果・§9 結論・貢献の段落・題名の最終形（題名は結果を見る前に決める）。
 - 投稿前に attack-me を stage: manuscript で回す（結果の後）。round 1 の接地の本文 `attack-me/outline-threat-model/round-1/tmp/` はそのあと消す。
-- Kaggle の公開元（The Learning Agency Lab）への連絡の下書き（結果の後・投稿の前。送るのは研究者・判断 61）。
+- Kaggle の公開の側への連絡（判断 61・64）: Dr. Tian へのメールに Crossley を CC で入れる形にした（下書き済み）。The Learning Agency Lab への短い連絡の下書きは結果の後・投稿の前（送るのは研究者）。Kaggle の主催は Vanderbilt University と The Learning Agency Lab、Citation の著者に KLiCKe の共著者 Crossley が入る。論文では共通の著者がいることを文で書かない。
 - Hanisch を出版版で照合する（ACM の PDF はボットに閉じているので研究者に頼む）。
 - 投稿版で、所属の書き方が匿名性を損なわないか確かめる。
 - PoPETs の PC chairs への催促は 10/27 ごろ（下書きは `reply-drafts-20261013.md` の 3・送るのは研究者）。
-- Dr. Tian へのメール（`reply-drafts-20261013.md` の 4）: 件名は前のスレッドへの返信「Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis」に決めた（2026-10-20）。空欄は遅れのお詫び・主な結果の 1〜2 文・投稿予定日。送るのは草稿が完成したとき。
+- Dr. Tian へのメール（`reply-drafts-20261013.md` の 4）: 件名は前のスレッドへの返信「Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis」に決めた（2026-10-20）。空欄は遅れのお詫び・主な結果の 1〜2 文・投稿予定日。CC に Crossley（アドレスは研究者が入れる）。送るのは草稿が完成したとき。
 
 ## 守ること
 

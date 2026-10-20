@@ -331,3 +331,11 @@ round 2 の判定は minor revision（R1 major・R2 minor・R3 minor）。記録
 1. 攻撃コードは事前登録の案 (2): KLiCKe と ENJA15 を読み・加工し・評価するコードは公開し、他の公開された記録を直接読むコードは書かず公開しない（Kaggle のデータを読むコードは書いていない）。他の選択肢は (1) 全部公開・(3) 求めに応じて共有。倫理の節と open science の節に書いた。
 2. 二重盲検では、論文用 repo を anonymous.4open.science などで匿名化した複製で示し、OSF の登録のリンクは採択まで伏せる（登録の日付と事前登録の SHA-256 は本文に書く）。投稿版では personal communication の日付を外した（camera-ready で戻す）。他の選択肢は「OSF をそのままリンク」「PC chairs に先に問う」。
 - 気づいたこと（判断不要・記録）: `config.json` の現在の SHA-256（afc73eec…）は登録の値（54158b3b…）と違う。notes.md l.178 のとおり取得の記録（svn_revision・files・sha256）を埋めたためで、凍結した値の変更ではない。論文の方法の節でこのことを書く。
+
+## 判断 64: Kaggle の公開の側への連絡の経路（研究者・AskUserQuestion 1 回・2026-10-20）
+
+研究者の問い（「Kaggle の公開者と KLiCKe の著者は Dr. Tian ではないか」）を受けて、Kaggle のコンペの Overview のページを Chrome で読んだ（2026-10-20）。主催は Vanderbilt University と The Learning Agency Lab の共同（Competition Host の欄は The Learning Agency Lab）。Citation の著者は Franklin・King・Demkin・Baffour・Holbrook・Crossley の 6 人で、KLiCKe の共著者 Scott Crossley が入る。Yu Tian の名前は無い。書誌（[V265]・`references.bib`）の著者を "The Learning Agency Lab" から Citation の 6 人に直した。
+
+研究者の決定（2 問とも推奨を選んだ）:
+1. 判断 61 の連絡は、Dr. Tian へ草稿を送るメール（`reply-drafts-20261013.md` の 4）に Crossley を CC で入れ、Kaggle のデータは使わず照合もしていないことを 1 段落で足す。The Learning Agency Lab にも別に短く知らせる（下書きは結果の後・送るのは研究者）。他の選択肢は「Tian のメールだけで済ませる」「判断 61 のまま別々に送る」。
+2. 論文では引用を Kaggle の示す形に正すだけにし、共通の著者がいることを文で書かない。今の本文は「手順が同じ構成」までで、作文が同じかは調べていない（倫理上の理由）。共通の著者を文で書くと、同じ作文だと読者に推させる方へ寄るため。他の選択肢は「§3 に 1 文で書く」。
