@@ -7,18 +7,20 @@
 - [x] PoPETs 2027 の著者向けの案内とテンプレートを一次で取得
 
 ## 執筆
-- [ ] 骨組み（main.tex・outline.md・BUILD.md・build.sh・references.bib）
-- [ ] 脅威モデルの節（動機）
-- [ ] attack-me（stage: 原稿の外枠）
+- [x] 骨組み（main.tex・outline.md・BUILD.md・build.sh・references.bib）
+- [x] 脅威モデルの節（動機）
+- [x] attack-me（stage: 原稿の外枠）round 1・2（判断 61・62）
 - [ ] 序論
 - [ ] 関連研究
 - [ ] 方法（事前登録から。探索的な分析 2 つを明記）
-- [ ] 倫理・open science・AI の利用
+- [ ] 倫理（草稿あり・連絡とコード公開の範囲が未決）・open science（未）・AI の利用（草稿あり）
+- [ ] Kaggle の公開元への連絡の下書き（結果の後・投稿の前。送るのは研究者）
+- [ ] 攻撃コードの公開範囲（事前登録の 3 案）を研究者に問う
 - [ ] 二重盲検の扱い（OSF の登録とコードの示し方）を研究者に問う
 
 ## 確認
-- [ ] build.sh でビルド
-- [ ] _style_check.py
+- [x] build.sh でビルド（エラー 0）
+- [x] _style_check.py（違反 0）
 
 ## 完了処理
 - [ ] decisions.md
