@@ -299,3 +299,11 @@ PoPETs の採択の見込みの検討（会話）の後、研究者が「第一�
   3. 11/10〜11/25（Mac）: 結果と考察・原稿の通し・attack-me（投稿前）・`/cross-review`。
   4. 11/27 ごろ: 出すか Issue 4（2027-02-28）に回すかを研究者が決める。
 - PC chairs の返事（判断 57）は段取りの条件にしない。10/27 ごろ催促（下書き 3）。
+
+## 判断 60: 原稿の置き場（研究者・AskUserQuestion 1 回・2026-10-20）
+
+- PC chairs への問い合わせ（判断 57）: 2026-10-20 時点で返事なし・催促も未送付（研究者の回答）。予定どおり 10/27 ごろに下書き 3 で催促する。
+- 採用（推奨を選んだ）: 原稿は GSE の repo の `papers/keystroke-log-release-matching/manuscript/` に置く。他の選択肢は「論文用 repo（mikotomiura/keystroke-log-release-matching）に置く」。
+- 理由: IME 論文と同じ形で、公開物の文体の門（`_style_check.py`）と書誌の運用をそのまま使える。草稿は公開しない repo に残り、論文用 repo は登録とコードの公開物のまま保てる。
+- テンプレートは PoPETs 2027 の submission-template-2027.zip（SHA-256 `b1abbcc0832b7860f5fe8d9773088540b0456965a05fd14c3d47b3a8d85ea7d7`・2026-10-20 に petsymposium.org/files から取得）。著者向けの案内（authors-2027.php・2026-10-20 に読んだ）: 本文 12 頁、必須の 3 節は頁数に数えない、識別につながる外部の資料は匿名化した複製（anonymous.4open.science など）で示すことを勧める、付録は査読者が読まなくてよい。
+- 作業記録: `.steering/20261020-public-keystroke-matching-manuscript/`。

@@ -1,0 +1,62 @@
+% Manuscript for the Proceedings on Privacy Enhancing Technologies, built with the PoPETs 2027 submission template
+% (class acmart with popets.sty). The template files are not part of this directory; see BUILD.md. The sections are
+% kept in separate files while the manuscript is written. The structure and the evidence for each claim are fixed in
+% outline.md.
+\documentclass[sigconf,anonymous,review]{acmart}
+\usepackage{popets}
+
+\setcopyright{popets}
+\copyrightyear{2027}
+\acmYear{2027}
+\acmVolume{2027}
+\acmNumber{3}
+\acmDOI{XXXXXXX.XXXXXXX}
+\acmISBN{}
+\acmConference{Proceedings on Privacy Enhancing Technologies}
+\settopmatter{printacmref=false,printccs=false,printfolios=true}
+
+\begin{document}
+
+\title[Matching processed keystroke logs to texts]{How far does the processing of public keystroke logs protect
+against matching logs to texts?}
+
+\author{Anonymous}
+\affiliation{%
+  \institution{Anonymous}
+  \country{Anonymous}}
+
+\renewcommand{\shortauthors}{Anonymous}
+
+\begin{abstract}
+  To be written after the results.
+\end{abstract}
+
+\keywords{keystroke logging, data release, de-identification, matching attack, writing process}
+
+\maketitle
+
+\input{sections/introduction}
+\input{sections/related}
+\input{sections/threat-model}
+\input{sections/data}
+\input{sections/attackers}
+\input{sections/protocol}
+\input{sections/results}
+\input{sections/discussion}
+\input{sections/conclusion}
+
+\appendix
+
+\begin{acks}
+To be written for the camera-ready version.
+\end{acks}
+
+\input{sections/ethics}
+\input{sections/open-science}
+\input{sections/ai-use}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\end{document}
+\endinput
