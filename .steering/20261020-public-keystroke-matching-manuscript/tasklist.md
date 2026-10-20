@@ -24,7 +24,7 @@
 - [ ] 探索的な分析 3〜5 を G-GEAR で実装して回す（引き継ぎ next-session-public-keystroke-matching-exploratory-3-5-ggear.md）
 - [ ] ethics.tex の空欄（外部の審査を受けなかった理由・利害の表明）を研究者が書く
 - [ ] 倫理（草稿あり・公開元への連絡は結果の後）・open science（草稿あり・匿名リンクが空欄）・AI の利用（草稿あり）
-- [ ] Kaggle の公開元への連絡の下書き（結果の後・投稿の前。送るのは研究者）
+- [x] Kaggle の公開元への連絡の下書き（2026-10-21・reply-drafts の 5・送るのは研究者・結果が出たらすぐ）
 - [x] 攻撃コードの公開範囲（事前登録の 3 案）を研究者に問う（判断 63）
 - [x] 二重盲検の扱い（OSF の登録とコードの示し方）を研究者に問う（判断 63）
 
@@ -36,3 +36,6 @@
 - [ ] decisions.md
 - [ ] git commit（branch を確かめる）・push
 - [x] 残りの節の引き継ぎ（`.steering/_handoff/next-session-public-keystroke-matching-manuscript-draft-rest.md`・2026-10-20）
+
+- [x] 題名（判断 69）・重複の削除（Page budget の 1）・§3.2 の文（判断 70）（2026-10-21）
+- [x] 次のセッションの引き継ぎ（Mac: next-session-public-keystroke-matching-manuscript-after-attack-me.md・G-GEAR: next-session-public-keystroke-matching-exploratory-3-5-ggear.md）

@@ -88,6 +88,8 @@ Kind regards,
 
 ## 4. Dr. Tian へ、論文の草稿を送る（2026-10-20 に下書き・送るのは研究者）
 
+2026-10-21 追記: 判断 68 で害 (a) を「本文を持つ者による結び付き」に定義し直したので、本文の In brief の 1 文を合わせて直した。題名は判断 69 で決めた。
+
 送る時期: 本計算の結果と考察を入れた草稿ができたとき（投稿の前。11/10〜11/25 の目安）。前の返信（下書き 3）で「今月中」と書いて送ったなら、遅れを詫びる 1 文（[ ] 内の任意の文）を入れる。`[ ]` は結果が出てから埋める。
 
 送る前に確かめること:
@@ -107,7 +109,7 @@ Before anything else, a note on the copy. I have added Scott to this reply for t
 
 [I am sorry this has taken longer than I expected.] I have now finished a full draft of the paper that uses the KLiCKe corpus, and I attach it here. As promised, I wanted you to see it before it is submitted.
 
-In brief, the paper asks how well the processing applied to publicly released keystroke logs protects against matching a log to its text. KLiCKe is the data on which I evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate.] All results are reported in aggregate, as you recommended, with no result for an individual writer and no excerpt of an essay or a log.
+In brief, the paper asks how far the processing applied to publicly released keystroke logs keeps the logs apart from their texts, against a party that holds candidate texts. KLiCKe is the data on which I evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate.] All results are reported in aggregate, as you recommended, with no result for an individual writer and no excerpt of an essay or a log.
 
 The paper takes the Kaggle competition as an example of such processing: its letters and digits were masked "to prevent reproduction of the essay text". The competition data were not used in this study and were not matched against any text. The paper notes that the competition's description of data collection follows the same procedure as KLiCKe, but it does not examine whether the two share essays. Scott, if anything in how the paper describes the competition is inaccurate, or if you think The Learning Agency Lab should hear about the paper from you rather than from me, please let me know.
 
@@ -119,3 +121,30 @@ I hope we can stay in touch, and I would be happy to hear about your work as wel
 
 Best regards,
 Mikoto
+
+## 5. The Learning Agency Lab への通知（2026-10-21 に下書き・判断 61・64・68・送るのは研究者）
+
+送る時期: 本計算の結果が出たらすぐ（11/9 ごろの見込み）。投稿（11/30）までの約 2 週を応答の猶予にする（判断 68 の 4）。送った日付・猶予・応答の有無を ethics.tex の空欄に書く。
+
+送る前に確かめること:
+- 宛先: The Learning Agency Lab の連絡先は**まだ確かめていない**（Kaggle の Overview の Competition Host が The Learning Agency Lab・判断 64）。公式サイトの連絡先を研究者が一次で確かめて入れる。Dr. Tian へのメール（下書き 4）で Crossley が「自分から伝える」と答えた場合は、この下書きを送らずに Crossley の返事に合わせる。
+- 下書き 4（Dr. Tian・Crossley）との順番: 4 を先に送り、Crossley の答えを数日待ってから 5 を送るのが自然。ただし猶予の 2 週を削らないよう、4 の返事を待つのは 3 日ほどまでにする。
+- 添付は付けない（二重盲検の投稿前なので草稿は渡さない。求められたら研究者が判断する）。結果の数字は集計の 1〜2 文だけ。書き手ごとの値・本文・記録の抜粋は書かない。
+- `[ ]` は結果が出てから埋める。
+
+**Subject**: Notice of a forthcoming paper that discusses the masking in "Linking Writing Processes to Writing Quality"
+
+Dear The Learning Agency Lab team,
+
+I am an independent researcher writing to let you know, before submission, about a paper that discusses the Kaggle competition "Linking Writing Processes to Writing Quality", which you hosted with Vanderbilt University.
+
+The paper evaluates how far the processing of released keystroke logs keeps the logs apart from their texts, against a party that already holds candidate texts on the same prompts. It takes the competition's masking, in which letters and digits were replaced by "q" "to prevent reproduction of the essay text", as the example of processing used in a public release, and evaluates the same masking, together with alternatives that release less, on the public KLiCKe corpus, whose texts are known. [One or two sentences on the main finding for the masking, in aggregate.]
+
+I want to be clear about what the study did not do. The competition data were not downloaded or used, no log from the competition was matched against any text, and the paper does not examine whether the competition shares essays with any other release. The paper describes the competition only from its public pages and from the first-place write-up, and notes that its description of data collection follows the same procedure as KLiCKe.
+
+I plan to submit the paper to the Proceedings on Privacy Enhancing Technologies by [date]. If you have any comments, concerns or corrections about how the competition is described, I would be grateful to hear them by [date, about two weeks after sending], so that I can take them into account before submission. The paper will report that you were informed and whether you responded.
+
+Thank you for releasing the data and for the care taken to protect the writers.
+
+Best regards,
+Mikoto Miura

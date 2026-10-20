@@ -392,3 +392,8 @@ round 2 の判定は minor revision（R1 major・R2 minor・R3 minor）。記録
 
 - 採用（推奨を選んだ）: **"Hiding the Text, Keeping the Process: Matching Processed Keystroke Logs to Texts Held by Others"**。公開する側の狙い（本文を隠して過程を残す）と攻撃の前提（本文を他者が持つ）を言い、結果の向きを含まない。判断 68 で害 (a) を「本文を持つ者による結び付き」に定義し直したのに合わせた。他の選択肢は「How Far Does Processing Keep Keystroke Logs Apart from Their Texts? …」「Masked but Matchable? …」（結果の向きを先取りして読める）「仮題のまま」。
 - 同じ日に、頁の縮め方の (1)（§8.1 を §3.5 への参照に寄せ、「推奨しない」とデータの扱いを 1 か所ずつに）を結果の前に済ませた（判断不要の作業）。本文は 1〜12 頁（結論が 12 頁の上）。
+
+## 判断 70: §3.2 の「照合された記録はラベル付きの標本になる」の文（研究者・AskUserQuestion 1 回・2026-10-21）
+
+- 採用（推奨を選んだ）: **残して範囲を明記**。"this study does not evaluate such a further link, which would use several releases" を足した（脅威モデルは複数の公開物の結び付けを使わない）。他の選択肢は「削る」「そのまま」。attack-me round 1 の監査 2-2 への対応。
+- 同じ日に、The Learning Agency Lab への通知の下書き（reply-drafts-20261013.md の 5）を書き、下書き 4 の In brief の 1 文を害 (a) の定義し直しに合わせた（判断不要）。G-GEAR への引き継ぎに具体的な実装案を足した。
