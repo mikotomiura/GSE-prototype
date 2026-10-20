@@ -28,7 +28,7 @@ body.
 | 1 Introduction | `sections/introduction.tex` | Contributions paragraph only | Not written |
 | 2 Background and related work | `sections/related.tex` | No | Not written |
 | 3 Threat model | `sections/threat-model.tex` | No | Draft, revised after the first pre-submission review |
-| 4 Data and release forms | `sections/data.tex` | Counts after exclusion | Not written |
+| 4 Data and release forms | `sections/data.tex` | Counts after exclusion | Draft; the counts after exclusion are left blank |
 | 5 Attackers | `sections/attackers.tex` | No | Not written |
 | 6 Evaluation protocol | `sections/protocol.tex` | No | Not written |
 | 7 Results, with a short subsection on the Japanese translation logs (question 4) | `sections/results.tex` | Yes | After the main computation |

@@ -1,4 +1,159 @@
 \section{Data and release forms}
 \label{sec:data}
 
-To be written.
+This section describes the two corpora and the public model used in the evaluation (\S\ref{sec:data:corpora}), the
+checks made after acquisition (\S\ref{sec:data:checks}) and the release forms, that is, the processing applied to the
+logs before an attacker sees them (\S\ref{sec:data:forms}). All of it was fixed in the preregistration before any data
+were acquired, except where a deviation is reported.
+
+\subsection{Corpora and model}
+\label{sec:data:corpora}
+
+\paragraph{KLiCKe.}
+The KLiCKe corpus holds the keystroke logs, final texts and human scores of 4,992 argumentative essays on four prompts
+derived from the SAT, with 1,136 to 1,329 writers per prompt, each essay written in 30 minutes~\cite{tian2025klicke}.
+A~log has one row per event, with the press and release times, the action time, the pressed and released keys, the
+activity (such as input, removal, paste or replacement), the text change, the cursor position and the word count. The
+terms of use allow the files to be downloaded and used freely, with the corpus cited as the source. We acquired the
+corpus on 12 October 2026 (UTC), after the preregistration was fixed, from the folder linked by the corpus repository
+at a fixed commit. We acquired only the archive of the argumentative writing task and extracted only its logs, texts,
+scores and prompts. The demographic file, whose questionnaire asked for the participants' Mechanical Turk worker
+IDs~\cite{tian2025klicke}, was not acquired, and the archive we acquired holds no demographic file. The SHA-256 of
+every file is recorded in the study repository.
+
+Writers are excluded if their log, text or score is missing, or if their text has fewer than 50 words (runs of letters
+and digits). After exclusion \textbf{[n after exclusion]} writers remain.
+% The checks after acquisition found no writer that meets an exclusion criterion; the number is filled in with the
+% counts of the main computation.
+Each log is trimmed to its active writing window, from the first key press to the last event that changes the text in
+the unprocessed log; a releasing party would apply such trimming before processing, and the corpus authors also remove
+inactivity at the start and end~\cite{tian2025klicke}. The four prompts are split with a fixed seed into two pairs.
+Attackers that need training are trained on the writers of one pair and evaluated on the writers of the other, and then
+the roles are swapped. Every writer is thus evaluated once, and no writer or text of an evaluated prompt is used for
+training.
+
+\paragraph{ENJA15.}
+ENJA15 is a public corpus of English-to-Japanese translation processes recorded with Translog-II, in which Japanese was
+typed with an input method~\cite{carl2016lrec,zou2026translog}. We use only the from-scratch translation sessions and
+take the final translation recorded in each log as its text. The sessions were acquired on 12 October 2026 (UTC) from
+the repository of the database that distributes them, at a fixed revision. The database states two licences on two of
+its pages; both are non-commercial with attribution, and we follow the more restrictive one, which also requires
+derived works to be shared alike~\cite{crittlicense}. The corpus has 76 from-scratch sessions by 39 translators on six
+source texts, with 12 or 13 translators per source text. Thirty-seven translators translated two source texts and two
+translated one, so translators and source texts are crossed. Sessions are excluded if the log or translation is missing,
+if the translation is empty, or if the log contains neither an input-method event nor an inserted letter; after
+exclusion \textbf{[n after exclusion]} sessions remain.
+
+\paragraph{The KeyTAR model.}
+KeyTAR reconstructs typed text from keystroke intervals with a fine-tuned language model~\cite{qiu2026keytar}. We use
+its public artifact as released (Zenodo record 17254163), with the checkpoint trained on intervals recorded from typing
+rather than on intervals recovered through a cache side channel. The artifact is released under the MIT licence and the
+record under CC~BY~4.0; its statements on ethics and intended use do not exclude reconstruction from the intervals of
+public keystroke data. We do not fine-tune it on KLiCKe, and it runs on a local GPU.
+
+\subsection{Checks after acquisition}
+\label{sec:data:checks}
+
+Before any value of matching or utility was computed, the preregistration allowed only a fixed list of checks: the
+counts of files, rows, writers and excluded writers; the column names and values; the share of logs whose final draft,
+rebuilt from the unprocessed log, matches the distributed text; the error of the segment rule
+(\S\ref{sec:attackers:segments}); the structure of ENJA15; the inference time of KeyTAR on one log; and a verification
+of our formulas for the process measures. The checks report counts only; the scripts print no writer identifier, no
+text and no log.
+
+\paragraph{Escaped characters.}
+The distributed logs write four characters (newline, tab, double quote and backslash) in the text change and key
+columns as two-character escape sequences, which the procedure did not anticipate. Read as they are, a newline is
+inserted as two characters and the rebuilt draft drifts from the cursor position. We undo the escapes when the logs are
+read and change nothing else in the procedure; this is reported as a deviation, with the values of the checks before
+and after the change. After it, the final draft rebuilt from the unprocessed log matches the distributed text exactly,
+after normalisation of whitespace, for 4,842 of the 4,992 writers (97.0\%), against 72 before. The other 150 writers
+stay in full-text matching, and accuracy is also reported separately for writers whose rebuilt draft matches and
+writers whose draft does not.
+
+\paragraph{Other checks.}
+The action time of modifier keys, which the corpus description gives as zero~\cite{tian2025klicke}, is zero for Shift,
+Control and Alt but not for most CapsLock and Meta presses. No attacker uses hold times and the coarser forms drop
+them, so the procedure is unchanged. The corpus does not distribute the process measures computed by Inputlog, so the
+verification of our formulas against them could not be done (\S\ref{sec:protocol:utility}). For KeyTAR, the default
+settings of the artifact were recorded, and the inference on one log fitted in the memory of a 16\,GB GPU.
+
+\subsection{Release forms}
+\label{sec:data:forms}
+
+A release form fixes, for each column, what is released. Table~\ref{tab:forms} lists the forms. R0 is the unprocessed
+log, a reference. R1 is the masking of the competition data~\cite{kaggle2023lwp}. R2 to R4 release less and less: key
+categories with the position and word count, key categories alone, categories with characters and separators merged,
+and the sequence of segment values alone. R3-t rounds the press times and R7 suppresses presses at random. R5
+(substitution) and R6 (permutation) are our definitions after the names of processing steps in Vassallo et
+al.~\cite{vassallo2017privacy}, whose full text we could not obtain; they do not reproduce that work and are reported in
+the appendix. The masking with \texttt{@} of the programming datasets~\cite{edwards2023csedm} is not a form here, since
+it hides names and not the text.
+
+\begin{table*}
+  \caption{Release forms for KLiCKe. ``Category'' is one of 16 key categories (letter, digit, space, punctuation,
+  BackSpace, Delete, Enter, ArrowLeft, ArrowRight, Home, End, other navigation, Control and Meta, other modifiers,
+  mouse, other). In R3-u, letters, digits, space, punctuation and Enter are merged into one category ``char''.
+  ``Down'' is the press time. Segment values are defined in Section~\ref{sec:attackers:segments}.}
+  \label{tab:forms}
+  \small
+  \begin{tabular}{>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}p{0.22\linewidth}>{\raggedright\arraybackslash}p{0.2\linewidth}>{\raggedright\arraybackslash}p{0.1\linewidth}>{\raggedright\arraybackslash}p{0.17\linewidth}}
+    \toprule
+    Form & Pressed key & Activity and text change & Position and word count & Times \\
+    \midrule
+    R0 No processing & As is & As is & As is & As is \\
+    R1 \texttt{q} masking & Letters and digits to \texttt{q} & As is, letters and digits to \texttt{q} & As is & As is \\
+    R2 Categories & Category & Dropped & As is & As is \\
+    R3 Categories only & Category; released key dropped & Dropped & Dropped & Down only \\
+    R3-u Separators merged & Category, with ``char'' & Dropped & Dropped & Down only \\
+    R3-t($w$) Rounded times & Category & Dropped & Dropped & Down rounded to $\lfloor t/w \rfloor w$, with
+      $w = 10$, $100$, $1{,}000$\,ms \\
+    R4($w$) Segment values & \multicolumn{4}{>{\raggedright\arraybackslash}p{0.75\linewidth}}{Only the sequence
+      $\lfloor v/w \rfloor$ of the segment values $v$ of the log, with $w = 1$, $2$, $4$, $8$} \\
+    R7($p$) Suppression & As R3; each press and its release dropped with probability $p = 0.1$, $0.25$, $0.5$ &
+      Dropped & Dropped & Down of the remaining presses \\
+    R5 Substitution (appendix) & Letters and digits to a random neighbour on a QWERTY keyboard & As is, with the
+      same substitution & As is & As is \\
+    R6 Permutation (appendix) & Typed letters and digits permuted within each segment & As is, with the same
+      permutation; letters and digits of pasted, replaced and removed strings to \texttt{q} & As is & As is \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\paragraph{What the coarser forms keep.}
+Forms R3, R3-u, R3-t and R7 release the event number, the press time and the category of the pressed key, and nothing
+else. Release times and hold times are dropped because they carry the duration of a drag or of a held key, and the
+released key is dropped because a released key that differs from the pressed key could reveal the order of releases.
+Columns that the table does not list, such as the pause time distributed with KLiCKe, are dropped in every form except
+R0, and no form keeps a column derived from times. R3-t differs from R3 only in its times, so attackers that do not
+use times give the same values in both. In R7 the remaining events are renumbered.
+
+\paragraph{A check on synthetic logs before registration.}
+Before the preregistration was fixed, we checked on synthetic logs, with no human data, whether the lengths of words
+can be recovered from columns other than the key categories. The synthetic logs included deletion, deletion of a
+selection, replacement, paste, cursor movement by arrows, Home, End and mouse, and undo. In pairs of synthetic logs
+that share the category sequence and the press times and differ only in hidden choices, such as the target of a mouse
+click or the pasted words, forms R3, R3-u, R3-t and R7 gave identical output, while R0, R1 and R2 differed in every
+pair (R2 through the position and the word count). The release times were at first kept in these forms; in a
+simulation in which a drag's duration appears in its hold time, the output differed through them, and they were then
+dropped. A drag's duration, and that of a held key when the next press follows its release, still remains as a lower
+bound of the next press interval, which a form that releases press times cannot remove. In R2, rebuilding the draft
+from the cursor position recovered the exact sequence of word lengths in 64\% of the synthetic logs with light
+editing. These checks led to the present definitions of the forms, the categories and the segment rule, which are part
+of the registered plan.
+
+\paragraph{Forms for ENJA15.}
+For ENJA15 the forms are R0j (no processing); R3j, which keeps the event type and the time and replaces each key event
+by one of the categories romaji letter, conversion, commit, commit containing punctuation, BackSpace, Enter, navigation
+and other, and removes every string (the key name, the committed text and the keys typed for it); R3j-t($w$), with the
+press times of R3j rounded ($w = 10$, $100$, $1{,}000$\,ms); and R4($w$). The logs have no release events, so hold
+times do not arise. Before the main computation we checked on all sessions, which include updates of uncommitted
+strings, conversions, cancelled conversions and commits, that no row of R3j keeps a string of its session.
+
+\subsection{Handling of logs}
+\label{sec:data:handling}
+
+The logs and texts of both corpora are public, but they are kept outside the study repository, on the author's
+computers. Only aggregates are put in the repository and reported. Results per writer and excerpts of texts and logs
+are not published. Logs and texts are not sent to any external language model or other external service. KeyTAR runs
+on a local GPU, and its reconstructions are stored next to the logs and are not read, printed or published.
