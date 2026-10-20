@@ -1,4 +1,179 @@
 \section{Attackers}
 \label{sec:attackers}
 
-To be written.
+The attackers compare what a release form leaves of a log with each candidate text and choose the candidate that fits
+best. Most of them compare sequences of segment values, which roughly correspond to word lengths
+(\S\ref{sec:attackers:segments}), through a common alignment (\S\ref{sec:attackers:alignment}).
+Section~\ref{sec:attackers:list} lists the attackers, Section~\ref{sec:attackers:windows} states how they work on
+windows of a log, and Section~\ref{sec:attackers:enja} states the attackers on the Japanese translation logs. All
+attackers know the processing, and no attacker uses a column that its form does not release. The attackers and their
+parameters were fixed in the preregistration.
+
+\subsection{Segments}
+\label{sec:attackers:segments}
+
+\paragraph{Texts.}
+In a text, a word is a run of letters and digits, and its segment value is the number of letters and digits in it;
+other characters separate words.
+
+\paragraph{Logs.}
+In a log, segments are counted from the key categories alone. A letter or digit press adds 1, a BackSpace press
+subtracts 1, and a space, punctuation or Enter press closes the segment. If the next press after a Control or Meta
+press, other than a modifier, is a letter or digit, it is a shortcut and is neither counted nor a separator; whether
+Control is still held cannot be read, because the corpus gives modifier presses an action time of zero. Navigation,
+other modifiers, mouse, Delete and other presses are neither counted nor separators, and a trailing open segment is
+kept if it contains a counted press. Deletion of a selection, paste and replacement cannot be seen in the categories
+and are counted by this rule as they are, so the value of a segment can differ from the length of the word it became.
+
+\paragraph{Error of the rule.}
+The checks after acquisition compared the value of each segment with the number of its counted characters that
+survive in the final draft, obtained by replaying the unprocessed log. Of the 2,381,444 segments with at least one
+counted press, the two values agree for 77.1\%; the share of agreeing segments per writer has a median of 0.80 (10th
+percentile 0.62, 90th percentile 0.92). Empty segments, which arise for example after a comma followed by a space,
+agree by construction and are not included in these shares. The error is reported with the tables, and the rule was
+not changed. The rule ``the next press after Control'' misses shortcuts made with several keys while Control is held,
+such as two successive undos, and pastes made from a menu: in 566 of the 1,133 paste events of the corpus, the
+preceding press, ignoring Shift, Alt and CapsLock, is not Control.
+
+\subsection{Alignment}
+\label{sec:attackers:alignment}
+
+Attackers A1, A1', A2 and A3 align a sequence of record segments with a sequence of text segments by dynamic
+programming. A group maps $p$ record segments to $q$ text segments, with $(p, q)$ one of $(1,1)$, $(2,1)$, $(1,2)$,
+$(3,1)$ and $(1,3)$, which absorbs a separator that was typed but not kept or kept but not typed. The cost of a group
+is
+\[
+  \Bigl|\sum \text{record values} - \sum \text{text values}\Bigr| + \lambda\,(p - 1 + q - 1),
+\]
+with $\lambda = 8$, a value fixed in earlier prototypes and not tuned on these data; $\lambda = 4$ and $16$ are reported
+as a secondary analysis. Among paths of equal cost, the group listed first is chosen, and where the end can be chosen, the earlier position in the
+text. In full-text matching both
+sequences are used to their ends; in window matching the whole window is used and the text may end early. Under
+suppression (R7), dropping a separator press merges record segments, so the groups are extended to $(p', 1)$ and
+$(1, q)$ with $p', q$ up to $\lceil 3/(1-p) \rceil$, that is 4 for $p = 0.1$ and $0.25$ and 6 for $p = 0.5$; the
+cost is the same. This alignment ignores the binomial variation of suppression and is not a likelihood. A candidate
+with no path has infinite cost and is never chosen; if every candidate has infinite cost, all candidates tie. The
+numbers of such cases are reported.
+
+\subsection{Attackers}
+\label{sec:attackers:list}
+
+Table~\ref{tab:attackers} lists the attackers and the forms on which each is run. Attackers A2-b and A3 are trained on
+the unprocessed logs and texts of all writers of the two prompts not being evaluated, with the evaluated form applied to
+the training logs. The strongest attacker of a form is the best of the adaptive attackers (A0 to A3, including A1$'$ and A2-b) on that
+form
+(\S\ref{sec:protocol:quantities}).
+
+\begin{table*}
+  \caption{Attackers. A0 to A3 are within the threat model and adapt to the processing; A4 is a reference outside the
+  threat model.}
+  \label{tab:attackers}
+  \small
+  \begin{tabular}{>{\raggedright\arraybackslash}p{0.16\linewidth}>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}p{0.58\linewidth}}
+    \toprule
+    Attacker & Forms & What it compares \\
+    \midrule
+    A0 Total length & All & Letter and digit presses minus BackSpace presses in the log (R3-u: ``char'' presses
+      minus BackSpace; R7: the remaining presses scaled by $1/(1-p)$), against the number of letters and digits in the
+      candidate (R3-u: all characters); in R4, the sum of the released values against the sum of $\lfloor v/w
+      \rfloor$ over the candidate's segments \\
+    A1 Final-draft lengths & R0, R1, R2, R5, R6 & The final draft is rebuilt from the text change and the position (R2:
+      the categories and the position), as in the winning solution of the competition~\cite{inubushi2024first}, and
+      its word lengths are aligned with the candidate's \\
+    A1$'$ Editor replay & R3, R3-t, R7 & The category column is replayed as an editor, and the word lengths of the
+      replayed draft are aligned with the candidate's (R7: candidate lengths scaled by $1-p$) \\
+    A2 Segment alignment & R2, R3, R3-t, R4, R7 & The record segments are aligned with the candidate's segments (R4:
+      both as $\lfloor v/w \rfloor$; R7: candidate values scaled by $1-p$) \\
+    A2-b Boundary estimation & R3-u & A logistic regression predicts which ``char'' presses are separators from the
+      intervals around them; the predicted segments are aligned as in A2 \\
+    A3 Timing & R0, R1, R2, R3, R3-t, R3-u, R5, R6, R7 & The likelihood of the press intervals under the character
+      pairs of the candidate, on the A2 alignment; in R3-u combined with a length term; in R7 the duration of each
+      segment \\
+    A4 KeyTAR (reference) & R0, R1, R2, R3, R3-t & The public model reconstructs text from the intervals of letter, digit
+      and space presses; the candidate nearest to the reconstruction is chosen \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\paragraph{A0: total length.}
+A0 is the baseline that every other attacker is compared with: it chooses the candidate whose length is closest to
+the number of characters that the log leaves.
+
+\paragraph{A1 and A1$'$: the final draft.}
+A1 rebuilds the final draft from the columns that R0, R1, R2, R5 and R6 release. A1$'$ uses only the category column:
+a character press inserts at the cursor, BackSpace deletes to the left and Delete to the right, ArrowLeft, ArrowRight,
+Home and End move the cursor, with lines separated by Enter, and other navigation and mouse presses put the cursor at
+the end, since their effect cannot be known. After a Control press, Home and End move to the start and the end of the
+document and the arrows are treated as unknown; shortcuts are ignored. Both attackers align the word lengths of the
+draft with those of each candidate over the full text and choose the candidate with the lowest cost.
+
+\paragraph{A2 and A2-b: segments.}
+A2 aligns the record segments directly with the candidate's word lengths. In R3-u the separators are merged into
+``char'', so A2-b first estimates them: a logistic regression, trained on the training logs processed to R3-u,
+predicts from the intervals before and after each ``char'' press, and from the neighbouring intervals, whether the
+press is a space, punctuation or Enter.
+
+\paragraph{A3: timing.}
+From the training logs, A3 estimates the mean and variance of the logarithm of the press interval for each pair of
+consecutive characters. A pair seen fewer than 20 times takes the values of its pair of character types (such as
+letter followed by space), and a type pair seen fewer than 20 times takes the values of all intervals. For each record
+segment without a BackSpace, the intervals are scored under the character pairs of the candidate word that the A2
+alignment assigns to it, and the log-likelihoods are summed; the candidate with the highest sum is chosen. In R3-t the
+likelihood of a rounded interval is the probability of its rounding interval. In R3-u, where segments are not visible,
+A3 combines two terms: the A1$'$ replay gives the sequence of ``char'' items of the final draft, matched one to one from
+the start with all characters of the candidate, and the timing term uses the intervals between adjacent final
+characters that were typed consecutively; the length term is the log-likelihood of the difference between the replayed
+count and the candidate's character count, estimated on the training logs. The timing term is used both as a sum and
+as a mean per term, and the better of the two versions is reported as A3 on R3-u; a version with the length term alone
+is reported to separate the contribution of timing. In R7, A3 scores the duration of each segment, from its first to
+its last remaining press, with a regression on the logarithm of the candidate segment's character count, estimated on
+training logs with the same suppression. The check on synthetic logs showed that the one-to-one correspondence in R3-u
+uses in effect only the part of the log before the first replay error. Details that the registration left open, such
+as how an interval is scored when the candidate word has fewer characters than the segment has intervals, were fixed
+on synthetic logs before the data were opened and are documented with the code.
+
+\paragraph{A4: KeyTAR, a reference outside the threat model.}
+A4 takes the intervals between letter, digit and space presses, cuts them into chunks of 20 record segments, gives
+each chunk to the public KeyTAR model to reconstruct the text, and chooses the candidate with the smallest normalised
+edit distance to the concatenated reconstruction, after both are lowercased and every character other than a letter or
+digit is replaced by a space. The model is used with the default settings of its artifact, with intervals capped at
+1,023\,ms as in its training data and without preceding context. Among the defaults is a limit of 50 generated tokens
+per chunk, which is expected to cut the reconstruction of many chunks short; we kept it as registered rather than
+choose, after the fact, a setting that would make the attacker stronger. KeyTAR assumes ordinary English input without
+revision~\cite{qiu2026keytar}, it contains a language model, and it does not adapt to the processing. It is therefore
+reported in a separate row and is not part of the strongest attacker. The intervals it uses are the same in R0, R1,
+R2 and R3, so these forms share one reconstruction.
+
+\subsection{Attackers on windows}
+\label{sec:attackers:windows}
+
+A window is a run of segments of the unprocessed log that contains $k$ non-empty segments; empty segments between them
+are inside the window but not counted. Its rows run from the row after the separator that precedes its first segment
+to the separator that closes its last segment, and include the mouse, navigation and modifier rows in between. Each
+form takes these rows and segments them with its own rule, so every form starts from the same presses. Because the
+ends of a window are word boundaries of the unprocessed log, the attacker knows both ends of the window even in forms
+that hide separators (R3-u) or drop presses (R7). This favours the attacker
+(\S\ref{sec:threat-model:bias}), and the difference between R3 and R3-u in windows may be smaller than it would be for
+parts of logs released in practice.
+
+On windows, A0 counts the window's presses as on full texts and compares the count with the candidate window. A1 and
+A1$'$ are not run, since a part of the process does not determine the final draft. A2 and A2-b align the window's
+segments with the candidate window, with the window end of the alignment; A2 is also run on R0, R1, R5 and R6, whose
+key categories allow segments to be built. A3 uses the A2 alignment (in R3-u the A2-b alignment, and the timing term
+alone, since the length term is the count of A0). On full texts A3 on R3-u uses the one-to-one correspondence of the
+replay, so its difference between full texts and windows also reflects the change of mechanism. A4 reconstructs the
+window's intervals and compares the reconstruction with the candidate window.
+
+\subsection{Attackers on the Japanese translation logs}
+\label{sec:attackers:enja}
+
+In a translation, segments are split at the Japanese comma and full stop (U+3001, U+3002, U+FF0C and U+FF0E) and at
+line breaks, and the value of a segment
+is the standard number of keystrokes needed to type its reading with an input method, from the readings of a
+morphological analyser and a romaji conversion table. In a log, among the input-method and insertion events, a letter
+press adds 1, a BackSpace press subtracts 1, and a commit that contains punctuation closes the segment. Only A0 and A2
+are run on these logs. A1, A1$'$, A3 and A4 are not, because they rely on rebuilding the final draft or on models of
+English. A0 compares the number of letter presses minus BackSpace presses with the sum of the keystroke counts of the
+candidate's readings. A2 aligns the segments as on KLiCKe, with the same groups and $\lambda$. Neither reads a string,
+so they give the same values on R0j, R3j and R3j-t; in R0j the committed strings remain in the log and matching is
+trivial for an attacker that reads them, so R0j is only a reference.
