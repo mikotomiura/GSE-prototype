@@ -93,25 +93,22 @@ Kind regards,
 送る前に確かめること:
 - 添付は PDF の草稿だけ。個々の書き手の結果・本文や記録の抜粋を含めない（先方の勧めと事前登録のとおり）。
 - PoPETs は二重盲検。先方が査読者に当たる可能性があるので、草稿を他に回さないよう頼む文を入れる（下の最後の段落）。
-- 倫理の節は先方の言葉を要約して書いているので、その段落を本文に貼って正確か確かめてもらう。
+- 倫理の節は先方の言葉を要約して書いているので、書き方を変えたければ直すと 1〜2 文で伝える（段落の貼り付けと確認の依頼はやめた・2026-10-20 研究者）。
+- 研究者の意向（2026-10-20）: お礼、草稿ができたこと、独立研究者として倫理の問題に一人で向き合ってきたのでコーパスの公開に大変助けられたこと、今後も交流を続けたいことを入れる。
 
-**Subject**: Draft paper using the KLiCKe corpus (for your review before submission)
+**Subject**: Draft paper using the KLiCKe corpus
 
 Hi Yu,
 
 [I am sorry this has taken longer than I expected.] I have now finished a full draft of the paper that uses the KLiCKe corpus, and I attach it here. As promised, I wanted you to see it before it is submitted.
 
-In brief, the paper asks how well the processing applied to publicly released keystroke logs, such as the masking of letters and digits used in a recent Kaggle competition, protects against matching a log to its text. KLiCKe is the data on which we evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate, for example: against the attackers we tried, at N = 1,000, the q masking allowed accuracy of X times the chance level, while form Y reduced it to Z and kept most of the standard process measures.] All results are reported in aggregate, as you recommended; the paper contains no result for an individual writer and no excerpt of an essay or a log.
+In brief, the paper asks how well the processing applied to publicly released keystroke logs, such as the masking of letters and digits used in a recent Kaggle competition, protects against matching a log to its text. KLiCKe is the data on which we evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate.] All results are reported in aggregate, as you recommended, with no result for an individual writer and no excerpt of an essay or a log.
 
-I would be grateful if you could check one paragraph in particular. The ethics section describes the collection and consent of KLiCKe based on your messages:
+In the ethics section, I describe the IRB approval at Georgia State University and the scope of consent as you explained them to me. If you would like anything worded differently, I would be glad to change it. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date]. Because the venue uses double-blind review, I would appreciate it if you could keep the draft to yourself for now.
 
-> [paste the KLiCKe paragraph of the ethics section here]
+I would also like to thank you more personally. I work as an independent researcher, without an institution behind me, and questions of research ethics have always been something I had to face on my own. A large, carefully documented corpus that is openly available, together with your clear and generous answers to my questions, made this study possible in a way it otherwise could not have been. I am very grateful.
 
-If anything in it is inaccurate or you would prefer different wording, please let me know. Any other comments on how the paper describes the corpus would also be very welcome. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date].
-
-Because the venue uses double-blind review, I would appreciate it if you could keep the draft to yourself for now.
-
-Thank you again for making the corpus available and for your help with this study.
+I hope we can stay in touch, and I would be happy to hear about your work as well.
 
 Best regards,
 Mikoto
