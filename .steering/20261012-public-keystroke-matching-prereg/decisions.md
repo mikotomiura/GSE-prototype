@@ -307,3 +307,13 @@ PoPETs の採択の見込みの検討（会話）の後、研究者が「第一�
 - 理由: IME 論文と同じ形で、公開物の文体の門（`_style_check.py`）と書誌の運用をそのまま使える。草稿は公開しない repo に残り、論文用 repo は登録とコードの公開物のまま保てる。
 - テンプレートは PoPETs 2027 の submission-template-2027.zip（SHA-256 `b1abbcc0832b7860f5fe8d9773088540b0456965a05fd14c3d47b3a8d85ea7d7`・2026-10-20 に petsymposium.org/files から取得）。著者向けの案内（authors-2027.php・2026-10-20 に読んだ）: 本文 12 頁、必須の 3 節は頁数に数えない、識別につながる外部の資料は匿名化した複製（anonymous.4open.science など）で示すことを勧める、付録は査読者が読まなくてよい。
 - 作業記録: `.steering/20261020-public-keystroke-matching-manuscript/`。
+
+## 判断 61: 脅威モデルの節の attack-me（round 1）への対応（研究者・AskUserQuestion 1 回・2026-10-20）
+
+attack-me（stage: 原稿の外枠・査読者役 3 人と意図の監査役）を Section 3 と outline.md にかけた。判定は major revision（R1 major・R2 minor・R3 major）。記録は `.steering/20261020-public-keystroke-matching-manuscript/attack-me/outline-threat-model/round-1/verdict.md`。凍結した脅威モデル・攻撃者・手順は変えない。
+
+研究者の決定（4 問とも推奨を選んだ）:
+1. 直す一覧（verdict.md の 4 の 1〜12）を全部承認。
+2. Kaggle の公開元（The Learning Agency Lab）に、結果が出た後・投稿の前に知らせる（加工の評価の論文を出すこと、Kaggle のデータは照合していないこと）。下書きは Claude、送るのは研究者。倫理の節に書く。他の選択肢は「知らせない・理由を書く」「結果を見てから決める」。
+3. 場面 3（書き手が作文を公開し、公開された記録の中から探す）は残し、向きが逆で開いた世界になること、閉じた世界の正答率はこの場面では目安にすぎないことを限界に書く。他の選択肢は「外す」。
+4. ENJA15（問い 4）は結果の節の短い小節で本文に報告する。脅威モデルにも「同じ原文の訳を持つ者」を 1 文。他の選択肢は「付録に置き本文で 1 段落」。

@@ -1,66 +1,113 @@
 \section{Threat model}
 \label{sec:threat-model}
 
-This section first describes how keystroke logs of writing are released and who holds the texts that a released log
-could be matched to (\S\ref{sec:threat-model:setting}). It then states the attacker's knowledge, goals and the sizes of
-the candidate set (\S\ref{sec:threat-model:attacker}). The attacker's knowledge, the candidate sets and the list of
-attackers were fixed in the preregistration of this study before any data were acquired; this section motivates them
-and does not change them.
+This section describes how keystroke logs of writing are released (\S\ref{sec:threat-model:releases}), the kind of
+auxiliary information that this study considers (\S\ref{sec:threat-model:auxiliary}) and who holds it
+(\S\ref{sec:threat-model:settings}). It then states the attacker (\S\ref{sec:threat-model:attacker}) and the direction
+in which the assumptions bias the results (\S\ref{sec:threat-model:bias}). The attacker's knowledge, the candidate sets
+and the list of attackers were fixed in the preregistration of this study before any data were acquired; this section
+motivates them and does not change them.
 
-\subsection{Releases of keystroke logs and holders of texts}
-\label{sec:threat-model:setting}
+\subsection{Releases of keystroke logs}
+\label{sec:threat-model:releases}
 
-\paragraph{Logs are released with the text processed.}
-Keystroke logs of writing are released to support research on the writing process. A release may hide the text and
-keep the rest of the log. The Kaggle competition ``Linking Writing Processes to Writing Quality'' released logs of
+\paragraph{Logs are released with the text hidden.}
+Keystroke logs of writing are released to support research on the writing process, and a release may hide the text
+and keep the rest of the log. The Kaggle competition ``Linking Writing Processes to Writing Quality'' released logs of
 argumentative essays in which, in the words of its data description, ``to prevent reproduction of the essay text, all
 alphanumeric character inputs have been replaced with the `anonymous' character q;\ punctuation and other special
 characters have not been anonymized''~\cite{kaggle2023lwp}. The released columns include the press and release times,
-the activity, the text change, the cursor position and the word count. Two public datasets of keystrokes in an
-introductory programming course mask the characters of identifying text, such as a student's name, with the
-character~\texttt{@}~\cite{edwards2023csedm}. In both cases the masking keeps one character for one character, so the
-length of a masked word stays in the log: in the example of the dataset paper, a function \texttt{even()} in which the
-name ``Eve'' was masked becomes \texttt{@@@n()}~\cite{edwards2023csedm}. In both releases the masking applies to
-characters, and the times of the events remain in the logs.
+the activity, the text change, the cursor position and the word count. This is the release that motivates the study:
+the text is hidden, and every letter and digit is still present as a press.
 
-\paragraph{The structure that remains is used.}
-The lengths that masking keeps are not incidental. The winning solution of the Kaggle competition began by rebuilding
-the essay from the masked log (``the first thing I did in this competition is to reconstruct sentences from keyboard
-activities'') and used statistics of the rebuilt text, such as words per sentence and word length, to predict the
-score~\cite{inubushi2024first}. The structure that makes a masked log useful for research on writing is also the
-structure that a party holding candidate texts can compare with those texts. The processing therefore leaves open the
-question that this study asks: whether a processed log can be matched to its text.
+\paragraph{The lengths that remain are used.}
+Masking each letter and digit keeps the length of every word. The winning solution of the competition began by
+rebuilding the essay from the masked log (``the first thing I did in this competition is to reconstruct sentences from
+keyboard activities'') and used statistics of the rebuilt text, such as words per sentence and word length, to predict
+the score~\cite{inubushi2024first}. The structure that makes a masked log useful for research on writing is also the
+structure that a party holding candidate texts can compare with those texts.
 
-\paragraph{The release argument concerns labelled keystrokes.}
-The paper that released the programming datasets states the limits of its de-identification. It notes that timing and
-other typing patterns can identify participants, and answers that ``all of these identification techniques require a
-labeled sample, which the regulatory definition of identifiability assumes is not available''; its conclusion repeats
-that ``the data is deidentified only as long as there is no other labeled sample of a student's
-keystrokes''~\cite{edwards2023csedm}. The labelled sample in this argument is a sample of the same person's
-keystrokes. The threat model of this study concerns a different kind of auxiliary information: the texts.
+\paragraph{Other masking keeps lengths too.}
+Two public datasets of keystrokes in an introductory programming course mask the characters of identifying text, such
+as a student's name, with the character \texttt{@}; a~function \texttt{even()} in which the name ``Eve'' was masked
+becomes \texttt{@@@n()}~\cite{edwards2023csedm}. This release hides names, not the program, so it is not an instance of
+the threat studied here; it shows that masking one character for one character is a common choice, and with it the
+lengths of the masked strings remain. The times of the events are not processed in this release.
 
-\paragraph{Who holds the texts.}
-A released log is matched to a text only if the text exists somewhere outside the release. We see three settings in
-which it does.
-\begin{itemize}
-  \item \emph{The same kind of collection.} The essays of the KLiCKe corpus were collected on Amazon Mechanical Turk in
-    2022 and released together with their keystroke logs and human scores: 4,992 argumentative essays on four
-    prompts derived from the SAT, each written in 30 minutes~\cite{tian2025klicke}. The description of the procedure of the
-    Kaggle data names the same platform, the same kind of prompts and the same sequence of tasks~\cite{kaggle2023lwp}.
-    We do not examine whether the two releases contain the same essays, and the threat model does not depend on it:
-    the point is that a public set of about a thousand essays per prompt is the kind of candidate set that a release
-    of processed logs on the same prompts would face.
-  \item \emph{Raters, teachers and platforms.} Whoever scores an essay reads its text. The KLiCKe essays were scored by
-    trained raters on a holistic six-point scale~\cite{tian2025klicke}. In classrooms, writing tools now keep the
-    text and the writing process in one product: a writing report ``shows your full typing and editing history from
-    start to finish'' and can be shared with ``an instructor or editor''~\cite{grammarly2026authorship}, and a
-    product for student writing advertises ``video playback of draft history'' with ``insights into pasted text,
-    typing patterns, and construction time''~\cite{turnitin2026clarity}. If logs from such settings are later
-    released for research with the text processed, the teacher of a class or the staff of a course hold the texts of
-    the candidates.
-  \item \emph{The writer.} An essay may be published by its writer, in a class or online. A party who finds it can
-    look for its log in a release.
-\end{itemize}
+\paragraph{Parts of logs.}
+A log may also be shared or analysed only in part. The evaluation therefore covers windows of a log as well as full
+logs (Section~\ref{sec:protocol}).
+
+\subsection{Auxiliary information other than labelled keystrokes}
+\label{sec:threat-model:auxiliary}
+
+Earlier work on releasing keystroke data considered an attacker who holds a labelled sample of the same person's
+keystrokes. Keystroke latencies link students across samples, and rounding the latencies in typing profiles reduced
+identification~\cite{leinonen2017preventing}. The paper that released the programming datasets answers the risk of
+identification by timing in the same terms: ``all of these identification techniques require a labeled sample, which
+the regulatory definition of identifiability assumes is not available'', and ``the data is deidentified only as long
+as there is no other labeled sample of a student's keystrokes''~\cite{edwards2023csedm}. A survey of anonymisation for
+behavioural biometric data notes that ``most anonymization techniques are only evaluated rudimentarily with the
+assumption of a weak attacker''~\cite{hanisch2021survey}.
+
+This study considers a different kind of auxiliary information: the texts. Records in a release can be linked to
+outside information that the releasing party did not anticipate~\cite{narayanan2008robust}, and for logs of writing the
+most direct such information is the text that was written. A log matched to a text whose writer is known would, from
+then on, also be a labelled sample of that writer's keystrokes.
+
+\subsection{Who holds the texts}
+\label{sec:threat-model:settings}
+
+A hidden text can be matched only if it exists somewhere outside the release. Table~\ref{tab:settings} lists the
+settings we consider. They differ in what the holder has, in the direction of the search and in whether the true text
+is always among the candidates (the closed world assumed by the evaluation).
+
+\begin{table*}
+  \caption{Settings in which texts are held outside a release of processed logs.}
+  \label{tab:settings}
+  \small
+  \begin{tabular}{>{\raggedright\arraybackslash}p{0.15\linewidth}>{\raggedright\arraybackslash}p{0.19\linewidth}>{\raggedright\arraybackslash}p{0.12\linewidth}>{\raggedright\arraybackslash}p{0.19\linewidth}>{\raggedright\arraybackslash}p{0.21\linewidth}}
+    \toprule
+    Setting & Holder has & Direction & Closed world holds when & Newly learned by matching \\
+    \midrule
+    Public corpus on the same prompts & Texts of a public corpus collected in the same way & One log, many texts &
+      The hidden essays are in the corpus & The hidden text, and the score and process columns of its log \\
+    Classroom & The texts and names of the students of a class or course & One log, many texts & The release consists
+      of that class & The writing process, given for research, of a named student \\
+    Published essay & One text and its writer, found in a class or online & One text, many logs & Rarely: the log need
+      not be in the release (open world) & The writing process and score of a known writer \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\paragraph{A public corpus on the same prompts.}
+The KLiCKe corpus was collected on Amazon Mechanical Turk in 2022 and released together with its keystroke logs and
+human scores: 4,992 argumentative essays on four prompts derived from the SAT, each written in 30
+minutes~\cite{tian2025klicke}. Because its texts are public, its logs need no protection of the text; it is the
+data on which we evaluate the processing. The description of the procedure of the competition data names the same
+platform, the same kind of prompts and the same sequence of tasks~\cite{kaggle2023lwp}. A public set of about a
+thousand essays per prompt is therefore the kind of candidate set that a text-hidden release on the same prompts would
+face. The closed world holds only if the hidden essays are among the public ones. We did not examine whether the two
+releases share essays, for ethical reasons (see the ethical considerations).
+
+\paragraph{Classrooms.}
+Teachers and course staff hold the texts submitted by their students, with names. The programming datasets above were
+collected in a course~\cite{edwards2023csedm}, and writing tools now keep the text and the writing process of students
+in one product and offer a replay of the process to instructors~\cite{grammarly2026authorship,turnitin2026clarity}.
+We know of no release of logs from such tools for research. If a release contained the logs of one class with the
+text processed, its teacher would hold every candidate; if the release spans many classes, the teacher holds the
+candidates for only part of it, and the closed world does not hold.
+
+\paragraph{A published essay.}
+An essay may be published by its writer, in a class or online. A party who finds it holds one text and searches a
+release for its log. The search runs in the other direction, and the log may not be in the release at all. The
+evaluation does not run this direction, and its closed-world accuracy is only a guide in this setting: with many logs
+to search and a true log that may be absent, false matches are expected to be more frequent.
+
+\paragraph{Translation.}
+In research on the translation process, translations of the same source text by other translators are held by the
+researchers who collected them. The Japanese translation logs evaluated in this study use these translations as
+candidates (Section~\ref{sec:results}).
 
 \subsection{Attacker}
 \label{sec:threat-model:attacker}
@@ -69,23 +116,39 @@ which it does.
 The attacker holds one processed log and $N$ candidate texts that include the true text, all written on the same
 prompt. The attacker knows the processing procedure, following Kerckhoffs's principle~\cite{kerckhoffs1883}. The
 attacker may train on public data of the same kind, that is, logs before processing paired with their texts; in this
-study these are the writers of the prompts that are not being evaluated, and their texts are never candidates. The
-attacker does not use the writer's earlier texts, text generated by language models, or links across several
-releases. In the taxonomy of Wagner and Eckhoff~\cite{wagner2018metrics}, the attacker is passive, external and static
-and has prior knowledge (the candidate set and the training data). One attacker in this study, the public KeyTAR
-model~\cite{qiu2026keytar}, contains a public language model; it is reported as a reference outside this threat
-model.
+study these are the writers of the prompts that are not being evaluated, and their texts are never candidates. Beyond
+the processed log and the candidates, the attacker does not use the writer's earlier texts, text generated by language
+models, or links across several releases (such as several logs of the same writer). In the taxonomy of Wagner and
+Eckhoff~\cite{wagner2018metrics}, the attacker is passive, external (it observes the release from outside the
+releasing party) and static, and has prior knowledge (the candidate set and the training data). One attacker in this
+study, the public KeyTAR model~\cite{qiu2026keytar}, contains a public language model; it is reported as a reference
+outside this threat model.
 
 \paragraph{Goals and harms.}
-The attacker may want (a) to learn the content of a hidden text, which defeats the purpose of the processing, or (b)
-to link a log and its other columns (times, the revision process, the score) to a text and, where the writer of the
-text is known, to the writer. Both rest on the link between a log and its text, which is what this study measures.
-The study does not identify writers.
+The main harm is (b): linking a log and its other columns (times, pauses, the revision process, pasting, the score)
+to a text and, where the writer of the text is known, to the writer. In the classroom and published-essay settings,
+this ties a record that a writer gave for research to a named person. A secondary harm is (a): learning which text a
+processed log hides, which defeats the purpose of the processing even when that text is public elsewhere. Both rest on
+the link between a log and its text, which is what this study measures; the study does not identify writers. Because
+the protection given by a processing step may differ between writers, the distribution of accuracy per writer is
+reported as well as the mean.
 
 \paragraph{Size of the candidate set.}
-We use $N = 10$ (a narrowed set, such as a small class or a list of submissions), $N = 100$ (a year or a course) and
-$N = 1{,}000$ (a large corpus on the same prompt, as in the first setting above).
+We use $N = 10$, $100$ and $1{,}000$. The value $1{,}000$ is the size of a public corpus on one prompt; $10$ and
+$100$ are illustrative sizes of a class or a list of submissions and of a year or a course. $N$ gives only the number
+of candidates. The decoys are drawn uniformly from writers on the same prompt, who need not be as similar to one another
+as the members of one class.
 
-\paragraph{Closed world.}
-The true text is always among the candidates. Whether a log can be matched when its text may be absent (the open
-world) is examined only as a diagnostic.
+\subsection{Assumptions and the direction of bias}
+\label{sec:threat-model:bias}
+
+Some assumptions favour the attacker: the true text is always among the candidates (the closed world, examined
+otherwise only as a diagnostic), the attacker trains on data collected in the same way as the evaluated logs, and in
+windows the attacker knows where the window starts and ends. Others limit it: the attackers do not use language models,
+the writer's earlier texts or several releases, because the study measures what the processed columns themselves leave.
+The results therefore describe the attackers tried here, under these assumptions. They give no proof of safety and no
+upper bound on the risk of matching; a processing step that defeats these attackers may not defeat a stronger one.
+
+Under this threat model a releasing party chooses which columns to keep, how coarsely to give times and lengths, and
+whether to release full logs or parts of them. The results are material for that choice; they do not recommend a
+form.
