@@ -29,9 +29,9 @@
    - 抄録の日本語の機械訳を足す（`ja.json` に CS の ID で）。
    - `make_screening_candidates.py` が確かめの標本を群 `coverage_sample` として出し、TRACE の DB と `c_screening.py` が CS の記録を読む（`records-coverage.json`・`make_coverage_records.py`）。
 
-6. 判定者 1 の DB（`TRACE_database.xlsx`）を `make_trace_db.py`（`update_trace_db.py`）で作り直し、段 2・3 の「最終」と「最終の中心」の選び肢に「合意できない」が出ることを確かめる（判断 69 で「最終」に、判断 72 で「最終の中心」に足した。Excel で閉じてから）。
+6. 判定者 1 の DB（`TRACE_database.xlsx`）を `make_trace_db.py`（`update_trace_db.py`）で作り直し、段 2・3 の「最終」と「最終の中心」の選び肢に「合意できない」が出ることを確かめる（判断 69 で「最終」に、判断 72 で「最終の中心」に足した。Excel で閉じてから）。**2026-10-20 に済み**（判断 76。元の DB は Drive の `AF-NR/` に移っていたので、脚本の既定をそこに直した）。
 
-7. 研究者: 反例集の V03 に足した 2 項目（「I would rather not use it again」・「I avoid starting my assignments」）と、そのキー（`key-items.csv` の type・target・target_from_stem）を確かめる（判断 74 の後・AI が下書きした）。違えば直してから当日の検査に進む。
+7. 研究者: 反例集の V03 に足した 2 項目（「I would rather not use it again」・「I avoid starting my assignments」）と、そのキー（`key-items.csv` の type・target・target_from_stem）を確かめる（判断 74 の後・AI が下書きした）。違えば直してから当日の検査に進む。**2026-10-20 に済み**（このままでよい・判断 76）。
 
 ## 締切を遅らせたとき（判断 74・GSRR-39）
 
@@ -111,7 +111,7 @@
 判定するのは第一著者と共著者の 2 人。AI は段 1 で、第一著者が除いた記録を拾い直して共著者に回す網としてだけ使う（AI の答えは最終を決める材料にしない。`differences --stage 1` は止まり、AI の引用や理由は出ない。ただし最終の CSV の ai 列と、網を待つ記録の止まりの文で、AI が回すべきと答えたかは研究者にも分かる）。段 2・3 では AI を走らせない（`prepare`・`gate`・`check-ai` は止まる）。共著者の冊は `make_coauthor_db.py` で作り、Drive の `TRACE/Co-Author/` に置く。冊には第一著者と AI の判定が入らない。共著者が返した冊は、`import-coauthor` で取り込むまで研究者は開かない。
 
 共著者への受け渡し（判断 44・55）:
-- 1 回目（登録の直後）: 段 1 の 2 割の冊。追加候補 264 件から 53 件（seed 20261018）と、確かめの標本 300 件から 60 件（seed 20261023）、合わせて 113 件。`make_coauthor_db.py --stage 1 --out <置き場所>`。⚠️ Drive の今の段 1 の冊は 264 件からの 53 件だけ。作り直して置き換えるのは研究者に確かめてから。
+- 1 回目（登録の直後）: 段 1 の 2 割の冊。追加候補 264 件から 53 件（seed 20261018）と、確かめの標本 300 件から 60 件（seed 20261023）、合わせて 113 件。`make_coauthor_db.py --stage 1 --out <置き場所>`。Drive の今の段 1 の冊（2026-10-19 に `--hold` で作った 113 件）は、2026-10-20 の道具で作り直しても作成日の 1 行が違うだけだった（判断 76）。そのまま使う。
 - 2 回目（第一著者の段 1 が 564 件すべて済み、2 割の冊が戻った後）: 段 2・3 の冊（全文段に回った記録の全部）と、段 1 の追加の冊（網の記録。2 割の一致が 80% に届かなかったときは段 1 の残りの全部）を同時に渡す。
 - 3 回目（要るときだけ）: 追加の段 1 の冊で共著者だけが回した記録の段 2・3 の冊と、保留の記録に全文が見つかったときの判定し直しの冊。どちらも `coauthor-ids --stage 2 --book h2`（名前は新しく）が、全文段に回った記録のうちその回の共著者の判定がまだ無いものを出す。冊を作り、戻ったら `import-coauthor --stage 2 --book h2`。`coauthor-ids --stage 2` が「no record」で止まれば、渡す物は残っていない。
 
