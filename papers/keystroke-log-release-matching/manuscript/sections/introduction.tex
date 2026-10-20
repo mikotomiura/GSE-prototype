@@ -7,7 +7,8 @@
 Keystroke logs record how a text was written: every press and release, the pauses between them, the revisions and the
 movements of the cursor. Writing research uses them to study the process of writing, and public corpora release logs
 together with their texts and scores~\cite{tian2025klicke}. A~log also carries the text it produced, so a release
-that is meant to protect the writers has to hide the text while keeping the process. One public release did this by masking letters and digits:
+that is meant to keep the text apart from the process has to hide the text. One public release did this by masking
+letters and digits:
 the logs of a Kaggle competition on writing quality replaced every letter and digit by \texttt{q}, with the stated goal
 ``to prevent reproduction of the essay text''~\cite{kaggle2023lwp}. The lengths of words, the punctuation, the times
 and the cursor positions remained, and the winning solution rebuilt the masked essays from the logs and used their
@@ -18,21 +19,23 @@ those who collected and scored them, and texts on the same prompts can be public
 texts of a class. A party
 who holds candidate texts does not need a labelled sample of a writer's keystrokes, which earlier work on releasing
 keystroke data assumed an attacker would need~\cite{edwards2023csedm}; it can compare what the processed log leaves with
-each text. This paper asks whether the processing meets its own goal against such a party, and what each form of
-processing costs research.
+each text. This paper asks how far processing keeps logs apart from their texts against such a party, which is how we read the
+stated goal, and what each form of processing costs research.
 
-\textbf{[Paragraph on the approach: the evaluation answers the question for one processed log against $N$ candidate
+\textbf{[Paragraph on the approach, stating the four questions of the preregistration (protection by each form,
+the effect of the columns kept and of the attacker, the process measures that remain, and the Japanese translation
+logs): the evaluation answers the question for one processed log against $N$ candidate
 texts on the same prompt in a closed world, with $N = 10$, $100$ and $1{,}000$, on a public corpus whose texts are
-known (KLiCKe), for the masking used in practice and for alternatives that release less (key categories, merged
+known (KLiCKe), for the masking used in one public release and for alternatives that release less (key categories, merged
 separators, rounded times, segment values, suppression), against attackers that know the processing; each form is
 reported with the accuracy of the strongest attacker, as a multiple of $1/N$ and as a gain over an attacker that uses
 only the total length, and with how far ten standard process measures can still be computed. The study was
 preregistered before any data were acquired.]}
 
-\textbf{[Paragraph on the harms: the main harm is learning which text a processed log hides, against the goal the
-releasing party stated; linking a log to a named writer is stated only as a consequence if logs were released by class
+\textbf{[Paragraph on the harms: the main harm is the link between a processed log and its text, for a party that
+holds the text, read against the goal the releasing party stated; linking a log to a named writer is stated only as a consequence if logs were released by class
 or found from a published essay (Section~\ref{sec:threat-model}).]}
 
-\textbf{[Contributions, after the results. Not more than the evaluation of the processing used in practice and of
+\textbf{[Contributions, after the results. Not more than the evaluation of the masking used in one public release and of
 alternatives, against the attackers tried, with the cost to the process measures; no claim of safety or of an upper
 bound.]}

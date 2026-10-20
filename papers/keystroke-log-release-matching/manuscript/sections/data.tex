@@ -14,8 +14,10 @@ The KLiCKe corpus holds the keystroke logs, final texts and human scores of 4,99
 derived from the SAT, with 1,136 to 1,329 writers per prompt, each essay written in 30 minutes~\cite{tian2025klicke}.
 A~log has one row per event, with the press and release times, the action time, the pressed and released keys, the
 activity (such as input, removal, paste or replacement), the text change, the cursor position and the word count. The
-terms of use allow the files to be downloaded and used freely, with the corpus cited as the source. We acquired the
-corpus on 12 October 2026 (UTC), after the preregistration was fixed, from the folder linked by the corpus repository
+description of use by the corpus authors allows the files to be downloaded and used freely, with the repository cited
+as the source~\cite{inputlog2026community}, and the corpus authors told us (personal communication) that the corpus is
+released under the MIT License. We acquired the
+corpus on 12 October 2026 at 19:29 UTC, after the preregistration was registered at 16:43 UTC, from the folder linked by the corpus repository
 at a fixed commit. We acquired only the archive of the argumentative writing task and extracted only its logs, texts,
 scores and prompts. The demographic file, whose questionnaire asked for the participants' Mechanical Turk worker
 IDs~\cite{tian2025klicke}, was not acquired, and the archive we acquired holds no demographic file. The SHA-256 of
@@ -153,7 +155,7 @@ strings, conversions, cancelled conversions and commits, that no row of R3j keep
 \subsection{Handling of logs}
 \label{sec:data:handling}
 
-The logs and texts of both corpora are public, but they are kept outside the study repository, on the author's
+The logs and texts of both corpora are public, but they are kept outside the study repository, on the authors'
 computers. Only aggregates are put in the repository and reported. Results per writer and excerpts of texts and logs
 are not published. Logs and texts are not sent to any external language model or other external service. KeyTAR runs
 on a local GPU, and its reconstructions are stored next to the logs and are not read, printed or published.

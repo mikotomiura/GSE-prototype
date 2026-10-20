@@ -17,7 +17,8 @@ Proceedings on Privacy Enhancing Technologies 2027, submission template of 2027:
 double-blind review (anonymous option of the class, third-person references to the author's own work, identifying
 external material only through an anonymised copy); the first page must state how the work is relevant to real-world
 privacy applications; three mandatory sections (ethical considerations, open science, AI use) between the
-acknowledgements and the references, outside the page limit, in the order of the template (after `\appendix`, as in
+acknowledgements and the references, outside the page limit, in the order of the template (`\appendix`, the acknowledgements, the three sections, the references, then the
+appendix sections, as in
 the template's example); appendices are not required reading, so every result needed for a conclusion is in the main
 body.
 
@@ -37,7 +38,7 @@ body.
 | Ethical considerations | `sections/ethics.tex` | No | Draft |
 | Open science | `sections/open-science.tex` | No | Draft |
 | AI use | `sections/ai-use.tex` | No | Draft |
-| Appendices (after the references): all writers for A0 to A3, forms R5 and R6, the full KeyTAR rows | to be added | Yes | After the main computation |
+| Appendices (after the references): all writers for A0 to A3, forms R5 and R6, the full KeyTAR rows, the exploratory tables | to be added | Yes | After the main computation |
 
 ## First page
 
@@ -49,7 +50,9 @@ attacker who holds candidate texts, and what it costs research. The evaluation a
 candidates in a closed world; harm (b), linking a log to a named writer, is stated only as a consequence if logs were
 released by class or found from a published essay. The first page also says that the auxiliary information is the
 text, not a labelled sample of keystrokes. The contributions paragraph is written after the results and does not
-claim more than the evaluation of processing used in practice and of alternatives against the attackers tried.
+claim more than the evaluation of the masking used in one public release and of alternatives against the attackers
+tried. Harm (a) is the link between a processed log and its text for a party that holds the text; the stated goal is
+the prevention of reproduction, and reading it as keeping the text apart from the process is ours.
 
 ## What a releasing party takes away
 
@@ -62,16 +65,21 @@ Agreements not to re-identify, which releasing parties also use, are discussed a
 
 ## Page budget
 
-Estimated on 21 October 2026, before the results. The main body runs from page 1 to the left column of page 11
-(about 10.5 pages). The results (two tables, one figure, the subsection on the Japanese translation logs, about 2.5
-pages), the three paragraphs of the introduction, the take-aways, the conclusion (about 0.8 page) and the abstract
-(about 0.25 page) bring it to about 14 pages, so about two pages (four columns) move to the appendices after the
-results, in this order: (1) merge the overlap of the assumptions (Section 3.5) and the limitations (Section 8.1);
-(2) the checks after acquisition and on synthetic logs (Sections 4.2 and 4.3); (3) the registration paragraph of
-Section 6.8, into the open science section; (4) the exploratory analyses (Section 6.7); (5) the methods for the
-Japanese translation logs (Sections 4.1, 4.3, 5.5 and 6.6), with a summary of three sentences kept in the body.
-Items (1) to (5) free about 3.5 columns; if more is needed, (6) the details of A3 and of the alignment, then (7) the
-table of process measures. The methods of the main results (full texts, windows, utility) stay in the body.
+Estimated on 21 October 2026, before the results, and revised after the first pre-submission review of the manuscript
+(the appendices are not required reading, so nothing that a result in the body needs is moved). The main body runs
+from page 1 to page 11 (about 11 pages after the revision). The results (two tables, one figure, the subsection on the
+Japanese translation logs, about 2.5 pages), the three paragraphs of the introduction, the take-aways, the conclusion
+(about 0.8 page) and the abstract (about 0.25 page) bring it to about 14.5 pages, so about 2.5 pages move to the
+appendices after the results, in this order: (1) merge the overlap of the assumptions (Section 3.5) and the
+limitations (Section 8.1), and state once each the absence of a recommendation and the handling of the data; (2) the
+checks after acquisition and on synthetic logs (Sections 4.2 and 4.3), keeping in the body the agreement of the segment
+rule and a one-sentence summary of each deviation; (3) the details of the registration (seeds and hashes) of Section
+6.8, into the open science section, keeping a two-sentence summary in Section 6; (4) the procedures of the exploratory
+analyses (Section 6.7), keeping one paragraph that names them; (5) the details of the methods for the Japanese
+translation logs (Sections 4.1, 4.3, 5.5 and 6.6), keeping in the body the candidates, the segment rule, the quantity
+that answers question 4 and the rule for "exceeds". The details of A3 and of the alignment and the table of process
+measures stay in the body, since the main results depend on them. If (1) to (5) do not suffice, the next candidates
+are chosen with the results in view.
 
 ## Claims and evidence: Section 2 (Background and related work)
 
@@ -82,7 +90,7 @@ table of process measures. The methods of the main results (full texts, windows,
 | Records are linked through auxiliary information the releasing party did not anticipate | `narayanan2008robust` | Stated |
 | Evaluations of anonymisation for behavioural data often assume a weak attacker | `hanisch2021survey` (quotation) | Quoted |
 | Earlier work on releasing keystroke data considered labelled keystroke samples and identification, not texts | `leinonen2017preventing`, `edwards2023csedm` | Stated for these works; not "no work considers texts" |
-| What is new: the evaluation, on public keystroke data whose texts are known, of the processing used in practice and of alternatives, by an attack that matches logs to texts | Preregistration, "What is not concluded" (last item); the literature searches before registration found no such evaluation | "To our knowledge", with the sources, dates and counts of the searches in two sentences (the search terms were not recorded and are not reconstructed) |
+| What is new: the evaluation, on public keystroke data whose texts are known, of the masking used in one public release and of alternatives, by an attack that matches logs to texts | Preregistration, "What is not concluded" (last item); the literature searches before registration found no such evaluation | "To our knowledge", with the sources, dates and counts of the searches in two sentences (the search terms were not recorded and are not reconstructed) |
 
 ## Claims and evidence: Section 3 (Threat model)
 
@@ -124,6 +132,13 @@ table of process measures. The methods of the main results (full texts, windows,
 - The KLiCKe authors receive the paper when it is complete.
 - Submitted version: the personal communication is undated and the registration link is withheld (anonymised copy of the study repository instead); both are restored in the camera-ready version.
 - Code: published only for the two corpora evaluated; no code reads other released logs.
+- The benefit is stated as the measurement on two corpora, not as a means for releasing parties to measure their own
+  logs (the code covers the two corpora only).
+- The releasing party of the competition data is informed as soon as the results are known, about two weeks before
+  submission, with time to respond; the date, the time given and the response are reported.
+- Submitted version: "the authors", and "no institutional ethics committee was available to the authors", with the
+  reason for not seeking a board outside an institution (to be confirmed by the authors); a statement of interests
+  (to be written by the authors).
 
 ## Not claimed in Section 3
 

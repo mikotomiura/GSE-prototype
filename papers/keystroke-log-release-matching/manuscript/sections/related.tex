@@ -5,8 +5,9 @@
 % the claims and their strength follow the table for this section in outline.md.
 
 \paragraph{Matching and reconstruction from keystrokes.}
-Matching a log to candidate texts is a known kind of attack, and we do not claim a stronger attack. Keystroke timings
-alone have been used to decide which of a set of candidate texts was typed~\cite{gonzalez2021reverse}. KeyTAR
+Matching a log to candidate texts is a known kind of attack, and we do not claim a stronger attack. Inter-keystroke
+timings leaked by interactive SSH sessions were shown to speed up the search for typed passwords~\cite{song2001timing}.
+Keystroke timings alone have been used to decide which of a set of candidate texts was typed~\cite{gonzalez2021reverse}. KeyTAR
 reconstructs English input from inter-keystroke timings with a fine-tuned language model, without
 candidates~\cite{qiu2026keytar}, and reports that reconstruction ``is extremely sensitive to the accuracy of retrieved
 inter-keystroke timings''. Outside keystroke logs, the sequence of packet lengths of encrypted voice calls identifies
@@ -27,9 +28,11 @@ attacker~\cite{hanisch2021survey}. Our forms are our own definitions after these
 
 \paragraph{Auxiliary information and uniqueness.}
 Records in a release can be linked through auxiliary information that the releasing party did not
-anticipate~\cite{narayanan2008robust}. Measures of uniqueness, such as the share of records that a few known points
-single out, fall as the population grows~\cite{farzanehfar2021risk}, and uniqueness in a sample does not imply
-uniqueness in the population~\cite{sanchez2016comment}. For processed logs of writing, the auxiliary information is the
+anticipate~\cite{narayanan2008robust}. The share of records that a few known points single out decreases only slowly
+as a dataset grows~\cite{farzanehfar2021risk}, and whether uniqueness in a sample indicates the likelihood of a
+correct re-identification in the population is disputed~\cite{sanchez2016comment,rocher2019estimating}. A university
+that holds data about students decides what to release, to whom and for what purpose~\cite{borgman2018open}; the
+settings of Section~\ref{sec:threat-model:settings} describe, for processed logs, who holds the texts. For processed logs of writing, the auxiliary information is the
 text, and the question is how far the structure that remains, the lengths of words and the times between presses,
 singles out the true text among texts on the same prompt.
 
@@ -41,11 +44,12 @@ that no work considers texts. Public corpora of writing processes with their tex
 and ENJA15~\cite{carl2016lrec}, make such an evaluation possible, because the true text of every log is known.
 
 \paragraph{What is new.}
-What is new is the evaluation, on public keystroke data whose texts are known, of the processing used in practice and
+What is new is the evaluation, on public keystroke data whose texts are known, of the masking used in one public release and
 of alternative processing, by attacks that match logs to texts, together with what each form costs the process measures
 of writing research. To our knowledge, no such evaluation has been published.
-The searches behind this statement were made on 12 October 2026, before registration: in OpenAlex we traced the
+The searches behind this statement were made on 11 October 2026 (UTC), before registration: in OpenAlex we traced the
 works citing the attacks on timings~\cite{gonzalez2021reverse,monaco2019searching,qiu2026keytar}, the rounding of
 latencies~\cite{leinonen2017preventing} and KLiCKe~\cite{tian2025klicke}, and screened the titles and abstracts of the
 works of four authors of keystroke-logging research on writing (663 works); we also read the full text of the
-anonymisation survey~\cite{hanisch2021survey}. Google Scholar and Semantic Scholar were not searched.
+anonymisation survey~\cite{hanisch2021survey}. The search terms were not recorded, and Google Scholar and Semantic
+Scholar were not searched.

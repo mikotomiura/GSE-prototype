@@ -4,7 +4,7 @@
 This section states how candidate sets are built (\S\ref{sec:protocol:candidates}), what is reported for matching
 (\S\ref{sec:protocol:quantities}) and for the process measures (\S\ref{sec:protocol:utility}), how the two are
 summarised (\S\ref{sec:protocol:summary}), the diagnostics (\S\ref{sec:protocol:diagnostics}) and the analysis of the
-Japanese translation logs (\S\ref{sec:protocol:enja}). Two exploratory analyses that are not part of the
+Japanese translation logs (\S\ref{sec:protocol:enja}). Five exploratory analyses that are not part of the
 preregistration are described separately (\S\ref{sec:protocol:exploratory}). Section~\ref{sec:protocol:registration}
 states how the registered plan relates to what was run. No pass or fail criterion is set: $k$, $N$ and the levels of
 processing are settings of the experiment, not thresholds.
@@ -34,7 +34,7 @@ number is reported.
 
 \paragraph{Samples.}
 KeyTAR is expensive to run, so 125 writers are drawn from each prompt, 500 in all, and the main tables report every
-attacker on these 500 writers. Attackers A0 to A3 on all writers after exclusion are reported in the appendix.
+attacker on these 500 writers, so that KeyTAR stands next to the other attackers on the same writers. Attackers A0 to A3 on all writers after exclusion are reported in the appendix.
 
 \subsection{Reported quantities}
 \label{sec:protocol:quantities}
@@ -42,7 +42,10 @@ attacker on these 500 writers. Attackers A0 to A3 on all writers after exclusion
 For each form, attacker, $N$ and scope we report the accuracy (the share of logs whose true text is chosen, averaged
 over draws and starts) with its 95\% interval, its multiple of $1/N$, and its gain over A0, the difference in accuracy
 from the attacker that uses only the total length, with its interval. Intervals are percentile bootstrap intervals with
-writers as units, 2,000 resamples stratified by prompt; cells of the same sample use the same resamples.
+writers as units, 2,000 resamples stratified by prompt; cells of the same sample use the same resamples. Two
+reference points serve different purposes. What processing removes is read from R0 and from the contrasts between
+forms, as the protection of a release is measured against the unprocessed data~\cite{stadler2022synthetic}; the gain
+over A0 is what an attacker obtains beyond the total length that every form leaves.
 
 \paragraph{Strongest attacker.}
 For each form, the strongest attacker is the maximum over the adaptive attackers available on that form. Its interval
@@ -73,7 +76,7 @@ A form that defeats matching may also defeat the research the release was for. W
 measures of the KLiCKe paper~\cite{tian2025klicke}: mean P-burst length (bursts ended by a pause over 2\,s), mean
 R-burst length, mean pause (intervals over 200\,ms), mean within-word and between-word pauses, mean deletion length,
 deletion proportion, mean insertion length, insertion proportion, and the variance of the production rate over ten equal
-intervals. The definitions follow that paper and are computed with our own formulas, the same code for every form. The
+intervals (named as in that paper and computed as a standard deviation, below). The definitions follow that paper and are computed with our own formulas, the same code for every form. The
 paper gives no operational definition of the ``task maximum'' to which the production rate is related; we divide the
 production rate of each interval by the maximum interval rate over all writers of the same prompt, which is the same
 denominator for every form, and take the standard deviation over the ten intervals. Characters are counted as character
@@ -130,8 +133,11 @@ of resamples, the multiple of $1/N$, the gain over A0, the numbers of process me
 and not computed, and the median Spearman correlation with R0 over the ten measures. The figure plots, for $N =
 1{,}000$ on full texts, the strongest attacker's multiple of $1/N$ against the median Spearman correlation with R0 over
 the ten measures, in which a measure that is not computed counts as zero and an approximated measure counts with its
-approximate value; R4 computes none of the measures and therefore sits at zero. The forms that are not dominated on
-both axes are described. All cells are given in the appendix, and no cell is selected for being favourable. The table
+approximate value; R4 computes none of the measures and therefore sits at zero. The utility axis is the agreement of
+our own formulas with their values in R0, for these ten measures only; it does not cover measures not yet defined or
+the prediction of scores, and it depends on how the measures are aggregated. The forms that are not dominated on both
+axes are described, against the attackers tried; a low accuracy is not evidence of protection
+(\S\ref{sec:threat-model:bias}). All cells are given in the appendix, and no cell is selected for being favourable. The table
 and the figure are material for choosing a form; no rule recommends one, and the decision is left to the releasing
 party.
 
@@ -146,9 +152,10 @@ form and $N$ in the main computation and is not selected again, since the maximu
 lies above chance; each adaptive attacker is also reported. Accuracy near $1/N$ is expected.
 
 \paragraph{Open world.}
-For $N = 1{,}000$ on full texts, we pair, for each draw, the strongest attacker's lowest cost over the $N$ candidates
-with its lowest cost over the same candidates without the true text, and report the probability that the former is
-lower (ties count one half) as an area under the curve. It shows how well the scores separate candidate sets that
+For $N = 1{,}000$ on full texts, each draw gives two values for the strongest attacker: its lowest cost over the $N$
+candidates, and its lowest cost over the same candidates without the true text. Pooling each kind of value over all
+logs and draws, we report the probability that a value of the first kind is lower than a value of the second kind,
+over all pairs (ties count one half), as an area under the curve. It shows how well the scores separate candidate sets that
 contain the true text from sets that do not; it is not a rate of false matches (\S\ref{sec:threat-model:bias}).
 
 \paragraph{Position of true windows.}
@@ -166,15 +173,20 @@ translators and source texts are crossed, intervals come from 2,000 bootstrap re
 sessions, without stratification, and differences are taken within each resample. The quantity that answers the
 question is the accuracy of A2 on R3j, full texts and $N$ = all, with its differences from $1/N$ and from A0. We say
 that matching ``exceeds'' chance and A0 only if the lower bounds of the intervals of both differences are above zero.
-R3j-t($w$) and R4($w$) are reported with the same rule, values per source text are only described, and R0j is a
-reference. ENJA15 is much smaller than KLiCKe, and its intervals are expected to be wide.
+R3j-t($w$) and R4($w$) are reported with the same rule; since neither A0 nor A2 uses times, R3j-t($w$) gives the
+values of R3j. Values per source text are only described, and R0j is a reference. ENJA15 is much smaller than KLiCKe, and its intervals are expected to be wide.
 
 \subsection{Exploratory analyses not in the preregistration}
 \label{sec:protocol:exploratory}
 
-Two analyses were added after the preregistration was fixed and are not part of it. They change no registered value or
-procedure. Their procedures were fixed and committed to the study repository before any value of matching or utility
-on the human data had been seen, and they are reported as exploratory and are not used to answer the four questions.
+% The statement about the last three analyses holds only if no result of the main computation had been opened when
+% their procedures were committed; confirm this with the record of the main computation before submission.
+Five analyses were added after the preregistration was fixed and are not part of it. They change no registered value
+or procedure. Their procedures were fixed and committed to the study repository before any value of matching or
+utility on the human data had been seen, the first two on 13 October 2026 and the other three on 21 October 2026, and
+they are reported as exploratory and are not used to answer the four questions. The last three use the strongest
+attacker selected in the main computation for the same form and $N$, without selecting again, on full texts, the main
+forms, $N = 10$ and $1{,}000$ and the 500 writers, with the same resamples.
 
 \paragraph{Uniqueness of word-length sequences among $N$ candidates.}
 The first analysis uses the texts alone. For each of the 500 writers and each $k$ from 1 to 50, five runs of $k$
@@ -184,9 +196,10 @@ the accuracy $1/m$ of an attacker who chooses uniformly among the $m$ texts that
 draw reference lines $k^{*} = \log_2 N / h$, where $h$ is a plug-in estimate of the entropy rate of word lengths in
 bits per word, conditioned on up to two preceding words~\cite{kalimeri2012entropy}; plug-in estimates fall as the
 order rises, and the lines are a reference, not a prediction. We call the quantity uniqueness among $N$ candidates and
-not a risk of re-identification, since uniqueness in a sample does not imply uniqueness in a
-population~\cite{sanchez2016comment}, and we do not extend it beyond the values of $N$ tried, since uniqueness falls as
-the set grows~\cite{farzanehfar2021risk}.
+not a risk of re-identification. Whether uniqueness in a sample says anything about a population is
+disputed~\cite{sanchez2016comment,rocher2019estimating}, and in location data unicity decreases, slowly, as the dataset
+grows~\cite{farzanehfar2021risk}; here the population is the set of $N$ candidates itself, and we do not extend the
+quantity beyond the values of $N$ tried.
 
 \paragraph{A form with differentially private noise.}
 The second analysis adds a form R-DP($\varepsilon$), $\varepsilon = 0.5$, $1$, $2$, $4$, built on R3, with letters and
@@ -203,8 +216,23 @@ and an actual release would also need an implementation that is exact on finite
 computers~\cite{canonne2020discrete}. The attackers are those of R3, with the timing table of A3 built from training
 logs with the same interval noise; the candidates are unchanged, and every process measure that R3 computes is counted as
 approximated. The scope, samples and resamples are those of the main computation, with the contrast R3~$-$~R-DP and the
-open-world area, but no negative control. R-DP is reported in exploratory tables and is not part of the main table or
-figure.
+open-world area, but no negative control. R-DP is reported in exploratory tables, where $\varepsilon$ is labelled as the budget per segment count and per
+interval, and it is not part of the main table or figure.
+
+\paragraph{The upper tail of accuracy per writer.}
+The third analysis reports the 95th and 99th percentiles of accuracy per writer and the share of writers whose true text
+is chosen alone in every draw. No value per writer is reported.
+
+\paragraph{Matches above a margin.}
+The fourth analysis takes, for each log and draw, the difference between the attacker's second-lowest and lowest cost
+over the candidates (zero if the lowest is tied), with log-likelihoods turned into costs by a change of sign. At
+thresholds set at the 0th, 10th, \ldots, 90th percentiles of these differences, it reports the share of logs and draws
+at or above the threshold and the accuracy among them. Costs of different attackers are not compared.
+
+\paragraph{Accuracy by score band.}
+The fifth analysis divides the 500 writers of each prompt into thirds by their human score and reports the strongest
+attacker's accuracy in each third and the difference between the top and bottom thirds. The attackers do not use the
+scores.
 
 \subsection{Registration, deviations and reproducibility}
 \label{sec:protocol:registration}
@@ -228,6 +256,6 @@ before any value of matching was seen, and are recorded with the code.
 
 \paragraph{Predictions.}
 Before any data were acquired, we registered predictions of the strongest attacker's accuracy for $N = 1{,}000$ on full
-texts, with a reason for each; they were proposed by an AI assistant and adopted by the author (see the AI use
+texts, and of KeyTAR and of the forms reported in the appendix, with a reason for each; they were proposed by an AI assistant and adopted by the authors (see the AI use
 section). The registration states that a miss does not change the conclusions. They are given with the results
 (Section~\ref{sec:results}) only to show what was expected before the data were seen.

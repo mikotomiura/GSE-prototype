@@ -19,7 +19,8 @@ alphanumeric character inputs have been replaced with the `anonymous' character 
 characters have not been anonymized''~\cite{kaggle2023lwp}. The released columns include the press and release times,
 the activity, the text change, the cursor position and the word count. The releasing party states the goal of the
 processing: the text should not be reproducible from the log. The essays were scored, since the competition asks for
-the score to be predicted, so their texts exist outside the release.
+the score to be predicted, so their texts exist outside the release; the scores of the training essays are released
+with the logs.
 
 \paragraph{The lengths that remain are used.}
 Replacing each letter and digit by \texttt{q} keeps the length of every word. The winning solution of the competition
@@ -73,26 +74,32 @@ first setting.
     Setting & Holder has & Direction & Closed world holds when & Newly learned by matching \\
     \midrule
     Texts on the same prompts & Essays on the prompts of the release: those that were collected and scored, or a
-      public corpus on the same prompts & One log, many texts & The hidden essays are among the held texts & Which
-      text a processed log hides; if the texts and logs are already public elsewhere, only which records of two
-      releases correspond \\
+      public corpus on the same prompts & One log, many texts & The hidden essays are among the held texts & The link
+      between a processed log (its process and score) and a held text; if the texts and logs are already public
+      elsewhere, only which records of two releases correspond \\
     Classroom & The texts and names of a class, but not the released process (another teacher, a teaching
-      assistant, a classmate) & One log, many texts & The release consists of that class & The writing process,
-      given for research, of a named student \\
+      assistant, a classmate) & One log, many texts & The release consists of that class & If a log is matched:
+      the writing process, given for research, of a named student \\
     Published essay & One text and its writer, found in a class or online & One text, many logs & Rarely: the log need
-      not be in the release (open world) & The writing process and score of a known writer \\
+      not be in the release (open world) & If the log is found: the writing process and score of a known
+      writer \\
     \bottomrule
   \end{tabular}
 \end{table*}
 
 \paragraph{Texts on the same prompts.}
 The texts of the hidden essays were collected and scored, so they are held by the collecting party and by whoever
-scored them. Texts on the same prompts can also be public. The KLiCKe corpus was collected on Amazon Mechanical Turk in
+scored them. Within the releasing party the texts and logs are already linked; matching matters where the texts are
+held outside it, for example by raters who are not part of it or by anyone to whom the texts are passed later. We do
+not know who held the texts of the competition data. In this setting the evaluation measures how far a processed log
+can be linked to its text by a party that holds the texts; it does not estimate a harm that has occurred. Texts on the
+same prompts can also be public. The KLiCKe corpus was collected on Amazon Mechanical Turk in
 2022 and released together with its keystroke logs and human scores: 4,992 argumentative essays on four prompts derived
 from the SAT, each written in 30 minutes~\cite{tian2025klicke}. Because its texts are public, its logs need no
 protection of the text; it is the data on which we evaluate the processing. The description of the procedure of the
 competition data names the same platform, the same kind of prompts and the same sequence of tasks~\cite{kaggle2023lwp}.
-About a thousand essays per prompt is therefore a realistic size for a set of candidate texts on the same prompts. The
+We take the size of KLiCKe on one prompt, about a thousand essays, as the size of a set of candidate texts on the
+same prompts. The
 closed world holds only if the hidden essays are among the held texts. If they were among the public KLiCKe essays,
 their logs and scores would already be public, and matching would show only which records of the two releases
 correspond. We did not examine whether the two releases share essays, for ethical reasons (see the ethical
@@ -130,11 +137,13 @@ candidate set and the training data). One attacker in this study, the public Key
 contains a public language model; it is reported as a reference outside this threat model.
 
 \paragraph{Goals and harms.}
-The main harm is (a): learning which text a processed log hides. The releasing party processed the logs so that the
-text could not be reproduced; the texts are the writers' own, and the processing is the protection given to them. If a
-log can be matched to its text, the processing does not meet its stated goal, and every other column of the log (the
-times, the revision process, the score) is linked to that text. The evaluation measures this link directly, in the
-setting of texts on the same prompts. A further harm, (b), arises where the writer of a text is known, as in the
+The main harm is (a): a processed log is linked to its text by a party that holds the text, so that every other
+column of the log (the times, the revision process and, where released, the score) is linked to that text. The
+releasing party stated its goal as preventing the reproduction of the text from the log, and it does not name the
+writers' privacy. A party that holds candidate texts does not need to reproduce a text; it needs only to choose among
+them. We read the stated goal as keeping the text apart from the rest of the log, and this reading is ours. Under it, a
+form that lets a log be matched to its text does not keep them apart for a party that holds the texts. The evaluation
+measures this link directly, in the setting of texts on the same prompts. A further harm, (b), arises where the writer of a text is known, as in the
 classroom and published-essay settings: the log is then linked to a named person. We know of no release in which (b)
 has occurred, and we state it as a consequence that would follow if logs were released in those settings. The study
 does not identify writers.
@@ -150,17 +159,29 @@ candidate set from that corpus, whose texts are public, and not a setting of its
 \label{sec:threat-model:bias}
 
 Some assumptions favour the attacker: the true text is always among the candidates (the closed world, examined
-otherwise only as a diagnostic), the attacker trains on data collected in the same way as the evaluated logs, and in
-windows the attacker knows where the window starts and ends. Others limit it: the attackers within the threat model do
+otherwise only as a diagnostic), the attacker trains on data collected in the same way as the evaluated logs, in
+windows the attacker knows where the window starts and ends and each decoy contributes a single window rather than
+every position of its text, and the strongest attacker, like the better of the two versions of A3 on R3-u, is chosen
+on the evaluated logs, which a real attacker could not do. Others limit it: the attackers within the threat model do
 not use language models, the writer's earlier texts or several releases, because the study measures what the processed
-columns themselves leave. The direction of one assumption is unknown: the decoys are drawn uniformly from writers on
-the same prompt, who may be more or less alike than the members of one class.
+columns themselves leave; they do not use the released scores, which a holder of scored texts would also hold and
+which would narrow the candidates; and the attackers on the suppressed and noisy forms do not try to undo the
+processing, for example by estimating the noise from the dependence between neighbouring intervals. The attackers
+available also differ by form: the finer forms admit an attacker that rebuilds the final draft, the coarser ones only
+simpler attackers, so a contrast between forms contains the difference in attackers as well as in columns and leans
+in favour of the coarser forms (\S\ref{sec:protocol:quantities}). This is the weakness of evaluation that the survey
+above notes~\cite{hanisch2021survey}, and it applies to this study. The direction of one assumption is unknown: the
+decoys are drawn uniformly from writers on the same prompt, who may be more or less alike than the members of one
+class.
 
 The attackers always choose a candidate and never declare that no candidate matches. The open-world diagnostic shows
 how well the scores separate true from absent texts, but it does not give the rate of false matches that a holder of a
-single text would face. The distribution of accuracy per writer is reported up to its 90th percentile, so the writers
-whose logs are matched most easily are not shown individually; results per writer are not published, to protect the
-writers.
+single text would face, and the accuracy is not the share of matches that an attacker could recognise as correct. The
+accuracy is an average over writers and draws and can understate the risk for the few writers whose logs are matched
+most easily. The registered distribution of accuracy per writer stops at its 90th percentile; the upper tail, matches
+above a margin of cost and accuracy by score band are reported as exploratory analyses (\S\ref{sec:protocol:exploratory}),
+and results per writer are not published, to protect the writers. Closed-world accuracy is therefore not the size of a
+harm in any of the settings above.
 
 The results therefore describe the attackers tried here, under these assumptions. They give no proof of safety and no
 upper bound on the risk of matching; a processing step that defeats these attackers may not defeat a stronger one.
