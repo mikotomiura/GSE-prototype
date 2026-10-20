@@ -278,3 +278,13 @@ PoPETs の採択の見込みの検討（会話）の後、研究者が「第一�
 - 未確認（投稿先を移すと決めた時点で一次で確かめる）: 2・3 の費用と発表の条件、PoPETs で却下された論文の再投稿の制限、JEDM・JWR が公開データの二次解析と所属のない単著を受けるか。
 - 事前登録は OSF にあり投稿先から独立しているので、投稿先を移しても逸脱にならない。
 - 採択の見込みについての Claude の見立て（会話・数えた値ではない）: 1 回目でそのまま採択は低く、major revision を経た最終採択は結果がはっきり出れば 3 割前後。いちばん効きそうな指摘は脅威モデルの現実性（誰が・どの公開物と・どの候補の本文で照合するか）。
+
+## 判断 58: PoPETs の次の投稿先を改める（研究者・AskUserQuestion 1 回・2026-10-20）
+
+研究者が PoPETs 以外の具体的な候補と見込みの分析を求めた。Claude が WebSearch と各誌の公式ページで確かめた（2026-10-20）。
+
+- 確かめたこと（公式ページ）: JWR は「double-blind … rejection rate above 90%」と自ら書く・diamond OA（jowr.org/jowr/about）。JEDM は APC・投稿料なし・3 人の査読・3 か月で判定を目指す（jedm.educationaldatamining.org/index.php/JEDM/about）。TDP は「diamond open access」・single-blind・3〜4 か月（tdp.cat/forAuthors.php）。JPC は privacy, confidentiality, and disclosure limitation の多分野誌・投稿料も掲載料もなし（DOAJ と journalprivacyconfidentiality.org の記述）・single-blind。JLA は投稿・掲載の費用なし（SoLAR が負担）・掲載まで 6〜8 か月。PoPETs の採択率は 2025 年が 26%（Issue 3 は 19%）・2024 年 21%・2023 年 22%（petsymposium.org/acceptance-rates.php・検索の要約で読んだ値）。
+- 採用（推奨を選んだ）: **PoPETs → JPC か TDP → JEDM**。判断 57 の 2・3 を置き換え、**JWR は外す**（却下率 90% 超で、範囲は作文の過程そのもの。この論文は作文の研究ではない）。他の選択肢は「JEDM を 2 番目に」「判断 57 のまま」。
+- JPC と TDP のどちらにするかは、PoPETs の査読の中身を見て決める（開示制御・DP の読み手に寄せるなら JPC、匿名化の技術の読み手に寄せるなら TDP）。
+- 外した候補と理由: ACM TOPS（選択的で、ACM の全面 OA 移行で所属機関の無い著者に APC がかかる可能性・未確認）、Computers & Security（購読の経路なら無料だが、読み手が広すぎる）、IEEE Transactions on Privacy（全面 OA で APC がかかる見込み・額は未確認）。
+- 未確認（投稿先を移すときに一次で確かめる）: JPC・TDP・JEDM の採択率（公開されていない）、JPC の現在の著作権の扱い、ACM TOPS の APC の有無。
