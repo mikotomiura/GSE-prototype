@@ -1,4 +1,50 @@
 \section{Background and related work}
 \label{sec:related}
 
-To be written.
+% Skeleton with draft paragraphs, written before the results. The emphasis is revised after the results are known;
+% the claims and their strength follow the table for this section in outline.md.
+
+\paragraph{Matching and reconstruction from keystrokes.}
+Matching a log to candidate texts is a known kind of attack, and we do not claim a stronger attack. Keystroke timings
+alone have been used to decide which of a set of candidate texts was typed~\cite{gonzalez2021reverse}. KeyTAR
+reconstructs English input from inter-keystroke timings with a fine-tuned language model, without
+candidates~\cite{qiu2026keytar}, and reports that reconstruction ``is extremely sensitive to the accuracy of retrieved
+inter-keystroke timings''. Outside keystroke logs, the sequence of packet lengths of encrypted voice calls identifies
+spoken phrases among candidates, and padding the lengths removes most of the effect~\cite{wright2008spotme}; the
+timing of keystrokes and the positions of spaces identify search queries among candidates~\cite{monaco2019searching}.
+Most of these works observe typing through a side channel, and the search-query attack assumes that only letters and
+the space are typed~\cite{monaco2019searching}. Here the attacker holds a released log of writing, with its revisions,
+and the processing is chosen by the party that releases it.
+
+\paragraph{Processing of keystroke data.}
+The processing steps evaluated here are not new. Substitution, permutation and suppression of keystrokes have been
+proposed to protect what is typed in behavioural authentication on smartphones, and were evaluated by the error rates
+of authentication~\cite{vassallo2017privacy}. Rounding the latencies in typing profiles reduced the identification of
+students~\cite{leinonen2017preventing}. A survey of anonymisation for behavioural biometric data lists such
+techniques, against identification and for protecting what is typed, and none of those it lists for keystrokes is
+evaluated by matching to texts; it notes that most techniques are evaluated against a weak
+attacker~\cite{hanisch2021survey}. Our forms are our own definitions after these names.
+
+\paragraph{Auxiliary information and uniqueness.}
+Records in a release can be linked through auxiliary information that the releasing party did not
+anticipate~\cite{narayanan2008robust}. Measures of uniqueness, such as the share of records that a few known points
+single out, fall as the population grows~\cite{farzanehfar2021risk}, and uniqueness in a sample does not imply
+uniqueness in the population~\cite{sanchez2016comment}. For processed logs of writing, the auxiliary information is the
+text, and the question is how far the structure that remains, the lengths of words and the times between presses,
+singles out the true text among texts on the same prompt.
+
+\paragraph{Releases of keystroke logs of writing and programming.}
+Earlier work on releasing keystroke data considered an attacker with a labelled sample of the same person's keystrokes
+and the goal of identification~\cite{leinonen2017preventing,edwards2023csedm}; Section~\ref{sec:threat-model:auxiliary}
+quotes how the programming datasets answer that risk. These works do not evaluate matching to texts; we do not claim
+that no work considers texts. Public corpora of writing processes with their texts, such as KLiCKe~\cite{tian2025klicke}
+and ENJA15~\cite{carl2016lrec}, make such an evaluation possible, because the true text of every log is known.
+
+\paragraph{What is new.}
+What is new is the evaluation, on public keystroke data whose texts are known, of the processing used in practice and
+of alternative processing, by attacks that match logs to texts, together with what each form costs the process measures
+of writing research. To our knowledge, no such evaluation has been published.
+\textbf{[One or two sentences on the scope of the searches: on 12 and 13 October 2026, before registration, we traced
+the works citing the attacks above and the anonymisation survey in OpenAlex, searched the works of authors of writing
+research in OpenAlex, and read the full text of the survey; search terms to be added. Google Scholar and Semantic
+Scholar were not searched.]}
