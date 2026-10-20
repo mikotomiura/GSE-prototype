@@ -11,6 +11,8 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| **C（TRACE）: 登録の前の attack-me round 7 → 登録の日**（研究の物は `~/TRACE`・記録は worktree `/Users/johnd/GSE-prototype-af-c`） | **`next-session-ai-fatigue-c-attack-me-round7.md`**（2026-10-20） | **現行**。共著者が全部を引き受けた後（判断 69〜71）。前の `next-session-ai-fatigue-c-after-coauthor-reply.md` を置き換える |
+| ~~**C（TRACE）: 共著者の返事の後・登録の下書きの書き換え**~~ | `next-session-ai-fatigue-c-after-coauthor-reply.md`（2026-10-19） | 完了（判断 67〜71）。後続は上の行 |
 | **C（TRACE）: 共著者への相談の前の仕上げ（草稿の更新と Drive の置き換え・符号化のスプレッドシート）**（研究の物は `~/TRACE`・記録は worktree `/Users/johnd/GSE-prototype-af-c`） | **`next-session-ai-fatigue-c-ready-for-consult.md`**（2026-10-19） | **現行・先にこちら**。研究者の方針「完全に準備できてから相談を行う」。判断 55〜59 の後 |
 | **C（TRACE）: 共著者の返事の後の登録の書き換え**（同上） | **`next-session-ai-fatigue-c-after-two-human-tools.md`**（2026-10-19） | **現行・相談の後に使う**（§2 の「共著者の返事の後」）。「返事の前」の項は上の行に移した。前の `next-session-ai-fatigue-c-three-screeners.md` を置き換える |
 | ~~**C（TRACE）: 選別の道具を判断 54 の形に（判定は人 2 人・AI は段 1 の網）・判断 44 の未決**~~ | `next-session-ai-fatigue-c-three-screeners.md`（2026-10-19） | 完了（判断 55〜57）。後続は上の行。以下は当時の記述: 前は `next-session-ai-fatigue-c-after-coverage.md` → `next-session-ai-fatigue-c-draft-and-repo.md`（判断 48〜53・草稿の直し・TRACE リポジトリ）。共著者の返事待ちの項は `tasklist.md` の末尾 |
