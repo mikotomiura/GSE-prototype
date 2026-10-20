@@ -364,3 +364,10 @@ round 2 の判定は minor revision（R1 major・R2 minor・R3 minor）。記録
 
 気づいたこと（判断不要・記録）:
 - §8.2 合意の段落を一次資料で書いた（2026-10-21）。DataShop の利用条件（[V328]・逐語 "You will not make any attempts to de-anonymize the data"）、Kaggle のコンペの規則（第 7 条 A 非商用・学術研究を含む、B 未同意者への提供の禁止。全文を identif・anonym・privacy・personal で検索し、書き手の識別や本文の復元を禁じる条項は無かった。第 16 条は参加者の個人情報）、KLiCKe の条件（[V273]）。CSEDM の論文の本文には利用条件の記述が無く、使わなかった。教育データの合意の例は DataShop の 1 つだけで、「一般に使われている」とは書いていない。
+
+## 判断 67: Kaggle のコンペのデータを使うか（研究者・AskUserQuestion 1 回・2026-10-21）
+
+研究者の問い（「KLiCKe の著者に許可をもらい、集計だけにしているので、Kaggle も使ってよいか」）を受けて。
+
+- 採用（推奨を選んだ）: **今のまま使わない**。判断 3・判断 63 と事前登録（"The Kaggle data are not linked to KLiCKe"・"No values of the competition data were seen"）のまま。他の選択肢は「照合しない記述統計だけに使う（R1 が実際の公開を再現しているかの裏づけ・探索的な分析として逸脱に記録）」「KLiCKe と突き合わせて照合する（判断 3 を覆す）」。
+- 理由: 規則（第 7 条 A）上は学術研究に使えるが、Kaggle の記録には本文が無く、照合の正答率を測るには KLiCKe と突き合わせるしかない。それは隠された本文の照合そのもので、集計だけを出しても行為は起きる。KLiCKe の著者の返事は KLiCKe の分析についてで、Kaggle の公開元（The Learning Agency Lab・Vanderbilt）の同意ではない。R1 で加工の評価はできる。
