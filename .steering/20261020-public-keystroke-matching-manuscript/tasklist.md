@@ -19,7 +19,10 @@
 - [x] 考察の合意の段落の出典を一次で確かめる（2026-10-21・[V328]）
 - [x] §2 の検索の範囲を情報源・日付・件数で書く（判断 66）
 - [x] 頁の見積もりと移す順（判断 66・outline.md の Page budget）
-- [ ] attack-me（stage: manuscript・round 1・Codex 付き）
+- [x] attack-me（stage: manuscript・round 1・Codex 付き）（判断 68・verdict.md）
+- [x] round 1 の指摘を直す（コミット 723f494d）
+- [ ] 探索的な分析 3〜5 を G-GEAR で実装して回す（引き継ぎ next-session-public-keystroke-matching-exploratory-3-5-ggear.md）
+- [ ] ethics.tex の空欄（外部の審査を受けなかった理由・利害の表明）を研究者が書く
 - [ ] 倫理（草稿あり・公開元への連絡は結果の後）・open science（草稿あり・匿名リンクが空欄）・AI の利用（草稿あり）
 - [ ] Kaggle の公開元への連絡の下書き（結果の後・投稿の前。送るのは研究者）
 - [x] 攻撃コードの公開範囲（事前登録の 3 案）を研究者に問う（判断 63）

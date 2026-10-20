@@ -68,3 +68,25 @@ nit
 - 害 (a) と設定 1 の書き直しの方向（1）
 - 探索的な分析を足すか（R1 の尾の集計・確信の曲線、R2 の得点の層）。足すなら結果を見る前に notes.md の逸脱へ
 - 倫理の利益の主張（5）と開示の扱い（6）
+
+## 7. 対応（判断 68・2026-10-21・コミット 723f494d・探索の手順は 8c124a11）
+
+直した:
+- A 害 (a): threat-model.tex の Goals and harms・表 1・Texts on the same prompts、introduction.tex、outline.md の First page。
+- 日付: open-science.tex（OSF 2026-10-12 16:43 UTC・取得 19:22 UTC から）、data.tex（KLiCKe 19:29 UTC）、related.tex（検索は 2026-10-11 UTC。研究ノートのコミットが 2026-10-12 02:40 JST まで＝ 10-11 17:40 UTC）。判断 66 の記録の「12 October」は日本時間の日付で、原稿は UTC にした。
+- 開いた世界の説明: protocol.tex §6.5。
+- 偏りの向き: threat-model.tex §3.5（評価データ上の選択・区間のおとりが 1 窓・得点を使わない・加工を戻さない・攻撃者の非対称と Hanisch の批判が自分にも当たること・閉じた世界の正答率は害の大きさではない・平均は尾を過小に示しうる）。
+- 探索的な分析 3〜5: notes.md に手順（結果の前）、protocol.tex §6.7 に記述。G-GEAR で実装（引き継ぎ `next-session-public-keystroke-matching-exploratory-3-5-ggear.md`）。
+- 倫理: 利益の主張を弱めた・開示の猶予の文（空欄）・二重盲検の書き方・KLiCKe の著者に完成稿を送る・コードの制限の効果を限定・利害の欄（空欄）・外部の審査を受けなかった理由（確かめる印つき）。
+- 文献: song2001timing（[V248]）・rocher2019estimating（[V254]）・stadler2022synthetic（[V255]）・borgman2018open（[V329] を新規登録）。Farzanehfar を抄録の主旨どおりに引いた。
+- そのほか: "used in practice" → "the masking used in one public release"、KLiCKe の条件を §4.1 に 1 つに、4 つの問いを §1 の計画に、検索の語が記録に無いこと、有用さの軸の限界（§6.4・§8.1）、§8.2 に測度だけを出す・申請者にだけ渡す選択、§8.3 の区間には有用さの軸が無いこと、R-DP の ε の単位、R3j-t の注、予測の範囲、500 人の理由、「現実的な大きさ」、AI use の文、the authors、outline の付録の置き場所と頁の縮め方。
+
+直していない（理由）:
+- 統計的開示制御の文献（R2）: 読めた本が無いので足していない（Borgman で管理の立場だけを引いた）。必要なら研究者が選ぶ。
+- 監査 2-2（照合された記録がラベル付きの標本になる帰結・threat-model.tex 56–57）: 設計の判断で、今回は問わなかった。条件文のまま残した。
+- 重複の削除（R2・E）: 頁の縮め方の (1) として結果の後に行う。
+- 監査 3-7: テンプレートは `\appendix`→謝辞→必須の 3 節→参考文献→付録の節の順で、main.tex と outline は食い違っていなかった（偽陽性）。outline の書き方だけ明確にした。
+
+空欄で残したもの（研究者が書く・確かめる）: 外部の審査を受けなかった理由（ethics.tex・案の文に確かめる印）、利害の表明（ethics.tex）、公開元への通知の日付と応答（ethics.tex）。
+
+ビルド: エラー 0・未定義の参照 0・未定義の引用 0・overfull 2。本文は 1〜12 頁（結論が 12 頁）。文体の門 違反 0。
