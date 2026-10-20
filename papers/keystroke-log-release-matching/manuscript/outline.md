@@ -7,9 +7,12 @@ wherever they differ; the threat model, the attackers and the procedure are take
 
 ## Title
 
-How far does the processing of public keystroke logs protect against matching logs to texts?
+Hiding the Text, Keeping the Process: Matching Processed Keystroke Logs to Texts Held by Others
 
-Working title, close to the title of the preregistration. To be fixed before the results are seen.
+Fixed on 21 October 2026, before the results were seen. It names the aim of the releasing party (hide the text, keep
+the process) and the premise of the attack (the texts are held by others), and it states no direction of the results.
+The preregistration's title was "How far do processing steps applied to public keystroke logs protect against
+matching logs to texts?".
 
 ## Venue requirements to be met
 
@@ -70,7 +73,8 @@ Estimated on 21 October 2026, before the results, and revised after the first pr
 from page 1 to page 11 (about 11 pages after the revision). The results (two tables, one figure, the subsection on the
 Japanese translation logs, about 2.5 pages), the three paragraphs of the introduction, the take-aways, the conclusion
 (about 0.8 page) and the abstract (about 0.25 page) bring it to about 14.5 pages, so about 2.5 pages move to the
-appendices after the results, in this order: (1) merge the overlap of the assumptions (Section 3.5) and the
+appendices after the results, in this order: (1, done on 21 October 2026: Section 8.1 now refers to Section 3.5,
+and the absence of a recommendation and the handling of the data are each stated once) merge the overlap of the assumptions (Section 3.5) and the
 limitations (Section 8.1), and state once each the absence of a recommendation and the handling of the data; (2) the
 checks after acquisition and on synthetic logs (Sections 4.2 and 4.3), keeping in the body the agreement of the segment
 rule and a one-sentence summary of each deviation; (3) the details of the registration (seeds and hashes) of Section

@@ -7,26 +7,13 @@
 \subsection{What the results do not show}
 \label{sec:discussion:limits}
 
-\paragraph{No proof of safety.}
-The results describe the attackers tried here, under the assumptions of Section~\ref{sec:threat-model:bias}. They give
-no proof of safety and no upper bound on the risk of matching, and a form that defeats these attackers may not defeat a
-stronger one. The strongest attacker is the maximum over the attackers tried, not an attack that combines all the
-length and timing information a form leaves; only A3 on R3-u combines the two. The alignment for suppression ignores
-the binomial variation and is not a likelihood. The timing term of A3 on R3-u uses, in effect, only the part of a log
-before the first error of the replay.
-
-\paragraph{Paths that the forms leave open.}
-In the forms that release press times, the duration of a drag, and that of a held key when the next press follows its
-release, remains as a lower bound of the next press interval. No attacker targets it, but it can enter the interval
-features of A2-b and the segment durations of A3 on R7. The rule that treats the next press after Control as a shortcut
-fails when several keys are pressed while Control is held, because whether Control is held cannot be read when its
-action time is zero.
-
-\paragraph{The closed world and the candidates.}
-The true text is always among the candidates, the attackers always choose one and never abstain, and the open-world
-diagnostic does not give a rate of false matches. The decoys are drawn uniformly from the writers of the same prompt,
-who may be more or less alike than the members of a class. On windows the attacker knows both ends of the window. The
-distribution of accuracy per writer is reported only up to its 90th percentile.
+\paragraph{The assumptions.}
+Section~\ref{sec:threat-model:bias} states the assumptions and the direction in which each biases the results; they
+apply to every result here, and the results give no proof of safety and no upper bound on the risk of matching. The
+strongest attacker is a maximum over the attackers tried, not an attack that combines all the length and timing
+information a form leaves; only A3 on R3-u combines the two. No attacker targets the lower bound of the next press
+interval that drags and held keys leave in the forms with press times (\S\ref{sec:data:forms}), although it can enter
+the interval features of A2-b and the segment durations of A3 on R7.
 
 \paragraph{What the data allow.}
 We claim no difference by writer attributes, since the demographic file was not acquired, and we do not describe matching

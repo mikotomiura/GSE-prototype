@@ -387,3 +387,8 @@ round 2 の判定は minor revision（R1 major・R2 minor・R3 minor）。記録
 - OSF 登録は 2026-10-12 16:43:33 UTC で、取得（ENJA15 19:22:52 UTC・KLiCKe 19:29:56 UTC）より前。原稿の "13 October 2026" は日本時間の日付だった（書き方の誤り・逸脱ではない）。
 - 開いた世界の AUC は `scripts/aggregate.py` の `auc()` が全部の組で計算しており事前登録どおり。原稿 §6.5 の「各回で組にする」書き方が実装と違っていた（Codex の指摘・書き方の誤り）。
 - Kaggle のデータは `train_scores.csv`（"The score the essay received out of 6"）を公開している（2026-10-21 に Data の頁で確かめた）。
+
+## 判断 69: 題名（研究者・AskUserQuestion 1 回・2026-10-21・結果を見る前）
+
+- 採用（推奨を選んだ）: **"Hiding the Text, Keeping the Process: Matching Processed Keystroke Logs to Texts Held by Others"**。公開する側の狙い（本文を隠して過程を残す）と攻撃の前提（本文を他者が持つ）を言い、結果の向きを含まない。判断 68 で害 (a) を「本文を持つ者による結び付き」に定義し直したのに合わせた。他の選択肢は「How Far Does Processing Keep Keystroke Logs Apart from Their Texts? …」「Masked but Matchable? …」（結果の向きを先取りして読める）「仮題のまま」。
+- 同じ日に、頁の縮め方の (1)（§8.1 を §3.5 への参照に寄せ、「推奨しない」とデータの扱いを 1 か所ずつに）を結果の前に済ませた（判断不要の作業）。本文は 1〜12 頁（結論が 12 頁の上）。
