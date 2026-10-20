@@ -6,7 +6,7 @@
 ## 新しいセッションで最初に打ち込む文
 
 ```
-.steering/_handoff/next-session-public-keystroke-matching-manuscript-before-results.md を読んで、照合の論文の結果の前にできる残り（検索の範囲・合意の段落・頁の見積もり）を進めて。
+.steering/_handoff/next-session-public-keystroke-matching-manuscript-before-results.md を読んで、照合の論文の結果の前にできる残り（検索の範囲・合意の段落・頁の見積もり）を進め、草稿ができたら attack-me（Codex 付き）でプレ査読して。
 ```
 
 結果が出た後のセッションは、このメモの「結果が出たら」を読んで始める（その時点で別の引き継ぎを書いてもよい）。
@@ -38,14 +38,20 @@
 1. **§2 の検索の範囲**: 登録の前のサーヴェイ（`docs/literature/20261012-public-keystroke-matching-novelty.md`・`20261012-public-keystroke-matching-prereg-search.md`）に検索の語が残っていない。今は情報源と日付（10/12・13・OpenAlex の被引用の追跡と著者別・Hanisch の調査の全文・Google Scholar と Semantic Scholar は使っていない）だけを `[...]` に書いた。研究者に AskUserQuestion で問う。案: (a) 情報源と日付だけで書く（推奨の候補: 語を後から作ると記録と違う文になる）、(b) 投稿の前に同じ範囲で検索をやり直し、語と日付を記録して書く。
 2. **§8 の合意の段落**: 「再識別や隠した本文の復元を禁じる利用条件」の段落の下書きがある。KLiCKe の条件は「出典を示せば自由」で禁止の条項が無い（[V273]）ところまでは書いた。Kaggle の規則（第 7 条など）と、教育データで使われる合意の実例を一次で確かめてから埋める。確かめられない主張は書かない。
 3. **頁の見積もりと縮め方の案**: 結果の節が空で本文が約 11 頁（序論 p1 〜 結論 p11）。表 2 つと図 1 つを足すと 12 頁を超える。結果を見る前に、付録へ移せる方法の細部の候補（§5 の窓の段落・ENJA15 の区間と攻撃者・§6 の窓の規則・探索的な分析の手順・有用性の近似の規則など）を挙げ、研究者に移す順を問う。⚠️ PoPETs の付録は査読者が読まなくてよいので、結論に要るものは本文に残す（`outline.md` の Venue requirements）。移すのは結果の後でもよいが、案は今のうちに。
-4. 各変更のあとビルドと文体の門を通し、`outline.md` の Structure の表と `tasklist.md` を更新して、節ごとにコミット・push する。
+4. **attack-me でプレ査読する（stage: manuscript・round 1・Codex を 5 人目に加える）**: 1〜3 を終え、結果を除いた大まかな草稿ができたら回す（研究者の指示・2026-10-20）。`.claude/skills/attack-me/SKILL.md` を読んでから始める。
+   - 記録: `.steering/20261020-public-keystroke-matching-manuscript/attack-me/manuscript-<略名>/round-1/`。stage は `manuscript`（原稿の全体）。外枠の dir（`outline-threat-model/`）は閉じてあるので使わない。同じ立場・同じ接地の文献を使い回してよい（`outline-threat-model/round-1/tmp/` の本文。tmp は git に入らないので、まだ残っているかを先に確かめる）。
+   - 依頼文の「今回の stage と重く見るもの」に、§7 結果・§9 結論・貢献・抄録がまだ無く、`[...]` の空欄が残ることを書き、それ自体を欠陥にしないと書く。重く見るのは §1〜§6・§8 と必須の 3 節。
+   - ⚠️ 方法（§4〜§6）への指摘は、凍結した事前登録の手順を変える形では受けない。書き方・限界の節・逸脱の記録（`notes.md`）のどれで返すかを研究者が決める。
+   - Codex（5 人目）: 4 本が返った後に直列で回す。先に `.codex/budget.json`（と origin/main の台帳）で 1 日の予算を確かめる。`scripts/run-codex-consult.sh --preview` で送る中身を見せ、研究者の OK を取ってから送る。入力は査読者役のひな形から「接地」と「読んでよいファイル」の節を除き、原稿の本文（`sections/*.tex` を節の順につないだもの・`outline.md`）と PoPETs の規程の抜粋を貼ったもの。⚠️ `.steering/`・`context-B.md`・`notes.md` などの内部の文書は貼らない。原稿は集計の数しか持たず、打鍵の記録・本文・書き手ごとの値・書き手の ID を含まないことを、送る前に目で確かめる。結果は `review-codex.md` に置き、一致は別枠で書く。
+   - 判定と直す順を出したら、研究者に採否を AskUserQuestion で問い、判断の番号を振って `decisions.md` に書く。
+5. 各変更のあとビルドと文体の門を通し、`outline.md` の Structure の表と `tasklist.md` を更新して、節ごとにコミット・push する。
 
 ## 結果が出たら（11/9 ごろ・G-GEAR の出力を Mac に持ってきてから）
 
 - §7 結果（ENJA15 の短い小節を含む・判断 61 の 4）、予測を結果と並べる（判断 65）、§9 結論、§1 の貢献と方法・害の段落、抄録、題名の最終形（題名は結果を見る前に決める予定だったので、結果の前に研究者に確かめる）。
 - 空欄を埋める: 除外の後の件数（§4）、逸脱の一覧（§6・`notes.md` の「逸脱」に D3 以降があれば足す）、倫理の公開元への連絡の日付、Open science の匿名リンク。
 - 頁を 12 に縮める（上の 3 の案）。
-- 投稿前の attack-me（stage: manuscript）。round 1 の接地の本文 `attack-me/outline-threat-model/round-1/tmp/` はそのあと消す。`/cross-review`。
+- 投稿前の attack-me は、上の 4 と同じ dir の round 2（stage は manuscript のまま・round 1 の引き継ぎを役ごとに渡す・Codex も同じ形で）。そのあと接地の本文の tmp（`outline-threat-model/round-1/tmp/` と manuscript の round の tmp）を消す。`/cross-review`。
 
 ## 研究者の側で進んでいること（このセッションでは送らない）
 
