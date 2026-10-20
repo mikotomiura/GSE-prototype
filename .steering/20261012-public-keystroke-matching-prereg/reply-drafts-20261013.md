@@ -94,19 +94,22 @@ Kind regards,
 - 添付は PDF の草稿だけ。個々の書き手の結果・本文や記録の抜粋を含めない（先方の勧めと事前登録のとおり）。
 - PoPETs は二重盲検。先方が査読者に当たる可能性があるので、草稿を他に回さないよう頼む文を入れる（下の最後の段落）。
 - 倫理の節は先方の言葉を要約して書いているので、書き方を変えたければ直すと 1〜2 文で伝える（段落の貼り付けと確認の依頼はやめた・2026-10-20 研究者）。
+- 前のスレッドに返信して Crossley を CC に入れるとき、引用される前のやり取り（Dr. Tian の倫理の説明を含む）を消してから送る（本文の最初の段落でそう伝えている・2026-10-20 研究者の意向で CC の理由を明記）。
 - 研究者の意向（2026-10-20）: お礼、草稿ができたこと、独立研究者として倫理の問題に一人で向き合ってきたのでコーパスの公開に大変助けられたこと、今後も交流を続けたいことを入れる。
 
 **Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis（前のスレッドへの返信として送る・2026-10-20 研究者が決定）
 
 **CC**: Scott Crossley（[メールアドレス]・KLiCKe の共著者で、Kaggle のコンペの Citation の著者・判断 64）
 
-Hi Yu,
+Hi Yu (and Scott, copied here),
+
+Before anything else, a note on the copy. I have added Scott to this reply for two reasons. The paper discusses the Kaggle competition "Linking Writing Processes to Writing Quality", of which he is one of the authors, and I would like him to be able to check how it is described before I submit. As a co-author of KLiCKe, he may also wish to see how the corpus is used. I have removed our earlier messages from this reply, so that only this message is shared with him. I hope this is all right with you.
 
 [I am sorry this has taken longer than I expected.] I have now finished a full draft of the paper that uses the KLiCKe corpus, and I attach it here. As promised, I wanted you to see it before it is submitted.
 
-In brief, the paper asks how well the processing applied to publicly released keystroke logs, such as the masking of letters and digits used in a recent Kaggle competition, protects against matching a log to its text. KLiCKe is the data on which we evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate.] All results are reported in aggregate, as you recommended, with no result for an individual writer and no excerpt of an essay or a log.
+In brief, the paper asks how well the processing applied to publicly released keystroke logs protects against matching a log to its text. KLiCKe is the data on which I evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate.] All results are reported in aggregate, as you recommended, with no result for an individual writer and no excerpt of an essay or a log.
 
-I have copied Scott, because he is also among the authors of the Kaggle competition "Linking Writing Processes to Writing Quality", which the paper discusses as an example of a release. The competition data were not used in this study and were not matched against any text; the paper names the competition only to describe how its logs were processed.
+The paper takes the Kaggle competition as an example of such processing: its letters and digits were masked "to prevent reproduction of the essay text". The competition data were not used in this study and were not matched against any text. The paper notes that the competition's description of data collection follows the same procedure as KLiCKe, but it does not examine whether the two share essays. Scott, if anything in how the paper describes the competition is inaccurate, or if you think The Learning Agency Lab should hear about the paper from you rather than from me, please let me know.
 
 In the ethics section, I describe the IRB approval at Georgia State University and the scope of consent as you explained them to me. If you would like anything worded differently, I would be glad to change it. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date]. Because the venue uses double-blind review, I would appreciate it if you could both keep the draft to yourselves for now.
 
