@@ -138,7 +138,7 @@ uv run --with openpyxl python c_coding_book.py make --coder author2 --ids ../scr
 ```
 `author2-coding-order.txt` をコミットする（途中で止まったとき、符号化した記録が無作為の標本であることの裏づけ）。
 
-符号化の後（判断 72）: 第三回の後・共著者との話し合いの前の第一著者の値を `*_prediscussion.csv` として残す（話し合いで決めた値 `*_reconciled.csv` とは別・GSRR-47・48・判断 73）。2 人の一致は共著者の値（`*_author2.csv`）と並べて `c_synthesis.py --agreement <dir> --pair prediscussion author2` を回して `out/agreement_prediscussion_author2.csv` を作り（入力の SHA-256 が記録される）、表を作るときに `--tables <話し合いの後の dir> --agreement-file <その CSV>` で渡す（80% 未満の符号が問題の文と表の行に並ぶ）。感度分析 5 は、話し合いの後の dir に `*_author2.csv` の 4 つを置くと出る。C4f の下書きと C5 の照合は、話し合いが済んでから開く。
+符号化の後（判断 72）: 第三回の後・共著者との話し合いの前に、第一著者の値の 4 つ（`records`・`instruments`・`items`・`c4f` の `*_reconciled.csv`）を `*_prediscussion.csv` に写してコミットし、そのまま残す（話し合いで決めた値 `*_reconciled.csv` とは別・GSRR-47・48・判断 73）。2 人の一致は共著者の値（`*_author2.csv`）と並べて `c_synthesis.py --agreement <dir> --pair prediscussion author2` を回して `out/agreement_prediscussion_author2.csv` を作り（入力の SHA-256 が記録される）、表を作るときに `--tables <話し合いの後の dir> --agreement-file <その CSV>` で渡す（80% 未満の符号が問題の文と表の行に並ぶ）。感度分析 5 は、話し合いの後の dir に `*_author2.csv` の 4 つを置くと出る。C4f の下書きと C5 の照合は、話し合いが済んでから開く。
 
 ### 選別の後（前の形・`ai-screener`。登録の形では使わない）
 
