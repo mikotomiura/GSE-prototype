@@ -1,4 +1,64 @@
 \section{Discussion and limitations}
 \label{sec:discussion}
 
-To be written.
+% Skeleton with draft paragraphs, written before the results. The limitations are written first, from the
+% preregistration ("What is not concluded") and Section 3.5; the discussion of the results is added after them.
+
+\subsection{What the results do not show}
+\label{sec:discussion:limits}
+
+\paragraph{No proof of safety.}
+The results describe the attackers tried here, under the assumptions of Section~\ref{sec:threat-model:bias}. They give
+no proof of safety and no upper bound on the risk of matching, and a form that defeats these attackers may not defeat a
+stronger one. The strongest attacker is the maximum over the attackers tried, not an attack that combines all the
+length and timing information a form leaves; only A3 on R3-u combines the two. The alignment for suppression ignores
+the binomial variation and is not a likelihood. The timing term of A3 on R3-u uses, in effect, only the part of a log
+before the first error of the replay.
+
+\paragraph{Paths that the forms leave open.}
+In the forms that release press times, the duration of a drag, and that of a held key when the next press follows its
+release, remains as a lower bound of the next press interval. No attacker targets it, but it can enter the interval
+features of A2-b and the segment durations of A3 on R7. The rule that treats the next press after Control as a shortcut
+fails when several keys are pressed while Control is held, because whether Control is held cannot be read when its
+action time is zero.
+
+\paragraph{The closed world and the candidates.}
+The true text is always among the candidates, the attackers always choose one and never abstain, and the open-world
+diagnostic does not give a rate of false matches. The decoys are drawn uniformly from the writers of the same prompt,
+who may be more or less alike than the members of a class. On windows the attacker knows both ends of the window. The
+distribution of accuracy per writer is reported only up to its 90th percentile.
+
+\paragraph{What the data allow.}
+We claim no difference by writer attributes, since the demographic file was not acquired, and we do not describe matching
+as identification of writers. The results on KLiCKe are not generalised to other tasks (a limit of 30 minutes,
+argumentative essays, crowdsourced writers) or to logs that did not pass the selection of the KLiCKe release, such as
+logs with much pasting~\cite{tian2025klicke}. The results on ENJA15 are not generalised to Japanese free writing or to
+logs of input methods in general, and differences from KLiCKe are not attributed to language or input method, since
+the task, the input and the language differ at once. Our formulas for the process measures could not be verified
+against Inputlog (\S\ref{sec:protocol:utility}). KeyTAR was run with the defaults of its artifact, including a limit on
+generated tokens that is expected to cut reconstructions short, and is a reference, not a bound.
+
+\paragraph{The exploratory analyses.}
+The uniqueness of word-length sequences is measured among the $N$ candidates tried and is not a risk of
+re-identification in a population. The form with differentially private noise gives its guarantee for one segment
+count or one interval, not for a writer's log, and its noise comes from a seeded generator for evaluation, not from an
+implementation suitable for release.
+
+\subsection{Processing and agreements}
+\label{sec:discussion:agreements}
+
+\textbf{[Draft paragraph.]} Processing is not the only protection that a releasing party can give. A release can also
+be bound by terms that forbid attempts to re-identify writers or to recover the hidden texts. Such terms do not change
+what a log reveals to a party that ignores them, and they do not bind a party that holds the texts and obtains the logs
+outside the terms; but they define who may use a release and for what, and they can be combined with any of the forms
+evaluated here. The terms of use of KLiCKe ask only that the corpus be cited. \textbf{[Terms of the other releases
+discussed, and of agreements used for educational data, to be checked in the primary sources before this paragraph is
+completed.]}
+
+\subsection{What a releasing party can take away}
+\label{sec:discussion:takeaways}
+
+\textbf{[After the results.]} The results are material for three choices: which columns to keep, how coarsely to give
+times and lengths, and whether to release full logs or windows. Each statement takes the form ``against this attacker,
+at this $N$, this form had this multiple of $1/N$ and kept this much of the process measures''. No rule recommends a
+form, and the paper does not say that a form works or withstands matching.
