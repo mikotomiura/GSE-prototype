@@ -96,7 +96,7 @@ Kind regards,
 - 倫理の節は先方の言葉を要約して書いているので、書き方を変えたければ直すと 1〜2 文で伝える（段落の貼り付けと確認の依頼はやめた・2026-10-20 研究者）。
 - 研究者の意向（2026-10-20）: お礼、草稿ができたこと、独立研究者として倫理の問題に一人で向き合ってきたのでコーパスの公開に大変助けられたこと、今後も交流を続けたいことを入れる。
 
-**Subject**: Draft paper using the KLiCKe corpus
+**Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis（前のスレッドへの返信として送る・2026-10-20 研究者が決定）
 
 Hi Yu,
 

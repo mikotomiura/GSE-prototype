@@ -57,7 +57,7 @@
 - Hanisch を出版版で照合する（ACM の PDF はボットに閉じているので研究者に頼む）。
 - 投稿版で、所属の書き方が匿名性を損なわないか確かめる。
 - PoPETs の PC chairs への催促は 10/27 ごろ（下書きは `reply-drafts-20261013.md` の 3・送るのは研究者）。
-- Dr. Tian へのメール（`reply-drafts-20261013.md` の 4）: 件名が未決。案は、前のスレッドへの返信（Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis）か、新しく "Draft paper on the KLiCKe corpus, as promised" など。空欄は遅れのお詫び・主な結果の 1〜2 文・投稿予定日。送るのは草稿が完成したとき。
+- Dr. Tian へのメール（`reply-drafts-20261013.md` の 4）: 件名は前のスレッドへの返信「Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis」に決めた（2026-10-20）。空欄は遅れのお詫び・主な結果の 1〜2 文・投稿予定日。送るのは草稿が完成したとき。
 
 ## 守ること
 
