@@ -952,3 +952,4 @@
 - 8: 体裁の検査は登録版の意図した日本語の語 3 件だけ（添付 3 の 84 件は日本語の検索式の逐語で、前からある）。草稿の組版はエラー 0。草稿の「The protocol is not yet registered … registration draft 0.21」は、OSF の識別子が来る 12 で書き換える（登録が済むまでは事実なので）。
 - 9: `c_screening.py mode --set two-human`（束は 0）。`screening/mode.txt` = `two-human 2026-10-20T15:38:57Z`。
 - 10: TRACE `bbbaae7` をコミットし push した。
+- attack-me の round-1〜8 の tmp（追跡していない）を、研究者の確認（消す・推奨どおり）を得て消した（2026-10-21）。
