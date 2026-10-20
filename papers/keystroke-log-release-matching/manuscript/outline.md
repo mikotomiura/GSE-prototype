@@ -26,7 +26,7 @@ body.
 | Section | File | Depends on the results | State |
 |---|---|---|---|
 | 1 Introduction | `sections/introduction.tex` | Contributions paragraph only | Skeleton with draft paragraphs; approach, harms and contributions left as bracketed plans |
-| 2 Background and related work | `sections/related.tex` | No | Skeleton with draft paragraphs; the search terms of "To our knowledge" are to be added |
+| 2 Background and related work | `sections/related.tex` | No | Skeleton with draft paragraphs; the scope of the searches behind "To our knowledge" is given by sources, dates and counts (search terms were not recorded) |
 | 3 Threat model | `sections/threat-model.tex` | No | Draft, revised after the first pre-submission review |
 | 4 Data and release forms | `sections/data.tex` | Counts after exclusion | Draft; the counts after exclusion are left blank |
 | 5 Attackers | `sections/attackers.tex` | No | Draft |
@@ -60,6 +60,19 @@ paper does not say that a form "works" or "withstands" matching. The recommendat
 "against this attacker, at this N, this form had this multiple of 1/N and kept this much of the process measures".
 Agreements not to re-identify, which releasing parties also use, are discussed alongside the processing in Section 8.
 
+## Page budget
+
+Estimated on 21 October 2026, before the results. The main body runs from page 1 to the left column of page 11
+(about 10.5 pages). The results (two tables, one figure, the subsection on the Japanese translation logs, about 2.5
+pages), the three paragraphs of the introduction, the take-aways, the conclusion (about 0.8 page) and the abstract
+(about 0.25 page) bring it to about 14 pages, so about two pages (four columns) move to the appendices after the
+results, in this order: (1) merge the overlap of the assumptions (Section 3.5) and the limitations (Section 8.1);
+(2) the checks after acquisition and on synthetic logs (Sections 4.2 and 4.3); (3) the registration paragraph of
+Section 6.8, into the open science section; (4) the exploratory analyses (Section 6.7); (5) the methods for the
+Japanese translation logs (Sections 4.1, 4.3, 5.5 and 6.6), with a summary of three sentences kept in the body.
+Items (1) to (5) free about 3.5 columns; if more is needed, (6) the details of A3 and of the alignment, then (7) the
+table of process measures. The methods of the main results (full texts, windows, utility) stay in the body.
+
 ## Claims and evidence: Section 2 (Background and related work)
 
 | Claim | Evidence | Strength used in the text |
@@ -69,7 +82,7 @@ Agreements not to re-identify, which releasing parties also use, are discussed a
 | Records are linked through auxiliary information the releasing party did not anticipate | `narayanan2008robust` | Stated |
 | Evaluations of anonymisation for behavioural data often assume a weak attacker | `hanisch2021survey` (quotation) | Quoted |
 | Earlier work on releasing keystroke data considered labelled keystroke samples and identification, not texts | `leinonen2017preventing`, `edwards2023csedm` | Stated for these works; not "no work considers texts" |
-| What is new: the evaluation, on public keystroke data whose texts are known, of the processing used in practice and of alternatives, by an attack that matches logs to texts | Preregistration, "What is not concluded" (last item); the literature searches before registration found no such evaluation | "To our knowledge", with the sources, search terms and dates of the searches given in one or two sentences or an appendix |
+| What is new: the evaluation, on public keystroke data whose texts are known, of the processing used in practice and of alternatives, by an attack that matches logs to texts | Preregistration, "What is not concluded" (last item); the literature searches before registration found no such evaluation | "To our knowledge", with the sources, dates and counts of the searches in two sentences (the search terms were not recorded and are not reconstructed) |
 
 ## Claims and evidence: Section 3 (Threat model)
 
