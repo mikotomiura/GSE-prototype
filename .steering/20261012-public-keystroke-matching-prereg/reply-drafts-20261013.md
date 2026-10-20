@@ -66,3 +66,22 @@ Mikoto
 （2026-10-14 に作り直した版。前の版は、返事の中身を長く繰り返していた。）
 
 （注: 「by the end of this month」は約束になる。間に合うか不安なら「in the coming weeks」にする。倫理の節に「personal communication」として書く許可は、先方が「helpful for your ethics section」と書いているので改めて尋ねない。）
+
+## 3. PoPETs の program chairs への催促（2026-10-20 に下書き・判断 57）
+
+10/13 に送ったメール（下書き 2）への返信の形で送る。送るのは研究者（10/27 ごろの目安）。送ったら日付を `decisions.md` に書く。
+
+**Subject**: Re: Question on presentation requirements for accepted PoPETs 2027 papers
+
+Dear PETS 2027 Program Chairs,
+
+I am writing to follow up on my message of 13 October. I understand that this is a busy period before the Issue 3 deadline, and I would be grateful for a short reply when you have time.
+
+My question is whether an author of an accepted paper who does not attend the symposium in person must give a live online presentation or submit a recorded video for the paper to appear in the proceedings. Knowing this before the Issue 3 deadline (30 November) would help me decide where to submit.
+
+If another contact handles this question, I would appreciate being pointed to them.
+
+Thank you for your time.
+
+Kind regards,
+[name]
