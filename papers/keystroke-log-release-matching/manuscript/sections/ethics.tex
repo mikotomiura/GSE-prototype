@@ -1,0 +1,74 @@
+\begin{ethics}
+\paragraph{Review by an ethics committee.}
+No institutional ethics committee was available to the authors, and no external committee or board reviewed the
+study. The study collects no new data. It uses two public corpora and a public
+model under their terms, identifies no individual and reports only aggregates.
+
+\paragraph{The data and the consent of their participants.}
+The authors of the KLiCKe corpus informed us (personal communication) that its collection was
+approved by the Institutional Review Board of Georgia State University; that the participants, recruited through
+Amazon Mechanical Turk, gave informed consent to the use of their data for research purposes and were informed that
+their data would be ``used for research purposes by the broader research community''; that the data were reviewed for
+personally identifiable information before release; the terms of use are given in Section~\ref{sec:data:corpora}. The
+published description of the corpus states that participants received an informed consent form outlining the study's
+objectives and procedures~\cite{tian2025klicke}. We describe the scope of consent in the words of the corpus authors
+and do not claim that participants consented to any particular form of public release. The corpus authors saw no
+particular concern with this analysis and recommended reporting the findings in aggregate and not disclosing
+potentially sensitive or identifying information about individual participants. The corpus authors will receive the
+paper when it is complete. The paper that describes the collection of ENJA15 states that its participants ``signed a
+form in which they agreed that their translation data would be made publicly available under a creative commons
+license''~\cite{carl2016lrec}; we follow the more restrictive of the two licence statements of the database that
+distributes it~\cite{crittlicense}. We did not acquire the demographic file of KLiCKe, whose questionnaire asked for
+the participants' Mechanical Turk worker IDs~\cite{tian2025klicke}.
+
+\paragraph{The competition data.}
+The competition data, which hide the texts, were not used, and we did not examine whether they share essays with
+KLiCKe (Section~\ref{sec:threat-model}). Doing so would test a real release whose participants did not agree to that
+use, and it is not needed to evaluate the processing. \textbf{[To be completed after the party is informed: on (date),
+about two weeks before submission, we informed the party that released the competition data that this evaluation
+would be published and that its data were not matched, and invited a response; (whether and how it responded).]}
+
+\paragraph{Stakeholders and what they could lose.}
+The stakeholders are the writers whose logs are in the two corpora, the writers of other released logs (including the
+competition data), the parties that release keystroke logs, and readers who could reuse the procedures described here.
+What the writers could lose is the link between their writing process, their scores and their texts. If no one misuses
+the paper, the writers of the two corpora lose nothing new: their texts and logs are already public, no result is
+published for an individual writer, and no text or log is excerpted. If someone reuses the procedures against a
+release that hides texts, the writers of that release could have their logs linked to their texts. The procedures are
+of known types (Section~\ref{sec:related}), so this risk does not arise from this paper alone; what the paper adds is
+a measurement, on two corpora, of how much each kind of processing reduced matching and kept the process measures. By
+naming the competition data next to a public corpus collected in the same way, the paper also points to a release
+against which the procedures could be tried. We did not try them, the releasing party is informed (above), and we
+report only that the two releases were collected in the same way, which their own descriptions state.
+
+\paragraph{Reasons from duties.}
+Apart from these consequences, the study keeps within the purpose to which the participants agreed (research use of
+their data), collects no new data, does not acquire the demographic file, and does not use the release whose
+participants did not agree to an evaluation of this kind (the competition data).
+
+\paragraph{Weighing harms and benefits.}
+We also weighed the study against the principles of the Menlo Report~\cite{dittrich2012menlo}. \emph{Respect for
+persons:} the participants agreed to the use of their data for research; this study evaluates how well the release of
+such data protects them, collects nothing new, identifies no one and publishes no result for an individual writer and
+no excerpt of a text or a log. \emph{Beneficence:} the harm is that the paper describes procedures that link processed
+logs to texts; the benefit is that parties who release keystroke logs learn how much each processing step reduced
+matching by the attackers tried here, and how much of the standard process measures it kept, before they release more
+data. The attacks evaluated here are of known types (Section~\ref{sec:related}); what is new is their evaluation, on
+public keystroke data whose texts are known, against the masking used in one public release and against alternatives.
+\emph{Justice:} no new burden falls on participants, and the benefit reaches every writer whose keystroke logs are
+released. \emph{Respect for law and public interest:} the data and the public KeyTAR model are used under their
+licences and terms, their sources are cited, and the study and its analysis plan were preregistered before any data
+were acquired. The code is published only for the two corpora evaluated here; no code that reads
+other released logs, and in particular the competition data, is written or published (see the open science section).
+This withholds a ready tool aimed at a particular release; since the columns of the two releases are close, it does
+little to stop a party determined to adapt the code.
+
+\paragraph{Handling of the data.}
+Logs and texts were handled as described in Section~\ref{sec:data:handling}; only aggregates are reported and
+published.
+
+\paragraph{Interests.}
+The authors develop software that records keystroke logs for research and plan to release keystroke logs collected
+with it; the results of this paper bear on how such logs should be processed before release. The authors have no
+financial interest in the results, and the study received no funding.
+\end{ethics}

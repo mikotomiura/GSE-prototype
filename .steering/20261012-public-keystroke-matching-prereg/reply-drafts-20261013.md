@@ -66,3 +66,85 @@ Mikoto
 （2026-10-14 に作り直した版。前の版は、返事の中身を長く繰り返していた。）
 
 （注: 「by the end of this month」は約束になる。間に合うか不安なら「in the coming weeks」にする。倫理の節に「personal communication」として書く許可は、先方が「helpful for your ethics section」と書いているので改めて尋ねない。）
+
+## 3. PoPETs の program chairs への催促（2026-10-20 に下書き・判断 57）
+
+10/13 に送ったメール（下書き 2）への返信の形で送る。送るのは研究者（10/27 ごろの目安）。送ったら日付を `decisions.md` に書く。
+
+**Subject**: Re: Question on presentation requirements for accepted PoPETs 2027 papers
+
+Dear PETS 2027 Program Chairs,
+
+I am writing to follow up on my message of 13 October. I understand that this is a busy period before the Issue 3 deadline, and I would be grateful for a short reply when you have time.
+
+My question is whether an author of an accepted paper who does not attend the symposium in person must give a live online presentation or submit a recorded video for the paper to appear in the proceedings. Knowing this before the Issue 3 deadline (30 November) would help me decide where to submit.
+
+If another contact handles this question, I would appreciate being pointed to them.
+
+Thank you for your time.
+
+Kind regards,
+[name]
+
+## 4. Dr. Tian へ、論文の草稿を送る（2026-10-20 に下書き・送るのは研究者）
+
+2026-10-21 追記: 判断 68 で害 (a) を「本文を持つ者による結び付き」に定義し直したので、本文の In brief の 1 文を合わせて直した。題名は判断 69 で決めた。
+
+送る時期: 本計算の結果と考察を入れた草稿ができたとき（投稿の前。11/10〜11/25 の目安）。前の返信（下書き 3）で「今月中」と書いて送ったなら、遅れを詫びる 1 文（[ ] 内の任意の文）を入れる。`[ ]` は結果が出てから埋める。
+
+送る前に確かめること:
+- 添付は PDF の草稿だけ。個々の書き手の結果・本文や記録の抜粋を含めない（先方の勧めと事前登録のとおり）。
+- PoPETs は二重盲検。先方が査読者に当たる可能性があるので、草稿を他に回さないよう頼む文を入れる（下の最後の段落）。
+- 倫理の節は先方の言葉を要約して書いているので、書き方を変えたければ直すと 1〜2 文で伝える（段落の貼り付けと確認の依頼はやめた・2026-10-20 研究者）。
+- 前のスレッドに返信して Crossley を CC に入れるとき、引用される前のやり取り（Dr. Tian の倫理の説明を含む）を消してから送る（本文の最初の段落でそう伝えている・2026-10-20 研究者の意向で CC の理由を明記）。
+- 研究者の意向（2026-10-20）: お礼、草稿ができたこと、独立研究者として倫理の問題に一人で向き合ってきたのでコーパスの公開に大変助けられたこと、今後も交流を続けたいことを入れる。
+
+**Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis（前のスレッドへの返信として送る・2026-10-20 研究者が決定）
+
+**CC**: Scott Crossley <scott.crossley@vanderbilt.edu>（Vanderbilt の Data Science Institute の affiliates のページに載る住所・2026-10-20 に検索で確認。所属は Peabody College の Special Education。送る前に最近の論文の連絡先などで確かめる・KLiCKe の共著者で、Kaggle のコンペの Citation の著者・判断 64）
+
+Hi Yu (and Scott, copied here),
+
+Before anything else, a note on the copy. I have added Scott to this reply for two reasons. The paper discusses the Kaggle competition "Linking Writing Processes to Writing Quality", of which he is one of the authors, and I would like him to be able to check how it is described before I submit. As a co-author of KLiCKe, he may also wish to see how the corpus is used. I have removed our earlier messages from this reply, so that only this message is shared with him. I hope this is all right with you.
+
+[I am sorry this has taken longer than I expected.] I have now finished a full draft of the paper that uses the KLiCKe corpus, and I attach it here. As promised, I wanted you to see it before it is submitted.
+
+In brief, the paper asks how far the processing applied to publicly released keystroke logs keeps the logs apart from their texts, against a party that holds candidate texts. KLiCKe is the data on which I evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate.] All results are reported in aggregate, as you recommended, with no result for an individual writer and no excerpt of an essay or a log.
+
+The paper takes the Kaggle competition as an example of such processing: its letters and digits were masked "to prevent reproduction of the essay text". The competition data were not used in this study and were not matched against any text. The paper notes that the competition's description of data collection follows the same procedure as KLiCKe, but it does not examine whether the two share essays. Scott, if anything in how the paper describes the competition is inaccurate, or if you think The Learning Agency Lab should hear about the paper from you rather than from me, please let me know.
+
+In the ethics section, I describe the IRB approval at Georgia State University and the scope of consent as you explained them to me. If you would like anything worded differently, I would be glad to change it. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date]. Because the venue uses double-blind review, I would appreciate it if you could both keep the draft to yourselves for now.
+
+I would also like to thank you more personally. I work as an independent researcher, without an institution behind me, and questions of research ethics have always been something I had to face on my own. A large, carefully documented corpus that is openly available, together with your clear and generous answers to my questions, made this study possible in a way it otherwise could not have been. I am very grateful.
+
+I hope we can stay in touch, and I would be happy to hear about your work as well.
+
+Best regards,
+Mikoto
+
+## 5. The Learning Agency Lab への通知（2026-10-21 に下書き・判断 61・64・68・送るのは研究者）
+
+送る時期: 本計算の結果が出たらすぐ（11/9 ごろの見込み）。投稿（11/30）までの約 2 週を応答の猶予にする（判断 68 の 4）。送った日付・猶予・応答の有無を ethics.tex の空欄に書く。
+
+送る前に確かめること:
+- 宛先: The Learning Agency Lab の連絡先は**まだ確かめていない**（Kaggle の Overview の Competition Host が The Learning Agency Lab・判断 64）。公式サイトの連絡先を研究者が一次で確かめて入れる。Dr. Tian へのメール（下書き 4）で Crossley が「自分から伝える」と答えた場合は、この下書きを送らずに Crossley の返事に合わせる。
+- 下書き 4（Dr. Tian・Crossley）との順番: 4 を先に送り、Crossley の答えを数日待ってから 5 を送るのが自然。ただし猶予の 2 週を削らないよう、4 の返事を待つのは 3 日ほどまでにする。
+- 添付は付けない（二重盲検の投稿前なので草稿は渡さない。求められたら研究者が判断する）。結果の数字は集計の 1〜2 文だけ。書き手ごとの値・本文・記録の抜粋は書かない。
+- `[ ]` は結果が出てから埋める。
+
+**Subject**: Notice of a forthcoming paper that discusses the masking in "Linking Writing Processes to Writing Quality"
+
+Dear The Learning Agency Lab team,
+
+I am an independent researcher writing to let you know, before submission, about a paper that discusses the Kaggle competition "Linking Writing Processes to Writing Quality", which you hosted with Vanderbilt University.
+
+The paper evaluates how far the processing of released keystroke logs keeps the logs apart from their texts, against a party that already holds candidate texts on the same prompts. It takes the competition's masking, in which letters and digits were replaced by "q" "to prevent reproduction of the essay text", as the example of processing used in a public release, and evaluates the same masking, together with alternatives that release less, on the public KLiCKe corpus, whose texts are known. [One or two sentences on the main finding for the masking, in aggregate.]
+
+I want to be clear about what the study did not do. The competition data were not downloaded or used, no log from the competition was matched against any text, and the paper does not examine whether the competition shares essays with any other release. The paper describes the competition only from its public pages and from the first-place write-up, and notes that its description of data collection follows the same procedure as KLiCKe.
+
+I plan to submit the paper to the Proceedings on Privacy Enhancing Technologies by [date]. If you have any comments, concerns or corrections about how the competition is described, I would be grateful to hear them by [date, about two weeks after sending], so that I can take them into account before submission. The paper will report that you were informed and whether you responded.
+
+Thank you for releasing the data and for the care taken to protect the writers.
+
+Best regards,
+Mikoto Miura

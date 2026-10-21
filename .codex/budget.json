@@ -33,11 +33,12 @@
   "_comment_merge_2026_10_11_paper2_defer": "2026-10-11: docs/paper2-defer-dataset に origin/main（PR #354 の前）を merge した際、today が衝突した。共通の起点の today は 10-11 の 397928 / 11 回。和を採った: 起点 397928 / 11 ＋ 本ブランチ +23743 / +1（ADR-039 D1 の注の /cross-review の Codex 1 回） ＋ origin/main +83076 / +2 = 504747 / 14 回。",
   "_comment_merge_2026_10_12_eh3_after_impl": "2026-10-12: docs/portrait-eh3-after-impl に origin/main（PR #355 の後）を merge した際、台帳が衝突した。10-12 は両側とも起点が無い（本ブランチの起点は 10-11 の 481004 / 13 回）ので和を採った: 本ブランチ 53993 / 2 回（EH3 の夜間の制約を外したタスクの /cross-review の Codex 2 巡）＋ origin/main 99497 / 2 回 = 153490 / 4 回。history の 10-11 は origin/main の 504747 / 14 回（本ブランチの 481004 / 13 回を含む）を採った。",
   "_comment_merge_2026_10_13_public_matching": "2026-10-13: docs/public-keystroke-matching-freeze に origin/main を merge した際、today と history の 10-12 が衝突した。共通の起点（c97f4fb0）は 10-12 の 309776 / 8 回。10-12 は本ブランチで増えていないので origin/main の 517454 / 15 回を採った。10-13 は和: 本ブランチ 67500 / 2 回（本計算のコードの直しの Codex レビュー 2 巡）＋ origin/main 214879 / 7 回 = 282379 / 9 回。",
+  "_comment_merge_2026_10_21_public_matching": "2026-10-21: docs/public-keystroke-matching-freeze に docs/public-keystroke-matching-manuscript を merge した際、today と history が衝突した。today の 10-21 は和: 本ブランチ 26894 / 1 回（逸脱 D4 の Codex レビュー）＋ manuscript 51803 / 1 回 = 78697 / 2 回。history は本ブランチの 10-18（21882 / 1 回）を残した。",
   "_comment_merge_2026_10_12_public_matching": "2026-10-12: docs/public-keystroke-matching-prereg に origin/main を merge した際、today が衝突した。共通の起点の today は 10-12 の 99497 / 2 回。和を採った: 起点 99497 / 2 ＋ 本ブランチ +101499 / +2（合成の記録の検査の /cross-review 2 巡の Codex） ＋ origin/main +108780 / +4 = 309776 / 8 回。",
   "today": {
     "date": "2026-10-21",
-    "tokens_used": 26894,
-    "invocations": 1
+    "tokens_used": 78697,
+    "invocations": 2
   },
   "history": [
     {

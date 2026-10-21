@@ -1,0 +1,59 @@
+\section{Discussion and limitations}
+\label{sec:discussion}
+
+% Skeleton with draft paragraphs, written before the results. The limitations are written first, from the
+% preregistration ("What is not concluded") and Section 3.5; the discussion of the results is added after them.
+
+\subsection{What the results do not show}
+\label{sec:discussion:limits}
+
+\paragraph{The assumptions.}
+Section~\ref{sec:threat-model:bias} states the assumptions and the direction in which each biases the results; they
+apply to every result here, and the results give no proof of safety and no upper bound on the risk of matching. The
+strongest attacker is a maximum over the attackers tried, not an attack that combines all the length and timing
+information a form leaves; only A3 on R3-u combines the two. No attacker targets the lower bound of the next press
+interval that drags and held keys leave in the forms with press times (\S\ref{sec:data:forms}), although it can enter
+the interval features of A2-b and the segment durations of A3 on R7.
+
+\paragraph{What the data allow.}
+We claim no difference by writer attributes, since the demographic file was not acquired, and we do not describe matching
+as identification of writers. The results on KLiCKe are not generalised to other tasks (a limit of 30 minutes,
+argumentative essays, crowdsourced writers) or to logs that did not pass the selection of the KLiCKe release, such as
+logs with much pasting~\cite{tian2025klicke}. The results on ENJA15 are not generalised to Japanese free writing or to
+logs of input methods in general, and differences from KLiCKe are not attributed to language or input method, since
+the task, the input and the language differ at once. Our formulas for the process measures could not be verified
+against Inputlog (\S\ref{sec:protocol:utility}), so the utility axis is the agreement of our formulas with themselves
+in R0, for ten measures, and not the agreement with Inputlog or the value of a release for measures not yet defined or
+for predicting scores. KeyTAR was run with the defaults of its artifact, including a limit on
+generated tokens that is expected to cut reconstructions short, and is a reference, not a bound.
+
+\paragraph{The exploratory analyses.}
+The uniqueness of word-length sequences is measured among the $N$ candidates tried and is not a risk of
+re-identification in a population. The form with differentially private noise gives its guarantee for one segment
+count or one interval, not for a writer's log, and its noise comes from a seeded generator for evaluation, not from an
+implementation suitable for release.
+
+\subsection{Processing and agreements}
+\label{sec:discussion:agreements}
+
+Processing is not the only protection that a releasing party can give. A release can also be bound by terms of
+use. The terms of DataShop, a repository of data from educational software, state ``You will not make any attempts to
+de-anonymize the data'' and forbid creating a dataset with information that identifies
+students~\cite{datashop2012terms}. The rules of the competition allow the data to be used for non-commercial purposes,
+including academic research, and forbid passing them to anyone who has not agreed to the rules; in the rules and on the
+data page we found no clause on recovering the texts or identifying the writers~\cite{kaggle2023lwp}. KLiCKe may be
+downloaded and used freely, with the repository cited as the source~\cite{inputlog2026community}. Terms do not change
+what a log reveals to a party that ignores them, and they do not bind a party that holds the texts and obtains the
+logs outside the terms; but they define who may use a release and for what, and they can be combined with any of the
+forms evaluated here. Processing and terms are also not the only choice: a releasing party can give the process
+measures instead of the logs, or give the logs only to those who apply for them, since what to release depends on who
+asks and for what purpose~\cite{borgman2018open}. These choices lie outside this evaluation.
+
+\subsection{What a releasing party can take away}
+\label{sec:discussion:takeaways}
+
+\textbf{[After the results.]} The results are material for three choices: which columns to keep, how coarsely to give
+times and lengths, and whether to release full logs or windows; for windows only the accuracy of matching is reported,
+since the process measures are computed on full logs. Each statement takes the form ``against this attacker,
+at this $N$, this form had this multiple of $1/N$ and kept this much of the process measures''. No rule recommends a
+form, and the paper does not say that a form works or withstands matching.
