@@ -11,9 +11,9 @@
 - [x] citation-ssot の確かめ（外部文献に依らない旨を ADR の頭に書いた）
 
 ## レビュー
-- [ ] /cross-review
-- [ ] 指摘への対応を design.md に記録
+- [x] /cross-review（2 巡）
+- [x] 指摘への対応を design.md に記録
 
 ## 完了処理
-- [ ] design.md の最終化
+- [x] design.md の最終化
 - [ ] git commit・push（PR は出さない）
