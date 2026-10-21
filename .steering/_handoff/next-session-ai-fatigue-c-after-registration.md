@@ -1,5 +1,7 @@
 # 引き継ぎ: C（TRACE）—— 登録の後
 
+（2026-10-21 に `next-session-ai-fatigue-c-stage2.md` で置き換えた。）
+
 作成 2026-10-21（Mac）。`next-session-ai-fatigue-c-registration-day.md` を置き換える（前の日まで・当日のメインの 1〜10 は判断 76・77 で済んだ）。
 
 - 返答・記録・AskUserQuestion の引数は日本語で書く。記号を多用しない。
