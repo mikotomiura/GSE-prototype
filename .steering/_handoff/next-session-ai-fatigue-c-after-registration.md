@@ -9,7 +9,7 @@
 
 ## 始め方
 
-研究の物は `~/TRACE`（main は `bbbaae7` 以降・push 済み）。記録は worktree `/Users/johnd/GSE-prototype-af-c`（ブランチ `docs/ai-fatigue-c-outline`）の `.steering/20261017-ai-fatigue-c-outline/`（判断は 77 まで）。手順は同じ場所の `registration-day.md`。
+研究の物は `~/TRACE`（main は `8b235ce` 以降・push 済み）。記録は worktree `/Users/johnd/GSE-prototype-af-c`（ブランチ `docs/ai-fatigue-c-outline`）の `.steering/20261017-ai-fatigue-c-outline/`（判断は 79 まで）。手順は同じ場所の `registration-day.md`。
 
 ## 1. 済んだこと
 
