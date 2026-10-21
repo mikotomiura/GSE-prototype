@@ -12,7 +12,10 @@ and R7; equal numbers of A3 terms across candidates; the vectorised A3; characte
 order; stratified resamples; the aggregation layer by value (strongest attacker per resample, uplift over A0, A3 on
 R3-u, resamples without writers, contrasts with every config pair, utility per prompt with dropped counts, the
 negative control with a fixed attacker, the open-world AUC, the split by the rebuilt draft); utility runs across
-modifier rows; the whole run (no text in the output, every contrast and the fixed attacker of the negative control).
+modifier rows; the exploratory analyses 3 to 5 (m, thresholds with infinities, tail, margin curve and intervals,
+score bands, the fixed attacker and the R3-u version); the whole
+run (no text in the output, every contrast and the fixed attacker of the negative control, the exploratory files);
+resuming from the cache (deviation D4).
 """
 import json
 import os
@@ -469,16 +472,130 @@ def t_negative_control(seed):
           "sum 1.0 not taken)" % am["acc"])
 
 
+def t_exploratory(seed):
+    """Exploratory analyses 3 to 5 (decision 68): m against a plain sort (ties and infinities), the tail against
+    numpy and a plain count, the margin curve against a plain count, the score bands against a plain ranking (ties by
+    writer ID), and the attacker fixed by the main point estimate (not selected again)."""
+    rng = np.random.default_rng(23)
+    vecs = [rng.random(10), np.array([0.3, 0.1, 0.1, 0.5]), np.array([np.inf, 2.0, np.inf]),
+            np.array([np.inf, np.inf, 1.0]), np.array([np.inf, np.inf]), np.array([5.0, 1.0, 3.0])]
+    want = [float(np.sort(v)[1] - np.sort(v)[0]) for v in vecs[:2]] + [np.inf, np.inf, 0.0, 2.0]
+    got = [evaluate.margin(v) for v in vecs]
+    got.append(evaluate.margin(np.array([1.0, np.nan, np.nan])))
+    want.append(np.inf)
+    check(all(g == w or close(g, w) for g, w in zip(got, want)), "explore_margin",
+          "m = second smallest - smallest (tie 0, infinite ties 0, only the smallest finite or NaN costs: inf): %s"
+          % got)
+    srt = np.array([0, 0, 1, 2, 3] + [np.inf] * 6, dtype=float)
+    want_p = []
+    for q in aggregate.MARGIN_Q:  # the linear definition by hand: s[lo] + (s[hi] - s[lo]) * frac, inf above
+        h = (len(srt) - 1) * q / 100
+        lo, hi = int(np.floor(h)), int(np.ceil(h))
+        want_p.append(srt[lo] if lo == hi else (np.inf if np.isinf(srt[hi]) else srt[lo] + (srt[hi] - srt[lo]) *
+                                                (h - lo)))
+    got_p = [aggregate._pct_sorted(srt, q) for q in aggregate.MARGIN_Q]
+    check(got_p == want_p and got_p[4] == 3.0 and np.isinf(got_p[5]), "explore_pct_inf",
+          "thresholds with infinite m: the linear percentile by hand (numpy gives nan here): %s" % got_p)
+    ids = ["w%02d" % i for i in range(30)]
+    res = []
+    for j, wid in enumerate(ids):
+        p = "P%d" % (j % 2)
+        acc = {"A2": 1.0 if j == 0 else round(0.4 + j / 50, 4), "A0": 1.0}  # p95 and p99 interpolate below 1
+        full = {("full", "R3", a, 10): {"acc": v} for a, v in acc.items()}
+        mg = [(float(rng.integers(0, 6)), float(rng.integers(0, 2))) for _ in range(1 + j % 5)]
+        margin = {} if j == 5 else {("R3", "A2", 10): mg}  # one writer without records, unequal numbers of draws
+        res.append({"prompt": p, "writer": wid, "full": full, "window": {}, "margin": margin})
+    R, _ = aggregate.resamples(seed, [r["prompt"] for r in res], "explore", n=200)
+    best = {"full|R3|10": {"attacker": "A2"}}
+    cells = {"full|R3|A2|10": {"acc": 0.692}, "full|R3|A0|10": {"acc": 1.0}}
+    st = evaluate.STRONGEST_FULL
+    tail = aggregate.exploratory_tail(res, R, best, cells, ["R3"], st).get("full|R3|10", {})
+    v = np.array([r["full"][("full", "R3", "A2", 10)]["acc"] for r in res])
+    r3u = aggregate.fixed_attacker({"full|R3-u|10": {"attacker": "A3"}},
+                                   {"full|R3-u|A3-sum|10": {"acc": 0.30}, "full|R3-u|A3-mean|10": {"acc": 0.32}},
+                                   "R3-u", 10, st)
+    check(tail.get("attacker") == "A2" and tail.get("costs_of") == "A2", "explore_fixed",
+          "the exploratory analyses use the attacker of the main point estimate (A2; A0 1.0 not taken)")
+    check(r3u == ("A3", "A3-mean"), "explore_fixed_r3u",
+          "on R3-u, A3 reads the version of the main point estimate (A3-mean 0.32 over A3-sum 0.30): %s" % (r3u,))
+    tv = {k: tail.get(k, {}).get("value", np.nan) for k in ("p95", "p99", "share_acc_1")}
+    plain = np.array([[np.percentile(v[row], 95), np.percentile(v[row], 99), np.mean(v[row] == 1.0)] for row in R])
+    check(close(tv["p95"], np.percentile(v, 95)) and close(tv["p99"], np.percentile(v, 99))
+          and tv["p95"] < tv["p99"] < 1
+          and close(tv["share_acc_1"], np.mean(v == 1.0))
+          and all(close(tail.get(k, {}).get("ci"), aggregate.ci(plain[:, j]))
+                  for j, k in enumerate(("p95", "p99", "share_acc_1"))),
+          "explore_tail", "tail: p95 %.3f, p99 %.3f, share of accuracy 1 %.3f (plain: %.3f)"
+          % (tv["p95"], tv["p99"], tv["share_acc_1"], np.mean(v == 1.0)))
+    mg = aggregate.exploratory_margin(res, R, best, cells, ["R3"], st).get("full|R3|10", {"draws": -1, "curve": []})
+    per = [r["margin"].get(("R3", "A2", 10), []) for r in res]
+    m = np.array([x for d in per for x, _ in d])
+    c = np.array([y for d in per for _, y in d])
+    ok = mg.get("draws", -1) == len(m)
+    for e in mg.get("curve", []):
+        t = np.percentile(m, e["q"])
+        ok = ok and close(e["t"], t) and close(e["coverage"], np.mean(m >= t)) and close(e["precision"],
+                                                                                          np.mean(c[m >= t]))
+        bc, bp = [], []
+        for row in R:  # the draws of the resampled writers, a writer drawn twice counted twice
+            mr = np.array([x for i in row for x, _ in per[i]])
+            cr = np.array([y for i in row for _, y in per[i]])
+            bc.append(np.mean(mr >= t))
+            bp.append(np.mean(cr[mr >= t]) if np.any(mr >= t) else np.nan)
+        ok = ok and close(e["coverage_ci"], aggregate.ci(bc)) and close(e["precision_ci"], aggregate.ci(bp))
+    check(ok and bool(mg.get("curve")) and mg["curve"][0]["coverage"] == 1.0, "explore_margin_curve",
+          "margin curve: thresholds at the 0th..90th percentiles of m, coverage and precision and their intervals as "
+          "plain counts (unequal draws, a writer without records)")
+    scores = [float(j % 4) for j in range(30)]
+    scores[3] = None
+    band = aggregate.score_bands(res, scores)
+    ok = band[3] == -1
+    for p in ("P0", "P1"):
+        ix = [i for i, r in enumerate(res) if r["prompt"] == p and scores[i] is not None]
+        order = sorted(ix, key=lambda i: (scores[i], res[i]["writer"]))
+        ok = ok and all(band[i] == (3 * k) // len(order) for k, i in enumerate(order))
+    sb = aggregate.exploratory_score_band(res, R, best, cells, ["R3"], scores, st)
+    e = sb.get("full|R3|10", {})
+    b0 = np.nanmean(np.where(band == 0, v, np.nan))
+    b2 = np.nanmean(np.where(band == 2, v, np.nan))
+    tb = e.get("top_minus_bottom", {})
+    with np.errstate(invalid="ignore"):
+        diff = [np.mean([v[i] for i in row if band[i] == 2]) - np.mean([v[i] for i in row if band[i] == 0])
+                for row in R]
+    check(ok and sb["writers_without_score"] == "<10" and close(e.get("band0", {}).get("acc"), b0)
+          and close(e.get("band2", {}).get("acc"), b2) and close(tb.get("value"), b2 - b0)
+          and close(tb.get("ci"), aggregate.ci(diff)),
+          "explore_band", "score bands by (score, writer ID) in thirds per prompt; top - bottom %.3f"
+          % (b2 - b0))
+
+
 def t_run(seed, tmp, cfg):
     out = os.path.join(tmp, "selftest_main_run.json")
+    exdir = os.path.join(tmp, "selftest_main_explore")
     subprocess.run([sys.executable, os.path.join(HERE, "run_main.py"), "--out", out, "--per-prompt", "16",
-                    "--per-prompt-sample", "4", "--workers", "4", "--no-timing", "--open-world-n", "10"], check=True,
-                   capture_output=True)
+                    "--per-prompt-sample", "4", "--workers", "4", "--no-timing", "--open-world-n", "10",
+                    "--exploratory-3-5", exdir], check=True, capture_output=True)
     with open(out, encoding="utf-8") as f:
         s = f.read()
+    ex = {}
+    for n in ("tail", "margin", "score_band"):
+        with open(os.path.join(exdir, "exploratory_%s.json" % n), encoding="utf-8") as f:
+            ex[n] = f.read()
     texts = [w.text for w in corpus.synthetic_corpus(seed, 4, 16, tag="main")]
-    leaks = sum(1 for t in texts for wd in A.Cand(t).words if len(wd) >= 7 and wd in s)
-    check(leaks == 0, "no_text", "no word of the texts appears in the output (%d found)" % leaks)
+    outs = [s] + list(ex.values())
+    leaks = sum(1 for t in texts for wd in A.Cand(t).words if len(wd) >= 7 and any(wd in x for x in outs))
+    check(leaks == 0, "no_text", "no word of the texts appears in the output or the exploratory files (%d found)"
+          % leaks)
+    strong = json.loads(s).get("main500", {}).get("strongest", {})
+    want_ex = {n for n in strong if n.split("|")[0] == "full" and len(n.split("|")) == 3
+               and n.split("|")[1] in forms.MAIN and int(n.split("|")[2]) in (10, 1000)}
+    an = [json.loads(x)["analysis"] for x in ex.values()]
+    got_ex = [set(k for k in a if k.startswith("full|")) for a in an]
+    check(len(want_ex) > 0 and all(g == want_ex for g in got_ex)
+          and not any(a[k].get("missing") for a in an for k in want_ex)
+          and all(a[k]["attacker"] == strong[k]["attacker"] for a in an for k in want_ex), "run_explore",
+          "the run writes the exploratory analyses 3 to 5 for every main form and N in (10, 1000) of the strongest "
+          "attacker (%d each, its attacker; the main output is checked unchanged by run_resume)" % len(want_ex))
     d = json.loads(s)
     m = d.get("main500", {})
     check(bool(m.get("cells")), "run_cells", "the run writes aggregate cells")
@@ -561,6 +678,7 @@ def main():
     t_utility_summary(seed)
     t_utility_runs()
     t_negative_control(seed)
+    t_exploratory(seed)
     if not os.environ.get("MAIN_MUTATE") or os.environ.get("MAIN_MUTATE") in RUN_MUTANTS:
         t_run(seed, tmp, cfg)
     print("PASS" if not FAILS else "FAIL (%d): %s" % (len(FAILS), " ".join(sorted(set(FAILS)))))
@@ -590,6 +708,11 @@ MUTANTS = {
     "window_r7_shift": ["window_r7"],
     "cand_codes_shared": ["cand_codes"],
     "train_unsorted": ["train_order"],
+    "margin_first_two": ["explore_margin"],
+    "tail_share_ge": ["explore_tail"],
+    "band_ties_reversed": ["explore_band"],
+    "explore_reselect": ["explore_fixed"],
+    "explore_r3u_sum": ["explore_fixed_r3u"],
 }
 RUN_MUTANTS = ()  # mutations checked without the whole run (each targets a unit check)
 

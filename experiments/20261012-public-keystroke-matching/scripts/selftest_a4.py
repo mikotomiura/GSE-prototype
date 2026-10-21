@@ -69,7 +69,7 @@ def main():
         out = os.path.join(tmp, "out.json")
         args = argparse.Namespace(source="synthetic", root=None, out=out, workers=1, all=False, forms="main",
                                   a4_dir=tmp, a4_partial=False, per_prompt=per, per_prompt_sample=take, open_world_n=10,
-                                  no_timing=True)
+                                  no_timing=True, cache_dir=None, exploratory_3_5=None)
         run_main.run(args)
         with open(out, encoding="utf-8") as f:
             res = json.load(f)

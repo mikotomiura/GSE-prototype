@@ -29,9 +29,10 @@ if [ "$STAGE" = data ] || [ "$STAGE" = all ]; then
   "$PYK" -I scripts/a4_keytar.py --root "$KLICKE" \
       --model raw/keytar/extracted/data_artifact/data/key_ground_truth_olmo \
       --out-dir raw/derived/a4 --summary results/a4_generation.json
-  # main tables (500 writers) without A4, and again with the A4 cells (the other cells are the same as in main.json)
+  # main tables (500 writers) without A4 (and the exploratory analyses 3 to 5, decision 68), and again with the A4
+  # cells (the other cells are the same as in main.json)
   "$PY" -I scripts/run_main.py --source klicke --root "$KLICKE" --out results/main.json --workers "$WORKERS" \
-      --cache-dir "$CACHE"
+      --cache-dir "$CACHE" --exploratory-3-5 results
   "$PY" -I scripts/run_main.py --source klicke --root "$KLICKE" --a4-dir raw/derived/a4 \
       --out results/main_a4.json --workers "$WORKERS" --cache-dir "$CACHE"
   # ENJA15 (question 4)

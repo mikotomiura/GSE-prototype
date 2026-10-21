@@ -440,3 +440,161 @@ def _val(r, f, m):
 
 def _f(x):
     return None if x is None or (isinstance(x, float) and np.isnan(x)) else float(x)
+
+
+# --- exploratory analyses 3 to 5 (decision 68; notes.md, "Exploratory analyses, part 2"; not preregistered) --------
+
+EXPLORATORY_N = (10, 1000)
+TAIL_Q = (95, 99)
+MARGIN_Q = tuple(range(0, 100, 10))
+
+
+def fixed_attacker(best, cells, f, N, strongest=None):
+    """(attacker, costs_of) selected for (full text, f, N) by the point estimate of the main computation, as in the
+    negative control and the open world (R3-u A3: the version with the larger point estimate); None when absent.
+    strongest is read only by the mutant explore_reselect."""
+    name = "full|%s|%d" % (f, N)
+    if name not in best:
+        return None
+    att = best[name]["attacker"]
+    if MUTATE == "explore_reselect" and strongest:
+        pts = {a: cells.get("full|%s|%s|%d" % (f, a, N), {}).get("acc", -1.0) for a in strongest}
+        att = max(pts, key=pts.get)
+    if f == "R3-u" and att == "A3":
+        return att, R3U_A3[0] if MUTATE == "explore_r3u_sum" else r3u_a3_version(cells, "full", N)
+    return att, att
+
+
+def _tail_stats(v):
+    v = v[~np.isnan(v)]
+    if not len(v):
+        return [np.nan] * (len(TAIL_Q) + 1)
+    share = np.mean(v >= 0.95) if MUTATE == "tail_share_ge" else np.mean(v == 1.0)
+    return [float(np.percentile(v, q)) for q in TAIL_Q] + [float(share)]
+
+
+def exploratory_tail(results, R, best, cells, forms_list, strongest=None):
+    """Analysis 3: the 95th and 99th percentiles (numpy's linear interpolation) of the writers' accuracies and the
+    share of writers with accuracy 1, with intervals on the same resamples."""
+    out = {}
+    for f in forms_list:
+        for N in EXPLORATORY_N:
+            fx = fixed_attacker(best, cells, f, N, strongest)
+            if fx is None:
+                continue
+            v = cell_matrix(results, ("full", f, fx[1], N))
+            if np.all(np.isnan(v)):
+                out["full|%s|%d" % (f, N)] = {"attacker": fx[0], "costs_of": fx[1], "missing": True}
+                continue
+            point = _tail_stats(v)
+            bs = np.array([_tail_stats(v[row]) for row in R])
+            e = {"attacker": fx[0], "costs_of": fx[1], "writers": int(np.sum(~np.isnan(v)))}
+            for j, q in enumerate(TAIL_Q):
+                e["p%d" % q] = {"value": point[j], "ci": ci(bs[:, j])}
+            e["share_acc_1"] = {"value": point[-1], "ci": ci(bs[:, -1])}
+            out["full|%s|%d" % (f, N)] = e
+    return out
+
+
+def _pct_sorted(s, q):
+    """numpy's linear percentile of a sorted array that may hold +inf (inf when the upper neighbour is inf)."""
+    h = (len(s) - 1) * q / 100.0
+    lo, hi = int(np.floor(h)), int(np.ceil(h))
+    if lo == hi or s[hi] == s[lo]:
+        return float(s[lo])
+    if np.isinf(s[hi]):
+        return float("inf")
+    return float(s[lo] + (s[hi] - s[lo]) * (h - lo))
+
+
+def _margin_curve(m, c, ts):
+    cov, prec = [], []
+    for t in ts:
+        keep = m >= t
+        cov.append(float(np.mean(keep)) if len(m) else np.nan)
+        prec.append(float(np.mean(c[keep])) if keep.any() else np.nan)
+    return cov, prec
+
+
+def exploratory_margin(results, R, best, cells, forms_list, strongest=None):
+    """Analysis 4: per record and draw, m = second smallest - smallest cost of the N candidates (evaluate.margin);
+    thresholds t = the 0th, 10th, ..., 90th percentiles of m over every record and draw of the form and N (fixed at
+    the point estimate); coverage(t) = share of the records and draws with m >= t, precision(t) = their mean credit
+    (ties 1/m). Intervals: the same resamples of writers, the thresholds kept. Attackers are not compared."""
+    out = {}
+    for f in forms_list:
+        for N in EXPLORATORY_N:
+            fx = fixed_attacker(best, cells, f, N, strongest)
+            if fx is None:
+                continue
+            per = [r.get("margin", {}).get((f, fx[1], N)) for r in results]
+            if not any(per):
+                out["full|%s|%d" % (f, N)] = {"attacker": fx[0], "costs_of": fx[1], "missing": True}
+                continue
+            lens = np.array([len(p) if p else 0 for p in per], dtype=np.int64)
+            m = np.array([x for p in per if p for x, _ in p], dtype=float)
+            c = np.array([y for p in per if p for _, y in p], dtype=float)
+            ts = [_pct_sorted(np.sort(m), q) for q in MARGIN_Q]
+            cov, prec = _margin_curve(m, c, ts)
+            start = np.concatenate([[0], np.cumsum(lens)[:-1]])
+            bc, bp = [], []
+            for row in R:
+                ix = np.repeat(start[row], lens[row]) + _ranges(lens[row])
+                a, b = _margin_curve(m[ix], c[ix], ts)
+                bc.append(a)
+                bp.append(b)
+            bc, bp = np.array(bc, dtype=float), np.array(bp, dtype=float)
+            out["full|%s|%d" % (f, N)] = {
+                "attacker": fx[0], "costs_of": fx[1], "draws": int(lens.sum()), "m_infinite": int(np.isinf(m).sum()),
+                "m_zero": int((m == 0).sum()),
+                "curve": [{"q": q, "t": ts[j], "coverage": cov[j], "coverage_ci": ci(bc[:, j]),
+                           "precision": prec[j], "precision_ci": ci(bp[:, j])} for j, q in enumerate(MARGIN_Q)]}
+    return out
+
+
+def score_bands(results, scores):
+    """Band 0 (lowest), 1, 2 (highest) per writer: within each prompt, the writers with a score ranked by (score,
+    writer ID) and cut into thirds by rank (band = floor(3 r / n)); -1 without a score."""
+    band = np.full(len(results), -1, dtype=np.int64)
+    by_p = {}
+    for i, (r, s) in enumerate(zip(results, scores)):
+        if s is not None and not (isinstance(s, float) and np.isnan(s)):
+            by_p.setdefault(r["prompt"], []).append(i)
+    for p, ix in by_p.items():
+        order = sorted(ix, key=lambda i: results[i]["writer"], reverse=MUTATE == "band_ties_reversed")
+        order = sorted(order, key=lambda i: float(scores[i]))  # stable: ties stay in the order of the writer ID
+        n = len(order)
+        for rk, i in enumerate(order):
+            band[i] = (3 * rk) // n
+    return band
+
+
+def exploratory_score_band(results, R, best, cells, forms_list, scores, strongest=None):
+    """Analysis 5: accuracy of the fixed attacker per score band (score_bands) with intervals, and top - bottom
+    with its interval (the difference taken inside each resample). The attackers do not use the score."""
+    band = score_bands(results, scores)
+    missing = int((band < 0).sum())  # 0 in the main run: a missing score excludes the writer (corpus.exclusion_reason)
+    out = {"writers_per_band": [int((band == b).sum()) for b in range(3)],
+           "writers_without_score": "<10" if 0 < missing < 10 else missing}  # no subtraction down to a few writers
+    for f in forms_list:
+        for N in EXPLORATORY_N:
+            fx = fixed_attacker(best, cells, f, N, strongest)
+            if fx is None:
+                continue
+            v = cell_matrix(results, ("full", f, fx[1], N))
+            if np.all(np.isnan(v)):
+                out["full|%s|%d" % (f, N)] = {"attacker": fx[0], "costs_of": fx[1], "missing": True}
+                continue
+            e = {"attacker": fx[0], "costs_of": fx[1]}
+            bms = []
+            for b in range(3):
+                vb = np.where(band == b, v, np.nan)
+                bm = _boot_mean(vb, R)
+                bms.append(bm)
+                e["band%d" % b] = {"acc": _f(np.nanmean(vb)) if np.any(~np.isnan(vb)) else None, "ci": ci(bm),
+                                   "writers": int(np.sum(~np.isnan(vb)))}
+            top, bottom = e["band2"]["acc"], e["band0"]["acc"]
+            e["top_minus_bottom"] = {"value": None if top is None or bottom is None else top - bottom,
+                                     "ci": ci(bms[2] - bms[0])}
+            out["full|%s|%d" % (f, N)] = e
+    return out

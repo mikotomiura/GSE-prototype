@@ -31,12 +31,25 @@ R3U_A3 = ("A3-sum", "A3-mean")
 WINDOW_A2_EXTRA = ("R0", "R1", "R5", "R6")
 KS = (5, 10, 20, 50)
 OPEN_WORLD_N = 1000
+MARGIN_N = (10, 1000)  # exploratory analysis 4 (notes.md, "Exploratory analyses, part 2")
 MUTATE = os.environ.get("MAIN_MUTATE", "")
 
 
 def adaptive_costs(costs_of_form):
     """The cost vectors that the strongest attacker, the negative control and the open world read."""
     return {a: cv for a, cv in costs_of_form.items() if a in STRONGEST_FULL or a in R3U_A3}
+
+
+def margin(costs):
+    """Second smallest minus smallest cost of the candidates (0 when the smallest is tied, also between infinities;
+    infinite when only the smallest is finite). Every cost is already lower-is-better (A3: the negated
+    log-likelihood)."""
+    c = np.asarray(costs, dtype=float)
+    c = np.where(np.isnan(c), np.inf, c)  # as credit_stats: a cost that is not finite is never the minimum
+    if MUTATE == "margin_first_two":
+        return float(c[1] - c[0])
+    s0, s1 = np.partition(c, 1)[:2]
+    return 0.0 if s0 == s1 else float(s1 - s0)
 
 
 def norm_ws(s):
@@ -206,7 +219,7 @@ def evaluate_writer(w, ctx):
     rels = {f: forms.release(w.rows, f, seed, p, w.writer) for f in ctx.forms}
     final, origins = replay_origins(w.rows)
     res = {"writer": w.writer, "prompt": p, "full": {}, "window": {}, "utility": {}, "counts": {}, "costs": None,
-           "rebuilt_match": norm_ws(final) == norm_ws(pool[me].text), "open_world": {}}
+           "rebuilt_match": norm_ws(final) == norm_ws(pool[me].text), "open_world": {}, "margin": {}}
     memo = {}
     costs = {f: full_costs(rel, pool, model, cfg, memo) for f, rel in rels.items()}
     a4 = load_a4(ctx, w)
@@ -230,10 +243,14 @@ def evaluate_writer(w, ctx):
                 break
             cand = [me] + dec[0]
             for f in ctx.forms:
+                keep_margin = N in MARGIN_N and f in forms.MAIN
                 for a, cv in costs[f].items():
                     if a.startswith("A2-lam") and N != 1000:
                         continue
-                    _add(res["full"], ("full", f, a, N), matching.credit_stats(0, cv[cand]))
+                    st = matching.credit_stats(0, cv[cand])
+                    _add(res["full"], ("full", f, a, N), st)
+                    if keep_margin and (a in STRONGEST_FULL or a in R3U_A3):
+                        res["margin"].setdefault((f, a, N), []).append((margin(cv[cand]), st[0]))
                 if N == ctx.open_world_n:
                     for a, cv in adaptive_costs(costs[f]).items():
                         res["open_world"].setdefault((f, a), []).append((float(np.min(cv[cand])),

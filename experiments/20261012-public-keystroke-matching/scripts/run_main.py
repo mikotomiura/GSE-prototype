@@ -199,7 +199,9 @@ def cache_fingerprint(args):
     """SHA-256 of everything a task's result depends on besides the writer and its flags: seed, config, the code of
     this folder that the run imports (the modules imported lazily included), library versions, the content of every
     data file and A4 reconstruction, and the arguments that change a task's result. The sample (--per-prompt-sample)
-    and --all are not in it: they choose the tasks, not their results."""
+    and --all are not in it: they choose the tasks, not their results. aggregate.py is not in it either: it only
+    aggregates the results in the parent and is never run by a task (an aggregation can be fixed and rerun from the
+    cache)."""
     import Levenshtein
     import scipy
     import sklearn
@@ -216,7 +218,7 @@ def cache_fingerprint(args):
     put("config", _sha(os.path.join(HERE, "..", "config.json")))
     code = {os.path.basename(m.__file__) for m in list(sys.modules.values())
             if getattr(m, "__file__", None) and os.path.dirname(os.path.abspath(m.__file__)) == HERE}
-    for n in sorted(code | {"run_main.py"}):
+    for n in sorted((code | {"run_main.py"}) - {"aggregate.py"}):
         put("code:" + n, _sha(os.path.join(HERE, n)))
     put("versions", (platform.python_version(), np.__version__, scipy.__version__, sklearn.__version__,
                      Levenshtein.__version__))
@@ -315,6 +317,8 @@ def evaluate_tasks(tasks, ctx, workers, cache=None):
 
 def run(args):
     t0 = time.time()
+    if args.exploratory_3_5 and args.forms != "main":
+        raise SystemExit("--exploratory-3-5 needs the main forms (--forms main)")
     cache = None
     if args.cache_dir:
         cache = os.path.join(args.cache_dir, cache_fingerprint(args)[:16])
@@ -407,6 +411,8 @@ def run(args):
             best = out[name].pop("_best")
             out[name]["negative_control"] = negative_control(res, results, nc_b, pool_ids, seed, R, strongest, best,
                                                              out[name]["cells"])
+            if args.exploratory_3_5:  # written after the main output (below), so that a failure keeps main.json
+                explore = (res, R, best, out[name]["cells"], [by_prompt[r["prompt"]][r["writer"]].score for r in res])
         out[name].pop("_best", None)
     out["seconds"] = None if args.no_timing else round(time.time() - t0, 1)
     with open(args.out + ".part", "w", encoding="utf-8", newline="\n") as f:  # never a half-written output
@@ -414,6 +420,34 @@ def run(args):
         f.write("\n")
     os.replace(args.out + ".part", args.out)
     print("wrote", args.out, "tasks", len(tasks))
+    if args.exploratory_3_5:
+        res, R, best, cells, scores = explore
+        write_exploratory_3_5(args, res, R, best, cells, out, scores)
+
+
+def write_exploratory_3_5(args, res, R, best, cells, out, scores):
+    """Exploratory analyses 3 to 5 (decision 68; notes.md, "Exploratory analyses, part 2"; not preregistered): the
+    main forms, full text, N = 10 and 1,000, the 500 writers, the attacker fixed by the main point estimate, the
+    resamples of the main computation. Three files of aggregates in args.exploratory_3_5; the main output is not
+    changed."""
+    head = {k: out[k] for k in ("source", "seed_file_sha256", "config_sha256", "sample_sizes")}
+    head["sample"] = "main500"
+    head["note"] = "exploratory (decision 68), not preregistered; not used for questions 1 to 4"
+    if MUTATE:
+        head["mutate"] = MUTATE
+    st = evaluate.STRONGEST_FULL
+    parts = {"exploratory_tail.json": aggregate.exploratory_tail(res, R, best, cells, forms.MAIN, st),
+             "exploratory_margin.json": aggregate.exploratory_margin(res, R, best, cells, forms.MAIN, st),
+             "exploratory_score_band.json": aggregate.exploratory_score_band(res, R, best, cells, forms.MAIN,
+                                                                             scores, st)}
+    os.makedirs(args.exploratory_3_5, exist_ok=True)
+    for fname, body in parts.items():
+        path = os.path.join(args.exploratory_3_5, fname)
+        with open(path + ".part", "w", encoding="utf-8", newline="\n") as f:
+            json.dump(_clean(dict(head, analysis=body)), f, indent=1, sort_keys=True)
+            f.write("\n")
+        os.replace(path + ".part", path)
+        print("wrote", path)
 
 
 def summarise_sample(res, R, cols, strongest, cfg, open_world_n, scores, form_list=None):
@@ -527,6 +561,8 @@ def main():
     ap.add_argument("--open-world-n", type=int, default=evaluate.OPEN_WORLD_N,
                     help="N of the open-world diagnostic (1000 as registered; smaller only for the self-test)")
     ap.add_argument("--no-timing", action="store_true", help="omit the run time so that reruns are byte-identical")
+    ap.add_argument("--exploratory-3-5", default=None, metavar="DIR",
+                    help="also write the exploratory analyses 3 to 5 (main forms only) into DIR")
     ap.add_argument("--cache-dir", default=None,
                     help="store each task's result here and reuse it on a rerun (resumable; keep it under raw/)")
     run(ap.parse_args())
