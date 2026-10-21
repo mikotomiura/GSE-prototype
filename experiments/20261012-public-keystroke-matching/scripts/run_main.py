@@ -15,13 +15,23 @@ With KLiCKe the rows are never all in memory (17M rows): a worker reads one writ
 models and the task maximum need from it and drops the rows (train_contrib); the parent merges the contributions in
 (prompt, writer) order, which gives the same models as the list-based build; the evaluation workers read the log
 again.
+
+--cache-dir makes the run resumable (deviation D4, notes.md): the result of each evaluation task is written to
+<cache-dir>/<fingerprint>/ as soon as it returns, and a rerun with the same fingerprint (seed, config, code, library
+versions, source, forms, A4 reconstructions, open-world N) loads it instead of evaluating again. A task's result
+depends only on the writer, its two flags and the context, not on the order of the tasks or on the sample, so a
+resumed run writes the same output as an uninterrupted one (selftest_main.py, run_resume). The cache holds per-writer
+results: keep it under raw/ (not versioned).
 """
 import argparse
+import hashlib
 import json
 import os
+import pickle
+import platform
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
 
@@ -177,8 +187,138 @@ def _work(task):
         _drop_rows(w)
 
 
+def _files_under(root):
+    for d, dirs, names in os.walk(root):
+        dirs.sort()
+        for n in sorted(names):
+            p = os.path.join(d, n)
+            yield os.path.relpath(p, root).replace(os.sep, "/"), p
+
+
+def cache_fingerprint(args):
+    """SHA-256 of everything a task's result depends on besides the writer and its flags: seed, config, the code of
+    this folder that the run imports (the modules imported lazily included), library versions, the content of every
+    data file and A4 reconstruction, and the arguments that change a task's result. The sample (--per-prompt-sample)
+    and --all are not in it: they choose the tasks, not their results."""
+    import Levenshtein
+    import scipy
+    import sklearn
+    import load_klicke  # noqa: F401  (imported lazily by the loader and the workers)
+    import synthetic_logs  # noqa: F401
+    if args.a4_dir:
+        import a4_keytar  # noqa: F401  (imported lazily by evaluate.a4_cells)
+    h = hashlib.sha256()
+
+    def put(name, value):
+        h.update(("%s=%s\n" % (name, value)).encode("utf-8"))
+
+    put("seed", _sha(os.path.join(HERE, "..", "SEED")))
+    put("config", _sha(os.path.join(HERE, "..", "config.json")))
+    code = {os.path.basename(m.__file__) for m in list(sys.modules.values())
+            if getattr(m, "__file__", None) and os.path.dirname(os.path.abspath(m.__file__)) == HERE}
+    for n in sorted(code | {"run_main.py"}):
+        put("code:" + n, _sha(os.path.join(HERE, n)))
+    put("versions", (platform.python_version(), np.__version__, scipy.__version__, sklearn.__version__,
+                     Levenshtein.__version__))
+    put("args", (args.source, args.forms, args.open_world_n, args.per_prompt if args.source == "synthetic" else None,
+                 MUTATE))
+    if args.root:
+        for rel, p in _files_under(args.root):
+            put("data:" + rel, _sha(p))
+    if args.a4_dir:
+        for rel, p in _files_under(args.a4_dir):
+            put("a4:" + rel, _sha(p))
+    return h.hexdigest()
+
+
+def _task_key(task):
+    w, windows, keep_costs = task
+    return [w.prompt, w.writer, bool(windows), bool(keep_costs)]
+
+
+def _cache_path(cache, task):
+    key = hashlib.sha256(json.dumps(_task_key(task)).encode("utf-8")).hexdigest()
+    return os.path.join(cache, key[:32] + ".pkl")
+
+
+def _cache_load(cache, task):
+    """The cached result of task, or None (also for a damaged file, which is evaluated again). The cache folder is
+    trusted (pickle): point --cache-dir only at a folder this script wrote; a cache is never shared or received."""
+    path = _cache_path(cache, task)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "rb") as f:
+            key, r = pickle.load(f)
+    except (EOFError, pickle.UnpicklingError, ValueError) as e:
+        print("cache file %s unreadable (%s): evaluated again" % (path, type(e).__name__), flush=True)
+        return None
+    if key != _task_key(task):
+        raise SystemExit("cache file %s belongs to another task" % path)
+    return r
+
+
+def _cache_store(cache, task, r):
+    path = _cache_path(cache, task)
+    part = "%s.%d.part" % (path, os.getpid())
+    with open(part, "wb") as f:
+        pickle.dump((_task_key(task), r), f, protocol=pickle.HIGHEST_PROTOCOL)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(part, path)
+
+
+def evaluate_tasks(tasks, ctx, workers, cache=None):
+    """{(prompt, writer): result} of every task; with cache, done tasks are loaded and new ones stored on return.
+    A failed task does not discard the others: they are still stored, and the first error is raised at the end."""
+    results, todo, first_error = {}, [], None
+    for t in tasks:
+        r = _cache_load(cache, t) if cache else None
+        if r is None:
+            todo.append(t)
+        else:
+            results[(r["prompt"], r["writer"])] = r
+    if cache:
+        print("cache %s: %d of %d tasks done, %d to run" % (cache, len(results), len(tasks), len(todo)), flush=True)
+
+    def take(t, get):
+        nonlocal first_error
+        if not cache:
+            r = get()
+        else:
+            try:
+                r = get()
+                _cache_store(cache, t, r)
+            except Exception as e:  # noqa: BLE001  (raised again after the other tasks)
+                print("a task of %s failed (%s); the others go on" % (t[0].prompt, type(e).__name__), flush=True)
+                first_error = first_error or e
+                return
+        results[(r["prompt"], r["writer"])] = r
+
+    if workers > 1 and todo:
+        with ProcessPoolExecutor(workers, initializer=_init, initargs=(ctx,)) as ex:
+            futures = {ex.submit(_work, t): t for t in todo}
+            try:
+                for fut in as_completed(futures):
+                    take(futures[fut], fut.result)
+            except BaseException:
+                ex.shutdown(cancel_futures=True)
+                raise
+    else:
+        _init(ctx)
+        for t in todo:
+            take(t, lambda: _work(t))
+    if first_error is not None:
+        raise first_error
+    return results
+
+
 def run(args):
     t0 = time.time()
+    cache = None
+    if args.cache_dir:
+        cache = os.path.join(args.cache_dir, cache_fingerprint(args)[:16])
+        os.makedirs(cache, exist_ok=True)
     cfg = load_config()
     seed = seeds.read_seed()
     form_list = forms.DP if args.forms == "dp" else forms.ALL
@@ -238,16 +378,7 @@ def run(args):
             in_sample = (p, wid) in sample_set
             if in_sample or (p, wid) in need_costs or args.all:
                 tasks.append((by_prompt[p][wid], in_sample or args.all, (p, wid) in need_costs))
-    results = {}
-    if args.workers > 1:
-        with ProcessPoolExecutor(args.workers, initializer=_init, initargs=(ctx,)) as ex:
-            for t, r in zip(tasks, ex.map(_work, tasks, chunksize=1)):
-                results[(r["prompt"], r["writer"])] = r
-    else:
-        _init(ctx)
-        for t in tasks:
-            r = _work(t)
-            results[(r["prompt"], r["writer"])] = r
+    results = evaluate_tasks(tasks, ctx, args.workers, cache)
     out = {"source": args.source, "seed_file_sha256": _sha(os.path.join(HERE, "..", "SEED")),
            "config_sha256": _sha(os.path.join(HERE, "..", "config.json")),
            "writers_after_exclusion": {p: len(pool_ids[p]) for p in prompts}, "excluded": excluded,
@@ -278,9 +409,10 @@ def run(args):
                                                              out[name]["cells"])
         out[name].pop("_best", None)
     out["seconds"] = None if args.no_timing else round(time.time() - t0, 1)
-    with open(args.out, "w", encoding="utf-8", newline="\n") as f:
+    with open(args.out + ".part", "w", encoding="utf-8", newline="\n") as f:  # never a half-written output
         json.dump(_clean(out), f, indent=1, sort_keys=True)
         f.write("\n")
+    os.replace(args.out + ".part", args.out)
     print("wrote", args.out, "tasks", len(tasks))
 
 
@@ -395,6 +527,8 @@ def main():
     ap.add_argument("--open-world-n", type=int, default=evaluate.OPEN_WORLD_N,
                     help="N of the open-world diagnostic (1000 as registered; smaller only for the self-test)")
     ap.add_argument("--no-timing", action="store_true", help="omit the run time so that reruns are byte-identical")
+    ap.add_argument("--cache-dir", default=None,
+                    help="store each task's result here and reuse it on a rerun (resumable; keep it under raw/)")
     run(ap.parse_args())
 
 

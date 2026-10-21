@@ -150,6 +150,9 @@ gse_*.ndjson
 experiments/**/raw/
 experiments/**/*.ndjson
 experiments/**/*.jsonl
+# 本計算のキャッシュ（書き手ごとの結果・run_main.py --cache-dir・逸脱 D4）は raw/ の下に置くが、場所を誤っても入らないように
+experiments/**/*.pkl
+experiments/**/*.pkl.*.part
 
 # G1 配布用 .docx（markdown から再生成できる派生物）
 experiments/*/handouts/

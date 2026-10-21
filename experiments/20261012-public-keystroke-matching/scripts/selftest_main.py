@@ -502,6 +502,45 @@ def t_run(seed, tmp, cfg):
           % (20 * sample))
     check(m.get("rebuilt_split", {}).get("cells") and m.get("window_bias"), "run_secondary",
           "the run writes the rebuilt split and the bias of true windows")
+    t_run_resume(tmp, out, s)
+
+
+def t_run_resume(tmp, plain_out, plain):
+    """--cache-dir (deviation D4): a fresh cached run, and a run resumed after half of the cache is removed, write the
+    same bytes as the run without the cache; --all with the cache of the run without --all writes the same bytes as
+    --all without the cache and reuses the sample's tasks."""
+    import shutil
+    cache = os.path.join(tmp, "selftest_main_cache")
+    shutil.rmtree(cache, ignore_errors=True)
+    base = [sys.executable, os.path.join(HERE, "run_main.py"), "--per-prompt", "16", "--per-prompt-sample", "4",
+            "--workers", "4", "--no-timing", "--open-world-n", "10"]
+
+    def run(name, *extra):
+        out = os.path.join(tmp, "selftest_main_run_%s.json" % name)
+        r = subprocess.run(base + list(extra) + ["--out", out], check=True, capture_output=True, text=True)
+        with open(out, encoding="utf-8") as f:
+            return f.read(), r.stdout
+
+    try:
+        first, _ = run("cache0", "--cache-dir", cache)
+        sub = [os.path.join(cache, d) for d in os.listdir(cache)]
+        files = sorted(os.path.join(sub[0], n) for n in os.listdir(sub[0])) if len(sub) == 1 else []
+        for p in files[::2]:
+            os.remove(p)
+        second, log = run("cache1", "--cache-dir", cache)
+        resumed = "%d of %d tasks done" % (len(files) - len(files[::2]), len(files)) in log
+        check(len(files) > 1 and resumed and first == plain and second == plain, "run_resume",
+              "a cached run and a run resumed after removing %d of %d cached tasks write the same bytes as %s"
+              % (len(files[::2]), len(files), os.path.basename(plain_out)))
+        all_cached, log = run("all_cache", "--all", "--cache-dir", cache)
+        reused = [line for line in log.splitlines() if " tasks done" in line]
+        n_reused = int(reused[0].split(": ")[1].split()[0]) if reused else 0
+        all_plain, _ = run("all", "--all")
+        check(n_reused == 16 and all_cached == all_plain, "run_resume_all",
+              "--all with the cache of the run without --all reuses %d tasks (the 16 of the sample) and writes the "
+              "same bytes as --all without the cache" % n_reused)
+    finally:
+        shutil.rmtree(cache, ignore_errors=True)
 
 
 def main():

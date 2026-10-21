@@ -21,20 +21,27 @@ if [ "$STAGE" = synthetic ] || [ "$STAGE" = all ]; then
 fi
 
 if [ "$STAGE" = data ] || [ "$STAGE" = all ]; then
-  # main tables (500 writers) and the appendix of all writers, without A4 (CPU; runs while the GPU makes A4)
-  "$PY" -I scripts/run_main.py --source klicke --root "$KLICKE" --out results/main.json --workers "$WORKERS" --all
-  # A4 reconstructions (GPU, about 80 hours for 500 writers; resumable; the reconstructions stay under raw/)
+  # each run_main.py stage is resumable: rerun the same command after an interruption (deviation D4; the cache
+  # holds per-writer results and stays under raw/)
+  CACHE=raw/derived/main_cache
+  # A4 reconstructions (GPU, about 150 hours for 500 writers; resumable; the reconstructions stay under raw/;
+  # chunks that do not fit on the GPU: scripts/a4_keytar_cpu_fallback.py, deviation D3)
   "$PYK" -I scripts/a4_keytar.py --root "$KLICKE" \
       --model raw/keytar/extracted/data_artifact/data/key_ground_truth_olmo \
       --out-dir raw/derived/a4 --summary results/a4_generation.json
-  # the 500 writers again with the A4 cells (the other cells are the same as in main.json)
+  # main tables (500 writers) without A4, and again with the A4 cells (the other cells are the same as in main.json)
+  "$PY" -I scripts/run_main.py --source klicke --root "$KLICKE" --out results/main.json --workers "$WORKERS" \
+      --cache-dir "$CACHE"
   "$PY" -I scripts/run_main.py --source klicke --root "$KLICKE" --a4-dir raw/derived/a4 \
-      --out results/main_a4.json --workers "$WORKERS"
+      --out results/main_a4.json --workers "$WORKERS" --cache-dir "$CACHE"
   # ENJA15 (question 4)
   "$PY" -I scripts/enja15_main.py --root raw/enja15 --out results/enja15_main.json
   # exploratory analyses (decisions 55 and 56; not in the preregistration)
   "$PY" -I scripts/exploratory_unicity.py --source klicke --root "$KLICKE" --out results/exploratory_unicity.json \
       --workers "$WORKERS"
   "$PY" -I scripts/run_main.py --source klicke --root "$KLICKE" --forms dp --out results/exploratory_dp.json \
-      --workers "$WORKERS"
+      --workers "$WORKERS" --cache-dir "$CACHE"
+  # the appendix of all writers without A4 (about 10 days on 12 workers; reuses the cached tasks of the sample)
+  "$PY" -I scripts/run_main.py --source klicke --root "$KLICKE" --out results/main_all.json --workers "$WORKERS" \
+      --all --cache-dir "$CACHE"
 fi
