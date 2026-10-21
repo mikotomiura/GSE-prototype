@@ -119,7 +119,7 @@ are chosen with the results in view.
 
 ## Ethical considerations: plan
 
-- No external committee; reasons (no affiliation). Public data and a public model only, aggregates only. In the
+- No external committee (no affiliation); no reason is given for not seeking a board outside an institution (decided 21 October 2026). Public data and a public model only, aggregates only. In the
   submitted version, check that the wording about affiliation and the dated personal communication do not identify
   the author beyond what the venue requires (to be decided with the handling of double-blind review).
 - Consent of the KLiCKe participants in the words of the corpus authors (personal communication); consent of the ENJA15
@@ -141,8 +141,8 @@ are chosen with the results in view.
 - The releasing party of the competition data is informed as soon as the results are known, about two weeks before
   submission, with time to respond; the date, the time given and the response are reported.
 - Submitted version: "the authors", and "no institutional ethics committee was available to the authors", with the
-  reason for not seeking a board outside an institution (to be confirmed by the authors); a statement of interests
-  (to be written by the authors).
+  no reason for not seeking a board outside an institution; a statement of interests (the recording software, the
+  plan to release logs collected with it, no financial interest, no funding; decided 21 October 2026).
 
 ## Not claimed in Section 3
 

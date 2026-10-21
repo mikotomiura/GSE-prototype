@@ -22,7 +22,7 @@
 - [x] attack-me（stage: manuscript・round 1・Codex 付き）（判断 68・verdict.md）
 - [x] round 1 の指摘を直す（コミット 723f494d）
 - [ ] 探索的な分析 3〜5 を G-GEAR で実装して回す（引き継ぎ next-session-public-keystroke-matching-exploratory-3-5-ggear.md）
-- [ ] ethics.tex の空欄（外部の審査を受けなかった理由・利害の表明）を研究者が書く
+- [x] ethics.tex の空欄（外部の審査を受けなかった理由・利害の表明）を研究者が書く（判断 71）
 - [ ] 倫理（草稿あり・公開元への連絡は結果の後）・open science（草稿あり・匿名リンクが空欄）・AI の利用（草稿あり）
 - [x] Kaggle の公開元への連絡の下書き（2026-10-21・reply-drafts の 5・送るのは研究者・結果が出たらすぐ）
 - [x] 攻撃コードの公開範囲（事前登録の 3 案）を研究者に問う（判断 63）
