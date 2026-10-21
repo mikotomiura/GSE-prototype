@@ -15,11 +15,21 @@
 
 - 2026-10-21 に OSF に登録した（https://osf.io/yckwq ・DOI 10.17605/OSF.IO/YCKWQ・判断 79）。登録版・外枠・草稿に DOI と日付を書いた（TRACE `8b235ce`）。
 
-## 2. 次にやること
+## 2. 次にやること（この順・研究者が 2026-10-21 に決めた）
 
-- 研究者が原田さんに「登録が済んだ」と伝える。あわせて、OSF の招待のメールからアカウントを有効にし、プロフィールに所属（Hiroshima University）を書いてもらう（任意・登録に後から出る）。
-- Drive の草稿（docx と PDF）を登録済みの版に置き換えるかを研究者に聞く（判断 71・76 のやり方で、手直しが入っていないかを先に比べる）。
-- `registration-day.md` の「登録の後すぐ」の「人 2 人の形」に従い、判定者 1 の段 1 を束ごとに回す。共著者の段 1 の冊（Drive の `TRACE_co-author_stage1.xlsx`・113 件）はそのまま使える（判断 76）。
+### 2.1 Drive の草稿を登録済みの版に置き換える
+
+- 置き換えると決まっている（研究者）。置き換える前に、Drive の 3 つ（共著者フォルダの `TRACE_草稿_2026-10-18.docx`・`.pdf`、TRACE 直下の docx）が判断 76 で置いた版のままかを比べる（docx の作成と更新の時刻・cmp）。違えば止めて研究者に聞く。
+- TRACE `8b235ce` 以降の草稿（`manuscript/draft/main.pdf`・`main.docx`。組版済み）で同じ名前で置き換え、cmp で一致を確かめる。
+- 案内（`TRACE_共著者への案内_2026-10-18.docx`）に「登録の前」「登録が済んだら連絡する」の文が残っていないかを見る。直すなら判断 71・76 のやり方（Drive の docx の run の中だけ・研究者の手直しを残す）で、先に研究者に聞く。
+
+### 2.2 判定者 1 の段 1 を始める
+
+- 手順は `registration-day.md` の「登録の後すぐ」の「人 2 人の形」の段 1（共通の手順「段 1」の 1〜6、7 は使わない）。道具は `~/TRACE/scripts/c_screening.py`（`uv run --with openpyxl python c_screening.py <命令>`）。形は `two-human` に固めてある（`screening/mode.txt`）。
+- 1 束ずつ: `next --stage 1` → `batches.csv` をコミット → `prepare --stage 1 --batch bNN` → 研究者が DB の『段1』で 9 件を判定（全文は開かない）→ `export-author --stage 1 --batch bNN` → 出た CSV を名指しで add・コミット・push → `gate` → AI の網（`prompt.txt`・`call.md`・サブエージェント 1 つ）→ `check-ai --stage 1 --batch bNN --model-id <サブエージェントの記録の model> --claude-code-version <claude --version>`（打ち間違いで止まっても `--another-model` は本当に別の模型のときだけ）→ 目録をコミット。
+- 研究者の判定の DB は Drive の `TRACE/TRACE_database.xlsx`（判断 76 で作り直した・564 件・入力 0）。研究者が Excel で開いている間は作り直さない。
+- 共著者の段 1 の冊（`TRACE_co-author_stage1.xlsx`・113 件）は、研究者が「登録が済んだ」と伝えれば共著者がそのまま使える。戻ってきたら `import-coauthor --stage 1 --book sample --file <戻った冊>`（取り込むまで研究者は開かない）。
+- 原田さんへの連絡（登録が済んだこと・OSF のアカウントを有効にしてプロフィールに所属を書くこと）は研究者がする。
 
 ## 3. 守ること
 
