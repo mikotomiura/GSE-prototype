@@ -17,7 +17,10 @@ def load(path):
     out = {}
     for ws in wb.worksheets:
         rows = list(ws.iter_rows(values_only=True))
-        out[ws.title] = rows
+        while rows and all(v is None for v in rows[-1]):
+            rows.pop()  # 書き手によっては末尾に空行を足す（Codex の保存は 1000 行）
+        width = max((i + 1 for r in rows for i, v in enumerate(r) if v is not None), default=0)
+        out[ws.title] = [tuple(r[:width]) + (None,) * (width - len(r[:width])) for r in rows]
     return out
 
 
