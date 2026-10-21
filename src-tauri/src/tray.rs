@@ -22,7 +22,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::AppHandle;
 
@@ -113,6 +113,11 @@ const MENU_HANDMARK_CLOSE: &str = "gse-tray-handmark-close";
 /// 手跡の背景の層の試作を閉じる（spike・窓が出ているときだけ項目を出す）。
 #[cfg(target_os = "macos")]
 const MENU_HANDMARK_STAGE_CLOSE: &str = "gse-tray-handmark-stage-close";
+/// 手跡の背景の層のカーソル・クリックの入れ切り（spike・ADR-040 D4・判断 5）。選んだことは記録しない。
+#[cfg(target_os = "macos")]
+const MENU_HANDMARK_STAGE_CURSOR: &str = "gse-tray-handmark-stage-cursor";
+#[cfg(target_os = "macos")]
+const MENU_HANDMARK_STAGE_CLICK: &str = "gse-tray-handmark-stage-click";
 
 /// トレイを作り、1Hz で状態を追う更新スレッドを起こす。
 ///
@@ -189,6 +194,31 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         let position = menu.items()?.len().saturating_sub(1);
         menu.insert(&stage_close, position)?;
     }
+    // 手跡の背景の層の試作: 窓が出ているときだけ、カーソルとクリックの入れ切りを「背景を閉じる」の前に足す。
+    #[cfg(target_os = "macos")]
+    let stage_inputs = if crate::handmark_stage_spike::is_shown(app) {
+        let cursor = CheckMenuItem::with_id(
+            app,
+            MENU_HANDMARK_STAGE_CURSOR,
+            "背景: カーソル",
+            true,
+            crate::handmark_stage_pointer::cursor_on(),
+            None::<&str>,
+        )?;
+        let click = CheckMenuItem::with_id(
+            app,
+            MENU_HANDMARK_STAGE_CLICK,
+            "背景: クリック",
+            true,
+            crate::handmark_stage_pointer::click_on(),
+            None::<&str>,
+        )?;
+        let position = menu.items()?.len().saturating_sub(2);
+        menu.insert_items(&[&cursor, &click], position)?;
+        Some((cursor, click))
+    } else {
+        None
+    };
 
     let mut builder = TrayIconBuilder::with_id("gse-tray")
         .menu(&menu)
@@ -196,7 +226,7 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         .title(measure_title(initial))
         // ★ アイコンだけを左クリックしてもメニューを出す（macOS の既定に合わせる）。
         .show_menu_on_left_click(true)
-        .on_menu_event(|app, event| {
+        .on_menu_event(move |app, event| {
             if event.id.as_ref() == MENU_QUIT {
                 tracing::info!("tray: quit requested");
                 crate::shutdown_and_exit(app);
@@ -214,6 +244,19 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             #[cfg(target_os = "macos")]
             if event.id.as_ref() == MENU_HANDMARK_STAGE_CLOSE {
                 crate::handmark_stage_spike::close(app);
+            }
+            // 入れ切りは自前の状態を正にし、チェックの表示をそれに合わせる（表示が先に変わる OS の挙動に頼らない）。
+            #[cfg(target_os = "macos")]
+            if let Some((cursor, click)) = &stage_inputs {
+                if event.id.as_ref() == MENU_HANDMARK_STAGE_CURSOR {
+                    let on = !crate::handmark_stage_pointer::cursor_on();
+                    crate::handmark_stage_pointer::set_cursor_on(on);
+                    let _ = cursor.set_checked(on);
+                } else if event.id.as_ref() == MENU_HANDMARK_STAGE_CLICK {
+                    let on = !crate::handmark_stage_pointer::click_on();
+                    crate::handmark_stage_pointer::set_click_on(on);
+                    let _ = click.set_checked(on);
+                }
             }
         });
     if let Some(icon) = app.default_window_icon() {

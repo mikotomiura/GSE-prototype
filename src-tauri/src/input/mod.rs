@@ -21,5 +21,10 @@ pub mod liveness;
 // ⚠️★★★ O1 (R3-a) の非打鍵チャネル (ADR-014 D4 の段 1)。
 //   ★ OS 依存は `observe_{windows,macos}.rs` に閉じ、ここ (`observe.rs`) は受け口だけ。
 pub mod observe;
+// 手跡の背景の層の表現の入力（spike・ADR-040）。記録の経路（`observe*`）とは別のファイル。
+#[cfg(target_os = "macos")]
+pub mod handmark_pointer;
+#[cfg(target_os = "macos")]
+pub mod handmark_pointer_macos;
 // EH3: スリープの直前と復帰の通知（肖像の終わりと始まり）。OS 依存は `power_{windows,macos}.rs`。
 pub mod power;

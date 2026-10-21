@@ -49,6 +49,12 @@ pub mod redaction;
 mod handmark_spike;
 // 手跡の背景の層の試作（spike・本線に入れない・GSE_HANDMARK_STAGE_SPIKE=1 のときだけ動く）。
 mod handmark_stage_spike;
+// 手跡の背景の層へカーソルとクリックを渡す（spike・ADR-040・macOS だけ）。
+#[cfg(target_os = "macos")]
+mod handmark_stage_pointer;
+// ADR-040 D3 の検査（テストだけ）。
+#[cfg(all(test, target_os = "macos"))]
+mod handmark_stage_guard;
 // macOS: overlay 窓を非アクティブ NSPanel 化する FFI グルー (decisions D7)。
 #[cfg(target_os = "macos")]
 mod overlay_panel;
@@ -5855,8 +5861,6 @@ pub fn run() {
             greet,
             handmark_spike::handmark_spike_latency,
             handmark_spike::handmark_spike_ripple,
-            handmark_stage_spike::handmark_stage_tick,
-            handmark_stage_spike::handmark_stage_measure_enabled,
             get_cognitive_state,
             get_intervention_decision,
             force_nudge,
