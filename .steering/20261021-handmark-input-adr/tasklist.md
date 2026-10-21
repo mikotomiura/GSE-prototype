@@ -16,4 +16,4 @@
 
 ## 完了処理
 - [x] design.md の最終化
-- [ ] git commit・push（PR は出さない）
+- [x] git commit・push（PR は出さない）

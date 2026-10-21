@@ -30,7 +30,7 @@ ADR-040 を `docs/adr/` に起こし、`docs/adr/README.md` の一覧に足す�
 - [x] README の一覧に ADR-040 がある
 - [x] 引用が要る記述は `citation-ssot` に従っている（外部文献に依らないならその旨を書く）
 - [x] `/cross-review` を通し、指摘への対応を記録した
-- [ ] push した
+- [x] push した
 
 ## 関連ドキュメント
 
