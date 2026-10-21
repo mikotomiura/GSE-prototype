@@ -11,6 +11,7 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| **C（TRACE）: 共著者の段 1 の冊が戻った後（取り込み → 一致 → 網・監査・2 回目の冊）**（研究の物は `~/TRACE`・記録は worktree `/Users/johnd/GSE-prototype-af-c`） | **`next-session-ai-fatigue-c-after-coauthor-stage1.md`**（2026-10-21） | **現行・冊が戻ったら使う**。第一著者の段 1（564 件）と段 2・3 の b01〜b19 は push 済み（判断 80〜86）。前の `next-session-ai-fatigue-c-stage2.md` を置き換える |
 | **C（TRACE）: 登録の前の attack-me round 7 → 登録の日**（研究の物は `~/TRACE`・記録は worktree `/Users/johnd/GSE-prototype-af-c`） | **`next-session-ai-fatigue-c-attack-me-round7.md`**（2026-10-20） | **現行**。共著者が全部を引き受けた後（判断 69〜71）。前の `next-session-ai-fatigue-c-after-coauthor-reply.md` を置き換える |
 | ~~**C（TRACE）: 共著者の返事の後・登録の下書きの書き換え**~~ | `next-session-ai-fatigue-c-after-coauthor-reply.md`（2026-10-19） | 完了（判断 67〜71）。後続は上の行 |
 | **C（TRACE）: 共著者への相談の前の仕上げ（草稿の更新と Drive の置き換え・符号化のスプレッドシート）**（研究の物は `~/TRACE`・記録は worktree `/Users/johnd/GSE-prototype-af-c`） | **`next-session-ai-fatigue-c-ready-for-consult.md`**（2026-10-19） | **現行・先にこちら**。研究者の方針「完全に準備できてから相談を行う」。判断 55〜59 の後 |

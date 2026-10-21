@@ -1,5 +1,7 @@
 # 引き継ぎ: C（TRACE）—— 段 2・3（研究者の判定）
 
+（完了・2026-10-21。2.1・2.2 は判断 84〜86 で済んだ。後続は `next-session-ai-fatigue-c-after-coauthor-stage1.md`）
+
 作成 2026-10-21（Mac）。`next-session-ai-fatigue-c-after-registration.md` を置き換える（そこの 2.1・2.2 は判断 80〜83 で済んだ）。
 
 - 返答・記録・AskUserQuestion の引数は日本語で書く。記号を多用しない。
