@@ -376,6 +376,7 @@ GPU の設定は生成の指紋に入らず、生成の中身を変えない（�
 - 研究者の判断（2026-10-20）: 500 人の本計算（`--all` なし・`results/main.json`）→ `main_a4.json` → ENJA15 → 探索的な分析を先に回し、全員の付録（`--all`）は論文を書きながら最後に回す。全員の付録の出力は `results/main_all.json`（`run.sh` の data の段はまだ `--all` を `main.json` に書く。全員の付録を回す前に直す）。
 - 500 人の本計算: 2026-10-20 00:15 UTC に 12 並列で始めた。ENJA15 は同時に回した（1 プロセス・00:15:45〜00:16:26 UTC・終了コード 0・`results/enja15_main.json` の SHA-256 `b4dcd5ac…`）。
 - 500 人の本計算は 2026-10-20 19:29 UTC（約 19 時間後）に Windows Update の再起動で止まった（System のイベント 1074・`MoUsoCoreWorker.exe`・計画済みの再起動・起動 19:31 UTC）。`run_main.py` は結果を最後にまとめて書くので、途中の結果は残っていない（`BrokenProcessPool`・`results/main.json` なし）。2026-10-21 03:37 UTC に確かめた: commit の上限 95.1 GB。
+- 再開（逸脱 D4 の後・コミット `e7206812`）: 2026-10-21 04:25:48 UTC に `raw/main_chain/run_chain.sh` で始めた（12 並列）。500 人の段の評価は 916 件（キャッシュの指紋 `feb23d233506a9d2`・0 件から）。見込みは 916 × 約 42 分 ÷ 12 ≈ 53 時間。
 
 ## 逸脱
 
