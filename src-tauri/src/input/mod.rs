@@ -26,5 +26,7 @@ pub mod observe;
 pub mod handmark_pointer;
 #[cfg(target_os = "macos")]
 pub mod handmark_pointer_macos;
+#[cfg(target_os = "macos")]
+pub mod handmark_wheel_macos;
 // EH3: スリープの直前と復帰の通知（肖像の終わりと始まり）。OS 依存は `power_{windows,macos}.rs`。
 pub mod power;

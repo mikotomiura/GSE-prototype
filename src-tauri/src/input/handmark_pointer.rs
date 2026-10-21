@@ -96,12 +96,13 @@ impl Default for PointerReader {
 }
 
 /// 負荷の計測に使う合成のポインタ（人の手の入力を読まない・ADR-040 判断 7）。
-/// 半径 150 の円を 4 秒で 1 周し、2 秒ごとに 80ms だけ左を押す。
+/// 主画面の左下から (600, 300) を中心に半径 150 の円を 4 秒で 1 周し（粒の帯と草の帯の両方を通る）、
+/// 2 秒ごとに 80ms だけ左を押す。
 pub fn synthetic_sample(t_ms: u64) -> PointerSample {
     let a = (t_ms % 4_000) as f64 / 4_000.0 * std::f64::consts::TAU;
     PointerSample::new(
         600.0 + 150.0 * a.cos(),
-        500.0 + 150.0 * a.sin(),
+        300.0 + 150.0 * a.sin(),
         t_ms % 2_000 < 80,
     )
 }

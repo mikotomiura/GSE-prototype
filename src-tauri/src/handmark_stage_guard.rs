@@ -7,14 +7,14 @@
 //! 文字列の検査は別名の関数を経由した漏れを見つけられない（ADR-040 D3 の「止められないもの」）。
 
 use crate::handmark_stage_pointer::{
-    payload_type_name, Forwarder, PointerPayload, Switches, POINTER_EVENT,
+    payload_type_name, Forwarder, Io, PointerPayload, Switches, POINTER_EVENT,
 };
 use crate::input::handmark_pointer::{synthetic_sample, PointerSample, PointerUpdate};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
 /// ポインタの値を扱う Rust のファイル。
-const RUST: [(&str, &str); 3] = [
+const RUST: [(&str, &str); 4] = [
     (
         "input/handmark_pointer.rs",
         include_str!("input/handmark_pointer.rs"),
@@ -26,6 +26,10 @@ const RUST: [(&str, &str); 3] = [
     (
         "handmark_stage_pointer.rs",
         include_str!("handmark_stage_pointer.rs"),
+    ),
+    (
+        "input/handmark_wheel_macos.rs",
+        include_str!("input/handmark_wheel_macos.rs"),
     ),
 ];
 
@@ -182,7 +186,15 @@ fn run_forwarding(leak_log: bool, leak_file: Option<&Path>) -> (usize, usize) {
                     let _ = std::fs::write(path.join(format!("leak-{k}")), json);
                 }
             };
-            fw.tick(&sw, (k * 16) as f64, &mut read, &mut send);
+            let mut take_wheel = || if k % 30 == 0 { 1.0 } else { 0.0 };
+            let mut discard_wheel = || {};
+            let mut io = Io {
+                read: &mut read,
+                take_wheel: &mut take_wheel,
+                discard_wheel: &mut discard_wheel,
+                send: &mut send,
+            };
+            fw.tick(&sw, (k * 16) as f64, &mut io);
         }
     });
     (count.load(std::sync::atomic::Ordering::Relaxed), sent)
@@ -447,6 +459,34 @@ fn d3_boundary_macos_reads_only_the_pointer() {
     );
     let b = body(RUST[1].1);
     assert!(b.contains("mouseLocation") && b.contains("pressedMouseButtons"));
+    // ホイールの tap はホイールだけを聞き（聞くだけ）、キーボード・位置・他のマウスの通知を聞かない（判断 9）
+    let wheel = [RUST[3]];
+    assert_clean(
+        "境界",
+        &wheel,
+        &[
+            "KeyDown",
+            "KeyUp",
+            "FlagsChanged",
+            "keyCode",
+            "KEYBOARD",
+            "Keyboard",
+            "MouseMoved",
+            "MouseDown",
+            "MouseUp",
+            "Dragged",
+            "location",
+            "Options::Default",
+            "observe",
+        ],
+    );
+    let wb = body(RUST[3].1);
+    assert!(wb.contains("CGEventTapOptions::ListenOnly"));
+    assert_eq!(
+        wb.matches("CGEventType::ScrollWheel").count(),
+        2,
+        "tap のマスクと通知の判定の 2 か所だけ"
+    );
     // 窓の用意・トレイの側はポインタの値の型を知らない
     let [a, b2, c] = type_names();
     assert_clean(
@@ -471,6 +511,11 @@ fn d3_boundary_macos_reads_only_the_pointer() {
                 include_str!("analysis/pointer_bin.rs"),
             ),
         ],
-        &["handmark_pointer", a.as_str(), b2.as_str()],
+        &[
+            "handmark_pointer",
+            "handmark_wheel",
+            a.as_str(),
+            b2.as_str(),
+        ],
     );
 }

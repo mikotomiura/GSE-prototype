@@ -4,7 +4,9 @@
 // - 打鍵: 直近 30 秒の打鍵の時刻だけ。風（草のなびき・粒の横の流れ）。
 // - カーソル: 近くの草が動いた向きへなびき、動かしている間だけ近くの粒が寄る。数秒で戻る。
 // - クリック（左だけ）: その場に一回きりの波紋。枠は 6 で、1.6 秒で消す。
+// - ホイール（macOS）: 粒全体の描く位置を縦にずらし、1 秒で半分に戻す。
 // - 霧: どの入力にも依らない基層。
+// 入力の跡も打鍵の風も無い間は、霧と粒の漂いだけを 1 秒に約 10 回描く（負荷を抑える・判断 10）。
 // ポインタの値は Rust が読んで送る（窓はマウスを受けない）。この窓は値を保存も返送もしない
 // （ADR-040 D2〜D4・検査は src-tauri/src/handmark_stage_guard.rs）。推定は受け取らない。数値・文字は描かない。
 import { useEffect, useRef } from "react";
@@ -45,6 +47,14 @@ const MOTE_R = 0.18;
 const MOTE_HALF_MS = 900;
 const MOTE_PULL = 0.0006;
 const MOTE_MAX = 0.08;
+// ホイールの写し方（見本 Version 5）。
+const WHEEL_STEP = 0.05;
+const WHEEL_MAX = 0.15;
+const WHEEL_HALF_MS = 1000;
+/** 入力が無い間の描く間隔。 */
+const IDLE_FRAME_MS = 100;
+/** 最後の入力からこの間は、跡が戻りきるまで毎フレーム描く。 */
+const ACTIVE_HOLD_MS = 4000;
 
 interface Blade {
   x: number;
@@ -193,6 +203,10 @@ export default function HandmarkStage() {
     const cursor = { x: 0, y: 0, px: 0, py: 0, inside: false, fresh: false, vx: 0, vy: 0 };
     const rippleSlots = makeRipples();
     const receiver = makeReceiver();
+    // ホイール: 粒全体の縦のずれ 1 つ。
+    let wheelOff = 0;
+    let wheelShown = 0;
+    let lastInputAt = -Infinity;
 
     const clearCursorTrace = (): void => {
       for (const bl of blades) bl.push = 0;
@@ -211,7 +225,13 @@ export default function HandmarkStage() {
       const v = receive(receiver, m, now);
       if (v.cursorOff) clearCursorTrace();
       if (v.clickOff) clearRipples(rippleSlots);
+      if (v.wheelOff) {
+        wheelOff = 0;
+        wheelShown = 0;
+      }
       if (!v.use) return;
+      lastInputAt = now;
+      kick();
       // 主画面の左下が原点の座標を、窓の左上が原点に直す（窓は主画面の全体を覆う）。
       const x = m.x;
       const y = H - m.y;
@@ -223,6 +243,10 @@ export default function HandmarkStage() {
       }
       if (m.clicked && receiver.clickOn && inside) {
         addRipple(rippleSlots, x, y, now);
+      }
+      if (m.wheel !== 0 && receiver.wheelOn) {
+        // 下へ回すと粒は上へ（見本と同じ）。
+        wheelOff = Math.max(-WHEEL_MAX, Math.min(WHEEL_MAX, wheelOff - m.wheel * WHEEL_STEP));
       }
     };
 
@@ -245,6 +269,8 @@ export default function HandmarkStage() {
       cursor.px = cursor.x;
       cursor.py = cursor.y;
       cursor.fresh = cursor.inside;
+      wheelOff *= Math.pow(0.5, dt / WHEEL_HALF_MS);
+      wheelShown += (wheelOff - wheelShown) * (1 - Math.exp(-dt / 150));
     };
 
     const dualStroke = (width: number, darkA: number, lightA: number): void => {
@@ -289,7 +315,8 @@ export default function HandmarkStage() {
         ctx.fill();
       }
 
-      // 漂う粒。基層の流れ＋打鍵の風（横）＋カーソルへ寄るずれ（描く位置だけ）。
+      // 漂う粒。基層の流れ＋打鍵の風（横）＋カーソルへ寄るずれ＋ホイールの縦のずれ（描く位置だけ）。
+      const lift = receiver.wheelOn ? wheelShown * H : 0;
       const mdecay = Math.pow(0.5, dt / MOTE_HALF_MS);
       const mR = MOTE_R * H;
       const mMax = MOTE_MAX * H;
@@ -299,7 +326,7 @@ export default function HandmarkStage() {
         m.oy *= mdecay;
         if (pullMotes) {
           const dx = cursor.x - (m.x + m.ox);
-          const dy = cursor.y - (m.y + m.oy);
+          const dy = cursor.y - (m.y + m.oy + lift * m.k);
           const d = Math.hypot(dx, dy);
           if (d < mR && d > 1) {
             const f = 1 - d / mR;
@@ -334,7 +361,7 @@ export default function HandmarkStage() {
           m.oy = 0;
         }
         const x = m.x + m.ox;
-        const y = m.y + m.oy;
+        const y = m.y + m.oy + lift * m.k;
         const r = m.r * S;
         ctx.beginPath();
         ctx.arc(x, y, r * 1.9, 0, Math.PI * 2);
@@ -409,6 +436,20 @@ export default function HandmarkStage() {
 
     let last: number | null = null;
     let frame: number | null = null;
+    let idleTimer: number | null = null;
+    const busy = (now: number): boolean =>
+      speed > 0 ||
+      speedTo > 0 ||
+      now - lastInputAt < ACTIVE_HOLD_MS ||
+      rippleSlots.ripples.some((rp) => rippleAge(rp, now) !== null);
+    // 入力が来たら、絞っていた描画をすぐ戻す。
+    const kick = (): void => {
+      if (idleTimer !== null) {
+        window.clearTimeout(idleTimer);
+        idleTimer = null;
+        frame = requestAnimationFrame(loop);
+      }
+    };
     const loop = (now: number): void => {
       // 描画が止まっていた間の分は進めない。
       const dt = last === null ? 16 : Math.min(now - last, 100);
@@ -423,7 +464,14 @@ export default function HandmarkStage() {
       ctx.clearRect(0, 0, W, H);
       drawNature(dt, reduceMotion ? 0.3 : 1);
       drawRipples(now);
-      frame = requestAnimationFrame(loop);
+      if (busy(now)) {
+        frame = requestAnimationFrame(loop);
+      } else {
+        idleTimer = window.setTimeout(() => {
+          idleTimer = null;
+          frame = requestAnimationFrame(loop);
+        }, IDLE_FRAME_MS);
+      }
     };
     frame = requestAnimationFrame(loop);
 
@@ -440,7 +488,10 @@ export default function HandmarkStage() {
     // 打鍵の時刻だけを持つ（キーの種類は受け取らない）。listen に失敗したら背景は動かないだけ。
     win
       .listen(KEY_EVENT, () => {
-        presses.push(performance.now());
+        const now = performance.now();
+        presses.push(now);
+        lastInputAt = now;
+        kick();
       })
       .then((fn) => {
         if (disposed) fn();
@@ -463,6 +514,9 @@ export default function HandmarkStage() {
       window.removeEventListener("resize", onResize);
       if (frame !== null) {
         cancelAnimationFrame(frame);
+      }
+      if (idleTimer !== null) {
+        window.clearTimeout(idleTimer);
       }
       if (unlistenKey !== null) unlistenKey();
       if (unlistenPointer !== null) unlistenPointer();

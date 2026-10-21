@@ -3,7 +3,7 @@
 //! `.steering/20261016-handmark-stage-spike/` の design.md を参照。
 //! 環境変数 `GSE_HANDMARK_STAGE_SPIKE=1` で起動したときだけ、macOS の主画面の全体に透明な窓を
 //! デスクトップの高さ（壁紙の上・アイコンと他の窓の下）で出し、自然世界（霧・草・粒・波紋）を描く。
-//! 材料は打鍵の時刻と、カーソルの位置・左のクリック（`crate::handmark_stage_pointer`・ADR-040）。
+//! 材料は打鍵の時刻と、カーソルの位置・左のクリック・ホイール（`crate::handmark_stage_pointer`・ADR-040）。
 //! `.steering/20261021-handmark-stage-pointer/` で等高線の波から見本 Version 5 の自然世界に替え、計測の CSV を外した。
 //!
 //! 守ること（親タスク `.steering/20261015-tangibility-design/decisions.md` 判断 16・表現の議論の判断 2）:
@@ -12,6 +12,7 @@
 //! - 本人の操作を記録しない。窓はマウスを受けない（ポインタは Rust が読んで送る）。窓は何も返さない
 //!   （計測の CSV と `invoke` の口は外した・判断 4）。このファイルはポインタの値の型を知らない。
 //! - `GSE_HANDMARK_STAGE_SPIKE_SYNTH_POINTER=1` のときは OS を読まず合成のポインタを使う（負荷の計測用）。
+//!   `GSE_HANDMARK_STAGE_SPIKE_POINTER_OFF=1` のときはカーソル・クリック・ホイールを切った状態で始める（同じく計測用・トレイで入れ直せる）。
 //! - 共有の種別は既定のまま出す（写るかを測る）。`GSE_HANDMARK_STAGE_SPIKE_PROTECT=1` のときだけ「なし」にし、
 //!   読み返せなければ出さない（小面と同じ fail-closed）。
 
@@ -30,6 +31,8 @@ const ENV_ENABLE: &str = "GSE_HANDMARK_STAGE_SPIKE";
 const ENV_PROTECT: &str = "GSE_HANDMARK_STAGE_SPIKE_PROTECT";
 #[cfg(target_os = "macos")]
 const ENV_SYNTH_POINTER: &str = "GSE_HANDMARK_STAGE_SPIKE_SYNTH_POINTER";
+#[cfg(target_os = "macos")]
+const ENV_POINTER_OFF: &str = "GSE_HANDMARK_STAGE_SPIKE_POINTER_OFF";
 
 /// 窓が出ていて打鍵を送ってよいときだけ true。閉じたら false に戻す。
 #[cfg(target_os = "macos")]
@@ -96,6 +99,11 @@ mod imp {
                 let _ = APP.set(app.handle().clone());
                 ACTIVE.store(true, Ordering::Release);
                 let synthetic = crate::handmark_spike::env_flag(ENV_SYNTH_POINTER);
+                if crate::handmark_spike::env_flag(ENV_POINTER_OFF) {
+                    crate::handmark_stage_pointer::set_cursor_on(false);
+                    crate::handmark_stage_pointer::set_click_on(false);
+                    crate::handmark_stage_pointer::set_wheel_on(false);
+                }
                 // ポインタを読むスレッドは窓が出ている間だけ回る（閉じると ACTIVE が false になり抜ける）。
                 let pointer = crate::handmark_stage_pointer::start(
                     app.handle().clone(),
@@ -106,6 +114,7 @@ mod imp {
                 tracing::info!(
                     protect = crate::handmark_spike::env_flag(ENV_PROTECT),
                     synthetic_pointer = synthetic,
+                    pointer_off = crate::handmark_spike::env_flag(ENV_POINTER_OFF),
                     pointer_started = pointer.is_ok(),
                     "handmark stage spike: stage shown at desktop level"
                 );

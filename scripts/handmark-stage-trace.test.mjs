@@ -56,14 +56,17 @@ test("切ったら全部の枠が消え、入れ直しても前の跡は出な�
 });
 
 const msg = (over) => ({
-  epoch: 0, tMs: 0, cursorOn: true, clickOn: true, x: 0, y: 0, moved: true, clicked: false, ...over,
+  epoch: 0, tMs: 0, cursorOn: true, clickOn: true, wheelOn: true, x: 0, y: 0, moved: true, clicked: false, wheel: 0,
+  ...over,
 });
 
 test("古い世代の値は捨て、切ったことを知らせる", () => {
   const rc = makeReceiver();
-  assert.deepEqual(receive(rc, msg({ epoch: 0, tMs: 0 }), 100), { use: true, cursorOff: false, clickOff: false });
+  assert.deepEqual(receive(rc, msg({ epoch: 0, tMs: 0 }), 100), {
+    use: true, cursorOff: false, clickOff: false, wheelOff: false,
+  });
   const off = receive(rc, msg({ epoch: 1, tMs: 16, cursorOn: false, moved: false }), 116);
-  assert.deepEqual(off, { use: true, cursorOff: true, clickOff: false });
+  assert.deepEqual(off, { use: true, cursorOff: true, clickOff: false, wheelOff: false });
   // 切る前に送られて遅れて届いた値
   assert.equal(receive(rc, msg({ epoch: 0, tMs: 10 }), 117).use, false);
   assert.equal(rc.cursorOn, false);
@@ -88,4 +91,12 @@ test("切った知らせは遅れて届いても効く", () => {
   assert.equal(v.use, false);
   assert.equal(v.clickOff, true);
   assert.equal(rc.clickOn, false);
+});
+
+test("ホイールを切った知らせも届き、切る前に回した量は捨てる", () => {
+  const rc = makeReceiver();
+  receive(rc, msg({ tMs: 0 }), 100);
+  const v = receive(rc, msg({ epoch: 1, tMs: 16, wheelOn: false, moved: false }), 116);
+  assert.equal(v.wheelOff, true);
+  assert.equal(receive(rc, msg({ epoch: 0, tMs: 10, wheel: 1 }), 117).use, false);
 });

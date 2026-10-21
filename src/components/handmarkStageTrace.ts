@@ -74,11 +74,14 @@ export interface PointerMessage {
   tMs: number;
   cursorOn: boolean;
   clickOn: boolean;
+  wheelOn: boolean;
   /** 主画面の左下が原点の座標。 */
   x: number;
   y: number;
   moved: boolean;
   clicked: boolean;
+  /** 前の送りから回した量（1 回ぶんを 1・画面を下へ送る向きを正）。 */
+  wheel: number;
 }
 
 export interface Receiver {
@@ -87,10 +90,11 @@ export interface Receiver {
   minLag: number;
   cursorOn: boolean;
   clickOn: boolean;
+  wheelOn: boolean;
 }
 
 export function makeReceiver(): Receiver {
-  return { epoch: -1, minLag: Infinity, cursorOn: false, clickOn: false };
+  return { epoch: -1, minLag: Infinity, cursorOn: false, clickOn: false, wheelOn: false };
 }
 
 export interface Verdict {
@@ -100,24 +104,29 @@ export interface Verdict {
   cursorOff: boolean;
   /** いまクリックが切られた（跡を消す）。 */
   clickOff: boolean;
+  /** いまホイールが切られた（跡を消す）。 */
+  wheelOff: boolean;
 }
 
 /** 届いた値を受けるかを決める。`now` は受け取った時刻（窓の時計）。 */
 export function receive(rc: Receiver, m: PointerMessage, now: number): Verdict {
   if (m.epoch < rc.epoch) {
     // 切る前の世代の値（配送待ちだったもの）は捨てる。
-    return { use: false, cursorOff: false, clickOff: false };
+    return { use: false, cursorOff: false, clickOff: false, wheelOff: false };
   }
   let cursorOff = false;
   let clickOff = false;
+  let wheelOff = false;
   if (m.epoch > rc.epoch) {
     cursorOff = rc.cursorOn && !m.cursorOn;
     clickOff = rc.clickOn && !m.clickOn;
+    wheelOff = rc.wheelOn && !m.wheelOn;
     rc.epoch = m.epoch;
     rc.cursorOn = m.cursorOn;
     rc.clickOn = m.clickOn;
+    rc.wheelOn = m.wheelOn;
   }
   const lag = now - m.tMs;
   rc.minLag = Math.min(rc.minLag, lag);
-  return { use: lag - rc.minLag <= STALE_MS, cursorOff, clickOff };
+  return { use: lag - rc.minLag <= STALE_MS, cursorOff, clickOff, wheelOff };
 }
