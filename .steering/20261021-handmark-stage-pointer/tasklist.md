@@ -13,4 +13,4 @@
 - [x] 負荷の計測（design.md §6）・一時ファイルを消す
 - [x] 研究者の試視（判断 12〜14・results.md §5。打鍵の tap の失効はいまは切り分けない）
 - [x] ADR-040 の見直し（末尾に補訂 1・Proposed のまま。枝 `docs/tangibility-design` の側）
-- [ ] `/cross-review`・push
+- [x] `/cross-review`（2 巡・判断 17〜19）・push
