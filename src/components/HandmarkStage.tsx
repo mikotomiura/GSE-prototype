@@ -5,7 +5,7 @@
 // - カーソル: 近くの草が動いた向きへなびき、動かしている間だけ近くの粒が寄る。数秒で戻る。
 // - クリック（左だけ）: その場に一回きりの波紋。枠は 6 で、1.6 秒で消す。
 // - ホイール（macOS）: 粒全体の描く位置を縦にずらし、1 秒で半分に戻す。
-// - 霧: どの入力にも依らない基層。
+// - 霧: どの入力にも依らない基層。帯は 3 本（見本は 4 本で、明るい壁紙で見えるのは 2 本だった。試視で見える帯を 1 本足した・判断 13）。
 // 入力の跡も打鍵の風も無い間は、霧と粒の漂いだけを 1 秒に約 10 回描く（負荷を抑える・判断 10）。
 // ポインタの値は Rust が読んで送る（窓はマウスを受けない）。この窓は値を保存も返送もしない
 // （ADR-040 D2〜D4・検査は src-tauri/src/handmark_stage_guard.rs）。推定は受け取らない。数値・文字は描かない。
@@ -30,8 +30,21 @@ const POINTER_EVENT = "handmark-stage-pointer";
 // 打鍵の写し方（版 4 と同じ・強さ 1）。
 const WINDOW_MS = 30_000;
 const STOP_MS = 2_000;
+/** 打鍵の数を数える窓（直近 1 秒）。 */
 const TICK_MS = 1_000;
+/** 風の目標を決める間隔（試視で版 4 の 1 秒は鈍いとされた・判断 12）。 */
+const WIND_TICK_MS = 250;
 const SPEED_PER_KEY = 0.05;
+/** 1 秒の打鍵の数の頭打ち（版 4 は 10）。 */
+const MAX_KEYS_PER_SEC = 14;
+/** 風が最大になる速さ（版 4 は 0.4 = 毎秒 8 打。いまは毎秒 12 打）。 */
+const FULL_WIND_SPEED = 0.6;
+/** 霧の帯の本数と、いちばん上の帯の高さ・帯の間隔（画面の高さに対する割合）。 */
+const FOG_BANDS = 3;
+const FOG_TOP = 0.12;
+const FOG_STEP = 0.18;
+/** 打鍵が無い 0.25 秒ごとの減り（版 4 の 1 秒に 0.6 倍とほぼ同じ）。 */
+const WIND_DECAY = 0.88;
 const MIN_SPEED = 0.002;
 const IRREG_MS = 10_000;
 const IRREG_MIN_GAPS = 4;
@@ -180,6 +193,7 @@ export default function HandmarkStage() {
     let irregTo = 0;
     let tickAt = performance.now();
 
+
     const irregularity = (now: number): number | null => {
       let n = 0;
       let sum = 0;
@@ -298,20 +312,24 @@ export default function HandmarkStage() {
     const gustAt = (x: number): number => Math.max(0, 1 + 0.9 * irreg * fbm((x / W) * 2.2 + 500, drift * 1.1));
 
     const drawNature = (dt: number, slow: number): void => {
-      const wind = Math.min(1, speed / 0.4);
+      const wind = Math.min(1, speed / FULL_WIND_SPEED);
       // 「動きを減らす」は基層の漂いと粒の流れだけを遅くする（跡の減衰は実時間のまま）。
       const mdt = dt * slow;
       drift += mdt / 1000;
 
       // 霧の帯。基層だけで動き、どの入力でも変わらない。
       const step = Math.max(8, Math.round(10 * S));
-      for (let b = 0; b < 4; b++) {
-        const yc = H * (0.12 + b * 0.14);
+      for (let b = 0; b < FOG_BANDS; b++) {
+        const yc = H * (FOG_TOP + b * FOG_STEP);
         ctx.beginPath();
         for (let x = 0; x <= W + step; x += step) ctx.lineTo(x, yc + fogEdge(b, x, false));
         for (let x = W + step; x >= 0; x -= step) ctx.lineTo(x, yc + H * 0.05 + fogEdge(b, x, true));
         ctx.closePath();
-        ctx.fillStyle = b % 2 === 0 ? "rgba(255,255,255,0.12)" : "rgba(18,22,27,0.06)";
+        // 墨の薄い塗りの上に白の塗りを重ね、壁紙の明暗に依らずどの帯も見えるようにする（草の線の二重と同じ考え）。
+        // 見本は白と墨の交互で、明るい壁紙では白の帯が透明に見えた（判断 14）。
+        ctx.fillStyle = "rgba(18,22,27,0.08)";
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.12)";
         ctx.fill();
       }
 
@@ -422,17 +440,18 @@ export default function HandmarkStage() {
       const lastSec = presses.filter((t) => now - t <= TICK_MS).length;
       speedFrom = speed;
       irregFrom = irreg;
-      const rate = Math.min(lastSec, 10) * SPEED_PER_KEY;
-      const next = lastSec > 0 ? 0.5 * speed + 0.5 * rate : speed * 0.6;
+      const rate = Math.min(lastSec, MAX_KEYS_PER_SEC) * SPEED_PER_KEY;
+      const next = lastSec > 0 ? 0.5 * speed + 0.5 * rate : speed * WIND_DECAY;
       speedTo = next < MIN_SPEED ? 0 : next;
       const ir = irregularity(now);
-      irregTo = ir === null ? irreg * 0.85 : 0.5 * irreg + 0.5 * ir;
+      // 打鍵の間合いが足りない間の減りは、版 4 の 1 秒に 0.85 倍と同じ（0.25 秒ごとに 0.96 倍）。
+      irregTo = ir === null ? irreg * 0.96 : 0.5 * irreg + 0.5 * ir;
       if (irregTo < 0.002) irregTo = 0;
       tickAt = now;
       // 描画が止まっている間（全画面のアプリなど）も、寿命を過ぎた波紋の枠を消す。
       sweepRipples(rippleSlots, now);
     };
-    const timer = window.setInterval(tick, TICK_MS);
+    const timer = window.setInterval(tick, WIND_TICK_MS);
 
     let last: number | null = null;
     let frame: number | null = null;
@@ -454,7 +473,7 @@ export default function HandmarkStage() {
       // 描画が止まっていた間の分は進めない。
       const dt = last === null ? 16 : Math.min(now - last, 100);
       last = now;
-      const k = Math.min(1, (now - tickAt) / TICK_MS);
+      const k = Math.min(1, (now - tickAt) / WIND_TICK_MS);
       const e = k * k * (3 - 2 * k);
       speed = speedFrom + (speedTo - speedFrom) * e;
       irreg = irregFrom + (irregTo - irregFrom) * e;
