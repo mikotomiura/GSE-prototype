@@ -45,10 +45,57 @@ const WINDOW: [(&str, &str); 2] = [
     ),
 ];
 
-/// テストの部分と、行の頭からのコメントを除いた本文。
+/// `#[cfg(test)]` の付いた項目だけを除く。属性の後の最初の `;` か、最初の `{` から対応する `}` までを外す。
+/// それより後ろの本番のコードは残す（最初の `#[cfg(test)]` から後ろを全部外すと、その後ろに足した本番の
+/// 関数が検査から漏れる）。文字列や文字の中の括弧は数えるので、`'{'` のような字があると外しすぎうる。
+fn strip_test_items(src: &str) -> String {
+    const ATTR: &str = "#[cfg(test)]";
+    let mut out = String::with_capacity(src.len());
+    let mut rest = src;
+    while let Some(i) = rest.find(ATTR) {
+        out.push_str(&rest[..i]);
+        let after = &rest[i + ATTR.len()..];
+        let semi = after.find(';');
+        let open = after.find('{');
+        let end = match (semi, open) {
+            (Some(s), Some(o)) if s < o => Some(s + 1),
+            (Some(s), None) => Some(s + 1),
+            (_, Some(o)) => {
+                let mut depth = 0usize;
+                let mut close = None;
+                for (k, ch) in after[o..].char_indices() {
+                    match ch {
+                        '{' => depth += 1,
+                        '}' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                close = Some(o + k + 1);
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                close
+            }
+            (None, None) => None,
+        };
+        match end {
+            Some(e) => rest = &after[e..],
+            // 閉じていない: 残りは検査に残す（外しすぎない）。
+            None => {
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// テストの項目と、行の頭からのコメントを除いた本文。
 fn body(src: &str) -> String {
-    let head = src.split("#[cfg(test)]").next().unwrap_or(src);
-    head.lines()
+    strip_test_items(src)
+        .lines()
         .filter(|l| !l.trim_start().starts_with("//"))
         .collect::<Vec<_>>()
         .join("\n")
@@ -518,4 +565,29 @@ fn d3_boundary_macos_reads_only_the_pointer() {
             b2.as_str(),
         ],
     );
+}
+
+#[test]
+fn body_keeps_production_code_after_a_test_item() {
+    let src = [
+        "fn a() {}",
+        "#[cfg(test)]",
+        "fn only_for_tests() -> &'static str { if true { \"T1\" } else { \"T2\" } }",
+        "#[cfg(test)]",
+        "use std::fmt::Write;",
+        "fn production() { let _ = \"P1\"; }",
+        "#[cfg(test)]",
+        "mod tests { fn t() { let _ = \"T3\"; } }",
+        "fn after_tests() { let _ = \"P2\"; }",
+    ]
+    .join("\n");
+    let b = body(&src);
+    assert!(b.contains("P1") && b.contains("P2"), "{b}");
+    assert!(
+        !b.contains("T1") && !b.contains("T2") && !b.contains("T3") && !b.contains("fmt::Write"),
+        "{b}"
+    );
+    // 陽性対照: 旧い切り方（最初の属性から後ろを全部外す）では本番の P1・P2 が落ちる
+    let old = src.split("#[cfg(test)]").next().unwrap_or(&src);
+    assert!(!old.contains("P1") && !old.contains("P2"));
 }

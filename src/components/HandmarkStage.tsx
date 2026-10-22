@@ -14,11 +14,13 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
   addRipple,
   clearRipples,
+  decayFactor,
   makeReceiver,
   makeRipples,
   receive,
   rippleAge,
   sweepRipples,
+  tracesExpired,
   type PointerMessage,
 } from "./handmarkStageTrace";
 
@@ -221,6 +223,9 @@ export default function HandmarkStage() {
     let wheelOff = 0;
     let wheelShown = 0;
     let lastInputAt = -Infinity;
+    // ポインタの最後の入力（打鍵は含めない。打ち続けている間も、ポインタの跡は消す）。
+    let lastPointerAt = -Infinity;
+    let tracesCleared = true;
 
     const clearCursorTrace = (): void => {
       for (const bl of blades) bl.push = 0;
@@ -228,6 +233,10 @@ export default function HandmarkStage() {
         m.ox = 0;
         m.oy = 0;
       }
+      cursor.x = 0;
+      cursor.y = 0;
+      cursor.px = 0;
+      cursor.py = 0;
       cursor.inside = false;
       cursor.fresh = false;
       cursor.vx = 0;
@@ -245,6 +254,8 @@ export default function HandmarkStage() {
       }
       if (!v.use) return;
       lastInputAt = now;
+      lastPointerAt = now;
+      tracesCleared = false;
       kick();
       // 主画面の左下が原点の座標を、窓の左上が原点に直す（窓は主画面の全体を覆う）。
       const x = m.x;
@@ -264,7 +275,8 @@ export default function HandmarkStage() {
       }
     };
 
-    const updatePointer = (dt: number): void => {
+    // dt は動きに使う（頭打ちあり）。elapsed は戻っていく値の減衰に使う実際の経過時間（頭打ちなし）。
+    const updatePointer = (dt: number, elapsed: number): void => {
       // 描画のたびに最後の 1 点を見て、前の点との差から速さを出す。平滑化は実時間。
       if (receiver.cursorOn && cursor.inside && cursor.fresh) {
         const v = ((cursor.x - cursor.px) / Math.max(dt, 1)) * 1000;
@@ -283,8 +295,8 @@ export default function HandmarkStage() {
       cursor.px = cursor.x;
       cursor.py = cursor.y;
       cursor.fresh = cursor.inside;
-      wheelOff *= Math.pow(0.5, dt / WHEEL_HALF_MS);
-      wheelShown += (wheelOff - wheelShown) * (1 - Math.exp(-dt / 150));
+      wheelOff *= decayFactor(WHEEL_HALF_MS, elapsed);
+      wheelShown += (wheelOff - wheelShown) * (1 - Math.exp(-elapsed / 150));
     };
 
     const dualStroke = (width: number, darkA: number, lightA: number): void => {
@@ -311,7 +323,7 @@ export default function HandmarkStage() {
     const baseLift = (seed: number): number => fbm(seed * 9.1 + 300, drift * 0.25) * 6;
     const gustAt = (x: number): number => Math.max(0, 1 + 0.9 * irreg * fbm((x / W) * 2.2 + 500, drift * 1.1));
 
-    const drawNature = (dt: number, slow: number): void => {
+    const drawNature = (dt: number, elapsed: number, slow: number): void => {
       const wind = Math.min(1, speed / FULL_WIND_SPEED);
       // 「動きを減らす」は基層の漂いと粒の流れだけを遅くする（跡の減衰は実時間のまま）。
       const mdt = dt * slow;
@@ -335,7 +347,7 @@ export default function HandmarkStage() {
 
       // 漂う粒。基層の流れ＋打鍵の風（横）＋カーソルへ寄るずれ＋ホイールの縦のずれ（描く位置だけ）。
       const lift = receiver.wheelOn ? wheelShown * H : 0;
-      const mdecay = Math.pow(0.5, dt / MOTE_HALF_MS);
+      const mdecay = decayFactor(MOTE_HALF_MS, elapsed);
       const mR = MOTE_R * H;
       const mMax = MOTE_MAX * H;
       const pullMotes = receiver.cursorOn && (cursor.vx !== 0 || cursor.vy !== 0);
@@ -392,7 +404,7 @@ export default function HandmarkStage() {
       }
 
       // 草の群れ。基層の小さな揺れ＋打鍵の風＋カーソルの押し（近くの草だけ・数秒で戻る）。
-      const decay = Math.pow(0.5, dt / CURSOR_HALF_MS);
+      const decay = decayFactor(CURSOR_HALF_MS, elapsed);
       const R = CURSOR_R * H;
       const cv = receiver.cursorOn ? Math.max(-1, Math.min(1, cursor.vx / (W * 0.4))) : 0;
       for (const bl of blades) {
@@ -450,6 +462,13 @@ export default function HandmarkStage() {
       tickAt = now;
       // 描画が止まっている間（全画面のアプリなど）も、寿命を過ぎた波紋の枠を消す。
       sweepRipples(rippleSlots, now);
+      // 同じく、入力が途絶えて十分経ったら、戻っていく値と最後の一点を消す（D4）。
+      if (!tracesCleared && tracesExpired(lastPointerAt, now)) {
+        clearCursorTrace();
+        wheelOff = 0;
+        wheelShown = 0;
+        tracesCleared = true;
+      }
     };
     const timer = window.setInterval(tick, WIND_TICK_MS);
 
@@ -470,18 +489,19 @@ export default function HandmarkStage() {
       }
     };
     const loop = (now: number): void => {
-      // 描画が止まっていた間の分は進めない。
-      const dt = last === null ? 16 : Math.min(now - last, 100);
+      // 描画が止まっていた間の分は、動きには進めない（dt）。戻っていく値は実時間で減らす（elapsed）。
+      const elapsed = last === null ? 16 : now - last;
+      const dt = Math.min(elapsed, 100);
       last = now;
       const k = Math.min(1, (now - tickAt) / WIND_TICK_MS);
       const e = k * k * (3 - 2 * k);
       speed = speedFrom + (speedTo - speedFrom) * e;
       irreg = irregFrom + (irregTo - irregFrom) * e;
       phase += (speed * dt) / 1000;
-      updatePointer(dt);
+      updatePointer(dt, elapsed);
       sweepRipples(rippleSlots, now);
       ctx.clearRect(0, 0, W, H);
-      drawNature(dt, reduceMotion ? 0.3 : 1);
+      drawNature(dt, elapsed, reduceMotion ? 0.3 : 1);
       drawRipples(now);
       if (busy(now)) {
         frame = requestAnimationFrame(loop);

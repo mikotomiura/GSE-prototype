@@ -6,13 +6,16 @@ import {
   RIPPLE_MS,
   RIPPLE_SLOTS,
   STALE_MS,
+  TRACE_CLEAR_MS,
   addRipple,
   clearRipples,
+  decayFactor,
   makeReceiver,
   makeRipples,
   receive,
   rippleAge,
   sweepRipples,
+  tracesExpired,
 } from "../src/components/handmarkStageTrace.ts";
 
 const empty = (s) => s.x === 0 && s.y === 0 && s.t0 === null;
@@ -99,4 +102,20 @@ test("ホイールを切った知らせも届き、切る前に回した量は�
   const v = receive(rc, msg({ epoch: 1, tMs: 16, wheelOn: false, moved: false }), 116);
   assert.equal(v.wheelOff, true);
   assert.equal(receive(rc, msg({ epoch: 0, tMs: 10, wheel: 1 }), 117).use, false);
+});
+
+test("戻っていく値は、描画が止まっていた時間の分も実時間で減る", () => {
+  // 窓が 10 秒隠れていた後の最初の描画で、半減期 700ms の値はほぼ 0 になる
+  assert.ok(decayFactor(700, 10_000) < 1e-4);
+  assert.equal(decayFactor(700, 700), 0.5);
+  assert.equal(decayFactor(700, -5), 1);
+  // 陽性対照: 経過を 100ms で頭打ちにした旧い減らし方では、10 秒後も 9 割が残る
+  assert.ok(decayFactor(700, Math.min(10_000, 100)) > 0.9);
+});
+
+test("ポインタの入力が途絶えて十分経ったら、跡を消す時になる", () => {
+  assert.equal(tracesExpired(1000, 1000 + TRACE_CLEAR_MS - 1), false);
+  assert.equal(tracesExpired(1000, 1000 + TRACE_CLEAR_MS), true);
+  // まだ入力が来ていない
+  assert.equal(tracesExpired(-Infinity, 0), true);
 });

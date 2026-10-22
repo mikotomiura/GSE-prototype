@@ -9,6 +9,19 @@ export const RIPPLE_SLOTS = 6;
 export const RIPPLE_MS = 1600;
 /** これより遅れて届いた値は描かずに捨てる。 */
 export const STALE_MS = 250;
+/** 最後の入力からこれだけ経ったら、戻っていく値（草の押し・粒のずれ・縦のずれ・最後の一点）を 0 にする。
+ * 描画が止まっていても（窓が隠れている間など）、時計の知らせで消す。 */
+export const TRACE_CLEAR_MS = 8000;
+
+/** 戻っていく値を 0 にする時か。 */
+export function tracesExpired(lastInputAt: number, now: number): boolean {
+  return now - lastInputAt >= TRACE_CLEAR_MS;
+}
+
+/** 半減期 `halfMs` の値が、実際に経った時間 `elapsed` でどれだけ残るか。描画が止まっていた間も実時間で減らす。 */
+export function decayFactor(halfMs: number, elapsed: number): number {
+  return Math.pow(0.5, Math.max(0, elapsed) / halfMs);
+}
 
 export interface RippleSlot {
   x: number;

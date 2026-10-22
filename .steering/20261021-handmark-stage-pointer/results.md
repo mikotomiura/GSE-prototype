@@ -69,3 +69,11 @@
 - 無効にされた後は 1〜2 秒で作り直され、「delivering events again」で戻った。「may be dead」は数秒〜数分で戻ることが多い。
 - ホイールの tap が原因かは分からない。ホイールの tap を持たない条件（`GSE_HANDMARK_STAGE_SPIKE=1` なし、またはトレイでホイールを切る）と同じ長さで比べていない。本体だけの頻度は `macos-tap-idle-away-probe-bug` の記録を見る必要がある。
 - 研究者の判断（2026-10-23・AskUserQuestion・推奨どおり）: O1 の収集をこれ以上欠かさないため、いまは切り分けない。ADR-040 の見直しで、ホイールの例外の注意として書く。
+
+## 6. レビュー（2026-10-23）と直したこと
+
+- `/cross-review`（Claude と Codex）と security-checker を、コード（`64835bd5..0b6f7735 -- src src-tauri scripts`）と ADR-040 補訂 1 に掛けた。`.steering/` は外した（研究者の判断）。Codex は安全ゲートで止まらずに 2 回走った。
+- 確かめた指摘: 減衰の経過時間が 100ms で頭打ち（`HandmarkStage.tsx`）、`body()` が最初の `#[cfg(test)]` から後ろを全部外す、core-graphics 0.24 の `CGEventTap` は drop で mach port を無効にしない（`hook_macos.rs` が 2026-09-10 に SIGSEGV として直したのと同じ穴が、ホイールの tap にあった）。
+- 直した後: `cargo test --workspace` 緑（lib 953 件）、`clippy -D warnings` 緑、`tsc` 緑、`node --test` 9 件緑。
+- 壊して赤を見た: `#[cfg(test)] fn payload_type_name` と `mod tests` の間に `tracing::debug!` を持つ本番の関数を足す → 直す前は検査から漏れる位置で、直した後は記録の検査が赤。`decayFactor` を 100ms の頭打ちに戻す → `node --test` が 1 件赤。戻すと緑。
+- 確かめていないもの: 直した後の画面（開発版を起動していない・O1 を止めないため）、ホイールの tap が入れ切りで残らないこと（判断 19）。

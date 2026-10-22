@@ -4,8 +4,13 @@
 //!   macOS ではホイールに繰り返し読む方法がなく、入力監視の許可と tap が要る（results.md §4 の実測）。
 //! - 持つのは、前に読まれてからの回した量の和 1 つだけ（列を作らない）。位置も時刻も読まない。
 //! - 入れている間だけスレッドと tap を作る。切ったら tap ごとスレッドを終え、溜まった量を捨てる（D4）。
+//!   切ってからスレッドが抜けるまでの間に届いた通知は数えない。
+//! - 抜けるときは run loop から source を外し、mach port を無効にする。core-graphics 0.24 の `CGEventTap` は
+//!   drop で無効にしないので、無効にしないと解放済みの通知の関数が呼ばれうる（`hook_macos.rs` の同じ注意）。
 //! - 検査は `crate::handmark_stage_guard`。
 
+use core_foundation::base::TCFType;
+use core_foundation::mach_port::CFMachPortRef;
 use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop};
 use core_graphics::event::{
     CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
@@ -25,6 +30,11 @@ static LAST_FAILURE: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(N
 
 const RETRY_AFTER: Duration = Duration::from_secs(5);
 
+#[link(name = "CoreFoundation", kind = "framework")]
+extern "C" {
+    fn CFMachPortInvalidate(port: CFMachPortRef);
+}
+
 /// 1 回の通知の量を、見本と同じ 1 回ぶんの単位にする（画面を下へ送る向きを正）。
 /// 連続の装置（トラックパッド）は画素の量を 100 で 1 回ぶんにして ±1 で頭打ち。刻みの装置は 1 回ぶん。
 fn amount(event: &CGEvent) -> f64 {
@@ -39,8 +49,8 @@ fn amount(event: &CGEvent) -> f64 {
     }
 }
 
-/// tap の通知。数を足すだけ（ブロックしない・ログを出さない）。
-fn on_event(event_type: CGEventType, event: &CGEvent) {
+/// tap の通知。数を足すだけ（ブロックしない・ログを出さない）。切っている間は数えない。
+fn on_event(event_type: CGEventType, event: &CGEvent, wanted: fn() -> bool) {
     if matches!(
         event_type,
         CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput
@@ -48,7 +58,7 @@ fn on_event(event_type: CGEventType, event: &CGEvent) {
         DISABLED.store(true, Ordering::Release);
         return;
     }
-    if matches!(event_type, CGEventType::ScrollWheel) {
+    if matches!(event_type, CGEventType::ScrollWheel) && wanted() {
         AMOUNT_MILLI.fetch_add((amount(event) * 1_000.0) as i64, Ordering::Relaxed);
     }
 }
@@ -104,7 +114,7 @@ fn run(wanted: fn() -> bool) {
         CGEventTapOptions::ListenOnly,
         vec![CGEventType::ScrollWheel],
         |_proxy, event_type, event| {
-            on_event(event_type, event);
+            on_event(event_type, event, wanted);
             None
         },
     );
@@ -113,6 +123,8 @@ fn run(wanted: fn() -> bool) {
         return;
     };
     let Ok(source) = tap.mach_port.create_runloop_source(0) else {
+        // SAFETY: `tap` はまだ生きていて、mach_port は有効な CFMachPortRef。同じスレッドから呼ぶ。
+        unsafe { CFMachPortInvalidate(tap.mach_port.as_concrete_TypeRef() as CFMachPortRef) };
         note_failure();
         return;
     };
@@ -131,5 +143,10 @@ fn run(wanted: fn() -> bool) {
             false,
         );
     }
-    // スレッドを抜けると tap と run loop の source が捨てられ、取得が止まる。
+    // source を外し、mach port を無効にしてから tap を捨てる（配送を止める手段は無効にすることだけ）。
+    // SAFETY: 同上。
+    run_loop.remove_source(&source, unsafe { kCFRunLoopDefaultMode });
+    // SAFETY: `tap` はこの時点でまだ生きていて（drop は関数の末尾）、mach_port は有効な CFMachPortRef。
+    //   同じスレッドから呼ぶ。
+    unsafe { CFMachPortInvalidate(tap.mach_port.as_concrete_TypeRef() as CFMachPortRef) };
 }

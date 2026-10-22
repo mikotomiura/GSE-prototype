@@ -66,9 +66,10 @@ mod imp {
         Ok(unsafe { &*(ptr as *const objc2_app_kit::NSWindow) })
     }
 
-    /// `setup()`（メインスレッド）から呼ぶ。環境変数が無ければ何もしない。
+    /// `setup()`（メインスレッド）から呼ぶ。開発用のビルドで環境変数があるときだけ動く
+    /// （配布物のビルドでは環境変数があっても何もしない）。
     pub fn setup(app: &tauri::App<Wry>) {
-        if !crate::handmark_spike::env_flag(ENV_ENABLE) {
+        if !cfg!(debug_assertions) || !crate::handmark_spike::env_flag(ENV_ENABLE) {
             return;
         }
         let window = match tauri::WebviewWindowBuilder::new(

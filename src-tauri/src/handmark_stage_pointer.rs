@@ -5,6 +5,7 @@
 //! - ホイールは macOS の tap（`input/handmark_wheel_macos.rs`・判断 9）が数えた量を 16ms ごとに受け取る。
 //! - 入れ切り（トレイ・判断 5）のたびに世代を進め、新しい世代の状態を送る。窓は古い世代を捨てる（D4）。
 //!   カーソルとクリックを両方切っている間は OS の位置を読まず、ホイールを切っている間は tap を作らない。
+//! - 記録の一時停止の間は、3 つとも切ったのと同じに扱う（読まない・送らない・跡を消す。判断 18）。
 //! - 送る先は背景の窓だけ（`emit_to`）。イベント名はこの窓専用（D3 の他の窓への配送）。
 //! - このファイルは記録・ファイル・ネットワーク・推定の道具を使わない。検査は `crate::handmark_stage_guard`。
 //!   `.steering/20261021-handmark-stage-pointer/design.md` §1・§3。
@@ -20,10 +21,12 @@ pub(crate) struct Switches {
     cursor: AtomicBool,
     click: AtomicBool,
     wheel: AtomicBool,
+    /// 記録の一時停止の間（読みのスレッドが写す）。
+    paused: AtomicBool,
     epoch: AtomicU64,
 }
 
-/// ある時点の入れ切りと世代。
+/// ある時点の入れ切りと世代。一時停止の間は 3 つとも false。
 #[derive(Clone, Copy, PartialEq)]
 struct State {
     epoch: u64,
@@ -38,6 +41,7 @@ impl Switches {
             cursor: AtomicBool::new(true),
             click: AtomicBool::new(true),
             wheel: AtomicBool::new(true),
+            paused: AtomicBool::new(false),
             epoch: AtomicU64::new(0),
         }
     }
@@ -60,12 +64,18 @@ impl Switches {
         self.set(&self.wheel, on);
     }
 
+    pub(crate) fn set_paused(&self, paused: bool) {
+        self.set(&self.paused, paused);
+    }
+
     fn snapshot(&self) -> State {
+        let epoch = self.epoch.load(Ordering::SeqCst);
+        let live = !self.paused.load(Ordering::SeqCst);
         State {
-            epoch: self.epoch.load(Ordering::SeqCst),
-            cursor: self.cursor.load(Ordering::SeqCst),
-            click: self.click.load(Ordering::SeqCst),
-            wheel: self.wheel.load(Ordering::SeqCst),
+            epoch,
+            cursor: live && self.cursor.load(Ordering::SeqCst),
+            click: live && self.click.load(Ordering::SeqCst),
+            wheel: live && self.wheel.load(Ordering::SeqCst),
         }
     }
 }
@@ -84,16 +94,17 @@ pub fn set_wheel_on(on: bool) {
     SWITCHES.set_wheel(on);
 }
 
+/// トレイの入れ切りの状態（一時停止は含めない）。
 pub fn cursor_on() -> bool {
-    SWITCHES.snapshot().cursor
+    SWITCHES.cursor.load(Ordering::SeqCst)
 }
 
 pub fn click_on() -> bool {
-    SWITCHES.snapshot().click
+    SWITCHES.click.load(Ordering::SeqCst)
 }
 
 pub fn wheel_on() -> bool {
-    SWITCHES.snapshot().wheel
+    SWITCHES.wheel.load(Ordering::SeqCst)
 }
 
 /// 窓へ送る数だけの値。この型はこのファイルの外へ出さない。
@@ -194,7 +205,7 @@ mod imp {
         STAGE_ACTIVE
             .get()
             .is_some_and(|a| a.load(Ordering::Acquire))
-            && wheel_on()
+            && SWITCHES.snapshot().wheel
     }
 
     /// 背景の窓が出ている間（`active` が true の間）だけ読み続けるスレッドを起こす。
@@ -239,6 +250,7 @@ mod imp {
                     let _ = app.emit_to(label, POINTER_EVENT, p);
                 };
                 while active.load(Ordering::Acquire) {
+                    SWITCHES.set_paused(crate::recording::is_paused());
                     if !synthetic && wheel_wanted() {
                         wheel::ensure_running(wheel_wanted);
                     }
@@ -386,5 +398,31 @@ mod tests {
         assert!(!c.out[0].moved && c.out[0].cursor_on);
         run(&mut fw, &sw, 6, 1, 0, &mut c);
         assert!(c.out[1].moved && c.out[1].epoch == 2);
+    }
+
+    #[test]
+    fn nothing_is_read_or_sent_while_recording_is_paused() {
+        let sw = Switches::new();
+        let mut fw = Forwarder::new();
+        let mut c = Counts::default();
+        run(&mut fw, &sw, 0, 10, 5, &mut c);
+        sw.set_paused(true);
+        let (reads, takes, sent) = (c.reads, c.wheel_takes, c.out.len());
+        run(&mut fw, &sw, 10, 300, 5, &mut c);
+        // 切ったのと同じ: 読まない・回した量を受け取らない・切った状態を 1 回だけ知らせる
+        assert_eq!(c.reads, reads);
+        assert_eq!(c.wheel_takes, takes);
+        assert_eq!(c.out.len(), sent + 1);
+        let last = c.out[c.out.len() - 1];
+        assert!(!last.cursor_on && !last.click_on && !last.wheel_on);
+        // トレイの入れ切りの状態は変えない
+        assert!(sw.cursor.load(Ordering::SeqCst) && sw.wheel.load(Ordering::SeqCst));
+        // 同じ値を写し続けても世代は進まない。再開すると新しい世代で読み始める
+        sw.set_paused(true);
+        sw.set_paused(false);
+        run(&mut fw, &sw, 310, 2, 0, &mut c);
+        assert!(c.reads > reads);
+        assert!(c.out[c.out.len() - 1].cursor_on);
+        assert_eq!(c.out[c.out.len() - 1].epoch, 2);
     }
 }
