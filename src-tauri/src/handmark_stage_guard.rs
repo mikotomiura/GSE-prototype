@@ -45,50 +45,133 @@ const WINDOW: [(&str, &str); 2] = [
     ),
 ];
 
-/// `#[cfg(test)]` の付いた項目だけを除く。属性の後の最初の `;` か、最初の `{` から対応する `}` までを外す。
-/// それより後ろの本番のコードは残す（最初の `#[cfg(test)]` から後ろを全部外すと、その後ろに足した本番の
-/// 関数が検査から漏れる）。文字列や文字の中の括弧は数えるので、`'{'` のような字があると外しすぎうる。
+/// 識別子の字か。
+fn ident(c: Option<&u8>) -> bool {
+    c.is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_')
+}
+
+/// `i` からコメント・文字列・文字・raw 文字列が始まるなら、その後ろの位置を返す（閉じていなければ末尾）。
+/// 括弧を数えるときに、これらの中の `{` や `;` を数えないために使う。
+fn skip_lexeme(b: &[u8], i: usize) -> Option<usize> {
+    let at = |k: usize| b.get(k).copied();
+    match b[i] {
+        b'/' if at(i + 1) == Some(b'/') => Some(
+            b[i..]
+                .iter()
+                .position(|c| *c == b'\n')
+                .map_or(b.len(), |k| i + k),
+        ),
+        b'/' if at(i + 1) == Some(b'*') => {
+            let (mut depth, mut j) = (1usize, i + 2);
+            while j < b.len() && depth > 0 {
+                if b[j] == b'/' && at(j + 1) == Some(b'*') {
+                    depth += 1;
+                    j += 2;
+                } else if b[j] == b'*' && at(j + 1) == Some(b'/') {
+                    depth -= 1;
+                    j += 2;
+                } else {
+                    j += 1;
+                }
+            }
+            Some(j)
+        }
+        b'"' => {
+            let mut j = i + 1;
+            while j < b.len() {
+                match b[j] {
+                    b'\\' => j += 2,
+                    b'"' => return Some(j + 1),
+                    _ => j += 1,
+                }
+            }
+            Some(b.len())
+        }
+        b'r' if !ident(i.checked_sub(1).and_then(|k| b.get(k)))
+            || (i >= 1 && b[i - 1] == b'b' && !ident(i.checked_sub(2).and_then(|k| b.get(k)))) =>
+        {
+            let hashes = b[i + 1..].iter().take_while(|c| **c == b'#').count();
+            if at(i + 1 + hashes) != Some(b'"') {
+                return None;
+            }
+            let mut j = i + 2 + hashes;
+            while j < b.len() {
+                if b[j] == b'"'
+                    && b[j + 1..]
+                        .iter()
+                        .take(hashes)
+                        .filter(|c| **c == b'#')
+                        .count()
+                        == hashes
+                {
+                    return Some(j + 1 + hashes);
+                }
+                j += 1;
+            }
+            Some(b.len())
+        }
+        b'\'' if at(i + 1) == Some(b'\\') => Some(
+            b[i + 2..]
+                .iter()
+                .position(|c| *c == b'\'')
+                .map_or(b.len(), |k| i + 3 + k),
+        ),
+        // 1 バイトの文字（`'{'` など）。それ以外の `'` は寿命の印か多バイトの字で、括弧にならない。
+        b'\'' if at(i + 2) == Some(b'\'') => Some(i + 3),
+        _ => None,
+    }
+}
+
+/// `j` から始まる項目の終わり（`;` か、対応する `}` の後ろ）。閉じていなければ `None`。
+fn item_end(b: &[u8], mut j: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    while j < b.len() {
+        if let Some(n) = skip_lexeme(b, j) {
+            j = n;
+            continue;
+        }
+        match b[j] {
+            b';' if depth == 0 => return Some(j + 1),
+            b'{' | b'(' | b'[' => depth += 1,
+            b'}' | b')' | b']' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 && b[j] == b'}' {
+                    return Some(j + 1);
+                }
+            }
+            _ => {}
+        }
+        j += 1;
+    }
+    None
+}
+
+/// `#[cfg(test)]` の付いた項目だけを除く。属性の後の `;` か、対応する `}` までを外し、後ろの本番のコードは残す
+/// （最初の `#[cfg(test)]` から後ろを全部外すと、その後ろに足した本番の関数が検査から漏れる）。
+/// コメント・文字列・文字・raw 文字列の中の属性や括弧は数えない。閉じていない項目は外さない（外しすぎない）。
 fn strip_test_items(src: &str) -> String {
     const ATTR: &str = "#[cfg(test)]";
+    let b = src.as_bytes();
     let mut out = String::with_capacity(src.len());
-    let mut rest = src;
-    while let Some(i) = rest.find(ATTR) {
-        out.push_str(&rest[..i]);
-        let after = &rest[i + ATTR.len()..];
-        let semi = after.find(';');
-        let open = after.find('{');
-        let end = match (semi, open) {
-            (Some(s), Some(o)) if s < o => Some(s + 1),
-            (Some(s), None) => Some(s + 1),
-            (_, Some(o)) => {
-                let mut depth = 0usize;
-                let mut close = None;
-                for (k, ch) in after[o..].char_indices() {
-                    match ch {
-                        '{' => depth += 1,
-                        '}' => {
-                            depth -= 1;
-                            if depth == 0 {
-                                close = Some(o + k + 1);
-                                break;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                close
-            }
-            (None, None) => None,
-        };
-        match end {
-            Some(e) => rest = &after[e..],
-            // 閉じていない: 残りは検査に残す（外しすぎない）。
-            None => {
-                rest = after;
-            }
+    let (mut i, mut from) = (0usize, 0usize);
+    while i < b.len() {
+        if let Some(n) = skip_lexeme(b, i) {
+            i = n;
+            continue;
         }
+        if b[i..].starts_with(ATTR.as_bytes()) {
+            if let Some(e) = item_end(b, i + ATTR.len()) {
+                out.push_str(&src[from..i]);
+                i = e;
+                from = e;
+                continue;
+            }
+            i += ATTR.len();
+            continue;
+        }
+        i += 1;
     }
-    out.push_str(rest);
+    out.push_str(&src[from..]);
     out
 }
 
@@ -587,6 +670,21 @@ fn body_keeps_production_code_after_a_test_item() {
         !b.contains("T1") && !b.contains("T2") && !b.contains("T3") && !b.contains("fmt::Write"),
         "{b}"
     );
+    // コメント・文字列・文字・raw 文字列の中の属性や括弧に引きずられない
+    let tricky = [
+        "// 説明: #[cfg(test)] の項目は外す",
+        "fn p0() { let _ = \"P0\"; }",
+        "#[cfg(test)]",
+        "fn t4() { let _ = '{'; let _ = \"}\"; let _ = r#\"{\"a\":1\"#; /* } */ let _ = \"T4\"; }",
+        "fn p3() { let _ = \"P3\"; } // }",
+        "#[cfg(test)]",
+        "const T5: [u8; 2] = [1, 2];",
+        "fn p4() { let _ = \"P4\"; }",
+    ]
+    .join("\n");
+    let tb = body(&tricky);
+    assert!(["P0", "P3", "P4"].iter().all(|s| tb.contains(s)), "{tb}");
+    assert!(!tb.contains("T4") && !tb.contains("T5"), "{tb}");
     // 陽性対照: 旧い切り方（最初の属性から後ろを全部外す）では本番の P1・P2 が落ちる
     let old = src.split("#[cfg(test)]").next().unwrap_or(&src);
     assert!(!old.contains("P1") && !old.contains("P2"));

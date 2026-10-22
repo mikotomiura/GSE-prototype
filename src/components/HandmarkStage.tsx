@@ -253,10 +253,13 @@ export default function HandmarkStage() {
         wheelShown = 0;
       }
       if (!v.use) return;
-      lastInputAt = now;
-      lastPointerAt = now;
-      tracesCleared = false;
-      kick();
+      // 入れ切りの知らせ（動き・押下・回した量が無い）は入力として数えない。
+      if (m.moved || m.clicked || m.wheel !== 0) {
+        lastInputAt = now;
+        lastPointerAt = now;
+        tracesCleared = false;
+        kick();
+      }
       // 主画面の左下が原点の座標を、窓の左上が原点に直す（窓は主画面の全体を覆う）。
       const x = m.x;
       const y = H - m.y;
