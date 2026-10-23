@@ -43,7 +43,15 @@ h3 { font-size: 0.95rem; font-weight: 700; margin: 0; }
 .stage-scroll.actual canvas { width: 1470px; max-width: none; }
 #main { width: 100%; max-width: 100%; aspect-ratio: 1470 / 956; display: block; }
 .stage-scroll.actual #main { width: 1470px; }
-.caption { font-size: 0.9rem; color: var(--muted); margin: 0; min-height: 1.7em; }
+.caption { font-size: 0.9rem; color: var(--muted); margin: 0; min-height: 1.7em; flex: 1 1 280px; min-width: 0; }
+.reveal-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+#reveal {
+  font: inherit; font-size: 0.9rem; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--surface); color: var(--ink);
+}
+#reveal[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+#reveal:disabled { opacity: 0.45; cursor: not-allowed; }
+#reveal:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px 24px; }
 fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 8px; align-content: start; }
 legend { font-size: 0.78rem; letter-spacing: 0.08em; color: var(--muted); padding: 0; margin-bottom: 6px; }
@@ -90,7 +98,10 @@ section.notes li { margin: 2px 0; font-size: 0.92rem; }
   </header>
 
   <div class="stage-scroll" id="stageScroll"><canvas id="main" aria-label="窓を並べた画面の模型と、選んだ候補"></canvas></div>
-  <p class="caption" id="caption"></p>
+  <div class="reveal-row">
+    <button type="button" id="reveal" aria-pressed="false">他の窓をどけて背景を見る</button>
+    <p class="caption" id="caption"></p>
+  </div>
 
   <div class="controls">
     <fieldset>
@@ -155,6 +166,7 @@ section.notes li { margin: 2px 0; font-size: 0.92rem; }
     <table>
       <thead><tr><th>候補</th><th>窓を並べたとき</th><th>全画面のとき</th><th>作りに要るもの</th><th>まだ確かめていないこと</th></tr></thead>
       <tbody>
+        <tr><td>組み合わせ（判断 4）</td><td>下の縁の帯が見える。他の窓をどけると背景の全体が見える</td><td>下の縁の帯だけが見える（accessory のとき）</td><td>下の縁の帯の作り（下の行）。どけるのは NSApplication の hideOtherApplications と unhideAllApplications の見込み</td><td>どける操作が全画面の中で効くか。戻すきっかけ。もともと隠していたアプリの扱い</td></tr>
         <tr><td>今の背景</td><td>窓の隙間からだけ見える</td><td>見えない（regular だと全画面の Space に入らない）</td><td>今のまま</td><td>なし</td></tr>
         <tr><td>下の縁の帯</td><td>見える。窓の下端の 14 点ほどに重なる</td><td>見える（accessory のとき）</td><td>浮く層以上・クリック透過・accessory（または背景だけを別のプロセスに）</td><td>Dock を出す設定のとき Dock と重なる。普段のアプリの全画面で同じか</td></tr>
         <tr><td>上の縁の帯</td><td>見える。メニューバーのすぐ下、窓のタイトルバーに重なる</td><td>見える。メニューバーが下りてくると重なる</td><td>同上</td><td>同上</td></tr>
@@ -204,6 +216,7 @@ section.notes li { margin: 2px 0; font-size: 0.92rem; }
   const SW = 1470, SH = 956, MENU = 33;
 
   const CANDS = [
+    { id: "combo", label: "組み合わせ", note: "今の背景（窓の後ろ）と下の縁の帯。必要なときに他の窓をどけて背景を見る（判断 4）。" },
     { id: "bg", label: "今の背景", note: "デスクトップの層。窓の後ろに隠れる。" },
     { id: "bottom", label: "下の縁の帯", note: "画面の下の縁。窓の下端に重なる。" },
     { id: "top", label: "上の縁の帯", note: "メニューバーのすぐ下。タイトルバーに重なる。" },
@@ -215,8 +228,8 @@ section.notes li { margin: 2px 0; font-size: 0.92rem; }
   ];
 
   const state = {
-    cand: "bottom", screen: "tiled", winTone: "light", wall: "photo", content: "both",
-    thick: 14, opacity: 0.7, fadeNear: false, pat: "normal"
+    cand: "combo", screen: "tiled", winTone: "light", wall: "photo", content: "both",
+    thick: 14, opacity: 0.7, fadeNear: false, pat: "normal", reveal: false
   };
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -520,6 +533,7 @@ section.notes li { margin: 2px 0; font-size: 0.92rem; }
     const s = v.s, T = state.thick * s, menuOn = state.screen !== "full";
     const top = menuOn ? MENU * s : 0;
     switch (cand) {
+      case "combo":
       case "bottom": return [["b", 0, v.H - T, v.W, T]];
       case "top": return [["t", 0, top, v.W, T]];
       case "sides": return [["l", 0, top, T, v.H - top], ["r", v.W - T, top, T, v.H - top]];
@@ -541,8 +555,15 @@ section.notes li { margin: 2px 0; font-size: 0.92rem; }
     ctx.globalAlpha = 1;
     ctx.drawImage(v.wallCanvas, 0, 0);
     // 今の背景はデスクトップの層。窓より先に描くので、窓の後ろに隠れる。全画面では Space に居ない。
-    if (cand === "bg" && state.screen !== "full") drawWorld(v, ctx, mdt);
-    for (const wdw of windowsFor(v)) drawWindow(v, ctx, wdw);
+    if ((cand === "bg" || cand === "combo") && state.screen !== "full") drawWorld(v, ctx, mdt);
+    // 他の窓をどける（大きな画面の組み合わせだけ）。窓を薄くして消し、戻すときは同じ速さで戻す。
+    const revealTarget = !v.fixedCand && cand === "combo" && state.reveal && state.screen !== "full" ? 1 : 0;
+    v.reveal = (v.reveal || 0) + (revealTarget - (v.reveal || 0)) * (1 - Math.exp(-dt / 120));
+    if (v.reveal < 0.995) {
+      ctx.globalAlpha = 1 - v.reveal;
+      for (const wdw of windowsFor(v)) drawWindow(v, ctx, wdw);
+      ctx.globalAlpha = 1;
+    }
     if (state.screen !== "full") drawMenubar(v, ctx);
 
     // カーソルが近づいたら薄くする（帯・小面・メニューバーの項目）。
@@ -623,8 +644,18 @@ section.notes li { margin: 2px 0; font-size: 0.92rem; }
     label.querySelector("input").addEventListener("change", () => setCand(c.id));
   }
   const caption = document.getElementById("caption");
+  const revealBtn = document.getElementById("reveal");
+  function syncReveal() {
+    const usable = state.cand === "combo" && state.screen !== "full";
+    revealBtn.disabled = !usable;
+    if (!usable) state.reveal = false;
+    revealBtn.setAttribute("aria-pressed", String(state.reveal));
+    revealBtn.textContent = state.reveal ? "窓を戻す" : "他の窓をどけて背景を見る";
+  }
+  revealBtn.addEventListener("click", () => { state.reveal = !state.reveal; syncReveal(); updateCaption(); });
   function setCand(id) {
     state.cand = id;
+    syncReveal();
     document.getElementById("cand-" + id).checked = true;
     for (const v of thumbViews) v.btn.setAttribute("aria-pressed", String(v.fixedCand === id));
     updateCaption();
@@ -632,6 +663,8 @@ section.notes li { margin: 2px 0; font-size: 0.92rem; }
   function updateCaption() {
     const c = CANDS.find((x) => x.id === state.cand);
     let extra = "";
+    if (state.cand === "combo" && state.screen === "full") extra = " 全画面では今の背景は見えず、下の縁の帯だけが見えます。他の窓をどける操作が全画面の中で効くかは確かめていないので、ここでは押せません。";
+    if (state.cand === "combo" && state.reveal) extra = " いまは他の窓を隠しています（実物なら「ほかを隠す」と同じ動きの見込み）。戻すきっかけは未決なので、ここではもう一度押すと戻ります。";
     if (state.screen === "full" && state.cand === "bg") extra = " 全画面では、今の背景は全画面の Space に居ないので何も見えません。";
     if (state.screen === "full" && state.cand === "menubar") extra = " 全画面ではメニューバーが隠れるので見えません。";
     if (state.screen === "full" && state.cand !== "bg" && state.cand !== "menubar") extra = " 全画面の上に出るのは、アプリを Dock に出ない扱い（accessory）にしたとき（実測は試作が作った窓だけ）。";
@@ -672,7 +705,7 @@ section.notes li { margin: 2px 0; font-size: 0.92rem; }
 
   // ---- 操作 ----
   const radios = (name, fn) => document.querySelectorAll(`input[name="${name}"]`).forEach((el) => el.addEventListener("change", () => fn(el.value)));
-  radios("screen", (val) => { state.screen = val; updateCaption(); });
+  radios("screen", (val) => { state.screen = val; syncReveal(); updateCaption(); });
   radios("winTone", (val) => { state.winTone = val; });
   radios("wall", (val) => { state.wall = val; });
   radios("content", (val) => { state.content = val; });
