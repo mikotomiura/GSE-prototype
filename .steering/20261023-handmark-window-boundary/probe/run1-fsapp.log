@@ -1,0 +1,5 @@
+fsapp 512.1 normal_small
+fsapp 514.2 covering_visibleFrame
+fsapp 517.4 toggle_fullscreen_on
+fsapp 523.7 toggle_fullscreen_off
+fsapp 527.8 quit

@@ -1,0 +1,10 @@
+layer=20 alpha=1.0 bounds=0,0,1470x956
+layer=0 alpha=1.0 bounds=669,33,801x874
+layer=0 alpha=1.0 bounds=736,33,734x874
+layer=0 alpha=1.0 bounds=0,33,735x871
+layer=0 alpha=1.0 bounds=0,33,735x871
+layer=0 alpha=1.0 bounds=734,33,736x871
+layer=-2147483603 alpha=1.0 bounds=0,0,1470x956
+layer=-2147483624 alpha=1.0 bounds=0,0,1470x956
+layer=-2147483626 alpha=1.0 bounds=0,0,1470x956
+overlapping=9 screen=1470x956
