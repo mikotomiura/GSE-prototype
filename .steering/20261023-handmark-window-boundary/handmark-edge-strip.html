@@ -1,0 +1,705 @@
+<title>手跡の縁の帯</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* 配置: 上に大きな画面（候補を 1 つ選んで見る）、その下に操作、次に全候補を同じ打鍵で並べた一覧、最後に候補ごとの要るもの。 */
+:root {
+  --bg: #eef0ec;
+  --surface: #f8f9f6;
+  --ink: #1d2420;
+  --muted: #5b655f;
+  --line: #cfd5cf;
+  --accent: #3f6b57;
+  --accent-ink: #ffffff;
+  --display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151a17; --surface: #1d2420; --ink: #e4e9e4; --muted: #9aa69f;
+    --line: #34403a; --accent: #8fc2a8; --accent-ink: #10201a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151a17; --surface: #1d2420; --ink: #e4e9e4; --muted: #9aa69f;
+  --line: #34403a; --accent: #8fc2a8; --accent-ink: #10201a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.7;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 22px; }
+header { display: grid; gap: 4px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 1.7rem; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 1.1rem; margin: 0; text-wrap: balance; }
+h3 { font-size: 0.95rem; font-weight: 700; margin: 0; }
+.lede { color: var(--muted); margin: 0; max-width: 68ch; }
+.stage-scroll { overflow-x: auto; border-radius: 6px; border: 1px solid var(--line); background: #222; }
+.stage-scroll.actual canvas { width: 1470px; max-width: none; }
+#main { width: 100%; max-width: 100%; aspect-ratio: 1470 / 956; display: block; }
+.stage-scroll.actual #main { width: 1470px; }
+.caption { font-size: 0.9rem; color: var(--muted); margin: 0; min-height: 1.7em; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px 24px; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 8px; align-content: start; }
+legend { font-size: 0.78rem; letter-spacing: 0.08em; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg label { cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: inline-block; padding: 4px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 0.88rem; }
+.seg input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; cursor: pointer; }
+.check input, .range input { accent-color: var(--accent); }
+.check small { color: var(--muted); }
+.range { display: grid; grid-template-columns: 5.5em 1fr 3.5em; gap: 8px; align-items: center; font-size: 0.9rem; }
+.range output { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+#pad {
+  border: 1px dashed var(--muted); border-radius: 6px; padding: 10px 12px; font-size: 0.9rem; color: var(--muted);
+  background: var(--surface); cursor: text; user-select: none;
+}
+#pad:focus { outline: 2px solid var(--accent); outline-offset: 2px; color: var(--ink); }
+.grid-head { display: grid; gap: 2px; border-top: 1px solid var(--line); padding-top: 18px; }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 18px 16px; }
+.thumb { display: grid; gap: 6px; min-width: 0; }
+.thumb button {
+  all: unset; cursor: pointer; display: block; border-radius: 5px; overflow: hidden; border: 1px solid var(--line); background: #222;
+}
+.thumb button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.thumb button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.thumb canvas { width: 100%; aspect-ratio: 1470 / 956; display: block; }
+.thumb p { margin: 0; font-size: 0.86rem; color: var(--muted); }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.88rem; }
+th, td { text-align: left; vertical-align: top; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+th { font-weight: 700; color: var(--muted); font-size: 0.8rem; letter-spacing: 0.04em; }
+section.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px 32px; border-top: 1px solid var(--line); padding-top: 16px; }
+section.notes ul { margin: 6px 0 0; padding-left: 1.2em; }
+section.notes li { margin: 2px 0; font-size: 0.92rem; }
+[hidden] { display: none !important; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>手跡の縁の帯</h1>
+    <p class="lede">背景が窓に覆われる問題への候補を、窓を並べた画面（1470 × 956 の Mac を模したもの）の上で見比べる見本です。いまの背景はデスクトップの層にあり、窓の後ろに隠れます。ほかの候補は、普通の窓より上の層に置いたクリック透過の面で、窓を並べても全画面にしても見えます。どの候補も打鍵だけで動き、キーの種類は読みません。入力は記録も送信もしません。</p>
+  </header>
+
+  <div class="stage-scroll" id="stageScroll"><canvas id="main" aria-label="窓を並べた画面の模型と、選んだ候補"></canvas></div>
+  <p class="caption" id="caption"></p>
+
+  <div class="controls">
+    <fieldset>
+      <legend>候補</legend>
+      <div class="seg" id="candSeg"></div>
+      <label class="check"><input type="checkbox" id="actual"> 実寸で見る <small>1 点を 1 px で描く（横にスクロール）</small></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>画面</legend>
+      <div class="seg">
+        <label><input type="radio" name="screen" value="tiled" checked><span>窓を並べる</span></label>
+        <label><input type="radio" name="screen" value="full"><span>全画面</span></label>
+        <label><input type="radio" name="screen" value="desk"><span>窓なし</span></label>
+      </div>
+      <div class="seg">
+        <label><input type="radio" name="winTone" value="light" checked><span>明るい窓</span></label>
+        <label><input type="radio" name="winTone" value="dark"><span>暗い窓</span></label>
+      </div>
+      <div class="seg">
+        <label><input type="radio" name="wall" value="photo" checked><span>写真風の壁紙</span></label>
+        <label><input type="radio" name="wall" value="light"><span>明るい壁紙</span></label>
+        <label><input type="radio" name="wall" value="dark"><span>暗い壁紙</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>帯の中身と見え方</legend>
+      <div class="seg">
+        <label><input type="radio" name="content" value="both" checked><span>霧と粒と線</span></label>
+        <label><input type="radio" name="content" value="fog"><span>霧と粒</span></label>
+        <label><input type="radio" name="content" value="line"><span>線だけ</span></label>
+      </div>
+      <label class="range"><span>帯の太さ</span><input type="range" id="thick" min="4" max="32" step="1" value="14"><output id="thickOut">14 点</output></label>
+      <label class="range"><span>濃さ</span><input type="range" id="opacity" min="10" max="100" step="5" value="70"><output id="opacityOut">70%</output></label>
+      <label class="check"><input type="checkbox" id="fadeNear"> カーソルが近づいたら薄くする</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>打鍵</legend>
+      <div class="seg">
+        <label><input type="radio" name="pat" value="normal" checked><span>ふつう</span></label>
+        <label><input type="radio" name="pat" value="steady"><span>一定のリズム</span></label>
+        <label><input type="radio" name="pat" value="fast"><span>速打ち</span></label>
+        <label><input type="radio" name="pat" value="sparse"><span>ちょいちょい</span></label>
+        <label><input type="radio" name="pat" value="none"><span>止める</span></label>
+      </div>
+      <div id="pad" tabindex="0">ここを押してから打つと、その打鍵でも動きます（文字は出しません）</div>
+    </fieldset>
+  </div>
+
+  <div class="grid-head">
+    <h2>全部の候補を並べる</h2>
+    <p class="lede">同じ打鍵で、全部の候補が同時に動きます。押すと上の大きな画面に出ます。上の画面・帯の中身・太さ・濃さの設定はここにも効きます。</p>
+  </div>
+  <div class="thumbs" id="thumbs"></div>
+
+  <div class="grid-head">
+    <h2>候補ごとの要るもの</h2>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>候補</th><th>窓を並べたとき</th><th>全画面のとき</th><th>作りに要るもの</th><th>まだ確かめていないこと</th></tr></thead>
+      <tbody>
+        <tr><td>今の背景</td><td>窓の隙間からだけ見える</td><td>見えない（regular だと全画面の Space に入らない）</td><td>今のまま</td><td>なし</td></tr>
+        <tr><td>下の縁の帯</td><td>見える。窓の下端の 14 点ほどに重なる</td><td>見える（accessory のとき）</td><td>浮く層以上・クリック透過・accessory（または背景だけを別のプロセスに）</td><td>Dock を出す設定のとき Dock と重なる。普段のアプリの全画面で同じか</td></tr>
+        <tr><td>上の縁の帯</td><td>見える。メニューバーのすぐ下、窓のタイトルバーに重なる</td><td>見える。メニューバーが下りてくると重なる</td><td>同上</td><td>同上</td></tr>
+        <tr><td>左右の縁の帯</td><td>見える。左右の窓の外側の端に重なる</td><td>見える</td><td>同上</td><td>同上</td></tr>
+        <tr><td>四辺の細い枠</td><td>見える。画面を縁取る</td><td>見える</td><td>同上</td><td>同上</td></tr>
+        <tr><td>全面に薄く重ねる</td><td>見える。作業の領域の全体に重なる</td><td>見える</td><td>同上</td><td>全面が動くと無視しにくい（P469・P470）。文字の読みやすさ</td></tr>
+        <tr><td>小面を広げる</td><td>見える。右下の 240 × 96 点</td><td>見える</td><td>同上（今の小面と同じ作り）</td><td>窓の右下のボタンなどに重なる</td></tr>
+        <tr><td>メニューバーの中</td><td>見える。64 × 21 点</td><td>隠れる（全画面ではメニューバーが隠れる設定が多い）</td><td>NSStatusItem。accessory は要らない</td><td>描き換えの頻度と負荷。利用者が外せる</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <section class="notes">
+    <div>
+      <h2>置いた制約</h2>
+      <ul>
+        <li>打鍵だけで動かす。動くのは風（粒の流れの速さ・線の揺れ）で、霧はどの入力にも依らない基層のまま。</li>
+        <li>溜めない・育たない。粒の数は最初から決まっていて、打鍵の時刻は直近 30 秒だけ持つ。風は打鍵が止まると 0.25 秒ごとに 0.88 倍に減り、数秒で静まる。</li>
+        <li>数や評価を出さない。打った数はどこにも出さない。</li>
+        <li>写し方は背景の試作（spike/handmark-stage）と同じ。風の目標は 0.25 秒ごと、1 秒の打鍵の数は 14 で頭打ち、毎秒 12 打で風が最大。</li>
+      </ul>
+    </div>
+    <div>
+      <h2>見るところ</h2>
+      <ul>
+        <li>作業の画面のまま、打鍵と一緒に動いているのが分かるか。分かるのに、目が持っていかれないか。</li>
+        <li>帯の位置ごとに、窓の端の何に重なるか（タイトルバー・下端のボタン・スクロールバー）。</li>
+        <li>帯の中身（霧と粒・線）で、打鍵とのつながりの感じ方が変わるか。</li>
+        <li>止めたとき、帯が静まるまでの間が自然か。</li>
+        <li>実寸で見たとき、太さ 14 点と濃さ 70% が強すぎないか。</li>
+      </ul>
+    </div>
+    <div>
+      <h2>この見本で分からないこと</h2>
+      <ul>
+        <li>実機の明るさ・Retina の細さ・視野の端での見え方。ブラウザの中の縮んだ画面なので、実寸でも視野角は違う。</li>
+        <li>画面共有や録画に映るか。上の層の窓を取り込みから外せるかは確かめていない。</li>
+        <li>普段のアプリの全画面で、浮く層の窓が上に出るか（実測は試作が自分で作った窓だけ）。</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  // 模型の画面の大きさ（点）。研究者の Mac の画面と、メニューバーの高さ。
+  const SW = 1470, SH = 956, MENU = 33;
+
+  const CANDS = [
+    { id: "bg", label: "今の背景", note: "デスクトップの層。窓の後ろに隠れる。" },
+    { id: "bottom", label: "下の縁の帯", note: "画面の下の縁。窓の下端に重なる。" },
+    { id: "top", label: "上の縁の帯", note: "メニューバーのすぐ下。タイトルバーに重なる。" },
+    { id: "sides", label: "左右の縁の帯", note: "画面の左右の縁。" },
+    { id: "frame", label: "四辺の細い枠", note: "画面を縁取る。太さは帯の半分。" },
+    { id: "overlay", label: "全面に薄く重ねる", note: "今の背景を上の層へ上げ、薄くする。" },
+    { id: "panel", label: "小面を広げる", note: "右下の小面に霧と粒と線を持たせる。" },
+    { id: "menubar", label: "メニューバーの中", note: "ステータス項目の大きさ。全画面では隠れる。" }
+  ];
+
+  const state = {
+    cand: "bottom", screen: "tiled", winTone: "light", wall: "photo", content: "both",
+    thick: 14, opacity: 0.7, fadeNear: false, pat: "normal"
+  };
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- 周期の無いノイズ（背景の試作と同じ） ----
+  function hash2(i, j) {
+    let h = Math.imul(i | 0, 0x27d4eb2d) ^ Math.imul(((j | 0) + 0x3c6ef372) | 0, 0x165667b1);
+    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  function grad(i, j, x, y) { const a = hash2(i, j) / 4294967296 * Math.PI * 2; return Math.cos(a) * x + Math.sin(a) * y; }
+  function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  function noise2(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+    const u = fade(fx), v = fade(fy);
+    const n00 = grad(ix, iy, fx, fy), n10 = grad(ix + 1, iy, fx - 1, fy);
+    const n01 = grad(ix, iy + 1, fx, fy - 1), n11 = grad(ix + 1, iy + 1, fx - 1, fy - 1);
+    const nx0 = n00 + (n10 - n00) * u, nx1 = n01 + (n11 - n01) * u;
+    return (nx0 + (nx1 - nx0) * v) * 1.41;
+  }
+  function fbm(x, y) { return noise2(x, y) * 0.68 + noise2(x * 2.07 + 17.3, y * 2.13 + 5.1) * 0.32; }
+
+  // ---- 打鍵の材料（時刻だけ）と風。写し方は背景の試作と同じ ----
+  const WINDOW_MS = 30000, STOP_MS = 2000, TICK_MS = 1000, WIND_TICK_MS = 250;
+  const SPEED_PER_KEY = 0.05, MAX_KEYS_PER_SEC = 14, FULL_WIND_SPEED = 0.6, WIND_DECAY = 0.88, MIN_SPEED = 0.002;
+  const IRREG_MS = 10000, IRREG_MIN_GAPS = 4;
+  const presses = [];
+  const press = (t) => presses.push(t);
+
+  let burstUntil = 0, pauseUntil = 0, steadyNext = 0;
+  function synth(now, dt) {
+    if (state.pat === "steady") {
+      if (now >= steadyNext) { press(now); steadyNext = now + 200 * (1 + (Math.random() - 0.5) * 0.12); }
+      return;
+    }
+    let rate = 0;
+    if (state.pat === "fast") rate = 8;
+    else if (state.pat === "sparse") rate = 0.65;
+    else if (state.pat === "normal") {
+      if (now > burstUntil && now > pauseUntil) {
+        if (Math.random() < 0.5) burstUntil = now + 3000 + Math.random() * 5000;
+        else pauseUntil = now + 1000 + Math.random() * 2500;
+      }
+      rate = now < burstUntil ? 4.5 : 0;
+    }
+    if (rate > 0 && Math.random() < rate * dt / 1000) press(now);
+  }
+
+  let speed = 0, speedFrom = 0, speedTo = 0, phase = 0, drift = 0;
+  let irreg = 0, irregFrom = 0, irregTo = 0, tickAt = performance.now();
+  function irregularity(now) {
+    const gaps = [];
+    for (let i = 1; i < presses.length; i++) {
+      if (now - presses[i] > IRREG_MS) continue;
+      const g = presses[i] - presses[i - 1];
+      if (g < STOP_MS) gaps.push(g);
+    }
+    if (gaps.length < IRREG_MIN_GAPS) return null;
+    const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const sd = Math.sqrt(gaps.reduce((a, b) => a + (b - mean) * (b - mean), 0) / gaps.length);
+    return Math.max(0, Math.min(1, (sd / mean - 0.1) / 0.9));
+  }
+  function tick() {
+    const now = performance.now();
+    while (presses.length && now - presses[0] > WINDOW_MS) presses.shift();
+    const lastSec = presses.filter((t) => now - t <= TICK_MS).length;
+    speedFrom = speed; irregFrom = irreg;
+    const rate = Math.min(lastSec, MAX_KEYS_PER_SEC) * SPEED_PER_KEY;
+    const next = lastSec > 0 ? 0.5 * speed + 0.5 * rate : speed * WIND_DECAY;
+    speedTo = next < MIN_SPEED ? 0 : next;
+    const ir = irregularity(now);
+    irregTo = ir === null ? irreg * 0.96 : 0.5 * irreg + 0.5 * ir;
+    if (irregTo < 0.002) irregTo = 0;
+    tickAt = now;
+  }
+  const windNow = () => Math.min(1, speed / FULL_WIND_SPEED);
+  const gustAt = (u) => Math.max(0, 1 + 0.9 * irreg * fbm(u * 2.2 + 500, drift * 1.1));
+
+  // ---- 1 つの画面の描き手。大きな画面と一覧の小さな画面で同じものを使う ----
+  function makeView(canvas, fixedCand) {
+    const ctx = canvas.getContext("2d");
+    const v = { canvas, ctx, fixedCand, W: 0, H: 0, s: 1, wallKey: "", wallCanvas: null, layer: null,
+      bands: new Map(), world: null, cursor: { x: -1e6, y: -1e6, inside: false }, fadeMul: 1, visible: true };
+
+    v.resize = (w) => {
+      v.W = Math.round(w); v.H = Math.round(w * SH / SW); v.s = v.W / SW;
+      canvas.width = v.W; canvas.height = v.H;
+      v.wallKey = ""; v.world = null; v.bands.clear();
+      v.layer = document.createElement("canvas"); v.layer.width = v.W; v.layer.height = v.H;
+    };
+
+    canvas.addEventListener("pointermove", (ev) => {
+      const r = canvas.getBoundingClientRect();
+      v.cursor.x = (ev.clientX - r.left) / r.width * v.W;
+      v.cursor.y = (ev.clientY - r.top) / r.height * v.H;
+      v.cursor.inside = true;
+    });
+    canvas.addEventListener("pointerleave", () => { v.cursor.inside = false; });
+    return v;
+  }
+
+  function buildWall(v) {
+    const key = state.wall + v.W;
+    if (v.wallKey === key) return;
+    v.wallKey = key;
+    const c = document.createElement("canvas"); c.width = v.W; c.height = v.H;
+    const w = c.getContext("2d"), W = v.W, H = v.H;
+    if (state.wall === "light") {
+      const g = w.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#f4f5f2"); g.addColorStop(1, "#e3e6e1");
+      w.fillStyle = g; w.fillRect(0, 0, W, H);
+    } else if (state.wall === "dark") {
+      const g = w.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#14181d"); g.addColorStop(1, "#202631");
+      w.fillStyle = g; w.fillRect(0, 0, W, H);
+    } else {
+      const g = w.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#9fb4c4"); g.addColorStop(0.55, "#c9c2ad"); g.addColorStop(1, "#5d6b4f");
+      w.fillStyle = g; w.fillRect(0, 0, W, H);
+      let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      for (let i = 0; i < 90; i++) {
+        const x = rnd() * W, y = rnd() * H, r = (0.04 + rnd() * 0.16) * H;
+        const rg = w.createRadialGradient(x, y, 0, x, y, r); const light = rnd() > 0.5;
+        rg.addColorStop(0, light ? "rgba(255,250,235,0.22)" : "rgba(30,38,30,0.20)"); rg.addColorStop(1, "rgba(0,0,0,0)");
+        w.fillStyle = rg; w.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+    }
+    v.wallCanvas = c;
+  }
+
+  function dualStroke(ctx, width, darkA, lightA) {
+    const base = ctx.globalAlpha;
+    ctx.globalAlpha = base * darkA; ctx.strokeStyle = "#12161b"; ctx.lineWidth = width * 2.5; ctx.stroke();
+    ctx.globalAlpha = base * lightA; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = width; ctx.stroke();
+    ctx.globalAlpha = base;
+  }
+  function dualDot(ctx, x, y, r, darkA, lightA) {
+    const base = ctx.globalAlpha;
+    ctx.globalAlpha = base * darkA; ctx.fillStyle = "#12161b"; ctx.beginPath(); ctx.arc(x, y, r * 1.9, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = base * lightA; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = base;
+  }
+
+  // ---- 全面の自然世界（今の背景と、全面に薄く重ねる）。霧 3 本・粒・草。打鍵の風だけで動く ----
+  function buildWorld(v) {
+    const W = v.W, H = v.H;
+    let seed = 11; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const blades = [];
+    for (let r = 0; r < 5; r++) {
+      const depth = r / 4, y = H * (0.66 + depth * 0.32), n = 34 + r * 10;
+      for (let i = 0; i < n; i++) blades.push({ x: (i + rnd() * 0.9) / n * W, y: y + (rnd() - 0.5) * H * 0.03,
+        h: H * (0.05 + rnd() * 0.05) * (0.55 + depth * 0.6), w: 0.55 + depth * 0.75, seed: rnd() * 6.28, depth });
+    }
+    const motes = [];
+    for (let i = 0; i < 140; i++) motes.push({ x: rnd() * W, y: rnd() * H * 0.9, r: 1 + rnd() * 2.2, seed: rnd() * 6.28, k: 0.5 + rnd() });
+    v.world = { blades, motes };
+  }
+  function drawWorld(v, ctx, mdt) {
+    if (!v.world) buildWorld(v);
+    const W = v.W, H = v.H, S = H / 900, wind = windNow();
+    const step = Math.max(6, Math.round(10 * S));
+    for (let b = 0; b < 3; b++) {
+      const yc = H * (0.12 + b * 0.18), a = H * 0.055 * (1 + b * 0.2);
+      ctx.beginPath();
+      for (let x = 0; x <= W + step; x += step) ctx.lineTo(x, yc + a * fbm(x / W * 1.6 + b * 7.3, drift * 0.105 * (1 + b * 0.2) + b * 11));
+      for (let x = W + step; x >= 0; x -= step) ctx.lineTo(x, yc + H * 0.05 + a * fbm(x / W * 1.3 + b * 3.1 + 40, drift * 0.09 + b * 23));
+      ctx.closePath();
+      const base = ctx.globalAlpha;
+      ctx.fillStyle = "#12161b"; ctx.globalAlpha = base * 0.08; ctx.fill();
+      ctx.fillStyle = "#ffffff"; ctx.globalAlpha = base * 0.12; ctx.fill();
+      ctx.globalAlpha = base;
+    }
+    for (const m of v.world.motes) {
+      m.x += (6 + 70 * wind * gustAt(m.x / W)) * m.k * S * mdt / 1000;
+      m.y += fbm(m.seed * 9.1 + 300, drift * 0.25) * 6 * S * mdt / 1000;
+      if (m.x > W + 10) m.x -= W + 20;
+      if (m.y < -10) m.y += H * 0.9; else if (m.y > H * 0.9 + 10) m.y -= H * 0.9;
+      dualDot(ctx, m.x, m.y, m.r * S, 0.14 / 1.0, 0.7);
+    }
+    for (const bl of v.world.blades) {
+      const sway = fbm(bl.seed * 13.7, drift * 0.35) * 0.1;
+      const gust = wind * gustAt(bl.x / W) * (0.32 + 0.22 * Math.sin(bl.x / W * 9 - phase * 3 + bl.depth));
+      const bend = (sway + gust) * bl.h;
+      ctx.beginPath(); ctx.moveTo(bl.x, bl.y);
+      ctx.quadraticCurveTo(bl.x + bend * 0.25, bl.y - bl.h * 0.55, bl.x + bend, bl.y - bl.h + Math.abs(bend) * 0.25);
+      dualStroke(ctx, bl.w * S, 0.14, 0.45 + bl.depth * 0.2);
+    }
+  }
+
+  // ---- 帯の描き手。帯の向きに沿った座標（長さ L・太さ T）で描き、縦の帯は回して置く ----
+  function bandState(v, key, L) {
+    let b = v.bands.get(key);
+    if (!b || b.L !== L) {
+      let seed = 0; for (const ch of key) seed = (seed * 31 + ch.charCodeAt(0)) % 2147483647; seed = seed || 5;
+      const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      const n = Math.max(4, Math.round(L / (34 * v.s)));
+      const motes = Array.from({ length: n }, () => ({ p: rnd(), q: 0.2 + rnd() * 0.6, k: 0.5 + rnd(), r: 0.7 + rnd() * 0.8, seed: rnd() * 6.28 }));
+      b = { L, motes, seed: rnd() * 100 };
+      v.bands.set(key, b);
+    }
+    return b;
+  }
+  function drawBand(v, ctx, key, L, T, mdt) {
+    const b = bandState(v, key, L), s = v.s, wind = windNow();
+    const content = state.content;
+    const step = Math.max(3, Math.round(6 * s));
+    if (content !== "line") {
+      // 霧。基層だけで動く。帯の中の上下の縁が揺らぐ薄い塗り。
+      ctx.beginPath();
+      for (let x = 0; x <= L + step; x += step) ctx.lineTo(x, T * (0.12 + 0.22 * (fbm(x / (300 * s) + b.seed, drift * 0.1) + 1) / 2));
+      for (let x = L + step; x >= 0; x -= step) ctx.lineTo(x, T * (0.88 - 0.22 * (fbm(x / (300 * s) + b.seed + 40, drift * 0.09) + 1) / 2));
+      ctx.closePath();
+      const base = ctx.globalAlpha;
+      ctx.fillStyle = "#12161b"; ctx.globalAlpha = base * 0.16; ctx.fill();
+      ctx.fillStyle = "#ffffff"; ctx.globalAlpha = base * 0.22; ctx.fill();
+      ctx.globalAlpha = base;
+      // 粒。基層の流れ＋打鍵の風で、帯に沿って流れる。
+      for (const m of b.motes) {
+        const px = (6 + 70 * wind * gustAt(m.p)) * m.k * s;
+        m.p = (m.p + px * mdt / 1000 / L) % 1;
+        const y = T * (m.q + 0.08 * fbm(m.seed * 9.1, drift * 0.25));
+        dualDot(ctx, m.p * L, y, Math.max(0.6, Math.min(T * 0.16, 1.6 * s * m.r)), 0.22, 0.85);
+      }
+    }
+    if (content !== "fog") {
+      // 線。基層の小さな揺れ＋打鍵の風の波。
+      ctx.beginPath();
+      for (let x = 0; x <= L + step; x += step) {
+        const u = x / L;
+        const sway = fbm(x / (420 * s) + b.seed, drift * 0.35) * 0.35;
+        const gust = wind * gustAt(u) * Math.sin(x / (110 * s) - phase * 6) * (0.75 + 0.25 * fbm(x / (200 * s), drift * 0.5));
+        const y = T * 0.5 + T * 0.34 * Math.max(-1, Math.min(1, sway + gust));
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      dualStroke(ctx, Math.max(0.6, 1.1 * s), 0.22, 0.85);
+    }
+  }
+  // 帯を画面の矩形 (x, y, w, h) に置く。縦長なら回す。
+  function placeBand(v, ctx, key, x, y, w, h, mdt) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    if (w >= h) { ctx.translate(x, y); drawBand(v, ctx, key, w, h, mdt); }
+    else { ctx.translate(x + w, y); ctx.rotate(Math.PI / 2); drawBand(v, ctx, key, h, w, mdt); }
+    ctx.restore();
+  }
+
+  // ---- 画面の模型 ----
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function windowsFor(v) {
+    const s = v.s;
+    if (state.screen === "desk") return [];
+    if (state.screen === "full") return [{ x: 0, y: 0, w: v.W, h: v.H, r: 0, kind: "doc" }];
+    // 窓を並べる: メニューバーの下から下端の近くまで、左右に 2 枚。
+    const top = MENU * s, bottom = v.H - 6 * s, mid = v.W * 0.5;
+    return [
+      { x: 4 * s, y: top + 4 * s, w: mid - 6 * s, h: bottom - top - 4 * s, r: 10 * s, kind: "doc" },
+      { x: mid + 2 * s, y: top + 4 * s, w: mid - 6 * s, h: bottom - top - 4 * s, r: 10 * s, kind: "code" }
+    ];
+  }
+  function drawWindow(v, ctx, wdw) {
+    const s = v.s, dark = state.winTone === "dark";
+    const bg = dark ? "#1f2326" : "#fbfbfa", bar = dark ? "#2a2f33" : "#ecedea", text = dark ? "#4a5258" : "#d5d8d4";
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.28)"; ctx.shadowBlur = 18 * s; ctx.shadowOffsetY = 6 * s;
+    roundRect(ctx, wdw.x, wdw.y, wdw.w, wdw.h, wdw.r); ctx.fillStyle = bg; ctx.fill();
+    ctx.restore();
+    ctx.save(); roundRect(ctx, wdw.x, wdw.y, wdw.w, wdw.h, wdw.r); ctx.clip();
+    const barH = 30 * s;
+    ctx.fillStyle = bar; ctx.fillRect(wdw.x, wdw.y, wdw.w, barH);
+    ["#ec6a5e", "#f4bf4f", "#61c554"].forEach((c, i) => {
+      ctx.beginPath(); ctx.arc(wdw.x + (16 + i * 20) * s, wdw.y + barH / 2, 6 * s, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill();
+    });
+    ctx.fillStyle = text;
+    const left = wdw.x + (wdw.kind === "code" ? 56 : 40) * s;
+    for (let i = 0, y = wdw.y + barH + 26 * s; y < wdw.y + wdw.h - 20 * s; i++, y += 24 * s) {
+      const ind = wdw.kind === "code" ? (Math.floor(Math.abs(Math.sin(i * 1.7)) * 4) * 22 * s) : 0;
+      const len = (wdw.w - 100 * s) * (0.35 + 0.55 * Math.abs(Math.sin(i * 2.3 + wdw.x)));
+      ctx.fillRect(left + ind, y, Math.max(20 * s, len - ind), 8 * s);
+    }
+    // 右下の小さなボタンと、右端のスクロールバー（帯が何に重なるかを見るため）。
+    ctx.fillStyle = dark ? "#3a4146" : "#dfe2de";
+    roundRect(ctx, wdw.x + wdw.w - 96 * s, wdw.y + wdw.h - 34 * s, 80 * s, 22 * s, 5 * s); ctx.fill();
+    ctx.fillRect(wdw.x + wdw.w - 9 * s, wdw.y + barH + 8 * s, 5 * s, wdw.h * 0.3);
+    ctx.restore();
+  }
+  function drawMenubar(v, ctx) {
+    const s = v.s, h = MENU * s, dark = state.wall === "dark";
+    ctx.fillStyle = dark ? "rgba(30,34,40,0.72)" : "rgba(246,246,244,0.72)"; ctx.fillRect(0, 0, v.W, h);
+    ctx.fillStyle = dark ? "#c9cdd2" : "#2a2e33";
+    ctx.beginPath(); ctx.arc(22 * s, h / 2, 6 * s, 0, Math.PI * 2); ctx.fill();
+    [52, 112, 162, 212, 262].forEach((x, i) => ctx.fillRect(x * s, h / 2 - 4 * s, (i === 0 ? 46 : 34) * s, 8 * s));
+    [-150, -124, -98].forEach((x) => ctx.fillRect(v.W + x * s, h / 2 - 6 * s, 14 * s, 12 * s));
+    ctx.font = `${Math.round(13 * s)}px system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "right";
+    ctx.fillText("10月23日(木) 14:24", v.W - 14 * s, h / 2);
+    ctx.textAlign = "left";
+  }
+
+  // 候補の面の矩形（カーソルとの距離を測るため）。
+  function regions(v, cand) {
+    const s = v.s, T = state.thick * s, menuOn = state.screen !== "full";
+    const top = menuOn ? MENU * s : 0;
+    switch (cand) {
+      case "bottom": return [["b", 0, v.H - T, v.W, T]];
+      case "top": return [["t", 0, top, v.W, T]];
+      case "sides": return [["l", 0, top, T, v.H - top], ["r", v.W - T, top, T, v.H - top]];
+      case "frame": { const t = Math.max(2 * s, T / 2);
+        return [["ft", 0, top, v.W, t], ["fb", 0, v.H - t, v.W, t], ["fl", 0, top + t, t, v.H - top - 2 * t], ["fr", v.W - t, top + t, t, v.H - top - 2 * t]]; }
+      case "panel": return [["p", v.W - (16 + 240) * s, v.H - (16 + 96) * s, 240 * s, 96 * s]];
+      case "menubar": return menuOn ? [["m", v.W - 248 * s, 6 * s, 64 * s, 21 * s]] : [];
+      default: return [];
+    }
+  }
+  function distToRect(px, py, x, y, w, h) {
+    const dx = Math.max(x - px, 0, px - (x + w)), dy = Math.max(y - py, 0, py - (y + h));
+    return Math.hypot(dx, dy);
+  }
+
+  function drawView(v, dt, mdt) {
+    const ctx = v.ctx, cand = v.fixedCand || state.cand, s = v.s;
+    buildWall(v);
+    ctx.globalAlpha = 1;
+    ctx.drawImage(v.wallCanvas, 0, 0);
+    // 今の背景はデスクトップの層。窓より先に描くので、窓の後ろに隠れる。全画面では Space に居ない。
+    if (cand === "bg" && state.screen !== "full") drawWorld(v, ctx, mdt);
+    for (const wdw of windowsFor(v)) drawWindow(v, ctx, wdw);
+    if (state.screen !== "full") drawMenubar(v, ctx);
+
+    // カーソルが近づいたら薄くする（帯・小面・メニューバーの項目）。
+    const regs = regions(v, cand);
+    let target = 1;
+    if (state.fadeNear && v.cursor.inside && regs.length) {
+      const d = Math.min(...regs.map((r) => distToRect(v.cursor.x, v.cursor.y, r[1], r[2], r[3], r[4])));
+      const reach = 90 * s;
+      target = d >= reach ? 1 : 0.15 + 0.85 * (d / reach);
+    }
+    v.fadeMul += (target - v.fadeMul) * (1 - Math.exp(-dt / 180));
+
+    if (cand === "overlay") {
+      // 上の層に全面の世界を描き、薄くして重ねる。カーソルの周りは穴をあけて薄くする。
+      const lc = v.layer.getContext("2d");
+      lc.globalAlpha = 1; lc.globalCompositeOperation = "source-over"; lc.clearRect(0, 0, v.W, v.H);
+      drawWorld(v, lc, mdt);
+      if (state.fadeNear && v.cursor.inside) {
+        const r = 200 * s;
+        const g = lc.createRadialGradient(v.cursor.x, v.cursor.y, 0, v.cursor.x, v.cursor.y, r);
+        g.addColorStop(0, "rgba(0,0,0,0.85)"); g.addColorStop(1, "rgba(0,0,0,0)");
+        lc.globalCompositeOperation = "destination-out"; lc.fillStyle = g; lc.fillRect(v.cursor.x - r, v.cursor.y - r, 2 * r, 2 * r);
+        lc.globalCompositeOperation = "source-over";
+      }
+      ctx.globalAlpha = state.opacity * 0.5;
+      ctx.drawImage(v.layer, 0, 0);
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    ctx.globalAlpha = state.opacity * v.fadeMul;
+    if (cand === "panel") {
+      const [, x, y, w, h] = regs[0];
+      ctx.save();
+      roundRect(ctx, x, y, w, h, 14 * s);
+      ctx.fillStyle = "rgba(240,242,238,0.38)"; ctx.fill();
+      ctx.strokeStyle = "rgba(18,22,27,0.18)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.clip();
+      const pad = 8 * s;
+      ctx.translate(x, y + pad); drawBand(v, ctx, "p", w, h - 2 * pad, mdt);
+      ctx.restore();
+    } else if (cand === "menubar") {
+      if (regs.length) {
+        const [, x, y, w, h] = regs[0];
+        ctx.save(); roundRect(ctx, x, y, w, h, 5 * s);
+        ctx.fillStyle = "rgba(120,128,124,0.16)"; ctx.fill(); ctx.clip();
+        ctx.translate(x, y); drawBand(v, ctx, "m", w, h, mdt);
+        ctx.restore();
+      }
+    } else {
+      for (const [key, x, y, w, h] of regs) placeBand(v, ctx, key, x, y, w, h, mdt);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- 組み立て ----
+  const mainCanvas = document.getElementById("main");
+  const main = makeView(mainCanvas, null);
+  const thumbsEl = document.getElementById("thumbs");
+  const thumbViews = [];
+  for (const c of CANDS) {
+    const box = document.createElement("div"); box.className = "thumb";
+    const btn = document.createElement("button"); btn.type = "button"; btn.id = "thumb-" + c.id;
+    btn.setAttribute("aria-label", c.label + "を上の画面に出す");
+    const cv = document.createElement("canvas"); btn.appendChild(cv);
+    const h = document.createElement("h3"); h.textContent = c.label;
+    const p = document.createElement("p"); p.textContent = c.note;
+    box.append(btn, h, p); thumbsEl.appendChild(box);
+    const v = makeView(cv, c.id); v.btn = btn; thumbViews.push(v);
+    btn.addEventListener("click", () => setCand(c.id));
+  }
+
+  const seg = document.getElementById("candSeg");
+  for (const c of CANDS) {
+    const label = document.createElement("label");
+    label.innerHTML = `<input type="radio" name="cand" id="cand-${c.id}" value="${c.id}"><span>${c.label}</span>`;
+    seg.appendChild(label);
+    label.querySelector("input").addEventListener("change", () => setCand(c.id));
+  }
+  const caption = document.getElementById("caption");
+  function setCand(id) {
+    state.cand = id;
+    document.getElementById("cand-" + id).checked = true;
+    for (const v of thumbViews) v.btn.setAttribute("aria-pressed", String(v.fixedCand === id));
+    updateCaption();
+  }
+  function updateCaption() {
+    const c = CANDS.find((x) => x.id === state.cand);
+    let extra = "";
+    if (state.screen === "full" && state.cand === "bg") extra = " 全画面では、今の背景は全画面の Space に居ないので何も見えません。";
+    if (state.screen === "full" && state.cand === "menubar") extra = " 全画面ではメニューバーが隠れるので見えません。";
+    if (state.screen === "full" && state.cand !== "bg" && state.cand !== "menubar") extra = " 全画面の上に出るのは、アプリを Dock に出ない扱い（accessory）にしたとき（実測は試作が作った窓だけ）。";
+    caption.textContent = c.label + "。" + c.note + extra;
+  }
+
+  function sizeAll() {
+    const actual = document.getElementById("actual").checked;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cssW = actual ? SW : mainCanvas.parentElement.clientWidth;
+    main.resize(cssW * dpr);
+    for (const v of thumbViews) v.resize(Math.max(200, v.canvas.parentElement.clientWidth) * Math.min(dpr, 1.5));
+  }
+
+  // 画面の外の一覧は描かない。
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) { const v = thumbViews.find((t) => t.canvas === e.target); if (v) v.visible = e.isIntersecting; }
+    });
+    for (const v of thumbViews) io.observe(v.canvas);
+  }
+
+  let last = null;
+  function frame(now) {
+    const dt = last === null ? 16 : Math.min(now - last, 100);
+    last = now;
+    synth(now, dt);
+    const k = Math.min(1, (now - tickAt) / WIND_TICK_MS), e = k * k * (3 - 2 * k);
+    speed = speedFrom + (speedTo - speedFrom) * e;
+    irreg = irregFrom + (irregTo - irregFrom) * e;
+    phase += speed * dt / 1000;
+    const mdt = dt * (reduceMotion ? 0.3 : 1);
+    drift += mdt / 1000;
+    drawView(main, dt, mdt);
+    for (const v of thumbViews) if (v.visible) drawView(v, dt, mdt);
+    requestAnimationFrame(frame);
+  }
+
+  // ---- 操作 ----
+  const radios = (name, fn) => document.querySelectorAll(`input[name="${name}"]`).forEach((el) => el.addEventListener("change", () => fn(el.value)));
+  radios("screen", (val) => { state.screen = val; updateCaption(); });
+  radios("winTone", (val) => { state.winTone = val; });
+  radios("wall", (val) => { state.wall = val; });
+  radios("content", (val) => { state.content = val; });
+  radios("pat", (val) => { state.pat = val; burstUntil = 0; pauseUntil = 0; steadyNext = 0; });
+  const thick = document.getElementById("thick"), thickOut = document.getElementById("thickOut");
+  thick.addEventListener("input", () => { state.thick = Number(thick.value); thickOut.textContent = thick.value + " 点"; });
+  const opacity = document.getElementById("opacity"), opacityOut = document.getElementById("opacityOut");
+  opacity.addEventListener("input", () => { state.opacity = Number(opacity.value) / 100; opacityOut.textContent = opacity.value + "%"; });
+  document.getElementById("fadeNear").addEventListener("change", (ev) => { state.fadeNear = ev.target.checked; });
+  document.getElementById("actual").addEventListener("change", (ev) => {
+    document.getElementById("stageScroll").classList.toggle("actual", ev.target.checked); sizeAll();
+  });
+
+  // 手で打つ欄。時刻だけを取り、キーの種類は見ない。
+  const pad = document.getElementById("pad");
+  pad.addEventListener("keydown", (ev) => {
+    if (ev.repeat) return;
+    if (ev.key !== "Tab") ev.preventDefault();
+    press(performance.now());
+  });
+
+  let resizeTimer = 0;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(sizeAll, 150); });
+
+  setCand(state.cand);
+  sizeAll();
+  setInterval(tick, WIND_TICK_MS);
+  requestAnimationFrame(frame);
+})();
+</script>
