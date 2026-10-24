@@ -39,6 +39,7 @@
 - 空欄: 除外の後の件数（§4）・逸脱の一覧（§6・notes.md の D3 以降）・公開元への通知の日付と応答（ethics.tex・下書き 5 を送った後）・Open science の匿名リンク。
 - 頁を 12 に縮める（outline.md の Page budget の (2)〜(5)。A3 の細部と有用性の表は本文に残す）。
 - 書くときは `paper-write` Skill（ブランチ `chore/paper-write-skill`・main に入るまではそのブランチの `.claude/skills/paper-write/SKILL.md` を読む）に従う。本文に残すのは中心の主張を理解し評価するのに要るものだけで、方法の細部・追加の分析・検証の手順は付録へ。直しは足すより移す。
+- この草稿が `paper-write` と attack-me の E の**最初の実地の試し**（2026-10-24 研究者）。手順で詰まった所・解釈に迷った文言・足りなかった手順を `.steering/20261024-paper-write-skill/field-trial.md`（ブランチ `chore/paper-write-skill`）に書き、Skill を直してから PR を出す。
 - 書き始め: `main.json` が来たら §7 の A4 以外から。`main_a4.json`・`exploratory_unicity.json`・`exploratory_dp.json` が来たら足す。`main_all.json`（全員の付録・11 月中旬の見込み）は待たない。
 - **草稿の完成**（判断 76 の追記）: 次の 6 つが全部そろったとき。
   1. 数値: `main.json`・`main_a4.json`・`exploratory_unicity.json`・`exploratory_dp.json`・探索的な分析 3〜5・`enja15_main.json` が本文と付録に入っている（A4 の 499 人の版も・D3）。
