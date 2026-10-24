@@ -106,6 +106,7 @@ are chosen with the results in view.
 | Earlier releases answered the timing risk in terms of labelled keystroke samples | `edwards2023csedm` (two quotations), `leinonen2017preventing` | Quoted; the papers are not said to ignore texts |
 | KLiCKe: 4,992 essays, four SAT-based prompts, 30 minutes, MTurk in 2022, released with logs and human scores | `tian2025klicke`, Sections 2.1, 2.3 and 3 | Stated |
 | The procedure of the competition data names the same platform, kind of prompts and sequence of tasks as KLiCKe | `kaggle2023lwp`, data collection procedure page | Stated; whether the essays are the same is not examined, for ethical reasons |
+| The competition data were drawn from the KLiCKe corpus before it was released | Authors of KLiCKe, personal communication (2026-10-24; date removed in the submitted version) | Reported as told; not checked against either release. If the hidden essays are in the public KLiCKe, the masking no longer keeps their logs apart from their texts |
 | Writing tools keep text and process together and offer replays to instructors | `grammarly2026authorship` (support page); `turnitin2026clarity` (product page) | Existence only; no release of such logs is known |
 | The competition states the goal "to prevent reproduction of the essay text"; the essays were scored, so their texts exist outside the release | `kaggle2023lwp` (quotation); the competition asks for the score to be predicted (`inubushi2024first`) | Quoted; stated |
 | Settings table: holder, direction, when the closed world holds, what is newly learned. The preregistration's holders (teachers, raters or platforms; the essay published with its text; the essay published in a class or online) are kept: raters and the collecting party under "texts on the same prompts", teachers and platforms under "classroom", the published essay as its own row | Reasoning from the settings; the preregistration's "Threat model" (setting, goals, N, closed world) | Stated as the scope of the evaluation and its limits; the evaluation corresponds directly to the first row only |
@@ -129,7 +130,8 @@ are chosen with the results in view.
   public corpus is weighed as a harm. Reasons from duties (consent scope, no new collection, the competition data not
   used) in a paragraph of their own; consequences under the Menlo principles.
 - The competition data are not used, and whether they share essays with KLiCKe is not examined, because doing so would
-  test a real release without its participants' agreement to that use.
+  test a real release without its participants' agreement to that use. The authors of KLiCKe told us the competition
+  data were drawn from KLiCKe; this is reported as a personal communication and not checked.
 - The releasing party of the competition data is informed before submission that this evaluation will be published
   and that its data were not matched (after the results; the date is reported).
 - The scope in which the attack code is published (the preregistration's three options), and the reasons.
