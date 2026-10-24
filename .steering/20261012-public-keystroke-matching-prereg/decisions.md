@@ -465,3 +465,14 @@ round 2 の判定は minor revision（R1 major・R2 minor・R3 minor）。記録
 - round 2 の `tmp/` は round 3 の後に消す（git は無視する）。
 
 追記（2026-10-24・研究者との会話）: 上の「G-GEAR の本計算と探索的な分析 3〜5 が全部済み」は、main_a4・unicity・dp が抜けていて不正確だった。一続きの段は main500 → main_a4 → unicity → dp → all（全員の付録・約 10〜12 日）。草稿の完成は main_all を待たない（判断 2026-10-20 の「全員の付録は論文を書きながら最後に回す」のとおり・締切 11/30 と公開元への約 2 週の猶予のため）。完成の定義 6 項目（数値・空欄・paper-write のチェックリスト・分量・ビルドと文体・予測と逸脱）は引き継ぎ `next-session-public-keystroke-matching-manuscript-after-attack-me.md` に書いた。round 3 には attack-me に新しく足した編集者の役 E を入れる。書く段は新しい `paper-write` Skill に従う（ブランチ `chore/paper-write-skill`）。
+
+## 判断 77: 結果の前に、本文と付録の分けと組み直しを paper-write で進める（研究者・2026-10-24）
+
+研究者の提案（「結果が来る前からかける箇所としての枠組みなどの執筆を行なってみる？skill の試しとして」）を採る。
+
+- 何を: 結果の値に依らない所（序論の結果に依らない段落・§2〜§6・必須の 3 節）を、`paper-write` の Step 0〜5 で組み直す。投稿先の適合・主張と貢献の形・本文と付録の分け・仕組みごとの組み・但し書きの集約・分量の測定。
+- outline.md の Page budget の (2)〜(5) は「結果の後」としていたが、結果に依らない移し方なので前倒しする。「(1)〜(5) で足りなければ結果を見て選ぶ」の部分は結果の後のまま。
+- 移す前に、移す計画を研究者に聞く。移すのは記述の置き場で、手順は変えない。
+- このセッションで Skill の最初の実地の試しを行う。詰まった所は `field-trial.md`（ブランチ chore/paper-write-skill）に書き、Skill の直しは草稿と round 3 の後にまとめる。
+- attack-me は回さない（判断 76 のとおり round 3 は草稿の完成の後）。
+- 引き継ぎ: `.steering/_handoff/next-session-public-keystroke-matching-manuscript-paper-write-trial.md`。
