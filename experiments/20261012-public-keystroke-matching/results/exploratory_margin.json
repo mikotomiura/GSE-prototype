@@ -1,0 +1,4485 @@
+{
+ "analysis": {
+  "full|R0|10": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 0,
+     "t": 362.0
+    },
+    {
+     "coverage": 0.9015,
+     "coverage_ci": [
+      0.8815,
+      0.9206
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 10,
+     "t": 523.0
+    },
+    {
+     "coverage": 0.8002,
+     "coverage_ci": [
+      0.769,
+      0.829403
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 20,
+     "t": 600.0
+    },
+    {
+     "coverage": 0.7002,
+     "coverage_ci": [
+      0.6652,
+      0.733405
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 30,
+     "t": 689.0
+    },
+    {
+     "coverage": 0.601,
+     "coverage_ci": [
+      0.562993,
+      0.6385
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 40,
+     "t": 760.0
+    },
+    {
+     "coverage": 0.5007,
+     "coverage_ci": [
+      0.461597,
+      0.540605
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 50,
+     "t": 861.0
+    },
+    {
+     "coverage": 0.4007,
+     "coverage_ci": [
+      0.363395,
+      0.439902
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 60,
+     "t": 963.0
+    },
+    {
+     "coverage": 0.3002,
+     "coverage_ci": [
+      0.263297,
+      0.339707
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 70,
+     "t": 1090.0
+    },
+    {
+     "coverage": 0.2,
+     "coverage_ci": [
+      0.167392,
+      0.232902
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 80,
+     "t": 1306.2
+    },
+    {
+     "coverage": 0.1002,
+     "coverage_ci": [
+      0.0786,
+      0.123402
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 1730.0
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 4,
+   "m_zero": 0
+  },
+  "full|R0|1000": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 0,
+     "t": 362.0
+    },
+    {
+     "coverage": 0.9016,
+     "coverage_ci": [
+      0.8764,
+      0.9252
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 10,
+     "t": 452.0
+    },
+    {
+     "coverage": 0.802,
+     "coverage_ci": [
+      0.7672,
+      0.83441
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 20,
+     "t": 500.0
+    },
+    {
+     "coverage": 0.7004,
+     "coverage_ci": [
+      0.6604,
+      0.73881
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 30,
+     "t": 591.0
+    },
+    {
+     "coverage": 0.6004,
+     "coverage_ci": [
+      0.55759,
+      0.64201
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 40,
+     "t": 654.0
+    },
+    {
+     "coverage": 0.5004,
+     "coverage_ci": [
+      0.458,
+      0.544
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 50,
+     "t": 748.0
+    },
+    {
+     "coverage": 0.4008,
+     "coverage_ci": [
+      0.3588,
+      0.44401
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 60,
+     "t": 848.0
+    },
+    {
+     "coverage": 0.3016,
+     "coverage_ci": [
+      0.26159,
+      0.3432
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 70,
+     "t": 941.0
+    },
+    {
+     "coverage": 0.2016,
+     "coverage_ci": [
+      0.166,
+      0.2384
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 80,
+     "t": 1131.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.076,
+      0.128
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 1429.2
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 0
+  },
+  "full|R1|10": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 0,
+     "t": 362.0
+    },
+    {
+     "coverage": 0.9015,
+     "coverage_ci": [
+      0.8815,
+      0.9206
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 10,
+     "t": 523.0
+    },
+    {
+     "coverage": 0.8002,
+     "coverage_ci": [
+      0.769,
+      0.829403
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 20,
+     "t": 600.0
+    },
+    {
+     "coverage": 0.7002,
+     "coverage_ci": [
+      0.6652,
+      0.733405
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 30,
+     "t": 689.0
+    },
+    {
+     "coverage": 0.601,
+     "coverage_ci": [
+      0.562993,
+      0.6385
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 40,
+     "t": 760.0
+    },
+    {
+     "coverage": 0.5007,
+     "coverage_ci": [
+      0.461597,
+      0.540605
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 50,
+     "t": 861.0
+    },
+    {
+     "coverage": 0.4007,
+     "coverage_ci": [
+      0.363395,
+      0.439902
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 60,
+     "t": 963.0
+    },
+    {
+     "coverage": 0.3002,
+     "coverage_ci": [
+      0.263297,
+      0.339707
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 70,
+     "t": 1090.0
+    },
+    {
+     "coverage": 0.2,
+     "coverage_ci": [
+      0.167392,
+      0.232902
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 80,
+     "t": 1306.2
+    },
+    {
+     "coverage": 0.1002,
+     "coverage_ci": [
+      0.0786,
+      0.123402
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 1730.0
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 4,
+   "m_zero": 0
+  },
+  "full|R1|1000": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 0,
+     "t": 362.0
+    },
+    {
+     "coverage": 0.9016,
+     "coverage_ci": [
+      0.8764,
+      0.9252
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 10,
+     "t": 452.0
+    },
+    {
+     "coverage": 0.802,
+     "coverage_ci": [
+      0.7672,
+      0.83441
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 20,
+     "t": 500.0
+    },
+    {
+     "coverage": 0.7004,
+     "coverage_ci": [
+      0.6604,
+      0.73881
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 30,
+     "t": 591.0
+    },
+    {
+     "coverage": 0.6004,
+     "coverage_ci": [
+      0.55759,
+      0.64201
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 40,
+     "t": 654.0
+    },
+    {
+     "coverage": 0.5004,
+     "coverage_ci": [
+      0.458,
+      0.544
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 50,
+     "t": 748.0
+    },
+    {
+     "coverage": 0.4008,
+     "coverage_ci": [
+      0.3588,
+      0.44401
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 60,
+     "t": 848.0
+    },
+    {
+     "coverage": 0.3016,
+     "coverage_ci": [
+      0.26159,
+      0.3432
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 70,
+     "t": 941.0
+    },
+    {
+     "coverage": 0.2016,
+     "coverage_ci": [
+      0.166,
+      0.2384
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 80,
+     "t": 1131.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.076,
+      0.128
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 1429.2
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 0
+  },
+  "full|R2|10": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.9892,
+     "precision_ci": [
+      0.9797,
+      0.9967
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9002,
+     "coverage_ci": [
+      0.879397,
+      0.919702
+     ],
+     "precision": 0.999,
+     "precision_ci": [
+      0.997318,
+      1.0
+     ],
+     "q": 10,
+     "t": 505.0
+    },
+    {
+     "coverage": 0.8005,
+     "coverage_ci": [
+      0.771097,
+      0.829303
+     ],
+     "precision": 0.999126,
+     "precision_ci": [
+      0.997586,
+      1.0
+     ],
+     "q": 20,
+     "t": 575.0
+    },
+    {
+     "coverage": 0.7001,
+     "coverage_ci": [
+      0.664597,
+      0.7334
+     ],
+     "precision": 0.999143,
+     "precision_ci": [
+      0.997694,
+      1.0
+     ],
+     "q": 30,
+     "t": 665.0
+    },
+    {
+     "coverage": 0.6011,
+     "coverage_ci": [
+      0.563397,
+      0.637302
+     ],
+     "precision": 0.999168,
+     "precision_ci": [
+      0.997535,
+      1.0
+     ],
+     "q": 40,
+     "t": 740.0
+    },
+    {
+     "coverage": 0.5005,
+     "coverage_ci": [
+      0.460498,
+      0.539203
+     ],
+     "precision": 0.999001,
+     "precision_ci": [
+      0.997026,
+      1.0
+     ],
+     "q": 50,
+     "t": 836.0
+    },
+    {
+     "coverage": 0.4001,
+     "coverage_ci": [
+      0.362592,
+      0.439707
+     ],
+     "precision": 0.99875,
+     "precision_ci": [
+      0.99625,
+      1.0
+     ],
+     "q": 60,
+     "t": 945.0
+    },
+    {
+     "coverage": 0.3,
+     "coverage_ci": [
+      0.263697,
+      0.33861
+     ],
+     "precision": 0.998333,
+     "precision_ci": [
+      0.995004,
+      1.0
+     ],
+     "q": 70,
+     "t": 1064.3
+    },
+    {
+     "coverage": 0.2003,
+     "coverage_ci": [
+      0.169198,
+      0.2327
+     ],
+     "precision": 0.998502,
+     "precision_ci": [
+      0.994921,
+      1.0
+     ],
+     "q": 80,
+     "t": 1263.0
+    },
+    {
+     "coverage": 0.1001,
+     "coverage_ci": [
+      0.0783,
+      0.1235
+     ],
+     "precision": 0.999001,
+     "precision_ci": [
+      0.996495,
+      1.0
+     ],
+     "q": 90,
+     "t": 1679.0
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 3,
+   "m_zero": 20
+  },
+  "full|R2|1000": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.986002,
+     "precision_ci": [
+      0.974006,
+      0.996
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9004,
+     "coverage_ci": [
+      0.8736,
+      0.9248
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 10,
+     "t": 436.0
+    },
+    {
+     "coverage": 0.8,
+     "coverage_ci": [
+      0.76519,
+      0.8348
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 20,
+     "t": 487.8
+    },
+    {
+     "coverage": 0.702,
+     "coverage_ci": [
+      0.66199,
+      0.74
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 30,
+     "t": 565.0
+    },
+    {
+     "coverage": 0.602,
+     "coverage_ci": [
+      0.56039,
+      0.642
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 40,
+     "t": 639.0
+    },
+    {
+     "coverage": 0.5,
+     "coverage_ci": [
+      0.4572,
+      0.54201
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 50,
+     "t": 714.5
+    },
+    {
+     "coverage": 0.4,
+     "coverage_ci": [
+      0.35839,
+      0.4412
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 60,
+     "t": 816.4
+    },
+    {
+     "coverage": 0.3,
+     "coverage_ci": [
+      0.2608,
+      0.34161
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 70,
+     "t": 920.3
+    },
+    {
+     "coverage": 0.2,
+     "coverage_ci": [
+      0.1652,
+      0.2344
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 80,
+     "t": 1079.4
+    },
+    {
+     "coverage": 0.1004,
+     "coverage_ci": [
+      0.07559,
+      0.1276
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 1362.0
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 9
+  },
+  "full|R3-t(10)|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.9362,
+     "precision_ci": [
+      0.915197,
+      0.9544
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9,
+     "coverage_ci": [
+      0.8772,
+      0.9188
+     ],
+     "precision": 0.973222,
+     "precision_ci": [
+      0.961196,
+      0.983893
+     ],
+     "q": 10,
+     "t": 99.9
+    },
+    {
+     "coverage": 0.8008,
+     "coverage_ci": [
+      0.767597,
+      0.8309
+     ],
+     "precision": 0.985764,
+     "precision_ci": [
+      0.976756,
+      0.993098
+     ],
+     "q": 20,
+     "t": 220.0
+    },
+    {
+     "coverage": 0.7002,
+     "coverage_ci": [
+      0.6623,
+      0.7349
+     ],
+     "precision": 0.988432,
+     "precision_ci": [
+      0.979938,
+      0.995116
+     ],
+     "q": 30,
+     "t": 323.0
+    },
+    {
+     "coverage": 0.6007,
+     "coverage_ci": [
+      0.560582,
+      0.638107
+     ],
+     "precision": 0.989013,
+     "precision_ci": [
+      0.979946,
+      0.995906
+     ],
+     "q": 40,
+     "t": 416.0
+    },
+    {
+     "coverage": 0.5013,
+     "coverage_ci": [
+      0.461797,
+      0.53911
+     ],
+     "precision": 0.989228,
+     "precision_ci": [
+      0.979603,
+      0.99654
+     ],
+     "q": 50,
+     "t": 494.0
+    },
+    {
+     "coverage": 0.4006,
+     "coverage_ci": [
+      0.363495,
+      0.437405
+     ],
+     "precision": 0.988018,
+     "precision_ci": [
+      0.97683,
+      0.996349
+     ],
+     "q": 60,
+     "t": 567.0
+    },
+    {
+     "coverage": 0.3003,
+     "coverage_ci": [
+      0.265,
+      0.336302
+     ],
+     "precision": 0.987346,
+     "precision_ci": [
+      0.974965,
+      0.996701
+     ],
+     "q": 70,
+     "t": 685.0
+    },
+    {
+     "coverage": 0.2005,
+     "coverage_ci": [
+      0.169295,
+      0.232102
+     ],
+     "precision": 0.984539,
+     "precision_ci": [
+      0.967365,
+      0.99698
+     ],
+     "q": 80,
+     "t": 877.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.078,
+      0.123002
+     ],
+     "precision": 0.982,
+     "precision_ci": [
+      0.959287,
+      0.997076
+     ],
+     "q": 90,
+     "t": 1219.2
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 3,
+   "m_zero": 6
+  },
+  "full|R3-t(10)|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.8672,
+     "precision_ci": [
+      0.8352,
+      0.8948
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9004,
+     "coverage_ci": [
+      0.8748,
+      0.924
+     ],
+     "precision": 0.951133,
+     "precision_ci": [
+      0.93137,
+      0.968231
+     ],
+     "q": 10,
+     "t": 15.0
+    },
+    {
+     "coverage": 0.8008,
+     "coverage_ci": [
+      0.7648,
+      0.83361
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 20,
+     "t": 78.0
+    },
+    {
+     "coverage": 0.7012,
+     "coverage_ci": [
+      0.6584,
+      0.73921
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 30,
+     "t": 202.0
+    },
+    {
+     "coverage": 0.6004,
+     "coverage_ci": [
+      0.5556,
+      0.64321
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 40,
+     "t": 287.0
+    },
+    {
+     "coverage": 0.5,
+     "coverage_ci": [
+      0.454,
+      0.544
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 50,
+     "t": 370.0
+    },
+    {
+     "coverage": 0.4,
+     "coverage_ci": [
+      0.3572,
+      0.44401
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 60,
+     "t": 439.4
+    },
+    {
+     "coverage": 0.3004,
+     "coverage_ci": [
+      0.2616,
+      0.34081
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 70,
+     "t": 498.0
+    },
+    {
+     "coverage": 0.2004,
+     "coverage_ci": [
+      0.16598,
+      0.2364
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 80,
+     "t": 654.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.074,
+      0.12761
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 905.2
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 19
+  },
+  "full|R3-t(100)|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.9362,
+     "precision_ci": [
+      0.915197,
+      0.9544
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9,
+     "coverage_ci": [
+      0.8772,
+      0.9188
+     ],
+     "precision": 0.973222,
+     "precision_ci": [
+      0.961196,
+      0.983893
+     ],
+     "q": 10,
+     "t": 99.9
+    },
+    {
+     "coverage": 0.8008,
+     "coverage_ci": [
+      0.767597,
+      0.8309
+     ],
+     "precision": 0.985764,
+     "precision_ci": [
+      0.976756,
+      0.993098
+     ],
+     "q": 20,
+     "t": 220.0
+    },
+    {
+     "coverage": 0.7002,
+     "coverage_ci": [
+      0.6623,
+      0.7349
+     ],
+     "precision": 0.988432,
+     "precision_ci": [
+      0.979938,
+      0.995116
+     ],
+     "q": 30,
+     "t": 323.0
+    },
+    {
+     "coverage": 0.6007,
+     "coverage_ci": [
+      0.560582,
+      0.638107
+     ],
+     "precision": 0.989013,
+     "precision_ci": [
+      0.979946,
+      0.995906
+     ],
+     "q": 40,
+     "t": 416.0
+    },
+    {
+     "coverage": 0.5013,
+     "coverage_ci": [
+      0.461797,
+      0.53911
+     ],
+     "precision": 0.989228,
+     "precision_ci": [
+      0.979603,
+      0.99654
+     ],
+     "q": 50,
+     "t": 494.0
+    },
+    {
+     "coverage": 0.4006,
+     "coverage_ci": [
+      0.363495,
+      0.437405
+     ],
+     "precision": 0.988018,
+     "precision_ci": [
+      0.97683,
+      0.996349
+     ],
+     "q": 60,
+     "t": 567.0
+    },
+    {
+     "coverage": 0.3003,
+     "coverage_ci": [
+      0.265,
+      0.336302
+     ],
+     "precision": 0.987346,
+     "precision_ci": [
+      0.974965,
+      0.996701
+     ],
+     "q": 70,
+     "t": 685.0
+    },
+    {
+     "coverage": 0.2005,
+     "coverage_ci": [
+      0.169295,
+      0.232102
+     ],
+     "precision": 0.984539,
+     "precision_ci": [
+      0.967365,
+      0.99698
+     ],
+     "q": 80,
+     "t": 877.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.078,
+      0.123002
+     ],
+     "precision": 0.982,
+     "precision_ci": [
+      0.959287,
+      0.997076
+     ],
+     "q": 90,
+     "t": 1219.2
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 3,
+   "m_zero": 6
+  },
+  "full|R3-t(100)|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.8672,
+     "precision_ci": [
+      0.8352,
+      0.8948
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9004,
+     "coverage_ci": [
+      0.8748,
+      0.924
+     ],
+     "precision": 0.951133,
+     "precision_ci": [
+      0.93137,
+      0.968231
+     ],
+     "q": 10,
+     "t": 15.0
+    },
+    {
+     "coverage": 0.8008,
+     "coverage_ci": [
+      0.7648,
+      0.83361
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 20,
+     "t": 78.0
+    },
+    {
+     "coverage": 0.7012,
+     "coverage_ci": [
+      0.6584,
+      0.73921
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 30,
+     "t": 202.0
+    },
+    {
+     "coverage": 0.6004,
+     "coverage_ci": [
+      0.5556,
+      0.64321
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 40,
+     "t": 287.0
+    },
+    {
+     "coverage": 0.5,
+     "coverage_ci": [
+      0.454,
+      0.544
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 50,
+     "t": 370.0
+    },
+    {
+     "coverage": 0.4,
+     "coverage_ci": [
+      0.3572,
+      0.44401
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 60,
+     "t": 439.4
+    },
+    {
+     "coverage": 0.3004,
+     "coverage_ci": [
+      0.2616,
+      0.34081
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 70,
+     "t": 498.0
+    },
+    {
+     "coverage": 0.2004,
+     "coverage_ci": [
+      0.16598,
+      0.2364
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 80,
+     "t": 654.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.074,
+      0.12761
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 905.2
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 19
+  },
+  "full|R3-t(1000)|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.9362,
+     "precision_ci": [
+      0.915197,
+      0.9544
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9,
+     "coverage_ci": [
+      0.8772,
+      0.9188
+     ],
+     "precision": 0.973222,
+     "precision_ci": [
+      0.961196,
+      0.983893
+     ],
+     "q": 10,
+     "t": 99.9
+    },
+    {
+     "coverage": 0.8008,
+     "coverage_ci": [
+      0.767597,
+      0.8309
+     ],
+     "precision": 0.985764,
+     "precision_ci": [
+      0.976756,
+      0.993098
+     ],
+     "q": 20,
+     "t": 220.0
+    },
+    {
+     "coverage": 0.7002,
+     "coverage_ci": [
+      0.6623,
+      0.7349
+     ],
+     "precision": 0.988432,
+     "precision_ci": [
+      0.979938,
+      0.995116
+     ],
+     "q": 30,
+     "t": 323.0
+    },
+    {
+     "coverage": 0.6007,
+     "coverage_ci": [
+      0.560582,
+      0.638107
+     ],
+     "precision": 0.989013,
+     "precision_ci": [
+      0.979946,
+      0.995906
+     ],
+     "q": 40,
+     "t": 416.0
+    },
+    {
+     "coverage": 0.5013,
+     "coverage_ci": [
+      0.461797,
+      0.53911
+     ],
+     "precision": 0.989228,
+     "precision_ci": [
+      0.979603,
+      0.99654
+     ],
+     "q": 50,
+     "t": 494.0
+    },
+    {
+     "coverage": 0.4006,
+     "coverage_ci": [
+      0.363495,
+      0.437405
+     ],
+     "precision": 0.988018,
+     "precision_ci": [
+      0.97683,
+      0.996349
+     ],
+     "q": 60,
+     "t": 567.0
+    },
+    {
+     "coverage": 0.3003,
+     "coverage_ci": [
+      0.265,
+      0.336302
+     ],
+     "precision": 0.987346,
+     "precision_ci": [
+      0.974965,
+      0.996701
+     ],
+     "q": 70,
+     "t": 685.0
+    },
+    {
+     "coverage": 0.2005,
+     "coverage_ci": [
+      0.169295,
+      0.232102
+     ],
+     "precision": 0.984539,
+     "precision_ci": [
+      0.967365,
+      0.99698
+     ],
+     "q": 80,
+     "t": 877.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.078,
+      0.123002
+     ],
+     "precision": 0.982,
+     "precision_ci": [
+      0.959287,
+      0.997076
+     ],
+     "q": 90,
+     "t": 1219.2
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 3,
+   "m_zero": 6
+  },
+  "full|R3-t(1000)|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.8672,
+     "precision_ci": [
+      0.8352,
+      0.8948
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9004,
+     "coverage_ci": [
+      0.8748,
+      0.924
+     ],
+     "precision": 0.951133,
+     "precision_ci": [
+      0.93137,
+      0.968231
+     ],
+     "q": 10,
+     "t": 15.0
+    },
+    {
+     "coverage": 0.8008,
+     "coverage_ci": [
+      0.7648,
+      0.83361
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 20,
+     "t": 78.0
+    },
+    {
+     "coverage": 0.7012,
+     "coverage_ci": [
+      0.6584,
+      0.73921
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 30,
+     "t": 202.0
+    },
+    {
+     "coverage": 0.6004,
+     "coverage_ci": [
+      0.5556,
+      0.64321
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 40,
+     "t": 287.0
+    },
+    {
+     "coverage": 0.5,
+     "coverage_ci": [
+      0.454,
+      0.544
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 50,
+     "t": 370.0
+    },
+    {
+     "coverage": 0.4,
+     "coverage_ci": [
+      0.3572,
+      0.44401
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 60,
+     "t": 439.4
+    },
+    {
+     "coverage": 0.3004,
+     "coverage_ci": [
+      0.2616,
+      0.34081
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 70,
+     "t": 498.0
+    },
+    {
+     "coverage": 0.2004,
+     "coverage_ci": [
+      0.16598,
+      0.2364
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 80,
+     "t": 654.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.074,
+      0.12761
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 905.2
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 19
+  },
+  "full|R3-u|10": {
+   "attacker": "A3",
+   "costs_of": "A3-mean",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.7929,
+     "precision_ci": [
+      0.764195,
+      0.818805
+     ],
+     "q": 0,
+     "t": 1.4e-05
+    },
+    {
+     "coverage": 0.9,
+     "coverage_ci": [
+      0.885397,
+      0.9139
+     ],
+     "precision": 0.837444,
+     "precision_ci": [
+      0.813016,
+      0.858972
+     ],
+     "q": 10,
+     "t": 0.200606
+    },
+    {
+     "coverage": 0.8,
+     "coverage_ci": [
+      0.777597,
+      0.821103
+     ],
+     "precision": 0.881875,
+     "precision_ci": [
+      0.861282,
+      0.900138
+     ],
+     "q": 20,
+     "t": 0.619218
+    },
+    {
+     "coverage": 0.7,
+     "coverage_ci": [
+      0.670198,
+      0.729403
+     ],
+     "precision": 0.921429,
+     "precision_ci": [
+      0.906203,
+      0.934776
+     ],
+     "q": 30,
+     "t": 0.92663
+    },
+    {
+     "coverage": 0.6,
+     "coverage_ci": [
+      0.565697,
+      0.635003
+     ],
+     "precision": 0.951167,
+     "precision_ci": [
+      0.940328,
+      0.960866
+     ],
+     "q": 40,
+     "t": 1.388883
+    },
+    {
+     "coverage": 0.5,
+     "coverage_ci": [
+      0.462697,
+      0.5387
+     ],
+     "precision": 0.974,
+     "precision_ci": [
+      0.96664,
+      0.980362
+     ],
+     "q": 50,
+     "t": 1.9445
+    },
+    {
+     "coverage": 0.4,
+     "coverage_ci": [
+      0.3618,
+      0.440105
+     ],
+     "precision": 0.98925,
+     "precision_ci": [
+      0.984943,
+      0.992799
+     ],
+     "q": 60,
+     "t": 2.781643
+    },
+    {
+     "coverage": 0.3,
+     "coverage_ci": [
+      0.26399,
+      0.337802
+     ],
+     "precision": 0.995333,
+     "precision_ci": [
+      0.99265,
+      0.997559
+     ],
+     "q": 70,
+     "t": 4.277108
+    },
+    {
+     "coverage": 0.2,
+     "coverage_ci": [
+      0.173198,
+      0.2271
+     ],
+     "precision": 0.998,
+     "precision_ci": [
+      0.995839,
+      0.999547
+     ],
+     "q": 80,
+     "t": 5.454111
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.083297,
+      0.117705
+     ],
+     "precision": 0.999,
+     "precision_ci": [
+      0.996685,
+      1.0
+     ],
+     "q": 90,
+     "t": 6.310761
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 0,
+   "m_zero": 0
+  },
+  "full|R3-u|1000": {
+   "attacker": "A3",
+   "costs_of": "A3-mean",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.36,
+     "precision_ci": [
+      0.31918,
+      0.402
+     ],
+     "q": 0,
+     "t": 0.000596
+    },
+    {
+     "coverage": 0.9,
+     "coverage_ci": [
+      0.8772,
+      0.9216
+     ],
+     "precision": 0.384889,
+     "precision_ci": [
+      0.34181,
+      0.428515
+     ],
+     "q": 10,
+     "t": 0.027645
+    },
+    {
+     "coverage": 0.8,
+     "coverage_ci": [
+      0.77,
+      0.8288
+     ],
+     "precision": 0.3915,
+     "precision_ci": [
+      0.347395,
+      0.440791
+     ],
+     "q": 20,
+     "t": 0.079634
+    },
+    {
+     "coverage": 0.7004,
+     "coverage_ci": [
+      0.6652,
+      0.7332
+     ],
+     "precision": 0.413478,
+     "precision_ci": [
+      0.366316,
+      0.463342
+     ],
+     "q": 30,
+     "t": 0.179476
+    },
+    {
+     "coverage": 0.6004,
+     "coverage_ci": [
+      0.56279,
+      0.63521
+     ],
+     "precision": 0.433045,
+     "precision_ci": [
+      0.381777,
+      0.48849
+     ],
+     "q": 40,
+     "t": 0.377015
+    },
+    {
+     "coverage": 0.5008,
+     "coverage_ci": [
+      0.4624,
+      0.5368
+     ],
+     "precision": 0.486422,
+     "precision_ci": [
+      0.431512,
+      0.547909
+     ],
+     "q": 50,
+     "t": 0.610877
+    },
+    {
+     "coverage": 0.4,
+     "coverage_ci": [
+      0.3628,
+      0.43642
+     ],
+     "precision": 0.563,
+     "precision_ci": [
+      0.50196,
+      0.630977
+     ],
+     "q": 60,
+     "t": 1.035339
+    },
+    {
+     "coverage": 0.3004,
+     "coverage_ci": [
+      0.2644,
+      0.3376
+     ],
+     "precision": 0.677763,
+     "precision_ci": [
+      0.610137,
+      0.746489
+     ],
+     "q": 70,
+     "t": 2.328077
+    },
+    {
+     "coverage": 0.2,
+     "coverage_ci": [
+      0.17039,
+      0.2312
+     ],
+     "precision": 0.72,
+     "precision_ci": [
+      0.641391,
+      0.798675
+     ],
+     "q": 80,
+     "t": 2.803466
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.0788,
+      0.1228
+     ],
+     "precision": 0.76,
+     "precision_ci": [
+      0.655598,
+      0.850005
+     ],
+     "q": 90,
+     "t": 3.285944
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 0
+  },
+  "full|R3|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.9362,
+     "precision_ci": [
+      0.915197,
+      0.9544
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9,
+     "coverage_ci": [
+      0.8772,
+      0.9188
+     ],
+     "precision": 0.973222,
+     "precision_ci": [
+      0.961196,
+      0.983893
+     ],
+     "q": 10,
+     "t": 99.9
+    },
+    {
+     "coverage": 0.8008,
+     "coverage_ci": [
+      0.767597,
+      0.8309
+     ],
+     "precision": 0.985764,
+     "precision_ci": [
+      0.976756,
+      0.993098
+     ],
+     "q": 20,
+     "t": 220.0
+    },
+    {
+     "coverage": 0.7002,
+     "coverage_ci": [
+      0.6623,
+      0.7349
+     ],
+     "precision": 0.988432,
+     "precision_ci": [
+      0.979938,
+      0.995116
+     ],
+     "q": 30,
+     "t": 323.0
+    },
+    {
+     "coverage": 0.6007,
+     "coverage_ci": [
+      0.560582,
+      0.638107
+     ],
+     "precision": 0.989013,
+     "precision_ci": [
+      0.979946,
+      0.995906
+     ],
+     "q": 40,
+     "t": 416.0
+    },
+    {
+     "coverage": 0.5013,
+     "coverage_ci": [
+      0.461797,
+      0.53911
+     ],
+     "precision": 0.989228,
+     "precision_ci": [
+      0.979603,
+      0.99654
+     ],
+     "q": 50,
+     "t": 494.0
+    },
+    {
+     "coverage": 0.4006,
+     "coverage_ci": [
+      0.363495,
+      0.437405
+     ],
+     "precision": 0.988018,
+     "precision_ci": [
+      0.97683,
+      0.996349
+     ],
+     "q": 60,
+     "t": 567.0
+    },
+    {
+     "coverage": 0.3003,
+     "coverage_ci": [
+      0.265,
+      0.336302
+     ],
+     "precision": 0.987346,
+     "precision_ci": [
+      0.974965,
+      0.996701
+     ],
+     "q": 70,
+     "t": 685.0
+    },
+    {
+     "coverage": 0.2005,
+     "coverage_ci": [
+      0.169295,
+      0.232102
+     ],
+     "precision": 0.984539,
+     "precision_ci": [
+      0.967365,
+      0.99698
+     ],
+     "q": 80,
+     "t": 877.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.078,
+      0.123002
+     ],
+     "precision": 0.982,
+     "precision_ci": [
+      0.959287,
+      0.997076
+     ],
+     "q": 90,
+     "t": 1219.2
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 3,
+   "m_zero": 6
+  },
+  "full|R3|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.8672,
+     "precision_ci": [
+      0.8352,
+      0.8948
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9004,
+     "coverage_ci": [
+      0.8748,
+      0.924
+     ],
+     "precision": 0.951133,
+     "precision_ci": [
+      0.93137,
+      0.968231
+     ],
+     "q": 10,
+     "t": 15.0
+    },
+    {
+     "coverage": 0.8008,
+     "coverage_ci": [
+      0.7648,
+      0.83361
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 20,
+     "t": 78.0
+    },
+    {
+     "coverage": 0.7012,
+     "coverage_ci": [
+      0.6584,
+      0.73921
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 30,
+     "t": 202.0
+    },
+    {
+     "coverage": 0.6004,
+     "coverage_ci": [
+      0.5556,
+      0.64321
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 40,
+     "t": 287.0
+    },
+    {
+     "coverage": 0.5,
+     "coverage_ci": [
+      0.454,
+      0.544
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 50,
+     "t": 370.0
+    },
+    {
+     "coverage": 0.4,
+     "coverage_ci": [
+      0.3572,
+      0.44401
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 60,
+     "t": 439.4
+    },
+    {
+     "coverage": 0.3004,
+     "coverage_ci": [
+      0.2616,
+      0.34081
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 70,
+     "t": 498.0
+    },
+    {
+     "coverage": 0.2004,
+     "coverage_ci": [
+      0.16598,
+      0.2364
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 80,
+     "t": 654.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.074,
+      0.12761
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 905.2
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 19
+  },
+  "full|R4(1)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.61605,
+     "precision_ci": [
+      0.590996,
+      0.641401
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9136,
+     "coverage_ci": [
+      0.9064,
+      0.9208
+     ],
+     "precision": 0.640105,
+     "precision_ci": [
+      0.613374,
+      0.666963
+     ],
+     "q": 10,
+     "t": 7.0
+    },
+    {
+     "coverage": 0.8091,
+     "coverage_ci": [
+      0.7965,
+      0.821303
+     ],
+     "precision": 0.669633,
+     "precision_ci": [
+      0.640841,
+      0.697147
+     ],
+     "q": 20,
+     "t": 16.0
+    },
+    {
+     "coverage": 0.7021,
+     "coverage_ci": [
+      0.686,
+      0.718803
+     ],
+     "precision": 0.710867,
+     "precision_ci": [
+      0.680169,
+      0.739476
+     ],
+     "q": 30,
+     "t": 27.0
+    },
+    {
+     "coverage": 0.6028,
+     "coverage_ci": [
+      0.584797,
+      0.621703
+     ],
+     "precision": 0.747346,
+     "precision_ci": [
+      0.715164,
+      0.777168
+     ],
+     "q": 40,
+     "t": 40.0
+    },
+    {
+     "coverage": 0.5035,
+     "coverage_ci": [
+      0.483198,
+      0.524303
+     ],
+     "precision": 0.781331,
+     "precision_ci": [
+      0.747461,
+      0.813079
+     ],
+     "q": 50,
+     "t": 58.0
+    },
+    {
+     "coverage": 0.4015,
+     "coverage_ci": [
+      0.380397,
+      0.423505
+     ],
+     "precision": 0.82142,
+     "precision_ci": [
+      0.785938,
+      0.854278
+     ],
+     "q": 60,
+     "t": 83.0
+    },
+    {
+     "coverage": 0.3018,
+     "coverage_ci": [
+      0.2805,
+      0.3244
+     ],
+     "precision": 0.85951,
+     "precision_ci": [
+      0.823644,
+      0.89321
+     ],
+     "q": 70,
+     "t": 124.0
+    },
+    {
+     "coverage": 0.2002,
+     "coverage_ci": [
+      0.1802,
+      0.2217
+     ],
+     "precision": 0.893107,
+     "precision_ci": [
+      0.855747,
+      0.927421
+     ],
+     "q": 80,
+     "t": 187.0
+    },
+    {
+     "coverage": 0.1007,
+     "coverage_ci": [
+      0.0838,
+      0.118117
+     ],
+     "precision": 0.940417,
+     "precision_ci": [
+      0.896732,
+      0.974367
+     ],
+     "q": 90,
+     "t": 342.0
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 0,
+   "m_zero": 64
+  },
+  "full|R4(1)|1000": {
+   "attacker": "A2",
+   "costs_of": "A2",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.4048,
+     "precision_ci": [
+      0.3612,
+      0.4476
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9224,
+     "coverage_ci": [
+      0.9028,
+      0.9408
+     ],
+     "precision": 0.43582,
+     "precision_ci": [
+      0.390276,
+      0.478675
+     ],
+     "q": 10,
+     "t": 3.0
+    },
+    {
+     "coverage": 0.8136,
+     "coverage_ci": [
+      0.78439,
+      0.8424
+     ],
+     "precision": 0.485742,
+     "precision_ci": [
+      0.438732,
+      0.529816
+     ],
+     "q": 20,
+     "t": 8.0
+    },
+    {
+     "coverage": 0.7064,
+     "coverage_ci": [
+      0.6708,
+      0.74121
+     ],
+     "precision": 0.554926,
+     "precision_ci": [
+      0.505751,
+      0.598798
+     ],
+     "q": 30,
+     "t": 13.0
+    },
+    {
+     "coverage": 0.6056,
+     "coverage_ci": [
+      0.5656,
+      0.64521
+     ],
+     "precision": 0.634082,
+     "precision_ci": [
+      0.582862,
+      0.680576
+     ],
+     "q": 40,
+     "t": 20.0
+    },
+    {
+     "coverage": 0.5084,
+     "coverage_ci": [
+      0.4664,
+      0.5508
+     ],
+     "precision": 0.733281,
+     "precision_ci": [
+      0.68149,
+      0.778477
+     ],
+     "q": 50,
+     "t": 31.0
+    },
+    {
+     "coverage": 0.4044,
+     "coverage_ci": [
+      0.3624,
+      0.446
+     ],
+     "precision": 0.872404,
+     "precision_ci": [
+      0.826632,
+      0.910352
+     ],
+     "q": 60,
+     "t": 58.0
+    },
+    {
+     "coverage": 0.304,
+     "coverage_ci": [
+      0.264,
+      0.342
+     ],
+     "precision": 0.965789,
+     "precision_ci": [
+      0.934383,
+      0.991621
+     ],
+     "q": 70,
+     "t": 109.0
+    },
+    {
+     "coverage": 0.2012,
+     "coverage_ci": [
+      0.166,
+      0.236
+     ],
+     "precision": 0.95825,
+     "precision_ci": [
+      0.915919,
+      0.991597
+     ],
+     "q": 80,
+     "t": 193.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.0744,
+      0.12521
+     ],
+     "precision": 0.94,
+     "precision_ci": [
+      0.862998,
+      1.0
+     ],
+     "q": 90,
+     "t": 324.1
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 35
+  },
+  "full|R4(2)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.514883,
+     "precision_ci": [
+      0.486195,
+      0.541851
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9052,
+     "coverage_ci": [
+      0.8975,
+      0.9126
+     ],
+     "precision": 0.533915,
+     "precision_ci": [
+      0.503842,
+      0.562265
+     ],
+     "q": 10,
+     "t": 4.0
+    },
+    {
+     "coverage": 0.8085,
+     "coverage_ci": [
+      0.7971,
+      0.8197
+     ],
+     "precision": 0.562523,
+     "precision_ci": [
+      0.529887,
+      0.59248
+     ],
+     "q": 20,
+     "t": 8.0
+    },
+    {
+     "coverage": 0.7002,
+     "coverage_ci": [
+      0.685,
+      0.715102
+     ],
+     "precision": 0.592831,
+     "precision_ci": [
+      0.558812,
+      0.623858
+     ],
+     "q": 30,
+     "t": 13.0
+    },
+    {
+     "coverage": 0.6116,
+     "coverage_ci": [
+      0.5952,
+      0.629103
+     ],
+     "precision": 0.625245,
+     "precision_ci": [
+      0.589582,
+      0.657116
+     ],
+     "q": 40,
+     "t": 18.0
+    },
+    {
+     "coverage": 0.5049,
+     "coverage_ci": [
+      0.4854,
+      0.525
+     ],
+     "precision": 0.666271,
+     "precision_ci": [
+      0.628592,
+      0.70006
+     ],
+     "q": 50,
+     "t": 26.0
+    },
+    {
+     "coverage": 0.4019,
+     "coverage_ci": [
+      0.3813,
+      0.423112
+     ],
+     "precision": 0.716099,
+     "precision_ci": [
+      0.674591,
+      0.751131
+     ],
+     "q": 60,
+     "t": 36.0
+    },
+    {
+     "coverage": 0.3051,
+     "coverage_ci": [
+      0.2842,
+      0.327105
+     ],
+     "precision": 0.773517,
+     "precision_ci": [
+      0.733309,
+      0.808915
+     ],
+     "q": 70,
+     "t": 50.0
+    },
+    {
+     "coverage": 0.2009,
+     "coverage_ci": [
+      0.181998,
+      0.221102
+     ],
+     "precision": 0.851667,
+     "precision_ci": [
+      0.810008,
+      0.888407
+     ],
+     "q": 80,
+     "t": 77.0
+    },
+    {
+     "coverage": 0.1003,
+     "coverage_ci": [
+      0.0837,
+      0.117702
+     ],
+     "precision": 0.932203,
+     "precision_ci": [
+      0.888263,
+      0.967191
+     ],
+     "q": 90,
+     "t": 137.0
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 0,
+   "m_zero": 174
+  },
+  "full|R4(2)|1000": {
+   "attacker": "A2",
+   "costs_of": "A2",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.0444,
+     "precision_ci": [
+      0.028,
+      0.0632
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9768,
+     "coverage_ci": [
+      0.96719,
+      0.9856
+     ],
+     "precision": 0.045455,
+     "precision_ci": [
+      0.028637,
+      0.064312
+     ],
+     "q": 10,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.8324,
+     "coverage_ci": [
+      0.80559,
+      0.85921
+     ],
+     "precision": 0.051898,
+     "precision_ci": [
+      0.032073,
+      0.073917
+     ],
+     "q": 20,
+     "t": 3.0
+    },
+    {
+     "coverage": 0.7172,
+     "coverage_ci": [
+      0.6852,
+      0.7484
+     ],
+     "precision": 0.058003,
+     "precision_ci": [
+      0.036049,
+      0.083197
+     ],
+     "q": 30,
+     "t": 5.0
+    },
+    {
+     "coverage": 0.6184,
+     "coverage_ci": [
+      0.5844,
+      0.6532
+     ],
+     "precision": 0.06727,
+     "precision_ci": [
+      0.042076,
+      0.096117
+     ],
+     "q": 40,
+     "t": 7.0
+    },
+    {
+     "coverage": 0.5104,
+     "coverage_ci": [
+      0.4756,
+      0.54641
+     ],
+     "precision": 0.080721,
+     "precision_ci": [
+      0.049921,
+      0.114317
+     ],
+     "q": 50,
+     "t": 10.0
+    },
+    {
+     "coverage": 0.4156,
+     "coverage_ci": [
+      0.38,
+      0.4528
+     ],
+     "precision": 0.088547,
+     "precision_ci": [
+      0.052965,
+      0.128782
+     ],
+     "q": 60,
+     "t": 13.0
+    },
+    {
+     "coverage": 0.3,
+     "coverage_ci": [
+      0.26759,
+      0.3368
+     ],
+     "precision": 0.12,
+     "precision_ci": [
+      0.070522,
+      0.171705
+     ],
+     "q": 70,
+     "t": 17.3
+    },
+    {
+     "coverage": 0.204,
+     "coverage_ci": [
+      0.17439,
+      0.2372
+     ],
+     "precision": 0.160784,
+     "precision_ci": [
+      0.095585,
+      0.228969
+     ],
+     "q": 80,
+     "t": 26.0
+    },
+    {
+     "coverage": 0.1024,
+     "coverage_ci": [
+      0.07959,
+      0.128
+     ],
+     "precision": 0.253906,
+     "precision_ci": [
+      0.141115,
+      0.370388
+     ],
+     "q": 90,
+     "t": 43.0
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 58
+  },
+  "full|R4(4)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.31155,
+     "precision_ci": [
+      0.283781,
+      0.337953
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9667,
+     "coverage_ci": [
+      0.9628,
+      0.9704
+     ],
+     "precision": 0.315196,
+     "precision_ci": [
+      0.286805,
+      0.342114
+     ],
+     "q": 10,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.8399,
+     "coverage_ci": [
+      0.829997,
+      0.849202
+     ],
+     "precision": 0.330873,
+     "precision_ci": [
+      0.300702,
+      0.359317
+     ],
+     "q": 20,
+     "t": 3.0
+    },
+    {
+     "coverage": 0.7388,
+     "coverage_ci": [
+      0.7254,
+      0.7515
+     ],
+     "precision": 0.346643,
+     "precision_ci": [
+      0.314631,
+      0.376799
+     ],
+     "q": 30,
+     "t": 5.0
+    },
+    {
+     "coverage": 0.6098,
+     "coverage_ci": [
+      0.593,
+      0.6257
+     ],
+     "precision": 0.373565,
+     "precision_ci": [
+      0.338338,
+      0.407447
+     ],
+     "q": 40,
+     "t": 8.0
+    },
+    {
+     "coverage": 0.5048,
+     "coverage_ci": [
+      0.486198,
+      0.5226
+     ],
+     "precision": 0.39481,
+     "precision_ci": [
+      0.356666,
+      0.432149
+     ],
+     "q": 50,
+     "t": 11.0
+    },
+    {
+     "coverage": 0.4147,
+     "coverage_ci": [
+      0.395797,
+      0.4339
+     ],
+     "precision": 0.425609,
+     "precision_ci": [
+      0.383316,
+      0.465833
+     ],
+     "q": 60,
+     "t": 14.0
+    },
+    {
+     "coverage": 0.3066,
+     "coverage_ci": [
+      0.287497,
+      0.326002
+     ],
+     "precision": 0.4788,
+     "precision_ci": [
+      0.431388,
+      0.523243
+     ],
+     "q": 70,
+     "t": 19.0
+    },
+    {
+     "coverage": 0.2021,
+     "coverage_ci": [
+      0.1842,
+      0.221102
+     ],
+     "precision": 0.55715,
+     "precision_ci": [
+      0.502075,
+      0.607651
+     ],
+     "q": 80,
+     "t": 27.0
+    },
+    {
+     "coverage": 0.1004,
+     "coverage_ci": [
+      0.085797,
+      0.1159
+     ],
+     "precision": 0.687251,
+     "precision_ci": [
+      0.621044,
+      0.748368
+     ],
+     "q": 90,
+     "t": 43.0
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 0,
+   "m_zero": 333
+  },
+  "full|R4(4)|1000": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.003533,
+     "precision_ci": [
+      0.000733,
+      0.007335
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.003533,
+     "precision_ci": [
+      0.000733,
+      0.007335
+     ],
+     "q": 10,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.003533,
+     "precision_ci": [
+      0.000733,
+      0.007335
+     ],
+     "q": 20,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.003533,
+     "precision_ci": [
+      0.000733,
+      0.007335
+     ],
+     "q": 30,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.003533,
+     "precision_ci": [
+      0.000733,
+      0.007335
+     ],
+     "q": 40,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.003533,
+     "precision_ci": [
+      0.000733,
+      0.007335
+     ],
+     "q": 50,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.003533,
+     "precision_ci": [
+      0.000733,
+      0.007335
+     ],
+     "q": 60,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.003533,
+     "precision_ci": [
+      0.000733,
+      0.007335
+     ],
+     "q": 70,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.2572,
+     "coverage_ci": [
+      0.22599,
+      0.2904
+     ],
+     "precision": 0.00311,
+     "precision_ci": [
+      0.0,
+      0.010222
+     ],
+     "q": 80,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.2572,
+     "coverage_ci": [
+      0.22599,
+      0.2904
+     ],
+     "precision": 0.00311,
+     "precision_ci": [
+      0.0,
+      0.010222
+     ],
+     "q": 90,
+     "t": 1.0
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 1857
+  },
+  "full|R4(8)|10": {
+   "attacker": "A2",
+   "costs_of": "A2",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.14026,
+     "precision_ci": [
+      0.11982,
+      0.161814
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9014,
+     "coverage_ci": [
+      0.8924,
+      0.9099
+     ],
+     "precision": 0.14777,
+     "precision_ci": [
+      0.126168,
+      0.170476
+     ],
+     "q": 10,
+     "t": 26.0
+    },
+    {
+     "coverage": 0.8025,
+     "coverage_ci": [
+      0.7891,
+      0.815503
+     ],
+     "precision": 0.157383,
+     "precision_ci": [
+      0.133692,
+      0.181716
+     ],
+     "q": 20,
+     "t": 58.0
+    },
+    {
+     "coverage": 0.7015,
+     "coverage_ci": [
+      0.6842,
+      0.718803
+     ],
+     "precision": 0.170207,
+     "precision_ci": [
+      0.144839,
+      0.196746
+     ],
+     "q": 30,
+     "t": 98.0
+    },
+    {
+     "coverage": 0.6012,
+     "coverage_ci": [
+      0.5809,
+      0.622503
+     ],
+     "precision": 0.187458,
+     "precision_ci": [
+      0.160034,
+      0.216945
+     ],
+     "q": 40,
+     "t": 145.0
+    },
+    {
+     "coverage": 0.5014,
+     "coverage_ci": [
+      0.478997,
+      0.525
+     ],
+     "precision": 0.209613,
+     "precision_ci": [
+      0.177716,
+      0.242298
+     ],
+     "q": 50,
+     "t": 204.0
+    },
+    {
+     "coverage": 0.4013,
+     "coverage_ci": [
+      0.377895,
+      0.4261
+     ],
+     "precision": 0.239223,
+     "precision_ci": [
+      0.201783,
+      0.276975
+     ],
+     "q": 60,
+     "t": 285.0
+    },
+    {
+     "coverage": 0.3007,
+     "coverage_ci": [
+      0.277695,
+      0.324902
+     ],
+     "precision": 0.285002,
+     "precision_ci": [
+      0.239739,
+      0.329711
+     ],
+     "q": 70,
+     "t": 396.0
+    },
+    {
+     "coverage": 0.2,
+     "coverage_ci": [
+      0.179598,
+      0.222
+     ],
+     "precision": 0.356,
+     "precision_ci": [
+      0.298252,
+      0.411343
+     ],
+     "q": 80,
+     "t": 587.2
+    },
+    {
+     "coverage": 0.1001,
+     "coverage_ci": [
+      0.084398,
+      0.117402
+     ],
+     "precision": 0.497502,
+     "precision_ci": [
+      0.414678,
+      0.575523
+     ],
+     "q": 90,
+     "t": 959.0
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 35,
+   "m_zero": 49
+  },
+  "full|R4(8)|1000": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.00137,
+     "precision_ci": [
+      8.2e-05,
+      0.003553
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.00137,
+     "precision_ci": [
+      8.2e-05,
+      0.003553
+     ],
+     "q": 10,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.00137,
+     "precision_ci": [
+      8.2e-05,
+      0.003553
+     ],
+     "q": 20,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.00137,
+     "precision_ci": [
+      8.2e-05,
+      0.003553
+     ],
+     "q": 30,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.00137,
+     "precision_ci": [
+      8.2e-05,
+      0.003553
+     ],
+     "q": 40,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.00137,
+     "precision_ci": [
+      8.2e-05,
+      0.003553
+     ],
+     "q": 50,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.4256,
+     "coverage_ci": [
+      0.38678,
+      0.46881
+     ],
+     "precision": 0.00282,
+     "precision_ci": [
+      0.0,
+      0.007923
+     ],
+     "q": 60,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.4256,
+     "coverage_ci": [
+      0.38678,
+      0.46881
+     ],
+     "precision": 0.00282,
+     "precision_ci": [
+      0.0,
+      0.007923
+     ],
+     "q": 70,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.4256,
+     "coverage_ci": [
+      0.38678,
+      0.46881
+     ],
+     "precision": 0.00282,
+     "precision_ci": [
+      0.0,
+      0.007923
+     ],
+     "q": 80,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.1496,
+     "coverage_ci": [
+      0.1252,
+      0.1736
+     ],
+     "precision": 0.005348,
+     "precision_ci": [
+      0.0,
+      0.017246
+     ],
+     "q": 90,
+     "t": 2.0
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 1436
+  },
+  "full|R7(0.1)|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.8602,
+     "precision_ci": [
+      0.834,
+      0.885405
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9,
+     "coverage_ci": [
+      0.882397,
+      0.9159
+     ],
+     "precision": 0.914444,
+     "precision_ci": [
+      0.894091,
+      0.93317
+     ],
+     "q": 10,
+     "t": 29.1
+    },
+    {
+     "coverage": 0.8,
+     "coverage_ci": [
+      0.770397,
+      0.826805
+     ],
+     "precision": 0.95325,
+     "precision_ci": [
+      0.938509,
+      0.966617
+     ],
+     "q": 20,
+     "t": 62.38
+    },
+    {
+     "coverage": 0.7001,
+     "coverage_ci": [
+      0.6646,
+      0.7314
+     ],
+     "precision": 0.972861,
+     "precision_ci": [
+      0.960918,
+      0.983416
+     ],
+     "q": 30,
+     "t": 101.5
+    },
+    {
+     "coverage": 0.6,
+     "coverage_ci": [
+      0.5637,
+      0.633903
+     ],
+     "precision": 0.977333,
+     "precision_ci": [
+      0.964812,
+      0.987742
+     ],
+     "q": 40,
+     "t": 142.96
+    },
+    {
+     "coverage": 0.5,
+     "coverage_ci": [
+      0.4637,
+      0.535105
+     ],
+     "precision": 0.98,
+     "precision_ci": [
+      0.967033,
+      0.99077
+     ],
+     "q": 50,
+     "t": 187.7
+    },
+    {
+     "coverage": 0.4001,
+     "coverage_ci": [
+      0.3668,
+      0.434512
+     ],
+     "precision": 0.979505,
+     "precision_ci": [
+      0.964113,
+      0.991535
+     ],
+     "q": 60,
+     "t": 231.8
+    },
+    {
+     "coverage": 0.3001,
+     "coverage_ci": [
+      0.270397,
+      0.3311
+     ],
+     "precision": 0.978674,
+     "precision_ci": [
+      0.961142,
+      0.99254
+     ],
+     "q": 70,
+     "t": 288.3
+    },
+    {
+     "coverage": 0.2,
+     "coverage_ci": [
+      0.174198,
+      0.226405
+     ],
+     "precision": 0.9745,
+     "precision_ci": [
+      0.951261,
+      0.99247
+     ],
+     "q": 80,
+     "t": 373.5
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.082295,
+      0.119202
+     ],
+     "precision": 0.965,
+     "precision_ci": [
+      0.927495,
+      0.992
+     ],
+     "q": 90,
+     "t": 544.71
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 0,
+   "m_zero": 1
+  },
+  "full|R7(0.1)|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.7024,
+     "precision_ci": [
+      0.6604,
+      0.7424
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9,
+     "coverage_ci": [
+      0.878,
+      0.9204
+     ],
+     "precision": 0.770667,
+     "precision_ci": [
+      0.731803,
+      0.805485
+     ],
+     "q": 10,
+     "t": 3.49
+    },
+    {
+     "coverage": 0.8004,
+     "coverage_ci": [
+      0.7676,
+      0.83201
+     ],
+     "precision": 0.856572,
+     "precision_ci": [
+      0.824179,
+      0.886766
+     ],
+     "q": 20,
+     "t": 9.6
+    },
+    {
+     "coverage": 0.7004,
+     "coverage_ci": [
+      0.6604,
+      0.73881
+     ],
+     "precision": 0.931468,
+     "precision_ci": [
+      0.907438,
+      0.953384
+     ],
+     "q": 30,
+     "t": 20.1
+    },
+    {
+     "coverage": 0.6004,
+     "coverage_ci": [
+      0.554,
+      0.6412
+     ],
+     "precision": 0.990007,
+     "precision_ci": [
+      0.979194,
+      0.998643
+     ],
+     "q": 40,
+     "t": 40.7
+    },
+    {
+     "coverage": 0.5012,
+     "coverage_ci": [
+      0.45719,
+      0.54321
+     ],
+     "precision": 0.99601,
+     "precision_ci": [
+      0.990123,
+      1.0
+     ],
+     "q": 50,
+     "t": 76.1
+    },
+    {
+     "coverage": 0.4008,
+     "coverage_ci": [
+      0.35799,
+      0.4424
+     ],
+     "precision": 0.999002,
+     "precision_ci": [
+      0.996822,
+      1.0
+     ],
+     "q": 60,
+     "t": 124.9
+    },
+    {
+     "coverage": 0.3004,
+     "coverage_ci": [
+      0.26079,
+      0.3404
+     ],
+     "precision": 0.998668,
+     "precision_ci": [
+      0.995744,
+      1.0
+     ],
+     "q": 70,
+     "t": 157.2
+    },
+    {
+     "coverage": 0.2,
+     "coverage_ci": [
+      0.1648,
+      0.2348
+     ],
+     "precision": 0.998,
+     "precision_ci": [
+      0.993435,
+      1.0
+     ],
+     "q": 80,
+     "t": 204.24
+    },
+    {
+     "coverage": 0.1004,
+     "coverage_ci": [
+      0.0728,
+      0.12801
+     ],
+     "precision": 1.0,
+     "precision_ci": [
+      1.0,
+      1.0
+     ],
+     "q": 90,
+     "t": 290.0
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 5
+  },
+  "full|R7(0.25)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.6117,
+     "precision_ci": [
+      0.585245,
+      0.6377
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9001,
+     "coverage_ci": [
+      0.8926,
+      0.9077
+     ],
+     "precision": 0.638929,
+     "precision_ci": [
+      0.610598,
+      0.665856
+     ],
+     "q": 10,
+     "t": 8.0
+    },
+    {
+     "coverage": 0.8025,
+     "coverage_ci": [
+      0.7906,
+      0.8148
+     ],
+     "precision": 0.664424,
+     "precision_ci": [
+      0.634673,
+      0.692402
+     ],
+     "q": 20,
+     "t": 17.0
+    },
+    {
+     "coverage": 0.7022,
+     "coverage_ci": [
+      0.687198,
+      0.718102
+     ],
+     "precision": 0.69624,
+     "precision_ci": [
+      0.665173,
+      0.724657
+     ],
+     "q": 30,
+     "t": 28.0
+    },
+    {
+     "coverage": 0.6002,
+     "coverage_ci": [
+      0.5829,
+      0.618903
+     ],
+     "precision": 0.731423,
+     "precision_ci": [
+      0.699326,
+      0.762008
+     ],
+     "q": 40,
+     "t": 41.0
+    },
+    {
+     "coverage": 0.5019,
+     "coverage_ci": [
+      0.482297,
+      0.522405
+     ],
+     "precision": 0.768878,
+     "precision_ci": [
+      0.735763,
+      0.800119
+     ],
+     "q": 50,
+     "t": 59.0
+    },
+    {
+     "coverage": 0.4,
+     "coverage_ci": [
+      0.3786,
+      0.421305
+     ],
+     "precision": 0.809,
+     "precision_ci": [
+      0.773658,
+      0.842133
+     ],
+     "q": 60,
+     "t": 82.666667
+    },
+    {
+     "coverage": 0.301,
+     "coverage_ci": [
+      0.2793,
+      0.3228
+     ],
+     "precision": 0.851495,
+     "precision_ci": [
+      0.813997,
+      0.885193
+     ],
+     "q": 70,
+     "t": 121.0
+    },
+    {
+     "coverage": 0.2006,
+     "coverage_ci": [
+      0.1805,
+      0.2219
+     ],
+     "precision": 0.887338,
+     "precision_ci": [
+      0.848096,
+      0.921425
+     ],
+     "q": 80,
+     "t": 184.0
+    },
+    {
+     "coverage": 0.1001,
+     "coverage_ci": [
+      0.0835,
+      0.118102
+     ],
+     "precision": 0.934066,
+     "precision_ci": [
+      0.889827,
+      0.968414
+     ],
+     "q": 90,
+     "t": 336.333333
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 0,
+   "m_zero": 42
+  },
+  "full|R7(0.25)|1000": {
+   "attacker": "A2",
+   "costs_of": "A2",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.1432,
+     "precision_ci": [
+      0.11479,
+      0.174
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9144,
+     "coverage_ci": [
+      0.89559,
+      0.9332
+     ],
+     "precision": 0.153106,
+     "precision_ci": [
+      0.122872,
+      0.185677
+     ],
+     "q": 10,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.8144,
+     "coverage_ci": [
+      0.7888,
+      0.8404
+     ],
+     "precision": 0.167485,
+     "precision_ci": [
+      0.134335,
+      0.202683
+     ],
+     "q": 20,
+     "t": 2.25
+    },
+    {
+     "coverage": 0.704,
+     "coverage_ci": [
+      0.6712,
+      0.73601
+     ],
+     "precision": 0.180682,
+     "precision_ci": [
+      0.144073,
+      0.220414
+     ],
+     "q": 30,
+     "t": 3.5
+    },
+    {
+     "coverage": 0.6036,
+     "coverage_ci": [
+      0.5684,
+      0.6376
+     ],
+     "precision": 0.208085,
+     "precision_ci": [
+      0.165911,
+      0.252587
+     ],
+     "q": 40,
+     "t": 4.75
+    },
+    {
+     "coverage": 0.5028,
+     "coverage_ci": [
+      0.466,
+      0.5388
+     ],
+     "precision": 0.23389,
+     "precision_ci": [
+      0.18607,
+      0.285055
+     ],
+     "q": 50,
+     "t": 6.75
+    },
+    {
+     "coverage": 0.4012,
+     "coverage_ci": [
+      0.3636,
+      0.4368
+     ],
+     "precision": 0.266201,
+     "precision_ci": [
+      0.209988,
+      0.32515
+     ],
+     "q": 60,
+     "t": 9.25
+    },
+    {
+     "coverage": 0.3044,
+     "coverage_ci": [
+      0.2696,
+      0.3392
+     ],
+     "precision": 0.344284,
+     "precision_ci": [
+      0.277097,
+      0.415244
+     ],
+     "q": 70,
+     "t": 12.5
+    },
+    {
+     "coverage": 0.2048,
+     "coverage_ci": [
+      0.1756,
+      0.23601
+     ],
+     "precision": 0.40625,
+     "precision_ci": [
+      0.317596,
+      0.493541
+     ],
+     "q": 80,
+     "t": 17.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.07679,
+      0.1252
+     ],
+     "precision": 0.572,
+     "precision_ci": [
+      0.443945,
+      0.69261
+     ],
+     "q": 90,
+     "t": 26.525
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 29
+  },
+  "full|R7(0.5)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.571033,
+     "precision_ci": [
+      0.544431,
+      0.598136
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.9069,
+     "coverage_ci": [
+      0.899698,
+      0.9141
+     ],
+     "precision": 0.59345,
+     "precision_ci": [
+      0.565343,
+      0.622225
+     ],
+     "q": 10,
+     "t": 8.0
+    },
+    {
+     "coverage": 0.8089,
+     "coverage_ci": [
+      0.797597,
+      0.8202
+     ],
+     "precision": 0.61936,
+     "precision_ci": [
+      0.590246,
+      0.65001
+     ],
+     "q": 20,
+     "t": 17.0
+    },
+    {
+     "coverage": 0.7007,
+     "coverage_ci": [
+      0.6853,
+      0.715902
+     ],
+     "precision": 0.654631,
+     "precision_ci": [
+      0.624212,
+      0.68701
+     ],
+     "q": 30,
+     "t": 29.0
+    },
+    {
+     "coverage": 0.6058,
+     "coverage_ci": [
+      0.5878,
+      0.623805
+     ],
+     "precision": 0.685375,
+     "precision_ci": [
+      0.652745,
+      0.719278
+     ],
+     "q": 40,
+     "t": 42.0
+    },
+    {
+     "coverage": 0.5007,
+     "coverage_ci": [
+      0.480797,
+      0.5215
+     ],
+     "precision": 0.734372,
+     "precision_ci": [
+      0.700038,
+      0.768554
+     ],
+     "q": 50,
+     "t": 60.0
+    },
+    {
+     "coverage": 0.4005,
+     "coverage_ci": [
+      0.3801,
+      0.423102
+     ],
+     "precision": 0.779775,
+     "precision_ci": [
+      0.743391,
+      0.813809
+     ],
+     "q": 60,
+     "t": 84.0
+    },
+    {
+     "coverage": 0.302,
+     "coverage_ci": [
+      0.280498,
+      0.323705
+     ],
+     "precision": 0.82649,
+     "precision_ci": [
+      0.787467,
+      0.862145
+     ],
+     "q": 70,
+     "t": 118.0
+    },
+    {
+     "coverage": 0.2008,
+     "coverage_ci": [
+      0.180393,
+      0.221602
+     ],
+     "precision": 0.870518,
+     "precision_ci": [
+      0.830077,
+      0.906953
+     ],
+     "q": 80,
+     "t": 181.0
+    },
+    {
+     "coverage": 0.1,
+     "coverage_ci": [
+      0.0831,
+      0.117402
+     ],
+     "precision": 0.928,
+     "precision_ci": [
+      0.882227,
+      0.964249
+     ],
+     "q": 90,
+     "t": 329.1
+    }
+   ],
+   "draws": 10000,
+   "m_infinite": 0,
+   "m_zero": 73
+  },
+  "full|R7(0.5)|1000": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "curve": [
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.0219,
+     "precision_ci": [
+      0.0114,
+      0.033762
+     ],
+     "q": 0,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.0219,
+     "precision_ci": [
+      0.0114,
+      0.033762
+     ],
+     "q": 10,
+     "t": 0.0
+    },
+    {
+     "coverage": 1.0,
+     "coverage_ci": [
+      1.0,
+      1.0
+     ],
+     "precision": 0.0219,
+     "precision_ci": [
+      0.0114,
+      0.033762
+     ],
+     "q": 20,
+     "t": 0.0
+    },
+    {
+     "coverage": 0.7076,
+     "coverage_ci": [
+      0.67519,
+      0.73961
+     ],
+     "precision": 0.024873,
+     "precision_ci": [
+      0.011022,
+      0.04098
+     ],
+     "q": 30,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.7076,
+     "coverage_ci": [
+      0.67519,
+      0.73961
+     ],
+     "precision": 0.024873,
+     "precision_ci": [
+      0.011022,
+      0.04098
+     ],
+     "q": 40,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.7076,
+     "coverage_ci": [
+      0.67519,
+      0.73961
+     ],
+     "precision": 0.024873,
+     "precision_ci": [
+      0.011022,
+      0.04098
+     ],
+     "q": 50,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.7076,
+     "coverage_ci": [
+      0.67519,
+      0.73961
+     ],
+     "precision": 0.024873,
+     "precision_ci": [
+      0.011022,
+      0.04098
+     ],
+     "q": 60,
+     "t": 1.0
+    },
+    {
+     "coverage": 0.3372,
+     "coverage_ci": [
+      0.30119,
+      0.374
+     ],
+     "precision": 0.039146,
+     "precision_ci": [
+      0.014012,
+      0.068183
+     ],
+     "q": 70,
+     "t": 2.0
+    },
+    {
+     "coverage": 0.2144,
+     "coverage_ci": [
+      0.1828,
+      0.2468
+     ],
+     "precision": 0.059701,
+     "precision_ci": [
+      0.020444,
+      0.105592
+     ],
+     "q": 80,
+     "t": 3.0
+    },
+    {
+     "coverage": 0.102,
+     "coverage_ci": [
+      0.08,
+      0.1264
+     ],
+     "precision": 0.109804,
+     "precision_ci": [
+      0.033829,
+      0.197723
+     ],
+     "q": 90,
+     "t": 5.0
+    }
+   ],
+   "draws": 2500,
+   "m_infinite": 0,
+   "m_zero": 731
+  }
+ },
+ "config_sha256": "afc73eec79a53f4916683f83f2db8911ed9994b2b8988045ad69f28d57a0044a",
+ "note": "exploratory (decision 68), not preregistered; not used for questions 1 to 4",
+ "sample": "main500",
+ "sample_sizes": {
+  "APPEARANCE": 125,
+  "COMPETITION": 125,
+  "HAPPINESS": 125,
+  "MATERIALISM": 125
+ },
+ "seed_file_sha256": "d766284cd36eea562c99c5268cedd99a4bd2ae5ed9d75cb1bad330633cbbe9ff",
+ "source": "klicke"
+}

@@ -14,6 +14,7 @@ C:\GSE-wt-matching-prereg\.steering\_handoff\next-session-public-keystroke-match
 - A4 は 500/500（D3）。ENJA15 は済み（`results/enja15_main.json`・コミット `578f2cda`）。
 - 500 人の本計算は 1 回目が Windows Update の再起動で 19 時間後に止まった。`run_main.py --cache-dir` で再開できるようにした（逸脱 D4・コミット `e7206812`・レビュー済み）。研究者は Windows Update を一時停止した（2026-10-21）。
 - 2026-10-21 05:55:08 UTC に `raw/main_chain/run_chain.sh`（git の外）で一続きを始めた（コミット `accfea3f` のコード。04:25 の 1 回目は探索的な分析 3〜5 を足すために止めた）。段の順: main500（`results/main.json` と探索的な分析 3〜5 の `results/exploratory_{tail,margin,score_band}.json`・916 件・約 53 時間）→ explore35（探索のファイルが無いときだけキャッシュから集計し直す）→ main_a4（`main_a4.json`・全件を計算し直す）→ unicity（`exploratory_unicity.json`）→ dp（`exploratory_dp.json`）→ all（`main_all.json`・標本の件を使い回す・約 10 日）。
+- 500 人の段は 2026-10-24 06:21:45 UTC に終わった（約 72 時間・1 時間に約 12.6 件）。`main.json` と探索 3〜5 はコミット済み。同じ時刻に main_a4 を始めた（指紋 `628d6e4e756e4b71`・916 件）。いまの速さでの見込み: main_a4 は 10-27 ごろ、R-DP は 11-01 ごろ、全員の付録は 11-16 ごろ（研究者に Windows Update の一時停止を 11-16 より先まで、とお願いした）。
 
 ## 様子の見方
 
