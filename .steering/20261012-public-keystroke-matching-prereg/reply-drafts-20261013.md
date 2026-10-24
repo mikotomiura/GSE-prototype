@@ -113,7 +113,7 @@ In brief, the paper asks how far the processing applied to publicly released key
 
 The paper takes the Kaggle competition as an example of such processing: its letters and digits were masked "to prevent reproduction of the essay text". The competition data were not used in this study and were not matched against any text. The paper notes that the competition's description of data collection follows the same procedure as KLiCKe, but it does not examine whether the two share essays. Scott, if anything in how the paper describes the competition is inaccurate, or if you think The Learning Agency Lab should hear about the paper from you rather than from me, please let me know.
 
-In the ethics section, I describe the IRB approval at Georgia State University and the scope of consent as you explained them to me. If you would like anything worded differently, I would be glad to change it. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date]. Because the venue uses double-blind review, I would appreciate it if you could both keep the draft to yourselves for now.
+In the ethics section, I describe the IRB approval at Georgia State University and the scope of consent as you explained them to me. In Section [n], I also state, as a personal communication from you, that the competition data were drawn from the KLiCKe corpus before it was published. If you would like anything worded differently, I would be glad to change it. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date]. Because the venue uses double-blind review, I would appreciate it if you could both keep the draft to yourselves for now.
 
 I would also like to thank you more personally. I work as an independent researcher, without an institution behind me, and questions of research ethics have always been something I had to face on my own. A large, carefully documented corpus that is openly available, together with your clear and generous answers to my questions, made this study possible in a way it otherwise could not have been. I am very grateful.
 
@@ -148,3 +148,43 @@ Thank you for releasing the data and for the care taken to protect the writers.
 
 Best regards,
 Mikoto Miura
+
+## 6. Dr. Tian へ、遅れの知らせと Kaggle のデータの問い（2026-10-23 に下書き・送るのは研究者）
+
+研究者の決定（2026-10-23・AskUserQuestion 1 回・3 問とも推奨を選んだ）: Kaggle について尋ねるのは「照合をせず集計だけで使ってよいか」だけ（作文が KLiCKe と重なるかは尋ねない・判断 64）。Crossley は CC に入れない（草稿を送る下書き 4 で入れる）。新しい見込みは「11 月中旬ごろ」。遅れの段落は、遅れの理由（計算・ハードウェア）と投稿の事情を書かず、送るのが遅れることだけを伝える（研究者・2026-10-23）。英文は Claude が見直した（DeepL Write の API は無料のキーで使えなかった）。
+
+前の返信（下書き 3）で「今月中に仕上げる」と書いたので、その遅れを伝える。判断 67（Kaggle のデータは使わない）は、返事を受けて研究者が改めて決めるまで変わらない。使うことになれば、事前登録に無い探索的な分析として逸脱に記録する。
+
+**Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis（前のスレッドへの返信）
+
+Hi Yu,
+
+I hope you are well. I am writing with a short update.
+
+In my last message I said I would send you the paper by the end of this month. I am sorry, but it will take a little longer than I expected. I now expect to send it to you around mid-November.
+
+There is also one thing I would like to ask you, if I may. It concerns the Kaggle competition "Linking Writing Processes to Writing Quality". The paper discusses it as an example of how keystroke logs are processed before public release, but I have not used its data. I am considering using the competition data only for aggregate descriptive statistics, for example to check that the masking I apply to KLiCKe reproduces the format of the released logs. I would not match any log against any text, and I would report nothing about individual writers. Would you consider this appropriate, or would it be better to ask The Learning Agency Lab or the competition organizers first? I would be grateful for your view, and I would understand if this is not something you can answer.
+
+Thank you again for your help.
+
+Best regards,
+Mikoto
+
+## 7. Dr. Tian へ、お礼と論文に書く許可の問い（2026-10-24 に下書き・判断 72・送るのは研究者）
+
+下書き 6 への返事（2026-10-24）への返信。同じスレッドに返す。宛先は Dr. Tian だけ。
+
+**Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis
+
+Hi Yu,
+
+Thank you for your quick reply, and for being so understanding about the timeline.
+
+Thank you also for telling me where the Kaggle competition data came from. I should have been clearer: I was not planning to replicate the study with them, only to check the format of the released logs. Given what you explained, I will not use the competition data.
+
+May I ask one more thing? The paper takes the competition as an example of how keystroke logs are processed before release, so what you told me, that the competition data were drawn from the KLiCKe corpus before it was published, matters for how the paper describes that example. Would it be all right for me to state this in the paper, citing it as a personal communication from you? If you would prefer that I not mention it, or would like it worded in a particular way, please let me know.
+
+Thank you again for your help.
+
+Best regards,
+Mikoto
