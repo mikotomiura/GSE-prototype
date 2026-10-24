@@ -1,0 +1,48 @@
+\section{Methods for the Japanese translation logs}
+\label{app:enja}
+
+% Moved from Sections 4.1, 4.3, 5.5 and 6.6 of the main body on 24 October 2026, without changing the procedure. The
+% main body keeps the candidates, the segment rule, the quantity that answers question 4 and the rule for "exceeds".
+
+\paragraph{Corpus.}
+ENJA15 is a public corpus of English-to-Japanese translation processes recorded with Translog-II, in which Japanese was
+typed with an input method~\cite{carl2016lrec,zou2026translog}. We use only the from-scratch translation sessions and
+take the final translation recorded in each log as its text. The sessions were acquired on 12 October 2026 (UTC) from
+the repository of the database that distributes them, at a fixed revision. The database states two licences on two of
+its pages; both are non-commercial with attribution, and we follow the more restrictive one, which also requires
+derived works to be shared alike~\cite{crittlicense}. The corpus has 76 from-scratch sessions by 39 translators on six
+source texts, with 12 or 13 translators per source text. Thirty-seven translators translated two source texts and two
+translated one, so translators and source texts are crossed. Sessions are excluded if the log or translation is missing,
+if the translation is empty, or if the log contains neither an input-method event nor an inserted letter.
+
+\paragraph{Forms.}
+For ENJA15 the forms are R0j (no processing); R3j, which keeps the event type and the time and replaces each key event
+by one of the categories romaji letter, conversion, commit, commit containing punctuation, BackSpace, Enter, navigation
+and other, and removes every string (the key name, the committed text and the keys typed for it); R3j-t($w$), with the
+press times of R3j rounded ($w = 10$, $100$, $1{,}000$\,ms); and R4($w$). The logs have no release events, so hold
+times do not arise. Before the main computation we checked on all sessions, which include updates of uncommitted
+strings, conversions, cancelled conversions and commits, that no row of R3j keeps a string of its session.
+
+\paragraph{Attackers.}
+In a translation, segments are split at the Japanese comma and full stop (U+3001, U+3002, U+FF0C and U+FF0E) and at
+line breaks, and the value of a segment
+is the standard number of keystrokes needed to type its reading with an input method, from the readings of a
+morphological analyser and a romaji conversion table. In a log, among the input-method and insertion events, a letter
+press adds 1, a BackSpace press subtracts 1, and a commit that contains punctuation closes the segment. Only A0 and A2
+are run on these logs. A1, A1$'$, A3 and A4 are not, because they rely on rebuilding the final draft or on models of
+English. A0 compares the number of letter presses minus BackSpace presses with the sum of the keystroke counts of the
+candidate's readings. A2 aligns the segments as on KLiCKe, with the same groups and $\lambda$. Neither reads a string,
+so they give the same values on R0j, R3j and R3j-t; in R0j the committed strings remain in the log and matching is
+trivial for an attacker that reads them, so R0j is only a reference.
+
+\paragraph{Analysis.}
+The fourth question of the study asks how far above chance and above A0 the same kind of matching is on the Japanese
+translation logs. The candidates for a log are translations of the same source text by other translators: all of them
+($N$ = all), or nine drawn without replacement, 20 times per log ($N = 10$); identical translations tie. Accuracy, $1/N$
+and the accuracy of A0 are averaged over the logs of each source text and then over the source texts. Since
+translators and source texts are crossed, intervals come from 2,000 bootstrap resamples of translators with all their
+sessions, without stratification, and differences are taken within each resample. The quantity that answers the
+question is the accuracy of A2 on R3j, full texts and $N$ = all, with its differences from $1/N$ and from A0. We say
+that matching ``exceeds'' chance and A0 only if the lower bounds of the intervals of both differences are above zero.
+R3j-t($w$) and R4($w$) are reported with the same rule; since neither A0 nor A2 uses times, R3j-t($w$) gives the
+values of R3j. Values per source text are only described, and R0j is a reference. ENJA15 is much smaller than KLiCKe, and its intervals are expected to be wide.

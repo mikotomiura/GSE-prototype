@@ -39,3 +39,5 @@
 
 - [x] 題名（判断 69）・重複の削除（Page budget の 1）・§3.2 の文（判断 70）（2026-10-21）
 - [x] 次のセッションの引き継ぎ（Mac: next-session-public-keystroke-matching-manuscript-after-attack-me.md・G-GEAR: next-session-public-keystroke-matching-exploratory-3-5-ggear.md）
+- [x] 結果の前の組み直し（paper-write の実地の試し 1 回目・判断 77・78・2026-10-24）: venue-fit・主張と貢献・本文と付録の分け（付録 A〜E）・柱ごとの冒頭・分析の地位の定義を 1 か所・分量の記録
+- [ ] 残り約 1 頁の縮め方（length-log.md の候補・結果に依らないものは研究者に聞く）

@@ -1,13 +1,24 @@
 \section{Evaluation protocol}
 \label{sec:protocol}
 
-This section states how candidate sets are built (\S\ref{sec:protocol:candidates}), what is reported for matching
+% What this part is meant to establish and what is measured. What was found and why it matters are written in
+% Section 7 after the results.
+The evaluation is meant to show, for each form, how far above chance and above the total length the attackers choose
+the true text among $N$ candidates, and how far the process measures can still be computed. This section states how
+candidate sets are built (\S\ref{sec:protocol:candidates}), what is reported for matching
 (\S\ref{sec:protocol:quantities}) and for the process measures (\S\ref{sec:protocol:utility}), how the two are
-summarised (\S\ref{sec:protocol:summary}), the diagnostics (\S\ref{sec:protocol:diagnostics}) and the analysis of the
-Japanese translation logs (\S\ref{sec:protocol:enja}). Five exploratory analyses that are not part of the
-preregistration are described separately (\S\ref{sec:protocol:exploratory}). Section~\ref{sec:protocol:registration}
-states how the registered plan relates to what was run. No pass or fail criterion is set: $k$, $N$ and the levels of
-processing are settings of the experiment, not thresholds.
+summarised (\S\ref{sec:protocol:summary}), the diagnostics (\S\ref{sec:protocol:diagnostics}), the Japanese translation
+logs (\S\ref{sec:protocol:enja}), the analyses that are not part of the preregistration
+(\S\ref{sec:protocol:exploratory}) and how the registered plan relates to what was run
+(\S\ref{sec:protocol:registration}). No pass or fail criterion is set: $k$, $N$ and the levels of processing are
+settings of the experiment, not thresholds.
+
+\paragraph{Status of the analyses.}
+Everything in Sections~\ref{sec:threat-model} to~\ref{sec:protocol}, including the threat model, the forms, the
+attackers and their parameters, was fixed in the preregistration of this study before any data were acquired. The
+exceptions are the deviations listed in \S\ref{sec:protocol:registration} and the five analyses of
+\S\ref{sec:protocol:exploratory}, which are labelled as exploratory wherever they are reported. These sections
+motivate and state the registered plan and do not change it.
 
 \subsection{Candidates, scope and samples}
 \label{sec:protocol:candidates}
@@ -22,19 +33,13 @@ that $N$.
 
 \paragraph{Windows.}
 Windows contain $k = 5$, $10$, $20$ or $50$ non-empty segments (\S\ref{sec:attackers:windows}), with five window starts
-per log drawn uniformly from the valid starts. The true window is found once, on the unprocessed log, and used by
-every form and attacker. Replaying the log gives, for each press, the character of the final draft that it became; the
-true window is the $k$ words of the text that start at the word holding most of the surviving characters of the
-window's first segment. Windows whose first segment leaves no character in the final draft, and windows that would run
-past the end of the text, are not used. For writers whose rebuilt draft does not match the distributed text, the words
-of the two are aligned after normalisation of whitespace, and only windows whose first word maps to a word of the
-distributed text are used; the windows that do not map are counted. Each decoy contributes one window of $k$ words,
-drawn uniformly from its valid windows. Logs with no valid window of length $k$ are left out for that $k$, and their
-number is reported.
+per log. The true window, the $k$ words of the text that the window's presses became, is found once on the unprocessed
+log and used by every form and attacker; each decoy contributes one window of $k$ words. The rules for valid windows
+are in Appendix~\ref{app:attackers}.
 
 \paragraph{Samples.}
 KeyTAR is expensive to run, so 125 writers are drawn from each prompt, 500 in all, and the main tables report every
-attacker on these 500 writers, so that KeyTAR stands next to the other attackers on the same writers. Attackers A0 to A3 on all writers after exclusion are reported in the appendix.
+attacker on these 500 writers, so that KeyTAR stands next to the other attackers on the same writers. Attackers A0 to A3 on all writers after exclusion are reported in Appendix~\ref{app:results}.
 
 \subsection{Reported quantities}
 \label{sec:protocol:quantities}
@@ -64,10 +69,8 @@ R3-t, so the difference of A3 is also reported. No form drops all times; the coa
 stands in for it.
 
 \paragraph{Secondary quantities.}
-We also report the rank of the true text (top-5 accuracy and mean reciprocal rank); the distribution of accuracy per
-writer, at its 10th, 50th and 90th percentiles; A2 with $\lambda = 4$ and $16$ ($N = 1{,}000$, full text); accuracy
-separately for writers whose rebuilt draft matches the distributed text and writers whose draft does not; and the
-numbers of candidates without an alignment path.
+The rank of the true text, the distribution of accuracy per writer to its 90th percentile and the other secondary
+quantities are listed and reported in Appendix~\ref{app:results}.
 
 \subsection{Utility}
 \label{sec:protocol:utility}
@@ -154,103 +157,47 @@ For $N = 1{,}000$ on full texts, each draw gives two values for the strongest at
 candidates, and its lowest cost over the same candidates without the true text. Pooling each kind of value over all
 logs and draws, we report the probability that a value of the first kind is lower than a value of the second kind,
 over all pairs (ties count one half), as an area under the curve. It shows how well the scores separate candidate sets that
-contain the true text from sets that do not; it is not a rate of false matches (\S\ref{sec:threat-model:bias}).
-
-\paragraph{Position of true windows.}
-To see whether true windows sit at positions that favour the alignment, we show the distribution of the A2 alignment
-cost at the true window next to that of the whole log.
+contain the true text from sets that do not; it is not a rate of false matches (\S\ref{sec:threat-model:bias}). A
+diagnostic of the position of true windows is in Appendix~\ref{app:attackers}.
 
 \subsection{Japanese translation logs}
 \label{sec:protocol:enja}
 
 The fourth question of the study asks how far above chance and above A0 the same kind of matching is on the Japanese
-translation logs. The candidates for a log are translations of the same source text by other translators: all of them
-($N$ = all), or nine drawn without replacement, 20 times per log ($N = 10$); identical translations tie. Accuracy, $1/N$
-and the accuracy of A0 are averaged over the logs of each source text and then over the source texts. Since
-translators and source texts are crossed, intervals come from 2,000 bootstrap resamples of translators with all their
-sessions, without stratification, and differences are taken within each resample. The quantity that answers the
-question is the accuracy of A2 on R3j, full texts and $N$ = all, with its differences from $1/N$ and from A0. We say
-that matching ``exceeds'' chance and A0 only if the lower bounds of the intervals of both differences are above zero.
-R3j-t($w$) and R4($w$) are reported with the same rule; since neither A0 nor A2 uses times, R3j-t($w$) gives the
-values of R3j. Values per source text are only described, and R0j is a reference. ENJA15 is much smaller than KLiCKe, and its intervals are expected to be wide.
+translation logs. The candidates for a log are translations of the same source text by other translators ($N$ = all,
+and $N = 10$). The quantity that answers the question is the accuracy of A2 on R3j, full texts and $N$ = all, with its
+differences from $1/N$ and from A0, and we say that matching ``exceeds'' chance and A0 only if the lower bounds of the
+intervals of both differences are above zero. The averaging and the intervals, which resample translators since
+translators and source texts are crossed, are given in Appendix~\ref{app:enja}. ENJA15 is much smaller than KLiCKe,
+and its intervals are expected to be wide.
 
 \subsection{Exploratory analyses not in the preregistration}
 \label{sec:protocol:exploratory}
 
-% The statement about the last three analyses holds only if no result of the main computation had been opened when
-% their procedures were committed; confirm this with the record of the main computation before submission.
-Five analyses were added after the preregistration was fixed and are not part of it. They change no registered value
-or procedure. Their procedures were fixed and committed to the study repository before any value of matching or
-utility on the human data had been seen, the first two on 13 October 2026 and the other three on 21 October 2026, and
-they are reported as exploratory and are not used to answer the four questions. The last three use the strongest
-attacker selected in the main computation for the same form and $N$, without selecting again, on full texts, the main
-forms, $N = 10$ and $1{,}000$ and the 500 writers, with the same resamples.
-
-\paragraph{Uniqueness of word-length sequences among $N$ candidates.}
-The first analysis uses the texts alone. For each of the 500 writers and each $k$ from 1 to 50, five runs of $k$
-consecutive words are drawn from the writer's text, and we report the share for which none of the $N - 1$ decoys,
-drawn as in the main computation, contains the same sequence of word lengths at any position; as a secondary quantity,
-the accuracy $1/m$ of an attacker who chooses uniformly among the $m$ texts that contain it. Next to these curves we
-draw reference lines $k^{*} = \log_2 N / h$, where $h$ is a plug-in estimate of the entropy rate of word lengths in
-bits per word, conditioned on up to two preceding words~\cite{kalimeri2012entropy}; plug-in estimates fall as the
-order rises, and the lines are a reference, not a prediction. We call the quantity uniqueness among $N$ candidates and
-not a risk of re-identification. Whether uniqueness in a sample says anything about a population is
-disputed~\cite{sanchez2016comment,rocher2019estimating}, and in location data unicity decreases, slowly, as the dataset
-grows~\cite{farzanehfar2021risk}; here the population is the set of $N$ candidates itself, and we do not extend the
-quantity beyond the values of $N$ tried.
-
-\paragraph{A form with differentially private noise.}
-The second analysis adds a form R-DP($\varepsilon$), $\varepsilon = 0.5$, $1$, $2$, $4$, built on R3, with letters and
-digits released as one category. Two mechanisms use the same $\varepsilon$. First, the number of counted letter and
-digit presses of each segment receives two-sided geometric noise with sensitivity 1, and letter presses are added at
-random positions in the segment or removed at random accordingly, with the count kept at zero or above. Second, every
-press interval is clipped at 2,000\,ms, the threshold of the P-bursts, and receives two-sided geometric noise with
-sensitivity 2,000\,ms, and negative intervals are set to zero. Each guarantee holds for its own unit, one segment count
-or one interval, and not for a writer's whole log: over a log the budgets add up over all segments and
-intervals~\cite{kellaris2014event}. We do not claim that the combined release is differentially private for neighbouring
-logs that differ by an inserted or removed press with its time. The noise is drawn from a seeded generator so that the
-evaluation can be repeated, which is acceptable for evaluation but not for an actual release~\cite{holohan2023random},
-and an actual release would also need an implementation that is exact on finite
-computers~\cite{canonne2020discrete}. The attackers are those of R3, with the timing table of A3 built from training
-logs with the same interval noise; the candidates are unchanged, and every process measure that R3 computes is counted as
-approximated. The scope, samples and resamples are those of the main computation, with the contrast R3~$-$~R-DP and the
-open-world area, but no negative control. R-DP is reported in exploratory tables, where $\varepsilon$ is labelled as the budget per segment count and per
-interval, and it is not part of the main table or figure.
-
-\paragraph{The upper tail of accuracy per writer.}
-The third analysis reports the 95th and 99th percentiles of accuracy per writer and the share of writers whose true text
-is chosen alone in every draw. No value per writer is reported.
-
-\paragraph{Matches above a margin.}
-The fourth analysis takes, for each log and draw, the difference between the attacker's second-lowest and lowest cost
-over the candidates (zero if the lowest is tied), with log-likelihoods turned into costs by a change of sign. At
-thresholds set at the 0th, 10th, \ldots, 90th percentiles of these differences, it reports the share of logs and draws
-at or above the threshold and the accuracy among them. Costs of different attackers are not compared.
-
-\paragraph{Accuracy by score band.}
-The fifth analysis divides the 500 writers of each prompt into thirds by their human score and reports the strongest
-attacker's accuracy in each third and the difference between the top and bottom thirds. The attackers do not use the
-scores.
+% The statement about the dates holds only if no result of the main computation had been opened when the procedures
+% of the last three analyses were committed; confirm this with the record of the main computation before submission.
+Five analyses were added after the preregistration was fixed and are not part of it: the uniqueness of word-length
+sequences among $N$ candidates, a form with differentially private noise (R-DP), the upper tail of accuracy per
+writer, matches above a margin of cost, and accuracy by score band. They change no registered value or procedure,
+they are reported as exploratory and are not used to answer the four questions. Their procedures were fixed and
+committed to the study repository before any value of matching or utility on the human data had been seen, the first
+two on 13 October 2026 and the other three on 21 October 2026, and are given in Appendix~\ref{app:exploratory}.
 
 \subsection{Registration, deviations and reproducibility}
 \label{sec:protocol:registration}
 
 \paragraph{Registration.}
-The plan, its parameters (\texttt{config.json}) and its seed (\texttt{SEED}) were registered before any data were
-acquired, with the SHA-256 of each file (see the open science section). The present \texttt{config.json} differs from
-the registered file only in three fields that the registered file left to be filled at acquisition: the version and
-SHA-256 of the files acquired from each source. No registered value was changed. Every random choice uses a seed
-derived as the first eight bytes of the SHA-256 of the registered seed joined with the use, prompt, writer, $N$, $k$ and
-draw, so each draw can be reproduced on its own.
+The plan, its parameters and its seed were registered before any data were acquired, and no registered value was
+changed; the registered files, their SHA-256 and how each random choice derives its seed are given in the open science
+section.
 
 \paragraph{Deviations.}
 % Update the list of deviations from the record when the main computation is complete.
-At the time of writing, two deviations are recorded with their times and reasons. The first is the undoing of escaped characters when the logs
-are read (\S\ref{sec:data:checks}). The second concerns the code: three processing functions removed a column that
-the reading of KLiCKe had already dropped, which stopped a trial run; they were changed to remove the column only if
-it is present. The released columns did not change, and no value of matching or utility had been
-computed before either change. Details that the registration left open were decided, before the data were opened or
-before any value of matching was seen, and are recorded with the code.
+At the time of writing, two deviations are recorded with their times and reasons: the undoing of escaped characters
+when the logs are read (\S\ref{sec:data:corpora}), and a change to three processing functions that removed a column
+the reading of KLiCKe had already dropped, which stopped a trial run. Neither changed the released columns, and no
+value of matching or utility had been computed before either change. Details that the registration left open were
+decided before the data were opened or before any value of matching was seen, and are recorded with the code.
 
 \paragraph{Predictions.}
 Before any data were acquired, we registered predictions of the strongest attacker's accuracy for $N = 1{,}000$ on full

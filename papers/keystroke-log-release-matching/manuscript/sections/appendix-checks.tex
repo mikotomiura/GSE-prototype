@@ -1,0 +1,53 @@
+\section{Checks after acquisition and on synthetic logs}
+\label{app:checks}
+
+% Moved from Sections 4.2, 4.3 and 5.1 of the main body on 24 October 2026, without changing the procedure. The text
+% is that of the main body before the move, except for the references back to it.
+
+\subsection{Checks after acquisition}
+\label{sec:data:checks}
+
+Before any value of matching or utility was computed, the preregistration allowed only a fixed list of checks: the
+counts of files, rows, writers and excluded writers; the column names and values; the share of logs whose final draft,
+rebuilt from the unprocessed log, matches the distributed text; the error of the segment rule
+(\S\ref{sec:attackers:segments}); the structure of ENJA15; the inference time of KeyTAR on one log; and a verification
+of our formulas for the process measures. The checks report counts only; the scripts print no writer identifier, no
+text and no log.
+
+\paragraph{Escaped characters.}
+The distributed logs write four characters (newline, tab, double quote and backslash) in the text change and key
+columns as two-character escape sequences, which the procedure did not anticipate. Read as they are, a newline is
+inserted as two characters and the rebuilt draft drifts from the cursor position. We undo the escapes when the logs are
+read and change nothing else in the procedure; this is reported as a deviation, with the values of the checks before
+and after the change. After it, the final draft rebuilt from the unprocessed log matches the distributed text exactly,
+after normalisation of whitespace, for 4,842 of the 4,992 writers (97.0\%), against 72 before. The other 150 writers
+stay in full-text matching, and accuracy is also reported separately for writers whose rebuilt draft matches and
+writers whose draft does not.
+
+\paragraph{Other checks.}
+The action time of modifier keys, which the corpus description gives as zero~\cite{tian2025klicke}, is zero for Shift,
+Control and Alt but not for most CapsLock and Meta presses. No attacker uses hold times and the coarser forms drop
+them, so the procedure is unchanged. The corpus does not distribute the process measures computed by Inputlog, so the
+verification of our formulas against them could not be done (\S\ref{sec:protocol:utility}). For KeyTAR, the default
+settings of the artifact were recorded, and the inference on one log fitted in the memory of a 16\,GB GPU.
+
+\paragraph{Cases that the segment rule misses.}
+The rule ``the next press after Control'' misses shortcuts made with several keys while Control is held,
+such as two successive undos, and pastes made from a menu: in 566 of the 1,133 paste events of the corpus, the
+preceding press, ignoring Shift, Alt and CapsLock, is not Control.
+
+\subsection{A check on synthetic logs before registration}
+\label{app:checks:synthetic}
+
+Before the preregistration was fixed, we checked on synthetic logs, with no human data, whether the lengths of words
+can be recovered from columns other than the key categories. The synthetic logs included deletion, deletion of a
+selection, replacement, paste, cursor movement by arrows, Home, End and mouse, and undo. In pairs of synthetic logs
+that share the category sequence and the press times and differ only in hidden choices, such as the target of a mouse
+click or the pasted words, forms R3, R3-u, R3-t and R7 gave identical output, while R0, R1 and R2 differed in every
+pair (R2 through the position and the word count). The release times were at first kept in these forms; in a
+simulation in which a drag's duration appears in its hold time, the output differed through them, and they were then
+dropped. A drag's duration, and that of a held key when the next press follows its release, still remains as a lower
+bound of the next press interval, which a form that releases press times cannot remove. In R2, rebuilding the draft
+from the cursor position recovered the exact sequence of word lengths in 64\% of the synthetic logs with light
+editing. These checks led to the present definitions of the forms, the categories and the segment rule, which are part
+of the registered plan.

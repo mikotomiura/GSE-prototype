@@ -9,6 +9,23 @@ plan, its parameters, the record of deviations and the record of data acquisitio
 \textbf{[anonymous link to be added]}. Analyses that were not registered are marked as exploratory where they are
 reported.
 
+\paragraph{Registered files and seeds.}
+The plan, its parameters (\texttt{config.json}) and its seed (\texttt{SEED}) were registered before any data were
+acquired, with the SHA-256 of each file. The present \texttt{config.json} differs from
+the registered file only in three fields that the registered file left to be filled at acquisition: the version and
+SHA-256 of the files acquired from each source. No registered value was changed. Every random choice uses a seed
+derived as the first eight bytes of the SHA-256 of the registered seed joined with the use, prompt, writer, $N$, $k$ and
+draw, so each draw can be reproduced on its own.
+
+\paragraph{Data acquisition.}
+We acquired the KLiCKe corpus on 12 October 2026 at 19:29 UTC, after the preregistration was registered at 16:43 UTC,
+from the folder linked by the corpus repository at a fixed commit. We acquired only the archive of the argumentative
+writing task and extracted only its logs, texts, scores and prompts. The demographic file, whose questionnaire asked
+for the participants' Mechanical Turk worker IDs~\cite{tian2025klicke}, was not acquired, and the archive we acquired
+holds no demographic file. The ENJA15 sessions were acquired the same day from the repository of the database that
+distributes them, at a fixed revision (Appendix~\ref{app:enja}). The SHA-256 of every file is recorded in the study
+repository.
+
 \paragraph{Code and data.}
 We publish the code that reads, processes and evaluates the two corpora used here, and the aggregated results, as a
 release of the study repository with a DOI on acceptance. We do not write or publish code that reads other released

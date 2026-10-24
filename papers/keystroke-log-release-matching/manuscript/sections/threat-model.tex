@@ -4,9 +4,7 @@
 This section describes how keystroke logs of writing are released (\S\ref{sec:threat-model:releases}), the kind of
 auxiliary information that this study considers (\S\ref{sec:threat-model:auxiliary}) and who holds it
 (\S\ref{sec:threat-model:settings}). It then states the attacker (\S\ref{sec:threat-model:attacker}) and the direction
-in which the assumptions bias the results (\S\ref{sec:threat-model:bias}). The attacker's knowledge, the candidate sets
-and the list of attackers were fixed in the preregistration of this study before any data were acquired; this section
-motivates them and does not change them.
+in which the assumptions bias the results (\S\ref{sec:threat-model:bias}).
 
 \subsection{Releases of keystroke logs}
 \label{sec:threat-model:releases}
@@ -163,7 +161,7 @@ does not identify writers.
 \paragraph{Size of the candidate set.}
 We use $N = 10$, $100$ and $1{,}000$. The value $1{,}000$ is the size of a public corpus on one prompt; $10$ and
 $100$ are illustrative sizes of a class or a list of submissions and of a year or a course. $N$ gives only the number
-of candidates: the decoys are drawn uniformly from writers on the same prompt. For the Japanese translation logs, the
+of candidates (\S\ref{sec:threat-model:bias}). For the Japanese translation logs, the
 candidates are translations of the same source text by other translators; this is how the evaluation builds a
 candidate set from that corpus, whose texts are public, and not a setting of its own.
 
@@ -197,9 +195,3 @@ harm in any of the settings above.
 
 The results therefore describe the attackers tried here, under these assumptions. They give no proof of safety and no
 upper bound on the risk of matching; a processing step that defeats these attackers may not defeat a stronger one.
-
-Under this threat model a releasing party chooses which columns to keep, how coarsely to give times and lengths, and
-whether to release full logs or parts of them, and each choice may cost some of the measures that writing research
-computes from the logs. Each form is therefore reported with the accuracy of matching and with how far the standard
-process measures can still be computed (Section~\ref{sec:protocol}). The results are material for that choice; they do
-not recommend a form.

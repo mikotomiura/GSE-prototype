@@ -5,6 +5,38 @@ written before the results of the main computation are known and contain no resu
 English version registered on OSF, `preregistration.md` of the study repository) takes precedence over this outline
 wherever they differ; the threat model, the attackers and the procedure are taken from it and are not changed.
 
+## Claim and contributions
+
+Written on 24 October 2026, before the results were seen. Bracketed parts are filled with measured values only; no
+direction of the results is assumed. Numbers in square brackets after a work are those of the central bibliography of
+the study repository (`docs/references.md`), not of this paper.
+
+**Take-away (form only).** Against attackers that know the processing and hold $N$ candidate texts on the same prompt,
+the masking used in one public release left [accuracy of the strongest attacker, as a multiple of $1/N$ and as a gain
+over the total length] at $N = 1{,}000$, and the forms that release less left [range] while keeping [how many of the
+ten process measures, and how closely].
+
+**Strongest claim, in the same words in the abstract, the introduction, the first paragraph of the discussion and the
+conclusion.** "How far each form of processing keeps a keystroke log apart from its text against a party that holds
+candidate texts, and what each form costs the process measures of writing research." The introduction already asks
+this question in these words (end of its second paragraph).
+
+| # | Contribution | Kind | Compared with | Evidence | Strength |
+|---|---|---|---|---|---|
+| C1 | The masking used in one public release (R1) is evaluated against attackers that hold candidate texts and know the processing | New measurement | Attacks that select a typed text among candidates from timing or lengths in other channels: `gonzalez2021reverse` [V266], `wright2008spotme` [V269], `monaco2019searching` [V268]; the release whose masking is evaluated: `kaggle2023lwp` [V265], used by `inubushi2024first` [V279] | Section 7 (after the results): Table 2, rows R0 and R1 | Decided after the results (established for the attackers tried, at the $N$ tried; never as safety) |
+| C2 | Forms that release less (R2 to R4, R3-u, R3-t, R7) are evaluated on two axes, the accuracy of matching and how far ten process measures can still be computed | New measurement | Processing evaluated by authentication or identification, not by matching to texts: `vassallo2017privacy` [V275], `leinonen2017preventing` [V244]; the observation that evaluations assume a weak attacker: `hanisch2021survey` [V276] | Section 7 (after the results): Table 2, Figure 1, the contrasts between forms | Decided after the results; the contrasts contain the difference in attackers (Section 3.5) |
+| C3 | A threat model in which the auxiliary information is the text, with the settings in which texts are held outside a release | Framing (argued, not measured) | The labelled-sample threat of earlier releases: `edwards2023csedm` [V243], `leinonen2017preventing` [V244]; linkage through unanticipated auxiliary information: `narayanan2008robust` (not yet in the central bibliography) | Section 3, Table 1 | Argued from the releases and the settings; the evaluation corresponds to the first setting only |
+
+Incidental (one paragraph, not a contribution of its own): the same matching on Japanese translation logs typed with an
+input method (question 4; Section 7, subsection after the results; conditional, since ENJA15 is small and task,
+input and language differ at once), and the preregistered protocol with code for the two corpora (open science
+section).
+
+**Not claimed** (stated once, in Section 8.1, which refers to Section 3.5): that any form is safe or that the
+accuracies bound the risk; that any form is recommended; that writers are identified, that harm (b) has occurred, or
+anything about the competition data beyond what their pages state and what the authors of KLiCKe told us (they are
+not matched).
+
 ## Title
 
 Hiding the Text, Keeping the Process: Matching Processed Keystroke Logs to Texts Held by Others
@@ -23,7 +55,10 @@ privacy applications; three mandatory sections (ethical considerations, open sci
 acknowledgements and the references, outside the page limit, in the order of the template (`\appendix`, the acknowledgements, the three sections, the references, then the
 appendix sections, as in
 the template's example); appendices are not required reading, so every result needed for a conclusion is in the main
-body.
+body. The rules (taken again from the authors' page on 24 October 2026) also say that appendices "should only be used
+to provide supplementary information that falls outside of the stated contribution of the paper or to provide extended
+details that would not be of interest to most readers", and that "The paper should be complete and self-contained
+without appendices".
 
 ## Structure
 
@@ -32,16 +67,20 @@ body.
 | 1 Introduction | `sections/introduction.tex` | Contributions paragraph only | Skeleton with draft paragraphs; approach, harms and contributions left as bracketed plans |
 | 2 Background and related work | `sections/related.tex` | No | Skeleton with draft paragraphs; the scope of the searches behind "To our knowledge" is given by sources, dates and counts (search terms were not recorded) |
 | 3 Threat model | `sections/threat-model.tex` | No | Draft, revised after the first pre-submission review |
-| 4 Data and release forms | `sections/data.tex` | Counts after exclusion | Draft; the counts after exclusion are left blank |
-| 5 Attackers | `sections/attackers.tex` | No | Draft |
-| 6 Evaluation protocol | `sections/protocol.tex` | No | Draft; the list of deviations is updated after the main computation |
-| 7 Results, with a short subsection on the Japanese translation logs (question 4) | `sections/results.tex` | Yes | After the main computation |
+| 4 Data and release forms | `sections/data.tex` | Counts after exclusion | Draft; the counts after exclusion are left blank; opens with what the forms are meant to establish and what is measured; checks, ENJA15 and KeyTAR details in Appendices A to C |
+| 5 Attackers | `sections/attackers.tex` | No | Draft; opens with what the attackers are meant to establish and what is measured; details of A4, windows and ENJA15 in Appendices B and C |
+| 6 Evaluation protocol | `sections/protocol.tex` | No | Draft; the status of the analyses (registered, exploratory, deviation) is defined once at its start; exploratory procedures in Appendix D; the list of deviations is updated after the main computation |
+| 7 Results, with a short subsection on the Japanese translation logs (question 4) | `sections/results.tex` | Yes | Bracketed plans by pillar (what was found, why it matters); written after the main computation |
 | 8 Discussion and limitations | `sections/discussion.tex` | Partly | Limitations drafted; the paragraph on agreements drafted from primary sources (DataShop terms, the competition rules, the KLiCKe terms); the take-aways after the results |
 | 9 Conclusion | `sections/conclusion.tex` | Yes | After the main computation |
 | Ethical considerations | `sections/ethics.tex` | No | Draft |
 | Open science | `sections/open-science.tex` | No | Draft |
 | AI use | `sections/ai-use.tex` | No | Draft |
-| Appendices (after the references): all writers for A0 to A3, forms R5 and R6, the full KeyTAR rows, the exploratory tables | to be added | Yes | After the main computation |
+| Appendix A Checks after acquisition and on synthetic logs | `sections/appendix-checks.tex` | No | Moved from Sections 4.2, 4.3 and 5.1 (24 October 2026) |
+| Appendix B Methods for the Japanese translation logs | `sections/appendix-enja.tex` | No | Moved from Sections 4.1, 4.3, 5.5 and 6.6 |
+| Appendix C Details of the attackers and of windows | `sections/appendix-attackers.tex` | No | Moved from Sections 4.1, 5.3, 5.4, 6.1 and 6.5 |
+| Appendix D Exploratory analyses | `sections/appendix-exploratory.tex` | Tables only | Procedures moved unchanged from Section 6.7; tables after the main computation |
+| Appendix E Forms R5 and R6, secondary quantities, results for all writers (A0 to A3 on all writers, R5 and R6, the full KeyTAR rows) | `sections/appendix-results.tex` | Yes | Definitions moved from Sections 4.3 and 6.2; results after the main computation |
 
 ## First page
 
@@ -68,7 +107,22 @@ Agreements not to re-identify, which releasing parties also use, are discussed a
 
 ## Page budget
 
-Estimated on 21 October 2026, before the results, and revised after the first pre-submission review of the manuscript
+Revised on 24 October 2026, before the results, after moving (2) to (5) below and some further details to the
+appendices and the mandatory sections. The moves change where the procedure is described, not the procedure; moved
+text is kept unchanged in the appendices, and the main body names the appendix it moves to. The appendices are, in
+order: A checks after acquisition and on synthetic logs; B methods for the Japanese translation logs; C details of the
+attackers and of windows; D exploratory analyses (procedures now, tables after the results); E forms R5 and R6, the
+secondary quantities and all results for all writers (after the results). The handling of the logs moved to the
+ethical considerations, and the registered files, seeds and acquisition times to the open science section.
+
+The main body now reaches Section 7 at about 8.8 pages and ends at about 9.6 pages, including about 0.2 page of
+bracketed plans in Section 7. With the results (about 2.5 pages), the three paragraphs of the introduction, the
+take-aways and the conclusion (about 0.8 page) and the abstract (about 0.25 page), it is expected at about 13 pages,
+about one page over the limit. The candidates for that page are listed in the length log of this task
+(`paper-write/length-log.md`); those that do not depend on the results are put to the author before they are moved,
+and the others are chosen with the results in view.
+
+The estimate before this revision follows. Estimated on 21 October 2026, before the results, and revised after the first pre-submission review of the manuscript
 (the appendices are not required reading, so nothing that a result in the body needs is moved). The main body runs
 from page 1 to page 11 (about 11 pages after the revision). The results (two tables, one figure, the subsection on the
 Japanese translation logs, about 2.5 pages), the three paragraphs of the introduction, the take-aways, the conclusion

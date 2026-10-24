@@ -1,0 +1,60 @@
+\section{Exploratory analyses: procedures}
+\label{app:exploratory}
+
+% Moved from Section 6.7 of the main body on 24 October 2026. The text of the procedures is unchanged; the tables are
+% added after the main computation.
+
+% The statement about the last three analyses holds only if no result of the main computation had been opened when
+% their procedures were committed; confirm this with the record of the main computation before submission.
+Five analyses were added after the preregistration was fixed and are not part of it. They change no registered value
+or procedure. Their procedures were fixed and committed to the study repository before any value of matching or
+utility on the human data had been seen, the first two on 13 October 2026 and the other three on 21 October 2026, and
+they are reported as exploratory and are not used to answer the four questions. The last three use the strongest
+attacker selected in the main computation for the same form and $N$, without selecting again, on full texts, the main
+forms, $N = 10$ and $1{,}000$ and the 500 writers, with the same resamples.
+
+\paragraph{Uniqueness of word-length sequences among $N$ candidates.}
+The first analysis uses the texts alone. For each of the 500 writers and each $k$ from 1 to 50, five runs of $k$
+consecutive words are drawn from the writer's text, and we report the share for which none of the $N - 1$ decoys,
+drawn as in the main computation, contains the same sequence of word lengths at any position; as a secondary quantity,
+the accuracy $1/m$ of an attacker who chooses uniformly among the $m$ texts that contain it. Next to these curves we
+draw reference lines $k^{*} = \log_2 N / h$, where $h$ is a plug-in estimate of the entropy rate of word lengths in
+bits per word, conditioned on up to two preceding words~\cite{kalimeri2012entropy}; plug-in estimates fall as the
+order rises, and the lines are a reference, not a prediction. We call the quantity uniqueness among $N$ candidates and
+not a risk of re-identification. Whether uniqueness in a sample says anything about a population is
+disputed~\cite{sanchez2016comment,rocher2019estimating}, and in location data unicity decreases, slowly, as the dataset
+grows~\cite{farzanehfar2021risk}; here the population is the set of $N$ candidates itself, and we do not extend the
+quantity beyond the values of $N$ tried.
+
+\paragraph{A form with differentially private noise.}
+The second analysis adds a form R-DP($\varepsilon$), $\varepsilon = 0.5$, $1$, $2$, $4$, built on R3, with letters and
+digits released as one category. Two mechanisms use the same $\varepsilon$. First, the number of counted letter and
+digit presses of each segment receives two-sided geometric noise with sensitivity 1, and letter presses are added at
+random positions in the segment or removed at random accordingly, with the count kept at zero or above. Second, every
+press interval is clipped at 2,000\,ms, the threshold of the P-bursts, and receives two-sided geometric noise with
+sensitivity 2,000\,ms, and negative intervals are set to zero. Each guarantee holds for its own unit, one segment count
+or one interval, and not for a writer's whole log: over a log the budgets add up over all segments and
+intervals~\cite{kellaris2014event}. We do not claim that the combined release is differentially private for neighbouring
+logs that differ by an inserted or removed press with its time. The noise is drawn from a seeded generator so that the
+evaluation can be repeated, which is acceptable for evaluation but not for an actual release~\cite{holohan2023random},
+and an actual release would also need an implementation that is exact on finite
+computers~\cite{canonne2020discrete}. The attackers are those of R3, with the timing table of A3 built from training
+logs with the same interval noise; the candidates are unchanged, and every process measure that R3 computes is counted as
+approximated. The scope, samples and resamples are those of the main computation, with the contrast R3~$-$~R-DP and the
+open-world area, but no negative control. R-DP is reported in exploratory tables, where $\varepsilon$ is labelled as the budget per segment count and per
+interval, and it is not part of the main table or figure.
+
+\paragraph{The upper tail of accuracy per writer.}
+The third analysis reports the 95th and 99th percentiles of accuracy per writer and the share of writers whose true text
+is chosen alone in every draw. No value per writer is reported.
+
+\paragraph{Matches above a margin.}
+The fourth analysis takes, for each log and draw, the difference between the attacker's second-lowest and lowest cost
+over the candidates (zero if the lowest is tied), with log-likelihoods turned into costs by a change of sign. At
+thresholds set at the 0th, 10th, \ldots, 90th percentiles of these differences, it reports the share of logs and draws
+at or above the threshold and the accuracy among them. Costs of different attackers are not compared.
+
+\paragraph{Accuracy by score band.}
+The fifth analysis divides the 500 writers of each prompt into thirds by their human score and reports the strongest
+attacker's accuracy in each third and the difference between the top and bottom thirds. The attackers do not use the
+scores.
