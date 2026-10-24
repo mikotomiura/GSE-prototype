@@ -38,9 +38,20 @@
 - 探索的な分析 1〜5 の表（付録）。3〜5 は G-GEAR の `results/exploratory_{tail,margin,score_band}.json`。§6.7 の LaTeX のコメント（結果を開く前に手順を固定したかの確認）を、G-GEAR の記録で確かめてから消す。
 - 空欄: 除外の後の件数（§4）・逸脱の一覧（§6・notes.md の D3 以降）・公開元への通知の日付と応答（ethics.tex・下書き 5 を送った後）・Open science の匿名リンク。
 - 頁を 12 に縮める（outline.md の Page budget の (2)〜(5)。A3 の細部と有用性の表は本文に残す）。
-- 投稿前の attack-me は **round 3・原稿の全体**（判断 76）。round 2 は 2026-10-24 に Kaggle の出どころの変更箇所だけで使った（判断 75）。G-GEAR の計算が全部済み、上の節を全部書いて草稿が完成してから回す。
+- 書くときは `paper-write` Skill（ブランチ `chore/paper-write-skill`・main に入るまではそのブランチの `.claude/skills/paper-write/SKILL.md` を読む）に従う。本文に残すのは中心の主張を理解し評価するのに要るものだけで、方法の細部・追加の分析・検証の手順は付録へ。直しは足すより移す。
+- 書き始め: `main.json` が来たら §7 の A4 以外から。`main_a4.json`・`exploratory_unicity.json`・`exploratory_dp.json` が来たら足す。`main_all.json`（全員の付録・11 月中旬の見込み）は待たない。
+- **草稿の完成**（判断 76 の追記）: 次の 6 つが全部そろったとき。
+  1. 数値: `main.json`・`main_a4.json`・`exploratory_unicity.json`・`exploratory_dp.json`・探索的な分析 3〜5・`enja15_main.json` が本文と付録に入っている（A4 の 499 人の版も・D3）。
+  2. 空欄: 本文と付録の角括弧が無い。残してよいのは 3 つだけ（公開元への通知の日付と応答・Open science の匿名リンク・全員の付録の値）。
+  3. paper-write のチェックリストを通る（持ち帰り 1 文と貢献に根拠の位置と強さ・抄録から結論まで主張の言い方がそろう・本文と付録の分け・分析の地位の定義が 1 か所・考察で確かめた問題と可能性にとどまる問題を分ける）。
+  4. 分量: 本文が PoPETs の頁の上限の中（規程をこのとき一次で取り直す・付録を査読者が読む義務があるかも確かめる）。`length-log.md` に記録。
+  5. ビルド（エラー 0・未定義 0）と文体の門（違反 0）。
+  6. 予測が結果と並び、逸脱の一覧が `notes.md` と一致している。
+- 投稿前の attack-me は **round 3・原稿の全体**（判断 76）。round 2 は 2026-10-24 に Kaggle の出どころの変更箇所だけで使った（判断 75）。上の「草稿の完成」の後に回す。編集者の役 E（本文だけを読む・attack-me に 2026-10-24 に足した）も入れる。
   - 同じ dir（`manuscript-matching/`）・stage manuscript のまま・同じ立場と同じ接地の文献（round 2 の `panel.md`）・Codex も round 1 と同じ形。
+  - E は round 3 が初めてなので引き継ぎは無い。接地は PoPETs の CFP（範囲）と規程、Mensh & Kording 2017。
   - 引き継ぎは役ごとに round 1 と round 2 の両方を渡す。round 2 で直した 4 点（出どころを書くことを害として量る段落・照合しない理由の言い直し・§3.3 の対応づけが攻撃者の範囲の外である 1 文・§8.2 の持ち帰り）が新しい稿で崩れていないかを、指摘ごとに判定させる。
+  - `main_all.json` が後から来たら付録の値を埋め、本文と食い違わないかを確かめる（attack-me はやり直さない）。
   - そのあと接地の本文の tmp（`outline-threat-model/round-1/tmp/`・`manuscript-matching/round-1/tmp/`・`manuscript-matching/round-2/tmp/`）を消す。`/cross-review`。直した稿を下書き 4 で Dr. Tian に送る。
 
 ## 守ること

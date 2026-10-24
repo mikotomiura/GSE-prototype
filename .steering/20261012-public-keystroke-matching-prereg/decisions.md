@@ -463,3 +463,5 @@ round 2 の判定は minor revision（R1 major・R2 minor・R3 minor）。記録
 - 範囲: 原稿の全体（stage manuscript・round 3・同じ立場と文献）。引き継ぎに round 1 と round 2 の両方を役ごとに渡す。
 - 理由: 結果を書くと序論・害・寄与・§8 が変わり、round 2 で直した文も書き直される見込みが高い。いま変更箇所だけを見ても、その書き直しで消える文を見ることになる。Dr. Tian からは進め方を任されている（判断 72 の追記）ので、草稿の完成を待つことに支障はない。
 - round 2 の `tmp/` は round 3 の後に消す（git は無視する）。
+
+追記（2026-10-24・研究者との会話）: 上の「G-GEAR の本計算と探索的な分析 3〜5 が全部済み」は、main_a4・unicity・dp が抜けていて不正確だった。一続きの段は main500 → main_a4 → unicity → dp → all（全員の付録・約 10〜12 日）。草稿の完成は main_all を待たない（判断 2026-10-20 の「全員の付録は論文を書きながら最後に回す」のとおり・締切 11/30 と公開元への約 2 週の猶予のため）。完成の定義 6 項目（数値・空欄・paper-write のチェックリスト・分量・ビルドと文体・予測と逸脱）は引き継ぎ `next-session-public-keystroke-matching-manuscript-after-attack-me.md` に書いた。round 3 には attack-me に新しく足した編集者の役 E を入れる。書く段は新しい `paper-write` Skill に従う（ブランチ `chore/paper-write-skill`）。
