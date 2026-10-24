@@ -1,7 +1,8 @@
 # Manuscript outline
 
 This outline fixes the structure of the manuscript and the evidence for each claim. The sections listed here are
-written before the results of the main computation are known and contain no result value. The preregistration (the
+written before the results of the main computation are known and contain no result value; Section 7, the
+introduction's last three paragraphs, the take-aways, the conclusion and the abstract were written after them (24 October 2026). The preregistration (the
 English version registered on OSF, `preregistration.md` of the study repository) takes precedence over this outline
 wherever they differ; the threat model, the attackers and the procedure are taken from it and are not changed.
 
@@ -11,10 +12,12 @@ Written on 24 October 2026, before the results were seen. Bracketed parts are fi
 direction of the results is assumed. Numbers in square brackets after a work are those of the central bibliography of
 the study repository (`docs/references.md`), not of this paper.
 
-**Take-away (form only).** Against attackers that know the processing and hold $N$ candidate texts on the same prompt,
-the masking used in one public release left [accuracy of the strongest attacker, as a multiple of $1/N$ and as a gain
-over the total length] at $N = 1{,}000$, and the forms that release less left [range] while keeping [how many of the
-ten process measures, and how closely].
+**Take-away (filled on 24 October 2026 with the results on the 500 writers, without A4).** Against attackers that
+know the processing and hold $N$ candidate texts on the same prompt, the masking used in one public release left the
+true text chosen for every log at $N = 1{,}000$ (1,000 times $1/N$, 98.2 points above the total length), and the forms
+that release less left between 0.14% and 98.6%; every form that kept a median correlation of 0.84 or more with the
+unprocessed values of the ten process measures left 70% or more, and the forms near the total length kept a median of
+at most 0.70 or no measure.
 
 **Strongest claim, in the same words in the abstract, the introduction, the first paragraph of the discussion and the
 conclusion.** "How far each form of processing keeps a keystroke log apart from its text against a party that holds
@@ -23,8 +26,8 @@ this question in these words (end of its second paragraph).
 
 | # | Contribution | Kind | Compared with | Evidence | Strength |
 |---|---|---|---|---|---|
-| C1 | The masking used in one public release (R1) is evaluated against attackers that hold candidate texts and know the processing | New measurement | Attacks that select a typed text among candidates from timing or lengths in other channels: `gonzalez2021reverse` [V266], `wright2008spotme` [V269], `monaco2019searching` [V268]; the release whose masking is evaluated: `kaggle2023lwp` [V265], used by `inubushi2024first` [V279] | Section 7 (after the results): Table 2, rows R0 and R1 | Decided after the results (established for the attackers tried, at the $N$ tried; never as safety) |
-| C2 | Forms that release less (R2 to R4, R3-u, R3-t, R7) are evaluated on two axes, the accuracy of matching and how far ten process measures can still be computed | New measurement | Processing evaluated by authentication or identification, not by matching to texts: `vassallo2017privacy` [V275], `leinonen2017preventing` [V244]; the observation that evaluations assume a weak attacker: `hanisch2021survey` [V276] | Section 7 (after the results): Table 2, Figure 1, the contrasts between forms | Decided after the results; the contrasts contain the difference in attackers (Section 3.5) |
+| C1 | The masking used in one public release (R1) is evaluated against attackers that hold candidate texts and know the processing | New measurement | Attacks that select a typed text among candidates from timing or lengths in other channels: `gonzalez2021reverse` [V266], `wright2008spotme` [V269], `monaco2019searching` [V268]; the release whose masking is evaluated: `kaggle2023lwp` [V265], used by `inubushi2024first` [V279] | Section 7.1: Table 2, rows R0 and R1; the negative control | Established by measurement for the attackers tried, at the $N$ tried (100.0% at $N = 1{,}000$ and $10$); never as safety |
+| C2 | Forms that release less (R2 to R4, R3-u, R3-t, R7) are evaluated on two axes, the accuracy of matching and how far ten process measures can still be computed | New measurement | Processing evaluated by authentication or identification, not by matching to texts: `vassallo2017privacy` [V275], `leinonen2017preventing` [V244]; the observation that evaluations assume a weak attacker: `hanisch2021survey` [V276] | Sections 7.2 and 7.3: Table 2, Figure 1, the contrasts between forms | Established by measurement for the attackers tried; the contrasts and the dominance in Figure 1 are conditional, since they contain the difference in attackers (Section 3.5) |
 | C3 | A threat model in which the auxiliary information is the text, with the settings in which texts are held outside a release | Framing (argued, not measured) | The labelled-sample threat of earlier releases: `edwards2023csedm` [V243], `leinonen2017preventing` [V244]; linkage through unanticipated auxiliary information: `narayanan2008robust` (not yet in the central bibliography) | Section 3, Table 1 | Argued from the releases and the settings; the evaluation corresponds to the first setting only |
 
 Incidental (one paragraph, not a contribution of its own): the same matching on Japanese translation logs typed with an
@@ -64,23 +67,23 @@ without appendices".
 
 | Section | File | Depends on the results | State |
 |---|---|---|---|
-| 1 Introduction | `sections/introduction.tex` | Contributions paragraph only | Skeleton with draft paragraphs; approach, harms and contributions left as bracketed plans |
+| 1 Introduction | `sections/introduction.tex` | Contributions paragraph only | Draft; approach, harms and contributions written after the results (24 October 2026) |
 | 2 Background and related work | `sections/related.tex` | No | Skeleton with draft paragraphs; the scope of the searches behind "To our knowledge" is given by sources, dates and counts (search terms were not recorded) |
 | 3 Threat model | `sections/threat-model.tex` | No | Draft, revised after the first pre-submission review |
-| 4 Data and release forms | `sections/data.tex` | Counts after exclusion | Draft; the counts after exclusion are left blank; opens with what the forms are meant to establish and what is measured; checks, ENJA15 and KeyTAR details in Appendices A to C |
+| 4 Data and release forms | `sections/data.tex` | Counts after exclusion | Draft; the counts after exclusion filled in (no writer or session excluded); opens with what the forms are meant to establish and what is measured; checks, ENJA15 and KeyTAR details in Appendices A to C |
 | 5 Attackers | `sections/attackers.tex` | No | Draft; opens with what the attackers are meant to establish and what is measured; details of A4, windows and ENJA15 in Appendices B and C |
 | 6 Evaluation protocol | `sections/protocol.tex` | No | Draft; the status of the analyses (registered, exploratory, deviation) is defined once at its start; exploratory procedures in Appendix D; the list of deviations is updated after the main computation |
-| 7 Results, with a short subsection on the Japanese translation logs (question 4) | `sections/results.tex` | Yes | Bracketed plans by pillar (what was found, why it matters); written after the main computation |
+| 7 Results, with a short subsection on the Japanese translation logs (question 4) | `sections/results.tex` | Yes | Written on 24 October 2026 from the 500 writers, ENJA15 and exploratory analyses 3 to 5; A4 and exploratory analyses 1 and 2 bracketed |
 | 8 Discussion and limitations | `sections/discussion.tex` | Partly | Limitations drafted; the paragraph on agreements drafted from primary sources (DataShop terms, the competition rules, the KLiCKe terms); the take-aways after the results |
-| 9 Conclusion | `sections/conclusion.tex` | Yes | After the main computation |
+| 9 Conclusion | `sections/conclusion.tex` | Yes | Draft (24 October 2026) |
 | Ethical considerations | `sections/ethics.tex` | No | Draft |
 | Open science | `sections/open-science.tex` | No | Draft |
 | AI use | `sections/ai-use.tex` | No | Draft |
 | Appendix A Checks after acquisition and on synthetic logs | `sections/appendix-checks.tex` | No | Moved from Sections 4.2, 4.3 and 5.1 (24 October 2026) |
 | Appendix B Methods for the Japanese translation logs | `sections/appendix-enja.tex` | No | Moved from Sections 4.1, 4.3, 5.5 and 6.6 |
 | Appendix C Details of the attackers and of windows | `sections/appendix-attackers.tex` | No | Moved from Sections 4.1, 5.3, 5.4, 6.1 and 6.5 |
-| Appendix D Exploratory analyses | `sections/appendix-exploratory.tex` | Tables only | Procedures moved unchanged from Section 6.7; tables after the main computation |
-| Appendix E Forms R5 and R6, secondary quantities, results for all writers (A0 to A3 on all writers, R5 and R6, the full KeyTAR rows) | `sections/appendix-results.tex` | Yes | Definitions moved from Sections 4.3 and 6.2; results after the main computation |
+| Appendix D Exploratory analyses | `sections/appendix-exploratory.tex` | Tables only | Procedures moved unchanged from Section 6.7; tables of analyses 3 to 5 generated by `make_tables.py`; 1 and 2 bracketed |
+| Appendix E Forms R5 and R6, secondary quantities, results for all writers (A0 to A3 on all writers, R5 and R6, the full KeyTAR rows) | `sections/appendix-results.tex` | Yes | Definitions moved from Sections 4.3 and 6.2; the table of computability moved from Section 6.3 (24 October 2026); tables on the 500 writers generated by `make_tables.py`; all writers and KeyTAR bracketed |
 
 ## First page
 
@@ -106,6 +109,13 @@ paper does not say that a form "works" or "withstands" matching. The recommendat
 Agreements not to re-identify, which releasing parties also use, are discussed alongside the processing in Section 8.
 
 ## Page budget
+
+After the results (24 October 2026): the main body ends on page 12 (right column, at 0.85 of its height). To get there,
+the table of computability of the process measures moved to Appendix E and the overlaps between Sections 2 and 3 were
+removed, with the scope of the searches moved to the open science section (both approved by the author), and the
+results were shortened to what Table 2, Figure 1 and the appendices do not show. The measurements are in the length log
+of this task.
+
 
 Revised on 24 October 2026, before the results, after moving (2) to (5) below and some further details to the
 appendices and the mandatory sections. The moves change where the procedure is described, not the procedure; moved

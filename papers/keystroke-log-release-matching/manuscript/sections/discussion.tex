@@ -1,8 +1,17 @@
 \section{Discussion and limitations}
 \label{sec:discussion}
 
-% Skeleton with draft paragraphs, written before the results. The limitations are written first, from the
-% preregistration ("What is not concluded") and Section 3.5; the discussion of the results is added after them.
+% The first paragraph and Section 8.3 were written after the main results (24 October 2026); the limitations were
+% written before them, from the preregistration ("What is not concluded") and Section 3.5.
+
+We asked how far each form of processing keeps a keystroke log apart from its text against a party that holds
+candidate texts, and what each form costs the process measures of writing research. Against the attackers tried, the
+masking used in one public release kept no log apart from its text at $N = 1{,}000$, and among the forms that release
+less, none kept matching low and the measures close to their unprocessed values at once (Section~\ref{sec:results}).
+For a party that releases logs whose texts exist elsewhere, hiding the characters did not hide the text while the
+lengths and the editing keys remained. We measured the accuracy of these attackers on these forms in a closed world;
+the link to named writers (harm (b)), the rate of false matches for a holder of a single text and stronger attackers
+remain possible but untested (\S\ref{sec:discussion:limits}).
 
 \subsection{What the results do not show}
 \label{sec:discussion:limits}
@@ -52,8 +61,11 @@ also has to track where the data of a release come from and what else is release
 \subsection{What a releasing party can take away}
 \label{sec:discussion:takeaways}
 
-\textbf{[After the results.]} The results are material for three choices: which columns to keep, how coarsely to give
-times and lengths, and whether to release full logs or windows; for windows only the accuracy of matching is reported,
-since the process measures are computed on full logs. Each statement takes the form ``against this attacker,
-at this $N$, this form had this multiple of $1/N$ and kept this much of the process measures''. No rule recommends a
-form, and the paper does not say that a form works or withstands matching.
+The results are material for three choices; each statement holds for the attackers tried, and none recommends a
+form. \emph{Columns.} Masking letters and digits left 100\% at $N = 1{,}000$ (R1), and the categories of the editing
+keys alone still left 86.7\% (R3); only merging the separators, coarsening the segment values or suppressing at least a
+quarter of the presses brought the strongest attacker below 40\%. \emph{Coarseness.} Rounding the press times to one
+second left 86.7\% and lost five of the ten measures; segment values with $w \geq 4$ left no gain over the total length
+and no measure; suppressing a quarter of the presses left 14.3\%, with a median correlation of 0.81. \emph{Windows.}
+Five words in key categories were matched in 65.8\% of draws at $N = 1{,}000$, under assumptions that favour the
+attacker.

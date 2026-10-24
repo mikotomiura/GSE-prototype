@@ -85,34 +85,12 @@ production rate of each interval by the maximum interval rate over all writers o
 denominator for every form, and take the standard deviation over the ten intervals. Characters are counted as character
 presses, word boundaries as separator presses and pauses as intervals between presses, in the unprocessed log as well.
 
-Table~\ref{tab:utility} fixes, before any data were seen, whether each measure is computed on each form with the same
-inputs and formula as in R0 (ok), from other inputs by approximation rules (approx), or not at all (none). The
+Before any data were seen, we fixed whether each measure is computed on each form with the same
+inputs and formula as in R0 (ok), from other inputs by approximation rules (approx), or not at all (none); the table is in Appendix~\ref{app:results}, and Table~\ref{tab:main} gives the counts for each form. The
 approximation rules are: the number of characters is the number of character presses; a deletion is one character per
 BackSpace or Delete press; an insertion is a character press while the cursor of the A1$'$ replay is not at the end; a
 word boundary is a separator press; and counts in R7 are scaled by $1/(1-p)$. The random processing of R5, R6 and R7
 is applied once per log, and the same processed logs are used for matching and for utility.
-
-\begin{table}
-  \caption{Whether each process measure is computed on each form: with the same inputs as in R0 (ok), by approximation
-  (ap), or not (--). R0$^{*}$ is R0, R1, R5 and R6; R3-t$_{s}$ is R3-t(10) and R3-t(100); R3-t$_{c}$ is
-  R3-t(1,000).}
-  \label{tab:utility}
-  \small
-  \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{>{\raggedright\arraybackslash}p{0.27\linewidth}cccccccc}
-    \toprule
-    Measure & R0$^{*}$ & R2 & R3 & R3-u & R3-t$_{s}$ & R3-t$_{c}$ & R7 & R4 \\
-    \midrule
-    P-burst & ok & ok & ok & ok & ap & -- & ap & -- \\
-    R-burst & ok & ap & ap & ap & ap & -- & ap & -- \\
-    Mean pause & ok & ok & ok & ok & ap & -- & ap & -- \\
-    Within- and between-word pauses & ok & ok & ok & -- & ap & -- & ap & -- \\
-    Deletion length and proportion & ok & ap & ap & ap & ap & ap & ap & -- \\
-    Insertion length and proportion & ok & ap & ap & ap & ap & ap & ap & -- \\
-    Variance of production rate & ok & ok & ok & ok & ap & ap & ap & -- \\
-    \bottomrule
-  \end{tabular}
-\end{table}
 
 For each measure and form we report the Spearman correlation with the value in R0; the median and the 10th and 90th
 percentiles of the ratio to the value in R0, leaving out writers whose R0 value is zero or undefined (with their
@@ -174,8 +152,6 @@ and its intervals are expected to be wide.
 \subsection{Exploratory analyses not in the preregistration}
 \label{sec:protocol:exploratory}
 
-% The statement about the dates holds only if no result of the main computation had been opened when the procedures
-% of the last three analyses were committed; confirm this with the record of the main computation before submission.
 Five analyses were added after the preregistration was fixed and are not part of it: the uniqueness of word-length
 sequences among $N$ candidates, a form with differentially private noise (R-DP), the upper tail of accuracy per
 writer, matches above a margin of cost, and accuracy by score band. They change no registered value or procedure,
@@ -192,12 +168,18 @@ changed; the registered files, their SHA-256 and how each random choice derives 
 section.
 
 \paragraph{Deviations.}
-% Update the list of deviations from the record when the main computation is complete.
-At the time of writing, two deviations are recorded with their times and reasons: the undoing of escaped characters
-when the logs are read (\S\ref{sec:data:corpora}), and a change to three processing functions that removed a column
-the reading of KLiCKe had already dropped, which stopped a trial run. Neither changed the released columns, and no
-value of matching or utility had been computed before either change. Details that the registration left open were
-decided before the data were opened or before any value of matching was seen, and are recorded with the code.
+% The list follows the deviations D1 to D4 of the record of the main computation (notes.md); add any deviation of the
+% computations of A4 and of all writers when they are complete.
+Four deviations are recorded with their times and reasons. The escaped characters of the distributed logs are undone
+when the logs are read (\S\ref{sec:data:corpora}). Three processing functions were changed so that they no longer
+remove a column that the reading of KLiCKe had already dropped, which had stopped a trial run. The KeyTAR model ran out
+of GPU memory on the longest chunks, and the four chunks of one writer were generated on the CPU with the same model
+and settings; since the two can give different reconstructions, KeyTAR is reported with and without that writer. After
+a restart of the computer stopped the main computation, it was made to keep each finished result and resume; on
+synthetic logs its output was identical byte for byte with and without resuming. None of these changed the released
+columns or a registered value, and no value of matching or utility had been computed before any of them. Details that
+the registration left open were decided before the data were opened or before any value of matching was seen, and are
+recorded with the code.
 
 \paragraph{Predictions.}
 Before any data were acquired, we registered predictions of the strongest attacker's accuracy for $N = 1{,}000$ on full

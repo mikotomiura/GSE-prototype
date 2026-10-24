@@ -28,11 +28,9 @@ length, to predict the score~\cite{inubushi2024first}. The structure that makes 
 quality of writing is also the structure that a party holding candidate texts can compare with those texts.
 
 \paragraph{Other masking keeps lengths too.}
-Two public datasets of keystrokes in an introductory programming course mask the characters of identifying text, such
-as a student's name, with the character \texttt{@}; a~function \texttt{even()} in which the name ``Eve'' was masked
-becomes \texttt{@@@n()}~\cite{edwards2023csedm}. This release hides names, not the program, so it is not an instance of
-the threat studied here. It shows that masking one character for one character is used in at least one other release,
-and with it the lengths of the masked strings remain. The times of the events are not processed in this release.
+Two public datasets of keystrokes in a programming course mask identifying text, such as a student's name, one
+character for one character with \texttt{@}, so the lengths of the masked strings remain~\cite{edwards2023csedm}. They
+hide names, not the program, and are not an instance of the threat studied here.
 
 \paragraph{Parts of logs.}
 A releasing party may also choose to release only parts of logs. We know of no such release; the evaluation covers
@@ -46,13 +44,11 @@ keystrokes. Keystroke latencies link students across samples, and rounding the l
 identification~\cite{leinonen2017preventing}. The paper that released the programming datasets answers the risk of
 identification by timing in the same terms: ``all of these identification techniques require a labeled sample, which
 the regulatory definition of identifiability assumes is not available'', and ``the data is deidentified only as long
-as there is no other labeled sample of a student's keystrokes''~\cite{edwards2023csedm}. A survey of anonymisation for
-behavioural biometric data notes that ``most anonymization techniques are only evaluated rudimentarily with the
-assumption of a weak attacker''~\cite{hanisch2021survey}.
+as there is no other labeled sample of a student's keystrokes''~\cite{edwards2023csedm}.
 
 This study considers a different kind of auxiliary information: the texts. Records in a release can be linked to
-outside information that the releasing party did not anticipate~\cite{narayanan2008robust}, and for logs of writing the
-most direct such information is the text that was written. If a log were matched to a text whose writer is known, the
+outside information that the releasing party did not anticipate (Section~\ref{sec:related}), and for logs of writing
+the most direct such information is the text that was written. If a log were matched to a text whose writer is known, the
 log would from then on also be a labelled sample of that writer's keystrokes; this study does not evaluate such a
 further link, which would use several releases (\S\ref{sec:threat-model:attacker}).
 
@@ -93,9 +89,8 @@ held outside it, for example by raters who are not part of it or by anyone to wh
 from what the authors of KLiCKe told us (below), we do not know who held the texts of the competition data. In this
 setting the evaluation measures how far a processed log can be linked to its text by a party that holds the texts; it
 does not estimate whether anyone has made such a link. Texts on the
-same prompts can also be public. The KLiCKe corpus was collected on Amazon Mechanical Turk in
-2022 and released together with its keystroke logs and human scores: 4,992 argumentative essays on four prompts derived
-from the SAT, each written in 30 minutes~\cite{tian2025klicke}. Because its texts are public, its logs need no
+same prompts can also be public. The KLiCKe corpus, collected on Amazon Mechanical Turk in 2022, was released with its
+texts, keystroke logs and human scores (\S\ref{sec:data:corpora}). Because its texts are public, its logs need no
 protection of the text; it is the data on which we evaluate the processing. The description of the procedure of the
 competition data names the same platform, the same kind of prompts and the same sequence of tasks~\cite{kaggle2023lwp}.
 We take the size of KLiCKe on one prompt, about a thousand essays, as the size of a set of candidate texts on the
@@ -180,7 +175,7 @@ processing, for example by estimating the noise from the dependence between neig
 available also differ by form: the finer forms admit an attacker that rebuilds the final draft, the coarser ones only
 simpler attackers, so a contrast between forms contains the difference in attackers as well as in columns and leans
 in favour of the coarser forms (\S\ref{sec:protocol:quantities}). This is the weakness of evaluation that the survey
-above notes~\cite{hanisch2021survey}, and it applies to this study. The direction of one assumption is unknown: the
+quoted in Section~\ref{sec:related} notes~\cite{hanisch2021survey}, and it applies to this study. The direction of one assumption is unknown: the
 decoys are drawn uniformly from writers on the same prompt, who may be more or less alike than the members of one
 class.
 

@@ -1,8 +1,8 @@
 \section{Background and related work}
 \label{sec:related}
 
-% Skeleton with draft paragraphs, written before the results. The emphasis is revised after the results are known;
-% the claims and their strength follow the table for this section in outline.md.
+% The claims and their strength follow the table for this section in outline.md. Shortened on 24 October 2026 after
+% the results: overlaps with Section 3.2 removed, and the scope of the searches moved to the open science section.
 
 \paragraph{Matching and reconstruction from keystrokes.}
 Matching a log to candidate texts is a known kind of attack, and we do not claim a stronger attack. Inter-keystroke
@@ -23,33 +23,25 @@ proposed to protect what is typed in behavioural authentication on smartphones, 
 of authentication~\cite{vassallo2017privacy}. Rounding the latencies in typing profiles reduced the identification of
 students~\cite{leinonen2017preventing}. A survey of anonymisation for behavioural biometric data lists such
 techniques, against identification and for protecting what is typed, and none of those it lists for keystrokes is
-evaluated by matching to texts; it notes that most techniques are evaluated against a weak
-attacker~\cite{hanisch2021survey}. Our forms are our own definitions after these names.
+evaluated by matching to texts; it notes that ``most anonymization techniques are only evaluated rudimentarily with
+the assumption of a weak attacker''~\cite{hanisch2021survey}. Our forms are our own definitions after these names.
 
 \paragraph{Auxiliary information and uniqueness.}
 Records in a release can be linked through auxiliary information that the releasing party did not
 anticipate~\cite{narayanan2008robust}. The share of records that a few known points single out decreases only slowly
 as a dataset grows~\cite{farzanehfar2021risk}, and whether uniqueness in a sample indicates the likelihood of a
 correct re-identification in the population is disputed~\cite{sanchez2016comment,rocher2019estimating}. A university
-that holds data about students decides what to release, to whom and for what purpose~\cite{borgman2018open}; the
-settings of Section~\ref{sec:threat-model:settings} describe, for processed logs, who holds the texts. For processed logs of writing, the auxiliary information is the
-text, and the question is how far the structure that remains, the lengths of words and the times between presses,
-singles out the true text among texts on the same prompt.
+that holds data about students decides what to release, to whom and for what purpose~\cite{borgman2018open}. For
+processed logs of writing, the auxiliary information is the text (Section~\ref{sec:threat-model:auxiliary}).
 
 \paragraph{Releases of keystroke logs of writing and programming.}
 Earlier work on releasing keystroke data considered an attacker with a labelled sample of the same person's keystrokes
-and the goal of identification~\cite{leinonen2017preventing,edwards2023csedm}; Section~\ref{sec:threat-model:auxiliary}
-quotes how the programming datasets answer that risk. These works do not evaluate matching to texts; we do not claim
-that no work considers texts. Public corpora of writing processes with their texts, such as KLiCKe~\cite{tian2025klicke}
+and the goal of identification (Section~\ref{sec:threat-model:auxiliary}); it does not evaluate matching to texts, and
+we do not claim that no work considers texts. Public corpora of writing processes with their texts, such as KLiCKe~\cite{tian2025klicke}
 and ENJA15~\cite{carl2016lrec}, make such an evaluation possible, because the true text of every log is known.
 
 \paragraph{What is new.}
 What is new is the evaluation, on public keystroke data whose texts are known, of the masking used in one public release and
 of alternative processing, by attacks that match logs to texts, together with what each form costs the process measures
 of writing research. To our knowledge, no such evaluation has been published.
-The searches behind this statement were made on 11 October 2026 (UTC), before registration: in OpenAlex we traced the
-works citing the attacks on timings~\cite{gonzalez2021reverse,monaco2019searching,qiu2026keytar}, the rounding of
-latencies~\cite{leinonen2017preventing} and KLiCKe~\cite{tian2025klicke}, and screened the titles and abstracts of the
-works of four authors of keystroke-logging research on writing (663 works); we also read the full text of the
-anonymisation survey~\cite{hanisch2021survey}. The search terms were not recorded, and Google Scholar and Semantic
-Scholar were not searched.
+The searches behind this statement are described in the open science section.

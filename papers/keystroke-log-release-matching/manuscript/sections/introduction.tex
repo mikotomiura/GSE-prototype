@@ -1,8 +1,8 @@
 \section{Introduction}
 \label{sec:introduction}
 
-% Skeleton with draft paragraphs, written before the results, following the plan of the first page in outline.md.
-% The first page must state how the work is relevant to real-world privacy. The emphasis is revised after the results.
+% Follows the plan of the first page in outline.md; the first page must state how the work is relevant to real-world
+% privacy. The last three paragraphs were written after the main results (24 October 2026).
 
 Keystroke logs record how a text was written: every press and release, the pauses between them, the revisions and the
 movements of the cursor. Writing research uses them to study the process of writing, and public corpora release logs
@@ -24,20 +24,25 @@ keystroke data assumed an attacker would need~\cite{edwards2023csedm}; it can co
 each text. This paper asks how far processing keeps logs apart from their texts against such a party, which is how we read the
 stated goal, and what each form of processing costs research.
 
-\textbf{[Paragraph on the approach, stating the four questions of the preregistration (protection by each form,
-the effect of the columns kept and of the attacker, the process measures that remain, and the Japanese translation
-logs): the evaluation answers the question for one processed log against $N$ candidate
-texts on the same prompt in a closed world, with $N = 10$, $100$ and $1{,}000$, on a public corpus whose texts are
-known (KLiCKe), for the masking used in one public release and for alternatives that release less (key categories, merged
-separators, rounded times, segment values, suppression), against attackers that know the processing; each form is
-reported with the accuracy of the strongest attacker, as a multiple of $1/N$ and as a gain over an attacker that uses
-only the total length, and with how far ten standard process measures can still be computed. The study was
-preregistered before any data were acquired.]}
+We answer this for one processed log against $N$ candidate texts on the same prompt, in a closed world, with $N =
+10$, $100$ and $1{,}000$, on a public corpus whose texts are known (KLiCKe). The forms are the masking used in the
+competition and alternatives that release less: key categories, merged separators, rounded times, segment values
+alone and random suppression of presses. The attackers know the processing and range from one that uses only the
+total length to one that rebuilds the final draft and one that scores the press intervals. For each form we report
+the strongest attacker's accuracy, as a multiple of $1/N$ and as a gain over the total length, and how far ten
+standard process measures of writing research can still be computed; the same kind of matching is also run on
+Japanese translation logs typed with an input method. The study was preregistered before any data were acquired.
 
-\textbf{[Paragraph on the harms: the main harm is the link between a processed log and its text, for a party that
-holds the text, read against the goal the releasing party stated; linking a log to a named writer is stated only as a consequence if logs were released by class
-or found from a published essay (Section~\ref{sec:threat-model}).]}
+The main harm we consider is the link between a processed log and its text for a party that holds the text: the times,
+the revisions and any released score of the log are then linked to that text. Where the writer of a text is known, as
+in a class or for an essay its writer has published, the log would also be linked to a named person; we know of no
+release in which this has happened and state it only as a consequence (Section~\ref{sec:threat-model}).
 
-\textbf{[Contributions, after the results. Not more than the evaluation of the masking used in one public release and of
-alternatives, against the attackers tried, with the cost to the process measures; no claim of safety or of an upper
-bound.]}
+Against the attackers tried, the masking kept no log apart from its text: an attacker that rebuilds the final draft,
+as the winning solution of the competition did, chose the true essay among 1,000 for every log (C1,
+Section~\ref{sec:results:masking}). Forms that release less lowered matching only at a cost to the process measures:
+keeping the key categories still left 86.7\% at $N = 1{,}000$, every form that kept the measures close to their
+unprocessed values (a median correlation of 0.84 or more) left 70\% or more, and the forms that brought matching near the total length kept them at a
+median correlation of at most 0.70 or not at all (C2, Sections~\ref{sec:results:forms} and~\ref{sec:results:utility}). We frame a threat in which the
+auxiliary information is the text, held outside the release, and give the settings in which it arises (C3,
+Section~\ref{sec:threat-model}). The results describe the attackers tried; they are not bounds on the risk.

@@ -1,27 +1,190 @@
 \section{Results}
 \label{sec:results}
 
-% Written after the main computation. The plan below is ordered by the pillars of Sections 4 to 6; for each, what was
-% found and why it matters for the claim (outline.md, Claim and contributions). The bracketed plans hold no result.
-% Budget: about 2.5 pages, with Table 2 (two parts, N = 1,000 and N = 10), Figure 1 and the subsection on ENJA15.
+% Ordered by the pillars of Sections 4 to 6; for each, what it was meant to establish, what was measured, what was
+% found and why it matters for the claim (outline.md, Claim and contributions). Values come from the aggregate files of
+% the main computation through make_tables.py. The rows of KeyTAR (A4) are filled in when its computation is complete;
+% A4 is not part of the strongest attacker, so no statement below depends on it.
+Values are for full texts and the 500 writers unless stated otherwise, in percent, with 95\% intervals in brackets;
+no writer met an exclusion criterion. Every attacker at every $N$, the windows and the diagnostics are in
+Appendix~\ref{app:results}.
 
-\textbf{[The masking used in one public release (R1) and the unprocessed log (R0): the strongest attacker's accuracy at
-$N = 1{,}000$ and $N = 10$, as a multiple of $1/N$ and as a gain over A0, with the selected attacker and its share of
-resamples; the negative control next to it. Why it matters: contribution C1, read against the stated goal
-(Section~\ref{sec:threat-model:attacker}).]}
+\begin{table*}
+  \caption{The strongest attacker on full texts, 500 writers. A0: accuracy of the total-length attacker. Strongest:
+  accuracy of the best adaptive attacker with its interval; the selected attacker is given with the percentage of
+  resamples in which it was selected when this is below 100. $\times 1/N$: the accuracy as a multiple of chance.
+  Gain: the difference from A0 in percentage points. Measures: the numbers of the ten process measures computed with
+  the same inputs as in R0, approximated and not computed; $\rho$: the median over the ten measures of the Spearman
+  correlation with R0 (a measure not computed counts as zero). The measures do not depend on $N$. A4 (KeyTAR) is a
+  reference outside the threat model and is not part of the strongest attacker.}
+  \label{tab:main}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{lrlrrlrr}
+    \toprule
+    \multicolumn{8}{l}{(a) $N = 1{,}000$ ($1/N = 0.1\%$)} \\
+    Form & A0 & Strongest & Attacker & $\times 1/N$ & Gain over A0 & Measures & $\rho$ \\
+    \midrule
+    \tabinput{sections/generated/main-1000.tex}
+    A4 on R0 to R3-t & \multicolumn{7}{l}{\textbf{[after the computation of A4]}} \\
+    \midrule
+    \multicolumn{8}{l}{(b) $N = 10$ ($1/N = 10\%$)} \\
+    Form & A0 & Strongest & Attacker & $\times 1/N$ & Gain over A0 & & \\
+    \midrule
+    \tabinput{sections/generated/main-10.tex}
+    A4 on R0 to R3-t & \multicolumn{7}{l}{\textbf{[after the computation of A4]}} \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
 
-\textbf{[The forms that release less: the contrasts between adjacent forms (R1~$-$~R2, R2~$-$~R3, R3~$-$~R3-u,
-R3~$-$~R3-t($w$)), R4($w$) and R7($p$), each with the change in attackers it contains (\S\ref{sec:protocol:quantities}).
-Why it matters: contribution C2, which columns carry the link.]}
+\subsection{The masking of the public release}
+\label{sec:results:masking}
 
-\textbf{[The cost to the process measures: Figure 1, accuracy against the median correlation with R0; the forms not
-dominated on both axes, described against the attackers tried. Why it matters: the second axis of C2.]}
+This part asks whether the masking used in the competition (R1) keeps a log apart from its text, measured by the
+strongest attacker's accuracy against $1/N$ and A0, with the negative control beside it. It does not, against the attacker that rebuilds the final draft as the winning solution did: on R1, A1 chose the
+true text for every log in every draw, at $N = 1{,}000$ as at $N = 10$ (100.0\% [100.0, 100.0], 1,000 times $1/N$, a
+gain of 98.2 points [97.1, 99.2] over A0, selected in every resample). R1 gave the same values as the unprocessed log
+R0, as did R5 and R6, also for the 18 writers whose rebuilt draft differs from the distributed text. In the negative
+control, the same attacker chose the true text in 0.0\% of draws at $N = 1{,}000$ and 9.9\% at $N = 10$, close to
+$1/N$, so the accuracy comes from the link between each log and its own text; the open-world area was 1.000.
 
-\textbf{[Windows ($k$) and the open-world diagnostic, with KeyTAR in its own row as a reference.]}
+This is contribution C1. Under our reading of the stated goal (\S\ref{sec:threat-model:attacker}), the masking does
+not keep a log apart from its text for anyone who holds the essays of the same prompt: the word lengths that the
+masking leaves were enough to pick each essay out of a thousand.
 
-\textbf{[The predictions registered before the data, next to the results (\S\ref{sec:protocol:registration}).]}
+\subsection{Forms that release less}
+\label{sec:results:forms}
 
-\textbf{[Subsection on the Japanese translation logs: the accuracy of A2 on R3j at $N$ = all, its differences from
-$1/N$ and A0, and whether it ``exceeds'' them by the registered rule (\S\ref{sec:protocol:enja}).]}
+This part asks which columns carry the link, measured by the contrasts between adjacent forms
+(\S\ref{sec:protocol:quantities}). Dropping the activity and the text change (R1~$-$~R2) changed little: A1 rebuilt
+the draft from the categories and the position and reached 98.6\% [97.4, 99.6] at $N = 1{,}000$ (difference 1.4
+points [0.4, 2.6]). Dropping the position and the word count as well (R2~$-$~R3) cost the strongest attacker 11.9
+points [9.1, 15.1], but on R3 the editor replay A1$'$, which reads only the category column, still chose the true text
+in 86.7\% [83.5, 89.5] of draws (867 times $1/N$). Rounding the press times did not change the strongest attacker for
+any $w$, since A1$'$ does not use times; the timing attacker A3 fell from 47.1\% on R3 to 42.6\%, 40.7\% and 5.4\% at
+$w = 10$, $100$ and $1{,}000$\,ms (differences 4.5 [2.4, 6.9], 6.4 [3.2, 9.8] and 41.7 [37.2, 46.1] points).
 
-\textbf{[One paragraph naming the exploratory results, with the tables in Appendix~\ref{app:exploratory}.]}
+Merging the separators into one category (R3~$-$~R3-u) lowered the strongest attacker by 50.7 points [46.0, 55.1], to
+36.0\% [31.9, 40.2], by A3 with its mean timing term. On R3-u, A0 counts all characters, separators included, and
+reached 19.2\% by itself, so the gain over A0 is 16.8 points [13.6, 20.1]. Releasing only the segment values kept A2 at its value on R3 for $w =
+1$ (40.5\% [36.1, 44.8]), lowered it to 4.4\% [2.8, 6.3] for $w = 2$, and for $w = 4$ and $8$ left no attacker above
+A0. Suppression lowered the strongest
+attacker to 70.2\% [66.0, 74.2], 14.3\% [11.5, 17.4] and 2.2\% [1.4, 3.4] for $p = 0.1$, $0.25$ and $0.5$; at $p =
+0.5$ the strongest attacker was A0 (gain 0.0 [0.0, 1.1]).
+
+At $N = 10$ the order of the forms is the same, but A0 alone already chose the true text in 61.6\% of draws, so the
+gains are smaller (Table~\ref{tab:main}b): 32.0 points on R3, 3.8 points [2.2, 5.4] on R3-u, and none whose lower
+bound is above zero on R4($w$) and on R7 with $p \geq 0.25$. The negative control stayed near $1/N$ for every form
+(9.6\% to 11.5\% at $N = 10$, at most 0.34\% at $N = 1{,}000$).
+
+This is the first axis of contribution C2. Against the attackers tried, the forms that keep the key categories (R2,
+R3, R3-t) left matching within 14 points of the masking, and the times were not needed by the strongest attacker. Only
+merging the separators, coarsening the segment values to $w \geq 2$ or suppressing at least a quarter of the presses
+brought the strongest attacker below 40\% at $N = 1{,}000$, and only R4(4), R4(8) and R7(0.5) left no gain over the
+total length. These contrasts contain the difference in attackers as well as in columns
+(\S\ref{sec:threat-model:bias}).
+
+\subsection{The cost to the process measures}
+\label{sec:results:utility}
+
+\begin{figure}
+  \centering
+  \begin{tikzpicture}
+    \begin{semilogxaxis}[
+      width=\linewidth, height=0.62\linewidth,
+      xmin=0.8, xmax=2000, ymin=-0.06, ymax=1.08,
+      xlabel={Strongest attacker at $N = 1{,}000$, multiple of $1/N$},
+      ylabel={Median Spearman correlation with R0},
+      tick label style={font=\scriptsize}, label style={font=\footnotesize},
+      xtick={1,10,100,1000}, xticklabels={1,10,100,1{,}000},
+      ytick={0,0.25,0.5,0.75,1}, axis lines=left,
+    ]
+      % Coordinates from sections/generated/figure-coords.tex. Filled: not dominated; open: dominated.
+      \addplot[only marks, mark=*, mark size=1.8pt, black] coordinates
+        {(1000,1.0) (867.2,0.9225) (702.4,0.8471) (143.2,0.8070) (21.9,0.7022) (1.37,0.0)};
+      \addplot[only marks, mark=o, mark size=1.8pt, black] coordinates
+        {(986,0.9225) (867.2,0.9200) (867.2,0.8681) (867.2,0.0950) (360,0.6347) (404.8,0.0) (44.4,0.0) (3.533,0.0)};
+      \node[font=\scriptsize, anchor=east] at (axis cs:600,1.03) {R0, R1};
+      \node[font=\scriptsize, anchor=east] at (axis cs:600,0.95) {R2, R3, R3-t(10)};
+      \node[font=\scriptsize, anchor=east] at (axis cs:560,0.875) {R3-t(100)};
+      \node[font=\scriptsize, anchor=north] at (axis cs:702.4,0.82) {R7(0.1)};
+      \node[font=\scriptsize, anchor=east] at (axis cs:120,0.807) {R7(0.25)};
+      \node[font=\scriptsize, anchor=east] at (axis cs:18,0.702) {R7(0.5)};
+      \node[font=\scriptsize, anchor=east] at (axis cs:300,0.635) {R3-u};
+      \node[font=\scriptsize, anchor=south] at (axis cs:867.2,0.12) {R3-t(1{,}000)};
+      \node[font=\scriptsize, anchor=south] at (axis cs:404.8,0.02) {R4(1)};
+      \node[font=\scriptsize, anchor=south] at (axis cs:44.4,0.02) {R4(2)};
+      \node[font=\scriptsize, anchor=south] at (axis cs:3.533,0.02) {R4(4)};
+      \node[font=\scriptsize, anchor=south] at (axis cs:1.37,0.08) {R4(8)};
+    \end{semilogxaxis}
+  \end{tikzpicture}
+  \caption{Matching against the process measures for the main forms, full texts, $N = 1{,}000$ (lower left: less
+  matching, fewer measures). Filled: forms that no other form dominates, that is, no other form has a lower or equal
+  accuracy and a higher or equal correlation, one of them strictly. Open: dominated forms.}
+  \label{fig:tradeoff}
+\end{figure}
+
+This part asks what each form costs writing research, measured by the agreement of the ten process measures with
+their values in R0 (\S\ref{sec:protocol:utility}). R0 and R1 compute all ten measures as before. R2 and R3 compute the
+P-bursts, the pauses and the variance of the production rate as in R0 and approximate the R-bursts, deletions and
+insertions, with correlations from 0.19 (insertion proportion) to 0.85 (deletion proportion); the median is 0.92. At $w = 1{,}000$\,ms five measures cannot be computed,
+R3-u loses the pauses within and between words, and R4 computes none (Table~\ref{tab:main}).
+
+Figure~\ref{fig:tradeoff} plots the two axes. The forms that no other form dominates are R0 and R1, R3, the three
+levels of suppression and R4(8). R3 dominates R2 and R3-t, which have the same or a lower correlation and the same
+accuracy or a higher one, and R7(0.25) dominates R3-u, with a lower accuracy (14.3\% against 36.0\%) and a higher
+correlation (0.81 against 0.63). The approximations also change how a
+measure relates to the human scores: the mean pause correlates with the score at $-0.11$ in R0 and at $-0.50$ in
+R7(0.5), and the R-burst length at $-0.04$ in R0 and at $0.20$ in R2 (Appendix~\ref{app:results}). The utility axis
+measures agreement with R0, not whether a measure keeps its relation to the quality of writing.
+
+This is the second axis of contribution C2. No form evaluated here brought the strongest attacker near $1/N$ while
+keeping the measures close to their values in R0: every form with a median correlation of at least 0.84 left the
+strongest attacker at 70\% or more at $N = 1{,}000$, and the forms at or below 2.2\% kept a median of at most 0.70.
+
+\subsection{Windows, the open world and KeyTAR}
+\label{sec:results:windows}
+
+This part asks whether releasing parts of logs changes the picture, and how well the scores separate candidate sets
+with and without the true text. On windows, where A1 and A1$'$ are not run, A2 was the strongest attacker on R0 to R3,
+R3-t and R4(1), with the same values on all of them, since A2 reads only the segments. At $N = 1{,}000$ it chose the true window in 65.8\% [63.9, 67.8] of draws with $k = 5$ and in 72.3\%
+[70.2, 74.5] with $k = 20$; at $N = 10$, in 84\% to 88\%. On R3-u, where A0 was the strongest attacker, accuracy at
+$N = 1{,}000$ was 0.6\% to 1.9\%; on R7(0.1), 26.7\% to 47.5\%; on R4(8), 1.5\% to 16.7\%
+(Appendix~\ref{app:results}). Under the assumptions about windows (\S\ref{sec:threat-model:bias}), releasing parts of logs did not by itself
+keep them apart from their texts.
+
+In the open-world diagnostic, the area was 1.000 for R0 and R1, 0.978 for R2, 0.774 [0.753, 0.795] for R3 and R3-t
+and at most 0.62 for the other forms. KeyTAR, the reference outside the threat model, reached \textbf{[A4: accuracy on R0 to R3-t at $N =
+1{,}000$ and $N = 10$, with and without the one writer whose chunks were generated on the CPU]}.
+
+\subsection{Predictions and results}
+\label{sec:results:predictions}
+
+All predictions registered before the data were acquired (\S\ref{sec:protocol:registration}) held for the forms within
+the threat model: 95\% or more for R0 to R2, R5 and R6; 80\% or more for R3 and R3-t; 10\% to 60\% for R3-u; R7
+falling with $p$ and below 30\% at $p = 0.5$; R4(1) about as high as A2 on R3 and R4(8) about as high as A0
+(Table~\ref{tab:main}). The prediction for KeyTAR, below 10 times $1/N$, \textbf{[held or did not hold, with the value of A4]}.
+
+\subsection{The Japanese translation logs}
+\label{sec:results:enja}
+
+This part asks question 4: whether the same kind of matching exceeds chance and A0 on logs typed with an input method,
+measured by A2 on R3j at $N$ = all (\S\ref{sec:protocol:enja}). No session met an exclusion criterion, so all 76
+sessions of 39 translators on six source texts were used, with 12 or 13 candidates per log. On R3j, which keeps no
+string, A2 chose the true translation in 51.6\% [39.3, 63.5] of logs, against $1/N$ = 7.9\% and 11.9\% [5.3, 19.7] for
+A0. The differences were 43.7 points [31.4, 55.6] from $1/N$ and 39.7 points [25.6, 53.0] from A0; both lower bounds
+are above zero, so by the registered rule matching exceeds chance and A0. Accuracy ranged from 33\% to
+77\% over the source texts, and R3j-t($w$) and R4($w$) also exceeded both (Appendix~\ref{app:enja}). The result is
+conditional (\S\ref{sec:discussion:limits}): without any string, the categories of input-method events kept enough
+of a translation's segment structure to choose it in half of the logs.
+
+\subsection{Exploratory analyses}
+\label{sec:results:exploratory}
+
+The exploratory analyses (\S\ref{sec:protocol:exploratory}; Appendix~\ref{app:exploratory}) add three observations
+at $N = 1{,}000$. On R4(2) and R7(0.5), with mean accuracies of 4.4\% and 2.2\%, 4.2\% and 1.6\% of writers were
+matched in every draw: the matches concentrate on a few writers. On R3, the 80\% of logs and draws with the largest
+margin between the best and the second-best candidate were all matched correctly. Accuracy did not differ by score
+band on R1 to R3, while on R3-u the lowest third was matched more often than the highest ($-16.9$ points [$-26.9$,
+$-6.9$]). \textbf{[Uniqueness of word-length sequences and R-DP, when their computations are
+complete.]}
