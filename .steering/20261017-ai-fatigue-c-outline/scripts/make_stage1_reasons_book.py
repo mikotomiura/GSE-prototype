@@ -159,7 +159,7 @@ def main():
              links={"DOI": lambda v: ("https://doi.org/" + v[8], v[8]) if v[8] else None}, tab="64748B",
              height=lambda v: st.text_height((v[1], 36), (v[2], 30), (v[3], 70), (v[4], 60)))
     cr = wb.create_sheet("判定基準")
-    st.table(cr, ["項目", "内容"], [22, 120], [list(x) for x in db.CRITERIA] + [list(x) for x in CRITERIA_ADD],
+    st.table(cr, ["項目", "内容"], [22, 120], [list(x) for x in db.CRITERIA] + [list(x) for x in CRITERIA_ADD if x[0] not in dict(db.CRITERIA)],
              wrap={"内容"}, tab="64748B",
              height=lambda v: st.text_height((v[1], 120)))
     os.makedirs(out, exist_ok=True)
