@@ -35,6 +35,11 @@ COLS = ["ID", "束", "論文タイトル", "題名（日本語・機械訳）", 
         "著者 1 の根拠メモ", "共著者の理由", "共著者の読んだ範囲", "共著者の根拠メモ", "提案する理由", "提案の根拠",
         "共著者の返答", "共著者のコメント"]
 A1_INPUTS = {"提案する理由", "提案の根拠"}
+CRITERIA_ADD = [   # registered in attachment 6 (Q2, Q4, section 4) but not in the workbooks' criteria (decision 91)
+    ("理由が 2 つ以上当たるとき", "先のものを 1 つ選ぶ。題名・抄録の段の順は E4、E1、E3、E2、E7。"),
+    ("E3 の補足", "参加者が AI の系を使う・監督する・評価する研究でない（AI の利用を導入・操作・比較する研究でもない）とき、または疲労がその AI の利用と関係づけられていないとき。論文が手法として AI を使っているかどうかではない。"),
+    ("E2 の補足（題名・抄録の段）", "題名・抄録が、疲労を測っていない・分析していないと述べるときだけ E2 にする。測定や結果の一覧に疲労が無いだけなら不明とし、E2 にしない。"),
+]
 A2_INPUTS = {"共著者の返答", "共著者のコメント"}
 
 
@@ -75,6 +80,8 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--sample-book", required=True, help="author 2's 20%% sample workbook as imported (id-restored)")
     ap.add_argument("--net1-book", required=True, help="author 2's net1 workbook as returned")
+    ap.add_argument("--review-book", help="author 1's review workbook (decision 93): the note of a changed code")
+    ap.add_argument("--carry", help="an earlier version of this workbook: author 1's proposals are carried over")
     ap.add_argument("--data", default="~/Documents/TRACE/data")
     a = ap.parse_args()
     out, data = os.path.expanduser(a.out), os.path.expanduser(a.data)
@@ -91,16 +98,24 @@ def main():
     recs = {r["id"]: r for r in db.load_records(data)}
     meta = db.load(os.path.join(data, "meta.json"), {})
     ja = db.load(os.path.join(data, "ja.json"), {})
+    review = sheet_by_id(os.path.expanduser(a.review_book), "段1の見直し") if a.review_book else {}
+    carry = sheet_by_id(os.path.expanduser(a.carry), "除外理由") if a.carry else {}
     body, bad = [], []
     for b, rid, c1, c2 in named:
         x, (book, y) = a1[rid], co_csv[rid]
         cy = co[rid] if book == "net1" else sheet_by_id(os.path.expanduser(a.sample_book), "段1")[rid]
-        if (x["除外理由"] or "") != c1 or y["code"] != c2 or (cy["除外理由"] or "") != c2:
+        rv = review.get(rid, {})
+        if rv.get("見直しの結果") == "理由を変える":   # author 1's code after the re-check, with its note
+            code1, memo1 = rv["見直しの除外理由"], "（見直し）" + (rv["見直しの根拠メモ"] or "")
+        else:
+            code1, memo1 = x["除外理由"] or "", x["根拠メモ"] or ""
+        if code1 != c1 or y["code"] != c2 or (cy["除外理由"] or "") != c2:
             bad.append(rid)
+        k = carry.get(rid, {})
         r = recs[rid]
         body.append([rid, b, r["title"], (ja.get(rid) or {}).get("title_ja", ""), f"{c1} / {c2}", c1,
-                     x["読んだ範囲"] or "", x["根拠メモ"] or "", c2, cy["読んだ範囲"] or "", cy["根拠メモ"] or "",
-                     "", "", "", ""])
+                     x["読んだ範囲"] or "", memo1, c2, cy["読んだ範囲"] or "", cy["根拠メモ"] or "",
+                     k.get("提案する理由") or "", k.get("提案の根拠") or "", "", ""])
     if bad:
         raise SystemExit(f"the codes in the database or the workbooks differ from the committed ones: {bad}")
     body.sort(key=lambda v: (v[4], v[1], v[0]))   # the same pair of codes together, then batch
@@ -144,7 +159,8 @@ def main():
              links={"DOI": lambda v: ("https://doi.org/" + v[8], v[8]) if v[8] else None}, tab="64748B",
              height=lambda v: st.text_height((v[1], 36), (v[2], 30), (v[3], 70), (v[4], 60)))
     cr = wb.create_sheet("判定基準")
-    st.table(cr, ["項目", "内容"], [22, 120], [list(x) for x in db.CRITERIA], wrap={"内容"}, tab="64748B",
+    st.table(cr, ["項目", "内容"], [22, 120], [list(x) for x in db.CRITERIA] + [list(x) for x in CRITERIA_ADD],
+             wrap={"内容"}, tab="64748B",
              height=lambda v: st.text_height((v[1], 120)))
     os.makedirs(out, exist_ok=True)
     path = os.path.join(out, "TRACE_co-author_stage1_reasons.xlsx")
