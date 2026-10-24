@@ -7,10 +7,13 @@ This script is not imported by run_main.py, so it is not in the cache fingerprin
 The cache folder is trusted (pickle): point --cache only at the folder run_main.py wrote.
 
     python -I scripts/a4_without_cpu_writer.py --cache raw/derived/main_cache/<fingerprint 16> \
-        --exclude raw/derived_a4_cpu_fallback_writers.json --sample-name main500_without_cpu_writer \
-        --out results/main_a4_without_cpu_writer.json
-    python -I scripts/a4_without_cpu_writer.py --cache ... --sample-name main500 --compare results/main_a4.json \
-        --out results/.tmp/a4_positive_control.json      # no --exclude: positive control against main_a4.json
+        --compare results/main_a4.json --exclude raw/derived_a4_cpu_fallback_writers.json --expect-excluded 1 \
+        --sample-name main500_without_cpu_writer --out results/main_a4_without_cpu_writer.json
+
+Every run first recomputes the A4 cells of all the sample with the resamples main500 and stops unless they are
+identical to reference_A4 of --compare (the positive control), and unless the sample sizes per prompt are those of
+--compare; the excluded version is computed from the same loaded results. Without --exclude it writes the positive
+control. The sample positions it prints can be turned back into IDs with the public seed: do not publish the log.
 """
 import argparse
 import glob
@@ -36,9 +39,9 @@ def load_sample(cache):
     for path in sorted(glob.glob(os.path.join(cache, "*.pkl"))):
         with open(path, "rb") as f:
             key, r = pickle.load(f)
-        if key[2] or MUTATE == "keep_cost_only":
+        if key[2] or MUTATE == "keep_cost_only":  # windows = in the sample (main_a4 runs without --all)
             res.append(r)
-    if MUTATE != "unsorted":
+    if MUTATE != "unsorted":  # as run_main.run: [results[k] for k in sorted(sample_set)], k = (prompt, writer)
         res.sort(key=lambda r: (r["prompt"], r["writer"]))
     return res
 
@@ -70,44 +73,62 @@ def _dump(x):
 
 
 def run(args):
+    if MUTATE:
+        parts = os.path.normpath(os.path.abspath(args.out)).split(os.sep)
+        if "results" in parts and ".tmp" not in parts:
+            raise SystemExit("A4WO_MUTATE is set: not writing into results/")
     res = load_sample(args.cache)
+    keys = [(r["prompt"], r["writer"]) for r in res]
     missing_a4 = sum(1 for r in res if not r.get("a4"))
-    if not res or missing_a4:
-        raise SystemExit("the cache has %d sample results, %d without A4" % (len(res), missing_a4))
-    drop = excluded_keys(args.exclude) if args.exclude else set()
-    if args.expect_excluded is not None and len(drop) != args.expect_excluded:
-        raise SystemExit("%d writer(s) to exclude, expected %d" % (len(drop), args.expect_excluded))
-    if not drop and args.sample_name != "main500":
-        raise SystemExit("without --exclude the sample name must be main500 (the positive control)")
-    if drop and args.sample_name == "main500":
-        raise SystemExit("with --exclude the resamples need a new sample name, not main500")
-    pos = [i for i, r in enumerate(res) if (r["prompt"], r["writer"]) in drop]
-    ref, kept = a4_without(res, drop, seeds.read_seed(), args.sample_name)
-    print("sample %d writers, excluded %d at position(s) %s of the sorted sample, kept %d"
-          % (len(res), len(res) - len(kept), pos, len(kept)), flush=True)
+    if not res or missing_a4 or len(set(keys)) != len(keys):
+        raise SystemExit("the cache has %d sample results, %d without A4, %d duplicated"
+                         % (len(res), missing_a4, len(keys) - len(set(keys))))
     sizes = {}
+    for p, _ in keys:
+        sizes[p] = sizes.get(p, 0) + 1
+    with open(args.compare, encoding="utf-8") as f:
+        want = json.load(f)
+    if sizes != want["sample_sizes"] and MUTATE != "no_sizes":
+        raise SystemExit("the sample of the cache is not the sample of %s" % args.compare)
+    seed = seeds.read_seed()
+    ref0, _ = a4_without(res, set(), seed, "main500")
+    same = _dump(ref0) == _dump(want["main500"]["reference_A4"])
+    print("positive control: reference_A4 of %d writers, %d cells %s %s"
+          % (len(res), len(ref0), "identical to" if same else "DIFFERENT from", args.compare), flush=True)
+    if not same and MUTATE != "no_positive":
+        raise SystemExit(2)
+    name, ref, kept = "main500", ref0, res
+    if args.exclude:
+        if args.expect_excluded is None:
+            raise SystemExit("--exclude needs --expect-excluded")
+        if args.sample_name in (None, "main500", "all"):
+            raise SystemExit("with --exclude the resamples need a new sample name, not %s" % args.sample_name)
+        drop, name = excluded_keys(args.exclude), args.sample_name
+        pos = [i for i, k in enumerate(keys) if k in drop]
+        ref, kept = a4_without(res, drop, seed, name)
+        print("excluded %d at position(s) %s of the sorted sample, kept %d" % (len(res) - len(kept), pos, len(kept)),
+              flush=True)
+        if len(res) - len(kept) != args.expect_excluded:
+            raise SystemExit("%d writer(s) excluded, expected %d" % (len(res) - len(kept), args.expect_excluded))
+    kept_sizes = {}
     for r in kept:
-        sizes[r["prompt"]] = sizes.get(r["prompt"], 0) + 1
+        kept_sizes[r["prompt"]] = kept_sizes.get(r["prompt"], 0) + 1
     out = {"seed_file_sha256": run_main._sha(os.path.join(HERE, "..", "SEED")),
            "config_sha256": run_main._sha(os.path.join(HERE, "..", "config.json")),
-           "cache": os.path.basename(os.path.normpath(args.cache)), "sample": args.sample_name,
-           "writers": len(kept), "excluded_writers": len(res) - len(kept), "sample_sizes": sizes,
+           "cache": os.path.basename(os.path.normpath(args.cache)), "sample": name,
+           "writers": len(kept), "excluded_writers": len(res) - len(kept), "sample_sizes": kept_sizes,
+           "positive_control": "reference_A4 of the %d writers with main500 identical to main_a4.json" % len(res),
            "note": "A4 cells without the writer of the CPU chunks (deviation D3); aggregates only",
            "reference_A4": ref}
     if MUTATE:
         out["mutate"] = MUTATE
-    if args.compare:
-        with open(args.compare, encoding="utf-8") as f:
-            want = json.load(f)["main500"]["reference_A4"]
-        same = _dump(ref) == _dump(want)
-        print("positive control: reference_A4 of %d cells %s %s" % (len(want), "identical to" if same
-                                                                       else "DIFFERENT from", args.compare))
-        if not same:
-            raise SystemExit(2)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out + ".part", "w", encoding="utf-8", newline="\n") as f:
+    part = "%s.%d.part" % (args.out, os.getpid())
+    with open(part, "w", encoding="utf-8", newline="\n") as f:
         f.write(_dump(out) + "\n")
-    os.replace(args.out + ".part", args.out)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(part, args.out)
     print("wrote", args.out)
     return out
 
@@ -115,10 +136,10 @@ def run(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--cache", required=True, help="the cache folder of the main_a4 stage (with its fingerprint)")
+    ap.add_argument("--compare", required=True, help="main_a4.json: the positive control and the sample sizes")
     ap.add_argument("--exclude", help="JSON list of {prompt, writer, ...} to exclude (not printed)")
-    ap.add_argument("--expect-excluded", type=int, help="stop unless --exclude lists this many writers")
-    ap.add_argument("--sample-name", required=True, help="the name of the resamples (seed use bootstrap)")
-    ap.add_argument("--compare", help="main_a4.json: stop unless reference_A4 is identical (positive control)")
+    ap.add_argument("--expect-excluded", type=int, help="with --exclude: stop unless this many writers are removed")
+    ap.add_argument("--sample-name", help="with --exclude: the new name of the resamples (seed use bootstrap)")
     ap.add_argument("--out", required=True)
     run(ap.parse_args())
 
