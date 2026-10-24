@@ -1146,3 +1146,12 @@
 - h2: 研究者の選択（推奨どおり）で、4 件の手の保存を待たずに作った。`coauthor-ids --stage 2 --book h2` で 141 件（149 件から h1 の 8 件を除いた集合と同じ）、TRACE `3af051e`。`make_coauthor_db.py` → `edit_coauthor_intro.py`（2 セル・入力規則とリンクの数は同じ）で `TRACE_co-author_stage2_h2.xlsx`（`3c8d0dbd…`・228,790 バイト・全文あり 82）。ID の順は `h2.ids` と同じ、判定と中心は h1 と同じく「未判定」で、ほかの入力の欄は空、著者 1・AI・最終の欄は無い、『判定基準』は第一著者の DB と同じ 21 行（判断 96 の 6 行を含む）。`TRACE_Co-Author_judge-sheet` に置き（Drive の ID `1Y8BRv1romywYspkVSp4WVqLMM7ucvOCU`）、API で大きさが同じ。手元は `~/Documents/TRACE/coauthor-books-20261024-h2/`。共有と連絡は研究者。
 - Chrome のタブ: グループの最初のタブを閉じるとグループが消え、残ったタブを閉じられなくなった（2 回）。研究者に閉じてもらう。ASME の PDF のタブは手の保存に使える。
 - 待っていること: 研究者が DB の『段2・3』で b23〜b39 を判定する（4 件を手で保存できれば、その前に全文を置いて DB を作り直す）→ `compare_stage2_db.py` で照合 → `export_stage2.sh b23 … b39` → push → `import-coauthor --stage 2 --book h1`。h2 の共有と連絡。
+
+## 判断 99: 研究者が手で保存した 4 件を置き、DB と h2 を作り直し、判定する記録の一覧をスプレッドシートにした（2026-10-24・研究者の指示）
+
+- 研究者の指示: 取れなかった 4 件を Chrome で開く（私は 4 つのタブを開いただけで、確かめのページには触れていない）→ 研究者が保存。判定してほしいものはスプレッドシートにする。Drive に今回直したものを反映させて更新する。
+- 4 件: 研究者がダウンロードのフォルダに保存した `kead209.pdf`（CS07857）・`jcise-24-1654.pdf`（CS06984）・`90-94_48.pdf`（CS09582）・`1-s2.0-S0003687024001236-am.pdf`（S05-03・受理稿）。すべて `%PDF` で題名の語の一致は 1.0。ID の名前で全文のフォルダに置いた。`chrome_status.json` は控え（`backup/chrome_status.20261024-231714.json`）と比べ、違いはこの 4 件の状態（captcha 3・failed 1 → saved・注に元のファイル名と研究者が手で保存したこと）だけ。
+- 149 件の全文: あり 91・なし 58（有料 49・リンクなし 6・取れず 3）。
+- DB: Excel が閉じていること、Drive の DB が判断 98 の作り直し（`041077b7…`）のままで研究者の記入が無いことを確かめ、控え `~/Documents/TRACE/TRACE_database.手の4件前-20261024.xlsx`（`041077b7…`）を取ってから `update_trace_db.py`。4 ファイルを Drive に写し、全文 285・リンク 311（`f279cc52…`・1,242,227 バイト・Drive の ID は `1iMt0mNinodAqb9OQJ-6xhx33EulJfNwp` に変わった）。控えと比べ、違いは『段2・3』と『全文』の 4 行の全文の欄とファイル（と『全文』の取得元 1 セル）、『はじめに』の作成日だけ。入力の欄は違い 0。Drive の API で大きさが同じ。
+- h2: Drive の冊が置いた版（`3c8d0dbd…`）のままであることを確かめてから、同じ手順（`make_coauthor_db.py` → `edit_coauthor_intro.py`）で作り直して同じ名前で置き換えた（`5bfbcc95…`・228,898 バイト・Drive の ID `1Y8BRv1romywYspkVSp4WVqLMM7ucvOCU` のまま・API で大きさが同じ）。前の版と比べ、違いは『段2・3』の 4 行の全文の欄とファイル、『はじめに』の作成日だけ。全文あり 86（141 件のうち）。手元は `~/Documents/TRACE/coauthor-books-20261024-h2/v2/`。
+- 判定する記録の一覧: `TRACE_段2の判定-b23-39.xlsx`（Drive の `TRACE` フォルダ・ID `1E1PChB60wrDm-WDGm7T2-Y2CwIiKqlM8`・33,158 バイト・手元は `~/Documents/TRACE/`）。判定は道具が読む DB の『段2・3』に書くので、この表は一覧（束・ID・題名・機械訳の題名・全文の有無・全文のファイル〔Drive のリンク〕か状態・h1 で共著者が判定済みか・注意）。注意は CS03205（「保留・E7」の直し）・CS04589（予稿の代わりに最終版）・CS09148（表を PDF に）。判定の値は入っていない。前の一覧の .txt は置き換えた（残してある）。
