@@ -91,9 +91,10 @@ first setting.
 \paragraph{Texts on the same prompts.}
 The texts of the hidden essays were collected and scored, so they are held by the collecting party and by whoever
 scored them. Within the releasing party the texts and logs are already linked; matching matters where the texts are
-held outside it, for example by raters who are not part of it or by anyone to whom the texts are passed later. We do
-not know who held the texts of the competition data. In this setting the evaluation measures how far a processed log
-can be linked to its text by a party that holds the texts; it does not estimate a harm that has occurred. Texts on the
+held outside it, for example by raters who are not part of it or by anyone to whom the texts are passed later. Apart
+from what the authors of KLiCKe told us (below), we do not know who held the texts of the competition data. In this
+setting the evaluation measures how far a processed log can be linked to its text by a party that holds the texts; it
+does not estimate whether anyone has made such a link. Texts on the
 same prompts can also be public. The KLiCKe corpus was collected on Amazon Mechanical Turk in
 2022 and released together with its keystroke logs and human scores: 4,992 argumentative essays on four prompts derived
 from the SAT, each written in 30 minutes~\cite{tian2025klicke}. Because its texts are public, its logs need no
@@ -102,12 +103,17 @@ competition data names the same platform, the same kind of prompts and the same 
 We take the size of KLiCKe on one prompt, about a thousand essays, as the size of a set of candidate texts on the
 same prompts. The
 closed world holds only if the hidden essays are among the held texts. The authors of the KLiCKe corpus informed us
-(personal communication) that the competition data were drawn from the KLiCKe corpus before it was released. We did
-not check this against either release: we did not examine whether the two releases share essays, for ethical reasons
-(see the ethical considerations). If the hidden essays are among the public KLiCKe essays, their texts, logs and
-scores are already public, and matching would show only which records of the two releases correspond; for those
-essays the masking no longer keeps the log apart from its text, since the text was released later with another log
-of the same writing.
+(personal communication) that the competition data were drawn from the KLiCKe corpus before it was released; they did
+not say whether all the competition essays, or only some, are in the released corpus, which passed a
+selection~\cite{tian2025klicke}. We did not check this against either release, and we did not examine whether the two
+releases share essays (see the ethical considerations). For a hidden essay that is in the released corpus, the text
+and a log of its writing are public, whether that log is the same recording without the masking or another one; a
+party that holds both releases holds the text, and the masking no longer keeps the competition log apart from it.
+What such a party can still learn is which records of the two releases correspond, and with them any column that
+differs between the releases, such as a score. It could find the correspondence by comparing the two logs with each
+other, without the texts. That is a link across releases, which the attacker of this study does not use
+(Section~\ref{sec:threat-model:attacker}), so the closed-world accuracy reported here does not measure the risk in
+this case.
 
 \paragraph{Classrooms.}
 Teachers, teaching assistants and classmates may hold the texts of a class, with names, without holding the
@@ -145,7 +151,9 @@ The main harm is (a): a processed log is linked to its text by a party that hold
 column of the log (the times, the revision process and, where released, the score) is linked to that text. The
 releasing party stated its goal as preventing the reproduction of the text from the log, and it does not name the
 writers' privacy. A party that holds candidate texts does not need to reproduce a text; it needs only to choose among
-them. We read the stated goal as keeping the text apart from the rest of the log, and this reading is ours. Under it, a
+them. We read the stated goal as keeping the text apart from the rest of the log, and this reading is ours; if the
+competition essays were drawn from a corpus to be released later with its texts (Section~\ref{sec:threat-model:settings}),
+the goal may have been meant to hold only until then, which we do not know. Under our reading, a
 form that lets a log be matched to its text does not keep them apart for a party that holds the texts. The evaluation
 measures this link directly, in the setting of texts on the same prompts. A further harm, (b), arises where the writer of a text is known, as in the
 classroom and published-essay settings: the log is then linked to a named person. We know of no release in which (b)

@@ -1,5 +1,7 @@
 # 次のセッション（Mac）: 照合の論文 —— Kaggle のデータが KLiCKe から取られたことを原稿に入れる
 
+**使用済み（2026-10-24）**: やること 1〜8 を済ませた（判断 74・75、attack-me round 2）。round 3 は未実施。
+
 作成 2026-10-24（判断 72 の後）。この機械は Mac。本計算と探索的な分析 3〜5 は G-GEAR（`next-session-public-keystroke-matching-exploratory-3-5-ggear.md`）。G-GEAR の作業はこのセッションでしない。前の引き継ぎ `next-session-public-keystroke-matching-manuscript-after-attack-me.md` の「結果が出たら」はそのまま生きている（この作業はその前に済ませる）。
 
 ## 新しいセッションで最初に打ち込む文
