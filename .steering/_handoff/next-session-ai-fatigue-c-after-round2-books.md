@@ -1,6 +1,6 @@
 # 引き継ぎ: C（TRACE）—— 共著者の 2 回目の冊を置いた後
 
-作成 2026-10-24（Mac）。`next-session-ai-fatigue-c-after-coauthor-stage1.md` を置き換える（そこの 2.1〜2.3 は判断 88 で済み）。
+作成 2026-10-24（Mac）。**同じ日のうちに 2 本に置き換えた: `next-session-ai-fatigue-c-author1-stage2-rest.md`（先に行う）と `next-session-ai-fatigue-c-after-net1-h1-return.md`（共著者の冊が戻った後）。この文書は経緯のためだけに残す。**`next-session-ai-fatigue-c-after-coauthor-stage1.md` を置き換える（そこの 2.1〜2.3 は判断 88 で済み）。
 
 - 返答・記録・AskUserQuestion の引数は日本語で書く。記号を多用しない。
 - 決めてほしいことは AskUserQuestion で、推奨と理由を添えて聞く。
