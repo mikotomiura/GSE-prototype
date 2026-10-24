@@ -28,7 +28,7 @@
 1. **済み（2026-10-21・判断 71）**: 理由は書かず、利害の表明を入れた。以下は当時の記述。ethics.tex の空欄 2 つ: (a) 所属に頼らない外部の審査を受けなかった理由（案「費用を払えなかった」に確かめる印）、(b) 利害の表明（打鍵を記録するソフトを作っていること・打鍵の記録の公開の計画が当たるか。投稿版では著者を絞り込む書き方を避ける）。研究者が文を決めたら入れる。
 2. **送る下書き（送るのは研究者）**: `.steering/20261012-public-keystroke-matching-prereg/reply-drafts-20261013.md`
    - 3: PC chairs への催促（10/27 ごろ）
-   - 4: Dr. Tian（CC Crossley）へ草稿（結果と考察を入れた草稿ができたとき）
+   - 4: Dr. Tian へ草稿（CC なし・判断 73）。**投稿前の attack-me（下）の指摘を直した後に送る**（倫理の節に「投稿前に草稿を渡す」と書いたので、渡す稿は直した後のもの）。Dr. Tian からは「本研究に最も適切な形で進めてよい・原稿を読んでから全体を見て考えを伝えたい」と返事をもらっている（判断 72 の追記）。
    - 5: The Learning Agency Lab への通知（**結果が出たらすぐ**・投稿まで約 2 週の猶予・宛先の連絡先は未確認で研究者が一次で確かめる・4 を先に送り Crossley の答えは 3 日ほどまで待つ）
 3. Hanisch の出版版での照合（研究者・ACM の PDF）。
 
@@ -38,7 +38,10 @@
 - 探索的な分析 1〜5 の表（付録）。3〜5 は G-GEAR の `results/exploratory_{tail,margin,score_band}.json`。§6.7 の LaTeX のコメント（結果を開く前に手順を固定したかの確認）を、G-GEAR の記録で確かめてから消す。
 - 空欄: 除外の後の件数（§4）・逸脱の一覧（§6・notes.md の D3 以降）・公開元への通知の日付と応答（ethics.tex・下書き 5 を送った後）・Open science の匿名リンク。
 - 頁を 12 に縮める（outline.md の Page budget の (2)〜(5)。A3 の細部と有用性の表は本文に残す）。
-- 投稿前の attack-me round 2（同じ dir・stage manuscript のまま・round 1 の引き継ぎを役ごとに渡す・Codex も同じ形）。そのあと接地の本文の tmp（`outline-threat-model/round-1/tmp/` と `manuscript-matching/round-1/tmp/`）を消す。`/cross-review`。
+- 投稿前の attack-me は **round 3・原稿の全体**（判断 76）。round 2 は 2026-10-24 に Kaggle の出どころの変更箇所だけで使った（判断 75）。G-GEAR の計算が全部済み、上の節を全部書いて草稿が完成してから回す。
+  - 同じ dir（`manuscript-matching/`）・stage manuscript のまま・同じ立場と同じ接地の文献（round 2 の `panel.md`）・Codex も round 1 と同じ形。
+  - 引き継ぎは役ごとに round 1 と round 2 の両方を渡す。round 2 で直した 4 点（出どころを書くことを害として量る段落・照合しない理由の言い直し・§3.3 の対応づけが攻撃者の範囲の外である 1 文・§8.2 の持ち帰り）が新しい稿で崩れていないかを、指摘ごとに判定させる。
+  - そのあと接地の本文の tmp（`outline-threat-model/round-1/tmp/`・`manuscript-matching/round-1/tmp/`・`manuscript-matching/round-2/tmp/`）を消す。`/cross-review`。直した稿を下書き 4 で Dr. Tian に送る。
 
 ## 守ること
 
