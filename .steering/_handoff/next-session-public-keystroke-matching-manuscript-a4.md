@@ -24,7 +24,7 @@
 
 - G-GEAR の `main_a4` の段が終了コード 0 で終わり、`results/main_a4.json` が原稿の枝に merge されている。merge の手順は 7a515f81 と d3b7df70 と同じ（freeze の枝に results の commit → 原稿の枝へ merge）。
 - notes.md に、`main_a4` の段の終了時刻と SHA-256 の記録がある。
-- **A4 の 499 人の版**（CPU で生成した 1 人を除いた版・逸脱 D3 の約束）が出ている。⚠️ 2026-10-24 に確かめたところ、`run_main.py` と `aggregate.py` には 1 人を除く集計が無い（`reference_rows` は A4 のセルをそのまま返すだけ）。書き手の ID は `raw/derived_a4_cpu_fallback_writers.json`（G-GEAR・git に入らない）にあるので、除いた版は G-GEAR でキャッシュから集計し直すしかない。無ければ、研究者に G-GEAR の作業として頼むかを AskUserQuestion で聞く。Mac で書き手の ID を扱わない。
+- **A4 の 499 人の版**（CPU で生成した 1 人を除いた版・逸脱 D3 の約束）が出ている。⚠️ 2026-10-24 に確かめたところ、`run_main.py` と `aggregate.py` には 1 人を除く集計が無い（`reference_rows` は A4 のセルをそのまま返すだけ）。書き手の ID は `raw/derived_a4_cpu_fallback_writers.json`（G-GEAR・git に入らない）にあるので、除いた版は G-GEAR でキャッシュから集計し直すしかない。G-GEAR の作業は `.steering/_handoff/next-session-public-keystroke-matching-a4-499-ggear.md`（出力 `results/main_a4_without_cpu_writer.json`）。無ければ書かずに止まる。Mac で書き手の ID を扱わない。
 
 ## やること
 
