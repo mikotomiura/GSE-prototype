@@ -1,0 +1,795 @@
+{
+ "analysis": {
+  "full|R0|10": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "writers": 500
+  },
+  "full|R0|1000": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "writers": 500
+  },
+  "full|R1|10": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "writers": 500
+  },
+  "full|R1|1000": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "writers": 500
+  },
+  "full|R2|10": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.978,
+     0.996
+    ],
+    "value": 0.988
+   },
+   "writers": 500
+  },
+  "full|R2|1000": {
+   "attacker": "A1",
+   "costs_of": "A1",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.974,
+     0.996
+    ],
+    "value": 0.986
+   },
+   "writers": 500
+  },
+  "full|R3-t(10)|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.854,
+     0.91
+    ],
+    "value": 0.884
+   },
+   "writers": 500
+  },
+  "full|R3-t(10)|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.834,
+     0.894
+    ],
+    "value": 0.866
+   },
+   "writers": 500
+  },
+  "full|R3-t(100)|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.854,
+     0.91
+    ],
+    "value": 0.884
+   },
+   "writers": 500
+  },
+  "full|R3-t(100)|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.834,
+     0.894
+    ],
+    "value": 0.866
+   },
+   "writers": 500
+  },
+  "full|R3-t(1000)|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.854,
+     0.91
+    ],
+    "value": 0.884
+   },
+   "writers": 500
+  },
+  "full|R3-t(1000)|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.834,
+     0.894
+    ],
+    "value": 0.866
+   },
+   "writers": 500
+  },
+  "full|R3-u|10": {
+   "attacker": "A3",
+   "costs_of": "A3-mean",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.46,
+     0.548
+    ],
+    "value": 0.504
+   },
+   "writers": 500
+  },
+  "full|R3-u|1000": {
+   "attacker": "A3",
+   "costs_of": "A3-mean",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.30795,
+     0.38805
+    ],
+    "value": 0.348
+   },
+   "writers": 500
+  },
+  "full|R3|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.854,
+     0.91
+    ],
+    "value": 0.884
+   },
+   "writers": 500
+  },
+  "full|R3|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.834,
+     0.894
+    ],
+    "value": 0.866
+   },
+   "writers": 500
+  },
+  "full|R4(1)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "p95": {
+    "ci": [
+     0.975,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.048,
+     0.092
+    ],
+    "value": 0.068
+   },
+   "writers": 500
+  },
+  "full|R4(1)|1000": {
+   "attacker": "A2",
+   "costs_of": "A2",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.358,
+     0.444
+    ],
+    "value": 0.402
+   },
+   "writers": 500
+  },
+  "full|R4(2)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "p95": {
+    "ci": [
+     0.95,
+     1.0
+    ],
+    "value": 0.975
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.03,
+     0.066
+    ],
+    "value": 0.048
+   },
+   "writers": 500
+  },
+  "full|R4(2)|1000": {
+   "attacker": "A2",
+   "costs_of": "A2",
+   "p95": {
+    "ci": [
+     0.0,
+     1.0
+    ],
+    "value": 0.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.026,
+     0.06
+    ],
+    "value": 0.042
+   },
+   "writers": 500
+  },
+  "full|R4(4)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "p95": {
+    "ci": [
+     0.85,
+     0.95
+    ],
+    "value": 0.9
+   },
+   "p99": {
+    "ci": [
+     0.95,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.008,
+     0.032
+    ],
+    "value": 0.018
+   },
+   "writers": 500
+  },
+  "full|R4(4)|1000": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "p95": {
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "value": 0.0
+   },
+   "p99": {
+    "ci": [
+     0.0,
+     0.401
+    ],
+    "value": 0.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "value": 0.0
+   },
+   "writers": 500
+  },
+  "full|R4(8)|10": {
+   "attacker": "A2",
+   "costs_of": "A2",
+   "p95": {
+    "ci": [
+     0.6,
+     0.8
+    ],
+    "value": 0.7
+   },
+   "p99": {
+    "ci": [
+     0.850487,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.004,
+     0.022
+    ],
+    "value": 0.012
+   },
+   "writers": 500
+  },
+  "full|R4(8)|1000": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "p95": {
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "value": 0.0
+   },
+   "p99": {
+    "ci": [
+     0.0,
+     0.04565
+    ],
+    "value": 0.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "value": 0.0
+   },
+   "writers": 500
+  },
+  "full|R7(0.1)|10": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.706,
+     0.784
+    ],
+    "value": 0.746
+   },
+   "writers": 500
+  },
+  "full|R7(0.1)|1000": {
+   "attacker": "A1p",
+   "costs_of": "A1p",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.656,
+     0.738
+    ],
+    "value": 0.698
+   },
+   "writers": 500
+  },
+  "full|R7(0.25)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.06,
+     0.108
+    ],
+    "value": 0.084
+   },
+   "writers": 500
+  },
+  "full|R7(0.25)|1000": {
+   "attacker": "A2",
+   "costs_of": "A2",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.104,
+     0.164
+    ],
+    "value": 0.134
+   },
+   "writers": 500
+  },
+  "full|R7(0.5)|10": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "p95": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "p99": {
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.054,
+     0.1
+    ],
+    "value": 0.076
+   },
+   "writers": 500
+  },
+  "full|R7(0.5)|1000": {
+   "attacker": "A0",
+   "costs_of": "A0",
+   "p95": {
+    "ci": [
+     0.0,
+     0.068333
+    ],
+    "value": 0.0
+   },
+   "p99": {
+    "ci": [
+     0.401,
+     1.0
+    ],
+    "value": 1.0
+   },
+   "share_acc_1": {
+    "ci": [
+     0.006,
+     0.026
+    ],
+    "value": 0.016
+   },
+   "writers": 500
+  }
+ },
+ "config_sha256": "afc73eec79a53f4916683f83f2db8911ed9994b2b8988045ad69f28d57a0044a",
+ "note": "exploratory (decision 68), not preregistered; not used for questions 1 to 4",
+ "sample": "main500",
+ "sample_sizes": {
+  "APPEARANCE": 125,
+  "COMPETITION": 125,
+  "HAPPINESS": 125,
+  "MATERIALISM": 125
+ },
+ "seed_file_sha256": "d766284cd36eea562c99c5268cedd99a4bd2ae5ed9d75cb1bad330633cbbe9ff",
+ "source": "klicke"
+}
