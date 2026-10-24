@@ -96,24 +96,25 @@ Kind regards,
 - 添付は PDF の草稿だけ。個々の書き手の結果・本文や記録の抜粋を含めない（先方の勧めと事前登録のとおり）。
 - PoPETs は二重盲検。先方が査読者に当たる可能性があるので、草稿を他に回さないよう頼む文を入れる（下の最後の段落）。
 - 倫理の節は先方の言葉を要約して書いているので、書き方を変えたければ直すと 1〜2 文で伝える（段落の貼り付けと確認の依頼はやめた・2026-10-20 研究者）。
-- 前のスレッドに返信して Crossley を CC に入れるとき、引用される前のやり取り（Dr. Tian の倫理の説明を含む）を消してから送る（本文の最初の段落でそう伝えている・2026-10-20 研究者の意向で CC の理由を明記）。
+- 2026-10-24 判断 73: CC はやめた。Dr. Tian だけに前のスレッドへの返信で送るので、前のやり取りの引用は残してよい。草稿を Crossley に見せるか・The Learning Agency Lab へどう知らせるかは本文で尋ねる。Crossley に見せてよいと返ってきたら、研究者が別に送る（そのときは前のやり取りを含めない）。
+- 2026-10-24 時点で未直し: "it does not examine whether the two share essays" の文は、原稿に著者の説明を入れた後に合わせる（引き継ぎ `next-session-public-keystroke-matching-manuscript-kaggle-source.md`）。
 - 研究者の意向（2026-10-20）: お礼、草稿ができたこと、独立研究者として倫理の問題に一人で向き合ってきたのでコーパスの公開に大変助けられたこと、今後も交流を続けたいことを入れる。
 
 **Subject**: Re: Question about the terms of use of the KLiCKe corpus for a secondary analysis（前のスレッドへの返信として送る・2026-10-20 研究者が決定）
 
-**CC**: Scott Crossley <scott.crossley@vanderbilt.edu>（Vanderbilt の Data Science Institute の affiliates のページに載る住所・2026-10-20 に検索で確認。所属は Peabody College の Special Education。送る前に最近の論文の連絡先などで確かめる・KLiCKe の共著者で、Kaggle のコンペの Citation の著者・判断 64）
+**CC**: なし（2026-10-24 判断 73: Dr. Tian だけに送り、Kaggle の側へ草稿を送るかは同じメールで尋ねる。Crossley の住所の控え: scott.crossley@vanderbilt.edu（2026-10-20 に検索で確認・送る前に一次で確かめる））
 
-Hi Yu (and Scott, copied here),
-
-Before anything else, a note on the copy. I have added Scott to this reply for two reasons. The paper discusses the Kaggle competition "Linking Writing Processes to Writing Quality", of which he is one of the authors, and I would like him to be able to check how it is described before I submit. As a co-author of KLiCKe, he may also wish to see how the corpus is used. I have removed our earlier messages from this reply, so that only this message is shared with him. I hope this is all right with you.
+Hi Yu,
 
 [I am sorry this has taken longer than I expected.] I have now finished a full draft of the paper that uses the KLiCKe corpus, and I attach it here. As promised, I wanted you to see it before it is submitted.
 
 In brief, the paper asks how far the processing applied to publicly released keystroke logs keeps the logs apart from their texts, against a party that holds candidate texts. KLiCKe is the data on which I evaluate this, because its texts are known. [One or two sentences on the main finding, in aggregate.] All results are reported in aggregate, as you recommended, with no result for an individual writer and no excerpt of an essay or a log.
 
-The paper takes the Kaggle competition as an example of such processing: its letters and digits were masked "to prevent reproduction of the essay text". The competition data were not used in this study and were not matched against any text. The paper notes that the competition's description of data collection follows the same procedure as KLiCKe, but it does not examine whether the two share essays. Scott, if anything in how the paper describes the competition is inaccurate, or if you think The Learning Agency Lab should hear about the paper from you rather than from me, please let me know.
+The paper takes the Kaggle competition as an example of such processing: its letters and digits were masked "to prevent reproduction of the essay text". The competition data were not used in this study and were not matched against any text. The paper notes that the competition's description of data collection follows the same procedure as KLiCKe, but it does not examine whether the two share essays.
 
-In the ethics section, I describe the IRB approval at Georgia State University and the scope of consent as you explained them to me. In Section [n], I also state, as a personal communication from you, that the competition data were drawn from the KLiCKe corpus before it was published. If you would like anything worded differently, I would be glad to change it. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date]. Because the venue uses double-blind review, I would appreciate it if you could both keep the draft to yourselves for now.
+I would also like to ask your advice about the competition side. Would it be appropriate for me to share this draft with Scott, as one of the authors of the competition, so that he can check how it is described? I am also planning to let The Learning Agency Lab know about the paper before I submit, without sending them the draft. Would you recommend doing so, and would it be better for them to hear about it from Scott rather than from me?
+
+In the ethics section, I describe the IRB approval at Georgia State University and the scope of consent as you explained them to me. In Section [n], I also state, as a personal communication from you, that the competition data were drawn from the KLiCKe corpus before it was published. If you would like anything worded differently, I would be glad to change it. I plan to submit to the Proceedings on Privacy Enhancing Technologies by [date]. Because the venue uses double-blind review, I would appreciate it if you could keep the draft to yourself for now.
 
 I would also like to thank you more personally. I work as an independent researcher, without an institution behind me, and questions of research ethics have always been something I had to face on my own. A large, carefully documented corpus that is openly available, together with your clear and generous answers to my questions, made this study possible in a way it otherwise could not have been. I am very grateful.
 
@@ -127,6 +128,7 @@ Mikoto
 送る時期: 本計算の結果が出たらすぐ（11/9 ごろの見込み）。投稿（11/30）までの約 2 週を応答の猶予にする（判断 68 の 4）。送った日付・猶予・応答の有無を ethics.tex の空欄に書く。
 
 送る前に確かめること:
+- 2026-10-24 判断 73: 下書き 4 で Dr. Tian に知らせ方を尋ねる。返事が約 1 週来なければ、この通知は予定どおり研究者から送る（応答の猶予の約 2 週を削らない）。Dr. Tian が Crossley 経由を勧めたらそれに合わせる。
 - 宛先: The Learning Agency Lab の連絡先は**まだ確かめていない**（Kaggle の Overview の Competition Host が The Learning Agency Lab・判断 64）。公式サイトの連絡先を研究者が一次で確かめて入れる。Dr. Tian へのメール（下書き 4）で Crossley が「自分から伝える」と答えた場合は、この下書きを送らずに Crossley の返事に合わせる。
 - 下書き 4（Dr. Tian・Crossley）との順番: 4 を先に送り、Crossley の答えを数日待ってから 5 を送るのが自然。ただし猶予の 2 週を削らないよう、4 の返事を待つのは 3 日ほどまでにする。
 - 添付は付けない（二重盲検の投稿前なので草稿は渡さない。求められたら研究者が判断する）。結果の数字は集計の 1〜2 文だけ。書き手ごとの値・本文・記録の抜粋は書かない。

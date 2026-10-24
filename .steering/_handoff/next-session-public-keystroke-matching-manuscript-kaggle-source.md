@@ -13,7 +13,7 @@
 - worktree `/Users/johnd/GSE-wt-matching-manuscript`・ブランチ `docs/public-keystroke-matching-manuscript`。
 - 2026-10-23 に研究者が Dr. Tian へ遅れの知らせ（草稿は 11 月中旬ごろ）と Kaggle の問いを送った（`reply-drafts-20261013.md` の 6）。
 - 返事（10-24）: Kaggle のコンペのデータは **KLiCKe を公開する前に KLiCKe のコーパスから取ったもの**。研究者が下書き 7 で論文に personal communication として書いてよいかを尋ね、返事は「最も適切だと思う形で進めてよい・原稿を読んでから考えを伝える」。→ 書く（判断 72 と追記）。この返事への返信は要らない。
-- Kaggle のデータは使わないまま（判断 67・72）。下書き 4 の CC に Crossley を入れたまま（判断 72 の追記）。下書き 5（The Learning Agency Lab への通知）も保つ。
+- Kaggle のデータは使わないまま（判断 67・72）。下書き 4 は **Dr. Tian だけ**に送り、草稿を Crossley に見せるか・The Learning Agency Lab へどう知らせるかを同じメールで尋ねる（判断 73・下書き 4 は直し済み）。下書き 5 は保ち、返事が約 1 週来なければ予定どおり送る。
 - 返事の本文とアドレスは repo に入れない（要旨だけ `decisions.md` の判断 72）。
 
 ## やること（順に）
@@ -28,7 +28,7 @@
    - 書く文の言い方（「KLiCKe の著者によれば」の形・personal communication の日付。投稿版は二重盲検で日付を外す・判断 63）。
    - 「調べなかった」の文は残す（当方は照合も突き合わせもしていない）。そのうえで著者から聞いたことを足す。
 3. 決めた形で直す: threat-model・introduction・ethics・必要なら discussion と outline.md の該当行。判断 64 の 2（共通の著者を文で書かない）はこの事実に合わせて改めた（判断 72 の 2）ことを本文の書き方に反映する。
-4. 下書き 4 を合わせる: "it does not examine whether the two share essays" の段落を、著者から聞いた事実に合わせて直す。倫理の段落の `Section [n]` を埋める。CC の段落の理由（コンペの記述を見てもらう）はそのまま。
+4. 下書き 4 を合わせる: "it does not examine whether the two share essays" の段落を、著者から聞いた事実に合わせて直す。倫理の段落の `Section [n]` を埋める（CC はやめ、Kaggle の側への送り方を尋ねる段落に替えた・判断 73）。
 5. 下書き 5（The Learning Agency Lab への通知）の "the paper does not examine whether the competition shares essays with any other release" を直す（照合していないことは保つ）。
 6. ビルド（`build.sh`・エラー 0・未定義 0）と文体の門（`_style_check.py`）。
 7. 直した節に attack-me（stage: manuscript・変えた箇所に限る）。採否は研究者に問う。
