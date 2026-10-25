@@ -29,5 +29,5 @@
 
 ## 4. 並行して残っていること（このタスクの外）
 
-- 研究者: 例題 W01〜W04 のキーを確かめる（Drive の `TRACE_calibration/worked-examples/`）。1 回目の前に例題で定義を試す。
+- 例題 W01〜W04 は判断 110 で確定した。改訂の候補（本番の前）: 主の尺度の `instrument_id` = main（判断 107）、language は ISO 639-1 の 2 文字（判断 110）。
 - h2 の取り込みは済み（判断 106）。b23〜b39 の 2 人で決める記録を `next-session-ai-fatigue-c-stage2-close-b01-b22.md` と同じ手順で出す。

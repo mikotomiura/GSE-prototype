@@ -1248,3 +1248,11 @@
 - 突き合わせ: 研究者の ID（`single`・`csi` など）はキーの ID（`I2`・`I3` など）と記録の中の順で 1 対 1 に対応した。対応表で読み替え、全列を比べた（`~/Documents/TRACE/calibration/worked-examples-compare/compare.py`・`diff.csv`）。違いは 75 で、符号の列 37・自由記述の列 38（根拠・場所など。結論の文は全件一致）。
 - 符号の列の 37: 言語の表記（en と English）9、findings の 17 点に当たるもの 27、findings に無いもの 1（W04 の改変した尺度の `mod_scoring`。キーは no_change だが、例題はこの研究の採点を書いていないので、キーの誤りの見込みが高い）。
 - 研究者が判断する表 `TRACE_例題_突き合わせ.xlsx`（`37df868d…`）を Drive の `worked-examples/` に置いた。判断の列は「キーの誤り・研究者の誤り・規則で決まらない・表記だけ」から選ぶ。
+
+## 判断 110: 研究者の判断で例題のキーを確定し、言語の書き方を決めた（2026-10-26・研究者・AskUserQuestion 1 回）
+
+- 判断の表: Drive の `TRACE_例題_突き合わせ.xlsx`（8,858 バイト）。写し `~/Documents/TRACE/calibration/worked-examples-compare/TRACE_例題_突き合わせ.returned-20261026.xlsx`（`186d4a87…`・読み取り専用）。37 行すべてに判断があった。
+- 判断の数: キーの誤り 1（W04 の改変した尺度の `mod_scoring`）・研究者の誤り 2（W03 の C1 の L1a・L1b。項目と前置きが載っていないので not_verifiable）・表記だけ 9（language）・規則で決まらない 25（findings の 17 点の 2・3・4・5・7・8・12・13・14・15 に当たる）。
+- キー: `instruments_coder1.csv` の W04・I2 の `mod_scoring` を no_change → not_verifiable に直した（ほかの値は変えていない・`check_tables` を通る・`254457e1…`）。`findings.md` に「Check by author 1 (2026-10-26)」の節を足し、見出しの「not yet checked」を確かめた日に直した（`9f92aa1d…`）。Drive の 2 つは置いたときのままであることを cmp で確かめてから置き換えた。
+- 言語: 研究者の選択（推奨どおり）は ISO 639-1 の小文字 2 文字。較正の案内に書き（案内を作り直して `9f17df5e…`・Drive の版を置いたときのままであることを確かめてから置き換えた）、主の尺度の `main` と並べて本番の前の改訂の候補にした。
+- 例題で見つかった点は、GSRR-44 の 2 により、較正の 2 回の食い違いに現れたときだけ改訂の根拠になる（findings に書いた）。
