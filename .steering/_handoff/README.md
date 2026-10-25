@@ -11,6 +11,7 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| EH3 の凍結の前の準備を閉じる（drift の決定 → G-GEAR の後で PR・Mac） | **`next-session-eh3-pre-freeze-close.md`**（2026-10-26） | **現行**。F-1 は lattice に決定（判断 9）。drift と理由は研究者待ち。PR は G-GEAR の処理が終わってから |
 | **公開データでの照合の論文: 凍結 → 取得 → 検査 → 本計算**（PoPETs 2027 Issue 3・締切 2026-11-30 AoE を目標・G-GEAR） | **`next-session-public-keystroke-matching-research-forward.md`**（2026-10-12） | **現行**。事前登録は下書き 8（未凍結）・合成の記録の検査は済み（PR #358）。判断 51: KLiCKe の返事を待たずに進める。ただし凍結（OSF）が取得より先。取得の後は記録と本文の中身を Claude も読まない（集計だけ）。前の `next-session-public-keystroke-matching-freeze.md` を置き換える |
 | 公開データでの照合の論文: KLiCKe の著者への催促と日程の確認（2026-10-26 ごろ） | `next-session-public-keystroke-matching-1026-reminder.md`（2026-10-12） | **現行・10/26 に使う**。問い合わせは 2026-10-12 に送った（判断 50）。返事が無ければ催促の下書きを研究者に渡す。PoPETs の録画の要否の問い合わせの確認と、代わりの投稿先の候補（未確認）もここ |
 | ~~公開データでの照合の論文: 合成の記録の検査と凍結~~ | `next-session-public-keystroke-matching-freeze.md`（2026-10-12） | 置き換え済み（判断 51）。上の 2 行へ |
