@@ -1,5 +1,6 @@
 # 引き継ぎ: C（TRACE）—— 較正の符号化の準備（探索の集合・11 月に 1 回目）
 
+> 使用済み（2026-10-25）: §2 の 1〜6 を終えた（判断 107）。続きは `next-session-ai-fatigue-c-calibration-pass2.md`。
 作成 2026-10-25（Mac）。前提は判断 104・105（`.steering/20261017-ai-fatigue-c-outline/decisions.md`）。**始める前に、判断 105 があること、TRACE が `f21d792` 以降で push 済みであることを確かめる。**
 
 - 返答・記録・AskUserQuestion の引数は日本語で書く。記号を多用しない。
