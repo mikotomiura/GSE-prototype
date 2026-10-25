@@ -11,10 +11,10 @@
 ## 1. いまの状態（2026-10-25 の終わり）
 
 - 段 2: 39 束・347 件。第一著者の判定はすべて書き出し・push 済み（b23〜b39 は判断 101）。DB の判定の欄は道具の値（見直し後）と全件で一致（判断 102）。
-- 共著者: h1（206 件）は取り込み済み（TRACE `e2de85e`・24 件の中心を消した写しで取り込んだ・判断 101）。h2（141 件）は Drive の `TRACE_Co-Author_judge-sheet` に置いた（`1Y8BRv1romywYspkVSp4WVqLMM7ucvOCU`・228,898 バイト）が、共有と連絡は研究者でまだ。
+- 共著者: h1（206 件）は取り込み済み（TRACE `e2de85e`・24 件の中心を消した写しで取り込んだ・判断 101）。h2（141 件）は Drive の `TRACE_Co-Author_judge-sheet` に置いた（`1Y8BRv1romywYspkVSp4WVqLMM7ucvOCU`）が、共有と連絡は研究者でまだ。判断 104 で、直した判定基準（E4 と手順 1 の行に付録 6 の Q1 の定義）で作り直して置き換えた（`2664c96c…`・229,117 バイト・ID は同じ）。
 - 2 人の判定がそろっている束: **b01〜b22（198 件）**。b23〜b36 は h2 待ち、b37〜b39 は h1 と h2 の記録が混ざるので h2 の後。締めの CSV（`*.final2.csv`・`*.final3.csv`）はまだ 0。
-- 段 1: 63 束のうち 49 束を締めた。残り 14 束は 16 件の冊（理由を決める冊）が共著者から戻るのを待つ（別の引き継ぎ `next-session-ai-fatigue-c-reasons-return.md`）。どれも 2 人とも除外で、全文の段の記録を増やさない。
-- Drive: 主の DB `TRACE_database.xlsx`（`1iMt0mNinodAqb9OQJ-6xhx33EulJfNwp`・`2f5169e2…`・1,253,898 バイト）。研究者が b23〜b39 を書いた表 `TRACE_段2の判定-b23-39.xlsx`（`1E1PChB60wrDm-WDGm7T2-Y2CwIiKqlM8`）。
+- 段 1: 63 束すべてを締めた（残りの 14 束は判断 104・TRACE `e4e8bd4` まで push 済み）。全文の段の記録は増えていない。
+- Drive: 主の DB `TRACE_database.xlsx`（判断 104 で作り直し・`1r4lKbbGusnYcaO3VMqxqHiDMpbOcWK04`・`a1ed1bf6…`・1,254,074 バイト）。判断 103 の表 `TRACE_2人で決める記録-b01-22.xlsx` の『判定基準』は直す前の E4 の行のまま（研究者が記入中かもしれないので触っていない。作り直すかは研究者に聞く）。研究者が b23〜b39 を書いた表 `TRACE_段2の判定-b23-39.xlsx`（`1E1PChB60wrDm-WDGm7T2-Y2CwIiKqlM8`）。
 
 ## 2. やること（この順）
 
