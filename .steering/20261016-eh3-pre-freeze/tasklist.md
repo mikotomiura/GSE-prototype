@@ -10,8 +10,9 @@
 - [x] cargo test / clippy / fmt
 - [x] コミット（段 1）
 - [x] 壁紙の自動の置き替え（launchd・判断 8）
-- [ ] 10-18〜10-25 の見比べ（毎晩 AskUserQuestion → f1-viewing-notes.md）
-- [ ] 10-26 朝: F-1 の選択と drift の扱いを decisions.md に・launchd を外す
+- [x] 10-18〜10-25 の見比べ（毎晩 AskUserQuestion → f1-viewing-notes.md）
+- [x] F-1 の選択（lattice・判断 9）・launchd を外す
+- [ ] F-1 の理由（研究者）・drift の決定
 
 ## 段 2: 分け方の検査（見比べの間に）
 - [x] design.md 段 2
