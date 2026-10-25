@@ -1235,3 +1235,8 @@
   - 主の尺度の `instrument_id`: 集計の脚本（`c_synthesis.py` 1414 行）は `main` の行だけを主の尺度として読むが、登録にも列の辞書にも書かれていない（例題の下書きで見つかった）。研究者の選択（推奨どおり）: 案内に書き、本番の前の改訂の候補に並べる。案内を作り直し、Drive の版を置き換えた（置き換える前に Drive の版が置いたときのままであることを cmp で確かめた）。
   - C5 の AI の照合: 登録された作り方が無かったので、添付 6 の call.md と同じ形（Opus のサブエージェント・入力は repo の外・網と同じく本文の数は返さない）で作った。作業の場所 `~/TRACE-calibration-c5/`（指示 `instructions-c5.md`・入力は 34 件の確かめの本文と AF002 の pdftotext）。段 1 は記録ごとの抜き出し（2 体・6 件と 5 件）、段 2 は記録の組の手がかりの表 `out/matches.csv`（データ行 8）。3 体とも `claude-opus-5-5` を報告した。私は中身を開いていない（抜き出しは JSON の鍵の有無だけ、照合は行の数だけ見た）。読み取り専用にした。SHA-256: 指示 `56e49cd3a1b6a45919a592e9199ee3a315d92ca21b057a4478a2858775c515cb`・`matches.csv` `0aba2d0a78609e060b8b871274b8fbdda942b2993b7c54adf7008a400d71507d`（全ファイルは `~/TRACE-calibration-c5/SHA256SUMS`）。開くのは較正の 2 回の後。
 - 符号の値はこの記録に書いていない（まだ無い）。
+
+## 判断 108: 例題 W01〜W04 を書き込む空の冊を作った（2026-10-25・研究者の指示）
+
+- 手順（研究者に示した）: キーを見ずに `cases.md` だけで例題を符号化して定義を試し、その後に私が書き出してキーと欄ごとに比べ、違いを研究者が「キーの誤り・研究者の誤り・規則で決まらない」に分ける。キーの 4 枚と `findings.md` は突き合わせまで開かない。
+- 冊: `c_coding_book.py make --coder coder1 --ids W01〜W04` で作り、名を `TRACE_例題_符号化_coder1.xlsx` にした（SHA-256 `f79ee8ded1356197…`・手元 `~/Documents/TRACE/calibration/worked-examples-book/book/`）。Drive の `TRACE_calibration/worked-examples/` に置いた。キーの CSV（`*_coder1.csv`）と同じフォルダにあるので、書き出しは別のディレクトリへ行う。
