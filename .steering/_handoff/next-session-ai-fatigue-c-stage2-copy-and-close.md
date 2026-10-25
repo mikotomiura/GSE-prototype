@@ -1,5 +1,7 @@
 # 引き継ぎ: C（TRACE）—— 段 2・3 を締める（2 つの表の記入を写して書き出す）
 
+> 使用済み（2026-10-26）: 判断 112・113 で表の形と書く順が変わった。続きは `next-session-ai-fatigue-c-stage2-coauthor-answer-and-close.md`。
+
 作成 2026-10-26（Mac）。前提は判断 103・104・106・111・112（`.steering/20261017-ai-fatigue-c-outline/decisions.md`）。始める前に次を確かめる。
 
 - 判断 112 があること。TRACE が `b01a94f` 以降で `origin/main` と同じこと。
