@@ -1240,3 +1240,11 @@
 
 - 手順（研究者に示した）: キーを見ずに `cases.md` だけで例題を符号化して定義を試し、その後に私が書き出してキーと欄ごとに比べ、違いを研究者が「キーの誤り・研究者の誤り・規則で決まらない」に分ける。キーの 4 枚と `findings.md` は突き合わせまで開かない。
 - 冊: `c_coding_book.py make --coder coder1 --ids W01〜W04` で作り、名を `TRACE_例題_符号化_coder1.xlsx` にした（SHA-256 `f79ee8ded1356197…`・手元 `~/Documents/TRACE/calibration/worked-examples-book/book/`）。Drive の `TRACE_calibration/worked-examples/` に置いた。キーの CSV（`*_coder1.csv`）と同じフォルダにあるので、書き出しは別のディレクトリへ行う。
+
+## 判断 109: 研究者の例題の符号をキーと突き合わせた（2026-10-26・研究者の連絡）
+
+- 戻った冊: Drive の例題の冊（ID `1_gFpLw8jH2ehsIxGGWeKw452Uxu1vcn7`・117,800 バイト・API の大きさが同期フォルダと同じ・更新 2026-10-25T15:13:45Z）。写し `~/Documents/TRACE/calibration/worked-examples-book/TRACE_例題_符号化_coder1.returned-20261026.xlsx`（`072cf3b6…`・読み取り専用）。研究者はキーと findings.md を開いていないと連絡した。
+- 書き出し: `export` は items の `target_from_stem` が数値（7 セル・値は 0 と 1）で止まった。値を変えずに文字にした写し（`.text.xlsx`・元との違いはこの 7 セルだけ）で書き出し、検査を通った（records 4・instruments 9・items 20・c4f 9）。例題は訓練の材料なので研究者に聞かずに行い、報告した。
+- 突き合わせ: 研究者の ID（`single`・`csi` など）はキーの ID（`I2`・`I3` など）と記録の中の順で 1 対 1 に対応した。対応表で読み替え、全列を比べた（`~/Documents/TRACE/calibration/worked-examples-compare/compare.py`・`diff.csv`）。違いは 75 で、符号の列 37・自由記述の列 38（根拠・場所など。結論の文は全件一致）。
+- 符号の列の 37: 言語の表記（en と English）9、findings の 17 点に当たるもの 27、findings に無いもの 1（W04 の改変した尺度の `mod_scoring`。キーは no_change だが、例題はこの研究の採点を書いていないので、キーの誤りの見込みが高い）。
+- 研究者が判断する表 `TRACE_例題_突き合わせ.xlsx`（`37df868d…`）を Drive の `worked-examples/` に置いた。判断の列は「キーの誤り・研究者の誤り・規則で決まらない・表記だけ」から選ぶ。
