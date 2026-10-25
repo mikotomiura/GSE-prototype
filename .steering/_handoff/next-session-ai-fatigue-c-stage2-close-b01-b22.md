@@ -1,5 +1,6 @@
 # 引き継ぎ: C（TRACE）—— 段 2・3 を b01〜b22 で締める（2 人で決める記録）
 
+> 使用済み（2026-10-26）: §2.1・2.2 は判断 103 で済んだ。続き（b01〜b22 の写しと締め・b23〜b39）は `next-session-ai-fatigue-c-stage2-close-all.md`。
 作成 2026-10-25（Mac）。前提は判断 98〜102（`.steering/20261017-ai-fatigue-c-outline/decisions.md`）。**始める前に、判断 102 があること、TRACE が `e2de85e` 以降で push 済みであること、`screening/coauthor/books.csv` の h1 に `imported_utc` があることを確かめる。**
 
 - 返答・記録・AskUserQuestion の引数は日本語で書く。記号を多用しない。
