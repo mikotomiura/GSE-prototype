@@ -1,9 +1,11 @@
-"""The sheet on which author 1 and author 2 decide together the records of batches b01 to b22: '段2' holds the
+"""The sheet on which author 1 and author 2 decide together the records of a run of batches: '段2' holds the
 records differences --stage 2 names, '段3' the records both humans included whose centres they decide together
 (the records differences --stage 3 will name among them). The entries ('最終', '最終の除外理由', '最終の中心',
 '同じ標本の相手（E5）') are copied to the database afterwards. Author 1's values are the tool's (after the re-check)
-with the notes of the database; author 2's are the tool's (h1) with the notes of the returned workbook.
-Usage: make_consensus_sheet.py <db.xlsx> <returned h1.xlsx> <diff dir> <out.xlsx>"""
+with the notes of the database; author 2's are the tool's with the notes of the returned workbooks (h1, h2: their
+records do not overlap, so b37 to b39, which mix the two, read both).
+Usage: make_consensus_sheet.py <db.xlsx> <diff dir> <out.xlsx> <first batch> <last batch> <returned book.xlsx>...
+(decision 103: b01 b22 with the centre-cleared h1; decision 111: b23 b39 with that h1 and the returned h2)"""
 import csv, glob, os, re, sys, argparse
 sys.path.insert(0, os.path.expanduser("~/TRACE/scripts"))
 from openpyxl import Workbook, load_workbook
@@ -11,8 +13,10 @@ import c_screening as c
 import make_trace_db as db
 import trace_style as st
 
-DB, H1, DIFF, OUT = sys.argv[1:5]
-BATCHES = [f"b{n:02d}" for n in range(1, 23)]
+DB, DIFF, OUT, FIRST, LAST = sys.argv[1:6]
+BOOKS = sys.argv[6:]
+BATCHES = [f"b{n:02d}" for n in range(int(FIRST[1:]), int(LAST[1:]) + 1)]
+SPAN = f"{BATCHES[0]}〜{BATCHES[-1]}"
 STALE_E5 = {"S04-21", "CS05713"}   # withdrawn in author 1's re-check; cleared when the sheet is copied (decision 103)
 a = argparse.Namespace(**{k: v.expanduser() for k, v in c.DEFAULTS.items()})
 a.stage = 2
@@ -33,7 +37,12 @@ def sheet(path, name, cols):
 
 VALS = ["判定", "除外理由", "中心", "読んだ範囲", "根拠メモ"]
 s1 = sheet(DB, "段2・3", VALS + ["最終", "最終の除外理由", "最終の中心", "同じ標本の相手（E5）"])
-s2 = sheet(H1, "段2・3", VALS)
+s2 = {}
+for path in BOOKS:
+    got = sheet(path, "段2・3", VALS)
+    if set(got) & set(s2):
+        raise SystemExit(f"{path}: records already read from another workbook")
+    s2.update(got)
 A = c.author1_rows(a, 2)
 
 
@@ -73,6 +82,9 @@ for b in BATCHES:
                 note = "2 人とも理由のない保留（全文を読んでも決まらない）。"
             elif "include" in (x2[0], y2[0]):
                 note = "一方が含めた。『最終』を含めるにするときは『最終の中心』も書く。"
+            elif "E6" in (x2[1], y2[1]):
+                note = ("一方が除外、他方が無料の全文が見つからない保留（E6）。全文があるかを確かめて決める。全文があれば全文で"
+                        "決め、無ければ『最終』を保留、『最終の除外理由』を E6 とする。")
             else:
                 note = "一方が除外、他方が理由のない保留。"
             if "E5" in (x2[1], y2[1]):
@@ -98,7 +110,7 @@ for b in BATCHES:
 ids = [r[1] for r in rows2] + [r[1] for r in rows3]
 bib_row = {i: n + 2 for n, i in enumerate(ids)}
 wb = Workbook()
-st.intro(wb.active, "2 人で決める記録（段 2・3・束 b01〜b22）",
+st.intro(wb.active, f"2 人で決める記録（段 2・3・束 {SPAN}）",
          f"段 2 は {len(rows2)} 件、段 3 は {len(rows3)} 件", [
     ("この表", ["2 人の判定が違う記録、または 2 人とも理由のない保留の記録を『段2』に、2 人とも含めて中心が違う記録、"
                "またはどちらかが境界（保留）の記録を『段3』に並べた。2 人で全文を見て決めた値を、青い欄に書く。",
@@ -110,6 +122,8 @@ st.intro(wb.active, "2 人で決める記録（段 2・3・束 b01〜b22）",
                       "『最終』を含めるにした記録は、『最終の中心』（中心-A か中心-B）も書く。",
                       "除外・E5 にするときは『同じ標本の相手（E5）』に相手の記録の ID を書く。",
                       "全文を読んでも決まらない記録は保留（除外理由なし）とする。",
+                      "一方が無料の全文が見つからない保留（E6）の記録は、全文があるかを確かめる。全文があれば全文で決め、"
+                      "無ければ保留・E6 とする。",
                       "2 人で話しても合意できない記録は『最終』に「合意できない」と書き、ほかの『最終…』の欄は空のままにする。"]),
     ("『段3』の書き方", ["『最終の中心』に中心-A か中心-B を書く。2 人で話しても合意できない記録は「合意できない」と書く。"]),
     ("判定基準", ["『判定基準』のシートは DB と同じ。"])])

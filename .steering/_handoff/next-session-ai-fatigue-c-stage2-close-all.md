@@ -1,5 +1,7 @@
 # 引き継ぎ: C（TRACE）—— 段 2・3 を締める（b01〜b22 の記入の写しと、b23〜b39 の 2 人で決める記録）
 
+> 使用済み（2026-10-26）: §2.1〜2.3 は判断 111 で済んだ（b23〜b39 は別の表）。b01〜b22・b23〜b39 の写しと締めは `next-session-ai-fatigue-c-stage2-copy-and-close.md`。
+
 作成 2026-10-26（Mac）。前提は判断 103・104・106（`.steering/20261017-ai-fatigue-c-outline/decisions.md`）。前の引き継ぎ `next-session-ai-fatigue-c-stage2-close-b01-b22.md` の手順（2.1〜2.5）をそのまま使い、b23〜b39 に広げる。始める前に次を確かめる。
 
 - 判断 110 があること。TRACE が `b01a94f` 以降で `origin/main` と同じこと。
