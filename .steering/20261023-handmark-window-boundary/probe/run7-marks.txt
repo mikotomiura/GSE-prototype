@@ -1,0 +1,6 @@
+mark 1792739869 start
+mark 1792739877 ax_windows=2
+mark 1792739877 fs_on_sent
+mark 1792739881 fs_state=true
+mark 1792739898 fs_off_sent
+mark 1792739902 textedit_quit
