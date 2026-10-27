@@ -163,6 +163,39 @@ reported in Table~\ref{tab:main} are not repeated for the strongest attacker.
   \end{tabular}
 \end{table*}
 
+\paragraph{KeyTAR.}
+Tables~\ref{tab:app:a4} and~\ref{tab:app:a4win} give A4 at every $N$ on full texts and on windows, with all 500
+writers and without the one writer whose chunks were generated on the CPU (\S\ref{sec:protocol:registration}). R0 to
+R3 share one row, since A4 reads the same intervals from them and gave the same values.
+
+\begin{table*}
+  \caption{KeyTAR (A4) on full texts: accuracy with its 95\% interval, in percent, with all 500 writers and without
+  the writer whose chunks were generated on the CPU (499).}
+  \label{tab:app:a4}
+  \small
+  \begin{tabular}{lrlll}
+    \toprule
+    Form & Writers & $N = 10$ & $N = 100$ & $N = 1{,}000$ \\
+    \midrule
+    \tabinput{sections/generated/a4-full.tex}
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\begin{table*}
+  \caption{KeyTAR (A4) on windows of $k$ segments: accuracy in percent at $N = 1{,}000$ and $N = 10$. Writers: as in
+  the full-text rows; a log with no valid window of $k$ segments is left out at that $k$.}
+  \label{tab:app:a4win}
+  \small
+  \begin{tabular}{lrrrrrrrrr}
+    \toprule
+    & & \multicolumn{4}{c}{$N = 1{,}000$} & \multicolumn{4}{c}{$N = 10$} \\
+    Form & Writers & $k = 5$ & 10 & 20 & 50 & $k = 5$ & 10 & 20 & 50 \\
+    \midrule
+    \tabinput{sections/generated/a4-windows.tex}
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
 \paragraph{Results on all writers.}
-\textbf{[After the computation on all writers: attackers A0 to A3 on all writers after exclusion. The full rows of
-KeyTAR, with and without the one writer whose chunks were generated on the CPU, after the computation of A4.]}
+\textbf{[After the computation on all writers: attackers A0 to A3 on all writers after exclusion.]}

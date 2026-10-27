@@ -3,7 +3,8 @@
     python3 -I make_tables.py <results dir> <output dir>
 
 <results dir> is experiments/20261012-public-keystroke-matching/results. The script reads main.json,
-enja15_main.json and exploratory_{tail,margin,score_band}.json (aggregates only) and writes one .tex file per table
+main_a4.json and main_a4_without_cpu_writer.json (the KeyTAR rows), enja15_main.json and
+exploratory_{tail,margin,score_band}.json (aggregates only) and writes one .tex file per table
 into <output dir> (sections/generated). The tables are included by the sections; values are never typed by hand.
 Accuracies are printed in percent.
 """
@@ -143,6 +144,43 @@ def window_table(m):
     return rows
 
 
+# A4 uses one reconstruction for R0 to R3 (the same intervals), so these forms are one row; R3-t(w) has its own.
+A4_GROUPS = [("R0 to R3", ["R0", "R1", "R2", "R3"]), ("R3-t(10)", ["R3-t(10)"]), ("R3-t(100)", ["R3-t(100)"]),
+             ("R3-t(1000)", ["R3-t(1000)"])]
+
+
+def a4_cell(ref, kind, forms, rest):
+    """The A4 cell of a group of forms; stops if the forms of the group do not give the same values."""
+    vals = [ref[f"{kind}|{f}|A4|{rest}"] for f in forms]
+    if any(v != vals[0] for v in vals[1:]):
+        raise SystemExit(f"A4 differs within {forms} at {kind}|{rest}")
+    return vals[0]
+
+
+def a4_main_row(ref, n):
+    g = a4_cell(ref, "full", A4_GROUPS[0][1], n)
+    t = [a4_cell(ref, "full", fs, n) for _, fs in A4_GROUPS[1:]]
+    acc = [pct(v["acc"]) for v in t]
+    text = f"R0 to R3: {pct(g['acc'])} {ci(g['ci'])}; R3-t(10), (100), (1{{,}}000): {acc[0]}, {acc[1]} and {acc[2]}"
+    return [f"A4 on R0 to R3-t & \\multicolumn{{7}}{{l}}{{{text}}} \\\\"]
+
+
+def a4_tables(ref, ref_wo):
+    """KeyTAR on full texts at every N and on windows, with all 500 writers and without the CPU writer."""
+    if set(ref) != set(ref_wo):
+        raise SystemExit("the cells of main_a4_without_cpu_writer.json differ from reference_A4 of main_a4.json")
+    full, win = [], []
+    for name, fs in A4_GROUPS:
+        for r in (ref, ref_wo):
+            writers = str(a4_cell(r, "full", fs, "1000")["writers"])
+            cells = [a4_cell(r, "full", fs, n) for n in ("10", "100", "1000")]
+            full.append(" & ".join([form_tex(name), writers] + [f"{pct(v['acc'])} {ci(v['ci'])}" for v in cells])
+                        + " \\\\")
+            wc = [a4_cell(r, "window", fs, f"{n}|{k}") for n in ("1000", "10") for k in ("5", "10", "20", "50")]
+            win.append(" & ".join([form_tex(name), writers] + [pct(v["acc"]) for v in wc]) + " \\\\")
+    return full, win
+
+
 def utility_table(m, key):
     u = m["utility"]
     forms = ["R0", "R2", "R3", "R3-u", "R3-t(10)", "R3-t(100)", "R3-t(1000)", "R7(0.1)", "R7(0.25)", "R7(0.5)"]
@@ -227,6 +265,13 @@ def main():
     write(out, "windows.tex", window_table(m))
     write(out, "utility-r0.tex", utility_table(m, "spearman_r0"))
     write(out, "utility-score.tex", utility_table(m, "spearman_score"))
+    ref = json.load(open(os.path.join(res, "main_a4.json"), encoding="utf-8"))["main500"]["reference_A4"]
+    ref_wo = json.load(open(os.path.join(res, "main_a4_without_cpu_writer.json"), encoding="utf-8"))["reference_A4"]
+    write(out, "main-a4-1000.tex", a4_main_row(ref, "1000"))
+    write(out, "main-a4-10.tex", a4_main_row(ref, "10"))
+    a4_full, a4_win = a4_tables(ref, ref_wo)
+    write(out, "a4-full.tex", a4_full)
+    write(out, "a4-windows.tex", a4_win)
     split, neg, ow = other_tables(m)
     write(out, "split.tex", split)
     write(out, "negative.tex", neg)

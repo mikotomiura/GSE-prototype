@@ -62,8 +62,8 @@ release made by another party under its own rules (above).
 \paragraph{Weighing harms and benefits.}
 We also weighed the study against the principles of the Menlo Report~\cite{dittrich2012menlo}. \emph{Respect for
 persons:} the participants agreed to the use of their data for research; this study evaluates how well the release of
-such data protects them, collects nothing new, identifies no one and publishes no result for an individual writer and
-no excerpt of a text or a log. \emph{Beneficence:} the harm is that the paper describes procedures that link processed
+such data protects them, collects nothing new, identifies no one and publishes no result for an individual writer (with the
+one exception under the handling of the data) and no excerpt of a text or a log. \emph{Beneficence:} the harm is that the paper describes procedures that link processed
 logs to texts; the benefit is that parties who release keystroke logs learn how much each processing step reduced
 matching by the attackers tried here, and how much of the standard process measures it kept, before they release more
 data. The attacks evaluated here are of known types (Section~\ref{sec:related}); what is new is their evaluation, on
@@ -80,7 +80,10 @@ needed (Section~\ref{sec:threat-model:settings}).
 \paragraph{Handling of the data.}
 The logs and texts of both corpora are public, but they are kept outside the study repository, on the authors'
 computers. Only aggregates are put in the repository and reported. Results per writer and excerpts of texts and logs
-are not published. Logs and texts are not sent to any external language model or other external service. KeyTAR runs
+are not published, with one exception: since KeyTAR is reported with and without one writer
+(\S\ref{sec:protocol:registration}), the difference gives that writer's aggregate values for KeyTAR, and the writer can
+be located in the sample drawn with the registered seed. These values can be recomputed by anyone from the public
+data, the code we publish and the public model, so they add no information. Logs and texts are not sent to any external language model or other external service. KeyTAR runs
 on a local GPU, and its reconstructions are stored next to the logs and are not read, printed or published.
 
 \paragraph{Interests.}

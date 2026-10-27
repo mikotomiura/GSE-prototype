@@ -3,8 +3,9 @@
 
 % Ordered by the pillars of Sections 4 to 6; for each, what it was meant to establish, what was measured, what was
 % found and why it matters for the claim (outline.md, Claim and contributions). Values come from the aggregate files of
-% the main computation through make_tables.py. The rows of KeyTAR (A4) are filled in when its computation is complete;
-% A4 is not part of the strongest attacker, so no statement below depends on it.
+% the main computation through make_tables.py (the rows of KeyTAR from main_a4.json and
+% main_a4_without_cpu_writer.json). A4 is not part of the strongest attacker, so no statement on the other forms
+% depends on it.
 Values are for full texts and the 500 writers unless stated otherwise, in percent, with 95\% intervals in brackets;
 no writer met an exclusion criterion. Every attacker at every $N$, the windows and the diagnostics are in
 Appendix~\ref{app:results}.
@@ -26,13 +27,13 @@ Appendix~\ref{app:results}.
     Form & A0 & Strongest & Attacker & $\times 1/N$ & Gain over A0 & Measures & $\rho$ \\
     \midrule
     \tabinput{sections/generated/main-1000.tex}
-    A4 on R0 to R3-t & \multicolumn{7}{l}{\textbf{[after the computation of A4]}} \\
+    \tabinput{sections/generated/main-a4-1000.tex}
     \midrule
     \multicolumn{8}{l}{(b) $N = 10$ ($1/N = 10\%$)} \\
     Form & A0 & Strongest & Attacker & $\times 1/N$ & Gain over A0 & & \\
     \midrule
     \tabinput{sections/generated/main-10.tex}
-    A4 on R0 to R3-t & \multicolumn{7}{l}{\textbf{[after the computation of A4]}} \\
+    \tabinput{sections/generated/main-a4-10.tex}
     \bottomrule
   \end{tabular}
 \end{table*}
@@ -154,8 +155,9 @@ $N = 1{,}000$ was 0.6\% to 1.9\%; on R7(0.1), 26.7\% to 47.5\%; on R4(8), 1.5\% 
 keep them apart from their texts.
 
 In the open-world diagnostic, the area was 1.000 for R0 and R1, 0.978 for R2, 0.774 [0.753, 0.795] for R3 and R3-t
-and at most 0.62 for the other forms. KeyTAR, the reference outside the threat model, reached \textbf{[A4: accuracy on R0 to R3-t at $N =
-1{,}000$ and $N = 10$, with and without the one writer whose chunks were generated on the CPU]}.
+and at most 0.62 for the other forms. KeyTAR, the reference outside the threat model (\S\ref{sec:attackers:list}), stayed below A0 on every form and $N$
+(Table~\ref{tab:main}) and on windows reached at most 0.50\% at $N = 1{,}000$ and 17.1\% at $N = 10$; without the
+writer whose chunks were generated on the CPU, no accuracy changed by more than 0.11 points (Appendix~\ref{app:results}).
 
 \subsection{Predictions and results}
 \label{sec:results:predictions}
@@ -163,7 +165,8 @@ and at most 0.62 for the other forms. KeyTAR, the reference outside the threat m
 All predictions registered before the data were acquired (\S\ref{sec:protocol:registration}) held for the forms within
 the threat model: 95\% or more for R0 to R2, R5 and R6; 80\% or more for R3 and R3-t; 10\% to 60\% for R3-u; R7
 falling with $p$ and below 30\% at $p = 0.5$; R4(1) about as high as A2 on R3 and R4(8) about as high as A0
-(Table~\ref{tab:main}). The prediction for KeyTAR, below 10 times $1/N$, \textbf{[held or did not hold, with the value of A4]}.
+(Table~\ref{tab:main}). The prediction for KeyTAR, below 10 times $1/N$ at $N = 1{,}000$, did not hold on R0 to R3,
+R3-t(10) and R3-t(100) (11 to 16 times; the intervals include 10 times) and held on R3-t(1{,}000).
 
 \subsection{The Japanese translation logs}
 \label{sec:results:enja}

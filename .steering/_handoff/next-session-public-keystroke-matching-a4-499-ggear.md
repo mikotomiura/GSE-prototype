@@ -1,5 +1,7 @@
 # 次のセッション（G-GEAR）: 照合の論文 —— A4 の 499 人の版を集計する（逸脱 D3 の約束）
 
+> 使用済み（2026-10-27）: G-GEAR で集計した（notes.md D3「回した」・`results/main_a4_without_cpu_writer.json`）。Mac の段 1 で原稿に入れた（判断 80）。
+
 作成 2026-10-24（Mac・判断 79 の後）。**この作業は G-GEAR で行う。Mac では行わない。** 手順は Mac で書き、ブランチ `docs/public-keystroke-matching-manuscript` に push 済み。G-GEAR では、まずこのブランチを pull してから始める。
 
 ## 新しいセッションで最初に打ち込む文（G-GEAR で）
