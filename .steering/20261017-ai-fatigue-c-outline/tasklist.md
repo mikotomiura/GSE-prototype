@@ -113,3 +113,8 @@
 - [x] 研究者: 7 件に共著者が合意した（判断 116）
 - [x] 全件を確かめ、DB に写し、`export-final --stage 2`・`--stage 3` で b01〜b39 を締めて push（判断 116）
 - [ ] `screening-csv`・`release`
+
+## 保留・E6 の探し直し（判断 117・2026-10-27）
+- [x] 102 件の全文を探し直し、7 件の本文を取って束 b40 を切った・DB を作り直した
+- [ ] 研究者: DB の『段2・3』で b40 の 7 件を判定し直す
+- [ ] `export-author --stage 2 --batch b40` → push → `coauthor-ids --stage 2 --book h3` で共著者の冊
