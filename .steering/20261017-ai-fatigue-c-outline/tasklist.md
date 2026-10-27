@@ -132,7 +132,7 @@
 - [ ] 較正の 1 回目: 研究者の符号化待ち（Drive の `TRACE_calibration/pass1/`）
 - [ ] 締めの日（2026-12-31・GSRR-39）: 保留の記録の判定し直しを締め、`screening-csv` を作り直し、`python3 screening_values.py` を走らせ直して組む。原稿冒頭の状態の注の暫定の文を直す
 - [ ] 符号化の後: 表 3・図 1・表 3 の注を、`values-screening.tex` の未使用のマクロで埋める（判断 122）
-- [ ] 原稿の Use of AI の残り `\tbd{Any other use in preparing the manuscript.}`（原稿の文を書くのに AI を使ったこと）を研究者と決める
+- [x] 原稿の Use of AI の残り `\tbd{Any other use in preparing the manuscript.}`（原稿の文を書くのに AI を使ったこと）を研究者と決める（判断 122・TRACE `86ece1e`）
 - [ ] Drive の草稿の置き換え（判断 122 で今回は置き換えない。置き換える前に cmp で前の版のままかを確かめる）
 - [ ] 研究者: Word で案内を開き、番号つきの箇条書きと表を見る（上の 51 行の項）
 - [ ] 研究者: Drive の `TRACE_database.xlsx` の段 1 を見る（上の 52 行の項）
