@@ -1339,3 +1339,11 @@
 - 書き出し: `export-author --stage 2 --batch b40`（止まりなし）→ コミット・push（TRACE `d34b404`）。`coauthor-ids --stage 2 --book h3` が 7 件（`h3.ids`・`books.csv` に h3 の行）→ コミット・push（TRACE `bd636c6`）。
 - 冊: `make_coauthor_db.py --stage 2 --book h3`（`--out` はフォルダを取る）→ `edit_coauthor_intro.py`（2 セル・入力規則とリンクの数は同じ）で `TRACE_co-author_stage2_h3.xlsx`（`7af2f197affbc3624310aab428bd08969f41bd5dce470ae2da84bce5445999cf`・22,599 バイト・手元 `~/Documents/TRACE/coauthor-books-20261027-h3/`・読み取り専用）。ID の順は `h3.ids` と同じ、判定・中心は「未判定」、ほかの入力の欄は空、全文 7 件ともあり。h1・h2 と同じ共有フォルダ `TRACE_Co-Author/TRACE_Co-Author_judge-sheet`（ID `1X2-a01Ep5f1SR3tBf-KsLm17_FaaKXF_`）に置いた（Drive の ID `1OcWw_9lCsiaAztpODzFVIeqVKbTa3Xuq`・API で同じ大きさ）。共有の設定は変えていない。
 - 次: 研究者が共著者に h3 を知らせる → 戻ったら控えを取り `import-coauthor --stage 2 --book h3 --file <戻った冊>` → `differences --stage 2 --batch b40` → 2 人で決める → DB に写す → `export-final --stage 2`・`--stage 3`。
+
+## 判断 119: 共著者の h3 が戻った。b40 の 3 件を 2 人で決める最終として DB に書いた（2026-10-27・研究者・AskUserQuestion 1 回）
+
+- 戻った冊: `~/Downloads/TRACE_co-author_stage2_h3.xlsx`（`d4a00f0e…`・24,186 バイト）。控え `~/Documents/TRACE/coauthor-returned/TRACE_co-author_stage2_h3.returned-20261027-2215.xlsx`（読み取り専用）。根拠メモの末尾に「ChatGPT判定案」が 7/7（判断 91 と同じ扱い・研究者は補助と分かっている）。
+- 取り込み: `import-coauthor --stage 2 --book h3` が 7 件 → `h3.csv`・`books.csv` をコミット・push（TRACE `d77bb19`）。`differences --stage 2 --batch b40`: 7 件中 4 件が一致、3 件が 2 人で決めるもの（2 人とも理由なしの保留 1・著者 1 が除外で著者 2 が保留 2）。
+- 研究者の選択（1 件 1 問・3 件とも推奨どおり。値は `~/Documents/TRACE/2人で決めた3件-b40-20261027.csv`）。論点: 2 人とも理由なしの保留にしたものは、規則（全文の段の保留）にそのまま当たるので合意できないにしない。E3 の補足「参加者が AI を使う…研究でない」は研究の設計を問うもので、本文から設計が分かれば保留にしない。データセットの記録は、公開された説明を全文として読む扱いを 2 件でそろえる（E6 にしない）。
+- DB: Excel が閉じていること、DB が判断 118 の控え（`81039c76…`）と同じことを確かめ、控え `TRACE_database.b40最終の前-20261027-2230.xlsx`（読み取り専用）を取った。`scripts/fill_b40_finals.py` で 3 件の『最終…』だけ書いた（b40 の記録か・『最終…』が空か・`check_decision` を通るかを見る）。DB `90a04353…`。
+- 次: 判断 116 と同じく、研究者が共著者に 3 件の最終の合意を取る → 合意が取れたら `export-final --stage 2 --batch b40`・`--stage 3` → push。
