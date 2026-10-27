@@ -116,5 +116,6 @@
 
 ## 保留・E6 の探し直し（判断 117・2026-10-27）
 - [x] 102 件の全文を探し直し、7 件の本文を取って束 b40 を切った・DB を作り直した
-- [ ] 研究者: DB の『段2・3』で b40 の 7 件を判定し直す
-- [ ] `export-author --stage 2 --batch b40` → push → `coauthor-ids --stage 2 --book h3` で共著者の冊
+- [x] 研究者: DB の『段2・3』で b40 の 7 件を判定し直す
+- [x] `export-author --stage 2 --batch b40` → push → `coauthor-ids --stage 2 --book h3` で共著者の冊（判断 118）
+- [ ] 研究者: 共著者に h3 を知らせる → 戻ったら取り込み・2 人で決める・締める
