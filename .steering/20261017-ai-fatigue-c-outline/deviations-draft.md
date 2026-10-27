@@ -38,13 +38,13 @@
   - 印が無いもの: 2 割の標本 113 件には 0 件。つまり、段 1 の一致率の元になる判定には印が無い。
 - 登録との関係: 登録が選別に使う AI は、段 1 の網だけである（役割の表・GSRR-33）。
 - 研究者の判断（判断 91）: 判定は共著者のもので、ChatGPT は補助として使った、と研究者は分かっている。そのまま進めた。
-- 状態: 要確認。報告するかどうかではなく、書き方の確認である。共著者が何に使ったかを共著者の言葉で確かめ、Use of AI の宣言にも同じ内容を書く。
+- 状態: 確定（判断 121・研究者の選択: 判断 91 の研究者の理解で書く。共著者への確かめは取らない）。Use of AI の宣言にも同じ内容を書く。
 
 **英文案（表 2）**
 
 | Date | Registration item | Change and reason | Affected |
 |---|---|---|---|
-| 2026-10-24 to 2026-10-27 | Roles (AI assistant; screeners); GSRR-33 (AI only as the safety net at title and abstract) | Author 2 used ChatGPT (OpenAI) to draft the reasons for their judgements in the net workbook, the full-text workbooks, the workbook on exclusion codes and the reconciliation tables; each judgement was made and entered by author 2. The registration names no AI tool for the screeners other than the safety net. Author 2's judgements on the random 20% at title and abstract carry no such mark, so the title-and-abstract agreement does not involve the tool. [to be confirmed with author 2: what the tool was given and what it returned] | Use of AI statement; screening at full text and centre |
+| 2026-10-24 to 2026-10-27 | Roles (AI assistant; screeners); GSRR-33 (AI only as the safety net at title and abstract) | Author 2 used ChatGPT (OpenAI) to draft the reasons for their judgements in the net workbook, the full-text workbooks, the workbook on exclusion codes and the reconciliation tables; each judgement was made and entered by author 2. The registration names no AI tool for the screeners other than the safety net. Author 2's judgements on the random 20% at title and abstract carry no such mark, so the title-and-abstract agreement does not involve the tool. | Use of AI statement; screening at full text and centre |
 
 ## D3. 戻った冊を取り込む前に、値の形を直した（判断 88・101）
 
@@ -99,28 +99,22 @@
 |---|---|---|---|
 | 2026-10-27 | GSRR-33 (full texts; both authors use the same full text; records whose free full text is found later are judged again) | For one record (S13-18), the file judged at full text held only the one-page abstract of the preprint; the full text was in a supplementary file on the record's page. Author 1's judgement had also drawn on a 2022 version with a different title and year. The full text was obtained during reconciliation (converted to PDF without retyping), and the record was decided together on it rather than judged again in a separate batch, because it was not a pending record. | One record's stage-2 decision |
 
-## D7. 理由なしの保留を、合意で保留のまま残した（24 件・判断 115・116・119）
+## D7. 理由なしの保留 24 件を「合意できない」に直し、道具を直した（判断 115・116・119・121）
 
-- 起きたこと: 段 2 の最終が「保留・理由なし」の記録が 24 件ある。どれも決まり方は「consensus」で、内訳は次のとおり。
+- 起きたこと: 段 2 の最終が「保留・理由なし」で、決まり方が「consensus」の記録が 24 件あった。内訳は次のとおり。
   - 2 人とも理由なしの保留: 15 件
   - 片方が保留で、もう片方が含める: 5 件
   - 片方が保留で、もう片方が除外: 4 件
-- 登録との関係: GSRR-33 は次のように決めている。
-  - 2 人とも理由なしで保留にした記録は、読み直して一緒に決める。合意できなければ unresolved にする。
-  - 含めるかで合意できない記録は unresolved にし、ID と数を報告する。
+- 登録との関係: GSRR-33 は、2 人とも理由なしで保留にした記録を、読み直して一緒に決め、合意できなければ unresolved にするとしている。含めるかで合意できない記録も unresolved にし、ID と数を報告する。登録の最終に「合意して理由なしの保留」は無い。
+- 対応（判断 121・研究者の選択）: 24 件の DB の『最終』を「合意できない」に直し、15 束の段 2 の最終を書き出し直した。前の版は履歴に残っている。
+- 道具の変更: 束のうち 3 つ（b12・b14・b19）には、b40 で判定し直した記録があり、元の道具は書き出し直しを拒んだ。そこで道具を直した。判定し直した記録のその束の回は、束自身のファイルから読む。2 人の値だけで決まる回だけを書き出し直せる。登録の決まりは変えていない。
+- 状態: 確定（道具の変更は逸脱として書く）
 
-  登録が書く最終の値は、含める・除外（理由つき）・E6 の保留・unresolved だけで、「合意して理由なしの保留」は無い。道具の `unresolved_row` も、2 人とも理由なしの保留にした記録を unresolved の対象としている。
-- 影響: どちらにしても本体の外である。違いは表 3 と流れ図での数え方（pending か unresolved か）と、ID を報告するかどうか。
-- 訂正: 私は b40 の CS00828 に「保留・理由なし」を勧めた。そのとき「合意できない」の説明に「2 人の判断は割れていないので実際の状態と合わない」と書いたが、これは登録の文を読み落としていた。
-- 状態: 要確認（研究者の選択）。決め方は 2 つある。
-  - (a) 24 件の最終を「合意できない」に書き直す（新しい書き出しのコミットが要る）。
-  - (b) そのまま残し、逸脱として報告する。
-
-**英文案（表 2・(b) を選んだ場合）**
+**英文案（表 2）**
 
 | Date | Registration item | Change and reason | Affected |
 |---|---|---|---|
-| 2026-10-27 | GSRR-33 (a record left pending without a code is decided together and is unresolved if they cannot agree) | For 24 records at full text, the authors agreed, after reading them again, that the rules do not settle them (15 both left pending without a code; in 9 one author left the record pending). They were recorded as pending without a code by consensus rather than as unresolved. Like unresolved records, they are outside the main set; their IDs are released and they are counted with the records pending at the closing date. | Table 3; flow diagram |
+| 2026-10-28 | GSRR-33 (a record left pending without a code is decided together and is unresolved if they cannot agree); screening tool (attachment) | 24 records at full text were first recorded as pending without a code by consensus, a final the registration does not provide: in 15 both authors had left them pending without a code, and in 9 one author had. After reading them again the authors could not settle them, so they were recorded as unresolved and their batches' finals were exported again; the earlier finals remain in the history. To export again a batch that held a record later screened again, the screening tool was changed to read that record's earlier round from the batch's own files; only a round the two authors' own values settle can be exported again. | Table 3; flow diagram (24 unresolved on inclusion) |
 
 ## D8. 方法の節に書くが、逸脱ではないもの
 
@@ -128,7 +122,11 @@
 - データセットの記録の全文（判断 83・98・117）: 公開されている説明の頁を全文とした。対象は CS00828・CS07885・CS09148、学会の抄録の頁の 1 件。
 - 形式の変換（判断 88・98・115・117）: docx・xlsx だけが公開されていた 4 件は、打ち直さずに PDF に変えた。元のファイルも横に残した。
 - 著者 1 の判定の入力（判断 80・81・89）: 著者 1 が決めた判定とメモを、Codex（Google Drive のプラグイン）が DB に書き込んだ。
-  - 状態: 要確認。判断 85 では、段 2 の 1 回目の 174 件の表が作業を始めて約 6 分でできていた。入力だけだったのかを研究者に確かめ、Use of AI に書くかを決める。
+  - 状態: 確定（判断 121・研究者の答え: Codex がしたのは入力だけ）。方法の節と Use of AI に 1 文ずつ書く。
+
+**英文案（方法の節と Use of AI）**
+
+> Author 1's judgements and notes were entered into the screening database by an AI coding assistant (Codex, OpenAI) acting only as a typist; author 1 made every judgement, and before each export the database was compared with a copy taken before entry to confirm that only author 1's judgement columns had changed.
 
 **英文案（方法の節）**
 
