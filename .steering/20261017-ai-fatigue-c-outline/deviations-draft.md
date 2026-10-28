@@ -131,3 +131,20 @@
 **英文案（方法の節）**
 
 > Pending records whose free full text was found in a later search were judged again by both authors in one batch (7 of 102 records left pending with E6). For records that are datasets, the public description page was taken as the full text. Full texts published only as word-processor or spreadsheet files were converted to PDF without retyping, and the original files were kept.
+
+## D9. 較正の 1 回目に AI の下書きを使い、版 1 の値と C5 の照合を参照した（判断 124）
+
+- 何が起きたか: 1 回目は、AI（Codex）がすべての欄を下書きし、著者 1 が全欄を確かめて決めた。確かめの中で、版 1 の値と、封をしていた C5 の照合を参照した。行ったのは 2026-10-28（登録は 11 月）。
+- 登録: GSRR-44 の 2（著者 1 が符号化・1 回目は 11 月）、GSRR-44 の 5（AI の下書きは C4f と C5 だけ）、GSRR-46（版 1 の値は参照しない・C5 の照合は 2 回と 3 回目が決まるまで開かない）。
+- 影響: 較正の符号はデータではない。直に影響するのは、定義を直すかの判断（80% の線）。2 回の一致は高めに出うる。C5 の較正の値は照合を見た後のもの。
+- 状態: 文案（研究者の確かめ待ち）
+
+**英文案（表 2）**
+
+| Date | Registration item | Change and reason | Affected |
+|---|---|---|---|
+| 2026-10-28 | GSRR-44 (calibration: author 1 codes; first pass in November 2026; AI drafts only for C4f and C5); GSRR-46 (version-1 values not consulted; C5 matches opened only after both passes) | The first calibration pass was drafted in every column by an AI coding assistant (Codex, OpenAI) and author 1 checked and settled every value. While checking, the version-1 codebook values and the AI bibliographic matches for C5 were consulted. The pass was made on 28 October 2026, before the registered month. Because author 1 had by then read every value, the pass was not redone. The second pass is made by author 1 alone, without AI drafts and without looking at the first. | Calibration agreement (all units; C5 in particular); amendments after calibration |
+
+**英文案（限界の節）**
+
+> The first calibration pass was settled by author 1 from an AI draft, with the version-1 values and the C5 matches in view, so agreement between the two calibration passes may be higher than author 1's own consistency, and fewer definitions may have been amended than otherwise would have been.

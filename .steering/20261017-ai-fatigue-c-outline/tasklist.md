@@ -129,7 +129,9 @@
 
 ## 残り（2026-10-28 に並べ直した）
 - [ ] `release` の前の引用の確かめ: 著者 1 が `~/TRACE-screening/quote-review.csv`（3,430 行）の scale_item に yes か no を付ける（判断 121 で後回し）
-- [ ] 較正の 1 回目: 研究者の符号化待ち（Drive の `TRACE_calibration/pass1/`）
+- [x] 較正の 1 回目: 閉じた（判断 124・`~/Documents/TRACE/calibration/pass1-closed/`）。逸脱 D9 の文案を書く
+- [ ] 較正の 2 回目（12 月・AI を使わず・1 回目を見ずに）: `c_coding_book.py make --coder coder2 --ids` で冊を作り、手順に「著者 1 が自分で符号化する」と書く
+- [ ] 逸脱 D9（較正の 1 回目）の英文を表 2・限界の節に入れる
 - [ ] 締めの日（2026-12-31・GSRR-39）: 保留の記録の判定し直しを締め、`screening-csv` を作り直し、`python3 screening_values.py` を走らせ直して組む。原稿冒頭の状態の注の暫定の文を直す
 - [ ] 符号化の後: 表 3・図 1・表 3 の注を、`values-screening.tex` の未使用のマクロで埋める（判断 122）
 - [x] 原稿の Use of AI の残り `\tbd{Any other use in preparing the manuscript.}`（原稿の文を書くのに AI を使ったこと）を研究者と決める（判断 122・TRACE `86ece1e`）
