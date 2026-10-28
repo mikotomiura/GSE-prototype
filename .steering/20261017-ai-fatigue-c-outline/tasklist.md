@@ -128,7 +128,7 @@
 - [x] TRACE と steering のコミット・push（TRACE `adaff0c`・PR は研究者が確かめてから）
 
 ## 残り（2026-10-28 に並べ直した）
-- [ ] `release` の前の引用の確かめ: 著者 1 が `~/TRACE-screening/quote-review.csv`（3,430 行）の scale_item に yes か no を付ける（判断 121 で後回し）
+- [ ] `release` の前の引用の確かめ: 著者 1 が `~/TRACE-screening/quote-review.csv`（3,430 行）の scale_item に yes か no を付ける（判断 121 で後回し）。2026-10-29: Codex が付けた冊は使わず、空の冊 `~/TRACE-screening/quote-review-book.xlsx` で付け直す（判断 125）
 - [x] 較正の 1 回目: 閉じた（判断 124・`~/Documents/TRACE/calibration/pass1-closed/`）。逸脱 D9 の文案を書く
 - [ ] 較正の 2 回目（12 月・AI を使わず・1 回目を見ずに）: `c_coding_book.py make --coder coder2 --ids` で冊を作り、手順に「著者 1 が自分で符号化する」と書く
 - [ ] 逸脱 D9（較正の 1 回目）の英文を表 2・限界の節に入れる
