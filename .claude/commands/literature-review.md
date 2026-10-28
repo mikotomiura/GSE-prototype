@@ -91,7 +91,7 @@ angle の例: 分野を変える（HCI / 教育心理 / SE） / 測定法を変�
 
 ★ `WebFetch` は PDF を**読めない**が、**原本をローカルへ保存はする**。
 → ★ そのパスを **`pypdf`** で開けば一次全文が取れる。
-⚠️ `Read` の PDF 経路は `pdftoppm` 不在のため**この環境では使えない**。
+⚠️ `Read` の PDF 経路は `pdftoppm` 不在のため**この環境では使えない**、と以前は書いていた。2026-10-28 には `/opt/homebrew/bin/pdftoppm` があり、PDF の頁を画像にできた（Read の PDF 経路そのものは試していない）。
 
 ```python
 from pypdf import PdfReader
@@ -100,6 +100,24 @@ print("\n".join(p.extract_text() or "" for p in PdfReader(path).pages))
 
 ⚠️ 要旨・二次記述だけで採番したなら、`references.md` の備考に
 **「一次全文未取得」と明記する**（★ 黙って一次扱いにしない）。
+
+### 本文が有料・見つからないときは、著者本人のページを入念に見る
+
+OpenAlex・Unpaywall・Semantic Scholar が closed と言っても、著者が自分の個人サイトや研究室のページに本文を置いていることがある。closed は「索引が知らない」というだけで、「どこにもない」ではない。「入手できない」と書く前に、次を順に見る。
+
+1. 著者ごと（共著者も全員）の個人サイト・研究室のページ・大学の教員のページ・博士論文のリポジトリを特定する。古い論文は、退職した著者の個人のドメインに残っていることが多い。
+2. 業績の一覧のページだけで判断しない。一覧にリンクがなくても、同じサイトの別の場所（`articles/`・`papers/`・`pdf/` など）に PDF が置いてあることがある。
+3. Wayback Machine の CDX でサイトの PDF を全部挙げる。生きているサイトの一覧に載っていない PDF も出てくる。
+   `curl -s "https://web.archive.org/cdx/search/cdx?url=<domain>/<path>/*&filter=mimetype:application/pdf&fl=original&collapse=urlkey"`
+   見つかったら、今のサイトから直接取れるかを試す。WebFetch が archive.org を拒んでも、Bash の curl なら CDX は引ける。
+4. 取れたら、1 頁目の題・著者・巻号で、目当ての論文かを確かめる。スキャンで文字の層がない（pdftotext で 0 字）ときは、`pdftoppm` で画像にして読む。出どころの URL・取得日・SHA-256 を、本文の隣のメモに残す。
+5. それでもなければ、合法な有料の道（出版社からの 1 本売り・国立国会図書館の遠隔複写・相互貸借）を研究者に示す。
+
+海賊版の置き場（Sci-Hub・LibGen・Anna's Archive など）は使わない。第三者の上げもの（Scribd・授業のフォルダ・著者以外の ResearchGate の上げもの）は、権利が不明なので本文として使わない。ブロックやペイウォールを回り込まない。
+
+subagent に探させるときは、この 1〜3 を brief に書く。書かないと、業績の一覧を見ただけで「ない」と返ってくる。
+
+先例: 2026-10-28 の Valdez & Mehrabian（1994）。索引は 3 つとも closed で、subagent は著者のサイトの業績の一覧にリンクがないことから「ない」と報告した。メインが CDX を引くと、同じサイトの `articles/` に出版版のスキャンがあり、今のサイトからも取れた。
 
 ---
 
@@ -244,6 +262,7 @@ python3 scripts/check_citations.py
 - ❌ 「該当研究ゼロ」を「弱い支持」と書く
 - ❌ 否決した主張を記録せず捨てる（次ラウンドで同じ主張が無検証で再浮上する）
 - ❌ 未確認の DOI / URL を書く（`provisional` で登録して確認に回す）
+- ❌ 索引が closed と言うだけで「本文は入手できない」と書く（著者本人のページと Wayback の CDX を先に見る。Step 2 の「本文が有料・見つからないとき」）
 - ❌ 既存 [n] を renumber する / 削除する（inline 番号が全部ずれる）
 - ❌ 凍結済み preregistration を本コマンドで書き換える
 

@@ -37,6 +37,7 @@ docs/literature/<YYYYMMDD>-<topic-slug>.md に保存し、_index.md の表に 1 
 カードの「やり残し」が research-positioning.md §4（差分）の主張を補強/反証するかを 1 行で述べる。
 
 ## チェックリスト
+- [ ] 本文を読んだか。有料・見つからないときは、著者本人の個人サイト・研究室のページと、Wayback の CDX のサイト内の PDF を見てから「取れない」と書いたか（手順は .claude/commands/literature-review.md Step 2 の「本文が有料・見つからないとき」）
 - [ ] 6 項目すべて埋めたか
 - [ ] 「やり残し」を 1 行で抽出したか
 - [ ] _index.md に追記したか
