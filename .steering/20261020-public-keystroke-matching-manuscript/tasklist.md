@@ -20,6 +20,9 @@
 - [x] 段 2: 探索的な分析 1・2（`exploratory_unicity.json`・`exploratory_dp.json`）の角括弧を埋める（判断 81・2026-10-29・R-DP の R0 に比べる有用性は角括弧が残る・notes.md D5）
 - [x] 段 3 の一部: R-DP の R0 に比べる有用性（`exploratory_dp_utility_r0.json`）を表 8 に入れる（判断 82・2026-10-29）
 - [ ] 段 3: 全員の付録（`main_all.json`）の角括弧を埋める
+- [x] /cross-review（判断 83）・attack-me round 3（判断 85）とその直し（2026-10-29）
+- [ ] 探索的な分析 6・7（λ の格子・窓の走査・判断 86）: G-GEAR（引き継ぎ `next-session-public-keystroke-matching-exploratory-lambda-ggear.md`）→ Mac で原稿へ
+- [ ] 倫理審査の手段・統計的開示制御の文献・Dr. Tian への草稿（引き継ぎ `next-session-public-keystroke-matching-manuscript-ethics-sdc-tian.md`）
 - [x] 考察の合意の段落の出典を一次で確かめる（2026-10-21・[V328]）
 - [x] §2 の検索の範囲を情報源・日付・件数で書く（判断 66）
 - [x] 頁の見積もりと移す順（判断 66・outline.md の Page budget）
