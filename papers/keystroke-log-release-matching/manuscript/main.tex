@@ -2,7 +2,12 @@
 % (class acmart with popets.sty). The template files are not part of this directory; see BUILD.md. The sections are
 % kept in separate files while the manuscript is written. The structure and the evidence for each claim are fixed in
 % outline.md.
+% build.sh defines \authorfile when it is given a file with the author block; the version for review is anonymous.
+\ifdefined\authorfile
+\documentclass[sigconf,review]{acmart}
+\else
 \documentclass[sigconf,anonymous,review]{acmart}
+\fi
 \usepackage{popets}
 % Ragged-right columns in the tables.
 \usepackage{array}
@@ -29,12 +34,16 @@
 \title[Matching processed keystroke logs to texts]{Hiding the Text, Keeping the Process: Matching Processed
 Keystroke Logs to Texts Held by Others}
 
+\ifdefined\authorfile
+\input{\authorfile}
+\else
 \author{Anonymous}
 \affiliation{%
   \institution{Anonymous}
   \country{Anonymous}}
 
 \renewcommand{\shortauthors}{Anonymous}
+\fi
 
 \begin{abstract}
   Keystroke logs record how a text was written. One public release of essay logs masked every letter and digit, with

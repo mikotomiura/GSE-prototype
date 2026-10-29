@@ -107,6 +107,7 @@ process measures can still be computed. No rule recommends a form (preregistrati
 paper does not say that a form "works" or "withstands" matching. The recommendations in the discussion are stated as
 "against this attacker, at this N, this form had this multiple of 1/N and kept this much of the process measures".
 Agreements not to re-identify, which releasing parties also use, are discussed alongside the processing in Section 8.
+Section 8.3 names each form in the terms of statistical disclosure control (global recoding, suppression, perturbation; hundepool2026handbook), and Section 8.2 cites the same handbook for balancing a licence against the detail released (added 29 October 2026, after attack-me round 3, R2).
 
 ## Page budget
 
@@ -184,7 +185,7 @@ are chosen with the results in view.
 
 ## Ethical considerations: plan
 
-- No external committee (no affiliation); no reason is given for not seeking a board outside an institution (decided 21 October 2026). Public data and a public model only, aggregates only. In the
+- No external committee (no affiliation); no reason is given for not seeking a board outside an institution (decided 21 October 2026). In its place, the inquiry to the KLiCKe authors before acquisition and the registered rule to stop and delete the data if they raised a concern (preregistration, conditions to acquire; decided 29 October 2026). Public data and a public model only, aggregates only. In the
   submitted version, check that the wording about affiliation and the dated personal communication do not identify
   the author beyond what the venue requires (to be decided with the handling of double-blind review).
 - Consent of the KLiCKe participants in the words of the corpus authors (personal communication); consent of the ENJA15
