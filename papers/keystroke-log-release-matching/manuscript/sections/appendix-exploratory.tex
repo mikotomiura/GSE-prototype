@@ -60,8 +60,59 @@ attacker's accuracy in each third and the difference between the top and bottom 
 scores.
 
 \paragraph{Tables.}
-Tables~\ref{tab:app:tail} to~\ref{tab:app:band} give the last three analyses. \textbf{[The uniqueness of word-length
-sequences and R-DP, when their computations are complete.]}
+% The computation of R-DP (run_main.py --forms dp) ran R3 and R-DP without R0, so the summaries of the process measures
+% relative to R0 are empty in exploratory_dp.json (notes.md, D5); the matching values of R3 equal those of main.json.
+Tables~\ref{tab:app:unicity} to~\ref{tab:app:band} give the five analyses. \textbf{[For R-DP, the ratio to R0 and the
+correlation with R0 of the process measures, when they are computed.]}
+
+\begin{table*}
+  \caption{Exploratory: uniqueness of word-length sequences among $N$ candidates, 500 writers. Unique: the percentage
+  of runs of $k$ consecutive words whose sequence of word lengths no decoy contains, averaged per writer and then over
+  writers, with its interval. $1/m$: the accuracy of choosing uniformly among the $m$ candidates that contain the
+  sequence. All: unique at $N = 1{,}000$ for all writers after exclusion. $k^{*}$: the reference lines $\log_2 N / h_m$ for
+  $m = 0$, $1$, $2$, with $h_m$ the plug-in entropy rate of word lengths over all writers after exclusion.}
+  \label{tab:app:unicity}
+  \small
+  \begin{tabular}{rllllllr}
+    \toprule
+    & \multicolumn{2}{l}{$N = 10$} & \multicolumn{2}{l}{$N = 100$} & \multicolumn{2}{l}{$N = 1{,}000$} & All \\
+    $k$ & Unique & $1/m$ & Unique & $1/m$ & Unique & $1/m$ & $1{,}000$ \\
+    \midrule
+    \tabinput{sections/generated/explore-unicity.tex}
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\begin{table*}
+  \caption{Exploratory: R-DP($\varepsilon$), with $\varepsilon$ the budget per segment count and per interval, not per
+  writer, and R3, 500 writers. Full texts: the accuracy of the strongest attacker, A1$'$ on every form and $N$, and the
+  contrast R3~$-$~R-DP in points at $N = 1{,}000$. Windows: the accuracy of the strongest attacker, A2, at
+  $N = 1{,}000$. Area: the open-world area. The values of R3 are those of the main computation.}
+  \label{tab:app:dp}
+  \small
+  \begin{tabular}{lrrlllllll}
+    \toprule
+    & \multicolumn{4}{l}{Full texts} & \multicolumn{4}{l}{Windows, $N = 1{,}000$} & \\
+    Form & $N = 10$ & $100$ & $1{,}000$ & R3~$-$~form & $k = 5$ & $10$ & $20$ & $50$ & Area \\
+    \midrule
+    \tabinput{sections/generated/explore-dp.tex}
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\begin{table*}
+  \caption{Exploratory: the Spearman correlation of each process measure with the human score (mean over prompts) on
+  R3 and R-DP($\varepsilon$), 500 writers. Every measure on R-DP is approximated.}
+  \label{tab:app:dp-score}
+  \small
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Measure & R3 & R-DP(4) & R-DP(2) & R-DP(1) & R-DP(0.5) \\
+    \midrule
+    \tabinput{sections/generated/explore-dp-score.tex}
+    \bottomrule
+  \end{tabular}
+\end{table*}
 
 \begin{table*}
   \caption{Exploratory: the upper tail of accuracy per writer, full texts, 500 writers: the 95th and 99th percentiles

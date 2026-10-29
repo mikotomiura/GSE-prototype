@@ -1,5 +1,7 @@
 # 次のセッション（Mac）: 照合の論文 —— 段 2: 探索的な分析 1・2（一意さ・R-DP）を入れる
 
+> 使用済み（2026-10-29）: 段 2 を入れた（判断 81）。R-DP の R0 に比べる有用性は空で届いたので、G-GEAR の `next-session-public-keystroke-matching-dp-utility-r0-ggear.md` で集計し直し、段 3（`next-session-public-keystroke-matching-manuscript-stage-3.md`）で入れる。
+
 作成 2026-10-27（判断 80 の後）。この機械は Mac。G-GEAR の作業はこのセッションでしない。
 
 執筆は届いた結果ごとに段で進める（研究者 2026-10-24）。このセッションは **段 2 だけ**を行う。

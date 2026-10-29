@@ -4,7 +4,7 @@
 
 <results dir> is experiments/20261012-public-keystroke-matching/results. The script reads main.json,
 main_a4.json and main_a4_without_cpu_writer.json (the KeyTAR rows), enja15_main.json and
-exploratory_{tail,margin,score_band}.json (aggregates only) and writes one .tex file per table
+exploratory_{unicity,dp,tail,margin,score_band}.json (aggregates only) and writes one .tex file per table
 into <output dir> (sections/generated). The tables are included by the sections; values are never typed by hand.
 Accuracies are printed in percent.
 """
@@ -253,6 +253,76 @@ def explore_tables(tail, margin, band):
     return t_rows, m_rows, b_rows
 
 
+UNICITY_K = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30, 50]
+
+
+def unicity_table(u):
+    """Uniqueness of word-length sequences among N candidates by k, with k* = log2 N / h_m as the last row.
+    Stops if the sample sizes or the values of k are not those of the procedure."""
+    if u["N"] != [10, 100, 1000] or u["kmax"] != 50 or u["mutate"]:
+        raise SystemExit("exploratory_unicity.json: unexpected N, kmax or mutation")
+    everyone = sum(u["writers_after_exclusion"].values())
+    for s, n_writers in (("main500", 500), ("all", everyone)):
+        for n in ("10", "100", "1000"):
+            c = u[s][n]
+            if c["k"] != list(range(1, 51)) or set(c["writers"]) != {n_writers}:
+                raise SystemExit(f"exploratory_unicity.json: unexpected k or writers in {s}|{n}")
+    rows = []
+    for k in UNICITY_K:
+        i = k - 1
+        cells = []
+        for n in ("10", "100", "1000"):
+            c = u["main500"][n]
+            cells += [f"{pct(c['unique'][i])} {ci(c['unique_ci'][i])}", pct(c["credit"][i])]
+        cells.append(pct(u["all"]["1000"]["unique"][i]))
+        rows.append(" & ".join([str(k)] + cells) + " \\\\")
+    h = u["entropy_bits_per_word"]
+    ks = [u["k_star"][n] for n in ("10", "100", "1000")]
+    rows.append("\\midrule")
+    rows.append(" & ".join(["$k^{*}$"] + [f"\\multicolumn{{2}}{{l}}{{{min(v.values()):.2f} to {max(v.values()):.2f}}}"
+                                          for v in ks] + [""]) + " \\\\")
+    rows.append(f"$h_m$ & \\multicolumn{{7}}{{l}}{{{h['h0']:.2f}, {h['h1']:.2f} and {h['h2']:.2f} bits per word}} \\\\")
+    return rows
+
+
+DP_FORMS = ["R3", "R-DP(4)", "R-DP(2)", "R-DP(1)", "R-DP(0.5)"]
+
+
+def dp_tables(dp, m):
+    """R-DP: matching (full texts at every N, the contrast with R3, windows at N = 1,000, the open-world area) and the
+    Spearman correlation of each measure with the human score. Stops if the R3 values differ from main.json or if the
+    strongest attacker is not A1' on full texts and A2 on windows, as the caption states."""
+    s, c = dp["strongest"], dp["cells"]
+    for k, v in s.items():
+        if "|R3|" in k and v != m["strongest"][k]:
+            raise SystemExit(f"exploratory_dp.json: R3 differs from main.json at {k}")
+        if v["attacker"] != ("A1p" if k.startswith("full|") else "A2"):
+            raise SystemExit(f"exploratory_dp.json: the strongest attacker at {k} is {v['attacker']}")
+    for k, v in c.items():
+        if "|R3|" in k and v != m["cells"][k]:
+            raise SystemExit(f"exploratory_dp.json: R3 differs from main.json at {k}")
+    match, util = [], []
+    for f in DP_FORMS:
+        full = [s[f"full|{f}|{n}"] for n in ("10", "100", "1000")]
+        cells = [pct(v["acc"]) for v in full[:2]] + [f"{pct(full[2]['acc'])} {ci(full[2]['ci'])}"]
+        if f == "R3":
+            cells.append("--")
+        else:
+            d = dp["contrasts"][f"R3 - {f}|1000|full"]
+            cells.append(f"{pct(d['diff'])} {ci(d['ci'])}")
+        cells += [pct(s[f"window|{f}|1000|{k}"]["acc"]) for k in ("5", "10", "20", "50")]
+        ow = dp["open_world"][f"full|{f}|1000"]
+        cells.append(f"{ow['auc']:.3f}")
+        match.append(" & ".join([form_tex(f)] + cells) + " \\\\")
+    for mk, label in MEASURES:
+        cells = []
+        for f in DP_FORMS:
+            q = dp["utility"][f"{mk}|{f}"]["spearman_score"]
+            cells.append(f"{q['mean']:.2f}" if q.get("mean") is not None else "--")
+        util.append(" & ".join([label] + cells) + " \\\\")
+    return match, util
+
+
 def main():
     res, out = sys.argv[1], sys.argv[2]
     os.makedirs(out, exist_ok=True)
@@ -285,6 +355,12 @@ def main():
     write(out, "explore-tail.tex", t)
     write(out, "explore-margin.tex", mg)
     write(out, "explore-band.tex", b)
+    u = json.load(open(os.path.join(res, "exploratory_unicity.json"), encoding="utf-8"))
+    write(out, "explore-unicity.tex", unicity_table(u))
+    dp = json.load(open(os.path.join(res, "exploratory_dp.json"), encoding="utf-8"))["main500"]
+    dp_match, dp_util = dp_tables(dp, m)
+    write(out, "explore-dp.tex", dp_match)
+    write(out, "explore-dp-score.tex", dp_util)
 
 
 if __name__ == "__main__":

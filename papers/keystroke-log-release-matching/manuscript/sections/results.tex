@@ -184,10 +184,10 @@ of a translation's segment structure to choose it in half of the logs.
 \subsection{Exploratory analyses}
 \label{sec:results:exploratory}
 
-The exploratory analyses (\S\ref{sec:protocol:exploratory}; Appendix~\ref{app:exploratory}) add three observations
+The exploratory analyses (\S\ref{sec:protocol:exploratory}; Appendix~\ref{app:exploratory}) add five observations
 at $N = 1{,}000$. On R4(2) and R7(0.5), with mean accuracies of 4.4\% and 2.2\%, 4.2\% and 1.6\% of writers were
 matched in every draw: the matches concentrate on a few writers. On R3, the 80\% of logs and draws with the largest
 margin between the best and the second-best candidate were all matched correctly. Accuracy did not differ by score
 band on R1 to R3, while on R3-u the lowest third was matched more often than the highest ($-16.9$ points [$-26.9$,
-$-6.9$]). \textbf{[Uniqueness of word-length sequences and R-DP, when their computations are
-complete.]}
+$-6.9$]). Eight consecutive word lengths were unique among the candidates in 93.8\% of runs; with differentially private
+noise at $\varepsilon = 0.5$, A1$'$ still chose the true text in 48.8\% of draws.
