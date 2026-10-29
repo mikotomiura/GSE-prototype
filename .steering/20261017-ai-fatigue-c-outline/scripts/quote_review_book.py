@@ -98,7 +98,10 @@ def back(csv_path, book_path):
         if all(v in (None, "") for v in cells):
             continue
         v = {h: ("" if x is None else str(x)) for h, x in zip(HEAD, cells)}
-        i = int(v["row"]) - 2
+        n_row = float(v["row"])  # Google Sheets writes the row number back as 165.0
+        if n_row != int(n_row):
+            sys.exit(f"{book_path} line {n}: row {v['row']} is not a whole number")
+        i = int(n_row) - 2
         if not 0 <= i < len(rows) or i in seen:
             sys.exit(f"{book_path} line {n}: row {v['row']} is not a row of the CSV or appears twice")
         r = rows[i]

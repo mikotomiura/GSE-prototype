@@ -1407,3 +1407,6 @@
 - 研究者の選択（推奨どおり）: Codex の冊は消さずに `~/TRACE-screening/quote-review-book.codex-draft-20261028.xlsx`（読み取り専用・`eee0b57c…`）へ移し、空の冊を作り直した（`bfcdfebf…`・3,430 行・印の 29 行が先頭）。研究者が AI を使わずに Excel で付ける。Codex の下書きを使わないので逸脱にはしない。
 - 次に `back` を走らせる前に、冊の保存の道具が Microsoft Excel であることを確かめる。
 - 私の手順の文の不備（判断 124 と同じ）: 前の手順に AI を使わないことを書いたが、渡された先が AI であることは防げなかった。手順の冒頭に「この作業は著者 1 本人が行う。AI のエージェントに渡さない」と書く。
+- 2026-10-29 の続き: 研究者が空の冊に自分で付けた（Google スプレッドシートで付けて xlsx で書き出した・3,430 行すべて no・memo 4 行。memo の行も文も Codex の下書きと違う）。控えは `~/TRACE-screening/quote-review-book.author1-20261029.xlsx`（読み取り専用・`735aeb32…`）。Google スプレッドシートは行番号を `165.0` の形で書き出すので、`quote_review_book.py back` が小数点以下 0 の数を整数として読むよう直した（0 でなければ止まる）。写しで試してから `back` を走らせた（控え `quote-review.before-back-20261029-111148.csv`・新しい CSV `45793cdb…`）。
+- `release` を repo の外（`~/TRACE-screening/release-20261029/`）に書いた: 判定 1,024 行・網の答え 3,948 行・除いた引用 0。`verify-removed` は通ったが、yes が 0 なので検査としては空振り。監査の 2 冊と段 1 の組の冊は repo の版とバイトが同じ。
+- Drive に引用の冊が 1 つ残っている（研究者のマイドライブ直下・共有なし・ID `1oDQDleL…`）。研究者にゴミ箱へ移すよう頼んだ。
