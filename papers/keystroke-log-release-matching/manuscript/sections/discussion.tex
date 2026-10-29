@@ -7,9 +7,9 @@
 We asked how far each form of processing keeps a keystroke log apart from its text against a party that holds
 candidate texts, and what each form costs the process measures of writing research. Against the attackers tried, the
 masking used in one public release kept no log apart from its text at $N = 1{,}000$, and among the forms that release
-less, none kept matching low and the measures close to their unprocessed values at once (Section~\ref{sec:results}).
-For a party that releases logs whose texts exist elsewhere, hiding the characters did not hide the text while the
-lengths and the editing keys remained. We measured the accuracy of these attackers on these forms in a closed world;
+less, only those that compute no process measure brought the full-text attackers within four times chance
+(Section~\ref{sec:results}). In that release, hiding the characters did not hide the text, because the lengths and
+the editing keys remained. We measured the accuracy of these attackers on these forms in a closed world;
 the link to named writers (harm (b)), the rate of false matches for a holder of a single text and stronger attackers
 remain possible but untested (\S\ref{sec:discussion:limits}).
 
@@ -31,13 +31,9 @@ logs with much pasting~\cite{tian2025klicke}. The results on ENJA15 are not gene
 logs of input methods in general, and differences from KLiCKe are not attributed to language or input method, since
 the task, the input and the language differ at once. Our formulas for the process measures could not be verified
 against Inputlog (\S\ref{sec:protocol:utility}), and the utility axis covers only what Section~\ref{sec:protocol:summary}
-states. KeyTAR, run with the defaults of its artifact (\S\ref{sec:attackers:list}), is a reference, not a bound.
-
-\paragraph{The exploratory analyses.}
-The uniqueness of word-length sequences is measured among the $N$ candidates tried and is not a risk of
-re-identification in a population. The form with differentially private noise gives its guarantee for one segment
-count or one interval, not for a writer's log, and its noise comes from a seeded generator for evaluation, not from an
-implementation suitable for release.
+states. KeyTAR, run with the defaults of its artifact (\S\ref{sec:attackers:list}), is a reference, not a bound. On
+the coarse forms, the full-text attackers were weaker than the windows and the lighter penalty suggest
+(\S\ref{sec:results:forms}).
 
 \subsection{Processing and agreements}
 \label{sec:discussion:agreements}
@@ -60,11 +56,17 @@ also has to track where the data of a release come from and what else is release
 \subsection{What a releasing party can take away}
 \label{sec:discussion:takeaways}
 
-The results are material for three choices; each statement holds for the attackers tried, and none recommends a
-form. \emph{Columns.} Masking letters and digits left 100\% at $N = 1{,}000$ (R1), and the categories of the editing
-keys alone still left 86.7\% (R3); only merging the separators, coarsening the segment values or suppressing at least a
-quarter of the presses brought the strongest attacker below 40\%. \emph{Coarseness.} Rounding the press times to one
-second left 86.7\% and lost five of the ten measures; segment values with $w \geq 4$ left no gain over the total length
-for the main attackers and no measure; suppressing a quarter of the presses left 14.3\%, with a median correlation of 0.81. \emph{Windows.}
-Windows of five segments were matched in 65.8\% of draws at $N = 1{,}000$ on R0 to R3, under assumptions that favour the
-attacker.
+The results are material for three choices, and none recommends a form. \emph{Columns.} Masking letters and digits left
+100\% at $N = 1{,}000$ (R1), and the categories of the editing keys alone still left 86.7\% (R3); only merging the
+separators, coarsening the segment values or suppressing at least a quarter of the presses brought the strongest
+attacker below 40\%. \emph{Coarseness.} Rounding the press times to one second left 86.7\% and lost five of the ten
+measures; suppressing a quarter of the presses left 14.3\%, with a median correlation of 0.81, against attackers that
+do not try to undo the suppression; segment values with $w \geq 4$ computed no measure, and their low full-text values
+may reflect the attacker. Every form from R2 on approximated or dropped the R-burst and insertion measures, and the
+approximations changed how measures relate to the human scores, so a release would need to state which measures are
+approximated. \emph{Setting.} The size of the candidate set changes the choice: at $N = 10$, as in a class, the total
+length alone chose the true text in 61.6\% of draws on the forms that keep it exactly, and every form except R4(4) and
+R4(8) left the strongest attacker at 51.5\% or more; at $N = 1{,}000$, the few matches on R4(2) and R7(0.5)
+concentrated on a few writers (exploratory). \emph{Windows.}
+Windows of five segments were matched in 65.8\% of draws at $N = 1{,}000$ on R0 to R3, with one window per decoy, and
+the utility of windows was not evaluated.

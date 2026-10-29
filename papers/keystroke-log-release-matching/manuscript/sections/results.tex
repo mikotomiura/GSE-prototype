@@ -3,9 +3,8 @@
 
 % Ordered by the pillars of Sections 4 to 6; for each, what it was meant to establish, what was measured, what was
 % found and why it matters for the claim (outline.md, Claim and contributions). Values come from the aggregate files of
-% the main computation through make_tables.py (the rows of KeyTAR from main_a4.json and
-% main_a4_without_cpu_writer.json). A4 is not part of the strongest attacker, so no statement on the other forms
-% depends on it.
+% the main computation through make_tables.py. KeyTAR (A4) was moved to Appendix E on 29 October 2026;
+% it is not part of the strongest attacker, so no statement on the other forms depends on it.
 Values are for full texts and the 500 writers unless stated otherwise, in percent, with 95\% intervals in brackets;
 no writer met an exclusion criterion. Every attacker at every $N$, the windows and the diagnostics are in
 Appendix~\ref{app:results}.
@@ -16,8 +15,8 @@ Appendix~\ref{app:results}.
   resamples in which it was selected when this is below 100. $\times 1/N$: the accuracy as a multiple of chance.
   Gain: the difference from A0 in percentage points. Measures: the numbers of the ten process measures computed with
   the same inputs as in R0, approximated and not computed; $\rho$: the median over the ten measures of the Spearman
-  correlation with R0 (a measure not computed counts as zero). The measures do not depend on $N$. A4 (KeyTAR) is a
-  reference outside the threat model and is not part of the strongest attacker.}
+  correlation with R0 (a measure not computed counts as zero). The measures do not depend on $N$. At 100\% the
+  bootstrap interval is degenerate and does not show the uncertainty.}
   \label{tab:main}
   \small
   \setlength{\tabcolsep}{4pt}
@@ -27,13 +26,11 @@ Appendix~\ref{app:results}.
     Form & A0 & Strongest & Attacker & $\times 1/N$ & Gain over A0 & Measures & $\rho$ \\
     \midrule
     \tabinput{sections/generated/main-1000.tex}
-    \tabinput{sections/generated/main-a4-1000.tex}
     \midrule
     \multicolumn{8}{l}{(b) $N = 10$ ($1/N = 10\%$)} \\
     Form & A0 & Strongest & Attacker & $\times 1/N$ & Gain over A0 & & \\
     \midrule
     \tabinput{sections/generated/main-10.tex}
-    \tabinput{sections/generated/main-a4-10.tex}
     \bottomrule
   \end{tabular}
 \end{table*}
@@ -43,9 +40,9 @@ Appendix~\ref{app:results}.
 
 This part asks whether the masking used in the competition (R1) keeps a log apart from its text, measured by the
 strongest attacker's accuracy against $1/N$ and A0, with the negative control beside it. It does not, against the attacker that rebuilds the final draft as the winning solution did: on R1, A1 chose the
-true text for every log in every draw, at $N = 1{,}000$ as at $N = 10$ (100.0\% [100.0, 100.0], 1,000 times $1/N$, a
-gain of 98.2 points [97.1, 99.2] over A0, selected in every resample). R1 gave the same values as the unprocessed log
-R0, as did R5 and R6, also for the 18 writers whose rebuilt draft differs from the distributed text. In the negative
+true text for every log in every draw, at $N = 1{,}000$ as at $N = 10$ (1,000 times $1/N$, a gain of 98.2 points
+[97.1, 99.2] over A0, selected in every resample). R1 gave the same values as the unprocessed log R0, as did two
+further forms (Appendix~\ref{app:results}), also for the 18 writers whose rebuilt draft differs from the distributed text. In the negative
 control, the same attacker chose the true text in 0.0\% of draws at $N = 1{,}000$ and 9.9\% at $N = 10$, close to
 $1/N$, so the accuracy comes from the link between each log and its own text; the open-world area was 1.000.
 
@@ -70,14 +67,17 @@ Merging the separators into one category (R3~$-$~R3-u) lowered the strongest att
 reached 19.2\% by itself, so the gain over A0 is 16.8 points [13.6, 20.1]. Releasing only the segment values kept A2 at its value on R3 for $w =
 1$ (40.5\% [36.1, 44.8]), lowered it to 4.4\% [2.8, 6.3] for $w = 2$, and for $w = 4$ and $8$ left no attacker above
 A0. With the lighter penalty $\lambda = 4$, a registered secondary analysis (\S\ref{sec:attackers:alignment}), A2
-reached 75.1\%, 36.4\% and 4.5\% for $w = 1$, $2$ and $4$, so the results on segment values depend on this penalty.
+reached 75.1\%, 36.4\% and 4.5\% for $w = 1$, $2$ and $4$, and on windows of 5 to 50 segments A2 chose the true window
+in 44\% to 58\% of draws on R4(2) and 13\% to 43\% on R4(4) (Appendix~\ref{app:results}). The low full-text values on
+the coarse forms may therefore reflect the end-to-end alignment with $\lambda = 8$ rather than the form.
 Suppression lowered the strongest
 attacker to 70.2\% [66.0, 74.2], 14.3\% [11.5, 17.4] and 2.2\% [1.4, 3.4] for $p = 0.1$, $0.25$ and $0.5$; at $p =
 0.5$ the strongest attacker was A0 (gain 0.0 [0.0, 1.1]).
 
 At $N = 10$ the order of the forms is the same except that R3-u rises above R4(1) and R7(0.5) above R4(2), but A0 alone already chose the true text in 61.6\% of draws, so the
 gains are smaller (Table~\ref{tab:main}b): 32.0 points on R3, 3.8 points [2.2, 5.4] on R3-u, and none whose lower
-bound is above zero on R4($w$) and on R7 with $p \geq 0.25$. The negative control stayed near $1/N$ for every form
+bound is above zero on R4($w$) and on R7 with $p \geq 0.25$, for attackers that do not combine A0 with the others
+(\S\ref{sec:protocol:quantities}). The negative control stayed near $1/N$ for every form
 (9.6\% to 11.5\% at $N = 10$, at most 0.34\% at $N = 1{,}000$).
 
 This is the first axis of contribution C2. Against the attackers tried, the forms that keep the key categories (R2,
@@ -121,8 +121,9 @@ total length (R4(4) not against A2 with $\lambda = 4$). These contrasts contain 
       \node[font=\scriptsize, anchor=south] at (axis cs:1.37,0.08) {R4(8)};
     \end{semilogxaxis}
   \end{tikzpicture}
-  \caption{Matching against the process measures for the main forms, full texts, $N = 1{,}000$ (lower left: less
-  matching, fewer measures). Filled: forms that no other form dominates, that is, no other form has a lower or equal
+  \caption{No form evaluated brought matching near chance while computing the process measures. Matching against the
+  measures for the main forms, full texts, $N = 1{,}000$, attackers with $\lambda = 8$ (lower left: less matching, fewer
+  measures); the utility axis has no interval, so dominance by a small difference rests on the point estimates. Filled: forms that no other form dominates, that is, no other form has a lower or equal
   accuracy and a higher or equal correlation, one of them strictly. Open: dominated forms.}
   \label{fig:tradeoff}
 \end{figure}
@@ -130,7 +131,9 @@ total length (R4(4) not against A2 with $\lambda = 4$). These contrasts contain 
 This part asks what each form costs writing research, measured by the agreement of the ten process measures with
 their values in R0 (\S\ref{sec:protocol:utility}). R0 and R1 compute all ten measures as before. R2 and R3 compute the
 P-bursts, the pauses and the variance of the production rate as in R0 and approximate the R-bursts, deletions and
-insertions, with correlations from 0.19 (insertion proportion) to 0.85 (deletion proportion); the median is 0.92. At $w = 1{,}000$\,ms five measures cannot be computed,
+insertions, with correlations from 0.19 (insertion proportion) to 0.85 (deletion proportion); with the five measures
+computed as in R0, the median is 0.92. The approximation rules do not use the position column of R2, so R2 has the
+values of R3. At $w = 1{,}000$\,ms five measures cannot be computed,
 R3-u loses the pauses within and between words, and R4 computes none (Table~\ref{tab:main}).
 
 Figure~\ref{fig:tradeoff} plots the two axes. The forms that no other form dominates are R0 and R1, R3, the three
@@ -141,34 +144,29 @@ measure relates to the human scores: the mean pause correlates with the score at
 R7(0.5), and the R-burst length at $-0.04$ in R0 and at $0.20$ in R2 (Appendix~\ref{app:results}). The utility axis
 measures agreement with R0, not whether a measure keeps its relation to the quality of writing.
 
-This is the second axis of contribution C2. No form evaluated here brought the strongest attacker near $1/N$ while
-keeping the measures close to their values in R0: every form with a median correlation of at least 0.84 left the
-strongest attacker at 70\% or more at $N = 1{,}000$, and the forms at or below 2.2\% kept a median of at most 0.70.
+This is the second axis of contribution C2, read from the forms that no other form dominates. R3 kept 86.7\% with
+five measures as in R0 and a median correlation of 0.92; suppressing a tenth, a quarter and a half of the presses gave
+70.2\%, 14.3\% and 2.2\% with medians of 0.85, 0.81 and 0.70; R4(8) gave 0.14\% and no measure. Only R4(4) and R4(8)
+brought the strongest attacker within four times $1/N$, and they compute no measure; every form from R2 on computed the
+R-burst and insertion measures at a correlation below 0.5 or not at all (Appendix~\ref{app:results}).
 
-\subsection{Windows, the open world and KeyTAR}
+\subsection{Windows and the open world}
 \label{sec:results:windows}
 
 This part asks whether releasing parts of logs changes the picture, and how well the scores separate candidate sets
 with and without the true text. On windows, where A1 and A1$'$ are not run, A2 was the strongest attacker on R0 to R3,
-R3-t and R4(1), with the same values on all of them, since A2 reads only the segments. At $N = 1{,}000$ it chose the true window in 65.8\% [63.9, 67.8] of draws with $k = 5$ and in 72.3\%
-[70.2, 74.5] with $k = 20$; at $N = 10$, in 84\% to 88\%. On R3-u, where A0 was the strongest attacker, accuracy at
-$N = 1{,}000$ was 0.6\% to 1.9\%; on R7(0.1), 26.7\% to 47.5\%; on R4(8), 1.5\% to 16.7\%
-(Appendix~\ref{app:results}). Under the assumptions about windows (\S\ref{sec:threat-model:bias}), releasing parts of logs did not by itself
-keep them apart from their texts.
+R3-t and R4(1), with the same values on all of them, since A2 reads only the segments. At $N = 1{,}000$ it chose the
+true window in 65.8\% [63.9, 67.8] of draws with $k = 5$ and in 72.3\% [70.2, 74.5] with $k = 20$; at $N = 10$, in 84\%
+to 88\%. On R3-u, where A0 was the strongest attacker, accuracy at $N = 1{,}000$ was 0.6\% to 1.9\%; on R7(0.1), 26.7\%
+to 47.5\%; on R4(8), 1.5\% to 16.7\% (Appendix~\ref{app:results}). Each decoy contributed one window, so these values
+hold for far fewer candidates than an attacker searching every position of every text would face
+(\S\ref{sec:threat-model:bias}), and no process measure is defined on windows.
 
 In the open-world diagnostic, the area was 1.000 for R0 and R1, 0.978 for R2, 0.774 [0.753, 0.795] for R3 and R3-t
-and at most 0.62 for the other forms. KeyTAR, the reference outside the threat model (\S\ref{sec:attackers:list}), stayed below A0 on every form and $N$
-(Table~\ref{tab:main}) and on windows reached at most 0.50\% at $N = 1{,}000$ and 17.1\% at $N = 10$; without the
-writer whose chunks were generated on the CPU, no accuracy changed by more than 0.12 points (Appendix~\ref{app:results}).
-
-\subsection{Predictions and results}
-\label{sec:results:predictions}
-
-All predictions registered before the data were acquired (\S\ref{sec:protocol:registration}) held for the forms within
-the threat model: 95\% or more for R0 to R2, R5 and R6; 80\% or more for R3 and R3-t; 10\% to 60\% for R3-u; R7
-falling with $p$ and below 30\% at $p = 0.5$; R4(1) about as high as A2 on R3 and R4(8) about as high as A0
-(Table~\ref{tab:main}). The prediction for KeyTAR, below 10 times $1/N$ at $N = 1{,}000$, did not hold on R0 to R3,
-R3-t(10) and R3-t(100) (11 to 16 times; the intervals include 10 times) and held on R3-t(1{,}000).
+and at most 0.62 for the other forms. Within each log, a large margin between the best and the second-best candidate
+marked correct matches: on R3, the 80\% of logs and draws with the largest margins were all matched correctly
+(exploratory; Appendix~\ref{app:exploratory}). KeyTAR, the reference outside the threat model, stayed
+below A0 on every form and $N$ (Appendix~\ref{app:results}).
 
 \subsection{The Japanese translation logs}
 \label{sec:results:enja}
@@ -179,15 +177,14 @@ sessions of 39 translators on six source texts were used, with 12 or 13 candidat
 string, A2 chose the true translation in 51.6\% [39.3, 63.5] of logs, against $1/N$ = 7.9\% and 11.9\% [5.3, 19.7] for
 A0 (means over the six source texts). The differences were 43.7 points [31.4, 55.6] from $1/N$ and 39.7 points [25.6, 53.0] from A0; both lower bounds
 are above zero, so by the registered rule matching exceeds chance and A0. Accuracy ranged from 33\% to
-77\% over the source texts, and R3j-t($w$) and R4($w$) also exceeded both (Appendix~\ref{app:enja}). The result is
+77\% over the source texts, and R3j-t($w$) and R4($w$) also exceeded both (Appendix~\ref{app:enja}); A2 reads the same
+segments from R3j, R3j-t($w$) and R4(1), so these share its values. The result is
 conditional (\S\ref{sec:discussion:limits}): without any string, the categories of input-method events kept enough
 of a translation's segment structure to choose it in half of the logs.
 
 \subsection{Exploratory analyses}
 \label{sec:results:exploratory}
 
-The exploratory analyses (\S\ref{sec:protocol:exploratory}; Appendix~\ref{app:exploratory}) add five observations
-at $N = 1{,}000$. On R4(2) and R7(0.5), 4.2\% and 1.6\% of writers were matched in every draw, so the matches
-concentrate on a few writers. On R3, the 80\% of logs and draws with the largest margins were all matched correctly.
-Accuracy did not differ by score band on R1 to R3, but did on R3-u. Eight consecutive word lengths were unique among the candidates in 93.8\% of runs; with differentially private
-noise at $\varepsilon = 0.5$, A1$'$ still chose the true text in 48.8\% of draws.
+The exploratory analyses (\S\ref{sec:protocol:exploratory}) are reported in Appendix~\ref{app:exploratory}. Among
+them, on R4(2) and R7(0.5) the matches concentrated on 4.2\% and 1.6\% of writers, matched in every draw, and accuracy
+differed by score band on R3-u and on several coarse forms.

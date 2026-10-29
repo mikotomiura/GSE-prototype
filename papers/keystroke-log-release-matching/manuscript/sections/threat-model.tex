@@ -148,7 +148,8 @@ them. We read the stated goal as keeping the text apart from the rest of the log
 competition essays were drawn from a corpus to be released later with its texts (Section~\ref{sec:threat-model:settings}),
 the goal may have been meant to hold only until then, which we do not know. Under our reading, a
 form that lets a log be matched to its text does not keep them apart for a party that holds the texts. The evaluation
-measures this link directly, in the setting of texts on the same prompts. A further harm, (b), arises where the writer of a text is known, as in the
+measures this link directly, in the setting of texts on the same prompts; the preregistration states (a) as learning
+the content of a hidden text and names this link as the quantity that underlies (a) and (b). A further harm, (b), arises where the writer of a text is known, as in the
 classroom and published-essay settings: the log is then linked to a named person. We know of no release in which (b)
 has occurred, and we state it as a consequence that would follow if logs were released in those settings. The study
 does not identify writers.
@@ -166,7 +167,7 @@ candidate set from that corpus, whose texts are public, and not a setting of its
 Some assumptions favour the attacker: the true text is always among the candidates (the closed world, examined
 otherwise only as a diagnostic), the attacker trains on data collected in the same way as the evaluated logs, in
 windows the attacker knows where the window starts and ends and each decoy contributes a single window rather than
-every position of its text, and the strongest attacker, like the better of the two versions of A3 on R3-u, is chosen
+every position of its text, so that an attacker searching every position would face far more candidates, and the strongest attacker, like the better of the two versions of A3 on R3-u, is chosen
 on the evaluated logs, which a real attacker could not do. Others limit it: the attackers within the threat model do
 not use language models, the writer's earlier texts or several releases, because the study measures what the processed
 columns themselves leave; they do not use the released scores, which a holder of scored texts would also hold and
@@ -174,10 +175,12 @@ which would narrow the candidates; and the attackers on the suppressed and noisy
 processing, for example by estimating the noise from the dependence between neighbouring intervals. The attackers
 available also differ by form: the finer forms admit an attacker that rebuilds the final draft, the coarser ones only
 simpler attackers, so a contrast between forms contains the difference in attackers as well as in columns and leans
-in favour of the coarser forms (\S\ref{sec:protocol:quantities}). This is the weakness of evaluation that the survey
+in favour of the coarser forms (\S\ref{sec:protocol:quantities}). This bias makes the claim that no form evaluated
+both lowered matching and kept the measures conservative, but it favours the low accuracy of a single coarse form. This is the weakness of evaluation that the survey
 quoted in Section~\ref{sec:related} notes~\cite{hanisch2021survey}, and it applies to this study. The direction of one assumption is unknown: the
 decoys are drawn uniformly from writers on the same prompt, who may be more or less alike than the members of one
-class.
+class. On the utility axis, the approximation rules are fixed and simple, so an approximated measure may agree less
+with R0 than a better approximation would.
 
 The attackers always choose a candidate and never declare that no candidate matches. The open-world diagnostic shows
 how well the scores separate true from absent texts, but it does not give the rate of false matches that a holder of a

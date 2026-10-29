@@ -14,8 +14,9 @@ logs (\S\ref{sec:protocol:enja}), the analyses that are not part of the preregis
 settings of the experiment, not thresholds.
 
 \paragraph{Status of the analyses.}
-Everything in Sections~\ref{sec:threat-model} to~\ref{sec:protocol}, including the threat model, the forms, the
-attackers and their parameters, was fixed in the preregistration of this study before any data were acquired. The
+The threat model, the forms, the attackers, their parameters and the analyses of Sections~\ref{sec:threat-model}
+to~\ref{sec:protocol} were fixed in the preregistration of this study before any data were acquired; what the authors of
+KLiCKe told us about the competition data (\S\ref{sec:threat-model:settings}) was learned afterwards. The
 exceptions are the deviations listed in \S\ref{sec:protocol:registration} and the five analyses of
 \S\ref{sec:protocol:exploratory}, which are labelled as exploratory wherever they are reported. These sections
 motivate and state the registered plan and do not change it.
@@ -39,7 +40,7 @@ are in Appendix~\ref{app:attackers}.
 
 \paragraph{Samples.}
 KeyTAR is expensive to run, so 125 writers are drawn from each prompt, 500 in all, and the main tables report every
-attacker on these 500 writers, so that KeyTAR stands next to the other attackers on the same writers. Attackers A0 to A3 on all writers after exclusion are reported in Appendix~\ref{app:results}.
+attacker on these 500 writers. Attackers A0 to A3 on all writers after exclusion are reported in Appendix~\ref{app:results}.
 
 \subsection{Reported quantities}
 \label{sec:protocol:quantities}
@@ -56,7 +57,7 @@ over A0 is what an attacker obtains beyond the total length that every form leav
 For each form, the strongest attacker is the maximum over the adaptive attackers available on that form. Its interval
 takes the maximum again within each bootstrap resample, and we report the share of resamples in which each attacker is
 selected. It is the maximum over the attackers tried and not an attack that combines all length and timing information;
-only A3 on R3-u combines the two. KeyTAR is reported in a separate row.
+only A3 on R3-u combines the two. KeyTAR is reported separately (Appendix~\ref{app:results}).
 
 \paragraph{Contrasts between forms.}
 We report the difference in the strongest attacker's accuracy, with its interval, for adjacent forms: R1~$-$~R2 (from
@@ -117,8 +118,7 @@ the ten measures, in which a measure that is not computed counts as zero and an 
 approximate value; R4 computes none of the measures and therefore sits at zero. The utility axis is the agreement of
 our own formulas with their values in R0, for these ten measures only; it does not cover measures not yet defined or
 the prediction of scores, and it depends on how the measures are aggregated. The forms that are not dominated on both
-axes are described, against the attackers tried; a low accuracy is not evidence of protection
-(\S\ref{sec:threat-model:bias}). All cells are given in the appendix, and no cell is selected for being favourable.
+axes are described, against the attackers tried. All cells are given in the appendix, and no cell is selected for being favourable.
 
 \subsection{Diagnostics}
 \label{sec:protocol:diagnostics}
@@ -135,7 +135,9 @@ For $N = 1{,}000$ on full texts, each draw gives two values for the strongest at
 candidates, and its lowest cost over the same candidates without the true text. Pooling each kind of value over all
 logs and draws, we report the probability that a value of the first kind is lower than a value of the second kind,
 over all pairs (ties count one half), as an area under the curve. It shows how well the scores separate candidate sets that
-contain the true text from sets that do not; it is not a rate of false matches (\S\ref{sec:threat-model:bias}). A
+contain the true text from sets that do not; it is not a rate of false matches (\S\ref{sec:threat-model:bias}). Since
+costs grow with the length of a log, the pooled area also contains the differences in length between logs and can show
+less separation than a decision made within each log~\cite{narayanan2008robust}. A
 diagnostic of the position of true windows is in Appendix~\ref{app:attackers}.
 
 \subsection{Japanese translation logs}
@@ -153,11 +155,9 @@ and its intervals are expected to be wide.
 \label{sec:protocol:exploratory}
 
 Five analyses were added after the preregistration was fixed and are not part of it: the uniqueness of word-length
-sequences among $N$ candidates, a form with differentially private noise (R-DP), the upper tail of accuracy per
-writer, matches above a margin of cost, and accuracy by score band. They change no registered value or procedure,
-they are reported as exploratory and are not used to answer the four questions. Their procedures were fixed and
-committed to the study repository before any value of matching or utility on the human data had been seen, the first
-two on 13 October 2026 and the other three on 21 October 2026, and are given in Appendix~\ref{app:exploratory}.
+sequences, a form with differentially private noise, the upper tail of accuracy per writer, matches above a margin of
+cost, and accuracy by score band. They are reported as exploratory, are not used to answer the four questions, and
+are given with their procedures in Appendix~\ref{app:exploratory}.
 
 \subsection{Registration, deviations and reproducibility}
 \label{sec:protocol:registration}
@@ -167,22 +167,7 @@ The plan, its parameters and its seed were registered before any data were acqui
 changed; the registered files, their SHA-256 and how each random choice derives its seed are given in the open science
 section.
 
-\paragraph{Deviations.}
-% The list follows the deviations D1 to D4 of the record of the main computation (notes.md); add any deviation of the
-% computations of A4 and of all writers when they are complete.
-Four deviations are recorded with their times and reasons. The escaped characters of the distributed logs are undone
-when the logs are read (\S\ref{sec:data:corpora}). Three processing functions were changed so that they no longer
-remove a column that the reading of KLiCKe had already dropped, which had stopped a trial run. The KeyTAR model ran out
-of GPU memory on the longest chunks, and the four chunks of one writer were generated on the CPU with the same model
-and settings; since the two can give different reconstructions, KeyTAR is reported with and without that writer. After
-a restart of the computer stopped the main computation, it was made to keep each finished result and resume; on
-synthetic logs its output was identical byte for byte with and without resuming. None of these changed the released
-columns or a registered value, and no value of matching or utility had been computed before any of them. Details that
-the registration left open were decided before the data were opened or before any value of matching was seen, and are
-recorded with the code.
-
-\paragraph{Predictions.}
-Before any data were acquired, we registered predictions of the strongest attacker's accuracy for $N = 1{,}000$ on full
-texts, and of KeyTAR and of the forms reported in the appendix, with a reason for each; they were proposed by an AI assistant and adopted by the authors (see the AI use
-section). The registration states that a miss does not change the conclusions. They are given with the results
-(Section~\ref{sec:results}) only to show what was expected before the data were seen.
+\paragraph{Deviations and predictions.}
+Four deviations are recorded with their times and reasons, and none changed the released columns or a registered
+value. Predictions of the strongest attacker's accuracy were registered before any data were acquired; the
+registration states that a miss does not change the conclusions. Both are given in Appendix~\ref{app:checks}.

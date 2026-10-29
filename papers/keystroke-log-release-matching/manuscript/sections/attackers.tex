@@ -27,12 +27,8 @@ kept if it contains a counted press. Deletion of a selection, paste and replacem
 and are counted by this rule as they are, so the value of a segment can differ from the length of the word it became.
 
 \paragraph{Error of the rule.}
-The checks after acquisition compared the value of each segment with the number of its counted characters that
-survive in the final draft, obtained by replaying the unprocessed log. Of the 2,381,444 segments with at least one
-counted press, the two values agree for 77.1\%; the share of agreeing segments per writer has a median of 0.80 (10th
-percentile 0.62, 90th percentile 0.92). Empty segments, which arise for example after a comma followed by a space,
-agree by construction and are not included in these shares. The error is reported with the tables, and the rule was
-not changed; cases that the rule misses are described in Appendix~\ref{app:checks}.
+The value of a segment agrees with the number of its characters that survive in the final draft for 77.1\% of the
+segments with a counted press; the rule was not changed (Appendix~\ref{app:checks}).
 
 \subsection{Alignment}
 \label{sec:attackers:alignment}
@@ -45,8 +41,7 @@ is
   \Bigl|\sum \text{record values} - \sum \text{text values}\Bigr| + \lambda\,(p - 1 + q - 1),
 \]
 with $\lambda = 8$, a value fixed in earlier prototypes and not tuned on these data; $\lambda = 4$ and $16$ are reported
-as a secondary analysis. Among paths of equal cost, the group listed first is chosen, and where the end can be chosen, the earlier position in the
-text. In full-text matching both
+as a secondary analysis. In full-text matching both
 sequences are used to their ends; in window matching the whole window is used and the text may end early. Under
 suppression (R7), dropping a separator press merges record segments, so the groups are extended to $(p', 1)$ and
 $(1, q)$ with $p', q$ up to $\lceil 3/(1-p) \rceil$, that is 4 for $p = 0.1$ and $0.25$ and 6 for $p = 0.5$; the
@@ -113,31 +108,18 @@ predicts from the intervals before and after each ``char'' press, and from the n
 press is a space, punctuation or Enter.
 
 \paragraph{A3: timing.}
-From the training logs, A3 estimates the mean and variance of the logarithm of the press interval for each pair of
-consecutive characters. A pair seen fewer than 20 times takes the values of its pair of character types (such as
-letter followed by space), and a type pair seen fewer than 20 times takes the values of all intervals. For each record
-segment without a BackSpace, the intervals are scored under the character pairs of the candidate word that the A2
-alignment assigns to it, and the log-likelihoods are summed; the candidate with the highest sum is chosen. In R3-t the
-likelihood of a rounded interval is the probability of its rounding interval. In R3-u, where segments are not visible,
-A3 combines two terms: the A1$'$ replay gives the sequence of ``char'' items of the final draft, matched one to one from
-the start with all characters of the candidate, and the timing term uses the intervals between adjacent final
-characters that were typed consecutively; the length term is the log-likelihood of the difference between the replayed
-count and the candidate's character count, estimated on the training logs. The timing term is used both as a sum and
-as a mean per term, and the better of the two versions is reported as A3 on R3-u; a version with the length term alone
-is reported to separate the contribution of timing. In R7, A3 scores the duration of each segment, from its first to
-its last remaining press, with a regression on the logarithm of the candidate segment's character count, estimated on
-training logs with the same suppression. The check on synthetic logs showed that the one-to-one correspondence in R3-u
-uses in effect only the part of the log before the first replay error. Details that the registration left open, such
-as how an interval is scored when the candidate word has fewer characters than the segment has intervals, were fixed
-on synthetic logs before the data were opened and are documented with the code.
+From the training logs, A3 estimates the distribution of the logarithm of the press interval for each pair of
+consecutive characters. For each record segment without a BackSpace, the intervals are scored under the character pairs
+of the candidate word that the A2 alignment assigns to it, and the candidate with the highest summed log-likelihood is
+chosen. In R3-t the likelihood of a rounded interval is that of its rounding interval. In R3-u, where segments are not
+visible, A3 combines a timing term over the A1$'$ replay with a length term, in two versions (a sum and a mean per
+term), and the better, the mean, is reported. In R7, A3 scores the duration of each segment against the candidate's
+character count. The details are in Appendix~\ref{app:attackers}.
 
 \paragraph{A4: KeyTAR, a reference outside the threat model.}
-A4 gives the intervals between letter, digit and space presses, in chunks, to the public KeyTAR model and chooses the
-candidate nearest to the reconstruction. The model is used with the default settings of its artifact, which include a
-limit on generated tokens that is expected to cut many reconstructions short; we kept it as registered. KeyTAR assumes
-ordinary English input without revision~\cite{qiu2026keytar}, it contains a language model, and it does not adapt to
-the processing. It is therefore reported in a separate row and is not part of the strongest attacker. The details are
-in Appendix~\ref{app:attackers}.
+A4 gives the press intervals to the public KeyTAR model, which contains a language model and does not adapt to the
+processing, and chooses the candidate nearest to its reconstruction. It is not part of the strongest attacker and is
+reported in Appendix~\ref{app:results}; the details are in Appendix~\ref{app:attackers}.
 
 \subsection{Attackers on windows}
 \label{sec:attackers:windows}

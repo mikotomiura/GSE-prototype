@@ -23,6 +23,23 @@ revision~\cite{qiu2026keytar}, it contains a language model, and it does not ada
 reported in a separate row and is not part of the strongest attacker. The intervals it uses are the same in R0, R1,
 R2 and R3, so these forms share one reconstruction.
 
+\paragraph{Alignment and A3.}
+Among alignment paths of equal cost, the group listed first is chosen, and where the end can be chosen, the earlier
+position in the text. A3 estimates the mean and variance of the logarithm of the press interval for each pair of
+consecutive characters; a pair seen fewer than 20 times takes the values of its pair of character types (such as
+letter followed by space), and a type pair seen fewer than 20 times takes the values of all intervals. In R3-u the
+A1$'$ replay gives the sequence of ``char'' items of the final draft, matched one to one from the start with all
+characters of the candidate; the timing term uses the intervals between adjacent final characters that were typed
+consecutively, and the length term is the log-likelihood of the difference between the replayed count and the
+candidate's character count, estimated on the training logs. The timing term is used both as a sum and as a mean per
+term, and the better version is reported as A3 on R3-u; a version with the length term alone separates the
+contribution of timing. The check on synthetic logs showed that the one-to-one correspondence in R3-u uses in effect
+only the part of the log before the first replay error. In R7, A3 scores the duration of each segment, from its first
+to its last remaining press, with a regression on the logarithm of the candidate segment's character count, estimated
+on training logs with the same suppression. Details that the registration left open, such as how an interval is
+scored when the candidate word has fewer characters than the segment has intervals, were fixed on synthetic logs
+before the data were opened and are documented with the code.
+
 \paragraph{The attackers on windows.}
 On windows, A0 counts the window's presses as on full texts and compares the count with the candidate window. A1 and
 A1$'$ are not run, since a part of the process does not determine the final draft. A2 and A2-b align the window's

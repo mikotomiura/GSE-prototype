@@ -32,9 +32,38 @@ verification of our formulas against them could not be done (\S\ref{sec:protocol
 settings of the artifact were recorded, and the inference on one log fitted in the memory of a 16\,GB GPU.
 
 \paragraph{Cases that the segment rule misses.}
+The checks compared the value of each segment with the number of its counted characters that survive in the final
+draft, obtained by replaying the unprocessed log. Of the 2,381,444 segments with at least one counted press, the two
+values agree for 77.1\%; the share of agreeing segments per writer has a median of 0.80 (10th percentile 0.62, 90th
+percentile 0.92). Empty segments, which arise for example after a comma followed by a space, agree by construction
+and are not included in these shares.
 The rule ``the next press after Control'' misses shortcuts made with several keys while Control is held,
 such as two successive undos, and pastes made from a menu: in 566 of the 1,133 paste events of the corpus, the
 preceding press, ignoring Shift, Alt and CapsLock, is not Control.
+
+\subsection{Deviations and predictions}
+\label{app:checks:deviations}
+
+% Moved from Sections 6.8 and 7.5 of the main body on 29 October 2026, without changing the text of the
+% deviations. The list follows the deviations D1 to D4 of the record of the main computation (notes.md).
+Four deviations are recorded with their times and reasons. The escaped characters of the distributed logs are undone
+when the logs are read (\S\ref{sec:data:corpora}). Three processing functions were changed so that they no longer
+remove a column that the reading of KLiCKe had already dropped, which had stopped a trial run. The KeyTAR model ran out
+of GPU memory on the longest chunks, and the four chunks of one writer were generated on the CPU with the same model
+and settings; since the two can give different reconstructions, KeyTAR is reported with and without that writer. After
+a restart of the computer stopped the main computation, it was made to keep each finished result and resume; on
+synthetic logs its output was identical byte for byte with and without resuming. None of these changed the released
+columns or a registered value, and no value of matching or utility had been computed before any of them. Details that
+the registration left open were decided before the data were opened or before any value of matching was seen, and are
+recorded with the code.
+
+Before any data were acquired, we registered predictions of the strongest attacker's accuracy for $N = 1{,}000$ on full
+texts, and of KeyTAR and of the forms reported in the appendix, with a reason for each; they were proposed by an AI assistant and adopted by the authors (see the AI use
+section). The registration states that a miss does not change the conclusions. They are given here only to show what was expected before the data were seen. All predictions held for the forms within the threat model: 95\% or more for R0 to R2, R5 and R6; 80\% or
+more for R3 and R3-t; 10\% to 60\% for R3-u; R7 falling with $p$ and below 30\% at $p = 0.5$; R4(1) about as high as
+A2 on R3, which it is by construction, since A2 reads the same segments; and R4(8) about as high as A0
+(Table~\ref{tab:main}). The prediction for KeyTAR, below 10 times $1/N$ at $N = 1{,}000$, did not hold on R0 to R3,
+R3-t(10) and R3-t(100) (11 to 16 times) and held on R3-t(1{,}000).
 
 \subsection{A check on synthetic logs before registration}
 \label{app:checks:synthetic}

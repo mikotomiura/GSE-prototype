@@ -17,12 +17,13 @@ word and sentence lengths to predict their scores~\cite{inubushi2024first}.
 The texts of such essays do not disappear when the logs are released. They were collected and scored, so they are held by
 those who collected and scored them, and texts on the same prompts can be public; in a classroom, a teacher holds the
 texts of a class. The authors of a public corpus, KLiCKe~\cite{tian2025klicke}, told us that the competition data were
-drawn from that corpus before it was released with its texts; we did not check whether the released corpus contains the hidden essays
-(Section~\ref{sec:threat-model:settings}). A party
+drawn from it before its release, which we did not check (Section~\ref{sec:threat-model:settings}). A party
 who holds candidate texts does not need a labelled sample of a writer's keystrokes, which earlier work on releasing
 keystroke data assumed an attacker would need~\cite{edwards2023csedm}; it can compare what the processed log leaves with
-each text. This paper asks how far processing keeps logs apart from their texts against such a party, which is how we read the
-stated goal, and what each form of processing costs research.
+each text. We ask how far processing keeps logs apart from their texts against such a party, which is how we read the
+stated goal (question 1); how this depends on the columns kept and on the attacker (question 2); how far the process
+measures of writing research can still be computed (question 3); and whether the same kind of matching exceeds chance
+on logs typed with an input method (question 4).
 
 We answer this for one processed log against $N$ candidate texts on the same prompt, in a closed world, with $N =
 10$, $100$ and $1{,}000$, on a public corpus whose texts are known (KLiCKe). The forms are the masking used in the
@@ -33,16 +34,18 @@ the strongest attacker's accuracy, as a multiple of $1/N$ and as a gain over the
 standard process measures of writing research can still be computed; the same kind of matching is also run on
 Japanese translation logs typed with an input method. The study was preregistered before any data were acquired.
 
-The main harm we consider is the link between a processed log and its text for a party that holds the text: the times,
-the revisions and any released score of the log are then linked to that text. Where the writer of a text is known, as
+The main harm we consider is to the writers' privacy: a party that holds a text and links a processed log to it learns
+how its writer wrote it, since the times, the revisions and any released score of the log are then linked to that
+text. The writers released their process for research, not this link. Where the writer of a text is known, as
 in a class or for an essay its writer has published, the log would also be linked to a named person; we know of no
 release in which this has happened and state it only as a consequence (Section~\ref{sec:threat-model}).
 
 Against the attackers tried, the masking kept no log apart from its text: an attacker that rebuilds the final draft,
 as the winning solution of the competition did, chose the true essay among 1,000 for every log (C1,
-Section~\ref{sec:results:masking}). Forms that release less lowered matching only at a cost to the process measures:
-keeping the key categories still left 86.7\% at $N = 1{,}000$, every form that kept the measures close to their
-unprocessed values (a median correlation of 0.84 or more) left 70\% or more, and the forms that brought matching near the total length kept them at a
-median correlation of at most 0.70 or not at all (C2, Sections~\ref{sec:results:forms} and~\ref{sec:results:utility}). We frame a threat in which the
-auxiliary information is the text, held outside the release, and give the settings in which it arises (C3,
-Section~\ref{sec:threat-model}). The results describe the attackers tried; they are not bounds on the risk.
+Section~\ref{sec:results:masking}). Among the forms that release less, lower matching came with fewer process measures:
+keeping the key categories still left 86.7\% at $N = 1{,}000$, suppressing a quarter of the presses left 14.3\% with a
+median correlation of 0.81, and only the forms that compute no measure brought the full-text attackers within four
+times chance; every main form from R2 on computed the R-burst and insertion measures at a correlation below 0.5 or not
+at all (C2,
+Sections~\ref{sec:results:forms} and~\ref{sec:results:utility}). We frame a threat in which the auxiliary information
+is the text, held outside the release, and give the settings in which it arises (C3, Section~\ref{sec:threat-model}).
