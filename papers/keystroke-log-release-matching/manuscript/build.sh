@@ -7,7 +7,8 @@
 # acmart.cls, popets.sty and ACM-Reference-Format.bst); see BUILD.md for where to obtain it. The template is not part
 # of this directory. <out-dir> receives main.pdf and the logs; it must lie outside the directory of the article.
 # <author-file>, if given, holds the author block (\author, \affiliation and so on) and builds a version with the
-# authors' names in place of the anonymous version for review. It is kept outside the repository.
+# authors' names in place of the anonymous version for review, written as main-authors.pdf. It must lie outside the
+# repository (outside the directory of the article when git is not available).
 set -euo pipefail
 
 if [ "$#" -ne 2 ] && [ "$#" -ne 3 ]; then
@@ -50,22 +51,29 @@ export TEXINPUTS="${here}:${template}:"
 export BSTINPUTS="${template}:"
 export BIBINPUTS="${here}:"
 
+job=main
 if [ -n "$authors" ]; then
-  authors="$(absolute "$(dirname "$authors")")/$(basename "$authors")"
+  authors=$(realpath "$authors")
+  repo=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null || echo "$root")
+  repo=$(absolute "$repo")
   case "$authors" in
-    "$root"/*)
-      echo "build.sh: $authors lies inside $root; keep the author file outside it" >&2
+    "$repo"/*)
+      echo "build.sh: $authors lies inside $repo; keep the author file outside it" >&2
+      exit 2 ;;
+    *[%#{}~\\\ ]*)
+      echo "build.sh: the path of the author file may not contain % # { } ~ \\ or a space" >&2
       exit 2 ;;
   esac
+  job=main-authors
   source_tex="\\def\\authorfile{$authors}\\input{$here/main.tex}"
 else
   source_tex="$here/main.tex"
 fi
 
 latex() {
-  if ! pdflatex -no-shell-escape -interaction=nonstopmode -halt-on-error -jobname=main -output-directory="$out" \
-      "$source_tex" > "$out/main.run.log"; then
-    echo "build.sh: pdflatex failed; see $out/main.run.log" >&2
+  if ! pdflatex -no-shell-escape -interaction=nonstopmode -halt-on-error -jobname="$job" -output-directory="$out" \
+      "$source_tex" > "$out/$job.run.log"; then
+    echo "build.sh: pdflatex failed; see $out/$job.run.log" >&2
     exit 1
   fi
 }
@@ -74,13 +82,13 @@ latex() {
 # 1 when it only warns; the warnings are counted below.
 cd "$here"
 latex
-(cd "$out" && bibtex main > main.bibtex.log) || [ $? -eq 1 ] || {
-  echo "build.sh: bibtex failed; see $out/main.blg" >&2
+(cd "$out" && bibtex "$job" > "$job.bibtex.log") || [ $? -eq 1 ] || {
+  echo "build.sh: bibtex failed; see $out/$job.blg" >&2
   exit 1
 }
 latex
 latex
 
-log="$out/main.log"
-echo "main: $(grep -c '^!' "$log" || true) errors, $(grep -c 'LaTeX Warning: Reference' "$log" || true) undefined references, $(grep -c 'Warning: Citation' "$log" || true) undefined citations, $(grep -c '^Overfull' "$log" || true) overfull boxes"
-echo "bibtex: $(grep -c '^Warning--' "$out/main.blg" || true) warnings"
+log="$out/$job.log"
+echo "$job: $(grep -c '^!' "$log" || true) errors, $(grep -c 'LaTeX Warning: Reference' "$log" || true) undefined references, $(grep -c 'Warning: Citation' "$log" || true) undefined citations, $(grep -c '^Overfull' "$log" || true) overfull boxes"
+echo "bibtex: $(grep -c '^Warning--' "$out/$job.blg" || true) warnings"

@@ -19,11 +19,12 @@ A TeX distribution with pdfLaTeX and BibTeX is needed. The build was checked wit
 
 The script writes `main.pdf` and the logs to the output directory, which must lie outside the directory of the
 article. LaTeX runs without shell escape. The script ends by printing the number of errors, undefined references,
-undefined citations and overfull boxes, and the number of BibTeX warnings.
+undefined citations and overfull boxes, and the number of BibTeX warnings. References to sections that are not
+written yet are reported as undefined.
 
 The manuscript is anonymous for review. To build a version with the authors' names, give a third argument, a file
 that holds the author block (`\author`, `\orcid`, `\affiliation` with `\institution` and `\country`, and
-`\renewcommand{\shortauthors}{...}`), kept outside the directory of the article:
+`\renewcommand{\shortauthors}{...}`), kept outside the repository. Its path may not contain the characters
+`% # { } ~ \` or a space. This version is written as `main-authors.pdf`, so that it does not replace `main.pdf`:
 
-    bash build.sh <path to PoPETS-2027-latex-template> <output directory> <author file> References to sections that are not
-written yet are reported as undefined.
+    bash build.sh <path to PoPETS-2027-latex-template> <output directory> <author file>

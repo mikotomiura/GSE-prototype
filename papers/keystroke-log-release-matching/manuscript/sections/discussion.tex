@@ -45,8 +45,8 @@ students~\cite{datashop2012terms}. In the rules of the competition and on the da
 recovering the texts or identifying the writers~\cite{kaggle2023lwp}. The terms of KLiCKe are given in Section~\ref{sec:data:corpora}. Terms do not change
 what a log reveals to a party that ignores them, and they do not bind a party that holds the texts and obtains the
 logs outside the terms; but they define who may use a release and for what, and they can be combined with any of the
-forms evaluated here; statistical disclosure control likewise balances the control in a licence against the detail
-and perturbation of the released data~\cite{hundepool2026handbook}. Processing and terms are also not the only choice: a releasing party can give the process
+forms evaluated here; statistical disclosure control likewise balances the control in a licence against the
+detail and perturbation of the released data~\cite{hundepool2026handbook}. Processing and terms are also not the only choice: a releasing party can give the process
 measures instead of the logs, or give the logs only to those who apply for them, since what to release depends on who
 asks and for what purpose~\cite{borgman2018open}. These choices lie outside this evaluation. Whatever the form,
 processing protects a text only while no later release contains that text: if the essays of a release that hides
@@ -58,9 +58,9 @@ also has to track where the data of a release come from and what else is release
 \label{sec:discussion:takeaways}
 
 The results are material for three choices, and none recommends a form. In the terms of statistical disclosure
-control~\cite{hundepool2026handbook}, R1 to R3-u recode the keys globally (R2 to R3-u also drop columns), R3-t recodes
-the press times globally, R4 releases only a variable derived from each log, recoded globally when $w > 1$, R7 suppresses
-presses at random rather than, as local suppression does, where a combination of values is unsafe, and R5 and R6
+control~\cite{hundepool2026handbook}, R1 to R3-u recode the keys globally (R2 to R3-u also drop columns), and R3-t
+recodes the press times globally. R4 releases only a variable derived from each log, recoded globally when $w > 1$.
+R7 suppresses presses at random, not, as local suppression does, where a combination of values is unsafe. R5 and R6
 perturb the keys. \emph{Columns.} Masking letters and digits left
 100\% at $N = 1{,}000$ (R1), and the categories of the editing keys alone still left 86.7\% (R3); only merging the
 separators, coarsening the segment values or suppressing at least a quarter of the presses brought the strongest

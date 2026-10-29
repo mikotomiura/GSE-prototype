@@ -647,3 +647,18 @@ G-GEAR の集計し直し（コミット `84527b7a`・`9463d81b`・`520e6be5`・
 - 確かめ: ビルドはエラー 0・未定義 0・overfull 2・BibTeX の警告 25（直す前と同じ）。総頁 28、結論と倫理の見出しは p12 のまま。著者名入りの版も 28 頁・本文 p12（国は `[country]` の仮の値で試した。acmart は国を必須にしている）。匿名版のテキストは直した版の前回のビルドと一致。文体の門 違反 0。`check_citations.py` の違反は V299〜V325 の欠番 1 件で、今回の前からある。
 - 下書き 4 を直した（Crossley の問いを外す・出どころと倫理の節の内容を personal communication として載せてよいかを明示に尋ねる 1 文・判断 87 の注）。outline.md の倫理の計画と持ち帰りの節を合わせた。
 - 残り: 著者の欄の国（研究者に確かめる）、6・7 を原稿に入れる段、下書き 4 の `[ ]`（主な結果の 1〜2 文・日付）。
+
+## 判断 87 の追記: /cross-review（2026-10-29）
+
+範囲は `4c06ec5c..7e72c131` の原稿と docs/references.md（8 ファイル・+64/−10）。Codex の消費 23,907 tokens（worktree の台帳）。Claude 側は cross-reviewer 自身（サブエージェントを起動していない）。.steering は送っていない。
+
+一次で確かめて採った直し:
+- BUILD.md のコマンド例に、元の段落の末尾の文が混ざっていた（両者一致・真）。戻した。
+- build.sh の「外」の判定が論文のディレクトリ（`$here/..`）で、repo の他の場所を拒まなかった（両者一致・真）。`git rev-parse --show-toplevel` の根で判定し（git が無ければ論文のディレクトリ）、ファイルは `realpath` で解決してから比べる。
+- 著者のファイルのパスを TeX に埋め込むので `% # { } ~ \` と空白で壊れる（Codex のみ・真）。拒む。
+- 記名版と匿名版が同じ `main.pdf` に出て取り違えうる（Claude のみ・真）。記名版を `-jobname=main-authors` にした。
+- 倫理の「In its place」が根拠より強い（Claude のみ・採った）。「As a safeguard」に。「before acquiring」は保つ: 問い合わせを送ったと記録した判断 50 のコミット 3056f6a4 が 2026-10-12 23:41 JST（14:41 UTC）で、取得（19:29 UTC）より前。
+- §8.3 の対応づけの文が長い（Claude のみ）。4 文に分けた。R3-u のカテゴリの統合は §3.4.3.2 のカテゴリ変数の定義（"several categories are combined to form new (less specific) categories"・公式版の本文で確かめた）に当たる。R6 の語の中の並べ替えはハンドブックの swapping（記録の間の交換）とは違うが、§3.4.1 の perturbative masking の定義（"distorted before publication"）には入るので「perturb」のままにした。
+
+採らなかった: [V330] にハッシュの値を書くこと（版と日付で区別できる）、bib に版の出所を書くこと。
+確かめ: 匿名版・記名版ともエラー 0・overfull 2・28 頁・結論は p12。匿名版の 1 頁目に名前 0 件。拒む 3 通り（.steering の中・repo の中を指すシンボリックリンク・# を含むパス）はどれも exit 2。文体の門 違反 0。
