@@ -1,37 +1,44 @@
-# 次のセッション（Mac）: 照合の論文 —— 段 3: 全員の付録と、R-DP の R0 に比べる有用性を入れる
+# 次のセッション（Mac）: 照合の論文 —— 段 3: 全員の付録（`main_all.json`）を入れる
 
-作成 2026-10-29（判断 81 の後）。この機械は Mac。G-GEAR の作業はこのセッションでしない。
+作成 2026-10-29（判断 81 の後）。2026-10-29 に判断 82 の後で書き直した（R-DP の R0 に比べる有用性は済み、残りは `main_all.json` だけ）。この機械は Mac。G-GEAR の作業はこのセッションでしない。
 
 | 段 | 届くもの | 書く所 |
 |---|---|---|
 | 済み | `main.json`・`enja15_main.json`・探索 3〜5 | §7・序論・考察・結論・抄録（判断 79） |
 | 済み | `main_a4.json`・`main_a4_without_cpu_writer.json` | 表 2 の A4 の行・§7.4・§7.5・付録 E の KeyTAR（判断 80） |
 | 済み | `exploratory_unicity.json`・`exploratory_dp.json` | §7.7 の 1 文・付録 D の表 6〜8（判断 81） |
-| 済み | `exploratory_dp_utility_r0.json`（R-DP の R0 に比べる有用性） | 付録 D の表 8 と「Tables」の段落の角括弧（判断 82・2026-10-29） |
-| **3（このセッション）** | `main_all.json`（全員の付録） | 付録 E の Results on all writers |
+| 済み | `exploratory_dp_utility_r0.json` | 付録 D の表 8 の R0 との相関（判断 82） |
+| **3（このセッション）** | `main_all.json`（全員の付録） | 付録 E の「Results on all writers」（`appendix-results.tex` 201 行目の角括弧） |
 | 完成 | ― | 草稿の完成（判断 76）→ attack-me round 3 |
 
 ## 新しいセッションで最初に打ち込む文
 
 ```
-.steering/_handoff/next-session-public-keystroke-matching-manuscript-stage-3.md を読んで、照合の論文に段 3 の結果を入れて。
+.steering/_handoff/next-session-public-keystroke-matching-manuscript-stage-3.md を読んで、照合の論文に全員の付録（main_all.json）の結果を入れて。
 ```
 
-## 始める条件（揃っていなければ、揃った方だけ書くか、書かずに止まる）
+## 始める条件（揃っていなければ書かずに止まる）
 
-- `results/main_all.json`: G-GEAR の `all` の段（2026-10-28 18:12 UTC 開始・約 10〜12 日・11 月中旬の見込み）が終了コード 0 で終わり、原稿の枝に merge され、notes.md に終了時刻と SHA-256 の記録がある。
-- `results/exploratory_dp_utility_r0.json`: G-GEAR の引き継ぎ `next-session-public-keystroke-matching-dp-utility-r0-ggear.md` が済み、notes.md の D5 に陽性対照の結果がある。
-- 2 つは独立。片方だけ届いていれば、その方だけ書き、もう片方の角括弧は残す。
+- G-GEAR の `all` の段（2026-10-28 18:12 UTC 開始・12 並列で約 10〜12 日・11 月中旬の見込み）が終了コード 0 で終わり、`results/main_all.json` が原稿の枝に merge され、notes.md に終了時刻と SHA-256 の記録がある。
 - worktree は `/Users/johnd/GSE-wt-matching-manuscript`（枝 `docs/public-keystroke-matching-manuscript`）。始める前に `git fetch` と `git merge --ff-only origin/docs/public-keystroke-matching-manuscript`。
+- SHA-256 を notes.md の記録と照らす。
+
+## `main_all.json` の形（コードから・値は未見）
+
+- `run_main.py --all`（`run.sh` 46 行目）の出力。A4 は無い（A0〜A3）。形は main の 15 形（`--forms main`）。
+- 上の段に `main500` と `all` の 2 つの標本がある（`run_main.py` 402〜416 行）。`main500` は標本の 500 人で、キャッシュ（指紋 `33fa95833296d7a5`）を使い回すので、**`main.json` の `main500` と同じになるはず**（`seconds` を除く）。これを陽性対照にする。違えば値を書かずに止まり、notes.md に逸脱として書いて研究者に聞く。
+- `all` は除外の後の全員（一意さの `all` は 4,992 人だった。照合の除外は同じか `sample_sizes` で確かめる）。`all` に負の対照と探索 3〜5 は無い（`main500` だけ）。区間は `aggregate.resamples(seed, …, "all")` の抽出。
 
 ## やること
 
-1. `main_all.json`: 開く前に、`main.json` と重なる葉（標本の 500 人の件をキャッシュから使い回した部分ではなく、集計が別になる）の関係を notes.md D4 で確かめる。全員の付録は A0〜A3 の全文（`appendix-results.tex` の 201 行目の角括弧）。`make_tables.py` に関数を足し、既存の生成ファイルが変わらないことを `git status` で確かめ、止まる条件は壊した写しで確かめる（判断 80・81 と同じ）。
-2. （済み・判断 82）`exploratory_dp_utility_r0.json`: 表 8（`explore-dp-score.tex`）に R0 との相関（平均）を足すか、R0 との比の中央値の表を足す。`utility-r0.tex`・付録 E の有用性の表と同じ量と書き方にそろえる。R3 の値が `main.json` と違えば止まる条件を入れる。付録 D の「Tables」の段落の角括弧と、その上の LaTeX のコメント（D5）を直す。§7.7 の文は変えない（本文の余白は 0）。
-3. 数値と量の語を集計の JSON と機械で照らす（`verify-before-claiming`）。
-4. 頁を測る（`paper-write/length-log.md` の数え方）。付録だけなので本文は動かない見込みだが、測る。⚠️ 余白は 0。
-5. ビルド（エラー 0・未定義 0・overfull は今 2）・PDF を画像で見る（表の幅。判断 80・81 で `\multicolumn` の行が表を広げた）・文体の門（違反 0）・`length-log.md` に 1 行・`../20261012-public-keystroke-matching-prereg/decisions.md` に判断 83・tasklist.md・commit・push。
-6. 草稿の完成（判断 76）の残り: 倫理の公開元への連絡の角括弧（下の「別の手続き」）・open science の匿名リンク。揃ったら attack-me round 3 の引き継ぎを書く。
+1. 陽性対照: `main_all["main500"]` と `main.json["main500"]` を `seconds` 以外で全部の葉で比べる。上の段（`seed_file_sha256`・`config_sha256`・除外）も比べる。
+2. `make_tables.py` に `all_writers_table`（仮）を足す。量は付録 E の表と同じ書き方: 全文の最も強い攻撃者の正答率と区間（N = 10・100・1,000）、主な形。500 人の値と並べるかは表の幅を見て決める（判断 80・81 で `\multicolumn` の行が表を広げた）。止まる条件: 陽性対照が合わない、最も強い攻撃者が本文の注と違う、人数が `sample_sizes` と違う。壊した写しで止まること、既存の生成ファイルが変わらないこと（`git status`）を確かめる（判断 80〜82 と同じ）。
+3. 201 行目の角括弧を、表への参照と 1〜2 文に替える。500 人と全員で結論が変わるか（強さの順・R3 の値）だけを書く。本文（§7）は変えない（余白 0）。全員の結果が 500 人と食い違うなら本文の主張に響くので、書かずに研究者に聞く。
+4. 数値と量の語を集計の JSON と機械で照らす（`verify-before-claiming`）。
+5. 頁を測る（`paper-write/length-log.md` の数え方・本文の終わりが p12 右段の最終行のままか）。
+6. ビルド（エラー 0・未定義 0・overfull は今 2）・PDF を画像で見る・文体の門（違反 0）・`length-log.md` に 1 行・`../20261012-public-keystroke-matching-prereg/decisions.md` に判断 83・tasklist.md の段 3・commit・push。
+7. `/cross-review`（研究者が 2026-10-29 に、集計の値を含む原稿の diff を Codex に送ってよいと認めた。`raw/` と results の JSON は送らない）。
+8. 草稿の完成（判断 76）の残り: 倫理の公開元への連絡の角括弧（`ethics.tex` 30 行目・下の「別の手続き」）・open science の匿名リンク（`open-science.tex` 9 行目）。揃ったら attack-me round 3（まだなら）。
 
 ## 道具
 
@@ -48,7 +55,7 @@
 ## 守ること
 
 - 脅威モデル・攻撃者・手順は凍結した事前登録から変えない。変えるときは notes.md の「逸脱」に書く。
-- 集計の JSON だけを読む。打鍵の記録・本文・キャッシュを開かない。外部 LLM（Codex を含む）に送らない。
+- 集計の JSON だけを読む。打鍵の記録・本文・キャッシュを開かない。それらを外部 LLM（Codex を含む）に送らない。原稿の diff は Codex に送ってよい（2026-10-29 研究者）。
 - 引用は citation-ssot。公開する原稿に内部の番号・GSE を書かない。
 - 応答は日本語。決めてほしいことは推奨と理由を添えて AskUserQuestion で聞く。
 - worktree で作業し、コミット前に `git branch --show-current`。`git add -A` を使わない。push だけで止める。G-GEAR で計算している間は PR を出さない。
