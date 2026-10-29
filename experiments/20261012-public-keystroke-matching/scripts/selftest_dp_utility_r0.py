@@ -1,9 +1,9 @@
 """Self-test of dp_utility_r0.py on synthetic writers (no human data): two run_main.run with caches, the main forms
 and --forms dp, then (a) the dp run alone has no ratio to R0 (the output of deviation D5 reproduced), (b) the script
-fills the ratios and correlations with R0 for every form, agrees with a naive count and with both runs, gives the
-same output when the main cache holds writers outside the sample (as the all stage adds them), and (c) a main
-cache without a writer of the sample, a dp cache without one, an R3 that differs between the caches, or another
-main.json stop it.
+fills the ratios and correlations with R0 for every form, agrees with a naive ratio and Spearman and with both runs,
+gives the same output when the main cache holds writers outside the sample (as the all stage adds them), and (c) a
+main cache without a writer of the sample, a dp cache without one or with one twice, an R3 that differs between the
+caches, another seed, or a JSON file that differs in one positive control stop it.
 
     python -I scripts/selftest_dp_utility_r0.py            # PASS, then each mutant must be killed
 """
@@ -21,6 +21,7 @@ import sys
 import tempfile
 
 import numpy as np
+from scipy.stats import spearmanr
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -31,8 +32,9 @@ import utility  # noqa: E402
 
 FAIL = []
 PER, TAKE = 14, 4
-MUTANTS = {"no_r0": "positive", "unsorted": "positive", "sample_from_main": "superset", "skip_keys": "keys_guard",
-           "skip_r3": "r3_guard", "no_positive": "compare_guard"}
+MUTANTS = {"no_r0": "positive", "unsorted": "positive", "skip_keys": "keys_guard", "skip_dup": "dup_guard",
+           "skip_r3": "r3_guard", "skip_provenance": "provenance_guard", "no_positive_r3": "compare_r3",
+           "no_positive_fig": "compare_fig", "no_positive_dp": "compare_dp"}
 
 
 def check(name, cond):
@@ -49,13 +51,14 @@ def ns(tmp, main_cache, dp_cache, **kw):
     return argparse.Namespace(**d)
 
 
-def stops(args, why=""):
-    """True when T.run stops, with why in its message."""
+def stops(args, why="", printed=""):
+    """True when T.run stops, with why in its message and printed in its printed lines."""
+    out = io.StringIO()
     try:
-        with contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(out):
             T.run(args)
     except SystemExit as e:
-        return why in str(e)
+        return why in str(e) and printed in out.getvalue()
     return False
 
 
@@ -116,6 +119,21 @@ def tests(tmp):
                 n += 1
                 ok = ok and got is not None and abs(np.mean([np.median(x) for x in per.values()]) - got) < 1e-9
     check("naive", ok and n > 0)
+    # naive: the per-prompt Spearman of R0 and the form over the writers with both, then the mean over the prompts
+    ok, n = True, 0
+    for f in forms.DP[1:]:
+        for m in utility.METRICS:
+            per = {}
+            for r in dp_r:
+                r0, v = main_r[(r["prompt"], r["writer"])]["utility"]["R0"].get(m), r["utility"][f].get(m)
+                if r0 is not None and v is not None and np.isfinite(r0) and np.isfinite(v):
+                    per.setdefault(r["prompt"], []).append((r0, v))
+            rho = [spearmanr(*zip(*x))[0] for x in per.values() if len(x) >= 3]
+            got = u["%s|%s" % (m, f)]["spearman_r0"]["mean"]
+            if len(rho) == len(want_dp["sample_sizes"]) and all(np.isfinite(rho)):
+                n += 1
+                ok = ok and got is not None and abs(np.mean(rho) - got) < 1e-9
+    check("naive_spearman", ok and n > 0)
     # a main cache with a writer outside the sample (as the all stage adds them): the same output
     big_dir = os.path.join(tmp, "main_big")
     shutil.rmtree(big_dir, ignore_errors=True)
@@ -132,15 +150,20 @@ def tests(tmp):
         check("superset", T._dump(s["utility"]) == T._dump(u) and s["writers"] == a["writers"])
     except SystemExit:
         check("superset", False)
-    # (c) guards, on copies of the caches
-    os.remove(sample_pickles(big_dir)[1][0])
-    check("keys_guard", stops(ns(tmp, big_dir, dp_cache, out=os.path.join(tmp, "c.json")), "lacks 1 of"))
+    # (c) guards, on copies of the caches and the JSON files
+    c_out = os.path.join(tmp, "c.json")
+    os.remove(next(x for x, _ in sample_pickles(big_dir) if os.path.basename(x) != "extra.pkl"))
+    check("keys_guard", stops(ns(tmp, big_dir, dp_cache, out=c_out), "lacks 1 of"))
     shutil.rmtree(big_dir)
     bad_dir = os.path.join(tmp, "dp_bad")
     shutil.rmtree(bad_dir, ignore_errors=True)
     shutil.copytree(dp_cache, bad_dir)
     os.remove(sample_pickles(bad_dir)[0][0])
-    check("sizes_guard", stops(ns(tmp, main_cache, bad_dir, out=os.path.join(tmp, "c.json")), "not the sample"))
+    check("sizes_guard", stops(ns(tmp, main_cache, bad_dir, out=c_out), "not the sample"))
+    shutil.rmtree(bad_dir)
+    shutil.copytree(dp_cache, bad_dir)
+    shutil.copy(sample_pickles(bad_dir)[0][0], os.path.join(bad_dir, "dup.pkl"))
+    check("dup_guard", stops(ns(tmp, main_cache, bad_dir, out=c_out), "1 duplicated writer"))
     shutil.rmtree(bad_dir)
     shutil.copytree(dp_cache, bad_dir)
     path, _ = sample_pickles(bad_dir)[0]
@@ -150,14 +173,31 @@ def tests(tmp):
     r["utility"]["R3"][m0] = r["utility"]["R3"][m0] + 1.0
     with open(path, "wb") as f:
         pickle.dump((key, r), f)
-    check("r3_guard", stops(ns(tmp, main_cache, bad_dir, out=os.path.join(tmp, "c.json")), "R3 utility"))
+    check("r3_guard", stops(ns(tmp, main_cache, bad_dir, out=c_out), "R3 utility"))
     shutil.rmtree(bad_dir)
-    other = json.loads(json.dumps(want_main))
-    other["main500"]["utility_figure"]["R3"]["median_spearman_r0"] = -2.0
-    bad = os.path.join(tmp, "bad_main.json")
-    with open(bad, "w", encoding="utf-8") as f:
-        json.dump(other, f)
-    check("compare_guard", stops(ns(tmp, main_cache, dp_cache, compare_main=bad, out=os.path.join(tmp, "c.json"))))
+
+    def bad_json(want, name, change):
+        other = json.loads(json.dumps(want))
+        change(other)
+        path = os.path.join(tmp, name)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(other, f)
+        return path
+
+    k_r3 = sorted(k for k in want_main["main500"]["utility"] if k.endswith("|R3"))[0]
+    k_dp = sorted(du)[-1]
+    p = bad_json(want_dp, "bad_seed.json", lambda o: o.update(seed_file_sha256="0" * 64))
+    check("provenance_guard", stops(ns(tmp, main_cache, dp_cache, compare_dp=p, out=c_out), "seed or the config"))
+    p = bad_json(want_main, "bad_r3.json", lambda o: o["main500"]["utility"][k_r3]["ratio_median"].update(mean=-2.0))
+    check("compare_r3", stops(ns(tmp, main_cache, dp_cache, compare_main=p, out=c_out), "2",
+                              "positive control R3 utility: 1 differ"))
+    p = bad_json(want_main, "bad_fig.json",
+                 lambda o: o["main500"]["utility_figure"]["R3"].update(median_spearman_r0=-2.0))
+    check("compare_fig", stops(ns(tmp, main_cache, dp_cache, compare_main=p, out=c_out), "2",
+                               "positive control R3 utility_figure: 1 differ"))
+    p = bad_json(want_dp, "bad_dp.json", lambda o: o["main500"]["utility"][k_dp]["spearman_score"].update(mean=-2.0))
+    check("compare_dp", stops(ns(tmp, main_cache, dp_cache, compare_dp=p, out=c_out), "2",
+                              "positive control keys, spearman_score and cell: 1 differ"))
     # no writer ID in the output or the printed lines
     ids = {w for _, w in main_r}
     text = open(os.path.join(tmp, "out.json"), encoding="utf-8").read() + log.getvalue()
