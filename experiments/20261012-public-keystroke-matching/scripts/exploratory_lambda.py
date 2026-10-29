@@ -19,13 +19,15 @@ only read. It stops, writing nothing, unless the pool and the sample are those o
 control passes: per writer, A2 and A1' at lambda 8 equal the main cache (N = 10 and 1,000) and A2 at lambda 4 and 16
 equal A2-lam4 and A2-lam16 of the main cache (R3 and R4(w), N = 1,000); the cells of those attackers equal main.json;
 the strongest attacker of the main attackers, formed again from the main cache, equals main.json. With --time-first n
-it evaluates n writers spread over the sample, prints the seconds per writer and writes no output.
+it computes n writers spread over the sample (not cached, with the lambda 8 control of analysis 6), prints
+the seconds per writer and writes no output.
 """
 import argparse
 import hashlib
 import os
 import platform
 import sys
+import tempfile
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -156,6 +158,9 @@ def fingerprint(args, analysis):
     put("config", run_main._sha(os.path.join(HERE, "..", "config.json")))
     code = {os.path.basename(m.__file__) for m in list(sys.modules.values())
             if getattr(m, "__file__", None) and os.path.dirname(os.path.abspath(m.__file__)) == HERE}
+    # the entry of analysis 7 and the self-tests are left out, so that analysis 7 can compute analysis 6's
+    # fingerprint again and check that analysis 6's cache was written by the current code
+    code = {n for n in code if n != "exploratory_scan.py" and not n.startswith("selftest_")}
     for n in sorted((code | {"exploratory_lambda.py", "align_local.py"}) - {"aggregate.py"}):
         put("code:" + n, run_main._sha(os.path.join(HERE, n)))
     put("versions", (platform.python_version(), np.__version__, scipy.__version__, sklearn.__version__,
@@ -175,11 +180,14 @@ def setup(args, workers):
     for w in writers:
         w.text = (w.text or "").replace("\r\n", "\n")
     order = sorted(writers, key=lambda w: (w.prompt, w.writer))
-    if workers > 1:
-        with ProcessPoolExecutor(workers) as ex:
-            why = list(ex.map(_exclusion, order, chunksize=4))
-    else:
-        why = [_exclusion(w) for w in order]
+    try:
+        if workers > 1:
+            with ProcessPoolExecutor(workers) as ex:
+                why = list(ex.map(_exclusion, order, chunksize=4))
+        else:
+            why = [_exclusion(w) for w in order]
+    except Exception as e:  # noqa: BLE001  (the message may name a writer or its log: only the type is shown)
+        raise SystemExit("reading a writer failed (%s)" % type(e).__name__) from None
     excluded, by_prompt = {}, {}
     for w, y in zip(order, why):
         if y:
@@ -193,15 +201,28 @@ def setup(args, workers):
     return cfg, seed, by_prompt, pool_ids, pools, sample, excluded
 
 
-def evaluate_all(ws, ctx, workers, cache):
-    """{(prompt, writer): result}; with cache, done writers are loaded and new ones stored as they return (counts
-    and the prompt only are printed on failure)."""
+def _store(cache, w, r):
+    """run_main._cache_store, with its temporary file removed when the store fails."""
+    try:
+        run_main._cache_store(cache, (w, True, False), r)
+    finally:
+        part = "%s.%d.part" % (run_main._cache_path(cache, (w, True, False)), os.getpid())
+        if os.path.exists(part):
+            os.remove(part)
+
+
+def evaluate_all(ws, ctx, workers, cache, check=None):
+    """{(prompt, writer): result}; with cache, done writers are loaded and new ones stored as they return. check(r)
+    (analysis 6: lambda 8 against the main cache) runs on every result before it is stored or kept, and stops the
+    run at the first writer that fails it. Only counts, the prompt and the type of an error are printed."""
     results, todo, first_error = {}, [], None
     for w in ws:
         r = run_main._cache_load(cache, (w, True, False)) if cache else None
         if r is None:
             todo.append(w)
         else:
+            if check and not check(r):
+                raise SystemExit("positive control: a cached writer differs from the main cache at lambda 8")
             results[(r["prompt"], r["writer"])] = r
     print("cache: %d of %d writers done, %d to run" % (len(results), len(ws), len(todo)), flush=True)
     t0 = time.time()
@@ -210,12 +231,14 @@ def evaluate_all(ws, ctx, workers, cache):
         nonlocal first_error
         try:
             r = get()
-            if cache:
-                run_main._cache_store(cache, (w, True, False), r)
-        except Exception as e:  # noqa: BLE001  (raised again after the others)
+        except Exception as e:  # noqa: BLE001  (raised again, without its message, after the others)
             print("a writer of %s failed (%s); the others go on" % (w.prompt, type(e).__name__), flush=True)
             first_error = first_error or e
             return
+        if check and not check(r):
+            raise SystemExit("positive control: a writer of %s differs from the main cache at lambda 8" % w.prompt)
+        if cache:
+            _store(cache, w, r)
         results[(r["prompt"], r["writer"])] = r
         done = len(results)
         if done % 10 == 0 or done == len(ws):
@@ -234,8 +257,8 @@ def evaluate_all(ws, ctx, workers, cache):
         _init(ctx)
         for w in todo:
             take(w, lambda: _work(w))
-    if first_error is not None:
-        raise first_error
+    if first_error is not None:  # the message may name a writer or its log: only the type is shown
+        raise SystemExit("a writer failed (%s)" % type(first_error).__name__)
     return results
 
 
@@ -261,37 +284,44 @@ def merge(*parts):
     return out
 
 
-def positive_writers(res, main_of):
-    """{control: writers that differ}: per writer, lambda 8 against the main A2 and A1' cells, lambda 4 and 16
-    against A2-lam4 and A2-lam16 (a cell present on one side only differs too)."""
-    out = {"A2 and A1' at lambda 8": 0, "A2 at lambda 4 and 16": 0}
-    for r in res:
-        m = main_of[(r["prompt"], r["writer"])]["full"]
-        d8 = d416 = False
-        for f in FORMS:
-            for N in NS:
-                for a in ("A2", "A1p"):
-                    d8 |= dp_utility_r0._dump(r["full"].get(("full", f, name(a, 8), N))) != \
-                        dp_utility_r0._dump(m.get(("full", f, a, N)))
-                if forms.param(f)[0] != "R7" and N == 1000:
-                    for lam, old in MAIN_LAM.items():
-                        d416 |= dp_utility_r0._dump(r["full"].get(("full", f, name("A2", lam), N))) != \
-                            dp_utility_r0._dump(m.get(("full", f, old, N)))
-        out["A2 and A1' at lambda 8"] += d8
-        out["A2 at lambda 4 and 16"] += d416
+CONTROL8, CONTROL416 = "A2 and A1' at lambda 8", "A2 at lambda 4 and 16"
+
+
+def control_pairs(f, N):
+    """[(control, this run's attacker, the main cache's attacker)] of a form and N."""
+    out = [(CONTROL8, name(a, 8), a) for a in ("A2", "A1p")]
+    if forms.param(f)[0] != "R7" and N == 1000:
+        out += [(CONTROL416, name("A2", lam), old) for lam, old in MAIN_LAM.items()]
     return out
+
+
+def writer_control(r, m):
+    """{control: (differs, cells compared)} of one writer against its main-cache result m: a cell present on one
+    side only differs; 'compared' counts the cells present on both sides."""
+    out = {CONTROL8: [False, 0], CONTROL416: [False, 0]}
+    for f in FORMS:
+        for N in NS:
+            for c, new, old in control_pairs(f, N):
+                a, b = r["full"].get(("full", f, new, N)), m["full"].get(("full", f, old, N))
+                out[c][0] |= dp_utility_r0._dump(a) != dp_utility_r0._dump(b)
+                out[c][1] += a is not None and b is not None
+    return out
+
+
+def positive_writers(res, main_of):
+    """({control: writers that differ}, {control: cells compared over the writers})."""
+    bad, n = {CONTROL8: 0, CONTROL416: 0}, {CONTROL8: 0, CONTROL416: 0}
+    for r in res:
+        for c, (d, k) in writer_control(r, main_of[(r["prompt"], r["writer"])]).items():
+            bad[c] += d
+            n[c] += k
+    return bad, n
 
 
 def positive_cells(cells, want):
     """Cells of this run that must equal main.json: lambda 8 -> A2 and A1', lambda 4 and 16 -> A2-lam4/A2-lam16."""
-    pairs = []
-    for f in FORMS:
-        for N in NS:
-            for a in ("A2", "A1p"):
-                pairs.append(("full|%s|%s|%d" % (f, name(a, 8), N), "full|%s|%s|%d" % (f, a, N)))
-            if forms.param(f)[0] != "R7" and N == 1000:
-                for lam, old in MAIN_LAM.items():
-                    pairs.append(("full|%s|%s|%d" % (f, name("A2", lam), N), "full|%s|%s|%d" % (f, old, N)))
+    pairs = [("full|%s|%s|%d" % (f, new, N), "full|%s|%s|%d" % (f, old, N))
+             for f in FORMS for N in NS for _, new, old in control_pairs(f, N)]
     return [old for new, old in pairs
             if dp_utility_r0._dump(cells.get(new)) != dp_utility_r0._dump(want["main500"]["cells"].get(old))]
 
@@ -323,14 +353,50 @@ def strongest_report(base_best, all_best, new_best):
     return out
 
 
+def _real(path):
+    return os.path.normcase(os.path.realpath(os.path.abspath(path)))
+
+
+def _under(path, root):
+    path, root = _real(path), _real(root)
+    return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def check_paths(args, analysis):
+    """Stops on paths that could write into the main cache, a frozen result or a versioned folder."""
+    exp = os.path.join(HERE, "..")
+    if any(os.environ.get(v) for v in ("MAIN_MUTATE", "DPU_MUTATE", "SYNTH_MUTATE")):
+        raise SystemExit("a mutation variable of another script is set (MAIN_MUTATE, DPU_MUTATE or SYNTH_MUTATE)")
+    caches = [args.main_cache] + ([args.lambda_cache] if analysis == 7 else [])
+    if args.cache_dir:
+        # analysis 6's cache sits under the same root (<cache-dir>/analysis6/...), so only the main cache is checked
+        if "main_cache" in _real(args.cache_dir).split(os.sep) or _under(args.cache_dir, args.main_cache) \
+                or _under(args.main_cache, args.cache_dir):
+            raise SystemExit("--cache-dir must not be the main cache")
+        if not any(_under(args.cache_dir, r) for r in (os.path.join(exp, "raw"), os.path.join(exp, "results", ".tmp"),
+                                                       tempfile.gettempdir())):
+            raise SystemExit("--cache-dir must be under raw/ (not versioned), results/.tmp or the temporary folder")
+    frozen = [args.compare_main] + ([args.compare_lambda] if analysis == 7 else [])
+    if any(_real(args.out) == _real(p) for p in frozen):
+        raise SystemExit("--out must not be a file this run compares with")
+    if any(_under(args.out, c) for c in caches + ([args.cache_dir] if args.cache_dir else [])) \
+            or "main_cache" in _real(args.out).split(os.sep):
+        raise SystemExit("--out must not be inside a cache")
+    if MUTATE and _under(args.out, os.path.join(exp, "results")) \
+            and not _under(args.out, os.path.join(exp, "results", ".tmp")):
+        raise SystemExit("EXL_MUTATE is set: not writing into results/")
+
+
+def best_names(analysis):
+    """The variants that compete for the strongest attacker: lambda 8 of A2 and A1' is the main A2 and A1' (equal by
+    the positive control), so it is left out; A2-scan at lambda 8 is new and stays."""
+    names = variants(6) + (variants(7) if analysis == 7 else [])
+    return [n for n in names if not (n.endswith(".lam8") and not n.startswith("A2scan"))]
+
+
 def run(args, analysis=6):
-    if MUTATE:
-        parts = os.path.normpath(os.path.abspath(args.out)).split(os.sep)
-        if "results" in parts and ".tmp" not in parts:
-            raise SystemExit("EXL_MUTATE is set: not writing into results/")
-    if args.cache_dir and "main_cache" in os.path.normpath(os.path.abspath(args.cache_dir)).split(os.sep):
-        raise SystemExit("--cache-dir must not be the main cache")
     import json
+    check_paths(args, analysis)
     with open(args.compare_main, encoding="utf-8") as f:
         want = json.load(f)
     here = {"seed_file_sha256": run_main._sha(os.path.join(HERE, "..", "SEED")),
@@ -344,77 +410,98 @@ def run(args, analysis=6):
     keys = sorted((p, w) for p, ids in sample.items() for w in ids)
     if MUTATE == "unsorted":
         keys = keys[::-1]
+    main_of = dp_utility_r0.load_main_of(args.main_cache, keys)
+    check = None
+    if analysis == 6 and MUTATE != "skip_positive":
+        def check(r):
+            return not writer_control(r, main_of[(r["prompt"], r["writer"])])[CONTROL8][0]
+    ctx = Context(cfg, seed, pools, pool_ids, analysis)
+    ws = [by_prompt[p][w] for p, w in keys]
+    if args.time_first:  # no cache: the time of computing, not of reading
+        step = max(1, len(ws) // args.time_first)
+        pick = ws[::step][:args.time_first]
+        nw = min(args.workers, len(pick))
+        t0 = time.time()
+        evaluate_all(pick, ctx, nw, None, check)
+        per = (time.time() - t0) * nw / len(pick)
+        print("timing: %d writers, %d workers, %.1f s per writer per worker, %.1f h for %d writers with %d workers"
+              % (len(pick), nw, per, per * len(ws) / args.workers / 3600, len(ws), args.workers), flush=True)
+        return None
     cache = None
     if args.cache_dir:
         cache = os.path.join(args.cache_dir, "analysis%d" % analysis, fingerprint(args, analysis)[:16])
         os.makedirs(cache, exist_ok=True)
-    ctx = Context(cfg, seed, pools, pool_ids, analysis)
-    ws = [by_prompt[p][w] for p, w in keys]
-    if args.time_first:
-        step = max(1, len(ws) // args.time_first)
-        pick = ws[::step][:args.time_first]
-        t0 = time.time()
-        evaluate_all(pick, ctx, min(args.workers, len(pick)), cache)
-        dt = time.time() - t0
-        print("timing: %d writers, %d workers, %.0f s wall, %.1f s per writer per worker, %.1f h for %d writers "
-              "with %d workers" % (len(pick), min(args.workers, len(pick)), dt,
-                                   dt * min(args.workers, len(pick)) / len(pick),
-                                   dt * min(args.workers, len(pick)) / len(pick) * len(ws) / args.workers / 3600,
-                                   len(ws), args.workers), flush=True)
-        return None
-    results = evaluate_all(ws, ctx, args.workers, cache)
+    results = evaluate_all(ws, ctx, args.workers, cache, check)
     res = [results[k] for k in keys]
     R, _ = aggregate.resamples(seed, [r["prompt"] for r in res], "main500")
-    main_of = dp_utility_r0.load_main_of(args.main_cache, keys)
     main_res = main_part(main_of, keys)
     cells, _, _ = aggregate.summarise_cells(res, R, {"full": (), "window": ()})
 
-    bad = {}
+    bad, compared = {}, {}
     base_best = best_of(main_res, R, evaluate.STRONGEST_FULL)
     bad["main strongest attacker"] = [g for g in base_best if dp_utility_r0._dump(aggregate.strip_boot(
         {g: base_best[g]})[g]) != dp_utility_r0._dump(want["main500"]["strongest"].get(g))]
     if analysis == 6:
-        bad.update({k: ["%d writers" % v] if v else [] for k, v in positive_writers(res, main_of).items()})
+        diff, compared = positive_writers(res, main_of)
+        bad.update({k: ["%d writers" % v] if v else [] for k, v in diff.items()})
         bad["cells against main.json"] = positive_cells(cells, want)
-        parts, new_names = [main_res, res], variants(6)
+        # a control that compared nothing would pass: lambda 8 always has cells; lambda 4 and 16 have them at
+        # N = 1,000, which the real pools always reach (the synthetic pool of the self-test does not)
+        bad["cells compared"] = [c for c, n in compared.items()
+                                 if n == 0 and (c == CONTROL8 or args.source == "klicke")]
+        parts = [main_res, res]
     else:
-        lam_res, lam_cells = load_lambda(args, keys, R)
-        bad["analysis 6 cells against %s" % os.path.basename(args.compare_lambda)] = lam_cells
-        parts, new_names = [main_res, lam_res, res], variants(6) + variants(7)
+        lam_res, lam_bad = load_lambda(args, keys, R, here, main_of)
+        bad.update(lam_bad)
+        parts = [main_res, lam_res, res]
     if MUTATE == "skip_positive":
         bad = {k: [] for k in bad}
+    for c, n in compared.items():
+        print("positive control %s: %d cells compared" % (c, n), flush=True)
     for k, v in bad.items():
         print("positive control %s: %s" % (k, "%d differ" % len(v) if v else "identical"), flush=True)
     if any(bad.values()):
         raise SystemExit(2)
 
-    all_best = best_of(merge(*parts), R, tuple(evaluate.STRONGEST_FULL) + tuple(new_names))
-    new_best = best_of(merge(*parts[1:]) if len(parts) > 2 else res, R, new_names)
+    names = best_names(analysis)
+    all_best = best_of(merge(*parts), R, tuple(evaluate.STRONGEST_FULL) + tuple(names))
+    new_best = best_of(merge(*parts[1:]) if len(parts) > 2 else res, R, names)
     head = dict(here, source=args.source, sample="main500", sample_sizes=want["sample_sizes"], forms=FORMS,
                 lams=list(LAMS), N=list(NS), attackers=variants(analysis), note=NOTE[analysis],
                 caches={"main500": os.path.basename(os.path.normpath(args.main_cache)),
                         "this": os.path.basename(cache) if cache else None},
-                counts=run_main._counts(res),
+                counts=run_main._counts(res), control_cells_compared=compared,
                 positive_control=("per writer, A2 and A1' at lambda 8 equal the main cache and A2 at lambda 4 and "
                                   "16 equal A2-lam4/A2-lam16; their cells equal main.json; the main strongest "
                                   "attacker formed again equals main.json") if analysis == 6 else
-                ("the main strongest attacker formed again equals main.json; the analysis 6 cells formed again "
-                 "from its cache equal exploratory_lambda.json"))
+                ("the main strongest attacker formed again equals main.json; analysis 6's cache was written by "
+                 "the current code (its fingerprint), passes its per-writer controls again, and its cells formed "
+                 "again equal exploratory_lambda.json, whose provenance is this folder's"))
     if MUTATE:
         head["mutate"] = MUTATE
+    if analysis == 7:
+        head["caches"]["analysis6"] = os.path.basename(os.path.normpath(args.lambda_cache))
     out = dict(head, cells=cells, strongest=strongest_report(base_best, all_best, new_best),
-               strongest_attackers=list(evaluate.STRONGEST_FULL) + new_names)
+               strongest_attackers=list(evaluate.STRONGEST_FULL) + names)
     write(out, args.out)
     return out
 
 
-def load_lambda(args, keys, R):
-    """Analysis 6's per-writer results from its cache (only the files of keys) and the cells of
-    exploratory_lambda.json that they do not give again."""
+def load_lambda(args, keys, R, here, main_of):
+    """Analysis 6's per-writer results from its cache (only the files of keys) and {control: what differs}: its
+    folder against analysis 6's fingerprint of the current code, exploratory_lambda.json's provenance and cells,
+    and the per-writer controls of analysis 6 again."""
     import json
     from types import SimpleNamespace
     with open(args.compare_lambda, encoding="utf-8") as f:
         want6 = json.load(f)
+    folder = os.path.basename(os.path.normpath(args.lambda_cache))
+    c6 = want6.get("caches", {})
+    bad = {"analysis 6 cache of the current code": [] if folder == fingerprint(args, 6)[:16] else [folder],
+           "provenance of %s" % os.path.basename(args.compare_lambda):
+               [k for k, v in here.items() if want6.get(k) != v] + (["mutate"] if "mutate" in want6 else [])
+               + ([] if c6.get("this") == folder else ["cache folder"])
+               + ([] if c6.get("main500") == os.path.basename(os.path.normpath(args.main_cache)) else ["main cache"])}
     out, missing = [], 0
     for p, w in keys:
         r = run_main._cache_load(args.lambda_cache, (SimpleNamespace(prompt=p, writer=w), True, False))
@@ -424,11 +511,13 @@ def load_lambda(args, keys, R):
         out.append(r)
     if missing:
         raise SystemExit("the analysis 6 cache lacks %d of the %d writers" % (missing, len(keys)))
+    diff, _ = positive_writers(out, main_of)
+    bad["analysis 6 per-writer controls again"] = ["%d writers" % v for v in diff.values() if v]
     cells, _, _ = aggregate.summarise_cells(out, R, {"full": (), "window": ()})
-    diff = sorted(set(cells) ^ set(want6["cells"])) + [
-        k for k in sorted(set(cells) & set(want6["cells"]))
-        if dp_utility_r0._dump(cells[k]) != dp_utility_r0._dump(want6["cells"][k])]
-    return out, diff
+    bad["analysis 6 cells against %s" % os.path.basename(args.compare_lambda)] = sorted(
+        set(cells) ^ set(want6["cells"])) + [k for k in sorted(set(cells) & set(want6["cells"]))
+                                              if dp_utility_r0._dump(cells[k]) != dp_utility_r0._dump(want6["cells"][k])]
+    return out, bad
 
 
 def write(out, path):
@@ -456,13 +545,23 @@ def parser(desc):
     ap.add_argument("--compare-main", required=True, help="main.json")
     ap.add_argument("--cache-dir", default=None, help="this analysis's own cache root (not the main cache)")
     ap.add_argument("--workers", type=int, default=1)
-    ap.add_argument("--time-first", type=int, default=0, help="time this many writers and stop (no output)")
+    ap.add_argument("--time-first", type=int, default=0, help="time this many writers (computed, not cached) and stop; no output")
     ap.add_argument("--out", required=True)
     return ap
 
 
+def guarded(args, analysis):
+    """run, with an unexpected error shown by its type only (its message may name a writer or a log)."""
+    try:
+        return run(args, analysis)
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise SystemExit("stopped by an error (%s)" % type(e).__name__) from None
+
+
 def main():
-    run(parser(__doc__.split("\n")[0]).parse_args(), 6)
+    guarded(parser(__doc__.split("\n")[0]).parse_args(), 6)
 
 
 if __name__ == "__main__":

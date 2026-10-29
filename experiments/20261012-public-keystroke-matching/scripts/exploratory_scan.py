@@ -19,7 +19,7 @@ def main():
     ap = X.parser(__doc__.split("\n")[0])
     ap.add_argument("--lambda-cache", required=True, help="analysis 6's cache folder (with its fingerprint)")
     ap.add_argument("--compare-lambda", required=True, help="exploratory_lambda.json")
-    X.run(ap.parse_args(), 7)
+    X.guarded(ap.parse_args(), 7)
 
 
 if __name__ == "__main__":

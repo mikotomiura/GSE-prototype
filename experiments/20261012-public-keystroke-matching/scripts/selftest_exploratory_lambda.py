@@ -166,15 +166,16 @@ def tests(tmp):
           all(X.dp_utility_r0._dump(a["cells"]["full|%s|%s|10" % (f, X.name("A2", 8))])
               == X.dp_utility_r0._dump(want["main500"]["cells"]["full|%s|A2|10" % f])
               for f in X.FORMS))
-    check("strongest6", set(a["strongest"]) == {"full|%s|10" % f for f in X.FORMS} and
-          all(e["acc"] >= e["main_strongest"]["acc"] for e in a["strongest"].values()))
+    check("strongest6", set(a["strongest"]) == {"full|%s|10" % f for f in X.FORMS}
+          and strongest_ok(a, want, X.best_names(6)))
+    check("control_n1000", control_fixture())
     cache6 = os.path.join(tmp, "xcache", "analysis6", a["caches"]["this"])
     check("naive_lam", naive_checks(tmp, 6, cache6))
     # resume: from a full cache and from a half-deleted one, the same output
     pk = sorted(os.listdir(cache6))
     for x in pk[::2]:
         os.remove(os.path.join(cache6, x))
-    b = run(ns(tmp, out=os.path.join(tmp, "x6b.json")), 6)
+    b = run(ns(tmp, out=os.path.join(tmp, "x6b.json"), workers=2), 6)
     check("resume", X.dp_utility_r0._dump(b) == X.dp_utility_r0._dump(a))
     # guards
     c_out = os.path.join(tmp, "c.json")
@@ -200,7 +201,7 @@ def tests(tmp):
         "positive control main strongest attacker: 1 differ"))
     bad_dir = os.path.join(tmp, "main_bad")
     for change, why, printed, label in (("drop", "lacks 1 of", "", "guard_keys"),
-                                        ("cell", "2", "positive control A2 and A1' at lambda 8: 1 differ",
+                                        ("cell", "differs from the main cache at lambda 8", "",
                                          "guard_writer")):
         shutil.rmtree(bad_dir, ignore_errors=True)
         shutil.copytree(main_cache(tmp), bad_dir)
@@ -220,20 +221,29 @@ def tests(tmp):
         check(label, stops(ns(tmp, out=c_out, main_cache=bad_dir), 6, why, printed))
     shutil.rmtree(bad_dir, ignore_errors=True)
     check("guard_cache_dir", stops(ns(tmp, out=c_out, cache_dir=os.path.join(tmp, "main_cache")), 6,
-                                   "not be the main cache"))
+                                   "not be the main cache")
+          and stops(ns(tmp, out=c_out, cache_dir=os.path.join(HERE, "..", "not_raw_cache")), 6, "must be under raw/")
+          and not os.path.exists(os.path.join(HERE, "..", "not_raw_cache")))
+    check("guard_out", stops(ns(tmp, out=os.path.join(tmp, "main.json")), 6, "compares with")
+          and stops(ns(tmp, out=os.path.join(main_cache(tmp), "x.json")), 6, "inside a cache"))
+    check("error_no_ids", error_path_has_no_ids(tmp))
     # analysis 7
     a6_path = os.path.join(tmp, "x6.json")
     args7 = ns(tmp, out=os.path.join(tmp, "x7.json"), lambda_cache=cache6, compare_lambda=a6_path)
+    # the cache is written before the controls, so the naive check runs even when the controls stop the run
+    # (under a mutant, analysis 6's output carries "mutate" and analysis 7 stops on its provenance)
+    cache7 = os.path.join(tmp, "xcache", "analysis7", X.fingerprint(args7, 7)[:16])
     try:
         s = run(args7, 7, log)
     except SystemExit as e:
         check("positive7", False)
         print("(stopped: %s)" % e)
+        check("naive_scan", naive_checks(tmp, 7, cache7))
         return
     check("positive7", all(v["acc"] is not None for v in s["cells"].values())
           and {k.split("|")[2] for k in s["cells"]} == set(X.variants(7))
-          and all(e["acc"] >= a["strongest"][g]["acc"] for g, e in s["strongest"].items()))
-    cache7 = os.path.join(tmp, "xcache", "analysis7", s["caches"]["this"])
+          and strongest_ok(s, want, X.best_names(7), {**a["cells"], **s["cells"]})
+          and s["caches"]["this"] == os.path.basename(cache7))
     check("naive_scan", naive_checks(tmp, 7, cache7))
     with open(a6_path, encoding="utf-8") as f:
         want6 = json.load(f)
@@ -244,11 +254,88 @@ def tests(tmp):
         json.dump(want6, f)
     check("guard_lambda", stops(ns(tmp, out=c_out, lambda_cache=cache6, compare_lambda=bad6), 7, "2",
                                 "positive control analysis 6 cells against bad6.json: 1 differ"))
+    other = os.path.join(tmp, "xcache", "analysis6", "0000000000000000")
+    shutil.rmtree(other, ignore_errors=True)
+    shutil.copytree(cache6, other)
+    check("guard_lambda_fp", stops(ns(tmp, out=c_out, lambda_cache=other, compare_lambda=a6_path), 7, "2",
+                                   "positive control analysis 6 cache of the current code: 1 differ"))
+    shutil.rmtree(other, ignore_errors=True)
     # no writer ID
     ids = {w for p in want["sample_sizes"] for w in writers_and_pools(tmp)[3][p]}
     text = "".join(open(os.path.join(tmp, n), encoding="utf-8").read() for n in ("x6.json", "x7.json")) \
         + log.getvalue()
     check("no_ids", not any(re.search(r"\b%s\b" % re.escape(w), text) for w in ids))
+
+
+def strongest_ok(out, want, names, cells=None):
+    """The strongest attacker per form and N: the point is the maximum of the named cells (main attackers from
+    main.json, the variants from this output); the shares sum to 1; the differences are those of the points."""
+    cells = out["cells"] if cells is None else cells
+    mc = want["main500"]["cells"]
+    ok = True
+    for g, e in out["strongest"].items():
+        _, f, N = g.split("|")
+        pts = [mc[k]["acc"] for k in mc if k.startswith("full|%s|" % f) and k.endswith("|" + N)
+               and k.split("|")[2] in X.evaluate.STRONGEST_FULL]
+        pts += [cells[k]["acc"] for k in cells if k.startswith("full|%s|" % f) and k.endswith("|" + N)
+                and k.split("|")[2] in names]
+        sh = [v for v in e["share_selected"].values() if v is not None]
+        m = want["main500"]["strongest"][g]
+        ok &= abs(e["acc"] - max(pts)) < 1e-6 and abs(sum(sh) - 1) < 1e-9
+        ok &= abs(e["main_strongest"]["acc"] - m["acc"]) < 1e-6 and e["main_strongest"]["attacker"] == m["attacker"]
+        ok &= abs(e["diff_to_main"] - (e["acc"] - m["acc"])) < 1e-6
+        if "best_exploratory" in e:
+            be = e["best_exploratory"]
+            ok &= be["attacker"] in names and abs(be["minus_main"] - (be["acc"] - m["acc"])) < 1e-6
+            ok &= e["diff_to_main_ci"][0] >= -1e-9 and be["minus_main_ci"][0] <= e["diff_to_main_ci"][0] + 1e-9
+    return bool(ok)
+
+
+def control_fixture():
+    """writer_control on made-up cells at N = 1,000 (the synthetic pool never reaches N = 1,000): equal cells pass
+    and are counted, a value that differs or a cell on one side only fails."""
+    st = {"acc": 0.5, "top5": 1.0, "rr": 0.6, "all_inf": 0, "only_true_inf": 0, "draws": 5}
+    m = {"full": {}}
+    r = {"full": {}}
+    for f in X.FORMS:
+        for N in X.NS:
+            for _, new, old in X.control_pairs(f, N):
+                m["full"][("full", f, old, N)] = dict(st)
+                r["full"][("full", f, new, N)] = dict(st)
+    c = X.writer_control(r, m)
+    n416 = sum(1 for f in X.FORMS if X.forms.param(f)[0] != "R7") * 2
+    ok = c[X.CONTROL416] == [False, n416] and not c[X.CONTROL8][0]
+    r2 = copy.deepcopy(r)
+    r2["full"][("full", "R4(4)", X.name("A2", 16), 1000)]["acc"] = 0.4
+    ok &= X.writer_control(r2, m)[X.CONTROL416][0] and not X.writer_control(r2, m)[X.CONTROL8][0]
+    r3 = copy.deepcopy(r)
+    del r3["full"][("full", "R3", X.name("A2", 4), 1000)]
+    ok &= X.writer_control(r3, m)[X.CONTROL416][0]
+    m4 = copy.deepcopy(m)
+    del m4["full"][("full", "R3", "A2-lam16", 1000)]
+    ok &= X.writer_control(r, m4)[X.CONTROL416][0]
+    return bool(ok)
+
+
+def error_path_has_no_ids(tmp):
+    """A worker error whose message names the writer: the run stops with the error's type only."""
+    saved = X.evaluate_writer
+
+    def boom(w, ctx):
+        raise ValueError("writer %s failed" % w.writer)
+
+    X.evaluate_writer = boom
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            X.guarded(ns(tmp, out=os.path.join(tmp, "e.json"), cache_dir=None), 6)
+        return False
+    except SystemExit as e:
+        text = str(e) + out.getvalue()
+    finally:
+        X.evaluate_writer = saved
+    ids = {w for p, v in writers_and_pools(tmp)[3].items() for w in v}
+    return "ValueError" in text and not any(re.search(r"\b%s\b" % re.escape(w), text) for w in ids)
 
 
 def build(tmp):
