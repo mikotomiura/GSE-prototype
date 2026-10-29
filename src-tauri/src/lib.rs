@@ -49,6 +49,8 @@ pub mod redaction;
 mod handmark_spike;
 // 手跡の背景の層の試作（spike・本線に入れない・GSE_HANDMARK_STAGE_SPIKE=1 のときだけ動く）。
 mod handmark_stage_spike;
+// 手跡の下の縁の帯の試作（spike・本線に入れない・背景の層が出ているときだけ・macOS だけ）。
+mod handmark_edge_strip;
 // 手跡の背景の層へカーソルとクリックを渡す（spike・ADR-040・macOS だけ）。
 #[cfg(target_os = "macos")]
 mod handmark_stage_pointer;
@@ -5842,6 +5844,15 @@ pub fn run() {
                 }
                 #[cfg(target_os = "macos")]
                 crate::handmark_stage_spike::close(window.app_handle());
+                return;
+            }
+            // 手跡の下の縁の帯の試作: 閉じる要求は止めて隠すだけにする（NSPanel を壊さない）。
+            if window.label() == crate::handmark_edge_strip::LABEL {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                }
+                #[cfg(target_os = "macos")]
+                crate::handmark_edge_strip::close(window.app_handle());
                 return;
             }
             if window.label() == "overlay" {

@@ -112,6 +112,8 @@ mod imp {
                     &ACTIVE,
                     synthetic,
                 );
+                // 下の縁の帯は、背景が出たときだけ作る（.steering/20261030-handmark-edge-strip-impl/）。
+                crate::handmark_edge_strip::setup(app);
                 tracing::info!(
                     protect = crate::handmark_spike::env_flag(ENV_PROTECT),
                     synthetic_pointer = synthetic,

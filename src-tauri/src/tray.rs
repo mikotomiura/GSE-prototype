@@ -115,6 +115,8 @@ const MENU_HANDMARK_CLOSE: &str = "gse-tray-handmark-close";
 const MENU_HANDMARK_STAGE_CLOSE: &str = "gse-tray-handmark-stage-close";
 /// 手跡の背景の層のカーソル・クリック・ホイールの入れ切り（spike・ADR-040 D4・判断 5）。選んだことは記録しない。
 #[cfg(target_os = "macos")]
+/// 下の縁の帯の試作: 「背景を見る」（段 1 は前面に出られるかを読むだけ）。
+const MENU_HANDMARK_REVEAL: &str = "gse-tray-handmark-reveal";
 const MENU_HANDMARK_STAGE_CURSOR: &str = "gse-tray-handmark-stage-cursor";
 #[cfg(target_os = "macos")]
 const MENU_HANDMARK_STAGE_CLICK: &str = "gse-tray-handmark-stage-click";
@@ -196,6 +198,14 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
         let position = menu.items()?.len().saturating_sub(1);
         menu.insert(&stage_close, position)?;
     }
+    // 下の縁の帯の試作: 帯が出ているときだけ「背景を見る」を終了の前に足す。チェック印は付けない。
+    #[cfg(target_os = "macos")]
+    if crate::handmark_edge_strip::is_shown() {
+        let reveal =
+            MenuItem::with_id(app, MENU_HANDMARK_REVEAL, "背景を見る", true, None::<&str>)?;
+        let position = menu.items()?.len().saturating_sub(1);
+        menu.insert(&reveal, position)?;
+    }
     // 手跡の背景の層の試作: 窓が出ているときだけ、カーソル・クリック・ホイールの入れ切りを「背景を閉じる」の前に足す。
     #[cfg(target_os = "macos")]
     let stage_inputs = if crate::handmark_stage_spike::is_shown(app) {
@@ -254,6 +264,11 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             #[cfg(target_os = "macos")]
             if event.id.as_ref() == MENU_HANDMARK_STAGE_CLOSE {
                 crate::handmark_stage_spike::close(app);
+            }
+            // ⚠️ 選んだことは記録しない（ログに出るのは前面に出られたかと待った時間だけ）。
+            #[cfg(target_os = "macos")]
+            if event.id.as_ref() == MENU_HANDMARK_REVEAL {
+                crate::handmark_edge_strip::probe_activate(app);
             }
             // 入れ切りは自前の状態を正にし、チェックの表示をそれに合わせる（表示が先に変わる OS の挙動に頼らない）。
             #[cfg(target_os = "macos")]

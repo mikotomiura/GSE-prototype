@@ -5,6 +5,7 @@ import App from "./App";
 import InvitationSettings from "./components/InvitationSettings";
 import HandmarkSurface from "./components/HandmarkSurface";
 import HandmarkStage from "./components/HandmarkStage";
+import HandmarkEdgeStrip from "./components/HandmarkEdgeStrip";
 
 // Layer 2: React マウント前にウィンドウ別の背景制御。
 // overlay ウィンドウでは index.html のインライン背景 (#0f172a) を透過に切り替える。
@@ -15,7 +16,9 @@ const windowLabel = getCurrentWindow().label;
 const isHandmark = windowLabel === "handmark";
 // 手跡の背景の層の試作の窓も透明にする（spike）。
 const isHandmarkStage = windowLabel === "handmark-stage";
-if (windowLabel === "overlay" || isHandmark || isHandmarkStage) {
+// 手跡の下の縁の帯の試作の窓も透明にする（spike）。
+const isHandmarkEdgeStrip = windowLabel === "handmark-edge-strip";
+if (windowLabel === "overlay" || isHandmark || isHandmarkStage || isHandmarkEdgeStrip) {
   document.body.style.backgroundColor = "transparent";
 }
 // EH3 の招待の説明と設定の窓は App（メイン窓の処理）を通さずに描く。
@@ -68,6 +71,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         <HandmarkSurface />
       ) : isHandmarkStage ? (
         <HandmarkStage />
+      ) : isHandmarkEdgeStrip ? (
+        <HandmarkEdgeStrip />
       ) : isInvitationSettings ? (
         <InvitationSettings />
       ) : (
