@@ -15,6 +15,22 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// 背景の窓へポインタを知らせるイベント名。背景の窓のコードだけが受ける。
 pub const POINTER_EVENT: &str = "handmark-stage-pointer";
+/// 下の縁の帯へ「カーソルの近さ」だけを送るイベント名（帯の窓専用・判断 2）。座標は送らない。
+pub const STRIP_NEAR_EVENT: &str = "handmark-strip-near";
+/// 帯の高さ（点）と、近さが 0 になる帯の上の距離（点）。
+const STRIP_HEIGHT_PT: f64 = 14.0;
+const STRIP_NEAR_RANGE_PT: f64 = 80.0;
+
+/// 下の縁の帯へのカーソルの近さを 0〜10（0.1 刻み）にする。`y` は主画面の左下が原点の点。
+/// カーソルを切っている間は 0。帯の上にいれば 10。
+pub(crate) fn strip_near(cursor_on: bool, y: f64) -> u8 {
+    if !cursor_on || !y.is_finite() {
+        return 0;
+    }
+    let d = (y - STRIP_HEIGHT_PT).max(0.0);
+    let near = (1.0 - d / STRIP_NEAR_RANGE_PT).clamp(0.0, 1.0);
+    (near * 10.0).round() as u8
+}
 
 /// 入れ切りと世代。
 pub(crate) struct Switches {
@@ -245,9 +261,23 @@ mod imp {
                     }
                 };
                 let mut discard_wheel = wheel::discard;
+                // 帯へ最後に送った近さ（変わったときだけ送る）。
+                let mut near_sent: Option<u8> = None;
                 let mut send = |p: PointerPayload| {
                     // 送れなくても背景が動かないだけ（値をどこにも残さない）。
                     let _ = app.emit_to(label, POINTER_EVENT, p);
+                    // 帯へは近さの数 1 つだけ。カーソルを切ったら 0 を送る。
+                    if p.moved || !p.cursor_on {
+                        let near = strip_near(p.cursor_on, p.y);
+                        if near_sent != Some(near) {
+                            near_sent = Some(near);
+                            let _ = app.emit_to(
+                                crate::handmark_edge_strip::LABEL,
+                                STRIP_NEAR_EVENT,
+                                near,
+                            );
+                        }
+                    }
                 };
                 while active.load(Ordering::Acquire) {
                     SWITCHES.set_paused(crate::recording::is_paused());
@@ -329,6 +359,18 @@ mod tests {
             };
             fw.tick(sw, (k * 16) as f64, &mut io);
         }
+    }
+
+    #[test]
+    fn strip_near_is_one_number_that_fades_with_distance() {
+        assert_eq!(strip_near(true, 0.0), 10);
+        assert_eq!(strip_near(true, 14.0), 10);
+        assert_eq!(strip_near(true, 54.0), 5);
+        assert_eq!(strip_near(true, 94.0), 0);
+        assert_eq!(strip_near(true, 900.0), 0);
+        // カーソルを切っている間・値が壊れているときは 0
+        assert_eq!(strip_near(false, 0.0), 0);
+        assert_eq!(strip_near(true, f64::NAN), 0);
     }
 
     #[test]

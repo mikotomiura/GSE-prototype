@@ -4,8 +4,10 @@
 //! 出ているときだけ、主画面の下の縁に高さ 14 点の帯を出す。帯は本体の窓 1 枚で、非アクティブの NSPanel・
 //! 浮く層・全 Space・全画面の上・クリック透過にする（設計のタスクの判断 4）。
 //!
-//! 段 1 では、帯の中身は揺れる線 1 本だけで、確かめ用に窓の状態を 1 秒ごとに `tracing` へ出す。
-//! トレイの「背景を見る」は、自分が前面に出られるかを読むだけで、何も隠さない（判断 7 の確かめ）。
+//! 帯の中身は `src/components/HandmarkEdgeStrip.tsx`（風で揺れる線・霧・粒）。帯が全部覆われたかを 250ms ごとに
+//! `occlusionState` で読み、変わったときだけ窓へ知らせる（窓は覆われている間は描かない・設計の論点 3）。
+//! 変わったときは `tracing` にも 1 行出す（確かめ用）。
+//! トレイの「背景を見る」は、段 1 では自分が前面に出られるかを読むだけで、何も隠さない（判断 3 の確かめ）。
 //!
 //! 守ること（背景の層と同じ）:
 //! - 推定を use しない。アプリの名前を読まない・書かない。本人の操作を記録しない（ログに出すのは窓の状態と、
@@ -21,6 +23,7 @@ mod imp {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::mpsc;
     use std::time::{Duration, Instant};
+    use tauri::Emitter;
     use tauri::{AppHandle, Manager, Wry};
     use tauri_nspanel::ManagerExt;
 
@@ -29,8 +32,13 @@ mod imp {
     /// 前面に出るのを待つ上限と、読む間隔（設計の論点 6）。
     const ACTIVATE_WAIT: Duration = Duration::from_millis(1000);
     const ACTIVATE_POLL: Duration = Duration::from_millis(50);
-    /// 確かめ用に窓の状態を読む間隔。
-    const PROBE_EVERY: Duration = Duration::from_millis(1000);
+    /// 帯が覆われたかを読む間隔。
+    const PROBE_EVERY: Duration = Duration::from_millis(250);
+    /// 帯が見えているかを窓へ知らせるイベント名（帯の窓だけへ `emit_to`）。
+    const VISIBLE_EVENT: &str = "handmark-strip-visible";
+
+    /// 帯を出さない起動（負荷を帯の有無で比べる計測用・判断 4）。
+    const ENV_OFF: &str = "GSE_HANDMARK_EDGE_STRIP_OFF";
 
     /// 帯が出ている間だけ true。
     static SHOWN: AtomicBool = AtomicBool::new(false);
@@ -51,6 +59,10 @@ mod imp {
 
     /// 背景の層の `setup()`（メインスレッド）から、背景が出たときだけ呼ぶ。
     pub fn setup(app: &tauri::App<Wry>) {
+        if crate::handmark_spike::env_flag(ENV_OFF) {
+            tracing::info!("handmark edge strip: not built ({ENV_OFF}=1)");
+            return;
+        }
         let window = match tauri::WebviewWindowBuilder::new(
             app,
             LABEL,
@@ -139,32 +151,44 @@ mod imp {
         Ok(())
     }
 
-    /// 確かめ用（段 1）: 帯の窓の状態を 1 秒ごとに読んで出す。帯が隠れたら抜ける。
+    /// 帯の窓が見えているかを 250ms ごとに読み、変わったときだけ窓へ知らせて `tracing` に出す。
+    /// 帯が隠れたら抜ける。
     fn start_probe(app: AppHandle<Wry>) {
         let spawned = std::thread::Builder::new()
             .name("gse-handmark-strip-probe".to_string())
-            .spawn(move || loop {
-                std::thread::sleep(PROBE_EVERY);
-                if !SHOWN.load(Ordering::Acquire) || crate::is_shutting_down() {
-                    return;
-                }
-                let handle = app.clone();
-                let _ = app.run_on_main_thread(move || {
-                    let Some(window) = handle.get_webview_window(LABEL) else {
+            .spawn(move || {
+                let mut last: Option<bool> = None;
+                loop {
+                    std::thread::sleep(PROBE_EVERY);
+                    if !SHOWN.load(Ordering::Acquire) || crate::is_shutting_down() {
                         return;
+                    }
+                    let (tx, rx) = mpsc::channel();
+                    let handle = app.clone();
+                    let _ = app.run_on_main_thread(move || {
+                        let Some(window) = handle.get_webview_window(LABEL) else {
+                            return;
+                        };
+                        let Ok(ns) = ns_window(&window) else { return };
+                        let _ = tx.send((
+                            ns.occlusionState()
+                                .contains(objc2_app_kit::NSWindowOcclusionState::Visible),
+                            ns.isOnActiveSpace(),
+                        ));
+                    });
+                    let Ok((visible, on_active_space)) = rx.recv_timeout(PROBE_EVERY * 4) else {
+                        continue;
                     };
-                    let Ok(ns) = ns_window(&window) else { return };
-                    let visible_bit = ns
-                        .occlusionState()
-                        .contains(objc2_app_kit::NSWindowOcclusionState::Visible);
-                    tracing::info!(
-                        occlusion_visible = visible_bit,
-                        on_active_space = ns.isOnActiveSpace(),
-                        is_visible = ns.isVisible(),
-                        level = ns.level(),
-                        "handmark edge strip: probe"
-                    );
-                });
+                    if last != Some(visible) {
+                        last = Some(visible);
+                        let _ = app.emit_to(LABEL, VISIBLE_EVENT, visible);
+                        tracing::info!(
+                            occlusion_visible = visible,
+                            on_active_space,
+                            "handmark edge strip: visibility changed"
+                        );
+                    }
+                }
             });
         if let Err(e) = spawned {
             tracing::warn!("handmark edge strip: probe thread could not start: {}", e);

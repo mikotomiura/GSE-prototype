@@ -1,7 +1,8 @@
 // 手跡の背景の層の試作（spike・本線に入れない）。
 // デスクトップの高さの透明な窓の全面に、自然世界（霧・草・粒・波紋）を描く。写し方は見本 Version 5
 // （枝 docs/tangibility-design の .steering/20261020-handmark-multi-input/handmark-nature-multi.html）と同じ。
-// - 打鍵: 直近 30 秒の打鍵の時刻だけ。風（草のなびき・粒の横の流れ）。
+// - 打鍵: 風（草のなびき・粒の横の流れ）。風の目標は Rust が打鍵の時刻だけから 250ms ごとに計算し、
+//   この窓と下の縁の帯の窓へ同じ値を配る（src-tauri/src/handmark_wind.rs・.steering/20261030-handmark-edge-strip-impl/ 判断 1）。
 // - カーソル: 近くの草が動いた向きへなびき、動かしている間だけ近くの粒が寄る。数秒で戻る。
 // - クリック（左だけ）: その場に一回きりの波紋。枠は 6 で、1.6 秒で消す。
 // - ホイール（macOS）: 粒全体の描く位置を縦にずらし、1 秒で半分に戻す。
@@ -26,30 +27,19 @@ import {
 
 /** 打鍵を知らせるイベント名（src-tauri/src/handmark_stage_spike.rs）。 */
 const KEY_EVENT = "handmark-stage-key";
+/** 風の目標を知らせるイベント名（src-tauri/src/handmark_stage_spike.rs）。 */
+const WIND_EVENT = "handmark-wind";
 /** ポインタを知らせるイベント名（src-tauri/src/handmark_stage_pointer.rs・この窓専用）。 */
 const POINTER_EVENT = "handmark-stage-pointer";
 
-// 打鍵の写し方（版 4 と同じ・強さ 1）。
-const WINDOW_MS = 30_000;
-const STOP_MS = 2_000;
-/** 打鍵の数を数える窓（直近 1 秒）。 */
-const TICK_MS = 1_000;
-/** 風の目標を決める間隔（試視で版 4 の 1 秒は鈍いとされた・判断 12）。 */
+/** 風の目標が届く間隔（handmark_wind.rs の TICK_MS）。受け取った目標へこの時間をかけて寄せる。 */
 const WIND_TICK_MS = 250;
-const SPEED_PER_KEY = 0.05;
-/** 1 秒の打鍵の数の頭打ち（版 4 は 10）。 */
-const MAX_KEYS_PER_SEC = 14;
 /** 風が最大になる速さ（版 4 は 0.4 = 毎秒 8 打。いまは毎秒 12 打）。 */
 const FULL_WIND_SPEED = 0.6;
 /** 霧の帯の本数と、いちばん上の帯の高さ・帯の間隔（画面の高さに対する割合）。 */
 const FOG_BANDS = 3;
 const FOG_TOP = 0.12;
 const FOG_STEP = 0.18;
-/** 打鍵が無い 0.25 秒ごとの減り（版 4 の 1 秒に 0.6 倍とほぼ同じ）。 */
-const WIND_DECAY = 0.88;
-const MIN_SPEED = 0.002;
-const IRREG_MS = 10_000;
-const IRREG_MIN_GAPS = 4;
 
 // カーソルの写し方（見本 Version 5）。距離・上限は画面の高さに対する割合。
 const CURSOR_R = 0.16;
@@ -70,6 +60,12 @@ const WHEEL_HALF_MS = 1000;
 const IDLE_FRAME_MS = 100;
 /** 最後の入力からこの間は、跡が戻りきるまで毎フレーム描く。 */
 const ACTIVE_HOLD_MS = 4000;
+
+/** 風の目標（src-tauri/src/handmark_wind.rs の WindTarget）。 */
+interface WindMessage {
+  speed: number;
+  irreg: number;
+}
 
 interface Blade {
   x: number;
@@ -184,8 +180,7 @@ export default function HandmarkStage() {
     };
     resize();
 
-    // ---- 打鍵の材料（時刻だけ・版 4 と同じ） ----
-    const presses: number[] = [];
+    // ---- 風（Rust から目標が届く） ----
     let speed = 0;
     let speedFrom = 0;
     let speedTo = 0;
@@ -194,26 +189,6 @@ export default function HandmarkStage() {
     let irregFrom = 0;
     let irregTo = 0;
     let tickAt = performance.now();
-
-
-    const irregularity = (now: number): number | null => {
-      let n = 0;
-      let sum = 0;
-      let sumSq = 0;
-      for (let i = 1; i < presses.length; i++) {
-        if (now - presses[i] > IRREG_MS) continue;
-        const g = presses[i] - presses[i - 1];
-        if (g < STOP_MS) {
-          n += 1;
-          sum += g;
-          sumSq += g * g;
-        }
-      }
-      if (n < IRREG_MIN_GAPS) return null;
-      const mean = sum / n;
-      const sd = Math.sqrt(Math.max(0, sumSq / n - mean * mean));
-      return Math.max(0, Math.min(1, (sd / mean - 0.1) / 0.9));
-    };
 
     // ---- ポインタ。最後の 1 点と、数秒で 0 へ戻る値だけを持つ（列を持たない） ----
     const cursor = { x: 0, y: 0, px: 0, py: 0, inside: false, fresh: false, vx: 0, vy: 0 };
@@ -449,20 +424,19 @@ export default function HandmarkStage() {
       }
     };
 
-    const tick = (): void => {
+    // 風の目標を受け取り、今の値からこの目標へ WIND_TICK_MS かけて寄せる。
+    const onWind = (w: WindMessage): void => {
       const now = performance.now();
-      while (presses.length > 0 && now - presses[0] > WINDOW_MS) presses.shift();
-      const lastSec = presses.filter((t) => now - t <= TICK_MS).length;
       speedFrom = speed;
       irregFrom = irreg;
-      const rate = Math.min(lastSec, MAX_KEYS_PER_SEC) * SPEED_PER_KEY;
-      const next = lastSec > 0 ? 0.5 * speed + 0.5 * rate : speed * WIND_DECAY;
-      speedTo = next < MIN_SPEED ? 0 : next;
-      const ir = irregularity(now);
-      // 打鍵の間合いが足りない間の減りは、版 4 の 1 秒に 0.85 倍と同じ（0.25 秒ごとに 0.96 倍）。
-      irregTo = ir === null ? irreg * 0.96 : 0.5 * irreg + 0.5 * ir;
-      if (irregTo < 0.002) irregTo = 0;
+      speedTo = Number.isFinite(w.speed) ? Math.max(0, w.speed) : 0;
+      irregTo = Number.isFinite(w.irreg) ? Math.max(0, Math.min(1, w.irreg)) : 0;
       tickAt = now;
+      if (speedTo > 0) kick();
+    };
+
+    const tick = (): void => {
+      const now = performance.now();
       // 描画が止まっている間（全画面のアプリなど）も、寿命を過ぎた波紋の枠を消す。
       sweepRipples(rippleSlots, now);
       // 同じく、入力が途絶えて十分経ったら、戻っていく値と最後の一点を消す（D4）。
@@ -525,19 +499,27 @@ export default function HandmarkStage() {
 
     let disposed = false;
     let unlistenKey: (() => void) | null = null;
+    let unlistenWind: (() => void) | null = null;
     let unlistenPointer: (() => void) | null = null;
     const win = getCurrentWebviewWindow();
-    // 打鍵の時刻だけを持つ（キーの種類は受け取らない）。listen に失敗したら背景は動かないだけ。
+    // 打鍵の合図は描画を起こすだけ（キーの種類は受け取らない）。listen に失敗したら背景は動かないだけ。
     win
       .listen(KEY_EVENT, () => {
-        const now = performance.now();
-        presses.push(now);
-        lastInputAt = now;
+        lastInputAt = performance.now();
         kick();
       })
       .then((fn) => {
         if (disposed) fn();
         else unlistenKey = fn;
+      })
+      .catch(() => {});
+    win
+      .listen<WindMessage>(WIND_EVENT, (event) => {
+        onWind(event.payload);
+      })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlistenWind = fn;
       })
       .catch(() => {});
     win
@@ -561,6 +543,7 @@ export default function HandmarkStage() {
         window.clearTimeout(idleTimer);
       }
       if (unlistenKey !== null) unlistenKey();
+      if (unlistenWind !== null) unlistenWind();
       if (unlistenPointer !== null) unlistenPointer();
       clearRipples(rippleSlots);
     };

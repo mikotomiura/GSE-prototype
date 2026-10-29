@@ -24,6 +24,9 @@ pub const LABEL: &str = "handmark-stage";
 /// 打鍵を窓へ知らせるイベント名。
 #[cfg(target_os = "macos")]
 const KEY_EVENT: &str = "handmark-stage-key";
+/// 風の目標を窓へ配るイベント名（背景と下の縁の帯の 2 つの窓だけへ `emit_to`）。
+#[cfg(target_os = "macos")]
+const WIND_EVENT: &str = "handmark-wind";
 
 #[cfg(target_os = "macos")]
 const ENV_ENABLE: &str = "GSE_HANDMARK_STAGE_SPIKE";
@@ -41,7 +44,9 @@ static ACTIVE: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 mod imp {
     use super::*;
-    use std::sync::OnceLock;
+    use crate::handmark_wind::{Wind, TICK_MS};
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{Duration, Instant};
     use tauri::{AppHandle, Emitter, Manager, Wry};
 
     // CGWindowLevelKey（CGWindowLevel.h）のデスクトップの層（アイコンの層 kCGDesktopIconWindowLevelKey より下）。
@@ -53,6 +58,34 @@ mod imp {
     }
 
     static APP: OnceLock<AppHandle<Wry>> = OnceLock::new();
+    /// 風（打鍵の時刻だけを持つ）。分析スレッドが `press` し、風のスレッドが `tick` する。
+    static WIND: Mutex<Wind> = Mutex::new(Wind::new());
+    /// 風の時計の起点。
+    static T0: OnceLock<Instant> = OnceLock::new();
+
+    fn now_ms() -> u64 {
+        T0.get_or_init(Instant::now).elapsed().as_millis() as u64
+    }
+
+    /// 背景が出ている間、250ms ごとに風の目標を計算して 2 つの窓へ配る（判断 1）。
+    fn start_wind(app: AppHandle<Wry>) {
+        let spawned = std::thread::Builder::new()
+            .name("gse-handmark-wind".to_string())
+            .spawn(move || {
+                while ACTIVE.load(Ordering::Acquire) && !crate::is_shutting_down() {
+                    std::thread::sleep(Duration::from_millis(TICK_MS));
+                    let target = match WIND.lock() {
+                        Ok(mut w) => w.tick(now_ms()),
+                        Err(_) => return,
+                    };
+                    let _ = app.emit_to(LABEL, WIND_EVENT, target);
+                    let _ = app.emit_to(crate::handmark_edge_strip::LABEL, WIND_EVENT, target);
+                }
+            });
+        if let Err(e) = spawned {
+            tracing::warn!("handmark stage spike: wind thread could not start: {}", e);
+        }
+    }
 
     fn ns_window(window: &tauri::WebviewWindow<Wry>) -> Result<&objc2_app_kit::NSWindow, String> {
         let ptr = window
@@ -114,6 +147,7 @@ mod imp {
                 );
                 // 下の縁の帯は、背景が出たときだけ作る（.steering/20261030-handmark-edge-strip-impl/）。
                 crate::handmark_edge_strip::setup(app);
+                start_wind(app.handle().clone());
                 tracing::info!(
                     protect = crate::handmark_spike::env_flag(ENV_PROTECT),
                     synthetic_pointer = synthetic,
@@ -176,8 +210,13 @@ mod imp {
         if !ACTIVE.load(Ordering::Acquire) {
             return;
         }
+        if let Ok(mut w) = WIND.lock() {
+            w.press(now_ms());
+        }
         let Some(app) = APP.get() else { return };
+        // 打鍵の合図は描画を起こすのに使う（風そのものは WIND_EVENT で配る）。
         let _ = app.emit_to(LABEL, KEY_EVENT, ());
+        let _ = app.emit_to(crate::handmark_edge_strip::LABEL, KEY_EVENT, ());
     }
 
     /// トレイの「背景を閉じる」。隠すだけ（記録しない）。

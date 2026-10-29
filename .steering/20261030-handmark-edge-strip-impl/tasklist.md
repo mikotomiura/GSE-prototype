@@ -11,13 +11,13 @@
 - [x] 結果を results.md に
 
 ## 段 2: 風と帯の中身・負荷
-- [ ] `handmark_wind.rs`（純粋な計算・TS と同じ値のテスト）
-- [ ] 250ms のスレッドと `handmark-wind` の配布・`HandmarkStage.tsx` を受け取る形に
-- [ ] 帯の線・霧・粒・描く回数（33ms / 100ms）
-- [ ] 覆われたら止める（WebKit が止めるかを先に測る）
-- [ ] 帯への近さの数（`handmark_stage_pointer.rs`）・検査の `WINDOW` に帯を足す・陽性対照
-- [ ] 確かめ 4: 負荷（30・10 回/秒）
-- [ ] 研究者の目視（見え方）
+- [x] `handmark_wind.rs`（純粋な計算・TS と同じ値のテスト）
+- [x] 250ms のスレッドと `handmark-wind` の配布・`HandmarkStage.tsx` を受け取る形に
+- [x] 帯の線・霧・粒・描く回数（33ms / 100ms）
+- [x] 覆われたら止める（WebKit が止めるかは測らず、Rust が 250ms ごとに occlusionState を読んで知らせる形にした。覆われた状態は実機でまだ一度も出ていない＝止まることは未確認）
+- [x] 帯への近さの数（`handmark_stage_pointer.rs`）・検査の `WINDOW` に帯を足す・陽性対照
+- [x] 確かめ 4: 負荷（30・10 回/秒）
+- [x] 研究者の目視（見え方）
 
 ## 段 3: どける操作
 - [ ] `handmark_reveal.rs` と順番の純粋な関数・テスト

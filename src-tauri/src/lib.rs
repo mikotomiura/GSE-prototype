@@ -51,6 +51,9 @@ mod handmark_spike;
 mod handmark_stage_spike;
 // 手跡の下の縁の帯の試作（spike・本線に入れない・背景の層が出ているときだけ・macOS だけ）。
 mod handmark_edge_strip;
+// 手跡の風（背景の層と下の縁の帯が共有する・spike・OS 非依存の計算）。
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod handmark_wind;
 // 手跡の背景の層へカーソルとクリックを渡す（spike・ADR-040・macOS だけ）。
 #[cfg(target_os = "macos")]
 mod handmark_stage_pointer;

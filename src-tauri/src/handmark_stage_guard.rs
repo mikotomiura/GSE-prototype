@@ -7,7 +7,7 @@
 //! 文字列の検査は別名の関数を経由した漏れを見つけられない（ADR-040 D3 の「止められないもの」）。
 
 use crate::handmark_stage_pointer::{
-    payload_type_name, Forwarder, Io, PointerPayload, Switches, POINTER_EVENT,
+    payload_type_name, Forwarder, Io, PointerPayload, Switches, POINTER_EVENT, STRIP_NEAR_EVENT,
 };
 use crate::input::handmark_pointer::{synthetic_sample, PointerSample, PointerUpdate};
 use std::marker::PhantomData;
@@ -33,8 +33,8 @@ const RUST: [(&str, &str); 4] = [
     ),
 ];
 
-/// 背景の窓の側のファイル。
-const WINDOW: [(&str, &str); 2] = [
+/// 背景の窓と下の縁の帯の窓の側のファイル。
+const WINDOW: [(&str, &str); 3] = [
     (
         "src/components/HandmarkStage.tsx",
         include_str!("../../src/components/HandmarkStage.tsx"),
@@ -42,6 +42,10 @@ const WINDOW: [(&str, &str); 2] = [
     (
         "src/components/handmarkStageTrace.ts",
         include_str!("../../src/components/handmarkStageTrace.ts"),
+    ),
+    (
+        "src/components/HandmarkEdgeStrip.tsx",
+        include_str!("../../src/components/HandmarkEdgeStrip.tsx"),
     ),
 ];
 
@@ -490,6 +494,24 @@ fn d3_delivery_only_the_stage_window_knows_the_event() {
         hits(&format!("{needle}\n{src}"), &[needle.as_str()]).len(),
         1
     );
+}
+
+#[test]
+fn d3_delivery_only_the_strip_window_knows_the_near_event() {
+    // 帯へのカーソルの近さ（数 1 つ）を知るのは、送る側と帯の窓だけ。
+    assert_eq!(
+        files_naming(STRIP_NEAR_EVENT),
+        vec![
+            "HandmarkEdgeStrip.tsx".to_string(),
+            "handmark_stage_pointer.rs".to_string()
+        ],
+        "帯の近さのイベント名を帯の窓の外のコードが知っている（target なしの listen で届く）"
+    );
+    // 帯の窓はポインタの座標のイベントを知らない（上の検査と同じく背景の窓だけ）。
+    let strip = include_str!("../../src/components/HandmarkEdgeStrip.tsx");
+    assert!(!body(strip).contains(POINTER_EVENT));
+    // 陽性対照: 帯の本文の先頭にポインタのイベント名を足すと見つかる。
+    assert!(body(&format!("const n = \"{POINTER_EVENT}\";\n{strip}")).contains(POINTER_EVENT));
 }
 
 // ---- 推定 ----
