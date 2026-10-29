@@ -1,0 +1,10 @@
+mark 1793283346 start
+mark 1793283354 ax_windows=1
+mark 1793283354 fs_on_sent
+mark 1793283358 fs_state=true
+mark 1793283365 after_hide_textedit_visible=true
+mark 1793283372 mid_textedit_visible=true
+mark 1793283378 after_restore_textedit_visible=true fs_state=true
+mark 1793283380 fs_off_sent
+mark 1793283384 textedit_quit
+mark 1793283387 end

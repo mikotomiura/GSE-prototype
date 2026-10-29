@@ -1,0 +1,46 @@
+start screen=1470x956 thick=14 fps=60 duration=40 hide_at=12.0 restore_at=27.0
+t=1 onscreen=1 front_of_layer0=1 visible=1 layer0=3 full_size_layer0=0 cpu_pct=11.0 visible_apps=13 hidden_apps=1
+t=2 onscreen=1 front_of_layer0=1 visible=1 layer0=3 full_size_layer0=0 cpu_pct=12.1 visible_apps=12 hidden_apps=2
+t=3 onscreen=1 front_of_layer0=1 visible=1 layer0=3 full_size_layer0=0 cpu_pct=8.8 visible_apps=12 hidden_apps=2
+t=4 onscreen=1 front_of_layer0=1 visible=1 layer0=4 full_size_layer0=0 cpu_pct=11.1 visible_apps=13 hidden_apps=1
+t=5 onscreen=1 front_of_layer0=1 visible=1 layer0=4 full_size_layer0=0 cpu_pct=8.8 visible_apps=13 hidden_apps=1
+t=6 onscreen=1 front_of_layer0=0 visible=1 layer0=4 full_size_layer0=0 cpu_pct=6.7 visible_apps=13 hidden_apps=1
+t=7 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=7.7 visible_apps=13 hidden_apps=1
+t=8 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.4 visible_apps=13 hidden_apps=1
+t=9 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=10.2 visible_apps=13 hidden_apps=1
+t=10 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.2 visible_apps=13 hidden_apps=1
+t=11 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.5 visible_apps=13 hidden_apps=1
+t=12 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=7.9 visible_apps=13 hidden_apps=1
+activate_wait_ms=1018 active=0
+hide remembered=13 hide_true=0
+t=14 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=7.7 visible_apps=2 hidden_apps=12
+hide_check not_hidden_after_1s=2 active_not_hidden=1
+t=15 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.6 visible_apps=2 hidden_apps=12
+t=16 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.5 visible_apps=2 hidden_apps=12
+t=17 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.3 visible_apps=2 hidden_apps=12
+t=18 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=7.1 visible_apps=2 hidden_apps=12
+t=19 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.8 visible_apps=2 hidden_apps=12
+t=20 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.5 visible_apps=2 hidden_apps=12
+t=21 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.9 visible_apps=2 hidden_apps=12
+t=22 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.8 visible_apps=2 hidden_apps=12
+t=23 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=7.5 visible_apps=2 hidden_apps=12
+t=24 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.7 visible_apps=2 hidden_apps=12
+t=25 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.1 visible_apps=2 hidden_apps=12
+t=26 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.6 visible_apps=2 hidden_apps=12
+t=27 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=7.7 visible_apps=2 hidden_apps=12
+restore remembered=13 unhide_true=0 still_hidden_immediately=11
+restore_order apps=1
+t=28 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=7.8 visible_apps=13 hidden_apps=1
+order_check before_n=2 after_n=2 missing=0 same_order=1 front_same=1 active_same=1
+t=29 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.0 visible_apps=13 hidden_apps=1
+t=30 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=7.0 visible_apps=13 hidden_apps=1
+t=31 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=6.7 visible_apps=13 hidden_apps=1
+t=32 onscreen=1 front_of_layer0=1 visible=1 layer0=2 full_size_layer0=0 cpu_pct=8.1 visible_apps=13 hidden_apps=1
+t=33 onscreen=1 front_of_layer0=1 visible=1 layer0=4 full_size_layer0=1 cpu_pct=8.3 visible_apps=13 hidden_apps=1
+t=34 onscreen=1 front_of_layer0=1 visible=1 layer0=4 full_size_layer0=0 cpu_pct=9.0 visible_apps=13 hidden_apps=1
+t=35 onscreen=1 front_of_layer0=1 visible=1 layer0=4 full_size_layer0=0 cpu_pct=7.8 visible_apps=13 hidden_apps=1
+t=36 onscreen=1 front_of_layer0=1 visible=1 layer0=3 full_size_layer0=0 cpu_pct=8.0 visible_apps=12 hidden_apps=1
+t=37 onscreen=1 front_of_layer0=1 visible=1 layer0=3 full_size_layer0=0 cpu_pct=9.1 visible_apps=12 hidden_apps=1
+t=38 onscreen=1 front_of_layer0=1 visible=1 layer0=3 full_size_layer0=0 cpu_pct=6.8 visible_apps=12 hidden_apps=1
+t=39 onscreen=1 front_of_layer0=1 visible=1 layer0=3 full_size_layer0=0 cpu_pct=6.9 visible_apps=12 hidden_apps=1
+t=40 onscreen=1 front_of_layer0=1 visible=1 layer0=3 full_size_layer0=0 cpu_pct=8.6 visible_apps=12 hidden_apps=1
