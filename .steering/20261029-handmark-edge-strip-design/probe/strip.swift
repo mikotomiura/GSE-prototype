@@ -140,6 +140,14 @@ final class D: NSObject, NSApplicationDelegate {
           RunLoop.current.run(until: Date().addingTimeInterval(0.05))
         }
         print("activate_wait_ms=\(Int(Date().timeIntervalSince(w0) * 1000)) active=\(NSApp.isActive ? 1 : 0)")
+        // --abort-if-inactive: 前面に出られなければ隠さずにやめる（design.md 論点 6 の手順 2）。
+        if !NSApp.isActive && CommandLine.arguments.contains("--abort-if-inactive") {
+          print("hide aborted_inactive=1")
+          remembered = []; orderBefore = []; activeBefore = nil
+          restoreDone = true
+          fflush(stdout)
+          return
+        }
       }
       let ok = remembered.map { $0.hide() }.filter { $0 }.count
       print("hide remembered=\(remembered.count) hide_true=\(ok)")
@@ -181,6 +189,15 @@ final class D: NSObject, NSApplicationDelegate {
     }
     fflush(stdout)
     if el >= duration { NSApp.terminate(nil) }
+  }
+
+  // 隠したまま終わらない（cross-review A）: 終了時に、まだ戻していなければ覚えたアプリを戻す。
+  func applicationWillTerminate(_ n: Notification) {
+    if hidDone && !restoreDone {
+      remembered.forEach { _ = $0.unhide() }
+      print("terminate_restore remembered=\(remembered.count)")
+      fflush(stdout)
+    }
   }
 }
 let app = NSApplication.shared

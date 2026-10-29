@@ -18,9 +18,9 @@
 - [x] design.md に論点 1〜7 と、次のタスクの最初に確かめることを書く
 
 ## レビュー
-- [ ] /cross-review（code-reviewer と Codex）
-- [ ] 指摘への対応
+- [x] /cross-review（code-reviewer と Codex）
+- [x] 指摘への対応（判断 7）・陽性対照の試し 5（run17）
 
 ## 完了処理
-- [ ] 次のタスク（実装）への引き継ぎ
+- [x] 次のタスク（実装）への引き継ぎ（`.steering/_handoff/next-session-handmark-edge-strip-impl.md`）
 - [ ] git commit（コミットの前に `git branch --show-current`）・push（PR は出さない）

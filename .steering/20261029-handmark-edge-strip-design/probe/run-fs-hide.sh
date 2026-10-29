@@ -7,6 +7,10 @@ set -u
 STRIP="$1"; OUT="$2"; MARKS="$3"; shift 3
 # 4 番目以降は帯の試作に渡す。無ければ run14・run15 と同じ引数。
 ARGS=("$@"); [ ${#ARGS[@]} -eq 0 ] && ARGS=(--hide-at 12 --restore-at 27 --activate-first --restore-order)
+# テキストエディットが起動中なら中止する（最後に quit saving no で終了させるので、既存の書類を失わないため。cross-review K）。
+if pgrep -x TextEdit >/dev/null; then echo "TextEdit is already running; abort" >&2; exit 2; fi
+# 印の after_hide_ / mid_ / after_restore_ は帯の試作の 12・19・27 秒目ごろの時刻の目印。隠さない試し（run16）でも同じ名前で書く。
+# --duration は先頭の 40 が使われる（試作は最初の値を読む）。
 mark() { echo "mark $(date +%s) $*" >> "$MARKS"; }
 : > "$MARKS"
 fs_state() { osascript -e 'tell application "System Events" to tell process "TextEdit" to get value of attribute "AXFullScreen" of window 1' 2>&1; }
