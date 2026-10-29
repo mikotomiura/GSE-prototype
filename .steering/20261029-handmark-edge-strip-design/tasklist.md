@@ -23,4 +23,4 @@
 
 ## 完了処理
 - [x] 次のタスク（実装）への引き継ぎ（`.steering/_handoff/next-session-handmark-edge-strip-impl.md`）
-- [ ] git commit（コミットの前に `git branch --show-current`）・push（PR は出さない）
+- [x] git commit（コミットの前に `git branch --show-current`）・push（PR は出さない）
