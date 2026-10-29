@@ -69,11 +69,13 @@ Merging the separators into one category (R3~$-$~R3-u) lowered the strongest att
 36.0\% [31.9, 40.2], by A3 with its mean timing term. On R3-u, A0 counts all characters, separators included, and
 reached 19.2\% by itself, so the gain over A0 is 16.8 points [13.6, 20.1]. Releasing only the segment values kept A2 at its value on R3 for $w =
 1$ (40.5\% [36.1, 44.8]), lowered it to 4.4\% [2.8, 6.3] for $w = 2$, and for $w = 4$ and $8$ left no attacker above
-A0. Suppression lowered the strongest
+A0. With the lighter penalty $\lambda = 4$, a registered secondary analysis (\S\ref{sec:attackers:alignment}), A2
+reached 75.1\%, 36.4\% and 4.5\% for $w = 1$, $2$ and $4$, so the results on segment values depend on this penalty.
+Suppression lowered the strongest
 attacker to 70.2\% [66.0, 74.2], 14.3\% [11.5, 17.4] and 2.2\% [1.4, 3.4] for $p = 0.1$, $0.25$ and $0.5$; at $p =
 0.5$ the strongest attacker was A0 (gain 0.0 [0.0, 1.1]).
 
-At $N = 10$ the order of the forms is the same, but A0 alone already chose the true text in 61.6\% of draws, so the
+At $N = 10$ the order of the forms is the same except that R3-u rises above R4(1) and R7(0.5) above R4(2), but A0 alone already chose the true text in 61.6\% of draws, so the
 gains are smaller (Table~\ref{tab:main}b): 32.0 points on R3, 3.8 points [2.2, 5.4] on R3-u, and none whose lower
 bound is above zero on R4($w$) and on R7 with $p \geq 0.25$. The negative control stayed near $1/N$ for every form
 (9.6\% to 11.5\% at $N = 10$, at most 0.34\% at $N = 1{,}000$).
@@ -82,7 +84,7 @@ This is the first axis of contribution C2. Against the attackers tried, the form
 R3, R3-t) left matching within 14 points of the masking, and the times were not needed by the strongest attacker. Only
 merging the separators, coarsening the segment values to $w \geq 2$ or suppressing at least a quarter of the presses
 brought the strongest attacker below 40\% at $N = 1{,}000$, and only R4(4), R4(8) and R7(0.5) left no gain over the
-total length. These contrasts contain the difference in attackers as well as in columns
+total length (R4(4) not against A2 with $\lambda = 4$). These contrasts contain the difference in attackers as well as in columns
 (\S\ref{sec:threat-model:bias}).
 
 \subsection{The cost to the process measures}
@@ -157,7 +159,7 @@ keep them apart from their texts.
 In the open-world diagnostic, the area was 1.000 for R0 and R1, 0.978 for R2, 0.774 [0.753, 0.795] for R3 and R3-t
 and at most 0.62 for the other forms. KeyTAR, the reference outside the threat model (\S\ref{sec:attackers:list}), stayed below A0 on every form and $N$
 (Table~\ref{tab:main}) and on windows reached at most 0.50\% at $N = 1{,}000$ and 17.1\% at $N = 10$; without the
-writer whose chunks were generated on the CPU, no accuracy changed by more than 0.11 points (Appendix~\ref{app:results}).
+writer whose chunks were generated on the CPU, no accuracy changed by more than 0.12 points (Appendix~\ref{app:results}).
 
 \subsection{Predictions and results}
 \label{sec:results:predictions}
@@ -175,7 +177,7 @@ This part asks question 4: whether the same kind of matching exceeds chance and 
 measured by A2 on R3j at $N$ = all (\S\ref{sec:protocol:enja}). No session met an exclusion criterion, so all 76
 sessions of 39 translators on six source texts were used, with 12 or 13 candidates per log. On R3j, which keeps no
 string, A2 chose the true translation in 51.6\% [39.3, 63.5] of logs, against $1/N$ = 7.9\% and 11.9\% [5.3, 19.7] for
-A0. The differences were 43.7 points [31.4, 55.6] from $1/N$ and 39.7 points [25.6, 53.0] from A0; both lower bounds
+A0 (means over the six source texts). The differences were 43.7 points [31.4, 55.6] from $1/N$ and 39.7 points [25.6, 53.0] from A0; both lower bounds
 are above zero, so by the registered rule matching exceeds chance and A0. Accuracy ranged from 33\% to
 77\% over the source texts, and R3j-t($w$) and R4($w$) also exceeded both (Appendix~\ref{app:enja}). The result is
 conditional (\S\ref{sec:discussion:limits}): without any string, the categories of input-method events kept enough
@@ -185,9 +187,7 @@ of a translation's segment structure to choose it in half of the logs.
 \label{sec:results:exploratory}
 
 The exploratory analyses (\S\ref{sec:protocol:exploratory}; Appendix~\ref{app:exploratory}) add five observations
-at $N = 1{,}000$. On R4(2) and R7(0.5), with mean accuracies of 4.4\% and 2.2\%, 4.2\% and 1.6\% of writers were
-matched in every draw: the matches concentrate on a few writers. On R3, the 80\% of logs and draws with the largest
-margin between the best and the second-best candidate were all matched correctly. Accuracy did not differ by score
-band on R1 to R3, while on R3-u the lowest third was matched more often than the highest ($-16.9$ points [$-26.9$,
-$-6.9$]). Eight consecutive word lengths were unique among the candidates in 93.8\% of runs; with differentially private
+at $N = 1{,}000$. On R4(2) and R7(0.5), 4.2\% and 1.6\% of writers were matched in every draw, so the matches
+concentrate on a few writers. On R3, the 80\% of logs and draws with the largest margins were all matched correctly.
+Accuracy did not differ by score band on R1 to R3, but did on R3-u. Eight consecutive word lengths were unique among the candidates in 93.8\% of runs; with differentially private
 noise at $\varepsilon = 0.5$, A1$'$ still chose the true text in 48.8\% of draws.

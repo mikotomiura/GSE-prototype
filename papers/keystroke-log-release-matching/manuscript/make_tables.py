@@ -56,9 +56,22 @@ def times(x):
     return f"{x:.1f}"
 
 
-def attacker(v):
-    name = ATTACKER_TEX[v["attacker"]]
-    share = v["share_selected"].get(v["attacker"], 1.0)
+def a3_key(m, f, a, n):
+    """On R3-u the attacker A3 is the better of its two timing terms; it is named by the one it equals (stops if
+    neither), so that every table names it the same way."""
+    if f != "R3-u" or a != "A3":
+        return a
+    c = m["cells"]
+    acc = c[f"full|R3-u|A3|{n}"]["acc"]
+    for k in ("A3-mean", "A3-sum"):
+        if c[f"full|R3-u|{k}|{n}"]["acc"] == acc:
+            return k
+    raise SystemExit(f"A3 on R3-u at N = {n} equals neither A3-mean nor A3-sum")
+
+
+def attacker(v, m=None, f=None, n=None):
+    name = ATTACKER_TEX[a3_key(m, f, v["attacker"], n) if m else v["attacker"]]
+    share = v["share_selected"][v["attacker"]]
     if share < 0.995:
         name += f" ({100 * share:.0f})"
     return name
@@ -77,14 +90,15 @@ def main_table(m, n, with_utility):
     if not with_utility:
         # Without the utility columns, the rows of R3-t(w) are merged when every value is the same for all w.
         keys = ("acc", "ci", "attacker", "uplift_over_A0", "uplift_ci")
-        same = all(s[f"full|R3-t({w})|{n}"][k] == s[f"full|R3-t(10)|{n}"][k] for w in (100, 1000) for k in keys)
+        same = all(s[f"full|R3-t({w})|{n}"][k] == s[f"full|R3-t(10)|{n}"][k] for w in (100, 1000) for k in keys) and \
+            all(c[f"full|R3-t({w})|A0|{n}"]["acc"] == c[f"full|R3-t(10)|A0|{n}"]["acc"] for w in (100, 1000))
         if same:
             forms = [f for f in MAIN_FORMS if f not in ("R3-t(100)", "R3-t(1000)")]
     for f in forms:
         v = s[f"full|{f}|{n}"]
         a0 = c[f"full|{f}|A0|{n}"]["acc"]
         name = "R3-t($w$), all $w$" if (not with_utility and f == "R3-t(10)" and len(forms) < len(MAIN_FORMS)) else form_tex(f)
-        row = [name, pct(a0), f"{pct(v['acc'])} {ci(v['ci'])}", attacker(v), times(v["x_chance"]),
+        row = [name, pct(a0), f"{pct(v['acc'])} {ci(v['ci'])}", attacker(v, m, f, n), times(v["x_chance"]),
                f"{pct(v['uplift_over_A0'])} {ci(v['uplift_ci'])}"]
         if with_utility:
             u = uf[f]
@@ -121,11 +135,9 @@ def secondary_table(m):
     s, c = m["strongest"], m["cells"]
     rows = []
     for f in ALL_FORMS:
-        a = s[f"full|{f}|1000"]["attacker"]
-        if f == "R3-u" and a == "A3":
-            a = "A3-mean" if s[f"full|{f}|1000"]["acc"] == c[f"full|{f}|A3-mean|1000"]["acc"] else "A3-sum"
+        a = a3_key(m, f, s[f"full|{f}|1000"]["attacker"], "1000")
         v = c[f"full|{f}|{a}|1000"]
-        p = v.get("writer_p10_p50_p90") or [None] * 3
+        p = v["writer_p10_p50_p90"]
         rows.append(" & ".join([form_tex(f), ATTACKER_TEX[a], pct(v["acc"]), pct(v["top5"]), f"{v['mrr']:.3f}",
                                 "/".join(pct(x) for x in p), str(v["only_true_inf"]), str(v["all_inf"])]) + " \\\\")
     return rows
@@ -138,8 +150,10 @@ def window_table(m):
         cells = []
         for n in ("1000", "10"):
             for k in ("5", "10", "20", "50"):
-                v = s.get(f"window|{f}|{n}|{k}")
-                cells.append(f"{pct(v['acc'])} ({ATTACKER_TEX[v['attacker']]})" if v else "--")
+                v = s[f"window|{f}|{n}|{k}"]
+                if f == "R3-u" and v["attacker"] == "A3":
+                    raise SystemExit(f"window|R3-u|{n}|{k}: A3 on windows is not named by its timing term")
+                cells.append(f"{pct(v['acc'])} ({ATTACKER_TEX[v['attacker']]})")
         rows.append(" & ".join([form_tex(f)] + cells) + " \\\\")
     return rows
 
@@ -188,8 +202,7 @@ def utility_table(m, key):
     for mk, label in MEASURES:
         cells = []
         for f in forms:
-            v = u.get(f"{mk}|{f}")
-            q = v.get(key) if v else None
+            q = u[f"{mk}|{f}"][key]  # a missing key stops; a measure that was not computed has no mean
             cells.append(f"{q['mean']:.2f}" if q and q.get("mean") is not None else "--")
         rows.append(" & ".join([label] + cells) + " \\\\")
     return rows
@@ -213,7 +226,7 @@ def other_tables(m):
     ow = []
     for f in MAIN_FORMS:
         v = m["open_world"][f"full|{f}|1000"]
-        ow.append(" & ".join([form_tex(f), ATTACKER_TEX[v["costs_of"]] if v["costs_of"] in ATTACKER_TEX else v["costs_of"],
+        ow.append(" & ".join([form_tex(f), ATTACKER_TEX[v["costs_of"]],
                               f"{v['auc']:.3f} [{v['ci'][0]:.3f}, {v['ci'][1]:.3f}]"]) + " \\\\")
     return rows, neg, ow
 
@@ -232,22 +245,22 @@ def enja_table(d):
     return rows
 
 
-def explore_tables(tail, margin, band):
+def explore_tables(tail, margin, band, m):
     t_rows, m_rows, b_rows = [], [], []
     for f in MAIN_FORMS:
         for n in ("1000", "10"):
             v = tail[f"full|{f}|{n}"]
-            t_rows.append(" & ".join([form_tex(f), "1{,}000" if n == "1000" else "10", ATTACKER_TEX[v["attacker"]],
+            t_rows.append(" & ".join([form_tex(f), "1{,}000" if n == "1000" else "10", ATTACKER_TEX[a3_key(m, f, v["attacker"], n)],
                                       f"{pct(v['p95']['value'])} {ci(v['p95']['ci'])}",
                                       f"{pct(v['p99']['value'])} {ci(v['p99']['ci'])}",
                                       f"{pct(v['share_acc_1']['value'])} {ci(v['share_acc_1']['ci'])}"]) + " \\\\")
             mv = margin[f"full|{f}|{n}"]
             cv = {p["q"]: p for p in mv["curve"]}
             cells = [f"{pct(cv[q]['coverage'])}/{pct(cv[q]['precision'])}" for q in (0, 20, 50, 80, 90)]
-            m_rows.append(" & ".join([form_tex(f), "1{,}000" if n == "1000" else "10", ATTACKER_TEX[mv["attacker"]]] + cells)
+            m_rows.append(" & ".join([form_tex(f), "1{,}000" if n == "1000" else "10", ATTACKER_TEX[a3_key(m, f, mv["attacker"], n)]] + cells)
                           + " \\\\")
             bv = band[f"full|{f}|{n}"]
-            b_rows.append(" & ".join([form_tex(f), "1{,}000" if n == "1000" else "10", ATTACKER_TEX[bv["attacker"]],
+            b_rows.append(" & ".join([form_tex(f), "1{,}000" if n == "1000" else "10", ATTACKER_TEX[a3_key(m, f, bv["attacker"], n)],
                                       pct(bv["band0"]["acc"]), pct(bv["band1"]["acc"]), pct(bv["band2"]["acc"]),
                                       f"{pct(bv['top_minus_bottom']['value'])} {ci(bv['top_minus_bottom']['ci'])}"]) + " \\\\")
     return t_rows, m_rows, b_rows
@@ -257,7 +270,7 @@ UNICITY_K = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30, 50]
 
 
 def unicity_table(u):
-    """Uniqueness of word-length sequences among N candidates by k, with k* = log2 N / h_m as the last row.
+    """Uniqueness of word-length sequences among N candidates by k, with k* = log2 N / h_j as the last row.
     Stops if the sample sizes or the values of k are not those of the procedure."""
     if u["N"] != [10, 100, 1000] or u["kmax"] != 50 or u["mutate"]:
         raise SystemExit("exploratory_unicity.json: unexpected N, kmax or mutation")
@@ -281,7 +294,7 @@ def unicity_table(u):
     rows.append("\\midrule")
     rows.append(" & ".join(["$k^{*}$"] + [f"\\multicolumn{{2}}{{l}}{{{min(v.values()):.2f} to {max(v.values()):.2f}}}"
                                           for v in ks] + [""]) + " \\\\")
-    rows.append(f"$h_m$ & \\multicolumn{{7}}{{l}}{{{h['h0']:.2f}, {h['h1']:.2f} and {h['h2']:.2f} bits per word}} \\\\")
+    rows.append(f"$h_j$ & \\multicolumn{{7}}{{l}}{{{h['h0']:.2f}, {h['h1']:.2f} and {h['h2']:.2f} bits per word}} \\\\")
     return rows
 
 
@@ -343,7 +356,10 @@ def main():
     write(out, "main-1000.tex", main_table(m, "1000", True))
     write(out, "main-10.tex", main_table(m, "10", False))
     write(out, "figure-coords.tex", figure_coords(m))
-    write(out, "cells.tex", cells_table(m))
+    cells = cells_table(m)
+    cut = next(i for i, r in enumerate(cells) if r.startswith("R4("))  # two tables: one would not fit on a page
+    write(out, "cells-1.tex", cells[:cut])
+    write(out, "cells-2.tex", cells[cut:])
     write(out, "secondary.tex", secondary_table(m))
     write(out, "windows.tex", window_table(m))
     write(out, "utility-r0.tex", utility_table(m, "spearman_r0"))
@@ -364,7 +380,7 @@ def main():
     tail = json.load(open(os.path.join(res, "exploratory_tail.json"), encoding="utf-8"))["analysis"]
     margin = json.load(open(os.path.join(res, "exploratory_margin.json"), encoding="utf-8"))["analysis"]
     band = json.load(open(os.path.join(res, "exploratory_score_band.json"), encoding="utf-8"))["analysis"]
-    t, mg, b = explore_tables(tail, margin, band)
+    t, mg, b = explore_tables(tail, margin, band, m)
     write(out, "explore-tail.tex", t)
     write(out, "explore-margin.tex", mg)
     write(out, "explore-band.tex", b)
