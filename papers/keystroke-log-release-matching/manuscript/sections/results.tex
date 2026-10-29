@@ -41,8 +41,8 @@ Appendix~\ref{app:results}.
 This part asks whether the masking used in the competition (R1) keeps a log apart from its text, measured by the
 strongest attacker's accuracy against $1/N$ and A0, with the negative control beside it. It does not, against the attacker that rebuilds the final draft as the winning solution did: on R1, A1 chose the
 true text for every log in every draw, at $N = 1{,}000$ as at $N = 10$ (1,000 times $1/N$, a gain of 98.2 points
-[97.1, 99.2] over A0, selected in every resample). R1 gave the same values as the unprocessed log R0, as did two
-further forms (Appendix~\ref{app:results}), also for the 18 writers whose rebuilt draft differs from the distributed text. In the negative
+[97.1, 99.2] over A0, selected in every resample). R1 gave the same values as the unprocessed log R0, as did R5 and R6
+(Appendix~\ref{app:results}), also for the 18 writers whose rebuilt draft differs from the distributed text. In the negative
 control, the same attacker chose the true text in 0.0\% of draws at $N = 1{,}000$ and 9.9\% at $N = 10$, close to
 $1/N$, so the accuracy comes from the link between each log and its own text; the open-world area was 1.000.
 
@@ -67,8 +67,8 @@ Merging the separators into one category (R3~$-$~R3-u) lowered the strongest att
 reached 19.2\% by itself, so the gain over A0 is 16.8 points [13.6, 20.1]. Releasing only the segment values kept A2 at its value on R3 for $w =
 1$ (40.5\% [36.1, 44.8]), lowered it to 4.4\% [2.8, 6.3] for $w = 2$, and for $w = 4$ and $8$ left no attacker above
 A0. With the lighter penalty $\lambda = 4$, a registered secondary analysis (\S\ref{sec:attackers:alignment}), A2
-reached 75.1\%, 36.4\% and 4.5\% for $w = 1$, $2$ and $4$, and on windows of 5 to 50 segments A2 chose the true window
-in 44\% to 58\% of draws on R4(2) and 13\% to 43\% on R4(4) (Appendix~\ref{app:results}). The low full-text values on
+reached 75.1\%, 36.4\% and 4.5\% for $w = 1$, $2$ and $4$, and on windows of 5 to 50 segments, at $N = 1{,}000$ with
+$\lambda = 8$, A2 chose the true window in 44\% to 58\% of draws on R4(2) and 13\% to 43\% on R4(4) (Appendix~\ref{app:results}). The low full-text values on
 the coarse forms may therefore reflect the end-to-end alignment with $\lambda = 8$ rather than the form.
 Suppression lowered the strongest
 attacker to 70.2\% [66.0, 74.2], 14.3\% [11.5, 17.4] and 2.2\% [1.4, 3.4] for $p = 0.1$, $0.25$ and $0.5$; at $p =
@@ -147,8 +147,8 @@ measures agreement with R0, not whether a measure keeps its relation to the qual
 This is the second axis of contribution C2, read from the forms that no other form dominates. R3 kept 86.7\% with
 five measures as in R0 and a median correlation of 0.92; suppressing a tenth, a quarter and a half of the presses gave
 70.2\%, 14.3\% and 2.2\% with medians of 0.85, 0.81 and 0.70; R4(8) gave 0.14\% and no measure. Only R4(4) and R4(8)
-brought the strongest attacker within four times $1/N$, and they compute no measure; every form from R2 on computed the
-R-burst and insertion measures at a correlation below 0.5 or not at all (Appendix~\ref{app:results}).
+brought the strongest attacker within four times $1/N$, and they compute no measure; every main form from R2 on computed
+the R-burst and insertion measures at a mean correlation below 0.5 or not at all (Appendix~\ref{app:results}).
 
 \subsection{Windows and the open world}
 \label{sec:results:windows}
