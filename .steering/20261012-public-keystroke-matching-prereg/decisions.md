@@ -551,3 +551,14 @@ paper-write の Step 0〜5 の実地の試し（判断 77）。記録は `.steer
 - PoPETs の program chairs の返事（研究者が会話に貼った・2026-10-29 に共有）: 採録の論文は会場に出席しなくても予稿集に載る（出席は強く勧める）。遠隔の発表は、録画を含め一切ない。判断 57 の「PoPETs を外す条件」（ライブのオンライン発表が掲載の条件）には当たらない。渡航しなければ発表の機会は無い。続けるかは研究者が決める（今回は聞いていない）。
 
 追記（2026-10-29・研究者・AskUserQuestion 1 回）: 研究者は渡航の費用が無く英語の発表も難しいため、出席しない。その前提で PoPETs への投稿を続ける（推奨を選んだ）。CfP（https://petsymposium.org/cfp27.php・2026-10-29 に取り直した）の原文: "in-person attendance is not strictly required for publication in the proceedings"・"does not have article processing charges or article submission charges"。掲載の条件に登録費を払うという文は CfP に無かった。採否は査読で決まり、二重盲検なので出席の予定は採否に関わらない。採録されたら、出席できないことを program chairs に伝える（下書きは Claude・送るのは研究者）。
+
+## 判断 82: R-DP の R0 に比べる有用性を付録 D の表 8 に入れる（段 3 の一部・研究者の指示・2026-10-29）
+
+G-GEAR の集計し直し（コミット `84527b7a`・`9463d81b`・`520e6be5`・notes.md D5）が済み、研究者は「すでに実施できるから取り込もう」と指示した。`main_all.json` は待たない（段 3 の引き継ぎは 2 つを独立とする）。
+
+- 開いた後の照合（Mac・独立）: `exploratory_dp_utility_r0.json` の SHA-256 `72b011cc…` が notes.md と一致。R3 の有用性 10 項目と `utility_figure` の R3 が `main.json` と同じ。鍵の集合・`spearman_score`・`cell` が `exploratory_dp.json` と同じ。R0 との相関と比の空の葉は 0。insertion の 2 指標で R0 と比べられない書き手 21 人は `main.json` の R3 と同じ数（R0 の値が 0 の書き手）。書き手の ID らしい文字列は無い。
+- 何を載せるか: 付録 E の有用性の表（表 `tab:app:utility`）は「R0 との相関」と「得点との相関」の 2 段で、R0 との比はどの表にも無い。表 8 を同じ 2 段にそろえ、比は載せない（同じ量と書き方にそろえる・段 3 の引き継ぎの 2）。
+- 書いたもの: `make_tables.py` の `dp_tables` が `exploratory_dp_utility_r0.json` を読み、`explore-dp-r0.tex` を出す。止まる条件を 3 つ足した: 鍵の集合が `exploratory_dp.json` と違う、`cell` か `spearman_score` が違う、R3 が `main.json` と違う。4 つの壊した写し（R3・得点・cell・鍵の欠け）で止まり、壊さない写しで既存の生成ファイルは 1 つも変わらなかった。付録 D の「Tables」の段落の角括弧を外し、LaTeX のコメント（D5）を集計し直した旨に直した。表 8 の注を「上: R0 との相関・下: 得点との相関」にした。§7.7 は変えていない。
+- 確かめ: ビルドはエラー 0・未定義 0・overfull 2（前と同じ）。本文は変えておらず、Ethical Considerations は p13 の頭のまま。総頁は 26 から 27（表 8 が 1 頁に移った）。PDF を画像で見て表 8 の幅は崩れていない。文体の門は違反 0。R3 の列は付録 E の表の R3 の列と同じ値になった。
+
+気づいたこと（判断不要・記録）: R0 との相関は、間（pause）の指標が R-DP(4) で 0.08〜0.48 まで下がる一方、削除と挿入の指標は ε によらずほぼ R3 と同じ（0.18〜0.85）。P-burst は 0.93（ε = 4）から 0.53（ε = 0.5）。原稿の文には書いていない（§7.7 は余白 0）。

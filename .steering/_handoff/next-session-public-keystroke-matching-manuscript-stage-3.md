@@ -7,7 +7,8 @@
 | 済み | `main.json`・`enja15_main.json`・探索 3〜5 | §7・序論・考察・結論・抄録（判断 79） |
 | 済み | `main_a4.json`・`main_a4_without_cpu_writer.json` | 表 2 の A4 の行・§7.4・§7.5・付録 E の KeyTAR（判断 80） |
 | 済み | `exploratory_unicity.json`・`exploratory_dp.json` | §7.7 の 1 文・付録 D の表 6〜8（判断 81） |
-| **3（このセッション）** | `main_all.json`（全員の付録）・`exploratory_dp_utility_r0.json`（R-DP の R0 に比べる有用性） | 付録 E の Results on all writers・付録 D の表 8 と「Tables」の段落の角括弧 |
+| 済み | `exploratory_dp_utility_r0.json`（R-DP の R0 に比べる有用性） | 付録 D の表 8 と「Tables」の段落の角括弧（判断 82・2026-10-29） |
+| **3（このセッション）** | `main_all.json`（全員の付録） | 付録 E の Results on all writers |
 | 完成 | ― | 草稿の完成（判断 76）→ attack-me round 3 |
 
 ## 新しいセッションで最初に打ち込む文
@@ -26,10 +27,10 @@
 ## やること
 
 1. `main_all.json`: 開く前に、`main.json` と重なる葉（標本の 500 人の件をキャッシュから使い回した部分ではなく、集計が別になる）の関係を notes.md D4 で確かめる。全員の付録は A0〜A3 の全文（`appendix-results.tex` の 201 行目の角括弧）。`make_tables.py` に関数を足し、既存の生成ファイルが変わらないことを `git status` で確かめ、止まる条件は壊した写しで確かめる（判断 80・81 と同じ）。
-2. `exploratory_dp_utility_r0.json`: 表 8（`explore-dp-score.tex`）に R0 との相関（平均）を足すか、R0 との比の中央値の表を足す。`utility-r0.tex`・付録 E の有用性の表と同じ量と書き方にそろえる。R3 の値が `main.json` と違えば止まる条件を入れる。付録 D の「Tables」の段落の角括弧と、その上の LaTeX のコメント（D5）を直す。§7.7 の文は変えない（本文の余白は 0）。
+2. （済み・判断 82）`exploratory_dp_utility_r0.json`: 表 8（`explore-dp-score.tex`）に R0 との相関（平均）を足すか、R0 との比の中央値の表を足す。`utility-r0.tex`・付録 E の有用性の表と同じ量と書き方にそろえる。R3 の値が `main.json` と違えば止まる条件を入れる。付録 D の「Tables」の段落の角括弧と、その上の LaTeX のコメント（D5）を直す。§7.7 の文は変えない（本文の余白は 0）。
 3. 数値と量の語を集計の JSON と機械で照らす（`verify-before-claiming`）。
 4. 頁を測る（`paper-write/length-log.md` の数え方）。付録だけなので本文は動かない見込みだが、測る。⚠️ 余白は 0。
-5. ビルド（エラー 0・未定義 0・overfull は今 2）・PDF を画像で見る（表の幅。判断 80・81 で `\multicolumn` の行が表を広げた）・文体の門（違反 0）・`length-log.md` に 1 行・`../20261012-public-keystroke-matching-prereg/decisions.md` に判断 82・tasklist.md・commit・push。
+5. ビルド（エラー 0・未定義 0・overfull は今 2）・PDF を画像で見る（表の幅。判断 80・81 で `\multicolumn` の行が表を広げた）・文体の門（違反 0）・`length-log.md` に 1 行・`../20261012-public-keystroke-matching-prereg/decisions.md` に判断 83・tasklist.md・commit・push。
 6. 草稿の完成（判断 76）の残り: 倫理の公開元への連絡の角括弧（下の「別の手続き」）・open science の匿名リンク。揃ったら attack-me round 3 の引き継ぎを書く。
 
 ## 道具

@@ -61,9 +61,10 @@ scores.
 
 \paragraph{Tables.}
 % The computation of R-DP (run_main.py --forms dp) ran R3 and R-DP without R0, so the summaries of the process measures
-% relative to R0 are empty in exploratory_dp.json (notes.md, D5); the matching values of R3 equal those of main.json.
-Tables~\ref{tab:app:unicity} to~\ref{tab:app:band} give the five analyses. \textbf{[For R-DP, the ratio to R0 and the
-correlation with R0 of the process measures, when they are computed.]}
+% relative to R0 were empty in exploratory_dp.json (notes.md, D5). They were recomputed from the caches with R0 of the
+% main computation, with the same sample and resamples (exploratory_dp_utility_r0.json); the values of R3 equal those
+% of main.json.
+Tables~\ref{tab:app:unicity} to~\ref{tab:app:band} give the five analyses.
 
 \begin{table*}
   \caption{Exploratory: uniqueness of word-length sequences among $N$ candidates, 500 writers. Unique: the percentage
@@ -101,14 +102,19 @@ correlation with R0 of the process measures, when they are computed.]}
 \end{table*}
 
 \begin{table*}
-  \caption{Exploratory: the Spearman correlation of each process measure with the human score (mean over prompts) on
-  R3 and R-DP($\varepsilon$), 500 writers. Every measure on R-DP is approximated.}
+  \caption{Exploratory: process measures on R3 and R-DP($\varepsilon$), 500 writers, mean over the four prompts. Top:
+  the Spearman correlation with the value in R0. Bottom: the Spearman correlation with the human score. Every measure
+  on R-DP is approximated.}
   \label{tab:app:dp-score}
   \small
   \begin{tabular}{lrrrrr}
     \toprule
     Measure & R3 & R-DP(4) & R-DP(2) & R-DP(1) & R-DP(0.5) \\
     \midrule
+    \multicolumn{6}{l}{Correlation with R0} \\
+    \tabinput{sections/generated/explore-dp-r0.tex}
+    \midrule
+    \multicolumn{6}{l}{Correlation with the human score} \\
     \tabinput{sections/generated/explore-dp-score.tex}
     \bottomrule
   \end{tabular}

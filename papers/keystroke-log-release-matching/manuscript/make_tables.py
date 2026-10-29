@@ -4,7 +4,7 @@
 
 <results dir> is experiments/20261012-public-keystroke-matching/results. The script reads main.json,
 main_a4.json and main_a4_without_cpu_writer.json (the KeyTAR rows), enja15_main.json and
-exploratory_{unicity,dp,tail,margin,score_band}.json (aggregates only) and writes one .tex file per table
+exploratory_{unicity,dp,dp_utility_r0,tail,margin,score_band}.json (aggregates only) and writes one .tex file per table
 into <output dir> (sections/generated). The tables are included by the sections; values are never typed by hand.
 Accuracies are printed in percent.
 """
@@ -288,11 +288,21 @@ def unicity_table(u):
 DP_FORMS = ["R3", "R-DP(4)", "R-DP(2)", "R-DP(1)", "R-DP(0.5)"]
 
 
-def dp_tables(dp, m):
+def dp_tables(dp, du, m):
     """R-DP: matching (full texts at every N, the contrast with R3, windows at N = 1,000, the open-world area) and the
-    Spearman correlation of each measure with the human score. Stops if the R3 values differ from main.json or if the
-    strongest attacker is not A1' on full texts and A2 on windows, as the caption states."""
+    Spearman correlation of each measure with the value in R0 and with the human score. The utility comes from
+    exploratory_dp_utility_r0.json, recomputed with R0 from the caches (deviation D5). Stops if the R3 values differ
+    from main.json, if the recomputed utility differs from exploratory_dp.json in its keys, cells or correlation with
+    the score, or if the strongest attacker is not A1' on full texts and A2 on windows, as the caption states."""
     s, c = dp["strongest"], dp["cells"]
+    u = du["utility"]
+    if set(u) != set(dp["utility"]):
+        raise SystemExit("exploratory_dp_utility_r0.json: the utility keys differ from exploratory_dp.json")
+    for k, v in u.items():
+        if v["cell"] != dp["utility"][k]["cell"] or v["spearman_score"] != dp["utility"][k]["spearman_score"]:
+            raise SystemExit(f"exploratory_dp_utility_r0.json: {k} differs from exploratory_dp.json")
+        if k.endswith("|R3") and v != m["utility"][k]:
+            raise SystemExit(f"exploratory_dp_utility_r0.json: R3 differs from main.json at {k}")
     for k, v in s.items():
         if "|R3|" in k and v != m["strongest"][k]:
             raise SystemExit(f"exploratory_dp.json: R3 differs from main.json at {k}")
@@ -314,13 +324,16 @@ def dp_tables(dp, m):
         ow = dp["open_world"][f"full|{f}|1000"]
         cells.append(f"{ow['auc']:.3f}")
         match.append(" & ".join([form_tex(f)] + cells) + " \\\\")
-    for mk, label in MEASURES:
-        cells = []
-        for f in DP_FORMS:
-            q = dp["utility"][f"{mk}|{f}"]["spearman_score"]
-            cells.append(f"{q['mean']:.2f}" if q.get("mean") is not None else "--")
-        util.append(" & ".join([label] + cells) + " \\\\")
-    return match, util
+    for key in ("spearman_r0", "spearman_score"):
+        rows = []
+        for mk, label in MEASURES:
+            cells = []
+            for f in DP_FORMS:
+                q = u[f"{mk}|{f}"][key]
+                cells.append(f"{q['mean']:.2f}" if q.get("mean") is not None else "--")
+            rows.append(" & ".join([label] + cells) + " \\\\")
+        util.append(rows)
+    return match, util[0], util[1]
 
 
 def main():
@@ -358,9 +371,11 @@ def main():
     u = json.load(open(os.path.join(res, "exploratory_unicity.json"), encoding="utf-8"))
     write(out, "explore-unicity.tex", unicity_table(u))
     dp = json.load(open(os.path.join(res, "exploratory_dp.json"), encoding="utf-8"))["main500"]
-    dp_match, dp_util = dp_tables(dp, m)
+    du = json.load(open(os.path.join(res, "exploratory_dp_utility_r0.json"), encoding="utf-8"))
+    dp_match, dp_r0, dp_score = dp_tables(dp, du, m)
     write(out, "explore-dp.tex", dp_match)
-    write(out, "explore-dp-score.tex", dp_util)
+    write(out, "explore-dp-r0.tex", dp_r0)
+    write(out, "explore-dp-score.tex", dp_score)
 
 
 if __name__ == "__main__":
