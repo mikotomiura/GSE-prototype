@@ -1,0 +1,5977 @@
+{
+ "caches": {
+  "dp": "1383e6ee6aca2c58",
+  "main500": "33fa95833296d7a5"
+ },
+ "config_sha256": "afc73eec79a53f4916683f83f2db8911ed9994b2b8988045ad69f28d57a0044a",
+ "forms": [
+  "R3",
+  "R-DP(0.5)",
+  "R-DP(1)",
+  "R-DP(2)",
+  "R-DP(4)"
+ ],
+ "metrics": [
+  "p_burst_mean_len",
+  "r_burst_mean_len",
+  "pause_mean_200ms",
+  "within_word_pause_mean",
+  "between_word_pause_mean",
+  "deletion_mean_len",
+  "deletion_proportion",
+  "insertion_mean_len",
+  "insertion_proportion",
+  "interval_variance_10"
+ ],
+ "note": "exploratory (decision 55), not preregistered; utility of R-DP against R0 recomputed from the caches (deviation D5); aggregates only",
+ "positive_control": "utility of R3 identical to main.json; utility_figure of R3 identical to main.json; keys, spearman_score and cell of every form identical to exploratory_dp.json",
+ "sample": "main500",
+ "sample_sizes": {
+  "APPEARANCE": 125,
+  "COMPETITION": 125,
+  "HAPPINESS": 125,
+  "MATERIALISM": 125
+ },
+ "seed_file_sha256": "d766284cd36eea562c99c5268cedd99a4bd2ae5ed9d75cb1bad330633cbbe9ff",
+ "source": "klicke",
+ "utility": {
+  "between_word_pause_mean|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 2.773993,
+     "COMPETITION": 2.839906,
+     "HAPPINESS": 2.99764,
+     "MATERIALISM": 2.811162
+    },
+    "ci": [
+     2.727995,
+     3.005474
+    ],
+    "mean": 2.855675,
+    "prompts_with_value": 4,
+    "range": [
+     2.773993,
+     2.99764
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 1.646574,
+     "COMPETITION": 1.669534,
+     "HAPPINESS": 1.632339,
+     "MATERIALISM": 1.508173
+    },
+    "ci": [
+     1.463584,
+     1.711659
+    ],
+    "mean": 1.614155,
+    "prompts_with_value": 4,
+    "range": [
+     1.508173,
+     1.669534
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 4.992511,
+     "COMPETITION": 4.997642,
+     "HAPPINESS": 5.028993,
+     "MATERIALISM": 5.15726
+    },
+    "ci": [
+     4.703896,
+     5.481095
+    ],
+    "mean": 5.044101,
+    "prompts_with_value": 4,
+    "range": [
+     4.992511,
+     5.15726
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.076111,
+     "COMPETITION": 0.216074,
+     "HAPPINESS": 0.323404,
+     "MATERIALISM": 0.229837
+    },
+    "ci": [
+     0.117045,
+     0.295969
+    ],
+    "mean": 0.211356,
+    "prompts_with_value": 4,
+    "range": [
+     0.076111,
+     0.323404
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.081724,
+     "COMPETITION": 0.154729,
+     "HAPPINESS": 0.04279,
+     "MATERIALISM": -0.098961
+    },
+    "ci": [
+     -0.08149,
+     0.086645
+    ],
+    "mean": 0.004209,
+    "prompts_with_value": 4,
+    "range": [
+     -0.098961,
+     0.154729
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "between_word_pause_mean|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 1.684239,
+     "COMPETITION": 1.609241,
+     "HAPPINESS": 1.703185,
+     "MATERIALISM": 1.597373
+    },
+    "ci": [
+     1.559533,
+     1.716065
+    ],
+    "mean": 1.648509,
+    "prompts_with_value": 4,
+    "range": [
+     1.597373,
+     1.703185
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.912137,
+     "COMPETITION": 0.929937,
+     "HAPPINESS": 0.943074,
+     "MATERIALISM": 0.817705
+    },
+    "ci": [
+     0.839263,
+     0.999328
+    ],
+    "mean": 0.900713,
+    "prompts_with_value": 4,
+    "range": [
+     0.817705,
+     0.943074
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 2.709755,
+     "COMPETITION": 2.841935,
+     "HAPPINESS": 2.723156,
+     "MATERIALISM": 2.899557
+    },
+    "ci": [
+     2.600705,
+     3.017365
+    ],
+    "mean": 2.793601,
+    "prompts_with_value": 4,
+    "range": [
+     2.709755,
+     2.899557
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.114556,
+     "COMPETITION": 0.248184,
+     "HAPPINESS": 0.356891,
+     "MATERIALISM": 0.432098
+    },
+    "ci": [
+     0.195169,
+     0.369331
+    ],
+    "mean": 0.287932,
+    "prompts_with_value": 4,
+    "range": [
+     0.114556,
+     0.432098
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.207325,
+     "COMPETITION": 0.091646,
+     "HAPPINESS": -0.01125,
+     "MATERIALISM": -0.20076
+    },
+    "ci": [
+     -0.165386,
+     0.00266
+    ],
+    "mean": -0.081922,
+    "prompts_with_value": 4,
+    "range": [
+     -0.207325,
+     0.091646
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "between_word_pause_mean|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 1.007627,
+     "COMPETITION": 0.975499,
+     "HAPPINESS": 1.048989,
+     "MATERIALISM": 0.928953
+    },
+    "ci": [
+     0.947357,
+     1.036708
+    ],
+    "mean": 0.990267,
+    "prompts_with_value": 4,
+    "range": [
+     0.928953,
+     1.048989
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.546821,
+     "COMPETITION": 0.556823,
+     "HAPPINESS": 0.608475,
+     "MATERIALISM": 0.529076
+    },
+    "ci": [
+     0.526307,
+     0.61829
+    ],
+    "mean": 0.560299,
+    "prompts_with_value": 4,
+    "range": [
+     0.529076,
+     0.608475
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.642314,
+     "COMPETITION": 1.65909,
+     "HAPPINESS": 1.551938,
+     "MATERIALISM": 1.77432
+    },
+    "ci": [
+     1.546269,
+     1.7915
+    ],
+    "mean": 1.656915,
+    "prompts_with_value": 4,
+    "range": [
+     1.551938,
+     1.77432
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.190028,
+     "COMPETITION": 0.361223,
+     "HAPPINESS": 0.417917,
+     "MATERIALISM": 0.365942
+    },
+    "ci": [
+     0.243144,
+     0.413782
+    ],
+    "mean": 0.333777,
+    "prompts_with_value": 4,
+    "range": [
+     0.190028,
+     0.417917
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.25214,
+     "COMPETITION": 0.016958,
+     "HAPPINESS": -0.127445,
+     "MATERIALISM": -0.22886
+    },
+    "ci": [
+     -0.229244,
+     -0.064391
+    ],
+    "mean": -0.147872,
+    "prompts_with_value": 4,
+    "range": [
+     -0.25214,
+     0.016958
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "between_word_pause_mean|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.712905,
+     "COMPETITION": 0.694502,
+     "HAPPINESS": 0.714398,
+     "MATERIALISM": 0.660841
+    },
+    "ci": [
+     0.669445,
+     0.729762
+    ],
+    "mean": 0.695662,
+    "prompts_with_value": 4,
+    "range": [
+     0.660841,
+     0.714398
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.398415,
+     "COMPETITION": 0.412342,
+     "HAPPINESS": 0.44916,
+     "MATERIALISM": 0.37784
+    },
+    "ci": [
+     0.37875,
+     0.442861
+    ],
+    "mean": 0.409439,
+    "prompts_with_value": 4,
+    "range": [
+     0.37784,
+     0.44916
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.129461,
+     "COMPETITION": 1.098044,
+     "HAPPINESS": 1.066287,
+     "MATERIALISM": 1.105194
+    },
+    "ci": [
+     1.049556,
+     1.180775
+    ],
+    "mean": 1.099747,
+    "prompts_with_value": 4,
+    "range": [
+     1.066287,
+     1.129461
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.255982,
+     "COMPETITION": 0.392289,
+     "HAPPINESS": 0.505978,
+     "MATERIALISM": 0.412952
+    },
+    "ci": [
+     0.299983,
+     0.469256
+    ],
+    "mean": 0.3918,
+    "prompts_with_value": 4,
+    "range": [
+     0.255982,
+     0.505978
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.28311,
+     "COMPETITION": -0.05959,
+     "HAPPINESS": -0.194746,
+     "MATERIALISM": -0.323946
+    },
+    "ci": [
+     -0.295904,
+     -0.134821
+    ],
+    "mean": -0.215348,
+    "prompts_with_value": 4,
+    "range": [
+     -0.323946,
+     -0.05959
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "between_word_pause_mean|R3": {
+   "cell": "ok",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.04195,
+     "COMPETITION": -0.095742,
+     "HAPPINESS": -0.012371,
+     "MATERIALISM": -0.235701
+    },
+    "ci": [
+     -0.164709,
+     0.01636
+    ],
+    "mean": -0.075466,
+    "prompts_with_value": 4,
+    "range": [
+     -0.235701,
+     0.04195
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_mean_len|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.985263,
+     "COMPETITION": 0.982811,
+     "HAPPINESS": 0.977687,
+     "MATERIALISM": 0.953357
+    },
+    "ci": [
+     0.94726,
+     0.992237
+    ],
+    "mean": 0.97478,
+    "prompts_with_value": 4,
+    "range": [
+     0.953357,
+     0.985263
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.531103,
+     "COMPETITION": 0.57972,
+     "HAPPINESS": 0.541095,
+     "MATERIALISM": 0.528424
+    },
+    "ci": [
+     0.481902,
+     0.601081
+    ],
+    "mean": 0.545086,
+    "prompts_with_value": 4,
+    "range": [
+     0.528424,
+     0.57972
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.016667,
+     "COMPETITION": 1.019628,
+     "HAPPINESS": 1.018052,
+     "MATERIALISM": 1.011745
+    },
+    "ci": [
+     1.011355,
+     1.022411
+    ],
+    "mean": 1.016523,
+    "prompts_with_value": 4,
+    "range": [
+     1.011745,
+     1.019628
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.756646,
+     "COMPETITION": 0.834469,
+     "HAPPINESS": 0.790594,
+     "MATERIALISM": 0.758992
+    },
+    "ci": [
+     0.72245,
+     0.83374
+    ],
+    "mean": 0.785175,
+    "prompts_with_value": 4,
+    "range": [
+     0.756646,
+     0.834469
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.082235,
+     "COMPETITION": 0.07298,
+     "HAPPINESS": 0.27879,
+     "MATERIALISM": 0.152787
+    },
+    "ci": [
+     0.061233,
+     0.227262
+    ],
+    "mean": 0.146698,
+    "prompts_with_value": 4,
+    "range": [
+     0.07298,
+     0.27879
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_mean_len|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.986776,
+     "COMPETITION": 0.978776,
+     "HAPPINESS": 0.977687,
+     "MATERIALISM": 0.953357
+    },
+    "ci": [
+     0.944723,
+     0.990922
+    ],
+    "mean": 0.974149,
+    "prompts_with_value": 4,
+    "range": [
+     0.953357,
+     0.986776
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.531103,
+     "COMPETITION": 0.578547,
+     "HAPPINESS": 0.541095,
+     "MATERIALISM": 0.526628
+    },
+    "ci": [
+     0.483612,
+     0.601612
+    ],
+    "mean": 0.544343,
+    "prompts_with_value": 4,
+    "range": [
+     0.526628,
+     0.578547
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.004992,
+     "COMPETITION": 1.008711,
+     "HAPPINESS": 1.009016,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.002793,
+     1.01206
+    ],
+    "mean": 1.00568,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.009016
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.759656,
+     "COMPETITION": 0.835263,
+     "HAPPINESS": 0.792268,
+     "MATERIALISM": 0.760933
+    },
+    "ci": [
+     0.724064,
+     0.835489
+    ],
+    "mean": 0.78703,
+    "prompts_with_value": 4,
+    "range": [
+     0.759656,
+     0.835263
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.088178,
+     "COMPETITION": 0.072228,
+     "HAPPINESS": 0.282459,
+     "MATERIALISM": 0.15625
+    },
+    "ci": [
+     0.063552,
+     0.230627
+    ],
+    "mean": 0.149778,
+    "prompts_with_value": 4,
+    "range": [
+     0.072228,
+     0.282459
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_mean_len|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.985263,
+     "COMPETITION": 0.979278,
+     "HAPPINESS": 0.977687,
+     "MATERIALISM": 0.95
+    },
+    "ci": [
+     0.94281,
+     0.989826
+    ],
+    "mean": 0.973057,
+    "prompts_with_value": 4,
+    "range": [
+     0.95,
+     0.985263
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.531103,
+     "COMPETITION": 0.580711,
+     "HAPPINESS": 0.541095,
+     "MATERIALISM": 0.526628
+    },
+    "ci": [
+     0.481621,
+     0.60022
+    ],
+    "mean": 0.544884,
+    "prompts_with_value": 4,
+    "range": [
+     0.526628,
+     0.580711
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.008138,
+     "HAPPINESS": 1.00614,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.000607,
+     1.011166
+    ],
+    "mean": 1.00357,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.008138
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.759384,
+     "COMPETITION": 0.835988,
+     "HAPPINESS": 0.792336,
+     "MATERIALISM": 0.760724
+    },
+    "ci": [
+     0.724917,
+     0.835508
+    ],
+    "mean": 0.787108,
+    "prompts_with_value": 4,
+    "range": [
+     0.759384,
+     0.835988
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.083668,
+     "COMPETITION": 0.068344,
+     "HAPPINESS": 0.285334,
+     "MATERIALISM": 0.153319
+    },
+    "ci": [
+     0.062246,
+     0.228773
+    ],
+    "mean": 0.147666,
+    "prompts_with_value": 4,
+    "range": [
+     0.068344,
+     0.285334
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_mean_len|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.985263,
+     "COMPETITION": 0.978776,
+     "HAPPINESS": 0.977687,
+     "MATERIALISM": 0.95
+    },
+    "ci": [
+     0.942052,
+     0.989641
+    ],
+    "mean": 0.972932,
+    "prompts_with_value": 4,
+    "range": [
+     0.95,
+     0.985263
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.531103,
+     "COMPETITION": 0.578547,
+     "HAPPINESS": 0.541095,
+     "MATERIALISM": 0.526628
+    },
+    "ci": [
+     0.48127,
+     0.599614
+    ],
+    "mean": 0.544343,
+    "prompts_with_value": 4,
+    "range": [
+     0.526628,
+     0.578547
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.006734,
+     "HAPPINESS": 1.005719,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.000113,
+     1.006452
+    ],
+    "mean": 1.003113,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.006734
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.759916,
+     "COMPETITION": 0.835877,
+     "HAPPINESS": 0.792527,
+     "MATERIALISM": 0.760306
+    },
+    "ci": [
+     0.724524,
+     0.835399
+    ],
+    "mean": 0.787157,
+    "prompts_with_value": 4,
+    "range": [
+     0.759916,
+     0.835877
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.08551,
+     "COMPETITION": 0.071831,
+     "HAPPINESS": 0.283854,
+     "MATERIALISM": 0.153191
+    },
+    "ci": [
+     0.063448,
+     0.229915
+    ],
+    "mean": 0.148597,
+    "prompts_with_value": 4,
+    "range": [
+     0.071831,
+     0.283854
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_mean_len|R3": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.985263,
+     "COMPETITION": 0.978776,
+     "HAPPINESS": 0.977687,
+     "MATERIALISM": 0.95
+    },
+    "ci": [
+     0.942052,
+     0.989641
+    ],
+    "mean": 0.972932,
+    "prompts_with_value": 4,
+    "range": [
+     0.95,
+     0.985263
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.531103,
+     "COMPETITION": 0.578547,
+     "HAPPINESS": 0.541095,
+     "MATERIALISM": 0.526628
+    },
+    "ci": [
+     0.48127,
+     0.599614
+    ],
+    "mean": 0.544343,
+    "prompts_with_value": 4,
+    "range": [
+     0.526628,
+     0.578547
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.006734,
+     "HAPPINESS": 1.005719,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.000113,
+     1.006452
+    ],
+    "mean": 1.003113,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.006734
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.759916,
+     "COMPETITION": 0.835877,
+     "HAPPINESS": 0.792527,
+     "MATERIALISM": 0.760171
+    },
+    "ci": [
+     0.724524,
+     0.835399
+    ],
+    "mean": 0.787123,
+    "prompts_with_value": 4,
+    "range": [
+     0.759916,
+     0.835877
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.08551,
+     "COMPETITION": 0.071831,
+     "HAPPINESS": 0.283854,
+     "MATERIALISM": 0.152946
+    },
+    "ci": [
+     0.063447,
+     0.229915
+    ],
+    "mean": 0.148535,
+    "prompts_with_value": 4,
+    "range": [
+     0.071831,
+     0.283854
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_proportion|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.903706,
+     "COMPETITION": 0.873955,
+     "HAPPINESS": 0.887386,
+     "MATERIALISM": 0.869898
+    },
+    "ci": [
+     0.862036,
+     0.904809
+    ],
+    "mean": 0.883736,
+    "prompts_with_value": 4,
+    "range": [
+     0.869898,
+     0.903706
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.485687,
+     "COMPETITION": 0.518964,
+     "HAPPINESS": 0.452754,
+     "MATERIALISM": 0.452885
+    },
+    "ci": [
+     0.411656,
+     0.538743
+    ],
+    "mean": 0.477573,
+    "prompts_with_value": 4,
+    "range": [
+     0.452754,
+     0.518964
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.964941,
+     "COMPETITION": 0.973008,
+     "HAPPINESS": 0.974924,
+     "MATERIALISM": 0.961662
+    },
+    "ci": [
+     0.961291,
+     0.972661
+    ],
+    "mean": 0.968634,
+    "prompts_with_value": 4,
+    "range": [
+     0.961662,
+     0.974924
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.856442,
+     "COMPETITION": 0.856934,
+     "HAPPINESS": 0.828381,
+     "MATERIALISM": 0.831513
+    },
+    "ci": [
+     0.789736,
+     0.880065
+    ],
+    "mean": 0.843318,
+    "prompts_with_value": 4,
+    "range": [
+     0.828381,
+     0.856934
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.03962,
+     "COMPETITION": 0.012228,
+     "HAPPINESS": 0.083144,
+     "MATERIALISM": 0.022291
+    },
+    "ci": [
+     -0.049645,
+     0.127
+    ],
+    "mean": 0.039321,
+    "prompts_with_value": 4,
+    "range": [
+     0.012228,
+     0.083144
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_proportion|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.950642,
+     "COMPETITION": 0.907821,
+     "HAPPINESS": 0.915905,
+     "MATERIALISM": 0.921963
+    },
+    "ci": [
+     0.899451,
+     0.948017
+    ],
+    "mean": 0.924083,
+    "prompts_with_value": 4,
+    "range": [
+     0.907821,
+     0.950642
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.501695,
+     "COMPETITION": 0.535656,
+     "HAPPINESS": 0.479941,
+     "MATERIALISM": 0.476789
+    },
+    "ci": [
+     0.426258,
+     0.558
+    ],
+    "mean": 0.498521,
+    "prompts_with_value": 4,
+    "range": [
+     0.476789,
+     0.535656
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.000547,
+     "COMPETITION": 0.998038,
+     "HAPPINESS": 0.999528,
+     "MATERIALISM": 0.993995
+    },
+    "ci": [
+     0.994275,
+     1.0037
+    ],
+    "mean": 0.998027,
+    "prompts_with_value": 4,
+    "range": [
+     0.993995,
+     1.000547
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.858464,
+     "COMPETITION": 0.85624,
+     "HAPPINESS": 0.830157,
+     "MATERIALISM": 0.835439
+    },
+    "ci": [
+     0.791805,
+     0.881839
+    ],
+    "mean": 0.845075,
+    "prompts_with_value": 4,
+    "range": [
+     0.830157,
+     0.858464
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.040842,
+     "COMPETITION": 0.016505,
+     "HAPPINESS": 0.086128,
+     "MATERIALISM": 0.021974
+    },
+    "ci": [
+     -0.04824,
+     0.128268
+    ],
+    "mean": 0.041362,
+    "prompts_with_value": 4,
+    "range": [
+     0.016505,
+     0.086128
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_proportion|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.96,
+     "COMPETITION": 0.92982,
+     "HAPPINESS": 0.951121,
+     "MATERIALISM": 0.940312
+    },
+    "ci": [
+     0.914326,
+     0.966751
+    ],
+    "mean": 0.945313,
+    "prompts_with_value": 4,
+    "range": [
+     0.92982,
+     0.96
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.507649,
+     "COMPETITION": 0.54214,
+     "HAPPINESS": 0.480086,
+     "MATERIALISM": 0.479946
+    },
+    "ci": [
+     0.431936,
+     0.563675
+    ],
+    "mean": 0.502455,
+    "prompts_with_value": 4,
+    "range": [
+     0.479946,
+     0.54214
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.000774,
+     "COMPETITION": 1.002927,
+     "HAPPINESS": 1.003537,
+     "MATERIALISM": 0.997478
+    },
+    "ci": [
+     0.999144,
+     1.004561
+    ],
+    "mean": 1.001179,
+    "prompts_with_value": 4,
+    "range": [
+     0.997478,
+     1.003537
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.858273,
+     "COMPETITION": 0.856639,
+     "HAPPINESS": 0.828055,
+     "MATERIALISM": 0.83625
+    },
+    "ci": [
+     0.792183,
+     0.882232
+    ],
+    "mean": 0.844804,
+    "prompts_with_value": 4,
+    "range": [
+     0.828055,
+     0.858273
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.037568,
+     "COMPETITION": 0.01077,
+     "HAPPINESS": 0.091454,
+     "MATERIALISM": 0.019298
+    },
+    "ci": [
+     -0.050325,
+     0.127409
+    ],
+    "mean": 0.039773,
+    "prompts_with_value": 4,
+    "range": [
+     0.01077,
+     0.091454
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_proportion|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.961528,
+     "COMPETITION": 0.932211,
+     "HAPPINESS": 0.953789,
+     "MATERIALISM": 0.942377
+    },
+    "ci": [
+     0.918863,
+     0.976208
+    ],
+    "mean": 0.947476,
+    "prompts_with_value": 4,
+    "range": [
+     0.932211,
+     0.961528
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.508213,
+     "COMPETITION": 0.54326,
+     "HAPPINESS": 0.480488,
+     "MATERIALISM": 0.482076
+    },
+    "ci": [
+     0.433658,
+     0.5661
+    ],
+    "mean": 0.503509,
+    "prompts_with_value": 4,
+    "range": [
+     0.480488,
+     0.54326
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.001242,
+     "COMPETITION": 1.001793,
+     "HAPPINESS": 1.002159,
+     "MATERIALISM": 1.000567
+    },
+    "ci": [
+     1.000966,
+     1.005085
+    ],
+    "mean": 1.00144,
+    "prompts_with_value": 4,
+    "range": [
+     1.000567,
+     1.002159
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.857339,
+     "COMPETITION": 0.855392,
+     "HAPPINESS": 0.828842,
+     "MATERIALISM": 0.838643
+    },
+    "ci": [
+     0.793031,
+     0.882553
+    ],
+    "mean": 0.845054,
+    "prompts_with_value": 4,
+    "range": [
+     0.828842,
+     0.857339
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.038405,
+     "COMPETITION": 0.010923,
+     "HAPPINESS": 0.087393,
+     "MATERIALISM": 0.017129
+    },
+    "ci": [
+     -0.051427,
+     0.126062
+    ],
+    "mean": 0.038462,
+    "prompts_with_value": 4,
+    "range": [
+     0.010923,
+     0.087393
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "deletion_proportion|R3": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.961145,
+     "COMPETITION": 0.932692,
+     "HAPPINESS": 0.955128,
+     "MATERIALISM": 0.945205
+    },
+    "ci": [
+     0.918832,
+     0.97667
+    ],
+    "mean": 0.948543,
+    "prompts_with_value": 4,
+    "range": [
+     0.932692,
+     0.961145
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.508648,
+     "COMPETITION": 0.543622,
+     "HAPPINESS": 0.480502,
+     "MATERIALISM": 0.481833
+    },
+    "ci": [
+     0.433955,
+     0.566287
+    ],
+    "mean": 0.503651,
+    "prompts_with_value": 4,
+    "range": [
+     0.480502,
+     0.543622
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.004279
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.857899,
+     "COMPETITION": 0.855889,
+     "HAPPINESS": 0.828154,
+     "MATERIALISM": 0.838385
+    },
+    "ci": [
+     0.793197,
+     0.882694
+    ],
+    "mean": 0.845082,
+    "prompts_with_value": 4,
+    "range": [
+     0.828154,
+     0.857899
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.039161,
+     "COMPETITION": 0.0126,
+     "HAPPINESS": 0.087632,
+     "MATERIALISM": 0.01684
+    },
+    "ci": [
+     -0.050597,
+     0.127078
+    ],
+    "mean": 0.039058,
+    "prompts_with_value": 4,
+    "range": [
+     0.0126,
+     0.087632
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_mean_len|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     70
+    ],
+    "COMPETITION": [
+     10,
+     77
+    ],
+    "HAPPINESS": [
+     4,
+     71
+    ],
+    "MATERIALISM": [
+     3,
+     78
+    ]
+   },
+   "ratio_dropped_form": 296,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.644708,
+     "COMPETITION": 0.80918,
+     "HAPPINESS": 0.989573,
+     "MATERIALISM": 0.715496
+    },
+    "ci": [
+     0.654837,
+     0.934399
+    ],
+    "mean": 0.789739,
+    "prompts_with_value": 4,
+    "range": [
+     0.644708,
+     0.989573
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.116751,
+     "COMPETITION": 0.095945,
+     "HAPPINESS": 0.138922,
+     "MATERIALISM": 0.150229
+    },
+    "ci": [
+     0.093507,
+     0.200106
+    ],
+    "mean": 0.125462,
+    "prompts_with_value": 4,
+    "range": [
+     0.095945,
+     0.150229
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.522876,
+     "COMPETITION": 1.263368,
+     "HAPPINESS": 1.939836,
+     "MATERIALISM": 1.524774
+    },
+    "ci": [
+     1.356822,
+     2.534125
+    ],
+    "mean": 1.562713,
+    "prompts_with_value": 4,
+    "range": [
+     1.263368,
+     1.939836
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.282032,
+     "COMPETITION": 0.549051,
+     "HAPPINESS": 0.446344,
+     "MATERIALISM": 0.544487
+    },
+    "ci": [
+     0.309363,
+     0.581284
+    ],
+    "mean": 0.455478,
+    "prompts_with_value": 4,
+    "range": [
+     0.282032,
+     0.549051
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.105532,
+     "COMPETITION": 0.340734,
+     "HAPPINESS": 0.274574,
+     "MATERIALISM": 0.384251
+    },
+    "ci": [
+     0.128063,
+     0.41358
+    ],
+    "mean": 0.276273,
+    "prompts_with_value": 4,
+    "range": [
+     0.105532,
+     0.384251
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_mean_len|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     68
+    ],
+    "COMPETITION": [
+     10,
+     76
+    ],
+    "HAPPINESS": [
+     4,
+     72
+    ],
+    "MATERIALISM": [
+     3,
+     75
+    ]
+   },
+   "ratio_dropped_form": 291,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.5625,
+     "COMPETITION": 0.752888,
+     "HAPPINESS": 0.846154,
+     "MATERIALISM": 0.556962
+    },
+    "ci": [
+     0.572086,
+     0.855399
+    ],
+    "mean": 0.679626,
+    "prompts_with_value": 4,
+    "range": [
+     0.556962,
+     0.846154
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.10949,
+     "COMPETITION": 0.12575,
+     "HAPPINESS": 0.131566,
+     "MATERIALISM": 0.09752
+    },
+    "ci": [
+     0.092643,
+     0.166987
+    ],
+    "mean": 0.116081,
+    "prompts_with_value": 4,
+    "range": [
+     0.09752,
+     0.131566
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.535906,
+     "COMPETITION": 1.254739,
+     "HAPPINESS": 1.482079,
+     "MATERIALISM": 1.742857
+    },
+    "ci": [
+     1.30012,
+     2.213292
+    ],
+    "mean": 1.503895,
+    "prompts_with_value": 4,
+    "range": [
+     1.254739,
+     1.742857
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.218107,
+     "COMPETITION": 0.612442,
+     "HAPPINESS": 0.421425,
+     "MATERIALISM": 0.575698
+    },
+    "ci": [
+     0.319879,
+     0.566981
+    ],
+    "mean": 0.456918,
+    "prompts_with_value": 4,
+    "range": [
+     0.218107,
+     0.612442
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.110678,
+     "COMPETITION": 0.399082,
+     "HAPPINESS": 0.266286,
+     "MATERIALISM": 0.459405
+    },
+    "ci": [
+     0.16527,
+     0.446125
+    ],
+    "mean": 0.308863,
+    "prompts_with_value": 4,
+    "range": [
+     0.110678,
+     0.459405
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_mean_len|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     68
+    ],
+    "COMPETITION": [
+     10,
+     76
+    ],
+    "HAPPINESS": [
+     4,
+     71
+    ],
+    "MATERIALISM": [
+     3,
+     76
+    ]
+   },
+   "ratio_dropped_form": 291,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.616438,
+     "COMPETITION": 0.728983,
+     "HAPPINESS": 0.813999,
+     "MATERIALISM": 0.5593
+    },
+    "ci": [
+     0.554582,
+     0.837611
+    ],
+    "mean": 0.67968,
+    "prompts_with_value": 4,
+    "range": [
+     0.5593,
+     0.813999
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.096672,
+     "COMPETITION": 0.102254,
+     "HAPPINESS": 0.088699,
+     "MATERIALISM": 0.091455
+    },
+    "ci": [
+     0.079248,
+     0.152405
+    ],
+    "mean": 0.09477,
+    "prompts_with_value": 4,
+    "range": [
+     0.088699,
+     0.102254
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.364085,
+     "COMPETITION": 1.191829,
+     "HAPPINESS": 1.338327,
+     "MATERIALISM": 1.466415
+    },
+    "ci": [
+     1.244552,
+     2.176105
+    ],
+    "mean": 1.340164,
+    "prompts_with_value": 4,
+    "range": [
+     1.191829,
+     1.466415
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.212648,
+     "COMPETITION": 0.614018,
+     "HAPPINESS": 0.426974,
+     "MATERIALISM": 0.569461
+    },
+    "ci": [
+     0.320327,
+     0.567604
+    ],
+    "mean": 0.455775,
+    "prompts_with_value": 4,
+    "range": [
+     0.212648,
+     0.614018
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.112949,
+     "COMPETITION": 0.385801,
+     "HAPPINESS": 0.268305,
+     "MATERIALISM": 0.431391
+    },
+    "ci": [
+     0.158358,
+     0.433452
+    ],
+    "mean": 0.299612,
+    "prompts_with_value": 4,
+    "range": [
+     0.112949,
+     0.431391
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_mean_len|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     68
+    ],
+    "COMPETITION": [
+     10,
+     76
+    ],
+    "HAPPINESS": [
+     4,
+     71
+    ],
+    "MATERIALISM": [
+     3,
+     75
+    ]
+   },
+   "ratio_dropped_form": 290,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.595745,
+     "COMPETITION": 0.715315,
+     "HAPPINESS": 0.81745,
+     "MATERIALISM": 0.551688
+    },
+    "ci": [
+     0.545818,
+     0.843544
+    ],
+    "mean": 0.670049,
+    "prompts_with_value": 4,
+    "range": [
+     0.551688,
+     0.81745
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.096672,
+     "COMPETITION": 0.102254,
+     "HAPPINESS": 0.08208,
+     "MATERIALISM": 0.091473
+    },
+    "ci": [
+     0.078243,
+     0.148832
+    ],
+    "mean": 0.09312,
+    "prompts_with_value": 4,
+    "range": [
+     0.08208,
+     0.102254
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.342588,
+     "COMPETITION": 1.200648,
+     "HAPPINESS": 1.297008,
+     "MATERIALISM": 1.357708
+    },
+    "ci": [
+     1.218744,
+     2.052146
+    ],
+    "mean": 1.299488,
+    "prompts_with_value": 4,
+    "range": [
+     1.200648,
+     1.357708
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.303624,
+     "COMPETITION": 0.612318,
+     "HAPPINESS": 0.422162,
+     "MATERIALISM": 0.577843
+    },
+    "ci": [
+     0.339203,
+     0.585931
+    ],
+    "mean": 0.478987,
+    "prompts_with_value": 4,
+    "range": [
+     0.303624,
+     0.612318
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.187551,
+     "COMPETITION": 0.385717,
+     "HAPPINESS": 0.292365,
+     "MATERIALISM": 0.449726
+    },
+    "ci": [
+     0.182259,
+     0.456655
+    ],
+    "mean": 0.328839,
+    "prompts_with_value": 4,
+    "range": [
+     0.187551,
+     0.449726
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_mean_len|R3": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     68
+    ],
+    "COMPETITION": [
+     10,
+     76
+    ],
+    "HAPPINESS": [
+     4,
+     71
+    ],
+    "MATERIALISM": [
+     3,
+     75
+    ]
+   },
+   "ratio_dropped_form": 290,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.595745,
+     "COMPETITION": 0.715315,
+     "HAPPINESS": 0.81745,
+     "MATERIALISM": 0.551688
+    },
+    "ci": [
+     0.545798,
+     0.840752
+    ],
+    "mean": 0.670049,
+    "prompts_with_value": 4,
+    "range": [
+     0.551688,
+     0.81745
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.096672,
+     "COMPETITION": 0.102254,
+     "HAPPINESS": 0.08208,
+     "MATERIALISM": 0.091473
+    },
+    "ci": [
+     0.078243,
+     0.148898
+    ],
+    "mean": 0.09312,
+    "prompts_with_value": 4,
+    "range": [
+     0.08208,
+     0.102254
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.347526,
+     "COMPETITION": 1.192172,
+     "HAPPINESS": 1.300548,
+     "MATERIALISM": 1.364639
+    },
+    "ci": [
+     1.217589,
+     2.049223
+    ],
+    "mean": 1.301221,
+    "prompts_with_value": 4,
+    "range": [
+     1.192172,
+     1.364639
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.306947,
+     "COMPETITION": 0.615675,
+     "HAPPINESS": 0.420764,
+     "MATERIALISM": 0.579818
+    },
+    "ci": [
+     0.340702,
+     0.587049
+    ],
+    "mean": 0.480801,
+    "prompts_with_value": 4,
+    "range": [
+     0.306947,
+     0.615675
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.179177,
+     "COMPETITION": 0.399837,
+     "HAPPINESS": 0.293196,
+     "MATERIALISM": 0.449726
+    },
+    "ci": [
+     0.186421,
+     0.457954
+    ],
+    "mean": 0.330484,
+    "prompts_with_value": 4,
+    "range": [
+     0.179177,
+     0.449726
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_proportion|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     0
+    ],
+    "COMPETITION": [
+     10,
+     0
+    ],
+    "HAPPINESS": [
+     4,
+     0
+    ],
+    "MATERIALISM": [
+     3,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.000224
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.350642,
+     "COMPETITION": 0.2712,
+     "HAPPINESS": 0.339415,
+     "MATERIALISM": 0.307034
+    },
+    "ci": [
+     0.227564,
+     0.466545
+    ],
+    "mean": 0.317073,
+    "prompts_with_value": 4,
+    "range": [
+     0.2712,
+     0.350642
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.092062,
+     "COMPETITION": 0.263119,
+     "HAPPINESS": 0.15801,
+     "MATERIALISM": 0.255374
+    },
+    "ci": [
+     0.105525,
+     0.270979
+    ],
+    "mean": 0.192141,
+    "prompts_with_value": 4,
+    "range": [
+     0.092062,
+     0.263119
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.014269,
+     "COMPETITION": 0.16868,
+     "HAPPINESS": -0.013429,
+     "MATERIALISM": -0.131221
+    },
+    "ci": [
+     -0.080438,
+     0.099076
+    ],
+    "mean": 0.009575,
+    "prompts_with_value": 4,
+    "range": [
+     -0.131221,
+     0.16868
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_proportion|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     0
+    ],
+    "COMPETITION": [
+     10,
+     0
+    ],
+    "HAPPINESS": [
+     4,
+     0
+    ],
+    "MATERIALISM": [
+     3,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.000425
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.334058,
+     "COMPETITION": 0.278329,
+     "HAPPINESS": 0.338334,
+     "MATERIALISM": 0.326154
+    },
+    "ci": [
+     0.223207,
+     0.477727
+    ],
+    "mean": 0.319219,
+    "prompts_with_value": 4,
+    "range": [
+     0.278329,
+     0.338334
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.090695,
+     "COMPETITION": 0.284398,
+     "HAPPINESS": 0.149262,
+     "MATERIALISM": 0.21313
+    },
+    "ci": [
+     0.098133,
+     0.264547
+    ],
+    "mean": 0.184371,
+    "prompts_with_value": 4,
+    "range": [
+     0.090695,
+     0.284398
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.005816,
+     "COMPETITION": 0.151245,
+     "HAPPINESS": -0.019732,
+     "MATERIALISM": -0.172311
+    },
+    "ci": [
+     -0.097284,
+     0.080651
+    ],
+    "mean": -0.008746,
+    "prompts_with_value": 4,
+    "range": [
+     -0.172311,
+     0.151245
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_proportion|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     0
+    ],
+    "COMPETITION": [
+     10,
+     0
+    ],
+    "HAPPINESS": [
+     4,
+     0
+    ],
+    "MATERIALISM": [
+     3,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.000391
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.319188,
+     "COMPETITION": 0.280481,
+     "HAPPINESS": 0.409735,
+     "MATERIALISM": 0.272618
+    },
+    "ci": [
+     0.225766,
+     0.474342
+    ],
+    "mean": 0.320506,
+    "prompts_with_value": 4,
+    "range": [
+     0.272618,
+     0.409735
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.091597,
+     "COMPETITION": 0.283612,
+     "HAPPINESS": 0.156983,
+     "MATERIALISM": 0.232181
+    },
+    "ci": [
+     0.104602,
+     0.272109
+    ],
+    "mean": 0.191093,
+    "prompts_with_value": 4,
+    "range": [
+     0.091597,
+     0.283612
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.003381,
+     "COMPETITION": 0.149934,
+     "HAPPINESS": -0.017478,
+     "MATERIALISM": -0.157188
+    },
+    "ci": [
+     -0.094061,
+     0.084416
+    ],
+    "mean": -0.005338,
+    "prompts_with_value": 4,
+    "range": [
+     -0.157188,
+     0.149934
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_proportion|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     0
+    ],
+    "COMPETITION": [
+     10,
+     0
+    ],
+    "HAPPINESS": [
+     4,
+     0
+    ],
+    "MATERIALISM": [
+     3,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.000412
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.299117,
+     "COMPETITION": 0.275112,
+     "HAPPINESS": 0.427811,
+     "MATERIALISM": 0.329013
+    },
+    "ci": [
+     0.228051,
+     0.482033
+    ],
+    "mean": 0.332763,
+    "prompts_with_value": 4,
+    "range": [
+     0.275112,
+     0.427811
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.102494,
+     "COMPETITION": 0.284734,
+     "HAPPINESS": 0.157073,
+     "MATERIALISM": 0.214888
+    },
+    "ci": [
+     0.10384,
+     0.271771
+    ],
+    "mean": 0.189797,
+    "prompts_with_value": 4,
+    "range": [
+     0.102494,
+     0.284734
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.012895,
+     "COMPETITION": 0.151378,
+     "HAPPINESS": -0.017791,
+     "MATERIALISM": -0.173911
+    },
+    "ci": [
+     -0.095166,
+     0.08258
+    ],
+    "mean": -0.006857,
+    "prompts_with_value": 4,
+    "range": [
+     -0.173911,
+     0.151378
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "insertion_proportion|R3": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     4,
+     0
+    ],
+    "COMPETITION": [
+     10,
+     0
+    ],
+    "HAPPINESS": [
+     4,
+     0
+    ],
+    "MATERIALISM": [
+     3,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 21,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.000412
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.0,
+     "COMPETITION": 0.0,
+     "HAPPINESS": 0.0,
+     "MATERIALISM": 0.0
+    },
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "mean": 0.0,
+    "prompts_with_value": 4,
+    "range": [
+     0.0,
+     0.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.3,
+     "COMPETITION": 0.276989,
+     "HAPPINESS": 0.427273,
+     "MATERIALISM": 0.330409
+    },
+    "ci": [
+     0.228864,
+     0.482015
+    ],
+    "mean": 0.333668,
+    "prompts_with_value": 4,
+    "range": [
+     0.276989,
+     0.427273
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.102719,
+     "COMPETITION": 0.285041,
+     "HAPPINESS": 0.157309,
+     "MATERIALISM": 0.214888
+    },
+    "ci": [
+     0.103919,
+     0.271829
+    ],
+    "mean": 0.189989,
+    "prompts_with_value": 4,
+    "range": [
+     0.102719,
+     0.285041
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.013339,
+     "COMPETITION": 0.151321,
+     "HAPPINESS": -0.018392,
+     "MATERIALISM": -0.173911
+    },
+    "ci": [
+     -0.095194,
+     0.082682
+    ],
+    "mean": -0.006911,
+    "prompts_with_value": 4,
+    "range": [
+     -0.173911,
+     0.151321
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "interval_variance_10|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.060331,
+     "COMPETITION": 0.070197,
+     "HAPPINESS": 0.06388,
+     "MATERIALISM": 0.055635
+    },
+    "ci": [
+     0.058108,
+     0.068996
+    ],
+    "mean": 0.062511,
+    "prompts_with_value": 4,
+    "range": [
+     0.055635,
+     0.070197
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.028863,
+     "COMPETITION": 0.026589,
+     "HAPPINESS": 0.028609,
+     "MATERIALISM": 0.025735
+    },
+    "ci": [
+     0.025273,
+     0.030986
+    ],
+    "mean": 0.027449,
+    "prompts_with_value": 4,
+    "range": [
+     0.025735,
+     0.028863
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.197503,
+     "COMPETITION": 0.140576,
+     "HAPPINESS": 0.135804,
+     "MATERIALISM": 0.149711
+    },
+    "ci": [
+     0.137042,
+     0.174097
+    ],
+    "mean": 0.155898,
+    "prompts_with_value": 4,
+    "range": [
+     0.135804,
+     0.197503
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": -0.173364,
+     "COMPETITION": 0.035048,
+     "HAPPINESS": -0.004289,
+     "MATERIALISM": -0.081782
+    },
+    "ci": [
+     -0.14294,
+     0.029193
+    ],
+    "mean": -0.056097,
+    "prompts_with_value": 4,
+    "range": [
+     -0.173364,
+     0.035048
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.409271,
+     "COMPETITION": -0.31653,
+     "HAPPINESS": -0.411779,
+     "MATERIALISM": -0.42121
+    },
+    "ci": [
+     -0.464597,
+     -0.306774
+    ],
+    "mean": -0.389697,
+    "prompts_with_value": 4,
+    "range": [
+     -0.42121,
+     -0.31653
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "interval_variance_10|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.117581,
+     "COMPETITION": 0.136976,
+     "HAPPINESS": 0.126371,
+     "MATERIALISM": 0.120791
+    },
+    "ci": [
+     0.116664,
+     0.136552
+    ],
+    "mean": 0.12543,
+    "prompts_with_value": 4,
+    "range": [
+     0.117581,
+     0.136976
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.05719,
+     "COMPETITION": 0.053239,
+     "HAPPINESS": 0.054619,
+     "MATERIALISM": 0.056118
+    },
+    "ci": [
+     0.050582,
+     0.062263
+    ],
+    "mean": 0.055292,
+    "prompts_with_value": 4,
+    "range": [
+     0.053239,
+     0.05719
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.319727,
+     "COMPETITION": 0.290294,
+     "HAPPINESS": 0.254136,
+     "MATERIALISM": 0.283537
+    },
+    "ci": [
+     0.256229,
+     0.338843
+    ],
+    "mean": 0.286924,
+    "prompts_with_value": 4,
+    "range": [
+     0.254136,
+     0.319727
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": -0.095717,
+     "COMPETITION": 0.061628,
+     "HAPPINESS": -0.034581,
+     "MATERIALISM": -0.053382
+    },
+    "ci": [
+     -0.118253,
+     0.051637
+    ],
+    "mean": -0.030513,
+    "prompts_with_value": 4,
+    "range": [
+     -0.095717,
+     0.061628
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.324958,
+     "COMPETITION": -0.389472,
+     "HAPPINESS": -0.310673,
+     "MATERIALISM": -0.35314
+    },
+    "ci": [
+     -0.421781,
+     -0.253658
+    ],
+    "mean": -0.344561,
+    "prompts_with_value": 4,
+    "range": [
+     -0.389472,
+     -0.310673
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "interval_variance_10|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.216384,
+     "COMPETITION": 0.241073,
+     "HAPPINESS": 0.212355,
+     "MATERIALISM": 0.189035
+    },
+    "ci": [
+     0.204425,
+     0.231248
+    ],
+    "mean": 0.214712,
+    "prompts_with_value": 4,
+    "range": [
+     0.189035,
+     0.241073
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.113386,
+     "COMPETITION": 0.105051,
+     "HAPPINESS": 0.109692,
+     "MATERIALISM": 0.091656
+    },
+    "ci": [
+     0.094918,
+     0.114763
+    ],
+    "mean": 0.104946,
+    "prompts_with_value": 4,
+    "range": [
+     0.091656,
+     0.113386
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.526208,
+     "COMPETITION": 0.454062,
+     "HAPPINESS": 0.429926,
+     "MATERIALISM": 0.466651
+    },
+    "ci": [
+     0.420373,
+     0.528204
+    ],
+    "mean": 0.469212,
+    "prompts_with_value": 4,
+    "range": [
+     0.429926,
+     0.526208
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": -0.04373,
+     "COMPETITION": 0.161395,
+     "HAPPINESS": 0.217776,
+     "MATERIALISM": 0.108363
+    },
+    "ci": [
+     0.02405,
+     0.202239
+    ],
+    "mean": 0.110951,
+    "prompts_with_value": 4,
+    "range": [
+     -0.04373,
+     0.217776
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.270618,
+     "COMPETITION": -0.299862,
+     "HAPPINESS": -0.197577,
+     "MATERIALISM": -0.307168
+    },
+    "ci": [
+     -0.347251,
+     -0.176563
+    ],
+    "mean": -0.268806,
+    "prompts_with_value": 4,
+    "range": [
+     -0.307168,
+     -0.197577
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "interval_variance_10|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.362761,
+     "COMPETITION": 0.393968,
+     "HAPPINESS": 0.336174,
+     "MATERIALISM": 0.309881
+    },
+    "ci": [
+     0.334179,
+     0.370376
+    ],
+    "mean": 0.350696,
+    "prompts_with_value": 4,
+    "range": [
+     0.309881,
+     0.393968
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.186901,
+     "COMPETITION": 0.170823,
+     "HAPPINESS": 0.169311,
+     "MATERIALISM": 0.164855
+    },
+    "ci": [
+     0.161281,
+     0.190453
+    ],
+    "mean": 0.172973,
+    "prompts_with_value": 4,
+    "range": [
+     0.164855,
+     0.186901
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.697552,
+     "COMPETITION": 0.659845,
+     "HAPPINESS": 0.572179,
+     "MATERIALISM": 0.66082
+    },
+    "ci": [
+     0.594819,
+     0.696541
+    ],
+    "mean": 0.647599,
+    "prompts_with_value": 4,
+    "range": [
+     0.572179,
+     0.697552
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.294599,
+     "COMPETITION": 0.362255,
+     "HAPPINESS": 0.327662,
+     "MATERIALISM": 0.2793
+    },
+    "ci": [
+     0.230293,
+     0.393395
+    ],
+    "mean": 0.315954,
+    "prompts_with_value": 4,
+    "range": [
+     0.2793,
+     0.362255
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.22689,
+     "COMPETITION": -0.212197,
+     "HAPPINESS": -0.024866,
+     "MATERIALISM": -0.150319
+    },
+    "ci": [
+     -0.241576,
+     -0.063744
+    ],
+    "mean": -0.153568,
+    "prompts_with_value": 4,
+    "range": [
+     -0.22689,
+     -0.024866
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "interval_variance_10|R3": {
+   "cell": "ok",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.221517,
+     "COMPETITION": 0.241427,
+     "HAPPINESS": 0.199928,
+     "MATERIALISM": 0.36772
+    },
+    "ci": [
+     0.171982,
+     0.33898
+    ],
+    "mean": 0.257648,
+    "prompts_with_value": 4,
+    "range": [
+     0.199928,
+     0.36772
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "p_burst_mean_len|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.077915,
+     "COMPETITION": 0.078077,
+     "HAPPINESS": 0.076259,
+     "MATERIALISM": 0.075795
+    },
+    "ci": [
+     0.073834,
+     0.081137
+    ],
+    "mean": 0.077011,
+    "prompts_with_value": 4,
+    "range": [
+     0.075795,
+     0.078077
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.039527,
+     "COMPETITION": 0.038465,
+     "HAPPINESS": 0.039521,
+     "MATERIALISM": 0.034132
+    },
+    "ci": [
+     0.033984,
+     0.041146
+    ],
+    "mean": 0.037912,
+    "prompts_with_value": 4,
+    "range": [
+     0.034132,
+     0.039527
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.141056,
+     "COMPETITION": 0.159884,
+     "HAPPINESS": 0.136956,
+     "MATERIALISM": 0.161217
+    },
+    "ci": [
+     0.138072,
+     0.163318
+    ],
+    "mean": 0.149778,
+    "prompts_with_value": 4,
+    "range": [
+     0.136956,
+     0.161217
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.489118,
+     "COMPETITION": 0.507859,
+     "HAPPINESS": 0.56365,
+     "MATERIALISM": 0.552786
+    },
+    "ci": [
+     0.451536,
+     0.587301
+    ],
+    "mean": 0.528353,
+    "prompts_with_value": 4,
+    "range": [
+     0.489118,
+     0.56365
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.349618,
+     "COMPETITION": 0.193809,
+     "HAPPINESS": 0.335368,
+     "MATERIALISM": 0.41808
+    },
+    "ci": [
+     0.238908,
+     0.406044
+    ],
+    "mean": 0.324219,
+    "prompts_with_value": 4,
+    "range": [
+     0.193809,
+     0.41808
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "p_burst_mean_len|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.118035,
+     "COMPETITION": 0.115856,
+     "HAPPINESS": 0.117869,
+     "MATERIALISM": 0.113775
+    },
+    "ci": [
+     0.109631,
+     0.120721
+    ],
+    "mean": 0.116384,
+    "prompts_with_value": 4,
+    "range": [
+     0.113775,
+     0.118035
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.05962,
+     "COMPETITION": 0.060477,
+     "HAPPINESS": 0.059765,
+     "MATERIALISM": 0.052082
+    },
+    "ci": [
+     0.051614,
+     0.062505
+    ],
+    "mean": 0.057986,
+    "prompts_with_value": 4,
+    "range": [
+     0.052082,
+     0.060477
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.203397,
+     "COMPETITION": 0.226158,
+     "HAPPINESS": 0.191475,
+     "MATERIALISM": 0.229417
+    },
+    "ci": [
+     0.197942,
+     0.230424
+    ],
+    "mean": 0.212612,
+    "prompts_with_value": 4,
+    "range": [
+     0.191475,
+     0.229417
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.656305,
+     "COMPETITION": 0.679957,
+     "HAPPINESS": 0.589398,
+     "MATERIALISM": 0.708922
+    },
+    "ci": [
+     0.593349,
+     0.709741
+    ],
+    "mean": 0.658646,
+    "prompts_with_value": 4,
+    "range": [
+     0.589398,
+     0.708922
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.413711,
+     "COMPETITION": 0.380147,
+     "HAPPINESS": 0.507319,
+     "MATERIALISM": 0.459197
+    },
+    "ci": [
+     0.361848,
+     0.511437
+    ],
+    "mean": 0.440093,
+    "prompts_with_value": 4,
+    "range": [
+     0.380147,
+     0.507319
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "p_burst_mean_len|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.240783,
+     "COMPETITION": 0.244209,
+     "HAPPINESS": 0.24181,
+     "MATERIALISM": 0.243462
+    },
+    "ci": [
+     0.233289,
+     0.252976
+    ],
+    "mean": 0.242566,
+    "prompts_with_value": 4,
+    "range": [
+     0.240783,
+     0.244209
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.129284,
+     "COMPETITION": 0.132683,
+     "HAPPINESS": 0.127618,
+     "MATERIALISM": 0.119582
+    },
+    "ci": [
+     0.118529,
+     0.140333
+    ],
+    "mean": 0.127292,
+    "prompts_with_value": 4,
+    "range": [
+     0.119582,
+     0.132683
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.386221,
+     "COMPETITION": 0.416992,
+     "HAPPINESS": 0.388794,
+     "MATERIALISM": 0.422384
+    },
+    "ci": [
+     0.383787,
+     0.421191
+    ],
+    "mean": 0.403598,
+    "prompts_with_value": 4,
+    "range": [
+     0.386221,
+     0.422384
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.801776,
+     "COMPETITION": 0.823361,
+     "HAPPINESS": 0.818931,
+     "MATERIALISM": 0.900648
+    },
+    "ci": [
+     0.798186,
+     0.859929
+    ],
+    "mean": 0.836179,
+    "prompts_with_value": 4,
+    "range": [
+     0.801776,
+     0.900648
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.417115,
+     "COMPETITION": 0.36716,
+     "HAPPINESS": 0.526093,
+     "MATERIALISM": 0.603802
+    },
+    "ci": [
+     0.403955,
+     0.540351
+    ],
+    "mean": 0.478543,
+    "prompts_with_value": 4,
+    "range": [
+     0.36716,
+     0.603802
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "p_burst_mean_len|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.784335,
+     "COMPETITION": 0.763031,
+     "HAPPINESS": 0.771883,
+     "MATERIALISM": 0.744286
+    },
+    "ci": [
+     0.738482,
+     0.787896
+    ],
+    "mean": 0.765884,
+    "prompts_with_value": 4,
+    "range": [
+     0.744286,
+     0.784335
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.512018,
+     "COMPETITION": 0.509468,
+     "HAPPINESS": 0.531488,
+     "MATERIALISM": 0.466378
+    },
+    "ci": [
+     0.473005,
+     0.541627
+    ],
+    "mean": 0.504838,
+    "prompts_with_value": 4,
+    "range": [
+     0.466378,
+     0.531488
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 0.976906,
+     "COMPETITION": 1.026031,
+     "HAPPINESS": 1.006714,
+     "MATERIALISM": 1.014113
+    },
+    "ci": [
+     0.977811,
+     1.027344
+    ],
+    "mean": 1.005941,
+    "prompts_with_value": 4,
+    "range": [
+     0.976906,
+     1.026031
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.934144,
+     "COMPETITION": 0.914912,
+     "HAPPINESS": 0.909813,
+     "MATERIALISM": 0.944707
+    },
+    "ci": [
+     0.904175,
+     0.935846
+    ],
+    "mean": 0.925894,
+    "prompts_with_value": 4,
+    "range": [
+     0.909813,
+     0.944707
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.48137,
+     "COMPETITION": 0.44905,
+     "HAPPINESS": 0.519665,
+     "MATERIALISM": 0.591514
+    },
+    "ci": [
+     0.438113,
+     0.57467
+    ],
+    "mean": 0.5104,
+    "prompts_with_value": 4,
+    "range": [
+     0.44905,
+     0.591514
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "p_burst_mean_len|R3": {
+   "cell": "ok",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.449728,
+     "COMPETITION": 0.362296,
+     "HAPPINESS": 0.360941,
+     "MATERIALISM": 0.556548
+    },
+    "ci": [
+     0.354759,
+     0.501397
+    ],
+    "mean": 0.432378,
+    "prompts_with_value": 4,
+    "range": [
+     0.360941,
+     0.556548
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "pause_mean_200ms|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 3.864331,
+     "COMPETITION": 3.351448,
+     "HAPPINESS": 3.598346,
+     "MATERIALISM": 3.437211
+    },
+    "ci": [
+     3.435686,
+     3.69868
+    ],
+    "mean": 3.562834,
+    "prompts_with_value": 4,
+    "range": [
+     3.351448,
+     3.864331
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 2.450224,
+     "COMPETITION": 1.972065,
+     "HAPPINESS": 2.179043,
+     "MATERIALISM": 2.306222
+    },
+    "ci": [
+     2.001652,
+     2.407894
+    ],
+    "mean": 2.226889,
+    "prompts_with_value": 4,
+    "range": [
+     1.972065,
+     2.450224
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 5.506883,
+     "COMPETITION": 5.484022,
+     "HAPPINESS": 5.697608,
+     "MATERIALISM": 5.470782
+    },
+    "ci": [
+     5.312569,
+     5.916495
+    ],
+    "mean": 5.539824,
+    "prompts_with_value": 4,
+    "range": [
+     5.470782,
+     5.697608
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.032043,
+     "COMPETITION": 0.029825,
+     "HAPPINESS": 0.11541,
+     "MATERIALISM": 0.062243
+    },
+    "ci": [
+     -0.029181,
+     0.145218
+    ],
+    "mean": 0.05988,
+    "prompts_with_value": 4,
+    "range": [
+     0.029825,
+     0.11541
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.071459,
+     "COMPETITION": -0.119889,
+     "HAPPINESS": -0.093319,
+     "MATERIALISM": -0.128926
+    },
+    "ci": [
+     -0.195833,
+     -0.014697
+    ],
+    "mean": -0.103398,
+    "prompts_with_value": 4,
+    "range": [
+     -0.128926,
+     -0.071459
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "pause_mean_200ms|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 2.045482,
+     "COMPETITION": 1.793823,
+     "HAPPINESS": 1.888702,
+     "MATERIALISM": 1.84954
+    },
+    "ci": [
+     1.829536,
+     1.980155
+    ],
+    "mean": 1.894387,
+    "prompts_with_value": 4,
+    "range": [
+     1.793823,
+     2.045482
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 1.305194,
+     "COMPETITION": 1.023315,
+     "HAPPINESS": 1.160202,
+     "MATERIALISM": 1.21361
+    },
+    "ci": [
+     1.067633,
+     1.278071
+    ],
+    "mean": 1.17558,
+    "prompts_with_value": 4,
+    "range": [
+     1.023315,
+     1.305194
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 2.96358,
+     "COMPETITION": 2.91405,
+     "HAPPINESS": 3.013919,
+     "MATERIALISM": 2.952144
+    },
+    "ci": [
+     2.850275,
+     3.155017
+    ],
+    "mean": 2.960923,
+    "prompts_with_value": 4,
+    "range": [
+     2.91405,
+     3.013919
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": -0.085585,
+     "COMPETITION": 0.21235,
+     "HAPPINESS": 0.020922,
+     "MATERIALISM": -0.011754
+    },
+    "ci": [
+     -0.051858,
+     0.123871
+    ],
+    "mean": 0.033983,
+    "prompts_with_value": 4,
+    "range": [
+     -0.085585,
+     0.21235
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.240198,
+     "COMPETITION": -0.179395,
+     "HAPPINESS": -0.215233,
+     "MATERIALISM": -0.346778
+    },
+    "ci": [
+     -0.329263,
+     -0.159446
+    ],
+    "mean": -0.245401,
+    "prompts_with_value": 4,
+    "range": [
+     -0.346778,
+     -0.179395
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "pause_mean_200ms|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 1.174624,
+     "COMPETITION": 1.052691,
+     "HAPPINESS": 1.089953,
+     "MATERIALISM": 1.07925
+    },
+    "ci": [
+     1.057405,
+     1.143929
+    ],
+    "mean": 1.099129,
+    "prompts_with_value": 4,
+    "range": [
+     1.052691,
+     1.174624
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.756555,
+     "COMPETITION": 0.605075,
+     "HAPPINESS": 0.681945,
+     "MATERIALISM": 0.692531
+    },
+    "ci": [
+     0.611937,
+     0.736468
+    ],
+    "mean": 0.684026,
+    "prompts_with_value": 4,
+    "range": [
+     0.605075,
+     0.756555
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.716319,
+     "COMPETITION": 1.715201,
+     "HAPPINESS": 1.717528,
+     "MATERIALISM": 1.666267
+    },
+    "ci": [
+     1.624933,
+     1.814718
+    ],
+    "mean": 1.703829,
+    "prompts_with_value": 4,
+    "range": [
+     1.666267,
+     1.717528
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.033948,
+     "COMPETITION": 0.076418,
+     "HAPPINESS": 0.039883,
+     "MATERIALISM": 0.018495
+    },
+    "ci": [
+     -0.046779,
+     0.127792
+    ],
+    "mean": 0.042186,
+    "prompts_with_value": 4,
+    "range": [
+     0.018495,
+     0.076418
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.384196,
+     "COMPETITION": -0.264007,
+     "HAPPINESS": -0.421621,
+     "MATERIALISM": -0.571134
+    },
+    "ci": [
+     -0.481129,
+     -0.329113
+    ],
+    "mean": -0.410239,
+    "prompts_with_value": 4,
+    "range": [
+     -0.571134,
+     -0.264007
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "pause_mean_200ms|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.761174,
+     "COMPETITION": 0.68777,
+     "HAPPINESS": 0.720967,
+     "MATERIALISM": 0.710364
+    },
+    "ci": [
+     0.688521,
+     0.742797
+    ],
+    "mean": 0.720069,
+    "prompts_with_value": 4,
+    "range": [
+     0.68777,
+     0.761174
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.480076,
+     "COMPETITION": 0.388566,
+     "HAPPINESS": 0.434571,
+     "MATERIALISM": 0.454028
+    },
+    "ci": [
+     0.3855,
+     0.474565
+    ],
+    "mean": 0.43931,
+    "prompts_with_value": 4,
+    "range": [
+     0.388566,
+     0.480076
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.083802,
+     "COMPETITION": 1.088906,
+     "HAPPINESS": 1.128899,
+     "MATERIALISM": 1.109683
+    },
+    "ci": [
+     1.052537,
+     1.166051
+    ],
+    "mean": 1.102823,
+    "prompts_with_value": 4,
+    "range": [
+     1.083802,
+     1.128899
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.049985,
+     "COMPETITION": 0.191496,
+     "HAPPINESS": 0.126783,
+     "MATERIALISM": -0.060289
+    },
+    "ci": [
+     -0.013348,
+     0.162755
+    ],
+    "mean": 0.076994,
+    "prompts_with_value": 4,
+    "range": [
+     -0.060289,
+     0.191496
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.516136,
+     "COMPETITION": -0.40821,
+     "HAPPINESS": -0.48567,
+     "MATERIALISM": -0.579731
+    },
+    "ci": [
+     -0.562508,
+     -0.424477
+    ],
+    "mean": -0.497437,
+    "prompts_with_value": 4,
+    "range": [
+     -0.579731,
+     -0.40821
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "pause_mean_200ms|R3": {
+   "cell": "ok",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.065907,
+     "COMPETITION": -0.149681,
+     "HAPPINESS": -0.029887,
+     "MATERIALISM": -0.203349
+    },
+    "ci": [
+     -0.201965,
+     -0.019774
+    ],
+    "mean": -0.112206,
+    "prompts_with_value": 4,
+    "range": [
+     -0.203349,
+     -0.029887
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "r_burst_mean_len|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.69001,
+     "COMPETITION": 0.704319,
+     "HAPPINESS": 0.754718,
+     "MATERIALISM": 0.789122
+    },
+    "ci": [
+     0.620766,
+     0.81508
+    ],
+    "mean": 0.734542,
+    "prompts_with_value": 4,
+    "range": [
+     0.69001,
+     0.789122
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.18099,
+     "COMPETITION": 0.1443,
+     "HAPPINESS": 0.166201,
+     "MATERIALISM": 0.159456
+    },
+    "ci": [
+     0.148267,
+     0.185445
+    ],
+    "mean": 0.162737,
+    "prompts_with_value": 4,
+    "range": [
+     0.1443,
+     0.18099
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 2.094788,
+     "COMPETITION": 2.210329,
+     "HAPPINESS": 1.895916,
+     "MATERIALISM": 2.336293
+    },
+    "ci": [
+     1.881668,
+     2.261951
+    ],
+    "mean": 2.134331,
+    "prompts_with_value": 4,
+    "range": [
+     1.895916,
+     2.336293
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.287459,
+     "COMPETITION": 0.21514,
+     "HAPPINESS": 0.219035,
+     "MATERIALISM": 0.132178
+    },
+    "ci": [
+     0.123188,
+     0.300238
+    ],
+    "mean": 0.213453,
+    "prompts_with_value": 4,
+    "range": [
+     0.132178,
+     0.287459
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.176961,
+     "COMPETITION": -0.021101,
+     "HAPPINESS": 0.240931,
+     "MATERIALISM": 0.296337
+    },
+    "ci": [
+     0.087859,
+     0.263521
+    ],
+    "mean": 0.173282,
+    "prompts_with_value": 4,
+    "range": [
+     -0.021101,
+     0.296337
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "r_burst_mean_len|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 0.979521,
+     "COMPETITION": 0.958176,
+     "HAPPINESS": 1.05514,
+     "MATERIALISM": 1.048922
+    },
+    "ci": [
+     0.868388,
+     1.126783
+    ],
+    "mean": 1.010439,
+    "prompts_with_value": 4,
+    "range": [
+     0.958176,
+     1.05514
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.258334,
+     "COMPETITION": 0.203226,
+     "HAPPINESS": 0.236683,
+     "MATERIALISM": 0.235492
+    },
+    "ci": [
+     0.213382,
+     0.265005
+    ],
+    "mean": 0.233434,
+    "prompts_with_value": 4,
+    "range": [
+     0.203226,
+     0.258334
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 2.693426,
+     "COMPETITION": 2.967327,
+     "HAPPINESS": 2.655585,
+     "MATERIALISM": 3.243727
+    },
+    "ci": [
+     2.61378,
+     3.1815
+    ],
+    "mean": 2.890016,
+    "prompts_with_value": 4,
+    "range": [
+     2.655585,
+     3.243727
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.279115,
+     "COMPETITION": 0.217536,
+     "HAPPINESS": 0.320055,
+     "MATERIALISM": 0.328971
+    },
+    "ci": [
+     0.19866,
+     0.371049
+    ],
+    "mean": 0.286419,
+    "prompts_with_value": 4,
+    "range": [
+     0.217536,
+     0.328971
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.203467,
+     "COMPETITION": 0.08465,
+     "HAPPINESS": 0.35413,
+     "MATERIALISM": 0.337945
+    },
+    "ci": [
+     0.156926,
+     0.332843
+    ],
+    "mean": 0.245048,
+    "prompts_with_value": 4,
+    "range": [
+     0.08465,
+     0.35413
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "r_burst_mean_len|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 1.671194,
+     "COMPETITION": 1.558557,
+     "HAPPINESS": 1.859355,
+     "MATERIALISM": 1.929783
+    },
+    "ci": [
+     1.4787,
+     2.014258
+    ],
+    "mean": 1.754722,
+    "prompts_with_value": 4,
+    "range": [
+     1.558557,
+     1.929783
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.47397,
+     "COMPETITION": 0.401399,
+     "HAPPINESS": 0.439921,
+     "MATERIALISM": 0.441802
+    },
+    "ci": [
+     0.404645,
+     0.489937
+    ],
+    "mean": 0.439273,
+    "prompts_with_value": 4,
+    "range": [
+     0.401399,
+     0.47397
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 5.083287,
+     "COMPETITION": 5.593988,
+     "HAPPINESS": 4.767382,
+     "MATERIALISM": 6.022685
+    },
+    "ci": [
+     4.812516,
+     6.097672
+    ],
+    "mean": 5.366836,
+    "prompts_with_value": 4,
+    "range": [
+     4.767382,
+     6.022685
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.243521,
+     "COMPETITION": 0.254077,
+     "HAPPINESS": 0.240344,
+     "MATERIALISM": 0.273856
+    },
+    "ci": [
+     0.161088,
+     0.334431
+    ],
+    "mean": 0.252949,
+    "prompts_with_value": 4,
+    "range": [
+     0.240344,
+     0.273856
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.148856,
+     "COMPETITION": 0.072165,
+     "HAPPINESS": 0.343024,
+     "MATERIALISM": 0.42047
+    },
+    "ci": [
+     0.159036,
+     0.329124
+    ],
+    "mean": 0.246129,
+    "prompts_with_value": 4,
+    "range": [
+     0.072165,
+     0.42047
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "r_burst_mean_len|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 2.975546,
+     "COMPETITION": 2.648096,
+     "HAPPINESS": 3.601665,
+     "MATERIALISM": 3.867334
+    },
+    "ci": [
+     2.780679,
+     3.829648
+    ],
+    "mean": 3.27316,
+    "prompts_with_value": 4,
+    "range": [
+     2.648096,
+     3.867334
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 0.92926,
+     "COMPETITION": 0.868805,
+     "HAPPINESS": 0.901038,
+     "MATERIALISM": 0.895182
+    },
+    "ci": [
+     0.865038,
+     0.992255
+    ],
+    "mean": 0.898571,
+    "prompts_with_value": 4,
+    "range": [
+     0.868805,
+     0.92926
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 11.053801,
+     "COMPETITION": 11.069822,
+     "HAPPINESS": 11.114153,
+     "MATERIALISM": 12.669553
+    },
+    "ci": [
+     9.990326,
+     12.769701
+    ],
+    "mean": 11.476832,
+    "prompts_with_value": 4,
+    "range": [
+     11.053801,
+     12.669553
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.265432,
+     "COMPETITION": 0.278729,
+     "HAPPINESS": 0.3062,
+     "MATERIALISM": 0.259459
+    },
+    "ci": [
+     0.186983,
+     0.360777
+    ],
+    "mean": 0.277455,
+    "prompts_with_value": 4,
+    "range": [
+     0.259459,
+     0.3062
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.126145,
+     "COMPETITION": 0.066379,
+     "HAPPINESS": 0.296512,
+     "MATERIALISM": 0.366306
+    },
+    "ci": [
+     0.122527,
+     0.298114
+    ],
+    "mean": 0.213835,
+    "prompts_with_value": 4,
+    "range": [
+     0.066379,
+     0.366306
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "r_burst_mean_len|R3": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 3.429825,
+     "COMPETITION": 2.82381,
+     "HAPPINESS": 3.663551,
+     "MATERIALISM": 4.509091
+    },
+    "ci": [
+     3.062207,
+     4.220195
+    ],
+    "mean": 3.606569,
+    "prompts_with_value": 4,
+    "range": [
+     2.82381,
+     4.509091
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 1.033372,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.015713,
+     "MATERIALISM": 1.010942
+    },
+    "ci": [
+     1.005026,
+     1.095561
+    ],
+    "mean": 1.015007,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.033372
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 13.106954,
+     "COMPETITION": 12.62728,
+     "HAPPINESS": 13.023529,
+     "MATERIALISM": 15.170938
+    },
+    "ci": [
+     11.470975,
+     14.993381
+    ],
+    "mean": 13.482176,
+    "prompts_with_value": 4,
+    "range": [
+     12.62728,
+     15.170938
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.26502,
+     "COMPETITION": 0.311736,
+     "HAPPINESS": 0.284854,
+     "MATERIALISM": 0.259644
+    },
+    "ci": [
+     0.186888,
+     0.36483
+    ],
+    "mean": 0.280313,
+    "prompts_with_value": 4,
+    "range": [
+     0.259644,
+     0.311736
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.141921,
+     "COMPETITION": 0.065116,
+     "HAPPINESS": 0.230952,
+     "MATERIALISM": 0.371738
+    },
+    "ci": [
+     0.112504,
+     0.287685
+    ],
+    "mean": 0.202432,
+    "prompts_with_value": 4,
+    "range": [
+     0.065116,
+     0.371738
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "within_word_pause_mean|R-DP(0.5)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 12.095098,
+     "COMPETITION": 12.277095,
+     "HAPPINESS": 12.339212,
+     "MATERIALISM": 12.082954
+    },
+    "ci": [
+     12.023352,
+     12.412907
+    ],
+    "mean": 12.19859,
+    "prompts_with_value": 4,
+    "range": [
+     12.082954,
+     12.339212
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 9.306788,
+     "COMPETITION": 9.722158,
+     "HAPPINESS": 9.861018,
+     "MATERIALISM": 9.465046
+    },
+    "ci": [
+     9.063496,
+     9.982116
+    ],
+    "mean": 9.588752,
+    "prompts_with_value": 4,
+    "range": [
+     9.306788,
+     9.861018
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 14.24984,
+     "COMPETITION": 14.989408,
+     "HAPPINESS": 14.622901,
+     "MATERIALISM": 13.928253
+    },
+    "ci": [
+     14.118125,
+     14.730594
+    ],
+    "mean": 14.4476,
+    "prompts_with_value": 4,
+    "range": [
+     13.928253,
+     14.989408
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": -0.111588,
+     "COMPETITION": 0.164068,
+     "HAPPINESS": 0.067422,
+     "MATERIALISM": 0.040418
+    },
+    "ci": [
+     -0.045829,
+     0.127518
+    ],
+    "mean": 0.04008,
+    "prompts_with_value": 4,
+    "range": [
+     -0.111588,
+     0.164068
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": 0.015048,
+     "COMPETITION": -0.014195,
+     "HAPPINESS": -0.214996,
+     "MATERIALISM": -0.028019
+    },
+    "ci": [
+     -0.151425,
+     0.023587
+    ],
+    "mean": -0.060541,
+    "prompts_with_value": 4,
+    "range": [
+     -0.214996,
+     0.015048
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "within_word_pause_mean|R-DP(1)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 6.373867,
+     "COMPETITION": 6.564831,
+     "HAPPINESS": 6.446967,
+     "MATERIALISM": 6.424234
+    },
+    "ci": [
+     6.316816,
+     6.561111
+    ],
+    "mean": 6.452475,
+    "prompts_with_value": 4,
+    "range": [
+     6.373867,
+     6.564831
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 4.832949,
+     "COMPETITION": 5.110944,
+     "HAPPINESS": 5.170018,
+     "MATERIALISM": 5.062073
+    },
+    "ci": [
+     4.764073,
+     5.289414
+    ],
+    "mean": 5.043996,
+    "prompts_with_value": 4,
+    "range": [
+     4.832949,
+     5.170018
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 7.530802,
+     "COMPETITION": 7.683466,
+     "HAPPINESS": 7.550341,
+     "MATERIALISM": 7.392413
+    },
+    "ci": [
+     7.407144,
+     7.674473
+    ],
+    "mean": 7.539255,
+    "prompts_with_value": 4,
+    "range": [
+     7.392413,
+     7.683466
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": -0.000725,
+     "COMPETITION": 0.194249,
+     "HAPPINESS": 0.10529,
+     "MATERIALISM": 0.049825
+    },
+    "ci": [
+     -0.001577,
+     0.174763
+    ],
+    "mean": 0.08716,
+    "prompts_with_value": 4,
+    "range": [
+     -0.000725,
+     0.194249
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.104462,
+     "COMPETITION": -0.154957,
+     "HAPPINESS": -0.132394,
+     "MATERIALISM": -0.115673
+    },
+    "ci": [
+     -0.215614,
+     -0.038265
+    ],
+    "mean": -0.126872,
+    "prompts_with_value": 4,
+    "range": [
+     -0.154957,
+     -0.104462
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "within_word_pause_mean|R-DP(2)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 3.525585,
+     "COMPETITION": 3.618057,
+     "HAPPINESS": 3.560985,
+     "MATERIALISM": 3.549516
+    },
+    "ci": [
+     3.502481,
+     3.612382
+    ],
+    "mean": 3.563536,
+    "prompts_with_value": 4,
+    "range": [
+     3.525585,
+     3.618057
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 2.732343,
+     "COMPETITION": 2.808002,
+     "HAPPINESS": 2.860461,
+     "MATERIALISM": 2.794244
+    },
+    "ci": [
+     2.656903,
+     2.898609
+    ],
+    "mean": 2.798762,
+    "prompts_with_value": 4,
+    "range": [
+     2.732343,
+     2.860461
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 4.149489,
+     "COMPETITION": 4.21686,
+     "HAPPINESS": 4.203796,
+     "MATERIALISM": 4.037031
+    },
+    "ci": [
+     4.080218,
+     4.223529
+    ],
+    "mean": 4.151794,
+    "prompts_with_value": 4,
+    "range": [
+     4.037031,
+     4.21686
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.174433,
+     "COMPETITION": 0.321002,
+     "HAPPINESS": 0.17047,
+     "MATERIALISM": 0.265118
+    },
+    "ci": [
+     0.140801,
+     0.317623
+    ],
+    "mean": 0.232756,
+    "prompts_with_value": 4,
+    "range": [
+     0.17047,
+     0.321002
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.070631,
+     "COMPETITION": -0.182689,
+     "HAPPINESS": -0.198169,
+     "MATERIALISM": -0.286428
+    },
+    "ci": [
+     -0.272164,
+     -0.093938
+    ],
+    "mean": -0.184479,
+    "prompts_with_value": 4,
+    "range": [
+     -0.286428,
+     -0.070631
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "within_word_pause_mean|R-DP(4)": {
+   "cell": "approx",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 2.082709,
+     "COMPETITION": 2.134893,
+     "HAPPINESS": 2.145577,
+     "MATERIALISM": 2.124831
+    },
+    "ci": [
+     2.091042,
+     2.145675
+    ],
+    "mean": 2.122002,
+    "prompts_with_value": 4,
+    "range": [
+     2.082709,
+     2.145577
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 1.668432,
+     "COMPETITION": 1.694313,
+     "HAPPINESS": 1.722086,
+     "MATERIALISM": 1.747269
+    },
+    "ci": [
+     1.629752,
+     1.776029
+    ],
+    "mean": 1.708025,
+    "prompts_with_value": 4,
+    "range": [
+     1.668432,
+     1.747269
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 2.43347,
+     "COMPETITION": 2.51746,
+     "HAPPINESS": 2.455039,
+     "MATERIALISM": 2.382884
+    },
+    "ci": [
+     2.402783,
+     2.474419
+    ],
+    "mean": 2.447213,
+    "prompts_with_value": 4,
+    "range": [
+     2.382884,
+     2.51746
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 0.511693,
+     "COMPETITION": 0.553118,
+     "HAPPINESS": 0.427201,
+     "MATERIALISM": 0.443214
+    },
+    "ci": [
+     0.402301,
+     0.556263
+    ],
+    "mean": 0.483806,
+    "prompts_with_value": 4,
+    "range": [
+     0.427201,
+     0.553118
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.468859,
+     "COMPETITION": -0.404688,
+     "HAPPINESS": -0.496615,
+     "MATERIALISM": -0.465009
+    },
+    "ci": [
+     -0.526536,
+     -0.3847
+    ],
+    "mean": -0.458793,
+    "prompts_with_value": 4,
+    "range": [
+     -0.496615,
+     -0.404688
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  },
+  "within_word_pause_mean|R3": {
+   "cell": "ok",
+   "ratio_dropped_by_prompt": {
+    "APPEARANCE": [
+     0,
+     0
+    ],
+    "COMPETITION": [
+     0,
+     0
+    ],
+    "HAPPINESS": [
+     0,
+     0
+    ],
+    "MATERIALISM": [
+     0,
+     0
+    ]
+   },
+   "ratio_dropped_form": 0,
+   "ratio_dropped_r0": 0,
+   "ratio_median": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p10": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "ratio_p90": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_r0": {
+    "by_prompt": {
+     "APPEARANCE": 1.0,
+     "COMPETITION": 1.0,
+     "HAPPINESS": 1.0,
+     "MATERIALISM": 1.0
+    },
+    "ci": [
+     1.0,
+     1.0
+    ],
+    "mean": 1.0,
+    "prompts_with_value": 4,
+    "range": [
+     1.0,
+     1.0
+    ],
+    "resamples_with_a_prompt_missing": 0
+   },
+   "spearman_score": {
+    "by_prompt": {
+     "APPEARANCE": -0.252265,
+     "COMPETITION": -0.293509,
+     "HAPPINESS": -0.26039,
+     "MATERIALISM": -0.38414
+    },
+    "ci": [
+     -0.375717,
+     -0.21205
+    ],
+    "mean": -0.297576,
+    "prompts_with_value": 4,
+    "range": [
+     -0.38414,
+     -0.252265
+    ],
+    "resamples_with_a_prompt_missing": 0
+   }
+  }
+ },
+ "utility_figure": {
+  "R-DP(0.5)": {
+   "approx": 10,
+   "computed_but_undefined": 0,
+   "median_spearman_r0": 0.212405,
+   "none": 0,
+   "ok": 0
+  },
+  "R-DP(1)": {
+   "approx": 10,
+   "computed_but_undefined": 0,
+   "median_spearman_r0": 0.287176,
+   "none": 0,
+   "ok": 0
+  },
+  "R-DP(2)": {
+   "approx": 10,
+   "computed_but_undefined": 0,
+   "median_spearman_r0": 0.293363,
+   "none": 0,
+   "ok": 0
+  },
+  "R-DP(4)": {
+   "approx": 10,
+   "computed_but_undefined": 0,
+   "median_spearman_r0": 0.435393,
+   "none": 0,
+   "ok": 0
+  },
+  "R3": {
+   "approx": 5,
+   "computed_but_undefined": 0,
+   "median_spearman_r0": 0.922541,
+   "none": 0,
+   "ok": 5
+  }
+ },
+ "writers": 500
+}
