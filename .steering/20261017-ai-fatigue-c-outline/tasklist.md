@@ -140,3 +140,5 @@
 - [ ] 研究者: Drive の `TRACE_database.xlsx` の段 1 を見る（上の 52 行の項）
 - [ ] 研究者: Drive の `fulltext` の共有（上の項）・共著者への案内の置き換え（判断 65 の項）
 - [ ] 締めの日（2026-12-31）の後に `release` を走らせ直し、screening/ の公開のファイルを新しいコミットで置き換える（判断 125）
+- [ ] 較正の 2 回目の冊と案内を作る・D9 の英文を研究者が確かめる（引き継ぎ `_handoff/next-session-ai-fatigue-c-calibration-pass2-prep-and-d9.md`・判断 126）
+- [ ] 較正の 2 回目（2026-12-01 以降・引き継ぎ `_handoff/next-session-ai-fatigue-c-calibration-pass2-run.md`）
