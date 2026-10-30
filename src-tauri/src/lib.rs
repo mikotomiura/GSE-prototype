@@ -5930,8 +5930,16 @@ pub fn run() {
             record_self_marker,
             record_vignette_response,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|_app, _event| {
+            // 手跡の帯の試作: Cmd+Q など shutdown() を通らない終了でも、隠したアプリを戻す
+            // （handmark_reveal.rs・code-reviewer / security-checker の指摘）。Exit はメインスレッドで来る。
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Exit = _event {
+                crate::handmark_reveal::restore_on_exit(_app);
+            }
+        });
 }
 
 #[cfg(test)]

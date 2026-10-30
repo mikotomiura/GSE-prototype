@@ -711,3 +711,70 @@ fn body_keeps_production_code_after_a_test_item() {
     let old = src.split("#[cfg(test)]").next().unwrap_or(&src);
     assert!(!old.contains("P1") && !old.contains("P2"));
 }
+
+/// 帯とどける操作の Rust のファイル（アプリや窓の名前を読まない・判断 6 と design.md の段 3）。
+const NO_NAMES: [(&str, &str); 3] = [
+    ("handmark_reveal.rs", include_str!("handmark_reveal.rs")),
+    (
+        "handmark_edge_strip.rs",
+        include_str!("handmark_edge_strip.rs"),
+    ),
+    ("handmark_wind.rs", include_str!("handmark_wind.rs")),
+];
+
+/// アプリや窓の名前を読む API の名前（実行時に組み立てる・この表を検査対象に書いても自分を見つけないように）。
+fn name_apis() -> Vec<String> {
+    [
+        ["localized", "Name"],
+        ["bundle", "Identifier"],
+        ["kCGWindow", "Name"],
+        ["kCGWindow", "OwnerName"],
+        ["executable", "URL"],
+        ["bundle", "URL"],
+    ]
+    .iter()
+    .map(|p| p.concat())
+    .collect()
+}
+
+fn names_read(body: &str) -> Vec<String> {
+    name_apis()
+        .into_iter()
+        .filter(|n| body.contains(n.as_str()))
+        .collect()
+}
+
+#[test]
+fn the_strip_and_the_reveal_do_not_read_app_or_window_names() {
+    for (path, body) in NO_NAMES {
+        assert!(
+            names_read(body).is_empty(),
+            "{path} reads names: {:?}",
+            names_read(body)
+        );
+    }
+    // 陽性対照: 本文の先頭に名前を読む API を足すと見つかる。
+    for (path, body) in NO_NAMES {
+        let planted = format!("let _ = app.{}();\n{}", name_apis()[0], body);
+        assert!(!names_read(&planted).is_empty(), "{path}: control missed");
+    }
+}
+
+/// 風の計算は打鍵の時刻を持つので、ファイル・ネットワーク・ログへ出さない。
+#[test]
+fn the_wind_writes_nowhere() {
+    let body = include_str!("handmark_wind.rs");
+    let banned: Vec<String> = [
+        ["std::", "fs"],
+        ["Tcp", "Stream"],
+        ["tracing", "::"],
+        ["File", "::"],
+    ]
+    .iter()
+    .map(|p| p.concat())
+    .collect();
+    let found = |b: &str| banned.iter().filter(|w| b.contains(w.as_str())).count();
+    assert_eq!(found(body), 0, "handmark_wind.rs writes somewhere");
+    let planted = format!("{}::write(\"x\", \"y\");\n{}", banned[0], body);
+    assert_eq!(found(&planted), 1, "control missed");
+}

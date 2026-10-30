@@ -27,6 +27,6 @@
 - [x] 全画面の中で帯を画面の下端に置く（判断 6・run9 で研究者の目視）
 
 ## 仕上げ
-- [ ] cargo test --workspace・clippy・tsc・gse-replay --snapshot 1 回
-- [ ] code-reviewer + security-checker
+- [x] cargo test --workspace・clippy・tsc・gse-replay --snapshot 1 回（968 件・警告なし・tsc 0・15 snapshots 一致）
+- [x] code-reviewer + security-checker（review.md・HIGH 2 件を直し、Cmd+Q と近さを実機で確かめた）
 - [ ] /finish-task（/cross-review 必須）・コミット・push まで（PR なし）

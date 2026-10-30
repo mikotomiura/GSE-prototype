@@ -18,6 +18,16 @@
 /// 帯の窓の label。capabilities/handmark-stage.json と src/main.tsx の分岐と一致させる。
 pub const LABEL: &str = "handmark-edge-strip";
 
+/// 帯の下端の、主画面の下端からの高さ（点・f64 のビット）。近さの計算が使う（handmark_stage_pointer.rs）。
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+static BOTTOM_PT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// 帯の下端の、主画面の下端からの高さ（点）。帯を置く前は 0。
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub(crate) fn bottom_pt() -> f64 {
+    f64::from_bits(BOTTOM_PT.load(std::sync::atomic::Ordering::Relaxed))
+}
+
 /// 窓（CG の座標・左上が原点・点）が主画面の幅いっぱいで、画面の下端まで届いているか。
 /// 全画面のアプリの窓とみなす（判断 6）。切り欠きのある画面では全画面の窓の上端が下がるので、上端は見ない。
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -166,6 +176,9 @@ mod imp {
                     if !SHOWN.load(Ordering::Acquire) || crate::is_shutting_down() {
                         return;
                     }
+                    // 窓の一覧はメインスレッドの外で読む（WindowServer とのやりとりで描画を止めない）。
+                    let main = core_graphics::display::CGDisplay::main().bounds();
+                    let fullscreen = fullscreen_window_shown(main.size.width, main.size.height);
                     let (tx, rx) = mpsc::channel();
                     let handle = app.clone();
                     let _ = app.run_on_main_thread(move || {
@@ -173,7 +186,7 @@ mod imp {
                             return;
                         };
                         let Ok(ns) = ns_window(&window) else { return };
-                        let lift = follow_dock(ns);
+                        let lift = follow_dock(ns, fullscreen);
                         let _ = tx.send((
                             ns.occlusionState()
                                 .contains(objc2_app_kit::NSWindowOcclusionState::Visible),
@@ -209,6 +222,7 @@ mod imp {
 
     /// 主画面に、他のアプリの全画面の窓（層 0・幅いっぱいで下端まで）が出ているか。
     /// 読むのは窓の層・持ち主の pid・大きさだけで、アプリや窓の名前は読まない（判断 6）。
+    /// 帯の見張りのスレッドから呼ぶ（CGWindowListCopyWindowInfo はメインスレッドを要しない）。
     fn fullscreen_window_shown(screen_w: f64, screen_h: f64) -> bool {
         use core_foundation::base::{CFType, TCFType};
         use core_foundation::dictionary::{CFDictionary, CFDictionaryRef};
@@ -280,17 +294,17 @@ mod imp {
     /// 全画面の Space でも visibleFrame は Dock を除いたままなので（run8 の (4)）、他のアプリの全画面の窓が
     /// 出ているときは画面の下端へ置く（判断 6）。
     /// 動かしたときだけ、画面の下端からの高さ（点）を返す。メインスレッドから呼ぶ。
-    fn follow_dock(ns: &objc2_app_kit::NSWindow) -> Option<f64> {
+    fn follow_dock(ns: &objc2_app_kit::NSWindow, fullscreen: bool) -> Option<f64> {
         let mtm = objc2::MainThreadMarker::new()?;
         // 主画面（メニューバーのある画面・原点 0,0）。
         let screen = objc2_app_kit::NSScreen::screens(mtm).firstObject()?;
         let sf = screen.frame();
         let vf = screen.visibleFrame();
-        let bottom = if fullscreen_window_shown(sf.size.width, sf.size.height) {
-            sf.origin.y
-        } else {
-            vf.origin.y
-        };
+        let bottom = if fullscreen { sf.origin.y } else { vf.origin.y };
+        super::BOTTOM_PT.store(
+            (bottom - sf.origin.y).to_bits(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
         let target = objc2_foundation::NSRect::new(
             objc2_foundation::NSPoint::new(sf.origin.x, bottom),
             objc2_foundation::NSSize::new(sf.size.width, HEIGHT),
@@ -335,18 +349,28 @@ mod tests {
     #[test]
     fn a_fullscreen_window_reaches_the_bottom() {
         // 切り欠きのない画面の全画面。
-        assert!(reaches_screen_bottom(0.0, 0.0, 1512.0, 982.0, 1512.0, 982.0));
+        assert!(reaches_screen_bottom(
+            0.0, 0.0, 1512.0, 982.0, 1512.0, 982.0
+        ));
         // 切り欠きのある画面の全画面（上端が下がる）。
-        assert!(reaches_screen_bottom(0.0, 38.0, 1512.0, 944.0, 1512.0, 982.0));
+        assert!(reaches_screen_bottom(
+            0.0, 38.0, 1512.0, 944.0, 1512.0, 982.0
+        ));
     }
 
     #[test]
     fn a_zoomed_window_above_the_dock_does_not() {
         // メニューバーの下から Dock の上まで（全画面の外で広げた窓）。
-        assert!(!reaches_screen_bottom(0.0, 33.0, 1512.0, 901.0, 1512.0, 982.0));
+        assert!(!reaches_screen_bottom(
+            0.0, 33.0, 1512.0, 901.0, 1512.0, 982.0
+        ));
         // 幅が足りない窓。
-        assert!(!reaches_screen_bottom(0.0, 0.0, 800.0, 982.0, 1512.0, 982.0));
+        assert!(!reaches_screen_bottom(
+            0.0, 0.0, 800.0, 982.0, 1512.0, 982.0
+        ));
         // 横にずれた窓。
-        assert!(!reaches_screen_bottom(100.0, 0.0, 1512.0, 982.0, 1512.0, 982.0));
+        assert!(!reaches_screen_bottom(
+            100.0, 0.0, 1512.0, 982.0, 1512.0, 982.0
+        ));
     }
 }

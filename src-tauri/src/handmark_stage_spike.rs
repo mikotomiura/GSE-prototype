@@ -225,6 +225,8 @@ mod imp {
         if let Some(w) = app.get_webview_window(LABEL) {
             let _ = w.hide();
         }
+        // 風が止まるので、帯も一緒に隠す（最後の風の目標のまま描き続けないように）。
+        crate::handmark_edge_strip::close(app);
     }
 
     pub fn is_shown(_app: &AppHandle<Wry>) -> bool {

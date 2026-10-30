@@ -79,6 +79,8 @@ mod imp {
     static STATE: Mutex<Option<Remembered>> = Mutex::new(None);
     /// 隠す・戻すが走っている間だけ true（重ねて走らせない）。
     static BUSY: AtomicBool = AtomicBool::new(false);
+    /// 見張りの世代。隠すたびに 1 増やし、古い見張りは抜ける（重ねて走らせない）。
+    static WATCH_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     /// トレイの項目（文字を状態に合わせて替える）。
     static ITEM: OnceLock<tauri::menu::MenuItem<Wry>> = OnceLock::new();
 
@@ -248,8 +250,22 @@ mod imp {
         }
 
         // 3. 隠す。成否は isHidden を読み直す（hide() の戻り値は当てにしない）。
+        //    隠す前に一覧を覚える（隠している途中に終了しても restore_on_exit が戻せるように）。
+        if crate::is_shutting_down() {
+            return;
+        }
+        if let Ok(mut s) = STATE.lock() {
+            *s = Some(Remembered {
+                hidden: hidden.clone(),
+                order,
+            });
+        }
         let to_hide = hidden.clone();
         let _ = on_main(app, Duration::from_secs(2), move || {
+            // 終了が始まっていたら隠さない（restore_on_exit が先に走っていても、後から隠さない）。
+            if crate::is_shutting_down() {
+                return;
+            }
             for pid in &to_hide {
                 if let Some(a) = app_of(*pid) {
                     let _ = a.hide();
@@ -271,9 +287,6 @@ mod imp {
             not_hidden = still,
             "handmark reveal: hidden"
         );
-        if let Ok(mut s) = STATE.lock() {
-            *s = Some(Remembered { hidden, order });
-        }
         set_label(LABEL_RESTORE);
         start_watch(app.clone());
     }
@@ -319,11 +332,12 @@ mod imp {
 
     /// 隠している間、研究者が自分でアプリを全部戻したら（Dock・Cmd+Tab）、覚えた一覧を捨てて項目を戻す。
     fn start_watch(app: AppHandle<Wry>) {
+        let gen = WATCH_GEN.fetch_add(1, Ordering::AcqRel) + 1;
         let _ = std::thread::Builder::new()
             .name("gse-handmark-reveal-watch".to_string())
             .spawn(move || loop {
                 std::thread::sleep(WATCH_EVERY);
-                if crate::is_shutting_down() {
+                if crate::is_shutting_down() || WATCH_GEN.load(Ordering::Acquire) != gen {
                     return;
                 }
                 let hidden = match STATE.lock() {
@@ -364,8 +378,9 @@ mod imp {
         };
         if objc2::MainThreadMarker::new().is_some() {
             unhide();
-        } else {
-            let _ = on_main(app, Duration::from_secs(2), unhide);
+        } else if on_main(app, Duration::from_secs(2), unhide).is_none() {
+            tracing::warn!("handmark reveal: could not restore on exit (main thread did not run)");
+            return;
         }
         tracing::info!("handmark reveal: restored on exit");
     }

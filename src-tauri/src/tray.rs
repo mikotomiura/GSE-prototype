@@ -272,7 +272,8 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             if event.id.as_ref() == MENU_HANDMARK_STAGE_CLOSE {
                 crate::handmark_stage_spike::close(app);
             }
-            // ⚠️ 選んだことは記録しない（ログに出るのは前面に出られたか・待った時間・アプリの数だけ）。
+            // 選んだことは記録（NDJSON）に入れない。ただし操作 1 回ごとに tracing の行（前面に出られたか・待った時間・
+            // アプリの数）が applog に残るので、行を数えれば回数と時刻は分かる（試作の段の限り）。
             #[cfg(target_os = "macos")]
             if event.id.as_ref() == MENU_HANDMARK_REVEAL {
                 crate::handmark_reveal::toggle(app);

@@ -21,13 +21,18 @@ pub const STRIP_NEAR_EVENT: &str = "handmark-strip-near";
 const STRIP_HEIGHT_PT: f64 = 14.0;
 const STRIP_NEAR_RANGE_PT: f64 = 80.0;
 
-/// 下の縁の帯へのカーソルの近さを 0〜10（0.1 刻み）にする。`y` は主画面の左下が原点の点。
-/// カーソルを切っている間は 0。帯の上にいれば 10。
-pub(crate) fn strip_near(cursor_on: bool, y: f64) -> u8 {
-    if !cursor_on || !y.is_finite() {
+/// 下の縁の帯へのカーソルの近さを 0〜10（0.1 刻み）にする。`y` は主画面の左下が原点の点、
+/// `bottom` は帯の下端（同じ座標・帯は Dock に合わせて動く・判断 5）。
+/// カーソルを切っている間は 0。帯の上にいれば 10。帯より下（Dock の上）では帯からの距離で薄れる。
+pub(crate) fn strip_near(cursor_on: bool, y: f64, bottom: f64) -> u8 {
+    if !cursor_on || !y.is_finite() || !bottom.is_finite() {
         return 0;
     }
-    let d = (y - STRIP_HEIGHT_PT).max(0.0);
+    let d = if y < bottom {
+        bottom - y
+    } else {
+        (y - bottom - STRIP_HEIGHT_PT).max(0.0)
+    };
     let near = (1.0 - d / STRIP_NEAR_RANGE_PT).clamp(0.0, 1.0);
     (near * 10.0).round() as u8
 }
@@ -268,7 +273,8 @@ mod imp {
                     let _ = app.emit_to(label, POINTER_EVENT, p);
                     // 帯へは近さの数 1 つだけ。カーソルを切ったら 0 を送る。
                     if p.moved || !p.cursor_on {
-                        let near = strip_near(p.cursor_on, p.y);
+                        let near =
+                            strip_near(p.cursor_on, p.y, crate::handmark_edge_strip::bottom_pt());
                         if near_sent != Some(near) {
                             near_sent = Some(near);
                             let _ = app.emit_to(
@@ -363,14 +369,19 @@ mod tests {
 
     #[test]
     fn strip_near_is_one_number_that_fades_with_distance() {
-        assert_eq!(strip_near(true, 0.0), 10);
-        assert_eq!(strip_near(true, 14.0), 10);
-        assert_eq!(strip_near(true, 54.0), 5);
-        assert_eq!(strip_near(true, 94.0), 0);
-        assert_eq!(strip_near(true, 900.0), 0);
+        assert_eq!(strip_near(true, 0.0, 0.0), 10);
+        assert_eq!(strip_near(true, 14.0, 0.0), 10);
+        assert_eq!(strip_near(true, 54.0, 0.0), 5);
+        assert_eq!(strip_near(true, 94.0, 0.0), 0);
+        assert_eq!(strip_near(true, 900.0, 0.0), 0);
+        // 帯が Dock の上（下端から 48 点）にあるとき: 帯の上で 10、帯の下（Dock の上）では距離で薄れる。
+        assert_eq!(strip_near(true, 55.0, 48.0), 10);
+        assert_eq!(strip_near(true, 102.0, 48.0), 5);
+        assert_eq!(strip_near(true, 8.0, 48.0), 5);
         // カーソルを切っている間・値が壊れているときは 0
-        assert_eq!(strip_near(false, 0.0), 0);
-        assert_eq!(strip_near(true, f64::NAN), 0);
+        assert_eq!(strip_near(false, 0.0, 0.0), 0);
+        assert_eq!(strip_near(true, f64::NAN, 0.0), 0);
+        assert_eq!(strip_near(true, 10.0, f64::NAN), 0);
     }
 
     #[test]
