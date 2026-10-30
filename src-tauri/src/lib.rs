@@ -54,6 +54,9 @@ mod handmark_edge_strip;
 // 手跡の風（背景の層と下の縁の帯が共有する・spike・OS 非依存の計算）。
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod handmark_wind;
+// 手跡の背景を見るために他のアプリの窓をどける（spike・macOS だけ・順番の計算は OS 非依存）。
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod handmark_reveal;
 // 手跡の背景の層へカーソルとクリックを渡す（spike・ADR-040・macOS だけ）。
 #[cfg(target_os = "macos")]
 mod handmark_stage_pointer;
@@ -3759,6 +3762,9 @@ fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>) {
         return;
     }
     tracing::info!("shutdown requested");
+    // 手跡のどける操作の試作: 隠したままにしない（.steering/20261030-handmark-edge-strip-impl/）。
+    #[cfg(target_os = "macos")]
+    crate::handmark_reveal::restore_on_exit(app);
     // EH3: 肖像の「終わり」（A-seed なら seed）を書いてから `End` を送る。待ち合わせはこの関数を呼んだ
     //   スレッド（メインのことがある）ではなく、下のバックグラウンドのスレッドで行う。
     let portrait_end = crate::eh3::is_eh3() && WALL_TX.get().is_some();

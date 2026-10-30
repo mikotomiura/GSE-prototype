@@ -1,0 +1,6 @@
+mark 1793339549 start
+mark 1793339564 fs_on_sent
+mark 1793339570 fs_state=false
+mark 1793339630 fs_state_before_off=true
+mark 1793339631 fs_off_sent
+mark 1793339636 textedit_quit

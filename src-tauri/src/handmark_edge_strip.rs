@@ -7,7 +7,8 @@
 //! 帯の中身は `src/components/HandmarkEdgeStrip.tsx`（風で揺れる線・霧・粒）。帯が全部覆われたかを 250ms ごとに
 //! `occlusionState` で読み、変わったときだけ窓へ知らせる（窓は覆われている間は描かない・設計の論点 3）。
 //! 変わったときは `tracing` にも 1 行出す（確かめ用）。
-//! トレイの「背景を見る」は、段 1 では自分が前面に出られるかを読むだけで、何も隠さない（判断 3 の確かめ）。
+//! 帯の位置は、主画面の今の Space で使える領域（Dock を除く）の下端に合わせて動かす（判断 5）。
+//! トレイの「背景を見る」（他の窓をどける操作）は `handmark_reveal.rs`。
 //!
 //! 守ること（背景の層と同じ）:
 //! - 推定を use しない。アプリの名前を読まない・書かない。本人の操作を記録しない（ログに出すのは窓の状態と、
@@ -17,21 +18,25 @@
 /// 帯の窓の label。capabilities/handmark-stage.json と src/main.tsx の分岐と一致させる。
 pub const LABEL: &str = "handmark-edge-strip";
 
+/// 窓（CG の座標・左上が原点・点）が主画面の幅いっぱいで、画面の下端まで届いているか。
+/// 全画面のアプリの窓とみなす（判断 6）。切り欠きのある画面では全画面の窓の上端が下がるので、上端は見ない。
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn reaches_screen_bottom(x: f64, y: f64, w: f64, h: f64, screen_w: f64, screen_h: f64) -> bool {
+    x.abs() < 1.0 && (w - screen_w).abs() < 1.0 && (y + h - screen_h).abs() < 1.0
+}
+
 #[cfg(target_os = "macos")]
 mod imp {
     use super::LABEL;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::mpsc;
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
     use tauri::Emitter;
     use tauri::{AppHandle, Manager, Wry};
     use tauri_nspanel::ManagerExt;
 
     /// 帯の高さ（論理 px = 点）。仮（設計の論点 5）。
     const HEIGHT: f64 = 14.0;
-    /// 前面に出るのを待つ上限と、読む間隔（設計の論点 6）。
-    const ACTIVATE_WAIT: Duration = Duration::from_millis(1000);
-    const ACTIVATE_POLL: Duration = Duration::from_millis(50);
     /// 帯が覆われたかを読む間隔。
     const PROBE_EVERY: Duration = Duration::from_millis(250);
     /// 帯が見えているかを窓へ知らせるイベント名（帯の窓だけへ `emit_to`）。
@@ -42,8 +47,6 @@ mod imp {
 
     /// 帯が出ている間だけ true。
     static SHOWN: AtomicBool = AtomicBool::new(false);
-    /// 前面に出られるかの読みが走っている間だけ true（重ねて走らせない）。
-    static ACTIVATING: AtomicBool = AtomicBool::new(false);
 
     fn ns_window(window: &tauri::WebviewWindow<Wry>) -> Result<&objc2_app_kit::NSWindow, String> {
         let ptr = window
@@ -170,15 +173,24 @@ mod imp {
                             return;
                         };
                         let Ok(ns) = ns_window(&window) else { return };
+                        let lift = follow_dock(ns);
                         let _ = tx.send((
                             ns.occlusionState()
                                 .contains(objc2_app_kit::NSWindowOcclusionState::Visible),
                             ns.isOnActiveSpace(),
+                            lift,
                         ));
                     });
-                    let Ok((visible, on_active_space)) = rx.recv_timeout(PROBE_EVERY * 4) else {
+                    let Ok((visible, on_active_space, lift)) = rx.recv_timeout(PROBE_EVERY * 4)
+                    else {
                         continue;
                     };
+                    if let Some(lift) = lift {
+                        tracing::info!(
+                            bottom_lift_pt = lift,
+                            "handmark edge strip: moved to the bottom of the visible area"
+                        );
+                    }
                     if last != Some(visible) {
                         last = Some(visible);
                         let _ = app.emit_to(LABEL, VISIBLE_EVENT, visible);
@@ -195,47 +207,104 @@ mod imp {
         }
     }
 
-    /// トレイの「背景を見る」（段 1）: 自分を前面に出し、最大 1 秒の間に前面になったかを読んで出す。
-    /// 何も隠さない。メインスレッドは止めない（待つのは別スレッド）。
-    pub fn probe_activate(app: &AppHandle<Wry>) {
-        if ACTIVATING.swap(true, Ordering::AcqRel) {
-            return;
-        }
-        let handle = app.clone();
-        let spawned = std::thread::Builder::new()
-            .name("gse-handmark-activate".to_string())
-            .spawn(move || {
-                let started = Instant::now();
-                let _ = handle.run_on_main_thread(|| {
-                    if let Some(mtm) = objc2::MainThreadMarker::new() {
-                        objc2_app_kit::NSApplication::sharedApplication(mtm).activate();
-                    }
-                });
-                let mut active = false;
-                while started.elapsed() < ACTIVATE_WAIT {
-                    std::thread::sleep(ACTIVATE_POLL);
-                    let (tx, rx) = mpsc::channel();
-                    let _ = handle.run_on_main_thread(move || {
-                        let _ = tx.send(
-                            objc2_app_kit::NSRunningApplication::currentApplication().isActive(),
-                        );
-                    });
-                    if rx.recv_timeout(ACTIVATE_POLL * 4).unwrap_or(false) {
-                        active = true;
-                        break;
-                    }
+    /// 主画面に、他のアプリの全画面の窓（層 0・幅いっぱいで下端まで）が出ているか。
+    /// 読むのは窓の層・持ち主の pid・大きさだけで、アプリや窓の名前は読まない（判断 6）。
+    fn fullscreen_window_shown(screen_w: f64, screen_h: f64) -> bool {
+        use core_foundation::base::{CFType, TCFType};
+        use core_foundation::dictionary::{CFDictionary, CFDictionaryRef};
+        use core_foundation::number::CFNumber;
+        use core_foundation::string::CFString;
+        use core_graphics::window::{
+            copy_window_info, kCGNullWindowID, kCGWindowBounds, kCGWindowLayer,
+            kCGWindowListExcludeDesktopElements, kCGWindowListOptionOnScreenOnly,
+            kCGWindowOwnerPID,
+        };
+        let me = std::process::id() as i32;
+        let Some(list) = copy_window_info(
+            kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
+            kCGNullWindowID,
+        ) else {
+            return false;
+        };
+        // SAFETY: 3 つとも CoreGraphics の定数の CFString で、プロセスの間ずっと生きている。
+        let (layer_key, pid_key, bounds_key) = unsafe {
+            (
+                CFString::wrap_under_get_rule(kCGWindowLayer),
+                CFString::wrap_under_get_rule(kCGWindowOwnerPID),
+                CFString::wrap_under_get_rule(kCGWindowBounds),
+            )
+        };
+        let (kx, ky, kw, kh) = (
+            CFString::from_static_string("X"),
+            CFString::from_static_string("Y"),
+            CFString::from_static_string("Width"),
+            CFString::from_static_string("Height"),
+        );
+        list.iter().any(|item| {
+            // SAFETY: CGWindowListCopyWindowInfo の要素は CFDictionary（Apple の文書）。get の規則で包み、所有しない。
+            let dict: CFDictionary<CFString, CFType> =
+                unsafe { CFDictionary::wrap_under_get_rule(*item as CFDictionaryRef) };
+            let int = |k: &CFString| {
+                dict.find(k)
+                    .and_then(|v| v.downcast::<CFNumber>())
+                    .and_then(|n| n.to_i32())
+            };
+            if int(&layer_key) != Some(0) || int(&pid_key) == Some(me) {
+                return false;
+            }
+            let Some(b) = dict
+                .find(&bounds_key)
+                .and_then(|v| v.downcast::<CFDictionary>())
+            else {
+                return false;
+            };
+            // SAFETY: kCGWindowBounds の値は X・Y・Width・Height の CFNumber を持つ CFDictionary（Apple の文書）。
+            let b: CFDictionary<CFString, CFType> =
+                unsafe { CFDictionary::wrap_under_get_rule(b.as_concrete_TypeRef()) };
+            let f = |k: &CFString| {
+                b.find(k)
+                    .and_then(|v| v.downcast::<CFNumber>())
+                    .and_then(|n| n.to_f64())
+            };
+            match (f(&kx), f(&ky), f(&kw), f(&kh)) {
+                (Some(x), Some(y), Some(w), Some(h)) => {
+                    super::reaches_screen_bottom(x, y, w, h, screen_w, screen_h)
                 }
-                tracing::info!(
-                    active,
-                    activate_wait_ms = started.elapsed().as_millis() as u64,
-                    "handmark edge strip: activate probe"
-                );
-                ACTIVATING.store(false, Ordering::Release);
-            });
-        if spawned.is_err() {
-            ACTIVATING.store(false, Ordering::Release);
-            tracing::warn!("handmark edge strip: activate thread could not start");
+                _ => false,
+            }
+        })
+    }
+
+    /// 帯を、主画面の今の Space で使える領域（Dock を除く）の下端へ置く（判断 5）。
+    /// 全画面の外では Dock のすぐ上、Dock が引っ込んでいれば画面の下端になる見込み。
+    /// 全画面の Space でも visibleFrame は Dock を除いたままなので（run8 の (4)）、他のアプリの全画面の窓が
+    /// 出ているときは画面の下端へ置く（判断 6）。
+    /// 動かしたときだけ、画面の下端からの高さ（点）を返す。メインスレッドから呼ぶ。
+    fn follow_dock(ns: &objc2_app_kit::NSWindow) -> Option<f64> {
+        let mtm = objc2::MainThreadMarker::new()?;
+        // 主画面（メニューバーのある画面・原点 0,0）。
+        let screen = objc2_app_kit::NSScreen::screens(mtm).firstObject()?;
+        let sf = screen.frame();
+        let vf = screen.visibleFrame();
+        let bottom = if fullscreen_window_shown(sf.size.width, sf.size.height) {
+            sf.origin.y
+        } else {
+            vf.origin.y
+        };
+        let target = objc2_foundation::NSRect::new(
+            objc2_foundation::NSPoint::new(sf.origin.x, bottom),
+            objc2_foundation::NSSize::new(sf.size.width, HEIGHT),
+        );
+        let now = ns.frame();
+        let same = (now.origin.x - target.origin.x).abs() < 0.5
+            && (now.origin.y - target.origin.y).abs() < 0.5
+            && (now.size.width - target.size.width).abs() < 0.5
+            && (now.size.height - target.size.height).abs() < 0.5;
+        if same {
+            return None;
         }
+        ns.setFrame_display(target, true);
+        Some(bottom - sf.origin.y)
     }
 
     /// 閉じる要求のとき: 隠すだけ（壊さない）。
@@ -257,4 +326,27 @@ mod imp {
 }
 
 #[cfg(target_os = "macos")]
-pub use imp::{close, is_shown, probe_activate, setup};
+pub use imp::{close, is_shown, setup};
+
+#[cfg(test)]
+mod tests {
+    use super::reaches_screen_bottom;
+
+    #[test]
+    fn a_fullscreen_window_reaches_the_bottom() {
+        // 切り欠きのない画面の全画面。
+        assert!(reaches_screen_bottom(0.0, 0.0, 1512.0, 982.0, 1512.0, 982.0));
+        // 切り欠きのある画面の全画面（上端が下がる）。
+        assert!(reaches_screen_bottom(0.0, 38.0, 1512.0, 944.0, 1512.0, 982.0));
+    }
+
+    #[test]
+    fn a_zoomed_window_above_the_dock_does_not() {
+        // メニューバーの下から Dock の上まで（全画面の外で広げた窓）。
+        assert!(!reaches_screen_bottom(0.0, 33.0, 1512.0, 901.0, 1512.0, 982.0));
+        // 幅が足りない窓。
+        assert!(!reaches_screen_bottom(0.0, 0.0, 800.0, 982.0, 1512.0, 982.0));
+        // 横にずれた窓。
+        assert!(!reaches_screen_bottom(100.0, 0.0, 1512.0, 982.0, 1512.0, 982.0));
+    }
+}
