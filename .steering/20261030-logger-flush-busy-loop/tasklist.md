@@ -29,4 +29,5 @@
 ## 完了処理
 - [x] design.md・decisions.md の最終化
 - [x] git commit
-- [ ] push（PR は研究者に確かめてから）
+- [x] push（2026-10-30）
+- [ ] PR（G-GEAR で処理が走っているため出さない・研究者の指示 2026-10-30。次に出すときは git-workflow ルール 6）
