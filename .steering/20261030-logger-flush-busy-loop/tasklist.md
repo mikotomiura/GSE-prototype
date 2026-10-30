@@ -23,8 +23,10 @@
 
 ## レビュー
 - [x] code-reviewer + security-checker を並列で
-- [ ] /finish-task で /cross-review（Claude と Codex）
+- [x] /finish-task で /cross-review（Claude と Codex。Codex は利用上限の解除を待って回した・判断 7）
+- [x] Codex の指摘 3 件を直す
 
 ## 完了処理
-- [ ] design.md・decisions.md の最終化
-- [ ] git commit（push は確かめてから）
+- [x] design.md・decisions.md の最終化
+- [x] git commit
+- [ ] push（PR は研究者に確かめてから）
