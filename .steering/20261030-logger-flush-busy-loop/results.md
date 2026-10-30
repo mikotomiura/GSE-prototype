@@ -29,6 +29,11 @@
 - 直した後: logger のテスト 99 件が緑。
 - ループの周回数のテスト `paused_logger_does_not_spin_past_flush_deadline`（code-reviewer の MEDIUM を受けて追加・decisions.md 判断 2）: 直した版で緑（6.5 秒）。変異で赤を確かめた: 元のバグに戻す → 383,764 周、ループから `on_tick` の呼び出しを消す → 373,319 周（しきい値 200）。
 - 全体: `cargo fmt --check` 緑、`cargo test --workspace` 1019 件 passed・2 ignored、`cargo clippy --all-targets -- -D warnings` 緑、`gse-replay --snapshot minimal` 15 件一致。
+- Codex の指摘を受けた直し（decisions.md 判断 7）の後:
+  - 周回数のテストは、一時停止の行を処理し終えた時刻から 5.5 秒たつまで待ち、届いた 14 行を処理し終えた（周回数 15 以上）のを確かめてから数える。
+  - 足したテスト `logger_flushes_written_line_at_deadline`: 一時停止せずに 1 行送り、終了の前にファイルに出るのを待つ（8 秒で諦める）。
+  - 変異: 元のバグに戻す → 単体 1 本と周回数のテストが赤（375,176 周）。ループの定期の `writer.flush()` を消す → `logger_flushes_written_line_at_deadline` が赤（「8 秒たってもファイルに出ていない」）。
+  - 全体: fmt 緑、`cargo test --workspace` 1020 件 passed・2 ignored、clippy 緑。
 
 ## 4. O1 の配布物への影響
 

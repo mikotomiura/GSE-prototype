@@ -61,6 +61,7 @@ TDD の順: まず `FlushClock` を今の挙動のまま（`dirty` のときだ�
 - 単体テスト（回帰）: `dirty=false` のまま期限を過ぎて `on_tick` を呼んだ後、`wait` が 0 にならない（修正前は赤）。
 - 単体テスト（約束の保持）: `dirty=true` なら期限で `on_tick` が true／期限前は false／`reset` の後は `wait` が `interval` に戻る。
 - ループの回帰（code-reviewer の MEDIUM を受けて追加）: 実際のロガーで一時停止中に行を 500ms ごとに 13 本流し、ループの周回数が 200 未満（`#[cfg(test)]` の個体ごとの数え上げ）。
+- 定期の flush（Codex の指摘を受けて追加）: 一時停止せずに 1 行送り、終了の前に期限でファイルに出ることを確かめる。
 - 既存の logger のテスト（一時停止中に書かない・`recording_pause` の即 flush など）が緑のまま。
 - `cargo test --manifest-path src-tauri/Cargo.toml --workspace`・clippy。
 - `gse-replay --snapshot` は HMM に触れないので任意（念のため回す）。

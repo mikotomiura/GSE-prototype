@@ -6405,7 +6405,10 @@ mod tests {
             paused: true,
         })
         .unwrap();
-        // 500ms ごとに 13 行（6.5 秒）。どれも一時停止のゲートで落とされる。
+        // 一時停止の行を処理し終えた時刻を取る（2 周目に入っている）。時計はそれより前に作られて
+        // いるので、ここから 5.5 秒たてば期限は必ず過ぎている（スレッドの起動が遅れても）。
+        let paused_at = wait_for_iters(&logger, 2);
+        // 500ms ごとに 13 行。どれも一時停止のゲートで落とされる。
         for i in 0..13u64 {
             std::thread::sleep(Duration::from_millis(500));
             tx.send(LogEntry::FocusTransition {
@@ -6413,6 +6416,10 @@ mod tests {
             })
             .unwrap();
         }
+        let rest = Duration::from_millis(5_500).saturating_sub(paused_at.elapsed());
+        std::thread::sleep(rest);
+        // 届いた 14 行を処理し終えている（1 周目 + 14 行）。
+        wait_for_iters(&logger, 15);
         let iters = logger.loop_iters.load(Ordering::Relaxed);
         tx.send(LogEntry::End).unwrap();
         shutdown_rx
@@ -6423,5 +6430,52 @@ mod tests {
 
         // 届いた行 14 本と、期限ごとの数回だけ回ればよい。
         assert!(iters < 200, "記録のスレッドが空回りしている: {iters} 周");
+    }
+
+    /// 書いた行は、終了・一時停止・ローテートを待たずに期限（5 秒）で書き出される（2026-10-30）。
+    ///
+    /// `FlushClock` 単体のテストは「flush せよ」の戻り値しか見ないので、実際のループで
+    /// ファイルに出ることを確かめる。6 秒あまりかかる。
+    #[test]
+    fn logger_flushes_written_line_at_deadline() {
+        let p = rot_test_path("deadline_flush", 1);
+        let (logger, tx, shutdown_rx, _status) = SessionLogger::start(p.clone(), None);
+        tx.send(LogEntry::Key {
+            vk_code: 0x41,
+            timestamp: 1_700_000_000_000,
+            is_press: true,
+        })
+        .unwrap();
+        let sent_at = Instant::now();
+        let mut flushed = false;
+        while sent_at.elapsed() < Duration::from_secs(8) {
+            let c = fs::read_to_string(&p).unwrap_or_default();
+            if c.contains(r#""type":"key""#) {
+                flushed = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        tx.send(LogEntry::End).unwrap();
+        shutdown_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("logger did not shut down in time");
+        drop(logger);
+        let _ = fs::remove_file(&p);
+
+        assert!(flushed, "書いた行が 8 秒たってもファイルに出ていない");
+    }
+
+    /// 記録のスレッドの周回数が `n` に届くまで待ち、届いた時刻を返す（5 秒で諦める）。
+    fn wait_for_iters(logger: &SessionLogger, n: u64) -> Instant {
+        let start = Instant::now();
+        while logger.loop_iters.load(Ordering::Relaxed) < n {
+            assert!(
+                start.elapsed() < Duration::from_secs(5),
+                "記録のスレッドが {n} 周に届かない"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        Instant::now()
     }
 }
