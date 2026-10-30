@@ -5937,6 +5937,8 @@ pub fn run() {
             // （handmark_reveal.rs・code-reviewer / security-checker の指摘）。Exit はメインスレッドで来る。
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Exit = _event {
+                // 終了の印を立ててから戻す（隠す途中の処理が後から隠さないように）。
+                SHUTTING_DOWN.store(true, Ordering::SeqCst);
                 crate::handmark_reveal::restore_on_exit(_app);
             }
         });

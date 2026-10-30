@@ -268,13 +268,16 @@ mod imp {
                 let mut discard_wheel = wheel::discard;
                 // 帯へ最後に送った近さ（変わったときだけ送る）。
                 let mut near_sent: Option<u8> = None;
+                // 近さを最後に測ったときの帯の下端（帯が Dock に合わせて動いたら、カーソルが止まっていても測り直す）。
+                let mut bottom_seen = f64::NAN;
                 let mut send = |p: PointerPayload| {
                     // 送れなくても背景が動かないだけ（値をどこにも残さない）。
                     let _ = app.emit_to(label, POINTER_EVENT, p);
                     // 帯へは近さの数 1 つだけ。カーソルを切ったら 0 を送る。
-                    if p.moved || !p.cursor_on {
-                        let near =
-                            strip_near(p.cursor_on, p.y, crate::handmark_edge_strip::bottom_pt());
+                    let bottom = crate::handmark_edge_strip::bottom_pt();
+                    if p.moved || !p.cursor_on || bottom != bottom_seen {
+                        bottom_seen = bottom;
+                        let near = strip_near(p.cursor_on, p.y, bottom);
                         if near_sent != Some(near) {
                             near_sent = Some(near);
                             let _ = app.emit_to(

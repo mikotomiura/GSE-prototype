@@ -88,6 +88,13 @@ mod imp {
         let _ = ITEM.set(item);
     }
 
+    /// 帯（と背景）を閉じたとき: 項目を押せなくする（背景の無いところで他のアプリを隠さない）。
+    pub fn disable_menu_item() {
+        if let Some(item) = ITEM.get() {
+            let _ = item.set_enabled(false);
+        }
+    }
+
     fn set_label(text: &str) {
         if let Some(item) = ITEM.get() {
             let _ = item.set_text(text);
@@ -106,6 +113,13 @@ mod imp {
         })
         .ok()?;
         rx.recv_timeout(wait).ok()
+    }
+
+    /// 前面のアプリの pid。メインスレッドから呼ぶ。
+    fn frontmost() -> Option<i32> {
+        objc2_app_kit::NSWorkspace::sharedWorkspace()
+            .frontmostApplication()
+            .map(|a| a.processIdentifier())
     }
 
     fn self_pid() -> i32 {
@@ -292,39 +306,60 @@ mod imp {
     }
 
     fn restore(app: &AppHandle<Wry>) {
-        let Some(r) = STATE.lock().ok().and_then(|mut s| s.take()) else {
+        // 一覧は読むだけにし、戻し終えてから捨てる（戻している途中に終了しても restore_on_exit が戻せるように）。
+        let Some(r) = STATE
+            .lock()
+            .ok()
+            .and_then(|s| s.as_ref().map(|r| (r.hidden.clone(), r.order.clone())))
+        else {
             return;
         };
+        let (hidden, order) = r;
         let me = self_pid();
-        let hidden = r.hidden.clone();
-        let front_is_me = on_main(app, Duration::from_secs(2), move || {
-            for pid in &hidden {
+        let to_unhide = hidden.clone();
+        let Some(front_is_me) = on_main(app, Duration::from_secs(2), move || {
+            for pid in &to_unhide {
                 if let Some(a) = app_of(*pid) {
                     let _ = a.unhide();
                 }
             }
-            objc2_app_kit::NSWorkspace::sharedWorkspace()
-                .frontmostApplication()
-                .map(|a| a.processIdentifier())
-                == Some(me)
-        })
-        .unwrap_or(false);
+            frontmost() == Some(me)
+        }) else {
+            tracing::warn!("handmark reveal: could not restore (main thread did not run)");
+            return;
+        };
+        if let Ok(mut s) = STATE.lock() {
+            *s = None;
+        }
         // 前面が他のアプリに替わっていたら、前へ出し直さない（焦点を奪わない）。
+        // 並べ直しの途中でも、前面が自分か 1 つ前に出したアプリでなくなったら（研究者が選んだ）やめる。
+        let mut reordered = front_is_me;
         if front_is_me {
-            for pid in r.order.iter().copied() {
-                let _ = app.run_on_main_thread(move || {
+            let mut prev = me;
+            for pid in order.iter().copied() {
+                let went = on_main(app, Duration::from_secs(2), move || {
+                    let front = frontmost();
+                    if front != Some(me) && front != Some(prev) {
+                        return false;
+                    }
                     if let Some(a) = app_of(pid) {
                         let _ = a.activateWithOptions(
                             objc2_app_kit::NSApplicationActivationOptions::ActivateAllWindows,
                         );
                     }
+                    true
                 });
+                if went != Some(true) {
+                    reordered = false;
+                    break;
+                }
+                prev = pid;
                 std::thread::sleep(RESTORE_STEP);
             }
         }
         tracing::info!(
-            restored = r.hidden.len(),
-            reordered = front_is_me,
+            restored = hidden.len(),
+            reordered,
             "handmark reveal: restored"
         );
         set_label(LABEL_SHOW);
@@ -353,10 +388,20 @@ mod imp {
                         .any(|p| app_of(*p).is_some_and(|a| a.isHidden()))
                 })
                 .unwrap_or(true);
-                if !any_hidden && !BUSY.load(Ordering::Acquire) {
+                // 隠す・戻すと重ならないように BUSY を取ってから捨てる（取れなければ次の回に見直す）。
+                if !any_hidden
+                    && BUSY
+                        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                        .is_ok()
+                {
+                    if WATCH_GEN.load(Ordering::Acquire) != gen {
+                        BUSY.store(false, Ordering::Release);
+                        return;
+                    }
                     if let Ok(mut s) = STATE.lock() {
                         *s = None;
                     }
+                    BUSY.store(false, Ordering::Release);
                     set_label(LABEL_SHOW);
                     tracing::info!("handmark reveal: all apps came back by themselves");
                     return;
@@ -387,7 +432,7 @@ mod imp {
 }
 
 #[cfg(target_os = "macos")]
-pub use imp::{restore_on_exit, set_menu_item, toggle, LABEL_SHOW};
+pub use imp::{disable_menu_item, restore_on_exit, set_menu_item, toggle, LABEL_SHOW};
 
 #[cfg(test)]
 mod tests {

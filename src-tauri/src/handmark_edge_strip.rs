@@ -171,6 +171,8 @@ mod imp {
             .name("gse-handmark-strip-probe".to_string())
             .spawn(move || {
                 let mut last: Option<bool> = None;
+                // 最初の 2 秒は変わらなくても送る（窓の listen が最初の知らせより遅れても取りこぼさない）。
+                let mut first_ticks = 8u8;
                 loop {
                     std::thread::sleep(PROBE_EVERY);
                     if !SHOWN.load(Ordering::Acquire) || crate::is_shutting_down() {
@@ -203,6 +205,12 @@ mod imp {
                             bottom_lift_pt = lift,
                             "handmark edge strip: moved to the bottom of the visible area"
                         );
+                    }
+                    if first_ticks > 0 {
+                        first_ticks -= 1;
+                        if last == Some(visible) {
+                            let _ = app.emit_to(LABEL, VISIBLE_EVENT, visible);
+                        }
                     }
                     if last != Some(visible) {
                         last = Some(visible);
@@ -324,6 +332,7 @@ mod imp {
     /// 閉じる要求のとき: 隠すだけ（壊さない）。
     pub fn close(app: &AppHandle<Wry>) {
         SHOWN.store(false, Ordering::Release);
+        crate::handmark_reveal::disable_menu_item();
         match app.get_webview_panel(LABEL) {
             Ok(panel) => panel.order_out(None),
             Err(_) => {

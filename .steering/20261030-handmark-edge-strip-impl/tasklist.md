@@ -29,4 +29,10 @@
 ## 仕上げ
 - [x] cargo test --workspace・clippy・tsc・gse-replay --snapshot 1 回（968 件・警告なし・tsc 0・15 snapshots 一致）
 - [x] code-reviewer + security-checker（review.md・HIGH 2 件を直し、Cmd+Q と近さを実機で確かめた）
-- [ ] /finish-task（/cross-review 必須）・コミット・push まで（PR なし）
+- [x] /finish-task（/cross-review 必須）・コミット・push まで（PR なし）
+
+## 次のタスクへ回すもの
+
+- GSE を軽い処理で動かす設計の検討（run11 で重い処理の間は前に出られなかった・研究者の提案）
+- logger.rs の recv_timeout が待ち時間 0 で回る件（main にも同じ行）
+- 覆われたら描くのを止めることの実機の確かめ
