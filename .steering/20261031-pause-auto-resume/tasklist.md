@@ -16,5 +16,5 @@
 - [x] /cross-review（判断 7）・再開の見張りを実機で確かめる（results.md の 8）
 - [x] Claude が自分で操作して確かめる（results.md の 9）
 - [x] Windows の実機の確かめ（画面の変更・見張り・README）を次のタスクの引き継ぎに書く（`.steering/_handoff/next-session-pause-ui-windows.md`・本体の checkout）
-- [ ] コミット・push（PR は G-GEAR の処理を研究者に聞いてから）
+- [x] コミット（2c73359e）・push（研究者の回答: push まで。PR は G-GEAR の処理が済んでから・`fix/logger-flush-busy-loop` の上にあるので、その PR を先に出すかを決める）
 - [ ] `docs/o1-distribution-tag.md` の v0.1.40 の注意への追記は、次の版を切るときに行う（CPU のタスクの results.md の 7 の 1 番目は満たした）
