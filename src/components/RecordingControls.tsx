@@ -283,6 +283,10 @@ const RecordingControls: React.FC = () => {
   };
 
   const paused = status?.paused === true;
+  // 止めたときに種類の欄が開いていたら閉じる (再開したときに勝手に開き直さないため)。
+  useEffect(() => {
+    if (paused) setPickingTaskKind(false);
+  }, [paused]);
   // ⚠️★★★ 止めていないのに記録できていない (フックの死 / 書込不可)。
   //   ★ backend が判定した値をそのまま描く (Frontend で判定しない)。
   const broken = status?.health === "broken";
@@ -354,7 +358,10 @@ const RecordingControls: React.FC = () => {
       {/* ── ⚠️★★★ O1 (R3-a): 作業の種類の宣言 (ADR-016 判断 4 / 4b) ───────────── */}
       {/* ★ 同意文書 §2 の逐語「記録中はいつも、画面のすみに『記録中 · 作業の種類: ○○』と
           出ています。そこを押すと、次の 4 つから選べます」を、この 1 行で満たす。
-          ⚠️ 通常運用 / G1 では **1 行も出さない** (o1_mode === null なら描画しない)。 */}
+          ⚠️ 通常運用 / G1 では **1 行も出さない** (o1_mode === null なら描画しない)。
+          止めている間は「記録中」と出さない (記録していないのに記録中と見せない)。
+          種類の宣言はファイルを切り替えるので、止めている間は backend が断る (`o1_rotate`)。
+          押せてから断られる形にせず、ここで押せなくする。 */}
       {o1Mode && (
         <div style={{ marginTop: "0.5rem" }}>
           <div
@@ -363,19 +370,24 @@ const RecordingControls: React.FC = () => {
             style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
           >
             <span>
-              記録中 · 作業の種類:{" "}
+              {paused ? "止めています" : "記録中"} · 作業の種類:{" "}
               <strong>{taskKindLabel(status?.task_kind ?? null)}</strong>
             </span>
             <button
               type="button"
               onClick={() => setPickingTaskKind((v) => !v)}
-              disabled={busy || status === null}
+              disabled={busy || status === null || paused}
             >
-              {pickingTaskKind ? "閉じる" : "選ぶ・変える"}
+              {pickingTaskKind && !paused ? "閉じる" : "選ぶ・変える"}
             </button>
           </div>
+          {paused && (
+            <p style={{ fontSize: "0.85em", opacity: 0.85, margin: "0.3rem 0 0" }}>
+              作業の種類は、記録を再開してから選べます。
+            </p>
+          )}
 
-          {pickingTaskKind && (
+          {pickingTaskKind && !paused && (
             <div style={{ marginTop: "0.5rem" }}>
               <p style={{ fontSize: "0.85em", opacity: 0.85, margin: "0 0 0.4rem" }}>
                 いま何の作業をしているかを選んでください。

@@ -2300,8 +2300,10 @@ impl SessionLogger {
                                 dirty = true;
                             }
                             LogEntry::RecordingPause { timestamp, paused } => {
-                                // ★ **書いてから状態を進める。** ⚠️ 先に進めると「止める」の行自身が
-                                //   ゲートに落ちて、**止めた事実が記録されない**。
+                                // ★ ここで状態を進めてから書いてよい。ゲート (上の `if recording_paused`)
+                                //   はこの行を match の前に通し終えており、`recording_pause` は
+                                //   止めている間も通る行 (`is_writable_while_paused`) なので、
+                                //   「止める」の行も「再開」の行も落ちない。
                                 recording_paused = paused;
                                 // ⚠️★★★ **遷移の時刻と向きだけ**。理由も回数も書かない
                                 //   (`LogEntry::RecordingPause` の doc)。
