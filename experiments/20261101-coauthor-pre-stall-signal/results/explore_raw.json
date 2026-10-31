@@ -12,7 +12,9 @@
   "writers_used": 27,
   "stalls_used": 633,
   "controls_used": 3129,
-  "stalls_ended_ai": 308
+  "stalls_ended_ai": 308,
+  "stalls_ended_self": 301,
+  "stalls_ended_censored": 24
  },
  "auc": {
   "d_p_stuck": {

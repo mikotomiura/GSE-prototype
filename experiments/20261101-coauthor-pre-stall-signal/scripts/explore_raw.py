@@ -2,7 +2,8 @@
 
 目的: 「打鍵に停滞の予兆が無い」のか「予兆はあるが今の推定が拾えていない」のかを分ける。
 量（u 以前 30 秒の押下から）: 打鍵間隔の中央値・2 秒以上の間隔の数・後退の割合。
-標本と対照は analyze_stall.py と同じ規則・同じ SEED で作る（対照の選び方の乱数の進み方も同じ）。
+標本と対照は analyze_stall.py と同じ規則・同じ SEED で作る。ただし押下が 3 つ未満の時刻（停滞・対照とも）を除くので、
+乱数の進み方がずれ、対照は本解析と別の標本になる（主の 4 信号も同じ標本で併記して比べる）。
 使い方: python3 -I explore_raw.py <work2_dir> <meta_creative.csv> <meta_argumentative.csv> <seed> <out.json>
 """
 import bisect
@@ -41,14 +42,15 @@ def main():
     S.sig_at = both
     S.SIGNALS = S.SIGNALS + RAW
     out = sys.argv[5]
-    tmp = out + ".dir"
+    import tempfile
+    tmpd = tempfile.TemporaryDirectory()
+    tmp = tmpd.name
     sys.argv = [sys.argv[0], sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], tmp]
     S.main()
     import json
-    import shutil
     res = {"counts": json.load(open(os.path.join(tmp, "counts.json"))), "auc": json.load(open(os.path.join(tmp, "auc.json")))}
     json.dump(res, open(out, "w"), indent=1)
-    shutil.rmtree(tmp)
+    tmpd.cleanup()
 
 
 if __name__ == "__main__":

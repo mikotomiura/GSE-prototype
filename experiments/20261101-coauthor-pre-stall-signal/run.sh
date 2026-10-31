@@ -13,3 +13,6 @@ mkdir -p "$OUT"
 python3 -I "$EXP_DIR/scripts/analyze_stall.py" "$WORK" "$COAUTHOR_DIR/raw/metadata_creative.csv" \
   "$COAUTHOR_DIR/raw/metadata_argumentative.csv" "$(cat "$EXP_DIR/SEED")" "$OUT"
 python3 -I -c "import json,sys;json.dump({'git_head':sys.argv[1]},open(sys.argv[2],'w'),indent=1)" "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$OUT/provenance.json"
+# 探索（事前に決めていない・notes.md の「探索」）
+python3 -I "$EXP_DIR/scripts/explore_raw.py" "$WORK" "$COAUTHOR_DIR/raw/metadata_creative.csv" \
+  "$COAUTHOR_DIR/raw/metadata_argumentative.csv" "$(cat "$EXP_DIR/SEED")" "$OUT/explore_raw.json" > /dev/null
