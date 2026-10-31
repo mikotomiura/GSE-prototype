@@ -2,15 +2,19 @@
 
 # 🧠 GSE — Generative Struggle Engine
 
-**打鍵のしかたから、作業状態と「介入すべきタイミング」を推定する — プライバシー保護型 HCI。**
+**打鍵のしかたから作業上の認知状態を推定し、詰まる前に、採点しない身体回帰の機会を差し出すことを目指す — プライバシー保護型 HCI。**
 
-GSE はあなたの脳内を読みません。読むのは*キーストローク動態*だけ。そこから、
-そっと促す Nudge が「今、本当に役立つか」と、「今は黙っているべきか」を判断します。
+GSE はあなたの脳内を読みません。読むのは*キーストローク動態*（打鍵の時刻と種類）だけで、本文は保存しません。そこから、
+画面から一度離れる招待を「今」差し出すか、それとも黙っているべきかを判断します。招待は開始も完了も測りません。
 
 > **現況:** 稼働している介入は **Nudge のみ**です。全画面の Wall と Monk Mode は
 > **2026-08 に削除しました**（[ADR-015](docs/adr/ADR-015-wall-removal.md)）。
 > Physical Anchor は**設計済み・未実装**です
 > （[ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)）。
+>
+> **2026-10-31 の方針:** Nudge は GSE 本体の介入としては出さず、本体の介入は身体回帰の機会を差し出す招待にします
+> （[ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)）。既定の変更は別作業で、それまでの実装は上のとおりです。
+> 招待の図像は今は検証用の EH3 モードでだけ動きます。
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)

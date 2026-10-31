@@ -6,7 +6,8 @@
 - [x] 第二の案（codex-consult）→ design.md 案 B
 - [x] 文献の接地（/literature-review）→ docs/literature/20261031-small-n-within-person-design.md
 - [x] 案を並べて研究者が選ぶ（判断 6: 段で重ねる）
-- [ ] research-positioning と WBS の改訂案（判断 10〜14 を反映・研究者の承認の後に反映）
+- [x] research-positioning・WBS・ADR-040・glossary・README（日・英）・agent-shared を改訂（判断 16・17）
+- [x] /cross-review（Claude と Codex）・指摘 9 件を反映（判断 17）
 - [ ] 別タスク: Nudge を本体で出さない ADR と既定の変更（判断 14-3）
 - [ ] 別タスク: 招待に friction_rising の契機と無作為の時刻の条件を足す（判断 13・14-2）
 
