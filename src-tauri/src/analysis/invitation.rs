@@ -94,7 +94,10 @@ pub enum TriggerKind {
     /// friction_rising: `p_stuck(now) − p_stuck(now − window_ms) ≥ delta` が偽から真になった tick で立つ。
     /// 真の間は立ち直さない。既定の値は置かない。
     Rising { delta: f64, window_ms: u64 },
-    /// 頻度を合わせた無作為: 離席候補の外・区切りでない tick ごとに、確率 `per_active_hour / 3600`（1 秒あたり）で立つ。
+    /// 頻度を合わせた無作為: 離席候補の外・区切りでない tick で、前の tick の秒の次から今の秒までの各整数秒 `s` について
+    /// `SplitMix64(実効 seed ^ s)` の最初の値(0 以上 1 未満)が `per_active_hour / 3600` 未満なら立つ。
+    /// 乱数は秒の番号だけで決まるので、tick が欠けても列がずれない。実効 seed は設定の `seed` とセッションの
+    /// 開始時刻から導く([`effective_seed`])。
     /// 乱数は `seed` から再現する。既定の値は置かない。
     Random { per_active_hour: f64, seed: u64 },
     /// 立たない（統制の「なし」）。
@@ -123,15 +126,25 @@ impl TriggerKind {
     /// 範囲の検査（設定ファイルの読み込みで使う）。範囲外は `false`（招待を出さない側）。
     pub fn is_valid(&self) -> bool {
         match *self {
-            TriggerKind::Estimator { p_stuck, .. } => {
-                p_stuck.is_finite() && p_stuck > 0.0 && p_stuck <= 1.0
+            TriggerKind::Estimator { p_stuck, hold_ms } => {
+                p_stuck.is_finite() && p_stuck > 0.0 && p_stuck <= 1.0 && hold_ms <= MAX_DURATION_MS
             }
             TriggerKind::Rising { delta, window_ms } => {
-                delta.is_finite() && delta > 0.0 && delta <= 1.0 && window_ms > 0
+                delta.is_finite()
+                    && delta > 0.0
+                    && delta <= 1.0
+                    && window_ms > 0
+                    && window_ms <= MAX_DURATION_MS
             }
             TriggerKind::Random {
-                per_active_hour, ..
-            } => per_active_hour.is_finite() && per_active_hour > 0.0 && per_active_hour <= 60.0,
+                per_active_hour,
+                seed,
+            } => {
+                per_active_hour.is_finite()
+                    && per_active_hour > 0.0
+                    && per_active_hour <= 60.0
+                    && seed <= MAX_SEED
+            }
             TriggerKind::Off { .. } => true,
         }
     }
@@ -154,7 +167,18 @@ impl TriggerKind {
     }
 }
 
-/// splitmix64（外部 crate を足さない・seed から再現する）。
+/// `hold_ms` と `window_ms` の上限（1 時間）。超える設定は無効（履歴の肥大・事実上の無効化を防ぐ）。
+pub const MAX_DURATION_MS: u64 = 3_600_000;
+/// 設定の `seed` の上限（2^53 - 1）。JSON を JS で読んでも丸められない範囲。
+pub const MAX_SEED: u64 = (1u64 << 53) - 1;
+
+/// 無作為の契機の実効 seed。設定の seed とセッションの開始時刻（`session_start` 行の `t`）から導く。
+/// 同じ設定でもセッションごとに列が変わり、記録の値から実機と同じ列を再現できる。
+pub fn effective_seed(seed: u64, session_start_ms: u64) -> u64 {
+    SplitMix64(seed ^ session_start_ms).next_u64()
+}
+
+/// splitmix64（外部 crate を足さない）。同じ入力から同じ値を返す。
 #[derive(Debug, Clone)]
 struct SplitMix64(u64);
 
@@ -197,8 +221,12 @@ struct RisingState {
 struct RandomState {
     /// 1 秒あたりの確率。
     p_per_sec: f64,
-    rng: SplitMix64,
-    last_ms: Option<u64>,
+    /// 実効 seed。整数秒 `s` の乱数は `SplitMix64(seed_eff ^ s)` の最初の値（tick の回数に依らない）。
+    seed_eff: u64,
+    /// 最後に引いた整数秒（epoch 秒）。
+    last_sec: Option<u64>,
+    /// 直近の `step` で立った秒（最も早い秒）。
+    fired_sec: Option<u64>,
 }
 
 impl RisingState {
@@ -231,14 +259,30 @@ impl RisingState {
 }
 
 impl RandomState {
+    /// 一度に遡って引く秒数の上限（30 秒以上の欠けは区切りになる）。
+    const MAX_CATCHUP_SECS: u64 = 30;
+
+    /// 前の tick の秒の次から今の秒まで、各整数秒の乱数を引く。1 つでも確率未満なら立つ。
     fn step(&mut self, now: u64) -> bool {
-        let dt_s = self
-            .last_ms
-            .map_or(1.0, |t| (now.saturating_sub(t) as f64 / 1000.0).min(30.0));
-        self.last_ms = Some(now);
-        self.rng.next_unit() < self.p_per_sec * dt_s
+        let cur = now / 1000;
+        self.fired_sec = None;
+        let from = match self.last_sec {
+            None => cur,
+            Some(l) if cur > l => (l + 1).max(cur.saturating_sub(Self::MAX_CATCHUP_SECS - 1)),
+            Some(_) => return false,
+        };
+        self.last_sec = Some(cur);
+        for sec in from..=cur {
+            let u = SplitMix64(self.seed_eff ^ sec).next_unit();
+            if u < self.p_per_sec {
+                self.fired_sec = Some(sec);
+                return true;
+            }
+        }
+        false
     }
 }
+
 /// 停滞の区間が終わる条件（`p_stuck < 閾値` が続く長さ）。
 pub const EPISODE_END_HOLD_MS: u64 = 60_000;
 /// 提示から閉じるまで（実時間）。PC 面の曝露予算の実測は無い（PC-11）ので、見逃されても主課題を傷つけない側に短く置く。
@@ -392,10 +436,16 @@ impl InvitationMachine {
         }
     }
 
-    /// 契機の種類を指定して作る（通常のモードの研究者の設定）。
+    /// 契機の種類を指定して作る（セッションの開始時刻 0。テスト・例用）。
+    pub fn with_kind(kind: TriggerKind) -> Self {
+        Self::with_kind_session(kind, 0)
+    }
+
+    /// 契機の種類とセッションの開始時刻（`session_start` 行の `t`）を指定して作る（通常のモード）。
+    /// 無作為の実効 seed は [`effective_seed`] で導く。
     ///
     /// ⚠️ 範囲外の値（[`TriggerKind::is_valid`] が偽）は `Off`（立たない）として作る＝招待を出さない側。
-    pub fn with_kind(kind: TriggerKind) -> Self {
+    pub fn with_kind_session(kind: TriggerKind, session_start_ms: u64) -> Self {
         if !kind.is_valid() {
             return Self {
                 source: Source::Off,
@@ -421,8 +471,9 @@ impl InvitationMachine {
             } => Self {
                 source: Source::Random(RandomState {
                     p_per_sec: per_active_hour / 3600.0,
-                    rng: SplitMix64(seed),
-                    last_ms: None,
+                    seed_eff: effective_seed(seed, session_start_ms),
+                    last_sec: None,
+                    fired_sec: None,
                 }),
                 ..Self::default()
             },
@@ -430,6 +481,15 @@ impl InvitationMachine {
                 source: Source::Off,
                 ..Self::default()
             },
+        }
+    }
+
+    /// 直近の `tick` で無作為の契機が立った秒の先頭（epoch ms）。無作為でない・立っていなければ `None`。
+    /// tick が欠けて複数の秒をまとめて引いたとき、立った秒を知るために使う（再現の道具用）。
+    pub fn random_fired_ms(&self) -> Option<u64> {
+        match &self.source {
+            Source::Random(r) => r.fired_sec.map(|s| s * 1000),
+            _ => None,
         }
     }
 
@@ -509,7 +569,8 @@ impl InvitationMachine {
         };
         let fired = match &mut self.source {
             Source::Rising(r) => {
-                if blocked {
+                if blocked || !input.p_stuck.is_finite() {
+                    // 欠測（非有限）は 0 として積まず履歴を捨てる（欠測の後に高い値が戻っても立たない）
                     r.reset();
                     false
                 } else {
@@ -518,7 +579,8 @@ impl InvitationMachine {
             }
             Source::Random(r) => {
                 if blocked {
-                    r.last_ms = None;
+                    r.last_sec = None;
+                    r.fired_sec = None;
                     false
                 } else {
                     r.step(now)
@@ -1607,5 +1669,103 @@ mod tests {
             let (shown, _) = run_kind(kind, &|s| if s % 100 < 50 { 0.0 } else { 0.9 }, &off, 8000);
             assert!(shown.is_empty(), "{kind:?}: {shown:?}");
         }
+    }
+
+    #[test]
+    fn rising_missing_values_reset_the_history() {
+        // 低 → 欠測(NaN)の区間 → 高い値が戻る。欠測を 0 として積まないので、立ち上がりとして数えない
+        let p = |s: u64| {
+            if (15..25).contains(&s) {
+                f64::NAN
+            } else if s >= 25 {
+                0.9
+            } else {
+                0.1
+            }
+        };
+        let (_, trig) = run_kind(RISING, &p, &nothing, 25 + 9);
+        assert!(trig.is_empty(), "欠測の直後は基準が無い: {trig:?}");
+        // 欠測の後に窓が埋まり直したあとの差(0.9 と 0.9)では立たない
+        let (_, trig) = run_kind(RISING, &p, &nothing, 200);
+        assert!(trig.is_empty(), "{trig:?}");
+    }
+
+    #[test]
+    fn durations_and_seed_have_upper_bounds() {
+        let ok = TriggerKind::from_json;
+        assert!(ok(r#"{"kind":"estimator","p_stuck":0.6,"hold_ms":3600000}"#).is_some());
+        assert!(ok(r#"{"kind":"estimator","p_stuck":0.6,"hold_ms":3600001}"#).is_none());
+        assert!(ok(r#"{"kind":"rising","delta":0.3,"window_ms":3600000}"#).is_some());
+        assert!(ok(r#"{"kind":"rising","delta":0.3,"window_ms":3600001}"#).is_none());
+        assert!(ok(r#"{"kind":"random","per_active_hour":6,"seed":9007199254740991}"#).is_some());
+        assert!(ok(r#"{"kind":"random","per_active_hour":6,"seed":9007199254740992}"#).is_none());
+        // 範囲外で直接作ると立たない
+        let (shown, trig) = run_kind(
+            TriggerKind::Estimator {
+                p_stuck: 0.6,
+                hold_ms: MAX_DURATION_MS + 1,
+            },
+            &|_| 0.99,
+            &nothing,
+            5000,
+        );
+        assert!(shown.is_empty() && trig.is_empty());
+    }
+
+    #[test]
+    fn random_draws_by_second_number_not_by_tick_count() {
+        let kind = TriggerKind::Random {
+            per_active_hour: 60.0,
+            seed: 11,
+        };
+        // 毎秒 tick と、5 秒に 1 回しか tick しない列で、立った秒の集合が同じ(各秒の乱数は秒の番号だけで決まる)
+        let fired = |every: u64| -> Vec<u64> {
+            let mut m = InvitationMachine::with_kind_session(kind, 1234);
+            let mut v = Vec::new();
+            let mut s = 0;
+            while s < 3000 {
+                let i = input(T0 + s * SEC, 0.0, widest());
+                if m.tick(&i).triggered {
+                    v.push(m.random_fired_ms().unwrap());
+                    // 1 区間 1 回の規則で出せなくても、立った秒は変わらない
+                }
+                s += every;
+            }
+            v
+        };
+        let every1 = fired(1);
+        let every5 = fired(5);
+        assert!(!every1.is_empty());
+        // 5 秒 tick の窓(直前の tick の次の秒から今の秒)ごとに、毎秒 tick の最も早い立った秒が出る
+        let mut expect = Vec::new();
+        let mut last_window = None;
+        for &ms in &every1 {
+            let off_s = (ms - T0) / 1000; // T0 からの秒
+            let window = off_s.div_ceil(5);
+            if last_window != Some(window) {
+                expect.push(ms);
+                last_window = Some(window);
+            }
+        }
+        assert_eq!(every5, expect);
+    }
+
+    #[test]
+    fn effective_seed_depends_on_the_session_start() {
+        assert_ne!(effective_seed(42, 1_000), effective_seed(42, 2_000));
+        assert_ne!(effective_seed(42, 1_000), effective_seed(43, 1_000));
+        assert_eq!(effective_seed(42, 1_000), effective_seed(42, 1_000));
+        let kind = TriggerKind::Random {
+            per_active_hour: 30.0,
+            seed: 42,
+        };
+        let at = |start: u64| {
+            let mut m = InvitationMachine::with_kind_session(kind, start);
+            (0..20_000u64)
+                .filter(|s| m.tick(&input(T0 + s * SEC, 0.0, widest())).triggered)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(at(7), at(7));
+        assert_ne!(at(7), at(8), "セッションの開始時刻が違えば列も違う");
     }
 }
