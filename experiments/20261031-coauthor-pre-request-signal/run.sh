@@ -21,6 +21,8 @@ for f in "$RAW"/*.jsonl; do
     | sed "s/^{/{\"sid\": \"$sid\", /" >> "$WORK/convert_stats.ndjson"
   "$BIN" "$WORK/$sid.ndjson" > "$WORK/${sid}_feat.json" 2>>"$WORK/replay_stderr.log"
   "$BIN" "$WORK/$sid.ndjson" --features > "$WORK/${sid}_ft.json" 2>>"$WORK/replay_stderr.log"
+  # ディスク節約: analyze.py が読む項目だけを残す（dwell 100 で出力がバイト同一と確認・notes.md 逸脱 1）
+  python3 -I "$EXP_DIR/scripts/slim.py" "$WORK/${sid}_feat.json" "$WORK/${sid}_ft.json"
 done
 python3 -I -c "
 import json,sys,collections
