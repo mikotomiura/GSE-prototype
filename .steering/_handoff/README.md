@@ -11,6 +11,7 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| **GSE: 3 本の並行（T1 実装・T2 項目 2・T3 フォーカス）のまとめ役** | **`next-session-gse-three-parallel-tracks.md`**（2026-11-01） | **現行**。各セッションの入口の文・ぶつからないための約束（worktree・CI・main へのマージ・台帳・ディスク）・合流の仕方。個別の中身は下の 3 行 |
 | **GSE 本体: Nudge の既定の無効化と招待の配線**（ADR-040 Migration 1・2・実装・下の行と並行可） | **`next-session-gse-nudge-off-and-invitation-wiring.md`**（2026-10-31） | **現行**。決定は `.steering/20261031-gse-small-n-research-design/decisions.md` 判断 10〜18 |
 | **GSE: 公開データの当てはめ 項目 2（KLiCKe・Kaggle・作文中の値の分布と誤発火の基準）** | **`next-session-gse-public-data-fit-item2.md`**（2026-11-01） | **現行**。項目 1 と案 A は完了（2026-11-01・`experiments/20261031-coauthor-pre-request-signal/`・`experiments/20261101-coauthor-pre-stall-signal/`）。新しいセッションで始める |
 | **GSE: 止まりの最中にフォーカスを離れることは受領に先立つか（招待の契機の候補・オフライン）**（上下の行と並行可） | **`next-session-gse-focus-leave-before-receipt.md`**（2026-11-01） | **現行**。研究者の決定（`.steering/20261101-gse-pre-stall-signal/decisions.md` 判断 4）。手元のログで確かめる |
