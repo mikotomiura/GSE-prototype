@@ -14,6 +14,8 @@ pub mod eh3;
 // 効果 (ローテート / 5 分でのブロック終了 / プローブ停止 / 二重起動 fail-loud) は lib.rs が適用する。
 pub mod g1;
 pub mod input;
+// 通常のモードの招待の契機の設定（`~/.gse/invitation_trigger.json`）と、招待を許す条件（ADR-040 D4・タスク B）。
+pub mod invitation_trigger;
 pub mod logger;
 // ⚠️★★★ O1 (R3-a・自然作業の常時収集) の「O1 モード」判定と、そのモードでだけ変わる方針
 //   (ADR-014 D6 / ADR-016 判断 4b-0)。★ `g1` と同層の純判定モジュールで、
@@ -1039,6 +1041,17 @@ impl PortraitRunner {
 /// EH3: いま招待を出しているか（分析スレッドが書き、overlay が `get_invitation_state` で読む）。
 static INVITATION_PRESENT: AtomicBool = AtomicBool::new(false);
 
+/// 通常のモード（EH3・O1・G1 でない走行）: このセッションで招待を許すか。
+///
+/// `record_session_meta` がセッションの宣言・契機の設定・条件の行の送信がすべて通ったときだけ真にする。
+/// 偽が既定で、`start_session` と宣言の受付の入り口で偽に戻す（fail-closed）。第 1 週・O1・G1 では真にならない。
+static NORMAL_INVITATION_ALLOWED: AtomicBool = AtomicBool::new(false);
+
+/// 招待を出してよい走行か（EH3、または通常のモードで招待を許すセッション）。
+fn invitation_surface_active() -> bool {
+    crate::eh3::is_eh3() || NORMAL_INVITATION_ALLOWED.load(Ordering::Acquire)
+}
+
 /// EH3: 本人の招待の設定（外枠）。`None` はまだ読んでいない。
 static INVITATION_SETTINGS: Mutex<Option<crate::analysis::invitation::Settings>> = Mutex::new(None);
 
@@ -1059,7 +1072,7 @@ fn current_invitation_settings() -> crate::analysis::invitation::Settings {
 /// ⚠️ 返すのは真偽だけ（理由・回数・残りを返さない・ADR-026 D4 / PC-10）。
 #[tauri::command]
 fn get_invitation_state() -> bool {
-    crate::eh3::is_eh3() && INVITATION_PRESENT.load(Ordering::Acquire)
+    invitation_surface_active() && INVITATION_PRESENT.load(Ordering::Acquire)
 }
 
 /// 招待の設定（説明と設定の窓が読む）。
@@ -1073,7 +1086,7 @@ fn get_invitation_settings() -> crate::analysis::invitation::Settings {
 /// ⚠️ 設定の変更は記録しない（NDJSON・applog とも）。状態機械の控えも解かない（外枠だけが変わる・ADR-035 D4）。
 #[tauri::command]
 fn set_invitation_settings(settings: crate::analysis::invitation::Settings) -> Result<(), String> {
-    if !crate::eh3::is_eh3() {
+    if !invitation_surface_active() {
         return Err("EH3 mode is not active".into());
     }
     let path = crate::eh3::invitation_settings_path()
@@ -1126,10 +1139,11 @@ impl InvitationRunner {
     /// 実時間がこれ以上飛んだら、スリープなどでセッションが区切れたとみなす（招待を閉じ、停滞の区間を終える）。
     const GAP_AS_BOUNDARY_MS: u64 = 30_000;
 
-    /// `trigger` は割り当ての段の契機（`eh3::TriggerStage::trigger`）。
-    fn new(trigger: crate::analysis::invitation::Trigger) -> Self {
+    /// `machine` は契機を決めて作った状態機械。EH3 は割り当ての段の契機（`eh3::TriggerStage::trigger`）、
+    /// 通常のモードは研究者の設定ファイル（`invitation_trigger::process_config`）で作る。
+    fn new(machine: crate::analysis::invitation::InvitationMachine) -> Self {
         Self {
-            machine: crate::analysis::invitation::InvitationMachine::with_trigger(trigger),
+            machine,
             last_tick_ms: None,
             last_day: None,
             last_press_ms: None,
@@ -1209,7 +1223,13 @@ impl InvitationRunner {
             idle_ms: self
                 .last_press_ms
                 .map_or(u64::MAX, |t| now_ms.saturating_sub(t)),
-            research_enabled: crate::eh3::is_eh3() && assigned_today,
+            // EH3 は割り当て済みの日だけ（今のまま）。通常のモードは、セッションの宣言・契機の設定・条件の行が
+            // 揃ったときだけ（第 1 週・O1・G1 では `NORMAL_INVITATION_ALLOWED` が偽）。
+            research_enabled: if crate::eh3::is_eh3() {
+                assigned_today
+            } else {
+                NORMAL_INVITATION_ALLOWED.load(Ordering::Acquire)
+            },
             recording_active: !paused,
             settings: current_invitation_settings(),
             session_boundary: boundary,
@@ -3054,6 +3074,7 @@ fn record_session_meta(
     intervention_enabled: bool,
     condition: Option<String>,
     label_pool: Option<String>,
+    invitation_enabled: Option<bool>,
     log: State<'_, Arc<Mutex<LogState>>>,
     engine: State<'_, CognitiveStateEngine>,
 ) -> Result<(), String> {
@@ -3068,6 +3089,9 @@ fn record_session_meta(
         tracing::warn!("O1: record_session_meta rejected (use declare_task_kind instead)");
         return Err("この画面はこの記録では使いません。".to_string());
     }
+
+    // 通常のモードの招待: 宣言を受け付けた時点で一旦閉じる（以降の検証で落ちたら閉じたまま・fail-closed）。
+    NORMAL_INVITATION_ALLOWED.store(false, Ordering::Release);
 
     let track = Track::parse(&track).ok_or_else(|| format!("invalid track: {:?}", track))?;
     let task_kind =
@@ -3130,6 +3154,36 @@ fn record_session_meta(
         task_kind.as_str(),
         head_id.as_str()
     );
+    // 通常のモードの招待を許すか（第 2 週の宣言・契機の設定が読めた・O1/G1/EH3 でない）。
+    //   許すときは条件の行（契機の種類と値・推定器の版）を**先に**送り、送れたときだけ開ける
+    //   （条件の行が無い提示を作らない）。
+    {
+        let config = crate::invitation_trigger::process_config();
+        let allowed = crate::invitation_trigger::normal_invitation_allowed(
+            invitation_enabled.unwrap_or(false),
+            crate::o1::is_o1(),
+            g1_mode().is_some(),
+            crate::eh3::is_eh3(),
+            config,
+        );
+        if let (true, Some(kind)) = (allowed, config.usable()) {
+            let sent = log
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .tx
+                .try_send(LogEntry::InvitationCondition {
+                    timestamp: epoch_ms(),
+                    kind,
+                })
+                .is_ok();
+            if sent {
+                NORMAL_INVITATION_ALLOWED.store(true, Ordering::Release);
+            } else {
+                tracing::warn!("invitation condition row could not be sent; invitations are off");
+            }
+        }
+    }
+
     // ⚠️★★★ G-1: **`Ok` を返す直前**に立てる。フロントはこの `Ok` を見て `isStarted` へ進み、
     //   失敗時にだけ**再押下を促す**。→ ★ この旗が「握手が済んだか」と一対一に対応する。
     //   以後の再押下は**本物の二度押し**として扱ってよい (`g1::decide_start_action`)。
@@ -3664,6 +3718,8 @@ fn start_session(
     // (前セッションの値 or 0)。スケジューラは session_start と meta 世代を照合してから初期化するため、
     // record_session_meta が来るまで較正プロファイル選択は確定しない (race 排除)。明示リセットは不要
     // (世代照合が staleness を吸収する)。
+    // 通常のモードの招待: 新しいセッションの宣言（`record_session_meta`）が通るまで閉じる（前のセッションの許可を持ち越さない）。
+    NORMAL_INVITATION_ALLOWED.store(false, Ordering::Release);
     SESSION_START_MS.store(now, Ordering::Release);
 
     // ⚠️★★★ **ここでブロック遷移の排他を離す** (D-1)。
@@ -4169,8 +4225,21 @@ pub fn run() {
         });
         let mut utc_offset = UtcOffsetCache::new();
         // EH3: 招待の状態機械（1 秒に 1 回進める）。入力は推定の停滞・無操作の長さ・本人の設定・研究の条件だけ。
-        let mut invitation =
-            crate::eh3::assignment().map(|a| InvitationRunner::new(a.trigger.trigger()));
+        //   通常のモード（EH3・O1・G1 でない）でも作る。出すかはセッションの宣言が決める
+        //   （`NORMAL_INVITATION_ALLOWED`）。契機は研究者の設定ファイル（読めなければ出さない）。
+        let mut invitation = match crate::eh3::assignment() {
+            Some(a) => Some(InvitationRunner::new(
+                crate::analysis::invitation::InvitationMachine::with_trigger(a.trigger.trigger()),
+            )),
+            None if !o1_always_on && g1_mode().is_none() => Some(InvitationRunner::new(
+                crate::analysis::invitation::InvitationMachine::with_kind(
+                    crate::invitation_trigger::process_config()
+                        .usable()
+                        .unwrap_or(crate::analysis::invitation::TriggerKind::Off {}),
+                ),
+            )),
+            None => None,
+        };
         let mut eh3_was_paused = crate::recording::is_paused();
         let mut eh3_reemit_gen = EH3_REEMIT_GEN.load(Ordering::Acquire);
         // EH3: 肖像の層（壁紙）。スリープの通知は肖像の終わりと始まりにだけ使う（記録しない）。
@@ -4204,6 +4273,11 @@ pub fn run() {
                 session_active_for_thread.load(Ordering::Acquire),
             ) {
                 while rx.try_recv().is_ok() {}
+                // 通常のモード: セッションが無い間は招待の図像を残さない（状態機械は止まっているので、
+                // 次のセッションの最初の tick が失効・区切りで閉じる）。
+                if !crate::eh3::is_eh3() {
+                    INVITATION_PRESENT.store(false, Ordering::Release);
+                }
                 // ★ G1: 「もうこのスレッドは LogEntry を投げない」ことの表明。
                 //   ブロック終了スレッドがこれを観測してから session_end を書く。
                 ANALYSIS_IDLE.store(true, Ordering::Release);
@@ -5748,7 +5822,8 @@ pub fn run() {
 
             // EH3: 招待の説明と設定の窓を隠したまま先に作る（overlay と同じく setup のメインスレッドで作る・
             //   Windows のデッドロックの回避）。閉じるボタンは隠すだけにする。
-            if crate::eh3::is_eh3() {
+            //   通常のモードでも作る（O1・G1 を除く）: 第 2 週の招待の図像から開くため。
+            if crate::eh3::is_eh3() || (!crate::o1::is_o1() && g1_mode().is_none()) {
                 match tauri::WebviewWindowBuilder::new(
                     app,
                     INVITATION_SETTINGS_LABEL,

@@ -1590,4 +1590,22 @@ mod tests {
         assert_eq!(r.next_u64(), 0xE220_A839_7B1D_CDAF);
         assert_eq!(r.next_u64(), 0x6E78_9E6A_A1B9_65F4);
     }
+
+    #[test]
+    fn no_kind_presents_when_the_research_condition_is_false() {
+        // 第 1 週・O1・G1 では通常のモードの研究の条件が偽（`lib.rs` の `NORMAL_INVITATION_ALLOWED`）。
+        // どの契機でも、立っても出さない・出ていれば閉じる。
+        for kind in [
+            TriggerKind::default(),
+            TriggerKind::Random {
+                per_active_hour: 60.0,
+                seed: 3,
+            },
+            RISING,
+        ] {
+            let off = |_: u64, i: &mut TickInput| i.research_enabled = false;
+            let (shown, _) = run_kind(kind, &|s| if s % 100 < 50 { 0.0 } else { 0.9 }, &off, 8000);
+            assert!(shown.is_empty(), "{kind:?}: {shown:?}");
+        }
+    }
 }

@@ -103,6 +103,8 @@ interface WeekConfig {
   description: string;
   /** session_meta.intervention_enabled。false で backend が全介入を gate (lib.rs safe_default)。 */
   interventionEnabled: boolean;
+  /** session_meta の宣言に添える。招待 (Physical Anchor の PC 面) を出してよい週か (ADR-040 D4)。 */
+  invitationEnabled: boolean;
   /** 較正モード = モデル出力を非表示にし主観回答の測定独立性を守る。 */
   calibrationMode: boolean;
   /** backend Condition enum と同期 (blind_calibration / baseline)。 */
@@ -117,17 +119,20 @@ const PHASE_WEEKS: WeekConfig[] = [
     label: "第1週 (blind 較正)",
     description: "介入は発火せず推定状態も非表示。X1 較正ラベルを収集 (calibration_blind)。",
     interventionEnabled: false,
+    invitationEnabled: false,
     calibrationMode: true,
     condition: "blind_calibration",
     labelPool: "calibration_blind",
   },
   {
     value: "week2_intervention",
-    label: "第2週 (Nudge なし)",
+    label: "第2週 (招待)",
     description:
-      "Nudge は出さない (ADR-040)。推定状態は開発ビルドでのみ表示。ラベルは別プールで収集 (post_intervention)。",
+      "Nudge は出さない (ADR-040)。招待 (小さな図像) を出すことがある。推定状態は開発ビルドでのみ表示。ラベルは別プールで収集 (post_intervention)。",
     // ADR-040 D1: Nudge を本体の既定で出さない。condition / labelPool は据え置く。
+    // ADR-040 D4: 第 2 週だけ招待を出してよい (出すかは backend の条件が決める)。
     interventionEnabled: false,
+    invitationEnabled: true,
     calibrationMode: false,
     condition: "baseline",
     labelPool: "post_intervention",
@@ -251,7 +256,7 @@ function App() {
   // 静かに倒れて汚染を隠すため使わない。不変条件を型で表明し、破れれば下の分割代入で fail-loud に落とす（FD7 思想）。
   const weekConfig = PHASE_WEEKS.find((w) => w.value === phaseWeek)!;
   // 派生値: Dashboard 表示制御と session_meta 記録に使う。週セレクタが唯一の真実源。
-  const { interventionEnabled, calibrationMode } = weekConfig;
+  const { interventionEnabled, invitationEnabled, calibrationMode } = weekConfig;
   // Ref mirrors: setInterval 内からステート最新値を参照するため
   // (依存配列に含めるとintervalが破棄・再作成され、タイマー精度が低下する)
   // (特に overlay は last_decision を読む) ため、これが無いと毎ポーリングで再起動してしまう。
@@ -469,6 +474,7 @@ function App() {
         track: "main",
         taskKind,
         interventionEnabled,
+        invitationEnabled,
         condition: weekConfig.condition,
         labelPool: weekConfig.labelPool,
       });
