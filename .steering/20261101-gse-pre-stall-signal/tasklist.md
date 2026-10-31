@@ -5,4 +5,4 @@
 - [x] 本計算・notes
 - [x] レビュー（code-reviewer＋/cross-review）と反映
 - [x] 項目 2 の引き継ぎ
-- [ ] main へのマージ（PR なし・[skip ci]）
+- [x] main へのマージ（PR なし・[skip ci]）
