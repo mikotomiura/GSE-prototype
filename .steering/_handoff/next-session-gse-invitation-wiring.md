@@ -1,30 +1,22 @@
-# 引き継ぎ — 招待の契機と配線（ADR-040 D4・Migration 2・タスク B）
+# 引き継ぎ — 招待の配線（ADR-040 Migration 1・2・T1）の残り
 
-> 作成: 2026-10-31（タスク A の後）。このメモを一次資料にしない。事実はコード・ADR・decisions で確かめ直す。
+> 更新: 2026-11-01（タスク A・B の実装・レビュー 2 巡・研究者の決定まで済み）。このメモを一次資料にしない。
 
-## 0 前提
+## 0 状態
 
-- ADR-040 は main に入っている（PR #369）。
-- タスク A（Nudge の既定の無効化）は `feature/nudge-default-off`（worktree `/Users/johnd/GSE-prototype-nudge-off`）でローカルにコミット済み（a39cf2a5・c1e280e8）。**未 push**: ci.yml は `feature/*` の push でも CI を起動し、G-GEAR が重い計算をしている間は載せないため。push と PR は研究者が G-GEAR の空きを言ってから。記録は `.steering/20261031-nudge-default-off/`。
-- タスク B はタスク A の上（`feature/nudge-default-off` の先端）から切るか、A が main に入ってから origin/main から切る。どちらにするかは始める時の状況で決める（A が未マージなら A の上から）。
+- ブランチ `feature/nudge-default-off`（worktree `/Users/johnd/GSE-prototype-nudge-off`）。**未 push**（研究者の決定 2026-11-01: 実機の確かめか G-GEAR の空きの後）。
+- 記録: タスク A `.steering/20261031-nudge-default-off/`、タスク B `.steering/20261101-invitation-wiring/`（決定とレビューの対応は decisions.md 判断 1〜5）。
+- 最後の検証（2026-11-01・d83d0468）: `cargo test --workspace` 1054 passed・0 failed、clippy `-D warnings` 0、tsc 0、emit_schema byte-equal。
 
-## 1 研究者が決めたこと（2026-10-31・AskUserQuestion）
+## 1 残り（この順）
 
-1. 招待を出す範囲: **通常のモードでは出す・O1 では出さない**・EH3 は今のまま。
-   - O1 は同意文書に介入が出る旨が無い（判断 O1-5）ので出さない。
-   - 通常のモードの出し方は EH3 と同じ既定（`invitation.rs` の `Settings::default` = 出す・終日・1 日 2 回）で、本人が設定で変えられる（ADR-035）。
-   - 第1週の盲検較正では出さない（推定への応答を混ぜない）。この点は私の推奨の説明に含めて研究者が選んだ。実装の前に第2週の扱いも含めて確かめる。
-2. 契機の既定: **今の挙動のまま**（`p_stuck ≥ 0.60` が 30 秒）。`friction_rising` と頻度を合わせた無作為の時刻は、注入できる・選べる契機として足すだけ。EH3 の挙動は変えない（事前登録が未凍結・`experiments/20261011-portrait-eh3/`）。
+1. 実機の確かめ（研究者・トレイの後から差し込む項目は AX から見えない）: 第 1 週で始めてトレイに「印の説明と設定」が無い → 第 2 週で始めて 2 秒ほど後に項目が出る・押すと設定の窓が開く → 「出さない」にしても項目が残り窓を開ける → 停止で項目が消え、第 1 週で再開しても出ない → 状態表示と終了の項目が崩れない。招待の図像が第 2 週で出ることは、契機を立ちやすくした `~/.gse/invitation_trigger.json`（例 `{"kind":"estimator","p_stuck":0.5,"hold_ms":10000}`）で早く見られる。
+2. push の前に `git fetch` し origin/main を取り込む（T3 の d6b1e978 以降）。テストを回し直す。G-GEAR が空いているかを研究者に確かめてから push（`feature/*` は self-hosted の CI が走る）。PR も研究者に確かめてから。
+3. gse-dataset の schema parity: `schema/current.json` に `InvitationCondition` が増えた。gse-dataset 側の同期は別作業。
+4. `_handoff/README.md` の T1 の行を、push の時に更新する。
 
-## 2 やること（ADR-040 Migration 2）
+## 2 未決（研究者・合流で）
 
-1. `friction_rising` の契機を足す（値は注入できる形・既定では使わない）。
-2. 頻度を合わせた無作為の時刻で出す条件を足す（判断 14）。
-3. 通常のモードの配線（上の 1）。記録は session_meta と別の行で、条件（推定器 / 無作為 / なし）と推定器の版が後から分かるようにする。
-4. 新しい契機を `gse-replay` で記録から再現できるようにする（時機のオフライン評価）。
-
-## 3 守ること
-
-- 招待は応答を入力に持たない（ADR-033）・本人の統制（ADR-035）・EH3 を壊さない。
-- `/start-task` から。完了時は `/cross-review`。push は G-GEAR の空きを確かめてから（docs だけなら `[skip ci]` の道がある。コードを含むなら研究者に聞く）。
-- Skill: `architecture-rules`・`rust-standards`・`typescript-standards`・`intervention-design`・`data-privacy`・`reproducibility-discipline`。HMM の挙動は変えない見込み（変えるなら `HMM_VERSION`）。
+- 説明と設定の窓の文（`InvitationSettings.tsx`）は推定器の契機を前提にしている。無作為・なし・上がりを使う前に、文と同意の扱い（盲検か）を決める（decisions.md 判断 3）。
+- 通常のモードの同意文書に `invitation_present`・`invitation_condition` が載っているか。
+- 契機の中身（T2・T3 の結果を見て・three-parallel-tracks §4）。T3 は「見えない」（`experiments/20261101-focus-leave-before-receipt/notes.md`）。
