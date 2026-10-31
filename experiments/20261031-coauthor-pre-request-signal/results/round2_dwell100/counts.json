@@ -1,0 +1,19 @@
+{
+ "writers_total": 61,
+ "req_c5": 3370,
+ "req_L": 616,
+ "req_A_no_value": 0,
+ "req_A_no_control": 45,
+ "req_L_no_control": 16,
+ "writers_L": 38,
+ "requests_L": 581,
+ "controls_L": 2798,
+ "onsets_req_L": 10,
+ "onsets_ctrl_L": 122,
+ "writers_A": 50,
+ "requests_A": 3308,
+ "controls_A": 16344,
+ "onsets_req_A": 93,
+ "onsets_ctrl_A": 760,
+ "onsets_total": 2390
+}

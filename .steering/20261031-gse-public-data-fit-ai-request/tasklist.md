@@ -7,5 +7,7 @@
 - [x] 本計算（dwell 100 ms）
 - [x] 感度（dwell 60/140 ms）
 - [x] notes.md に結果と言える範囲を書く
-- [ ] レビュー（code-reviewer＋/cross-review）
+- [x] 1 回目のレビュー（code-reviewer＋/cross-review）と反映
+- [x] 2 回目（本人の揺れ＋層別）の条件・計算
+- [ ] 2 回目のレビュー
 - [ ] コミット・push（PR は研究者に確かめてから）
