@@ -457,7 +457,8 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
 
 - EH3: 契機は割り当ての段（`eh3::TriggerStage`）のまま。新しい設定ファイルは読まない。
 - 通常のモード（EH3・O1・G1 でない走行）: `lib.rs` の `InvitationRunner` を作り、契機は研究者の設定 `~/.gse/invitation_trigger.json`（`invitation_trigger.rs`・本人の画面には出さない）で選ぶ。無い→推定器の既定、読めない・未知の欄・値の欠け・範囲外→招待を出さない。研究の条件は `NORMAL_INVITATION_ALLOWED`（セッション開始の宣言 `invitationEnabled`＝第 2 週だけ真・設定が読めた・条件の行を送れた、のすべてが揃ったときだけ真。`start_session` と宣言の入口で偽に戻す）。
-- 記録: 通常のモードで招待を許すセッションの開始時に `invitation_condition` 行（契機の種類と値・`hmm_version`）を 1 行。提示は `invitation_present`。立ったが出さなかった契機は記録しない。
+- 無作為の契機(`random`): 整数秒 `s` ごとに `SplitMix64(実効 seed ^ s)` の最初の値が `per_active_hour/3600` 未満なら立つ。実効 seed は設定の `seed`(2^53 - 1 以下)とセッションの開始時刻(`session_start` 行の `t`)から `SplitMix64(seed ^ session_start)` で導く。秒の番号で引くので、tick が欠けても列がずれず、記録の `session_start` 行と設定から実機と同じ秒を再現できる(`gse-replay --invitation` は `session_start` 行の `t` から導く。設定 64 KiB・記録の 1 行 1 MiB が上限・`p_stuck` の欠けた `feat` 行は exit 1)。`rising` は非有限の `p_stuck` で履歴を捨てる。`hold_ms`・`window_ms` は 1 時間以下。設定ファイルは通常のファイルで 64 KiB 以下。
+- 記録: 通常のモードで招待を許すセッションの開始時に `invitation_condition` 行（契機の種類と値・`hmm_version`。`random` は設定の `seed` と導いた `seed_effective`(u64 を文字列で)）を 1 行(宣言が再び呼ばれたときは複数行)。提示は `invitation_present`。立ったが出さなかった契機は記録しない。
 - 再現: `gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs N]`（`feat` 行の `p_stuck` と `key` 行の押下の時刻だけを読む）。
 
 ### EH3 の層（招待と肖像・2026-10-11）
