@@ -11,8 +11,11 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
-| **GSE 本体: Nudge の既定の無効化と招待の配線**（ADR-040 Migration 1・2・実装・下の行と並行可） | `next-session-gse-nudge-off-and-invitation-wiring.md`（2026-10-31）→ **`next-session-gse-invitation-wiring.md`**（2026-10-31・タスク B） | タスク A は `feature/nudge-default-off` でコミット済み・未 push（G-GEAR の空き待ち）。**タスク B が現行**（研究者の決定 2 件を記載）。決定の元は `.steering/20261031-gse-small-n-research-design/decisions.md` 判断 10〜18 |
-| **GSE: 公開データ・既存の資産の当てはめ（少人数の弱いところを補う・項目 1 → 2 → 3）**（上の行と並行可） | **`next-session-gse-public-data-fit.md`**（2026-10-31） | **現行**。IME 論文 2 の仕組みは読むだけで使う |
+| **GSE: 3 本の並行（T1 実装・T2 項目 2・T3 フォーカス）のまとめ役** | **`next-session-gse-three-parallel-tracks.md`**（2026-11-01） | **現行**。各セッションの入口の文・ぶつからないための約束（worktree・CI・main へのマージ・台帳・ディスク）・合流の仕方。個別の中身は下の 3 行 |
+| **GSE 本体: Nudge の既定の無効化と招待の配線**（ADR-040 Migration 1・2・実装・T1・下の行と並行可） | `next-session-gse-nudge-off-and-invitation-wiring.md`（2026-10-31）→ **`next-session-gse-invitation-wiring.md`**（2026-10-31・タスク B） | **進行中（T1・2026-11-01）**。タスク A は `feature/nudge-default-off` でコミット済み・未 push（G-GEAR の空き待ち）。タスク B を同じブランチで進める。決定は `.steering/20261031-gse-small-n-research-design/decisions.md` 判断 10〜18 |
+| **GSE: 公開データの当てはめ 項目 2（KLiCKe・Kaggle・作文中の値の分布と誤発火の基準）** | **`next-session-gse-public-data-fit-item2.md`**（2026-11-01） | **現行**。項目 1 と案 A は完了（2026-11-01・`experiments/20261031-coauthor-pre-request-signal/`・`experiments/20261101-coauthor-pre-stall-signal/`）。新しいセッションで始める |
+| **GSE: 止まりの最中にフォーカスを離れることは受領に先立つか（招待の契機の候補・オフライン）**（上下の行と並行可） | **`next-session-gse-focus-leave-before-receipt.md`**（2026-11-01） | **現行**。研究者の決定（`.steering/20261101-gse-pre-stall-signal/decisions.md` 判断 4）。手元のログで確かめる |
+| GSE: 公開データ・既存の資産の当てはめ（項目 1〜7 の計画） | `next-session-gse-public-data-fit.md`（2026-10-31） | 計画の表として参照。項目 1 は完了・次は上の行 |
 | ~~GSE: 少人数の研究設計（research-positioning・WBS の改訂案）~~ | `next-session-gse-small-n-design-revision.md`（2026-10-31） | 完了（同日・判断 10〜17・ADR-040）。上の 2 行へ |
 | **公開データでの照合の論文: 凍結 → 取得 → 検査 → 本計算**（PoPETs 2027 Issue 3・締切 2026-11-30 AoE を目標・G-GEAR） | **`next-session-public-keystroke-matching-research-forward.md`**（2026-10-12） | **現行**。事前登録は下書き 8（未凍結）・合成の記録の検査は済み（PR #358）。判断 51: KLiCKe の返事を待たずに進める。ただし凍結（OSF）が取得より先。取得の後は記録と本文の中身を Claude も読まない（集計だけ）。前の `next-session-public-keystroke-matching-freeze.md` を置き換える |
 | 公開データでの照合の論文: KLiCKe の著者への催促と日程の確認（2026-10-26 ごろ） | `next-session-public-keystroke-matching-1026-reminder.md`（2026-10-12） | **現行・10/26 に使う**。問い合わせは 2026-10-12 に送った（判断 50）。返事が無ければ催促の下書きを研究者に渡す。PoPETs の録画の要否の問い合わせの確認と、代わりの投稿先の候補（未確認）もここ |

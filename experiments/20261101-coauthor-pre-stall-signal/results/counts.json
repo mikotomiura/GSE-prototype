@@ -1,0 +1,17 @@
+{
+ "writers_total": 61,
+ "onsets_total": 2390,
+ "onsets_unassigned": 0,
+ "onsets_no_text_before": 107,
+ "onsets_gap_lt_30s": 607,
+ "onsets_duplicate_anchor": 38,
+ "stall_anchors": 1638,
+ "stall_ineligible": 945,
+ "stall_no_control": 9,
+ "writers_used": 28,
+ "stalls_used": 645,
+ "controls_used": 3187,
+ "stalls_ended_ai": 314,
+ "stalls_ended_self": 307,
+ "stalls_ended_censored": 24
+}
