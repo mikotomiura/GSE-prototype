@@ -9,3 +9,4 @@
 - [x] /cross-review と code-reviewer（判断 3）
 - [x] commit・push（PR は出さない・76908aab）
 - [x] 取得が 0 でも残る約 2% の出どころを探す（コードは直さない・results.md 5）
+- [x] 経過秒の時計を切り出す試し → 効きなしで捨てた（判断 4・results.md 6）
