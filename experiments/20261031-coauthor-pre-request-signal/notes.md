@@ -3,7 +3,7 @@
 - 問いと条件: `conditions.md`（計算の前にコミット `99f7b33b`）。研究者の判断は `.steering/20261031-gse-public-data-fit-ai-request/decisions.md` 判断 1〜4。
 - X/Y の区別: ここでの `ewma_x` は MhD 内部の X（摩擦の軸）で、検証の X1/X2 ではない。`p_stuck` は L1 の出力で、L0 の検証の対象ではない（`docs/experiment-tracking.md`）。本実験は探索で、ゲートに載せない。
 - 事前登録: 該当なし（GSE の参加者のデータではない）。`friction_rising` の値を決める前の予備の根拠（ADR-040・判断 13）。
-- 借用した手法・データ: CoAuthor（Lee, Liang & Yang, CHI 2022）。文献の登録は未了（`docs/references.md` への登録はメインが直列で行う）。
+- 借用した手法・データ: CoAuthor [V348]（Lee, Liang & Yang, CHI 2022）。
 
 ## 標本（dwell 100 ms・`results/dwell100/counts.json`）
 
