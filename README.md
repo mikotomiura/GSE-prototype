@@ -8,13 +8,14 @@ GSE doesn't read your mind. It reads *keystroke dynamics* (key timing and key ty
 whether to offer an invitation to step away from the screen now, or to stay out of the way. The invitation never measures whether you started or finished.
 
 > **Status:** GSE itself shows **no intervention by default**. Nudge remains in the code but is off by default
-> ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)); the invitation glyph runs only in the EH3 study mode. The full-screen Wall and Monk Mode
+> ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)); the invitation glyph runs in the EH3 study mode and in the normal mode's week 2 (session declaration "第2週 (招待)"; not in week 1, O1 or G1). The full-screen Wall and Monk Mode
 > were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)); Physical Anchor
 > is **designed but not implemented** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)).
 >
 > **Direction as of 2026-10-31:** Nudge will no longer be shown as an intervention in GSE itself; the core intervention
 > becomes the invitation to physical return ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). Nudge is now off by default;
-> wiring the invitation into the normal mode is a separate task.
+> the invitation is wired into the normal mode's week 2 with a swappable trigger (estimator / rising / random / none, chosen in
+> the researcher's `~/.gse/invitation_trigger.json`; fail-closed) and reproducible offline with `gse-replay --invitation`.
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)

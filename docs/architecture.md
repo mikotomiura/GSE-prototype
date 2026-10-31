@@ -451,6 +451,15 @@ Phase 2a で比例キャリーフォワード方式を導入済み (HMM_VERSION 
   ★ 分岐はすべて `o1::*` の純関数の中に閉じており、非 O1 では `session_active` と**同値**である
 - 詳細: `.steering/20260827-o1-collection-enablement/` / ADR-014 D6・D8 / ADR-016 判断 4b
 
+### 招待の契機と通常のモードの配線（ADR-040 D4・2026-11-01）
+
+招待の状態機械（`analysis/invitation.rs`）は、出す規則（1 区間 1 回・失効 60 秒・閉じた後 30 分・1 日の上限・時間帯・研究の条件・一時停止）を共有し、差し替えるのは「この tick で契機が立ったか」だけである（`TriggerKind`: `estimator` / `rising` / `random` / `none`）。
+
+- EH3: 契機は割り当ての段（`eh3::TriggerStage`）のまま。新しい設定ファイルは読まない。
+- 通常のモード（EH3・O1・G1 でない走行）: `lib.rs` の `InvitationRunner` を作り、契機は研究者の設定 `~/.gse/invitation_trigger.json`（`invitation_trigger.rs`・本人の画面には出さない）で選ぶ。無い→推定器の既定、読めない・未知の欄・値の欠け・範囲外→招待を出さない。研究の条件は `NORMAL_INVITATION_ALLOWED`（セッション開始の宣言 `invitationEnabled`＝第 2 週だけ真・設定が読めた・条件の行を送れた、のすべてが揃ったときだけ真。`start_session` と宣言の入口で偽に戻す）。
+- 記録: 通常のモードで招待を許すセッションの開始時に `invitation_condition` 行（契機の種類と値・`hmm_version`）を 1 行。提示は `invitation_present`。立ったが出さなかった契機は記録しない。
+- 再現: `gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs N]`（`feat` 行の `p_stuck` と `key` 行の押下の時刻だけを読む）。
+
 ### EH3 の層（招待と肖像・2026-10-11）
 
 EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く。EH3 でないときの記録と挙動は変わらない。
@@ -487,7 +496,7 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 > ⚠️★★★ **2026-08-23 改訂**: 旧フローは **Lv2 Wall**（QR → Zen Timer → `POST /unlock`）を記述していたが、
 > **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。★ **現行の介入は Lv1 Nudge のみ**である。
 > ⚠️ **2026-10-31 改訂**: ADR-040 D1 で **Nudge も既定で無効**にした（`lib.rs` の `INTERVENTION_ENABLED` の初期値と、開始画面の第2週の `interventionEnabled` を false）。
-> 下のフローは介入が有効なとき（研究者が戻したとき）の経路であり、判断のロジックは `gse-replay --intervention` の評価に残す（D2）。招待は EH3 モードだけで動く。
+> 下のフローは介入が有効なとき（研究者が戻したとき）の経路であり、判断のロジックは `gse-replay --intervention` の評価に残す（D2）。招待は EH3 モードと、通常のモードの第 2 週で動く（上の「招待の契機と通常のモードの配線」）。
 
 1. Analysis Thread が 1Hz で `FeatSnapshot` を生成し、`LatestFeatState` に保持
 2. Main Window が 500ms ごとに `get_intervention_decision` を invoke
