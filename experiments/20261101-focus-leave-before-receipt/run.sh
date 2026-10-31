@@ -18,5 +18,6 @@ for f in "$GSE_SESSIONS"/gse_o1_*.ndjson; do
   rm -f "$WORK/tmp.json"
 done
 python3 -I "$EXP_DIR/scripts/analyze.py" "$WORK" "$GSE_SESSIONS" "$(cat "$EXP_DIR/SEED")" "$OUT"
-python3 -I -c "import json,sys;json.dump({'git_head':sys.argv[1],'replay_parse_failures':sys.argv[2]},open(sys.argv[3],'w'),indent=1)" \
-  "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$(cat "$WORK"/*.err | grep -c 'failed to parse' || true)" "$OUT/provenance.json"
+# replay の警告（解析できなかった行）があったファイルの数。行の中身は記録しない。
+python3 -I -c "import json,sys;json.dump({'git_head':sys.argv[1],'files_with_replay_parse_warnings':int(sys.argv[2]),'files_total':int(sys.argv[3])},open(sys.argv[4],'w'),indent=1)" \
+  "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$(grep -l 'failed to parse\|not JSON objects' "$WORK"/*.err | wc -l | tr -d ' ')" "$(ls "$WORK"/*.err | wc -l | tr -d ' ')" "$OUT/provenance.json"
