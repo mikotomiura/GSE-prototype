@@ -123,7 +123,7 @@ def main():
         by_w.setdefault(writers[sid], []).append(Session(wd, sid))
 
     counts = {"sessions_without_writer": no_writer, "writers_total": len(by_w), "requests_raw": 0,
-              "requests_c5": 0, "requests_no_matched_control": 0, "writers_ge_min": 0}
+              "requests_c5": 0, "requests_no_snapshot": 0, "requests_no_matched_control": 0, "writers_ge_min": 0}
     data = {}  # w -> {"req": [(sess,T,P)], "matched": [...], "unmatched": [...]}
     for w in sorted(by_w):
         sess = by_w[w]
@@ -146,19 +146,20 @@ def main():
         for s, T, P in reqs:
             v = s.values(T)
             if v is None:
+                counts["requests_no_snapshot"] += 1
                 continue
             cands = [(g[0], g[1] + P) for g in gaps if g[2] > P and g[0].ctrl_ok(g[1] + P)]
             if not cands:
                 counts["requests_no_matched_control"] += 1
                 continue
             pick = rng.sample(cands, min(N_MATCHED, len(cands)))
-            mv = [c[0].values(c[1]) for c in pick]
-            mv = [x for x in mv if x is not None]
+            mv = [(c[0], c[1], c[0].values(c[1])) for c in pick]
+            mv = [m for m in mv if m[2] is not None]  # 時刻と値を組のまま除く（レビュー指摘）
             if not mv:
                 counts["requests_no_matched_control"] += 1
                 continue
             req_vals.append((s, T, v))
-            matched_vals.extend((c[0], c[1], x) for c, x in zip(pick, mv))
+            matched_vals.extend(mv)
         unmatched_vals = []
         dur = [(s, s.t_start + WARM, s.t_end) for s in sess if s.t_end > s.t_start + WARM]
         tot = sum(b - a for _, a, b in dur)
@@ -167,11 +168,15 @@ def main():
         while len(unmatched_vals) < need and tot > 0 and tries < 200 * need:
             tries += 1
             x = rng.random() * tot
+            hit = None
             for s, a, b in dur:
                 if x < b - a:
-                    T = int(a + x)
+                    hit = (s, int(a + x))
                     break
                 x -= b - a
+            if hit is None:  # 浮動小数の端（x == tot）。レビュー指摘
+                continue
+            s, T = hit
             if s.ctrl_ok(T):
                 v = s.values(T)
                 if v is not None:

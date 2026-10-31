@@ -15,6 +15,9 @@ SEED="$(cat "$EXP_DIR/SEED")"
 mkdir -p "$WORK" "$OUT"
 [ -x "$BIN" ] || (cd "$REPO_ROOT/src-tauri" && cargo build --release --bin gse-replay)
 : > "$WORK/convert_stats.ndjson"
+: > "$WORK/replay_stderr.log"
+# 古いセッションの中間が残らないように（レビュー指摘）
+find "$WORK" -maxdepth 1 -name "*_events.json" -delete
 for f in "$RAW"/*.jsonl; do
   sid="$(basename "$f" .jsonl)"
   python3 -I "$EXP_DIR/scripts/convert.py" "$f" "$WORK/$sid.ndjson" "$WORK/${sid}_events.json" "$DWELL" \
@@ -34,3 +37,5 @@ for l in open(sys.argv[1]):
 c['sessions']=n; json.dump(c,open(sys.argv[2],'w'),indent=1)" "$WORK/convert_stats.ndjson" "$OUT/convert_stats.json"
 python3 -I "$EXP_DIR/scripts/analyze.py" "$WORK" "$COAUTHOR_DIR/raw/metadata_creative.csv" \
   "$COAUTHOR_DIR/raw/metadata_argumentative.csv" "$SEED" "$OUT"
+# 来歴（レビュー指摘）
+python3 -I -c "import json,sys,hashlib;json.dump({'git_head':sys.argv[1],'gse_replay_sha256':hashlib.sha256(open(sys.argv[2],'rb').read()).hexdigest(),'dwell_ms':int(sys.argv[3]),'replay_stderr_bytes':int(sys.argv[4])},open(sys.argv[5],'w'),indent=1)" "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$BIN" "$DWELL" "$(wc -c < "$WORK/replay_stderr.log")" "$OUT/provenance.json"
