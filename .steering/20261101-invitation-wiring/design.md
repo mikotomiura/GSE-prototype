@@ -6,7 +6,7 @@
 - `TriggerKind`（serde・`deny_unknown_fields`・`tag = "kind"`）:
   - `estimator { p_stuck, hold_ms }`: 今の区間の追跡（`track_episode`）そのもの。`Trigger::MAIN` / `PROTO` はこの値。EH3 はここだけを使う。
   - `rising { delta, window_ms }`（friction_rising）: `p_stuck(now) − p_stuck(now − window_ms) ≥ delta` が偽から真になった tick で立つ。真の間は立ち直さない。値の既定は置かない。
-  - `random { per_active_hour, seed }`: 離席候補の外（`idle_ms < AWAY_IDLE_MS`）・区切りでない tick ごとに、確率 `per_active_hour / 3600` で立つ（1 tick = 1 秒の前提・tick の間隔が 1 秒からずれたら経過秒で割合を変える）。乱数は外部 crate を足さずに splitmix64 を本モジュールに置き、seed から再現する。既定値は置かない。
+  - `random { per_active_hour, seed }`: 離席候補の外（`idle_ms < AWAY_IDLE_MS`）・区切りでない tick で、前の tick の秒の次から今の秒までの各整数秒 s（最大 30 秒）について、`SplitMix64(seed_eff ^ s)` の最初の値が `per_active_hour / 3600` 未満なら立つ。`seed_eff = splitmix64(seed ^ session_start_ms)`（判断 2・レビューの後に改めた）。tick が欠けても列がずれず、`gse-replay` は記録の `session_start` から同じ秒で再現する。乱数は外部 crate を足さずに splitmix64 を本モジュールに置く。既定値は置かない。`seed` は 2^53−1 以下。
   - `none`: 立たない（統制の「なし」）。
 - 将来の候補（止まりの初期・フォーカスの遷移）は合流の後で足す。足しやすいよう、契機の判定は `TriggerKind` ごとの小さな状態（enum の中の構造体）に閉じ、`tick` の本体は `triggered: bool` だけを受ける形にする。
 - 推定器の以外の契機での「区間」: `estimator` は今の区間をそのまま使う。`rising` と `random` は立った瞬間を 1 区間とみなし、`episode_used` の繰り越さない規則は「その瞬間に出せなければ出さない」と同じ意味になる。

@@ -161,6 +161,15 @@ pub fn build_recorded_ticks(feats: &[(u64, f64)], presses: &[u64]) -> Vec<Record
 /// 殻（`lib.rs` の `InvitationRunner`）と同じく、`feat` 行が 30 秒以上空いたらセッションの区切りとし、
 /// 現地の日（4:00 区切り）が変わったら区切る。記録の一時停止・割り当て済みの日の判定は再現しない
 /// （研究の条件は常に真）。
+///
+/// 実機と一致しうる範囲（/cross-review 2 巡目）:
+/// - 1 本の状態機械で記録の全期間を回す。実機は宣言（`record_session_meta`）のたびに状態機械を
+///   作り直すので、一致するのは最初の宣言以降で、再宣言による数え直し（保持・上限）は再現しない。
+///   記録の `invitation_condition` 行（`seed_effective`）で照合する。
+/// - `random` の秒の引き直しは `feat` 行の tick でだけ起きる。実機は毎秒 tick し、離席候補の tick で
+///   遡りの起点を捨てる。30 秒未満の `feat` 行の欠けが離席候補からの再開をまたぐと、引く秒の数が
+///   実機と違いうる。
+/// - 1 回の tick で遡った区間に当たりの秒が複数あっても、立つのは最初の 1 つだけ（実機も同じ）。
 pub fn replay_recorded(
     ticks: &[RecordedTick],
     kind: TriggerKind,

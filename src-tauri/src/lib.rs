@@ -3245,9 +3245,11 @@ fn record_session_meta(
                 })
                 .is_ok();
             if sent {
-                NORMAL_INVITATION_ALLOWED.store(true, Ordering::Release);
-                // 状態機械を、このセッションの開始時刻から導いた seed で作り直させる
+                // 状態機械を、このセッションの開始時刻から導いた seed で作り直させる。
+                // 世代を先に進めてから許可を立てる（逆順だと、許可が真のまま古い状態機械で
+                // 1 tick 進みうる・/cross-review 2 巡目 M1）。
                 INVITATION_RESET_GEN.fetch_add(1, Ordering::AcqRel);
+                NORMAL_INVITATION_ALLOWED.store(true, Ordering::Release);
             } else {
                 tracing::warn!("invitation condition row could not be sent; invitations are off");
             }
