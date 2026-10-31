@@ -34,7 +34,7 @@ class S2(A.Session):
             r = json.loads(line)
             if r.get("type") == "key" and r["press"]:
                 ks.append((r["t"], r["category"]))
-        ks.sort()
+        ks.sort(key=lambda x: x[0])  # 安定ソート: 同時刻は行順を保つ（レビュー指摘）
         self.press = [t for t, _ in ks]
         self.cat = [c for _, c in ks]
         feat = sorted(json.load(open(os.path.join(wd, f"{sid}_feat.json"))), key=lambda x: x["timestamp"])
@@ -47,7 +47,8 @@ class S2(A.Session):
         return self.feat[i - 1] if i > 0 else None
 
     def cls_at(self, t_press):
-        i = bisect.bisect_left(self.press, t_press)
+        # 同時刻の打鍵が複数あるときは最後のもの（last_press_before と同じ打鍵・レビュー指摘）
+        i = bisect.bisect_right(self.press, t_press) - 1
         return "boundary" if self.cat[i] in BOUNDARY else "mid"
 
     def values2(self, T):
@@ -70,23 +71,28 @@ def main():
         if sid in writers:
             by_w.setdefault(writers[sid], []).append(S2(wd, sid))
     onset_stats = {}
+    unassigned = [0]
     for w, sess in by_w.items():
         ft = json.load(open(os.path.join(wd, "writers", f"{w}_ft.json")))
         offs = json.load(open(os.path.join(wd, "writers", f"{w}_offsets.json")))
         on = [r["t_ms"] for r in ft["rows"] if r["stall_onset"].get("is_onset")]
         th = [r["stall_onset"].get("theta_person_ms") for r in ft["rows"] if r["stall_onset"].get("is_onset")]
         bysid = {s.sid: s for s in sess}
-        spans = sorted((s.t_start + offs[s.sid], s.t_end + offs[s.sid], s.sid) for s in sess if s.sid in offs)
+        # 区間は concat_writer が詰めた基準（最初と最後の key/feat 行）で作る（レビュー指摘・重ならない）
+        spans = sorted((min(s.press[:1] + s.feat_t[:1]) + offs[s.sid], max(s.press[-1:] + s.feat_t[-1:]) + offs[s.sid], s.sid)
+                       for s in sess if s.sid in offs and (s.press or s.feat_t))
         for t in on:
             for a, b, sid in spans:
-                if a <= t <= b + 2500:
+                if a <= t <= b:
                     bysid[sid].onsets.append(t - offs[sid])
                     break
+            else:
+                unassigned[0] += 1
         for s in sess:
             s.onsets.sort()
         onset_stats[w] = {"onsets": len(on), "theta_median_ms": sorted(th)[len(th) // 2] if th else None}
 
-    counts = {"writers_total": len(by_w), "req_c5": 0, "req_L": 0, "req_A_no_value": 0,
+    counts = {"writers_total": len(by_w), "onsets_unassigned": unassigned[0], "req_c5": 0, "req_L": 0, "req_A_no_value": 0,
               "req_A_no_control": 0, "req_L_no_control": 0}
     data = {"L": {}, "A": {}}
     for w in sorted(by_w):
@@ -125,9 +131,13 @@ def main():
                         d = data[layer].setdefault(w, {"req": [], "ctrl": []})
                         d["req"].append(v)
                         d["ctrl"].extend(c[2] for c in pick)
+                        d.setdefault("pairs", []).append((v, [c[2] for c in pick]))
     for layer, mn in (("L", MIN_L), ("A", MIN_A)):
         used = [w for w, d in data[layer].items() if len(d["req"]) >= mn]
+        counts[f"req_{layer}_with_control"] = sum(len(d["req"]) for d in data[layer].values())
         counts[f"writers_{layer}"] = len(used)
+        counts[f"writers_{layer}_with_any_onset"] = sum(
+            1 for w in used if any(v["onset30"] for v in data[layer][w]["req"] + data[layer][w]["ctrl"]))
         counts[f"requests_{layer}"] = sum(len(data[layer][w]["req"]) for w in used)
         counts[f"controls_{layer}"] = sum(len(data[layer][w]["ctrl"]) for w in used)
         counts[f"onsets_req_{layer}"] = sum(int(v["onset30"]) for w in used for v in data[layer][w]["req"])
@@ -152,6 +162,20 @@ def main():
             else:
                 res[layer][sig] = None
     json.dump(res, open(os.path.join(out, "auc.json"), "w"), indent=1)
+    # 感度（事後に足した・判定に使わない）: 要求ごとに自分の対照との勝率を出し、書き手の中で平均する
+    res2 = {}
+    for layer, mn in (("L", MIN_L), ("A", MIN_A)):
+        used = [w for w in sorted(data[layer]) if len(data[layer][w]["req"]) >= mn]
+        res2[layer] = {}
+        for sig in SIGNALS:
+            per = []
+            for w in used:
+                wins = [A.auc([v[sig]], [c[sig] for c in cs]) for v, cs in data[layer][w]["pairs"]]
+                per.append(sum(wins) / len(wins))
+            r = A.boot_median(per, random.Random(seed + 1))
+            r["share_gt_05"] = sum(1 for a in per if a > 0.5) / len(per)
+            res2[layer][sig] = r
+    json.dump(res2, open(os.path.join(out, "auc_per_request.json"), "w"), indent=1)
     print(json.dumps(counts))
 
 

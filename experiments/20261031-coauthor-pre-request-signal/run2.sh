@@ -31,7 +31,7 @@ while read -r wid sids; do
   for s in $sids; do [ -f "$WORK/$s.withfeat.ndjson" ] && files+=("$WORK/$s.withfeat.ndjson"); done
   [ "${#files[@]}" -gt 0 ] || continue
   python3 -I "$SC/concat_writer.py" "$WORK/writers/$wid.ndjson" "$WORK/writers/${wid}_offsets.json" "${files[@]}"
-  "$BIN" "$WORK/writers/$wid.ndjson" --features > "$WORK/writers/${wid}_ftfull.json" 2>>"$WORK/replay_stderr.log"
+  "$BIN" "$WORK/writers/$wid.ndjson" --features > "$WORK/writers/${wid}_ftfull.json" 2>>"$WORK/replay_stderr.log" < /dev/null
   python3 -I -c "import json,sys;d=json.load(open(sys.argv[1]));json.dump({'observed_intervals':len(d['provenance']['observed_intervals']),'rows':[{'t_ms':r['t_ms'],'stall_onset':{k:r['stall_onset'].get(k) for k in ('is_onset','theta_person_ms')}} for r in d['rows'] if r['stall_onset'].get('is_onset')]},open(sys.argv[2],'w'))" \
     "$WORK/writers/${wid}_ftfull.json" "$WORK/writers/${wid}_ft.json"
   rm "$WORK/writers/${wid}_ftfull.json" "$WORK/writers/$wid.ndjson"
