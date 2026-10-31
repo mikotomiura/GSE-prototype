@@ -16,3 +16,11 @@
 - 決定: 識別子 `week2_intervention` は変えず、画面の `label` と `description` だけを事実に合わせる。
 - 理由: Nudge が出ないのに「介入」と表示すると、研究者が条件を取り違える。第2週も推定状態はブラインドで、表示は開発ビルドだけ（`Dashboard.tsx:249-251`）なので、「推定を表示」とも書かない。
 - 却下案: 識別子も改名する（session_meta には出ないが、変える利点がなく差分だけ増える）。
+
+## D4: レビューの指摘への対応（security-checker・/cross-review 1 巡目・2026-10-31）
+
+- 第2週の `label_pool`（`post_intervention`）に、Nudge が出る環境の旧データと出ない新データが混ざる（security-checker LOW・cross-review MEDIUM 一致）。据え置きは D1 のとおり。旧データと新データは session_meta の `intervention_enabled` で分ける。`logger.rs` の `LabelPool` の doc をこの形に直した。下流で `label_pool` を読むコードは今は無い（replay.rs の `#[allow(dead_code)]`）。`schema_dto.rs` の doc は「介入可視」と書いていないので触らない（emit_schema の出力を変えない）。
+- 第2週の false を守るテストが無い（cross-review MEDIUM 一致）。フロントに単体テストの基盤（vitest 等）が無く、tsc も cargo test も App.tsx の値を見ない。基盤を入れるのは範囲外とし、残りとして記録する。守っているのは初期値（定数の const assert）だけである。
+- D2 に挙げた intervention-design Skill を diff に入れていなかった（cross-review LOW）。description に ADR-040 D1 を足した。ルール 3（Wall Server）は削除済みの機能の記述で、触らない。
+- pilot-runbook の「介入は無い」に「招待は EH3 モードでだけ動く」を添えた（README と揃える）。
+- Codex の `FORCE_NUDGE` の言及は既存のデバッグ仕様（`GSE_DEBUG=1` の門）で、指摘に数えない。

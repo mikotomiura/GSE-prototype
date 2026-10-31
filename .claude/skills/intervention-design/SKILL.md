@@ -3,6 +3,7 @@ name: intervention-design
 description: >
   GSE の段階的介入システム設計規則。⚠️ Lv2 Wall / Zen Timer / Monk Mode / Early Unlock は
   2026-08-23 に削除された (ADR-015)。★ 現行は Lv1 Nudge と none/defer のみ。
+  ⚠️ Nudge は 2026-10-31 に本体の既定で無効になった (ADR-040 D1・判断のロジックは評価に残す D2)。
   以下の状況で必須参照:
   - Overlay.tsx の Nudge 表示ロジックを変更するとき
   - 介入の発火トリガー・cooldown・daily cap を変更するとき

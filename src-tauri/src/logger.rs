@@ -401,7 +401,9 @@ impl Condition {
 }
 
 /// ラベルプール (label_pool)。`calibration_blind` = blind 較正で集めたラベル (X1 判定に使用)、
-/// `post_intervention` = 介入可視環境で集めたラベル (合算せず別管理)。
+/// `post_intervention` = 第2週の条件で集めたラベル (合算せず別管理)。
+/// ⚠️ 介入の有無は `intervention_enabled` で分ける。ADR-040 D1 (2026-10-31) 以降の第2週は
+/// `intervention_enabled=false` で、それ以前のこのプールは Nudge が出る環境で集めた。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelPool {
     CalibrationBlind,
