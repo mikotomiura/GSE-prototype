@@ -486,6 +486,8 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 
 > ⚠️★★★ **2026-08-23 改訂**: 旧フローは **Lv2 Wall**（QR → Zen Timer → `POST /unlock`）を記述していたが、
 > **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。★ **現行の介入は Lv1 Nudge のみ**である。
+> ⚠️ **2026-10-31 改訂**: ADR-040 D1 で **Nudge も既定で無効**にした（`lib.rs` の `INTERVENTION_ENABLED` の初期値と、開始画面の第2週の `interventionEnabled` を false）。
+> 下のフローは介入が有効なとき（研究者が戻したとき）の経路であり、判断のロジックは `gse-replay --intervention` の評価に残す（D2）。招待は EH3 モードだけで動く。
 
 1. Analysis Thread が 1Hz で `FeatSnapshot` を生成し、`LatestFeatState` に保持
 2. Main Window が 500ms ごとに `get_intervention_decision` を invoke

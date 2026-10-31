@@ -123,9 +123,11 @@ const PHASE_WEEKS: WeekConfig[] = [
   },
   {
     value: "week2_intervention",
-    label: "第2週 (介入)",
-    description: "介入が実発火。介入下のラベルを別プールで収集 (post_intervention)。",
-    interventionEnabled: true,
+    label: "第2週 (Nudge なし)",
+    description:
+      "Nudge は出さない (ADR-040)。推定状態は開発ビルドでのみ表示。ラベルは別プールで収集 (post_intervention)。",
+    // ADR-040 D1: Nudge を本体の既定で出さない。condition / labelPool は据え置く。
+    interventionEnabled: false,
     calibrationMode: false,
     condition: "baseline",
     labelPool: "post_intervention",

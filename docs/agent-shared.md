@@ -15,12 +15,13 @@ Claude / Codex 固有の動作プロトコルはここに書きません
    ⚠️★★★ **段階呼称 Lv1〜Lv4 は 2026-08-30 に廃止方向** — ADR-018 D7。★ **実体名で呼ぶ**。
    ⚠️★★★ **「*段階的* 介入」とも書かない** — Wall が消え、Physical Anchor が完了条件を持たなくなった
    (ADR-018 D1) 結果、**強度が単調に上がる「段」の構造は現存しない**。
-   ★ **現行で稼働するのは Nudge のみ**で、**不便を担う Physical Anchor は未実装**。
+   ★ **本体は既定で介入を出さない**（Nudge は既定で無効・ADR-040 D1・2026-10-31。招待は EH3 モードだけ）。
+   **不便を担う Physical Anchor は未実装**。
    → ★ **「不便益 HCI である」とは書かない** — `docs/glossary.md` 禁止用語)
 - **位置づけ（2026-10-31 改訂・研究者決定）**: 打鍵の時刻と種類から**作業上の認知状態**を推定し（本文は保存しない）、
   詰まる前に介入を促して、**身体回帰の機会**（採点しない招待）を差し出す。「作業中の認知状態」とは書かない。
   これは目指す姿で、詰まる前の契機（`friction_rising`）と通常のモードの招待は未実装（今の招待は EH3 モードだけ）。
-  Nudge は本体では出さない（ADR-040・既定の変更は別タスクで、それまで実装は従来のまま）。
+  Nudge は本体では出さない（ADR-040 D1。既定は無効にした。判断のロジックは `gse-replay --intervention` の評価に残す）。
   詳細は `docs/research-positioning.md` §1 冒頭の 2026-10-31 改訂ブロック。
 - **主要技術**: Tauri 2.0 + Rust (Backend: KB Hook / HMM / ONNX) + React/TypeScript (Frontend)
   + Python/PyTorch (ML 学習) + Flutter (ストレッチ: Physical Anchor)
@@ -35,7 +36,7 @@ Claude / Codex 固有の動作プロトコルはここに書きません
 分析層 (`analysis/`) に渡す。分析層は 30 秒ローリングウィンドウで 5 特徴量を抽出し、HMM
 (Forward Algorithm) で 3 状態確率を推定、1Hz ゲートで `FeatSnapshot` を生成する。`intervention`
 が介入要否を判定し、`logger` が NDJSON にセッションを記録する。
-⚠️ **Lv2 Wall と `wall_server.rs` は 2026-08-23 に削除された** (ADR-015)。現行の介入は **Nudge のみ**。
+⚠️ **Lv2 Wall と `wall_server.rs` は 2026-08-23 に削除された** (ADR-015)。Nudge は既定で無効 (ADR-040 D1)。招待は EH3 モードだけで動く。
 `analysis/` は **プラットフォーム非依存** (OS API は `input/` + `sensors*.rs` に隔離)。
 詳細は `docs/architecture.md`。
 

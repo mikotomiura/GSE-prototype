@@ -7,14 +7,14 @@
 GSE はあなたの脳内を読みません。読むのは*キーストローク動態*（打鍵の時刻と種類）だけで、本文は保存しません。そこから、
 画面から一度離れる招待を「今」差し出すか、それとも黙っているべきかを判断します。招待は開始も完了も測りません。
 
-> **現況:** 稼働している介入は **Nudge のみ**です。全画面の Wall と Monk Mode は
+> **現況:** GSE 本体は**既定では介入を出しません**。Nudge はコードに残っていますが既定で無効です
+> （[ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)）。招待の図像は検証用の EH3 モードでだけ動きます。全画面の Wall と Monk Mode は
 > **2026-08 に削除しました**（[ADR-015](docs/adr/ADR-015-wall-removal.md)）。
 > Physical Anchor は**設計済み・未実装**です
 > （[ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)）。
 >
 > **2026-10-31 の方針:** Nudge は GSE 本体の介入としては出さず、本体の介入は身体回帰の機会を差し出す招待にします
-> （[ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)）。既定の変更は別作業で、それまでの実装は上のとおりです。
-> 招待の図像は今は検証用の EH3 モードでだけ動きます。
+> （[ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)）。Nudge の既定は無効にしました。通常のモードへの招待の配線は別作業です。
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)

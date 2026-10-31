@@ -119,7 +119,10 @@ const PROBE_META_READY_GRACE_MS: u64 = 5_000;
 // Task C: セッションが宣言する介入の有効/無効 (session_meta.intervention_enabled)。
 // record_session_meta が設定し、get_intervention_decision が抑止判断に使う。
 // main/overlay の両ウィンドウが同コマンドを叩くため単一情報源で抑止される (cross-review)。
-static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(true);
+// ADR-040 D1: 初期値は無効 (Nudge を本体の既定で出さない)。判断のロジックは
+// `gse-replay --intervention` の評価のために残す (D2)。
+const INTERVENTION_ENABLED_DEFAULT: bool = false;
+static INTERVENTION_ENABLED: AtomicBool = AtomicBool::new(INTERVENTION_ENABLED_DEFAULT);
 
 // 通常は false のまま = 既存挙動と完全同一 (pilot 非汚染)。
 
@@ -3996,9 +3999,9 @@ pub fn run() {
             crate::o1::SUBMIT_GRACE_MS
         );
         // ⚠️★★★ **判断 O1-5: O1 では介入を出さない。**
-        //   ★ 既定値は `true` (下の `INTERVENTION_ENABLED`) で、O1 は
-        //   `record_session_meta` を通らないので **何もしなければ Nudge が出る**。
-        //   → ★ ここで明示的に落とす。理由は (1) 介入が入ると自然作業ではなくなる
+        //   ★ 既定値は ADR-040 D1 で `false` になった (上の `INTERVENTION_ENABLED`) が、
+        //   O1 は `record_session_meta` を通らないので既定値に頼らない。
+        //   → ★ ここで明示的に落とす (既定値が戻されても O1 では出ない二重の守り)。理由は (1) 介入が入ると自然作業ではなくなる
         //   (観測している行動を介入が変える) (2) 同意文書に「助言が出ることがある」旨が無い。
         INTERVENTION_ENABLED.store(false, Ordering::Release);
     }
@@ -5916,6 +5919,12 @@ mod shutdown_tests {
 #[cfg(test)]
 mod task_c_command_tests {
     use super::*;
+
+    // ADR-040 D1: Nudge を本体の既定で出さない。static はテスト間で共有されるので定数を検査する。
+    #[test]
+    fn intervention_is_disabled_by_default() {
+        const { assert!(!INTERVENTION_ENABLED_DEFAULT) };
+    }
 
     // #1 層2: 誤誘導ラベル是正 — Full と Disconnected を文言で区別すること。
     #[test]

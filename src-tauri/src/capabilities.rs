@@ -123,7 +123,7 @@ pub const THRESHOLD_GATED: &[&str] = &["hook_health", "starve_window"];
 /// | 行種 | 止まる条件 | 実測 |
 /// |---|---|---|
 /// | `probe_assignment` / `realtime_label` | ⚠️ **G1 実施中と EH3 では常に止まる** | `lib.rs`: `probes_disabled = disabled_by_env \|\| disabled_by_g1.is_some() \|\| disabled_by_eh3` |
-/// | `intervention_decision` / `intervention_response` | ⚠️ **盲検較正 (`intervention_enabled=false`) では常に止まる** | `lib.rs`: `if !INTERVENTION_ENABLED { return safe_default(); }` |
+/// | `intervention_decision` / `intervention_response` | ⚠️ **`intervention_enabled=false` では常に止まる**（盲検較正・O1・EH3、★ ADR-040 D1 で既定も false） | `lib.rs`: `if !INTERVENTION_ENABLED { return safe_default(); }` |
 ///
 /// → ⚠️★★★ **G1 ログを D1 の判定表に掛けると `probe_assignment` 0 行が
 /// 「信号が無かった」という *偽の結論* になる。** ★ しかもこれは「計器が無い」より質が悪い

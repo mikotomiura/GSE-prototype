@@ -7,13 +7,14 @@
 GSE doesn't read your mind. It reads *keystroke dynamics* (key timing and key type only; no text is stored) — and decides
 whether to offer an invitation to step away from the screen now, or to stay out of the way. The invitation never measures whether you started or finished.
 
-> **Status:** the shipping intervention is **Nudge only**. The full-screen Wall and Monk Mode
+> **Status:** GSE itself shows **no intervention by default**. Nudge remains in the code but is off by default
+> ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)); the invitation glyph runs only in the EH3 study mode. The full-screen Wall and Monk Mode
 > were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)); Physical Anchor
 > is **designed but not implemented** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)).
 >
 > **Direction as of 2026-10-31:** Nudge will no longer be shown as an intervention in GSE itself; the core intervention
-> becomes the invitation to physical return ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). The default change is a
-> separate task, so the shipping behaviour above still holds until then. The invitation glyph currently runs only in the EH3 study mode.
+> becomes the invitation to physical return ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). Nudge is now off by default;
+> wiring the invitation into the normal mode is a separate task.
 
 [![CI / Release](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/mikotomiura/GSE-prototype/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2011%20·%20macOS-2563EB)
