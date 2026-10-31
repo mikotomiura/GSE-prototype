@@ -102,6 +102,9 @@ pub const KNOWN_LINE_TYPES: &[&str] = &[
     //   EH3 のときだけ `config_gated` に入る（EH3 でない記録の `meta` は 1 byte も変えない・R-L6）。
     "eh3_day",
     "invitation_present",
+    // 通常のモード（EH3・O1・G1 でない走行）で招待を許すセッションの条件（ADR-040 D4・タスク B）。
+    //   EH3 の条件は `eh3_day` が持つので、EH3 では出さない。
+    "invitation_condition",
 ];
 
 /// **閾値ゲート付き**の行種 (ADR-013 D1)。
@@ -260,6 +263,11 @@ pub fn config_gated() -> Vec<&'static str> {
         v.push("secure_input");
     }
     v.extend(eh3_line_types(crate::eh3::is_eh3()));
+    v.extend(normal_invitation_line_types(
+        crate::eh3::is_eh3(),
+        crate::o1::is_o1(),
+        crate::g1_mode().is_some(),
+    ));
 
     v.sort_unstable();
     v
@@ -277,6 +285,22 @@ fn eh3_line_types(eh3: bool) -> Vec<&'static str> {
         vec!["eh3_day", "invitation_present"]
     } else {
         Vec::new()
+    }
+}
+
+/// 通常のモード（EH3・O1・G1 でない走行）で招待を出せるビルドが宣言する行種 (純関数)。
+///
+/// `config_gated` に置く: セッションが招待を宣言しない（第 1 週）・契機の設定が読めない走行では送出元が
+/// 止まるので、0 行は「判定不能」である。EH3 は `eh3_line_types` が `invitation_present` を宣言するので、
+/// ここでは何も足さない（重複させない）。O1・G1 は招待を出さないので何も足さない。
+///
+/// 送出元: `invitation_present` は招待の状態機械（`lib.rs` の `InvitationRunner`）、
+/// `invitation_condition` は `lib.rs` の `record_session_meta`。
+fn normal_invitation_line_types(eh3: bool, o1: bool, g1: bool) -> Vec<&'static str> {
+    if eh3 || o1 || g1 {
+        Vec::new()
+    } else {
+        vec!["invitation_present", "invitation_condition"]
     }
 }
 
@@ -479,7 +503,7 @@ mod tests {
         #[cfg(not(target_os = "windows"))]
         let emitterless: &[&str] = &["activity_label"];
         // EH3 の走行でだけ宣言する行種（送出元はある・テストは EH3 ではない）。
-        let mode_gated: &[&str] = &["eh3_day", "invitation_present"];
+        let mode_gated: &[&str] = &["eh3_day", "invitation_present", "invitation_condition"];
 
         let mut lhs: BTreeSet<&str> = declared();
         lhs.insert(SELF_LINE_TYPE);
@@ -595,6 +619,34 @@ mod tests {
         // 宣言したものには writer がある（過大申告の逆アサート）
         let in_source = line_types_in_logger_source();
         for t in eh3_line_types(true) {
+            assert!(in_source.contains(t), "{t:?} の writer が logger.rs に無い");
+        }
+    }
+
+    /// 通常のモードの招待の行種は、EH3・O1・G1 でない走行だけが宣言する。EH3 の宣言と重ならない。
+    #[test]
+    fn normal_invitation_line_types_are_declared_only_in_normal_mode() {
+        assert_eq!(
+            normal_invitation_line_types(false, false, false),
+            vec!["invitation_present", "invitation_condition"]
+        );
+        assert!(normal_invitation_line_types(true, false, false).is_empty());
+        assert!(normal_invitation_line_types(false, true, false).is_empty());
+        assert!(normal_invitation_line_types(false, false, true).is_empty());
+        // EH3 の宣言と重ならない（`meta.capabilities` に同じ行種が 2 度出ない）
+        for (e, o, g) in [(true, false, false), (false, false, false)] {
+            let a = eh3_line_types(e);
+            let b = normal_invitation_line_types(e, o, g);
+            assert!(a.iter().all(|t| !b.contains(t)));
+        }
+        // 送出元が lib.rs に実在する（writer だけで宣言しない・ADR-013 D2）
+        let lib = include_str!("lib.rs");
+        assert!(
+            lib.contains("LogEntry::InvitationCondition {"),
+            "invitation_condition の送出元が無い"
+        );
+        let in_source = line_types_in_logger_source();
+        for t in normal_invitation_line_types(false, false, false) {
             assert!(in_source.contains(t), "{t:?} の writer が logger.rs に無い");
         }
     }

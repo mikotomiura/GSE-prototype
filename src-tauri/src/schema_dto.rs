@@ -506,6 +506,44 @@ pub enum LogEntryDto {
     ///
     /// 時刻キーは `t`。
     InvitationPresent { t: u64 },
+    /// 通常のモードで招待を許すセッションの条件（契機の種類と値・推定器の版）。
+    ///
+    /// `session_meta` とは別の行。招待を許すセッションの開始時（条件が決まった時点）に 1 行出す。EH3 は出さない
+    /// （EH3 の条件は `eh3_day`）。`condition` ごとに持つ欄が決まっている: `estimator` は `p_stuck`・`hold_ms`、
+    /// `rising` は `delta`・`window_ms`、`random` は `per_active_hour`・`seed`、`none` は持たない。
+    /// 立ったが出さなかった契機は記録しない。提示は `invitation_present` で読む。
+    ///
+    /// 時刻キーは `t`。
+    InvitationCondition {
+        t: u64,
+        condition: InvitationConditionDto,
+        hmm_version: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        p_stuck: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        hold_ms: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        delta: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        window_ms: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        per_active_hour: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seed: Option<u64>,
+    },
+}
+
+/// 招待の契機の種類。NDJSON 文字列は "estimator" / "rising" / "random" / "none"。
+#[derive(Serialize, JsonSchema)]
+pub enum InvitationConditionDto {
+    #[serde(rename = "estimator")]
+    Estimator,
+    #[serde(rename = "rising")]
+    Rising,
+    #[serde(rename = "random")]
+    Random,
+    #[serde(rename = "none")]
+    None,
 }
 
 /// EH3 のその日の条件。NDJSON 文字列は "blank" / "decor" / "a_none" / "a_seed"。

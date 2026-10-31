@@ -1169,6 +1169,9 @@ enum ReplayEvent {
     /// 読み飛ばし専用。EH3 の招待を出した時刻（記録のみ・推論へ流さない）。
     #[serde(rename = "invitation_present")]
     InvitationPresent(#[allow(dead_code)] serde_json::Value),
+    /// 読み飛ばし専用。通常のモードで招待を許すセッションの条件（記録のみ・推論へ流さない）。
+    #[serde(rename = "invitation_condition")]
+    InvitationCondition(#[allow(dead_code)] serde_json::Value),
     /// ⚠️★★★ **O1 の監査 criterion**（ADR-031 D1）。★ 読み飛ばし専用。
     ///
     /// ⚠️★★★ **2026-09-14 に足し忘れて実測で踏んだ。**★ `activity_label` 行を 1 本足した
@@ -1279,6 +1282,7 @@ impl ReplayEvent {
             // EH3 の 2 行種も記録のみで推論へ流さない。
             ReplayEvent::Eh3Day(_) => None,
             ReplayEvent::InvitationPresent(_) => None,
+            ReplayEvent::InvitationCondition(_) => None,
             // ⚠️★★★ 監査 criterion（ADR-031）。★ 記録のみで推論へ流さない。
             ReplayEvent::ActivityLabel(_) => None,
             // v0.3 較正 variant は --calibration 専用コレクタで別途抽出する。
@@ -4011,6 +4015,7 @@ fn run_replay(session_path: &PathBuf) -> Result<Vec<FeatSnapshot>, String> {
             // EH3 の 2 行種も読み飛ばす。
             | ReplayEvent::Eh3Day(_)
             | ReplayEvent::InvitationPresent(_)
+            | ReplayEvent::InvitationCondition(_)
             // ⚠️★★★ 監査 criterion (ADR-031)。★ 記録のみで推論へ流さない。
             | ReplayEvent::ActivityLabel(_)
             | ReplayEvent::SessionMeta { .. }
@@ -6579,6 +6584,10 @@ not json\n";
             (
                 "invitation_present",
                 r#"{"type":"invitation_present","t":1}"#,
+            ),
+            (
+                "invitation_condition",
+                r#"{"type":"invitation_condition","t":1,"condition":"none","hmm_version":"0.5.0"}"#,
             ),
         ];
 
