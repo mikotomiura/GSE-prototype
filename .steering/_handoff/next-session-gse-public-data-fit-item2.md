@@ -26,18 +26,16 @@
 ## 2 先に確かめること（一次）
 
 - データの置き場: 照合論文のトラック（`/Users/johnd/GSE-wt-matching-manuscript/experiments/20261012-public-keystroke-matching/data.md`・ブランチ `docs/public-keystroke-matching-manuscript`）は KLiCKe の `WritingTask.zip`（SHA-256 `ffa4d753…555d`・記録の CSV 4,992 本）を取得済みだが、置き場の `raw/` は 2026-11-01 時点でこの Mac の worktree に無かった（G-GEAR の可能性）。そのトラックの成果物は書き換えない・読むだけ（判断 18）。Mac に無ければ、同じ data.md の手順（Drive のファイル ID・SHA-256 で照合）で `~/gse-public-data/klicke/` に取り直す。人口統計のファイルは取らない（MTurk の worker ID を尋ねる調査票）。
-- KLiCKe の利用条件: [V273] 逐語 "These files can be downloaded and used freely. However, if you wish to use them in your research project, please reference this repository as an original"。著者からの 2026-10-24 の返事は利用への懸念を書いていない（`/Users/johnd/GSE-wt-matching-manuscript/.steering/_handoff/next-session-public-keystroke-matching-manuscript-kaggle-source.md:17`）。ただし問い合わせの目的は照合論文。GSE の解析は別の目的なので、使ってよいかを研究者に確かめる。
-- Kaggle [V265]: コンペのデータは KLiCKe を公開する前に KLiCKe のコーパスから取ったもの（同じ返事）。独立のデータではないので、両方を数えると重複する。コンペの規約（コンペ外の利用の可否）を一次で読む。
+- KLiCKe の利用条件: [V273] 逐語 "These files can be downloaded and used freely. However, if you wish to use them in your research project, please reference this repository as an original"。著者からの 2026-10-24 の返事は利用への懸念を書いていない（`/Users/johnd/GSE-wt-matching-manuscript/.steering/_handoff/next-session-public-keystroke-matching-manuscript-kaggle-source.md:17`）。研究者は公開の条件で使うと決めた（§3）。
+- Kaggle [V265]: コンペのデータは KLiCKe を公開する前に KLiCKe のコーパスから取ったもの（同じ返事）。独立のデータではないので使わない（§3）。
 - KLiCKe の記録は押下と離しの時刻（`DownTime`・`UpTime`）を持つ。CoAuthor と違って離しの合成が要らない。列と書式の癖（バックスラッシュつきの 2 字・cp1252 の 21 本）は照合論文の data.md の検査 1・2 と notes.md の逸脱 D1。
 
-## 3 研究者に聞くこと（推奨を添える）
+## 3 研究者が決めたこと（2026-11-01・`.steering/20261101-gse-pre-stall-signal/decisions.md` 判断 4）
 
-1. データ: KLiCKe だけ（推奨・離しの時刻がある・Kaggle は KLiCKe 由来で独立でない）／Kaggle だけ／両方。
-2. 何の分布を出すか（案 A の結果を受けて、`friction_rising` を「先回りの上がり」で定義する根拠が無かったため）:
-   - 候補 a（推奨）: 「止まりの初期」の契機の値。本人の θ に対する休止の長さの比（例: 休止が θ の 0.5・0.75 倍に届いた時点）で、作文中の発火の頻度（1 時間あたり）と、そのうち本人の停滞に至る割合。少人数で値を合わせすぎないための母集団の分布になる。
-   - 候補 b: 元の計画どおり、今の推定の `ewma_x`・`p_stuck` の上がりの分位点と誤発火の基準（案 A の結果からは契機として弱い）。
-   - 候補 c: 両方。
-3. 解析の条件（何を数えるか・何なら成り立つと読むか）。
+1. データ: KLiCKe だけ（Kaggle は KLiCKe 由来で独立でない・使わない）。
+2. 出す分布: 両方。主は止まりの初期の値（休止が本人の θ の 0.5・0.75 倍に届いた時点で、作文中の発火の頻度（1 時間あたり）と、そのうち本人の停滞に至る割合）。副は KLiCKe での案 A の追試（離しの時刻があるので、合成の離しの影響を外した形）。
+3. KLiCKe の利用: 公開の利用条件の範囲で使い、出すのは集計値だけ。人口統計のファイルは取らない。
+4. 残っているのは解析の条件（何を数えるか・何なら成り立つと読むか）。新しいセッションで推奨を添えて AskUserQuestion で聞き、計算の前にコミットする。
 
 ## 4 使えるもの
 
