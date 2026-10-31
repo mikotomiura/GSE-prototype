@@ -1170,6 +1170,8 @@ pub enum LogEntry {
     InvitationCondition {
         timestamp: u64,
         kind: crate::analysis::invitation::TriggerKind,
+        /// セッションの開始時刻(`session_start` 行の `t`)。無作為の実効 seed を導く。
+        session_start_ms: u64,
     },
     /// **G1: ブロック終了マーカー。** 現ファイルに `session_end` を書いて flush するが、
     /// ★ **書込先は切り替えない**。切り替えは次の `Rotate` が行う。
@@ -1672,6 +1674,7 @@ fn format_invitation_present_line(timestamp: u64) -> String {
 fn format_invitation_condition_line(
     timestamp: u64,
     kind: crate::analysis::invitation::TriggerKind,
+    session_start_ms: u64,
     hmm_version: &str,
 ) -> String {
     use crate::analysis::invitation::TriggerKind;
@@ -1688,9 +1691,12 @@ fn format_invitation_condition_line(
             per_active_hour,
             seed,
         } => format!(
-            r#","per_active_hour":{},"seed":{}"#,
+            // 設定の seed は 2^53 以下に制限してある(JS で丸められない)。導いた実効 seed は u64 全体なので
+            // 文字列で書く。
+            r#","per_active_hour":{},"seed":{},"seed_effective":"{}""#,
             num(per_active_hour),
-            seed
+            seed,
+            crate::analysis::invitation::effective_seed(seed, session_start_ms)
         ),
         TriggerKind::Off {} => String::new(),
     };
@@ -2404,13 +2410,18 @@ impl SessionLogger {
                                 );
                                 dirty = true;
                             }
-                            LogEntry::InvitationCondition { timestamp, kind } => {
+                            LogEntry::InvitationCondition {
+                                timestamp,
+                                kind,
+                                session_start_ms,
+                            } => {
                                 let _ = writeln!(
                                     writer,
                                     "{}",
                                     format_invitation_condition_line(
                                         timestamp,
                                         kind,
+                                        session_start_ms,
                                         crate::analysis::engine::HMM_VERSION
                                     )
                                 );
@@ -3087,7 +3098,9 @@ mod tests {
     #[test]
     fn invitation_condition_line_carries_only_the_condition() {
         use crate::analysis::invitation::{Trigger, TriggerKind};
-        let line = |k: TriggerKind| format_invitation_condition_line(1_700_000_000_000, k, "9.9.9");
+        let line = |k: TriggerKind| {
+            format_invitation_condition_line(1_700_000_000_000, k, 1_699_999_999_000, "9.9.9")
+        };
         let obj = |l: &str| -> serde_json::Map<String, serde_json::Value> {
             serde_json::from_str::<serde_json::Value>(l)
                 .unwrap()
@@ -3142,11 +3155,17 @@ mod tests {
                 "hmm_version",
                 "per_active_hour",
                 "seed",
+                "seed_effective",
                 "t",
                 "type"
             ]
         );
         assert_eq!(m["seed"], 42);
+        // 導いた seed は u64 全体なので文字列で書く(JS で丸めない)
+        assert_eq!(
+            m["seed_effective"],
+            crate::analysis::invitation::effective_seed(42, 1_699_999_999_000).to_string()
+        );
         let m = obj(&line(TriggerKind::Off {}));
         assert_eq!(keys(&m), ["condition", "hmm_version", "t", "type"]);
         assert_eq!(m["condition"], "none");
@@ -3844,6 +3863,7 @@ mod tests {
             LogEntry::InvitationCondition {
                 timestamp: 1,
                 kind: crate::analysis::invitation::TriggerKind::default(),
+                session_start_ms: 1,
             },
             LogEntry::Key {
                 vk_code: 0x41,

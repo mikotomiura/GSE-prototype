@@ -510,7 +510,8 @@ pub enum LogEntryDto {
     ///
     /// `session_meta` とは別の行。招待を許すセッションの開始時（条件が決まった時点）に 1 行出す。EH3 は出さない
     /// （EH3 の条件は `eh3_day`）。`condition` ごとに持つ欄が決まっている: `estimator` は `p_stuck`・`hold_ms`、
-    /// `rising` は `delta`・`window_ms`、`random` は `per_active_hour`・`seed`、`none` は持たない。
+    /// `rising` は `delta`・`window_ms`、`random` は `per_active_hour`・`seed`・`seed_effective`、`none` は持たない。
+    /// 1 つのファイルに複数行ありうる（セッションの宣言が再び呼ばれたとき。後の行がその時点からの条件）。
     /// 立ったが出さなかった契機は記録しない。提示は `invitation_present` で読む。
     ///
     /// 時刻キーは `t`。
@@ -528,8 +529,12 @@ pub enum LogEntryDto {
         window_ms: Option<u64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         per_active_hour: Option<f64>,
+        /// 設定の seed(2^53 - 1 以下)。
         #[serde(skip_serializing_if = "Option::is_none")]
         seed: Option<u64>,
+        /// セッションの開始時刻(`session_start` 行の `t`)と設定の seed から導いた実効 seed(u64 を 10 進の文字列で)。
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seed_effective: Option<String>,
     },
 }
 
