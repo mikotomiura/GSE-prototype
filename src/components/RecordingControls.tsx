@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useFirstMouseGuard } from "../firstMouseGuard";
 
 /**
  * O1（普段の作業の長期記録）で被験者に約束した **3 点セット** の UI。
@@ -143,8 +144,9 @@ const RecordingControls: React.FC = () => {
   // ⚠️★★★ O1 の開始前ゲート (研究者判断 R-7)。null = まだ読んでいない。
   const [enrollment, setEnrollment] = useState<O1EnrollmentDto | null>(null);
 
+  // ★ promise を返す（押下の後に読み直し終わるまで busy を保つため）。
   const refresh = useCallback(() => {
-    invoke<RecordingStatusDto>("get_recording_status")
+    return invoke<RecordingStatusDto>("get_recording_status")
       .then((s) => {
         setStatus(s);
         setError(null);
@@ -236,11 +238,19 @@ const RecordingControls: React.FC = () => {
       .finally(() => setBusy(false));
   };
 
-  const togglePause = () => {
+  // ⚠️★★★ 止めると再開は**別のボタン**にし、送る向きをボタンごとに固定する (2026-10-31)。
+  //   ★ 旧実装は 1 つのボタンが押すたびに向きを変え (`!status.paused` を送る)、
+  //   止めた後に確かめるつもりで同じ場所を押すと**記録が再開した** (実機で 2 回観測・
+  //   `.steering/20261031-pause-auto-resume/results.md`)。
+  // ★ 再開だけ、窓を前に出すクリックを捨てる (firstMouseGuard.ts・decisions.md 判断 7)。
+  //   ⚠️ 「すぐ止める」には付けない（1 回で止まる約束）。
+  const resumeGuard = useFirstMouseGuard();
+
+  const setPaused = (next: boolean) => {
     if (!status) return;
     setBusy(true);
     // ⚠️★★★ 理由を聞かない。★ 確認ダイアログも出さない（「すぐ止める」が約束である）。
-    invoke<boolean>("set_recording_paused", { paused: !status.paused })
+    invoke<boolean>("set_recording_paused", { paused: next })
       .then(() => refresh())
       .catch((e) => setError(typeof e === "string" ? e : String(e)))
       .finally(() => setBusy(false));
@@ -309,15 +319,30 @@ const RecordingControls: React.FC = () => {
                 ? "記録を止めています（このあいだは何も記録されません）"
                 : "記録しています"}
         </strong>
+        {/* ★ 止めた後は同じ場所を押せない「止めています」にする（押し直しても再開しない）。 */}
         <button
           type="button"
-          onClick={togglePause}
-          disabled={busy || status === null}
+          onClick={() => setPaused(true)}
+          disabled={busy || status === null || paused}
           style={{ marginLeft: "auto" }}
         >
-          {paused ? "記録を再開する" : "すぐ止める"}
+          {paused ? "止めています" : "すぐ止める"}
         </button>
       </div>
+
+      {/* ★ 再開は止めているときだけ、別の行に出す（「すぐ止める」と同じ場所に置かない）。 */}
+      {paused && (
+        <div style={{ marginTop: "0.5rem" }}>
+          <button
+            type="button"
+            onPointerDown={resumeGuard.onPointerDown}
+            onClick={() => resumeGuard.guardClick(() => setPaused(false))}
+            disabled={busy}
+          >
+            記録を再開する
+          </button>
+        </div>
+      )}
 
       {/* ⚠️★★★ **黙って赤くしない。** ★ 何が壊れているかと、次に何をすればよいかを出す。 */}
       {broken && status?.health_detail && (

@@ -2015,8 +2015,9 @@ fn declare_task_kind(
 /// ⚠️★★★ **理由を聞かない。** ★ 同意文書 §4 の逐語「**理由を聞きません**」。
 ///
 /// ★ 状態が**変わったときだけ** `recording_pause` 行を書く（⚠️ 連打の回数を残さない）。
-/// ⚠️ 「止める」方向の行は **`set_paused` の前**に送る —— ★ 後に送ると自分自身が
-/// 一時停止ゲートに落ちて、**止めた事実が記録されない**。
+/// ★ 行は `set_paused` の**後**に送ってよい。ロガーはグローバルのフラグではなく
+/// ストリームの `RecordingPause` 行で止まる・再開する（`logger.rs` の書き出しの入口）ので、
+/// 「止める」の行自身がゲートに落ちることはない（2026-10-31 にコメントを実装に合わせた）。
 #[tauri::command]
 fn set_recording_paused(paused: bool, log: State<Arc<Mutex<LogState>>>) -> bool {
     let now = SystemTime::now()

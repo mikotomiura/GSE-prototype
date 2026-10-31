@@ -6,6 +6,7 @@ import Dashboard from "./components/Dashboard";
 import Overlay from "./components/Overlay";
 import VignetteTest from "./components/VignetteTest";
 import type { TaskKind } from "./probeTypes";
+import { useFirstMouseGuard } from "./firstMouseGuard";
 import "./App.css";
 
 // Task C: session_meta の task_kind 宣言 (start 画面のセレクタ)。
@@ -173,6 +174,8 @@ function App() {
   // overlay なら最初からセッション開始済みとして扱う。
   const currentWindow = useMemo(() => getCurrentWindow(), []);
   const windowLabel = currentWindow.label;
+  // ★ 窓を前に出すクリックを G1 の送信の同意に混ぜない (firstMouseGuard.ts)。
+  const approveGuard = useFirstMouseGuard();
   const [isStarted, setIsStarted] = useState(windowLabel === "overlay");
   const [keyboardIdleMs, setKeyboardIdleMs] = useState(0);
   const [hookActive, setHookActive] = useState<boolean | null>(null);
@@ -638,7 +641,8 @@ function App() {
             </span>
             <div style={{ display: "flex", gap: "0.6rem", marginTop: "0.7rem" }}>
               <button
-                onClick={async () => {
+                onPointerDown={approveGuard.onPointerDown}
+                onClick={() => approveGuard.guardClick(async () => {
                   setApproveError(null);
                   setApproving(true);
                   try {
@@ -654,7 +658,7 @@ function App() {
                   } finally {
                     setApproving(false);
                   }
-                }}
+                })}
                 disabled={approving}
                 style={{
                   padding: "0.45rem 1.1rem",

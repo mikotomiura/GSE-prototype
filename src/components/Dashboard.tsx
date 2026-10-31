@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import RecordingControls from "./RecordingControls";
+import { useFirstMouseGuard } from "../firstMouseGuard";
 
 interface DiagnosticInfo {
   hook_active: string;
@@ -87,6 +88,8 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, keyboardIdleMs, hookActive, calibrationMode = false, o1Mode = false }) => {
+  // ★ 窓を前に出すクリックを自己ラベルに混ぜない (firstMouseGuard.ts)。
+  const selfMarkerGuard = useFirstMouseGuard();
   // セッション経過時間 (ストップウォッチ)
   const sessionStartRef = useRef(Date.now());
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -569,7 +572,8 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
         className={`self-stuck-button ${stuckMarked ? 'marked' : ''}`}
         disabled={stuckMarked}
         aria-label="今とても詰まっていると感じたら記録する自己ラベル"
-        onClick={() => {
+        onPointerDown={selfMarkerGuard.onPointerDown}
+        onClick={() => selfMarkerGuard.guardClick(() => {
           invoke<boolean>("record_self_marker")
             .then((recorded) => {
               // デバウンスで弾かれた (false) ときは確認表示を出さない。
@@ -578,7 +582,7 @@ const Dashboard: React.FC<DashboardProps> = ({ cognitiveState, onQuit, onBack, k
               setTimeout(() => setStuckMarked(false), 1500);
             })
             .catch((e) => console.error("record_self_marker failed:", e));
-        }}
+        })}
         title="今とても詰まっていると感じたら押す (Ctrl+Shift+Alt+D)"
       >
         {stuckMarked ? '✓ 記録しました' : '🔴 今とても詰まっている'}
