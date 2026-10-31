@@ -23,3 +23,16 @@
 
 - 返答・記録・AskUserQuestion は日本語、記号を多用しない。決めることは推奨と理由を添えて AskUserQuestion で 1 件 1 問。
 - ADR 本文は書き換えない。研究の主張は研究者のもの。
+
+## 2026-10-31 追記: 同日中に進んだこと（このメモの上の「次にやること」の多くは済んだ）
+
+- 判断 7〜17 を `.steering/20261031-gse-small-n-research-design/decisions.md` に記録した。位置づけの改訂（作業上の認知状態を推定し、詰まる前に介入を促して身体回帰の機会を差し出す）・Nudge を本体で出さない（ADR-040）・「詰まる前」は friction_rising で始めて将来ハザードへ・主要アウトカムは ADR-024 据え置き＋副・1 段目は招待を {推定器 / 無作為 / なし}。
+- research-positioning・WBS・glossary・README（日・英）・agent-shared を改訂し、ADR-040 を起こした（コミット 45064fe6・/cross-review 済み）。
+- 文献の 2 ラウンド目: `docs/literature/20261031-non-human-substitutes-small-n.md`（[V312]〜[V347]）。
+
+次にやること:
+1. 別タスク（`/start-task`）: Nudge の既定を無効にする（ADR-040 Migration 1）。
+2. 別タスク: 招待に friction_rising の契機・無作為の時刻の条件・通常のモードの配線・`gse-replay` での再現を足す（ADR-040 Migration 2）。
+3. 研究者本人の記録で詰まりの件数を数え、friction_rising の値とシミュレーションの前提を決める（WBS の A0）。
+4. 事前登録の項目（ADR-040 Migration 3）。
+5. PR はまだ出していない（研究者が確かめてから）。
