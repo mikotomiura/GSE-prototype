@@ -11,7 +11,7 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
-| **GSE 本体: Nudge の既定の無効化と招待の配線**（ADR-040 Migration 1・2・実装・下の行と並行可） | **`next-session-gse-nudge-off-and-invitation-wiring.md`**（2026-10-31） | **現行**。決定は `.steering/20261031-gse-small-n-research-design/decisions.md` 判断 10〜18 |
+| **GSE 本体: Nudge の既定の無効化と招待の配線**（ADR-040 Migration 1・2・実装・下の行と並行可） | `next-session-gse-nudge-off-and-invitation-wiring.md`（2026-10-31）→ **`next-session-gse-invitation-wiring.md`**（2026-10-31・タスク B） | タスク A は `feature/nudge-default-off` でコミット済み・未 push（G-GEAR の空き待ち）。**タスク B が現行**（研究者の決定 2 件を記載）。決定の元は `.steering/20261031-gse-small-n-research-design/decisions.md` 判断 10〜18 |
 | **GSE: 公開データ・既存の資産の当てはめ（少人数の弱いところを補う・項目 1 → 2 → 3）**（上の行と並行可） | **`next-session-gse-public-data-fit.md`**（2026-10-31） | **現行**。IME 論文 2 の仕組みは読むだけで使う |
 | ~~GSE: 少人数の研究設計（research-positioning・WBS の改訂案）~~ | `next-session-gse-small-n-design-revision.md`（2026-10-31） | 完了（同日・判断 10〜17・ADR-040）。上の 2 行へ |
 | **公開データでの照合の論文: 凍結 → 取得 → 検査 → 本計算**（PoPETs 2027 Issue 3・締切 2026-11-30 AoE を目標・G-GEAR） | **`next-session-public-keystroke-matching-research-forward.md`**（2026-10-12） | **現行**。事前登録は下書き 8（未凍結）・合成の記録の検査は済み（PR #358）。判断 51: KLiCKe の返事を待たずに進める。ただし凍結（OSF）が取得より先。取得の後は記録と本文の中身を Claude も読まない（集計だけ）。前の `next-session-public-keystroke-matching-freeze.md` を置き換える |
