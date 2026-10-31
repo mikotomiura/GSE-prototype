@@ -6,7 +6,9 @@
 - [x] 第二の案（codex-consult）→ design.md 案 B
 - [x] 文献の接地（/literature-review）→ docs/literature/20261031-small-n-within-person-design.md
 - [x] 案を並べて研究者が選ぶ（判断 6: 段で重ねる）
-- [ ] decisions.md に記録・必要なら research-positioning の改訂案
+- [ ] research-positioning と WBS の改訂案（判断 10〜14 を反映・研究者の承認の後に反映）
+- [ ] 別タスク: Nudge を本体で出さない ADR と既定の変更（判断 14-3）
+- [ ] 別タスク: 招待に friction_rising の契機と無作為の時刻の条件を足す（判断 13・14-2）
 
 ## 2 ラウンド目: 人を使わない技術で補えるか（研究者の問い・2026-10-31）
 
