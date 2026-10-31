@@ -212,6 +212,8 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
             let mut last = initial;
             // 通常のモード: 項目をいま差し込んでいるか
             let mut invitation_shown = false;
+            // 差し込みの失敗は最初の 1 回だけ警告する(毎秒の連投を避ける・内容は書かない)
+            let mut insert_failure_warned = false;
             loop {
                 std::thread::sleep(Duration::from_millis(1000));
                 // ★ 終了処理が始まったら抜ける。⚠️ 落ちるまでの数百 ms のあいだ
@@ -227,6 +229,10 @@ pub fn setup(app: &AppHandle, session_active: Arc<AtomicBool>) -> tauri::Result<
                     if want && !invitation_shown {
                         // 状態表示・区切りの次（静的な並びの「印の説明と設定」と同じ位置）
                         invitation_shown = menu.insert(item, 2).is_ok();
+                        if !invitation_shown && !insert_failure_warned {
+                            insert_failure_warned = true;
+                            tracing::warn!("tray invitation item could not be inserted");
+                        }
                     } else if !want && invitation_shown && menu.remove(item).is_ok() {
                         invitation_shown = false;
                     }

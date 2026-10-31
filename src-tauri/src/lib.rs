@@ -1047,9 +1047,29 @@ static INVITATION_PRESENT: AtomicBool = AtomicBool::new(false);
 /// 偽が既定で、`start_session` と宣言の受付の入り口で偽に戻す（fail-closed）。第 1 週・O1・G1 では真にならない。
 static NORMAL_INVITATION_ALLOWED: AtomicBool = AtomicBool::new(false);
 
+/// 通常のモードの招待の「世代」。セッションの終了・開始・宣言のたびに進め、分析スレッドの
+/// `InvitationRunner` が状態機械(提示・停滞の区間・履歴)を作り直す(前の状態を引き継がない)。
+static INVITATION_RESET_GEN: AtomicU64 = AtomicU64::new(0);
+
+/// 通常のモードの招待を閉じる(セッションの終了・宣言の受付の入口)。許可と図像を下ろし、状態機械を作り直させる。
+/// EH3 の図像は触らない。
+fn close_normal_invitation() {
+    if crate::eh3::is_eh3() {
+        return;
+    }
+    NORMAL_INVITATION_ALLOWED.store(false, Ordering::Release);
+    INVITATION_PRESENT.store(false, Ordering::Release);
+    INVITATION_RESET_GEN.fetch_add(1, Ordering::AcqRel);
+}
+
 /// 通常のモードで、いま招待が許されているか（トレイの項目の出し入れが読む）。
 pub(crate) fn normal_invitation_allowed_now() -> bool {
     NORMAL_INVITATION_ALLOWED.load(Ordering::Acquire)
+}
+
+/// 招待の設定を保存してよい走行か(EH3、または O1・G1 でない通常のモード)。設定の窓を作る条件と同じ。
+fn invitation_settings_editable() -> bool {
+    crate::eh3::is_eh3() || (!crate::o1::is_o1() && g1_mode().is_none())
 }
 
 /// 招待を出してよい走行か（EH3、または通常のモードで招待を許すセッション）。
@@ -1091,8 +1111,10 @@ fn get_invitation_settings() -> crate::analysis::invitation::Settings {
 /// ⚠️ 設定の変更は記録しない（NDJSON・applog とも）。状態機械の控えも解かない（外枠だけが変わる・ADR-035 D4）。
 #[tauri::command]
 fn set_invitation_settings(settings: crate::analysis::invitation::Settings) -> Result<(), String> {
-    if !invitation_surface_active() {
-        return Err("EH3 mode is not active".into());
+    // EH3 は今のまま。通常のモードは O1・G1 でなければ常に保存できる(設定の窓を作る条件と同じ。
+    // 第 2 週でない間も、本人が設定を戻しておける)。
+    if !invitation_settings_editable() {
+        return Err("この記録では招待の設定を変えられません。".into());
     }
     let path = crate::eh3::invitation_settings_path()
         .ok_or_else(|| "保存先 (~/.gse) を解決できませんでした。".to_string())?;
@@ -1124,9 +1146,34 @@ pub(crate) fn show_invitation_settings_window(app: &tauri::AppHandle) -> Result<
 /// 説明と設定の窓のラベル（`capabilities/default.json` の `windows` にも載せる）。
 const INVITATION_SETTINGS_LABEL: &str = "invitation-settings";
 
+/// 招待の状態機械の作り方。
+#[derive(Clone, Copy)]
+enum MachineBuild {
+    /// EH3: 割り当ての段の契機。
+    Eh3(crate::analysis::invitation::Trigger),
+    /// 通常のモード: 研究者の設定の契機(セッションの開始時刻で無作為の seed を導く)。
+    Normal(crate::analysis::invitation::TriggerKind),
+}
+
+impl MachineBuild {
+    fn make(self) -> crate::analysis::invitation::InvitationMachine {
+        use crate::analysis::invitation::InvitationMachine;
+        match self {
+            MachineBuild::Eh3(t) => InvitationMachine::with_trigger(t),
+            MachineBuild::Normal(k) => {
+                InvitationMachine::with_kind_session(k, SESSION_START_MS.load(Ordering::Acquire))
+            }
+        }
+    }
+}
+
 /// EH3: 分析スレッドで招待の状態機械を 1 秒に 1 回進める薄い殻（OS 依存の値をここで集め、純ロジックへ渡す）。
 struct InvitationRunner {
     machine: crate::analysis::invitation::InvitationMachine,
+    /// 状態機械の作り方(世代が進んだら作り直す)。
+    build: MachineBuild,
+    /// 見た世代(`INVITATION_RESET_GEN`)。
+    reset_gen: u64,
     last_tick_ms: Option<u64>,
     last_day: Option<i64>,
     /// 最後の打鍵の時刻（離席候補の判定にだけ使う）。⚠️ 記録の一時停止中の打鍵は入れない。
@@ -1146,9 +1193,11 @@ impl InvitationRunner {
 
     /// `machine` は契機を決めて作った状態機械。EH3 は割り当ての段の契機（`eh3::TriggerStage::trigger`）、
     /// 通常のモードは研究者の設定ファイル（`invitation_trigger::process_config`）で作る。
-    fn new(machine: crate::analysis::invitation::InvitationMachine) -> Self {
+    fn new(build: MachineBuild) -> Self {
         Self {
-            machine,
+            machine: build.make(),
+            build,
+            reset_gen: INVITATION_RESET_GEN.load(Ordering::Acquire),
             last_tick_ms: None,
             last_day: None,
             last_press_ms: None,
@@ -1184,6 +1233,19 @@ impl InvitationRunner {
         offset: &mut UtcOffsetCache,
         assigned_today: bool,
     ) -> Option<u64> {
+        // 通常のモード: セッションの終了・開始・宣言で世代が進んだら、状態機械と時刻の控えを作り直す
+        // (提示・停滞の区間・履歴を前のセッションから引き継がない)。EH3 は世代が進まない。
+        let gen = INVITATION_RESET_GEN.load(Ordering::Acquire);
+        if gen != self.reset_gen {
+            self.reset_gen = gen;
+            self.machine = self.build.make();
+            self.last_tick_ms = None;
+            self.last_day = None;
+            self.last_press_ms = None;
+            self.p_stuck = 0.0;
+            self.p_stuck_at_ms = 0;
+            self.stall_blocked_until_ms = 0;
+        }
         let paused = crate::recording::is_paused();
         if paused {
             self.stall_blocked_until_ms = now_ms + Self::FEATURE_WINDOW_MS;
@@ -3096,7 +3158,7 @@ fn record_session_meta(
     }
 
     // 通常のモードの招待: 宣言を受け付けた時点で一旦閉じる（以降の検証で落ちたら閉じたまま・fail-closed）。
-    NORMAL_INVITATION_ALLOWED.store(false, Ordering::Release);
+    close_normal_invitation();
 
     let track = Track::parse(&track).ok_or_else(|| format!("invalid track: {:?}", track))?;
     let task_kind =
@@ -3179,10 +3241,13 @@ fn record_session_meta(
                 .try_send(LogEntry::InvitationCondition {
                     timestamp: epoch_ms(),
                     kind,
+                    session_start_ms: SESSION_START_MS.load(Ordering::Acquire),
                 })
                 .is_ok();
             if sent {
                 NORMAL_INVITATION_ALLOWED.store(true, Ordering::Release);
+                // 状態機械を、このセッションの開始時刻から導いた seed で作り直させる
+                INVITATION_RESET_GEN.fetch_add(1, Ordering::AcqRel);
             } else {
                 tracing::warn!("invitation condition row could not be sent; invitations are off");
             }
@@ -3724,7 +3789,7 @@ fn start_session(
     // record_session_meta が来るまで較正プロファイル選択は確定しない (race 排除)。明示リセットは不要
     // (世代照合が staleness を吸収する)。
     // 通常のモードの招待: 新しいセッションの宣言（`record_session_meta`）が通るまで閉じる（前のセッションの許可を持ち越さない）。
-    NORMAL_INVITATION_ALLOWED.store(false, Ordering::Release);
+    close_normal_invitation();
     SESSION_START_MS.store(now, Ordering::Release);
 
     // ⚠️★★★ **ここでブロック遷移の排他を離す** (D-1)。
@@ -3808,6 +3873,8 @@ fn shutdown(app: &tauri::AppHandle, log: &Arc<Mutex<LogState>>) {
         return;
     }
     tracing::info!("shutdown requested");
+    // 通常のモードの招待: 終了の処理で許可と図像を下ろす（提示中に終了して再開しても引き継がない）。
+    close_normal_invitation();
     // EH3: 肖像の「終わり」（A-seed なら seed）を書いてから `End` を送る。待ち合わせはこの関数を呼んだ
     //   スレッド（メインのことがある）ではなく、下のバックグラウンドのスレッドで行う。
     let portrait_end = crate::eh3::is_eh3() && WALL_TX.get().is_some();
@@ -4233,16 +4300,16 @@ pub fn run() {
         //   通常のモード（EH3・O1・G1 でない）でも作る。出すかはセッションの宣言が決める
         //   （`NORMAL_INVITATION_ALLOWED`）。契機は研究者の設定ファイル（読めなければ出さない）。
         let mut invitation = match crate::eh3::assignment() {
-            Some(a) => Some(InvitationRunner::new(
-                crate::analysis::invitation::InvitationMachine::with_trigger(a.trigger.trigger()),
-            )),
-            None if !o1_always_on && g1_mode().is_none() => Some(InvitationRunner::new(
-                crate::analysis::invitation::InvitationMachine::with_kind(
+            Some(a) => Some(InvitationRunner::new(MachineBuild::Eh3(
+                a.trigger.trigger(),
+            ))),
+            None if !o1_always_on && g1_mode().is_none() => {
+                Some(InvitationRunner::new(MachineBuild::Normal(
                     crate::invitation_trigger::process_config()
                         .usable()
                         .unwrap_or(crate::analysis::invitation::TriggerKind::Off {}),
-                ),
-            )),
+                )))
+            }
             None => None,
         };
         let mut eh3_was_paused = crate::recording::is_paused();
@@ -4281,6 +4348,10 @@ pub fn run() {
                 // 通常のモード: セッションが無い間は招待の図像を残さない（状態機械は止まっているので、
                 // 次のセッションの最初の tick が失効・区切りで閉じる）。
                 if !crate::eh3::is_eh3() {
+                    if NORMAL_INVITATION_ALLOWED.load(Ordering::Acquire) {
+                        // セッションが終わった(許可が残っている)→ 許可・図像・状態機械を片づける
+                        close_normal_invitation();
+                    }
                     INVITATION_PRESENT.store(false, Ordering::Release);
                 }
                 // ★ G1: 「もうこのスレッドは LogEntry を投げない」ことの表明。
@@ -5828,7 +5899,7 @@ pub fn run() {
             // EH3: 招待の説明と設定の窓を隠したまま先に作る（overlay と同じく setup のメインスレッドで作る・
             //   Windows のデッドロックの回避）。閉じるボタンは隠すだけにする。
             //   通常のモードでも作る（O1・G1 を除く）: 第 2 週の招待の図像から開くため。
-            if crate::eh3::is_eh3() || (!crate::o1::is_o1() && g1_mode().is_none()) {
+            if invitation_settings_editable() {
                 match tauri::WebviewWindowBuilder::new(
                     app,
                     INVITATION_SETTINGS_LABEL,
@@ -6754,5 +6825,61 @@ mod debug_readout_tests {
             !head[gate..].contains(")}"),
             "debugView gate が読み出しブロックの前で閉じている (被験者に出てしまう)"
         );
+    }
+}
+
+#[cfg(test)]
+mod invitation_reset_tests {
+    use super::*;
+    use crate::analysis::invitation::{Settings, TickInput, Trigger, TriggerKind};
+
+    fn input(now_ms: u64, p_stuck: f64) -> TickInput {
+        TickInput {
+            now_ms,
+            local_day: 100,
+            minute_of_day: 600,
+            p_stuck,
+            idle_ms: 0,
+            research_enabled: true,
+            recording_active: true,
+            settings: Settings::default(),
+            session_boundary: false,
+        }
+    }
+
+    /// セッションの終了で許可・図像が下り、状態機械の世代が進む(通常のモード)。
+    #[test]
+    fn closing_the_normal_invitation_clears_the_flags_and_bumps_the_generation() {
+        NORMAL_INVITATION_ALLOWED.store(true, Ordering::Release);
+        INVITATION_PRESENT.store(true, Ordering::Release);
+        let before = INVITATION_RESET_GEN.load(Ordering::Acquire);
+        close_normal_invitation();
+        assert!(!NORMAL_INVITATION_ALLOWED.load(Ordering::Acquire));
+        assert!(!INVITATION_PRESENT.load(Ordering::Acquire));
+        assert!(INVITATION_RESET_GEN.load(Ordering::Acquire) > before);
+    }
+
+    /// 世代が進んだときに作り直す状態機械は、提示も停滞の履歴も持たない
+    /// (提示中に終了してすぐ再開しても前の提示・区間を引き継がない)。
+    #[test]
+    fn a_rebuilt_machine_carries_neither_the_presentation_nor_the_stall_history() {
+        let build = MachineBuild::Normal(TriggerKind::from(Trigger::MAIN));
+        let t0: u64 = 1_760_000_000_000;
+        let mut old = build.make();
+        let mut shown = false;
+        for s in 0..40u64 {
+            shown |= old.tick(&input(t0 + s * 1000, 0.9)).presented;
+        }
+        assert!(shown && old.is_present(), "前提: 提示中");
+        // 作り直す
+        let mut fresh = build.make();
+        assert!(!fresh.is_present());
+        // 再開直後に高い p_stuck が続いても、保持の 30 秒を新しく数え直す(すぐには立たない)
+        let resume = t0 + 41_000;
+        for s in 0..30u64 {
+            let out = fresh.tick(&input(resume + s * 1000, 0.9));
+            assert!(!out.triggered && !out.presented, "{s}");
+        }
+        assert!(fresh.tick(&input(resume + 30_000, 0.9)).presented);
     }
 }
