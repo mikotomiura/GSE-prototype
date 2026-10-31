@@ -156,7 +156,12 @@ pub fn line_timestamp(line: &str) -> Option<u64> {
     // ⚠️★★★ **`meta` / `session_meta` 行は消さない**（上記 R-12 / ADR-031 D6 決定 3）。
     //   ★ 行種で弾くので、将来これらに時刻フィールドが増えても**自動的に守られる**。
     let line_type = obj.get("type").and_then(serde_json::Value::as_str);
-    if matches!(line_type, Some("meta") | Some("session_meta")) {
+    //   ★ `invitation_condition`（招待の契機の種類と値・推定器の版）も同じ側（セッションの条件の行）。
+    //   消すとそのファイルの招待の条件が読めなくなる（ADR-040 D4・2026-11-01 研究者の決定）。
+    if matches!(
+        line_type,
+        Some("meta") | Some("session_meta") | Some("invitation_condition")
+    ) {
         return None;
     }
     // ★ 既定は `"t"`。⚠️ 別名を書く行種だけを**明示列挙**する（ADR-031 D6）。
@@ -607,7 +612,7 @@ mod tests {
             let line_type = &rest[..q];
 
             // ★ `meta` / `session_meta` は**常に残す**側である (D6 決定 3)。
-            if matches!(line_type, "meta" | "session_meta") {
+            if matches!(line_type, "meta" | "session_meta" | "invitation_condition") {
                 continue;
             }
 
@@ -656,7 +661,7 @@ mod tests {
         let expected: std::collections::BTreeSet<&str> = crate::capabilities::KNOWN_LINE_TYPES
             .iter()
             .copied()
-            .filter(|t| !matches!(*t, "meta" | "session_meta"))
+            .filter(|t| !matches!(*t, "meta" | "session_meta" | "invitation_condition"))
             .collect();
         assert_eq!(
             checked, expected,
@@ -776,6 +781,22 @@ mod tests {
             line_timestamp(r#"{"type":"meta","session_start":500,"hmm_version":"0.5.0"}"#),
             None
         );
+    }
+
+    /// `invitation_condition` も `session_meta` と同じく区間削除で消さない（ADR-040 D4）。
+    /// 時刻キーが `t` でも行種で弾く（`session_meta_is_never_redacted_like_meta` と対）。
+    #[test]
+    fn invitation_condition_is_never_redacted() {
+        let line = r#"{"type":"invitation_condition","t":1000,"condition":"estimator","p_stuck":0.6,"hold_ms":30000,"hmm_version":"0.5.0"}"#;
+        assert_eq!(line_timestamp(line), None);
+        // 対照: 同じ時刻の招待の提示は時刻を持つ（消える側）
+        assert_eq!(
+            line_timestamp(r#"{"type":"invitation_present","t":1000}"#),
+            Some(1000)
+        );
+        let (kept, removed) = retain_outside_range([line], 500, 5000);
+        assert_eq!(removed, 0);
+        assert_eq!(kept.len(), 1);
     }
 
     /// ★ 通しの回帰: **自己申告行が実際に落ちて、`session_meta` と `meta` は残る**。
