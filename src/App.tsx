@@ -281,32 +281,65 @@ function App() {
   // 3. 統合ポーリング (500ms): cognitive state + keyboard idle + intervention decision
   //    単一の setInterval 内で Promise.all で並行取得し、同じブロック内で
   //    Rust 側の Opportunity 判定結果を UI に反映する。
-  //    これにより interval の破棄・再作成が発生せず、タイマー精度が向上する。
+  //    これにより interval の破棄・再作成が発生せず、タイマー精度が向上する
+  //    (張り直すのは isStarted・windowLabel・o1Mode が変わったときだけ)。
+  //
+  //    使わない分は取らない (refactor/trim-ui-polling・2026-10-31)。
+  //    ⚠️ 主窓の get_intervention_decision は表示用の読み出しではなく、介入の判定を進める時計
+  //    (判定の行の記録もここ)。通常運用と G1 では、窓が見えなくても呼ぶのを止めない。
+  //    ただし WebKit は隠れた窓のタイマーを間引く (macOS で最小化すると 1 秒に 1 回になると実測した。
+  //    直す前から同じ。Windows の WebView2 は未確認)。最小化で visibilityState が hidden になることも
+  //    macOS で実測した (.steering/20261031-trim-ui-polling/results.md)。
+  //    - overlay: 判定の結果だけを使う (<Overlay> しか描かない)。
+  //    - O1: 介入は必ず切ってあり (lib.rs の O1 の初期化)、推定状態も出さない (ブラインド)。
+  //      要るのは KEYBOARD の表示に使う無打鍵の時間だけで、見えない間はそれも取らない。
+  //    - 通常運用・G1 の主窓: 見えない間は表示用の 2 本 (状態・無打鍵の時間) を取らない。
+  //    O1 の判定がまだ (o1Mode === undefined) の間は O1 ではないものとして扱い、判定の時計を回す。
   useEffect(() => {
     if (!isStarted) return;
 
-    const interval = setInterval(async () => {
+    const isOverlay = windowLabel === "overlay";
+    const isO1 = !!o1Mode;
+
+    // clock=false は表示の取り直しだけ (判定の時計を余分に進めない)。
+    const tick = async (clock: boolean) => {
+      const visible = document.visibilityState !== "hidden";
+      const wantState = !isOverlay && !isO1 && visible;
+      const wantIdle = !isOverlay && visible;
+      const wantDecision = clock && (isOverlay || !isO1);
+      if (!wantState && !wantIdle && !wantDecision) return;
       try {
         const [state, idle, decision] = await Promise.all([
-          invoke<CognitiveStateRaw>("get_cognitive_state"),
-          invoke<number>("get_keyboard_idle_ms"),
-          invoke<InterventionDecision>("get_intervention_decision", {
-            windowLabel,
-          }),
+          wantState ? invoke<CognitiveStateRaw>("get_cognitive_state") : null,
+          wantIdle ? invoke<number>("get_keyboard_idle_ms") : null,
+          wantDecision
+            ? invoke<InterventionDecision>("get_intervention_decision", {
+                windowLabel,
+              })
+            : null,
         ]);
-        setCognitiveState(state);
-        setKeyboardIdleMs(idle);
-        setInterventionDecision(decision);
-
+        if (state !== null) setCognitiveState(state);
+        if (idle !== null) setKeyboardIdleMs(idle);
+        if (decision !== null) setInterventionDecision(decision);
       } catch (e) {
         console.error("Failed to fetch state:", e);
-        setCognitiveState({ flow: 1.0, incubation: 0.0, stuck: 0.0 });
-        setInterventionDecision(DEFAULT_INTERVENTION_DECISION);
+        if (wantState) setCognitiveState({ flow: 1.0, incubation: 0.0, stuck: 0.0 });
+        if (wantDecision) setInterventionDecision(DEFAULT_INTERVENTION_DECISION);
       }
-    }, 500);
+    };
 
-    return () => clearInterval(interval);
-  }, [isStarted, windowLabel]);
+    const interval = setInterval(() => void tick(true), 500);
+    // 見えるようになったら、次の 500ms を待たずに表示を取り直す。
+    const onVisibility = () => {
+      if (document.visibilityState !== "hidden") void tick(false);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [isStarted, windowLabel, o1Mode]);
 
   // 4b. G1 モードの取得 (起動時 1 回)。null なら通常運用で、画面には何も足さない。
   //     ⚠️ ★ G1 実施者は「G1 モード」の表示が出ていることを開始前に確認する
