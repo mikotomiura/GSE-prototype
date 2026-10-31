@@ -1,0 +1,50 @@
+{
+ "ended": {
+  "d_p_stuck": {
+   "mean_ai": -0.024486034510783062,
+   "n_ai": 314,
+   "mean_self": -0.02215691916769102,
+   "n_self": 307,
+   "writers_both_ge3": 12,
+   "auc_ai_gt_self_median": 0.531060606060606
+  },
+  "d_ewma_x": {
+   "mean_ai": -0.04031838562342398,
+   "n_ai": 314,
+   "mean_self": -0.08705782869925438,
+   "n_self": 307,
+   "writers_both_ge3": 12,
+   "auc_ai_gt_self_median": 0.5393939393939393
+  }
+ },
+ "threshold": {
+  "d_p_stuck": {
+   "0.8": {
+    "stall_hit_rate_median": 0.16233766233766234,
+    "control_exceed_rate_median": 0.18544973544973545
+   },
+   "0.9": {
+    "stall_hit_rate_median": 0.07142857142857142,
+    "control_exceed_rate_median": 0.08571428571428572
+   },
+   "0.95": {
+    "stall_hit_rate_median": 0.028991596638655463,
+    "control_exceed_rate_median": 0.04
+   }
+  },
+  "d_ewma_x": {
+   "0.8": {
+    "stall_hit_rate_median": 0.19375,
+    "control_exceed_rate_median": 0.18571428571428572
+   },
+   "0.9": {
+    "stall_hit_rate_median": 0.08831168831168831,
+    "control_exceed_rate_median": 0.08571428571428572
+   },
+   "0.95": {
+    "stall_hit_rate_median": 0.0,
+    "control_exceed_rate_median": 0.04
+   }
+  }
+ }
+}
