@@ -89,6 +89,93 @@ pub fn normal_invitation_allowed(
     declared && !o1 && !g1 && !eh3 && config.usable().is_some()
 }
 
+/// 記録から組んだ 1 tick（`feat` 行 1 行 = 1 tick）。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RecordedTick {
+    /// `feat` 行の時刻（epoch ms）。
+    pub t: u64,
+    pub p_stuck: f64,
+    /// この時刻までの最後の打鍵（押下）の時刻。
+    pub last_press: Option<u64>,
+}
+
+/// 記録から契機を再現した結果（時刻は epoch ms）。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RecordedRun {
+    /// 契機が立った時刻（出したかどうかに依らない）。
+    pub triggered: Vec<u64>,
+    /// 出した時刻（本人の設定の既定・終日・上限 2）。
+    pub presented: Vec<u64>,
+}
+
+/// `feat` 行の列（時刻の狭義単調）と打鍵の押下の時刻から tick を組む。
+///
+/// 打鍵は時刻だけを使う（本文は読まない）。組み方は `examples/invitation_trigger_sweep.rs` と同じ。
+pub fn build_recorded_ticks(feats: &[(u64, f64)], presses: &[u64]) -> Vec<RecordedTick> {
+    let mut presses = presses.to_vec();
+    presses.sort_unstable();
+    let mut k = 0;
+    let mut last_press = None;
+    feats
+        .iter()
+        .map(|&(t, p_stuck)| {
+            while k < presses.len() && presses[k] <= t {
+                last_press = Some(presses[k]);
+                k += 1;
+            }
+            RecordedTick {
+                t,
+                p_stuck,
+                last_press,
+            }
+        })
+        .collect()
+}
+
+/// 記録の tick を、実機と同じ状態機械（`InvitationMachine`）で回して契機と提示の時刻を返す。
+///
+/// 殻（`lib.rs` の `InvitationRunner`）と同じく、`feat` 行が 30 秒以上空いたらセッションの区切りとし、
+/// 現地の日（4:00 区切り）が変わったら区切る。記録の一時停止・割り当て済みの日の判定は再現しない
+/// （研究の条件は常に真）。
+pub fn replay_recorded(
+    ticks: &[RecordedTick],
+    kind: TriggerKind,
+    utc_offset_secs: i32,
+) -> RecordedRun {
+    use crate::analysis::invitation::{InvitationMachine, Settings, TickInput};
+    // 殻の `InvitationRunner::GAP_AS_BOUNDARY_MS` と同じ。
+    const GAP_AS_BOUNDARY_MS: u64 = 30_000;
+    let mut m = InvitationMachine::with_kind(kind);
+    let mut run = RecordedRun::default();
+    let mut prev: Option<u64> = None;
+    let mut last_day: Option<i64> = None;
+    for r in ticks {
+        let day = crate::eh3::local_day(r.t, utc_offset_secs);
+        let boundary = prev.is_some_and(|q| r.t.saturating_sub(q) >= GAP_AS_BOUNDARY_MS)
+            || last_day.is_some_and(|d| d != day);
+        prev = Some(r.t);
+        last_day = Some(day);
+        let out = m.tick(&TickInput {
+            now_ms: r.t,
+            local_day: day,
+            minute_of_day: crate::eh3::local_minute_of_day(r.t, utc_offset_secs),
+            p_stuck: r.p_stuck,
+            idle_ms: r.last_press.map_or(u64::MAX, |p| r.t.saturating_sub(p)),
+            research_enabled: true,
+            recording_active: true,
+            settings: Settings::default(),
+            session_boundary: boundary,
+        });
+        if out.triggered {
+            run.triggered.push(r.t);
+        }
+        if out.presented {
+            run.presented.push(r.t);
+        }
+    }
+    run
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,5 +270,66 @@ mod tests {
             false,
             TriggerConfig::Kind(TriggerKind::Off {})
         ));
+    }
+
+    const T0: u64 = 1_760_000_000_000;
+
+    /// 1 秒 1 行の記録。`p` は経過秒 → p_stuck。打鍵は毎秒（離席候補にならない）。
+    fn recorded(secs: u64, p: &dyn Fn(u64) -> f64) -> Vec<RecordedTick> {
+        let feats: Vec<(u64, f64)> = (0..secs).map(|s| (T0 + s * 1000, p(s))).collect();
+        let presses: Vec<u64> = (0..secs).map(|s| T0 + s * 1000).collect();
+        build_recorded_ticks(&feats, &presses)
+    }
+
+    #[test]
+    fn replay_estimator_matches_the_machine() {
+        let ticks = recorded(120, &|s| if s >= 10 { 0.9 } else { 0.1 });
+        let run = replay_recorded(&ticks, TriggerKind::default(), 0);
+        assert_eq!(run.triggered, vec![T0 + 40_000]);
+        assert_eq!(run.presented, vec![T0 + 40_000]);
+    }
+
+    #[test]
+    fn replay_off_and_random_and_rising() {
+        let ticks = recorded(7200, &|s| if (s / 600) % 2 == 1 { 0.9 } else { 0.1 });
+        assert!(replay_recorded(&ticks, TriggerKind::Off {}, 0)
+            .triggered
+            .is_empty());
+        let r = TriggerKind::Random {
+            per_active_hour: 30.0,
+            seed: 5,
+        };
+        let a = replay_recorded(&ticks, r, 0);
+        let b = replay_recorded(&ticks, r, 0);
+        assert_eq!(a, b, "seed から再現する");
+        assert!(!a.triggered.is_empty());
+        assert!(a.presented.len() <= 2, "既定の上限 2");
+        let rising = TriggerKind::Rising {
+            delta: 0.5,
+            window_ms: 10_000,
+        };
+        let c = replay_recorded(&ticks, rising, 0);
+        // 600 秒ごとの 0.1 → 0.9 の立ち上がりで 1 回ずつ（窓 10 秒の中に収まる急な上がりは 1 つの立ち上がり）
+        assert_eq!(c.triggered.len(), 6, "{:?}", c.triggered);
+    }
+
+    #[test]
+    fn replay_gap_and_missing_press_block_triggers() {
+        // 打鍵が無い記録は離席候補で、どの契機も立たない
+        let feats: Vec<(u64, f64)> = (0..300).map(|s| (T0 + s * 1000, 0.9)).collect();
+        let ticks = build_recorded_ticks(&feats, &[]);
+        assert!(replay_recorded(&ticks, TriggerKind::default(), 0)
+            .triggered
+            .is_empty());
+        // 30 秒以上の欠けは区切り（区間が貯まらない）
+        let feats: Vec<(u64, f64)> = (0..25)
+            .map(|s| (T0 + s * 1000, 0.9))
+            .chain((0..25).map(|s| (T0 + 100_000 + s * 1000, 0.9)))
+            .collect();
+        let presses: Vec<u64> = feats.iter().map(|f| f.0).collect();
+        let ticks = build_recorded_ticks(&feats, &presses);
+        assert!(replay_recorded(&ticks, TriggerKind::default(), 0)
+            .triggered
+            .is_empty());
     }
 }

@@ -1532,6 +1532,11 @@ struct Args {
     segments_path: Option<PathBuf>,
     /// --intervention: v2 介入ポリシーをオフライン反実仮想リプレイし HIR/DC 等を算出
     intervention: bool,
+    /// --invitation <trigger.json>: 招待の契機（`TriggerKind` の JSON）を記録から再現し、契機が立った時刻と
+    /// 出した時刻を JSON で出す（ADR-040 D4・`feat` 行の `p_stuck` と `key` 行の押下の時刻だけを読む）。
+    invitation_path: Option<PathBuf>,
+    /// --utc-offset-secs <N>: `--invitation` の現地の日（4:00 区切り）の計算に使う UTC との差（秒・既定 0）。
+    utc_offset_secs: Option<i32>,
     /// --calibration: v0.3 較正解析 (時間隔離窓 C-index / 2段ゲート / MNAR / ビネット)。
     /// 1 被験者の複数セッションを受けるため、追加の positional を `extra_sessions` に積む。
     calibration: bool,
@@ -1629,6 +1634,34 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     } else {
         false
     };
+
+    // --invitation <trigger.json> フラグ (招待の契機の再現)
+    let invitation_path = if let Some(pos) = args.iter().position(|a| a == "--invitation") {
+        if pos + 1 >= args.len() {
+            return Err("--invitation requires a path argument".to_string());
+        }
+        let path = args.remove(pos + 1);
+        args.remove(pos);
+        Some(PathBuf::from(path))
+    } else {
+        None
+    };
+    let utc_offset_secs = if let Some(pos) = args.iter().position(|a| a == "--utc-offset-secs") {
+        if pos + 1 >= args.len() {
+            return Err("--utc-offset-secs requires an integer argument".to_string());
+        }
+        let v = args.remove(pos + 1);
+        args.remove(pos);
+        Some(
+            v.parse::<i32>()
+                .map_err(|_| "--utc-offset-secs requires an integer argument".to_string())?,
+        )
+    } else {
+        None
+    };
+    if utc_offset_secs.is_some() && invitation_path.is_none() {
+        return Err("--utc-offset-secs requires --invitation".to_string());
+    }
 
     // --calibration フラグ (v0.3 較正解析)
     let calibration = if let Some(pos) = args.iter().position(|a| a == "--calibration") {
@@ -1733,6 +1766,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         segments_path.is_some(),
         snapshot_path.is_some(),
         intervention,
+        invitation_path.is_some(),
         calibration,
         sweep,
         nudge_diag,
@@ -1744,7 +1778,7 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     .count();
     if mode_count > 1 {
         return Err(
-            "--metrics, --segment, --segments, --snapshot, --intervention, --calibration, --sweep, --nudge-diag, --corr-floor, --features are mutually exclusive"
+            "--metrics, --segment, --segments, --snapshot, --intervention, --invitation, --calibration, --sweep, --nudge-diag, --corr-floor, --features are mutually exclusive"
                 .to_string(),
         );
     }
@@ -1772,6 +1806,8 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
         segment,
         segments_path,
         intervention,
+        invitation_path,
+        utc_offset_secs,
         calibration,
         sweep,
         nudge_diag,
@@ -1784,6 +1820,59 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     })
 }
 
+/// `--invitation`: 記録の `feat` 行（`t`・`p_stuck`）と `key` 行（押下の時刻だけ）から tick を組み、
+/// 実機と同じ状態機械で契機を再現する。⚠️ 打鍵の本文は読まない（`key` 行は `t` と `press` だけ）。
+fn run_invitation(
+    session: &Path,
+    trigger_path: &Path,
+    utc_offset_secs: i32,
+) -> Result<serde_json::Value, String> {
+    let trigger_text = std::fs::read_to_string(trigger_path)
+        .map_err(|_| "trigger file could not be read".to_string())?;
+    let kind = gse_next_lib::analysis::invitation::TriggerKind::from_json(&trigger_text)
+        .ok_or_else(|| {
+            "trigger file is invalid (unknown field, missing or out-of-range value)".to_string()
+        })?;
+    let file =
+        std::fs::File::open(session).map_err(|_| "session file could not be read".to_string())?;
+    let (mut feats, mut presses): (Vec<(u64, f64)>, Vec<u64>) = (Vec::new(), Vec::new());
+    let mut prev_feat: Option<u64> = None;
+    for line in std::io::BufReader::new(file).lines() {
+        let line = line.map_err(|_| "session file could not be read".to_string())?;
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) else {
+            continue;
+        };
+        let Some(t) = v.get("t").and_then(|x| x.as_u64()) else {
+            continue;
+        };
+        match v.get("type").and_then(|x| x.as_str()) {
+            Some("key") => {
+                if v.get("press").and_then(|x| x.as_bool()) == Some(true) {
+                    presses.push(t);
+                }
+            }
+            Some("feat") => {
+                // 時計の戻り・同じ時刻の行は、並べ替えると実際と違う時系列になるので受け付けない
+                if prev_feat.is_some_and(|q| t <= q) {
+                    return Err("feat rows are not strictly increasing in t".to_string());
+                }
+                prev_feat = Some(t);
+                feats.push((t, v.get("p_stuck").and_then(|x| x.as_f64()).unwrap_or(0.0)));
+            }
+            _ => {}
+        }
+    }
+    let ticks = gse_next_lib::invitation_trigger::build_recorded_ticks(&feats, &presses);
+    let run = gse_next_lib::invitation_trigger::replay_recorded(&ticks, kind, utc_offset_secs);
+    Ok(serde_json::json!({
+        "trigger": kind,
+        "feat_rows": ticks.len(),
+        "utc_offset_secs": utc_offset_secs,
+        "triggered": run.triggered,
+        "presented": run.presented,
+    }))
+}
+
 fn usage() -> String {
     String::from(
         "gse-replay — NDJSON セッションを再実行し FeatSnapshot 列を生成\n\n\
@@ -1793,6 +1882,7 @@ fn usage() -> String {
          gse-replay <session.ndjson> --segment\n    \
          gse-replay <session.ndjson> --segments <segments.txt> [--json]\n    \
          gse-replay <session.ndjson> --intervention [--json]\n    \
+         gse-replay <session.ndjson> --invitation <trigger.json> [--utc-offset-secs <N>]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --calibration [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --sweep [--json]\n    \
          gse-replay <s1.ndjson> [s2.ndjson ...] --nudge-diag [--json]\n    \
@@ -2063,6 +2153,25 @@ fn main() -> ExitCode {
             let _ = write!(lock, "{}", format_intervention_pretty(&metrics));
         }
         return ExitCode::SUCCESS;
+    }
+
+    // --invitation 経路: 招待の契機を記録から再現する（ADR-040 D4）。HMM・特徴量は通らない。
+    //   ⚠️ 契機の設定が読めない・記録が不正なら exit 1 で、stdout には 1 バイトも出さない。
+    if let Some(ref trigger_path) = args.invitation_path {
+        return match run_invitation(
+            &args.session_path,
+            trigger_path,
+            args.utc_offset_secs.unwrap_or(0),
+        ) {
+            Ok(v) => {
+                let _ = writeln!(std::io::stdout().lock(), "{}", v);
+                ExitCode::SUCCESS
+            }
+            Err(msg) => {
+                tracing::error!("invalid --invitation: {}", msg);
+                ExitCode::from(1)
+            }
+        };
     }
 
     // --features 経路: ADR-030 の Tier 別 1 Hz tick 単位特徴行を JSON 配列で出力する
@@ -4422,6 +4531,109 @@ mod tests {
         p.push("snapshots");
         p.push(name);
         p
+    }
+
+    /// `--invitation` は他のモードと相互排他で、パスを要る。`--utc-offset-secs` は `--invitation` 専用。
+    #[test]
+    fn invitation_mode_args() {
+        let v = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let p = parse_args_from(v(&["s.ndjson", "--invitation", "t.json"])).expect("alone");
+        assert_eq!(p.invitation_path.as_deref(), Some(Path::new("t.json")));
+        assert_eq!(p.utc_offset_secs, None);
+        let p = parse_args_from(v(&[
+            "s.ndjson",
+            "--invitation",
+            "t.json",
+            "--utc-offset-secs",
+            "32400",
+        ]))
+        .expect("with offset");
+        assert_eq!(p.utc_offset_secs, Some(32400));
+        for bad in [
+            v(&["s.ndjson", "--invitation"]),
+            v(&["s.ndjson", "--invitation", "t.json", "--metrics"]),
+            v(&["s.ndjson", "--invitation", "t.json", "--intervention"]),
+            v(&["s.ndjson", "--invitation", "t.json", "--features"]),
+            v(&["s.ndjson", "--utc-offset-secs", "9"]),
+            v(&[
+                "s.ndjson",
+                "--invitation",
+                "t.json",
+                "--utc-offset-secs",
+                "x",
+            ]),
+        ] {
+            assert!(parse_args_from(bad.clone()).is_err(), "{bad:?}");
+        }
+    }
+
+    /// `--invitation` の本体: 小さな記録から契機と提示を再現する。設定が不正なら出力なしで `Err`。
+    #[test]
+    fn invitation_mode_replays_a_small_recording() {
+        let dir = std::env::temp_dir().join(format!("gse-replay-inv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let t0: u64 = 1_760_000_000_000;
+        // 10 秒目から p_stuck 0.9。打鍵は毎秒（本文は持たない行）。p_stuck 0.9 が 30 秒続く 40 秒目に立つ
+        let mut lines = vec![
+            r#"{"type":"meta","session_start":1760000000000,"hmm_version":"0.5.0"}"#.to_string(),
+        ];
+        for s in 0..120u64 {
+            let t = t0 + s * 1000;
+            lines.push(format!(
+                r#"{{"type":"key","t":{t},"vk":"letter","press":true}}"#
+            ));
+            let p = if s >= 10 { 0.9 } else { 0.1 };
+            lines.push(format!(
+                r#"{{"type":"feat","t":{t},"p_flow":0.05,"p_inc":0.05,"p_stuck":{p}}}"#
+            ));
+        }
+        let session = dir.join("s.ndjson");
+        std::fs::write(&session, lines.join("\n")).unwrap();
+        let trig = |name: &str, body: &str| {
+            let p = dir.join(name);
+            std::fs::write(&p, body).unwrap();
+            p
+        };
+
+        let est = trig(
+            "est.json",
+            r#"{"kind":"estimator","p_stuck":0.6,"hold_ms":30000}"#,
+        );
+        let v = run_invitation(&session, &est, 0).expect("estimator");
+        assert_eq!(v["feat_rows"], 120);
+        assert_eq!(v["triggered"], serde_json::json!([t0 + 40_000]));
+        assert_eq!(v["presented"], serde_json::json!([t0 + 40_000]));
+        assert_eq!(v["trigger"]["kind"], "estimator");
+
+        let none = trig("none.json", r#"{"kind":"none"}"#);
+        let v = run_invitation(&session, &none, 0).expect("none");
+        assert_eq!(v["triggered"], serde_json::json!([]));
+
+        // 設定が不正（未知の欄・欠け・範囲外・無い）は Err
+        for bad in [
+            r#"{"kind":"rising","delta":0.2}"#,
+            r#"{"kind":"none","x":1}"#,
+            r#"{"kind":"random","per_active_hour":0,"seed":1}"#,
+        ] {
+            let p = trig("bad.json", bad);
+            assert!(run_invitation(&session, &p, 0).is_err(), "{bad}");
+        }
+        assert!(run_invitation(&session, &dir.join("missing.json"), 0).is_err());
+
+        // feat の時刻が単調でない記録は Err
+        let broken = dir.join("broken.ndjson");
+        std::fs::write(
+            &broken,
+            format!(
+                "{}\n{}\n",
+                r#"{"type":"feat","t":2000,"p_stuck":0.1}"#,
+                r#"{"type":"feat","t":1000,"p_stuck":0.1}"#
+            ),
+        )
+        .unwrap();
+        assert!(run_invitation(&broken, &est, 0).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// AC4: `--features` は他のモードフラグと同時指定できない (exit ≠ 0 相当の `Err`)。
