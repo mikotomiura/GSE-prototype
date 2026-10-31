@@ -1,5 +1,6 @@
 {
- "git_head": "7424e4b369396288b4c8d064ff6249843b695117",
+ "git_head": "3cfb235e3ca902e44a44d651bb6f99ad947bec91",
+ "worktree_clean": true,
  "files_with_replay_parse_warnings": 1,
- "files_total": 20
+ "files_total": 19
 }
