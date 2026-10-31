@@ -1047,6 +1047,11 @@ static INVITATION_PRESENT: AtomicBool = AtomicBool::new(false);
 /// 偽が既定で、`start_session` と宣言の受付の入り口で偽に戻す（fail-closed）。第 1 週・O1・G1 では真にならない。
 static NORMAL_INVITATION_ALLOWED: AtomicBool = AtomicBool::new(false);
 
+/// 通常のモードで、いま招待が許されているか（トレイの項目の出し入れが読む）。
+pub(crate) fn normal_invitation_allowed_now() -> bool {
+    NORMAL_INVITATION_ALLOWED.load(Ordering::Acquire)
+}
+
 /// 招待を出してよい走行か（EH3、または通常のモードで招待を許すセッション）。
 fn invitation_surface_active() -> bool {
     crate::eh3::is_eh3() || NORMAL_INVITATION_ALLOWED.load(Ordering::Acquire)
