@@ -1,10 +1,11 @@
 """フォーカスの遷移と受領（conditions.md）。打鍵の本文は読まない: NDJSON からは
 `focus_transition` と `paste` の時刻と、`key` 行の押下の時刻だけを使う（`key` 行の category は読まない）。出力は集計だけ。
 
-usage: analyze.py <work_dir with *.onsets.json> <sessions_dir> <seed> <out_dir>
+usage: analyze.py <work_dir with *.onsets.json> <sessions_dir> <seed> <out_dir> <from YYYYMMDD> <to YYYYMMDD>
 """
 import bisect
 import glob
+import hashlib
 import json
 import os
 import random
@@ -21,7 +22,8 @@ def times(path):
     focus, paste, press = [], [], []
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
-            if '"focus_transition"' not in line and '"paste"' not in line and '"type":"key"' not in line:
+            # 前段の絞り込みは緩く（書式の空白に依らない）、型の判定は json の後で行う
+            if '"focus_transition"' not in line and '"paste"' not in line and '"key"' not in line:
                 continue
             try:
                 o = json.loads(line)
@@ -110,8 +112,22 @@ def verdict(ci, undefined):
     return "not_visible"
 
 
+def sha256_prefix(path, n=16):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()[:n]
+
+
+def file_date(name):
+    """gse_o1_YYYYMMDD_HHMMSS.ndjson の日付。"""
+    return name.split("_")[2]
+
+
 def main():
     work, sessions, seed, out = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
+    date_from, date_to = sys.argv[5], sys.argv[6]
     os.makedirs(out, exist_ok=True)
     excluded_files, files = [], []
     base_rows = []
@@ -119,12 +135,25 @@ def main():
     for sp in sorted(glob.glob(os.path.join(work, "*.onsets.json"))):
         d = json.load(open(sp))
         name = d["provenance"]["source_basename"]
-        focus, paste, press = times(os.path.join(sessions, name))
+        if not (date_from <= file_date(name) <= date_to):
+            excluded_files.append({"file": name, "reason": "outside period (C2; 10-31 excluded as still being written, decisions 4)"})
+            continue
+        src = os.path.join(sessions, name)
+        # 中間が今の入力から作られたことを確かめる（使い回しで古い中間を読まない）
+        want = d["provenance"]["source_sha256_prefix"]
+        got = sha256_prefix(src, len(want))
+        if got != want:
+            sys.exit(f"stale intermediate for {name}: source sha256 {got} != {want}; delete WORK and rerun")
+        focus, paste, press = times(src)
         if not focus:
             excluded_files.append({"file": name, "reason": "focus_transition 0 rows (config_gated)"})
             continue
+        if not press:
+            print(f"warning: no key presses parsed in {name}", file=sys.stderr)
         intervals = [(iv["a_ms"], iv["b_ms"]) for iv in d["provenance"]["observed_intervals"]]
-        files.append({"file": name, "onsets": len(d["onsets"]), "focus_rows": len(focus), "paste_rows": len(paste)})
+        files.append({"file": name, "source_sha256_prefix": want, "hmm_version": d["provenance"]["hmm_version"],
+                      "prereg_version": d["config"].get("prereg_version"), "onsets": len(d["onsets"]),
+                      "focus_rows": len(focus), "paste_rows": len(paste)})
         for o in d["onsets"]:
             s, t0 = o["s"], o["t0"]
             a = s - W_MS
@@ -140,6 +169,8 @@ def main():
                  "silence_ms": silence}
             for h, hm in HORIZONS.items():
                 r["in_obs_" + h] = inside(intervals, t0, t0 + hm)
+                # 感度（レビューの後に足した・判定に使わない）: 曝露の窓も同じ観測区間に収まる
+                r["in_obs_with_exposure_" + h] = inside(intervals, a, t0 + hm)
                 r["y_" + h] = any_in_open_left(paste, t0, t0 + hm)
             base_rows.append(r)
 
@@ -154,7 +185,8 @@ def main():
             if not r["in_obs_" + h]:
                 excl["horizon_outside_observation"] += 1
                 continue
-            rows.append({"day": r["day"], "exposed": r["exposed"], "y": r["y_" + h], "silence_ms": r["silence_ms"]})
+            rows.append({"day": r["day"], "exposed": r["exposed"], "y": r["y_" + h], "silence_ms": r["silence_ms"],
+                         "obs_exposure": r["in_obs_with_exposure_" + h]})
         by_day = {}
         for r in rows:
             by_day.setdefault(r["day"], []).append(r)
@@ -184,6 +216,15 @@ def main():
             strata[name_] = {"n": len(sr), "n_exposed": sum(r["exposed"] for r in sr), "rr": srr, "rd": srd,
                              "p_exposed": sps[0] if sps else None, "p_unexposed": sps[1] if sps else None}
         res["strata_by_silence"] = strata
+        sens = [r for r in rows if r["obs_exposure"]]
+        s_by_day = {}
+        for r in sens:
+            s_by_day.setdefault(r["day"], []).append(r)
+        srr, srd, sps = rr_rd(sens)
+        sb = boot(s_by_day, seed)
+        res["sensitivity_exposure_window_observed"] = {
+            "n": len(sens), "n_exposed": sum(r["exposed"] for r in sens), "rr": srr, "rd": srd,
+            "p_exposed": sps[0] if sps else None, "p_unexposed": sps[1] if sps else None, **sb}
         result[h] = res
     if lags:
         lv = [x["lag_to_t0_ms"] for x in lags]
