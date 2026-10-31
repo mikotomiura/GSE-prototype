@@ -41,13 +41,37 @@ impl TriggerConfig {
     }
 }
 
+/// 設定ファイルの大きさの上限（64 KiB）。
+pub const MAX_CONFIG_BYTES: u64 = 64 * 1024;
+
+/// 設定ファイルを安全に読む。無ければ `Ok(None)`。
+///
+/// 通常のファイルだけを受ける（symlink・ディレクトリ・特殊ファイルは `Err`）。上限を超えたら `Err`
+/// （`take` で上限までしか読まない）。
+pub fn read_config_text(path: &Path) -> std::io::Result<Option<String>> {
+    use std::io::Read;
+    let meta = match std::fs::symlink_metadata(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+        Ok(m) => m,
+    };
+    if !meta.file_type().is_file() || meta.len() > MAX_CONFIG_BYTES {
+        return Err(std::io::Error::other("not a regular file or too large"));
+    }
+    let file = std::fs::File::open(path)?;
+    let mut text = String::new();
+    file.take(MAX_CONFIG_BYTES + 1).read_to_string(&mut text)?;
+    if text.len() as u64 > MAX_CONFIG_BYTES {
+        return Err(std::io::Error::other("too large"));
+    }
+    Ok(Some(text))
+}
+
 /// 設定ファイルを読む。
 pub fn load_trigger_config(path: &Path) -> TriggerConfig {
-    match std::fs::read_to_string(path) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            TriggerConfig::Kind(TriggerKind::default())
-        }
-        Ok(t) => match TriggerKind::from_json(&t) {
+    match read_config_text(path) {
+        Ok(None) => TriggerConfig::Kind(TriggerKind::default()),
+        Ok(Some(t)) => match TriggerKind::from_json(&t) {
             Some(k) => TriggerConfig::Kind(k),
             None => {
                 tracing::warn!("invitation trigger config is unreadable; invitations are off");
@@ -140,12 +164,13 @@ pub fn build_recorded_ticks(feats: &[(u64, f64)], presses: &[u64]) -> Vec<Record
 pub fn replay_recorded(
     ticks: &[RecordedTick],
     kind: TriggerKind,
+    session_start_ms: u64,
     utc_offset_secs: i32,
 ) -> RecordedRun {
     use crate::analysis::invitation::{InvitationMachine, Settings, TickInput};
     // 殻の `InvitationRunner::GAP_AS_BOUNDARY_MS` と同じ。
     const GAP_AS_BOUNDARY_MS: u64 = 30_000;
-    let mut m = InvitationMachine::with_kind(kind);
+    let mut m = InvitationMachine::with_kind_session(kind, session_start_ms);
     let mut run = RecordedRun::default();
     let mut prev: Option<u64> = None;
     let mut last_day: Option<i64> = None;
@@ -167,7 +192,13 @@ pub fn replay_recorded(
             session_boundary: boundary,
         });
         if out.triggered {
-            run.triggered.push(r.t);
+            // 無作為で tick が欠けて複数の秒をまとめて引いたときは、立った秒を報告する
+            // （毎秒 tick の実機と同じ時刻になる）
+            let at = match m.random_fired_ms() {
+                Some(ms) if ms / 1000 != r.t / 1000 => ms,
+                _ => r.t,
+            };
+            run.triggered.push(at);
         }
         if out.presented {
             run.presented.push(r.t);
@@ -284,7 +315,7 @@ mod tests {
     #[test]
     fn replay_estimator_matches_the_machine() {
         let ticks = recorded(120, &|s| if s >= 10 { 0.9 } else { 0.1 });
-        let run = replay_recorded(&ticks, TriggerKind::default(), 0);
+        let run = replay_recorded(&ticks, TriggerKind::default(), 0, 0);
         assert_eq!(run.triggered, vec![T0 + 40_000]);
         assert_eq!(run.presented, vec![T0 + 40_000]);
     }
@@ -292,15 +323,15 @@ mod tests {
     #[test]
     fn replay_off_and_random_and_rising() {
         let ticks = recorded(7200, &|s| if (s / 600) % 2 == 1 { 0.9 } else { 0.1 });
-        assert!(replay_recorded(&ticks, TriggerKind::Off {}, 0)
+        assert!(replay_recorded(&ticks, TriggerKind::Off {}, 0, 0)
             .triggered
             .is_empty());
         let r = TriggerKind::Random {
             per_active_hour: 30.0,
             seed: 5,
         };
-        let a = replay_recorded(&ticks, r, 0);
-        let b = replay_recorded(&ticks, r, 0);
+        let a = replay_recorded(&ticks, r, 0, 0);
+        let b = replay_recorded(&ticks, r, 0, 0);
         assert_eq!(a, b, "seed から再現する");
         assert!(!a.triggered.is_empty());
         assert!(a.presented.len() <= 2, "既定の上限 2");
@@ -308,7 +339,7 @@ mod tests {
             delta: 0.5,
             window_ms: 10_000,
         };
-        let c = replay_recorded(&ticks, rising, 0);
+        let c = replay_recorded(&ticks, rising, 0, 0);
         // 600 秒ごとの 0.1 → 0.9 の立ち上がりで 1 回ずつ（窓 10 秒の中に収まる急な上がりは 1 つの立ち上がり）
         assert_eq!(c.triggered.len(), 6, "{:?}", c.triggered);
     }
@@ -318,7 +349,7 @@ mod tests {
         // 打鍵が無い記録は離席候補で、どの契機も立たない
         let feats: Vec<(u64, f64)> = (0..300).map(|s| (T0 + s * 1000, 0.9)).collect();
         let ticks = build_recorded_ticks(&feats, &[]);
-        assert!(replay_recorded(&ticks, TriggerKind::default(), 0)
+        assert!(replay_recorded(&ticks, TriggerKind::default(), 0, 0)
             .triggered
             .is_empty());
         // 30 秒以上の欠けは区切り（区間が貯まらない）
@@ -328,8 +359,89 @@ mod tests {
             .collect();
         let presses: Vec<u64> = feats.iter().map(|f| f.0).collect();
         let ticks = build_recorded_ticks(&feats, &presses);
-        assert!(replay_recorded(&ticks, TriggerKind::default(), 0)
+        assert!(replay_recorded(&ticks, TriggerKind::default(), 0, 0)
             .triggered
             .is_empty());
+    }
+
+    /// 実機を模した毎秒 tick(殻と同じ区切り: tick の間隔が 30 秒以上なら区切り)と、feat 行だけの replay が、
+    /// feat 行の欠けを挟んでも同じ時刻で契機が立つ(無作為・離席候補の外)。
+    #[test]
+    fn random_replay_matches_a_per_second_live_simulation_across_feat_holes() {
+        use crate::analysis::invitation::{InvitationMachine, Settings, TickInput};
+        let kind = TriggerKind::Random {
+            per_active_hour: 60.0,
+            seed: 20261101,
+        };
+        let session_start = T0 + 5_000;
+        // 打鍵は全期間で毎秒。feat 行は 600..606(短い欠け)と 1500..1560(30 秒以上の欠け)で欠ける
+        let all: Vec<u64> = (0..3600).collect();
+        let presses: Vec<u64> = all.iter().map(|s| T0 + s * 1000).collect();
+        let feat_secs: Vec<u64> = all
+            .iter()
+            .copied()
+            .filter(|s| !(600..606).contains(s) && !(1500..1560).contains(s))
+            .collect();
+        let feats: Vec<(u64, f64)> = feat_secs.iter().map(|s| (T0 + s * 1000, 0.1)).collect();
+        let replayed = replay_recorded(
+            &build_recorded_ticks(&feats, &presses),
+            kind,
+            session_start,
+            0,
+        );
+        assert!(
+            replayed.triggered.len() > 20,
+            "{}",
+            replayed.triggered.len()
+        );
+
+        // 実機: 短い欠け(600..606)は tick が続く。長い欠け(1500..1560)は分析が止まって tick が無い
+        let mut m = InvitationMachine::with_kind_session(kind, session_start);
+        let mut live = Vec::new();
+        let mut prev: Option<u64> = None;
+        for s in all.iter().copied().filter(|s| !(1500..1560).contains(s)) {
+            let t = T0 + s * 1000;
+            let boundary = prev.is_some_and(|q| t - q >= 30_000);
+            prev = Some(t);
+            let out = m.tick(&TickInput {
+                now_ms: t,
+                local_day: crate::eh3::local_day(t, 0),
+                minute_of_day: crate::eh3::local_minute_of_day(t, 0),
+                p_stuck: 0.1,
+                idle_ms: 0,
+                research_enabled: true,
+                recording_active: true,
+                settings: Settings::default(),
+                session_boundary: boundary,
+            });
+            if out.triggered {
+                live.push(t);
+            }
+        }
+        assert_eq!(replayed.triggered, live);
+    }
+
+    #[test]
+    fn config_reader_rejects_symlinks_and_oversize_files() {
+        let d = tmp("limits");
+        let big = d.join("big.json");
+        std::fs::write(&big, vec![b' '; MAX_CONFIG_BYTES as usize + 1]).unwrap();
+        assert_eq!(load_trigger_config(&big), TriggerConfig::Invalid);
+        // 上限ちょうどの空白 + JSON は読める大きさ(中身が JSON として正しければ受ける)
+        let ok = d.join("ok.json");
+        let mut body = br#"{"kind":"none"}"#.to_vec();
+        body.resize(MAX_CONFIG_BYTES as usize, b' ');
+        std::fs::write(&ok, body).unwrap();
+        assert_eq!(
+            load_trigger_config(&ok),
+            TriggerConfig::Kind(TriggerKind::Off {})
+        );
+        #[cfg(unix)]
+        {
+            let link = d.join("link.json");
+            std::os::unix::fs::symlink(&ok, &link).unwrap();
+            assert_eq!(load_trigger_config(&link), TriggerConfig::Invalid);
+        }
+        assert!(read_config_text(&d.join("none.json")).unwrap().is_none());
     }
 }

@@ -1820,6 +1820,10 @@ fn parse_args_from(mut args: Vec<String>) -> Result<Args, String> {
     })
 }
 
+/// `--invitation` の記録の 1 行の上限(1 MiB)。超えたら Err(exit 1)。設定ファイルの上限(64 KiB)は
+/// `invitation_trigger::MAX_CONFIG_BYTES`。
+const INVITATION_MAX_LINE_BYTES: u64 = 1 << 20;
+
 /// `--invitation`: 記録の `feat` 行（`t`・`p_stuck`）と `key` 行（押下の時刻だけ）から tick を組み、
 /// 実機と同じ状態機械で契機を再現する。⚠️ 打鍵の本文は読まない（`key` 行は `t` と `press` だけ）。
 fn run_invitation(
@@ -1827,25 +1831,58 @@ fn run_invitation(
     trigger_path: &Path,
     utc_offset_secs: i32,
 ) -> Result<serde_json::Value, String> {
-    let trigger_text = std::fs::read_to_string(trigger_path)
-        .map_err(|_| "trigger file could not be read".to_string())?;
+    use std::io::Read;
+    let trigger_text = gse_next_lib::invitation_trigger::read_config_text(trigger_path)
+        .ok()
+        .flatten()
+        .ok_or_else(|| {
+            "trigger file could not be read (missing, not a regular file or over 64 KiB)"
+                .to_string()
+        })?;
     let kind = gse_next_lib::analysis::invitation::TriggerKind::from_json(&trigger_text)
         .ok_or_else(|| {
             "trigger file is invalid (unknown field, missing or out-of-range value)".to_string()
         })?;
-    let file =
-        std::fs::File::open(session).map_err(|_| "session file could not be read".to_string())?;
+    let file = File::open(session).map_err(|_| "session file could not be read".to_string())?;
+    let mut reader = BufReader::new(file);
     let (mut feats, mut presses): (Vec<(u64, f64)>, Vec<u64>) = (Vec::new(), Vec::new());
     let mut prev_feat: Option<u64> = None;
-    for line in std::io::BufReader::new(file).lines() {
-        let line = line.map_err(|_| "session file could not be read".to_string())?;
-        let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) else {
+    // 無作為の実効 seed を導く開始時刻: 最初の `session_start` 行の `t`(実機の SESSION_START_MS と同じ値)。
+    // 無ければ `meta.session_start`(ファイルを開いた時刻・実機の値とは別なので出力に由来を書く)。
+    let mut session_start_row: Option<u64> = None;
+    let mut meta_session_start: Option<u64> = None;
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        buf.clear();
+        let n = (&mut reader)
+            .take(INVITATION_MAX_LINE_BYTES + 1)
+            .read_until(b'\n', &mut buf)
+            .map_err(|_| "session file could not be read".to_string())?;
+        if n == 0 {
+            break;
+        }
+        let content_len = buf.len() - usize::from(buf.last() == Some(&b'\n'));
+        if content_len as u64 > INVITATION_MAX_LINE_BYTES {
+            return Err("a session line is over 1 MiB".to_string());
+        }
+        let Ok(v) = serde_json::from_slice::<serde_json::Value>(&buf[..content_len]) else {
             continue;
         };
+        if v.get("type").and_then(|x| x.as_str()) == Some("meta") {
+            if meta_session_start.is_none() {
+                meta_session_start = v.get("session_start").and_then(|x| x.as_u64());
+            }
+            continue;
+        }
         let Some(t) = v.get("t").and_then(|x| x.as_u64()) else {
             continue;
         };
         match v.get("type").and_then(|x| x.as_str()) {
+            Some("session_start") => {
+                if session_start_row.is_none() {
+                    session_start_row = Some(t);
+                }
+            }
             Some("key") => {
                 if v.get("press").and_then(|x| x.as_bool()) == Some(true) {
                     presses.push(t);
@@ -1857,17 +1894,44 @@ fn run_invitation(
                     return Err("feat rows are not strictly increasing in t".to_string());
                 }
                 prev_feat = Some(t);
-                feats.push((t, v.get("p_stuck").and_then(|x| x.as_f64()).unwrap_or(0.0)));
+                // p_stuck の欠けは 0 にしない(停滞なしと誤読させない)
+                let p = v
+                    .get("p_stuck")
+                    .and_then(|x| x.as_f64())
+                    .ok_or_else(|| "a feat row has no p_stuck".to_string())?;
+                feats.push((t, p));
             }
             _ => {}
         }
     }
+    let (session_start_ms, session_start_source) = match (session_start_row, meta_session_start) {
+        (Some(t), _) => (t, "session_start_row"),
+        (None, Some(t)) => (t, "meta"),
+        (None, None) => (0, "none"),
+    };
+    if matches!(
+        kind,
+        gse_next_lib::analysis::invitation::TriggerKind::Random { .. }
+    ) && session_start_source == "none"
+    {
+        return Err(
+            "random trigger needs a session start (session_start row or meta) in the recording"
+                .to_string(),
+        );
+    }
     let ticks = gse_next_lib::invitation_trigger::build_recorded_ticks(&feats, &presses);
-    let run = gse_next_lib::invitation_trigger::replay_recorded(&ticks, kind, utc_offset_secs);
+    let run = gse_next_lib::invitation_trigger::replay_recorded(
+        &ticks,
+        kind,
+        session_start_ms,
+        utc_offset_secs,
+    );
     Ok(serde_json::json!({
         "trigger": kind,
         "feat_rows": ticks.len(),
         "utc_offset_secs": utc_offset_secs,
+        "session_start_ms": session_start_ms,
+        "session_start_source": session_start_source,
         "triggered": run.triggered,
         "presented": run.presented,
     }))
@@ -4633,6 +4697,39 @@ mod tests {
         )
         .unwrap();
         assert!(run_invitation(&broken, &est, 0).is_err());
+
+        // p_stuck が欠けた feat 行は 0 にせず Err
+        let nop = dir.join("nop.ndjson");
+        std::fs::write(&nop, "{\"type\":\"feat\",\"t\":1000}\n").unwrap();
+        assert!(run_invitation(&nop, &est, 0).is_err());
+
+        // 上限: 設定 64 KiB・記録の 1 行 1 MiB
+        let big_cfg = dir.join("bigcfg.json");
+        std::fs::write(&big_cfg, vec![b' '; 64 * 1024 + 1]).unwrap();
+        assert!(run_invitation(&session, &big_cfg, 0).is_err());
+        let long = dir.join("long.ndjson");
+        std::fs::write(&long, vec![b'x'; (1 << 20) + 10]).unwrap();
+        assert!(run_invitation(&long, &est, 0).is_err());
+
+        // 無作為: session_start 行の t から実効 seed を導く(行の無い記録は meta、どちらも無ければ Err)
+        let rnd = trig(
+            "rnd.json",
+            r#"{"kind":"random","per_active_hour":60,"seed":7}"#,
+        );
+        let with_row = |start: u64| {
+            let p = dir.join(format!("row{start}.ndjson"));
+            let mut l = vec![format!(r#"{{"type":"session_start","t":{start}}}"#)];
+            l.extend(lines.iter().skip(1).cloned());
+            std::fs::write(&p, l.join("\n")).unwrap();
+            p
+        };
+        let a1 = run_invitation(&with_row(t0), &rnd, 0).unwrap();
+        let a2 = run_invitation(&with_row(t0), &rnd, 0).unwrap();
+        let b = run_invitation(&with_row(t0 + 1), &rnd, 0).unwrap();
+        assert_eq!(a1, a2);
+        assert_eq!(a1["session_start_source"], "session_start_row");
+        assert_ne!(a1["triggered"], b["triggered"], "開始時刻が違えば列も違う");
+        assert!(run_invitation(&nop, &rnd, 0).is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
