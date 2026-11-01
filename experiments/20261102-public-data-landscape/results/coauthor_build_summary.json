@@ -1,0 +1,10 @@
+{
+ "jsonl": 1447,
+ "no_metadata": 2,
+ "sessions_with_metadata": 1445,
+ "held_out_sessions": 288,
+ "attempted": 1157,
+ "status": {
+  "ok": 1157
+ }
+}
