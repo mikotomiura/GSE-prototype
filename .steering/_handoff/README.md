@@ -11,6 +11,7 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| **GSE: 今の位置づけを 1 枚にまとめ直し、公開データ（KLiCKe・CoAuthor・CS1）を記述だけで俯瞰する**（合流の前・T1 と並行） | **`next-session-gse-public-data-landscape.md`**（2026-11-01） | **現行・次**。研究者の決定: 位置づけ → 俯瞰 → 合流の順。検定はせず、条件を計算の前にコミットし、一部を見ずに取っておく。打鍵と休止の層までしか言えない限界を明記 |
 | **GSE: 3 本の並行（T1 実装・T2 項目 2・T3 フォーカス）のまとめ役** | **`next-session-gse-three-parallel-tracks.md`**（2026-11-01） | **現行**。各セッションの入口の文・ぶつからないための約束（worktree・CI・main へのマージ・台帳・ディスク）・合流の仕方。個別の中身は下の 3 行 |
 | **GSE 本体: Nudge の既定の無効化と招待の配線**（ADR-040 Migration 1・2・実装・下の行と並行可） | **`next-session-gse-nudge-off-and-invitation-wiring.md`**（2026-10-31） | **現行**。決定は `.steering/20261031-gse-small-n-research-design/decisions.md` 判断 10〜18 |
 | ~~GSE: 公開データの当てはめ 項目 2（KLiCKe・作文中の値の分布と誤発火の基準）~~ | `next-session-gse-public-data-fit-item2.md`（2026-11-01） | 完了（2026-11-01・`experiments/20261101-klicke-early-stall-trigger/`・`.steering/20261101-gse-public-data-fit-item2/` 判断 4）。4,907 人で、止まりの初期（最後の文字から 0.5θ・0.75θ）は 182・124 回/時で停滞に至る 6%・9%、停滞の時計からは t0 の 1〜2 秒前（定義から）、今の契機は中央値 0 回/時。案 A の追試は AUC 0.512・0.518（上がっているがごく小さい）。合流は three-parallel-tracks §4 |
