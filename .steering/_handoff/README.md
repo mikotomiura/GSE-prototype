@@ -11,6 +11,7 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
+| **GSE: CS1 打鍵データの著者から返事が来たとき**（2019 年版・2021 年版の `keystrokes.csv` だけを頼んだ） | **`next-session-cs1-reply.md`**（2026-11-02） | **返事待ち**。研究者が 2026-11-02 に著者へ送った。返事の種類ごとの扱い（承諾・条件つき・断り・返事なし）と、承諾の後の取得・条件・L1〜L6 の当て方。2021 年版は 1 人に 8 課題あるので、L5 を長い単位で確かめられるのが見どころ |
 | **GSE: 今の位置づけを 1 枚にまとめ直し、公開データ（KLiCKe・CoAuthor・CS1）を記述だけで俯瞰する**（合流の前・T1 と並行） | **`next-session-gse-public-data-landscape.md`**（2026-11-01） | **完了（2026-11-02・俯瞰）**。位置づけの 1 枚は `.steering/20261102-gse-public-data-landscape/positioning.md`、結果は `experiments/20261102-public-data-landscape/notes.md`（KLiCKe 3,434 人・CoAuthor 41 人・書き手の 3 割は取っておいて見ていない）。停滞は t0 から短く終わり（中央値 6〜15 秒）、KLiCKe では約半分に削除以外の手の操作があり、作業の後ろに偏る。180 秒の途切れは 1 人 0〜1 件で、受領はデータの仕組みで 3% にも 81% にもなる。CS1 は著者へ連絡してから（文案は同じ steering の `cs1-contact-draft.md`・送るのは研究者）。T1 の残り（§6）は未着手。次は合流（three-parallel-tracks §4） |
 | **GSE: 3 本の並行（T1 実装・T2 項目 2・T3 フォーカス）のまとめ役** | **`next-session-gse-three-parallel-tracks.md`**（2026-11-01） | **現行**。各セッションの入口の文・ぶつからないための約束（worktree・CI・main へのマージ・台帳・ディスク）・合流の仕方。個別の中身は下の 3 行 |
 | **GSE 本体: Nudge の既定の無効化と招待の配線**（ADR-040 Migration 1・2・実装・下の行と並行可） | **`next-session-gse-nudge-off-and-invitation-wiring.md`**（2026-10-31） | **現行**。決定は `.steering/20261031-gse-small-n-research-design/decisions.md` 判断 10〜18 |
