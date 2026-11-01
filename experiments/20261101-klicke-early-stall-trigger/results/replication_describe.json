@@ -1,0 +1,30 @@
+{
+ "d_p_stuck": {
+  "0.8": {
+   "stall_hit_rate_median": 0.2,
+   "control_exceed_rate_median": 0.1625
+  },
+  "0.9": {
+   "stall_hit_rate_median": 0.14285714285714285,
+   "control_exceed_rate_median": 0.08
+  },
+  "0.95": {
+   "stall_hit_rate_median": 0.0,
+   "control_exceed_rate_median": 0.03333333333333333
+  }
+ },
+ "d_ewma_x": {
+  "0.8": {
+   "stall_hit_rate_median": 0.2,
+   "control_exceed_rate_median": 0.16363636363636364
+  },
+  "0.9": {
+   "stall_hit_rate_median": 0.125,
+   "control_exceed_rate_median": 0.075
+  },
+  "0.95": {
+   "stall_hit_rate_median": 0.0,
+   "control_exceed_rate_median": 0.03333333333333333
+  }
+ }
+}
