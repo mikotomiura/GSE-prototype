@@ -12,7 +12,8 @@
 
 1. 順番は、位置づけ → 俯瞰 → 合流。
 2. 俯瞰に使うデータは KLiCKe・CoAuthor・CS1 の 3 つ。
-3. T1（`next-session-gse-nudge-off-and-invitation-wiring.md`・差し替えの口の実装）は、別の worktree で並行して進める。契機の中身を決めずに作れる設計なので、俯瞰を待たない。
+3. T1（差し替えの口の実装）は並行して進める。契機の中身を決めずに作れる設計なので、俯瞰を待たない。
+   - 訂正（2026-11-02）: 当初「T1 は未着手」と書いたが誤り。T1 の実装は `/Users/johnd/GSE-prototype-nudge-off`（ブランチ `feature/nudge-default-off`・未 push）で済んでいる。研究者から Loop で回すかを問われたが、実装が済んでいるので Loop にしない。残りは下の §6。
 
 ## 2 段 1: 今の位置づけを 1 枚にまとめ直す
 
@@ -46,6 +47,17 @@
 - `docs/references.md` の [Vn] は append-only。
 - ディスク: 2026-11-01 時点の空きは約 3.9 GB。3 GB を切ったら重い段を始めない。CS1 を取る前に大きさを確かめる。他のトラックの中間を消さない。
 - 照合論文のトラック（`/Users/johnd/GSE-wt-matching-manuscript`）の成果物は読むだけ。
+
+## 6 T1 の残り（このタスクと並行・一次は T1 の枝の引き継ぎ）
+
+- 一次: T1 の枝にある `.steering/_handoff/next-session-gse-invitation-wiring.md`（main にはまだ無い）。記録は同じ枝の `.steering/20261031-nudge-default-off/` と `.steering/20261101-invitation-wiring/`。最後の検証は d83d0468 で `cargo test --workspace` 1054 passed・clippy 0・tsc 0・emit_schema byte-equal。
+- 残り（この順）
+  1. 実機の確かめ（研究者が押す。トレイの後から差し込む項目は AX から見えないため。手順は上の一次の §1 の 1）。
+  2. `git fetch` し、origin/main を取り込む（T2・T3 と、このメモの後のコミット）。テストを回し直す。G-GEAR が空いているかを研究者に確かめてから push する（`feature/*` は self-hosted の CI が走る）。PR も研究者に確かめてから出す。
+  3. gse-dataset の schema parity（`InvitationCondition` が増えた・同期は別作業）。
+  4. push の時に `_handoff/README.md` の T1 の行を更新する。
+- 合流に回すこと: 説明と設定の窓の文（`InvitationSettings.tsx`）が推定器の契機を前提にしている点、通常のモードの同意文書の扱い、契機の中身。
+- ディスク: T1 の worktree のビルドの中間は 2.9 GB ある。テストを回し直すと増えるので、俯瞰の重い段と同じ時に回さない。空きが 3 GB を切ったら止める。
 
 ## 5 終わった後
 
