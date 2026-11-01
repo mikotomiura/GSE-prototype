@@ -1,0 +1,15 @@
+{
+ "onsets_total": 33049,
+ "onsets_no_text_before": 3,
+ "onsets_gap_lt_30s": 10239,
+ "onsets_duplicate_anchor": 1355,
+ "stall_anchors": 21452,
+ "anchor_inside_stall": 335,
+ "stall_ineligible": 187,
+ "stall_no_control": 29,
+ "controls_dropped_inside_stall": 27075,
+ "writers_with_rows": 4734,
+ "writers_used_default": 1971,
+ "stalls_used_default": 13755,
+ "unit": "per_writer"
+}
