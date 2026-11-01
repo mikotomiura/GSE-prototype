@@ -10,7 +10,7 @@
 - [x] notes.md
 - [x] CS1 の著者への連絡の文案（送るのは研究者）
 - [x] code-reviewer と /cross-review（並列）・指摘の反映
-- [x] `_handoff/README.md` の行を更新・[ ] main へ `[skip ci]` の `--no-ff` マージ
+- [x] `_handoff/README.md` の行を更新・[x] main へ `[skip ci]` の `--no-ff` マージ
 
 対応表（どの場面で何を使うか）:
 - 集計のコード → code-reviewer ＋ /cross-review（Codex には差分だけ・データは送らない）
