@@ -1,7 +1,7 @@
 """conditions.md C4〜C5（L1〜L6）の記述の集計。検定はしない。
 
 使い方:
-  python3 -I analyze_landscape.py <klicke_work.tar.gz> <klicke_side.json> <coauthor_work_dir> <holdout.json> <out_dir>
+  python3 -I analyze_landscape.py <klicke_work.tar.gz> <klicke_side.json> <coauthor_work_dir> <holdout.json> <out_dir> <coauthor.zip> <metadata.csv>...
   python3 -I analyze_landscape.py --selftest
 出力は集計値だけ（書き手・セッションの ID も番号も出さない）: <out_dir>/landscape.json・counts.json。
 """
@@ -81,7 +81,7 @@ def pooled(num, den):
 # ---------- 1 セッション ----------
 
 class Session:
-    def __init__(self, d, clicks=(), receipts=(), ai=()):
+    def __init__(self, d, clicks=(), receipts=(), ai=(), receipt_kinds=None):
         self.keys = d["keys"]
         self.press = [k[0] for k in self.keys]
         self.cats = [k[1] for k in self.keys]
@@ -93,6 +93,9 @@ class Session:
         self.nav = [t for t, c in self.keys if c == NAV]
         self.clicks = sorted(clicks)
         self.receipts = sorted(receipts)
+        self.receipt_kinds = {k: sorted(v) for k, v in (receipt_kinds or {"all": receipts}).items()}
+        self.delete = [t for t, c in self.keys if c in t2.DELETE]
+        self.other_nontext = [t for t, c in self.keys if c not in TEXT and c not in t2.DELETE]
         self.ai = sorted(ai)
         self.t_start, self.t_end = self.press[0], self.press[-1]
         self.theta = t2.Theta(self.press, self.intervals)
@@ -138,8 +141,11 @@ class Session:
 
     def feat_in_obs(self):
         out = []
+        self.nonfinite_p = 0
         for t, p, x in self.feat:
             if any(a <= t <= b for a, b in self.intervals):
+                if p is None or not math.isfinite(p):
+                    self.nonfinite_p += 1
                 out.append((t, p if p is not None and math.isfinite(p) else 0.0, x))
         return out
 
@@ -173,12 +179,13 @@ def writer_l1(sessions, normal):
 
 
 def writer_l2(sessions, normal):
-    ps, xs, fires, obs = [], [], 0, 0
+    ps, xs, fires, obs, nonfinite = [], [], 0, 0, 0
     for s in sessions:
         rows = s.feat_in_obs()
         if normal:
             rows = [r for r in rows if not s.near_ai(r[0], r[0])]
         ps += [r[1] for r in rows]
+        nonfinite += s.nonfinite_p
         xs += [r[2] for r in rows if r[2] is not None and math.isfinite(r[2])]
         fs = t2.fires_current(s)
         if normal:
@@ -191,7 +198,8 @@ def writer_l2(sessions, normal):
     return {"p_median": statistics.median(ps), "p_ge": sum(1 for p in ps if p >= P_TRIG) / len(ps),
             "x_median": statistics.median(xs) if xs else None,
             "x_p90": xs_sorted[min(len(xs_sorted) - 1, math.ceil(0.9 * len(xs_sorted)) - 1)] if xs else None,
-            "fires_per_h": fires / (obs / H) if obs else None, "fires": fires}
+            "fires_per_h": fires / (obs / H) if obs else None, "fires": fires, "nonfinite_p": nonfinite,
+            "rows": len(ps)}
 
 
 def writer_l3(sessions, normal):
@@ -202,32 +210,54 @@ def writer_l3(sessions, normal):
                 continue
             pre = (st - PRE_WIN, t0)
             row = {}
-            for name, ts in (("nontext", s.nontext), ("nav", s.nav), ("click", s.clicks)):
+            for name, ts in (("nontext", s.nontext), ("nav", s.nav), ("click", s.clicks), ("delete", s.delete),
+                             ("other_nontext", s.other_nontext)):
                 row["pre_" + name] = count_in(ts, *pre) > 0
                 row["post_" + name] = count_in(ts, t0, end, lo_open=True, hi_open=r is not None) > 0
+            # レビューの後に足した（判定に使わない）: 削除を除いた手の操作（定義から出る削除を除く）
+            for side in ("pre", "post"):
+                row[side + "_hand_excl_delete"] = row[side + "_other_nontext"] or row[side + "_click"]
             rec.append(row)
     return rec
 
 
 def writer_l4(sessions):
     span = sum(s.span_ms() for s in sessions)
-    receipts = sum(len(s.receipts) for s in sessions)
+    obs = sum(s.obs_ms() for s in sessions)
+    kinds = {}
+    for s in sessions:
+        for k, v in s.receipt_kinds.items():
+            kinds[k] = kinds.get(k, 0) + len(v)
     st_tot = st_before = st_5min = 0
-    away = away_rec = 0
+    st_resumed = st_before_resumed = st_tracked = st_5min_tracked = 0
+    away = away_rec = away_tracked = away_rec_tracked = 0
     for s in sessions:
         for st, t0, r, end in s.stalls():
             st_tot += 1
-            if count_in(s.receipts, t0, end, lo_open=True) > 0:
-                st_before += 1
-            if count_in(s.receipts, t0, t0 + RECEIPT_WIN, lo_open=True) > 0:
-                st_5min += 1
+            hit_b = count_in(s.receipts, t0, end, lo_open=True) > 0
+            hit_5 = count_in(s.receipts, t0, t0 + RECEIPT_WIN, lo_open=True) > 0
+            st_before += hit_b
+            st_5min += hit_5
+            # レビューの後に足した: 再開した停滞だけ・5 分を追い切れた停滞だけ
+            if r is not None:
+                st_resumed += 1
+                st_before_resumed += hit_b
+            if t0 + RECEIPT_WIN <= s.t_end:
+                st_tracked += 1
+                st_5min_tracked += hit_5
         for a, b in s.gaps():
             if b - a >= AWAY:
                 away += 1
-                if count_in(s.receipts, b, b + RECEIPT_WIN) > 0:
-                    away_rec += 1
-    return {"span_ms": span, "receipts": receipts, "stalls": st_tot, "receipt_before_resume": st_before,
-            "receipt_5min": st_5min, "away": away, "away_receipt_5min": away_rec}
+                hit = count_in(s.receipts, b, b + RECEIPT_WIN) > 0
+                away_rec += hit
+                if b + RECEIPT_WIN <= s.t_end:
+                    away_tracked += 1
+                    away_rec_tracked += hit
+    return {"span_ms": span, "obs_ms": obs, "receipts_by_kind": kinds, "stalls": st_tot,
+            "receipt_before_resume": st_before, "receipt_5min": st_5min, "stalls_resumed": st_resumed,
+            "receipt_before_resume_resumed": st_before_resumed, "stalls_tracked_5min": st_tracked,
+            "receipt_5min_tracked": st_5min_tracked, "away": away, "away_receipt_5min": away_rec,
+            "away_tracked_5min": away_tracked, "away_receipt_5min_tracked": away_rec_tracked}
 
 
 def writer_l6(sessions):
@@ -250,7 +280,8 @@ def writer_l6(sessions):
             tdef = 0 if dfrom is None else max(0.0, b - max(a, dfrom)) if dfrom < b else 0
             row[k] = {"stall_per_h": n / (ob / H) if ob > 0 else None,
                       "p_ge": sum(1 for r in fr if r[1] >= P_TRIG) / len(fr) if fr else None,
-                      "x_median": statistics.median([r[2] for r in fr if r[2] is not None]) if fr else None,
+                      "x_median": statistics.median(xv) if (xv := [r[2] for r in fr if r[2] is not None
+                                                                     and math.isfinite(r[2])]) else None,
                       "theta_defined_frac": tdef / (b - a) if b > a else None}
         out.append(row)
     return out
@@ -282,9 +313,10 @@ def summarize(writers, normal, has_click):
                  "ewma_x_median": quart([x["x_median"] for x in l2]),
                  "ewma_x_p90": quart([x["x_p90"] for x in l2]),
                  "current_trigger_per_h": quart([x["fires_per_h"] for x in l2]),
-                 "current_trigger_writers_with_zero": sum(1 for x in l2 if x["fires"] == 0)}
+                 "current_trigger_writers_with_zero": sum(1 for x in l2 if x["fires"] == 0),
+                 "p_stuck_nonfinite_rows": pooled(sum(x["nonfinite_p"] for x in l2), sum(x["rows"] for x in l2))}
     l3w = [writer_l3(w, normal) for w in writers]
-    names = ["nontext", "nav"] + (["click"] if has_click else [])
+    names = ["nontext", "nav", "delete", "other_nontext", "hand_excl_delete"] + (["click"] if has_click else [])
     l3 = {}
     for side in ("pre", "post"):
         for nm in names:
@@ -299,9 +331,18 @@ def summarize(writers, normal, has_click):
 
 def summarize_l4(writers):
     l4 = [writer_l4(w) for w in writers]
+    kinds = sorted({k for x in l4 for k in x["receipts_by_kind"]})
+    sm = lambda key: sum(x[key] for x in l4)  # noqa: E731
     return {"writers": len(l4),
-            "receipt_per_h": quart([x["receipts"] / (x["span_ms"] / H) for x in l4 if x["span_ms"] > 0]),
-            "receipt_writers_with_zero": sum(1 for x in l4 if x["receipts"] == 0),
+            "receipt_per_h_by_kind": {k: quart([x["receipts_by_kind"].get(k, 0) / (x["obs_ms"] / H) for x in l4
+                                                if x["obs_ms"] > 0]) for k in kinds},
+            "receipt_writers_with_zero_by_kind": {k: sum(1 for x in l4 if x["receipts_by_kind"].get(k, 0) == 0)
+                                                  for k in kinds},
+            "stall_receipt_before_resume_resumed_only": pooled(sm("receipt_before_resume_resumed"),
+                                                               sm("stalls_resumed")),
+            "stall_receipt_within_5min_tracked_only": pooled(sm("receipt_5min_tracked"), sm("stalls_tracked_5min")),
+            "away_receipt_within_5min_tracked_only": pooled(sm("away_receipt_5min_tracked"),
+                                                            sm("away_tracked_5min")),
             "stall_receipt_before_resume": pooled(sum(x["receipt_before_resume"] for x in l4),
                                                   sum(x["stalls"] for x in l4)),
             "stall_receipt_within_5min": pooled(sum(x["receipt_5min"] for x in l4), sum(x["stalls"] for x in l4)),
@@ -333,12 +374,13 @@ def summarize_l6(writers):
 
 def summarize_l5(writers):
     """CoAuthor: θ が定義され観測 5 分以上のセッションが 5 本以上ある書き手。"""
-    rates, thetas, counts = [], [], []
+    rates, thetas, counts, obs_h = [], [], [], []
     for w in writers:
         ok = [s for s in w if s.theta.defined_from is not None and s.obs_ms() >= L5_MIN_OBS]
         if len(ok) < L5_MIN_SESSIONS:
             continue
         rates.append([len(s.onsets) / (s.obs_ms() / H) for s in ok])
+        obs_h.append([s.obs_ms() / H for s in ok])
         thetas.append([s.theta_last() / 1000 for s in ok])
         counts += [len(s.onsets) for s in ok]
 
@@ -354,8 +396,11 @@ def summarize_l5(writers):
                 "sd_within_mean": round(statistics.mean(statistics.stdev(g) for g in groups), 4),
                 "between_share": round(var_between / (var_between + var_within), 4)
                 if var_between + var_within > 0 else None}
+    # レビューの後に足した（判定に使わない）: 書き手の平均の率のポアソンで、数え上げだけから出る書き手の中の SD
+    pois = [statistics.mean(math.sqrt(statistics.mean(g) / h) for h in hs) for g, hs in zip(rates, obs_h)]
     return {"stall_per_h": decompose(rates), "theta_last_s": decompose(thetas),
-            "stalls_per_session": quart(counts)}
+            "stalls_per_session": quart(counts),
+            "stall_per_h_within_sd_expected_from_poisson_mean": round(statistics.mean(pois), 4) if pois else None}
 
 
 # ---------- 読み込み ----------
@@ -378,27 +423,47 @@ def load_klicke(tar_p, side_p, hold):
     return out, seen_hold
 
 
-def load_coauthor(work, hold_n):
+def load_coauthor(work, hold_w_idx=frozenset()):
     sess_w = json.load(open(os.path.join(work, "sessions.json")))
     by_w = {}
     for p in sorted(glob.glob(os.path.join(work, "s*.json"))):
         k = os.path.basename(p)[1:-5]
         if k not in sess_w:
             continue
+        if sess_w[k] in hold_w_idx:
+            sys.exit("取っておく書き手が CoAuthor の中間に入っている")
         d = json.load(open(p))
-        rec = [t for t, n in d["events"] if n in ("suggestion-select", "multi-insert")]
+        kinds = {n: [t for t, m in d["events"] if m == n] for n in ("suggestion-select", "multi-insert")}
+        rec = kinds["suggestion-select"] + kinds["multi-insert"]
         ai = [t for t, n in d["events"] if n.startswith("suggestion") or n == "api-insert"]
-        by_w.setdefault(sess_w[k], []).append(Session(d, receipts=rec, ai=ai))
+        by_w.setdefault(sess_w[k], []).append(Session(d, receipts=rec, ai=ai, receipt_kinds=kinds))
     return [by_w[w] for w in sorted(by_w)]
 
 
-def run(tar_p, side_p, cwork, hold_p, out_dir):
+def coauthor_hold_idx(czip, metas, hold_ids):
+    """build_coauthor.py と同じ並べ方で、取っておく書き手の通し番号を作り直す（C2 の照合のため）。"""
+    import csv
+    import zipfile
+    sid2w = {}
+    for p in metas:
+        for r in csv.DictReader(open(p, encoding="utf-8")):
+            sid2w[r["session_id"]] = r["worker_id"]
+    with zipfile.ZipFile(czip) as z:
+        sids = {os.path.basename(m)[:-len(".jsonl")] for m in z.namelist() if m.endswith(".jsonl")}
+    workers = sorted(set(sid2w[s] for s in sids & set(sid2w)))
+    idx = {i for i, w in enumerate(workers) if w in hold_ids}
+    if len(idx) != len(hold_ids & set(workers)):
+        sys.exit("取っておく書き手の通し番号を作り直せない")
+    return idx
+
+
+def run(tar_p, side_p, cwork, hold_p, out_dir, czip, *metas):
     hold = json.load(open(hold_p))
     kw, seen = load_klicke(tar_p, side_p, set(hold["klicke"]))
     side_keys = set(json.load(open(side_p)))
     if side_keys & {"%05d" % i for i in hold["klicke"]}:
         sys.exit("取っておく書き手が KLiCKe の補いに入っている")
-    cw = load_coauthor(cwork, len(hold["coauthor"]))
+    cw = load_coauthor(cwork, coauthor_hold_idx(czip, metas, set(hold["coauthor"])))
     counts = {"klicke": {"writers_loaded": len(kw), "holdout_skipped_in_tar": seen},
               "coauthor": {"writers_loaded": len(cw), "sessions_loaded": sum(len(w) for w in cw)}}
     k_el = [w for w in kw if sum(s.obs_ms() for s in w) >= MIN_WRITER_OBS]
@@ -448,6 +513,11 @@ def selftest():
     l4 = writer_l4([s])
     # 受領は再開の時刻と同じ（含む）
     assert l4["receipt_before_resume"] == 1 and l4["receipt_5min"] == 1 and l4["away"] == 0
+    l4b = writer_l4([s])
+    assert l4b["stalls_resumed"] == 1 and l4b["stalls_tracked_5min"] == 0  # 235 秒 + 5 分 > 終わり 308 秒
+    assert l3[0]["pre_hand_excl_delete"] and not l3[0]["pre_delete"]
+    l6 = writer_l6([s])
+    assert len(l6) == 1 and l6[0][2]["stall_per_h"] is not None or l6[0][1]["stall_per_h"] is not None
     print("selftest ok")
 
 
@@ -455,4 +525,4 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--selftest"]:
         selftest()
     else:
-        run(*sys.argv[1:6])
+        run(*sys.argv[1:])

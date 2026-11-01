@@ -29,7 +29,9 @@ python3 -I "$SC/klicke_side.py" "$KZIP" "$LAND/holdout.json" "$LAND/klicke_side.
 rm -rf "$LAND/coauthor_work"
 python3 -I "$SC/build_coauthor.py" "$CZIP" "$BIN" "$LAND/holdout.json" "$LAND/coauthor_work" "${JOBS:-6}" "${META[@]}" ${LIMIT:+--limit "$LIMIT"}
 cp "$LAND/coauthor_work/build_summary.json" "$OUT/coauthor_build_summary.json"
-python3 -I "$SC/analyze_landscape.py" "$KTAR" "$LAND/klicke_side.json" "$LAND/coauthor_work" "$LAND/holdout.json" "$OUT"
+python3 -I "$SC/analyze_landscape.py" "$KTAR" "$LAND/klicke_side.json" "$LAND/coauthor_work" "$LAND/holdout.json" "$OUT" "$CZIP" "${META[@]}"
+# 事後（conditions.md に無い・判定に使わない）
+python3 -I "$SC/posthoc.py" "$KTAR" "$LAND/klicke_side.json" "$LAND/coauthor_work" "$LAND/holdout.json" "$OUT/posthoc.json" "$CZIP" "${META[@]}" > /dev/null
 python3 -I -c "import json,sys,hashlib,glob,os;h=lambda p:hashlib.sha256(open(p,'rb').read()).hexdigest();json.dump({'git_head':sys.argv[1],'git_dirty_paths':[l for l in sys.argv[2].splitlines() if l],'gse_replay_sha256':h(sys.argv[3]),'klicke_work_tar_sha256':h(sys.argv[4]),'scripts_sha256':{os.path.relpath(os.path.realpath(p),os.path.realpath(sys.argv[6]+'/..')):h(p) for p in sorted(glob.glob(sys.argv[5]+'/*.py'))+[sys.argv[6]+'/../20261101-klicke-early-stall-trigger/scripts/analyze_item2.py',sys.argv[6]+'/../20261101-klicke-early-stall-trigger/scripts/convert_klicke.py',sys.argv[6]+'/../20261031-coauthor-pre-request-signal/scripts/convert.py',sys.argv[6]+'/../20261031-coauthor-pre-request-signal/scripts/add_feat.py']}},open(sys.argv[7],'w'),indent=1)" \
   "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$(git -C "$REPO_ROOT" status --porcelain -- experiments/20261102-public-data-landscape/scripts experiments/20261102-public-data-landscape/run.sh)" \
   "$BIN" "$KTAR" "$SC" "$EXP_DIR" "$OUT/provenance.json"
