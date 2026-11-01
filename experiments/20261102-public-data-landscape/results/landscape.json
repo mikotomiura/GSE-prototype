@@ -1,0 +1,842 @@
+{
+ "klicke": {
+  "writers": 3434,
+  "L1": {
+   "gap_share_pooled": {
+    "2": {
+     "num": 277442,
+     "den": 11612400,
+     "ratio": 0.0239
+    },
+    "5": {
+     "num": 119309,
+     "den": 11612400,
+     "ratio": 0.0103
+    },
+    "10": {
+     "num": 60515,
+     "den": 11612400,
+     "ratio": 0.0052
+    },
+    "30": {
+     "num": 17941,
+     "den": 11612400,
+     "ratio": 0.0015
+    },
+    "60": {
+     "num": 7430,
+     "den": 11612400,
+     "ratio": 0.0006
+    },
+    "180": {
+     "num": 1433,
+     "den": 11612400,
+     "ratio": 0.0001
+    }
+   },
+   "gap_per_h": {
+    "2": {
+     "n": 3434,
+     "q1": 136.4422,
+     "median": 178.3991,
+     "q3": 220.9763
+    },
+    "5": {
+     "n": 3434,
+     "q1": 56.741,
+     "median": 75.9558,
+     "q3": 95.8538
+    },
+    "10": {
+     "n": 3434,
+     "q1": 27.4729,
+     "median": 38.366,
+     "q3": 49.173
+    },
+    "30": {
+     "n": 3434,
+     "q1": 6.2501,
+     "median": 10.4817,
+     "q3": 15.33
+    },
+    "60": {
+     "n": 3434,
+     "q1": 2.0581,
+     "median": 4.1765,
+     "q3": 6.8726
+    },
+    "180": {
+     "n": 3434,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 2.086
+    }
+   },
+   "theta_last_s": {
+    "n": 3434,
+    "q1": 3.423,
+    "median": 5.2805,
+    "q3": 8.2732
+   },
+   "stall_per_h": {
+    "n": 3434,
+    "q1": 8.546,
+    "median": 13.3498,
+    "q3": 19.3375
+   },
+   "stalls": 23000,
+   "stall_duration_s": {
+    "n": 22716,
+    "q1": 3.653,
+    "median": 14.4645,
+    "q3": 44.0378
+   },
+   "stall_censored": 284
+  },
+  "L2": {
+   "writers": 3434,
+   "p_stuck_median": {
+    "n": 3434,
+    "q1": 0.0144,
+    "median": 0.0144,
+    "q3": 0.0144
+   },
+   "p_stuck_ge_060_share": {
+    "n": 3434,
+    "q1": 0.0098,
+    "median": 0.0308,
+    "q3": 0.0782
+   },
+   "p_stuck_ge_060_writers_with_zero": 232,
+   "ewma_x_median": {
+    "n": 3434,
+    "q1": 0.171,
+    "median": 0.2023,
+    "q3": 0.2816
+   },
+   "ewma_x_p90": {
+    "n": 3434,
+    "q1": 0.3706,
+    "median": 0.4607,
+    "q3": 0.5274
+   },
+   "current_trigger_per_h": {
+    "n": 3434,
+    "q1": 0.0,
+    "median": 0.0,
+    "q3": 2.1988
+   },
+   "current_trigger_writers_with_zero": 1887
+  },
+  "L3": {
+   "pre_nontext": {
+    "pooled": {
+     "num": 12435,
+     "den": 23000,
+     "ratio": 0.5407
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.3333,
+     "median": 0.542,
+     "q3": 0.7273
+    }
+   },
+   "pre_nav": {
+    "pooled": {
+     "num": 1993,
+     "den": 23000,
+     "ratio": 0.0867
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.125
+    }
+   },
+   "pre_click": {
+    "pooled": {
+     "num": 8380,
+     "den": 23000,
+     "ratio": 0.3643
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.1667,
+     "median": 0.3333,
+     "q3": 0.5714
+    }
+   },
+   "post_nontext": {
+    "pooled": {
+     "num": 10428,
+     "den": 23000,
+     "ratio": 0.4534
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.2857,
+     "median": 0.4615,
+     "q3": 0.625
+    }
+   },
+   "post_nav": {
+    "pooled": {
+     "num": 1509,
+     "den": 23000,
+     "ratio": 0.0656
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0769
+    }
+   },
+   "post_click": {
+    "pooled": {
+     "num": 10136,
+     "den": 23000,
+     "ratio": 0.4407
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.2,
+     "median": 0.433,
+     "q3": 0.6667
+    }
+   }
+  },
+  "L4": {
+   "writers": 3434,
+   "receipt_per_h": {
+    "n": 3434,
+    "q1": 0.0,
+    "median": 0.0,
+    "q3": 0.0
+   },
+   "receipt_writers_with_zero": 3012,
+   "stall_receipt_before_resume": {
+    "num": 30,
+    "den": 23000,
+    "ratio": 0.0013
+   },
+   "stall_receipt_within_5min": {
+    "num": 600,
+    "den": 23000,
+    "ratio": 0.0261
+   },
+   "away_per_h": {
+    "n": 3434,
+    "q1": 0.0,
+    "median": 0.0,
+    "q3": 2.086
+   },
+   "away_count_per_writer": {
+    "n": 3434,
+    "q1": 0.0,
+    "median": 0.0,
+    "q3": 1.0
+   },
+   "away_writers_with_zero": 2266,
+   "away_receipt_within_5min": {
+    "num": 30,
+    "den": 1433,
+    "ratio": 0.0209
+   }
+  },
+  "L6": {
+   "early": {
+    "stall_per_h": {
+     "n": 3434,
+     "q1": 0.0,
+     "median": 6.57,
+     "q3": 13.1822
+    },
+    "p_ge": {
+     "n": 3434,
+     "q1": 0.0,
+     "median": 0.0094,
+     "q3": 0.0291
+    },
+    "x_median": {
+     "n": 3434,
+     "q1": 0.0914,
+     "median": 0.167,
+     "q3": 0.2401
+    },
+    "theta_defined_frac": {
+     "n": 3434,
+     "q1": 0.8883,
+     "median": 0.9291,
+     "q3": 0.9516
+    }
+   },
+   "middle": {
+    "stall_per_h": {
+     "n": 3428,
+     "q1": 6.2891,
+     "median": 12.6275,
+     "q3": 20.3595
+    },
+    "p_ge": {
+     "n": 3428,
+     "q1": 0.0,
+     "median": 0.0119,
+     "q3": 0.0462
+    },
+    "x_median": {
+     "n": 3428,
+     "q1": 0.1414,
+     "median": 0.2,
+     "q3": 0.281
+    },
+    "theta_defined_frac": {
+     "n": 3434,
+     "q1": 1.0,
+     "median": 1.0,
+     "q3": 1.0
+    }
+   },
+   "late": {
+    "stall_per_h": {
+     "n": 3416,
+     "q1": 7.8296,
+     "median": 18.3101,
+     "q3": 28.0918
+    },
+    "p_ge": {
+     "n": 3416,
+     "q1": 0.0033,
+     "median": 0.0281,
+     "q3": 0.1316
+    },
+    "x_median": {
+     "n": 3416,
+     "q1": 0.1998,
+     "median": 0.2548,
+     "q3": 0.3645
+    },
+    "theta_defined_frac": {
+     "n": 3434,
+     "q1": 1.0,
+     "median": 1.0,
+     "q3": 1.0
+    }
+   },
+   "writers": 3434
+  }
+ },
+ "coauthor_normal": {
+  "writers": 41,
+  "L1": {
+   "gap_share_pooled": {
+    "2": {
+     "num": 6692,
+     "den": 463811,
+     "ratio": 0.0144
+    },
+    "5": {
+     "num": 2480,
+     "den": 463811,
+     "ratio": 0.0053
+    },
+    "10": {
+     "num": 1243,
+     "den": 463811,
+     "ratio": 0.0027
+    },
+    "30": {
+     "num": 339,
+     "den": 463811,
+     "ratio": 0.0007
+    },
+    "60": {
+     "num": 32,
+     "den": 463811,
+     "ratio": 0.0001
+    },
+    "180": {
+     "num": 3,
+     "den": 463811,
+     "ratio": 0.0
+    }
+   },
+   "gap_per_h": {
+    "2": {
+     "n": 39,
+     "q1": 145.3393,
+     "median": 185.75,
+     "q3": 243.683
+    },
+    "5": {
+     "n": 39,
+     "q1": 44.402,
+     "median": 58.6785,
+     "q3": 74.5925
+    },
+    "10": {
+     "n": 39,
+     "q1": 11.8953,
+     "median": 24.7057,
+     "q3": 39.0356
+    },
+    "30": {
+     "n": 39,
+     "q1": 0.0,
+     "median": 0.2693,
+     "q3": 6.8949
+    },
+    "60": {
+     "n": 39,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0
+    },
+    "180": {
+     "n": 39,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0
+    }
+   },
+   "theta_last_s": {
+    "n": 41,
+    "q1": 2.525,
+    "median": 3.682,
+    "q3": 6.542
+   },
+   "stall_per_h": {
+    "n": 41,
+    "q1": 0.0,
+    "median": 0.598,
+    "q3": 5.8755
+   },
+   "stalls": 354,
+   "stall_duration_s": {
+    "n": 333,
+    "q1": 2.44,
+    "median": 6.389,
+    "q3": 13.53
+   },
+   "stall_censored": 21
+  },
+  "L2": {
+   "writers": 41,
+   "p_stuck_median": {
+    "n": 41,
+    "q1": 0.0095,
+    "median": 0.0098,
+    "q3": 0.0144
+   },
+   "p_stuck_ge_060_share": {
+    "n": 41,
+    "q1": 0.0079,
+    "median": 0.0223,
+    "q3": 0.0772
+   },
+   "p_stuck_ge_060_writers_with_zero": 6,
+   "ewma_x_median": {
+    "n": 41,
+    "q1": 0.0601,
+    "median": 0.1213,
+    "q3": 0.2342
+   },
+   "ewma_x_p90": {
+    "n": 41,
+    "q1": 0.297,
+    "median": 0.3578,
+    "q3": 0.5
+   },
+   "current_trigger_per_h": {
+    "n": 41,
+    "q1": 0.0,
+    "median": 0.0,
+    "q3": 0.8522
+   },
+   "current_trigger_writers_with_zero": 25
+  },
+  "L3": {
+   "pre_nontext": {
+    "pooled": {
+     "num": 103,
+     "den": 354,
+     "ratio": 0.291
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.3949,
+     "median": 0.6427,
+     "q3": 0.9643
+    }
+   },
+   "pre_nav": {
+    "pooled": {
+     "num": 70,
+     "den": 354,
+     "ratio": 0.1977
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.166,
+     "median": 0.3068,
+     "q3": 0.706
+    }
+   },
+   "post_nontext": {
+    "pooled": {
+     "num": 103,
+     "den": 354,
+     "ratio": 0.291
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.2479,
+     "median": 0.5966,
+     "q3": 0.8544
+    }
+   },
+   "post_nav": {
+    "pooled": {
+     "num": 88,
+     "den": 354,
+     "ratio": 0.2486
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.1226,
+     "median": 0.4286,
+     "q3": 0.8059
+    }
+   }
+  }
+ },
+ "coauthor_all": {
+  "writers": 41,
+  "L1": {
+   "gap_share_pooled": {
+    "2": {
+     "num": 42417,
+     "den": 2113998,
+     "ratio": 0.0201
+    },
+    "5": {
+     "num": 20639,
+     "den": 2113998,
+     "ratio": 0.0098
+    },
+    "10": {
+     "num": 11301,
+     "den": 2113998,
+     "ratio": 0.0053
+    },
+    "30": {
+     "num": 1585,
+     "den": 2113998,
+     "ratio": 0.0007
+    },
+    "60": {
+     "num": 202,
+     "den": 2113998,
+     "ratio": 0.0001
+    },
+    "180": {
+     "num": 6,
+     "den": 2113998,
+     "ratio": 0.0
+    }
+   },
+   "gap_per_h": {
+    "2": {
+     "n": 41,
+     "q1": 152.1976,
+     "median": 185.1466,
+     "q3": 228.4783
+    },
+    "5": {
+     "n": 41,
+     "q1": 68.5853,
+     "median": 83.3959,
+     "q3": 101.8181
+    },
+    "10": {
+     "n": 41,
+     "q1": 37.4102,
+     "median": 52.899,
+     "q3": 61.0194
+    },
+    "30": {
+     "n": 41,
+     "q1": 1.9121,
+     "median": 5.6105,
+     "q3": 8.6496
+    },
+    "60": {
+     "n": 41,
+     "q1": 0.0,
+     "median": 0.2497,
+     "q3": 1.3458
+    },
+    "180": {
+     "n": 41,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0
+    }
+   },
+   "theta_last_s": {
+    "n": 41,
+    "q1": 2.525,
+    "median": 3.682,
+    "q3": 6.542
+   },
+   "stall_per_h": {
+    "n": 41,
+    "q1": 3.5805,
+    "median": 7.1013,
+    "q3": 9.761
+   },
+   "stalls": 1518,
+   "stall_duration_s": {
+    "n": 1487,
+    "q1": 2.1095,
+    "median": 6.479,
+    "q3": 15.447
+   },
+   "stall_censored": 31
+  },
+  "L2": {
+   "writers": 41,
+   "p_stuck_median": {
+    "n": 41,
+    "q1": 0.0095,
+    "median": 0.0103,
+    "q3": 0.0142
+   },
+   "p_stuck_ge_060_share": {
+    "n": 41,
+    "q1": 0.018,
+    "median": 0.0303,
+    "q3": 0.0565
+   },
+   "p_stuck_ge_060_writers_with_zero": 0,
+   "ewma_x_median": {
+    "n": 41,
+    "q1": 0.0666,
+    "median": 0.1154,
+    "q3": 0.1951
+   },
+   "ewma_x_p90": {
+    "n": 41,
+    "q1": 0.3032,
+    "median": 0.3553,
+    "q3": 0.4651
+   },
+   "current_trigger_per_h": {
+    "n": 41,
+    "q1": 0.1732,
+    "median": 0.7694,
+    "q3": 2.491
+   },
+   "current_trigger_writers_with_zero": 9
+  },
+  "L3": {
+   "pre_nontext": {
+    "pooled": {
+     "num": 777,
+     "den": 1518,
+     "ratio": 0.5119
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.3835,
+     "median": 0.6716,
+     "q3": 0.8031
+    }
+   },
+   "pre_nav": {
+    "pooled": {
+     "num": 534,
+     "den": 1518,
+     "ratio": 0.3518
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.213,
+     "median": 0.4237,
+     "q3": 0.6667
+    }
+   },
+   "post_nontext": {
+    "pooled": {
+     "num": 504,
+     "den": 1518,
+     "ratio": 0.332
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.2099,
+     "median": 0.3944,
+     "q3": 0.485
+    }
+   },
+   "post_nav": {
+    "pooled": {
+     "num": 396,
+     "den": 1518,
+     "ratio": 0.2609
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.1203,
+     "median": 0.2605,
+     "q3": 0.3935
+    }
+   }
+  },
+  "L4": {
+   "writers": 41,
+   "receipt_per_h": {
+    "n": 41,
+    "q1": 27.1425,
+    "median": 36.0087,
+    "q3": 58.997
+   },
+   "receipt_writers_with_zero": 0,
+   "stall_receipt_before_resume": {
+    "num": 326,
+    "den": 1518,
+    "ratio": 0.2148
+   },
+   "stall_receipt_within_5min": {
+    "num": 953,
+    "den": 1518,
+    "ratio": 0.6278
+   },
+   "away_per_h": {
+    "n": 41,
+    "q1": 0.0,
+    "median": 0.0,
+    "q3": 0.0
+   },
+   "away_count_per_writer": {
+    "n": 41,
+    "q1": 0.0,
+    "median": 0,
+    "q3": 0.0
+   },
+   "away_writers_with_zero": 37,
+   "away_receipt_within_5min": {
+    "num": 2,
+    "den": 6,
+    "ratio": 0.3333
+   }
+  },
+  "L5": {
+   "stall_per_h": {
+    "writers": 31,
+    "sessions": 1130,
+    "grand_mean": 7.6847,
+    "sd_between_writer_means": 5.1136,
+    "sd_within_mean": 5.9832,
+    "between_share": 0.3908
+   },
+   "theta_last_s": {
+    "writers": 31,
+    "sessions": 1130,
+    "grand_mean": 5.9195,
+    "sd_between_writer_means": 5.0747,
+    "sd_within_mean": 2.7448,
+    "between_share": 0.5912
+   },
+   "stalls_per_session": {
+    "n": 1130,
+    "q1": 0.0,
+    "median": 1.0,
+    "q3": 2.0
+   }
+  },
+  "L6": {
+   "early": {
+    "stall_per_h": {
+     "n": 41,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0
+    },
+    "p_ge": {
+     "n": 41,
+     "q1": 0.0047,
+     "median": 0.0235,
+     "q3": 0.0369
+    },
+    "x_median": {
+     "n": 41,
+     "q1": 0.0718,
+     "median": 0.1219,
+     "q3": 0.2013
+    },
+    "theta_defined_frac": {
+     "n": 41,
+     "q1": 0.7692,
+     "median": 0.8374,
+     "q3": 0.8782
+    }
+   },
+   "middle": {
+    "stall_per_h": {
+     "n": 41,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0
+    },
+    "p_ge": {
+     "n": 41,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0101
+    },
+    "x_median": {
+     "n": 41,
+     "q1": 0.0662,
+     "median": 0.1018,
+     "q3": 0.1937
+    },
+    "theta_defined_frac": {
+     "n": 41,
+     "q1": 1.0,
+     "median": 1.0,
+     "q3": 1.0
+    }
+   },
+   "late": {
+    "stall_per_h": {
+     "n": 41,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 15.3813
+    },
+    "p_ge": {
+     "n": 41,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0113
+    },
+    "x_median": {
+     "n": 41,
+     "q1": 0.0495,
+     "median": 0.0877,
+     "q3": 0.1831
+    },
+    "theta_defined_frac": {
+     "n": 41,
+     "q1": 1.0,
+     "median": 1.0,
+     "q3": 1.0
+    }
+   },
+   "writers": 41
+  }
+ }
+}
