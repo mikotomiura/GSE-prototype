@@ -53,9 +53,12 @@
 - 一次: T1 の枝にある `.steering/_handoff/next-session-gse-invitation-wiring.md`（main にはまだ無い）。記録は同じ枝の `.steering/20261031-nudge-default-off/` と `.steering/20261101-invitation-wiring/`。最後の検証は d83d0468 で `cargo test --workspace` 1054 passed・clippy 0・tsc 0・emit_schema byte-equal。
 - 残り（この順）
   1. 実機の確かめ（研究者が押す。トレイの後から差し込む項目は AX から見えないため。手順は上の一次の §1 の 1）。
-  2. `git fetch` し、origin/main を取り込む（T2・T3 と、このメモの後のコミット）。テストを回し直す。G-GEAR が空いているかを研究者に確かめてから push する（`feature/*` は self-hosted の CI が走る）。PR も研究者に確かめてから出す。
-  3. gse-dataset の schema parity（`InvitationCondition` が増えた・同期は別作業）。
-  4. push の時に `_handoff/README.md` の T1 の行を更新する。
+  2. `git fetch` し、origin/main を取り込む（T2・T3 と、このメモの後のコミット）。テストを回し直す（`cargo test --workspace`・clippy・tsc・emit_schema）。
+  3. 枝を push だけする（研究者の決定・2026-11-02）。G-GEAR で重い計算が走っていて self-hosted の CI を回せないため、push する先頭のコミット（取り込みのマージのコミット）に `[skip ci]` を付ける。`feature/*` への push は CI を起動するので、付け忘れない。目的は、手元にしか無い 19 コミットをリモートに逃がすこと。
+     - main へは入れない。PR も出さない。コードの変更（29 ファイル）で、Windows でのコンパイルと schema の一致は CI でしか確かめられないため（memory `windows-only-code-needs-ci`）。
+     - main へ入れるのは、G-GEAR が空いたと研究者が言ってから。そのときに CI を通し、PR を研究者に確かめてから出す。
+  4. gse-dataset の schema parity（`InvitationCondition` が増えた・同期は別作業）。
+  5. push の時に `_handoff/README.md` の T1 の行を更新する。
 - 合流に回すこと: 説明と設定の窓の文（`InvitationSettings.tsx`）が推定器の契機を前提にしている点、通常のモードの同意文書の扱い、契機の中身。
 - ディスク: T1 の worktree のビルドの中間は 2.9 GB ある。テストを回し直すと増えるので、俯瞰の重い段と同じ時に回さない。空きが 3 GB を切ったら止める。
 
