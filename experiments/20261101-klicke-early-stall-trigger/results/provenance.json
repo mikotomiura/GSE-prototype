@@ -1,5 +1,15 @@
 {
  "git_head": "182c8bdb2cca3f376f949e34e12f9b5d8992b988",
  "gse_replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
- "zip_sha256": "ffa4d753fdb9a54f5cadd6836426d56a0cabe73ceade8e7e40dddbbae178555d"
+ "zip_sha256": "ffa4d753fdb9a54f5cadd6836426d56a0cabe73ceade8e7e40dddbbae178555d",
+ "scripts_sha256_at_run": {
+  "analyze_item2.py": "426fcc728c3bf24d6928375af274ed4b3c2a8ec172b7a675f4c55d4a953d73c6",
+  "build_work.py": "3b148e4ca2746d9948505355cf1e80cf91157317ed97165c18c64e01ab45e4c9",
+  "convert_klicke.py": "acb77a729527505d82cb7bc8d0ac2dd642065742f4d9ba9bb6022d6236ee052a",
+  "vocabulary.py": "68347f4a3b3cee54df66fde52264b3b9ae4a08f0cc7178c4941f7c64100e72c1",
+  "run.sh": "dd60386247ab076d989b59e1530b43e873f7b38443a0d361e6e0b4635186eb02",
+  "add_feat.py": "f8d402dd1ecd5400e9c7700cd6385d59198023ae025b4390d6494d66e01ec2a7"
+ },
+ "scripts_commit_at_run": "b6b611ad",
+ "note": "git_head は run.sh を走らせた時点の HEAD（182c8bdb）で、スクリプトはまだコミットされていなかった。走らせたスクリプトは b6b611ad でコミットした版と同じ（走らせた後に変更していない）。convert_klicke.py は走っている間に 1 秒ほど書き換えて戻した（notes.md の逸脱 4・件数の照合で混入なし）。key_vocabulary.json はレビューの後に非 ASCII の 1 字を畳んで作り直した（category の件数は同じ）。"
 }

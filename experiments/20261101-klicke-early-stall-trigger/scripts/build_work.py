@@ -27,8 +27,6 @@ MIN_PRESSES = 200  # K3
 def one(args):
     zp, member, idx, replay, add_feat, work = args
     out = os.path.join(work, "w%05d.json" % idx)
-    if os.path.exists(out):
-        return {"status": "done_before"}
     with zipfile.ZipFile(zp) as z:
         raw = z.read(member)
     try:
@@ -75,6 +73,8 @@ def main():
     jobs = int(sys.argv[5]) if len(sys.argv) > 5 else 4
     limit = int(sys.argv[6]) if len(sys.argv) > 6 else None
     os.makedirs(work, exist_ok=True)
+    if any(n.startswith("w") and n.endswith(".json") for n in os.listdir(work)):
+        sys.exit("work_dir に前の中間がある。空の場所で作り直す（中間を使い回さない）")
     with zipfile.ZipFile(zp) as z:
         members = sorted(m for m in z.namelist() if "keystrokelogs/csv/" in m and m.endswith(".csv"))
     if limit:
@@ -87,6 +87,8 @@ def main():
     json.dump({"members": len(members), "status": status}, open(os.path.join(work, "build_summary.json"), "w"),
               indent=1)
     print(json.dumps(status))
+    if status["ok"] != len(members):
+        sys.exit("ok でないセッションがある: %s" % json.dumps(status))
 
 
 if __name__ == "__main__":

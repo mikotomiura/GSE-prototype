@@ -13,7 +13,7 @@
 |---|---|---|
 | **GSE: 3 本の並行（T1 実装・T2 項目 2・T3 フォーカス）のまとめ役** | **`next-session-gse-three-parallel-tracks.md`**（2026-11-01） | **現行**。各セッションの入口の文・ぶつからないための約束（worktree・CI・main へのマージ・台帳・ディスク）・合流の仕方。個別の中身は下の 3 行 |
 | **GSE 本体: Nudge の既定の無効化と招待の配線**（ADR-040 Migration 1・2・実装・下の行と並行可） | **`next-session-gse-nudge-off-and-invitation-wiring.md`**（2026-10-31） | **現行**。決定は `.steering/20261031-gse-small-n-research-design/decisions.md` 判断 10〜18 |
-| **GSE: 公開データの当てはめ 項目 2（KLiCKe・Kaggle・作文中の値の分布と誤発火の基準）** | **`next-session-gse-public-data-fit-item2.md`**（2026-11-01） | **現行**。項目 1 と案 A は完了（2026-11-01・`experiments/20261031-coauthor-pre-request-signal/`・`experiments/20261101-coauthor-pre-stall-signal/`）。新しいセッションで始める |
+| ~~GSE: 公開データの当てはめ 項目 2（KLiCKe・作文中の値の分布と誤発火の基準）~~ | `next-session-gse-public-data-fit-item2.md`（2026-11-01） | 完了（2026-11-01・`experiments/20261101-klicke-early-stall-trigger/`・`.steering/20261101-gse-public-data-fit-item2/` 判断 4）。4,907 人で、止まりの初期（最後の文字から 0.5θ・0.75θ）は 182・124 回/時で停滞に至る 6%・9%、停滞の時計からは t0 の 1〜2 秒前（定義から）、今の契機は中央値 0 回/時。案 A の追試は AUC 0.512・0.518（上がっているがごく小さい）。合流は three-parallel-tracks §4 |
 | **GSE: 止まりの最中にフォーカスを離れることは受領に先立つか（招待の契機の候補・オフライン）**（上下の行と並行可） | **`next-session-gse-focus-leave-before-receipt.md`**（2026-11-01） | **完了（2026-11-01・T3）**。研究者本人の O1 の 12 日で、5 分の RR 1.29（0.99〜1.67）＝「見えない」。誤発火 75%・遷移の 79% は停滞の検出の前。結果は `experiments/20261101-focus-leave-before-receipt/notes.md`、判断は `.steering/20261101-gse-focus-leave-before-receipt/decisions.md`。合流（three-parallel-tracks §4）の材料 |
 | GSE: 公開データ・既存の資産の当てはめ（項目 1〜7 の計画） | `next-session-gse-public-data-fit.md`（2026-10-31） | 計画の表として参照。項目 1 は完了・次は上の行 |
 | ~~GSE: 少人数の研究設計（research-positioning・WBS の改訂案）~~ | `next-session-gse-small-n-design-revision.md`（2026-10-31） | 完了（同日・判断 10〜17・ADR-040）。上の 2 行へ |

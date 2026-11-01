@@ -1,7 +1,7 @@
 """全セッションの DownEvent の値の種類と件数、category ごとの件数、読めなかった数を数える（K3・値ごとの件数だけ）。
 
 使い方: python3 -I vocabulary.py <WritingTask.zip> <out.json>
-1 字の英字・数字は値を畳む（英字 1 字・数字 1 字）。それ以外の値は名前と件数を出す（キーの名前で、本文ではない）。
+1 字の英字・数字・非 ASCII は値を畳む。それ以外の値は名前と件数を出す（キーの名前で、本文ではない）。
 """
 import json
 import os
@@ -30,6 +30,8 @@ with zipfile.ZipFile(zp) as z:
             cats[c] += 1
             if c in ("alphabetic", "numeric"):
                 vocab["<1 字の%s>" % c] += 1
+            elif len(name) == 1 and not name.isascii():
+                vocab["<1 字の非 ASCII>"] += 1  # 打った文字の断片を値のまま出さない（レビュー指摘）
             else:
                 vocab[name] += 1
 json.dump({"files": n_files, "read_errors": errs, "encoding": enc, "category_counts": cats,

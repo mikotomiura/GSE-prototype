@@ -378,6 +378,9 @@ def main():
     check_only = "--check-only" in sys.argv
     os.makedirs(out, exist_ok=True)
     paths = sorted(glob.glob(os.path.join(wd, "w*.json")))
+    summary = json.load(open(os.path.join(wd, "build_summary.json")))
+    if len(paths) != summary["members"] or summary["status"].get("ok") != summary["members"]:
+        sys.exit("中間の数が build_summary と合わない（欠けた書き手のまま照合しない）")
     writers = []
     chk = {"writers": 0, "onsets_replay": 0, "onsets_replicated": 0, "writers_onset_mismatch": 0,
            "theta_mismatch": 0}
