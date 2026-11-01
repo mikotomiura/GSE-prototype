@@ -1,13 +1,14 @@
 {
- "git_head": "e249c31d96a8cbffdb8a04518ecab8588c337bfd",
+ "git_head": "0e61de285500a58528459b1240d2ff92b0396941",
  "git_dirty_paths": [],
  "gse_replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
  "klicke_work_tar_sha256": "97d0e6690f75db9be9b9c2475b4b084d0611c7d0135a27aa2e99cd39137ef365",
  "scripts_sha256": {
-  "20261102-public-data-landscape/scripts/analyze_landscape.py": "5d6d0178394949a508c2c0de840037b695f0aae524bb3a1e4072b14ef7977c37",
+  "20261102-public-data-landscape/scripts/analyze_landscape.py": "f1a107ddcdb43325745dbef1bdb957e6a56cdfbdbc72d330df2db6c09708d958",
   "20261102-public-data-landscape/scripts/build_coauthor.py": "ab5d4e66c9f3e766013cbb92945e5fc720869bd16369f2aa77f4a9f10e9f07ed",
   "20261102-public-data-landscape/scripts/klicke_side.py": "b756819814dd1b1b33b662df3cf255fe76312782bb19cc4791f3a1213cccb89f",
   "20261102-public-data-landscape/scripts/make_holdout.py": "0bbcbe5541329bd6b867054758fe1d0f69d502ecf114f2a8672ae12528b0f47f",
+  "20261102-public-data-landscape/scripts/posthoc.py": "62c8909fadd4031c93ef429fe0fbd3167e64d332f7bab9dc7725cbfbcbf0ba61",
   "20261101-klicke-early-stall-trigger/scripts/analyze_item2.py": "9c8ca6a498c034c49021a18221c29321e86d9dc6eade148ce8f48e5b46abcc22",
   "20261101-klicke-early-stall-trigger/scripts/convert_klicke.py": "acb77a729527505d82cb7bc8d0ac2dd642065742f4d9ba9bb6022d6236ee052a",
   "20261031-coauthor-pre-request-signal/scripts/convert.py": "23e12a71f00d9b5917a06f4b44cdcda13dde701c71a6f7680fa0f5dfc5206a78",

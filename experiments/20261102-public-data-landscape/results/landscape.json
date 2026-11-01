@@ -126,7 +126,12 @@
     "median": 0.0,
     "q3": 2.1988
    },
-   "current_trigger_writers_with_zero": 1887
+   "current_trigger_writers_with_zero": 1887,
+   "p_stuck_nonfinite_rows": {
+    "num": 0,
+    "den": 5498949,
+    "ratio": 0.0
+   }
   },
   "L3": {
    "pre_nontext": {
@@ -153,6 +158,45 @@
      "q1": 0.0,
      "median": 0.0,
      "q3": 0.125
+    }
+   },
+   "pre_delete": {
+    "pooled": {
+     "num": 11711,
+     "den": 23000,
+     "ratio": 0.5092
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.3,
+     "median": 0.5,
+     "q3": 0.6875
+    }
+   },
+   "pre_other_nontext": {
+    "pooled": {
+     "num": 5418,
+     "den": 23000,
+     "ratio": 0.2356
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.0,
+     "median": 0.2,
+     "q3": 0.375
+    }
+   },
+   "pre_hand_excl_delete": {
+    "pooled": {
+     "num": 11391,
+     "den": 23000,
+     "ratio": 0.4953
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.2857,
+     "median": 0.5,
+     "q3": 0.7143
     }
    },
    "pre_click": {
@@ -194,6 +238,45 @@
      "q3": 0.0769
     }
    },
+   "post_delete": {
+    "pooled": {
+     "num": 5659,
+     "den": 23000,
+     "ratio": 0.246
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.1,
+     "median": 0.2,
+     "q3": 0.375
+    }
+   },
+   "post_other_nontext": {
+    "pooled": {
+     "num": 6151,
+     "den": 23000,
+     "ratio": 0.2674
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.1111,
+     "median": 0.2222,
+     "q3": 0.4
+    }
+   },
+   "post_hand_excl_delete": {
+    "pooled": {
+     "num": 13654,
+     "den": 23000,
+     "ratio": 0.5937
+    },
+    "writer_median": {
+     "n": 2250,
+     "q1": 0.4167,
+     "median": 0.6364,
+     "q3": 0.8
+    }
+   },
    "post_click": {
     "pooled": {
      "num": 10136,
@@ -210,13 +293,32 @@
   },
   "L4": {
    "writers": 3434,
-   "receipt_per_h": {
-    "n": 3434,
-    "q1": 0.0,
-    "median": 0.0,
-    "q3": 0.0
+   "receipt_per_h_by_kind": {
+    "all": {
+     "n": 3434,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0
+    }
    },
-   "receipt_writers_with_zero": 3012,
+   "receipt_writers_with_zero_by_kind": {
+    "all": 3012
+   },
+   "stall_receipt_before_resume_resumed_only": {
+    "num": 30,
+    "den": 22716,
+    "ratio": 0.0013
+   },
+   "stall_receipt_within_5min_tracked_only": {
+    "num": 511,
+    "den": 16879,
+    "ratio": 0.0303
+   },
+   "away_receipt_within_5min_tracked_only": {
+    "num": 23,
+    "den": 673,
+    "ratio": 0.0342
+   },
    "stall_receipt_before_resume": {
     "num": 30,
     "den": 23000,
@@ -455,7 +557,12 @@
     "median": 0.0,
     "q3": 0.8522
    },
-   "current_trigger_writers_with_zero": 25
+   "current_trigger_writers_with_zero": 25,
+   "p_stuck_nonfinite_rows": {
+    "num": 0,
+    "den": 142933,
+    "ratio": 0.0
+   }
   },
   "L3": {
    "pre_nontext": {
@@ -484,6 +591,45 @@
      "q3": 0.706
     }
    },
+   "pre_delete": {
+    "pooled": {
+     "num": 76,
+     "den": 354,
+     "ratio": 0.2147
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.1392,
+     "median": 0.3986,
+     "q3": 0.7885
+    }
+   },
+   "pre_other_nontext": {
+    "pooled": {
+     "num": 70,
+     "den": 354,
+     "ratio": 0.1977
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.166,
+     "median": 0.3068,
+     "q3": 0.706
+    }
+   },
+   "pre_hand_excl_delete": {
+    "pooled": {
+     "num": 70,
+     "den": 354,
+     "ratio": 0.1977
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.166,
+     "median": 0.3068,
+     "q3": 0.706
+    }
+   },
    "post_nontext": {
     "pooled": {
      "num": 103,
@@ -498,6 +644,45 @@
     }
    },
    "post_nav": {
+    "pooled": {
+     "num": 88,
+     "den": 354,
+     "ratio": 0.2486
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.1226,
+     "median": 0.4286,
+     "q3": 0.8059
+    }
+   },
+   "post_delete": {
+    "pooled": {
+     "num": 48,
+     "den": 354,
+     "ratio": 0.1356
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.166,
+     "median": 0.3024,
+     "q3": 0.3794
+    }
+   },
+   "post_other_nontext": {
+    "pooled": {
+     "num": 88,
+     "den": 354,
+     "ratio": 0.2486
+    },
+    "writer_median": {
+     "n": 10,
+     "q1": 0.1226,
+     "median": 0.4286,
+     "q3": 0.8059
+    }
+   },
+   "post_hand_excl_delete": {
     "pooled": {
      "num": 88,
      "den": 354,
@@ -639,7 +824,12 @@
     "median": 0.7694,
     "q3": 2.491
    },
-   "current_trigger_writers_with_zero": 9
+   "current_trigger_writers_with_zero": 9,
+   "p_stuck_nonfinite_rows": {
+    "num": 0,
+    "den": 773084,
+    "ratio": 0.0
+   }
   },
   "L3": {
    "pre_nontext": {
@@ -656,6 +846,45 @@
     }
    },
    "pre_nav": {
+    "pooled": {
+     "num": 534,
+     "den": 1518,
+     "ratio": 0.3518
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.213,
+     "median": 0.4237,
+     "q3": 0.6667
+    }
+   },
+   "pre_delete": {
+    "pooled": {
+     "num": 647,
+     "den": 1518,
+     "ratio": 0.4262
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.3209,
+     "median": 0.5973,
+     "q3": 0.7088
+    }
+   },
+   "pre_other_nontext": {
+    "pooled": {
+     "num": 534,
+     "den": 1518,
+     "ratio": 0.3518
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.213,
+     "median": 0.4237,
+     "q3": 0.6667
+    }
+   },
+   "pre_hand_excl_delete": {
     "pooled": {
      "num": 534,
      "den": 1518,
@@ -693,17 +922,82 @@
      "median": 0.2605,
      "q3": 0.3935
     }
+   },
+   "post_delete": {
+    "pooled": {
+     "num": 292,
+     "den": 1518,
+     "ratio": 0.1924
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.146,
+     "median": 0.2247,
+     "q3": 0.2975
+    }
+   },
+   "post_other_nontext": {
+    "pooled": {
+     "num": 396,
+     "den": 1518,
+     "ratio": 0.2609
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.1203,
+     "median": 0.2605,
+     "q3": 0.3935
+    }
+   },
+   "post_hand_excl_delete": {
+    "pooled": {
+     "num": 396,
+     "den": 1518,
+     "ratio": 0.2609
+    },
+    "writer_median": {
+     "n": 32,
+     "q1": 0.1203,
+     "median": 0.2605,
+     "q3": 0.3935
+    }
    }
   },
   "L4": {
    "writers": 41,
-   "receipt_per_h": {
-    "n": 41,
-    "q1": 27.1425,
-    "median": 36.0087,
-    "q3": 58.997
+   "receipt_per_h_by_kind": {
+    "multi-insert": {
+     "n": 41,
+     "q1": 0.0,
+     "median": 0.651,
+     "q3": 2.3082
+    },
+    "suggestion-select": {
+     "n": 41,
+     "q1": 23.3371,
+     "median": 33.5508,
+     "q3": 53.2095
+    }
    },
-   "receipt_writers_with_zero": 0,
+   "receipt_writers_with_zero_by_kind": {
+    "multi-insert": 11,
+    "suggestion-select": 0
+   },
+   "stall_receipt_before_resume_resumed_only": {
+    "num": 326,
+    "den": 1487,
+    "ratio": 0.2192
+   },
+   "stall_receipt_within_5min_tracked_only": {
+    "num": 575,
+    "den": 710,
+    "ratio": 0.8099
+   },
+   "away_receipt_within_5min_tracked_only": {
+    "num": 1,
+    "den": 2,
+    "ratio": 0.5
+   },
    "stall_receipt_before_resume": {
     "num": 326,
     "den": 1518,
@@ -755,7 +1049,8 @@
     "q1": 0.0,
     "median": 1.0,
     "q3": 2.0
-   }
+   },
+   "stall_per_h_within_sd_expected_from_poisson_mean": 6.0694
   },
   "L6": {
    "early": {
