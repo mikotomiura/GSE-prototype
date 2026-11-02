@@ -7,5 +7,5 @@
 - [x] claim を 3 票で検証
 - [x] カード・references・_index
 - [x] check_citations 違反なし
-- [ ] code-reviewer ＋ /cross-review
+- [x] code-reviewer ＋ /cross-review（1 巡目・判断 5）
 - [ ] コミット・push（docs だけなので [skip ci]）

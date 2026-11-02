@@ -21,3 +21,13 @@
 
 ## 経緯の記録
 - 一次の取得で、出版社の PDF を curl で User-Agent を変えて取ろうとしたコマンドが自動判定で止められた。User-Agent を変えるのをやめ、Chrome で HTML を開いて読んだ。
+
+## 判断 5: /cross-review 1 巡目の指摘を直す（2026-11-02）
+- 決定: Codex 5 件と code-reviewer（HIGH 5・MEDIUM 6・LOW 5）を一次で確かめ、全件を採った。主な直し:
+  - 「公開」を 3 段（申請なし／要連絡／未確認）に定義し、判定不能の 0 件を「申請なしで取れると確かめたもの」に限った。要連絡・未確認で残る道（Erasmus MC・Naegelin ら・RLKWiC）を gate と含意に並べた。
+  - 二次の記述だけの claim を PLAUSIBLE BUT UNPROVEN に下げた（SWELL の uLog の中身＝3b・Clarkson II＝8）。Clarkson I の請求制を Clarkson II に流用していたのを未確認に直した。
+  - 件数の集計を台帳から数え直した（16 件＝台帳 13＋否決 3）。
+  - 本文を読んでいない候補の表のセルに「（報告）」を付けた。
+  - references: 書誌を API で確かめた行は active にして「⚠️ 本文未読」を添えた（citation-ssot ルール 5 は書誌の未確定の印）。[V358] [V361] だけ provisional に残した。[V351] の重複の列から [P219]（別の論文）を外した。
+  - code-reviewer が取り違えを疑った [V360] [V363] [V366] は、Zenodo の API で実在と書誌を確かめた（取り違えではなかった）。
+- 却下案: なし。
