@@ -1,0 +1,28 @@
+{
+ "files": 76,
+ "held_files_skipped": 24,
+ "inputs_digest": "e1cda247fcaa589ef312ee4f7115ffc9bea1b08b3b876a22c3c2871786e99e1c",
+ "attempted": 52,
+ "status": {
+  "ok": 50,
+  "no_presses": 2
+ },
+ "stats_sum_ok": {
+  "presses": 185937,
+  "other": 4701,
+  "focus": 7941,
+  "clicks": 29203,
+  "subsecond_presses": 185759,
+  "release_synth": 185937,
+  "no_timestamp": 1
+ },
+ "excluded_by_condition": {
+  "no_presses|c1": 1,
+  "no_presses|c3": 1
+ },
+ "replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
+ "holdout_sha256": "0caa29e88d3bf056df55f2c0da0a78a011cafbae46809ec3e35e565633c86e00",
+ "add_feat_sha256": "f8d402dd1ecd5400e9c7700cd6385d59198023ae025b4390d6494d66e01ec2a7",
+ "converter_sha256": "60a29d285a2de6be58194c8745ffae661206e8395a11dd482290d4a3631608a7",
+ "build_sha256": "2f93243ba2fccb087d80828bea59d5825fd4b030f496aac84c38d1f97e4a98c3"
+}
