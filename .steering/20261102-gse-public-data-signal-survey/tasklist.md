@@ -8,4 +8,4 @@
 - [x] カード・references・_index
 - [x] check_citations 違反なし
 - [x] code-reviewer ＋ /cross-review（3 巡・判断 5〜7）
-- [ ] コミット・push（docs だけなので [skip ci]）
+- [x] コミット・push（docs だけなので [skip ci]）
