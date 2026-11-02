@@ -15,4 +15,4 @@
 - [x] 取っておく書き手を決める → 変換（自己検査・陽性対照）→ replay → 集計
 - [x] notes・provenance
 - [x] code-reviewer と /cross-review、指摘の反映（判断 19）
-- [ ] コミット（[skip ci]）・push（PR は研究者に確かめてから）
+- [x] コミット（[skip ci]）・push（PR は研究者に確かめてから）

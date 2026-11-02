@@ -1,14 +1,6 @@
 {
- "git_head": "633a51b976d484511d9c490b42cf32f8acf0eb95",
- "git_dirty_paths": [
-  " M experiments/20261102-stall-decomposition/data.md",
-  " A experiments/20261102-stall-decomposition/extend/analyze_extend.py",
-  " A experiments/20261102-stall-decomposition/extend/build_extend.py",
-  " A experiments/20261102-stall-decomposition/extend/convert_extend.py",
-  " A experiments/20261102-stall-decomposition/extend/make_holdout.py",
-  " A experiments/20261102-stall-decomposition/extend/notes.md",
-  " A experiments/20261102-stall-decomposition/extend/run.sh"
- ],
+ "git_head": "6d468117b0fe0ee4271295a69fdcc5f2a43d0146",
+ "git_dirty_paths": [],
  "python": "3.14.4",
  "scripts_sha256": {
   "experiments/20261102-stall-decomposition/extend/make_holdout.py": "b42edefeeaeed26f3dca1ee3726485baca3fee492f74630ae04e85cd89b662d7",
