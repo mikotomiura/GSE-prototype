@@ -351,6 +351,19 @@
    "ratio": 0.9186
   },
   "posthoc_C1_not_hit_C0_but_inside_C0_stall": 640,
+  "posthoc_C0_stalls_with_C1": {
+   "num": 871,
+   "den": 1459,
+   "ratio": 0.597
+  },
+  "posthoc_C1_per_C0_stall_with_C1": {
+   "n": 871,
+   "q1": 1.0,
+   "median": 1,
+   "q3": 2.0
+  },
+  "posthoc_C1_per_C0_stall_with_C1_max": 8,
+  "posthoc_C1_inside_C0_stalls_with_ge3_C1": 343,
   "day": {
    "C0_is_C2": {
     "n": 14,
