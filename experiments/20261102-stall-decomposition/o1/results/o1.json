@@ -365,7 +365,7 @@
    "5min": 14,
    "10min": 14
   },
-  "port_matches_replay_files": 14
+  "port_compared_with_value_file_horizons": 28
  },
  "c1b_stall_unit_receipt_free_resumption": {
   "pre_paste_excluded": 24,
@@ -424,23 +424,23 @@
   }
  },
  "c3_self_report": {
-  "row_types_all": {
-   "<unparsed>": 1,
-   "feat": 1077349,
-   "focus_transition": 7990,
-   "hook_health": 3371,
-   "ime_shadow": 7914,
-   "ime_state": 6920,
-   "key": 340735,
-   "meta": 28,
-   "paste": 506,
-   "pointer_bin": 154760,
-   "recording_pause": 4,
-   "secure_input": 434,
-   "session_meta": 14,
-   "starve_window": 2289
-  },
-  "probe_or_self_report_like_types": {},
+  "row_type_names": [
+   "<unparsed>",
+   "feat",
+   "focus_transition",
+   "hook_health",
+   "ime_shadow",
+   "ime_state",
+   "key",
+   "meta",
+   "paste",
+   "pointer_bin",
+   "recording_pause",
+   "secure_input",
+   "session_meta",
+   "starve_window"
+  ],
+  "probe_or_self_report_like_types": [],
   "countable": false
  },
  "units": {
@@ -448,7 +448,7 @@
    "units": 14,
    "pooled_rate_per_h": 9.558,
    "sd_between_units": 3.2802,
-   "sd_expected_poisson_mean": 1.0051,
+   "sd_expected_poisson_mean": 0.9738,
    "unit_obs_h": {
     "n": 14,
     "q1": 10.144,
@@ -463,31 +463,35 @@
    }
   },
   "block_obs_ge_30min": {
-   "units": 49,
-   "pooled_rate_per_h": 10.6269,
-   "sd_between_units": 3.8023,
-   "sd_expected_poisson_mean": 2.3715,
+   "units": 56,
+   "pooled_rate_per_h": 9.7409,
+   "sd_between_units": 4.3727,
+   "sd_expected_poisson_mean": 2.2405,
    "unit_obs_h": {
-    "n": 49,
-    "q1": 1.2584,
-    "median": 2.2197,
-    "q3": 3.4381
+    "n": 56,
+    "q1": 1.2441,
+    "median": 2.0077,
+    "q3": 3.2889
    },
    "unit_rate_per_h": {
-    "n": 49,
-    "q1": 8.1371,
-    "median": 10.6426,
-    "q3": 13.3996
+    "n": 56,
+    "q1": 6.7947,
+    "median": 9.4635,
+    "q3": 12.4602
    }
   },
   "blocks_total": 67,
-  "blocks_obs_ge_30min": 49,
+  "blocks_obs_ge_30min": 56,
   "block_obs_h_all": {
    "n": 67,
-   "q1": 0.4264,
-   "median": 1.5813,
-   "q3": 2.9864
+   "q1": 0.8097,
+   "median": 1.8287,
+   "q3": 3.0145
   }
+ },
+ "checks": {
+  "key_presses_category_missing": 0,
+  "touching_interval_joins": 0
  },
  "receipt_route": {
   "pastes": 506,
@@ -762,7 +766,8 @@
   "excluded_no_focus": 4,
   "excluded_presses": 0,
   "used": 14,
-  "replay_stderr_nonempty": 3,
+  "replay_files_with_parse_warnings": 1,
+  "replay_files_with_other_stderr": 3,
   "check_t3_12_files_onsets": 1313,
   "t3_reported_onsets": 1313
  }

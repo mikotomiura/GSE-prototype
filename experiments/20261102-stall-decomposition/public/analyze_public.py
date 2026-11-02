@@ -54,7 +54,8 @@ def p3_rates(writers, normal):
         u = {p: [0, 0] for p in tc.POS}
         for s in w:
             ivs = land.merge([list(iv) for iv in s.intervals])
-            regions = {"early": [[s.t_start, s.t_start + tc.EARLY_MS]], "later": [[s.t_start + tc.EARLY_MS, s.t_end]]}
+            end = max(s.t_end, max(b for _, b in s.intervals))
+            regions = {"early": [[s.t_start, s.t_start + tc.EARLY_MS]], "later": [[s.t_start + tc.EARLY_MS, end]]}
             for p, reg in regions.items():
                 if reg[0][1] <= reg[0][0]:
                     continue

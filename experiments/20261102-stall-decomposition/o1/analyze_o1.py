@@ -119,13 +119,12 @@ class Day:
 
     def blocks(self):
         """[(obs_ms, n_stalls)]（押下で区切った作業のまとまり・C3 の 2）"""
+        # 終端は次のまとまりの開始（最後は観測区間の終わり）。P3 と同じ（レビューの後に改めた・notes の逸脱 6）。
         st = self.rec.block_starts
-        press = self.press
+        end = max(b for _, b in self.intervals)
         res = []
         for i, a in enumerate(st):
-            nxt = st[i + 1] if i + 1 < len(st) else None
-            j = bisect.bisect_left(press, nxt) if nxt is not None else len(press)
-            b = press[j - 1]
+            b = st[i + 1] if i + 1 < len(st) else end
             ob = sum(max(0, min(b, y) - max(a, x)) for x, y in self.intervals)
             res.append([ob, 0])
         return res
@@ -158,7 +157,8 @@ def unit_sd(units):
     mean_rate = sum(n for _, n in units) / (sum(ob for ob, _ in units) / tc.H)
     return {"units": len(units), "pooled_rate_per_h": round(mean_rate, 4),
             "sd_between_units": round(statistics.stdev(rates), 4),
-            "sd_expected_poisson_mean": round(statistics.mean(math.sqrt(mean_rate / (ob / tc.H)) for ob, _ in units), 4),
+            "sd_expected_poisson_mean": round(statistics.mean(math.sqrt(statistics.mean(rates) / (ob / tc.H))
+                                                              for ob, _ in units), 4),
             "unit_obs_h": tc.quart([ob / tc.H for ob, _ in units]),
             "unit_rate_per_h": tc.quart(rates)}
 
@@ -208,7 +208,7 @@ def analyze(days, seed):
     # 候補 1a（ADR-024 の単位）
     fields = ("event_count", "source_episode_count", "receipt_count", "next_away_candidate_count", "censored_count",
               "degenerate_count", "n_at_risk_at_5min", "n_at_risk_at_10min")
-    outs, mism = [], 0
+    outs, mism, both = [], 0, 0
     per_file = {"5min": [], "10min": []}
     for dy in days:
         r = dy.d["receipt_free_resumption"]
@@ -220,6 +220,7 @@ def analyze(days, seed):
                 mism += 1
             if theirs is not None:
                 per_file[k].append(theirs)
+                both += mine is not None
     if mism:
         sys.exit("Aalen–Johansen の写しが replay の値と合わない")
     res["c1a_adr024_unit"] = {**{f: sum(dy.d["receipt_free_resumption"][f] for dy in days) for f in fields},
@@ -227,7 +228,7 @@ def analyze(days, seed):
                                                       for k, hz in HORIZONS.items()},
                               "per_file_receipt_free": {k: tc.quart(v) for k, v in per_file.items()},
                               "files_with_value": {k: len(v) for k, v in per_file.items()},
-                              "port_matches_replay_files": len(days)}
+                              "port_compared_with_value_file_horizons": both}
     ok = [r for r in allrows if not r.get("no_interval")]
     res["c1b_stall_unit_receipt_free_resumption"] = {
         "pre_paste_excluded": sum(1 for r in ok if r["pre_paste"]),
@@ -257,7 +258,7 @@ def analyze(days, seed):
         for k, v in dy.d["types"].items():
             types[k] = types.get(k, 0) + v
     probe_like = {k: v for k, v in types.items() if any(w in k.lower() for w in PROBE_WORDS)}
-    res["c3_self_report"] = {"row_types_all": dict(sorted(types.items())), "probe_or_self_report_like_types": probe_like,
+    res["c3_self_report"] = {"row_type_names": sorted(types), "probe_or_self_report_like_types": sorted(probe_like),
                              "countable": False if not probe_like else None}
     # 単位
     day_units = [(dy.obs, sum(1 for r in u if not r.get("no_interval"))) for dy, u in zip(days, units)]
@@ -285,6 +286,9 @@ def analyze(days, seed):
             covered.update(range(lo, hi))
         in_stall += len(covered)
     chars = [c for dy in days for c in dy.paste_chars]
+    res["checks"] = {"key_presses_category_missing": sum(1 for dy in days for _, c in dy.d["keys"] if c is None),
+                     "touching_interval_joins": sum(1 for dy in days for x, y in zip(dy.intervals, dy.intervals[1:])
+                                                    if y[0] <= x[1])}
     res["receipt_route"] = {"pastes": np_, "per_obs_h": round(np_ / obs_h, 4),
                             "with_focus_in_prev_30s": tc.pooled(with_focus, np_),
                             "in_some_stall_5min_unique": tc.pooled(in_stall, np_),
@@ -326,7 +330,8 @@ def run(work, seed, out_dir, *files):
             t3_onsets += len(d["onsets"])
     res, allrows = analyze(days, seed)
     res["files"] = {"given": len(files), "excluded_no_focus": excl, "excluded_presses": excl_press, "used": len(days),
-                    "replay_stderr_nonempty": sum(1 for dy in days if any(dy.d["replay_stderr_bytes"].values())),
+                    "replay_files_with_parse_warnings": sum(1 for dy in days if any(v["failed_to_parse"] for v in dy.d["replay_stderr_bytes"].values())),
+                    "replay_files_with_other_stderr": sum(1 for dy in days if any(v["other_nonempty_lines"] for v in dy.d["replay_stderr_bytes"].values())),
                     "check_t3_12_files_onsets": t3_onsets, "t3_reported_onsets": 1313}
     os.makedirs(out_dir, exist_ok=True)
     json.dump(res, open(os.path.join(out_dir, "o1.json"), "w"), indent=1)
@@ -357,7 +362,8 @@ def selftest():
                                      **{f: 0 for f in ("event_count", "source_episode_count", "receipt_count",
                                                        "next_away_candidate_count", "censored_count",
                                                        "degenerate_count", "n_at_risk_at_5min", "n_at_risk_at_10min")}},
-         "types": {"key": len(keys)}, "replay_stderr_bytes": {"features": 0, "metrics": 0}}
+         "types": {"key": len(keys)},
+         "replay_stderr_bytes": {k: {"failed_to_parse": 0, "other_nonempty_lines": 0} for k in ("features", "metrics")}}
     dy = Day(d)
     rows = dy.rows()
     r = rows[0]
@@ -385,6 +391,13 @@ def selftest():
               observed_intervals=[{"a_ms": 0, "b_ms": 300_000}, {"a_ms": 450_000, "b_ms": 800_000}])
     ins, cro = Day(dg).gaps()
     assert ins == [200_000] and cro == [300_000]
+    # まとまりの終端: 最後の押下の後の止まり（t0 > 最後の押下）も分母の時間に入る
+    db = dict(d, keys=[[0, "alphabetic"], [1000, "alphabetic"]], observed_intervals=[{"a_ms": 0, "b_ms": 100_000}],
+              onsets=[[50_000, 60_000]])
+    dyb = Day(db)
+    assert dyb.blocks() == [[100_000, 0]]
+    resb, _ = analyze([dyb], 1)
+    assert resb["units"]["blocks_total"] == 1
     print("o1 selftest ok")
 
 

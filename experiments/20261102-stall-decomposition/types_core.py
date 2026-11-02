@@ -153,7 +153,7 @@ def summarize_types(units, classes=CLASSES):
     res["P1_class_share_unit_median"] = {c: quart([sum(1 for r in u if r["pre_class"] == c) / len(u) for u in uok])
                                          for c in classes}
     res["P1_units_with_ge5"] = len(uok)
-    fx = [r for r in allrows if not r.get("no_interval") and r.get("pre_fixed_class") is not None]
+    fx = [r for r in ok if r.get("pre_fixed_class") is not None]
     res["P1_fixed_window_class_share"] = {c: pooled(sum(1 for r in fx if r["pre_fixed_class"] == c), len(fx))
                                           for c in classes}
     keys = ("focus", "other_nontext", "click", "delete2")

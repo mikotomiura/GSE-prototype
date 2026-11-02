@@ -50,7 +50,10 @@ def run_json(cmd, tmp):
     with open(tmp, "w") as out, open(tmp + ".err", "w") as err:
         subprocess.run(cmd, stdout=out, stderr=err, check=True)
     d = json.load(open(tmp))
-    warn = os.path.getsize(tmp + ".err")
+    # 警告は行の中身を残さず、種類（解析できない行の警告か、それ以外か）の数だけを持つ
+    lines = open(tmp + ".err", encoding="utf-8", errors="replace").read().splitlines()
+    warn = {"failed_to_parse": sum(1 for x in lines if "failed to parse" in x),
+            "other_nonempty_lines": sum(1 for x in lines if x.strip() and "failed to parse" not in x)}
     os.remove(tmp)
     os.remove(tmp + ".err")
     return d, warn
@@ -60,8 +63,11 @@ def build(replay, work, path):
     b = os.path.basename(path)[:-len(".ndjson")]
     dst = os.path.join(work, b + ".json")
     digest = sha256(path)
-    if os.path.exists(dst) and json.load(open(dst)).get("input_sha256") == digest:
-        return "kept"
+    made_by = {"replay_sha256": sha256(replay), "build_o1_sha256": sha256(os.path.abspath(__file__))}
+    if os.path.exists(dst):
+        old = json.load(open(dst))
+        if old.get("input_sha256") == digest and old.get("made_by") == made_by:
+            return "kept"
     feat, w1 = run_json([replay, path, "--features"], os.path.join(work, "tmp_features.json"))
     onsets = [[r["stall_onset"]["s_ms"], r["stall_onset"]["t0_ms"]] for r in feat["rows"]
               if r["stall_onset"]["is_onset"]]
@@ -71,7 +77,7 @@ def build(replay, work, path):
     ev = events(path)
     if digest != sha256(path):
         sys.exit("中間を作る間に入力が変わった（書き込み中のファイルの可能性）: " + b)
-    out = {"input_sha256": digest, "observed_intervals": p["observed_intervals"],
+    out = {"input_sha256": digest, "made_by": made_by, "observed_intervals": p["observed_intervals"],
            "hmm_version": p.get("hmm_version"), "o1_mode": p.get("o1_mode"),
            "onsets": onsets, "receipt_free_resumption": rfr,
            "replay_stderr_bytes": {"features": w1, "metrics": w2}, **ev}

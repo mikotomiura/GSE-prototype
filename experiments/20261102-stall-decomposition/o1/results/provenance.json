@@ -1,16 +1,22 @@
 {
- "git_head": "a994173e1b02883181722978bce3cefea3c9d53a",
+ "git_head": "b6782aef4655f19152b92609486e08b6d1272b1f",
  "git_dirty_paths": [
-  "?? experiments/20261102-stall-decomposition/public/results/"
+  " M experiments/20261102-stall-decomposition/o1/analyze_o1.py",
+  " M experiments/20261102-stall-decomposition/o1/build_o1.py",
+  " M experiments/20261102-stall-decomposition/o1/run.sh",
+  " M experiments/20261102-stall-decomposition/public/analyze_public.py",
+  " M experiments/20261102-stall-decomposition/types_core.py",
+  "?? experiments/20261102-stall-decomposition/o1/posthoc.py"
  ],
  "gse_replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
  "input_files": 18,
  "inputs_sha256_digest": "833cd06782ed9820de800a917e8fc2346a016decb568d270603e2175d806c1ab",
  "prereg_p1_episode_sha256": "dd1bb614021af09e2eab2112e27a7dc9ff42ae219364dfb122acaa68d30f3267",
  "scripts_sha256": {
-  "experiments/20261102-stall-decomposition/o1/build_o1.py": "f685dacd584af563c0618a3f992db43b22037f43754f9daf7bae9d9b03705902",
-  "experiments/20261102-stall-decomposition/o1/analyze_o1.py": "11566f75a80482b33b52cd95b0cc5f6ab998f295b0efa4a424273c01daa869ce",
-  "experiments/20261102-stall-decomposition/types_core.py": "514dead4cfabf8a1fc2826756f833d18aa63d63891d4d834cc5794b30ee1ad66",
+  "experiments/20261102-stall-decomposition/o1/build_o1.py": "299dbadaf82548c1086dc7673dfb9d0dc0ea6f4aae1df430fd3da5fd3079e118",
+  "experiments/20261102-stall-decomposition/o1/analyze_o1.py": "c31eb63a4380bfd0a421858eef7ddca2fd245879ff192358bedce34fd42771f9",
+  "experiments/20261102-stall-decomposition/o1/posthoc.py": "4a83b12c6665b4ee8219b96153e0fe3d930bcc9213eadc30d2ff0f1584bc5418",
+  "experiments/20261102-stall-decomposition/types_core.py": "c47b0324576972e15452fbb54c3f586eba1bb91e32ed8aba8fc9937bfaa12b19",
   "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py": "9c8ca6a498c034c49021a18221c29321e86d9dc6eade148ce8f48e5b46abcc22"
  }
 }

@@ -1,7 +1,15 @@
 {
- "git_head": "a994173e1b02883181722978bce3cefea3c9d53a",
+ "git_head": "b6782aef4655f19152b92609486e08b6d1272b1f",
  "git_dirty_paths": [
-  "?? experiments/20261102-stall-decomposition/o1/results/"
+  " M experiments/20261102-stall-decomposition/o1/analyze_o1.py",
+  " M experiments/20261102-stall-decomposition/o1/build_o1.py",
+  " M experiments/20261102-stall-decomposition/o1/results/o1.json",
+  " M experiments/20261102-stall-decomposition/o1/results/provenance.json",
+  " M experiments/20261102-stall-decomposition/o1/run.sh",
+  " M experiments/20261102-stall-decomposition/public/analyze_public.py",
+  " M experiments/20261102-stall-decomposition/types_core.py",
+  "?? experiments/20261102-stall-decomposition/o1/posthoc.py",
+  "?? experiments/20261102-stall-decomposition/o1/results/posthoc.json"
  ],
  "klicke_work_tar_sha256": "97d0e6690f75db9be9b9c2475b4b084d0611c7d0135a27aa2e99cd39137ef365",
  "klicke_side_sha256": "daec6f94db286fdab2cc08bcd0470ea65efa805e7c6e6466401c05a4f6c24ae5",
@@ -9,8 +17,8 @@
  "coauthor_work_files": 1159,
  "coauthor_work_digest": "34213bc1d84ac1a755b6a0f98e3e661d40b75f77ac135be06ac9fcdc399d337e",
  "scripts_sha256": {
-  "experiments/20261102-stall-decomposition/public/analyze_public.py": "f58f9fc3f00bf1dccd9c0751c2308d33e55d868147cf117c8abf5f763bf07501",
-  "experiments/20261102-stall-decomposition/types_core.py": "514dead4cfabf8a1fc2826756f833d18aa63d63891d4d834cc5794b30ee1ad66",
+  "experiments/20261102-stall-decomposition/public/analyze_public.py": "9e6aa60404c36877f52683c2afcadb8a6ba34d69fe25e5d7599c05327ee39f80",
+  "experiments/20261102-stall-decomposition/types_core.py": "c47b0324576972e15452fbb54c3f586eba1bb91e32ed8aba8fc9937bfaa12b19",
   "experiments/20261102-public-data-landscape/scripts/analyze_landscape.py": "f1a107ddcdb43325745dbef1bdb957e6a56cdfbdbc72d330df2db6c09708d958",
   "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py": "9c8ca6a498c034c49021a18221c29321e86d9dc6eade148ce8f48e5b46abcc22"
  }

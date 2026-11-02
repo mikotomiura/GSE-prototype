@@ -247,9 +247,9 @@
     }
    },
    "later": {
-    "pooled_per_h": 18.3597,
+    "pooled_per_h": 18.3596,
     "stalls": 17543,
-    "obs_h": 955.517,
+    "obs_h": 955.522,
     "unit_median_per_h": {
      "n": 3434,
      "q1": 9.4488,
@@ -556,14 +556,14 @@
     }
    },
    "later": {
-    "pooled_per_h": 7.9575,
+    "pooled_per_h": 7.9571,
     "stalls": 178,
-    "obs_h": 22.369,
+    "obs_h": 22.37,
     "unit_median_per_h": {
      "n": 34,
      "q1": 0.0,
-     "median": 5.3331,
-     "q3": 9.0665
+     "median": 5.3328,
+     "q3": 9.0655
     }
    }
   },
@@ -865,14 +865,14 @@
     }
    },
    "later": {
-    "pooled_per_h": 8.4424,
+    "pooled_per_h": 8.4418,
     "stalls": 78,
-    "obs_h": 9.239,
+    "obs_h": 9.24,
     "unit_median_per_h": {
      "n": 29,
      "q1": 0.0,
      "median": 0.0,
-     "q3": 5.0886
+     "q3": 5.0882
     }
    }
   },

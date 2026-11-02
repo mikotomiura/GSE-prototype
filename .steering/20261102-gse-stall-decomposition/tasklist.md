@@ -6,5 +6,5 @@
 - [x] 公開データの集計（自己検査・陽性対照・本計算）
 - [x] O1 の中間（14 本・hash 照合）と集計（自己検査・照合・本計算・変異 12 個）
 - [x] notes.md・data.md・env.md・provenance
-- [ ] code-reviewer と /cross-review、指摘の反映
+- [x] code-reviewer と /cross-review、指摘の反映（判断 10）
 - [ ] コミット（[skip ci]）・push は研究者に確かめてから
