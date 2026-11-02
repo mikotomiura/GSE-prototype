@@ -10,4 +10,6 @@
 - [x] 実地の 1 回目（照合の論文の草稿）の後に穴を直す（field-trial.md）
 - [x] 2026-11-02: main の checkout に未コミットで残っていた attack-me の Step 5（判定の推移を見て閉じる・2026-10-30 の指摘）を合わせ、
       memory の Codex の教訓 2 件（round 1 の前に加えるか問う・既知の未決の一覧を添える）を Step 2 の Codex の項に足した（研究者の指示: main へ [skip ci] でマージ）
-- [ ] /cross-review → push → PR（[skip ci]）は研究者に確かめてから
+- [x] /cross-review 1 巡目（code-reviewer ∥ Codex）: 両者一致 2・Codex のみ 3・Claude のみ MEDIUM 6/LOW 9 → 598039a2 で直した
+- [x] /cross-review 2 巡目（Codex・直しの差分のみ）: P1・P2・P2 を直した。P3「分岐の回帰ケース」は手順書に試験の枠が無いため回さない（必要なら empirical-prompt-tuning で）
+- [ ] push → PR（[skip ci]）は研究者に確かめてから
