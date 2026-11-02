@@ -270,8 +270,14 @@ def day_rows(dy):
     for r in rows["C0"]:
         r["c2"] = dy.is_c2(r["s"], r["o"])
     sp0 = [(r["s"], r["o"]) for r in rows["C0"]]
+    # 事後（conditions.md に無い・レビュー M4 の後）: C0 の停滞の [s, 再開]（打ち切りは区間の終わり）の中に C1 の [s1, t1] が入るか
+    full0 = []
+    for r in rows["C0"]:
+        iv = dy.interval_of(r["o"])
+        full0.append((r["s"], r["o"] + r["len"] if r["len"] is not None else iv[1]))
     for r in rows["C1"]:
         r["hit_c0"] = spans_hit(sp0, r["s"], r["o"])
+        r["in_c0_stall"] = any(a <= r["s"] and r["o"] <= b for a, b in full0)
     for r in rows["C6"]:
         for k in ("C0", "C1", "C2"):
             r["in_" + k] = any(x["s"] - PRE <= r["s"] <= x["o"] for x in rows[k])
@@ -341,6 +347,24 @@ def summarize(days, all_rows, no_warm):
           "C6_in_pre_or_span": {k: share(sum(1 for r in c6 if r["in_" + k]), len(c6)) for k in ("C0", "C1", "C2")},
           "has_C6_in_pre_or_span": {k: share(sum(1 for r in flat[k] if r["has_c6"]), len(flat[k]))
                                     for k in ("C0", "C1", "C2")}}
+    # K6: 日ごとの値の中央値・四分位（O3・O4・O5）
+    def dq(f):
+        return tc.quart([v for x, dy in zip(all_rows, days) if (v := f(x, dy)) is not None])
+
+    def ratio(rs, key):
+        return sum(1 for r in rs if r[key]) / len(rs) if rs else None
+    for k in ("C0", "C1", "C2"):
+        o3[k]["day_median_len_s"] = dq(lambda x, dy, k=k: tc.quart([r["len"] / 1000 for r in x[k] if r["len"] is not None])["median"]
+                                      if any(r["len"] is not None for r in x[k]) else None)
+        o3[k]["day_share_long_or_censored"] = dq(
+            lambda x, dy, k=k: sum(1 for r in x[k] if r["len_class"] in ("long", "censored")) / len(x[k]) if x[k] else None)
+    o4["posthoc_C1_inside_C0_stall_to_resume"] = share(sum(1 for r in c1 if r["in_c0_stall"]), len(c1))
+    o4["posthoc_C1_not_hit_C0_but_inside_C0_stall"] = sum(1 for r in c1 if r["in_c0_stall"] and not r["hit_c0"])
+    o4["day"] = {"C0_is_C2": dq(lambda x, dy: ratio(x["C0"], "c2")),
+                 "C0_hit_C1": dq(lambda x, dy: ratio(x["C0"], "hit_c1")),
+                 "C1_hit_C0": dq(lambda x, dy: ratio(x["C1"], "hit_c0"))}
+    for k in NAMES:
+        o5[k]["day_note"] = "位置ごとの日の率は出さない（序盤の観測が日に 1 時間に満たない）"
     res.update({"O1_counts_rates": o1, "O2_thresholds": o2, "O3_lengths": o3, "O4_overlap": o4, "O5_position": o5})
     return res
 
@@ -363,21 +387,23 @@ def run(work, out, expected_digest, *files):
         days.append(Day(d))
     if len(days) != 14 or excl != 4:
         sys.exit(f"使う日が 14 本・外す日が 4 本でない（{len(days)}・{excl}）")
-    all_rows, no_warm, match = [], {"C0": 0, "C1": 0}, {"files": 0, "onsets_replay": 0, "onsets_port": 0, "mismatch_files": 0}
-    for dy in days:
-        rows, nw = day_rows(dy)
-        port = [(r["s"], r["o"]) for r in rows["C0"]]
+    match = {"files": 0, "onsets_replay": 0, "onsets_port": 0, "mismatch_files": 0}
+    for dy in days:  # K2 の自己検査を C1・C6 の計算より前に（レビュー L4）
+        port = [(x[0], x[1]) for x in dy.c0()[0]]
         match["files"] += 1
         match["onsets_replay"] += len(dy.replay_onsets)
         match["onsets_port"] += len(port)
         if port != dy.replay_onsets:
             match["mismatch_files"] += 1
+    if match["mismatch_files"]:
+        sys.exit("K2 の自己検査: 検出器の C0 が gse-replay の onsets と一致しない " + json.dumps(match))
+    all_rows, no_warm = [], {"C0": 0, "C1": 0}
+    for dy in days:
+        rows, nw = day_rows(dy)
         check_structure(dy, rows)
         all_rows.append(rows)
         for k in nw:
             no_warm[k] += nw[k]
-    if match["mismatch_files"]:
-        sys.exit("K2 の自己検査: 検出器の C0 が gse-replay の onsets と一致しない " + json.dumps(match))
     res = summarize(days, all_rows, no_warm)
     res["O6_selfcheck"] = match
     res["files"] = {"given": len(files), "excluded_no_focus": excl, "used": len(days)}
@@ -441,7 +467,7 @@ def selftest():
     dyc = churn(20)
     rows, _ = day_rows(dyc)
     check_structure(dyc, rows)
-    assert len(rows["C6"]) == 1 and rows["C6"][0]["in_C0"] is not None
+    assert len(rows["C6"]) == 1
     # 3b 空回りが 2 回: 間が W 以上偽なら 2 件・W 未満なら 1 件（判断 4 の不応期）
     def churn2(short_false):
         ks = list(base)
@@ -480,6 +506,56 @@ def selftest():
     dy = Day(synth(ks, pointer=range(302_000, 340_000, 5000), intervals=iv2))
     rows, _ = day_rows(dy)
     assert len(rows["C2"]) == 1 and rows["C1"] == [], rows
+    # 7 θ0 が長い合成（温まり前に 60 秒の間隔を 3 つ。標本 203 個の rank = ⌈0.99·203⌉ = 201 → 上から 3 番目 = 60 秒）で、
+    #   [s, t0] の途中の途切れを見る（レビュー H1）
+    lk = [[i * 60_000, "alphabetic"] for i in range(4)]
+    lk += [[181_000 + i * 1000, "alphabetic"] for i in range(200)]
+    ll = 380_000
+    s7, t7 = ll + W, ll + W + 60_000
+    end7 = [[t7 + 5000, "alphabetic"]]
+    # 7a s から 20 秒はポインタ（5 秒ごと）、その後 t0 まで途切れる（W 以上）→ C2 でない
+    p7a = list(range(ll + 5000, s7 + 20_001, 5000))
+    dy = Day(synth(lk + end7, pointer=p7a))
+    rows, _ = day_rows(dy)
+    assert [(r["s"], r["o"]) for r in rows["C0"]] == [(s7, t7)] and rows["C2"] == [], rows
+    check_structure(dy, rows)
+    # 7b 最後のポインタがちょうど t0 − W（t0 で C1 の条件 A が真になる・閉区間の端）→ C2 でない
+    p7b = list(range(ll + 5000, t7 - W, 5000)) + [t7 - W]
+    dy = Day(synth(lk + end7, pointer=p7b))
+    rows, _ = day_rows(dy)
+    assert len(rows["C0"]) == 1 and rows["C2"] == [], rows
+    # 7c 同じでポインタが t0 − W + 1 まで続く → C2
+    dy = Day(synth(lk + end7, pointer=p7b[:-1] + [t7 - W + 1]))
+    rows, _ = day_rows(dy)
+    assert len(rows["C2"]) == 1, rows
+    # 8 C1 の流れ（レビュー M1）: 押下の間にポインタ（+500）→ θ1 = 500（θ0 = 1000 と違う）・s1 は最後のポインタ + W
+    pm = [i * 1000 + 500 for i in range(200)]
+    dy = Day(synth(base + [[600_000, "alphabetic"]], pointer=pm))
+    c1, _ = dy.c1()
+    assert c1[0][:3] == (last + 500 + W, last + 500 + W + 500, 500), c1
+    assert dy.c0()[0][0][:2] == (last + W, last + W + 1000)
+    # 8b フォーカスの遷移だけが 5 秒ごとに続く → C1 は立たず C2
+    dy = Day(synth(base + [[600_000, "alphabetic"]], focus=range(last + 5000, 600_000, 5000)))
+    rows, _ = day_rows(dy)
+    assert rows["C1"] == [] and len(rows["C2"]) == 1, rows
+    # 9 g がちょうど g*（15 往復 = 30 押下）→ 立つ（g ≥ g*・レビュー L1）
+    assert len(churn(15).c6()) == 1 and churn(14).c6() == []
+    # 10 重なりと幅（レビュー M2）: 空回りの直後に C0 が立ち、C6 はその手前 30 秒に入る
+    dyc = churn(20)
+    rows, _ = day_rows(dyc)
+    c0_after = [r for r in rows["C0"] if r["s"] > last + 60_000]
+    assert len(c0_after) == 1 and c0_after[0]["has_c6"] is True, rows["C0"]
+    assert rows["C6"][0]["in_C0"] is True and rows["C6"][0]["in_C1"] is False, rows["C6"]
+    assert sum(r["has_c6"] for r in rows["C0"]) == 1
+    # 空回りの押下は 259,000 から 500 ms ごとに 40 個。30 個目（273,500・削除の直後で正味 0）で立ち、
+    # 11 個目（264,000）が窓から抜ける 294,000 で g = 29 < g* = 30 になって閉じる → 幅 20,500
+    assert rows["C6"][0]["s"] == 273_500 and rows["C6"][0]["span"] == 20_500, rows["C6"]
+    # 11 事後の量: 文字が止まってもポインタが 60 秒動き、その後全部止まる → C0 は先に立ち、C1 は C0 の t0 の後
+    #    （[s, t0] とは交わらないが、C0 の停滞の [s, 再開] の中に入る）
+    dy = Day(synth(base + [[600_000, "alphabetic"]], pointer=range(last + 5000, last + 60_001, 5000)))
+    rows, _ = day_rows(dy)
+    assert len(rows["C0"]) == 1 and len(rows["C1"]) == 1, rows
+    assert rows["C1"][0]["hit_c0"] is False and rows["C1"][0]["in_c0_stall"] is True, rows["C1"]
     # 不応期: 条件 A が続く間は 2 件目が立たない
     dy = Day(synth(base + [[900_000, "alphabetic"]]))
     assert len(dy.c0()[0]) == 1 and len(dy.c1()[0]) == 1
