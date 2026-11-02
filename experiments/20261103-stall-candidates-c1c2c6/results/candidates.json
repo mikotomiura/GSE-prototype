@@ -191,6 +191,18 @@
     "q1": 33.9745,
     "median": 89.799,
     "q3": 225.5355
+   },
+   "day_median_len_s": {
+    "n": 14,
+    "q1": 78.706,
+    "median": 103.1548,
+    "q3": 125.133
+   },
+   "day_share_long_or_censored": {
+    "n": 14,
+    "q1": 0.3127,
+    "median": 0.359,
+    "q3": 0.4429
    }
   },
   "C1": {
@@ -219,6 +231,18 @@
     "q1": 20.6197,
     "median": 60.877,
     "q3": 164.102
+   },
+   "day_median_len_s": {
+    "n": 14,
+    "q1": 50.956,
+    "median": 62.1315,
+    "q3": 82.1942
+   },
+   "day_share_long_or_censored": {
+    "n": 14,
+    "q1": 0.1628,
+    "median": 0.2447,
+    "q3": 0.3219
    }
   },
   "C2": {
@@ -247,6 +271,18 @@
     "q1": 25.276,
     "median": 72.732,
     "q3": 171.882
+   },
+   "day_median_len_s": {
+    "n": 14,
+    "q1": 57.9646,
+    "median": 74.5573,
+    "q3": 89.3882
+   },
+   "day_share_long_or_censored": {
+    "n": 14,
+    "q1": 0.2255,
+    "median": 0.2863,
+    "q3": 0.3259
    }
   },
   "C6": {
@@ -308,6 +344,32 @@
     "den": 743,
     "ratio": 0.0
    }
+  },
+  "posthoc_C1_inside_C0_stall_to_resume": {
+   "num": 1286,
+   "den": 1400,
+   "ratio": 0.9186
+  },
+  "posthoc_C1_not_hit_C0_but_inside_C0_stall": 640,
+  "day": {
+   "C0_is_C2": {
+    "n": 14,
+    "q1": 0.3763,
+    "median": 0.4739,
+    "q3": 0.5723
+   },
+   "C0_hit_C1": {
+    "n": 14,
+    "q1": 0.3738,
+    "median": 0.509,
+    "q3": 0.5569
+   },
+   "C1_hit_C0": {
+    "n": 14,
+    "q1": 0.4081,
+    "median": 0.4423,
+    "q3": 0.4958
+   }
   }
  },
  "O5_position": {
@@ -322,7 +384,8 @@
     "obs_h": 140.276,
     "pooled_per_h": 9.5882
    },
-   "no_position": 0
+   "no_position": 0,
+   "day_note": "位置ごとの日の率は出さない（序盤の観測が日に 1 時間に満たない）"
   },
   "C1": {
    "early": {
@@ -335,7 +398,8 @@
     "obs_h": 140.276,
     "pooled_per_h": 9.3744
    },
-   "no_position": 4
+   "no_position": 4,
+   "day_note": "位置ごとの日の率は出さない（序盤の観測が日に 1 時間に満たない）"
   },
   "C2": {
    "early": {
@@ -348,7 +412,8 @@
     "obs_h": 140.276,
     "pooled_per_h": 4.8476
    },
-   "no_position": 0
+   "no_position": 0,
+   "day_note": "位置ごとの日の率は出さない（序盤の観測が日に 1 時間に満たない）"
   },
   "C6": {
    "early": {
@@ -361,7 +426,8 @@
     "obs_h": 140.276,
     "pooled_per_h": 0.0143
    },
-   "no_position": 0
+   "no_position": 0,
+   "day_note": "位置ごとの日の率は出さない（序盤の観測が日に 1 時間に満たない）"
   }
  },
  "O6_selfcheck": {

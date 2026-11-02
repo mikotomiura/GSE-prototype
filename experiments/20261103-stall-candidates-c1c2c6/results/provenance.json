@@ -1,10 +1,10 @@
 {
- "git_head": "c99a4e4c0985dff846dab53022af5d61ab62ccad",
+ "git_head": "fdfcb5035f8db2c4e19a48943f006042f4593784",
  "git_dirty_paths": [],
  "inputs_sha256_digest": "833cd06782ed9820de800a917e8fc2346a016decb568d270603e2175d806c1ab",
  "prereg_p1_episode_sha256": "dd1bb614021af09e2eab2112e27a7dc9ff42ae219364dfb122acaa68d30f3267",
  "scripts_sha256": {
-  "experiments/20261103-stall-candidates-c1c2c6/candidates.py": "8bf468acf4130001af2874367a83bb9e0d1818d26b548a3b4d19db0f16897dd7",
+  "experiments/20261103-stall-candidates-c1c2c6/candidates.py": "936febf38b60213cc96ffe1d8333ee3955209b250dd02c4303cae383cf84cdf6",
   "experiments/20261102-stall-decomposition/types_core.py": "c47b0324576972e15452fbb54c3f586eba1bb91e32ed8aba8fc9937bfaa12b19",
   "experiments/20261102-stall-decomposition/o1/analyze_o1.py": "c31eb63a4380bfd0a421858eef7ddca2fd245879ff192358bedce34fd42771f9",
   "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py": "9c8ca6a498c034c49021a18221c29321e86d9dc6eade148ce8f48e5b46abcc22"
