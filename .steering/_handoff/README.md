@@ -11,8 +11,9 @@
 
 | トラック | ファイル | 状態 |
 |---|---|---|
-| **GSE: 次の新しい形のユーザー検証の設計（C4 の取り方）。その次に MhD の議論** | **`next-session-gse-next-study-design.md`**（2026-11-03） | **現行・次**。研究者の順番: 次の検証の設計 → MhD の議論（単位を分ける ADR から） → 並行で既存のデータと公開データで補う。O1 で C4 を取らない決め（`.steering/20261103-gse-stall-candidates-c1c2c6/decisions.md` 判断 9）を受ける |
-| GSE: 6 択の問いの同意を次の検証へ持ち越す | `next-session-esm-consent-next-study.md`（2026-11-03） | 上の行の材料（同意の論点の一覧）。単独では始めない |
+| **GSE: MhD の議論（効果の単位と Decision Episode を分ける ADR から）** | **`next-session-gse-mhd-unit-adr.md`**（2026-11-03） | **現行・次**。前提は次の検証の段 1 の形（`.steering/20261103-gse-next-study-design/decisions.md` 判断 1〜12）。保留 1（手跡の動機づけと同期・共生の感覚の問い方）は別に残る |
+| ~~GSE: 次の新しい形のユーザー検証の設計（C4 の取り方）~~ | `next-session-gse-next-study-design.md`（2026-11-03） | 完了（2026-11-03・`.steering/20261103-gse-next-study-design/`）。段で分け、段 1 は招待なしの自然作業で C4 をアプリ内の問いで取る。本人で先に回して探索扱い。段 1 の後期に手跡を日ごとに無作為（始める日を人ごとにずらす）。新しい ADR 1 本に書く（起票は別タスク）。次は上の行 |
+| GSE: 6 択の問いの同意を次の検証へ持ち越す | `next-session-esm-consent-next-study.md`（2026-11-03） | §2 の 1 は閉じた（問いへの同意を参加の条件・next-study-design 判断 10）。§2 の 4 はアプリ内に決まった（判断 7）。残りは同意文書を書く別タスクの材料 |
 | ~~GSE: 停滞の定義の候補 C1・C2・C6~~ | `next-session-gse-c1c2c6.md`（2026-11-03） | 完了（2026-11-03・PR #375・`experiments/20261103-stall-candidates-c1c2c6/`） |
 | ~~GSE: 停滞の分解（段 1）と、O1 での主要アウトカムの候補の数え直し~~ | `next-session-gse-stall-decomposition.md`（2026-11-02） | 完了（PR #373・`experiments/20261102-stall-decomposition/`。2026-11-03 に状態を直した）。以下は当時の記述: （ADR-041 D2・D4）。先に段 1 の条件（型の軸の定義・O1 の範囲・取っておいた書き手の使い道）を研究者に聞いて計算の前にコミットする。下の公開データの調べと並行。T1 の残りと positioning の改訂は別 |
 | **GSE: 打鍵の外の信号（ポインタ・フォーカス・自己申告・長い記録）を持つ公開データの調べ**（停滞の分解と並行・worktree を分ける） | **`next-session-gse-public-data-signal-survey.md`**（2026-11-02） | **現行・次（並行）**。研究者が 2026-11-02 に並行を選んだ。データは取得せず、候補と利用条件を調べる。先に対象の優先などを研究者に聞く |
