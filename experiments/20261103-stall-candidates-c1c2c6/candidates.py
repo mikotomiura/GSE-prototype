@@ -305,9 +305,10 @@ def summarize(days, all_rows, no_warm):
                  "day_per_h": tc.quart([len(x) / (dy.obs / tc.H) for x, dy in zip(per_day, days) if dy.obs > 0]),
                  "day_unit_sd": ao.unit_sd([(dy.obs, len(x)) for x, dy in zip(per_day, days)])}
         if k != "C2":
-            o2[k] = {"threshold_ms_at_fire": tc.quart([r["th"] for x in per_day for r in x]),
-                     "day_median_threshold_ms": tc.quart([tc.quart([r["th"] for r in x])["median"]
-                                                          for x in per_day if x])}
+            o2[k] = {"unit": "presses_per_30s" if k == "C6" else "ms",
+                     "threshold_at_fire": tc.quart([r["th"] for x in per_day for r in x]),
+                     "day_median_threshold": tc.quart([tc.quart([r["th"] for r in x])["median"]
+                                                       for x in per_day if x])}
             if k in no_warm:
                 o2[k]["rises_without_threshold_warmup"] = no_warm[k]
         if k != "C6":
