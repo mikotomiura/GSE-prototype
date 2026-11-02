@@ -50,3 +50,6 @@
 - 決定: 研究者の指示で、Gmail の下書きを研究用の mmiura.network@gmail.com に作った（コネクタは別のアカウントにつながっていたので、Chrome で mmiura の Gmail を開いて作った）。コネクタで先に作った別のアカウントの 4 件は消していない（研究者が消す）。
 - Erasmus MC: Slijper さんのアドレスは見つからず、共同の寄託者の Frens さん（m.frens@erasmusmc.nl）宛てにして転送を頼む文にした。
 - SENSE-42: 掲載版の連絡先 z.sai@qmul.ac.uk。宛先を探すときに本文を読み、5 分ごとの自己申告（フラストレーションを含む）とフレームごとの打鍵・マウスを持つ統制課題のデータだと分かったので、カードの表と claim 6 の「残る道」に足した。claim 6（申請なしで取れると確かめたもの 0 件）は変わらない（Zenodo は restricted）。
+
+## 判断 10: 6 件を送った（2026-11-02）
+- 研究者が mmiura.network@gmail.com の下書き 6 件を送った（研究者の報告）。返事の入口は `.steering/_handoff/next-session-public-data-replies.md`。返事が来る前にデータを取らない。
