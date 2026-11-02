@@ -4,7 +4,7 @@
 
 ## 0 入口の文（新しいセッションに貼る）
 
-「`.steering/_handoff/next-session-gse-c1c2c6.md` を実施。`/start-task` から。条件をコミットしてから計算する」
+「`.steering/_handoff/next-session-gse-c1c2c6.md` を実施。`/start-task` から。C1・C2・C6 は条件をコミットしてから計算する。§3 の同意文書の改訂案の検討も同じセッションで行う」
 
 ## 1 決まっていること（`.steering/20261102-gse-synthesis-redesign/decisions.md`）
 
@@ -25,9 +25,20 @@
 4. 計算 → `notes.md` に記述だけ書く（検定なし・判定の閾値なし・型を選ばない）。
 5. code-reviewer と /cross-review。Codex には条件の文とコードだけを送り、記録・中間・結果の本文は送らない。
 
-## 3 並行（研究者）
+## 3 同じセッションのもう 1 つの仕事: 同意文書の改訂案を研究者と検討する
 
-- 同意文書の改訂案（`.steering/20260913-esm-audit-criterion-gate/consent-revision-proposal.md`）を読む。M5 の配線の前に `.steering/20260823-o1-nonkeystroke-gap-and-prereg/consent-draft-o1.md` 12 行目の (a)〜(f) を終える約束がある。2026-09-29 の「見送り」は判断 4 で進める方向に改めた。
+対象は `.steering/20260913-esm-audit-criterion-gate/consent-revision-proposal.md`（114 行・最終更新 2026-09-14 の `80baf128`）。M5 の配線の前に `.steering/20260823-o1-nonkeystroke-gap-and-prereg/consent-draft-o1.md` の dev メモ 12 行目の (a)〜(f) を終える約束がある。2026-09-29 の「見送り」は判断 4 で進める方向に改めた。承認するのは研究者で、Claude は論点を用意して AskUserQuestion で 1 問ずつ聞く。
+
+1. 改訂案を 9-14 以降の変化と照らす（一次で確かめる）。少なくとも:
+   - 頻度の数値（12 行目 (f)）が今の `ProbeConfig` の既定と一致しているか
+   - `docs/participant-setup-guide.md` の `:105`・`:185-186` の行番号と逐語が今も合っているか
+   - 同意の正本 `Form_O1/GSE_O1_Form_Builder.gs` のその後の改訂（O1-C の識別子の行・結果の公表と記録の公開の節・ADR-037 の 5 択）とぶつからないか
+   - EH3 では ESM をアプリの外で取る決め（`.steering/20261011-portrait-eh3-impl/decisions.md` 判断 3 #1）との関係
+   - ADR-032 と同じリリースにする約束（ADR-031 M9）を今も保つか
+2. 改訂案 §4（この案が答えていないこと）の論点を、研究者に 1 問ずつ聞く。
+3. 研究者が承認したら、(a)〜(f) を別タスク（M5 の配線と同じ版）として引き継ぎに書く。この仕事では同意文書の本文を確定しない。
+
+順番は研究者に聞く（推奨: 条件の文を書いてコミットした後、計算を回す前後の待ち時間にこちらを進める）。
 
 ## 4 注意
 
