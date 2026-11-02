@@ -1,15 +1,7 @@
 {
- "git_head": "b6782aef4655f19152b92609486e08b6d1272b1f",
+ "git_head": "020a7a0fa5a45a4a787ec53dbbe7dd4e7e15ed19",
  "git_dirty_paths": [
-  " M experiments/20261102-stall-decomposition/o1/analyze_o1.py",
-  " M experiments/20261102-stall-decomposition/o1/build_o1.py",
-  " M experiments/20261102-stall-decomposition/o1/results/o1.json",
-  " M experiments/20261102-stall-decomposition/o1/results/provenance.json",
-  " M experiments/20261102-stall-decomposition/o1/run.sh",
-  " M experiments/20261102-stall-decomposition/public/analyze_public.py",
-  " M experiments/20261102-stall-decomposition/types_core.py",
-  "?? experiments/20261102-stall-decomposition/o1/posthoc.py",
-  "?? experiments/20261102-stall-decomposition/o1/results/posthoc.json"
+  " M experiments/20261102-stall-decomposition/o1/results/provenance.json"
  ],
  "klicke_work_tar_sha256": "97d0e6690f75db9be9b9c2475b4b084d0611c7d0135a27aa2e99cd39137ef365",
  "klicke_side_sha256": "daec6f94db286fdab2cc08bcd0470ea65efa805e7c6e6466401c05a4f6c24ae5",
