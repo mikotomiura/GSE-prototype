@@ -71,7 +71,10 @@ def r1_unit(segs, rng, normal):
     """1 単位の停滞と対照。[(stall_flags, [control_flags], [random_flags])] と除外の数。"""
     excl = {"u_ge_s": 0, "near_start": 0, "window_outside": 0, "near_ai": 0, "no_u": 0, "gap_lt_30s": 0,
             "no_next_text": 0, "no_control": 0}
-    t_first = min(sg.t_first for sg in segs if sg.t_first is not None)  # 単位の最初の押下（8）
+    firsts = [sg.t_first for sg in segs if sg.t_first is not None]
+    if not firsts:
+        return [], excl
+    t_first = min(firsts)  # 単位の最初の押下（8）
     stalls, cands = [], {}
     for k, sg in enumerate(segs):
         for s, t0 in sg.onsets:
@@ -100,13 +103,13 @@ def r1_unit(segs, rng, normal):
                 excl["near_ai"] += 1
                 continue
             r = sg.rec.stall(s, t0)
-            stalls.append((u, k, sg.text_cat[i][1], r.get("len_ms")))
+            stalls.append((u, k, sg.text_cat[i][1], r))
         for t, c in control_candidates(sg, normal, t_first):
             cands.setdefault(c, []).append((t, k))
     used = set()
     out = []
-    all_iv = [iv for sg in segs for iv in sg.rec.intervals]  # 無作為な窓は単位の観測区間の全体から（3）
-    for u, k, c, ln in sorted(stalls, key=lambda x: x[0]):
+    all_iv = [(a, b, j) for j, sg in enumerate(segs) for a, b in sg.rec.intervals]  # 単位の観測区間の全体から（3）
+    for u, k, c, row in sorted(stalls, key=lambda x: x[0]):
         pool = [x for x in cands.get(c, []) if x not in used]
         if not pool:
             excl["no_control"] += 1
@@ -118,11 +121,11 @@ def r1_unit(segs, rng, normal):
         cf = [segs[kk].rec.flags(t - PRE, t) for t, kk in pick]
         rf = []
         for _ in range(N_RAND):
-            x = place(rng, all_iv, PRE)
-            if x is not None:
-                kk = next(j for j, g in enumerate(segs) if g.rec.interval_of(x) is not None)
+            got = place_seg(rng, all_iv, PRE)
+            if got is not None:
+                x, kk = got
                 rf.append(segs[kk].rec.flags(x - PRE, x))
-        out.append((sf, cf, rf, ln))
+        out.append((sf, cf, rf, row))
     return out, excl
 
 
@@ -144,6 +147,20 @@ def control_candidates(sg, normal, t_first=None):
             continue
         out.append((t, c))
     return out
+
+
+def place_seg(rng, ivs, length):
+    """(a, b, セグメントの番号) の区間の集まりに長さ length の窓を一様に置き、(窓の終わり, 番号) を返す。"""
+    ok = [(a + length, b, j) for a, b, j in ivs if b - a >= length]
+    tot = sum(b - a for a, b, _ in ok)
+    if tot <= 0:
+        return None
+    v = rng.uniform(0, tot)
+    for a, b, j in ok:
+        if v <= b - a:
+            return a + v, j
+        v -= b - a
+    return ok[-1][1], ok[-1][2]
 
 
 def place(rng, intervals, length):
@@ -267,13 +284,32 @@ def r2_summary(rows, u_class_len, classes):
 
 
 def u_class_lengths(r1_units, classes):
-    """R1 に入った停滞の、[u − 30 秒, u] の型ごとの長さ（再開した停滞だけ・レビューの後に R1 の停滞の集合に揃えた）。"""
+    """R1 に入った停滞の、[u − 30 秒, u] の型ごとの長さ（再開した停滞だけ）。"""
     out = {c: [] for c in classes}
     for u in r1_units:
-        for sf, _, _, ln in u:
-            if ln is not None:
-                out[tc.Rec.klass(sf)].append(ln / 1000)
+        for sf, _, _, row in u:
+            if row.get("len_ms") is not None:
+                out[tc.Rec.klass(sf)].append(row["len_ms"] / 1000)
     return out
+
+
+def same_set_three_windows(r1_units, classes):
+    """事後（条件に無い・2 巡目のレビューの後に足した）: R1 に入った同じ停滞を、止まる前の窓・前の窓・固定長の窓の
+    3 つで分けたときの、再開した停滞の長さの中央値と件数。窓の違いと集合の違いを分けるため。"""
+    res = {}
+    keys = {"pre_stop_u_window": None, "pre_class": "pre_class", "pre_fixed_class": "pre_fixed_class"}
+    for name, key in keys.items():
+        out = {c: [] for c in classes}
+        for u in r1_units:
+            for sf, _, _, row in u:
+                if row.get("len_ms") is None:
+                    continue
+                c = tc.Rec.klass(sf) if key is None else row.get(key)
+                if c is not None:
+                    out[c].append(row["len_ms"] / 1000)
+        res[name] = {c: {"n": len(v), "len_median_s": round(statistics.median(v), 2) if v else None}
+                     for c, v in out.items()}
+    return res
 
 
 def r3_summary(rows, classes):
@@ -300,7 +336,8 @@ def dataset(units_segs, rows_units, classes, rng, normal):
     rows = [r for u in rows_units for r in u]
     ucl = u_class_lengths(r1u, classes)
     return {"R1": {**r1_summary([u for u in r1u if u], classes, rng), "excluded": excl},
-            "R2": r2_summary(rows, ucl, classes), "R3": r3_summary(rows, classes)}
+            "R2": r2_summary(rows, ucl, classes), "R3": r3_summary(rows, classes),
+            "posthoc_same_set_three_windows": same_set_three_windows(r1u, classes)}
 
 
 # ---------- 読み込み ----------
@@ -408,7 +445,17 @@ def selftest():
     sg4 = Seg(rec, [(t, "alphabetic") for t in text_all], [(150_000, 235_000)])
     _, ex4 = r1_unit([sg4], random.Random(1), False)
     assert ex4["u_ge_s"] == 1
-    assert out[0][3] is not None  # 停滞の長さを持つ
+    assert out[0][3].get("len_ms") is not None  # 停滞の行（長さ）を持つ
+    # 単位の最初の押下はセッションをまたぐ: 2 本目のセッションの開始の 40 秒後の停滞も、単位の最初から 60 秒以上なら入る
+    T = 10 ** 6
+    tB = [T + i * 1000 for i in range(41)] + [T + 100_000 + i * 1000 for i in range(5)]
+    sgP = Seg(tc.Rec([0, 1000], [], [], [(0, 2000)]), [(0, "alphabetic"), (1000, "alphabetic")], [])
+    sgQ = Seg(tc.Rec(tB + [T + 200_000 + i * 5000 for i in range(10)], [], [], [(T - 50_000, T + 400_000)]),
+              [(t, "alphabetic") for t in tB + [T + 200_000 + i * 5000 for i in range(10)]], [(T + 45_000, T + 50_000)])
+    _, exPQ = r1_unit([sgP, sgQ], random.Random(1), False)
+    _, exQ = r1_unit([sgQ], random.Random(1), False)
+    assert exPQ["near_start"] == 0 and exQ["near_start"] == 1, (exPQ, exQ)
+    assert r1_unit([], random.Random(1), False)[0] == []
     # R2 の件数は再開した停滞だけ（打ち切りは数えない）
     rows = [{"pre_class": "silence", "pre_fixed_class": "silence", "pos": "later", "s": 0, "t0": th, "len_ms": ln,
              "len_class": lc} for th, ln, lc in ((1000, 20_000, "mid"), (2000, None, "censored"), (3000, 5000, "short"),
