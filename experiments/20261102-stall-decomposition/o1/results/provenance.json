@@ -1,0 +1,16 @@
+{
+ "git_head": "a994173e1b02883181722978bce3cefea3c9d53a",
+ "git_dirty_paths": [
+  "?? experiments/20261102-stall-decomposition/public/results/"
+ ],
+ "gse_replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
+ "input_files": 18,
+ "inputs_sha256_digest": "833cd06782ed9820de800a917e8fc2346a016decb568d270603e2175d806c1ab",
+ "prereg_p1_episode_sha256": "dd1bb614021af09e2eab2112e27a7dc9ff42ae219364dfb122acaa68d30f3267",
+ "scripts_sha256": {
+  "experiments/20261102-stall-decomposition/o1/build_o1.py": "f685dacd584af563c0618a3f992db43b22037f43754f9daf7bae9d9b03705902",
+  "experiments/20261102-stall-decomposition/o1/analyze_o1.py": "11566f75a80482b33b52cd95b0cc5f6ab998f295b0efa4a424273c01daa869ce",
+  "experiments/20261102-stall-decomposition/types_core.py": "514dead4cfabf8a1fc2826756f833d18aa63d63891d4d834cc5794b30ee1ad66",
+  "experiments/20261101-klicke-early-stall-trigger/scripts/analyze_item2.py": "9c8ca6a498c034c49021a18221c29321e86d9dc6eade148ce8f48e5b46abcc22"
+ }
+}
