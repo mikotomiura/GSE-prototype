@@ -7,4 +7,5 @@
 - [x] O1 の中間（14 本・hash 照合）と集計（自己検査・照合・本計算・変異 12 個）
 - [x] notes.md・data.md・env.md・provenance
 - [x] code-reviewer と /cross-review、指摘の反映（判断 10）
-- [ ] コミット（[skip ci]）・push は研究者に確かめてから
+- [x] コミット（[skip ci]）・push（PR は研究者に確かめてから）
+- [x] 残りの確かめ R1〜R3（判断 13〜15）
