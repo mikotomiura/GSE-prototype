@@ -11,4 +11,5 @@
 - [x] 論点 4: 事前登録の項目を並べる（decisions.md 1〜14）
 - [x] codex-consult の第二意見と対応（判断 11・12）
 - [x] MhD の議論の引き継ぎ（`.steering/_handoff/next-session-gse-mhd-unit-adr.md`）と索引の更新
-- [ ] コミットと push（PR は研究者に確かめてから）
+- [x] /cross-review 1 巡目と対応（判断 13）
+- [ ] コミットと push、PR と [skip ci] でマージ
