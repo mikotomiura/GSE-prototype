@@ -8,6 +8,8 @@
 - 自分の所属機関の倫理承認は無いと正直に書き、相手が条件を求めるならそれに従うと書く。
 - 返事が来る前にデータを取らない（CS1 と同じ）。
 
+Gmail の下書き: 6 件とも mmiura.network@gmail.com の下書きに作った（2026-11-02・送るのは研究者）。W-CoLeJa はお名前の漢字が〔〕のまま。
+
 宛先の出どころ（2026-11-02 に確かめた）:
 
 | # | 候補 | 宛先 | 出どころ |
@@ -15,9 +17,9 @@
 | 1 | Naegelin ら（職場・8 週） | aferrario@ethz.ch | medRxiv の本文の「For correspondence」（Chrome で確認）。本文の逐語 "Data are added to a repository in the Open Science Framework (OSF) under https://osf.io/qpekf/ and are available upon request."。OSF のノードは API で 401（非公開） |
 | 2 | Clarkson II | citer@clarkson.edu | CITeR の Clarkson I のページの "To request this dataset, please contact citer@clarkson.edu and indicate the specific dataset."。Clarkson II のページ（citer.clarkson.edu/?p=4082）は請求の方法を書かず、"Contacts" に案内する。同じセンターなのでこの宛先にした |
 | 3 | W-CoLeJa（国立国語研究所） | y.nakamura@ninjal.ac.jp | 2026-09-12 の NINJAL 日本語教師セミナーの案内の「プロジェクト窓口担当」（`[at]` を `@` に置き換えた） |
-| 4 | Erasmus MC「Computer use 2002-2008」 | DANS のデータセットのページの「Contact」のボタン（メールの宛先は公開されていない） | DANS のページの "Use email button above to contact."・連絡先は HP Slijper (Erasmus MC) |
+| 4 | Erasmus MC「Computer use 2002-2008」 | m.frens@erasmusmc.nl（共同の寄託者 Maarten Frens・Slijper さんに転送を頼む） | DANS の連絡先は HP Slijper だがアドレスは公開されておらず、Europe PMC の所属欄にも見つからなかった。Frens さんのアドレスは 2024 年の論文の所属欄（Europe PMC）。DANS のページの「Contact」のボタンからも送れる |
 | 5 | Multi-ID | tjneal@usf.edu | 著者のデータセットのページの "You may contact Dr. Tempestt Neal for dataset access" とプロフィールのアドレス |
-| 6 | SENSE-42 | Zenodo のレコードの「Request access」のフォーム | Zenodo の API で `access_right: restricted` を確認 |
+| 6 | SENSE-42 | z.sai@qmul.ac.uk（Sai Zhang・Scientific Data の掲載版の Correspondence to）。あわせて Zenodo の「Request access」のフォーム | 掲載版（doi:10.1038/s41597-026-07726-x・2026-06-26）の Data Records は Zenodo 20328099 を指し、API で `restricted`。プレプリントは Synapse（doi:10.7303/syn68713182）で「publicly available in open access」と書いていたが、Synapse は移行中で 2026-11-02 に確かめられなかった |
 
 送らない候補: Staley & Ford（データの公開の記述が無く 2015 年）、ISOT（指導者の署名つきの同意書が要るとの報告で、独立の研究者には満たせない）、EmoSurv（申請なしで落とせる・非商用）、Smeaton ら・RLKWiC（配布先を確かめていない）。
 
@@ -115,9 +117,9 @@ ORCID: https://orcid.org/0009-0000-4196-0508
 
 ---
 
-## 4. Erasmus MC「Computer use 2002-2008」（DANS の Contact のフォーム）
+## 4. Erasmus MC「Computer use 2002-2008」
 
-送り方: https://doi.org/10.17026/dans-zuf-ft56 のページの「Contact」のボタンから送る（宛先は HP Slijper と DANS）。
+宛先: m.frens@erasmusmc.nl（Gmail の下書きは Frens さん宛てに直した版。下の本文は DANS のフォームから Slijper さんに送るときの版）。
 
 Subject: Access request: "Computer use 2002-2008" (doi:10.17026/dans-zuf-ft56)
 
@@ -174,7 +176,9 @@ ORCID: https://orcid.org/0009-0000-4196-0508
 
 ---
 
-## 6. SENSE-42（Zenodo の Request access のフォーム）
+## 6. SENSE-42
+
+宛先: z.sai@qmul.ac.uk（Gmail の下書きはメールの版）。下はフォームに貼る版。
 
 送り方: https://zenodo.org/records/20328099 の「Request access」から送る。フォームの欄の名前は開いてから合わせる。
 
