@@ -9,3 +9,10 @@
 - [x] code-reviewer と /cross-review、指摘の反映（判断 10）
 - [x] コミット（[skip ci]）・push（PR は研究者に確かめてから）
 - [x] 残りの確かめ R1〜R3（判断 13〜15）
+- [x] (b) の問い 2・3 を聞く（判断 16・17）
+- [x] (b) の条件を書き、codex-consult を通す（判断 18）
+- [ ] (b) の条件を計算の前にコミットする
+- [ ] 取っておく書き手を決める → 変換（自己検査・陽性対照）→ replay → 集計
+- [ ] notes・provenance
+- [ ] code-reviewer と /cross-review、指摘の反映
+- [ ] コミット（[skip ci]）・push（PR は研究者に確かめてから）
