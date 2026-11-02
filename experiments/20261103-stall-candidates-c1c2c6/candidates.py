@@ -278,6 +278,8 @@ def day_rows(dy):
     for r in rows["C1"]:
         r["hit_c0"] = spans_hit(sp0, r["s"], r["o"])
         r["in_c0_stall"] = any(a <= r["s"] and r["o"] <= b for a, b in full0)
+    for r, (a, b) in zip(rows["C0"], full0):
+        r["n_c1_in_stall"] = sum(1 for x in rows["C1"] if a <= x["s"] and x["o"] <= b)
     for r in rows["C6"]:
         for k in ("C0", "C1", "C2"):
             r["in_" + k] = any(x["s"] - PRE <= r["s"] <= x["o"] for x in rows[k])
@@ -360,6 +362,11 @@ def summarize(days, all_rows, no_warm):
             lambda x, dy, k=k: sum(1 for r in x[k] if r["len_class"] in ("long", "censored")) / len(x[k]) if x[k] else None)
     o4["posthoc_C1_inside_C0_stall_to_resume"] = share(sum(1 for r in c1 if r["in_c0_stall"]), len(c1))
     o4["posthoc_C1_not_hit_C0_but_inside_C0_stall"] = sum(1 for r in c1 if r["in_c0_stall"] and not r["hit_c0"])
+    n1 = [r["n_c1_in_stall"] for r in c0]
+    o4["posthoc_C0_stalls_with_C1"] = share(sum(1 for n in n1 if n > 0), len(c0))
+    o4["posthoc_C1_per_C0_stall_with_C1"] = tc.quart([n for n in n1 if n > 0])
+    o4["posthoc_C1_per_C0_stall_with_C1_max"] = max(n1) if n1 else None
+    o4["posthoc_C1_inside_C0_stalls_with_ge3_C1"] = sum(n for n in n1 if n >= 3)
     o4["day"] = {"C0_is_C2": dq(lambda x, dy: ratio(x["C0"], "c2")),
                  "C0_hit_C1": dq(lambda x, dy: ratio(x["C0"], "hit_c1")),
                  "C1_hit_C0": dq(lambda x, dy: ratio(x["C1"], "hit_c0"))}
@@ -484,7 +491,10 @@ def selftest():
                 ks += [[t + j * 1000, "alphabetic"] for j in range(5)]
                 t += 60_000
         return Day(synth(ks + [[t + 300_000, "alphabetic"]]))
-    assert len(churn2(False).c6()) == 2, churn2(False).c6()
+    d2 = churn2(False)
+    assert len(d2.c6()) == 2, d2.c6()
+    # 1 件目は 5 文字を入れ始めた 279,000（偽の始まり）で閉じる → 幅 279,000 − 273,500
+    assert d2.c6_span[0] == 279_000 - 273_500, d2.c6_span
     assert len(churn2(True).c6()) == 1, churn2(True).c6()
     # 4 標本が 100 未満 → C1・C6 は立たない
     few = [[i * 1000, "alphabetic"] for i in range(50)]
@@ -556,6 +566,28 @@ def selftest():
     rows, _ = day_rows(dy)
     assert len(rows["C0"]) == 1 and len(rows["C1"]) == 1, rows
     assert rows["C1"][0]["hit_c0"] is False and rows["C1"][0]["in_c0_stall"] is True, rows["C1"]
+    # 11b 負の例: C0 は標本が 100 に届かず立たないが、ポインタで活動の標本が足りて C1 は立つ → C0 の停滞の外
+    few50 = [[i * 1000, "alphabetic"] for i in range(50)]
+    dy = Day(synth(few50 + [[400_000, "alphabetic"]], pointer=[i * 1000 + 500 for i in range(50)] + list(range(50_500, 100_500, 1000))))
+    rows, _ = day_rows(dy)
+    assert rows["C0"] == [] and len(rows["C1"]) == 1 and rows["C1"][0]["in_c0_stall"] is False, rows
+    # 11c 打ち切り: ポインタが 60 秒続いてから止まり、区間が再開の前（last + 100 秒）に終わる
+    #    → C0 の停滞は区間の終わりまで。C1（s1 = last + 90 秒・θ1 = 5 秒）は t0 の後だがその中
+    dy = Day(synth(base + [[600_000, "alphabetic"]], pointer=range(last + 5000, last + 60_001, 5000),
+                   intervals=((0, last + 100_000),)))
+    rows, _ = day_rows(dy)
+    assert rows["C0"][0]["len"] is None and [(r["s"], r["o"]) for r in rows["C1"]] == [(last + 90_000, last + 95_000)], rows
+    assert rows["C1"][0]["hit_c0"] is False and rows["C1"][0]["in_c0_stall"] is True, rows
+    assert rows["C0"][0]["n_c1_in_stall"] == 1
+    # 12 日ごとの値（K6・レビュー 2 巡目 M4）: 日 A = C2 の停滞 1 件（長い）、日 B = C1 と交わる停滞 1 件（打ち切り）
+    dA = Day(synth(base + [[600_000, "alphabetic"]], pointer=ptr))
+    dB = Day(synth(base + [[600_000, "alphabetic"]], intervals=((0, last + 100_000),)))
+    rA, _ = day_rows(dA)
+    rB, _ = day_rows(dB)
+    sm = summarize([dA, dB], [rA, rB], {"C0": 0, "C1": 0})
+    assert sm["O4_overlap"]["day"]["C0_is_C2"]["median"] == 0.5 and sm["O4_overlap"]["day"]["C0_is_C2"]["q3"] == 0.75, sm["O4_overlap"]["day"]
+    assert sm["O3_lengths"]["C0"]["day_share_long_or_censored"]["median"] == 1.0, sm["O3_lengths"]["C0"]
+    assert sm["O4_overlap"]["posthoc_C0_stalls_with_C1"]["num"] == 1
     # 不応期: 条件 A が続く間は 2 件目が立たない
     dy = Day(synth(base + [[900_000, "alphabetic"]]))
     assert len(dy.c0()[0]) == 1 and len(dy.c1()[0]) == 1
