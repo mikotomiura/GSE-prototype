@@ -1,5 +1,5 @@
 #!/bin/bash
-# 週次 cargo 掃除 (launchd local.gse.cargo-sweep) を導入・再導入する。
+# 毎日の cargo 掃除 (launchd local.gse.cargo-sweep) を導入・再導入する。
 #
 # ⚠️★★★ なぜ repo に置くか (code-reviewer 指摘 #3, 2026-08-31):
 #   初版は実体が `~/.local/bin/gse-cargo-sweep.sh` と `~/Library/LaunchAgents/*.plist` にしか
@@ -35,7 +35,7 @@ verify() {
   if command -v cargo-sweep >/dev/null 2>&1; then
     ok "cargo-sweep がある: $(command -v cargo-sweep)"
   else
-    ng "cargo-sweep が無い (これが無いと週次ジョブは毎回 exit 1 する)"
+    ng "cargo-sweep が無い (これが無いと定期ジョブは毎回 exit 1 する)"
   fi
 
   if [ -x "$DEST" ]; then
@@ -82,7 +82,7 @@ verify() {
 
   echo
   if [ "$fail" -eq 0 ]; then
-    echo "✅ 週次掃除は導入済みです (通過 / 未達 0)"
+    echo "✅ 定期掃除 (毎日) は導入済みです (通過 / 未達 0)"
   else
     echo "❌ 未達 ${fail} 件。上の ❌ を消してください"
   fi
@@ -134,10 +134,9 @@ cat > "$PLIST" <<PLIST_EOF
     <array>
         <string>${DEST}</string>
     </array>
-    <!-- 毎週日曜 03:00。スリープ中なら次回起床時に実行される。 -->
+    <!-- 毎日 03:00。スリープ中なら次回起床時に実行される。 -->
     <key>StartCalendarInterval</key>
     <dict>
-        <key>Weekday</key><integer>0</integer>
         <key>Hour</key><integer>3</integer>
         <key>Minute</key><integer>0</integer>
     </dict>
