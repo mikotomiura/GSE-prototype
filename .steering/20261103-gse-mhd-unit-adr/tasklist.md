@@ -7,7 +7,8 @@
 - [x] code-reviewer と /cross-review（1 巡目: 両方・2 巡目: /cross-review）（Codex に O1 の記録・数値を送らない・既知の未決を添える）
 - [x] 引き継ぎ §2 の 3（MhD 固有の事前登録の条件の中身の形）
 - [x] 引き継ぎ §2 の 4 は研究者がこのセッションで続けると決めた（判断 7・13・14）
-- [ ] 配管の空回し: 条件を書いてコミット → 陽性対照 → 計算 → notes → レビュー
+- [x] 配管の空回し: 条件を書いてコミット → 陽性対照 → 計算 → notes → レビュー（判断 16）
+- [x] 引き継ぎ（`.steering/_handoff/next-session-gse-after-mhd-unit-adr.md`）
 - [ ] push・PR は研究者に確かめてから
 
 ## 場面ごとの対応
