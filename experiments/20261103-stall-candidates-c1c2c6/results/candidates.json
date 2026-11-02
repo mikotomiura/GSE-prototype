@@ -1,0 +1,378 @@
+{
+ "days": 14,
+ "obs_h": 152.647,
+ "O1_counts_rates": {
+  "C0": {
+   "n": 1459,
+   "pooled_per_h": 9.558,
+   "day_per_h": {
+    "n": 14,
+    "q1": 7.8108,
+    "median": 8.9552,
+    "q3": 11.2674
+   },
+   "day_unit_sd": {
+    "units": 14,
+    "pooled_rate_per_h": 9.558,
+    "sd_between_units": 3.2802,
+    "sd_expected_poisson_mean": 0.9738,
+    "unit_obs_h": {
+     "n": 14,
+     "q1": 10.144,
+     "median": 11.4683,
+     "q3": 13.696
+    },
+    "unit_rate_per_h": {
+     "n": 14,
+     "q1": 7.8108,
+     "median": 8.9552,
+     "q3": 11.2674
+    }
+   }
+  },
+  "C1": {
+   "n": 1400,
+   "pooled_per_h": 9.1715,
+   "day_per_h": {
+    "n": 14,
+    "q1": 7.993,
+    "median": 9.3116,
+    "q3": 10.2315
+   },
+   "day_unit_sd": {
+    "units": 14,
+    "pooled_rate_per_h": 9.1715,
+    "sd_between_units": 2.0976,
+    "sd_expected_poisson_mean": 0.9618,
+    "unit_obs_h": {
+     "n": 14,
+     "q1": 10.144,
+     "median": 11.4683,
+     "q3": 13.696
+    },
+    "unit_rate_per_h": {
+     "n": 14,
+     "q1": 7.993,
+     "median": 9.3116,
+     "q3": 10.2315
+    }
+   }
+  },
+  "C2": {
+   "n": 743,
+   "pooled_per_h": 4.8674,
+   "day_per_h": {
+    "n": 14,
+    "q1": 2.4205,
+    "median": 4.2991,
+    "q3": 6.1568
+   },
+   "day_unit_sd": {
+    "units": 14,
+    "pooled_rate_per_h": 4.8674,
+    "sd_between_units": 2.7281,
+    "sd_expected_poisson_mean": 0.6933,
+    "unit_obs_h": {
+     "n": 14,
+     "q1": 10.144,
+     "median": 11.4683,
+     "q3": 13.696
+    },
+    "unit_rate_per_h": {
+     "n": 14,
+     "q1": 2.4205,
+     "median": 4.2991,
+     "q3": 6.1568
+    }
+   }
+  },
+  "C6": {
+   "n": 3,
+   "pooled_per_h": 0.0197,
+   "day_per_h": {
+    "n": 14,
+    "q1": 0.0,
+    "median": 0.0,
+    "q3": 0.0
+   },
+   "day_unit_sd": {
+    "units": 14,
+    "pooled_rate_per_h": 0.0197,
+    "sd_between_units": 0.0756,
+    "sd_expected_poisson_mean": 0.0581,
+    "unit_obs_h": {
+     "n": 14,
+     "q1": 10.144,
+     "median": 11.4683,
+     "q3": 13.696
+    },
+    "unit_rate_per_h": {
+     "n": 14,
+     "q1": 0.0,
+     "median": 0.0,
+     "q3": 0.0
+    }
+   }
+  }
+ },
+ "O2_thresholds": {
+  "C0": {
+   "unit": "ms",
+   "threshold_at_fire": {
+    "n": 1459,
+    "q1": 27064.0,
+    "median": 42363,
+    "q3": 59049.0
+   },
+   "day_median_threshold": {
+    "n": 14,
+    "q1": 32573.125,
+    "median": 46041.5,
+    "q3": 60207.75
+   },
+   "rises_without_threshold_warmup": 49
+  },
+  "C1": {
+   "unit": "ms",
+   "threshold_at_fire": {
+    "n": 1400,
+    "q1": 9433.0,
+    "median": 11100.0,
+    "q3": 15132.0
+   },
+   "day_median_threshold": {
+    "n": 14,
+    "q1": 10966.25,
+    "median": 11712.25,
+    "q3": 13117.375
+   },
+   "rises_without_threshold_warmup": 24
+  },
+  "C6": {
+   "unit": "presses_per_30s",
+   "threshold_at_fire": {
+    "n": 3,
+    "q1": 10.5,
+    "median": 11,
+    "q3": 30.5
+   },
+   "day_median_threshold": {
+    "n": 3,
+    "q1": 10.5,
+    "median": 11,
+    "q3": 30.5
+   }
+  }
+ },
+ "O3_lengths": {
+  "C0": {
+   "short": {
+    "num": 165,
+    "den": 1459,
+    "ratio": 0.1131
+   },
+   "mid": {
+    "num": 790,
+    "den": 1459,
+    "ratio": 0.5415
+   },
+   "long": {
+    "num": 412,
+    "den": 1459,
+    "ratio": 0.2824
+   },
+   "censored": {
+    "num": 92,
+    "den": 1459,
+    "ratio": 0.0631
+   },
+   "len_s_resumed": {
+    "n": 1367,
+    "q1": 33.9745,
+    "median": 89.799,
+    "q3": 225.5355
+   }
+  },
+  "C1": {
+   "short": {
+    "num": 272,
+    "den": 1400,
+    "ratio": 0.1943
+   },
+   "mid": {
+    "num": 803,
+    "den": 1400,
+    "ratio": 0.5736
+   },
+   "long": {
+    "num": 315,
+    "den": 1400,
+    "ratio": 0.225
+   },
+   "censored": {
+    "num": 10,
+    "den": 1400,
+    "ratio": 0.0071
+   },
+   "len_s_resumed": {
+    "n": 1390,
+    "q1": 20.6197,
+    "median": 60.877,
+    "q3": 164.102
+   }
+  },
+  "C2": {
+   "short": {
+    "num": 111,
+    "den": 743,
+    "ratio": 0.1494
+   },
+   "mid": {
+    "num": 433,
+    "den": 743,
+    "ratio": 0.5828
+   },
+   "long": {
+    "num": 173,
+    "den": 743,
+    "ratio": 0.2328
+   },
+   "censored": {
+    "num": 26,
+    "den": 743,
+    "ratio": 0.035
+   },
+   "len_s_resumed": {
+    "n": 717,
+    "q1": 25.276,
+    "median": 72.732,
+    "q3": 171.882
+   }
+  },
+  "C6": {
+   "span_s": {
+    "n": 3,
+    "q1": 0.8125,
+    "median": 0.932,
+    "q3": 9.13
+   }
+  }
+ },
+ "O4_overlap": {
+  "C0_hit_C1": {
+   "num": 636,
+   "den": 1459,
+   "ratio": 0.4359
+  },
+  "C1_hit_C0": {
+   "num": 646,
+   "den": 1400,
+   "ratio": 0.4614
+  },
+  "C0_is_C2": {
+   "num": 743,
+   "den": 1459,
+   "ratio": 0.5093
+  },
+  "C0_neither_C2_nor_hit_C1": 80,
+  "C6_in_pre_or_span": {
+   "C0": {
+    "num": 0,
+    "den": 3,
+    "ratio": 0.0
+   },
+   "C1": {
+    "num": 0,
+    "den": 3,
+    "ratio": 0.0
+   },
+   "C2": {
+    "num": 0,
+    "den": 3,
+    "ratio": 0.0
+   }
+  },
+  "has_C6_in_pre_or_span": {
+   "C0": {
+    "num": 0,
+    "den": 1459,
+    "ratio": 0.0
+   },
+   "C1": {
+    "num": 0,
+    "den": 1400,
+    "ratio": 0.0
+   },
+   "C2": {
+    "num": 0,
+    "den": 743,
+    "ratio": 0.0
+   }
+  }
+ },
+ "O5_position": {
+  "C0": {
+   "early": {
+    "n": 114,
+    "obs_h": 10.04,
+    "pooled_per_h": 11.3547
+   },
+   "later": {
+    "n": 1345,
+    "obs_h": 140.276,
+    "pooled_per_h": 9.5882
+   },
+   "no_position": 0
+  },
+  "C1": {
+   "early": {
+    "n": 81,
+    "obs_h": 10.04,
+    "pooled_per_h": 8.0678
+   },
+   "later": {
+    "n": 1315,
+    "obs_h": 140.276,
+    "pooled_per_h": 9.3744
+   },
+   "no_position": 4
+  },
+  "C2": {
+   "early": {
+    "n": 63,
+    "obs_h": 10.04,
+    "pooled_per_h": 6.275
+   },
+   "later": {
+    "n": 680,
+    "obs_h": 140.276,
+    "pooled_per_h": 4.8476
+   },
+   "no_position": 0
+  },
+  "C6": {
+   "early": {
+    "n": 1,
+    "obs_h": 10.04,
+    "pooled_per_h": 0.0996
+   },
+   "later": {
+    "n": 2,
+    "obs_h": 140.276,
+    "pooled_per_h": 0.0143
+   },
+   "no_position": 0
+  }
+ },
+ "O6_selfcheck": {
+  "files": 14,
+  "onsets_replay": 1459,
+  "onsets_port": 1459,
+  "mismatch_files": 0
+ },
+ "files": {
+  "given": 18,
+  "excluded_no_focus": 4,
+  "used": 14
+ }
+}
