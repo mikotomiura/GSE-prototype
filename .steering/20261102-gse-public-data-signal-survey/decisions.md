@@ -53,3 +53,12 @@
 
 ## 判断 10: 6 件を送った（2026-11-02）
 - 研究者が mmiura.network@gmail.com の下書き 6 件を送った（研究者の報告）。返事の入口は `.steering/_handoff/next-session-public-data-replies.md`。返事が来る前にデータを取らない。
+
+## 判断 11: Clarkson II の許諾書には署名せず、条件を問い合わせる（2026-11-03）
+
+- 届いたもの: CITeR（Lambert さん）から返信。許諾書（Clarkson University Joint Multi-modal Biometric Dataset Release Agreement・Last Revised 06-18）に署名すれば、データベースへのアクセスの案内を送る。費用はなく、出版するときは引用が要る。メールの「You will need to have a person authorized」の文は途中で切れている。
+- 許諾書の条件のうち、満たせない・重いもの（PDF の逐語に沿って）: §6 は requestor's supervisor の署名が要る／前文は署名した個人に、所属機関の IRB の規則に従って扱う責任を負わせる／§4 は biometric features を論文などに出す前に PI の書面の承認が要り、出したら写しを送る／§7 は Clarkson University への補償に上限がない（米国政府機関だけが外れる）。§2・§3（再配布・改変・商用の禁止、内部の研究目的に限る）と §5（Murphy, Huang, Hou, Schuckers, IJCB 2017 の引用）は予定と合う。
+- 選択肢: 署名せず条件を問い合わせる（推奨）／未踏の採択後まで保留／辞退／自分で署名して返す。
+- 研究者の選択: 推奨。返信の下書きは `clarkson-reply-draft.md`（自署でよいか・機関の倫理審査がないことが障りになるか・集計値だけの公開に §4 の承認が要るか・補償の条項を個人向けに変えられるか・所属を通した方がよいか、を尋ねる）。送るのは研究者。
+- 理由（Claude の推奨の理由）: 条件を満たさないまま署名すると、満たさない署名になる。GSE の側では Clarkson II は H4a・H5 を O1 以外で確かめる「取れれば」の材料で（synthesis §8）、次の検証の設計の要ではない。
+- 許諾書の PDF は repo にコミットしない。許可が来ても、すぐに取得しない（引き継ぎ §2）。
