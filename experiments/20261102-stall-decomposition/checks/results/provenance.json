@@ -1,5 +1,5 @@
 {
- "git_head": "2c7d2740fac1ae080b21dfa7044599e80230d30c",
+ "git_head": "bcb4a9e3b537a41f066e7bcab7e74f1fc9be200f",
  "git_dirty_paths": [],
  "scripts_sha256": {
   "experiments/20261102-stall-decomposition/checks/analyze_checks.py": "59c8f39dd42b5f0a3c04c5700784d0ad586a312b5b9523f1ec3e4a5b09d48675",
