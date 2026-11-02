@@ -114,7 +114,7 @@
 
 ## Migration
 
-1. `docs/adr/README.md` の一覧に本 ADR を足し、ADR-019・ADR-030 の行に、本 ADR（Proposed）が一部を上書きすることを注記する（本文は書き換えない）。
+1. `docs/adr/README.md` の一覧に本 ADR を足し、ADR-019・ADR-030 の行に、本 ADR が一部を上書きすることを注記する（本文は書き換えない）。
 2. `docs/glossary.md`: 「判断エピソード」「特徴行」「MhD」の項に注記を足し、「ラベルの付いた 1 件」の項を新しく立てる。
 3. `docs/architecture/personalization-and-online-learning.md` §3.1 に、Decision Episode は有効標本数の単位ではない（ADR-042）という参照を 1 行足す。
 4. `docs/research-positioning.md`（§1 の「約 50 セッション」）と `docs/wbs-verification-halfyear.md`（B4）は、ADR-041 Migration 4 の改訂のときに D5 の数え方へ合わせる（本 ADR では直さない）。未踏の提出資料は提出済みの文書なので直さない。
