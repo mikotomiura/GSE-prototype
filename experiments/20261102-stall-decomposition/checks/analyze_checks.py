@@ -54,9 +54,10 @@ class Seg:
         self.t_first = rec.press[0] if rec.press else None
 
     def next_text_gap(self, i):
+        """次の文字の入力までの間。次の文字が無ければ None（欠測・レビューの後に改めた）。"""
         if i + 1 < len(self.tt):
             return self.tt[i + 1] - self.tt[i]
-        return (self.rec.press[-1] - self.tt[i]) if self.rec.press else 0
+        return None
 
     def window_ok(self, u):
         iv = self.rec.interval_of(u)
@@ -69,7 +70,8 @@ class Seg:
 def r1_unit(segs, rng, normal):
     """1 単位の停滞と対照。[(stall_flags, [control_flags], [random_flags])] と除外の数。"""
     excl = {"u_ge_s": 0, "near_start": 0, "window_outside": 0, "near_ai": 0, "no_u": 0, "gap_lt_30s": 0,
-            "no_control": 0}
+            "no_next_text": 0, "no_control": 0}
+    t_first = min(sg.t_first for sg in segs if sg.t_first is not None)  # 単位の最初の押下（8）
     stalls, cands = [], {}
     for k, sg in enumerate(segs):
         for s, t0 in sg.onsets:
@@ -78,13 +80,17 @@ def r1_unit(segs, rng, normal):
                 excl["no_u"] += 1
                 continue
             u = sg.tt[i]
-            if sg.next_text_gap(i) < G_STALL:
+            g = sg.next_text_gap(i)
+            if g is None:
+                excl["no_next_text"] += 1
+                continue
+            if g < G_STALL:
                 excl["gap_lt_30s"] += 1
                 continue
             if u >= s:
                 excl["u_ge_s"] += 1
                 continue
-            if u - sg.t_first < MIN_FROM_START:
+            if u - t_first < MIN_FROM_START:
                 excl["near_start"] += 1
                 continue
             if not sg.window_ok(u):
@@ -93,12 +99,14 @@ def r1_unit(segs, rng, normal):
             if normal and sg.near_ai(u - AI_PAD, u):
                 excl["near_ai"] += 1
                 continue
-            stalls.append((u, k, sg.text_cat[i][1]))
-        for t, c in control_candidates(sg, normal):
+            r = sg.rec.stall(s, t0)
+            stalls.append((u, k, sg.text_cat[i][1], r.get("len_ms")))
+        for t, c in control_candidates(sg, normal, t_first):
             cands.setdefault(c, []).append((t, k))
     used = set()
     out = []
-    for u, k, c in sorted(stalls, key=lambda x: (x[1], x[0])):
+    all_iv = [iv for sg in segs for iv in sg.rec.intervals]  # 無作為な窓は単位の観測区間の全体から（3）
+    for u, k, c, ln in sorted(stalls, key=lambda x: x[0]):
         pool = [x for x in cands.get(c, []) if x not in used]
         if not pool:
             excl["no_control"] += 1
@@ -110,22 +118,25 @@ def r1_unit(segs, rng, normal):
         cf = [segs[kk].rec.flags(t - PRE, t) for t, kk in pick]
         rf = []
         for _ in range(N_RAND):
-            x = place(rng, sg.rec.intervals, PRE)
+            x = place(rng, all_iv, PRE)
             if x is not None:
-                rf.append(sg.rec.flags(x - PRE, x))
-        out.append((sf, cf, rf))
+                kk = next(j for j, g in enumerate(segs) if g.rec.interval_of(x) is not None)
+                rf.append(segs[kk].rec.flags(x - PRE, x))
+        out.append((sf, cf, rf, ln))
     return out, excl
 
 
-def control_candidates(sg, normal):
-    """対照の候補 [(u′, category)]（R1）。"""
+def control_candidates(sg, normal, t_first=None):
+    """対照の候補 [(u′, category)]（R1）。t_first は単位の最初の押下（既定はこの区間の最初）。"""
+    if t_first is None:
+        t_first = sg.t_first
     spans = [(s - PRE, t0) for s, t0 in sg.onsets]
     out = []
     for i, (t, c) in enumerate(sg.text_cat):
         g = sg.next_text_gap(i)
-        if not (CTRL_LO <= g < CTRL_HI):
+        if g is None or not (CTRL_LO <= g < CTRL_HI):
             continue
-        if t - sg.t_first < MIN_FROM_START or not sg.window_ok(t):
+        if t - t_first < MIN_FROM_START or not sg.window_ok(t):
             continue
         if any(a <= t <= b for a, b in spans):
             continue
@@ -154,7 +165,7 @@ def unit_counts(u, order, classes):
     ct = [0] * len(classes)
     rd = [0] * len(classes)
     ix = {c: i for i, c in enumerate(classes)}
-    for sf, cf, rf in u:
+    for sf, cf, rf, _ in u:
         st[ix[klass_order(sf, order)]] += 1
         for f in cf:
             ct[ix[klass_order(f, order)]] += 1
@@ -240,8 +251,8 @@ def r2_summary(rows, u_class_len, classes):
             rs = [r for r in ok if stratum(r["t0"] - r["s"]) == i]
             cell = {}
             for c in classes:
-                cr = [r for r in rs if r.get(key) == c]
-                lens = [r["len_ms"] / 1000 for r in cr if r["len_ms"] is not None]
+                cr = [r for r in rs if r.get(key) == c and r["len_ms"] is not None]  # 再開した停滞だけ（5）
+                lens = [r["len_ms"] / 1000 for r in cr]
                 cell[c] = {"n": len(cr), "len_median_s": round(statistics.median(lens), 2) if lens else None,
                            "long_share": round(sum(1 for r in cr if r["len_class"] == "long") / len(cr), 4) if cr else None}
             sl, op = cell.get("silence", {}), cell.get("move_or_click", {})
@@ -255,18 +266,13 @@ def r2_summary(rows, u_class_len, classes):
     return res
 
 
-def u_class_lengths(segs, classes):
+def u_class_lengths(r1_units, classes):
+    """R1 に入った停滞の、[u − 30 秒, u] の型ごとの長さ（再開した停滞だけ・レビューの後に R1 の停滞の集合に揃えた）。"""
     out = {c: [] for c in classes}
-    for sg in segs:
-        for s, t0 in sg.onsets:
-            r = sg.rec.stall(s, t0)
-            if r.get("no_interval") or r["len_ms"] is None:
-                continue
-            i = bisect.bisect_right(sg.tt, t0) - 1
-            if i < 0 or not sg.window_ok(sg.tt[i]):
-                continue
-            u = sg.tt[i]
-            out[tc.Rec.klass(sg.rec.flags(u - PRE, u))].append(r["len_ms"] / 1000)
+    for u in r1_units:
+        for sf, _, _, ln in u:
+            if ln is not None:
+                out[tc.Rec.klass(sf)].append(ln / 1000)
     return out
 
 
@@ -292,10 +298,7 @@ def dataset(units_segs, rows_units, classes, rng, normal):
         for k, v in ex.items():
             excl[k] = excl.get(k, 0) + v
     rows = [r for u in rows_units for r in u]
-    ucl = {c: [] for c in classes}
-    for segs in units_segs:
-        for c, v in u_class_lengths(segs, classes).items():
-            ucl[c] += v
+    ucl = u_class_lengths(r1u, classes)
     return {"R1": {**r1_summary([u for u in r1u if u], classes, rng), "excluded": excl},
             "R2": r2_summary(rows, ucl, classes), "R3": r3_summary(rows, classes)}
 
@@ -363,7 +366,21 @@ def selftest():
     c1 = [t for t, _ in control_candidates(sg, False)]
     c2 = [t for t, _ in control_candidates(sg2, False)]
     assert any(380_000 <= t <= 420_000 for t in c1) and not any(380_000 <= t <= 420_000 for t in c2)
-    assert len(c1) == 19  # 5 秒おきの 19 個（最後は次の文字が無い）
+    assert len(c1) == 19  # 5 秒おきの 20 個のうち、最後は次の文字が無い（欠測）ので 19 個
+    # 次の文字が無い最後の文字の後に別の押下が 10 秒後にあっても、対照にしない
+    rec_e = tc.Rec(text_all, [505_000], [], [(0, 600_000)])
+    sg_e = Seg(rec_e, [(t, "alphabetic") for t in text_all], [(229_000, 235_000)])
+    assert 495_000 not in [t for t, _ in control_candidates(sg_e, False)]
+    # 次の文字の無い停滞は no_next_text に数える
+    sg_n = Seg(tc.Rec(text, [], [], [(0, 600_000)]), [(t, "alphabetic") for t in text], [(410_000, 420_000)])
+    _, ex_n = r1_unit([sg_n], random.Random(1), False)
+    assert ex_n["no_next_text"] == 1 and ex_n["gap_lt_30s"] == 0
+    # 無作為な窓は単位の全区間から（停滞の無い長い区間 B にほとんどが置かれ、B の操作を拾う）
+    B0, B1 = 10 ** 7, 10 ** 7 + 6 * 10 ** 6
+    sgA = Seg(tc.Rec(text_all, [], [], [(0, 600_000)]), [(t, "alphabetic") for t in text_all], [(229_000, 235_000)])
+    sgB = Seg(tc.Rec([B0], [], list(range(B0, B1, 1000)), [(B0, B1)]), [(B0, "alphabetic")], [])
+    outAB, _ = r1_unit([sgA, sgB], random.Random(3), False)
+    assert sum(1 for f in outAB[0][2] if f["other_nontext"]) >= 7, outAB[0][2]
     # 30 秒以上の間は対照にしない（停滞にも足りない間）
     tx = sorted(text_all + [530_000])
     sg5 = Seg(tc.Rec(tx, [], [], [(0, 600_000)]), [(t, "alphabetic") for t in tx], [(229_000, 235_000)])
@@ -391,6 +408,13 @@ def selftest():
     sg4 = Seg(rec, [(t, "alphabetic") for t in text_all], [(150_000, 235_000)])
     _, ex4 = r1_unit([sg4], random.Random(1), False)
     assert ex4["u_ge_s"] == 1
+    assert out[0][3] is not None  # 停滞の長さを持つ
+    # R2 の件数は再開した停滞だけ（打ち切りは数えない）
+    rows = [{"pre_class": "silence", "pre_fixed_class": "silence", "pos": "later", "s": 0, "t0": th, "len_ms": ln,
+             "len_class": lc} for th, ln, lc in ((1000, 20_000, "mid"), (2000, None, "censored"), (3000, 5000, "short"),
+                                                   (4000, 200_000, "long"))]
+    r2 = r2_summary(rows, {"silence": []}, ("silence",))
+    assert sum(r2["pre_class"][q]["silence"]["n"] for q in ("Q1", "Q2", "Q3", "Q4")) == 3, r2
     cnt = unit_counts(out, ORDERS["current"], ("move_or_click", "delete2", "silence"))
     assert cnt[1] == 1 and cnt[3] == 5 and cnt[5] == N_RAND and cnt[0] == [1, 0, 0]
     sh = pooled_shares([cnt, cnt], 3)
