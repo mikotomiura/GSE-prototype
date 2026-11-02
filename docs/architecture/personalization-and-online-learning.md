@@ -332,7 +332,7 @@ doc#1 §6 は新規性を 3 点に置いていた:
 常時の全打鍵を ML 入力にせず、次のイベントを境界とする短い **Decision Episode** を作る
 （doc#2 §3.1 を採用）: `session start` / `task phase change` / `pause onset` / `pause recovery` /
 `externalization` / `revision loop` / `intervention decision` / `intervention outcome` / `session end`。
-（2026-11-03 注: Decision Episode は読み出しの単位で、MhD の有効標本数の単位ではない。標本はラベルの付いた 1 件・まとまりは日 —— ADR-042。）
+（2026-11-03 注: ADR-042（Proposed）は、Decision Episode を収集と読み出しの単位として残し、MhD の有効標本数の単位から外す。標本はラベルの付いた 1 件・まとまりは日。）
 
 **stall onset** = 個人×task_kind×phase 基準を下回る産出が、個人基準の pause 閾値を超えて継続し始めた時点。
 （絶対秒数で固定しない。F5 実測中央値が P011=1.0 〜 P014=65.7 と **66 倍**ばらつくため——doc#1 §1.3。）
