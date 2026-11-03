@@ -32,6 +32,8 @@ MUTANTS = {
     "公開用の丸めを外す": ("    text = json.dumps(public(res), indent=1, ensure_ascii=False)",
                          "    text = json.dumps(res, indent=1, ensure_ascii=False)"),
     "日付の形の走査を外す": (r'if re.search(r"\d{8}_\d{6}", text) or re.search(', 'if False and re.search('),
+    "丸めを件数のキーに限らない": ("    if isinstance(x, int) and key in COUNT_KEYS:\n", "    if isinstance(x, int):\n"),
+    "小さい分母の割合を伏せない": ('and x["den"] < MIN_DEN:', 'and x["den"] < 0:'),
     "観測 0 を外さない": ("            if dy.obs <= 0:\n", "            if dy.obs < 0:\n"),
 }
 

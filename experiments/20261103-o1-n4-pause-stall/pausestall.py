@@ -147,7 +147,10 @@ class Person:
         self.zero_obs = self.no_focus = self.zero_obs_onsets = 0
         self.versions = {}
         for f in files:
-            d = json.load(open(f["inter"]))
+            try:
+                d = json.load(open(f["inter"]))
+            except (OSError, ValueError):
+                sys.exit("中間が読めない（パスは出さない）")
             if d["input_sha256"] != f["plain_sha256"]:
                 sys.exit("中間と平文の SHA-256 が合わない")
             dy = cd.Day(d)
@@ -275,9 +278,15 @@ def between(per):
 
 # ---------- 公開用の丸め（判断 7） ----------
 
-KEEP_INT = {"k", "bic_k", "iterations", "app_version_kinds", "people", "people_with_within_sd",
-            "mismatch_files", "zero_obs_files_with_onsets", "hit_kmax"}
+# 件数・本数を表すキー（丸める）。ここに無い整数（θ の ms・K・反復の回数など）は丸めない。
+COUNT_KEYS = {"n", "num", "den", "days", "files", "units", "units_ge_4h", "used_all", "used_focus",
+              "excluded_zero_obs", "no_focus_rows", "no_position", "odd_names_excluded", "held_out_files",
+              "onsets_replay", "zero_ms_excluded", "rises_without_threshold_warmup", "C0_neither_C2_nor_hit_C1",
+              "posthoc_C1_inside_C0_stalls_with_ge3_C1", "posthoc_C1_not_hit_C0_but_inside_C0_stall",
+              "input_files", "zero_obs_files", "presses_in_zero_obs_files", "feat_rows_in_zero_obs_files",
+              "pointer_rows", "focus_rows", "presses"}
 HOUR_KEYS = {"obs_h", "obs_h_all", "total_pause_h"}
+MIN_DEN = 20   # 分母がこれ未満の割合は伏せる（丸めた分子と分母から件数が戻るため）
 
 
 def round_count(v):
@@ -286,13 +295,18 @@ def round_count(v):
 
 
 def public(x, key=None, parent=None):
-    """repo に入れる版。観測時間（10 時間単位）・単位の観測時間の四分位（1 時間単位）・件数と本数を丸め、
-    対数尤度と BIC の絶対値を最小との差に替える（どれも n の手がかりになるため）。率・割合・分位・比はそのまま。"""
+    """repo に入れる版（判断 7）。観測時間（10 時間単位）・単位の観測時間の四分位（1 時間単位）・件数と本数（COUNT_KEYS）を
+    丸め、分母が MIN_DEN 未満の割合を伏せ、単位不足の単位の数を伏せ、対数尤度と BIC の絶対値を最小との差に替える。
+    率・割合・分位・SD・比・θ はそのまま。"""
     if isinstance(x, dict):
         if "fits" in x and "bic_k" in x:
             best = min(f["bic"] for f in x["fits"])
             x = {**x, "fits": [{kk: vv for kk, vv in f.items() if kk not in ("loglik", "bic")} |
                                {"delta_bic": round(f["bic"] - best, 1)} for f in x["fits"]]}
+        if set(x) >= {"num", "den", "ratio"} and isinstance(x["den"], int) and x["den"] < MIN_DEN:
+            x = {**x, "num": None, "ratio": None}
+        if x.get("status") == "単位不足":
+            x = {k: (None if k in ("units", "units_ge_4h") else v) for k, v in x.items()}
         return {k: public(v, k, key) for k, v in x.items()}
     if isinstance(x, list):
         return [public(v, key, parent) for v in x]
@@ -302,7 +316,7 @@ def public(x, key=None, parent=None):
         return round(x)
     if key in HOUR_KEYS and isinstance(x, (int, float)):
         return int(10 * round(x / 10))
-    if isinstance(x, int) and key not in KEEP_INT:
+    if isinstance(x, int) and key in COUNT_KEYS:
         return round_count(x)
     return x
 
@@ -423,7 +437,7 @@ def selftest():
     run(work, 1, outp)
     full = json.load(open(os.path.join(work, "full.json")))
     pubtext = open(outp).read()
-    assert not leaks(pubtext, build_n4.PIDS, {"9.9.9-test"}), leaks(pubtext, build_n4.PIDS, {"9.9.9-test"})
+    assert not leaks(pubtext, build_n4.PIDS, {"9.9.9-test", "8.8.8-test"}), leaks(pubtext, build_n4.PIDS, {"9.9.9-test", "8.8.8-test"})
     for k in "ABCD":
         r = full["people"][k]
         assert r["files"]["used_all"] == 9 and r["files"]["used_focus"] == 8, r["files"]
@@ -443,12 +457,21 @@ def selftest():
     # 5. 記号と漏れの走査
     s1, s2 = build_n4.symbols(build_n4.PIDS, 7), build_n4.symbols(build_n4.PIDS, 7)
     assert s1 == s2 and sorted(s1.values()) == list("ABCD")
+    # 塩は repo の外に 1 度だけ作られ、権限は 600・2 回目は同じ値
+    sw = os.path.join(tmp, "saltwork")
+    os.makedirs(sw)
+    a1, a2 = build_n4.salt(sw), build_n4.salt(sw)
+    assert a1 == a2 and len(a1) == 64 and (os.stat(os.path.join(sw, "symbol_salt")).st_mode & 0o777) == 0o600
     assert leaks('{"x": "P011"}', build_n4.PIDS, set()) == ["P-ID"]
     assert leaks('{"x": "a_20261009_051916"}', build_n4.PIDS, set()) == ["日付・時刻の形"]
     assert leaks('{"x": 1.20261009}', build_n4.PIDS, set()) == ["日付・時刻の形"]
     assert leaks('{"v": "0.1.40"}', build_n4.PIDS, {"0.1.40"}) == ["版の文字列"]
     assert not leaks('{"A": 1}', build_n4.PIDS, {"0.1.40"})
     assert round_count(17) == 15 and round_count(1459) == 1500
+    pu = public({"threshold_at_fire": {"n": 1459, "median": 40700}, "x": {"num": 3, "den": 5, "ratio": 0.6},
+                 "u": {"status": "単位不足", "units_ge_4h": 3}, "k": 4})
+    assert pu["threshold_at_fire"] == {"n": 1500, "median": 40700}, pu
+    assert pu["x"]["ratio"] is None and pu["x"]["num"] is None and pu["u"]["units_ge_4h"] is None and pu["k"] == 4, pu
     # 6. 選ぶ規則: 取り置きは本人だけ・形の合わない名前と直下のファイルを数える
     rec = os.path.join(tmp, "recv")
     for pid, names in {"P009": ["P009_o1day01_gse_o1_20261101_083029.age", "P009_o1day02_gse_o1_20261101_083030.age"],

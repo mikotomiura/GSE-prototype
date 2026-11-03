@@ -29,8 +29,10 @@ python3 -I "$HERE/pausestall.py" --selftest
 python3 -I -B "$HERE/mutants.py"
 mkdir -p "$WORK" "$OUT"
 chmod 700 "$WORK"
-python3 -I "$HERE/build_n4.py" "$RECEIVING" "$UNPACK" "$IDENTITY" "$BIN" "$WORK" "$SEED"
+python3 -I "$HERE/build_n4.py" "$RECEIVING" "$UNPACK" "$IDENTITY" "$BIN" "$WORK"
 python3 -I "$HERE/pausestall.py" "$WORK" "$SEED" "$OUT/pausestall.json"
+# 事後（conditions.md に無い・notes の逸脱 1）
+python3 -I -B "$HERE/posthoc.py" "$WORK" "$OUT/posthoc.json"
 python3 -I - "$REPO_ROOT" "$HERE" "$OUT/provenance.json" "$WORK/files.json" "$BIN" "$UNPACK" <<'PY'
 import hashlib, json, os, subprocess, sys
 root, here, out, files_json, binp, unpack = sys.argv[1:]
@@ -46,11 +48,13 @@ rel = "experiments/20261103-o1-n4-pause-stall"
 json.dump({"git_head": subprocess.check_output(["git", "-C", root, "rev-parse", "HEAD"], text=True).strip(),
            "git_dirty_paths": [l for l in subprocess.check_output(["git", "-C", root, "status", "--porcelain", "--", rel, ":!" + rel + "/results"], text=True).splitlines() if l],
            "gse_replay_sha256": h(binp), "gse_unpack_sha256": h(unpack),
+           "symbol_salt_sha256": h(os.path.join(os.path.dirname(files_json), "symbol_salt")),
            "input_files": n, "plain_sha256_digest": cat.hexdigest(),
            "prereg_p1_episode_sha256": h(os.path.join(root, "src-tauri/prereg/p1-episode.json")),
            "scripts_sha256": {os.path.relpath(p, root): h(p) for p in [
                os.path.join(here, "build_n4.py"), os.path.join(here, "pausestall.py"), os.path.join(here, "mutants.py"),
                os.path.join(here, "run.sh"), os.path.join(here, "conditions.md"), os.path.join(here, "SEED"),
+               os.path.join(here, "posthoc.py"),
                os.path.join(root, "experiments/20261103-stall-candidates-c1c2c6/candidates.py"),
                os.path.join(root, "experiments/20261102-stall-decomposition/types_core.py"),
                os.path.join(root, "experiments/20261102-stall-decomposition/o1/build_o1.py"),

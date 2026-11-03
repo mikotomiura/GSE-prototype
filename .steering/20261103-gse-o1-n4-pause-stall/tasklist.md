@@ -16,8 +16,8 @@
 - [x] requirement.md・design.md・decisions.md
 - [x] 条件（conditions.md）とコード・陽性対照・変異
 - [x] 計算の前のレビュー（code-reviewer）と直し（HIGH 2・MEDIUM 7・LOW 9。判断 6・7）
-- [ ] 条件とコードをコミット（計算の前）
-- [ ] run.sh を 1 回
+- [x] 条件とコードをコミット（計算の前・c567c88c）
+- [x] run.sh を 1 回（exit 0・自己検査の食い違い 0）→ 記号の付け直し（判断 8）のため 2 回目（量は同じ）
 - [ ] notes.md（人ごとの値・人の間の幅・言える範囲・事前登録 §3 と S1-E7 への材料）
 - [ ] code-reviewer・security-checker・/cross-review
 - [ ] 引き継ぎの更新（C の済み・B の入口・G1 の 2 名の別タスク）
