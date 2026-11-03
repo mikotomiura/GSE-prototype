@@ -2,6 +2,8 @@
 
 > 作成: 2026-11-04（`.steering/20261103-gse-coauthor-per-person/` の後）。このメモを一次資料にしない。事実は notes・decisions・コードで確かめ直す。
 
+> 順番（研究者・2026-11-04）: CS1 の俯瞰（`next-session-cs1-reply.md`）を先に行い、この試験はその後。始める前に CS1 の俯瞰の notes を読み、CS1 の 2021 年版（1 人 8 課題）を 2 つ目のデータに使うかを grill で選ぶ。
+
 ## 0 入口の文
 
 「`.steering/_handoff/next-session-gse-coauthor-ml-improve.md` を読み、CoAuthor の 1 人ごとの学習の改善の試験（部分的なプール・EM の構造・λ の選び方・人の中の評価の量を 1 つの試験で）を `/start-task` から」

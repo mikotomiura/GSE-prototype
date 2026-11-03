@@ -2,6 +2,8 @@
 
 > 作成: 2026-11-02（研究者の依頼）。研究者は 2026-11-02 に著者（john.edwards@usu.edu）へメールを送った。
 > このメモを一次資料にしない。事実は一次（メールの本文・Dataverse の API）で確かめ直す。
+> 2026-11-04 追記: 著者から承諾の返事が来た（研究者が会話に貼った）。要点の逐語 "Yes, please feel free to use the files as you see fit. Please cite the below paper in any publications."。引用を求められた論文は Edwards, Hart & Shrestha (2023) JEDM 15(1) で [V243] と同じ。§1 の「承諾（条件なし）」として §2 へ進む。
+> 順番（研究者・2026-11-04）: この CS1 の俯瞰を先に行い、B の続きの改善の試験（`next-session-gse-coauthor-ml-improve.md`）はその後。改善の試験で CS1 の 2021 年版を 2 つ目のデータに使うかを向こうの grill で選べるように、俯瞰の notes に人ごとの課題の数と 1 単位の長さの四分位を残す。
 
 ## 0 何を頼んだか
 
