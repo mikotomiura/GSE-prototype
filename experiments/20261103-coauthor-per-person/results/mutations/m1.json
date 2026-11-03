@@ -1,0 +1,46 @@
+{
+ "mutate": [
+  "m1"
+ ],
+ "P-EM4": {
+  "result": {
+   "i": {
+    "1": {
+     "self_minus_pooled_median": 0.04526284570710693,
+     "self_minus_true_median": 0.3321836851708554
+    },
+    "5": {
+     "self_minus_pooled_median": 0.12098633991454699,
+     "self_minus_true_median": 0.41651403174070023
+    },
+    "15": {
+     "self_minus_pooled_median": 0.1509995458916657,
+     "self_minus_true_median": 0.45875691965410775
+    }
+   },
+   "ii": {
+    "1": {
+     "self_minus_pooled_median": -0.11901682808477143,
+     "self_minus_true_median": 0.36086016195943993
+    },
+    "5": {
+     "self_minus_pooled_median": -0.024647490968324397,
+     "self_minus_true_median": 0.45362151857525895
+    },
+    "15": {
+     "self_minus_pooled_median": -0.004705773585393707,
+     "self_minus_true_median": 0.46728560254987567
+    }
+   }
+  },
+  "leak_ok": false,
+  "i_ok": true,
+  "ii_ok": true,
+  "passed": false
+ },
+ "P-EM2": {
+  "decreases": 0,
+  "fits": 136,
+  "passed": true
+ }
+}

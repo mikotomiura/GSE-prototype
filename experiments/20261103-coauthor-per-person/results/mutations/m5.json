@@ -1,0 +1,19 @@
+{
+ "mutate": [
+  "m5"
+ ],
+ "P-L2": {
+  "coverage": {
+   "intercept_pct": 0.0,
+   "intercept_normal": 0.0,
+   "slope_pct": 0.9,
+   "slope_normal": 0.935
+  },
+  "coverage_gate_ok": false,
+  "mean_dbrier_i": -0.058522366628310854,
+  "mean_dbrier_ii": 0.029366281637759523,
+  "self_better_share_i": 0.7764705882352942,
+  "self_better_share_ii": 0.2823529411764706,
+  "passed": false
+ }
+}
