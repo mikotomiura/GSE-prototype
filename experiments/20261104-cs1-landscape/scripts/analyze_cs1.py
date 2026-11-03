@@ -1,0 +1,259 @@
+"""conditions.md D5〜D6（L1〜L6 と単位の記述）の記述の集計。検定はしない。
+
+使い方:
+  python3 -I analyze_cs1.py <work2019> <work2021> <holdout.json> <keystrokes_2019.csv> <keystrokes_2021.csv> <out_dir>
+  python3 -I analyze_cs1.py --selftest
+出力は集計値だけ（書き手・課題の ID も番号も出さない）: <out_dir>/cs1_landscape.json・counts.json。
+元の俯瞰の analyze_landscape.py の Session と集計をそのまま使い、CS1 で変えるところ（D5）だけを上書きする。
+"""
+import bisect
+import csv
+import glob
+import json
+import math
+import os
+import statistics
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "../../20261102-public-data-landscape/scripts"))
+import analyze_landscape as al  # noqa: E402
+
+H = al.H
+PROMPT_NO_ANSWER = 10 * 60_000  # D5
+PROMPT_FALLBACK = 60_000
+DAY = 86_400_000
+L3_EVENTS = ("run", "switch", "paste")
+
+
+def prompt_cover(events):
+    """[(t, name)] → 問いの区間（併合済み）。D5。"""
+    pr = sorted(t for t, n in events if n == "prompt")
+    ans = sorted(t for t, n in events if n == "prompt-answer")
+    out = []
+    for t in pr:
+        j = bisect.bisect_left(ans, t)
+        end = ans[j] if j < len(ans) and ans[j] - t <= PROMPT_NO_ANSWER else t + PROMPT_FALLBACK
+        out.append([t, end])
+    return al.merge(out)
+
+
+class Unit(al.Session):
+    """1 課題。作業のまとまりの中だけで間隔を取り、問いの区間を「AI の近く」の代わりに使う。"""
+
+    def __init__(self, d):
+        ev = d["events"]
+        kinds = {n: sorted(t for t, m in ev if m == n) for n in ("paste", "multi-insert")}
+        super().__init__(d, receipts=kinds["paste"] + kinds["multi-insert"], ai=(), receipt_kinds=kinds)
+        self.blocks = [tuple(b) for b in d["blocks"]]
+        self.ev = {n: sorted(t for t, m in ev if m == n) for n in L3_EVENTS}
+        self.ai_cover = prompt_cover(ev)
+        self.n_prompt = sum(1 for _, n in ev if n == "prompt")
+        self.first_event = min([t for t, _ in ev] + [self.t_start])
+        self.last_event = max([t for t, _ in ev] + [self.t_end])
+
+    def span_ms(self):
+        return sum(b - a for a, b in self.blocks)
+
+    def normal_span_ms(self):
+        return self.span_ms() - al.overlap_len([list(b) for b in self.blocks], self.ai_cover)
+
+    def near_ai(self, a, b):
+        i = bisect.bisect_right([c[0] for c in self.ai_cover], b)
+        return i > 0 and self.ai_cover[i - 1][1] >= a
+
+    def gaps(self):
+        out = []
+        for a, b in self.blocks:
+            lo, hi = bisect.bisect_left(self.press, a), bisect.bisect_right(self.press, b)
+            seg = self.press[lo:hi]
+            out += list(zip(seg, seg[1:]))
+        return out
+
+
+def writer_l3(units, normal):
+    rec = []
+    for s in units:
+        for st, t0, r, end in s.stalls():
+            if normal and s.near_ai(st - al.PRE_WIN, end):
+                continue
+            pre = (st - al.PRE_WIN, t0)
+            row = {}
+            series = [("nontext", s.nontext), ("nav", s.nav), ("delete", s.delete),
+                      ("other_nontext", s.other_nontext)] + [(n, s.ev[n]) for n in L3_EVENTS]
+            for name, ts in series:
+                row["pre_" + name] = al.count_in(ts, *pre) > 0
+                row["post_" + name] = al.count_in(ts, t0, end, lo_open=True, hi_open=r is not None) > 0
+            rec.append(row)
+    return rec
+
+
+def summarize_l3(writers, normal, has_nav):
+    l3w = [writer_l3(w, normal) for w in writers]
+    names = ["nontext", "delete", "other_nontext"] + (["nav"] if has_nav else []) + list(L3_EVENTS)
+    out = {}
+    for side in ("pre", "post"):
+        for nm in names:
+            key = side + "_" + nm
+            allrows = [r[key] for rows in l3w for r in rows]
+            out[key] = {"pooled": al.pooled(sum(allrows), len(allrows)),
+                        "writer_median": al.quart([sum(r[key] for r in rows) / len(rows) for rows in l3w
+                                                   if len(rows) >= al.MIN_STALLS_FOR_MEDIAN])}
+    return out
+
+
+def unit_l6(s):
+    """課題の観測時間を 3 等分する（観測区間をつなげた時間で切る・D6）。"""
+    ivs = al.merge([list(iv) for iv in s.intervals])
+    tot = sum(b - a for a, b in ivs)
+    if tot <= 0:
+        return None
+    # 観測時間の 1/3・2/3 にあたる時刻
+    cuts, acc, k = [], 0, 1
+    for a, b in ivs:
+        while k < 3 and acc + (b - a) >= tot * k / 3:
+            cuts.append(a + (tot * k / 3 - acc))
+            k += 1
+        acc += b - a
+    bounds = [ivs[0][0]] + cuts + [ivs[-1][1]]
+    rows = s.feat_in_obs()
+    dfrom = s.theta.defined_from
+    row = {}
+    for k in range(3):
+        a, b = bounds[k], bounds[k + 1]
+        ob = al.overlap_len(ivs, [[a, b]])
+        n = sum(1 for o in s.onsets if a <= o[1] < b or (k == 2 and o[1] == b))
+        fr = [r for r in rows if a <= r[0] < b or (k == 2 and r[0] == b)]
+        tdef = 0 if dfrom is None or dfrom >= b else al.overlap_len(ivs, [[max(a, dfrom), b]])
+        xv = [r[2] for r in fr if r[2] is not None and math.isfinite(r[2])]
+        row[k] = {"stall_per_h": n / (ob / H) if ob > 0 else None,
+                  "p_ge": sum(1 for r in fr if r[1] >= al.P_TRIG) / len(fr) if fr else None,
+                  "x_median": statistics.median(xv) if xv else None,
+                  "theta_defined_frac": tdef / ob if ob > 0 else None}
+    return row
+
+
+def summarize_l6(writers):
+    per_writer = []
+    for w in writers:
+        rows = [r for r in (unit_l6(s) for s in w) if r]
+        if not rows:
+            continue
+        per_writer.append({k: {m: (statistics.median(v) if v else None) for m, v in
+                               ((m, [r[k][m] for r in rows if r[k][m] is not None])
+                                for m in ("stall_per_h", "p_ge", "x_median", "theta_defined_frac"))}
+                           for k in range(3)})
+    out = {nm: {m: al.quart([w[k][m] for w in per_writer]) for m in
+                ("stall_per_h", "p_ge", "x_median", "theta_defined_frac")}
+           for k, nm in enumerate(("early", "middle", "late"))}
+    out["writers"] = len(per_writer)
+    return out
+
+
+def describe_units(writers):
+    """単位の記述（D6 の最後）。"""
+    us = [s for w in writers for s in w]
+    return {"writers": len(writers), "units": len(us),
+            "units_per_writer": al.quart([len(w) for w in writers]),
+            "unit_obs_h": al.quart([s.obs_ms() / H for s in us]),
+            "unit_blocks": al.quart([len(s.blocks) for s in us]),
+            "block_len_min": al.quart([(b - a) / 60_000 for s in us for a, b in s.blocks]),
+            "unit_span_days": al.quart([(s.last_event - s.first_event) / DAY for s in us]),
+            "writer_obs_h": al.quart([sum(s.obs_ms() for s in w) / H for w in writers]),
+            "units_theta_defined_obs_ge_5min": sum(1 for s in us if s.theta.defined_from is not None
+                                                   and s.obs_ms() >= al.L5_MIN_OBS),
+            "prompts": sum(s.n_prompt for s in us)}
+
+
+def load(work, hold_idx):
+    uw = json.load(open(os.path.join(work, "units.json")))
+    by_w = {}
+    for p in sorted(glob.glob(os.path.join(work, "u*.json"))):
+        k = os.path.basename(p)[1:-5]
+        if k not in uw:
+            continue
+        if uw[k] in hold_idx:
+            sys.exit("取っておく書き手が中間に入っている")
+        by_w.setdefault(uw[k], []).append(Unit(json.load(open(p))))
+    return [by_w[w] for w in sorted(by_w)]
+
+
+def hold_idx(path, hold_ids):
+    """build_cs1.py と同じ並べ方（取っておく書き手を除いた SubjectID の昇順）で、一覧の書き手が通し番号に入っていないかを確かめる。
+    build は取っておく書き手を読まないので、入っていれば番号が衝突する。ここでは CSV の SubjectID の集合と照らす。"""
+    csv.field_size_limit(10**9)
+    with open(path, newline="") as f:
+        r = csv.reader(f)
+        i = next(r).index("SubjectID")
+        subj = sorted({row[i] for row in r})
+    kept = [s for s in subj if s not in hold_ids]
+    if len(kept) + len(hold_ids & set(subj)) != len(subj):
+        sys.exit("書き手の数が合わない")
+    return len(kept)
+
+
+def summarize_year(writers, has_prompt, has_nav):
+    res = {}
+    for label, normal in (("normal", True), ("all", False)) if has_prompt else (("all", False),):
+        r = al.summarize(writers, normal=normal, has_click=False)
+        r["L3"] = summarize_l3(writers, normal, has_nav)
+        res[label] = r
+    res["all"]["L4"] = al.summarize_l4(writers)
+    res["all"]["L5"] = al.summarize_l5(writers)
+    res["all"]["L6"] = summarize_l6(writers)
+    return res
+
+
+def run(w19, w21, hold_p, csv19, csv21, out_dir):
+    hold = json.load(open(hold_p))
+    res, counts = {}, {}
+    for year, work, path, has_prompt, has_nav in (("2019", w19, csv19, False, False),
+                                                  ("2021", w21, csv21, True, True)):
+        n_kept = hold_idx(path, set(hold[year]))
+        ws = load(work, frozenset())
+        if len(ws) > n_kept:
+            sys.exit("中間の書き手が、取っておく書き手を除いた数より多い")
+        el = [w for w in ws if sum(s.obs_ms() for s in w) >= al.MIN_WRITER_OBS]
+        counts[year] = {"writers_not_held": n_kept, "writers_loaded": len(ws), "units_loaded": sum(len(w) for w in ws),
+                        "excluded_obs_lt_10min": len(ws) - len(el), "units_eligible": sum(len(w) for w in el)}
+        res[year] = summarize_year(el, has_prompt, has_nav)
+        res[year]["units"] = describe_units(el)
+    os.makedirs(out_dir, exist_ok=True)
+    json.dump(res, open(os.path.join(out_dir, "cs1_landscape.json"), "w"), indent=1)
+    json.dump(counts, open(os.path.join(out_dir, "counts.json"), "w"), indent=1)
+    print(json.dumps(counts))
+
+
+def selftest():
+    assert prompt_cover([(100, "prompt"), (5_000, "prompt-answer")]) == [[100, 5_000]]
+    assert prompt_cover([(100, "prompt"), (100 + 11 * 60_000, "prompt-answer")]) == [[100, 60_100]]
+    press = [i * 1000 for i in range(200)] + [259_000 + i * 1000 for i in range(50)] + \
+        [10_000_000 + i * 1000 for i in range(30)]
+    d = {"keys": [[t, "alphabetic"] for t in press], "feat": [[t, 0.7, 0.1] for t in press],
+         "onsets": [[229_000, 235_000, 1000, 199]],
+         "observed_intervals": [[0, 199_000], [259_000, 308_000], [10_000_000, 10_029_000]],
+         "blocks": [[0, 308_000], [10_000_000, 10_029_000]],
+         "events": [[230_000, "run"], [240_000, "prompt"], [250_000, "prompt-answer"], [259_000, "paste"]]}
+    u = Unit(d)
+    assert u.span_ms() == 308_000 + 29_000
+    g = u.gaps()
+    assert len(g) == len(press) - 2 and max(b - a for a, b in g) == 60_000  # まとまりの間の差は入らない
+    assert u.near_ai(245_000, 246_000) and not u.near_ai(251_000, 252_000)
+    assert u.normal_span_ms() == u.span_ms() - 10_000
+    l3 = writer_l3([u], normal=False)
+    # 後の窓は (t0, 再開) の開区間（元の L3 と同じ）。再開と同じ時刻の貼り付けは入らない
+    assert l3[0]["pre_run"] and not l3[0]["post_run"] and not l3[0]["post_paste"]
+    assert al.summarize_l4([[u]])["stall_receipt_before_resume"]["num"] == 1  # L4 は再開の時刻を含む
+    assert writer_l3([u], normal=True) == []  # 停滞 [s − 30 秒, 再開] が問いの区間にかかる
+    l6 = unit_l6(u)
+    assert l6 is not None and sum(1 for k in range(3) if l6[k]["stall_per_h"]) == 1
+    du = describe_units([[u]])
+    assert du["units"] == 1 and du["unit_blocks"]["median"] == 2
+    print("selftest ok")
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--selftest"]:
+        selftest()
+    else:
+        run(*sys.argv[1:])
