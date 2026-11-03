@@ -1,0 +1,164 @@
+{
+ "mutate": [],
+ "P-EM1": {
+  "models": {
+   "a": {
+    "median_max_err": {
+     "1": 0.12416862897823988,
+     "5": 0.04532985344416393,
+     "15": 0.022613897365161596
+    },
+    "passed": true
+   },
+   "b": {
+    "median_max_err": {
+     "1": 0.05466981802979379,
+     "5": 0.018674841284777532,
+     "15": 0.010706520660932174
+    },
+    "passed": true
+   }
+  },
+  "passed": true
+ },
+ "P-EM3": {
+  "worst": {
+   "fa": 4.440892098500626e-16,
+   "em": 4.440892098500626e-16,
+   "fb": 4.440892098500626e-16,
+   "r0": 0.0,
+   "r1": 2.220446049250313e-16
+  },
+  "passed": true
+ },
+ "P-EM4": {
+  "result": {
+   "i": {
+    "1": {
+     "self_minus_pooled_median": 0.10905329312188014,
+     "self_minus_true_median": -0.055747011045464694
+    },
+    "5": {
+     "self_minus_pooled_median": 0.15379738238230997,
+     "self_minus_true_median": -0.012863385851139565
+    },
+    "15": {
+     "self_minus_pooled_median": 0.15706155395112617,
+     "self_minus_true_median": -0.004170174825187133
+    }
+   },
+   "ii": {
+    "1": {
+     "self_minus_pooled_median": -0.05144017040710437,
+     "self_minus_true_median": -0.051487196790006864
+    },
+    "5": {
+     "self_minus_pooled_median": -0.012211026615293052,
+     "self_minus_true_median": -0.012650222138465323
+    },
+    "15": {
+     "self_minus_pooled_median": -0.004221750712416766,
+     "self_minus_true_median": -0.004457527552243286
+    }
+   }
+  },
+  "leak_ok": true,
+  "i_ok": true,
+  "ii_ok": true,
+  "passed": true
+ },
+ "P-L1": {
+  "recovery": true,
+  "finite": true,
+  "passed": true
+ },
+ "P-L2": {
+  "coverage": {
+   "intercept_pct": 0.89,
+   "intercept_normal": 0.895,
+   "slope_pct": 0.9,
+   "slope_normal": 0.935
+  },
+  "coverage_gate_ok": true,
+  "mean_dbrier_i": -0.058522366628310854,
+  "mean_dbrier_ii": 0.029366281637759523,
+  "self_better_share_i": 0.7764705882352942,
+  "self_better_share_ii": 0.2823529411764706,
+  "passed": true
+ },
+ "P-S": {
+  "passed": true
+ },
+ "P-EM2": {
+  "decreases": 0,
+  "fits": 196,
+  "passed": true
+ },
+ "mutations": {
+  "m1": {
+   "controls": [
+    {
+     "file": "m1.json",
+     "control": "P-EM4",
+     "red": true
+    }
+   ],
+   "hit": true
+  },
+  "m2": {
+   "controls": [
+    {
+     "file": "m2.json",
+     "control": "P-EM3",
+     "red": true
+    }
+   ],
+   "hit": true
+  },
+  "m3": {
+   "controls": [
+    {
+     "file": "m3_pd2.json",
+     "control": "P-D2",
+     "red": true
+    },
+    {
+     "file": "m3_em1.json",
+     "control": "P-EM1",
+     "red": true
+    }
+   ],
+   "hit": true
+  },
+  "m4": {
+   "controls": [
+    {
+     "file": "m4.json",
+     "control": "P-L2",
+     "red": true
+    }
+   ],
+   "hit": true
+  },
+  "m5": {
+   "controls": [
+    {
+     "file": "m5.json",
+     "control": "P-L2",
+     "red": true
+    }
+   ],
+   "hit": true
+  },
+  "m6": {
+   "controls": [
+    {
+     "file": "m6.json",
+     "control": "P-S",
+     "red": true
+    }
+   ],
+   "hit": true
+  }
+ }
+}

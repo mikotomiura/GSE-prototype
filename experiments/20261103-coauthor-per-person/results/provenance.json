@@ -1,0 +1,17 @@
+{
+ "git_head": "59d5264f689b0f0e6f8ae18209db235ebd7ec1e7",
+ "git_dirty_paths": [],
+ "scripts_sha256": {
+  "build_obs.py": "98fbaab852421083971c73e0dad87a0238205c54359102d5cc83e20f3b834f87",
+  "check_mutations.py": "a2ec2383dd492a8c0c1c7ea4e0bdb813f763216634b38ab973510854f9dbf575",
+  "check_same.py": "2465f1900971cde68e972a16c19c13450c2470bf676946021a687c79846e0968",
+  "hmm.py": "f86cca1fd864a29998c94c8ca451f6b5d060113ce4538f10f6d3d6d02fffff8a",
+  "perperson.py": "544692957b200483391d520f8e13d9a843a58cf79871db3a4cb93b1a9495fe7f",
+  "selftest.py": "e71637f8723665d73f9a7c31b2ad6bacad672dbbd5d60bc7d144a0ef55b79242"
+ },
+ "gse_replay_sha256": "26cae610383fb6de01651cc904895efa72a691c3dd1e27689a14a4ca51c33bb3",
+ "input_files": 1157,
+ "input_sha256_of_sha256_list": "6a1e24954c65f2e0b2dfd24abacde3be3539fd0e33924fa801d731325c64a9f7",
+ "python": "3.14.4",
+ "numpy": "2.5.2"
+}
