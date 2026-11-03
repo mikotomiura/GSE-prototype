@@ -27,6 +27,13 @@
 3. 段 1 の同意文書を書く（ADR-043 Migration 3・`next-session-esm-consent-next-study.md` §2 の 2〜6・手跡の後期の同意項目・ADR-032 の計器を入れるか）。
 4. ADR-031 M5（プローブの発火の配線・6 択 UI）の実装（段 1 の配布の前に要る）。
 5. 保留 1（動機づけと同期・共生の感覚の問い方・尺度は文献で接地してから）。
+6. 取得した公開データ全部の整理（研究者が 2026-11-03 に追加）。目的は、何をどこに持っていて、何に使い、何をまだ開けていないかを 1 か所で引けるようにすること。
+   - 置き場（2026-11-03 に `ls` と `du` だけで見た・中身は開いていない）:
+     - `~/gse-public-data/`: `coauthor/raw`（48 MB）・`dux/raw`（304 MB）・`swell/raw`（378 MB）・`klicke/`（`raw`・`bin`・`work.tar.gz`・883 MB）・`landscape/`（`coauthor_work`・`holdout.json`・`klicke_side.json`・108 MB）・`extend/`（`dux_work`・`dux_work_tabnav`・`swell_work`・`holdout.json`・28 MB）。
+     - 実験ごとの `raw/`（git に入らない）: `experiments/20261012-public-keystroke-matching/`（KLiCKe ほか・版と SHA-256 は `data.md`・`config.json`）・`experiments/20261009-length-sequence-uniqueness/`（青空文庫）。他の実験の `data.md` も見る。
+     - 問い合わせ中・返事待ち: 打鍵の外の信号のデータ 6 件（`.steering/_handoff/next-session-public-data-replies.md`）・CS1（`.steering/_handoff/next-session-cs1-reply.md`）・Clarkson II（`.steering/20261102-gse-synthesis-redesign/clarkson-ii.md`）。
+   - 書くもの（案）: データごとに、出典の番号（references.md）・入手先と利用条件・取得日と版と SHA-256・置き場・中間（work）の作り方と作った実験・使った実験と問い・取っておいた部分（holdout）の有無と開ける条件・消す条件（問い合わせの返事しだいのものを含む）。置き場は docs か `experiments/README.md` の近くにするかを研究者と決める。
+   - 注意: `holdout.json` は 2 つとも開かない（数えるのはファイルの有無だけ）。記録の中身を外部の LLM（Codex を含む）に送らない。整理のために新しく取得しない。重複（KLiCKe が `~/gse-public-data/klicke` と照合の実験の `raw/` の 2 か所にある可能性）は SHA-256 で確かめ、消すかは研究者に聞く。
 
 ## 4 注意
 
