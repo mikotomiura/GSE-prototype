@@ -3,6 +3,12 @@
 > 作成: 2026-11-03（`.steering/20261103-gse-target-reframe/` の後）。このメモを一次資料にしない。事実は ADR・コード・notes で確かめ直す。
 > 前の引き継ぎ `next-session-gse-target-reframe-and-mhd-rethink.md`（consolidation の worktree・main にもある）の §4 を、D の結論で書き直したもの。A・B・C はそれぞれ `/start-task` から。
 
+## 進み具合（2026-11-03 追記）
+
+- A は済んだ。ADR-046（`docs/adr/ADR-046-mhd-rethink-names-label-per-person.md`・PR #383 で main）。作業記録は `.steering/20261103-gse-mhd-rethink-adr/`（判断 0〜10）。B に効く決定: criterion 直結の段は 1 人ごとが既定・ラベルは二値で陽性の類（類は本人の探索の後に選ぶ）・1 人ごとの段のゲートは人の中の時間順の holdout・段 1 では ROCKET 系も EM も使わない（EM は時系列の段の候補で、入る条件は ADR-046 D3 の表）。
+- C は今はやらない（研究者・2026-11-03）。要るかは段 1 の本人の探索の後に見直す。
+- 次は B。入口の文: 「`.steering/_handoff/next-session-gse-mhd-rethink-abc.md` を読み、B（CoAuthor で個人ごとの学習の試験）を `/start-task` から」。B は公開データの試験で、段 1 の候補の外にある EM を試すのは ADR-046 の段 1 の制限（段 1 の記録で使わない）とはぶつからない。ただし結果を段 1 の候補の根拠にしない。
+
 ## 0 入口の文
 
 「`.steering/_handoff/next-session-gse-mhd-rethink-abc.md` を読み、A（MhD の再考の ADR 案）を `/start-task` から。A の後に B・C を別タスクで」
