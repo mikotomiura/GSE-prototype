@@ -11,12 +11,12 @@
 
 - [x] grill（判断 1〜5）
 - [x] /reimagine（design-v1.md・design.md・design-comparison.md・判断 6〜8）
-- [ ] 条件 `conditions.md` をコミット（計算の前）
-- [ ] 解析のスクリプトと `--selftest`・変異
-- [ ] 計算の前のレビュー（code-reviewer）
-- [ ] 中間の作り直しと門（Q1）
-- [ ] 陽性対照と変異（Q7）
-- [ ] 本計算
-- [ ] notes.md（学習曲線・越える k・言える範囲）
-- [ ] code-reviewer・/cross-review
+- [x] 条件 `conditions.md` をコミット（計算の前）
+- [x] 解析のスクリプトと `--selftest`・変異
+- [x] 計算の前のレビュー（code-reviewer）
+- [x] 中間の作り直しと門（Q1）
+- [x] 陽性対照と変異（Q7）
+- [x] 本計算
+- [x] notes.md（学習曲線・越える k・言える範囲）
+- [x] code-reviewer・/cross-review
 - [ ] 引き継ぎの更新・コミット・push
