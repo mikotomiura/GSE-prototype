@@ -19,4 +19,4 @@
 - [x] 本計算
 - [x] notes.md（学習曲線・越える k・言える範囲）
 - [x] code-reviewer・/cross-review
-- [ ] 引き継ぎの更新・コミット・push
+- [x] 引き継ぎの更新・コミット・push
