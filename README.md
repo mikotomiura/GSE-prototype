@@ -9,8 +9,9 @@ whether to offer an invitation to step away from the screen now, or to stay out 
 
 > **Status:** in the normal mode the shipping intervention is still **Nudge**. The full-screen Wall and Monk Mode
 > were **removed in 2026-08** ([ADR-015](docs/adr/ADR-015-wall-removal.md)). The invitation to physical return
-> (the PC side of Physical Anchor) is implemented as a glyph in the EH3 study mode, and walking promotion and its measurement
-> have been arranged by the researcher (2026-11-03, per the researcher).
+> (the PC side of Physical Anchor) is implemented as a glyph in the EH3 study mode. Walking promotion and its measurement are
+> not pursued (2026-11-03); what follows the invitation is read from work after a candidate away gap (typing resumes, and whether
+> an external answer is received) ([ADR-024](docs/adr/ADR-024-resumption-outcome-without-estimator.md)).
 >
 > **Direction as of 2026-10-31:** Nudge will no longer be shown as an intervention in GSE itself; the core intervention
 > becomes the invitation to physical return ([ADR-040](docs/adr/ADR-040-nudge-not-in-core.md)). The default change is a
@@ -114,8 +115,8 @@ suppressing is narrower than that ("taking the answer as-is"), and a screen bloc
 `wall_server.rs`, the QR/phone-unlock path, Monk Mode, the Zen Timer, and early unlock were all
 removed; **HIR (harmful-intervention rate) was kept** — only its target set changed.
 
-**Physical Anchor** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)) is the level that
-actually imposes effort. Its PC-side invitation runs in the EH3 study mode; walking promotion and its measurement have been arranged by the researcher (2026-11-03, per the researcher).
+**Physical Anchor** ([ADR-017](docs/adr/ADR-017-expression-channel-boundary.md)) is an invitation
+to step away from the screen. Its PC-side invitation runs in the EH3 study mode; walking promotion and its measurement are not pursued (2026-11-03), and what follows is read from typing after a candidate away gap (ADR-024).
 **The system judges neither the start nor the completion of it**
 ([ADR-018](docs/adr/ADR-018-physical-anchor-without-completion.md)): there is no threshold on how
 long you stay away or how you come back, and **no timer, countdown, or remaining-time display**.

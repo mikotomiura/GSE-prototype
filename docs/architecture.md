@@ -485,7 +485,7 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
 ### フロー 2: Opportunity 判定と Lv1 Nudge 介入
 
 > ⚠️★★★ **2026-08-23 改訂**: 旧フローは **Lv2 Wall**（QR → Zen Timer → `POST /unlock`）を記述していたが、
-> **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。通常モードで出る介入は Nudge である（2026-11-03 更新: PC 側の身体回帰の招待は EH3 モードで実装済み・`analysis/invitation.rs`。散歩の促進とその計測は研究者が手配済み〔研究者の言・中身は repo で未確認〕。通常モードの Nudge は本体では出さないと決めた・ADR-040）。
+> **ADR-015 D1 / D2 で Wall・Monk Mode・`wall_server.rs` を全削除**した。通常モードで出る介入は Nudge である（2026-11-03 更新: PC 側の身体回帰の招待は EH3 モードで実装済み・`analysis/invitation.rs`。散歩の促進とその計測は行わず、身体回帰の後は離席候補明けの打鍵の再開と受領の有無で見る〔2026-11-03 研究者の言・ADR-024〕。通常モードの Nudge は本体では出さないと決めた・ADR-040）。
 
 1. Analysis Thread が 1Hz で `FeatSnapshot` を生成し、`LatestFeatState` に保持
 2. Main Window が 500ms ごとに `get_intervention_decision` を invoke
@@ -496,7 +496,7 @@ EH3 のモード（O1 の上でだけ立つ・`eh3.rs`）のときだけ動く�
    （⚠️ **クリック透過・自動消失**。★ 画面を塞がない）
 7. ユーザーの dismiss / 無操作を `intervention_response` として記録する
    （⚠️ **`elapsed_ms` を書く経路は Wall 削除で無くなり、現状 production では常に `null`** — ADR-015 Consequences）
-8. Physical Anchor の PC 側の招待は EH3 モードで実装済み（`analysis/invitation.rs`）。散歩の促進とその計測は研究者が手配済み（2026-11-03 研究者の言・中身と記録の場所はこの repo では未確認）（2026-11-03 更新）。段階呼称 Lv3/Lv4 は ADR-018 D7 で廃止方向。★ 第 1 版の境界の形は **ADR-017 D3** が確定している
+8. Physical Anchor の PC 側の招待は EH3 モードで実装済み（`analysis/invitation.rs`）。散歩の促進とその計測は行わない（2026-11-03 研究者の言。歩数・位置は ADR-017 D10 で本体から外してある）。身体回帰の後は、離席候補（打鍵の途絶 180 秒以上）明けの作業上の状態（打鍵の再開と受領の有無）で見る（ADR-024 D1・D3・ADR-018 D3。身体が動いたことは測らない・ADR-024 D5）（2026-11-03 更新）。段階呼称 Lv3/Lv4 は ADR-018 D7 で廃止方向。★ 第 1 版の境界の形は **ADR-017 D3** が確定している
    （PC → スマホの一方向イベント / inbound を作らない / ⚠️ **完了条件は課さない** —— ADR-018 D1 で
    既決 D11 条件 2「完了条件は時間・往復」は取り下げ済み）
 
@@ -669,7 +669,7 @@ CGPreflightListenEventAccess()
 
 ### Physical Anchor
 
-> 2026-11-03 更新: 見出しの「未実装」を外した。PC 側の招待は EH3 モードで実装済み（`analysis/invitation.rs`）。散歩の促進とその計測は研究者が手配済み（2026-11-03 研究者の言・中身と記録の場所はこの repo では未確認）。
+> 2026-11-03 更新: 見出しの「未実装」を外した。PC 側の招待は EH3 モードで実装済み（`analysis/invitation.rs`）。散歩の促進とその計測は行わない（2026-11-03 研究者の言。歩数・位置は ADR-017 D10 で本体から外してある）。身体回帰の後は、離席候補（打鍵の途絶 180 秒以上）明けの作業上の状態（打鍵の再開と受領の有無）で見る（ADR-024 D1・D3・ADR-018 D3。身体が動いたことは測らない・ADR-024 D5）。
 
 > ⚠️★★★ **2026-09-01 訂正 —— 見出しから段階呼称「Lv3/Lv4」を外した**（ADR-018 D7）。
 > ★★★ **ADR-018 D1 / D2: 系は開始も完了も判定しない。** Physical Anchor が提示するのは
