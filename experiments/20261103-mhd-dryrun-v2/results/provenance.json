@@ -1,0 +1,14 @@
+{
+ "git_head": "6ee52abb011f570b6bfd4f33fd33e5aaca2ac332",
+ "git_dirty_paths": [],
+ "script_sha256": {
+  "daysim.py": "1c084992a2394340062e7bb6486b07f2594383382b968bd8076fdcca9b39a8e5",
+  "dryrun_v2.py": "7e2d151931690ac14a5ada2e2b1c1a28f910a91664ebcf739460984a446bb665"
+ },
+ "coauthor_session_files": 1157,
+ "coauthor_session_sha256_of_sha256_list": "c0aca814bd2d1c98b05483b3f660a0de67f8f598e163e9de5c9aabac5e5e9fa2",
+ "coauthor_sessions_json_sha256": "26c5b16efbe716ccd50d3ee0a95cb289fcc2d4c3546337eecb06aae1b87f9dda",
+ "coauthor_build_summary_sha256": "244c4f9d3c4c1bf1205b92bb1c3e1f4d191ce9f25bbbdfa6b416aa33ee79e081",
+ "python": "3.14.4",
+ "numpy": "2.5.2"
+}

@@ -1,0 +1,12 @@
+# P3 が赤だったことの事後の確かめ（2026-11-03・計算の後・scripts/posthoc/p3_diagnose.py scripts 20261103 400）
+## run.sh の --selftest（b372f1d3）
+P1 True 
+P2 True 
+P3 False  cov_i 0.922 cov_s 0.912
+P4 True  block cov_i 0.757 label cov_i 0.647
+P5 True 
+SELFTEST FAIL
+rc=1
+## 事後の確かめ
+block truth 0.9950 mean point 1.0187 median point 1.0057 SD across sims 0.2272 mean boot SD 0.2143 cov percentile 0.897 cov normal 0.925 median width 0.821
+label truth 0.9950 mean point 1.0200 median point 1.0007 SD across sims 0.2191 mean boot SD 0.2221 cov percentile 0.948 cov normal 0.963 median width 0.857

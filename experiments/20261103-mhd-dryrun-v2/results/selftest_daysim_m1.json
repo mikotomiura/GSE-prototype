@@ -1,0 +1,431 @@
+{
+ "P1": {
+  "weights_equal_replication": true,
+  "recovery": [
+   -0.3,
+   0.811,
+   -1.225
+  ],
+  "recovery_ok": true,
+  "pass_": true
+ },
+ "P2": {
+  "a": -1.0117431376095407,
+  "s": 0.8139229215591177,
+  "prevalence": 0.3,
+  "auc": 0.6999945812223418,
+  "pass_": true
+ },
+ "P3a": {
+  "result": {
+   "D": 100,
+   "eval_days": 40,
+   "AUC": 0.7,
+   "pi": 0.3,
+   "lam": 6,
+   "sd": 0.0,
+   "rho": 0.0,
+   "mode": "label",
+   "L": null,
+   "R": 400,
+   "solved": {
+    "a": -0.9616737023464199,
+    "s": 0.7805379060861659,
+    "prevalence": 0.29999999999999993,
+    "auc": 0.6999965126689137
+   },
+   "population": {
+    "cal_intercept": -0.006679992403804137,
+    "cal_slope": 0.9951506443236854,
+    "converged": true
+   },
+   "n_label_q": [
+    231.0,
+    241.0,
+    251.0
+   ],
+   "n_pos_q": [
+    67.0,
+    72.0,
+    78.0
+   ],
+   "width_intercept_q": [
+    0.5603258978568474,
+    0.5827780262735895,
+    0.6082275931128173
+   ],
+   "width_slope_q": [
+    0.012564397648721474,
+    0.013259968541663822,
+    0.014087421276235853
+   ],
+   "coverage_intercept": 0.96,
+   "coverage_slope": 0.0,
+   "by_method": {
+    "percentile": {
+     "coverage_intercept": 0.96,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.5603258978568474,
+      0.5827780262735895,
+      0.6082275931128173
+     ],
+     "width_slope_q": [
+      0.012564397648721474,
+      0.013259968541663822,
+      0.014087421276235853
+     ]
+    },
+    "normal": {
+     "coverage_intercept": 0.9625,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.563754992300908,
+      0.5846417015286467,
+      0.6067546548709071
+     ],
+     "width_slope_q": [
+      0.012684219333324559,
+      0.013375341120235673,
+      0.01418548750883701
+     ]
+    },
+    "basic": {
+     "coverage_intercept": 0.95,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.5603258978568475,
+      0.5827780262735895,
+      0.6082275931128173
+     ],
+     "width_slope_q": [
+      0.012564397648721474,
+      0.013259968541663822,
+      0.014087421276235853
+     ]
+    }
+   },
+   "sims_without_ci": 0,
+   "resamples_discarded_one_class": 0,
+   "resamples_nonconverged": 0,
+   "resamples_slope_abs_gt_50": 0,
+   "resamples_slope_abs_gt_50_and_nonconverged": 0,
+   "solve_ok": true
+  },
+  "truth_ok": true,
+  "pass_": false
+ },
+ "P3b": {
+  "result": {
+   "D": 100,
+   "eval_days": 40,
+   "AUC": 0.7,
+   "pi": 0.3,
+   "lam": 6,
+   "sd": 0.0,
+   "rho": 0.0,
+   "mode": "block",
+   "L": 3,
+   "R": 400,
+   "solved": {
+    "a": -0.9616737023464199,
+    "s": 0.7805379060861659,
+    "prevalence": 0.29999999999999993,
+    "auc": 0.6999965126689137
+   },
+   "population": {
+    "cal_intercept": -0.006679992403804137,
+    "cal_slope": 0.9951506443236854,
+    "converged": true
+   },
+   "n_label_q": [
+    230.0,
+    240.0,
+    251.0
+   ],
+   "n_pos_q": [
+    66.0,
+    71.0,
+    78.0
+   ],
+   "width_intercept_q": [
+    0.48904798488214934,
+    0.5484059729761172,
+    0.6211788998469365
+   ],
+   "width_slope_q": [
+    0.011139762592767102,
+    0.012594819564407757,
+    0.014302730291311065
+   ],
+   "coverage_intercept": 0.9225,
+   "coverage_slope": 0.0,
+   "by_method": {
+    "percentile": {
+     "coverage_intercept": 0.9225,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.48904798488214934,
+      0.5484059729761172,
+      0.6211788998469365
+     ],
+     "width_slope_q": [
+      0.011139762592767102,
+      0.012594819564407757,
+      0.014302730291311065
+     ]
+    },
+    "normal": {
+     "coverage_intercept": 0.93,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.48948769197955966,
+      0.5537833041031591,
+      0.628243959303208
+     ],
+     "width_slope_q": [
+      0.01120663621531859,
+      0.01263298470719798,
+      0.014282597907709372
+     ]
+    },
+    "basic": {
+     "coverage_intercept": 0.93,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.48904798488214934,
+      0.5484059729761172,
+      0.6211788998469365
+     ],
+     "width_slope_q": [
+      0.011139762592767102,
+      0.012594819564407757,
+      0.014302730291311065
+     ]
+    }
+   },
+   "sims_without_ci": 0,
+   "resamples_discarded_one_class": 0,
+   "resamples_nonconverged": 0,
+   "resamples_slope_abs_gt_50": 0,
+   "resamples_slope_abs_gt_50_and_nonconverged": 0,
+   "solve_ok": true
+  },
+  "in_band": {
+   "percentile": false,
+   "normal": false,
+   "basic": false
+  }
+ },
+ "P4": {
+  "block": {
+   "D": 50,
+   "eval_days": 20,
+   "AUC": 0.7,
+   "pi": 0.3,
+   "lam": 6,
+   "sd": 1.0,
+   "rho": 0.6,
+   "mode": "block",
+   "L": 3,
+   "R": 300,
+   "solved": {
+    "a": -1.1443565367527997,
+    "s": 0.9158921114436209,
+    "prevalence": 0.3,
+    "auc": 0.6999941355369276
+   },
+   "population": {
+    "cal_intercept": 0.148416451085534,
+    "cal_slope": 0.8519924018337802,
+    "converged": true
+   },
+   "n_label_q": [
+    111.75,
+    119.0,
+    127.0
+   ],
+   "n_pos_q": [
+    28.0,
+    34.5,
+    42.0
+   ],
+   "width_intercept_q": [
+    0.9648951396343395,
+    1.1662907367595392,
+    1.4328633162205686
+   ],
+   "width_slope_q": [
+    0.016989122749292814,
+    0.02083962610596421,
+    0.02474727860254903
+   ],
+   "coverage_intercept": 0.7566666666666667,
+   "coverage_slope": 0.0,
+   "by_method": {
+    "percentile": {
+     "coverage_intercept": 0.7566666666666667,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.9648951396343395,
+      1.1662907367595392,
+      1.4328633162205686
+     ],
+     "width_slope_q": [
+      0.016989122749292814,
+      0.02083962610596421,
+      0.02474727860254903
+     ]
+    },
+    "normal": {
+     "coverage_intercept": 0.7933333333333333,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.9745918924970904,
+      1.1843061830905461,
+      1.4459375280863462
+     ],
+     "width_slope_q": [
+      0.01725208329750317,
+      0.020877359437732185,
+      0.024567869508076504
+     ]
+    },
+    "basic": {
+     "coverage_intercept": 0.81,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.9648951396343395,
+      1.1662907367595392,
+      1.4328633162205686
+     ],
+     "width_slope_q": [
+      0.016989122749292814,
+      0.020839626105964213,
+      0.02474727860254903
+     ]
+    }
+   },
+   "sims_without_ci": 0,
+   "resamples_discarded_one_class": 0,
+   "resamples_nonconverged": 0,
+   "resamples_slope_abs_gt_50": 0,
+   "resamples_slope_abs_gt_50_and_nonconverged": 0,
+   "solve_ok": true
+  },
+  "label": {
+   "D": 50,
+   "eval_days": 20,
+   "AUC": 0.7,
+   "pi": 0.3,
+   "lam": 6,
+   "sd": 1.0,
+   "rho": 0.6,
+   "mode": "label",
+   "L": null,
+   "R": 300,
+   "solved": {
+    "a": -1.1443565367527997,
+    "s": 0.9158921114436209,
+    "prevalence": 0.3,
+    "auc": 0.6999941355369276
+   },
+   "population": {
+    "cal_intercept": 0.148416451085534,
+    "cal_slope": 0.8519924018337802,
+    "converged": true
+   },
+   "n_label_q": [
+    112.75,
+    119.0,
+    128.0
+   ],
+   "n_pos_q": [
+    27.75,
+    35.0,
+    43.0
+   ],
+   "width_intercept_q": [
+    0.8035454763795793,
+    0.8665783245108547,
+    0.9387606698960977
+   ],
+   "width_slope_q": [
+    0.020122510436680414,
+    0.021595016934849238,
+    0.023584839929594086
+   ],
+   "coverage_intercept": 0.6466666666666666,
+   "coverage_slope": 0.0,
+   "by_method": {
+    "percentile": {
+     "coverage_intercept": 0.6466666666666666,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.8035454763795793,
+      0.8665783245108547,
+      0.9387606698960977
+     ],
+     "width_slope_q": [
+      0.020122510436680414,
+      0.021595016934849238,
+      0.023584839929594086
+     ]
+    },
+    "normal": {
+     "coverage_intercept": 0.6666666666666666,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.8178974422426075,
+      0.8732128672778371,
+      0.9415835535008449
+     ],
+     "width_slope_q": [
+      0.020291948305663367,
+      0.021794901280681317,
+      0.023547395550473013
+     ]
+    },
+    "basic": {
+     "coverage_intercept": 0.68,
+     "coverage_slope": 0.0,
+     "width_intercept_q": [
+      0.8035454763795792,
+      0.8665783245108547,
+      0.9387606698960977
+     ],
+     "width_slope_q": [
+      0.020122510436680417,
+      0.021595016934849238,
+      0.023584839929594086
+     ]
+    }
+   },
+   "sims_without_ci": 0,
+   "resamples_discarded_one_class": 0,
+   "resamples_nonconverged": 0,
+   "resamples_slope_abs_gt_50": 0,
+   "resamples_slope_abs_gt_50_and_nonconverged": 0,
+   "solve_ok": true
+  },
+  "pass_": true
+ },
+ "P5": {
+  "rows_sum_m": true,
+  "mean_per_day": [
+   1.0012,
+   1.0024,
+   1.0059,
+   1.0095,
+   1.0009,
+   0.9972,
+   0.9891,
+   0.9939
+  ],
+  "mean_ok": true,
+  "contiguous": true,
+  "pass_": true
+ },
+ "mutate": "m1",
+ "SELFTEST": "FAIL"
+}

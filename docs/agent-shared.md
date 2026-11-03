@@ -195,11 +195,12 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 | `docs/research-positioning.md` | 研究の問い・差分・主張範囲 (機会保存/学習効果の分離) を確認したい時 |
 | `docs/preregistration-v0.3.md` | Phase1 の凍結された合否契約 (PreReg-1..8・GATE1–3) を確認したい時 |
 | `docs/preregistration-p1-episode.md` | ★ **P1 の episode 定義パラメータ** (`W` / `q` / `B` / `hole_gap_ms` / `warmup_count` / 分位点の推定法 / `T1a` の窓) を確認する時。⚠️ **v0.3 とは別の契約**（向こうは較正スモークの合否、こちらは P1 の解析パラメータで**合否を判定しない**）。★ 値の SSOT は `src-tauri/prereg/p1-episode.json`（`gse-replay --features` が既定として読む）。一致は `scripts/check_prereg_parity.py` が検査する |
+| `docs/preregistration-stage1.md` | 次の検証の段 1（詰まりの申告 C4 を取る段・ADR-043）の事前登録を確かめる・書く時。草案で凍結していない（値は研究者本人の段 1 の探索の後に埋め、凍結の前に attack-me をかける） |
 | `docs/wbs-verification-halfyear.md` | 検証の 26 週マイルストーン・WBS・改訂予定を確認したい時 |
 | `docs/references.md` | 出典を引く / 追加する時 (中央書誌 SSOT・`[Pn]`/`[Vn]` 名前空間) |
 | `docs/literature/_index.md` | 先行研究の精読カード一覧・各ラウンドの「やり残し」を確認したい時 |
 | `docs/experiment-tracking.md` | 実験を回す / 記録する / 再現する時の規約 (`experiments/`) |
-| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜041**) の根拠を確認したい時 |
+| `docs/adr/README.md` | 確定した設計判断 (**ADR-001〜043**) の根拠を確認したい時 |
 | `docs/theory/README.md` | 理論（生成的返権論ほか・theory candidate）を読む時。⚠️ **SSOT の主張ではない**（RP §1 は問いとして参照するだけ） |
 | `docs/architecture/gse-v2-overview.md` | v2 再設計 (ドメイン分離・介入決定エンジン) の全体像 |
 | `docs/architecture/workspace-behavior-observation.md` | R3 (自然作業の常時収集) の観測空間・ラベル・評価設計を確認する時 (形成的トラック) |

@@ -1,0 +1,60 @@
+{
+ "mutate": "m1",
+ "C3": {
+  "coef": [
+   -0.3213,
+   0.8055,
+   -1.1941
+  ],
+  "pass_": true
+ },
+ "C4": {
+  "deterministic": true,
+  "pass_": true
+ },
+ "C5": {
+  "mean_per_session": [
+   0.9964,
+   0.9988,
+   1.0036,
+   1.0012
+  ],
+  "v1_expected": [
+   0.67,
+   1.33,
+   1.33,
+   0.67
+  ],
+  "pass_": true
+ },
+ "C1": {
+  "R": 200,
+  "B": 500,
+  "coverage_slope": 0.0,
+  "coverage_intercept": 0.97,
+  "resample_counts": {
+   "discarded_one_class": 0,
+   "nonconverged": 0,
+   "slope_abs_gt_50": 0,
+   "used": 100000
+  },
+  "v1_coverage_slope": 0.995,
+  "v1_coverage_intercept": 0.99,
+  "pass_": false
+ },
+ "C2": {
+  "slope": 0.04264056029528799,
+  "ci": [
+   0.03158784374186337,
+   0.053773107442059855
+  ],
+  "resample_counts": {
+   "discarded_one_class": 0,
+   "nonconverged": 0,
+   "slope_abs_gt_50": 0,
+   "used": 500
+  },
+  "pass_": false
+ },
+ "SELFTEST": "FAIL"
+}
