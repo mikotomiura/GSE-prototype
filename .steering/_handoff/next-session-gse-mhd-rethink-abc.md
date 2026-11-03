@@ -3,6 +3,15 @@
 > 作成: 2026-11-03（`.steering/20261103-gse-target-reframe/` の後）。このメモを一次資料にしない。事実は ADR・コード・notes で確かめ直す。
 > 前の引き継ぎ `next-session-gse-target-reframe-and-mhd-rethink.md`（consolidation の worktree・main にもある）の §4 を、D の結論で書き直したもの。A・B・C はそれぞれ `/start-task` から。
 
+## 進み具合（2026-11-03 追記）
+
+- A は済んだ。ADR-046（`docs/adr/ADR-046-mhd-rethink-names-label-per-person.md`・PR #383 で main）。作業記録は `.steering/20261103-gse-mhd-rethink-adr/`（判断 0〜10）。B に効く決定: criterion 直結の段は 1 人ごとが既定・ラベルは二値で陽性の類（類は本人の探索の後に選ぶ）・1 人ごとの段のゲートは人の中の時間順の holdout・段 1 では ROCKET 系も EM も使わない（EM は時系列の段の候補で、入る条件は ADR-046 D3 の表）。
+- C は目的を改めて B より先にやる（研究者・2026-11-03。いったん「今はやらない」を選んだ後、O1 の n=3 が使えることから選び直した）。
+  - 改めた C: O1 の 3 人（研究者本人 ＋ 2 人）の記録で、人ごとの休止の長さの分布（混合モデルの成分と割合）と停滞（C0〜C2）の率・日の揺れの違いを記述し、事前登録 §3 の件数の見積もり（今は本人の 14 日の SD だけ）と S1-E7 の停滞の定義の材料にする。元の「H1 の内訳の見込み」は目的から外す（ラベルが無く、長い休止の中身は分からない）。
+  - 守ること: 形成的な内部の記述（ADR-014）で、主張に使わない。1 人ずつの値は外に出さない（ADR-039 D4・D8）。研究者本人の 11-01 08:30 以降の記録は開かない。他の 2 人に同じ区切りが要るか、削除の求め（`docs/o1-deletion-ledger.md`）が無いかを始める前に確かめる。他の 2 人が段 1 の確認に入る見込みがあれば、O1 の記録と段 1 の記録を分ける（S1-G1）。Codex に記録の本文も値も送らない。実験は reproducibility-discipline（条件は計算の前にコミット）。
+- 入口の文: 「`.steering/_handoff/next-session-gse-mhd-rethink-abc.md` を読み、改めた C（O1 の n=3 で人ごとの休止の分布と停滞の率の違いの記述）を `/start-task` から。C の後に B」。
+- B は C の後。B は公開データの試験で、段 1 の候補の外にある EM を試すのは ADR-046 の段 1 の制限（段 1 の記録で使わない）とはぶつからない。ただし結果を段 1 の候補の根拠にしない。
+
 ## 0 入口の文
 
 「`.steering/_handoff/next-session-gse-mhd-rethink-abc.md` を読み、A（MhD の再考の ADR 案）を `/start-task` から。A の後に B・C を別タスクで」
