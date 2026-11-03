@@ -99,7 +99,8 @@ def main(receiving, unpack, identity, replay, work):
                     mk = json.load(open(ok))
                 except (OSError, ValueError):
                     mk = {}  # 壊れた印は無いのと同じに扱い、復号し直す
-                reuse = mk.get("raw_key_lines") == 0 and mk.get("plain_sha256") == build_o1.sha256(nd)
+                reuse = (mk.get("raw_key_lines") == 0 and mk.get("plain_sha256") == build_o1.sha256(nd)
+                         and mk.get("age_sha256") == build_o1.sha256(age))
             if not reuse:
                 for x in (nd, ok):
                     if os.path.exists(x):
@@ -112,7 +113,8 @@ def main(receiving, unpack, identity, replay, work):
                     if os.path.exists(nd):
                         os.remove(nd)
                     sys.exit(f"復号に失敗したか、生キー由来の行がある（人 {sym[pid]}）")
-                json.dump({"raw_key_lines": 0, "plain_sha256": build_o1.sha256(nd)}, open(ok, "w"))
+                json.dump({"raw_key_lines": 0, "plain_sha256": build_o1.sha256(nd), "age_sha256": build_o1.sha256(age)},
+                          open(ok, "w"))
             try:
                 build_o1.build(replay, idir, nd)
             except (Exception, SystemExit):

@@ -196,7 +196,8 @@ def person_result(p, seed):
     # C0 だけ（フォーカスの行が 0 のファイルを含む）
     c0u = [(dy.obs, len(dy.c0()[0])) for dy in p.all]
     n0 = sum(n for _, n in c0u)
-    res["N4_C0_all_files"] = {"n": n0, "pooled_per_h": round(n0 / (sum(o for o, _ in c0u) / tc.H), 4),
+    obs_all = sum(o for o, _ in c0u)
+    res["N4_C0_all_files"] = {"n": n0, "pooled_per_h": round(n0 / (obs_all / tc.H), 4) if obs_all else None,
                               "unit_sd_file": unit_sd_4h(c0u), "unit_sd_date": unit_sd_4h(by_date(c0u, p.dates_all))}
     if p.focus:
         rows, nw = [], {"C0": 0, "C1": 0}
@@ -217,6 +218,11 @@ def person_result(p, seed):
         s["N4_unit_sd_ge_4h"] = sd
         res["N4_focus_files"] = s
     return res
+
+
+def _share(d):
+    """{num, den, ratio} の割合。分母が MIN_DEN 未満なら None（伏せる・判断 7 の改め）。"""
+    return None if d["den"] < MIN_DEN else d["ratio"]
 
 
 def _sd(d, key):
@@ -256,13 +262,13 @@ def between(per):
         b[f"{k}_sd_between_units_file"] = take(
             lambda r, k=k: _sd(r["N4_focus_files"]["N4_unit_sd_ge_4h"][k]["file"], "sd_between_units"), True)
         b[f"{k}_share_long_or_censored"] = take(
-            lambda r, k=k: None if r["N4_focus_files"]["O3_lengths"][k]["long"]["ratio"] is None else
+            lambda r, k=k: None if _share(r["N4_focus_files"]["O3_lengths"][k]["long"]) is None else
             round(r["N4_focus_files"]["O3_lengths"][k]["long"]["ratio"] + r["N4_focus_files"]["O3_lengths"][k]["censored"]["ratio"], 4), True)
     for k in ("C0", "C1"):
         b[f"{k}_theta_median_s"] = take(
             lambda r, k=k: None if r["N4_focus_files"]["O2_thresholds"][k]["threshold_at_fire"] is None else
             r["N4_focus_files"]["O2_thresholds"][k]["threshold_at_fire"]["median"] / 1000, True)
-    b["C0_is_C2_share"] = take(lambda r: r["N4_focus_files"]["O4_overlap"]["C0_is_C2"]["ratio"], True)
+    b["C0_is_C2_share"] = take(lambda r: _share(r["N4_focus_files"]["O4_overlap"]["C0_is_C2"]), True)
     b["C0_all_files_pooled_per_h"] = take(lambda r: r["N4_C0_all_files"]["pooled_per_h"])
     b["C0_all_files_sd_ratio_file"] = take(lambda r: _sd(r["N4_C0_all_files"]["unit_sd_file"], "sd_ratio"))
     # 人の間の率の SD と、人の中の単位の率の SD の平均（N4）
@@ -451,6 +457,15 @@ def selftest():
         assert r["N4_focus_files"]["N4_unit_sd_ge_4h"]["C0"]["file"]["units"] == 8
     for key in ("C0_pooled_per_h", "C1_pooled_per_h", "C0_sd_ratio_file", "P_press_q0.5_s", "A_activity_q0.99_s"):
         assert all(v is not None for v in full["between_people"][key]["by_person"].values()), key
+    # 小さい分母の割合は人の間の表でも伏せる
+    import copy
+    small = copy.deepcopy(full["people"]["A"])
+    small["N4_focus_files"]["O4_overlap"]["C0_is_C2"] = {"num": 3, "den": 5, "ratio": 0.6}
+    for c in ("long", "censored"):
+        small["N4_focus_files"]["O3_lengths"]["C0"][c] = {"num": 1, "den": 5, "ratio": 0.2}
+    bw = between({"A": small, "B": full["people"]["B"]})
+    assert bw["C0_is_C2_share"]["by_person"]["A"] is None and bw["C0_share_long_or_censored"]["by_person"]["A"] is None, bw["C0_is_C2_share"]
+    assert bw["C0_is_C2_share"]["by_person"]["B"] is not None
     pub = json.loads(pubtext)
     assert pub["people"]["A"]["files"]["used_all"] == 10 and pub["people"]["A"]["obs_h_all"] % 10 == 0, pub["people"]["A"]["files"]
     assert all("loglik" not in f and "delta_bic" in f for f in pub["people"]["A"]["N3_pause"]["P_press"]["mixture"]["fits"])

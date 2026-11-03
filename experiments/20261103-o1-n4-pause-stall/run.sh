@@ -49,7 +49,7 @@ json.dump({"git_head": subprocess.check_output(["git", "-C", root, "rev-parse", 
            "git_dirty_paths": [l for l in subprocess.check_output(["git", "-C", root, "status", "--porcelain", "--", rel, ":!" + rel + "/results"], text=True).splitlines() if l],
            "gse_replay_sha256": h(binp), "gse_unpack_sha256": h(unpack),
            "symbol_salt_sha256": h(os.path.join(os.path.dirname(files_json), "symbol_salt")),
-           "input_files": n, "plain_sha256_digest": cat.hexdigest(),
+           "input_files_rounded": (5 * round(n / 5)) if n < 50 else (100 * round(n / 100)), "plain_sha256_digest": cat.hexdigest(),
            "prereg_p1_episode_sha256": h(os.path.join(root, "src-tauri/prereg/p1-episode.json")),
            "scripts_sha256": {os.path.relpath(p, root): h(p) for p in [
                os.path.join(here, "build_n4.py"), os.path.join(here, "pausestall.py"), os.path.join(here, "mutants.py"),
